@@ -133,6 +133,29 @@ LM_DEVICE_FUNC bool EdgeEdgeIntersection(const Vector3<Scalar> &p0,
 }
 
 template <typename Scalar>
+LM_DEVICE_FUNC bool EdgeEdgeIntersection(const Vector3<Scalar> &p0,
+                                         const Vector3<Scalar> &p1,
+                                         const Vector3<Scalar> &p2,
+                                         const Vector3<Scalar> &p3) {
+  Vector3<Scalar> e1 = p1 - p0;
+  Vector3<Scalar> e2 = p3 - p2;
+  Vector3<Scalar> normal = e1.cross(e2);
+  if (normal.norm() < Eps<Scalar>()) {
+    return false;
+  }
+  normal.normalize();
+  e1 = e1.cross(normal);
+  e2 = e2.cross(normal);
+  e1.normalize();
+  e2.normalize();
+  Scalar d1 = e1.dot(p0);
+  Scalar d2 = e2.dot(p2);
+  int sig_product_e1 = Sign(e1.dot(p2) - d1) * Sign(e1.dot(p3) - d1);
+  int sig_product_e2 = Sign(e2.dot(p0) - d2) * Sign(e2.dot(p1) - d2);
+  return sig_product_e1 <= 0 && sig_product_e2 <= 0;
+}
+
+template <typename Scalar>
 LM_DEVICE_FUNC bool EdgeEdgeCCD(const Vector3<Scalar> &p0,
                                 const Vector3<Scalar> &p1,
                                 const Vector3<Scalar> &v0,
@@ -152,9 +175,79 @@ LM_DEVICE_FUNC bool EdgeEdgeCCD(const Vector3<Scalar> &p0,
                        &num_roots);
   PrivateSort(roots, num_roots);
   for (int i = 0; i < num_roots; i++) {
-    if (roots[i] >= 0) {
-      *t = roots[i];
-      return true;
+    auto root = roots[i];
+    if (root > *t) {
+      break;
+    }
+    if (root >= 0) {
+      if (EdgeEdgeIntersection(p0 + v0 * root, p1 + v1 * root, p2 + v2 * root,
+                               p3 + v3 * root)) {
+        *t = root;
+        return true;
+      }
+    }
+  }
+  return false;
+}
+
+template <typename Scalar>
+LM_DEVICE_FUNC bool FacePointIntersection(const Vector3<Scalar> &p0,
+                                          const Vector3<Scalar> &p1,
+                                          const Vector3<Scalar> &p2,
+                                          const Vector3<Scalar> &p) {
+  Vector3<Scalar> e0 = p2 - p1;
+  Vector3<Scalar> e1 = p0 - p2;
+  Vector3<Scalar> e2 = p1 - p0;
+  Vector3<Scalar> n = e1.cross(e2);
+  if (n.norm() < Eps<Scalar>()) {
+    return false;
+  }
+  n.normalize();
+  e0 = e0.cross(n);
+  e0.normalize();
+  e1 = e1.cross(n);
+  e1.normalize();
+  e2 = e2.cross(n);
+  e2.normalize();
+  Scalar d0 = e0.dot(p2);
+  Scalar d1 = e1.dot(p0);
+  Scalar d2 = e2.dot(p1);
+  int sig_product_e0 = -Sign(e0.dot(p) - d0);
+  int sig_product_e1 = -Sign(e1.dot(p) - d1);
+  int sig_product_e2 = -Sign(e2.dot(p) - d2);
+  return sig_product_e0 >= 0 && sig_product_e1 >= 0 && sig_product_e2 >= 0;
+}
+
+template <typename Scalar>
+LM_DEVICE_FUNC bool FacePointCCD(const Vector3<Scalar> &p0,
+                                 const Vector3<Scalar> &p1,
+                                 const Vector3<Scalar> &p2,
+                                 const Vector3<Scalar> &v0,
+                                 const Vector3<Scalar> &v1,
+                                 const Vector3<Scalar> &v2,
+                                 const Vector3<Scalar> &p,
+                                 const Vector3<Scalar> &v,
+                                 Scalar *t) {
+  Scalar polynomial_terms[4];
+  Scalar roots[3];
+  ThirdOrderVolumetricPolynomial(p0 - p, p1 - p, p2 - p, v0 - v, v1 - v, v2 - v,
+                                 polynomial_terms);
+  int num_roots = 0;
+  SolveCubicPolynomial(polynomial_terms[3], polynomial_terms[2],
+                       polynomial_terms[1], polynomial_terms[0], roots,
+                       &num_roots);
+  PrivateSort(roots, num_roots);
+  for (int i = 0; i < num_roots; i++) {
+    auto root = roots[i];
+    if (root > *t) {
+      break;
+    }
+    if (root >= 0) {
+      if (FacePointIntersection(p0 + v0 * root, p1 + v1 * root, p2 + v2 * root,
+                                p + v * root)) {
+        *t = root;
+        return true;
+      }
     }
   }
   return false;
