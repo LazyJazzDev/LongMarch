@@ -103,39 +103,6 @@ template <typename Scalar>
 LM_DEVICE_FUNC bool EdgeEdgeIntersection(const Vector3<Scalar> &p0,
                                          const Vector3<Scalar> &p1,
                                          const Vector3<Scalar> &p2,
-                                         const Vector3<Scalar> &p3,
-                                         Scalar *t) {
-  Vector3<Scalar> v0 = p1 - p0;
-  Vector3<Scalar> v1 = p3 - p2;
-  Vector3<Scalar> v2 = p2 - p0;
-  Scalar a = v0.dot(v0);
-  Scalar b = v0.dot(v1);
-  Scalar c = v0.dot(v2);
-  Scalar d = v1.dot(v1);
-  Scalar e = v1.dot(v2);
-  Scalar f = v2.dot(v2);
-  Scalar det = a * d - b * b;
-  Scalar s = b * e - c * d;
-  Scalar t_ = b * c - a * e;
-  Scalar inv_det = 1 / det;
-  if (det > 0) {
-    if (s >= 0 && s <= det && t_ >= 0 && t_ <= det) {
-      *t = s * inv_det;
-      return true;
-    }
-  } else {
-    if (s <= 0 && s >= det && t_ <= 0 && t_ >= det) {
-      *t = s * inv_det;
-      return true;
-    }
-  }
-  return false;
-}
-
-template <typename Scalar>
-LM_DEVICE_FUNC bool EdgeEdgeIntersection(const Vector3<Scalar> &p0,
-                                         const Vector3<Scalar> &p1,
-                                         const Vector3<Scalar> &p2,
                                          const Vector3<Scalar> &p3) {
   Vector3<Scalar> e1 = p1 - p0;
   Vector3<Scalar> e2 = p3 - p2;
@@ -167,8 +134,8 @@ LM_DEVICE_FUNC bool EdgeEdgeCCD(const Vector3<Scalar> &p0,
                                 Scalar *t) {
   Scalar polynomial_terms[4];
   Scalar roots[3];
-  ThirdOrderVolumetricPolynomial(p1 - p0, p2 - p0, p3 - p0, v1 - v0, v2 - v0,
-                                 v3 - v0, polynomial_terms);
+  ThirdOrderVolumetricPolynomial<Scalar>(p1 - p0, p2 - p0, p3 - p0, v1 - v0,
+                                         v2 - v0, v3 - v0, polynomial_terms);
   int num_roots = 0;
   SolveCubicPolynomial(polynomial_terms[3], polynomial_terms[2],
                        polynomial_terms[1], polynomial_terms[0], roots,
@@ -180,8 +147,8 @@ LM_DEVICE_FUNC bool EdgeEdgeCCD(const Vector3<Scalar> &p0,
       break;
     }
     if (root >= 0) {
-      if (EdgeEdgeIntersection(p0 + v0 * root, p1 + v1 * root, p2 + v2 * root,
-                               p3 + v3 * root)) {
+      if (EdgeEdgeIntersection<Scalar>(p0 + v0 * root, p1 + v1 * root,
+                                       p2 + v2 * root, p3 + v3 * root)) {
         *t = root;
         return true;
       }
