@@ -60,3 +60,5 @@ include(scripts/pack_shaders.cmake)
 add_subdirectory(code)
 
 add_subdirectory(demo)
+
+add_subdirectory(test)

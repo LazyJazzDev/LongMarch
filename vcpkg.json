@@ -8,6 +8,7 @@
     "fmt",
     "spdlog",
     "vulkan-memory-allocator",
-    "glslang"
+    "glslang",
+    "gtest"
   ]
 }
