@@ -197,8 +197,8 @@ LM_DEVICE_FUNC bool FacePointCCD(const Vector3<Scalar> &p0,
                                  Scalar *t) {
   Scalar polynomial_terms[4];
   Scalar roots[3];
-  ThirdOrderVolumetricPolynomial(p0 - p, p1 - p, p2 - p, v0 - v, v1 - v, v2 - v,
-                                 polynomial_terms);
+  ThirdOrderVolumetricPolynomial<Scalar>(p0 - p, p1 - p, p2 - p, v0 - v, v1 - v,
+                                         v2 - v, polynomial_terms);
   int num_roots = 0;
   SolveCubicPolynomial(polynomial_terms[3], polynomial_terms[2],
                        polynomial_terms[1], polynomial_terms[0], roots,
@@ -210,8 +210,8 @@ LM_DEVICE_FUNC bool FacePointCCD(const Vector3<Scalar> &p0,
       break;
     }
     if (root >= 0) {
-      if (FacePointIntersection(p0 + v0 * root, p1 + v1 * root, p2 + v2 * root,
-                                p + v * root)) {
+      if (FacePointIntersection<Scalar>(p0 + v0 * root, p1 + v1 * root,
+                                        p2 + v2 * root, p + v * root)) {
         *t = root;
         return true;
       }

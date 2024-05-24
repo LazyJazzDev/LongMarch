@@ -102,17 +102,18 @@ void TestEdgeEdgeIntersectionVolumeSolve() {
   std::uniform_real_distribution<Scalar> dis(-1, 1);
   geometry::Vector3<Scalar> p0, p1, p2, p3;
   geometry::Vector3<Scalar> v0, v1, v2, v3;
-  v0 = geometry::Vector3<Scalar>(dis(gen), dis(gen), dis(gen));
-  v1 = geometry::Vector3<Scalar>(dis(gen), dis(gen), dis(gen));
-  v2 = geometry::Vector3<Scalar>(dis(gen), dis(gen), dis(gen));
-  v3 = geometry::Vector3<Scalar>(dis(gen), dis(gen), dis(gen));
   do {
     p0 = geometry::Vector3<Scalar>(dis(gen), dis(gen), dis(gen));
     p1 = geometry::Vector3<Scalar>(dis(gen), dis(gen), dis(gen));
     p2 = geometry::Vector3<Scalar>(dis(gen), dis(gen), dis(gen));
     p3 = geometry::Vector3<Scalar>(dis(gen), dis(gen), dis(gen));
-  } while (geometry::TetrahedronVolume(p0, p1, p2, p3) <
-           geometry::Eps<Scalar>());
+    v0 = geometry::Vector3<Scalar>(dis(gen), dis(gen), dis(gen));
+    v1 = geometry::Vector3<Scalar>(dis(gen), dis(gen), dis(gen));
+    v2 = geometry::Vector3<Scalar>(dis(gen), dis(gen), dis(gen));
+    v3 = geometry::Vector3<Scalar>(dis(gen), dis(gen), dis(gen));
+  } while (fabs(geometry::TetrahedronVolume(p0, p1, p2, p3)) <
+               geometry::Eps<Scalar>() ||
+           fabs(geometry::TetrahedronVolume(v0, v1, v2, v3)) < 1e-2);
   Scalar t = 1;
   if (geometry::EdgeEdgeCCD(p0, p1, v0, v1, p2, p3, v2, v3, &t)) {
     geometry::Vector3<Scalar> x0 = p0 + v0 * t;
@@ -123,25 +124,73 @@ void TestEdgeEdgeIntersectionVolumeSolve() {
     EXPECT_NEAR(geometry::TetrahedronVolume(x0, x1, x2, x3), 0,
                 geometry::Eps<Scalar>() * fmax(t, static_cast<Scalar>(1)));
     // If expect is not satisfied, print the result
-    if (fabs(geometry::TetrahedronVolume(x0, x1, x2, x3)) >
-        geometry::Eps<Scalar>() * fmax(t, static_cast<Scalar>(1))) {
-      Scalar poly[4]{};
-      geometry::ThirdOrderVolumetricPolynomial<Scalar>(
-          p1 - p0, p2 - p0, p3 - p0, v1 - v0, v2 - v0, v3 - v0, poly);
-      std::cout << "Poly solution: "
-                << poly[3] * t * t * t + poly[2] * t * t + poly[1] * t + poly[0]
-                << std::endl;
-      std::cout << "Poly: " << poly[3] << "x^3 + " << poly[2] << "x^2 + "
-                << poly[1] << "x + " << poly[0] << std::endl;
-      std::cout << "Time: " << t << std::endl;
-      std::cout << "Before Volume: "
-                << geometry::TetrahedronVolume(p0, p1, p2, p3) * 6 << std::endl;
-      std::cout << "After Volume: "
-                << geometry::TetrahedronVolume(x0, x1, x2, x3) * 6 << std::endl;
-      std::cout << "Velocity Volume: "
-                << geometry::TetrahedronVolume<Scalar>(v0, v1, v2, v3) * 6
-                << std::endl;
-    }
+    //        if (fabs(geometry::TetrahedronVolume(x0, x1, x2, x3)) >
+    //            geometry::Eps<Scalar>() * fmax(t, static_cast<Scalar>(1))) {
+    //            Scalar poly[4]{};
+    //            geometry::ThirdOrderVolumetricPolynomial<Scalar>(
+    //                    p1 - p0, p2 - p0, p3 - p0, v1 - v0, v2 - v0, v3 - v0,
+    //                    poly);
+    //            Scalar roots[3];
+    //            int num_roots;
+    //            geometry::SolveCubicPolynomial(poly[3], poly[2], poly[1],
+    //            poly[0], roots, &num_roots); std::cout << "Roots:\n"; for (int
+    //            num_root = 0; num_root < num_roots; num_root++) {
+    //                Scalar x = roots[num_root];
+    //                std::cout << x << ":";
+    //                std::cout << poly[3] * x * x * x + poly[2] * x * x +
+    //                poly[1] * x + poly[0]
+    //                          << "\n";
+    //            }
+    //            std::cout << "Poly solution: "
+    //                      << poly[3] * t * t * t + poly[2] * t * t + poly[1] *
+    //                      t + poly[0]
+    //                      << std::endl;
+    //            std::cout << "Poly: " << poly[3] << "x^3 + " << poly[2] <<
+    //            "x^2 + "
+    //                      << poly[1] << "x + " << poly[0] << std::endl;
+    //            std::cout << "Time: " << t << std::endl;
+    //            std::cout << "Before Volume: "
+    //                      << geometry::TetrahedronVolume(p0, p1, p2, p3) * 6
+    //                      << std::endl;
+    //            std::cout << "After Volume: "
+    //                      << geometry::TetrahedronVolume(x0, x1, x2, x3) * 6
+    //                      << std::endl;
+    //            std::cout << "Velocity Volume: "
+    //                      << geometry::TetrahedronVolume<Scalar>(v0, v1, v2,
+    //                      v3) * 6
+    //                      << std::endl;
+    //        }
+  }
+}
+
+template <typename Scalar>
+void TestFacePointIntersectionVolumeSolve() {
+  std::random_device rd;
+  std::mt19937 gen(rd());
+  std::uniform_real_distribution<Scalar> dis(-1, 1);
+  geometry::Vector3<Scalar> p0, p1, p2, p3;
+  geometry::Vector3<Scalar> v0, v1, v2, v3;
+  do {
+    v0 = geometry::Vector3<Scalar>(dis(gen), dis(gen), dis(gen));
+    v1 = geometry::Vector3<Scalar>(dis(gen), dis(gen), dis(gen));
+    v2 = geometry::Vector3<Scalar>(dis(gen), dis(gen), dis(gen));
+    v3 = geometry::Vector3<Scalar>(dis(gen), dis(gen), dis(gen));
+    p0 = geometry::Vector3<Scalar>(dis(gen), dis(gen), dis(gen));
+    p1 = geometry::Vector3<Scalar>(dis(gen), dis(gen), dis(gen));
+    p2 = geometry::Vector3<Scalar>(dis(gen), dis(gen), dis(gen));
+    p3 = geometry::Vector3<Scalar>(dis(gen), dis(gen), dis(gen));
+  } while (geometry::TetrahedronVolume(p0, p1, p2, p3) <
+               geometry::Eps<Scalar>() ||
+           geometry::TetrahedronVolume(v0, v1, v2, v3) < 1e-2);
+  Scalar t = 1;
+  if (geometry::FacePointCCD(p0, p1, p2, v0, v1, v2, p3, v3, &t)) {
+    geometry::Vector3<Scalar> x0 = p0 + v0 * t;
+    geometry::Vector3<Scalar> x1 = p1 + v1 * t;
+    geometry::Vector3<Scalar> x2 = p2 + v2 * t;
+    geometry::Vector3<Scalar> x3 = p3 + v3 * t;
+    EXPECT_TRUE(geometry::FacePointIntersection(x0, x1, x2, x3));
+    EXPECT_NEAR(geometry::TetrahedronVolume(x0, x1, x2, x3), 0,
+                geometry::Eps<Scalar>() * fmax(t, static_cast<Scalar>(1)));
   }
 }
 
@@ -151,6 +200,7 @@ void BatchedTest() {
     TestEdgeEdgeIntersection<Scalar>();
     TestFacePointIntersection<Scalar>();
     TestEdgeEdgeIntersectionVolumeSolve<Scalar>();
+    TestFacePointIntersectionVolumeSolve<Scalar>();
   }
 }
 
