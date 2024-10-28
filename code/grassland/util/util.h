@@ -1,5 +1,7 @@
 #pragma once
 
+#define NOMINMAX
+
 #include "grassland/util/double_ptr.h"
 #include "grassland/util/event_manager.h"
 #include "grassland/util/log.h"
