@@ -65,5 +65,15 @@ struct DeviceFeatureRequirement;
 class DXGIFactory;
 class Adapter;
 class Device;
+class SwapChain;
+class DescriptorHeap;
+class RootSignature;
+class CommandQueue;
+class CommandAllocator;
+class CommandList;
+class Buffer;
+class Image;
+class Fence;
+class ShaderModule;
 
 }  // namespace grassland::d3d12

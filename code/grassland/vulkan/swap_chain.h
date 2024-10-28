@@ -14,8 +14,8 @@ struct SwapChainSupportDetails {
 
 class Swapchain {
  public:
-  Swapchain(const class grassland::vulkan::Device *device,
-            const class grassland::vulkan::Surface *surface,
+  Swapchain(const class Device *device,
+            const class Surface *surface,
             VkSwapchainKHR swapchain,
             VkFormat format,
             VkExtent2D extent);
