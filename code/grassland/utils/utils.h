@@ -3,6 +3,7 @@
 #include "grassland/utils/double_ptr.h"
 #include "grassland/utils/event_manager.h"
 #include "grassland/utils/log.h"
+#include "grassland/utils/string_convert.h"
 
 namespace grassland {
 #if defined(__CUDACC__)
