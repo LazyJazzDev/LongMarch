@@ -1,5 +1,5 @@
 #pragma once
-#include "grassland/algebra/algebra_utils.h"
+#include "grassland/algebra/algebra_util.h"
 
 namespace grassland::algebra {
 

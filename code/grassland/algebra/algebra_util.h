@@ -1,6 +1,6 @@
 #pragma once
 #include "Eigen/Eigen"
-#include "grassland/utils/utils.h"
+#include "grassland/util/util.h"
 
 namespace grassland::algebra {
 using Eigen::Matrix;

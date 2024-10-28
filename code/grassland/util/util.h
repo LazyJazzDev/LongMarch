@@ -1,9 +1,9 @@
 #pragma once
 
-#include "grassland/utils/double_ptr.h"
-#include "grassland/utils/event_manager.h"
-#include "grassland/utils/log.h"
-#include "grassland/utils/string_convert.h"
+#include "grassland/util/double_ptr.h"
+#include "grassland/util/event_manager.h"
+#include "grassland/util/log.h"
+#include "grassland/util/string_convert.h"
 
 namespace grassland {
 #if defined(__CUDACC__)

@@ -2,7 +2,7 @@
 
 #include "grassland/vulkan/instance_procedures.h"
 #include "grassland/vulkan/surface.h"
-#include "grassland/vulkan/vulkan_utils.h"
+#include "grassland/vulkan/vulkan_util.h"
 
 namespace grassland::vulkan {
 

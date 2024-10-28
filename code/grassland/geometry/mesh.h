@@ -3,7 +3,7 @@
 #include <filesystem>
 
 #include "fstream"
-#include "grassland/geometry/geometry_utils.h"
+#include "grassland/geometry/geometry_util.h"
 #include "mikktspace.h"
 #include "tiny_obj_loader.h"
 

@@ -12,7 +12,7 @@
 #include <string>
 #include <vector>
 
-#include "grassland/utils/utils.h"
+#include "grassland/util/util.h"
 
 namespace grassland::vulkan {
 #define GRASSLAND_VULKAN_PROCEDURE_VAR(function_name) \

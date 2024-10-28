@@ -1,5 +1,5 @@
 #pragma once
-#include "grassland/geometry/geometry_utils.h"
+#include "grassland/geometry/geometry_util.h"
 
 namespace grassland::geometry {
 template <typename Scalar, int dim>

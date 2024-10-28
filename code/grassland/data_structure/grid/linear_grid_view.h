@@ -1,5 +1,5 @@
 #pragma once
-#include "grassland/data_structure/grid/grid_utils.h"
+#include "grassland/data_structure/grid/grid_util.h"
 
 namespace grassland::data_structure {
 template <typename ContentType>

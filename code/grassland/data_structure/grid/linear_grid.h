@@ -1,6 +1,6 @@
 #pragma once
 
-#include "grassland/data_structure/grid/grid_utils.h"
+#include "grassland/data_structure/grid/grid_util.h"
 #include "grassland/data_structure/grid/linear_grid_view.h"
 
 namespace grassland::data_structure {
