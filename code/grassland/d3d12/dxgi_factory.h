@@ -5,8 +5,18 @@
 namespace grassland::d3d12 {
 class DXGIFactory {
  public:
-  explicit DXGIFactory(IDXGIFactory4 *factory) : factory_(factory) {
+  explicit DXGIFactory(IDXGIFactory4 *factory);
+
+  IDXGIFactory4 *Handle() const {
+    return factory_.Get();
   }
+
+  std::vector<Adapter> EnumerateAdapters() const;
+
+  HRESULT CreateDevice(
+      const DeviceFeatureRequirement &device_feature_requirement,
+      int device_index,
+      double_ptr<Device> pp_device);
 
  private:
   ComPtr<IDXGIFactory4> factory_;

@@ -60,4 +60,10 @@ std::string HRESULTToString(HRESULT hr);
                                                                     \
   } while (false)
 
+struct DeviceFeatureRequirement;
+
+class DXGIFactory;
+class Adapter;
+class Device;
+
 }  // namespace grassland::d3d12

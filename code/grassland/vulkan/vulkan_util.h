@@ -24,8 +24,6 @@ constexpr bool kDefaultEnableValidationLayers = false;
 constexpr bool kDefaultEnableValidationLayers = true;
 #endif
 
-std::string PCIVendorIDToName(uint32_t vendor_id);
-
 std::string VkFormatToName(VkFormat format);
 
 std::string VkColorSpaceToName(VkColorSpaceKHR color_space);

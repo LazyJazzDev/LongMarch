@@ -4,6 +4,9 @@
 #define GLFW_EXPOSE_NATIVE_WIN32
 #include <GLFW/glfw3native.h>
 
+#include "grassland/d3d12/device.h"
+#include "grassland/util/vendor_id.h"
+
 namespace D3D12 {
 
 Application::Application() {
@@ -42,7 +45,14 @@ void Application::CreateWindowAssets() {
   glfw_window_ = glfwCreateWindow(2560, 1440, "D3D12", nullptr, nullptr);
 
   // Get HWND from GLFW window
-  d3d12::CreateDXGIFactory(&factory_);
+  CreateDXGIFactory(&factory_);
+
+  factory_->CreateDevice(DeviceFeatureRequirement{}, -1, &device_);
+  LogInfo("Device: {}", device_->Adapter().Name());
+  LogInfo("- Vendor: {}", PCIVendorIDToName(device_->Adapter().VendorID()));
+  LogInfo("- Device Feature Level: {}.{}",
+          uint32_t(device_->FeatureLevel()) >> 12,
+          (uint32_t(device_->FeatureLevel()) >> 8) & 0xf);
 }
 
 void Application::DestroyWindowAssets() {

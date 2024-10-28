@@ -1,5 +1,9 @@
 #include "grassland/d3d12/dxgi_factory.h"
 
+#include "grassland/d3d12/adapter.h"
+#include "grassland/d3d12/device.h"
+#include "grassland/d3d12/device_feature_requirement.h"
+
 namespace grassland::d3d12 {
 
 void ThrowError(const std::string &message) {
@@ -13,7 +17,7 @@ void ThrowIfFailed(HRESULT hr, const std::string &message) {
 }
 
 void Warning(const std::string &message) {
-  LogWarning("[Vulkan] " + message);
+  LogWarning("[D3D12] " + message);
 }
 
 namespace {
@@ -21,12 +25,112 @@ std::string error_message;
 }
 
 void SetErrorMessage(const std::string &message) {
-  LogError("[Vulkan] " + message);
+  LogError("[D3D12] " + message);
   error_message = message;
 }
 
 std::string GetErrorMessage() {
   return error_message;
+}
+
+DXGIFactory::DXGIFactory(IDXGIFactory4 *factory) : factory_(factory) {
+}
+
+std::vector<Adapter> DXGIFactory::EnumerateAdapters() const {
+  std::vector<Adapter> adapters;
+  IDXGIAdapter1 *adapter;
+  for (UINT i = 0; factory_->EnumAdapters1(i, &adapter) != DXGI_ERROR_NOT_FOUND;
+       i++) {
+    DXGI_ADAPTER_DESC1 desc;
+    adapter->GetDesc1(&desc);
+    if (desc.Flags & DXGI_ADAPTER_FLAG_SOFTWARE) {
+      adapter->Release();
+      continue;
+    }
+    adapters.emplace_back(adapter);
+    adapter->Release();
+  }
+  return adapters;
+}
+
+HRESULT DXGIFactory::CreateDevice(
+    const DeviceFeatureRequirement &device_feature_requirement,
+    int device_index,
+    double_ptr<Device> pp_device) {
+  auto adapters = EnumerateAdapters();
+
+  if (device_index < 0) {
+    uint64_t max_score = 0;
+    for (int i = 0; i < adapters.size(); i++) {
+      if (!adapters[i].CheckFeatureSupport(device_feature_requirement)) {
+        continue;
+      }
+
+      uint64_t score = adapters[i].Evaluate();
+      if (device_index < 0 || score > max_score) {
+        max_score = score;
+        device_index = i;
+      }
+    }
+  }
+
+  if (device_index < 0 || device_index >= adapters.size()) {
+    SetErrorMessage("no suitable physical device found.");
+    return E_FAIL;
+  }
+
+  ComPtr<ID3D12Device> device;
+
+  const D3D_FEATURE_LEVEL min_feature_level = D3D_FEATURE_LEVEL_11_0;
+
+  HRESULT hr = D3D12CreateDevice(adapters[device_index].Handle(),
+                                 min_feature_level, IID_PPV_ARGS(&device));
+
+  if (FAILED(hr)) {
+    SetErrorMessage("failed to create device.");
+    return hr;
+  }
+
+#ifndef NDEBUG
+  // Configure debug device (if active).
+  ComPtr<ID3D12InfoQueue> d3dInfoQueue;
+  if (SUCCEEDED(device.As(&d3dInfoQueue))) {
+#ifdef _DEBUG
+    d3dInfoQueue->SetBreakOnSeverity(D3D12_MESSAGE_SEVERITY_CORRUPTION, true);
+    d3dInfoQueue->SetBreakOnSeverity(D3D12_MESSAGE_SEVERITY_ERROR, true);
+#endif
+    D3D12_MESSAGE_ID hide[] = {D3D12_MESSAGE_ID_MAP_INVALID_NULLRANGE,
+                               D3D12_MESSAGE_ID_UNMAP_INVALID_NULLRANGE};
+    D3D12_INFO_QUEUE_FILTER filter = {};
+    filter.DenyList.NumIDs = _countof(hide);
+    filter.DenyList.pIDList = hide;
+    d3dInfoQueue->AddStorageFilterEntries(&filter);
+  }
+#endif
+
+  static const D3D_FEATURE_LEVEL feature_levels[] = {
+      D3D_FEATURE_LEVEL_12_1,
+      D3D_FEATURE_LEVEL_12_0,
+      D3D_FEATURE_LEVEL_11_1,
+      D3D_FEATURE_LEVEL_11_0,
+  };
+
+  D3D12_FEATURE_DATA_FEATURE_LEVELS feat_levels = {
+      _countof(feature_levels), feature_levels, min_feature_level};
+
+  hr = device->CheckFeatureSupport(D3D12_FEATURE_FEATURE_LEVELS, &feat_levels,
+                                   sizeof(feat_levels));
+
+  D3D_FEATURE_LEVEL d3d_feature_level;
+
+  if (SUCCEEDED(hr)) {
+    d3d_feature_level = feat_levels.MaxSupportedFeatureLevel;
+  } else {
+    d3d_feature_level = min_feature_level;
+  }
+
+  pp_device.construct(adapters[device_index], d3d_feature_level, device.Get());
+  return S_OK;
 }
 
 HRESULT CreateDXGIFactory(double_ptr<DXGIFactory> pp_factory) {
@@ -53,6 +157,7 @@ HRESULT CreateDXGIFactory(double_ptr<DXGIFactory> pp_factory) {
       "failed to create DXGI factory.");
 
   pp_factory.construct(factory);
+  factory->Release();
   return S_OK;
 }
 }  // namespace grassland::d3d12

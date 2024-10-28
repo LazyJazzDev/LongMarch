@@ -22,7 +22,8 @@ class Application {
 
   GLFWwindow *glfw_window_;
 
-  std::unique_ptr<grassland::d3d12::DXGIFactory> factory_;
+  std::unique_ptr<DXGIFactory> factory_;
+  std::unique_ptr<Device> device_;
 };
 
 }  // namespace D3D12
