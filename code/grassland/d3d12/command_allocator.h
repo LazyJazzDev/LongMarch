@@ -1,8 +1,23 @@
-//
-// Created by zijian on 2024/10/28.
-//
+#pragma once
+#include "grassland/d3d12/device.h"
 
-#ifndef COMMAND_ALLOCATOR_H
-#define COMMAND_ALLOCATOR_H
+namespace grassland::d3d12 {
 
-#endif  // COMMAND_ALLOCATOR_H
+class CommandAllocator {
+ public:
+  CommandAllocator(const ComPtr<ID3D12CommandAllocator> &command_allocator);
+
+  ID3D12CommandAllocator *Handle() const {
+    return command_allocator_.Get();
+  }
+
+  HRESULT CreateCommandList(D3D12_COMMAND_LIST_TYPE type,
+                            double_ptr<CommandList> pp_command_list);
+
+  HRESULT ResetCommandRecord(CommandList *command_list);
+
+ private:
+  ComPtr<ID3D12CommandAllocator> command_allocator_;
+};
+
+}  // namespace grassland::d3d12

@@ -1,5 +1,3 @@
-//
-// Created by zijian on 2024/10/28.
-//
+#include "grassland/d3d12/root_signature.h"
 
-#include "root_signature.h"
+namespace grassland::d3d12 {}

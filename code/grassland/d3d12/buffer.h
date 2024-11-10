@@ -1,8 +1,4 @@
-//
-// Created by zijian on 2024/10/28.
-//
+#pragma once
+#include "grassland/d3d12/device.h"
 
-#ifndef BUFFER_H
-#define BUFFER_H
-
-#endif  // BUFFER_H
+namespace grassland::d3d12 {}

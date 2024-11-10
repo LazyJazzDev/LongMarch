@@ -72,6 +72,7 @@ function(PACK_SHADER_CODE TARGET_NAME)
             ${CMAKE_CURRENT_SOURCE_DIR}/*.rgen
             ${CMAKE_CURRENT_SOURCE_DIR}/*.rchit
             ${CMAKE_CURRENT_SOURCE_DIR}/*.rmiss
+            ${CMAKE_CURRENT_SOURCE_DIR}/*.hlsl
             RELATIVE ${CMAKE_CURRENT_SOURCE_DIR}
             LIST_DIRECTORIES false
     )

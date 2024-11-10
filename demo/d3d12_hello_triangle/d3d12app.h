@@ -20,10 +20,20 @@ class Application {
   void CreateWindowAssets();
   void DestroyWindowAssets();
 
+  const uint32_t frame_count = 2;
+
   GLFWwindow *glfw_window_;
 
   std::unique_ptr<DXGIFactory> factory_;
   std::unique_ptr<Device> device_;
+
+  std::unique_ptr<CommandQueue> command_queue_;
+  std::unique_ptr<CommandAllocator> command_allocator_;
+  std::unique_ptr<CommandList> command_list_;
+
+  std::unique_ptr<SwapChain> swap_chain_;
+
+  std::unique_ptr<Fence> fence_;
 };
 
 }  // namespace D3D12

@@ -5,7 +5,7 @@
 namespace grassland::d3d12 {
 class Adapter {
  public:
-  Adapter(IDXGIAdapter1 *adapter);
+  Adapter(ComPtr<IDXGIAdapter1> adapter);
 
   IDXGIAdapter1 *Handle() const {
     return adapter_.Get();

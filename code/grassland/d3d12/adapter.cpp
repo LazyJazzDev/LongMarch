@@ -1,10 +1,12 @@
 #include "grassland/d3d12/adapter.h"
 
+#include <utility>
+
 #include "../../../cmake-build-release/vcpkg_installed/x64-windows/include/gtest/gtest.h"
 
 namespace grassland::d3d12 {
 
-Adapter::Adapter(IDXGIAdapter1 *adapter) : adapter_(adapter) {
+Adapter::Adapter(ComPtr<IDXGIAdapter1> adapter) : adapter_(std::move(adapter)) {
   adapter_->GetDesc1(&desc_);
 }
 

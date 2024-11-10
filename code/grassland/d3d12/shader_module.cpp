@@ -1,5 +1,3 @@
-//
-// Created by zijian on 2024/10/28.
-//
+#include "grassland/d3d12/shader_module.h"
 
-#include "shader_module.h"
+namespace grassland::d3d12 {}

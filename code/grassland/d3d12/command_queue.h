@@ -1,8 +1,18 @@
-//
-// Created by zijian on 2024/10/28.
-//
+#pragma once
+#include "grassland/d3d12/device.h"
 
-#ifndef COMMAND_QUEUE_H
-#define COMMAND_QUEUE_H
+namespace grassland::d3d12 {
 
-#endif  // COMMAND_QUEUE_H
+class CommandQueue {
+ public:
+  CommandQueue(const ComPtr<ID3D12CommandQueue> &command_queue);
+
+  ID3D12CommandQueue *Handle() const {
+    return command_queue_.Get();
+  }
+
+ private:
+  ComPtr<ID3D12CommandQueue> command_queue_;
+};
+
+}  // namespace grassland::d3d12

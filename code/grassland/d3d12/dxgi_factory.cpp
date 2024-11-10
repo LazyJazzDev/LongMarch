@@ -1,8 +1,10 @@
 #include "grassland/d3d12/dxgi_factory.h"
 
 #include "grassland/d3d12/adapter.h"
+#include "grassland/d3d12/command_queue.h"
 #include "grassland/d3d12/device.h"
 #include "grassland/d3d12/device_feature_requirement.h"
+#include "grassland/d3d12/swap_chain.h"
 
 namespace grassland::d3d12 {
 
@@ -33,22 +35,21 @@ std::string GetErrorMessage() {
   return error_message;
 }
 
-DXGIFactory::DXGIFactory(IDXGIFactory4 *factory) : factory_(factory) {
+DXGIFactory::DXGIFactory(const ComPtr<IDXGIFactory4> &factory)
+    : factory_(factory) {
 }
 
 std::vector<Adapter> DXGIFactory::EnumerateAdapters() const {
   std::vector<Adapter> adapters;
-  IDXGIAdapter1 *adapter;
+  ComPtr<IDXGIAdapter1> adapter;
   for (UINT i = 0; factory_->EnumAdapters1(i, &adapter) != DXGI_ERROR_NOT_FOUND;
        i++) {
     DXGI_ADAPTER_DESC1 desc;
     adapter->GetDesc1(&desc);
     if (desc.Flags & DXGI_ADAPTER_FLAG_SOFTWARE) {
-      adapter->Release();
       continue;
     }
     adapters.emplace_back(adapter);
-    adapter->Release();
   }
   return adapters;
 }
@@ -129,8 +130,50 @@ HRESULT DXGIFactory::CreateDevice(
     d3d_feature_level = min_feature_level;
   }
 
-  pp_device.construct(adapters[device_index], d3d_feature_level, device.Get());
+  pp_device.construct(adapters[device_index], d3d_feature_level, device);
   return S_OK;
+}
+
+HRESULT DXGIFactory::CreateSwapChain(const CommandQueue &command_queue,
+                                     HWND hwnd,
+                                     const DXGI_SWAP_CHAIN_DESC1 &desc,
+                                     double_ptr<SwapChain> pp_swap_chain) {
+  ComPtr<IDXGISwapChain1> swap_chain;
+  RETURN_IF_FAILED_HR(
+      factory_->CreateSwapChainForHwnd(command_queue.Handle(), hwnd, &desc,
+                                       nullptr, nullptr, &swap_chain),
+      "failed to create swap chain.");
+
+  ComPtr<IDXGISwapChain3> swap_chain3;
+  RETURN_IF_FAILED_HR(swap_chain.As(&swap_chain3),
+                      "failed to create swap chain.");
+
+  pp_swap_chain.construct(swap_chain3);
+
+  return S_OK;
+}
+
+HRESULT DXGIFactory::CreateSwapChain(const CommandQueue &command_queue,
+                                     HWND hwnd,
+                                     UINT buffer_count,
+                                     double_ptr<SwapChain> pp_swap_chain) {
+  // Get window size from hwnd.
+  RECT rect;
+  GetClientRect(hwnd, &rect);
+  UINT width = rect.right - rect.left;
+  UINT height = rect.bottom - rect.top;
+  DXGI_SWAP_CHAIN_DESC1 desc = {};
+  desc.BufferCount = buffer_count;
+  desc.Width = width;
+  desc.Height = height;
+  desc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
+  desc.BufferUsage = DXGI_USAGE_RENDER_TARGET_OUTPUT;
+  desc.SwapEffect = DXGI_SWAP_EFFECT_FLIP_DISCARD;
+  desc.SampleDesc.Count = 1;
+
+  LogInfo("Swap Chain: {}x{}", width, height);
+
+  return CreateSwapChain(command_queue, hwnd, desc, pp_swap_chain);
 }
 
 HRESULT CreateDXGIFactory(double_ptr<DXGIFactory> pp_factory) {
@@ -151,13 +194,12 @@ HRESULT CreateDXGIFactory(double_ptr<DXGIFactory> pp_factory) {
   }
 #endif
 
-  IDXGIFactory4 *factory;
+  ComPtr<IDXGIFactory4> factory;
   RETURN_IF_FAILED_HR(
       CreateDXGIFactory2(dxgi_factory_flags, IID_PPV_ARGS(&factory)),
       "failed to create DXGI factory.");
 
   pp_factory.construct(factory);
-  factory->Release();
   return S_OK;
 }
 }  // namespace grassland::d3d12

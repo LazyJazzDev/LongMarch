@@ -1,8 +1,18 @@
-//
-// Created by zijian on 2024/10/28.
-//
+#pragma once
+#include "grassland/d3d12/device.h"
 
-#ifndef COMMAND_LIST_H
-#define COMMAND_LIST_H
+namespace grassland::d3d12 {
 
-#endif  // COMMAND_LIST_H
+class CommandList {
+ public:
+  CommandList(const ComPtr<ID3D12GraphicsCommandList> &command_list);
+
+  ID3D12GraphicsCommandList *Handle() const {
+    return command_list_.Get();
+  }
+
+ private:
+  ComPtr<ID3D12GraphicsCommandList> command_list_;
+};
+
+}  // namespace grassland::d3d12
