@@ -75,5 +75,6 @@ class Buffer;
 class Image;
 class Fence;
 class ShaderModule;
+class PipelineState;
 
 }  // namespace grassland::d3d12

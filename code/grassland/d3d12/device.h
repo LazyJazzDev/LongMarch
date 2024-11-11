@@ -36,6 +36,30 @@ class Device {
 
   HRESULT CreateFence(double_ptr<Fence> pp_fence);
 
+  HRESULT CreateBuffer(size_t size,
+                       D3D12_HEAP_TYPE heap_type,
+                       D3D12_RESOURCE_STATES resource_state,
+                       double_ptr<Buffer> pp_buffer);
+
+  HRESULT CreateBuffer(size_t size,
+                       D3D12_HEAP_TYPE heap_type,
+                       double_ptr<Buffer> pp_buffer);
+
+  HRESULT CreateBuffer(size_t size, double_ptr<Buffer> pp_buffer);
+
+  HRESULT CreateShaderModule(const void *compiled_shader_data,
+                             size_t size,
+                             double_ptr<ShaderModule> pp_shader_module);
+
+  HRESULT CreateShaderModule(const ComPtr<ID3DBlob> &compiled_shader,
+                             double_ptr<ShaderModule> pp_shader_module);
+
+  HRESULT CreateRootSignature(const CD3DX12_VERSIONED_ROOT_SIGNATURE_DESC &desc,
+                              double_ptr<RootSignature> pp_root_signature);
+
+  HRESULT CreatePipelineState(const D3D12_GRAPHICS_PIPELINE_STATE_DESC &desc,
+                              double_ptr<PipelineState> pp_pipeline_state);
+
  private:
   class Adapter adapter_;
   ComPtr<ID3D12Device> device_;

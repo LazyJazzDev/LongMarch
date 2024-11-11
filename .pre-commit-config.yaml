@@ -3,7 +3,7 @@ repos:
     rev: v13.0.1
     hooks:
       - id: clang-format
-        files: '\.(glsl|frag|vert|cu|cuh|cc|cpp|hpp|h|c|cxx|hxx|rchit|rgen|rmiss|comp|proto)$'
+        files: '\.(glsl|frag|vert|cu|cuh|cc|cpp|hpp|h|c|cxx|hxx|rchit|rgen|rmiss|comp|proto|hlsl)$'
         types_or: ['text']
 
 

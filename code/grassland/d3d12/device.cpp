@@ -7,6 +7,7 @@
 #include "grassland/d3d12/descriptor_heap.h"
 #include "grassland/d3d12/fence.h"
 #include "grassland/d3d12/image.h"
+#include "grassland/d3d12/pipeline_state.h"
 #include "grassland/d3d12/root_signature.h"
 #include "grassland/d3d12/shader_module.h"
 
@@ -78,6 +79,107 @@ HRESULT Device::CreateFence(double_ptr<Fence> pp_fence) {
   device_->CreateFence(0, D3D12_FENCE_FLAG_NONE, IID_PPV_ARGS(&fence));
 
   pp_fence.construct(fence);
+
+  return S_OK;
+}
+
+HRESULT Device::CreateBuffer(size_t size,
+                             D3D12_HEAP_TYPE heap_type,
+                             D3D12_RESOURCE_STATES resource_state,
+                             double_ptr<Buffer> pp_buffer) {
+  ComPtr<ID3D12Resource> buffer;
+  CD3DX12_HEAP_PROPERTIES heap_properties(heap_type);
+
+  CD3DX12_RESOURCE_DESC resource_desc = CD3DX12_RESOURCE_DESC::Buffer(size);
+
+  RETURN_IF_FAILED_HR(
+      device_->CreateCommittedResource(&heap_properties, D3D12_HEAP_FLAG_NONE,
+                                       &resource_desc, resource_state, nullptr,
+                                       IID_PPV_ARGS(&buffer)),
+      "failed to create buffer.");
+
+  pp_buffer.construct(buffer);
+
+  return S_OK;
+}
+
+HRESULT Device::CreateBuffer(size_t size,
+                             D3D12_HEAP_TYPE heap_type,
+                             double_ptr<Buffer> pp_buffer) {
+  return CreateBuffer(size, heap_type, D3D12_RESOURCE_STATE_GENERIC_READ,
+                      pp_buffer);
+}
+
+HRESULT Device::CreateBuffer(size_t size, double_ptr<Buffer> pp_buffer) {
+  return CreateBuffer(size, D3D12_HEAP_TYPE_DEFAULT, pp_buffer);
+}
+
+HRESULT Device::CreateShaderModule(const void *compiled_shader_data,
+                                   size_t size,
+                                   double_ptr<ShaderModule> pp_shader_module) {
+  std::vector<uint8_t> shader_code(
+      static_cast<const uint8_t *>(compiled_shader_data),
+      static_cast<const uint8_t *>(compiled_shader_data) + size);
+  pp_shader_module.construct(shader_code);
+  return S_OK;
+}
+
+HRESULT Device::CreateShaderModule(const ComPtr<ID3DBlob> &compiled_shader,
+                                   double_ptr<ShaderModule> pp_shader_module) {
+  return CreateShaderModule(compiled_shader->GetBufferPointer(),
+                            compiled_shader->GetBufferSize(), pp_shader_module);
+}
+
+HRESULT Device::CreateRootSignature(
+    const CD3DX12_VERSIONED_ROOT_SIGNATURE_DESC &desc,
+    double_ptr<RootSignature> pp_root_signature) {
+  D3D12_FEATURE_DATA_ROOT_SIGNATURE featureData = {};
+
+  // This is the highest version the sample supports. If CheckFeatureSupport
+  // succeeds, the HighestVersion returned will not be greater than this.
+  featureData.HighestVersion = D3D_ROOT_SIGNATURE_VERSION_1_1;
+
+  if (FAILED(device_->CheckFeatureSupport(D3D12_FEATURE_ROOT_SIGNATURE,
+                                          &featureData, sizeof(featureData)))) {
+    featureData.HighestVersion = D3D_ROOT_SIGNATURE_VERSION_1_0;
+  }
+
+  ComPtr<ID3DBlob> signature;
+  ComPtr<ID3DBlob> error;
+
+  auto hr = D3DX12SerializeVersionedRootSignature(
+      &desc, featureData.HighestVersion, &signature, &error);
+  if (FAILED(hr)) {
+    if (error) {
+      LogError("failed to serialize root signature: {}",
+               static_cast<const char *>(error->GetBufferPointer()));
+    }
+    return hr;
+  }
+
+  ComPtr<ID3D12RootSignature> root_signature;
+
+  RETURN_IF_FAILED_HR(
+      device_->CreateRootSignature(0, signature->GetBufferPointer(),
+                                   signature->GetBufferSize(),
+                                   IID_PPV_ARGS(&root_signature)),
+      "failed to create root signature.");
+
+  pp_root_signature.construct(root_signature);
+
+  return S_OK;
+}
+
+HRESULT Device::CreatePipelineState(
+    const D3D12_GRAPHICS_PIPELINE_STATE_DESC &desc,
+    double_ptr<PipelineState> pp_pipeline_state) {
+  ComPtr<ID3D12PipelineState> pipeline_state;
+
+  RETURN_IF_FAILED_HR(device_->CreateGraphicsPipelineState(
+                          &desc, IID_PPV_ARGS(&pipeline_state)),
+                      "failed to create pipeline state.");
+
+  pp_pipeline_state.construct(pipeline_state);
 
   return S_OK;
 }

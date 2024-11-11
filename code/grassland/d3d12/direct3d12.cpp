@@ -1,5 +1,3 @@
-//
-// Created by zijian on 2024/10/27.
-//
+#include "grassland/d3d12/direct3d12.h"
 
-#include "direct3d12.h"
+namespace grassland::d3d12 {}
