@@ -26,9 +26,13 @@ VkDeviceAddress Buffer::GetDeviceAddress() const {
 void CopyBuffer(VkCommandBuffer command_buffer,
                 Buffer *src_buffer,
                 Buffer *dst_buffer,
-                VkDeviceSize size) {
+                VkDeviceSize size,
+                VkDeviceSize src_offset,
+                VkDeviceSize dst_offset) {
   VkBufferCopy copy_region{};
   copy_region.size = size;
+  copy_region.srcOffset = src_offset;
+  copy_region.dstOffset = dst_offset;
   vkCmdCopyBuffer(command_buffer, src_buffer->Handle(), dst_buffer->Handle(), 1,
                   &copy_region);
 }

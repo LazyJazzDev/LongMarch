@@ -48,6 +48,8 @@ std::string GetErrorMessage();
 
 std::string HRESULTToString(HRESULT hr);
 
+size_t SizeByFormat(DXGI_FORMAT format);
+
 #define RETURN_IF_FAILED_HR(cmd, ...)                               \
   do {                                                              \
     HRESULT res = cmd;                                              \

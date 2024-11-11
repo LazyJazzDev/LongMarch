@@ -18,11 +18,15 @@ class Buffer {
   void *Map() const;
   void Unmap() const;
 
-  void UploadData(const void *data, size_t size, size_t offset = 0);
-  void DownloadData(void *data, size_t size, size_t offset = 0);
-
  private:
   ComPtr<ID3D12Resource> buffer_;
 };
+
+void CopyBuffer(ID3D12GraphicsCommandList *command_list,
+                Buffer *src_buffer,
+                Buffer *dst_buffer,
+                size_t size,
+                size_t src_offset = 0,
+                size_t dst_offset = 0);
 
 }  // namespace grassland::d3d12

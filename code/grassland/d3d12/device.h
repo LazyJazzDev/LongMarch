@@ -47,6 +47,30 @@ class Device {
 
   HRESULT CreateBuffer(size_t size, double_ptr<Buffer> pp_buffer);
 
+ private:
+  HRESULT CreateImage(const D3D12_RESOURCE_DESC &desc,
+                      double_ptr<Image> pp_image);
+
+ public:
+  HRESULT CreateImage(size_t width,
+                      size_t height,
+                      DXGI_FORMAT format,
+                      D3D12_RESOURCE_FLAGS flags,
+                      double_ptr<Image> pp_image);
+
+  HRESULT CreateImage(size_t width,
+                      size_t height,
+                      DXGI_FORMAT format,
+                      double_ptr<Image> pp_image);
+
+  HRESULT CreateImageF32(size_t width,
+                         size_t height,
+                         double_ptr<Image> pp_image);
+
+  HRESULT CreateImageU8(size_t width,
+                        size_t height,
+                        double_ptr<Image> pp_image);
+
   HRESULT CreateShaderModule(const void *compiled_shader_data,
                              size_t size,
                              double_ptr<ShaderModule> pp_shader_module);

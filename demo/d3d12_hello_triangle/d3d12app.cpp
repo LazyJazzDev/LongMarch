@@ -115,7 +115,7 @@ void Application::CreateWindowAssets() {
   glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
   glfwWindowHint(GLFW_RESIZABLE, GLFW_FALSE);
 
-  glfw_window_ = glfwCreateWindow(2560, 1440, "D3D12", nullptr, nullptr);
+  glfw_window_ = glfwCreateWindow(800, 600, "D3D12", nullptr, nullptr);
 
   CreateDXGIFactory(&factory_);
 
@@ -155,16 +155,33 @@ void Application::CreatePipelineAssets() {
 
   std::vector<uint32_t> indices = {0, 1, 2};
 
+  std::unique_ptr<Buffer> staging_vertex_buffer;
+  std::unique_ptr<Buffer> staging_index_buffer;
+
   device_->CreateBuffer(vertices.size() * sizeof(Vertex),
-                        D3D12_HEAP_TYPE_UPLOAD, &vertex_buffer_);
+                        D3D12_HEAP_TYPE_UPLOAD, &staging_vertex_buffer);
   device_->CreateBuffer(indices.size() * sizeof(uint32_t),
-                        D3D12_HEAP_TYPE_UPLOAD, &index_buffer_);
-  std::memcpy(vertex_buffer_->Map(), vertices.data(),
+                        D3D12_HEAP_TYPE_UPLOAD, &staging_index_buffer);
+
+  device_->CreateBuffer(vertices.size() * sizeof(Vertex),
+                        D3D12_HEAP_TYPE_DEFAULT, &vertex_buffer_);
+  device_->CreateBuffer(indices.size() * sizeof(uint32_t),
+                        D3D12_HEAP_TYPE_DEFAULT, &index_buffer_);
+  std::memcpy(staging_vertex_buffer->Map(), vertices.data(),
               vertices.size() * sizeof(Vertex));
-  vertex_buffer_->Unmap();
-  std::memcpy(index_buffer_->Map(), indices.data(),
+  staging_vertex_buffer->Unmap();
+  std::memcpy(staging_index_buffer->Map(), indices.data(),
               indices.size() * sizeof(uint32_t));
-  index_buffer_->Unmap();
+  staging_index_buffer->Unmap();
+
+  command_queue_->SingleTimeCommand(
+      [&staging_vertex_buffer, &staging_index_buffer,
+       this](ID3D12GraphicsCommandList *cmd_list) {
+        CopyBuffer(cmd_list, staging_vertex_buffer.get(), vertex_buffer_.get(),
+                   staging_vertex_buffer->Size());
+        CopyBuffer(cmd_list, staging_index_buffer.get(), index_buffer_.get(),
+                   staging_index_buffer->Size());
+      });
 
   device_->CreateShaderModule(
       CompileShader(GetShaderCode("shaders/main.hlsl"), "VSMain", "vs_5_0"),

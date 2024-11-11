@@ -49,7 +49,9 @@ class Buffer {
 void CopyBuffer(VkCommandBuffer command_buffer,
                 Buffer *src_buffer,
                 Buffer *dst_buffer,
-                VkDeviceSize size);
+                VkDeviceSize size,
+                VkDeviceSize src_offset = 0,
+                VkDeviceSize dst_offset = 0);
 
 void UploadBuffer(Queue *queue,
                   CommandPool *command_pool,

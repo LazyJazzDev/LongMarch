@@ -114,6 +114,55 @@ HRESULT Device::CreateBuffer(size_t size, double_ptr<Buffer> pp_buffer) {
   return CreateBuffer(size, D3D12_HEAP_TYPE_DEFAULT, pp_buffer);
 }
 
+HRESULT Device::CreateImage(const D3D12_RESOURCE_DESC &desc,
+                            double_ptr<Image> pp_image) {
+  ComPtr<ID3D12Resource> image;
+  RETURN_IF_FAILED_HR(
+      device_->CreateCommittedResource(
+          &CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_DEFAULT),
+          D3D12_HEAP_FLAG_NONE, &desc, D3D12_RESOURCE_STATE_GENERIC_READ,
+          nullptr, IID_PPV_ARGS(&image)),
+      "failed to create image.");
+
+  pp_image.construct(image);
+
+  return S_OK;
+}
+
+HRESULT Device::CreateImage(size_t width,
+                            size_t height,
+                            DXGI_FORMAT format,
+                            D3D12_RESOURCE_FLAGS flags,
+                            double_ptr<Image> pp_image) {
+  CD3DX12_RESOURCE_DESC desc =
+      CD3DX12_RESOURCE_DESC::Tex2D(format, width, height, 1, 1, 1, 0, flags,
+                                   D3D12_TEXTURE_LAYOUT_UNKNOWN, 0);
+  return CreateImage(desc, pp_image);
+}
+
+HRESULT Device::CreateImage(size_t width,
+                            size_t height,
+                            DXGI_FORMAT format,
+                            double_ptr<Image> pp_image) {
+  return CreateImage(width, height, format,
+                     D3D12_RESOURCE_FLAG_ALLOW_RENDER_TARGET |
+                         D3D12_RESOURCE_FLAG_ALLOW_DEPTH_STENCIL |
+                         D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS,
+                     pp_image);
+}
+
+HRESULT Device::CreateImageF32(size_t width,
+                               size_t height,
+                               double_ptr<Image> pp_image) {
+  return CreateImage(width, height, DXGI_FORMAT_R32G32B32A32_FLOAT, pp_image);
+}
+
+HRESULT Device::CreateImageU8(size_t width,
+                              size_t height,
+                              double_ptr<Image> pp_image) {
+  return CreateImage(width, height, DXGI_FORMAT_R8G8B8A8_UNORM, pp_image);
+}
+
 HRESULT Device::CreateShaderModule(const void *compiled_shader_data,
                                    size_t size,
                                    double_ptr<ShaderModule> pp_shader_module) {

@@ -51,6 +51,8 @@ class Application {
 
   std::unique_ptr<RootSignature> root_signature_;
   std::unique_ptr<PipelineState> pipeline_state_;
+
+  std::unique_ptr<Image> texture_;
 };
 
 }  // namespace D3D12
