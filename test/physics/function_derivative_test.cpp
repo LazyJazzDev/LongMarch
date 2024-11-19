@@ -1,3 +1,5 @@
+#include <glm/ext/scalar_constants.hpp>
+
 #include "cmath"
 #include "grassland/physics/physics.h"
 #include "gtest/gtest.h"
@@ -8,10 +10,8 @@
 using namespace long_march;
 
 template <typename FunctionSet = Determinant3<double>>
-void TestFunctionSet() {
-  FunctionSet f;
+void TestFunctionSet(FunctionSet f = FunctionSet{}, const int test_cnt = 100) {
   using Real = typename FunctionSet::Scalar;
-  constexpr int test_cnt = 100;
   for (int i = 0; i < test_cnt; i++) {
     using InputVec =
         Eigen::Vector<Real, FunctionSet::InputType::SizeAtCompileTime>;
@@ -113,7 +113,6 @@ void TestFunctionSet() {
     }
   }
 }
-
 TEST(Physics, FunctionDerivativeDeterminant3) {
   TestFunctionSet<Determinant3<double>>();
 }
@@ -168,4 +167,50 @@ TEST(Physics, FunctionDerivativeDihedralAngleAssistNormalsAxisToSinCosTheta) {
 
 TEST(Physics, FunctionDerivativeDihedralAngleByEdges) {
   TestFunctionSet<DihedralAngleByEdges<double>>();
+}
+
+TEST(Physics, FunctionDerivativeDihedralAngleAssistVerticesToEdges) {
+  TestFunctionSet<DihedralAngleAssistVerticesToEdges<double>>();
+}
+
+TEST(Physics, FunctionDerivativeDihedralAngleByVertices) {
+  TestFunctionSet<DihedralAngleByVertices<double>>();
+}
+
+TEST(Physics, FunctionDerivativeDihedralEnergy) {
+  DihedralEnergy<double> f;
+  std::random_device rd;
+  for (int i = 0; i < 100; i++) {
+    f.rest_angle = std::uniform_real_distribution<double>(
+        -glm::pi<double>() * 0.5, glm::pi<double>() * 0.5)(rd);
+    TestFunctionSet(f, 1);
+  }
+}
+
+TEST(Physics, FunctionDerivativeFEMTetrahedronDeformationGradient) {
+  Eigen::Matrix3<double> Dm;
+  do {
+    Dm = Eigen::Matrix3<double>::Random();
+  } while (Dm.determinant() < 0);
+  TestFunctionSet<FEMTetrahedronDeformationGradient<double>>({Dm});
+}
+
+TEST(Physics, FunctionDerivativeFEMDeformationGradient3x2To3x3) {
+  TestFunctionSet<FEMDeformationGradient3x2To3x3<double>>();
+}
+
+TEST(Physics, FunctionDerivativeFEMTriangleDeformationGradient3x2) {
+  Eigen::Matrix2<double> Dm;
+  do {
+    Dm = Eigen::Matrix2<double>::Random();
+  } while (Dm.determinant() < 0);
+  TestFunctionSet<FEMTriangleDeformationGradient3x2<double>>({Dm});
+}
+
+TEST(Physics, FunctionDerivativeFEMTriangleDeformationGradient3x3) {
+  Eigen::Matrix2<double> Dm;
+  do {
+    Dm = Eigen::Matrix2<double>::Random();
+  } while (Dm.determinant() < 0);
+  TestFunctionSet<FEMTriangleDeformationGradient3x3<double>>({Dm});
 }

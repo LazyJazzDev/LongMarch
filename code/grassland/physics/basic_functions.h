@@ -5,6 +5,42 @@
 
 namespace grassland {
 
+template <typename Func1, typename Func2>
+struct Compose {
+  Func1 f1;
+  Func2 f2;
+
+  typedef typename Func1::Scalar Scalar;
+  typedef typename Func1::InputType InputType;
+  typedef typename Func2::OutputType OutputType;
+
+  LM_DEVICE_FUNC bool ValidInput(const InputType &x) const {
+    return f1.ValidInput(x) && f2.ValidInput(f1(x));
+  }
+
+  LM_DEVICE_FUNC OutputType operator()(const InputType &x) const {
+    return f2(f1(x));
+  }
+
+  LM_DEVICE_FUNC Eigen::Matrix<Scalar,
+                               OutputType::SizeAtCompileTime,
+                               InputType::SizeAtCompileTime>
+  Jacobian(const InputType &x) const {
+    return f2.Jacobian(f1(x)) * f1.Jacobian(x);
+  }
+
+  LM_DEVICE_FUNC HessianTensor<Scalar,
+                               OutputType::SizeAtCompileTime,
+                               InputType::SizeAtCompileTime>
+  Hessian(const InputType &x) const {
+    auto J1 = f1.Jacobian(x);
+    auto J2 = f2.Jacobian(f1(x));
+    auto H1 = f1.Hessian(x);
+    auto H2 = f2.Hessian(f1(x));
+    return H2 * J1 + J2 * H1;
+  }
+};
+
 template <typename Real>
 struct Determinant3 {
   typedef Real Scalar;
@@ -356,40 +392,68 @@ struct Atan2 {
   }
 };
 
-template <typename Func1, typename Func2>
-struct Compose {
-  Func1 f1;
-  Func2 f2;
+template <typename Func>
+struct MultiplyConstant {
+  typedef typename Func::Scalar Scalar;
+  typedef typename Func::InputType InputType;
+  typedef typename Func::OutputType OutputType;
 
-  typedef typename Func1::Scalar Scalar;
-  typedef typename Func1::InputType InputType;
-  typedef typename Func2::OutputType OutputType;
-
-  LM_DEVICE_FUNC bool ValidInput(const InputType &x) const {
-    return f1.ValidInput(x) && f2.ValidInput(f1(x));
+  LM_DEVICE_FUNC bool ValidInput(const InputType &v) const {
+    return f.ValidInput(v);
   }
 
-  LM_DEVICE_FUNC OutputType operator()(const InputType &x) const {
-    return f2(f1(x));
+  LM_DEVICE_FUNC OutputType operator()(const InputType &v) const {
+    return f(v) * s;
   }
 
   LM_DEVICE_FUNC Eigen::Matrix<Scalar,
                                OutputType::SizeAtCompileTime,
                                InputType::SizeAtCompileTime>
-  Jacobian(const InputType &x) const {
-    return f2.Jacobian(f1(x)) * f1.Jacobian(x);
+  Jacobian(const InputType &v) const {
+    return f.Jacobian(v) * s;
   }
 
   LM_DEVICE_FUNC HessianTensor<Scalar,
                                OutputType::SizeAtCompileTime,
                                InputType::SizeAtCompileTime>
-  Hessian(const InputType &x) const {
-    auto J1 = f1.Jacobian(x);
-    auto J2 = f2.Jacobian(f1(x));
-    auto H1 = f1.Hessian(x);
-    auto H2 = f2.Hessian(f1(x));
-    return H2 * J1 + J2 * H1;
+  Hessian(const InputType &v) const {
+    return f.Hessian(v) * s;
   }
+
+  Func f{};
+  Scalar s{1.0};
+};
+
+template <typename Func>
+struct PlusConstant {
+  typedef typename Func::Scalar Scalar;
+  typedef typename Func::InputType InputType;
+  typedef typename Func::OutputType OutputType;
+
+  LM_DEVICE_FUNC bool ValidInput(const InputType &v) const {
+    return f.ValidInput(v);
+  }
+
+  LM_DEVICE_FUNC OutputType operator()(const InputType &v) const {
+    return f(v) + s;
+  }
+
+  LM_DEVICE_FUNC Eigen::Matrix<Scalar,
+                               OutputType::SizeAtCompileTime,
+                               InputType::SizeAtCompileTime>
+  Jacobian(const InputType &v) const {
+    return f.Jacobian(v);
+  }
+
+  LM_DEVICE_FUNC HessianTensor<Scalar,
+                               OutputType::SizeAtCompileTime,
+                               InputType::SizeAtCompileTime>
+  Hessian(const InputType &v) const {
+    return f.Hessian(v);
+  }
+
+  Func f{};
+  OutputType s{};
 };
 
 template <typename Real>
