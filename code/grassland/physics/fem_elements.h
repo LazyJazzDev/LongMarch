@@ -28,32 +28,48 @@ struct FEMTetrahedronDeformationGradient {
                   InputType::SizeAtCompileTime>
         J;
     J.setZero();
-    J.block<3, 3>(0, 0) = -Eigen::Matrix<Real, 3, 3>::Identity();
-    J.block<3, 3>(0, 3) = Eigen::Matrix<Real, 3, 3>::Identity();
-    J.block<3, 3>(3, 0) = -Eigen::Matrix<Real, 3, 3>::Identity();
-    J.block<3, 3>(3, 6) = Eigen::Matrix<Real, 3, 3>::Identity();
-    J.block<3, 3>(6, 0) = -Eigen::Matrix<Real, 3, 3>::Identity();
-    J.block<3, 3>(6, 9) = Eigen::Matrix<Real, 3, 3>::Identity();
-    Eigen::Matrix3<Real> Dm_inv_t = Dm.inverse().transpose();
+    for (int i = 0; i < 3; i++) {
+      J(i, i) = -1;
+      J(i, i + 3) = 1;
+      J(i + 3, i) = -1;
+      J(i + 3, i + 6) = 1;
+      J(i + 6, i) = -1;
+      J(i + 6, i + 9) = 1;
+    }
+    Eigen::Matrix3<Real> Dm_inv = Dm.inverse();
+    Eigen::Matrix3<Real> Dm_inv_t = Dm_inv.transpose();
+
     Eigen::Matrix<Real, 9, 9> Dm_inv_t_jacobian;
-    Dm_inv_t_jacobian.block<3, 3>(0, 0) =
-        Eigen::Matrix<Real, 3, 3>::Identity() * Dm_inv_t(0, 0);
-    Dm_inv_t_jacobian.block<3, 3>(0, 3) =
-        Eigen::Matrix<Real, 3, 3>::Identity() * Dm_inv_t(0, 1);
-    Dm_inv_t_jacobian.block<3, 3>(0, 6) =
-        Eigen::Matrix<Real, 3, 3>::Identity() * Dm_inv_t(0, 2);
-    Dm_inv_t_jacobian.block<3, 3>(3, 0) =
-        Eigen::Matrix<Real, 3, 3>::Identity() * Dm_inv_t(1, 0);
-    Dm_inv_t_jacobian.block<3, 3>(3, 3) =
-        Eigen::Matrix<Real, 3, 3>::Identity() * Dm_inv_t(1, 1);
-    Dm_inv_t_jacobian.block<3, 3>(3, 6) =
-        Eigen::Matrix<Real, 3, 3>::Identity() * Dm_inv_t(1, 2);
-    Dm_inv_t_jacobian.block<3, 3>(6, 0) =
-        Eigen::Matrix<Real, 3, 3>::Identity() * Dm_inv_t(2, 0);
-    Dm_inv_t_jacobian.block<3, 3>(6, 3) =
-        Eigen::Matrix<Real, 3, 3>::Identity() * Dm_inv_t(2, 1);
-    Dm_inv_t_jacobian.block<3, 3>(6, 6) =
-        Eigen::Matrix<Real, 3, 3>::Identity() * Dm_inv_t(2, 2);
+    Dm_inv_t_jacobian.setZero();
+    for (int i = 0; i < 3; i++) {
+      Dm_inv_t_jacobian(i, i) = Dm_inv_t(0, 0);
+      Dm_inv_t_jacobian(i, i + 3) = Dm_inv_t(0, 1);
+      Dm_inv_t_jacobian(i, i + 6) = Dm_inv_t(0, 2);
+      Dm_inv_t_jacobian(i + 3, i) = Dm_inv_t(1, 0);
+      Dm_inv_t_jacobian(i + 3, i + 3) = Dm_inv_t(1, 1);
+      Dm_inv_t_jacobian(i + 3, i + 6) = Dm_inv_t(1, 2);
+      Dm_inv_t_jacobian(i + 6, i) = Dm_inv_t(2, 0);
+      Dm_inv_t_jacobian(i + 6, i + 3) = Dm_inv_t(2, 1);
+      Dm_inv_t_jacobian(i + 6, i + 6) = Dm_inv_t(2, 2);
+    }
+    // Dm_inv_t_jacobian.block<3, 3>(0, 0) =
+    //     Eigen::Matrix<Real, 3, 3>::Identity() * Dm_inv_t(0, 0);
+    // Dm_inv_t_jacobian.block<3, 3>(0, 3) =
+    //     Eigen::Matrix<Real, 3, 3>::Identity() * Dm_inv_t(0, 1);
+    // Dm_inv_t_jacobian.block<3, 3>(0, 6) =
+    //     Eigen::Matrix<Real, 3, 3>::Identity() * Dm_inv_t(0, 2);
+    // Dm_inv_t_jacobian.block<3, 3>(3, 0) =
+    //     Eigen::Matrix<Real, 3, 3>::Identity() * Dm_inv_t(1, 0);
+    // Dm_inv_t_jacobian.block<3, 3>(3, 3) =
+    //     Eigen::Matrix<Real, 3, 3>::Identity() * Dm_inv_t(1, 1);
+    // Dm_inv_t_jacobian.block<3, 3>(3, 6) =
+    //     Eigen::Matrix<Real, 3, 3>::Identity() * Dm_inv_t(1, 2);
+    // Dm_inv_t_jacobian.block<3, 3>(6, 0) =
+    //     Eigen::Matrix<Real, 3, 3>::Identity() * Dm_inv_t(2, 0);
+    // Dm_inv_t_jacobian.block<3, 3>(6, 3) =
+    //     Eigen::Matrix<Real, 3, 3>::Identity() * Dm_inv_t(2, 1);
+    // Dm_inv_t_jacobian.block<3, 3>(6, 6) =
+    //     Eigen::Matrix<Real, 3, 3>::Identity() * Dm_inv_t(2, 2);
     return Dm_inv_t_jacobian * J;
   }
 
@@ -82,7 +98,7 @@ struct FEMDeformationGradient3x2To3x3 {
 
   LM_DEVICE_FUNC OutputType operator()(const InputType &F3x2) const {
     OutputType F;
-    F.block<3, 2>(0, 0) = F3x2;
+    F.block(0, 0, 3, 2) = F3x2;
     F.col(2) = F3x2.col(0).cross(F3x2.col(1));
     return F;
   }
@@ -94,8 +110,11 @@ struct FEMDeformationGradient3x2To3x3 {
                   InputType::SizeAtCompileTime>
         J;
     Cross3<Real> cross3;
-    J.block<6, 6>(0, 0) = Eigen::Matrix<Real, 6, 6>::Identity();
-    J.block<3, 6>(6, 0) = cross3.Jacobian(F3x2);
+    J.setZero();
+    for (int i = 0; i < 6; i++) {
+      J(i, i) = 1;
+    }
+    J.block(6, 0, 3, 6) = cross3.Jacobian(F3x2);
     return J;
   }
 
@@ -138,20 +157,34 @@ struct FEMTriangleDeformationGradient3x2 {
                   InputType::SizeAtCompileTime>
         J;
     J.setZero();
-    J.block<3, 3>(0, 0) = -Eigen::Matrix<Real, 3, 3>::Identity();
-    J.block<3, 3>(0, 3) = Eigen::Matrix<Real, 3, 3>::Identity();
-    J.block<3, 3>(3, 0) = -Eigen::Matrix<Real, 3, 3>::Identity();
-    J.block<3, 3>(3, 6) = Eigen::Matrix<Real, 3, 3>::Identity();
-    Eigen::Matrix2<Real> Dm_inv_t = Dm.inverse().transpose();
+    for (int i = 0; i < 3; i++) {
+      J(i, i) = -1;
+      J(i, i + 3) = 1;
+      J(i + 3, i) = -1;
+      J(i + 3, i + 6) = 1;
+    }
+    // J.block<3, 3>(0, 0) = -Eigen::Matrix<Real, 3, 3>::Identity();
+    // J.block<3, 3>(0, 3) = Eigen::Matrix<Real, 3, 3>::Identity();
+    // J.block<3, 3>(3, 0) = -Eigen::Matrix<Real, 3, 3>::Identity();
+    // J.block<3, 3>(3, 6) = Eigen::Matrix<Real, 3, 3>::Identity();
+    Eigen::Matrix2<Real> Dm_inv = Dm.inverse();
+    Eigen::Matrix2<Real> Dm_inv_t = Dm_inv.transpose();
     Eigen::Matrix<Real, 6, 6> Dm_inv_t_jacobian;
-    Dm_inv_t_jacobian.block<3, 3>(0, 0) =
-        Eigen::Matrix<Real, 3, 3>::Identity() * Dm_inv_t(0, 0);
-    Dm_inv_t_jacobian.block<3, 3>(0, 3) =
-        Eigen::Matrix<Real, 3, 3>::Identity() * Dm_inv_t(0, 1);
-    Dm_inv_t_jacobian.block<3, 3>(3, 0) =
-        Eigen::Matrix<Real, 3, 3>::Identity() * Dm_inv_t(1, 0);
-    Dm_inv_t_jacobian.block<3, 3>(3, 3) =
-        Eigen::Matrix<Real, 3, 3>::Identity() * Dm_inv_t(1, 1);
+    Dm_inv_t_jacobian.setZero();
+    for (int i = 0; i < 3; i++) {
+      Dm_inv_t_jacobian(i, i) = Dm_inv_t(0, 0);
+      Dm_inv_t_jacobian(i, i + 3) = Dm_inv_t(0, 1);
+      Dm_inv_t_jacobian(i + 3, i) = Dm_inv_t(1, 0);
+      Dm_inv_t_jacobian(i + 3, i + 3) = Dm_inv_t(1, 1);
+    }
+    // Dm_inv_t_jacobian.block<3, 3>(0, 0) =
+    //     Eigen::Matrix<Real, 3, 3>::Identity() * Dm_inv_t(0, 0);
+    // Dm_inv_t_jacobian.block<3, 3>(0, 3) =
+    //     Eigen::Matrix<Real, 3, 3>::Identity() * Dm_inv_t(0, 1);
+    // Dm_inv_t_jacobian.block<3, 3>(3, 0) =
+    //     Eigen::Matrix<Real, 3, 3>::Identity() * Dm_inv_t(1, 0);
+    // Dm_inv_t_jacobian.block<3, 3>(3, 3) =
+    //     Eigen::Matrix<Real, 3, 3>::Identity() * Dm_inv_t(1, 1);
     return Dm_inv_t_jacobian * J;
   }
 

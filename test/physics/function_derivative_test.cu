@@ -1,13 +1,73 @@
-#include <glm/ext/scalar_constants.hpp>
+﻿#include <glm/ext/scalar_constants.hpp>
+#include <glm/glm.hpp>
 
 #include "cmath"
 #include "grassland/physics/physics.h"
 #include "gtest/gtest.h"
 #include "iostream"
-#include "long_march.h"
 #include "random"
 
-using namespace long_march;
+using namespace grassland;
+
+template <typename FunctionSet>
+__global__ void DeviceValueKernel(FunctionSet f,
+                                  const typename FunctionSet::InputType v,
+                                  typename FunctionSet::OutputType *out) {
+  out[0] = f(v);
+}
+
+template <typename FunctionSet>
+__global__ void DeviceJacobianKernel(FunctionSet f,
+                                     const typename FunctionSet::InputType v,
+                                     JacobianType<FunctionSet> *out) {
+  out[0] = f.Jacobian(v);
+}
+
+template <typename FunctionSet>
+__global__ void DeviceHessianKernel(FunctionSet f,
+                                    const typename FunctionSet::InputType v,
+                                    HessianType<FunctionSet> *out) {
+  out[0] = f.Hessian(v);
+}
+
+template <typename FunctionSet>
+typename FunctionSet::OutputType DeviceValue(
+    FunctionSet f,
+    const typename FunctionSet::InputType &x) {
+  typename FunctionSet::OutputType *out;
+  cudaMallocManaged(&out, sizeof(FunctionSet::OutputType));
+  DeviceValueKernel<<<1, 1>>>(f, x, out);
+  cudaDeviceSynchronize();
+  typename FunctionSet::OutputType result = *out;
+  cudaFree(out);
+  return result;
+}
+
+template <typename FunctionSet>
+JacobianType<FunctionSet> DeviceJacobian(
+    FunctionSet f,
+    const typename FunctionSet::InputType &x) {
+  JacobianType<FunctionSet> *out;
+  cudaMallocManaged(&out, sizeof(JacobianType<FunctionSet>));
+  DeviceJacobianKernel<<<1, 1>>>(f, x, out);
+  cudaDeviceSynchronize();
+  JacobianType<FunctionSet> result = *out;
+  cudaFree(out);
+  return result;
+}
+
+template <typename FunctionSet>
+HessianType<FunctionSet> DeviceHessian(
+    FunctionSet f,
+    const typename FunctionSet::InputType &x) {
+  HessianType<FunctionSet> *out;
+  cudaMallocManaged(&out, sizeof(HessianType<FunctionSet>));
+  DeviceHessianKernel<<<1, 1>>>(f, x, out);
+  cudaDeviceSynchronize();
+  HessianType<FunctionSet> result = *out;
+  cudaFree(out);
+  return result;
+}
 
 template <typename FunctionSet = Determinant3<double>>
 void TestFunctionSet(FunctionSet f = FunctionSet{}, const int test_cnt = 100) {
@@ -40,10 +100,23 @@ void TestFunctionSet(FunctionSet f = FunctionSet{}, const int test_cnt = 100) {
 
     Real eps = algebra::Eps<Real>();
     OutputVec y = OutputTypeToOutputVec(f(InputVecToInputType(x)));
+    OutputVec y_device =
+        OutputTypeToOutputVec(DeviceValue(f, InputVecToInputType(x)));
+
+    for (int i = 0; i < y.size(); i++) {
+      EXPECT_NEAR(y(i), y_device(i), fmax(fabs(sqrt(eps) * y(i)), sqrt(eps)));
+    }
+
     JacobiType J = f.Jacobian(InputVecToInputType(x));
     JacobiType J_finite_diff;
-    J_finite_diff.setZero();
 
+    JacobiType J_device = DeviceJacobian(f, InputVecToInputType(x));
+
+    for (int i = 0; i < J.size(); i++) {
+      EXPECT_NEAR(J(i), J_device(i), fmax(fabs(sqrt(eps) * J(i)), sqrt(eps)));
+    }
+
+    J_finite_diff.setZero();
     for (int j = 0; j < x.size(); j++) {
       InputVec x_plus = x;
       x_plus[j] += eps;
@@ -77,6 +150,17 @@ void TestFunctionSet(FunctionSet f = FunctionSet{}, const int test_cnt = 100) {
                       FunctionSet::InputType::SizeAtCompileTime>;
     HessianType H = f.Hessian(InputVecToInputType(x));
     HessianType H_finite_diff;
+
+    HessianType H_device = DeviceHessian(f, InputVecToInputType(x));
+
+    for (int j = 0; j < OutputVec::SizeAtCompileTime; j++) {
+      for (int k = 0; k < InputVec::SizeAtCompileTime; k++) {
+        for (int l = 0; l < InputVec::SizeAtCompileTime; l++) {
+          EXPECT_NEAR(H.m[j](k, l), H_device.m[j](k, l),
+                      fmax(fabs(sqrt(eps) * H.m[j](k, l)), sqrt(eps)));
+        }
+      }
+    }
 
     for (int j = 0; j < x.size(); j++) {
       InputVec x_plus = x;

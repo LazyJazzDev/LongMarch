@@ -5,6 +5,16 @@
 
 namespace grassland {
 
+template <typename Func>
+using JacobianType = Eigen::Matrix<typename Func::Scalar,
+                                   Func::OutputType::SizeAtCompileTime,
+                                   Func::InputType::SizeAtCompileTime>;
+
+template <typename Func>
+using HessianType = HessianTensor<typename Func::Scalar,
+                                  Func::OutputType::SizeAtCompileTime,
+                                  Func::InputType::SizeAtCompileTime>;
+
 template <typename Func1, typename Func2>
 struct Compose {
   Func1 f1;
@@ -62,9 +72,9 @@ struct Determinant3 {
     Eigen::Matrix<Real, OutputType::SizeAtCompileTime,
                   InputType::SizeAtCompileTime>
         J;
-    J.block<1, 3>(0, 0) = A.col(1).cross(A.col(2)).transpose();
-    J.block<1, 3>(0, 3) = A.col(2).cross(A.col(0)).transpose();
-    J.block<1, 3>(0, 6) = A.col(0).cross(A.col(1)).transpose();
+    J.block(0, 0, 1, 3) = A.col(1).cross(A.col(2)).transpose();
+    J.block(0, 3, 1, 3) = A.col(2).cross(A.col(0)).transpose();
+    J.block(0, 6, 1, 3) = A.col(0).cross(A.col(1)).transpose();
     return J;
   }
 
@@ -75,12 +85,12 @@ struct Determinant3 {
     HessianTensor<Real, OutputType::SizeAtCompileTime,
                   InputType::SizeAtCompileTime>
         H;
-    H.m[0].block<3, 3>(0, 3) = Skew3<Real>(-A.col(2));
-    H.m[0].block<3, 3>(0, 6) = Skew3<Real>(A.col(1));
-    H.m[0].block<3, 3>(3, 0) = Skew3<Real>(A.col(2));
-    H.m[0].block<3, 3>(3, 6) = Skew3<Real>(-A.col(0));
-    H.m[0].block<3, 3>(6, 0) = Skew3<Real>(-A.col(1));
-    H.m[0].block<3, 3>(6, 3) = Skew3<Real>(A.col(0));
+    H.m[0].block(0, 3, 3, 3) = Skew3<Real>(-A.col(2));
+    H.m[0].block(0, 6, 3, 3) = Skew3<Real>(A.col(1));
+    H.m[0].block(3, 0, 3, 3) = Skew3<Real>(A.col(2));
+    H.m[0].block(3, 6, 3, 3) = Skew3<Real>(-A.col(0));
+    H.m[0].block(6, 0, 3, 3) = Skew3<Real>(-A.col(1));
+    H.m[0].block(6, 3, 3, 3) = Skew3<Real>(A.col(0));
     return H;
   }
 };
@@ -276,8 +286,8 @@ struct Cross3 {
     Eigen::Matrix<Real, OutputType::SizeAtCompileTime,
                   InputType::SizeAtCompileTime>
         J;
-    J.block<3, 3>(0, 0) = -Skew3<Real>(v.col(1));
-    J.block<3, 3>(0, 3) = Skew3<Real>(v.col(0));
+    J.block(0, 0, 3, 3) = -Skew3<Real>(v.col(1));
+    J.block(0, 3, 3, 3) = Skew3<Real>(v.col(0));
     return J;
   }
 
@@ -329,8 +339,8 @@ struct Dot {
     Eigen::Matrix<Real, OutputType::SizeAtCompileTime,
                   InputType::SizeAtCompileTime>
         J;
-    J.block<1, 3>(0, 0) = v.col(1).transpose();
-    J.block<1, 3>(0, 3) = v.col(0).transpose();
+    J.block(0, 0, 1, 3) = v.col(1).transpose();
+    J.block(0, 3, 1, 3) = v.col(0).transpose();
     return J;
   }
 

@@ -7,6 +7,7 @@
 #include <vk_mem_alloc.h>
 #include <vulkan/vulkan.h>
 
+#include <algorithm>
 #include <optional>
 #include <string>
 #include <vector>

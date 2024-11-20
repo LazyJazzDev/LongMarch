@@ -25,12 +25,18 @@ else ()
     message(STATUS "CUDA not found, skipping CUDA code.")
 endif ()
 
+if (MSVC)
+#    add_compile_options("$<$<COMPILE_LANGUAGE:CXX>:/utf-8>")
+#    set(CMAKE_CUDA_FLAGS "${CMAKE_CUDA_FLAGS} -Xcompiler=\"/utf-8\"")
+#    add_compile_options("$<$<COMPILE_LANGUAGE:CUDA>:-Xcompiler \"/source-charset:utf-8\",\"/execution-charset:utf-8\">")
+endif()
+
 find_package(fmt CONFIG REQUIRED)
-set(FMT_LIB_NAME fmt::fmt-header-only) # fmt::fmt is also available
+set(FMT_LIB_NAME fmt::fmt) # fmt::fmt is also available
 list(APPEND LIB_LIST ${FMT_LIB_NAME})
 
 find_package(spdlog CONFIG REQUIRED)
-set(SPDLOG_LIB_NAME spdlog::spdlog_header_only) # spdlog::spdlog is also available
+set(SPDLOG_LIB_NAME spdlog::spdlog) # spdlog::spdlog is also available
 list(APPEND LIB_LIST ${SPDLOG_LIB_NAME})
 
 find_package(Eigen3 CONFIG REQUIRED)

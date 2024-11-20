@@ -18,8 +18,8 @@ struct DihedralAngleAssistEdgesToNormalsAxis {
     CrossNormalized<Real> cross_normalized;
     VecNormalized<Real> vec_normalized;
     OutputType normals_axis;
-    normals_axis.col(0) = cross_normalized(E.block<3, 2>(0, 0));
-    normals_axis.col(1) = -cross_normalized(E.block<3, 2>(0, 1));
+    normals_axis.col(0) = cross_normalized(E.block(0, 0, 3, 2));
+    normals_axis.col(1) = -cross_normalized(E.block(0, 1, 3, 2));
     normals_axis.col(2) = vec_normalized(E.col(1));
     return normals_axis;
   }
@@ -33,9 +33,9 @@ struct DihedralAngleAssistEdgesToNormalsAxis {
     J.setZero();
     CrossNormalized<Real> cross_normalized;
     VecNormalized<Real> vec_normalized;
-    J.block<3, 6>(0, 0) = cross_normalized.Jacobian(E.block<3, 2>(0, 0));
-    J.block<3, 6>(3, 3) = -cross_normalized.Jacobian(E.block<3, 2>(0, 1));
-    J.block<3, 3>(6, 3) = vec_normalized.Jacobian(E.col(1));
+    J.block(0, 0, 3, 6) = cross_normalized.Jacobian(E.block(0, 0, 3, 2));
+    J.block(3, 3, 3, 6) = -cross_normalized.Jacobian(E.block(0, 1, 3, 2));
+    J.block(6, 3, 3, 3) = vec_normalized.Jacobian(E.col(1));
     return J;
   }
 
@@ -49,7 +49,7 @@ struct DihedralAngleAssistEdgesToNormalsAxis {
     CrossNormalized<Real> cross_normalized;
     VecNormalized<Real> vec_normalized;
     auto cross_normalized_hessian =
-        cross_normalized.Hessian(E.block<3, 2>(0, 0));
+        cross_normalized.Hessian(E.block(0, 0, 3, 2));
     for (int i = 0; i < 3; i++) {
       for (int j = 0; j < 6; j++) {
         for (int k = 0; k < 6; k++) {
@@ -57,7 +57,7 @@ struct DihedralAngleAssistEdgesToNormalsAxis {
         }
       }
     }
-    cross_normalized_hessian = -cross_normalized.Hessian(E.block<3, 2>(0, 1));
+    cross_normalized_hessian = -cross_normalized.Hessian(E.block(0, 1, 3, 2));
     for (int i = 0; i < 3; i++) {
       for (int j = 0; j < 6; j++) {
         for (int k = 0; k < 6; k++) {
@@ -103,7 +103,7 @@ struct DihedralAngleAssistNormalsAxisToSinCosTheta {
     Determinant3<Real> det3;
     Dot<Real> dot;
     J.row(0) = det3.Jacobian(N);
-    J.block<1, 6>(1, 0) = dot.Jacobian(N.block<3, 2>(0, 0));
+    J.block(1, 0, 1, 6) = dot.Jacobian(N.block(0, 0, 3, 2));
     return J;
   }
 
@@ -115,7 +115,7 @@ struct DihedralAngleAssistNormalsAxisToSinCosTheta {
                   InputType::SizeAtCompileTime>
         H;
     H.m[0] = Determinant3<Real>().Hessian(A).m[0];
-    H.m[1].block<6, 6>(0, 0) = Dot<Real>().Hessian(A.block<3, 2>(0, 0)).m[0];
+    H.m[1].block(0, 0, 6, 6) = Dot<Real>().Hessian(A.block(0, 0, 3, 2)).m[0];
     return H;
   }
 };
@@ -145,12 +145,20 @@ struct DihedralAngleAssistVerticesToEdges {
                   InputType::SizeAtCompileTime>
         J;
     J.setZero();
-    J.block<3, 3>(0, 0) = -Eigen::Matrix<Real, 3, 3>::Identity();
-    J.block<3, 3>(0, 3) = Eigen::Matrix<Real, 3, 3>::Identity();
-    J.block<3, 3>(3, 3) = -Eigen::Matrix<Real, 3, 3>::Identity();
-    J.block<3, 3>(3, 6) = Eigen::Matrix<Real, 3, 3>::Identity();
-    J.block<3, 3>(6, 6) = -Eigen::Matrix<Real, 3, 3>::Identity();
-    J.block<3, 3>(6, 9) = Eigen::Matrix<Real, 3, 3>::Identity();
+    // J.block<3, 3>(0, 0) = -Eigen::Matrix<Real, 3, 3>::Identity();
+    // J.block<3, 3>(0, 3) = Eigen::Matrix<Real, 3, 3>::Identity();
+    // J.block<3, 3>(3, 3) = -Eigen::Matrix<Real, 3, 3>::Identity();
+    // J.block<3, 3>(3, 6) = Eigen::Matrix<Real, 3, 3>::Identity();
+    // J.block<3, 3>(6, 6) = -Eigen::Matrix<Real, 3, 3>::Identity();
+    // J.block<3, 3>(6, 9) = Eigen::Matrix<Real, 3, 3>::Identity();
+    for (int i = 0; i < 3; i++) {
+      J(i, i) = -1;
+      J(i, i + 3) = 1;
+      J(i + 3, i + 3) = -1;
+      J(i + 3, i + 6) = 1;
+      J(i + 6, i + 6) = -1;
+      J(i + 6, i + 9) = 1;
+    }
     return J;
   }
 
