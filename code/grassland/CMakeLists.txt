@@ -13,4 +13,4 @@ endforeach ()
 
 message(STATUS "GRASSLAND_LIBS: ${GRASSLAND_LIBS}")
 
-target_link_libraries(Grassland ${GRASSLAND_LIBS})
+target_link_libraries(Grassland PUBLIC ${GRASSLAND_LIBS})
