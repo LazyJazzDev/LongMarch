@@ -190,6 +190,39 @@ void Application::CreatePipelineAssets() {
       CompileShader(GetShaderCode("shaders/main.hlsl"), "PSMain", "ps_5_0"),
       &pixel_shader_);
 
+  ComPtr<ID3DBlob> vertex_shader_blob =
+      CompileShader(GetShaderCode("shaders/main.hlsl"), "VSMain", "vs_5_0");
+
+  ComPtr<ID3DBlob> root_signature_blob;
+  ComPtr<ID3DBlob> error_blob;
+  if (FAILED(D3DGetBlobPart(vertex_shader_blob->GetBufferPointer(),
+                            vertex_shader_blob->GetBufferSize(),
+                            D3D_BLOB_ROOT_SIGNATURE, 0,
+                            &root_signature_blob))) {
+    std::cout << "Failed to get root signature blob" << std::endl;
+  }
+
+  ComPtr<ID3D12VersionedRootSignatureDeserializer> root_signature_deserializer;
+
+  D3D12CreateVersionedRootSignatureDeserializer(
+      root_signature_blob->GetBufferPointer(),
+      root_signature_blob->GetBufferSize(),
+      IID_PPV_ARGS(&root_signature_deserializer));
+
+  const D3D12_VERSIONED_ROOT_SIGNATURE_DESC *root_signature_desc_retrieved;
+
+  root_signature_deserializer->GetRootSignatureDescAtVersion(
+      D3D_ROOT_SIGNATURE_VERSION_1_1, &root_signature_desc_retrieved);
+
+  std::cout << "Root signature flags: "
+            << root_signature_desc_retrieved->Desc_1_1.Flags << std::endl;
+  std::cout << "Root signature num parameters: "
+            << root_signature_desc_retrieved->Desc_1_1.NumParameters
+            << std::endl;
+  std::cout << "Root signature num static samplers: "
+            << root_signature_desc_retrieved->Desc_1_1.NumStaticSamplers
+            << std::endl;
+
   CD3DX12_VERSIONED_ROOT_SIGNATURE_DESC root_signature_desc;
   root_signature_desc.Init_1_1(
       0, nullptr, 0, nullptr,
