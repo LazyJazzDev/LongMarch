@@ -1,8 +1,4 @@
-//
-// Created by zijian on 2024/12/3.
-//
+#pragma once
+#include "grassland/graphics/graphics_util.h"
 
-#ifndef IMAGE_H
-#define IMAGE_H
-
-#endif  // IMAGE_H
+namespace grassland::graphics {}

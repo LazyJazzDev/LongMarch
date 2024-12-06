@@ -1,8 +1,3 @@
-//
-// Created by zijian on 2024/12/3.
-//
-
-#ifndef GRAPHICS_H
-#define GRAPHICS_H
-
-#endif  // GRAPHICS_H
+#pragma once
+#include "grassland/graphics/backend/backend.h"
+#include "grassland/graphics/interface.h"

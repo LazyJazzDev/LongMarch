@@ -3,7 +3,6 @@
 // Include GLFW native window handle
 #define GLFW_EXPOSE_NATIVE_WIN32
 #include <GLFW/glfw3native.h>
-#include <dxcapi.h>
 
 #include "grassland/d3d12/buffer.h"
 #include "grassland/d3d12/device.h"
@@ -117,7 +116,7 @@ void Application::CreateWindowAssets() {
   glfwWindowHint(GLFW_RESIZABLE, GLFW_FALSE);
 
   glfw_window_ =
-      glfwCreateWindow(800, 600, "D3D12 Hello Triangle", nullptr, nullptr);
+      glfwCreateWindow(800, 600, "D3D12 Hello Cube", nullptr, nullptr);
 
   CreateDXGIFactory(&factory_);
 
@@ -185,24 +184,6 @@ void Application::CreatePipelineAssets() {
                    staging_index_buffer->Size());
       });
 
-  // Read
-  const std::string shader_code_path =
-      "C:\\Users\\zijian\\LongMarch\\demo\\d3d12_hello_triangle\\shaders\\main."
-      "cso";
-  std::ifstream shader_code_file(shader_code_path, std::ios::binary);
-  shader_code_file.seekg(0, std::ios::end);
-  size_t shader_code_size = shader_code_file.tellg();
-  shader_code_file.seekg(0, std::ios::beg);
-  std::vector<char> shader_code(shader_code_size);
-  shader_code_file.read(shader_code.data(), shader_code_size);
-  shader_code_file.close();
-  LogInfo("{}", shader_code_size);
-  ComPtr<ID3DBlob> vertex_shader_blob;
-
-  D3DCreateBlob(shader_code_size, &vertex_shader_blob);
-  std::memcpy(vertex_shader_blob->GetBufferPointer(), shader_code.data(),
-              shader_code_size);
-
   device_->CreateShaderModule(
       CompileShader(GetShaderCode("shaders/main.hlsl"), "VSMain", "vs_6_0"),
       &vertex_shader_);
@@ -210,11 +191,38 @@ void Application::CreatePipelineAssets() {
       CompileShader(GetShaderCode("shaders/main.hlsl"), "PSMain", "ps_6_0"),
       &pixel_shader_);
 
-  LogInfo("{}", GetShaderCode("shaders/main.hlsl"));
+  ComPtr<ID3DBlob> vertex_shader_blob =
+      CompileShader(GetShaderCode("shaders/main.hlsl"), "VSMain", "vs_5_0");
 
-  // ComPtr<ID3DBlob> vertex_shader_blob =
-  //     CompileShaderLegacy(GetShaderCode("shaders/main.hlsl"), "VSMain",
-  //     "vs_6_0");
+  ComPtr<ID3DBlob> root_signature_blob;
+  ComPtr<ID3DBlob> error_blob;
+  if (FAILED(D3DGetBlobPart(vertex_shader_blob->GetBufferPointer(),
+                            vertex_shader_blob->GetBufferSize(),
+                            D3D_BLOB_ROOT_SIGNATURE, 0,
+                            &root_signature_blob))) {
+    std::cout << "Failed to get root signature blob" << std::endl;
+  }
+
+  ComPtr<ID3D12VersionedRootSignatureDeserializer> root_signature_deserializer;
+
+  D3D12CreateVersionedRootSignatureDeserializer(
+      root_signature_blob->GetBufferPointer(),
+      root_signature_blob->GetBufferSize(),
+      IID_PPV_ARGS(&root_signature_deserializer));
+
+  const D3D12_VERSIONED_ROOT_SIGNATURE_DESC *root_signature_desc_retrieved;
+
+  root_signature_deserializer->GetRootSignatureDescAtVersion(
+      D3D_ROOT_SIGNATURE_VERSION_1_1, &root_signature_desc_retrieved);
+
+  std::cout << "Root signature flags: "
+            << root_signature_desc_retrieved->Desc_1_1.Flags << std::endl;
+  std::cout << "Root signature num parameters: "
+            << root_signature_desc_retrieved->Desc_1_1.NumParameters
+            << std::endl;
+  std::cout << "Root signature num static samplers: "
+            << root_signature_desc_retrieved->Desc_1_1.NumStaticSamplers
+            << std::endl;
 
   CD3DX12_VERSIONED_ROOT_SIGNATURE_DESC root_signature_desc;
   root_signature_desc.Init_1_1(
@@ -224,9 +232,9 @@ void Application::CreatePipelineAssets() {
   device_->CreateRootSignature(root_signature_desc, &root_signature_);
 
   std::vector<D3D12_INPUT_ELEMENT_DESC> input_element_descs = {
-      {"TEXCOORD", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, 0,
+      {"ATTRIBUTE", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, 0,
        D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0},
-      {"TEXCOORD", 1, DXGI_FORMAT_R32G32B32_FLOAT, 0, 12,
+      {"ATTRIBUTE", 1, DXGI_FORMAT_R32G32B32_FLOAT, 0, 12,
        D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0},
   };
 

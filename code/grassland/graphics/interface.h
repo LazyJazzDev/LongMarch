@@ -1,8 +1,6 @@
-//
-// Created by zijian on 2024/12/3.
-//
+#pragma once
+#include "grassland/graphics/buffer.h"
+#include "grassland/graphics/core.h"
+#include "grassland/graphics/image.h"
 
-#ifndef GRAPHICS_INTERFACE_H
-#define GRAPHICS_INTERFACE_H
-
-#endif  // GRAPHICS_INTERFACE_H
+namespace grassland::graphics {}

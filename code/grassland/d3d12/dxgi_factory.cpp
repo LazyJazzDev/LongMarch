@@ -24,7 +24,24 @@ void Warning(const std::string &message) {
 
 namespace {
 std::string error_message;
+
+void EnableD3D12DebugLayer() {
+  ComPtr<ID3D12Debug> debugController;
+  if (SUCCEEDED(D3D12GetDebugInterface(IID_PPV_ARGS(&debugController)))) {
+    debugController->EnableDebugLayer();
+    std::cout << "D3D12 Debug Layer enabled." << std::endl;
+  } else {
+    std::cerr << "Failed to enable D3D12 Debug Layer." << std::endl;
+  }
+
+  ComPtr<ID3D12Debug1> debugController1;
+  if (SUCCEEDED(D3D12GetDebugInterface(IID_PPV_ARGS(&debugController1)))) {
+    debugController1->SetEnableGPUBasedValidation(TRUE);
+    std::cout << "GPU-based validation enabled." << std::endl;
+  }
 }
+
+}  // namespace
 
 void SetErrorMessage(const std::string &message) {
   LogError("[D3D12] " + message);
@@ -58,6 +75,10 @@ HRESULT DXGIFactory::CreateDevice(
     const DeviceFeatureRequirement &device_feature_requirement,
     int device_index,
     double_ptr<Device> pp_device) {
+#ifndef NDEBUG
+  EnableD3D12DebugLayer();
+#endif
+
   auto adapters = EnumerateAdapters();
 
   if (device_index < 0) {

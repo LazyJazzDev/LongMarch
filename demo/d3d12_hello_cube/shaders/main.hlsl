@@ -9,9 +9,18 @@ struct PSInput {
   float3 color : COLOR;
 };
 
+struct UniformBufferObject {
+  float4x4 model;
+  float4x4 view;
+  float4x4 proj;
+};
+
+ConstantBuffer<UniformBufferObject> ubo : register(b0);
+
 PSInput VSMain(VSInput input) {
   PSInput output;
-  output.position = float4(input.position, 1.0f);
+  output.position = mul(
+      ubo.proj, mul(ubo.view, mul(ubo.model, float4(input.position, 1.0f))));
   output.color = input.color;
   return output;
 }
