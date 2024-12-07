@@ -50,6 +50,8 @@ std::string HRESULTToString(HRESULT hr);
 
 size_t SizeByFormat(DXGI_FORMAT format);
 
+size_t SizeAlignTo(size_t size, size_t alignment);
+
 #define RETURN_IF_FAILED_HR(cmd, ...)                               \
   do {                                                              \
     HRESULT res = cmd;                                              \

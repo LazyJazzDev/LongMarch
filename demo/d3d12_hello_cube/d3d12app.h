@@ -11,6 +11,12 @@ struct Vertex {
   glm::vec3 color;
 };
 
+struct UniformBufferObject {
+  glm::mat4 model;
+  glm::mat4 view;
+  glm::mat4 proj;
+};
+
 class Application {
  public:
   Application();
@@ -52,7 +58,12 @@ class Application {
   std::unique_ptr<RootSignature> root_signature_;
   std::unique_ptr<PipelineState> pipeline_state_;
 
+  std::unique_ptr<Buffer> uniform_buffer_;
+  std::unique_ptr<DescriptorHeap> descriptor_heap_;
+
   std::unique_ptr<Image> texture_;
+  std::unique_ptr<Image> depth_image_;
+  std::unique_ptr<DescriptorHeap> dsv_descriptor_heap_;
 };
 
 }  // namespace D3D12

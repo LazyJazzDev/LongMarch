@@ -90,7 +90,8 @@ HRESULT Device::CreateBuffer(size_t size,
   ComPtr<ID3D12Resource> buffer;
   CD3DX12_HEAP_PROPERTIES heap_properties(heap_type);
 
-  CD3DX12_RESOURCE_DESC resource_desc = CD3DX12_RESOURCE_DESC::Buffer(size);
+  CD3DX12_RESOURCE_DESC resource_desc =
+      CD3DX12_RESOURCE_DESC::Buffer(SizeAlignTo(size, 256));
 
   RETURN_IF_FAILED_HR(
       device_->CreateCommittedResource(&heap_properties, D3D12_HEAP_FLAG_NONE,
@@ -106,8 +107,7 @@ HRESULT Device::CreateBuffer(size_t size,
 HRESULT Device::CreateBuffer(size_t size,
                              D3D12_HEAP_TYPE heap_type,
                              double_ptr<Buffer> pp_buffer) {
-  return CreateBuffer(size, heap_type, D3D12_RESOURCE_STATE_GENERIC_READ,
-                      pp_buffer);
+  return CreateBuffer(size, heap_type, D3D12_RESOURCE_STATE_COMMON, pp_buffer);
 }
 
 HRESULT Device::CreateBuffer(size_t size, double_ptr<Buffer> pp_buffer) {
@@ -145,10 +145,7 @@ HRESULT Device::CreateImage(size_t width,
                             DXGI_FORMAT format,
                             double_ptr<Image> pp_image) {
   return CreateImage(width, height, format,
-                     D3D12_RESOURCE_FLAG_ALLOW_RENDER_TARGET |
-                         D3D12_RESOURCE_FLAG_ALLOW_DEPTH_STENCIL |
-                         D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS,
-                     pp_image);
+                     D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS, pp_image);
 }
 
 HRESULT Device::CreateImageF32(size_t width,

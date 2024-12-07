@@ -58,4 +58,8 @@ size_t SizeByFormat(DXGI_FORMAT format) {
   }
 }
 
+size_t SizeAlignTo(size_t size, size_t alignment) {
+  return (size + alignment - 1) & ~(alignment - 1);
+}
+
 }  // namespace grassland::d3d12

@@ -56,11 +56,6 @@ ComPtr<ID3DBlob> CompileShader(const std::string &source_code,
     LogError("Failed to create blob with encoding from pinned.");
   }
 
-  HMODULE dxil_module = LoadLibrary("dxil.dll");
-  if (!dxil_module) {
-    LogError("Failed to load dxil.dll.");
-  }
-
   ComPtr<IDxcCompilerArgs> dxc_args;
   dxc_utils->BuildArguments(nullptr, StringToWString(entry_point).c_str(),
                             StringToWString(target).c_str(), nullptr, 0,
