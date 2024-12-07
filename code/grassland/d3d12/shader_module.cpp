@@ -71,12 +71,6 @@ ComPtr<ID3DBlob> CompileShader(const std::string &source_code,
                              dxc_args->GetCount(), nullptr,
                              IID_PPV_ARGS(&result));
 
-  auto args = dxc_args->GetArguments();
-
-  for (int i = 0; i < dxc_args->GetCount(); i++) {
-    LogInfo("Arg: {}", WStringToString(args[i]));
-  }
-
   if (result->HasOutput(DXC_OUT_ERRORS)) {
     ComPtr<IDxcBlobUtf8> error_blob;
     ComPtr<IDxcBlobUtf16> output_name;
@@ -90,21 +84,6 @@ ComPtr<ID3DBlob> CompileShader(const std::string &source_code,
     ComPtr<IDxcBlob> object_blob;
     ComPtr<IDxcBlobUtf16> output_name;
     result->GetOutput(DXC_OUT_OBJECT, IID_PPV_ARGS(&object_blob), &output_name);
-
-    ComPtr<IDxcValidator2> dxc_validator;
-    DxcCreateInstance(CLSID_DxcValidator, IID_PPV_ARGS(&dxc_validator));
-    ComPtr<IDxcOperationResult> validation_result;
-    hr = dxc_validator->Validate(
-        object_blob.Get(), DxcValidatorFlags_InPlaceEdit, &validation_result);
-    validation_result->GetStatus(&hr);
-    if (FAILED(hr)) {
-      LogError("Failed to validate shader.");
-      ComPtr<IDxcBlobEncoding> error_blob;
-      validation_result->GetErrorBuffer(&error_blob);
-      LogError("{}", static_cast<char *>(error_blob->GetBufferPointer()));
-    } else {
-      LogInfo("Shader validated.");
-    }
 
     D3DCreateBlob(object_blob->GetBufferSize(), &shader_blob);
     std::memcpy(shader_blob->GetBufferPointer(),
