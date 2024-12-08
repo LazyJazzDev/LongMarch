@@ -37,7 +37,7 @@ void Application::Run() {
 void Application::OnInit() {
   VkResult result;
   result = long_march::vulkan::CreateInstance(
-      long_march::vulkan::InstanceCreateHint{true}, &instance_);
+      long_march::vulkan::InstanceCreateHint{}, &instance_);
   if (result != VK_SUCCESS) {
     throw std::runtime_error("Failed to create Vulkan instance");
   }

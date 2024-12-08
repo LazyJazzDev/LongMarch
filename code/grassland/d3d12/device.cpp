@@ -116,12 +116,23 @@ HRESULT Device::CreateBuffer(size_t size, double_ptr<Buffer> pp_buffer) {
 
 HRESULT Device::CreateImage(const D3D12_RESOURCE_DESC &desc,
                             double_ptr<Image> pp_image) {
+  D3D12_CLEAR_VALUE clear_value = {};
+  clear_value.Format = desc.Format;
+  if (desc.Format == DXGI_FORMAT_D32_FLOAT) {
+    clear_value.DepthStencil.Depth = 1.0f;
+    clear_value.DepthStencil.Stencil = 0;
+  } else {
+    clear_value.Color[0] = 0.0f;
+    clear_value.Color[1] = 0.0f;
+    clear_value.Color[2] = 0.0f;
+    clear_value.Color[3] = 1.0f;
+  }
+  const CD3DX12_HEAP_PROPERTIES heap_properties(D3D12_HEAP_TYPE_DEFAULT);
   ComPtr<ID3D12Resource> image;
   RETURN_IF_FAILED_HR(
-      device_->CreateCommittedResource(
-          &CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_DEFAULT),
-          D3D12_HEAP_FLAG_NONE, &desc, D3D12_RESOURCE_STATE_GENERIC_READ,
-          nullptr, IID_PPV_ARGS(&image)),
+      device_->CreateCommittedResource(&heap_properties, D3D12_HEAP_FLAG_NONE,
+                                       &desc, D3D12_RESOURCE_STATE_GENERIC_READ,
+                                       &clear_value, IID_PPV_ARGS(&image)),
       "failed to create image.");
 
   pp_image.construct(image);

@@ -8,7 +8,7 @@
 #include "grassland/vulkan/validation_layer.h"
 
 namespace grassland::vulkan {
-InstanceCreateHint::InstanceCreateHint(bool surface_support) {
+InstanceCreateHint::InstanceCreateHint() {
   app_info.sType = VK_STRUCTURE_TYPE_APPLICATION_INFO;
   app_info.pApplicationName = "Grassland";
   app_info.applicationVersion = VK_MAKE_VERSION(1, 0, 0);
@@ -16,9 +16,7 @@ InstanceCreateHint::InstanceCreateHint(bool surface_support) {
   app_info.engineVersion = VK_MAKE_VERSION(1, 0, 0);
   app_info.apiVersion = VK_API_VERSION_1_2;
 
-  if (surface_support) {
-    ApplyGLFWSurfaceSupport();
-  }
+  ApplyGLFWSurfaceSupport();
 }
 
 void InstanceCreateHint::SetValidationLayersEnabled(bool enabled) {
@@ -33,19 +31,29 @@ void InstanceCreateHint::ApplyGLFWSurfaceSupport() {
   uint32_t glfw_extension_count = 0;
   const char **glfw_extensions;
   glfw_extensions = glfwGetRequiredInstanceExtensions(&glfw_extension_count);
-  for (uint32_t i = 0; i < glfw_extension_count; i++) {
-    bool found = false;
-    for (const auto &ext : extensions) {
-      if (strcmp(ext, glfw_extensions[i]) == 0) {
-        found = true;
-        break;
-      }
-    }
-    if (!found) {
-      extensions.push_back(glfw_extensions[i]);
+  if (!glfw_extensions) {
+    int err = glfwGetError(nullptr);
+    if (err == GLFW_NOT_INITIALIZED) {
+      glfwInit();
+      glfw_extensions =
+          glfwGetRequiredInstanceExtensions(&glfw_extension_count);
+      glfwTerminate();
     }
   }
-  glfw_surface_support = true;
+  if (glfw_extensions) {
+    for (uint32_t i = 0; i < glfw_extension_count; i++) {
+      bool found = false;
+      for (const auto &ext : extensions) {
+        if (strcmp(ext, glfw_extensions[i]) == 0) {
+          found = true;
+          break;
+        }
+      }
+      if (!found) {
+        extensions.push_back(glfw_extensions[i]);
+      }
+    }
+  }
 }
 
 VkResult CreateInstance(InstanceCreateHint create_hint,
@@ -153,10 +161,6 @@ Instance::~Instance() {
 VkResult Instance::CreateSurfaceFromGLFWWindow(
     GLFWwindow *window,
     double_ptr<Surface> pp_surface) const {
-  if (!create_hint_.glfw_surface_support) {
-    Warning("GLFW surface support is not enabled.");
-  }
-
   VkSurfaceKHR surface{nullptr};
   VkResult result =
       glfwCreateWindowSurface(instance_, window, nullptr, &surface);

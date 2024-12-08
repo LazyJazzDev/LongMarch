@@ -13,9 +13,7 @@ struct InstanceCreateHint {
 
   VkApplicationInfo app_info{};
 
-  bool glfw_surface_support{false};
-
-  explicit InstanceCreateHint(bool surface_support = true);
+  explicit InstanceCreateHint();
 
   void SetValidationLayersEnabled(
       bool enabled = kDefaultEnableValidationLayers);
