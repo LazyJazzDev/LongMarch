@@ -1,21 +1,25 @@
 #include "app.h"
 
 Application::Application() {
-  uint32_t glfw_extension_count = 0;
-  const char **glfw_extensions;
-  glfw_extensions = glfwGetRequiredInstanceExtensions(&glfw_extension_count);
-  if (!glfw_extensions) {
-    const char *glfw_error;
-    int ret = glfwGetError(&glfw_error);
-    if (ret != GLFW_NO_ERROR) {
-      printf("Error: %s\n", glfw_error);
-      printf("Is GLFW not initialized: %s\n",
-             ret == GLFW_NOT_INITIALIZED ? "yes" : "no");
-    }
+  grassland::graphics::CreateCore(grassland::graphics::BACKEND_API_D3D12,
+                                  grassland::graphics::Core::Settings{},
+                                  &core_);
+
+  auto d3d12_core =
+      std::dynamic_pointer_cast<grassland::graphics::backend::D3D12Core>(core_);
+  auto vulkan_core =
+      std::dynamic_pointer_cast<grassland::graphics::backend::VulkanCore>(
+          core_);
+
+  if (d3d12_core) {
+    puts("Is D3D12Core");
+  } else {
+    puts("Not D3D12Core");
   }
 
-  glfwInit();
-  glfwTerminate();
-
-  grassland::LogInfo("Hello, Triangle!");
+  if (vulkan_core) {
+    puts("Is VulkanCore");
+  } else {
+    puts("Not VulkanCore");
+  }
 }

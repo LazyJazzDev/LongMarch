@@ -4,9 +4,8 @@
 namespace grassland::graphics {
 
 typedef enum BackendAPI {
-  None = 0,
-  Vulkan = 1,
-  D3D12 = 2,
+  BACKEND_API_VULKAN = 0,
+  BACKEND_API_D3D12 = 1,
 } BackendAPI;
 
 typedef enum ImageFormat {
@@ -20,19 +19,29 @@ typedef enum ImageFormat {
   IMAGE_FORMAT_D32_SFLOAT = 7,
 } ImageFormat;
 
-typedef enum AttributeFormat {
-  UINT = 0,
-  INT = 1,
-  FLOAT = 2,
-  UINT2 = 3,
-  INT2 = 4,
-  FLOAT2 = 5,
-  UINT3 = 6,
-  INT3 = 7,
-  FLOAT3 = 8,
-  UINT4 = 9,
-  INT4 = 10,
-  FLOAT4 = 11,
-} AttributeFormat;
+typedef enum InputType {
+  INPUT_TYPE_UINT = 0,
+  INPUT_TYPE_INT = 1,
+  INPUT_TYPE_FLOAT = 2,
+  INPUT_TYPE_UINT2 = 3,
+  INPUT_TYPE_INT2 = 4,
+  INPUT_TYPE_FLOAT2 = 5,
+  INPUT_TYPE_UINT3 = 6,
+  INPUT_TYPE_INT3 = 7,
+  INPUT_TYPE_FLOAT3 = 8,
+  INPUT_TYPE_UINT4 = 9,
+  INPUT_TYPE_INT4 = 10,
+  INPUT_TYPE_FLOAT4 = 11,
+} InputType;
+
+typedef enum BufferType {
+  BUFFER_TYPE_STATIC = 0,
+  BUFFER_TYPE_DYNAMIC = 1,
+  BUFFER_TYPE_ONETIME = 2,
+} BufferType;
+
+class Core;
+class Buffer;
+class Image;
 
 }  // namespace grassland::graphics
