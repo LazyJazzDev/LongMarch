@@ -52,10 +52,7 @@ class DeviceCreateInfo
 DeviceFeatureRequirement::GenerateRecommendedDeviceCreateInfo(
     const PhysicalDevice &physical_device) const {
   DeviceCreateInfo create_info;
-
-  if (surface) {
-    create_info.AddExtension(VK_KHR_SWAPCHAIN_EXTENSION_NAME);
-  }
+  create_info.AddExtension(VK_KHR_SWAPCHAIN_EXTENSION_NAME);
 
 #ifdef __APPLE__
   create_info.AddExtension("VK_KHR_portability_subset");
@@ -120,37 +117,11 @@ DeviceFeatureRequirement::GenerateRecommendedDeviceCreateInfo(
   create_info.AddFeature(physical_device_descriptor_indexing_features);
   create_info.AddFeature(physical_device_dynamic_rendering_features);
 
-  //        VkPhysicalDeviceSynchronization2FeaturesKHR
-  //                physical_device_synchronization2_features{};
-  //        physical_device_synchronization2_features.sType =
-  //                VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SYNCHRONIZATION_2_FEATURES_KHR;
-  //        physical_device_synchronization2_features.synchronization2 =
-  //        VK_TRUE;
-  //        create_info.AddFeature(physical_device_synchronization2_features);
-
-  std::map<int, int> queue_count;
-
-  if (num_graphics_queue > 0) {
-    queue_count[physical_device.GraphicsFamilyIndex()] += num_graphics_queue;
-  }
-  if (num_transfer_queue > 0) {
-    queue_count[physical_device.TransferFamilyIndex()] += num_transfer_queue;
-  }
-  if (num_compute_queue > 0) {
-    queue_count[physical_device.ComputeFamilyIndex()] += num_compute_queue;
-  }
-
-  if (surface) {
-    queue_count[physical_device.PresentFamilyIndex(surface)] =
-        std::max(queue_count[physical_device.PresentFamilyIndex(surface)], 1);
-  }
-
   auto queue_family_properties = physical_device.GetQueueFamilyProperties();
 
-  for (auto &[family_index, count] : queue_count) {
-    count =
-        std::min(count, int(queue_family_properties[family_index].queueCount));
-    create_info.AddQueueFamily(family_index, std::vector<float>(count, 1.0f));
+  for (int i = 0; i < queue_family_properties.size(); i++) {
+    create_info.AddQueueFamily(
+        i, std::vector<float>(queue_family_properties[i].queueCount, 1.0f));
   }
 
   return create_info;

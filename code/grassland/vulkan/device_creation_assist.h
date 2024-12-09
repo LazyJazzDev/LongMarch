@@ -9,11 +9,7 @@
 namespace grassland::vulkan {
 
 struct DeviceFeatureRequirement {
-  Surface *surface{};
   bool enable_raytracing_extension{false};
-  int num_graphics_queue{1};
-  int num_transfer_queue{1};
-  int num_compute_queue{0};
 
   class DeviceCreateInfo GenerateRecommendedDeviceCreateInfo(
       const PhysicalDevice &physical_device) const;

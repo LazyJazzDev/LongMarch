@@ -208,7 +208,6 @@ VkResult Instance::CreateDevice(Surface *surface,
                                 int device_index,
                                 double_ptr<struct Device> pp_device) const {
   DeviceFeatureRequirement device_feature_requirement{};
-  device_feature_requirement.surface = surface;
   device_feature_requirement.enable_raytracing_extension =
       enable_raytracing_extension;
   return CreateDevice(device_feature_requirement, device_index, pp_device);
@@ -262,6 +261,15 @@ VkResult Instance::CreateDevice(
     const DeviceFeatureRequirement &device_feature_requirement,
     DeviceCreateInfo create_info,
     double_ptr<Device> pp_device) const {
+  return CreateDevice(physical_device, create_info,
+                      device_feature_requirement.GetVmaAllocatorCreateFlags(),
+                      pp_device);
+}
+
+VkResult Instance::CreateDevice(const PhysicalDevice &physical_device,
+                                struct DeviceCreateInfo create_info,
+                                VmaAllocatorCreateFlags allocator_flags,
+                                double_ptr<class Device> pp_device) const {
   VkDeviceCreateInfo device_create_info = create_info.CompileVkDeviceCreateInfo(
       create_hint_.enable_validation_layers, physical_device);
 
@@ -272,8 +280,7 @@ VkResult Instance::CreateDevice(
                       "failed to create logical device.");
 
   if (pp_device) {
-    pp_device.construct(this, physical_device, create_info,
-                        device_feature_requirement.GetVmaAllocatorCreateFlags(),
+    pp_device.construct(this, physical_device, create_info, allocator_flags,
                         device);
   } else {
     vkDestroyDevice(device, nullptr);

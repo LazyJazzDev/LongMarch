@@ -56,6 +56,11 @@ class Instance {
       struct DeviceCreateInfo create_info,
       double_ptr<struct Device> pp_device) const;
 
+  VkResult CreateDevice(const PhysicalDevice &physical_device,
+                        struct DeviceCreateInfo create_info,
+                        VmaAllocatorCreateFlags allocator_flags,
+                        double_ptr<struct Device> pp_device) const;
+
   VkResult CreateDevice(Surface *surface,
                         bool enable_raytracing_extension,
                         int device_index,
