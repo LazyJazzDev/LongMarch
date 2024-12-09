@@ -4,8 +4,10 @@
 
 class Application {
  public:
-  Application();
-  ~Application() = default;
+  Application(grassland::graphics::BackendAPI api =
+                  grassland::graphics::BACKEND_API_VULKAN);
+
+  ~Application();
 
  private:
   std::shared_ptr<grassland::graphics::Core> core_;

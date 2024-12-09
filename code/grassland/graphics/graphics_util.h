@@ -40,8 +40,20 @@ typedef enum BufferType {
   BUFFER_TYPE_ONETIME = 2,
 } BufferType;
 
+struct PhysicalDeviceProperties {
+  std::string name;
+  uint64_t score;
+  bool ray_tracing_support;
+};
+
 class Core;
 class Buffer;
 class Image;
+
+#ifndef NDEBUG
+constexpr bool kEnableDebug = true;
+#else
+constexpr bool kEnableDebug = false;
+#endif
 
 }  // namespace grassland::graphics

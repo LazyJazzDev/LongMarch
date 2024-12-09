@@ -150,7 +150,7 @@ void Application::CreateWindowAssets() {
   glfw_window_ =
       glfwCreateWindow(800, 600, "D3D12 Hello Cube", nullptr, nullptr);
 
-  CreateDXGIFactory(&factory_);
+  CreateDXGIFactory({}, &factory_);
 
   factory_->CreateDevice(DeviceFeatureRequirement{}, -1, &device_);
   LogInfo("Device: {}", device_->Adapter().Name());

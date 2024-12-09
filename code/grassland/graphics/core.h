@@ -7,8 +7,7 @@ class Core {
  public:
   struct Settings {
     int frames_in_flight{2};
-    bool enable_debug{false};
-    bool enable_ray_tracing{false};
+    bool enable_debug{kEnableDebug};
   };
   Core(const Settings &settings);
 
@@ -23,11 +22,14 @@ class Core {
                           ImageFormat format,
                           double_ptr<Image> pp_image) = 0;
 
+  virtual int GetPhysicalDeviceProperties(
+      PhysicalDeviceProperties *p_physical_device_properties = nullptr) = 0;
+
+  virtual int InitialLogicalDevice(int device_index) = 0;
+
   int FramesInFlight() const;
 
   bool DebugEnabled() const;
-
-  bool RayTracingEnabled() const;
 
  private:
   Settings settings_;

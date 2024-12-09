@@ -81,4 +81,10 @@ class Fence;
 class ShaderModule;
 class PipelineState;
 
+#ifdef NDEBUG
+constexpr bool kDefaultEnableDebugLayer = false;
+#else
+constexpr bool kDefaultEnableDebugLayer = true;
+#endif
+
 }  // namespace grassland::d3d12

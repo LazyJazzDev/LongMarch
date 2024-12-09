@@ -1,25 +1,21 @@
 #include "app.h"
 
-Application::Application() {
-  grassland::graphics::CreateCore(grassland::graphics::BACKEND_API_D3D12,
-                                  grassland::graphics::Core::Settings{},
+Application::Application(grassland::graphics::BackendAPI api) {
+  grassland::graphics::CreateCore(api, grassland::graphics::Core::Settings{},
                                   &core_);
 
-  auto d3d12_core =
-      std::dynamic_pointer_cast<grassland::graphics::backend::D3D12Core>(core_);
-  auto vulkan_core =
-      std::dynamic_pointer_cast<grassland::graphics::backend::VulkanCore>(
-          core_);
+  int num_devices = core_->GetPhysicalDeviceProperties();
+  std::vector<grassland::graphics::PhysicalDeviceProperties> properties(
+      num_devices);
 
-  if (d3d12_core) {
-    puts("Is D3D12Core");
-  } else {
-    puts("Not D3D12Core");
+  core_->GetPhysicalDeviceProperties(properties.data());
+  for (const auto &property : properties) {
+    grassland::LogInfo("Device: {}, score: {}, ray tracing support: {}",
+                       property.name, property.score,
+                       property.ray_tracing_support);
   }
+}
 
-  if (vulkan_core) {
-    puts("Is VulkanCore");
-  } else {
-    puts("Not VulkanCore");
-  }
+Application::~Application() {
+  core_.reset();
 }

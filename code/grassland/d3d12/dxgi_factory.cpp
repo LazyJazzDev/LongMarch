@@ -35,8 +35,13 @@ std::string GetErrorMessage() {
   return error_message;
 }
 
-DXGIFactory::DXGIFactory(const ComPtr<IDXGIFactory4> &factory)
-    : factory_(factory) {
+DXGIFactoryCreateHint::DXGIFactoryCreateHint(bool enable_debug)
+    : enable_debug(enable_debug) {
+}
+
+DXGIFactory::DXGIFactory(DXGIFactoryCreateHint hint,
+                         const ComPtr<IDXGIFactory4> &factory)
+    : hint_(hint), factory_(factory) {
 }
 
 std::vector<Adapter> DXGIFactory::EnumerateAdapters() const {
@@ -92,22 +97,20 @@ HRESULT DXGIFactory::CreateDevice(
     return hr;
   }
 
-#ifndef NDEBUG
-  // Configure debug device (if active).
-  ComPtr<ID3D12InfoQueue> d3dInfoQueue;
-  if (SUCCEEDED(device.As(&d3dInfoQueue))) {
-#ifdef _DEBUG
-    d3dInfoQueue->SetBreakOnSeverity(D3D12_MESSAGE_SEVERITY_CORRUPTION, true);
-    d3dInfoQueue->SetBreakOnSeverity(D3D12_MESSAGE_SEVERITY_ERROR, true);
-#endif
-    D3D12_MESSAGE_ID hide[] = {D3D12_MESSAGE_ID_MAP_INVALID_NULLRANGE,
-                               D3D12_MESSAGE_ID_UNMAP_INVALID_NULLRANGE};
-    D3D12_INFO_QUEUE_FILTER filter = {};
-    filter.DenyList.NumIDs = _countof(hide);
-    filter.DenyList.pIDList = hide;
-    d3dInfoQueue->AddStorageFilterEntries(&filter);
+  if (hint_.enable_debug) {
+    // Configure debug device (if active).
+    ComPtr<ID3D12InfoQueue> d3dInfoQueue;
+    if (SUCCEEDED(device.As(&d3dInfoQueue))) {
+      d3dInfoQueue->SetBreakOnSeverity(D3D12_MESSAGE_SEVERITY_CORRUPTION, true);
+      d3dInfoQueue->SetBreakOnSeverity(D3D12_MESSAGE_SEVERITY_ERROR, true);
+      D3D12_MESSAGE_ID hide[] = {D3D12_MESSAGE_ID_MAP_INVALID_NULLRANGE,
+                                 D3D12_MESSAGE_ID_UNMAP_INVALID_NULLRANGE};
+      D3D12_INFO_QUEUE_FILTER filter = {};
+      filter.DenyList.NumIDs = _countof(hide);
+      filter.DenyList.pIDList = hide;
+      d3dInfoQueue->AddStorageFilterEntries(&filter);
+    }
   }
-#endif
 
   static const D3D_FEATURE_LEVEL feature_levels[] = {
       D3D_FEATURE_LEVEL_12_1,
@@ -176,14 +179,14 @@ HRESULT DXGIFactory::CreateSwapChain(const CommandQueue &command_queue,
   return CreateSwapChain(command_queue, hwnd, desc, pp_swap_chain);
 }
 
-HRESULT CreateDXGIFactory(double_ptr<DXGIFactory> pp_factory) {
+HRESULT CreateDXGIFactory(DXGIFactoryCreateHint hint,
+                          double_ptr<DXGIFactory> pp_factory) {
   UINT dxgi_factory_flags = 0;
 
-#if defined(_DEBUG)
   // Enable the debug layer (requires the Graphics Tools "optional feature").
   // NOTE: Enabling the debug layer after device creation will invalidate the
   // active device.
-  {
+  if (hint.enable_debug) {
     ComPtr<ID3D12Debug> debugController;
     if (SUCCEEDED(D3D12GetDebugInterface(IID_PPV_ARGS(&debugController)))) {
       debugController->EnableDebugLayer();
@@ -192,14 +195,13 @@ HRESULT CreateDXGIFactory(double_ptr<DXGIFactory> pp_factory) {
       dxgi_factory_flags |= DXGI_CREATE_FACTORY_DEBUG;
     }
   }
-#endif
 
   ComPtr<IDXGIFactory4> factory;
   RETURN_IF_FAILED_HR(
       CreateDXGIFactory2(dxgi_factory_flags, IID_PPV_ARGS(&factory)),
       "failed to create DXGI factory.");
 
-  pp_factory.construct(factory);
+  pp_factory.construct(hint, factory);
   return S_OK;
 }
 }  // namespace grassland::d3d12

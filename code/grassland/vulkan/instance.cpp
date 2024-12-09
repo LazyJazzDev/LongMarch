@@ -24,35 +24,42 @@ void InstanceCreateHint::SetValidationLayersEnabled(bool enabled) {
 }
 
 void InstanceCreateHint::AddExtension(const char *extension) {
-  extensions.push_back(extension);
+  bool found = false;
+  for (const auto &ext : extensions) {
+    if (strcmp(ext, extension) == 0) {
+      found = true;
+      break;
+    }
+  }
+  if (!found) {
+    extensions.push_back(extension);
+  }
 }
 
 void InstanceCreateHint::ApplyGLFWSurfaceSupport() {
   uint32_t glfw_extension_count = 0;
   const char **glfw_extensions;
   glfw_extensions = glfwGetRequiredInstanceExtensions(&glfw_extension_count);
+  bool local_init = false;
+
   if (!glfw_extensions) {
     int err = glfwGetError(nullptr);
     if (err == GLFW_NOT_INITIALIZED) {
       glfwInit();
       glfw_extensions =
           glfwGetRequiredInstanceExtensions(&glfw_extension_count);
-      glfwTerminate();
+      local_init = true;
     }
   }
+
   if (glfw_extensions) {
     for (uint32_t i = 0; i < glfw_extension_count; i++) {
-      bool found = false;
-      for (const auto &ext : extensions) {
-        if (strcmp(ext, glfw_extensions[i]) == 0) {
-          found = true;
-          break;
-        }
-      }
-      if (!found) {
-        extensions.push_back(glfw_extensions[i]);
-      }
+      AddExtension(glfw_extensions[i]);
     }
+  }
+
+  if (local_init) {
+    glfwTerminate();
   }
 }
 
@@ -188,6 +195,7 @@ std::vector<PhysicalDevice> Instance::EnumeratePhysicalDevices() const {
 
   std::vector<PhysicalDevice> physical_devices;
   physical_devices.reserve(devices.size());
+
   for (const auto &device : devices) {
     physical_devices.emplace_back(device);
   }

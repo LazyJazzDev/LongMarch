@@ -16,10 +16,6 @@ bool Core::DebugEnabled() const {
   return settings_.enable_debug;
 }
 
-bool Core::RayTracingEnabled() const {
-  return settings_.enable_ray_tracing;
-}
-
 int CreateCore(BackendAPI api,
                const Core::Settings &settings,
                double_ptr<Core> pp_core) {

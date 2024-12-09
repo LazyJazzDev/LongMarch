@@ -3,9 +3,16 @@
 #include "grassland/util/double_ptr.h"
 
 namespace grassland::d3d12 {
+
+struct DXGIFactoryCreateHint {
+  bool enable_debug{kDefaultEnableDebugLayer};
+  DXGIFactoryCreateHint(bool enable_debug = kDefaultEnableDebugLayer);
+};
+
 class DXGIFactory {
  public:
-  explicit DXGIFactory(const ComPtr<IDXGIFactory4> &factory);
+  explicit DXGIFactory(DXGIFactoryCreateHint hint,
+                       const ComPtr<IDXGIFactory4> &factory);
 
   IDXGIFactory4 *Handle() const {
     return factory_.Get();
@@ -29,9 +36,11 @@ class DXGIFactory {
                           double_ptr<SwapChain> pp_swap_chain);
 
  private:
+  DXGIFactoryCreateHint hint_;
   ComPtr<IDXGIFactory4> factory_;
 };
 
-HRESULT CreateDXGIFactory(double_ptr<DXGIFactory> pp_factory);
+HRESULT CreateDXGIFactory(DXGIFactoryCreateHint hint,
+                          double_ptr<DXGIFactory> pp_factory);
 
 }  // namespace grassland::d3d12

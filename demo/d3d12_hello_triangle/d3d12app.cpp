@@ -119,7 +119,7 @@ void Application::CreateWindowAssets() {
   glfw_window_ =
       glfwCreateWindow(800, 600, "D3D12 Hello Triangle", nullptr, nullptr);
 
-  CreateDXGIFactory(&factory_);
+  CreateDXGIFactory({}, &factory_);
 
   factory_->CreateDevice(DeviceFeatureRequirement{}, -1, &device_);
   LogInfo("Device: {}", device_->Adapter().Name());
@@ -185,36 +185,12 @@ void Application::CreatePipelineAssets() {
                    staging_index_buffer->Size());
       });
 
-  // Read
-  const std::string shader_code_path =
-      "C:\\Users\\zijian\\LongMarch\\demo\\d3d12_hello_triangle\\shaders\\main."
-      "cso";
-  std::ifstream shader_code_file(shader_code_path, std::ios::binary);
-  shader_code_file.seekg(0, std::ios::end);
-  size_t shader_code_size = shader_code_file.tellg();
-  shader_code_file.seekg(0, std::ios::beg);
-  std::vector<char> shader_code(shader_code_size);
-  shader_code_file.read(shader_code.data(), shader_code_size);
-  shader_code_file.close();
-  LogInfo("{}", shader_code_size);
-  ComPtr<ID3DBlob> vertex_shader_blob;
-
-  D3DCreateBlob(shader_code_size, &vertex_shader_blob);
-  std::memcpy(vertex_shader_blob->GetBufferPointer(), shader_code.data(),
-              shader_code_size);
-
   device_->CreateShaderModule(
       CompileShader(GetShaderCode("shaders/main.hlsl"), "VSMain", "vs_6_0"),
       &vertex_shader_);
   device_->CreateShaderModule(
       CompileShader(GetShaderCode("shaders/main.hlsl"), "PSMain", "ps_6_0"),
       &pixel_shader_);
-
-  LogInfo("{}", GetShaderCode("shaders/main.hlsl"));
-
-  // ComPtr<ID3DBlob> vertex_shader_blob =
-  //     CompileShaderLegacy(GetShaderCode("shaders/main.hlsl"), "VSMain",
-  //     "vs_6_0");
 
   CD3DX12_VERSIONED_ROOT_SIGNATURE_DESC root_signature_desc;
   root_signature_desc.Init_1_1(
