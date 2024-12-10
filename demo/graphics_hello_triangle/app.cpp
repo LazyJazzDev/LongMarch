@@ -3,19 +3,30 @@
 Application::Application(grassland::graphics::BackendAPI api) {
   grassland::graphics::CreateCore(api, grassland::graphics::Core::Settings{},
                                   &core_);
+  core_->InitializeLogicalDeviceAutoSelect(false);
 
-  int num_devices = core_->GetPhysicalDeviceProperties();
-  std::vector<grassland::graphics::PhysicalDeviceProperties> properties(
-      num_devices);
-
-  core_->GetPhysicalDeviceProperties(properties.data());
-  for (const auto &property : properties) {
-    grassland::LogInfo("Device: {}, score: {}, ray tracing support: {}",
-                       property.name, property.score,
-                       property.ray_tracing_support);
-  }
+  grassland::LogInfo("Device Name: {}", core_->DeviceName());
+  grassland::LogInfo("- Ray Tracing Support: {}",
+                     core_->DeviceRayTracingSupport());
 }
 
 Application::~Application() {
   core_.reset();
+}
+
+void Application::OnInit() {
+  core_->CreateWindowObject(1280, 720, "Graphics Hello Triangle", &window_);
+}
+
+void Application::OnClose() {
+}
+
+void Application::OnUpdate() {
+  if (window_->ShouldClose()) {
+    window_->CloseWindow();
+    alive_ = false;
+  }
+}
+
+void Application::OnRender() {
 }

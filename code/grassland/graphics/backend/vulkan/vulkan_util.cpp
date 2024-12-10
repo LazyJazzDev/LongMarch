@@ -1,3 +1,3 @@
 #include "grassland/graphics/backend/vulkan/vulkan_util.h"
 
-namespace grassland::graphics::vulkan_backend {}
+namespace grassland::graphics::backend {}

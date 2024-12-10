@@ -22,17 +22,32 @@ class Core {
                           ImageFormat format,
                           double_ptr<Image> pp_image) = 0;
 
+  virtual int CreateWindowObject(int width,
+                                 int height,
+                                 const std::string &title,
+                                 double_ptr<Window> pp_window) = 0;
+
   virtual int GetPhysicalDeviceProperties(
       PhysicalDeviceProperties *p_physical_device_properties = nullptr) = 0;
 
-  virtual int InitialLogicalDevice(int device_index) = 0;
+  virtual int InitializeLogicalDevice(int device_index) = 0;
+
+  int InitializeLogicalDeviceAutoSelect(bool require_ray_tracing);
 
   int FramesInFlight() const;
 
   bool DebugEnabled() const;
 
+  bool DeviceRayTracingSupport() const;
+
+  std::string DeviceName() const;
+
  private:
   Settings settings_;
+
+ protected:
+  std::string device_name_{};
+  bool ray_tracing_support_{false};
 };
 
 int CreateCore(BackendAPI api,

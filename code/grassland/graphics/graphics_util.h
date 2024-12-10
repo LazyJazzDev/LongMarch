@@ -49,6 +49,7 @@ struct PhysicalDeviceProperties {
 class Core;
 class Buffer;
 class Image;
+class Window;
 
 #ifndef NDEBUG
 constexpr bool kEnableDebug = true;

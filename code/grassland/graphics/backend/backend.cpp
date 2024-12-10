@@ -1,5 +1,3 @@
-//
-// Created by zijian on 2024/12/3.
-//
+#include "grassland/graphics/backend/backend.h"
 
-#include "backend.h"
+namespace grassland::graphics::backend {}

@@ -17,11 +17,16 @@ class VulkanCore : public Core {
                   ImageFormat format,
                   double_ptr<Image> pp_image) override;
 
+  int CreateWindowObject(int width,
+                         int height,
+                         const std::string &title,
+                         double_ptr<Window> pp_window) override;
+
   int GetPhysicalDeviceProperties(
       PhysicalDeviceProperties *p_physical_device_properties =
           nullptr) override;
 
-  int InitialLogicalDevice(int device_index) override;
+  int InitializeLogicalDevice(int device_index) override;
 
   vulkan::Instance *Instance() {
     return instance_.get();
@@ -34,6 +39,17 @@ class VulkanCore : public Core {
  private:
   std::unique_ptr<vulkan::Instance> instance_;
   std::unique_ptr<vulkan::Device> device_;
+
+  uint32_t current_frame_{0};
+  std::vector<std::unique_ptr<vulkan::Semaphore>> render_finished_semaphores_;
+  std::vector<std::unique_ptr<vulkan::Fence>> in_flight_fences_;
+
+  std::unique_ptr<vulkan::CommandPool> graphics_command_pool_;
+  std::unique_ptr<vulkan::CommandPool> transfer_command_pool_;
+  std::vector<std::unique_ptr<vulkan::CommandBuffer>> command_buffers_;
+
+  std::unique_ptr<vulkan::Queue> graphics_queue_;
+  std::unique_ptr<vulkan::Queue> transfer_queue_;
 };
 
 }  // namespace grassland::graphics::backend
