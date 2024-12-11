@@ -27,6 +27,10 @@ Window::Window(int width, int height, const std::string &title) {
   }
 }
 
+Window::~Window() {
+  CloseWindow();
+}
+
 int Window::GetWidth() const {
   int width, height;
   glfwGetWindowSize(window_, &width, &height);
@@ -49,6 +53,7 @@ void Window::Resize(int new_width, int new_height) {
 
 void Window::CloseWindow() {
   glfwDestroyWindow(window_);
+  window_ = nullptr;
 }
 
 bool Window::ShouldClose() const {

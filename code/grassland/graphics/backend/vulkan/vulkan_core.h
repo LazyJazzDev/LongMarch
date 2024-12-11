@@ -28,12 +28,16 @@ class VulkanCore : public Core {
 
   int InitializeLogicalDevice(int device_index) override;
 
-  vulkan::Instance *Instance() {
+  vulkan::Instance *Instance() const {
     return instance_.get();
   }
 
-  vulkan::Device *Device() {
+  vulkan::Device *Device() const {
     return device_.get();
+  }
+
+  vulkan::Queue *GraphicsQueue() const {
+    return graphics_queue_.get();
   }
 
  private:

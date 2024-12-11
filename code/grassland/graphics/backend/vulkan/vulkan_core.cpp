@@ -30,7 +30,7 @@ int VulkanCore::CreateWindowObject(int width,
                                    int height,
                                    const std::string &title,
                                    double_ptr<Window> pp_window) {
-  pp_window.construct<VulkanWindow>(width, height, title);
+  pp_window.construct<VulkanWindow>(width, height, title, this);
   return 0;
 }
 

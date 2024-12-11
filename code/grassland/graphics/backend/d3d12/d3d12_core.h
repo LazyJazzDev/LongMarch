@@ -28,6 +28,34 @@ class D3D12Core : public Core {
 
   int InitializeLogicalDevice(int device_index) override;
 
+  d3d12::DXGIFactory *DXGIFactory() const {
+    return dxgi_factory_.get();
+  }
+
+  d3d12::Device *Device() const {
+    return device_.get();
+  }
+
+  d3d12::CommandQueue *CommandQueue() const {
+    return command_queue_.get();
+  }
+
+  d3d12::CommandList *CommandList() const {
+    return command_lists_[current_frame_].get();
+  }
+
+  d3d12::CommandAllocator *CommandAllocator() const {
+    return command_allocators_[current_frame_].get();
+  }
+
+  d3d12::Fence *Fence() const {
+    return fences_[current_frame_].get();
+  }
+
+  uint32_t CurrentFrame() const {
+    return current_frame_;
+  }
+
  private:
   std::unique_ptr<d3d12::DXGIFactory> dxgi_factory_;
   std::unique_ptr<d3d12::Device> device_;

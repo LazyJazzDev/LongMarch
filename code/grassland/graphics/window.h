@@ -6,7 +6,7 @@ namespace grassland::graphics {
 class Window {
  public:
   Window(int width, int height, const std::string &title);
-  virtual ~Window() = default;
+  virtual ~Window();
 
   GLFWwindow *GLFWWindow() const {
     return window_;

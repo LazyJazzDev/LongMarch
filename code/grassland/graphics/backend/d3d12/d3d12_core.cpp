@@ -29,7 +29,7 @@ int D3D12Core::CreateWindowObject(int width,
                                   int height,
                                   const std::string &title,
                                   double_ptr<Window> pp_window) {
-  pp_window.construct<D3D12Window>(width, height, title);
+  pp_window.construct<D3D12Window>(width, height, title, this);
   return 0;
 }
 
