@@ -32,6 +32,8 @@ class Core {
 
   virtual int InitializeLogicalDevice(int device_index) = 0;
 
+  virtual void WaitGPU() = 0;
+
   int InitializeLogicalDeviceAutoSelect(bool require_ray_tracing);
 
   int FramesInFlight() const;

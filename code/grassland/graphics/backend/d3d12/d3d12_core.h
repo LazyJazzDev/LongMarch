@@ -28,6 +28,8 @@ class D3D12Core : public Core {
 
   int InitializeLogicalDevice(int device_index) override;
 
+  void WaitGPU() override;
+
   d3d12::DXGIFactory *DXGIFactory() const {
     return dxgi_factory_.get();
   }
@@ -56,6 +58,9 @@ class D3D12Core : public Core {
     return current_frame_;
   }
 
+  void SingleTimeCommand(
+      std::function<void(ID3D12GraphicsCommandList *)> command);
+
  private:
   std::unique_ptr<d3d12::DXGIFactory> dxgi_factory_;
   std::unique_ptr<d3d12::Device> device_;
@@ -65,6 +70,11 @@ class D3D12Core : public Core {
   std::vector<std::unique_ptr<d3d12::CommandList>> command_lists_;
 
   std::vector<std::unique_ptr<d3d12::Fence>> fences_;
+
+  std::unique_ptr<d3d12::CommandAllocator> single_time_allocator_;
+  std::unique_ptr<d3d12::CommandList> single_time_command_list_;
+  std::unique_ptr<d3d12::Fence> single_time_fence_;
+
   uint32_t current_frame_{0};
 };
 

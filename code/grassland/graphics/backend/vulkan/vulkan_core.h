@@ -28,6 +28,8 @@ class VulkanCore : public Core {
 
   int InitializeLogicalDevice(int device_index) override;
 
+  void WaitGPU() override;
+
   vulkan::Instance *Instance() const {
     return instance_.get();
   }
@@ -38,6 +40,30 @@ class VulkanCore : public Core {
 
   vulkan::Queue *GraphicsQueue() const {
     return graphics_queue_.get();
+  }
+
+  vulkan::Queue *TransferQueue() const {
+    return transfer_queue_.get();
+  }
+
+  vulkan::CommandPool *GraphicsCommandPool() const {
+    return graphics_command_pool_.get();
+  }
+
+  vulkan::CommandPool *TransferCommandPool() const {
+    return transfer_command_pool_.get();
+  }
+
+  vulkan::CommandBuffer *CommandBuffer() const {
+    return command_buffers_[current_frame_].get();
+  }
+
+  vulkan::Semaphore *RenderFinishedSemaphore() const {
+    return render_finished_semaphores_[current_frame_].get();
+  }
+
+  vulkan::Fence *InFlightFence() const {
+    return in_flight_fences_[current_frame_].get();
   }
 
  private:

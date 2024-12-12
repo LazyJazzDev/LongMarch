@@ -1,5 +1,6 @@
 #include "grassland/graphics/backend/vulkan/vulkan_core.h"
 
+#include "grassland/graphics/backend/vulkan/vulkan_buffer.h"
 #include "vulkan_window.h"
 
 namespace grassland::graphics::backend {
@@ -16,6 +17,7 @@ VulkanCore::~VulkanCore() {
 int VulkanCore::CreateBuffer(size_t size,
                              BufferType type,
                              double_ptr<Buffer> pp_buffer) {
+  pp_buffer.construct<VulkanStaticBuffer>(size, this);
   return 0;
 }
 
@@ -100,6 +102,11 @@ int VulkanCore::InitializeLogicalDevice(int device_index) {
                             &transfer_command_pool_),
                         "failed to create transfer command pool");
 
+  device_->GetQueue(device_->PhysicalDevice().GraphicsFamilyIndex(), 0,
+                    &graphics_queue_);
+  device_->GetQueue(device_->PhysicalDevice().TransferFamilyIndex(), 0,
+                    &transfer_queue_);
+
   render_finished_semaphores_.resize(FramesInFlight());
   in_flight_fences_.resize(FramesInFlight());
   command_buffers_.resize(FramesInFlight());
@@ -112,6 +119,10 @@ int VulkanCore::InitializeLogicalDevice(int device_index) {
   }
 
   return 0;
+}
+
+void VulkanCore::WaitGPU() {
+  device_->WaitIdle();
 }
 
 }  // namespace grassland::graphics::backend

@@ -1,5 +1,6 @@
 #include "grassland/graphics/backend/d3d12/d3d12_core.h"
 
+#include "grassland/graphics/backend/d3d12/d3d12_buffer.h"
 #include "grassland/graphics/backend/d3d12/d3d12_window.h"
 
 namespace grassland::graphics::backend {
@@ -15,6 +16,7 @@ D3D12Core::~D3D12Core() {
 int D3D12Core::CreateBuffer(size_t size,
                             BufferType type,
                             double_ptr<Buffer> pp_buffer) {
+  pp_buffer.construct<D3D12StaticBuffer>(size, this);
   return 0;
 }
 
@@ -83,7 +85,30 @@ int D3D12Core::InitializeLogicalDevice(int device_index) {
                                               &command_lists_[i]);
   }
 
+  device_->CreateCommandAllocator(D3D12_COMMAND_LIST_TYPE_DIRECT,
+                                  &single_time_allocator_);
+  device_->CreateFence(&single_time_fence_);
+  single_time_allocator_->CreateCommandList(D3D12_COMMAND_LIST_TYPE_DIRECT,
+                                            &single_time_command_list_);
+
   return 0;
+}
+
+void D3D12Core::WaitGPU() {
+  single_time_fence_->Signal(command_queue_.get());
+  single_time_fence_->Wait();
+}
+
+void D3D12Core::SingleTimeCommand(
+    std::function<void(ID3D12GraphicsCommandList *)> command) {
+  single_time_allocator_->ResetCommandRecord(single_time_command_list_.get());
+  command(single_time_command_list_->Handle());
+  single_time_command_list_->Handle()->Close();
+
+  ID3D12CommandList *command_lists[] = {single_time_command_list_->Handle()};
+  command_queue_->Handle()->ExecuteCommandLists(1, command_lists);
+  single_time_fence_->Signal(command_queue_.get());
+  single_time_fence_->Wait();
 }
 
 }  // namespace grassland::graphics::backend

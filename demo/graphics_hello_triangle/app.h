@@ -2,6 +2,11 @@
 #include "grassland/graphics/graphics.h"
 #include "long_march.h"
 
+struct Vertex {
+  glm::vec3 pos;
+  glm::vec3 color;
+};
+
 class Application {
  public:
   Application(grassland::graphics::BackendAPI api =
@@ -21,5 +26,7 @@ class Application {
  private:
   std::shared_ptr<grassland::graphics::Core> core_;
   std::unique_ptr<grassland::graphics::Window> window_;
+  std::unique_ptr<grassland::graphics::Buffer> vertex_buffer_;
+  std::unique_ptr<grassland::graphics::Buffer> index_buffer_;
   bool alive_{true};
 };
