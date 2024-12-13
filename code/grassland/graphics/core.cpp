@@ -7,6 +7,20 @@ namespace grassland::graphics {
 
 Core::Core(const Settings &settings) : settings_(settings) {
 }
+
+#ifdef WIN32
+int Core::CreateShader(Microsoft::WRL::ComPtr<ID3DBlob> shader_blob,
+                       double_ptr<Shader> pp_shader) {
+  return CreateShader(shader_blob->GetBufferPointer(),
+                      shader_blob->GetBufferSize(), pp_shader);
+}
+#endif
+
+int Core::CreateShader(const std::vector<uint32_t> &spirv,
+                       double_ptr<Shader> pp_shader) {
+  return CreateShader(spirv.data(), spirv.size() * sizeof(uint32_t), pp_shader);
+}
+
 int Core::InitializeLogicalDeviceAutoSelect(bool require_ray_tracing) {
   auto num_device = GetPhysicalDeviceProperties();
   std::vector<PhysicalDeviceProperties> device_properties(num_device);

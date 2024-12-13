@@ -1,5 +1,5 @@
 #pragma once
-#include "grassland/vulkan/vulkan.h"
+#include "grassland/grassland.h"
 
 namespace grassland::graphics {
 
@@ -50,6 +50,7 @@ class Core;
 class Buffer;
 class Image;
 class Window;
+class Shader;
 
 #ifndef NDEBUG
 constexpr bool kEnableDebug = true;

@@ -235,6 +235,14 @@ VkResult Device::CreateCommandPool(
 VkResult Device::CreateShaderModule(
     const std::vector<uint32_t> &code,
     double_ptr<ShaderModule> pp_shader_module) const {
+  return CreateShaderModule(code.data(), code.size() * sizeof(uint32_t),
+                            pp_shader_module);
+}
+
+VkResult Device::CreateShaderModule(
+    const void *p_code,
+    size_t code_size,
+    double_ptr<ShaderModule> pp_shader_module) const {
   if (!pp_shader_module) {
     SetErrorMessage("pp_shader_module is nullptr");
     return VK_ERROR_INITIALIZATION_FAILED;
@@ -243,8 +251,8 @@ VkResult Device::CreateShaderModule(
   VkShaderModule shader_module;
   VkShaderModuleCreateInfo create_info = {};
   create_info.sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO;
-  create_info.codeSize = code.size() * sizeof(uint32_t);
-  create_info.pCode = code.data();
+  create_info.codeSize = code_size;
+  create_info.pCode = reinterpret_cast<const uint32_t *>(p_code);
 
   RETURN_IF_FAILED_VK(
       vkCreateShaderModule(device_, &create_info, nullptr, &shader_module),

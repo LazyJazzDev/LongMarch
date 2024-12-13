@@ -28,5 +28,7 @@ class Application {
   std::unique_ptr<grassland::graphics::Window> window_;
   std::unique_ptr<grassland::graphics::Buffer> vertex_buffer_;
   std::unique_ptr<grassland::graphics::Buffer> index_buffer_;
+  std::unique_ptr<grassland::graphics::Shader> vertex_shader_;
+  std::unique_ptr<grassland::graphics::Shader> fragment_shader_;
   bool alive_{true};
 };

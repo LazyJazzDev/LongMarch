@@ -1,4 +1,7 @@
 #pragma once
+#include <d3dcommon.h>
+#include <wrl/client.h>
+
 #include "grassland/graphics/graphics_util.h"
 
 namespace grassland::graphics {
@@ -13,6 +16,8 @@ class Core {
 
   virtual ~Core() = default;
 
+  virtual BackendAPI API() const = 0;
+
   virtual int CreateBuffer(size_t size,
                            BufferType type,
                            double_ptr<Buffer> pp_buffer) = 0;
@@ -26,6 +31,17 @@ class Core {
                                  int height,
                                  const std::string &title,
                                  double_ptr<Window> pp_window) = 0;
+#ifdef WIN32
+  int CreateShader(Microsoft::WRL::ComPtr<ID3DBlob> shader_blob,
+                   double_ptr<Shader> pp_shader);
+#endif
+
+  int CreateShader(const std::vector<uint32_t> &spirv,
+                   double_ptr<Shader> pp_shader);
+
+  virtual int CreateShader(const void *data,
+                           size_t size,
+                           double_ptr<Shader> pp_shader) = 0;
 
   virtual int GetPhysicalDeviceProperties(
       PhysicalDeviceProperties *p_physical_device_properties = nullptr) = 0;

@@ -1,8 +1,11 @@
-//
-// Created by zijian on 2024/12/3.
-//
+#pragma once
+#include "grassland/graphics/graphics_util.h"
 
-#ifndef PROGRAM_H
-#define PROGRAM_H
+namespace grassland::graphics {
 
-#endif  // PROGRAM_H
+class Shader {
+ public:
+  virtual ~Shader() = default;
+};
+
+}  // namespace grassland::graphics

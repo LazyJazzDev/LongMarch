@@ -1,7 +1,8 @@
 #include "grassland/graphics/backend/vulkan/vulkan_core.h"
 
 #include "grassland/graphics/backend/vulkan/vulkan_buffer.h"
-#include "vulkan_window.h"
+#include "grassland/graphics/backend/vulkan/vulkan_program.h"
+#include "grassland/graphics/backend/vulkan/vulkan_window.h"
 
 namespace grassland::graphics::backend {
 
@@ -33,6 +34,13 @@ int VulkanCore::CreateWindowObject(int width,
                                    const std::string &title,
                                    double_ptr<Window> pp_window) {
   pp_window.construct<VulkanWindow>(width, height, title, this);
+  return 0;
+}
+
+int VulkanCore::CreateShader(const void *data,
+                             size_t size,
+                             double_ptr<Shader> pp_shader) {
+  pp_shader.construct<VulkanShader>(this, data, size);
   return 0;
 }
 

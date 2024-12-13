@@ -1,6 +1,7 @@
 #include "grassland/graphics/backend/d3d12/d3d12_core.h"
 
 #include "grassland/graphics/backend/d3d12/d3d12_buffer.h"
+#include "grassland/graphics/backend/d3d12/d3d12_program.h"
 #include "grassland/graphics/backend/d3d12/d3d12_window.h"
 
 namespace grassland::graphics::backend {
@@ -32,6 +33,13 @@ int D3D12Core::CreateWindowObject(int width,
                                   const std::string &title,
                                   double_ptr<Window> pp_window) {
   pp_window.construct<D3D12Window>(width, height, title, this);
+  return 0;
+}
+
+int D3D12Core::CreateShader(const void *data,
+                            size_t size,
+                            double_ptr<Shader> pp_shader) {
+  pp_shader.construct<D3D12Shader>(data, size, this);
   return 0;
 }
 

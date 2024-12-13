@@ -1,5 +1,3 @@
-//
-// Created by zijian on 2024/12/3.
-//
+#include "grassland/graphics/program.h"
 
-#include "program.h"
+namespace grassland::graphics {}

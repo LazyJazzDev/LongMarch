@@ -8,6 +8,10 @@ class D3D12Core : public Core {
   D3D12Core(const Settings &settings);
   ~D3D12Core() override;
 
+  BackendAPI API() const override {
+    return BACKEND_API_D3D12;
+  }
+
   int CreateBuffer(size_t size,
                    BufferType type,
                    double_ptr<Buffer> pp_buffer) override;
@@ -21,6 +25,10 @@ class D3D12Core : public Core {
                          int height,
                          const std::string &title,
                          double_ptr<Window> pp_window) override;
+
+  int CreateShader(const void *data,
+                   size_t size,
+                   double_ptr<Shader> pp_shader) override;
 
   int GetPhysicalDeviceProperties(
       PhysicalDeviceProperties *p_physical_device_properties =
