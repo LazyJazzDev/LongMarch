@@ -6,7 +6,7 @@ namespace grassland::graphics::backend {
 
 class D3D12Window : public Window {
  public:
-  D3D12Window(int width, int height, const std::string &title, D3D12Core *core);
+  D3D12Window(D3D12Core *core, int width, int height, const std::string &title);
 
   virtual void CloseWindow() override;
 

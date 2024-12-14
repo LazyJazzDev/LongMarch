@@ -59,10 +59,23 @@ void Application::OnInit() {
     grassland::LogInfo("[D3D12] Shader compiled successfully");
   }
 #endif
+
+  core_->CreateProgram({grassland::graphics::IMAGE_FORMAT_R32G32B32A32_SFLOAT},
+                       grassland::graphics::IMAGE_FORMAT_UNDEFINED, &program_);
+  program_->AddInputBinding(sizeof(Vertex), false);
+  program_->AddInputAttribute(0, grassland::graphics::INPUT_TYPE_FLOAT3, 0);
+  program_->AddInputAttribute(0, grassland::graphics::INPUT_TYPE_FLOAT3,
+                              sizeof(float) * 3);
+  program_->BindShader(vertex_shader_.get(),
+                       grassland::graphics::SHADER_TYPE_VERTEX);
+  program_->BindShader(fragment_shader_.get(),
+                       grassland::graphics::SHADER_TYPE_FRAGMENT);
+  program_->Finalize();
 }
 
 void Application::OnClose() {
-  vertex_buffer_.reset();
+  program_.reset();
+  vertex_shader_.reset();
   fragment_shader_.reset();
   index_buffer_.reset();
   vertex_buffer_.reset();

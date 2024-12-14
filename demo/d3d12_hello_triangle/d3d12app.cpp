@@ -1,14 +1,5 @@
 #include "d3d12app.h"
 
-// Include GLFW native window handle
-#define GLFW_EXPOSE_NATIVE_WIN32
-#include <GLFW/glfw3native.h>
-#include <dxcapi.h>
-
-#include "grassland/d3d12/buffer.h"
-#include "grassland/d3d12/device.h"
-#include "grassland/util/vendor_id.h"
-
 namespace D3D12 {
 
 namespace {

@@ -2,7 +2,7 @@
 
 namespace grassland::graphics::backend {
 
-VulkanStaticBuffer::VulkanStaticBuffer(size_t size, VulkanCore *core)
+VulkanStaticBuffer::VulkanStaticBuffer(VulkanCore *core, size_t size)
     : core_(core) {
   auto usage =
       VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_TRANSFER_SRC_BIT |

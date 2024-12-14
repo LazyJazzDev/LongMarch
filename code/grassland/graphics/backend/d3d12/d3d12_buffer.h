@@ -6,7 +6,7 @@ namespace grassland::graphics::backend {
 
 class D3D12StaticBuffer : public Buffer {
  public:
-  D3D12StaticBuffer(size_t size, D3D12Core *core);
+  D3D12StaticBuffer(D3D12Core *core, size_t size);
   ~D3D12StaticBuffer() override;
 
   BufferType Type() const override;

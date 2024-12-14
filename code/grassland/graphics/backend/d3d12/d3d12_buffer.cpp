@@ -2,7 +2,7 @@
 
 namespace grassland::graphics::backend {
 
-D3D12StaticBuffer::D3D12StaticBuffer(size_t size, D3D12Core *core)
+D3D12StaticBuffer::D3D12StaticBuffer(D3D12Core *core, size_t size)
     : core_(core) {
   core_->Device()->CreateBuffer(size, D3D12_HEAP_TYPE_DEFAULT, &buffer_);
 }

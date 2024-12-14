@@ -40,6 +40,18 @@ typedef enum BufferType {
   BUFFER_TYPE_ONETIME = 2,
 } BufferType;
 
+typedef enum BindingType {
+  BINDING_TYPE_UNIFORM_BUFFER = 0,
+  BINDING_TYPE_STORAGE_BUFFER = 1,
+  BINDING_TYPE_TEXTURE = 2,
+  BINDING_TYPE_IMAGE = 3,
+} BindingType;
+
+typedef enum ShaderType {
+  SHADER_TYPE_VERTEX = 0,
+  SHADER_TYPE_FRAGMENT = 1
+} ShaderType;
+
 struct PhysicalDeviceProperties {
   std::string name;
   uint64_t score;
@@ -51,6 +63,7 @@ class Buffer;
 class Image;
 class Window;
 class Shader;
+class Program;
 
 #ifndef NDEBUG
 constexpr bool kEnableDebug = true;

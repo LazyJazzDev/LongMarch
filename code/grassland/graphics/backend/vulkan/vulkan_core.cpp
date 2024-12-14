@@ -18,7 +18,7 @@ VulkanCore::~VulkanCore() {
 int VulkanCore::CreateBuffer(size_t size,
                              BufferType type,
                              double_ptr<Buffer> pp_buffer) {
-  pp_buffer.construct<VulkanStaticBuffer>(size, this);
+  pp_buffer.construct<VulkanStaticBuffer>(this, size);
   return 0;
 }
 
@@ -33,7 +33,7 @@ int VulkanCore::CreateWindowObject(int width,
                                    int height,
                                    const std::string &title,
                                    double_ptr<Window> pp_window) {
-  pp_window.construct<VulkanWindow>(width, height, title, this);
+  pp_window.construct<VulkanWindow>(this, width, height, title);
   return 0;
 }
 
@@ -41,6 +41,13 @@ int VulkanCore::CreateShader(const void *data,
                              size_t size,
                              double_ptr<Shader> pp_shader) {
   pp_shader.construct<VulkanShader>(this, data, size);
+  return 0;
+}
+
+int VulkanCore::CreateProgram(const std::vector<ImageFormat> &color_formats,
+                              ImageFormat depth_format,
+                              double_ptr<Program> pp_program) {
+  pp_program.construct<VulkanProgram>(this, color_formats, depth_format);
   return 0;
 }
 

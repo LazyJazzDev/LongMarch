@@ -1,10 +1,10 @@
 #include "grassland/graphics/backend/d3d12/d3d12_window.h"
 
 namespace grassland::graphics::backend {
-D3D12Window::D3D12Window(int width,
+D3D12Window::D3D12Window(D3D12Core *core,
+                         int width,
                          int height,
-                         const std::string &title,
-                         D3D12Core *core)
+                         const std::string &title)
     : Window(width, height, title), core_(core) {
   HWND hwnd = glfwGetWin32Window(GLFWWindow());
   core_->DXGIFactory()->CreateSwapChain(*core_->CommandQueue(), hwnd,

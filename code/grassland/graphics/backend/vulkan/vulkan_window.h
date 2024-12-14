@@ -6,10 +6,10 @@ namespace grassland::graphics::backend {
 
 class VulkanWindow : public Window {
  public:
-  VulkanWindow(int width,
+  VulkanWindow(VulkanCore *core,
+               int width,
                int height,
-               const std::string &title,
-               VulkanCore *core);
+               const std::string &title);
 
   virtual void CloseWindow() override;
 

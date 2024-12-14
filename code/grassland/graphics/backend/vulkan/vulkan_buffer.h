@@ -5,7 +5,7 @@
 namespace grassland::graphics::backend {
 class VulkanStaticBuffer : public Buffer {
  public:
-  VulkanStaticBuffer(size_t size, VulkanCore *core);
+  VulkanStaticBuffer(VulkanCore *core, size_t size);
   ~VulkanStaticBuffer() override;
 
   size_t Size() const override {

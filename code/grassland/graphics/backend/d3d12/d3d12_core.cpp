@@ -17,7 +17,7 @@ D3D12Core::~D3D12Core() {
 int D3D12Core::CreateBuffer(size_t size,
                             BufferType type,
                             double_ptr<Buffer> pp_buffer) {
-  pp_buffer.construct<D3D12StaticBuffer>(size, this);
+  pp_buffer.construct<D3D12StaticBuffer>(this, size);
   return 0;
 }
 
@@ -32,14 +32,21 @@ int D3D12Core::CreateWindowObject(int width,
                                   int height,
                                   const std::string &title,
                                   double_ptr<Window> pp_window) {
-  pp_window.construct<D3D12Window>(width, height, title, this);
+  pp_window.construct<D3D12Window>(this, width, height, title);
   return 0;
 }
 
 int D3D12Core::CreateShader(const void *data,
                             size_t size,
                             double_ptr<Shader> pp_shader) {
-  pp_shader.construct<D3D12Shader>(data, size, this);
+  pp_shader.construct<D3D12Shader>(this, data, size);
+  return 0;
+}
+
+int D3D12Core::CreateProgram(const std::vector<ImageFormat> &color_formats,
+                             ImageFormat depth_format,
+                             double_ptr<Program> pp_program) {
+  pp_program.construct<D3D12Program>(this, color_formats, depth_format);
   return 0;
 }
 

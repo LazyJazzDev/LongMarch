@@ -11,6 +11,7 @@
 #include "grassland/util/event_manager.h"
 #include "grassland/util/log.h"
 #include "grassland/util/string_convert.h"
+#include "grassland/util/vendor_id.h"
 
 namespace grassland {
 #if defined(__CUDACC__)

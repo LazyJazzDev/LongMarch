@@ -1,13 +1,6 @@
 #include "d3d12app.h"
 
 #include "glm/gtc/matrix_transform.hpp"
-// Include GLFW native window handle
-#define GLFW_EXPOSE_NATIVE_WIN32
-#include <GLFW/glfw3native.h>
-
-#include "grassland/d3d12/buffer.h"
-#include "grassland/d3d12/device.h"
-#include "grassland/util/vendor_id.h"
 
 namespace D3D12 {
 

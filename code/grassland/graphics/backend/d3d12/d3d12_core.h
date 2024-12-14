@@ -30,6 +30,10 @@ class D3D12Core : public Core {
                    size_t size,
                    double_ptr<Shader> pp_shader) override;
 
+  int CreateProgram(const std::vector<ImageFormat> &color_formats,
+                    ImageFormat depth_format,
+                    double_ptr<Program> pp_program) override;
+
   int GetPhysicalDeviceProperties(
       PhysicalDeviceProperties *p_physical_device_properties =
           nullptr) override;

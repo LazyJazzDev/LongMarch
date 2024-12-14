@@ -43,6 +43,10 @@ class Core {
                            size_t size,
                            double_ptr<Shader> pp_shader) = 0;
 
+  virtual int CreateProgram(const std::vector<ImageFormat> &color_formats,
+                            ImageFormat depth_format,
+                            double_ptr<Program> pp_program) = 0;
+
   virtual int GetPhysicalDeviceProperties(
       PhysicalDeviceProperties *p_physical_device_properties = nullptr) = 0;
 
