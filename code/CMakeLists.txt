@@ -8,6 +8,8 @@ add_library(LongMarch ${SOURCES})
 
 add_subdirectory(grassland)
 
+add_subdirectory(snow_mount)
+
 target_include_directories(LongMarch PUBLIC ${LONGMARCH_INCLUDE_DIR})
 
-target_link_libraries(LongMarch PUBLIC Grassland)
+target_link_libraries(LongMarch PUBLIC Grassland SnowMount)

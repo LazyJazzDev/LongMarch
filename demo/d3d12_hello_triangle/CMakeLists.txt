@@ -3,7 +3,7 @@ if (WIN32)
 
     add_executable(${DEMO_NAME} ${DEMO_SOURCES})
 
-    target_link_libraries(${DEMO_NAME} LongMarch)
+    target_link_libraries(${DEMO_NAME} PUBLIC LongMarch)
 
     PACK_SHADER_CODE(${DEMO_NAME})
 endif ()

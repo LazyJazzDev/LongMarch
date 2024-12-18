@@ -27,10 +27,13 @@ class SwapChain {
         rtv_descriptor_size_);
   }
 
+  DXGI_FORMAT BackBufferFormat() const;
+
  private:
   ComPtr<IDXGISwapChain3> swap_chain_;
   ComPtr<ID3D12DescriptorHeap> rtv_heap_;
   uint32_t rtv_descriptor_size_{};
   std::vector<ComPtr<ID3D12Resource>> back_buffers_;
+  DXGI_FORMAT back_buffer_format_{};
 };
 }  // namespace grassland::d3d12

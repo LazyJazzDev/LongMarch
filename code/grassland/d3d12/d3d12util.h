@@ -50,6 +50,8 @@ std::string HRESULTToString(HRESULT hr);
 
 size_t SizeByFormat(DXGI_FORMAT format);
 
+size_t SizeAlignTo(size_t size, size_t alignment);
+
 #define RETURN_IF_FAILED_HR(cmd, ...)                               \
   do {                                                              \
     HRESULT res = cmd;                                              \
@@ -78,5 +80,13 @@ class Image;
 class Fence;
 class ShaderModule;
 class PipelineState;
+
+#ifdef NDEBUG
+constexpr bool kDefaultEnableDebugLayer = false;
+#else
+constexpr bool kDefaultEnableDebugLayer = true;
+#endif
+
+bool IsDepthFormat(DXGI_FORMAT format);
 
 }  // namespace grassland::d3d12

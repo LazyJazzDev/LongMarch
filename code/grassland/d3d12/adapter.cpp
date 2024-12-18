@@ -51,7 +51,7 @@ uint64_t Adapter::Evaluate() const {
   if (SupportRayTracing()) {
     score += 100000;
   }
-  return 0;
+  return score;
 }
 
 bool Adapter::CheckFeatureSupport(

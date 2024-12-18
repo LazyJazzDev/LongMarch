@@ -8,5 +8,5 @@ if (WIN32)
 
     target_include_directories(${GRASSLAND_SUBLIB_NAME} PUBLIC ${LONGMARCH_INCLUDE_DIR} ${Vulkan_INCLUDE_DIRS})
 
-    target_link_libraries(${GRASSLAND_SUBLIB_NAME} PUBLIC dxgi d3d12 dxguid d3dcompiler ${GLFW3_LIB_NAME} ${FMT_LIB_NAME} ${GLSLANG_LIB_NAME} ${GLM_LIB_NAME} ${IMGUI_LIB_NAME} grassland_util grassland_imgui)
+    target_link_libraries(${GRASSLAND_SUBLIB_NAME} PUBLIC dxgi d3d12 dxguid d3dcompiler dxcompiler ${GLFW3_LIB_NAME} ${FMT_LIB_NAME} ${GLSLANG_LIB_NAME} ${GLM_LIB_NAME} ${IMGUI_LIB_NAME} grassland_util grassland_imgui)
 endif ()

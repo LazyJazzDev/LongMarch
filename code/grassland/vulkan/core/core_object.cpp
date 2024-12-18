@@ -4,7 +4,7 @@
 
 grassland::vulkan::Core::Core(const grassland::vulkan::CoreSettings &settings)
     : settings_(settings) {
-  InstanceCreateHint hint{settings_.window != nullptr};
+  InstanceCreateHint hint;
   CreateInstance(hint, &instance_);
   if (settings_.window) {
     instance_->CreateSurfaceFromGLFWWindow(settings_.window, &surface_);

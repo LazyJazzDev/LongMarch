@@ -101,4 +101,6 @@ class AccelerationStructure;
 class RayTracingPipeline;
 class ShaderBindingTable;
 
+bool IsDepthFormat(VkFormat format);
+
 }  // namespace grassland::vulkan

@@ -5,6 +5,7 @@ set(LONG_MARCH_BINARY_DIR ${CMAKE_CURRENT_BINARY_DIR} CACHE STRING "Grassland Bi
 set(LONG_MARCH_PYTHON3_EXECUTABLE ${Python3_EXECUTABLE} CACHE STRING "Grassland Python3 Executable")
 
 if (WIN32)
+    set(LONG_MARCH_DXIL_DLL ${DIRECTX_DXC_TOOL_PATH}/dxil.dll CACHE STRING "Grassland DXIL DLL")
     # Define a cmake function XXD
     function(XXD input_file output_file dir_name)
         add_custom_command(
@@ -58,8 +59,18 @@ function(flatten_glsl_shader input_file output_file)
     )
 endfunction()
 
+function(COPY_DXIL_DLL TARGET_NAME)
+    if (WIN32)
+        add_custom_command(TARGET ${TARGET_NAME} POST_BUILD
+                COMMAND ${CMAKE_COMMAND} -E copy_if_different ${LONG_MARCH_DXIL_DLL} $<TARGET_FILE_DIR:${TARGET_NAME}>
+        )
+    endif ()
+endfunction()
+
 function(PACK_SHADER_CODE TARGET_NAME)
     message(STATUS "PACK_SHADER_CODE ${CMAKE_CURRENT_SOURCE_DIR}")
+
+    COPY_DXIL_DLL(${TARGET_NAME})
 
     # Find all the shader files under current directory
     file(GLOB_RECURSE SHADER_FILES

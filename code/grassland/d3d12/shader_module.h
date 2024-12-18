@@ -16,6 +16,10 @@ class ShaderModule {
   std::vector<uint8_t> shader_code_;
 };
 
+ComPtr<ID3DBlob> CompileShaderLegacy(const std::string &source_code,
+                                     const std::string &entry_point,
+                                     const std::string &target);
+
 ComPtr<ID3DBlob> CompileShader(const std::string &source_code,
                                const std::string &entry_point,
                                const std::string &target);

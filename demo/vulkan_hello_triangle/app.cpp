@@ -37,7 +37,7 @@ void Application::Run() {
 void Application::OnInit() {
   VkResult result;
   result = long_march::vulkan::CreateInstance(
-      long_march::vulkan::InstanceCreateHint{true}, &instance_);
+      long_march::vulkan::InstanceCreateHint{}, &instance_);
   if (result != VK_SUCCESS) {
     throw std::runtime_error("Failed to create Vulkan instance");
   }
@@ -48,10 +48,9 @@ void Application::OnInit() {
   }
 
   long_march::vulkan::DeviceFeatureRequirement feature_requirement;
-  feature_requirement.surface = surface_.get();
   feature_requirement.enable_raytracing_extension = false;
 
-  result = instance_->CreateDevice(surface_.get(), false, &device_);
+  result = instance_->CreateDevice(surface_.get(), false, -1, &device_);
   if (result != VK_SUCCESS) {
     throw std::runtime_error("Failed to create Vulkan device");
   }

@@ -13,23 +13,24 @@ project(LongMarch)
 
 set(CMAKE_CXX_STANDARD 17)
 
-find_package(CUDAToolkit)
-
-if (CUDAToolkit_FOUND)
-    enable_language(CUDA)
-    set(CMAKE_CUDA_STANDARD 17)
-    set(LONGMARCH_CUDA_ENABLED ON)
-#    set_target_properties(my_cuda_app PROPERTIES CUDA_SEPARABLE_COMPILATION ON)
-#    set_target_properties(my_cuda_app PROPERTIES CUDA_ARCHITECTURES "60;70;75")
-else ()
-    message(STATUS "CUDA not found, skipping CUDA code.")
-endif ()
+#find_package(CUDAToolkit)
+#
+#if (CUDAToolkit_FOUND)
+#    enable_language(CUDA)
+#    set(CMAKE_CUDA_STANDARD 17)
+#    set(LONGMARCH_CUDA_ENABLED ON)
+##    set_target_properties(my_cuda_app PROPERTIES CUDA_SEPARABLE_COMPILATION ON)
+##    set_target_properties(my_cuda_app PROPERTIES CUDA_ARCHITECTURES "60;70;75")
+#else ()
+#    message(STATUS "CUDA not found, skipping CUDA code.")
+#endif ()
 
 if (MSVC)
 #    add_compile_options("$<$<COMPILE_LANGUAGE:CXX>:/utf-8>")
 #    set(CMAKE_CUDA_FLAGS "${CMAKE_CUDA_FLAGS} -Xcompiler=\"/utf-8\"")
 #    add_compile_options("$<$<COMPILE_LANGUAGE:CUDA>:-Xcompiler \"/source-charset:utf-8\",\"/execution-charset:utf-8\">")
 endif()
+
 
 find_package(fmt CONFIG REQUIRED)
 set(FMT_LIB_NAME fmt::fmt) # fmt::fmt is also available
@@ -78,7 +79,16 @@ list(APPEND LIB_LIST ${TINYOBJLOADER_LIB_NAME})
 if (WIN32)
     find_path(D3DX12_INCLUDE_DIRS "d3dx12.h")
     list(APPEND INC_LIST ${D3DX12_INCLUDE_DIRS})
+
+    find_package(directx-dxc CONFIG REQUIRED)
+    get_filename_component(DIRECTX_DXC_TOOL_PATH ${DIRECTX_DXC_TOOL} DIRECTORY)
+    message(STATUS "DIRECTX_DXC_TOOL_PATH: ${DIRECTX_DXC_TOOL_PATH}")
 endif ()
+
+message(STATUS "CMAKE_ARCHIVE_OUTPUT_DIRECTORY : ${CMAKE_ARCHIVE_OUTPUT_DIRECTORY}")
+message(STATUS "CMAKE_LIBRARY_OUTPUT_DIRECTORY : ${CMAKE_LIBRARY_OUTPUT_DIRECTORY}")
+message(STATUS "CMAKE_RUNTIME_OUTPUT_DIRECTORY : ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}")
+message(STATUS "PROJECT_BINARY_DIR : ${PROJECT_BINARY_DIR}")
 
 find_package(Python3 COMPONENTS Interpreter REQUIRED)
 
@@ -86,8 +96,17 @@ include(scripts/pack_shaders.cmake)
 
 add_subdirectory(code)
 
+#get_target_property(SHARED_LIB_PATH LongMarch IMPORTED_LOCATION)
+#message(STATUS "SHARED_LIB_PATH : ${SHARED_LIB_PATH}")
+#message("Executable output folder: $<TARGET_FILE_DIR:LongMarch>")
+#file(GET_RUNTIME_DEPENDENCIES)
+
 # If current list is the root list
 if ("${CMAKE_CURRENT_SOURCE_DIR}" STREQUAL "${CMAKE_SOURCE_DIR}")
     add_subdirectory(demo)
     add_subdirectory(test)
 endif ()
+
+
+get_target_property(bin_path LongMarch INTERFACE_LINK_LIBRARIES)
+message(STATUS "bin_path : ${bin_path}")

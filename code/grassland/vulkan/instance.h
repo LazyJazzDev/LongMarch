@@ -13,9 +13,7 @@ struct InstanceCreateHint {
 
   VkApplicationInfo app_info{};
 
-  bool glfw_surface_support{false};
-
-  explicit InstanceCreateHint(bool surface_support = true);
+  explicit InstanceCreateHint();
 
   void SetValidationLayersEnabled(
       bool enabled = kDefaultEnableValidationLayers);
@@ -57,6 +55,11 @@ class Instance {
       const struct DeviceFeatureRequirement &device_feature_requirement,
       struct DeviceCreateInfo create_info,
       double_ptr<struct Device> pp_device) const;
+
+  VkResult CreateDevice(const PhysicalDevice &physical_device,
+                        struct DeviceCreateInfo create_info,
+                        VmaAllocatorCreateFlags allocator_flags,
+                        double_ptr<struct Device> pp_device) const;
 
   VkResult CreateDevice(Surface *surface,
                         bool enable_raytracing_extension,

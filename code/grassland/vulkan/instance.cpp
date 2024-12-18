@@ -8,7 +8,7 @@
 #include "grassland/vulkan/validation_layer.h"
 
 namespace grassland::vulkan {
-InstanceCreateHint::InstanceCreateHint(bool surface_support) {
+InstanceCreateHint::InstanceCreateHint() {
   app_info.sType = VK_STRUCTURE_TYPE_APPLICATION_INFO;
   app_info.pApplicationName = "Grassland";
   app_info.applicationVersion = VK_MAKE_VERSION(1, 0, 0);
@@ -16,9 +16,7 @@ InstanceCreateHint::InstanceCreateHint(bool surface_support) {
   app_info.engineVersion = VK_MAKE_VERSION(1, 0, 0);
   app_info.apiVersion = VK_API_VERSION_1_2;
 
-  if (surface_support) {
-    ApplyGLFWSurfaceSupport();
-  }
+  ApplyGLFWSurfaceSupport();
 }
 
 void InstanceCreateHint::SetValidationLayersEnabled(bool enabled) {
@@ -26,26 +24,43 @@ void InstanceCreateHint::SetValidationLayersEnabled(bool enabled) {
 }
 
 void InstanceCreateHint::AddExtension(const char *extension) {
-  extensions.push_back(extension);
+  bool found = false;
+  for (const auto &ext : extensions) {
+    if (strcmp(ext, extension) == 0) {
+      found = true;
+      break;
+    }
+  }
+  if (!found) {
+    extensions.push_back(extension);
+  }
 }
 
 void InstanceCreateHint::ApplyGLFWSurfaceSupport() {
   uint32_t glfw_extension_count = 0;
   const char **glfw_extensions;
   glfw_extensions = glfwGetRequiredInstanceExtensions(&glfw_extension_count);
-  for (uint32_t i = 0; i < glfw_extension_count; i++) {
-    bool found = false;
-    for (const auto &ext : extensions) {
-      if (strcmp(ext, glfw_extensions[i]) == 0) {
-        found = true;
-        break;
-      }
-    }
-    if (!found) {
-      extensions.push_back(glfw_extensions[i]);
+  bool local_init = false;
+
+  if (!glfw_extensions) {
+    int err = glfwGetError(nullptr);
+    if (err == GLFW_NOT_INITIALIZED) {
+      glfwInit();
+      glfw_extensions =
+          glfwGetRequiredInstanceExtensions(&glfw_extension_count);
+      local_init = true;
     }
   }
-  glfw_surface_support = true;
+
+  if (glfw_extensions) {
+    for (uint32_t i = 0; i < glfw_extension_count; i++) {
+      AddExtension(glfw_extensions[i]);
+    }
+  }
+
+  if (local_init) {
+    glfwTerminate();
+  }
 }
 
 VkResult CreateInstance(InstanceCreateHint create_hint,
@@ -153,10 +168,6 @@ Instance::~Instance() {
 VkResult Instance::CreateSurfaceFromGLFWWindow(
     GLFWwindow *window,
     double_ptr<Surface> pp_surface) const {
-  if (!create_hint_.glfw_surface_support) {
-    Warning("GLFW surface support is not enabled.");
-  }
-
   VkSurfaceKHR surface{nullptr};
   VkResult result =
       glfwCreateWindowSurface(instance_, window, nullptr, &surface);
@@ -184,6 +195,7 @@ std::vector<PhysicalDevice> Instance::EnumeratePhysicalDevices() const {
 
   std::vector<PhysicalDevice> physical_devices;
   physical_devices.reserve(devices.size());
+
   for (const auto &device : devices) {
     physical_devices.emplace_back(device);
   }
@@ -196,7 +208,6 @@ VkResult Instance::CreateDevice(Surface *surface,
                                 int device_index,
                                 double_ptr<struct Device> pp_device) const {
   DeviceFeatureRequirement device_feature_requirement{};
-  device_feature_requirement.surface = surface;
   device_feature_requirement.enable_raytracing_extension =
       enable_raytracing_extension;
   return CreateDevice(device_feature_requirement, device_index, pp_device);
@@ -250,6 +261,15 @@ VkResult Instance::CreateDevice(
     const DeviceFeatureRequirement &device_feature_requirement,
     DeviceCreateInfo create_info,
     double_ptr<Device> pp_device) const {
+  return CreateDevice(physical_device, create_info,
+                      device_feature_requirement.GetVmaAllocatorCreateFlags(),
+                      pp_device);
+}
+
+VkResult Instance::CreateDevice(const PhysicalDevice &physical_device,
+                                struct DeviceCreateInfo create_info,
+                                VmaAllocatorCreateFlags allocator_flags,
+                                double_ptr<class Device> pp_device) const {
   VkDeviceCreateInfo device_create_info = create_info.CompileVkDeviceCreateInfo(
       create_hint_.enable_validation_layers, physical_device);
 
@@ -260,8 +280,7 @@ VkResult Instance::CreateDevice(
                       "failed to create logical device.");
 
   if (pp_device) {
-    pp_device.construct(this, physical_device, create_info,
-                        device_feature_requirement.GetVmaAllocatorCreateFlags(),
+    pp_device.construct(this, physical_device, create_info, allocator_flags,
                         device);
   } else {
     vkDestroyDevice(device, nullptr);

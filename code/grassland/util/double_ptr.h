@@ -62,7 +62,23 @@ class double_ptr {
     return operator ContentType *();
   }
 
-  explicit operator ContentType *() {
+  template <class ChildType, class... Args>
+  ContentType *construct(Args &&...args) {
+    switch (type) {
+      case double_ptr_type::raw:
+        *raw_ptr = new ChildType(std::forward<Args>(args)...);
+        break;
+      case double_ptr_type::shared:
+        *shared_ptr = std::make_shared<ChildType>(std::forward<Args>(args)...);
+        break;
+      case double_ptr_type::unique:
+        *unique_ptr = std::make_unique<ChildType>(std::forward<Args>(args)...);
+        break;
+    }
+    return operator ContentType *();
+  }
+
+  explicit operator ContentType *() const {
     switch (type) {
       case double_ptr_type::raw:
         return *raw_ptr;
@@ -74,11 +90,11 @@ class double_ptr {
     return nullptr;
   }
 
-  ContentType *operator->() {
+  ContentType *operator->() const {
     return operator ContentType *();
   }
 
-  ContentType *operator*() {
+  ContentType *operator*() const {
     return operator ContentType *();
   }
 

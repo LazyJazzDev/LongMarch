@@ -1,13 +1,5 @@
 #include "d3d12app.h"
 
-// Include GLFW native window handle
-#define GLFW_EXPOSE_NATIVE_WIN32
-#include <GLFW/glfw3native.h>
-
-#include "grassland/d3d12/buffer.h"
-#include "grassland/d3d12/device.h"
-#include "grassland/util/vendor_id.h"
-
 namespace D3D12 {
 
 namespace {
@@ -115,9 +107,10 @@ void Application::CreateWindowAssets() {
   glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
   glfwWindowHint(GLFW_RESIZABLE, GLFW_FALSE);
 
-  glfw_window_ = glfwCreateWindow(800, 600, "D3D12", nullptr, nullptr);
+  glfw_window_ =
+      glfwCreateWindow(800, 600, "D3D12 Hello Triangle", nullptr, nullptr);
 
-  CreateDXGIFactory(&factory_);
+  CreateDXGIFactory({}, &factory_);
 
   factory_->CreateDevice(DeviceFeatureRequirement{}, -1, &device_);
   LogInfo("Device: {}", device_->Adapter().Name());
@@ -184,10 +177,10 @@ void Application::CreatePipelineAssets() {
       });
 
   device_->CreateShaderModule(
-      CompileShader(GetShaderCode("shaders/main.hlsl"), "VSMain", "vs_5_0"),
+      CompileShader(GetShaderCode("shaders/main.hlsl"), "VSMain", "vs_6_0"),
       &vertex_shader_);
   device_->CreateShaderModule(
-      CompileShader(GetShaderCode("shaders/main.hlsl"), "PSMain", "ps_5_0"),
+      CompileShader(GetShaderCode("shaders/main.hlsl"), "PSMain", "ps_6_0"),
       &pixel_shader_);
 
   CD3DX12_VERSIONED_ROOT_SIGNATURE_DESC root_signature_desc;
@@ -198,9 +191,9 @@ void Application::CreatePipelineAssets() {
   device_->CreateRootSignature(root_signature_desc, &root_signature_);
 
   std::vector<D3D12_INPUT_ELEMENT_DESC> input_element_descs = {
-      {"ATTRIBUTE", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, 0,
+      {"TEXCOORD", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, 0,
        D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0},
-      {"ATTRIBUTE", 1, DXGI_FORMAT_R32G32B32_FLOAT, 0, 12,
+      {"TEXCOORD", 1, DXGI_FORMAT_R32G32B32_FLOAT, 0, 12,
        D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0},
   };
 

@@ -1,7 +1,7 @@
 
 struct VSInput {
-  float3 position : ATTRIBUTE0;
-  float3 color : ATTRIBUTE1;
+  float3 position : TEXCOORD0;
+  float3 color : TEXCOORD1;
 };
 
 struct PSInput {

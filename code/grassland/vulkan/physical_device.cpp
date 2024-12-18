@@ -240,32 +240,20 @@ VkSampleCountFlagBits PhysicalDevice::GetMaxUsableSampleCount() const {
 
 bool PhysicalDevice::CheckFeatureSupport(
     const DeviceFeatureRequirement &feature_requirement) const {
-  if (feature_requirement.num_graphics_queue) {
-    if (GraphicsFamilyIndex() == -1) {
-      return false;
-    }
+  if (GraphicsFamilyIndex() == -1) {
+    return false;
   }
 
-  if (feature_requirement.num_compute_queue) {
-    if (ComputeFamilyIndex() == -1) {
-      return false;
-    }
+  if (ComputeFamilyIndex() == -1) {
+    return false;
   }
 
-  if (feature_requirement.num_transfer_queue) {
-    if (TransferFamilyIndex() == -1) {
-      return false;
-    }
+  if (TransferFamilyIndex() == -1) {
+    return false;
   }
 
   if (feature_requirement.enable_raytracing_extension) {
     if (!SupportRayTracing()) {
-      return false;
-    }
-  }
-
-  if (feature_requirement.surface) {
-    if (PresentFamilyIndex(feature_requirement.surface) == -1) {
       return false;
     }
   }

@@ -10,6 +10,8 @@ SwapChain::SwapChain(const ComPtr<IDXGISwapChain3> &swap_chain)
   swap_chain_->GetDesc(&desc);
   back_buffers_.resize(desc.BufferCount);
 
+  back_buffer_format_ = desc.BufferDesc.Format;
+
   D3D12_DESCRIPTOR_HEAP_DESC rtv_heap_desc = {};
   rtv_heap_desc.NumDescriptors = desc.BufferCount;
   rtv_heap_desc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_RTV;
@@ -27,6 +29,10 @@ SwapChain::SwapChain(const ComPtr<IDXGISwapChain3> &swap_chain)
         rtv_descriptor_size_);
     device->CreateRenderTargetView(back_buffers_[i].Get(), nullptr, handle);
   }
+}
+
+DXGI_FORMAT SwapChain::BackBufferFormat() const {
+  return back_buffer_format_;
 }
 
 }  // namespace grassland::d3d12
