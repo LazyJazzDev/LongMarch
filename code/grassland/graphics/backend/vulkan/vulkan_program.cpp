@@ -65,4 +65,13 @@ void VulkanProgram::Finalize() {
   pipeline_settings_.pipeline_layout = pipeline_layout_.get();
   core_->Device()->CreatePipeline(pipeline_settings_, &pipeline_);
 }
+
+int VulkanProgram::NumInputBindings() const {
+  return pipeline_settings_.vertex_input_binding_descriptions.size();
+}
+
+const vulkan::PipelineSettings *VulkanProgram::PipelineSettings() const {
+  return &pipeline_settings_;
+}
+
 }  // namespace grassland::graphics::backend

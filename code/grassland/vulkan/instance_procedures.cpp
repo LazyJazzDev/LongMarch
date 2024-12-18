@@ -23,8 +23,8 @@ void InstanceProcedures::Initialize(VkInstance instance,
     GET_PROCEDURE(instance, vkCreateDebugUtilsMessengerEXT);
     GET_PROCEDURE(instance, vkDestroyDebugUtilsMessengerEXT);
     GET_PROCEDURE(instance, vkSetDebugUtilsObjectNameEXT);
-    GET_PROCEDURE(instance, vkCmdBeginRenderingKHR);
-    GET_PROCEDURE(instance, vkCmdEndRenderingKHR);
   }
+  GET_PROCEDURE(instance, vkCmdBeginRenderingKHR);
+  GET_PROCEDURE(instance, vkCmdEndRenderingKHR);
 }
 }  // namespace grassland::vulkan

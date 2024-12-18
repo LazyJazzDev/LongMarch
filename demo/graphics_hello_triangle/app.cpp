@@ -19,7 +19,13 @@ Application::~Application() {
 }
 
 void Application::OnInit() {
-  core_->CreateWindowObject(1280, 720, "Graphics Hello Triangle", &window_);
+  alive_ = true;
+  core_->CreateWindowObject(
+      1280, 720,
+      ((core_->API() == grassland::graphics::BACKEND_API_VULKAN) ? "[Vulkan]"
+                                                                 : "[D3D12]") +
+          std::string(" Graphics Hello Triangle"),
+      &window_);
 
   std::vector<Vertex> vertices = {
       {{0.0f, -0.5f, 0.0f}, {1.0f, 0.0f, 0.0f}},
@@ -101,16 +107,10 @@ void Application::OnRender() {
   command_context->BindIndexBuffer(index_buffer_.get());
   command_context->BindColorTargets({color_image_.get()});
 
-  static glm::vec3 hsv = {0.0f, 0.5f, 0.5f};
-  hsv.x += 0.001f;
-  while (hsv.x >= 1.0f) {
-    hsv.x -= 1.0f;
-  }
+  command_context->CmdSetViewport({0, 0, 1280, 720, 0.0f, 1.0f});
+  command_context->CmdSetScissor({0, 0, 1280, 720});
 
-  auto rgb = grassland::graphics::HSVtoRGB(hsv);
-
-  command_context->CmdClearImage(color_image_.get(),
-                                 {{rgb.r, rgb.g, rgb.b, 1.0}});
+  command_context->CmdClearImage(color_image_.get(), {{0.6, 0.7, 0.8, 1.0}});
   command_context->CmdDrawIndexed(3, 1, 0, 0, 0);
   command_context->CmdPresent(window_.get(), color_image_.get());
   core_->SubmitCommandContext(command_context.get());

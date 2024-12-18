@@ -33,6 +33,7 @@ D3D12Program::D3D12Program(D3D12Core *core,
   pipeline_state_desc_.SampleMask = UINT_MAX;
   pipeline_state_desc_.IBStripCutValue =
       D3D12_INDEX_BUFFER_STRIP_CUT_VALUE_DISABLED;
+  pipeline_state_desc_.RasterizerState.FrontCounterClockwise = TRUE;
 }
 
 void D3D12Program::AddInputAttribute(uint32_t binding,
@@ -88,6 +89,19 @@ void D3D12Program::Finalize() {
   pipeline_state_desc_.pRootSignature = root_signature_->Handle();
 
   core_->Device()->CreatePipelineState(pipeline_state_desc_, &pipeline_state_);
+}
+
+int D3D12Program::NumInputBindings() const {
+  return input_bindings_.size();
+}
+
+uint32_t D3D12Program::InputBindingStride(uint32_t index) const {
+  return input_bindings_[index].first;
+}
+
+const D3D12_GRAPHICS_PIPELINE_STATE_DESC *D3D12Program::PipelineStateDesc()
+    const {
+  return &pipeline_state_desc_;
 }
 
 }  // namespace grassland::graphics::backend

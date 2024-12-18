@@ -32,5 +32,5 @@ class Application {
   std::unique_ptr<grassland::graphics::Shader> fragment_shader_;
   std::unique_ptr<grassland::graphics::Image> color_image_;
   std::unique_ptr<grassland::graphics::Program> program_;
-  bool alive_{true};
+  bool alive_{false};
 };

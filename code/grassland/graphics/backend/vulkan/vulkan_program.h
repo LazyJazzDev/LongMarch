@@ -30,6 +30,13 @@ class VulkanProgram : public Program {
   void BindShader(Shader *shader, ShaderType type) override;
   void Finalize() override;
 
+  int NumInputBindings() const;
+  const vulkan::PipelineSettings *PipelineSettings() const;
+
+  vulkan::Pipeline *Pipeline() const {
+    return pipeline_.get();
+  }
+
  private:
   VulkanCore *core_;
   std::unique_ptr<vulkan::DescriptorSetLayout> descriptor_set_layout_;

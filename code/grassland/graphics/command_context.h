@@ -11,6 +11,8 @@ class CommandContext {
   virtual void BindVertexBuffers(const std::vector<Buffer *> &buffers) = 0;
   virtual void BindIndexBuffer(Buffer *buffer) = 0;
 
+  virtual void CmdSetViewport(const Viewport &viewport) = 0;
+  virtual void CmdSetScissor(const Scissor &scissor) = 0;
   virtual void CmdDrawIndexed(uint32_t index_count,
                               uint32_t instance_count,
                               uint32_t first_index,

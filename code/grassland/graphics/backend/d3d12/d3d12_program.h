@@ -29,6 +29,18 @@ class D3D12Program : public Program {
   void BindShader(Shader *shader, ShaderType type) override;
   void Finalize() override;
 
+  int NumInputBindings() const;
+  uint32_t InputBindingStride(uint32_t index) const;
+  const D3D12_GRAPHICS_PIPELINE_STATE_DESC *PipelineStateDesc() const;
+
+  d3d12::PipelineState *PipelineState() const {
+    return pipeline_state_.get();
+  }
+
+  d3d12::RootSignature *RootSignature() const {
+    return root_signature_.get();
+  }
+
  private:
   D3D12Core *core_;
   std::vector<std::pair<uint32_t, bool>> input_bindings_;

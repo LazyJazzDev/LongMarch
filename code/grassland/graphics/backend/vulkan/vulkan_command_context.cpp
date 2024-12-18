@@ -38,10 +38,12 @@ void VulkanCommandContext::BindProgram(Program *program) {
   program_ = dynamic_cast<VulkanProgram *>(program);
 }
 
-void VulkanCommandContext::CmdClearImage(Image *image,
-                                         const ClearValue &color) {
-  commands_.push_back(std::make_unique<VulkanCmdClearImage>(
-      dynamic_cast<VulkanImage *>(image), color));
+void VulkanCommandContext::CmdSetViewport(const Viewport &viewport) {
+  commands_.push_back(std::make_unique<VulkanCmdSetViewport>(viewport));
+}
+
+void VulkanCommandContext::CmdSetScissor(const Scissor &scissor) {
+  commands_.push_back(std::make_unique<VulkanCmdSetScissor>(scissor));
 }
 
 void VulkanCommandContext::CmdDrawIndexed(uint32_t index_count,
@@ -49,6 +51,15 @@ void VulkanCommandContext::CmdDrawIndexed(uint32_t index_count,
                                           uint32_t first_index,
                                           uint32_t vertex_offset,
                                           uint32_t first_instance) {
+  commands_.push_back(std::make_unique<VulkanCmdDrawIndexed>(
+      program_, vertex_buffers_, index_buffer_, color_targets_, depth_target_,
+      index_count, instance_count, first_index, vertex_offset, first_instance));
+}
+
+void VulkanCommandContext::CmdClearImage(Image *image,
+                                         const ClearValue &color) {
+  commands_.push_back(std::make_unique<VulkanCmdClearImage>(
+      dynamic_cast<VulkanImage *>(image), color));
 }
 
 void VulkanCommandContext::CmdPresent(Window *window, Image *image) {

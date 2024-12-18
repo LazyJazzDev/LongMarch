@@ -79,6 +79,25 @@ struct Extent2D {
   uint32_t height;
 };
 
+struct Offset2D {
+  int x;
+  int y;
+};
+
+struct Scissor {
+  Offset2D offset;
+  Extent2D extent;
+};
+
+struct Viewport {
+  float x;
+  float y;
+  float width;
+  float height;
+  float min_depth;
+  float max_depth;
+};
+
 class Core;
 class Buffer;
 class Image;

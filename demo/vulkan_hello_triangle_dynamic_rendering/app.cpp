@@ -48,7 +48,6 @@ void Application::OnInit() {
   }
 
   long_march::vulkan::DeviceFeatureRequirement feature_requirement;
-  feature_requirement.surface = surface_.get();
   feature_requirement.enable_raytracing_extension = false;
 
   result = instance_->CreateDevice(surface_.get(), false, &device_);

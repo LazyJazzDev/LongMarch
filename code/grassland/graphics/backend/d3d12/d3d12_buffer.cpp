@@ -65,4 +65,8 @@ void D3D12StaticBuffer::DownloadData(void *data, size_t size, size_t offset) {
   staging_buffer->Unmap();
 }
 
+d3d12::Buffer *D3D12StaticBuffer::Buffer() const {
+  return buffer_.get();
+}
+
 }  // namespace grassland::graphics::backend

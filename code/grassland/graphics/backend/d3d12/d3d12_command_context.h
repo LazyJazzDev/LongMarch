@@ -21,12 +21,14 @@ class D3D12CommandContext : public CommandContext {
   void BindIndexBuffer(Buffer *buffer) override;
   void BindProgram(Program *program) override;
 
-  void CmdClearImage(Image *image, const ClearValue &color) override;
+  void CmdSetViewport(const Viewport &viewport) override;
+  void CmdSetScissor(const Scissor &scissor) override;
   void CmdDrawIndexed(uint32_t index_count,
                       uint32_t instance_count,
                       uint32_t first_index,
                       uint32_t vertex_offset,
                       uint32_t first_instance) override;
+  void CmdClearImage(Image *image, const ClearValue &color) override;
   void CmdPresent(Window *window, Image *image) override;
 
   void RecordRTVImage(const D3D12Image *image);

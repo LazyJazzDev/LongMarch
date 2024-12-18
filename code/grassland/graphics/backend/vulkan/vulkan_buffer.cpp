@@ -75,4 +75,8 @@ void VulkanStaticBuffer::DownloadData(void *data, size_t size, size_t offset) {
   staging_buffer->Unmap();
 }
 
+VkBuffer VulkanStaticBuffer::Buffer() const {
+  return buffer_->Handle();
+}
+
 }  // namespace grassland::graphics::backend

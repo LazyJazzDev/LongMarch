@@ -45,6 +45,24 @@ void D3D12CommandContext::BindProgram(Program *program) {
   program_ = dynamic_cast<D3D12Program *>(program);
 }
 
+void D3D12CommandContext::CmdSetViewport(const Viewport &viewport) {
+  commands_.push_back(std::make_unique<D3D12CmdSetViewport>(viewport));
+}
+
+void D3D12CommandContext::CmdSetScissor(const Scissor &scissor) {
+  commands_.push_back(std::make_unique<D3D12CmdSetScissor>(scissor));
+}
+
+void D3D12CommandContext::CmdDrawIndexed(uint32_t index_count,
+                                         uint32_t instance_count,
+                                         uint32_t first_index,
+                                         uint32_t vertex_offset,
+                                         uint32_t first_instance) {
+  commands_.push_back(std::make_unique<D3D12CmdDrawIndexed>(
+      program_, vertex_buffers_, index_buffer_, color_targets_, depth_target_,
+      index_count, instance_count, first_index, vertex_offset, first_instance));
+}
+
 void D3D12CommandContext::CmdClearImage(Image *image, const ClearValue &color) {
   auto d3d12_image = dynamic_cast<D3D12Image *>(image);
   commands_.push_back(std::make_unique<D3D12CmdClearImage>(d3d12_image, color));
@@ -53,13 +71,6 @@ void D3D12CommandContext::CmdClearImage(Image *image, const ClearValue &color) {
   } else {
     RecordRTVImage(d3d12_image);
   }
-}
-
-void D3D12CommandContext::CmdDrawIndexed(uint32_t index_count,
-                                         uint32_t instance_count,
-                                         uint32_t first_index,
-                                         uint32_t vertex_offset,
-                                         uint32_t first_instance) {
 }
 
 void D3D12CommandContext::CmdPresent(Window *window, Image *image) {

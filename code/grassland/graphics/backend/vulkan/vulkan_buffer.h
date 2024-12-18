@@ -4,7 +4,10 @@
 
 namespace grassland::graphics::backend {
 
-class VulkanBuffer : public Buffer {};
+class VulkanBuffer : public Buffer {
+ public:
+  virtual VkBuffer Buffer() const = 0;
+};
 
 class VulkanStaticBuffer : public VulkanBuffer {
  public:
@@ -24,6 +27,8 @@ class VulkanStaticBuffer : public VulkanBuffer {
   void UploadData(const void *data, size_t size, size_t offset) override;
 
   void DownloadData(void *data, size_t size, size_t offset) override;
+
+  VkBuffer Buffer() const override;
 
  private:
   VulkanCore *core_;
