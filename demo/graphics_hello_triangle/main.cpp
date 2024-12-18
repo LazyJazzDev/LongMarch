@@ -10,10 +10,14 @@ int main() {
   while (app_d3d12.IsAlive() || app_vulkan.IsAlive()) {
     if (app_d3d12.IsAlive()) {
       app_d3d12.OnUpdate();
+    }
+    if (app_d3d12.IsAlive()) {
       app_d3d12.OnRender();
     }
     if (app_vulkan.IsAlive()) {
       app_vulkan.OnUpdate();
+    }
+    if (app_vulkan.IsAlive()) {
       app_vulkan.OnRender();
     }
 

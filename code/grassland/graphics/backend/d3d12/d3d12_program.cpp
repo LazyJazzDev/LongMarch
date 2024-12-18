@@ -26,7 +26,9 @@ D3D12Program::D3D12Program(D3D12Core *core,
   pipeline_state_desc_.BlendState = CD3DX12_BLEND_DESC(D3D12_DEFAULT);
   pipeline_state_desc_.DepthStencilState =
       CD3DX12_DEPTH_STENCIL_DESC(D3D12_DEFAULT);
-  pipeline_state_desc_.DepthStencilState.DepthEnable = FALSE;
+  if (!IsDepthFormat(depth_format)) {
+    pipeline_state_desc_.DepthStencilState.DepthEnable = FALSE;
+  }
   pipeline_state_desc_.DepthStencilState.StencilEnable = FALSE;
   pipeline_state_desc_.SampleMask = UINT_MAX;
   pipeline_state_desc_.IBStripCutValue =

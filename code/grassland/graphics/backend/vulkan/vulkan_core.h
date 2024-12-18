@@ -34,6 +34,11 @@ class VulkanCore : public Core {
                     ImageFormat depth_format,
                     double_ptr<Program> pp_program) override;
 
+  int CreateCommandContext(
+      double_ptr<CommandContext> pp_command_context) override;
+
+  int SubmitCommandContext(CommandContext *p_command_context) override;
+
   int GetPhysicalDeviceProperties(
       PhysicalDeviceProperties *p_physical_device_properties =
           nullptr) override;
@@ -70,20 +75,21 @@ class VulkanCore : public Core {
     return command_buffers_[current_frame_].get();
   }
 
-  vulkan::Semaphore *RenderFinishedSemaphore() const {
-    return render_finished_semaphores_[current_frame_].get();
-  }
-
   vulkan::Fence *InFlightFence() const {
     return in_flight_fences_[current_frame_].get();
   }
+
+  uint32_t CurrentFrame() const {
+    return current_frame_;
+  }
+
+  void SingleTimeCommand(std::function<void(VkCommandBuffer)> command);
 
  private:
   std::unique_ptr<vulkan::Instance> instance_;
   std::unique_ptr<vulkan::Device> device_;
 
   uint32_t current_frame_{0};
-  std::vector<std::unique_ptr<vulkan::Semaphore>> render_finished_semaphores_;
   std::vector<std::unique_ptr<vulkan::Fence>> in_flight_fences_;
 
   std::unique_ptr<vulkan::CommandPool> graphics_command_pool_;

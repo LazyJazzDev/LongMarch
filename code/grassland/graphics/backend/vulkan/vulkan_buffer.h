@@ -3,7 +3,10 @@
 #include "grassland/graphics/backend/vulkan/vulkan_util.h"
 
 namespace grassland::graphics::backend {
-class VulkanStaticBuffer : public Buffer {
+
+class VulkanBuffer : public Buffer {};
+
+class VulkanStaticBuffer : public VulkanBuffer {
  public:
   VulkanStaticBuffer(VulkanCore *core, size_t size);
   ~VulkanStaticBuffer() override;

@@ -155,8 +155,13 @@ HRESULT Device::CreateImage(size_t width,
                             size_t height,
                             DXGI_FORMAT format,
                             double_ptr<Image> pp_image) {
-  return CreateImage(width, height, format,
-                     D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS, pp_image);
+  D3D12_RESOURCE_FLAGS flags = D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS;
+  if (IsDepthFormat(format)) {
+    flags |= D3D12_RESOURCE_FLAG_ALLOW_DEPTH_STENCIL;
+  } else {
+    flags |= D3D12_RESOURCE_FLAG_ALLOW_RENDER_TARGET;
+  }
+  return CreateImage(width, height, format, flags, pp_image);
 }
 
 HRESULT Device::CreateImageF32(size_t width,

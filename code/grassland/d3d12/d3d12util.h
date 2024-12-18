@@ -87,4 +87,6 @@ constexpr bool kDefaultEnableDebugLayer = false;
 constexpr bool kDefaultEnableDebugLayer = true;
 #endif
 
+bool IsDepthFormat(DXGI_FORMAT format);
+
 }  // namespace grassland::d3d12

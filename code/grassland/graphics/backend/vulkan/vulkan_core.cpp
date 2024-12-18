@@ -1,6 +1,8 @@
 #include "grassland/graphics/backend/vulkan/vulkan_core.h"
 
 #include "grassland/graphics/backend/vulkan/vulkan_buffer.h"
+#include "grassland/graphics/backend/vulkan/vulkan_command_context.h"
+#include "grassland/graphics/backend/vulkan/vulkan_image.h"
 #include "grassland/graphics/backend/vulkan/vulkan_program.h"
 #include "grassland/graphics/backend/vulkan/vulkan_window.h"
 
@@ -26,6 +28,14 @@ int VulkanCore::CreateImage(int width,
                             int height,
                             ImageFormat format,
                             double_ptr<Image> pp_image) {
+  pp_image.construct<VulkanImage>(this, width, height, format);
+  SingleTimeCommand([this, pp_image](VkCommandBuffer command_buffer) {
+    VulkanImage *image = dynamic_cast<VulkanImage *>(*pp_image);
+    vulkan::TransitImageLayout(
+        command_buffer, image->Image()->Handle(), VK_IMAGE_LAYOUT_UNDEFINED,
+        VK_IMAGE_LAYOUT_GENERAL, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT,
+        VK_PIPELINE_STAGE_ALL_GRAPHICS_BIT, VK_ACCESS_MEMORY_READ_BIT, 0);
+  });
   return 0;
 }
 
@@ -48,6 +58,80 @@ int VulkanCore::CreateProgram(const std::vector<ImageFormat> &color_formats,
                               ImageFormat depth_format,
                               double_ptr<Program> pp_program) {
   pp_program.construct<VulkanProgram>(this, color_formats, depth_format);
+  return 0;
+}
+
+int VulkanCore::CreateCommandContext(
+    double_ptr<CommandContext> pp_command_context) {
+  pp_command_context.construct<VulkanCommandContext>(this);
+  return 0;
+}
+
+int VulkanCore::SubmitCommandContext(CommandContext *p_command_context) {
+  VulkanCommandContext *command_context =
+      dynamic_cast<VulkanCommandContext *>(p_command_context);
+  for (auto &window : command_context->windows_) {
+    window->AcquireNextImage();
+  }
+  VkCommandBuffer command_buffer = command_buffers_[current_frame_]->Handle();
+  vkResetCommandBuffer(command_buffer, 0);
+  VkCommandBufferBeginInfo begin_info{};
+  begin_info.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
+  begin_info.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
+  if (vkBeginCommandBuffer(command_buffer, &begin_info) != VK_SUCCESS) {
+    return -1;
+  }
+
+  for (auto &command : command_context->commands_) {
+    command->CompileCommand(command_context, command_buffer);
+  }
+
+  for (auto [image, state] : command_context->image_states_) {
+    vulkan::TransitImageLayout(command_buffer, image, state.layout,
+                               VK_IMAGE_LAYOUT_GENERAL, state.stage,
+                               VK_PIPELINE_STAGE_ALL_GRAPHICS_BIT, state.access,
+                               VK_ACCESS_MEMORY_READ_BIT);
+  }
+  command_context->image_states_.clear();
+
+  vkEndCommandBuffer(command_buffer);
+
+  std::vector<VkSemaphore> wait_semaphores;
+  std::vector<VkSemaphore> signal_semaphores;
+
+  for (auto &window : command_context->windows_) {
+    wait_semaphores.push_back(window->ImageAvailableSemaphore()->Handle());
+    signal_semaphores.push_back(window->RenderFinishSemaphore()->Handle());
+  }
+
+  VkFence fence = in_flight_fences_[current_frame_]->Handle();
+  vkResetFences(device_->Handle(), 1, &fence);
+
+  VkPipelineStageFlags wait_stages[] = {
+      VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT};
+
+  VkSubmitInfo submit_info{};
+  submit_info.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
+  submit_info.pWaitDstStageMask = wait_stages;
+  submit_info.commandBufferCount = 1;
+  submit_info.pCommandBuffers = &command_buffer;
+  if (!wait_semaphores.empty()) {
+    submit_info.waitSemaphoreCount = wait_semaphores.size();
+    submit_info.pWaitSemaphores = wait_semaphores.data();
+    submit_info.signalSemaphoreCount = signal_semaphores.size();
+    submit_info.pSignalSemaphores = signal_semaphores.data();
+  }
+  vkQueueSubmit(graphics_queue_->Handle(), 1, &submit_info, fence);
+
+  for (auto &window : command_context->windows_) {
+    window->Present();
+  }
+
+  current_frame_ = (current_frame_ + 1) % FramesInFlight();
+  fence = in_flight_fences_[current_frame_]->Handle();
+  vkWaitForFences(device_->Handle(), 1, &fence, VK_TRUE,
+                  std::numeric_limits<uint64_t>::max());
+
   return 0;
 }
 
@@ -122,12 +206,10 @@ int VulkanCore::InitializeLogicalDevice(int device_index) {
   device_->GetQueue(device_->PhysicalDevice().TransferFamilyIndex(), 0,
                     &transfer_queue_);
 
-  render_finished_semaphores_.resize(FramesInFlight());
   in_flight_fences_.resize(FramesInFlight());
   command_buffers_.resize(FramesInFlight());
 
   for (int i = 0; i < FramesInFlight(); i++) {
-    device_->CreateSemaphore(&render_finished_semaphores_[i]);
     device_->CreateFence(true, &in_flight_fences_[i]);
     graphics_command_pool_->AllocateCommandBuffer(
         VK_COMMAND_BUFFER_LEVEL_PRIMARY, &command_buffers_[i]);
@@ -138,6 +220,12 @@ int VulkanCore::InitializeLogicalDevice(int device_index) {
 
 void VulkanCore::WaitGPU() {
   device_->WaitIdle();
+}
+
+void VulkanCore::SingleTimeCommand(
+    std::function<void(VkCommandBuffer)> command) {
+  vulkan::SingleTimeCommand(graphics_queue_.get(), graphics_command_pool_.get(),
+                            command);
 }
 
 }  // namespace grassland::graphics::backend

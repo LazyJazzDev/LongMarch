@@ -78,7 +78,7 @@ class double_ptr {
     return operator ContentType *();
   }
 
-  explicit operator ContentType *() {
+  explicit operator ContentType *() const {
     switch (type) {
       case double_ptr_type::raw:
         return *raw_ptr;
@@ -90,11 +90,11 @@ class double_ptr {
     return nullptr;
   }
 
-  ContentType *operator->() {
+  ContentType *operator->() const {
     return operator ContentType *();
   }
 
-  ContentType *operator*() {
+  ContentType *operator*() const {
     return operator ContentType *();
   }
 

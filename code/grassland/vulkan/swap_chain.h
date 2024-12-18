@@ -58,6 +58,10 @@ class Swapchain {
     return image_views_[index];
   }
 
+  uint32_t ImageCount() const {
+    return image_count_;
+  }
+
   // Acquire an image from the swap chain
   VkResult AcquireNextImage(uint64_t timeout,
                             VkSemaphore semaphore,

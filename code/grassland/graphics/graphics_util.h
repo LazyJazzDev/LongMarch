@@ -58,17 +58,43 @@ struct PhysicalDeviceProperties {
   bool ray_tracing_support;
 };
 
+struct ColorClearValue {
+  float r;
+  float g;
+  float b;
+  float a;
+};
+
+struct DepthClearValue {
+  float depth;
+};
+
+union ClearValue {
+  ColorClearValue color;
+  DepthClearValue depth;
+};
+
+struct Extent2D {
+  uint32_t width;
+  uint32_t height;
+};
+
 class Core;
 class Buffer;
 class Image;
 class Window;
 class Shader;
 class Program;
+class CommandContext;
 
 #ifndef NDEBUG
 constexpr bool kEnableDebug = true;
 #else
 constexpr bool kEnableDebug = false;
 #endif
+
+bool IsDepthFormat(ImageFormat format);
+
+glm::vec3 HSVtoRGB(glm::vec3 hsv);
 
 }  // namespace grassland::graphics

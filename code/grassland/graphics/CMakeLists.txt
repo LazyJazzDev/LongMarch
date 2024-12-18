@@ -12,3 +12,5 @@ target_link_libraries(${GRASSLAND_SUBLIB_NAME} PUBLIC grassland_vulkan)
 if (WIN32)
     target_link_libraries(${GRASSLAND_SUBLIB_NAME} PUBLIC grassland_d3d12)
 endif ()
+
+PACK_SHADER_CODE(${GRASSLAND_SUBLIB_NAME})

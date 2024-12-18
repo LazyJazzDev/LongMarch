@@ -16,4 +16,13 @@ void D3D12Window::CloseWindow() {
   Window::CloseWindow();
 }
 
+d3d12::SwapChain *D3D12Window::SwapChain() const {
+  return swap_chain_.get();
+}
+
+ID3D12Resource *D3D12Window::CurrentBackBuffer() const {
+  return swap_chain_->BackBuffer(
+      swap_chain_->Handle()->GetCurrentBackBufferIndex());
+}
+
 }  // namespace grassland::graphics::backend

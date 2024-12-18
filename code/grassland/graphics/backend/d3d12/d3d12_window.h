@@ -10,6 +10,10 @@ class D3D12Window : public Window {
 
   virtual void CloseWindow() override;
 
+  d3d12::SwapChain *SwapChain() const;
+
+  ID3D12Resource *CurrentBackBuffer() const;
+
  private:
   D3D12Core *core_;
   std::unique_ptr<d3d12::SwapChain> swap_chain_;

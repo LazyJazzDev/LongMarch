@@ -30,6 +30,7 @@ class Application {
   std::unique_ptr<grassland::graphics::Buffer> index_buffer_;
   std::unique_ptr<grassland::graphics::Shader> vertex_shader_;
   std::unique_ptr<grassland::graphics::Shader> fragment_shader_;
+  std::unique_ptr<grassland::graphics::Image> color_image_;
   std::unique_ptr<grassland::graphics::Program> program_;
   bool alive_{true};
 };

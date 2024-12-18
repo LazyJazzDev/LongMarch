@@ -35,6 +35,10 @@ void Application::OnInit() {
   vertex_buffer_->UploadData(vertices.data(), vertices.size() * sizeof(Vertex));
   index_buffer_->UploadData(indices.data(), indices.size() * sizeof(uint32_t));
 
+  core_->CreateImage(1280, 720,
+                     grassland::graphics::IMAGE_FORMAT_R32G32B32A32_SFLOAT,
+                     &color_image_);
+
   if (core_->API() == grassland::graphics::BACKEND_API_VULKAN) {
     core_->CreateShader(grassland::vulkan::CompileGLSLToSPIRV(
                             GetShaderCode("shaders/vulkan/shader.vert"),
@@ -77,6 +81,7 @@ void Application::OnClose() {
   program_.reset();
   vertex_shader_.reset();
   fragment_shader_.reset();
+  color_image_.reset();
   index_buffer_.reset();
   vertex_buffer_.reset();
 }
@@ -89,4 +94,24 @@ void Application::OnUpdate() {
 }
 
 void Application::OnRender() {
+  std::unique_ptr<grassland::graphics::CommandContext> command_context;
+  core_->CreateCommandContext(&command_context);
+  command_context->BindProgram(program_.get());
+  command_context->BindVertexBuffers({vertex_buffer_.get()});
+  command_context->BindIndexBuffer(index_buffer_.get());
+  command_context->BindColorTargets({color_image_.get()});
+
+  static glm::vec3 hsv = {0.0f, 0.5f, 0.5f};
+  hsv.x += 0.001f;
+  while (hsv.x >= 1.0f) {
+    hsv.x -= 1.0f;
+  }
+
+  auto rgb = grassland::graphics::HSVtoRGB(hsv);
+
+  command_context->CmdClearImage(color_image_.get(),
+                                 {{rgb.r, rgb.g, rgb.b, 1.0}});
+  command_context->CmdDrawIndexed(3, 1, 0, 0, 0);
+  command_context->CmdPresent(window_.get(), color_image_.get());
+  core_->SubmitCommandContext(command_context.get());
 }
