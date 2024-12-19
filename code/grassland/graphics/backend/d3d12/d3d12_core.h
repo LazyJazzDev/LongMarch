@@ -107,6 +107,7 @@ class D3D12Core : public Core {
   struct BlitPipeline blit_pipeline_;
 
   std::unique_ptr<d3d12::CommandQueue> command_queue_;
+  std::unique_ptr<d3d12::CommandQueue> transfer_command_queue_;
   std::vector<std::unique_ptr<d3d12::CommandAllocator>> command_allocators_;
   std::vector<std::unique_ptr<d3d12::CommandList>> command_lists_;
 
@@ -115,6 +116,10 @@ class D3D12Core : public Core {
   std::unique_ptr<d3d12::CommandAllocator> single_time_allocator_;
   std::unique_ptr<d3d12::CommandList> single_time_command_list_;
   std::unique_ptr<d3d12::Fence> single_time_fence_;
+
+  std::unique_ptr<d3d12::CommandAllocator> transfer_allocator_;
+  std::unique_ptr<d3d12::CommandList> transfer_command_list_;
+  std::unique_ptr<d3d12::Fence> transfer_fence_;
 
   std::vector<std::unique_ptr<d3d12::DescriptorHeap>>
       resource_descriptor_heaps_;

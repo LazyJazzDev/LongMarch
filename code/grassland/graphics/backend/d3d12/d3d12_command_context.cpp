@@ -33,12 +33,25 @@ void D3D12CommandContext::BindVertexBuffers(
     const std::vector<Buffer *> &buffers) {
   vertex_buffers_.resize(buffers.size());
   for (size_t i = 0; i < buffers.size(); ++i) {
-    vertex_buffers_[i] = dynamic_cast<D3D12Buffer *>(buffers[i]);
+    auto d3d12_buffer = dynamic_cast<D3D12Buffer *>(buffers[i]);
+    vertex_buffers_[i] = d3d12_buffer;
+    if (d3d12_buffer) {
+      auto dynamic_buffer = dynamic_cast<D3D12DynamicBuffer *>(d3d12_buffer);
+      if (dynamic_buffer) {
+        dynamic_buffers_.insert(dynamic_buffer);
+      }
+    }
   }
 }
 
 void D3D12CommandContext::BindIndexBuffer(Buffer *buffer) {
   index_buffer_ = dynamic_cast<D3D12Buffer *>(buffer);
+  if (index_buffer_) {
+    auto dynamic_buffer = dynamic_cast<D3D12DynamicBuffer *>(index_buffer_);
+    if (dynamic_buffer) {
+      dynamic_buffers_.insert(dynamic_buffer);
+    }
+  }
 }
 
 void D3D12CommandContext::BindProgram(Program *program) {
@@ -128,6 +141,26 @@ CD3DX12_CPU_DESCRIPTOR_HANDLE D3D12CommandContext::RTVHandle(
 CD3DX12_CPU_DESCRIPTOR_HANDLE D3D12CommandContext::DSVHandle(
     ID3D12Resource *resource) const {
   return core_->DSVDescriptorHeap()->CPUHandle(dsv_index_.at(resource));
+}
+
+CD3DX12_GPU_DESCRIPTOR_HANDLE D3D12CommandContext::WriteDescriptor(
+    D3D12Image *image) {
+  D3D12_SHADER_RESOURCE_VIEW_DESC desc = {};
+  desc.Format = ImageFormatToDXGIFormat(image->Format());
+  desc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2D;
+  desc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
+  desc.Texture2D.MostDetailedMip = 0;
+  desc.Texture2D.MipLevels = 1;
+  desc.Texture2D.PlaneSlice = 0;
+  desc.Texture2D.ResourceMinLODClamp = 0.0f;
+
+  core_->Device()->Handle()->CreateShaderResourceView(
+      image->Image()->Handle(), &desc, resource_descriptor_base_);
+
+  resource_descriptor_base_.Offset(descriptor_size_);
+  auto result = resource_descriptor_gpu_base_;
+  resource_descriptor_gpu_base_.Offset(descriptor_size_);
+  return result;
 }
 
 }  // namespace grassland::graphics::backend

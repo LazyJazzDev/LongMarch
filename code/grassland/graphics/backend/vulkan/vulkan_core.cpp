@@ -20,7 +20,14 @@ VulkanCore::~VulkanCore() {
 int VulkanCore::CreateBuffer(size_t size,
                              BufferType type,
                              double_ptr<Buffer> pp_buffer) {
-  pp_buffer.construct<VulkanStaticBuffer>(this, size);
+  switch (type) {
+    case BUFFER_TYPE_DYNAMIC:
+      pp_buffer.construct<VulkanDynamicBuffer>(this, size);
+      break;
+    default:
+      pp_buffer.construct<VulkanStaticBuffer>(this, size);
+      break;
+  }
   return 0;
 }
 
@@ -73,6 +80,28 @@ int VulkanCore::SubmitCommandContext(CommandContext *p_command_context) {
   for (auto &window : command_context->windows_) {
     window->AcquireNextImage();
   }
+
+  if (command_context->dynamic_buffers_.size()) {
+    vkResetCommandBuffer(transfer_command_buffer_->Handle(), 0);
+    VkCommandBufferBeginInfo begin_info = {};
+    begin_info.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
+    begin_info.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
+
+    vkBeginCommandBuffer(transfer_command_buffer_->Handle(), &begin_info);
+    for (auto &buffer : command_context->dynamic_buffers_) {
+      buffer->TransferData(transfer_command_buffer_->Handle());
+    }
+    vkEndCommandBuffer(transfer_command_buffer_->Handle());
+
+    VkCommandBuffer command_buffers[] = {transfer_command_buffer_->Handle()};
+
+    VkSubmitInfo submit_info = {};
+    submit_info.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
+    submit_info.commandBufferCount = 1;
+    submit_info.pCommandBuffers = command_buffers;
+    vkQueueSubmit(transfer_queue_->Handle(), 1, &submit_info, nullptr);
+  }
+
   VkCommandBuffer command_buffer = command_buffers_[current_frame_]->Handle();
   vkResetCommandBuffer(command_buffer, 0);
   VkCommandBufferBeginInfo begin_info{};
@@ -131,6 +160,8 @@ int VulkanCore::SubmitCommandContext(CommandContext *p_command_context) {
   fence = in_flight_fences_[current_frame_]->Handle();
   vkWaitForFences(device_->Handle(), 1, &fence, VK_TRUE,
                   std::numeric_limits<uint64_t>::max());
+
+  vkQueueWaitIdle(transfer_queue_->Handle());
 
   return 0;
 }
@@ -214,6 +245,8 @@ int VulkanCore::InitializeLogicalDevice(int device_index) {
     graphics_command_pool_->AllocateCommandBuffer(
         VK_COMMAND_BUFFER_LEVEL_PRIMARY, &command_buffers_[i]);
   }
+  transfer_command_pool_->AllocateCommandBuffer(VK_COMMAND_BUFFER_LEVEL_PRIMARY,
+                                                &transfer_command_buffer_);
 
   return 0;
 }

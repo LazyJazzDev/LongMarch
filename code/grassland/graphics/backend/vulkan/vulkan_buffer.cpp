@@ -16,6 +16,14 @@ VulkanStaticBuffer::~VulkanStaticBuffer() {
   buffer_.reset();
 }
 
+size_t VulkanStaticBuffer::Size() const {
+  return buffer_->Size();
+}
+
+BufferType VulkanStaticBuffer::Type() const {
+  return BUFFER_TYPE_STATIC;
+}
+
 void VulkanStaticBuffer::Resize(size_t new_size) {
   core_->WaitGPU();
   std::unique_ptr<vulkan::Buffer> new_buffer;
@@ -77,6 +85,93 @@ void VulkanStaticBuffer::DownloadData(void *data, size_t size, size_t offset) {
 
 VkBuffer VulkanStaticBuffer::Buffer() const {
   return buffer_->Handle();
+}
+
+VulkanDynamicBuffer::VulkanDynamicBuffer(VulkanCore *core, size_t size)
+    : core_(core) {
+  auto usage =
+      VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_TRANSFER_SRC_BIT;
+  core_->Device()->CreateBuffer(size, usage, VMA_MEMORY_USAGE_CPU_TO_GPU,
+                                &staging_buffer_);
+
+  usage = VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_TRANSFER_SRC_BIT |
+          VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT |
+          VK_BUFFER_USAGE_STORAGE_BUFFER_BIT |
+          VK_BUFFER_USAGE_INDEX_BUFFER_BIT | VK_BUFFER_USAGE_VERTEX_BUFFER_BIT;
+
+  buffers_.resize(core_->FramesInFlight());
+
+  for (size_t i = 0; i < buffers_.size(); ++i) {
+    core_->Device()->CreateBuffer(size, usage, VMA_MEMORY_USAGE_GPU_ONLY,
+                                  &buffers_[i]);
+  }
+}
+
+VulkanDynamicBuffer::~VulkanDynamicBuffer() {
+  buffers_.clear();
+  staging_buffer_.reset();
+}
+
+size_t VulkanDynamicBuffer::Size() const {
+  return staging_buffer_->Size();
+}
+
+BufferType VulkanDynamicBuffer::Type() const {
+  return BUFFER_TYPE_DYNAMIC;
+}
+
+void VulkanDynamicBuffer::Resize(size_t new_size) {
+  std::unique_ptr<vulkan::Buffer> new_buffer;
+  auto usage =
+      VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_TRANSFER_SRC_BIT |
+      VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT | VK_BUFFER_USAGE_STORAGE_BUFFER_BIT |
+      VK_BUFFER_USAGE_INDEX_BUFFER_BIT | VK_BUFFER_USAGE_VERTEX_BUFFER_BIT;
+  core_->Device()->CreateBuffer(new_size, usage, VMA_MEMORY_USAGE_CPU_TO_GPU,
+                                &new_buffer);
+  std::memcpy(new_buffer->Map(), staging_buffer_->Map(),
+              std::min(new_size, staging_buffer_->Size()));
+  new_buffer->Unmap();
+  staging_buffer_->Unmap();
+  staging_buffer_.reset();
+  staging_buffer_ = std::move(new_buffer);
+}
+
+void VulkanDynamicBuffer::UploadData(const void *data,
+                                     size_t size,
+                                     size_t offset) {
+  std::memcpy(static_cast<uint8_t *>(staging_buffer_->Map()) + offset, data,
+              size);
+  staging_buffer_->Unmap();
+}
+
+void VulkanDynamicBuffer::DownloadData(void *data, size_t size, size_t offset) {
+  std::memcpy(data, static_cast<uint8_t *>(staging_buffer_->Map()) + offset,
+              size);
+  staging_buffer_->Unmap();
+}
+
+VkBuffer VulkanDynamicBuffer::Buffer() const {
+  return buffers_[core_->CurrentFrame()]->Handle();
+}
+
+void VulkanDynamicBuffer::TransferData(VkCommandBuffer cmd_buffer) {
+  if (buffers_[core_->CurrentFrame()]->Size() != staging_buffer_->Size()) {
+    buffers_[core_->CurrentFrame()].reset();
+    auto usage =
+        VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_TRANSFER_SRC_BIT |
+        VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT |
+        VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_INDEX_BUFFER_BIT |
+        VK_BUFFER_USAGE_VERTEX_BUFFER_BIT;
+    core_->Device()->CreateBuffer(staging_buffer_->Size(), usage,
+                                  VMA_MEMORY_USAGE_GPU_ONLY,
+                                  &buffers_[core_->CurrentFrame()]);
+  }
+
+  VkBufferCopy copy_region{};
+  copy_region.size = staging_buffer_->Size();
+
+  vkCmdCopyBuffer(cmd_buffer, staging_buffer_->Handle(),
+                  buffers_[core_->CurrentFrame()]->Handle(), 1, &copy_region);
 }
 
 }  // namespace grassland::graphics::backend

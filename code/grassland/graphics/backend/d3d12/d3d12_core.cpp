@@ -77,7 +77,14 @@ D3D12Core::~D3D12Core() {
 int D3D12Core::CreateBuffer(size_t size,
                             BufferType type,
                             double_ptr<Buffer> pp_buffer) {
-  pp_buffer.construct<D3D12StaticBuffer>(this, size);
+  switch (type) {
+    case BUFFER_TYPE_DYNAMIC:
+      pp_buffer.construct<D3D12DynamicBuffer>(this, size);
+      break;
+    default:
+      pp_buffer.construct<D3D12StaticBuffer>(this, size);
+      break;
+  }
   return 0;
 }
 
@@ -120,6 +127,18 @@ int D3D12Core::CreateCommandContext(
 int D3D12Core::SubmitCommandContext(CommandContext *p_command_context) {
   D3D12CommandContext *command_context =
       dynamic_cast<D3D12CommandContext *>(p_command_context);
+
+  if (command_context->dynamic_buffers_.size()) {
+    transfer_allocator_->ResetCommandRecord(transfer_command_list_.get());
+    for (auto buffer : command_context->dynamic_buffers_) {
+      buffer->TransferData(transfer_command_list_->Handle());
+    }
+    transfer_command_list_->Handle()->Close();
+
+    ID3D12CommandList *command_lists[] = {transfer_command_list_->Handle()};
+    transfer_command_queue_->Handle()->ExecuteCommandLists(1, command_lists);
+    transfer_fence_->Signal(transfer_command_queue_.get());
+  }
 
   command_allocators_[current_frame_]->ResetCommandRecord(
       command_lists_[current_frame_].get());
@@ -208,6 +227,7 @@ int D3D12Core::SubmitCommandContext(CommandContext *p_command_context) {
 
   current_frame_ = (current_frame_ + 1) % FramesInFlight();
   fences_[current_frame_]->Wait();
+  transfer_fence_->Wait();
 
   return 0;
 }
@@ -270,6 +290,14 @@ int D3D12Core::InitializeLogicalDevice(int device_index) {
   device_->CreateFence(&single_time_fence_);
   single_time_allocator_->CreateCommandList(D3D12_COMMAND_LIST_TYPE_DIRECT,
                                             &single_time_command_list_);
+
+  device_->CreateCommandQueue(D3D12_COMMAND_LIST_TYPE_DIRECT,
+                              &transfer_command_queue_);
+  device_->CreateCommandAllocator(D3D12_COMMAND_LIST_TYPE_DIRECT,
+                                  &transfer_allocator_);
+  device_->CreateFence(&transfer_fence_);
+  transfer_allocator_->CreateCommandList(D3D12_COMMAND_LIST_TYPE_DIRECT,
+                                         &transfer_command_list_);
 
   blit_pipeline_.Initialize(device_.get());
 

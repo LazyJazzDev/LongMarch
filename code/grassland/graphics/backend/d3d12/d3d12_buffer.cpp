@@ -69,4 +69,70 @@ d3d12::Buffer *D3D12StaticBuffer::Buffer() const {
   return buffer_.get();
 }
 
+D3D12DynamicBuffer::D3D12DynamicBuffer(D3D12Core *core, size_t size)
+    : core_(core) {
+  buffers_.resize(core_->FramesInFlight());
+  for (size_t i = 0; i < buffers_.size(); ++i) {
+    core_->Device()->CreateBuffer(size, D3D12_HEAP_TYPE_DEFAULT, &buffers_[i]);
+  }
+  core_->Device()->CreateBuffer(size, D3D12_HEAP_TYPE_UPLOAD, &staging_buffer_);
+}
+
+D3D12DynamicBuffer::~D3D12DynamicBuffer() {
+  buffers_.clear();
+  staging_buffer_.reset();
+}
+
+BufferType D3D12DynamicBuffer::Type() const {
+  return BUFFER_TYPE_DYNAMIC;
+}
+
+size_t D3D12DynamicBuffer::Size() const {
+  return staging_buffer_->Size();
+}
+
+void D3D12DynamicBuffer::Resize(size_t new_size) {
+  std::unique_ptr<d3d12::Buffer> new_buffer;
+  core_->Device()->CreateBuffer(new_size, D3D12_HEAP_TYPE_UPLOAD, &new_buffer);
+
+  std::memcpy(new_buffer->Map(), staging_buffer_->Map(),
+              std::min(new_size, Size()));
+  new_buffer->Unmap();
+  staging_buffer_->Unmap();
+
+  staging_buffer_.reset();
+  staging_buffer_ = std::move(new_buffer);
+}
+
+void D3D12DynamicBuffer::UploadData(const void *data,
+                                    size_t size,
+                                    size_t offset) {
+  std::memcpy(static_cast<uint8_t *>(staging_buffer_->Map()) + offset, data,
+              size);
+  staging_buffer_->Unmap();
+}
+
+void D3D12DynamicBuffer::DownloadData(void *data, size_t size, size_t offset) {
+  std::memcpy(data, static_cast<uint8_t *>(staging_buffer_->Map()) + offset,
+              size);
+  staging_buffer_->Unmap();
+}
+
+d3d12::Buffer *D3D12DynamicBuffer::Buffer() const {
+  return buffers_[core_->CurrentFrame()].get();
+}
+
+void D3D12DynamicBuffer::TransferData(ID3D12GraphicsCommandList *command_list) {
+  if (buffers_[core_->CurrentFrame()]->Size() != staging_buffer_->Size()) {
+    buffers_[core_->CurrentFrame()].reset();
+    core_->Device()->CreateBuffer(staging_buffer_->Size(),
+                                  D3D12_HEAP_TYPE_DEFAULT,
+                                  &buffers_[core_->CurrentFrame()]);
+  }
+
+  command_list->CopyBufferRegion(buffers_[core_->CurrentFrame()]->Handle(), 0,
+                                 staging_buffer_->Handle(), 0,
+                                 staging_buffer_->Size());
+}
+
 }  // namespace grassland::graphics::backend

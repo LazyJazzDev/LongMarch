@@ -61,31 +61,13 @@ class D3D12CommandContext : public CommandContext {
   std::vector<std::unique_ptr<D3D12Command>> commands_;
   std::set<D3D12Window *> windows_;
 
+  std::set<D3D12DynamicBuffer *> dynamic_buffers_;
+
   std::map<ID3D12Resource *, D3D12_RESOURCE_STATES> resource_states_;
   int resource_descriptor_count_{0};
   int descriptor_size_{};
   CD3DX12_CPU_DESCRIPTOR_HANDLE resource_descriptor_base_{};
   CD3DX12_GPU_DESCRIPTOR_HANDLE resource_descriptor_gpu_base_{};
 };
-
-inline CD3DX12_GPU_DESCRIPTOR_HANDLE D3D12CommandContext::WriteDescriptor(
-    D3D12Image *image) {
-  D3D12_SHADER_RESOURCE_VIEW_DESC desc = {};
-  desc.Format = ImageFormatToDXGIFormat(image->Format());
-  desc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2D;
-  desc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
-  desc.Texture2D.MostDetailedMip = 0;
-  desc.Texture2D.MipLevels = 1;
-  desc.Texture2D.PlaneSlice = 0;
-  desc.Texture2D.ResourceMinLODClamp = 0.0f;
-
-  core_->Device()->Handle()->CreateShaderResourceView(
-      image->Image()->Handle(), &desc, resource_descriptor_base_);
-
-  resource_descriptor_base_.Offset(descriptor_size_);
-  auto result = resource_descriptor_gpu_base_;
-  resource_descriptor_gpu_base_.Offset(descriptor_size_);
-  return result;
-}
 
 }  // namespace grassland::graphics::backend

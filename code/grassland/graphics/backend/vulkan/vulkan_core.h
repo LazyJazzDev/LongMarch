@@ -95,6 +95,7 @@ class VulkanCore : public Core {
   std::unique_ptr<vulkan::CommandPool> graphics_command_pool_;
   std::unique_ptr<vulkan::CommandPool> transfer_command_pool_;
   std::vector<std::unique_ptr<vulkan::CommandBuffer>> command_buffers_;
+  std::unique_ptr<vulkan::CommandBuffer> transfer_command_buffer_;
 
   std::unique_ptr<vulkan::Queue> graphics_queue_;
   std::unique_ptr<vulkan::Queue> transfer_queue_;

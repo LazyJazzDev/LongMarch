@@ -26,12 +26,25 @@ void VulkanCommandContext::BindVertexBuffers(
     const std::vector<Buffer *> &buffers) {
   vertex_buffers_.resize(buffers.size());
   for (size_t i = 0; i < buffers.size(); ++i) {
-    vertex_buffers_[i] = dynamic_cast<VulkanBuffer *>(buffers[i]);
+    auto vk_buffer = dynamic_cast<VulkanBuffer *>(buffers[i]);
+    vertex_buffers_[i] = vk_buffer;
+    if (vk_buffer) {
+      auto dynamic_buffer = dynamic_cast<VulkanDynamicBuffer *>(vk_buffer);
+      if (dynamic_buffer) {
+        dynamic_buffers_.insert(dynamic_buffer);
+      }
+    }
   }
 }
 
 void VulkanCommandContext::BindIndexBuffer(Buffer *buffer) {
   index_buffer_ = dynamic_cast<VulkanBuffer *>(buffer);
+  if (index_buffer_) {
+    auto dynamic_buffer = dynamic_cast<VulkanDynamicBuffer *>(index_buffer_);
+    if (dynamic_buffer) {
+      dynamic_buffers_.insert(dynamic_buffer);
+    }
+  }
 }
 
 void VulkanCommandContext::BindProgram(Program *program) {

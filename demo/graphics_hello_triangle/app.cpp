@@ -35,9 +35,10 @@ void Application::OnInit() {
   std::vector<uint32_t> indices = {0, 1, 2};
 
   core_->CreateBuffer(vertices.size() * sizeof(Vertex),
-                      grassland::graphics::BUFFER_TYPE_STATIC, &vertex_buffer_);
+                      grassland::graphics::BUFFER_TYPE_DYNAMIC,
+                      &vertex_buffer_);
   core_->CreateBuffer(indices.size() * sizeof(uint32_t),
-                      grassland::graphics::BUFFER_TYPE_STATIC, &index_buffer_);
+                      grassland::graphics::BUFFER_TYPE_DYNAMIC, &index_buffer_);
   vertex_buffer_->UploadData(vertices.data(), vertices.size() * sizeof(Vertex));
   index_buffer_->UploadData(indices.data(), indices.size() * sizeof(uint32_t));
 

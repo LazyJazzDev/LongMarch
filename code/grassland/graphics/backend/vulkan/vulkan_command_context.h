@@ -1,4 +1,5 @@
 #pragma once
+#include "grassland/graphics/backend/vulkan/vulkan_buffer.h"
 #include "grassland/graphics/backend/vulkan/vulkan_commands.h"
 #include "grassland/graphics/backend/vulkan/vulkan_core.h"
 #include "grassland/graphics/backend/vulkan/vulkan_util.h"
@@ -47,6 +48,8 @@ class VulkanCommandContext : public CommandContext {
 
   std::vector<std::unique_ptr<VulkanCommand>> commands_;
   std::set<VulkanWindow *> windows_;
+
+  std::set<VulkanDynamicBuffer *> dynamic_buffers_;
 
   struct ImageState {
     VkImageLayout layout;
