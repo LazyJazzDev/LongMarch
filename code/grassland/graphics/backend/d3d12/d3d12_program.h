@@ -26,6 +26,8 @@ class D3D12Program : public Program {
                          InputType type,
                          uint32_t offset) override;
   void AddInputBinding(uint32_t stride, bool input_per_instance) override;
+  void AddResourceBinding(ResourceType type, int count) override;
+  void SetCullMode(CullMode mode) override;
   void BindShader(Shader *shader, ShaderType type) override;
   void Finalize() override;
 
@@ -41,10 +43,15 @@ class D3D12Program : public Program {
     return root_signature_.get();
   }
 
+  CD3DX12_DESCRIPTOR_RANGE1 *DescriptorRange(int index) {
+    return &descriptor_ranges_[index];
+  }
+
  private:
   D3D12Core *core_;
   std::vector<std::pair<uint32_t, bool>> input_bindings_;
   std::vector<D3D12_INPUT_ELEMENT_DESC> input_attributes_;
+  std::vector<CD3DX12_DESCRIPTOR_RANGE1> descriptor_ranges_;
   std::unique_ptr<d3d12::RootSignature> root_signature_;
   D3D12_GRAPHICS_PIPELINE_STATE_DESC pipeline_state_desc_;
   std::unique_ptr<d3d12::PipelineState> pipeline_state_;

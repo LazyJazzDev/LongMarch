@@ -284,7 +284,13 @@ VkResult Device::CreateDescriptorPool(
       vkCreateDescriptorPool(device_, &create_info, nullptr, &descriptor_pool),
       "failed to create descriptor pool!");
 
-  pp_descriptor_pool.construct(this, descriptor_pool);
+  DescriptorPoolSize pool_size;
+  for (const auto &pool_size_info : pool_sizes) {
+    pool_size.descriptor_type_count[pool_size_info.type] =
+        pool_size_info.descriptorCount;
+  }
+
+  pp_descriptor_pool.construct(this, descriptor_pool, pool_size, max_sets);
 
   return VK_SUCCESS;
 }

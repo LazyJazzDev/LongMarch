@@ -63,6 +63,10 @@ VKAPI_ATTR VkBool32 VKAPI_CALL DebugUtilsMessengerUserCallback(
   std::cerr << fmt::format("validation layer ({}): {}", message_tag,
                            callback_data->pMessage)
             << std::endl;
+
+  if (message_severity > VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT) {
+    throw std::runtime_error("validation layer error");
+  }
   return VK_FALSE;
 }
 

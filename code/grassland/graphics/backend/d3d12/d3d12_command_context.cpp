@@ -14,48 +14,64 @@ D3D12Core *D3D12CommandContext::Core() const {
   return core_;
 }
 
-void D3D12CommandContext::BindColorTargets(const std::vector<Image *> &images) {
-  color_targets_.resize(images.size());
-  for (size_t i = 0; i < images.size(); ++i) {
-    auto d3d12_image = dynamic_cast<D3D12Image *>(images[i]);
-    color_targets_[i] = d3d12_image;
-    RecordRTVImage(d3d12_image);
-  }
+void D3D12CommandContext::CmdBindProgram(Program *program) {
+  auto d3d12_program = dynamic_cast<D3D12Program *>(program);
+  commands_.push_back(std::make_unique<D3D12CmdBindProgram>(d3d12_program));
+  program_ = d3d12_program;
 }
 
-void D3D12CommandContext::BindDepthTarget(Image *image) {
-  auto d3d12_image = dynamic_cast<D3D12Image *>(image);
-  depth_target_ = d3d12_image;
-  RecordDSVImage(d3d12_image);
-}
-
-void D3D12CommandContext::BindVertexBuffers(
-    const std::vector<Buffer *> &buffers) {
-  vertex_buffers_.resize(buffers.size());
+void D3D12CommandContext::CmdBindVertexBuffers(
+    uint32_t first_binding,
+    const std::vector<Buffer *> &buffers,
+    const std::vector<uint64_t> &offsets) {
+  std::vector<D3D12Buffer *> vertex_buffers(buffers.size());
   for (size_t i = 0; i < buffers.size(); ++i) {
-    auto d3d12_buffer = dynamic_cast<D3D12Buffer *>(buffers[i]);
-    vertex_buffers_[i] = d3d12_buffer;
-    if (d3d12_buffer) {
-      auto dynamic_buffer = dynamic_cast<D3D12DynamicBuffer *>(d3d12_buffer);
-      if (dynamic_buffer) {
-        dynamic_buffers_.insert(dynamic_buffer);
-      }
-    }
+    vertex_buffers[i] = dynamic_cast<D3D12Buffer *>(buffers[i]);
+    RecordDynamicBuffer(vertex_buffers[i]);
   }
+  commands_.push_back(std::make_unique<D3D12CmdBindVertexBuffers>(
+      first_binding, vertex_buffers, offsets, program_));
 }
 
-void D3D12CommandContext::BindIndexBuffer(Buffer *buffer) {
-  index_buffer_ = dynamic_cast<D3D12Buffer *>(buffer);
-  if (index_buffer_) {
-    auto dynamic_buffer = dynamic_cast<D3D12DynamicBuffer *>(index_buffer_);
-    if (dynamic_buffer) {
-      dynamic_buffers_.insert(dynamic_buffer);
-    }
-  }
+void D3D12CommandContext::CmdBindIndexBuffer(Buffer *buffer, uint64_t offset) {
+  auto index_buffer = dynamic_cast<D3D12Buffer *>(buffer);
+  commands_.push_back(
+      std::make_unique<D3D12CmdBindIndexBuffer>(index_buffer, offset));
+  RecordDynamicBuffer(index_buffer);
 }
 
-void D3D12CommandContext::BindProgram(Program *program) {
-  program_ = dynamic_cast<D3D12Program *>(program);
+void D3D12CommandContext::CmdBindResources(
+    int slot,
+    const std::vector<Buffer *> &buffers) {
+  auto descriptor_range = program_->DescriptorRange(slot);
+  resource_descriptor_count_ += descriptor_range->NumDescriptors;
+  std::vector<D3D12Buffer *> d3d12_buffers(buffers.size());
+  for (size_t i = 0; i < buffers.size(); ++i) {
+    d3d12_buffers[i] = dynamic_cast<D3D12Buffer *>(buffers[i]);
+    RecordDynamicBuffer(d3d12_buffers[i]);
+  }
+  commands_.push_back(std::make_unique<D3D12CmdBindResourceBuffers>(
+      slot, d3d12_buffers, program_));
+}
+
+void D3D12CommandContext::CmdBeginRendering(
+    const std::vector<Image *> &color_targets,
+    Image *depth_target) {
+  std::vector<D3D12Image *> d3d12_color_targets(color_targets.size());
+  D3D12Image *d3d12_depth_target{nullptr};
+  for (size_t i = 0; i < color_targets.size(); ++i) {
+    d3d12_color_targets[i] = dynamic_cast<D3D12Image *>(color_targets[i]);
+    RecordRTVImage(d3d12_color_targets[i]);
+  }
+  if (depth_target) {
+    d3d12_depth_target = dynamic_cast<D3D12Image *>(depth_target);
+    RecordDSVImage(d3d12_depth_target);
+  }
+  commands_.push_back(std::make_unique<D3D12CmdBeginRendering>(
+      d3d12_color_targets, d3d12_depth_target));
+}
+
+void D3D12CommandContext::CmdEndRendering() {
 }
 
 void D3D12CommandContext::CmdSetViewport(const Viewport &viewport) {
@@ -69,10 +85,9 @@ void D3D12CommandContext::CmdSetScissor(const Scissor &scissor) {
 void D3D12CommandContext::CmdDrawIndexed(uint32_t index_count,
                                          uint32_t instance_count,
                                          uint32_t first_index,
-                                         uint32_t vertex_offset,
+                                         int32_t vertex_offset,
                                          uint32_t first_instance) {
   commands_.push_back(std::make_unique<D3D12CmdDrawIndexed>(
-      program_, vertex_buffers_, index_buffer_, color_targets_, depth_target_,
       index_count, instance_count, first_index, vertex_offset, first_instance));
 }
 
@@ -143,7 +158,23 @@ CD3DX12_CPU_DESCRIPTOR_HANDLE D3D12CommandContext::DSVHandle(
   return core_->DSVDescriptorHeap()->CPUHandle(dsv_index_.at(resource));
 }
 
-CD3DX12_GPU_DESCRIPTOR_HANDLE D3D12CommandContext::WriteDescriptor(
+CD3DX12_GPU_DESCRIPTOR_HANDLE D3D12CommandContext::WriteUAVDescriptor(
+    D3D12Image *image) {
+  D3D12_UNORDERED_ACCESS_VIEW_DESC desc = {};
+  desc.Format = ImageFormatToDXGIFormat(image->Format());
+  desc.ViewDimension = D3D12_UAV_DIMENSION_TEXTURE2D;
+  desc.Texture2D.MipSlice = 0;
+  desc.Texture2D.PlaneSlice = 0;
+
+  core_->Device()->Handle()->CreateUnorderedAccessView(
+      image->Image()->Handle(), nullptr, &desc, resource_descriptor_base_);
+  resource_descriptor_base_.Offset(descriptor_size_);
+  auto result = resource_descriptor_gpu_base_;
+  resource_descriptor_gpu_base_.Offset(descriptor_size_);
+  return result;
+}
+
+CD3DX12_GPU_DESCRIPTOR_HANDLE D3D12CommandContext::WriteSRVDescriptor(
     D3D12Image *image) {
   D3D12_SHADER_RESOURCE_VIEW_DESC desc = {};
   desc.Format = ImageFormatToDXGIFormat(image->Format());
@@ -161,6 +192,48 @@ CD3DX12_GPU_DESCRIPTOR_HANDLE D3D12CommandContext::WriteDescriptor(
   auto result = resource_descriptor_gpu_base_;
   resource_descriptor_gpu_base_.Offset(descriptor_size_);
   return result;
+}
+
+CD3DX12_GPU_DESCRIPTOR_HANDLE D3D12CommandContext::WriteSRVDescriptor(
+    D3D12Buffer *buffer) {
+  // D3D12_SHADER_RESOURCE_VIEW_DESC desc = {};
+  // desc.Format = DXGI_FORMAT_UNKNOWN;
+  // desc.ViewDimension = D3D12_SRV_DIMENSION_BUFFER;
+  // desc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
+  // desc.Buffer.FirstElement = 0;
+  // desc.Buffer.Flags = D3D12_BUFFER_SRV_FLAG_RAW;
+  // desc.Buffer.NumElements = static_cast<UINT>(buffer->Size());
+  // desc.Buffer.StructureByteStride = 0;
+
+  core_->Device()->Handle()->CreateShaderResourceView(
+      buffer->Buffer()->Handle(), nullptr, resource_descriptor_base_);
+
+  resource_descriptor_base_.Offset(descriptor_size_);
+  auto result = resource_descriptor_gpu_base_;
+  resource_descriptor_gpu_base_.Offset(descriptor_size_);
+  return result;
+}
+
+CD3DX12_GPU_DESCRIPTOR_HANDLE D3D12CommandContext::WriteCBVDescriptor(
+    D3D12Buffer *buffer) {
+  D3D12_CONSTANT_BUFFER_VIEW_DESC desc = {};
+  desc.BufferLocation = buffer->Buffer()->Handle()->GetGPUVirtualAddress();
+  desc.SizeInBytes = static_cast<UINT>(buffer->Size());
+
+  core_->Device()->Handle()->CreateConstantBufferView(
+      &desc, resource_descriptor_base_);
+
+  resource_descriptor_base_.Offset(descriptor_size_);
+  auto result = resource_descriptor_gpu_base_;
+  resource_descriptor_gpu_base_.Offset(descriptor_size_);
+  return result;
+}
+
+void D3D12CommandContext::RecordDynamicBuffer(D3D12Buffer *buffer) {
+  auto *dynamic_buffer = dynamic_cast<D3D12DynamicBuffer *>(buffer);
+  if (dynamic_buffer) {
+    dynamic_buffers_.insert(dynamic_buffer);
+  }
 }
 
 }  // namespace grassland::graphics::backend

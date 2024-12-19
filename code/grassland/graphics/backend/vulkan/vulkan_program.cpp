@@ -30,7 +30,7 @@ VulkanProgram::VulkanProgram(VulkanCore *core,
 VulkanProgram::~VulkanProgram() {
   pipeline_.reset();
   pipeline_layout_.reset();
-  descriptor_set_layout_.reset();
+  descriptor_set_layouts_.clear();
 }
 
 void VulkanProgram::AddInputAttribute(uint32_t binding,
@@ -48,6 +48,21 @@ void VulkanProgram::AddInputBinding(uint32_t stride, bool input_per_instance) {
                          : VK_VERTEX_INPUT_RATE_VERTEX);
 }
 
+void VulkanProgram::AddResourceBinding(ResourceType type, int count) {
+  VkDescriptorSetLayoutBinding binding = {};
+  binding.binding = 0;
+  binding.descriptorType = ResourceTypeToVkDescriptorType(type);
+  binding.descriptorCount = count;
+  binding.stageFlags = VK_SHADER_STAGE_ALL;
+  std::unique_ptr<vulkan::DescriptorSetLayout> descriptor_set_layout;
+  core_->Device()->CreateDescriptorSetLayout({binding}, &descriptor_set_layout);
+  descriptor_set_layouts_.push_back(std::move(descriptor_set_layout));
+}
+
+void VulkanProgram::SetCullMode(CullMode mode) {
+  pipeline_settings_.SetCullMode(CullModeToVkCullMode(mode));
+}
+
 void VulkanProgram::BindShader(Shader *shader, ShaderType type) {
   VulkanShader *vulkan_shader = dynamic_cast<VulkanShader *>(shader);
   if (vulkan_shader) {
@@ -59,8 +74,12 @@ void VulkanProgram::BindShader(Shader *shader, ShaderType type) {
 }
 
 void VulkanProgram::Finalize() {
-  core_->Device()->CreateDescriptorSetLayout({}, &descriptor_set_layout_);
-  core_->Device()->CreatePipelineLayout({descriptor_set_layout_->Handle()},
+  std::vector<VkDescriptorSetLayout> descriptor_set_layouts;
+  descriptor_set_layouts.reserve(descriptor_set_layouts_.size());
+  for (auto &descriptor_set_layout : descriptor_set_layouts_) {
+    descriptor_set_layouts.push_back(descriptor_set_layout->Handle());
+  }
+  core_->Device()->CreatePipelineLayout(descriptor_set_layouts,
                                         &pipeline_layout_);
   pipeline_settings_.pipeline_layout = pipeline_layout_.get();
   core_->Device()->CreatePipeline(pipeline_settings_, &pipeline_);

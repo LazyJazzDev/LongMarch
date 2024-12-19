@@ -1,6 +1,5 @@
 #include "grassland/graphics/core.h"
 
-#include "backend/vulkan/vulkan_core.h"
 #include "grassland/graphics/backend/backend.h"
 
 namespace grassland::graphics {
@@ -63,9 +62,11 @@ int CreateCore(BackendAPI api,
     case BACKEND_API_VULKAN:
       pp_core.construct<backend::VulkanCore>(settings);
       break;
+#if defined(_WIN32)
     case BACKEND_API_D3D12:
       pp_core.construct<backend::D3D12Core>(settings);
       break;
+#endif
     default:
       return -1;
   }

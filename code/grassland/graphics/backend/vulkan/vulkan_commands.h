@@ -9,6 +9,78 @@ class VulkanCommand {
                               VkCommandBuffer command_buffer) = 0;
 };
 
+class VulkanCmdBindProgram : public VulkanCommand {
+ public:
+  VulkanCmdBindProgram(VulkanProgram *program);
+
+  void CompileCommand(VulkanCommandContext *context,
+                      VkCommandBuffer command_buffer) override;
+
+ private:
+  VulkanProgram *program_;
+};
+
+class VulkanCmdBindVertexBuffers : public VulkanCommand {
+ public:
+  VulkanCmdBindVertexBuffers(uint32_t first_binding,
+                             const std::vector<VulkanBuffer *> &buffers,
+                             const std::vector<uint64_t> &offsets);
+
+  void CompileCommand(VulkanCommandContext *context,
+                      VkCommandBuffer command_buffer) override;
+
+ private:
+  uint32_t first_binding_;
+  std::vector<VulkanBuffer *> buffers_;
+  std::vector<VkDeviceSize> offsets_;
+};
+
+class VulkanCmdBindIndexBuffer : public VulkanCommand {
+ public:
+  VulkanCmdBindIndexBuffer(VulkanBuffer *buffer, uint64_t offset);
+
+  void CompileCommand(VulkanCommandContext *context,
+                      VkCommandBuffer command_buffer) override;
+
+ private:
+  VulkanBuffer *buffer_;
+  VkDeviceSize offset_;
+};
+
+class VulkanCmdBeginRendering : public VulkanCommand {
+ public:
+  VulkanCmdBeginRendering(const std::vector<VulkanImage *> &color_targets,
+                          VulkanImage *depth_target);
+
+  void CompileCommand(VulkanCommandContext *context,
+                      VkCommandBuffer command_buffer) override;
+
+ private:
+  std::vector<VulkanImage *> color_targets_;
+  VulkanImage *depth_target_;
+};
+
+class VulkanCmdBindResourceBuffers : public VulkanCommand {
+ public:
+  VulkanCmdBindResourceBuffers(int slot,
+                               const std::vector<VulkanBuffer *> &buffers,
+                               VulkanProgram *program);
+
+  void CompileCommand(VulkanCommandContext *context,
+                      VkCommandBuffer command_buffer) override;
+
+ private:
+  int slot_;
+  std::vector<VulkanBuffer *> buffers_;
+  VulkanProgram *program_;
+};
+
+class VulkanCmdEndRendering : public VulkanCommand {
+ public:
+  void CompileCommand(VulkanCommandContext *context,
+                      VkCommandBuffer command_buffer) override;
+};
+
 class VulkanCmdClearImage : public VulkanCommand {
  public:
   VulkanCmdClearImage(VulkanImage *image, const ClearValue &clear_value);
@@ -45,30 +117,20 @@ class VulkanCmdSetScissor : public VulkanCommand {
 
 class VulkanCmdDrawIndexed : public VulkanCommand {
  public:
-  VulkanCmdDrawIndexed(VulkanProgram *program,
-                       const std::vector<VulkanBuffer *> &vertex_buffers,
-                       VulkanBuffer *index_buffer,
-                       const std::vector<VulkanImage *> &color_targets,
-                       VulkanImage *depth_target,
-                       uint32_t index_count,
+  VulkanCmdDrawIndexed(uint32_t index_count,
                        uint32_t instance_count,
                        uint32_t first_index,
-                       uint32_t vertex_offset,
+                       int32_t vertex_offset,
                        uint32_t first_instance);
 
   void CompileCommand(VulkanCommandContext *context,
                       VkCommandBuffer command_buffer) override;
 
  private:
-  VulkanProgram *program_;
-  std::vector<VulkanBuffer *> vertex_buffers_;
-  VulkanBuffer *index_buffer_;
-  std::vector<VulkanImage *> color_targets_;
-  VulkanImage *depth_target_;
   uint32_t index_count_;
   uint32_t instance_count_;
   uint32_t first_index_;
-  uint32_t vertex_offset_;
+  int32_t vertex_offset_;
   uint32_t first_instance_;
 };
 

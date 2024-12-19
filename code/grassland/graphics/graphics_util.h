@@ -1,5 +1,7 @@
 #pragma once
-#include "grassland/grassland.h"
+#include "GLFW/glfw3.h"
+#include "glm/glm.hpp"
+#include "grassland/util/util.h"
 
 namespace grassland::graphics {
 
@@ -40,12 +42,12 @@ typedef enum BufferType {
   BUFFER_TYPE_ONETIME = 2,
 } BufferType;
 
-typedef enum BindingType {
-  BINDING_TYPE_UNIFORM_BUFFER = 0,
-  BINDING_TYPE_STORAGE_BUFFER = 1,
-  BINDING_TYPE_TEXTURE = 2,
-  BINDING_TYPE_IMAGE = 3,
-} BindingType;
+typedef enum ResourceType {
+  RESOURCE_TYPE_UNIFORM_BUFFER = 0,
+  RESOURCE_TYPE_STORAGE_BUFFER = 1,
+  RESOURCE_TYPE_TEXTURE = 2,
+  RESOURCE_TYPE_IMAGE = 3,
+} ResourceType;
 
 typedef enum ShaderType {
   SHADER_TYPE_VERTEX = 0,
@@ -97,6 +99,12 @@ struct Viewport {
   float min_depth;
   float max_depth;
 };
+
+typedef enum CullMode {
+  CULL_MODE_NONE = 0,
+  CULL_MODE_FRONT = 1,
+  CULL_MODE_BACK = 2,
+} CullMode;
 
 class Core;
 class Buffer;

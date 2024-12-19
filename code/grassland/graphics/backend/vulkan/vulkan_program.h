@@ -27,6 +27,8 @@ class VulkanProgram : public Program {
                          InputType type,
                          uint32_t offset) override;
   void AddInputBinding(uint32_t stride, bool input_per_instance) override;
+  void AddResourceBinding(ResourceType type, int count) override;
+  void SetCullMode(CullMode mode) override;
   void BindShader(Shader *shader, ShaderType type) override;
   void Finalize() override;
 
@@ -37,9 +39,18 @@ class VulkanProgram : public Program {
     return pipeline_.get();
   }
 
+  vulkan::PipelineLayout *PipelineLayout() const {
+    return pipeline_layout_.get();
+  }
+
+  vulkan::DescriptorSetLayout *DescriptorSetLayout(int index) const {
+    return descriptor_set_layouts_[index].get();
+  }
+
  private:
   VulkanCore *core_;
-  std::unique_ptr<vulkan::DescriptorSetLayout> descriptor_set_layout_;
+  std::vector<std::unique_ptr<vulkan::DescriptorSetLayout>>
+      descriptor_set_layouts_;
   std::unique_ptr<vulkan::PipelineLayout> pipeline_layout_;
   vulkan::PipelineSettings pipeline_settings_;
   std::unique_ptr<vulkan::Pipeline> pipeline_;

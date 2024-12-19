@@ -1,6 +1,8 @@
 #pragma once
+#ifdef WIN32
 #include <d3dcommon.h>
 #include <wrl/client.h>
+#endif
 
 #include "grassland/graphics/graphics_util.h"
 

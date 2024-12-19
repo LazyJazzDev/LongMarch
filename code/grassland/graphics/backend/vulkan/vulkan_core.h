@@ -1,4 +1,6 @@
 #pragma once
+#include <queue>
+
 #include "grassland/graphics/backend/vulkan/vulkan_util.h"
 
 namespace grassland::graphics::backend {
@@ -86,11 +88,17 @@ class VulkanCore : public Core {
   void SingleTimeCommand(std::function<void(VkCommandBuffer)> command);
 
  private:
+  friend class VulkanCommandContext;
   std::unique_ptr<vulkan::Instance> instance_;
   std::unique_ptr<vulkan::Device> device_;
 
   uint32_t current_frame_{0};
   std::vector<std::unique_ptr<vulkan::Fence>> in_flight_fences_;
+
+  std::vector<std::unique_ptr<vulkan::DescriptorPool>> descriptor_pools_;
+  std::vector<std::queue<vulkan::DescriptorSet *>> descriptor_sets_;
+  vulkan::DescriptorPool *current_descriptor_pool_{nullptr};
+  std::queue<vulkan::DescriptorSet *> *current_descriptor_set_queue_{nullptr};
 
   std::unique_ptr<vulkan::CommandPool> graphics_command_pool_;
   std::unique_ptr<vulkan::CommandPool> transfer_command_pool_;

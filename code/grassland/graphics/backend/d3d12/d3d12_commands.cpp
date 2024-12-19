@@ -7,6 +7,126 @@
 
 namespace grassland::graphics::backend {
 
+D3D12CmdBindProgram::D3D12CmdBindProgram(D3D12Program *program)
+    : program_(program) {
+}
+
+void D3D12CmdBindProgram::CompileCommand(
+    D3D12CommandContext *context,
+    ID3D12GraphicsCommandList *command_list) {
+  command_list->SetGraphicsRootSignature(program_->RootSignature()->Handle());
+  command_list->SetPipelineState(program_->PipelineState()->Handle());
+}
+
+D3D12CmdBindVertexBuffers::D3D12CmdBindVertexBuffers(
+    uint32_t first_binding,
+    const std::vector<D3D12Buffer *> &buffers,
+    const std::vector<uint64_t> &offsets,
+    D3D12Program *program)
+    : first_binding_(first_binding), buffers_(buffers), program_(program) {
+  offsets_.resize(buffers_.size());
+  for (size_t i = 0; i < buffers_.size(); ++i) {
+    if (i < offsets.size()) {
+      offsets_[i] = offsets[i];
+    } else {
+      offsets_[i] = 0;
+    }
+  }
+}
+
+void D3D12CmdBindVertexBuffers::CompileCommand(
+    D3D12CommandContext *context,
+    ID3D12GraphicsCommandList *command_list) {
+  std::vector<D3D12_VERTEX_BUFFER_VIEW> vertex_buffer_views(buffers_.size());
+  for (size_t i = 0; i < buffers_.size(); ++i) {
+    vertex_buffer_views[i].BufferLocation =
+        buffers_[i]->Buffer()->Handle()->GetGPUVirtualAddress() + offsets_[i];
+    vertex_buffer_views[i].StrideInBytes =
+        program_->InputBindingStride(first_binding_ + i);
+    vertex_buffer_views[i].SizeInBytes = buffers_[i]->Size() - offsets_[i];
+  }
+  command_list->IASetVertexBuffers(first_binding_, buffers_.size(),
+                                   vertex_buffer_views.data());
+}
+
+D3D12CmdBindIndexBuffer::D3D12CmdBindIndexBuffer(D3D12Buffer *buffer,
+                                                 uint64_t offset)
+    : buffer_(buffer), offset_(offset) {
+}
+
+void D3D12CmdBindIndexBuffer::CompileCommand(
+    D3D12CommandContext *context,
+    ID3D12GraphicsCommandList *command_list) {
+  D3D12_INDEX_BUFFER_VIEW index_buffer_view;
+  index_buffer_view.BufferLocation =
+      buffer_->Buffer()->Handle()->GetGPUVirtualAddress() + offset_;
+  index_buffer_view.SizeInBytes = buffer_->Size() - offset_;
+  index_buffer_view.Format = DXGI_FORMAT_R32_UINT;
+  command_list->IASetIndexBuffer(&index_buffer_view);
+}
+
+D3D12CmdBindResourceBuffers::D3D12CmdBindResourceBuffers(
+    int slot,
+    const std::vector<D3D12Buffer *> &buffers,
+    D3D12Program *program)
+    : slot_(slot), buffers_(buffers), program_(program) {
+}
+
+void D3D12CmdBindResourceBuffers::CompileCommand(
+    D3D12CommandContext *context,
+    ID3D12GraphicsCommandList *command_list) {
+  auto descriptor_range = program_->DescriptorRange(slot_);
+  CD3DX12_GPU_DESCRIPTOR_HANDLE first_descriptor;
+  switch (descriptor_range->RangeType) {
+    case D3D12_DESCRIPTOR_RANGE_TYPE_CBV:
+      for (size_t i = 0; i < buffers_.size(); ++i) {
+        auto desc = context->WriteCBVDescriptor(buffers_[i]);
+        if (i == 0) {
+          first_descriptor = desc;
+        }
+      }
+      break;
+    case D3D12_DESCRIPTOR_RANGE_TYPE_SRV:
+      for (size_t i = 0; i < buffers_.size(); ++i) {
+        auto desc = context->WriteSRVDescriptor(buffers_[i]);
+        if (i == 0) {
+          first_descriptor = desc;
+        }
+      }
+      break;
+  }
+  command_list->SetGraphicsRootDescriptorTable(slot_, first_descriptor);
+}
+
+D3D12CmdBeginRendering::D3D12CmdBeginRendering(
+    const std::vector<D3D12Image *> &color_targets,
+    D3D12Image *depth_target)
+    : color_targets_(color_targets), depth_target_(depth_target) {
+}
+
+void D3D12CmdBeginRendering::CompileCommand(
+    D3D12CommandContext *context,
+    ID3D12GraphicsCommandList *command_list) {
+  CD3DX12_CPU_DESCRIPTOR_HANDLE rtv_handles[8]{};
+  CD3DX12_CPU_DESCRIPTOR_HANDLE dsv_handle{};
+  for (size_t i = 0; i < color_targets_.size(); ++i) {
+    context->RequireImageState(command_list,
+                               color_targets_[i]->Image()->Handle(),
+                               D3D12_RESOURCE_STATE_RENDER_TARGET);
+    rtv_handles[i] = context->RTVHandle(color_targets_[i]->Image()->Handle());
+  }
+  if (depth_target_) {
+    context->RequireImageState(command_list, depth_target_->Image()->Handle(),
+                               D3D12_RESOURCE_STATE_DEPTH_WRITE);
+    dsv_handle = context->DSVHandle(depth_target_->Image()->Handle());
+    command_list->OMSetRenderTargets(color_targets_.size(), rtv_handles, FALSE,
+                                     &dsv_handle);
+  } else {
+    command_list->OMSetRenderTargets(color_targets_.size(), rtv_handles, FALSE,
+                                     nullptr);
+  }
+}
+
 D3D12CmdClearImage::D3D12CmdClearImage(D3D12Image *image,
                                        const ClearValue &clear_value)
     : image_(image), clear_value_(clear_value) {
@@ -73,83 +193,21 @@ void D3D12CmdSetScissor::CompileCommand(
   command_list->RSSetScissorRects(1, &scissor_rect);
 }
 
-D3D12CmdDrawIndexed::D3D12CmdDrawIndexed(
-    D3D12Program *program,
-    const std::vector<D3D12Buffer *> &vertex_buffers,
-    D3D12Buffer *index_buffer,
-    const std::vector<D3D12Image *> &color_targets,
-    D3D12Image *depth_target,
-    uint32_t index_count,
-    uint32_t instance_count,
-    uint32_t first_index,
-    uint32_t vertex_offset,
-    uint32_t first_instance)
-    : program_(program),
-      vertex_buffers_({}),
-      index_buffer_(index_buffer),
-      color_targets_({}),
-      depth_target_(nullptr),
-      index_count_(index_count),
+D3D12CmdDrawIndexed::D3D12CmdDrawIndexed(uint32_t index_count,
+                                         uint32_t instance_count,
+                                         uint32_t first_index,
+                                         int32_t vertex_offset,
+                                         uint32_t first_instance)
+    : index_count_(index_count),
       instance_count_(instance_count),
       first_index_(first_index),
       vertex_offset_(vertex_offset),
       first_instance_(first_instance) {
-  vertex_buffers_.resize(program_->NumInputBindings());
-  for (size_t i = 0; i < vertex_buffers_.size(); ++i) {
-    vertex_buffers_[i] = vertex_buffers[i];
-  }
-  color_targets_.resize(program_->PipelineStateDesc()->NumRenderTargets);
-  for (size_t i = 0; i < color_targets_.size(); ++i) {
-    color_targets_[i] = color_targets[i];
-  }
-  if (program_->PipelineStateDesc()->DSVFormat != DXGI_FORMAT_UNKNOWN) {
-    depth_target_ = depth_target;
-  }
 }
 
 void D3D12CmdDrawIndexed::CompileCommand(
     D3D12CommandContext *context,
     ID3D12GraphicsCommandList *command_list) {
-  command_list->SetGraphicsRootSignature(program_->RootSignature()->Handle());
-  command_list->SetPipelineState(program_->PipelineState()->Handle());
-  CD3DX12_CPU_DESCRIPTOR_HANDLE rtv_handles[8]{};
-  CD3DX12_CPU_DESCRIPTOR_HANDLE dsv_handle{};
-  for (size_t i = 0; i < color_targets_.size(); ++i) {
-    context->RequireImageState(command_list,
-                               color_targets_[i]->Image()->Handle(),
-                               D3D12_RESOURCE_STATE_RENDER_TARGET);
-    rtv_handles[i] = context->RTVHandle(color_targets_[i]->Image()->Handle());
-  }
-  if (depth_target_) {
-    context->RequireImageState(command_list, depth_target_->Image()->Handle(),
-                               D3D12_RESOURCE_STATE_DEPTH_WRITE);
-    dsv_handle = context->DSVHandle(depth_target_->Image()->Handle());
-    command_list->OMSetRenderTargets(color_targets_.size(), rtv_handles, FALSE,
-                                     &dsv_handle);
-  } else {
-    command_list->OMSetRenderTargets(color_targets_.size(), rtv_handles, FALSE,
-                                     nullptr);
-  }
-  if (!vertex_buffers_.empty()) {
-    std::vector<D3D12_VERTEX_BUFFER_VIEW> vertex_buffer_views;
-    for (size_t i = 0; i < vertex_buffers_.size(); ++i) {
-      D3D12_VERTEX_BUFFER_VIEW vertex_buffer_view = {};
-      vertex_buffer_view.BufferLocation =
-          vertex_buffers_[i]->Buffer()->Handle()->GetGPUVirtualAddress();
-      vertex_buffer_view.StrideInBytes = program_->InputBindingStride(i);
-      vertex_buffer_view.SizeInBytes = vertex_buffers_[i]->Size();
-      vertex_buffer_views.push_back(vertex_buffer_view);
-    }
-    command_list->IASetVertexBuffers(0, vertex_buffers_.size(),
-                                     vertex_buffer_views.data());
-  }
-
-  D3D12_INDEX_BUFFER_VIEW index_buffer_view = {};
-  index_buffer_view.BufferLocation =
-      index_buffer_->Buffer()->Handle()->GetGPUVirtualAddress();
-  index_buffer_view.Format = DXGI_FORMAT_R32_UINT;
-  index_buffer_view.SizeInBytes = index_buffer_->Size();
-  command_list->IASetIndexBuffer(&index_buffer_view);
   command_list->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
   command_list->DrawIndexedInstanced(index_count_, instance_count_,
                                      first_index_, vertex_offset_,
@@ -162,7 +220,7 @@ D3D12CmdPresent::D3D12CmdPresent(D3D12Window *window, D3D12Image *image)
 
 void D3D12CmdPresent::CompileCommand(D3D12CommandContext *context,
                                      ID3D12GraphicsCommandList *command_list) {
-  auto gpu_descriptor = context->WriteDescriptor(image_);
+  auto gpu_descriptor = context->WriteSRVDescriptor(image_);
 
   context->RequireImageState(command_list, image_->Image()->Handle(),
                              D3D12_RESOURCE_STATE_GENERIC_READ);

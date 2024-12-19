@@ -56,6 +56,17 @@ void D3D12Program::AddInputBinding(uint32_t stride, bool input_per_instance) {
   input_bindings_.emplace_back(stride, input_per_instance);
 }
 
+void D3D12Program::AddResourceBinding(ResourceType type, int count) {
+  CD3DX12_DESCRIPTOR_RANGE1 range;
+  range.Init(ResourceTypeToD3D12DescriptorRangeType(type), count, 0,
+             descriptor_ranges_.size());
+  descriptor_ranges_.push_back(range);
+}
+
+void D3D12Program::SetCullMode(CullMode mode) {
+  pipeline_state_desc_.RasterizerState.CullMode = CullModeToD3D12CullMode(mode);
+}
+
 void D3D12Program::BindShader(Shader *shader, ShaderType type) {
   D3D12Shader *d3d12_shader = dynamic_cast<D3D12Shader *>(shader);
   if (d3d12_shader) {
@@ -75,9 +86,16 @@ void D3D12Program::BindShader(Shader *shader, ShaderType type) {
 }
 
 void D3D12Program::Finalize() {
+  std::vector<CD3DX12_ROOT_PARAMETER1> root_parameters(
+      descriptor_ranges_.size());
+  for (size_t i = 0; i < descriptor_ranges_.size(); i++) {
+    root_parameters[i].InitAsDescriptorTable(1, &descriptor_ranges_[i],
+                                             D3D12_SHADER_VISIBILITY_ALL);
+  }
   CD3DX12_VERSIONED_ROOT_SIGNATURE_DESC root_signature_desc;
   root_signature_desc.Init_1_1(
-      0, nullptr, 0, nullptr,
+      root_parameters.empty() ? 0 : static_cast<UINT>(root_parameters.size()),
+      root_parameters.empty() ? nullptr : root_parameters.data(), 0, nullptr,
       D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT);
 
   core_->Device()->CreateRootSignature(root_signature_desc, &root_signature_);

@@ -63,4 +63,45 @@ VkShaderStageFlagBits ShaderTypeToVkShaderStageFlags(ShaderType type) {
       return VK_SHADER_STAGE_ALL;
   }
 }
+
+VkDescriptorType ResourceTypeToVkDescriptorType(ResourceType type) {
+  switch (type) {
+    case RESOURCE_TYPE_IMAGE:
+      return VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
+    case RESOURCE_TYPE_TEXTURE:
+      return VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE;
+    case RESOURCE_TYPE_UNIFORM_BUFFER:
+      return VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+    case RESOURCE_TYPE_STORAGE_BUFFER:
+      return VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+    default:
+      return VK_DESCRIPTOR_TYPE_MAX_ENUM;
+  }
+}
+
+VkCullModeFlagBits CullModeToVkCullMode(CullMode mode) {
+  switch (mode) {
+    case CULL_MODE_NONE:
+      return VK_CULL_MODE_NONE;
+    case CULL_MODE_FRONT:
+      return VK_CULL_MODE_FRONT_BIT;
+    case CULL_MODE_BACK:
+      return VK_CULL_MODE_BACK_BIT;
+    default:
+      return VK_CULL_MODE_NONE;
+  }
+}
+
+VulkanResourceBinding::VulkanResourceBinding()
+    : buffer(nullptr), image(nullptr) {
+}
+
+VulkanResourceBinding::VulkanResourceBinding(VulkanBuffer *buffer)
+    : buffer(buffer), image(nullptr) {
+}
+
+VulkanResourceBinding::VulkanResourceBinding(VulkanImage *image)
+    : buffer(nullptr), image(image) {
+}
+
 }  // namespace grassland::graphics::backend

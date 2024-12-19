@@ -203,8 +203,6 @@ int D3D12Core::SubmitCommandContext(CommandContext *p_command_context) {
     command->CompileCommand(command_context, command_list);
   }
 
-  command_list->Close();
-
   for (auto &[image, state] : command_context->resource_states_) {
     if (state != D3D12_RESOURCE_STATE_GENERIC_READ) {
       CD3DX12_RESOURCE_BARRIER barrier = CD3DX12_RESOURCE_BARRIER::Transition(
@@ -212,6 +210,8 @@ int D3D12Core::SubmitCommandContext(CommandContext *p_command_context) {
       command_list->ResourceBarrier(1, &barrier);
     }
   }
+
+  command_list->Close();
 
   command_context->dsv_index_.clear();
   command_context->rtv_index_.clear();

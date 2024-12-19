@@ -2,6 +2,7 @@
 #include "grassland/algebra/algebra.h"
 #include "grassland/data_structure/data_structure.h"
 #include "grassland/geometry/geometry.h"
+#include "grassland/graphics/graphics.h"
 #include "grassland/util/util.h"
 #include "grassland/vulkan/vulkan.h"
 

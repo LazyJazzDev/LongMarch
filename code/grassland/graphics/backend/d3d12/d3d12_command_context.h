@@ -15,18 +15,23 @@ class D3D12CommandContext : public CommandContext {
 
   D3D12Core *Core() const;
 
-  void BindColorTargets(const std::vector<Image *> &images) override;
-  void BindDepthTarget(Image *image) override;
-  void BindVertexBuffers(const std::vector<Buffer *> &buffers) override;
-  void BindIndexBuffer(Buffer *buffer) override;
-  void BindProgram(Program *program) override;
+  void CmdBindProgram(Program *program) override;
+  void CmdBindVertexBuffers(uint32_t first_binding,
+                            const std::vector<Buffer *> &buffers,
+                            const std::vector<uint64_t> &offsets) override;
+  void CmdBindIndexBuffer(Buffer *buffer, uint64_t offset) override;
+  void CmdBindResources(int slot,
+                        const std::vector<Buffer *> &buffers) override;
+  void CmdBeginRendering(const std::vector<Image *> &color_targets,
+                         Image *depth_target) override;
+  void CmdEndRendering() override;
 
   void CmdSetViewport(const Viewport &viewport) override;
   void CmdSetScissor(const Scissor &scissor) override;
   void CmdDrawIndexed(uint32_t index_count,
                       uint32_t instance_count,
                       uint32_t first_index,
-                      uint32_t vertex_offset,
+                      int32_t vertex_offset,
                       uint32_t first_instance) override;
   void CmdClearImage(Image *image, const ClearValue &color) override;
   void CmdPresent(Window *window, Image *image) override;
@@ -43,17 +48,18 @@ class D3D12CommandContext : public CommandContext {
   CD3DX12_CPU_DESCRIPTOR_HANDLE RTVHandle(ID3D12Resource *resource) const;
   CD3DX12_CPU_DESCRIPTOR_HANDLE DSVHandle(ID3D12Resource *resource) const;
 
-  CD3DX12_GPU_DESCRIPTOR_HANDLE WriteDescriptor(D3D12Image *image);
+  CD3DX12_GPU_DESCRIPTOR_HANDLE WriteUAVDescriptor(D3D12Image *image);
+  CD3DX12_GPU_DESCRIPTOR_HANDLE WriteSRVDescriptor(D3D12Image *image);
+  CD3DX12_GPU_DESCRIPTOR_HANDLE WriteSRVDescriptor(D3D12Buffer *buffer);
+  CD3DX12_GPU_DESCRIPTOR_HANDLE WriteCBVDescriptor(D3D12Buffer *buffer);
+
+  void RecordDynamicBuffer(D3D12Buffer *buffer);
 
  private:
   friend D3D12Core;
   D3D12Core *core_;
 
   D3D12Program *program_{nullptr};
-  std::vector<D3D12Image *> color_targets_;
-  D3D12Image *depth_target_{nullptr};
-  std::vector<D3D12Buffer *> vertex_buffers_;
-  D3D12Buffer *index_buffer_{nullptr};
 
   std::map<ID3D12Resource *, int> rtv_index_;
   std::map<ID3D12Resource *, int> dsv_index_;

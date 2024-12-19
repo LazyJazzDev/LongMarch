@@ -50,4 +50,45 @@ DXGI_FORMAT InputTypeToDXGIFormat(InputType type) {
       return DXGI_FORMAT_UNKNOWN;
   }
 }
+
+D3D12_DESCRIPTOR_RANGE_TYPE ResourceTypeToD3D12DescriptorRangeType(
+    ResourceType type) {
+  switch (type) {
+    case RESOURCE_TYPE_UNIFORM_BUFFER:
+      return D3D12_DESCRIPTOR_RANGE_TYPE_CBV;
+    case RESOURCE_TYPE_STORAGE_BUFFER:
+      return D3D12_DESCRIPTOR_RANGE_TYPE_SRV;
+    case RESOURCE_TYPE_TEXTURE:
+      return D3D12_DESCRIPTOR_RANGE_TYPE_SRV;
+    case RESOURCE_TYPE_IMAGE:
+      return D3D12_DESCRIPTOR_RANGE_TYPE_UAV;
+    default:
+      return D3D12_DESCRIPTOR_RANGE_TYPE_SRV;
+  }
+}
+
+D3D12_CULL_MODE CullModeToD3D12CullMode(CullMode mode) {
+  switch (mode) {
+    case CULL_MODE_NONE:
+      return D3D12_CULL_MODE_NONE;
+    case CULL_MODE_BACK:
+      return D3D12_CULL_MODE_BACK;
+    case CULL_MODE_FRONT:
+      return D3D12_CULL_MODE_FRONT;
+    default:
+      return D3D12_CULL_MODE_NONE;
+  }
+}
+
+D3D12ResourceBinding::D3D12ResourceBinding() : buffer(nullptr), image(nullptr) {
+}
+
+D3D12ResourceBinding::D3D12ResourceBinding(D3D12Buffer *buffer)
+    : buffer(buffer), image(nullptr) {
+}
+
+D3D12ResourceBinding::D3D12ResourceBinding(D3D12Image *image)
+    : buffer(nullptr), image(image) {
+}
+
 }  // namespace grassland::graphics::backend

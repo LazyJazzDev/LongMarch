@@ -15,6 +15,13 @@ VulkanCore::VulkanCore(const Settings &settings) : Core(settings) {
 }
 
 VulkanCore::~VulkanCore() {
+  for (auto &descriptor_set : descriptor_sets_) {
+    while (!descriptor_set.empty()) {
+      delete descriptor_set.front();
+      descriptor_set.pop();
+    }
+  }
+  descriptor_pools_.clear();
 }
 
 int VulkanCore::CreateBuffer(size_t size,
@@ -41,7 +48,8 @@ int VulkanCore::CreateImage(int width,
     vulkan::TransitImageLayout(
         command_buffer, image->Image()->Handle(), VK_IMAGE_LAYOUT_UNDEFINED,
         VK_IMAGE_LAYOUT_GENERAL, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT,
-        VK_PIPELINE_STAGE_ALL_GRAPHICS_BIT, VK_ACCESS_MEMORY_READ_BIT, 0);
+        VK_PIPELINE_STAGE_ALL_GRAPHICS_BIT, VK_ACCESS_MEMORY_READ_BIT, 0,
+        image->Image()->Aspect());
   });
   return 0;
 }
@@ -77,6 +85,46 @@ int VulkanCore::CreateCommandContext(
 int VulkanCore::SubmitCommandContext(CommandContext *p_command_context) {
   VulkanCommandContext *command_context =
       dynamic_cast<VulkanCommandContext *>(p_command_context);
+
+  auto &set_queue = descriptor_sets_[current_frame_];
+  auto &pool = descriptor_pools_[current_frame_];
+
+  while (!set_queue.empty()) {
+    delete set_queue.front();
+    set_queue.pop();
+  }
+
+  auto pool_size = pool->PoolSize();
+  auto max_sets = pool->MaxSets();
+  bool update_pool = false;
+  for (auto &[type, count] :
+       command_context->required_pool_size_.descriptor_type_count) {
+    if (!pool_size.descriptor_type_count.count(type) ||
+        pool_size.descriptor_type_count[type] < count) {
+      uint32_t type_count = pool_size.descriptor_type_count[type];
+      if (!type_count) {
+        type_count = 1;
+      }
+      while (type_count < count) {
+        type_count *= 2;
+      }
+      pool_size.descriptor_type_count[type] = type_count;
+      update_pool = true;
+      break;
+    }
+  }
+  while (max_sets < command_context->required_set_count_) {
+    max_sets *= 2;
+    update_pool = true;
+  }
+  if (update_pool) {
+    pool.reset();
+    device_->CreateDescriptorPool(pool_size.ToVkDescriptorPoolSize(), max_sets,
+                                  &pool);
+  }
+  current_descriptor_pool_ = pool.get();
+  current_descriptor_set_queue_ = &set_queue;
+
   for (auto &window : command_context->windows_) {
     window->AcquireNextImage();
   }
@@ -119,7 +167,7 @@ int VulkanCore::SubmitCommandContext(CommandContext *p_command_context) {
     vulkan::TransitImageLayout(command_buffer, image, state.layout,
                                VK_IMAGE_LAYOUT_GENERAL, state.stage,
                                VK_PIPELINE_STAGE_ALL_GRAPHICS_BIT, state.access,
-                               VK_ACCESS_MEMORY_READ_BIT);
+                               VK_ACCESS_MEMORY_READ_BIT, state.aspect);
   }
   command_context->image_states_.clear();
 
@@ -240,10 +288,23 @@ int VulkanCore::InitializeLogicalDevice(int device_index) {
   in_flight_fences_.resize(FramesInFlight());
   command_buffers_.resize(FramesInFlight());
 
+  descriptor_pools_.resize(FramesInFlight());
+  descriptor_sets_.resize(FramesInFlight());
+
   for (int i = 0; i < FramesInFlight(); i++) {
     device_->CreateFence(true, &in_flight_fences_[i]);
     graphics_command_pool_->AllocateCommandBuffer(
         VK_COMMAND_BUFFER_LEVEL_PRIMARY, &command_buffers_[i]);
+
+    VkDescriptorPoolSize pool_sizes[] = {
+        {VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 100},
+        {VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 100},
+        {VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, 100},
+        {VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, 100},
+    };
+
+    device_->CreateDescriptorPool({{VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 1}}, 1,
+                                  &descriptor_pools_[i]);
   }
   transfer_command_pool_->AllocateCommandBuffer(VK_COMMAND_BUFFER_LEVEL_PRIMARY,
                                                 &transfer_command_buffer_);

@@ -1,11 +1,18 @@
 #include "grassland/vulkan/descriptor_pool.h"
 
+#include <utility>
+
 #include "grassland/vulkan/descriptor_set.h"
 
 namespace grassland::vulkan {
 DescriptorPool::DescriptorPool(const struct Device *device,
-                               VkDescriptorPool descriptor_pool)
-    : device_(device), descriptor_pool_(descriptor_pool) {
+                               VkDescriptorPool descriptor_pool,
+                               DescriptorPoolSize pool_size,
+                               uint32_t max_sets)
+    : device_(device),
+      descriptor_pool_(descriptor_pool),
+      pool_size_(std::move(pool_size)),
+      max_sets_(max_sets) {
 }
 
 DescriptorPool::~DescriptorPool() {

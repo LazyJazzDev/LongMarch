@@ -8,6 +8,163 @@
 
 namespace grassland::graphics::backend {
 
+VulkanCmdBindProgram::VulkanCmdBindProgram(VulkanProgram *program)
+    : program_(program) {
+}
+
+void VulkanCmdBindProgram::CompileCommand(VulkanCommandContext *context,
+                                          VkCommandBuffer command_buffer) {
+  vkCmdBindPipeline(command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS,
+                    program_->Pipeline()->Handle());
+}
+
+VulkanCmdBindVertexBuffers::VulkanCmdBindVertexBuffers(
+    uint32_t first_binding,
+    const std::vector<VulkanBuffer *> &buffers,
+    const std::vector<uint64_t> &offsets)
+    : first_binding_(first_binding), buffers_(buffers) {
+  offsets_.resize(buffers_.size());
+  for (size_t i = 0; i < offsets.size(); ++i) {
+    if (i < offsets.size()) {
+      offsets_[i] = offsets[i];
+    } else {
+      offsets_[i] = 0;
+    }
+  }
+}
+
+void VulkanCmdBindVertexBuffers::CompileCommand(
+    VulkanCommandContext *context,
+    VkCommandBuffer command_buffer) {
+  std::vector<VkBuffer> buffers(buffers_.size());
+  for (size_t i = 0; i < buffers_.size(); ++i) {
+    buffers[i] = buffers_[i]->Buffer();
+  }
+  vkCmdBindVertexBuffers(command_buffer, first_binding_, buffers.size(),
+                         buffers.data(), offsets_.data());
+}
+
+VulkanCmdBindIndexBuffer::VulkanCmdBindIndexBuffer(VulkanBuffer *buffer,
+                                                   uint64_t offset)
+    : buffer_(buffer), offset_(offset) {
+}
+
+void VulkanCmdBindIndexBuffer::CompileCommand(VulkanCommandContext *context,
+                                              VkCommandBuffer command_buffer) {
+  vkCmdBindIndexBuffer(command_buffer, buffer_->Buffer(), offset_,
+                       VK_INDEX_TYPE_UINT32);
+}
+
+VulkanCmdBeginRendering::VulkanCmdBeginRendering(
+    const std::vector<VulkanImage *> &color_targets,
+    VulkanImage *depth_target)
+    : color_targets_(color_targets), depth_target_(depth_target) {
+}
+
+void VulkanCmdBeginRendering::CompileCommand(VulkanCommandContext *context,
+                                             VkCommandBuffer command_buffer) {
+  std::vector<VkRenderingAttachmentInfo> color_attachment_infos;
+  VkRenderingAttachmentInfo depth_attachment_info{};
+  Extent2D extent;
+  extent.width = 0x7fffffff;
+  extent.height = 0x7fffffff;
+  for (int i = 0; i < color_targets_.size(); i++) {
+    auto &color_target = color_targets_[i];
+    context->RequireImageState(command_buffer, color_target->Image()->Handle(),
+                               VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
+                               VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
+                               VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT,
+                               color_target->Image()->Aspect());
+
+    VkRenderingAttachmentInfo attachment_info{};
+    attachment_info.sType = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO;
+    attachment_info.pNext = nullptr;
+    attachment_info.imageView = color_target->Image()->ImageView();
+    attachment_info.imageLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+    attachment_info.loadOp = VK_ATTACHMENT_LOAD_OP_LOAD;
+    attachment_info.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
+    color_attachment_infos.push_back(attachment_info);
+
+    auto target_extent = color_target->Extent();
+    extent.width = std::min(extent.width, target_extent.width);
+    extent.height = std::min(extent.height, target_extent.height);
+  }
+  VkRenderingInfo rendering_info{};
+  rendering_info.sType = VK_STRUCTURE_TYPE_RENDERING_INFO;
+  rendering_info.pNext = nullptr;
+  rendering_info.colorAttachmentCount = color_attachment_infos.size();
+  rendering_info.pColorAttachments = color_attachment_infos.data();
+  rendering_info.renderArea.offset = {0, 0};
+  rendering_info.layerCount = 1;
+  if (depth_target_) {
+    context->RequireImageState(command_buffer, depth_target_->Image()->Handle(),
+                               VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL,
+                               VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT,
+                               VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT,
+                               depth_target_->Image()->Aspect());
+    depth_attachment_info.sType = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO;
+    depth_attachment_info.pNext = nullptr;
+    depth_attachment_info.imageView = depth_target_->Image()->ImageView();
+    depth_attachment_info.imageLayout =
+        VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
+    depth_attachment_info.loadOp = VK_ATTACHMENT_LOAD_OP_LOAD;
+    depth_attachment_info.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
+    rendering_info.pDepthAttachment = &depth_attachment_info;
+    auto target_extent = depth_target_->Extent();
+    extent.width = std::min(extent.width, target_extent.width);
+    extent.height = std::min(extent.height, target_extent.height);
+  }
+  rendering_info.renderArea.extent.width = extent.width;
+  rendering_info.renderArea.extent.height = extent.height;
+  context->Core()->Instance()->Procedures().vkCmdBeginRenderingKHR(
+      command_buffer, &rendering_info);
+}
+
+VulkanCmdBindResourceBuffers::VulkanCmdBindResourceBuffers(
+    int slot,
+    const std::vector<VulkanBuffer *> &buffers,
+    VulkanProgram *program)
+    : slot_(slot), buffers_(buffers), program_(program) {
+}
+
+void VulkanCmdBindResourceBuffers::CompileCommand(
+    VulkanCommandContext *context,
+    VkCommandBuffer command_buffer) {
+  std::vector<VkDescriptorBufferInfo> buffer_infos(buffers_.size());
+  for (size_t i = 0; i < buffers_.size(); ++i) {
+    buffer_infos[i].buffer = buffers_[i]->Buffer();
+    buffer_infos[i].offset = 0;
+    buffer_infos[i].range = buffers_[i]->Size();
+  }
+  auto descriptor_set = context->AcquireDescriptorSet(
+      program_->DescriptorSetLayout(slot_)->Handle());
+
+  auto binding = program_->DescriptorSetLayout(slot_)->Bindings()[0];
+
+  VkWriteDescriptorSet write_descriptor_set{};
+  write_descriptor_set.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+  write_descriptor_set.dstSet = descriptor_set->Handle();
+  write_descriptor_set.dstBinding = binding.binding;
+  write_descriptor_set.dstArrayElement = 0;
+  write_descriptor_set.descriptorCount = binding.descriptorCount;
+  write_descriptor_set.descriptorType = binding.descriptorType;
+  write_descriptor_set.pBufferInfo = buffer_infos.data();
+  vkUpdateDescriptorSets(context->Core()->Device()->Handle(), 1,
+                         &write_descriptor_set, 0, nullptr);
+
+  VkDescriptorSet descriptor_sets[] = {descriptor_set->Handle()};
+
+  vkCmdBindDescriptorSets(command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS,
+                          program_->PipelineLayout()->Handle(), slot_, 1,
+                          descriptor_sets, 0, nullptr);
+}
+
+void VulkanCmdEndRendering::CompileCommand(VulkanCommandContext *context,
+                                           VkCommandBuffer command_buffer) {
+  context->Core()->Instance()->Procedures().vkCmdEndRenderingKHR(
+      command_buffer);
+}
+
 VulkanCmdClearImage::VulkanCmdClearImage(VulkanImage *image,
                                          const ClearValue &clear_value)
     : image_(image), clear_value_(clear_value) {
@@ -15,10 +172,10 @@ VulkanCmdClearImage::VulkanCmdClearImage(VulkanImage *image,
 
 void VulkanCmdClearImage::CompileCommand(VulkanCommandContext *context,
                                          VkCommandBuffer command_buffer) {
-  context->RequireImageState(command_buffer, image_->Image()->Handle(),
-                             VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
-                             VK_PIPELINE_STAGE_TRANSFER_BIT,
-                             VK_ACCESS_TRANSFER_WRITE_BIT);
+  context->RequireImageState(
+      command_buffer, image_->Image()->Handle(),
+      VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_PIPELINE_STAGE_TRANSFER_BIT,
+      VK_ACCESS_TRANSFER_WRITE_BIT, image_->Image()->Aspect());
   if (!vulkan::IsDepthFormat(image_->Image()->Format())) {
     VkClearColorValue clear_value;
     clear_value.float32[0] = clear_value_.color.r;
@@ -78,118 +235,22 @@ void VulkanCmdSetScissor::CompileCommand(VulkanCommandContext *context,
   vkCmdSetScissor(command_buffer, 0, 1, &scissor);
 }
 
-VulkanCmdDrawIndexed::VulkanCmdDrawIndexed(
-    VulkanProgram *program,
-    const std::vector<VulkanBuffer *> &vertex_buffers,
-    VulkanBuffer *index_buffer,
-    const std::vector<VulkanImage *> &color_targets,
-    VulkanImage *depth_target,
-    uint32_t index_count,
-    uint32_t instance_count,
-    uint32_t first_index,
-    uint32_t vertex_offset,
-    uint32_t first_instance)
-    : program_(program),
-      vertex_buffers_({}),
-      index_buffer_(index_buffer),
-      color_targets_({}),
-      depth_target_(nullptr),
-      index_count_(index_count),
+VulkanCmdDrawIndexed::VulkanCmdDrawIndexed(uint32_t index_count,
+                                           uint32_t instance_count,
+                                           uint32_t first_index,
+                                           int32_t vertex_offset,
+                                           uint32_t first_instance)
+    : index_count_(index_count),
       instance_count_(instance_count),
       first_index_(first_index),
       vertex_offset_(vertex_offset),
       first_instance_(first_instance) {
-  vertex_buffers_.resize(program_->NumInputBindings());
-  for (size_t i = 0; i < vertex_buffers_.size(); ++i) {
-    vertex_buffers_[i] = vertex_buffers[i];
-  }
-  color_targets_.resize(
-      program_->PipelineSettings()->color_attachment_formats.size());
-  for (size_t i = 0; i < color_targets_.size(); ++i) {
-    color_targets_[i] = color_targets[i];
-  }
-  if (program_->PipelineSettings()->depth_attachment_format !=
-      VK_FORMAT_UNDEFINED) {
-    depth_target_ = depth_target;
-  }
 }
 
 void VulkanCmdDrawIndexed::CompileCommand(VulkanCommandContext *context,
                                           VkCommandBuffer command_buffer) {
-  std::vector<VkRenderingAttachmentInfo> color_attachment_infos;
-  VkRenderingAttachmentInfo depth_attachment_info{};
-  for (int i = 0; i < color_targets_.size(); i++) {
-    auto &color_target = color_targets_[i];
-    context->RequireImageState(command_buffer, color_target->Image()->Handle(),
-                               VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
-                               VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
-                               VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT);
-
-    VkRenderingAttachmentInfo attachment_info{};
-    attachment_info.sType = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO;
-    attachment_info.pNext = nullptr;
-    attachment_info.imageView = color_target->Image()->ImageView();
-    attachment_info.imageLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
-    attachment_info.loadOp = VK_ATTACHMENT_LOAD_OP_LOAD;
-    attachment_info.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
-    color_attachment_infos.push_back(attachment_info);
-  }
-  VkRenderingInfo rendering_info{};
-  rendering_info.sType = VK_STRUCTURE_TYPE_RENDERING_INFO;
-  rendering_info.pNext = nullptr;
-  rendering_info.colorAttachmentCount = color_attachment_infos.size();
-  rendering_info.pColorAttachments = color_attachment_infos.data();
-  rendering_info.renderArea.offset = {0, 0};
-  if (color_targets_.empty()) {
-    rendering_info.renderArea.extent.width = depth_target_->Extent().width;
-    rendering_info.renderArea.extent.height = depth_target_->Extent().height;
-  } else {
-    rendering_info.renderArea.extent.width = color_targets_[0]->Extent().width;
-    rendering_info.renderArea.extent.height =
-        color_targets_[0]->Extent().height;
-  }
-  rendering_info.layerCount = 1;
-  if (depth_target_) {
-    context->RequireImageState(command_buffer, depth_target_->Image()->Handle(),
-                               VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL,
-                               VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT,
-                               VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT);
-    depth_attachment_info.sType = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO;
-    depth_attachment_info.pNext = nullptr;
-    depth_attachment_info.imageView = depth_target_->Image()->ImageView();
-    depth_attachment_info.imageLayout =
-        VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
-    depth_attachment_info.loadOp = VK_ATTACHMENT_LOAD_OP_LOAD;
-    depth_attachment_info.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
-    rendering_info.pDepthAttachment = &depth_attachment_info;
-  }
-  context->Core()->Instance()->Procedures().vkCmdBeginRenderingKHR(
-      command_buffer, &rendering_info);
-
-  vkCmdBindPipeline(command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS,
-                    program_->Pipeline()->Handle());
-
-  if (!vertex_buffers_.empty()) {
-    std::vector<VkBuffer> vertex_buffer_handles;
-    std::vector<VkDeviceSize> vertex_buffer_offsets;
-    for (int i = 0; i < vertex_buffers_.size(); i++) {
-      auto &vertex_buffer = vertex_buffers_[i];
-      vertex_buffer_handles.push_back(vertex_buffer->Buffer());
-      vertex_buffer_offsets.push_back(0);
-    }
-    vkCmdBindVertexBuffers(command_buffer, 0, vertex_buffers_.size(),
-                           vertex_buffer_handles.data(),
-                           vertex_buffer_offsets.data());
-  }
-
-  vkCmdBindIndexBuffer(command_buffer, index_buffer_->Buffer(), 0,
-                       VK_INDEX_TYPE_UINT32);
-
   vkCmdDrawIndexed(command_buffer, index_count_, instance_count_, first_index_,
                    vertex_offset_, first_instance_);
-
-  context->Core()->Instance()->Procedures().vkCmdEndRenderingKHR(
-      command_buffer);
 }
 
 VulkanCmdPresent::VulkanCmdPresent(VulkanWindow *window, VulkanImage *image)
@@ -204,10 +265,10 @@ void VulkanCmdPresent::CompileCommand(VulkanCommandContext *context,
       VK_PIPELINE_STAGE_TRANSFER_BIT, 0, VK_ACCESS_TRANSFER_WRITE_BIT,
       VK_IMAGE_ASPECT_COLOR_BIT);
 
-  context->RequireImageState(command_buffer, image_->Image()->Handle(),
-                             VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
-                             VK_PIPELINE_STAGE_TRANSFER_BIT,
-                             VK_ACCESS_TRANSFER_READ_BIT);
+  context->RequireImageState(
+      command_buffer, image_->Image()->Handle(),
+      VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, VK_PIPELINE_STAGE_TRANSFER_BIT,
+      VK_ACCESS_TRANSFER_READ_BIT, image_->Image()->Aspect());
 
   auto image_extent = image_->Extent();
   auto window_extent = window_->SwapChain()->Extent();
