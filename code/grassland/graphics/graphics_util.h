@@ -138,6 +138,14 @@ struct SamplerInfo {
   AddressMode address_mode_w;
 };
 
+typedef enum PrimitiveTopology {
+  PRIMITIVE_TOPOLOGY_TRIANGLE_LIST = 0,
+  PRIMITIVE_TOPOLOGY_TRIANGLE_STRIP = 1,
+  PRIMITIVE_TOPOLOGY_LINE_LIST = 2,
+  PRIMITIVE_TOPOLOGY_LINE_STRIP = 3,
+  PRIMITIVE_TOPOLOGY_POINT_LIST = 4,
+} PrimitiveTopology;
+
 class Core;
 class Buffer;
 class Image;

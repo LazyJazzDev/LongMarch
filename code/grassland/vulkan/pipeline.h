@@ -54,6 +54,8 @@ struct PipelineSettings {
 
   void SetTessellationState(uint32_t patch_control_points);
 
+  void EnableDynamicPrimitiveTopology();
+
   // Render pass
   const RenderPass *render_pass;
 
@@ -75,6 +77,7 @@ struct PipelineSettings {
 
   // Primitive topology
   VkPipelineInputAssemblyStateCreateInfo input_assembly_state_create_info{};
+  bool dynamic_primitive_topology{false};
 
   // Depth stencil state
   std::optional<VkPipelineDepthStencilStateCreateInfo>

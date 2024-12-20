@@ -12,5 +12,6 @@ class InstanceProcedures {
   GRASSLAND_VULKAN_PROCEDURE_VAR(vkSetDebugUtilsObjectNameEXT);
   GRASSLAND_VULKAN_PROCEDURE_VAR(vkCmdBeginRenderingKHR);
   GRASSLAND_VULKAN_PROCEDURE_VAR(vkCmdEndRenderingKHR);
+  GRASSLAND_VULKAN_PROCEDURE_VAR(vkCmdSetPrimitiveTopologyEXT);
 };
 }  // namespace grassland::vulkan

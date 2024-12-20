@@ -148,6 +148,17 @@ class VulkanCmdSetScissor : public VulkanCommand {
   Scissor scissor_;
 };
 
+class VulkanCmdSetPrimitiveTopology : public VulkanCommand {
+ public:
+  VulkanCmdSetPrimitiveTopology(PrimitiveTopology topology);
+
+  void CompileCommand(VulkanCommandContext *context,
+                      VkCommandBuffer command_buffer) override;
+
+ private:
+  PrimitiveTopology topology_;
+};
+
 class VulkanCmdDrawIndexed : public VulkanCommand {
  public:
   VulkanCmdDrawIndexed(uint32_t index_count,

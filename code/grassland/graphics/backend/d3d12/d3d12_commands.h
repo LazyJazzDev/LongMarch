@@ -132,6 +132,16 @@ class D3D12CmdSetScissor : public D3D12Command {
   Scissor scissor_;
 };
 
+class D3D12CmdSetPrimitiveTopology : public D3D12Command {
+ public:
+  D3D12CmdSetPrimitiveTopology(PrimitiveTopology topology);
+  void CompileCommand(D3D12CommandContext *context,
+                      ID3D12GraphicsCommandList *command_list) override;
+
+ private:
+  PrimitiveTopology topology_;
+};
+
 class D3D12CmdDrawIndexed : public D3D12Command {
  public:
   D3D12CmdDrawIndexed(uint32_t index_count,

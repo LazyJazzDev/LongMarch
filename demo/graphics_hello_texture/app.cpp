@@ -47,17 +47,20 @@ void Application::OnInit() {
   core_->CreateImage(1280, 720, grassland::graphics::IMAGE_FORMAT_D32_SFLOAT,
                      &depth_image_);
 
-  core_->CreateImage(256, 256, grassland::graphics::IMAGE_FORMAT_R8G8B8A8_UNORM,
+  uint32_t texture_side_length = 256;
+
+  core_->CreateImage(texture_side_length, texture_side_length,
+                     grassland::graphics::IMAGE_FORMAT_R8G8B8A8_UNORM,
                      &texture_image_);
 
   core_->CreateSampler(grassland::graphics::FILTER_MODE_LINEAR, &sampler_);
 
-  std::vector<uint32_t> texture_data(256 * 256);
-  for (int i = 0; i < 256; i++) {
-    for (int j = 0; j < 256; j++) {
+  std::vector<uint32_t> texture_data(texture_side_length * texture_side_length);
+  for (int i = 0; i < texture_side_length; i++) {
+    for (int j = 0; j < texture_side_length; j++) {
       uint32_t pixel = i ^ j;
       pixel = pixel | (pixel << 8) | (pixel << 16) | 0xFF000000;
-      texture_data[i * 256 + j] = pixel;
+      texture_data[i * texture_side_length + j] = pixel;
     }
   }
   texture_image_->UploadData(texture_data.data());
@@ -135,6 +138,8 @@ void Application::OnRender() {
   command_context->CmdBindResources(1, {sampler_.get()});
   command_context->CmdSetViewport({0, 0, 1280, 720, 0.0f, 1.0f});
   command_context->CmdSetScissor({0, 0, 1280, 720});
+  command_context->CmdSetPrimitiveTopology(
+      grassland::graphics::PRIMITIVE_TOPOLOGY_TRIANGLE_LIST);
   command_context->CmdDrawIndexed(3, 1, 0, 0, 0);
   command_context->CmdEndRendering();
   command_context->CmdPresent(window_.get(), color_image_.get());

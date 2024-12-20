@@ -25,6 +25,7 @@ VulkanProgram::VulkanProgram(VulkanCore *core,
       pipeline_settings_(nullptr,
                          ConvertImageFormats(color_formats),
                          ImageFormatToVkFormat(depth_format)) {
+  pipeline_settings_.EnableDynamicPrimitiveTopology();
 }
 
 VulkanProgram::~VulkanProgram() {

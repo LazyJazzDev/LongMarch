@@ -20,6 +20,9 @@ VkSamplerMipmapMode FilterModeToVkSamplerMipmapMode(FilterMode filter);
 
 VkSamplerAddressMode AddressModeToVkSamplerAddressMode(AddressMode mode);
 
+VkPrimitiveTopology PrimitiveTopologyToVkPrimitiveTopology(
+    PrimitiveTopology topology);
+
 class VulkanCore;
 class VulkanBuffer;
 class VulkanImage;

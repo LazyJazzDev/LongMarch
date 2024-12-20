@@ -19,6 +19,9 @@ D3D12_FILTER FilterModeToD3D12Filter(FilterMode min_filter,
 
 D3D12_TEXTURE_ADDRESS_MODE AddressModeToD3D12AddressMode(AddressMode mode);
 
+D3D12_PRIMITIVE_TOPOLOGY PrimitiveTopologyToD3D12PrimitiveTopology(
+    PrimitiveTopology topology);
+
 class D3D12Core;
 class D3D12Buffer;
 class D3D12Image;

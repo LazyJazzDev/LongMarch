@@ -321,6 +321,18 @@ void VulkanCmdSetScissor::CompileCommand(VulkanCommandContext *context,
   vkCmdSetScissor(command_buffer, 0, 1, &scissor);
 }
 
+VulkanCmdSetPrimitiveTopology::VulkanCmdSetPrimitiveTopology(
+    PrimitiveTopology topology)
+    : topology_(topology) {
+}
+
+void VulkanCmdSetPrimitiveTopology::CompileCommand(
+    VulkanCommandContext *context,
+    VkCommandBuffer command_buffer) {
+  context->Core()->Instance()->Procedures().vkCmdSetPrimitiveTopologyEXT(
+      command_buffer, PrimitiveTopologyToVkPrimitiveTopology(topology_));
+}
+
 VulkanCmdDrawIndexed::VulkanCmdDrawIndexed(uint32_t index_count,
                                            uint32_t instance_count,
                                            uint32_t first_index,

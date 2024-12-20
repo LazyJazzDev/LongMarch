@@ -211,6 +211,10 @@ void PipelineSettings::SetTessellationState(uint32_t patch_control_points) {
   };
 }
 
+void PipelineSettings::EnableDynamicPrimitiveTopology() {
+  dynamic_primitive_topology = true;
+}
+
 Pipeline::Pipeline(const class Device *device, VkPipeline pipeline)
     : device_(device), pipeline_(pipeline) {
 }

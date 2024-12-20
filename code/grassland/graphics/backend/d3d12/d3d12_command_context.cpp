@@ -108,6 +108,10 @@ void D3D12CommandContext::CmdSetScissor(const Scissor &scissor) {
   commands_.push_back(std::make_unique<D3D12CmdSetScissor>(scissor));
 }
 
+void D3D12CommandContext::CmdSetPrimitiveTopology(PrimitiveTopology topology) {
+  commands_.push_back(std::make_unique<D3D12CmdSetPrimitiveTopology>(topology));
+}
+
 void D3D12CommandContext::CmdDrawIndexed(uint32_t index_count,
                                          uint32_t instance_count,
                                          uint32_t first_index,

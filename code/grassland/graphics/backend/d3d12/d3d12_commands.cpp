@@ -120,6 +120,8 @@ void D3D12CmdBindResourceImages::CompileCommand(
         if (i == 0) {
           first_descriptor = desc;
         }
+        context->RequireImageState(command_list, images_[i]->Image()->Handle(),
+                                   D3D12_RESOURCE_STATE_GENERIC_READ);
       }
       break;
     case D3D12_DESCRIPTOR_RANGE_TYPE_UAV:
@@ -128,6 +130,8 @@ void D3D12CmdBindResourceImages::CompileCommand(
         if (i == 0) {
           first_descriptor = desc;
         }
+        context->RequireImageState(command_list, images_[i]->Image()->Handle(),
+                                   D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
       }
       break;
   }
@@ -250,6 +254,18 @@ void D3D12CmdSetScissor::CompileCommand(
   command_list->RSSetScissorRects(1, &scissor_rect);
 }
 
+D3D12CmdSetPrimitiveTopology::D3D12CmdSetPrimitiveTopology(
+    PrimitiveTopology topology)
+    : topology_(topology) {
+}
+
+void D3D12CmdSetPrimitiveTopology::CompileCommand(
+    D3D12CommandContext *context,
+    ID3D12GraphicsCommandList *command_list) {
+  command_list->IASetPrimitiveTopology(
+      PrimitiveTopologyToD3D12PrimitiveTopology(topology_));
+}
+
 D3D12CmdDrawIndexed::D3D12CmdDrawIndexed(uint32_t index_count,
                                          uint32_t instance_count,
                                          uint32_t first_index,
@@ -265,7 +281,6 @@ D3D12CmdDrawIndexed::D3D12CmdDrawIndexed(uint32_t index_count,
 void D3D12CmdDrawIndexed::CompileCommand(
     D3D12CommandContext *context,
     ID3D12GraphicsCommandList *command_list) {
-  command_list->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
   command_list->DrawIndexedInstanced(index_count_, instance_count_,
                                      first_index_, vertex_offset_,
                                      first_instance_);

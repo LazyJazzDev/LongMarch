@@ -60,6 +60,15 @@ DeviceFeatureRequirement::GenerateRecommendedDeviceCreateInfo(
   create_info.AddExtension(VK_KHR_MAINTENANCE3_EXTENSION_NAME);
   create_info.AddExtension(VK_EXT_DESCRIPTOR_INDEXING_EXTENSION_NAME);
   create_info.AddExtension(VK_KHR_DYNAMIC_RENDERING_EXTENSION_NAME);
+  create_info.AddExtension(VK_EXT_EXTENDED_DYNAMIC_STATE_EXTENSION_NAME);
+
+  VkPhysicalDeviceExtendedDynamicStateFeaturesEXT
+      physical_device_extended_dynamic_state_features{};
+  physical_device_extended_dynamic_state_features.sType =
+      VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_EXTENDED_DYNAMIC_STATE_FEATURES_EXT;
+  physical_device_extended_dynamic_state_features.extendedDynamicState =
+      VK_TRUE;
+  create_info.AddFeature(physical_device_extended_dynamic_state_features);
 
   if (enable_raytracing_extension) {
     create_info.AddExtension(VK_KHR_BUFFER_DEVICE_ADDRESS_EXTENSION_NAME);

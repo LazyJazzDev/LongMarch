@@ -656,6 +656,9 @@ VkResult Device::CreatePipeline(const struct PipelineSettings &settings,
 
   std::vector<VkDynamicState> dynamic_states = {VK_DYNAMIC_STATE_VIEWPORT,
                                                 VK_DYNAMIC_STATE_SCISSOR};
+  if (settings.dynamic_primitive_topology) {
+    dynamic_states.push_back(VK_DYNAMIC_STATE_PRIMITIVE_TOPOLOGY);
+  }
   VkPipelineDynamicStateCreateInfo dynamic_state{};
   dynamic_state.sType = VK_STRUCTURE_TYPE_PIPELINE_DYNAMIC_STATE_CREATE_INFO;
   dynamic_state.dynamicStateCount =

@@ -128,6 +128,23 @@ VkSamplerAddressMode AddressModeToVkSamplerAddressMode(AddressMode mode) {
   return VK_SAMPLER_ADDRESS_MODE_REPEAT;
 }
 
+VkPrimitiveTopology PrimitiveTopologyToVkPrimitiveTopology(
+    PrimitiveTopology topology) {
+  switch (topology) {
+    case PRIMITIVE_TOPOLOGY_TRIANGLE_LIST:
+      return VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;
+    case PRIMITIVE_TOPOLOGY_TRIANGLE_STRIP:
+      return VK_PRIMITIVE_TOPOLOGY_TRIANGLE_STRIP;
+    case PRIMITIVE_TOPOLOGY_LINE_LIST:
+      return VK_PRIMITIVE_TOPOLOGY_LINE_LIST;
+    case PRIMITIVE_TOPOLOGY_LINE_STRIP:
+      return VK_PRIMITIVE_TOPOLOGY_LINE_STRIP;
+    case PRIMITIVE_TOPOLOGY_POINT_LIST:
+      return VK_PRIMITIVE_TOPOLOGY_POINT_LIST;
+  }
+  return VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;
+}
+
 VulkanResourceBinding::VulkanResourceBinding()
     : buffer(nullptr), image(nullptr) {
 }

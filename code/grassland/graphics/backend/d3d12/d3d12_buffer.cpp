@@ -23,11 +23,10 @@ void D3D12StaticBuffer::Resize(size_t new_size) {
   core_->WaitGPU();
   std::unique_ptr<d3d12::Buffer> new_buffer;
   core_->Device()->CreateBuffer(new_size, D3D12_HEAP_TYPE_DEFAULT, &new_buffer);
-  core_->CommandQueue()->SingleTimeCommand(
-      [&](ID3D12GraphicsCommandList *command_list) {
-        d3d12::CopyBuffer(command_list, buffer_.get(), new_buffer.get(),
-                          std::min(buffer_->Size(), new_size));
-      });
+  core_->SingleTimeCommand([&](ID3D12GraphicsCommandList *command_list) {
+    d3d12::CopyBuffer(command_list, buffer_.get(), new_buffer.get(),
+                      std::min(buffer_->Size(), new_size));
+  });
 
   buffer_.reset();
   buffer_ = std::move(new_buffer);
@@ -55,11 +54,10 @@ void D3D12StaticBuffer::DownloadData(void *data, size_t size, size_t offset) {
   std::unique_ptr<d3d12::Buffer> staging_buffer;
   core_->Device()->CreateBuffer(size, D3D12_HEAP_TYPE_READBACK,
                                 &staging_buffer);
-  core_->CommandQueue()->SingleTimeCommand(
-      [&](ID3D12GraphicsCommandList *command_list) {
-        d3d12::CopyBuffer(command_list, buffer_.get(), staging_buffer.get(),
-                          size, offset);
-      });
+  core_->SingleTimeCommand([&](ID3D12GraphicsCommandList *command_list) {
+    d3d12::CopyBuffer(command_list, buffer_.get(), staging_buffer.get(), size,
+                      offset);
+  });
   std::memcpy(data, staging_buffer->Map(), size);
   staging_buffer->Unmap();
 }

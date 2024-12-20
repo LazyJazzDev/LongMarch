@@ -110,6 +110,8 @@ void Application::OnRender() {
   command_context->CmdBindIndexBuffer(index_buffer_.get(), 0);
   command_context->CmdSetViewport({0, 0, 1280, 720, 0.0f, 1.0f});
   command_context->CmdSetScissor({0, 0, 1280, 720});
+  command_context->CmdSetPrimitiveTopology(
+      grassland::graphics::PRIMITIVE_TOPOLOGY_TRIANGLE_LIST);
   command_context->CmdDrawIndexed(3, 1, 0, 0, 0);
   command_context->CmdEndRendering();
   command_context->CmdPresent(window_.get(), color_image_.get());

@@ -26,5 +26,6 @@ void InstanceProcedures::Initialize(VkInstance instance,
   }
   GET_PROCEDURE(instance, vkCmdBeginRenderingKHR);
   GET_PROCEDURE(instance, vkCmdEndRenderingKHR);
+  GET_PROCEDURE(instance, vkCmdSetPrimitiveTopologyEXT);
 }
 }  // namespace grassland::vulkan

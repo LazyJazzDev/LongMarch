@@ -112,6 +112,11 @@ void VulkanCommandContext::CmdSetScissor(const Scissor &scissor) {
   commands_.push_back(std::make_unique<VulkanCmdSetScissor>(scissor));
 }
 
+void VulkanCommandContext::CmdSetPrimitiveTopology(PrimitiveTopology topology) {
+  commands_.push_back(
+      std::make_unique<VulkanCmdSetPrimitiveTopology>(topology));
+}
+
 void VulkanCommandContext::CmdDrawIndexed(uint32_t index_count,
                                           uint32_t instance_count,
                                           uint32_t first_index,
