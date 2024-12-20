@@ -145,6 +145,64 @@ VkPrimitiveTopology PrimitiveTopologyToVkPrimitiveTopology(
   return VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;
 }
 
+VkBlendFactor BlendFactorToVkBlendFactor(BlendFactor factor) {
+  switch (factor) {
+    case BLEND_FACTOR_ZERO:
+      return VK_BLEND_FACTOR_ZERO;
+    case BLEND_FACTOR_ONE:
+      return VK_BLEND_FACTOR_ONE;
+    case BLEND_FACTOR_SRC_COLOR:
+      return VK_BLEND_FACTOR_SRC_COLOR;
+    case BLEND_FACTOR_ONE_MINUS_SRC_COLOR:
+      return VK_BLEND_FACTOR_ONE_MINUS_SRC_COLOR;
+    case BLEND_FACTOR_DST_COLOR:
+      return VK_BLEND_FACTOR_DST_COLOR;
+    case BLEND_FACTOR_ONE_MINUS_DST_COLOR:
+      return VK_BLEND_FACTOR_ONE_MINUS_DST_COLOR;
+    case BLEND_FACTOR_SRC_ALPHA:
+      return VK_BLEND_FACTOR_SRC_ALPHA;
+    case BLEND_FACTOR_ONE_MINUS_SRC_ALPHA:
+      return VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA;
+    case BLEND_FACTOR_DST_ALPHA:
+      return VK_BLEND_FACTOR_DST_ALPHA;
+    case BLEND_FACTOR_ONE_MINUS_DST_ALPHA:
+      return VK_BLEND_FACTOR_ONE_MINUS_DST_ALPHA;
+  }
+  return VK_BLEND_FACTOR_ZERO;
+}
+
+VkBlendOp BlendOpToVkBlendOp(BlendOp op) {
+  switch (op) {
+    case BLEND_OP_ADD:
+      return VK_BLEND_OP_ADD;
+    case BLEND_OP_SUBTRACT:
+      return VK_BLEND_OP_SUBTRACT;
+    case BLEND_OP_REVERSE_SUBTRACT:
+      return VK_BLEND_OP_REVERSE_SUBTRACT;
+    case BLEND_OP_MIN:
+      return VK_BLEND_OP_MIN;
+    case BLEND_OP_MAX:
+      return VK_BLEND_OP_MAX;
+  }
+  return VK_BLEND_OP_ADD;
+}
+
+VkPipelineColorBlendAttachmentState
+BlendStateToVkPipelineColorBlendAttachmentState(const BlendState &state) {
+  VkPipelineColorBlendAttachmentState attachment{};
+  attachment.blendEnable = state.blend_enable;
+  attachment.srcColorBlendFactor = BlendFactorToVkBlendFactor(state.src_color);
+  attachment.dstColorBlendFactor = BlendFactorToVkBlendFactor(state.dst_color);
+  attachment.colorBlendOp = BlendOpToVkBlendOp(state.color_op);
+  attachment.srcAlphaBlendFactor = BlendFactorToVkBlendFactor(state.src_alpha);
+  attachment.dstAlphaBlendFactor = BlendFactorToVkBlendFactor(state.dst_alpha);
+  attachment.alphaBlendOp = BlendOpToVkBlendOp(state.alpha_op);
+  attachment.colorWriteMask =
+      VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT |
+      VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT;
+  return attachment;
+}
+
 VulkanResourceBinding::VulkanResourceBinding()
     : buffer(nullptr), image(nullptr) {
 }

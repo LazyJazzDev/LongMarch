@@ -67,6 +67,12 @@ void D3D12Program::SetCullMode(CullMode mode) {
   pipeline_state_desc_.RasterizerState.CullMode = CullModeToD3D12CullMode(mode);
 }
 
+void D3D12Program::SetBlendState(int target_id, const BlendState &state) {
+  pipeline_state_desc_.BlendState.IndependentBlendEnable = TRUE;
+  pipeline_state_desc_.BlendState.RenderTarget[target_id] =
+      BlendStateToD3D12RenderTargetBlendDesc(state);
+}
+
 void D3D12Program::BindShader(Shader *shader, ShaderType type) {
   D3D12Shader *d3d12_shader = dynamic_cast<D3D12Shader *>(shader);
   if (d3d12_shader) {

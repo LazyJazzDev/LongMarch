@@ -40,6 +40,40 @@ SamplerInfo::SamplerInfo(FilterMode min_filter,
       address_mode_w(address_mode_w) {
 }
 
+BlendState::BlendState() {
+  blend_enable = false;
+  src_color = BLEND_FACTOR_ONE;
+  dst_color = BLEND_FACTOR_ZERO;
+  color_op = BLEND_OP_ADD;
+  src_alpha = BLEND_FACTOR_ONE;
+  dst_alpha = BLEND_FACTOR_ZERO;
+  alpha_op = BLEND_OP_ADD;
+}
+
+BlendState::BlendState(bool blend_enable) : blend_enable(blend_enable) {
+  src_color = BLEND_FACTOR_SRC_ALPHA;
+  dst_color = BLEND_FACTOR_ONE_MINUS_SRC_ALPHA;
+  color_op = BLEND_OP_ADD;
+  src_alpha = BLEND_FACTOR_ONE;
+  dst_alpha = BLEND_FACTOR_ONE_MINUS_SRC_ALPHA;
+  alpha_op = BLEND_OP_ADD;
+}
+
+BlendState::BlendState(BlendFactor src_color,
+                       BlendFactor dst_color,
+                       BlendOp color_op,
+                       BlendFactor src_alpha,
+                       BlendFactor dst_alpha,
+                       BlendOp alpha_op)
+    : blend_enable(true),
+      src_color(src_color),
+      dst_color(dst_color),
+      color_op(color_op),
+      src_alpha(src_alpha),
+      dst_alpha(dst_alpha),
+      alpha_op(alpha_op) {
+}
+
 bool IsDepthFormat(ImageFormat format) {
   switch (format) {
     case IMAGE_FORMAT_D32_SFLOAT:

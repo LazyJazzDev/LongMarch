@@ -18,6 +18,7 @@ class Program {
                                  uint32_t offset) = 0;
   virtual void AddResourceBinding(ResourceType type, int count) = 0;
   virtual void SetCullMode(CullMode mode) = 0;
+  virtual void SetBlendState(int target_id, const BlendState &state) = 0;
   virtual void BindShader(Shader *shader, ShaderType type) = 0;
   virtual void Finalize() = 0;
 };

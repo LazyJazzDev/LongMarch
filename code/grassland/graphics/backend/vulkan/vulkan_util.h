@@ -23,6 +23,13 @@ VkSamplerAddressMode AddressModeToVkSamplerAddressMode(AddressMode mode);
 VkPrimitiveTopology PrimitiveTopologyToVkPrimitiveTopology(
     PrimitiveTopology topology);
 
+VkBlendFactor BlendFactorToVkBlendFactor(BlendFactor factor);
+
+VkBlendOp BlendOpToVkBlendOp(BlendOp op);
+
+VkPipelineColorBlendAttachmentState
+BlendStateToVkPipelineColorBlendAttachmentState(const BlendState &state);
+
 class VulkanCore;
 class VulkanBuffer;
 class VulkanImage;

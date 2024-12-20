@@ -146,6 +146,48 @@ typedef enum PrimitiveTopology {
   PRIMITIVE_TOPOLOGY_POINT_LIST = 4,
 } PrimitiveTopology;
 
+typedef enum BlendFactor {
+  BLEND_FACTOR_ZERO = 0,
+  BLEND_FACTOR_ONE = 1,
+  BLEND_FACTOR_SRC_COLOR = 2,
+  BLEND_FACTOR_ONE_MINUS_SRC_COLOR = 3,
+  BLEND_FACTOR_DST_COLOR = 4,
+  BLEND_FACTOR_ONE_MINUS_DST_COLOR = 5,
+  BLEND_FACTOR_SRC_ALPHA = 6,
+  BLEND_FACTOR_ONE_MINUS_SRC_ALPHA = 7,
+  BLEND_FACTOR_DST_ALPHA = 8,
+  BLEND_FACTOR_ONE_MINUS_DST_ALPHA = 9,
+} BlendFactor;
+
+typedef enum BlendOp {
+  BLEND_OP_ADD = 0,
+  BLEND_OP_SUBTRACT = 1,
+  BLEND_OP_REVERSE_SUBTRACT = 2,
+  BLEND_OP_MIN = 3,
+  BLEND_OP_MAX = 4,
+} BlendOp;
+
+struct BlendState {
+  bool blend_enable;
+  BlendFactor src_color;
+  BlendFactor dst_color;
+  BlendOp color_op;
+  BlendFactor src_alpha;
+  BlendFactor dst_alpha;
+  BlendOp alpha_op;
+
+  BlendState();
+
+  BlendState(bool blend_enable);
+
+  BlendState(BlendFactor src_color,
+             BlendFactor dst_color,
+             BlendOp color_op,
+             BlendFactor src_alpha,
+             BlendFactor dst_alpha,
+             BlendOp alpha_op);
+};
+
 class Core;
 class Buffer;
 class Image;

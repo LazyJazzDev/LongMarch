@@ -155,6 +155,66 @@ D3D12_PRIMITIVE_TOPOLOGY PrimitiveTopologyToD3D12PrimitiveTopology(
   return D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST;
 }
 
+D3D12_BLEND BlendFactorToD3D12Blend(BlendFactor factor) {
+  switch (factor) {
+    case BLEND_FACTOR_ZERO:
+      return D3D12_BLEND_ZERO;
+    case BLEND_FACTOR_ONE:
+      return D3D12_BLEND_ONE;
+    case BLEND_FACTOR_SRC_COLOR:
+      return D3D12_BLEND_SRC_COLOR;
+    case BLEND_FACTOR_ONE_MINUS_SRC_COLOR:
+      return D3D12_BLEND_INV_SRC_COLOR;
+    case BLEND_FACTOR_DST_COLOR:
+      return D3D12_BLEND_DEST_COLOR;
+    case BLEND_FACTOR_ONE_MINUS_DST_COLOR:
+      return D3D12_BLEND_INV_DEST_COLOR;
+    case BLEND_FACTOR_SRC_ALPHA:
+      return D3D12_BLEND_SRC_ALPHA;
+    case BLEND_FACTOR_ONE_MINUS_SRC_ALPHA:
+      return D3D12_BLEND_INV_SRC_ALPHA;
+    case BLEND_FACTOR_DST_ALPHA:
+      return D3D12_BLEND_DEST_ALPHA;
+    case BLEND_FACTOR_ONE_MINUS_DST_ALPHA:
+      return D3D12_BLEND_INV_DEST_ALPHA;
+  }
+  return D3D12_BLEND_ZERO;
+}
+
+D3D12_BLEND_OP BlendOpToD3D12BlendOp(BlendOp op) {
+  switch (op) {
+    case BLEND_OP_ADD:
+      return D3D12_BLEND_OP_ADD;
+    case BLEND_OP_SUBTRACT:
+      return D3D12_BLEND_OP_SUBTRACT;
+    case BLEND_OP_REVERSE_SUBTRACT:
+      return D3D12_BLEND_OP_REV_SUBTRACT;
+    case BLEND_OP_MIN:
+      return D3D12_BLEND_OP_MIN;
+    case BLEND_OP_MAX:
+      return D3D12_BLEND_OP_MAX;
+  }
+  return D3D12_BLEND_OP_ADD;
+}
+
+D3D12_RENDER_TARGET_BLEND_DESC BlendStateToD3D12RenderTargetBlendDesc(
+    const BlendState &state) {
+  D3D12_RENDER_TARGET_BLEND_DESC desc{};
+  desc.BlendEnable = state.blend_enable;
+  desc.SrcBlend = BlendFactorToD3D12Blend(state.src_color);
+  desc.DestBlend = BlendFactorToD3D12Blend(state.dst_color);
+  desc.BlendOp = BlendOpToD3D12BlendOp(state.color_op);
+  desc.SrcBlendAlpha = BlendFactorToD3D12Blend(state.src_alpha);
+  desc.DestBlendAlpha = BlendFactorToD3D12Blend(state.dst_alpha);
+  desc.BlendOpAlpha = BlendOpToD3D12BlendOp(state.alpha_op);
+  desc.RenderTargetWriteMask =
+      D3D12_COLOR_WRITE_ENABLE_RED | D3D12_COLOR_WRITE_ENABLE_GREEN |
+      D3D12_COLOR_WRITE_ENABLE_BLUE | D3D12_COLOR_WRITE_ENABLE_ALPHA;
+  desc.LogicOpEnable = FALSE;
+  desc.LogicOp = D3D12_LOGIC_OP_NOOP;
+  return desc;
+}
+
 D3D12ResourceBinding::D3D12ResourceBinding() : buffer(nullptr), image(nullptr) {
 }
 

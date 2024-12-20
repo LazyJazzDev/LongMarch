@@ -22,6 +22,13 @@ D3D12_TEXTURE_ADDRESS_MODE AddressModeToD3D12AddressMode(AddressMode mode);
 D3D12_PRIMITIVE_TOPOLOGY PrimitiveTopologyToD3D12PrimitiveTopology(
     PrimitiveTopology topology);
 
+D3D12_BLEND BlendFactorToD3D12Blend(BlendFactor factor);
+
+D3D12_BLEND_OP BlendOpToD3D12BlendOp(BlendOp op);
+
+D3D12_RENDER_TARGET_BLEND_DESC BlendStateToD3D12RenderTargetBlendDesc(
+    const BlendState &state);
+
 class D3D12Core;
 class D3D12Buffer;
 class D3D12Image;

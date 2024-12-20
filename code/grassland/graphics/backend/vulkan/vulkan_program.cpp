@@ -64,6 +64,11 @@ void VulkanProgram::SetCullMode(CullMode mode) {
   pipeline_settings_.SetCullMode(CullModeToVkCullMode(mode));
 }
 
+void VulkanProgram::SetBlendState(int target_id, const BlendState &state) {
+  pipeline_settings_.SetBlendState(
+      target_id, BlendStateToVkPipelineColorBlendAttachmentState(state));
+}
+
 void VulkanProgram::BindShader(Shader *shader, ShaderType type) {
   VulkanShader *vulkan_shader = dynamic_cast<VulkanShader *>(shader);
   if (vulkan_shader) {

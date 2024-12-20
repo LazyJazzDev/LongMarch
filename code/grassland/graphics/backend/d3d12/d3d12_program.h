@@ -28,6 +28,7 @@ class D3D12Program : public Program {
   void AddInputBinding(uint32_t stride, bool input_per_instance) override;
   void AddResourceBinding(ResourceType type, int count) override;
   void SetCullMode(CullMode mode) override;
+  void SetBlendState(int target_id, const BlendState &state) override;
   void BindShader(Shader *shader, ShaderType type) override;
   void Finalize() override;
 
