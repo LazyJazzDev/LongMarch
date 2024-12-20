@@ -4,6 +4,7 @@
 #include "grassland/graphics/backend/d3d12/d3d12_command_context.h"
 #include "grassland/graphics/backend/d3d12/d3d12_image.h"
 #include "grassland/graphics/backend/d3d12/d3d12_program.h"
+#include "grassland/graphics/backend/d3d12/d3d12_sampler.h"
 #include "grassland/graphics/backend/d3d12/d3d12_window.h"
 
 namespace grassland::graphics::backend {
@@ -96,6 +97,12 @@ int D3D12Core::CreateImage(int width,
   return 0;
 }
 
+int D3D12Core::CreateSampler(const SamplerInfo &info,
+                             double_ptr<Sampler> pp_sampler) {
+  pp_sampler.construct<D3D12Sampler>(this, info);
+  return 0;
+}
+
 int D3D12Core::CreateWindowObject(int width,
                                   int height,
                                   const std::string &title,
@@ -158,13 +165,31 @@ int D3D12Core::SubmitCommandContext(CommandContext *p_command_context) {
                                   &resource_descriptor_heaps_[current_frame_]);
   }
 
+  if (!sampler_descriptor_heaps_[current_frame_] ||
+      sampler_descriptor_heaps_[current_frame_]->NumDescriptors() <
+          command_context->sampler_descriptor_count_) {
+    sampler_descriptor_heaps_[current_frame_].reset();
+    device_->CreateDescriptorHeap(D3D12_DESCRIPTOR_HEAP_TYPE_SAMPLER,
+                                  command_context->sampler_descriptor_count_,
+                                  &sampler_descriptor_heaps_[current_frame_]);
+  }
+
   if (command_context->resource_descriptor_count_) {
-    command_context->descriptor_size_ =
+    command_context->resource_descriptor_size_ =
         resource_descriptor_heaps_[current_frame_]->DescriptorSize();
     command_context->resource_descriptor_base_ =
         resource_descriptor_heaps_[current_frame_]->CPUHandle(0);
     command_context->resource_descriptor_gpu_base_ =
         resource_descriptor_heaps_[current_frame_]->GPUHandle(0);
+  }
+
+  if (command_context->sampler_descriptor_count_) {
+    command_context->sampler_descriptor_size_ =
+        sampler_descriptor_heaps_[current_frame_]->DescriptorSize();
+    command_context->sampler_descriptor_base_ =
+        sampler_descriptor_heaps_[current_frame_]->CPUHandle(0);
+    command_context->sampler_descriptor_gpu_base_ =
+        sampler_descriptor_heaps_[current_frame_]->GPUHandle(0);
   }
 
   if (!rtv_descriptor_heaps_[current_frame_] ||
@@ -195,9 +220,10 @@ int D3D12Core::SubmitCommandContext(CommandContext *p_command_context) {
     device_->Handle()->CreateDepthStencilView(resource, nullptr, dsv_handle);
   }
 
-  auto resource_heap = resource_descriptor_heaps_[current_frame_]->Handle();
-
-  command_list->SetDescriptorHeaps(1, &resource_heap);
+  ID3D12DescriptorHeap *resource_heaps[] = {
+      resource_descriptor_heaps_[current_frame_]->Handle(),
+      sampler_descriptor_heaps_[current_frame_]->Handle()};
+  command_list->SetDescriptorHeaps(2, resource_heaps);
 
   for (auto &command : command_context->commands_) {
     command->CompileCommand(command_context, command_list);
@@ -220,7 +246,7 @@ int D3D12Core::SubmitCommandContext(CommandContext *p_command_context) {
   command_queue_->Handle()->ExecuteCommandLists(1, command_lists);
 
   for (auto window : command_context->windows_) {
-    window->SwapChain()->Handle()->Present(1, 0);
+    window->SwapChain()->Handle()->Present(0, 0);
   }
 
   fences_[current_frame_]->Signal(command_queue_.get());
@@ -273,10 +299,16 @@ int D3D12Core::InitializeLogicalDevice(int device_index) {
   command_lists_.resize(FramesInFlight());
   fences_.resize(FramesInFlight());
   resource_descriptor_heaps_.resize(FramesInFlight());
+  sampler_descriptor_heaps_.resize(FramesInFlight());
   rtv_descriptor_heaps_.resize(FramesInFlight());
   dsv_descriptor_heaps_.resize(FramesInFlight());
 
   for (int i = 0; i < FramesInFlight(); i++) {
+    device_->CreateDescriptorHeap(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV, 64,
+                                  &resource_descriptor_heaps_[i]);
+    device_->CreateDescriptorHeap(D3D12_DESCRIPTOR_HEAP_TYPE_SAMPLER, 64,
+                                  &sampler_descriptor_heaps_[i]);
+
     device_->CreateCommandAllocator(D3D12_COMMAND_LIST_TYPE_DIRECT,
                                     &command_allocators_[i]);
     device_->CreateFence(&fences_[i]);

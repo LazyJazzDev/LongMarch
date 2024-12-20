@@ -66,7 +66,8 @@ HRESULT Device::CreateDescriptorHeap(
   desc.Type = type;
   desc.NumDescriptors = num_descriptors;
   desc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_NONE;
-  if (type == D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV) {
+  if (type == D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV ||
+      type == D3D12_DESCRIPTOR_HEAP_TYPE_SAMPLER) {
     desc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE;
   }
 

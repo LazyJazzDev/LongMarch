@@ -19,6 +19,9 @@ class VulkanCommandContext : public CommandContext {
                          Image *depth_target) override;
   void CmdBindResources(int slot,
                         const std::vector<Buffer *> &buffers) override;
+  void CmdBindResources(int slot, const std::vector<Image *> &images) override;
+  void CmdBindResources(int slot,
+                        const std::vector<Sampler *> &samplers) override;
   void CmdEndRendering() override;
 
   void CmdSetViewport(const Viewport &viewport) override;
@@ -57,6 +60,8 @@ class VulkanCommandContext : public CommandContext {
   std::set<VulkanWindow *> windows_;
 
   std::set<VulkanDynamicBuffer *> dynamic_buffers_;
+
+  VulkanCmdBeginRendering *active_rendering_cmd_{nullptr};
 
   struct ImageState {
     VkImageLayout layout;

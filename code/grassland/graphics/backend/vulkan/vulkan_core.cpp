@@ -4,6 +4,7 @@
 #include "grassland/graphics/backend/vulkan/vulkan_command_context.h"
 #include "grassland/graphics/backend/vulkan/vulkan_image.h"
 #include "grassland/graphics/backend/vulkan/vulkan_program.h"
+#include "grassland/graphics/backend/vulkan/vulkan_sampler.h"
 #include "grassland/graphics/backend/vulkan/vulkan_window.h"
 
 namespace grassland::graphics::backend {
@@ -51,6 +52,12 @@ int VulkanCore::CreateImage(int width,
         VK_PIPELINE_STAGE_ALL_GRAPHICS_BIT, VK_ACCESS_MEMORY_READ_BIT, 0,
         image->Image()->Aspect());
   });
+  return 0;
+}
+
+int VulkanCore::CreateSampler(const SamplerInfo &info,
+                              double_ptr<Sampler> pp_sampler) {
+  pp_sampler.construct<VulkanSampler>(this, info);
   return 0;
 }
 

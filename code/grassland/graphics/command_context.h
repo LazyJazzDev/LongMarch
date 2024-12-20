@@ -15,6 +15,10 @@ class CommandContext {
                                  Image *depth_target) = 0;
   virtual void CmdBindResources(int slot,
                                 const std::vector<Buffer *> &buffers) = 0;
+  virtual void CmdBindResources(int slot,
+                                const std::vector<Image *> &images) = 0;
+  virtual void CmdBindResources(int slot,
+                                const std::vector<Sampler *> &samplers) = 0;
   virtual void CmdEndRendering() = 0;
 
   virtual void CmdSetViewport(const Viewport &viewport) = 0;

@@ -14,9 +14,16 @@ VkDescriptorType ResourceTypeToVkDescriptorType(ResourceType type);
 
 VkCullModeFlagBits CullModeToVkCullMode(CullMode mode);
 
+VkFilter FilterModeToVkFilter(FilterMode filter);
+
+VkSamplerMipmapMode FilterModeToVkSamplerMipmapMode(FilterMode filter);
+
+VkSamplerAddressMode AddressModeToVkSamplerAddressMode(AddressMode mode);
+
 class VulkanCore;
 class VulkanBuffer;
 class VulkanImage;
+class VulkanSampler;
 class VulkanShader;
 class VulkanProgram;
 class VulkanCommandContext;

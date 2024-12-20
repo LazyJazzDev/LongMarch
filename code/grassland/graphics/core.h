@@ -29,6 +29,9 @@ class Core {
                           ImageFormat format,
                           double_ptr<Image> pp_image) = 0;
 
+  virtual int CreateSampler(const SamplerInfo &info,
+                            double_ptr<Sampler> pp_sampler) = 0;
+
   virtual int CreateWindowObject(int width,
                                  int height,
                                  const std::string &title,

@@ -3,6 +3,7 @@
 #include "grassland/graphics/backend/vulkan/vulkan_buffer.h"
 #include "grassland/graphics/backend/vulkan/vulkan_image.h"
 #include "grassland/graphics/backend/vulkan/vulkan_program.h"
+#include "grassland/graphics/backend/vulkan/vulkan_sampler.h"
 #include "grassland/graphics/backend/vulkan/vulkan_window.h"
 
 namespace grassland::graphics::backend {
@@ -49,8 +50,12 @@ void VulkanCommandContext::CmdBeginRendering(
     vk_depth_target = dynamic_cast<VulkanImage *>(depth_target);
   }
 
-  commands_.push_back(std::make_unique<VulkanCmdBeginRendering>(
-      vk_color_targets, vk_depth_target));
+  auto cmd = std::make_unique<VulkanCmdBeginRendering>(vk_color_targets,
+                                                       vk_depth_target);
+
+  active_rendering_cmd_ = cmd.get();
+
+  commands_.push_back(std::move(cmd));
 }
 
 void VulkanCommandContext::CmdBindResources(
@@ -67,7 +72,35 @@ void VulkanCommandContext::CmdBindResources(
   required_set_count_++;
 }
 
+void VulkanCommandContext::CmdBindResources(
+    int slot,
+    const std::vector<Image *> &images) {
+  std::vector<VulkanImage *> vk_images(images.size());
+  for (size_t i = 0; i < images.size(); ++i) {
+    vk_images[i] = dynamic_cast<VulkanImage *>(images[i]);
+    active_rendering_cmd_->RecordResourceImages(vk_images[i]);
+  }
+  commands_.push_back(
+      std::make_unique<VulkanCmdBindResourceImages>(slot, vk_images, program_));
+  required_pool_size_ += program_->DescriptorSetLayout(slot)->GetPoolSize();
+  required_set_count_++;
+}
+
+void VulkanCommandContext::CmdBindResources(
+    int slot,
+    const std::vector<Sampler *> &samplers) {
+  std::vector<VulkanSampler *> vk_samplers(samplers.size());
+  for (size_t i = 0; i < samplers.size(); ++i) {
+    vk_samplers[i] = dynamic_cast<VulkanSampler *>(samplers[i]);
+  }
+  commands_.push_back(std::make_unique<VulkanCmdBindResourceSamplers>(
+      slot, vk_samplers, program_));
+  required_pool_size_ += program_->DescriptorSetLayout(slot)->GetPoolSize();
+  required_set_count_++;
+}
+
 void VulkanCommandContext::CmdEndRendering() {
+  active_rendering_cmd_ = nullptr;
   commands_.push_back(std::make_unique<VulkanCmdEndRendering>());
 }
 

@@ -13,9 +13,16 @@ D3D12_DESCRIPTOR_RANGE_TYPE ResourceTypeToD3D12DescriptorRangeType(
 
 D3D12_CULL_MODE CullModeToD3D12CullMode(CullMode mode);
 
+D3D12_FILTER FilterModeToD3D12Filter(FilterMode min_filter,
+                                     FilterMode mag_filter,
+                                     FilterMode mip_filter);
+
+D3D12_TEXTURE_ADDRESS_MODE AddressModeToD3D12AddressMode(AddressMode mode);
+
 class D3D12Core;
 class D3D12Buffer;
 class D3D12Image;
+class D3D12Sampler;
 class D3D12Shader;
 class D3D12Program;
 class D3D12CommandContext;

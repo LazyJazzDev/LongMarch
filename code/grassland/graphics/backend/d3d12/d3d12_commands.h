@@ -61,6 +61,34 @@ class D3D12CmdBindResourceBuffers : public D3D12Command {
   D3D12Program *program_;
 };
 
+class D3D12CmdBindResourceImages : public D3D12Command {
+ public:
+  D3D12CmdBindResourceImages(int slot,
+                             const std::vector<D3D12Image *> &images,
+                             D3D12Program *program);
+  void CompileCommand(D3D12CommandContext *context,
+                      ID3D12GraphicsCommandList *command_list) override;
+
+ private:
+  int slot_;
+  std::vector<D3D12Image *> images_;
+  D3D12Program *program_;
+};
+
+class D3D12CmdBindResourceSamplers : public D3D12Command {
+ public:
+  D3D12CmdBindResourceSamplers(int slot,
+                               const std::vector<D3D12Sampler *> &samplers,
+                               D3D12Program *program);
+  void CompileCommand(D3D12CommandContext *context,
+                      ID3D12GraphicsCommandList *command_list) override;
+
+ private:
+  int slot_;
+  std::vector<D3D12Sampler *> samplers_;
+  D3D12Program *program_;
+};
+
 class D3D12CmdBeginRendering : public D3D12Command {
  public:
   D3D12CmdBeginRendering(const std::vector<D3D12Image *> &color_targets,

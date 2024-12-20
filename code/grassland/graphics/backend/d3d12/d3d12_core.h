@@ -31,6 +31,9 @@ class D3D12Core : public Core {
                   ImageFormat format,
                   double_ptr<Image> pp_image) override;
 
+  int CreateSampler(const SamplerInfo &info,
+                    double_ptr<Sampler> pp_sampler) override;
+
   int CreateWindowObject(int width,
                          int height,
                          const std::string &title,
@@ -123,6 +126,7 @@ class D3D12Core : public Core {
 
   std::vector<std::unique_ptr<d3d12::DescriptorHeap>>
       resource_descriptor_heaps_;
+  std::vector<std::unique_ptr<d3d12::DescriptorHeap>> sampler_descriptor_heaps_;
 
   std::vector<std::unique_ptr<d3d12::DescriptorHeap>> rtv_descriptor_heaps_;
   std::vector<std::unique_ptr<d3d12::DescriptorHeap>> dsv_descriptor_heaps_;

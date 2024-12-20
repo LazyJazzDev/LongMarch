@@ -23,6 +23,9 @@ class VulkanCore : public Core {
                   ImageFormat format,
                   double_ptr<Image> pp_image) override;
 
+  int CreateSampler(const SamplerInfo &info,
+                    double_ptr<Sampler> pp_sampler) override;
+
   int CreateWindowObject(int width,
                          int height,
                          const std::string &title,

@@ -74,6 +74,8 @@ VkDescriptorType ResourceTypeToVkDescriptorType(ResourceType type) {
       return VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
     case RESOURCE_TYPE_STORAGE_BUFFER:
       return VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+    case RESOURCE_TYPE_SAMPLER:
+      return VK_DESCRIPTOR_TYPE_SAMPLER;
     default:
       return VK_DESCRIPTOR_TYPE_MAX_ENUM;
   }
@@ -90,6 +92,40 @@ VkCullModeFlagBits CullModeToVkCullMode(CullMode mode) {
     default:
       return VK_CULL_MODE_NONE;
   }
+}
+
+VkFilter FilterModeToVkFilter(FilterMode filter) {
+  switch (filter) {
+    case FILTER_MODE_NEAREST:
+      return VK_FILTER_NEAREST;
+    case FILTER_MODE_LINEAR:
+      return VK_FILTER_LINEAR;
+  }
+  return VK_FILTER_NEAREST;
+}
+
+VkSamplerMipmapMode FilterModeToVkSamplerMipmapMode(FilterMode filter) {
+  switch (filter) {
+    case FILTER_MODE_NEAREST:
+      return VK_SAMPLER_MIPMAP_MODE_NEAREST;
+    case FILTER_MODE_LINEAR:
+      return VK_SAMPLER_MIPMAP_MODE_LINEAR;
+  }
+  return VK_SAMPLER_MIPMAP_MODE_NEAREST;
+}
+
+VkSamplerAddressMode AddressModeToVkSamplerAddressMode(AddressMode mode) {
+  switch (mode) {
+    case ADDRESS_MODE_REPEAT:
+      return VK_SAMPLER_ADDRESS_MODE_REPEAT;
+    case ADDRESS_MODE_MIRRORED_REPEAT:
+      return VK_SAMPLER_ADDRESS_MODE_MIRRORED_REPEAT;
+    case ADDRESS_MODE_CLAMP_TO_EDGE:
+      return VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
+    case ADDRESS_MODE_CLAMP_TO_BORDER:
+      return VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_BORDER;
+  }
+  return VK_SAMPLER_ADDRESS_MODE_REPEAT;
 }
 
 VulkanResourceBinding::VulkanResourceBinding()

@@ -28,18 +28,11 @@ void Application::OnInit() {
           std::string(" Graphics Hello Cube"),
       &window_);
 
-  std::vector<Vertex> vertices = {{{-1.0f, -1.0f, -1.0f}, {0.0f, 0.0f, 0.0f}},
-                                  {{1.0f, -1.0f, -1.0f}, {1.0f, 0.0f, 0.0f}},
-                                  {{-1.0f, 1.0f, -1.0f}, {0.0f, 1.0f, 0.0f}},
-                                  {{1.0f, 1.0f, -1.0f}, {1.0f, 1.0f, 0.0f}},
-                                  {{-1.0f, -1.0f, 1.0f}, {0.0f, 0.0f, 1.0f}},
-                                  {{1.0f, -1.0f, 1.0f}, {1.0f, 0.0f, 1.0f}},
-                                  {{-1.0f, 1.0f, 1.0f}, {0.0f, 1.0f, 1.0f}},
-                                  {{1.0f, 1.0f, 1.0f}, {1.0f, 1.0f, 1.0f}}};
+  std::vector<Vertex> vertices = {{{0.0, -0.5, 0.0}, {0.5, 0.0}},
+                                  {{0.5, 0.5, 0.0}, {1.0, 1.0}},
+                                  {{-0.5, 0.5, 0.0}, {0.0, 1.0}}};
 
-  std::vector<uint32_t> indices = {0, 1, 2, 2, 1, 3, 2, 3, 6, 6, 3, 7,
-                                   6, 7, 4, 4, 7, 5, 4, 5, 0, 0, 5, 1,
-                                   1, 5, 3, 3, 5, 7, 0, 2, 4, 4, 2, 6};
+  std::vector<uint32_t> indices = {0, 1, 2};
 
   core_->CreateBuffer(vertices.size() * sizeof(Vertex),
                       grassland::graphics::BUFFER_TYPE_STATIC, &vertex_buffer_);
@@ -48,15 +41,26 @@ void Application::OnInit() {
   vertex_buffer_->UploadData(vertices.data(), vertices.size() * sizeof(Vertex));
   index_buffer_->UploadData(indices.data(), indices.size() * sizeof(uint32_t));
 
-  core_->CreateBuffer(sizeof(GlobalUniformBuffer),
-                      grassland::graphics::BUFFER_TYPE_DYNAMIC,
-                      &uniform_buffer_);
-
   core_->CreateImage(1280, 720,
                      grassland::graphics::IMAGE_FORMAT_R32G32B32A32_SFLOAT,
                      &color_image_);
   core_->CreateImage(1280, 720, grassland::graphics::IMAGE_FORMAT_D32_SFLOAT,
                      &depth_image_);
+
+  core_->CreateImage(256, 256, grassland::graphics::IMAGE_FORMAT_R8G8B8A8_UNORM,
+                     &texture_image_);
+
+  core_->CreateSampler(grassland::graphics::FILTER_MODE_LINEAR, &sampler_);
+
+  std::vector<uint32_t> texture_data(256 * 256);
+  for (int i = 0; i < 256; i++) {
+    for (int j = 0; j < 256; j++) {
+      uint32_t pixel = i ^ j;
+      pixel = pixel | (pixel << 8) | (pixel << 16) | 0xFF000000;
+      texture_data[i * 256 + j] = pixel;
+    }
+  }
+  texture_image_->UploadData(texture_data.data());
 
   if (core_->API() == grassland::graphics::BACKEND_API_VULKAN) {
     core_->CreateShader(grassland::vulkan::CompileGLSLToSPIRV(
@@ -87,11 +91,11 @@ void Application::OnInit() {
                        grassland::graphics::IMAGE_FORMAT_D32_SFLOAT, &program_);
   program_->AddInputBinding(sizeof(Vertex), false);
   program_->AddInputAttribute(0, grassland::graphics::INPUT_TYPE_FLOAT3, 0);
-  program_->AddInputAttribute(0, grassland::graphics::INPUT_TYPE_FLOAT3,
+  program_->AddInputAttribute(0, grassland::graphics::INPUT_TYPE_FLOAT2,
                               sizeof(float) * 3);
-  program_->AddResourceBinding(
-      grassland::graphics::RESOURCE_TYPE_UNIFORM_BUFFER, 1);
-  program_->SetCullMode(grassland::graphics::CULL_MODE_NONE);
+  program_->AddResourceBinding(grassland::graphics::RESOURCE_TYPE_TEXTURE, 1);
+  program_->AddResourceBinding(grassland::graphics::RESOURCE_TYPE_SAMPLER, 1);
+  // program_->SetCullMode(grassland::graphics::CULL_MODE_NONE);
   program_->BindShader(vertex_shader_.get(),
                        grassland::graphics::SHADER_TYPE_VERTEX);
   program_->BindShader(fragment_shader_.get(),
@@ -103,33 +107,18 @@ void Application::OnClose() {
   program_.reset();
   vertex_shader_.reset();
   fragment_shader_.reset();
+  sampler_.reset();
+  texture_image_.reset();
   color_image_.reset();
   depth_image_.reset();
   index_buffer_.reset();
   vertex_buffer_.reset();
-  uniform_buffer_.reset();
 }
 
 void Application::OnUpdate() {
   if (window_->ShouldClose()) {
     window_->CloseWindow();
     alive_ = false;
-  }
-  if (alive_) {
-    static float x = 0.0;
-    x += glm::radians(1.0f);
-    while (x > glm::radians(360.0f)) {
-      x -= glm::radians(360.0f);
-    }
-
-    GlobalUniformBuffer ubo = {};
-    ubo.model = glm::rotate(glm::mat4{1.0f}, x, glm::vec3{0.0f, 1.0f, 0.0f});
-    ubo.view =
-        glm::lookAt(glm::vec3{0.0f, 0.0f, 5.0f}, glm::vec3{0.0f, 0.0f, 0.0f},
-                    glm::vec3{0.0f, 1.0f, 0.0f});
-    ubo.proj =
-        glm::perspectiveZO(glm::radians(45.0f), 1280.0f / 720.0f, 3.5f, 6.5f);
-    uniform_buffer_->UploadData(&ubo, sizeof(GlobalUniformBuffer));
   }
 }
 
@@ -142,10 +131,11 @@ void Application::OnRender() {
   command_context->CmdBindProgram(program_.get());
   command_context->CmdBindVertexBuffers(0, {vertex_buffer_.get()}, {0});
   command_context->CmdBindIndexBuffer(index_buffer_.get(), 0);
-  command_context->CmdBindResources(0, {uniform_buffer_.get()});
+  command_context->CmdBindResources(0, {texture_image_.get()});
+  command_context->CmdBindResources(1, {sampler_.get()});
   command_context->CmdSetViewport({0, 0, 1280, 720, 0.0f, 1.0f});
   command_context->CmdSetScissor({0, 0, 1280, 720});
-  command_context->CmdDrawIndexed(36, 1, 0, 0, 0);
+  command_context->CmdDrawIndexed(3, 1, 0, 0, 0);
   command_context->CmdEndRendering();
   command_context->CmdPresent(window_.get(), color_image_.get());
   core_->SubmitCommandContext(command_context.get());

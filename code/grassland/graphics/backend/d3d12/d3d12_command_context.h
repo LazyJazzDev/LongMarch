@@ -22,6 +22,9 @@ class D3D12CommandContext : public CommandContext {
   void CmdBindIndexBuffer(Buffer *buffer, uint64_t offset) override;
   void CmdBindResources(int slot,
                         const std::vector<Buffer *> &buffers) override;
+  void CmdBindResources(int slot, const std::vector<Image *> &images) override;
+  void CmdBindResources(int slot,
+                        const std::vector<Sampler *> &samplers) override;
   void CmdBeginRendering(const std::vector<Image *> &color_targets,
                          Image *depth_target) override;
   void CmdEndRendering() override;
@@ -52,6 +55,8 @@ class D3D12CommandContext : public CommandContext {
   CD3DX12_GPU_DESCRIPTOR_HANDLE WriteSRVDescriptor(D3D12Image *image);
   CD3DX12_GPU_DESCRIPTOR_HANDLE WriteSRVDescriptor(D3D12Buffer *buffer);
   CD3DX12_GPU_DESCRIPTOR_HANDLE WriteCBVDescriptor(D3D12Buffer *buffer);
+  CD3DX12_GPU_DESCRIPTOR_HANDLE WriteSamplerDescriptor(
+      const D3D12_SAMPLER_DESC &desc);
 
   void RecordDynamicBuffer(D3D12Buffer *buffer);
 
@@ -71,9 +76,14 @@ class D3D12CommandContext : public CommandContext {
 
   std::map<ID3D12Resource *, D3D12_RESOURCE_STATES> resource_states_;
   int resource_descriptor_count_{0};
-  int descriptor_size_{};
+  int resource_descriptor_size_{};
   CD3DX12_CPU_DESCRIPTOR_HANDLE resource_descriptor_base_{};
   CD3DX12_GPU_DESCRIPTOR_HANDLE resource_descriptor_gpu_base_{};
+
+  int sampler_descriptor_count_{0};
+  int sampler_descriptor_size_{};
+  CD3DX12_CPU_DESCRIPTOR_HANDLE sampler_descriptor_base_{};
+  CD3DX12_GPU_DESCRIPTOR_HANDLE sampler_descriptor_gpu_base_{};
 };
 
 }  // namespace grassland::graphics::backend

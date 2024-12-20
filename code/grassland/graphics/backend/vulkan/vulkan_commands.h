@@ -55,9 +55,12 @@ class VulkanCmdBeginRendering : public VulkanCommand {
   void CompileCommand(VulkanCommandContext *context,
                       VkCommandBuffer command_buffer) override;
 
+  void RecordResourceImages(VulkanImage *resource_image);
+
  private:
   std::vector<VulkanImage *> color_targets_;
   VulkanImage *depth_target_;
+  std::set<VulkanImage *> resource_images_;
 };
 
 class VulkanCmdBindResourceBuffers : public VulkanCommand {
@@ -72,6 +75,36 @@ class VulkanCmdBindResourceBuffers : public VulkanCommand {
  private:
   int slot_;
   std::vector<VulkanBuffer *> buffers_;
+  VulkanProgram *program_;
+};
+
+class VulkanCmdBindResourceImages : public VulkanCommand {
+ public:
+  VulkanCmdBindResourceImages(int slot,
+                              const std::vector<VulkanImage *> &images,
+                              VulkanProgram *program);
+
+  void CompileCommand(VulkanCommandContext *context,
+                      VkCommandBuffer command_buffer) override;
+
+ private:
+  int slot_;
+  std::vector<VulkanImage *> images_;
+  VulkanProgram *program_;
+};
+
+class VulkanCmdBindResourceSamplers : public VulkanCommand {
+ public:
+  VulkanCmdBindResourceSamplers(int slot,
+                                const std::vector<VulkanSampler *> &samplers,
+                                VulkanProgram *program);
+
+  void CompileCommand(VulkanCommandContext *context,
+                      VkCommandBuffer command_buffer) override;
+
+ private:
+  int slot_;
+  std::vector<VulkanSampler *> samplers_;
   VulkanProgram *program_;
 };
 

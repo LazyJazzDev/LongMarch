@@ -3,6 +3,7 @@
 #include "grassland/graphics/backend/d3d12/d3d12_buffer.h"
 #include "grassland/graphics/backend/d3d12/d3d12_image.h"
 #include "grassland/graphics/backend/d3d12/d3d12_program.h"
+#include "grassland/graphics/backend/d3d12/d3d12_sampler.h"
 #include "grassland/graphics/backend/d3d12/d3d12_window.h"
 
 namespace grassland::graphics::backend {
@@ -52,6 +53,31 @@ void D3D12CommandContext::CmdBindResources(
   }
   commands_.push_back(std::make_unique<D3D12CmdBindResourceBuffers>(
       slot, d3d12_buffers, program_));
+}
+
+void D3D12CommandContext::CmdBindResources(int slot,
+                                           const std::vector<Image *> &images) {
+  auto descriptor_range = program_->DescriptorRange(slot);
+  resource_descriptor_count_ += descriptor_range->NumDescriptors;
+  std::vector<D3D12Image *> d3d12_images(images.size());
+  for (size_t i = 0; i < images.size(); ++i) {
+    d3d12_images[i] = dynamic_cast<D3D12Image *>(images[i]);
+  }
+  commands_.push_back(std::make_unique<D3D12CmdBindResourceImages>(
+      slot, d3d12_images, program_));
+}
+
+void D3D12CommandContext::CmdBindResources(
+    int slot,
+    const std::vector<Sampler *> &samplers) {
+  auto descriptor_range = program_->DescriptorRange(slot);
+  sampler_descriptor_count_ += descriptor_range->NumDescriptors;
+  std::vector<D3D12Sampler *> d3d12_samplers(samplers.size());
+  for (size_t i = 0; i < samplers.size(); ++i) {
+    d3d12_samplers[i] = dynamic_cast<D3D12Sampler *>(samplers[i]);
+  }
+  commands_.push_back(std::make_unique<D3D12CmdBindResourceSamplers>(
+      slot, d3d12_samplers, program_));
 }
 
 void D3D12CommandContext::CmdBeginRendering(
@@ -168,9 +194,9 @@ CD3DX12_GPU_DESCRIPTOR_HANDLE D3D12CommandContext::WriteUAVDescriptor(
 
   core_->Device()->Handle()->CreateUnorderedAccessView(
       image->Image()->Handle(), nullptr, &desc, resource_descriptor_base_);
-  resource_descriptor_base_.Offset(descriptor_size_);
+  resource_descriptor_base_.Offset(resource_descriptor_size_);
   auto result = resource_descriptor_gpu_base_;
-  resource_descriptor_gpu_base_.Offset(descriptor_size_);
+  resource_descriptor_gpu_base_.Offset(resource_descriptor_size_);
   return result;
 }
 
@@ -178,6 +204,9 @@ CD3DX12_GPU_DESCRIPTOR_HANDLE D3D12CommandContext::WriteSRVDescriptor(
     D3D12Image *image) {
   D3D12_SHADER_RESOURCE_VIEW_DESC desc = {};
   desc.Format = ImageFormatToDXGIFormat(image->Format());
+  if (desc.Format == DXGI_FORMAT_D32_FLOAT) {
+    desc.Format = DXGI_FORMAT_R32_FLOAT;
+  }
   desc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2D;
   desc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
   desc.Texture2D.MostDetailedMip = 0;
@@ -188,9 +217,9 @@ CD3DX12_GPU_DESCRIPTOR_HANDLE D3D12CommandContext::WriteSRVDescriptor(
   core_->Device()->Handle()->CreateShaderResourceView(
       image->Image()->Handle(), &desc, resource_descriptor_base_);
 
-  resource_descriptor_base_.Offset(descriptor_size_);
+  resource_descriptor_base_.Offset(resource_descriptor_size_);
   auto result = resource_descriptor_gpu_base_;
-  resource_descriptor_gpu_base_.Offset(descriptor_size_);
+  resource_descriptor_gpu_base_.Offset(resource_descriptor_size_);
   return result;
 }
 
@@ -208,9 +237,9 @@ CD3DX12_GPU_DESCRIPTOR_HANDLE D3D12CommandContext::WriteSRVDescriptor(
   core_->Device()->Handle()->CreateShaderResourceView(
       buffer->Buffer()->Handle(), nullptr, resource_descriptor_base_);
 
-  resource_descriptor_base_.Offset(descriptor_size_);
+  resource_descriptor_base_.Offset(resource_descriptor_size_);
   auto result = resource_descriptor_gpu_base_;
-  resource_descriptor_gpu_base_.Offset(descriptor_size_);
+  resource_descriptor_gpu_base_.Offset(resource_descriptor_size_);
   return result;
 }
 
@@ -223,9 +252,19 @@ CD3DX12_GPU_DESCRIPTOR_HANDLE D3D12CommandContext::WriteCBVDescriptor(
   core_->Device()->Handle()->CreateConstantBufferView(
       &desc, resource_descriptor_base_);
 
-  resource_descriptor_base_.Offset(descriptor_size_);
+  resource_descriptor_base_.Offset(resource_descriptor_size_);
   auto result = resource_descriptor_gpu_base_;
-  resource_descriptor_gpu_base_.Offset(descriptor_size_);
+  resource_descriptor_gpu_base_.Offset(resource_descriptor_size_);
+  return result;
+}
+
+CD3DX12_GPU_DESCRIPTOR_HANDLE
+D3D12CommandContext::WriteSamplerDescriptor(const D3D12_SAMPLER_DESC &desc) {
+  core_->Device()->Handle()->CreateSampler(&desc, sampler_descriptor_base_);
+
+  sampler_descriptor_base_.Offset(sampler_descriptor_size_);
+  auto result = sampler_descriptor_gpu_base_;
+  sampler_descriptor_gpu_base_.Offset(sampler_descriptor_size_);
   return result;
 }
 

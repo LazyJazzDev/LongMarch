@@ -1,5 +1,6 @@
 #include "grassland/graphics/backend/d3d12/d3d12_commands.h"
 
+#include "d3d12_sampler.h"
 #include "grassland/graphics/backend/d3d12/d3d12_command_context.h"
 #include "grassland/graphics/backend/d3d12/d3d12_image.h"
 #include "grassland/graphics/backend/d3d12/d3d12_program.h"
@@ -77,6 +78,7 @@ void D3D12CmdBindResourceBuffers::CompileCommand(
     ID3D12GraphicsCommandList *command_list) {
   auto descriptor_range = program_->DescriptorRange(slot_);
   CD3DX12_GPU_DESCRIPTOR_HANDLE first_descriptor;
+  first_descriptor.ptr = 0;
   switch (descriptor_range->RangeType) {
     case D3D12_DESCRIPTOR_RANGE_TYPE_CBV:
       for (size_t i = 0; i < buffers_.size(); ++i) {
@@ -94,6 +96,61 @@ void D3D12CmdBindResourceBuffers::CompileCommand(
         }
       }
       break;
+  }
+  command_list->SetGraphicsRootDescriptorTable(slot_, first_descriptor);
+}
+
+D3D12CmdBindResourceImages::D3D12CmdBindResourceImages(
+    int slot,
+    const std::vector<D3D12Image *> &images,
+    D3D12Program *program)
+    : slot_(slot), images_(images), program_(program) {
+}
+
+void D3D12CmdBindResourceImages::CompileCommand(
+    D3D12CommandContext *context,
+    ID3D12GraphicsCommandList *command_list) {
+  auto descriptor_range = program_->DescriptorRange(slot_);
+  CD3DX12_GPU_DESCRIPTOR_HANDLE first_descriptor;
+  first_descriptor.ptr = 0;
+  switch (descriptor_range->RangeType) {
+    case D3D12_DESCRIPTOR_RANGE_TYPE_SRV:
+      for (size_t i = 0; i < images_.size(); ++i) {
+        auto desc = context->WriteSRVDescriptor(images_[i]);
+        if (i == 0) {
+          first_descriptor = desc;
+        }
+      }
+      break;
+    case D3D12_DESCRIPTOR_RANGE_TYPE_UAV:
+      for (size_t i = 0; i < images_.size(); ++i) {
+        auto desc = context->WriteUAVDescriptor(images_[i]);
+        if (i == 0) {
+          first_descriptor = desc;
+        }
+      }
+      break;
+  }
+  command_list->SetGraphicsRootDescriptorTable(slot_, first_descriptor);
+}
+
+D3D12CmdBindResourceSamplers::D3D12CmdBindResourceSamplers(
+    int slot,
+    const std::vector<D3D12Sampler *> &samplers,
+    D3D12Program *program)
+    : slot_(slot), samplers_(samplers), program_(program) {
+}
+
+void D3D12CmdBindResourceSamplers::CompileCommand(
+    D3D12CommandContext *context,
+    ID3D12GraphicsCommandList *command_list) {
+  CD3DX12_GPU_DESCRIPTOR_HANDLE first_descriptor;
+  first_descriptor.ptr = 0;
+  for (size_t i = 0; i < samplers_.size(); ++i) {
+    auto desc = context->WriteSamplerDescriptor(samplers_[i]->SamplerDesc());
+    if (i == 0) {
+      first_descriptor = desc;
+    }
   }
   command_list->SetGraphicsRootDescriptorTable(slot_, first_descriptor);
 }

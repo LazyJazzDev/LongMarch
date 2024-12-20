@@ -47,6 +47,7 @@ typedef enum ResourceType {
   RESOURCE_TYPE_STORAGE_BUFFER = 1,
   RESOURCE_TYPE_TEXTURE = 2,
   RESOURCE_TYPE_IMAGE = 3,
+  RESOURCE_TYPE_SAMPLER = 4,
 } ResourceType;
 
 typedef enum ShaderType {
@@ -106,9 +107,41 @@ typedef enum CullMode {
   CULL_MODE_BACK = 2,
 } CullMode;
 
+typedef enum FilterMode {
+  FILTER_MODE_NEAREST = 0,
+  FILTER_MODE_LINEAR = 1,
+} FilterMode;
+
+typedef enum AddressMode {
+  ADDRESS_MODE_REPEAT = 0,
+  ADDRESS_MODE_MIRRORED_REPEAT = 1,
+  ADDRESS_MODE_CLAMP_TO_EDGE = 2,
+  ADDRESS_MODE_CLAMP_TO_BORDER = 3,
+} AddressMode;
+
+struct SamplerInfo {
+  SamplerInfo();
+  SamplerInfo(FilterMode filter);
+  SamplerInfo(AddressMode address_mode);
+  SamplerInfo(FilterMode filter, AddressMode address_mode);
+  SamplerInfo(FilterMode min_filter,
+              FilterMode mag_filter,
+              FilterMode mip_filter,
+              AddressMode address_mode_u,
+              AddressMode address_mode_v,
+              AddressMode address_mode_w);
+  FilterMode min_filter;
+  FilterMode mag_filter;
+  FilterMode mip_filter;
+  AddressMode address_mode_u;
+  AddressMode address_mode_v;
+  AddressMode address_mode_w;
+};
+
 class Core;
 class Buffer;
 class Image;
+class Sampler;
 class Window;
 class Shader;
 class Program;
@@ -123,5 +156,7 @@ constexpr bool kEnableDebug = false;
 bool IsDepthFormat(ImageFormat format);
 
 glm::vec3 HSVtoRGB(glm::vec3 hsv);
+
+uint32_t PixelSize(ImageFormat format);
 
 }  // namespace grassland::graphics

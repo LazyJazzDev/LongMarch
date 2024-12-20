@@ -41,14 +41,13 @@ void D3D12StaticBuffer::UploadData(const void *data,
   core_->Device()->CreateBuffer(size, D3D12_HEAP_TYPE_UPLOAD, &staging_buffer);
   std::memcpy(staging_buffer->Map(), data, size);
   staging_buffer->Unmap();
-  core_->CommandQueue()->SingleTimeCommand(
-      [&](ID3D12GraphicsCommandList *command_list) {
-        void *mapped_data = staging_buffer->Map();
-        std::memcpy(mapped_data, data, size);
-        staging_buffer->Unmap();
-        d3d12::CopyBuffer(command_list, staging_buffer.get(), buffer_.get(),
-                          size, 0, offset);
-      });
+  core_->SingleTimeCommand([&](ID3D12GraphicsCommandList *command_list) {
+    void *mapped_data = staging_buffer->Map();
+    std::memcpy(mapped_data, data, size);
+    staging_buffer->Unmap();
+    d3d12::CopyBuffer(command_list, staging_buffer.get(), buffer_.get(), size,
+                      0, offset);
+  });
 }
 
 void D3D12StaticBuffer::DownloadData(void *data, size_t size, size_t offset) {

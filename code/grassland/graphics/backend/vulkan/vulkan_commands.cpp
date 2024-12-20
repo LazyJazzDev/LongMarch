@@ -1,10 +1,11 @@
 #include "grassland/graphics/backend/vulkan/vulkan_commands.h"
 
+#include "grassland/graphics/backend/vulkan/vulkan_buffer.h"
 #include "grassland/graphics/backend/vulkan/vulkan_command_context.h"
 #include "grassland/graphics/backend/vulkan/vulkan_image.h"
-#include "vulkan_buffer.h"
-#include "vulkan_program.h"
-#include "vulkan_window.h"
+#include "grassland/graphics/backend/vulkan/vulkan_program.h"
+#include "grassland/graphics/backend/vulkan/vulkan_sampler.h"
+#include "grassland/graphics/backend/vulkan/vulkan_window.h"
 
 namespace grassland::graphics::backend {
 
@@ -63,6 +64,14 @@ VulkanCmdBeginRendering::VulkanCmdBeginRendering(
 
 void VulkanCmdBeginRendering::CompileCommand(VulkanCommandContext *context,
                                              VkCommandBuffer command_buffer) {
+  for (auto &image : resource_images_) {
+    context->RequireImageState(
+        command_buffer, image->Image()->Handle(), VK_IMAGE_LAYOUT_GENERAL,
+        VK_PIPELINE_STAGE_ALL_GRAPHICS_BIT,
+        VK_ACCESS_MEMORY_READ_BIT | VK_ACCESS_MEMORY_WRITE_BIT,
+        image->Image()->Aspect());
+  }
+
   std::vector<VkRenderingAttachmentInfo> color_attachment_infos;
   VkRenderingAttachmentInfo depth_attachment_info{};
   Extent2D extent;
@@ -120,6 +129,11 @@ void VulkanCmdBeginRendering::CompileCommand(VulkanCommandContext *context,
       command_buffer, &rendering_info);
 }
 
+void VulkanCmdBeginRendering::RecordResourceImages(
+    VulkanImage *resource_image) {
+  resource_images_.insert(resource_image);
+}
+
 VulkanCmdBindResourceBuffers::VulkanCmdBindResourceBuffers(
     int slot,
     const std::vector<VulkanBuffer *> &buffers,
@@ -153,6 +167,78 @@ void VulkanCmdBindResourceBuffers::CompileCommand(
                          &write_descriptor_set, 0, nullptr);
 
   VkDescriptorSet descriptor_sets[] = {descriptor_set->Handle()};
+
+  vkCmdBindDescriptorSets(command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS,
+                          program_->PipelineLayout()->Handle(), slot_, 1,
+                          descriptor_sets, 0, nullptr);
+}
+
+VulkanCmdBindResourceImages::VulkanCmdBindResourceImages(
+    int slot,
+    const std::vector<VulkanImage *> &images,
+    VulkanProgram *program)
+    : slot_(slot), images_(images), program_(program) {
+}
+
+void VulkanCmdBindResourceImages::CompileCommand(
+    VulkanCommandContext *context,
+    VkCommandBuffer command_buffer) {
+  std::vector<VkDescriptorImageInfo> image_infos(images_.size());
+  for (size_t i = 0; i < images_.size(); ++i) {
+    image_infos[i].sampler = VK_NULL_HANDLE;
+    image_infos[i].imageView = images_[i]->Image()->ImageView();
+    image_infos[i].imageLayout = VK_IMAGE_LAYOUT_GENERAL;
+  }
+  auto descriptor_set = context->AcquireDescriptorSet(
+      program_->DescriptorSetLayout(slot_)->Handle());
+  VkDescriptorSet descriptor_sets[] = {descriptor_set->Handle()};
+  auto binding = program_->DescriptorSetLayout(slot_)->Bindings()[0];
+  VkWriteDescriptorSet write_descriptor_set{};
+  write_descriptor_set.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+  write_descriptor_set.dstSet = descriptor_set->Handle();
+  write_descriptor_set.dstBinding = binding.binding;
+  write_descriptor_set.dstArrayElement = 0;
+  write_descriptor_set.descriptorCount = binding.descriptorCount;
+  write_descriptor_set.descriptorType = binding.descriptorType;
+  write_descriptor_set.pImageInfo = image_infos.data();
+  vkUpdateDescriptorSets(context->Core()->Device()->Handle(), 1,
+                         &write_descriptor_set, 0, nullptr);
+
+  vkCmdBindDescriptorSets(command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS,
+                          program_->PipelineLayout()->Handle(), slot_, 1,
+                          descriptor_sets, 0, nullptr);
+}
+
+VulkanCmdBindResourceSamplers::VulkanCmdBindResourceSamplers(
+    int slot,
+    const std::vector<VulkanSampler *> &samplers,
+    VulkanProgram *program)
+    : slot_(slot), samplers_(samplers), program_(program) {
+}
+
+void VulkanCmdBindResourceSamplers::CompileCommand(
+    VulkanCommandContext *context,
+    VkCommandBuffer command_buffer) {
+  std::vector<VkDescriptorImageInfo> sampler_infos(samplers_.size());
+  for (size_t i = 0; i < samplers_.size(); ++i) {
+    sampler_infos[i].sampler = samplers_[i]->Sampler()->Handle();
+    sampler_infos[i].imageView = VK_NULL_HANDLE;
+    sampler_infos[i].imageLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+  }
+  auto descriptor_set = context->AcquireDescriptorSet(
+      program_->DescriptorSetLayout(slot_)->Handle());
+  VkDescriptorSet descriptor_sets[] = {descriptor_set->Handle()};
+  auto binding = program_->DescriptorSetLayout(slot_)->Bindings()[0];
+  VkWriteDescriptorSet write_descriptor_set{};
+  write_descriptor_set.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+  write_descriptor_set.dstSet = descriptor_set->Handle();
+  write_descriptor_set.dstBinding = binding.binding;
+  write_descriptor_set.dstArrayElement = 0;
+  write_descriptor_set.descriptorCount = binding.descriptorCount;
+  write_descriptor_set.descriptorType = binding.descriptorType;
+  write_descriptor_set.pImageInfo = sampler_infos.data();
+  vkUpdateDescriptorSets(context->Core()->Device()->Handle(), 1,
+                         &write_descriptor_set, 0, nullptr);
 
   vkCmdBindDescriptorSets(command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS,
                           program_->PipelineLayout()->Handle(), slot_, 1,
