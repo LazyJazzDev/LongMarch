@@ -33,7 +33,6 @@ D3D12Program::D3D12Program(D3D12Core *core,
   pipeline_state_desc_.SampleMask = UINT_MAX;
   pipeline_state_desc_.IBStripCutValue =
       D3D12_INDEX_BUFFER_STRIP_CUT_VALUE_DISABLED;
-  pipeline_state_desc_.RasterizerState.FrontCounterClockwise = TRUE;
 }
 
 void D3D12Program::AddInputAttribute(uint32_t binding,

@@ -29,6 +29,8 @@ class VulkanCore : public Core {
   int CreateWindowObject(int width,
                          int height,
                          const std::string &title,
+                         bool fullscreen,
+                         bool resizable,
                          double_ptr<Window> pp_window) override;
 
   int CreateShader(const void *data,

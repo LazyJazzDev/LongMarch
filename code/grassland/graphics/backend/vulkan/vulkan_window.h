@@ -9,7 +9,9 @@ class VulkanWindow : public Window {
   VulkanWindow(VulkanCore *core,
                int width,
                int height,
-               const std::string &title);
+               const std::string &title,
+               bool fullscreen,
+               bool resizable);
 
   virtual void CloseWindow() override;
 

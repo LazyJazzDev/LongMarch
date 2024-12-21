@@ -9,6 +9,8 @@ SwapChain::SwapChain(const ComPtr<IDXGISwapChain3> &swap_chain)
   DXGI_SWAP_CHAIN_DESC desc;
   swap_chain_->GetDesc(&desc);
   back_buffers_.resize(desc.BufferCount);
+  width = desc.BufferDesc.Width;
+  height = desc.BufferDesc.Height;
 
   back_buffer_format_ = desc.BufferDesc.Format;
 

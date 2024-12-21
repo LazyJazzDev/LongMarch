@@ -32,9 +32,15 @@ class Core {
   virtual int CreateSampler(const SamplerInfo &info,
                             double_ptr<Sampler> pp_sampler) = 0;
 
+  int CreateWindowObject(int width,
+                         int height,
+                         const std::string &title,
+                         double_ptr<Window> pp_window);
   virtual int CreateWindowObject(int width,
                                  int height,
                                  const std::string &title,
+                                 bool fullscreen,
+                                 bool resizable,
                                  double_ptr<Window> pp_window) = 0;
 #ifdef WIN32
   int CreateShader(Microsoft::WRL::ComPtr<ID3DBlob> shader_blob,

@@ -308,8 +308,8 @@ void D3D12CmdPresent::CompileCommand(D3D12CommandContext *context,
   auto pso = context->Core()->BlitPipeline()->GetPipelineState(
       window_->SwapChain()->BackBufferFormat());
   Extent2D extent;
-  extent.width = window_->GetWidth();
-  extent.height = window_->GetHeight();
+  extent.width = window_->SwapChain()->Width();
+  extent.height = window_->SwapChain()->Height();
   command_list->SetPipelineState(pso->Handle());
   command_list->SetGraphicsRootSignature(root_signature);
   command_list->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);

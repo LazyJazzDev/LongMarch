@@ -301,9 +301,9 @@ void VulkanCmdSetViewport::CompileCommand(VulkanCommandContext *context,
                                           VkCommandBuffer command_buffer) {
   VkViewport viewport{};
   viewport.x = viewport_.x;
-  viewport.y = viewport_.y;
+  viewport.y = viewport_.y + viewport_.height;
   viewport.width = viewport_.width;
-  viewport.height = viewport_.height;
+  viewport.height = -viewport_.height;
   viewport.minDepth = viewport_.min_depth;
   viewport.maxDepth = viewport_.max_depth;
   vkCmdSetViewport(command_buffer, 0, 1, &viewport);

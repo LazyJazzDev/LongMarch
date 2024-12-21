@@ -5,8 +5,10 @@ namespace grassland::graphics::backend {
 VulkanWindow::VulkanWindow(VulkanCore *core,
                            int width,
                            int height,
-                           const std::string &title)
-    : Window(width, height, title), core_(core) {
+                           const std::string &title,
+                           bool fullscreen,
+                           bool resizable)
+    : Window(width, height, title, fullscreen, resizable), core_(core) {
   core_->Instance()->CreateSurfaceFromGLFWWindow(GLFWWindow(), &surface_);
   core_->Device()->CreateSwapchain(surface_.get(), &swap_chain_);
   image_available_semaphores_.resize(swap_chain_->ImageCount());

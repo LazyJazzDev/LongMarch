@@ -64,8 +64,11 @@ int VulkanCore::CreateSampler(const SamplerInfo &info,
 int VulkanCore::CreateWindowObject(int width,
                                    int height,
                                    const std::string &title,
+                                   bool fullscreen,
+                                   bool resizable,
                                    double_ptr<Window> pp_window) {
-  pp_window.construct<VulkanWindow>(this, width, height, title);
+  pp_window.construct<VulkanWindow>(this, width, height, title, fullscreen,
+                                    resizable);
   return 0;
 }
 

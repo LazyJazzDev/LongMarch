@@ -106,8 +106,11 @@ int D3D12Core::CreateSampler(const SamplerInfo &info,
 int D3D12Core::CreateWindowObject(int width,
                                   int height,
                                   const std::string &title,
+                                  bool fullscreen,
+                                  bool resizable,
                                   double_ptr<Window> pp_window) {
-  pp_window.construct<D3D12Window>(this, width, height, title);
+  pp_window.construct<D3D12Window>(this, width, height, title, fullscreen,
+                                   resizable);
   return 0;
 }
 

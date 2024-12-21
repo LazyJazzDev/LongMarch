@@ -15,6 +15,7 @@ PSInput VSMain(uint vertex_id : SV_VertexID) {
   PSInput result;
   result.position = float4(vertices[vertex_id], 0.0, 1.0);
   result.tex_coord = 0.5 * (vertices[vertex_id] + 1.0);
+  result.tex_coord.y = 1.0 - result.tex_coord.y;
 
   return result;
 }

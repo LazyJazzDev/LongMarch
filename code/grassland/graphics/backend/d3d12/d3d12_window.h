@@ -6,7 +6,12 @@ namespace grassland::graphics::backend {
 
 class D3D12Window : public Window {
  public:
-  D3D12Window(D3D12Core *core, int width, int height, const std::string &title);
+  D3D12Window(D3D12Core *core,
+              int width,
+              int height,
+              const std::string &title,
+              bool fullscreen,
+              bool resizable);
 
   virtual void CloseWindow() override;
 
@@ -17,6 +22,7 @@ class D3D12Window : public Window {
  private:
   D3D12Core *core_;
   std::unique_ptr<d3d12::SwapChain> swap_chain_;
+  uint32_t swap_chain_recreate_event_id_;
 };
 
 }  // namespace grassland::graphics::backend

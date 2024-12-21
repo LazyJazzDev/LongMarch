@@ -14,17 +14,69 @@ void InitializeGLFW() {
 }
 }  // namespace
 
-Window::Window(int width, int height, const std::string &title) {
+Window::Window(int width,
+               int height,
+               const std::string &title,
+               bool fullscreen,
+               bool resizable) {
   InitializeGLFW();
 
   glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
-  glfwWindowHint(GLFW_RESIZABLE, GLFW_FALSE);
+  if (fullscreen) {
+    glfwWindowHint(GLFW_DECORATED, GLFW_FALSE);
+    glfwWindowHint(GLFW_AUTO_ICONIFY, GLFW_FALSE);
+    glfwWindowHint(GLFW_FLOATING, GLFW_TRUE);
+    glfwWindowHint(GLFW_RESIZABLE, GLFW_FALSE);
+  } else {
+    if (!resizable) {
+      glfwWindowHint(GLFW_RESIZABLE, GLFW_FALSE);
+    } else {
+      glfwWindowHint(GLFW_RESIZABLE, GLFW_TRUE);
+    }
+  }
 
   window_ = glfwCreateWindow(width, height, title.c_str(), nullptr, nullptr);
 
   if (!window_) {
     throw std::runtime_error("Failed to create GLFW window");
   }
+
+  glfwSetWindowUserPointer(window_, this);
+  glfwSetWindowSizeCallback(window_, [](GLFWwindow *window, int width,
+                                        int height) {
+    Window *p_window = static_cast<Window *>(glfwGetWindowUserPointer(window));
+    p_window->resize_event_.InvokeCallbacks(width, height);
+  });
+  glfwSetMouseButtonCallback(window_, [](GLFWwindow *window, int button,
+                                         int action, int mods) {
+    Window *p_window = static_cast<Window *>(glfwGetWindowUserPointer(window));
+    double x, y;
+    glfwGetCursorPos(window, &x, &y);
+    p_window->mouse_button_event_.InvokeCallbacks(button, action, mods, x, y);
+  });
+  glfwSetCursorPosCallback(window_, [](GLFWwindow *window, double x, double y) {
+    Window *p_window = static_cast<Window *>(glfwGetWindowUserPointer(window));
+    p_window->mouse_move_event_.InvokeCallbacks(x, y);
+  });
+  glfwSetScrollCallback(window_, [](GLFWwindow *window, double xoffset,
+                                    double yoffset) {
+    Window *p_window = static_cast<Window *>(glfwGetWindowUserPointer(window));
+    p_window->scroll_event_.InvokeCallbacks(xoffset, yoffset);
+  });
+  glfwSetKeyCallback(window_, [](GLFWwindow *window, int key, int scancode,
+                                 int action, int mods) {
+    Window *p_window = static_cast<Window *>(glfwGetWindowUserPointer(window));
+    p_window->key_event_.InvokeCallbacks(key, scancode, action, mods);
+  });
+  glfwSetCharCallback(window_, [](GLFWwindow *window, unsigned int codepoint) {
+    Window *p_window = static_cast<Window *>(glfwGetWindowUserPointer(window));
+    p_window->char_event_.InvokeCallbacks(codepoint);
+  });
+  glfwSetDropCallback(window_, [](GLFWwindow *window, int count,
+                                  const char **paths) {
+    Window *p_window = static_cast<Window *>(glfwGetWindowUserPointer(window));
+    p_window->drop_event_.InvokeCallbacks(count, paths);
+  });
 }
 
 Window::~Window() {

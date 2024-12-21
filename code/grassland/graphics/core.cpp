@@ -7,6 +7,13 @@ namespace grassland::graphics {
 Core::Core(const Settings &settings) : settings_(settings) {
 }
 
+int Core::CreateWindowObject(int width,
+                             int height,
+                             const std::string &title,
+                             double_ptr<Window> pp_window) {
+  return CreateWindowObject(width, height, title, false, false, pp_window);
+}
+
 #ifdef WIN32
 int Core::CreateShader(Microsoft::WRL::ComPtr<ID3DBlob> shader_blob,
                        double_ptr<Shader> pp_shader) {
