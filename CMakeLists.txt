@@ -26,15 +26,19 @@ set(CMAKE_CXX_STANDARD 17)
 #endif ()
 
 if (MSVC)
-#    add_compile_options("$<$<COMPILE_LANGUAGE:CXX>:/utf-8>")
-#    set(CMAKE_CUDA_FLAGS "${CMAKE_CUDA_FLAGS} -Xcompiler=\"/utf-8\"")
-#    add_compile_options("$<$<COMPILE_LANGUAGE:CUDA>:-Xcompiler \"/source-charset:utf-8\",\"/execution-charset:utf-8\">")
-endif()
+    #    add_compile_options("$<$<COMPILE_LANGUAGE:CXX>:/utf-8>")
+    #    set(CMAKE_CUDA_FLAGS "${CMAKE_CUDA_FLAGS} -Xcompiler=\"/utf-8\"")
+    #    add_compile_options("$<$<COMPILE_LANGUAGE:CUDA>:-Xcompiler \"/source-charset:utf-8\",\"/execution-charset:utf-8\">")
+endif ()
 
 
 find_package(fmt CONFIG REQUIRED)
 set(FMT_LIB_NAME fmt::fmt) # fmt::fmt is also available
 list(APPEND LIB_LIST ${FMT_LIB_NAME})
+
+find_package(Freetype REQUIRED)
+set(FREETYPE_LIB_NAME Freetype::Freetype) # since CMake 3.10
+list(APPEND LIB_LIST ${FREETYPE_LIB_NAME})
 
 find_package(spdlog CONFIG REQUIRED)
 set(SPDLOG_LIB_NAME spdlog::spdlog) # spdlog::spdlog is also available
