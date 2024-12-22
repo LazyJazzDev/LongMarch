@@ -22,6 +22,7 @@ class FontCore {
   ~FontCore();
 
   void SetFontTypeFile(const std::string &filename);
+  void SetASCIIFontTypeFile(const std::string &filename);
   void SetFontSize(uint32_t size);
   CharModel GetCharModel(uint32_t char_code);
 
@@ -40,6 +41,6 @@ class FontCore {
   FT_Face active_face_;
   uint32_t active_size_;
   FaceMap face_map_;
-  CharMap *active_char_map_;
+  FT_Face active_ascii_face_{nullptr};
 };
 }  // namespace snow_mount::draw

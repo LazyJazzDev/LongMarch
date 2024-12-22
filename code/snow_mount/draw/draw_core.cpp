@@ -159,6 +159,10 @@ void Core::SetFontTypeFile(const std::string &filename) {
   font_core_->SetFontTypeFile(filename);
 }
 
+void Core::SetASCIIFontTypeFile(const std::string &filename) {
+  font_core_->SetASCIIFontTypeFile(filename);
+}
+
 void Core::SetFontSize(uint32_t size) {
   font_core_->SetFontSize(size);
 }

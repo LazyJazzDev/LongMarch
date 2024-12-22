@@ -63,8 +63,9 @@ void DrawNGUI::OnInit() {
   texture_->UploadData(texture_data.data());
   model_->SetModelData(vertices, indices);
 
-  draw_core_->GetFontCore()->SetFontTypeFile(
-      grassland::FindAssetsFile("fonts/simhei.ttf"));
+  draw_core_->SetFontTypeFile(grassland::FindAssetsFile("fonts/simhei.ttf"));
+  draw_core_->SetASCIIFontTypeFile(
+      grassland::FindAssetsFile("fonts/georgia.ttf"));
 }
 
 void DrawNGUI::OnClose() {
@@ -104,7 +105,6 @@ void DrawNGUI::OnUpdate() {
   draw_core_->GetFontCore()->SetFontSize(font_size);
   auto text_width_1 = draw_core_->GetTextWidth(u8"我爱你，中国！");
   auto text_width_2 = draw_core_->GetTextWidth(u8"I LOVE U, CHINA!");
-  grassland::LogInfo("Text width: {} {}", text_width_1, text_width_2);
   draw_core_->CmdDrawText({(extent.width - text_width_1) / 2, font_size * 0.9f},
                           u8"我爱你，中国！", {1.0f, 1.0f, 1.0f, 1.0f});
   draw_core_->CmdDrawText(

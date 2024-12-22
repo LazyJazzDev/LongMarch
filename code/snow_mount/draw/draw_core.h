@@ -26,6 +26,7 @@ class Core {
   void CmdDrawText(glm::vec2 origin, const std::string &text, glm::vec4 color);
 
   void SetFontTypeFile(const std::string &filename);
+  void SetASCIIFontTypeFile(const std::string &filename);
   void SetFontSize(uint32_t size);
 
   float GetTextWidth(const std::string &text);

@@ -37,15 +37,35 @@ void FontCore::SetFontTypeFile(const std::string &filename) {
   UpdateActiveCharMap();
 }
 
+void FontCore::SetASCIIFontTypeFile(const std::string &filename) {
+  if (faces_.find(filename) == faces_.end()) {
+    FT_Face face;
+    FT_New_Face(library_, filename.c_str(), 0, &face);
+    faces_[filename] = face;
+  }
+  active_ascii_face_ = faces_[filename];
+  UpdateActiveCharMap();
+
+  if (active_ascii_face_) {
+    LogInfo("ASCII font loaded: {}", filename);
+  }
+}
+
 void FontCore::SetFontSize(uint32_t size) {
   active_size_ = size;
   UpdateActiveCharMap();
 }
 
 CharModel FontCore::GetCharModel(uint32_t char_code) {
-  if (active_char_map_->find(char_code) == active_char_map_->end()) {
-    FT_Load_Char(active_face_, char_code, FT_LOAD_RENDER);
-    auto glyph = active_face_->glyph;
+  auto active_face = active_face_;
+  auto active_char_map = &face_map_[active_face_][active_size_];
+  if (active_ascii_face_ && char_code < 128) {
+    active_face = active_ascii_face_;
+    active_char_map = &face_map_[active_ascii_face_][active_size_];
+  }
+  if (active_char_map->find(char_code) == active_char_map->end()) {
+    FT_Load_Char(active_face, char_code, FT_LOAD_RENDER);
+    auto glyph = active_face->glyph;
     auto bitmap = glyph->bitmap;
     auto width = bitmap.width;
     auto height = bitmap.rows;
@@ -73,9 +93,9 @@ CharModel FontCore::GetCharModel(uint32_t char_code) {
     model.bearing_y_ = bearing_y;
     model.width_ = width;
     model.height_ = height;
-    (*active_char_map_)[char_code] = model;
+    (*active_char_map)[char_code] = model;
   }
-  return active_char_map_->at(char_code);
+  return active_char_map->at(char_code);
 }
 
 uint32_t FontCore::GetFontSize() const {
@@ -84,7 +104,9 @@ uint32_t FontCore::GetFontSize() const {
 
 void FontCore::UpdateActiveCharMap() {
   FT_Set_Pixel_Sizes(active_face_, 0, active_size_);
-  active_char_map_ = &face_map_[active_face_][active_size_];
+  if (active_ascii_face_) {
+    FT_Set_Pixel_Sizes(active_ascii_face_, 0, active_size_);
+  }
 }
 
 }  // namespace snow_mount::draw
