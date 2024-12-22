@@ -100,11 +100,15 @@ void DrawNGUI::OnUpdate() {
                      {0.5f, 0.5f, 1.0f}),
           -2.0f * theta, glm::vec3{0.0f, 0.0f, 1.0f}),
       glm::vec4{1.0f, 1.0f, 1.0f, alpha});
-  draw_core_->GetFontCore()->SetFontSize(extent.height * 0.5);
-  draw_core_->CmdDrawText({extent.height * 0.05, extent.height * 0.5 * 0.8f},
+  const int font_size = 128;
+  draw_core_->GetFontCore()->SetFontSize(font_size);
+  auto text_width_1 = draw_core_->GetTextWidth(u8"我爱你，中国！");
+  auto text_width_2 = draw_core_->GetTextWidth(u8"I LOVE U, CHINA!");
+  grassland::LogInfo("Text width: {} {}", text_width_1, text_width_2);
+  draw_core_->CmdDrawText({(extent.width - text_width_1) / 2, font_size * 0.9f},
                           u8"我爱你，中国！", {1.0f, 1.0f, 1.0f, 1.0f});
   draw_core_->CmdDrawText(
-      {extent.height * 0.05, extent.height * 0.5 * 0.8f + extent.height * 0.5f},
+      {(extent.width - text_width_2) / 2, font_size * 0.9f + font_size},
       u8"I LOVE U, CHINA!", {1.0f, 1.0f, 1.0f, 1.0f});
   draw_core_->EndDraw();
 }
