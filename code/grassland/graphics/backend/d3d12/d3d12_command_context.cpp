@@ -229,17 +229,17 @@ CD3DX12_GPU_DESCRIPTOR_HANDLE D3D12CommandContext::WriteSRVDescriptor(
 
 CD3DX12_GPU_DESCRIPTOR_HANDLE D3D12CommandContext::WriteSRVDescriptor(
     D3D12Buffer *buffer) {
-  // D3D12_SHADER_RESOURCE_VIEW_DESC desc = {};
-  // desc.Format = DXGI_FORMAT_UNKNOWN;
-  // desc.ViewDimension = D3D12_SRV_DIMENSION_BUFFER;
-  // desc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
-  // desc.Buffer.FirstElement = 0;
-  // desc.Buffer.Flags = D3D12_BUFFER_SRV_FLAG_RAW;
-  // desc.Buffer.NumElements = static_cast<UINT>(buffer->Size());
-  // desc.Buffer.StructureByteStride = 0;
+  D3D12_SHADER_RESOURCE_VIEW_DESC desc = {};
+  desc.Format = DXGI_FORMAT_R32_TYPELESS;
+  desc.ViewDimension = D3D12_SRV_DIMENSION_BUFFER;
+  desc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
+  desc.Buffer.FirstElement = 0;
+  desc.Buffer.Flags = D3D12_BUFFER_SRV_FLAG_RAW;
+  desc.Buffer.NumElements = static_cast<UINT>(buffer->Size()) / 4;
+  desc.Buffer.StructureByteStride = 0;
 
   core_->Device()->Handle()->CreateShaderResourceView(
-      buffer->Buffer()->Handle(), nullptr, resource_descriptor_base_);
+      buffer->Buffer()->Handle(), &desc, resource_descriptor_base_);
 
   resource_descriptor_base_.Offset(resource_descriptor_size_);
   auto result = resource_descriptor_gpu_base_;

@@ -1,7 +1,5 @@
 #include "grassland/graphics/backend/d3d12/d3d12_util.h"
 
-#include "../../../../../cmake-build-debug/demo/d3d12_hello_cube/built_in_shaders.inl"
-
 namespace grassland::graphics::backend {
 DXGI_FORMAT ImageFormatToDXGIFormat(ImageFormat format) {
   switch (format) {

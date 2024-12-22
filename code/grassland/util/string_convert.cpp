@@ -48,13 +48,13 @@ std::wstring StringToWString(const std::string &str) {
     if (c < 0x80) {
       wc = c;
       wstr.push_back(wc);
-    } else if (c & 0xE0 == 0xC0) {
+    } else if ((c & 0xE0) == 0xC0) {
       wc = c & 0x1F;
       appendix_count = 1;
-    } else if (c & 0xF0 == 0xE0) {
+    } else if ((c & 0xF0) == 0xE0) {
       wc = c & 0x0F;
       appendix_count = 2;
-    } else if (c & 0xF8 == 0xF0) {
+    } else if ((c & 0xF8) == 0xF0) {
       wc = c & 0x07;
       appendix_count = 3;
     } else {
