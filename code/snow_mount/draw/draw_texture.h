@@ -1,8 +1,27 @@
-//
-// Created by zijian on 2024/12/21.
-//
+#pragma once
+#include "snow_mount/draw/draw_util.h"
 
-#ifndef DRAW_TEXTURE_H
-#define DRAW_TEXTURE_H
+namespace snow_mount::draw {
 
-#endif  // DRAW_TEXTURE_H
+class Texture {
+ public:
+  Texture(Core *core, int width, int height);
+
+  Core *DrawCore() const {
+    return core_;
+  }
+
+  graphics::Image *Image() const {
+    return image_.get();
+  }
+
+  void UploadData(const void *data) {
+    image_->UploadData(data);
+  }
+
+ private:
+  Core *core_;
+  std::unique_ptr<graphics::Image> image_;
+};
+
+}  // namespace snow_mount::draw

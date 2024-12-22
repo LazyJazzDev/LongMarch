@@ -1,5 +1,3 @@
-//
-// Created by zijian on 2024/12/21.
-//
+#include "snow_mount/draw/draw.h"
 
-#include "draw.h"
+namespace snow_mount::draw {}

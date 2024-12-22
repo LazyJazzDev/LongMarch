@@ -15,13 +15,9 @@ class Buffer {
 
   virtual void Resize(size_t new_size) = 0;
 
-  void UploadData(const void *data, size_t size);
+  virtual void UploadData(const void *data, size_t size, size_t offset = 0) = 0;
 
-  void DownloadData(void *data, size_t size);
-
-  virtual void UploadData(const void *data, size_t size, size_t offset) = 0;
-
-  virtual void DownloadData(void *data, size_t size, size_t offset) = 0;
+  virtual void DownloadData(void *data, size_t size, size_t offset = 0) = 0;
 };
 
 }  // namespace grassland::graphics
