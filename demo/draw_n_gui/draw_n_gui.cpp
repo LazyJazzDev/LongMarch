@@ -87,6 +87,16 @@ void DrawNGUI::OnUpdate() {
                      {0.5f, 0.5f, 1.0f}),
           -2.0f * theta, glm::vec3{0.0f, 0.0f, 1.0f}),
       glm::vec4{1.0f, 1.0f, 1.0f, alpha});
+  theta += glm::pi<float>();
+  draw_core_->CmdDrawInstance(
+      model_.get(), texture_.get(),
+      glm::rotate(
+          glm::scale(glm::translate(glm::rotate(glm::mat4{1.0f}, theta,
+                                                glm::vec3{0.0f, 0.0f, 1.0f}),
+                                    {0.0f, 0.0f, 0.0f}),
+                     {0.5f, 0.5f, 1.0f}),
+          -2.0f * theta, glm::vec3{0.0f, 0.0f, 1.0f}),
+      glm::vec4{1.0f, 1.0f, 1.0f, alpha});
   draw_core_->EndDraw();
 }
 

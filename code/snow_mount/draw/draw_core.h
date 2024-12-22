@@ -43,6 +43,7 @@ class Core {
   std::unique_ptr<graphics::Shader> fragment_shader_;
   std::map<graphics::ImageFormat, std::unique_ptr<graphics::Program>> programs_;
   std::unique_ptr<graphics::Buffer> metadata_buffer_;
+  std::unique_ptr<graphics::Buffer> instance_index_buffer_;
 
   std::vector<DrawMetadata> draw_metadata_;
   std::vector<std::unique_ptr<DrawCommand>> commands_;

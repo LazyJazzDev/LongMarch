@@ -3,6 +3,7 @@
 layout(location = 0) in vec2 in_position;
 layout(location = 1) in vec2 in_tex_coord;
 layout(location = 2) in vec4 in_color;
+layout(location = 3) in uint in_instance_index;
 
 layout(location = 0) out vec2 out_tex_coord;
 layout(location = 1) out vec4 out_color;
@@ -18,7 +19,7 @@ layout(std430, set = 0, binding = 0) buffer DrawMetadataBuffer {
 
 void main() {
   out_tex_coord = in_tex_coord;
-  out_color = in_color * draw_metadata[gl_InstanceIndex].color;
+  out_color = in_color * draw_metadata[in_instance_index].color;
   gl_Position =
-      draw_metadata[gl_InstanceIndex].model * vec4(in_position, 0.0, 1.0);
+      draw_metadata[in_instance_index].model * vec4(in_position, 0.0, 1.0);
 }

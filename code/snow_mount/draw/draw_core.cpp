@@ -21,9 +21,27 @@ Core::Core(graphics::Core *core) : core_(core) {
                                    VK_SHADER_STAGE_FRAGMENT_BIT),
         &fragment_shader_);
   }
+#if defined(WIN32)
+  else if (core_->API() == graphics::BACKEND_API_D3D12) {
+    core_->CreateShader(d3d12::CompileShader(GetShaderCode("shaders/draw.hlsl"),
+                                             "VSMain", "vs_6_0"),
+                        &vertex_shader_);
+    core_->CreateShader(d3d12::CompileShader(GetShaderCode("shaders/draw.hlsl"),
+                                             "PSMain", "ps_6_0"),
+                        &fragment_shader_);
+  }
+#endif
 
   core_->CreateBuffer(sizeof(DrawMetadata), graphics::BUFFER_TYPE_DYNAMIC,
                       &metadata_buffer_);
+
+  core_->CreateBuffer(1024, graphics::BUFFER_TYPE_DYNAMIC,
+                      &instance_index_buffer_);
+  std::vector<uint32_t> instance_indices(1024 / 4);
+  for (size_t i = 0; i < instance_indices.size(); i++) {
+    instance_indices[i] = i;
+  }
+  instance_index_buffer_->UploadData(instance_indices.data(), 1024);
 
   core_->CreateImage(1, 1, graphics::IMAGE_FORMAT_R8G8B8A8_UNORM,
                      &pure_white_texture_);
@@ -39,6 +57,17 @@ void Core::EndDraw() {
 }
 
 void Core::Render(graphics::CommandContext *context, graphics::Image *image) {
+  if (draw_metadata_.size() * sizeof(uint32_t) >
+      instance_index_buffer_->Size()) {
+    instance_index_buffer_->Resize(draw_metadata_.size() * sizeof(uint32_t));
+    std::vector<uint32_t> instance_indices(instance_index_buffer_->Size() / 4);
+    for (size_t i = 0; i < instance_indices.size(); i++) {
+      instance_indices[i] = i;
+    }
+    instance_index_buffer_->UploadData(
+        instance_indices.data(), instance_indices.size() * sizeof(uint32_t));
+  }
+
   if (draw_metadata_.size() * sizeof(DrawMetadata) > metadata_buffer_->Size()) {
     metadata_buffer_->Resize(draw_metadata_.size() * sizeof(DrawMetadata));
   }
@@ -48,6 +77,7 @@ void Core::Render(graphics::CommandContext *context, graphics::Image *image) {
 
   context->CmdBeginRendering({image}, nullptr);
   context->CmdBindProgram(GetProgram(image->Format()));
+  context->CmdBindVertexBuffers(1, {instance_index_buffer_.get()}, {0});
   graphics::Extent2D extent = image->Extent();
   graphics::Viewport viewport;
   graphics::Scissor scissor;
@@ -65,6 +95,7 @@ void Core::Render(graphics::CommandContext *context, graphics::Image *image) {
   context->CmdBindResources(0, {metadata_buffer_.get()});
   context->CmdBindResources(1, {pure_white_texture_.get()});
   context->CmdBindResources(2, {linear_sampler_.get()});
+
   for (auto &command : commands_) {
     command->Execute(context);
   }
@@ -112,12 +143,14 @@ graphics::Program *Core::GetProgram(graphics::ImageFormat format) {
     program->BindShader(vertex_shader_.get(), graphics::SHADER_TYPE_VERTEX);
     program->BindShader(fragment_shader_.get(), graphics::SHADER_TYPE_FRAGMENT);
     program->AddInputBinding(sizeof(Vertex));
+    program->AddInputBinding(sizeof(uint32_t), true);
     program->AddInputAttribute(0, graphics::INPUT_TYPE_FLOAT2,
                                offsetof(Vertex, position));
     program->AddInputAttribute(0, graphics::INPUT_TYPE_FLOAT2,
                                offsetof(Vertex, tex_coord));
     program->AddInputAttribute(0, graphics::INPUT_TYPE_FLOAT4,
                                offsetof(Vertex, color));
+    program->AddInputAttribute(1, graphics::INPUT_TYPE_UINT4, 0);
     program->SetBlendState(0, true);
     program->SetCullMode(graphics::CULL_MODE_NONE);
     program->AddResourceBinding(graphics::RESOURCE_TYPE_STORAGE_BUFFER, 1);
