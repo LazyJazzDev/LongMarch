@@ -98,6 +98,8 @@ find_package(Python3 COMPONENTS Interpreter REQUIRED)
 
 include(scripts/pack_shaders.cmake)
 
+set(LONGMARCH_ASSETS_DIR ${CMAKE_CURRENT_SOURCE_DIR}/assets/)
+
 add_subdirectory(code)
 
 #get_target_property(SHARED_LIB_PATH LongMarch IMPORTED_LOCATION)

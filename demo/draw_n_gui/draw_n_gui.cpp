@@ -1,6 +1,7 @@
-#include "draw_n_gui.h"
+﻿#include "draw_n_gui.h"
 
 #include "glm/gtc/matrix_transform.hpp"
+#include "snow_mount/draw/draw_font.h"
 
 DrawNGUI::DrawNGUI(grassland::graphics::BackendAPI api) {
   grassland::graphics::CreateCore(api, {}, &core_);
@@ -61,6 +62,9 @@ void DrawNGUI::OnInit() {
   }
   texture_->UploadData(texture_data.data());
   model_->SetModelData(vertices, indices);
+
+  draw_core_->GetFontCore()->SetFontTypeFile(
+      grassland::FindAssetsFile("fonts/georgiai.ttf"));
 }
 
 void DrawNGUI::OnClose() {
@@ -74,8 +78,7 @@ void DrawNGUI::OnClose() {
 void DrawNGUI::OnUpdate() {
   draw_core_->BeginDraw();
   auto extent = color_image_->Extent();
-  draw_core_->CmdSetDrawRegion(extent.width / 2 - 200, extent.height / 2 - 200,
-                               400, 400);
+  draw_core_->CmdSetDrawRegion(0, 0, extent.width, extent.height);
   float alpha = 0.5f + 0.5f * glm::sin(glfwGetTime() * 5.0f);
   float theta = glfwGetTime();
   draw_core_->CmdDrawInstance(
@@ -97,6 +100,9 @@ void DrawNGUI::OnUpdate() {
                      {0.5f, 0.5f, 1.0f}),
           -2.0f * theta, glm::vec3{0.0f, 0.0f, 1.0f}),
       glm::vec4{1.0f, 1.0f, 1.0f, alpha});
+  draw_core_->GetFontCore()->SetFontSize(extent.height * 0.5);
+  draw_core_->CmdDrawText({extent.height * 0.05, extent.height * 0.5 * 0.8f},
+                          "Abcefg", {1.0f, 1.0f, 1.0f, 1.0f});
   draw_core_->EndDraw();
 }
 

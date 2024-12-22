@@ -23,6 +23,7 @@ class Core {
                        const Transform &transform = Transform{1.0f},
                        glm::vec4 color = glm::vec4{1.0f, 1.0f, 1.0f, 1.0f});
   void CmdDrawInstance(Model *model, glm::vec4 color);
+  void CmdDrawText(glm::vec2 origin, const std::string &text, glm::vec4 color);
 
   void CreateModel(double_ptr<Model> model);
   void CreateTexture(int width, int height, double_ptr<Texture> texture);
@@ -32,6 +33,10 @@ class Core {
   }
 
   graphics::Program *GetProgram(graphics::ImageFormat format);
+
+  FontCore *GetFontCore() const {
+    return font_core_.get();
+  }
 
  private:
   void CmdDrawInstance(Model *model,
@@ -50,6 +55,11 @@ class Core {
 
   std::unique_ptr<graphics::Image> pure_white_texture_;
   std::unique_ptr<graphics::Sampler> linear_sampler_;
+
+  std::unique_ptr<Model> text_model_;
+
+  std::unique_ptr<FontCore> font_core_;
+  Transform pixel_transform_;
 };
 
 void CreateCore(graphics::Core *core, double_ptr<Core> draw_core);

@@ -9,6 +9,7 @@ class Core;
 class Texture;
 class Model;
 class DrawCommand;
+class FontCore;
 
 struct Vertex {
   glm::vec2 position;

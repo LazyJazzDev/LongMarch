@@ -1,6 +1,7 @@
 #include "snow_mount/draw/draw_core.h"
 
 #include "snow_mount/draw/draw_commands.h"
+#include "snow_mount/draw/draw_font.h"
 #include "snow_mount/draw/draw_model.h"
 #include "snow_mount/draw/draw_texture.h"
 
@@ -47,7 +48,21 @@ Core::Core(graphics::Core *core) : core_(core) {
                      &pure_white_texture_);
   uint32_t white = 0xFFFFFFFF;
   pure_white_texture_->UploadData(&white);
-  core_->CreateSampler(graphics::FILTER_MODE_LINEAR, &linear_sampler_);
+  core_->CreateSampler(
+      {graphics::FILTER_MODE_LINEAR,
+       grassland::graphics::AddressMode::ADDRESS_MODE_CLAMP_TO_EDGE},
+      &linear_sampler_);
+  font_core_ = std::make_unique<FontCore>(this);
+
+  CreateModel(&text_model_);
+  std::vector<Vertex> vertices = {
+      {{-1.0f, 1.0f}, {0.0f, 0.0f}, {1.0f, 1.0f, 1.0f, 1.0f}},
+      {{-1.0f, -1.0f}, {0.0f, 1.0f}, {1.0f, 1.0f, 1.0f, 1.0f}},
+      {{1.0f, 1.0f}, {1.0f, 0.0f}, {1.0f, 1.0f, 1.0f, 1.0f}},
+      {{1.0f, -1.0f}, {1.0f, 1.0f}, {1.0f, 1.0f, 1.0f, 1.0f}},
+  };
+  std::vector<uint32_t> indices = {0, 1, 2, 2, 1, 3};
+  text_model_->SetModelData(vertices, indices);
 }
 
 void Core::BeginDraw() {
@@ -78,23 +93,11 @@ void Core::Render(graphics::CommandContext *context, graphics::Image *image) {
   context->CmdBeginRendering({image}, nullptr);
   context->CmdBindProgram(GetProgram(image->Format()));
   context->CmdBindVertexBuffers(1, {instance_index_buffer_.get()}, {0});
-  graphics::Extent2D extent = image->Extent();
-  graphics::Viewport viewport;
-  graphics::Scissor scissor;
-  viewport.x = 0;
-  viewport.y = 0;
-  viewport.width = extent.width;
-  viewport.height = extent.height;
-  viewport.min_depth = 0.0f;
-  viewport.max_depth = 1.0f;
-  scissor.offset = {0, 0};
-  scissor.extent = extent;
-  context->CmdSetViewport(viewport);
-  context->CmdSetScissor(scissor);
   context->CmdSetPrimitiveTopology(graphics::PRIMITIVE_TOPOLOGY_TRIANGLE_LIST);
   context->CmdBindResources(0, {metadata_buffer_.get()});
   context->CmdBindResources(1, {pure_white_texture_.get()});
-  context->CmdBindResources(2, {linear_sampler_.get()});
+  context->CmdBindResources(
+      2, std::vector<graphics::Sampler *>{linear_sampler_.get()});
 
   for (auto &command : commands_) {
     command->Execute(context);
@@ -106,6 +109,7 @@ void Core::Render(graphics::CommandContext *context, graphics::Image *image) {
 void Core::CmdSetDrawRegion(int x, int y, int width, int height) {
   commands_.push_back(
       std::make_unique<DrawCmdSetDrawRegion>(x, y, width, height));
+  pixel_transform_ = PixelCoordToNDC(width, height);
 }
 
 void Core::CmdDrawInstance(Model *model,
@@ -123,6 +127,30 @@ void Core::CmdDrawInstance(Model *model,
 
 void Core::CmdDrawInstance(Model *model, glm::vec4 color) {
   CmdDrawInstance(model, pure_white_texture_.get(), Transform{1.0f}, color);
+}
+
+void Core::CmdDrawText(glm::vec2 origin,
+                       const std::string &text,
+                       glm::vec4 color) {
+  float base_x_ = origin.x;
+  float base_y_ = origin.y;
+  std::wstring wtext = StringToWString(text);
+
+  for (size_t i = 0; i < wtext.size(); i++) {
+    auto char_model = font_core_->GetCharModel(wtext[i]);
+    float left = base_x_ + char_model.bearing_x_;
+    float top = base_y_ - char_model.bearing_y_;
+    float right = char_model.width_ + left;
+    float bottom = char_model.height_ + top;
+    Transform transform{1.0f};
+    transform[0][0] = (right - left) / 2.0f;
+    transform[1][1] = (top - bottom) / 2.0f;
+    transform[3][0] = left + (right - left) / 2.0f;
+    transform[3][1] = top + (bottom - top) / 2.0f;
+    CmdDrawInstance(text_model_.get(), char_model.char_tex_,
+                    pixel_transform_ * transform, color);
+    base_x_ += char_model.advance_x_;
+  }
 }
 
 void Core::CreateModel(double_ptr<Model> model) {
