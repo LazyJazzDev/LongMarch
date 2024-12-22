@@ -138,19 +138,39 @@ void Core::CmdDrawText(glm::vec2 origin,
 
   for (size_t i = 0; i < wtext.size(); i++) {
     auto char_model = font_core_->GetCharModel(wtext[i]);
-    float left = base_x_ + char_model.bearing_x_;
-    float top = base_y_ - char_model.bearing_y_;
-    float right = char_model.width_ + left;
-    float bottom = char_model.height_ + top;
-    Transform transform{1.0f};
-    transform[0][0] = (right - left) / 2.0f;
-    transform[1][1] = (top - bottom) / 2.0f;
-    transform[3][0] = left + (right - left) / 2.0f;
-    transform[3][1] = top + (bottom - top) / 2.0f;
-    CmdDrawInstance(text_model_.get(), char_model.char_tex_,
-                    pixel_transform_ * transform, color);
+    if (char_model.char_tex_) {
+      float left = base_x_ + char_model.bearing_x_;
+      float top = base_y_ - char_model.bearing_y_;
+      float right = char_model.width_ + left;
+      float bottom = char_model.height_ + top;
+      Transform transform{1.0f};
+      transform[0][0] = (right - left) / 2.0f;
+      transform[1][1] = (top - bottom) / 2.0f;
+      transform[3][0] = left + (right - left) / 2.0f;
+      transform[3][1] = top + (bottom - top) / 2.0f;
+      CmdDrawInstance(text_model_.get(), char_model.char_tex_,
+                      pixel_transform_ * transform, color);
+    }
     base_x_ += char_model.advance_x_;
   }
+}
+
+void Core::SetFontTypeFile(const std::string &filename) {
+  font_core_->SetFontTypeFile(filename);
+}
+
+void Core::SetFontSize(uint32_t size) {
+  font_core_->SetFontSize(size);
+}
+
+float Core::GetTextWidth(const std::string &text) {
+  auto wtext = StringToWString(text);
+  float width = 0.0f;
+  for (size_t i = 0; i < wtext.size(); i++) {
+    auto char_model = font_core_->GetCharModel(wtext[i]);
+    width += char_model.advance_x_;
+  }
+  return width;
 }
 
 void Core::CreateModel(double_ptr<Model> model) {

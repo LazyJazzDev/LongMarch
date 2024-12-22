@@ -25,6 +25,11 @@ class Core {
   void CmdDrawInstance(Model *model, glm::vec4 color);
   void CmdDrawText(glm::vec2 origin, const std::string &text, glm::vec4 color);
 
+  void SetFontTypeFile(const std::string &filename);
+  void SetFontSize(uint32_t size);
+
+  float GetTextWidth(const std::string &text);
+
   void CreateModel(double_ptr<Model> model);
   void CreateTexture(int width, int height, double_ptr<Texture> texture);
 

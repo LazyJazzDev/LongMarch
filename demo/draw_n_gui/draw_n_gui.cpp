@@ -64,7 +64,7 @@ void DrawNGUI::OnInit() {
   model_->SetModelData(vertices, indices);
 
   draw_core_->GetFontCore()->SetFontTypeFile(
-      grassland::FindAssetsFile("fonts/georgiai.ttf"));
+      grassland::FindAssetsFile("fonts/simhei.ttf"));
 }
 
 void DrawNGUI::OnClose() {
@@ -102,7 +102,10 @@ void DrawNGUI::OnUpdate() {
       glm::vec4{1.0f, 1.0f, 1.0f, alpha});
   draw_core_->GetFontCore()->SetFontSize(extent.height * 0.5);
   draw_core_->CmdDrawText({extent.height * 0.05, extent.height * 0.5 * 0.8f},
-                          "Abcefg", {1.0f, 1.0f, 1.0f, 1.0f});
+                          u8"我爱你，中国！", {1.0f, 1.0f, 1.0f, 1.0f});
+  draw_core_->CmdDrawText(
+      {extent.height * 0.05, extent.height * 0.5 * 0.8f + extent.height * 0.5f},
+      u8"I LOVE U, CHINA!", {1.0f, 1.0f, 1.0f, 1.0f});
   draw_core_->EndDraw();
 }
 

@@ -53,6 +53,10 @@ CharModel FontCore::GetCharModel(uint32_t char_code) {
     auto advance_y = glyph->advance.y * (1.0f / 64.0f);
     auto bearing_x = glyph->bitmap_left;
     auto bearing_y = glyph->bitmap_top;
+    LogInfo(
+        "char_code: {}, width: {}, height: {}, advance_x: {}, advance_y: {}, "
+        "bearing_x: {}, bearing_y: {}",
+        char_code, width, height, advance_x, advance_y, bearing_x, bearing_y);
     Texture *tex = nullptr;
     if (width && height) {
       core_->CreateTexture(width, height, &tex);
