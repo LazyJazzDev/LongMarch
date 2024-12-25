@@ -45,10 +45,6 @@ void FontCore::SetASCIIFontTypeFile(const std::string &filename) {
   }
   active_ascii_face_ = faces_[filename];
   UpdateActiveCharMap();
-
-  if (active_ascii_face_) {
-    LogInfo("ASCII font loaded: {}", filename);
-  }
 }
 
 void FontCore::SetFontSize(uint32_t size) {

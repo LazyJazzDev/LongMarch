@@ -55,10 +55,10 @@ VkResult Device::CreateSwapchain(const Surface *surface,
       PhysicalDevice().Handle(), surface->Handle());
 
   // List all available surface formats, print both VkFormat and VkColorSpace
-  spdlog::info("Available surface formats:");
+  LogInfo("Available surface formats:");
   for (const auto &format : swapChainSupport.formats) {
-    spdlog::info("  Format: {}, Color space: {}", VkFormatToName(format.format),
-                 VkColorSpaceToName(format.colorSpace));
+    LogInfo("  Format: {}, Color space: {}", VkFormatToName(format.format),
+            VkColorSpaceToName(format.colorSpace));
   }
 
   VkSurfaceFormatKHR surfaceFormat =
@@ -68,11 +68,11 @@ VkResult Device::CreateSwapchain(const Surface *surface,
   VkExtent2D extent = Swapchain::ChooseSwapExtent(swapChainSupport.capabilities,
                                                   surface->Window());
 
-  spdlog::info("Swap chain extent: {}x{}", extent.width, extent.height);
-  spdlog::info("Swap chain format: {}", VkFormatToName(surfaceFormat.format));
-  spdlog::info("Swap chain color space: {}",
-               VkColorSpaceToName(surfaceFormat.colorSpace));
-  spdlog::info("Swap chain present mode: {}", VkPresentModeToName(presentMode));
+  LogInfo("Swap chain extent: {}x{}", extent.width, extent.height);
+  LogInfo("Swap chain format: {}", VkFormatToName(surfaceFormat.format));
+  LogInfo("Swap chain color space: {}",
+          VkColorSpaceToName(surfaceFormat.colorSpace));
+  LogInfo("Swap chain present mode: {}", VkPresentModeToName(presentMode));
 
   // Print selected surface format and present mode
 

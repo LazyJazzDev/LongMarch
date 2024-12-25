@@ -74,9 +74,11 @@ ComPtr<ID3DBlob> CompileShader(const std::string &source_code,
   if (result->HasOutput(DXC_OUT_ERRORS)) {
     ComPtr<IDxcBlobUtf8> error_blob;
     ComPtr<IDxcBlobUtf16> output_name;
-    result->GetOutput(DXC_OUT_ERRORS, IID_PPV_ARGS(&error_blob), nullptr);
+    result->GetOutput(DXC_OUT_ERRORS, IID_PPV_ARGS(&error_blob), &output_name);
 
-    LogInfo("{}", static_cast<char *>(error_blob->GetBufferPointer()));
+    if (error_blob->GetStringPointer() && error_blob->GetStringLength()) {
+      LogInfo("Error: {}", error_blob->GetStringPointer());
+    }
   }
 
   ComPtr<ID3DBlob> shader_blob;

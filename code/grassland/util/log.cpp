@@ -24,14 +24,14 @@ std::string GetTimestamp() {
 }
 
 void LogInfo(const std::string &message) {
-  spdlog::info(message);
+  std::cout << "[INFO][" << GetTimestamp() << "] " << message << std::endl;
 }
 
 void LogWarning(const std::string &message) {
-  spdlog::warn(message);
+  std::cout << "[WARNING][" << GetTimestamp() << "] " << message << std::endl;
 }
 
 void LogError(const std::string &message) {
-  spdlog::error(message);
+  std::cout << "[ERROR][" << GetTimestamp() << "] " << message << std::endl;
 }
 }  // namespace grassland

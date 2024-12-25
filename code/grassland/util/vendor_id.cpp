@@ -1,5 +1,7 @@
 #include "grassland/util/vendor_id.h"
 
+#include "fmt/format.h"
+
 namespace grassland {
 
 std::string PCIVendorIDToName(uint32_t vendor_id) {

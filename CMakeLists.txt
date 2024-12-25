@@ -13,22 +13,21 @@ project(LongMarch)
 
 set(CMAKE_CXX_STANDARD 17)
 
-#find_package(CUDAToolkit)
-#
-#if (CUDAToolkit_FOUND)
-#    enable_language(CUDA)
-#    set(CMAKE_CUDA_STANDARD 17)
-#    set(LONGMARCH_CUDA_ENABLED ON)
-##    set_target_properties(my_cuda_app PROPERTIES CUDA_SEPARABLE_COMPILATION ON)
-##    set_target_properties(my_cuda_app PROPERTIES CUDA_ARCHITECTURES "60;70;75")
-#else ()
-#    message(STATUS "CUDA not found, skipping CUDA code.")
-#endif ()
+find_package(CUDAToolkit)
+
+if (CUDAToolkit_FOUND)
+    enable_language(CUDA)
+    set(CMAKE_CUDA_STANDARD 17)
+    set(LONGMARCH_CUDA_ENABLED ON)
+    set(CUDA_SEPARABLE_COMPILATION ON)
+    set(CMAKE_CUDA_ARCHITECTURES 61 70 75 80)
+else ()
+    message(STATUS "CUDA not found, skipping CUDA code.")
+endif ()
 
 if (MSVC)
-    #    add_compile_options("$<$<COMPILE_LANGUAGE:CXX>:/utf-8>")
-    #    set(CMAKE_CUDA_FLAGS "${CMAKE_CUDA_FLAGS} -Xcompiler=\"/utf-8\"")
-    #    add_compile_options("$<$<COMPILE_LANGUAGE:CUDA>:-Xcompiler \"/source-charset:utf-8\",\"/execution-charset:utf-8\">")
+    add_compile_options("$<$<COMPILE_LANGUAGE:CXX>:/utf-8>")
+    add_compile_options("$<$<COMPILE_LANGUAGE:CUDA>:-Xcompiler=\"/utf-8\">")
 endif ()
 
 
@@ -39,10 +38,6 @@ list(APPEND LIB_LIST ${FMT_LIB_NAME})
 find_package(Freetype REQUIRED)
 set(FREETYPE_LIB_NAME Freetype::Freetype) # since CMake 3.10
 list(APPEND LIB_LIST ${FREETYPE_LIB_NAME})
-
-find_package(spdlog CONFIG REQUIRED)
-set(SPDLOG_LIB_NAME spdlog::spdlog) # spdlog::spdlog is also available
-list(APPEND LIB_LIST ${SPDLOG_LIB_NAME})
 
 find_package(Eigen3 CONFIG REQUIRED)
 set(EIGEN3_LIB_NAME Eigen3::Eigen)

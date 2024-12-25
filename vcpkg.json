@@ -8,7 +8,6 @@
     "glfw3",
     "fmt",
     "freetype",
-    "spdlog",
     "vulkan-memory-allocator",
     "glslang",
     "gtest",
