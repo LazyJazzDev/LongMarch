@@ -1,6 +1,5 @@
 #include "grassland/vulkan/validation_layer.h"
 
-#include "fmt/format.h"
 #include "iostream"
 
 namespace grassland::vulkan {

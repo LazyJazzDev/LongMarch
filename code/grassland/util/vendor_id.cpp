@@ -25,6 +25,7 @@ std::string PCIVendorIDToName(uint32_t vendor_id) {
       return "ARM";
     default:
       return fmt::format("Unknown vendor id: 0x{:04X}", vendor_id);
+      // Rewrite with std::string
   }
 }
 

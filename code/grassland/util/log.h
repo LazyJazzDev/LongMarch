@@ -1,9 +1,17 @@
 #pragma once
+#if !defined(__CUDACC__)
 #include "fmt/format.h"
+#else
+namespace fmt {
+template <typename... Args>
+std::string format(const std::string &format_str, Args &&...args) {
+  return "";
+}
+}  // namespace fmt
+#endif
 #include "iostream"
 
 namespace grassland {
-
 std::string GetTimestamp();
 
 void LogInfo(const std::string &message);
