@@ -59,6 +59,8 @@ VkShaderStageFlagBits ShaderTypeToVkShaderStageFlags(ShaderType type) {
       return VK_SHADER_STAGE_VERTEX_BIT;
     case SHADER_TYPE_FRAGMENT:
       return VK_SHADER_STAGE_FRAGMENT_BIT;
+    case SHADER_TYPE_GEOMETRY:
+      return VK_SHADER_STAGE_GEOMETRY_BIT;
     default:
       return VK_SHADER_STAGE_ALL;
   }

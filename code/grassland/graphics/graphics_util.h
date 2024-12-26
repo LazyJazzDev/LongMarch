@@ -52,7 +52,8 @@ typedef enum ResourceType {
 
 typedef enum ShaderType {
   SHADER_TYPE_VERTEX = 0,
-  SHADER_TYPE_FRAGMENT = 1
+  SHADER_TYPE_FRAGMENT = 1,
+  SHADER_TYPE_GEOMETRY = 2,
 } ShaderType;
 
 struct PhysicalDeviceProperties {
