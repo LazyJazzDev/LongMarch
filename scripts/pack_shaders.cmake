@@ -6,6 +6,7 @@ set(LONG_MARCH_PYTHON3_EXECUTABLE ${Python3_EXECUTABLE} CACHE STRING "Grassland 
 
 if (WIN32)
     set(LONG_MARCH_DXIL_DLL ${DIRECTX_DXC_TOOL_PATH}/dxil.dll CACHE STRING "Grassland DXIL DLL")
+    message(STATUS "LONG_MARCH_DXIL_DLL: ${LONG_MARCH_DXIL_DLL}")
     # Define a cmake function XXD
     function(XXD input_file output_file dir_name)
         add_custom_command(
@@ -61,6 +62,7 @@ endfunction()
 
 function(COPY_DXIL_DLL TARGET_NAME)
     if (WIN32)
+        message(STATUS "COPY_DXIL_DLL ${LONG_MARCH_DXIL_DLL} to $<TARGET_FILE_DIR:${TARGET_NAME}>")
         add_custom_command(TARGET ${TARGET_NAME} POST_BUILD
                 COMMAND ${CMAKE_COMMAND} -E copy_if_different ${LONG_MARCH_DXIL_DLL} $<TARGET_FILE_DIR:${TARGET_NAME}>
         )

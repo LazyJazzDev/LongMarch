@@ -84,6 +84,10 @@ void D3D12Program::BindShader(Shader *shader, ShaderType type) {
         pipeline_state_desc_.PS =
             CD3DX12_SHADER_BYTECODE(d3d12_shader->ShaderBlob());
         break;
+      case SHADER_TYPE_GEOMETRY:
+        pipeline_state_desc_.GS =
+            CD3DX12_SHADER_BYTECODE(d3d12_shader->ShaderBlob());
+        break;
     }
   } else {
     throw std::runtime_error("Invalid shader object, expected D3D12Shader");
