@@ -1,4 +1,11 @@
-file(GLOB_RECURSE SOURCES "*.cpp" "*.h")
+
+if (LONGMARCH_CUDA_ENABLED)
+    message(STATUS "CUDA enabled, compiling CUDA code.")
+    file(GLOB_RECURSE SOURCES "*.cu" "*.h")
+else ()
+    message(STATUS "CUDA disabled, compiling C++ code.")
+    file(GLOB_RECURSE SOURCES "*.cpp" "*.h")
+endif ()
 
 add_library(${GRASSLAND_SUBLIB_NAME} ${SOURCES})
 

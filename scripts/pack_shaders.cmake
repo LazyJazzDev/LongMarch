@@ -175,5 +175,6 @@ function(PACK_SHADER_CODE TARGET_NAME)
 
     target_sources(${TARGET_NAME} PRIVATE ${BUILT_IN_SHADERS_INL})
     target_include_directories(${TARGET_NAME} PRIVATE ${CMAKE_CURRENT_BINARY_DIR})
+    message(STATUS "Including ${CMAKE_CURRENT_BINARY_DIR} in ${TARGET_NAME}")
 
 endfunction()

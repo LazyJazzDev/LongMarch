@@ -1,4 +1,8 @@
-file(GLOB SOURCES "*.cpp")
+if (LONGMARCH_CUDA_ENABLED)
+    file(GLOB SOURCES "*.cpp" "*.h" "*.cu" "*.cuh")
+else ()
+    file(GLOB SOURCES "*.cpp" "*.h")
+endif ()
 
 add_library(Grassland ${SOURCES})
 
