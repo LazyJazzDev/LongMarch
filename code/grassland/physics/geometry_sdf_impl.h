@@ -1,7 +1,13 @@
 #pragma once
+#include <algorithm>
+
 #include "grassland/physics/geometry_sdf.h"
 
 namespace grassland {
+
+using std::max;
+using std::min;
+
 template <typename Real>
 LM_DEVICE_FUNC bool SphereSDF<Real>::ValidInput(const InputType &v) const {
   return (v - center).norm() > algebra::Eps<Real>() * 100;
@@ -34,7 +40,7 @@ LM_DEVICE_FUNC bool LineSDF<Real>::ValidInput(const LineSDF<Real>::InputType &v)
 }
 
 template <typename Real>
-LM_DEVICE_FUNC LineSDF<Real>::OutputType LineSDF<Real>::operator()(const LineSDF<Real>::InputType &v) const {
+LM_DEVICE_FUNC typename LineSDF<Real>::OutputType LineSDF<Real>::operator()(const LineSDF<Real>::InputType &v) const {
   Eigen::Vector3<Real> ab = B - A;
   Real t = (v - A).dot(ab) / ab.squaredNorm();
   t = max(Real(0), min(Real(1), t));
@@ -75,7 +81,7 @@ LM_DEVICE_FUNC bool CapsuleSDF<Real>::ValidInput(const InputType &v) const {
 }
 
 template <typename Real>
-LM_DEVICE_FUNC CapsuleSDF<Real>::OutputType CapsuleSDF<Real>::operator()(const InputType &v) const {
+LM_DEVICE_FUNC typename CapsuleSDF<Real>::OutputType CapsuleSDF<Real>::operator()(const InputType &v) const {
   Eigen::Vector3<Real> ab = B - A;
   Real t = (v - A).dot(ab) / ab.squaredNorm();
   t = max(Real(0), min(Real(1), t));
@@ -116,7 +122,7 @@ LM_DEVICE_FUNC bool CubeSDF<Real>::ValidInput(const InputType &p) const {
 }
 
 template <typename Real>
-LM_DEVICE_FUNC CubeSDF<Real>::OutputType CubeSDF<Real>::operator()(const InputType &p) const {
+LM_DEVICE_FUNC typename CubeSDF<Real>::OutputType CubeSDF<Real>::operator()(const InputType &p) const {
   Eigen::Vector3<Real> p0 = p - center;
   Eigen::Vector3<Real> q = p0.cwiseAbs() - Eigen::Vector3<Real>(size, size, size);
   if (q.maxCoeff() > 0) {

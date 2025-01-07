@@ -8,7 +8,7 @@ LM_DEVICE_FUNC bool ElasticNeoHookean<Real>::ValidInput(const InputType &F) cons
 }
 
 template <typename Real>
-LM_DEVICE_FUNC ElasticNeoHookean<Real>::OutputType ElasticNeoHookean<Real>::operator()(const InputType &F) const {
+LM_DEVICE_FUNC typename ElasticNeoHookean<Real>::OutputType ElasticNeoHookean<Real>::operator()(const InputType &F) const {
   Determinant3<Real> det3;
   auto J = det3(F).value();
   auto log_J = log(J);
@@ -44,7 +44,7 @@ LM_DEVICE_FUNC bool ElasticNeoHookeanSimple<Real>::ValidInput(const InputType &F
 }
 
 template <typename Real>
-LM_DEVICE_FUNC ElasticNeoHookeanSimple<Real>::OutputType ElasticNeoHookeanSimple<Real>::operator()(const InputType &F) const {
+LM_DEVICE_FUNC typename ElasticNeoHookeanSimple<Real>::OutputType ElasticNeoHookeanSimple<Real>::operator()(const InputType &F) const {
   Determinant3<Real> det3;
   auto J = det3(F).value();
   Eigen::Map<const Eigen::Vector<Real, 9>> F_map(F.data());
@@ -89,7 +89,7 @@ LM_DEVICE_FUNC bool ElasticNeoHookeanF3x2<Real>::ValidInput(const InputType &F) 
 }
 
 template <typename Real>
-LM_DEVICE_FUNC ElasticNeoHookeanF3x2<Real>::OutputType ElasticNeoHookeanF3x2<Real>::operator()(const InputType &F) const {
+LM_DEVICE_FUNC typename ElasticNeoHookeanF3x2<Real>::OutputType ElasticNeoHookeanF3x2<Real>::operator()(const InputType &F) const {
   CrossNorm<Real> cross_norm;
   auto J = cross_norm(F).value();
   auto log_J = log(J);
@@ -134,7 +134,7 @@ LM_DEVICE_FUNC bool ElasticNeoHookeanSimpleF3x2<Real>::ValidInput(const InputTyp
 }
 
 template <typename Real>
-LM_DEVICE_FUNC ElasticNeoHookeanSimpleF3x2<Real>::OutputType ElasticNeoHookeanSimpleF3x2<Real>::operator()(const InputType &F) const {
+LM_DEVICE_FUNC typename ElasticNeoHookeanSimpleF3x2<Real>::OutputType ElasticNeoHookeanSimpleF3x2<Real>::operator()(const InputType &F) const {
   CrossNorm<Real> cross_norm;
   auto J = cross_norm(F).value();
   auto log_J = log(J);
@@ -178,7 +178,7 @@ LM_DEVICE_FUNC bool ElasticNeoHookeanTetrahedron<Real>::ValidInput(const InputTy
 }
 
 template <typename Real>
-LM_DEVICE_FUNC ElasticNeoHookeanTetrahedron<Real>::OutputType ElasticNeoHookeanTetrahedron<Real>::operator()(const InputType &V) const {
+LM_DEVICE_FUNC typename ElasticNeoHookeanTetrahedron<Real>::OutputType ElasticNeoHookeanTetrahedron<Real>::operator()(const InputType &V) const {
   FEMTetrahedronDeformationGradient<Real> deformation_gradient{Dm};
   ElasticNeoHookean<Real> neo_hookean{mu, lambda};
   return neo_hookean(deformation_gradient(V));
@@ -244,7 +244,7 @@ LM_DEVICE_FUNC bool ElasticNeoHookeanSimpleTetrahedron<Real>::ValidInput(const I
 }
 
 template <typename Real>
-LM_DEVICE_FUNC ElasticNeoHookeanSimpleTetrahedron<Real>::OutputType ElasticNeoHookeanSimpleTetrahedron<Real>::operator()(const InputType &V) const {
+LM_DEVICE_FUNC typename ElasticNeoHookeanSimpleTetrahedron<Real>::OutputType ElasticNeoHookeanSimpleTetrahedron<Real>::operator()(const InputType &V) const {
   FEMTetrahedronDeformationGradient<Real> deformation_gradient{Dm};
   ElasticNeoHookeanSimple<Real> neo_hookean{mu, lambda};
   return neo_hookean(deformation_gradient(V));
@@ -310,7 +310,7 @@ LM_DEVICE_FUNC bool ElasticNeoHookeanTriangle<Real>::ValidInput(const InputType 
 }
 
 template <typename Real>
-LM_DEVICE_FUNC ElasticNeoHookeanTriangle<Real>::OutputType ElasticNeoHookeanTriangle<Real>::operator()(const InputType &V) const {
+LM_DEVICE_FUNC typename ElasticNeoHookeanTriangle<Real>::OutputType ElasticNeoHookeanTriangle<Real>::operator()(const InputType &V) const {
   FEMTriangleDeformationGradient3x2<Real> deformation_gradient3x2{Dm};
   ElasticNeoHookeanF3x2<Real> neo_hookean_f3x2{mu, lambda};
   return neo_hookean_f3x2(deformation_gradient3x2(V));
@@ -341,7 +341,7 @@ LM_DEVICE_FUNC bool ElasticNeoHookeanSimpleTriangle<Real>::ValidInput(const Inpu
 }
 
 template <typename Real>
-LM_DEVICE_FUNC ElasticNeoHookeanSimpleTriangle<Real>::OutputType ElasticNeoHookeanSimpleTriangle<Real>::operator()(const InputType &V) const {
+LM_DEVICE_FUNC typename ElasticNeoHookeanSimpleTriangle<Real>::OutputType ElasticNeoHookeanSimpleTriangle<Real>::operator()(const InputType &V) const {
   FEMTriangleDeformationGradient3x2<Real> deformation_gradient3x2{Dm};
   ElasticNeoHookeanSimpleF3x2<Real> neo_hookean_f3x2{mu, lambda};
   return neo_hookean_f3x2(deformation_gradient3x2(V));

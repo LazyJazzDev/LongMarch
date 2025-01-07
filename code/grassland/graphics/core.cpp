@@ -7,23 +7,17 @@ namespace grassland::graphics {
 Core::Core(const Settings &settings) : settings_(settings) {
 }
 
-int Core::CreateWindowObject(int width,
-                             int height,
-                             const std::string &title,
-                             double_ptr<Window> pp_window) {
+int Core::CreateWindowObject(int width, int height, const std::string &title, double_ptr<Window> pp_window) {
   return CreateWindowObject(width, height, title, false, false, pp_window);
 }
 
 #ifdef WIN32
-int Core::CreateShader(Microsoft::WRL::ComPtr<ID3DBlob> shader_blob,
-                       double_ptr<Shader> pp_shader) {
-  return CreateShader(shader_blob->GetBufferPointer(),
-                      shader_blob->GetBufferSize(), pp_shader);
+int Core::CreateShader(Microsoft::WRL::ComPtr<ID3DBlob> shader_blob, double_ptr<Shader> pp_shader) {
+  return CreateShader(shader_blob->GetBufferPointer(), shader_blob->GetBufferSize(), pp_shader);
 }
 #endif
 
-int Core::CreateShader(const std::vector<uint32_t> &spirv,
-                       double_ptr<Shader> pp_shader) {
+int Core::CreateShader(const std::vector<uint32_t> &spirv, double_ptr<Shader> pp_shader) {
   return CreateShader(spirv.data(), spirv.size() * sizeof(uint32_t), pp_shader);
 }
 
@@ -62,19 +56,21 @@ std::string Core::DeviceName() const {
   return device_name_;
 }
 
-int CreateCore(BackendAPI api,
-               const Core::Settings &settings,
-               double_ptr<Core> pp_core) {
+int CreateCore(BackendAPI api, const Core::Settings &settings, double_ptr<Core> pp_core) {
   switch (api) {
-    case BACKEND_API_VULKAN:
-      pp_core.construct<backend::VulkanCore>(settings);
-      break;
 #if defined(_WIN32)
     case BACKEND_API_D3D12:
       pp_core.construct<backend::D3D12Core>(settings);
       break;
+#else
+    case BACKEND_API_D3D12:
+      LogInfo("D3D12 is not supported on this platform, falling back to Vulkan");
 #endif
+    case BACKEND_API_VULKAN:
+      pp_core.construct<backend::VulkanCore>(settings);
+      break;
     default:
+      throw std::runtime_error("Unsupported backend API");
       return -1;
   }
   return 0;

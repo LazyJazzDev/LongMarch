@@ -8,7 +8,7 @@ LM_DEVICE_FUNC bool DihedralAngleAssistEdgesToNormalsAxis<Real>::ValidInput(cons
 }
 
 template <typename Real>
-LM_DEVICE_FUNC DihedralAngleAssistEdgesToNormalsAxis<Real>::OutputType DihedralAngleAssistEdgesToNormalsAxis<Real>::operator()(const InputType &E) const {
+LM_DEVICE_FUNC typename DihedralAngleAssistEdgesToNormalsAxis<Real>::OutputType DihedralAngleAssistEdgesToNormalsAxis<Real>::operator()(const InputType &E) const {
   CrossNormalized<Real> cross_normalized;
   VecNormalized<Real> vec_normalized;
   OutputType normals_axis;
@@ -71,7 +71,7 @@ LM_DEVICE_FUNC bool DihedralAngleAssistNormalsAxisToSinCosTheta<Real>::ValidInpu
 }
 
 template <typename Real>
-LM_DEVICE_FUNC DihedralAngleAssistNormalsAxisToSinCosTheta<Real>::OutputType DihedralAngleAssistNormalsAxisToSinCosTheta<Real>::operator()(const InputType &N) const {
+LM_DEVICE_FUNC typename DihedralAngleAssistNormalsAxisToSinCosTheta<Real>::OutputType DihedralAngleAssistNormalsAxisToSinCosTheta<Real>::operator()(const InputType &N) const {
   Determinant3<Real> det3;
   Dot<Real> dot;
   return OutputType{det3(N).value(), dot(N.col(0), N.col(1)).value()};
@@ -105,7 +105,7 @@ LM_DEVICE_FUNC bool DihedralAngleAssistVerticesToEdges<Real>::ValidInput(const I
 }
 
 template <typename Real>
-LM_DEVICE_FUNC DihedralAngleAssistVerticesToEdges<Real>::OutputType DihedralAngleAssistVerticesToEdges<Real>::operator()(const InputType &V) const {
+LM_DEVICE_FUNC typename DihedralAngleAssistVerticesToEdges<Real>::OutputType DihedralAngleAssistVerticesToEdges<Real>::operator()(const InputType &V) const {
   OutputType res;
   res.col(0) = V.col(1) - V.col(0);
   res.col(1) = V.col(2) - V.col(1);
@@ -149,7 +149,7 @@ LM_DEVICE_FUNC bool DihedralEnergy<Real>::ValidInput(const InputType &) const {
 }
 
 template <typename Real>
-LM_DEVICE_FUNC DihedralEnergy<Real>::OutputType DihedralEnergy<Real>::operator()(const InputType &V) const {
+LM_DEVICE_FUNC typename DihedralEnergy<Real>::OutputType DihedralEnergy<Real>::operator()(const InputType &V) const {
   DihedralAngleByVertices<Real> dihedral_angle;
   Real res = dihedral_angle(V).value();
   res -= rest_angle;
@@ -183,7 +183,7 @@ LM_DEVICE_FUNC bool DihedralAngle<Real>::ValidInput(const InputType &) const {
 }
 
 template <typename Real>
-LM_DEVICE_FUNC DihedralAngle<Real>::OutputType DihedralAngle<Real>::operator()(const InputType &V) const {
+LM_DEVICE_FUNC typename DihedralAngle<Real>::OutputType DihedralAngle<Real>::operator()(const InputType &V) const {
   Eigen::Vector3<Real> e0 = V.col(2) - V.col(1);
   Eigen::Vector3<Real> e1 = V.col(0) - V.col(2);
   Eigen::Vector3<Real> e2 = V.col(0) - V.col(1);

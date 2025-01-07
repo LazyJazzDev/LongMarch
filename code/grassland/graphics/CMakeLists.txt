@@ -1,6 +1,7 @@
-file(GLOB_RECURSE SOURCES "*.cpp" "*.h")
+file(GLOB SOURCES "*.cpp" "*.h")
 
 add_library(${GRASSLAND_SUBLIB_NAME} ${SOURCES})
+add_subdirectory(backend)
 
 list(APPEND GRASSLAND_LIBS ${GRASSLAND_SUBLIB_NAME})
 set(GRASSLAND_LIBS ${GRASSLAND_LIBS} PARENT_SCOPE)
