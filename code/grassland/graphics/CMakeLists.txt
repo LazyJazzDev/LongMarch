@@ -8,7 +8,7 @@ set(GRASSLAND_LIBS ${GRASSLAND_LIBS} PARENT_SCOPE)
 
 target_include_directories(${GRASSLAND_SUBLIB_NAME} PUBLIC ${LONGMARCH_INCLUDE_DIR})
 
-target_link_libraries(${GRASSLAND_SUBLIB_NAME} PUBLIC grassland_vulkan)
+target_link_libraries(${GRASSLAND_SUBLIB_NAME} PUBLIC grassland_vulkan ${DXC_LIB_NAME})
 
 if (WIN32)
     target_link_libraries(${GRASSLAND_SUBLIB_NAME} PUBLIC grassland_d3d12)

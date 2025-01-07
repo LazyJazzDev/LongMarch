@@ -5,27 +5,32 @@
 namespace grassland::graphics::backend {
 class VulkanShader : public Shader {
  public:
-  VulkanShader(VulkanCore *core, const void *data, size_t size);
+  VulkanShader(VulkanCore *core, const CompiledShaderBlob &shader_blob);
   ~VulkanShader() override = default;
 
   vulkan::ShaderModule *ShaderModule() const {
     return shader_module_.get();
   }
 
+  std::string &EntryPoint() {
+    return entry_point_;
+  }
+
+  const std::string &EntryPoint() const {
+    return entry_point_;
+  }
+
  private:
   VulkanCore *core_;
   std::unique_ptr<vulkan::ShaderModule> shader_module_;
+  std::string entry_point_;
 };
 
 class VulkanProgram : public Program {
  public:
-  VulkanProgram(VulkanCore *core,
-                const std::vector<ImageFormat> &color_formats,
-                ImageFormat depth_format);
+  VulkanProgram(VulkanCore *core, const std::vector<ImageFormat> &color_formats, ImageFormat depth_format);
   ~VulkanProgram() override;
-  void AddInputAttribute(uint32_t binding,
-                         InputType type,
-                         uint32_t offset) override;
+  void AddInputAttribute(uint32_t binding, InputType type, uint32_t offset) override;
   void AddInputBinding(uint32_t stride, bool input_per_instance) override;
   void AddResourceBinding(ResourceType type, int count) override;
   void SetCullMode(CullMode mode) override;
@@ -50,8 +55,7 @@ class VulkanProgram : public Program {
 
  private:
   VulkanCore *core_;
-  std::vector<std::unique_ptr<vulkan::DescriptorSetLayout>>
-      descriptor_set_layouts_;
+  std::vector<std::unique_ptr<vulkan::DescriptorSetLayout>> descriptor_set_layouts_;
   std::unique_ptr<vulkan::PipelineLayout> pipeline_layout_;
   vulkan::PipelineSettings pipeline_settings_;
   std::unique_ptr<vulkan::Pipeline> pipeline_;

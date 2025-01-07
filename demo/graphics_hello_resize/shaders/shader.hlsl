@@ -8,20 +8,19 @@ struct UniformBufferObject {
 ConstantBuffer<UniformBufferObject> ubo : register(b0, space0);
 
 struct VSInput {
-  float3 position : TEXCOORD0;
-  float3 color : TEXCOORD1;
+  [[vk::location(0)]] float3 position : TEXCOORD0;
+  [[vk::location(1)]] float3 color : TEXCOORD1;
 };
 
 struct PSInput {
   float4 position : SV_POSITION;
-  float4 color : COLOR;
+  [[vk::location(0)]] float4 color : COLOR;
 };
 
 PSInput VSMain(VSInput input) {
   PSInput output;
   output.position = float4(input.position, 1.0f);
-  output.position =
-      mul(ubo.proj, mul(ubo.view, mul(ubo.model, output.position)));
+  output.position = mul(ubo.proj, mul(ubo.view, mul(ubo.model, output.position)));
   output.color = float4(input.color, 1.0f);
   return output;
 }

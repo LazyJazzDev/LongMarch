@@ -14,41 +14,27 @@ class VulkanCore : public Core {
     return BACKEND_API_VULKAN;
   }
 
-  int CreateBuffer(size_t size,
-                   BufferType type,
-                   double_ptr<Buffer> pp_buffer) override;
+  int CreateBuffer(size_t size, BufferType type, double_ptr<Buffer> pp_buffer) override;
 
-  int CreateImage(int width,
-                  int height,
-                  ImageFormat format,
-                  double_ptr<Image> pp_image) override;
+  int CreateImage(int width, int height, ImageFormat format, double_ptr<Image> pp_image) override;
 
-  int CreateSampler(const SamplerInfo &info,
-                    double_ptr<Sampler> pp_sampler) override;
+  int CreateSampler(const SamplerInfo &info, double_ptr<Sampler> pp_sampler) override;
 
-  int CreateWindowObject(int width,
-                         int height,
-                         const std::string &title,
-                         bool fullscreen,
-                         bool resizable,
-                         double_ptr<Window> pp_window) override;
+  int CreateWindowObject(int width, int height, const std::string &title, bool fullscreen, bool resizable, double_ptr<Window> pp_window) override;
 
-  int CreateShader(const void *data,
-                   size_t size,
-                   double_ptr<Shader> pp_shader) override;
+  int CreateShader(const void *data, size_t size, double_ptr<Shader> pp_shader) override;
 
-  int CreateProgram(const std::vector<ImageFormat> &color_formats,
-                    ImageFormat depth_format,
-                    double_ptr<Program> pp_program) override;
+  int CreateShader(const CompiledShaderBlob &shader_blob, double_ptr<Shader> pp_shader) override;
 
-  int CreateCommandContext(
-      double_ptr<CommandContext> pp_command_context) override;
+  int CreateShader(const std::string &source_code, const std::string &entry_point, const std::string &target, double_ptr<Shader> pp_shader) override;
+
+  int CreateProgram(const std::vector<ImageFormat> &color_formats, ImageFormat depth_format, double_ptr<Program> pp_program) override;
+
+  int CreateCommandContext(double_ptr<CommandContext> pp_command_context) override;
 
   int SubmitCommandContext(CommandContext *p_command_context) override;
 
-  int GetPhysicalDeviceProperties(
-      PhysicalDeviceProperties *p_physical_device_properties =
-          nullptr) override;
+  int GetPhysicalDeviceProperties(PhysicalDeviceProperties *p_physical_device_properties = nullptr) override;
 
   int InitializeLogicalDevice(int device_index) override;
 

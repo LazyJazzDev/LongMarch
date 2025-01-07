@@ -14,12 +14,9 @@
     "imgui",
     "mikktspace",
     "tinyobjloader",
+    "directx-dxc",
     {
       "name": "d3dx12",
-      "platform": "windows"
-    },
-    {
-      "name": "directx-dxc",
       "platform": "windows"
     }
   ]

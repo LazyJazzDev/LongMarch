@@ -75,11 +75,14 @@ find_package(tinyobjloader CONFIG REQUIRED)
 set(TINYOBJLOADER_LIB_NAME tinyobjloader::tinyobjloader)
 list(APPEND LIB_LIST ${TINYOBJLOADER_LIB_NAME})
 
+find_package(directx-dxc CONFIG REQUIRED)
+set(DXC_LIB_NAME Microsoft::DirectXShaderCompiler)
+list(APPEND LIB_LIST ${DXC_LIB_NAME})
+
 if (WIN32)
     find_path(D3DX12_INCLUDE_DIRS "d3dx12.h")
     list(APPEND INC_LIST ${D3DX12_INCLUDE_DIRS})
 
-    find_package(directx-dxc CONFIG REQUIRED)
     get_filename_component(DIRECTX_DXC_TOOL_PATH ${DIRECTX_DXC_TOOL} DIRECTORY)
     message(STATUS "DIRECTX_DXC_TOOL_PATH: ${DIRECTX_DXC_TOOL_PATH}")
 endif ()

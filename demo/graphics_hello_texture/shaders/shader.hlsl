@@ -3,13 +3,13 @@ Texture2D texture : register(t0, space0);
 SamplerState samp : register(s0, space1);
 
 struct VSInput {
-  float3 position : TEXCOORD0;
-  float2 tex_coord : TEXCOORD1;
+  [[vk::location(0)]] float3 position : TEXCOORD0;
+  [[vk::location(1)]] float2 tex_coord : TEXCOORD1;
 };
 
 struct PSInput {
   float4 position : SV_POSITION;
-  float2 tex_coord : TEXCOORD0;
+  [[vk::location(0)]] float2 tex_coord : TEXCOORD0;
 };
 
 PSInput VSMain(VSInput input) {

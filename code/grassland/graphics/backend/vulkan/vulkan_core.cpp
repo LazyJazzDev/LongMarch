@@ -25,9 +25,7 @@ VulkanCore::~VulkanCore() {
   descriptor_pools_.clear();
 }
 
-int VulkanCore::CreateBuffer(size_t size,
-                             BufferType type,
-                             double_ptr<Buffer> pp_buffer) {
+int VulkanCore::CreateBuffer(size_t size, BufferType type, double_ptr<Buffer> pp_buffer) {
   switch (type) {
     case BUFFER_TYPE_DYNAMIC:
       pp_buffer.construct<VulkanDynamicBuffer>(this, size);
@@ -39,62 +37,54 @@ int VulkanCore::CreateBuffer(size_t size,
   return 0;
 }
 
-int VulkanCore::CreateImage(int width,
-                            int height,
-                            ImageFormat format,
-                            double_ptr<Image> pp_image) {
+int VulkanCore::CreateImage(int width, int height, ImageFormat format, double_ptr<Image> pp_image) {
   pp_image.construct<VulkanImage>(this, width, height, format);
   SingleTimeCommand([this, pp_image](VkCommandBuffer command_buffer) {
     VulkanImage *image = dynamic_cast<VulkanImage *>(*pp_image);
-    vulkan::TransitImageLayout(
-        command_buffer, image->Image()->Handle(), VK_IMAGE_LAYOUT_UNDEFINED,
-        VK_IMAGE_LAYOUT_GENERAL, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT,
-        VK_PIPELINE_STAGE_ALL_GRAPHICS_BIT, VK_ACCESS_MEMORY_READ_BIT, 0,
-        image->Image()->Aspect());
+    vulkan::TransitImageLayout(command_buffer, image->Image()->Handle(), VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_GENERAL, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, VK_PIPELINE_STAGE_ALL_GRAPHICS_BIT, VK_ACCESS_MEMORY_READ_BIT, 0, image->Image()->Aspect());
   });
   return 0;
 }
 
-int VulkanCore::CreateSampler(const SamplerInfo &info,
-                              double_ptr<Sampler> pp_sampler) {
+int VulkanCore::CreateSampler(const SamplerInfo &info, double_ptr<Sampler> pp_sampler) {
   pp_sampler.construct<VulkanSampler>(this, info);
   return 0;
 }
 
-int VulkanCore::CreateWindowObject(int width,
-                                   int height,
-                                   const std::string &title,
-                                   bool fullscreen,
-                                   bool resizable,
-                                   double_ptr<Window> pp_window) {
-  pp_window.construct<VulkanWindow>(this, width, height, title, fullscreen,
-                                    resizable);
+int VulkanCore::CreateWindowObject(int width, int height, const std::string &title, bool fullscreen, bool resizable, double_ptr<Window> pp_window) {
+  pp_window.construct<VulkanWindow>(this, width, height, title, fullscreen, resizable);
   return 0;
 }
 
-int VulkanCore::CreateShader(const void *data,
-                             size_t size,
-                             double_ptr<Shader> pp_shader) {
-  pp_shader.construct<VulkanShader>(this, data, size);
+int VulkanCore::CreateShader(const void *data, size_t size, double_ptr<Shader> pp_shader) {
+  CompiledShaderBlob blob;
+  blob.entry_point = "main";
+  blob.data.resize(size);
+  std::memcpy(blob.data.data(), data, size);
+  return CreateShader(blob, pp_shader);
+}
+
+int VulkanCore::CreateShader(const CompiledShaderBlob &shader_blob, double_ptr<Shader> pp_shader) {
+  pp_shader.construct<VulkanShader>(this, shader_blob);
   return 0;
 }
 
-int VulkanCore::CreateProgram(const std::vector<ImageFormat> &color_formats,
-                              ImageFormat depth_format,
-                              double_ptr<Program> pp_program) {
+int VulkanCore::CreateShader(const std::string &source_code, const std::string &entry_point, const std::string &target, double_ptr<Shader> pp_shader) {
+  return CreateShader(CompileShader(source_code, entry_point, target, {"-spirv"}), pp_shader);
+}
+
+int VulkanCore::CreateProgram(const std::vector<ImageFormat> &color_formats, ImageFormat depth_format, double_ptr<Program> pp_program) {
   pp_program.construct<VulkanProgram>(this, color_formats, depth_format);
   return 0;
 }
 
-int VulkanCore::CreateCommandContext(
-    double_ptr<CommandContext> pp_command_context) {
+int VulkanCore::CreateCommandContext(double_ptr<CommandContext> pp_command_context) {
   pp_command_context.construct<VulkanCommandContext>(this);
   return 0;
 }
 
 int VulkanCore::SubmitCommandContext(CommandContext *p_command_context) {
-  VulkanCommandContext *command_context =
-      dynamic_cast<VulkanCommandContext *>(p_command_context);
+  VulkanCommandContext *command_context = dynamic_cast<VulkanCommandContext *>(p_command_context);
 
   auto &set_queue = descriptor_sets_[current_frame_];
   auto &pool = descriptor_pools_[current_frame_];
@@ -107,10 +97,8 @@ int VulkanCore::SubmitCommandContext(CommandContext *p_command_context) {
   auto pool_size = pool->PoolSize();
   auto max_sets = pool->MaxSets();
   bool update_pool = false;
-  for (auto &[type, count] :
-       command_context->required_pool_size_.descriptor_type_count) {
-    if (!pool_size.descriptor_type_count.count(type) ||
-        pool_size.descriptor_type_count[type] < count) {
+  for (auto &[type, count] : command_context->required_pool_size_.descriptor_type_count) {
+    if (!pool_size.descriptor_type_count.count(type) || pool_size.descriptor_type_count[type] < count) {
       uint32_t type_count = pool_size.descriptor_type_count[type];
       if (!type_count) {
         type_count = 1;
@@ -129,8 +117,7 @@ int VulkanCore::SubmitCommandContext(CommandContext *p_command_context) {
   }
   if (update_pool) {
     pool.reset();
-    device_->CreateDescriptorPool(pool_size.ToVkDescriptorPoolSize(), max_sets,
-                                  &pool);
+    device_->CreateDescriptorPool(pool_size.ToVkDescriptorPoolSize(), max_sets, &pool);
   }
   current_descriptor_pool_ = pool.get();
   current_descriptor_set_queue_ = &set_queue;
@@ -174,10 +161,7 @@ int VulkanCore::SubmitCommandContext(CommandContext *p_command_context) {
   }
 
   for (auto [image, state] : command_context->image_states_) {
-    vulkan::TransitImageLayout(command_buffer, image, state.layout,
-                               VK_IMAGE_LAYOUT_GENERAL, state.stage,
-                               VK_PIPELINE_STAGE_ALL_GRAPHICS_BIT, state.access,
-                               VK_ACCESS_MEMORY_READ_BIT, state.aspect);
+    vulkan::TransitImageLayout(command_buffer, image, state.layout, VK_IMAGE_LAYOUT_GENERAL, state.stage, VK_PIPELINE_STAGE_ALL_GRAPHICS_BIT, state.access, VK_ACCESS_MEMORY_READ_BIT, state.aspect);
   }
   command_context->image_states_.clear();
 
@@ -194,8 +178,7 @@ int VulkanCore::SubmitCommandContext(CommandContext *p_command_context) {
   VkFence fence = in_flight_fences_[current_frame_]->Handle();
   vkResetFences(device_->Handle(), 1, &fence);
 
-  VkPipelineStageFlags wait_stages[] = {
-      VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT};
+  VkPipelineStageFlags wait_stages[] = {VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT};
 
   VkSubmitInfo submit_info{};
   submit_info.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
@@ -216,16 +199,14 @@ int VulkanCore::SubmitCommandContext(CommandContext *p_command_context) {
 
   current_frame_ = (current_frame_ + 1) % FramesInFlight();
   fence = in_flight_fences_[current_frame_]->Handle();
-  vkWaitForFences(device_->Handle(), 1, &fence, VK_TRUE,
-                  std::numeric_limits<uint64_t>::max());
+  vkWaitForFences(device_->Handle(), 1, &fence, VK_TRUE, std::numeric_limits<uint64_t>::max());
 
   vkQueueWaitIdle(transfer_queue_->Handle());
 
   return 0;
 }
 
-int VulkanCore::GetPhysicalDeviceProperties(
-    PhysicalDeviceProperties *p_physical_device_properties) {
+int VulkanCore::GetPhysicalDeviceProperties(PhysicalDeviceProperties *p_physical_device_properties) {
   auto physical_devices = instance_->EnumeratePhysicalDevices();
   if (physical_devices.empty()) {
     return 0;
@@ -265,35 +246,19 @@ int VulkanCore::InitializeLogicalDevice(int device_index) {
   }
   auto physical_device = physical_devices[device_index];
   grassland::vulkan::DeviceFeatureRequirement device_feature_requirement{};
-  device_feature_requirement.enable_raytracing_extension =
-      physical_device.SupportRayTracing();
-  if (instance_->CreateDevice(
-          physical_device,
-          device_feature_requirement.GenerateRecommendedDeviceCreateInfo(
-              physical_device),
-          device_feature_requirement.GetVmaAllocatorCreateFlags(),
-          &device_) != VK_SUCCESS) {
+  device_feature_requirement.enable_raytracing_extension = physical_device.SupportRayTracing();
+  if (instance_->CreateDevice(physical_device, device_feature_requirement.GenerateRecommendedDeviceCreateInfo(physical_device), device_feature_requirement.GetVmaAllocatorCreateFlags(), &device_) != VK_SUCCESS) {
     return -1;
   }
 
   device_name_ = physical_device.GetPhysicalDeviceProperties().deviceName;
   ray_tracing_support_ = physical_device.SupportRayTracing();
 
-  vulkan::ThrowIfFailed(device_->CreateCommandPool(
-                            device_->PhysicalDevice().GraphicsFamilyIndex(),
-                            VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT,
-                            &graphics_command_pool_),
-                        "failed to create graphics command pool");
-  vulkan::ThrowIfFailed(device_->CreateCommandPool(
-                            device_->PhysicalDevice().TransferFamilyIndex(),
-                            VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT,
-                            &transfer_command_pool_),
-                        "failed to create transfer command pool");
+  vulkan::ThrowIfFailed(device_->CreateCommandPool(device_->PhysicalDevice().GraphicsFamilyIndex(), VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT, &graphics_command_pool_), "failed to create graphics command pool");
+  vulkan::ThrowIfFailed(device_->CreateCommandPool(device_->PhysicalDevice().TransferFamilyIndex(), VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT, &transfer_command_pool_), "failed to create transfer command pool");
 
-  device_->GetQueue(device_->PhysicalDevice().GraphicsFamilyIndex(), 0,
-                    &graphics_queue_);
-  device_->GetQueue(device_->PhysicalDevice().TransferFamilyIndex(), 0,
-                    &transfer_queue_);
+  device_->GetQueue(device_->PhysicalDevice().GraphicsFamilyIndex(), 0, &graphics_queue_);
+  device_->GetQueue(device_->PhysicalDevice().TransferFamilyIndex(), 0, &transfer_queue_);
 
   in_flight_fences_.resize(FramesInFlight());
   command_buffers_.resize(FramesInFlight());
@@ -303,8 +268,7 @@ int VulkanCore::InitializeLogicalDevice(int device_index) {
 
   for (int i = 0; i < FramesInFlight(); i++) {
     device_->CreateFence(true, &in_flight_fences_[i]);
-    graphics_command_pool_->AllocateCommandBuffer(
-        VK_COMMAND_BUFFER_LEVEL_PRIMARY, &command_buffers_[i]);
+    graphics_command_pool_->AllocateCommandBuffer(VK_COMMAND_BUFFER_LEVEL_PRIMARY, &command_buffers_[i]);
 
     VkDescriptorPoolSize pool_sizes[] = {
         {VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 100},
@@ -313,11 +277,9 @@ int VulkanCore::InitializeLogicalDevice(int device_index) {
         {VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, 100},
     };
 
-    device_->CreateDescriptorPool({{VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 1}}, 1,
-                                  &descriptor_pools_[i]);
+    device_->CreateDescriptorPool({{VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 1}}, 1, &descriptor_pools_[i]);
   }
-  transfer_command_pool_->AllocateCommandBuffer(VK_COMMAND_BUFFER_LEVEL_PRIMARY,
-                                                &transfer_command_buffer_);
+  transfer_command_pool_->AllocateCommandBuffer(VK_COMMAND_BUFFER_LEVEL_PRIMARY, &transfer_command_buffer_);
 
   return 0;
 }
@@ -326,10 +288,8 @@ void VulkanCore::WaitGPU() {
   device_->WaitIdle();
 }
 
-void VulkanCore::SingleTimeCommand(
-    std::function<void(VkCommandBuffer)> command) {
-  vulkan::SingleTimeCommand(graphics_queue_.get(), graphics_command_pool_.get(),
-                            command);
+void VulkanCore::SingleTimeCommand(std::function<void(VkCommandBuffer)> command) {
+  vulkan::SingleTimeCommand(graphics_queue_.get(), graphics_command_pool_.get(), command);
 }
 
 }  // namespace grassland::graphics::backend

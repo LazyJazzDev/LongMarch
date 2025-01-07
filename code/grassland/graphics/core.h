@@ -20,51 +20,33 @@ class Core {
 
   virtual BackendAPI API() const = 0;
 
-  virtual int CreateBuffer(size_t size,
-                           BufferType type,
-                           double_ptr<Buffer> pp_buffer) = 0;
+  virtual int CreateBuffer(size_t size, BufferType type, double_ptr<Buffer> pp_buffer) = 0;
 
-  virtual int CreateImage(int width,
-                          int height,
-                          ImageFormat format,
-                          double_ptr<Image> pp_image) = 0;
+  virtual int CreateImage(int width, int height, ImageFormat format, double_ptr<Image> pp_image) = 0;
 
-  virtual int CreateSampler(const SamplerInfo &info,
-                            double_ptr<Sampler> pp_sampler) = 0;
+  virtual int CreateSampler(const SamplerInfo &info, double_ptr<Sampler> pp_sampler) = 0;
 
-  int CreateWindowObject(int width,
-                         int height,
-                         const std::string &title,
-                         double_ptr<Window> pp_window);
-  virtual int CreateWindowObject(int width,
-                                 int height,
-                                 const std::string &title,
-                                 bool fullscreen,
-                                 bool resizable,
-                                 double_ptr<Window> pp_window) = 0;
+  int CreateWindowObject(int width, int height, const std::string &title, double_ptr<Window> pp_window);
+  virtual int CreateWindowObject(int width, int height, const std::string &title, bool fullscreen, bool resizable, double_ptr<Window> pp_window) = 0;
 #ifdef WIN32
-  int CreateShader(Microsoft::WRL::ComPtr<ID3DBlob> shader_blob,
-                   double_ptr<Shader> pp_shader);
+  int CreateShader(Microsoft::WRL::ComPtr<ID3DBlob> shader_blob, double_ptr<Shader> pp_shader);
 #endif
 
-  int CreateShader(const std::vector<uint32_t> &spirv,
-                   double_ptr<Shader> pp_shader);
+  int CreateShader(const std::vector<uint32_t> &spirv, double_ptr<Shader> pp_shader);
 
-  virtual int CreateShader(const void *data,
-                           size_t size,
-                           double_ptr<Shader> pp_shader) = 0;
+  virtual int CreateShader(const void *data, size_t size, double_ptr<Shader> pp_shader) = 0;
 
-  virtual int CreateProgram(const std::vector<ImageFormat> &color_formats,
-                            ImageFormat depth_format,
-                            double_ptr<Program> pp_program) = 0;
+  virtual int CreateShader(const CompiledShaderBlob &shader_blob, double_ptr<Shader> pp_shader) = 0;
 
-  virtual int CreateCommandContext(
-      double_ptr<CommandContext> pp_command_context) = 0;
+  virtual int CreateShader(const std::string &source_code, const std::string &entry_point, const std::string &target, double_ptr<Shader> pp_shader) = 0;
+
+  virtual int CreateProgram(const std::vector<ImageFormat> &color_formats, ImageFormat depth_format, double_ptr<Program> pp_program) = 0;
+
+  virtual int CreateCommandContext(double_ptr<CommandContext> pp_command_context) = 0;
 
   virtual int SubmitCommandContext(CommandContext *p_command_context) = 0;
 
-  virtual int GetPhysicalDeviceProperties(
-      PhysicalDeviceProperties *p_physical_device_properties = nullptr) = 0;
+  virtual int GetPhysicalDeviceProperties(PhysicalDeviceProperties *p_physical_device_properties = nullptr) = 0;
 
   virtual int InitializeLogicalDevice(int device_index) = 0;
 
@@ -88,8 +70,6 @@ class Core {
   bool ray_tracing_support_{false};
 };
 
-int CreateCore(BackendAPI api,
-               const Core::Settings &settings,
-               double_ptr<Core> pp_core);
+int CreateCore(BackendAPI api, const Core::Settings &settings, double_ptr<Core> pp_core);
 
 }  // namespace grassland::graphics
