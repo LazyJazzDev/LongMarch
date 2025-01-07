@@ -4,7 +4,7 @@ int main() {
   Application app_d3d12{grassland::graphics::BACKEND_API_D3D12};
   Application app_vulkan{grassland::graphics::BACKEND_API_VULKAN};
 
-  // app_d3d12.OnInit();
+  app_d3d12.OnInit();
   app_vulkan.OnInit();
 
   grassland::Metronome metronome;

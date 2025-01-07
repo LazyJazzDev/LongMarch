@@ -1,5 +1,8 @@
 #include "grassland/graphics/program.h"
 
+#ifdef _WIN32
+#include "d3dcompiler.h"
+#endif
 #include "directx-dxc/dxcapi.h"
 
 namespace grassland::graphics {
@@ -68,7 +71,7 @@ CompiledShaderBlob CompileShader(const std::string &source_code, const std::stri
     result->GetOutput(DXC_OUT_ERRORS, IID_PPV_ARGS(&error_blob), &output_name);
 
     if (error_blob->GetStringPointer() && error_blob->GetStringLength()) {
-      LogInfo("Error: {}", error_blob->GetStringPointer());
+      LogInfo("{}", error_blob->GetStringPointer());
     }
     SAFE_RELEASE(error_blob);
     SAFE_RELEASE(output_name);

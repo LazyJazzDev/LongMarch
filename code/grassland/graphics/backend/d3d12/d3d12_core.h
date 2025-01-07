@@ -22,41 +22,27 @@ class D3D12Core : public Core {
     return BACKEND_API_D3D12;
   }
 
-  int CreateBuffer(size_t size,
-                   BufferType type,
-                   double_ptr<Buffer> pp_buffer) override;
+  int CreateBuffer(size_t size, BufferType type, double_ptr<Buffer> pp_buffer) override;
 
-  int CreateImage(int width,
-                  int height,
-                  ImageFormat format,
-                  double_ptr<Image> pp_image) override;
+  int CreateImage(int width, int height, ImageFormat format, double_ptr<Image> pp_image) override;
 
-  int CreateSampler(const SamplerInfo &info,
-                    double_ptr<Sampler> pp_sampler) override;
+  int CreateSampler(const SamplerInfo &info, double_ptr<Sampler> pp_sampler) override;
 
-  int CreateWindowObject(int width,
-                         int height,
-                         const std::string &title,
-                         bool fullscreen,
-                         bool resizable,
-                         double_ptr<Window> pp_window) override;
+  int CreateWindowObject(int width, int height, const std::string &title, bool fullscreen, bool resizable, double_ptr<Window> pp_window) override;
 
-  int CreateShader(const void *data,
-                   size_t size,
-                   double_ptr<Shader> pp_shader) override;
+  int CreateShader(const void *data, size_t size, double_ptr<Shader> pp_shader) override;
 
-  int CreateProgram(const std::vector<ImageFormat> &color_formats,
-                    ImageFormat depth_format,
-                    double_ptr<Program> pp_program) override;
+  int CreateShader(const CompiledShaderBlob &shader_blob, double_ptr<Shader> pp_shader) override;
 
-  int CreateCommandContext(
-      double_ptr<CommandContext> pp_command_context) override;
+  int CreateShader(const std::string &source_code, const std::string &entry_point, const std::string &target, double_ptr<Shader> pp_shader) override;
+
+  int CreateProgram(const std::vector<ImageFormat> &color_formats, ImageFormat depth_format, double_ptr<Program> pp_program) override;
+
+  int CreateCommandContext(double_ptr<CommandContext> pp_command_context) override;
 
   int SubmitCommandContext(CommandContext *p_command_context) override;
 
-  int GetPhysicalDeviceProperties(
-      PhysicalDeviceProperties *p_physical_device_properties =
-          nullptr) override;
+  int GetPhysicalDeviceProperties(PhysicalDeviceProperties *p_physical_device_properties = nullptr) override;
 
   int InitializeLogicalDevice(int device_index) override;
 
@@ -90,8 +76,7 @@ class D3D12Core : public Core {
     return current_frame_;
   }
 
-  void SingleTimeCommand(
-      std::function<void(ID3D12GraphicsCommandList *)> command);
+  void SingleTimeCommand(std::function<void(ID3D12GraphicsCommandList *)> command);
 
   BlitPipeline *BlitPipeline() {
     return &blit_pipeline_;
@@ -126,8 +111,7 @@ class D3D12Core : public Core {
   std::unique_ptr<d3d12::CommandList> transfer_command_list_;
   std::unique_ptr<d3d12::Fence> transfer_fence_;
 
-  std::vector<std::unique_ptr<d3d12::DescriptorHeap>>
-      resource_descriptor_heaps_;
+  std::vector<std::unique_ptr<d3d12::DescriptorHeap>> resource_descriptor_heaps_;
   std::vector<std::unique_ptr<d3d12::DescriptorHeap>> sampler_descriptor_heaps_;
 
   std::vector<std::unique_ptr<d3d12::DescriptorHeap>> rtv_descriptor_heaps_;

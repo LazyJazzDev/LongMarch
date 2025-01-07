@@ -26,8 +26,12 @@ else ()
 endif ()
 
 if (MSVC)
+    # /utf-8
     add_compile_options("$<$<COMPILE_LANGUAGE:CXX>:/utf-8>")
     add_compile_options("$<$<COMPILE_LANGUAGE:CUDA>:-Xcompiler=\"/utf-8\">")
+    # /bigobj
+    add_compile_options("$<$<COMPILE_LANGUAGE:CXX>:/bigobj>")
+    add_compile_options("$<$<COMPILE_LANGUAGE:CUDA>:-Xcompiler=\"/bigobj\">")
 endif ()
 
 
