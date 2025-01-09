@@ -1,10 +1,10 @@
+file(GLOB_RECURSE SOURCES "*.cpp")
 
 if (LONGMARCH_CUDA_ENABLED)
-    message(STATUS "CUDA enabled, compiling CUDA code.")
-    file(GLOB_RECURSE SOURCES "*.cu" "*.h")
-else ()
-    message(STATUS "CUDA disabled, compiling C++ code.")
-    file(GLOB_RECURSE SOURCES "*.cpp" "*.h")
+    message(STATUS "CUDA enabled, marking source files as CUDA source.")
+    foreach (source_file ${SOURCES})
+        set_source_files_properties(${source_file} PROPERTIES LANGUAGE CUDA)
+    endforeach ()
 endif ()
 
 add_library(${GRASSLAND_SUBLIB_NAME} ${SOURCES})
