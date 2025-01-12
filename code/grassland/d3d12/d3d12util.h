@@ -52,16 +52,15 @@ size_t SizeByFormat(DXGI_FORMAT format);
 
 size_t SizeAlignTo(size_t size, size_t alignment);
 
-#define RETURN_IF_FAILED_HR(cmd, ...)                               \
-  do {                                                              \
-    HRESULT res = cmd;                                              \
-    if (FAILED(res)) {                                              \
-      ::grassland::d3d12::SetErrorMessage(__VA_ARGS__);             \
-      ::grassland::d3d12::SetErrorMessage(                          \
-          "HRESULT: {}", ::grassland::d3d12::HRESULTToString(res)); \
-      return res;                                                   \
-    }                                                               \
-                                                                    \
+#define RETURN_IF_FAILED_HR(cmd, ...)                                                               \
+  do {                                                                                              \
+    HRESULT res = cmd;                                                                              \
+    if (FAILED(res)) {                                                                              \
+      ::grassland::d3d12::SetErrorMessage(__VA_ARGS__);                                             \
+      ::grassland::d3d12::SetErrorMessage("HRESULT: {}", ::grassland::d3d12::HRESULTToString(res)); \
+      return res;                                                                                   \
+    }                                                                                               \
+                                                                                                    \
   } while (false)
 
 struct DeviceFeatureRequirement;
@@ -80,6 +79,7 @@ class Image;
 class Fence;
 class ShaderModule;
 class PipelineState;
+class AccelerationStructure;
 
 #ifdef NDEBUG
 constexpr bool kDefaultEnableDebugLayer = false;
@@ -88,5 +88,12 @@ constexpr bool kDefaultEnableDebugLayer = true;
 #endif
 
 bool IsDepthFormat(DXGI_FORMAT format);
+
+HRESULT CreateBuffer(ID3D12Device *device,
+                     size_t size,
+                     D3D12_HEAP_TYPE heap_type,
+                     D3D12_RESOURCE_STATES resource_state,
+                     D3D12_RESOURCE_FLAGS resource_flags,
+                     ComPtr<ID3D12Resource> &buffer);
 
 }  // namespace grassland::d3d12

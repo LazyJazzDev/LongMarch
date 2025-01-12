@@ -50,12 +50,9 @@ class Device {
     return vkDeviceWaitIdle(device_);
   }
 
-  VkResult GetQueue(uint32_t queue_family_index,
-                    int queue_index,
-                    double_ptr<Queue> pp_queue) const;
+  VkResult GetQueue(uint32_t queue_family_index, int queue_index, double_ptr<Queue> pp_queue) const;
 
-  VkResult CreateSwapchain(const Surface *surface,
-                           double_ptr<Swapchain> pp_swapchain) const;
+  VkResult CreateSwapchain(const Surface *surface, double_ptr<Swapchain> pp_swapchain) const;
 
   VkResult CreateSemaphore(double_ptr<Semaphore> pp_semaphore) const;
 
@@ -67,45 +64,36 @@ class Device {
 
   VkResult CreateCommandPool(double_ptr<CommandPool> pp_command_pool) const;
 
-  VkResult CreateShaderModule(const std::vector<uint32_t> &code,
-                              double_ptr<ShaderModule> pp_shader_module) const;
+  VkResult CreateShaderModule(const std::vector<uint32_t> &code, double_ptr<ShaderModule> pp_shader_module) const;
 
-  VkResult CreateShaderModule(const void *p_code,
-                              size_t code_size,
-                              double_ptr<ShaderModule> pp_shader_module) const;
+  VkResult CreateShaderModule(const void *p_code, size_t code_size, double_ptr<ShaderModule> pp_shader_module) const;
 
-  VkResult CreateDescriptorPool(
-      const std::vector<VkDescriptorPoolSize> &pool_sizes,
-      uint32_t max_sets,
-      double_ptr<DescriptorPool> pp_descriptor_pool) const;
+  VkResult CreateDescriptorPool(const std::vector<VkDescriptorPoolSize> &pool_sizes,
+                                uint32_t max_sets,
+                                double_ptr<DescriptorPool> pp_descriptor_pool) const;
 
-  VkResult CreateDescriptorSetLayout(
-      const std::vector<VkDescriptorSetLayoutBinding> &bindings,
-      double_ptr<DescriptorSetLayout> pp_descriptor_set_layout) const;
+  VkResult CreateDescriptorSetLayout(const std::vector<VkDescriptorSetLayoutBinding> &bindings,
+                                     double_ptr<DescriptorSetLayout> pp_descriptor_set_layout) const;
 
-  VkResult CreateRenderPass(
-      const std::vector<VkAttachmentDescription> &attachment_descriptions,
-      const std::vector<struct SubpassSettings> &subpass_settings,
-      const std::vector<VkSubpassDependency> &dependencies,
-      double_ptr<RenderPass> pp_render_pass) const;
+  VkResult CreateRenderPass(const std::vector<VkAttachmentDescription> &attachment_descriptions,
+                            const std::vector<struct SubpassSettings> &subpass_settings,
+                            const std::vector<VkSubpassDependency> &dependencies,
+                            double_ptr<RenderPass> pp_render_pass) const;
 
-  VkResult CreateRenderPass(
-      const std::vector<VkAttachmentDescription> &attachment_descriptions,
-      const std::vector<VkAttachmentReference> &color_attachment_references,
-      const std::optional<VkAttachmentReference> &depth_attachment_reference,
-      const std::vector<VkAttachmentReference> &resolve_attachment_references,
-      double_ptr<RenderPass> pp_render_pass) const;
+  VkResult CreateRenderPass(const std::vector<VkAttachmentDescription> &attachment_descriptions,
+                            const std::vector<VkAttachmentReference> &color_attachment_references,
+                            const std::optional<VkAttachmentReference> &depth_attachment_reference,
+                            const std::vector<VkAttachmentReference> &resolve_attachment_references,
+                            double_ptr<RenderPass> pp_render_pass) const;
 
-  VkResult CreateRenderPass(
-      const std::vector<VkAttachmentDescription> &attachment_descriptions,
-      const std::vector<VkAttachmentReference> &color_attachment_references,
-      const std::optional<VkAttachmentReference> &depth_attachment_reference,
-      double_ptr<RenderPass> pp_render_pass) const;
+  VkResult CreateRenderPass(const std::vector<VkAttachmentDescription> &attachment_descriptions,
+                            const std::vector<VkAttachmentReference> &color_attachment_references,
+                            const std::optional<VkAttachmentReference> &depth_attachment_reference,
+                            double_ptr<RenderPass> pp_render_pass) const;
 
-  VkResult CreateRenderPass(
-      const std::vector<VkAttachmentDescription> &attachment_descriptions,
-      const std::vector<VkAttachmentReference> &color_attachment_references,
-      double_ptr<RenderPass> pp_render_pass) const;
+  VkResult CreateRenderPass(const std::vector<VkAttachmentDescription> &attachment_descriptions,
+                            const std::vector<VkAttachmentReference> &color_attachment_references,
+                            double_ptr<RenderPass> pp_render_pass) const;
 
   VkResult CreateImage(VkFormat format,
                        VkExtent2D extent,
@@ -128,14 +116,9 @@ class Device {
                        VkImageAspectFlags aspect,
                        double_ptr<Image> pp_image) const;
 
-  VkResult CreateImage(VkFormat format,
-                       VkExtent2D extent,
-                       VkImageUsageFlags usage,
-                       double_ptr<Image> pp_image) const;
+  VkResult CreateImage(VkFormat format, VkExtent2D extent, VkImageUsageFlags usage, double_ptr<Image> pp_image) const;
 
-  VkResult CreateImage(VkFormat format,
-                       VkExtent2D extent,
-                       double_ptr<Image> pp_image) const;
+  VkResult CreateImage(VkFormat format, VkExtent2D extent, double_ptr<Image> pp_image) const;
 
   VkResult CreateSampler(VkFilter mag_filter,
                          VkFilter min_filter,
@@ -158,30 +141,26 @@ class Device {
                         VmaMemoryUsage memory_usage,
                         double_ptr<Buffer> pp_buffer) const;
 
-  VkResult CreatePipelineLayout(
-      const std::vector<VkDescriptorSetLayout> &descriptor_set_layouts,
-      double_ptr<PipelineLayout> pp_pipeline_layout) const;
+  VkResult CreatePipelineLayout(const std::vector<VkDescriptorSetLayout> &descriptor_set_layouts,
+                                double_ptr<PipelineLayout> pp_pipeline_layout) const;
 
-  VkResult CreatePipeline(const struct PipelineSettings &settings,
-                          double_ptr<Pipeline> pp_pipeline) const;
+  VkResult CreatePipeline(const struct PipelineSettings &settings, double_ptr<Pipeline> pp_pipeline) const;
 
-  VkResult CreateBottomLevelAccelerationStructure(
-      VkDeviceAddress vertex_buffer_address,
-      VkDeviceAddress index_buffer_address,
-      uint32_t num_vertex,
-      VkDeviceSize stride,
-      uint32_t primitive_count,
-      CommandPool *command_pool,
-      Queue *queue,
-      double_ptr<AccelerationStructure> pp_blas);
+  VkResult CreateBottomLevelAccelerationStructure(VkDeviceAddress vertex_buffer_address,
+                                                  VkDeviceAddress index_buffer_address,
+                                                  uint32_t num_vertex,
+                                                  VkDeviceSize stride,
+                                                  uint32_t primitive_count,
+                                                  CommandPool *command_pool,
+                                                  Queue *queue,
+                                                  double_ptr<AccelerationStructure> pp_blas);
 
-  VkResult CreateBottomLevelAccelerationStructure(
-      Buffer *vertex_buffer,
-      Buffer *index_buffer,
-      VkDeviceSize stride,
-      CommandPool *command_pool,
-      Queue *queue,
-      double_ptr<AccelerationStructure> pp_blas);
+  VkResult CreateBottomLevelAccelerationStructure(Buffer *vertex_buffer,
+                                                  Buffer *index_buffer,
+                                                  VkDeviceSize stride,
+                                                  CommandPool *command_pool,
+                                                  Queue *queue,
+                                                  double_ptr<AccelerationStructure> pp_blas);
 
   VkResult CreateTopLevelAccelerationStructure(
       const std::vector<std::pair<AccelerationStructure *, glm::mat4>> &objects,
@@ -195,9 +174,7 @@ class Device {
                                     ShaderModule *closest_hit_shader,
                                     double_ptr<Pipeline> pp_pipeline) const;
 
-  VkResult CreateShaderBindingTable(
-      Pipeline *ray_tracing_pipeline,
-      double_ptr<ShaderBindingTable> pp_sbt) const;
+  VkResult CreateShaderBindingTable(Pipeline *ray_tracing_pipeline, double_ptr<ShaderBindingTable> pp_sbt) const;
 
   void NameObject(VkImage image, const std::string &name);
   void NameObject(VkImageView image_view, const std::string &name);
@@ -205,8 +182,7 @@ class Device {
   void NameObject(VkDeviceMemory memory, const std::string &name);
   void NameObject(VkPipeline pipeline, const std::string &name);
   void NameObject(VkPipelineLayout pipeline_layout, const std::string &name);
-  void NameObject(VkDescriptorSetLayout descriptor_set_layout,
-                  const std::string &name);
+  void NameObject(VkDescriptorSetLayout descriptor_set_layout, const std::string &name);
   void NameObject(VkDescriptorSet descriptor_set, const std::string &name);
   void NameObject(VkRenderPass render_pass, const std::string &name);
   void NameObject(VkSampler sampler, const std::string &name);
@@ -215,8 +191,7 @@ class Device {
   void NameObject(VkFramebuffer framebuffer, const std::string &name);
   void NameObject(VkDescriptorPool descriptor_pool, const std::string &name);
   void NameObject(VkShaderModule shader_module, const std::string &name);
-  void NameObject(VkAccelerationStructureKHR acceleration_structure,
-                  const std::string &name);
+  void NameObject(VkAccelerationStructureKHR acceleration_structure, const std::string &name);
 
  private:
   const class Instance *instance_{};

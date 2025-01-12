@@ -11,6 +11,7 @@
 #include "grassland/d3d12/fence.h"
 #include "grassland/d3d12/image.h"
 #include "grassland/d3d12/pipeline_state.h"
+#include "grassland/d3d12/raytracing/raytracing.h"
 #include "grassland/d3d12/root_signature.h"
 #include "grassland/d3d12/shader_module.h"
 #include "grassland/d3d12/swap_chain.h"
