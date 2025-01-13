@@ -4,7 +4,8 @@
 
 namespace grassland::d3d12 {
 
-AccelerationStructure::AccelerationStructure(const ComPtr<ID3D12Resource> &as) : as_(as) {
+AccelerationStructure::AccelerationStructure(Device *device, const ComPtr<ID3D12Resource> &as)
+    : device_(device), as_(as) {
 }
 
 HRESULT AccelerationStructure::UpdateInstances(
@@ -12,7 +13,7 @@ HRESULT AccelerationStructure::UpdateInstances(
     CommandQueue *queue,
     Fence *fence,
     CommandAllocator *allocator) const {
-  ComPtr<ID3D12Device5> device;
+  ID3D12Device5 *device = device_->DXRDevice();
   RETURN_IF_FAILED_HR(as_->GetDevice(IID_PPV_ARGS(&device)), "failed to get DXR device.");
 
   std::vector<D3D12_RAYTRACING_INSTANCE_DESC> instance_descs;
@@ -40,11 +41,8 @@ HRESULT AccelerationStructure::UpdateInstances(
     instance_descs.push_back(instance_desc);
   }
 
-  ComPtr<ID3D12Resource> instance_buffer;
-  RETURN_IF_FAILED_HR(d3d12::CreateBuffer(device.Get(), sizeof(D3D12_RAYTRACING_INSTANCE_DESC) * instance_descs.size(),
-                                          D3D12_HEAP_TYPE_UPLOAD, D3D12_RESOURCE_STATE_GENERIC_READ,
-                                          D3D12_RESOURCE_FLAG_NONE, instance_buffer),
-                      "failed to create instance buffer.");
+  ID3D12Resource *instance_buffer =
+      device_->RequestInstanceBuffer(sizeof(D3D12_RAYTRACING_INSTANCE_DESC) * instance_descs.size());
   void *instance_buffer_ptr{};
   RETURN_IF_FAILED_HR(instance_buffer->Map(0, nullptr, &instance_buffer_ptr), "failed to map instance buffer.");
   std::memcpy(instance_buffer_ptr, instance_descs.data(),
@@ -63,12 +61,7 @@ HRESULT AccelerationStructure::UpdateInstances(
   D3D12_RAYTRACING_ACCELERATION_STRUCTURE_PREBUILD_INFO as_prebuild_info = {};
   device->GetRaytracingAccelerationStructurePrebuildInfo(&as_inputs, &as_prebuild_info);
 
-  ComPtr<ID3D12Resource> scratch_buffer;
-  RETURN_IF_FAILED_HR(
-      d3d12::CreateBuffer(device.Get(), as_prebuild_info.ScratchDataSizeInBytes, D3D12_HEAP_TYPE_DEFAULT,
-                          D3D12_RESOURCE_STATE_COMMON, D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS, scratch_buffer),
-      "failed to create scratch buffer.");
-
+  ID3D12Resource *scratch_buffer = device_->RequestScratchBuffer(as_prebuild_info.ScratchDataSizeInBytes);
   D3D12_BUILD_RAYTRACING_ACCELERATION_STRUCTURE_DESC as_desc = {};
   as_desc.Inputs = as_inputs;
   as_desc.ScratchAccelerationStructureData = scratch_buffer->GetGPUVirtualAddress();

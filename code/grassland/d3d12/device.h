@@ -10,6 +10,10 @@ class Device {
     return device_.Get();
   }
 
+  ID3D12Device5 *DXRDevice() const {
+    return dxr_device_.Get();
+  }
+
   const Adapter &Adapter() const {
     return adapter_;
   }
@@ -104,11 +108,18 @@ class Device {
   HRESULT CreateShaderTable(RayTracingPipeline *ray_tracing_pipeline, double_ptr<ShaderTable> pp_shader_table) const;
 
  private:
+  friend AccelerationStructure;
+
+  ID3D12Resource *RequestScratchBuffer(size_t size);
+  ID3D12Resource *RequestInstanceBuffer(size_t size);
+
   class Adapter adapter_;
   ComPtr<ID3D12Device> device_;
   D3D_FEATURE_LEVEL feature_level_;
 
   // Get DXR device
   ComPtr<ID3D12Device5> dxr_device_;
+  ComPtr<ID3D12Resource> scratch_buffer_;
+  ComPtr<ID3D12Resource> instance_buffer_;
 };
 }  // namespace grassland::d3d12

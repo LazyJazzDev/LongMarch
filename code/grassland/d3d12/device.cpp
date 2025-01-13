@@ -253,11 +253,7 @@ HRESULT Device::CreateBottomLevelAccelerationStructure(D3D12_GPU_VIRTUAL_ADDRESS
   D3D12_RAYTRACING_ACCELERATION_STRUCTURE_PREBUILD_INFO as_prebuild_info = {};
   dxr_device_->GetRaytracingAccelerationStructurePrebuildInfo(&as_inputs, &as_prebuild_info);
 
-  ComPtr<ID3D12Resource> scratch_buffer;
-  RETURN_IF_FAILED_HR(
-      d3d12::CreateBuffer(Handle(), as_prebuild_info.ScratchDataSizeInBytes, D3D12_HEAP_TYPE_DEFAULT,
-                          D3D12_RESOURCE_STATE_COMMON, D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS, scratch_buffer),
-      "failed to create scratch buffer.");
+  ID3D12Resource *scratch_buffer = RequestScratchBuffer(as_prebuild_info.ScratchDataSizeInBytes);
 
   ComPtr<ID3D12Resource> as;
   RETURN_IF_FAILED_HR(d3d12::CreateBuffer(Handle(), as_prebuild_info.ResultDataMaxSizeInBytes, D3D12_HEAP_TYPE_DEFAULT,
@@ -278,7 +274,7 @@ HRESULT Device::CreateBottomLevelAccelerationStructure(D3D12_GPU_VIRTUAL_ADDRESS
     }
   });
 
-  pp_as.construct(as);
+  pp_as.construct(this, as);
   return S_OK;
 }
 
@@ -326,19 +322,18 @@ HRESULT Device::CreateTopLevelAccelerationStructure(
     instance_descs.push_back(instance_desc);
   }
 
-  std::unique_ptr<Buffer> instance_buffer;
-  RETURN_IF_FAILED_HR(
-      CreateBuffer(sizeof(D3D12_RAYTRACING_INSTANCE_DESC) * instance_descs.size(), D3D12_HEAP_TYPE_UPLOAD,
-                   D3D12_RESOURCE_STATE_GENERIC_READ, D3D12_RESOURCE_FLAG_NONE, &instance_buffer),
-      "failed to create instance buffer.");
-  std::memcpy(instance_buffer->Map(), instance_descs.data(),
+  ID3D12Resource *instance_buffer =
+      RequestInstanceBuffer(sizeof(D3D12_RAYTRACING_INSTANCE_DESC) * instance_descs.size());
+  void *instance_buffer_ptr{};
+  RETURN_IF_FAILED_HR(instance_buffer->Map(0, nullptr, &instance_buffer_ptr), "failed to map instance buffer.");
+  std::memcpy(instance_buffer_ptr, instance_descs.data(),
               instance_descs.size() * sizeof(D3D12_RAYTRACING_INSTANCE_DESC));
-  instance_buffer->Unmap();
+  instance_buffer->Unmap(0, nullptr);
 
   D3D12_BUILD_RAYTRACING_ACCELERATION_STRUCTURE_INPUTS as_inputs = {};
   as_inputs.Type = D3D12_RAYTRACING_ACCELERATION_STRUCTURE_TYPE_TOP_LEVEL;
   as_inputs.DescsLayout = D3D12_ELEMENTS_LAYOUT_ARRAY;
-  as_inputs.InstanceDescs = instance_buffer->Handle()->GetGPUVirtualAddress();
+  as_inputs.InstanceDescs = instance_buffer->GetGPUVirtualAddress();
   as_inputs.NumDescs = instance_descs.size();
   as_inputs.Flags = D3D12_RAYTRACING_ACCELERATION_STRUCTURE_BUILD_FLAG_PREFER_FAST_TRACE |
                     D3D12_RAYTRACING_ACCELERATION_STRUCTURE_BUILD_FLAG_ALLOW_UPDATE;
@@ -346,11 +341,7 @@ HRESULT Device::CreateTopLevelAccelerationStructure(
   D3D12_RAYTRACING_ACCELERATION_STRUCTURE_PREBUILD_INFO as_prebuild_info = {};
   dxr_device_->GetRaytracingAccelerationStructurePrebuildInfo(&as_inputs, &as_prebuild_info);
 
-  ComPtr<ID3D12Resource> scratch_buffer;
-  RETURN_IF_FAILED_HR(
-      d3d12::CreateBuffer(Handle(), as_prebuild_info.ScratchDataSizeInBytes, D3D12_HEAP_TYPE_DEFAULT,
-                          D3D12_RESOURCE_STATE_COMMON, D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS, scratch_buffer),
-      "failed to create scratch buffer.");
+  ID3D12Resource *scratch_buffer = RequestScratchBuffer(as_prebuild_info.ScratchDataSizeInBytes);
 
   ComPtr<ID3D12Resource> as;
   RETURN_IF_FAILED_HR(d3d12::CreateBuffer(Handle(), as_prebuild_info.ResultDataMaxSizeInBytes, D3D12_HEAP_TYPE_DEFAULT,
@@ -371,7 +362,7 @@ HRESULT Device::CreateTopLevelAccelerationStructure(
     }
   });
 
-  pp_tlas.construct(as);
+  pp_tlas.construct(this, as);
   return S_OK;
 }
 
@@ -464,6 +455,24 @@ HRESULT Device::CreateShaderTable(RayTracingPipeline *ray_tracing_pipeline,
   pp_shader_table.construct(buffer, ray_gen_shader_offset, miss_shader_offset, hit_group_shader_offset);
 
   return S_OK;
+}
+
+ID3D12Resource *Device::RequestScratchBuffer(size_t size) {
+  if (!scratch_buffer_ || scratch_buffer_->GetDesc().Width < size) {
+    scratch_buffer_.Reset();
+    d3d12::CreateBuffer(Handle(), size, D3D12_HEAP_TYPE_DEFAULT, D3D12_RESOURCE_STATE_COMMON,
+                        D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS, scratch_buffer_);
+  }
+  return scratch_buffer_.Get();
+}
+
+ID3D12Resource *Device::RequestInstanceBuffer(size_t size) {
+  if (!instance_buffer_ || instance_buffer_->GetDesc().Width < size) {
+    instance_buffer_.Reset();
+    d3d12::CreateBuffer(Handle(), size, D3D12_HEAP_TYPE_UPLOAD, D3D12_RESOURCE_STATE_GENERIC_READ,
+                        D3D12_RESOURCE_FLAG_NONE, instance_buffer_);
+  }
+  return instance_buffer_.Get();
 }
 
 }  // namespace grassland::d3d12
