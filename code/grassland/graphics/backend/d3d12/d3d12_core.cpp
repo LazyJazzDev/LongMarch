@@ -159,6 +159,23 @@ int D3D12Core::CreateTopLevelAccelerationStructure(
   return 0;
 }
 
+int D3D12Core::CreateRayTracingProgram(Shader *raygen_shader,
+                                       Shader *miss_shader,
+                                       Shader *closest_shader,
+                                       double_ptr<RayTracingProgram> pp_program) {
+  D3D12Shader *d3d12_raygen_shader = dynamic_cast<D3D12Shader *>(raygen_shader);
+  D3D12Shader *d3d12_miss_shader = dynamic_cast<D3D12Shader *>(miss_shader);
+  D3D12Shader *d3d12_closest_shader = dynamic_cast<D3D12Shader *>(closest_shader);
+
+  assert(d3d12_raygen_shader != nullptr);
+  assert(d3d12_miss_shader != nullptr);
+  assert(d3d12_closest_shader != nullptr);
+
+  pp_program.construct<D3D12RayTracingProgram>(this, d3d12_raygen_shader, d3d12_miss_shader, d3d12_closest_shader);
+
+  return 0;
+}
+
 int D3D12Core::SubmitCommandContext(CommandContext *p_command_context) {
   D3D12CommandContext *command_context = dynamic_cast<D3D12CommandContext *>(p_command_context);
 

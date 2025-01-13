@@ -46,6 +46,11 @@ class VulkanCore : public Core {
   int CreateTopLevelAccelerationStructure(const std::vector<std::pair<AccelerationStructure *, glm::mat4>> &objects,
                                           double_ptr<AccelerationStructure> pp_tlas) override;
 
+  int CreateRayTracingProgram(Shader *raygen_shader,
+                              Shader *miss_shader,
+                              Shader *closest_shader,
+                              double_ptr<RayTracingProgram> pp_program) override;
+
   int SubmitCommandContext(CommandContext *p_command_context) override;
 
   int GetPhysicalDeviceProperties(PhysicalDeviceProperties *p_physical_device_properties = nullptr) override;

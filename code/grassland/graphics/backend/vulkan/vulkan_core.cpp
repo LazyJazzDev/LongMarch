@@ -117,6 +117,23 @@ int VulkanCore::CreateTopLevelAccelerationStructure(
   return 0;
 }
 
+int VulkanCore::CreateRayTracingProgram(Shader *raygen_shader,
+                                        Shader *miss_shader,
+                                        Shader *closest_shader,
+                                        double_ptr<RayTracingProgram> pp_program) {
+  VulkanShader *vk_raygen_shader = dynamic_cast<VulkanShader *>(raygen_shader);
+  VulkanShader *vk_miss_shader = dynamic_cast<VulkanShader *>(miss_shader);
+  VulkanShader *vk_closest_shader = dynamic_cast<VulkanShader *>(closest_shader);
+
+  assert(vk_raygen_shader != nullptr);
+  assert(vk_miss_shader != nullptr);
+  assert(vk_closest_shader != nullptr);
+
+  pp_program.construct<VulkanRayTracingProgram>(this, vk_raygen_shader, vk_miss_shader, vk_closest_shader);
+
+  return 0;
+}
+
 int VulkanCore::SubmitCommandContext(CommandContext *p_command_context) {
   VulkanCommandContext *command_context = dynamic_cast<VulkanCommandContext *>(p_command_context);
 

@@ -57,6 +57,12 @@ typedef enum ShaderType {
   SHADER_TYPE_GEOMETRY = 2,
 } ShaderType;
 
+typedef enum BindPoint {
+  BIND_POINT_GRAPHICS = 0,
+  BIND_POINT_RAYTRACING = 1,
+  BIND_POINT_COUNT = 2,
+} BindPoint;
+
 struct PhysicalDeviceProperties {
   std::string name;
   uint64_t score;

@@ -55,6 +55,11 @@ class Core {
       const std::vector<std::pair<AccelerationStructure *, glm::mat4>> &objects,
       double_ptr<AccelerationStructure> pp_tlas) = 0;
 
+  virtual int CreateRayTracingProgram(Shader *raygen_shader,
+                                      Shader *miss_shader,
+                                      Shader *closest_shader,
+                                      double_ptr<RayTracingProgram> pp_program) = 0;
+
   virtual int SubmitCommandContext(CommandContext *p_command_context) = 0;
 
   virtual int GetPhysicalDeviceProperties(PhysicalDeviceProperties *p_physical_device_properties = nullptr) = 0;

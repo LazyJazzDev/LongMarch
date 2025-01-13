@@ -28,6 +28,8 @@ VkBlendOp BlendOpToVkBlendOp(BlendOp op);
 
 VkPipelineColorBlendAttachmentState BlendStateToVkPipelineColorBlendAttachmentState(const BlendState &state);
 
+VkPipelineBindPoint BindPointToVkPipelineBindPoint(BindPoint point);
+
 class VulkanCore;
 class VulkanBuffer;
 class VulkanImage;
@@ -38,6 +40,7 @@ class VulkanCommandContext;
 class VulkanWindow;
 class VulkanAccelerationStructure;
 class VulkanRayTracingProgram;
+class VulkanProgramBase;
 
 struct VulkanResourceBinding {
   VulkanResourceBinding();

@@ -16,16 +16,37 @@ VulkanShader::VulkanShader(VulkanCore *core, const CompiledShaderBlob &shader_bl
   core_->Device()->CreateShaderModule(shader_blob, &shader_module_);
 }
 
+VulkanProgramBase::VulkanProgramBase(VulkanCore *core) : core_(core) {
+}
+
+void VulkanProgramBase::AddResourceBindingImpl(ResourceType type, int count) {
+  VkDescriptorSetLayoutBinding binding = {};
+  binding.binding = 0;
+  binding.descriptorType = ResourceTypeToVkDescriptorType(type);
+  binding.descriptorCount = count;
+  binding.stageFlags = VK_SHADER_STAGE_ALL;
+  std::unique_ptr<vulkan::DescriptorSetLayout> descriptor_set_layout;
+  core_->Device()->CreateDescriptorSetLayout({binding}, &descriptor_set_layout);
+  descriptor_set_layouts_.push_back(std::move(descriptor_set_layout));
+}
+
+void VulkanProgramBase::FinalizePipelineLayout() {
+  std::vector<VkDescriptorSetLayout> descriptor_set_layouts;
+  descriptor_set_layouts.reserve(descriptor_set_layouts_.size());
+  for (auto &descriptor_set_layout : descriptor_set_layouts_) {
+    descriptor_set_layouts.push_back(descriptor_set_layout->Handle());
+  }
+  core_->Device()->CreatePipelineLayout(descriptor_set_layouts, &pipeline_layout_);
+}
+
 VulkanProgram::VulkanProgram(VulkanCore *core, const std::vector<ImageFormat> &color_formats, ImageFormat depth_format)
-    : core_(core),
+    : VulkanProgramBase(core),
       pipeline_settings_(nullptr, ConvertImageFormats(color_formats), ImageFormatToVkFormat(depth_format)) {
   pipeline_settings_.EnableDynamicPrimitiveTopology();
 }
 
 VulkanProgram::~VulkanProgram() {
   pipeline_.reset();
-  pipeline_layout_.reset();
-  descriptor_set_layouts_.clear();
 }
 
 void VulkanProgram::AddInputAttribute(uint32_t binding, InputType type, uint32_t offset) {
@@ -39,14 +60,7 @@ void VulkanProgram::AddInputBinding(uint32_t stride, bool input_per_instance) {
 }
 
 void VulkanProgram::AddResourceBinding(ResourceType type, int count) {
-  VkDescriptorSetLayoutBinding binding = {};
-  binding.binding = 0;
-  binding.descriptorType = ResourceTypeToVkDescriptorType(type);
-  binding.descriptorCount = count;
-  binding.stageFlags = VK_SHADER_STAGE_ALL;
-  std::unique_ptr<vulkan::DescriptorSetLayout> descriptor_set_layout;
-  core_->Device()->CreateDescriptorSetLayout({binding}, &descriptor_set_layout);
-  descriptor_set_layouts_.push_back(std::move(descriptor_set_layout));
+  AddResourceBindingImpl(type, count);
 }
 
 void VulkanProgram::SetCullMode(CullMode mode) {
@@ -68,12 +82,7 @@ void VulkanProgram::BindShader(Shader *shader, ShaderType type) {
 }
 
 void VulkanProgram::Finalize() {
-  std::vector<VkDescriptorSetLayout> descriptor_set_layouts;
-  descriptor_set_layouts.reserve(descriptor_set_layouts_.size());
-  for (auto &descriptor_set_layout : descriptor_set_layouts_) {
-    descriptor_set_layouts.push_back(descriptor_set_layout->Handle());
-  }
-  core_->Device()->CreatePipelineLayout(descriptor_set_layouts, &pipeline_layout_);
+  FinalizePipelineLayout();
   pipeline_settings_.pipeline_layout = pipeline_layout_.get();
   core_->Device()->CreatePipeline(pipeline_settings_, &pipeline_);
 }
@@ -84,6 +93,28 @@ int VulkanProgram::NumInputBindings() const {
 
 const vulkan::PipelineSettings *VulkanProgram::PipelineSettings() const {
   return &pipeline_settings_;
+}
+
+VulkanRayTracingProgram::VulkanRayTracingProgram(VulkanCore *core,
+                                                 VulkanShader *raygen_shader,
+                                                 VulkanShader *miss_shader,
+                                                 VulkanShader *closest_hit_shader)
+    : VulkanProgramBase(core),
+      raygen_shader_(raygen_shader),
+      miss_shader_(miss_shader),
+      closest_hit_shader_(closest_hit_shader) {
+}
+
+void VulkanRayTracingProgram::AddResourceBinding(ResourceType type, int count) {
+  AddResourceBindingImpl(type, count);
+}
+
+void VulkanRayTracingProgram::Finalize() {
+  FinalizePipelineLayout();
+  core_->Device()->CreateRayTracingPipeline(pipeline_layout_.get(), raygen_shader_->ShaderModule(),
+                                            miss_shader_->ShaderModule(), closest_hit_shader_->ShaderModule(),
+                                            &pipeline_);
+  core_->Device()->CreateShaderBindingTable(pipeline_.get(), &shader_binding_table_);
 }
 
 }  // namespace grassland::graphics::backend

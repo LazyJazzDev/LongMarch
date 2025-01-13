@@ -204,6 +204,17 @@ VkPipelineColorBlendAttachmentState BlendStateToVkPipelineColorBlendAttachmentSt
   return attachment;
 }
 
+VkPipelineBindPoint BindPointToVkPipelineBindPoint(BindPoint point) {
+  switch (point) {
+    case BIND_POINT_GRAPHICS:
+      return VK_PIPELINE_BIND_POINT_GRAPHICS;
+    case BIND_POINT_RAYTRACING:
+      return VK_PIPELINE_BIND_POINT_RAY_TRACING_KHR;
+    default:
+      throw std::runtime_error("Invalid bind point");
+  }
+}
+
 VulkanResourceBinding::VulkanResourceBinding() : buffer(nullptr), image(nullptr) {
 }
 

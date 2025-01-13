@@ -6,18 +6,25 @@ namespace grassland::graphics::backend {
 class D3D12Command {
  public:
   virtual ~D3D12Command() = default;
-  virtual void CompileCommand(D3D12CommandContext *context,
-                              ID3D12GraphicsCommandList *command_list) = 0;
+  virtual void CompileCommand(D3D12CommandContext *context, ID3D12GraphicsCommandList *command_list) = 0;
 };
 
 class D3D12CmdBindProgram : public D3D12Command {
  public:
   D3D12CmdBindProgram(D3D12Program *program);
-  void CompileCommand(D3D12CommandContext *context,
-                      ID3D12GraphicsCommandList *command_list) override;
+  void CompileCommand(D3D12CommandContext *context, ID3D12GraphicsCommandList *command_list) override;
 
  private:
   D3D12Program *program_;
+};
+
+class D3D12CmdBindRayTracingProgram : public D3D12Command {
+ public:
+  D3D12CmdBindRayTracingProgram(D3D12RayTracingProgram *program);
+  void CompileCommand(D3D12CommandContext *context, ID3D12GraphicsCommandList *command_list) override;
+
+ private:
+  D3D12RayTracingProgram *program_;
 };
 
 class D3D12CmdBindVertexBuffers : public D3D12Command {
@@ -26,8 +33,7 @@ class D3D12CmdBindVertexBuffers : public D3D12Command {
                             const std::vector<D3D12Buffer *> &buffers,
                             const std::vector<uint64_t> &offsets,
                             D3D12Program *program);
-  void CompileCommand(D3D12CommandContext *context,
-                      ID3D12GraphicsCommandList *command_list) override;
+  void CompileCommand(D3D12CommandContext *context, ID3D12GraphicsCommandList *command_list) override;
 
  private:
   uint32_t first_binding_;
@@ -39,8 +45,7 @@ class D3D12CmdBindVertexBuffers : public D3D12Command {
 class D3D12CmdBindIndexBuffer : public D3D12Command {
  public:
   D3D12CmdBindIndexBuffer(D3D12Buffer *buffer, uint64_t offset);
-  void CompileCommand(D3D12CommandContext *context,
-                      ID3D12GraphicsCommandList *command_list) override;
+  void CompileCommand(D3D12CommandContext *context, ID3D12GraphicsCommandList *command_list) override;
 
  private:
   D3D12Buffer *buffer_;
@@ -51,50 +56,66 @@ class D3D12CmdBindResourceBuffers : public D3D12Command {
  public:
   D3D12CmdBindResourceBuffers(int slot,
                               const std::vector<D3D12Buffer *> &buffers,
-                              D3D12Program *program);
-  void CompileCommand(D3D12CommandContext *context,
-                      ID3D12GraphicsCommandList *command_list) override;
+                              D3D12ProgramBase *program,
+                              BindPoint bind_point);
+  void CompileCommand(D3D12CommandContext *context, ID3D12GraphicsCommandList *command_list) override;
 
  private:
   int slot_;
   std::vector<D3D12Buffer *> buffers_;
-  D3D12Program *program_;
+  D3D12ProgramBase *program_;
+  BindPoint bind_point_;
 };
 
 class D3D12CmdBindResourceImages : public D3D12Command {
  public:
   D3D12CmdBindResourceImages(int slot,
                              const std::vector<D3D12Image *> &images,
-                             D3D12Program *program);
-  void CompileCommand(D3D12CommandContext *context,
-                      ID3D12GraphicsCommandList *command_list) override;
+                             D3D12ProgramBase *program,
+                             BindPoint bind_point);
+  void CompileCommand(D3D12CommandContext *context, ID3D12GraphicsCommandList *command_list) override;
 
  private:
   int slot_;
   std::vector<D3D12Image *> images_;
-  D3D12Program *program_;
+  D3D12ProgramBase *program_;
+  BindPoint bind_point_;
 };
 
 class D3D12CmdBindResourceSamplers : public D3D12Command {
  public:
   D3D12CmdBindResourceSamplers(int slot,
                                const std::vector<D3D12Sampler *> &samplers,
-                               D3D12Program *program);
-  void CompileCommand(D3D12CommandContext *context,
-                      ID3D12GraphicsCommandList *command_list) override;
+                               D3D12ProgramBase *program,
+                               BindPoint bind_point);
+  void CompileCommand(D3D12CommandContext *context, ID3D12GraphicsCommandList *command_list) override;
 
  private:
   int slot_;
   std::vector<D3D12Sampler *> samplers_;
-  D3D12Program *program_;
+  D3D12ProgramBase *program_;
+  BindPoint bind_point_;
+};
+
+class D3D12CmdBindResourceAccelerationStructure : public D3D12Command {
+ public:
+  D3D12CmdBindResourceAccelerationStructure(int slot,
+                                            D3D12AccelerationStructure *acceleration_structure,
+                                            D3D12ProgramBase *program,
+                                            BindPoint bind_point);
+  void CompileCommand(D3D12CommandContext *context, ID3D12GraphicsCommandList *command_list) override;
+
+ private:
+  int slot_;
+  D3D12AccelerationStructure *acceleration_structure_;
+  D3D12ProgramBase *program_;
+  BindPoint bind_point_;
 };
 
 class D3D12CmdBeginRendering : public D3D12Command {
  public:
-  D3D12CmdBeginRendering(const std::vector<D3D12Image *> &color_targets,
-                         D3D12Image *depth_target);
-  void CompileCommand(D3D12CommandContext *context,
-                      ID3D12GraphicsCommandList *command_list) override;
+  D3D12CmdBeginRendering(const std::vector<D3D12Image *> &color_targets, D3D12Image *depth_target);
+  void CompileCommand(D3D12CommandContext *context, ID3D12GraphicsCommandList *command_list) override;
 
  private:
   std::vector<D3D12Image *> color_targets_;
@@ -104,8 +125,7 @@ class D3D12CmdBeginRendering : public D3D12Command {
 class D3D12CmdClearImage : public D3D12Command {
  public:
   D3D12CmdClearImage(D3D12Image *image, const ClearValue &clear_value);
-  void CompileCommand(D3D12CommandContext *context,
-                      ID3D12GraphicsCommandList *command_list) override;
+  void CompileCommand(D3D12CommandContext *context, ID3D12GraphicsCommandList *command_list) override;
 
  private:
   D3D12Image *image_;
@@ -115,8 +135,7 @@ class D3D12CmdClearImage : public D3D12Command {
 class D3D12CmdSetViewport : public D3D12Command {
  public:
   D3D12CmdSetViewport(const Viewport &viewport);
-  void CompileCommand(D3D12CommandContext *context,
-                      ID3D12GraphicsCommandList *command_list) override;
+  void CompileCommand(D3D12CommandContext *context, ID3D12GraphicsCommandList *command_list) override;
 
  private:
   Viewport viewport_;
@@ -125,8 +144,7 @@ class D3D12CmdSetViewport : public D3D12Command {
 class D3D12CmdSetScissor : public D3D12Command {
  public:
   D3D12CmdSetScissor(const Scissor &scissor);
-  void CompileCommand(D3D12CommandContext *context,
-                      ID3D12GraphicsCommandList *command_list) override;
+  void CompileCommand(D3D12CommandContext *context, ID3D12GraphicsCommandList *command_list) override;
 
  private:
   Scissor scissor_;
@@ -135,8 +153,7 @@ class D3D12CmdSetScissor : public D3D12Command {
 class D3D12CmdSetPrimitiveTopology : public D3D12Command {
  public:
   D3D12CmdSetPrimitiveTopology(PrimitiveTopology topology);
-  void CompileCommand(D3D12CommandContext *context,
-                      ID3D12GraphicsCommandList *command_list) override;
+  void CompileCommand(D3D12CommandContext *context, ID3D12GraphicsCommandList *command_list) override;
 
  private:
   PrimitiveTopology topology_;
@@ -150,8 +167,7 @@ class D3D12CmdDrawIndexed : public D3D12Command {
                       int32_t vertex_offset,
                       uint32_t first_instance);
 
-  void CompileCommand(D3D12CommandContext *context,
-                      ID3D12GraphicsCommandList *command_list) override;
+  void CompileCommand(D3D12CommandContext *context, ID3D12GraphicsCommandList *command_list) override;
 
  private:
   uint32_t index_count_;
@@ -164,12 +180,23 @@ class D3D12CmdDrawIndexed : public D3D12Command {
 class D3D12CmdPresent : public D3D12Command {
  public:
   D3D12CmdPresent(D3D12Window *window, D3D12Image *image);
-  void CompileCommand(D3D12CommandContext *context,
-                      ID3D12GraphicsCommandList *command_list) override;
+  void CompileCommand(D3D12CommandContext *context, ID3D12GraphicsCommandList *command_list) override;
 
  private:
   D3D12Image *image_;
   D3D12Window *window_;
+};
+
+class D3D12CmdDispatchRays : public D3D12Command {
+ public:
+  D3D12CmdDispatchRays(D3D12RayTracingProgram *program, uint32_t width, uint32_t height, uint32_t depth);
+  void CompileCommand(D3D12CommandContext *context, ID3D12GraphicsCommandList *command_list) override;
+
+ private:
+  D3D12RayTracingProgram *program_;
+  uint32_t width_;
+  uint32_t height_;
+  uint32_t depth_;
 };
 
 }  // namespace grassland::graphics::backend

@@ -1,10 +1,9 @@
 #pragma once
-#include "grassland/graphics/graphics.h"
 #include "long_march.h"
 
-struct Vertex {
-  glm::vec3 pos;
-  glm::vec3 color;
+struct CameraObject {
+  glm::mat4 screen_to_camera;
+  glm::mat4 camera_to_world;
 };
 
 class Application {
@@ -28,6 +27,8 @@ class Application {
   std::unique_ptr<grassland::graphics::Buffer> vertex_buffer_;
   std::unique_ptr<grassland::graphics::Buffer> index_buffer_;
 
+  std::unique_ptr<grassland::graphics::Buffer> camera_object_buffer_;
+
   std::unique_ptr<grassland::graphics::Shader> raygen_shader_;
   std::unique_ptr<grassland::graphics::Shader> miss_shader_;
   std::unique_ptr<grassland::graphics::Shader> closest_hit_shader_;
@@ -36,6 +37,6 @@ class Application {
   std::unique_ptr<grassland::graphics::AccelerationStructure> tlas_;
 
   std::unique_ptr<grassland::graphics::Image> color_image_;
-  std::unique_ptr<grassland::graphics::Program> program_;
+  std::unique_ptr<grassland::graphics::RayTracingProgram> program_;
   bool alive_{false};
 };

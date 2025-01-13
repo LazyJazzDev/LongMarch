@@ -23,7 +23,6 @@ class Program {
 class RayTracingProgram {
  public:
   virtual ~RayTracingProgram() = default;
-  virtual void AddShader(Shader *shader, ShaderType type) = 0;
   virtual void AddResourceBinding(ResourceType type, int count) = 0;
   virtual void Finalize() = 0;
 };

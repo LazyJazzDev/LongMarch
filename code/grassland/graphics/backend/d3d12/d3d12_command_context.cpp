@@ -1,5 +1,6 @@
 #include "grassland/graphics/backend/d3d12/d3d12_command_context.h"
 
+#include "d3d12_acceleration_structure.h"
 #include "grassland/graphics/backend/d3d12/d3d12_buffer.h"
 #include "grassland/graphics/backend/d3d12/d3d12_image.h"
 #include "grassland/graphics/backend/d3d12/d3d12_program.h"
@@ -9,6 +10,9 @@
 namespace grassland::graphics::backend {
 
 D3D12CommandContext::D3D12CommandContext(D3D12Core *core) : core_(core) {
+  for (int i = 0; i < BIND_POINT_COUNT; i++) {
+    program_bases_[i] = nullptr;
+  }
 }
 
 D3D12Core *D3D12CommandContext::Core() const {
@@ -17,8 +21,16 @@ D3D12Core *D3D12CommandContext::Core() const {
 
 void D3D12CommandContext::CmdBindProgram(Program *program) {
   auto d3d12_program = dynamic_cast<D3D12Program *>(program);
+  assert(d3d12_program != nullptr);
   commands_.push_back(std::make_unique<D3D12CmdBindProgram>(d3d12_program));
-  program_ = d3d12_program;
+  program_bases_[BIND_POINT_GRAPHICS] = d3d12_program;
+}
+
+void D3D12CommandContext::CmdBindRayTracingProgram(RayTracingProgram *program) {
+  auto d3d12_program = dynamic_cast<D3D12RayTracingProgram *>(program);
+  assert(d3d12_program != nullptr);
+  commands_.push_back(std::make_unique<D3D12CmdBindRayTracingProgram>(d3d12_program));
+  program_bases_[BIND_POINT_RAYTRACING] = d3d12_program;
 }
 
 void D3D12CommandContext::CmdBindVertexBuffers(uint32_t first_binding,
@@ -29,7 +41,8 @@ void D3D12CommandContext::CmdBindVertexBuffers(uint32_t first_binding,
     vertex_buffers[i] = dynamic_cast<D3D12Buffer *>(buffers[i]);
     RecordDynamicBuffer(vertex_buffers[i]);
   }
-  commands_.push_back(std::make_unique<D3D12CmdBindVertexBuffers>(first_binding, vertex_buffers, offsets, program_));
+  commands_.push_back(std::make_unique<D3D12CmdBindVertexBuffers>(
+      first_binding, vertex_buffers, offsets, dynamic_cast<D3D12Program *>(program_bases_[BIND_POINT_GRAPHICS])));
 }
 
 void D3D12CommandContext::CmdBindIndexBuffer(Buffer *buffer, uint64_t offset) {
@@ -38,35 +51,65 @@ void D3D12CommandContext::CmdBindIndexBuffer(Buffer *buffer, uint64_t offset) {
   RecordDynamicBuffer(index_buffer);
 }
 
-void D3D12CommandContext::CmdBindResources(int slot, const std::vector<Buffer *> &buffers) {
-  auto descriptor_range = program_->DescriptorRange(slot);
+void D3D12CommandContext::CmdBindResources(int slot, const std::vector<Buffer *> &buffers, BindPoint bind_point) {
+  if (!program_bases_[bind_point]) {
+    LogError("[Graphics.D3D12] Program on bind point {} is not set", int(bind_point));
+    return;
+  }
+  auto descriptor_range = program_bases_[bind_point]->DescriptorRange(slot);
   resource_descriptor_count_ += descriptor_range->NumDescriptors;
   std::vector<D3D12Buffer *> d3d12_buffers(buffers.size());
   for (size_t i = 0; i < buffers.size(); ++i) {
     d3d12_buffers[i] = dynamic_cast<D3D12Buffer *>(buffers[i]);
     RecordDynamicBuffer(d3d12_buffers[i]);
   }
-  commands_.push_back(std::make_unique<D3D12CmdBindResourceBuffers>(slot, d3d12_buffers, program_));
+  commands_.push_back(
+      std::make_unique<D3D12CmdBindResourceBuffers>(slot, d3d12_buffers, program_bases_[bind_point], bind_point));
 }
 
-void D3D12CommandContext::CmdBindResources(int slot, const std::vector<Image *> &images) {
-  auto descriptor_range = program_->DescriptorRange(slot);
+void D3D12CommandContext::CmdBindResources(int slot, const std::vector<Image *> &images, BindPoint bind_point) {
+  if (!program_bases_[bind_point]) {
+    LogError("[Graphics.D3D12] Program on bind point {} is not set", int(bind_point));
+    return;
+  }
+  auto descriptor_range = program_bases_[bind_point]->DescriptorRange(slot);
   resource_descriptor_count_ += descriptor_range->NumDescriptors;
   std::vector<D3D12Image *> d3d12_images(images.size());
   for (size_t i = 0; i < images.size(); ++i) {
     d3d12_images[i] = dynamic_cast<D3D12Image *>(images[i]);
   }
-  commands_.push_back(std::make_unique<D3D12CmdBindResourceImages>(slot, d3d12_images, program_));
+  commands_.push_back(
+      std::make_unique<D3D12CmdBindResourceImages>(slot, d3d12_images, program_bases_[bind_point], bind_point));
 }
 
-void D3D12CommandContext::CmdBindResources(int slot, const std::vector<Sampler *> &samplers) {
-  auto descriptor_range = program_->DescriptorRange(slot);
+void D3D12CommandContext::CmdBindResources(int slot, const std::vector<Sampler *> &samplers, BindPoint bind_point) {
+  if (!program_bases_[bind_point]) {
+    LogError("[Graphics.D3D12] Program on bind point {} is not set", int(bind_point));
+    return;
+  }
+  auto descriptor_range = program_bases_[bind_point]->DescriptorRange(slot);
   sampler_descriptor_count_ += descriptor_range->NumDescriptors;
   std::vector<D3D12Sampler *> d3d12_samplers(samplers.size());
   for (size_t i = 0; i < samplers.size(); ++i) {
     d3d12_samplers[i] = dynamic_cast<D3D12Sampler *>(samplers[i]);
   }
-  commands_.push_back(std::make_unique<D3D12CmdBindResourceSamplers>(slot, d3d12_samplers, program_));
+  commands_.push_back(
+      std::make_unique<D3D12CmdBindResourceSamplers>(slot, d3d12_samplers, program_bases_[bind_point], bind_point));
+}
+
+void D3D12CommandContext::CmdBindResources(int slot,
+                                           AccelerationStructure *acceleration_structure,
+                                           BindPoint bind_point) {
+  if (!program_bases_[bind_point]) {
+    LogError("[Graphics.D3D12] Program on bind point {} is not set", int(bind_point));
+    return;
+  }
+  auto desriptor_range = program_bases_[bind_point]->DescriptorRange(slot);
+  resource_descriptor_count_ += desriptor_range->NumDescriptors;
+  auto d3d12_as = dynamic_cast<D3D12AccelerationStructure *>(acceleration_structure);
+  assert(d3d12_as != nullptr);
+  commands_.push_back(std::make_unique<D3D12CmdBindResourceAccelerationStructure>(
+      slot, d3d12_as, program_bases_[bind_point], bind_point));
 }
 
 void D3D12CommandContext::CmdBeginRendering(const std::vector<Image *> &color_targets, Image *depth_target) {
@@ -123,6 +166,11 @@ void D3D12CommandContext::CmdPresent(Window *window, Image *image) {
   commands_.push_back(std::make_unique<D3D12CmdPresent>(d3d12_window, d3d12_image));
   windows_.insert(d3d12_window);
   resource_descriptor_count_++;
+}
+
+void D3D12CommandContext::CmdDispatchRays(uint32_t width, uint32_t height, uint32_t depth) {
+  commands_.push_back(std::make_unique<D3D12CmdDispatchRays>(
+      dynamic_cast<D3D12RayTracingProgram *>(program_bases_[BIND_POINT_RAYTRACING]), width, height, depth));
 }
 
 void D3D12CommandContext::RecordRTVImage(const D3D12Image *image) {
@@ -217,6 +265,21 @@ CD3DX12_GPU_DESCRIPTOR_HANDLE D3D12CommandContext::WriteSRVDescriptor(D3D12Buffe
   desc.Buffer.StructureByteStride = 0;
 
   core_->Device()->Handle()->CreateShaderResourceView(buffer->Buffer()->Handle(), &desc, resource_descriptor_base_);
+
+  resource_descriptor_base_.Offset(resource_descriptor_size_);
+  auto result = resource_descriptor_gpu_base_;
+  resource_descriptor_gpu_base_.Offset(resource_descriptor_size_);
+  return result;
+}
+
+CD3DX12_GPU_DESCRIPTOR_HANDLE D3D12CommandContext::WriteSRVDescriptor(
+    D3D12AccelerationStructure *acceleration_structure) {
+  D3D12_SHADER_RESOURCE_VIEW_DESC desc = {};
+  desc.ViewDimension = D3D12_SRV_DIMENSION_RAYTRACING_ACCELERATION_STRUCTURE;
+  desc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
+  desc.RaytracingAccelerationStructure.Location = acceleration_structure->Handle()->Handle()->GetGPUVirtualAddress();
+
+  core_->Device()->Handle()->CreateShaderResourceView(nullptr, &desc, resource_descriptor_base_);
 
   resource_descriptor_base_.Offset(resource_descriptor_size_);
   auto result = resource_descriptor_gpu_base_;
