@@ -48,6 +48,7 @@ typedef enum ResourceType {
   RESOURCE_TYPE_TEXTURE = 2,
   RESOURCE_TYPE_IMAGE = 3,
   RESOURCE_TYPE_SAMPLER = 4,
+  RESOURCE_TYPE_ACCELERATION_STRUCTURE = 5,
 } ResourceType;
 
 typedef enum ShaderType {
@@ -202,7 +203,10 @@ class Window;
 class Shader;
 class Program;
 class CommandContext;
-struct CompiledShaderBlob;
+
+// Ray tracing objects
+class RayTracingProgram;
+class AccelerationStructure;
 
 #ifndef NDEBUG
 constexpr bool kEnableDebug = true;

@@ -1,5 +1,6 @@
 #include "grassland/graphics/backend/vulkan/vulkan_core.h"
 
+#include "grassland/graphics/backend/vulkan/vulkan_acceleration_structure.h"
 #include "grassland/graphics/backend/vulkan/vulkan_buffer.h"
 #include "grassland/graphics/backend/vulkan/vulkan_command_context.h"
 #include "grassland/graphics/backend/vulkan/vulkan_image.h"
@@ -41,7 +42,10 @@ int VulkanCore::CreateImage(int width, int height, ImageFormat format, double_pt
   pp_image.construct<VulkanImage>(this, width, height, format);
   SingleTimeCommand([this, pp_image](VkCommandBuffer command_buffer) {
     VulkanImage *image = dynamic_cast<VulkanImage *>(*pp_image);
-    vulkan::TransitImageLayout(command_buffer, image->Image()->Handle(), VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_GENERAL, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, VK_PIPELINE_STAGE_ALL_GRAPHICS_BIT, VK_ACCESS_MEMORY_READ_BIT, 0, image->Image()->Aspect());
+    vulkan::TransitImageLayout(command_buffer, image->Image()->Handle(), VK_IMAGE_LAYOUT_UNDEFINED,
+                               VK_IMAGE_LAYOUT_GENERAL, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT,
+                               VK_PIPELINE_STAGE_ALL_GRAPHICS_BIT, VK_ACCESS_MEMORY_READ_BIT, 0,
+                               image->Image()->Aspect());
   });
   return 0;
 }
@@ -51,35 +55,65 @@ int VulkanCore::CreateSampler(const SamplerInfo &info, double_ptr<Sampler> pp_sa
   return 0;
 }
 
-int VulkanCore::CreateWindowObject(int width, int height, const std::string &title, bool fullscreen, bool resizable, double_ptr<Window> pp_window) {
+int VulkanCore::CreateWindowObject(int width,
+                                   int height,
+                                   const std::string &title,
+                                   bool fullscreen,
+                                   bool resizable,
+                                   double_ptr<Window> pp_window) {
   pp_window.construct<VulkanWindow>(this, width, height, title, fullscreen, resizable);
   return 0;
 }
 
-int VulkanCore::CreateShader(const void *data, size_t size, double_ptr<Shader> pp_shader) {
-  CompiledShaderBlob blob;
-  blob.entry_point = "main";
-  blob.data.resize(size);
-  std::memcpy(blob.data.data(), data, size);
-  return CreateShader(blob, pp_shader);
-}
-
-int VulkanCore::CreateShader(const CompiledShaderBlob &shader_blob, double_ptr<Shader> pp_shader) {
-  pp_shader.construct<VulkanShader>(this, shader_blob);
+int VulkanCore::CreateShader(const std::string &source_code,
+                             const std::string &entry_point,
+                             const std::string &target,
+                             double_ptr<Shader> pp_shader) {
+  pp_shader.construct<VulkanShader>(
+      this, CompileShader(source_code, entry_point, target, {"-spirv", "-fspv-target-env=vulkan1.2"}));
   return 0;
 }
 
-int VulkanCore::CreateShader(const std::string &source_code, const std::string &entry_point, const std::string &target, double_ptr<Shader> pp_shader) {
-  return CreateShader(CompileShader(source_code, entry_point, target, {"-spirv"}), pp_shader);
-}
-
-int VulkanCore::CreateProgram(const std::vector<ImageFormat> &color_formats, ImageFormat depth_format, double_ptr<Program> pp_program) {
+int VulkanCore::CreateProgram(const std::vector<ImageFormat> &color_formats,
+                              ImageFormat depth_format,
+                              double_ptr<Program> pp_program) {
   pp_program.construct<VulkanProgram>(this, color_formats, depth_format);
   return 0;
 }
 
 int VulkanCore::CreateCommandContext(double_ptr<CommandContext> pp_command_context) {
   pp_command_context.construct<VulkanCommandContext>(this);
+  return 0;
+}
+
+int VulkanCore::CreateBottomLevelAccelerationStructure(Buffer *vertex_buffer,
+                                                       Buffer *index_buffer,
+                                                       uint32_t stride,
+                                                       double_ptr<AccelerationStructure> pp_blas) {
+  VulkanBuffer *vk_vertex_buffer = dynamic_cast<VulkanBuffer *>(vertex_buffer);
+  VulkanBuffer *vk_index_buffer = dynamic_cast<VulkanBuffer *>(index_buffer);
+  assert(vk_vertex_buffer != nullptr);
+  assert(vk_index_buffer != nullptr);
+  std::unique_ptr<vulkan::AccelerationStructure> blas;
+  device_->CreateBottomLevelAccelerationStructure(vk_vertex_buffer->InstantBuffer(), vk_index_buffer->InstantBuffer(),
+                                                  stride, graphics_command_pool_.get(), graphics_queue_.get(), &blas);
+  pp_blas.construct<VulkanAccelerationStructure>(this, std::move(blas));
+  return 0;
+}
+
+int VulkanCore::CreateTopLevelAccelerationStructure(
+    const std::vector<std::pair<AccelerationStructure *, glm::mat4>> &objects,
+    double_ptr<AccelerationStructure> pp_tlas) {
+  std::vector<std::pair<vulkan::AccelerationStructure *, glm::mat4>> vk_objects;
+  vk_objects.reserve(objects.size());
+  for (int i = 0; i < objects.size(); ++i) {
+    VulkanAccelerationStructure *vk_as = dynamic_cast<VulkanAccelerationStructure *>(objects[i].first);
+    assert(vk_as != nullptr);
+    vk_objects.push_back({vk_as->Handle(), objects[i].second});
+  }
+  std::unique_ptr<vulkan::AccelerationStructure> tlas;
+  device_->CreateTopLevelAccelerationStructure(vk_objects, graphics_command_pool_.get(), graphics_queue_.get(), &tlas);
+  pp_tlas.construct<VulkanAccelerationStructure>(this, std::move(tlas));
   return 0;
 }
 
@@ -161,7 +195,9 @@ int VulkanCore::SubmitCommandContext(CommandContext *p_command_context) {
   }
 
   for (auto [image, state] : command_context->image_states_) {
-    vulkan::TransitImageLayout(command_buffer, image, state.layout, VK_IMAGE_LAYOUT_GENERAL, state.stage, VK_PIPELINE_STAGE_ALL_GRAPHICS_BIT, state.access, VK_ACCESS_MEMORY_READ_BIT, state.aspect);
+    vulkan::TransitImageLayout(command_buffer, image, state.layout, VK_IMAGE_LAYOUT_GENERAL, state.stage,
+                               VK_PIPELINE_STAGE_ALL_GRAPHICS_BIT, state.access, VK_ACCESS_MEMORY_READ_BIT,
+                               state.aspect);
   }
   command_context->image_states_.clear();
 
@@ -247,15 +283,23 @@ int VulkanCore::InitializeLogicalDevice(int device_index) {
   auto physical_device = physical_devices[device_index];
   grassland::vulkan::DeviceFeatureRequirement device_feature_requirement{};
   device_feature_requirement.enable_raytracing_extension = physical_device.SupportRayTracing();
-  if (instance_->CreateDevice(physical_device, device_feature_requirement.GenerateRecommendedDeviceCreateInfo(physical_device), device_feature_requirement.GetVmaAllocatorCreateFlags(), &device_) != VK_SUCCESS) {
+  if (instance_->CreateDevice(physical_device,
+                              device_feature_requirement.GenerateRecommendedDeviceCreateInfo(physical_device),
+                              device_feature_requirement.GetVmaAllocatorCreateFlags(), &device_) != VK_SUCCESS) {
     return -1;
   }
 
   device_name_ = physical_device.GetPhysicalDeviceProperties().deviceName;
   ray_tracing_support_ = physical_device.SupportRayTracing();
 
-  vulkan::ThrowIfFailed(device_->CreateCommandPool(device_->PhysicalDevice().GraphicsFamilyIndex(), VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT, &graphics_command_pool_), "failed to create graphics command pool");
-  vulkan::ThrowIfFailed(device_->CreateCommandPool(device_->PhysicalDevice().TransferFamilyIndex(), VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT, &transfer_command_pool_), "failed to create transfer command pool");
+  vulkan::ThrowIfFailed(
+      device_->CreateCommandPool(device_->PhysicalDevice().GraphicsFamilyIndex(),
+                                 VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT, &graphics_command_pool_),
+      "failed to create graphics command pool");
+  vulkan::ThrowIfFailed(
+      device_->CreateCommandPool(device_->PhysicalDevice().TransferFamilyIndex(),
+                                 VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT, &transfer_command_pool_),
+      "failed to create transfer command pool");
 
   device_->GetQueue(device_->PhysicalDevice().GraphicsFamilyIndex(), 0, &graphics_queue_);
   device_->GetQueue(device_->PhysicalDevice().TransferFamilyIndex(), 0, &transfer_queue_);

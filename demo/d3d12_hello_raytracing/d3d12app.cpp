@@ -61,9 +61,9 @@ void Application::OnRender() {
   dxr_command_list->SetDescriptorHeaps(1, descriptor_heaps);
   dxr_command_list->SetComputeRootDescriptorTable(0, descriptor_heap_->GPUHandle(0));
 
-  auto align = [](size_t value, size_t alignment) { return (value + alignment - 1) & ~(alignment - 1); };
-  UINT shader_record_size = align(D3D12_SHADER_IDENTIFIER_SIZE_IN_BYTES, D3D12_RAYTRACING_SHADER_RECORD_BYTE_ALIGNMENT);
-  UINT shader_table_size = align(shader_record_size, D3D12_RAYTRACING_SHADER_TABLE_BYTE_ALIGNMENT);
+  UINT shader_record_size =
+      SizeAlignTo(D3D12_SHADER_IDENTIFIER_SIZE_IN_BYTES, D3D12_RAYTRACING_SHADER_RECORD_BYTE_ALIGNMENT);
+  UINT shader_table_size = SizeAlignTo(shader_record_size, D3D12_RAYTRACING_SHADER_TABLE_BYTE_ALIGNMENT);
 
   dispatch_desc.HitGroupTable.StartAddress = shader_table_->GetHitGroupDeviceAddress();
   dispatch_desc.HitGroupTable.SizeInBytes = shader_table_size;
@@ -233,7 +233,7 @@ void Application::CreatePipelineAssets() {
                                                descriptor_heap_->CPUHandle(1));
   D3D12_CONSTANT_BUFFER_VIEW_DESC cbv_desc{};
   cbv_desc.BufferLocation = camera_object_buffer_->Handle()->GetGPUVirtualAddress();
-  cbv_desc.SizeInBytes = camera_object_buffer_->Size();
+  cbv_desc.SizeInBytes = SizeAlignTo(camera_object_buffer_->Size(), 256);
   device_->Handle()->CreateConstantBufferView(&cbv_desc, descriptor_heap_->CPUHandle(2));
 
   device_->CreateRayTracingPipeline(root_signature_.get(), raygen_shader_.get(), miss_shader_.get(), hit_shader_.get(),

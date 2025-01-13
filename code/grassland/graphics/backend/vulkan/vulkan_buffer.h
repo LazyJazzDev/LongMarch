@@ -8,6 +8,8 @@ class VulkanBuffer : public Buffer {
  public:
   virtual VkBuffer Buffer() const = 0;
   virtual ~VulkanBuffer() = default;
+
+  virtual vulkan::Buffer *InstantBuffer() const = 0;
 };
 
 class VulkanStaticBuffer : public VulkanBuffer {
@@ -26,6 +28,8 @@ class VulkanStaticBuffer : public VulkanBuffer {
   void DownloadData(void *data, size_t size, size_t offset) override;
 
   VkBuffer Buffer() const override;
+
+  vulkan::Buffer *InstantBuffer() const override;
 
  private:
   VulkanCore *core_;
@@ -48,6 +52,8 @@ class VulkanDynamicBuffer : public VulkanBuffer {
   void DownloadData(void *data, size_t size, size_t offset) override;
 
   VkBuffer Buffer() const override;
+
+  vulkan::Buffer *InstantBuffer() const override;
 
   void TransferData(VkCommandBuffer cmd_buffer);
 

@@ -86,7 +86,7 @@ HRESULT Device::CreateBuffer(size_t size,
       ::grassland::d3d12::CreateBuffer(device_.Get(), size, heap_type, resource_state, resource_flags, buffer),
       "failed to create buffer.");
 
-  pp_buffer.construct(buffer);
+  pp_buffer.construct(buffer, size);
 
   return S_OK;
 }
@@ -425,11 +425,9 @@ HRESULT Device::CreateShaderTable(RayTracingPipeline *ray_tracing_pipeline,
   void *hit_group_shader_idenfitier =
       pipeline_properties->GetShaderIdentifier(ray_tracing_pipeline->HitGroupName().c_str());
 
-  auto align = [](size_t value, size_t alignment) { return (value + alignment - 1) & ~(alignment - 1); };
-
   UINT shader_idenfitier_size = D3D12_SHADER_IDENTIFIER_SIZE_IN_BYTES;
-  UINT shader_record_size = align(shader_idenfitier_size, D3D12_RAYTRACING_SHADER_RECORD_BYTE_ALIGNMENT);
-  auto shader_table_size = align(shader_record_size, D3D12_RAYTRACING_SHADER_TABLE_BYTE_ALIGNMENT);
+  UINT shader_record_size = SizeAlignTo(shader_idenfitier_size, D3D12_RAYTRACING_SHADER_RECORD_BYTE_ALIGNMENT);
+  UINT shader_table_size = SizeAlignTo(shader_record_size, D3D12_RAYTRACING_SHADER_TABLE_BYTE_ALIGNMENT);
   ComPtr<ID3D12Resource> buffer;
   RETURN_IF_FAILED_HR(d3d12::CreateBuffer(Handle(), shader_table_size * 3, D3D12_HEAP_TYPE_UPLOAD,
                                           D3D12_RESOURCE_STATE_GENERIC_READ, D3D12_RESOURCE_FLAG_NONE, buffer),

@@ -1,5 +1,6 @@
 #include "grassland/graphics/backend/d3d12/d3d12_core.h"
 
+#include "grassland/graphics/backend/d3d12/d3d12_acceleration_structure.h"
 #include "grassland/graphics/backend/d3d12/d3d12_buffer.h"
 #include "grassland/graphics/backend/d3d12/d3d12_command_context.h"
 #include "grassland/graphics/backend/d3d12/d3d12_image.h"
@@ -15,8 +16,10 @@ namespace {
 
 void BlitPipeline::Initialize(d3d12::Device *device) {
   device_ = device;
-  device_->CreateShaderModule(d3d12::CompileShader(GetShaderCode("shaders/d3d12/blit.hlsl"), "VSMain", "vs_6_0"), &vertex_shader);
-  device_->CreateShaderModule(d3d12::CompileShader(GetShaderCode("shaders/d3d12/blit.hlsl"), "PSMain", "ps_6_0"), &pixel_shader);
+  device_->CreateShaderModule(d3d12::CompileShader(GetShaderCode("shaders/d3d12/blit.hlsl"), "VSMain", "vs_6_0"),
+                              &vertex_shader);
+  device_->CreateShaderModule(d3d12::CompileShader(GetShaderCode("shaders/d3d12/blit.hlsl"), "PSMain", "ps_6_0"),
+                              &pixel_shader);
 
   CD3DX12_DESCRIPTOR_RANGE1 range;
   range.Init(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 1, 0, 0);
@@ -26,7 +29,8 @@ void BlitPipeline::Initialize(d3d12::Device *device) {
   CD3DX12_STATIC_SAMPLER_DESC sampler_desc(0, D3D12_FILTER_MIN_MAG_MIP_LINEAR);
 
   CD3DX12_VERSIONED_ROOT_SIGNATURE_DESC root_signature_desc;
-  root_signature_desc.Init_1_1(1, &root_parameter, 1, &sampler_desc, D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT);
+  root_signature_desc.Init_1_1(1, &root_parameter, 1, &sampler_desc,
+                               D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT);
   device_->CreateRootSignature(root_signature_desc, &root_signature);
 }
 
@@ -85,31 +89,73 @@ int D3D12Core::CreateSampler(const SamplerInfo &info, double_ptr<Sampler> pp_sam
   return 0;
 }
 
-int D3D12Core::CreateWindowObject(int width, int height, const std::string &title, bool fullscreen, bool resizable, double_ptr<Window> pp_window) {
+int D3D12Core::CreateWindowObject(int width,
+                                  int height,
+                                  const std::string &title,
+                                  bool fullscreen,
+                                  bool resizable,
+                                  double_ptr<Window> pp_window) {
   pp_window.construct<D3D12Window>(this, width, height, title, fullscreen, resizable);
   return 0;
 }
 
-int D3D12Core::CreateShader(const void *data, size_t size, double_ptr<Shader> pp_shader) {
-  pp_shader.construct<D3D12Shader>(this, data, size);
+int D3D12Core::CreateShader(const std::string &source_code,
+                            const std::string &entry_point,
+                            const std::string &target,
+                            double_ptr<Shader> pp_shader) {
+  pp_shader.construct<D3D12Shader>(this, CompileShader(source_code, entry_point, target));
   return 0;
 }
 
-int D3D12Core::CreateShader(const CompiledShaderBlob &shader_blob, double_ptr<Shader> pp_shader) {
-  return CreateShader(shader_blob.data.data(), shader_blob.data.size(), pp_shader);
-}
-
-int D3D12Core::CreateShader(const std::string &source_code, const std::string &entry_point, const std::string &target, double_ptr<Shader> pp_shader) {
-  return CreateShader(CompileShader(source_code, entry_point, target), pp_shader);
-}
-
-int D3D12Core::CreateProgram(const std::vector<ImageFormat> &color_formats, ImageFormat depth_format, double_ptr<Program> pp_program) {
+int D3D12Core::CreateProgram(const std::vector<ImageFormat> &color_formats,
+                             ImageFormat depth_format,
+                             double_ptr<Program> pp_program) {
   pp_program.construct<D3D12Program>(this, color_formats, depth_format);
   return 0;
 }
 
 int D3D12Core::CreateCommandContext(double_ptr<CommandContext> pp_command_context) {
   pp_command_context.construct<D3D12CommandContext>(this);
+  return 0;
+}
+
+int D3D12Core::CreateBottomLevelAccelerationStructure(Buffer *vertex_buffer,
+                                                      Buffer *index_buffer,
+                                                      uint32_t stride,
+                                                      double_ptr<AccelerationStructure> pp_blas) {
+  D3D12Buffer *d3d12_vertex_buffer = dynamic_cast<D3D12Buffer *>(vertex_buffer);
+  D3D12Buffer *d3d12_index_buffer = dynamic_cast<D3D12Buffer *>(index_buffer);
+
+  assert(d3d12_vertex_buffer != nullptr);
+  assert(d3d12_index_buffer != nullptr);
+
+  std::unique_ptr<d3d12::AccelerationStructure> blas;
+  device_->CreateBottomLevelAccelerationStructure(d3d12_vertex_buffer->InstantBuffer(),
+                                                  d3d12_index_buffer->InstantBuffer(), stride, command_queue_.get(),
+                                                  single_time_fence_.get(), single_time_allocator_.get(), &blas);
+
+  pp_blas.construct<D3D12AccelerationStructure>(this, std::move(blas));
+
+  return 0;
+}
+
+int D3D12Core::CreateTopLevelAccelerationStructure(
+    const std::vector<std::pair<AccelerationStructure *, glm::mat4>> &objects,
+    double_ptr<AccelerationStructure> pp_tlas) {
+  std::vector<std::pair<d3d12::AccelerationStructure *, glm::mat4>> d3d12_objects;
+  d3d12_objects.reserve(objects.size());
+  for (int i = 0; i < objects.size(); ++i) {
+    D3D12AccelerationStructure *d3d12_as = dynamic_cast<D3D12AccelerationStructure *>(objects[i].first);
+    assert(d3d12_as != nullptr);
+    d3d12_objects.push_back({d3d12_as->Handle(), objects[i].second});
+  }
+
+  std::unique_ptr<d3d12::AccelerationStructure> tlas;
+  device_->CreateTopLevelAccelerationStructure(d3d12_objects, command_queue_.get(), single_time_fence_.get(),
+                                               single_time_allocator_.get(), &tlas);
+
+  pp_tlas.construct<D3D12AccelerationStructure>(this, std::move(tlas));
+
   return 0;
 }
 
@@ -136,14 +182,18 @@ int D3D12Core::SubmitCommandContext(CommandContext *p_command_context) {
     command_context->RecordRTVImage(window->CurrentBackBuffer());
   }
 
-  if (!resource_descriptor_heaps_[current_frame_] || resource_descriptor_heaps_[current_frame_]->NumDescriptors() < command_context->resource_descriptor_count_) {
+  if (!resource_descriptor_heaps_[current_frame_] ||
+      resource_descriptor_heaps_[current_frame_]->NumDescriptors() < command_context->resource_descriptor_count_) {
     resource_descriptor_heaps_[current_frame_].reset();
-    device_->CreateDescriptorHeap(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV, command_context->resource_descriptor_count_, &resource_descriptor_heaps_[current_frame_]);
+    device_->CreateDescriptorHeap(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV, command_context->resource_descriptor_count_,
+                                  &resource_descriptor_heaps_[current_frame_]);
   }
 
-  if (!sampler_descriptor_heaps_[current_frame_] || sampler_descriptor_heaps_[current_frame_]->NumDescriptors() < command_context->sampler_descriptor_count_) {
+  if (!sampler_descriptor_heaps_[current_frame_] ||
+      sampler_descriptor_heaps_[current_frame_]->NumDescriptors() < command_context->sampler_descriptor_count_) {
     sampler_descriptor_heaps_[current_frame_].reset();
-    device_->CreateDescriptorHeap(D3D12_DESCRIPTOR_HEAP_TYPE_SAMPLER, command_context->sampler_descriptor_count_, &sampler_descriptor_heaps_[current_frame_]);
+    device_->CreateDescriptorHeap(D3D12_DESCRIPTOR_HEAP_TYPE_SAMPLER, command_context->sampler_descriptor_count_,
+                                  &sampler_descriptor_heaps_[current_frame_]);
   }
 
   if (command_context->resource_descriptor_count_) {
@@ -158,14 +208,18 @@ int D3D12Core::SubmitCommandContext(CommandContext *p_command_context) {
     command_context->sampler_descriptor_gpu_base_ = sampler_descriptor_heaps_[current_frame_]->GPUHandle(0);
   }
 
-  if (!rtv_descriptor_heaps_[current_frame_] || rtv_descriptor_heaps_[current_frame_]->NumDescriptors() < command_context->rtv_index_.size()) {
+  if (!rtv_descriptor_heaps_[current_frame_] ||
+      rtv_descriptor_heaps_[current_frame_]->NumDescriptors() < command_context->rtv_index_.size()) {
     rtv_descriptor_heaps_[current_frame_].reset();
-    device_->CreateDescriptorHeap(D3D12_DESCRIPTOR_HEAP_TYPE_RTV, command_context->rtv_index_.size(), &rtv_descriptor_heaps_[current_frame_]);
+    device_->CreateDescriptorHeap(D3D12_DESCRIPTOR_HEAP_TYPE_RTV, command_context->rtv_index_.size(),
+                                  &rtv_descriptor_heaps_[current_frame_]);
   }
 
-  if (!dsv_descriptor_heaps_[current_frame_] || dsv_descriptor_heaps_[current_frame_]->NumDescriptors() < command_context->dsv_index_.size()) {
+  if (!dsv_descriptor_heaps_[current_frame_] ||
+      dsv_descriptor_heaps_[current_frame_]->NumDescriptors() < command_context->dsv_index_.size()) {
     dsv_descriptor_heaps_[current_frame_].reset();
-    device_->CreateDescriptorHeap(D3D12_DESCRIPTOR_HEAP_TYPE_DSV, command_context->dsv_index_.size(), &dsv_descriptor_heaps_[current_frame_]);
+    device_->CreateDescriptorHeap(D3D12_DESCRIPTOR_HEAP_TYPE_DSV, command_context->dsv_index_.size(),
+                                  &dsv_descriptor_heaps_[current_frame_]);
   }
 
   for (auto &[resource, index] : command_context->rtv_index_) {
@@ -178,7 +232,8 @@ int D3D12Core::SubmitCommandContext(CommandContext *p_command_context) {
     device_->Handle()->CreateDepthStencilView(resource, nullptr, dsv_handle);
   }
 
-  ID3D12DescriptorHeap *resource_heaps[] = {resource_descriptor_heaps_[current_frame_]->Handle(), sampler_descriptor_heaps_[current_frame_]->Handle()};
+  ID3D12DescriptorHeap *resource_heaps[] = {resource_descriptor_heaps_[current_frame_]->Handle(),
+                                            sampler_descriptor_heaps_[current_frame_]->Handle()};
   command_list->SetDescriptorHeaps(2, resource_heaps);
 
   for (auto &command : command_context->commands_) {
@@ -187,7 +242,8 @@ int D3D12Core::SubmitCommandContext(CommandContext *p_command_context) {
 
   for (auto &[image, state] : command_context->resource_states_) {
     if (state != D3D12_RESOURCE_STATE_GENERIC_READ) {
-      CD3DX12_RESOURCE_BARRIER barrier = CD3DX12_RESOURCE_BARRIER::Transition(image, state, D3D12_RESOURCE_STATE_GENERIC_READ);
+      CD3DX12_RESOURCE_BARRIER barrier =
+          CD3DX12_RESOURCE_BARRIER::Transition(image, state, D3D12_RESOURCE_STATE_GENERIC_READ);
       command_list->ResourceBarrier(1, &barrier);
     }
   }
@@ -240,7 +296,8 @@ int D3D12Core::InitializeLogicalDevice(int device_index) {
     return -1;
   }
 
-  dxgi_factory_->CreateDevice(d3d12::DeviceFeatureRequirement{adapters[device_index].SupportRayTracing()}, device_index, &device_);
+  dxgi_factory_->CreateDevice(d3d12::DeviceFeatureRequirement{adapters[device_index].SupportRayTracing()}, device_index,
+                              &device_);
 
   device_name_ = adapters[device_index].Name();
   ray_tracing_support_ = adapters[device_index].SupportRayTracing();

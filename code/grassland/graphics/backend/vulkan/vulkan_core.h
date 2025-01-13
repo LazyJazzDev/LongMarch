@@ -20,17 +20,31 @@ class VulkanCore : public Core {
 
   int CreateSampler(const SamplerInfo &info, double_ptr<Sampler> pp_sampler) override;
 
-  int CreateWindowObject(int width, int height, const std::string &title, bool fullscreen, bool resizable, double_ptr<Window> pp_window) override;
+  int CreateWindowObject(int width,
+                         int height,
+                         const std::string &title,
+                         bool fullscreen,
+                         bool resizable,
+                         double_ptr<Window> pp_window) override;
 
-  int CreateShader(const void *data, size_t size, double_ptr<Shader> pp_shader) override;
+  int CreateShader(const std::string &source_code,
+                   const std::string &entry_point,
+                   const std::string &target,
+                   double_ptr<Shader> pp_shader) override;
 
-  int CreateShader(const CompiledShaderBlob &shader_blob, double_ptr<Shader> pp_shader) override;
-
-  int CreateShader(const std::string &source_code, const std::string &entry_point, const std::string &target, double_ptr<Shader> pp_shader) override;
-
-  int CreateProgram(const std::vector<ImageFormat> &color_formats, ImageFormat depth_format, double_ptr<Program> pp_program) override;
+  int CreateProgram(const std::vector<ImageFormat> &color_formats,
+                    ImageFormat depth_format,
+                    double_ptr<Program> pp_program) override;
 
   int CreateCommandContext(double_ptr<CommandContext> pp_command_context) override;
+
+  int CreateBottomLevelAccelerationStructure(Buffer *vertex_buffer,
+                                             Buffer *index_buffer,
+                                             uint32_t stride,
+                                             double_ptr<AccelerationStructure> pp_blas) override;
+
+  int CreateTopLevelAccelerationStructure(const std::vector<std::pair<AccelerationStructure *, glm::mat4>> &objects,
+                                          double_ptr<AccelerationStructure> pp_tlas) override;
 
   int SubmitCommandContext(CommandContext *p_command_context) override;
 

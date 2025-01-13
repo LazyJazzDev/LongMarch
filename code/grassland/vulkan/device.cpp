@@ -35,6 +35,19 @@ Device::Device(const class Instance *instance,
   allocator_info.vulkanApiVersion = instance_->CreateHint().app_info.apiVersion;
   allocator_info.flags = allocator_flags;
   vmaCreateAllocator(&allocator_info, &allocator_);
+
+  bool ray_tracing_enabled = false;
+
+  for (auto extension : create_info_.extensions) {
+    if (strcmp(extension, VK_KHR_RAY_TRACING_PIPELINE_EXTENSION_NAME) == 0) {
+      ray_tracing_enabled = true;
+      break;
+    }
+  }
+
+  if (ray_tracing_enabled) {
+    procedures_.GetRayTracingProcedures(device_);
+  }
 }
 
 Device::~Device() {

@@ -20,15 +20,13 @@ VkSamplerMipmapMode FilterModeToVkSamplerMipmapMode(FilterMode filter);
 
 VkSamplerAddressMode AddressModeToVkSamplerAddressMode(AddressMode mode);
 
-VkPrimitiveTopology PrimitiveTopologyToVkPrimitiveTopology(
-    PrimitiveTopology topology);
+VkPrimitiveTopology PrimitiveTopologyToVkPrimitiveTopology(PrimitiveTopology topology);
 
 VkBlendFactor BlendFactorToVkBlendFactor(BlendFactor factor);
 
 VkBlendOp BlendOpToVkBlendOp(BlendOp op);
 
-VkPipelineColorBlendAttachmentState
-BlendStateToVkPipelineColorBlendAttachmentState(const BlendState &state);
+VkPipelineColorBlendAttachmentState BlendStateToVkPipelineColorBlendAttachmentState(const BlendState &state);
 
 class VulkanCore;
 class VulkanBuffer;
@@ -38,6 +36,8 @@ class VulkanShader;
 class VulkanProgram;
 class VulkanCommandContext;
 class VulkanWindow;
+class VulkanAccelerationStructure;
+class VulkanRayTracingProgram;
 
 struct VulkanResourceBinding {
   VulkanResourceBinding();

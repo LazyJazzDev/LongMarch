@@ -53,8 +53,7 @@ DXGI_FORMAT InputTypeToDXGIFormat(InputType type) {
   }
 }
 
-D3D12_DESCRIPTOR_RANGE_TYPE ResourceTypeToD3D12DescriptorRangeType(
-    ResourceType type) {
+D3D12_DESCRIPTOR_RANGE_TYPE ResourceTypeToD3D12DescriptorRangeType(ResourceType type) {
   switch (type) {
     case RESOURCE_TYPE_UNIFORM_BUFFER:
       return D3D12_DESCRIPTOR_RANGE_TYPE_CBV;
@@ -66,6 +65,8 @@ D3D12_DESCRIPTOR_RANGE_TYPE ResourceTypeToD3D12DescriptorRangeType(
       return D3D12_DESCRIPTOR_RANGE_TYPE_UAV;
     case RESOURCE_TYPE_SAMPLER:
       return D3D12_DESCRIPTOR_RANGE_TYPE_SAMPLER;
+    case RESOURCE_TYPE_ACCELERATION_STRUCTURE:
+      return D3D12_DESCRIPTOR_RANGE_TYPE_SRV;
     default:
       return D3D12_DESCRIPTOR_RANGE_TYPE_SRV;
   }
@@ -84,39 +85,28 @@ D3D12_CULL_MODE CullModeToD3D12CullMode(CullMode mode) {
   }
 }
 
-D3D12_FILTER FilterModeToD3D12Filter(FilterMode min_filter,
-                                     FilterMode mag_filter,
-                                     FilterMode mip_filter) {
-  if (min_filter == FILTER_MODE_NEAREST && mag_filter == FILTER_MODE_NEAREST &&
-      mip_filter == FILTER_MODE_NEAREST) {
+D3D12_FILTER FilterModeToD3D12Filter(FilterMode min_filter, FilterMode mag_filter, FilterMode mip_filter) {
+  if (min_filter == FILTER_MODE_NEAREST && mag_filter == FILTER_MODE_NEAREST && mip_filter == FILTER_MODE_NEAREST) {
     return D3D12_FILTER_MIN_MAG_MIP_POINT;
-  } else if (min_filter == FILTER_MODE_NEAREST &&
-             mag_filter == FILTER_MODE_NEAREST &&
+  } else if (min_filter == FILTER_MODE_NEAREST && mag_filter == FILTER_MODE_NEAREST &&
              mip_filter == FILTER_MODE_LINEAR) {
     return D3D12_FILTER_MIN_MAG_POINT_MIP_LINEAR;
-  } else if (min_filter == FILTER_MODE_NEAREST &&
-             mag_filter == FILTER_MODE_LINEAR &&
+  } else if (min_filter == FILTER_MODE_NEAREST && mag_filter == FILTER_MODE_LINEAR &&
              mip_filter == FILTER_MODE_NEAREST) {
     return D3D12_FILTER_MIN_POINT_MAG_LINEAR_MIP_POINT;
-  } else if (min_filter == FILTER_MODE_NEAREST &&
-             mag_filter == FILTER_MODE_LINEAR &&
+  } else if (min_filter == FILTER_MODE_NEAREST && mag_filter == FILTER_MODE_LINEAR &&
              mip_filter == FILTER_MODE_LINEAR) {
     return D3D12_FILTER_MIN_POINT_MAG_MIP_LINEAR;
-  } else if (min_filter == FILTER_MODE_LINEAR &&
-             mag_filter == FILTER_MODE_NEAREST &&
+  } else if (min_filter == FILTER_MODE_LINEAR && mag_filter == FILTER_MODE_NEAREST &&
              mip_filter == FILTER_MODE_NEAREST) {
     return D3D12_FILTER_MIN_LINEAR_MAG_MIP_POINT;
-  } else if (min_filter == FILTER_MODE_LINEAR &&
-             mag_filter == FILTER_MODE_NEAREST &&
+  } else if (min_filter == FILTER_MODE_LINEAR && mag_filter == FILTER_MODE_NEAREST &&
              mip_filter == FILTER_MODE_LINEAR) {
     return D3D12_FILTER_MIN_LINEAR_MAG_POINT_MIP_LINEAR;
-  } else if (min_filter == FILTER_MODE_LINEAR &&
-             mag_filter == FILTER_MODE_LINEAR &&
+  } else if (min_filter == FILTER_MODE_LINEAR && mag_filter == FILTER_MODE_LINEAR &&
              mip_filter == FILTER_MODE_NEAREST) {
     return D3D12_FILTER_MIN_MAG_LINEAR_MIP_POINT;
-  } else if (min_filter == FILTER_MODE_LINEAR &&
-             mag_filter == FILTER_MODE_LINEAR &&
-             mip_filter == FILTER_MODE_LINEAR) {
+  } else if (min_filter == FILTER_MODE_LINEAR && mag_filter == FILTER_MODE_LINEAR && mip_filter == FILTER_MODE_LINEAR) {
     return D3D12_FILTER_MIN_MAG_MIP_LINEAR;
   }
   return D3D12_FILTER_MIN_MAG_MIP_POINT;
@@ -136,8 +126,7 @@ D3D12_TEXTURE_ADDRESS_MODE AddressModeToD3D12AddressMode(AddressMode mode) {
   return D3D12_TEXTURE_ADDRESS_MODE_WRAP;
 }
 
-D3D12_PRIMITIVE_TOPOLOGY PrimitiveTopologyToD3D12PrimitiveTopology(
-    PrimitiveTopology topology) {
+D3D12_PRIMITIVE_TOPOLOGY PrimitiveTopologyToD3D12PrimitiveTopology(PrimitiveTopology topology) {
   switch (topology) {
     case PRIMITIVE_TOPOLOGY_LINE_LIST:
       return D3D_PRIMITIVE_TOPOLOGY_LINELIST;
@@ -195,8 +184,7 @@ D3D12_BLEND_OP BlendOpToD3D12BlendOp(BlendOp op) {
   return D3D12_BLEND_OP_ADD;
 }
 
-D3D12_RENDER_TARGET_BLEND_DESC BlendStateToD3D12RenderTargetBlendDesc(
-    const BlendState &state) {
+D3D12_RENDER_TARGET_BLEND_DESC BlendStateToD3D12RenderTargetBlendDesc(const BlendState &state) {
   D3D12_RENDER_TARGET_BLEND_DESC desc{};
   desc.BlendEnable = state.blend_enable;
   desc.SrcBlend = BlendFactorToD3D12Blend(state.src_color);
@@ -205,9 +193,8 @@ D3D12_RENDER_TARGET_BLEND_DESC BlendStateToD3D12RenderTargetBlendDesc(
   desc.SrcBlendAlpha = BlendFactorToD3D12Blend(state.src_alpha);
   desc.DestBlendAlpha = BlendFactorToD3D12Blend(state.dst_alpha);
   desc.BlendOpAlpha = BlendOpToD3D12BlendOp(state.alpha_op);
-  desc.RenderTargetWriteMask =
-      D3D12_COLOR_WRITE_ENABLE_RED | D3D12_COLOR_WRITE_ENABLE_GREEN |
-      D3D12_COLOR_WRITE_ENABLE_BLUE | D3D12_COLOR_WRITE_ENABLE_ALPHA;
+  desc.RenderTargetWriteMask = D3D12_COLOR_WRITE_ENABLE_RED | D3D12_COLOR_WRITE_ENABLE_GREEN |
+                               D3D12_COLOR_WRITE_ENABLE_BLUE | D3D12_COLOR_WRITE_ENABLE_ALPHA;
   desc.LogicOpEnable = FALSE;
   desc.LogicOp = D3D12_LOGIC_OP_NOOP;
   return desc;
@@ -216,12 +203,10 @@ D3D12_RENDER_TARGET_BLEND_DESC BlendStateToD3D12RenderTargetBlendDesc(
 D3D12ResourceBinding::D3D12ResourceBinding() : buffer(nullptr), image(nullptr) {
 }
 
-D3D12ResourceBinding::D3D12ResourceBinding(D3D12Buffer *buffer)
-    : buffer(buffer), image(nullptr) {
+D3D12ResourceBinding::D3D12ResourceBinding(D3D12Buffer *buffer) : buffer(buffer), image(nullptr) {
 }
 
-D3D12ResourceBinding::D3D12ResourceBinding(D3D12Image *image)
-    : buffer(nullptr), image(image) {
+D3D12ResourceBinding::D3D12ResourceBinding(D3D12Image *image) : buffer(nullptr), image(image) {
 }
 
 }  // namespace grassland::graphics::backend

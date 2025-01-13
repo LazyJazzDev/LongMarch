@@ -5,26 +5,22 @@
 namespace grassland::graphics::backend {
 class D3D12Shader : public Shader {
  public:
-  D3D12Shader(D3D12Core *core, const void *data, size_t size);
+  D3D12Shader(D3D12Core *core, const CompiledShaderBlob &shader_blob);
   ~D3D12Shader() override = default;
 
-  ID3DBlob *ShaderBlob() const {
-    return shader_blob_.Get();
+  const d3d12::ShaderModule &ShaderModule() const {
+    return shader_module_;
   }
 
  private:
   D3D12Core *core_;
-  Microsoft::WRL::ComPtr<ID3DBlob> shader_blob_;
+  d3d12::ShaderModule shader_module_;
 };
 
 class D3D12Program : public Program {
  public:
-  D3D12Program(D3D12Core *core,
-               const std::vector<ImageFormat> &color_formats,
-               ImageFormat depth_format);
-  void AddInputAttribute(uint32_t binding,
-                         InputType type,
-                         uint32_t offset) override;
+  D3D12Program(D3D12Core *core, const std::vector<ImageFormat> &color_formats, ImageFormat depth_format);
+  void AddInputAttribute(uint32_t binding, InputType type, uint32_t offset) override;
   void AddInputBinding(uint32_t stride, bool input_per_instance) override;
   void AddResourceBinding(ResourceType type, int count) override;
   void SetCullMode(CullMode mode) override;

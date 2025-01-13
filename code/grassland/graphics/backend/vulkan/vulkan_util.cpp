@@ -78,6 +78,8 @@ VkDescriptorType ResourceTypeToVkDescriptorType(ResourceType type) {
       return VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
     case RESOURCE_TYPE_SAMPLER:
       return VK_DESCRIPTOR_TYPE_SAMPLER;
+    case RESOURCE_TYPE_ACCELERATION_STRUCTURE:
+      return VK_DESCRIPTOR_TYPE_ACCELERATION_STRUCTURE_KHR;
     default:
       return VK_DESCRIPTOR_TYPE_MAX_ENUM;
   }
@@ -130,8 +132,7 @@ VkSamplerAddressMode AddressModeToVkSamplerAddressMode(AddressMode mode) {
   return VK_SAMPLER_ADDRESS_MODE_REPEAT;
 }
 
-VkPrimitiveTopology PrimitiveTopologyToVkPrimitiveTopology(
-    PrimitiveTopology topology) {
+VkPrimitiveTopology PrimitiveTopologyToVkPrimitiveTopology(PrimitiveTopology topology) {
   switch (topology) {
     case PRIMITIVE_TOPOLOGY_TRIANGLE_LIST:
       return VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;
@@ -189,8 +190,7 @@ VkBlendOp BlendOpToVkBlendOp(BlendOp op) {
   return VK_BLEND_OP_ADD;
 }
 
-VkPipelineColorBlendAttachmentState
-BlendStateToVkPipelineColorBlendAttachmentState(const BlendState &state) {
+VkPipelineColorBlendAttachmentState BlendStateToVkPipelineColorBlendAttachmentState(const BlendState &state) {
   VkPipelineColorBlendAttachmentState attachment{};
   attachment.blendEnable = state.blend_enable;
   attachment.srcColorBlendFactor = BlendFactorToVkBlendFactor(state.src_color);
@@ -200,21 +200,17 @@ BlendStateToVkPipelineColorBlendAttachmentState(const BlendState &state) {
   attachment.dstAlphaBlendFactor = BlendFactorToVkBlendFactor(state.dst_alpha);
   attachment.alphaBlendOp = BlendOpToVkBlendOp(state.alpha_op);
   attachment.colorWriteMask =
-      VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT |
-      VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT;
+      VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT | VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT;
   return attachment;
 }
 
-VulkanResourceBinding::VulkanResourceBinding()
-    : buffer(nullptr), image(nullptr) {
+VulkanResourceBinding::VulkanResourceBinding() : buffer(nullptr), image(nullptr) {
 }
 
-VulkanResourceBinding::VulkanResourceBinding(VulkanBuffer *buffer)
-    : buffer(buffer), image(nullptr) {
+VulkanResourceBinding::VulkanResourceBinding(VulkanBuffer *buffer) : buffer(buffer), image(nullptr) {
 }
 
-VulkanResourceBinding::VulkanResourceBinding(VulkanImage *image)
-    : buffer(nullptr), image(image) {
+VulkanResourceBinding::VulkanResourceBinding(VulkanImage *image) : buffer(nullptr), image(image) {
 }
 
 }  // namespace grassland::graphics::backend

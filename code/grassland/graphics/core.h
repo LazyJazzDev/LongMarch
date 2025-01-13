@@ -4,6 +4,7 @@
 #include <wrl/client.h>
 #endif
 
+#include "buffer.h"
 #include "grassland/graphics/graphics_util.h"
 
 namespace grassland::graphics {
@@ -27,22 +28,32 @@ class Core {
   virtual int CreateSampler(const SamplerInfo &info, double_ptr<Sampler> pp_sampler) = 0;
 
   int CreateWindowObject(int width, int height, const std::string &title, double_ptr<Window> pp_window);
-  virtual int CreateWindowObject(int width, int height, const std::string &title, bool fullscreen, bool resizable, double_ptr<Window> pp_window) = 0;
-#ifdef WIN32
-  int CreateShader(Microsoft::WRL::ComPtr<ID3DBlob> shader_blob, double_ptr<Shader> pp_shader);
-#endif
+  virtual int CreateWindowObject(int width,
+                                 int height,
+                                 const std::string &title,
+                                 bool fullscreen,
+                                 bool resizable,
+                                 double_ptr<Window> pp_window) = 0;
 
-  int CreateShader(const std::vector<uint32_t> &spirv, double_ptr<Shader> pp_shader);
+  virtual int CreateShader(const std::string &source_code,
+                           const std::string &entry_point,
+                           const std::string &target,
+                           double_ptr<Shader> pp_shader) = 0;
 
-  virtual int CreateShader(const void *data, size_t size, double_ptr<Shader> pp_shader) = 0;
-
-  virtual int CreateShader(const CompiledShaderBlob &shader_blob, double_ptr<Shader> pp_shader) = 0;
-
-  virtual int CreateShader(const std::string &source_code, const std::string &entry_point, const std::string &target, double_ptr<Shader> pp_shader) = 0;
-
-  virtual int CreateProgram(const std::vector<ImageFormat> &color_formats, ImageFormat depth_format, double_ptr<Program> pp_program) = 0;
+  virtual int CreateProgram(const std::vector<ImageFormat> &color_formats,
+                            ImageFormat depth_format,
+                            double_ptr<Program> pp_program) = 0;
 
   virtual int CreateCommandContext(double_ptr<CommandContext> pp_command_context) = 0;
+
+  virtual int CreateBottomLevelAccelerationStructure(Buffer *vertex_buffer,
+                                                     Buffer *index_buffer,
+                                                     uint32_t stride,
+                                                     double_ptr<AccelerationStructure> pp_blas) = 0;
+
+  virtual int CreateTopLevelAccelerationStructure(
+      const std::vector<std::pair<AccelerationStructure *, glm::mat4>> &objects,
+      double_ptr<AccelerationStructure> pp_tlas) = 0;
 
   virtual int SubmitCommandContext(CommandContext *p_command_context) = 0;
 
