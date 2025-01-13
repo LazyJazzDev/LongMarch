@@ -64,9 +64,12 @@ class Device {
 
   VkResult CreateCommandPool(double_ptr<CommandPool> pp_command_pool) const;
 
-  VkResult CreateShaderModule(const std::vector<uint32_t> &code, double_ptr<ShaderModule> pp_shader_module) const;
+  VkResult CreateShaderModule(const CompiledShaderBlob &code, double_ptr<ShaderModule> pp_shader_module) const;
 
-  VkResult CreateShaderModule(const void *p_code, size_t code_size, double_ptr<ShaderModule> pp_shader_module) const;
+  VkResult CreateShaderModule(const void *p_code,
+                              size_t code_size,
+                              const std::string &entry_point,
+                              double_ptr<ShaderModule> pp_shader_module) const;
 
   VkResult CreateDescriptorPool(const std::vector<VkDescriptorPoolSize> &pool_sizes,
                                 uint32_t max_sets,

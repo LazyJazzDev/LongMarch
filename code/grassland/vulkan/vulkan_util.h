@@ -11,11 +11,11 @@
 #include <string>
 #include <vector>
 
+#include "grassland/graphics/graphics_util.h"
 #include "grassland/util/util.h"
 
 namespace grassland::vulkan {
-#define GRASSLAND_VULKAN_PROCEDURE_VAR(function_name) \
-  PFN_##function_name function_name{};
+#define GRASSLAND_VULKAN_PROCEDURE_VAR(function_name) PFN_##function_name function_name{};
 
 #ifdef NDEBUG
 constexpr bool kDefaultEnableValidationLayers = false;
@@ -39,9 +39,7 @@ void ThrowError(const std::string &message, Args &&...args) {
 void ThrowIfFailed(VkResult result, const std::string &message);
 
 template <class... Args>
-void ThrowIfFailed(VkResult result,
-                   const std::string &message,
-                   Args &&...args) {
+void ThrowIfFailed(VkResult result, const std::string &message, Args &&...args) {
   ThrowIfFailed(result, fmt::format(message, std::forward<Args>(args)...));
 }
 
@@ -63,16 +61,15 @@ std::string GetErrorMessage();
 
 std::string VkResultToString(VkResult result);
 
-#define RETURN_IF_FAILED_VK(cmd, ...)                                  \
-  do {                                                                 \
-    VkResult res = cmd;                                                \
-    if (res != VK_SUCCESS) {                                           \
-      ::grassland::vulkan::SetErrorMessage(__VA_ARGS__);               \
-      ::grassland::vulkan::SetErrorMessage(                            \
-          "VkResult: {}", ::grassland::vulkan::VkResultToString(res)); \
-      return res;                                                      \
-    }                                                                  \
-                                                                       \
+#define RETURN_IF_FAILED_VK(cmd, ...)                                                                   \
+  do {                                                                                                  \
+    VkResult res = cmd;                                                                                 \
+    if (res != VK_SUCCESS) {                                                                            \
+      ::grassland::vulkan::SetErrorMessage(__VA_ARGS__);                                                \
+      ::grassland::vulkan::SetErrorMessage("VkResult: {}", ::grassland::vulkan::VkResultToString(res)); \
+      return res;                                                                                       \
+    }                                                                                                   \
+                                                                                                        \
   } while (false)
 
 class Instance;
@@ -101,5 +98,7 @@ class RayTracingPipeline;
 class ShaderBindingTable;
 
 bool IsDepthFormat(VkFormat format);
+
+using graphics::CompiledShaderBlob;
 
 }  // namespace grassland::vulkan

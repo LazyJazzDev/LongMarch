@@ -140,6 +140,41 @@ void Application::CreatePipelineAssets() {
       glm::lookAtLH(glm::vec3{0.0f, 0.0f, -2.0f}, glm::vec3{0.0f, 0.0f, 0.0f}, glm::vec3{0.0f, 1.0f, 0.0f}));
   std::memcpy(camera_object_buffer_->Map(), &camera_object, sizeof(CameraObject));
   camera_object_buffer_->Unmap();
+
+  CD3DX12_DESCRIPTOR_RANGE1 descriptor_ranges[3];
+  descriptor_ranges[0].Init(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 1, 0);
+  descriptor_ranges[1].Init(D3D12_DESCRIPTOR_RANGE_TYPE_UAV, 1, 0);
+  descriptor_ranges[2].Init(D3D12_DESCRIPTOR_RANGE_TYPE_CBV, 1, 0);
+
+  CD3DX12_ROOT_PARAMETER1 root_parameter;
+  root_parameter.InitAsDescriptorTable(3, descriptor_ranges, D3D12_SHADER_VISIBILITY_ALL);
+
+  CD3DX12_VERSIONED_ROOT_SIGNATURE_DESC root_signature_desc;
+  root_signature_desc.Init_1_1(1, &root_parameter, 0, nullptr, D3D12_ROOT_SIGNATURE_FLAG_NONE);
+
+  device_->CreateRootSignature(root_signature_desc, &root_signature_);
+
+  device_->CreateImage(swap_chain_->Width(), swap_chain_->Height(), DXGI_FORMAT_R8G8B8A8_UNORM, &frame_image_);
+
+  device_->CreateDescriptorHeap(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV, 3, &descriptor_heap_);
+
+  D3D12_SHADER_RESOURCE_VIEW_DESC srv_desc{};
+  srv_desc.ViewDimension = D3D12_SRV_DIMENSION_RAYTRACING_ACCELERATION_STRUCTURE;
+  srv_desc.RaytracingAccelerationStructure.Location = tlas_->Handle()->GetGPUVirtualAddress();
+  srv_desc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
+  device_->Handle()->CreateShaderResourceView(nullptr, &srv_desc, descriptor_heap_->CPUHandle(0));
+
+  D3D12_UNORDERED_ACCESS_VIEW_DESC uav_desc{};
+  uav_desc.ViewDimension = D3D12_UAV_DIMENSION_TEXTURE2D;
+  uav_desc.Format = frame_image_->Format();
+  uav_desc.Texture2D.MipSlice = 0;
+  uav_desc.Texture2D.PlaneSlice = 0;
+  device_->Handle()->CreateUnorderedAccessView(frame_image_->Handle(), nullptr, &uav_desc,
+                                               descriptor_heap_->CPUHandle(1));
+  D3D12_CONSTANT_BUFFER_VIEW_DESC cbv_desc{};
+  cbv_desc.BufferLocation = camera_object_buffer_->Handle()->GetGPUVirtualAddress();
+  cbv_desc.SizeInBytes = camera_object_buffer_->Size();
+  device_->Handle()->CreateConstantBufferView(&cbv_desc, descriptor_heap_->CPUHandle(2));
 }
 
 void Application::DestroyPipelineAssets() {

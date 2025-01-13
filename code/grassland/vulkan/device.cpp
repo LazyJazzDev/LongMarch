@@ -204,14 +204,7 @@ VkResult Device::CreateCommandPool(double_ptr<CommandPool> pp_command_pool) cons
                            pp_command_pool);
 }
 
-VkResult Device::CreateShaderModule(const std::vector<uint32_t> &code,
-                                    double_ptr<ShaderModule> pp_shader_module) const {
-  return CreateShaderModule(code.data(), code.size() * sizeof(uint32_t), pp_shader_module);
-}
-
-VkResult Device::CreateShaderModule(const void *p_code,
-                                    size_t code_size,
-                                    double_ptr<ShaderModule> pp_shader_module) const {
+VkResult Device::CreateShaderModule(const CompiledShaderBlob &code, double_ptr<ShaderModule> pp_shader_module) const {
   if (!pp_shader_module) {
     SetErrorMessage("pp_shader_module is nullptr");
     return VK_ERROR_INITIALIZATION_FAILED;
@@ -220,15 +213,26 @@ VkResult Device::CreateShaderModule(const void *p_code,
   VkShaderModule shader_module;
   VkShaderModuleCreateInfo create_info = {};
   create_info.sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO;
-  create_info.codeSize = code_size;
-  create_info.pCode = reinterpret_cast<const uint32_t *>(p_code);
+  create_info.codeSize = code.data.size();
+  create_info.pCode = reinterpret_cast<const uint32_t *>(code.data.data());
 
   RETURN_IF_FAILED_VK(vkCreateShaderModule(device_, &create_info, nullptr, &shader_module),
                       "failed to create shader module!");
 
-  pp_shader_module.construct(this, shader_module);
+  pp_shader_module.construct(this, shader_module, code.entry_point);
 
   return VK_SUCCESS;
+}
+
+VkResult Device::CreateShaderModule(const void *p_code,
+                                    size_t code_size,
+                                    const std::string &entry_point,
+                                    double_ptr<ShaderModule> pp_shader_module) const {
+  CompiledShaderBlob code;
+  code.data.resize(code_size);
+  std::memcpy(code.data.data(), p_code, code_size);
+  code.entry_point = entry_point;
+  return CreateShaderModule(code, pp_shader_module);
 }
 
 VkResult Device::CreateDescriptorPool(const std::vector<VkDescriptorPoolSize> &pool_sizes,
@@ -785,7 +789,7 @@ VkResult Device::CreateRayTracingPipeline(PipelineLayout *pipeline_layout,
       0,
       VK_SHADER_STAGE_RAYGEN_BIT_KHR,
       ray_gen_shader->Handle(),
-      "main",
+      ray_gen_shader->EntryPoint().c_str(),
       nullptr,
   });
   shader_stage_create_infos.push_back({
@@ -794,7 +798,7 @@ VkResult Device::CreateRayTracingPipeline(PipelineLayout *pipeline_layout,
       0,
       VK_SHADER_STAGE_MISS_BIT_KHR,
       miss_shader->Handle(),
-      "main",
+      miss_shader->EntryPoint().c_str(),
       nullptr,
   });
   shader_stage_create_infos.push_back({
@@ -803,7 +807,7 @@ VkResult Device::CreateRayTracingPipeline(PipelineLayout *pipeline_layout,
       0,
       VK_SHADER_STAGE_CLOSEST_HIT_BIT_KHR,
       closest_hit_shader->Handle(),
-      "main",
+      closest_hit_shader->EntryPoint().c_str(),
       nullptr,
   });
   std::vector<VkRayTracingShaderGroupCreateInfoKHR> shader_groups;

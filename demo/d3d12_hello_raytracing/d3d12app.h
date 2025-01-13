@@ -51,12 +51,15 @@ class Application {
   std::unique_ptr<AccelerationStructure> blas_;
   std::unique_ptr<AccelerationStructure> tlas_;
 
+  std::unique_ptr<Image> frame_image_;
+
   std::unique_ptr<ShaderModule> raygen_shader_;
   std::unique_ptr<ShaderModule> miss_shader_;
   std::unique_ptr<ShaderModule> hit_shader_;
 
   std::unique_ptr<RootSignature> root_signature_;
   std::unique_ptr<PipelineState> pipeline_state_;
+  std::unique_ptr<DescriptorHeap> descriptor_heap_;
 
   std::unique_ptr<Image> texture_;
 };

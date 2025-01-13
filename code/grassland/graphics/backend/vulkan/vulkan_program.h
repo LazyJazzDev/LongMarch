@@ -12,18 +12,13 @@ class VulkanShader : public Shader {
     return shader_module_.get();
   }
 
-  std::string &EntryPoint() {
-    return entry_point_;
-  }
-
   const std::string &EntryPoint() const {
-    return entry_point_;
+    return shader_module_->EntryPoint();
   }
 
  private:
   VulkanCore *core_;
   std::unique_ptr<vulkan::ShaderModule> shader_module_;
-  std::string entry_point_;
 };
 
 class VulkanProgram : public Program {
