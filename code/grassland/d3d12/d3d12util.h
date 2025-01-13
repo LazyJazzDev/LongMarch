@@ -10,6 +10,7 @@
 #include "GLFW/glfw3.h"
 #define GLFW_EXPOSE_NATIVE_WIN32
 #include "GLFW/glfw3native.h"
+#include "glm/glm.hpp"
 #include "grassland/util/util.h"
 
 namespace grassland::d3d12 {
@@ -95,5 +96,10 @@ HRESULT CreateBuffer(ID3D12Device *device,
                      D3D12_RESOURCE_STATES resource_state,
                      D3D12_RESOURCE_FLAGS resource_flags,
                      ComPtr<ID3D12Resource> &buffer);
+
+struct CompiledShaderBlob {
+  std::vector<uint8_t> data;
+  std::string entry_point;
+};
 
 }  // namespace grassland::d3d12

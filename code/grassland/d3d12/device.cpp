@@ -8,6 +8,7 @@
 #include "grassland/d3d12/fence.h"
 #include "grassland/d3d12/image.h"
 #include "grassland/d3d12/pipeline_state.h"
+#include "grassland/d3d12/raytracing/raytracing.h"
 #include "grassland/d3d12/root_signature.h"
 #include "grassland/d3d12/shader_module.h"
 
@@ -160,14 +161,17 @@ HRESULT Device::CreateImageU8(size_t width, size_t height, double_ptr<Image> pp_
 HRESULT Device::CreateShaderModule(const void *compiled_shader_data,
                                    size_t size,
                                    double_ptr<ShaderModule> pp_shader_module) {
-  std::vector<uint8_t> shader_code(static_cast<const uint8_t *>(compiled_shader_data),
-                                   static_cast<const uint8_t *>(compiled_shader_data) + size);
-  pp_shader_module.construct(shader_code);
-  return S_OK;
+  CompiledShaderBlob shader_code;
+  shader_code.data.resize(size);
+  std::memcpy(shader_code.data.data(), compiled_shader_data, size);
+  shader_code.entry_point = "main";
+  return CreateShaderModule(shader_code, pp_shader_module);
 }
 
-HRESULT Device::CreateShaderModule(const ComPtr<ID3DBlob> &compiled_shader, double_ptr<ShaderModule> pp_shader_module) {
-  return CreateShaderModule(compiled_shader->GetBufferPointer(), compiled_shader->GetBufferSize(), pp_shader_module);
+HRESULT Device::CreateShaderModule(const CompiledShaderBlob &compiled_shader,
+                                   double_ptr<ShaderModule> pp_shader_module) {
+  pp_shader_module.construct(compiled_shader);
+  return S_OK;
 }
 
 HRESULT Device::CreateRootSignature(const CD3DX12_VERSIONED_ROOT_SIGNATURE_DESC &desc,
@@ -222,8 +226,8 @@ HRESULT Device::CreateBottomLevelAccelerationStructure(D3D12_GPU_VIRTUAL_ADDRESS
                                                        uint32_t stride,
                                                        uint32_t primitive_count,
                                                        CommandQueue *queue,
-                                                       CommandAllocator *allocator,
                                                        Fence *fence,
+                                                       CommandAllocator *allocator,
                                                        double_ptr<AccelerationStructure> pp_as) {
   D3D12_RAYTRACING_GEOMETRY_DESC geometry = {};
   geometry.Type = D3D12_RAYTRACING_GEOMETRY_TYPE_TRIANGLES;
@@ -249,11 +253,125 @@ HRESULT Device::CreateBottomLevelAccelerationStructure(D3D12_GPU_VIRTUAL_ADDRESS
   D3D12_RAYTRACING_ACCELERATION_STRUCTURE_PREBUILD_INFO as_prebuild_info = {};
   dxr_device_->GetRaytracingAccelerationStructurePrebuildInfo(&as_inputs, &as_prebuild_info);
 
-  std::unique_ptr<Buffer> scratch_buffer;
+  ComPtr<ID3D12Resource> scratch_buffer;
   RETURN_IF_FAILED_HR(
-      CreateBuffer(as_prebuild_info.ScratchDataSizeInBytes, D3D12_HEAP_TYPE_DEFAULT,
-                   D3D12_RESOURCE_STATE_UNORDERED_ACCESS, D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS, &scratch_buffer),
+      d3d12::CreateBuffer(Handle(), as_prebuild_info.ScratchDataSizeInBytes, D3D12_HEAP_TYPE_DEFAULT,
+                          D3D12_RESOURCE_STATE_COMMON, D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS, scratch_buffer),
       "failed to create scratch buffer.");
+
+  ComPtr<ID3D12Resource> as;
+  RETURN_IF_FAILED_HR(d3d12::CreateBuffer(Handle(), as_prebuild_info.ResultDataMaxSizeInBytes, D3D12_HEAP_TYPE_DEFAULT,
+                                          D3D12_RESOURCE_STATE_RAYTRACING_ACCELERATION_STRUCTURE,
+                                          D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS, as),
+                      "failed to create acceleration structure buffer.");
+
+  D3D12_BUILD_RAYTRACING_ACCELERATION_STRUCTURE_DESC as_desc = {};
+  as_desc.Inputs = as_inputs;
+  as_desc.ScratchAccelerationStructureData = scratch_buffer->GetGPUVirtualAddress();
+  as_desc.DestAccelerationStructureData = as->GetGPUVirtualAddress();
+  as_desc.SourceAccelerationStructureData = 0;
+
+  queue->SingleTimeCommand(fence, allocator, [&](ID3D12GraphicsCommandList *command_list) {
+    ComPtr<ID3D12GraphicsCommandList4> command_list4;
+    if (SUCCEEDED(command_list->QueryInterface(IID_PPV_ARGS(&command_list4)))) {
+      command_list4->BuildRaytracingAccelerationStructure(&as_desc, 0, nullptr);
+    }
+  });
+
+  pp_as.construct(as);
+  return S_OK;
+}
+
+HRESULT Device::CreateBottomLevelAccelerationStructure(Buffer *vertex_buffer,
+                                                       Buffer *index_buffer,
+                                                       uint32_t stride,
+                                                       CommandQueue *queue,
+                                                       Fence *fence,
+                                                       CommandAllocator *allocator,
+                                                       double_ptr<AccelerationStructure> pp_as) {
+  return CreateBottomLevelAccelerationStructure(
+      vertex_buffer->Handle()->GetGPUVirtualAddress(), index_buffer->Handle()->GetGPUVirtualAddress(),
+      vertex_buffer->Size() / stride, stride, index_buffer->Size() / (sizeof(uint32_t) * 3), queue, fence, allocator,
+      pp_as);
+}
+
+HRESULT Device::CreateTopLevelAccelerationStructure(
+    const std::vector<std::pair<AccelerationStructure *, glm::mat4>> &objects,
+    CommandQueue *queue,
+    Fence *fence,
+    CommandAllocator *allocator,
+    double_ptr<AccelerationStructure> pp_tlas) {
+  std::vector<D3D12_RAYTRACING_INSTANCE_DESC> instance_descs;
+  instance_descs.reserve(objects.size());
+  for (int i = 0; i < objects.size(); i++) {
+    auto &object = objects[i];
+    D3D12_RAYTRACING_INSTANCE_DESC instance_desc = {};
+    instance_desc.Transform[0][0] = object.second[0][0];
+    instance_desc.Transform[0][1] = object.second[1][0];
+    instance_desc.Transform[0][2] = object.second[2][0];
+    instance_desc.Transform[0][3] = object.second[3][0];
+    instance_desc.Transform[1][0] = object.second[0][1];
+    instance_desc.Transform[1][1] = object.second[1][1];
+    instance_desc.Transform[1][2] = object.second[2][1];
+    instance_desc.Transform[1][3] = object.second[3][1];
+    instance_desc.Transform[2][0] = object.second[0][2];
+    instance_desc.Transform[2][1] = object.second[1][2];
+    instance_desc.Transform[2][2] = object.second[2][2];
+    instance_desc.Transform[2][3] = object.second[3][2];
+    instance_desc.InstanceID = i;
+    instance_desc.InstanceMask = 0xFF;
+    instance_desc.InstanceContributionToHitGroupIndex = 0;
+    instance_desc.Flags = D3D12_RAYTRACING_INSTANCE_FLAG_TRIANGLE_CULL_DISABLE;
+    instance_desc.AccelerationStructure = objects[i].first->Handle()->GetGPUVirtualAddress();
+    instance_descs.push_back(instance_desc);
+  }
+
+  std::unique_ptr<Buffer> instance_buffer;
+  RETURN_IF_FAILED_HR(
+      CreateBuffer(sizeof(D3D12_RAYTRACING_INSTANCE_DESC) * instance_descs.size(), D3D12_HEAP_TYPE_UPLOAD,
+                   D3D12_RESOURCE_STATE_GENERIC_READ, D3D12_RESOURCE_FLAG_NONE, &instance_buffer),
+      "failed to create instance buffer.");
+  std::memcpy(instance_buffer->Map(), instance_descs.data(),
+              instance_descs.size() * sizeof(D3D12_RAYTRACING_INSTANCE_DESC));
+  instance_buffer->Unmap();
+
+  D3D12_BUILD_RAYTRACING_ACCELERATION_STRUCTURE_INPUTS as_inputs = {};
+  as_inputs.Type = D3D12_RAYTRACING_ACCELERATION_STRUCTURE_TYPE_TOP_LEVEL;
+  as_inputs.DescsLayout = D3D12_ELEMENTS_LAYOUT_ARRAY;
+  as_inputs.InstanceDescs = instance_buffer->Handle()->GetGPUVirtualAddress();
+  as_inputs.NumDescs = instance_descs.size();
+  as_inputs.Flags = D3D12_RAYTRACING_ACCELERATION_STRUCTURE_BUILD_FLAG_PREFER_FAST_TRACE;
+
+  D3D12_RAYTRACING_ACCELERATION_STRUCTURE_PREBUILD_INFO as_prebuild_info = {};
+  dxr_device_->GetRaytracingAccelerationStructurePrebuildInfo(&as_inputs, &as_prebuild_info);
+
+  ComPtr<ID3D12Resource> scratch_buffer;
+  RETURN_IF_FAILED_HR(
+      d3d12::CreateBuffer(Handle(), as_prebuild_info.ScratchDataSizeInBytes, D3D12_HEAP_TYPE_DEFAULT,
+                          D3D12_RESOURCE_STATE_COMMON, D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS, scratch_buffer),
+      "failed to create scratch buffer.");
+
+  ComPtr<ID3D12Resource> as;
+  RETURN_IF_FAILED_HR(d3d12::CreateBuffer(Handle(), as_prebuild_info.ResultDataMaxSizeInBytes, D3D12_HEAP_TYPE_DEFAULT,
+                                          D3D12_RESOURCE_STATE_RAYTRACING_ACCELERATION_STRUCTURE,
+                                          D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS, as),
+                      "failed to create acceleration structure buffer.");
+
+  D3D12_BUILD_RAYTRACING_ACCELERATION_STRUCTURE_DESC as_desc = {};
+  as_desc.Inputs = as_inputs;
+  as_desc.ScratchAccelerationStructureData = scratch_buffer->GetGPUVirtualAddress();
+  as_desc.DestAccelerationStructureData = as->GetGPUVirtualAddress();
+  as_desc.SourceAccelerationStructureData = 0;
+
+  queue->SingleTimeCommand(fence, allocator, [&](ID3D12GraphicsCommandList *command_list) {
+    ComPtr<ID3D12GraphicsCommandList4> command_list4;
+    if (SUCCEEDED(command_list->QueryInterface(IID_PPV_ARGS(&command_list4)))) {
+      command_list4->BuildRaytracingAccelerationStructure(&as_desc, 0, nullptr);
+    }
+  });
+
+  pp_tlas.construct(as);
+  return S_OK;
 }
 
 }  // namespace grassland::d3d12

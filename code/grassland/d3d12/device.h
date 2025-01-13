@@ -63,7 +63,7 @@ class Device {
 
   HRESULT CreateShaderModule(const void *compiled_shader_data, size_t size, double_ptr<ShaderModule> pp_shader_module);
 
-  HRESULT CreateShaderModule(const ComPtr<ID3DBlob> &compiled_shader, double_ptr<ShaderModule> pp_shader_module);
+  HRESULT CreateShaderModule(const CompiledShaderBlob &compiled_shader, double_ptr<ShaderModule> pp_shader_module);
 
   HRESULT CreateRootSignature(const CD3DX12_VERSIONED_ROOT_SIGNATURE_DESC &desc,
                               double_ptr<RootSignature> pp_root_signature);
@@ -77,9 +77,23 @@ class Device {
                                                  uint32_t stride,
                                                  uint32_t primitive_count,
                                                  CommandQueue *queue,
-                                                 CommandAllocator *allocator,
                                                  Fence *fence,
+                                                 CommandAllocator *allocator,
                                                  double_ptr<AccelerationStructure> pp_as);
+
+  HRESULT CreateBottomLevelAccelerationStructure(Buffer *vertex_buffer,
+                                                 Buffer *index_buffer,
+                                                 uint32_t stride,
+                                                 CommandQueue *queue,
+                                                 Fence *fence,
+                                                 CommandAllocator *allocator,
+                                                 double_ptr<AccelerationStructure> pp_as);
+
+  HRESULT CreateTopLevelAccelerationStructure(const std::vector<std::pair<AccelerationStructure *, glm::mat4>> &objects,
+                                              CommandQueue *queue,
+                                              Fence *fence,
+                                              CommandAllocator *allocator,
+                                              double_ptr<AccelerationStructure> pp_tlas);
 
  private:
   class Adapter adapter_;

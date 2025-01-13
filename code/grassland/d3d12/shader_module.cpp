@@ -3,8 +3,8 @@
 #include <dxcapi.h>
 
 namespace grassland::d3d12 {
-ShaderModule::ShaderModule(const std::vector<uint8_t> &shader_code)
-    : shader_code_(shader_code) {
+ShaderModule::ShaderModule(const CompiledShaderBlob &shader_blob)
+    : shader_code_(shader_blob.data), entry_point_(shader_blob.entry_point) {
 }
 
 ComPtr<ID3DBlob> CompileShaderLegacy(const std::string &source_code,
@@ -19,13 +19,11 @@ ComPtr<ID3DBlob> CompileShaderLegacy(const std::string &source_code,
 
   ComPtr<ID3DBlob> shader_blob;
   ComPtr<ID3DBlob> error_blob;
-  auto hr = D3DCompile(source_code.c_str(), source_code.size(), nullptr,
-                       nullptr, nullptr, entry_point.c_str(), target.c_str(),
-                       compile_flags, 0, &shader_blob, &error_blob);
+  auto hr = D3DCompile(source_code.c_str(), source_code.size(), nullptr, nullptr, nullptr, entry_point.c_str(),
+                       target.c_str(), compile_flags, 0, &shader_blob, &error_blob);
   if (FAILED(hr)) {
     if (error_blob) {
-      LogError("Failed to compile shader: {}",
-               static_cast<char *>(error_blob->GetBufferPointer()));
+      LogError("Failed to compile shader: {}", static_cast<char *>(error_blob->GetBufferPointer()));
     } else {
       LogError("Failed to compile shader.");
     }
@@ -34,9 +32,9 @@ ComPtr<ID3DBlob> CompileShaderLegacy(const std::string &source_code,
   return shader_blob;
 }
 
-ComPtr<ID3DBlob> CompileShader(const std::string &source_code,
-                               const std::string &entry_point,
-                               const std::string &target) {
+CompiledShaderBlob CompileShader(const std::string &source_code,
+                                 const std::string &entry_point,
+                                 const std::string &target) {
 #if defined(_DEBUG)
   // Enable better shader debugging with the graphics debugging tools.
   UINT compile_flags = D3DCOMPILE_DEBUG | D3DCOMPILE_SKIP_OPTIMIZATION;
@@ -50,15 +48,13 @@ ComPtr<ID3DBlob> CompileShader(const std::string &source_code,
   DxcCreateInstance(CLSID_DxcUtils, IID_PPV_ARGS(&dxc_utils));
 
   HRESULT hr;
-  hr = dxc_utils->CreateBlobFromPinned(source_code.c_str(), source_code.size(),
-                                       CP_UTF8, &source_blob);
+  hr = dxc_utils->CreateBlobFromPinned(source_code.c_str(), source_code.size(), CP_UTF8, &source_blob);
   if (FAILED(hr)) {
     LogError("Failed to create blob with encoding from pinned.");
   }
 
   ComPtr<IDxcCompilerArgs> dxc_args;
-  dxc_utils->BuildArguments(nullptr, StringToWString(entry_point).c_str(),
-                            StringToWString(target).c_str(), nullptr, 0,
+  dxc_utils->BuildArguments(nullptr, StringToWString(entry_point).c_str(), StringToWString(target).c_str(), nullptr, 0,
                             nullptr, 0, &dxc_args);
 
   DxcBuffer dxc_buffer;
@@ -67,8 +63,7 @@ ComPtr<ID3DBlob> CompileShader(const std::string &source_code,
   dxc_buffer.Encoding = CP_UTF8;
 
   ComPtr<IDxcResult> result;
-  hr = dxc_compiler->Compile(&dxc_buffer, dxc_args->GetArguments(),
-                             dxc_args->GetCount(), nullptr,
+  hr = dxc_compiler->Compile(&dxc_buffer, dxc_args->GetArguments(), dxc_args->GetCount(), nullptr,
                              IID_PPV_ARGS(&result));
 
   if (result->HasOutput(DXC_OUT_ERRORS)) {
@@ -88,13 +83,16 @@ ComPtr<ID3DBlob> CompileShader(const std::string &source_code,
     result->GetOutput(DXC_OUT_OBJECT, IID_PPV_ARGS(&object_blob), &output_name);
 
     D3DCreateBlob(object_blob->GetBufferSize(), &shader_blob);
-    std::memcpy(shader_blob->GetBufferPointer(),
-                object_blob->GetBufferPointer(), object_blob->GetBufferSize());
+    std::memcpy(shader_blob->GetBufferPointer(), object_blob->GetBufferPointer(), object_blob->GetBufferSize());
   } else {
     LogError("Failed to compile shader.");
   }
 
-  return shader_blob;
+  CompiledShaderBlob shader_blob_data;
+  shader_blob_data.data.resize(shader_blob->GetBufferSize());
+  std::memcpy(shader_blob_data.data.data(), shader_blob->GetBufferPointer(), shader_blob->GetBufferSize());
+  shader_blob_data.entry_point = entry_point;
+  return shader_blob_data;
 }
 
 }  // namespace grassland::d3d12

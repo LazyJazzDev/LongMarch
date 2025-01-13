@@ -125,7 +125,12 @@ struct SamplerInfo {
   SamplerInfo(FilterMode filter);
   SamplerInfo(AddressMode address_mode);
   SamplerInfo(FilterMode filter, AddressMode address_mode);
-  SamplerInfo(FilterMode min_filter, FilterMode mag_filter, FilterMode mip_filter, AddressMode address_mode_u, AddressMode address_mode_v, AddressMode address_mode_w);
+  SamplerInfo(FilterMode min_filter,
+              FilterMode mag_filter,
+              FilterMode mip_filter,
+              AddressMode address_mode_u,
+              AddressMode address_mode_v,
+              AddressMode address_mode_w);
   FilterMode min_filter;
   FilterMode mag_filter;
   FilterMode mip_filter;
@@ -176,7 +181,17 @@ struct BlendState {
 
   BlendState(bool blend_enable);
 
-  BlendState(BlendFactor src_color, BlendFactor dst_color, BlendOp color_op, BlendFactor src_alpha, BlendFactor dst_alpha, BlendOp alpha_op);
+  BlendState(BlendFactor src_color,
+             BlendFactor dst_color,
+             BlendOp color_op,
+             BlendFactor src_alpha,
+             BlendFactor dst_alpha,
+             BlendOp alpha_op);
+};
+
+struct CompiledShaderBlob {
+  std::vector<uint8_t> data;
+  std::string entry_point;
 };
 
 class Core;

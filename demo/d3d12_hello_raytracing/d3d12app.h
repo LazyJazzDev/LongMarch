@@ -6,9 +6,9 @@ namespace D3D12 {
 using namespace long_march;
 using namespace long_march::d3d12;
 
-struct Vertex {
-  glm::vec3 pos;
-  glm::vec3 color;
+struct CameraObject {
+  glm::mat4 screen_to_camera;
+  glm::mat4 camera_to_world;
 };
 
 class Application {
@@ -46,8 +46,14 @@ class Application {
   std::unique_ptr<Buffer> vertex_buffer_;
   std::unique_ptr<Buffer> index_buffer_;
 
-  std::unique_ptr<ShaderModule> vertex_shader_;
-  std::unique_ptr<ShaderModule> pixel_shader_;
+  std::unique_ptr<Buffer> camera_object_buffer_;
+
+  std::unique_ptr<AccelerationStructure> blas_;
+  std::unique_ptr<AccelerationStructure> tlas_;
+
+  std::unique_ptr<ShaderModule> raygen_shader_;
+  std::unique_ptr<ShaderModule> miss_shader_;
+  std::unique_ptr<ShaderModule> hit_shader_;
 
   std::unique_ptr<RootSignature> root_signature_;
   std::unique_ptr<PipelineState> pipeline_state_;
