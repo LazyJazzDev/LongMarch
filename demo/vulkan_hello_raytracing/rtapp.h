@@ -40,7 +40,6 @@ class RayTracingApp {
   std::unique_ptr<vulkan::StaticBuffer<glm::vec3>> vertex_buffer_;
   std::unique_ptr<vulkan::StaticBuffer<uint32_t>> index_buffer_;
 
-  std::unique_ptr<vulkan::Buffer> buffer_;
   std::unique_ptr<vulkan::AccelerationStructure> blas_;
   std::unique_ptr<vulkan::AccelerationStructure> tlas_;
 

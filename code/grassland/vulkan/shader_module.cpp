@@ -3,6 +3,8 @@
 #include <glslang/Public/ShaderLang.h>
 #include <glslang/SPIRV/GlslangToSpv.h>
 
+#include "grassland/graphics/graphics_util.h"
+
 namespace grassland::vulkan {
 
 namespace {
@@ -149,25 +151,22 @@ TBuiltInResource InitResources() {
   return Resources;
 }
 
-std::vector<uint32_t> ByteDataToDwordData(
-    const std::vector<uint8_t> &byte_data) {
+std::vector<uint32_t> ByteDataToDwordData(const std::vector<uint8_t> &byte_data) {
   std::vector<uint32_t> dword_data(byte_data.size() / sizeof(uint32_t));
   memcpy(dword_data.data(), byte_data.data(), byte_data.size());
   return dword_data;
 }
 }  // namespace
 
-ShaderModule::ShaderModule(const struct Device *device,
-                           VkShaderModule shader_module)
-    : device_(device), shader_module_(shader_module) {
+ShaderModule::ShaderModule(const struct Device *device, VkShaderModule shader_module, const std::string &entry_point)
+    : device_(device), shader_module_(shader_module), entry_point_(entry_point) {
 }
 
 ShaderModule::~ShaderModule() {
   vkDestroyShaderModule(device_->Handle(), shader_module_, nullptr);
 }
 
-std::vector<uint32_t> CompileGLSLToSPIRV(const std::string &glsl_code,
-                                         VkShaderStageFlagBits shader_stage) {
+CompiledShaderBlob CompileGLSLToSPIRV(const std::string &glsl_code, VkShaderStageFlagBits shader_stage) {
   glslang::InitializeProcess();
   glslang::TShader shader(VkShaderStageToEShLanguage(shader_stage));
   shader.setEntryPoint("main");
@@ -188,21 +187,25 @@ std::vector<uint32_t> CompileGLSLToSPIRV(const std::string &glsl_code,
   if (!shader.parse(&resources, 100, false, EShMsgDefault)) {
     SetErrorMessage("code:\n{}\n", glsl_code);
     // print error message
-    SetErrorMessage("failed to parse shader!\nInfo: {}\n Debug Info: {}",
-                    shader.getInfoLog(), shader.getInfoDebugLog());
+    SetErrorMessage("failed to parse shader!\nInfo: {}\n Debug Info: {}", shader.getInfoLog(),
+                    shader.getInfoDebugLog());
   }
   glslang::TProgram program;
   program.addShader(&shader);
   if (!program.link(EShMsgDefault)) {
-    SetErrorMessage("failed to link shader!\nInfo: {}\n Debug Info: {}",
-                    program.getInfoLog(), program.getInfoDebugLog());
+    SetErrorMessage("failed to link shader!\nInfo: {}\n Debug Info: {}", program.getInfoLog(),
+                    program.getInfoDebugLog());
   }
   std::vector<uint32_t> spirv_code;
-  glslang::GlslangToSpv(
-      *program.getIntermediate(VkShaderStageToEShLanguage(shader_stage)),
-      spirv_code);
+  glslang::GlslangToSpv(*program.getIntermediate(VkShaderStageToEShLanguage(shader_stage)), spirv_code);
   glslang::FinalizeProcess();
-  return spirv_code;
+
+  CompiledShaderBlob compiled_shader_blob;
+  compiled_shader_blob.data.resize(spirv_code.size() * sizeof(uint32_t));
+  std::memcpy(compiled_shader_blob.data.data(), spirv_code.data(), compiled_shader_blob.data.size());
+  compiled_shader_blob.entry_point = "main";
+
+  return compiled_shader_blob;
 }
 
 /*

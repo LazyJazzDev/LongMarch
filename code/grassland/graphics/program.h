@@ -20,11 +20,9 @@ class Program {
   virtual void Finalize() = 0;
 };
 
-struct CompiledShaderBlob {
-  std::vector<uint8_t> data;
-  std::string entry_point;
-};
-
-CompiledShaderBlob CompileShader(const std::string &source_code, const std::string &entry_point, const std::string &target, const std::vector<std::string> &args = {});
+CompiledShaderBlob CompileShader(const std::string &source_code,
+                                 const std::string &entry_point,
+                                 const std::string &target,
+                                 const std::vector<std::string> &args = {});
 
 }  // namespace grassland::graphics

@@ -10,6 +10,8 @@
 #include "GLFW/glfw3.h"
 #define GLFW_EXPOSE_NATIVE_WIN32
 #include "GLFW/glfw3native.h"
+#include "glm/glm.hpp"
+#include "grassland/graphics/graphics_util.h"
 #include "grassland/util/util.h"
 
 namespace grassland::d3d12 {
@@ -52,16 +54,15 @@ size_t SizeByFormat(DXGI_FORMAT format);
 
 size_t SizeAlignTo(size_t size, size_t alignment);
 
-#define RETURN_IF_FAILED_HR(cmd, ...)                               \
-  do {                                                              \
-    HRESULT res = cmd;                                              \
-    if (FAILED(res)) {                                              \
-      ::grassland::d3d12::SetErrorMessage(__VA_ARGS__);             \
-      ::grassland::d3d12::SetErrorMessage(                          \
-          "HRESULT: {}", ::grassland::d3d12::HRESULTToString(res)); \
-      return res;                                                   \
-    }                                                               \
-                                                                    \
+#define RETURN_IF_FAILED_HR(cmd, ...)                                                               \
+  do {                                                                                              \
+    HRESULT res = cmd;                                                                              \
+    if (FAILED(res)) {                                                                              \
+      ::grassland::d3d12::SetErrorMessage(__VA_ARGS__);                                             \
+      ::grassland::d3d12::SetErrorMessage("HRESULT: {}", ::grassland::d3d12::HRESULTToString(res)); \
+      return res;                                                                                   \
+    }                                                                                               \
+                                                                                                    \
   } while (false)
 
 struct DeviceFeatureRequirement;
@@ -80,6 +81,9 @@ class Image;
 class Fence;
 class ShaderModule;
 class PipelineState;
+class AccelerationStructure;
+class RayTracingPipeline;
+class ShaderTable;
 
 #ifdef NDEBUG
 constexpr bool kDefaultEnableDebugLayer = false;
@@ -88,5 +92,14 @@ constexpr bool kDefaultEnableDebugLayer = true;
 #endif
 
 bool IsDepthFormat(DXGI_FORMAT format);
+
+HRESULT CreateBuffer(ID3D12Device *device,
+                     size_t size,
+                     D3D12_HEAP_TYPE heap_type,
+                     D3D12_RESOURCE_STATES resource_state,
+                     D3D12_RESOURCE_FLAGS resource_flags,
+                     ComPtr<ID3D12Resource> &buffer);
+
+using graphics::CompiledShaderBlob;
 
 }  // namespace grassland::d3d12

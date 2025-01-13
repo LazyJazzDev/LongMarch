@@ -13,11 +13,12 @@ std::vector<VkFormat> ConvertImageFormats(const std::vector<ImageFormat> &format
 }  // namespace
 
 VulkanShader::VulkanShader(VulkanCore *core, const CompiledShaderBlob &shader_blob) : core_(core) {
-  core_->Device()->CreateShaderModule(shader_blob.data.data(), shader_blob.data.size(), &shader_module_);
-  entry_point_ = shader_blob.entry_point;
+  core_->Device()->CreateShaderModule(shader_blob, &shader_module_);
 }
 
-VulkanProgram::VulkanProgram(VulkanCore *core, const std::vector<ImageFormat> &color_formats, ImageFormat depth_format) : core_(core), pipeline_settings_(nullptr, ConvertImageFormats(color_formats), ImageFormatToVkFormat(depth_format)) {
+VulkanProgram::VulkanProgram(VulkanCore *core, const std::vector<ImageFormat> &color_formats, ImageFormat depth_format)
+    : core_(core),
+      pipeline_settings_(nullptr, ConvertImageFormats(color_formats), ImageFormatToVkFormat(depth_format)) {
   pipeline_settings_.EnableDynamicPrimitiveTopology();
 }
 
@@ -28,11 +29,13 @@ VulkanProgram::~VulkanProgram() {
 }
 
 void VulkanProgram::AddInputAttribute(uint32_t binding, InputType type, uint32_t offset) {
-  pipeline_settings_.AddInputAttribute(binding, pipeline_settings_.vertex_input_attribute_descriptions.size(), InputTypeToVkFormat(type), offset);
+  pipeline_settings_.AddInputAttribute(binding, pipeline_settings_.vertex_input_attribute_descriptions.size(),
+                                       InputTypeToVkFormat(type), offset);
 }
 
 void VulkanProgram::AddInputBinding(uint32_t stride, bool input_per_instance) {
-  pipeline_settings_.AddInputBinding(pipeline_settings_.vertex_input_binding_descriptions.size(), stride, input_per_instance ? VK_VERTEX_INPUT_RATE_INSTANCE : VK_VERTEX_INPUT_RATE_VERTEX);
+  pipeline_settings_.AddInputBinding(pipeline_settings_.vertex_input_binding_descriptions.size(), stride,
+                                     input_per_instance ? VK_VERTEX_INPUT_RATE_INSTANCE : VK_VERTEX_INPUT_RATE_VERTEX);
 }
 
 void VulkanProgram::AddResourceBinding(ResourceType type, int count) {
@@ -57,7 +60,8 @@ void VulkanProgram::SetBlendState(int target_id, const BlendState &state) {
 void VulkanProgram::BindShader(Shader *shader, ShaderType type) {
   VulkanShader *vulkan_shader = dynamic_cast<VulkanShader *>(shader);
   if (vulkan_shader) {
-    pipeline_settings_.AddShaderStage(vulkan_shader->ShaderModule(), ShaderTypeToVkShaderStageFlags(type), vulkan_shader->EntryPoint().c_str());
+    pipeline_settings_.AddShaderStage(vulkan_shader->ShaderModule(), ShaderTypeToVkShaderStageFlags(type),
+                                      vulkan_shader->EntryPoint().c_str());
   } else {
     throw std::runtime_error("Invalid shader object, expected VulkanShader");
   }
