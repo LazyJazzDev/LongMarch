@@ -2,7 +2,8 @@
 
 namespace grassland::d3d12 {
 
-Buffer::Buffer(const ComPtr<ID3D12Resource> &buffer) : buffer_(buffer) {
+Buffer::Buffer(const ComPtr<ID3D12Resource> &buffer, size_t allocated_size)
+    : buffer_(buffer), allocated_size_(allocated_size) {
 }
 
 void *Buffer::Map() const {
@@ -27,8 +28,7 @@ void CopyBuffer(ID3D12GraphicsCommandList *command_list,
   //
   // command_list->ResourceBarrier(1, &barrier);
 
-  command_list->CopyBufferRegion(dst_buffer->Handle(), dst_offset,
-                                 src_buffer->Handle(), src_offset, size);
+  command_list->CopyBufferRegion(dst_buffer->Handle(), dst_offset, src_buffer->Handle(), src_offset, size);
 
   // barrier = CD3DX12_RESOURCE_BARRIER::Transition(
   //     dst_buffer->Handle(), D3D12_RESOURCE_STATE_COPY_DEST,

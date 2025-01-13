@@ -20,6 +20,13 @@ class Program {
   virtual void Finalize() = 0;
 };
 
+class RayTracingProgram {
+ public:
+  virtual ~RayTracingProgram() = default;
+  virtual void AddResourceBinding(ResourceType type, int count) = 0;
+  virtual void Finalize() = 0;
+};
+
 CompiledShaderBlob CompileShader(const std::string &source_code,
                                  const std::string &entry_point,
                                  const std::string &target,

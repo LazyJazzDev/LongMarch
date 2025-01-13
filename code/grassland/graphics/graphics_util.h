@@ -48,6 +48,7 @@ typedef enum ResourceType {
   RESOURCE_TYPE_TEXTURE = 2,
   RESOURCE_TYPE_IMAGE = 3,
   RESOURCE_TYPE_SAMPLER = 4,
+  RESOURCE_TYPE_ACCELERATION_STRUCTURE = 5,
 } ResourceType;
 
 typedef enum ShaderType {
@@ -55,6 +56,12 @@ typedef enum ShaderType {
   SHADER_TYPE_FRAGMENT = 1,
   SHADER_TYPE_GEOMETRY = 2,
 } ShaderType;
+
+typedef enum BindPoint {
+  BIND_POINT_GRAPHICS = 0,
+  BIND_POINT_RAYTRACING = 1,
+  BIND_POINT_COUNT = 2,
+} BindPoint;
 
 struct PhysicalDeviceProperties {
   std::string name;
@@ -202,7 +209,10 @@ class Window;
 class Shader;
 class Program;
 class CommandContext;
-struct CompiledShaderBlob;
+
+// Ray tracing objects
+class RayTracingProgram;
+class AccelerationStructure;
 
 #ifndef NDEBUG
 constexpr bool kEnableDebug = true;

@@ -8,6 +8,8 @@ class D3D12Buffer : public Buffer {
  public:
   virtual d3d12::Buffer *Buffer() const = 0;
   virtual ~D3D12Buffer() = default;
+
+  virtual d3d12::Buffer *InstantBuffer() const = 0;
 };
 
 class D3D12StaticBuffer : public D3D12Buffer {
@@ -26,6 +28,8 @@ class D3D12StaticBuffer : public D3D12Buffer {
   void DownloadData(void *data, size_t size, size_t offset) override;
 
   d3d12::Buffer *Buffer() const override;
+
+  d3d12::Buffer *InstantBuffer() const override;
 
  private:
   D3D12Core *core_;
@@ -48,6 +52,8 @@ class D3D12DynamicBuffer : public D3D12Buffer {
   void DownloadData(void *data, size_t size, size_t offset) override;
 
   d3d12::Buffer *Buffer() const override;
+
+  d3d12::Buffer *InstantBuffer() const override;
 
   void TransferData(ID3D12GraphicsCommandList *command_list);
 

@@ -56,15 +56,21 @@ void Application::OnRender() {
   command_list_->Handle()->QueryInterface(IID_PPV_ARGS(&dxr_command_list));
 
   dxr_command_list->SetComputeRootSignature(root_signature_->Handle());
-  D3D12_DISPATCH_RAYS_DESC dispatch_desc = {};
   ID3D12DescriptorHeap *descriptor_heaps[] = {descriptor_heap_->Handle()};
   dxr_command_list->SetDescriptorHeaps(1, descriptor_heaps);
   dxr_command_list->SetComputeRootDescriptorTable(0, descriptor_heap_->GPUHandle(0));
 
-  auto align = [](size_t value, size_t alignment) { return (value + alignment - 1) & ~(alignment - 1); };
-  UINT shader_record_size = align(D3D12_SHADER_IDENTIFIER_SIZE_IN_BYTES, D3D12_RAYTRACING_SHADER_RECORD_BYTE_ALIGNMENT);
-  UINT shader_table_size = align(shader_record_size, D3D12_RAYTRACING_SHADER_TABLE_BYTE_ALIGNMENT);
+  dxr_command_list->SetPipelineState1(ray_tracing_pipeline_->Handle());
 
+  barrier = CD3DX12_RESOURCE_BARRIER::Transition(frame_image_->Handle(), D3D12_RESOURCE_STATE_GENERIC_READ,
+                                                 D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
+
+  command_list_->Handle()->ResourceBarrier(1, &barrier);
+  UINT shader_record_size =
+      SizeAlignTo(D3D12_SHADER_IDENTIFIER_SIZE_IN_BYTES, D3D12_RAYTRACING_SHADER_RECORD_BYTE_ALIGNMENT);
+  UINT shader_table_size = SizeAlignTo(shader_record_size, D3D12_RAYTRACING_SHADER_TABLE_BYTE_ALIGNMENT);
+
+  D3D12_DISPATCH_RAYS_DESC dispatch_desc = {};
   dispatch_desc.HitGroupTable.StartAddress = shader_table_->GetHitGroupDeviceAddress();
   dispatch_desc.HitGroupTable.SizeInBytes = shader_table_size;
   dispatch_desc.HitGroupTable.StrideInBytes = shader_record_size;
@@ -76,13 +82,6 @@ void Application::OnRender() {
   dispatch_desc.Width = frame_image_->Width();
   dispatch_desc.Height = frame_image_->Height();
   dispatch_desc.Depth = 1;
-  dxr_command_list->SetPipelineState1(ray_tracing_pipeline_->Handle());
-
-  barrier = CD3DX12_RESOURCE_BARRIER::Transition(frame_image_->Handle(), D3D12_RESOURCE_STATE_GENERIC_READ,
-                                                 D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
-
-  command_list_->Handle()->ResourceBarrier(1, &barrier);
-
   dxr_command_list->DispatchRays(&dispatch_desc);
 
   barrier = CD3DX12_RESOURCE_BARRIER::Transition(swap_chain_->BackBuffer(back_buffer_index),
@@ -233,7 +232,7 @@ void Application::CreatePipelineAssets() {
                                                descriptor_heap_->CPUHandle(1));
   D3D12_CONSTANT_BUFFER_VIEW_DESC cbv_desc{};
   cbv_desc.BufferLocation = camera_object_buffer_->Handle()->GetGPUVirtualAddress();
-  cbv_desc.SizeInBytes = camera_object_buffer_->Size();
+  cbv_desc.SizeInBytes = SizeAlignTo(camera_object_buffer_->Size(), 256);
   device_->Handle()->CreateConstantBufferView(&cbv_desc, descriptor_heap_->CPUHandle(2));
 
   device_->CreateRayTracingPipeline(root_signature_.get(), raygen_shader_.get(), miss_shader_.get(), hit_shader_.get(),

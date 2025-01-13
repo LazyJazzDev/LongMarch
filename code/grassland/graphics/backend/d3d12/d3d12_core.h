@@ -28,17 +28,36 @@ class D3D12Core : public Core {
 
   int CreateSampler(const SamplerInfo &info, double_ptr<Sampler> pp_sampler) override;
 
-  int CreateWindowObject(int width, int height, const std::string &title, bool fullscreen, bool resizable, double_ptr<Window> pp_window) override;
+  int CreateWindowObject(int width,
+                         int height,
+                         const std::string &title,
+                         bool fullscreen,
+                         bool resizable,
+                         double_ptr<Window> pp_window) override;
 
-  int CreateShader(const void *data, size_t size, double_ptr<Shader> pp_shader) override;
+  int CreateShader(const std::string &source_code,
+                   const std::string &entry_point,
+                   const std::string &target,
+                   double_ptr<Shader> pp_shader) override;
 
-  int CreateShader(const CompiledShaderBlob &shader_blob, double_ptr<Shader> pp_shader) override;
-
-  int CreateShader(const std::string &source_code, const std::string &entry_point, const std::string &target, double_ptr<Shader> pp_shader) override;
-
-  int CreateProgram(const std::vector<ImageFormat> &color_formats, ImageFormat depth_format, double_ptr<Program> pp_program) override;
+  int CreateProgram(const std::vector<ImageFormat> &color_formats,
+                    ImageFormat depth_format,
+                    double_ptr<Program> pp_program) override;
 
   int CreateCommandContext(double_ptr<CommandContext> pp_command_context) override;
+
+  int CreateBottomLevelAccelerationStructure(Buffer *vertex_buffer,
+                                             Buffer *index_buffer,
+                                             uint32_t stride,
+                                             double_ptr<AccelerationStructure> pp_blas) override;
+
+  int CreateTopLevelAccelerationStructure(const std::vector<std::pair<AccelerationStructure *, glm::mat4>> &objects,
+                                          double_ptr<AccelerationStructure> pp_tlas) override;
+
+  int CreateRayTracingProgram(Shader *raygen_shader,
+                              Shader *miss_shader,
+                              Shader *closest_shader,
+                              double_ptr<RayTracingProgram> pp_program) override;
 
   int SubmitCommandContext(CommandContext *p_command_context) override;
 
@@ -70,6 +89,14 @@ class D3D12Core : public Core {
 
   d3d12::Fence *Fence() const {
     return fences_[current_frame_].get();
+  }
+
+  d3d12::CommandAllocator *SingleTimeCommandAllocator() const {
+    return single_time_allocator_.get();
+  }
+
+  d3d12::Fence *SingleTimeFence() const {
+    return single_time_fence_.get();
   }
 
   uint32_t CurrentFrame() const {

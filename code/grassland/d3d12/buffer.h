@@ -5,10 +5,10 @@ namespace grassland::d3d12 {
 
 class Buffer {
  public:
-  Buffer(const ComPtr<ID3D12Resource> &buffer);
+  Buffer(const ComPtr<ID3D12Resource> &buffer, size_t allocated_size);
 
   size_t Size() const {
-    return buffer_->GetDesc().Width;
+    return allocated_size_;
   }
 
   ID3D12Resource *Handle() const {
@@ -20,6 +20,7 @@ class Buffer {
 
  private:
   ComPtr<ID3D12Resource> buffer_;
+  size_t allocated_size_;
 };
 
 void CopyBuffer(ID3D12GraphicsCommandList *command_list,
