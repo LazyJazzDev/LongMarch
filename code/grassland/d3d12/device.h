@@ -95,6 +95,14 @@ class Device {
                                               CommandAllocator *allocator,
                                               double_ptr<AccelerationStructure> pp_tlas);
 
+  HRESULT CreateRayTracingPipeline(RootSignature *root_signature,
+                                   ShaderModule *ray_gen_shader,
+                                   ShaderModule *miss_shader,
+                                   ShaderModule *closest_hit_shader,
+                                   double_ptr<RayTracingPipeline> pp_pipeline);
+
+  HRESULT CreateShaderTable(RayTracingPipeline *ray_tracing_pipeline, double_ptr<ShaderTable> pp_shader_table) const;
+
  private:
   class Adapter adapter_;
   ComPtr<ID3D12Device> device_;

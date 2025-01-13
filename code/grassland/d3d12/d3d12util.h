@@ -82,6 +82,8 @@ class Fence;
 class ShaderModule;
 class PipelineState;
 class AccelerationStructure;
+class RayTracingPipeline;
+class ShaderTable;
 
 #ifdef NDEBUG
 constexpr bool kDefaultEnableDebugLayer = false;

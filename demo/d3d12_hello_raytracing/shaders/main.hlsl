@@ -38,7 +38,7 @@ struct RayPayload {
 }
 
     [shader("miss")] void MissMain(inout RayPayload payload) {
-  payload.color = float3(0.6, 0.7, 0.8);
+  payload.color = float3(0.8, 0.7, 0.6);
 }
 
 [shader("closesthit")] void ClosestHitMain(inout RayPayload payload, in BuiltInTriangleIntersectionAttributes attr) {

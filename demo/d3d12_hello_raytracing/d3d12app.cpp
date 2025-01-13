@@ -45,8 +45,61 @@ void Application::OnRender() {
 
   command_list_->Handle()->ClearRenderTargetView(rtv_handle, clear_color, 0, nullptr);
 
+  ComPtr<ID3D12GraphicsCommandList4> dxr_command_list;
+  command_list_->Handle()->QueryInterface(IID_PPV_ARGS(&dxr_command_list));
+
+  dxr_command_list->SetComputeRootSignature(root_signature_->Handle());
+  D3D12_DISPATCH_RAYS_DESC dispatch_desc = {};
+  ID3D12DescriptorHeap *descriptor_heaps[] = {descriptor_heap_->Handle()};
+  dxr_command_list->SetDescriptorHeaps(1, descriptor_heaps);
+  dxr_command_list->SetComputeRootDescriptorTable(0, descriptor_heap_->GPUHandle(0));
+
+  auto align = [](size_t value, size_t alignment) { return (value + alignment - 1) & ~(alignment - 1); };
+  UINT shader_record_size = align(D3D12_SHADER_IDENTIFIER_SIZE_IN_BYTES, D3D12_RAYTRACING_SHADER_RECORD_BYTE_ALIGNMENT);
+  UINT shader_table_size = align(shader_record_size, D3D12_RAYTRACING_SHADER_TABLE_BYTE_ALIGNMENT);
+
+  dispatch_desc.HitGroupTable.StartAddress = shader_table_->GetHitGroupDeviceAddress();
+  dispatch_desc.HitGroupTable.SizeInBytes = shader_table_size;
+  dispatch_desc.HitGroupTable.StrideInBytes = shader_record_size;
+  dispatch_desc.MissShaderTable.StartAddress = shader_table_->GetMissDeviceAddress();
+  dispatch_desc.MissShaderTable.SizeInBytes = shader_table_size;
+  dispatch_desc.MissShaderTable.StrideInBytes = shader_record_size;
+  dispatch_desc.RayGenerationShaderRecord.StartAddress = shader_table_->GetRayGenDeviceAddress();
+  dispatch_desc.RayGenerationShaderRecord.SizeInBytes = shader_table_size;
+  dispatch_desc.Width = frame_image_->Width();
+  dispatch_desc.Height = frame_image_->Height();
+  dispatch_desc.Depth = 1;
+  dxr_command_list->SetPipelineState1(ray_tracing_pipeline_->Handle());
+
+  barrier = CD3DX12_RESOURCE_BARRIER::Transition(frame_image_->Handle(), D3D12_RESOURCE_STATE_GENERIC_READ,
+                                                 D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
+
+  command_list_->Handle()->ResourceBarrier(1, &barrier);
+
+  dxr_command_list->DispatchRays(&dispatch_desc);
+
   barrier = CD3DX12_RESOURCE_BARRIER::Transition(swap_chain_->BackBuffer(back_buffer_index),
-                                                 D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_PRESENT);
+                                                 D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_COPY_DEST);
+
+  command_list_->Handle()->ResourceBarrier(1, &barrier);
+
+  barrier = CD3DX12_RESOURCE_BARRIER::Transition(frame_image_->Handle(), D3D12_RESOURCE_STATE_UNORDERED_ACCESS,
+                                                 D3D12_RESOURCE_STATE_COPY_SOURCE);
+
+  command_list_->Handle()->ResourceBarrier(1, &barrier);
+
+  CD3DX12_TEXTURE_COPY_LOCATION src(frame_image_->Handle());
+  CD3DX12_TEXTURE_COPY_LOCATION dst(swap_chain_->BackBuffer(back_buffer_index));
+
+  command_list_->Handle()->CopyTextureRegion(&dst, 0, 0, 0, &src, nullptr);
+
+  barrier = CD3DX12_RESOURCE_BARRIER::Transition(frame_image_->Handle(), D3D12_RESOURCE_STATE_COPY_SOURCE,
+                                                 D3D12_RESOURCE_STATE_GENERIC_READ);
+
+  command_list_->Handle()->ResourceBarrier(1, &barrier);
+
+  barrier = CD3DX12_RESOURCE_BARRIER::Transition(swap_chain_->BackBuffer(back_buffer_index),
+                                                 D3D12_RESOURCE_STATE_COPY_DEST, D3D12_RESOURCE_STATE_PRESENT);
 
   command_list_->Handle()->ResourceBarrier(1, &barrier);
 
@@ -72,7 +125,7 @@ void Application::CreateWindowAssets() {
   glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
   glfwWindowHint(GLFW_RESIZABLE, GLFW_FALSE);
 
-  glfw_window_ = glfwCreateWindow(800, 600, "D3D12 Hello Ray Tracing", nullptr, nullptr);
+  glfw_window_ = glfwCreateWindow(1920, 1080, "D3D12 Hello Ray Tracing", nullptr, nullptr);
 
   CreateDXGIFactory({}, &factory_);
 
@@ -142,9 +195,9 @@ void Application::CreatePipelineAssets() {
   camera_object_buffer_->Unmap();
 
   CD3DX12_DESCRIPTOR_RANGE1 descriptor_ranges[3];
-  descriptor_ranges[0].Init(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 1, 0);
-  descriptor_ranges[1].Init(D3D12_DESCRIPTOR_RANGE_TYPE_UAV, 1, 0);
-  descriptor_ranges[2].Init(D3D12_DESCRIPTOR_RANGE_TYPE_CBV, 1, 0);
+  descriptor_ranges[0].Init(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 1, 0, 0);
+  descriptor_ranges[1].Init(D3D12_DESCRIPTOR_RANGE_TYPE_UAV, 1, 0, 1);
+  descriptor_ranges[2].Init(D3D12_DESCRIPTOR_RANGE_TYPE_CBV, 1, 0, 2);
 
   CD3DX12_ROOT_PARAMETER1 root_parameter;
   root_parameter.InitAsDescriptorTable(3, descriptor_ranges, D3D12_SHADER_VISIBILITY_ALL);
@@ -175,6 +228,11 @@ void Application::CreatePipelineAssets() {
   cbv_desc.BufferLocation = camera_object_buffer_->Handle()->GetGPUVirtualAddress();
   cbv_desc.SizeInBytes = camera_object_buffer_->Size();
   device_->Handle()->CreateConstantBufferView(&cbv_desc, descriptor_heap_->CPUHandle(2));
+
+  device_->CreateRayTracingPipeline(root_signature_.get(), raygen_shader_.get(), miss_shader_.get(), hit_shader_.get(),
+                                    &ray_tracing_pipeline_);
+
+  device_->CreateShaderTable(ray_tracing_pipeline_.get(), &shader_table_);
 }
 
 void Application::DestroyPipelineAssets() {

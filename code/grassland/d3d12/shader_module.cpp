@@ -6,7 +6,7 @@
 
 namespace grassland::d3d12 {
 ShaderModule::ShaderModule(const CompiledShaderBlob &shader_blob)
-    : shader_code_(shader_blob.data), entry_point_(shader_blob.entry_point) {
+    : shader_code_(shader_blob.data), entry_point_(StringToWString(shader_blob.entry_point)) {
 }
 
 ComPtr<ID3DBlob> CompileShaderLegacy(const std::string &source_code,

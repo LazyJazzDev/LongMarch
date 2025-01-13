@@ -58,8 +58,10 @@ class Application {
   std::unique_ptr<ShaderModule> hit_shader_;
 
   std::unique_ptr<RootSignature> root_signature_;
-  std::unique_ptr<PipelineState> pipeline_state_;
   std::unique_ptr<DescriptorHeap> descriptor_heap_;
+
+  std::unique_ptr<RayTracingPipeline> ray_tracing_pipeline_;
+  std::unique_ptr<ShaderTable> shader_table_;
 
   std::unique_ptr<Image> texture_;
 };

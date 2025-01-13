@@ -11,13 +11,13 @@ class ShaderModule {
     return {shader_code_.data(), shader_code_.size()};
   }
 
-  const std::string &EntryPoint() const {
+  const std::wstring &EntryPoint() const {
     return entry_point_;
   }
 
  private:
   std::vector<uint8_t> shader_code_;
-  std::string entry_point_;
+  std::wstring entry_point_;
 };
 
 ComPtr<ID3DBlob> CompileShaderLegacy(const std::string &source_code,

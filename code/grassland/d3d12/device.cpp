@@ -141,7 +141,7 @@ HRESULT Device::CreateImage(size_t width,
 }
 
 HRESULT Device::CreateImage(size_t width, size_t height, DXGI_FORMAT format, double_ptr<Image> pp_image) {
-  D3D12_RESOURCE_FLAGS flags;
+  D3D12_RESOURCE_FLAGS flags{};
   if (IsDepthFormat(format)) {
     flags = D3D12_RESOURCE_FLAG_ALLOW_DEPTH_STENCIL;
   } else {
@@ -371,6 +371,97 @@ HRESULT Device::CreateTopLevelAccelerationStructure(
   });
 
   pp_tlas.construct(as);
+  return S_OK;
+}
+
+HRESULT Device::CreateRayTracingPipeline(RootSignature *root_signature,
+                                         ShaderModule *ray_gen_shader,
+                                         ShaderModule *miss_shader,
+                                         ShaderModule *closest_hit_shader,
+                                         double_ptr<RayTracingPipeline> pp_pipeline) {
+  const std::wstring hit_group_name = L"HitGroup";
+
+  CD3DX12_STATE_OBJECT_DESC pipeline_desc(D3D12_STATE_OBJECT_TYPE_RAYTRACING_PIPELINE);
+  auto lib_ray_gen = pipeline_desc.CreateSubobject<CD3DX12_DXIL_LIBRARY_SUBOBJECT>();
+  auto ray_gen_code = ray_gen_shader->Handle();
+  lib_ray_gen->SetDXILLibrary(&ray_gen_code);
+  lib_ray_gen->DefineExport(ray_gen_shader->EntryPoint().c_str());
+
+  auto lib_miss = pipeline_desc.CreateSubobject<CD3DX12_DXIL_LIBRARY_SUBOBJECT>();
+  auto miss_code = miss_shader->Handle();
+  lib_miss->SetDXILLibrary(&miss_code);
+  lib_miss->DefineExport(miss_shader->EntryPoint().c_str());
+
+  auto lib_rchit = pipeline_desc.CreateSubobject<CD3DX12_DXIL_LIBRARY_SUBOBJECT>();
+  auto rchit_code = closest_hit_shader->Handle();
+  lib_rchit->SetDXILLibrary(&rchit_code);
+  lib_rchit->DefineExport(closest_hit_shader->EntryPoint().c_str());
+
+  auto hit_group = pipeline_desc.CreateSubobject<CD3DX12_HIT_GROUP_SUBOBJECT>();
+  hit_group->SetClosestHitShaderImport(closest_hit_shader->EntryPoint().c_str());
+  hit_group->SetHitGroupExport(hit_group_name.c_str());
+  hit_group->SetHitGroupType(D3D12_HIT_GROUP_TYPE_TRIANGLES);
+
+  auto shader_config = pipeline_desc.CreateSubobject<CD3DX12_RAYTRACING_SHADER_CONFIG_SUBOBJECT>();
+  shader_config->Config(512 * sizeof(float), 2 * sizeof(float));
+
+  auto global_root_signature = pipeline_desc.CreateSubobject<CD3DX12_GLOBAL_ROOT_SIGNATURE_SUBOBJECT>();
+  global_root_signature->SetRootSignature(root_signature->Handle());
+
+  auto pipeline_config = pipeline_desc.CreateSubobject<CD3DX12_RAYTRACING_PIPELINE_CONFIG_SUBOBJECT>();
+  pipeline_config->Config(1);
+
+  ComPtr<ID3D12StateObject> pipeline;
+
+  RETURN_IF_FAILED_HR(dxr_device_->CreateStateObject(pipeline_desc, IID_PPV_ARGS(&pipeline)),
+                      "failed to create ray tracing pipeline.");
+
+  pp_pipeline.construct(pipeline, ray_gen_shader->EntryPoint(), miss_shader->EntryPoint(), hit_group_name);
+  return S_OK;
+}
+
+HRESULT Device::CreateShaderTable(RayTracingPipeline *ray_tracing_pipeline,
+                                  double_ptr<ShaderTable> pp_shader_table) const {
+  ComPtr<ID3D12StateObjectProperties> pipeline_properties;
+  RETURN_IF_FAILED_HR(ray_tracing_pipeline->Handle()->QueryInterface(IID_PPV_ARGS(&pipeline_properties)),
+                      "failed to get pipeline properties.");
+
+  void *ray_gen_shader_idenfitier =
+      pipeline_properties->GetShaderIdentifier(ray_tracing_pipeline->RayGenShaderName().c_str());
+  void *miss_shader_idenfitier =
+      pipeline_properties->GetShaderIdentifier(ray_tracing_pipeline->MissShaderName().c_str());
+  void *hit_group_shader_idenfitier =
+      pipeline_properties->GetShaderIdentifier(ray_tracing_pipeline->HitGroupName().c_str());
+
+  auto align = [](size_t value, size_t alignment) { return (value + alignment - 1) & ~(alignment - 1); };
+
+  UINT shader_idenfitier_size = D3D12_SHADER_IDENTIFIER_SIZE_IN_BYTES;
+  UINT shader_record_size = align(shader_idenfitier_size, D3D12_RAYTRACING_SHADER_RECORD_BYTE_ALIGNMENT);
+  auto shader_table_size = align(shader_record_size, D3D12_RAYTRACING_SHADER_TABLE_BYTE_ALIGNMENT);
+  ComPtr<ID3D12Resource> buffer;
+  RETURN_IF_FAILED_HR(d3d12::CreateBuffer(Handle(), shader_table_size * 3, D3D12_HEAP_TYPE_UPLOAD,
+                                          D3D12_RESOURCE_STATE_GENERIC_READ, D3D12_RESOURCE_FLAG_NONE, buffer),
+                      "failed to create shader binding table buffer.");
+  uint8_t *data = nullptr;
+  RETURN_IF_FAILED_HR(buffer->Map(0, nullptr, reinterpret_cast<void **>(&data)),
+                      "failed to map shader binding table buffer.");
+
+  std::memcpy(data, ray_gen_shader_idenfitier, shader_idenfitier_size);
+  data += shader_table_size;
+
+  std::memcpy(data, miss_shader_idenfitier, shader_idenfitier_size);
+  data += shader_table_size;
+
+  std::memcpy(data, hit_group_shader_idenfitier, shader_idenfitier_size);
+
+  D3D12_GPU_VIRTUAL_ADDRESS ray_gen_shader_offset = 0;
+  D3D12_GPU_VIRTUAL_ADDRESS miss_shader_offset = ray_gen_shader_offset + shader_table_size;
+  D3D12_GPU_VIRTUAL_ADDRESS hit_group_shader_offset = miss_shader_offset + shader_table_size;
+
+  buffer->Unmap(0, nullptr);
+
+  pp_shader_table.construct(buffer, ray_gen_shader_offset, miss_shader_offset, hit_group_shader_offset);
+
   return S_OK;
 }
 
