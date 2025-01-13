@@ -340,7 +340,8 @@ HRESULT Device::CreateTopLevelAccelerationStructure(
   as_inputs.DescsLayout = D3D12_ELEMENTS_LAYOUT_ARRAY;
   as_inputs.InstanceDescs = instance_buffer->Handle()->GetGPUVirtualAddress();
   as_inputs.NumDescs = instance_descs.size();
-  as_inputs.Flags = D3D12_RAYTRACING_ACCELERATION_STRUCTURE_BUILD_FLAG_PREFER_FAST_TRACE;
+  as_inputs.Flags = D3D12_RAYTRACING_ACCELERATION_STRUCTURE_BUILD_FLAG_PREFER_FAST_TRACE |
+                    D3D12_RAYTRACING_ACCELERATION_STRUCTURE_BUILD_FLAG_ALLOW_UPDATE;
 
   D3D12_RAYTRACING_ACCELERATION_STRUCTURE_PREBUILD_INFO as_prebuild_info = {};
   dxr_device_->GetRaytracingAccelerationStructurePrebuildInfo(&as_inputs, &as_prebuild_info);

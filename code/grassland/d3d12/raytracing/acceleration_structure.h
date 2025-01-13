@@ -12,6 +12,11 @@ class AccelerationStructure {
     return as_.Get();
   }
 
+  HRESULT UpdateInstances(const std::vector<std::pair<AccelerationStructure *, glm::mat4>> &objects,
+                          CommandQueue *queue,
+                          Fence *fence,
+                          CommandAllocator *allocator) const;
+
  private:
   ComPtr<ID3D12Resource> as_;
 };

@@ -27,6 +27,13 @@ void Application::OnInit() {
 }
 
 void Application::OnUpdate() {
+  static float theta = 0.0f;
+  theta += glm::radians(0.1f);
+
+  tlas_->UpdateInstances(
+      std::vector<std::pair<grassland::d3d12::AccelerationStructure *, glm::mat4>>{
+          {blas_.get(), glm::rotate(glm::mat4{1.0f}, theta, glm::vec3{0.0f, 1.0f, 0.0f})}},
+      command_queue_.get(), fence_.get(), command_allocator_.get());
 }
 
 void Application::OnRender() {
