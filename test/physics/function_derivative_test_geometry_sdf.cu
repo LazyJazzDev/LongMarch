@@ -1,5 +1,11 @@
 ﻿#include "function_derivative_test.h"
 
+TEST(Physics, FunctionDerivativePointSDF) {
+  PointSDF<double> f;
+  f.position = Eigen::Vector3d::Random();
+  TestFunctionSet<PointSDF<double>>(f);
+}
+
 TEST(Physics, FunctionDerivativeSphereSDF) {
   SphereSDF<double> f;
   f.center = Eigen::Vector3d::Random();
@@ -7,12 +13,12 @@ TEST(Physics, FunctionDerivativeSphereSDF) {
   TestFunctionSet<SphereSDF<double>>(f);
 }
 
-TEST(Physics, FunctionDerivativeLineSDF) {
+TEST(Physics, FunctionDerivativeSegmentSDF) {
   for (int i = 0; i < 100; i++) {
-    LineSDF<double> f;
+    SegmentSDF<double> f;
     f.A = Eigen::Vector3d::Random();
     f.B = Eigen::Vector3d::Random();
-    TestFunctionSet<LineSDF<double>>(f, 1);
+    TestFunctionSet<SegmentSDF<double>>(f, 1);
   }
 }
 
@@ -32,5 +38,23 @@ TEST(Physics, FunctionDerivativeCubeSDF) {
     f.center = {0.0, 0.0, 0.0};
     f.size = 0.1;
     TestFunctionSet<CubeSDF<double>>(f, 1);
+  }
+}
+
+TEST(Physics, FunctionDerivativePlaneSDF) {
+  for (int i = 0; i < 100; i++) {
+    PlaneSDF<double> f;
+    f.normal = Eigen::Vector3<double>::Random().normalized();
+    f.d = Eigen::Matrix<double, 1, 1>::Random().value();
+    TestFunctionSet<PlaneSDF<double>>(f, 1);
+  }
+}
+
+TEST(Physics, FunctionDerivativeLineSDF) {
+  for (int i = 0; i < 100; i++) {
+    LineSDF<double> f;
+    f.origin = Eigen::Vector3<double>::Random();
+    f.direction = Eigen::Vector3<double>::Random().normalized();
+    TestFunctionSet<LineSDF<double>>(f, 1);
   }
 }
