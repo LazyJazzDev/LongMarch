@@ -22,4 +22,10 @@ namespace grassland {
 #else
 #define LM_DEVICE_FUNC
 #endif
+
+typedef enum DeviceType {
+  CPU = 0,
+  CUDA = 1,
+} DeviceType;
+
 }  // namespace grassland
