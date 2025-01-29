@@ -40,6 +40,9 @@ LM_DEVICE_FUNC bool InstanceHit(const Eigen::Vector3<float> &position,
     Eigen::Vector3<float> p = attached->vertices[attached->indices[instance_index * 3 + i]];
     float d = (p - position).norm();
     if (d < dist) {
+      if (d == 0.0) {
+        printf("point: %d\n", i);
+      }
       dist = d;
       hit = true;
       grassland::PointSDF<float> point_sdf;
@@ -67,6 +70,9 @@ LM_DEVICE_FUNC bool InstanceHit(const Eigen::Vector3<float> &position,
     }
     wn = (p0 - p2).cross(n);
     if (wn.dot(position) < wn.dot(p2)) {
+      break;
+    }
+    if (n.squaredNorm() == 0.0) {
       break;
     }
     n.normalize();
@@ -104,6 +110,9 @@ LM_DEVICE_FUNC bool InstanceHit(const Eigen::Vector3<float> &position,
     p0 += n * (dp - dp0);
     float d = (p0 - position).norm();
     if (d < dist) {
+      if (d == 0.0) {
+        printf("edge: %d\n", i);
+      }
       dist = d;
       hit = true;
       grassland::LineSDF<float> line_sdf;
@@ -178,15 +187,14 @@ int main() {
   // indices = {0, 1, 2, 1, 3, 2, 4, 6, 5, 5, 6, 7, 0, 2, 4, 4, 2, 6,
   //              1, 5, 3, 5, 7, 3, 0, 4, 1, 4, 5, 1, 2, 3, 6, 6, 3, 7};
 
-  int precision = 100;
+  int precision = 50;
   float inv_precision = 1.0 / precision;
   const float pi = 3.14159265358979323846264338327950288419716939937510f;
   for (int i = 0; i <= precision; i++) {
     float theta = pi * i * inv_precision;
     for (int j = 0; j < precision; j++) {
       float phi = 2 * pi * j * inv_precision;
-      vertices.push_back(
-          Eigen::Vector3<float>{std::sin(theta) * std::cos(phi), std::sin(theta) * std::sin(phi), std::cos(theta)});
+      vertices.emplace_back(std::sin(theta) * std::cos(phi), std::sin(theta) * std::sin(phi), std::cos(theta));
       if (i < precision) {
         int i1 = i + 1;
         int j1 = (j + 1) % precision;
@@ -232,10 +240,11 @@ int main() {
   attached.num_indices = indices.size();
   std::vector<Eigen::Vector3<float>> queries;
 
-  int num_queries = 131072;
+  int num_queries = 1048576;
 
   for (int i = 0; i < num_queries; i++) {
-    queries.push_back(Eigen::Vector3<float>::Random() * 10);
+    Eigen::Vector3<float> vec = Eigen::Vector3<float>::Random() * 10;
+    queries.push_back(vec);
   }
   std::vector<SDFResult> results(queries.size());
   std::vector<SDFResult> results_dev;
@@ -252,7 +261,7 @@ int main() {
 
   for (int i = 0; i < queries.size(); i++) {
     if (fabs(results[i].sdf - results_dev[i].sdf) > 1e-4) {
-      std::cout << "Error: " << results[i].sdf << " " << results_dev[i].sdf << std::endl;
+      std::cout << "Error: " << i << " " << results[i].sdf << " " << results_dev[i].sdf << std::endl;
     }
   }
 
