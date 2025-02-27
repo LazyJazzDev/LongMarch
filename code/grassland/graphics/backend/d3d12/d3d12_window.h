@@ -11,7 +11,8 @@ class D3D12Window : public Window {
               int height,
               const std::string &title,
               bool fullscreen,
-              bool resizable);
+              bool resizable,
+              bool enable_hdr);
 
   virtual void CloseWindow() override;
 

@@ -5,11 +5,7 @@ namespace grassland::graphics {
 
 class Window {
  public:
-  Window(int width,
-         int height,
-         const std::string &title,
-         bool fullscreen,
-         bool resizable);
+  Window(int width, int height, const std::string &title, bool fullscreen, bool resizable, bool enable_hdr);
   virtual ~Window();
 
   GLFWwindow *GLFWWindow() const {
@@ -27,6 +23,8 @@ class Window {
   virtual void CloseWindow();
 
   bool ShouldClose() const;
+
+  void SetHDR(bool enable_hdr);
 
   EventManager<void(int, int)> &ResizeEvent() {
     return resize_event_;
@@ -66,6 +64,9 @@ class Window {
   EventManager<void(int, int, int, int)> key_event_;
   EventManager<void(uint32_t)> char_event_;
   EventManager<void(int, const char **)> drop_event_;
+
+ protected:
+  bool enable_hdr_;
 };
 
 }  // namespace grassland::graphics

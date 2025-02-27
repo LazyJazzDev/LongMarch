@@ -11,8 +11,7 @@ struct DXGIFactoryCreateHint {
 
 class DXGIFactory {
  public:
-  explicit DXGIFactory(DXGIFactoryCreateHint hint,
-                       const ComPtr<IDXGIFactory4> &factory);
+  explicit DXGIFactory(DXGIFactoryCreateHint hint, const ComPtr<IDXGIFactory4> &factory);
 
   IDXGIFactory4 *Handle() const {
     return factory_.Get();
@@ -20,14 +19,19 @@ class DXGIFactory {
 
   std::vector<Adapter> EnumerateAdapters() const;
 
-  HRESULT CreateDevice(
-      const DeviceFeatureRequirement &device_feature_requirement,
-      int device_index,
-      double_ptr<Device> pp_device);
+  HRESULT CreateDevice(const DeviceFeatureRequirement &device_feature_requirement,
+                       int device_index,
+                       double_ptr<Device> pp_device);
 
   HRESULT CreateSwapChain(const CommandQueue &command_queue,
                           HWND hwnd,
                           const DXGI_SWAP_CHAIN_DESC1 &desc,
+                          double_ptr<SwapChain> pp_swap_chain);
+
+  HRESULT CreateSwapChain(const CommandQueue &command_queue,
+                          HWND hwnd,
+                          UINT buffer_count,
+                          DXGI_FORMAT format,
                           double_ptr<SwapChain> pp_swap_chain);
 
   HRESULT CreateSwapChain(const CommandQueue &command_queue,
@@ -40,7 +44,6 @@ class DXGIFactory {
   ComPtr<IDXGIFactory4> factory_;
 };
 
-HRESULT CreateDXGIFactory(DXGIFactoryCreateHint hint,
-                          double_ptr<DXGIFactory> pp_factory);
+HRESULT CreateDXGIFactory(DXGIFactoryCreateHint hint, double_ptr<DXGIFactory> pp_factory);
 
 }  // namespace grassland::d3d12

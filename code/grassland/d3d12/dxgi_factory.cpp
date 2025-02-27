@@ -35,20 +35,17 @@ std::string GetErrorMessage() {
   return error_message;
 }
 
-DXGIFactoryCreateHint::DXGIFactoryCreateHint(bool enable_debug)
-    : enable_debug(enable_debug) {
+DXGIFactoryCreateHint::DXGIFactoryCreateHint(bool enable_debug) : enable_debug(enable_debug) {
 }
 
-DXGIFactory::DXGIFactory(DXGIFactoryCreateHint hint,
-                         const ComPtr<IDXGIFactory4> &factory)
+DXGIFactory::DXGIFactory(DXGIFactoryCreateHint hint, const ComPtr<IDXGIFactory4> &factory)
     : hint_(hint), factory_(factory) {
 }
 
 std::vector<Adapter> DXGIFactory::EnumerateAdapters() const {
   std::vector<Adapter> adapters;
   ComPtr<IDXGIAdapter1> adapter;
-  for (UINT i = 0; factory_->EnumAdapters1(i, &adapter) != DXGI_ERROR_NOT_FOUND;
-       i++) {
+  for (UINT i = 0; factory_->EnumAdapters1(i, &adapter) != DXGI_ERROR_NOT_FOUND; i++) {
     DXGI_ADAPTER_DESC1 desc;
     adapter->GetDesc1(&desc);
     if (desc.Flags & DXGI_ADAPTER_FLAG_SOFTWARE) {
@@ -59,10 +56,9 @@ std::vector<Adapter> DXGIFactory::EnumerateAdapters() const {
   return adapters;
 }
 
-HRESULT DXGIFactory::CreateDevice(
-    const DeviceFeatureRequirement &device_feature_requirement,
-    int device_index,
-    double_ptr<Device> pp_device) {
+HRESULT DXGIFactory::CreateDevice(const DeviceFeatureRequirement &device_feature_requirement,
+                                  int device_index,
+                                  double_ptr<Device> pp_device) {
   auto adapters = EnumerateAdapters();
 
   if (device_index < 0) {
@@ -89,8 +85,7 @@ HRESULT DXGIFactory::CreateDevice(
 
   const D3D_FEATURE_LEVEL min_feature_level = D3D_FEATURE_LEVEL_11_0;
 
-  HRESULT hr = D3D12CreateDevice(adapters[device_index].Handle(),
-                                 min_feature_level, IID_PPV_ARGS(&device));
+  HRESULT hr = D3D12CreateDevice(adapters[device_index].Handle(), min_feature_level, IID_PPV_ARGS(&device));
 
   if (FAILED(hr)) {
     SetErrorMessage("failed to create device.");
@@ -103,8 +98,7 @@ HRESULT DXGIFactory::CreateDevice(
     if (SUCCEEDED(device.As(&d3dInfoQueue))) {
       d3dInfoQueue->SetBreakOnSeverity(D3D12_MESSAGE_SEVERITY_CORRUPTION, true);
       d3dInfoQueue->SetBreakOnSeverity(D3D12_MESSAGE_SEVERITY_ERROR, true);
-      D3D12_MESSAGE_ID hide[] = {D3D12_MESSAGE_ID_MAP_INVALID_NULLRANGE,
-                                 D3D12_MESSAGE_ID_UNMAP_INVALID_NULLRANGE};
+      D3D12_MESSAGE_ID hide[] = {D3D12_MESSAGE_ID_MAP_INVALID_NULLRANGE, D3D12_MESSAGE_ID_UNMAP_INVALID_NULLRANGE};
       D3D12_INFO_QUEUE_FILTER filter = {};
       filter.DenyList.NumIDs = _countof(hide);
       filter.DenyList.pIDList = hide;
@@ -119,11 +113,9 @@ HRESULT DXGIFactory::CreateDevice(
       D3D_FEATURE_LEVEL_11_0,
   };
 
-  D3D12_FEATURE_DATA_FEATURE_LEVELS feat_levels = {
-      _countof(feature_levels), feature_levels, min_feature_level};
+  D3D12_FEATURE_DATA_FEATURE_LEVELS feat_levels = {_countof(feature_levels), feature_levels, min_feature_level};
 
-  hr = device->CheckFeatureSupport(D3D12_FEATURE_FEATURE_LEVELS, &feat_levels,
-                                   sizeof(feat_levels));
+  hr = device->CheckFeatureSupport(D3D12_FEATURE_FEATURE_LEVELS, &feat_levels, sizeof(feat_levels));
 
   D3D_FEATURE_LEVEL d3d_feature_level;
 
@@ -143,13 +135,22 @@ HRESULT DXGIFactory::CreateSwapChain(const CommandQueue &command_queue,
                                      double_ptr<SwapChain> pp_swap_chain) {
   ComPtr<IDXGISwapChain1> swap_chain;
   RETURN_IF_FAILED_HR(
-      factory_->CreateSwapChainForHwnd(command_queue.Handle(), hwnd, &desc,
-                                       nullptr, nullptr, &swap_chain),
+      factory_->CreateSwapChainForHwnd(command_queue.Handle(), hwnd, &desc, nullptr, nullptr, &swap_chain),
       "failed to create swap chain.");
 
   ComPtr<IDXGISwapChain3> swap_chain3;
-  RETURN_IF_FAILED_HR(swap_chain.As(&swap_chain3),
-                      "failed to create swap chain.");
+  RETURN_IF_FAILED_HR(swap_chain.As(&swap_chain3), "failed to create swap chain.");
+
+  if (desc.Format == DXGI_FORMAT_R16G16B16A16_FLOAT) {
+    // Enable HDR.
+    DXGI_COLOR_SPACE_TYPE color_space = DXGI_COLOR_SPACE_RGB_FULL_G10_NONE_P709;
+    UINT color_space_support = 0;
+    if (SUCCEEDED(swap_chain3->CheckColorSpaceSupport(color_space, &color_space_support)) &&
+        ((color_space_support & DXGI_SWAP_CHAIN_COLOR_SPACE_SUPPORT_FLAG_PRESENT) ==
+         DXGI_SWAP_CHAIN_COLOR_SPACE_SUPPORT_FLAG_PRESENT)) {
+      RETURN_IF_FAILED_HR(swap_chain3->SetColorSpace1(color_space), "failed to set color space.");
+    }
+  }
 
   pp_swap_chain.construct(swap_chain3);
 
@@ -159,6 +160,7 @@ HRESULT DXGIFactory::CreateSwapChain(const CommandQueue &command_queue,
 HRESULT DXGIFactory::CreateSwapChain(const CommandQueue &command_queue,
                                      HWND hwnd,
                                      UINT buffer_count,
+                                     DXGI_FORMAT format,
                                      double_ptr<SwapChain> pp_swap_chain) {
   // Get window size from hwnd.
   RECT rect;
@@ -169,18 +171,26 @@ HRESULT DXGIFactory::CreateSwapChain(const CommandQueue &command_queue,
   desc.BufferCount = buffer_count;
   desc.Width = width;
   desc.Height = height;
-  desc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
+  desc.Format = format;
   desc.BufferUsage = DXGI_USAGE_RENDER_TARGET_OUTPUT;
   desc.SwapEffect = DXGI_SWAP_EFFECT_FLIP_DISCARD;
   desc.SampleDesc.Count = 1;
 
+#ifndef NDEBUG
   LogInfo("Swap Chain: {}x{}", width, height);
+#endif
 
   return CreateSwapChain(command_queue, hwnd, desc, pp_swap_chain);
 }
 
-HRESULT CreateDXGIFactory(DXGIFactoryCreateHint hint,
-                          double_ptr<DXGIFactory> pp_factory) {
+HRESULT DXGIFactory::CreateSwapChain(const CommandQueue &command_queue,
+                                     HWND hwnd,
+                                     UINT buffer_count,
+                                     double_ptr<SwapChain> pp_swap_chain) {
+  return CreateSwapChain(command_queue, hwnd, buffer_count, DXGI_FORMAT_R8G8B8A8_UNORM, pp_swap_chain);
+}
+
+HRESULT CreateDXGIFactory(DXGIFactoryCreateHint hint, double_ptr<DXGIFactory> pp_factory) {
   UINT dxgi_factory_flags = 0;
 
   // Enable the debug layer (requires the Graphics Tools "optional feature").
@@ -197,9 +207,7 @@ HRESULT CreateDXGIFactory(DXGIFactoryCreateHint hint,
   }
 
   ComPtr<IDXGIFactory4> factory;
-  RETURN_IF_FAILED_HR(
-      CreateDXGIFactory2(dxgi_factory_flags, IID_PPV_ARGS(&factory)),
-      "failed to create DXGI factory.");
+  RETURN_IF_FAILED_HR(CreateDXGIFactory2(dxgi_factory_flags, IID_PPV_ARGS(&factory)), "failed to create DXGI factory.");
 
   pp_factory.construct(hint, factory);
   return S_OK;

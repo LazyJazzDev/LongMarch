@@ -63,23 +63,16 @@ class Swapchain {
   }
 
   // Acquire an image from the swap chain
-  VkResult AcquireNextImage(uint64_t timeout,
-                            VkSemaphore semaphore,
-                            VkFence fence,
-                            uint32_t *image_index) const;
+  VkResult AcquireNextImage(uint64_t timeout, VkSemaphore semaphore, VkFence fence, uint32_t *image_index) const;
 
-  static SwapChainSupportDetails QuerySwapChainSupport(VkPhysicalDevice device,
-                                                       VkSurfaceKHR surface);
+  static SwapChainSupportDetails QuerySwapChainSupport(VkPhysicalDevice device, VkSurfaceKHR surface);
 
-  static VkSurfaceFormatKHR ChooseSwapSurfaceFormat(
-      const std::vector<VkSurfaceFormatKHR> &availableFormats);
+  static VkSurfaceFormatKHR ChooseSwapSurfaceFormat(const std::vector<VkSurfaceFormatKHR> &availableFormats,
+                                                    VkFormat preferred_format);
 
-  static VkPresentModeKHR ChooseSwapPresentMode(
-      const std::vector<VkPresentModeKHR> &availablePresentModes);
+  static VkPresentModeKHR ChooseSwapPresentMode(const std::vector<VkPresentModeKHR> &availablePresentModes);
 
-  static VkExtent2D ChooseSwapExtent(
-      const VkSurfaceCapabilitiesKHR &capabilities,
-      GLFWwindow *window);
+  static VkExtent2D ChooseSwapExtent(const VkSurfaceCapabilitiesKHR &capabilities, GLFWwindow *window);
 
  private:
   void CreateImageViews();

@@ -17,6 +17,8 @@ VkFormat ImageFormatToVkFormat(ImageFormat format) {
       return VK_FORMAT_R32_SFLOAT;
     case IMAGE_FORMAT_D32_SFLOAT:
       return VK_FORMAT_D32_SFLOAT;
+    case IMAGE_FORMAT_R16G16B16A16_SFLOAT:
+      return VK_FORMAT_R16G16B16A16_SFLOAT;
     default:
       return VK_FORMAT_UNDEFINED;
   }

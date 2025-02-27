@@ -61,7 +61,7 @@ int VulkanCore::CreateWindowObject(int width,
                                    bool fullscreen,
                                    bool resizable,
                                    double_ptr<Window> pp_window) {
-  pp_window.construct<VulkanWindow>(this, width, height, title, fullscreen, resizable);
+  pp_window.construct<VulkanWindow>(this, width, height, title, fullscreen, resizable, false);
   return 0;
 }
 

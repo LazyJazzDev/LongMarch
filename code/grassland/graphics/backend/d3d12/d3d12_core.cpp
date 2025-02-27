@@ -95,7 +95,7 @@ int D3D12Core::CreateWindowObject(int width,
                                   bool fullscreen,
                                   bool resizable,
                                   double_ptr<Window> pp_window) {
-  pp_window.construct<D3D12Window>(this, width, height, title, fullscreen, resizable);
+  pp_window.construct<D3D12Window>(this, width, height, title, fullscreen, resizable, false);
   return 0;
 }
 

@@ -55,7 +55,7 @@ Device::~Device() {
   vkDestroyDevice(device_, nullptr);
 }
 
-VkResult Device::CreateSwapchain(const Surface *surface, double_ptr<Swapchain> pp_swapchain) const {
+VkResult Device::CreateSwapchain(const Surface *surface, VkFormat format, double_ptr<Swapchain> pp_swapchain) const {
   if (!pp_swapchain) {
     SetErrorMessage("pp_swapchain is nullptr");
     return VK_ERROR_INITIALIZATION_FAILED;
@@ -64,19 +64,23 @@ VkResult Device::CreateSwapchain(const Surface *surface, double_ptr<Swapchain> p
       Swapchain::QuerySwapChainSupport(PhysicalDevice().Handle(), surface->Handle());
 
   // List all available surface formats, print both VkFormat and VkColorSpace
+#ifndef NDEBUG
   LogInfo("Available surface formats:");
   for (const auto &format : swapChainSupport.formats) {
     LogInfo("  Format: {}, Color space: {}", VkFormatToName(format.format), VkColorSpaceToName(format.colorSpace));
   }
+#endif
 
-  VkSurfaceFormatKHR surfaceFormat = Swapchain::ChooseSwapSurfaceFormat(swapChainSupport.formats);
+  VkSurfaceFormatKHR surfaceFormat = Swapchain::ChooseSwapSurfaceFormat(swapChainSupport.formats, format);
   VkPresentModeKHR presentMode = Swapchain::ChooseSwapPresentMode(swapChainSupport.presentModes);
   VkExtent2D extent = Swapchain::ChooseSwapExtent(swapChainSupport.capabilities, surface->Window());
 
+#ifndef NDEBUG
   LogInfo("Swap chain extent: {}x{}", extent.width, extent.height);
   LogInfo("Swap chain format: {}", VkFormatToName(surfaceFormat.format));
   LogInfo("Swap chain color space: {}", VkColorSpaceToName(surfaceFormat.colorSpace));
   LogInfo("Swap chain present mode: {}", VkPresentModeToName(presentMode));
+#endif
 
   // Print selected surface format and present mode
 
@@ -118,6 +122,10 @@ VkResult Device::CreateSwapchain(const Surface *surface, double_ptr<Swapchain> p
   pp_swapchain.construct(this, surface, swapchain, surfaceFormat.format, extent);
 
   return VK_SUCCESS;
+}
+
+VkResult Device::CreateSwapchain(const Surface *surface, double_ptr<Swapchain> pp_swapchain) const {
+  return CreateSwapchain(surface, VK_FORMAT_R8G8B8A8_UNORM, pp_swapchain);
 }
 
 VkResult Device::GetQueue(uint32_t queue_family_index, int queue_index, double_ptr<Queue> pp_queue) const {

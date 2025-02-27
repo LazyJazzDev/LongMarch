@@ -7,20 +7,21 @@ VulkanWindow::VulkanWindow(VulkanCore *core,
                            int height,
                            const std::string &title,
                            bool fullscreen,
-                           bool resizable)
-    : Window(width, height, title, fullscreen, resizable), core_(core) {
+                           bool resizable,
+                           bool enable_hdr)
+    : Window(width, height, title, fullscreen, resizable, enable_hdr), core_(core) {
   core_->Instance()->CreateSurfaceFromGLFWWindow(GLFWWindow(), &surface_);
-  core_->Device()->CreateSwapchain(surface_.get(), &swap_chain_);
+  core_->Device()->CreateSwapchain(
+      surface_.get(), enable_hdr_ ? VK_FORMAT_R16G16B16A16_SFLOAT : VK_FORMAT_R8G8B8A8_UNORM, &swap_chain_);
   image_available_semaphores_.resize(swap_chain_->ImageCount());
   render_finish_semaphores_.resize(swap_chain_->ImageCount());
   for (size_t i = 0; i < image_available_semaphores_.size(); ++i) {
     core_->Device()->CreateSemaphore(&image_available_semaphores_[i]);
     core_->Device()->CreateSemaphore(&render_finish_semaphores_[i]);
   }
-  vkGetDeviceQueue(
-      core_->Device()->Handle(),
-      core_->Device()->PhysicalDevice().PresentFamilyIndex(surface_.get()), 0,
-      &present_queue_);
+  vkGetDeviceQueue(core_->Device()->Handle(), core_->Device()->PhysicalDevice().PresentFamilyIndex(surface_.get()), 0,
+                   &present_queue_);
+  ResizeEvent().RegisterCallback([this](int width, int height) { Rebuild(); });
 }
 
 void VulkanWindow::CloseWindow() {
@@ -45,22 +46,21 @@ vulkan::Semaphore *VulkanWindow::ImageAvailableSemaphore() const {
 }
 
 uint32_t VulkanWindow::AcquireNextImage() {
-  swap_chain_->AcquireNextImage(
-      std::numeric_limits<uint64_t>::max(),
-      image_available_semaphores_[core_->CurrentFrame()]->Handle(),
-      VK_NULL_HANDLE, &image_index_);
+  swap_chain_->AcquireNextImage(std::numeric_limits<uint64_t>::max(),
+                                image_available_semaphores_[core_->CurrentFrame()]->Handle(), VK_NULL_HANDLE,
+                                &image_index_);
   return image_index_;
 }
 
 void VulkanWindow::Rebuild() {
   core_->WaitGPU();
   swap_chain_.reset();
-  core_->Device()->CreateSwapchain(surface_.get(), &swap_chain_);
+  core_->Device()->CreateSwapchain(
+      surface_.get(), enable_hdr_ ? VK_FORMAT_R16G16B16A16_SFLOAT : VK_FORMAT_R8G8B8A8_UNORM, &swap_chain_);
 }
 
 void VulkanWindow::Present() {
-  VkSemaphore render_finish_semaphore =
-      render_finish_semaphores_[core_->CurrentFrame()]->Handle();
+  VkSemaphore render_finish_semaphore = render_finish_semaphores_[core_->CurrentFrame()]->Handle();
 
   VkSwapchainKHR swap_chain = swap_chain_->Handle();
 
