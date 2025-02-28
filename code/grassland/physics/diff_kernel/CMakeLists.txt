@@ -1,4 +1,4 @@
-file(GLOB_RECURSE SOURCES "*.cpp")
+file(GLOB SOURCES "*.cpp")
 
 if (LONGMARCH_CUDA_ENABLED)
     message(STATUS "CUDA enabled, marking source files as CUDA source.")

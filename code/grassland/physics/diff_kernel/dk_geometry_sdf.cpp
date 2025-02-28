@@ -4,9 +4,6 @@
 
 namespace grassland {
 
-using std::max;
-using std::min;
-
 template <typename Real>
 LM_DEVICE_FUNC bool PointSDF<Real>::ValidInput(const InputType &v) const {
   return (v - position).norm() > algebra::Eps<Real>() * 100;
@@ -18,16 +15,12 @@ LM_DEVICE_FUNC typename PointSDF<Real>::OutputType PointSDF<Real>::operator()(co
 }
 
 template <typename Real>
-LM_DEVICE_FUNC
-    Eigen::Matrix<Real, Eigen::Matrix<Real, 1, 1>::SizeAtCompileTime, Eigen::Matrix<Real, 3, 1>::SizeAtCompileTime>
-    PointSDF<Real>::Jacobian(const InputType &v) const {
+LM_DEVICE_FUNC Eigen::Matrix<Real, 1, 3> PointSDF<Real>::Jacobian(const InputType &v) const {
   return (v - position).normalized().transpose();
 }
 
 template <typename Real>
-LM_DEVICE_FUNC
-    HessianTensor<Real, Eigen::Matrix<Real, 1, 1>::SizeAtCompileTime, Eigen::Matrix<Real, 3, 1>::SizeAtCompileTime>
-    PointSDF<Real>::Hessian(const InputType &v) const {
+LM_DEVICE_FUNC HessianTensor<Real, 1, 3> PointSDF<Real>::Hessian(const InputType &v) const {
   HessianTensor<Real, OutputType::SizeAtCompileTime, InputType::SizeAtCompileTime> H;
   auto v_hat = (v - position).normalized().derived();
   H.m[0] = (H.m[0].Identity() - v_hat * v_hat.transpose()) / (v - position).norm();
@@ -48,16 +41,12 @@ LM_DEVICE_FUNC typename SphereSDF<Real>::OutputType SphereSDF<Real>::operator()(
 }
 
 template <typename Real>
-LM_DEVICE_FUNC
-    Eigen::Matrix<Real, SphereSDF<Real>::OutputType::SizeAtCompileTime, SphereSDF<Real>::InputType::SizeAtCompileTime>
-    SphereSDF<Real>::Jacobian(const InputType &v) const {
+LM_DEVICE_FUNC Eigen::Matrix<Real, 1, 3> SphereSDF<Real>::Jacobian(const InputType &v) const {
   return (v - center).normalized().transpose();
 }
 
 template <typename Real>
-LM_DEVICE_FUNC
-    HessianTensor<Real, SphereSDF<Real>::OutputType::SizeAtCompileTime, SphereSDF<Real>::InputType::SizeAtCompileTime>
-    SphereSDF<Real>::Hessian(const InputType &v) const {
+LM_DEVICE_FUNC HessianTensor<Real, 1, 3> SphereSDF<Real>::Hessian(const InputType &v) const {
   HessianTensor<Real, OutputType::SizeAtCompileTime, InputType::SizeAtCompileTime> H;
   auto v_hat = (v - center).normalized().derived();
   H.m[0] = (H.m[0].Identity() - v_hat * v_hat.transpose()) / (v - center).norm();
@@ -68,7 +57,7 @@ template class SphereSDF<float>;
 template class SphereSDF<double>;
 
 template <typename Real>
-LM_DEVICE_FUNC bool SegmentSDF<Real>::ValidInput(const SegmentSDF<Real>::InputType &v) const {
+LM_DEVICE_FUNC bool SegmentSDF<Real>::ValidInput(const InputType &v) const {
   return operator()(v).value() > algebra::Eps<Real>() * 100;
 }
 
@@ -77,28 +66,24 @@ LM_DEVICE_FUNC typename SegmentSDF<Real>::OutputType SegmentSDF<Real>::operator(
     const SegmentSDF<Real>::InputType &v) const {
   Eigen::Vector3<Real> ab = B - A;
   Real t = (v - A).dot(ab) / ab.squaredNorm();
-  t = max(Real(0), min(Real(1), t));
+  t = fmax(Real(0), fmin(Real(1), t));
   return OutputType{(v - (A + t * ab)).norm()};
 }
 
 template <typename Real>
-LM_DEVICE_FUNC
-    Eigen::Matrix<Real, SegmentSDF<Real>::OutputType::SizeAtCompileTime, SegmentSDF<Real>::InputType::SizeAtCompileTime>
-    SegmentSDF<Real>::Jacobian(const InputType &v) const {
+LM_DEVICE_FUNC Eigen::Matrix<Real, 1, 3> SegmentSDF<Real>::Jacobian(const InputType &v) const {
   Eigen::Vector3<Real> ab = B - A;
   Real t = (v - A).dot(ab) / ab.squaredNorm();
-  t = max(Real(0), min(Real(1), t));
+  t = fmax(Real(0), fmin(Real(1), t));
   return (v - (A + t * ab)).normalized();
 }
 
 template <typename Real>
-LM_DEVICE_FUNC
-    HessianTensor<Real, SegmentSDF<Real>::OutputType::SizeAtCompileTime, SegmentSDF<Real>::InputType::SizeAtCompileTime>
-    SegmentSDF<Real>::Hessian(const InputType &v) const {
+LM_DEVICE_FUNC HessianTensor<Real, 1, 3> SegmentSDF<Real>::Hessian(const InputType &v) const {
   HessianTensor<Real, OutputType::SizeAtCompileTime, InputType::SizeAtCompileTime> H;
   Eigen::Vector3<Real> ab = B - A;
   Real t = (v - A).dot(ab) / ab.squaredNorm();
-  Eigen::Vector3<Real> center = A + max(Real(0), min(Real(1), t)) * ab;
+  Eigen::Vector3<Real> center = A + fmax(Real(0), fmin(Real(1), t)) * ab;
   if (t < Real(0.0) || t > Real(1.0)) {
     auto v_hat = (v - center).normalized().derived();
     H.m[0] = (H.m[0].Identity() - v_hat * v_hat.transpose()) / (v - center).norm();
@@ -122,28 +107,24 @@ template <typename Real>
 LM_DEVICE_FUNC typename CapsuleSDF<Real>::OutputType CapsuleSDF<Real>::operator()(const InputType &v) const {
   Eigen::Vector3<Real> ab = B - A;
   Real t = (v - A).dot(ab) / ab.squaredNorm();
-  t = max(Real(0), min(Real(1), t));
+  t = fmax(Real(0), fmin(Real(1), t));
   return OutputType{(v - (A + t * ab)).norm() - radius};
 }
 
 template <typename Real>
-LM_DEVICE_FUNC
-    Eigen::Matrix<Real, CapsuleSDF<Real>::OutputType::SizeAtCompileTime, CapsuleSDF<Real>::InputType::SizeAtCompileTime>
-    CapsuleSDF<Real>::Jacobian(const InputType &v) const {
+LM_DEVICE_FUNC Eigen::Matrix<Real, 1, 3> CapsuleSDF<Real>::Jacobian(const InputType &v) const {
   Eigen::Vector3<Real> ab = B - A;
   Real t = (v - A).dot(ab) / ab.squaredNorm();
-  t = max(Real(0), min(Real(1), t));
+  t = fmax(Real(0), fmin(Real(1), t));
   return (v - (A + t * ab)).normalized();
 }
 
 template <typename Real>
-LM_DEVICE_FUNC
-    HessianTensor<Real, CapsuleSDF<Real>::OutputType::SizeAtCompileTime, CapsuleSDF<Real>::InputType::SizeAtCompileTime>
-    CapsuleSDF<Real>::Hessian(const InputType &v) const {
+LM_DEVICE_FUNC HessianTensor<Real, 1, 3> CapsuleSDF<Real>::Hessian(const InputType &v) const {
   HessianTensor<Real, OutputType::SizeAtCompileTime, InputType::SizeAtCompileTime> H;
   Eigen::Vector3<Real> ab = B - A;
   Real t = (v - A).dot(ab) / ab.squaredNorm();
-  Eigen::Vector3<Real> center = A + max(Real(0), min(Real(1), t)) * ab;
+  Eigen::Vector3<Real> center = A + fmax(Real(0), fmin(Real(1), t)) * ab;
   if (t < Real(0.0) || t > Real(1.0)) {
     auto v_hat = (v - center).normalized().derived();
     H.m[0] = (H.m[0].Identity() - v_hat * v_hat.transpose()) / (v - center).norm();
@@ -176,9 +157,7 @@ LM_DEVICE_FUNC typename CubeSDF<Real>::OutputType CubeSDF<Real>::operator()(cons
 }
 
 template <typename Real>
-LM_DEVICE_FUNC
-    Eigen::Matrix<Real, CubeSDF<Real>::OutputType::SizeAtCompileTime, CubeSDF<Real>::InputType::SizeAtCompileTime>
-    CubeSDF<Real>::Jacobian(const InputType &p) const {
+LM_DEVICE_FUNC Eigen::Matrix<Real, 1, 3> CubeSDF<Real>::Jacobian(const InputType &p) const {
   Eigen::Vector3<Real> p0 = p - center;
   Eigen::Vector3<Real> q = p0.cwiseAbs() - Eigen::Vector3<Real>(size, size, size);
   if (q.maxCoeff() > 0) {
@@ -208,9 +187,7 @@ LM_DEVICE_FUNC
 }
 
 template <typename Real>
-LM_DEVICE_FUNC
-    HessianTensor<Real, CubeSDF<Real>::OutputType::SizeAtCompileTime, CubeSDF<Real>::InputType::SizeAtCompileTime>
-    CubeSDF<Real>::Hessian(const InputType &v) const {
+LM_DEVICE_FUNC HessianTensor<Real, 1, 3> CubeSDF<Real>::Hessian(const InputType &v) const {
   HessianTensor<Real, OutputType::SizeAtCompileTime, InputType::SizeAtCompileTime> H;
   Eigen::Vector3<Real> v_diff = v - center;
   Eigen::Vector3<Real> p = v_diff;
@@ -250,16 +227,12 @@ LM_DEVICE_FUNC typename PlaneSDF<Real>::OutputType PlaneSDF<Real>::operator()(co
 }
 
 template <typename Real>
-LM_DEVICE_FUNC
-    Eigen::Matrix<Real, Eigen::Matrix<Real, 1, 1>::SizeAtCompileTime, Eigen::Matrix<Real, 3, 1>::SizeAtCompileTime>
-    PlaneSDF<Real>::Jacobian(const InputType &v) const {
+LM_DEVICE_FUNC Eigen::Matrix<Real, 1, 3> PlaneSDF<Real>::Jacobian(const InputType &v) const {
   return normal.transpose();
 }
 
 template <typename Real>
-LM_DEVICE_FUNC
-    HessianTensor<Real, Eigen::Matrix<Real, 1, 1>::SizeAtCompileTime, Eigen::Matrix<Real, 3, 1>::SizeAtCompileTime>
-    PlaneSDF<Real>::Hessian(const InputType &v) const {
+LM_DEVICE_FUNC HessianTensor<Real, 1, 3> PlaneSDF<Real>::Hessian(const InputType &v) const {
   return HessianTensor<Real, Eigen::Matrix<Real, 1, 1>::SizeAtCompileTime,
                        Eigen::Matrix<Real, 3, 1>::SizeAtCompileTime>{};
 }
@@ -278,17 +251,13 @@ LM_DEVICE_FUNC typename LineSDF<Real>::OutputType LineSDF<Real>::operator()(cons
 }
 
 template <typename Real>
-LM_DEVICE_FUNC
-    Eigen::Matrix<Real, Eigen::Matrix<Real, 1, 1>::SizeAtCompileTime, Eigen::Matrix<Real, 3, 1>::SizeAtCompileTime>
-    LineSDF<Real>::Jacobian(const InputType &v) const {
+LM_DEVICE_FUNC Eigen::Matrix<Real, 1, 3> LineSDF<Real>::Jacobian(const InputType &v) const {
   Eigen::Vector3<Real> p = v - origin;
   return (p - p.dot(direction) * direction).normalized().transpose();
 }
 
 template <typename Real>
-LM_DEVICE_FUNC
-    HessianTensor<Real, Eigen::Matrix<Real, 1, 1>::SizeAtCompileTime, Eigen::Matrix<Real, 3, 1>::SizeAtCompileTime>
-    LineSDF<Real>::Hessian(const InputType &v) const {
+LM_DEVICE_FUNC HessianTensor<Real, 1, 3> LineSDF<Real>::Hessian(const InputType &v) const {
   Eigen::Vector3<Real> t = (v - origin).cross(direction);
   HessianTensor<Real, Eigen::Matrix<Real, 1, 1>::SizeAtCompileTime, Eigen::Matrix<Real, 3, 1>::SizeAtCompileTime> H;
   Real t_norm = t.norm();

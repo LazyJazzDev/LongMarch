@@ -19,10 +19,7 @@ LM_DEVICE_FUNC typename ElasticNeoHookean<Real>::OutputType ElasticNeoHookean<Re
 }
 
 template <typename Real>
-LM_DEVICE_FUNC Eigen::Matrix<Real,
-                             ElasticNeoHookean<Real>::OutputType::SizeAtCompileTime,
-                             ElasticNeoHookean<Real>::InputType::SizeAtCompileTime>
-ElasticNeoHookean<Real>::Jacobian(const InputType &F) const {
+LM_DEVICE_FUNC Eigen::Matrix<Real, 1, 9> ElasticNeoHookean<Real>::Jacobian(const InputType &F) const {
   LogDeterminant3<Real> log_J;
   LogSquareDeterminant3<Real> log_2_J;
   Eigen::Map<const Eigen::RowVector<Real, 9>> F_map(F.data());
@@ -30,10 +27,7 @@ ElasticNeoHookean<Real>::Jacobian(const InputType &F) const {
 }
 
 template <typename Real>
-LM_DEVICE_FUNC HessianTensor<Real,
-                             ElasticNeoHookean<Real>::OutputType::SizeAtCompileTime,
-                             ElasticNeoHookean<Real>::InputType::SizeAtCompileTime>
-ElasticNeoHookean<Real>::Hessian(const InputType &F) const {
+LM_DEVICE_FUNC HessianTensor<Real, 1, 9> ElasticNeoHookean<Real>::Hessian(const InputType &F) const {
   HessianTensor<Real, OutputType::SizeAtCompileTime, InputType::SizeAtCompileTime> H;
   LogDeterminant3<Real> log_J;
   LogSquareDeterminant3<Real> log_2_J;
@@ -63,10 +57,7 @@ LM_DEVICE_FUNC typename ElasticNeoHookeanSimple<Real>::OutputType ElasticNeoHook
 }
 
 template <typename Real>
-LM_DEVICE_FUNC Eigen::Matrix<Real,
-                             ElasticNeoHookeanSimple<Real>::OutputType::SizeAtCompileTime,
-                             ElasticNeoHookeanSimple<Real>::InputType::SizeAtCompileTime>
-ElasticNeoHookeanSimple<Real>::Jacobian(const InputType &F) const {
+LM_DEVICE_FUNC Eigen::Matrix<Real, 1, 9> ElasticNeoHookeanSimple<Real>::Jacobian(const InputType &F) const {
   Determinant3<Real> det3;
   auto J = det3(F).value();
   Eigen::Map<const Eigen::Vector<Real, 9>> F_map(F.data());
@@ -76,10 +67,7 @@ ElasticNeoHookeanSimple<Real>::Jacobian(const InputType &F) const {
 }
 
 template <typename Real>
-LM_DEVICE_FUNC HessianTensor<Real,
-                             ElasticNeoHookeanSimple<Real>::OutputType::SizeAtCompileTime,
-                             ElasticNeoHookeanSimple<Real>::InputType::SizeAtCompileTime>
-ElasticNeoHookeanSimple<Real>::Hessian(const InputType &F) const {
+LM_DEVICE_FUNC HessianTensor<Real, 1, 9> ElasticNeoHookeanSimple<Real>::Hessian(const InputType &F) const {
   HessianTensor<Real, OutputType::SizeAtCompileTime, InputType::SizeAtCompileTime> H;
 
   Determinant3<Real> det3;
@@ -116,10 +104,7 @@ LM_DEVICE_FUNC typename ElasticNeoHookeanF3x2<Real>::OutputType ElasticNeoHookea
 }
 
 template <typename Real>
-LM_DEVICE_FUNC Eigen::Matrix<Real,
-                             ElasticNeoHookeanF3x2<Real>::OutputType::SizeAtCompileTime,
-                             ElasticNeoHookeanF3x2<Real>::InputType::SizeAtCompileTime>
-ElasticNeoHookeanF3x2<Real>::Jacobian(const InputType &F) const {
+LM_DEVICE_FUNC Eigen::Matrix<Real, 1, 6> ElasticNeoHookeanF3x2<Real>::Jacobian(const InputType &F) const {
   CrossNorm<Real> cross_norm;
   auto J = cross_norm(F).value();
   auto log_J = log(J);
@@ -130,10 +115,7 @@ ElasticNeoHookeanF3x2<Real>::Jacobian(const InputType &F) const {
 }
 
 template <typename Real>
-LM_DEVICE_FUNC HessianTensor<Real,
-                             ElasticNeoHookeanF3x2<Real>::OutputType::SizeAtCompileTime,
-                             ElasticNeoHookeanF3x2<Real>::InputType::SizeAtCompileTime>
-ElasticNeoHookeanF3x2<Real>::Hessian(const InputType &F) const {
+LM_DEVICE_FUNC HessianTensor<Real, 1, 6> ElasticNeoHookeanF3x2<Real>::Hessian(const InputType &F) const {
   HessianTensor<Real, OutputType::SizeAtCompileTime, InputType::SizeAtCompileTime> H;
   CrossNorm<Real> cross_norm;
   auto J = cross_norm(F).value();
@@ -173,10 +155,7 @@ LM_DEVICE_FUNC typename ElasticNeoHookeanSimpleF3x2<Real>::OutputType ElasticNeo
 }
 
 template <typename Real>
-LM_DEVICE_FUNC Eigen::Matrix<Real,
-                             ElasticNeoHookeanSimpleF3x2<Real>::OutputType::SizeAtCompileTime,
-                             ElasticNeoHookeanSimpleF3x2<Real>::InputType::SizeAtCompileTime>
-ElasticNeoHookeanSimpleF3x2<Real>::Jacobian(const InputType &F) const {
+LM_DEVICE_FUNC Eigen::Matrix<Real, 1, 6> ElasticNeoHookeanSimpleF3x2<Real>::Jacobian(const InputType &F) const {
   CrossNorm<Real> cross_norm;
   auto J = cross_norm(F).value();
   Eigen::Map<const Eigen::Vector<Real, 6>> F_map(F.data());
@@ -186,10 +165,7 @@ ElasticNeoHookeanSimpleF3x2<Real>::Jacobian(const InputType &F) const {
 }
 
 template <typename Real>
-LM_DEVICE_FUNC HessianTensor<Real,
-                             ElasticNeoHookeanSimpleF3x2<Real>::OutputType::SizeAtCompileTime,
-                             ElasticNeoHookeanSimpleF3x2<Real>::InputType::SizeAtCompileTime>
-ElasticNeoHookeanSimpleF3x2<Real>::Hessian(const InputType &F) const {
+LM_DEVICE_FUNC HessianTensor<Real, 1, 6> ElasticNeoHookeanSimpleF3x2<Real>::Hessian(const InputType &F) const {
   HessianTensor<Real, OutputType::SizeAtCompileTime, InputType::SizeAtCompileTime> H;
   CrossNorm<Real> cross_norm;
   auto J = cross_norm(F).value();
@@ -220,20 +196,14 @@ LM_DEVICE_FUNC typename ElasticNeoHookeanTetrahedron<Real>::OutputType ElasticNe
 }
 
 template <typename Real>
-LM_DEVICE_FUNC Eigen::Matrix<Real,
-                             ElasticNeoHookeanTetrahedron<Real>::OutputType::SizeAtCompileTime,
-                             ElasticNeoHookeanTetrahedron<Real>::InputType::SizeAtCompileTime>
-ElasticNeoHookeanTetrahedron<Real>::Jacobian(const InputType &V) const {
+LM_DEVICE_FUNC Eigen::Matrix<Real, 1, 12> ElasticNeoHookeanTetrahedron<Real>::Jacobian(const InputType &V) const {
   FEMTetrahedronDeformationGradient<Real> deformation_gradient{Dm};
   ElasticNeoHookean<Real> neo_hookean{mu, lambda};
   return neo_hookean.Jacobian(deformation_gradient(V)) * deformation_gradient.Jacobian(V);
 }
 
 template <typename Real>
-LM_DEVICE_FUNC HessianTensor<Real,
-                             ElasticNeoHookeanTetrahedron<Real>::OutputType::SizeAtCompileTime,
-                             ElasticNeoHookeanTetrahedron<Real>::InputType::SizeAtCompileTime>
-ElasticNeoHookeanTetrahedron<Real>::Hessian(const InputType &V) const {
+LM_DEVICE_FUNC HessianTensor<Real, 1, 12> ElasticNeoHookeanTetrahedron<Real>::Hessian(const InputType &V) const {
   FEMTetrahedronDeformationGradient<Real> deformation_gradient{Dm};
   ElasticNeoHookean<Real> neo_hookean{mu, lambda};
   return neo_hookean.Hessian(deformation_gradient(V)) * deformation_gradient.Jacobian(V);
@@ -293,20 +263,14 @@ ElasticNeoHookeanSimpleTetrahedron<Real>::operator()(const InputType &V) const {
 }
 
 template <typename Real>
-LM_DEVICE_FUNC Eigen::Matrix<Real,
-                             ElasticNeoHookeanSimpleTetrahedron<Real>::OutputType::SizeAtCompileTime,
-                             ElasticNeoHookeanSimpleTetrahedron<Real>::InputType::SizeAtCompileTime>
-ElasticNeoHookeanSimpleTetrahedron<Real>::Jacobian(const InputType &V) const {
+LM_DEVICE_FUNC Eigen::Matrix<Real, 1, 12> ElasticNeoHookeanSimpleTetrahedron<Real>::Jacobian(const InputType &V) const {
   FEMTetrahedronDeformationGradient<Real> deformation_gradient{Dm};
   ElasticNeoHookeanSimple<Real> neo_hookean{mu, lambda};
   return neo_hookean.Jacobian(deformation_gradient(V)) * deformation_gradient.Jacobian(V);
 }
 
 template <typename Real>
-LM_DEVICE_FUNC HessianTensor<Real,
-                             ElasticNeoHookeanSimpleTetrahedron<Real>::OutputType::SizeAtCompileTime,
-                             ElasticNeoHookeanSimpleTetrahedron<Real>::InputType::SizeAtCompileTime>
-ElasticNeoHookeanSimpleTetrahedron<Real>::Hessian(const InputType &V) const {
+LM_DEVICE_FUNC HessianTensor<Real, 1, 12> ElasticNeoHookeanSimpleTetrahedron<Real>::Hessian(const InputType &V) const {
   FEMTetrahedronDeformationGradient<Real> deformation_gradient{Dm};
   ElasticNeoHookeanSimple<Real> neo_hookean{mu, lambda};
   return neo_hookean.Hessian(deformation_gradient(V)) * deformation_gradient.Jacobian(V);
@@ -367,20 +331,14 @@ LM_DEVICE_FUNC typename ElasticNeoHookeanTriangle<Real>::OutputType ElasticNeoHo
 }
 
 template <typename Real>
-LM_DEVICE_FUNC Eigen::Matrix<Real,
-                             ElasticNeoHookeanTriangle<Real>::OutputType::SizeAtCompileTime,
-                             ElasticNeoHookeanTriangle<Real>::InputType::SizeAtCompileTime>
-ElasticNeoHookeanTriangle<Real>::Jacobian(const InputType &V) const {
+LM_DEVICE_FUNC Eigen::Matrix<Real, 1, 9> ElasticNeoHookeanTriangle<Real>::Jacobian(const InputType &V) const {
   FEMTriangleDeformationGradient3x2<Real> deformation_gradient3x2{Dm};
   ElasticNeoHookeanF3x2<Real> neo_hookean_f3x2{mu, lambda};
   return neo_hookean_f3x2.Jacobian(deformation_gradient3x2(V)) * deformation_gradient3x2.Jacobian(V);
 }
 
 template <typename Real>
-LM_DEVICE_FUNC HessianTensor<Real,
-                             ElasticNeoHookeanTriangle<Real>::OutputType::SizeAtCompileTime,
-                             ElasticNeoHookeanTriangle<Real>::InputType::SizeAtCompileTime>
-ElasticNeoHookeanTriangle<Real>::Hessian(const InputType &V) const {
+LM_DEVICE_FUNC HessianTensor<Real, 1, 9> ElasticNeoHookeanTriangle<Real>::Hessian(const InputType &V) const {
   FEMTriangleDeformationGradient3x2<Real> deformation_gradient3x2{Dm};
   ElasticNeoHookeanF3x2<Real> neo_hookean_f3x2{mu, lambda};
   return neo_hookean_f3x2.Hessian(deformation_gradient3x2(V)) * deformation_gradient3x2.Jacobian(V);
@@ -405,20 +363,14 @@ ElasticNeoHookeanSimpleTriangle<Real>::operator()(const InputType &V) const {
 }
 
 template <typename Real>
-LM_DEVICE_FUNC Eigen::Matrix<Real,
-                             ElasticNeoHookeanSimpleTriangle<Real>::OutputType::SizeAtCompileTime,
-                             ElasticNeoHookeanSimpleTriangle<Real>::InputType::SizeAtCompileTime>
-ElasticNeoHookeanSimpleTriangle<Real>::Jacobian(const InputType &V) const {
+LM_DEVICE_FUNC Eigen::Matrix<Real, 1, 9> ElasticNeoHookeanSimpleTriangle<Real>::Jacobian(const InputType &V) const {
   FEMTriangleDeformationGradient3x2<Real> deformation_gradient3x2{Dm};
   ElasticNeoHookeanSimpleF3x2<Real> neo_hookean_f3x2{mu, lambda};
   return neo_hookean_f3x2.Jacobian(deformation_gradient3x2(V)) * deformation_gradient3x2.Jacobian(V);
 }
 
 template <typename Real>
-LM_DEVICE_FUNC HessianTensor<Real,
-                             ElasticNeoHookeanSimpleTriangle<Real>::OutputType::SizeAtCompileTime,
-                             ElasticNeoHookeanSimpleTriangle<Real>::InputType::SizeAtCompileTime>
-ElasticNeoHookeanSimpleTriangle<Real>::Hessian(const InputType &V) const {
+LM_DEVICE_FUNC HessianTensor<Real, 1, 9> ElasticNeoHookeanSimpleTriangle<Real>::Hessian(const InputType &V) const {
   FEMTriangleDeformationGradient3x2<Real> deformation_gradient3x2{Dm};
   ElasticNeoHookeanSimpleF3x2<Real> neo_hookean_f3x2{mu, lambda};
   return neo_hookean_f3x2.Hessian(deformation_gradient3x2(V)) * deformation_gradient3x2.Jacobian(V);

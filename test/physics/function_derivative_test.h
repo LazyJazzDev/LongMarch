@@ -10,6 +10,7 @@
 
 using namespace grassland;
 
+#if defined(__CUDACC__)
 template <typename FunctionSet>
 __global__ void DeviceValueKernel(FunctionSet f,
                                   const typename FunctionSet::InputType v,
@@ -32,9 +33,7 @@ __global__ void DeviceHessianKernel(FunctionSet f,
 }
 
 template <typename FunctionSet>
-typename FunctionSet::OutputType DeviceValue(
-    FunctionSet f,
-    const typename FunctionSet::InputType &x) {
+typename FunctionSet::OutputType DeviceValue(FunctionSet f, const typename FunctionSet::InputType &x) {
   typename FunctionSet::OutputType *out;
   cudaMallocManaged(&out, sizeof(FunctionSet::OutputType));
   DeviceValueKernel<<<1, 1>>>(f, x, out);
@@ -45,9 +44,7 @@ typename FunctionSet::OutputType DeviceValue(
 }
 
 template <typename FunctionSet>
-JacobianType<FunctionSet> DeviceJacobian(
-    FunctionSet f,
-    const typename FunctionSet::InputType &x) {
+JacobianType<FunctionSet> DeviceJacobian(FunctionSet f, const typename FunctionSet::InputType &x) {
   JacobianType<FunctionSet> *out;
   cudaMallocManaged(&out, sizeof(JacobianType<FunctionSet>));
   DeviceJacobianKernel<<<1, 1>>>(f, x, out);
@@ -58,9 +55,7 @@ JacobianType<FunctionSet> DeviceJacobian(
 }
 
 template <typename FunctionSet>
-HessianType<FunctionSet> DeviceHessian(
-    FunctionSet f,
-    const typename FunctionSet::InputType &x) {
+HessianType<FunctionSet> DeviceHessian(FunctionSet f, const typename FunctionSet::InputType &x) {
   HessianType<FunctionSet> *out;
   cudaMallocManaged(&out, sizeof(HessianType<FunctionSet>));
   DeviceHessianKernel<<<1, 1>>>(f, x, out);
@@ -69,48 +64,45 @@ HessianType<FunctionSet> DeviceHessian(
   cudaFree(out);
   return result;
 }
+#endif
 
 template <typename FunctionSet = Determinant3<double>>
 void TestFunctionSetWithInput(
     FunctionSet f,
-    const Eigen::Vector<typename FunctionSet::Scalar,
-                        FunctionSet::InputType::SizeAtCompileTime> &x) {
+    const Eigen::Vector<typename FunctionSet::Scalar, FunctionSet::InputType::SizeAtCompileTime> &x) {
   using Real = typename FunctionSet::Scalar;
-  using InputVec =
-      Eigen::Vector<Real, FunctionSet::InputType::SizeAtCompileTime>;
-  using OutputVec =
-      Eigen::Vector<Real, FunctionSet::OutputType::SizeAtCompileTime>;
+  using InputVec = Eigen::Vector<Real, FunctionSet::InputType::SizeAtCompileTime>;
+  using OutputVec = Eigen::Vector<Real, FunctionSet::OutputType::SizeAtCompileTime>;
 
   using JacobiType =
-      Eigen::Matrix<Real, FunctionSet::OutputType::SizeAtCompileTime,
-                    FunctionSet::InputType::SizeAtCompileTime>;
+      Eigen::Matrix<Real, FunctionSet::OutputType::SizeAtCompileTime, FunctionSet::InputType::SizeAtCompileTime>;
 
   auto InputVecToInputType = [](const InputVec &x) ->
-      typename FunctionSet::InputType {
-        return Eigen::Map<const typename FunctionSet::InputType>(x.data());
-      };
+      typename FunctionSet::InputType { return Eigen::Map<const typename FunctionSet::InputType>(x.data()); };
 
-  auto OutputTypeToOutputVec =
-      [](const typename FunctionSet::OutputType &y) -> OutputVec {
+  auto OutputTypeToOutputVec = [](const typename FunctionSet::OutputType &y) -> OutputVec {
     return Eigen::Map<const OutputVec>(y.data());
   };
   Real eps = algebra::Eps<Real>();
   OutputVec y = OutputTypeToOutputVec(f(InputVecToInputType(x)));
-  OutputVec y_device =
-      OutputTypeToOutputVec(DeviceValue(f, InputVecToInputType(x)));
+#if defined(__CUDACC__)
+  OutputVec y_device = OutputTypeToOutputVec(DeviceValue(f, InputVecToInputType(x)));
 
   for (int i = 0; i < y.size(); i++) {
     EXPECT_NEAR(y(i), y_device(i), fmax(fabs(sqrt(eps) * y(i)), sqrt(eps)));
   }
+#endif
 
   JacobiType J = f.Jacobian(InputVecToInputType(x));
   JacobiType J_finite_diff;
 
+#if defined(__CUDACC__)
   JacobiType J_device = DeviceJacobian(f, InputVecToInputType(x));
 
   for (int i = 0; i < J.size(); i++) {
     EXPECT_NEAR(J(i), J_device(i), fmax(fabs(sqrt(eps) * J(i)), sqrt(eps)));
   }
+#endif
 
   J_finite_diff.setZero();
   for (int j = 0; j < x.size(); j++) {
@@ -136,27 +128,25 @@ void TestFunctionSetWithInput(
 
   // Compare J and J_finite_diff
   for (int j = 0; j < J.size(); j++) {
-    EXPECT_NEAR(J(j), J_finite_diff(j),
-                fmax(fabs(sqrt(eps) * J(j)), sqrt(eps))),
-        printf("J(%d)\n", j);
+    EXPECT_NEAR(J(j), J_finite_diff(j), fmax(fabs(sqrt(eps) * J(j)), sqrt(eps))), printf("J(%d)\n", j);
   }
 
   using HessianType =
-      HessianTensor<Real, FunctionSet::OutputType::SizeAtCompileTime,
-                    FunctionSet::InputType::SizeAtCompileTime>;
+      HessianTensor<Real, FunctionSet::OutputType::SizeAtCompileTime, FunctionSet::InputType::SizeAtCompileTime>;
   HessianType H = f.Hessian(InputVecToInputType(x));
   HessianType H_finite_diff;
 
+#if defined(__CUDACC__)
   HessianType H_device = DeviceHessian(f, InputVecToInputType(x));
 
   for (int j = 0; j < OutputVec::SizeAtCompileTime; j++) {
     for (int k = 0; k < InputVec::SizeAtCompileTime; k++) {
       for (int l = 0; l < InputVec::SizeAtCompileTime; l++) {
-        EXPECT_NEAR(H.m[j](k, l), H_device.m[j](k, l),
-                    fmax(fabs(sqrt(eps) * H.m[j](k, l)), sqrt(eps)));
+        EXPECT_NEAR(H.m[j](k, l), H_device.m[j](k, l), fmax(fabs(sqrt(eps) * H.m[j](k, l)), sqrt(eps)));
       }
     }
   }
+#endif
 
   for (int j = 0; j < x.size(); j++) {
     InputVec x_plus = x;
@@ -181,8 +171,7 @@ void TestFunctionSetWithInput(
   for (int j = 0; j < OutputVec::SizeAtCompileTime; j++) {
     for (int k = 0; k < InputVec::SizeAtCompileTime; k++) {
       for (int l = 0; l < InputVec::SizeAtCompileTime; l++) {
-        EXPECT_NEAR(H.m[j](k, l), H_finite_diff.m[j](k, l),
-                    fmax(fabs(sqrt(eps) * H.m[j](k, l)), sqrt(eps))),
+        EXPECT_NEAR(H.m[j](k, l), H_finite_diff.m[j](k, l), fmax(fabs(sqrt(eps) * H.m[j](k, l)), sqrt(eps))),
             diff = true;
       }
     }
@@ -202,13 +191,10 @@ template <typename FunctionSet = Determinant3<double>>
 void TestFunctionSet(FunctionSet f = FunctionSet{}, const int test_cnt = 100) {
   using Real = typename FunctionSet::Scalar;
   for (int i = 0; i < test_cnt; i++) {
-    using InputVec =
-        Eigen::Vector<Real, FunctionSet::InputType::SizeAtCompileTime>;
+    using InputVec = Eigen::Vector<Real, FunctionSet::InputType::SizeAtCompileTime>;
 
     auto InputVecToInputType = [](const InputVec &x) ->
-        typename FunctionSet::InputType {
-          return Eigen::Map<const typename FunctionSet::InputType>(x.data());
-        };
+        typename FunctionSet::InputType { return Eigen::Map<const typename FunctionSet::InputType>(x.data()); };
 
     InputVec x = InputVec::Random();
 

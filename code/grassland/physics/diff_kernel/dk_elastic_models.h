@@ -13,11 +13,9 @@ struct ElasticNeoHookean {
 
   LM_DEVICE_FUNC OutputType operator()(const InputType &F) const;
 
-  LM_DEVICE_FUNC Eigen::Matrix<Real, OutputType::SizeAtCompileTime, InputType::SizeAtCompileTime> Jacobian(
-      const InputType &F) const;
+  LM_DEVICE_FUNC Eigen::Matrix<Real, 1, 9> Jacobian(const InputType &F) const;
 
-  LM_DEVICE_FUNC HessianTensor<Real, OutputType::SizeAtCompileTime, InputType::SizeAtCompileTime> Hessian(
-      const InputType &F) const;
+  LM_DEVICE_FUNC HessianTensor<Real, 1, 9> Hessian(const InputType &F) const;
 
   Real mu{1.0};
   Real lambda{1.0};
@@ -33,11 +31,9 @@ struct ElasticNeoHookeanSimple {
 
   LM_DEVICE_FUNC OutputType operator()(const InputType &F) const;
 
-  LM_DEVICE_FUNC Eigen::Matrix<Real, OutputType::SizeAtCompileTime, InputType::SizeAtCompileTime> Jacobian(
-      const InputType &F) const;
+  LM_DEVICE_FUNC Eigen::Matrix<Real, 1, 9> Jacobian(const InputType &F) const;
 
-  LM_DEVICE_FUNC HessianTensor<Real, OutputType::SizeAtCompileTime, InputType::SizeAtCompileTime> Hessian(
-      const InputType &F) const;
+  LM_DEVICE_FUNC HessianTensor<Real, 1, 9> Hessian(const InputType &F) const;
 
   Real mu{1.0};
   Real lambda{1.0};
@@ -53,11 +49,9 @@ struct ElasticNeoHookeanF3x2 {
 
   LM_DEVICE_FUNC OutputType operator()(const InputType &F) const;
 
-  LM_DEVICE_FUNC Eigen::Matrix<Real, OutputType::SizeAtCompileTime, InputType::SizeAtCompileTime> Jacobian(
-      const InputType &F) const;
+  LM_DEVICE_FUNC Eigen::Matrix<Real, 1, 6> Jacobian(const InputType &F) const;
 
-  LM_DEVICE_FUNC HessianTensor<Real, OutputType::SizeAtCompileTime, InputType::SizeAtCompileTime> Hessian(
-      const InputType &F) const;
+  LM_DEVICE_FUNC HessianTensor<Real, 1, 6> Hessian(const InputType &F) const;
 
   Real mu{1.0};
   Real lambda{1.0};
@@ -73,11 +67,9 @@ struct ElasticNeoHookeanSimpleF3x2 {
 
   LM_DEVICE_FUNC OutputType operator()(const InputType &F) const;
 
-  LM_DEVICE_FUNC Eigen::Matrix<Real, OutputType::SizeAtCompileTime, InputType::SizeAtCompileTime> Jacobian(
-      const InputType &F) const;
+  LM_DEVICE_FUNC Eigen::Matrix<Real, 1, 6> Jacobian(const InputType &F) const;
 
-  LM_DEVICE_FUNC HessianTensor<Real, OutputType::SizeAtCompileTime, InputType::SizeAtCompileTime> Hessian(
-      const InputType &F) const;
+  LM_DEVICE_FUNC HessianTensor<Real, 1, 6> Hessian(const InputType &F) const;
 
   Real mu{1.0};
   Real lambda{1.0};
@@ -93,11 +85,9 @@ struct ElasticNeoHookeanTetrahedron {
 
   LM_DEVICE_FUNC OutputType operator()(const InputType &V) const;
 
-  LM_DEVICE_FUNC Eigen::Matrix<Real, OutputType::SizeAtCompileTime, InputType::SizeAtCompileTime> Jacobian(
-      const InputType &V) const;
+  LM_DEVICE_FUNC Eigen::Matrix<Real, 1, 12> Jacobian(const InputType &V) const;
 
-  LM_DEVICE_FUNC HessianTensor<Real, OutputType::SizeAtCompileTime, InputType::SizeAtCompileTime> Hessian(
-      const InputType &V) const;
+  LM_DEVICE_FUNC HessianTensor<Real, 1, 12> Hessian(const InputType &V) const;
 
   LM_DEVICE_FUNC Eigen::Matrix3<Real> SubHessian(const InputType &V, int dim) const;
 
@@ -116,11 +106,9 @@ struct ElasticNeoHookeanSimpleTetrahedron {
 
   LM_DEVICE_FUNC OutputType operator()(const InputType &V) const;
 
-  LM_DEVICE_FUNC Eigen::Matrix<Real, OutputType::SizeAtCompileTime, InputType::SizeAtCompileTime> Jacobian(
-      const InputType &V) const;
+  LM_DEVICE_FUNC Eigen::Matrix<Real, 1, 12> Jacobian(const InputType &V) const;
 
-  LM_DEVICE_FUNC HessianTensor<Real, OutputType::SizeAtCompileTime, InputType::SizeAtCompileTime> Hessian(
-      const InputType &V) const;
+  LM_DEVICE_FUNC HessianTensor<Real, 1, 12> Hessian(const InputType &V) const;
 
   LM_DEVICE_FUNC Eigen::Matrix3<Real> SubHessian(const InputType &V, int dim) const;
 
@@ -139,11 +127,9 @@ struct ElasticNeoHookeanTriangle {
 
   LM_DEVICE_FUNC OutputType operator()(const InputType &V) const;
 
-  LM_DEVICE_FUNC Eigen::Matrix<Real, OutputType::SizeAtCompileTime, InputType::SizeAtCompileTime> Jacobian(
-      const InputType &V) const;
+  LM_DEVICE_FUNC Eigen::Matrix<Real, 1, 9> Jacobian(const InputType &V) const;
 
-  LM_DEVICE_FUNC HessianTensor<Real, OutputType::SizeAtCompileTime, InputType::SizeAtCompileTime> Hessian(
-      const InputType &V) const;
+  LM_DEVICE_FUNC HessianTensor<Real, 1, 9> Hessian(const InputType &V) const;
 
   Real mu{1.0};
   Real lambda{1.0};
@@ -160,11 +146,9 @@ struct ElasticNeoHookeanSimpleTriangle {
 
   LM_DEVICE_FUNC OutputType operator()(const InputType &V) const;
 
-  LM_DEVICE_FUNC Eigen::Matrix<Real, OutputType::SizeAtCompileTime, InputType::SizeAtCompileTime> Jacobian(
-      const InputType &V) const;
+  LM_DEVICE_FUNC Eigen::Matrix<Real, 1, 9> Jacobian(const InputType &V) const;
 
-  LM_DEVICE_FUNC HessianTensor<Real, OutputType::SizeAtCompileTime, InputType::SizeAtCompileTime> Hessian(
-      const InputType &V) const;
+  LM_DEVICE_FUNC HessianTensor<Real, 1, 9> Hessian(const InputType &V) const;
 
   Real mu{1.0};
   Real lambda{1.0};

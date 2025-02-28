@@ -20,11 +20,9 @@ DihedralAngleAssistEdgesToNormalsAxis<Real>::operator()(const InputType &E) cons
 }
 
 template <typename Real>
-LM_DEVICE_FUNC Eigen::Matrix<Real,
-                             DihedralAngleAssistEdgesToNormalsAxis<Real>::OutputSize,
-                             DihedralAngleAssistEdgesToNormalsAxis<Real>::InputSize>
-DihedralAngleAssistEdgesToNormalsAxis<Real>::Jacobian(const InputType &E) const {
-  Eigen::Matrix<Real, OutputSize, InputSize> J;
+LM_DEVICE_FUNC Eigen::Matrix<Real, 9, 9> DihedralAngleAssistEdgesToNormalsAxis<Real>::Jacobian(
+    const InputType &E) const {
+  Eigen::Matrix<Real, OutputType::SizeAtCompileTime, InputType::SizeAtCompileTime> J;
   J.setZero();
   CrossNormalized<Real> cross_normalized;
   VecNormalized<Real> vec_normalized;
@@ -35,11 +33,9 @@ DihedralAngleAssistEdgesToNormalsAxis<Real>::Jacobian(const InputType &E) const 
 }
 
 template <typename Real>
-LM_DEVICE_FUNC HessianTensor<Real,
-                             DihedralAngleAssistEdgesToNormalsAxis<Real>::OutputSize,
-                             DihedralAngleAssistEdgesToNormalsAxis<Real>::InputSize>
-DihedralAngleAssistEdgesToNormalsAxis<Real>::Hessian(const InputType &E) const {
-  HessianTensor<Real, OutputSize, InputSize> H;
+LM_DEVICE_FUNC HessianTensor<Real, 9, 9> DihedralAngleAssistEdgesToNormalsAxis<Real>::Hessian(
+    const InputType &E) const {
+  HessianTensor<Real, OutputType::SizeAtCompileTime, InputType::SizeAtCompileTime> H;
   CrossNormalized<Real> cross_normalized;
   VecNormalized<Real> vec_normalized;
   auto cross_normalized_hessian = cross_normalized.Hessian(E.block(0, 0, 3, 2));
@@ -86,11 +82,9 @@ DihedralAngleAssistNormalsAxisToSinCosTheta<Real>::operator()(const InputType &N
 }
 
 template <typename Real>
-LM_DEVICE_FUNC Eigen::Matrix<Real,
-                             DihedralAngleAssistNormalsAxisToSinCosTheta<Real>::OutputSize,
-                             DihedralAngleAssistNormalsAxisToSinCosTheta<Real>::InputSize>
-DihedralAngleAssistNormalsAxisToSinCosTheta<Real>::Jacobian(const InputType &N) const {
-  Eigen::Matrix<Real, OutputSize, InputSize> J;
+LM_DEVICE_FUNC Eigen::Matrix<Real, 2, 9> DihedralAngleAssistNormalsAxisToSinCosTheta<Real>::Jacobian(
+    const InputType &N) const {
+  Eigen::Matrix<Real, OutputType::SizeAtCompileTime, InputType::SizeAtCompileTime> J;
   J.setZero();
   Determinant3<Real> det3;
   Dot<Real> dot;
@@ -100,11 +94,9 @@ DihedralAngleAssistNormalsAxisToSinCosTheta<Real>::Jacobian(const InputType &N) 
 }
 
 template <typename Real>
-LM_DEVICE_FUNC HessianTensor<Real,
-                             DihedralAngleAssistNormalsAxisToSinCosTheta<Real>::OutputSize,
-                             DihedralAngleAssistNormalsAxisToSinCosTheta<Real>::InputSize>
-DihedralAngleAssistNormalsAxisToSinCosTheta<Real>::Hessian(const InputType &A) const {
-  HessianTensor<Real, OutputSize, InputSize> H;
+LM_DEVICE_FUNC HessianTensor<Real, 2, 9> DihedralAngleAssistNormalsAxisToSinCosTheta<Real>::Hessian(
+    const InputType &A) const {
+  HessianTensor<Real, OutputType::SizeAtCompileTime, InputType::SizeAtCompileTime> H;
   H.m[0] = Determinant3<Real>().Hessian(A).m[0];
   H.m[1].block(0, 0, 6, 6) = Dot<Real>().Hessian(A.block(0, 0, 3, 2)).m[0];
   return H;
@@ -129,11 +121,8 @@ DihedralAngleAssistVerticesToEdges<Real>::operator()(const InputType &V) const {
 }
 
 template <typename Real>
-LM_DEVICE_FUNC Eigen::Matrix<Real,
-                             DihedralAngleAssistVerticesToEdges<Real>::OutputSize,
-                             DihedralAngleAssistVerticesToEdges<Real>::InputSize>
-DihedralAngleAssistVerticesToEdges<Real>::Jacobian(const InputType &) const {
-  Eigen::Matrix<Real, OutputSize, InputSize> J;
+LM_DEVICE_FUNC Eigen::Matrix<Real, 9, 12> DihedralAngleAssistVerticesToEdges<Real>::Jacobian(const InputType &) const {
+  Eigen::Matrix<Real, OutputType::SizeAtCompileTime, InputType::SizeAtCompileTime> J;
   J.setZero();
   // J.block<3, 3>(0, 0) = -Eigen::Matrix<Real, 3, 3>::Identity();
   // J.block<3, 3>(0, 3) = Eigen::Matrix<Real, 3, 3>::Identity();
@@ -153,11 +142,8 @@ DihedralAngleAssistVerticesToEdges<Real>::Jacobian(const InputType &) const {
 }
 
 template <typename Real>
-LM_DEVICE_FUNC HessianTensor<Real,
-                             DihedralAngleAssistVerticesToEdges<Real>::OutputSize,
-                             DihedralAngleAssistVerticesToEdges<Real>::InputSize>
-DihedralAngleAssistVerticesToEdges<Real>::Hessian(const InputType &) const {
-  HessianTensor<Real, OutputSize, InputSize> H;
+LM_DEVICE_FUNC HessianTensor<Real, 9, 12> DihedralAngleAssistVerticesToEdges<Real>::Hessian(const InputType &) const {
+  HessianTensor<Real, OutputType::SizeAtCompileTime, InputType::SizeAtCompileTime> H;
   return H;
 }
 
@@ -178,8 +164,7 @@ LM_DEVICE_FUNC typename DihedralEnergy<Real>::OutputType DihedralEnergy<Real>::o
 }
 
 template <typename Real>
-LM_DEVICE_FUNC Eigen::Matrix<Real, DihedralEnergy<Real>::OutputSize, DihedralEnergy<Real>::InputSize>
-DihedralEnergy<Real>::Jacobian(const InputType &V) const {
+LM_DEVICE_FUNC Eigen::Matrix<Real, 1, 12> DihedralEnergy<Real>::Jacobian(const InputType &V) const {
   DihedralAngleByVertices<Real> dihedral_angle;
   auto angle = dihedral_angle(V).value() - rest_angle;
   auto J = dihedral_angle.Jacobian(V);
@@ -187,8 +172,7 @@ DihedralEnergy<Real>::Jacobian(const InputType &V) const {
 }
 
 template <typename Real>
-LM_DEVICE_FUNC HessianTensor<Real, DihedralEnergy<Real>::OutputSize, DihedralEnergy<Real>::InputSize>
-DihedralEnergy<Real>::Hessian(const InputType &V) const {
+LM_DEVICE_FUNC HessianTensor<Real, 1, 12> DihedralEnergy<Real>::Hessian(const InputType &V) const {
   DihedralAngleByVertices<Real> dihedral_angle;
   auto angle = dihedral_angle(V).value() - rest_angle;
   auto J = dihedral_angle.Jacobian(V);
@@ -220,8 +204,7 @@ LM_DEVICE_FUNC typename DihedralAngle<Real>::OutputType DihedralAngle<Real>::ope
 }
 
 template <typename Real>
-LM_DEVICE_FUNC Eigen::Matrix<Real, DihedralAngle<Real>::OutputSize, DihedralAngle<Real>::InputSize>
-DihedralAngle<Real>::Jacobian(const InputType &V) const {
+LM_DEVICE_FUNC Eigen::Matrix<Real, 1, 12> DihedralAngle<Real>::Jacobian(const InputType &V) const {
   Eigen::Vector3<Real> e0 = V.col(2) - V.col(1);
   Eigen::Vector3<Real> e1 = V.col(0) - V.col(2);
   Eigen::Vector3<Real> e2 = V.col(0) - V.col(1);
@@ -276,8 +259,7 @@ DihedralAngle<Real>::Jacobian(const InputType &V) const {
 }
 
 template <typename Real>
-LM_DEVICE_FUNC HessianTensor<Real, DihedralAngle<Real>::OutputSize, DihedralAngle<Real>::InputSize>
-DihedralAngle<Real>::Hessian(const InputType &V) const {
+LM_DEVICE_FUNC HessianTensor<Real, 1, 12> DihedralAngle<Real>::Hessian(const InputType &V) const {
   Eigen::Vector3<Real> e0 = V.col(2) - V.col(1);
   Eigen::Vector3<Real> e1 = V.col(0) - V.col(2);
   Eigen::Vector3<Real> e2 = V.col(0) - V.col(1);

@@ -13,16 +13,18 @@ project(LongMarch)
 
 set(CMAKE_CXX_STANDARD 17)
 
-find_package(CUDAToolkit)
+if (NOT LONGMARCH_DISABLE_CUDA)
+    find_package(CUDAToolkit)
 
-if (CUDAToolkit_FOUND)
-    enable_language(CUDA)
-    set(CMAKE_CUDA_STANDARD 17)
-    set(LONGMARCH_CUDA_ENABLED ON)
-    set(CMAKE_CUDA_SEPARABLE_COMPILATION ON)
-    set(CMAKE_CUDA_ARCHITECTURES 61 70 75 80)
-else ()
-    message(STATUS "CUDA not found, skipping CUDA code.")
+    if (CUDAToolkit_FOUND)
+        enable_language(CUDA)
+        set(CMAKE_CUDA_STANDARD 17)
+        set(LONGMARCH_CUDA_ENABLED ON)
+        set(CMAKE_CUDA_SEPARABLE_COMPILATION ON)
+        set(CMAKE_CUDA_ARCHITECTURES 61)
+    else ()
+        message(STATUS "CUDA not found, skipping CUDA code.")
+    endif ()
 endif ()
 
 if (MSVC)
@@ -32,6 +34,10 @@ if (MSVC)
     # /bigobj
     add_compile_options("$<$<COMPILE_LANGUAGE:CXX>:/bigobj>")
     add_compile_options("$<$<COMPILE_LANGUAGE:CUDA>:-Xcompiler=\"/bigobj\">")
+
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} /wd4068")
+    set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} /wd4068")
+    add_compile_options("$<$<COMPILE_LANGUAGE:CUDA>:-Xcompiler=\"/wd4068\">")
 endif ()
 
 
