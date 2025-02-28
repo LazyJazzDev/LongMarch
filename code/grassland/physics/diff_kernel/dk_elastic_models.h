@@ -1,6 +1,6 @@
 #pragma once
-#include "grassland/physics/basic_functions.h"
-#include "grassland/physics/fem_elements.h"
+#include "grassland/physics/diff_kernel/dk_basics.h"
+#include "grassland/physics/diff_kernel/dk_fem_elements.h"
 
 namespace grassland {
 template <typename Real>
@@ -13,9 +13,11 @@ struct ElasticNeoHookean {
 
   LM_DEVICE_FUNC OutputType operator()(const InputType &F) const;
 
-  LM_DEVICE_FUNC Eigen::Matrix<Real, OutputType::SizeAtCompileTime, InputType::SizeAtCompileTime> Jacobian(const InputType &F) const;
+  LM_DEVICE_FUNC Eigen::Matrix<Real, OutputType::SizeAtCompileTime, InputType::SizeAtCompileTime> Jacobian(
+      const InputType &F) const;
 
-  LM_DEVICE_FUNC HessianTensor<Real, OutputType::SizeAtCompileTime, InputType::SizeAtCompileTime> Hessian(const InputType &F) const;
+  LM_DEVICE_FUNC HessianTensor<Real, OutputType::SizeAtCompileTime, InputType::SizeAtCompileTime> Hessian(
+      const InputType &F) const;
 
   Real mu{1.0};
   Real lambda{1.0};
@@ -31,9 +33,11 @@ struct ElasticNeoHookeanSimple {
 
   LM_DEVICE_FUNC OutputType operator()(const InputType &F) const;
 
-  LM_DEVICE_FUNC Eigen::Matrix<Real, OutputType::SizeAtCompileTime, InputType::SizeAtCompileTime> Jacobian(const InputType &F) const;
+  LM_DEVICE_FUNC Eigen::Matrix<Real, OutputType::SizeAtCompileTime, InputType::SizeAtCompileTime> Jacobian(
+      const InputType &F) const;
 
-  LM_DEVICE_FUNC HessianTensor<Real, OutputType::SizeAtCompileTime, InputType::SizeAtCompileTime> Hessian(const InputType &F) const;
+  LM_DEVICE_FUNC HessianTensor<Real, OutputType::SizeAtCompileTime, InputType::SizeAtCompileTime> Hessian(
+      const InputType &F) const;
 
   Real mu{1.0};
   Real lambda{1.0};
@@ -49,9 +53,11 @@ struct ElasticNeoHookeanF3x2 {
 
   LM_DEVICE_FUNC OutputType operator()(const InputType &F) const;
 
-  LM_DEVICE_FUNC Eigen::Matrix<Real, OutputType::SizeAtCompileTime, InputType::SizeAtCompileTime> Jacobian(const InputType &F) const;
+  LM_DEVICE_FUNC Eigen::Matrix<Real, OutputType::SizeAtCompileTime, InputType::SizeAtCompileTime> Jacobian(
+      const InputType &F) const;
 
-  LM_DEVICE_FUNC HessianTensor<Real, OutputType::SizeAtCompileTime, InputType::SizeAtCompileTime> Hessian(const InputType &F) const;
+  LM_DEVICE_FUNC HessianTensor<Real, OutputType::SizeAtCompileTime, InputType::SizeAtCompileTime> Hessian(
+      const InputType &F) const;
 
   Real mu{1.0};
   Real lambda{1.0};
@@ -67,9 +73,11 @@ struct ElasticNeoHookeanSimpleF3x2 {
 
   LM_DEVICE_FUNC OutputType operator()(const InputType &F) const;
 
-  LM_DEVICE_FUNC Eigen::Matrix<Real, OutputType::SizeAtCompileTime, InputType::SizeAtCompileTime> Jacobian(const InputType &F) const;
+  LM_DEVICE_FUNC Eigen::Matrix<Real, OutputType::SizeAtCompileTime, InputType::SizeAtCompileTime> Jacobian(
+      const InputType &F) const;
 
-  LM_DEVICE_FUNC HessianTensor<Real, OutputType::SizeAtCompileTime, InputType::SizeAtCompileTime> Hessian(const InputType &F) const;
+  LM_DEVICE_FUNC HessianTensor<Real, OutputType::SizeAtCompileTime, InputType::SizeAtCompileTime> Hessian(
+      const InputType &F) const;
 
   Real mu{1.0};
   Real lambda{1.0};
@@ -85,9 +93,11 @@ struct ElasticNeoHookeanTetrahedron {
 
   LM_DEVICE_FUNC OutputType operator()(const InputType &V) const;
 
-  LM_DEVICE_FUNC Eigen::Matrix<Real, OutputType::SizeAtCompileTime, InputType::SizeAtCompileTime> Jacobian(const InputType &V) const;
+  LM_DEVICE_FUNC Eigen::Matrix<Real, OutputType::SizeAtCompileTime, InputType::SizeAtCompileTime> Jacobian(
+      const InputType &V) const;
 
-  LM_DEVICE_FUNC HessianTensor<Real, OutputType::SizeAtCompileTime, InputType::SizeAtCompileTime> Hessian(const InputType &V) const;
+  LM_DEVICE_FUNC HessianTensor<Real, OutputType::SizeAtCompileTime, InputType::SizeAtCompileTime> Hessian(
+      const InputType &V) const;
 
   LM_DEVICE_FUNC Eigen::Matrix3<Real> SubHessian(const InputType &V, int dim) const;
 
@@ -106,9 +116,11 @@ struct ElasticNeoHookeanSimpleTetrahedron {
 
   LM_DEVICE_FUNC OutputType operator()(const InputType &V) const;
 
-  LM_DEVICE_FUNC Eigen::Matrix<Real, OutputType::SizeAtCompileTime, InputType::SizeAtCompileTime> Jacobian(const InputType &V) const;
+  LM_DEVICE_FUNC Eigen::Matrix<Real, OutputType::SizeAtCompileTime, InputType::SizeAtCompileTime> Jacobian(
+      const InputType &V) const;
 
-  LM_DEVICE_FUNC HessianTensor<Real, OutputType::SizeAtCompileTime, InputType::SizeAtCompileTime> Hessian(const InputType &V) const;
+  LM_DEVICE_FUNC HessianTensor<Real, OutputType::SizeAtCompileTime, InputType::SizeAtCompileTime> Hessian(
+      const InputType &V) const;
 
   LM_DEVICE_FUNC Eigen::Matrix3<Real> SubHessian(const InputType &V, int dim) const;
 
@@ -127,9 +139,11 @@ struct ElasticNeoHookeanTriangle {
 
   LM_DEVICE_FUNC OutputType operator()(const InputType &V) const;
 
-  LM_DEVICE_FUNC Eigen::Matrix<Real, OutputType::SizeAtCompileTime, InputType::SizeAtCompileTime> Jacobian(const InputType &V) const;
+  LM_DEVICE_FUNC Eigen::Matrix<Real, OutputType::SizeAtCompileTime, InputType::SizeAtCompileTime> Jacobian(
+      const InputType &V) const;
 
-  LM_DEVICE_FUNC HessianTensor<Real, OutputType::SizeAtCompileTime, InputType::SizeAtCompileTime> Hessian(const InputType &V) const;
+  LM_DEVICE_FUNC HessianTensor<Real, OutputType::SizeAtCompileTime, InputType::SizeAtCompileTime> Hessian(
+      const InputType &V) const;
 
   Real mu{1.0};
   Real lambda{1.0};
@@ -146,9 +160,11 @@ struct ElasticNeoHookeanSimpleTriangle {
 
   LM_DEVICE_FUNC OutputType operator()(const InputType &V) const;
 
-  LM_DEVICE_FUNC Eigen::Matrix<Real, OutputType::SizeAtCompileTime, InputType::SizeAtCompileTime> Jacobian(const InputType &V) const;
+  LM_DEVICE_FUNC Eigen::Matrix<Real, OutputType::SizeAtCompileTime, InputType::SizeAtCompileTime> Jacobian(
+      const InputType &V) const;
 
-  LM_DEVICE_FUNC HessianTensor<Real, OutputType::SizeAtCompileTime, InputType::SizeAtCompileTime> Hessian(const InputType &V) const;
+  LM_DEVICE_FUNC HessianTensor<Real, OutputType::SizeAtCompileTime, InputType::SizeAtCompileTime> Hessian(
+      const InputType &V) const;
 
   Real mu{1.0};
   Real lambda{1.0};

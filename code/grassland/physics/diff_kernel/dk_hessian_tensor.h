@@ -70,8 +70,7 @@ struct HessianTensor {
     return new_H;
   }
 
-  LM_DEVICE_FUNC friend HessianTensor operator*(Real a,
-                                                const HessianTensor &H) {
+  LM_DEVICE_FUNC friend HessianTensor operator*(Real a, const HessianTensor &H) {
     return H * a;
   }
 

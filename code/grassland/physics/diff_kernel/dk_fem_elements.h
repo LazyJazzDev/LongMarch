@@ -1,5 +1,5 @@
 #pragma once
-#include "grassland/physics/basic_functions.h"
+#include "grassland/physics/diff_kernel/dk_basics.h"
 
 namespace grassland {
 
@@ -21,12 +21,9 @@ struct FEMTetrahedronDeformationGradient {
     return Ds * Dm.inverse();
   }
 
-  LM_DEVICE_FUNC Eigen::
-      Matrix<Real, OutputType::SizeAtCompileTime, InputType::SizeAtCompileTime>
-      Jacobian(const InputType &) const {
-    Eigen::Matrix<Real, OutputType::SizeAtCompileTime,
-                  InputType::SizeAtCompileTime>
-        J;
+  LM_DEVICE_FUNC Eigen::Matrix<Real, OutputType::SizeAtCompileTime, InputType::SizeAtCompileTime> Jacobian(
+      const InputType &) const {
+    Eigen::Matrix<Real, OutputType::SizeAtCompileTime, InputType::SizeAtCompileTime> J;
     J.setZero();
     for (int i = 0; i < 3; i++) {
       J(i, i) = -1;
@@ -73,13 +70,9 @@ struct FEMTetrahedronDeformationGradient {
     return Dm_inv_t_jacobian * J;
   }
 
-  LM_DEVICE_FUNC HessianTensor<Real,
-                               OutputType::SizeAtCompileTime,
-                               InputType::SizeAtCompileTime>
-  Hessian(const InputType &) const {
-    HessianTensor<Real, OutputType::SizeAtCompileTime,
-                  InputType::SizeAtCompileTime>
-        H;
+  LM_DEVICE_FUNC HessianTensor<Real, OutputType::SizeAtCompileTime, InputType::SizeAtCompileTime> Hessian(
+      const InputType &) const {
+    HessianTensor<Real, OutputType::SizeAtCompileTime, InputType::SizeAtCompileTime> H;
     return H;
   }
 
@@ -103,12 +96,9 @@ struct FEMDeformationGradient3x2To3x3 {
     return F;
   }
 
-  LM_DEVICE_FUNC Eigen::
-      Matrix<Real, OutputType::SizeAtCompileTime, InputType::SizeAtCompileTime>
-      Jacobian(const InputType &F3x2) const {
-    Eigen::Matrix<Real, OutputType::SizeAtCompileTime,
-                  InputType::SizeAtCompileTime>
-        J;
+  LM_DEVICE_FUNC Eigen::Matrix<Real, OutputType::SizeAtCompileTime, InputType::SizeAtCompileTime> Jacobian(
+      const InputType &F3x2) const {
+    Eigen::Matrix<Real, OutputType::SizeAtCompileTime, InputType::SizeAtCompileTime> J;
     Cross3<Real> cross3;
     J.setZero();
     for (int i = 0; i < 6; i++) {
@@ -118,13 +108,9 @@ struct FEMDeformationGradient3x2To3x3 {
     return J;
   }
 
-  LM_DEVICE_FUNC HessianTensor<Real,
-                               OutputType::SizeAtCompileTime,
-                               InputType::SizeAtCompileTime>
-  Hessian(const InputType &F3x2) const {
-    HessianTensor<Real, OutputType::SizeAtCompileTime,
-                  InputType::SizeAtCompileTime>
-        H;
+  LM_DEVICE_FUNC HessianTensor<Real, OutputType::SizeAtCompileTime, InputType::SizeAtCompileTime> Hessian(
+      const InputType &F3x2) const {
+    HessianTensor<Real, OutputType::SizeAtCompileTime, InputType::SizeAtCompileTime> H;
     auto H_cross3 = Cross3<Real>().Hessian(F3x2);
     H.m[6] = H_cross3.m[0];
     H.m[7] = H_cross3.m[1];
@@ -150,12 +136,9 @@ struct FEMTriangleDeformationGradient3x2 {
     return Ds * Dm.inverse();
   }
 
-  LM_DEVICE_FUNC Eigen::
-      Matrix<Real, OutputType::SizeAtCompileTime, InputType::SizeAtCompileTime>
-      Jacobian(const InputType &) const {
-    Eigen::Matrix<Real, OutputType::SizeAtCompileTime,
-                  InputType::SizeAtCompileTime>
-        J;
+  LM_DEVICE_FUNC Eigen::Matrix<Real, OutputType::SizeAtCompileTime, InputType::SizeAtCompileTime> Jacobian(
+      const InputType &) const {
+    Eigen::Matrix<Real, OutputType::SizeAtCompileTime, InputType::SizeAtCompileTime> J;
     J.setZero();
     for (int i = 0; i < 3; i++) {
       J(i, i) = -1;
@@ -188,13 +171,9 @@ struct FEMTriangleDeformationGradient3x2 {
     return Dm_inv_t_jacobian * J;
   }
 
-  LM_DEVICE_FUNC HessianTensor<Real,
-                               OutputType::SizeAtCompileTime,
-                               InputType::SizeAtCompileTime>
-  Hessian(const InputType &) const {
-    HessianTensor<Real, OutputType::SizeAtCompileTime,
-                  InputType::SizeAtCompileTime>
-        H;
+  LM_DEVICE_FUNC HessianTensor<Real, OutputType::SizeAtCompileTime, InputType::SizeAtCompileTime> Hessian(
+      const InputType &) const {
+    HessianTensor<Real, OutputType::SizeAtCompileTime, InputType::SizeAtCompileTime> H;
     return H;
   }
 
@@ -217,18 +196,15 @@ struct FEMTriangleDeformationGradient3x3 {
     return F3x2_to_F3x3(F3x2(V));
   }
 
-  LM_DEVICE_FUNC Eigen::
-      Matrix<Real, OutputType::SizeAtCompileTime, InputType::SizeAtCompileTime>
-      Jacobian(const InputType &V) const {
+  LM_DEVICE_FUNC Eigen::Matrix<Real, OutputType::SizeAtCompileTime, InputType::SizeAtCompileTime> Jacobian(
+      const InputType &V) const {
     FEMTriangleDeformationGradient3x2<Real> F3x2{Dm};
     FEMDeformationGradient3x2To3x3<Real> F3x2_to_F3x3;
     return F3x2_to_F3x3.Jacobian(F3x2(V)) * F3x2.Jacobian(V);
   }
 
-  LM_DEVICE_FUNC HessianTensor<Real,
-                               OutputType::SizeAtCompileTime,
-                               InputType::SizeAtCompileTime>
-  Hessian(const InputType &V) const {
+  LM_DEVICE_FUNC HessianTensor<Real, OutputType::SizeAtCompileTime, InputType::SizeAtCompileTime> Hessian(
+      const InputType &V) const {
     FEMTriangleDeformationGradient3x2<Real> F3x2{Dm};
     FEMDeformationGradient3x2To3x3<Real> F3x2_to_F3x3;
     return F3x2_to_F3x3.Hessian(F3x2(V)) * F3x2.Jacobian(V);

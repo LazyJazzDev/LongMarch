@@ -1,4 +1,3 @@
-#pragma once
 #include "grassland/physics/diff_kernel/diff_kernel.h"
 
 namespace grassland {}
