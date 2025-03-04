@@ -36,8 +36,8 @@ void BVHHost::Print() const {
     const BVHNode &node = nodes_[i];
     printf("Node %zd: instance_index = %d, lch = %d, rch = %d, next_node_on_failure = %d\n", i, node.instance_index,
            node.lch, node.rch, node.next_node_on_failure);
-    printf("  AABB: lower = {%f %f %f}, upper = {%f %f %f}\n", node.aabb.lower[0], node.aabb.lower[1],
-           node.aabb.lower[2], node.aabb.upper[0], node.aabb.upper[1], node.aabb.upper[2]);
+    printf("  AABB: lower = {%f %f %f}, upper = {%f %f %f}\n", node.aabb.lower_bound[0], node.aabb.lower_bound[1],
+           node.aabb.lower_bound[2], node.aabb.upper_bound[0], node.aabb.upper_bound[1], node.aabb.upper_bound[2]);
   }
 }
 
@@ -50,7 +50,7 @@ int BVHHostBuilder::Build(std::pair<AABB, int> *build_contents, int num_contents
   } else {
     std::sort(build_contents, build_contents + num_contents,
               [cut_dim](const std::pair<AABB, int> &a, const std::pair<AABB, int> &b) {
-                return a.first.lower[cut_dim] < b.first.lower[cut_dim];
+                return a.first.lower_bound[cut_dim] < b.first.lower_bound[cut_dim];
               });
     int mid = num_contents / 2;
     int rch = Build(build_contents + mid, num_contents - mid, next_dim, failure_next_node);

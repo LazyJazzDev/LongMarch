@@ -6,7 +6,7 @@ namespace grassland {
 
 template <typename Real>
 LM_DEVICE_FUNC bool PointSDF<Real>::ValidInput(const InputType &v) const {
-  return (v - position).norm() > algebra::Eps<Real>() * 100;
+  return (v - position).norm() > Eps<Real>() * 100;
 }
 
 template <typename Real>
@@ -32,7 +32,7 @@ template class PointSDF<double>;
 
 template <typename Real>
 LM_DEVICE_FUNC bool SphereSDF<Real>::ValidInput(const InputType &v) const {
-  return (v - center).norm() > algebra::Eps<Real>() * 100;
+  return (v - center).norm() > Eps<Real>() * 100;
 }
 
 template <typename Real>
@@ -58,7 +58,7 @@ template class SphereSDF<double>;
 
 template <typename Real>
 LM_DEVICE_FUNC bool SegmentSDF<Real>::ValidInput(const InputType &v) const {
-  return operator()(v).value() > algebra::Eps<Real>() * 100;
+  return operator()(v).value() > Eps<Real>() * 100;
 }
 
 template <typename Real>
@@ -100,7 +100,7 @@ template class SegmentSDF<double>;
 
 template <typename Real>
 LM_DEVICE_FUNC bool CapsuleSDF<Real>::ValidInput(const InputType &v) const {
-  return SegmentSDF<Real>{A, B}(v).value() > algebra::Eps<Real>() * 100;
+  return SegmentSDF<Real>{A, B}(v).value() > Eps<Real>() * 100;
 }
 
 template <typename Real>
@@ -204,7 +204,7 @@ LM_DEVICE_FUNC HessianTensor<Real, 1, 3> CubeSDF<Real>::Hessian(const InputType 
   }
   v_diff = v_diff - p;
   Real v_diff_norm = v_diff.norm();
-  if (v_diff_norm > algebra::Eps<Real>()) {
+  if (v_diff_norm > Eps<Real>()) {
     v_diff = v_diff / v_diff_norm;
     H.m[0] = (H.m[0] - v_diff * v_diff.transpose()) / v_diff_norm;
     return H;

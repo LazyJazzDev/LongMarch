@@ -7,7 +7,7 @@ LM_DEVICE_FUNC void EigenDecomp(const Eigen::Matrix2<Real> &A, Eigen::Matrix2<Re
   Real b = A(0, 1);
   Real d = A(1, 1);
 
-  if (fabs(b) < algebra::Eps<Real>()) {
+  if (fabs(b) < Eps<Real>()) {
     D = A;
     G.setIdentity();
     return;

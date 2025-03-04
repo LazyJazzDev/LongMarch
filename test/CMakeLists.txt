@@ -19,10 +19,4 @@ endforeach()
 
 target_link_libraries(test_main PRIVATE LongMarch GTest::gtest GTest::gtest_main)
 
-
 file(GLOB_RECURSE SOURCES "*.cpp")
-
-foreach (source_file ${SOURCES})
-    get_source_file_property(IS_CUDA_SOURCE ${source_file} LANGUAGE)
-    message(STATUS "source_file : ${source_file} IS_CUDA_SOURCE : ${IS_CUDA_SOURCE}")
-endforeach ()

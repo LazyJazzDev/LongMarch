@@ -1,5 +1,5 @@
 #pragma once
-#include "grassland/algebra/algebra.h"
+#include "grassland/math/math.h"
 #include "grassland/physics/diff_kernel/dk_hessian_tensor.h"
 #include "grassland/physics/physics_util.h"
 
@@ -156,7 +156,7 @@ struct VecLength {
   typedef Eigen::Matrix<Real, 1, 1> OutputType;
 
   LM_DEVICE_FUNC bool ValidInput(const InputType &v) const {
-    return v.norm() > algebra::Eps<Real>() * 100;
+    return v.norm() > Eps<Real>() * 100;
   }
 
   LM_DEVICE_FUNC OutputType operator()(const InputType &v) const {
@@ -184,7 +184,7 @@ struct VecNormalized {
   typedef Eigen::Vector<Real, dim> OutputType;
 
   LM_DEVICE_FUNC bool ValidInput(const InputType &v) const {
-    return v.norm() > algebra::Eps<Real>() * 100;
+    return v.norm() > Eps<Real>() * 100;
   }
 
   LM_DEVICE_FUNC OutputType operator()(const InputType &v) const {
@@ -315,7 +315,7 @@ struct Atan2 {
   typedef Eigen::Matrix<Real, 1, 1> OutputType;
 
   LM_DEVICE_FUNC bool ValidInput(const InputType &v) const {
-    return v.norm() > algebra::Eps<Real>() * 100;
+    return v.norm() > Eps<Real>() * 100;
   }
 
   LM_DEVICE_FUNC OutputType operator()(const InputType &v) const {
@@ -349,7 +349,7 @@ struct CrossNorm {
   typedef Eigen::Matrix<Real, 1, 1> OutputType;
 
   LM_DEVICE_FUNC bool ValidInput(const InputType &F) const {
-    return F.col(0).cross(F.col(1)).norm() > algebra::Eps<Real>() * 100;
+    return F.col(0).cross(F.col(1)).norm() > Eps<Real>() * 100;
   }
 
   LM_DEVICE_FUNC OutputType operator()(const InputType &F) const {

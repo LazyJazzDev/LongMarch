@@ -1,5 +1,5 @@
 #include "cmath"
-#include "grassland/physics/dihedral_angle.h"
+#include "grassland/physics/physics.h"
 #include "iostream"
 #include "thrust/device_vector.h"
 #include "thrust/host_vector.h"

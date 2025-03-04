@@ -1,9 +1,7 @@
 #pragma once
-#include "grassland/algebra/algebra.h"
 #include "grassland/bvh/bvh.h"
-#include "grassland/data_structure/data_structure.h"
-#include "grassland/geometry/geometry.h"
 #include "grassland/graphics/graphics.h"
+#include "grassland/math/math.h"
 #include "grassland/physics/physics.h"
 #include "grassland/util/util.h"
 #include "grassland/vulkan/vulkan.h"

@@ -3,8 +3,7 @@
 namespace grassland {
 template <typename Real>
 LM_DEVICE_FUNC bool DihedralAngleAssistEdgesToNormalsAxis<Real>::ValidInput(const InputType &A) const {
-  return A.col(0).cross(A.col(1)).norm() > algebra::Eps<Real>() * 100 &&
-         A.col(1).cross(A.col(2)).norm() > algebra::Eps<Real>() * 100;
+  return A.col(0).cross(A.col(1)).norm() > Eps<Real>() * 100 && A.col(1).cross(A.col(2)).norm() > Eps<Real>() * 100;
 }
 
 template <typename Real>

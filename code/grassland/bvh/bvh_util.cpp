@@ -6,8 +6,8 @@ namespace grassland {
 
 AABB Join(const AABB &aabb0, const AABB &aabb1) {
   AABB result;
-  result.lower = aabb0.lower.cwiseMin(aabb1.lower);
-  result.upper = aabb0.upper.cwiseMax(aabb1.upper);
+  result.lower_bound = aabb0.lower_bound.cwiseMin(aabb1.lower_bound);
+  result.upper_bound = aabb0.upper_bound.cwiseMax(aabb1.upper_bound);
   return result;
 }
 

@@ -1,4 +1,5 @@
 #include "device_clock.cuh"
+#include "gtest/gtest.h"
 #include "long_march.h"
 #include "thrust/device_vector.h"
 
@@ -179,7 +180,7 @@ void BatchQueryDev(const grassland::BVHHost &bvh,
   thrust::copy(result_dev.begin(), result_dev.end(), result);
 }
 
-int main() {
+TEST(BVH, SphereSDF) {
   std::vector<Eigen::Vector3<float>> vertices;
   std::vector<uint32_t> indices;
   // vertices = {{-1.0, -1.0, -1.0}, {1.0, -1.0, -1.0}, {-1.0, 1.0, -1.0}, {1.0, 1.0, -1.0},
@@ -207,15 +208,6 @@ int main() {
       }
     }
   }
-
-  std::ofstream out("bvh_test.obj");
-  for (const auto &v : vertices) {
-    out << "v " << v.x() << " " << v.y() << " " << v.z() << std::endl;
-  }
-  for (size_t i = 0; i < indices.size(); i += 3) {
-    out << "f " << indices[i] + 1 << " " << indices[i + 1] + 1 << " " << indices[i + 2] + 1 << std::endl;
-  }
-  out.close();
 
   std::vector<grassland::AABB> aabbs;
   std::vector<int> instance_indices;
@@ -260,10 +252,6 @@ int main() {
   std::cout << "CPU: " << std::chrono::duration_cast<std::chrono::milliseconds>(tp1 - tp).count() << "ms" << std::endl;
 
   for (int i = 0; i < queries.size(); i++) {
-    if (fabs(results[i].sdf - results_dev[i].sdf) > 1e-4) {
-      std::cout << "Error: " << i << " " << results[i].sdf << " " << results_dev[i].sdf << std::endl;
-    }
+    EXPECT_NEAR(results[i].sdf, results_dev[i].sdf, 1e-4);
   }
-
-  return 0;
 }

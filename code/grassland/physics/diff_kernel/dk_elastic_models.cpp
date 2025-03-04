@@ -88,7 +88,7 @@ template class ElasticNeoHookeanSimple<double>;
 
 template <typename Real>
 LM_DEVICE_FUNC bool ElasticNeoHookeanF3x2<Real>::ValidInput(const InputType &F) const {
-  return F.col(0).cross(F.col(1)).norm() > algebra::Eps<Real>() * 100;
+  return F.col(0).cross(F.col(1)).norm() > Eps<Real>() * 100;
 }
 
 template <typename Real>
@@ -138,7 +138,7 @@ template class ElasticNeoHookeanF3x2<double>;
 
 template <typename Real>
 LM_DEVICE_FUNC bool ElasticNeoHookeanSimpleF3x2<Real>::ValidInput(const InputType &F) const {
-  return F.col(0).cross(F.col(1)).norm() > algebra::Eps<Real>() * 100;
+  return F.col(0).cross(F.col(1)).norm() > Eps<Real>() * 100;
 }
 
 template <typename Real>

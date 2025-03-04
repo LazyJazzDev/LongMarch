@@ -2,7 +2,7 @@
 #include <Eigen/Eigen>
 #include <iostream>
 
-#include "grassland/algebra/algebra.h"
+#include "grassland/math/math.h"
 #include "grassland/util/util.h"
 
 namespace grassland {

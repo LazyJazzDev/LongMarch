@@ -1,14 +1,10 @@
 #pragma once
 #include <Eigen/Eigen>
 
+#include "grassland/math/math.h"
 #include "grassland/util/util.h"
 
 namespace grassland {
-
-struct AABB {
-  Eigen::Vector3<float> lower;
-  Eigen::Vector3<float> upper;
-};
 
 AABB Join(const AABB &aabb0, const AABB &aabb1);
 
