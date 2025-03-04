@@ -1,4 +1,4 @@
-#include "grassland/physics/diff_kernel/dk_svd.h"
+#include "grassland/math/math_svd.h"
 
 namespace grassland {
 template <typename Real>

@@ -1,5 +1,11 @@
 file(GLOB_RECURSE SOURCES "*.cpp" "*.h")
 
+if (LONGMARCH_CUDA_ENABLED)
+    foreach (source_file ${SOURCES})
+        set_source_files_properties(${source_file} PROPERTIES LANGUAGE CUDA)
+    endforeach ()
+endif ()
+
 add_library(${GRASSLAND_SUBLIB_NAME} ${SOURCES})
 
 list(APPEND GRASSLAND_LIBS ${GRASSLAND_SUBLIB_NAME})

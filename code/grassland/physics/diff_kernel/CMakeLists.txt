@@ -1,7 +1,6 @@
 file(GLOB SOURCES "*.cpp")
 
 if (LONGMARCH_CUDA_ENABLED)
-    message(STATUS "CUDA enabled, marking source files as CUDA source.")
     foreach (source_file ${SOURCES})
         set_source_files_properties(${source_file} PROPERTIES LANGUAGE CUDA)
     endforeach ()
