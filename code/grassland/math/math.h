@@ -6,6 +6,7 @@
 #include "grassland/math/math_polynomial.h"
 #include "grassland/math/math_ray.h"
 #include "grassland/math/math_spd_projection.h"
+#include "grassland/math/math_static_collision.h"
 #include "grassland/math/math_svd.h"
 #include "grassland/math/math_triangle.h"
 #include "grassland/math/math_util.h"
