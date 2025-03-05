@@ -1,5 +1,6 @@
 #pragma once
 #include "grassland/math/math_util.h"
+#include "math_aabb.h"
 
 namespace grassland {
 
@@ -78,5 +79,28 @@ LM_DEVICE_FUNC Real DistanceSegmentSegment(const Vector3<Real> &p0,
                                            const Vector3<Real> &p1,
                                            const Vector3<Real> &q0,
                                            const Vector3<Real> &q1);
+
+template <class Real>
+LM_DEVICE_FUNC Real DistancePointAABB(const Vector3<Real> &p,
+                                      const Vector3<Real> &lower_bound,
+                                      const Vector3<Real> &upper_bound);
+
+template <class Real>
+LM_DEVICE_FUNC Real DistancePointAABB(const Vector3<Real> &p, const AxisAlignedBoundingBox3<Real> &aabb);
+
+template <class Real>
+LM_DEVICE_FUNC Real AnyHitRayAABB(const Vector3<Real> &origin,
+                                  const Vector3<Real> &direction,
+                                  const Vector3<Real> &lower_bound,
+                                  const Vector3<Real> &upper_bound,
+                                  Real t_min = Eps<Real>(),
+                                  Real t_max = 1.0 / Eps<Real>());
+
+template <class Real>
+LM_DEVICE_FUNC Real AnyHitRayAABB(const Vector3<Real> &origin,
+                                  const Vector3<Real> &direction,
+                                  const AxisAlignedBoundingBox3<Real> &aabb,
+                                  Real t_min = Eps<Real>(),
+                                  Real t_max = 1.0 / Eps<Real>());
 
 }  // namespace grassland

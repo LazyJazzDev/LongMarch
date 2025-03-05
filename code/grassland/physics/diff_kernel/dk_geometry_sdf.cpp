@@ -193,12 +193,11 @@ LM_DEVICE_FUNC HessianTensor<Real, 1, 3> CubeSDF<Real>::Hessian(const InputType 
   Eigen::Vector3<Real> p = v_diff;
   H.m[0] = Eigen::Matrix3<Real>::Identity();
   for (int dim = 0; dim < 3; dim++) {
-    if (v(dim) < -size) {
+    if (p(dim) < -size) {
       p(dim) = -size;
-    } else if (v(dim) > size) {
+    } else if (p(dim) > size) {
       p(dim) = size;
     } else {
-      p(dim) = v_diff(dim);
       H.m[0](dim, dim) = 0;
     }
   }

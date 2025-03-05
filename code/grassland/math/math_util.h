@@ -38,4 +38,35 @@ LM_DEVICE_FUNC int Sign(Scalar x) {
     return 0;
   }
 }
+
+template <typename Scalar>
+LM_DEVICE_FUNC Scalar PI() {
+  return 3.14159265358979323846264338327950288419716939937510;
+}
+
+struct VertexBufferView {
+  const void *data;
+  size_t stride;
+  VertexBufferView() : data(nullptr), stride(0) {
+  }
+  VertexBufferView(const void *data_, size_t stride_, size_t offset_ = 0)
+      : data(static_cast<const char *>(data_) + offset_), stride(stride_) {
+  }
+
+  template <typename T>
+  VertexBufferView(const T *data_, size_t offset = 0) : data(data_), stride(sizeof(T)) {
+    data = static_cast<const char *>(data) + offset;
+  }
+
+  template <typename T>
+  LM_DEVICE_FUNC const T &Get(size_t index, size_t offset = 0) const {
+    return *reinterpret_cast<const T *>(static_cast<const char *>(data) + stride * index + offset);
+  }
+
+  template <typename T>
+  LM_DEVICE_FUNC T &At(size_t index, size_t offset = 0) {
+    return *reinterpret_cast<T *>(static_cast<char *>(const_cast<void *>(data)) + stride * index + offset);
+  }
+};
+
 }  // namespace grassland

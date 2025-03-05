@@ -356,4 +356,100 @@ template LM_DEVICE_FUNC double DistanceSegmentSegment(const Vector3<double> &p0,
                                                       const Vector3<double> &q0,
                                                       const Vector3<double> &q1);
 
+template <class Real>
+LM_DEVICE_FUNC Real DistancePointAABB(const Vector3<Real> &p,
+                                      const Vector3<Real> &lower_bound,
+                                      const Vector3<Real> &upper_bound) {
+  Vector3<Real> diff = Vector3<Real>::Zero();
+  for (int i = 0; i < 3; i++) {
+    if (p[i] < lower_bound[i]) {
+      diff[i] = p[i] - lower_bound[i];
+    } else if (p[i] > upper_bound[i]) {
+      diff[i] = p[i] - upper_bound[i];
+    }
+  }
+  return diff.norm();
+}
+
+template LM_DEVICE_FUNC float DistancePointAABB(const Vector3<float> &p,
+                                                const Vector3<float> &lower_bound,
+                                                const Vector3<float> &upper_bound);
+template LM_DEVICE_FUNC double DistancePointAABB(const Vector3<double> &p,
+                                                 const Vector3<double> &lower_bound,
+                                                 const Vector3<double> &upper_bound);
+
+template <class Real>
+LM_DEVICE_FUNC Real DistancePointAABB(const Vector3<Real> &p, const AxisAlignedBoundingBox3<Real> &aabb) {
+  return DistancePointAABB(p, aabb.lower_bound, aabb.upper_bound);
+}
+
+template LM_DEVICE_FUNC float DistancePointAABB(const Vector3<float> &p, const AxisAlignedBoundingBox3<float> &aabb);
+template LM_DEVICE_FUNC double DistancePointAABB(const Vector3<double> &p, const AxisAlignedBoundingBox3<double> &aabb);
+
+template <class Real>
+LM_DEVICE_FUNC Real AnyHitRayAABB(const Vector3<Real> &origin,
+                                  const Vector3<Real> &direction,
+                                  const Vector3<Real> &lower_bound,
+                                  const Vector3<Real> &upper_bound,
+                                  Real t_min,
+                                  Real t_max) {
+  for (int dim = 0; dim < 3; dim++) {
+    Real lower_diff = lower_bound[dim] - origin[dim];
+    Real upper_diff = upper_bound[dim] - origin[dim];
+    if (fabs(direction[dim]) < Eps<Real>() * Eps<Real>()) {
+      if (lower_diff * upper_diff > 0) {
+        return -1;
+      }
+    } else {
+      Real inv_dir = 1 / direction[dim];
+      lower_diff *= inv_dir;
+      upper_diff *= inv_dir;
+      if (inv_dir < 0) {
+        t_min = fmax(t_min, upper_diff);
+        t_max = fmin(t_max, lower_diff);
+      } else {
+        t_min = fmax(t_min, lower_diff);
+        t_max = fmin(t_max, upper_diff);
+      }
+    }
+  }
+  if (t_min > t_max) {
+    return -1;
+  }
+  return t_min;
+}
+
+template LM_DEVICE_FUNC float AnyHitRayAABB(const Vector3<float> &origin,
+                                            const Vector3<float> &direction,
+                                            const Vector3<float> &lower_bound,
+                                            const Vector3<float> &upper_bound,
+                                            float t_min,
+                                            float t_max);
+template LM_DEVICE_FUNC double AnyHitRayAABB(const Vector3<double> &origin,
+                                             const Vector3<double> &direction,
+                                             const Vector3<double> &lower_bound,
+                                             const Vector3<double> &upper_bound,
+                                             double t_min,
+                                             double t_max);
+
+template <class Real>
+LM_DEVICE_FUNC Real AnyHitRayAABB(const Vector3<Real> &origin,
+                                  const Vector3<Real> &direction,
+                                  const AxisAlignedBoundingBox3<Real> &aabb,
+                                  Real t_min,
+                                  Real t_max) {
+  return AnyHitRayAABB(origin, direction, aabb.lower_bound, aabb.upper_bound, t_min, t_max);
+}
+
+template LM_DEVICE_FUNC float AnyHitRayAABB(const Vector3<float> &origin,
+                                            const Vector3<float> &direction,
+                                            const AxisAlignedBoundingBox3<float> &aabb,
+                                            float t_min,
+                                            float t_max);
+template LM_DEVICE_FUNC double AnyHitRayAABB(const Vector3<double> &origin,
+                                             const Vector3<double> &direction,
+                                             const AxisAlignedBoundingBox3<double> &aabb,
+                                             double t_min,
+                                             double t_max);
+
 }  // namespace grassland
