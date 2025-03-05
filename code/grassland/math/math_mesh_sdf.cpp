@@ -16,6 +16,8 @@ void MeshSDFRef::SDF(const Vector3<float> &position,
                      Matrix3<float> *hessian) const {
   float u, v;
   float local_sdf = std::numeric_limits<float>::max();
+  Vector3<float> local_jacobian = Vector3<float>::Zero();
+  Matrix3<float> local_hessian = Matrix3<float>::Zero();
   for (int i = 0; i < num_triangles; i++) {
     int a = triangle_indices[i * 3 + 0];
     int b = triangle_indices[i * 3 + 1];
@@ -32,8 +34,7 @@ void MeshSDFRef::SDF(const Vector3<float> &position,
         }
         local_sdf = t;
         n.normalize();
-        *jacobian = n;
-        *hessian = Matrix3<float>::Zero();
+        local_jacobian = n;
       }
     }
   }
@@ -49,12 +50,12 @@ void MeshSDFRef::SDF(const Vector3<float> &position,
         line_sdf.origin = pa;
         line_sdf.direction = (pb - pa).normalized();
         local_sdf = t;
-        *jacobian = line_sdf.Jacobian(position);
-        *hessian = line_sdf.Hessian(position).m[0];
+        local_jacobian = line_sdf.Jacobian(position);
+        local_hessian = line_sdf.Hessian(position).m[0];
         if (edge_inside[i]) {
           local_sdf = -local_sdf;
-          *jacobian = -*jacobian;
-          *hessian = -*hessian;
+          local_jacobian = -local_jacobian;
+          local_hessian = -local_hessian;
         }
       }
     }
@@ -65,16 +66,22 @@ void MeshSDFRef::SDF(const Vector3<float> &position,
     float t = point_sdf(position).value();
     if (t < fabs(local_sdf)) {
       local_sdf = t;
-      *jacobian = point_sdf.Jacobian(position);
-      *hessian = point_sdf.Hessian(position).m[0];
+      local_jacobian = point_sdf.Jacobian(position);
+      local_hessian = point_sdf.Hessian(position).m[0];
       if (point_inside[i]) {
         local_sdf = -local_sdf;
-        *jacobian = -*jacobian;
-        *hessian = -*hessian;
+        local_jacobian = -local_jacobian;
+        local_hessian = -local_hessian;
       }
     }
   }
   *sdf = local_sdf;
+  if (jacobian) {
+    *jacobian = local_jacobian;
+  }
+  if (hessian) {
+    *hessian = local_hessian;
+  }
 }
 
 MeshSDF::MeshSDF(VertexBufferView vertex_buffer_view, size_t num_vertex, uint32_t *indices, size_t num_indices) {

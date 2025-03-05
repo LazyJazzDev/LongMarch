@@ -28,7 +28,13 @@ TEST(Math, MeshSDFCorrectness) {
     cube_sdf.center = t;
     cube_sdf.size = s;
     for (int test = 0; test < 100; test++) {
-      Eigen::Vector3<float> p = Eigen::Vector3<float>::Random() * 4.0 * s + t;
+      Eigen::Vector3<float> p;
+      Eigen::Vector3<float> dp;
+      do {
+        Eigen::Vector3<float>::Random() * 4.0 * s + t;
+        dp = p - t;
+      } while (fabs(dp[0] - dp[1]) < grassland::Eps<float>() || fabs(dp[1] - dp[2]) < grassland::Eps<float>() ||
+               fabs(dp[0] - dp[2]) < grassland::Eps<float>());
       // p << -2.09659, 5.56972, -0.757746;
       Eigen::Vector3<float> mesh_jacobian;
       Eigen::Matrix<float, 3, 3> mesh_hessian;
@@ -41,9 +47,12 @@ TEST(Math, MeshSDFCorrectness) {
       cube_jacobian = cube_sdf.Jacobian(p);
       cube_hessian = cube_sdf.Hessian(p).m[0];
       bool error = false;
-      EXPECT_NEAR(mesh_t, cube_t, 5e-4f), error = true;
-      EXPECT_NEAR((mesh_jacobian - cube_jacobian).norm(), 0, 5e-4f), error = true;
-      EXPECT_NEAR((mesh_hessian - cube_hessian).norm(), 0, 5e-4f), error = true;
+      EXPECT_NEAR(mesh_t, cube_t, 1e-4f), error = true;
+      EXPECT_NEAR((mesh_jacobian - cube_jacobian).norm() / fmax(mesh_jacobian.norm() * cube_jacobian.norm(), 1), 0,
+                  1e-4f),
+          error = true;
+      EXPECT_NEAR((mesh_hessian - cube_hessian).norm() / fmax(mesh_hessian.norm() * cube_hessian.norm(), 1), 0, 1e-4f),
+          error = true;
       if (error) {
         std::cout << "test: " << test << std::endl,
             std::cout << "mesh_t: " << mesh_t << " "
