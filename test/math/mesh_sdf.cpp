@@ -1,4 +1,7 @@
+
+#if defined(__CUDACC__)
 #include <thrust/host_vector.h>
+#endif
 
 #include "gtest/gtest.h"
 #include "long_march.h"

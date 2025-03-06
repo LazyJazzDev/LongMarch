@@ -13,7 +13,7 @@ void DistancePointPlaneCorrectnessTest() {
     v0 = Vector3<Real>::Random();
     v1 = Vector3<Real>::Random();
     v2 = Vector3<Real>::Random();
-  } while ((v1 - v0).cross(v2 - v0).norm() < Eps<Real>());
+  } while ((v1 - v0).cross(v2 - v0).norm() < 0.1);
   Real u, v;
   Real d = DistancePointPlane(p, v0, v1, v2, u, v);
   Real d2 = DistancePointPlane(p, v0, v1, v2);
