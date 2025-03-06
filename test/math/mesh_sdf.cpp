@@ -198,9 +198,9 @@ TEST(Math, MeshSDFDevice) {
                   << "sdf_dev: " << mesh_t_dev << std::endl;
         std::cout << "jacobian: " << mesh_jacobian.transpose() << std::endl
                   << "jacobian_dev: " << mesh_jacobian_dev.transpose() << std::endl;
-        std::cout << "hessiance: " << std::endl
+        std::cout << "hessian: " << std::endl
                   << mesh_hessian << std::endl
-                  << "hessiance_dev: " << std::endl
+                  << "hessian_dev: " << std::endl
                   << mesh_hessian_dev << std::endl;
       }
     }
