@@ -84,7 +84,7 @@ LM_DEVICE_FUNC void MeshSDFRef::SDF(const Vector3<float> &position,
   }
 }
 
-MeshSDF::MeshSDF(VertexBufferView vertex_buffer_view, size_t num_vertex, uint32_t *indices, size_t num_indices) {
+MeshSDF::MeshSDF(VertexBufferView vertex_buffer_view, size_t num_vertex, const uint32_t *indices, size_t num_indices) {
   x_.resize(num_vertex);
   triangle_indices_.resize(num_indices);
   std::map<std::pair<uint32_t, uint32_t>, uint32_t> map_third_vertex;

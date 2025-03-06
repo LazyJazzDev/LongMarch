@@ -31,9 +31,29 @@ struct MeshSDFRef {
 class MeshSDF {
  public:
   MeshSDF() = default;
-  MeshSDF(VertexBufferView vertex_buffer_view, size_t num_vertex, uint32_t *indices, size_t num_indices);
+  MeshSDF(VertexBufferView vertex_buffer_view, size_t num_vertex, const uint32_t *indices, size_t num_indices);
 
   operator MeshSDFRef() const;
+
+  const std::vector<Vector3<float>> &GetVertices() const {
+    return x_;
+  }
+
+  const std::vector<uint32_t> &GetTriangleIndices() const {
+    return triangle_indices_;
+  }
+
+  const std::vector<uint32_t> &GetEdgeIndices() const {
+    return edge_indices_;
+  }
+
+  const std::vector<uint8_t> &GetEdgeInside() const {
+    return edge_inside_;
+  }
+
+  const std::vector<uint8_t> &GetPointInside() const {
+    return point_inside_;
+  }
 
  private:
   friend class MeshSDFDevice;
