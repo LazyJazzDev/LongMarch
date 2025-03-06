@@ -1,6 +1,11 @@
 #pragma once
 #include "grassland/math/math_util.h"
 
+#if defined(__CUDACC__)
+#include <cuda_runtime.h>
+#include <thrust/device_vector.h>
+#endif
+
 namespace grassland {
 
 struct MeshSDFRef {
@@ -30,11 +35,28 @@ class MeshSDF {
   operator MeshSDFRef() const;
 
  private:
+  friend class MeshSDFDevice;
   std::vector<Vector3<float>> x_;
   std::vector<uint32_t> triangle_indices_;
   std::vector<uint32_t> edge_indices_;
   std::vector<uint8_t> edge_inside_;
   std::vector<uint8_t> point_inside_;
 };
+
+#if defined(__CUDACC__)
+class MeshSDFDevice {
+ public:
+  MeshSDFDevice(const MeshSDF &mesh_sdf);
+
+  operator MeshSDFRef() const;
+
+ private:
+  thrust::device_vector<Vector3<float>> x_;
+  thrust::device_vector<uint32_t> triangle_indices_;
+  thrust::device_vector<uint32_t> edge_indices_;
+  thrust::device_vector<uint8_t> edge_inside_;
+  thrust::device_vector<uint8_t> point_inside_;
+};
+#endif
 
 }  // namespace grassland

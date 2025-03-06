@@ -1,3 +1,5 @@
+#include <thrust/host_vector.h>
+
 #include "gtest/gtest.h"
 #include "long_march.h"
 
@@ -20,8 +22,7 @@ TEST(Math, MeshSDFCorrectness) {
   for (int task = 0; task < 10000; task++) {
     Eigen::Vector3<float> t = Eigen::Vector3<float>::Random();
     float s = Eigen::Matrix<float, 1, 1>::Random().value() + 1.1;
-    // s = 1.65211;
-    // t << -0.561205, 0.785272, 0.777642;
+
     mesh_ref.translation = t;
     mesh_ref.rotation = Eigen::Matrix<float, 3, 3>::Identity() * s;
     grassland::CubeSDF<float> cube_sdf;
@@ -31,11 +32,11 @@ TEST(Math, MeshSDFCorrectness) {
       Eigen::Vector3<float> p;
       Eigen::Vector3<float> dp;
       do {
-        Eigen::Vector3<float>::Random() * 4.0 * s + t;
-        dp = p - t;
+        p = Eigen::Vector3<float>::Random() * 4.0 * s + t;
+        dp = (p - t).cwiseAbs();
       } while (fabs(dp[0] - dp[1]) < grassland::Eps<float>() || fabs(dp[1] - dp[2]) < grassland::Eps<float>() ||
                fabs(dp[0] - dp[2]) < grassland::Eps<float>());
-      // p << -2.09659, 5.56972, -0.757746;
+
       Eigen::Vector3<float> mesh_jacobian;
       Eigen::Matrix<float, 3, 3> mesh_hessian;
       float mesh_t;
@@ -73,3 +74,136 @@ TEST(Math, MeshSDFCorrectness) {
     }
   }
 }
+
+#if defined(__CUDACC__)
+
+__global__ void MeshSDFDeviceKernel(grassland::MeshSDFRef mesh_sdf,
+                                    const Eigen::Vector4<float> *mesh_refs,
+                                    const Eigen::Vector3<float> *task_positions,
+                                    float *results_t,
+                                    Eigen::Vector3<float> *results_jacobian,
+                                    Eigen::Matrix3<float> *results_hessian) {
+  int task = blockIdx.x;
+  int test = threadIdx.x;
+  int idx = task * blockDim.x + test;
+
+  Eigen::Vector3<float> t = mesh_refs[task].head<3>();
+  float s = mesh_refs[task][3];
+  mesh_sdf.rotation = Eigen::Matrix<float, 3, 3>::Identity() * s;
+  mesh_sdf.translation = t;
+
+  Eigen::Vector3<float> position = task_positions[idx];
+  mesh_sdf.SDF(position, &results_t[idx], &results_jacobian[idx], &results_hessian[idx]);
+}
+
+TEST(Math, MeshSDFDevice) {
+  std::vector<Eigen::Vector3f> positions = {
+      {-1, -1, -1}, {1, -1, -1}, {1, 1, -1}, {-1, 1, -1}, {-1, -1, 1}, {1, -1, 1}, {1, 1, 1}, {-1, 1, 1},
+  };
+  std::vector<uint32_t> indices = {
+      0, 1, 2, 0, 2, 3, 1, 5, 6, 1, 6, 2, 5, 4, 7, 5, 7, 6, 4, 0, 3, 4, 3, 7, 3, 2, 6, 3, 6, 7, 0, 4, 5, 0, 5, 1,
+  };
+
+  for (size_t i = 0; i < indices.size(); i += 3) {
+    std::swap(indices[i], indices[i + 1]);
+  }
+
+  grassland::VertexBufferView vbv = {positions.data()};
+  grassland::MeshSDF mesh_sdf(vbv, positions.size(), indices.data(), indices.size());
+  grassland::MeshSDFDevice mesh_sdf_device = mesh_sdf;
+  grassland::MeshSDFRef mesh_ref = mesh_sdf;
+  grassland::MeshSDFRef mesh_ref_device = mesh_sdf_device;
+
+  std::vector<Eigen::Vector4<float>> mesh_refs;
+  thrust::device_vector<Eigen::Vector4<float>> mesh_refs_device;
+  std::vector<Eigen::Vector3<float>> task_positions;
+  thrust::device_vector<Eigen::Vector3<float>> task_positions_device;
+  thrust::device_vector<float> results_t;
+  thrust::device_vector<Eigen::Vector3<float>> results_jacobian;
+  thrust::device_vector<Eigen::Matrix<float, 3, 3>> results_hessian;
+  thrust::host_vector<float> results_t_host;
+  thrust::host_vector<Eigen::Vector3<float>> results_jacobian_host;
+  thrust::host_vector<Eigen::Matrix<float, 3, 3>> results_hessian_host;
+
+  const int num_task = 100000;
+  const int num_test = 100;
+  for (int task = 0; task < num_task; task++) {
+    Eigen::Vector3<float> t = Eigen::Vector3<float>::Random();
+    float s = Eigen::Matrix<float, 1, 1>::Random().value() + 1.1;
+
+    mesh_refs.push_back({t[0], t[1], t[2], s});
+
+    for (int test = 0; test < num_test; test++) {
+      Eigen::Vector3<float> p;
+      Eigen::Vector3<float> dp;
+      do {
+        p = Eigen::Vector3<float>::Random() * 4.0 * s + t;
+        dp = (p - t).cwiseAbs();
+      } while (fabs(dp[0] - dp[1]) < grassland::Eps<float>() || fabs(dp[1] - dp[2]) < grassland::Eps<float>() ||
+               fabs(dp[0] - dp[2]) < grassland::Eps<float>());
+      task_positions.push_back(p);
+    }
+  }
+
+  mesh_refs_device = mesh_refs;
+  task_positions_device = task_positions;
+  results_t.resize(task_positions.size());
+  results_jacobian.resize(task_positions.size());
+  results_hessian.resize(task_positions.size());
+
+  MeshSDFDeviceKernel<<<num_task, num_test>>>(mesh_ref_device, mesh_refs_device.data().get(),
+                                              task_positions_device.data().get(), results_t.data().get(),
+                                              results_jacobian.data().get(), results_hessian.data().get());
+
+  results_t_host = results_t;
+  results_jacobian_host = results_jacobian;
+  results_hessian_host = results_hessian;
+
+  for (int task = 0; task < num_task; task++) {
+    Eigen::Vector3<float> t = mesh_refs[task].head<3>();
+    float s = mesh_refs[task][3];
+
+    mesh_ref.rotation = Eigen::Matrix<float, 3, 3>::Identity() * s;
+    mesh_ref.translation = t;
+
+    for (int test = 0; test < num_test; test++) {
+      int idx = task * num_test + test;
+      Eigen::Vector3<float> p = task_positions[idx];
+      float mesh_t;
+      Eigen::Vector3<float> mesh_jacobian;
+      Eigen::Matrix3<float> mesh_hessian;
+
+      float mesh_t_dev;
+      Eigen::Vector3<float> mesh_jacobian_dev;
+      Eigen::Matrix3<float> mesh_hessian_dev;
+
+      mesh_ref.SDF(p, &mesh_t, &mesh_jacobian, &mesh_hessian);
+      mesh_t_dev = results_t_host[idx];
+      mesh_jacobian_dev = results_jacobian_host[idx];
+      mesh_hessian_dev = results_hessian_host[idx];
+
+      bool error = false;
+      EXPECT_NEAR(mesh_t, mesh_t_dev, 1e-4f), error = true;
+      EXPECT_NEAR((mesh_jacobian - mesh_jacobian_dev).norm() / fmax(mesh_jacobian.norm() * mesh_jacobian_dev.norm(), 1),
+                  0, 1e-4f),
+          error = true;
+      EXPECT_NEAR((mesh_hessian - mesh_hessian_dev).norm() / fmax(mesh_hessian.norm() * mesh_hessian_dev.norm(), 1), 0,
+                  1e-4f),
+          error = true;
+      if (error) {
+        std::cout << "p: " << p.transpose() << std::endl;
+        std::cout << "t: " << t.transpose() << std::endl << "s: " << s << std::endl;
+        std::cout << "p - t: " << (p - t).transpose() << std::endl;
+        std::cout << "sdf: " << mesh_t << " "
+                  << "sdf_dev: " << mesh_t_dev << std::endl;
+        std::cout << "jacobian: " << mesh_jacobian.transpose() << std::endl
+                  << "jacobian_dev: " << mesh_jacobian_dev.transpose() << std::endl;
+        std::cout << "hessiance: " << std::endl
+                  << mesh_hessian << std::endl
+                  << "hessiance_dev: " << std::endl
+                  << mesh_hessian_dev << std::endl;
+      }
+    }
+  }
+}
+#endif

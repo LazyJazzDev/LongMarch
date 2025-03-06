@@ -10,10 +10,10 @@ LM_DEVICE_FUNC Vector3<float> MeshSDFRef::GetPosition(int index) const {
   return rotation * x[index] + translation;
 }
 
-void MeshSDFRef::SDF(const Vector3<float> &position,
-                     float *sdf,
-                     Vector3<float> *jacobian,
-                     Matrix3<float> *hessian) const {
+LM_DEVICE_FUNC void MeshSDFRef::SDF(const Vector3<float> &position,
+                                    float *sdf,
+                                    Vector3<float> *jacobian,
+                                    Matrix3<float> *hessian) const {
   float u, v;
   float local_sdf = std::numeric_limits<float>::max();
   Vector3<float> local_jacobian = Vector3<float>::Zero();
@@ -156,5 +156,30 @@ MeshSDF::operator MeshSDFRef() const {
   mesh_sdf.translation = Vector3<float>::Zero();
   return mesh_sdf;
 }
+
+#if defined(__CUDACC__)
+MeshSDFDevice::MeshSDFDevice(const MeshSDF &mesh_sdf) {
+  x_ = mesh_sdf.x_;
+  triangle_indices_ = mesh_sdf.triangle_indices_;
+  edge_indices_ = mesh_sdf.edge_indices_;
+  edge_inside_ = mesh_sdf.edge_inside_;
+  point_inside_ = mesh_sdf.point_inside_;
+}
+
+MeshSDFDevice::operator MeshSDFRef() const {
+  MeshSDFRef mesh_sdf;
+  mesh_sdf.num_triangles = triangle_indices_.size() / 3;
+  mesh_sdf.num_edges = edge_indices_.size() / 2;
+  mesh_sdf.num_points = x_.size();
+  mesh_sdf.x = x_.data().get();
+  mesh_sdf.triangle_indices = triangle_indices_.data().get();
+  mesh_sdf.edge_indices = edge_indices_.data().get();
+  mesh_sdf.edge_inside = edge_inside_.data().get();
+  mesh_sdf.point_inside = point_inside_.data().get();
+  mesh_sdf.rotation = Matrix3<float>::Identity();
+  mesh_sdf.translation = Vector3<float>::Zero();
+  return mesh_sdf;
+}
+#endif
 
 }  // namespace grassland
