@@ -30,6 +30,7 @@ struct MeshSDFRef {
 
 class MeshSDF {
  public:
+  MeshSDF() = default;
   MeshSDF(VertexBufferView vertex_buffer_view, size_t num_vertex, uint32_t *indices, size_t num_indices);
 
   operator MeshSDFRef() const;
@@ -46,6 +47,7 @@ class MeshSDF {
 #if defined(__CUDACC__)
 class MeshSDFDevice {
  public:
+  MeshSDFDevice() = default;
   MeshSDFDevice(const MeshSDF &mesh_sdf);
 
   operator MeshSDFRef() const;
