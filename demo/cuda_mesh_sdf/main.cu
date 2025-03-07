@@ -41,7 +41,7 @@ int main() {
   indices = {
       0, 1, 2, 0, 2, 3, 0, 3, 4, 0, 4, 1, 1, 4, 5, 1, 5, 2, 2, 5, 3, 3, 5, 4,
   };
-  outfile.open("diamond.obj");
+  outfile.open("octahedron.obj");
   for (const auto &pos : positions) {
     outfile << "v " << pos.x() << " " << pos.y() << " " << pos.z() << std::endl;
   }

@@ -452,4 +452,76 @@ template LM_DEVICE_FUNC double AnyHitRayAABB(const Vector3<double> &origin,
                                              double t_min,
                                              double t_max);
 
+template <class Real>
+LM_DEVICE_FUNC bool IsSegmentTriangleIntersect(const Vector3<Real> &s0,
+                                               const Vector3<Real> &s1,
+                                               const Vector3<Real> &t0,
+                                               const Vector3<Real> &t1,
+                                               const Vector3<Real> &t2) {
+  Vector3<Real> pdiff = t0 - s0;
+  Vector3<Real> tuv;
+  Matrix3<Real> A;
+  A.col(0) = s1 - s0;
+  A.col(1) = t0 - t1;
+  A.col(2) = t0 - t2;
+  if (fabs(A.determinant()) < Eps<Real>() * Eps<Real>()) {
+    return false;
+  }
+  tuv = A.inverse() * pdiff;
+  if (tuv[0] < 0 || tuv[0] > 1 || tuv[1] < 0 || tuv[2] < 0 || tuv[1] + tuv[2] > 1) {
+    return false;
+  }
+  return true;
+}
+
+template LM_DEVICE_FUNC bool IsSegmentTriangleIntersect(const Vector3<float> &s0,
+                                                        const Vector3<float> &s1,
+                                                        const Vector3<float> &t0,
+                                                        const Vector3<float> &t1,
+                                                        const Vector3<float> &t2);
+template LM_DEVICE_FUNC bool IsSegmentTriangleIntersect(const Vector3<double> &s0,
+                                                        const Vector3<double> &s1,
+                                                        const Vector3<double> &t0,
+                                                        const Vector3<double> &t1,
+                                                        const Vector3<double> &t2);
+
+template <class Real>
+LM_DEVICE_FUNC Real AnyHitRayTriangle(const Vector3<Real> &origin,
+                                      const Vector3<Real> &direction,
+                                      const Vector3<Real> &v0,
+                                      const Vector3<Real> &v1,
+                                      const Vector3<Real> &v2,
+                                      Real t_min,
+                                      Real t_max) {
+  Vector3<Real> pdiff = v0 - origin;
+  Vector3<Real> tuv;
+  Matrix3<Real> A;
+  A.col(0) = direction;
+  A.col(1) = v0 - v1;
+  A.col(2) = v0 - v2;
+  if (fabs(A.determinant()) < Eps<Real>() * Eps<Real>()) {
+    return -1;
+  }
+  tuv = A.inverse() * pdiff;
+  if (tuv[0] < t_min || tuv[0] > t_max || tuv[1] < 0 || tuv[2] < 0 || tuv[1] + tuv[2] > 1) {
+    return -1;
+  }
+  return tuv[0];
+}
+
+template LM_DEVICE_FUNC float AnyHitRayTriangle(const Vector3<float> &origin,
+                                                const Vector3<float> &direction,
+                                                const Vector3<float> &v0,
+                                                const Vector3<float> &v1,
+                                                const Vector3<float> &v2,
+                                                float t_min,
+                                                float t_max);
+template LM_DEVICE_FUNC double AnyHitRayTriangle(const Vector3<double> &origin,
+                                                 const Vector3<double> &direction,
+                                                 const Vector3<double> &v0,
+                                                 const Vector3<double> &v1,
+                                                 const Vector3<double> &v2,
+                                                 double t_min,
+                                                 double t_max);
+
 }  // namespace grassland

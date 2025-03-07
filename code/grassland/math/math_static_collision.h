@@ -103,4 +103,20 @@ LM_DEVICE_FUNC Real AnyHitRayAABB(const Vector3<Real> &origin,
                                   Real t_min = Eps<Real>(),
                                   Real t_max = 1.0 / Eps<Real>());
 
+template <class Real>
+LM_DEVICE_FUNC bool IsSegmentTriangleIntersect(const Vector3<Real> &s0,
+                                               const Vector3<Real> &s1,
+                                               const Vector3<Real> &t0,
+                                               const Vector3<Real> &t1,
+                                               const Vector3<Real> &t2);
+
+template <class Real>
+LM_DEVICE_FUNC Real AnyHitRayTriangle(const Vector3<Real> &origin,
+                                      const Vector3<Real> &direction,
+                                      const Vector3<Real> &v0,
+                                      const Vector3<Real> &v1,
+                                      const Vector3<Real> &v2,
+                                      Real t_min = Eps<Real>(),
+                                      Real t_max = 1.0 / Eps<Real>());
+
 }  // namespace grassland
