@@ -31,6 +31,7 @@ class D3D12CommandContext : public CommandContext {
   void CmdSetViewport(const Viewport &viewport) override;
   void CmdSetScissor(const Scissor &scissor) override;
   void CmdSetPrimitiveTopology(PrimitiveTopology topology) override;
+  void CmdDraw(uint32_t index_count, uint32_t instance_count, int32_t vertex_offset, uint32_t first_instance) override;
   void CmdDrawIndexed(uint32_t index_count,
                       uint32_t instance_count,
                       uint32_t first_index,

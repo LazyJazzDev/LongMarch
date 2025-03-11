@@ -159,6 +159,19 @@ class D3D12CmdSetPrimitiveTopology : public D3D12Command {
   PrimitiveTopology topology_;
 };
 
+class D3D12CmdDraw : public D3D12Command {
+ public:
+  D3D12CmdDraw(uint32_t index_count, uint32_t instance_count, int32_t vertex_offset, uint32_t first_instance);
+
+  void CompileCommand(D3D12CommandContext *context, ID3D12GraphicsCommandList *command_list) override;
+
+ private:
+  uint32_t index_count_;
+  uint32_t instance_count_;
+  int32_t vertex_offset_;
+  uint32_t first_instance_;
+};
+
 class D3D12CmdDrawIndexed : public D3D12Command {
  public:
   D3D12CmdDrawIndexed(uint32_t index_count,

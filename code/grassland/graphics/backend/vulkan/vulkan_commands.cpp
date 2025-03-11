@@ -339,6 +339,20 @@ void VulkanCmdSetPrimitiveTopology::CompileCommand(VulkanCommandContext *context
       command_buffer, PrimitiveTopologyToVkPrimitiveTopology(topology_));
 }
 
+VulkanCmdDraw::VulkanCmdDraw(uint32_t index_count,
+                             uint32_t instance_count,
+                             int32_t vertex_offset,
+                             uint32_t first_instance)
+    : index_count_(index_count),
+      instance_count_(instance_count),
+      vertex_offset_(vertex_offset),
+      first_instance_(first_instance) {
+}
+
+void VulkanCmdDraw::CompileCommand(VulkanCommandContext *context, VkCommandBuffer command_buffer) {
+  vkCmdDraw(command_buffer, index_count_, instance_count_, vertex_offset_, first_instance_);
+}
+
 VulkanCmdDrawIndexed::VulkanCmdDrawIndexed(uint32_t index_count,
                                            uint32_t instance_count,
                                            uint32_t first_index,

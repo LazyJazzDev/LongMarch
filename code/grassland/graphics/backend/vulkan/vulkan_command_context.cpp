@@ -148,6 +148,13 @@ void VulkanCommandContext::CmdSetPrimitiveTopology(PrimitiveTopology topology) {
   commands_.push_back(std::make_unique<VulkanCmdSetPrimitiveTopology>(topology));
 }
 
+void VulkanCommandContext::CmdDraw(uint32_t index_count,
+                                   uint32_t instance_count,
+                                   int32_t vertex_offset,
+                                   uint32_t first_instance) {
+  commands_.push_back(std::make_unique<VulkanCmdDraw>(index_count, instance_count, vertex_offset, first_instance));
+}
+
 void VulkanCommandContext::CmdDrawIndexed(uint32_t index_count,
                                           uint32_t instance_count,
                                           uint32_t first_index,

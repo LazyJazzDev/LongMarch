@@ -179,6 +179,19 @@ class VulkanCmdSetPrimitiveTopology : public VulkanCommand {
   PrimitiveTopology topology_;
 };
 
+class VulkanCmdDraw : public VulkanCommand {
+ public:
+  VulkanCmdDraw(uint32_t index_count, uint32_t instance_count, int32_t vertex_offset, uint32_t first_instance);
+
+  void CompileCommand(VulkanCommandContext *context, VkCommandBuffer command_buffer) override;
+
+ private:
+  uint32_t index_count_;
+  uint32_t instance_count_;
+  int32_t vertex_offset_;
+  uint32_t first_instance_;
+};
+
 class VulkanCmdDrawIndexed : public VulkanCommand {
  public:
   VulkanCmdDrawIndexed(uint32_t index_count,

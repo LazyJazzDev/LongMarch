@@ -274,6 +274,20 @@ void D3D12CmdSetPrimitiveTopology::CompileCommand(D3D12CommandContext *context,
   command_list->IASetPrimitiveTopology(PrimitiveTopologyToD3D12PrimitiveTopology(topology_));
 }
 
+D3D12CmdDraw::D3D12CmdDraw(uint32_t index_count,
+                           uint32_t instance_count,
+                           int32_t vertex_offset,
+                           uint32_t first_instance)
+    : index_count_(index_count),
+      instance_count_(instance_count),
+      vertex_offset_(vertex_offset),
+      first_instance_(first_instance) {
+}
+
+void D3D12CmdDraw::CompileCommand(D3D12CommandContext *context, ID3D12GraphicsCommandList *command_list) {
+  command_list->DrawInstanced(index_count_, instance_count_, vertex_offset_, first_instance_);
+}
+
 D3D12CmdDrawIndexed::D3D12CmdDrawIndexed(uint32_t index_count,
                                          uint32_t instance_count,
                                          uint32_t first_index,
