@@ -10,6 +10,7 @@ class VulkanImage : public Image {
   Extent2D Extent() const override;
   ImageFormat Format() const override;
   void UploadData(const void *data) const override;
+  void DownloadData(void *data) const override;
 
   vulkan::Image *Image() {
     return image_.get();

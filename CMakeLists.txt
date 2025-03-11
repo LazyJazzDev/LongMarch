@@ -89,6 +89,10 @@ find_package(directx-dxc CONFIG REQUIRED)
 set(DXC_LIB_NAME Microsoft::DirectXShaderCompiler)
 list(APPEND LIB_LIST ${DXC_LIB_NAME})
 
+find_package(Stb REQUIRED)
+set(STB_INC_DIR ${Stb_INCLUDE_DIR})
+list(APPEND INC_LIST ${STB_INC_DIR})
+
 if (WIN32)
     find_path(D3DX12_INCLUDE_DIRS "d3dx12.h")
     list(APPEND INC_LIST ${D3DX12_INCLUDE_DIRS})

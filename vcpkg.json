@@ -12,6 +12,7 @@
     "glslang",
     "gtest",
     "imgui",
+    "stb",
     "mikktspace",
     "tinyobjloader",
     "directx-dxc",

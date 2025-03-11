@@ -9,8 +9,7 @@ struct Vertex {
 
 class Application {
  public:
-  Application(grassland::graphics::BackendAPI api =
-                  grassland::graphics::BACKEND_API_VULKAN);
+  Application(grassland::graphics::BackendAPI api = grassland::graphics::BACKEND_API_VULKAN);
 
   ~Application();
 
@@ -33,4 +32,5 @@ class Application {
   std::unique_ptr<grassland::graphics::Image> color_image_;
   std::unique_ptr<grassland::graphics::Program> program_;
   bool alive_{false};
+  bool first_frame_{true};
 };

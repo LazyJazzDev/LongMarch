@@ -10,6 +10,7 @@ class D3D12Image : public Image {
   Extent2D Extent() const override;
   ImageFormat Format() const override;
   void UploadData(const void *data) const override;
+  void DownloadData(void *data) const override;
 
   d3d12::Image *Image() const;
 

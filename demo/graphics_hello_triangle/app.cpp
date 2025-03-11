@@ -1,4 +1,6 @@
 #include "app.h"
+#define STB_IMAGE_WRITE_IMPLEMENTATION
+#include "stb_image_write.h"
 
 namespace {
 #include "built_in_shaders.inl"
@@ -35,14 +37,13 @@ void Application::OnInit() {
   vertex_buffer_->UploadData(vertices.data(), vertices.size() * sizeof(Vertex));
   index_buffer_->UploadData(indices.data(), indices.size() * sizeof(uint32_t));
 
-  core_->CreateImage(1280, 720, grassland::graphics::IMAGE_FORMAT_R32G32B32A32_SFLOAT, &color_image_);
+  core_->CreateImage(1280, 720, grassland::graphics::IMAGE_FORMAT_R8G8B8A8_UNORM, &color_image_);
 
   core_->CreateShader(GetShaderCode("shaders/shader.hlsl"), "VSMain", "vs_6_0", &vertex_shader_);
   core_->CreateShader(GetShaderCode("shaders/shader.hlsl"), "PSMain", "ps_6_0", &fragment_shader_);
   grassland::LogInfo("Shader compiled successfully");
 
-  core_->CreateProgram({grassland::graphics::IMAGE_FORMAT_R32G32B32A32_SFLOAT},
-                       grassland::graphics::IMAGE_FORMAT_UNDEFINED, &program_);
+  core_->CreateProgram({color_image_->Format()}, grassland::graphics::IMAGE_FORMAT_UNDEFINED, &program_);
   program_->AddInputBinding(sizeof(Vertex), false);
   program_->AddInputAttribute(0, grassland::graphics::INPUT_TYPE_FLOAT3, 0);
   program_->AddInputAttribute(0, grassland::graphics::INPUT_TYPE_FLOAT3, sizeof(float) * 3);
@@ -82,4 +83,13 @@ void Application::OnRender() {
   command_context->CmdEndRendering();
   command_context->CmdPresent(window_.get(), color_image_.get());
   core_->SubmitCommandContext(command_context.get());
+  if (first_frame_) {
+    first_frame_ = false;
+    std::vector<uint8_t> pixel_data(color_image_->Extent().width * color_image_->Extent().height * 4);
+    color_image_->DownloadData(pixel_data.data());
+    stbi_write_bmp((((core_->API() == grassland::graphics::BACKEND_API_VULKAN) ? "vulkan_" : "d3d12_") +
+                    std::string("hello_triangle.bmp"))
+                       .c_str(),
+                   color_image_->Extent().width, color_image_->Extent().height, 4, pixel_data.data());
+  }
 }
