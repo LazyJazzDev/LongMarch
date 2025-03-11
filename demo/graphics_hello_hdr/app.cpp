@@ -25,10 +25,10 @@ void Application::OnInit() {
   window_->SetHDR(true);
 
   std::vector<Vertex> vertices = {
-      {{-0.5f, 0.1f, 0.0f}, {0.0f, 0.0f, 0.0f}},
-      {{0.5f, 0.1f, 0.0f}, {3.0f, 3.0f, 3.0f}},
-      {{0.5f, -0.1f, 0.0f}, {3.0f, 3.0f, 3.0f}},
       {{-0.5f, -0.1f, 0.0f}, {0.0f, 0.0f, 0.0f}},
+      {{0.5f, -0.1f, 0.0f}, {3.0f, 3.0f, 3.0f}},
+      {{0.5f, 0.1f, 0.0f}, {3.0f, 3.0f, 3.0f}},
+      {{-0.5f, 0.1f, 0.0f}, {0.0f, 0.0f, 0.0f}},
   };
   std::vector<uint32_t> indices = {0, 1, 2, 0, 2, 3};
 

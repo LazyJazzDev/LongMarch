@@ -18,10 +18,15 @@ Application::~Application() {
 
 void Application::OnInit() {
   alive_ = true;
-  core_->CreateWindowObject(1280, 720, ((core_->API() == grassland::graphics::BACKEND_API_VULKAN) ? "[Vulkan]" : "[D3D12]") + std::string(" Graphics Hello Blending"), &window_);
+  core_->CreateWindowObject(1280, 720,
+                            ((core_->API() == grassland::graphics::BACKEND_API_VULKAN) ? "[Vulkan]" : "[D3D12]") +
+                                std::string(" Graphics Hello Blending"),
+                            &window_);
 
   std::vector<Vertex> vertices = {
-      {{0.0f, 0.5f, 0.0f}, {0.0f, 1.0f, 1.0f, 0.5f}}, {{0.5f, -0.5f, 0.0f}, {1.0f, 0.0f, 1.0f, 0.5f}}, {{-0.5f, -0.5f, 0.0f}, {1.0f, 1.0f, 0.0f, 0.5f}}, {{0.0f, 0.25f, 0.0f}, {1.0f, 0.0f, 0.0f, 1.0f}}, {{0.3f, -0.35f, 0.0f}, {0.0f, 1.0f, 0.0f, 1.0f}}, {{-0.3f, -0.35f, 0.0f}, {0.0f, 0.0f, 1.0f, 1.0f}},
+      {{0.0f, 0.5f, 0.0f}, {0.0f, 1.0f, 1.0f, 0.5f}},    {{-0.5f, -0.5f, 0.0f}, {1.0f, 1.0f, 0.0f, 0.5f}},
+      {{0.5f, -0.5f, 0.0f}, {1.0f, 0.0f, 1.0f, 0.5f}},   {{0.0f, 0.25f, 0.0f}, {1.0f, 0.0f, 0.0f, 1.0f}},
+      {{-0.3f, -0.35f, 0.0f}, {0.0f, 0.0f, 1.0f, 1.0f}}, {{0.3f, -0.35f, 0.0f}, {0.0f, 1.0f, 0.0f, 1.0f}},
   };
   std::vector<uint32_t> indices = {0, 1, 2};
 
@@ -36,7 +41,8 @@ void Application::OnInit() {
   core_->CreateShader(GetShaderCode("shaders/shader.hlsl"), "PSMain", "ps_6_0", &fragment_shader_);
   grassland::LogInfo("Shader compiled successfully");
 
-  core_->CreateProgram({grassland::graphics::IMAGE_FORMAT_R32G32B32A32_SFLOAT}, grassland::graphics::IMAGE_FORMAT_UNDEFINED, &program_);
+  core_->CreateProgram({grassland::graphics::IMAGE_FORMAT_R32G32B32A32_SFLOAT},
+                       grassland::graphics::IMAGE_FORMAT_UNDEFINED, &program_);
   program_->AddInputBinding(sizeof(Vertex), false);
   program_->AddInputAttribute(0, grassland::graphics::INPUT_TYPE_FLOAT3, 0);
   program_->AddInputAttribute(0, grassland::graphics::INPUT_TYPE_FLOAT4, sizeof(float) * 3);

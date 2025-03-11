@@ -38,6 +38,7 @@ D3D12Program::D3D12Program(D3D12Core *core, const std::vector<ImageFormat> &colo
   pipeline_state_desc_.SampleDesc.Quality = 0;
   pipeline_state_desc_.PrimitiveTopologyType = D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE;
   pipeline_state_desc_.RasterizerState = CD3DX12_RASTERIZER_DESC(D3D12_DEFAULT);
+  pipeline_state_desc_.RasterizerState.FrontCounterClockwise = TRUE;
   pipeline_state_desc_.BlendState = CD3DX12_BLEND_DESC(D3D12_DEFAULT);
   pipeline_state_desc_.DepthStencilState = CD3DX12_DEPTH_STENCIL_DESC(D3D12_DEFAULT);
   if (!IsDepthFormat(depth_format)) {

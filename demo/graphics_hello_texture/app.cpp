@@ -19,9 +19,13 @@ Application::~Application() {
 
 void Application::OnInit() {
   alive_ = true;
-  core_->CreateWindowObject(1280, 720, ((core_->API() == grassland::graphics::BACKEND_API_VULKAN) ? "[Vulkan]" : "[D3D12]") + std::string(" Graphics Hello Texture"), &window_);
+  core_->CreateWindowObject(1280, 720,
+                            ((core_->API() == grassland::graphics::BACKEND_API_VULKAN) ? "[Vulkan]" : "[D3D12]") +
+                                std::string(" Graphics Hello Texture"),
+                            &window_);
 
-  std::vector<Vertex> vertices = {{{0.0, 0.5, 0.0}, {0.5, 0.0}}, {{0.5, -0.5, 0.0}, {1.0, 1.0}}, {{-0.5, -0.5, 0.0}, {0.0, 1.0}}};
+  std::vector<Vertex> vertices = {
+      {{0.0, 0.5, 0.0}, {0.5, 0.0}}, {{-0.5, -0.5, 0.0}, {0.0, 1.0}}, {{0.5, -0.5, 0.0}, {1.0, 1.0}}};
 
   std::vector<uint32_t> indices = {0, 1, 2};
 
@@ -35,7 +39,8 @@ void Application::OnInit() {
 
   uint32_t texture_side_length = 256;
 
-  core_->CreateImage(texture_side_length, texture_side_length, grassland::graphics::IMAGE_FORMAT_R8G8B8A8_UNORM, &texture_image_);
+  core_->CreateImage(texture_side_length, texture_side_length, grassland::graphics::IMAGE_FORMAT_R8G8B8A8_UNORM,
+                     &texture_image_);
 
   core_->CreateSampler(grassland::graphics::FILTER_MODE_LINEAR, &sampler_);
 
@@ -53,7 +58,8 @@ void Application::OnInit() {
   core_->CreateShader(GetShaderCode("shaders/shader.hlsl"), "PSMain", "ps_6_0", &fragment_shader_);
   grassland::LogInfo("Shader compiled successfully");
 
-  core_->CreateProgram({grassland::graphics::IMAGE_FORMAT_R32G32B32A32_SFLOAT}, grassland::graphics::IMAGE_FORMAT_D32_SFLOAT, &program_);
+  core_->CreateProgram({grassland::graphics::IMAGE_FORMAT_R32G32B32A32_SFLOAT},
+                       grassland::graphics::IMAGE_FORMAT_D32_SFLOAT, &program_);
   program_->AddInputBinding(sizeof(Vertex), false);
   program_->AddInputAttribute(0, grassland::graphics::INPUT_TYPE_FLOAT3, 0);
   program_->AddInputAttribute(0, grassland::graphics::INPUT_TYPE_FLOAT2, sizeof(float) * 3);

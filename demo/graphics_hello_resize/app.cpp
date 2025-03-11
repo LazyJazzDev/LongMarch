@@ -19,11 +19,19 @@ Application::~Application() {
 
 void Application::OnInit() {
   alive_ = true;
-  core_->CreateWindowObject(1280, 720, ((core_->API() == grassland::graphics::BACKEND_API_VULKAN) ? "[Vulkan]" : "[D3D12]") + std::string(" Graphics Hello Resize"), false, true, &window_);
+  core_->CreateWindowObject(1280, 720,
+                            ((core_->API() == grassland::graphics::BACKEND_API_VULKAN) ? "[Vulkan]" : "[D3D12]") +
+                                std::string(" Graphics Hello Resize"),
+                            false, true, &window_);
 
-  std::vector<Vertex> vertices = {{{-1.0f, -1.0f, -1.0f}, {0.0f, 0.0f, 0.0f}}, {{1.0f, -1.0f, -1.0f}, {1.0f, 0.0f, 0.0f}}, {{-1.0f, 1.0f, -1.0f}, {0.0f, 1.0f, 0.0f}}, {{1.0f, 1.0f, -1.0f}, {1.0f, 1.0f, 0.0f}}, {{-1.0f, -1.0f, 1.0f}, {0.0f, 0.0f, 1.0f}}, {{1.0f, -1.0f, 1.0f}, {1.0f, 0.0f, 1.0f}}, {{-1.0f, 1.0f, 1.0f}, {0.0f, 1.0f, 1.0f}}, {{1.0f, 1.0f, 1.0f}, {1.0f, 1.0f, 1.0f}}};
+  std::vector<Vertex> vertices = {
+      {{-1.0f, -1.0f, 1.0f}, {0.0f, 0.0f, 0.0f}},  {{1.0f, -1.0f, 1.0f}, {1.0f, 0.0f, 0.0f}},
+      {{-1.0f, 1.0f, 1.0f}, {0.0f, 1.0f, 0.0f}},   {{1.0f, 1.0f, 1.0f}, {1.0f, 1.0f, 0.0f}},
+      {{-1.0f, -1.0f, -1.0f}, {0.0f, 0.0f, 1.0f}}, {{1.0f, -1.0f, -1.0f}, {1.0f, 0.0f, 1.0f}},
+      {{-1.0f, 1.0f, -1.0f}, {0.0f, 1.0f, 1.0f}},  {{1.0f, 1.0f, -1.0f}, {1.0f, 1.0f, 1.0f}}};
 
-  std::vector<uint32_t> indices = {0, 1, 2, 2, 1, 3, 2, 3, 6, 6, 3, 7, 6, 7, 4, 4, 7, 5, 4, 5, 0, 0, 5, 1, 1, 5, 3, 3, 5, 7, 0, 2, 4, 4, 2, 6};
+  std::vector<uint32_t> indices = {0, 1, 2, 2, 1, 3, 2, 3, 6, 6, 3, 7, 6, 7, 4, 4, 7, 5,
+                                   4, 5, 0, 0, 5, 1, 1, 5, 3, 3, 5, 7, 0, 2, 4, 4, 2, 6};
 
   core_->CreateBuffer(vertices.size() * sizeof(Vertex), grassland::graphics::BUFFER_TYPE_STATIC, &vertex_buffer_);
   core_->CreateBuffer(indices.size() * sizeof(uint32_t), grassland::graphics::BUFFER_TYPE_STATIC, &index_buffer_);
@@ -47,7 +55,8 @@ void Application::OnInit() {
   core_->CreateShader(GetShaderCode("shaders/shader.hlsl"), "PSMain", "ps_6_0", &fragment_shader_);
   grassland::LogInfo("Shader compiled successfully");
 
-  core_->CreateProgram({grassland::graphics::IMAGE_FORMAT_R32G32B32A32_SFLOAT}, grassland::graphics::IMAGE_FORMAT_D32_SFLOAT, &program_);
+  core_->CreateProgram({grassland::graphics::IMAGE_FORMAT_R32G32B32A32_SFLOAT},
+                       grassland::graphics::IMAGE_FORMAT_D32_SFLOAT, &program_);
   program_->AddInputBinding(sizeof(Vertex), false);
   program_->AddInputAttribute(0, grassland::graphics::INPUT_TYPE_FLOAT3, 0);
   program_->AddInputAttribute(0, grassland::graphics::INPUT_TYPE_FLOAT3, sizeof(float) * 3);

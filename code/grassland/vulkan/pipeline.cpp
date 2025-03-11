@@ -4,7 +4,8 @@
 
 namespace grassland::vulkan {
 
-PipelineSettings::PipelineSettings(const RenderPass *render_pass, const PipelineLayout *pipeline_layout, int subpass) : render_pass(render_pass), pipeline_layout(pipeline_layout), subpass(subpass) {
+PipelineSettings::PipelineSettings(const RenderPass *render_pass, const PipelineLayout *pipeline_layout, int subpass)
+    : render_pass(render_pass), pipeline_layout(pipeline_layout), subpass(subpass) {
   PipelineSettingsCommon();
 
   auto &subpass_settings = render_pass->SubpassSettings()[subpass];
@@ -12,7 +13,18 @@ PipelineSettings::PipelineSettings(const RenderPass *render_pass, const Pipeline
   if (render_pass) {
     if (subpass_settings.DepthAttachmentReference().has_value()) {
       depth_stencil_state_create_info = VkPipelineDepthStencilStateCreateInfo{
-          VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO, nullptr, 0, VK_TRUE, VK_TRUE, VK_COMPARE_OP_LESS, VK_FALSE, VK_FALSE, VkStencilOpState{}, VkStencilOpState{}, 0.0f, 1.0f,
+          VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO,
+          nullptr,
+          0,
+          VK_TRUE,
+          VK_TRUE,
+          VK_COMPARE_OP_LESS,
+          VK_FALSE,
+          VK_FALSE,
+          VkStencilOpState{},
+          VkStencilOpState{},
+          0.0f,
+          1.0f,
       };
     }
 
@@ -26,7 +38,8 @@ PipelineSettings::PipelineSettings(const RenderPass *render_pass, const Pipeline
         pipeline_color_blend_attachment_states[i].srcAlphaBlendFactor = VK_BLEND_FACTOR_ONE;
         pipeline_color_blend_attachment_states[i].dstAlphaBlendFactor = VK_BLEND_FACTOR_ZERO;
         pipeline_color_blend_attachment_states[i].alphaBlendOp = VK_BLEND_OP_ADD;
-        pipeline_color_blend_attachment_states[i].colorWriteMask = VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT | VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT;
+        pipeline_color_blend_attachment_states[i].colorWriteMask =
+            VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT | VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT;
       }
     }
 
@@ -37,11 +50,29 @@ PipelineSettings::PipelineSettings(const RenderPass *render_pass, const Pipeline
   }
 }
 
-PipelineSettings::PipelineSettings(const PipelineLayout *pipeline_layout, const std::vector<VkFormat> &color_attachment_formats, VkFormat depth_attachment_format) : render_pass(nullptr), pipeline_layout(pipeline_layout), color_attachment_formats(color_attachment_formats), depth_attachment_format(depth_attachment_format), subpass(0) {
+PipelineSettings::PipelineSettings(const PipelineLayout *pipeline_layout,
+                                   const std::vector<VkFormat> &color_attachment_formats,
+                                   VkFormat depth_attachment_format)
+    : render_pass(nullptr),
+      pipeline_layout(pipeline_layout),
+      color_attachment_formats(color_attachment_formats),
+      depth_attachment_format(depth_attachment_format),
+      subpass(0) {
   PipelineSettingsCommon();
   if (depth_attachment_format != VK_FORMAT_UNDEFINED) {
     depth_stencil_state_create_info = VkPipelineDepthStencilStateCreateInfo{
-        VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO, nullptr, 0, VK_TRUE, VK_TRUE, VK_COMPARE_OP_LESS, VK_FALSE, VK_FALSE, VkStencilOpState{}, VkStencilOpState{}, 0.0f, 1.0f,
+        VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO,
+        nullptr,
+        0,
+        VK_TRUE,
+        VK_TRUE,
+        VK_COMPARE_OP_LESS,
+        VK_FALSE,
+        VK_FALSE,
+        VkStencilOpState{},
+        VkStencilOpState{},
+        0.0f,
+        1.0f,
     };
   }
 
@@ -55,7 +86,8 @@ PipelineSettings::PipelineSettings(const PipelineLayout *pipeline_layout, const 
       pipeline_color_blend_attachment_states[i].srcAlphaBlendFactor = VK_BLEND_FACTOR_ONE;
       pipeline_color_blend_attachment_states[i].dstAlphaBlendFactor = VK_BLEND_FACTOR_ZERO;
       pipeline_color_blend_attachment_states[i].alphaBlendOp = VK_BLEND_OP_ADD;
-      pipeline_color_blend_attachment_states[i].colorWriteMask = VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT | VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT;
+      pipeline_color_blend_attachment_states[i].colorWriteMask =
+          VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT | VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT;
     }
   }
 }
@@ -79,7 +111,7 @@ void PipelineSettings::PipelineSettingsCommon() {
   rasterization_state_create_info.polygonMode = VK_POLYGON_MODE_FILL;
   rasterization_state_create_info.lineWidth = 1.0f;
   rasterization_state_create_info.cullMode = VK_CULL_MODE_BACK_BIT;
-  rasterization_state_create_info.frontFace = VK_FRONT_FACE_CLOCKWISE;
+  rasterization_state_create_info.frontFace = VK_FRONT_FACE_COUNTER_CLOCKWISE;
   rasterization_state_create_info.depthBiasEnable = VK_FALSE;
 }
 
@@ -100,7 +132,9 @@ void PipelineSettings::AddInputAttribute(uint32_t binding, uint32_t location, Vk
   });
 }
 
-void PipelineSettings::AddShaderStage(ShaderModule *shader_module, VkShaderStageFlagBits stage, const char *entry_point) {
+void PipelineSettings::AddShaderStage(ShaderModule *shader_module,
+                                      VkShaderStageFlagBits stage,
+                                      const char *entry_point) {
   shader_stage_create_infos.push_back(VkPipelineShaderStageCreateInfo{
       VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO,
       nullptr,
@@ -132,7 +166,8 @@ void PipelineSettings::SetSubpass(int subpass) {
   this->subpass = subpass;
 }
 
-void PipelineSettings::SetBlendState(int color_attachment_index, VkPipelineColorBlendAttachmentState blend_attachment_state) {
+void PipelineSettings::SetBlendState(int color_attachment_index,
+                                     VkPipelineColorBlendAttachmentState blend_attachment_state) {
   pipeline_color_blend_attachment_states[color_attachment_index] = blend_attachment_state;
 }
 
