@@ -86,6 +86,19 @@ union ClearValue {
   DepthClearValue depth;
 };
 
+struct ClearValueUnion {
+  ClearValue value;
+  ClearValueUnion(ColorClearValue c) {
+    value.color = c;
+  }
+  ClearValueUnion(DepthClearValue d) {
+    value.depth = d;
+  }
+  explicit operator ClearValue() const {
+    return value;
+  }
+};
+
 struct Extent2D {
   uint32_t width;
   uint32_t height;

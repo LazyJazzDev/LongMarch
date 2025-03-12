@@ -39,8 +39,34 @@ void PybindModuleRegistration(pybind11::module_ &m) {
   buffer_type.value("BUFFER_TYPE_VERTEX", BufferType::BUFFER_TYPE_STATIC);
   buffer_type.value("BUFFER_TYPE_INDEX", BufferType::BUFFER_TYPE_DYNAMIC);
 
+  pybind11::class_<ColorClearValue> color_clear_value(m, "ColorClearValue");
+  color_clear_value.def(pybind11::init<float, float, float, float>(), pybind11::arg("r") = 0.0f,
+                        pybind11::arg("g") = 0.0f, pybind11::arg("b") = 0.0f, pybind11::arg("a") = 1.0f);
+  color_clear_value.def_readwrite("r", &ColorClearValue::r);
+  color_clear_value.def_readwrite("g", &ColorClearValue::g);
+  color_clear_value.def_readwrite("b", &ColorClearValue::b);
+  color_clear_value.def_readwrite("a", &ColorClearValue::a);
+  color_clear_value.def("__repr__", [](const ColorClearValue &c) {
+    return pybind11::str("ColorClearValue({},{},{},{})").format(c.r, c.g, c.b, c.a);
+  });
+
+  pybind11::class_<DepthClearValue> depth_clear_value(m, "DepthClearValue");
+  depth_clear_value.def(pybind11::init<float>(), pybind11::arg("depth") = 1.0f);
+  depth_clear_value.def_readwrite("depth", &DepthClearValue::depth);
+  depth_clear_value.def("__repr__",
+                        [](const DepthClearValue &c) { return pybind11::str("DepthClearValue({})").format(c.depth); });
+
+  pybind11::class_<Extent2D> extent2d(m, "Extent2D");
+  extent2d.def(pybind11::init<uint32_t, uint32_t>(), pybind11::arg("width") = 0, pybind11::arg("height") = 0);
+  extent2d.def_readwrite("width", &Extent2D::width);
+  extent2d.def_readwrite("height", &Extent2D::height);
+  extent2d.def("__repr__",
+               [](const Extent2D &e) { return pybind11::str("Extent2D({}, {})").format(e.width, e.height); });
+
   Core::PybindModuleRegistration(m);
   Window::PybindModuleRegistration(m);
+  Image::PybindModuleRegistration(m);
+  CommandContext::PybindModuleRegistration(m);
 }
 
 }  // namespace grassland::graphics

@@ -15,6 +15,8 @@ class D3D12CommandContext : public CommandContext {
 
   D3D12Core *Core() const;
 
+  graphics::Core *GetCore() const override;
+
   void CmdBindProgram(Program *program) override;
   void CmdBindRayTracingProgram(RayTracingProgram *program) override;
   void CmdBindVertexBuffers(uint32_t first_binding,

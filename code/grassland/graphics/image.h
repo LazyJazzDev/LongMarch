@@ -10,6 +10,8 @@ class Image {
   virtual ImageFormat Format() const = 0;
   virtual void UploadData(const void *data) const = 0;
   virtual void DownloadData(void *data) const = 0;
+
+  static void PybindModuleRegistration(pybind11::module &m);
 };
 
 }  // namespace grassland::graphics

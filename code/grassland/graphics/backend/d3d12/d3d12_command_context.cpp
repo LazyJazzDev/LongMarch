@@ -19,6 +19,10 @@ D3D12Core *D3D12CommandContext::Core() const {
   return core_;
 }
 
+graphics::Core *D3D12CommandContext::GetCore() const {
+  return core_;
+}
+
 void D3D12CommandContext::CmdBindProgram(Program *program) {
   auto d3d12_program = dynamic_cast<D3D12Program *>(program);
   assert(d3d12_program != nullptr);

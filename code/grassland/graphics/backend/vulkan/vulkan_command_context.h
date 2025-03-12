@@ -10,6 +10,10 @@ class VulkanCommandContext : public CommandContext {
  public:
   VulkanCommandContext(VulkanCore *core);
 
+  VulkanCore *Core() const;
+
+  graphics::Core *GetCore() const override;
+
   void CmdBindProgram(Program *program) override;
   void CmdBindRayTracingProgram(RayTracingProgram *program) override;
   void CmdBindVertexBuffers(uint32_t first_binding,
@@ -42,10 +46,6 @@ class VulkanCommandContext : public CommandContext {
                          VkPipelineStageFlags stage,
                          VkAccessFlags access,
                          VkImageAspectFlags aspect = VK_IMAGE_ASPECT_DEPTH_BIT);
-
-  VulkanCore *Core() const {
-    return core_;
-  }
 
   void RecordDynamicBuffer(VulkanBuffer *buffer);
 

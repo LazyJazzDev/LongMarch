@@ -12,15 +12,14 @@ def main():
     window = core.create_window(resizable=True)
     window.set_title("Project01")
 
+    color_frame = core.create_image(800, 600, graphics.IMAGE_FORMAT_R32G32B32A32_SFLOAT)
+    print(color_frame)
+
     while not window.should_close():
-        if (window.get_key(glfw.KEY_A)):
-            print('A')
-        if (window.get_key(glfw.KEY_D)):
-            print('D')
-        if (window.get_key(glfw.KEY_W)):
-            print('W')
-        if (window.get_key(glfw.KEY_S)):
-            print('S')
+        context = core.create_command_context()
+        context.cmd_clear_image(color_frame, graphics.ColorClearValue(pow(1.8, 2.2), pow(2.1, 2.2), pow(2.4, 2.2), 1))
+        context.cmd_present(window, color_frame)
+        context.submit()
         graphics.glfw_poll_events()
 
 

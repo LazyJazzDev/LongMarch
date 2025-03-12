@@ -6,6 +6,8 @@ class CommandContext {
  public:
   virtual ~CommandContext() = default;
 
+  virtual Core *GetCore() const = 0;
+
   virtual void CmdBindProgram(Program *program) = 0;
   virtual void CmdBindRayTracingProgram(RayTracingProgram *program) = 0;
   virtual void CmdBindVertexBuffers(uint32_t first_binding,
@@ -43,6 +45,8 @@ class CommandContext {
   virtual void CmdPresent(Window *window, Image *image) = 0;
 
   virtual void CmdDispatchRays(uint32_t width, uint32_t height, uint32_t depth) = 0;
+
+  static void PybindModuleRegistration(pybind11::module &m);
 
  protected:
 };

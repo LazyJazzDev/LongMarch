@@ -49,9 +49,8 @@ std::string Core::DeviceName() const {
 
 void Core::PybindModuleRegistration(pybind11::module &m) {
   pybind11::class_<Core::Settings> core_settings_class(m, "CoreSettings");
-  core_settings_class.def(pybind11::init<>());
-  core_settings_class.def(pybind11::init<int>());
-  core_settings_class.def(pybind11::init<int, bool>());
+  core_settings_class.def(pybind11::init<int, bool>(), pybind11::arg("frames_in_flight") = 2,
+                          pybind11::arg("enable_debug") = false);
   core_settings_class.def_readwrite("frames_in_flight", &Settings::frames_in_flight);
   core_settings_class.def_readwrite("enable_debug", &Settings::enable_debug);
   core_settings_class.def("__repr__", [](const Core::Settings &settings) {
@@ -97,6 +96,26 @@ void Core::PybindModuleRegistration(pybind11::module &m) {
       },
       pybind11::arg("width") = 800, pybind11::arg("height") = 600, pybind11::arg("title") = "Grassland",
       pybind11::arg("fullscreen") = false, pybind11::arg("resizable") = false);
+
+  core_class.def(
+      "create_image",
+      [](std::shared_ptr<Core> core, int width, int height, ImageFormat format) {
+        std::shared_ptr<Image> image;
+        core->CreateImage(width, height, format, &image);
+        pybind11::object image_obj = pybind11::cast(image);
+        image_obj.attr("core_ref") = core;
+        return image_obj;
+      },
+      pybind11::arg("width"), pybind11::arg("height"), pybind11::arg("format") = IMAGE_FORMAT_R8G8B8A8_UNORM);
+
+  core_class.def("create_command_context", [](std::shared_ptr<Core> core) {
+    std::shared_ptr<CommandContext> context;
+    core->CreateCommandContext(&context);
+    pybind11::object context_obj = pybind11::cast(context);
+    context_obj.attr("core_ref") = core;
+    return context_obj;
+  });
+  core_class.def("submit_command_context", &Core::SubmitCommandContext);
 }
 
 int CreateCore(BackendAPI api, const Core::Settings &settings, double_ptr<Core> pp_core) {

@@ -15,6 +15,14 @@ VulkanCommandContext::VulkanCommandContext(VulkanCore *core) : core_(core) {
   }
 }
 
+VulkanCore *VulkanCommandContext::Core() const {
+  return core_;
+}
+
+Core *VulkanCommandContext::GetCore() const {
+  return core_;
+}
+
 void VulkanCommandContext::CmdBindProgram(Program *program) {
   auto vk_program = dynamic_cast<VulkanProgram *>(program);
   assert(vk_program != nullptr);
