@@ -6,5 +6,6 @@ PYBIND11_MODULE(long_march, m) {
   m.attr("__version__") = "0.0.1";
   m.attr("BUILD_TIME") = __DATE__ " " __TIME__;
 
-  pybind11::module_ grassland = m.def_submodule("grassland", "Grassland");
+  pybind11::module_ m_grassland = m.def_submodule("grassland", "Grassland");
+  grassland::PybindModuleRegistration(m_grassland);
 }

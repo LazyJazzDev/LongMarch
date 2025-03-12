@@ -14,5 +14,21 @@ pybind11_add_module(long_march long_march_pybind.cpp)
 target_include_directories(long_march PUBLIC ${LONGMARCH_INCLUDE_DIR})
 target_link_libraries(long_march PUBLIC LongMarch)
 
-install( TARGETS long_march
-    LIBRARY DESTINATION ${Python3_SITEARCH})
+# copy all related dll files to the destination too.
+install(TARGETS long_march
+        RUNTIME_DEPENDENCY_SET long_march_deps
+        LIBRARY DESTINATION ${Python3_SITEARCH})
+
+install(
+        RUNTIME_DEPENDENCY_SET long_march_deps
+        DESTINATION ${Python3_SITEARCH}
+        PRE_EXCLUDE_REGEXES
+        [=[api-ms-]=]
+        [=[ext-ms-]=]
+        [[kernel32\.dll]]
+        [[libc\.so\..*]] [[libgcc_s\.so\..*]] [[libm\.so\..*]] [[libstdc\+\+\.so\..*]]
+        POST_EXCLUDE_REGEXES
+        [=[.*system32\/.*\.dll]=]
+        [=[^\/(lib|usr\/lib|usr\/local\/lib)]=]
+        DIRECTORIES "$<TARGET_FILE_DIR:long_march>"
+)

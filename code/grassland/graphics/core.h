@@ -15,6 +15,7 @@ class Core {
     int frames_in_flight{2};
     bool enable_debug{kEnableDebug};
   };
+
   Core(const Settings &settings);
 
   virtual ~Core() = default;
@@ -77,6 +78,8 @@ class Core {
   bool DeviceRayTracingSupport() const;
 
   std::string DeviceName() const;
+
+  static void PybindModuleRegistration(pybind11::module &m);
 
  private:
   Settings settings_;
