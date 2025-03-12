@@ -106,7 +106,13 @@ message(STATUS "CMAKE_LIBRARY_OUTPUT_DIRECTORY : ${CMAKE_LIBRARY_OUTPUT_DIRECTOR
 message(STATUS "CMAKE_RUNTIME_OUTPUT_DIRECTORY : ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}")
 message(STATUS "PROJECT_BINARY_DIR : ${PROJECT_BINARY_DIR}")
 
-find_package(Python3 COMPONENTS Interpreter REQUIRED)
+find_package(Python3 REQUIRED COMPONENTS Interpreter Development)
+set(PYTHON3_LIB_NAME Python3::Python)
+list(APPEND LIB_LIST ${PYTHON_LIB_NAME})
+
+find_package(pybind11 CONFIG)
+set(PYBIND11_LIB_NAME pybind11::headers)
+list(APPEND LIB_LIST ${PYBIND11_LIB_NAME})
 
 include(scripts/pack_shaders.cmake)
 

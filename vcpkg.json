@@ -16,6 +16,7 @@
     "mikktspace",
     "tinyobjloader",
     "directx-dxc",
+    "pybind11",
     {
       "name": "d3dx12",
       "platform": "windows"
