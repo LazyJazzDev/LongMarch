@@ -40,6 +40,7 @@ void PybindModuleRegistration(pybind11::module_ &m) {
   buffer_type.value("BUFFER_TYPE_INDEX", BufferType::BUFFER_TYPE_DYNAMIC);
 
   Core::PybindModuleRegistration(m);
+  Window::PybindModuleRegistration(m);
 }
 
 }  // namespace grassland::graphics

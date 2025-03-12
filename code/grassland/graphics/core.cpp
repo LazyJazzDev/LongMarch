@@ -82,8 +82,21 @@ void Core::PybindModuleRegistration(pybind11::module &m) {
                 core.DebugEnabled());
   });
   core_class.def("API", &Core::API);
+  core_class.def("device_name", &Core::DeviceName);
+  core_class.def("ray_tracing", &Core::DeviceRayTracingSupport);
   core_class.def("frames_in_flight", &Core::FramesInFlight);
   core_class.def("debug_enabled", &Core::DebugEnabled);
+  core_class.def(
+      "create_window",
+      [](std::shared_ptr<Core> core, int width, int height, const std::string &title, bool fullscreen, bool resizable) {
+        std::shared_ptr<Window> window;
+        core->CreateWindowObject(width, height, title, fullscreen, resizable, &window);
+        pybind11::object window_obj = pybind11::cast(window);
+        window_obj.attr("core_ref") = core;
+        return window_obj;
+      },
+      pybind11::arg("width") = 800, pybind11::arg("height") = 600, pybind11::arg("title") = "Grassland",
+      pybind11::arg("fullscreen") = false, pybind11::arg("resizable") = false);
 }
 
 int CreateCore(BackendAPI api, const Core::Settings &settings, double_ptr<Core> pp_core) {

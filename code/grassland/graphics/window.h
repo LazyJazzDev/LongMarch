@@ -18,6 +18,8 @@ class Window {
 
   void SetTitle(const std::string &title);
 
+  std::string GetTitle() const;
+
   void Resize(int new_width, int new_height);
 
   virtual void CloseWindow();
@@ -53,6 +55,8 @@ class Window {
   EventManager<void(int, const char **)> &DropEvent() {
     return drop_event_;
   }
+
+  static void PybindModuleRegistration(pybind11::module &m);
 
  private:
   GLFWwindow *window_;

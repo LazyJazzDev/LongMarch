@@ -91,6 +91,10 @@ void Window::SetTitle(const std::string &title) {
   glfwSetWindowTitle(window_, title.c_str());
 }
 
+std::string Window::GetTitle() const {
+  return glfwGetWindowTitle(window_);
+}
+
 void Window::Resize(int new_width, int new_height) {
   glfwSetWindowSize(window_, new_width, new_height);
 }
@@ -107,6 +111,27 @@ bool Window::ShouldClose() const {
 void Window::SetHDR(bool enable_hdr) {
   enable_hdr_ = enable_hdr;
   resize_event_.InvokeCallbacks(GetWidth(), GetHeight());
+}
+
+void Window::PybindModuleRegistration(pybind11::module &m) {
+  pybind11::class_<Window, std::shared_ptr<Window>> window(m, "Window", pybind11::dynamic_attr());
+  window.def("__repr__",
+             [](const Window &w) { return pybind11::str("<Window {}x{}>").format(w.GetWidth(), w.GetHeight()); });
+  window.def("width", &Window::GetWidth);
+  window.def("height", &Window::GetHeight);
+  window.def("should_close", &Window::ShouldClose);
+  window.def("resize", &Window::Resize, pybind11::arg("width"), pybind11::arg("height"));
+  window.def("close", &Window::CloseWindow);
+  window.def("set_title", &Window::SetTitle, pybind11::arg("title"));
+  window.def("get_title", &Window::GetTitle);
+  window.def("set_hdr", &Window::SetHDR, pybind11::arg("hdr"));
+  window.def(
+      "get_key", [](const Window &w, int key) { return glfwGetKey(w.GLFWWindow(), key); }, pybind11::arg("key"));
+  window.def(
+      "get_mouse_button", [](const Window &w, int button) { return glfwGetMouseButton(w.GLFWWindow(), button); },
+      pybind11::arg("button"));
+
+  m.def("glfw_poll_events", []() { glfwPollEvents(); });
 }
 
 }  // namespace grassland::graphics
