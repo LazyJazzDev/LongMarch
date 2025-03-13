@@ -17,11 +17,10 @@ def main():
 
     while not window.should_close():
         context = core.create_command_context()
-        context.cmd_clear_image(color_frame, graphics.ColorClearValue(pow(1.8, 2.2), pow(2.1, 2.2), pow(2.4, 2.2), 1))
+        context.cmd_clear_image(color_frame, graphics.ColorClearValue(.6, .7, .8, 1.))
         context.cmd_present(window, color_frame)
         context.submit()
         graphics.glfw_poll_events()
-
 
 if __name__ == "__main__":
     main()

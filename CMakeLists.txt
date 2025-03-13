@@ -108,9 +108,10 @@ message(STATUS "PROJECT_BINARY_DIR : ${PROJECT_BINARY_DIR}")
 
 find_package(Python3 REQUIRED COMPONENTS Interpreter Development)
 set(PYTHON3_LIB_NAME Python3::Python)
-list(APPEND LIB_LIST ${PYTHON_LIB_NAME})
+list(APPEND LIB_LIST ${PYTHON3_LIB_NAME})
 
-find_package(pybind11 CONFIG)
+# find_package(pybind11 CONFIG)
+add_subdirectory(external/pybind11)
 set(PYBIND11_LIB_NAME pybind11::headers)
 list(APPEND LIB_LIST ${PYBIND11_LIB_NAME})
 

@@ -27,6 +27,7 @@ install(
         [=[ext-ms-]=]
         [[kernel32\.dll]]
         [[libc\.so\..*]] [[libgcc_s\.so\..*]] [[libm\.so\..*]] [[libstdc\+\+\.so\..*]]
+        [[python*]]
         POST_EXCLUDE_REGEXES
         [=[.*system32\/.*\.dll]=]
         [=[^\/(lib|usr\/lib|usr\/local\/lib)]=]
