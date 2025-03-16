@@ -1,5 +1,3 @@
-//
-// Created by zijian on 2025/3/12.
-//
+#include "snow_mount/visualizer/visualizer_entity.h"
 
-#include "visualizer_entity.h"
+namespace snow_mount::visualizer {}

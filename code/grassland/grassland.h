@@ -12,6 +12,6 @@
 
 namespace grassland {
 
-void PybindModuleRegistration(pybind11::module_ &m);
+void PyBind(pybind11::module_ &m);
 
 }

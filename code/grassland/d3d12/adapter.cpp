@@ -2,8 +2,6 @@
 
 #include <utility>
 
-#include "../../../cmake-build-release/vcpkg_installed/x64-windows/include/gtest/gtest.h"
-
 namespace grassland::d3d12 {
 
 Adapter::Adapter(ComPtr<IDXGIAdapter1> adapter) : adapter_(std::move(adapter)) {
@@ -28,13 +26,11 @@ SIZE_T Adapter::SharedMemorySize() const {
 
 bool Adapter::SupportRayTracing() const {
   ComPtr<ID3D12Device5> temporal_device;
-  if (FAILED(D3D12CreateDevice(adapter_.Get(), D3D_FEATURE_LEVEL_12_0,
-                               IID_PPV_ARGS(&temporal_device)))) {
+  if (FAILED(D3D12CreateDevice(adapter_.Get(), D3D_FEATURE_LEVEL_12_0, IID_PPV_ARGS(&temporal_device)))) {
     return false;
   }
   D3D12_FEATURE_DATA_D3D12_OPTIONS5 feature_support{};
-  temporal_device->CheckFeatureSupport(
-      D3D12_FEATURE_D3D12_OPTIONS5, &feature_support, sizeof(feature_support));
+  temporal_device->CheckFeatureSupport(D3D12_FEATURE_D3D12_OPTIONS5, &feature_support, sizeof(feature_support));
   // Check if the adapter supports ray tracing tier 1.1
   return feature_support.RaytracingTier >= D3D12_RAYTRACING_TIER_1_1;
 }
@@ -54,8 +50,7 @@ uint64_t Adapter::Evaluate() const {
   return score;
 }
 
-bool Adapter::CheckFeatureSupport(
-    const DeviceFeatureRequirement &feature_requirement) const {
+bool Adapter::CheckFeatureSupport(const DeviceFeatureRequirement &feature_requirement) const {
   if (feature_requirement.enable_raytracing_extension) {
     if (!SupportRayTracing()) {
       return false;

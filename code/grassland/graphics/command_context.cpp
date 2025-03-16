@@ -6,9 +6,8 @@
 
 namespace grassland::graphics {
 
-void CommandContext::PybindModuleRegistration(pybind11::module &m) {
-  pybind11::class_<CommandContext, std::shared_ptr<CommandContext>> command_context(m, "CommandContext",
-                                                                                    pybind11::dynamic_attr());
+void CommandContext::PyBind(pybind11::module &m) {
+  pybind11::class_<CommandContext, std::shared_ptr<CommandContext>> command_context(m, "CommandContext");
   command_context.def("cmd_present", &CommandContext::CmdPresent);
   command_context.def(
       "cmd_clear_image",

@@ -11,7 +11,7 @@ class Image {
   virtual void UploadData(const void *data) const = 0;
   virtual void DownloadData(void *data) const = 0;
 
-  static void PybindModuleRegistration(pybind11::module &m);
+  static void PyBind(pybind11::module &m);
 };
 
 }  // namespace grassland::graphics

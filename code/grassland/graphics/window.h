@@ -56,7 +56,7 @@ class Window {
     return drop_event_;
   }
 
-  static void PybindModuleRegistration(pybind11::module &m);
+  static void PyBind(pybind11::module &m);
 
  private:
   GLFWwindow *window_;

@@ -2,7 +2,7 @@
 
 namespace grassland::graphics {
 
-void PybindModuleRegistration(pybind11::module_ &m) {
+void PyBind(pybind11::module_ &m) {
   pybind11::enum_<BackendAPI> backend_api(m, "BackendAPI");
   backend_api.value("BACKEND_API_VULKAN", BackendAPI::BACKEND_API_VULKAN);
   backend_api.value("BACKEND_API_D3D12", BackendAPI::BACKEND_API_D3D12);
@@ -63,10 +63,10 @@ void PybindModuleRegistration(pybind11::module_ &m) {
   extent2d.def("__repr__",
                [](const Extent2D &e) { return pybind11::str("Extent2D({}, {})").format(e.width, e.height); });
 
-  Core::PybindModuleRegistration(m);
-  Window::PybindModuleRegistration(m);
-  Image::PybindModuleRegistration(m);
-  CommandContext::PybindModuleRegistration(m);
+  Core::PyBind(m);
+  Window::PyBind(m);
+  Image::PyBind(m);
+  CommandContext::PyBind(m);
 }
 
 }  // namespace grassland::graphics

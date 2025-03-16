@@ -79,7 +79,7 @@ class Core {
 
   std::string DeviceName() const;
 
-  static void PybindModuleRegistration(pybind11::module &m);
+  static void PyBind(pybind11::module &m);
 
  private:
   Settings settings_;

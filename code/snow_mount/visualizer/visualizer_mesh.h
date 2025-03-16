@@ -1,8 +1,30 @@
-//
-// Created by zijian on 2025/3/12.
-//
+#pragma once
+#include "snow_mount/visualizer/visualizer_util.h"
 
-#ifndef VISUALIZER_MESH_H
-#define VISUALIZER_MESH_H
+namespace snow_mount::visualizer {
+class Mesh {
+  friend class Core;
+  Mesh(const std::shared_ptr<Core> &core);
 
-#endif  // VISUALIZER_MESH_H
+ public:
+  void SetVertices(const Vertex *vertices);
+  void SetIndices(const uint32_t *indices);
+  void SetVertices(const Vertex *vertices, int num_vertex);
+  void SetIndices(const uint32_t *indices, int num_indices);
+
+  int GetVertexCount() const;
+  int GetIndexCount() const;
+
+  graphics::Buffer *GetVertexBuffer() const;
+  graphics::Buffer *GetIndexBuffer() const;
+
+  static void PyBind(pybind11::module_ &m);
+
+ private:
+  std::shared_ptr<Core> core_;
+  std::unique_ptr<graphics::Buffer> vertex_buffer_;
+  std::unique_ptr<graphics::Buffer> index_buffer_;
+  int num_vertices_;
+  int num_indices_;
+};
+}  // namespace snow_mount::visualizer

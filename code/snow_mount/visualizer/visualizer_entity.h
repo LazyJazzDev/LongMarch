@@ -1,8 +1,10 @@
-//
-// Created by zijian on 2025/3/12.
-//
+#pragma once
+#include "snow_mount/visualizer/visualizer_util.h"
 
-#ifndef VISUALIZER_ENTITY_H
-#define VISUALIZER_ENTITY_H
+namespace snow_mount::visualizer {
 
-#endif  // VISUALIZER_ENTITY_H
+class Entity : public std::enable_shared_from_this<Entity> {
+  friend class Core;
+};
+
+}  // namespace snow_mount::visualizer

@@ -2,10 +2,10 @@
 
 namespace grassland {
 
-void PybindModuleRegistration(pybind11::module_ &m) {
+void PyBind(pybind11::module_ &m) {
   m.doc() = "Grassland library.";
   pybind11::module_ m_graphics = m.def_submodule("graphics", "Graphics module.");
-  graphics::PybindModuleRegistration(m_graphics);
+  graphics::PyBind(m_graphics);
 }
 
 }  // namespace grassland

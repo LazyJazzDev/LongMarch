@@ -1,8 +1,49 @@
-//
-// Created by zijian on 2025/3/12.
-//
+#pragma once
+#include "grassland/grassland.h"
 
-#ifndef VISUALIZER_UTIL_H
-#define VISUALIZER_UTIL_H
+namespace snow_mount::visualizer {
+using namespace grassland;
 
-#endif  // VISUALIZER_UTIL_H
+class Core;
+class Scene;
+class Mesh;
+class Film;
+class Camera;
+class Program;
+
+struct Vertex {
+  glm::vec3 position;
+  glm::vec3 normal;
+  glm::vec2 tex_coord;
+  glm::vec4 color;
+};
+
+struct EntityInfo {
+  glm::mat4 model;
+};
+
+struct Material {
+  glm::vec4 albedo;
+};
+
+typedef enum TextureType { TEXTURE_TYPE_SDR = 0, TEXTURE_TYPE_HDR = 1 } TextureType;
+
+graphics::ImageFormat TextureTypeToImageFormat(TextureType type);
+
+struct CameraInfo {
+  glm::mat4 view;
+  glm::mat4 proj;
+};
+
+typedef enum FilmChannel {
+  FILM_CHANNEL_EXPOSURE = 0,
+  FILM_CHANNEL_ALBEDO = 1,
+  FILM_CHANNEL_POSITION = 2,
+  FILM_CHANNEL_NORMAL = 3,
+  FILM_CHANNEL_DEPTH = 4,
+  FILM_CHANNEL_COUNT = 5
+} FilmChannel;
+
+graphics::ImageFormat FilmChannelImageFormat(FilmChannel channel);
+
+}  // namespace snow_mount::visualizer

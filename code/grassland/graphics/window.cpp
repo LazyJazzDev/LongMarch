@@ -113,8 +113,8 @@ void Window::SetHDR(bool enable_hdr) {
   resize_event_.InvokeCallbacks(GetWidth(), GetHeight());
 }
 
-void Window::PybindModuleRegistration(pybind11::module &m) {
-  pybind11::class_<Window, std::shared_ptr<Window>> window(m, "Window", pybind11::dynamic_attr());
+void Window::PyBind(pybind11::module &m) {
+  pybind11::class_<Window, std::shared_ptr<Window>> window(m, "Window");
   window.def("__repr__",
              [](const Window &w) { return pybind11::str("<Window {}x{}>").format(w.GetWidth(), w.GetHeight()); });
   window.def("width", &Window::GetWidth);
