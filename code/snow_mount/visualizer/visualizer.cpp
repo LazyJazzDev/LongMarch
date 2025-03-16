@@ -1,8 +1,9 @@
 #include "snow_mount/visualizer/visualizer.h"
 
-#include "visualizer_core.h"
-#include "visualizer_film.h"
-#include "visualizer_mesh.h"
+#include "snow_mount/visualizer/visualizer_core.h"
+#include "snow_mount/visualizer/visualizer_film.h"
+#include "snow_mount/visualizer/visualizer_mesh.h"
+#include "visualizer_camera.h"
 
 namespace snow_mount::visualizer {
 
@@ -18,6 +19,7 @@ void PyBind(pybind11::module_ &m) {
   Core::PyBind(m);
   Mesh::PyBind(m);
   Film::PyBind(m);
+  Camera::PyBind(m);
 }
 
 }  // namespace snow_mount::visualizer

@@ -8,7 +8,7 @@ class Core;
 class Scene;
 class Mesh;
 class Film;
-class Camera;
+struct Camera;
 class Program;
 
 struct Vertex {
@@ -29,11 +29,6 @@ struct Material {
 typedef enum TextureType { TEXTURE_TYPE_SDR = 0, TEXTURE_TYPE_HDR = 1 } TextureType;
 
 graphics::ImageFormat TextureTypeToImageFormat(TextureType type);
-
-struct CameraInfo {
-  glm::mat4 view;
-  glm::mat4 proj;
-};
 
 typedef enum FilmChannel {
   FILM_CHANNEL_EXPOSURE = 0,

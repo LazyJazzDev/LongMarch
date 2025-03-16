@@ -1,3 +1,5 @@
+import math
+
 from long_march.grassland import graphics
 from long_march.snow_mount import visualizer
 import glfw
@@ -46,6 +48,10 @@ def main():
 
     mesh.set_vertices(mesh_vertices)
     mesh.set_indices(mesh_indices)
+
+    camera = visualizer.Camera()
+    camera.proj = visualizer.perspective(fovy=math.radians(90), aspect=800 / 600, near=0.1, far=100)
+    camera.view = visualizer.look_at(eye=[0, 1, 5], center=[0, 0, 0], up=[0, 1, 0])
 
     while not window.should_close():
         context = core.create_command_context()
