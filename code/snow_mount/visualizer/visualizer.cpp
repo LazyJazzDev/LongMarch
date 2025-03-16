@@ -4,6 +4,8 @@
 #include "snow_mount/visualizer/visualizer_film.h"
 #include "snow_mount/visualizer/visualizer_mesh.h"
 #include "visualizer_camera.h"
+#include "visualizer_entity.h"
+#include "visualizer_scene.h"
 
 namespace snow_mount::visualizer {
 
@@ -16,10 +18,13 @@ void PyBind(pybind11::module_ &m) {
   film_channel.value("FILM_CHANNEL_DEPTH", FilmChannel::FILM_CHANNEL_DEPTH);
   film_channel.export_values();
 
+  Material::PyBind(m);
   Core::PyBind(m);
   Mesh::PyBind(m);
   Film::PyBind(m);
+  Scene::PyBind(m);
   Camera::PyBind(m);
+  Entity::PyBind(m);
 }
 
 }  // namespace snow_mount::visualizer

@@ -4,11 +4,18 @@
 namespace snow_mount::visualizer {
 
 class Scene {
+  friend class Core;
   Scene(const std::shared_ptr<Core> &core);
 
  public:
+  uint64_t AddEntity(const std::shared_ptr<Entity> &entity);
+
+  static void PyBind(pybind11::module_ &m);
+
  private:
   std::shared_ptr<Core> core_;
+  std::map<uint64_t, std::shared_ptr<Entity>> entities_;
+  uint64_t entity_next_id_{0};
 };
 
 }  // namespace snow_mount::visualizer

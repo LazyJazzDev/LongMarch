@@ -10,6 +10,9 @@ class Mesh;
 class Film;
 struct Camera;
 class Program;
+class Entity;
+
+struct RenderContext;
 
 struct Vertex {
   glm::vec3 position;
@@ -18,12 +21,15 @@ struct Vertex {
   glm::vec4 color;
 };
 
-struct EntityInfo {
-  glm::mat4 model;
-};
-
 struct Material {
   glm::vec4 albedo;
+
+  static void PyBind(pybind11::module_ &m);
+};
+
+struct EntityInfo {
+  Material material;
+  glm::mat4 model;
 };
 
 typedef enum TextureType { TEXTURE_TYPE_SDR = 0, TEXTURE_TYPE_HDR = 1 } TextureType;
@@ -40,5 +46,11 @@ typedef enum FilmChannel {
 } FilmChannel;
 
 graphics::ImageFormat FilmChannelImageFormat(FilmChannel channel);
+
+typedef enum RenderStage { RENDER_STAGE_RASTER_GEOMETRY_PASS = 0, RENDER_STAGE_RASTER_LIGHTING_PASS = 1 } RenderStage;
+
+typedef enum ProgramID : uint64_t {
+  PROGRAM_ID_NO_NORMAL = 0,
+} ProgramID;
 
 }  // namespace snow_mount::visualizer

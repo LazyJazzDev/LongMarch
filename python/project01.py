@@ -53,6 +53,13 @@ def main():
     camera.proj = visualizer.perspective(fovy=math.radians(90), aspect=800 / 600, near=0.1, far=100)
     camera.view = visualizer.look_at(eye=[0, 1, 5], center=[0, 0, 0], up=[0, 1, 0])
 
+    entity = vis_core.create_entity_mesh_object()
+    print("create_entity_mesh_object")
+    scene = vis_core.create_scene()
+    print("create_scene")
+    scene.add_entity(entity)
+    print("add_entity")
+
     while not window.should_close():
         context = core.create_command_context()
         context.cmd_clear_image(film.get_image(), graphics.ColorClearValue(.6, .7, .8, 1.))

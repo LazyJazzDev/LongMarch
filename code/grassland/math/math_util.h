@@ -77,7 +77,7 @@ LM_DEVICE_FUNC Matrix<Scalar, row, col> GLMToEigen(const glm::mat<col, row, Scal
 }
 
 template <typename Scalar, int dim>
-LM_DEVICE_FUNC Vector<Scalar, dim> EigenToGLM(const glm::vec<dim, Scalar> &v) {
+LM_DEVICE_FUNC Vector<Scalar, dim> GLMToEigen(const glm::vec<dim, Scalar> &v) {
   Vector<Scalar, dim> result;
   for (int i = 0; i < dim; i++) {
     result[i] = v[i];
