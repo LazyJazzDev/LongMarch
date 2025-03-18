@@ -15,9 +15,12 @@
 #include "grassland/util/metronome.h"
 #include "grassland/util/string_convert.h"
 #include "grassland/util/vendor_id.h"
+#include "pybind11/chrono.h"
 #include "pybind11/eigen.h"
+#include "pybind11/functional.h"
 #include "pybind11/numpy.h"
 #include "pybind11/pybind11.h"
+#include "pybind11/stl.h"
 
 namespace grassland {
 #if defined(__CUDACC__)

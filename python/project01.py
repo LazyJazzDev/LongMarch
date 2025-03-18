@@ -2,6 +2,7 @@ import math
 
 from long_march.grassland import graphics
 from long_march.snow_mount import visualizer
+import scipy
 import glfw
 import time
 import numpy as np
@@ -16,7 +17,7 @@ class CameraController:
         self.last_update_time = time.time()
         self.last_cursor_pos = self.window.get_cursor_pos()
         self.move_speed = 1.0
-        print(type(self.last_cursor_pos))
+        self.rot_speed = 0.003
 
     def update(self, effective=True):
         this_update_time = time.time()
@@ -34,15 +35,35 @@ class CameraController:
             move_signal[2] += 1
         if self.window.get_key(glfw.KEY_SPACE):
             move_signal[1] += 1
-        if self.window.get_key(glfw.KEY_LEFT_SHIFT):
+        if self.window.get_key(glfw.KEY_LEFT_CONTROL):
             move_signal[1] -= 1
         move_signal = np.asarray(move_signal)
         move_signal = move_signal * self.move_speed * period
-        self.camera_position += move_signal
+
+        if self.window.get_mouse_button(glfw.MOUSE_BUTTON_LEFT):
+            self.camera_orientation[1] -= cursor_diff[0] * self.rot_speed
+            self.camera_orientation[0] -= cursor_diff[1] * self.rot_speed
+            self.camera_orientation[0] = np.clip(self.camera_orientation[0], -math.pi / 2, math.pi / 2)
+            self.camera_orientation[1] = self.camera_orientation[1] % (2 * math.pi)
+        R = np.identity(4)
+
+        R[:3, :3] = scipy.spatial.transform.Rotation.from_rotvec(
+            [0, self.camera_orientation[1], 0]).as_matrix() @ scipy.spatial.transform.Rotation.from_rotvec(
+            [self.camera_orientation[0], 0, 0]).as_matrix() @ scipy.spatial.transform.Rotation.from_rotvec(
+            [0, 0, self.camera_orientation[2]]).as_matrix()
+
+        self.camera_position += R[:3, :3] @ move_signal
+
+        R[:3, 3] = self.camera_position
+
+        # inverse matrix R
+        R = np.linalg.inv(R)
+
         if effective:
-            self.camera.view = visualizer.look_at(self.camera_position, [0, 0, 0], [0, 1, 0])
+            self.camera.view = R
         self.last_update_time = this_update_time
         self.last_cursor_pos = this_cursor_pos
+
 
 def main():
     glfw.init()
@@ -56,6 +77,18 @@ def main():
     vis_core = visualizer.Core(core)
     mesh = vis_core.create_mesh()
     film = vis_core.create_film(800, 600)
+
+    image = core.create_image(800, 600, graphics.IMAGE_FORMAT_R8G8B8A8_UNORM)
+
+    width, height = 0, 0
+    # make a function that changes width and height on callback
+    def resize_callback(w, h):
+        nonlocal core, film
+        core.wait_gpu()
+        film = vis_core.create_film(w, h)
+
+
+    window.reg_resize_callback(resize_callback)
     print(film)
     print(film.get_image(visualizer.FILM_CHANNEL_EXPOSURE))
     print(film.get_image(visualizer.FILM_CHANNEL_DEPTH))
@@ -87,8 +120,7 @@ def main():
     mesh.set_indices(mesh_indices)
 
     camera = vis_core.create_camera()
-    camera.proj = visualizer.perspective(fovy=math.radians(90), aspect=800 / 600, near=0.1, far=100)
-    camera.view = visualizer.look_at(eye=[0, 1, 5], center=[0, 0, 0], up=[0, 1, 0])
+    camera.proj = visualizer.perspective(fovy=math.radians(60), aspect=800 / 600, near=0.1, far=100)
 
     cam_controller = CameraController(window, camera)
 
@@ -104,7 +136,6 @@ def main():
         current_frame_time = time.time()
         period = current_frame_time - last_frame_time
         context = core.create_command_context()
-        # context.cmd_clear_image(film.get_image(), graphics.ColorClearValue(.6, .7, .8, 1.))
         vis_core.render(context, scene, camera, film)
         context.cmd_present(window, film.get_image())
         context.submit()

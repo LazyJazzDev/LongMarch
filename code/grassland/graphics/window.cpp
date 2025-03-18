@@ -135,6 +135,40 @@ void Window::PyBind(pybind11::module &m) {
     glfwGetCursorPos(w.GLFWWindow(), &pos.first, &pos.second);
     return pos;
   });
+  window.def("reg_resize_callback", [](Window &w, std::function<void(int, int)> callback) {
+    return w.ResizeEvent().RegisterCallback(callback);
+  });
+  window.def("unreg_resize_callback", [](Window &w, int id) { return w.ResizeEvent().UnregisterCallback(id); });
+  window.def("reg_mouse_move_callback", [](Window &w, std::function<void(double, double)> callback) {
+    return w.MouseMoveEvent().RegisterCallback(callback);
+  });
+  window.def("unreg_mouse_move_callback", [](Window &w, int id) { return w.MouseMoveEvent().UnregisterCallback(id); });
+  window.def("reg_mouse_button_callback", [](Window &w, std::function<void(int, int, int, double, double)> callback) {
+    return w.MouseButtonEvent().RegisterCallback(callback);
+  });
+  window.def("unreg_mouse_button_callback",
+             [](Window &w, int id) { return w.MouseButtonEvent().UnregisterCallback(id); });
+  window.def("reg_scroll_callback", [](Window &w, std::function<void(double, double)> callback) {
+    return w.ScrollEvent().RegisterCallback(callback);
+  });
+  window.def("unreg_scroll_callback", [](Window &w, int id) { return w.ScrollEvent().UnregisterCallback(id); });
+  window.def("reg_key_callback", [](Window &w, std::function<void(int, int, int, int)> callback) {
+    return w.KeyEvent().RegisterCallback(callback);
+  });
+  window.def("unreg_key_callback", [](Window &w, int id) { return w.KeyEvent().UnregisterCallback(id); });
+  window.def("reg_char_callback", [](Window &w, std::function<void(uint32_t)> callback) {
+    return w.CharEvent().RegisterCallback(callback);
+  });
+  window.def("unreg_char_callback", [](Window &w, int id) { return w.CharEvent().UnregisterCallback(id); });
+  window.def("reg_drop_callback", [](Window &w, std::function<void(const std::vector<std::string>)> callback) {
+    return w.DropEvent().RegisterCallback([callback](int count, const char **paths) {
+      std::vector<std::string> args;
+      for (int i = 0; i < count; i++) {
+        args.emplace_back(paths[i]);
+      }
+      return callback(args);
+    });
+  });
 
   m.def("glfw_poll_events", []() { glfwPollEvents(); });
 }
