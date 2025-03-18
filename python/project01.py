@@ -78,7 +78,6 @@ def main():
     mesh = vis_core.create_mesh()
     film = vis_core.create_film(800, 600)
 
-    image = core.create_image(800, 600, graphics.IMAGE_FORMAT_R8G8B8A8_UNORM)
 
     mesh_vertices = [
         [-1, -1, -1],
@@ -136,13 +135,13 @@ def main():
         context = core.create_command_context()
         vis_core.render(context, scene, camera, film)
         if len(entities):
-            scene.add_entity(entities[0])
             entities = []
         else:
             entity = vis_core.create_entity_mesh_object()
             entity.set_mesh(mesh)
-            entity.set_material(visualizer.Material())
+            entity.set_material(visualizer.Material([0.8, 0.5, 0.5, 1.0]))
             entities = [entity]
+            scene.add_entity(entities[0])
         context.cmd_present(window, film.get_image())
         context.submit()
         graphics.glfw_poll_events()

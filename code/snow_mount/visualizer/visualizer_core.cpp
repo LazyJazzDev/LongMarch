@@ -92,6 +92,9 @@ int Core::Render(graphics::CommandContext *context,
       to_del_entities.push(id);
     }
   }
+
+  context->CmdEndRendering();
+
   context->PushPostExecutionCallback([holder = render_context.ownership_holder]() { holder->Clear(); });
   while (!to_del_entities.empty()) {
     scene->entities_.erase(to_del_entities.front());
