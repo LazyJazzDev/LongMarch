@@ -139,7 +139,7 @@ HRESULT DXGIFactory::CreateSwapChain(const CommandQueue &command_queue,
       "failed to create swap chain.");
 
   ComPtr<IDXGISwapChain3> swap_chain3;
-  RETURN_IF_FAILED_HR(swap_chain.As(&swap_chain3), "failed to create swap chain.");
+  RETURN_IF_FAILED_HR(swap_chain.As(&swap_chain3), "failed to create swap chain 3.");
 
   if (desc.Format == DXGI_FORMAT_R16G16B16A16_FLOAT) {
     // Enable HDR.

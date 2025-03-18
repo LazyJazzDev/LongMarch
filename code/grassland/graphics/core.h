@@ -73,6 +73,8 @@ class Core {
 
   int FramesInFlight() const;
 
+  virtual uint32_t CurrentFrame() const = 0;
+
   bool DebugEnabled() const;
 
   bool DeviceRayTracingSupport() const;

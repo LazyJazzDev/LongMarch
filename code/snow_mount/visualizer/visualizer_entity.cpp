@@ -3,6 +3,7 @@
 #include "snow_mount/visualizer/visualizer_core.h"
 #include "snow_mount/visualizer/visualizer_mesh.h"
 #include "visualizer_camera.h"
+#include "visualizer_ownership_holder.h"
 #include "visualizer_render_context.h"
 
 namespace snow_mount::visualizer {
@@ -66,6 +67,7 @@ int EntityMeshObject::ExecuteStage(RenderStage render_stage, const RenderContext
   std::shared_ptr<Mesh> mesh = mesh_.lock();
   if (mesh) {
     if (render_stage == RENDER_STAGE_RASTER_GEOMETRY_PASS) {
+      ctx.ownership_holder->AddMesh(mesh);
       ctx.cmd_ctx->CmdBindProgram(program_->program_.get());
       ctx.cmd_ctx->CmdSetPrimitiveTopology(graphics::PRIMITIVE_TOPOLOGY_TRIANGLE_LIST);
       ctx.cmd_ctx->CmdBindResources(0, {ctx.camera_buffer});

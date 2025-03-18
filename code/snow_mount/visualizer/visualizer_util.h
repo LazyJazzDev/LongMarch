@@ -13,6 +13,7 @@ class Program;
 class Entity;
 
 struct RenderContext;
+class OwnershipHolder;
 
 struct Vertex {
   glm::vec3 position;

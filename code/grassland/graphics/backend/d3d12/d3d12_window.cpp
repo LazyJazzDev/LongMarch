@@ -10,16 +10,16 @@ D3D12Window::D3D12Window(D3D12Core *core,
                          bool enable_hdr)
     : Window(width, height, title, fullscreen, resizable, enable_hdr), core_(core) {
   HWND hwnd = glfwGetWin32Window(GLFWWindow());
-  core_->DXGIFactory()->CreateSwapChain(*core_->CommandQueue(), hwnd, core_->FramesInFlight(),
-                                        enable_hdr_ ? DXGI_FORMAT_R16G16B16A16_FLOAT : DXGI_FORMAT_R8G8B8A8_UNORM,
-                                        &swap_chain_);
+  core_->DXGIFactory()->CreateSwapChain(
+      *core_->CommandQueue(), hwnd, std::max(std::min(core_->FramesInFlight(), DXGI_MAX_SWAP_CHAIN_BUFFERS), 2),
+      enable_hdr_ ? DXGI_FORMAT_R16G16B16A16_FLOAT : DXGI_FORMAT_R8G8B8A8_UNORM, &swap_chain_);
   ResizeEvent().RegisterCallback([this](int width, int height) {
     core_->WaitGPU();
     swap_chain_.reset();
     HWND hwnd = glfwGetWin32Window(GLFWWindow());
-    core_->DXGIFactory()->CreateSwapChain(*core_->CommandQueue(), hwnd, core_->FramesInFlight(),
-                                          enable_hdr_ ? DXGI_FORMAT_R16G16B16A16_FLOAT : DXGI_FORMAT_R8G8B8A8_UNORM,
-                                          &swap_chain_);
+    core_->DXGIFactory()->CreateSwapChain(
+        *core_->CommandQueue(), hwnd, std::max(std::min(core_->FramesInFlight(), DXGI_MAX_SWAP_CHAIN_BUFFERS), 2),
+        enable_hdr_ ? DXGI_FORMAT_R16G16B16A16_FLOAT : DXGI_FORMAT_R8G8B8A8_UNORM, &swap_chain_);
   });
 }
 

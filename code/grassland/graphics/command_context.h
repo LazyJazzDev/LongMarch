@@ -46,8 +46,12 @@ class CommandContext {
 
   virtual void CmdDispatchRays(uint32_t width, uint32_t height, uint32_t depth) = 0;
 
+  void PushPostExecutionCallback(std::function<void()> callback);
+  const std::vector<std::function<void()>> &GetPostExecutionCallbacks() const;
+
   static void PyBind(pybind11::module &m);
 
  protected:
+  std::vector<std::function<void()>> post_execution_callbacks_;
 };
 }  // namespace grassland::graphics

@@ -250,11 +250,18 @@ int VulkanCore::SubmitCommandContext(CommandContext *p_command_context) {
     window->Present();
   }
 
+  post_execute_functions_[current_frame_] = p_command_context->GetPostExecutionCallbacks();
+
   current_frame_ = (current_frame_ + 1) % FramesInFlight();
   fence = in_flight_fences_[current_frame_]->Handle();
   vkWaitForFences(device_->Handle(), 1, &fence, VK_TRUE, std::numeric_limits<uint64_t>::max());
 
   vkQueueWaitIdle(transfer_queue_->Handle());
+
+  for (auto &callback : post_execute_functions_[current_frame_]) {
+    callback();
+  }
+  post_execute_functions_[current_frame_].clear();
 
   return 0;
 }
@@ -327,6 +334,8 @@ int VulkanCore::InitializeLogicalDevice(int device_index) {
   descriptor_pools_.resize(FramesInFlight());
   descriptor_sets_.resize(FramesInFlight());
 
+  post_execute_functions_.resize(FramesInFlight());
+
   for (int i = 0; i < FramesInFlight(); i++) {
     device_->CreateFence(true, &in_flight_fences_[i]);
     graphics_command_pool_->AllocateCommandBuffer(VK_COMMAND_BUFFER_LEVEL_PRIMARY, &command_buffers_[i]);
@@ -347,6 +356,12 @@ int VulkanCore::InitializeLogicalDevice(int device_index) {
 
 void VulkanCore::WaitGPU() {
   device_->WaitIdle();
+  for (auto &post_execute : post_execute_functions_) {
+    for (auto &callback : post_execute) {
+      callback();
+    }
+    post_execute.clear();
+  }
 }
 
 void VulkanCore::SingleTimeCommand(std::function<void(VkCommandBuffer)> command) {

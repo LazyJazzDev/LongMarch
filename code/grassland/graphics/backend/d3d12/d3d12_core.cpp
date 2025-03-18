@@ -279,9 +279,16 @@ int D3D12Core::SubmitCommandContext(CommandContext *p_command_context) {
 
   fences_[current_frame_]->Signal(command_queue_.get());
 
+  post_execute_functions_[current_frame_] = p_command_context->GetPostExecutionCallbacks();
+
   current_frame_ = (current_frame_ + 1) % FramesInFlight();
   fences_[current_frame_]->Wait();
   transfer_fence_->Wait();
+
+  for (auto &function : post_execute_functions_[current_frame_]) {
+    function();
+  }
+  post_execute_functions_[current_frame_].clear();
 
   return 0;
 }
@@ -328,6 +335,8 @@ int D3D12Core::InitializeLogicalDevice(int device_index) {
   rtv_descriptor_heaps_.resize(FramesInFlight());
   dsv_descriptor_heaps_.resize(FramesInFlight());
 
+  post_execute_functions_.resize(FramesInFlight());
+
   for (int i = 0; i < FramesInFlight(); i++) {
     device_->CreateDescriptorHeap(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV, 64, &resource_descriptor_heaps_[i]);
     device_->CreateDescriptorHeap(D3D12_DESCRIPTOR_HEAP_TYPE_SAMPLER, 64, &sampler_descriptor_heaps_[i]);
@@ -355,6 +364,12 @@ int D3D12Core::InitializeLogicalDevice(int device_index) {
 void D3D12Core::WaitGPU() {
   single_time_fence_->Signal(command_queue_.get());
   single_time_fence_->Wait();
+  for (auto &post_execute : post_execute_functions_) {
+    for (auto &callback : post_execute) {
+      callback();
+    }
+    post_execute.clear();
+  }
 }
 
 void D3D12Core::SingleTimeCommand(std::function<void(ID3D12GraphicsCommandList *)> command) {

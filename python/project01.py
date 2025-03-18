@@ -80,20 +80,6 @@ def main():
 
     image = core.create_image(800, 600, graphics.IMAGE_FORMAT_R8G8B8A8_UNORM)
 
-    width, height = 0, 0
-    # make a function that changes width and height on callback
-    def resize_callback(w, h):
-        nonlocal core, film
-        core.wait_gpu()
-        film = vis_core.create_film(w, h)
-
-
-    window.reg_resize_callback(resize_callback)
-    print(film)
-    print(film.get_image(visualizer.FILM_CHANNEL_EXPOSURE))
-    print(film.get_image(visualizer.FILM_CHANNEL_DEPTH))
-    print(visualizer.FilmChannel(2))
-
     mesh_vertices = [
         [-1, -1, -1],
         [1, -1, -1],
@@ -130,13 +116,33 @@ def main():
     scene = vis_core.create_scene()
     scene.add_entity(entity)
 
+    entities = [entity]
+    del entity
+
     last_frame_time = time.time()
+
+    def resize_callback(w, h):
+        nonlocal core, film, camera
+        core.wait_gpu()
+        film = vis_core.create_film(w, h)
+        camera.proj = visualizer.perspective(fovy=math.radians(60), aspect=w / h, near=0.1, far=100)
+
+
+    window.reg_resize_callback(resize_callback)
 
     while not window.should_close():
         current_frame_time = time.time()
         period = current_frame_time - last_frame_time
         context = core.create_command_context()
         vis_core.render(context, scene, camera, film)
+        if len(entities):
+            scene.add_entity(entities[0])
+            entities = []
+        else:
+            entity = vis_core.create_entity_mesh_object()
+            entity.set_mesh(mesh)
+            entity.set_material(visualizer.Material())
+            entities = [entity]
         context.cmd_present(window, film.get_image())
         context.submit()
         graphics.glfw_poll_events()

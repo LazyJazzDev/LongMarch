@@ -99,7 +99,7 @@ class D3D12Core : public Core {
     return single_time_fence_.get();
   }
 
-  uint32_t CurrentFrame() const {
+  uint32_t CurrentFrame() const override {
     return current_frame_;
   }
 
@@ -145,6 +145,8 @@ class D3D12Core : public Core {
   std::vector<std::unique_ptr<d3d12::DescriptorHeap>> dsv_descriptor_heaps_;
 
   uint32_t current_frame_{0};
+
+  std::vector<std::vector<std::function<void()>>> post_execute_functions_;
 };
 
 }  // namespace grassland::graphics::backend

@@ -44,6 +44,7 @@ class Core : public std::enable_shared_from_this<Core> {
  private:
   graphics::Core *core_;
   std::map<uint64_t, std::shared_ptr<Program>> programs_;
+  std::vector<OwnershipHolder> ownership_holders_;
 };
 
 std::shared_ptr<Core> CreateCore(graphics::Core *graphics_core);

@@ -91,7 +91,7 @@ class VulkanCore : public Core {
     return in_flight_fences_[current_frame_].get();
   }
 
-  uint32_t CurrentFrame() const {
+  uint32_t CurrentFrame() const override {
     return current_frame_;
   }
 
@@ -117,6 +117,8 @@ class VulkanCore : public Core {
 
   std::unique_ptr<vulkan::Queue> graphics_queue_;
   std::unique_ptr<vulkan::Queue> transfer_queue_;
+
+  std::vector<std::vector<std::function<void()>>> post_execute_functions_;
 };
 
 }  // namespace grassland::graphics::backend

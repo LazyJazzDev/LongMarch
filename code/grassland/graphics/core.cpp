@@ -49,7 +49,7 @@ std::string Core::DeviceName() const {
 void Core::PyBind(pybind11::module &m) {
   pybind11::class_<Core::Settings> core_settings_class(m, "CoreSettings");
   core_settings_class.def(pybind11::init<int, bool>(), pybind11::arg("frames_in_flight") = 2,
-                          pybind11::arg("enable_debug") = false);
+                          pybind11::arg("enable_debug") = kEnableDebug);
   core_settings_class.def_readwrite("frames_in_flight", &Settings::frames_in_flight);
   core_settings_class.def_readwrite("enable_debug", &Settings::enable_debug);
   core_settings_class.def("__repr__", [](const Core::Settings &settings) {
