@@ -1,4 +1,3 @@
-#include "device_clock.cuh"
 #include "gtest/gtest.h"
 #include "long_march.h"
 #include "thrust/device_vector.h"
@@ -170,7 +169,7 @@ void BatchQueryDev(const grassland::BVHHost &bvh,
 
   grassland::BVHCuda bvh_dev(bvh);
 
-  DeviceClock clock;
+  grassland::DeviceClock clock;
   BatchQueryDevKernel<<<(num_tasks + 255) / 256, 256>>>(bvh_dev, thrust::raw_pointer_cast(queries_dev.data()),
                                                         thrust::raw_pointer_cast(result_dev.data()), attached_dev,
                                                         num_tasks);
