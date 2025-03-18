@@ -1,4 +1,10 @@
-#include "device_clock.cuh"
+#if defined(LONGMARCH_CUDA_RUNTIME)
+
+#include "grassland/util/device_clock.h"
+
+#include "grassland/math/math_basics.h"
+
+namespace grassland {
 
 namespace {
 cudaEvent_t CudaCreateAndRecordEvent() {
@@ -52,3 +58,7 @@ void DeviceClock::Finish() {
     cudaEventDestroy(event);
   }
 }
+
+}  // namespace grassland
+
+#endif

@@ -8,6 +8,7 @@
 #endif
 
 #include "grassland/util/deferred_process.h"
+#include "grassland/util/device_clock.h"
 #include "grassland/util/double_ptr.h"
 #include "grassland/util/event_manager.h"
 #include "grassland/util/file_probe.h"
@@ -21,6 +22,11 @@
 #include "pybind11/numpy.h"
 #include "pybind11/pybind11.h"
 #include "pybind11/stl.h"
+
+#if defined(LONGMARCH_CUDA_RUNTIME)
+#include "cuda_runtime.h"
+#include "thrust/device_vector.h"
+#endif
 
 namespace grassland {
 #if defined(__CUDACC__)

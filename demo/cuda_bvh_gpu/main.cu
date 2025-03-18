@@ -5,7 +5,6 @@
 #include "cub/cub.cuh"
 #include "cuda_runtime.h"
 #include "curand.h"
-#include "device_clock.cuh"
 #include "long_march.h"
 
 #define KERNEL_LAUNCH_SIZE(n, nthread) (n + nthread - 1) / nthread, nthread
@@ -28,7 +27,7 @@ __global__ void GenerateRandomNumber(float *x, int *y, int n) {
 }
 
 int main() {
-  DeviceClock clock;
+  grassland::DeviceClock clock;
   const int n = 1000000;
   thrust::device_vector<float> x;
   thrust::device_vector<int> y;

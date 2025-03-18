@@ -3,7 +3,6 @@
 #include "cub/cub.cuh"
 #include "cuda_runtime.h"
 #include "curand.h"
-#include "device_clock.cuh"
 #include "long_march.h"
 
 int main() {
