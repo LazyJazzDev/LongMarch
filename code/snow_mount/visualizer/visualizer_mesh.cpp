@@ -36,11 +36,11 @@ void Mesh::SetIndices(const uint32_t *indices, int num_indices) {
   num_indices_ = num_indices;
 }
 
-int Mesh::GetVertexCount() const {
+int Mesh::VertexCount() const {
   return num_vertices_;
 }
 
-int Mesh::GetIndexCount() const {
+int Mesh::IndexCount() const {
   return num_indices_;
 }
 
@@ -88,8 +88,8 @@ void Mesh::PyBind(pybind11::module_ &m) {
     mesh.SetIndices(index_data.data(), index_data.size());
   });
 
-  mesh.def("get_vertex_count", &Mesh::GetVertexCount);
-  mesh.def("get_index_count", &Mesh::GetIndexCount);
+  mesh.def("vertex_count", &Mesh::VertexCount);
+  mesh.def("index_count", &Mesh::IndexCount);
 }
 
 }  // namespace snow_mount::visualizer

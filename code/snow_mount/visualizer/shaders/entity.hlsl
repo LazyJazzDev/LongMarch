@@ -75,7 +75,7 @@ GSInput VSMain(VSInput input) {
   output.position = mul(entity_info.model, float4(input.position, 1.0f));
   output.world_position = output.position.xyz;
   output.position = mul(camera_info.view, output.position);
-  output.position = mul(camera_info.projection, output.position);
+  output.position = mul(camera_info.proj, output.position);
   output.normal =
       mul(transpose(inverse(float3x3(entity_info.model[0].xyz, entity_info.model[1].xyz, entity_info.model[2].xyz))),
           input.normal);
@@ -87,7 +87,7 @@ GSInput VSMain(VSInput input) {
 [maxvertexcount(3)] void GSMain(triangle GSInput input[3], inout TriangleStream<PSInput> triStream) {
   float3 v0 = input[1].world_position - input[0].world_position;
   float3 v1 = input[2].world_position - input[0].world_position;
-  float3 normal = -normalize(cross(v0, v1));
+  float3 normal = normalize(cross(v0, v1));
   PSInput output = (PSInput)0;
   [unroll] for (int i = 0; i < 3; i++) {
     output.position = input[i].position;

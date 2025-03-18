@@ -14,7 +14,7 @@ class Scene {
 
  private:
   std::shared_ptr<Core> core_;
-  std::map<uint64_t, std::shared_ptr<Entity>> entities_;
+  std::map<uint64_t, std::weak_ptr<Entity>> entities_;
   uint64_t entity_next_id_{0};
 };
 

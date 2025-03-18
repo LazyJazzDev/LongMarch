@@ -130,6 +130,11 @@ void Window::PyBind(pybind11::module &m) {
   window.def(
       "get_mouse_button", [](const Window &w, int button) { return glfwGetMouseButton(w.GLFWWindow(), button); },
       pybind11::arg("button"));
+  window.def("get_cursor_pos", [](const Window &w) {
+    std::pair<double, double> pos;
+    glfwGetCursorPos(w.GLFWWindow(), &pos.first, &pos.second);
+    return pos;
+  });
 
   m.def("glfw_poll_events", []() { glfwPollEvents(); });
 }

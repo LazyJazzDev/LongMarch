@@ -1,5 +1,6 @@
 #pragma once
 #include "snow_mount/visualizer/visualizer_util.h"
+#include "visualizer_scene.h"
 
 namespace snow_mount::visualizer {
 
@@ -20,6 +21,8 @@ class Core : public std::enable_shared_from_this<Core> {
 
   static std::shared_ptr<Core> CreateCore(graphics::Core *graphics_core);
 
+  std::shared_ptr<Camera> CreateCamera(const Matrix4<float> &proj, const Matrix4<float> &view);
+
   std::shared_ptr<Mesh> CreateMesh();
 
   std::shared_ptr<Film> CreateFilm(int width, int height);
@@ -30,6 +33,11 @@ class Core : public std::enable_shared_from_this<Core> {
   std::shared_ptr<EntityType> CreateEntity(Args &&...args) {
     return std::make_shared<EntityType>(shared_from_this(), std::forward<Args>(args)...);
   }
+
+  int Render(graphics::CommandContext *context,
+             const std::shared_ptr<Scene> &scene,
+             const std::shared_ptr<Camera> &camera,
+             const std::shared_ptr<Film> &film);
 
   static void PyBind(pybind11::module_ &m);
 

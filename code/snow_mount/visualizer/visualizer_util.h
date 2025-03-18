@@ -8,7 +8,7 @@ class Core;
 class Scene;
 class Mesh;
 class Film;
-struct Camera;
+class Camera;
 class Program;
 class Entity;
 
@@ -25,6 +25,11 @@ struct Material {
   glm::vec4 albedo;
 
   static void PyBind(pybind11::module_ &m);
+};
+
+struct CameraInfo {
+  glm::mat4 proj;
+  glm::mat4 view;
 };
 
 struct EntityInfo {

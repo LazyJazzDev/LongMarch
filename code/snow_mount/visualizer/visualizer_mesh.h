@@ -12,8 +12,8 @@ class Mesh {
   void SetVertices(const Vertex *vertices, int num_vertex);
   void SetIndices(const uint32_t *indices, int num_indices);
 
-  int GetVertexCount() const;
-  int GetIndexCount() const;
+  int VertexCount() const;
+  int IndexCount() const;
 
   graphics::Buffer *GetVertexBuffer() const;
   graphics::Buffer *GetIndexBuffer() const;

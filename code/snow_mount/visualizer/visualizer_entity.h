@@ -9,7 +9,7 @@ class Entity {
 
  public:
   virtual ~Entity() = default;
-  virtual int ExecuteStage(RenderStage render_stage, RenderContext *ctx);
+  virtual int ExecuteStage(RenderStage render_stage, const RenderContext &ctx);
 
   static void PyBind(pybind11::module &m);
 
@@ -25,7 +25,14 @@ class EntityMeshObject : public Entity {
                    const Material &material,
                    const Matrix4<float> &transform);
 
-  int ExecuteStage(RenderStage render_stage, RenderContext *ctx) override;
+  int ExecuteStage(RenderStage render_stage, const RenderContext &ctx) override;
+
+  void SetMesh(const std::shared_ptr<Mesh> &mesh);
+
+  void SetMaterial(const Material &material);
+
+  void SetTransform(const Matrix4<float> &transform);
+
   static void PyBind(pybind11::module &m);
 
  private:

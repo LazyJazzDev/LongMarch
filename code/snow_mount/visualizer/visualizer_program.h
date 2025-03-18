@@ -11,7 +11,6 @@ class ProgramNoNormal : public Program {
  public:
   ~ProgramNoNormal() override = default;
 
- private:
   std::unique_ptr<graphics::Shader> vertex_shader_;
   std::unique_ptr<graphics::Shader> geometry_shader_;
   std::unique_ptr<graphics::Shader> fragment_shader_;
