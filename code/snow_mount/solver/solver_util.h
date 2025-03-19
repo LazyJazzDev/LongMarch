@@ -7,7 +7,7 @@ using namespace grassland;
 
 class Core;
 class Scene;
-class ObjectPack;
-class ObjectPackView;
-class RigidObject;
+struct ObjectPack;
+struct ObjectPackView;
+struct RigidObject;
 }  // namespace snow_mount::solver

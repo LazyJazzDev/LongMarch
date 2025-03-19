@@ -1,7 +1,6 @@
 #pragma once
 #include "snow_mount/solver/solver_element.h"
 #include "snow_mount/solver/solver_object_pack.h"
-#include "snow_mount/solver/solver_object_pack_view.h"
 #include "snow_mount/solver/solver_rigid_object.h"
 #include "snow_mount/solver/solver_scene.h"
 #include "snow_mount/solver/solver_util.h"

@@ -1,4 +1,13 @@
-file(GLOB_RECURSE SOURCES "*.cpp" "*.h")
+file(GLOB_RECURSE SOURCES "*.cpp")
+
+if (LONGMARCH_CUDA_ENABLED)
+    # mark *.cpp as CUDA sources
+    foreach (source IN LISTS SOURCES)
+        if (source MATCHES ".*\\.cpp$")
+            set_property(SOURCE ${source} PROPERTY LANGUAGE CUDA)
+        endif ()
+    endforeach ()
+endif ()
 
 add_library(${SNOW_MOUNT_SUBLIB_NAME} ${SOURCES})
 

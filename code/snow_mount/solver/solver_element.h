@@ -17,7 +17,7 @@ struct ElementBending {
   float stiffness{0.0f};
   float damping{0.0f};
   float theta_rest{0.0f};
-  float bending_bound{4.0f};  // any value larger than pi
+  float elastic_limit{4.0f};  // any value larger than pi
 };
 
 namespace element {

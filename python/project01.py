@@ -67,6 +67,32 @@ class CameraController:
 
 
 def main():
+    # make a numpy grid
+
+    cloth_vertices = []
+    for i in range(50):
+        for j in range(50):
+            cloth_vertices.append([i / 49 * 2 - 1, 1, j / 49 * 2 - 1])
+    cloth_vertices = np.asarray(cloth_vertices)
+    cloth_indices = []
+
+    for i in range(49):
+        i1 = i + 1
+        for j in range(49):
+            j1 = j + 1
+            v00 = i * 50 + j
+            v01 = i * 50 + j1
+            v10 = i1 * 50 + j
+            v11 = i1 * 50 + j1
+            cloth_indices.append([v00, v01, v11])
+            cloth_indices.append([v00, v11, v10])
+    # serialize the indices
+    cloth_indices = np.asarray(cloth_indices).flatten()
+    solver_scene = solver.Scene()
+
+    object_pack = solver.ObjectPack.create_grid_cloth(cloth_vertices, 50, 50)
+    object_pack_view = solver_scene.add_object(object_pack)
+
     glfw.init()
     core_settings = graphics.CoreSettings()
     core_settings.frames_in_flight = 1
@@ -78,7 +104,6 @@ def main():
     vis_core = visualizer.Core(core)
     mesh = vis_core.create_mesh()
     film = vis_core.create_film(800, 600)
-
 
     mesh_vertices = [
         [-1, -1, -1],
@@ -102,8 +127,8 @@ def main():
                     0, 5, 4,
                     0, 1, 5]
 
-    mesh.set_vertices(mesh_vertices)
-    mesh.set_indices(mesh_indices)
+    mesh.set_vertices(cloth_vertices)
+    mesh.set_indices(cloth_indices)
 
     camera = vis_core.create_camera()
     camera.proj = visualizer.perspective(fovy=math.radians(60), aspect=800 / 600, near=0.1, far=100)
@@ -126,6 +151,7 @@ def main():
         core.wait_gpu()
         film = vis_core.create_film(w, h)
         camera.proj = visualizer.perspective(fovy=math.radians(60), aspect=w / h, near=0.1, far=100)
+
     window.reg_resize_callback(resize_callback)
 
     stretching = solver.ElementStretching()
@@ -135,6 +161,10 @@ def main():
     while not window.should_close():
         current_frame_time = time.time()
         period = current_frame_time - last_frame_time
+
+        cloth_vertices = solver_scene.get_positions(object_pack_view.particle_ids)
+        mesh.set_vertices(cloth_vertices)
+
         context = core.create_command_context()
         vis_core.render(context, scene, camera, film)
         if len(entities):
