@@ -1,5 +1,5 @@
 import math
-
+import long_march
 from long_march.grassland import graphics
 from long_march.snow_mount import visualizer
 from long_march.snow_mount import solver
@@ -127,11 +127,12 @@ def main():
                     0, 5, 4,
                     0, 1, 5]
 
+    mesh_sdf = long_march.grassland.math.MeshSDF(mesh_vertices, mesh_indices)
+
     mesh.set_vertices(cloth_vertices)
     mesh.set_indices(cloth_indices)
 
-    camera = vis_core.create_camera()
-    camera.proj = visualizer.perspective(fovy=math.radians(60), aspect=800 / 600, near=0.1, far=100)
+    camera = vis_core.create_camera(proj=visualizer.perspective(fovy=math.radians(60), aspect=800 / 600, near=0.1, far=100))
 
     cam_controller = CameraController(window, camera)
 
