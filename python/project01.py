@@ -2,6 +2,7 @@ import math
 
 from long_march.grassland import graphics
 from long_march.snow_mount import visualizer
+from long_march.snow_mount import solver
 import scipy
 import glfw
 import time
@@ -125,9 +126,11 @@ def main():
         core.wait_gpu()
         film = vis_core.create_film(w, h)
         camera.proj = visualizer.perspective(fovy=math.radians(60), aspect=w / h, near=0.1, far=100)
-
-
     window.reg_resize_callback(resize_callback)
+
+    stretching = solver.ElementStretching()
+    bending = solver.ElementBending()
+    print(stretching, bending)
 
     while not window.should_close():
         current_frame_time = time.time()

@@ -1,8 +1,27 @@
-//
-// Created by zijian on 2025/3/18.
-//
+#pragma once
+#include "snow_mount/solver/solver_util.h"
 
-#ifndef SOLVER_ELEMENT_H
-#define SOLVER_ELEMENT_H
+namespace snow_mount::solver {
 
-#endif  // SOLVER_ELEMENT_H
+struct ElementStretching {
+  float mu{0.0f};
+  float lambda{0.0f};
+  float area{0.0f};
+  float damping{0.0f};
+  Matrix2<float> Dm{Matrix2<float>::Identity()};
+  float sigma_lb{-1.0f};
+  float sigma_ub{-1.0f};
+};
+
+struct ElementBending {
+  float stiffness{0.0f};
+  float damping{0.0f};
+  float theta_rest{0.0f};
+  float bending_bound{4.0f};  // any value larger than pi
+};
+
+namespace element {
+void PyBind(pybind11::module_ &m);
+}
+
+}  // namespace snow_mount::solver

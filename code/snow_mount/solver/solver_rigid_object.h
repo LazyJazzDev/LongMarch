@@ -1,8 +1,4 @@
-//
-// Created by zijian on 2025/3/18.
-//
+#pragma once
+#include "snow_mount/solver/solver_util.h"
 
-#ifndef SOLVER_RIGID_OBJECT_H
-#define SOLVER_RIGID_OBJECT_H
-
-#endif  // SOLVER_RIGID_OBJECT_H
+namespace snow_mount::solver {}

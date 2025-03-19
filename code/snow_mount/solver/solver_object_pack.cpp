@@ -1,5 +1,3 @@
-//
-// Created by zijian on 2025/3/18.
-//
+#include "snow_mount/solver/solver_object_pack.h"
 
-#include "solver_object_pack.h"
+namespace snow_mount::solver {}
