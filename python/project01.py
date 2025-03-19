@@ -93,6 +93,8 @@ def main():
     object_pack = solver.ObjectPack.create_grid_cloth(cloth_vertices, 50, 50)
     object_pack_view = solver_scene.add_object(object_pack)
 
+    solver_scene_dev = solver.SceneDevice(solver_scene)
+
     glfw.init()
     core_settings = graphics.CoreSettings()
     core_settings.frames_in_flight = 1
@@ -138,12 +140,9 @@ def main():
 
     entity = vis_core.create_entity_mesh_object()
     entity.set_mesh(mesh)
-    entity.set_material(visualizer.Material())
+    entity.set_material(visualizer.Material([0.5, 0.2, 0.2, 1.0]))
     scene = vis_core.create_scene()
     scene.add_entity(entity)
-
-    entities = [entity]
-    del entity
 
     last_frame_time = time.time()
 
@@ -160,22 +159,15 @@ def main():
     print(stretching, bending)
 
     while not window.should_close():
+        solver.update_scene(solver_scene_dev, .003)
         current_frame_time = time.time()
         period = current_frame_time - last_frame_time
 
-        cloth_vertices = solver_scene.get_positions(object_pack_view.particle_ids)
+        cloth_vertices = solver_scene_dev.get_positions(object_pack_view.particle_ids)
         mesh.set_vertices(cloth_vertices)
 
         context = core.create_command_context()
         vis_core.render(context, scene, camera, film)
-        if len(entities):
-            entities = []
-        else:
-            entity = vis_core.create_entity_mesh_object()
-            entity.set_mesh(mesh)
-            entity.set_material(visualizer.Material([0.8, 0.5, 0.5, 1.0]))
-            entities = [entity]
-            scene.add_entity(entities[0])
         context.cmd_present(window, film.get_image())
         context.submit()
         graphics.glfw_poll_events()

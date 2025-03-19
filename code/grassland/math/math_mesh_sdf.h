@@ -71,6 +71,7 @@ class MeshSDFDevice {
   MeshSDFDevice(const MeshSDF &mesh_sdf);
 
   operator MeshSDFRef() const;
+  operator MeshSDF() const;
 
  private:
   thrust::device_vector<Vector3<float>> x_;

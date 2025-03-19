@@ -180,6 +180,16 @@ MeshSDFDevice::operator MeshSDFRef() const {
   mesh_sdf.translation = Vector3<float>::Zero();
   return mesh_sdf;
 }
+
+MeshSDFDevice::operator MeshSDF() const {
+  MeshSDF mesh_sdf;
+  thrust::copy(x_.begin(), x_.end(), std::back_inserter(mesh_sdf.x_));
+  thrust::copy(triangle_indices_.begin(), triangle_indices_.end(), std::back_inserter(mesh_sdf.triangle_indices_));
+  thrust::copy(edge_indices_.begin(), edge_indices_.end(), std::back_inserter(mesh_sdf.edge_indices_));
+  thrust::copy(edge_inside_.begin(), edge_inside_.end(), std::back_inserter(mesh_sdf.edge_inside_));
+  thrust::copy(point_inside_.begin(), point_inside_.end(), std::back_inserter(mesh_sdf.point_inside_));
+  return mesh_sdf;
+}
 #endif
 
 }  // namespace grassland

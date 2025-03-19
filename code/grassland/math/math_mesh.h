@@ -333,7 +333,7 @@ int Mesh<Scalar>::LoadObjFile(const std::string &filename) {
       index_offset += fv;
 
       // per-face material
-      shapes[s].mesh.material_ids[f];
+      // shapes[s].mesh.material_ids[f];
     }
   }
 
