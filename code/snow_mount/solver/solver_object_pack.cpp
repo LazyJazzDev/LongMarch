@@ -222,7 +222,12 @@ void ObjectPack::PushBending(int a, int b, int c, int d, float stiffness, float 
   DihedralAngle<float> dihedral_angle;
   Matrix<float, 3, 4> V;
   V << x[a], x[b], x[c], x[d];
-  bending.stiffness = stiffness;
+
+  const Vector3<float> e = V.col(1) - V.col(2);
+
+  const float h = (e.cross(V.col(0) - V.col(1)).norm() + e.cross(V.col(2) - V.col(3)).norm()) / e.norm();
+
+  bending.stiffness = stiffness * e.norm() * 6.0f / h;
   bending.damping = damping;
   bending.theta_rest = dihedral_angle(V).value();
   bending.elastic_limit = elastic_limit;
