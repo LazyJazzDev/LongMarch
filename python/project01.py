@@ -82,7 +82,7 @@ def main():
     cloth_vertices = []
     for i in range(50):
         for j in range(50):
-            cloth_vertices.append([i / 49 * 2 - 1, 1, j / 49 * 2 - 1])
+            cloth_vertices.append([i / 49 - 0.5, 1, j / 49 - 0.5])
     cloth_vertices = np.asarray(cloth_vertices)
     cloth_indices = []
 
@@ -100,7 +100,7 @@ def main():
     cloth_indices = np.asarray(cloth_indices).flatten()
     solver_scene = solver.Scene()
 
-    object_pack = solver.ObjectPack.create_grid_cloth(cloth_vertices, 50, 50, young = 1)
+    object_pack = solver.ObjectPack.create_from_mesh(cloth_vertices, cloth_indices, young = 1, bending_stiffness=0.03)
     object_pack_view = solver_scene.add_object(object_pack)
 
 

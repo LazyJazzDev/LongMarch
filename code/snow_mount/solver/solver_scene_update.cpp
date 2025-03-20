@@ -68,12 +68,17 @@ __global__ void SolveVBDParticlePosition(SceneRef scene_ref, const int *particle
       hessian = (2.0 * theta * hessian + 2.0 * jacobian * jacobian.transpose()).derived();
       jacobian *= 2.0 * theta;
 
+      // if (fabs(theta) > 0.0f) {
+      //   printf("theta: %f jacobian: %f %f %f, current_angle: %f, theta_rest: %f\n", theta, jacobian[0], jacobian[1],
+      //   jacobian[2], dihedral_angle(X).value(), bending.theta_rest);
+      // }
+
       float k_damping = bending.damping / dt;
       f -= jacobian * bending.stiffness + hessian * (x - x_prev) * k_damping * bending.stiffness;
       H += hessian * (1.0 + k_damping) * bending.stiffness;
     }
 
-    const float &k_friction = 5.0f;
+    const float k_friction = 5.0f;
     const Vector3<float> rel_vel = (x - x_prev) / dt;
 
     constexpr float K_DAMPING = 1e-6;
@@ -103,7 +108,7 @@ __global__ void SolveVBDParticlePosition(SceneRef scene_ref, const int *particle
         if (vel_comp_norm > max_friction_force * dt / m) {
           f -= velocity_component / vel_comp_norm * max_friction_force;
         } else if (vel_comp_norm > 1e-9) {
-          f -= velocity_component / vel_comp_norm / dt * m;
+          f -= velocity_component / dt * m;
         }
       }
     }

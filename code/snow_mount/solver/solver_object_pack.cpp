@@ -92,10 +92,10 @@ ObjectPack ObjectPack::CreateGridCloth(const std::vector<Vector3<float>> &pos_gr
       int v01 = i * n_row + j1;
       int v10 = i1 * n_row + j;
       int v11 = i1 * n_row + j1;
-      object_pack.PushStretching(v00, v01, v10, mu * .25, lambda * .25, sigma_lb, sigma_ub, damping);
-      object_pack.PushStretching(v11, v01, v10, mu * .25, lambda * .25, sigma_lb, sigma_ub, damping);
-      object_pack.PushStretching(v00, v01, v11, mu * .25, lambda * .25, sigma_lb, sigma_ub, damping);
-      object_pack.PushStretching(v00, v10, v11, mu * .25, lambda * .25, sigma_lb, sigma_ub, damping);
+      object_pack.PushStretching(v00, v01, v10, mu * .25, lambda * .25, damping, sigma_lb, sigma_ub);
+      object_pack.PushStretching(v11, v01, v10, mu * .25, lambda * .25, damping, sigma_lb, sigma_ub);
+      object_pack.PushStretching(v00, v01, v11, mu * .25, lambda * .25, damping, sigma_lb, sigma_ub);
+      object_pack.PushStretching(v00, v10, v11, mu * .25, lambda * .25, damping, sigma_lb, sigma_ub);
       object_pack.PushBending(v01, v00, v11, v10, bending_stiffness * .5, damping, elastic_limit);
       object_pack.PushBending(v00, v01, v10, v11, bending_stiffness * .5, damping, elastic_limit);
     }
@@ -191,7 +191,6 @@ void ObjectPack::PushStretching(int u,
                                 float damping,
                                 float sigma_lb,
                                 float sigma_ub) {
-  return;
   ElementStretching stretching;
   stretching.mu = mu;
   stretching.lambda = lambda;
@@ -219,7 +218,6 @@ void ObjectPack::PushStretching(int u,
 }
 
 void ObjectPack::PushBending(int a, int b, int c, int d, float stiffness, float damping, float elastic_limit) {
-  return;
   ElementBending bending;
   DihedralAngle<float> dihedral_angle;
   Matrix<float, 3, 4> V;
