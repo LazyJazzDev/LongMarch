@@ -118,6 +118,7 @@ void Scene::PyBind(pybind11::module_ &m) {
   scene_device.def("set_rigid_object_state", &SceneDevice::SetRigidObjectState, pybind11::arg("rigid_object_id"),
                    pybind11::arg("state"));
   m.def("update_scene", &SceneDevice::Update);
+  m.def("update_scene_batch", &SceneDevice::UpdateBatch);
 #endif
 }
 
@@ -153,8 +154,6 @@ SceneDevice::SceneDevice(const Scene &scene) {
   rigid_object_ids_ = scene.rigid_object_ids_;
   rigid_object_ids_host_ = scene.rigid_object_ids_;
   next_rigid_object_id_ = scene.next_rigid_object_id_;
-
-  puts("HERE");
 
   int num_particle = x_.size();
   Directory stretching_directory{scene.stretching_indices_, num_particle};

@@ -248,6 +248,41 @@ void SceneDevice::Update(SceneDevice &scene, float dt) {
 }
 
 void SceneDevice::UpdateBatch(const std::vector<SceneDevice *> &scenes, float dt) {
+  DeviceClock clk;
+  std::vector<SceneRef> scene_refs(scenes.size());
+  for (int i = 0; i < scenes.size(); i++) {
+    scene_refs[i] = *scenes[i];
+    scenes[i]->x_prev_ = scenes[i]->x_;
+    InitializeSolver<<<DEFAULT_DISPATCH_SIZE(scene_refs[i].num_particle), 0, scenes[i]->stream_>>>(
+        scene_refs[i], Vector3<float>{0.0, -9.8, 0.0}, dt);
+  }
+  clk.Record("Initialize Solver");
+
+  const int num_vbd_iterations_ = 20;
+  for (int i = 0; i < scenes.size(); i++) {
+    for (int iter = 0; iter < num_vbd_iterations_; iter++) {
+      // ApplyFrictionForcesInLoop<<<DEFAULT_DISPATCH_SIZE(num_particle)>>>(scene_device_ref, dt_);
+      SolveVBDParticlePositionLaunch<<<1, 1, 0, scenes[i]->stream_>>>(
+          scenes[i]->particle_directory_, scenes[i]->particle_directory_.first.size(), scene_refs[i], dt);
+    }
+  }
+  clk.Record("Solve VBD");
+
+  for (int i = 0; i < scenes.size(); i++) {
+    UpdateVelocity<<<DEFAULT_DISPATCH_SIZE(scene_refs[i].num_particle), 0, scenes[i]->stream_>>>(scene_refs[i], dt);
+  }
+  clk.Record("Update Velocity");
+
+  for (int i = 0; i < scenes.size(); i++) {
+    UpdateStretchingPlasticity<<<DEFAULT_DISPATCH_SIZE(scene_refs[i].num_stretching)>>>(scene_refs[i]);
+  }
+  clk.Record("Update stretching plasticity");
+
+  for (int i = 0; i < scenes.size(); i++) {
+    UpdateBendingPlasticity<<<DEFAULT_DISPATCH_SIZE(scene_refs[i].num_bending)>>>(scene_refs[i]);
+  }
+  clk.Record("Update bending plasticity");
+  clk.Finish();
 }
 
 }  // namespace snow_mount::solver
