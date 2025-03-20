@@ -87,13 +87,9 @@ __global__ void SolveVBDParticlePosition(SceneRef scene_ref, const int *particle
       Vector3<float> jacobian;
       Matrix3<float> hessian;
       scene_ref.rigid_objects[i].mesh_sdf.SDF(x, &sdf, &jacobian, &hessian);
-      Vector3<float> contact_point = x - sdf * jacobian;
+      Vector3<float> r = x - sdf * jacobian - scene_ref.rigid_objects[i].mesh_sdf.translation;
       sdf -= 0.018;
       if (sdf < 0.0) {
-        // printf("pid: %d\nx: %f %f %f\nsdf: %f\njacobian: %f %f %f\nmesh_t: %f %f %f\n", pid, x[0], x[1], x[2], sdf,
-        //        jacobian[0], jacobian[1], jacobian[2], scene_ref.rigid_objects[i].mesh_sdf.translation[0],
-        //        scene_ref.rigid_objects[i].mesh_sdf.translation[1],
-        //        scene_ref.rigid_objects[i].mesh_sdf.translation[2]);
         float k_stiffness = scene_ref.rigid_objects[i].stiffness * m;
         float force_mag = -2.0 * k_stiffness * sdf;
         Matrix3<float> partial_H =
@@ -101,7 +97,8 @@ __global__ void SolveVBDParticlePosition(SceneRef scene_ref, const int *particle
         f -= 2.0 * k_stiffness * sdf * jacobian + partial_H * (x - x_prev) * K_DAMPING;
         H += partial_H + partial_H * K_DAMPING;
 
-        Vector3<float> velocity_component = rel_vel - scene_ref.rigid_objects[i].v;
+        Vector3<float> velocity_component =
+            rel_vel - scene_ref.rigid_objects[i].v - scene_ref.rigid_objects[i].omega.cross(r);
         velocity_component = velocity_component - jacobian * jacobian.transpose() * velocity_component;
         float max_friction_force = force_mag * k_friction;
         float vel_comp_norm = velocity_component.norm();
@@ -112,12 +109,6 @@ __global__ void SolveVBDParticlePosition(SceneRef scene_ref, const int *particle
         }
       }
     }
-    // if (tid == 0) {
-    //   printf("f: %f %f %f\n", f[0], f[1], f[2]);
-    //   printf("H=\n%f %f %f\n", H(0, 0), H(0, 1), H(0, 2));
-    //   printf("%f %f %f\n", H(1, 0), H(1, 1), H(1, 2));
-    //   printf("%f %f %f\n", H(2, 0), H(2, 1), H(2, 2));
-    // }
     Vector3<float> delta_x = H.inverse() * f;
     scene_ref.x[pidx] += delta_x;
   }
