@@ -86,6 +86,9 @@ class SceneDevice {
 
   std::vector<Vector3<float>> GetPositions(const std::vector<int> &particle_ids) const;
 
+  RigidObjectState GetRigidObjectState(int rigid_object_id) const;
+  void SetRigidObjectState(int rigid_object_id, const RigidObjectState &state);
+
   operator SceneRef();
 
   static void Update(SceneDevice &scene, float dt);
@@ -98,6 +101,7 @@ class SceneDevice {
   thrust::device_vector<Vector3<float>> v_;
   thrust::device_vector<float> m_;
   thrust::device_vector<int> particle_ids_;
+  std::vector<int> particle_ids_host_;
   int next_particle_id_{0};
   thrust::device_vector<int> particle_colors_;
   DirectoryDevice particle_directory_;
@@ -105,18 +109,21 @@ class SceneDevice {
   thrust::device_vector<ElementStretching> stretchings_;
   thrust::device_vector<int> stretching_indices_;
   thrust::device_vector<int> stretching_ids_;
+  std::vector<int> stretching_ids_host_;
   int next_stretching_id_{0};
   DirectoryDevice stretching_directory_;
 
   thrust::device_vector<ElementBending> bendings_;
   thrust::device_vector<int> bending_indices_;
   thrust::device_vector<int> bending_ids_;
+  std::vector<int> bending_ids_host_;
   int next_bending_id_{0};
   DirectoryDevice bending_directory_;
 
   thrust::device_vector<RigidObjectRef> rigid_objects_;
   std::vector<MeshSDFDevice> rigid_object_meshes_;
   thrust::device_vector<int> rigid_object_ids_;
+  std::vector<int> rigid_object_ids_host_;
   int next_rigid_object_id_{0};
 
   cudaStream_t stream_;

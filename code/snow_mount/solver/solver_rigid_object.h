@@ -5,23 +5,13 @@ namespace snow_mount::solver {
 
 struct RigidObjectRef {
   MeshSDFRef mesh_sdf;
-  Matrix3<float> R;
-  Vector3<float> t;
-  Vector3<float> v;
-  Vector3<float> omega;
-  float mass;
-  Matrix3<float> inertia;
+  RigidObjectState state;
   float stiffness;
 };
 
 struct RigidObject {
   MeshSDF mesh_sdf;
-  Matrix3<float> R;
-  Vector3<float> t;
-  Vector3<float> v;
-  Vector3<float> omega;
-  float mass;
-  Matrix3<float> inertia;
+  RigidObjectState state;
   float stiffness;
 
   static void PyBind(pybind11::module_ &m);
@@ -32,12 +22,7 @@ struct RigidObject {
 #if defined(__CUDACC__)
 struct RigidObjectDevice {
   MeshSDFDevice mesh_sdf;
-  Matrix3<float> R;
-  Vector3<float> t;
-  Vector3<float> v;
-  Vector3<float> omega;
-  float mass;
-  Matrix3<float> inertia;
+  RigidObjectState state;
   float stiffness;
 
   operator RigidObjectRef() const;

@@ -6,6 +6,7 @@ from long_march.grassland import graphics
 from long_march.snow_mount import solver
 from long_march.snow_mount import visualizer
 import glfw
+
 glfw.init()
 
 import numpy as np
@@ -13,8 +14,12 @@ import numpy as np
 
 class Scene:
     def __init__(self, vis_core: visualizer.Core):
+        self.sol_scene_dev = None
         self.vis_scene = vis_core.create_scene()
         self.sol_scene = solver.Scene()
+
+    def build_scene(self):
+        self.sol_scene_dev = solver.SceneDevice(self.sol_scene)
 
 
 class RigidObject:
@@ -38,6 +43,29 @@ class RigidObject:
         transform4x4[:3, :3] = R
         transform4x4[:3, 3] = t
         self.vis_entity.set_transform(transform4x4)
+        rigid_object_state = self.scene.sol_scene_dev.get_rigid_object_state(self.sol_rigid_id)
+        rigid_object_state.R = R
+        rigid_object_state.t = t
+        self.scene.sol_scene_dev.set_rigid_object_state(self.sol_rigid_id, rigid_object_state)
+
+
+class GridCloth:
+    def __init__(self, scene: Scene, vertices, indices):
+        self.scene = scene
+        self.cloth_object = solver.ObjectPack.create_from_mesh(vertices, indices)
+        self.cloth_object_view = scene.sol_scene.add_object(self.cloth_object)
+        self.cloth_vis_mesh = scene.vis_scene.get_core().create_mesh()
+        self.cloth_vis_mesh.set_vertices(scene.sol_scene.get_positions(self.cloth_object_view.particle_ids))
+        self.cloth_vis_mesh.set_indices(indices)
+        self.cloth_vis_entity = scene.vis_scene.get_core().create_entity_mesh_object()
+        self.cloth_vis_entity.set_mesh(self.cloth_vis_mesh)
+        self.cloth_vis_entity.set_transform(np.identity(4))
+        self.cloth_vis_entity.set_material(visualizer.Material([0.8, 0.5, 0.5, 1.0]))
+        self.scene.vis_scene.add_entity(self.cloth_vis_entity)
+
+    def post_solver_update(self):
+        self.cloth_vis_mesh.set_vertices(self.scene.sol_scene_dev.get_positions(self.cloth_object_view.particle_ids))
+
 
 class CameraController:
     def __init__(self, window: graphics.Window, camera: visualizer.Camera):
@@ -95,6 +123,7 @@ class CameraController:
         self.last_update_time = this_update_time
         self.last_cursor_pos = this_cursor_pos
 
+
 def main():
     core_settings = graphics.CoreSettings()
     core_settings.frames_in_flight = 1
@@ -111,7 +140,7 @@ def main():
 
     scene = Scene(vis_core)
 
-    mesh_vertices = [
+    mesh_vertices = np.asarray([
         [-1, -1, -1],
         [1, -1, -1],
         [1, 1, -1],
@@ -119,23 +148,50 @@ def main():
         [-1, -1, 1],
         [1, -1, 1],
         [1, 1, 1],
-        [-1, 1, 1]]
-    mesh_indices = [0, 2, 1,
-                    0, 3, 2,
-                    1, 6, 5,
-                    1, 2, 6,
-                    5, 7, 4,
-                    5, 6, 7,
-                    4, 3, 0,
-                    4, 7, 3,
-                    3, 6, 2,
-                    3, 7, 6,
-                    0, 5, 4,
-                    0, 1, 5]
+        [-1, 1, 1]])
+    mesh_indices = np.asarray([0, 2, 1,
+                               0, 3, 2,
+                               1, 6, 5,
+                               1, 2, 6,
+                               5, 7, 4,
+                               5, 6, 7,
+                               4, 3, 0,
+                               4, 7, 3,
+                               3, 6, 2,
+                               3, 7, 6,
+                               0, 5, 4,
+                               0, 1, 5])
 
-    rigid_object = RigidObject(scene, mesh_vertices, mesh_indices)
+    cloth_vertices = []
+    for i in range(50):
+        for j in range(50):
+            cloth_vertices.append([i / 49 - 0.5, 2.0, j / 49 - 0.5])
+    cloth_vertices = np.asarray(cloth_vertices)
+    cloth_indices = []
+
+    for i in range(49):
+        i1 = i + 1
+        for j in range(49):
+            j1 = j + 1
+            v00 = i * 50 + j
+            v01 = i * 50 + j1
+            v10 = i1 * 50 + j
+            v11 = i1 * 50 + j1
+            cloth_indices.append([v00, v01, v11])
+            cloth_indices.append([v00, v11, v10])
+    # serialize the indices
+    cloth_indices = np.asarray(cloth_indices).flatten()
+
+    rigid_object = RigidObject(scene, mesh_vertices * 0.5, mesh_indices)
+    cloth_object = GridCloth(scene, cloth_vertices, cloth_indices)
+
+    scene.build_scene()
+
+    rigid_object.set_transform(np.identity(3), [-0.5, 0, 0])
 
     while not window.should_close():
+        solver.update_scene(scene.sol_scene_dev, 0.003)
+        cloth_object.post_solver_update()
         camera_controller.update(True)
         context = graphics_core.create_command_context()
         vis_core.render(context, scene.vis_scene, camera, film)

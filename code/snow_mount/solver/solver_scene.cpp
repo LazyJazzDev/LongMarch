@@ -73,12 +73,7 @@ int Scene::AddRigidBody(const RigidObject &rigid_object) {
   rigid_object_ids_.push_back(rigid_object_id);
   RigidObjectRef rigid_object_ref;
   rigid_object_ref.mesh_sdf = rigid_object_meshes_.back();
-  rigid_object_ref.R = rigid_object.R;
-  rigid_object_ref.t = rigid_object.t;
-  rigid_object_ref.v = rigid_object.v;
-  rigid_object_ref.omega = rigid_object.omega;
-  rigid_object_ref.mass = rigid_object.mass;
-  rigid_object_ref.inertia = rigid_object.inertia;
+  rigid_object_ref.state = rigid_object.state;
   rigid_object_ref.stiffness = rigid_object.stiffness;
   rigid_objects_.push_back(rigid_object_ref);
   return rigid_object_id;
@@ -119,6 +114,9 @@ void Scene::PyBind(pybind11::module_ &m) {
   pybind11::class_<SceneDevice, std::shared_ptr<SceneDevice>> scene_device(m, "SceneDevice");
   scene_device.def(pybind11::init<const Scene &>(), pybind11::arg("scene"));
   scene_device.def("get_positions", &SceneDevice::GetPositions);
+  scene_device.def("get_rigid_object_state", &SceneDevice::GetRigidObjectState, pybind11::arg("rigid_object_id"));
+  scene_device.def("set_rigid_object_state", &SceneDevice::SetRigidObjectState, pybind11::arg("rigid_object_id"),
+                   pybind11::arg("state"));
   m.def("update_scene", &SceneDevice::Update);
 #endif
 }
@@ -130,16 +128,19 @@ SceneDevice::SceneDevice(const Scene &scene) {
   v_ = scene.v_;
   m_ = scene.m_;
   particle_ids_ = scene.particle_ids_;
+  particle_ids_host_ = scene.particle_ids_;
   next_particle_id_ = scene.next_particle_id_;
 
   stretchings_ = scene.stretchings_;
   stretching_indices_ = scene.stretching_indices_;
   stretching_ids_ = scene.stretching_ids_;
+  stretching_ids_host_ = scene.stretching_ids_;
   next_stretching_id_ = scene.next_stretching_id_;
 
   bendings_ = scene.bendings_;
   bending_indices_ = scene.bending_indices_;
   bending_ids_ = scene.bending_ids_;
+  bending_ids_host_ = scene.bending_ids_;
   next_bending_id_ = scene.next_bending_id_;
 
   std::vector<RigidObjectRef> rigid_objects = scene.rigid_objects_;
@@ -150,6 +151,7 @@ SceneDevice::SceneDevice(const Scene &scene) {
   }
   rigid_objects_ = rigid_objects;
   rigid_object_ids_ = scene.rigid_object_ids_;
+  rigid_object_ids_host_ = scene.rigid_object_ids_;
   next_rigid_object_id_ = scene.next_rigid_object_id_;
 
   puts("HERE");
@@ -244,6 +246,20 @@ std::vector<Vector3<float>> SceneDevice::GetPositions(const std::vector<int> &pa
   std::vector<Vector3<float>> result_positions_host(particle_ids.size());
   thrust::copy(result_positions.begin(), result_positions.end(), result_positions_host.begin());
   return result_positions_host;
+}
+
+RigidObjectState SceneDevice::GetRigidObjectState(int rigid_object_id) const {
+  RigidObjectState rigid_object{};
+  int rigid_object_idx = BinarySearch(rigid_object_ids_host_.data(), rigid_object_ids_host_.size(), rigid_object_id);
+  RigidObjectRef ref = rigid_objects_[rigid_object_idx];
+  return ref.state;
+}
+
+void SceneDevice::SetRigidObjectState(int rigid_object_id, const RigidObjectState &state) {
+  int rigid_object_idx = BinarySearch(rigid_object_ids_host_.data(), rigid_object_ids_host_.size(), rigid_object_id);
+  RigidObjectRef ref = rigid_objects_[rigid_object_idx];
+  ref.state = state;
+  rigid_objects_[rigid_object_idx] = ref;
 }
 
 SceneDevice::operator SceneRef() {

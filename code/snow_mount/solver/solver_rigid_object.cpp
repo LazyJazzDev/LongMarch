@@ -11,12 +11,7 @@ void RigidObject::PyBind(pybind11::module_ &m) {
                    pybind11::arg("omega") = Vector3<float>::Zero(), pybind11::arg("mass") = 1.0,
                    pybind11::arg("inertia") = Matrix3<float>::Identity(), pybind11::arg("stiffness") = 1e5f);
   rigid_object.def_readwrite("mesh_sdf", &RigidObject::mesh_sdf);
-  rigid_object.def_readwrite("R", &RigidObject::R);
-  rigid_object.def_readwrite("t", &RigidObject::t);
-  rigid_object.def_readwrite("v", &RigidObject::v);
-  rigid_object.def_readwrite("omega", &RigidObject::omega);
-  rigid_object.def_readwrite("mass", &RigidObject::mass);
-  rigid_object.def_readwrite("inertia", &RigidObject::inertia);
+  rigid_object.def_readwrite("state", &RigidObject::state);
   rigid_object.def_readwrite("stiffness", &RigidObject::stiffness);
 
   pybind11::class_<RigidObjectState> rigid_object_state(m, "RigidObjectState");
@@ -41,12 +36,7 @@ void RigidObject::PyBind(pybind11::module_ &m) {
 RigidObject::operator RigidObjectRef() const {
   RigidObjectRef rigid_object;
   rigid_object.mesh_sdf = mesh_sdf;
-  rigid_object.R = R;
-  rigid_object.t = t;
-  rigid_object.v = v;
-  rigid_object.omega = omega;
-  rigid_object.mass = mass;
-  rigid_object.inertia = inertia;
+  rigid_object.state = state;
   rigid_object.stiffness = stiffness;
   return rigid_object;
 }
@@ -54,12 +44,7 @@ RigidObject::operator RigidObjectRef() const {
 RigidObjectDevice::operator RigidObjectRef() const {
   RigidObjectRef rigid_object;
   rigid_object.mesh_sdf = mesh_sdf;
-  rigid_object.R = R;
-  rigid_object.t = t;
-  rigid_object.v = v;
-  rigid_object.omega = omega;
-  rigid_object.mass = mass;
-  rigid_object.inertia = inertia;
+  rigid_object.state = state;
   rigid_object.stiffness = stiffness;
   return rigid_object;
 }
