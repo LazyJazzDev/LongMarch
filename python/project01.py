@@ -14,9 +14,10 @@ def make_transform4x4(rotation, transform):
     t[:3, :3] = rotation
     t[:3, 3] = transform
     return t
+
+
 def depack_transform4x4(t):
     return np.array(t[:3, :3]), np.array(t[:3, 3])
-
 
 
 class CameraController:
@@ -100,9 +101,11 @@ def main():
     cloth_indices = np.asarray(cloth_indices).flatten()
     solver_scene = solver.Scene()
 
-    object_pack = solver.ObjectPack.create_from_mesh(cloth_vertices, cloth_indices, young = 1, bending_stiffness=0.03)
+    object_pack = solver.ObjectPack.create_from_mesh(cloth_vertices, cloth_indices, young=3000, bending_stiffness=0.03,
+                                                     sigma_ub=1.2, elastic_limit=math.pi * 0.05, mesh_mass=0.1)
+    # object_pack = solver.ObjectPack.create_grid_cloth(cloth_vertices, 50, 50, young=3000, bending_stiffness=0.03,
+    #                                                   sigma_ub=1.2, elastic_limit=math.pi * 0.05)
     object_pack_view = solver_scene.add_object(object_pack)
-
 
     glfw.init()
     core_settings = graphics.CoreSettings()
@@ -137,17 +140,21 @@ def main():
                     0, 5, 4,
                     0, 1, 5]
     mesh_vertices = np.array(mesh_vertices)
-    mesh_vertices *= 10
 
-    cube_mesh_sdf = long_march.grassland.math.MeshSDF(mesh_vertices, mesh_indices)
+    cube_mesh_sdf = long_march.grassland.math.MeshSDF(mesh_vertices * 10, mesh_indices)
     cube_mesh = vis_core.create_mesh()
     cube_mesh.set_vertices(mesh_vertices)
     cube_mesh.set_indices(mesh_indices)
+
+    block_mesh_sdf = long_march.grassland.math.MeshSDF(mesh_vertices * 0.5, mesh_indices)
 
     cube_rigid = solver.RigidObject(mesh_sdf=cube_mesh_sdf, t=[0, -11, 0])
     print(cube_rigid)
     cube_rid = solver_scene.add_rigid_object(cube_rigid)
     print(cube_rid)
+
+    cube_rigid_2 = solver.RigidObject(mesh_sdf=block_mesh_sdf, t=[-0.5, 0, 0])
+    solver_scene.add_rigid_object(cube_rigid_2)
 
     mesh = vis_core.create_mesh()
     mesh.set_vertices(cloth_vertices)
@@ -164,12 +171,18 @@ def main():
 
     cube_entity = vis_core.create_entity_mesh_object()
     cube_entity.set_mesh(cube_mesh)
-    cube_entity.set_transform(make_transform4x4(np.identity(3), [0, -11, 0]))
+    cube_entity.set_transform(make_transform4x4(np.identity(3) * 10, [0, -11, 0]))
     cube_entity.set_material(visualizer.Material([0.8, 0.8, 0.8, 1.0]))
+
+    cube_entity_2 = vis_core.create_entity_mesh_object()
+    cube_entity_2.set_mesh(cube_mesh)
+    cube_entity_2.set_transform(make_transform4x4(np.identity(3) * 0.5, [-0.5, 0, 0]))
+    cube_entity_2.set_material(visualizer.Material([0.8, 0.8, 0.8, 1.0]))
 
     scene = vis_core.create_scene()
     scene.add_entity(entity)
     scene.add_entity(cube_entity)
+    scene.add_entity(cube_entity_2)
 
     print("building solver")
     solver_scene_dev = solver.SceneDevice(solver_scene)

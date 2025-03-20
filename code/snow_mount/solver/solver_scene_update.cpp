@@ -123,6 +123,92 @@ __global__ void SolveVBDParticlePosition(SceneRef scene_ref, const int *particle
   }
 }
 
+__global__ void UpdateStretchingPlasticity(SceneRef scene_ref) {
+  int sid = threadIdx.x + blockIdx.x * blockDim.x;
+  if (sid < scene_ref.num_stretching) {
+    ElementStretching stretching = scene_ref.stretchings[sid];
+    if (stretching.sigma_lb > 0.0 || stretching.sigma_ub > 0.0) {
+      uint32_t u = scene_ref.stretching_indices[sid * 3 + 0];
+      uint32_t v = scene_ref.stretching_indices[sid * 3 + 1];
+      uint32_t w = scene_ref.stretching_indices[sid * 3 + 2];
+      Matrix3<float> X;
+      X << scene_ref.x[u], scene_ref.x[v], scene_ref.x[w];
+      Matrix<float, 3, 2> F;
+      F << X.col(1) - X.col(0), X.col(2) - X.col(0);
+      Matrix<float, 3, 2> Fe = F * stretching.Dm.inverse();
+      Matrix<float, 3, 2> U;
+      Matrix<float, 2, 2> S;
+      Matrix<float, 2, 2> Vt;
+      SVD(Fe, U, S, Vt);
+      if (stretching.sigma_lb > 0.0) {
+        // if (S(0, 0) < stretching.theta_lb || S(1, 1) < stretching.theta_lb) {
+        //   // printf("Stretching clamped (lower)\n");
+        // }
+        S(0, 0) = max(S(0, 0), stretching.sigma_lb);
+        S(1, 1) = max(S(1, 1), stretching.sigma_lb);
+      }
+      if (stretching.sigma_ub > 0.0) {
+        // if (S(0, 0) > stretching.theta_ub || S(1, 1) > stretching.theta_ub) {
+        //   printf("Stretching clamped (upper)\n");
+        //   printf("%f %f\n", S(0, 0), S(1, 1));
+        // }
+        S(0, 0) = min(S(0, 0), stretching.sigma_ub);
+        S(1, 1) = min(S(1, 1), stretching.sigma_ub);
+      }
+      S(0, 0) = 1.0 / S(0, 0);
+      S(1, 1) = 1.0 / S(1, 1);
+      // printf("BP1");
+      stretching.Dm = Vt.transpose() * S * U.transpose() * F;
+      // printf("BP2");
+      scene_ref.stretchings[sid] = stretching;
+    }
+  }
+}
+
+__global__ void UpdateBendingPlasticity(SceneRef scene_ref) {
+  int bid = threadIdx.x + blockIdx.x * blockDim.x;
+  if (bid < scene_ref.num_bending) {
+    ElementBending bending = scene_ref.bendings[bid];
+    constexpr float pi = 3.14159265358979323846;
+    if (bending.elastic_limit < pi) {
+      uint32_t a = scene_ref.bending_indices[bid * 4 + 0];
+      uint32_t b = scene_ref.bending_indices[bid * 4 + 1];
+      uint32_t c = scene_ref.bending_indices[bid * 4 + 2];
+      uint32_t d = scene_ref.bending_indices[bid * 4 + 3];
+      Matrix<float, 3, 4> X;
+      X << scene_ref.x[a], scene_ref.x[b], scene_ref.x[c], scene_ref.x[d];
+      DihedralAngle<float> dihedral_angle;
+      float theta = dihedral_angle(X).value();
+      float theta_rest = bending.theta_rest;
+
+      // limit difference between theta and theta_rest to bending.bending_bound
+      float diff = theta_rest - theta;
+      if (diff > pi) {
+        diff -= 2.0 * pi;
+      }
+      if (diff < -pi) {
+        diff += 2.0 * pi;
+      }
+      if (diff < 0.0) {
+        diff = max(diff, -bending.elastic_limit);
+      }
+      if (diff > 0.0) {
+        diff = min(diff, bending.elastic_limit);
+      }
+
+      theta_rest = theta + diff;
+      if (theta_rest < -pi) {
+        theta_rest += 2.0 * pi;
+      }
+      if (theta_rest > pi) {
+        theta_rest -= 2.0 * pi;
+      }
+      bending.theta_rest = theta_rest;
+      scene_ref.bendings[bid] = bending;
+    }
+  }
+}
+
 __global__ void SolveVBDParticlePositionLaunch(DirectoryRef directory_ref,
                                                int num_color,
                                                SceneRef scene_ref,
@@ -158,6 +244,13 @@ void SceneDevice::Update(SceneDevice &scene, float dt) {
 
   UpdateVelocity<<<DEFAULT_DISPATCH_SIZE(scene_ref.num_particle), 0, scene.stream_>>>(scene_ref, dt);
   clk.Record("Update Velocity");
+
+  UpdateStretchingPlasticity<<<DEFAULT_DISPATCH_SIZE(scene_ref.num_stretching)>>>(scene_ref);
+  clk.Record("Update stretching plasticity");
+
+  UpdateBendingPlasticity<<<DEFAULT_DISPATCH_SIZE(scene_ref.num_bending)>>>(scene_ref);
+  clk.Record("Update bending plasticity");
+
   clk.Finish();
   printf("particles: %d, stretchings: %d, bendings: %d\n", scene_ref.num_particle, scene_ref.num_stretching,
          scene_ref.num_bending);

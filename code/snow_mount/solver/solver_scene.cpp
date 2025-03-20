@@ -143,6 +143,7 @@ SceneDevice::SceneDevice(const Scene &scene) {
   next_bending_id_ = scene.next_bending_id_;
 
   std::vector<RigidObjectRef> rigid_objects = scene.rigid_objects_;
+  rigid_object_meshes_.reserve(scene.rigid_object_meshes_.size());
   for (int i = 0; i < scene.rigid_object_meshes_.size(); i++) {
     rigid_object_meshes_.emplace_back(scene.rigid_object_meshes_[i]);
     rigid_objects[i].mesh_sdf = rigid_object_meshes_.back();
