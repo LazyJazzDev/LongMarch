@@ -25,15 +25,11 @@ void DrawNGUI::Run() {
 
 void DrawNGUI::OnInit() {
   core_->CreateWindowObject(1280, 720, "Draw & GUI", false, true, &window_);
-  core_->CreateImage(1280, 720,
-                     grassland::graphics::IMAGE_FORMAT_R32G32B32A32_SFLOAT,
-                     &color_image_);
+  core_->CreateImage(1280, 720, grassland::graphics::IMAGE_FORMAT_R32G32B32A32_SFLOAT, &color_image_);
   window_->ResizeEvent().RegisterCallback([this](int width, int height) {
     core_->WaitGPU();
     color_image_.reset();
-    core_->CreateImage(width, height,
-                       grassland::graphics::IMAGE_FORMAT_R32G32B32A32_SFLOAT,
-                       &color_image_);
+    core_->CreateImage(width, height, grassland::graphics::IMAGE_FORMAT_R32G32B32A32_SFLOAT, &color_image_);
   });
 
   snow_mount::draw::CreateCore(core_.get(), &draw_core_);
@@ -46,8 +42,7 @@ void DrawNGUI::OnInit() {
     float angle = 2.0f * glm::pi<float>() * i * inv_precision;
     float x = glm::cos(angle);
     float y = glm::sin(angle);
-    vertices.push_back(
-        {{x, y}, {x * 0.5f + 0.5f, y * 0.5f + 0.5f}, {1.0f, 1.0f, 1.0f, 1.0f}});
+    vertices.push_back({{x, y}, {x * 0.5f + 0.5f, y * 0.5f + 0.5f}, {1.0f, 1.0f, 1.0f, 1.0f}});
     indices.push_back(i);
     indices.push_back((i + 1) % precision);
     indices.push_back(precision);
@@ -63,9 +58,8 @@ void DrawNGUI::OnInit() {
   texture_->UploadData(texture_data.data());
   model_->SetModelData(vertices, indices);
 
-  draw_core_->SetFontTypeFile(grassland::FindAssetsFile("fonts/simhei.ttf"));
-  draw_core_->SetASCIIFontTypeFile(
-      grassland::FindAssetsFile("fonts/georgia.ttf"));
+  draw_core_->SetFontTypeFile(grassland::FindAssetFile("fonts/simhei.ttf"));
+  draw_core_->SetASCIIFontTypeFile(grassland::FindAssetFile("fonts/georgia.ttf"));
 }
 
 void DrawNGUI::OnClose() {
@@ -84,32 +78,27 @@ void DrawNGUI::OnUpdate() {
   float theta = glfwGetTime();
   draw_core_->CmdDrawInstance(
       model_.get(), texture_.get(),
-      glm::rotate(
-          glm::scale(glm::translate(glm::rotate(glm::mat4{1.0f}, theta,
-                                                glm::vec3{0.0f, 0.0f, 1.0f}),
-                                    {1.0f, 0.0f, 0.0f}),
-                     {0.5f, 0.5f, 1.0f}),
-          -2.0f * theta, glm::vec3{0.0f, 0.0f, 1.0f}),
+      glm::rotate(glm::scale(glm::translate(glm::rotate(glm::mat4{1.0f}, theta, glm::vec3{0.0f, 0.0f, 1.0f}),
+                                            {1.0f, 0.0f, 0.0f}),
+                             {0.5f, 0.5f, 1.0f}),
+                  -2.0f * theta, glm::vec3{0.0f, 0.0f, 1.0f}),
       glm::vec4{1.0f, 1.0f, 1.0f, alpha});
   theta += glm::pi<float>();
   draw_core_->CmdDrawInstance(
       model_.get(), texture_.get(),
-      glm::rotate(
-          glm::scale(glm::translate(glm::rotate(glm::mat4{1.0f}, theta,
-                                                glm::vec3{0.0f, 0.0f, 1.0f}),
-                                    {0.0f, 0.0f, 0.0f}),
-                     {0.5f, 0.5f, 1.0f}),
-          -2.0f * theta, glm::vec3{0.0f, 0.0f, 1.0f}),
+      glm::rotate(glm::scale(glm::translate(glm::rotate(glm::mat4{1.0f}, theta, glm::vec3{0.0f, 0.0f, 1.0f}),
+                                            {0.0f, 0.0f, 0.0f}),
+                             {0.5f, 0.5f, 1.0f}),
+                  -2.0f * theta, glm::vec3{0.0f, 0.0f, 1.0f}),
       glm::vec4{1.0f, 1.0f, 1.0f, alpha});
   const int font_size = 128;
   draw_core_->GetFontCore()->SetFontSize(font_size);
   auto text_width_1 = draw_core_->GetTextWidth(u8"我爱你，中国！");
   auto text_width_2 = draw_core_->GetTextWidth(u8"I LOVE U, CHINA!");
-  draw_core_->CmdDrawText({(extent.width - text_width_1) / 2, font_size * 0.9f},
-                          u8"我爱你，中国！", {1.0f, 1.0f, 1.0f, 1.0f});
-  draw_core_->CmdDrawText(
-      {(extent.width - text_width_2) / 2, font_size * 0.9f + font_size},
-      u8"I LOVE U, CHINA!", {1.0f, 1.0f, 1.0f, 1.0f});
+  draw_core_->CmdDrawText({(extent.width - text_width_1) / 2, font_size * 0.9f}, u8"我爱你，中国！",
+                          {1.0f, 1.0f, 1.0f, 1.0f});
+  draw_core_->CmdDrawText({(extent.width - text_width_2) / 2, font_size * 0.9f + font_size}, u8"I LOVE U, CHINA!",
+                          {1.0f, 1.0f, 1.0f, 1.0f});
   draw_core_->EndDraw();
 }
 

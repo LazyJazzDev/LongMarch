@@ -20,5 +20,5 @@ class FileProbe {
   std::vector<std::string> search_paths_;
 };
 
-std::string FindAssetsFile(const std::string &filename);
+std::string FindAssetFile(const std::string &filename);
 }  // namespace grassland

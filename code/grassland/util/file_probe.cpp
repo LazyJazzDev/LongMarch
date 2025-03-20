@@ -17,8 +17,7 @@ void FileProbe::AddSearchPath(const std::string &path) {
 std::string FileProbe::FindFile(const std::string &filename) const {
   for (const auto &path : search_paths_) {
     std::string full_path = path + filename;
-    if (std::filesystem::exists(full_path) &&
-        std::filesystem::is_regular_file(full_path)) {
+    if (std::filesystem::exists(full_path) && std::filesystem::is_regular_file(full_path)) {
       return full_path;
     }
   }
@@ -47,7 +46,7 @@ std::ostream &operator<<(std::ostream &os, const FileProbe &probe) {
   return os;
 }
 
-std::string FindAssetsFile(const std::string &filename) {
+std::string FindAssetFile(const std::string &filename) {
   return FileProbe::GetInstance().FindFile(filename);
 }
 

@@ -183,11 +183,14 @@ def main():
     cloth_indices = np.asarray(cloth_indices).flatten()
 
     rigid_object = RigidObject(scene, mesh_vertices * 0.5, mesh_indices)
+
+    ground_object = RigidObject(scene, mesh_vertices * 10.0, mesh_indices)
     cloth_object = GridCloth(scene, cloth_vertices, cloth_indices)
 
     scene.build_scene()
 
-    rigid_object.set_transform(np.identity(3), [-0.5, 0, 0])
+    rigid_object.set_transform(np.identity(3), [-0.5, -0.5, 0])
+    ground_object.set_transform(np.identity(3), [0, -11, 0])
 
     while not window.should_close():
         solver.update_scene(scene.sol_scene_dev, 0.003)
@@ -199,9 +202,10 @@ def main():
         graphics_core.submit_command_context(context)
         graphics.glfw_poll_events()
 
-    print(scene.vis_scene, scene.sol_scene)
-
     graphics_core.wait_gpu()
+
+    print(long_march.grassland.util.find_asset_file("meshes/gripper_left.obj"))
+    print(long_march.grassland.util.find_asset_file("meshes/gripper_right.obj"))
 
 
 if __name__ == "__main__":

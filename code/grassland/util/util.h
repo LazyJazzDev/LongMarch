@@ -12,4 +12,8 @@
 #include "grassland/util/util_util.h"
 #include "grassland/util/vendor_id.h"
 
-namespace grassland {}
+namespace grassland {
+
+void PyBindUtil(pybind11::module_ &m);
+
+}

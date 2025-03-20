@@ -249,7 +249,6 @@ std::vector<Vector3<float>> SceneDevice::GetPositions(const std::vector<int> &pa
 }
 
 RigidObjectState SceneDevice::GetRigidObjectState(int rigid_object_id) const {
-  RigidObjectState rigid_object{};
   int rigid_object_idx = BinarySearch(rigid_object_ids_host_.data(), rigid_object_ids_host_.size(), rigid_object_id);
   RigidObjectRef ref = rigid_objects_[rigid_object_idx];
   return ref.state;
