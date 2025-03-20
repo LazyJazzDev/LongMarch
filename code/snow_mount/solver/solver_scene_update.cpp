@@ -204,10 +204,6 @@ __global__ void SolveVBDParticlePositionLaunch(DirectoryRef directory_ref,
                                                int num_color,
                                                SceneRef scene_ref,
                                                float dt) {
-  for (int c = 0; c < num_color; c++) {
-    SolveVBDParticlePosition<<<DEFAULT_DISPATCH_SIZE(directory_ref.count[c])>>>(
-        scene_ref, directory_ref.positions + directory_ref.first[c], directory_ref.count[c], dt);
-  }
 }
 
 __global__ void UpdateVelocity(SceneRef scene_ref, float dt) {
@@ -227,9 +223,11 @@ void SceneDevice::Update(SceneDevice &scene, float dt) {
 
   const int num_vbd_iterations_ = 40;
   for (int iter = 0; iter < num_vbd_iterations_; iter++) {
-    // ApplyFrictionForcesInLoop<<<DEFAULT_DISPATCH_SIZE(num_particle)>>>(scene_device_ref, dt_);
-    SolveVBDParticlePositionLaunch<<<1, 1, 0, scene.stream_>>>(scene.particle_directory_,
-                                                               scene.particle_directory_.first.size(), scene_ref, dt);
+    for (int c = 0; c < scene.particle_directory_host_.first.size(); c++) {
+      SolveVBDParticlePosition<<<DEFAULT_DISPATCH_SIZE(scene.particle_directory_host_.count[c])>>>(
+          scene_ref, scene.particle_directory_host_.positions.data() + scene.particle_directory_host_.first[c],
+          scene.particle_directory_host_.count[c], dt);
+    }
   }
   clk.Record("Solve VBD");
 
@@ -261,9 +259,13 @@ void SceneDevice::UpdateBatch(const std::vector<SceneDevice *> &scenes, float dt
   const int num_vbd_iterations_ = 20;
   for (int i = 0; i < scenes.size(); i++) {
     for (int iter = 0; iter < num_vbd_iterations_; iter++) {
-      // ApplyFrictionForcesInLoop<<<DEFAULT_DISPATCH_SIZE(num_particle)>>>(scene_device_ref, dt_);
-      SolveVBDParticlePositionLaunch<<<1, 1, 0, scenes[i]->stream_>>>(
-          scenes[i]->particle_directory_, scenes[i]->particle_directory_.first.size(), scene_refs[i], dt);
+      for (int c = 0; c < scenes[i]->particle_directory_host_.first.size(); c++) {
+        SolveVBDParticlePosition<<<DEFAULT_DISPATCH_SIZE(scenes[i]->particle_directory_host_.count[c]), 0,
+                                   scenes[i]->stream_>>>(
+            scene_refs[i],
+            scenes[i]->particle_directory_.positions.data().get() + scenes[i]->particle_directory_host_.first[c],
+            scenes[i]->particle_directory_host_.count[c], dt);
+      }
     }
   }
   clk.Record("Solve VBD");

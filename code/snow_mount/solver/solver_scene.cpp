@@ -216,7 +216,8 @@ SceneDevice::SceneDevice(const Scene &scene) {
   }
   // puts("here");
   particle_colors_ = particle_colors;
-  particle_directory_ = Directory(particle_colors, c);
+  particle_directory_host_ = Directory(particle_colors, c);
+  particle_directory_ = particle_directory_host_;
 
   cudaStreamCreate(&stream_);
 }

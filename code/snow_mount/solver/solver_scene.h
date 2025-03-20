@@ -105,6 +105,7 @@ class SceneDevice {
   int next_particle_id_{0};
   thrust::device_vector<int> particle_colors_;
   DirectoryDevice particle_directory_;
+  Directory particle_directory_host_;
 
   thrust::device_vector<ElementStretching> stretchings_;
   thrust::device_vector<int> stretching_indices_;

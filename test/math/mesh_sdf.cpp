@@ -25,9 +25,7 @@ TEST(Math, MeshSDFCorrectness) {
   for (int task = 0; task < 10000; task++) {
     Eigen::Vector3<float> t = Eigen::Vector3<float>::Random();
     float s = Eigen::Matrix<float, 1, 1>::Random().value() + 1.1;
-
-    mesh_ref.translation = t;
-    mesh_ref.rotation = Eigen::Matrix<float, 3, 3>::Identity() * s;
+    Eigen::Matrix<float, 3, 3> R = Eigen::Matrix<float, 3, 3>::Identity() * s;
     grassland::CubeSDF<float> cube_sdf;
     cube_sdf.center = t;
     cube_sdf.size = s;
@@ -43,7 +41,7 @@ TEST(Math, MeshSDFCorrectness) {
       Eigen::Vector3<float> mesh_jacobian;
       Eigen::Matrix<float, 3, 3> mesh_hessian;
       float mesh_t;
-      mesh_ref.SDF(p, &mesh_t, &mesh_jacobian, &mesh_hessian);
+      mesh_ref.SDF(p, R, t, &mesh_t, &mesh_jacobian, &mesh_hessian);
       Eigen::Vector3<float> cube_jacobian;
       Eigen::Matrix<float, 3, 3> cube_hessian;
       float cube_t;
@@ -92,11 +90,9 @@ __global__ void MeshSDFDeviceKernel(grassland::MeshSDFRef mesh_sdf,
 
   Eigen::Vector3<float> t = mesh_refs[task].head<3>();
   float s = mesh_refs[task][3];
-  mesh_sdf.rotation = Eigen::Matrix<float, 3, 3>::Identity() * s;
-  mesh_sdf.translation = t;
-
+  Eigen::Matrix<float, 3, 3> R = Eigen::Matrix<float, 3, 3>::Identity() * s;
   Eigen::Vector3<float> position = task_positions[idx];
-  mesh_sdf.SDF(position, &results_t[idx], &results_jacobian[idx], &results_hessian[idx]);
+  mesh_sdf.SDF(position, R, t, &results_t[idx], &results_jacobian[idx], &results_hessian[idx]);
 }
 
 TEST(Math, MeshSDFDevice) {
@@ -166,8 +162,7 @@ TEST(Math, MeshSDFDevice) {
     Eigen::Vector3<float> t = mesh_refs[task].head<3>();
     float s = mesh_refs[task][3];
 
-    mesh_ref.rotation = Eigen::Matrix<float, 3, 3>::Identity() * s;
-    mesh_ref.translation = t;
+    Eigen::Matrix<float, 3, 3> R = Eigen::Matrix<float, 3, 3>::Identity() * s;
 
     for (int test = 0; test < num_test; test++) {
       int idx = task * num_test + test;
@@ -180,7 +175,7 @@ TEST(Math, MeshSDFDevice) {
       Eigen::Vector3<float> mesh_jacobian_dev;
       Eigen::Matrix3<float> mesh_hessian_dev;
 
-      mesh_ref.SDF(p, &mesh_t, &mesh_jacobian, &mesh_hessian);
+      mesh_ref.SDF(p, R, t, &mesh_t, &mesh_jacobian, &mesh_hessian);
       mesh_t_dev = results_t_host[idx];
       mesh_jacobian_dev = results_jacobian_host[idx];
       mesh_hessian_dev = results_hessian_host[idx];

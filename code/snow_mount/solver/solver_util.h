@@ -29,6 +29,7 @@ struct DirectoryRef {
 };
 
 struct Directory {
+  Directory() = default;
   Directory(const std::vector<int> &contents, int num_bucket);
   std::vector<int> first;
   std::vector<int> count;
