@@ -191,6 +191,7 @@ void ObjectPack::PushStretching(int u,
                                 float damping,
                                 float sigma_lb,
                                 float sigma_ub) {
+  return;
   ElementStretching stretching;
   stretching.mu = mu;
   stretching.lambda = lambda;
@@ -218,6 +219,7 @@ void ObjectPack::PushStretching(int u,
 }
 
 void ObjectPack::PushBending(int a, int b, int c, int d, float stiffness, float damping, float elastic_limit) {
+  return;
   ElementBending bending;
   DihedralAngle<float> dihedral_angle;
   Matrix<float, 3, 4> V;

@@ -9,6 +9,16 @@ import time
 import numpy as np
 
 
+def make_transform4x4(rotation, transform):
+    t = np.identity(4)
+    t[:3, :3] = rotation
+    t[:3, 3] = transform
+    return t
+def depack_transform4x4(t):
+    return np.array(t[:3, :3]), np.array(t[:3, 3])
+
+
+
 class CameraController:
     def __init__(self, window: graphics.Window, camera: visualizer.Camera):
         self.window = window
@@ -90,10 +100,9 @@ def main():
     cloth_indices = np.asarray(cloth_indices).flatten()
     solver_scene = solver.Scene()
 
-    object_pack = solver.ObjectPack.create_grid_cloth(cloth_vertices, 50, 50)
+    object_pack = solver.ObjectPack.create_grid_cloth(cloth_vertices, 50, 50, young = 1)
     object_pack_view = solver_scene.add_object(object_pack)
 
-    solver_scene_dev = solver.SceneDevice(solver_scene)
 
     glfw.init()
     core_settings = graphics.CoreSettings()
@@ -104,7 +113,6 @@ def main():
     window.set_title("Project01")
 
     vis_core = visualizer.Core(core)
-    mesh = vis_core.create_mesh()
     film = vis_core.create_film(800, 600)
 
     mesh_vertices = [
@@ -128,21 +136,44 @@ def main():
                     3, 7, 6,
                     0, 5, 4,
                     0, 1, 5]
+    mesh_vertices = np.array(mesh_vertices)
+    mesh_vertices *= 10
 
-    mesh_sdf = long_march.grassland.math.MeshSDF(mesh_vertices, mesh_indices)
+    cube_mesh_sdf = long_march.grassland.math.MeshSDF(mesh_vertices, mesh_indices)
+    cube_mesh = vis_core.create_mesh()
+    cube_mesh.set_vertices(mesh_vertices)
+    cube_mesh.set_indices(mesh_indices)
 
+    cube_rigid = solver.RigidObject(mesh_sdf=cube_mesh_sdf, t=[0, -11, 0])
+    print(cube_rigid)
+    cube_rid = solver_scene.add_rigid_object(cube_rigid)
+    print(cube_rid)
+
+    mesh = vis_core.create_mesh()
     mesh.set_vertices(cloth_vertices)
     mesh.set_indices(cloth_indices)
 
-    camera = vis_core.create_camera(proj=visualizer.perspective(fovy=math.radians(60), aspect=800 / 600, near=0.1, far=100))
+    camera = vis_core.create_camera(
+        proj=visualizer.perspective(fovy=math.radians(60), aspect=800 / 600, near=0.1, far=100))
 
     cam_controller = CameraController(window, camera)
 
     entity = vis_core.create_entity_mesh_object()
     entity.set_mesh(mesh)
-    entity.set_material(visualizer.Material([0.5, 0.2, 0.2, 1.0]))
+    entity.set_material(visualizer.Material([0.8, 0.5, 0.5, 1.0]))
+
+    cube_entity = vis_core.create_entity_mesh_object()
+    cube_entity.set_mesh(cube_mesh)
+    cube_entity.set_transform(make_transform4x4(np.identity(3), [0, -11, 0]))
+    cube_entity.set_material(visualizer.Material([0.8, 0.8, 0.8, 1.0]))
+
     scene = vis_core.create_scene()
     scene.add_entity(entity)
+    scene.add_entity(cube_entity)
+
+    print("building solver")
+    solver_scene_dev = solver.SceneDevice(solver_scene)
+    print("solver built")
 
     last_frame_time = time.time()
 
@@ -153,10 +184,6 @@ def main():
         camera.proj = visualizer.perspective(fovy=math.radians(60), aspect=w / h, near=0.1, far=100)
 
     window.reg_resize_callback(resize_callback)
-
-    stretching = solver.ElementStretching()
-    bending = solver.ElementBending()
-    print(stretching, bending)
 
     while not window.should_close():
         solver.update_scene(solver_scene_dev, .003)

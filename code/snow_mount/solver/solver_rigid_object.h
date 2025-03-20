@@ -22,6 +22,8 @@ struct RigidObject {
   Matrix3<float> inertia;
   float stiffness;
 
+  static void PyBind(pybind11::module_ &m);
+
   operator RigidObjectRef() const;
 };
 

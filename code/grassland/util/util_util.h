@@ -17,6 +17,8 @@
 #if defined(LONGMARCH_CUDA_RUNTIME)
 #include "cuda_runtime.h"
 #include "thrust/device_vector.h"
+#include "thrust/host_vector.h"
+#include "thrust/sort.h"
 #endif
 
 namespace grassland {

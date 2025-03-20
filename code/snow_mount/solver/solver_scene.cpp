@@ -80,6 +80,7 @@ int Scene::AddRigidBody(const RigidObject &rigid_object) {
   rigid_object_ref.mass = rigid_object.mass;
   rigid_object_ref.inertia = rigid_object.inertia;
   rigid_object_ref.stiffness = rigid_object.stiffness;
+  rigid_objects_.push_back(rigid_object_ref);
   return rigid_object_id;
 }
 
@@ -111,6 +112,7 @@ void Scene::PyBind(pybind11::module_ &m) {
   pybind11::class_<Scene, std::shared_ptr<Scene>> scene(m, "Scene");
   scene.def(pybind11::init<>());
   scene.def("add_object", &Scene::AddObject);
+  scene.def("add_rigid_object", &Scene::AddRigidBody);
   scene.def("get_positions", &Scene::GetPositions);
 
 #if defined(__CUDACC__)
@@ -144,20 +146,25 @@ SceneDevice::SceneDevice(const Scene &scene) {
   for (int i = 0; i < scene.rigid_object_meshes_.size(); i++) {
     rigid_object_meshes_.emplace_back(scene.rigid_object_meshes_[i]);
     rigid_objects[i].mesh_sdf = rigid_object_meshes_.back();
+    rigid_objects[i].mesh_sdf.rotation = scene.rigid_objects_[i].mesh_sdf.rotation;
+    rigid_objects[i].mesh_sdf.translation = scene.rigid_objects_[i].mesh_sdf.translation;
   }
   rigid_objects_ = rigid_objects;
   rigid_object_ids_ = scene.rigid_object_ids_;
   next_rigid_object_id_ = scene.next_rigid_object_id_;
 
-  Directory stretching_directory{scene.stretching_indices_};
-  stretching_directory_ = stretching_directory;
-  Directory bending_directory{scene.bending_indices_};
-  bending_directory_ = bending_directory;
+  puts("HERE");
 
   int num_particle = x_.size();
+  Directory stretching_directory{scene.stretching_indices_, num_particle};
+  stretching_directory_ = stretching_directory;
+  Directory bending_directory{scene.bending_indices_, num_particle};
+  bending_directory_ = bending_directory;
+
   std::vector<int> particle_colors(num_particle, -1);
 
-  for (int c = 0, colored = 0; colored < num_particle; c++) {
+  int c = 0;
+  for (int colored = 0; colored < num_particle; c++) {
     for (int i = 0; i < num_particle; i++) {
       if (particle_colors[i] != -1)
         continue;
@@ -209,7 +216,7 @@ SceneDevice::SceneDevice(const Scene &scene) {
   }
   // puts("here");
   particle_colors_ = particle_colors;
-  particle_directory_ = Directory(particle_colors);
+  particle_directory_ = Directory(particle_colors, c);
 
   cudaStreamCreate(&stream_);
 }

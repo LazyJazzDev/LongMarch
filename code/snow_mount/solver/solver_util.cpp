@@ -1,13 +1,21 @@
 #include "snow_mount/solver/solver_util.h"
 
 namespace snow_mount::solver {
-Directory::Directory(const std::vector<int> &contents) {
-  int max_content = 0;
-  for (int content : contents) {
-    max_content = std::max(max_content, content);
-  }
-  first.resize(max_content + 1, 0);
-  count.resize(max_content + 1, 0);
+
+LM_DEVICE_FUNC RigidObjectState RigidObjectState::NextState(float dt) const {
+  RigidObjectState new_state = *this;
+  new_state.t += v * dt;
+  new_state.R = Eigen::AngleAxis<float>(omega.norm() * dt, omega.normalized()).toRotationMatrix() * R;
+  Matrix3<float> I = R * inertia * R.transpose();
+  Vector3<float> angular_momentum = I * omega;
+  I = new_state.R * inertia * new_state.R.transpose();
+  new_state.omega = I.inverse() * angular_momentum;
+  return new_state;
+}
+
+Directory::Directory(const std::vector<int> &contents, int num_bucket) {
+  first.resize(num_bucket, 0);
+  count.resize(num_bucket, 0);
   for (int content : contents) {
     count[content]++;
   }
