@@ -7,6 +7,8 @@ class Film {
   friend class Core;
 
  public:
+  std::shared_ptr<Core> GetCore() const;
+
   graphics::Extent2D Extent() const;
 
   graphics::Image *GetImage(FilmChannel film_channel);

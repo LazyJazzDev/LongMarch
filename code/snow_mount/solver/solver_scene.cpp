@@ -73,8 +73,8 @@ int Scene::AddRigidBody(const RigidObject &rigid_object) {
   rigid_object_ids_.push_back(rigid_object_id);
   RigidObjectRef rigid_object_ref;
   rigid_object_ref.mesh_sdf = rigid_object_meshes_.back();
-  rigid_object_ref.mesh_sdf.rotation = rigid_object.R;
-  rigid_object_ref.mesh_sdf.translation = rigid_object.t;
+  rigid_object_ref.R = rigid_object.R;
+  rigid_object_ref.t = rigid_object.t;
   rigid_object_ref.v = rigid_object.v;
   rigid_object_ref.omega = rigid_object.omega;
   rigid_object_ref.mass = rigid_object.mass;
@@ -147,8 +147,6 @@ SceneDevice::SceneDevice(const Scene &scene) {
   for (int i = 0; i < scene.rigid_object_meshes_.size(); i++) {
     rigid_object_meshes_.emplace_back(scene.rigid_object_meshes_[i]);
     rigid_objects[i].mesh_sdf = rigid_object_meshes_.back();
-    rigid_objects[i].mesh_sdf.rotation = scene.rigid_objects_[i].mesh_sdf.rotation;
-    rigid_objects[i].mesh_sdf.translation = scene.rigid_objects_[i].mesh_sdf.translation;
   }
   rigid_objects_ = rigid_objects;
   rigid_object_ids_ = scene.rigid_object_ids_;

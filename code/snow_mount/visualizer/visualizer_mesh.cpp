@@ -12,6 +12,10 @@ Mesh::Mesh(const std::shared_ptr<Core> &core) : core_(core) {
   num_indices_ = 0;
 }
 
+std::shared_ptr<Core> Mesh::GetCore() const {
+  return core_;
+}
+
 void Mesh::SetVertices(const Vertex *vertices) {
   SetVertices(vertices, num_vertices_);
 }
@@ -54,6 +58,7 @@ graphics::Buffer *Mesh::GetIndexBuffer() const {
 
 void Mesh::PyBind(pybind11::module_ &m) {
   pybind11::class_<Mesh, std::shared_ptr<Mesh>> mesh(m, "Mesh");
+  mesh.def("get_core", &Mesh::GetCore);
   mesh.def("set_vertices", [](Mesh &mesh, pybind11::array_t<float> vertices) {
     auto r = vertices.unchecked<2>();
     std::vector<Vertex> vertex_data;

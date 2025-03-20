@@ -11,6 +11,8 @@ class Camera {
   glm::mat4 proj;
   glm::mat4 view;
 
+  std::shared_ptr<Core> GetCore() const;
+
   CameraInfo GetInfo() const;
   void SetInfo(const CameraInfo &camera_info);
 

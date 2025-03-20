@@ -15,12 +15,17 @@ namespace {
 Entity::Entity(const std::shared_ptr<Core> &core) : core_(core) {
 }
 
+std::shared_ptr<Core> Entity::GetCore() const {
+  return core_;
+}
+
 int Entity::ExecuteStage(RenderStage render_stage, const RenderContext &ctx) {
   return 0;
 }
 
 void Entity::PyBind(pybind11::module &m) {
   pybind11::class_<Entity, std::shared_ptr<Entity>> entity(m, "Entity");
+  entity.def("get_core", &Entity::GetCore);
 
   EntityMeshObject::PyBind(m);
 }

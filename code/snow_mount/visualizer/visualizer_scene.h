@@ -8,6 +8,8 @@ class Scene {
   Scene(const std::shared_ptr<Core> &core);
 
  public:
+  std::shared_ptr<Core> GetCore() const;
+
   uint64_t AddEntity(const std::shared_ptr<Entity> &entity);
 
   static void PyBind(pybind11::module_ &m);

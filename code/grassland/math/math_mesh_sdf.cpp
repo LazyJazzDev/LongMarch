@@ -6,11 +6,10 @@
 #include "math_static_collision.h"
 
 namespace grassland {
-LM_DEVICE_FUNC Vector3<float> MeshSDFRef::GetPosition(int index) const {
-  return rotation * x[index] + translation;
-}
 
 LM_DEVICE_FUNC void MeshSDFRef::SDF(const Vector3<float> &position,
+                                    const Matrix3<float> &R,
+                                    const Vector3<float> &t,
                                     float *sdf,
                                     Vector3<float> *jacobian,
                                     Matrix3<float> *hessian) const {
@@ -22,9 +21,9 @@ LM_DEVICE_FUNC void MeshSDFRef::SDF(const Vector3<float> &position,
     int a = triangle_indices[i * 3 + 0];
     int b = triangle_indices[i * 3 + 1];
     int c = triangle_indices[i * 3 + 2];
-    Vector3<float> pa = GetPosition(a);
-    Vector3<float> pb = GetPosition(b);
-    Vector3<float> pc = GetPosition(c);
+    Vector3<float> pa = R * x[a] + t;
+    Vector3<float> pb = R * x[b] + t;
+    Vector3<float> pc = R * x[c] + t;
     Vector3<float> n = (pb - pa).cross(pc - pa);
     float t = DistancePointPlane(position, pa, pb, pc, u, v);
     if (u >= 0 && v >= 0 && u + v <= 1) {
@@ -41,8 +40,8 @@ LM_DEVICE_FUNC void MeshSDFRef::SDF(const Vector3<float> &position,
   for (int i = 0; i < num_edges; i++) {
     int a = edge_indices[i * 2 + 0];
     int b = edge_indices[i * 2 + 1];
-    Vector3<float> pa = GetPosition(a);
-    Vector3<float> pb = GetPosition(b);
+    Vector3<float> pa = R * x[a] + t;
+    Vector3<float> pb = R * x[b] + t;
     float t = DistancePointLine(position, pa, pb, u);
     if (0 < u && u < 1) {
       if (t < fabs(local_sdf)) {
@@ -62,7 +61,7 @@ LM_DEVICE_FUNC void MeshSDFRef::SDF(const Vector3<float> &position,
   }
   for (int i = 0; i < num_points; i++) {
     PointSDF<float> point_sdf;
-    point_sdf.position = GetPosition(i);
+    point_sdf.position = R * x[i] + t;
     float t = point_sdf(position).value();
     if (t < fabs(local_sdf)) {
       local_sdf = t;
@@ -152,8 +151,6 @@ MeshSDF::operator MeshSDFRef() const {
   mesh_sdf.edge_indices = edge_indices_.data();
   mesh_sdf.edge_inside = edge_inside_.data();
   mesh_sdf.point_inside = point_inside_.data();
-  mesh_sdf.rotation = Matrix3<float>::Identity();
-  mesh_sdf.translation = Vector3<float>::Zero();
   return mesh_sdf;
 }
 
@@ -176,8 +173,6 @@ MeshSDFDevice::operator MeshSDFRef() const {
   mesh_sdf.edge_indices = edge_indices_.data().get();
   mesh_sdf.edge_inside = edge_inside_.data().get();
   mesh_sdf.point_inside = point_inside_.data().get();
-  mesh_sdf.rotation = Matrix3<float>::Identity();
-  mesh_sdf.translation = Vector3<float>::Zero();
   return mesh_sdf;
 }
 

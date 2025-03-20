@@ -18,11 +18,9 @@ struct MeshSDFRef {
   int num_edges;
   int num_points;
 
-  Matrix3<float> rotation;
-  Vector3<float> translation;
-
-  LM_DEVICE_FUNC Vector3<float> GetPosition(int index) const;
   LM_DEVICE_FUNC void SDF(const Vector3<float> &position,
+                          const Matrix3<float> &R,
+                          const Vector3<float> &t,
                           float *sdf,
                           Vector3<float> *jacobian,
                           Matrix3<float> *hessian) const;

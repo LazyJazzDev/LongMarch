@@ -5,6 +5,8 @@ namespace snow_mount::solver {
 
 struct RigidObjectRef {
   MeshSDFRef mesh_sdf;
+  Matrix3<float> R;
+  Vector3<float> t;
   Vector3<float> v;
   Vector3<float> omega;
   float mass;

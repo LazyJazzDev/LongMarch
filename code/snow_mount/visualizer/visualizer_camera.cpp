@@ -11,6 +11,10 @@ Camera::Camera(const std::shared_ptr<Core> &core) : core_(core) {
   core_->GraphicsCore()->CreateBuffer(sizeof(CameraInfo), graphics::BUFFER_TYPE_DYNAMIC, &camera_buffer_);
 }
 
+std::shared_ptr<Core> Camera::GetCore() const {
+  return core_;
+}
+
 CameraInfo Camera::GetInfo() const {
   return {proj, view};
 }
@@ -52,6 +56,7 @@ void Camera::PyBind(pybind11::module_ &m) {
   camera.def("__repr__", [](const Camera &camera) {
     return pybind11::str("Camera(\nproj=\n{},\nview=\n{}\n)").format(GLMToEigen(camera.proj), GLMToEigen(camera.view));
   });
+  camera.def("get_core", &Camera::GetCore);
   camera.def_property(
       "proj", [](const Camera &cam) { return GLMToEigen(cam.proj); },
       [](Camera &cam, const Matrix4<float> &proj) { cam.proj = EigenToGLM(proj); });

@@ -7,6 +7,8 @@ class Mesh {
   Mesh(const std::shared_ptr<Core> &core);
 
  public:
+  std::shared_ptr<Core> GetCore() const;
+
   void SetVertices(const Vertex *vertices);
   void SetIndices(const uint32_t *indices);
   void SetVertices(const Vertex *vertices, int num_vertex);

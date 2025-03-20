@@ -9,6 +9,10 @@ Film::Film(const std::shared_ptr<Core> &core, int width, int height) : core_(cor
                                      &images_[FILM_CHANNEL_EXPOSURE]);
 }
 
+std::shared_ptr<Core> Film::GetCore() const {
+  return core_;
+}
+
 graphics::Extent2D Film::Extent() const {
   return images_[FILM_CHANNEL_EXPOSURE]->Extent();
 }
@@ -26,6 +30,7 @@ void Film::PyBind(pybind11::module_ &m) {
   film.def("__repr__", [](const Film &film) {
     return pybind11::str("Film({}x{})").format(film.Extent().width, film.Extent().height);
   });
+  film.def("get_core", &Film::GetCore);
   film.def("extent", &Film::Extent);
   film.def("get_image", &Film::GetImage, pybind11::return_value_policy::reference,
            pybind11::arg("film_channel") = FILM_CHANNEL_EXPOSURE);

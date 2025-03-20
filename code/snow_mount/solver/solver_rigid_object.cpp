@@ -41,8 +41,8 @@ void RigidObject::PyBind(pybind11::module_ &m) {
 RigidObject::operator RigidObjectRef() const {
   RigidObjectRef rigid_object;
   rigid_object.mesh_sdf = mesh_sdf;
-  rigid_object.mesh_sdf.rotation = R;
-  rigid_object.mesh_sdf.translation = t;
+  rigid_object.R = R;
+  rigid_object.t = t;
   rigid_object.v = v;
   rigid_object.omega = omega;
   rigid_object.mass = mass;
@@ -54,8 +54,8 @@ RigidObject::operator RigidObjectRef() const {
 RigidObjectDevice::operator RigidObjectRef() const {
   RigidObjectRef rigid_object;
   rigid_object.mesh_sdf = mesh_sdf;
-  rigid_object.mesh_sdf.rotation = R;
-  rigid_object.mesh_sdf.translation = t;
+  rigid_object.R = R;
+  rigid_object.t = t;
   rigid_object.v = v;
   rigid_object.omega = omega;
   rigid_object.mass = mass;

@@ -86,19 +86,19 @@ __global__ void SolveVBDParticlePosition(SceneRef scene_ref, const int *particle
       float sdf;
       Vector3<float> jacobian;
       Matrix3<float> hessian;
-      scene_ref.rigid_objects[i].mesh_sdf.SDF(x, &sdf, &jacobian, &hessian);
-      Vector3<float> r = x - sdf * jacobian - scene_ref.rigid_objects[i].mesh_sdf.translation;
+      RigidObjectRef rigid_object = scene_ref.rigid_objects[i];
+      rigid_object.mesh_sdf.SDF(x, rigid_object.R, rigid_object.t, &sdf, &jacobian, &hessian);
+      Vector3<float> r = x - sdf * jacobian - rigid_object.t;
       sdf -= 0.018;
       if (sdf < 0.0) {
-        float k_stiffness = scene_ref.rigid_objects[i].stiffness * m;
+        float k_stiffness = rigid_object.stiffness * m;
         float force_mag = -2.0 * k_stiffness * sdf;
         Matrix3<float> partial_H =
             2.0 * k_stiffness * jacobian * jacobian.transpose() + 2.0 * k_stiffness * sdf * hessian;
         f -= 2.0 * k_stiffness * sdf * jacobian + partial_H * (x - x_prev) * K_DAMPING;
         H += partial_H + partial_H * K_DAMPING;
 
-        Vector3<float> velocity_component =
-            rel_vel - scene_ref.rigid_objects[i].v - scene_ref.rigid_objects[i].omega.cross(r);
+        Vector3<float> velocity_component = rel_vel - rigid_object.v - rigid_object.omega.cross(r);
         velocity_component = velocity_component - jacobian * jacobian.transpose() * velocity_component;
         float max_friction_force = force_mag * k_friction;
         float vel_comp_norm = velocity_component.norm();

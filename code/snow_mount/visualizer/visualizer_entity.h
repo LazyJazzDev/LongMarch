@@ -9,6 +9,9 @@ class Entity {
 
  public:
   virtual ~Entity() = default;
+
+  std::shared_ptr<Core> GetCore() const;
+
   virtual int ExecuteStage(RenderStage render_stage, const RenderContext &ctx);
 
   static void PyBind(pybind11::module &m);
