@@ -117,6 +117,10 @@ void Scene::PyBind(pybind11::module_ &m) {
   scene_device.def("get_rigid_object_state", &SceneDevice::GetRigidObjectState, pybind11::arg("rigid_object_id"));
   scene_device.def("set_rigid_object_state", &SceneDevice::SetRigidObjectState, pybind11::arg("rigid_object_id"),
                    pybind11::arg("state"));
+  scene_device.def("get_rigid_object_stiffness", &SceneDevice::GetRigidObjectStiffness,
+                   pybind11::arg("rigid_object_id"));
+  scene_device.def("set_rigid_object_stiffness", &SceneDevice::SetRigidObjectStiffness,
+                   pybind11::arg("rigid_object_id"), pybind11::arg("stiffness"));
   m.def("update_scene", &SceneDevice::Update);
   m.def("update_scene_batch", &SceneDevice::UpdateBatch);
 #endif
@@ -258,6 +262,19 @@ void SceneDevice::SetRigidObjectState(int rigid_object_id, const RigidObjectStat
   int rigid_object_idx = BinarySearch(rigid_object_ids_host_.data(), rigid_object_ids_host_.size(), rigid_object_id);
   RigidObjectRef ref = rigid_objects_[rigid_object_idx];
   ref.state = state;
+  rigid_objects_[rigid_object_idx] = ref;
+}
+
+float SceneDevice::GetRigidObjectStiffness(int rigid_object_id) const {
+  int rigid_object_idx = BinarySearch(rigid_object_ids_host_.data(), rigid_object_ids_host_.size(), rigid_object_id);
+  RigidObjectRef ref = rigid_objects_[rigid_object_idx];
+  return ref.stiffness;
+}
+
+void SceneDevice::SetRigidObjectStiffness(int rigid_object_id, float stiffness) {
+  int rigid_object_idx = BinarySearch(rigid_object_ids_host_.data(), rigid_object_ids_host_.size(), rigid_object_id);
+  RigidObjectRef ref = rigid_objects_[rigid_object_idx];
+  ref.stiffness = stiffness;
   rigid_objects_[rigid_object_idx] = ref;
 }
 

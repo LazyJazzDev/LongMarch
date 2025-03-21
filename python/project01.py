@@ -6,6 +6,7 @@ from long_march.grassland import graphics
 from long_march.snow_mount import solver
 from long_march.snow_mount import visualizer
 import glfw
+import open3d as o3d
 
 glfw.init()
 
@@ -23,7 +24,7 @@ class Scene:
 
 
 class RigidObject:
-    def __init__(self, scene: Scene, vertices, indices):
+    def __init__(self, scene: Scene, vertices, indices, stiffness=1e5):
         self.scene = scene
         self.vertices = np.asarray(vertices)
         self.indices = np.asarray(indices)
@@ -31,7 +32,7 @@ class RigidObject:
         self.vis_mesh.set_vertices(vertices)
         self.vis_mesh.set_indices(indices)
         mesh_sdf = long_march.grassland.math.MeshSDF(vertices, indices)
-        self.sol_rigid_object = solver.RigidObject(mesh_sdf)
+        self.sol_rigid_object = solver.RigidObject(mesh_sdf, stiffness=stiffness)
         self.sol_rigid_id = scene.sol_scene.add_rigid_object(self.sol_rigid_object)
         self.vis_entity = scene.vis_scene.get_core().create_entity_mesh_object()
         self.vis_entity.set_mesh(self.vis_mesh)
@@ -47,6 +48,18 @@ class RigidObject:
         rigid_object_state.R = R
         rigid_object_state.t = t
         self.scene.sol_scene_dev.set_rigid_object_state(self.sol_rigid_id, rigid_object_state)
+
+    def set_color(self, color):
+        self.vis_entity.set_material(visualizer.Material(color))
+
+    @staticmethod
+    def load_from_mesh(scene: Scene, path: str, stiffness=1e5):
+        full_path = long_march.grassland.util.find_asset_file(path)
+        # load obj mesh from full_path, use open3d
+        mesh = o3d.io.read_triangle_mesh(full_path)
+        vertices = np.asarray(mesh.vertices)
+        indices = np.asarray(mesh.triangles).flatten()
+        return RigidObject(scene, vertices, indices, stiffness=stiffness)
 
 
 class GridCloth:
@@ -170,21 +183,25 @@ class Environment:
         # serialize the indices
         cloth_indices = np.asarray(cloth_indices).flatten()
 
-        self.rigid_object = RigidObject(self.scene, mesh_vertices * 0.5, mesh_indices)
+        self.left_gripper = RigidObject.load_from_mesh(self.scene, "meshes/gripper_left.obj", stiffness=1e6)
+        self.right_gripper = RigidObject.load_from_mesh(self.scene, "meshes/gripper_right.obj", stiffness=1e6)
+        # (self.scene, mesh_vertices * 0.5, mesh_indices)
 
         self.ground_object = RigidObject(self.scene, mesh_vertices * 10.0, mesh_indices)
         self.cloth_object = GridCloth(self.scene, cloth_vertices, cloth_indices)
 
         self.scene.build_scene()
 
-        self.rigid_object.set_transform(np.identity(3), [-0.5, -0.5, 0])
         self.ground_object.set_transform(np.identity(3), [0, -11, 0])
+
     def render(self, context, camera, film):
         self.vis_core.render(context, self.scene.vis_scene, camera, film)
+
 
 def update_env(env: Environment, dt):
     solver.update_scene(env.scene.sol_scene_dev, dt)
     env.cloth_object.post_solver_update()
+
 
 def update_envs(envs, dt):
     sol_scene_devs = []
@@ -193,6 +210,7 @@ def update_envs(envs, dt):
     solver.update_scene_batch(sol_scene_devs, dt)
     for env in envs:
         env.cloth_object.post_solver_update()
+
 
 def main():
     core_settings = graphics.CoreSettings()
@@ -220,9 +238,6 @@ def main():
         graphics.glfw_poll_events()
 
     graphics_core.wait_gpu()
-
-    print(long_march.grassland.util.find_asset_file("meshes/gripper_left.obj"))
-    print(long_march.grassland.util.find_asset_file("meshes/gripper_right.obj"))
 
 
 if __name__ == "__main__":

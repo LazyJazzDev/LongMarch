@@ -200,12 +200,6 @@ __global__ void UpdateBendingPlasticity(SceneRef scene_ref) {
   }
 }
 
-__global__ void SolveVBDParticlePositionLaunch(DirectoryRef directory_ref,
-                                               int num_color,
-                                               SceneRef scene_ref,
-                                               float dt) {
-}
-
 __global__ void UpdateVelocity(SceneRef scene_ref, float dt) {
   int pid = threadIdx.x + blockIdx.x * blockDim.x;
   if (pid < scene_ref.num_particle) {
