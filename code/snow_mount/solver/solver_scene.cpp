@@ -188,6 +188,8 @@ SceneDevice::SceneDevice(const Scene &scene) {
         check_conflict(scene.stretching_indices_[stretching_i * 3]);
         check_conflict(scene.stretching_indices_[stretching_i * 3 + 1]);
         check_conflict(scene.stretching_indices_[stretching_i * 3 + 2]);
+        // printf("id: %d u: %d v: %d w: %d\n", id, scene.stretching_indices_[stretching_i * 3],
+        // scene.stretching_indices_[stretching_i * 3 + 1], scene.stretching_indices_[stretching_i * 3 + 2]);
       }
 
       for (int j = 0, first = bending_directory.first[id], size = bending_directory.count[id]; pass && j < size; j++) {
@@ -199,13 +201,12 @@ SceneDevice::SceneDevice(const Scene &scene) {
         // scene.bending_indices_[bending_i * 4 + 1], scene.bending_indices_[bending_i * 4 + 2],
         // scene.bending_indices_[bending_i * 4 + 3]);
         check_conflict(scene.bending_indices_[bending_i * 4]);
-        // puts("check0");
         check_conflict(scene.bending_indices_[bending_i * 4 + 1]);
-        // puts("check1");
         check_conflict(scene.bending_indices_[bending_i * 4 + 2]);
-        // puts("check2");
         check_conflict(scene.bending_indices_[bending_i * 4 + 3]);
-        // puts("check3");
+        // printf("id: %d a: %d b: %d c: %d d: %d\n", id, scene.bending_indices_[bending_i * 4],
+        // scene.bending_indices_[bending_i * 4 + 1], scene.bending_indices_[bending_i * 4 + 2],
+        // scene.bending_indices_[bending_i * 4 + 3]);
       }
 
       if (pass) {
@@ -214,10 +215,18 @@ SceneDevice::SceneDevice(const Scene &scene) {
       }
     }
   }
-  // puts("here");
+  // for (int i = 0; i < particle_colors.size(); i++) {
+  //   printf("%d ", particle_colors[i]);
+  // }
+  // puts("");
   particle_colors_ = particle_colors;
   particle_directory_host_ = Directory(particle_colors, c);
   particle_directory_ = particle_directory_host_;
+
+  printf("#color: %d\n", static_cast<int>(particle_directory_host_.first.size()));
+  for (int c = 0; c < particle_directory_host_.first.size(); c++) {
+    printf("- color %d: %d\n", c, particle_directory_host_.count[c]);
+  }
 
   cudaStreamCreate(&stream_);
 }

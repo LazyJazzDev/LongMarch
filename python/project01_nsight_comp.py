@@ -149,22 +149,22 @@ class Environment:
                                    3, 7, 6,
                                    0, 5, 4,
                                    0, 1, 5])
-
+        n_roll = 50
         cloth_vertices = []
-        for i in range(50):
-            for j in range(50):
-                cloth_vertices.append([i / 49 - 0.5, 2.0, j / 49 - 0.5])
+        for i in range(n_roll):
+            for j in range(n_roll):
+                cloth_vertices.append([i / (n_roll - 1) * (n_roll / 50) - (n_roll / 50) / 2, 2.0, j / (n_roll - 1) * (n_roll / 50) - (n_roll / 50) / 2])
         cloth_vertices = np.asarray(cloth_vertices)
 
         cloth_indices = []
-        for i in range(49):
+        for i in range(n_roll - 1):
             i1 = i + 1
-            for j in range(49):
+            for j in range(n_roll -  1):
                 j1 = j + 1
-                v00 = i * 50 + j
-                v01 = i * 50 + j1
-                v10 = i1 * 50 + j
-                v11 = i1 * 50 + j1
+                v00 = i * n_roll + j
+                v01 = i * n_roll + j1
+                v10 = i1 * n_roll + j
+                v11 = i1 * n_roll + j1
                 cloth_indices.append([v00, v01, v11])
                 cloth_indices.append([v00, v11, v10])
         # serialize the indices
@@ -195,16 +195,16 @@ def update_envs(envs, dt):
         env.cloth_object.post_solver_update()
 
 def main():
-    time.sleep(1)
+    time.sleep(2)
     core_settings = graphics.CoreSettings()
     core_settings.frames_in_flight = 1
 
     graphics_core = graphics.Core(graphics.BACKEND_API_VULKAN, core_settings)
     vis_core = visualizer.Core(graphics_core)
 
-    envs = [Environment(vis_core) for i in range(20)]
+    envs = [Environment(vis_core) for i in range(1)]
 
-    for i in range(10):
+    for i in range(1):
         update_envs(envs, 0.003)
 
 if __name__ == "__main__":

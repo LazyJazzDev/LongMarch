@@ -14,6 +14,55 @@ __global__ void InitializeSolver(SceneRef scene_ref, Vector3<float> gravity, flo
   }
 }
 
+__global__ void SolveVBDParticlePositionStretching(Vector3<float> *pos,
+                                                   Vector3<float> *pos_prev,
+                                                   Vector3<float> *vel,
+                                                   float *mass,
+                                                   int *particle_ids,
+                                                   int num_particles,
+                                                   DirectoryRef stretching_directory,
+                                                   ElementStretching *stretchings,
+                                                   int *stretching_indices,
+                                                   const int *particle_indices,
+                                                   int num_particle,
+                                                   float dt) {
+  int tid = threadIdx.x + blockIdx.x * blockDim.x;
+  if (tid < num_particle) {
+    int pid = particle_indices[tid];
+    int pidx = BinarySearch(particle_ids, num_particles, pid);
+    Vector3<float> x = pos[pidx];
+    Vector3<float> x_prev = pos_prev[pidx];
+    Vector3<float> v = vel[pidx];
+    float m = mass[pidx];
+    Vector3<float> f = -(m / (dt * dt)) * (x - (x_prev + v * dt));
+    Matrix3<float> H = (m / (dt * dt)) * Matrix3<float>::Identity();
+
+    for (int i = 0; i < stretching_directory.count[pid]; i++) {
+      int stretching_id = stretching_directory.positions[stretching_directory.first[pid] + i] / 3;
+      auto stretching = stretchings[stretching_id];
+
+      grassland::ElasticNeoHookeanSimpleTriangle<float> neo_hookean{stretching.mu, stretching.lambda, stretching.Dm};
+      uint32_t u = stretching_indices[stretching_id * 3 + 0];
+      uint32_t v = stretching_indices[stretching_id * 3 + 1];
+      uint32_t w = stretching_indices[stretching_id * 3 + 2];
+      int self_index = pid == u ? 0 : (pid == v ? 1 : 2);
+
+      Matrix3<float> X;
+      X << pos[u], pos[v], pos[w];
+      Vector3<float> jacobian = Vector3<float>::Zero();
+      // jacobian = neo_hookean.Jacobian(X).block(0, 3 * self_index, 1, 3).transpose() * stretching.area;
+      Matrix3<float> hessian = Matrix3<float>::Identity();
+      hessian = neo_hookean.Hessian(X).m[0].block(3 * self_index, 3 * self_index, 3, 3) * stretching.area;
+
+      float k_damping = stretching.damping / dt;
+      f -= jacobian + hessian * (x - x_prev) * k_damping;
+      H += hessian * (1.0 + k_damping);
+    }
+    Vector3<float> delta_x = H.inverse() * f;
+    pos[pidx] += delta_x;
+  }
+}
+
 __global__ void SolveVBDParticlePosition(SceneRef scene_ref, const int *particle_indices, int num_particle, float dt) {
   int tid = threadIdx.x + blockIdx.x * blockDim.x;
   if (tid < num_particle) {
@@ -65,8 +114,8 @@ __global__ void SolveVBDParticlePosition(SceneRef scene_ref, const int *particle
       Vector3<float> jacobian = dihedral_angle.Jacobian(X).block(0, 3 * self_index, 1, 3).transpose();
       Matrix3<float> hessian = Matrix3<float>::Zero();
       hessian = dihedral_angle.SubHessian(X, self_index);
-      hessian = (2.0 * theta * hessian + 2.0 * jacobian * jacobian.transpose()).derived();
-      jacobian *= 2.0 * theta;
+      hessian = (2.0f * theta * hessian + 2.0f * jacobian * jacobian.transpose()).derived();
+      jacobian *= 2.0f * theta;
 
       // if (fabs(theta) > 0.0f) {
       //   printf("theta: %f jacobian: %f %f %f, current_angle: %f, theta_rest: %f\n", theta, jacobian[0], jacobian[1],
@@ -77,11 +126,11 @@ __global__ void SolveVBDParticlePosition(SceneRef scene_ref, const int *particle
       f -= jacobian * bending.stiffness + hessian * (x - x_prev) * k_damping * bending.stiffness;
       H += hessian * (1.0 + k_damping) * bending.stiffness;
     }
-
+    //
     const float k_friction = 5.0f;
     const Vector3<float> rel_vel = (x - x_prev) / dt;
 
-    constexpr float K_DAMPING = 1e-6;
+    constexpr float K_DAMPING = 1e-6f;
     for (int i = 0; i < scene_ref.num_rigid_object; i++) {
       float sdf;
       Vector3<float> jacobian;
@@ -89,13 +138,13 @@ __global__ void SolveVBDParticlePosition(SceneRef scene_ref, const int *particle
       RigidObjectRef rigid_object = scene_ref.rigid_objects[i];
       rigid_object.mesh_sdf.SDF(x, rigid_object.state.R, rigid_object.state.t, &sdf, &jacobian, &hessian);
       Vector3<float> r = x - sdf * jacobian - rigid_object.state.t;
-      sdf -= 0.018;
-      if (sdf < 0.0) {
+      sdf -= 0.018f;
+      if (sdf < 0.0f) {
         float k_stiffness = rigid_object.stiffness * m;
-        float force_mag = -2.0 * k_stiffness * sdf;
+        float force_mag = -2.0f * k_stiffness * sdf;
         Matrix3<float> partial_H =
-            2.0 * k_stiffness * jacobian * jacobian.transpose() + 2.0 * k_stiffness * sdf * hessian;
-        f -= 2.0 * k_stiffness * sdf * jacobian + partial_H * (x - x_prev) * K_DAMPING;
+            2.0f * k_stiffness * jacobian * jacobian.transpose() + 2.0f * k_stiffness * sdf * hessian;
+        f -= 2.0f * k_stiffness * sdf * jacobian + partial_H * (x - x_prev) * K_DAMPING;
         H += partial_H + partial_H * K_DAMPING;
 
         Vector3<float> velocity_component = rel_vel - rigid_object.state.v - rigid_object.state.omega.cross(r);
@@ -104,11 +153,12 @@ __global__ void SolveVBDParticlePosition(SceneRef scene_ref, const int *particle
         float vel_comp_norm = velocity_component.norm();
         if (vel_comp_norm > max_friction_force * dt / m) {
           f -= velocity_component / vel_comp_norm * max_friction_force;
-        } else if (vel_comp_norm > 1e-9) {
+        } else if (vel_comp_norm > 1e-9f) {
           f -= velocity_component / dt * m;
         }
       }
     }
+
     Vector3<float> delta_x = H.inverse() * f;
     scene_ref.x[pidx] += delta_x;
   }
@@ -225,8 +275,13 @@ void SceneDevice::Update(SceneDevice &scene, float dt) {
   for (int iter = 0; iter < num_vbd_iterations_; iter++) {
     for (int c = 0; c < scene.particle_directory_host_.first.size(); c++) {
       SolveVBDParticlePosition<<<DEFAULT_DISPATCH_SIZE(scene.particle_directory_host_.count[c])>>>(
-          scene_ref, scene.particle_directory_host_.positions.data() + scene.particle_directory_host_.first[c],
+          scene_ref, scene.particle_directory_.positions.data().get() + scene.particle_directory_host_.first[c],
           scene.particle_directory_host_.count[c], dt);
+      // SolveVBDParticlePositionStretching<<<DEFAULT_DISPATCH_SIZE(scene.particle_directory_host_.count[c])>>>(
+      //     scene_ref.x, scene_ref.x_prev, scene_ref.v, scene_ref.m, scene_ref.particle_ids, scene_ref.num_particle,
+      //     scene_ref.stretching_directory, scene_ref.stretchings, scene_ref.stretching_indices,
+      //     scene.particle_directory_host_.positions.data() + scene.particle_directory_host_.first[c],
+      //     scene.particle_directory_host_.count[c], dt);
     }
   }
   clk.Record("Solve VBD");
@@ -260,18 +315,24 @@ void SceneDevice::UpdateBatch(const std::vector<SceneDevice *> &scenes, float dt
   for (int i = 0; i < scenes.size(); i++) {
     for (int iter = 0; iter < num_vbd_iterations_; iter++) {
       for (int c = 0; c < scenes[i]->particle_directory_host_.first.size(); c++) {
-        SolveVBDParticlePosition<<<DEFAULT_DISPATCH_SIZE(scenes[i]->particle_directory_host_.count[c]), 0,
+        SolveVBDParticlePosition<<<DISPATCH_SIZE(scenes[i]->particle_directory_host_.count[c], 64), 0,
                                    scenes[i]->stream_>>>(
             scene_refs[i],
             scenes[i]->particle_directory_.positions.data().get() + scenes[i]->particle_directory_host_.first[c],
             scenes[i]->particle_directory_host_.count[c], dt);
+        // SolveVBDParticlePositionStretching<<<DEFAULT_DISPATCH_SIZE(scenes[i]->particle_directory_host_.count[c])>>>(
+        //     scene_refs[i].x, scene_refs[i].x_prev, scene_refs[i].v, scene_refs[i].m, scene_refs[i].particle_ids,
+        //     scene_refs[i].num_particle, scene_refs[i].stretching_directory, scene_refs[i].stretchings,
+        //     scene_refs[i].stretching_indices,
+        //     scenes[i]->particle_directory_.positions.data().get() + scenes[i]->particle_directory_host_.first[c],
+        //     scenes[i]->particle_directory_host_.count[c], dt);
       }
     }
   }
   clk.Record("Solve VBD");
 
   for (int i = 0; i < scenes.size(); i++) {
-    UpdateVelocity<<<DEFAULT_DISPATCH_SIZE(scene_refs[i].num_particle), 0, scenes[i]->stream_>>>(scene_refs[i], dt);
+    UpdateVelocity<<<DISPATCH_SIZE(scene_refs[i].num_particle, 256), 0, scenes[i]->stream_>>>(scene_refs[i], dt);
   }
   clk.Record("Update Velocity");
 

@@ -208,7 +208,7 @@ def main():
 
     film = vis_core.create_film(1280, 720)
 
-    envs = [Environment(vis_core) for i in range(20)]
+    envs = [Environment(vis_core) for i in range(256)]
 
     while not window.should_close():
         update_envs(envs, 0.003)

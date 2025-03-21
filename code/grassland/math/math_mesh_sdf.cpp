@@ -28,7 +28,7 @@ LM_DEVICE_FUNC void MeshSDFRef::SDF(const Vector3<float> &position,
     float t = DistancePointPlane(position, pa, pb, pc, u, v);
     if (u >= 0 && v >= 0 && u + v <= 1) {
       if (t < fabs(local_sdf)) {
-        if ((position - pa).dot(n) < 0) {
+        if ((position - pa).dot(n) < 0.0f) {
           t = -t;
         }
         local_sdf = t;
