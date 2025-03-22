@@ -1,10 +1,10 @@
 import math
 import time
-import scipy
 import long_march
 from long_march.grassland import graphics
 from long_march.snow_mount import solver
 from long_march.snow_mount import visualizer
+from long_march.grassland.math import rotation
 import glfw
 import open3d as o3d
 
@@ -49,6 +49,12 @@ class RigidObject:
         rigid_object_state.t = t
         self.scene.sol_scene_dev.set_rigid_object_state(self.sol_rigid_id, rigid_object_state)
 
+    def set_movement(self, v, omega):
+        rigid_object_state = self.scene.sol_scene_dev.get_rigid_object_state(self.sol_rigid_id)
+        rigid_object_state.v = v
+        rigid_object_state.omega = omega
+        self.scene.sol_scene_dev.set_rigid_object_state(self.sol_rigid_id, rigid_object_state)
+
     def set_color(self, color):
         self.vis_entity.set_material(visualizer.Material(color))
 
@@ -65,7 +71,8 @@ class RigidObject:
 class GridCloth:
     def __init__(self, scene: Scene, vertices, indices):
         self.scene = scene
-        self.cloth_object = solver.ObjectPack.create_from_mesh(vertices, indices)
+        self.cloth_object = solver.ObjectPack.create_from_mesh(vertices, indices, bending_stiffness=0.003,
+                                                               elastic_limit=math.pi * 0.05)
         self.cloth_object_view = scene.sol_scene.add_object(self.cloth_object)
         self.cloth_vis_mesh = scene.vis_scene.get_core().create_mesh()
         self.cloth_vis_mesh.set_vertices(scene.sol_scene.get_positions(self.cloth_object_view.particle_ids))
@@ -78,6 +85,62 @@ class GridCloth:
 
     def post_solver_update(self):
         self.cloth_vis_mesh.set_vertices(self.scene.sol_scene_dev.get_positions(self.cloth_object_view.particle_ids))
+
+
+class GripperObject:
+    def __init__(self, scene: Scene):
+        self.scene = scene
+        self.left_gripper = RigidObject.load_from_mesh(scene, "meshes/gripper_left.obj", stiffness=1e6)
+        self.right_gripper = RigidObject.load_from_mesh(scene, "meshes/gripper_right.obj", stiffness=1e6)
+        self.left_gripper.set_color([0.5, 0.5, 0.5, 1.0])
+        self.right_gripper.set_color([0.5, 0.5, 0.5, 1.0])
+        self.R = np.identity(3)
+        self.t = np.asarray([0., 0., 0.])
+        self.local_angular_vel = np.asarray([0., 0., 0.])
+        self.local_vel = np.asarray([0., 0., 0.])
+        self.distance = 0.01
+        self.open = False
+
+    def pre_solver_update(self, dt):
+        gripper_distance_speed_max = 0.2
+        gripper_distance_speed = 0.0
+        print("open: ", self.open)
+        if self.open:
+            if self.distance < 0.1:
+                self.distance += gripper_distance_speed_max * dt
+                gripper_distance_speed = gripper_distance_speed_max
+                self.distance = np.clip(self.distance, 0.01, 0.1)
+            else:
+                self.distance = 0.1
+        else:
+            if self.distance > 0.01:
+                self.distance -= gripper_distance_speed_max * dt
+                gripper_distance_speed = -gripper_distance_speed_max
+                self.distance = np.clip(self.distance, 0.01, 0.1)
+            else:
+                self.distance = 0.01
+        self.t += self.R @ self.local_vel * dt
+        angular_vel = self.R @ self.local_angular_vel
+        self.R = rotation(angular_vel * dt) @ self.R
+        self.left_gripper.set_transform(self.R, self.t + self.R @ np.asarray([-self.distance, 0., 0.]))
+        self.right_gripper.set_transform(self.R, self.t + self.R @ np.asarray([self.distance, 0., 0.]))
+        min_y_boundary = 0.015
+        coord_y_correction = 0
+        # enumerate all the transformed vertices of the gripper
+        for vertex in self.left_gripper.vertices:
+            v = self.R @ (vertex + np.asarray([-self.distance, 0., 0.])) + self.t
+            coord_y_correction = max(coord_y_correction, min_y_boundary - v[1])
+        for vertex in self.right_gripper.vertices:
+            v = self.R @ (vertex + np.asarray([self.distance, 0., 0.])) + self.t
+            coord_y_correction = max(coord_y_correction, min_y_boundary - v[1])
+        self.t[1] += coord_y_correction
+        local_vel = self.local_vel + np.transpose(self.R) @ np.asarray([0., coord_y_correction / dt, 0.])
+        self.left_gripper.set_movement(
+            self.R @ (local_vel + np.asarray([-gripper_distance_speed, 0., 0.]) + np.cross(self.local_angular_vel, np.asarray([-self.distance, 0., 0.]))),
+            angular_vel)
+        self.right_gripper.set_movement(
+            self.R @ (local_vel - np.asarray([-gripper_distance_speed, 0., 0.]) + np.cross(self.local_angular_vel, np.asarray([self.distance, 0., 0.]))),
+            angular_vel)
 
 
 class CameraController:
@@ -95,43 +158,41 @@ class CameraController:
         this_update_time = time.time()
         period = this_update_time - self.last_update_time
         this_cursor_pos = self.window.get_cursor_pos()
-        cursor_diff = [this_cursor_pos[0] - self.last_cursor_pos[0], this_cursor_pos[1] - self.last_cursor_pos[1]]
-        move_signal = [0., 0., 0.]
-        if self.window.get_key(glfw.KEY_A):
-            move_signal[0] += -1
-        if self.window.get_key(glfw.KEY_D):
-            move_signal[0] += 1
-        if self.window.get_key(glfw.KEY_W):
-            move_signal[2] += -1
-        if self.window.get_key(glfw.KEY_S):
-            move_signal[2] += 1
-        if self.window.get_key(glfw.KEY_SPACE):
-            move_signal[1] += 1
-        if self.window.get_key(glfw.KEY_LEFT_CONTROL):
-            move_signal[1] -= 1
-        move_signal = np.asarray(move_signal)
-        move_signal = move_signal * self.move_speed * period
-
-        if self.window.get_mouse_button(glfw.MOUSE_BUTTON_LEFT):
-            self.camera_orientation[1] -= cursor_diff[0] * self.rot_speed
-            self.camera_orientation[0] -= cursor_diff[1] * self.rot_speed
-            self.camera_orientation[0] = np.clip(self.camera_orientation[0], -math.pi / 2, math.pi / 2)
-            self.camera_orientation[1] = self.camera_orientation[1] % (2 * math.pi)
-        R = np.identity(4)
-
-        R[:3, :3] = scipy.spatial.transform.Rotation.from_rotvec(
-            [0, self.camera_orientation[1], 0]).as_matrix() @ scipy.spatial.transform.Rotation.from_rotvec(
-            [self.camera_orientation[0], 0, 0]).as_matrix() @ scipy.spatial.transform.Rotation.from_rotvec(
-            [0, 0, self.camera_orientation[2]]).as_matrix()
-
-        self.camera_position += R[:3, :3] @ move_signal
-
-        R[:3, 3] = self.camera_position
-
-        # inverse matrix R
-        R = np.linalg.inv(R)
-
         if effective:
+            cursor_diff = [this_cursor_pos[0] - self.last_cursor_pos[0], this_cursor_pos[1] - self.last_cursor_pos[1]]
+            move_signal = [0., 0., 0.]
+            if self.window.get_key(glfw.KEY_A):
+                move_signal[0] += -1
+            if self.window.get_key(glfw.KEY_D):
+                move_signal[0] += 1
+            if self.window.get_key(glfw.KEY_W):
+                move_signal[2] += -1
+            if self.window.get_key(glfw.KEY_S):
+                move_signal[2] += 1
+            if self.window.get_key(glfw.KEY_SPACE):
+                move_signal[1] += 1
+            if self.window.get_key(glfw.KEY_LEFT_CONTROL):
+                move_signal[1] -= 1
+            move_signal = np.asarray(move_signal)
+            move_signal = move_signal * self.move_speed * period
+
+            if self.window.get_mouse_button(glfw.MOUSE_BUTTON_LEFT):
+                self.camera_orientation[1] -= cursor_diff[0] * self.rot_speed
+                self.camera_orientation[0] -= cursor_diff[1] * self.rot_speed
+                self.camera_orientation[0] = np.clip(self.camera_orientation[0], -math.pi / 2, math.pi / 2)
+                self.camera_orientation[1] = self.camera_orientation[1] % (2 * math.pi)
+            R = np.identity(4)
+
+            R[:3, :3] = rotation([0, self.camera_orientation[1], 0]) @ rotation(
+                [self.camera_orientation[0], 0, 0]) @ rotation([0, 0, self.camera_orientation[2]])
+
+            self.camera_position += R[:3, :3] @ move_signal
+
+            R[:3, 3] = self.camera_position
+
+            # inverse matrix R
+            R = np.linalg.inv(R)
+
             self.camera.view = R
         self.last_update_time = this_update_time
         self.last_cursor_pos = this_cursor_pos
@@ -183,8 +244,7 @@ class Environment:
         # serialize the indices
         cloth_indices = np.asarray(cloth_indices).flatten()
 
-        self.left_gripper = RigidObject.load_from_mesh(self.scene, "meshes/gripper_left.obj", stiffness=1e6)
-        self.right_gripper = RigidObject.load_from_mesh(self.scene, "meshes/gripper_right.obj", stiffness=1e6)
+        self.gripper = GripperObject(self.scene)
         # (self.scene, mesh_vertices * 0.5, mesh_indices)
 
         self.ground_object = RigidObject(self.scene, mesh_vertices * 10.0, mesh_indices)
@@ -192,24 +252,34 @@ class Environment:
 
         self.scene.build_scene()
 
-        self.ground_object.set_transform(np.identity(3), [0, -11, 0])
+        self.ground_object.set_transform(np.identity(3), [0, -10, 0])
 
     def render(self, context, camera, film):
         self.vis_core.render(context, self.scene.vis_scene, camera, film)
 
+    def pre_solver_update(self, dt):
+        self.gripper.pre_solver_update(dt)
+
+    def post_solver_update(self, dt):
+        self.cloth_object.post_solver_update()
+
 
 def update_env(env: Environment, dt):
+    env.pre_solver_update(dt)
     solver.update_scene(env.scene.sol_scene_dev, dt)
-    env.cloth_object.post_solver_update()
+    env.post_solver_update(dt)
 
 
 def update_envs(envs, dt):
     sol_scene_devs = []
+
+    for env in envs:
+        env.pre_solver_update(dt)
     for env in envs:
         sol_scene_devs.append(env.scene.sol_scene_dev)
     solver.update_scene_batch(sol_scene_devs, dt)
     for env in envs:
-        env.cloth_object.post_solver_update()
+        env.post_solver_update(dt)
 
 
 def main():
@@ -226,11 +296,60 @@ def main():
 
     film = vis_core.create_film(1280, 720)
 
-    envs = [Environment(vis_core) for i in range(20)]
+    envs = [Environment(vis_core) for i in range(1)]
+
+    control_camera = True
+
+    def key_callback(key, scancode, action, mods):
+        nonlocal control_camera
+        if key == glfw.KEY_TAB and action == glfw.PRESS:
+            control_camera = not control_camera
+
+    window.reg_key_callback(key_callback)
+
+    for env in envs:
+        env.gripper.t = np.asarray([-1.5, 0., 0.])
 
     while not window.should_close():
+        camera_controller.update(control_camera)
+        if not control_camera:
+            k_angular_speed = math.radians(180)
+            k_speed = 1.0
+            gripper_vel = np.asarray([0., 0., 0.])
+            gripper_angular_vel = np.asarray([0., 0., 0.])
+            if window.get_key(glfw.KEY_A) == glfw.PRESS:
+                gripper_vel[0] += -k_speed
+            if window.get_key(glfw.KEY_D) == glfw.PRESS:
+                gripper_vel[0] += k_speed
+            if window.get_key(glfw.KEY_W) == glfw.PRESS:
+                gripper_vel[2] += -k_speed
+            if window.get_key(glfw.KEY_S) == glfw.PRESS:
+                gripper_vel[2] += k_speed
+            if window.get_key(glfw.KEY_R) == glfw.PRESS:
+                gripper_vel[1] += k_speed
+            if window.get_key(glfw.KEY_F) == glfw.PRESS:
+                gripper_vel[1] -= k_speed
+            if window.get_key(glfw.KEY_Q) == glfw.PRESS:
+                gripper_angular_vel[2] += k_angular_speed
+            if window.get_key(glfw.KEY_E) == glfw.PRESS:
+                gripper_angular_vel[2] -= k_angular_speed
+            if window.get_key(glfw.KEY_UP) == glfw.PRESS:
+                gripper_angular_vel[0] += k_angular_speed
+            if window.get_key(glfw.KEY_DOWN) == glfw.PRESS:
+                gripper_angular_vel[0] -= k_angular_speed
+            if window.get_key(glfw.KEY_LEFT) == glfw.PRESS:
+                gripper_angular_vel[1] += k_angular_speed
+            if window.get_key(glfw.KEY_RIGHT) == glfw.PRESS:
+                gripper_angular_vel[1] -= k_angular_speed
+            gripper_open = True
+            if window.get_key(glfw.KEY_SPACE) == glfw.PRESS:
+                gripper_open = False
+            print("gripper_open: ", gripper_open)
+            for env in envs:
+                env.gripper.local_vel = gripper_vel
+                env.gripper.local_angular_vel = gripper_angular_vel
+                env.gripper.open = gripper_open
         update_envs(envs, 0.003)
-        camera_controller.update(True)
         context = graphics_core.create_command_context()
         envs[0].render(context, camera, film)
         context.cmd_present(window, film.get_image())

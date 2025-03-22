@@ -11,6 +11,14 @@ void PyBindMath(pybind11::module_ &m) {
     return pybind11::str("MeshSDF(\n vts={}\n inds={}\n edge_inds={}\n)")
         .format(self.GetVertices(), self.GetTriangleIndices(), self.GetEdgeIndices());
   });
+
+  m.def("rotation", [](const Vector3<float> &rot_vec) -> Matrix3<float> {
+    // return the rotation matrix related to the rotation vector rot_vec
+    if (rot_vec.norm() < 1e-6f) {
+      return Matrix3<float>::Identity();
+    }
+    return Eigen::AngleAxis<float>(rot_vec.norm(), rot_vec.normalized()).toRotationMatrix();
+  });
 }
 
 }  // namespace grassland
