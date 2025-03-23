@@ -108,6 +108,7 @@ void Core::PyBind(pybind11::module_ &m) {
   core_class.def(
       pybind11::init([](graphics::Core *graphics_core) { return std::shared_ptr<Core>(new Core(graphics_core)); }),
       pybind11::arg("graphics_core"), pybind11::keep_alive<1, 2>());
+  core_class.def("get_core", &Core::GraphicsCore, pybind11::return_value_policy::reference);
   core_class.def("create_camera", &Core::CreateCamera, pybind11::keep_alive<0, 1>(),
                  pybind11::arg("proj") = Matrix4<float>::Identity(),
                  pybind11::arg("view") = Matrix4<float>::Identity());

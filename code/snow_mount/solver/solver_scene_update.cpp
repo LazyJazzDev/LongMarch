@@ -89,7 +89,7 @@ __global__ void SolveVBDParticlePosition(SceneRef scene_ref, const int *particle
       RigidObjectRef rigid_object = scene_ref.rigid_objects[i];
       rigid_object.mesh_sdf.SDF(x, rigid_object.state.R, rigid_object.state.t, &sdf, &jacobian, &hessian);
       Vector3<float> r = x - sdf * jacobian - rigid_object.state.t;
-      sdf -= 0.018;
+      sdf -= 0.018f;
       if (sdf < 0.0) {
         float k_stiffness = rigid_object.stiffness * m;
         float force_mag = -2.0 * k_stiffness * sdf;
@@ -106,6 +106,7 @@ __global__ void SolveVBDParticlePosition(SceneRef scene_ref, const int *particle
           f -= velocity_component / vel_comp_norm * max_friction_force;
         } else if (vel_comp_norm > 1e-9) {
           f -= velocity_component / dt * m;
+          // f -= velocity_component / vel_comp_norm * max_friction_force;
         }
       }
     }
@@ -219,7 +220,7 @@ void SceneDevice::Update(SceneDevice &scene, float dt) {
   for (int iter = 0; iter < num_vbd_iterations_; iter++) {
     for (int c = 0; c < scene.particle_directory_host_.first.size(); c++) {
       SolveVBDParticlePosition<<<DEFAULT_DISPATCH_SIZE(scene.particle_directory_host_.count[c])>>>(
-          scene_ref, scene.particle_directory_host_.positions.data() + scene.particle_directory_host_.first[c],
+          scene_ref, scene.particle_directory_.positions.data().get() + scene.particle_directory_host_.first[c],
           scene.particle_directory_host_.count[c], dt);
     }
   }

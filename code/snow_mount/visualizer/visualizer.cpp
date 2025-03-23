@@ -1,11 +1,11 @@
 #include "snow_mount/visualizer/visualizer.h"
 
+#include "snow_mount/visualizer/visualizer_camera.h"
 #include "snow_mount/visualizer/visualizer_core.h"
+#include "snow_mount/visualizer/visualizer_entity.h"
 #include "snow_mount/visualizer/visualizer_film.h"
 #include "snow_mount/visualizer/visualizer_mesh.h"
-#include "visualizer_camera.h"
-#include "visualizer_entity.h"
-#include "visualizer_scene.h"
+#include "snow_mount/visualizer/visualizer_scene.h"
 
 namespace snow_mount::visualizer {
 
