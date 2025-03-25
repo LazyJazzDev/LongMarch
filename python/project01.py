@@ -266,7 +266,7 @@ class Environment:
         n_precision = 50
         for i in range(n_precision):
             for j in range(n_precision):
-                cloth_vertices.append([i / (n_precision - 1) - 0.5, 0.11, j / (n_precision - 1) - 0.5])
+                cloth_vertices.append([i / (n_precision - 1) - 0.5, 0.12, j / (n_precision - 1) - 0.5])
         cloth_vertices = np.asarray(cloth_vertices)
 
         cloth_indices = []
@@ -300,7 +300,7 @@ class Environment:
 
     def reward(self):
         poses = np.asarray(self.scene.sol_scene_dev.get_positions(self.cloth_object.cloth_object_view.particle_ids))
-        return 10 - np.linalg.norm(poses - self.target_poses)
+        return max(10 - np.linalg.norm(poses - self.target_poses), -20)
 
     def render(self, context, camera, film):
         self.vis_core.render(context, self.scene.vis_scene, camera, film)
@@ -308,8 +308,9 @@ class Environment:
     def pre_solver_update(self, dt):
         self.gripper.pre_solver_update(dt)
 
-    def post_solver_update(self, dt):
-        self.cloth_object.post_solver_update()
+    def post_solver_update(self, dt, copy_for_vis=True):
+        if copy_for_vis:
+            self.cloth_object.post_solver_update()
 
 
 def update_env(env: Environment, dt):
@@ -318,7 +319,7 @@ def update_env(env: Environment, dt):
     env.post_solver_update(dt)
 
 
-def update_envs(envs, dt):
+def update_envs(envs, dt, copy_for_vis=True):
     sol_scene_devs = []
 
     for env in envs:
@@ -327,13 +328,13 @@ def update_envs(envs, dt):
         sol_scene_devs.append(env.scene.sol_scene_dev)
     solver.update_scene_batch(sol_scene_devs, dt)
     for env in envs:
-        env.post_solver_update(dt)
+        env.post_solver_update(dt, copy_for_vis=copy_for_vis)
 
 class PaperEnv(gym.Env):
     def __init__(self, vis_core: visualizer.Core, render_mode="human"):
         self.render_mode = render_mode
-        self.action_space = gym.spaces.Box(low=np.array([-1.0, -1.0, -1.0, -math.radians(180), -math.radians(180), -math.radians(180), -1.0], dtype=np.float32),
-                                                 high=np.array([1.0, 1.0, 1.0, math.radians(180), math.radians(180), math.radians(180), 1.0], dtype=np.float32), dtype=np.float32)
+        self.action_space = gym.spaces.Box(low=np.array([-1.0, -1.0, -1.0, -math.radians(360), -math.radians(360), -math.radians(360), -1.0], dtype=np.float32),
+                                                 high=np.array([1.0, 1.0, 1.0, math.radians(360), math.radians(360), math.radians(360), 1.0], dtype=np.float32), dtype=np.float32)
         # observation space is a 2500\times 3 matrix, where all the elements has unlimited range
         # another observation space is the gripper position and orientation and the distance between the gripper
         self.observation_space = gym.spaces.Dict(
@@ -381,7 +382,7 @@ class PaperEnv(gym.Env):
     ) -> tuple[ObsType, SupportsFloat, bool, bool, dict[str, Any]]:
         self.env.gripper.set_action(action[:3], action[3:6], action[6])
         for _ in range(5):
-            update_envs([self.env], 0.003)
+            update_envs([self.env], 0.003, self.render_mode == "human")
             if self.render_mode == "human":
                 self.render()
         obs = self.get_observation()
@@ -402,9 +403,9 @@ class PaperEnv(gym.Env):
         graphics.glfw_poll_events()
 
 class PaperVecEnv(VecEnv):
-    def __init__(self, vis_core: visualizer.Core, num_envs: int = 2):
-        action_space = gym.spaces.Box(low=np.array([-1.0, -1.0, -1.0, -math.radians(180), -math.radians(180), -math.radians(180), -1.0], dtype=np.float32),
-                                      high=np.array([1.0, 1.0, 1.0, math.radians(180), math.radians(180), math.radians(180), 1.0], dtype=np.float32), dtype=np.float32)
+    def __init__(self, vis_core: visualizer.Core, num_envs: int = 2, render_mode="human"):
+        action_space = gym.spaces.Box(low=np.array([-1.0, -1.0, -1.0, -math.radians(360), -math.radians(360), -math.radians(360), -1.0], dtype=np.float32),
+                                      high=np.array([1.0, 1.0, 1.0, math.radians(360), math.radians(360), math.radians(360), 1.0], dtype=np.float32), dtype=np.float32)
         observation_space = gym.spaces.Dict(
             {
                 "gripper_position": gym.spaces.Box(low=-np.inf, high=np.inf, shape=(3,), dtype=np.float32),
@@ -414,7 +415,7 @@ class PaperVecEnv(VecEnv):
             }
         )
         self.vis_core = vis_core
-        self.render_mode = ["human" for i in range(num_envs)]
+        self.render_modes = [render_mode for i in range(num_envs)]
         super(PaperVecEnv, self).__init__(num_envs=num_envs, action_space=action_space, observation_space=observation_space)
         # observation space is a 2500\times 3 matrix, where all the elements has unlimited range
         # another observation space is the gripper position and orientation and the distance between the gripper
@@ -422,10 +423,11 @@ class PaperVecEnv(VecEnv):
         self.graphics_core = self.vis_core.get_core()
 
         self.camera = self.vis_core.create_camera(proj=visualizer.perspective(math.radians(60), 1280 / 720, 0.1, 100.0))
-        self.windows = [self.graphics_core.create_window(1280, 720, "Project01") for i in range(num_envs)]
+        if render_mode == "human":
+            self.windows = [self.graphics_core.create_window(1280, 720, "Project01") for i in range(num_envs)]
+            self.camera_controller = CameraController(self.windows[0], self.camera)
+            self.camera_controller.update(True)
         self.films = [self.vis_core.create_film(1280, 720) for i in range(num_envs)]
-        self.camera_controller = CameraController(self.windows[0], self.camera)
-        self.camera_controller.update(True)
         self.envs = [PaperEnv(self.vis_core, render_mode="off") for i in range(num_envs)]
         self.n_steps = [0 for i in range(num_envs)]
         self.num_envs = num_envs
@@ -446,7 +448,7 @@ class PaperVecEnv(VecEnv):
     def get_attr(self, attr_name: str, indices: VecEnvIndices = None) -> list[Any]:
         print("get_attr", attr_name, indices)
         if attr_name == "render_mode":
-            return ["human" for env in self.envs]
+            return self.render_modes
 
     def get_observation(self):
         original_obs = [env.get_observation() for env in self.envs]
@@ -471,11 +473,12 @@ class PaperVecEnv(VecEnv):
             self.envs[i].env.gripper.set_action(actions[i][:3], actions[i][3:6], actions[i][6])
         for _ in range(5):
             envs = [self.envs[i].env for i in range(self.num_envs)]
-            update_envs(envs, 0.003)
+            update_envs(envs, 0.003, self.render_mode=="human")
             context = self.graphics_core.create_command_context()
             for i in range(self.num_envs):
-                self.envs[i].env.render(context, self.camera, self.films[i])
-                context.cmd_present(self.windows[i], self.films[i].get_image())
+                if self.render_mode == "human":
+                    self.envs[i].env.render(context, self.camera, self.films[i])
+                    context.cmd_present(self.windows[i], self.films[i].get_image())
             context.submit()
             graphics.glfw_poll_events()
         for i in range(self.num_envs):
@@ -491,13 +494,22 @@ class PaperVecEnv(VecEnv):
         # make an empty tuple name infos
         infos = []
 
-        obs = self.get_observation()
         for i in range(self.num_envs):
             info = {"TimeLimit.truncated": truncated[i]}
+            ob = self.envs[i].get_observation()
+            if np.isnan(ob["cloth"]).any():
+                merged_dones[i] = True
+                dones[i] = True
+                rewards[i] = -(self.envs[i].step_limit - self.envs[i].step_count) * 100
+
+
             if merged_dones[i]:
-                info["terminal_observation"] = self.envs[i].get_observation()
+                if dones[i]:
+                    rewards[i] += (self.envs[i].step_limit - self.envs[i].step_count) * 10
+                info["terminal_observation"] = ob
                 self.envs[i].reset()
             infos.append(info)
+        obs = self.get_observation()
         return obs, np.asarray(rewards, dtype=np.float32), np.asarray(merged_dones), infos
 
 def main():
@@ -508,12 +520,11 @@ def main():
     graphics_core = graphics.Core(graphics.BACKEND_API_VULKAN, core_settings)
     vis_core = visualizer.Core(graphics_core)
 
-    vec_env = PaperVecEnv(vis_core, 9) # SubprocVecEnv([make_env_custom() for i in range(num_cpu)])
+    vec_env = PaperVecEnv(vis_core, 64, render_mode="off") # SubprocVecEnv([make_env_custom() for i in range(num_cpu)])
     model = PPO("MultiInputPolicy", vec_env, verbose=1)
-    model.learn(total_timesteps=250_000_000)
-
-    # save model to tmp/model.zip
-    model.save("tmp/model.zip")
+    model.learn(total_timesteps=10_000_000, progress_bar=True)
+    for i in range(10000):
+        model.save("tmp/model_{}.zip".format(i))
 
     obs = vec_env.reset()
     for _ in range(1000):
@@ -547,7 +558,7 @@ def main():
     while not window.should_close():
         camera_controller.update(control_camera)
         if not control_camera:
-            k_angular_speed = math.radians(180)
+            k_angular_speed = math.radians(360)
             k_speed = 1.0
             gripper_vel = np.asarray([0., 0., 0.])
             gripper_angular_vel = np.asarray([0., 0., 0.])

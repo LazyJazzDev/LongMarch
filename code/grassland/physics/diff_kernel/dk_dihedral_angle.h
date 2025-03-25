@@ -90,4 +90,25 @@ struct DihedralAngle {
   LM_DEVICE_FUNC Eigen::Matrix3<Real> SubHessian(const InputType &V, int subdim) const;
 };
 
+LM_DEVICE_FUNC void DihedralAngleSubHessianJacobian0(const Matrix<float, 3, 4> &V,
+                                                     Vector3<float> &jacobian,
+                                                     Matrix3<float> &hessian);
+
+LM_DEVICE_FUNC void DihedralAngleSubHessianJacobian1(const Matrix<float, 3, 4> &V,
+                                                     Vector3<float> &jacobian,
+                                                     Matrix3<float> &hessian);
+
+LM_DEVICE_FUNC void DihedralAngleSubHessianJacobian2(const Matrix<float, 3, 4> &V,
+                                                     Vector3<float> &jacobian,
+                                                     Matrix3<float> &hessian);
+
+LM_DEVICE_FUNC void DihedralAngleSubHessianJacobian3(const Matrix<float, 3, 4> &V,
+                                                     Vector3<float> &jacobian,
+                                                     Matrix3<float> &hessian);
+
+LM_DEVICE_FUNC void DihedralAngleSubHessianJacobian(const Matrix<float, 3, 4> &V,
+                                                    Vector3<float> &jacobian,
+                                                    Matrix3<float> &hessian,
+                                                    int subdim);
+
 }  // namespace grassland

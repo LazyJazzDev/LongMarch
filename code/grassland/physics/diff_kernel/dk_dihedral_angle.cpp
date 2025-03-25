@@ -303,25 +303,25 @@ LM_DEVICE_FUNC HessianTensor<Real, 1, 12> DihedralAngle<Real>::Hessian(const Inp
   Real cos_a0_tilda = e1_tilda.dot(e2_tilda) / (e1_tilda_norm * e2_tilda_norm);
   Real cos_a1_tilda = e2_tilda.dot(e0) / (e2_tilda_norm * e0_norm);
   Real cos_a2_tilda = -e0.dot(e1_tilda) / (e0_norm * e1_tilda_norm);
-#define w00 (Real(1.0) / (h0 * h0))
-#define w01 (Real(1.0) / (h0 * h1))
-#define w02 (Real(1.0) / (h0 * h2))
-#define w10 (Real(1.0) / (h1 * h0))
-#define w11 (Real(1.0) / (h1 * h1))
-#define w12 (Real(1.0) / (h1 * h2))
-#define w20 (Real(1.0) / (h2 * h0))
-#define w21 (Real(1.0) / (h2 * h1))
-#define w22 (Real(1.0) / (h2 * h2))
+#define w00 (1.0 / (h0 * h0))
+#define w01 (1.0 / (h0 * h1))
+#define w02 (1.0 / (h0 * h2))
+#define w10 (1.0 / (h1 * h0))
+#define w11 (1.0 / (h1 * h1))
+#define w12 (1.0 / (h1 * h2))
+#define w20 (1.0 / (h2 * h0))
+#define w21 (1.0 / (h2 * h1))
+#define w22 (1.0 / (h2 * h2))
 
-#define w00_tilda (Real(1.0) / (h0_tilda * h0_tilda))
-#define w01_tilda (Real(1.0) / (h0_tilda * h1_tilda))
-#define w02_tilda (Real(1.0) / (h0_tilda * h2_tilda))
-#define w10_tilda (Real(1.0) / (h1_tilda * h0_tilda))
-#define w11_tilda (Real(1.0) / (h1_tilda * h1_tilda))
-#define w12_tilda (Real(1.0) / (h1_tilda * h2_tilda))
-#define w20_tilda (Real(1.0) / (h2_tilda * h0_tilda))
-#define w21_tilda (Real(1.0) / (h2_tilda * h1_tilda))
-#define w22_tilda (Real(1.0) / (h2_tilda * h2_tilda))
+#define w00_tilda (1.0 / (h0_tilda * h0_tilda))
+#define w01_tilda (1.0 / (h0_tilda * h1_tilda))
+#define w02_tilda (1.0 / (h0_tilda * h2_tilda))
+#define w10_tilda (1.0 / (h1_tilda * h0_tilda))
+#define w11_tilda (1.0 / (h1_tilda * h1_tilda))
+#define w12_tilda (1.0 / (h1_tilda * h2_tilda))
+#define w20_tilda (1.0 / (h2_tilda * h0_tilda))
+#define w21_tilda (1.0 / (h2_tilda * h1_tilda))
+#define w22_tilda (1.0 / (h2_tilda * h2_tilda))
 
 #define M0 (n * m0.transpose())
 #define M1 (n * m1.transpose())
@@ -483,11 +483,9 @@ template class DihedralAngle<float>;
 template class DihedralAngle<double>;
 
 // https://la.disneyresearch.com/wp-content/uploads/Discrete-Bending-Forces-and-Their-Jacobians-Paper.pdf
-//
-//   LM_DEVICE_FUNC HessianTensor<Real,
-//                                OutputType::SizeAtCompileTime,
-//                                InputType::SizeAtCompileTime>
-//   Hessian(const InputType &V) const {
+
+// template <typename Real>
+// LM_DEVICE_FUNC HessianTensor<Real, 1, 12> DihedralAngle<Real>::Hessian(const InputType &V) const {
 // #define e0 (V.col(2) - V.col(1))
 // #define e1 (V.col(0) - V.col(2))
 // #define e2 (V.col(0) - V.col(1))
@@ -510,11 +508,9 @@ template class DihedralAngle<double>;
 // #define m1 ((e2 - e2.dot(e1) * e1 / e1_norm_sqr).normalized())
 // #define m2 ((e1 - e1.dot(e2) * e2 / e2_norm_sqr).normalized())
 //
-// #define m0_tilda (-(e1_tilda - e1_tilda.dot(e0) * e0 /
-// e0_norm_sqr).normalized()) #define m1_tilda ((e2_tilda -
-// e2_tilda.dot(e1_tilda) * e1_tilda / e1_tilda_norm_sqr).normalized())
-// #define m2_tilda ((e1_tilda - e1_tilda.dot(e2_tilda) * e2_tilda /
-// e2_tilda_norm_sqr).normalized())
+// #define m0_tilda (-(e1_tilda - e1_tilda.dot(e0) * e0 / e0_norm_sqr).normalized())
+// #define m1_tilda ((e2_tilda - e2_tilda.dot(e1_tilda) * e1_tilda / e1_tilda_norm_sqr).normalized())
+// #define m2_tilda ((e1_tilda - e1_tilda.dot(e2_tilda) * e2_tilda / e2_tilda_norm_sqr).normalized())
 //
 // #define h0 (-m0.dot(e1))
 // #define h1 (m1.dot(e2))
@@ -529,12 +525,11 @@ template class DihedralAngle<double>;
 //
 // #define cos_a0 (e1.dot(e2) / (e1_norm * e2_norm))
 // #define cos_a1 (e2.dot(e0) / (e2_norm * e0_norm))
-// #define  cos_a2 (-e0.dot(e1) / (e0_norm * e1_norm))
+// #define cos_a2 (-e0.dot(e1) / (e0_norm * e1_norm))
 //
-// #define cos_a0_tilda (e1_tilda.dot(e2_tilda) / (e1_tilda_norm *
-// e2_tilda_norm)) #define cos_a1_tilda (e2_tilda.dot(e0) / (e2_tilda_norm *
-// e0_norm)) #define cos_a2_tilda (-e0.dot(e1_tilda) / (e0_norm *
-// e1_tilda_norm))
+// #define cos_a0_tilda (e1_tilda.dot(e2_tilda) / (e1_tilda_norm * e2_tilda_norm))
+// #define cos_a1_tilda (e2_tilda.dot(e0) / (e2_tilda_norm * e0_norm))
+// #define cos_a2_tilda (-e0.dot(e1_tilda) / (e0_norm * e1_tilda_norm))
 //
 // #define w00 (Real(1.0) / (h0 * h0))
 // #define w01 (Real(1.0) / (h0 * h1))
@@ -589,89 +584,86 @@ template class DihedralAngle<double>;
 //
 // #define S(A) (A + A.transpose())
 //
-//     HessianTensor<Real, OutputType::SizeAtCompileTime,
-//                   InputType::SizeAtCompileTime>
-//         H;
+//   HessianTensor<Real, OutputType::SizeAtCompileTime, InputType::SizeAtCompileTime> H;
 // #define H_theta(i, j) H.m[0].block(i * 3, j * 3, 3, 3)
-//     H_theta(0, 0) = -S(Q0);
-//     H_theta(3, 3) = -S(Q0_tilda);
-//     H_theta(2, 2) = S(P22) - N0 + S(P22_tilda) - N0_tilda;
-//     H_theta(1, 1) = S(P11) - N0 + S(P11_tilda) - N0_tilda;
-//     H_theta(1, 0) = P10 - Q1;
-//     H_theta(2, 0) = P20 - Q2;
-//     H_theta(1, 3) = P10_tilda - Q1_tilda;
-//     H_theta(2, 3) = P20_tilda - Q2_tilda;
-//     H_theta(1, 2) = P12 + P21.transpose() + N0 + P12_tilda +
-//                     P21_tilda.transpose() + N0_tilda;
-//     H_theta(0, 1) = H_theta(1, 0).transpose();
-//     H_theta(0, 2) = H_theta(2, 0).transpose();
-//     H_theta(3, 1) = H_theta(1, 3).transpose();
-//     H_theta(3, 2) = H_theta(2, 3).transpose();
-//     H_theta(2, 1) = H_theta(1, 2).transpose();
+//   H_theta(0, 0) = -S(Q0);
+//   H_theta(3, 3) = -S(Q0_tilda);
+//   H_theta(2, 2) = S(P22) - N0 + S(P22_tilda) - N0_tilda;
+//   H_theta(1, 1) = S(P11) - N0 + S(P11_tilda) - N0_tilda;
+//   H_theta(1, 0) = P10 - Q1;
+//   H_theta(2, 0) = P20 - Q2;
+//   H_theta(1, 3) = P10_tilda - Q1_tilda;
+//   H_theta(2, 3) = P20_tilda - Q2_tilda;
+//   H_theta(1, 2) = P12 + P21.transpose() + N0 + P12_tilda + P21_tilda.transpose() + N0_tilda;
+//   H_theta(0, 1) = H_theta(1, 0).transpose();
+//   H_theta(0, 2) = H_theta(2, 0).transpose();
+//   H_theta(3, 1) = H_theta(1, 3).transpose();
+//   H_theta(3, 2) = H_theta(2, 3).transpose();
+//   H_theta(2, 1) = H_theta(1, 2).transpose();
 //
 // #if !defined(__CUDA_ARCH__) && false
-//     std::cout << "h0: " << h0 << std::endl;
-//     std::cout << "h1: " << h1 << std::endl;
-//     std::cout << "h2: " << h2 << std::endl;
-//     std::cout << "~h0: " << h0_tilda << std::endl;
-//     std::cout << "~h1: " << h1_tilda << std::endl;
-//     std::cout << "~h2: " << h2_tilda << std::endl;
-//     std::cout << "n: " << n.transpose() << std::endl;
-//     std::cout << "~n: " << n_tilda.transpose() << std::endl;
-//     std::cout << "m0: " << m0.transpose() << std::endl;
-//     std::cout << "m1: " << m1.transpose() << std::endl;
-//     std::cout << "m2: " << m2.transpose() << std::endl;
-//     std::cout << "~m0: " << m0_tilda.transpose() << std::endl;
-//     std::cout << "~m1: " << m1_tilda.transpose() << std::endl;
-//     std::cout << "~m2: " << m2_tilda.transpose() << std::endl;
-//     std::cout << "cos a0: " << cos_a0 << std::endl;
-//     std::cout << "cos a1: " << cos_a1 << std::endl;
-//     std::cout << "cos a2: " << cos_a2 << std::endl;
-//     std::cout << "cos ~a0: " << cos_a0_tilda << std::endl;
-//     std::cout << "cos ~a1: " << cos_a1_tilda << std::endl;
-//     std::cout << "cos ~a2: " << cos_a2_tilda << std::endl;
-//     std::cout << "M0: \n" << M0 << std::endl;
-//     std::cout << "M1: \n" << M1 << std::endl;
-//     std::cout << "M2: \n" << M2 << std::endl;
-//     std::cout << "~M0: \n" << M0_tilda << std::endl;
-//     std::cout << "~M1: \n" << M1_tilda << std::endl;
-//     std::cout << "~M2: \n" << M2_tilda << std::endl;
-//     std::cout << "N0: \n" << N0 << std::endl;
-//     std::cout << "N1: \n" << N1 << std::endl;
-//     std::cout << "N2: \n" << N2 << std::endl;
-//     std::cout << "~N0: \n" << N0_tilda << std::endl;
-//     std::cout << "~N1: \n" << N1_tilda << std::endl;
-//     std::cout << "~N2: \n" << N2_tilda << std::endl;
-//     std::cout << "P11: \n" << P11 << std::endl;
-//     std::cout << "P22: \n" << P22 << std::endl;
-//     std::cout << "~P11: \n" << P11_tilda << std::endl;
-//     std::cout << "~P22: \n" << P22_tilda << std::endl;
-//     std::cout << "S(P11): \n" << S(P11) << std::endl;
-//     std::cout << "S(P22): \n" << S(P22) << std::endl;
-//     std::cout << "S(~P11): \n" << S(P11_tilda) << std::endl;
-//     std::cout << "S(~P22): \n" << S(P22_tilda) << std::endl;
+//   std::cout << "h0: " << h0 << std::endl;
+//   std::cout << "h1: " << h1 << std::endl;
+//   std::cout << "h2: " << h2 << std::endl;
+//   std::cout << "~h0: " << h0_tilda << std::endl;
+//   std::cout << "~h1: " << h1_tilda << std::endl;
+//   std::cout << "~h2: " << h2_tilda << std::endl;
+//   std::cout << "n: " << n.transpose() << std::endl;
+//   std::cout << "~n: " << n_tilda.transpose() << std::endl;
+//   std::cout << "m0: " << m0.transpose() << std::endl;
+//   std::cout << "m1: " << m1.transpose() << std::endl;
+//   std::cout << "m2: " << m2.transpose() << std::endl;
+//   std::cout << "~m0: " << m0_tilda.transpose() << std::endl;
+//   std::cout << "~m1: " << m1_tilda.transpose() << std::endl;
+//   std::cout << "~m2: " << m2_tilda.transpose() << std::endl;
+//   std::cout << "cos a0: " << cos_a0 << std::endl;
+//   std::cout << "cos a1: " << cos_a1 << std::endl;
+//   std::cout << "cos a2: " << cos_a2 << std::endl;
+//   std::cout << "cos ~a0: " << cos_a0_tilda << std::endl;
+//   std::cout << "cos ~a1: " << cos_a1_tilda << std::endl;
+//   std::cout << "cos ~a2: " << cos_a2_tilda << std::endl;
+//   std::cout << "M0: \n" << M0 << std::endl;
+//   std::cout << "M1: \n" << M1 << std::endl;
+//   std::cout << "M2: \n" << M2 << std::endl;
+//   std::cout << "~M0: \n" << M0_tilda << std::endl;
+//   std::cout << "~M1: \n" << M1_tilda << std::endl;
+//   std::cout << "~M2: \n" << M2_tilda << std::endl;
+//   std::cout << "N0: \n" << N0 << std::endl;
+//   std::cout << "N1: \n" << N1 << std::endl;
+//   std::cout << "N2: \n" << N2 << std::endl;
+//   std::cout << "~N0: \n" << N0_tilda << std::endl;
+//   std::cout << "~N1: \n" << N1_tilda << std::endl;
+//   std::cout << "~N2: \n" << N2_tilda << std::endl;
+//   std::cout << "P11: \n" << P11 << std::endl;
+//   std::cout << "P22: \n" << P22 << std::endl;
+//   std::cout << "~P11: \n" << P11_tilda << std::endl;
+//   std::cout << "~P22: \n" << P22_tilda << std::endl;
+//   std::cout << "S(P11): \n" << S(P11) << std::endl;
+//   std::cout << "S(P22): \n" << S(P22) << std::endl;
+//   std::cout << "S(~P11): \n" << S(P11_tilda) << std::endl;
+//   std::cout << "S(~P22): \n" << S(P22_tilda) << std::endl;
 // #endif
-//     return H;
-//   }
+//   return H;
+// }
 //
-//   LM_DEVICE_FUNC Eigen::Matrix3<Real> SubHessian(const InputType &V,
-//                                                  int subdim) const {
-//
+// template <typename Real>
+// LM_DEVICE_FUNC Matrix3<Real> DihedralAngle<Real>::SubHessian(const InputType &V, int subdim) const {
 // #define S(A) (A + A.transpose())
-//     switch (subdim) {
-//       case 0:
-//         return -S(Q0);
-//       case 1:
-//         return S(P11) - N0 + S(P11_tilda) - N0_tilda;
-//       case 2:
-//         return S(P22) - N0 + S(P22_tilda) - N0_tilda;
-//       case 3:
-//         return -S(Q0_tilda);
-//       default:
-//         return Eigen::Matrix3<Real>::Zero();
-//     }
+//   switch (subdim) {
+//     case 0:
+//       return -S(Q0);
+//     case 1:
+//       return S(P11) - N0 + S(P11_tilda) - N0_tilda;
+//     case 2:
+//       return S(P22) - N0 + S(P22_tilda) - N0_tilda;
+//     case 3:
+//       return -S(Q0_tilda);
+//     default:
+//       return Matrix3<Real>::Zero();
 //   }
-// };
+// }
+//
+//
 //
 // #undef e0
 // #undef e1
@@ -709,7 +701,6 @@ template class DihedralAngle<double>;
 //
 // #undef n
 // #undef n_tilda
-//
 //
 // #undef cos_a0
 // #undef cos_a1
@@ -771,4 +762,136 @@ template class DihedralAngle<double>;
 // #undef Q2_tilda
 //
 // #undef S
+
+LM_DEVICE_FUNC void DihedralAngleSubHessianJacobian0(const Matrix<float, 3, 4> &V,
+                                                     Vector3<float> &jacobian,
+                                                     Matrix3<float> &hessian) {
+  Vector3<float> e0 = V.col(2) - V.col(1);
+  Vector3<float> e1 = V.col(0) - V.col(2);
+  Vector3<float> e2 = V.col(0) - V.col(1);
+
+  float e0_norm_sqr = e0.squaredNorm();
+
+  Vector3<float> m0 = -(e1 - e1.dot(e0) * e0 / e0_norm_sqr).normalized();
+
+  float h0 = -m0.dot(e1);
+
+  Vector3<float> n = e2.cross(e1).normalized();
+
+  jacobian = -1.0 / h0 * n;
+  hessian = -S(Q0);
+}
+
+LM_DEVICE_FUNC void DihedralAngleSubHessianJacobian1(const Matrix<float, 3, 4> &V,
+                                                     Vector3<float> &jacobian,
+                                                     Matrix3<float> &hessian) {
+  Vector3<float> e0 = V.col(2) - V.col(1);
+  Vector3<float> e1 = V.col(0) - V.col(2);
+  Vector3<float> e2 = V.col(0) - V.col(1);
+
+  float e0_norm_sqr = e0.squaredNorm();
+  float e1_norm_sqr = e1.squaredNorm();
+  float e0_norm = sqrt(e0_norm_sqr);
+  float e1_norm = sqrt(e1_norm_sqr);
+  Vector3<float> m0 = -(e1 - e1.dot(e0) * e0 / e0_norm_sqr).normalized();
+  Vector3<float> m1 = (e2 - e2.dot(e1) * e1 / e1_norm_sqr).normalized();
+  float h1 = m1.dot(e2);
+  Vector3<float> n = e2.cross(e1).normalized();
+  float cos_a2 = -e0.dot(e1) / (e0_norm * e1_norm);
+
+  jacobian = cos_a2 / h1 * n;
+  hessian = S(P11) - N0;
+
+  e1 = V.col(3) - V.col(2);
+  e2 = V.col(3) - V.col(1);
+  e1_norm_sqr = e1.squaredNorm();
+  e1_norm = sqrt(e1_norm_sqr);
+  m0 = -(e1 - e1.dot(e0) * e0 / e0_norm_sqr).normalized();
+  m1 = (e2 - e2.dot(e1) * e1 / e1_norm_sqr).normalized();
+  h1 = m1.dot(e2);
+  n = e1.cross(e2).normalized();
+  cos_a2 = -e0.dot(e1) / (e0_norm * e1_norm);
+
+  jacobian += cos_a2 / h1 * n;
+  hessian += S(P11) - N0;
+}
+
+LM_DEVICE_FUNC void DihedralAngleSubHessianJacobian2(const Matrix<float, 3, 4> &V,
+                                                     Vector3<float> &jacobian,
+                                                     Matrix3<float> &hessian) {
+  Vector3<float> e0 = V.col(2) - V.col(1);
+  Vector3<float> e1 = V.col(0) - V.col(2);
+  Vector3<float> e2 = V.col(0) - V.col(1);
+  float e0_norm_sqr = e0.squaredNorm();
+  float e1_norm_sqr = e1.squaredNorm();
+  float e2_norm_sqr = e2.squaredNorm();
+  float e0_norm = sqrt(e0_norm_sqr);
+  float e2_norm = sqrt(e2_norm_sqr);
+  Vector3<float> m0 = -(e1 - e1.dot(e0) * e0 / e0_norm_sqr).normalized();
+  Vector3<float> m2 = (e1 - e1.dot(e2) * e2 / e2_norm_sqr).normalized();
+  float h2 = m2.dot(e1);
+  Vector3<float> n = e2.cross(e1).normalized();
+  float cos_a1 = e2.dot(e0) / (e2_norm * e0_norm);
+
+  jacobian = cos_a1 / h2 * n;
+  hessian = S(P22) - N0;
+
+  e1 = V.col(3) - V.col(2);
+  e2 = V.col(3) - V.col(1);
+  e1_norm_sqr = e1.squaredNorm();
+  e2_norm_sqr = e2.squaredNorm();
+  e2_norm = sqrt(e2_norm_sqr);
+  m0 = -(e1 - e1.dot(e0) * e0 / e0_norm_sqr).normalized();
+  m2 = (e1 - e1.dot(e2) * e2 / e2_norm_sqr).normalized();
+  h2 = m2.dot(e1);
+  n = e1.cross(e2).normalized();
+  cos_a1 = e2.dot(e0) / (e2_norm * e0_norm);
+
+  jacobian += cos_a1 / h2 * n;
+  hessian += S(P22) - N0;
+}
+
+LM_DEVICE_FUNC void DihedralAngleSubHessianJacobian3(const Matrix<float, 3, 4> &V,
+                                                     Vector3<float> &jacobian,
+                                                     Matrix3<float> &hessian) {
+  Vector3<float> e0 = V.col(2) - V.col(1);
+  Vector3<float> e1 = V.col(0) - V.col(2);
+  Vector3<float> e2 = V.col(0) - V.col(1);
+  Vector3<float> e1_tilda = V.col(3) - V.col(2);
+  Vector3<float> e2_tilda = V.col(3) - V.col(1);
+
+  float e0_norm_sqr = e0.squaredNorm();
+
+  Vector3<float> m0_tilda = -(e1_tilda - e1_tilda.dot(e0) * e0 / e0_norm_sqr).normalized();
+
+  float h0_tilda = -m0_tilda.dot(e1_tilda);
+
+  Vector3<float> n_tilda = e1_tilda.cross(e2_tilda).normalized();
+
+  jacobian = -1.0 / h0_tilda * n_tilda;
+  hessian = -S(Q0_tilda);
+}
+
+LM_DEVICE_FUNC void DihedralAngleSubHessianJacobian(const Matrix<float, 3, 4> &V,
+                                                    Vector3<float> &jacobian,
+                                                    Matrix3<float> &hessian,
+                                                    int subdim) {
+  switch (subdim) {
+    case 0:
+      DihedralAngleSubHessianJacobian0(V, jacobian, hessian);
+      break;
+    case 1:
+      DihedralAngleSubHessianJacobian1(V, jacobian, hessian);
+      break;
+    case 2:
+      DihedralAngleSubHessianJacobian2(V, jacobian, hessian);
+      break;
+    case 3:
+      DihedralAngleSubHessianJacobian3(V, jacobian, hessian);
+      break;
+    default:
+      break;
+  }
+}
+
 }  // namespace grassland

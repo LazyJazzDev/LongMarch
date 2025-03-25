@@ -151,20 +151,21 @@ class Environment:
                                    0, 1, 5])
 
         cloth_vertices = []
-        for i in range(50):
-            for j in range(50):
-                cloth_vertices.append([i / 49 - 0.5, 2.0, j / 49 - 0.5])
+        n_precision = 50
+        for i in range(n_precision):
+            for j in range(n_precision):
+                cloth_vertices.append([i / (n_precision - 1) - 0.5, 0.12, j / (n_precision - 1) - 0.5])
         cloth_vertices = np.asarray(cloth_vertices)
 
         cloth_indices = []
-        for i in range(49):
+        for i in range(n_precision - 1):
             i1 = i + 1
-            for j in range(49):
+            for j in range(n_precision - 1):
                 j1 = j + 1
-                v00 = i * 50 + j
-                v01 = i * 50 + j1
-                v10 = i1 * 50 + j
-                v11 = i1 * 50 + j1
+                v00 = i * n_precision + j
+                v01 = i * n_precision + j1
+                v10 = i1 * n_precision + j
+                v11 = i1 * n_precision + j1
                 cloth_indices.append([v00, v01, v11])
                 cloth_indices.append([v00, v11, v10])
         # serialize the indices
@@ -202,10 +203,13 @@ def main():
     graphics_core = graphics.Core(graphics.BACKEND_API_VULKAN, core_settings)
     vis_core = visualizer.Core(graphics_core)
 
-    envs = [Environment(vis_core) for i in range(20)]
+    envs = [Environment(vis_core) for i in range(64)]
 
+    begin = time.time()
     for i in range(10):
         update_envs(envs, 0.003)
+    end = time.time()
+    print(f"Time: {end - begin}")
 
 if __name__ == "__main__":
     main()
