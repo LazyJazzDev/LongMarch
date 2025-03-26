@@ -1,5 +1,6 @@
 import math
 import time
+from math import isnan
 from typing import Any, SupportsFloat
 
 import long_march
@@ -292,7 +293,7 @@ class Environment:
         # (self.scene, mesh_vertices * 0.5, mesh_indices)
 
         self.ground_object = RigidObject(self.scene, mesh_vertices * 10.0, mesh_indices, stiffness=1e6)
-        self.cloth_object = GridCloth(self.scene, cloth_vertices, cloth_indices, bending_stiffness=0.001, elastic_limit=math.pi * 0.1, mesh_mass=0.1, young=300)
+        self.cloth_object = GridCloth(self.scene, cloth_vertices, cloth_indices, bending_stiffness=0.003, elastic_limit=math.pi * 0.1, mesh_mass=0.1, young=300)
 
         self.scene.build_scene()
 
@@ -300,7 +301,8 @@ class Environment:
 
     def reward(self):
         poses = np.asarray(self.scene.sol_scene_dev.get_positions(self.cloth_object.cloth_object_view.particle_ids))
-        return max(10 - np.linalg.norm(poses - self.target_poses), -20)
+        dist = np.linalg.norm(poses - self.target_poses)
+        return max(10 - dist, -20) if not isnan(dist) else -20
 
     def render(self, context, camera, film):
         self.vis_core.render(context, self.scene.vis_scene, camera, film)
@@ -319,7 +321,7 @@ def update_env(env: Environment, dt):
     env.post_solver_update(dt)
 
 
-def update_envs(envs, dt, copy_for_vis=True):
+def update_envs(envs, dt, render_mode="human"):
     sol_scene_devs = []
 
     for env in envs:
@@ -327,8 +329,8 @@ def update_envs(envs, dt, copy_for_vis=True):
     for env in envs:
         sol_scene_devs.append(env.scene.sol_scene_dev)
     solver.update_scene_batch(sol_scene_devs, dt)
-    for env in envs:
-        env.post_solver_update(dt, copy_for_vis=copy_for_vis)
+    for i, env in enumerate(envs):
+        env.post_solver_update(dt, copy_for_vis=(render_mode=="human" or (render_mode == "first" and i == 0)))
 
 class PaperEnv(gym.Env):
     def __init__(self, vis_core: visualizer.Core, render_mode="human"):
@@ -427,6 +429,10 @@ class PaperVecEnv(VecEnv):
             self.windows = [self.graphics_core.create_window(1280, 720, "Project01") for i in range(num_envs)]
             self.camera_controller = CameraController(self.windows[0], self.camera)
             self.camera_controller.update(True)
+        elif render_mode == "first":
+            self.window = self.graphics_core.create_window(1280, 720, "Project01")
+            self.camera_controller = CameraController(self.window, self.camera)
+            self.camera_controller.update(True)
         self.films = [self.vis_core.create_film(1280, 720) for i in range(num_envs)]
         self.envs = [PaperEnv(self.vis_core, render_mode="off") for i in range(num_envs)]
         self.n_steps = [0 for i in range(num_envs)]
@@ -471,16 +477,31 @@ class PaperVecEnv(VecEnv):
     def step_async(self, actions: np.ndarray) -> None:
         for i in range(self.num_envs):
             self.envs[i].env.gripper.set_action(actions[i][:3], actions[i][3:6], actions[i][6])
-        for _ in range(5):
+        for substep in range(15):
             envs = [self.envs[i].env for i in range(self.num_envs)]
-            update_envs(envs, 0.003, self.render_mode=="human")
-            context = self.graphics_core.create_command_context()
-            for i in range(self.num_envs):
-                if self.render_mode == "human":
-                    self.envs[i].env.render(context, self.camera, self.films[i])
-                    context.cmd_present(self.windows[i], self.films[i].get_image())
-            context.submit()
-            graphics.glfw_poll_events()
+            update_envs(envs, 0.001, self.render_mode)
+            if substep % 5 == 4:
+                context = self.graphics_core.create_command_context()
+                for i in range(self.num_envs):
+                    if self.render_mode == "human":
+                        self.envs[i].env.render(context, self.camera, self.films[i])
+                        context.cmd_present(self.windows[i], self.films[i].get_image())
+                if self.render_mode == "first":
+                    self.envs[0].env.render(context, self.camera, self.films[0])
+                    context.cmd_present(self.window, self.films[0].get_image())
+                context.submit()
+                graphics.glfw_poll_events()
+
+        context = self.graphics_core.create_command_context()
+        for i in range(self.num_envs):
+            if self.render_mode == "human":
+                self.envs[i].env.render(context, self.camera, self.films[i])
+                context.cmd_present(self.windows[i], self.films[i].get_image())
+        if self.render_mode == "first":
+            self.envs[0].env.render(context, self.camera, self.films[0])
+            context.cmd_present(self.window, self.films[0].get_image())
+        context.submit()
+        graphics.glfw_poll_events()
         for i in range(self.num_envs):
             self.envs[i].step_count += 1
 
@@ -520,7 +541,7 @@ def main():
     graphics_core = graphics.Core(graphics.BACKEND_API_VULKAN, core_settings)
     vis_core = visualizer.Core(graphics_core)
 
-    vec_env = PaperVecEnv(vis_core, 64, render_mode="off") # SubprocVecEnv([make_env_custom() for i in range(num_cpu)])
+    vec_env = PaperVecEnv(vis_core, 64, render_mode="first") # SubprocVecEnv([make_env_custom() for i in range(num_cpu)])
     model = PPO("MultiInputPolicy", vec_env, verbose=1)
     model.learn(total_timesteps=10_000_000, progress_bar=True)
     for i in range(10000):

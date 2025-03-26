@@ -203,10 +203,10 @@ def main():
     graphics_core = graphics.Core(graphics.BACKEND_API_VULKAN, core_settings)
     vis_core = visualizer.Core(graphics_core)
 
-    envs = [Environment(vis_core) for i in range(64)]
+    envs = [Environment(vis_core) for i in range(256)]
 
     begin = time.time()
-    for i in range(10):
+    for i in range(1):
         update_envs(envs, 0.003)
     end = time.time()
     print(f"Time: {end - begin}")
