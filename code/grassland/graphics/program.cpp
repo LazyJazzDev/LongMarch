@@ -2,7 +2,9 @@
 
 #if defined(_WIN32)
 #include "d3dcompiler.h"
-#elif defined(__APPLE__)
+#endif
+
+#if defined(__APPLE__)
 #define __EMULATE_UUID
 #include "dxc/dxcapi.h"
 #else

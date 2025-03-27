@@ -538,10 +538,10 @@ def main():
     core_settings = graphics.CoreSettings()
     core_settings.frames_in_flight = 1
 
-    graphics_core = graphics.Core(graphics.BACKEND_API_VULKAN, core_settings)
+    graphics_core = graphics.Core(graphics.BACKEND_API_D3D12, core_settings)
     vis_core = visualizer.Core(graphics_core)
 
-    vec_env = PaperVecEnv(vis_core, 64, render_mode="first") # SubprocVecEnv([make_env_custom() for i in range(num_cpu)])
+    vec_env = PaperVecEnv(vis_core, 8, render_mode="first") # SubprocVecEnv([make_env_custom() for i in range(num_cpu)])
     model = PPO("MultiInputPolicy", vec_env, verbose=1)
     model.learn(total_timesteps=10_000_000, progress_bar=True)
     for i in range(10000):

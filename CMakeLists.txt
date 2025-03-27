@@ -107,9 +107,6 @@ list(APPEND INC_LIST ${STB_INC_DIR})
 if (WIN32)
     find_path(D3DX12_INCLUDE_DIRS "d3dx12.h")
     list(APPEND INC_LIST ${D3DX12_INCLUDE_DIRS})
-
-    get_filename_component(DIRECTX_DXC_TOOL_PATH ${DIRECTX_DXC_TOOL} DIRECTORY)
-    message(STATUS "DIRECTX_DXC_TOOL_PATH: ${DIRECTX_DXC_TOOL_PATH}")
 endif ()
 
 message(STATUS "CMAKE_ARCHIVE_OUTPUT_DIRECTORY : ${CMAKE_ARCHIVE_OUTPUT_DIRECTORY}")
@@ -143,8 +140,8 @@ add_subdirectory(code)
 # If current list is the root list
 if ("${CMAKE_CURRENT_SOURCE_DIR}" STREQUAL "${CMAKE_SOURCE_DIR}")
     if (NOT LONGMARCH_NO_DEMO)
-        add_subdirectory(demo)
-        add_subdirectory(test)
+        add_subdirectory(demo EXCLUDE_FROM_ALL)
+        add_subdirectory(test EXCLUDE_FROM_ALL)
     endif ()
 endif ()
 
