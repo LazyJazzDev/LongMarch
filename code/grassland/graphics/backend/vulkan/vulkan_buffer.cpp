@@ -38,7 +38,7 @@ void VulkanStaticBuffer::Resize(size_t new_size) {
   core_->Device()->CreateBuffer(new_size, usage, VMA_MEMORY_USAGE_GPU_ONLY, &new_buffer);
   vulkan::SingleTimeCommand(core_->TransferQueue(), core_->TransferCommandPool(), [&](VkCommandBuffer command_buffer) {
     VkBufferCopy copy_region{};
-    copy_region.size = std::min(buffer_->Size(), new_size);
+    copy_region.size = std::min(static_cast<size_t>(buffer_->Size()), new_size);
     vkCmdCopyBuffer(command_buffer, buffer_->Handle(), new_buffer->Handle(), 1, &copy_region);
   });
   buffer_.reset();
@@ -120,7 +120,8 @@ void VulkanDynamicBuffer::Resize(size_t new_size) {
              VK_BUFFER_USAGE_ACCELERATION_STRUCTURE_BUILD_INPUT_READ_ONLY_BIT_KHR;
   }
   core_->Device()->CreateBuffer(new_size, usage, VMA_MEMORY_USAGE_CPU_TO_GPU, &new_buffer);
-  std::memcpy(new_buffer->Map(), staging_buffer_->Map(), std::min(new_size, staging_buffer_->Size()));
+  std::memcpy(new_buffer->Map(), staging_buffer_->Map(),
+              std::min(new_size, static_cast<size_t>(staging_buffer_->Size())));
   new_buffer->Unmap();
   staging_buffer_->Unmap();
   staging_buffer_.reset();

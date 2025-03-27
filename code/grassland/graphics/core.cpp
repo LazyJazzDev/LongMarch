@@ -18,6 +18,7 @@ int Core::InitializeLogicalDeviceAutoSelect(bool require_ray_tracing) {
   int device_index = -1;
   uint64_t max_score = 0;
   for (int i = 0; i < device_properties.size(); i++) {
+    // LogInfo("Device: {} score={}", device_properties[i].name, device_properties[i].score);
     if (require_ray_tracing && !device_properties[i].ray_tracing_support) {
       continue;
     }
@@ -25,6 +26,10 @@ int Core::InitializeLogicalDeviceAutoSelect(bool require_ray_tracing) {
       device_index = i;
       max_score = device_properties[i].score;
     }
+  }
+
+  if (device_index == -1) {
+    LogError("[graphics] Required device not found. Require ray tracing: {}", require_ray_tracing);
   }
 
   return InitializeLogicalDevice(device_index);

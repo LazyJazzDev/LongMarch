@@ -279,9 +279,7 @@ int VulkanCore::GetPhysicalDeviceProperties(PhysicalDeviceProperties *p_physical
     properties.name = physical_device.GetPhysicalDeviceProperties().deviceName;
     properties.score = physical_device.Evaluate();
     properties.ray_tracing_support = physical_device.SupportRayTracing();
-    if (!physical_device.SupportGeometryShader()) {
-      continue;
-    }
+    properties.geometry_shader_support = physical_device.SupportGeometryShader();
     if (p_physical_device_properties) {
       p_physical_device_properties[i] = properties;
     }
@@ -296,9 +294,7 @@ int VulkanCore::InitializeLogicalDevice(int device_index) {
   std::vector<vulkan::PhysicalDevice> physical_devices;
   // Erase non geometry shader support devices
   for (auto &physical_device : original_physical_devices) {
-    if (physical_device.SupportGeometryShader()) {
-      physical_devices.push_back(physical_device);
-    }
+    physical_devices.push_back(physical_device);
   }
 
   if (device_index < 0 || device_index >= physical_devices.size()) {

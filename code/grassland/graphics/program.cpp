@@ -1,9 +1,13 @@
 #include "grassland/graphics/program.h"
 
-#ifdef _WIN32
+#if defined(_WIN32)
 #include "d3dcompiler.h"
-#endif
+#elif defined(__APPLE__)
+#define __EMULATE_UUID
+#include "dxc/dxcapi.h"
+#else
 #include "directx-dxc/dxcapi.h"
+#endif
 
 namespace grassland::graphics {
 #define SAFE_RELEASE(p) \
@@ -12,7 +16,10 @@ namespace grassland::graphics {
     p = nullptr;        \
   }
 
-CompiledShaderBlob CompileShader(const std::string &source_code, const std::string &entry_point, const std::string &target, const std::vector<std::string> &args) {
+CompiledShaderBlob CompileShader(const std::string &source_code,
+                                 const std::string &entry_point,
+                                 const std::string &target,
+                                 const std::vector<std::string> &args) {
   CompiledShaderBlob shader_blob;
   shader_blob.entry_point = entry_point;
 
@@ -54,14 +61,16 @@ CompiledShaderBlob CompileShader(const std::string &source_code, const std::stri
     warg_ptrs.push_back(arg.c_str());
   }
 
-  dxc_utils->BuildArguments(nullptr, StringToWString(entry_point).c_str(), StringToWString(target).c_str(), warg_ptrs.data(), wargs.size(), nullptr, 0, &dxc_args);
+  dxc_utils->BuildArguments(nullptr, StringToWString(entry_point).c_str(), StringToWString(target).c_str(),
+                            warg_ptrs.data(), wargs.size(), nullptr, 0, &dxc_args);
 
   DxcBuffer dxc_buffer;
   dxc_buffer.Ptr = source_blob->GetBufferPointer();
   dxc_buffer.Size = source_blob->GetBufferSize();
   dxc_buffer.Encoding = CP_UTF8;
 
-  hr = dxc_compiler->Compile(&dxc_buffer, dxc_args->GetArguments(), dxc_args->GetCount(), nullptr, IID_PPV_ARGS(&result));
+  hr = dxc_compiler->Compile(&dxc_buffer, dxc_args->GetArguments(), dxc_args->GetCount(), nullptr,
+                             IID_PPV_ARGS(&result));
 #ifndef IDxcBlobUtf16
 #define IDxcBlobUtf16 IDxcBlobWide
 #endif

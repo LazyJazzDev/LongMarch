@@ -21,8 +21,8 @@ void RigidObject::PyBind(pybind11::module_ &m) {
       pybind11::arg("v") = Vector3<float>::Zero(), pybind11::arg("omega") = Vector3<float>::Zero(),
       pybind11::arg("mass") = 1.0, pybind11::arg("inertia") = Matrix3<float>::Identity());
   rigid_object_state.def("__repr__", [](const RigidObjectState &state) {
-    return fmt::format("RigidObjectState(\nR={},\nt={},\nv={},\nomega={},\nmass={},\ninertia={}\n)", state.R, state.t,
-                       state.v, state.omega, state.mass, state.inertia);
+    return pybind11::str("RigidObjectState(\nR={},\nt={},\nv={},\nomega={},\nmass={},\ninertia={}\n)")
+        .format(state.R, state.t, state.v, state.omega, state.mass, state.inertia);
   });
   rigid_object_state.def_readwrite("R", &RigidObjectState::R);
   rigid_object_state.def_readwrite("t", &RigidObjectState::t);
@@ -41,6 +41,7 @@ RigidObject::operator RigidObjectRef() const {
   return rigid_object;
 }
 
+#if defined(__CUDACC__)
 RigidObjectDevice::operator RigidObjectRef() const {
   RigidObjectRef rigid_object;
   rigid_object.mesh_sdf = mesh_sdf;
@@ -48,4 +49,5 @@ RigidObjectDevice::operator RigidObjectRef() const {
   rigid_object.stiffness = stiffness;
   return rigid_object;
 }
+#endif
 }  // namespace snow_mount::solver

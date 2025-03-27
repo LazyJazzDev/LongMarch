@@ -65,23 +65,24 @@ SwapChainSupportDetails Swapchain::QuerySwapChainSupport(VkPhysicalDevice device
 }
 
 VkSurfaceFormatKHR Swapchain::ChooseSwapSurfaceFormat(const std::vector<VkSurfaceFormatKHR> &availableFormats,
-                                                      VkFormat preferred_format) {
+                                                      VkFormat preferred_format,
+                                                      VkColorSpaceKHR preferred_color_space) {
   VkSurfaceFormatKHR result = availableFormats[0];
 
-  // for (const auto &availableFormat : availableFormats) {
-  //   if (availableFormat.format == preferred_format) {
-  //     result = availableFormat;
-  //   } else if (availableFormat.format == VK_FORMAT_R8G8B8A8_UNORM &&
-  //              availableFormat.colorSpace == VK_COLOR_SPACE_SRGB_NONLINEAR_KHR) {
-  //     result = availableFormat;
-  //   }
-  // }
-
-  result.format = preferred_format;
-  result.colorSpace = VK_COLOR_SPACE_SRGB_NONLINEAR_KHR;
-  if (result.format == VK_FORMAT_R16G16B16A16_SFLOAT) {
-    result.colorSpace = VK_COLOR_SPACE_EXTENDED_SRGB_LINEAR_EXT;
+  for (const auto &availableFormat : availableFormats) {
+    if (availableFormat.format == preferred_format && availableFormat.colorSpace == preferred_color_space) {
+      result = availableFormat;
+    } else if (availableFormat.format == VK_FORMAT_R8G8B8A8_UNORM &&
+               availableFormat.colorSpace == VK_COLOR_SPACE_SRGB_NONLINEAR_KHR) {
+      result = availableFormat;
+    }
   }
+
+  // result.format = preferred_format;
+  // result.colorSpace = VK_COLOR_SPACE_SRGB_NONLINEAR_KHR;
+  // if (result.format == VK_FORMAT_R16G16B16A16_SFLOAT) {
+  //   result.colorSpace = VK_COLOR_SPACE_EXTENDED_SRGB_LINEAR_EXT;
+  // }
 
   return result;
 }

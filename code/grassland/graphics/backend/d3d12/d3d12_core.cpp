@@ -306,6 +306,7 @@ int D3D12Core::GetPhysicalDeviceProperties(PhysicalDeviceProperties *p_physical_
       properties.name = adapter.Name();
       properties.score = adapter.Evaluate();
       properties.ray_tracing_support = adapter.SupportRayTracing();
+      properties.geometry_shader_support = true;
       p_physical_device_properties[i] = properties;
     }
   }

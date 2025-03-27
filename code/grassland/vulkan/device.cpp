@@ -55,7 +55,10 @@ Device::~Device() {
   vkDestroyDevice(device_, nullptr);
 }
 
-VkResult Device::CreateSwapchain(const Surface *surface, VkFormat format, double_ptr<Swapchain> pp_swapchain) const {
+VkResult Device::CreateSwapchain(const Surface *surface,
+                                 VkFormat format,
+                                 VkColorSpaceKHR color_space,
+                                 double_ptr<Swapchain> pp_swapchain) const {
   if (!pp_swapchain) {
     SetErrorMessage("pp_swapchain is nullptr");
     return VK_ERROR_INITIALIZATION_FAILED;
@@ -71,7 +74,7 @@ VkResult Device::CreateSwapchain(const Surface *surface, VkFormat format, double
   }
 #endif
 
-  VkSurfaceFormatKHR surfaceFormat = Swapchain::ChooseSwapSurfaceFormat(swapChainSupport.formats, format);
+  VkSurfaceFormatKHR surfaceFormat = Swapchain::ChooseSwapSurfaceFormat(swapChainSupport.formats, format, color_space);
   VkPresentModeKHR presentMode = Swapchain::ChooseSwapPresentMode(swapChainSupport.presentModes);
   VkExtent2D extent = Swapchain::ChooseSwapExtent(swapChainSupport.capabilities, surface->Window());
 
@@ -125,7 +128,7 @@ VkResult Device::CreateSwapchain(const Surface *surface, VkFormat format, double
 }
 
 VkResult Device::CreateSwapchain(const Surface *surface, double_ptr<Swapchain> pp_swapchain) const {
-  return CreateSwapchain(surface, VK_FORMAT_R8G8B8A8_UNORM, pp_swapchain);
+  return CreateSwapchain(surface, VK_FORMAT_R8G8B8A8_UNORM, VK_COLOR_SPACE_SRGB_NONLINEAR_KHR, pp_swapchain);
 }
 
 VkResult Device::GetQueue(uint32_t queue_family_index, int queue_index, double_ptr<Queue> pp_queue) const {

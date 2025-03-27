@@ -68,6 +68,7 @@ struct PhysicalDeviceProperties {
   std::string name;
   uint64_t score;
   bool ray_tracing_support;
+  bool geometry_shader_support;
 };
 
 struct ColorClearValue {

@@ -68,7 +68,8 @@ class Swapchain {
   static SwapChainSupportDetails QuerySwapChainSupport(VkPhysicalDevice device, VkSurfaceKHR surface);
 
   static VkSurfaceFormatKHR ChooseSwapSurfaceFormat(const std::vector<VkSurfaceFormatKHR> &availableFormats,
-                                                    VkFormat preferred_format);
+                                                    VkFormat preferred_format,
+                                                    VkColorSpaceKHR preferred_color_space);
 
   static VkPresentModeKHR ChooseSwapPresentMode(const std::vector<VkPresentModeKHR> &availablePresentModes);
 

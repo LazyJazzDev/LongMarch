@@ -12,7 +12,8 @@ VulkanWindow::VulkanWindow(VulkanCore *core,
     : Window(width, height, title, fullscreen, resizable, enable_hdr), core_(core) {
   core_->Instance()->CreateSurfaceFromGLFWWindow(GLFWWindow(), &surface_);
   core_->Device()->CreateSwapchain(
-      surface_.get(), enable_hdr_ ? VK_FORMAT_R16G16B16A16_SFLOAT : VK_FORMAT_R8G8B8A8_UNORM, &swap_chain_);
+      surface_.get(), enable_hdr_ ? VK_FORMAT_R16G16B16A16_SFLOAT : VK_FORMAT_R8G8B8A8_UNORM,
+      enable_hdr_ ? VK_COLOR_SPACE_EXTENDED_SRGB_LINEAR_EXT : VK_COLOR_SPACE_SRGB_NONLINEAR_KHR, &swap_chain_);
   image_available_semaphores_.resize(swap_chain_->ImageCount());
   render_finish_semaphores_.resize(swap_chain_->ImageCount());
   for (size_t i = 0; i < image_available_semaphores_.size(); ++i) {
@@ -56,7 +57,8 @@ void VulkanWindow::Rebuild() {
   core_->WaitGPU();
   swap_chain_.reset();
   core_->Device()->CreateSwapchain(
-      surface_.get(), enable_hdr_ ? VK_FORMAT_R16G16B16A16_SFLOAT : VK_FORMAT_R8G8B8A8_UNORM, &swap_chain_);
+      surface_.get(), enable_hdr_ ? VK_FORMAT_R16G16B16A16_SFLOAT : VK_FORMAT_R8G8B8A8_UNORM,
+      enable_hdr_ ? VK_COLOR_SPACE_EXTENDED_SRGB_LINEAR_EXT : VK_COLOR_SPACE_SRGB_NONLINEAR_KHR, &swap_chain_);
 }
 
 void VulkanWindow::Present() {

@@ -52,7 +52,10 @@ class Device {
 
   VkResult GetQueue(uint32_t queue_family_index, int queue_index, double_ptr<Queue> pp_queue) const;
 
-  VkResult CreateSwapchain(const Surface *surface, VkFormat format, double_ptr<Swapchain> pp_swapchain) const;
+  VkResult CreateSwapchain(const Surface *surface,
+                           VkFormat format,
+                           VkColorSpaceKHR color_space,
+                           double_ptr<Swapchain> pp_swapchain) const;
 
   VkResult CreateSwapchain(const Surface *surface, double_ptr<Swapchain> pp_swapchain) const;
 
