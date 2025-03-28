@@ -191,9 +191,10 @@ class Environment:
         self.gripper = None
         self.ground_object = None
         self.cloth_object = None
-        self.ambient_light = self.vis_core.create_entity_ambient_light([0.5, 0.5, 0.5])
 
+        self.ambient_light = self.vis_core.create_entity_ambient_light([0.5, 0.5, 0.5])
         self.directional_light = self.vis_core.create_entity_directional_light([3., 1., 2.], [0.5, 0.5, 0.5])
+
         self.reset()
 
     def reset(self):

@@ -4,6 +4,7 @@ namespace grassland {
 
 void PyBindUtil(pybind11::module_ &m) {
   m.def("find_asset_file", &FindAssetFile);
+  FPSCounter::PyBind(m);
 }
 
 }  // namespace grassland

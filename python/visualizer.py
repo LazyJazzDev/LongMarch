@@ -22,6 +22,13 @@ def main():
     camera = vis_core.create_camera(proj=snow_mount.visualizer.perspective(math.radians(60.0), 1280 / 720, 0.1, 100.0),
                                     view=snow_mount.visualizer.look_at([0, 1, 5], [0, 0, 0], [0, 1, 0]))
 
+    def on_resize(width, height):
+        nonlocal film, camera
+        film = vis_core.create_film(width, height)
+        camera.proj = snow_mount.visualizer.perspective(math.radians(60.0), width / height, 0.1, 100.0)
+
+    window.reg_resize_callback(on_resize)
+
     mesh = vis_core.create_mesh()
     # load form "meshes/cube.obj"
     o3d_cube_mesh = o3d.io.read_triangle_mesh(grassland.util.find_asset_file("meshes/cube.obj"))
@@ -34,11 +41,15 @@ def main():
     ambient_light = vis_core.create_entity_ambient_light([0.5, 0.5, 0.5])
     scene.add_entity(ambient_light)
 
-    directional_light = vis_core.create_entity_directional_light([3., 1., 2.], [0.5, 0.5, 0.5])
-    scene.add_entity(directional_light)
+    light_count = 100
+    directional_lights = [vis_core.create_entity_directional_light([3., 1., 2.], np.asarray([0.5, 0.5, 0.5]) / light_count) for _ in range(light_count)]
+    for directional_light in directional_lights:
+        scene.add_entity(directional_light)
 
     camera_controller = CameraController(window, camera)
     camera_controller.set_camera_position([0., 1., 5.], [0., 0., 0.])
+
+    fps_counter = grassland.util.FPSCounter()
 
     while not window.should_close():
         camera_controller.update(True)
@@ -47,6 +58,7 @@ def main():
         context.cmd_present(window, film.get_image())
         context.submit()
         graphics.glfw_poll_events()
+        window.set_title("Visualizer - FPS: {:.2f}".format(fps_counter.tick_fps()))
 
 
 if __name__ == "__main__":
