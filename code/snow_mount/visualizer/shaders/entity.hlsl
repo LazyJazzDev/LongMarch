@@ -1,33 +1,4 @@
-
-float spvDet2x2(float a1, float a2, float b1, float b2) {
-  return a1 * b2 - b1 * a2;
-}
-
-float3x3 inverse(float3x3 m) {
-  float3x3 adj;  // The adjoint matrix (inverse after dividing by determinant)
-
-  // Create the transpose of the cofactors, as the classical adjoint of the
-  // matrix.
-  adj[0][0] = spvDet2x2(m[1][1], m[1][2], m[2][1], m[2][2]);
-  adj[0][1] = -spvDet2x2(m[0][1], m[0][2], m[2][1], m[2][2]);
-  adj[0][2] = spvDet2x2(m[0][1], m[0][2], m[1][1], m[1][2]);
-
-  adj[1][0] = -spvDet2x2(m[1][0], m[1][2], m[2][0], m[2][2]);
-  adj[1][1] = spvDet2x2(m[0][0], m[0][2], m[2][0], m[2][2]);
-  adj[1][2] = -spvDet2x2(m[0][0], m[0][2], m[1][0], m[1][2]);
-
-  adj[2][0] = spvDet2x2(m[1][0], m[1][1], m[2][0], m[2][1]);
-  adj[2][1] = -spvDet2x2(m[0][0], m[0][1], m[2][0], m[2][1]);
-  adj[2][2] = spvDet2x2(m[0][0], m[0][1], m[1][0], m[1][1]);
-
-  // Calculate the determinant as a combination of the cofactors of the first
-  // row.
-  float det = (adj[0][0] * m[0][0]) + (adj[0][1] * m[1][0]) + (adj[0][2] * m[2][0]);
-
-  // Divide the classical adjoint matrix by the determinant.
-  // If determinant is zero, matrix is not invertable, so leave it unchanged.
-  return (det != 0.0f) ? (adj * (1.0f / det)) : m;
-}
+#include "inverse.h"
 
 struct VSInput {
   [[vk::location(0)]] float3 position : TEXCOORD0;
@@ -111,8 +82,8 @@ PSOutput PSMain(PSInput input, bool is_front_facing
   PSOutput output = (PSOutput)0;
   // out_exposure = vec4(frag_color.rgb * (max(0.0, dot(normal,
   // normalize(vec3(3.0, 1.0, 2.0)))) * 0.5 + 0.5), 1.0)
-  output.exposure =
-      float4(input.color.rgb * (max(0.0, dot(normal, normalize(float3(3.0, 1.0, 2.0)))) * 0.5 + 0.5), 1.0f);
+  output.exposure = float4(0., 0., 0., 1.0f);
+  // float4(input.color.rgb * (max(0.0, dot(normal, normalize(float3(3.0, 1.0, 2.0)))) * 0.5), 1.0f);
   output.albedo = input.color;
   output.position = float4(input.world_position, 1.0f);
   output.normal = float4(normal, 1.0f);

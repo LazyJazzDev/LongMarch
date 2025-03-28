@@ -57,6 +57,8 @@ typedef enum RenderStage { RENDER_STAGE_RASTER_GEOMETRY_PASS = 0, RENDER_STAGE_R
 
 typedef enum ProgramID : uint64_t {
   PROGRAM_ID_NO_NORMAL = 0,
+  PROGRAM_AMBIENT_LIGHTING_PASS = 1,
+  PROGRAM_DIRECTION_LIGHTING_PASS = 2,
 } ProgramID;
 
 }  // namespace snow_mount::visualizer

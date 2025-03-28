@@ -95,6 +95,16 @@ int Core::Render(graphics::CommandContext *context,
 
   context->CmdEndRendering();
 
+  context->CmdBeginRendering({film->GetImage(FILM_CHANNEL_EXPOSURE)}, nullptr);
+
+  for (auto &entity : entities_holder) {
+    if (entity) {
+      entity->ExecuteStage(RENDER_STAGE_RASTER_LIGHTING_PASS, render_context);
+    }
+  }
+
+  context->CmdEndRendering();
+
   context->PushPostExecutionCallback([holder = render_context.ownership_holder]() { holder->Clear(); });
   while (!to_del_entities.empty()) {
     scene->entities_.erase(to_del_entities.front());
@@ -122,6 +132,12 @@ void Core::PyBind(pybind11::module_ &m) {
       pybind11::keep_alive<0, 1>(), pybind11::arg("mesh") = nullptr,
       pybind11::arg("material") = Material{{0.8, 0.8, 0.8, 1.0}},
       pybind11::arg("transform") = Matrix4<float>::Identity());
+  core_class.def("create_entity_ambient_light", &Core::CreateEntity<EntityAmbientLight, const Vector3<float> &>,
+                 pybind11::keep_alive<0, 1>(), pybind11::arg("intensity") = Vector3<float>{0.5, 0.5, 0.5});
+  core_class.def("create_entity_directional_light",
+                 &Core::CreateEntity<EntityDirectionalLight, const Vector3<float> &, const Vector3<float> &>,
+                 pybind11::keep_alive<0, 1>(), pybind11::arg("direction") = Vector3<float>{3.0, 1.0, 2.0},
+                 pybind11::arg("intensity") = Vector3<float>{0.5, 0.5, 0.5});
   core_class.def("render", &Core::Render, pybind11::arg("context"), pybind11::arg("scene"), pybind11::arg("camera"),
                  pybind11::arg("film"));
 }

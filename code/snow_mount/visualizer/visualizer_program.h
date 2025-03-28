@@ -7,9 +7,18 @@ class Program {
   virtual ~Program() = default;
 };
 
-class ProgramNoNormal : public Program {
+class ProgramCommonRaster : public Program {
  public:
-  ~ProgramNoNormal() override = default;
+  ~ProgramCommonRaster() override = default;
+
+  std::unique_ptr<graphics::Shader> vertex_shader_;
+  std::unique_ptr<graphics::Shader> fragment_shader_;
+  std::unique_ptr<graphics::Program> program_;
+};
+
+class ProgramWithGeometryShader : public Program {
+ public:
+  ~ProgramWithGeometryShader() override = default;
 
   std::unique_ptr<graphics::Shader> vertex_shader_;
   std::unique_ptr<graphics::Shader> geometry_shader_;
