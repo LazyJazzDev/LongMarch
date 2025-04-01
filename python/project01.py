@@ -23,6 +23,7 @@ from stable_baselines3.common.monitor import Monitor
 from stable_baselines3.common.vec_env.base_vec_env import VecEnvIndices, VecEnvObs, VecEnvStepReturn
 
 from camera_controller import CameraController
+from stable_baselines3.common.callbacks import BaseCallback
 
 import numpy as np
 
@@ -38,7 +39,7 @@ class Scene:
 
 
 class RigidObject:
-    def __init__(self, scene: Scene, vertices, indices, stiffness=1e5):
+    def __init__(self, scene: Scene, vertices, indices, stiffness=1e5, friction=0.3):
         self.scene = scene
         self.vertices = np.asarray(vertices)
         self.indices = np.asarray(indices)
@@ -46,8 +47,8 @@ class RigidObject:
         self.vis_mesh.set_vertices(vertices)
         self.vis_mesh.set_indices(indices)
         mesh_sdf = long_march.grassland.math.MeshSDF(vertices, indices)
-        self.sol_rigid_object = solver.RigidObject(mesh_sdf, stiffness=stiffness)
-        self.sol_rigid_id = scene.sol_scene.add_rigid_object(self.sol_rigid_object)
+        sol_rigid_object = solver.RigidObject(mesh_sdf, stiffness=stiffness, friction=friction)
+        self.sol_rigid_id = scene.sol_scene.add_rigid_object(sol_rigid_object)
         self.vis_entity = scene.vis_scene.get_core().create_entity_mesh_object()
         self.vis_entity.set_mesh(self.vis_mesh)
         self.vis_entity.set_material(visualizer.Material([0.8, 0.8, 0.8, 1.0]))
@@ -72,14 +73,20 @@ class RigidObject:
     def set_color(self, color):
         self.vis_entity.set_material(visualizer.Material(color))
 
+    def set_stiffness(self, stiffness):
+        self.scene.sol_scene_dev.set_rigid_object_stiffness(self.sol_rigid_id, stiffness)
+
+    def set_friction(self, friction):
+        self.scene.sol_scene_dev.set_rigid_object_friction(self.sol_rigid_id, friction)
+
     @staticmethod
-    def load_from_mesh(scene: Scene, path: str, stiffness=1e5):
+    def load_from_mesh(scene: Scene, path: str, stiffness=1e5, friction=0.3):
         full_path = long_march.grassland.util.find_asset_file(path)
         # load obj mesh from full_path, use open3d
         mesh = o3d.io.read_triangle_mesh(full_path)
         vertices = np.asarray(mesh.vertices)
         indices = np.asarray(mesh.triangles).flatten()
-        return RigidObject(scene, vertices, indices, stiffness=stiffness)
+        return RigidObject(scene, vertices, indices, stiffness=stiffness, friction=friction)
 
 
 class GridCloth:
@@ -106,8 +113,8 @@ class GridCloth:
 class GripperObject:
     def __init__(self, scene: Scene):
         self.scene = scene
-        self.left_gripper = RigidObject.load_from_mesh(scene, "meshes/gripper_left.obj", stiffness=1e6)
-        self.right_gripper = RigidObject.load_from_mesh(scene, "meshes/gripper_right.obj", stiffness=1e6)
+        self.left_gripper = RigidObject.load_from_mesh(scene, "meshes/gripper_left.obj", stiffness=1e6, friction=5.0)
+        self.right_gripper = RigidObject.load_from_mesh(scene, "meshes/gripper_right.obj", stiffness=1e6, friction=5.0)
         self.left_gripper.set_color([0.5, 0.5, 0.5, 1.0])
         self.right_gripper.set_color([0.5, 0.5, 0.5, 1.0])
         self.R = np.identity(3)
@@ -252,7 +259,7 @@ class Environment:
         self.gripper.R = rotation([0., 0., math.pi * -0.5])
         # (self.scene, mesh_vertices * 0.5, mesh_indices)
 
-        self.ground_object = RigidObject(self.scene, mesh_vertices * 10.0, mesh_indices, stiffness=1e6)
+        self.ground_object = RigidObject(self.scene, mesh_vertices * 10.0, mesh_indices, stiffness=1e6, friction=0.3)
         self.cloth_object = GridCloth(self.scene, cloth_vertices, cloth_indices, bending_stiffness=0.003,
                                       elastic_limit=math.pi * 0.1, mesh_mass=0.1, young=300)
 
@@ -459,7 +466,7 @@ class PaperVecEnv(VecEnv):
         for substep in range(15):
             envs = [self.envs[i].env for i in range(self.num_envs)]
             update_envs(envs, 0.001, self.render_mode)
-            if substep % 5 == 4:
+            if substep % 5 == 4 and (self.render_mode == "human" or self.render_mode == "first"):
                 context = self.graphics_core.create_command_context()
                 for i in range(self.num_envs):
                     if self.render_mode == "human":
@@ -510,26 +517,60 @@ class PaperVecEnv(VecEnv):
         obs = self.get_observation()
         return obs, np.asarray(rewards, dtype=np.float32), np.asarray(merged_dones), infos
 
+class CustomCallback(BaseCallback):
+    def init_callback(self, model) -> None:
+        print("init_callback")
+        self.model = model
+        self.step_cnt = 0
+    def _on_step(self) -> bool:
+        self.step_cnt = self.step_cnt + 1
+        if self.step_cnt % 1000 == 0:
+            print("saving: model_{}.zip".format(self.step_cnt))
+            self.model.save("tmp/model_{}.zip".format(self.step_cnt))
+        return True
+
+import os
 
 def main():
+    # enumerate all files under tmp/, make them a list
+    loading_model_number = 0
+    for file in os.listdir("tmp/"):
+        # Get the number in form model_{}.zip
+        number = file.split("_")[-1].split(".")[0]
+        # convert the str into int
+        if number.isdigit():
+            number = int(number)
+            loading_model_number = max(loading_model_number, number)
+            # print the number and type
+
+    loading_model_number = 0
+
+    # Check if tmp directory exists, if not create it
+    if not os.path.exists("tmp"):
+        os.makedirs("tmp")
+
     core_settings = graphics.CoreSettings()
     core_settings.frames_in_flight = 1
 
     graphics_core = graphics.Core(graphics.BACKEND_API_D3D12, core_settings)
     vis_core = visualizer.Core(graphics_core)
 
-    vec_env = PaperVecEnv(vis_core, 64,
+    vec_env = PaperVecEnv(vis_core, 1,
                           render_mode="first")  # SubprocVecEnv([make_env_custom() for i in range(num_cpu)])
-    model = PPO("MultiInputPolicy", vec_env, verbose=1)
-    model.learn(total_timesteps=10_000_000, progress_bar=True)
-    for i in range(10000):
-        model.save("tmp/model_{}.zip".format(i))
+
+    if loading_model_number > 0:
+        model = PPO.load("tmp/model_{}.zip".format(loading_model_number), env=vec_env)
+    else:
+        model = PPO("MultiInputPolicy", vec_env, verbose=1)
+    model.learn(total_timesteps=10_000_000, progress_bar=True, callback=CustomCallback())
+    model.save("tmp/model_final.zip")
 
     obs = vec_env.reset()
     for _ in range(1000):
         action, _states = model.predict(obs)
         obs, rewards, dones, info = vec_env.step(action)
-        vec_env.render()
+        # vec_env.render()
+        print("rewards: {}".format(rewards))
 
     window = graphics_core.create_window(1280, 720, "Project01")
 

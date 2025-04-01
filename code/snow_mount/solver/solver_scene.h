@@ -92,6 +92,9 @@ class SceneDevice {
   float GetRigidObjectStiffness(int rigid_object_id) const;
   void SetRigidObjectStiffness(int rigid_object_id, float stiffness);
 
+  float GetRigidObjectFriction(int rigid_object_id) const;
+  void SetRigidObjectFriction(int rigid_object_id, float friction);
+
   operator SceneRef();
 
   static void Update(SceneDevice &scene, float dt);

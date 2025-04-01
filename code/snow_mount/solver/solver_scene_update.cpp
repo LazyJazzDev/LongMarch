@@ -118,7 +118,6 @@ __global__ void SolveVBDParticlePosition(SceneRef scene_ref, const int *particle
       H += hessian * (1.0 + k_damping) * bending.stiffness;
     }
 
-    const float k_friction = 5.0f;
     const Vector3<float> rel_vel = (x - x_prev) / dt;
 
     constexpr float K_DAMPING = 1e-6;
@@ -140,7 +139,7 @@ __global__ void SolveVBDParticlePosition(SceneRef scene_ref, const int *particle
 
         Vector3<float> velocity_component = rel_vel - rigid_object.state.v - rigid_object.state.omega.cross(r);
         velocity_component = velocity_component - jacobian * jacobian.transpose() * velocity_component;
-        float max_friction_force = force_mag * k_friction;
+        float max_friction_force = force_mag * rigid_object.friction;
         float vel_comp_norm = velocity_component.norm();
         if (vel_comp_norm > max_friction_force * dt / m) {
           f -= velocity_component / vel_comp_norm * max_friction_force;

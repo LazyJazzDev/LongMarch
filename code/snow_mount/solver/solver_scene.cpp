@@ -69,10 +69,8 @@ int Scene::AddRigidBody(const RigidObject &rigid_object) {
   int rigid_object_id = next_rigid_object_id_++;
   rigid_object_meshes_.push_back(rigid_object.mesh_sdf);
   rigid_object_ids_.push_back(rigid_object_id);
-  RigidObjectRef rigid_object_ref;
+  RigidObjectRef rigid_object_ref = rigid_object;
   rigid_object_ref.mesh_sdf = rigid_object_meshes_.back();
-  rigid_object_ref.state = rigid_object.state;
-  rigid_object_ref.stiffness = rigid_object.stiffness;
   rigid_objects_.push_back(rigid_object_ref);
   return rigid_object_id;
 }
@@ -119,6 +117,9 @@ void Scene::PyBind(pybind11::module_ &m) {
                    pybind11::arg("rigid_object_id"));
   scene_device.def("set_rigid_object_stiffness", &SceneDevice::SetRigidObjectStiffness,
                    pybind11::arg("rigid_object_id"), pybind11::arg("stiffness"));
+  scene_device.def("get_rigid_object_friction", &SceneDevice::GetRigidObjectFriction, pybind11::arg("rigid_object_id"));
+  scene_device.def("set_rigid_object_friction", &SceneDevice::SetRigidObjectFriction, pybind11::arg("rigid_object_id"),
+                   pybind11::arg("friction"));
   m.def("update_scene", &SceneDevice::Update);
   m.def("update_scene_batch", &SceneDevice::UpdateBatch);
 #endif
@@ -273,6 +274,19 @@ void SceneDevice::SetRigidObjectStiffness(int rigid_object_id, float stiffness) 
   int rigid_object_idx = BinarySearch(rigid_object_ids_host_.data(), rigid_object_ids_host_.size(), rigid_object_id);
   RigidObjectRef ref = rigid_objects_[rigid_object_idx];
   ref.stiffness = stiffness;
+  rigid_objects_[rigid_object_idx] = ref;
+}
+
+float SceneDevice::GetRigidObjectFriction(int rigid_object_id) const {
+  int rigid_object_idx = BinarySearch(rigid_object_ids_host_.data(), rigid_object_ids_host_.size(), rigid_object_id);
+  RigidObjectRef ref = rigid_objects_[rigid_object_idx];
+  return ref.friction;
+}
+
+void SceneDevice::SetRigidObjectFriction(int rigid_object_id, float friction) {
+  int rigid_object_idx = BinarySearch(rigid_object_ids_host_.data(), rigid_object_ids_host_.size(), rigid_object_id);
+  RigidObjectRef ref = rigid_objects_[rigid_object_idx];
+  ref.friction = friction;
   rigid_objects_[rigid_object_idx] = ref;
 }
 
