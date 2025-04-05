@@ -87,6 +87,18 @@ int Window::GetHeight() const {
   return height;
 }
 
+int Window::GetFrameWidth() const {
+  int width, height;
+  glfwGetFramebufferSize(window_, &width, &height);
+  return width;
+}
+
+int Window::GetFrameHeight() const {
+  int width, height;
+  glfwGetFramebufferSize(window_, &width, &height);
+  return height;
+}
+
 void Window::SetTitle(const std::string &title) {
   glfwSetWindowTitle(window_, title.c_str());
 }

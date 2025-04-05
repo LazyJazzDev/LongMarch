@@ -16,6 +16,10 @@ class Window {
 
   int GetHeight() const;
 
+  int GetFrameWidth() const;
+
+  int GetFrameHeight() const;
+
   void SetTitle(const std::string &title);
 
   std::string GetTitle() const;

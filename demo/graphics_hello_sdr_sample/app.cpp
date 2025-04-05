@@ -24,7 +24,8 @@ void Application::OnInit() {
                             &window_);
   // window_->SetHDR(true);
 
-  core_->CreateImage(1280, 720, grassland::graphics::IMAGE_FORMAT_R32G32B32A32_SFLOAT, &color_image_);
+  core_->CreateImage(window_->GetFrameWidth(), window_->GetFrameHeight(),
+                     grassland::graphics::IMAGE_FORMAT_R32G32B32A32_SFLOAT, &color_image_);
 
   core_->CreateShader(GetShaderCode("shaders/shader.hlsl"), "VSMain", "vs_6_0", &vertex_shader_);
   core_->CreateShader(GetShaderCode("shaders/shader.hlsl"), "PSMain", "ps_6_0", &fragment_shader_);

@@ -103,7 +103,7 @@ VkExtent2D Swapchain::ChooseSwapExtent(const VkSurfaceCapabilitiesKHR &capabilit
     return capabilities.currentExtent;
   } else {
     int width, height;
-    glfwGetFramebufferSize(window, &width, &height);
+    glfwGetWindowSize(window, &width, &height);
 
     VkExtent2D actualExtent = {static_cast<uint32_t>(width), static_cast<uint32_t>(height)};
 
