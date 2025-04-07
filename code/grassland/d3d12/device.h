@@ -93,6 +93,12 @@ class Device {
                                                  CommandAllocator *allocator,
                                                  double_ptr<AccelerationStructure> pp_as);
 
+  HRESULT CreateTopLevelAccelerationStructure(const std::vector<D3D12_RAYTRACING_INSTANCE_DESC> &instances,
+                                              CommandQueue *queue,
+                                              Fence *fence,
+                                              CommandAllocator *allocator,
+                                              double_ptr<AccelerationStructure> pp_tlas);
+
   HRESULT CreateTopLevelAccelerationStructure(const std::vector<std::pair<AccelerationStructure *, glm::mat4>> &objects,
                                               CommandQueue *queue,
                                               Fence *fence,

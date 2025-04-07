@@ -170,6 +170,11 @@ class Device {
                                                   Queue *queue,
                                                   double_ptr<AccelerationStructure> pp_blas);
 
+  VkResult CreateTopLevelAccelerationStructure(const std::vector<VkAccelerationStructureInstanceKHR> &instances,
+                                               CommandPool *command_pool,
+                                               Queue *queue,
+                                               double_ptr<AccelerationStructure> pp_tlas);
+
   VkResult CreateTopLevelAccelerationStructure(
       const std::vector<std::pair<AccelerationStructure *, glm::mat4>> &objects,
       CommandPool *command_pool,

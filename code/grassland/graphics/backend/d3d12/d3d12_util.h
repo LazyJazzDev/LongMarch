@@ -24,6 +24,8 @@ D3D12_BLEND_OP BlendOpToD3D12BlendOp(BlendOp op);
 
 D3D12_RENDER_TARGET_BLEND_DESC BlendStateToD3D12RenderTargetBlendDesc(const BlendState &state);
 
+D3D12_RAYTRACING_INSTANCE_DESC RayTracingInstanceToD3D12RayTracingInstanceDesc(const RayTracingInstance &instance);
+
 class D3D12Core;
 class D3D12Buffer;
 class D3D12Image;

@@ -52,9 +52,12 @@ class Core {
                                                      uint32_t stride,
                                                      double_ptr<AccelerationStructure> pp_blas) = 0;
 
+  virtual int CreateTopLevelAccelerationStructure(const std::vector<RayTracingInstance> &instances,
+                                                  double_ptr<AccelerationStructure> pp_tlas) = 0;
+
   virtual int CreateTopLevelAccelerationStructure(
       const std::vector<std::pair<AccelerationStructure *, glm::mat4>> &objects,
-      double_ptr<AccelerationStructure> pp_tlas) = 0;
+      double_ptr<AccelerationStructure> pp_tlas);
 
   virtual int CreateRayTracingProgram(Shader *raygen_shader,
                                       Shader *miss_shader,

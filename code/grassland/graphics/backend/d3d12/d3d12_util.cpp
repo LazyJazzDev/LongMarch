@@ -1,5 +1,7 @@
 #include "grassland/graphics/backend/d3d12/d3d12_util.h"
 
+#include "grassland/graphics/backend/d3d12/d3d12_acceleration_structure.h"
+
 namespace grassland::graphics::backend {
 DXGI_FORMAT ImageFormatToDXGIFormat(ImageFormat format) {
   switch (format) {
@@ -199,6 +201,20 @@ D3D12_RENDER_TARGET_BLEND_DESC BlendStateToD3D12RenderTargetBlendDesc(const Blen
                                D3D12_COLOR_WRITE_ENABLE_BLUE | D3D12_COLOR_WRITE_ENABLE_ALPHA;
   desc.LogicOpEnable = FALSE;
   desc.LogicOp = D3D12_LOGIC_OP_NOOP;
+  return desc;
+}
+
+D3D12_RAYTRACING_INSTANCE_DESC RayTracingInstanceToD3D12RayTracingInstanceDesc(const RayTracingInstance &instance) {
+  D3D12_RAYTRACING_INSTANCE_DESC desc{};
+  std::memcpy(desc.Transform, instance.transform, sizeof(instance.transform));
+  desc.InstanceID = instance.instance_id;
+  desc.InstanceMask = instance.instance_mask;
+  desc.InstanceContributionToHitGroupIndex = instance.instance_hit_group_offset;
+  desc.Flags = instance.instance_flags;
+  desc.AccelerationStructure = dynamic_cast<D3D12AccelerationStructure *>(instance.acceleration_structure)
+                                   ->Handle()
+                                   ->Handle()
+                                   ->GetGPUVirtualAddress();
   return desc;
 }
 

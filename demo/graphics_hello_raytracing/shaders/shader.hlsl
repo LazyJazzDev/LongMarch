@@ -15,6 +15,7 @@ struct RayPayload {
 [shader("raygeneration")] void RayGenMain() {
   float2 pixel_center = (float2)DispatchRaysIndex() + float2(0.5, 0.5);
   float2 uv = pixel_center / float2(DispatchRaysDimensions().xy);
+  uv.y = 1.0 - uv.y;
   float2 d = uv * 2.0 - 1.0;
   float4 origin = mul(camera_info.camera_to_world, float4(0, 0, 0, 1));
   float4 target = mul(camera_info.screen_to_camera, float4(d, 1, 1));
@@ -32,7 +33,7 @@ struct RayPayload {
   ray.TMin = t_min;
   ray.TMax = t_max;
 
-  TraceRay(as, RAY_FLAG_FORCE_OPAQUE, 0xFF, 0, 1, 0, ray, payload);
+  TraceRay(as, 0, 0xFF, 0, 1, 0, ray, payload);
 
   output[DispatchRaysIndex().xy] = float4(payload.color, 1);
 }

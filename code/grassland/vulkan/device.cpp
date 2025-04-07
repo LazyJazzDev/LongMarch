@@ -734,36 +734,16 @@ VkResult Device::CreateBottomLevelAccelerationStructure(Buffer *vertex_buffer,
       index_buffer->Size() / (sizeof(uint32_t) * 3), command_pool, queue, pp_blas);
 }
 
-VkResult Device::CreateTopLevelAccelerationStructure(
-    const std::vector<std::pair<AccelerationStructure *, glm::mat4>> &objects,
-    CommandPool *command_pool,
-    Queue *queue,
-    double_ptr<AccelerationStructure> pp_tlas) {
-  std::vector<VkAccelerationStructureInstanceKHR> acceleration_structure_instances;
-  acceleration_structure_instances.reserve(objects.size());
-  for (int i = 0; i < objects.size(); i++) {
-    auto &object = objects[i];
-    VkAccelerationStructureInstanceKHR acceleration_structure_instance{};
-    acceleration_structure_instance.transform = {object.second[0][0], object.second[1][0], object.second[2][0],
-                                                 object.second[3][0], object.second[0][1], object.second[1][1],
-                                                 object.second[2][1], object.second[3][1], object.second[0][2],
-                                                 object.second[1][2], object.second[2][2], object.second[3][2]};
-    acceleration_structure_instance.instanceCustomIndex = i;
-    acceleration_structure_instance.mask = 0xFF;
-    acceleration_structure_instance.instanceShaderBindingTableRecordOffset = 0;
-    acceleration_structure_instance.flags = VK_GEOMETRY_INSTANCE_TRIANGLE_FACING_CULL_DISABLE_BIT_KHR;
-    acceleration_structure_instance.accelerationStructureReference = object.first->DeviceAddress();
-    acceleration_structure_instances.push_back(acceleration_structure_instance);
-  }
-
+VkResult Device::CreateTopLevelAccelerationStructure(const std::vector<VkAccelerationStructureInstanceKHR> &instances,
+                                                     CommandPool *command_pool,
+                                                     Queue *queue,
+                                                     double_ptr<AccelerationStructure> pp_tlas) {
   std::unique_ptr<Buffer> instances_buffer;
   CreateBuffer(
-      sizeof(VkAccelerationStructureInstanceKHR) *
-          std::max(acceleration_structure_instances.size(), static_cast<size_t>(1)),
+      sizeof(VkAccelerationStructureInstanceKHR) * std::max(instances.size(), static_cast<size_t>(1)),
       VK_BUFFER_USAGE_ACCELERATION_STRUCTURE_BUILD_INPUT_READ_ONLY_BIT_KHR | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
       VMA_MEMORY_USAGE_CPU_TO_GPU, &instances_buffer);
-  std::memcpy(instances_buffer->Map(), acceleration_structure_instances.data(),
-              acceleration_structure_instances.size() * sizeof(VkAccelerationStructureInstanceKHR));
+  std::memcpy(instances_buffer->Map(), instances.data(), instances.size() * sizeof(VkAccelerationStructureInstanceKHR));
   instances_buffer->Unmap();
 
   VkDeviceOrHostAddressConstKHR instance_data_device_address{};
@@ -787,8 +767,8 @@ VkResult Device::CreateTopLevelAccelerationStructure(
   BuildAccelerationStructure(
       this, acceleration_structure_geometry, VK_ACCELERATION_STRUCTURE_TYPE_TOP_LEVEL_KHR,
       VK_BUILD_ACCELERATION_STRUCTURE_PREFER_FAST_TRACE_BIT_KHR | VK_BUILD_ACCELERATION_STRUCTURE_ALLOW_UPDATE_BIT_KHR,
-      VK_BUILD_ACCELERATION_STRUCTURE_MODE_BUILD_KHR, acceleration_structure_instances.size(), command_pool, queue,
-      &acceleration_structure, &buffer);
+      VK_BUILD_ACCELERATION_STRUCTURE_MODE_BUILD_KHR, instances.size(), command_pool, queue, &acceleration_structure,
+      &buffer);
 
   // Get the top acceleration structure's handle, which will be used to setup
   // it's descriptor
@@ -799,6 +779,31 @@ VkResult Device::CreateTopLevelAccelerationStructure(
       procedures_.vkGetAccelerationStructureDeviceAddressKHR(device_, &acceleration_device_address_info);
   pp_tlas.construct(this, std::move(buffer), device_address, acceleration_structure);
   return VK_SUCCESS;
+}
+
+VkResult Device::CreateTopLevelAccelerationStructure(
+    const std::vector<std::pair<AccelerationStructure *, glm::mat4>> &objects,
+    CommandPool *command_pool,
+    Queue *queue,
+    double_ptr<AccelerationStructure> pp_tlas) {
+  std::vector<VkAccelerationStructureInstanceKHR> acceleration_structure_instances;
+  acceleration_structure_instances.reserve(objects.size());
+  for (int i = 0; i < objects.size(); i++) {
+    auto &object = objects[i];
+    VkAccelerationStructureInstanceKHR acceleration_structure_instance{};
+    acceleration_structure_instance.transform = {object.second[0][0], object.second[1][0], object.second[2][0],
+                                                 object.second[3][0], object.second[0][1], object.second[1][1],
+                                                 object.second[2][1], object.second[3][1], object.second[0][2],
+                                                 object.second[1][2], object.second[2][2], object.second[3][2]};
+    acceleration_structure_instance.instanceCustomIndex = i;
+    acceleration_structure_instance.mask = 0xFF;
+    acceleration_structure_instance.instanceShaderBindingTableRecordOffset = 0;
+    acceleration_structure_instance.flags = VK_GEOMETRY_INSTANCE_TRIANGLE_FACING_CULL_DISABLE_BIT_KHR;
+    acceleration_structure_instance.accelerationStructureReference = object.first->DeviceAddress();
+    acceleration_structure_instances.push_back(acceleration_structure_instance);
+  }
+
+  return CreateTopLevelAccelerationStructure(acceleration_structure_instances, command_pool, queue, pp_tlas);
 }
 
 VkResult Device::CreateRayTracingPipeline(PipelineLayout *pipeline_layout,

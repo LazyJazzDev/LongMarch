@@ -259,7 +259,7 @@ class Environment:
         self.gripper.R = rotation([0., 0., math.pi * -0.5])
         # (self.scene, mesh_vertices * 0.5, mesh_indices)
 
-        self.ground_object = RigidObject(self.scene, mesh_vertices * 10.0, mesh_indices, stiffness=1e6, friction=0.3)
+        self.ground_object = RigidObject(self.scene, mesh_vertices * 10.0, mesh_indices, stiffness=1e6, friction=5.0)
         self.cloth_object = GridCloth(self.scene, cloth_vertices, cloth_indices, bending_stiffness=0.003,
                                       elastic_limit=math.pi * 0.1, mesh_mass=0.1, young=300)
 
@@ -467,6 +467,8 @@ class PaperVecEnv(VecEnv):
             envs = [self.envs[i].env for i in range(self.num_envs)]
             update_envs(envs, 0.001, self.render_mode)
             if substep % 5 == 4 and (self.render_mode == "human" or self.render_mode == "first"):
+                if self.render_mode == "first":
+                    self.camera_controller.update(True)
                 context = self.graphics_core.create_command_context()
                 for i in range(self.num_envs):
                     if self.render_mode == "human":
@@ -477,7 +479,8 @@ class PaperVecEnv(VecEnv):
                     context.cmd_present(self.window, self.films[0].get_image())
                 context.submit()
                 graphics.glfw_poll_events()
-
+        if self.render_mode == "first":
+            self.camera_controller.update(True)
         context = self.graphics_core.create_command_context()
         for i in range(self.num_envs):
             if self.render_mode == "human":
@@ -543,7 +546,7 @@ def main():
             loading_model_number = max(loading_model_number, number)
             # print the number and type
 
-    loading_model_number = 0
+    # loading_model_number = 0
 
     # Check if tmp directory exists, if not create it
     if not os.path.exists("tmp"):
@@ -562,8 +565,8 @@ def main():
         model = PPO.load("tmp/model_{}.zip".format(loading_model_number), env=vec_env)
     else:
         model = PPO("MultiInputPolicy", vec_env, verbose=1)
-    model.learn(total_timesteps=10_000_000, progress_bar=True, callback=CustomCallback())
-    model.save("tmp/model_final.zip")
+    # model.learn(total_timesteps=10_000_000, progress_bar=True, callback=CustomCallback())
+    # model.save("tmp/model_final.zip")
 
     obs = vec_env.reset()
     for _ in range(1000):

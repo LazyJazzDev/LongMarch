@@ -139,19 +139,17 @@ int D3D12Core::CreateBottomLevelAccelerationStructure(Buffer *vertex_buffer,
   return 0;
 }
 
-int D3D12Core::CreateTopLevelAccelerationStructure(
-    const std::vector<std::pair<AccelerationStructure *, glm::mat4>> &objects,
-    double_ptr<AccelerationStructure> pp_tlas) {
-  std::vector<std::pair<d3d12::AccelerationStructure *, glm::mat4>> d3d12_objects;
-  d3d12_objects.reserve(objects.size());
-  for (int i = 0; i < objects.size(); ++i) {
-    D3D12AccelerationStructure *d3d12_as = dynamic_cast<D3D12AccelerationStructure *>(objects[i].first);
-    assert(d3d12_as != nullptr);
-    d3d12_objects.push_back({d3d12_as->Handle(), objects[i].second});
+int D3D12Core::CreateTopLevelAccelerationStructure(const std::vector<RayTracingInstance> &instances,
+                                                   double_ptr<AccelerationStructure> pp_tlas) {
+  std::vector<D3D12_RAYTRACING_INSTANCE_DESC> d3d12_instances;
+  d3d12_instances.reserve(instances.size());
+
+  for (const auto &instance : instances) {
+    d3d12_instances.emplace_back(RayTracingInstanceToD3D12RayTracingInstanceDesc(instance));
   }
 
   std::unique_ptr<d3d12::AccelerationStructure> tlas;
-  device_->CreateTopLevelAccelerationStructure(d3d12_objects, command_queue_.get(), single_time_fence_.get(),
+  device_->CreateTopLevelAccelerationStructure(d3d12_instances, command_queue_.get(), single_time_fence_.get(),
                                                single_time_allocator_.get(), &tlas);
 
   pp_tlas.construct<D3D12AccelerationStructure>(this, std::move(tlas));

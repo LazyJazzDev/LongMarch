@@ -25,7 +25,7 @@ void Application::OnInit() {
                                 std::string(" Graphics Hello Ray Tracing"),
                             &window_);
 
-  std::vector<glm::vec3> vertices = {{1.0f, 1.0f, 0.0f}, {-1.0f, 1.0f, 0.0f}, {0.0f, -1.0f, 0.0f}};
+  std::vector<glm::vec3> vertices = {{-1.0f, -1.0f, 0.0f}, {1.0f, -1.0f, 0.0f}, {0.0f, 1.0f, 0.0f}};
   std::vector<uint32_t> indices = {0, 1, 2};
 
   core_->CreateBuffer(vertices.size() * sizeof(glm::vec3), grassland::graphics::BUFFER_TYPE_DYNAMIC, &vertex_buffer_);
@@ -36,9 +36,9 @@ void Application::OnInit() {
   core_->CreateBuffer(sizeof(CameraObject), grassland::graphics::BUFFER_TYPE_DYNAMIC, &camera_object_buffer_);
   CameraObject camera_object{};
   camera_object.screen_to_camera = glm::inverse(
-      glm::perspectiveLH(glm::radians(90.0f), (float)window_->GetWidth() / (float)window_->GetHeight(), 0.1f, 10.0f));
-  camera_object.camera_to_world = glm::inverse(
-      glm::lookAtLH(glm::vec3{0.0f, 0.0f, -2.0f}, glm::vec3{0.0f, 0.0f, 0.0f}, glm::vec3{0.0f, 1.0f, 0.0f}));
+      glm::perspective(glm::radians(60.0f), (float)window_->GetWidth() / (float)window_->GetHeight(), 0.1f, 10.0f));
+  camera_object.camera_to_world =
+      glm::inverse(glm::lookAt(glm::vec3{0.0f, 1.0f, 5.0f}, glm::vec3{0.0f, 0.0f, 0.0f}, glm::vec3{0.0f, 1.0f, 0.0f}));
   camera_object_buffer_->UploadData(&camera_object, sizeof(CameraObject));
 
   core_->CreateImage(window_->GetWidth(), window_->GetHeight(), grassland::graphics::IMAGE_FORMAT_R32G32B32A32_SFLOAT,
@@ -50,7 +50,8 @@ void Application::OnInit() {
   grassland::LogInfo("Shader compiled successfully");
 
   core_->CreateBottomLevelAccelerationStructure(vertex_buffer_.get(), index_buffer_.get(), sizeof(glm::vec3), &blas_);
-  core_->CreateTopLevelAccelerationStructure({{blas_.get(), glm::mat4(1.0f)}}, &tlas_);
+  core_->CreateTopLevelAccelerationStructure(
+      {blas_->MakeInstance(glm::mat4{1.0f}, 0, 0xFF, 0, grassland::graphics::RAYTRACING_INSTANCE_FLAG_NONE)}, &tlas_);
 
   core_->CreateRayTracingProgram(raygen_shader_.get(), miss_shader_.get(), closest_hit_shader_.get(), &program_);
   program_->AddResourceBinding(grassland::graphics::RESOURCE_TYPE_ACCELERATION_STRUCTURE, 1);
@@ -83,8 +84,9 @@ void Application::OnUpdate() {
     static float theta = 0.0f;
     theta += glm::radians(0.1f);
 
-    tlas_->UpdateInstances(std::vector<std::pair<grassland::graphics::AccelerationStructure *, glm::mat4>>{
-        {blas_.get(), glm::rotate(glm::mat4{1.0f}, theta, glm::vec3{0.0f, 1.0f, 0.0f})}});
+    tlas_->UpdateInstances(
+        std::vector{blas_->MakeInstance(glm::rotate(glm::mat4{1.0f}, theta, glm::vec3{0.0f, 1.0f, 0.0f}), 0, 0xFF, 0,
+                                        grassland::graphics::RAYTRACING_INSTANCE_FLAG_NONE)});
   }
 }
 

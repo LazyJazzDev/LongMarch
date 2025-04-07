@@ -7,7 +7,7 @@ class VulkanAccelerationStructure : public AccelerationStructure {
  public:
   VulkanAccelerationStructure(VulkanCore *core,
                               std::unique_ptr<vulkan::AccelerationStructure> &&acceleration_structure);
-  int UpdateInstances(const std::vector<std::pair<AccelerationStructure *, glm::mat4>> &instances) override;
+  int UpdateInstances(const std::vector<RayTracingInstance> &instances) override;
 
   vulkan::AccelerationStructure *Handle() const {
     return acceleration_structure_.get();

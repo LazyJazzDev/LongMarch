@@ -101,18 +101,16 @@ int VulkanCore::CreateBottomLevelAccelerationStructure(Buffer *vertex_buffer,
   return 0;
 }
 
-int VulkanCore::CreateTopLevelAccelerationStructure(
-    const std::vector<std::pair<AccelerationStructure *, glm::mat4>> &objects,
-    double_ptr<AccelerationStructure> pp_tlas) {
-  std::vector<std::pair<vulkan::AccelerationStructure *, glm::mat4>> vk_objects;
-  vk_objects.reserve(objects.size());
-  for (int i = 0; i < objects.size(); ++i) {
-    VulkanAccelerationStructure *vk_as = dynamic_cast<VulkanAccelerationStructure *>(objects[i].first);
-    assert(vk_as != nullptr);
-    vk_objects.push_back({vk_as->Handle(), objects[i].second});
+int VulkanCore::CreateTopLevelAccelerationStructure(const std::vector<RayTracingInstance> &instances,
+                                                    double_ptr<AccelerationStructure> pp_tlas) {
+  std::vector<VkAccelerationStructureInstanceKHR> vk_instances;
+  vk_instances.reserve(instances.size());
+  for (const auto &instance : instances) {
+    vk_instances.emplace_back(RayTracingInstanceToVkAccelerationStructureInstanceKHR(instance));
   }
   std::unique_ptr<vulkan::AccelerationStructure> tlas;
-  device_->CreateTopLevelAccelerationStructure(vk_objects, graphics_command_pool_.get(), graphics_queue_.get(), &tlas);
+  device_->CreateTopLevelAccelerationStructure(vk_instances, graphics_command_pool_.get(), graphics_queue_.get(),
+                                               &tlas);
   pp_tlas.construct<VulkanAccelerationStructure>(this, std::move(tlas));
   return 0;
 }

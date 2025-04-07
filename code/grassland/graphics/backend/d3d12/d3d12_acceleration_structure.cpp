@@ -10,14 +10,11 @@ D3D12AccelerationStructure::D3D12AccelerationStructure(
     : core_(core), acceleration_structure_(std::move(acceleration_structure)) {
 }
 
-int D3D12AccelerationStructure::UpdateInstances(
-    const std::vector<std::pair<AccelerationStructure *, glm::mat4>> &instances) {
-  std::vector<std::pair<d3d12::AccelerationStructure *, glm::mat4>> d3d12_instances;
+int D3D12AccelerationStructure::UpdateInstances(const std::vector<RayTracingInstance> &instances) {
+  std::vector<D3D12_RAYTRACING_INSTANCE_DESC> d3d12_instances;
   d3d12_instances.reserve(instances.size());
   for (const auto &instance : instances) {
-    D3D12AccelerationStructure *d3d12_instance = dynamic_cast<D3D12AccelerationStructure *>(instance.first);
-    assert(d3d12_instance != nullptr);
-    d3d12_instances.push_back({d3d12_instance->acceleration_structure_.get(), instance.second});
+    d3d12_instances.emplace_back(RayTracingInstanceToD3D12RayTracingInstanceDesc(instance));
   }
   acceleration_structure_->UpdateInstances(d3d12_instances, core_->CommandQueue(), core_->SingleTimeFence(),
                                            core_->SingleTimeCommandAllocator());

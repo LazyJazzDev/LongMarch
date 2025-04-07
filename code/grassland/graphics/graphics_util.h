@@ -5,6 +5,19 @@
 
 namespace grassland::graphics {
 
+class Core;
+class Buffer;
+class Image;
+class Sampler;
+class Window;
+class Shader;
+class Program;
+class CommandContext;
+
+// Ray tracing objects
+class RayTracingProgram;
+class AccelerationStructure;
+
 typedef enum BackendAPI {
   BACKEND_API_VULKAN = 0,
   BACKEND_API_D3D12 = 1,
@@ -190,6 +203,14 @@ typedef enum BlendOp {
   BLEND_OP_MAX = 4,
 } BlendOp;
 
+typedef enum RayTracingInstanceFlag : uint32_t {
+  RAYTRACING_INSTANCE_FLAG_NONE = 0,
+  RAYTRACING_INSTANCE_FLAG_TRIANGLE_FACING_CULL_DISABLE = 0x00000001,
+  RAYTRACING_INSTANCE_FLAG_TRIANGLE_FLIP_FACING = 0x00000002,
+  RAYTRACING_INSTANCE_FLAG_OPAQUE = 0x00000004,
+  RAYTRACING_INSTANCE_FLAG_NO_OPAQUE = 0x00000008
+} RayTracingInstanceFlag;
+
 struct BlendState {
   bool blend_enable;
   BlendFactor src_color;
@@ -216,18 +237,14 @@ struct CompiledShaderBlob {
   std::string entry_point;
 };
 
-class Core;
-class Buffer;
-class Image;
-class Sampler;
-class Window;
-class Shader;
-class Program;
-class CommandContext;
-
-// Ray tracing objects
-class RayTracingProgram;
-class AccelerationStructure;
+struct RayTracingInstance {
+  float transform[3][4];
+  uint32_t instance_id : 24;
+  uint32_t instance_mask : 8;
+  uint32_t instance_hit_group_offset : 24;
+  RayTracingInstanceFlag instance_flags : 8;
+  AccelerationStructure *acceleration_structure;
+};
 
 #ifndef NDEBUG
 constexpr bool kEnableDebug = true;

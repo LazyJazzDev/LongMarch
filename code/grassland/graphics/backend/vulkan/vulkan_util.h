@@ -30,6 +30,9 @@ VkPipelineColorBlendAttachmentState BlendStateToVkPipelineColorBlendAttachmentSt
 
 VkPipelineBindPoint BindPointToVkPipelineBindPoint(BindPoint point);
 
+VkAccelerationStructureInstanceKHR RayTracingInstanceToVkAccelerationStructureInstanceKHR(
+    const RayTracingInstance &instance);
+
 class VulkanCore;
 class VulkanBuffer;
 class VulkanImage;

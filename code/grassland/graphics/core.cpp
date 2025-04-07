@@ -1,5 +1,6 @@
 #include "grassland/graphics/core.h"
 
+#include "grassland/graphics/acceleration_structure.h"
 #include "grassland/graphics/backend/backend.h"
 
 namespace grassland::graphics {
@@ -9,6 +10,16 @@ Core::Core(const Settings &settings) : settings_(settings) {
 
 int Core::CreateWindowObject(int width, int height, const std::string &title, double_ptr<Window> pp_window) {
   return CreateWindowObject(width, height, title, false, false, pp_window);
+}
+
+int Core::CreateTopLevelAccelerationStructure(const std::vector<std::pair<AccelerationStructure *, glm::mat4>> &objects,
+                                              double_ptr<AccelerationStructure> pp_tlas) {
+  std::vector<RayTracingInstance> instances(objects.size());
+  for (int i = 0; i < objects.size(); i++) {
+    auto &object = objects[i];
+    instances[i] = object.first->MakeInstance(object.second, i);
+  }
+  return CreateTopLevelAccelerationStructure(instances, pp_tlas);
 }
 
 int Core::InitializeLogicalDeviceAutoSelect(bool require_ray_tracing) {

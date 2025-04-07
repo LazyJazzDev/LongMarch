@@ -1,5 +1,7 @@
 #include "grassland/graphics/backend/vulkan/vulkan_util.h"
 
+#include "grassland/graphics/backend/vulkan/vulkan_acceleration_structure.h"
+
 namespace grassland::graphics::backend {
 VkFormat ImageFormatToVkFormat(ImageFormat format) {
   switch (format) {
@@ -215,6 +217,19 @@ VkPipelineBindPoint BindPointToVkPipelineBindPoint(BindPoint point) {
     default:
       throw std::runtime_error("Invalid bind point");
   }
+}
+
+VkAccelerationStructureInstanceKHR RayTracingInstanceToVkAccelerationStructureInstanceKHR(
+    const RayTracingInstance &instance) {
+  VkAccelerationStructureInstanceKHR vk_instance;
+  std::memcpy(&vk_instance.transform, instance.transform, sizeof(instance.transform));
+  vk_instance.instanceCustomIndex = instance.instance_id;
+  vk_instance.mask = instance.instance_mask;
+  vk_instance.instanceShaderBindingTableRecordOffset = instance.instance_hit_group_offset;
+  vk_instance.flags = instance.instance_flags;
+  vk_instance.accelerationStructureReference =
+      dynamic_cast<VulkanAccelerationStructure *>(instance.acceleration_structure)->Handle()->DeviceAddress();
+  return vk_instance;
 }
 
 VulkanResourceBinding::VulkanResourceBinding() : buffer(nullptr), image(nullptr) {

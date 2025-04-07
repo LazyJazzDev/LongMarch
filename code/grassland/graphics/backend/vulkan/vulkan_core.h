@@ -43,7 +43,7 @@ class VulkanCore : public Core {
                                              uint32_t stride,
                                              double_ptr<AccelerationStructure> pp_blas) override;
 
-  int CreateTopLevelAccelerationStructure(const std::vector<std::pair<AccelerationStructure *, glm::mat4>> &objects,
+  int CreateTopLevelAccelerationStructure(const std::vector<RayTracingInstance> &instances,
                                           double_ptr<AccelerationStructure> pp_tlas) override;
 
   int CreateRayTracingProgram(Shader *raygen_shader,
