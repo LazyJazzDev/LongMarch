@@ -1,6 +1,5 @@
 #include "grassland/graphics/backend/vulkan/vulkan_acceleration_structure.h"
 
-#include "grassland/graphics/backend/d3d12/d3d12_util.h"
 #include "grassland/graphics/backend/vulkan/vulkan_core.h"
 
 namespace grassland::graphics::backend {
