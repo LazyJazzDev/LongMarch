@@ -91,6 +91,7 @@ list(APPEND LIB_LIST ${TINYOBJLOADER_LIB_NAME})
 # decide base on platform, whether it's macOS or not
 if (APPLE)
     include(external/DirectXShaderCompiler/cmake/caches/PredefinedParams.cmake)
+    set(HLSL_DISABLE_SOURCE_GENERATION ON)
     add_subdirectory(external/DirectXShaderCompiler)
     set(DXC_LIB_NAME dxcompiler)
     list(APPEND LIB_LIST ${DXC_LIB_NAME})
