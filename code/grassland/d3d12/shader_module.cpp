@@ -1,7 +1,5 @@
 #include "grassland/d3d12/shader_module.h"
 
-#include <dxcapi.h>
-
 #include "grassland/graphics/program.h"
 
 namespace grassland::d3d12 {

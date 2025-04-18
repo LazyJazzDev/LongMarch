@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.22)
+cmake_minimum_required(VERSION 3.25)
 
 if (VCPKG_PATH)
     set(CMAKE_TOOLCHAIN_FILE "${VCPKG_PATH}/scripts/buildsystems/vcpkg.cmake" CACHE STRING "")
@@ -60,9 +60,11 @@ find_package(glfw3 CONFIG REQUIRED)
 set(GLFW3_LIB_NAME glfw)
 list(APPEND LIB_LIST ${GLFW3_LIB_NAME})
 
-find_package(Vulkan REQUIRED)
+find_package(Vulkan REQUIRED COMPONENTS dxc)
 set(VULKAN_LIB_NAME ${Vulkan_LIBRARIES})
 list(APPEND LIB_LIST ${VULKAN_LIB_NAME})
+set(DXC_LIB_NAME Vulkan::dxc_lib)
+list(APPEND LIB_LIST ${DXC_LIB_NAME})
 
 find_package(VulkanMemoryAllocator CONFIG REQUIRED)
 set(VMA_LIB_NAME Vulkan::Headers GPUOpen::VulkanMemoryAllocator)
@@ -87,19 +89,6 @@ list(APPEND LIB_LIST ${MIKKTSPACE_LIB_NAME})
 find_package(tinyobjloader CONFIG REQUIRED)
 set(TINYOBJLOADER_LIB_NAME tinyobjloader::tinyobjloader)
 list(APPEND LIB_LIST ${TINYOBJLOADER_LIB_NAME})
-
-# decide base on platform, whether it's macOS or not
-if (APPLE)
-    include(external/DirectXShaderCompiler/cmake/caches/PredefinedParams.cmake)
-    set(HLSL_DISABLE_SOURCE_GENERATION ON)
-    add_subdirectory(external/DirectXShaderCompiler)
-    set(DXC_LIB_NAME dxcompiler)
-    list(APPEND LIB_LIST ${DXC_LIB_NAME})
-else ()
-    find_package(directx-dxc CONFIG REQUIRED)
-    set(DXC_LIB_NAME Microsoft::DirectXShaderCompiler)
-    list(APPEND LIB_LIST ${DXC_LIB_NAME})
-endif ()
 
 find_package(Stb REQUIRED)
 set(STB_INC_DIR ${Stb_INCLUDE_DIR})
