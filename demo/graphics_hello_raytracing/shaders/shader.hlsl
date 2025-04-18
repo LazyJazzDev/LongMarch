@@ -10,6 +10,9 @@ ConstantBuffer<CameraInfo> camera_info : register(b0, space2);
 
 struct RayPayload {
   float3 color;
+  bool hit;
+  float a;
+  float3 b;
 };
 
 [shader("raygeneration")] void RayGenMain() {
@@ -33,17 +36,29 @@ struct RayPayload {
   ray.TMin = t_min;
   ray.TMax = t_max;
 
-  TraceRay(as, 0, 0xFF, 0, 1, 0, ray, payload);
+  payload.hit = false;
+  payload.a = 1.0;
+  payload.b = float3(0, 0, 0);
+  TraceRay(as, RAY_FLAG_CULL_BACK_FACING_TRIANGLES, 0xFF, 0, 1, 0, ray, payload);
+
+  payload.a = -1.0;
+  payload.b = float3(1, 1, 1);
+  TraceRay(as, RAY_FLAG_CULL_FRONT_FACING_TRIANGLES, 0xFF, 0, 1, 0, ray, payload);
 
   output[DispatchRaysIndex().xy] = float4(payload.color, 1);
 }
 
     [shader("miss")] void MissMain(inout RayPayload payload) {
-  payload.color = float3(0.8, 0.7, 0.6);
+  if (!payload.hit) {
+    payload.color = float3(0.8, 0.7, 0.6);
+  }
 }
 
 [shader("closesthit")] void ClosestHitMain(inout RayPayload payload, in BuiltInTriangleIntersectionAttributes attr) {
   float3 barycentrics =
       float3(1.0 - attr.barycentrics.x - attr.barycentrics.y, attr.barycentrics.x, attr.barycentrics.y);
-  payload.color = barycentrics;
+  if (!payload.hit) {
+    payload.color = payload.a * barycentrics + payload.b;
+    payload.hit = true;
+  }
 }
