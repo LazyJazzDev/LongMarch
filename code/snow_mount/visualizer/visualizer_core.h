@@ -1,6 +1,6 @@
 #pragma once
+#include "snow_mount/visualizer/visualizer_scene.h"
 #include "snow_mount/visualizer/visualizer_util.h"
-#include "visualizer_scene.h"
 
 namespace snow_mount::visualizer {
 
