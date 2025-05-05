@@ -4,7 +4,7 @@
 #include <wrl/client.h>
 #endif
 
-#include "buffer.h"
+#include "grassland/graphics/buffer.h"
 #include "grassland/graphics/graphics_util.h"
 
 namespace grassland::graphics {

@@ -2,8 +2,8 @@
 
 #include <grassland/physics/diff_kernel/dk_geometry_sdf.h>
 
-#include "math_basics.h"
-#include "math_static_collision.h"
+#include "grassland/math/math_basics.h"
+#include "grassland/math/math_static_collision.h"
 
 namespace grassland {
 

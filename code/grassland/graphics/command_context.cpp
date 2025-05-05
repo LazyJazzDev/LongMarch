@@ -1,6 +1,6 @@
 #include "grassland/graphics/command_context.h"
 
-#include "core.h"
+#include "grassland/graphics/core.h"
 #include "grassland/graphics/image.h"
 #include "grassland/graphics/window.h"
 
