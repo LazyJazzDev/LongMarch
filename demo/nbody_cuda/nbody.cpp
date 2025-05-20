@@ -49,7 +49,7 @@ void NBody::OnRender() {
   graphics::Viewport viewport{0, 0, window_->GetWidth(), window_->GetHeight()};
   ctx->CmdSetScissor(scissor);
   ctx->CmdSetViewport(viewport);
-  ctx->CmdBindVertexBuffers(0, {particles_buffer_.get()}, {0, 0});
+  ctx->CmdBindVertexBuffers(0, {particles_buffer_.get()}, {0});
   ctx->CmdBindResources(0, {global_uniform_buffer_.get()});
   ctx->CmdDraw(6, n_particles_, 0, 0);
   ctx->CmdEndRendering();

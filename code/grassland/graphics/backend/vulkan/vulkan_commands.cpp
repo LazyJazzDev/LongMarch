@@ -29,7 +29,7 @@ VulkanCmdBindVertexBuffers::VulkanCmdBindVertexBuffers(uint32_t first_binding,
                                                        const std::vector<uint64_t> &offsets)
     : first_binding_(first_binding), buffers_(buffers) {
   offsets_.resize(buffers_.size());
-  for (size_t i = 0; i < offsets.size(); ++i) {
+  for (size_t i = 0; i < buffers_.size(); ++i) {
     if (i < offsets.size()) {
       offsets_[i] = offsets[i];
     } else {
