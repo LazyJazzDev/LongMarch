@@ -335,6 +335,14 @@ void D3D12CmdPresent::CompileCommand(D3D12CommandContext *context, ID3D12Graphic
   command_list->SetGraphicsRootDescriptorTable(0, gpu_descriptor);
   command_list->DrawInstanced(6, 1, 0, 0);
 
+  auto &imgui_assets = window_->ImGuiAssets();
+  if (imgui_assets.context && imgui_assets.draw_command) {
+    imgui_assets.draw_command = false;
+    auto binding_heap = imgui_assets.srv_heap->Handle();
+    command_list->SetDescriptorHeaps(1, &binding_heap);
+    ImGui_ImplDX12_RenderDrawData(ImGui::GetDrawData(), command_list);
+  }
+
   barrier = CD3DX12_RESOURCE_BARRIER::Transition(window_->CurrentBackBuffer(), D3D12_RESOURCE_STATE_RENDER_TARGET,
                                                  D3D12_RESOURCE_STATE_PRESENT);
   command_list->ResourceBarrier(1, &barrier);

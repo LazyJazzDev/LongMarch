@@ -48,7 +48,6 @@ if (MSVC)
     add_compile_options("$<$<COMPILE_LANGUAGE:CUDA>:-Xcompiler=\"/wd4068\">")
 endif ()
 
-
 find_package(fmt CONFIG REQUIRED)
 set(FMT_LIB_NAME fmt::fmt) # fmt::fmt is also available
 list(APPEND LIB_LIST ${FMT_LIB_NAME})
@@ -104,6 +103,8 @@ if (WIN32)
     list(APPEND INC_LIST ${D3DX12_INCLUDE_DIRS})
 endif ()
 
+set(LONGMARCH_IMGUI_DIR ${CMAKE_CURRENT_LIST_DIR}/external/imgui)
+
 message(STATUS "CMAKE_ARCHIVE_OUTPUT_DIRECTORY : ${CMAKE_ARCHIVE_OUTPUT_DIRECTORY}")
 message(STATUS "CMAKE_LIBRARY_OUTPUT_DIRECTORY : ${CMAKE_LIBRARY_OUTPUT_DIRECTORY}")
 message(STATUS "CMAKE_RUNTIME_OUTPUT_DIRECTORY : ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}")
@@ -112,7 +113,6 @@ message(STATUS "PROJECT_BINARY_DIR : ${PROJECT_BINARY_DIR}")
 find_package(Python3 REQUIRED COMPONENTS Interpreter Development)
 set(PYTHON3_LIB_NAME Python3::Python)
 list(APPEND LIB_LIST ${PYTHON3_LIB_NAME})
-
 
 message(STATUS "Python3_EXECUTABLE: ${Python3_EXECUTABLE}")
 

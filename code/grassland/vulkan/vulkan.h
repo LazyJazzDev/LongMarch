@@ -3,7 +3,6 @@
 #include "grassland/vulkan/buffer.h"
 #include "grassland/vulkan/command_buffer.h"
 #include "grassland/vulkan/command_pool.h"
-#include "grassland/vulkan/core/core.h"
 #include "grassland/vulkan/descriptor_pool.h"
 #include "grassland/vulkan/descriptor_set.h"
 #include "grassland/vulkan/descriptor_set_layout.h"

@@ -1,5 +1,6 @@
 #pragma once
 #include "grassland/graphics/graphics_util.h"
+#include "imgui.h"
 
 namespace grassland::graphics {
 
@@ -27,6 +28,12 @@ class Window {
   bool ShouldClose() const;
 
   void SetHDR(bool enable_hdr);
+
+  virtual void InitImGui(const char *font_file_path = nullptr, float font_size = 13.0f) = 0;
+  virtual void TerminateImGui() = 0;
+  virtual void BeginImGuiFrame() = 0;
+  virtual void EndImGuiFrame() = 0;
+  virtual ImGuiContext *GetImGuiContext() const = 0;
 
   EventManager<void(int, int)> &ResizeEvent() {
     return resize_event_;

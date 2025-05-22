@@ -3,6 +3,7 @@ struct GlobalUniformObject {
   float4x4 world_to_screen;
   float4x4 camera_to_world;
   float particle_size;
+  bool hdr;
 };
 
 struct PSInput {
@@ -27,5 +28,5 @@ PSInput VSMain([[vk::location(0)]] float4 pos
 
 float4 PSMain(PSInput input) : SV_TARGET {
   float scale = max(1.0 - length(input.frag_v), 0.0);
-  return float4(float3(0.5, 0.2, 0.1) * scale * scale * scale, 0.0);
+  return float4(float3(1.0, 0.4, 0.2) * scale * scale * scale, 0.0);
 }

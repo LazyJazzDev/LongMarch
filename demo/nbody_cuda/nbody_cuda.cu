@@ -17,15 +17,14 @@ __global__ void UpdateKernel(const glm::vec4 *positions,
       shared_pos[threadIdx.x] = positions[threadIdx.x + j];
     }
     __syncthreads();
-    for (int i = 0; i < blockDim.x && i + j < n_particle; i++) {
+#pragma unroll 128
+    for (int i = 0; i < blockDim.x; i++) {
       auto diff = pos - shared_pos[i];
-      auto lsqr = diff.x * diff.x;
+      auto lsqr = 0.00125f * 0.00125f;
+      lsqr += diff.x * diff.x;
       lsqr += diff.y * diff.y;
       lsqr += diff.z * diff.z;
       auto l = rsqrt(lsqr);
-      if (lsqr < DELTA_T * DELTA_T) {
-        continue;
-      }
       lsqr = l * l * l * (-DELTA_T * GRAVITY_COE);
       accel.x += diff.x * lsqr;
       accel.y += diff.y * lsqr;

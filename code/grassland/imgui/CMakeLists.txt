@@ -1,10 +1,16 @@
-file(GLOB_RECURSE SOURCES "*.cpp" "*.h")
+set(SOURCES "")
+list(APPEND SOURCES ${LONGMARCH_IMGUI_DIR}/backends/imgui_impl_glfw.cpp)
+list(APPEND SOURCES ${LONGMARCH_IMGUI_DIR}/backends/imgui_impl_vulkan.cpp)
+
+if (WIN32)
+    list(APPEND SOURCES ${LONGMARCH_IMGUI_DIR}/backends/imgui_impl_dx12.cpp)
+endif ()
 
 add_library(${GRASSLAND_SUBLIB_NAME} ${SOURCES})
 
 list(APPEND GRASSLAND_LIBS ${GRASSLAND_SUBLIB_NAME})
 set(GRASSLAND_LIBS ${GRASSLAND_LIBS} PARENT_SCOPE)
 
-target_include_directories(${GRASSLAND_SUBLIB_NAME} PUBLIC ${LONGMARCH_INCLUDE_DIR} ${Vulkan_INCLUDE_DIRS})
+target_include_directories(${GRASSLAND_SUBLIB_NAME} PUBLIC ${LONGMARCH_INCLUDE_DIR} ${Vulkan_INCLUDE_DIRS} ${LONGMARCH_IMGUI_DIR}/backends)
 
 target_link_libraries(${GRASSLAND_SUBLIB_NAME} PUBLIC ${IMGUI_LIB_NAME} ${VULKAN_LIB_NAME})
