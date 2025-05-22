@@ -27,7 +27,6 @@ __global__ void UpdateKernel(const glm::vec4 *positions,
         continue;
       }
       lsqr = l * l * l * (-DELTA_T * GRAVITY_COE);
-      // accel += -diff * DELTA_T * GRAVITY_COE;
       accel.x += diff.x * lsqr;
       accel.y += diff.y * lsqr;
       accel.z += diff.z * lsqr;
