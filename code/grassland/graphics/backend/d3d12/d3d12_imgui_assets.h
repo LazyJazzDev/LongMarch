@@ -6,43 +6,43 @@
 namespace grassland::graphics::backend {
 
 struct ExampleDescriptorHeapAllocator {
-  ID3D12DescriptorHeap *Heap = nullptr;
-  D3D12_DESCRIPTOR_HEAP_TYPE HeapType = D3D12_DESCRIPTOR_HEAP_TYPE_NUM_TYPES;
-  D3D12_CPU_DESCRIPTOR_HANDLE HeapStartCpu;
-  D3D12_GPU_DESCRIPTOR_HANDLE HeapStartGpu;
-  UINT HeapHandleIncrement;
-  ImVector<int> FreeIndices;
+  ID3D12DescriptorHeap *heap = nullptr;
+  D3D12_DESCRIPTOR_HEAP_TYPE heap_type = D3D12_DESCRIPTOR_HEAP_TYPE_NUM_TYPES;
+  D3D12_CPU_DESCRIPTOR_HANDLE heap_start_cpu;
+  D3D12_GPU_DESCRIPTOR_HANDLE heap_start_gpu;
+  UINT heap_handle_increment;
+  ImVector<int> free_indices;
 
   void Create(ID3D12Device *device, ID3D12DescriptorHeap *heap) {
     IM_ASSERT(Heap == nullptr && FreeIndices.empty());
-    Heap = heap;
+    heap = heap;
     D3D12_DESCRIPTOR_HEAP_DESC desc = heap->GetDesc();
-    HeapType = desc.Type;
-    HeapStartCpu = Heap->GetCPUDescriptorHandleForHeapStart();
-    HeapStartGpu = Heap->GetGPUDescriptorHandleForHeapStart();
-    HeapHandleIncrement = device->GetDescriptorHandleIncrementSize(HeapType);
-    FreeIndices.reserve((int)desc.NumDescriptors);
+    heap_type = desc.Type;
+    heap_start_cpu = heap->GetCPUDescriptorHandleForHeapStart();
+    heap_start_gpu = heap->GetGPUDescriptorHandleForHeapStart();
+    heap_handle_increment = device->GetDescriptorHandleIncrementSize(heap_type);
+    free_indices.reserve((int)desc.NumDescriptors);
     for (int n = desc.NumDescriptors; n > 0; n--)
-      FreeIndices.push_back(n - 1);
+      free_indices.push_back(n - 1);
   }
 
   void Destroy() {
-    Heap = nullptr;
-    FreeIndices.clear();
+    heap = nullptr;
+    free_indices.clear();
   }
 
   void Alloc(D3D12_CPU_DESCRIPTOR_HANDLE *out_cpu_desc_handle, D3D12_GPU_DESCRIPTOR_HANDLE *out_gpu_desc_handle) {
     IM_ASSERT(FreeIndices.Size > 0);
-    int idx = FreeIndices.back();
-    FreeIndices.pop_back();
-    out_cpu_desc_handle->ptr = HeapStartCpu.ptr + (idx * HeapHandleIncrement);
-    out_gpu_desc_handle->ptr = HeapStartGpu.ptr + (idx * HeapHandleIncrement);
+    int idx = free_indices.back();
+    free_indices.pop_back();
+    out_cpu_desc_handle->ptr = heap_start_cpu.ptr + (idx * heap_handle_increment);
+    out_gpu_desc_handle->ptr = heap_start_gpu.ptr + (idx * heap_handle_increment);
   }
   void Free(D3D12_CPU_DESCRIPTOR_HANDLE out_cpu_desc_handle, D3D12_GPU_DESCRIPTOR_HANDLE out_gpu_desc_handle) {
-    int cpu_idx = (int)((out_cpu_desc_handle.ptr - HeapStartCpu.ptr) / HeapHandleIncrement);
-    int gpu_idx = (int)((out_gpu_desc_handle.ptr - HeapStartGpu.ptr) / HeapHandleIncrement);
+    int cpu_idx = (int)((out_cpu_desc_handle.ptr - heap_start_cpu.ptr) / heap_handle_increment);
+    int gpu_idx = (int)((out_gpu_desc_handle.ptr - heap_start_gpu.ptr) / heap_handle_increment);
     IM_ASSERT(cpu_idx == gpu_idx);
-    FreeIndices.push_back(cpu_idx);
+    free_indices.push_back(cpu_idx);
   }
 };
 

@@ -35,7 +35,7 @@ class D3D12Window : public Window {
   D3D12Core *core_;
   std::unique_ptr<d3d12::SwapChain> swap_chain_;
   uint32_t swap_chain_recreate_event_id_;
-  D3D12ImGuiAssets imgui_assets_;
+  D3D12ImGuiAssets imgui_assets_{};
 };
 
 }  // namespace grassland::graphics::backend

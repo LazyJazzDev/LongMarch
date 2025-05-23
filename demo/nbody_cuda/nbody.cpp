@@ -33,7 +33,7 @@ void NBody::OnUpdate() {
           world_to_cam,
       glm::inverse(world_to_cam), PARTICLE_SIZE, hdr_};
   global_uniform_buffer_->UploadData(&ubo, sizeof(ubo));
-  particles_buffer_->UploadData(positions_.data(), sizeof(glm::vec4) * n_particles_);
+  particles_buffer_->UploadData(positions_.data(), sizeof(glm::vec3) * n_particles_);
 
   static FPSCounter fps_counter;
   window_->SetTitle("NBody fps: " + std::to_string(fps_counter.TickFPS()));
@@ -77,8 +77,8 @@ void NBody::OnInit() {
         0, graphics::BlendState(graphics::BLEND_FACTOR_ONE, graphics::BLEND_FACTOR_ONE, graphics::BLEND_OP_ADD,
                                 graphics::BLEND_FACTOR_ONE, graphics::BLEND_FACTOR_ONE_MINUS_SRC_ALPHA,
                                 graphics::BLEND_OP_ADD));
-    program_->AddInputBinding(sizeof(glm::vec4), true);
-    program_->AddInputAttribute(0, graphics::INPUT_TYPE_FLOAT4, 0);
+    program_->AddInputBinding(sizeof(glm::vec3), true);
+    program_->AddInputAttribute(0, graphics::INPUT_TYPE_FLOAT3, 0);
     program_->AddResourceBinding(graphics::RESOURCE_TYPE_UNIFORM_BUFFER, 1);
     program_->BindShader(vertex_shader_.get(), graphics::SHADER_TYPE_VERTEX);
     program_->BindShader(fragment_shader_.get(), graphics::SHADER_TYPE_FRAGMENT);
@@ -86,25 +86,12 @@ void NBody::OnInit() {
   });
 
   core_->CreateBuffer(sizeof(GlobalUniformObject), graphics::BUFFER_TYPE_DYNAMIC, &global_uniform_buffer_);
-  core_->CreateBuffer(sizeof(glm::vec4) * n_particles_, graphics::BUFFER_TYPE_DYNAMIC, &particles_buffer_);
+  core_->CreateBuffer(sizeof(glm::vec3) * n_particles_, graphics::BUFFER_TYPE_DYNAMIC, &particles_buffer_);
 
   positions_.resize(n_particles_);
   velocities_.resize(n_particles_);
 
-  std::vector<glm::vec4> origins;
-  std::vector<glm::vec4> initial_vels;
-  for (int i = 0; i < 10; i++) {
-    origins.emplace_back(RandomInSphere() * INITIAL_RADIUS * 2.0f, 0.0f);
-    initial_vels.emplace_back(RandomInSphere() * INITIAL_RADIUS * 0.1f, 0.0f);
-  }
-
-  for (int i = 0; i < n_particles_; i++) {
-    auto &pos = positions_[i];
-    auto &vel = velocities_[i];
-    int index = std::uniform_int_distribution<int>(0, origins.size() - 1)(random_device_);
-    pos = glm::vec4{RandomInSphere() * INITIAL_RADIUS * 0.2f, 1.0f} + origins[index];
-    vel = glm::vec4{RandomInSphere() * INITIAL_SPEED, 0.0f} + initial_vels[index];
-  }
+  ResetParticles();
 
   window_->InitImGui(FileProbe::GetInstance().FindFile("fonts/simhei.ttf").c_str(), 20.0f);
   BuildRenderNode();
@@ -139,8 +126,8 @@ void NBody::BuildRenderNode() {
   program_->SetBlendState(0, graphics::BlendState(graphics::BLEND_FACTOR_ONE, graphics::BLEND_FACTOR_ONE,
                                                   graphics::BLEND_OP_ADD, graphics::BLEND_FACTOR_ONE,
                                                   graphics::BLEND_FACTOR_ONE_MINUS_SRC_ALPHA, graphics::BLEND_OP_ADD));
-  program_->AddInputBinding(sizeof(glm::vec4), true);
-  program_->AddInputAttribute(0, graphics::INPUT_TYPE_FLOAT4, 0);
+  program_->AddInputBinding(sizeof(glm::vec3), true);
+  program_->AddInputAttribute(0, graphics::INPUT_TYPE_FLOAT3, 0);
   program_->AddResourceBinding(graphics::RESOURCE_TYPE_UNIFORM_BUFFER, 1);
   program_->BindShader(vertex_shader_.get(), graphics::SHADER_TYPE_VERTEX);
   program_->BindShader(fragment_shader_.get(), graphics::SHADER_TYPE_FRAGMENT);
@@ -173,7 +160,40 @@ glm::vec3 NBody::RandomInSphere() {
   return RandomOnSphere() * std::pow(RandomFloat(), 0.333333333333333333f);
 }
 
+void NBody::ResetParticles() {
+  std::vector<glm::vec3> origins;
+  std::vector<glm::vec3> initial_vels;
+  for (int i = 0; i < galaxy_number_; i++) {
+    origins.emplace_back(RandomInSphere() * INITIAL_RADIUS * 2.0f);
+    initial_vels.emplace_back(RandomInSphere() * INITIAL_RADIUS * 0.1f);
+  }
+
+  glm::vec3 avg_vel{0.0f};
+  glm::vec3 avg_pos{0.0f};
+  for (int i = 0; i < galaxy_number_; i++) {
+    avg_vel += initial_vels[i];
+    avg_pos += origins[i];
+  }
+  avg_vel /= float(galaxy_number_);
+  avg_pos /= float(galaxy_number_);
+  for (int i = 0; i < galaxy_number_; i++) {
+    initial_vels[i] -= avg_vel;
+    origins[i] -= avg_pos;
+  }
+
+  for (int i = 0; i < n_particles_; i++) {
+    auto &pos = positions_[i];
+    auto &vel = velocities_[i];
+    int index = std::uniform_int_distribution<int>(0, origins.size() - 1)(random_device_);
+    pos =
+        glm::vec3{RandomInSphere() * INITIAL_RADIUS * 0.2f * pow(10.0f / galaxy_number_, 1.0f / 3.0f)} + origins[index];
+    vel = glm::vec3{RandomInSphere() * INITIAL_SPEED} + initial_vels[index];
+  }
+}
+
 void NBody::UpdateParticles() {
+  if (!step_)
+    return;
 #if !ENABLE_GPU
   for (int i = 0; i < n_particles_; i++) {
     auto &pos_i = positions_[i];
@@ -193,7 +213,7 @@ void NBody::UpdateParticles() {
     positions_[i] += velocities_[i] * DELTA_T;
   }
 #else
-  UpdateStep(positions_.data(), velocities_.data(), n_particles_);
+  UpdateStep(positions_.data(), velocities_.data(), n_particles_, delta_t_);
 #endif
 }
 
@@ -202,13 +222,14 @@ void NBody::UpdateImGui() {
   ImGui::SetNextWindowPos(ImVec2{0.0f, 0.0f}, ImGuiCond_Once);
   ImGui::SetNextWindowBgAlpha(0.3f);
   bool trigger_hdr_switch = false;
-  if (ImGui::Begin("Statistics"), nullptr, ImGuiWindowFlags_NoMove) {
+  if (ImGui::Begin("NBody"), nullptr, ImGuiWindowFlags_NoMove) {
+    ImGui::Text("Statistics");
+    ImGui::Separator();
     auto current_tp = std::chrono::steady_clock::now();
     static auto last_frame_tp = current_tp;
     auto duration = current_tp - last_frame_tp;
     auto duration_ms = float(duration / std::chrono::microseconds(1)) * 1e-3f;
     ImGui::Text("Frame Duration: %.3f ms", duration_ms);
-    ImGui::Text("FPS: %.3f", 1e3f / duration_ms);
     float ops = float(n_particles_) * float(n_particles_) / (duration_ms * 1e-3f);
     if (ops < 8e2f) {
       ImGui::Text("%.2f op/s", ops);
@@ -220,7 +241,53 @@ void NBody::UpdateImGui() {
       ImGui::Text("%.2f Gop/s", ops * 1e-9f);
     }
 
-    if (ImGui::Button("HDR")) {
+    if (ImGui::CollapsingHeader("Speed Distribution")) {
+      std::vector<float> speeds(n_particles_);
+      glm::vec3 avg_vel{0.0f};
+      for (int i = 0; i < n_particles_; i++) {
+        avg_vel += velocities_[i];
+      }
+      avg_vel /= float(n_particles_);
+      for (int i = 0; i < n_particles_; i++) {
+        speeds[i] = glm::length(velocities_[i] - avg_vel);
+      }
+      std::sort(speeds.begin(), speeds.end());
+      float max_speed = speeds[n_particles_ - 1];
+      constexpr int num_samples = 100;
+      int samples[num_samples]{};
+      for (int i = 0; i < n_particles_; i++) {
+        samples[std::max(std::min(int(speeds[i] / max_speed * num_samples), num_samples - 1), 0)]++;
+      }
+      int max_sample = 0;
+      for (int i = 0; i < num_samples; i++) {
+        max_sample = std::max(max_sample, samples[i]);
+      }
+      float normalized_samples[num_samples]{};
+      for (int i = 0; i < num_samples; i++) {
+        normalized_samples[i] = float(samples[i]) / float(max_sample);
+      }
+      ImGui::PlotLines("##1", normalized_samples, num_samples, 0, nullptr, 0.0f, 1.0f);
+    }
+
+    ImGui::NewLine();
+
+    ImGui::Text("Control");
+    ImGui::Separator();
+    if (ImGui::Button("Reset")) {
+      ResetParticles();
+    }
+    ImGui::SameLine();
+    if (ImGui::Button(step_ ? "Pause" : "Resume")) {
+      step_ = !step_;
+    }
+    // Make slider logarithmic
+    ImGui::SliderFloat("Delta Time", &delta_t_, 0.001f, 0.1f, "%.3f", ImGuiSliderFlags_Logarithmic);
+    ImGui::SliderInt("Galaxy Number", &galaxy_number_, 1, 20, "%d");
+    ImGui::NewLine();
+
+    ImGui::Text("Visualizer");
+    ImGui::Separator();
+    if (ImGui::Button(("HDR: " + std::string(hdr_ ? "ON" : "OFF")).c_str())) {
       trigger_hdr_switch = true;
     }
     ImGui::End();

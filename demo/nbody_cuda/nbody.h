@@ -36,6 +36,8 @@ class NBody {
   glm::vec3 RandomOnSphere();
   glm::vec3 RandomInSphere();
 
+  void ResetParticles();
+
   std::unique_ptr<graphics::Core> core_;
   std::unique_ptr<graphics::Window> window_;
   std::unique_ptr<graphics::Buffer> global_uniform_buffer_;
@@ -49,10 +51,13 @@ class NBody {
   std::unique_ptr<graphics::Shader> hdr_fragment_shader_;
   std::unique_ptr<graphics::Program> hdr_program_;
 
-  std::vector<glm::vec4> positions_;
-  std::vector<glm::vec4> velocities_;
+  std::vector<glm::vec3> positions_;
+  std::vector<glm::vec3> velocities_;
   int n_particles_;
   std::mt19937 random_device_{uint32_t(std::time(nullptr))};
   glm::mat4 rotation{1.0f};
   bool hdr_{false};
+  bool step_{true};
+  float delta_t_{DELTA_T};
+  int galaxy_number_{10};
 };

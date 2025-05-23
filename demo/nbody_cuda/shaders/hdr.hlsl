@@ -29,7 +29,7 @@ void PSMain(PSInput input) {
   output_image.GetDimensions(image_size.x, image_size.y);
   float4 color = output_image[uint2(uv * image_size)];
   if (ubo.hdr) {
-    color.rgb = pow(color.rgb, 2.2);
+    color.rgb = pow(color.rgb * 1.055, 2.4) - 0.055;
   }
   output_image[uint2(uv * image_size)] = color;
 }
