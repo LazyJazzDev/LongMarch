@@ -6,9 +6,9 @@ namespace {
 
 NBody::NBody(int n_particles) : n_particles_(n_particles) {
   graphics::Core::Settings settings;
-  graphics::CreateCore(graphics::BACKEND_API_D3D12, settings, &core_);
+  graphics::CreateCore(graphics::BACKEND_API_DEFAULT, settings, &core_);
   core_->InitializeLogicalDeviceAutoSelect(false);
-  core_->CreateWindowObject(1280, 720, "NBody", false, true, &window_);
+  core_->CreateWindowObject(1920, 1080, "NBody", false, true, &window_);
 }
 
 void NBody::Run() {
@@ -36,7 +36,7 @@ void NBody::OnUpdate() {
   particles_buffer_->UploadData(positions_.data(), sizeof(glm::vec3) * n_particles_);
 
   static FPSCounter fps_counter;
-  window_->SetTitle("NBody fps: " + std::to_string(fps_counter.TickFPS()));
+  window_->SetTitle("NBody FPS: " + std::to_string(fps_counter.TickFPS()));
 }
 
 void NBody::OnRender() {
@@ -65,7 +65,7 @@ void NBody::OnRender() {
 }
 
 void NBody::OnInit() {
-  core_->CreateImage(1280, 720, graphics::IMAGE_FORMAT_B8G8R8A8_UNORM, &frame_image_);
+  core_->CreateImage(window_->GetWidth(), window_->GetHeight(), graphics::IMAGE_FORMAT_B8G8R8A8_UNORM, &frame_image_);
 
   window_->ResizeEvent().RegisterCallback([this](int width, int height) {
     frame_image_.reset();
@@ -230,26 +230,25 @@ void NBody::UpdateImGui() {
     auto duration = current_tp - last_frame_tp;
     auto duration_ms = float(duration / std::chrono::microseconds(1)) * 1e-3f;
     ImGui::Text("Frame Duration: %.3f ms", duration_ms);
-    float ops = float(n_particles_) * float(n_particles_) / (duration_ms * 1e-3f);
-    if (ops < 8e2f) {
-      ImGui::Text("%.2f op/s", ops);
-    } else if (ops < 8e5f) {
-      ImGui::Text("%.2f Kop/s", ops * 1e-3f);
-    } else if (ops < 8e8f) {
-      ImGui::Text("%.2f Mop/s", ops * 1e-6f);
-    } else {
-      ImGui::Text("%.2f Gop/s", ops * 1e-9f);
+    if (step_) {
+      constexpr float num_flops_per_intersection = 20.0f;  // From NVIDIA's official CUDA N-body example
+      float intersection_per_second = float(n_particles_) * float(n_particles_) / (duration_ms * 1e-3f);
+      float ops = intersection_per_second * num_flops_per_intersection;
+      if (ops < 8e2f) {
+        ImGui::Text("%.2f FLOP/s", ops);
+      } else if (ops < 8e5f) {
+        ImGui::Text("%.2f KFLOP/s", ops * 1e-3f);
+      } else if (ops < 8e8f) {
+        ImGui::Text("%.2f MFLOP/s", ops * 1e-6f);
+      } else {
+        ImGui::Text("%.2f GFLOP/s", ops * 1e-9f);
+      }
     }
 
     if (ImGui::CollapsingHeader("Speed Distribution")) {
       std::vector<float> speeds(n_particles_);
-      glm::vec3 avg_vel{0.0f};
       for (int i = 0; i < n_particles_; i++) {
-        avg_vel += velocities_[i];
-      }
-      avg_vel /= float(n_particles_);
-      for (int i = 0; i < n_particles_; i++) {
-        speeds[i] = glm::length(velocities_[i] - avg_vel);
+        speeds[i] = glm::length(velocities_[i]);
       }
       std::sort(speeds.begin(), speeds.end());
       float max_speed = speeds[n_particles_ - 1];
