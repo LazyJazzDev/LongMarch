@@ -82,8 +82,19 @@ find_package(glm CONFIG REQUIRED)
 set(GLM_LIB_NAME glm::glm)
 list(APPEND LIB_LIST ${GLM_LIB_NAME})
 
-find_package(imgui CONFIG REQUIRED)
-set(IMGUI_LIB_NAME imgui::imgui)
+add_library(imgui)
+target_sources(imgui
+    PRIVATE
+        external/imgui/imgui.cpp
+        external/imgui/imgui_draw.cpp
+        external/imgui/imgui_widgets.cpp
+        external/imgui/imgui_demo.cpp
+        external/imgui/imgui_tables.cpp)
+target_include_directories(imgui
+    PUBLIC
+        $<BUILD_INTERFACE:${CMAKE_CURRENT_LIST_DIR}/external/imgui>
+        $<INSTALL_INTERFACE:include>)
+set(IMGUI_LIB_NAME imgui)
 list(APPEND LIB_LIST ${IMGUI_LIB_NAME})
 
 find_package(mikktspace CONFIG REQUIRED)

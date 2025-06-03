@@ -11,7 +11,6 @@
     "vulkan-memory-allocator",
     "glslang",
     "gtest",
-    "imgui",
     "stb",
     "mikktspace",
     "tinyobjloader",
