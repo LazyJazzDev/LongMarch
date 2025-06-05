@@ -70,7 +70,8 @@ int VulkanCore::CreateShader(const std::string &source_code,
                              const std::string &target,
                              double_ptr<Shader> pp_shader) {
   pp_shader.construct<VulkanShader>(
-      this, CompileShader(source_code, entry_point, target, {"-spirv", "-fspv-target-env=vulkan1.2"}));
+      this,
+      CompileShader(source_code, entry_point, target, {"-spirv", "-fspv-target-env=vulkan1.2", "-fvk-use-dx-layout"}));
   return 0;
 }
 
@@ -78,6 +79,11 @@ int VulkanCore::CreateProgram(const std::vector<ImageFormat> &color_formats,
                               ImageFormat depth_format,
                               double_ptr<Program> pp_program) {
   pp_program.construct<VulkanProgram>(this, color_formats, depth_format);
+  return 0;
+}
+
+int VulkanCore::CreateComputeProgram(Shader *compute_shader, double_ptr<ComputeProgram> pp_program) {
+  pp_program.construct<VulkanComputeProgram>(this, dynamic_cast<VulkanShader *>(compute_shader));
   return 0;
 }
 
@@ -157,7 +163,6 @@ int VulkanCore::SubmitCommandContext(CommandContext *p_command_context) {
       }
       pool_size.descriptor_type_count[type] = type_count;
       update_pool = true;
-      break;
     }
   }
   while (max_sets < command_context->required_set_count_) {

@@ -75,6 +75,24 @@ class VulkanProgram : public Program, public VulkanProgramBase {
   std::unique_ptr<vulkan::Pipeline> pipeline_;
 };
 
+class VulkanComputeProgram : public ComputeProgram, public VulkanProgramBase {
+ public:
+  VulkanComputeProgram(VulkanCore *core, VulkanShader *compute_shader);
+  ~VulkanComputeProgram() override;
+
+  void AddResourceBinding(ResourceType type, int count) override;
+
+  void Finalize() override;
+
+  VkPipeline Pipeline() const {
+    return pipeline_;
+  }
+
+ private:
+  VulkanShader *compute_shader_;
+  VkPipeline pipeline_;
+};
+
 class VulkanRayTracingProgram : public RayTracingProgram, public VulkanProgramBase {
  public:
   VulkanRayTracingProgram(VulkanCore *core,

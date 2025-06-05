@@ -23,7 +23,6 @@ void NBody::Run() {
 }
 
 void NBody::OnUpdate() {
-  UpdateParticles();
   UpdateImGui();
   auto world_to_cam =
       glm::lookAt(glm::vec3{glm::vec4{10.0f, 20.0f, 30.0f, 0.0f}}, glm::vec3{0.0f}, glm::vec3{0.0f, 1.0f, 0.0f}) *
@@ -33,7 +32,12 @@ void NBody::OnUpdate() {
           world_to_cam,
       glm::inverse(world_to_cam), PARTICLE_SIZE, hdr_};
   global_uniform_buffer_->UploadData(&ubo, sizeof(ubo));
-  particles_pos_->UploadData(positions_.data(), sizeof(glm::vec3) * n_particles_);
+
+  NBodyGlobalSettings global_settings;
+  global_settings.delta_t = delta_t_;
+  global_settings.gravity = GRAVITY_COE;
+  global_settings.num_particle = n_particles_;
+  global_settings_buffer_->UploadData(&global_settings, sizeof(global_settings));
 
   static FPSCounter fps_counter;
   window_->SetTitle("NBody FPS: " + std::to_string(fps_counter.TickFPS()));
@@ -42,6 +46,15 @@ void NBody::OnUpdate() {
 void NBody::OnRender() {
   std::unique_ptr<graphics::CommandContext> ctx;
   core_->CreateCommandContext(&ctx);
+  if (step_) {
+    ctx->CmdBindComputeProgram(nbody_compute_program_.get());
+    ctx->CmdBindResources(0, {particles_pos_.get()}, graphics::BIND_POINT_COMPUTE);
+    ctx->CmdBindResources(1, {particles_vel_.get()}, graphics::BIND_POINT_COMPUTE);
+    ctx->CmdBindResources(2, {particles_pos_new_.get()}, graphics::BIND_POINT_COMPUTE);
+    ctx->CmdBindResources(3, {global_settings_buffer_.get()}, graphics::BIND_POINT_COMPUTE);
+    ctx->CmdDispatch(n_particles_ / 128, 1, 1);
+    ctx->CmdCopyBuffer(particles_pos_.get(), particles_pos_new_.get(), particles_pos_->Size());
+  }
   ctx->CmdClearImage(frame_image_.get(), {{0.0f, 0.0f, 0.0f, 0.0f}});
   ctx->CmdBeginRendering({frame_image_.get()}, nullptr);
   ctx->CmdBindProgram(program_.get());
@@ -85,10 +98,11 @@ void NBody::OnInit() {
   });
 
   core_->CreateBuffer(sizeof(GlobalUniformObject), graphics::BUFFER_TYPE_DYNAMIC, &global_uniform_buffer_);
-  core_->CreateBuffer(sizeof(glm::vec3) * n_particles_, graphics::BUFFER_TYPE_DYNAMIC, &particles_pos_);
+  core_->CreateBuffer(sizeof(glm::vec3) * n_particles_, graphics::BUFFER_TYPE_STATIC, &particles_pos_);
+  core_->CreateBuffer(sizeof(glm::vec3) * n_particles_, graphics::BUFFER_TYPE_STATIC, &particles_vel_);
+  core_->CreateBuffer(sizeof(glm::vec3) * n_particles_, graphics::BUFFER_TYPE_STATIC, &particles_pos_new_);
 
-  positions_.resize(n_particles_);
-  velocities_.resize(n_particles_);
+  core_->CreateBuffer(sizeof(NBodyGlobalSettings), graphics::BUFFER_TYPE_DYNAMIC, &global_settings_buffer_);
 
   ResetParticles();
 
@@ -113,8 +127,20 @@ void NBody::OnInit() {
 }
 
 void NBody::OnClose() {
+  nbody_compute_program_.reset();
+  nbody_compute_shader_.reset();
+
+  hdr_program_.reset();
+  hdr_vertex_shader_.reset();
+  hdr_fragment_shader_.reset();
+
   program_.reset();
+  fragment_shader_.reset();
+  vertex_shader_.reset();
+
   particles_pos_.reset();
+  particles_vel_.reset();
+  particles_pos_new_.reset();
   global_uniform_buffer_.reset();
 }
 
@@ -140,6 +166,14 @@ void NBody::BuildRenderNode() {
   hdr_program_->BindShader(hdr_vertex_shader_.get(), graphics::SHADER_TYPE_VERTEX);
   hdr_program_->BindShader(hdr_fragment_shader_.get(), graphics::SHADER_TYPE_FRAGMENT);
   hdr_program_->Finalize();
+
+  core_->CreateShader(GetShaderCode("shaders/nbody.hlsl"), "CSMain", "cs_6_0", &nbody_compute_shader_);
+  core_->CreateComputeProgram(nbody_compute_shader_.get(), &nbody_compute_program_);
+  nbody_compute_program_->AddResourceBinding(graphics::RESOURCE_TYPE_STORAGE_BUFFER, 1);
+  nbody_compute_program_->AddResourceBinding(graphics::RESOURCE_TYPE_WRITABLE_STORAGE_BUFFER, 1);
+  nbody_compute_program_->AddResourceBinding(graphics::RESOURCE_TYPE_WRITABLE_STORAGE_BUFFER, 1);
+  nbody_compute_program_->AddResourceBinding(graphics::RESOURCE_TYPE_UNIFORM_BUFFER, 1);
+  nbody_compute_program_->Finalize();
 }
 
 float NBody::RandomFloat() {
@@ -180,40 +214,20 @@ void NBody::ResetParticles() {
     origins[i] -= avg_pos;
   }
 
+  std::vector<glm::vec3> positions(n_particles_);
+  std::vector<glm::vec3> velocities(n_particles_);
+
   for (int i = 0; i < n_particles_; i++) {
-    auto &pos = positions_[i];
-    auto &vel = velocities_[i];
+    auto &pos = positions[i];
+    auto &vel = velocities[i];
     int index = std::uniform_int_distribution<int>(0, origins.size() - 1)(random_device_);
     pos =
         glm::vec3{RandomInSphere() * INITIAL_RADIUS * 0.2f * pow(10.0f / galaxy_number_, 1.0f / 3.0f)} + origins[index];
     vel = glm::vec3{RandomInSphere() * INITIAL_SPEED} + initial_vels[index];
   }
-}
 
-void NBody::UpdateParticles() {
-  if (!step_)
-    return;
-#if !ENABLE_GPU
-  for (int i = 0; i < n_particles_; i++) {
-    auto &pos_i = positions_[i];
-    for (int j = 0; j < n_particles_; j++) {
-      auto &pos_j = positions_[j];
-      auto diff = pos_i - pos_j;
-      auto l = glm::length(diff);
-      if (l < DELTA_T) {
-        continue;
-      }
-      diff /= l * l * l;
-      velocities_[i] += -diff * DELTA_T * GRAVITY_COE;
-    }
-  }
-
-  for (int i = 0; i < n_particles_; i++) {
-    positions_[i] += velocities_[i] * DELTA_T;
-  }
-#else
-  UpdateStep(positions_.data(), velocities_.data(), n_particles_, delta_t_);
-#endif
+  particles_pos_->UploadData(positions.data(), sizeof(glm::vec3) * n_particles_);
+  particles_vel_->UploadData(velocities.data(), sizeof(glm::vec3) * n_particles_);
 }
 
 void NBody::UpdateImGui() {
@@ -244,28 +258,28 @@ void NBody::UpdateImGui() {
       }
     }
 
-    if (ImGui::CollapsingHeader("Speed Distribution")) {
-      std::vector<float> speeds(n_particles_);
-      for (int i = 0; i < n_particles_; i++) {
-        speeds[i] = glm::length(velocities_[i]);
-      }
-      std::sort(speeds.begin(), speeds.end());
-      float max_speed = speeds[n_particles_ - 1];
-      constexpr int num_samples = 100;
-      int samples[num_samples]{};
-      for (int i = 0; i < n_particles_; i++) {
-        samples[std::max(std::min(int(speeds[i] / max_speed * num_samples), num_samples - 1), 0)]++;
-      }
-      int max_sample = 0;
-      for (int i = 0; i < num_samples; i++) {
-        max_sample = std::max(max_sample, samples[i]);
-      }
-      float normalized_samples[num_samples]{};
-      for (int i = 0; i < num_samples; i++) {
-        normalized_samples[i] = float(samples[i]) / float(max_sample);
-      }
-      ImGui::PlotLines("##1", normalized_samples, num_samples, 0, nullptr, 0.0f, 1.0f);
-    }
+    // if (ImGui::CollapsingHeader("Speed Distribution")) {
+    //   std::vector<float> speeds(n_particles_);
+    //   for (int i = 0; i < n_particles_; i++) {
+    //     speeds[i] = glm::length(velocities_[i]);
+    //   }
+    //   std::sort(speeds.begin(), speeds.end());
+    //   float max_speed = speeds[n_particles_ - 1];
+    //   constexpr int num_samples = 100;
+    //   int samples[num_samples]{};
+    //   for (int i = 0; i < n_particles_; i++) {
+    //     samples[std::max(std::min(int(speeds[i] / max_speed * num_samples), num_samples - 1), 0)]++;
+    //   }
+    //   int max_sample = 0;
+    //   for (int i = 0; i < num_samples; i++) {
+    //     max_sample = std::max(max_sample, samples[i]);
+    //   }
+    //   float normalized_samples[num_samples]{};
+    //   for (int i = 0; i < num_samples; i++) {
+    //     normalized_samples[i] = float(samples[i]) / float(max_sample);
+    //   }
+    //   ImGui::PlotLines("##1", normalized_samples, num_samples, 0, nullptr, 0.0f, 1.0f);
+    // }
 
     ImGui::NewLine();
 

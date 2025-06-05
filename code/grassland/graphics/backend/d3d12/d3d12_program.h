@@ -69,6 +69,22 @@ class D3D12Program : public Program, public D3D12ProgramBase {
   std::unique_ptr<d3d12::PipelineState> pipeline_state_;
 };
 
+class D3D12ComputeProgram : public ComputeProgram, public D3D12ProgramBase {
+ public:
+  D3D12ComputeProgram(D3D12Core *core, D3D12Shader *compute_shader);
+  ~D3D12ComputeProgram() override = default;
+  void AddResourceBinding(ResourceType type, int count) override;
+  void Finalize() override;
+
+  d3d12::ComPtr<ID3D12PipelineState> PipelineState() const {
+    return pipeline_state_;
+  }
+
+ private:
+  D3D12Shader *compute_shader_;
+  d3d12::ComPtr<ID3D12PipelineState> pipeline_state_;
+};
+
 class D3D12RayTracingProgram : public RayTracingProgram, public D3D12ProgramBase {
  public:
   D3D12RayTracingProgram(D3D12Core *core,

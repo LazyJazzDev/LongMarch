@@ -36,6 +36,8 @@ class VulkanCore : public Core {
                     ImageFormat depth_format,
                     double_ptr<Program> pp_program) override;
 
+  int CreateComputeProgram(Shader *compute_shader, double_ptr<ComputeProgram> pp_program) override;
+
   int CreateCommandContext(double_ptr<CommandContext> pp_command_context) override;
 
   int CreateBottomLevelAccelerationStructure(Buffer *vertex_buffer,

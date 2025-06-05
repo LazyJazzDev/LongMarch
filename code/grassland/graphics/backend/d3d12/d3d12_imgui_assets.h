@@ -14,8 +14,8 @@ struct ExampleDescriptorHeapAllocator {
   ImVector<int> free_indices;
 
   void Create(ID3D12Device *device, ID3D12DescriptorHeap *heap) {
-    IM_ASSERT(Heap == nullptr && FreeIndices.empty());
-    heap = heap;
+    IM_ASSERT(this->heap == nullptr && free_indices.empty());
+    this->heap = heap;
     D3D12_DESCRIPTOR_HEAP_DESC desc = heap->GetDesc();
     heap_type = desc.Type;
     heap_start_cpu = heap->GetCPUDescriptorHandleForHeapStart();
@@ -32,7 +32,7 @@ struct ExampleDescriptorHeapAllocator {
   }
 
   void Alloc(D3D12_CPU_DESCRIPTOR_HANDLE *out_cpu_desc_handle, D3D12_GPU_DESCRIPTOR_HANDLE *out_gpu_desc_handle) {
-    IM_ASSERT(FreeIndices.Size > 0);
+    IM_ASSERT(free_indices.Size > 0);
     int idx = free_indices.back();
     free_indices.pop_back();
     out_cpu_desc_handle->ptr = heap_start_cpu.ptr + (idx * heap_handle_increment);

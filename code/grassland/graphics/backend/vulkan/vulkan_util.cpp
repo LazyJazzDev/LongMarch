@@ -79,6 +79,7 @@ VkDescriptorType ResourceTypeToVkDescriptorType(ResourceType type) {
     case RESOURCE_TYPE_UNIFORM_BUFFER:
       return VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
     case RESOURCE_TYPE_STORAGE_BUFFER:
+    case RESOURCE_TYPE_WRITABLE_STORAGE_BUFFER:
       return VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
     case RESOURCE_TYPE_SAMPLER:
       return VK_DESCRIPTOR_TYPE_SAMPLER;
@@ -212,6 +213,8 @@ VkPipelineBindPoint BindPointToVkPipelineBindPoint(BindPoint point) {
   switch (point) {
     case BIND_POINT_GRAPHICS:
       return VK_PIPELINE_BIND_POINT_GRAPHICS;
+    case BIND_POINT_COMPUTE:
+      return VK_PIPELINE_BIND_POINT_COMPUTE;
     case BIND_POINT_RAYTRACING:
       return VK_PIPELINE_BIND_POINT_RAY_TRACING_KHR;
     default:

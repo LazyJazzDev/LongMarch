@@ -18,6 +18,16 @@ class VulkanCmdBindProgram : public VulkanCommand {
   VulkanProgram *program_;
 };
 
+class VulkanCmdBindComputeProgram : public VulkanCommand {
+ public:
+  VulkanCmdBindComputeProgram(VulkanComputeProgram *program);
+
+  void CompileCommand(VulkanCommandContext *context, VkCommandBuffer command_buffer) override;
+
+ private:
+  VulkanComputeProgram *program_;
+};
+
 class VulkanCmdBindRayTracingProgram : public VulkanCommand {
  public:
   VulkanCmdBindRayTracingProgram(VulkanRayTracingProgram *program);
@@ -231,6 +241,35 @@ class VulkanCmdDispatchRays : public VulkanCommand {
   uint32_t width_;
   uint32_t height_;
   uint32_t depth_;
+};
+
+class VulkanCmdDispatch : public VulkanCommand {
+ public:
+  VulkanCmdDispatch(uint32_t group_count_x, uint32_t group_count_y, uint32_t group_count_z);
+
+  void CompileCommand(VulkanCommandContext *context, VkCommandBuffer command_buffer) override;
+
+ private:
+  uint32_t group_count_x_;
+  uint32_t group_count_y_;
+  uint32_t group_count_z_;
+};
+
+class VulkanCmdCopyBuffer : public VulkanCommand {
+ public:
+  VulkanCmdCopyBuffer(VulkanBuffer *dst_buffer,
+                      VulkanBuffer *src_buffer,
+                      uint64_t size,
+                      uint64_t dst_offset,
+                      uint64_t src_offset);
+  void CompileCommand(VulkanCommandContext *context, VkCommandBuffer command_buffer) override;
+
+ private:
+  VulkanBuffer *dst_buffer_;
+  VulkanBuffer *src_buffer_;
+  uint64_t size_;
+  uint64_t dst_offset_;
+  uint64_t src_offset_;
 };
 
 }  // namespace grassland::graphics::backend

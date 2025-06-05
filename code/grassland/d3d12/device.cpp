@@ -95,11 +95,17 @@ HRESULT Device::CreateBuffer(size_t size,
                              D3D12_HEAP_TYPE heap_type,
                              D3D12_RESOURCE_STATES resource_state,
                              double_ptr<Buffer> pp_buffer) {
-  return CreateBuffer(size, heap_type, resource_state, D3D12_RESOURCE_FLAG_NONE, pp_buffer);
+  return CreateBuffer(
+      size, heap_type, resource_state,
+      (heap_type == D3D12_HEAP_TYPE_DEFAULT) ? D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS : D3D12_RESOURCE_FLAG_NONE,
+      pp_buffer);
 }
 
 HRESULT Device::CreateBuffer(size_t size, D3D12_HEAP_TYPE heap_type, double_ptr<Buffer> pp_buffer) {
-  return CreateBuffer(size, heap_type, D3D12_RESOURCE_STATE_COMMON, pp_buffer);
+  return CreateBuffer(
+      size, heap_type,
+      (heap_type == D3D12_HEAP_TYPE_DEFAULT) ? D3D12_RESOURCE_STATE_GENERIC_READ : D3D12_RESOURCE_STATE_COMMON,
+      pp_buffer);
 }
 
 HRESULT Device::CreateBuffer(size_t size, double_ptr<Buffer> pp_buffer) {

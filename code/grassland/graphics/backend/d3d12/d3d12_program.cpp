@@ -120,6 +120,24 @@ const D3D12_GRAPHICS_PIPELINE_STATE_DESC *D3D12Program::PipelineStateDesc() cons
   return &pipeline_state_desc_;
 }
 
+D3D12ComputeProgram::D3D12ComputeProgram(D3D12Core *core, D3D12Shader *compute_shader)
+    : D3D12ProgramBase(core), compute_shader_(compute_shader) {
+}
+
+void D3D12ComputeProgram::AddResourceBinding(ResourceType type, int count) {
+  AddResourceBindingImpl(type, count);
+}
+
+void D3D12ComputeProgram::Finalize() {
+  FinalizeRootSignature();
+
+  D3D12_COMPUTE_PIPELINE_STATE_DESC pipeline_desc{};
+  pipeline_desc.pRootSignature = root_signature_->Handle();
+  pipeline_desc.CS = compute_shader_->ShaderModule().Handle();
+
+  core_->Device()->Handle()->CreateComputePipelineState(&pipeline_desc, IID_PPV_ARGS(&pipeline_state_));
+}
+
 D3D12RayTracingProgram::D3D12RayTracingProgram(D3D12Core *core,
                                                D3D12Shader *raygen_shader,
                                                D3D12Shader *miss_shader,

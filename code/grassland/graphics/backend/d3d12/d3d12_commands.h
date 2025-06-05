@@ -27,6 +27,15 @@ class D3D12CmdBindRayTracingProgram : public D3D12Command {
   D3D12RayTracingProgram *program_;
 };
 
+class D3D12CmdBindComputeProgram : public D3D12Command {
+ public:
+  D3D12CmdBindComputeProgram(D3D12ComputeProgram *program);
+  void CompileCommand(D3D12CommandContext *context, ID3D12GraphicsCommandList *command_list) override;
+
+ private:
+  D3D12ComputeProgram *program_;
+};
+
 class D3D12CmdBindVertexBuffers : public D3D12Command {
  public:
   D3D12CmdBindVertexBuffers(uint32_t first_binding,
@@ -210,6 +219,34 @@ class D3D12CmdDispatchRays : public D3D12Command {
   uint32_t width_;
   uint32_t height_;
   uint32_t depth_;
+};
+
+class D3D12CmdDispatch : public D3D12Command {
+ public:
+  D3D12CmdDispatch(uint32_t group_count_x, uint32_t group_count_y, uint32_t group_count_z);
+  void CompileCommand(D3D12CommandContext *context, ID3D12GraphicsCommandList *command_list) override;
+
+ private:
+  uint32_t group_count_x_;
+  uint32_t group_count_y_;
+  uint32_t group_count_z_;
+};
+
+class D3D12CmdCopyBuffer : public D3D12Command {
+ public:
+  D3D12CmdCopyBuffer(D3D12Buffer *dst_buffer,
+                     D3D12Buffer *src_buffer,
+                     uint64_t size,
+                     uint64_t dst_offset,
+                     uint64_t src_offset);
+  void CompileCommand(D3D12CommandContext *context, ID3D12GraphicsCommandList *command_list) override;
+
+ private:
+  D3D12Buffer *dst_buffer_;
+  D3D12Buffer *src_buffer_;
+  uint64_t size_;
+  uint64_t dst_offset_;
+  uint64_t src_offset_;
 };
 
 }  // namespace grassland::graphics::backend

@@ -45,6 +45,8 @@ class Core {
                             ImageFormat depth_format,
                             double_ptr<Program> pp_program) = 0;
 
+  virtual int CreateComputeProgram(Shader *compute_shader, double_ptr<ComputeProgram> pp_program) = 0;
+
   virtual int CreateCommandContext(double_ptr<CommandContext> pp_command_context) = 0;
 
   virtual int CreateBottomLevelAccelerationStructure(Buffer *vertex_buffer,

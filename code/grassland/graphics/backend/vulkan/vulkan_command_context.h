@@ -16,6 +16,7 @@ class VulkanCommandContext : public CommandContext {
 
   void CmdBindProgram(Program *program) override;
   void CmdBindRayTracingProgram(RayTracingProgram *program) override;
+  void CmdBindComputeProgram(ComputeProgram *program) override;
   void CmdBindVertexBuffers(uint32_t first_binding,
                             const std::vector<Buffer *> &buffers,
                             const std::vector<uint64_t> &offsets) override;
@@ -39,6 +40,12 @@ class VulkanCommandContext : public CommandContext {
   void CmdClearImage(Image *image, const ClearValue &color) override;
   void CmdPresent(Window *window, Image *image) override;
   void CmdDispatchRays(uint32_t width, uint32_t height, uint32_t depth) override;
+  void CmdDispatch(uint32_t group_count_x, uint32_t group_count_y, uint32_t group_count_z) override;
+  void CmdCopyBuffer(Buffer *dst_buffer,
+                     Buffer *src_buffer,
+                     uint64_t size,
+                     uint64_t dst_offset,
+                     uint64_t src_offset) override;
 
   void RequireImageState(VkCommandBuffer cmd_buffer,
                          VkImage image,

@@ -37,6 +37,13 @@ void VulkanCommandContext::CmdBindRayTracingProgram(RayTracingProgram *program) 
   commands_.push_back(std::make_unique<VulkanCmdBindRayTracingProgram>(vk_program));
 }
 
+void VulkanCommandContext::CmdBindComputeProgram(ComputeProgram *program) {
+  VulkanComputeProgram *vk_program = dynamic_cast<VulkanComputeProgram *>(program);
+  assert(vk_program != nullptr);
+  program_bases_[BIND_POINT_COMPUTE] = vk_program;
+  commands_.push_back(std::make_unique<VulkanCmdBindComputeProgram>(vk_program));
+}
+
 void VulkanCommandContext::CmdBindVertexBuffers(uint32_t first_binding,
                                                 const std::vector<Buffer *> &buffers,
                                                 const std::vector<uint64_t> &offsets) {
@@ -186,6 +193,20 @@ void VulkanCommandContext::CmdPresent(Window *window, Image *image) {
 void VulkanCommandContext::CmdDispatchRays(uint32_t width, uint32_t height, uint32_t depth) {
   commands_.push_back(std::make_unique<VulkanCmdDispatchRays>(
       dynamic_cast<VulkanRayTracingProgram *>(program_bases_[BIND_POINT_RAYTRACING]), width, height, depth));
+}
+
+void VulkanCommandContext::CmdDispatch(uint32_t group_count_x, uint32_t group_count_y, uint32_t group_count_z) {
+  commands_.push_back(std::make_unique<VulkanCmdDispatch>(group_count_x, group_count_y, group_count_z));
+}
+
+void VulkanCommandContext::CmdCopyBuffer(Buffer *dst_buffer,
+                                         Buffer *src_buffer,
+                                         uint64_t size,
+                                         uint64_t dst_offset,
+                                         uint64_t src_offset) {
+  commands_.push_back(std::make_unique<VulkanCmdCopyBuffer>(dynamic_cast<VulkanBuffer *>(dst_buffer),
+                                                            dynamic_cast<VulkanBuffer *>(src_buffer), size, dst_offset,
+                                                            src_offset));
 }
 
 void VulkanCommandContext::RequireImageState(VkCommandBuffer cmd_buffer,

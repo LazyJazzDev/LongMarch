@@ -19,6 +19,7 @@ class D3D12CommandContext : public CommandContext {
 
   void CmdBindProgram(Program *program) override;
   void CmdBindRayTracingProgram(RayTracingProgram *program) override;
+  void CmdBindComputeProgram(ComputeProgram *program) override;
   void CmdBindVertexBuffers(uint32_t first_binding,
                             const std::vector<Buffer *> &buffers,
                             const std::vector<uint64_t> &offsets) override;
@@ -27,6 +28,7 @@ class D3D12CommandContext : public CommandContext {
   void CmdBindResources(int slot, const std::vector<Image *> &images, BindPoint bind_point) override;
   void CmdBindResources(int slot, const std::vector<Sampler *> &samplers, BindPoint bind_point) override;
   void CmdBindResources(int slot, AccelerationStructure *acceleration_structure, BindPoint bind_point) override;
+
   void CmdBeginRendering(const std::vector<Image *> &color_targets, Image *depth_target) override;
   void CmdEndRendering() override;
 
@@ -42,15 +44,21 @@ class D3D12CommandContext : public CommandContext {
   void CmdClearImage(Image *image, const ClearValue &color) override;
   void CmdPresent(Window *window, Image *image) override;
   void CmdDispatchRays(uint32_t width, uint32_t height, uint32_t depth) override;
+  void CmdDispatch(uint32_t group_count_x, uint32_t group_count_y, uint32_t group_count_z) override;
+  void CmdCopyBuffer(Buffer *src_buffer,
+                     Buffer *dst_buffer,
+                     uint64_t size,
+                     uint64_t src_offset,
+                     uint64_t dst_offset) override;
 
   void RecordRTVImage(const D3D12Image *image);
   void RecordDSVImage(const D3D12Image *image);
   void RecordRTVImage(ID3D12Resource *resource);
   void RecordDSVImage(ID3D12Resource *resource);
 
-  void RequireImageState(ID3D12GraphicsCommandList *command_list,
-                         ID3D12Resource *resource,
-                         D3D12_RESOURCE_STATES state);
+  void RequireResourceState(ID3D12GraphicsCommandList *command_list,
+                            ID3D12Resource *resource,
+                            D3D12_RESOURCE_STATES state);
 
   CD3DX12_CPU_DESCRIPTOR_HANDLE RTVHandle(ID3D12Resource *resource) const;
   CD3DX12_CPU_DESCRIPTOR_HANDLE DSVHandle(ID3D12Resource *resource) const;
@@ -60,6 +68,7 @@ class D3D12CommandContext : public CommandContext {
   CD3DX12_GPU_DESCRIPTOR_HANDLE WriteSRVDescriptor(D3D12Buffer *buffer);
   CD3DX12_GPU_DESCRIPTOR_HANDLE WriteSRVDescriptor(D3D12AccelerationStructure *acceleration_structure);
   CD3DX12_GPU_DESCRIPTOR_HANDLE WriteCBVDescriptor(D3D12Buffer *buffer);
+  CD3DX12_GPU_DESCRIPTOR_HANDLE WriteUAVDescriptor(D3D12Buffer *buffer);
   CD3DX12_GPU_DESCRIPTOR_HANDLE WriteSamplerDescriptor(const D3D12_SAMPLER_DESC &desc);
 
   void RecordDynamicBuffer(D3D12Buffer *buffer);

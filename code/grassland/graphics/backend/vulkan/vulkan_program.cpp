@@ -95,6 +95,31 @@ const vulkan::PipelineSettings *VulkanProgram::PipelineSettings() const {
   return &pipeline_settings_;
 }
 
+VulkanComputeProgram::VulkanComputeProgram(VulkanCore *core, VulkanShader *compute_shader)
+    : VulkanProgramBase(core), compute_shader_(compute_shader) {
+}
+
+VulkanComputeProgram::~VulkanComputeProgram() {
+  vkDestroyPipeline(core_->Device()->Handle(), pipeline_, nullptr);
+}
+
+void VulkanComputeProgram::AddResourceBinding(ResourceType type, int count) {
+  AddResourceBindingImpl(type, count);
+}
+
+void VulkanComputeProgram::Finalize() {
+  FinalizePipelineLayout();
+  VkComputePipelineCreateInfo pipeline_create_info = {};
+  pipeline_create_info.sType = VK_STRUCTURE_TYPE_COMPUTE_PIPELINE_CREATE_INFO;
+  pipeline_create_info.layout = pipeline_layout_->Handle();
+  pipeline_create_info.stage.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
+  pipeline_create_info.stage.stage = VK_SHADER_STAGE_COMPUTE_BIT;
+  pipeline_create_info.stage.module = compute_shader_->ShaderModule()->Handle();
+  pipeline_create_info.stage.pName = compute_shader_->EntryPoint().c_str();
+  pipeline_create_info.stage.pSpecializationInfo = nullptr;
+  vkCreateComputePipelines(core_->Device()->Handle(), VK_NULL_HANDLE, 1, &pipeline_create_info, nullptr, &pipeline_);
+}
+
 VulkanRayTracingProgram::VulkanRayTracingProgram(VulkanCore *core,
                                                  VulkanShader *raygen_shader,
                                                  VulkanShader *miss_shader,

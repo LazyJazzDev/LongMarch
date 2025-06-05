@@ -114,6 +114,12 @@ int D3D12Core::CreateProgram(const std::vector<ImageFormat> &color_formats,
   return 0;
 }
 
+int D3D12Core::CreateComputeProgram(Shader *compute_shader, double_ptr<ComputeProgram> pp_program) {
+  D3D12Shader *d3d12_compute_shader = dynamic_cast<D3D12Shader *>(compute_shader);
+  pp_program.construct<D3D12ComputeProgram>(this, d3d12_compute_shader);
+  return 0;
+}
+
 int D3D12Core::CreateCommandContext(double_ptr<CommandContext> pp_command_context) {
   pp_command_context.construct<D3D12CommandContext>(this);
   return 0;
@@ -177,6 +183,7 @@ int D3D12Core::CreateRayTracingProgram(Shader *raygen_shader,
 int D3D12Core::SubmitCommandContext(CommandContext *p_command_context) {
   D3D12CommandContext *command_context = dynamic_cast<D3D12CommandContext *>(p_command_context);
 
+  bool wait_for_transfer = false;
   if (command_context->dynamic_buffers_.size()) {
     transfer_allocator_->ResetCommandRecord(transfer_command_list_.get());
     for (auto buffer : command_context->dynamic_buffers_) {
@@ -187,6 +194,7 @@ int D3D12Core::SubmitCommandContext(CommandContext *p_command_context) {
     ID3D12CommandList *command_lists[] = {transfer_command_list_->Handle()};
     transfer_command_queue_->Handle()->ExecuteCommandLists(1, command_lists);
     transfer_fence_->Signal(transfer_command_queue_.get());
+    wait_for_transfer = true;
   }
 
   command_allocators_[current_frame_]->ResetCommandRecord(command_lists_[current_frame_].get());
@@ -269,6 +277,9 @@ int D3D12Core::SubmitCommandContext(CommandContext *p_command_context) {
   command_context->rtv_index_.clear();
 
   ID3D12CommandList *command_lists[] = {command_list};
+  if (wait_for_transfer) {
+    command_queue_->Handle()->Wait(transfer_fence_->Handle(), transfer_fence_->Value());
+  }
   command_queue_->Handle()->ExecuteCommandLists(1, command_lists);
 
   for (auto window : command_context->windows_) {

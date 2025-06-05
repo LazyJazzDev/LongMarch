@@ -21,15 +21,15 @@ __global__ void UpdateKernel(const glm::vec3 *positions,
 #pragma unroll 128
     for (int i = 0; i < blockDim.x; i++) {
       auto diff = pos - shared_pos[i];
-      auto lsqr = 0.00125f * 0.00125f;
-      lsqr += diff.x * diff.x;
-      lsqr += diff.y * diff.y;
-      lsqr += diff.z * diff.z;
-      auto l = rsqrt(lsqr);
-      lsqr = l * l * l * (-delta_t * GRAVITY_COE);
-      accel.x += diff.x * lsqr;
-      accel.y += diff.y * lsqr;
-      accel.z += diff.z * lsqr;
+      auto l = 0.00125f * 0.00125f;
+      l += diff.x * diff.x;
+      l += diff.y * diff.y;
+      l += diff.z * diff.z;
+      l = rsqrt(l);
+      l = l * l * l * (-delta_t * GRAVITY_COE);
+      accel.x += diff.x * l;
+      accel.y += diff.y * l;
+      accel.z += diff.z * l;
     }
     __syncthreads();
   }

@@ -3,7 +3,6 @@
 #include "glm/gtc/matrix_transform.hpp"
 #include "imgui.h"
 #include "long_march.h"
-#include "nbody_cuda.h"
 #include "params.h"
 #include "random"
 
@@ -14,6 +13,12 @@ struct GlobalUniformObject {
   glm::mat4 camera_to_world;
   float particle_size;
   int hdr;
+};
+
+struct NBodyGlobalSettings {
+  int num_particle;
+  float delta_t;
+  float gravity;
 };
 
 class NBody {
@@ -29,7 +34,6 @@ class NBody {
 
   void BuildRenderNode();
 
-  void UpdateParticles();
   void UpdateImGui();
 
   float RandomFloat();
@@ -41,7 +45,13 @@ class NBody {
   std::unique_ptr<graphics::Core> core_;
   std::unique_ptr<graphics::Window> window_;
   std::unique_ptr<graphics::Buffer> global_uniform_buffer_;
+
   std::unique_ptr<graphics::Buffer> particles_pos_;
+  std::unique_ptr<graphics::Buffer> particles_vel_;
+  std::unique_ptr<graphics::Buffer> particles_pos_new_;
+
+  std::unique_ptr<graphics::Buffer> global_settings_buffer_;
+
   std::unique_ptr<graphics::Image> frame_image_;
   std::unique_ptr<graphics::Shader> vertex_shader_;
   std::unique_ptr<graphics::Shader> fragment_shader_;
@@ -51,8 +61,9 @@ class NBody {
   std::unique_ptr<graphics::Shader> hdr_fragment_shader_;
   std::unique_ptr<graphics::Program> hdr_program_;
 
-  std::vector<glm::vec3> positions_;
-  std::vector<glm::vec3> velocities_;
+  std::unique_ptr<graphics::Shader> nbody_compute_shader_;
+  std::unique_ptr<graphics::ComputeProgram> nbody_compute_program_;
+
   int n_particles_;
   std::mt19937 random_device_{uint32_t(std::time(nullptr))};
   glm::mat4 rotation{1.0f};

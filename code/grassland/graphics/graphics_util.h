@@ -12,6 +12,7 @@ class Sampler;
 class Window;
 class Shader;
 class Program;
+class ComputeProgram;
 class CommandContext;
 
 // Ray tracing objects
@@ -69,6 +70,7 @@ typedef enum ResourceType {
   RESOURCE_TYPE_IMAGE = 3,
   RESOURCE_TYPE_SAMPLER = 4,
   RESOURCE_TYPE_ACCELERATION_STRUCTURE = 5,
+  RESOURCE_TYPE_WRITABLE_STORAGE_BUFFER = 6,
 } ResourceType;
 
 typedef enum ShaderType {
@@ -79,8 +81,9 @@ typedef enum ShaderType {
 
 typedef enum BindPoint {
   BIND_POINT_GRAPHICS = 0,
-  BIND_POINT_RAYTRACING = 1,
-  BIND_POINT_COUNT = 2,
+  BIND_POINT_COMPUTE = 1,
+  BIND_POINT_RAYTRACING = 2,
+  BIND_POINT_COUNT = 3,
 } BindPoint;
 
 struct PhysicalDeviceProperties {

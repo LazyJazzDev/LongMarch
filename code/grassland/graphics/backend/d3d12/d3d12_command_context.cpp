@@ -37,6 +37,13 @@ void D3D12CommandContext::CmdBindRayTracingProgram(RayTracingProgram *program) {
   program_bases_[BIND_POINT_RAYTRACING] = d3d12_program;
 }
 
+void D3D12CommandContext::CmdBindComputeProgram(ComputeProgram *program) {
+  auto d3d12_program = dynamic_cast<D3D12ComputeProgram *>(program);
+  assert(d3d12_program != nullptr);
+  commands_.push_back(std::make_unique<D3D12CmdBindComputeProgram>(d3d12_program));
+  program_bases_[BIND_POINT_COMPUTE] = d3d12_program;
+}
+
 void D3D12CommandContext::CmdBindVertexBuffers(uint32_t first_binding,
                                                const std::vector<Buffer *> &buffers,
                                                const std::vector<uint64_t> &offsets) {
@@ -184,6 +191,19 @@ void D3D12CommandContext::CmdDispatchRays(uint32_t width, uint32_t height, uint3
       dynamic_cast<D3D12RayTracingProgram *>(program_bases_[BIND_POINT_RAYTRACING]), width, height, depth));
 }
 
+void D3D12CommandContext::CmdDispatch(uint32_t group_count_x, uint32_t group_count_y, uint32_t group_count_z) {
+  commands_.push_back(std::make_unique<D3D12CmdDispatch>(group_count_x, group_count_y, group_count_z));
+}
+
+void D3D12CommandContext::CmdCopyBuffer(Buffer *dst_buffer,
+                                        Buffer *src_buffer,
+                                        uint64_t size,
+                                        uint64_t dst_offset,
+                                        uint64_t src_offset) {
+  commands_.push_back(std::make_unique<D3D12CmdCopyBuffer>(
+      dynamic_cast<D3D12Buffer *>(dst_buffer), dynamic_cast<D3D12Buffer *>(src_buffer), size, dst_offset, src_offset));
+}
+
 void D3D12CommandContext::RecordRTVImage(const D3D12Image *image) {
   RecordRTVImage(image->Image()->Handle());
 }
@@ -206,9 +226,9 @@ void D3D12CommandContext::RecordDSVImage(ID3D12Resource *resource) {
   }
 }
 
-void D3D12CommandContext::RequireImageState(ID3D12GraphicsCommandList *command_list,
-                                            ID3D12Resource *resource,
-                                            const D3D12_RESOURCE_STATES state) {
+void D3D12CommandContext::RequireResourceState(ID3D12GraphicsCommandList *command_list,
+                                               ID3D12Resource *resource,
+                                               const D3D12_RESOURCE_STATES state) {
   if (resource_states_.count(resource) == 0) {
     resource_states_[resource] = D3D12_RESOURCE_STATE_GENERIC_READ;
   }
@@ -304,6 +324,25 @@ CD3DX12_GPU_DESCRIPTOR_HANDLE D3D12CommandContext::WriteCBVDescriptor(D3D12Buffe
   desc.SizeInBytes = static_cast<UINT>(d3d12::SizeAlignTo(buffer->Size(), 256));
 
   core_->Device()->Handle()->CreateConstantBufferView(&desc, resource_descriptor_base_);
+
+  resource_descriptor_base_.Offset(resource_descriptor_size_);
+  auto result = resource_descriptor_gpu_base_;
+  resource_descriptor_gpu_base_.Offset(resource_descriptor_size_);
+  return result;
+}
+
+CD3DX12_GPU_DESCRIPTOR_HANDLE D3D12CommandContext::WriteUAVDescriptor(D3D12Buffer *buffer) {
+  D3D12_UNORDERED_ACCESS_VIEW_DESC desc = {};
+  desc.Format = DXGI_FORMAT_R32_TYPELESS;
+  desc.ViewDimension = D3D12_UAV_DIMENSION_BUFFER;
+  desc.Buffer.FirstElement = 0;
+  desc.Buffer.Flags = D3D12_BUFFER_UAV_FLAG_RAW;
+  desc.Buffer.NumElements = static_cast<UINT>(buffer->Size()) / 4;
+  desc.Buffer.StructureByteStride = 0;
+  desc.Buffer.CounterOffsetInBytes = 0;
+
+  core_->Device()->Handle()->CreateUnorderedAccessView(buffer->Buffer()->Handle(), nullptr, &desc,
+                                                       resource_descriptor_base_);
 
   resource_descriptor_base_.Offset(resource_descriptor_size_);
   auto result = resource_descriptor_gpu_base_;

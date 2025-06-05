@@ -39,6 +39,7 @@ class VulkanImage;
 class VulkanSampler;
 class VulkanShader;
 class VulkanProgram;
+class VulkanComputeProgram;
 class VulkanCommandContext;
 class VulkanWindow;
 class VulkanAccelerationStructure;

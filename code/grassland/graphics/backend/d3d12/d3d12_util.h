@@ -33,6 +33,7 @@ class D3D12Sampler;
 class D3D12Shader;
 class D3D12ProgramBase;
 class D3D12Program;
+class D3D12ComputeProgram;
 class D3D12CommandContext;
 class D3D12Window;
 class D3D12AccelerationStructure;

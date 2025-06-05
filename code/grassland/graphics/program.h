@@ -20,6 +20,13 @@ class Program {
   virtual void Finalize() = 0;
 };
 
+class ComputeProgram {
+ public:
+  virtual ~ComputeProgram() = default;
+  virtual void AddResourceBinding(ResourceType type, int count) = 0;
+  virtual void Finalize() = 0;
+};
+
 class RayTracingProgram {
  public:
   virtual ~RayTracingProgram() = default;

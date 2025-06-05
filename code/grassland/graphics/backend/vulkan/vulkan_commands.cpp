@@ -17,6 +17,13 @@ void VulkanCmdBindProgram::CompileCommand(VulkanCommandContext *context, VkComma
   vkCmdBindPipeline(command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, program_->Pipeline()->Handle());
 }
 
+VulkanCmdBindComputeProgram::VulkanCmdBindComputeProgram(VulkanComputeProgram *program) : program_(program) {
+}
+
+void VulkanCmdBindComputeProgram::CompileCommand(VulkanCommandContext *context, VkCommandBuffer command_buffer) {
+  vkCmdBindPipeline(command_buffer, VK_PIPELINE_BIND_POINT_COMPUTE, program_->Pipeline());
+}
+
 VulkanCmdBindRayTracingProgram::VulkanCmdBindRayTracingProgram(VulkanRayTracingProgram *program) : program_(program) {
 }
 
@@ -69,8 +76,8 @@ void VulkanCmdBeginRendering::CompileCommand(VulkanCommandContext *context, VkCo
   std::vector<VkRenderingAttachmentInfo> color_attachment_infos;
   VkRenderingAttachmentInfo depth_attachment_info{};
   Extent2D extent;
-  extent.width = 0x7fffffff;
-  extent.height = 0x7fffffff;
+  extent.width = 32768;
+  extent.height = 32768;
   for (int i = 0; i < color_targets_.size(); i++) {
     auto &color_target = color_targets_[i];
     context->RequireImageState(command_buffer, color_target->Image()->Handle(),
@@ -113,6 +120,7 @@ void VulkanCmdBeginRendering::CompileCommand(VulkanCommandContext *context, VkCo
     extent.width = std::min(extent.width, target_extent.width);
     extent.height = std::min(extent.height, target_extent.height);
   }
+
   rendering_info.renderArea.extent.width = extent.width;
   rendering_info.renderArea.extent.height = extent.height;
   context->Core()->Instance()->Procedures().vkCmdBeginRenderingKHR(command_buffer, &rendering_info);
@@ -472,6 +480,32 @@ void VulkanCmdDispatchRays::CompileCommand(VulkanCommandContext *context, VkComm
   program_->Core()->Device()->Procedures().vkCmdTraceRaysKHR(command_buffer, &ray_gen_shader_sbt_entry,
                                                              &miss_shader_sbt_entry, &hit_shader_sbt_entry,
                                                              &callable_shader_sbt_entry, width_, height_, depth_);
+}
+
+VulkanCmdDispatch::VulkanCmdDispatch(uint32_t group_count_x, uint32_t group_count_y, uint32_t group_count_z)
+    : group_count_x_(group_count_x), group_count_y_(group_count_y), group_count_z_(group_count_z) {
+}
+
+void VulkanCmdDispatch::CompileCommand(VulkanCommandContext *context, VkCommandBuffer command_buffer) {
+  vkCmdDispatch(command_buffer, group_count_x_, group_count_y_, group_count_z_);
+}
+
+VulkanCmdCopyBuffer::VulkanCmdCopyBuffer(VulkanBuffer *dst_buffer,
+                                         VulkanBuffer *src_buffer,
+                                         uint64_t size,
+                                         uint64_t dst_offset,
+                                         uint64_t src_offset)
+    : dst_buffer_(dst_buffer), src_buffer_(src_buffer), size_(size), dst_offset_(dst_offset), src_offset_(src_offset) {
+}
+
+void VulkanCmdCopyBuffer::CompileCommand(VulkanCommandContext *context, VkCommandBuffer command_buffer) {
+  vkCmdPipelineBarrier(command_buffer, VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT, 0, 0,
+                       nullptr, 0, nullptr, 0, nullptr);
+  VkBufferCopy copy_region{};
+  copy_region.size = size_;
+  copy_region.dstOffset = dst_offset_;
+  copy_region.srcOffset = src_offset_;
+  vkCmdCopyBuffer(command_buffer, src_buffer_->Buffer(), dst_buffer_->Buffer(), 1, &copy_region);
 }
 
 }  // namespace grassland::graphics::backend
