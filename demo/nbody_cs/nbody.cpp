@@ -59,8 +59,8 @@ void NBody::OnRender() {
   ctx->CmdBeginRendering({frame_image_.get()}, nullptr);
   ctx->CmdBindProgram(program_.get());
   ctx->CmdSetPrimitiveTopology(graphics::PRIMITIVE_TOPOLOGY_TRIANGLE_LIST);
-  graphics::Scissor scissor{0, 0, window_->GetWidth(), window_->GetHeight()};
-  graphics::Viewport viewport{0, 0, window_->GetWidth(), window_->GetHeight()};
+  graphics::Scissor scissor{0, 0, uint32_t(window_->GetWidth()), uint32_t(window_->GetHeight())};
+  graphics::Viewport viewport{0, 0, float(window_->GetWidth()), float(window_->GetHeight())};
   ctx->CmdSetScissor(scissor);
   ctx->CmdSetViewport(viewport);
   ctx->CmdBindVertexBuffers(0, {particles_pos_.get()}, {0});
