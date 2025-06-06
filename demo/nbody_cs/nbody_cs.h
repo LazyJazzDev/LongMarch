@@ -20,9 +20,9 @@ struct NBodyGlobalSettings {
   float gravity;
 };
 
-class NBody {
+class NBodyCS {
  public:
-  explicit NBody(int n_particles = NUM_PARTICLE);
+  explicit NBodyCS(int n_particles = NUM_PARTICLE);
   void Run();
 
  private:

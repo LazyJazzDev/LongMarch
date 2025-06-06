@@ -1,17 +1,17 @@
-#include "nbody.h"
+#include "nbody_cs.h"
 
 namespace {
 #include "built_in_shaders.inl"
 }
 
-NBody::NBody(int n_particles) : n_particles_(n_particles) {
+NBodyCS::NBodyCS(int n_particles) : n_particles_(n_particles) {
   graphics::Core::Settings settings;
   graphics::CreateCore(graphics::BACKEND_API_DEFAULT, settings, &core_);
   core_->InitializeLogicalDeviceAutoSelect(false);
-  core_->CreateWindowObject(1920, 1080, "NBody", false, true, &window_);
+  core_->CreateWindowObject(1920, 1080, "NBodyCS", false, true, &window_);
 }
 
-void NBody::Run() {
+void NBodyCS::Run() {
   OnInit();
   while (!glfwWindowShouldClose(window_->GLFWWindow())) {
     OnUpdate();
@@ -22,7 +22,7 @@ void NBody::Run() {
   OnClose();
 }
 
-void NBody::OnUpdate() {
+void NBodyCS::OnUpdate() {
   UpdateImGui();
   auto world_to_cam =
       glm::lookAt(glm::vec3{glm::vec4{10.0f, 20.0f, 30.0f, 0.0f}}, glm::vec3{0.0f}, glm::vec3{0.0f, 1.0f, 0.0f}) *
@@ -40,10 +40,10 @@ void NBody::OnUpdate() {
   global_settings_buffer_->UploadData(&global_settings, sizeof(global_settings));
 
   static FPSCounter fps_counter;
-  window_->SetTitle("NBody FPS: " + std::to_string(fps_counter.TickFPS()));
+  window_->SetTitle("NBody Compute Shader FPS: " + std::to_string(fps_counter.TickFPS()));
 }
 
-void NBody::OnRender() {
+void NBodyCS::OnRender() {
   std::unique_ptr<graphics::CommandContext> ctx;
   core_->CreateCommandContext(&ctx);
   if (step_) {
@@ -77,7 +77,7 @@ void NBody::OnRender() {
   core_->SubmitCommandContext(ctx.get());
 }
 
-void NBody::OnInit() {
+void NBodyCS::OnInit() {
   core_->CreateImage(window_->GetWidth(), window_->GetHeight(), graphics::IMAGE_FORMAT_R32G32B32A32_SFLOAT,
                      &frame_image_);
 
@@ -126,7 +126,7 @@ void NBody::OnInit() {
   });
 }
 
-void NBody::OnClose() {
+void NBodyCS::OnClose() {
   nbody_compute_program_.reset();
   nbody_compute_shader_.reset();
 
@@ -144,7 +144,7 @@ void NBody::OnClose() {
   global_uniform_buffer_.reset();
 }
 
-void NBody::BuildRenderNode() {
+void NBodyCS::BuildRenderNode() {
   core_->CreateShader(GetShaderCode("shaders/particle.hlsl"), "VSMain", "vs_6_0", &vertex_shader_);
   core_->CreateShader(GetShaderCode("shaders/particle.hlsl"), "PSMain", "ps_6_0", &fragment_shader_);
   core_->CreateProgram({frame_image_->Format()}, graphics::IMAGE_FORMAT_UNDEFINED, &program_);
@@ -176,11 +176,11 @@ void NBody::BuildRenderNode() {
   nbody_compute_program_->Finalize();
 }
 
-float NBody::RandomFloat() {
+float NBodyCS::RandomFloat() {
   return std::uniform_real_distribution<float>()(random_device_);
 }
 
-glm::vec3 NBody::RandomOnSphere() {
+glm::vec3 NBodyCS::RandomOnSphere() {
   float z = RandomFloat() * 2.0f - 1.0f;
   float inv_z = std::sqrt(1.0f - z * z);
   float theta = RandomFloat() * glm::pi<float>() * 2.0f;
@@ -189,11 +189,11 @@ glm::vec3 NBody::RandomOnSphere() {
   return {x, y, z};
 }
 
-glm::vec3 NBody::RandomInSphere() {
+glm::vec3 NBodyCS::RandomInSphere() {
   return RandomOnSphere() * std::pow(RandomFloat(), 0.333333333333333333f);
 }
 
-void NBody::ResetParticles() {
+void NBodyCS::ResetParticles() {
   std::vector<glm::vec3> origins;
   std::vector<glm::vec3> initial_vels;
   for (int i = 0; i < galaxy_number_; i++) {
@@ -230,12 +230,12 @@ void NBody::ResetParticles() {
   particles_vel_->UploadData(velocities.data(), sizeof(glm::vec3) * n_particles_);
 }
 
-void NBody::UpdateImGui() {
+void NBodyCS::UpdateImGui() {
   window_->BeginImGuiFrame();
   ImGui::SetNextWindowPos(ImVec2{0.0f, 0.0f}, ImGuiCond_Once);
   ImGui::SetNextWindowBgAlpha(0.3f);
   bool trigger_hdr_switch = false;
-  if (ImGui::Begin("NBody"), nullptr, ImGuiWindowFlags_NoMove) {
+  if (ImGui::Begin("NBodyCS"), nullptr, ImGuiWindowFlags_NoMove) {
     ImGui::Text("Statistics");
     ImGui::Separator();
     auto current_tp = std::chrono::steady_clock::now();

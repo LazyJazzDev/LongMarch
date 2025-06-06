@@ -1,8 +1,8 @@
-#include "nbody.h"
+#include "nbody_cuda.h"
 
 using namespace long_march;
 
 int main() {
-  NBody app;
+  NBodyCUDA app;
   app.Run();
 }

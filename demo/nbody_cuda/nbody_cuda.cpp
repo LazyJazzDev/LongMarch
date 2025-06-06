@@ -1,17 +1,17 @@
-#include "nbody.h"
+#include "nbody_cuda.h"
 
 namespace {
 #include "built_in_shaders.inl"
 }
 
-NBody::NBody(int n_particles) : n_particles_(n_particles) {
+NBodyCUDA::NBodyCUDA(int n_particles) : n_particles_(n_particles) {
   graphics::Core::Settings settings;
   graphics::CreateCore(graphics::BACKEND_API_DEFAULT, settings, &core_);
   core_->InitializeLogicalDeviceAutoSelect(false);
-  core_->CreateWindowObject(1920, 1080, "NBody", false, true, &window_);
+  core_->CreateWindowObject(1920, 1080, "NBody CUDA", false, true, &window_);
 }
 
-void NBody::Run() {
+void NBodyCUDA::Run() {
   OnInit();
   while (!glfwWindowShouldClose(window_->GLFWWindow())) {
     OnUpdate();
@@ -22,7 +22,7 @@ void NBody::Run() {
   OnClose();
 }
 
-void NBody::OnUpdate() {
+void NBodyCUDA::OnUpdate() {
   UpdateParticles();
   UpdateImGui();
   auto world_to_cam =
@@ -36,10 +36,10 @@ void NBody::OnUpdate() {
   particles_pos_->UploadData(positions_.data(), sizeof(glm::vec3) * n_particles_);
 
   static FPSCounter fps_counter;
-  window_->SetTitle("NBody FPS: " + std::to_string(fps_counter.TickFPS()));
+  window_->SetTitle("NBody CUDA FPS: " + std::to_string(fps_counter.TickFPS()));
 }
 
-void NBody::OnRender() {
+void NBodyCUDA::OnRender() {
   std::unique_ptr<graphics::CommandContext> ctx;
   core_->CreateCommandContext(&ctx);
   ctx->CmdClearImage(frame_image_.get(), {{0.0f, 0.0f, 0.0f, 0.0f}});
@@ -64,7 +64,7 @@ void NBody::OnRender() {
   core_->SubmitCommandContext(ctx.get());
 }
 
-void NBody::OnInit() {
+void NBodyCUDA::OnInit() {
   core_->CreateImage(window_->GetWidth(), window_->GetHeight(), graphics::IMAGE_FORMAT_R32G32B32A32_SFLOAT,
                      &frame_image_);
 
@@ -112,13 +112,13 @@ void NBody::OnInit() {
   });
 }
 
-void NBody::OnClose() {
+void NBodyCUDA::OnClose() {
   program_.reset();
   particles_pos_.reset();
   global_uniform_buffer_.reset();
 }
 
-void NBody::BuildRenderNode() {
+void NBodyCUDA::BuildRenderNode() {
   core_->CreateShader(GetShaderCode("shaders/particle.hlsl"), "VSMain", "vs_6_0", &vertex_shader_);
   core_->CreateShader(GetShaderCode("shaders/particle.hlsl"), "PSMain", "ps_6_0", &fragment_shader_);
   core_->CreateProgram({frame_image_->Format()}, graphics::IMAGE_FORMAT_UNDEFINED, &program_);
@@ -142,11 +142,11 @@ void NBody::BuildRenderNode() {
   hdr_program_->Finalize();
 }
 
-float NBody::RandomFloat() {
+float NBodyCUDA::RandomFloat() {
   return std::uniform_real_distribution<float>()(random_device_);
 }
 
-glm::vec3 NBody::RandomOnSphere() {
+glm::vec3 NBodyCUDA::RandomOnSphere() {
   float z = RandomFloat() * 2.0f - 1.0f;
   float inv_z = std::sqrt(1.0f - z * z);
   float theta = RandomFloat() * glm::pi<float>() * 2.0f;
@@ -155,11 +155,11 @@ glm::vec3 NBody::RandomOnSphere() {
   return {x, y, z};
 }
 
-glm::vec3 NBody::RandomInSphere() {
+glm::vec3 NBodyCUDA::RandomInSphere() {
   return RandomOnSphere() * std::pow(RandomFloat(), 0.333333333333333333f);
 }
 
-void NBody::ResetParticles() {
+void NBodyCUDA::ResetParticles() {
   std::vector<glm::vec3> origins;
   std::vector<glm::vec3> initial_vels;
   for (int i = 0; i < galaxy_number_; i++) {
@@ -190,38 +190,18 @@ void NBody::ResetParticles() {
   }
 }
 
-void NBody::UpdateParticles() {
+void NBodyCUDA::UpdateParticles() {
   if (!step_)
     return;
-#if !ENABLE_GPU
-  for (int i = 0; i < n_particles_; i++) {
-    auto &pos_i = positions_[i];
-    for (int j = 0; j < n_particles_; j++) {
-      auto &pos_j = positions_[j];
-      auto diff = pos_i - pos_j;
-      auto l = glm::length(diff);
-      if (l < DELTA_T) {
-        continue;
-      }
-      diff /= l * l * l;
-      velocities_[i] += -diff * DELTA_T * GRAVITY_COE;
-    }
-  }
-
-  for (int i = 0; i < n_particles_; i++) {
-    positions_[i] += velocities_[i] * DELTA_T;
-  }
-#else
   UpdateStep(positions_.data(), velocities_.data(), n_particles_, delta_t_);
-#endif
 }
 
-void NBody::UpdateImGui() {
+void NBodyCUDA::UpdateImGui() {
   window_->BeginImGuiFrame();
   ImGui::SetNextWindowPos(ImVec2{0.0f, 0.0f}, ImGuiCond_Once);
   ImGui::SetNextWindowBgAlpha(0.3f);
   bool trigger_hdr_switch = false;
-  if (ImGui::Begin("NBody"), nullptr, ImGuiWindowFlags_NoMove) {
+  if (ImGui::Begin("NBodyCUDA"), nullptr, ImGuiWindowFlags_NoMove) {
     ImGui::Text("Statistics");
     ImGui::Separator();
     auto current_tp = std::chrono::steady_clock::now();

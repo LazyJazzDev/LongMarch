@@ -1,8 +1,8 @@
-#include "nbody.h"
+#include "nbody_cs.h"
 
 using namespace long_march;
 
 int main() {
-  NBody app;
+  NBodyCS app;
   app.Run();
 }
