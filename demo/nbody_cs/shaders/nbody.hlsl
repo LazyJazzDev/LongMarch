@@ -11,6 +11,8 @@ ConstantBuffer<GlobalSettings> g_param : register(b0, space3);
 
 #define blocksize 128
 
+groupshared float3 shared_pos[blocksize];
+
 [numthreads(blocksize, 1, 1)] void CSMain(uint3 Gid
                                           : SV_GroupID, uint3 DTid
                                           : SV_DispatchThreadID, uint3 GTid
@@ -21,12 +23,17 @@ ConstantBuffer<GlobalSettings> g_param : register(b0, space3);
 
   float3 accel = float3(0.0, 0.0, 0.0);
 
-  for (int j = 0; j < g_param.num_particle; j++) {
-    float3 pos_j = positions[j];
-    float3 diff = pos - pos_j;
-    float l = rsqrt(dot(diff, diff) + 0.00125f * 0.00125f);
-    l = l * l * l * (-g_param.delta_t * g_param.gravity);
-    accel += diff * l;
+  for (int i = 0; i < g_param.num_particle / blocksize; i++) {
+    shared_pos[GI] = positions[i * blocksize + GI];
+    GroupMemoryBarrierWithGroupSync();
+    [unroll] for (int j = 0; j < blocksize; j++) {
+      float3 pos_j = shared_pos[j];
+      float3 diff = pos - pos_j;
+      float l = rsqrt(dot(diff, diff) + 0.00125f * 0.00125f);
+      l = l * l * l * (-g_param.delta_t * g_param.gravity);
+      accel += diff * l;
+    }
+    GroupMemoryBarrierWithGroupSync();
   }
 
   vel += accel;
