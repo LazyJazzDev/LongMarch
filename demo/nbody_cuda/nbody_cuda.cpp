@@ -9,9 +9,22 @@ NBodyCUDA::NBodyCUDA(int n_particles) : n_particles_(n_particles) {
   graphics::CreateCore(graphics::BACKEND_API_DEFAULT, settings, &core_);
   core_->InitializeLogicalDeviceAutoSelect(false);
   core_->CreateWindowObject(1920, 1080, "NBody CUDA", false, true, &window_);
+
+  int cuda_device_index = core_->CUDADeviceIndex();
+  if (cuda_device_index >= 0) {
+    cudaDeviceProp props;
+    cudaGetDeviceProperties(&props, cuda_device_index);
+    LogInfo("GPU Device {}: \"{}\" with compute capability {}.{}\n", cuda_device_index, props.name, props.major,
+            props.minor);
+    cudaSetDevice(cuda_device_index);
+  } else {
+    LogError("Selected graphics device is not a CUDA device.");
+  }
 }
 
 void NBodyCUDA::Run() {
+  if (core_->CUDADeviceIndex() == -1)
+    return;
   OnInit();
   while (!glfwWindowShouldClose(window_->GLFWWindow())) {
     OnUpdate();

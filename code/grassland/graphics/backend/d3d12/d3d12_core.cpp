@@ -368,6 +368,22 @@ int D3D12Core::InitializeLogicalDevice(int device_index) {
 
   blit_pipeline_.Initialize(device_.get());
 
+#if defined(LONGMARCH_CUDA_RUNTIME)
+  DXGI_ADAPTER_DESC1 adapter_desc = {};
+  device_->Adapter().Handle()->GetDesc1(&adapter_desc);
+
+  int cuda_device_count = 0;
+  cudaGetDeviceCount(&cuda_device_count);
+  for (int device_index = 0; device_index < cuda_device_count; device_index++) {
+    cudaDeviceProp device_prop;
+    cudaGetDeviceProperties(&device_prop, device_index);
+    if (std::memcmp(&device_prop.luid, &adapter_desc.AdapterLuid, sizeof(LUID)) == 0) {
+      cuda_device_ = device_index;
+      break;
+    }
+  }
+#endif
+
   return 0;
 }
 

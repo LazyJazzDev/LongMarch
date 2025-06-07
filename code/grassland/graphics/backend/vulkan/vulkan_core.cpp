@@ -350,6 +350,28 @@ int VulkanCore::InitializeLogicalDevice(int device_index) {
   }
   transfer_command_pool_->AllocateCommandBuffer(VK_COMMAND_BUFFER_LEVEL_PRIMARY, &transfer_command_buffer_);
 
+#if defined(LONGMARCH_CUDA_RUNTIME)
+  VkPhysicalDeviceIDProperties id_properties{};
+  id_properties.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_ID_PROPERTIES;
+  id_properties.pNext = nullptr;
+
+  VkPhysicalDeviceProperties2 properties2{};
+  properties2.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_PROPERTIES_2;
+  properties2.pNext = &id_properties;
+  vkGetPhysicalDeviceProperties2(physical_device.Handle(), &properties2);
+
+  int cuda_device_count = 0;
+  cudaGetDeviceCount(&cuda_device_count);
+  for (int i = 0; i < cuda_device_count; i++) {
+    cudaDeviceProp device_properties{};
+    cudaGetDeviceProperties(&device_properties, i);
+    if (std::memcmp(id_properties.deviceUUID, &device_properties.uuid, VK_UUID_SIZE) == 0) {
+      cuda_device_ = i;
+      break;
+    }
+  }
+#endif
+
   return 0;
 }
 

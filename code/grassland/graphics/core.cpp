@@ -144,6 +144,12 @@ void Core::PyBind(pybind11::module &m) {
   core_class.def("submit_command_context", &Core::SubmitCommandContext);
 }
 
+#if defined(LONGMARCH_CUDA_RUNTIME)
+int Core::CUDADeviceIndex() const {
+  return cuda_device_;
+}
+#endif
+
 int CreateCore(BackendAPI api, const Core::Settings &settings, double_ptr<Core> pp_core) {
   switch (api) {
 #if defined(_WIN32)

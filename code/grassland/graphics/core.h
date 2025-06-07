@@ -7,6 +7,10 @@
 #include "grassland/graphics/buffer.h"
 #include "grassland/graphics/graphics_util.h"
 
+#if defined(LONGMARCH_CUDA_RUNTIME)
+#include "cuda_runtime.h"
+#endif
+
 namespace grassland::graphics {
 
 class Core {
@@ -88,12 +92,20 @@ class Core {
 
   static void PyBind(pybind11::module &m);
 
+#if defined(LONGMARCH_CUDA_ENABLED)
+  int CUDADeviceIndex() const;
+#endif
+
  private:
   Settings settings_;
 
  protected:
   std::string device_name_{};
   bool ray_tracing_support_{false};
+
+#if defined(LONGMARCH_CUDA_RUNTIME)
+  int cuda_device_{-1};
+#endif
 };
 
 int CreateCore(BackendAPI api, const Core::Settings &settings, double_ptr<Core> pp_core);
