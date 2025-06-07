@@ -258,28 +258,30 @@ void NBodyCS::UpdateImGui() {
       }
     }
 
-    // if (ImGui::CollapsingHeader("Speed Distribution")) {
-    //   std::vector<float> speeds(n_particles_);
-    //   for (int i = 0; i < n_particles_; i++) {
-    //     speeds[i] = glm::length(velocities_[i]);
-    //   }
-    //   std::sort(speeds.begin(), speeds.end());
-    //   float max_speed = speeds[n_particles_ - 1];
-    //   constexpr int num_samples = 100;
-    //   int samples[num_samples]{};
-    //   for (int i = 0; i < n_particles_; i++) {
-    //     samples[std::max(std::min(int(speeds[i] / max_speed * num_samples), num_samples - 1), 0)]++;
-    //   }
-    //   int max_sample = 0;
-    //   for (int i = 0; i < num_samples; i++) {
-    //     max_sample = std::max(max_sample, samples[i]);
-    //   }
-    //   float normalized_samples[num_samples]{};
-    //   for (int i = 0; i < num_samples; i++) {
-    //     normalized_samples[i] = float(samples[i]) / float(max_sample);
-    //   }
-    //   ImGui::PlotLines("##1", normalized_samples, num_samples, 0, nullptr, 0.0f, 1.0f);
-    // }
+    if (ImGui::CollapsingHeader("Speed Distribution")) {
+      std::vector<glm::vec3> velocities(n_particles_);
+      particles_vel_->DownloadData(velocities.data(), sizeof(glm::vec3) * n_particles_);
+      std::vector<float> speeds(n_particles_);
+      for (int i = 0; i < n_particles_; i++) {
+        speeds[i] = glm::length(velocities[i]);
+      }
+      std::sort(speeds.begin(), speeds.end());
+      float max_speed = speeds[n_particles_ - 1];
+      constexpr int num_samples = 100;
+      int samples[num_samples]{};
+      for (int i = 0; i < n_particles_; i++) {
+        samples[std::max(std::min(int(speeds[i] / max_speed * num_samples), num_samples - 1), 0)]++;
+      }
+      int max_sample = 0;
+      for (int i = 0; i < num_samples; i++) {
+        max_sample = std::max(max_sample, samples[i]);
+      }
+      float normalized_samples[num_samples]{};
+      for (int i = 0; i < num_samples; i++) {
+        normalized_samples[i] = float(samples[i]) / float(max_sample);
+      }
+      ImGui::PlotLines("##1", normalized_samples, num_samples, 0, nullptr, 0.0f, 1.0f);
+    }
 
     ImGui::NewLine();
 
