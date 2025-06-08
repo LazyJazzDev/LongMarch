@@ -4,12 +4,12 @@
 
 namespace grassland::graphics::backend {
 
-class VulkanBuffer : public Buffer {
+class VulkanBuffer : virtual public Buffer {
  public:
-  virtual VkBuffer Buffer() const = 0;
   virtual ~VulkanBuffer() = default;
 
-  virtual vulkan::Buffer *InstantBuffer() const = 0;
+  virtual VkBuffer Buffer() const = 0;
+  virtual VkDeviceAddress DeviceAddress() const = 0;
 };
 
 class VulkanStaticBuffer : public VulkanBuffer {
@@ -29,7 +29,7 @@ class VulkanStaticBuffer : public VulkanBuffer {
 
   VkBuffer Buffer() const override;
 
-  vulkan::Buffer *InstantBuffer() const override;
+  VkDeviceAddress DeviceAddress() const override;
 
  private:
   VulkanCore *core_;
@@ -53,7 +53,7 @@ class VulkanDynamicBuffer : public VulkanBuffer {
 
   VkBuffer Buffer() const override;
 
-  vulkan::Buffer *InstantBuffer() const override;
+  VkDeviceAddress DeviceAddress() const override;
 
   void TransferData(VkCommandBuffer cmd_buffer);
 
@@ -62,5 +62,39 @@ class VulkanDynamicBuffer : public VulkanBuffer {
   std::vector<std::unique_ptr<vulkan::Buffer>> buffers_;
   std::unique_ptr<vulkan::Buffer> staging_buffer_;
 };
+
+#if defined(LONGMARCH_CUDA_RUNTIME)
+class VulkanCUDABuffer : public VulkanBuffer, public CUDABuffer {
+ public:
+  VulkanCUDABuffer(VulkanCore *core, size_t size);
+  ~VulkanCUDABuffer() override;
+
+  void Reset();
+
+  size_t Size() const override;
+
+  BufferType Type() const override;
+
+  void Resize(size_t new_size) override;
+
+  void UploadData(const void *data, size_t size, size_t offset) override;
+
+  void DownloadData(void *data, size_t size, size_t offset) override;
+
+  VkBuffer Buffer() const override;
+
+  VkDeviceAddress DeviceAddress() const override;
+
+  void GetCUDAMemoryPointer(void **ptr) override;
+
+ private:
+  VulkanCore *core_;
+  VkBuffer buffer_;
+  VkDeviceMemory memory_;
+  VkDeviceAddress address_;
+  VkDeviceSize size_;
+  cudaExternalMemory_t cuda_memory_;
+};
+#endif
 
 }  // namespace grassland::graphics::backend

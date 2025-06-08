@@ -12,6 +12,7 @@
 #include "grassland/util/string_convert.h"
 #include "grassland/util/util_util.h"
 #include "grassland/util/vendor_id.h"
+#include "grassland/util/windows_security_attributes.h"
 
 namespace grassland {
 

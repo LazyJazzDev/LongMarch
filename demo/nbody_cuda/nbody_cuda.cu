@@ -41,23 +41,8 @@ __global__ void UpdateKernel(const glm::vec3 *positions,
   velocities[id] = vel;
 }
 
-void UpdateStep(glm::vec3 *positions, glm::vec3 *velocities, int n_particles, float delta_t) {
-  glm::vec3 *dev_positions;
-  glm::vec3 *dev_velocities;
-  glm::vec3 *dev_positions_write;
-  cudaMalloc(&dev_positions, n_particles * sizeof(glm::vec3));
-  cudaMalloc(&dev_velocities, n_particles * sizeof(glm::vec3));
-  cudaMalloc(&dev_positions_write, n_particles * sizeof(glm::vec3));
-  cudaMemcpy(dev_positions, positions, sizeof(glm::vec3) * n_particles, cudaMemcpyHostToDevice);
-  cudaMemcpy(dev_velocities, velocities, sizeof(glm::vec3) * n_particles, cudaMemcpyHostToDevice);
-
-  UpdateKernel<<<GRID_SIZE, BLOCK_SIZE, BLOCK_SIZE * sizeof(glm::vec3)>>>(dev_positions, dev_positions_write,
-                                                                          dev_velocities, n_particles, delta_t);
-  cudaDeviceSynchronize();
-
-  cudaMemcpy(positions, dev_positions_write, sizeof(glm::vec3) * n_particles, cudaMemcpyDeviceToHost);
-  cudaMemcpy(velocities, dev_velocities, sizeof(glm::vec3) * n_particles, cudaMemcpyDeviceToHost);
-  cudaFree(dev_velocities);
-  cudaFree(dev_positions);
-  cudaFree(dev_positions_write);
+void UpdateStep(glm::vec3 *positions, glm::vec3 *velocities, glm::vec3 *positions_new, int n_particles, float delta_t) {
+  UpdateKernel<<<GRID_SIZE, BLOCK_SIZE, BLOCK_SIZE * sizeof(glm::vec3)>>>(positions, positions_new, velocities,
+                                                                          n_particles, delta_t);
+  cudaMemcpyAsync(positions, positions_new, sizeof(glm::vec3) * n_particles, cudaMemcpyDeviceToHost);
 }

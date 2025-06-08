@@ -267,4 +267,8 @@ glm::vec3 HSVtoRGB(glm::vec3 hsv);
 
 uint32_t PixelSize(ImageFormat format);
 
+#if defined(LONGMARCH_CUDA_RUNTIME)
+class CUDABuffer;
+#endif
+
 }  // namespace grassland::graphics

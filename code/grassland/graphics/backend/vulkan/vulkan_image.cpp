@@ -26,7 +26,7 @@ void VulkanImage::UploadData(const void *data) const {
                                 VMA_MEMORY_USAGE_CPU_ONLY, &staging_buffer);
   std::memcpy(staging_buffer->Map(), data, pixel_size * extent.width * extent.height);
   staging_buffer->Unmap();
-  vulkan::SingleTimeCommand(core_->TransferQueue(), core_->TransferCommandPool(), [&](VkCommandBuffer command_buffer) {
+  core_->SingleTimeCommand([&](VkCommandBuffer command_buffer) {
     VkImageAspectFlagBits aspect = IsDepthFormat(format_) ? VK_IMAGE_ASPECT_DEPTH_BIT : VK_IMAGE_ASPECT_COLOR_BIT;
     vulkan::TransitImageLayout(command_buffer, image_->Handle(), VK_IMAGE_LAYOUT_GENERAL,
                                VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT,
@@ -57,7 +57,7 @@ void VulkanImage::DownloadData(void *data) const {
   std::unique_ptr<vulkan::Buffer> staging_buffer;
   core_->Device()->CreateBuffer(pixel_size * extent.width * extent.height, VK_BUFFER_USAGE_TRANSFER_DST_BIT,
                                 VMA_MEMORY_USAGE_CPU_ONLY, &staging_buffer);
-  vulkan::SingleTimeCommand(core_->TransferQueue(), core_->TransferCommandPool(), [&](VkCommandBuffer command_buffer) {
+  core_->SingleTimeCommand([&](VkCommandBuffer command_buffer) {
     VkImageAspectFlagBits aspect = IsDepthFormat(format_) ? VK_IMAGE_ASPECT_DEPTH_BIT : VK_IMAGE_ASPECT_COLOR_BIT;
     vulkan::TransitImageLayout(command_buffer, image_->Handle(), VK_IMAGE_LAYOUT_GENERAL,
                                VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT,

@@ -79,6 +79,12 @@ int D3D12Core::CreateBuffer(size_t size, BufferType type, double_ptr<Buffer> pp_
   return 0;
 }
 
+#if defined(LONGMARCH_CUDA_RUNTIME)
+int D3D12Core::CreateCUDABuffer(size_t size, double_ptr<CUDABuffer> pp_buffer) {
+  return 0;
+}
+#endif
+
 int D3D12Core::CreateImage(int width, int height, ImageFormat format, double_ptr<Image> pp_image) {
   pp_image.construct<D3D12Image>(this, width, height, format);
   return 0;
@@ -407,6 +413,12 @@ void D3D12Core::SingleTimeCommand(std::function<void(ID3D12GraphicsCommandList *
   command_queue_->Handle()->ExecuteCommandLists(1, command_lists);
   single_time_fence_->Signal(command_queue_.get());
   single_time_fence_->Wait();
+}
+
+void D3D12Core::CUDABeginExecutionBarrier(cudaStream_t stream) {
+}
+
+void D3D12Core::CUDAEndExecutionBarrier(cudaStream_t stream) {
 }
 
 }  // namespace grassland::graphics::backend

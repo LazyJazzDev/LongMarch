@@ -6,6 +6,15 @@ namespace grassland::vulkan {
 VkResult SingleTimeCommand(const Queue *queue,
                            const CommandPool *command_pool,
                            std::function<void(VkCommandBuffer)> function) {
+  VkSubmitInfo submit_info = {};
+  submit_info.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
+  return SingleTimeCommand(queue, command_pool, function, submit_info);
+}
+
+VkResult SingleTimeCommand(const Queue *queue,
+                           const CommandPool *command_pool,
+                           std::function<void(VkCommandBuffer)> function,
+                           VkSubmitInfo &submit_info) {
   std::unique_ptr<CommandBuffer> command_buffer;
   command_pool->AllocateCommandBuffer(&command_buffer);
 
@@ -21,8 +30,6 @@ VkResult SingleTimeCommand(const Queue *queue,
 
   VkCommandBuffer command_buffers[] = {command_buffer->Handle()};
 
-  VkSubmitInfo submit_info = {};
-  submit_info.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
   submit_info.commandBufferCount = 1;
   submit_info.pCommandBuffers = command_buffers;
 

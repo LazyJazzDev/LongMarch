@@ -22,4 +22,9 @@ class Semaphore {
   const class Device *device_{};
   VkSemaphore semaphore_{};
 };
+
+#if defined(LONGMARCH_CUDA_RUNTIME)
+VkExternalSemaphoreHandleTypeFlagBits GetDefaultExternalSemaphoreHandleType();
+#endif
+
 }  // namespace grassland::vulkan

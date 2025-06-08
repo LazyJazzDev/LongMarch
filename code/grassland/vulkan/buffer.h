@@ -4,10 +4,7 @@
 namespace grassland::vulkan {
 class Buffer {
  public:
-  Buffer(const class Device *device,
-         VkDeviceSize size,
-         VkBuffer buffer,
-         VmaAllocation allocation);
+  Buffer(const class Device *device, VkDeviceSize size, VkBuffer buffer, VmaAllocation allocation);
 
   ~Buffer();
 
@@ -53,20 +50,25 @@ void CopyBuffer(VkCommandBuffer command_buffer,
                 VkDeviceSize src_offset = 0,
                 VkDeviceSize dst_offset = 0);
 
-void UploadBuffer(Queue *queue,
-                  CommandPool *command_pool,
-                  Buffer *buffer,
-                  const void *data,
-                  VkDeviceSize size);
+void UploadBuffer(Queue *queue, CommandPool *command_pool, Buffer *buffer, const void *data, VkDeviceSize size);
 
-void DownloadBuffer(Queue *queue,
-                    CommandPool *command_pool,
-                    Buffer *buffer,
-                    void *data,
-                    VkDeviceSize size);
+void DownloadBuffer(Queue *queue, CommandPool *command_pool, Buffer *buffer, void *data, VkDeviceSize size);
 
 class BufferObject {
  public:
   virtual Buffer *GetBuffer(uint32_t frame_index) const = 0;
 };
+
+#if defined(LONGMARCH_CUDA_RUNTIME)
+VkExternalMemoryHandleTypeFlagBits GetDefaultExternalMemoryHandleType();
+
+void CreateExternalBuffer(VkDevice device,
+                          std::function<uint32_t(uint32_t, VkMemoryPropertyFlags)> find_memory_type,
+                          VkDeviceSize size,
+                          VkBufferUsageFlags usage,
+                          VkMemoryPropertyFlags properties,
+                          VkBuffer &buffer,
+                          VkDeviceMemory &bufferMemory);
+#endif
+
 }  // namespace grassland::vulkan

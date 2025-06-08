@@ -13,10 +13,27 @@ namespace grassland::graphics::backend {
 VulkanCore::VulkanCore(const Settings &settings) : Core(settings) {
   vulkan::InstanceCreateHint hint{};
   hint.SetValidationLayersEnabled(DebugEnabled());
+#if defined(LONGMARCH_CUDA_RUNTIME)
+  hint.AddExtension(VK_KHR_EXTERNAL_MEMORY_CAPABILITIES_EXTENSION_NAME);
+  hint.AddExtension(VK_KHR_EXTERNAL_SEMAPHORE_CAPABILITIES_EXTENSION_NAME);
+#endif
   vulkan::CreateInstance(hint, &instance_);
 }
 
 VulkanCore::~VulkanCore() {
+#if defined(LONGMARCH_CUDA_RUNTIME)
+  if (cuda_synchronization_semaphore_) {
+    VkSemaphoreWaitInfo semaphore_wait_info{};
+    semaphore_wait_info.sType = VK_STRUCTURE_TYPE_SEMAPHORE_WAIT_INFO;
+    semaphore_wait_info.pSemaphores = &cuda_synchronization_semaphore_;
+    semaphore_wait_info.pValues = &cuda_synchronization_value_;
+    semaphore_wait_info.semaphoreCount = 1;
+    vkWaitSemaphores(device_->Handle(), &semaphore_wait_info, std::numeric_limits<uint64_t>::max());
+    cudaDestroyExternalSemaphore(cuda_external_semaphore_);
+    vkDestroySemaphore(device_->Handle(), cuda_synchronization_semaphore_, nullptr);
+  }
+#endif
+
   for (auto &descriptor_set : descriptor_sets_) {
     while (!descriptor_set.empty()) {
       delete descriptor_set.front();
@@ -37,6 +54,13 @@ int VulkanCore::CreateBuffer(size_t size, BufferType type, double_ptr<Buffer> pp
   }
   return 0;
 }
+
+#if defined(LONGMARCH_CUDA_RUNTIME)
+int VulkanCore::CreateCUDABuffer(size_t size, double_ptr<CUDABuffer> pp_buffer) {
+  pp_buffer.construct<VulkanCUDABuffer>(this, size);
+  return 0;
+}
+#endif
 
 int VulkanCore::CreateImage(int width, int height, ImageFormat format, double_ptr<Image> pp_image) {
   pp_image.construct<VulkanImage>(this, width, height, format);
@@ -101,8 +125,9 @@ int VulkanCore::CreateBottomLevelAccelerationStructure(Buffer *vertex_buffer,
   assert(vk_vertex_buffer != nullptr);
   assert(vk_index_buffer != nullptr);
   std::unique_ptr<vulkan::AccelerationStructure> blas;
-  device_->CreateBottomLevelAccelerationStructure(vk_vertex_buffer->InstantBuffer(), vk_index_buffer->InstantBuffer(),
-                                                  stride, graphics_command_pool_.get(), graphics_queue_.get(), &blas);
+  device_->CreateBottomLevelAccelerationStructure(
+      vk_vertex_buffer->DeviceAddress(), vk_index_buffer->DeviceAddress(), vertex_buffer->Size() / stride, stride,
+      index_buffer->Size() / (sizeof(uint32_t) * 3), graphics_command_pool_.get(), graphics_queue_.get(), &blas);
   pp_blas.construct<VulkanAccelerationStructure>(this, std::move(blas));
   return 0;
 }
@@ -198,6 +223,30 @@ int VulkanCore::SubmitCommandContext(CommandContext *p_command_context) {
     submit_info.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
     submit_info.commandBufferCount = 1;
     submit_info.pCommandBuffers = command_buffers;
+
+#if defined(LONGMARCH_CUDA_RUNTIME)
+    VkTimelineSemaphoreSubmitInfo timeline_info = {};
+    uint64_t wait_value;
+    uint64_t signal_value;
+    VkPipelineStageFlags wait_stages[] = {VK_PIPELINE_STAGE_ALL_COMMANDS_BIT};
+    if (cuda_device_ >= 0) {
+      wait_value = cuda_synchronization_value_++;
+      signal_value = cuda_synchronization_value_;
+      timeline_info.sType = VK_STRUCTURE_TYPE_TIMELINE_SEMAPHORE_SUBMIT_INFO;
+      timeline_info.waitSemaphoreValueCount = 1;
+      timeline_info.pWaitSemaphoreValues = &wait_value;
+      timeline_info.signalSemaphoreValueCount = 1;
+      timeline_info.pSignalSemaphoreValues = &signal_value;
+      timeline_info.pNext = submit_info.pNext;
+      submit_info.pNext = &timeline_info;
+      submit_info.signalSemaphoreCount = 1;
+      submit_info.pSignalSemaphores = &cuda_synchronization_semaphore_;
+      submit_info.pWaitDstStageMask = wait_stages;
+      submit_info.waitSemaphoreCount = 1;
+      submit_info.pWaitSemaphores = &cuda_synchronization_semaphore_;
+    }
+#endif
+
     vkQueueSubmit(transfer_queue_->Handle(), 1, &submit_info, nullptr);
   }
 
@@ -226,27 +275,49 @@ int VulkanCore::SubmitCommandContext(CommandContext *p_command_context) {
   std::vector<VkSemaphore> wait_semaphores;
   std::vector<VkSemaphore> signal_semaphores;
 
+  std::vector<VkPipelineStageFlags> wait_stages{};
   for (auto &window : command_context->windows_) {
     wait_semaphores.push_back(window->ImageAvailableSemaphore()->Handle());
+    wait_stages.push_back(VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT);
     signal_semaphores.push_back(window->RenderFinishSemaphore()->Handle());
   }
 
   VkFence fence = in_flight_fences_[current_frame_]->Handle();
   vkResetFences(device_->Handle(), 1, &fence);
 
-  VkPipelineStageFlags wait_stages[] = {VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT};
-
   VkSubmitInfo submit_info{};
   submit_info.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
-  submit_info.pWaitDstStageMask = wait_stages;
   submit_info.commandBufferCount = 1;
   submit_info.pCommandBuffers = &command_buffer;
+
+#if defined(LONGMARCH_CUDA_RUNTIME)
+  VkTimelineSemaphoreSubmitInfo timeline_info = {};
+  std::vector<uint64_t> wait_values(wait_semaphores.size() + 1, 0);
+  std::vector<uint64_t> signal_values(signal_semaphores.size() + 1, 0);
+  if (cuda_device_ >= 0) {
+    wait_values[wait_semaphores.size()] = cuda_synchronization_value_++;
+    signal_values[signal_semaphores.size()] = cuda_synchronization_value_;
+    timeline_info.sType = VK_STRUCTURE_TYPE_TIMELINE_SEMAPHORE_SUBMIT_INFO;
+    timeline_info.waitSemaphoreValueCount = wait_values.size();
+    timeline_info.pWaitSemaphoreValues = wait_values.data();
+    timeline_info.signalSemaphoreValueCount = signal_values.size();
+    timeline_info.pSignalSemaphoreValues = signal_values.data();
+    timeline_info.pNext = submit_info.pNext;
+    submit_info.pNext = &timeline_info;
+    wait_semaphores.push_back(cuda_synchronization_semaphore_);
+    wait_stages.push_back(VK_PIPELINE_STAGE_ALL_COMMANDS_BIT);
+    signal_semaphores.push_back(cuda_synchronization_semaphore_);
+  }
+#endif
+
   if (!wait_semaphores.empty()) {
     submit_info.waitSemaphoreCount = wait_semaphores.size();
     submit_info.pWaitSemaphores = wait_semaphores.data();
+    submit_info.pWaitDstStageMask = wait_stages.data();
     submit_info.signalSemaphoreCount = signal_semaphores.size();
     submit_info.pSignalSemaphores = signal_semaphores.data();
   }
+
   vkQueueSubmit(graphics_queue_->Handle(), 1, &submit_info, fence);
 
   for (auto &window : command_context->windows_) {
@@ -304,13 +375,55 @@ int VulkanCore::InitializeLogicalDevice(int device_index) {
     return -1;
   }
   auto physical_device = physical_devices[device_index];
+
+#if defined(LONGMARCH_CUDA_RUNTIME)
+  VkPhysicalDeviceIDProperties id_properties{};
+  id_properties.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_ID_PROPERTIES;
+  id_properties.pNext = nullptr;
+
+  VkPhysicalDeviceProperties2 properties2{};
+  properties2.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_PROPERTIES_2;
+  properties2.pNext = &id_properties;
+  vkGetPhysicalDeviceProperties2(physical_device.Handle(), &properties2);
+
+  int cuda_device_count = 0;
+  cudaGetDeviceCount(&cuda_device_count);
+  for (int i = 0; i < cuda_device_count; i++) {
+    cudaDeviceProp device_properties{};
+    cudaGetDeviceProperties(&device_properties, i);
+    if (std::memcmp(id_properties.deviceUUID, &device_properties.uuid, VK_UUID_SIZE) == 0) {
+      cuda_device_ = i;
+      break;
+    }
+  }
+#endif
+
   grassland::vulkan::DeviceFeatureRequirement device_feature_requirement{};
   device_feature_requirement.enable_raytracing_extension = physical_device.SupportRayTracing();
-  if (instance_->CreateDevice(physical_device,
-                              device_feature_requirement.GenerateRecommendedDeviceCreateInfo(physical_device),
-                              device_feature_requirement.GetVmaAllocatorCreateFlags(), &device_) != VK_SUCCESS) {
+  auto create_info = device_feature_requirement.GenerateRecommendedDeviceCreateInfo(physical_device);
+#if defined(LONGMARCH_CUDA_RUNTIME)
+  if (cuda_device_ >= 0) {
+    create_info.AddExtension(VK_KHR_EXTERNAL_MEMORY_EXTENSION_NAME);
+    create_info.AddExtension(VK_KHR_EXTERNAL_SEMAPHORE_EXTENSION_NAME);
+    create_info.AddExtension(VK_KHR_TIMELINE_SEMAPHORE_EXTENSION_NAME);
+#ifdef _WIN32
+    create_info.AddExtension(VK_KHR_EXTERNAL_MEMORY_WIN32_EXTENSION_NAME);
+    create_info.AddExtension(VK_KHR_EXTERNAL_SEMAPHORE_WIN32_EXTENSION_NAME);
+#else
+    create_info.AddExtension(VK_KHR_EXTERNAL_MEMORY_FD_EXTENSION_NAME);
+    create_info.AddExtension(VK_KHR_EXTERNAL_SEMAPHORE_FD_EXTENSION_NAME);
+#endif /* _WIN64 */
+    VkPhysicalDeviceTimelineSemaphoreFeatures physical_device_timeline_semaphore_features{};
+    physical_device_timeline_semaphore_features.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_TIMELINE_SEMAPHORE_FEATURES;
+    physical_device_timeline_semaphore_features.timelineSemaphore = VK_TRUE;
+    create_info.AddFeature(physical_device_timeline_semaphore_features);
+  }
+#endif
+  if (instance_->CreateDevice(physical_device, create_info, device_feature_requirement.GetVmaAllocatorCreateFlags(),
+                              &device_) != VK_SUCCESS) {
     return -1;
   }
+  memory_properties_ = physical_device.GetPhysicalDeviceMemoryProperties();
 
   device_name_ = physical_device.GetPhysicalDeviceProperties().deviceName;
   ray_tracing_support_ = physical_device.SupportRayTracing();
@@ -351,25 +464,50 @@ int VulkanCore::InitializeLogicalDevice(int device_index) {
   transfer_command_pool_->AllocateCommandBuffer(VK_COMMAND_BUFFER_LEVEL_PRIMARY, &transfer_command_buffer_);
 
 #if defined(LONGMARCH_CUDA_RUNTIME)
-  VkPhysicalDeviceIDProperties id_properties{};
-  id_properties.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_ID_PROPERTIES;
-  id_properties.pNext = nullptr;
 
-  VkPhysicalDeviceProperties2 properties2{};
-  properties2.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_PROPERTIES_2;
-  properties2.pNext = &id_properties;
-  vkGetPhysicalDeviceProperties2(physical_device.Handle(), &properties2);
+  if (cuda_device_ >= 0) {
+    // Create a timeline semaphore
+    auto handle_type = vulkan::GetDefaultExternalSemaphoreHandleType();
+    VkSemaphoreCreateInfo semaphore_create_info{};
+    semaphore_create_info.sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO;
+    VkExportSemaphoreCreateInfoKHR export_semaphore_create_info{};
+    export_semaphore_create_info.sType = VK_STRUCTURE_TYPE_EXPORT_SEMAPHORE_CREATE_INFO;
 
-  int cuda_device_count = 0;
-  cudaGetDeviceCount(&cuda_device_count);
-  for (int i = 0; i < cuda_device_count; i++) {
-    cudaDeviceProp device_properties{};
-    cudaGetDeviceProperties(&device_properties, i);
-    if (std::memcmp(id_properties.deviceUUID, &device_properties.uuid, VK_UUID_SIZE) == 0) {
-      cuda_device_ = i;
-      break;
+    VkSemaphoreTypeCreateInfo export_semaphore_create_info_timeline{};
+    export_semaphore_create_info_timeline.sType = VK_STRUCTURE_TYPE_SEMAPHORE_TYPE_CREATE_INFO;
+    export_semaphore_create_info_timeline.initialValue = 0;
+    export_semaphore_create_info_timeline.semaphoreType = VK_SEMAPHORE_TYPE_TIMELINE;
+    export_semaphore_create_info.pNext = &export_semaphore_create_info_timeline;
+    export_semaphore_create_info.handleTypes = handle_type;
+
+    semaphore_create_info.pNext = &export_semaphore_create_info;
+    vulkan::ThrowIfFailed(
+        vkCreateSemaphore(device_->Handle(), &semaphore_create_info, nullptr, &cuda_synchronization_semaphore_),
+        "Failed to create CUDA synchronization semaphore");
+
+    cudaExternalSemaphoreHandleDesc external_semaphore_handle_desc = {};
+
+    if (handle_type & VK_EXTERNAL_SEMAPHORE_HANDLE_TYPE_OPAQUE_WIN32_BIT) {
+      external_semaphore_handle_desc.type = cudaExternalSemaphoreHandleTypeTimelineSemaphoreWin32;
+    } else if (handle_type & VK_EXTERNAL_SEMAPHORE_HANDLE_TYPE_OPAQUE_WIN32_KMT_BIT) {
+      external_semaphore_handle_desc.type = cudaExternalSemaphoreHandleTypeTimelineSemaphoreWin32;
+    } else if (handle_type & VK_EXTERNAL_SEMAPHORE_HANDLE_TYPE_OPAQUE_FD_BIT) {
+      external_semaphore_handle_desc.type = cudaExternalSemaphoreHandleTypeTimelineSemaphoreFd;
+    } else {
+      throw std::runtime_error("Unknown handle type requested!");
     }
+
+#ifdef _WIN32
+    external_semaphore_handle_desc.handle.win32.handle = (HANDLE)GetSemaphoreHandle(cuda_synchronization_semaphore_);
+#else
+    externalSemaphoreHandleDesc.handle.fd = (int)(uintptr_t)getSemaphoreHandle(vkSem, handleType);
+#endif
+
+    external_semaphore_handle_desc.flags = 0;
+
+    cudaImportExternalSemaphore(&cuda_external_semaphore_, &external_semaphore_handle_desc);
   }
+
 #endif
 
   return 0;
@@ -386,7 +524,198 @@ void VulkanCore::WaitGPU() {
 }
 
 void VulkanCore::SingleTimeCommand(std::function<void(VkCommandBuffer)> command) {
-  vulkan::SingleTimeCommand(graphics_queue_.get(), graphics_command_pool_.get(), command);
+  VkSubmitInfo submit_info{};
+  submit_info.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
+#if defined(LONGMARCH_CUDA_RUNTIME)
+  VkTimelineSemaphoreSubmitInfo timeline_info = {};
+  uint64_t wait_value;
+  uint64_t signal_value;
+  VkPipelineStageFlags wait_stages[] = {VK_PIPELINE_STAGE_ALL_COMMANDS_BIT};
+  if (cuda_device_ >= 0) {
+    wait_value = cuda_synchronization_value_++;
+    signal_value = cuda_synchronization_value_;
+    timeline_info.sType = VK_STRUCTURE_TYPE_TIMELINE_SEMAPHORE_SUBMIT_INFO;
+    timeline_info.waitSemaphoreValueCount = 1;
+    timeline_info.pWaitSemaphoreValues = &wait_value;
+    timeline_info.signalSemaphoreValueCount = 1;
+    timeline_info.pSignalSemaphoreValues = &signal_value;
+    submit_info.pNext = &timeline_info;
+    submit_info.signalSemaphoreCount = 1;
+    submit_info.pSignalSemaphores = &cuda_synchronization_semaphore_;
+    submit_info.waitSemaphoreCount = 1;
+    submit_info.pWaitSemaphores = &cuda_synchronization_semaphore_;
+    submit_info.pWaitDstStageMask = wait_stages;
+  }
+#endif
+  vulkan::SingleTimeCommand(graphics_queue_.get(), graphics_command_pool_.get(), command, submit_info);
 }
+
+uint32_t VulkanCore::FindMemoryType(uint32_t type_filter, VkMemoryPropertyFlags properties) {
+  for (uint32_t i = 0; i < memory_properties_.memoryTypeCount; i++) {
+    if (type_filter & (1 << i) && (memory_properties_.memoryTypes[i].propertyFlags & properties) == properties) {
+      return i;
+    }
+  }
+  return ~0;
+}
+
+#if defined(LONGMARCH_CUDA_RUNTIME)
+
+void VulkanCore::ImportCudaExternalMemory(cudaExternalMemory_t &cuda_memory,
+                                          VkDeviceMemory &vulkan_memory,
+                                          VkDeviceSize size) {
+  auto handle_type = vulkan::GetDefaultExternalMemoryHandleType();
+  cudaExternalMemoryHandleDesc external_memory_handle_desc = {};
+
+  if (handle_type & VK_EXTERNAL_SEMAPHORE_HANDLE_TYPE_OPAQUE_WIN32_BIT) {
+    external_memory_handle_desc.type = cudaExternalMemoryHandleTypeOpaqueWin32;
+  } else if (handle_type & VK_EXTERNAL_SEMAPHORE_HANDLE_TYPE_OPAQUE_WIN32_KMT_BIT) {
+    external_memory_handle_desc.type = cudaExternalMemoryHandleTypeOpaqueWin32Kmt;
+  } else if (handle_type & VK_EXTERNAL_SEMAPHORE_HANDLE_TYPE_OPAQUE_FD_BIT) {
+    external_memory_handle_desc.type = cudaExternalMemoryHandleTypeOpaqueFd;
+  } else {
+    throw std::runtime_error("Unknown handle type requested!");
+  }
+
+  external_memory_handle_desc.size = size;
+
+#ifdef _WIN64
+  external_memory_handle_desc.handle.win32.handle = (HANDLE)GetMemoryHandle(vulkan_memory);
+#else
+  externalMemoryHandleDesc.handle.fd = (int)(uintptr_t)getMemHandle(vkMem, handleType);
+#endif
+
+  cudaImportExternalMemory(&cuda_memory, &external_memory_handle_desc);
+}
+
+void VulkanCore::CUDABeginExecutionBarrier(cudaStream_t stream) {
+  if (cuda_device_ < 0) {
+    throw std::runtime_error("Not CUDA device!");
+  }
+
+  cudaExternalSemaphoreWaitParams wait_params = {};
+  wait_params.flags = 0;
+  wait_params.params.fence.value = cuda_synchronization_value_;
+
+  cudaWaitExternalSemaphoresAsync(&cuda_external_semaphore_, &wait_params, 1, stream);
+}
+
+void VulkanCore::CUDAEndExecutionBarrier(cudaStream_t stream) {
+  if (cuda_device_ < 0) {
+    throw std::runtime_error("Not CUDA device!");
+  }
+
+  cuda_synchronization_value_++;
+  cudaExternalSemaphoreSignalParams signal_params = {};
+  signal_params.flags = 0;
+  signal_params.params.fence.value = cuda_synchronization_value_;
+  cudaSignalExternalSemaphoresAsync(&cuda_external_semaphore_, &signal_params, 1, stream);
+}
+
+void VulkanCore::CUDAWaitExecutionBarrier() {
+  VkSemaphoreWaitInfo semaphore_wait_info = {};
+  semaphore_wait_info.sType = VK_STRUCTURE_TYPE_SEMAPHORE_WAIT_INFO;
+  semaphore_wait_info.pSemaphores = &cuda_synchronization_semaphore_;
+  semaphore_wait_info.semaphoreCount = 1;
+  semaphore_wait_info.pValues = &cuda_synchronization_value_;
+  vkWaitSemaphores(device_->Handle(), &semaphore_wait_info, std::numeric_limits<uint64_t>::max());
+}
+
+void VulkanCore::CUDASignalExecutionBarrier() {
+  cuda_synchronization_value_++;
+  VkSemaphoreSignalInfo semaphore_signal_info = {};
+  semaphore_signal_info.sType = VK_STRUCTURE_TYPE_SEMAPHORE_SIGNAL_INFO;
+  semaphore_signal_info.semaphore = cuda_synchronization_semaphore_;
+  semaphore_signal_info.value = cuda_synchronization_value_;
+  vulkan::ThrowIfFailed(vkSignalSemaphore(device_->Handle(), &semaphore_signal_info),
+                        "Failed to signal CUDA synchronization semaphore!");
+}
+
+void *VulkanCore::GetMemoryHandle(VkDeviceMemory memory) {
+  VkExternalMemoryHandleTypeFlagBits handle_type = vulkan::GetDefaultExternalMemoryHandleType();
+#ifdef _WIN32
+  HANDLE handle = 0;
+
+  VkMemoryGetWin32HandleInfoKHR vk_memory_get_win32_handle_info_khr = {};
+  vk_memory_get_win32_handle_info_khr.sType = VK_STRUCTURE_TYPE_MEMORY_GET_WIN32_HANDLE_INFO_KHR;
+  vk_memory_get_win32_handle_info_khr.pNext = NULL;
+  vk_memory_get_win32_handle_info_khr.memory = memory;
+  vk_memory_get_win32_handle_info_khr.handleType = handle_type;
+
+  PFN_vkGetMemoryWin32HandleKHR fpGetMemoryWin32HandleKHR;
+  fpGetMemoryWin32HandleKHR =
+      (PFN_vkGetMemoryWin32HandleKHR)vkGetDeviceProcAddr(device_->Handle(), "vkGetMemoryWin32HandleKHR");
+  if (!fpGetMemoryWin32HandleKHR) {
+    throw std::runtime_error("Failed to retrieve vkGetMemoryWin32HandleKHR!");
+  }
+  if (fpGetMemoryWin32HandleKHR(device_->Handle(), &vk_memory_get_win32_handle_info_khr, &handle) != VK_SUCCESS) {
+    throw std::runtime_error("Failed to retrieve handle for buffer!");
+  }
+  return (void *)handle;
+#else
+  int fd = -1;
+
+  VkMemoryGetFdInfoKHR vk_memory_get_fd_info_khr = {};
+  vk_memory_get_fd_info_khr.sType = VK_STRUCTURE_TYPE_MEMORY_GET_FD_INFO_KHR;
+  vk_memory_get_fd_info_khr.pNext = NULL;
+  vk_memory_get_fd_info_khr.memory = memory;
+  vk_memory_get_fd_info_khr.handleType = handle_type;
+
+  PFN_vkGetMemoryFdKHR fpGetMemoryFdKHR;
+  fpGetMemoryFdKHR = (PFN_vkGetMemoryFdKHR)vkGetDeviceProcAddr(device_->Handle(), "vkGetMemoryFdKHR");
+  if (!fpGetMemoryFdKHR) {
+    throw std::runtime_error("Failed to retrieve vkGetMemoryWin32HandleKHR!");
+  }
+  if (fpGetMemoryFdKHR(device_->Handle(), &vk_memory_get_fd_info_khr, &fd) != VK_SUCCESS) {
+    throw std::runtime_error("Failed to retrieve handle for buffer!");
+  }
+  return (void *)(uintptr_t)fd;
+#endif
+}
+
+void *VulkanCore::GetSemaphoreHandle(VkSemaphore semaphore) {
+  VkExternalSemaphoreHandleTypeFlagBits handle_type = vulkan::GetDefaultExternalSemaphoreHandleType();
+#ifdef _WIN32
+  HANDLE handle;
+
+  VkSemaphoreGetWin32HandleInfoKHR semaphore_get_win32_handle_info_khr = {};
+  semaphore_get_win32_handle_info_khr.sType = VK_STRUCTURE_TYPE_SEMAPHORE_GET_WIN32_HANDLE_INFO_KHR;
+  semaphore_get_win32_handle_info_khr.pNext = nullptr;
+  semaphore_get_win32_handle_info_khr.semaphore = semaphore;
+  semaphore_get_win32_handle_info_khr.handleType = handle_type;
+
+  PFN_vkGetSemaphoreWin32HandleKHR fpGetSemaphoreWin32HandleKHR;
+  fpGetSemaphoreWin32HandleKHR =
+      (PFN_vkGetSemaphoreWin32HandleKHR)vkGetDeviceProcAddr(device_->Handle(), "vkGetSemaphoreWin32HandleKHR");
+  if (!fpGetSemaphoreWin32HandleKHR) {
+    throw std::runtime_error("Failed to retrieve vkGetMemoryWin32HandleKHR!");
+  }
+  if (fpGetSemaphoreWin32HandleKHR(device_->Handle(), &semaphore_get_win32_handle_info_khr, &handle) != VK_SUCCESS) {
+    throw std::runtime_error("Failed to retrieve handle for buffer!");
+  }
+
+  return (void *)handle;
+#else
+  int fd;
+
+  VkSemaphoreGetFdInfoKHR semaphore_get_fd_info_khr = {};
+  semaphore_get_fd_info_khr.sType = VK_STRUCTURE_TYPE_SEMAPHORE_GET_FD_INFO_KHR;
+  semaphore_get_fd_info_khr.pNext = nullptr;
+  semaphore_get_fd_info_khr.semaphore = semaphore;
+  semaphore_get_fd_info_khr.handleType = handle_type;
+
+  PFN_vkGetSemaphoreFdKHR fpGetSemaphoreFdKHR;
+  fpGetSemaphoreFdKHR = (PFN_vkGetSemaphoreFdKHR)vkGetDeviceProcAddr(device_->Handle(), "vkGetSemaphoreFdKHR");
+  if (!fpGetSemaphoreFdKHR) {
+    throw std::runtime_error("Failed to retrieve vkGetMemoryWin32HandleKHR!");
+  }
+  if (fpGetSemaphoreFdKHR(device_->Handle(), &semaphore_get_fd_info_khr, &fd) != VK_SUCCESS) {
+    throw std::runtime_error("Failed to retrieve handle for buffer!");
+  }
+
+  return (void *)(uintptr_t)fd;
+#endif
+}
+#endif
 
 }  // namespace grassland::graphics::backend

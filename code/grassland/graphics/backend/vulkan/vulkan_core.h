@@ -16,6 +16,10 @@ class VulkanCore : public Core {
 
   int CreateBuffer(size_t size, BufferType type, double_ptr<Buffer> pp_buffer) override;
 
+#if defined(LONGMARCH_CUDA_RUNTIME)
+  int CreateCUDABuffer(size_t size, double_ptr<CUDABuffer> pp_buffer) override;
+#endif
+
   int CreateImage(int width, int height, ImageFormat format, double_ptr<Image> pp_image) override;
 
   int CreateSampler(const SamplerInfo &info, double_ptr<Sampler> pp_sampler) override;
@@ -99,10 +103,21 @@ class VulkanCore : public Core {
 
   void SingleTimeCommand(std::function<void(VkCommandBuffer)> command);
 
+  uint32_t FindMemoryType(uint32_t type_filter, VkMemoryPropertyFlags properties);
+
+#if defined(LONGMARCH_CUDA_RUNTIME)
+  void ImportCudaExternalMemory(cudaExternalMemory_t &cuda_memory, VkDeviceMemory &vulkan_memory, VkDeviceSize size);
+  void CUDABeginExecutionBarrier(cudaStream_t stream) override;
+  void CUDAEndExecutionBarrier(cudaStream_t stream) override;
+  void CUDAWaitExecutionBarrier();
+  void CUDASignalExecutionBarrier();
+#endif
+
  private:
   friend class VulkanCommandContext;
   std::unique_ptr<vulkan::Instance> instance_;
   std::unique_ptr<vulkan::Device> device_;
+  VkPhysicalDeviceMemoryProperties memory_properties_;
 
   uint32_t current_frame_{0};
   std::vector<std::unique_ptr<vulkan::Fence>> in_flight_fences_;
@@ -121,6 +136,15 @@ class VulkanCore : public Core {
   std::unique_ptr<vulkan::Queue> transfer_queue_;
 
   std::vector<std::vector<std::function<void()>>> post_execute_functions_;
+
+#if defined(LONGMARCH_CUDA_RUNTIME)
+  VkSemaphore cuda_synchronization_semaphore_{VK_NULL_HANDLE};
+  uint64_t cuda_synchronization_value_{0};
+  cudaExternalSemaphore_t cuda_external_semaphore_{nullptr};
+
+  void *GetMemoryHandle(VkDeviceMemory memory);
+  void *GetSemaphoreHandle(VkSemaphore semaphore);
+#endif
 };
 
 }  // namespace grassland::graphics::backend

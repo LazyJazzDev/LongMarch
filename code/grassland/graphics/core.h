@@ -94,6 +94,10 @@ class Core {
 
 #if defined(LONGMARCH_CUDA_ENABLED)
   int CUDADeviceIndex() const;
+
+  virtual int CreateCUDABuffer(size_t size, double_ptr<CUDABuffer> pp_buffer) = 0;
+  virtual void CUDABeginExecutionBarrier(cudaStream_t stream = 0) = 0;
+  virtual void CUDAEndExecutionBarrier(cudaStream_t stream = 0) = 0;
 #endif
 
  private:

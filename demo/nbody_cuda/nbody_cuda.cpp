@@ -6,7 +6,7 @@ namespace {
 
 NBodyCUDA::NBodyCUDA(int n_particles) : n_particles_(n_particles) {
   graphics::Core::Settings settings;
-  graphics::CreateCore(graphics::BACKEND_API_DEFAULT, settings, &core_);
+  graphics::CreateCore(graphics::BACKEND_API_VULKAN, settings, &core_);
   core_->InitializeLogicalDeviceAutoSelect(false);
   core_->CreateWindowObject(1920, 1080, "NBody CUDA", false, true, &window_);
 
@@ -20,6 +20,11 @@ NBodyCUDA::NBodyCUDA(int n_particles) : n_particles_(n_particles) {
   } else {
     LogError("Selected graphics device is not a CUDA device.");
   }
+}
+
+NBodyCUDA::~NBodyCUDA() {
+  window_.reset();
+  core_.reset();
 }
 
 void NBodyCUDA::Run() {
@@ -46,7 +51,6 @@ void NBodyCUDA::OnUpdate() {
           world_to_cam,
       glm::inverse(world_to_cam), PARTICLE_SIZE, hdr_};
   global_uniform_buffer_->UploadData(&ubo, sizeof(ubo));
-  particles_pos_->UploadData(positions_.data(), sizeof(glm::vec3) * n_particles_);
 
   static FPSCounter fps_counter;
   window_->SetTitle("NBody CUDA FPS: " + std::to_string(fps_counter.TickFPS()));
@@ -98,10 +102,11 @@ void NBodyCUDA::OnInit() {
   });
 
   core_->CreateBuffer(sizeof(GlobalUniformObject), graphics::BUFFER_TYPE_DYNAMIC, &global_uniform_buffer_);
-  core_->CreateBuffer(sizeof(glm::vec3) * n_particles_, graphics::BUFFER_TYPE_DYNAMIC, &particles_pos_);
+  core_->CreateCUDABuffer(sizeof(glm::vec3) * n_particles_, &particles_pos_);
 
-  positions_.resize(n_particles_);
-  velocities_.resize(n_particles_);
+  particles_pos_->GetCUDAMemoryPointer(&positions_);
+  cudaMalloc(&velocities_, sizeof(glm::vec3) * n_particles_);
+  cudaMalloc(&positions_new_, sizeof(glm::vec3) * n_particles_);
 
   ResetParticles();
 
@@ -126,9 +131,20 @@ void NBodyCUDA::OnInit() {
 }
 
 void NBodyCUDA::OnClose() {
+  cudaFree(velocities_);
+  cudaFree(positions_new_);
+
   program_.reset();
+  vertex_shader_.reset();
+  fragment_shader_.reset();
+  hdr_program_.reset();
+  hdr_vertex_shader_.reset();
+  hdr_fragment_shader_.reset();
+
   particles_pos_.reset();
   global_uniform_buffer_.reset();
+
+  frame_image_.reset();
 }
 
 void NBodyCUDA::BuildRenderNode() {
@@ -173,6 +189,8 @@ glm::vec3 NBodyCUDA::RandomInSphere() {
 }
 
 void NBodyCUDA::ResetParticles() {
+  std::vector<glm::vec3> positions(n_particles_);
+  std::vector<glm::vec3> velocities(n_particles_);
   std::vector<glm::vec3> origins;
   std::vector<glm::vec3> initial_vels;
   for (int i = 0; i < galaxy_number_; i++) {
@@ -194,19 +212,26 @@ void NBodyCUDA::ResetParticles() {
   }
 
   for (int i = 0; i < n_particles_; i++) {
-    auto &pos = positions_[i];
-    auto &vel = velocities_[i];
+    auto &pos = positions[i];
+    auto &vel = velocities[i];
     int index = std::uniform_int_distribution<int>(0, origins.size() - 1)(random_device_);
     pos =
         glm::vec3{RandomInSphere() * INITIAL_RADIUS * 0.2f * pow(10.0f / galaxy_number_, 1.0f / 3.0f)} + origins[index];
     vel = glm::vec3{RandomInSphere() * INITIAL_SPEED} + initial_vels[index];
   }
+
+  core_->CUDABeginExecutionBarrier();
+  cudaMemcpyAsync(positions_, positions.data(), sizeof(glm::vec3) * n_particles_, cudaMemcpyHostToDevice);
+  cudaMemcpyAsync(velocities_, velocities.data(), sizeof(glm::vec3) * n_particles_, cudaMemcpyHostToDevice);
+  core_->CUDAEndExecutionBarrier();
 }
 
 void NBodyCUDA::UpdateParticles() {
   if (!step_)
     return;
-  UpdateStep(positions_.data(), velocities_.data(), n_particles_, delta_t_);
+  core_->CUDABeginExecutionBarrier();
+  UpdateStep(positions_, velocities_, positions_new_, n_particles_, delta_t_);
+  core_->CUDAEndExecutionBarrier();
 }
 
 void NBodyCUDA::UpdateImGui() {

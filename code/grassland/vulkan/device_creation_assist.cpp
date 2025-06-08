@@ -62,10 +62,10 @@ class DeviceCreateInfo DeviceFeatureRequirement::GenerateRecommendedDeviceCreate
   create_info.AddExtension(VK_EXT_SCALAR_BLOCK_LAYOUT_EXTENSION_NAME);
 
   VkPhysicalDeviceExtendedDynamicStateFeaturesEXT physical_device_extended_dynamic_state_features{};
-  VkPhysicalDeviceScalarBlockLayoutFeaturesEXT scalar_block_layout_features = {};
   physical_device_extended_dynamic_state_features.sType =
       VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_EXTENDED_DYNAMIC_STATE_FEATURES_EXT;
   physical_device_extended_dynamic_state_features.extendedDynamicState = VK_TRUE;
+  VkPhysicalDeviceScalarBlockLayoutFeaturesEXT scalar_block_layout_features = {};
   scalar_block_layout_features.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SCALAR_BLOCK_LAYOUT_FEATURES_EXT;
   scalar_block_layout_features.scalarBlockLayout = VK_TRUE;
   create_info.AddFeature(physical_device_extended_dynamic_state_features);

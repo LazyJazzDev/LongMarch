@@ -24,6 +24,10 @@ class D3D12Core : public Core {
 
   int CreateBuffer(size_t size, BufferType type, double_ptr<Buffer> pp_buffer) override;
 
+#if defined(LONGMARCH_CUDA_RUNTIME)
+  int CreateCUDABuffer(size_t size, double_ptr<CUDABuffer> pp_buffer) override;
+#endif
+
   int CreateImage(int width, int height, ImageFormat format, double_ptr<Image> pp_image) override;
 
   int CreateSampler(const SamplerInfo &info, double_ptr<Sampler> pp_sampler) override;
@@ -118,6 +122,11 @@ class D3D12Core : public Core {
   d3d12::DescriptorHeap *DSVDescriptorHeap() const {
     return dsv_descriptor_heaps_[current_frame_].get();
   }
+
+#if defined(LONGMARCH_CUDA_RUNTIME)
+  void CUDABeginExecutionBarrier(cudaStream_t stream) override;
+  void CUDAEndExecutionBarrier(cudaStream_t stream) override;
+#endif
 
  private:
   std::unique_ptr<d3d12::DXGIFactory> dxgi_factory_;
