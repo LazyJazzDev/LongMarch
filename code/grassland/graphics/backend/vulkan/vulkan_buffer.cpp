@@ -162,7 +162,7 @@ void VulkanDynamicBuffer::TransferData(VkCommandBuffer cmd_buffer) {
   vkCmdCopyBuffer(cmd_buffer, staging_buffer_->Handle(), buffers_[core_->CurrentFrame()]->Handle(), 1, &copy_region);
 }
 
-#if defined(LONGMARCH_CUDA_ENABLED)
+#if defined(LONGMARCH_CUDA_RUNTIME)
 VulkanCUDABuffer::VulkanCUDABuffer(VulkanCore *core, size_t size) : core_(core), size_(size) {
   auto usage = VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_TRANSFER_SRC_BIT |
                VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT | VK_BUFFER_USAGE_STORAGE_BUFFER_BIT |

@@ -124,7 +124,7 @@ void D3D12DynamicBuffer::TransferData(ID3D12GraphicsCommandList *command_list) {
                                  staging_buffer_->Size());
 }
 
-#if defined(LONGMARCH_CUDA_ENABLED)
+#if defined(LONGMARCH_CUDA_RUNTIME)
 D3D12CUDABuffer::D3D12CUDABuffer(D3D12Core *core, size_t size) : core_(core) {
   core_->Device()->CreateBuffer(size, D3D12_HEAP_TYPE_DEFAULT, D3D12_HEAP_FLAG_SHARED,
                                 D3D12_RESOURCE_STATE_GENERIC_READ, D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS,

@@ -92,7 +92,7 @@ class Core {
 
   static void PyBind(pybind11::module &m);
 
-#if defined(LONGMARCH_CUDA_ENABLED)
+#if defined(LONGMARCH_CUDA_RUNTIME)
   int CUDADeviceIndex() const;
 
   virtual int CreateCUDABuffer(size_t size, double_ptr<CUDABuffer> pp_buffer) = 0;
