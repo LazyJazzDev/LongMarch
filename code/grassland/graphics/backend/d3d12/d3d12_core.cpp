@@ -110,7 +110,7 @@ int D3D12Core::CreateShader(const std::string &source_code,
                             const std::string &entry_point,
                             const std::string &target,
                             double_ptr<Shader> pp_shader) {
-  pp_shader.construct<D3D12Shader>(this, CompileShader(source_code, entry_point, target));
+  pp_shader.construct<D3D12Shader>(this, CompileShader(source_code, entry_point, target, {"-Wno-ignored-attributes"}));
   return 0;
 }
 
