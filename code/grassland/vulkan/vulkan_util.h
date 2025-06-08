@@ -6,7 +6,7 @@
 #include <vk_mem_alloc.h>
 #include <vulkan/vulkan.h>
 
-#ifdef _WIN32
+#ifdef _WIN64
 // clang-format off
 #define NOMINMAX
 #include <Windows.h>

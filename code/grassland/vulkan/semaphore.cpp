@@ -1,6 +1,6 @@
 #include "grassland/vulkan/semaphore.h"
 
-#ifdef _WIN32
+#ifdef _WIN64
 #include <VersionHelpers.h>
 #endif
 
@@ -13,7 +13,7 @@ Semaphore::~Semaphore() {
 }
 #if defined(LONGMARCH_CUDA_RUNTIME)
 VkExternalSemaphoreHandleTypeFlagBits GetDefaultExternalSemaphoreHandleType() {
-#ifdef _WIN32
+#ifdef _WIN64
   return IsWindows8OrGreater() ? VK_EXTERNAL_SEMAPHORE_HANDLE_TYPE_OPAQUE_WIN32_BIT
                                : VK_EXTERNAL_SEMAPHORE_HANDLE_TYPE_OPAQUE_WIN32_KMT_BIT;
 #else

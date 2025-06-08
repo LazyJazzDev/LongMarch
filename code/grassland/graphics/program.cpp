@@ -1,6 +1,6 @@
 #include "grassland/graphics/program.h"
 
-#if defined(_WIN32)
+#ifdef _WIN64
 #include "d3dcompiler.h"
 #endif
 

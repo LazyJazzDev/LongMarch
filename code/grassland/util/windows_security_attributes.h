@@ -1,5 +1,5 @@
 #pragma once
-#ifdef _WIN32
+#ifdef _WIN64
 #include "grassland/util/util_util.h"
 
 namespace grassland {

@@ -1,5 +1,5 @@
 #include "grassland/util/windows_security_attributes.h"
-#ifdef _WIN32
+#ifdef _WIN64
 #include <aclapi.h>
 
 namespace grassland {

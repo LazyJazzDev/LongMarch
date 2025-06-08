@@ -6,9 +6,9 @@
 #include "grassland/util/util.h"
 #include "grassland/vulkan/vulkan.h"
 
-#if defined(_WIN32)
+#ifdef _WIN64
 #include "grassland/d3d12/direct3d12.h"
-#endif  // _WIN32
+#endif  // _WIN64
 
 namespace grassland {
 

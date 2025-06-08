@@ -2,7 +2,7 @@
 
 #include "grassland/vulkan/single_time_command.h"
 
-#if defined(_WIN32)
+#ifdef _WIN64
 #include <VersionHelpers.h>
 #include <dxgi1_2.h>
 #endif
@@ -59,7 +59,7 @@ void DownloadBuffer(Queue *queue, CommandPool *command_pool, Buffer *buffer, voi
 
 #if defined(LONGMARCH_CUDA_RUNTIME)
 VkExternalMemoryHandleTypeFlagBits GetDefaultExternalMemoryHandleType() {
-#ifdef _WIN32
+#ifdef _WIN64
   return IsWindows8Point1OrGreater() ? VK_EXTERNAL_MEMORY_HANDLE_TYPE_OPAQUE_WIN32_BIT
                                      : VK_EXTERNAL_MEMORY_HANDLE_TYPE_OPAQUE_WIN32_KMT_BIT;
 #else
@@ -93,7 +93,7 @@ void CreateExternalBuffer(VkDevice device,
   VkMemoryRequirements memory_requirements;
   vkGetBufferMemoryRequirements(device, buffer, &memory_requirements);
 
-#ifdef _WIN32
+#ifdef _WIN64
   WindowsSecurityAttributes winSecurityAttributes;
 
   VkExportMemoryWin32HandleInfoKHR vulkan_export_memory_win32_handle_info_khr = {};
@@ -105,7 +105,7 @@ void CreateExternalBuffer(VkDevice device,
 #endif /* _WIN64 */
   VkExportMemoryAllocateInfoKHR export_memory_allocate_info = {};
   export_memory_allocate_info.sType = VK_STRUCTURE_TYPE_EXPORT_MEMORY_ALLOCATE_INFO_KHR;
-#ifdef _WIN32
+#ifdef _WIN64
   export_memory_allocate_info.pNext = handle_type & VK_EXTERNAL_MEMORY_HANDLE_TYPE_OPAQUE_WIN32_BIT_KHR
                                           ? &vulkan_export_memory_win32_handle_info_khr
                                           : NULL;

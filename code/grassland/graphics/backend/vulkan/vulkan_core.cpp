@@ -406,7 +406,7 @@ int VulkanCore::InitializeLogicalDevice(int device_index) {
     create_info.AddExtension(VK_KHR_EXTERNAL_MEMORY_EXTENSION_NAME);
     create_info.AddExtension(VK_KHR_EXTERNAL_SEMAPHORE_EXTENSION_NAME);
     create_info.AddExtension(VK_KHR_TIMELINE_SEMAPHORE_EXTENSION_NAME);
-#ifdef _WIN32
+#ifdef _WIN64
     create_info.AddExtension(VK_KHR_EXTERNAL_MEMORY_WIN32_EXTENSION_NAME);
     create_info.AddExtension(VK_KHR_EXTERNAL_SEMAPHORE_WIN32_EXTENSION_NAME);
 #else
@@ -497,10 +497,10 @@ int VulkanCore::InitializeLogicalDevice(int device_index) {
       throw std::runtime_error("Unknown handle type requested!");
     }
 
-#ifdef _WIN32
+#ifdef _WIN64
     external_semaphore_handle_desc.handle.win32.handle = (HANDLE)GetSemaphoreHandle(cuda_synchronization_semaphore_);
 #else
-    external_semaphore_handle_desc.handle.fd = (int)(uintptr_t)getSemaphoreHandle(vkSem, handleType);
+    external_semaphore_handle_desc.handle.fd = (int)(uintptr_t)GetSemaphoreHandle(cuda_synchronization_semaphore_);
 #endif
 
     external_semaphore_handle_desc.flags = 0;
@@ -582,7 +582,7 @@ void VulkanCore::ImportCudaExternalMemory(cudaExternalMemory_t &cuda_memory,
 #ifdef _WIN64
   external_memory_handle_desc.handle.win32.handle = (HANDLE)GetMemoryHandle(vulkan_memory);
 #else
-  externalMemoryHandleDesc.handle.fd = (int)(uintptr_t)getMemHandle(vkMem, handleType);
+  external_memory_handle_desc.handle.fd = (int)(uintptr_t)GetMemoryHandle(vulkan_memory);
 #endif
 
   cudaImportExternalMemory(&cuda_memory, &external_memory_handle_desc);
@@ -614,7 +614,7 @@ void VulkanCore::CUDAEndExecutionBarrier(cudaStream_t stream) {
 
 void *VulkanCore::GetMemoryHandle(VkDeviceMemory memory) {
   VkExternalMemoryHandleTypeFlagBits handle_type = vulkan::GetDefaultExternalMemoryHandleType();
-#ifdef _WIN32
+#ifdef _WIN64
   HANDLE handle = 0;
 
   VkMemoryGetWin32HandleInfoKHR vk_memory_get_win32_handle_info_khr = {};
@@ -656,7 +656,7 @@ void *VulkanCore::GetMemoryHandle(VkDeviceMemory memory) {
 
 void *VulkanCore::GetSemaphoreHandle(VkSemaphore semaphore) {
   VkExternalSemaphoreHandleTypeFlagBits handle_type = vulkan::GetDefaultExternalSemaphoreHandleType();
-#ifdef _WIN32
+#ifdef _WIN64
   HANDLE handle;
 
   VkSemaphoreGetWin32HandleInfoKHR semaphore_get_win32_handle_info_khr = {};

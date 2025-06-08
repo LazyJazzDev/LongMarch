@@ -152,7 +152,7 @@ int Core::CUDADeviceIndex() const {
 
 int CreateCore(BackendAPI api, const Core::Settings &settings, double_ptr<Core> pp_core) {
   switch (api) {
-#if defined(_WIN32)
+#ifdef _WIN64
     case BACKEND_API_D3D12:
       pp_core.construct<backend::D3D12Core>(settings);
       break;

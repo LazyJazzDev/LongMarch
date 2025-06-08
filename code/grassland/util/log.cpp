@@ -9,17 +9,15 @@ std::string GetTimestamp() {
   auto now = std::chrono::system_clock::now();
   std::time_t current_time = std::chrono::system_clock::to_time_t(now);
   std::tm local_time{};
-#ifdef _WIN32
+#ifdef _WIN64
   localtime_s(&local_time, &current_time);
 #else
   localtime_r(&current_time, &local_time);
 #endif
-  auto milliseconds = std::chrono::duration_cast<std::chrono::milliseconds>(
-                          now.time_since_epoch()) %
-                      1000;
+  auto milliseconds = std::chrono::duration_cast<std::chrono::milliseconds>(now.time_since_epoch()) % 1000;
   std::ostringstream oss;
-  oss << std::put_time(&local_time, "[%Y-%m-%d %H:%M:%S.") << std::setfill('0')
-      << std::setw(3) << milliseconds.count() << "]";
+  oss << std::put_time(&local_time, "[%Y-%m-%d %H:%M:%S.") << std::setfill('0') << std::setw(3) << milliseconds.count()
+      << "]";
   return oss.str();
 }
 

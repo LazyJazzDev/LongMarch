@@ -263,9 +263,13 @@ void NBodyCUDA::UpdateImGui() {
     }
 
     if (ImGui::CollapsingHeader("Speed Distribution")) {
+      std::vector<glm::vec3> velocities(n_particles_);
+      core_->CUDABeginExecutionBarrier();
+      cudaMemcpy(velocities.data(), velocities_, sizeof(glm::vec3) * n_particles_, cudaMemcpyDeviceToHost);
+      core_->CUDAEndExecutionBarrier();
       std::vector<float> speeds(n_particles_);
       for (int i = 0; i < n_particles_; i++) {
-        speeds[i] = glm::length(velocities_[i]);
+        speeds[i] = glm::length(velocities[i]);
       }
       std::sort(speeds.begin(), speeds.end());
       float max_speed = speeds[n_particles_ - 1];
