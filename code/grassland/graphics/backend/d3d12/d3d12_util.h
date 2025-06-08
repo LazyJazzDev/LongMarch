@@ -50,4 +50,8 @@ struct D3D12ResourceBinding {
   D3D12Image *image;
 };
 
+#if defined(LONGMARCH_CUDA_RUNTIME)
+class D3D12CUDABuffer;
+#endif
+
 }  // namespace grassland::graphics::backend

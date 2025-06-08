@@ -11,15 +11,18 @@ Fence::Fence(const ComPtr<ID3D12Fence> &fence) : fence_(fence), value_(0) {
 
 HRESULT Fence::Signal(CommandQueue *command_queue) {
   value_++;
-  RETURN_IF_FAILED_HR(command_queue->Handle()->Signal(fence_.Get(), value_),
-                      "failed to signal fence.");
+  RETURN_IF_FAILED_HR(command_queue->Handle()->Signal(fence_.Get(), value_), "failed to signal fence.");
+  return S_OK;
+}
+
+HRESULT Fence::Wait(CommandQueue *command_queue) {
+  RETURN_IF_FAILED_HR(command_queue->Handle()->Wait(fence_.Get(), value_), "failed to wait fence.");
   return S_OK;
 }
 
 HRESULT Fence::WaitFor(uint64_t value) {
   if (fence_->GetCompletedValue() < value) {
-    RETURN_IF_FAILED_HR(fence_->SetEventOnCompletion(value, fence_event_),
-                        "failed to set event on completion.");
+    RETURN_IF_FAILED_HR(fence_->SetEventOnCompletion(value, fence_event_), "failed to set event on completion.");
     WaitForSingleObject(fence_event_, INFINITE);
   }
   return S_OK;

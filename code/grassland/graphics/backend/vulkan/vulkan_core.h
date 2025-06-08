@@ -109,8 +109,6 @@ class VulkanCore : public Core {
   void ImportCudaExternalMemory(cudaExternalMemory_t &cuda_memory, VkDeviceMemory &vulkan_memory, VkDeviceSize size);
   void CUDABeginExecutionBarrier(cudaStream_t stream) override;
   void CUDAEndExecutionBarrier(cudaStream_t stream) override;
-  void CUDAWaitExecutionBarrier();
-  void CUDASignalExecutionBarrier();
 #endif
 
  private:

@@ -57,4 +57,8 @@ struct VulkanResourceBinding {
   VulkanImage *image;
 };
 
+#if defined(LONGMARCH_CUDA_RUNTIME)
+class VulkanCUDABuffer;
+#endif
+
 }  // namespace grassland::graphics::backend

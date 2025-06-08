@@ -124,4 +124,81 @@ void D3D12DynamicBuffer::TransferData(ID3D12GraphicsCommandList *command_list) {
                                  staging_buffer_->Size());
 }
 
+#if defined(LONGMARCH_CUDA_ENABLED)
+D3D12CUDABuffer::D3D12CUDABuffer(D3D12Core *core, size_t size) : core_(core) {
+  core_->Device()->CreateBuffer(size, D3D12_HEAP_TYPE_DEFAULT, D3D12_HEAP_FLAG_SHARED,
+                                D3D12_RESOURCE_STATE_GENERIC_READ, D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS,
+                                &buffer_);
+  core_->ImportCudaExternalMemory(cuda_memory_, buffer_.get());
+}
+
+D3D12CUDABuffer::~D3D12CUDABuffer() {
+  cudaDestroyExternalMemory(cuda_memory_);
+  buffer_.reset();
+}
+
+BufferType D3D12CUDABuffer::Type() const {
+  return BUFFER_TYPE_STATIC;
+}
+
+size_t D3D12CUDABuffer::Size() const {
+  return buffer_->Size();
+}
+
+void D3D12CUDABuffer::Resize(size_t new_size) {
+  core_->WaitGPU();
+  std::unique_ptr<d3d12::Buffer> new_buffer;
+  core_->Device()->CreateBuffer(new_size, D3D12_HEAP_TYPE_DEFAULT, &new_buffer);
+  core_->SingleTimeCommand([&](ID3D12GraphicsCommandList *command_list) {
+    d3d12::CopyBuffer(command_list, buffer_.get(), new_buffer.get(), std::min(buffer_->Size(), new_size));
+  });
+  cudaDestroyExternalMemory(cuda_memory_);
+  buffer_.reset();
+
+  buffer_ = std::move(new_buffer);
+  core_->ImportCudaExternalMemory(cuda_memory_, buffer_.get());
+}
+
+void D3D12CUDABuffer::UploadData(const void *data, size_t size, size_t offset) {
+  core_->WaitGPU();
+  std::unique_ptr<d3d12::Buffer> staging_buffer;
+  core_->Device()->CreateBuffer(size, D3D12_HEAP_TYPE_UPLOAD, &staging_buffer);
+  std::memcpy(staging_buffer->Map(), data, size);
+  staging_buffer->Unmap();
+  core_->SingleTimeCommand([&](ID3D12GraphicsCommandList *command_list) {
+    void *mapped_data = staging_buffer->Map();
+    std::memcpy(mapped_data, data, size);
+    staging_buffer->Unmap();
+    d3d12::CopyBuffer(command_list, staging_buffer.get(), buffer_.get(), size, 0, offset);
+  });
+}
+
+void D3D12CUDABuffer::DownloadData(void *data, size_t size, size_t offset) {
+  core_->WaitGPU();
+  std::unique_ptr<d3d12::Buffer> staging_buffer;
+  core_->Device()->CreateBuffer(size, D3D12_HEAP_TYPE_READBACK, &staging_buffer);
+  core_->SingleTimeCommand([&](ID3D12GraphicsCommandList *command_list) {
+    d3d12::CopyBuffer(command_list, buffer_.get(), staging_buffer.get(), size, offset);
+  });
+  std::memcpy(data, staging_buffer->Map(), size);
+  staging_buffer->Unmap();
+}
+
+d3d12::Buffer *D3D12CUDABuffer::Buffer() const {
+  return buffer_.get();
+}
+
+d3d12::Buffer *D3D12CUDABuffer::InstantBuffer() const {
+  return buffer_.get();
+}
+
+void D3D12CUDABuffer::GetCUDAMemoryPointer(void **ptr) {
+  cudaExternalMemoryBufferDesc externalMemBufferDesc = {};
+  externalMemBufferDesc.offset = 0;
+  externalMemBufferDesc.size = buffer_->Size();
+  externalMemBufferDesc.flags = 0;
+  cudaExternalMemoryGetMappedBuffer(ptr, cuda_memory_, &externalMemBufferDesc);
+}
+#endif
+
 }  // namespace grassland::graphics::backend

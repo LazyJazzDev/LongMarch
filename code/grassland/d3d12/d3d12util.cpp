@@ -76,15 +76,25 @@ bool IsDepthFormat(DXGI_FORMAT format) {
 HRESULT CreateBuffer(ID3D12Device *device,
                      size_t size,
                      D3D12_HEAP_TYPE heap_type,
+                     D3D12_HEAP_FLAGS heap_flags,
                      D3D12_RESOURCE_STATES resource_state,
                      D3D12_RESOURCE_FLAGS resource_flags,
                      ComPtr<ID3D12Resource> &buffer) {
   auto heap_properties = CD3DX12_HEAP_PROPERTIES(heap_type);
   auto resource_desc = CD3DX12_RESOURCE_DESC::Buffer(SizeAlignTo(size, 256), resource_flags);
-  RETURN_IF_FAILED_HR(device->CreateCommittedResource(&heap_properties, D3D12_HEAP_FLAG_NONE, &resource_desc,
-                                                      resource_state, nullptr, IID_PPV_ARGS(&buffer)),
+  RETURN_IF_FAILED_HR(device->CreateCommittedResource(&heap_properties, heap_flags, &resource_desc, resource_state,
+                                                      nullptr, IID_PPV_ARGS(&buffer)),
                       "failed to create buffer.");
   return S_OK;
+}
+
+HRESULT CreateBuffer(ID3D12Device *device,
+                     size_t size,
+                     D3D12_HEAP_TYPE heap_type,
+                     D3D12_RESOURCE_STATES resource_state,
+                     D3D12_RESOURCE_FLAGS resource_flags,
+                     ComPtr<ID3D12Resource> &buffer) {
+  return CreateBuffer(device, size, heap_type, D3D12_HEAP_FLAG_NONE, resource_state, resource_flags, buffer);
 }
 
 }  // namespace grassland::d3d12

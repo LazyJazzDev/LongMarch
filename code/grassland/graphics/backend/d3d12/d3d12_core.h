@@ -94,15 +94,11 @@ class D3D12Core : public Core {
   }
 
   d3d12::Fence *Fence() const {
-    return fences_[current_frame_].get();
+    return fence_.get();
   }
 
   d3d12::CommandAllocator *SingleTimeCommandAllocator() const {
     return single_time_allocator_.get();
-  }
-
-  d3d12::Fence *SingleTimeFence() const {
-    return single_time_fence_.get();
   }
 
   uint32_t CurrentFrame() const override {
@@ -124,6 +120,7 @@ class D3D12Core : public Core {
   }
 
 #if defined(LONGMARCH_CUDA_RUNTIME)
+  void ImportCudaExternalMemory(cudaExternalMemory_t &cuda_memory, d3d12::Buffer *buffer);
   void CUDABeginExecutionBarrier(cudaStream_t stream) override;
   void CUDAEndExecutionBarrier(cudaStream_t stream) override;
 #endif
@@ -139,15 +136,14 @@ class D3D12Core : public Core {
   std::vector<std::unique_ptr<d3d12::CommandAllocator>> command_allocators_;
   std::vector<std::unique_ptr<d3d12::CommandList>> command_lists_;
 
-  std::vector<std::unique_ptr<d3d12::Fence>> fences_;
+  std::unique_ptr<d3d12::Fence> fence_;
+  std::vector<uint64_t> in_flight_values_;
 
   std::unique_ptr<d3d12::CommandAllocator> single_time_allocator_;
   std::unique_ptr<d3d12::CommandList> single_time_command_list_;
-  std::unique_ptr<d3d12::Fence> single_time_fence_;
 
   std::unique_ptr<d3d12::CommandAllocator> transfer_allocator_;
   std::unique_ptr<d3d12::CommandList> transfer_command_list_;
-  std::unique_ptr<d3d12::Fence> transfer_fence_;
 
   std::vector<std::unique_ptr<d3d12::DescriptorHeap>> resource_descriptor_heaps_;
   std::vector<std::unique_ptr<d3d12::DescriptorHeap>> sampler_descriptor_heaps_;
@@ -158,6 +154,11 @@ class D3D12Core : public Core {
   uint32_t current_frame_{0};
 
   std::vector<std::vector<std::function<void()>>> post_execute_functions_;
+
+#if defined(LONGMARCH_CUDA_RUNTIME)
+  uint32_t cuda_device_node_mask_;
+  cudaExternalSemaphore_t cuda_semaphore_{};
+#endif
 };
 
 }  // namespace grassland::graphics::backend

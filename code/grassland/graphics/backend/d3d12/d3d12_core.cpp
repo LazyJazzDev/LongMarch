@@ -81,6 +81,7 @@ int D3D12Core::CreateBuffer(size_t size, BufferType type, double_ptr<Buffer> pp_
 
 #if defined(LONGMARCH_CUDA_RUNTIME)
 int D3D12Core::CreateCUDABuffer(size_t size, double_ptr<CUDABuffer> pp_buffer) {
+  pp_buffer.construct<D3D12CUDABuffer>(this, size);
   return 0;
 }
 #endif
@@ -144,7 +145,7 @@ int D3D12Core::CreateBottomLevelAccelerationStructure(Buffer *vertex_buffer,
   std::unique_ptr<d3d12::AccelerationStructure> blas;
   device_->CreateBottomLevelAccelerationStructure(d3d12_vertex_buffer->InstantBuffer(),
                                                   d3d12_index_buffer->InstantBuffer(), stride, command_queue_.get(),
-                                                  single_time_fence_.get(), single_time_allocator_.get(), &blas);
+                                                  fence_.get(), single_time_allocator_.get(), &blas);
 
   pp_blas.construct<D3D12AccelerationStructure>(this, std::move(blas));
 
@@ -161,7 +162,7 @@ int D3D12Core::CreateTopLevelAccelerationStructure(const std::vector<RayTracingI
   }
 
   std::unique_ptr<d3d12::AccelerationStructure> tlas;
-  device_->CreateTopLevelAccelerationStructure(d3d12_instances, command_queue_.get(), single_time_fence_.get(),
+  device_->CreateTopLevelAccelerationStructure(d3d12_instances, command_queue_.get(), fence_.get(),
                                                single_time_allocator_.get(), &tlas);
 
   pp_tlas.construct<D3D12AccelerationStructure>(this, std::move(tlas));
@@ -189,7 +190,7 @@ int D3D12Core::CreateRayTracingProgram(Shader *raygen_shader,
 int D3D12Core::SubmitCommandContext(CommandContext *p_command_context) {
   D3D12CommandContext *command_context = dynamic_cast<D3D12CommandContext *>(p_command_context);
 
-  bool wait_for_transfer = false;
+  uint64_t transfer_wait_value = 0;
   if (command_context->dynamic_buffers_.size()) {
     transfer_allocator_->ResetCommandRecord(transfer_command_list_.get());
     for (auto buffer : command_context->dynamic_buffers_) {
@@ -198,9 +199,11 @@ int D3D12Core::SubmitCommandContext(CommandContext *p_command_context) {
     transfer_command_list_->Handle()->Close();
 
     ID3D12CommandList *command_lists[] = {transfer_command_list_->Handle()};
+
+    fence_->Wait(transfer_command_queue_.get());
     transfer_command_queue_->Handle()->ExecuteCommandLists(1, command_lists);
-    transfer_fence_->Signal(transfer_command_queue_.get());
-    wait_for_transfer = true;
+    fence_->Signal(transfer_command_queue_.get());
+    transfer_wait_value = fence_->Value();
   }
 
   command_allocators_[current_frame_]->ResetCommandRecord(command_lists_[current_frame_].get());
@@ -283,22 +286,20 @@ int D3D12Core::SubmitCommandContext(CommandContext *p_command_context) {
   command_context->rtv_index_.clear();
 
   ID3D12CommandList *command_lists[] = {command_list};
-  if (wait_for_transfer) {
-    command_queue_->Handle()->Wait(transfer_fence_->Handle(), transfer_fence_->Value());
-  }
+  fence_->Wait(command_queue_.get());
   command_queue_->Handle()->ExecuteCommandLists(1, command_lists);
 
   for (auto window : command_context->windows_) {
     window->SwapChain()->Handle()->Present(0, 0);
   }
 
-  fences_[current_frame_]->Signal(command_queue_.get());
+  fence_->Signal(command_queue_.get());
+  in_flight_values_[current_frame_] = fence_->Value();
 
   post_execute_functions_[current_frame_] = p_command_context->GetPostExecutionCallbacks();
 
   current_frame_ = (current_frame_ + 1) % FramesInFlight();
-  fences_[current_frame_]->Wait();
-  transfer_fence_->Wait();
+  fence_->WaitFor(std::max(in_flight_values_[current_frame_], transfer_wait_value));
 
   for (auto &function : post_execute_functions_[current_frame_]) {
     function();
@@ -345,31 +346,24 @@ int D3D12Core::InitializeLogicalDevice(int device_index) {
   device_->CreateCommandQueue(D3D12_COMMAND_LIST_TYPE_DIRECT, &command_queue_);
   command_allocators_.resize(FramesInFlight());
   command_lists_.resize(FramesInFlight());
-  fences_.resize(FramesInFlight());
   resource_descriptor_heaps_.resize(FramesInFlight());
   sampler_descriptor_heaps_.resize(FramesInFlight());
   rtv_descriptor_heaps_.resize(FramesInFlight());
   dsv_descriptor_heaps_.resize(FramesInFlight());
-
   post_execute_functions_.resize(FramesInFlight());
-
   for (int i = 0; i < FramesInFlight(); i++) {
     device_->CreateDescriptorHeap(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV, 64, &resource_descriptor_heaps_[i]);
     device_->CreateDescriptorHeap(D3D12_DESCRIPTOR_HEAP_TYPE_SAMPLER, 64, &sampler_descriptor_heaps_[i]);
 
     device_->CreateCommandAllocator(D3D12_COMMAND_LIST_TYPE_DIRECT, &command_allocators_[i]);
-    device_->CreateFence(&fences_[i]);
-
     command_allocators_[i]->CreateCommandList(D3D12_COMMAND_LIST_TYPE_DIRECT, &command_lists_[i]);
   }
 
   device_->CreateCommandAllocator(D3D12_COMMAND_LIST_TYPE_DIRECT, &single_time_allocator_);
-  device_->CreateFence(&single_time_fence_);
   single_time_allocator_->CreateCommandList(D3D12_COMMAND_LIST_TYPE_DIRECT, &single_time_command_list_);
 
   device_->CreateCommandQueue(D3D12_COMMAND_LIST_TYPE_DIRECT, &transfer_command_queue_);
   device_->CreateCommandAllocator(D3D12_COMMAND_LIST_TYPE_DIRECT, &transfer_allocator_);
-  device_->CreateFence(&transfer_fence_);
   transfer_allocator_->CreateCommandList(D3D12_COMMAND_LIST_TYPE_DIRECT, &transfer_command_list_);
 
   blit_pipeline_.Initialize(device_.get());
@@ -385,17 +379,36 @@ int D3D12Core::InitializeLogicalDevice(int device_index) {
     cudaGetDeviceProperties(&device_prop, device_index);
     if (std::memcmp(&device_prop.luid, &adapter_desc.AdapterLuid, sizeof(LUID)) == 0) {
       cuda_device_ = device_index;
+      cuda_device_node_mask_ = device_prop.luidDeviceNodeMask;
       break;
     }
   }
+
+  if (cuda_device_ >= 0) {
+    device_->CreateFence(D3D12_FENCE_FLAG_SHARED, &fence_);
+    cudaExternalSemaphoreHandleDesc externalSemaphoreHandleDesc{};
+    WindowsSecurityAttributes windowsSecurityAttributes;
+    LPCWSTR name = nullptr;
+    HANDLE sharedHandle;
+    externalSemaphoreHandleDesc.type = cudaExternalSemaphoreHandleTypeD3D12Fence;
+    device_->Handle()->CreateSharedHandle(fence_->Handle(), &windowsSecurityAttributes, GENERIC_ALL, name,
+                                          &sharedHandle);
+    externalSemaphoreHandleDesc.handle.win32.handle = (void *)sharedHandle;
+    externalSemaphoreHandleDesc.flags = 0;
+
+    cudaImportExternalSemaphore(&cuda_semaphore_, &externalSemaphoreHandleDesc);
+  } else
 #endif
+  {
+    device_->CreateFence(D3D12_FENCE_FLAG_NONE, &fence_);
+  }
+  in_flight_values_.resize(FramesInFlight(), 0);
 
   return 0;
 }
 
 void D3D12Core::WaitGPU() {
-  single_time_fence_->Signal(command_queue_.get());
-  single_time_fence_->Wait();
+  fence_->Wait();
   for (auto &post_execute : post_execute_functions_) {
     for (auto &callback : post_execute) {
       callback();
@@ -410,15 +423,64 @@ void D3D12Core::SingleTimeCommand(std::function<void(ID3D12GraphicsCommandList *
   single_time_command_list_->Handle()->Close();
 
   ID3D12CommandList *command_lists[] = {single_time_command_list_->Handle()};
+  fence_->Wait(command_queue_.get());
   command_queue_->Handle()->ExecuteCommandLists(1, command_lists);
-  single_time_fence_->Signal(command_queue_.get());
-  single_time_fence_->Wait();
+  fence_->Signal(command_queue_.get());
+  fence_->Wait();
+}
+
+#if defined(LONGMARCH_CUDA_RUNTIME)
+void D3D12Core::ImportCudaExternalMemory(cudaExternalMemory_t &cuda_memory, d3d12::Buffer *buffer) {
+  HANDLE sharedHandle;
+  WindowsSecurityAttributes windowsSecurityAttributes;
+  LPCWSTR name = NULL;
+  d3d12::ThrowIfFailed(device_->Handle()->CreateSharedHandle(buffer->Handle(), &windowsSecurityAttributes, GENERIC_ALL,
+                                                             name, &sharedHandle),
+                       "Failed to create shared handle for D3D12 resource");
+
+  D3D12_RESOURCE_ALLOCATION_INFO d3d12ResourceAllocationInfo;
+  auto resource_desc = CD3DX12_RESOURCE_DESC::Buffer(buffer->Size());
+  d3d12ResourceAllocationInfo = device_->Handle()->GetResourceAllocationInfo(cuda_device_node_mask_, 1, &resource_desc);
+  size_t actualSize = d3d12ResourceAllocationInfo.SizeInBytes;
+  size_t alignment = d3d12ResourceAllocationInfo.Alignment;
+
+  cudaExternalMemoryHandleDesc externalMemoryHandleDesc;
+  memset(&externalMemoryHandleDesc, 0, sizeof(externalMemoryHandleDesc));
+
+  externalMemoryHandleDesc.type = cudaExternalMemoryHandleTypeD3D12Resource;
+  externalMemoryHandleDesc.handle.win32.handle = sharedHandle;
+  externalMemoryHandleDesc.size = actualSize;
+  externalMemoryHandleDesc.flags = cudaExternalMemoryDedicated;
+
+  cudaImportExternalMemory(&cuda_memory, &externalMemoryHandleDesc);
+  CloseHandle(sharedHandle);
 }
 
 void D3D12Core::CUDABeginExecutionBarrier(cudaStream_t stream) {
+  if (cuda_device_ < 0) {
+    throw std::runtime_error("Not CUDA device!");
+  }
+
+  cudaExternalSemaphoreWaitParams wait_params = {};
+  wait_params.flags = 0;
+  wait_params.params.fence.value = fence_->Value();
+
+  cudaWaitExternalSemaphoresAsync(&cuda_semaphore_, &wait_params, 1, stream);
 }
 
 void D3D12Core::CUDAEndExecutionBarrier(cudaStream_t stream) {
+  if (cuda_device_ < 0) {
+    throw std::runtime_error("Not CUDA device!");
+  }
+
+  auto cuda_synchronization_value_ = fence_->Value();
+  cuda_synchronization_value_++;
+  cudaExternalSemaphoreSignalParams signal_params = {};
+  signal_params.flags = 0;
+  signal_params.params.fence.value = cuda_synchronization_value_;
+  cudaSignalExternalSemaphoresAsync(&cuda_semaphore_, &signal_params, 1, stream);
+  fence_->ExternalSignalUpdateValue(cuda_synchronization_value_);
 }
+#endif
 
 }  // namespace grassland::graphics::backend

@@ -65,12 +65,33 @@ HRESULT Device::CreateDescriptorHeap(D3D12_DESCRIPTOR_HEAP_TYPE type,
   return CreateDescriptorHeap(desc, pp_descriptor_heap);
 }
 
-HRESULT Device::CreateFence(double_ptr<Fence> pp_fence) {
+HRESULT Device::CreateFence(D3D12_FENCE_FLAGS fence_flags, double_ptr<Fence> pp_fence) {
   ComPtr<ID3D12Fence> fence;
 
-  device_->CreateFence(0, D3D12_FENCE_FLAG_NONE, IID_PPV_ARGS(&fence));
+  device_->CreateFence(0, fence_flags, IID_PPV_ARGS(&fence));
 
   pp_fence.construct(fence);
+
+  return S_OK;
+}
+
+HRESULT Device::CreateFence(double_ptr<Fence> pp_fence) {
+  return CreateFence(D3D12_FENCE_FLAG_NONE, pp_fence);
+}
+
+HRESULT Device::CreateBuffer(size_t size,
+                             D3D12_HEAP_TYPE heap_type,
+                             D3D12_HEAP_FLAGS heap_flags,
+                             D3D12_RESOURCE_STATES resource_state,
+                             D3D12_RESOURCE_FLAGS resource_flags,
+                             double_ptr<Buffer> pp_buffer) {
+  ComPtr<ID3D12Resource> buffer;
+
+  RETURN_IF_FAILED_HR(::grassland::d3d12::CreateBuffer(device_.Get(), size, heap_type, heap_flags, resource_state,
+                                                       resource_flags, buffer),
+                      "failed to create buffer.");
+
+  pp_buffer.construct(buffer, size);
 
   return S_OK;
 }
@@ -80,15 +101,7 @@ HRESULT Device::CreateBuffer(size_t size,
                              D3D12_RESOURCE_STATES resource_state,
                              D3D12_RESOURCE_FLAGS resource_flags,
                              double_ptr<Buffer> pp_buffer) {
-  ComPtr<ID3D12Resource> buffer;
-
-  RETURN_IF_FAILED_HR(
-      ::grassland::d3d12::CreateBuffer(device_.Get(), size, heap_type, resource_state, resource_flags, buffer),
-      "failed to create buffer.");
-
-  pp_buffer.construct(buffer, size);
-
-  return S_OK;
+  return CreateBuffer(size, heap_type, D3D12_HEAP_FLAG_NONE, resource_state, resource_flags, pp_buffer);
 }
 
 HRESULT Device::CreateBuffer(size_t size,

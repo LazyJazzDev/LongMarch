@@ -6,7 +6,7 @@ namespace {
 
 NBodyCUDA::NBodyCUDA(int n_particles) : n_particles_(n_particles) {
   graphics::Core::Settings settings;
-  graphics::CreateCore(graphics::BACKEND_API_VULKAN, settings, &core_);
+  graphics::CreateCore(graphics::BACKEND_API_DEFAULT, settings, &core_);
   core_->InitializeLogicalDeviceAutoSelect(false);
   core_->CreateWindowObject(1920, 1080, "NBody CUDA", false, true, &window_);
 

@@ -96,6 +96,14 @@ bool IsDepthFormat(DXGI_FORMAT format);
 HRESULT CreateBuffer(ID3D12Device *device,
                      size_t size,
                      D3D12_HEAP_TYPE heap_type,
+                     D3D12_HEAP_FLAGS heap_flags,
+                     D3D12_RESOURCE_STATES resource_state,
+                     D3D12_RESOURCE_FLAGS resource_flags,
+                     ComPtr<ID3D12Resource> &buffer);
+
+HRESULT CreateBuffer(ID3D12Device *device,
+                     size_t size,
+                     D3D12_HEAP_TYPE heap_type,
                      D3D12_RESOURCE_STATES resource_state,
                      D3D12_RESOURCE_FLAGS resource_flags,
                      ComPtr<ID3D12Resource> &buffer);

@@ -19,9 +19,18 @@ class Fence {
 
   HRESULT Signal(CommandQueue *command_queue);
 
+  HRESULT Wait(CommandQueue *command_queue);
+
   HRESULT WaitFor(uint64_t value);
 
   HRESULT Wait();
+
+  // This function is designed for cross API external signaling like with CUDA.
+  // Simply updating this value could cause issues if the fence is not synchronized properly with the GPU.
+  // Don't call this function unless you know what you're doing.
+  void ExternalSignalUpdateValue(uint64_t value) {
+    value_ = value;
+  }
 
  private:
   ComPtr<ID3D12Fence> fence_;

@@ -16,7 +16,7 @@ int D3D12AccelerationStructure::UpdateInstances(const std::vector<RayTracingInst
   for (const auto &instance : instances) {
     d3d12_instances.emplace_back(RayTracingInstanceToD3D12RayTracingInstanceDesc(instance));
   }
-  acceleration_structure_->UpdateInstances(d3d12_instances, core_->CommandQueue(), core_->SingleTimeFence(),
+  acceleration_structure_->UpdateInstances(d3d12_instances, core_->CommandQueue(), core_->Fence(),
                                            core_->SingleTimeCommandAllocator());
   return 0;
 }

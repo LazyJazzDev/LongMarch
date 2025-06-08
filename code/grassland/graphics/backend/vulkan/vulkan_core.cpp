@@ -500,7 +500,7 @@ int VulkanCore::InitializeLogicalDevice(int device_index) {
 #ifdef _WIN32
     external_semaphore_handle_desc.handle.win32.handle = (HANDLE)GetSemaphoreHandle(cuda_synchronization_semaphore_);
 #else
-    externalSemaphoreHandleDesc.handle.fd = (int)(uintptr_t)getSemaphoreHandle(vkSem, handleType);
+    external_semaphore_handle_desc.handle.fd = (int)(uintptr_t)getSemaphoreHandle(vkSem, handleType);
 #endif
 
     external_semaphore_handle_desc.flags = 0;
@@ -610,25 +610,6 @@ void VulkanCore::CUDAEndExecutionBarrier(cudaStream_t stream) {
   signal_params.flags = 0;
   signal_params.params.fence.value = cuda_synchronization_value_;
   cudaSignalExternalSemaphoresAsync(&cuda_external_semaphore_, &signal_params, 1, stream);
-}
-
-void VulkanCore::CUDAWaitExecutionBarrier() {
-  VkSemaphoreWaitInfo semaphore_wait_info = {};
-  semaphore_wait_info.sType = VK_STRUCTURE_TYPE_SEMAPHORE_WAIT_INFO;
-  semaphore_wait_info.pSemaphores = &cuda_synchronization_semaphore_;
-  semaphore_wait_info.semaphoreCount = 1;
-  semaphore_wait_info.pValues = &cuda_synchronization_value_;
-  vkWaitSemaphores(device_->Handle(), &semaphore_wait_info, std::numeric_limits<uint64_t>::max());
-}
-
-void VulkanCore::CUDASignalExecutionBarrier() {
-  cuda_synchronization_value_++;
-  VkSemaphoreSignalInfo semaphore_signal_info = {};
-  semaphore_signal_info.sType = VK_STRUCTURE_TYPE_SEMAPHORE_SIGNAL_INFO;
-  semaphore_signal_info.semaphore = cuda_synchronization_semaphore_;
-  semaphore_signal_info.value = cuda_synchronization_value_;
-  vulkan::ThrowIfFailed(vkSignalSemaphore(device_->Handle(), &semaphore_signal_info),
-                        "Failed to signal CUDA synchronization semaphore!");
 }
 
 void *VulkanCore::GetMemoryHandle(VkDeviceMemory memory) {

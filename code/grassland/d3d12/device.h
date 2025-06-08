@@ -32,7 +32,16 @@ class Device {
                                uint32_t num_descriptors,
                                double_ptr<DescriptorHeap> pp_descriptor_heap);
 
+  HRESULT CreateFence(D3D12_FENCE_FLAGS fence_flags, double_ptr<Fence> pp_fence);
+
   HRESULT CreateFence(double_ptr<Fence> pp_fence);
+
+  HRESULT CreateBuffer(size_t size,
+                       D3D12_HEAP_TYPE heap_type,
+                       D3D12_HEAP_FLAGS heap_flags,
+                       D3D12_RESOURCE_STATES resource_state,
+                       D3D12_RESOURCE_FLAGS resource_flags,
+                       double_ptr<Buffer> pp_buffer);
 
   HRESULT CreateBuffer(size_t size,
                        D3D12_HEAP_TYPE heap_type,
