@@ -9,7 +9,7 @@ enum class double_ptr_type { raw = 0, shared, unique };
 template <class ContentType>
 class double_ptr {
  public:
-  double_ptr(nullptr_t) {
+  double_ptr(std::nullptr_t) {
     raw_ptr = nullptr;
     type = double_ptr_type::raw;
   }
@@ -51,12 +51,10 @@ class double_ptr {
         *raw_ptr = new ContentType(std::forward<Args>(args)...);
         break;
       case double_ptr_type::shared:
-        *shared_ptr =
-            std::make_shared<ContentType>(std::forward<Args>(args)...);
+        *shared_ptr = std::make_shared<ContentType>(std::forward<Args>(args)...);
         break;
       case double_ptr_type::unique:
-        *unique_ptr =
-            std::make_unique<ContentType>(std::forward<Args>(args)...);
+        *unique_ptr = std::make_unique<ContentType>(std::forward<Args>(args)...);
         break;
     }
     return operator ContentType *();

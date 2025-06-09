@@ -33,7 +33,7 @@ PRINT_ARG_LIST(std::string)
 PRINT_ARG_LIST(char *)
 
 int main() {
-  const char str[] = "world!";
+  const char str[] = "World!";
   PrintArgs("Hello,", str);
-  PrintArgs("123x456=", 123 * 456);
+  PrintArgs("123 x 456 =", 123 * 456);
 }
