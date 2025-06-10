@@ -91,6 +91,9 @@ struct PhysicalDeviceProperties {
   uint64_t score;
   bool ray_tracing_support;
   bool geometry_shader_support;
+#if defined(LONGMARCH_CUDA_RUNTIME)
+  int cuda_device_index = -1;  // CUDA device index, -1 if not applicable
+#endif
 };
 
 struct ColorClearValue {

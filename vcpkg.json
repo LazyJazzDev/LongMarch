@@ -1,7 +1,7 @@
 {
   "name": "longmarch",
   "version-string": "0.0.1",
-  "description": "This road I'm taking is long and hard, but I must keep moving forward. No turning back.",
+  "description": "A C++ library for graphics study",
   "dependencies": [
     "eigen3",
     "glm",

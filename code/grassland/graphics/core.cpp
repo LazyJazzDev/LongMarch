@@ -62,6 +62,30 @@ std::string Core::DeviceName() const {
   return device_name_;
 }
 
+#if defined(LONGMARCH_CUDA_RUNTIME)
+int Core::CUDADeviceIndex() const {
+  return cuda_device_;
+}
+
+int Core::InitializeLogicalDeviceByCUDADeviceID(int cuda_device_id) {
+  auto num_device = GetPhysicalDeviceProperties();
+  std::vector<PhysicalDeviceProperties> device_properties(num_device);
+  GetPhysicalDeviceProperties(device_properties.data());
+  int device_index = -1;
+  for (int i = 0; i < device_properties.size(); i++) {
+    if (device_properties[i].cuda_device_index == cuda_device_id) {
+      device_index = i;
+    }
+  }
+
+  if (device_index == -1) {
+    LogError("[graphics] Required device not found. Required CUDA device index: {}", cuda_device_id);
+  }
+
+  return InitializeLogicalDevice(device_index);
+}
+#endif
+
 void Core::PyBind(pybind11::module &m) {
   pybind11::class_<Core::Settings> core_settings_class(m, "CoreSettings");
   core_settings_class.def(pybind11::init<int, bool>(), pybind11::arg("frames_in_flight") = 2,
@@ -143,12 +167,6 @@ void Core::PyBind(pybind11::module &m) {
       pybind11::keep_alive<0, 1>{});
   core_class.def("submit_command_context", &Core::SubmitCommandContext);
 }
-
-#if defined(LONGMARCH_CUDA_RUNTIME)
-int Core::CUDADeviceIndex() const {
-  return cuda_device_;
-}
-#endif
 
 int CreateCore(BackendAPI api, const Core::Settings &settings, double_ptr<Core> pp_core) {
   switch (api) {
