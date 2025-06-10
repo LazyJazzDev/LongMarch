@@ -396,7 +396,11 @@ int D3D12Core::InitializeLogicalDevice(int device_index) {
     externalSemaphoreHandleDesc.handle.win32.handle = (void *)sharedHandle;
     externalSemaphoreHandleDesc.flags = 0;
 
+    int current_cuda_device;
+    cudaGetDevice(&current_cuda_device);
+    cudaSetDevice(cuda_device_);
     cudaImportExternalSemaphore(&cuda_semaphore_, &externalSemaphoreHandleDesc);
+    cudaSetDevice(current_cuda_device);
   } else
 #endif
   {
@@ -452,7 +456,11 @@ void D3D12Core::ImportCudaExternalMemory(cudaExternalMemory_t &cuda_memory, d3d1
   externalMemoryHandleDesc.size = actualSize;
   externalMemoryHandleDesc.flags = cudaExternalMemoryDedicated;
 
+  int current_cuda_device;
+  cudaGetDevice(&current_cuda_device);
+  cudaSetDevice(cuda_device_);
   cudaImportExternalMemory(&cuda_memory, &externalMemoryHandleDesc);
+  cudaSetDevice(current_cuda_device);
   CloseHandle(sharedHandle);
 }
 

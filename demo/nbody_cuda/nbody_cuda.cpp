@@ -41,7 +41,7 @@ void NBodyCUDA::Run() {
     FPSCounter fps_counter;
     int progress = 0;
     for (int step = 0; step < num_step_; ++step) {
-      OnUpdate();
+      UpdateParticles();
       fps_counter.TickFrame();
       if (step * 10 / num_step_ > progress) {
         progress = step * 10 / num_step_;
@@ -69,44 +69,6 @@ void NBodyCUDA::Run() {
     core_->WaitGPU();
     OnClose();
   }
-}
-
-void NBodyCUDA::OnUpdate() {
-  UpdateParticles();
-
-  if (!headless_) {
-    UpdateRenderAssets();
-    UpdateImGui();
-    static FPSCounter fps_counter;
-    window_->SetTitle("NBody CUDA FPS: " + std::to_string(fps_counter.TickFPS()));
-  }
-}
-
-void NBodyCUDA::OnRender() {
-  std::unique_ptr<graphics::CommandContext> ctx;
-  core_->CreateCommandContext(&ctx);
-  ctx->CmdClearImage(frame_image_.get(), {{0.0f, 0.0f, 0.0f, 0.0f}});
-  ctx->CmdBeginRendering({frame_image_.get()}, nullptr);
-  ctx->CmdBindProgram(program_.get());
-  ctx->CmdSetPrimitiveTopology(graphics::PRIMITIVE_TOPOLOGY_TRIANGLE_LIST);
-  graphics::Scissor scissor{0, 0, frame_image_->Extent()};
-  graphics::Viewport viewport{0, 0, float(frame_image_->Extent().width), float(frame_image_->Extent().height)};
-  ctx->CmdSetScissor(scissor);
-  ctx->CmdSetViewport(viewport);
-  ctx->CmdBindVertexBuffers(0, {particles_pos_.get()}, {0});
-  ctx->CmdBindResources(0, {global_uniform_buffer_.get()});
-  ctx->CmdDraw(6, n_particles_, 0, 0);
-  ctx->CmdEndRendering();
-  if (!headless_) {
-    ctx->CmdBeginRendering({}, nullptr);
-    ctx->CmdBindProgram(hdr_program_.get());
-    ctx->CmdBindResources(0, {global_uniform_buffer_.get()});
-    ctx->CmdBindResources(1, {frame_image_.get()});
-    ctx->CmdDraw(6, 1, 0, 0);
-    ctx->CmdEndRendering();
-    ctx->CmdPresent(window_.get(), frame_image_.get());
-  }
-  core_->SubmitCommandContext(ctx.get());
 }
 
 void NBodyCUDA::OnInit() {
@@ -150,6 +112,8 @@ void NBodyCUDA::OnInit() {
     core_->CreateImage(960, 640, graphics::IMAGE_FORMAT_R8G8B8A8_UNORM, &frame_image_);
   }
 
+  LogInfo("Simulation {} particles...", n_particles_);
+
   core_->CreateBuffer(sizeof(GlobalUniformObject), graphics::BUFFER_TYPE_DYNAMIC, &global_uniform_buffer_);
   core_->CreateCUDABuffer(sizeof(glm::vec3) * n_particles_, &particles_pos_);
 
@@ -177,6 +141,44 @@ void NBodyCUDA::OnClose() {
   global_uniform_buffer_.reset();
 
   frame_image_.reset();
+}
+
+void NBodyCUDA::OnUpdate() {
+  UpdateParticles();
+
+  if (!headless_) {
+    UpdateRenderAssets();
+    UpdateImGui();
+    static FPSCounter fps_counter;
+    window_->SetTitle("NBody CUDA FPS: " + std::to_string(fps_counter.TickFPS()));
+  }
+}
+
+void NBodyCUDA::OnRender() {
+  std::unique_ptr<graphics::CommandContext> ctx;
+  core_->CreateCommandContext(&ctx);
+  ctx->CmdClearImage(frame_image_.get(), {{0.0f, 0.0f, 0.0f, 0.0f}});
+  ctx->CmdBeginRendering({frame_image_.get()}, nullptr);
+  ctx->CmdBindProgram(program_.get());
+  ctx->CmdSetPrimitiveTopology(graphics::PRIMITIVE_TOPOLOGY_TRIANGLE_LIST);
+  graphics::Scissor scissor{0, 0, frame_image_->Extent()};
+  graphics::Viewport viewport{0, 0, float(frame_image_->Extent().width), float(frame_image_->Extent().height)};
+  ctx->CmdSetScissor(scissor);
+  ctx->CmdSetViewport(viewport);
+  ctx->CmdBindVertexBuffers(0, {particles_pos_.get()}, {0});
+  ctx->CmdBindResources(0, {global_uniform_buffer_.get()});
+  ctx->CmdDraw(6, n_particles_, 0, 0);
+  ctx->CmdEndRendering();
+  if (!headless_) {
+    ctx->CmdBeginRendering({}, nullptr);
+    ctx->CmdBindProgram(hdr_program_.get());
+    ctx->CmdBindResources(0, {global_uniform_buffer_.get()});
+    ctx->CmdBindResources(1, {frame_image_.get()});
+    ctx->CmdDraw(6, 1, 0, 0);
+    ctx->CmdEndRendering();
+    ctx->CmdPresent(window_.get(), frame_image_.get());
+  }
+  core_->SubmitCommandContext(ctx.get());
 }
 
 void NBodyCUDA::BuildRenderNode() {

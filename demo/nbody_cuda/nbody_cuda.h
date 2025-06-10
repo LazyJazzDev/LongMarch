@@ -29,9 +29,9 @@ class NBodyCUDA {
 
  private:
   void OnInit();
+  void OnClose();
   void OnUpdate();
   void OnRender();
-  void OnClose();
 
   void BuildRenderNode();
 

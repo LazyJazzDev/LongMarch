@@ -486,7 +486,12 @@ int VulkanCore::InitializeLogicalDevice(int device_index) {
 
     external_semaphore_handle_desc.flags = 0;
 
+    int current_cuda_device;
+    cudaGetDevice(&current_cuda_device);
+    cudaSetDevice(cuda_device_);
+
     cudaImportExternalSemaphore(&cuda_external_semaphore_, &external_semaphore_handle_desc);
+    cudaSetDevice(current_cuda_device);
   }
 
 #endif
@@ -566,7 +571,11 @@ void VulkanCore::ImportCudaExternalMemory(cudaExternalMemory_t &cuda_memory,
   external_memory_handle_desc.handle.fd = (int)(uintptr_t)GetMemoryHandle(vulkan_memory);
 #endif
 
+  int current_cuda_device;
+  cudaGetDevice(&current_cuda_device);
+  cudaSetDevice(cuda_device_);
   cudaImportExternalMemory(&cuda_memory, &external_memory_handle_desc);
+  cudaSetDevice(current_cuda_device);
 }
 
 void VulkanCore::CUDABeginExecutionBarrier(cudaStream_t stream) {
@@ -578,7 +587,8 @@ void VulkanCore::CUDABeginExecutionBarrier(cudaStream_t stream) {
   wait_params.flags = 0;
   wait_params.params.fence.value = cuda_synchronization_value_;
 
-  cudaWaitExternalSemaphoresAsync(&cuda_external_semaphore_, &wait_params, 1, stream);
+  CUDAThrowIfFailed(cudaWaitExternalSemaphoresAsync(&cuda_external_semaphore_, &wait_params, 1, stream),
+                    "Failed to wait for cuda external semaphore.");
 }
 
 void VulkanCore::CUDAEndExecutionBarrier(cudaStream_t stream) {
@@ -590,7 +600,8 @@ void VulkanCore::CUDAEndExecutionBarrier(cudaStream_t stream) {
   cudaExternalSemaphoreSignalParams signal_params = {};
   signal_params.flags = 0;
   signal_params.params.fence.value = cuda_synchronization_value_;
-  cudaSignalExternalSemaphoresAsync(&cuda_external_semaphore_, &signal_params, 1, stream);
+  CUDAThrowIfFailed(cudaSignalExternalSemaphoresAsync(&cuda_external_semaphore_, &signal_params, 1, stream),
+                    "Failed to signal cuda external semaphore.");
 }
 
 void *VulkanCore::GetMemoryHandle(VkDeviceMemory memory) {
