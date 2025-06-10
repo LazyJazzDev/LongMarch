@@ -235,7 +235,7 @@ void NBodyCS::UpdateImGui() {
   ImGui::SetNextWindowPos(ImVec2{0.0f, 0.0f}, ImGuiCond_Once);
   ImGui::SetNextWindowBgAlpha(0.3f);
   bool trigger_hdr_switch = false;
-  if (ImGui::Begin("NBodyCS"), nullptr, ImGuiWindowFlags_NoMove) {
+  if (ImGui::Begin("NBodyCS", nullptr, ImGuiWindowFlags_NoMove)) {
     ImGui::Text("Statistics");
     ImGui::Separator();
     auto current_tp = std::chrono::steady_clock::now();
@@ -304,9 +304,9 @@ void NBodyCS::UpdateImGui() {
     if (ImGui::Button(("HDR: " + std::string(hdr_ ? "ON" : "OFF")).c_str())) {
       trigger_hdr_switch = true;
     }
-    ImGui::End();
     last_frame_tp = current_tp;
   }
+  ImGui::End();
   window_->EndImGuiFrame();
   if (trigger_hdr_switch) {
     hdr_ = !hdr_;

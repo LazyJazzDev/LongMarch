@@ -20,11 +20,9 @@ class PhysicalDevice {
 
   VkPhysicalDeviceMemoryProperties GetPhysicalDeviceMemoryProperties() const;
 
-  VkPhysicalDeviceRayTracingPipelinePropertiesKHR
-  GetPhysicalDeviceRayTracingPipelineProperties() const;
+  VkPhysicalDeviceRayTracingPipelinePropertiesKHR GetPhysicalDeviceRayTracingPipelineProperties() const;
 
-  VkPhysicalDeviceRayTracingPipelineFeaturesKHR
-  GetPhysicalDeviceRayTracingPipelineFeatures() const;
+  VkPhysicalDeviceRayTracingPipelineFeaturesKHR GetPhysicalDeviceRayTracingPipelineFeatures() const;
 
   uint64_t GetDeviceLocalMemorySize() const;
 
@@ -32,8 +30,7 @@ class PhysicalDevice {
 
   std::vector<VkQueueFamilyProperties> GetQueueFamilyProperties() const;
 
-  VkPhysicalDeviceRayTracingPipelinePropertiesKHR GetRayTracingProperties()
-      const;
+  VkPhysicalDeviceRayTracingPipelinePropertiesKHR GetRayTracingProperties() const;
 
   bool IsExtensionSupported(const char *extension_name) const;
 
@@ -53,8 +50,11 @@ class PhysicalDevice {
 
   VkSampleCountFlagBits GetMaxUsableSampleCount() const;
 
-  bool CheckFeatureSupport(
-      const struct DeviceFeatureRequirement &feature_requirement) const;
+  bool CheckFeatureSupport(const struct DeviceFeatureRequirement &feature_requirement) const;
+
+#if defined(LONGMARCH_CUDA_RUNTIME)
+  int GetCUDADeviceIndex() const;
+#endif
 
  private:
   VkPhysicalDevice physical_device_{};

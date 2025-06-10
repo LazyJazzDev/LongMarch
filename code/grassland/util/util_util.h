@@ -22,6 +22,11 @@
 #endif
 
 namespace grassland {
+
+#if defined(LONGMARCH_CUDA_RUNTIME)
+void CUDAThrowIfFailed(cudaError_t error, const std::string &message);
+#endif
+
 #if defined(__CUDACC__)
 #define LM_DEVICE_FUNC __device__ __host__
 #else

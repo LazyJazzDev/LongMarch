@@ -59,4 +59,22 @@ bool Adapter::CheckFeatureSupport(const DeviceFeatureRequirement &feature_requir
   return true;
 }
 
+#if defined(LONGMARCH_CUDA_RUNTIME)
+int Adapter::CUDADeviceIndex() const {
+  DXGI_ADAPTER_DESC1 adapter_desc = {};
+  adapter_->GetDesc1(&adapter_desc);
+
+  int cuda_device_count = 0;
+  cudaGetDeviceCount(&cuda_device_count);
+  for (int device_index = 0; device_index < cuda_device_count; device_index++) {
+    cudaDeviceProp device_prop{};
+    cudaGetDeviceProperties(&device_prop, device_index);
+    if (std::memcmp(&device_prop.luid, &adapter_desc.AdapterLuid, sizeof(LUID)) == 0) {
+      return device_index;
+    }
+  }
+  return -1;
+}
+#endif
+
 }  // namespace grassland::d3d12

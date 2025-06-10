@@ -1,14 +1,19 @@
 #include "nbody_cuda.h"
+#define STB_IMAGE_WRITE_IMPLEMENTATION
+#include "stb_image_write.h"
 
 namespace {
 #include "built_in_shaders.inl"
 }
 
-NBodyCUDA::NBodyCUDA(int n_particles) : n_particles_(n_particles) {
-  graphics::Core::Settings settings;
-  graphics::CreateCore(graphics::BACKEND_API_DEFAULT, settings, &core_);
-  core_->InitializeLogicalDeviceAutoSelect(false);
-  core_->CreateWindowObject(1920, 1080, "NBody CUDA", false, true, &window_);
+NBodyCUDA::NBodyCUDA(Settings settings)
+    : n_particles_(settings.n_particles), headless_(settings.headless), num_step_(settings.num_step) {
+  graphics::Core::Settings graphics_settings;
+  graphics::CreateCore(graphics::BACKEND_API_DEFAULT, graphics_settings, &core_);
+  core_->InitializeLogicalDeviceByCUDADeviceID(settings.device_id);
+  if (!headless_) {
+    core_->CreateWindowObject(1920, 1080, "NBody CUDA", false, true, &window_);
+  }
 
   int cuda_device_index = core_->CUDADeviceIndex();
   if (cuda_device_index >= 0) {
@@ -30,76 +35,84 @@ NBodyCUDA::~NBodyCUDA() {
 void NBodyCUDA::Run() {
   if (core_->CUDADeviceIndex() == -1)
     return;
-  OnInit();
-  while (!glfwWindowShouldClose(window_->GLFWWindow())) {
-    OnUpdate();
+  if (headless_) {
+    LogInfo("Headless mode enabled. Running simulation for {} steps...", num_step_);
+    OnInit();
+    FPSCounter fps_counter;
+    int progress = 0;
+    for (int step = 0; step < num_step_; ++step) {
+      UpdateParticles();
+      fps_counter.TickFrame();
+      if (step * 10 / num_step_ > progress) {
+        progress = step * 10 / num_step_;
+        LogInfo("Progress: {}%... ({} / {})", progress * 10, step, num_step_);
+      }
+    }
+    LogInfo("Done.");
+    UpdateRenderAssets();
     OnRender();
-    glfwPollEvents();
+    std::vector<uint8_t> color_buffer_(frame_image_->Extent().width * frame_image_->Extent().height * 4);
+    frame_image_->DownloadData(color_buffer_.data());
+    stbi_write_jpg("final_frame.jpg", frame_image_->Extent().width, frame_image_->Extent().height, 4,
+                   color_buffer_.data(), 100);
+    LogInfo("Frames per second: {:.2f}", fps_counter.GetFPS());
+    LogInfo("Final frame saved to final_frame.jpg");
+    core_->WaitGPU();
+    OnClose();
+  } else {
+    OnInit();
+    while (!glfwWindowShouldClose(window_->GLFWWindow())) {
+      OnUpdate();
+      OnRender();
+      glfwPollEvents();
+    }
+    core_->WaitGPU();
+    OnClose();
   }
-  core_->WaitGPU();
-  OnClose();
-}
-
-void NBodyCUDA::OnUpdate() {
-  UpdateParticles();
-  UpdateImGui();
-  auto world_to_cam =
-      glm::lookAt(glm::vec3{glm::vec4{10.0f, 20.0f, 30.0f, 0.0f}}, glm::vec3{0.0f}, glm::vec3{0.0f, 1.0f, 0.0f}) *
-      rotation;
-  GlobalUniformObject ubo{
-      glm::perspective(glm::radians(60.0f), float(window_->GetWidth()) / float(window_->GetHeight()), 0.1f, 100.0f) *
-          world_to_cam,
-      glm::inverse(world_to_cam), PARTICLE_SIZE, hdr_};
-  global_uniform_buffer_->UploadData(&ubo, sizeof(ubo));
-
-  static FPSCounter fps_counter;
-  window_->SetTitle("NBody CUDA FPS: " + std::to_string(fps_counter.TickFPS()));
-}
-
-void NBodyCUDA::OnRender() {
-  std::unique_ptr<graphics::CommandContext> ctx;
-  core_->CreateCommandContext(&ctx);
-  ctx->CmdClearImage(frame_image_.get(), {{0.0f, 0.0f, 0.0f, 0.0f}});
-  ctx->CmdBeginRendering({frame_image_.get()}, nullptr);
-  ctx->CmdBindProgram(program_.get());
-  ctx->CmdSetPrimitiveTopology(graphics::PRIMITIVE_TOPOLOGY_TRIANGLE_LIST);
-  graphics::Scissor scissor{0, 0, uint32_t(window_->GetWidth()), uint32_t(window_->GetHeight())};
-  graphics::Viewport viewport{0, 0, float(window_->GetWidth()), float(window_->GetHeight())};
-  ctx->CmdSetScissor(scissor);
-  ctx->CmdSetViewport(viewport);
-  ctx->CmdBindVertexBuffers(0, {particles_pos_.get()}, {0});
-  ctx->CmdBindResources(0, {global_uniform_buffer_.get()});
-  ctx->CmdDraw(6, n_particles_, 0, 0);
-  ctx->CmdEndRendering();
-  ctx->CmdBeginRendering({}, nullptr);
-  ctx->CmdBindProgram(hdr_program_.get());
-  ctx->CmdBindResources(0, {global_uniform_buffer_.get()});
-  ctx->CmdBindResources(1, {frame_image_.get()});
-  ctx->CmdDraw(6, 1, 0, 0);
-  ctx->CmdEndRendering();
-  ctx->CmdPresent(window_.get(), frame_image_.get());
-  core_->SubmitCommandContext(ctx.get());
 }
 
 void NBodyCUDA::OnInit() {
-  core_->CreateImage(window_->GetWidth(), window_->GetHeight(), graphics::IMAGE_FORMAT_R32G32B32A32_SFLOAT,
-                     &frame_image_);
+  if (!headless_) {
+    core_->CreateImage(window_->GetWidth(), window_->GetHeight(), graphics::IMAGE_FORMAT_R32G32B32A32_SFLOAT,
+                       &frame_image_);
+    window_->ResizeEvent().RegisterCallback([this](int width, int height) {
+      frame_image_.reset();
+      core_->CreateImage(width, height, graphics::IMAGE_FORMAT_R32G32B32A32_SFLOAT, &frame_image_);
+      core_->CreateProgram({frame_image_->Format()}, graphics::IMAGE_FORMAT_UNDEFINED, &program_);
+      program_->SetBlendState(
+          0, graphics::BlendState(graphics::BLEND_FACTOR_ONE, graphics::BLEND_FACTOR_ONE, graphics::BLEND_OP_ADD,
+                                  graphics::BLEND_FACTOR_ONE, graphics::BLEND_FACTOR_ONE_MINUS_SRC_ALPHA,
+                                  graphics::BLEND_OP_ADD));
+      program_->AddInputBinding(sizeof(glm::vec3), true);
+      program_->AddInputAttribute(0, graphics::INPUT_TYPE_FLOAT3, 0);
+      program_->AddResourceBinding(graphics::RESOURCE_TYPE_UNIFORM_BUFFER, 1);
+      program_->BindShader(vertex_shader_.get(), graphics::SHADER_TYPE_VERTEX);
+      program_->BindShader(fragment_shader_.get(), graphics::SHADER_TYPE_FRAGMENT);
+      program_->Finalize();
+    });
 
-  window_->ResizeEvent().RegisterCallback([this](int width, int height) {
-    frame_image_.reset();
-    core_->CreateImage(width, height, graphics::IMAGE_FORMAT_R32G32B32A32_SFLOAT, &frame_image_);
-    core_->CreateProgram({frame_image_->Format()}, graphics::IMAGE_FORMAT_UNDEFINED, &program_);
-    program_->SetBlendState(
-        0, graphics::BlendState(graphics::BLEND_FACTOR_ONE, graphics::BLEND_FACTOR_ONE, graphics::BLEND_OP_ADD,
-                                graphics::BLEND_FACTOR_ONE, graphics::BLEND_FACTOR_ONE_MINUS_SRC_ALPHA,
-                                graphics::BLEND_OP_ADD));
-    program_->AddInputBinding(sizeof(glm::vec3), true);
-    program_->AddInputAttribute(0, graphics::INPUT_TYPE_FLOAT3, 0);
-    program_->AddResourceBinding(graphics::RESOURCE_TYPE_UNIFORM_BUFFER, 1);
-    program_->BindShader(vertex_shader_.get(), graphics::SHADER_TYPE_VERTEX);
-    program_->BindShader(fragment_shader_.get(), graphics::SHADER_TYPE_FRAGMENT);
-    program_->Finalize();
-  });
+    window_->InitImGui(FileProbe::GetInstance().FindFile("fonts/simhei.ttf").c_str(), 20.0f);
+    window_->MouseMoveEvent().RegisterCallback([this](double xpos, double ypos) {
+      ImGui::SetCurrentContext(window_->GetImGuiContext());
+
+      static auto last_xpos = xpos;
+      static auto last_ypos = ypos;
+      if (glfwGetMouseButton(window_->GLFWWindow(), GLFW_MOUSE_BUTTON_LEFT) == GLFW_PRESS) {
+        auto diffx = xpos - last_xpos;
+        auto diffy = ypos - last_ypos;
+        if (!ImGui::GetIO().WantCaptureMouse) {
+          rotation = glm::rotate(glm::mat4{1.0f}, glm::radians(float(diffx)), glm::vec3{0.0f, 1.0f, 0.0f}) * rotation;
+          rotation = glm::rotate(glm::mat4{1.0f}, glm::radians(float(diffy)), glm::vec3{1.0f, 0.0f, 0.0f}) * rotation;
+        }
+      }
+      last_xpos = xpos;
+      last_ypos = ypos;
+    });
+  } else {
+    core_->CreateImage(960, 640, graphics::IMAGE_FORMAT_R8G8B8A8_UNORM, &frame_image_);
+  }
+
+  LogInfo("Simulating {} particles...", n_particles_);
 
   core_->CreateBuffer(sizeof(GlobalUniformObject), graphics::BUFFER_TYPE_DYNAMIC, &global_uniform_buffer_);
   core_->CreateCUDABuffer(sizeof(glm::vec3) * n_particles_, &particles_pos_);
@@ -110,24 +123,7 @@ void NBodyCUDA::OnInit() {
 
   ResetParticles();
 
-  window_->InitImGui(FileProbe::GetInstance().FindFile("fonts/simhei.ttf").c_str(), 20.0f);
   BuildRenderNode();
-  window_->MouseMoveEvent().RegisterCallback([this](double xpos, double ypos) {
-    ImGui::SetCurrentContext(window_->GetImGuiContext());
-
-    static auto last_xpos = xpos;
-    static auto last_ypos = ypos;
-    if (glfwGetMouseButton(window_->GLFWWindow(), GLFW_MOUSE_BUTTON_LEFT) == GLFW_PRESS) {
-      auto diffx = xpos - last_xpos;
-      auto diffy = ypos - last_ypos;
-      if (!ImGui::GetIO().WantCaptureMouse) {
-        rotation = glm::rotate(glm::mat4{1.0f}, glm::radians(float(diffx)), glm::vec3{0.0f, 1.0f, 0.0f}) * rotation;
-        rotation = glm::rotate(glm::mat4{1.0f}, glm::radians(float(diffy)), glm::vec3{1.0f, 0.0f, 0.0f}) * rotation;
-      }
-    }
-    last_xpos = xpos;
-    last_ypos = ypos;
-  });
 }
 
 void NBodyCUDA::OnClose() {
@@ -147,6 +143,44 @@ void NBodyCUDA::OnClose() {
   frame_image_.reset();
 }
 
+void NBodyCUDA::OnUpdate() {
+  UpdateParticles();
+
+  if (!headless_) {
+    UpdateRenderAssets();
+    UpdateImGui();
+    static FPSCounter fps_counter;
+    window_->SetTitle("NBody CUDA FPS: " + std::to_string(fps_counter.TickFPS()));
+  }
+}
+
+void NBodyCUDA::OnRender() {
+  std::unique_ptr<graphics::CommandContext> ctx;
+  core_->CreateCommandContext(&ctx);
+  ctx->CmdClearImage(frame_image_.get(), {{0.0f, 0.0f, 0.0f, 0.0f}});
+  ctx->CmdBeginRendering({frame_image_.get()}, nullptr);
+  ctx->CmdBindProgram(program_.get());
+  ctx->CmdSetPrimitiveTopology(graphics::PRIMITIVE_TOPOLOGY_TRIANGLE_LIST);
+  graphics::Scissor scissor{0, 0, frame_image_->Extent()};
+  graphics::Viewport viewport{0, 0, float(frame_image_->Extent().width), float(frame_image_->Extent().height)};
+  ctx->CmdSetScissor(scissor);
+  ctx->CmdSetViewport(viewport);
+  ctx->CmdBindVertexBuffers(0, {particles_pos_.get()}, {0});
+  ctx->CmdBindResources(0, {global_uniform_buffer_.get()});
+  ctx->CmdDraw(6, n_particles_, 0, 0);
+  ctx->CmdEndRendering();
+  if (!headless_) {
+    ctx->CmdBeginRendering({}, nullptr);
+    ctx->CmdBindProgram(hdr_program_.get());
+    ctx->CmdBindResources(0, {global_uniform_buffer_.get()});
+    ctx->CmdBindResources(1, {frame_image_.get()});
+    ctx->CmdDraw(6, 1, 0, 0);
+    ctx->CmdEndRendering();
+    ctx->CmdPresent(window_.get(), frame_image_.get());
+  }
+  core_->SubmitCommandContext(ctx.get());
+}
+
 void NBodyCUDA::BuildRenderNode() {
   core_->CreateShader(GetShaderCode("shaders/particle.hlsl"), "VSMain", "vs_6_0", &vertex_shader_);
   core_->CreateShader(GetShaderCode("shaders/particle.hlsl"), "PSMain", "ps_6_0", &fragment_shader_);
@@ -161,14 +195,16 @@ void NBodyCUDA::BuildRenderNode() {
   program_->BindShader(fragment_shader_.get(), graphics::SHADER_TYPE_FRAGMENT);
   program_->Finalize();
 
-  core_->CreateShader(GetShaderCode("shaders/hdr.hlsl"), "VSMain", "vs_6_0", &hdr_vertex_shader_);
-  core_->CreateShader(GetShaderCode("shaders/hdr.hlsl"), "PSMain", "ps_6_0", &hdr_fragment_shader_);
-  core_->CreateProgram({}, graphics::IMAGE_FORMAT_UNDEFINED, &hdr_program_);
-  hdr_program_->AddResourceBinding(graphics::RESOURCE_TYPE_UNIFORM_BUFFER, 1);
-  hdr_program_->AddResourceBinding(graphics::RESOURCE_TYPE_IMAGE, 1);
-  hdr_program_->BindShader(hdr_vertex_shader_.get(), graphics::SHADER_TYPE_VERTEX);
-  hdr_program_->BindShader(hdr_fragment_shader_.get(), graphics::SHADER_TYPE_FRAGMENT);
-  hdr_program_->Finalize();
+  if (!headless_) {
+    core_->CreateShader(GetShaderCode("shaders/hdr.hlsl"), "VSMain", "vs_6_0", &hdr_vertex_shader_);
+    core_->CreateShader(GetShaderCode("shaders/hdr.hlsl"), "PSMain", "ps_6_0", &hdr_fragment_shader_);
+    core_->CreateProgram({}, graphics::IMAGE_FORMAT_UNDEFINED, &hdr_program_);
+    hdr_program_->AddResourceBinding(graphics::RESOURCE_TYPE_UNIFORM_BUFFER, 1);
+    hdr_program_->AddResourceBinding(graphics::RESOURCE_TYPE_IMAGE, 1);
+    hdr_program_->BindShader(hdr_vertex_shader_.get(), graphics::SHADER_TYPE_VERTEX);
+    hdr_program_->BindShader(hdr_fragment_shader_.get(), graphics::SHADER_TYPE_FRAGMENT);
+    hdr_program_->Finalize();
+  }
 }
 
 float NBodyCUDA::RandomFloat() {
@@ -234,12 +270,24 @@ void NBodyCUDA::UpdateParticles() {
   core_->CUDAEndExecutionBarrier();
 }
 
+void NBodyCUDA::UpdateRenderAssets() {
+  auto world_to_cam =
+      glm::lookAt(glm::vec3{glm::vec4{10.0f, 20.0f, 30.0f, 0.0f}}, glm::vec3{0.0f}, glm::vec3{0.0f, 1.0f, 0.0f}) *
+      rotation;
+  GlobalUniformObject ubo{
+      glm::perspective(glm::radians(60.0f), float(frame_image_->Extent().width) / float(frame_image_->Extent().height),
+                       0.1f, 100.0f) *
+          world_to_cam,
+      glm::inverse(world_to_cam), PARTICLE_SIZE, hdr_};
+  global_uniform_buffer_->UploadData(&ubo, sizeof(ubo));
+}
+
 void NBodyCUDA::UpdateImGui() {
   window_->BeginImGuiFrame();
   ImGui::SetNextWindowPos(ImVec2{0.0f, 0.0f}, ImGuiCond_Once);
   ImGui::SetNextWindowBgAlpha(0.3f);
   bool trigger_hdr_switch = false;
-  if (ImGui::Begin("NBodyCUDA"), nullptr, ImGuiWindowFlags_NoMove) {
+  if (ImGui::Begin("NBody CUDA", nullptr, ImGuiWindowFlags_NoMove)) {
     ImGui::Text("Statistics");
     ImGui::Separator();
     auto current_tp = std::chrono::steady_clock::now();
@@ -310,9 +358,9 @@ void NBodyCUDA::UpdateImGui() {
     if (ImGui::Button(("HDR: " + std::string(hdr_ ? "ON" : "OFF")).c_str())) {
       trigger_hdr_switch = true;
     }
-    ImGui::End();
     last_frame_tp = current_tp;
   }
+  ImGui::End();
   window_->EndImGuiFrame();
   if (trigger_hdr_switch) {
     hdr_ = !hdr_;

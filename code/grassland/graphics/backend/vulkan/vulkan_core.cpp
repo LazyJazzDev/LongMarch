@@ -354,6 +354,9 @@ int VulkanCore::GetPhysicalDeviceProperties(PhysicalDeviceProperties *p_physical
     properties.score = physical_device.Evaluate();
     properties.ray_tracing_support = physical_device.SupportRayTracing();
     properties.geometry_shader_support = physical_device.SupportGeometryShader();
+#if defined(LONGMARCH_CUDA_RUNTIME)
+    properties.cuda_device_index = physical_device.GetCUDADeviceIndex();
+#endif
     if (p_physical_device_properties) {
       p_physical_device_properties[i] = properties;
     }
@@ -364,38 +367,16 @@ int VulkanCore::GetPhysicalDeviceProperties(PhysicalDeviceProperties *p_physical
 }
 
 int VulkanCore::InitializeLogicalDevice(int device_index) {
-  auto original_physical_devices = instance_->EnumeratePhysicalDevices();
-  std::vector<vulkan::PhysicalDevice> physical_devices;
-  // Erase non geometry shader support devices
-  for (auto &physical_device : original_physical_devices) {
-    physical_devices.push_back(physical_device);
-  }
+  std::vector<vulkan::PhysicalDevice> physical_devices = instance_->EnumeratePhysicalDevices();
 
   if (device_index < 0 || device_index >= physical_devices.size()) {
     return -1;
   }
+
   auto physical_device = physical_devices[device_index];
 
 #if defined(LONGMARCH_CUDA_RUNTIME)
-  VkPhysicalDeviceIDProperties id_properties{};
-  id_properties.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_ID_PROPERTIES;
-  id_properties.pNext = nullptr;
-
-  VkPhysicalDeviceProperties2 properties2{};
-  properties2.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_PROPERTIES_2;
-  properties2.pNext = &id_properties;
-  vkGetPhysicalDeviceProperties2(physical_device.Handle(), &properties2);
-
-  int cuda_device_count = 0;
-  cudaGetDeviceCount(&cuda_device_count);
-  for (int i = 0; i < cuda_device_count; i++) {
-    cudaDeviceProp device_properties{};
-    cudaGetDeviceProperties(&device_properties, i);
-    if (std::memcmp(id_properties.deviceUUID, &device_properties.uuid, VK_UUID_SIZE) == 0) {
-      cuda_device_ = i;
-      break;
-    }
-  }
+  cuda_device_ = physical_device.GetCUDADeviceIndex();
 #endif
 
   grassland::vulkan::DeviceFeatureRequirement device_feature_requirement{};
@@ -505,7 +486,12 @@ int VulkanCore::InitializeLogicalDevice(int device_index) {
 
     external_semaphore_handle_desc.flags = 0;
 
+    int current_cuda_device;
+    cudaGetDevice(&current_cuda_device);
+    cudaSetDevice(cuda_device_);
+
     cudaImportExternalSemaphore(&cuda_external_semaphore_, &external_semaphore_handle_desc);
+    cudaSetDevice(current_cuda_device);
   }
 
 #endif
@@ -585,7 +571,11 @@ void VulkanCore::ImportCudaExternalMemory(cudaExternalMemory_t &cuda_memory,
   external_memory_handle_desc.handle.fd = (int)(uintptr_t)GetMemoryHandle(vulkan_memory);
 #endif
 
+  int current_cuda_device;
+  cudaGetDevice(&current_cuda_device);
+  cudaSetDevice(cuda_device_);
   cudaImportExternalMemory(&cuda_memory, &external_memory_handle_desc);
+  cudaSetDevice(current_cuda_device);
 }
 
 void VulkanCore::CUDABeginExecutionBarrier(cudaStream_t stream) {
@@ -597,7 +587,8 @@ void VulkanCore::CUDABeginExecutionBarrier(cudaStream_t stream) {
   wait_params.flags = 0;
   wait_params.params.fence.value = cuda_synchronization_value_;
 
-  cudaWaitExternalSemaphoresAsync(&cuda_external_semaphore_, &wait_params, 1, stream);
+  CUDAThrowIfFailed(cudaWaitExternalSemaphoresAsync(&cuda_external_semaphore_, &wait_params, 1, stream),
+                    "Failed to wait for cuda external semaphore.");
 }
 
 void VulkanCore::CUDAEndExecutionBarrier(cudaStream_t stream) {
@@ -609,7 +600,8 @@ void VulkanCore::CUDAEndExecutionBarrier(cudaStream_t stream) {
   cudaExternalSemaphoreSignalParams signal_params = {};
   signal_params.flags = 0;
   signal_params.params.fence.value = cuda_synchronization_value_;
-  cudaSignalExternalSemaphoresAsync(&cuda_external_semaphore_, &signal_params, 1, stream);
+  CUDAThrowIfFailed(cudaSignalExternalSemaphoresAsync(&cuda_external_semaphore_, &signal_params, 1, stream),
+                    "Failed to signal cuda external semaphore.");
 }
 
 void *VulkanCore::GetMemoryHandle(VkDeviceMemory memory) {
