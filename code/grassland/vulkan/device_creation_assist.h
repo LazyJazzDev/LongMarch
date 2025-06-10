@@ -11,15 +11,15 @@ namespace grassland::vulkan {
 struct DeviceFeatureRequirement {
   bool enable_raytracing_extension{false};
 
-  class DeviceCreateInfo GenerateRecommendedDeviceCreateInfo(
-      const PhysicalDevice &physical_device) const;
+  class DeviceCreateInfo GenerateRecommendedDeviceCreateInfo(const PhysicalDevice &physical_device) const;
 
   VmaAllocatorCreateFlags GetVmaAllocatorCreateFlags() const;
 };
 
 struct DeviceFeatureContainerBase {
+  virtual ~DeviceFeatureContainerBase() = default;
   virtual void *LinkNext(void *pNext) = 0;
-  virtual std::unique_ptr<DeviceFeatureContainerBase> Duplicate() const = 0;
+  [[nodiscard]] virtual std::unique_ptr<DeviceFeatureContainerBase> Duplicate() const = 0;
 };
 
 template <class FeatureType>
@@ -52,7 +52,7 @@ struct DeviceCreateInfo {
  public:
   DeviceCreateInfo(const DeviceCreateInfo &other) {
     for (auto &feature : other.features) {
-      features.push_back(feature->Duplicate());
+      features.emplace_back(feature->Duplicate());
     }
     extensions = other.extensions;
     queue_families = other.queue_families;
@@ -64,8 +64,7 @@ struct DeviceCreateInfo {
 
   template <class FeatureType>
   void AddFeature(const FeatureType &feature) {
-    features.emplace_back(
-        std::make_unique<DeviceFeatureContainer<FeatureType>>(feature));
+    features.emplace_back(std::make_unique<DeviceFeatureContainer<FeatureType>>(feature));
   }
 
   void AddExtension(const char *extension) {
@@ -76,8 +75,6 @@ struct DeviceCreateInfo {
     queue_families[family_index] = priorities;
   }
 
-  VkDeviceCreateInfo CompileVkDeviceCreateInfo(
-      bool enable_validation_layers,
-      const PhysicalDevice &physical_device);
+  VkDeviceCreateInfo CompileVkDeviceCreateInfo(bool enable_validation_layers, const PhysicalDevice &physical_device);
 };
 }  // namespace grassland::vulkan

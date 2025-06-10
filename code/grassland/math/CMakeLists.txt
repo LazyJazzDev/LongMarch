@@ -1,4 +1,4 @@
-file(GLOB_RECURSE SOURCES "*.cpp" "*.h")
+file(GLOB_RECURSE SOURCES "*.cpp")
 
 if (LONGMARCH_CUDA_ENABLED)
     foreach (source_file ${SOURCES})

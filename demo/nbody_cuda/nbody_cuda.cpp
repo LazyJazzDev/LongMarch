@@ -287,7 +287,7 @@ void NBodyCUDA::UpdateImGui() {
   ImGui::SetNextWindowPos(ImVec2{0.0f, 0.0f}, ImGuiCond_Once);
   ImGui::SetNextWindowBgAlpha(0.3f);
   bool trigger_hdr_switch = false;
-  if (ImGui::Begin("NBodyCUDA"), nullptr, ImGuiWindowFlags_NoMove) {
+  if (ImGui::Begin("NBody CUDA", nullptr, ImGuiWindowFlags_NoMove)) {
     ImGui::Text("Statistics");
     ImGui::Separator();
     auto current_tp = std::chrono::steady_clock::now();
