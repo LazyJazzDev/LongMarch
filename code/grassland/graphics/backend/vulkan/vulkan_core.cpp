@@ -382,6 +382,10 @@ int VulkanCore::InitializeLogicalDevice(int device_index) {
   grassland::vulkan::DeviceFeatureRequirement device_feature_requirement{};
   device_feature_requirement.enable_raytracing_extension = physical_device.SupportRayTracing();
   auto create_info = device_feature_requirement.GenerateRecommendedDeviceCreateInfo(physical_device);
+  if (instance_->CreateHint().IsEnabledExtension(VK_KHR_SURFACE_EXTENSION_NAME) &&
+      physical_device.IsExtensionSupported(VK_KHR_SWAPCHAIN_EXTENSION_NAME)) {
+    create_info.AddExtension(VK_KHR_SWAPCHAIN_EXTENSION_NAME);
+  }
 #if defined(LONGMARCH_CUDA_RUNTIME)
   if (cuda_device_ >= 0) {
     create_info.AddExtension(VK_KHR_EXTERNAL_MEMORY_EXTENSION_NAME);

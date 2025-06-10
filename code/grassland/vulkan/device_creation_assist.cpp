@@ -49,11 +49,6 @@ VkDeviceCreateInfo DeviceCreateInfo::CompileVkDeviceCreateInfo(bool enable_valid
 class DeviceCreateInfo DeviceFeatureRequirement::GenerateRecommendedDeviceCreateInfo(
     const PhysicalDevice &physical_device) const {
   DeviceCreateInfo create_info;
-  if (physical_device.IsExtensionSupported(VK_KHR_SWAPCHAIN_EXTENSION_NAME) &&
-      physical_device.IsExtensionSupported(VK_KHR_SURFACE_EXTENSION_NAME)) {
-    create_info.AddExtension(VK_KHR_SWAPCHAIN_EXTENSION_NAME);
-    create_info.AddExtension(VK_KHR_SURFACE_EXTENSION_NAME);
-  }
 
 #ifdef __APPLE__
   create_info.AddExtension("VK_KHR_portability_subset");

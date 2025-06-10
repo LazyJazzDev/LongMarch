@@ -36,6 +36,15 @@ void InstanceCreateHint::AddExtension(const char *extension) {
   }
 }
 
+bool InstanceCreateHint::IsEnabledExtension(const char *extension) const {
+  for (auto ext : extensions) {
+    if (std::strcmp(ext, extension) == 0) {
+      return true;
+    }
+  }
+  return false;
+}
+
 void InstanceCreateHint::ApplyGLFWSurfaceSupport() {
   uint32_t glfw_extension_count = 0;
   const char **glfw_extensions;
@@ -46,8 +55,7 @@ void InstanceCreateHint::ApplyGLFWSurfaceSupport() {
     int err = glfwGetError(nullptr);
     if (err == GLFW_NOT_INITIALIZED) {
       glfwInit();
-      glfw_extensions =
-          glfwGetRequiredInstanceExtensions(&glfw_extension_count);
+      glfw_extensions = glfwGetRequiredInstanceExtensions(&glfw_extension_count);
       local_init = true;
     }
   }
@@ -63,8 +71,7 @@ void InstanceCreateHint::ApplyGLFWSurfaceSupport() {
   }
 }
 
-VkResult CreateInstance(InstanceCreateHint create_hint,
-                        double_ptr<Instance> pp_instance) {
+VkResult CreateInstance(InstanceCreateHint create_hint, double_ptr<Instance> pp_instance) {
   VkInstanceCreateInfo instance_create_info{};
   VkDebugUtilsMessengerCreateInfoEXT debug_create_info{};
 
@@ -75,22 +82,18 @@ VkResult CreateInstance(InstanceCreateHint create_hint,
       return VK_ERROR_UNKNOWN;
     }
     create_hint.AddExtension(VK_EXT_DEBUG_UTILS_EXTENSION_NAME);
-    instance_create_info.enabledLayerCount =
-        static_cast<uint32_t>(validation_layers.size());
+    instance_create_info.enabledLayerCount = static_cast<uint32_t>(validation_layers.size());
     instance_create_info.ppEnabledLayerNames = validation_layers.data();
     instance_create_info.pNext = &debug_create_info;
 
     debug_create_info = {};
-    debug_create_info.sType =
-        VK_STRUCTURE_TYPE_DEBUG_UTILS_MESSENGER_CREATE_INFO_EXT;
-    debug_create_info.messageSeverity =
-        VK_DEBUG_UTILS_MESSAGE_SEVERITY_VERBOSE_BIT_EXT |
-        VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT |
-        VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT;
-    debug_create_info.messageType =
-        VK_DEBUG_UTILS_MESSAGE_TYPE_GENERAL_BIT_EXT |
-        VK_DEBUG_UTILS_MESSAGE_TYPE_VALIDATION_BIT_EXT |
-        VK_DEBUG_UTILS_MESSAGE_TYPE_PERFORMANCE_BIT_EXT;
+    debug_create_info.sType = VK_STRUCTURE_TYPE_DEBUG_UTILS_MESSENGER_CREATE_INFO_EXT;
+    debug_create_info.messageSeverity = VK_DEBUG_UTILS_MESSAGE_SEVERITY_VERBOSE_BIT_EXT |
+                                        VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT |
+                                        VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT;
+    debug_create_info.messageType = VK_DEBUG_UTILS_MESSAGE_TYPE_GENERAL_BIT_EXT |
+                                    VK_DEBUG_UTILS_MESSAGE_TYPE_VALIDATION_BIT_EXT |
+                                    VK_DEBUG_UTILS_MESSAGE_TYPE_PERFORMANCE_BIT_EXT;
     debug_create_info.pfnUserCallback = DebugUtilsMessengerUserCallback;
   } else {
     instance_create_info.enabledLayerCount = 0;
@@ -103,40 +106,32 @@ VkResult CreateInstance(InstanceCreateHint create_hint,
 
   instance_create_info.sType = VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO;
   instance_create_info.pApplicationInfo = &create_hint.app_info;
-  instance_create_info.enabledExtensionCount =
-      static_cast<uint32_t>(create_hint.extensions.size());
+  instance_create_info.enabledExtensionCount = static_cast<uint32_t>(create_hint.extensions.size());
   instance_create_info.ppEnabledExtensionNames = create_hint.extensions.data();
 
 #ifdef __APPLE__
-  instance_create_info.flags |=
-      VK_INSTANCE_CREATE_ENUMERATE_PORTABILITY_BIT_KHR;
+  instance_create_info.flags |= VK_INSTANCE_CREATE_ENUMERATE_PORTABILITY_BIT_KHR;
 #endif
 
   VkInstance instance{nullptr};
   VkDebugUtilsMessengerEXT debug_messenger{nullptr};
   InstanceProcedures instance_procedures;
 
-  RETURN_IF_FAILED_VK(
-      vkCreateInstance(&instance_create_info, nullptr, &instance),
-      "failed to create instance.");
+  RETURN_IF_FAILED_VK(vkCreateInstance(&instance_create_info, nullptr, &instance), "failed to create instance.");
 
-  instance_procedures.Initialize(instance,
-                                 create_hint.enable_validation_layers);
+  instance_procedures.Initialize(instance, create_hint.enable_validation_layers);
 
   if (create_hint.enable_validation_layers) {
     RETURN_IF_FAILED_VK(
-        instance_procedures.vkCreateDebugUtilsMessengerEXT(
-            instance, &debug_create_info, nullptr, &debug_messenger),
+        instance_procedures.vkCreateDebugUtilsMessengerEXT(instance, &debug_create_info, nullptr, &debug_messenger),
         "failed to construct up debug messenger.");
   }
 
   if (pp_instance) {
-    pp_instance.construct(create_hint, instance, debug_messenger,
-                          instance_procedures);
+    pp_instance.construct(create_hint, instance, debug_messenger, instance_procedures);
   } else {
     if (create_hint.enable_validation_layers) {
-      instance_procedures.vkDestroyDebugUtilsMessengerEXT(
-          instance, debug_messenger, nullptr);
+      instance_procedures.vkDestroyDebugUtilsMessengerEXT(instance, debug_messenger, nullptr);
     }
     vkDestroyInstance(instance, nullptr);
     SetErrorMessage("pp_instance is nullptr.");
@@ -158,19 +153,15 @@ Instance::Instance(InstanceCreateHint create_hint,
 
 Instance::~Instance() {
   if (create_hint_.enable_validation_layers) {
-    instance_procedures_.vkDestroyDebugUtilsMessengerEXT(
-        instance_, debug_messenger_, nullptr);
+    instance_procedures_.vkDestroyDebugUtilsMessengerEXT(instance_, debug_messenger_, nullptr);
   }
 
   vkDestroyInstance(instance_, nullptr);
 }
 
-VkResult Instance::CreateSurfaceFromGLFWWindow(
-    GLFWwindow *window,
-    double_ptr<Surface> pp_surface) const {
+VkResult Instance::CreateSurfaceFromGLFWWindow(GLFWwindow *window, double_ptr<Surface> pp_surface) const {
   VkSurfaceKHR surface{nullptr};
-  VkResult result =
-      glfwCreateWindowSurface(instance_, window, nullptr, &surface);
+  VkResult result = glfwCreateWindowSurface(instance_, window, nullptr, &surface);
   if (result != VK_SUCCESS) {
     SetErrorMessage("failed to create window surface.");
     return result;
@@ -208,22 +199,19 @@ VkResult Instance::CreateDevice(Surface *surface,
                                 int device_index,
                                 double_ptr<struct Device> pp_device) const {
   DeviceFeatureRequirement device_feature_requirement{};
-  device_feature_requirement.enable_raytracing_extension =
-      enable_raytracing_extension;
+  device_feature_requirement.enable_raytracing_extension = enable_raytracing_extension;
   return CreateDevice(device_feature_requirement, device_index, pp_device);
 }
 
-VkResult Instance::CreateDevice(
-    const struct DeviceFeatureRequirement &device_feature_requirement,
-    int device_index,
-    double_ptr<struct Device> pp_device) const {
+VkResult Instance::CreateDevice(const struct DeviceFeatureRequirement &device_feature_requirement,
+                                int device_index,
+                                double_ptr<struct Device> pp_device) const {
   std::vector<PhysicalDevice> physical_devices = EnumeratePhysicalDevices();
 
   if (device_index < 0) {
     uint64_t max_score = 0;
     for (int i = 0; i < physical_devices.size(); i++) {
-      if (!physical_devices[i].CheckFeatureSupport(
-              device_feature_requirement)) {
+      if (!physical_devices[i].CheckFeatureSupport(device_feature_requirement)) {
         continue;
       }
 
@@ -242,11 +230,13 @@ VkResult Instance::CreateDevice(
 
   PhysicalDevice physical_device = physical_devices[device_index];
 
-  VkResult result = CreateDevice(
-      physical_device, device_feature_requirement,
-      device_feature_requirement.GenerateRecommendedDeviceCreateInfo(
-          physical_device),
-      pp_device);
+  auto create_info = device_feature_requirement.GenerateRecommendedDeviceCreateInfo(physical_device);
+
+  if (create_hint_.IsEnabledExtension(VK_KHR_SURFACE_EXTENSION_NAME) &&
+      physical_device.IsExtensionSupported(VK_KHR_SWAPCHAIN_EXTENSION_NAME)) {
+    create_info.AddExtension(VK_KHR_SWAPCHAIN_EXTENSION_NAME);
+  }
+  VkResult result = CreateDevice(physical_device, device_feature_requirement, create_info, pp_device);
   if (result == VK_SUCCESS) {
     if (device_feature_requirement.enable_raytracing_extension) {
       pp_device->Procedures().GetRayTracingProcedures(pp_device->Handle());
@@ -256,32 +246,27 @@ VkResult Instance::CreateDevice(
   return result;
 }
 
-VkResult Instance::CreateDevice(
-    const PhysicalDevice &physical_device,
-    const DeviceFeatureRequirement &device_feature_requirement,
-    DeviceCreateInfo create_info,
-    double_ptr<Device> pp_device) const {
-  return CreateDevice(physical_device, create_info,
-                      device_feature_requirement.GetVmaAllocatorCreateFlags(),
-                      pp_device);
+VkResult Instance::CreateDevice(const PhysicalDevice &physical_device,
+                                const DeviceFeatureRequirement &device_feature_requirement,
+                                DeviceCreateInfo create_info,
+                                double_ptr<Device> pp_device) const {
+  return CreateDevice(physical_device, create_info, device_feature_requirement.GetVmaAllocatorCreateFlags(), pp_device);
 }
 
 VkResult Instance::CreateDevice(const PhysicalDevice &physical_device,
                                 struct DeviceCreateInfo create_info,
                                 VmaAllocatorCreateFlags allocator_flags,
                                 double_ptr<class Device> pp_device) const {
-  VkDeviceCreateInfo device_create_info = create_info.CompileVkDeviceCreateInfo(
-      create_hint_.enable_validation_layers, physical_device);
+  VkDeviceCreateInfo device_create_info =
+      create_info.CompileVkDeviceCreateInfo(create_hint_.enable_validation_layers, physical_device);
 
   VkDevice device{nullptr};
 
-  RETURN_IF_FAILED_VK(vkCreateDevice(physical_device.Handle(),
-                                     &device_create_info, nullptr, &device),
+  RETURN_IF_FAILED_VK(vkCreateDevice(physical_device.Handle(), &device_create_info, nullptr, &device),
                       "failed to create logical device.");
 
   if (pp_device) {
-    pp_device.construct(this, physical_device, create_info, allocator_flags,
-                        device);
+    pp_device.construct(this, physical_device, create_info, allocator_flags, device);
   } else {
     vkDestroyDevice(device, nullptr);
     SetErrorMessage("pp_device is nullptr.");
@@ -297,9 +282,8 @@ VkResult Instance::CreateDevice(Surface *surface,
   return CreateDevice(surface, enable_raytracing_extension, -1, pp_device);
 }
 
-VkResult Instance::CreateDevice(
-    const DeviceFeatureRequirement &device_feature_requirement,
-    double_ptr<struct Device> pp_device) const {
+VkResult Instance::CreateDevice(const DeviceFeatureRequirement &device_feature_requirement,
+                                double_ptr<struct Device> pp_device) const {
   return CreateDevice(device_feature_requirement, -1, pp_device);
 }
 
