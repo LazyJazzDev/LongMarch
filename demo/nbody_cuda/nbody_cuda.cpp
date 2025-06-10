@@ -112,7 +112,7 @@ void NBodyCUDA::OnInit() {
     core_->CreateImage(960, 640, graphics::IMAGE_FORMAT_R8G8B8A8_UNORM, &frame_image_);
   }
 
-  LogInfo("Simulation {} particles...", n_particles_);
+  LogInfo("Simulating {} particles...", n_particles_);
 
   core_->CreateBuffer(sizeof(GlobalUniformObject), graphics::BUFFER_TYPE_DYNAMIC, &global_uniform_buffer_);
   core_->CreateCUDABuffer(sizeof(glm::vec3) * n_particles_, &particles_pos_);
@@ -358,9 +358,9 @@ void NBodyCUDA::UpdateImGui() {
     if (ImGui::Button(("HDR: " + std::string(hdr_ ? "ON" : "OFF")).c_str())) {
       trigger_hdr_switch = true;
     }
-    ImGui::End();
     last_frame_tp = current_tp;
   }
+  ImGui::End();
   window_->EndImGuiFrame();
   if (trigger_hdr_switch) {
     hdr_ = !hdr_;

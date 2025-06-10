@@ -19,8 +19,11 @@ class Adapter {
   uint32_t VendorID() const;
   uint64_t Evaluate() const;
 
-  bool CheckFeatureSupport(
-      const DeviceFeatureRequirement &feature_requirement) const;
+  bool CheckFeatureSupport(const DeviceFeatureRequirement &feature_requirement) const;
+
+#if defined(LONGMARCH_CUDA_RUNTIME)
+  int CUDADeviceIndex() const;
+#endif
 
  private:
   ComPtr<IDXGIAdapter1> adapter_;

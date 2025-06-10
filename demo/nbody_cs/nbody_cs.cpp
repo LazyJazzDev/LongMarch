@@ -304,9 +304,9 @@ void NBodyCS::UpdateImGui() {
     if (ImGui::Button(("HDR: " + std::string(hdr_ ? "ON" : "OFF")).c_str())) {
       trigger_hdr_switch = true;
     }
-    ImGui::End();
     last_frame_tp = current_tp;
   }
+  ImGui::End();
   window_->EndImGuiFrame();
   if (trigger_hdr_switch) {
     hdr_ = !hdr_;

@@ -323,6 +323,9 @@ int D3D12Core::GetPhysicalDeviceProperties(PhysicalDeviceProperties *p_physical_
       properties.score = adapter.Evaluate();
       properties.ray_tracing_support = adapter.SupportRayTracing();
       properties.geometry_shader_support = true;
+#if defined(LONGMARCH_CUDA_RUNTIME)
+      properties.cuda_device_index = adapter.CUDADeviceIndex();
+#endif
       p_physical_device_properties[i] = properties;
     }
   }
@@ -369,20 +372,10 @@ int D3D12Core::InitializeLogicalDevice(int device_index) {
   blit_pipeline_.Initialize(device_.get());
 
 #if defined(LONGMARCH_CUDA_RUNTIME)
-  DXGI_ADAPTER_DESC1 adapter_desc = {};
-  device_->Adapter().Handle()->GetDesc1(&adapter_desc);
-
-  int cuda_device_count = 0;
-  cudaGetDeviceCount(&cuda_device_count);
-  for (int device_index = 0; device_index < cuda_device_count; device_index++) {
-    cudaDeviceProp device_prop;
-    cudaGetDeviceProperties(&device_prop, device_index);
-    if (std::memcmp(&device_prop.luid, &adapter_desc.AdapterLuid, sizeof(LUID)) == 0) {
-      cuda_device_ = device_index;
-      cuda_device_node_mask_ = device_prop.luidDeviceNodeMask;
-      break;
-    }
-  }
+  cuda_device_ = device_->Adapter().CUDADeviceIndex();
+  cudaDeviceProp device_prop{};
+  cudaGetDeviceProperties(&device_prop, device_index);
+  cuda_device_node_mask_ = device_prop.luidDeviceNodeMask;
 
   if (cuda_device_ >= 0) {
     device_->CreateFence(D3D12_FENCE_FLAG_SHARED, &fence_);
