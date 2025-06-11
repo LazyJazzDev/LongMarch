@@ -66,6 +66,8 @@ void InstanceCreateHint::ApplyGLFWSurfaceSupport() {
     }
   }
 
+  AddExtension(VK_EXT_SWAPCHAIN_COLOR_SPACE_EXTENSION_NAME);
+
   if (local_init) {
     glfwTerminate();
   }

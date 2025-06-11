@@ -76,8 +76,8 @@ void VulkanCmdBeginRendering::CompileCommand(VulkanCommandContext *context, VkCo
   std::vector<VkRenderingAttachmentInfo> color_attachment_infos;
   VkRenderingAttachmentInfo depth_attachment_info{};
   Extent2D extent;
-  extent.width = 32768;
-  extent.height = 32768;
+  extent.width = context->Core()->Device()->PhysicalDevice().GetPhysicalDeviceProperties().limits.maxFramebufferWidth;
+  extent.height = context->Core()->Device()->PhysicalDevice().GetPhysicalDeviceProperties().limits.maxFramebufferHeight;
   for (int i = 0; i < color_targets_.size(); i++) {
     auto &color_target = color_targets_[i];
     context->RequireImageState(command_buffer, color_target->Image()->Handle(),
