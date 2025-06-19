@@ -114,6 +114,16 @@ int D3D12Core::CreateShader(const std::string &source_code,
   return 0;
 }
 
+int D3D12Core::CreateShader(const VirtualFileSystem &vfs,
+                            const std::string &source_file,
+                            const std::string &entry_point,
+                            const std::string &target,
+                            double_ptr<Shader> pp_shader) {
+  pp_shader.construct<D3D12Shader>(this,
+                                   CompileShader(vfs, source_file, entry_point, target, {"-Wno-ignored-attributes"}));
+  return 0;
+}
+
 int D3D12Core::CreateProgram(const std::vector<ImageFormat> &color_formats,
                              ImageFormat depth_format,
                              double_ptr<Program> pp_program) {

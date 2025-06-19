@@ -1,4 +1,4 @@
-#include "inverse.h"
+#include "inverse.hlsli"
 
 struct LightInfo {
   float3 direction;

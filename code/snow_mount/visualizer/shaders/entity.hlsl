@@ -1,4 +1,4 @@
-#include "inverse.h"
+#include "inverse.hlsli"
 
 struct VSInput {
   [[vk::location(0)]] float3 position : TEXCOORD0;

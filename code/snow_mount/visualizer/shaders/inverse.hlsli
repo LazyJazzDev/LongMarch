@@ -1,5 +1,5 @@
-#ifndef INVERSE_HLSL
-#define INVERSE_HLSL
+#ifndef INVERSE_HLSLI
+#define INVERSE_HLSLI
 
 // Returns the inverse of a matrix, by using the algorithm of calculating the classical
 // adjoint and dividing by the determinant. The contents of the matrix are changed.

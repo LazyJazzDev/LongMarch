@@ -99,6 +99,17 @@ int VulkanCore::CreateShader(const std::string &source_code,
   return 0;
 }
 
+int VulkanCore::CreateShader(const VirtualFileSystem &vfs,
+                             const std::string &source_file,
+                             const std::string &entry_point,
+                             const std::string &target,
+                             double_ptr<Shader> pp_shader) {
+  pp_shader.construct<VulkanShader>(this,
+                                    CompileShader(vfs, source_file, entry_point, target,
+                                                  {"-spirv", "-fspv-target-env=vulkan1.2", "-fvk-use-dx-layout"}));
+  return 0;
+}
+
 int VulkanCore::CreateProgram(const std::vector<ImageFormat> &color_formats,
                               ImageFormat depth_format,
                               double_ptr<Program> pp_program) {

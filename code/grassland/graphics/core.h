@@ -45,6 +45,12 @@ class Core {
                            const std::string &target,
                            double_ptr<Shader> pp_shader) = 0;
 
+  virtual int CreateShader(const VirtualFileSystem &vfs,
+                           const std::string &source_file,
+                           const std::string &entry_point,
+                           const std::string &target,
+                           double_ptr<Shader> pp_shader) = 0;
+
   virtual int CreateProgram(const std::vector<ImageFormat> &color_formats,
                             ImageFormat depth_format,
                             double_ptr<Program> pp_program) = 0;

@@ -1,9 +1,4 @@
-struct GlobalUniformObject {
-  float4x4 world_to_screen;
-  float4x4 camera_to_world;
-  float particle_size;
-  bool hdr;
-};
+#include "global_uniform_object.hlsli"
 
 ConstantBuffer<GlobalUniformObject> ubo : register(b0, space0);
 RWTexture2D<float4> output_image : register(u0, space1);

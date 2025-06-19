@@ -39,4 +39,10 @@ CompiledShaderBlob CompileShader(const std::string &source_code,
                                  const std::string &target,
                                  const std::vector<std::string> &args = {});
 
+CompiledShaderBlob CompileShader(const VirtualFileSystem &vfs,
+                                 const std::string &source_file,
+                                 const std::string &entry_point,
+                                 const std::string &target,
+                                 const std::vector<std::string> &args = {});
+
 }  // namespace grassland::graphics

@@ -133,6 +133,7 @@ add_subdirectory(external/pybind11)
 set(PYBIND11_LIB_NAME pybind11::headers)
 list(APPEND LIB_LIST ${PYBIND11_LIB_NAME})
 
+add_subdirectory(scripts)
 include(scripts/pack_shaders.cmake)
 
 set(LONGMARCH_ASSETS_DIR ${CMAKE_CURRENT_SOURCE_DIR}/assets/)
