@@ -145,8 +145,8 @@ void NBodyCS::OnClose() {
 }
 
 void NBodyCS::BuildRenderNode() {
-  core_->CreateShader(GetShaderCode("shaders/particle.hlsl"), "VSMain", "vs_6_0", &vertex_shader_);
-  core_->CreateShader(GetShaderCode("shaders/particle.hlsl"), "PSMain", "ps_6_0", &fragment_shader_);
+  core_->CreateShader(GetShaderVirtualFileSystem(), "shaders/particle.hlsl", "VSMain", "vs_6_0", &vertex_shader_);
+  core_->CreateShader(GetShaderVirtualFileSystem(), "shaders/particle.hlsl", "PSMain", "ps_6_0", &fragment_shader_);
   core_->CreateProgram({frame_image_->Format()}, graphics::IMAGE_FORMAT_UNDEFINED, &program_);
   program_->SetBlendState(0, graphics::BlendState(graphics::BLEND_FACTOR_ONE, graphics::BLEND_FACTOR_ONE,
                                                   graphics::BLEND_OP_ADD, graphics::BLEND_FACTOR_ONE,
@@ -158,8 +158,8 @@ void NBodyCS::BuildRenderNode() {
   program_->BindShader(fragment_shader_.get(), graphics::SHADER_TYPE_FRAGMENT);
   program_->Finalize();
 
-  core_->CreateShader(GetShaderCode("shaders/hdr.hlsl"), "VSMain", "vs_6_0", &hdr_vertex_shader_);
-  core_->CreateShader(GetShaderCode("shaders/hdr.hlsl"), "PSMain", "ps_6_0", &hdr_fragment_shader_);
+  core_->CreateShader(GetShaderVirtualFileSystem(), "shaders/hdr.hlsl", "VSMain", "vs_6_0", &hdr_vertex_shader_);
+  core_->CreateShader(GetShaderVirtualFileSystem(), "shaders/hdr.hlsl", "PSMain", "ps_6_0", &hdr_fragment_shader_);
   core_->CreateProgram({}, graphics::IMAGE_FORMAT_UNDEFINED, &hdr_program_);
   hdr_program_->AddResourceBinding(graphics::RESOURCE_TYPE_UNIFORM_BUFFER, 1);
   hdr_program_->AddResourceBinding(graphics::RESOURCE_TYPE_IMAGE, 1);

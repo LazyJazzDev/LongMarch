@@ -33,15 +33,11 @@ class CustomVFSIncludeHandler : public IDxcIncludeHandler {
 
   // IUnknown methods
   ULONG STDMETHODCALLTYPE AddRef() override {
-    return InterlockedIncrement(&m_ref);
+    return 1;
   }
 
   ULONG STDMETHODCALLTYPE Release() override {
-    ULONG ref = InterlockedDecrement(&m_ref);
-    if (ref == 0) {
-      delete this;
-    }
-    return ref;
+    return 1;
   }
 
   HRESULT STDMETHODCALLTYPE QueryInterface(REFIID riid, void **ppvObject) override {
@@ -64,9 +60,6 @@ class CustomVFSIncludeHandler : public IDxcIncludeHandler {
 
     // Convert LPCWSTR to std::wstring
     std::string filename = WStringToString(pFilename);
-
-    std::cout << "Loading include file: " << std::filesystem::proximate(filename, source_path_.remove_filename())
-              << std::endl;
 
     std::vector<uint8_t> data;
     if (vfs_->ReadFile(filename, data)) {
