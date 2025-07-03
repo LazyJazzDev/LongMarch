@@ -152,7 +152,23 @@ void D3D12RayTracingProgram::AddResourceBinding(ResourceType type, int count) {
   AddResourceBindingImpl(type, count);
 }
 
-void D3D12RayTracingProgram::Finalize() {
+void D3D12RayTracingProgram::AddRayGenShader(Shader *ray_gen_shader) {
+}
+
+void D3D12RayTracingProgram::AddMissShader(Shader *miss_shader) {
+}
+
+void D3D12RayTracingProgram::AddHitGroup(Shader *closest_hit_shader,
+                                         Shader *any_hit_shader,
+                                         Shader *intersection_shader) {
+}
+
+void D3D12RayTracingProgram::AddCallableShader(Shader *callable_shader) {
+}
+
+void D3D12RayTracingProgram::Finalize(const std::vector<int32_t> &miss_shader_indices,
+                                      const std::vector<int32_t> &hit_group_indices,
+                                      const std::vector<int32_t> &callable_shader_indices) {
   FinalizeRootSignature();
 
   core_->Device()->CreateRayTracingPipeline(root_signature_.get(), &raygen_shader_->ShaderModule(),

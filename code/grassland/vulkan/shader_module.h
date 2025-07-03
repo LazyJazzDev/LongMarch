@@ -27,5 +27,11 @@ class ShaderModule {
   std::string entry_point_;
 };
 
+struct HitGroup {
+  ShaderModule *closest_hit_shader{nullptr};
+  ShaderModule *any_hit_shader{nullptr};
+  ShaderModule *intersection_shader{nullptr};
+};
+
 CompiledShaderBlob CompileGLSLToSPIRV(const std::string &glsl_code, VkShaderStageFlagBits shader_stage);
 }  // namespace grassland::vulkan

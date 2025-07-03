@@ -103,7 +103,14 @@ class VulkanRayTracingProgram : public RayTracingProgram, public VulkanProgramBa
 
   void AddResourceBinding(ResourceType type, int count) override;
 
-  void Finalize() override;
+  void AddRayGenShader(Shader *ray_gen_shader) override;
+  void AddMissShader(Shader *miss_shader) override;
+  void AddHitGroup(Shader *closest_hit_shader, Shader *any_hit_shader, Shader *intersection_shader) override;
+  void AddCallableShader(Shader *callable_shader) override;
+
+  void Finalize(const std::vector<int32_t> &miss_shader_indices,
+                const std::vector<int32_t> &hit_group_indices,
+                const std::vector<int32_t> &callable_shader_indices) override;
 
   vulkan::Pipeline *Pipeline() const {
     return pipeline_.get();

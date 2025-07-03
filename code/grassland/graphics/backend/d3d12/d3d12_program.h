@@ -93,7 +93,15 @@ class D3D12RayTracingProgram : public RayTracingProgram, public D3D12ProgramBase
                          D3D12Shader *closest_hit_shader);
   ~D3D12RayTracingProgram() override = default;
   void AddResourceBinding(ResourceType type, int count) override;
-  void Finalize() override;
+
+  void AddRayGenShader(Shader *ray_gen_shader) override;
+  void AddMissShader(Shader *miss_shader) override;
+  void AddHitGroup(Shader *closest_hit_shader, Shader *any_hit_shader, Shader *intersection_shader) override;
+  void AddCallableShader(Shader *callable_shader) override;
+
+  void Finalize(const std::vector<int32_t> &miss_shader_indices,
+                const std::vector<int32_t> &hit_group_indices,
+                const std::vector<int32_t> &callable_shader_indices) override;
 
   d3d12::RayTracingPipeline *PipelineState() const {
     return pipeline_.get();

@@ -134,7 +134,23 @@ void VulkanRayTracingProgram::AddResourceBinding(ResourceType type, int count) {
   AddResourceBindingImpl(type, count);
 }
 
-void VulkanRayTracingProgram::Finalize() {
+void VulkanRayTracingProgram::AddRayGenShader(Shader *ray_gen_shader) {
+}
+
+void VulkanRayTracingProgram::AddMissShader(Shader *miss_shader) {
+}
+
+void VulkanRayTracingProgram::AddHitGroup(Shader *closest_hit_shader,
+                                          Shader *any_hit_shader,
+                                          Shader *intersection_shader) {
+}
+
+void VulkanRayTracingProgram::AddCallableShader(Shader *callable_shader) {
+}
+
+void VulkanRayTracingProgram::Finalize(const std::vector<int32_t> &miss_shader_indices,
+                                       const std::vector<int32_t> &hit_group_indices,
+                                       const std::vector<int32_t> &callable_shader_indices) {
   FinalizePipelineLayout();
   core_->Device()->CreateRayTracingPipeline(pipeline_layout_.get(), raygen_shader_->ShaderModule(),
                                             miss_shader_->ShaderModule(), closest_hit_shader_->ShaderModule(),
