@@ -116,6 +116,13 @@ class Device {
 
   HRESULT CreateRayTracingPipeline(RootSignature *root_signature,
                                    ShaderModule *ray_gen_shader,
+                                   const std::vector<ShaderModule *> &miss_shaders,
+                                   const std::vector<HitGroup> &hit_groups,
+                                   const std::vector<ShaderModule *> &callable_shaders,
+                                   double_ptr<RayTracingPipeline> pp_pipeline);
+
+  HRESULT CreateRayTracingPipeline(RootSignature *root_signature,
+                                   ShaderModule *ray_gen_shader,
                                    ShaderModule *miss_shader,
                                    ShaderModule *closest_hit_shader,
                                    double_ptr<RayTracingPipeline> pp_pipeline);

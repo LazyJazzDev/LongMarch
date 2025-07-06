@@ -84,6 +84,7 @@ class PipelineState;
 class AccelerationStructure;
 class RayTracingPipeline;
 class ShaderTable;
+struct HitGroup;
 
 #ifdef NDEBUG
 constexpr bool kDefaultEnableDebugLayer = false;
