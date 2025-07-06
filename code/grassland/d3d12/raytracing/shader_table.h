@@ -8,16 +8,19 @@ class ShaderTable {
   ShaderTable(const ComPtr<ID3D12Resource> &buffer,
               D3D12_GPU_VIRTUAL_ADDRESS ray_gen_offset,
               D3D12_GPU_VIRTUAL_ADDRESS miss_offset,
-              D3D12_GPU_VIRTUAL_ADDRESS hit_group_offset);
+              D3D12_GPU_VIRTUAL_ADDRESS hit_group_offset,
+              D3D12_GPU_VIRTUAL_ADDRESS callable_offset = 0);
   D3D12_GPU_VIRTUAL_ADDRESS GetRayGenDeviceAddress() const;
   D3D12_GPU_VIRTUAL_ADDRESS GetMissDeviceAddress() const;
   D3D12_GPU_VIRTUAL_ADDRESS GetHitGroupDeviceAddress() const;
+  D3D12_GPU_VIRTUAL_ADDRESS GetCallableDeviceAddress() const;
 
  private:
   ComPtr<ID3D12Resource> buffer_;
   D3D12_GPU_VIRTUAL_ADDRESS ray_gen_offset_;
   D3D12_GPU_VIRTUAL_ADDRESS miss_offset_;
   D3D12_GPU_VIRTUAL_ADDRESS hit_group_offset_;
+  D3D12_GPU_VIRTUAL_ADDRESS callable_offset_;
 };
 
 }  // namespace grassland::d3d12

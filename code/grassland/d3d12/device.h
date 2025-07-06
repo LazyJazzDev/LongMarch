@@ -127,6 +127,12 @@ class Device {
                                    ShaderModule *closest_hit_shader,
                                    double_ptr<RayTracingPipeline> pp_pipeline);
 
+  HRESULT CreateShaderTable(RayTracingPipeline *ray_tracing_pipeline,
+                            const std::vector<int32_t> &miss_shader_indices,
+                            const std::vector<int32_t> &hit_group_indices,
+                            const std::vector<int32_t> &callable_shader_indices,
+                            double_ptr<ShaderTable> pp_shader_table) const;
+
   HRESULT CreateShaderTable(RayTracingPipeline *ray_tracing_pipeline, double_ptr<ShaderTable> pp_shader_table) const;
 
  private:

@@ -467,7 +467,7 @@ HRESULT Device::CreateRayTracingPipeline(RootSignature *root_signature,
   RETURN_IF_FAILED_HR(dxr_device_->CreateStateObject(pipeline_desc, IID_PPV_ARGS(&pipeline)),
                       "failed to create ray tracing pipeline.");
 
-  pp_pipeline.construct(pipeline);
+  pp_pipeline.construct(pipeline, miss_shaders.size(), hit_groups.size(), callable_shaders.size());
   return S_OK;
 }
 
@@ -481,43 +481,84 @@ HRESULT Device::CreateRayTracingPipeline(RootSignature *root_signature,
 }
 
 HRESULT Device::CreateShaderTable(RayTracingPipeline *ray_tracing_pipeline,
+                                  const std::vector<int32_t> &miss_shader_indices,
+                                  const std::vector<int32_t> &hit_group_indices,
+                                  const std::vector<int32_t> &callable_shader_indices,
                                   double_ptr<ShaderTable> pp_shader_table) const {
   ComPtr<ID3D12StateObjectProperties> pipeline_properties;
   RETURN_IF_FAILED_HR(ray_tracing_pipeline->Handle()->QueryInterface(IID_PPV_ARGS(&pipeline_properties)),
                       "failed to get pipeline properties.");
 
-  void *ray_gen_shader_idenfitier = pipeline_properties->GetShaderIdentifier(L"RayGenMain");
-  void *miss_shader_idenfitier = pipeline_properties->GetShaderIdentifier(L"MissMain0");
-  void *hit_group_shader_idenfitier = pipeline_properties->GetShaderIdentifier(L"HitGroup0");
+  const UINT shader_idenfitier_size = D3D12_SHADER_IDENTIFIER_SIZE_IN_BYTES;
+  const UINT shader_record_size = SizeAlignTo(shader_idenfitier_size, D3D12_RAYTRACING_SHADER_RECORD_BYTE_ALIGNMENT);
+  const UINT shader_table_alignment = D3D12_RAYTRACING_SHADER_TABLE_BYTE_ALIGNMENT;
 
-  UINT shader_idenfitier_size = D3D12_SHADER_IDENTIFIER_SIZE_IN_BYTES;
-  UINT shader_record_size = SizeAlignTo(shader_idenfitier_size, D3D12_RAYTRACING_SHADER_RECORD_BYTE_ALIGNMENT);
-  UINT shader_table_size = SizeAlignTo(shader_record_size, D3D12_RAYTRACING_SHADER_TABLE_BYTE_ALIGNMENT);
+  D3D12_GPU_VIRTUAL_ADDRESS accum_offset = 0;
+
+  D3D12_GPU_VIRTUAL_ADDRESS ray_gen_shader_offset = 0;
+  D3D12_GPU_VIRTUAL_ADDRESS miss_shader_offset = 0;
+  D3D12_GPU_VIRTUAL_ADDRESS hit_group_offset = 0;
+  D3D12_GPU_VIRTUAL_ADDRESS callable_shader_offset = 0;
+
+  miss_shader_offset = accum_offset = SizeAlignTo(accum_offset + shader_record_size * 1, shader_table_alignment);
+
+  hit_group_offset = accum_offset =
+      SizeAlignTo(accum_offset + shader_record_size * miss_shader_indices.size(), shader_table_alignment);
+
+  callable_shader_offset = accum_offset =
+      SizeAlignTo(accum_offset + shader_record_size * hit_group_indices.size(), shader_table_alignment);
+
+  accum_offset =
+      SizeAlignTo(accum_offset + shader_record_size * callable_shader_indices.size(), shader_table_alignment);
+
   ComPtr<ID3D12Resource> buffer;
-  RETURN_IF_FAILED_HR(d3d12::CreateBuffer(Handle(), shader_table_size * 3, D3D12_HEAP_TYPE_UPLOAD,
+  RETURN_IF_FAILED_HR(d3d12::CreateBuffer(Handle(), accum_offset, D3D12_HEAP_TYPE_UPLOAD,
                                           D3D12_RESOURCE_STATE_GENERIC_READ, D3D12_RESOURCE_FLAG_NONE, buffer),
                       "failed to create shader binding table buffer.");
   uint8_t *data = nullptr;
   RETURN_IF_FAILED_HR(buffer->Map(0, nullptr, reinterpret_cast<void **>(&data)),
                       "failed to map shader binding table buffer.");
 
-  std::memcpy(data, ray_gen_shader_idenfitier, shader_idenfitier_size);
-  data += shader_table_size;
+  void *shader_idenfitier = pipeline_properties->GetShaderIdentifier(L"RayGenMain");
+  std::memcpy(data, shader_idenfitier, shader_idenfitier_size);
 
-  std::memcpy(data, miss_shader_idenfitier, shader_idenfitier_size);
-  data += shader_table_size;
+  for (size_t i = 0; i < miss_shader_indices.size(); i++) {
+    auto miss_id = miss_shader_indices[i];
+    shader_idenfitier = pipeline_properties->GetShaderIdentifier((L"MissMain" + std::to_wstring(miss_id)).c_str());
+    std::memcpy(data + miss_shader_offset + i * shader_record_size, shader_idenfitier, shader_idenfitier_size);
+  }
 
-  std::memcpy(data, hit_group_shader_idenfitier, shader_idenfitier_size);
+  for (size_t i = 0; i < hit_group_indices.size(); i++) {
+    auto hit_group_id = hit_group_indices[i];
+    shader_idenfitier = pipeline_properties->GetShaderIdentifier((L"HitGroup" + std::to_wstring(hit_group_id)).c_str());
+    std::memcpy(data + hit_group_offset + i * shader_record_size, shader_idenfitier, shader_idenfitier_size);
+  }
 
-  D3D12_GPU_VIRTUAL_ADDRESS ray_gen_shader_offset = 0;
-  D3D12_GPU_VIRTUAL_ADDRESS miss_shader_offset = ray_gen_shader_offset + shader_table_size;
-  D3D12_GPU_VIRTUAL_ADDRESS hit_group_shader_offset = miss_shader_offset + shader_table_size;
+  for (size_t i = 0; i < callable_shader_indices.size(); i++) {
+    auto callable_id = callable_shader_indices[i];
+    shader_idenfitier =
+        pipeline_properties->GetShaderIdentifier((L"CallableMain" + std::to_wstring(callable_id)).c_str());
+    std::memcpy(data + callable_shader_offset + i * shader_record_size, shader_idenfitier, shader_idenfitier_size);
+  }
 
   buffer->Unmap(0, nullptr);
 
-  pp_shader_table.construct(buffer, ray_gen_shader_offset, miss_shader_offset, hit_group_shader_offset);
+  pp_shader_table.construct(buffer, ray_gen_shader_offset, miss_shader_offset, hit_group_offset,
+                            callable_shader_offset);
 
   return S_OK;
+}
+
+HRESULT Device::CreateShaderTable(RayTracingPipeline *ray_tracing_pipeline,
+                                  double_ptr<ShaderTable> pp_shader_table) const {
+  std::vector<int32_t> miss_shader_indices(ray_tracing_pipeline->MissShaderCount());
+  std::iota(miss_shader_indices.begin(), miss_shader_indices.end(), 0);
+  std::vector<int32_t> hit_group_indices(ray_tracing_pipeline->HitGroupCount());
+  std::iota(hit_group_indices.begin(), hit_group_indices.end(), 0);
+  std::vector<int32_t> callable_shader_indices(ray_tracing_pipeline->CallableShaderCount());
+  std::iota(callable_shader_indices.begin(), callable_shader_indices.end(), 0);
+  return CreateShaderTable(ray_tracing_pipeline, miss_shader_indices, hit_group_indices, callable_shader_indices,
+                           pp_shader_table);
 }
 
 ID3D12Resource *Device::RequestScratchBuffer(size_t size) {
