@@ -127,6 +127,24 @@ int VulkanCore::CreateCommandContext(double_ptr<CommandContext> pp_command_conte
   return 0;
 }
 
+int VulkanCore::CreateBottomLevelAccelerationStructure(Buffer *aabb_buffer,
+                                                       uint32_t stride,
+                                                       uint32_t num_aabb,
+                                                       RayTracingGeometryFlag flags,
+                                                       double_ptr<AccelerationStructure> pp_blas) {
+  return 0;
+}
+
+int VulkanCore::CreateBottomLevelAccelerationStructure(Buffer *vertex_buffer,
+                                                       Buffer *index_buffer,
+                                                       uint32_t num_vertex,
+                                                       uint32_t stride,
+                                                       uint32_t num_primitive,
+                                                       RayTracingGeometryFlag flags,
+                                                       double_ptr<AccelerationStructure> pp_blas) {
+  return 0;
+}
+
 int VulkanCore::CreateBottomLevelAccelerationStructure(Buffer *vertex_buffer,
                                                        Buffer *index_buffer,
                                                        uint32_t stride,
@@ -157,19 +175,8 @@ int VulkanCore::CreateTopLevelAccelerationStructure(const std::vector<RayTracing
   return 0;
 }
 
-int VulkanCore::CreateRayTracingProgram(Shader *raygen_shader,
-                                        Shader *miss_shader,
-                                        Shader *closest_shader,
-                                        double_ptr<RayTracingProgram> pp_program) {
-  VulkanShader *vk_raygen_shader = dynamic_cast<VulkanShader *>(raygen_shader);
-  VulkanShader *vk_miss_shader = dynamic_cast<VulkanShader *>(miss_shader);
-  VulkanShader *vk_closest_shader = dynamic_cast<VulkanShader *>(closest_shader);
-
-  assert(vk_raygen_shader != nullptr);
-  assert(vk_miss_shader != nullptr);
-  assert(vk_closest_shader != nullptr);
-
-  pp_program.construct<VulkanRayTracingProgram>(this, vk_raygen_shader, vk_miss_shader, vk_closest_shader);
+int VulkanCore::CreateRayTracingProgram(double_ptr<RayTracingProgram> pp_program) {
+  pp_program.construct<VulkanRayTracingProgram>(this);
 
   return 0;
 }

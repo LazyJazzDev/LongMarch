@@ -142,10 +142,13 @@ D3D12RayTracingProgram::D3D12RayTracingProgram(D3D12Core *core,
                                                D3D12Shader *raygen_shader,
                                                D3D12Shader *miss_shader,
                                                D3D12Shader *closest_hit_shader)
-    : D3D12ProgramBase(core),
-      raygen_shader_(raygen_shader),
-      miss_shader_(miss_shader),
-      closest_hit_shader_(closest_hit_shader) {
+    : D3D12RayTracingProgram(core) {
+  AddRayGenShader(raygen_shader);
+  AddMissShader(miss_shader);
+  AddHitGroup(closest_hit_shader, nullptr, nullptr, false);
+}
+
+D3D12RayTracingProgram::D3D12RayTracingProgram(D3D12Core *core) : D3D12ProgramBase(core) {
 }
 
 void D3D12RayTracingProgram::AddResourceBinding(ResourceType type, int count) {
@@ -153,17 +156,43 @@ void D3D12RayTracingProgram::AddResourceBinding(ResourceType type, int count) {
 }
 
 void D3D12RayTracingProgram::AddRayGenShader(Shader *ray_gen_shader) {
+  D3D12Shader *shader = dynamic_cast<D3D12Shader *>(ray_gen_shader);
+
+  assert(shader != nullptr);
+
+  raygen_shader_ = &shader->ShaderModule();
 }
 
 void D3D12RayTracingProgram::AddMissShader(Shader *miss_shader) {
+  D3D12Shader *shader = dynamic_cast<D3D12Shader *>(miss_shader);
+  assert(shader != nullptr);
+  miss_shaders_.emplace_back(&shader->ShaderModule());
 }
 
 void D3D12RayTracingProgram::AddHitGroup(Shader *closest_hit_shader,
                                          Shader *any_hit_shader,
-                                         Shader *intersection_shader) {
+                                         Shader *intersection_shader,
+                                         bool procedure) {
+  d3d12::HitGroup hit_group;
+  D3D12Shader *d3d12_closest_hit_shader = dynamic_cast<D3D12Shader *>(closest_hit_shader);
+  assert(d3d12_closest_hit_shader != nullptr);
+  hit_group.closest_hit_shader = &d3d12_closest_hit_shader->ShaderModule();
+  D3D12Shader *d3d12_any_hit_shader = dynamic_cast<D3D12Shader *>(any_hit_shader);
+  if (d3d12_any_hit_shader) {
+    hit_group.any_hit_shader = &d3d12_any_hit_shader->ShaderModule();
+  }
+  D3D12Shader *d3d12_intersection_shader = dynamic_cast<D3D12Shader *>(intersection_shader);
+  if (d3d12_intersection_shader) {
+    hit_group.intersection_shader = &d3d12_intersection_shader->ShaderModule();
+  }
+  hit_group.procedure = procedure;
+  hit_groups_.emplace_back(hit_group);
 }
 
 void D3D12RayTracingProgram::AddCallableShader(Shader *callable_shader) {
+  D3D12Shader *shader = dynamic_cast<D3D12Shader *>(callable_shader);
+  assert(shader != nullptr);
+  callable_shaders_.emplace_back(&shader->ShaderModule());
 }
 
 void D3D12RayTracingProgram::Finalize(const std::vector<int32_t> &miss_shader_indices,
@@ -171,11 +200,11 @@ void D3D12RayTracingProgram::Finalize(const std::vector<int32_t> &miss_shader_in
                                       const std::vector<int32_t> &callable_shader_indices) {
   FinalizeRootSignature();
 
-  core_->Device()->CreateRayTracingPipeline(root_signature_.get(), &raygen_shader_->ShaderModule(),
-                                            &miss_shader_->ShaderModule(), &closest_hit_shader_->ShaderModule(),
-                                            &pipeline_);
+  core_->Device()->CreateRayTracingPipeline(root_signature_.get(), raygen_shader_, miss_shaders_, hit_groups_,
+                                            callable_shaders_, &pipeline_);
 
-  core_->Device()->CreateShaderTable(pipeline_.get(), &shader_table_);
+  core_->Device()->CreateShaderTable(pipeline_.get(), miss_shader_indices, hit_group_indices, callable_shader_indices,
+                                     &shader_table_);
 }
 
 }  // namespace grassland::graphics::backend

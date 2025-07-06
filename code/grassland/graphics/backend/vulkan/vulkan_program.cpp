@@ -120,14 +120,17 @@ void VulkanComputeProgram::Finalize() {
   vkCreateComputePipelines(core_->Device()->Handle(), VK_NULL_HANDLE, 1, &pipeline_create_info, nullptr, &pipeline_);
 }
 
+VulkanRayTracingProgram::VulkanRayTracingProgram(VulkanCore *core) : VulkanProgramBase(core) {
+}
+
 VulkanRayTracingProgram::VulkanRayTracingProgram(VulkanCore *core,
                                                  VulkanShader *raygen_shader,
                                                  VulkanShader *miss_shader,
                                                  VulkanShader *closest_hit_shader)
-    : VulkanProgramBase(core),
-      raygen_shader_(raygen_shader),
-      miss_shader_(miss_shader),
-      closest_hit_shader_(closest_hit_shader) {
+    : VulkanRayTracingProgram(core) {
+  raygen_shader_ = raygen_shader;
+  miss_shader_ = miss_shader;
+  closest_hit_shader_ = closest_hit_shader;
 }
 
 void VulkanRayTracingProgram::AddResourceBinding(ResourceType type, int count) {
@@ -142,7 +145,8 @@ void VulkanRayTracingProgram::AddMissShader(Shader *miss_shader) {
 
 void VulkanRayTracingProgram::AddHitGroup(Shader *closest_hit_shader,
                                           Shader *any_hit_shader,
-                                          Shader *intersection_shader) {
+                                          Shader *intersection_shader,
+                                          bool procedure) {
 }
 
 void VulkanRayTracingProgram::AddCallableShader(Shader *callable_shader) {

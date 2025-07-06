@@ -84,6 +84,26 @@ class Device {
   HRESULT CreatePipelineState(const D3D12_GRAPHICS_PIPELINE_STATE_DESC &desc,
                               double_ptr<PipelineState> pp_pipeline_state);
 
+  HRESULT CreateBottomLevelAccelerationStructure(D3D12_GPU_VIRTUAL_ADDRESS aabb_buffer,
+                                                 uint32_t stride,
+                                                 uint32_t num_aabb,
+                                                 D3D12_RAYTRACING_GEOMETRY_FLAGS flags,
+                                                 CommandQueue *queue,
+                                                 Fence *fence,
+                                                 CommandAllocator *allocator,
+                                                 double_ptr<AccelerationStructure> pp_as);
+
+  HRESULT CreateBottomLevelAccelerationStructure(D3D12_GPU_VIRTUAL_ADDRESS vertex_buffer,
+                                                 D3D12_GPU_VIRTUAL_ADDRESS index_buffer,
+                                                 uint32_t num_vertex,
+                                                 uint32_t stride,
+                                                 uint32_t primitive_count,
+                                                 D3D12_RAYTRACING_GEOMETRY_FLAGS flags,
+                                                 CommandQueue *queue,
+                                                 Fence *fence,
+                                                 CommandAllocator *allocator,
+                                                 double_ptr<AccelerationStructure> pp_as);
+
   HRESULT CreateBottomLevelAccelerationStructure(D3D12_GPU_VIRTUAL_ADDRESS vertex_buffer,
                                                  D3D12_GPU_VIRTUAL_ADDRESS index_buffer,
                                                  uint32_t num_vertex,

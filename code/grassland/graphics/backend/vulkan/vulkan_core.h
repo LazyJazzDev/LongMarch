@@ -50,6 +50,20 @@ class VulkanCore : public Core {
 
   int CreateCommandContext(double_ptr<CommandContext> pp_command_context) override;
 
+  int CreateBottomLevelAccelerationStructure(Buffer *aabb_buffer,
+                                             uint32_t stride,
+                                             uint32_t num_aabb,
+                                             RayTracingGeometryFlag flags,
+                                             double_ptr<AccelerationStructure> pp_blas) override;
+
+  int CreateBottomLevelAccelerationStructure(Buffer *vertex_buffer,
+                                             Buffer *index_buffer,
+                                             uint32_t num_vertex,
+                                             uint32_t stride,
+                                             uint32_t num_primitive,
+                                             RayTracingGeometryFlag flags,
+                                             double_ptr<AccelerationStructure> pp_blas) override;
+
   int CreateBottomLevelAccelerationStructure(Buffer *vertex_buffer,
                                              Buffer *index_buffer,
                                              uint32_t stride,
@@ -58,10 +72,7 @@ class VulkanCore : public Core {
   int CreateTopLevelAccelerationStructure(const std::vector<RayTracingInstance> &instances,
                                           double_ptr<AccelerationStructure> pp_tlas) override;
 
-  int CreateRayTracingProgram(Shader *raygen_shader,
-                              Shader *miss_shader,
-                              Shader *closest_shader,
-                              double_ptr<RayTracingProgram> pp_program) override;
+  int CreateRayTracingProgram(double_ptr<RayTracingProgram> pp_program) override;
 
   int SubmitCommandContext(CommandContext *p_command_context) override;
 

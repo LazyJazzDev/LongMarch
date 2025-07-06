@@ -11,6 +11,7 @@
 #include "grassland/d3d12/raytracing/raytracing.h"
 #include "grassland/d3d12/root_signature.h"
 #include "grassland/d3d12/shader_module.h"
+#include "grassland/math/math_aabb.h"
 
 namespace grassland::d3d12 {
 
@@ -239,26 +240,20 @@ HRESULT Device::CreatePipelineState(const D3D12_GRAPHICS_PIPELINE_STATE_DESC &de
   return S_OK;
 }
 
-HRESULT Device::CreateBottomLevelAccelerationStructure(D3D12_GPU_VIRTUAL_ADDRESS vertex_buffer,
-                                                       D3D12_GPU_VIRTUAL_ADDRESS index_buffer,
-                                                       uint32_t num_vertex,
+HRESULT Device::CreateBottomLevelAccelerationStructure(D3D12_GPU_VIRTUAL_ADDRESS aabb_buffer,
                                                        uint32_t stride,
-                                                       uint32_t primitive_count,
+                                                       uint32_t num_aabb,
+                                                       D3D12_RAYTRACING_GEOMETRY_FLAGS flags,
                                                        CommandQueue *queue,
                                                        Fence *fence,
                                                        CommandAllocator *allocator,
                                                        double_ptr<AccelerationStructure> pp_as) {
   D3D12_RAYTRACING_GEOMETRY_DESC geometry = {};
-  geometry.Type = D3D12_RAYTRACING_GEOMETRY_TYPE_TRIANGLES;
-  geometry.Triangles.VertexBuffer.StartAddress = vertex_buffer;
-  geometry.Triangles.VertexBuffer.StrideInBytes = stride;
-  geometry.Triangles.VertexCount = num_vertex;
-  geometry.Triangles.VertexFormat = DXGI_FORMAT_R32G32B32_FLOAT;
-  geometry.Triangles.IndexBuffer = index_buffer;
-  geometry.Triangles.IndexCount = primitive_count * 3;
-  geometry.Triangles.IndexFormat = DXGI_FORMAT_R32_UINT;
-  geometry.Triangles.Transform3x4 = 0;
-  geometry.Flags = D3D12_RAYTRACING_GEOMETRY_FLAG_OPAQUE;
+  geometry.Type = D3D12_RAYTRACING_GEOMETRY_TYPE_PROCEDURAL_PRIMITIVE_AABBS;
+  geometry.AABBs.AABBs.StartAddress = aabb_buffer;
+  geometry.AABBs.AABBs.StrideInBytes = stride;
+  geometry.AABBs.AABBCount = num_aabb;
+  geometry.Flags = flags;
 
   D3D12_RAYTRACING_ACCELERATION_STRUCTURE_BUILD_FLAGS build_flags =
       D3D12_RAYTRACING_ACCELERATION_STRUCTURE_BUILD_FLAG_PREFER_FAST_TRACE;
@@ -295,6 +290,79 @@ HRESULT Device::CreateBottomLevelAccelerationStructure(D3D12_GPU_VIRTUAL_ADDRESS
 
   pp_as.construct(this, as);
   return S_OK;
+}
+
+HRESULT Device::CreateBottomLevelAccelerationStructure(D3D12_GPU_VIRTUAL_ADDRESS vertex_buffer,
+                                                       D3D12_GPU_VIRTUAL_ADDRESS index_buffer,
+                                                       uint32_t num_vertex,
+                                                       uint32_t stride,
+                                                       uint32_t primitive_count,
+                                                       D3D12_RAYTRACING_GEOMETRY_FLAGS flags,
+                                                       CommandQueue *queue,
+                                                       Fence *fence,
+                                                       CommandAllocator *allocator,
+                                                       double_ptr<AccelerationStructure> pp_as) {
+  D3D12_RAYTRACING_GEOMETRY_DESC geometry = {};
+  geometry.Type = D3D12_RAYTRACING_GEOMETRY_TYPE_TRIANGLES;
+  geometry.Triangles.VertexBuffer.StartAddress = vertex_buffer;
+  geometry.Triangles.VertexBuffer.StrideInBytes = stride;
+  geometry.Triangles.VertexCount = num_vertex;
+  geometry.Triangles.VertexFormat = DXGI_FORMAT_R32G32B32_FLOAT;
+  geometry.Triangles.IndexBuffer = index_buffer;
+  geometry.Triangles.IndexCount = primitive_count * 3;
+  geometry.Triangles.IndexFormat = DXGI_FORMAT_R32_UINT;
+  geometry.Triangles.Transform3x4 = 0;
+  geometry.Flags = flags;
+
+  D3D12_RAYTRACING_ACCELERATION_STRUCTURE_BUILD_FLAGS build_flags =
+      D3D12_RAYTRACING_ACCELERATION_STRUCTURE_BUILD_FLAG_PREFER_FAST_TRACE;
+  D3D12_BUILD_RAYTRACING_ACCELERATION_STRUCTURE_INPUTS as_inputs = {};
+  as_inputs.Type = D3D12_RAYTRACING_ACCELERATION_STRUCTURE_TYPE_BOTTOM_LEVEL;
+  as_inputs.DescsLayout = D3D12_ELEMENTS_LAYOUT_ARRAY;
+  as_inputs.pGeometryDescs = &geometry;
+  as_inputs.NumDescs = 1;
+  as_inputs.Flags = build_flags;
+
+  D3D12_RAYTRACING_ACCELERATION_STRUCTURE_PREBUILD_INFO as_prebuild_info = {};
+  dxr_device_->GetRaytracingAccelerationStructurePrebuildInfo(&as_inputs, &as_prebuild_info);
+
+  ID3D12Resource *scratch_buffer = RequestScratchBuffer(as_prebuild_info.ScratchDataSizeInBytes);
+
+  ComPtr<ID3D12Resource> as;
+  RETURN_IF_FAILED_HR(d3d12::CreateBuffer(Handle(), as_prebuild_info.ResultDataMaxSizeInBytes, D3D12_HEAP_TYPE_DEFAULT,
+                                          D3D12_RESOURCE_STATE_RAYTRACING_ACCELERATION_STRUCTURE,
+                                          D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS, as),
+                      "failed to create acceleration structure buffer.");
+
+  D3D12_BUILD_RAYTRACING_ACCELERATION_STRUCTURE_DESC as_desc = {};
+  as_desc.Inputs = as_inputs;
+  as_desc.ScratchAccelerationStructureData = scratch_buffer->GetGPUVirtualAddress();
+  as_desc.DestAccelerationStructureData = as->GetGPUVirtualAddress();
+  as_desc.SourceAccelerationStructureData = 0;
+
+  queue->SingleTimeCommand(fence, allocator, [&](ID3D12GraphicsCommandList *command_list) {
+    ComPtr<ID3D12GraphicsCommandList4> command_list4;
+    if (SUCCEEDED(command_list->QueryInterface(IID_PPV_ARGS(&command_list4)))) {
+      command_list4->BuildRaytracingAccelerationStructure(&as_desc, 0, nullptr);
+    }
+  });
+
+  pp_as.construct(this, as);
+  return S_OK;
+}
+
+HRESULT Device::CreateBottomLevelAccelerationStructure(D3D12_GPU_VIRTUAL_ADDRESS vertex_buffer,
+                                                       D3D12_GPU_VIRTUAL_ADDRESS index_buffer,
+                                                       uint32_t num_vertex,
+                                                       uint32_t stride,
+                                                       uint32_t primitive_count,
+                                                       CommandQueue *queue,
+                                                       Fence *fence,
+                                                       CommandAllocator *allocator,
+                                                       double_ptr<AccelerationStructure> pp_as) {
+  return CreateBottomLevelAccelerationStructure(vertex_buffer, index_buffer, num_vertex, stride, primitive_count,
+                                                D3D12_RAYTRACING_GEOMETRY_FLAG_NO_DUPLICATE_ANYHIT_INVOCATION, queue,
+                                                fence, allocator, pp_as);
 }
 
 HRESULT Device::CreateBottomLevelAccelerationStructure(Buffer *vertex_buffer,

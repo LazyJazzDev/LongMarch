@@ -35,11 +35,12 @@ class RayTracingProgram {
   virtual void AddMissShader(Shader *miss_shader) = 0;
   virtual void AddHitGroup(Shader *closest_hit_shader,
                            Shader *any_hit_shader = nullptr,
-                           Shader *intersection_shader = nullptr) = 0;
+                           Shader *intersection_shader = nullptr,
+                           bool procedure = false) = 0;
   virtual void AddCallableShader(Shader *callable_shader) = 0;
   virtual void Finalize(const std::vector<int32_t> &miss_shader_indices = {0},
                         const std::vector<int32_t> &hit_group_indices = {0},
-                        const std::vector<int32_t> &callable_shader_indices = {0}) = 0;
+                        const std::vector<int32_t> &callable_shader_indices = {}) = 0;
 };
 
 CompiledShaderBlob CompileShader(const std::string &source_code,
