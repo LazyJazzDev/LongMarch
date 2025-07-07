@@ -5,9 +5,13 @@
 
 namespace grassland::vulkan {
 struct PipelineSettings {
-  explicit PipelineSettings(const RenderPass *render_pass = nullptr, const PipelineLayout *pipeline_layout = nullptr, int subpass = 0);
+  explicit PipelineSettings(const RenderPass *render_pass = nullptr,
+                            const PipelineLayout *pipeline_layout = nullptr,
+                            int subpass = 0);
 
-  explicit PipelineSettings(const PipelineLayout *pipeline_layout = nullptr, const std::vector<VkFormat> &color_attachment_formats = {}, VkFormat depth_attachment_format = VK_FORMAT_UNDEFINED);
+  explicit PipelineSettings(const PipelineLayout *pipeline_layout = nullptr,
+                            const std::vector<VkFormat> &color_attachment_formats = {},
+                            VkFormat depth_attachment_format = VK_FORMAT_UNDEFINED);
 
   void PipelineSettingsCommon();
 
@@ -36,7 +40,8 @@ struct PipelineSettings {
                          VK_BLEND_FACTOR_ONE,
                          VK_BLEND_FACTOR_ZERO,
                          VK_BLEND_OP_ADD,
-                         VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT | VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT,
+                         VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT | VK_COLOR_COMPONENT_B_BIT |
+                             VK_COLOR_COMPONENT_A_BIT,
                      });
 
   void SetTessellationState(uint32_t patch_control_points);
@@ -85,7 +90,7 @@ class Pipeline {
  public:
   explicit Pipeline(const class Device *device, VkPipeline pipeline);
 
-  ~Pipeline();
+  virtual ~Pipeline();
 
   VkPipeline Handle() const {
     return pipeline_;
@@ -99,4 +104,33 @@ class Pipeline {
   const class Device *device_{};
   VkPipeline pipeline_{};
 };
+
+class RayTracingPipeline : public Pipeline {
+ public:
+  explicit RayTracingPipeline(const class Device *device,
+                              VkPipeline pipeline,
+                              size_t miss_shader_count,
+                              size_t hit_group_count,
+                              size_t callable_shader_count);
+
+  ~RayTracingPipeline() = default;
+
+  size_t MissShaderCount() const {
+    return miss_shader_count_;
+  }
+
+  size_t HitGroupCount() const {
+    return hit_group_count_;
+  }
+
+  size_t CallableShaderCount() const {
+    return callable_shader_count_;
+  }
+
+ private:
+  size_t miss_shader_count_{};
+  size_t hit_group_count_{};
+  size_t callable_shader_count_{};
+};
+
 }  // namespace grassland::vulkan

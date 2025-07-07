@@ -5,7 +5,7 @@ int main() {
   Application app_vulkan{grassland::graphics::BACKEND_API_VULKAN};
 
   app_d3d12.OnInit();
-  // app_vulkan.OnInit();
+  app_vulkan.OnInit();
 
   while (app_d3d12.IsAlive() || app_vulkan.IsAlive()) {
     if (app_d3d12.IsAlive()) {

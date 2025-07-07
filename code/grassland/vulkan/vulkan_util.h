@@ -97,6 +97,7 @@ class Pipeline;
 class RenderPass;
 class Framebuffer;
 class ShaderModule;
+struct HitGroup;
 class Fence;
 class Semaphore;
 class Buffer;

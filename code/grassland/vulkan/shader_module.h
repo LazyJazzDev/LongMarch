@@ -31,6 +31,7 @@ struct HitGroup {
   ShaderModule *closest_hit_shader{nullptr};
   ShaderModule *any_hit_shader{nullptr};
   ShaderModule *intersection_shader{nullptr};
+  bool procedure{false};
 };
 
 CompiledShaderBlob CompileGLSLToSPIRV(const std::string &glsl_code, VkShaderStageFlagBits shader_stage);

@@ -392,16 +392,18 @@ void D3D12CmdDispatchRays::CompileCommand(D3D12CommandContext *context, ID3D12Gr
     auto shader_table = program_->ShaderTable();
     UINT shader_record_size =
         d3d12::SizeAlignTo(D3D12_SHADER_IDENTIFIER_SIZE_IN_BYTES, D3D12_RAYTRACING_SHADER_RECORD_BYTE_ALIGNMENT);
-    UINT shader_table_size = d3d12::SizeAlignTo(shader_record_size, D3D12_RAYTRACING_SHADER_TABLE_BYTE_ALIGNMENT);
     D3D12_DISPATCH_RAYS_DESC dispatch_desc = {};
     dispatch_desc.HitGroupTable.StartAddress = shader_table->GetHitGroupDeviceAddress();
-    dispatch_desc.HitGroupTable.SizeInBytes = shader_table_size;
+    dispatch_desc.HitGroupTable.SizeInBytes = shader_record_size * shader_table->HitGroupShaderCount();
     dispatch_desc.HitGroupTable.StrideInBytes = shader_record_size;
     dispatch_desc.MissShaderTable.StartAddress = shader_table->GetMissDeviceAddress();
-    dispatch_desc.MissShaderTable.SizeInBytes = shader_table_size;
+    dispatch_desc.MissShaderTable.SizeInBytes = shader_record_size * shader_table->MissShaderCount();
     dispatch_desc.MissShaderTable.StrideInBytes = shader_record_size;
     dispatch_desc.RayGenerationShaderRecord.StartAddress = shader_table->GetRayGenDeviceAddress();
-    dispatch_desc.RayGenerationShaderRecord.SizeInBytes = shader_table_size;
+    dispatch_desc.RayGenerationShaderRecord.SizeInBytes = shader_record_size;
+    dispatch_desc.CallableShaderTable.StartAddress = shader_table->GetCallableDeviceAddress();
+    dispatch_desc.CallableShaderTable.SizeInBytes = shader_record_size * shader_table->CallableShaderCount();
+    dispatch_desc.CallableShaderTable.StrideInBytes = shader_record_size;
     dispatch_desc.Width = width_;
     dispatch_desc.Height = height_;
     dispatch_desc.Depth = depth_;

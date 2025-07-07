@@ -611,8 +611,8 @@ HRESULT Device::CreateShaderTable(RayTracingPipeline *ray_tracing_pipeline,
 
   buffer->Unmap(0, nullptr);
 
-  pp_shader_table.construct(buffer, ray_gen_shader_offset, miss_shader_offset, hit_group_offset,
-                            callable_shader_offset);
+  pp_shader_table.construct(buffer, ray_gen_shader_offset, miss_shader_offset, hit_group_offset, callable_shader_offset,
+                            miss_shader_indices.size(), hit_group_indices.size(), callable_shader_indices.size());
 
   return S_OK;
 }

@@ -661,11 +661,67 @@ VkResult Device::CreatePipeline(const struct PipelineSettings &settings, double_
   return VK_SUCCESS;
 }
 
+VkResult Device::CreateBottomLevelAccelerationStructure(VkDeviceAddress aabb_address,
+                                                        VkDeviceSize stride,
+                                                        uint32_t num_aabb,
+                                                        VkGeometryFlagsKHR flags,
+                                                        CommandPool *command_pool,
+                                                        Queue *queue,
+                                                        double_ptr<AccelerationStructure> pp_blas) {
+  const VkBufferUsageFlags buffer_usage_flags =
+      VK_BUFFER_USAGE_ACCELERATION_STRUCTURE_BUILD_INPUT_READ_ONLY_BIT_KHR | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT;
+
+  // Setup a single transformation matrix that can be used to transform the
+  // whole geometry for a single bottom level acceleration structure
+  VkTransformMatrixKHR transform_matrix = {1.0f, 0.0f, 0.0f, 0.0f, 0.0f, 1.0f, 0.0f, 0.0f, 0.0f, 0.0f, 1.0f, 0.0f};
+  std::unique_ptr<Buffer> transform_matrix_buffer;
+  RETURN_IF_FAILED_VK(
+      CreateBuffer(sizeof(transform_matrix), buffer_usage_flags, VMA_MEMORY_USAGE_CPU_TO_GPU, &transform_matrix_buffer),
+      "failed to create transform matrix buffer!");
+  std::memcpy(transform_matrix_buffer->Map(), &transform_matrix, sizeof(transform_matrix));
+  transform_matrix_buffer->Unmap();
+
+  VkDeviceOrHostAddressConstKHR aabb_data_device_address{};
+  VkDeviceOrHostAddressConstKHR transform_matrix_device_address{};
+
+  aabb_data_device_address.deviceAddress = aabb_address;
+  transform_matrix_device_address.deviceAddress = transform_matrix_buffer->GetDeviceAddress();
+
+  // The bottom level acceleration structure contains one set of triangles as
+  // the input geometry
+  VkAccelerationStructureGeometryKHR acceleration_structure_geometry{};
+  acceleration_structure_geometry.sType = VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_GEOMETRY_KHR;
+  acceleration_structure_geometry.geometryType = VK_GEOMETRY_TYPE_AABBS_KHR;
+  acceleration_structure_geometry.flags = flags;
+  acceleration_structure_geometry.geometry.aabbs.sType =
+      VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_GEOMETRY_AABBS_DATA_KHR;
+  acceleration_structure_geometry.geometry.aabbs.pNext = nullptr;
+  acceleration_structure_geometry.geometry.aabbs.stride = stride;
+  acceleration_structure_geometry.geometry.aabbs.data = aabb_data_device_address;
+
+  std::unique_ptr<Buffer> buffer;
+  VkAccelerationStructureKHR acceleration_structure;
+
+  BuildAccelerationStructure(this, acceleration_structure_geometry, VK_ACCELERATION_STRUCTURE_TYPE_BOTTOM_LEVEL_KHR,
+                             VK_BUILD_ACCELERATION_STRUCTURE_PREFER_FAST_TRACE_BIT_KHR,
+                             VK_BUILD_ACCELERATION_STRUCTURE_MODE_BUILD_KHR, num_aabb, command_pool, queue,
+                             &acceleration_structure, &buffer);
+
+  VkAccelerationStructureDeviceAddressInfoKHR acceleration_device_address_info{};
+  acceleration_device_address_info.sType = VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_DEVICE_ADDRESS_INFO_KHR;
+  acceleration_device_address_info.accelerationStructure = acceleration_structure;
+  VkDeviceAddress device_address =
+      procedures_.vkGetAccelerationStructureDeviceAddressKHR(device_, &acceleration_device_address_info);
+  pp_blas.construct(this, std::move(buffer), device_address, acceleration_structure);
+  return VK_SUCCESS;
+}
+
 VkResult Device::CreateBottomLevelAccelerationStructure(VkDeviceAddress vertex_buffer_address,
                                                         VkDeviceAddress index_buffer_address,
                                                         uint32_t num_vertex,
                                                         VkDeviceSize stride,
                                                         uint32_t primitive_count,
+                                                        VkGeometryFlagsKHR flags,
                                                         CommandPool *command_pool,
                                                         Queue *queue,
                                                         double_ptr<AccelerationStructure> pp_blas) {
@@ -695,7 +751,7 @@ VkResult Device::CreateBottomLevelAccelerationStructure(VkDeviceAddress vertex_b
   VkAccelerationStructureGeometryKHR acceleration_structure_geometry{};
   acceleration_structure_geometry.sType = VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_GEOMETRY_KHR;
   acceleration_structure_geometry.geometryType = VK_GEOMETRY_TYPE_TRIANGLES_KHR;
-  acceleration_structure_geometry.flags = VK_GEOMETRY_OPAQUE_BIT_KHR;
+  acceleration_structure_geometry.flags = flags;
   acceleration_structure_geometry.geometry.triangles.sType =
       VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_GEOMETRY_TRIANGLES_DATA_KHR;
   acceleration_structure_geometry.geometry.triangles.vertexFormat = VK_FORMAT_R32G32B32_SFLOAT;
@@ -721,6 +777,19 @@ VkResult Device::CreateBottomLevelAccelerationStructure(VkDeviceAddress vertex_b
       procedures_.vkGetAccelerationStructureDeviceAddressKHR(device_, &acceleration_device_address_info);
   pp_blas.construct(this, std::move(buffer), device_address, acceleration_structure);
   return VK_SUCCESS;
+}
+
+VkResult Device::CreateBottomLevelAccelerationStructure(VkDeviceAddress vertex_buffer_address,
+                                                        VkDeviceAddress index_buffer_address,
+                                                        uint32_t num_vertex,
+                                                        VkDeviceSize stride,
+                                                        uint32_t primitive_count,
+                                                        CommandPool *command_pool,
+                                                        Queue *queue,
+                                                        double_ptr<AccelerationStructure> pp_blas) {
+  return CreateBottomLevelAccelerationStructure(vertex_buffer_address, index_buffer_address, num_vertex, stride,
+                                                primitive_count, VK_GEOMETRY_OPAQUE_BIT_KHR, command_pool, queue,
+                                                pp_blas);
 }
 
 VkResult Device::CreateBottomLevelAccelerationStructure(Buffer *vertex_buffer,
@@ -808,10 +877,23 @@ VkResult Device::CreateTopLevelAccelerationStructure(
 
 VkResult Device::CreateRayTracingPipeline(PipelineLayout *pipeline_layout,
                                           ShaderModule *ray_gen_shader,
-                                          ShaderModule *miss_shader,
-                                          ShaderModule *closest_hit_shader,
-                                          double_ptr<Pipeline> pp_pipeline) const {
+                                          const std::vector<ShaderModule *> &miss_shaders,
+                                          const std::vector<HitGroup> &hit_groups,
+                                          const std::vector<ShaderModule *> &callable_shaders,
+                                          double_ptr<RayTracingPipeline> pp_pipeline) const {
   std::vector<VkPipelineShaderStageCreateInfo> shader_stage_create_infos;
+  std::vector<VkRayTracingShaderGroupCreateInfoKHR> shader_groups;
+  // Ray generation group
+  {
+    VkRayTracingShaderGroupCreateInfoKHR ray_gen_group_ci{};
+    ray_gen_group_ci.sType = VK_STRUCTURE_TYPE_RAY_TRACING_SHADER_GROUP_CREATE_INFO_KHR;
+    ray_gen_group_ci.type = VK_RAY_TRACING_SHADER_GROUP_TYPE_GENERAL_KHR;
+    ray_gen_group_ci.generalShader = shader_stage_create_infos.size();
+    ray_gen_group_ci.closestHitShader = VK_SHADER_UNUSED_KHR;
+    ray_gen_group_ci.anyHitShader = VK_SHADER_UNUSED_KHR;
+    ray_gen_group_ci.intersectionShader = VK_SHADER_UNUSED_KHR;
+    shader_groups.push_back(ray_gen_group_ci);
+  }
   shader_stage_create_infos.push_back({
       VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO,
       nullptr,
@@ -821,59 +903,103 @@ VkResult Device::CreateRayTracingPipeline(PipelineLayout *pipeline_layout,
       ray_gen_shader->EntryPoint().c_str(),
       nullptr,
   });
-  shader_stage_create_infos.push_back({
-      VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO,
-      nullptr,
-      0,
-      VK_SHADER_STAGE_MISS_BIT_KHR,
-      miss_shader->Handle(),
-      miss_shader->EntryPoint().c_str(),
-      nullptr,
-  });
-  shader_stage_create_infos.push_back({
-      VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO,
-      nullptr,
-      0,
-      VK_SHADER_STAGE_CLOSEST_HIT_BIT_KHR,
-      closest_hit_shader->Handle(),
-      closest_hit_shader->EntryPoint().c_str(),
-      nullptr,
-  });
-  std::vector<VkRayTracingShaderGroupCreateInfoKHR> shader_groups;
-  // Ray generation group
-  {
-    VkRayTracingShaderGroupCreateInfoKHR ray_gen_group_ci{};
-    ray_gen_group_ci.sType = VK_STRUCTURE_TYPE_RAY_TRACING_SHADER_GROUP_CREATE_INFO_KHR;
-    ray_gen_group_ci.type = VK_RAY_TRACING_SHADER_GROUP_TYPE_GENERAL_KHR;
-    ray_gen_group_ci.generalShader = 0;
-    ray_gen_group_ci.closestHitShader = VK_SHADER_UNUSED_KHR;
-    ray_gen_group_ci.anyHitShader = VK_SHADER_UNUSED_KHR;
-    ray_gen_group_ci.intersectionShader = VK_SHADER_UNUSED_KHR;
-    shader_groups.push_back(ray_gen_group_ci);
+
+  for (auto miss_shader : miss_shaders) {
+    // Ray miss group
+    {
+      VkRayTracingShaderGroupCreateInfoKHR miss_group_ci{};
+      miss_group_ci.sType = VK_STRUCTURE_TYPE_RAY_TRACING_SHADER_GROUP_CREATE_INFO_KHR;
+      miss_group_ci.type = VK_RAY_TRACING_SHADER_GROUP_TYPE_GENERAL_KHR;
+      miss_group_ci.generalShader = shader_stage_create_infos.size();
+      miss_group_ci.closestHitShader = VK_SHADER_UNUSED_KHR;
+      miss_group_ci.anyHitShader = VK_SHADER_UNUSED_KHR;
+      miss_group_ci.intersectionShader = VK_SHADER_UNUSED_KHR;
+      shader_groups.push_back(miss_group_ci);
+    }
+    shader_stage_create_infos.push_back({
+        VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO,
+        nullptr,
+        0,
+        VK_SHADER_STAGE_MISS_BIT_KHR,
+        miss_shader->Handle(),
+        miss_shader->EntryPoint().c_str(),
+        nullptr,
+    });
   }
 
-  // Ray miss group
-  {
-    VkRayTracingShaderGroupCreateInfoKHR miss_group_ci{};
-    miss_group_ci.sType = VK_STRUCTURE_TYPE_RAY_TRACING_SHADER_GROUP_CREATE_INFO_KHR;
-    miss_group_ci.type = VK_RAY_TRACING_SHADER_GROUP_TYPE_GENERAL_KHR;
-    miss_group_ci.generalShader = 1;
-    miss_group_ci.closestHitShader = VK_SHADER_UNUSED_KHR;
-    miss_group_ci.anyHitShader = VK_SHADER_UNUSED_KHR;
-    miss_group_ci.intersectionShader = VK_SHADER_UNUSED_KHR;
-    shader_groups.push_back(miss_group_ci);
+  for (auto hit_group : hit_groups) {
+    // Ray closest hit group
+    VkRayTracingShaderGroupCreateInfoKHR hit_group_ci{};
+    hit_group_ci.sType = VK_STRUCTURE_TYPE_RAY_TRACING_SHADER_GROUP_CREATE_INFO_KHR;
+    hit_group_ci.type = hit_group.procedure ? VK_RAY_TRACING_SHADER_GROUP_TYPE_PROCEDURAL_HIT_GROUP_KHR
+                                            : VK_RAY_TRACING_SHADER_GROUP_TYPE_TRIANGLES_HIT_GROUP_KHR;
+    hit_group_ci.generalShader = VK_SHADER_UNUSED_KHR;
+    hit_group_ci.closestHitShader = VK_SHADER_UNUSED_KHR;
+    hit_group_ci.anyHitShader = VK_SHADER_UNUSED_KHR;
+    hit_group_ci.intersectionShader = VK_SHADER_UNUSED_KHR;
+
+    hit_group_ci.closestHitShader = shader_stage_create_infos.size();
+    shader_stage_create_infos.push_back({
+        VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO,
+        nullptr,
+        0,
+        VK_SHADER_STAGE_CLOSEST_HIT_BIT_KHR,
+        hit_group.closest_hit_shader->Handle(),
+        hit_group.closest_hit_shader->EntryPoint().c_str(),
+        nullptr,
+    });
+
+    if (hit_group.any_hit_shader) {
+      hit_group_ci.anyHitShader = shader_stage_create_infos.size();
+      shader_stage_create_infos.push_back({
+          VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO,
+          nullptr,
+          0,
+          VK_SHADER_STAGE_ANY_HIT_BIT_KHR,
+          hit_group.any_hit_shader->Handle(),
+          hit_group.any_hit_shader->EntryPoint().c_str(),
+          nullptr,
+      });
+    }
+
+    if (hit_group.intersection_shader) {
+      hit_group_ci.intersectionShader = shader_stage_create_infos.size();
+
+      shader_stage_create_infos.push_back({
+          VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO,
+          nullptr,
+          0,
+          VK_SHADER_STAGE_INTERSECTION_BIT_KHR,
+          hit_group.intersection_shader->Handle(),
+          hit_group.intersection_shader->EntryPoint().c_str(),
+          nullptr,
+      });
+    }
+
+    shader_groups.push_back(hit_group_ci);
   }
 
-  // Ray closest hit group
-  {
-    VkRayTracingShaderGroupCreateInfoKHR closes_hit_group_ci{};
-    closes_hit_group_ci.sType = VK_STRUCTURE_TYPE_RAY_TRACING_SHADER_GROUP_CREATE_INFO_KHR;
-    closes_hit_group_ci.type = VK_RAY_TRACING_SHADER_GROUP_TYPE_TRIANGLES_HIT_GROUP_KHR;
-    closes_hit_group_ci.generalShader = VK_SHADER_UNUSED_KHR;
-    closes_hit_group_ci.closestHitShader = 2;
-    closes_hit_group_ci.anyHitShader = VK_SHADER_UNUSED_KHR;
-    closes_hit_group_ci.intersectionShader = VK_SHADER_UNUSED_KHR;
-    shader_groups.push_back(closes_hit_group_ci);
+  for (auto callable_shader : callable_shaders) {
+    // Ray miss group
+    {
+      VkRayTracingShaderGroupCreateInfoKHR callable_group_ci{};
+      callable_group_ci.sType = VK_STRUCTURE_TYPE_RAY_TRACING_SHADER_GROUP_CREATE_INFO_KHR;
+      callable_group_ci.type = VK_RAY_TRACING_SHADER_GROUP_TYPE_GENERAL_KHR;
+      callable_group_ci.generalShader = shader_stage_create_infos.size();
+      callable_group_ci.closestHitShader = VK_SHADER_UNUSED_KHR;
+      callable_group_ci.anyHitShader = VK_SHADER_UNUSED_KHR;
+      callable_group_ci.intersectionShader = VK_SHADER_UNUSED_KHR;
+      shader_groups.push_back(callable_group_ci);
+    }
+    shader_stage_create_infos.push_back({
+        VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO,
+        nullptr,
+        0,
+        VK_SHADER_STAGE_CALLABLE_BIT_KHR,
+        callable_shader->Handle(),
+        callable_shader->EntryPoint().c_str(),
+        nullptr,
+    });
   }
 
   VkRayTracingPipelineCreateInfoKHR ray_tracing_pipeline_create_info{};
@@ -891,12 +1017,25 @@ VkResult Device::CreateRayTracingPipeline(PipelineLayout *pipeline_layout,
                                                                  &ray_tracing_pipeline_create_info, nullptr, &pipeline),
                       "failed to create ray tracing pipeline!");
 
-  pp_pipeline.construct(this, pipeline);
+  pp_pipeline.construct(this, pipeline, miss_shaders.size(), hit_groups.size(), callable_shaders.size());
 
   return VK_SUCCESS;
 }
 
-VkResult Device::CreateShaderBindingTable(Pipeline *ray_tracing_pipeline, double_ptr<ShaderBindingTable> pp_sbt) const {
+VkResult Device::CreateRayTracingPipeline(PipelineLayout *pipeline_layout,
+                                          ShaderModule *ray_gen_shader,
+                                          ShaderModule *miss_shader,
+                                          ShaderModule *closest_hit_shader,
+                                          double_ptr<RayTracingPipeline> pp_pipeline) const {
+  return CreateRayTracingPipeline(pipeline_layout, ray_gen_shader, {miss_shader},
+                                  {{closest_hit_shader, nullptr, nullptr, false}}, {}, pp_pipeline);
+}
+
+VkResult Device::CreateShaderBindingTable(RayTracingPipeline *ray_tracing_pipeline,
+                                          const std::vector<int32_t> &miss_shader_indices,
+                                          const std::vector<int32_t> &hit_group_indices,
+                                          const std::vector<int32_t> &callable_shader_indices,
+                                          double_ptr<ShaderBindingTable> pp_sbt) const {
   auto aligned_size = [](uint32_t value, uint32_t alignment) { return (value + alignment - 1) & ~(alignment - 1); };
 
   VkPhysicalDeviceRayTracingPipelinePropertiesKHR ray_tracing_pipeline_properties =
@@ -905,15 +1044,20 @@ VkResult Device::CreateShaderBindingTable(Pipeline *ray_tracing_pipeline, double
   const uint32_t handle_size = ray_tracing_pipeline_properties.shaderGroupHandleSize;
   const uint32_t handle_size_aligned = aligned_size(ray_tracing_pipeline_properties.shaderGroupHandleSize,
                                                     ray_tracing_pipeline_properties.shaderGroupHandleAlignment);
-  const uint32_t handle_alignment = ray_tracing_pipeline_properties.shaderGroupHandleAlignment;
-  const uint32_t group_count = 3;
-  const uint32_t ray_gen_handle_size =
-      aligned_size(handle_size_aligned, ray_tracing_pipeline_properties.shaderGroupBaseAlignment);
-  const uint32_t miss_handle_size =
-      aligned_size(handle_size_aligned, ray_tracing_pipeline_properties.shaderGroupBaseAlignment);
-  const uint32_t hit_handle_size =
-      aligned_size(handle_size_aligned, ray_tracing_pipeline_properties.shaderGroupBaseAlignment);
-  const uint32_t sbt_size = group_count * handle_size_aligned;
+  const uint32_t base_alignment = ray_tracing_pipeline_properties.shaderGroupBaseAlignment;
+  const uint32_t group_count =
+      1 + miss_shader_indices.size() + hit_group_indices.size() + callable_shader_indices.size();
+  VkDeviceSize raygen_shader_offset = 0;
+  VkDeviceSize miss_shader_offset = 0;
+  VkDeviceSize hit_group_offset = 0;
+  VkDeviceSize callable_shader_offset = 0;
+  VkDeviceSize sbt_size = 0;
+  miss_shader_offset = sbt_size = aligned_size(sbt_size + handle_size_aligned * 1, base_alignment);
+  hit_group_offset = sbt_size =
+      aligned_size(sbt_size + handle_size_aligned * miss_shader_indices.size(), base_alignment);
+  callable_shader_offset = sbt_size =
+      aligned_size(sbt_size + handle_size_aligned * hit_group_indices.size(), base_alignment);
+  sbt_size = aligned_size(sbt_size + handle_size_aligned * callable_shader_indices.size(), base_alignment);
   const VkBufferUsageFlags sbt_buffer_usage_flags = VK_BUFFER_USAGE_SHADER_BINDING_TABLE_BIT_KHR |
                                                     VK_BUFFER_USAGE_TRANSFER_SRC_BIT |
                                                     VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT;
@@ -921,29 +1065,59 @@ VkResult Device::CreateShaderBindingTable(Pipeline *ray_tracing_pipeline, double
   // Ray_gen
   // Create binding table buffers for each shader type
   std::unique_ptr<Buffer> buffer;
-  CreateBuffer(ray_gen_handle_size + miss_handle_size + hit_handle_size, sbt_buffer_usage_flags,
-               VMA_MEMORY_USAGE_CPU_TO_GPU, &buffer);
+  CreateBuffer(sbt_size, sbt_buffer_usage_flags, VMA_MEMORY_USAGE_CPU_TO_GPU, &buffer);
 
   VkDeviceAddress buffer_address = buffer->GetDeviceAddress();
-  VkDeviceAddress ray_gen_offset = 0;
-  VkDeviceAddress miss_offset = ray_gen_handle_size;
-  VkDeviceAddress closest_hit_offset = ray_gen_handle_size + miss_handle_size;
 
   // Copy the pipeline's shader handles into a host buffer
-  std::vector<uint8_t> shader_handle_storage(sbt_size);
-  procedures_.vkGetRayTracingShaderGroupHandlesKHR(device_, ray_tracing_pipeline->Handle(), 0, group_count, sbt_size,
-                                                   shader_handle_storage.data());
+  std::vector<uint8_t> shader_handle_storage(handle_size * group_count);
+  procedures_.vkGetRayTracingShaderGroupHandlesKHR(device_, ray_tracing_pipeline->Handle(), 0, group_count,
+                                                   handle_size * group_count, shader_handle_storage.data());
 
   // Copy the shader handles from the host buffer to the binding tables
   auto *data = static_cast<uint8_t *>(buffer->Map());
-  std::memcpy(data + ray_gen_offset, shader_handle_storage.data(), handle_size_aligned);
-  std::memcpy(data + miss_offset, shader_handle_storage.data() + handle_size_aligned, handle_size_aligned);
-  std::memcpy(data + closest_hit_offset, shader_handle_storage.data() + handle_size_aligned * 2, handle_size_aligned);
+  std::memcpy(data + raygen_shader_offset, shader_handle_storage.data(), handle_size_aligned);
+  auto data_head = data + miss_shader_offset;
+  for (auto miss_shader_index : miss_shader_indices) {
+    std::memcpy(data_head, shader_handle_storage.data() + handle_size * (miss_shader_index + 1), handle_size);
+    data_head += handle_size_aligned;
+  }
+  data_head = data + hit_group_offset;
+  for (auto hit_group_index : hit_group_indices) {
+    std::memcpy(
+        data_head,
+        shader_handle_storage.data() + handle_size * (hit_group_index + ray_tracing_pipeline->MissShaderCount() + 1),
+        handle_size);
+    data_head += handle_size_aligned;
+  }
+  data_head = data + callable_shader_offset;
+  for (auto callable_shader_index : callable_shader_indices) {
+    std::memcpy(
+        data_head,
+        shader_handle_storage.data() + handle_size * (callable_shader_index + ray_tracing_pipeline->HitGroupCount() +
+                                                      ray_tracing_pipeline->MissShaderCount() + 1),
+        handle_size);
+    data_head += handle_size_aligned;
+  }
   buffer->Unmap();
 
-  pp_sbt.construct(std::move(buffer), buffer_address, ray_gen_offset, miss_offset, closest_hit_offset);
+  pp_sbt.construct(std::move(buffer), buffer_address + raygen_shader_offset, buffer_address + miss_shader_offset,
+                   buffer_address + hit_group_offset, buffer_address + callable_shader_offset,
+                   miss_shader_indices.size(), hit_group_indices.size(), callable_shader_indices.size());
 
   return VK_SUCCESS;
+}
+
+VkResult Device::CreateShaderBindingTable(RayTracingPipeline *ray_tracing_pipeline,
+                                          double_ptr<ShaderBindingTable> pp_sbt) const {
+  std::vector<int32_t> miss_shader_indices(ray_tracing_pipeline->MissShaderCount());
+  std::iota(miss_shader_indices.begin(), miss_shader_indices.end(), 0);
+  std::vector<int32_t> hit_group_indices(ray_tracing_pipeline->HitGroupCount());
+  std::iota(hit_group_indices.begin(), hit_group_indices.end(), 0);
+  std::vector<int32_t> callable_shader_indices(ray_tracing_pipeline->CallableShaderCount());
+  std::iota(callable_shader_indices.begin(), callable_shader_indices.end(), 0);
+  return CreateShaderBindingTable(ray_tracing_pipeline, miss_shader_indices, hit_group_indices, callable_shader_indices,
+                                  pp_sbt);
 }
 
 void Device::NameObject(VkImage image, const std::string &name) {

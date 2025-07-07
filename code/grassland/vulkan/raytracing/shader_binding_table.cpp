@@ -5,27 +5,49 @@
 namespace grassland::vulkan {
 
 ShaderBindingTable::ShaderBindingTable(std::unique_ptr<Buffer> buffer,
-                                       VkDeviceAddress buffer_address,
-                                       VkDeviceAddress ray_gen_offset,
-                                       VkDeviceAddress miss_offset,
-                                       VkDeviceAddress closest_hit_offset)
+                                       VkDeviceAddress ray_gen_address,
+                                       VkDeviceAddress miss_address,
+                                       VkDeviceAddress hit_group_address,
+                                       VkDeviceAddress callable_address,
+                                       size_t miss_shader_count,
+                                       size_t hit_group_count,
+                                       size_t callable_shader_count)
     : buffer_(std::move(buffer)),
-      buffer_address_(buffer_address),
-      ray_gen_offset_(ray_gen_offset),
-      miss_offset_(miss_offset),
-      closest_hit_offset_(closest_hit_offset) {
+      ray_gen_address_(ray_gen_address),
+      miss_address_(miss_address),
+      hit_group_address_(hit_group_address),
+      callable_address_(callable_address),
+      miss_shader_count_(miss_shader_count),
+      hit_group_count_(hit_group_count),
+      callable_shader_count_(callable_shader_count) {
 }
 
 VkDeviceAddress ShaderBindingTable::GetRayGenDeviceAddress() const {
-  return buffer_address_ + ray_gen_offset_;
+  return ray_gen_address_;
 }
 
 VkDeviceAddress ShaderBindingTable::GetMissDeviceAddress() const {
-  return buffer_address_ + miss_offset_;
+  return miss_address_;
 }
 
-VkDeviceAddress ShaderBindingTable::GetClosestHitDeviceAddress() const {
-  return buffer_address_ + closest_hit_offset_;
+VkDeviceAddress ShaderBindingTable::GetHitGroupDeviceAddress() const {
+  return hit_group_address_;
+}
+
+VkDeviceAddress ShaderBindingTable::GetCallableDeviceAddress() const {
+  return callable_address_;
+}
+
+size_t ShaderBindingTable::MissShaderCount() const {
+  return miss_shader_count_;
+}
+
+size_t ShaderBindingTable::HitGroupCount() const {
+  return hit_group_count_;
+}
+
+size_t ShaderBindingTable::CallableShaderCount() const {
+  return callable_shader_count_;
 }
 
 }  // namespace grassland::vulkan
