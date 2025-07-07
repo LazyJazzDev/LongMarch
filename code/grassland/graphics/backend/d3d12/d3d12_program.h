@@ -91,9 +91,21 @@ class D3D12RayTracingProgram : public RayTracingProgram, public D3D12ProgramBase
                          D3D12Shader *raygen_shader,
                          D3D12Shader *miss_shader,
                          D3D12Shader *closest_hit_shader);
+  D3D12RayTracingProgram(D3D12Core *core);
   ~D3D12RayTracingProgram() override = default;
   void AddResourceBinding(ResourceType type, int count) override;
-  void Finalize() override;
+
+  void AddRayGenShader(Shader *ray_gen_shader) override;
+  void AddMissShader(Shader *miss_shader) override;
+  void AddHitGroup(Shader *closest_hit_shader,
+                   Shader *any_hit_shader,
+                   Shader *intersection_shader,
+                   bool procedure) override;
+  void AddCallableShader(Shader *callable_shader) override;
+
+  void Finalize(const std::vector<int32_t> &miss_shader_indices,
+                const std::vector<int32_t> &hit_group_indices,
+                const std::vector<int32_t> &callable_shader_indices) override;
 
   d3d12::RayTracingPipeline *PipelineState() const {
     return pipeline_.get();
@@ -104,9 +116,10 @@ class D3D12RayTracingProgram : public RayTracingProgram, public D3D12ProgramBase
   }
 
  private:
-  D3D12Shader *raygen_shader_;
-  D3D12Shader *miss_shader_;
-  D3D12Shader *closest_hit_shader_;
+  d3d12::ShaderModule *raygen_shader_;
+  std::vector<d3d12::ShaderModule *> miss_shaders_;
+  std::vector<d3d12::HitGroup> hit_groups_;
+  std::vector<d3d12::ShaderModule *> callable_shaders_;
   std::unique_ptr<d3d12::RayTracingPipeline> pipeline_;
   std::unique_ptr<d3d12::ShaderTable> shader_table_;
 };

@@ -59,6 +59,20 @@ class Core {
 
   virtual int CreateCommandContext(double_ptr<CommandContext> pp_command_context) = 0;
 
+  virtual int CreateBottomLevelAccelerationStructure(Buffer *aabb_buffer,
+                                                     uint32_t stride,
+                                                     uint32_t num_aabb,
+                                                     RayTracingGeometryFlag flags,
+                                                     double_ptr<AccelerationStructure> pp_blas) = 0;
+
+  virtual int CreateBottomLevelAccelerationStructure(Buffer *vertex_buffer,
+                                                     Buffer *index_buffer,
+                                                     uint32_t num_vertex,
+                                                     uint32_t stride,
+                                                     uint32_t num_primitive,
+                                                     RayTracingGeometryFlag flags,
+                                                     double_ptr<AccelerationStructure> pp_blas) = 0;
+
   virtual int CreateBottomLevelAccelerationStructure(Buffer *vertex_buffer,
                                                      Buffer *index_buffer,
                                                      uint32_t stride,
@@ -71,10 +85,12 @@ class Core {
       const std::vector<std::pair<AccelerationStructure *, glm::mat4>> &objects,
       double_ptr<AccelerationStructure> pp_tlas);
 
+  virtual int CreateRayTracingProgram(double_ptr<RayTracingProgram> pp_program) = 0;
+
   virtual int CreateRayTracingProgram(Shader *raygen_shader,
                                       Shader *miss_shader,
                                       Shader *closest_shader,
-                                      double_ptr<RayTracingProgram> pp_program) = 0;
+                                      double_ptr<RayTracingProgram> pp_program);
 
   virtual int SubmitCommandContext(CommandContext *p_command_context) = 0;
 

@@ -215,6 +215,12 @@ typedef enum BlendOp {
   BLEND_OP_MAX = 4,
 } BlendOp;
 
+typedef enum RayTracingGeometryFlag : uint32_t {
+  RAYTRACING_GEOMETRY_FLAG_NONE = 0,
+  RAYTRACING_GEOMETRY_FLAG_OPAQUE = 0x00000001,
+  RAYTRACING_GEOMETRY_FLAG_NO_DUPLICATE_ANYHIT_INVOCATION = 0x00000002,
+} RayTracingGeometryFlag;
+
 typedef enum RayTracingInstanceFlag : uint32_t {
   RAYTRACING_INSTANCE_FLAG_NONE = 0,
   RAYTRACING_INSTANCE_FLAG_TRIANGLE_FACING_CULL_DISABLE = 0x00000001,
@@ -256,6 +262,15 @@ struct RayTracingInstance {
   uint32_t instance_hit_group_offset : 24;
   RayTracingInstanceFlag instance_flags : 8;
   AccelerationStructure *acceleration_structure;
+};
+
+struct RayTracingAABB {
+  float min_x;
+  float min_y;
+  float min_z;
+  float max_x;
+  float max_y;
+  float max_z;
 };
 
 #ifndef NDEBUG

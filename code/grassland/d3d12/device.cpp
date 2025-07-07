@@ -11,6 +11,7 @@
 #include "grassland/d3d12/raytracing/raytracing.h"
 #include "grassland/d3d12/root_signature.h"
 #include "grassland/d3d12/shader_module.h"
+#include "grassland/math/math_aabb.h"
 
 namespace grassland::d3d12 {
 
@@ -239,26 +240,20 @@ HRESULT Device::CreatePipelineState(const D3D12_GRAPHICS_PIPELINE_STATE_DESC &de
   return S_OK;
 }
 
-HRESULT Device::CreateBottomLevelAccelerationStructure(D3D12_GPU_VIRTUAL_ADDRESS vertex_buffer,
-                                                       D3D12_GPU_VIRTUAL_ADDRESS index_buffer,
-                                                       uint32_t num_vertex,
+HRESULT Device::CreateBottomLevelAccelerationStructure(D3D12_GPU_VIRTUAL_ADDRESS aabb_buffer,
                                                        uint32_t stride,
-                                                       uint32_t primitive_count,
+                                                       uint32_t num_aabb,
+                                                       D3D12_RAYTRACING_GEOMETRY_FLAGS flags,
                                                        CommandQueue *queue,
                                                        Fence *fence,
                                                        CommandAllocator *allocator,
                                                        double_ptr<AccelerationStructure> pp_as) {
   D3D12_RAYTRACING_GEOMETRY_DESC geometry = {};
-  geometry.Type = D3D12_RAYTRACING_GEOMETRY_TYPE_TRIANGLES;
-  geometry.Triangles.VertexBuffer.StartAddress = vertex_buffer;
-  geometry.Triangles.VertexBuffer.StrideInBytes = stride;
-  geometry.Triangles.VertexCount = num_vertex;
-  geometry.Triangles.VertexFormat = DXGI_FORMAT_R32G32B32_FLOAT;
-  geometry.Triangles.IndexBuffer = index_buffer;
-  geometry.Triangles.IndexCount = primitive_count * 3;
-  geometry.Triangles.IndexFormat = DXGI_FORMAT_R32_UINT;
-  geometry.Triangles.Transform3x4 = 0;
-  geometry.Flags = D3D12_RAYTRACING_GEOMETRY_FLAG_OPAQUE;
+  geometry.Type = D3D12_RAYTRACING_GEOMETRY_TYPE_PROCEDURAL_PRIMITIVE_AABBS;
+  geometry.AABBs.AABBs.StartAddress = aabb_buffer;
+  geometry.AABBs.AABBs.StrideInBytes = stride;
+  geometry.AABBs.AABBCount = num_aabb;
+  geometry.Flags = flags;
 
   D3D12_RAYTRACING_ACCELERATION_STRUCTURE_BUILD_FLAGS build_flags =
       D3D12_RAYTRACING_ACCELERATION_STRUCTURE_BUILD_FLAG_PREFER_FAST_TRACE;
@@ -295,6 +290,79 @@ HRESULT Device::CreateBottomLevelAccelerationStructure(D3D12_GPU_VIRTUAL_ADDRESS
 
   pp_as.construct(this, as);
   return S_OK;
+}
+
+HRESULT Device::CreateBottomLevelAccelerationStructure(D3D12_GPU_VIRTUAL_ADDRESS vertex_buffer,
+                                                       D3D12_GPU_VIRTUAL_ADDRESS index_buffer,
+                                                       uint32_t num_vertex,
+                                                       uint32_t stride,
+                                                       uint32_t primitive_count,
+                                                       D3D12_RAYTRACING_GEOMETRY_FLAGS flags,
+                                                       CommandQueue *queue,
+                                                       Fence *fence,
+                                                       CommandAllocator *allocator,
+                                                       double_ptr<AccelerationStructure> pp_as) {
+  D3D12_RAYTRACING_GEOMETRY_DESC geometry = {};
+  geometry.Type = D3D12_RAYTRACING_GEOMETRY_TYPE_TRIANGLES;
+  geometry.Triangles.VertexBuffer.StartAddress = vertex_buffer;
+  geometry.Triangles.VertexBuffer.StrideInBytes = stride;
+  geometry.Triangles.VertexCount = num_vertex;
+  geometry.Triangles.VertexFormat = DXGI_FORMAT_R32G32B32_FLOAT;
+  geometry.Triangles.IndexBuffer = index_buffer;
+  geometry.Triangles.IndexCount = primitive_count * 3;
+  geometry.Triangles.IndexFormat = DXGI_FORMAT_R32_UINT;
+  geometry.Triangles.Transform3x4 = 0;
+  geometry.Flags = flags;
+
+  D3D12_RAYTRACING_ACCELERATION_STRUCTURE_BUILD_FLAGS build_flags =
+      D3D12_RAYTRACING_ACCELERATION_STRUCTURE_BUILD_FLAG_PREFER_FAST_TRACE;
+  D3D12_BUILD_RAYTRACING_ACCELERATION_STRUCTURE_INPUTS as_inputs = {};
+  as_inputs.Type = D3D12_RAYTRACING_ACCELERATION_STRUCTURE_TYPE_BOTTOM_LEVEL;
+  as_inputs.DescsLayout = D3D12_ELEMENTS_LAYOUT_ARRAY;
+  as_inputs.pGeometryDescs = &geometry;
+  as_inputs.NumDescs = 1;
+  as_inputs.Flags = build_flags;
+
+  D3D12_RAYTRACING_ACCELERATION_STRUCTURE_PREBUILD_INFO as_prebuild_info = {};
+  dxr_device_->GetRaytracingAccelerationStructurePrebuildInfo(&as_inputs, &as_prebuild_info);
+
+  ID3D12Resource *scratch_buffer = RequestScratchBuffer(as_prebuild_info.ScratchDataSizeInBytes);
+
+  ComPtr<ID3D12Resource> as;
+  RETURN_IF_FAILED_HR(d3d12::CreateBuffer(Handle(), as_prebuild_info.ResultDataMaxSizeInBytes, D3D12_HEAP_TYPE_DEFAULT,
+                                          D3D12_RESOURCE_STATE_RAYTRACING_ACCELERATION_STRUCTURE,
+                                          D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS, as),
+                      "failed to create acceleration structure buffer.");
+
+  D3D12_BUILD_RAYTRACING_ACCELERATION_STRUCTURE_DESC as_desc = {};
+  as_desc.Inputs = as_inputs;
+  as_desc.ScratchAccelerationStructureData = scratch_buffer->GetGPUVirtualAddress();
+  as_desc.DestAccelerationStructureData = as->GetGPUVirtualAddress();
+  as_desc.SourceAccelerationStructureData = 0;
+
+  queue->SingleTimeCommand(fence, allocator, [&](ID3D12GraphicsCommandList *command_list) {
+    ComPtr<ID3D12GraphicsCommandList4> command_list4;
+    if (SUCCEEDED(command_list->QueryInterface(IID_PPV_ARGS(&command_list4)))) {
+      command_list4->BuildRaytracingAccelerationStructure(&as_desc, 0, nullptr);
+    }
+  });
+
+  pp_as.construct(this, as);
+  return S_OK;
+}
+
+HRESULT Device::CreateBottomLevelAccelerationStructure(D3D12_GPU_VIRTUAL_ADDRESS vertex_buffer,
+                                                       D3D12_GPU_VIRTUAL_ADDRESS index_buffer,
+                                                       uint32_t num_vertex,
+                                                       uint32_t stride,
+                                                       uint32_t primitive_count,
+                                                       CommandQueue *queue,
+                                                       Fence *fence,
+                                                       CommandAllocator *allocator,
+                                                       double_ptr<AccelerationStructure> pp_as) {
+  return CreateBottomLevelAccelerationStructure(vertex_buffer, index_buffer, num_vertex, stride, primitive_count,
+                                                D3D12_RAYTRACING_GEOMETRY_FLAG_NO_DUPLICATE_ANYHIT_INVOCATION, queue,
+                                                fence, allocator, pp_as);
 }
 
 HRESULT Device::CreateBottomLevelAccelerationStructure(Buffer *vertex_buffer,
@@ -393,34 +461,68 @@ HRESULT Device::CreateTopLevelAccelerationStructure(
 
 HRESULT Device::CreateRayTracingPipeline(RootSignature *root_signature,
                                          ShaderModule *ray_gen_shader,
-                                         ShaderModule *miss_shader,
-                                         ShaderModule *closest_hit_shader,
+                                         const std::vector<ShaderModule *> &miss_shaders,
+                                         const std::vector<HitGroup> &hit_groups,
+                                         const std::vector<ShaderModule *> &callable_shaders,
                                          double_ptr<RayTracingPipeline> pp_pipeline) {
-  const std::wstring hit_group_name = L"HitGroup";
-
   CD3DX12_STATE_OBJECT_DESC pipeline_desc(D3D12_STATE_OBJECT_TYPE_RAYTRACING_PIPELINE);
   auto lib_ray_gen = pipeline_desc.CreateSubobject<CD3DX12_DXIL_LIBRARY_SUBOBJECT>();
   auto ray_gen_code = ray_gen_shader->Handle();
   lib_ray_gen->SetDXILLibrary(&ray_gen_code);
-  lib_ray_gen->DefineExport(ray_gen_shader->EntryPoint().c_str());
+  lib_ray_gen->DefineExport(ray_gen_shader->EntryPoint().c_str(), L"RayGenMain");
 
-  auto lib_miss = pipeline_desc.CreateSubobject<CD3DX12_DXIL_LIBRARY_SUBOBJECT>();
-  auto miss_code = miss_shader->Handle();
-  lib_miss->SetDXILLibrary(&miss_code);
-  lib_miss->DefineExport(miss_shader->EntryPoint().c_str());
+  for (size_t i = 0; i < miss_shaders.size(); i++) {
+    auto &miss_shader = miss_shaders[i];
+    auto lib_miss = pipeline_desc.CreateSubobject<CD3DX12_DXIL_LIBRARY_SUBOBJECT>();
+    auto miss_code = miss_shader->Handle();
+    lib_miss->SetDXILLibrary(&miss_code);
+    lib_miss->DefineExport((L"MissMain" + std::to_wstring(i)).c_str(), miss_shader->EntryPoint().c_str());
+  }
 
-  auto lib_rchit = pipeline_desc.CreateSubobject<CD3DX12_DXIL_LIBRARY_SUBOBJECT>();
-  auto rchit_code = closest_hit_shader->Handle();
-  lib_rchit->SetDXILLibrary(&rchit_code);
-  lib_rchit->DefineExport(closest_hit_shader->EntryPoint().c_str());
+  for (size_t i = 0; i < hit_groups.size(); i++) {
+    auto &hit_group = hit_groups[i];
+    auto obj_hit_group = pipeline_desc.CreateSubobject<CD3DX12_HIT_GROUP_SUBOBJECT>();
 
-  auto hit_group = pipeline_desc.CreateSubobject<CD3DX12_HIT_GROUP_SUBOBJECT>();
-  hit_group->SetClosestHitShaderImport(closest_hit_shader->EntryPoint().c_str());
-  hit_group->SetHitGroupExport(hit_group_name.c_str());
-  hit_group->SetHitGroupType(D3D12_HIT_GROUP_TYPE_TRIANGLES);
+    auto lib_rchit = pipeline_desc.CreateSubobject<CD3DX12_DXIL_LIBRARY_SUBOBJECT>();
+    auto rchit_code = hit_group.closest_hit_shader->Handle();
+    lib_rchit->SetDXILLibrary(&rchit_code);
+    lib_rchit->DefineExport((L"ClosestHitMain" + std::to_wstring(i)).c_str(),
+                            hit_group.closest_hit_shader->EntryPoint().c_str());
+    obj_hit_group->SetClosestHitShaderImport((L"ClosestHitMain" + std::to_wstring(i)).c_str());
+
+    if (hit_group.intersection_shader) {
+      auto lib_rint = pipeline_desc.CreateSubobject<CD3DX12_DXIL_LIBRARY_SUBOBJECT>();
+      auto rint_code = hit_group.intersection_shader->Handle();
+      lib_rint->SetDXILLibrary(&rint_code);
+      lib_rint->DefineExport((L"IntersectionMain" + std::to_wstring(i)).c_str(),
+                             hit_group.intersection_shader->EntryPoint().c_str());
+      obj_hit_group->SetIntersectionShaderImport((L"IntersectionMain" + std::to_wstring(i)).c_str());
+    }
+
+    if (hit_group.any_hit_shader) {
+      auto lib_rahit = pipeline_desc.CreateSubobject<CD3DX12_DXIL_LIBRARY_SUBOBJECT>();
+      auto rahit_code = hit_group.any_hit_shader->Handle();
+      lib_rahit->SetDXILLibrary(&rahit_code);
+      lib_rahit->DefineExport((L"AnyHitMain" + std::to_wstring(i)).c_str(),
+                              hit_group.any_hit_shader->EntryPoint().c_str());
+      obj_hit_group->SetAnyHitShaderImport((L"AnyHitMain" + std::to_wstring(i)).c_str());
+    }
+
+    obj_hit_group->SetHitGroupExport((L"HitGroup" + std::to_wstring(i)).c_str());
+    obj_hit_group->SetHitGroupType(hit_group.procedure ? D3D12_HIT_GROUP_TYPE_PROCEDURAL_PRIMITIVE
+                                                       : D3D12_HIT_GROUP_TYPE_TRIANGLES);
+  }
+
+  for (size_t i = 0; i < callable_shaders.size(); i++) {
+    auto &callable_shader = callable_shaders[i];
+    auto lib_callable = pipeline_desc.CreateSubobject<CD3DX12_DXIL_LIBRARY_SUBOBJECT>();
+    auto callable_code = callable_shader->Handle();
+    lib_callable->SetDXILLibrary(&callable_code);
+    lib_callable->DefineExport((L"CallableMain" + std::to_wstring(i)).c_str(), callable_shader->EntryPoint().c_str());
+  }
 
   auto shader_config = pipeline_desc.CreateSubobject<CD3DX12_RAYTRACING_SHADER_CONFIG_SUBOBJECT>();
-  shader_config->Config(512 * sizeof(float), 2 * sizeof(float));
+  shader_config->Config(512 * sizeof(float), 4 * sizeof(float));
 
   auto global_root_signature = pipeline_desc.CreateSubobject<CD3DX12_GLOBAL_ROOT_SIGNATURE_SUBOBJECT>();
   global_root_signature->SetRootSignature(root_signature->Handle());
@@ -433,51 +535,98 @@ HRESULT Device::CreateRayTracingPipeline(RootSignature *root_signature,
   RETURN_IF_FAILED_HR(dxr_device_->CreateStateObject(pipeline_desc, IID_PPV_ARGS(&pipeline)),
                       "failed to create ray tracing pipeline.");
 
-  pp_pipeline.construct(pipeline, ray_gen_shader->EntryPoint(), miss_shader->EntryPoint(), hit_group_name);
+  pp_pipeline.construct(pipeline, miss_shaders.size(), hit_groups.size(), callable_shaders.size());
   return S_OK;
 }
 
+HRESULT Device::CreateRayTracingPipeline(RootSignature *root_signature,
+                                         ShaderModule *ray_gen_shader,
+                                         ShaderModule *miss_shader,
+                                         ShaderModule *closest_hit_shader,
+                                         double_ptr<RayTracingPipeline> pp_pipeline) {
+  return CreateRayTracingPipeline(root_signature, ray_gen_shader, {miss_shader},
+                                  {{closest_hit_shader, nullptr, nullptr, false}}, {}, pp_pipeline);
+}
+
 HRESULT Device::CreateShaderTable(RayTracingPipeline *ray_tracing_pipeline,
+                                  const std::vector<int32_t> &miss_shader_indices,
+                                  const std::vector<int32_t> &hit_group_indices,
+                                  const std::vector<int32_t> &callable_shader_indices,
                                   double_ptr<ShaderTable> pp_shader_table) const {
   ComPtr<ID3D12StateObjectProperties> pipeline_properties;
   RETURN_IF_FAILED_HR(ray_tracing_pipeline->Handle()->QueryInterface(IID_PPV_ARGS(&pipeline_properties)),
                       "failed to get pipeline properties.");
 
-  void *ray_gen_shader_idenfitier =
-      pipeline_properties->GetShaderIdentifier(ray_tracing_pipeline->RayGenShaderName().c_str());
-  void *miss_shader_idenfitier =
-      pipeline_properties->GetShaderIdentifier(ray_tracing_pipeline->MissShaderName().c_str());
-  void *hit_group_shader_idenfitier =
-      pipeline_properties->GetShaderIdentifier(ray_tracing_pipeline->HitGroupName().c_str());
+  const UINT shader_idenfitier_size = D3D12_SHADER_IDENTIFIER_SIZE_IN_BYTES;
+  const UINT shader_record_size = SizeAlignTo(shader_idenfitier_size, D3D12_RAYTRACING_SHADER_RECORD_BYTE_ALIGNMENT);
+  const UINT shader_table_alignment = D3D12_RAYTRACING_SHADER_TABLE_BYTE_ALIGNMENT;
 
-  UINT shader_idenfitier_size = D3D12_SHADER_IDENTIFIER_SIZE_IN_BYTES;
-  UINT shader_record_size = SizeAlignTo(shader_idenfitier_size, D3D12_RAYTRACING_SHADER_RECORD_BYTE_ALIGNMENT);
-  UINT shader_table_size = SizeAlignTo(shader_record_size, D3D12_RAYTRACING_SHADER_TABLE_BYTE_ALIGNMENT);
+  D3D12_GPU_VIRTUAL_ADDRESS accum_offset = 0;
+
+  D3D12_GPU_VIRTUAL_ADDRESS ray_gen_shader_offset = 0;
+  D3D12_GPU_VIRTUAL_ADDRESS miss_shader_offset = 0;
+  D3D12_GPU_VIRTUAL_ADDRESS hit_group_offset = 0;
+  D3D12_GPU_VIRTUAL_ADDRESS callable_shader_offset = 0;
+
+  miss_shader_offset = accum_offset = SizeAlignTo(accum_offset + shader_record_size * 1, shader_table_alignment);
+
+  hit_group_offset = accum_offset =
+      SizeAlignTo(accum_offset + shader_record_size * miss_shader_indices.size(), shader_table_alignment);
+
+  callable_shader_offset = accum_offset =
+      SizeAlignTo(accum_offset + shader_record_size * hit_group_indices.size(), shader_table_alignment);
+
+  accum_offset =
+      SizeAlignTo(accum_offset + shader_record_size * callable_shader_indices.size(), shader_table_alignment);
+
   ComPtr<ID3D12Resource> buffer;
-  RETURN_IF_FAILED_HR(d3d12::CreateBuffer(Handle(), shader_table_size * 3, D3D12_HEAP_TYPE_UPLOAD,
+  RETURN_IF_FAILED_HR(d3d12::CreateBuffer(Handle(), accum_offset, D3D12_HEAP_TYPE_UPLOAD,
                                           D3D12_RESOURCE_STATE_GENERIC_READ, D3D12_RESOURCE_FLAG_NONE, buffer),
                       "failed to create shader binding table buffer.");
   uint8_t *data = nullptr;
   RETURN_IF_FAILED_HR(buffer->Map(0, nullptr, reinterpret_cast<void **>(&data)),
                       "failed to map shader binding table buffer.");
 
-  std::memcpy(data, ray_gen_shader_idenfitier, shader_idenfitier_size);
-  data += shader_table_size;
+  void *shader_idenfitier = pipeline_properties->GetShaderIdentifier(L"RayGenMain");
+  std::memcpy(data, shader_idenfitier, shader_idenfitier_size);
 
-  std::memcpy(data, miss_shader_idenfitier, shader_idenfitier_size);
-  data += shader_table_size;
+  for (size_t i = 0; i < miss_shader_indices.size(); i++) {
+    auto miss_id = miss_shader_indices[i];
+    shader_idenfitier = pipeline_properties->GetShaderIdentifier((L"MissMain" + std::to_wstring(miss_id)).c_str());
+    std::memcpy(data + miss_shader_offset + i * shader_record_size, shader_idenfitier, shader_idenfitier_size);
+  }
 
-  std::memcpy(data, hit_group_shader_idenfitier, shader_idenfitier_size);
+  for (size_t i = 0; i < hit_group_indices.size(); i++) {
+    auto hit_group_id = hit_group_indices[i];
+    shader_idenfitier = pipeline_properties->GetShaderIdentifier((L"HitGroup" + std::to_wstring(hit_group_id)).c_str());
+    std::memcpy(data + hit_group_offset + i * shader_record_size, shader_idenfitier, shader_idenfitier_size);
+  }
 
-  D3D12_GPU_VIRTUAL_ADDRESS ray_gen_shader_offset = 0;
-  D3D12_GPU_VIRTUAL_ADDRESS miss_shader_offset = ray_gen_shader_offset + shader_table_size;
-  D3D12_GPU_VIRTUAL_ADDRESS hit_group_shader_offset = miss_shader_offset + shader_table_size;
+  for (size_t i = 0; i < callable_shader_indices.size(); i++) {
+    auto callable_id = callable_shader_indices[i];
+    shader_idenfitier =
+        pipeline_properties->GetShaderIdentifier((L"CallableMain" + std::to_wstring(callable_id)).c_str());
+    std::memcpy(data + callable_shader_offset + i * shader_record_size, shader_idenfitier, shader_idenfitier_size);
+  }
 
   buffer->Unmap(0, nullptr);
 
-  pp_shader_table.construct(buffer, ray_gen_shader_offset, miss_shader_offset, hit_group_shader_offset);
+  pp_shader_table.construct(buffer, ray_gen_shader_offset, miss_shader_offset, hit_group_offset, callable_shader_offset,
+                            miss_shader_indices.size(), hit_group_indices.size(), callable_shader_indices.size());
 
   return S_OK;
+}
+
+HRESULT Device::CreateShaderTable(RayTracingPipeline *ray_tracing_pipeline,
+                                  double_ptr<ShaderTable> pp_shader_table) const {
+  std::vector<int32_t> miss_shader_indices(ray_tracing_pipeline->MissShaderCount());
+  std::iota(miss_shader_indices.begin(), miss_shader_indices.end(), 0);
+  std::vector<int32_t> hit_group_indices(ray_tracing_pipeline->HitGroupCount());
+  std::iota(hit_group_indices.begin(), hit_group_indices.end(), 0);
+  std::vector<int32_t> callable_shader_indices(ray_tracing_pipeline->CallableShaderCount());
+  std::iota(callable_shader_indices.begin(), callable_shader_indices.end(), 0);
+  return CreateShaderTable(ray_tracing_pipeline, miss_shader_indices, hit_group_indices, callable_shader_indices,
+                           pp_shader_table);
 }
 
 ID3D12Resource *Device::RequestScratchBuffer(size_t size) {

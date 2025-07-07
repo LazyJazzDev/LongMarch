@@ -468,14 +468,17 @@ void VulkanCmdDispatchRays::CompileCommand(VulkanCommandContext *context, VkComm
   VkStridedDeviceAddressRegionKHR miss_shader_sbt_entry{};
   miss_shader_sbt_entry.deviceAddress = shader_binding_table->GetMissDeviceAddress();
   miss_shader_sbt_entry.stride = handle_size_aligned;
-  miss_shader_sbt_entry.size = handle_size_aligned;
+  miss_shader_sbt_entry.size = handle_size_aligned * shader_binding_table->MissShaderCount();
 
   VkStridedDeviceAddressRegionKHR hit_shader_sbt_entry{};
-  hit_shader_sbt_entry.deviceAddress = shader_binding_table->GetClosestHitDeviceAddress();
+  hit_shader_sbt_entry.deviceAddress = shader_binding_table->GetHitGroupDeviceAddress();
   hit_shader_sbt_entry.stride = handle_size_aligned;
-  hit_shader_sbt_entry.size = handle_size_aligned;
+  hit_shader_sbt_entry.size = handle_size_aligned * shader_binding_table->HitGroupCount();
 
   VkStridedDeviceAddressRegionKHR callable_shader_sbt_entry{};
+  callable_shader_sbt_entry.deviceAddress = shader_binding_table->GetCallableDeviceAddress();
+  callable_shader_sbt_entry.stride = handle_size_aligned;
+  callable_shader_sbt_entry.size = handle_size_aligned * shader_binding_table->CallableShaderCount();
 
   program_->Core()->Device()->Procedures().vkCmdTraceRaysKHR(command_buffer, &ray_gen_shader_sbt_entry,
                                                              &miss_shader_sbt_entry, &hit_shader_sbt_entry,

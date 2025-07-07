@@ -154,6 +154,24 @@ class Device {
 
   VkResult CreatePipeline(const struct PipelineSettings &settings, double_ptr<Pipeline> pp_pipeline) const;
 
+  VkResult CreateBottomLevelAccelerationStructure(VkDeviceAddress aabb_address,
+                                                  VkDeviceSize stride,
+                                                  uint32_t num_aabb,
+                                                  VkGeometryFlagsKHR flags,
+                                                  CommandPool *command_pool,
+                                                  Queue *queue,
+                                                  double_ptr<AccelerationStructure> pp_blas);
+
+  VkResult CreateBottomLevelAccelerationStructure(VkDeviceAddress vertex_buffer_address,
+                                                  VkDeviceAddress index_buffer_address,
+                                                  uint32_t num_vertex,
+                                                  VkDeviceSize stride,
+                                                  uint32_t primitive_count,
+                                                  VkGeometryFlagsKHR flags,
+                                                  CommandPool *command_pool,
+                                                  Queue *queue,
+                                                  double_ptr<AccelerationStructure> pp_blas);
+
   VkResult CreateBottomLevelAccelerationStructure(VkDeviceAddress vertex_buffer_address,
                                                   VkDeviceAddress index_buffer_address,
                                                   uint32_t num_vertex,
@@ -183,11 +201,25 @@ class Device {
 
   VkResult CreateRayTracingPipeline(PipelineLayout *pipeline_layout,
                                     ShaderModule *ray_gen_shader,
+                                    const std::vector<ShaderModule *> &miss_shaders,
+                                    const std::vector<HitGroup> &hit_groups,
+                                    const std::vector<ShaderModule *> &callable_shaders,
+                                    double_ptr<RayTracingPipeline> pp_pipeline) const;
+
+  VkResult CreateRayTracingPipeline(PipelineLayout *pipeline_layout,
+                                    ShaderModule *ray_gen_shader,
                                     ShaderModule *miss_shader,
                                     ShaderModule *closest_hit_shader,
-                                    double_ptr<Pipeline> pp_pipeline) const;
+                                    double_ptr<RayTracingPipeline> pp_pipeline) const;
 
-  VkResult CreateShaderBindingTable(Pipeline *ray_tracing_pipeline, double_ptr<ShaderBindingTable> pp_sbt) const;
+  VkResult CreateShaderBindingTable(RayTracingPipeline *ray_tracing_pipeline,
+                                    const std::vector<int32_t> &miss_shader_indices,
+                                    const std::vector<int32_t> &hit_group_indices,
+                                    const std::vector<int32_t> &callable_shader_indices,
+                                    double_ptr<ShaderBindingTable> pp_sbt) const;
+
+  VkResult CreateShaderBindingTable(RayTracingPipeline *ray_tracing_pipeline,
+                                    double_ptr<ShaderBindingTable> pp_sbt) const;
 
   void NameObject(VkImage image, const std::string &name);
   void NameObject(VkImageView image_view, const std::string &name);

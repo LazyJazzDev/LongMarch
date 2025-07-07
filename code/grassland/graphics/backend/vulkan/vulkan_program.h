@@ -95,6 +95,7 @@ class VulkanComputeProgram : public ComputeProgram, public VulkanProgramBase {
 
 class VulkanRayTracingProgram : public RayTracingProgram, public VulkanProgramBase {
  public:
+  VulkanRayTracingProgram(VulkanCore *core);
   VulkanRayTracingProgram(VulkanCore *core,
                           VulkanShader *raygen_shader,
                           VulkanShader *miss_shader,
@@ -103,9 +104,19 @@ class VulkanRayTracingProgram : public RayTracingProgram, public VulkanProgramBa
 
   void AddResourceBinding(ResourceType type, int count) override;
 
-  void Finalize() override;
+  void AddRayGenShader(Shader *ray_gen_shader) override;
+  void AddMissShader(Shader *miss_shader) override;
+  void AddHitGroup(Shader *closest_hit_shader,
+                   Shader *any_hit_shader,
+                   Shader *intersection_shader,
+                   bool procedure = false) override;
+  void AddCallableShader(Shader *callable_shader) override;
 
-  vulkan::Pipeline *Pipeline() const {
+  void Finalize(const std::vector<int32_t> &miss_shader_indices,
+                const std::vector<int32_t> &hit_group_indices,
+                const std::vector<int32_t> &callable_shader_indices) override;
+
+  vulkan::RayTracingPipeline *Pipeline() const {
     return pipeline_.get();
   }
 
@@ -114,10 +125,11 @@ class VulkanRayTracingProgram : public RayTracingProgram, public VulkanProgramBa
   }
 
  private:
-  VulkanShader *raygen_shader_;
-  VulkanShader *miss_shader_;
-  VulkanShader *closest_hit_shader_;
-  std::unique_ptr<vulkan::Pipeline> pipeline_;
+  vulkan::ShaderModule *raygen_shader_;
+  std::vector<vulkan::ShaderModule *> miss_shaders_;
+  std::vector<vulkan::HitGroup> hit_groups_;
+  std::vector<vulkan::ShaderModule *> callable_shaders_;
+  std::unique_ptr<vulkan::RayTracingPipeline> pipeline_;
   std::unique_ptr<vulkan::ShaderBindingTable> shader_binding_table_;
 };
 

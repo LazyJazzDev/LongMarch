@@ -6,20 +6,30 @@ namespace grassland::vulkan {
 class ShaderBindingTable {
  public:
   explicit ShaderBindingTable(std::unique_ptr<Buffer> buffer,
-                              VkDeviceAddress buffer_address,
-                              VkDeviceAddress ray_gen_offset,
-                              VkDeviceAddress miss_offset,
-                              VkDeviceAddress closest_hit_offset);
-  [[nodiscard]] VkDeviceAddress GetRayGenDeviceAddress() const;
-  [[nodiscard]] VkDeviceAddress GetMissDeviceAddress() const;
-  [[nodiscard]] VkDeviceAddress GetClosestHitDeviceAddress() const;
+                              VkDeviceAddress ray_gen_address,
+                              VkDeviceAddress miss_address,
+                              VkDeviceAddress hit_group_address,
+                              VkDeviceAddress callable_address,
+                              size_t miss_shader_count,
+                              size_t hit_group_count,
+                              size_t callable_shader_count);
+  VkDeviceAddress GetRayGenDeviceAddress() const;
+  VkDeviceAddress GetMissDeviceAddress() const;
+  VkDeviceAddress GetHitGroupDeviceAddress() const;
+  VkDeviceAddress GetCallableDeviceAddress() const;
+  size_t MissShaderCount() const;
+  size_t HitGroupCount() const;
+  size_t CallableShaderCount() const;
 
  private:
   std::unique_ptr<Buffer> buffer_;
-  VkDeviceAddress buffer_address_;
-  VkDeviceAddress ray_gen_offset_;
-  VkDeviceAddress miss_offset_;
-  VkDeviceAddress closest_hit_offset_;
+  VkDeviceAddress ray_gen_address_;
+  VkDeviceAddress miss_address_;
+  VkDeviceAddress hit_group_address_;
+  VkDeviceAddress callable_address_;
+  size_t miss_shader_count_{};
+  size_t hit_group_count_{};
+  size_t callable_shader_count_{};
 };
 
 }  // namespace grassland::vulkan

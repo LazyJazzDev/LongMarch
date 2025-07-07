@@ -120,26 +120,69 @@ void VulkanComputeProgram::Finalize() {
   vkCreateComputePipelines(core_->Device()->Handle(), VK_NULL_HANDLE, 1, &pipeline_create_info, nullptr, &pipeline_);
 }
 
+VulkanRayTracingProgram::VulkanRayTracingProgram(VulkanCore *core) : VulkanProgramBase(core) {
+}
+
 VulkanRayTracingProgram::VulkanRayTracingProgram(VulkanCore *core,
                                                  VulkanShader *raygen_shader,
                                                  VulkanShader *miss_shader,
                                                  VulkanShader *closest_hit_shader)
-    : VulkanProgramBase(core),
-      raygen_shader_(raygen_shader),
-      miss_shader_(miss_shader),
-      closest_hit_shader_(closest_hit_shader) {
+    : VulkanRayTracingProgram(core) {
+  AddRayGenShader(raygen_shader);
+  AddMissShader(miss_shader);
+  AddHitGroup(closest_hit_shader, nullptr, nullptr, false);
 }
 
 void VulkanRayTracingProgram::AddResourceBinding(ResourceType type, int count) {
   AddResourceBindingImpl(type, count);
 }
 
-void VulkanRayTracingProgram::Finalize() {
+void VulkanRayTracingProgram::AddRayGenShader(Shader *ray_gen_shader) {
+  auto vk_raygen_shader = dynamic_cast<VulkanShader *>(ray_gen_shader);
+  assert(vk_raygen_shader != nullptr);
+  raygen_shader_ = vk_raygen_shader->ShaderModule();
+}
+
+void VulkanRayTracingProgram::AddMissShader(Shader *miss_shader) {
+  auto vk_miss_shader = dynamic_cast<VulkanShader *>(miss_shader);
+  assert(vk_miss_shader != nullptr);
+  miss_shaders_.emplace_back(vk_miss_shader->ShaderModule());
+}
+
+void VulkanRayTracingProgram::AddHitGroup(Shader *closest_hit_shader,
+                                          Shader *any_hit_shader,
+                                          Shader *intersection_shader,
+                                          bool procedure) {
+  vulkan::HitGroup vk_hit_group;
+  vk_hit_group.procedure = procedure;
+  auto vk_closest_hit_shader = dynamic_cast<VulkanShader *>(closest_hit_shader);
+  vk_hit_group.closest_hit_shader = vk_closest_hit_shader->ShaderModule();
+  assert(vk_hit_group.closest_hit_shader != nullptr);
+  auto vk_any_hit_shader = dynamic_cast<VulkanShader *>(any_hit_shader);
+  if (vk_any_hit_shader) {
+    vk_hit_group.any_hit_shader = vk_any_hit_shader->ShaderModule();
+  }
+  auto vk_intersection_shader = dynamic_cast<VulkanShader *>(intersection_shader);
+  if (vk_intersection_shader) {
+    vk_hit_group.intersection_shader = vk_intersection_shader->ShaderModule();
+  }
+  hit_groups_.emplace_back(std::move(vk_hit_group));
+}
+
+void VulkanRayTracingProgram::AddCallableShader(Shader *callable_shader) {
+  auto vk_callable_shader = dynamic_cast<VulkanShader *>(callable_shader);
+  assert(vk_callable_shader != nullptr);
+  callable_shaders_.emplace_back(vk_callable_shader->ShaderModule());
+}
+
+void VulkanRayTracingProgram::Finalize(const std::vector<int32_t> &miss_shader_indices,
+                                       const std::vector<int32_t> &hit_group_indices,
+                                       const std::vector<int32_t> &callable_shader_indices) {
   FinalizePipelineLayout();
-  core_->Device()->CreateRayTracingPipeline(pipeline_layout_.get(), raygen_shader_->ShaderModule(),
-                                            miss_shader_->ShaderModule(), closest_hit_shader_->ShaderModule(),
-                                            &pipeline_);
-  core_->Device()->CreateShaderBindingTable(pipeline_.get(), &shader_binding_table_);
+  core_->Device()->CreateRayTracingPipeline(pipeline_layout_.get(), raygen_shader_, miss_shaders_, hit_groups_,
+                                            callable_shaders_, &pipeline_);
+  core_->Device()->CreateShaderBindingTable(pipeline_.get(), miss_shader_indices, hit_group_indices,
+                                            callable_shader_indices, &shader_binding_table_);
 }
 
 }  // namespace grassland::graphics::backend

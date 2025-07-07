@@ -20,6 +20,13 @@ class ShaderModule {
   std::wstring entry_point_;
 };
 
+struct HitGroup {
+  ShaderModule *closest_hit_shader{nullptr};
+  ShaderModule *any_hit_shader{nullptr};
+  ShaderModule *intersection_shader{nullptr};
+  bool procedure{false};
+};
+
 ComPtr<ID3DBlob> CompileShaderLegacy(const std::string &source_code,
                                      const std::string &entry_point,
                                      const std::string &target);

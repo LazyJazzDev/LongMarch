@@ -22,6 +22,19 @@ int Core::CreateTopLevelAccelerationStructure(const std::vector<std::pair<Accele
   return CreateTopLevelAccelerationStructure(instances, pp_tlas);
 }
 
+int Core::CreateRayTracingProgram(Shader *raygen_shader,
+                                  Shader *miss_shader,
+                                  Shader *closest_shader,
+                                  double_ptr<RayTracingProgram> pp_program) {
+  int ret = CreateRayTracingProgram(pp_program);
+  if (!ret) {
+    pp_program->AddRayGenShader(raygen_shader);
+    pp_program->AddMissShader(miss_shader);
+    pp_program->AddHitGroup(closest_shader);
+  }
+  return ret;
+}
+
 int Core::InitializeLogicalDeviceAutoSelect(bool require_ray_tracing) {
   auto num_device = GetPhysicalDeviceProperties();
   std::vector<PhysicalDeviceProperties> device_properties(num_device);

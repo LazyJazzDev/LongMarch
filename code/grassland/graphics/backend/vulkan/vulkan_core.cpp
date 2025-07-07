@@ -127,20 +127,46 @@ int VulkanCore::CreateCommandContext(double_ptr<CommandContext> pp_command_conte
   return 0;
 }
 
+int VulkanCore::CreateBottomLevelAccelerationStructure(Buffer *aabb_buffer,
+                                                       uint32_t stride,
+                                                       uint32_t num_aabb,
+                                                       RayTracingGeometryFlag flags,
+                                                       double_ptr<AccelerationStructure> pp_blas) {
+  VulkanBuffer *vk_aabb_buffer = dynamic_cast<VulkanBuffer *>(aabb_buffer);
+  assert(vk_aabb_buffer);
+  std::unique_ptr<vulkan::AccelerationStructure> blas;
+  device_->CreateBottomLevelAccelerationStructure(vk_aabb_buffer->DeviceAddress(), stride, num_aabb, flags,
+                                                  graphics_command_pool_.get(), graphics_queue_.get(), &blas);
+  pp_blas.construct<VulkanAccelerationStructure>(this, std::move(blas));
+  return 0;
+}
+
 int VulkanCore::CreateBottomLevelAccelerationStructure(Buffer *vertex_buffer,
                                                        Buffer *index_buffer,
+                                                       uint32_t num_vertex,
                                                        uint32_t stride,
+                                                       uint32_t num_primitive,
+                                                       RayTracingGeometryFlag flags,
                                                        double_ptr<AccelerationStructure> pp_blas) {
   VulkanBuffer *vk_vertex_buffer = dynamic_cast<VulkanBuffer *>(vertex_buffer);
   VulkanBuffer *vk_index_buffer = dynamic_cast<VulkanBuffer *>(index_buffer);
   assert(vk_vertex_buffer != nullptr);
   assert(vk_index_buffer != nullptr);
   std::unique_ptr<vulkan::AccelerationStructure> blas;
-  device_->CreateBottomLevelAccelerationStructure(
-      vk_vertex_buffer->DeviceAddress(), vk_index_buffer->DeviceAddress(), vertex_buffer->Size() / stride, stride,
-      index_buffer->Size() / (sizeof(uint32_t) * 3), graphics_command_pool_.get(), graphics_queue_.get(), &blas);
+  device_->CreateBottomLevelAccelerationStructure(vk_vertex_buffer->DeviceAddress(), vk_index_buffer->DeviceAddress(),
+                                                  num_vertex, stride, num_primitive, flags,
+                                                  graphics_command_pool_.get(), graphics_queue_.get(), &blas);
   pp_blas.construct<VulkanAccelerationStructure>(this, std::move(blas));
   return 0;
+}
+
+int VulkanCore::CreateBottomLevelAccelerationStructure(Buffer *vertex_buffer,
+                                                       Buffer *index_buffer,
+                                                       uint32_t stride,
+                                                       double_ptr<AccelerationStructure> pp_blas) {
+  return CreateBottomLevelAccelerationStructure(vertex_buffer, index_buffer, vertex_buffer->Size() / stride, stride,
+                                                index_buffer->Size() / (sizeof(uint32_t) * 3),
+                                                RAYTRACING_GEOMETRY_FLAG_OPAQUE, pp_blas);
 }
 
 int VulkanCore::CreateTopLevelAccelerationStructure(const std::vector<RayTracingInstance> &instances,
@@ -157,20 +183,8 @@ int VulkanCore::CreateTopLevelAccelerationStructure(const std::vector<RayTracing
   return 0;
 }
 
-int VulkanCore::CreateRayTracingProgram(Shader *raygen_shader,
-                                        Shader *miss_shader,
-                                        Shader *closest_shader,
-                                        double_ptr<RayTracingProgram> pp_program) {
-  VulkanShader *vk_raygen_shader = dynamic_cast<VulkanShader *>(raygen_shader);
-  VulkanShader *vk_miss_shader = dynamic_cast<VulkanShader *>(miss_shader);
-  VulkanShader *vk_closest_shader = dynamic_cast<VulkanShader *>(closest_shader);
-
-  assert(vk_raygen_shader != nullptr);
-  assert(vk_miss_shader != nullptr);
-  assert(vk_closest_shader != nullptr);
-
-  pp_program.construct<VulkanRayTracingProgram>(this, vk_raygen_shader, vk_miss_shader, vk_closest_shader);
-
+int VulkanCore::CreateRayTracingProgram(double_ptr<RayTracingProgram> pp_program) {
+  pp_program.construct<VulkanRayTracingProgram>(this);
   return 0;
 }
 

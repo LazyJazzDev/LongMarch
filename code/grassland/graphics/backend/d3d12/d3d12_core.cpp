@@ -142,9 +142,32 @@ int D3D12Core::CreateCommandContext(double_ptr<CommandContext> pp_command_contex
   return 0;
 }
 
+int D3D12Core::CreateBottomLevelAccelerationStructure(Buffer *aabb_buffer,
+                                                      uint32_t stride,
+                                                      uint32_t num_aabb,
+                                                      RayTracingGeometryFlag flags,
+                                                      double_ptr<AccelerationStructure> pp_blas) {
+  D3D12Buffer *d3d12_aabb_buffer = dynamic_cast<D3D12Buffer *>(aabb_buffer);
+
+  assert(d3d12_aabb_buffer != nullptr);
+
+  std::unique_ptr<d3d12::AccelerationStructure> blas;
+  device_->CreateBottomLevelAccelerationStructure(d3d12_aabb_buffer->InstantBuffer()->Handle()->GetGPUVirtualAddress(),
+                                                  stride, num_aabb, static_cast<D3D12_RAYTRACING_GEOMETRY_FLAGS>(flags),
+                                                  command_queue_.get(), fence_.get(), single_time_allocator_.get(),
+                                                  &blas);
+
+  pp_blas.construct<D3D12AccelerationStructure>(this, std::move(blas));
+
+  return 0;
+}
+
 int D3D12Core::CreateBottomLevelAccelerationStructure(Buffer *vertex_buffer,
                                                       Buffer *index_buffer,
+                                                      uint32_t num_vertex,
                                                       uint32_t stride,
+                                                      uint32_t num_primitive,
+                                                      RayTracingGeometryFlag flags,
                                                       double_ptr<AccelerationStructure> pp_blas) {
   D3D12Buffer *d3d12_vertex_buffer = dynamic_cast<D3D12Buffer *>(vertex_buffer);
   D3D12Buffer *d3d12_index_buffer = dynamic_cast<D3D12Buffer *>(index_buffer);
@@ -153,13 +176,24 @@ int D3D12Core::CreateBottomLevelAccelerationStructure(Buffer *vertex_buffer,
   assert(d3d12_index_buffer != nullptr);
 
   std::unique_ptr<d3d12::AccelerationStructure> blas;
-  device_->CreateBottomLevelAccelerationStructure(d3d12_vertex_buffer->InstantBuffer(),
-                                                  d3d12_index_buffer->InstantBuffer(), stride, command_queue_.get(),
-                                                  fence_.get(), single_time_allocator_.get(), &blas);
+  device_->CreateBottomLevelAccelerationStructure(
+      d3d12_vertex_buffer->InstantBuffer()->Handle()->GetGPUVirtualAddress(),
+      d3d12_index_buffer->InstantBuffer()->Handle()->GetGPUVirtualAddress(), num_vertex, stride, num_primitive,
+      static_cast<D3D12_RAYTRACING_GEOMETRY_FLAGS>(flags), command_queue_.get(), fence_.get(),
+      single_time_allocator_.get(), &blas);
 
   pp_blas.construct<D3D12AccelerationStructure>(this, std::move(blas));
 
   return 0;
+}
+
+int D3D12Core::CreateBottomLevelAccelerationStructure(Buffer *vertex_buffer,
+                                                      Buffer *index_buffer,
+                                                      uint32_t stride,
+                                                      double_ptr<AccelerationStructure> pp_blas) {
+  return CreateBottomLevelAccelerationStructure(vertex_buffer, index_buffer, vertex_buffer->Size() / stride, stride,
+                                                index_buffer->Size() / (sizeof(uint32_t) * 3),
+                                                RAYTRACING_GEOMETRY_FLAG_NO_DUPLICATE_ANYHIT_INVOCATION, pp_blas);
 }
 
 int D3D12Core::CreateTopLevelAccelerationStructure(const std::vector<RayTracingInstance> &instances,
@@ -180,20 +214,8 @@ int D3D12Core::CreateTopLevelAccelerationStructure(const std::vector<RayTracingI
   return 0;
 }
 
-int D3D12Core::CreateRayTracingProgram(Shader *raygen_shader,
-                                       Shader *miss_shader,
-                                       Shader *closest_shader,
-                                       double_ptr<RayTracingProgram> pp_program) {
-  D3D12Shader *d3d12_raygen_shader = dynamic_cast<D3D12Shader *>(raygen_shader);
-  D3D12Shader *d3d12_miss_shader = dynamic_cast<D3D12Shader *>(miss_shader);
-  D3D12Shader *d3d12_closest_shader = dynamic_cast<D3D12Shader *>(closest_shader);
-
-  assert(d3d12_raygen_shader != nullptr);
-  assert(d3d12_miss_shader != nullptr);
-  assert(d3d12_closest_shader != nullptr);
-
-  pp_program.construct<D3D12RayTracingProgram>(this, d3d12_raygen_shader, d3d12_miss_shader, d3d12_closest_shader);
-
+int D3D12Core::CreateRayTracingProgram(double_ptr<RayTracingProgram> pp_program) {
+  pp_program.construct<D3D12RayTracingProgram>(this);
   return 0;
 }
 

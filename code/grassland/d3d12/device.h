@@ -84,6 +84,26 @@ class Device {
   HRESULT CreatePipelineState(const D3D12_GRAPHICS_PIPELINE_STATE_DESC &desc,
                               double_ptr<PipelineState> pp_pipeline_state);
 
+  HRESULT CreateBottomLevelAccelerationStructure(D3D12_GPU_VIRTUAL_ADDRESS aabb_buffer,
+                                                 uint32_t stride,
+                                                 uint32_t num_aabb,
+                                                 D3D12_RAYTRACING_GEOMETRY_FLAGS flags,
+                                                 CommandQueue *queue,
+                                                 Fence *fence,
+                                                 CommandAllocator *allocator,
+                                                 double_ptr<AccelerationStructure> pp_as);
+
+  HRESULT CreateBottomLevelAccelerationStructure(D3D12_GPU_VIRTUAL_ADDRESS vertex_buffer,
+                                                 D3D12_GPU_VIRTUAL_ADDRESS index_buffer,
+                                                 uint32_t num_vertex,
+                                                 uint32_t stride,
+                                                 uint32_t primitive_count,
+                                                 D3D12_RAYTRACING_GEOMETRY_FLAGS flags,
+                                                 CommandQueue *queue,
+                                                 Fence *fence,
+                                                 CommandAllocator *allocator,
+                                                 double_ptr<AccelerationStructure> pp_as);
+
   HRESULT CreateBottomLevelAccelerationStructure(D3D12_GPU_VIRTUAL_ADDRESS vertex_buffer,
                                                  D3D12_GPU_VIRTUAL_ADDRESS index_buffer,
                                                  uint32_t num_vertex,
@@ -116,9 +136,22 @@ class Device {
 
   HRESULT CreateRayTracingPipeline(RootSignature *root_signature,
                                    ShaderModule *ray_gen_shader,
+                                   const std::vector<ShaderModule *> &miss_shaders,
+                                   const std::vector<HitGroup> &hit_groups,
+                                   const std::vector<ShaderModule *> &callable_shaders,
+                                   double_ptr<RayTracingPipeline> pp_pipeline);
+
+  HRESULT CreateRayTracingPipeline(RootSignature *root_signature,
+                                   ShaderModule *ray_gen_shader,
                                    ShaderModule *miss_shader,
                                    ShaderModule *closest_hit_shader,
                                    double_ptr<RayTracingPipeline> pp_pipeline);
+
+  HRESULT CreateShaderTable(RayTracingPipeline *ray_tracing_pipeline,
+                            const std::vector<int32_t> &miss_shader_indices,
+                            const std::vector<int32_t> &hit_group_indices,
+                            const std::vector<int32_t> &callable_shader_indices,
+                            double_ptr<ShaderTable> pp_shader_table) const;
 
   HRESULT CreateShaderTable(RayTracingPipeline *ray_tracing_pipeline, double_ptr<ShaderTable> pp_shader_table) const;
 
