@@ -469,7 +469,7 @@ HRESULT Device::CreateRayTracingPipeline(RootSignature *root_signature,
   auto lib_ray_gen = pipeline_desc.CreateSubobject<CD3DX12_DXIL_LIBRARY_SUBOBJECT>();
   auto ray_gen_code = ray_gen_shader->Handle();
   lib_ray_gen->SetDXILLibrary(&ray_gen_code);
-  lib_ray_gen->DefineExport(ray_gen_shader->EntryPoint().c_str(), L"RayGenMain");
+  lib_ray_gen->DefineExport(L"RayGenMain", ray_gen_shader->EntryPoint().c_str());
 
   for (size_t i = 0; i < miss_shaders.size(); i++) {
     auto &miss_shader = miss_shaders[i];

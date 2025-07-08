@@ -87,19 +87,20 @@ struct SphereIntersectionAttributes {
   }
 
   float t = (-b - sqrt(discriminant)) / (2.0 * a);
-  if (t < RayTMin()) {
-    t = (-b + sqrt(discriminant)) / (2.0 * a);
-    if (t < RayTMin()) {
-      return;
-    }
+  if (t > RayTMin()) {
+    SphereIntersectionAttributes attr;
+    attr.normal = (origin + t * dir) - sphere_center;
+    attr.normal = normalize(mul(WorldToObject4x3(), attr.normal).xyz);
+    ReportHit(t, 0, attr);
   }
 
-  SphereIntersectionAttributes attr;
-  attr.normal = (origin + t * dir) - sphere_center;
-
-  attr.normal = normalize(mul(WorldToObject4x3(), attr.normal).xyz);
-
-  ReportHit(t, 0, attr);
+  t = (-b + sqrt(discriminant)) / (2.0 * a);
+  if (t > RayTMin()) {
+    SphereIntersectionAttributes attr;
+    attr.normal = (origin + t * dir) - sphere_center;
+    attr.normal = normalize(mul(WorldToObject4x3(), attr.normal).xyz);
+    ReportHit(t, 0, attr);
+  }
 }
 
 struct ShadingColor {

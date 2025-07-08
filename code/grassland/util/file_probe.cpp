@@ -24,6 +24,16 @@ std::string FileProbe::FindFile(const std::string &filename) const {
   return "";
 }
 
+std::string FileProbe::FindPath(const std::string &filename) const {
+  for (const auto &path : search_paths_) {
+    std::string full_path = path + filename;
+    if (std::filesystem::exists(full_path)) {
+      return full_path;
+    }
+  }
+  return "";
+}
+
 FileProbe &FileProbe::GetInstance() {
   static FileProbe instance;
   static bool initialized = false;
@@ -48,6 +58,10 @@ std::ostream &operator<<(std::ostream &os, const FileProbe &probe) {
 
 std::string FindAssetFile(const std::string &filename) {
   return FileProbe::GetInstance().FindFile(filename);
+}
+
+std::string FindAssetPath(const std::string &filename) {
+  return FileProbe::GetInstance().FindPath(filename);
 }
 
 }  // namespace grassland

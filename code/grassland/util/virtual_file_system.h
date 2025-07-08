@@ -12,6 +12,8 @@ class VirtualFileSystemEntry {
   }
   virtual ~VirtualFileSystemEntry() = default;
 
+  virtual std::unique_ptr<VirtualFileSystemEntry> deep_copy(VirtualFileSystemEntry *parent = nullptr) const = 0;
+
  protected:
   VirtualFileSystemEntry *parent_;
 };
@@ -19,6 +21,9 @@ class VirtualFileSystemEntry {
 class VirtualFileSystem {
  public:
   VirtualFileSystem();
+
+  VirtualFileSystem(const VirtualFileSystem &other);
+
   int WriteFile(const std::string &file_name, const std::vector<uint8_t> &data);
   int WriteFile(const std::string &file_name, const std::string &data);
   int WriteFile(const std::string &file_name, const char *data, size_t size);
@@ -27,9 +32,12 @@ class VirtualFileSystem {
 
   void Print() const;
 
+  static VirtualFileSystem LoadDirectory(const std::filesystem::path &path);
+
  private:
   VirtualFileSystemEntry *AccessFile(const std::string &path, bool create_if_not_exists = false) const;
 
   std::unique_ptr<VirtualFileSystemEntry> root_;
 };
+
 }  // namespace grassland

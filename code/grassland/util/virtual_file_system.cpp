@@ -1,5 +1,7 @@
 #include "grassland/util/virtual_file_system.h"
 
+#include <fstream>
+
 namespace grassland {
 class VirtualFileSystemFile;
 class VirtualFileSystemDirectory : public VirtualFileSystemEntry {
@@ -24,6 +26,13 @@ class VirtualFileSystemDirectory : public VirtualFileSystemEntry {
 
   VirtualFileSystemFile *open(const std::string &name, bool create_if_not_exists = false);
 
+  std::unique_ptr<VirtualFileSystemEntry> deep_copy(VirtualFileSystemEntry *parent) const override {
+    std::unique_ptr<VirtualFileSystemDirectory> copy = std::make_unique<VirtualFileSystemDirectory>(parent);
+    for (auto &[name, entry] : subentries_) {
+      copy->subentries_[name] = entry->deep_copy(copy.get());
+    }
+    return copy;
+  }
   std::map<std::string, std::unique_ptr<VirtualFileSystemEntry>> subentries_;
 };
 
@@ -31,6 +40,13 @@ class VirtualFileSystemFile : public VirtualFileSystemEntry {
  public:
   VirtualFileSystemFile(VirtualFileSystemEntry *parent) : VirtualFileSystemEntry(parent) {
   }
+
+  std::unique_ptr<VirtualFileSystemEntry> deep_copy(VirtualFileSystemEntry *parent) const override {
+    std::unique_ptr<VirtualFileSystemFile> copy = std::make_unique<VirtualFileSystemFile>(parent);
+    copy->data = data;  // Copy the file data
+    return copy;
+  }
+
   std::vector<uint8_t> data;
 };
 
@@ -52,6 +68,10 @@ VirtualFileSystemFile *VirtualFileSystemDirectory::open(const std::string &name,
 
 VirtualFileSystem::VirtualFileSystem() {
   root_ = std::make_unique<VirtualFileSystemDirectory>(nullptr);
+}
+
+VirtualFileSystem::VirtualFileSystem(const VirtualFileSystem &other) {
+  root_ = other.root_->deep_copy(nullptr);
 }
 
 int VirtualFileSystem::WriteFile(const std::string &file_name, const std::vector<uint8_t> &data) {
@@ -121,6 +141,28 @@ VirtualFileSystemEntry *VirtualFileSystem::AccessFile(const std::string &path, b
     current++;
   }
   return cwd->open(last->string(), create_if_not_exists);
+}
+
+VirtualFileSystem VirtualFileSystem::LoadDirectory(const std::filesystem::path &path) {
+  VirtualFileSystem vfs;
+
+  for (auto &entry : std::filesystem::recursive_directory_iterator(path)) {
+    auto relative_path = std::filesystem::relative(entry.path(), path);
+    if (entry.is_regular_file()) {
+      std::vector<uint8_t> data;
+      std::ifstream file(entry.path(), std::ios::binary);
+      if (file) {
+        file.seekg(0, std::ios::end);
+        size_t size = file.tellg();
+        file.seekg(0, std::ios::beg);
+        data.resize(size);
+        file.read(reinterpret_cast<char *>(data.data()), size);
+        vfs.WriteFile(relative_path.string(), data);
+      }
+    }
+  }
+
+  return vfs;
 }
 
 }  // namespace grassland
