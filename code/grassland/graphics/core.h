@@ -59,14 +59,14 @@ class Core {
 
   virtual int CreateCommandContext(double_ptr<CommandContext> pp_command_context) = 0;
 
-  virtual int CreateBottomLevelAccelerationStructure(Buffer *aabb_buffer,
+  virtual int CreateBottomLevelAccelerationStructure(BufferWithOffset aabb_buffer,
                                                      uint32_t stride,
                                                      uint32_t num_aabb,
                                                      RayTracingGeometryFlag flags,
                                                      double_ptr<AccelerationStructure> pp_blas) = 0;
 
-  virtual int CreateBottomLevelAccelerationStructure(Buffer *vertex_buffer,
-                                                     Buffer *index_buffer,
+  virtual int CreateBottomLevelAccelerationStructure(BufferWithOffset vertex_buffer,
+                                                     BufferWithOffset index_buffer,
                                                      uint32_t num_vertex,
                                                      uint32_t stride,
                                                      uint32_t num_primitive,

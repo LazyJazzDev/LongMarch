@@ -14,6 +14,7 @@ class Shader;
 class Program;
 class ComputeProgram;
 class CommandContext;
+struct BufferWithOffset;
 
 // Ray tracing objects
 class RayTracingProgram;

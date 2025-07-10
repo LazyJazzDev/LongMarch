@@ -142,44 +142,44 @@ int D3D12Core::CreateCommandContext(double_ptr<CommandContext> pp_command_contex
   return 0;
 }
 
-int D3D12Core::CreateBottomLevelAccelerationStructure(Buffer *aabb_buffer,
+int D3D12Core::CreateBottomLevelAccelerationStructure(BufferWithOffset aabb_buffer,
                                                       uint32_t stride,
                                                       uint32_t num_aabb,
                                                       RayTracingGeometryFlag flags,
                                                       double_ptr<AccelerationStructure> pp_blas) {
-  D3D12Buffer *d3d12_aabb_buffer = dynamic_cast<D3D12Buffer *>(aabb_buffer);
+  D3D12Buffer *d3d12_aabb_buffer = dynamic_cast<D3D12Buffer *>(aabb_buffer.buffer);
 
   assert(d3d12_aabb_buffer != nullptr);
 
   std::unique_ptr<d3d12::AccelerationStructure> blas;
-  device_->CreateBottomLevelAccelerationStructure(d3d12_aabb_buffer->InstantBuffer()->Handle()->GetGPUVirtualAddress(),
-                                                  stride, num_aabb, static_cast<D3D12_RAYTRACING_GEOMETRY_FLAGS>(flags),
-                                                  command_queue_.get(), fence_.get(), single_time_allocator_.get(),
-                                                  &blas);
+  device_->CreateBottomLevelAccelerationStructure(
+      d3d12_aabb_buffer->InstantBuffer()->Handle()->GetGPUVirtualAddress() + aabb_buffer.offset, stride, num_aabb,
+      static_cast<D3D12_RAYTRACING_GEOMETRY_FLAGS>(flags), command_queue_.get(), fence_.get(),
+      single_time_allocator_.get(), &blas);
 
   pp_blas.construct<D3D12AccelerationStructure>(this, std::move(blas));
 
   return 0;
 }
 
-int D3D12Core::CreateBottomLevelAccelerationStructure(Buffer *vertex_buffer,
-                                                      Buffer *index_buffer,
+int D3D12Core::CreateBottomLevelAccelerationStructure(BufferWithOffset vertex_buffer,
+                                                      BufferWithOffset index_buffer,
                                                       uint32_t num_vertex,
                                                       uint32_t stride,
                                                       uint32_t num_primitive,
                                                       RayTracingGeometryFlag flags,
                                                       double_ptr<AccelerationStructure> pp_blas) {
-  D3D12Buffer *d3d12_vertex_buffer = dynamic_cast<D3D12Buffer *>(vertex_buffer);
-  D3D12Buffer *d3d12_index_buffer = dynamic_cast<D3D12Buffer *>(index_buffer);
+  D3D12Buffer *d3d12_vertex_buffer = dynamic_cast<D3D12Buffer *>(vertex_buffer.buffer);
+  D3D12Buffer *d3d12_index_buffer = dynamic_cast<D3D12Buffer *>(index_buffer.buffer);
 
   assert(d3d12_vertex_buffer != nullptr);
   assert(d3d12_index_buffer != nullptr);
 
   std::unique_ptr<d3d12::AccelerationStructure> blas;
   device_->CreateBottomLevelAccelerationStructure(
-      d3d12_vertex_buffer->InstantBuffer()->Handle()->GetGPUVirtualAddress(),
-      d3d12_index_buffer->InstantBuffer()->Handle()->GetGPUVirtualAddress(), num_vertex, stride, num_primitive,
-      static_cast<D3D12_RAYTRACING_GEOMETRY_FLAGS>(flags), command_queue_.get(), fence_.get(),
+      d3d12_vertex_buffer->InstantBuffer()->Handle()->GetGPUVirtualAddress() + vertex_buffer.offset,
+      d3d12_index_buffer->InstantBuffer()->Handle()->GetGPUVirtualAddress() + index_buffer.offset, num_vertex, stride,
+      num_primitive, static_cast<D3D12_RAYTRACING_GEOMETRY_FLAGS>(flags), command_queue_.get(), fence_.get(),
       single_time_allocator_.get(), &blas);
 
   pp_blas.construct<D3D12AccelerationStructure>(this, std::move(blas));

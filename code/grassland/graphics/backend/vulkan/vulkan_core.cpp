@@ -127,35 +127,36 @@ int VulkanCore::CreateCommandContext(double_ptr<CommandContext> pp_command_conte
   return 0;
 }
 
-int VulkanCore::CreateBottomLevelAccelerationStructure(Buffer *aabb_buffer,
+int VulkanCore::CreateBottomLevelAccelerationStructure(BufferWithOffset aabb_buffer,
                                                        uint32_t stride,
                                                        uint32_t num_aabb,
                                                        RayTracingGeometryFlag flags,
                                                        double_ptr<AccelerationStructure> pp_blas) {
-  VulkanBuffer *vk_aabb_buffer = dynamic_cast<VulkanBuffer *>(aabb_buffer);
+  VulkanBuffer *vk_aabb_buffer = dynamic_cast<VulkanBuffer *>(aabb_buffer.buffer);
   assert(vk_aabb_buffer);
   std::unique_ptr<vulkan::AccelerationStructure> blas;
-  device_->CreateBottomLevelAccelerationStructure(vk_aabb_buffer->DeviceAddress(), stride, num_aabb, flags,
-                                                  graphics_command_pool_.get(), graphics_queue_.get(), &blas);
+  device_->CreateBottomLevelAccelerationStructure(vk_aabb_buffer->DeviceAddress() + aabb_buffer.offset, stride,
+                                                  num_aabb, flags, graphics_command_pool_.get(), graphics_queue_.get(),
+                                                  &blas);
   pp_blas.construct<VulkanAccelerationStructure>(this, std::move(blas));
   return 0;
 }
 
-int VulkanCore::CreateBottomLevelAccelerationStructure(Buffer *vertex_buffer,
-                                                       Buffer *index_buffer,
+int VulkanCore::CreateBottomLevelAccelerationStructure(BufferWithOffset vertex_buffer,
+                                                       BufferWithOffset index_buffer,
                                                        uint32_t num_vertex,
                                                        uint32_t stride,
                                                        uint32_t num_primitive,
                                                        RayTracingGeometryFlag flags,
                                                        double_ptr<AccelerationStructure> pp_blas) {
-  VulkanBuffer *vk_vertex_buffer = dynamic_cast<VulkanBuffer *>(vertex_buffer);
-  VulkanBuffer *vk_index_buffer = dynamic_cast<VulkanBuffer *>(index_buffer);
+  VulkanBuffer *vk_vertex_buffer = dynamic_cast<VulkanBuffer *>(vertex_buffer.buffer);
+  VulkanBuffer *vk_index_buffer = dynamic_cast<VulkanBuffer *>(index_buffer.buffer);
   assert(vk_vertex_buffer != nullptr);
   assert(vk_index_buffer != nullptr);
   std::unique_ptr<vulkan::AccelerationStructure> blas;
-  device_->CreateBottomLevelAccelerationStructure(vk_vertex_buffer->DeviceAddress(), vk_index_buffer->DeviceAddress(),
-                                                  num_vertex, stride, num_primitive, flags,
-                                                  graphics_command_pool_.get(), graphics_queue_.get(), &blas);
+  device_->CreateBottomLevelAccelerationStructure(
+      vk_vertex_buffer->DeviceAddress() + vertex_buffer.offset, vk_index_buffer->DeviceAddress() + index_buffer.offset,
+      num_vertex, stride, num_primitive, flags, graphics_command_pool_.get(), graphics_queue_.get(), &blas);
   pp_blas.construct<VulkanAccelerationStructure>(this, std::move(blas));
   return 0;
 }

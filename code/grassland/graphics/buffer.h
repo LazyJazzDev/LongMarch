@@ -4,6 +4,13 @@
 
 namespace grassland::graphics {
 
+struct BufferWithOffset {
+  Buffer *buffer;
+  size_t offset;
+  BufferWithOffset(Buffer *buffer, size_t offset = 0) : buffer(buffer), offset(offset) {
+  }
+};
+
 class Buffer {
  public:
   Buffer() = default;
