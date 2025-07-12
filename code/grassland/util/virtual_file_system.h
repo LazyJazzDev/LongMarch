@@ -23,6 +23,10 @@ class VirtualFileSystem {
   VirtualFileSystem();
 
   VirtualFileSystem(const VirtualFileSystem &other);
+  VirtualFileSystem(VirtualFileSystem &&other) noexcept;
+
+  VirtualFileSystem &operator=(const VirtualFileSystem &other);
+  VirtualFileSystem &operator=(VirtualFileSystem &&other) noexcept;
 
   int WriteFile(const std::string &file_name, const std::vector<uint8_t> &data);
   int WriteFile(const std::string &file_name, const std::string &data);

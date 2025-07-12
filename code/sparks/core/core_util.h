@@ -3,6 +3,8 @@
 
 namespace sparks {
 
+using namespace grassland;
+
 class Core;
 class Geometry;
 class Material;

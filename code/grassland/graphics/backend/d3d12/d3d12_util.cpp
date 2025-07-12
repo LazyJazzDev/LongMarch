@@ -21,6 +21,10 @@ DXGI_FORMAT ImageFormatToDXGIFormat(ImageFormat format) {
       return DXGI_FORMAT_D32_FLOAT;
     case IMAGE_FORMAT_R16G16B16A16_SFLOAT:
       return DXGI_FORMAT_R16G16B16A16_FLOAT;
+    case IMAGE_FORMAT_R32_UINT:
+      return DXGI_FORMAT_R32_UINT;
+    case IMAGE_FORMAT_R32_SINT:
+      return DXGI_FORMAT_R32_SINT;
     default:
       return DXGI_FORMAT_UNKNOWN;
   }

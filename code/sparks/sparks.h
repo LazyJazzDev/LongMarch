@@ -1,2 +1,11 @@
 #pragma once
-#include "long_march.h"
+#include "sparks/core/camera.h"
+#include "sparks/core/core.h"
+#include "sparks/core/entity.h"
+#include "sparks/core/film.h"
+#include "sparks/core/geometry.h"
+#include "sparks/core/material.h"
+#include "sparks/core/scene.h"
+#include "sparks/entity/entities.h"
+#include "sparks/geometry/geometries.h"
+#include "sparks/material/materials.h"

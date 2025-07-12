@@ -41,6 +41,8 @@ typedef enum ImageFormat {
   IMAGE_FORMAT_R32_SFLOAT = 6,
   IMAGE_FORMAT_D32_SFLOAT = 7,
   IMAGE_FORMAT_R16G16B16A16_SFLOAT = 8,
+  IMAGE_FORMAT_R32_UINT = 9,
+  IMAGE_FORMAT_R32_SINT = 10,
 } ImageFormat;
 
 typedef enum InputType {

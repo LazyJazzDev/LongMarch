@@ -9,7 +9,7 @@ add_subdirectory(snow_mount)
 add_subdirectory(sparks)
 
 target_include_directories(LongMarch PUBLIC ${LONGMARCH_INCLUDE_DIR})
-target_link_libraries(LongMarch PUBLIC Grassland SnowMount )
+target_link_libraries(LongMarch PUBLIC Grassland SnowMount Sparks)
 
 pybind11_add_module(long_march long_march_pybind.cpp)
 target_include_directories(long_march PUBLIC ${LONGMARCH_INCLUDE_DIR})

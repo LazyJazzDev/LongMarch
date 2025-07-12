@@ -74,6 +74,20 @@ VirtualFileSystem::VirtualFileSystem(const VirtualFileSystem &other) {
   root_ = other.root_->deep_copy(nullptr);
 }
 
+VirtualFileSystem::VirtualFileSystem(VirtualFileSystem &&other) noexcept {
+  root_ = std::move(other.root_);
+}
+
+VirtualFileSystem &VirtualFileSystem::operator=(const VirtualFileSystem &other) {
+  root_ = other.root_->deep_copy(nullptr);
+  return *this;
+}
+
+VirtualFileSystem &VirtualFileSystem::operator=(VirtualFileSystem &&other) noexcept {
+  root_ = std::move(other.root_);
+  return *this;
+}
+
 int VirtualFileSystem::WriteFile(const std::string &file_name, const std::vector<uint8_t> &data) {
   auto file = dynamic_cast<VirtualFileSystemFile *>(AccessFile(file_name, true));
   if (!file) {
