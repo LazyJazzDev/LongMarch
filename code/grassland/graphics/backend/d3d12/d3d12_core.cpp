@@ -110,8 +110,9 @@ int D3D12Core::CreateShader(const std::string &source_code,
                             const std::string &entry_point,
                             const std::string &target,
                             double_ptr<Shader> pp_shader) {
-  pp_shader.construct<D3D12Shader>(this, CompileShader(source_code, entry_point, target, {"-Wno-ignored-attributes"}));
-  return 0;
+  VirtualFileSystem vfs;
+  vfs.WriteFile("shader.hlsl", source_code);
+  return CreateShader(vfs, "shader.hlsl", entry_point, target, pp_shader);
 }
 
 int D3D12Core::CreateShader(const VirtualFileSystem &vfs,
@@ -119,8 +120,18 @@ int D3D12Core::CreateShader(const VirtualFileSystem &vfs,
                             const std::string &entry_point,
                             const std::string &target,
                             double_ptr<Shader> pp_shader) {
-  pp_shader.construct<D3D12Shader>(this,
-                                   CompileShader(vfs, source_file, entry_point, target, {"-Wno-ignored-attributes"}));
+  return CreateShader(vfs, source_file, entry_point, target, {}, pp_shader);
+}
+
+int D3D12Core::CreateShader(const VirtualFileSystem &vfs,
+                            const std::string &source_file,
+                            const std::string &entry_point,
+                            const std::string &target,
+                            const std::vector<std::string> &args,
+                            double_ptr<Shader> pp_shader) {
+  std::vector<std::string> compile_args = {"-Wno-ignored-attributes"};
+  compile_args.insert(compile_args.end(), args.begin(), args.end());
+  pp_shader.construct<D3D12Shader>(this, CompileShader(vfs, source_file, entry_point, target, compile_args));
   return 0;
 }
 

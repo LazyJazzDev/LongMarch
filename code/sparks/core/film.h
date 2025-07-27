@@ -8,6 +8,11 @@ class Film {
  public:
   Film(Core *core, int width, int height);
 
+  void Reset();
+
+  int GetWidth() const;
+  int GetHeight() const;
+
  private:
   friend Scene;
   friend Core;

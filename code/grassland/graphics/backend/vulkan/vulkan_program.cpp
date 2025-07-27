@@ -130,7 +130,7 @@ VulkanRayTracingProgram::VulkanRayTracingProgram(VulkanCore *core,
     : VulkanRayTracingProgram(core) {
   AddRayGenShader(raygen_shader);
   AddMissShader(miss_shader);
-  AddHitGroup(closest_hit_shader, nullptr, nullptr, false);
+  AddHitGroup({closest_hit_shader, nullptr, nullptr, false});
 }
 
 void VulkanRayTracingProgram::AddResourceBinding(ResourceType type, int count) {
@@ -149,23 +149,20 @@ void VulkanRayTracingProgram::AddMissShader(Shader *miss_shader) {
   miss_shaders_.emplace_back(vk_miss_shader->ShaderModule());
 }
 
-void VulkanRayTracingProgram::AddHitGroup(Shader *closest_hit_shader,
-                                          Shader *any_hit_shader,
-                                          Shader *intersection_shader,
-                                          bool procedure) {
+void VulkanRayTracingProgram::AddHitGroup(HitGroup hit_group) {
   vulkan::HitGroup vk_hit_group;
-  vk_hit_group.procedure = procedure;
-  auto vk_closest_hit_shader = dynamic_cast<VulkanShader *>(closest_hit_shader);
+  auto vk_closest_hit_shader = dynamic_cast<VulkanShader *>(hit_group.closest_hit_shader);
   vk_hit_group.closest_hit_shader = vk_closest_hit_shader->ShaderModule();
   assert(vk_hit_group.closest_hit_shader != nullptr);
-  auto vk_any_hit_shader = dynamic_cast<VulkanShader *>(any_hit_shader);
+  auto vk_any_hit_shader = dynamic_cast<VulkanShader *>(hit_group.any_hit_shader);
   if (vk_any_hit_shader) {
     vk_hit_group.any_hit_shader = vk_any_hit_shader->ShaderModule();
   }
-  auto vk_intersection_shader = dynamic_cast<VulkanShader *>(intersection_shader);
+  auto vk_intersection_shader = dynamic_cast<VulkanShader *>(hit_group.intersection_shader);
   if (vk_intersection_shader) {
     vk_hit_group.intersection_shader = vk_intersection_shader->ShaderModule();
   }
+  vk_hit_group.procedure = hit_group.procedure;
   hit_groups_.emplace_back(std::move(vk_hit_group));
 }
 

@@ -106,10 +106,7 @@ class VulkanRayTracingProgram : public RayTracingProgram, public VulkanProgramBa
 
   void AddRayGenShader(Shader *ray_gen_shader) override;
   void AddMissShader(Shader *miss_shader) override;
-  void AddHitGroup(Shader *closest_hit_shader,
-                   Shader *any_hit_shader,
-                   Shader *intersection_shader,
-                   bool procedure = false) override;
+  void AddHitGroup(HitGroup hit_group) override;
   void AddCallableShader(Shader *callable_shader) override;
 
   void Finalize(const std::vector<int32_t> &miss_shader_indices,

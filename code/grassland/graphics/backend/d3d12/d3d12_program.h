@@ -97,10 +97,7 @@ class D3D12RayTracingProgram : public RayTracingProgram, public D3D12ProgramBase
 
   void AddRayGenShader(Shader *ray_gen_shader) override;
   void AddMissShader(Shader *miss_shader) override;
-  void AddHitGroup(Shader *closest_hit_shader,
-                   Shader *any_hit_shader,
-                   Shader *intersection_shader,
-                   bool procedure) override;
+  void AddHitGroup(HitGroup hit_group) override;
   void AddCallableShader(Shader *callable_shader) override;
 
   void Finalize(const std::vector<int32_t> &miss_shader_indices,

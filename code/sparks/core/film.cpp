@@ -6,4 +6,20 @@ Film::Film(Core *core, int width, int height) : core_(core) {
   core_->GraphicsCore()->CreateImage(width, height, graphics::IMAGE_FORMAT_R32_SINT, &accumulated_samples_);
 }
 
+void Film::Reset() {
+  std::unique_ptr<graphics::CommandContext> cmd_context;
+  core_->GraphicsCore()->CreateCommandContext(&cmd_context);
+  cmd_context->CmdClearImage(accumulated_color_.get(), {0.0f, 0.0f, 0.0f, 0.0f});
+  cmd_context->CmdClearImage(accumulated_samples_.get(), {0});
+  core_->GraphicsCore()->SubmitCommandContext(cmd_context.get());
+}
+
+int Film::GetWidth() const {
+  return accumulated_color_->Extent().width;
+}
+
+int Film::GetHeight() const {
+  return accumulated_color_->Extent().height;
+}
+
 }  // namespace sparks

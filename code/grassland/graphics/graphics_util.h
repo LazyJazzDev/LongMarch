@@ -19,6 +19,7 @@ struct BufferWithOffset;
 // Ray tracing objects
 class RayTracingProgram;
 class AccelerationStructure;
+struct HitGroup;
 
 typedef enum BackendAPI {
   BACKEND_API_VULKAN = 0,

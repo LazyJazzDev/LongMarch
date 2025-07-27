@@ -33,6 +33,7 @@ class Core {
   virtual int CreateSampler(const SamplerInfo &info, double_ptr<Sampler> pp_sampler) = 0;
 
   int CreateWindowObject(int width, int height, const std::string &title, double_ptr<Window> pp_window);
+
   virtual int CreateWindowObject(int width,
                                  int height,
                                  const std::string &title,
@@ -49,6 +50,13 @@ class Core {
                            const std::string &source_file,
                            const std::string &entry_point,
                            const std::string &target,
+                           double_ptr<Shader> pp_shader) = 0;
+
+  virtual int CreateShader(const VirtualFileSystem &vfs,
+                           const std::string &source_file,
+                           const std::string &entry_point,
+                           const std::string &target,
+                           const std::vector<std::string> &args,
                            double_ptr<Shader> pp_shader) = 0;
 
   virtual int CreateProgram(const std::vector<ImageFormat> &color_formats,

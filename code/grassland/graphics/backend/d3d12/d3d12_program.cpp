@@ -145,7 +145,7 @@ D3D12RayTracingProgram::D3D12RayTracingProgram(D3D12Core *core,
     : D3D12RayTracingProgram(core) {
   AddRayGenShader(raygen_shader);
   AddMissShader(miss_shader);
-  AddHitGroup(closest_hit_shader, nullptr, nullptr, false);
+  AddHitGroup({closest_hit_shader, nullptr, nullptr, false});
 }
 
 D3D12RayTracingProgram::D3D12RayTracingProgram(D3D12Core *core) : D3D12ProgramBase(core) {
@@ -169,24 +169,21 @@ void D3D12RayTracingProgram::AddMissShader(Shader *miss_shader) {
   miss_shaders_.emplace_back(&shader->ShaderModule());
 }
 
-void D3D12RayTracingProgram::AddHitGroup(Shader *closest_hit_shader,
-                                         Shader *any_hit_shader,
-                                         Shader *intersection_shader,
-                                         bool procedure) {
-  d3d12::HitGroup hit_group;
-  D3D12Shader *d3d12_closest_hit_shader = dynamic_cast<D3D12Shader *>(closest_hit_shader);
+void D3D12RayTracingProgram::AddHitGroup(HitGroup hit_group) {
+  d3d12::HitGroup d3d_hit_group;
+  D3D12Shader *d3d12_closest_hit_shader = dynamic_cast<D3D12Shader *>(hit_group.closest_hit_shader);
   assert(d3d12_closest_hit_shader != nullptr);
-  hit_group.closest_hit_shader = &d3d12_closest_hit_shader->ShaderModule();
-  D3D12Shader *d3d12_any_hit_shader = dynamic_cast<D3D12Shader *>(any_hit_shader);
+  d3d_hit_group.closest_hit_shader = &d3d12_closest_hit_shader->ShaderModule();
+  D3D12Shader *d3d12_any_hit_shader = dynamic_cast<D3D12Shader *>(hit_group.any_hit_shader);
   if (d3d12_any_hit_shader) {
-    hit_group.any_hit_shader = &d3d12_any_hit_shader->ShaderModule();
+    d3d_hit_group.any_hit_shader = &d3d12_any_hit_shader->ShaderModule();
   }
-  D3D12Shader *d3d12_intersection_shader = dynamic_cast<D3D12Shader *>(intersection_shader);
+  D3D12Shader *d3d12_intersection_shader = dynamic_cast<D3D12Shader *>(hit_group.intersection_shader);
   if (d3d12_intersection_shader) {
-    hit_group.intersection_shader = &d3d12_intersection_shader->ShaderModule();
+    d3d_hit_group.intersection_shader = &d3d12_intersection_shader->ShaderModule();
   }
-  hit_group.procedure = procedure;
-  hit_groups_.emplace_back(hit_group);
+  d3d_hit_group.procedure = hit_group.procedure;
+  hit_groups_.emplace_back(d3d_hit_group);
 }
 
 void D3D12RayTracingProgram::AddCallableShader(Shader *callable_shader) {

@@ -6,7 +6,7 @@ void FPSCounter::TickFrame() {
   auto tp = std::chrono::high_resolution_clock::now();
   frames_.emplace(tp);
   tp -= std::chrono::seconds(1);
-  while (!frames_.empty() && frames_.front() < tp) {
+  while (frames_.size() > 2 && frames_.front() < tp) {
     frames_.pop();
   }
 }

@@ -50,6 +50,13 @@ class D3D12Core : public Core {
                    const std::string &target,
                    double_ptr<Shader> pp_shader) override;
 
+  int CreateShader(const VirtualFileSystem &vfs,
+                   const std::string &source_file,
+                   const std::string &entry_point,
+                   const std::string &target,
+                   const std::vector<std::string> &args,
+                   double_ptr<Shader> pp_shader) override;
+
   int CreateProgram(const std::vector<ImageFormat> &color_formats,
                     ImageFormat depth_format,
                     double_ptr<Program> pp_program) override;

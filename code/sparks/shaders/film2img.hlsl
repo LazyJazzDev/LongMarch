@@ -32,5 +32,5 @@ Texture2D<int> accumulated_samples : register(t0, space1);
   float4 average_color = color / (float)samples;
 
   // Write the result to the output image
-  output[pixel_coords] = average_color;
+  output[pixel_coords] = pow(average_color, 1.0 / 2.2);  // Apply gamma correction
 }

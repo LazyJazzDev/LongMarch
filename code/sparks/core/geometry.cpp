@@ -54,5 +54,20 @@ Geometry::Geometry(Core *core, const Mesh<float> &mesh) : core_(core) {
       {geometry_buffer_.get(), header.position_offset}, {geometry_buffer_.get(), header.index_offset},
       header.num_vertices, header.position_stride, header.num_indices / 3, graphics::RAYTRACING_GEOMETRY_FLAG_NONE,
       &blas_);
+
+  core_->GraphicsCore()->CreateShader(core_->GetShadersVFS(), "mesh_chit.hlsl", "ClosestHitMain", "lib_6_3",
+                                      &closest_hit_shader_);
+}
+
+graphics::Buffer *Geometry::Buffer() {
+  return geometry_buffer_.get();
+}
+
+graphics::HitGroup Geometry::HitGroup() {
+  return graphics::HitGroup{closest_hit_shader_.get(), nullptr, nullptr, false};
+}
+
+graphics::AccelerationStructure *Geometry::BLAS() {
+  return blas_.get();
 }
 }  // namespace sparks

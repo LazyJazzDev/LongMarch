@@ -23,10 +23,15 @@ class Geometry {
  public:
   Geometry(Core *core, const Mesh<float> &mesh);
 
+  graphics::Buffer *Buffer();
+  graphics::AccelerationStructure *BLAS();
+  graphics::HitGroup HitGroup();
+
  private:
   Core *core_;
   std::unique_ptr<graphics::Buffer> geometry_buffer_;
   std::unique_ptr<graphics::AccelerationStructure> blas_;
+  std::unique_ptr<graphics::Shader> closest_hit_shader_;
 };
 
 }  // namespace sparks
