@@ -292,7 +292,7 @@ CD3DX12_GPU_DESCRIPTOR_HANDLE D3D12CommandContext::WriteSRVDescriptor(D3D12Buffe
   desc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
   desc.Buffer.FirstElement = 0;
   desc.Buffer.Flags = D3D12_BUFFER_SRV_FLAG_RAW;
-  desc.Buffer.NumElements = static_cast<UINT>(buffer->Size()) / 4;
+  desc.Buffer.NumElements = static_cast<UINT>(buffer->Size()) >> 2;
   desc.Buffer.StructureByteStride = 0;
 
   core_->Device()->Handle()->CreateShaderResourceView(buffer->Buffer()->Handle(), &desc, resource_descriptor_base_);
@@ -337,7 +337,7 @@ CD3DX12_GPU_DESCRIPTOR_HANDLE D3D12CommandContext::WriteUAVDescriptor(D3D12Buffe
   desc.ViewDimension = D3D12_UAV_DIMENSION_BUFFER;
   desc.Buffer.FirstElement = 0;
   desc.Buffer.Flags = D3D12_BUFFER_UAV_FLAG_RAW;
-  desc.Buffer.NumElements = static_cast<UINT>(buffer->Size()) / 4;
+  desc.Buffer.NumElements = static_cast<UINT>(buffer->Size()) >> 2;
   desc.Buffer.StructureByteStride = 0;
   desc.Buffer.CounterOffsetInBytes = 0;
 

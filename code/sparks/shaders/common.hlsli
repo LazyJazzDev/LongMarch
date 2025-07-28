@@ -1,3 +1,5 @@
+#pragma once
+#include "constants.hlsli"
 #include "random.hlsli"
 
 struct CameraData {
@@ -31,4 +33,14 @@ struct RayGenPayload {
   float2 uv;
   float3 origin;
   float3 direction;
+};
+
+struct MaterialRegistration {
+  int shader_index;
+  int buffer_index;
+};
+
+struct SceneSettings {
+int samples_per_dispatch;
+int max_bounces;
 };

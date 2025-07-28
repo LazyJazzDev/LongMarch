@@ -1,5 +1,6 @@
 #include "bindings.hlsli"
 #include "common.hlsli"
+#include "random.hlsli"
 
 struct GeometryHeader {
   uint num_vertices;

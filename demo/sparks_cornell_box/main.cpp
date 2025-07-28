@@ -24,6 +24,9 @@ int main() {
   sparks::Material material_white(&sparks_core, {{0.725, 0.71, 0.68}, {0.0f, 0.0f, 0.0f}});
   sparks::Material material_red(&sparks_core, {{0.63, 0.065, 0.05}, {0.0f, 0.0f, 0.0f}});
   sparks::Material material_green(&sparks_core, {{0.14, 0.45, 0.091}, {0.0f, 0.0f, 0.0f}});
+  // sparks::Material material_white(&sparks_core, {{0.8f, 0.8f, 0.8f}, {0.0f, 0.0f, 0.0f}});
+  // sparks::Material material_red(&sparks_core, {{0.8f, 0.0f, 0.0f}, {0.0f, 0.0f, 0.0f}});
+  // sparks::Material material_green(&sparks_core, {{0.0f, 0.8f, 0.0f}, {0.0f, 0.0f, 0.0f}});
   sparks::Material material_light(&sparks_core, {{0.0f, 0.0f, 0.0f}, {30.0f, 30.0f, 30.0f}});
 
   std::vector<glm::vec3> positions;
@@ -122,10 +125,12 @@ int main() {
     core_->SubmitCommandContext(cmd_context.get());
     glfwPollEvents();
     float fps = fps_counter.TickFPS();
-    float rps = film.GetWidth() * film.GetHeight() * fps * 128;
-    char buf[16];
-    sprintf(buf, "%.2f", rps * 1e-6f);  // buf will be "3.14"
-    window->SetTitle("Sparks Cornell Box - " + std::to_string(fps) + "frams/s" + " - " + buf + "Mrays/s");
+    char fps_buf[16];
+    sprintf(fps_buf, "%.2f", fps);
+    float rps = film.GetWidth() * film.GetHeight() * fps * scene.settings.samples_per_dispatch;
+    char rps_buf[16];
+    sprintf(rps_buf, "%.2f", rps * 1e-6f);
+    window->SetTitle(std::string("Sparks Cornell Box - ") + fps_buf + "frams/s" + " - " + rps_buf + "Mrays/s");
   }
 
   sparks_core.ConvertFilmToImage(film, image.get());

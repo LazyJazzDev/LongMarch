@@ -26,6 +26,11 @@ class Scene {
     }
   };
 
+  struct Settings {
+    int samples_per_dispatch = 128;
+    int max_bounces = 32;
+  } settings;
+
  private:
   int32_t RegisterCallableShader(graphics::Shader *callable_shader);
   void UpdatePipeline(Camera *camera);
@@ -34,6 +39,7 @@ class Scene {
   std::unique_ptr<graphics::Shader> miss_shader_;
   std::unique_ptr<graphics::RayTracingProgram> rt_program_;
   std::unique_ptr<graphics::AccelerationStructure> tlas_;
+  std::unique_ptr<graphics::Buffer> scene_settings_buffer_;
   std::set<Entity *> entities_;
 
   std::vector<int32_t> miss_shader_indices_;

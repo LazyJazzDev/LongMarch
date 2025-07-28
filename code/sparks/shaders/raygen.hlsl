@@ -1,29 +1,33 @@
 #include "bindings.hlsli"
 #include "common.hlsli"
+#include "material.hlsl"
 
 [shader("raygeneration")] void Main() {
   // get the pixel coordinates
   uint sample_ind = accumulated_samples[DispatchRaysIndex().xy];
   RenderContext context;
-  for (int i = 0; i < 128; i++, sample_ind++) {
+  for (int i = 0; i < scene_settings.samples_per_dispatch; i++, sample_ind++) {
     {
       uint2 pixel_coords = DispatchRaysIndex().xy;
       uint2 image_size = DispatchRaysDimensions().xy;
-      float2 uv = (((float2(pixel_coords) + 0.5) / float2(image_size) * 2.0) - 1.0) * float2(1, -1);
+      context.rd = InitRandomSeed(pixel_coords.x, pixel_coords.y, sample_ind);
+      float2 uv = (((float2(pixel_coords) + float2(RandomFloat(context.rd), RandomFloat(context.rd))) /
+                    float2(image_size) * 2.0) -
+                   1.0) *
+                  float2(1, -1);
       RayGenPayload payload;
       payload.uv = uv;
       CallShader(0, payload);
-      context.rd = InitRandomSeed(pixel_coords.x, pixel_coords.y, sample_ind);
       context.origin = payload.origin;
       context.direction = payload.direction;
       context.radiance = float3(0.0, 0.0, 0.0);
       context.throughput = float3(1.0, 1.0, 1.0);
     }
 
-    for (int bounce = 0; bounce < 32; bounce++) {
+    for (int bounce = 0; bounce < scene_settings.max_bounces; bounce++) {
       RayDesc ray;
       ray.Origin = context.origin;
-      ray.TMin = 1e-2;
+      ray.TMin = T_MIN * length(context.origin);
       ray.Direction = context.direction;
       ray.TMax = 1e16;
       RayPayload payload = context.payload;
@@ -34,6 +38,7 @@
       if (payload.object_id >= 0) {
         // call the material shader
         CallShader(mat_reg.shader_index, context);
+        // CallableMain(context);
       } else {
         // if no object was hit, set the background color
         break;

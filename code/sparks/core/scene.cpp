@@ -11,20 +11,23 @@ namespace sparks {
 Scene::Scene(Core *core) : core_(core) {
   core_->GraphicsCore()->CreateShader(core_->GetShadersVFS(), "raygen.hlsl", "Main", "lib_6_3", &raygen_shader_);
   core_->GraphicsCore()->CreateShader(core_->GetShadersVFS(), "raygen.hlsl", "MissMain", "lib_6_3", &miss_shader_);
+  core_->GraphicsCore()->CreateBuffer(sizeof(Settings), graphics::BUFFER_TYPE_STATIC, &scene_settings_buffer_);
 }
 
 void Scene::Render(Camera *camera, Film *film) {
   UpdatePipeline(camera);
+  scene_settings_buffer_->UploadData(&settings, sizeof(Settings));
   std::unique_ptr<graphics::CommandContext> cmd_context;
   core_->GraphicsCore()->CreateCommandContext(&cmd_context);
   cmd_context->CmdBindRayTracingProgram(rt_program_.get());
   cmd_context->CmdBindResources(0, {film->accumulated_color_.get()}, graphics::BIND_POINT_RAYTRACING);
   cmd_context->CmdBindResources(1, {film->accumulated_samples_.get()}, graphics::BIND_POINT_RAYTRACING);
   cmd_context->CmdBindResources(2, {tlas_.get()}, graphics::BIND_POINT_RAYTRACING);
-  cmd_context->CmdBindResources(3, {camera->Buffer()}, graphics::BIND_POINT_RAYTRACING);
-  cmd_context->CmdBindResources(4, geometry_buffers_, graphics::BIND_POINT_RAYTRACING);
-  cmd_context->CmdBindResources(5, material_buffers_, graphics::BIND_POINT_RAYTRACING);
-  cmd_context->CmdBindResources(6, {mat_reg_buffer_.get()}, graphics::BIND_POINT_RAYTRACING);
+  cmd_context->CmdBindResources(3, {scene_settings_buffer_.get()}, graphics::BIND_POINT_RAYTRACING);
+  cmd_context->CmdBindResources(4, {camera->Buffer()}, graphics::BIND_POINT_RAYTRACING);
+  cmd_context->CmdBindResources(5, geometry_buffers_, graphics::BIND_POINT_RAYTRACING);
+  cmd_context->CmdBindResources(6, material_buffers_, graphics::BIND_POINT_RAYTRACING);
+  cmd_context->CmdBindResources(7, {mat_reg_buffer_.get()}, graphics::BIND_POINT_RAYTRACING);
   cmd_context->CmdDispatchRays(film->accumulated_color_->Extent().width, film->accumulated_samples_->Extent().height,
                                1);
   core_->GraphicsCore()->SubmitCommandContext(cmd_context.get());
@@ -128,6 +131,7 @@ void Scene::UpdatePipeline(Camera *camera) {
   rt_program_->AddResourceBinding(graphics::RESOURCE_TYPE_IMAGE, 1);
   rt_program_->AddResourceBinding(graphics::RESOURCE_TYPE_IMAGE, 1);
   rt_program_->AddResourceBinding(graphics::RESOURCE_TYPE_ACCELERATION_STRUCTURE, 1);
+  rt_program_->AddResourceBinding(graphics::RESOURCE_TYPE_UNIFORM_BUFFER, 1);
   rt_program_->AddResourceBinding(graphics::RESOURCE_TYPE_STORAGE_BUFFER, 1);
   rt_program_->AddResourceBinding(graphics::RESOURCE_TYPE_STORAGE_BUFFER, geometry_buffers_.size());
   rt_program_->AddResourceBinding(graphics::RESOURCE_TYPE_STORAGE_BUFFER, material_buffers_.size());

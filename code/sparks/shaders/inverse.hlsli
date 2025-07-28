@@ -1,6 +1,4 @@
-#ifndef INVERSE_HLSLI
-#define INVERSE_HLSLI
-
+#pragma once
 // Returns the inverse of a matrix, by using the algorithm of calculating the classical
 // adjoint and dividing by the determinant. The contents of the matrix are changed.
 float2x2 inverse(float2x2 m) {
@@ -90,5 +88,3 @@ float4x4 inverse(float4x4 m) {
   // If determinant is zero, matrix is not invertable, so leave it unchanged.
   return (det != 0.0f) ? (adj * (1.0f / det)) : m;
 }
-
-#endif
