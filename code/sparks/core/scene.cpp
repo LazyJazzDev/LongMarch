@@ -1,8 +1,8 @@
 #include "sparks/core/scene.h"
 
-#include "camera.h"
-#include "entity.h"
+#include "sparks/core/camera.h"
 #include "sparks/core/core.h"
+#include "sparks/core/entity.h"
 #include "sparks/core/film.h"
 #include "sparks/core/geometry.h"
 #include "sparks/core/material.h"

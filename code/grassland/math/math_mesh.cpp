@@ -538,6 +538,6 @@ Mesh<Scalar> Mesh<Scalar>::Sphere(int precision_lon, int precision_lat) {
   return sphere_mesh;
 }
 
-template Mesh<float>;
-template Mesh<double>;
+template class Mesh<float>;
+template class Mesh<double>;
 }  // namespace grassland

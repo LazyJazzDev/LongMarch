@@ -1,5 +1,4 @@
 #pragma once
-#include "grassland/d3d12/raytracing/acceleration_structure.h"
 #include "sparks/core/core_util.h"
 
 namespace sparks {
