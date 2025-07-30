@@ -16,7 +16,7 @@ struct GeometryHeader {
   uint index_offset;
 };
 
-[shader("closesthit")] void ClosestHitMain(inout HitRecord payload, in BuiltInTriangleIntersectionAttributes attr) {
+[shader("closesthit")] void ClosestHitMain(inout HitRecord hit_group, in BuiltInTriangleIntersectionAttributes attr) {
   ByteAddressBuffer geometry_buffer = geometry_data[InstanceID()];
   GeometryHeader header;
   header.num_vertices = geometry_buffer.Load(0);
@@ -45,55 +45,57 @@ struct GeometryHeader {
   float3 barycentrics =
       float3(1.0 - attr.barycentrics.x - attr.barycentrics.y, attr.barycentrics.x, attr.barycentrics.y);
 
-  payload.position = pos[0] * barycentrics[0] + pos[1] * barycentrics[1] + pos[2] * barycentrics[2];
-  payload.position = mul(ObjectToWorld3x4(), float4(payload.position, 1.0));
-  payload.geom_normal = normalize(mul(WorldToObject4x3(), cross(pos[1] - pos[0], pos[2] - pos[0])).xyz);
+  hit_group.front_facing = true;
+  hit_group.position = pos[0] * barycentrics[0] + pos[1] * barycentrics[1] + pos[2] * barycentrics[2];
+  hit_group.position = mul(ObjectToWorld3x4(), float4(hit_group.position, 1.0));
+  hit_group.geom_normal = normalize(mul(WorldToObject4x3(), cross(pos[1] - pos[0], pos[2] - pos[0])).xyz);
 
   if (header.normal_offset != 0) {
-    payload.normal =
+    hit_group.normal =
         LoadFloat3(geometry_buffer, header.normal_offset + header.normal_stride * vid[0]) * barycentrics[0] +
         LoadFloat3(geometry_buffer, header.normal_offset + header.normal_stride * vid[1]) * barycentrics[1] +
         LoadFloat3(geometry_buffer, header.normal_offset + header.normal_stride * vid[2]) * barycentrics[2];
-    payload.normal = normalize(mul(WorldToObject4x3(), payload.normal).xyz);
+    hit_group.normal = normalize(mul(WorldToObject4x3(), hit_group.normal).xyz);
   } else {
-    payload.normal = payload.geom_normal;
+    hit_group.normal = hit_group.geom_normal;
   }
   // normal transformation need to multiply inverse transpose of the object to world matrix
   if (header.tex_coord_offset != 0) {
-    payload.tex_coord =
+    hit_group.tex_coord =
         LoadFloat2(geometry_buffer, header.tex_coord_offset + header.tex_coord_stride * vid[0]) * barycentrics[0] +
         LoadFloat2(geometry_buffer, header.tex_coord_offset + header.tex_coord_stride * vid[1]) * barycentrics[1] +
         LoadFloat2(geometry_buffer, header.tex_coord_offset + header.tex_coord_stride * vid[2]) * barycentrics[2];
   } else {
-    payload.tex_coord = float2(0.0, 0.0);
+    hit_group.tex_coord = float2(0.0, 0.0);
   }
 
   if (header.tangent_offset != 0) {
-    payload.tangent =
+    hit_group.tangent =
         LoadFloat3(geometry_buffer, header.tangent_offset + header.tangent_stride * vid[0]) * barycentrics[0] +
         LoadFloat3(geometry_buffer, header.tangent_offset + header.tangent_stride * vid[1]) * barycentrics[1] +
         LoadFloat3(geometry_buffer, header.tangent_offset + header.tangent_stride * vid[2]) * barycentrics[2];
-    payload.tangent = normalize(mul(ObjectToWorld3x4(), float4(payload.tangent, 0.0)).xyz);
+    hit_group.tangent = normalize(mul(ObjectToWorld3x4(), float4(hit_group.tangent, 0.0)).xyz);
   } else {
-    payload.tangent = float3(0.0, 0.0, 0.0);
+    hit_group.tangent = float3(0.0, 0.0, 0.0);
   }
 
   if (header.signal_offset != 0) {
-    payload.signal =
+    hit_group.signal =
         LoadFloat(geometry_buffer, header.signal_offset + header.signal_stride * vid[0]) * barycentrics[0] +
         LoadFloat(geometry_buffer, header.signal_offset + header.signal_stride * vid[1]) * barycentrics[1] +
         LoadFloat(geometry_buffer, header.signal_offset + header.signal_stride * vid[2]) * barycentrics[2];
   } else {
-    payload.signal = 1.0;
+    hit_group.signal = 1.0;
   }
 
-  if (dot(WorldRayDirection(), payload.normal) > 0.0) {
-    payload.front_facing = false;
-    payload.normal = -payload.normal;
-    payload.tangent = -payload.tangent;
-    payload.signal = -payload.signal;
+  if (dot(WorldRayDirection(), hit_group.normal) > 0.0) {
+    hit_group.front_facing = false;
+    hit_group.geom_normal = -hit_group.geom_normal;
+    hit_group.normal = -hit_group.normal;
+    hit_group.tangent = -hit_group.tangent;
+    hit_group.signal = -hit_group.signal;
   }
 
-  payload.object_id = InstanceIndex();
-  payload.primitive_id = PrimitiveIndex();
+  hit_group.object_id = InstanceIndex();
+  hit_group.primitive_id = PrimitiveIndex();
 }
