@@ -8,4 +8,5 @@
 #include "sparks/core/surface.h"
 #include "sparks/entity/entities.h"
 #include "sparks/geometry/geometries.h"
+#include "sparks/light/lights.h"
 #include "sparks/surface/surfaces.h"

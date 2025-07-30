@@ -1,8 +1,3 @@
-//
-// Created by zijian on 2025/7/11.
-//
-
-#ifndef ENTITIES_H
-#define ENTITIES_H
-
-#endif  // ENTITIES_H
+#pragma once
+#include "sparks/entity/entity_geometry_light.h"
+#include "sparks/entity/entity_geometry_surface.h"
