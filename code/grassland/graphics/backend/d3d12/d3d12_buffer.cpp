@@ -2,6 +2,10 @@
 
 namespace grassland::graphics::backend {
 
+D3D12BufferRange::D3D12BufferRange(const BufferRange &range)
+    : buffer(dynamic_cast<D3D12Buffer *>(range.buffer)), offset(range.offset), size(range.size) {
+}
+
 D3D12StaticBuffer::D3D12StaticBuffer(D3D12Core *core, size_t size) : core_(core) {
   core_->Device()->CreateBuffer(size, D3D12_HEAP_TYPE_DEFAULT, &buffer_);
 }

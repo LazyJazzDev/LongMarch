@@ -153,7 +153,7 @@ int D3D12Core::CreateCommandContext(double_ptr<CommandContext> pp_command_contex
   return 0;
 }
 
-int D3D12Core::CreateBottomLevelAccelerationStructure(BufferWithOffset aabb_buffer,
+int D3D12Core::CreateBottomLevelAccelerationStructure(BufferRange aabb_buffer,
                                                       uint32_t stride,
                                                       uint32_t num_aabb,
                                                       RayTracingGeometryFlag flags,
@@ -173,8 +173,8 @@ int D3D12Core::CreateBottomLevelAccelerationStructure(BufferWithOffset aabb_buff
   return 0;
 }
 
-int D3D12Core::CreateBottomLevelAccelerationStructure(BufferWithOffset vertex_buffer,
-                                                      BufferWithOffset index_buffer,
+int D3D12Core::CreateBottomLevelAccelerationStructure(BufferRange vertex_buffer,
+                                                      BufferRange index_buffer,
                                                       uint32_t num_vertex,
                                                       uint32_t stride,
                                                       uint32_t num_primitive,
@@ -202,9 +202,9 @@ int D3D12Core::CreateBottomLevelAccelerationStructure(Buffer *vertex_buffer,
                                                       Buffer *index_buffer,
                                                       uint32_t stride,
                                                       double_ptr<AccelerationStructure> pp_blas) {
-  return CreateBottomLevelAccelerationStructure(vertex_buffer, index_buffer, vertex_buffer->Size() / stride, stride,
-                                                index_buffer->Size() / (sizeof(uint32_t) * 3),
-                                                RAYTRACING_GEOMETRY_FLAG_NO_DUPLICATE_ANYHIT_INVOCATION, pp_blas);
+  return CreateBottomLevelAccelerationStructure(
+      vertex_buffer->Range(), index_buffer->Range(), vertex_buffer->Size() / stride, stride,
+      index_buffer->Size() / (sizeof(uint32_t) * 3), RAYTRACING_GEOMETRY_FLAG_NO_DUPLICATE_ANYHIT_INVOCATION, pp_blas);
 }
 
 int D3D12Core::CreateTopLevelAccelerationStructure(const std::vector<RayTracingInstance> &instances,

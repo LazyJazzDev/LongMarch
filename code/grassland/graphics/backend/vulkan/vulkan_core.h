@@ -57,14 +57,14 @@ class VulkanCore : public Core {
 
   int CreateCommandContext(double_ptr<CommandContext> pp_command_context) override;
 
-  int CreateBottomLevelAccelerationStructure(BufferWithOffset aabb_buffer,
+  int CreateBottomLevelAccelerationStructure(BufferRange aabb_buffer,
                                              uint32_t stride,
                                              uint32_t num_aabb,
                                              RayTracingGeometryFlag flags,
                                              double_ptr<AccelerationStructure> pp_blas) override;
 
-  int CreateBottomLevelAccelerationStructure(BufferWithOffset vertex_buffer,
-                                             BufferWithOffset index_buffer,
+  int CreateBottomLevelAccelerationStructure(BufferRange vertex_buffer,
+                                             BufferRange index_buffer,
                                              uint32_t num_vertex,
                                              uint32_t stride,
                                              uint32_t num_primitive,

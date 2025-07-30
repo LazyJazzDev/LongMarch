@@ -46,6 +46,8 @@ class VulkanAccelerationStructure;
 class VulkanRayTracingProgram;
 class VulkanProgramBase;
 
+struct VulkanBufferRange;
+
 struct VulkanResourceBinding {
   VulkanResourceBinding();
 

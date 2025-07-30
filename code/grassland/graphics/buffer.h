@@ -4,11 +4,11 @@
 
 namespace grassland::graphics {
 
-struct BufferWithOffset {
+struct BufferRange {
   Buffer *buffer;
   size_t offset;
-  BufferWithOffset(Buffer *buffer, size_t offset = 0) : buffer(buffer), offset(offset) {
-  }
+  size_t size;
+  explicit BufferRange(Buffer *buffer = nullptr, size_t offset = 0, size_t size = ~0ull);
 };
 
 class Buffer {
@@ -25,6 +25,10 @@ class Buffer {
   virtual void UploadData(const void *data, size_t size, size_t offset = 0) = 0;
 
   virtual void DownloadData(void *data, size_t size, size_t offset = 0) = 0;
+
+  BufferRange Range(size_t offset = 0, size_t size = ~0ull) {
+    return BufferRange(this, offset, size);
+  }
 };
 
 #if defined(LONGMARCH_CUDA_RUNTIME)

@@ -1,8 +1,3 @@
-//
-// Created by zijian on 2025/7/11.
-//
-
-#ifndef MATERIALS_H
-#define MATERIALS_H
-
-#endif  // MATERIALS_H
+#pragma once
+#include "sparks/material/material_lambertian.h"
+#include "sparks/material/material_light.h"

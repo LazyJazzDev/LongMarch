@@ -8,14 +8,17 @@ struct CameraData {
  float2 scale;
 };
 
-struct RayPayload {
+struct HitRecord {
   float t;
+  int primitive_index;
   float3 position;
   float2 tex_coord;
   float3 normal;
+  float3 geom_normal;
   float3 tangent;
   float signal;
   int object_id;
+  int primitive_id;
   bool front_facing;
 };
 
@@ -24,7 +27,7 @@ struct RenderContext {
   float3 direction;
   float3 radiance;
   float3 throughput;
-  RayPayload payload;
+  HitRecord hit_record;
   int material_buffer_index;
   RandomDevice rd;
 };
@@ -41,6 +44,16 @@ struct MaterialRegistration {
 };
 
 struct SceneSettings {
-int samples_per_dispatch;
-int max_bounces;
+  int samples_per_dispatch;
+  int max_bounces;
+};
+
+struct LightRegistration {
+  int shader_index;
+  int buffer_index;
+};
+
+struct EntityInfo {
+  MaterialRegistration material_registration;
+  LightRegistration light_registration;
 };

@@ -64,14 +64,14 @@ class D3D12CmdBindIndexBuffer : public D3D12Command {
 class D3D12CmdBindResourceBuffers : public D3D12Command {
  public:
   D3D12CmdBindResourceBuffers(int slot,
-                              const std::vector<D3D12Buffer *> &buffers,
+                              const std::vector<D3D12BufferRange> &buffers,
                               D3D12ProgramBase *program,
                               BindPoint bind_point);
   void CompileCommand(D3D12CommandContext *context, ID3D12GraphicsCommandList *command_list) override;
 
  private:
   int slot_;
-  std::vector<D3D12Buffer *> buffers_;
+  std::vector<D3D12BufferRange> buffers_;
   D3D12ProgramBase *program_;
   BindPoint bind_point_;
 };

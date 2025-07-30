@@ -135,7 +135,7 @@ int VulkanCore::CreateCommandContext(double_ptr<CommandContext> pp_command_conte
   return 0;
 }
 
-int VulkanCore::CreateBottomLevelAccelerationStructure(BufferWithOffset aabb_buffer,
+int VulkanCore::CreateBottomLevelAccelerationStructure(BufferRange aabb_buffer,
                                                        uint32_t stride,
                                                        uint32_t num_aabb,
                                                        RayTracingGeometryFlag flags,
@@ -150,8 +150,8 @@ int VulkanCore::CreateBottomLevelAccelerationStructure(BufferWithOffset aabb_buf
   return 0;
 }
 
-int VulkanCore::CreateBottomLevelAccelerationStructure(BufferWithOffset vertex_buffer,
-                                                       BufferWithOffset index_buffer,
+int VulkanCore::CreateBottomLevelAccelerationStructure(BufferRange vertex_buffer,
+                                                       BufferRange index_buffer,
                                                        uint32_t num_vertex,
                                                        uint32_t stride,
                                                        uint32_t num_primitive,
@@ -173,9 +173,9 @@ int VulkanCore::CreateBottomLevelAccelerationStructure(Buffer *vertex_buffer,
                                                        Buffer *index_buffer,
                                                        uint32_t stride,
                                                        double_ptr<AccelerationStructure> pp_blas) {
-  return CreateBottomLevelAccelerationStructure(vertex_buffer, index_buffer, vertex_buffer->Size() / stride, stride,
-                                                index_buffer->Size() / (sizeof(uint32_t) * 3),
-                                                RAYTRACING_GEOMETRY_FLAG_OPAQUE, pp_blas);
+  return CreateBottomLevelAccelerationStructure(
+      vertex_buffer->Range(), index_buffer->Range(), vertex_buffer->Size() / stride, stride,
+      index_buffer->Size() / (sizeof(uint32_t) * 3), RAYTRACING_GEOMETRY_FLAG_OPAQUE, pp_blas);
 }
 
 int VulkanCore::CreateTopLevelAccelerationStructure(const std::vector<RayTracingInstance> &instances,

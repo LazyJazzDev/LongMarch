@@ -39,6 +39,8 @@ class D3D12Window;
 class D3D12AccelerationStructure;
 class D3D12RayTracingProgram;
 
+struct D3D12BufferRange;
+
 struct D3D12ResourceBinding {
   D3D12ResourceBinding();
 

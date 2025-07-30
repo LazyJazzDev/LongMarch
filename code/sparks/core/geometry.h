@@ -26,12 +26,16 @@ class Geometry {
   graphics::Buffer *Buffer();
   graphics::AccelerationStructure *BLAS();
   graphics::HitGroup HitGroup();
+  int PrimitiveCount();
+  CodeLines PrimitiveAreaFunction();
 
  private:
   Core *core_;
   std::unique_ptr<graphics::Buffer> geometry_buffer_;
   std::unique_ptr<graphics::AccelerationStructure> blas_;
   std::unique_ptr<graphics::Shader> closest_hit_shader_;
+  int primitive_count_;
+  CodeLines primitive_area_;
 };
 
 }  // namespace sparks

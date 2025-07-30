@@ -1,5 +1,6 @@
 #pragma once
 #include "grassland/grassland.h"
+#include "sparks/core/code_lines.h"
 
 namespace sparks {
 
@@ -12,6 +13,7 @@ class Entity;
 class Film;
 class Scene;
 class Camera;
+class Light;
 
 struct GeometryRegistration {
   int32_t hit_group_index;

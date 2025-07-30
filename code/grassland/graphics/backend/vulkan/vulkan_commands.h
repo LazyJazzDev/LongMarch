@@ -80,7 +80,7 @@ class VulkanCmdBeginRendering : public VulkanCommand {
 class VulkanCmdBindResourceBuffers : public VulkanCommand {
  public:
   VulkanCmdBindResourceBuffers(int slot,
-                               const std::vector<VulkanBuffer *> &buffers,
+                               const std::vector<VulkanBufferRange> &buffers,
                                VulkanProgramBase *program_base,
                                BindPoint bind_point);
 
@@ -88,7 +88,7 @@ class VulkanCmdBindResourceBuffers : public VulkanCommand {
 
  private:
   int slot_;
-  std::vector<VulkanBuffer *> buffers_;
+  std::vector<VulkanBufferRange> buffers_;
   VulkanProgramBase *program_base_;
   BindPoint bind_point_;
 };

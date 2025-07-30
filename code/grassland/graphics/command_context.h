@@ -17,8 +17,9 @@ class CommandContext {
                                     const std::vector<uint64_t> &offsets) = 0;
   virtual void CmdBindIndexBuffer(Buffer *buffer, uint64_t offset) = 0;
   virtual void CmdBindResources(int slot,
-                                const std::vector<Buffer *> &buffers,
+                                const std::vector<BufferRange> &buffers,
                                 BindPoint bind_point = BIND_POINT_GRAPHICS) = 0;
+  void CmdBindResources(int slot, const std::vector<Buffer *> &buffers, BindPoint bind_point = BIND_POINT_GRAPHICS);
   virtual void CmdBindResources(int slot,
                                 const std::vector<Image *> &images,
                                 BindPoint bind_point = BIND_POINT_GRAPHICS) = 0;

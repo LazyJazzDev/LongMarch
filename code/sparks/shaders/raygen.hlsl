@@ -1,6 +1,8 @@
 #include "bindings.hlsli"
 #include "common.hlsli"
-#include "material.hlsl"
+#include "material/lambertian/main.hlsl"
+
+// sample bsdf
 
 [shader("raygeneration")] void Main() {
   // get the pixel coordinates
@@ -30,12 +32,12 @@
       ray.TMin = T_MIN * length(context.origin);
       ray.Direction = context.direction;
       ray.TMax = 1e16;
-      RayPayload payload = context.payload;
-      TraceRay(as, RAY_FLAG_NONE, 0xFF, 0, 0, 0, ray, payload);
-      context.payload = payload;
-      MaterialRegistration mat_reg = material_regs[payload.object_id];
+      HitRecord hit_record = context.hit_record;
+      TraceRay(as, RAY_FLAG_NONE, 0xFF, 0, 0, 0, ray, hit_record);
+      context.hit_record = hit_record;
+      MaterialRegistration mat_reg = material_regs[context.hit_record.object_id];
       context.material_buffer_index = mat_reg.buffer_index;
-      if (payload.object_id >= 0) {
+      if (context.hit_record.object_id >= 0) {
         // call the material shader
         CallShader(mat_reg.shader_index, context);
         // CallableMain(context);
@@ -61,14 +63,16 @@
   }
 }
 
-    // miss shader
-    [shader("miss")] void MissMain(inout RayPayload payload) {
-  payload.t = -1;
-  payload.position = float3(0.0, 0.0, 0.0);
-  payload.normal = float3(0.0, 0.0, 0.0);
-  payload.tangent = float3(0.0, 0.0, 1.0);
-  payload.tex_coord = float2(0.0, 0.0);
-  payload.signal = 1.0;
-  payload.object_id = -1;
-  payload.front_facing = true;
+    [shader("miss")] void MissMain(inout HitRecord hit_record) {
+  hit_record.t = -1;
+  hit_record.position = float3(0.0, 0.0, 0.0);
+  hit_record.normal = float3(0.0, 0.0, 0.0);
+  hit_record.tangent = float3(0.0, 0.0, 1.0);
+  hit_record.tex_coord = float2(0.0, 0.0);
+  hit_record.signal = 1.0;
+  hit_record.object_id = -1;
+  hit_record.primitive_id = -1;
+  hit_record.geom_normal = float3(0.0, 0.0, 0.0);
+  // set the front facing flag to true by default
+  hit_record.front_facing = true;
 }

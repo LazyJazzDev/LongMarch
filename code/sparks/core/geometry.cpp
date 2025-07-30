@@ -51,12 +51,17 @@ Geometry::Geometry(Core *core, const Mesh<float> &mesh) : core_(core) {
   core_->GraphicsCore()->CreateBuffer(data.size(), graphics::BUFFER_TYPE_STATIC, &geometry_buffer_);
   geometry_buffer_->UploadData(data.data(), data.size());
   core_->GraphicsCore()->CreateBottomLevelAccelerationStructure(
-      {geometry_buffer_.get(), header.position_offset}, {geometry_buffer_.get(), header.index_offset},
+      geometry_buffer_->Range(header.position_offset), geometry_buffer_->Range(header.index_offset),
       header.num_vertices, header.position_stride, header.num_indices / 3, graphics::RAYTRACING_GEOMETRY_FLAG_NONE,
       &blas_);
 
-  core_->GraphicsCore()->CreateShader(core_->GetShadersVFS(), "mesh_chit.hlsl", "ClosestHitMain", "lib_6_3",
+  auto vfs = core_->GetShadersVFS();
+  core_->GraphicsCore()->CreateShader(vfs, "geometry/mesh/hit_group.hlsl", "ClosestHitMain", "lib_6_3", {"-I."},
                                       &closest_hit_shader_);
+  primitive_count_ = header.num_indices / 3;
+  std::vector<uint8_t> primitive_area_function_code_data;
+  vfs.ReadFile("geometry/mesh/primitive_area.hlsli", primitive_area_function_code_data);
+  primitive_area_ = CodeLines(primitive_area_function_code_data);
 }
 
 graphics::Buffer *Geometry::Buffer() {
@@ -65,6 +70,14 @@ graphics::Buffer *Geometry::Buffer() {
 
 graphics::HitGroup Geometry::HitGroup() {
   return graphics::HitGroup{closest_hit_shader_.get(), nullptr, nullptr, false};
+}
+
+int Geometry::PrimitiveCount() {
+  return primitive_count_;
+}
+
+CodeLines Geometry::PrimitiveAreaFunction() {
+  return primitive_area_;
 }
 
 graphics::AccelerationStructure *Geometry::BLAS() {

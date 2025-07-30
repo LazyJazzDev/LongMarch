@@ -24,7 +24,7 @@ class D3D12CommandContext : public CommandContext {
                             const std::vector<Buffer *> &buffers,
                             const std::vector<uint64_t> &offsets) override;
   void CmdBindIndexBuffer(Buffer *buffer, uint64_t offset) override;
-  void CmdBindResources(int slot, const std::vector<Buffer *> &buffers, BindPoint bind_point) override;
+  void CmdBindResources(int slot, const std::vector<BufferRange> &buffers, BindPoint bind_point) override;
   void CmdBindResources(int slot, const std::vector<Image *> &images, BindPoint bind_point) override;
   void CmdBindResources(int slot, const std::vector<Sampler *> &samplers, BindPoint bind_point) override;
   void CmdBindResources(int slot, AccelerationStructure *acceleration_structure, BindPoint bind_point) override;
@@ -65,10 +65,10 @@ class D3D12CommandContext : public CommandContext {
 
   CD3DX12_GPU_DESCRIPTOR_HANDLE WriteUAVDescriptor(D3D12Image *image);
   CD3DX12_GPU_DESCRIPTOR_HANDLE WriteSRVDescriptor(D3D12Image *image);
-  CD3DX12_GPU_DESCRIPTOR_HANDLE WriteSRVDescriptor(D3D12Buffer *buffer);
+  CD3DX12_GPU_DESCRIPTOR_HANDLE WriteSRVDescriptor(D3D12BufferRange buffer);
   CD3DX12_GPU_DESCRIPTOR_HANDLE WriteSRVDescriptor(D3D12AccelerationStructure *acceleration_structure);
-  CD3DX12_GPU_DESCRIPTOR_HANDLE WriteCBVDescriptor(D3D12Buffer *buffer);
-  CD3DX12_GPU_DESCRIPTOR_HANDLE WriteUAVDescriptor(D3D12Buffer *buffer);
+  CD3DX12_GPU_DESCRIPTOR_HANDLE WriteCBVDescriptor(D3D12BufferRange buffer);
+  CD3DX12_GPU_DESCRIPTOR_HANDLE WriteUAVDescriptor(D3D12BufferRange buffer);
   CD3DX12_GPU_DESCRIPTOR_HANDLE WriteSamplerDescriptor(const D3D12_SAMPLER_DESC &desc);
 
   void RecordDynamicBuffer(D3D12Buffer *buffer);

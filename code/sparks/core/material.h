@@ -3,28 +3,15 @@
 
 namespace sparks {
 
-struct MaterialLambertian {
-  glm::vec3 base_color{0.8f};
-  glm::vec3 emissive_color{0.0f};
-};
-
 class Material {
  public:
-  Material(Core *core, const MaterialLambertian &material = {});
+  Material(Core *core);
 
-  graphics::Buffer *Buffer() {
-    return material_buffer_.get();
-  }
-  graphics::Shader *CallableShader() {
-    return callable_shader_.get();
-  }
+  virtual graphics::Buffer *Buffer() = 0;
+  virtual graphics::Shader *CallableShader() = 0;
 
-  MaterialLambertian material;
-
- private:
+ protected:
   Core *core_;
-  std::unique_ptr<graphics::Buffer> material_buffer_;
-  std::unique_ptr<graphics::Shader> callable_shader_;
 };
 
 }  // namespace sparks

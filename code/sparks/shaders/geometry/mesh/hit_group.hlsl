@@ -1,6 +1,4 @@
 #include "bindings.hlsli"
-#include "common.hlsli"
-#include "random.hlsli"
 
 struct GeometryHeader {
   uint num_vertices;
@@ -18,7 +16,7 @@ struct GeometryHeader {
   uint index_offset;
 };
 
-[shader("closesthit")] void ClosestHitMain(inout RayPayload payload, in BuiltInTriangleIntersectionAttributes attr) {
+[shader("closesthit")] void ClosestHitMain(inout HitRecord payload, in BuiltInTriangleIntersectionAttributes attr) {
   ByteAddressBuffer geometry_buffer = geometry_data[InstanceID()];
   GeometryHeader header;
   header.num_vertices = geometry_buffer.Load(0);
@@ -49,16 +47,18 @@ struct GeometryHeader {
 
   payload.position = pos[0] * barycentrics[0] + pos[1] * barycentrics[1] + pos[2] * barycentrics[2];
   payload.position = mul(ObjectToWorld3x4(), float4(payload.position, 1.0));
+  payload.geom_normal = normalize(mul(WorldToObject4x3(), cross(pos[1] - pos[0], pos[2] - pos[0])).xyz);
+
   if (header.normal_offset != 0) {
     payload.normal =
         LoadFloat3(geometry_buffer, header.normal_offset + header.normal_stride * vid[0]) * barycentrics[0] +
         LoadFloat3(geometry_buffer, header.normal_offset + header.normal_stride * vid[1]) * barycentrics[1] +
         LoadFloat3(geometry_buffer, header.normal_offset + header.normal_stride * vid[2]) * barycentrics[2];
+    payload.normal = normalize(mul(WorldToObject4x3(), payload.normal).xyz);
   } else {
-    payload.normal = cross(pos[1] - pos[0], pos[2] - pos[0]);
+    payload.normal = payload.geom_normal;
   }
   // normal transformation need to multiply inverse transpose of the object to world matrix
-  payload.normal = normalize(mul(WorldToObject4x3(), payload.normal).xyz);
   if (header.tex_coord_offset != 0) {
     payload.tex_coord =
         LoadFloat2(geometry_buffer, header.tex_coord_offset + header.tex_coord_stride * vid[0]) * barycentrics[0] +
@@ -91,7 +91,9 @@ struct GeometryHeader {
     payload.front_facing = false;
     payload.normal = -payload.normal;
     payload.tangent = -payload.tangent;
+    payload.signal = -payload.signal;
   }
 
   payload.object_id = InstanceIndex();
+  payload.primitive_id = PrimitiveIndex();
 }

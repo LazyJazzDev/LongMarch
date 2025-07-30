@@ -4,6 +4,14 @@
 
 namespace grassland::graphics::backend {
 
+struct VulkanBufferRange {
+  VulkanBuffer *buffer;
+  VkDeviceSize offset;
+  VkDeviceSize size;
+  VulkanBufferRange() = default;
+  VulkanBufferRange(const BufferRange &range);
+};
+
 class VulkanBuffer : virtual public Buffer {
  public:
   virtual ~VulkanBuffer() = default;

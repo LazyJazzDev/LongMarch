@@ -2,6 +2,7 @@
 
 #define STB_IMAGE_WRITE_IMPLEMENTATION
 #include "glm/gtc/matrix_transform.hpp"
+#include "sparks/core/code_lines.h"
 #include "stb_image_write.h"
 
 using namespace long_march;
@@ -15,19 +16,17 @@ int main() {
   sparks_core.GetShadersVFS().Print();
 
   sparks::Scene scene(&sparks_core);
+  scene.settings.samples_per_dispatch = 128;
   sparks::Film film(&sparks_core, 1024, 1024);
   sparks::Camera camera(&sparks_core,
                         glm::lookAt(glm::vec3{278.0f, 273.0f, -800.0f}, glm::vec3{278.0f, 273.0f, -800.0f + 1.0f},
                                     glm::vec3{0.0, 1.0, 0.0}),
                         glm::radians(40.0f), static_cast<float>(film.GetWidth()) / film.GetHeight());
 
-  sparks::Material material_white(&sparks_core, {{0.725, 0.71, 0.68}, {0.0f, 0.0f, 0.0f}});
-  sparks::Material material_red(&sparks_core, {{0.63, 0.065, 0.05}, {0.0f, 0.0f, 0.0f}});
-  sparks::Material material_green(&sparks_core, {{0.14, 0.45, 0.091}, {0.0f, 0.0f, 0.0f}});
-  // sparks::Material material_white(&sparks_core, {{0.8f, 0.8f, 0.8f}, {0.0f, 0.0f, 0.0f}});
-  // sparks::Material material_red(&sparks_core, {{0.8f, 0.0f, 0.0f}, {0.0f, 0.0f, 0.0f}});
-  // sparks::Material material_green(&sparks_core, {{0.0f, 0.8f, 0.0f}, {0.0f, 0.0f, 0.0f}});
-  sparks::Material material_light(&sparks_core, {{0.0f, 0.0f, 0.0f}, {30.0f, 30.0f, 30.0f}});
+  sparks::MaterialLambertian material_white(&sparks_core, {0.725, 0.71, 0.68});
+  sparks::MaterialLambertian material_red(&sparks_core, {0.63, 0.065, 0.05});
+  sparks::MaterialLambertian material_green(&sparks_core, {0.14, 0.45, 0.091});
+  sparks::MaterialLight material_light(&sparks_core, {30.0f, 30.0f, 30.0f}, true, true);
 
   std::vector<glm::vec3> positions;
   std::vector<glm::vec2> tex_coords;

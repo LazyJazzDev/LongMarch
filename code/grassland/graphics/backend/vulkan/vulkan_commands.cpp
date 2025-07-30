@@ -131,7 +131,7 @@ void VulkanCmdBeginRendering::RecordResourceImages(VulkanImage *resource_image) 
 }
 
 VulkanCmdBindResourceBuffers::VulkanCmdBindResourceBuffers(int slot,
-                                                           const std::vector<VulkanBuffer *> &buffers,
+                                                           const std::vector<VulkanBufferRange> &buffers,
                                                            VulkanProgramBase *program_base,
                                                            BindPoint bind_point)
     : slot_(slot), buffers_(buffers), program_base_(program_base), bind_point_(bind_point) {
@@ -140,9 +140,9 @@ VulkanCmdBindResourceBuffers::VulkanCmdBindResourceBuffers(int slot,
 void VulkanCmdBindResourceBuffers::CompileCommand(VulkanCommandContext *context, VkCommandBuffer command_buffer) {
   std::vector<VkDescriptorBufferInfo> buffer_infos(buffers_.size());
   for (size_t i = 0; i < buffers_.size(); ++i) {
-    buffer_infos[i].buffer = buffers_[i]->Buffer();
-    buffer_infos[i].offset = 0;
-    buffer_infos[i].range = buffers_[i]->Size();
+    buffer_infos[i].buffer = buffers_[i].buffer->Buffer();
+    buffer_infos[i].offset = buffers_[i].offset;
+    buffer_infos[i].range = buffers_[i].size;
   }
   auto descriptor_set = context->AcquireDescriptorSet(program_base_->DescriptorSetLayout(slot_)->Handle());
 

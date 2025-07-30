@@ -62,17 +62,17 @@ void D3D12CommandContext::CmdBindIndexBuffer(Buffer *buffer, uint64_t offset) {
   RecordDynamicBuffer(index_buffer);
 }
 
-void D3D12CommandContext::CmdBindResources(int slot, const std::vector<Buffer *> &buffers, BindPoint bind_point) {
+void D3D12CommandContext::CmdBindResources(int slot, const std::vector<BufferRange> &buffers, BindPoint bind_point) {
   if (!program_bases_[bind_point]) {
     LogError("[Graphics.D3D12] Program on bind point {} is not set", int(bind_point));
     return;
   }
   auto descriptor_range = program_bases_[bind_point]->DescriptorRange(slot);
   resource_descriptor_count_ += descriptor_range->NumDescriptors;
-  std::vector<D3D12Buffer *> d3d12_buffers(buffers.size());
+  std::vector<D3D12BufferRange> d3d12_buffers(buffers.size());
   for (size_t i = 0; i < buffers.size(); ++i) {
-    d3d12_buffers[i] = dynamic_cast<D3D12Buffer *>(buffers[i]);
-    RecordDynamicBuffer(d3d12_buffers[i]);
+    d3d12_buffers[i] = buffers[i];
+    RecordDynamicBuffer(d3d12_buffers[i].buffer);
   }
   commands_.push_back(
       std::make_unique<D3D12CmdBindResourceBuffers>(slot, d3d12_buffers, program_bases_[bind_point], bind_point));
@@ -285,17 +285,18 @@ CD3DX12_GPU_DESCRIPTOR_HANDLE D3D12CommandContext::WriteSRVDescriptor(D3D12Image
   return result;
 }
 
-CD3DX12_GPU_DESCRIPTOR_HANDLE D3D12CommandContext::WriteSRVDescriptor(D3D12Buffer *buffer) {
+CD3DX12_GPU_DESCRIPTOR_HANDLE D3D12CommandContext::WriteSRVDescriptor(D3D12BufferRange buffer) {
   D3D12_SHADER_RESOURCE_VIEW_DESC desc = {};
   desc.Format = DXGI_FORMAT_R32_TYPELESS;
   desc.ViewDimension = D3D12_SRV_DIMENSION_BUFFER;
   desc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
-  desc.Buffer.FirstElement = 0;
+  desc.Buffer.FirstElement = buffer.offset >> 2;
   desc.Buffer.Flags = D3D12_BUFFER_SRV_FLAG_RAW;
-  desc.Buffer.NumElements = static_cast<UINT>(buffer->Size()) >> 2;
+  desc.Buffer.NumElements = static_cast<UINT>(buffer.size) >> 2;
   desc.Buffer.StructureByteStride = 0;
 
-  core_->Device()->Handle()->CreateShaderResourceView(buffer->Buffer()->Handle(), &desc, resource_descriptor_base_);
+  core_->Device()->Handle()->CreateShaderResourceView(buffer.buffer->Buffer()->Handle(), &desc,
+                                                      resource_descriptor_base_);
 
   resource_descriptor_base_.Offset(resource_descriptor_size_);
   auto result = resource_descriptor_gpu_base_;
@@ -318,10 +319,10 @@ CD3DX12_GPU_DESCRIPTOR_HANDLE D3D12CommandContext::WriteSRVDescriptor(
   return result;
 }
 
-CD3DX12_GPU_DESCRIPTOR_HANDLE D3D12CommandContext::WriteCBVDescriptor(D3D12Buffer *buffer) {
+CD3DX12_GPU_DESCRIPTOR_HANDLE D3D12CommandContext::WriteCBVDescriptor(D3D12BufferRange buffer) {
   D3D12_CONSTANT_BUFFER_VIEW_DESC desc = {};
-  desc.BufferLocation = buffer->Buffer()->Handle()->GetGPUVirtualAddress();
-  desc.SizeInBytes = static_cast<UINT>(d3d12::SizeAlignTo(buffer->Size(), 256));
+  desc.BufferLocation = buffer.buffer->Buffer()->Handle()->GetGPUVirtualAddress() + buffer.offset;
+  desc.SizeInBytes = static_cast<UINT>(d3d12::SizeAlignTo(buffer.size, 256));
 
   core_->Device()->Handle()->CreateConstantBufferView(&desc, resource_descriptor_base_);
 
@@ -331,17 +332,17 @@ CD3DX12_GPU_DESCRIPTOR_HANDLE D3D12CommandContext::WriteCBVDescriptor(D3D12Buffe
   return result;
 }
 
-CD3DX12_GPU_DESCRIPTOR_HANDLE D3D12CommandContext::WriteUAVDescriptor(D3D12Buffer *buffer) {
+CD3DX12_GPU_DESCRIPTOR_HANDLE D3D12CommandContext::WriteUAVDescriptor(D3D12BufferRange buffer) {
   D3D12_UNORDERED_ACCESS_VIEW_DESC desc = {};
   desc.Format = DXGI_FORMAT_R32_TYPELESS;
   desc.ViewDimension = D3D12_UAV_DIMENSION_BUFFER;
-  desc.Buffer.FirstElement = 0;
+  desc.Buffer.FirstElement = buffer.offset >> 2;
   desc.Buffer.Flags = D3D12_BUFFER_UAV_FLAG_RAW;
-  desc.Buffer.NumElements = static_cast<UINT>(buffer->Size()) >> 2;
+  desc.Buffer.NumElements = static_cast<UINT>(buffer.size) >> 2;
   desc.Buffer.StructureByteStride = 0;
   desc.Buffer.CounterOffsetInBytes = 0;
 
-  core_->Device()->Handle()->CreateUnorderedAccessView(buffer->Buffer()->Handle(), nullptr, &desc,
+  core_->Device()->Handle()->CreateUnorderedAccessView(buffer.buffer->Buffer()->Handle(), nullptr, &desc,
                                                        resource_descriptor_base_);
 
   resource_descriptor_base_.Offset(resource_descriptor_size_);

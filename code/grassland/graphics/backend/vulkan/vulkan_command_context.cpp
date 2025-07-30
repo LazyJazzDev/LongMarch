@@ -80,15 +80,15 @@ void VulkanCommandContext::CmdBeginRendering(const std::vector<Image *> &color_t
   commands_.push_back(std::move(cmd));
 }
 
-void VulkanCommandContext::CmdBindResources(int slot, const std::vector<Buffer *> &buffers, BindPoint bind_point) {
+void VulkanCommandContext::CmdBindResources(int slot, const std::vector<BufferRange> &buffers, BindPoint bind_point) {
   if (!program_bases_[bind_point]) {
     LogError("[Graphics.Vulkan] Program on bind point {} is not set", int(bind_point));
     return;
   }
-  std::vector<VulkanBuffer *> vk_buffers(buffers.size());
+  std::vector<VulkanBufferRange> vk_buffers(buffers.size());
   for (size_t i = 0; i < buffers.size(); ++i) {
-    vk_buffers[i] = dynamic_cast<VulkanBuffer *>(buffers[i]);
-    RecordDynamicBuffer(vk_buffers[i]);
+    vk_buffers[i] = buffers[i];
+    RecordDynamicBuffer(vk_buffers[i].buffer);
   }
   commands_.push_back(
       std::make_unique<VulkanCmdBindResourceBuffers>(slot, vk_buffers, program_bases_[bind_point], bind_point));

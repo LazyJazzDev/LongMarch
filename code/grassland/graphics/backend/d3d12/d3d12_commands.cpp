@@ -79,7 +79,7 @@ void D3D12CmdBindIndexBuffer::CompileCommand(D3D12CommandContext *context, ID3D1
 }
 
 D3D12CmdBindResourceBuffers::D3D12CmdBindResourceBuffers(int slot,
-                                                         const std::vector<D3D12Buffer *> &buffers,
+                                                         const std::vector<D3D12BufferRange> &buffers,
                                                          D3D12ProgramBase *program,
                                                          BindPoint bind_point)
     : slot_(slot), buffers_(buffers), program_(program), bind_point_(bind_point) {
@@ -97,7 +97,8 @@ void D3D12CmdBindResourceBuffers::CompileCommand(D3D12CommandContext *context,
         if (i == 0) {
           first_descriptor = desc;
         }
-        context->RequireResourceState(command_list, buffers_[i]->Buffer()->Handle(), D3D12_RESOURCE_STATE_GENERIC_READ);
+        context->RequireResourceState(command_list, buffers_[i].buffer->Buffer()->Handle(),
+                                      D3D12_RESOURCE_STATE_GENERIC_READ);
       }
       break;
     case D3D12_DESCRIPTOR_RANGE_TYPE_SRV:
@@ -106,7 +107,8 @@ void D3D12CmdBindResourceBuffers::CompileCommand(D3D12CommandContext *context,
         if (i == 0) {
           first_descriptor = desc;
         }
-        context->RequireResourceState(command_list, buffers_[i]->Buffer()->Handle(), D3D12_RESOURCE_STATE_GENERIC_READ);
+        context->RequireResourceState(command_list, buffers_[i].buffer->Buffer()->Handle(),
+                                      D3D12_RESOURCE_STATE_GENERIC_READ);
       }
       break;
     case D3D12_DESCRIPTOR_RANGE_TYPE_UAV:
@@ -115,7 +117,7 @@ void D3D12CmdBindResourceBuffers::CompileCommand(D3D12CommandContext *context,
         if (i == 0) {
           first_descriptor = desc;
         }
-        context->RequireResourceState(command_list, buffers_[i]->Buffer()->Handle(),
+        context->RequireResourceState(command_list, buffers_[i].buffer->Buffer()->Handle(),
                                       D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
       }
       break;

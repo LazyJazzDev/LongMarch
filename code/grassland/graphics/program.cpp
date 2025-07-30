@@ -63,7 +63,9 @@ class CustomVFSIncludeHandler : public IDxcIncludeHandler {
 
     std::vector<uint8_t> data;
     if (vfs_->ReadFile(filename, data)) {
+#ifndef NDEBUG
       std::wcerr << L"Failed to find include file: " << pFilename << std::endl;
+#endif
       return E_FAIL;
     }
 

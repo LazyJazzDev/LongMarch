@@ -4,6 +4,14 @@
 
 namespace grassland::graphics::backend {
 
+struct D3D12BufferRange {
+  D3D12Buffer *buffer;
+  D3D12_GPU_VIRTUAL_ADDRESS offset;
+  D3D12_GPU_VIRTUAL_ADDRESS size;
+  D3D12BufferRange() = default;
+  D3D12BufferRange(const BufferRange &range);
+};
+
 class D3D12Buffer : virtual public Buffer {
  public:
   virtual ~D3D12Buffer() = default;
