@@ -28,7 +28,7 @@ struct RenderContext {
   float3 radiance;
   float3 throughput;
   HitRecord hit_record;
-  int material_buffer_index;
+  int surface_buffer_index;
   RandomDevice rd;
 };
 
@@ -38,7 +38,7 @@ struct RayGenPayload {
   float3 direction;
 };
 
-struct MaterialRegistration {
+struct SurfaceRegistration {
   int shader_index;
   int buffer_index;
 };
@@ -54,6 +54,6 @@ struct LightRegistration {
 };
 
 struct EntityInfo {
-  MaterialRegistration material_registration;
+  SurfaceRegistration surface_registration;
   LightRegistration light_registration;
 };

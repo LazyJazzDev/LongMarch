@@ -8,7 +8,7 @@ using namespace grassland;
 
 class Core;
 class Geometry;
-class Material;
+class Surface;
 class Entity;
 class Film;
 class Scene;
@@ -25,7 +25,7 @@ struct InstanceRegistration {
   int32_t instance_index;
 };
 
-struct MaterialRegistration {
+struct SurfaceRegistration {
   int32_t shader_index;
   int32_t buffer_index;
 };

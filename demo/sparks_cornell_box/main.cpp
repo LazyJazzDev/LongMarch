@@ -23,10 +23,10 @@ int main() {
                                     glm::vec3{0.0, 1.0, 0.0}),
                         glm::radians(40.0f), static_cast<float>(film.GetWidth()) / film.GetHeight());
 
-  sparks::MaterialLambertian material_white(&sparks_core, {0.725, 0.71, 0.68});
-  sparks::MaterialLambertian material_red(&sparks_core, {0.63, 0.065, 0.05});
-  sparks::MaterialLambertian material_green(&sparks_core, {0.14, 0.45, 0.091});
-  sparks::MaterialLight material_light(&sparks_core, {30.0f, 30.0f, 30.0f}, true, true);
+  sparks::SurfaceLambertian material_white(&sparks_core, {0.725, 0.71, 0.68});
+  sparks::SurfaceLambertian material_red(&sparks_core, {0.63, 0.065, 0.05});
+  sparks::SurfaceLambertian material_green(&sparks_core, {0.14, 0.45, 0.091});
+  sparks::SurfaceLight material_light(&sparks_core, {30.0f, 30.0f, 30.0f}, true, true);
 
   std::vector<glm::vec3> positions;
   std::vector<glm::vec2> tex_coords;
@@ -39,42 +39,42 @@ int main() {
                     reinterpret_cast<Vector3<float> *>(positions.data()), nullptr,
                     reinterpret_cast<Vector2<float> *>(tex_coords.data()), nullptr);
   sparks::Geometry geometry_light(&sparks_core, light);
-  sparks::EntityGeometryObject entity_light(&sparks_core, &geometry_light, &material_light);
+  sparks::EntityGeometrySurface entity_light(&sparks_core, &geometry_light, &material_light);
 
   positions = {{552.8f, 0.0f, 0.0f}, {0.0f, 0.0f, 0.0f}, {0.0f, 0.0f, 559.2f}, {549.6f, 0.0f, 559.2f}};
   Mesh<float> floor(positions.size(), indices.size(), indices.data(),
                     reinterpret_cast<Vector3<float> *>(positions.data()), nullptr,
                     reinterpret_cast<Vector2<float> *>(tex_coords.data()), nullptr);
   sparks::Geometry geometry_floor(&sparks_core, floor);
-  sparks::EntityGeometryObject entity_floor(&sparks_core, &geometry_floor, &material_white);
+  sparks::EntityGeometrySurface entity_floor(&sparks_core, &geometry_floor, &material_white);
 
   positions = {{556.0f, 548.8f, 0.0f}, {556.0f, 548.8f, 559.2f}, {0.0f, 548.8f, 559.2f}, {0.0f, 548.8f, 0.0f}};
   Mesh<float> ceiling(positions.size(), indices.size(), indices.data(),
                       reinterpret_cast<Vector3<float> *>(positions.data()), nullptr,
                       reinterpret_cast<Vector2<float> *>(tex_coords.data()), nullptr);
   sparks::Geometry geometry_ceiling(&sparks_core, ceiling);
-  sparks::EntityGeometryObject entity_ceiling(&sparks_core, &geometry_ceiling, &material_white);
+  sparks::EntityGeometrySurface entity_ceiling(&sparks_core, &geometry_ceiling, &material_white);
 
   positions = {{549.6f, 0.0f, 559.2f}, {0.0f, 0.0f, 559.2f}, {0.0f, 548.8f, 559.2f}, {556.0f, 548.8f, 559.2f}};
   Mesh<float> back_wall(positions.size(), indices.size(), indices.data(),
                         reinterpret_cast<Vector3<float> *>(positions.data()), nullptr,
                         reinterpret_cast<Vector2<float> *>(tex_coords.data()), nullptr);
   sparks::Geometry geometry_back_wall(&sparks_core, back_wall);
-  sparks::EntityGeometryObject entity_back_wall(&sparks_core, &geometry_back_wall, &material_white);
+  sparks::EntityGeometrySurface entity_back_wall(&sparks_core, &geometry_back_wall, &material_white);
 
   positions = {{0.0f, 0.0f, 559.2f}, {0.0f, 0.0f, 0.0f}, {0.0f, 548.8f, 0.0f}, {0.0f, 548.8f, 559.2f}};
   Mesh<float> right_wall(positions.size(), indices.size(), indices.data(),
                          reinterpret_cast<Vector3<float> *>(positions.data()), nullptr,
                          reinterpret_cast<Vector2<float> *>(tex_coords.data()), nullptr);
   sparks ::Geometry geometry_right_wall(&sparks_core, right_wall);
-  sparks::EntityGeometryObject entity_right_wall(&sparks_core, &geometry_right_wall, &material_green);
+  sparks::EntityGeometrySurface entity_right_wall(&sparks_core, &geometry_right_wall, &material_green);
 
   positions = {{552.8f, 0.0f, 0.0f}, {549.6f, 0.0f, 559.2f}, {556.0f, 548.8f, 559.2f}, {556.0f, 548.8f, 0.0f}};
   Mesh<float> left_wall(positions.size(), indices.size(), indices.data(),
                         reinterpret_cast<Vector3<float> *>(positions.data()), nullptr,
                         reinterpret_cast<Vector2<float> *>(tex_coords.data()), nullptr);
   sparks::Geometry geometry_left_wall(&sparks_core, left_wall);
-  sparks::EntityGeometryObject entity_left_wall(&sparks_core, &geometry_left_wall, &material_red);
+  sparks::EntityGeometrySurface entity_left_wall(&sparks_core, &geometry_left_wall, &material_red);
 
   indices = {0, 1, 3, 1, 2, 3, 4, 5, 7, 5, 6, 7, 8, 9, 11, 9, 10, 11, 12, 13, 15, 13, 14, 15, 16, 17, 19, 17, 18, 19};
   positions = {{130.0f, 165.0f, 65.0f}, {82.0f, 165.0f, 225.0f},  {240.0f, 165.0f, 272.0f}, {290.0f, 165.0f, 114.0f},
@@ -88,7 +88,7 @@ int main() {
   sparks::Geometry short_box(&sparks_core, Mesh<float>(positions.size(), indices.size(), indices.data(),
                                                        reinterpret_cast<Vector3<float> *>(positions.data()), nullptr,
                                                        reinterpret_cast<Vector2<float> *>(tex_coords.data()), nullptr));
-  sparks::EntityGeometryObject entity_short_box(&sparks_core, &short_box, &material_white);
+  sparks::EntityGeometrySurface entity_short_box(&sparks_core, &short_box, &material_white);
 
   positions = {{423.0f, 330.0f, 247.0f}, {265.0f, 330.0f, 296.0f}, {314.0f, 330.0f, 456.0f}, {472.0f, 330.0f, 406.0f},
                {423.0f, 0.0f, 247.0f},   {423.0f, 330.0f, 247.0f}, {472.0f, 330.0f, 406.0f}, {472.0f, 0.0f, 406.0f},
@@ -99,7 +99,7 @@ int main() {
                        reinterpret_cast<Vector3<float> *>(positions.data()), nullptr,
                        reinterpret_cast<Vector2<float> *>(tex_coords.data()), nullptr);
   sparks::Geometry geometry_tall_box(&sparks_core, tall_box);
-  sparks::EntityGeometryObject entity_tall_box(&sparks_core, &geometry_tall_box, &material_white);
+  sparks::EntityGeometrySurface entity_tall_box(&sparks_core, &geometry_tall_box, &material_white);
   scene.AddEntity(&entity_light);
   scene.AddEntity(&entity_floor);
   scene.AddEntity(&entity_ceiling);

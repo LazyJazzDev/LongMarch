@@ -1,6 +1,6 @@
 #include "bindings.hlsli"
 #include "common.hlsli"
-#include "material/lambertian/main.hlsl"
+#include "surface/lambertian/main.hlsl"
 
 // sample bsdf
 
@@ -35,10 +35,10 @@
       HitRecord hit_record = context.hit_record;
       TraceRay(as, RAY_FLAG_NONE, 0xFF, 0, 0, 0, ray, hit_record);
       context.hit_record = hit_record;
-      MaterialRegistration mat_reg = material_regs[context.hit_record.object_id];
-      context.material_buffer_index = mat_reg.buffer_index;
+      SurfaceRegistration mat_reg = surface_regs[context.hit_record.object_id];
+      context.surface_buffer_index = mat_reg.buffer_index;
       if (context.hit_record.object_id >= 0) {
-        // call the material shader
+        // call the surface shader
         CallShader(mat_reg.shader_index, context);
         // CallableMain(context);
       } else {

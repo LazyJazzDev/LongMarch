@@ -5,7 +5,7 @@
 #include "sparks/core/entity.h"
 #include "sparks/core/film.h"
 #include "sparks/core/geometry.h"
-#include "sparks/core/material.h"
+#include "sparks/core/surface.h"
 
 namespace sparks {
 Scene::Scene(Core *core) : core_(core) {
@@ -26,7 +26,7 @@ void Scene::Render(Camera *camera, Film *film) {
   cmd_context->CmdBindResources(3, {scene_settings_buffer_.get()}, graphics::BIND_POINT_RAYTRACING);
   cmd_context->CmdBindResources(4, {camera->Buffer()}, graphics::BIND_POINT_RAYTRACING);
   cmd_context->CmdBindResources(5, geometry_buffers_, graphics::BIND_POINT_RAYTRACING);
-  cmd_context->CmdBindResources(6, material_buffers_, graphics::BIND_POINT_RAYTRACING);
+  cmd_context->CmdBindResources(6, surface_buffers_, graphics::BIND_POINT_RAYTRACING);
   cmd_context->CmdBindResources(7, {mat_reg_buffer_.get()}, graphics::BIND_POINT_RAYTRACING);
   cmd_context->CmdDispatchRays(film->accumulated_color_->Extent().width, film->accumulated_samples_->Extent().height,
                                1);
@@ -61,27 +61,27 @@ GeometryRegistration Scene::RegisterGeometry(Geometry *geometry) {
   return geom_reg;
 }
 
-MaterialRegistration Scene::RegisterMaterial(Material *material) {
-  MaterialRegistration mat_reg;
-  mat_reg.shader_index = RegisterCallableShader(material->CallableShader());
+SurfaceRegistration Scene::RegisterSurface(Surface *surface) {
+  SurfaceRegistration surf_reg{};
+  surf_reg.shader_index = RegisterCallableShader(surface->CallableShader());
 
-  if (!material_buffer_map_.count(material->Buffer())) {
-    material_buffer_map_[material->Buffer()] = static_cast<int32_t>(material_buffers_.size());
-    material_buffers_.emplace_back(material->Buffer());
+  if (!surface_buffer_map_.count(surface->Buffer())) {
+    surface_buffer_map_[surface->Buffer()] = static_cast<int32_t>(surface_buffers_.size());
+    surface_buffers_.emplace_back(surface->Buffer());
   }
-  mat_reg.buffer_index = material_buffer_map_[material->Buffer()];
+  surf_reg.buffer_index = surface_buffer_map_[surface->Buffer()];
 
-  return mat_reg;
+  return surf_reg;
 }
 
 InstanceRegistration Scene::RegisterInstance(GeometryRegistration geom_reg,
                                              const glm::mat4 &transformation,
-                                             MaterialRegistration mat_reg) {
+                                             SurfaceRegistration mat_reg) {
   InstanceRegistration instance_reg;
   instance_reg.instance_index = instances_.size();
 
   instances_.push_back(geom_reg.blas->MakeInstance(transformation, geom_reg.data_index, 255, geom_reg.hit_group_index));
-  materials_registrations_.push_back(mat_reg);
+  surfaces_registrations_.push_back(mat_reg);
 
   return instance_reg;
 }
@@ -105,10 +105,10 @@ void Scene::UpdatePipeline(Camera *camera) {
   geometry_buffer_map_.clear();
   callable_shaders_.clear();
   callable_shader_map_.clear();
-  material_buffers_.clear();
-  material_buffer_map_.clear();
+  surface_buffers_.clear();
+  surface_buffer_map_.clear();
   instances_.clear();
-  materials_registrations_.clear();
+  surfaces_registrations_.clear();
 
   RegisterCallableShader(camera->Shader());
 
@@ -123,10 +123,10 @@ void Scene::UpdatePipeline(Camera *camera) {
   core_->GraphicsCore()->CreateTopLevelAccelerationStructure(instances_, &tlas_);
 
   mat_reg_buffer_.reset();
-  core_->GraphicsCore()->CreateBuffer(sizeof(MaterialRegistration) * materials_registrations_.size(),
+  core_->GraphicsCore()->CreateBuffer(sizeof(SurfaceRegistration) * surfaces_registrations_.size(),
                                       graphics::BUFFER_TYPE_STATIC, &mat_reg_buffer_);
-  mat_reg_buffer_->UploadData(materials_registrations_.data(),
-                              sizeof(MaterialRegistration) * materials_registrations_.size());
+  mat_reg_buffer_->UploadData(surfaces_registrations_.data(),
+                              sizeof(SurfaceRegistration) * surfaces_registrations_.size());
 
   rt_program_->AddResourceBinding(graphics::RESOURCE_TYPE_IMAGE, 1);
   rt_program_->AddResourceBinding(graphics::RESOURCE_TYPE_IMAGE, 1);
@@ -134,7 +134,7 @@ void Scene::UpdatePipeline(Camera *camera) {
   rt_program_->AddResourceBinding(graphics::RESOURCE_TYPE_UNIFORM_BUFFER, 1);
   rt_program_->AddResourceBinding(graphics::RESOURCE_TYPE_STORAGE_BUFFER, 1);
   rt_program_->AddResourceBinding(graphics::RESOURCE_TYPE_STORAGE_BUFFER, geometry_buffers_.size());
-  rt_program_->AddResourceBinding(graphics::RESOURCE_TYPE_STORAGE_BUFFER, material_buffers_.size());
+  rt_program_->AddResourceBinding(graphics::RESOURCE_TYPE_STORAGE_BUFFER, surface_buffers_.size());
   rt_program_->AddResourceBinding(graphics::RESOURCE_TYPE_STORAGE_BUFFER, 1);
 
   rt_program_->AddRayGenShader(raygen_shader_.get());

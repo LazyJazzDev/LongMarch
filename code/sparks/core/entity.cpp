@@ -4,17 +4,17 @@
 
 namespace sparks {
 
-EntityGeometryObject::EntityGeometryObject(Core *core,
-                                           Geometry *geometry,
-                                           Material *material,
-                                           const glm::mat4 &transformation)
+EntityGeometrySurface::EntityGeometrySurface(Core *core,
+                                             Geometry *geometry,
+                                             Surface *surface,
+                                             const glm::mat4 &transformation)
     : Entity(core) {
   geometry_ = geometry;
-  material_ = material;
+  surface_ = surface;
   transformation_ = transformation;
 }
 
-void EntityGeometryObject::Update(Scene *scene) {
-  scene->RegisterInstance(scene->RegisterGeometry(geometry_), transformation_, scene->RegisterMaterial(material_));
+void EntityGeometrySurface::Update(Scene *scene) {
+  scene->RegisterInstance(scene->RegisterGeometry(geometry_), transformation_, scene->RegisterSurface(surface_));
 }
 }  // namespace sparks

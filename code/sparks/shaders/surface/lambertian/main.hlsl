@@ -1,9 +1,9 @@
 #include "bindings.hlsli"
 
 [shader("callable")] void CallableMain(inout RenderContext context) {
-  ByteAddressBuffer material_buffer = material_data[context.material_buffer_index];
-  float3 color = LoadFloat3(material_buffer, 0);
-  float3 emission = LoadFloat3(material_buffer, 12);
+  ByteAddressBuffer surface_buffer = surface_data[context.surface_buffer_index];
+  float3 color = LoadFloat3(surface_buffer, 0);
+  float3 emission = LoadFloat3(surface_buffer, 12);
   context.radiance += emission * context.throughput;
   float3 omega_in;
   float pdf;

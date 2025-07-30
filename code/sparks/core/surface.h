@@ -3,9 +3,9 @@
 
 namespace sparks {
 
-class Material {
+class Surface {
  public:
-  Material(Core *core);
+  Surface(Core *core);
 
   virtual graphics::Buffer *Buffer() = 0;
   virtual graphics::Shader *CallableShader() = 0;

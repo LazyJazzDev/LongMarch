@@ -13,11 +13,11 @@ class Scene {
 
   GeometryRegistration RegisterGeometry(Geometry *geometry);
 
-  MaterialRegistration RegisterMaterial(Material *material);
+  SurfaceRegistration RegisterSurface(Surface *surface);
 
   InstanceRegistration RegisterInstance(GeometryRegistration geom_reg,
                                         const glm::mat4 &transformation,
-                                        MaterialRegistration mat_reg);
+                                        SurfaceRegistration mat_reg);
 
   struct HitGroupComparator {
     bool operator()(const graphics::HitGroup &lhs, const graphics::HitGroup &rhs) const {
@@ -55,11 +55,11 @@ class Scene {
   std::vector<graphics::Shader *> callable_shaders_;
   std::map<graphics::Shader *, int32_t> callable_shader_map_;
 
-  std::vector<graphics::Buffer *> material_buffers_;
-  std::map<graphics::Buffer *, int32_t> material_buffer_map_;
+  std::vector<graphics::Buffer *> surface_buffers_;
+  std::map<graphics::Buffer *, int32_t> surface_buffer_map_;
 
   std::vector<graphics::RayTracingInstance> instances_;
-  std::vector<MaterialRegistration> materials_registrations_;
+  std::vector<SurfaceRegistration> surfaces_registrations_;
 
   std::unique_ptr<graphics::Buffer> mat_reg_buffer_;
 };
