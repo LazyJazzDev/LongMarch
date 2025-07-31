@@ -27,14 +27,14 @@ class GeometryMesh : public Geometry {
   graphics::AccelerationStructure *BLAS() override;
   graphics::HitGroup HitGroup() override;
   int PrimitiveCount() override;
-  CodeLines PrimitiveAreaFunction() override;
+  const CodeLines &SamplerImplementation() const override;
 
  private:
   std::unique_ptr<graphics::Buffer> geometry_buffer_;
   std::unique_ptr<graphics::AccelerationStructure> blas_;
   std::unique_ptr<graphics::Shader> closest_hit_shader_;
   int primitive_count_;
-  CodeLines primitive_area_;
+  CodeLines sampler_implementation_;
 };
 
 }  // namespace sparks

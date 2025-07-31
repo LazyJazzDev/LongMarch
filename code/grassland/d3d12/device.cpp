@@ -19,6 +19,7 @@ Device::Device(const class Adapter &adapter, const D3D_FEATURE_LEVEL feature_lev
     : adapter_(adapter), feature_level_(feature_level), device_(std::move(device)) {
   // Get DXR interfaces
   ThrowIfFailed(device_->QueryInterface(IID_PPV_ARGS(&dxr_device_)), "failed to get DXR device interface.");
+  device_->CheckFeatureSupport(D3D12_FEATURE_D3D12_OPTIONS1, &d3d12_options1_, sizeof(d3d12_options1_));
 }
 
 HRESULT Device::CreateCommandQueue(D3D12_COMMAND_LIST_TYPE type, double_ptr<CommandQueue> pp_command_queue) {

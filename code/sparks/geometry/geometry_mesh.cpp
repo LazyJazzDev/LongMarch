@@ -60,9 +60,9 @@ GeometryMesh::GeometryMesh(Core *core, const Mesh<float> &mesh) : Geometry(core)
   core_->GraphicsCore()->CreateShader(vfs, "geometry/mesh/hit_group.hlsl", "ClosestHitMain", "lib_6_3", {"-I."},
                                       &closest_hit_shader_);
   primitive_count_ = header.num_indices / 3;
-  std::vector<uint8_t> primitive_area_function_code_data;
-  vfs.ReadFile("geometry/mesh/primitive_area.hlsli", primitive_area_function_code_data);
-  primitive_area_ = CodeLines(primitive_area_function_code_data);
+  std::vector<uint8_t> sampler_impl_code_data;
+  vfs.ReadFile("geometry/mesh/geometry_sampler.hlsli", sampler_impl_code_data);
+  sampler_implementation_ = CodeLines(sampler_impl_code_data);
 }
 
 graphics::Buffer *GeometryMesh::Buffer() {
@@ -77,8 +77,8 @@ int GeometryMesh::PrimitiveCount() {
   return primitive_count_;
 }
 
-CodeLines GeometryMesh::PrimitiveAreaFunction() {
-  return primitive_area_;
+const CodeLines &GeometryMesh::SamplerImplementation() const {
+  return sampler_implementation_;
 }
 
 graphics::AccelerationStructure *GeometryMesh::BLAS() {

@@ -27,7 +27,18 @@ struct InstanceRegistration {
 
 struct SurfaceRegistration {
   int32_t shader_index;
-  int32_t buffer_index;
+  int32_t data_index;
+};
+
+struct LightRegistration {
+  int32_t shader_index;
+  int32_t data_index;
+};
+
+struct EntityMetadata {
+  GeometryRegistration geom_reg;
+  SurfaceRegistration surf_reg;
+  LightRegistration light_reg;
 };
 
 }  // namespace sparks

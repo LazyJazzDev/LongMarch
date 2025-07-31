@@ -50,6 +50,10 @@ class Device {
     return vkDeviceWaitIdle(device_);
   }
 
+  uint32_t SubGroupSize() const {
+    return subgroup_properties_.subgroupSize;
+  }
+
   VkResult GetQueue(uint32_t queue_family_index, int queue_index, double_ptr<Queue> pp_queue) const;
 
   VkResult CreateSwapchain(const Surface *surface,
@@ -244,6 +248,8 @@ class Device {
   class PhysicalDevice physical_device_;
 
   const DeviceCreateInfo create_info_;
+
+  VkPhysicalDeviceSubgroupProperties subgroup_properties_{};
 
   VkDevice device_{};
 

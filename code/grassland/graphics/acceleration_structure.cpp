@@ -3,7 +3,7 @@
 namespace grassland::graphics {
 
 int AccelerationStructure::UpdateInstances(
-    const std::vector<std::pair<AccelerationStructure *, glm::mat4>> &instances) {
+    const std::vector<std::pair<AccelerationStructure *, glm::mat4x3>> &instances) {
   std::vector<RayTracingInstance> raytracing_instances;
   raytracing_instances.reserve(instances.size());
   for (int i = 0; i < instances.size(); i++) {
@@ -13,7 +13,7 @@ int AccelerationStructure::UpdateInstances(
   return UpdateInstances(raytracing_instances);
 }
 
-RayTracingInstance AccelerationStructure::MakeInstance(const glm::mat4 &transform,
+RayTracingInstance AccelerationStructure::MakeInstance(const glm::mat4x3 &transform,
                                                        uint32_t instance_id,
                                                        uint32_t instance_mask,
                                                        uint32_t instance_hit_group_offset,

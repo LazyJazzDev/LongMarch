@@ -22,6 +22,10 @@ class Device {
     return feature_level_;
   }
 
+  UINT WaveLaneCountMax() const {
+    return d3d12_options1_.WaveLaneCountMax;
+  }
+
   HRESULT CreateCommandQueue(D3D12_COMMAND_LIST_TYPE type, double_ptr<CommandQueue> pp_command_queue);
 
   HRESULT CreateCommandAllocator(D3D12_COMMAND_LIST_TYPE type, double_ptr<CommandAllocator> pp_command_allocator);
@@ -164,6 +168,7 @@ class Device {
   class Adapter adapter_;
   ComPtr<ID3D12Device> device_;
   D3D_FEATURE_LEVEL feature_level_;
+  D3D12_FEATURE_DATA_D3D12_OPTIONS1 d3d12_options1_;
 
   // Get DXR device
   ComPtr<ID3D12Device5> dxr_device_;

@@ -48,6 +48,13 @@ Device::Device(const class Instance *instance,
   if (ray_tracing_enabled) {
     procedures_.GetRayTracingProcedures(device_);
   }
+
+  subgroup_properties_ = {};
+  subgroup_properties_.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SUBGROUP_PROPERTIES;
+  VkPhysicalDeviceProperties2 properties2{};
+  properties2.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_PROPERTIES_2;
+  properties2.pNext = &subgroup_properties_;
+  vkGetPhysicalDeviceProperties2(physical_device_.Handle(), &properties2);
 }
 
 Device::~Device() {

@@ -483,6 +483,9 @@ void VulkanCmdDispatchRays::CompileCommand(VulkanCommandContext *context, VkComm
   program_->Core()->Device()->Procedures().vkCmdTraceRaysKHR(command_buffer, &ray_gen_shader_sbt_entry,
                                                              &miss_shader_sbt_entry, &hit_shader_sbt_entry,
                                                              &callable_shader_sbt_entry, width_, height_, depth_);
+
+  vkCmdPipelineBarrier(command_buffer, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, 0, 0,
+                       nullptr, 0, nullptr, 0, nullptr);
 }
 
 VulkanCmdDispatch::VulkanCmdDispatch(uint32_t group_count_x, uint32_t group_count_y, uint32_t group_count_z)
@@ -491,6 +494,9 @@ VulkanCmdDispatch::VulkanCmdDispatch(uint32_t group_count_x, uint32_t group_coun
 
 void VulkanCmdDispatch::CompileCommand(VulkanCommandContext *context, VkCommandBuffer command_buffer) {
   vkCmdDispatch(command_buffer, group_count_x_, group_count_y_, group_count_z_);
+
+  vkCmdPipelineBarrier(command_buffer, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, 0, 0,
+                       nullptr, 0, nullptr, 0, nullptr);
 }
 
 VulkanCmdCopyBuffer::VulkanCmdCopyBuffer(VulkanBuffer *dst_buffer,
@@ -502,8 +508,6 @@ VulkanCmdCopyBuffer::VulkanCmdCopyBuffer(VulkanBuffer *dst_buffer,
 }
 
 void VulkanCmdCopyBuffer::CompileCommand(VulkanCommandContext *context, VkCommandBuffer command_buffer) {
-  vkCmdPipelineBarrier(command_buffer, VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT, 0, 0,
-                       nullptr, 0, nullptr, 0, nullptr);
   VkBufferCopy copy_region{};
   copy_region.size = size_;
   copy_region.dstOffset = dst_offset_;

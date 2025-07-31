@@ -7,7 +7,7 @@ namespace sparks {
 EntityGeometrySurface::EntityGeometrySurface(Core *core,
                                              Geometry *geometry,
                                              Surface *surface,
-                                             const glm::mat4 &transformation)
+                                             const glm::mat4x3 &transformation)
     : Entity(core) {
   geometry_ = geometry;
   surface_ = surface;

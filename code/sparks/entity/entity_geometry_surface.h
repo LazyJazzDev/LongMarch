@@ -8,17 +8,17 @@ class EntityGeometrySurface : public Entity {
   EntityGeometrySurface(Core *core,
                         Geometry *geometry,
                         Surface *surface,
-                        const glm::mat4 &transformation = glm::mat4{1.0f});
+                        const glm::mat4x3 &transformation = glm::mat4x3{1.0f});
   void Update(Scene *scene) override;
 
-  void SetTransformation(const glm::mat4 &transformation) {
+  void SetTransformation(const glm::mat4x3 &transformation) {
     transformation_ = transformation;
   }
 
  private:
   Geometry *geometry_{nullptr};
   Surface *surface_{nullptr};
-  glm::mat4 transformation_;
+  glm::mat4x3 transformation_;
 };
 
 }  // namespace sparks

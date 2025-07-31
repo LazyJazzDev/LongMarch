@@ -11,13 +11,17 @@ class SurfaceLambertian : public Surface {
 
   graphics::Buffer *Buffer() override;
   graphics::Shader *CallableShader() override;
+  const CodeLines &SamplerImplementation() const override;
 
   glm::vec3 base_color{0.8f};
   glm::vec3 emission{0.0f};
 
+  void SyncSurfaceData();
+
  private:
   std::unique_ptr<graphics::Buffer> surface_buffer_;
   std::unique_ptr<graphics::Shader> callable_shader_;
+  CodeLines sampler_implementation_;
 };
 
 }  // namespace sparks

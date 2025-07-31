@@ -12,7 +12,7 @@ class Geometry {
   virtual graphics::AccelerationStructure *BLAS() = 0;
   virtual graphics::HitGroup HitGroup() = 0;
   virtual int PrimitiveCount() = 0;
-  virtual CodeLines PrimitiveAreaFunction() = 0;
+  virtual const CodeLines &SamplerImplementation() const;
 
  protected:
   Core *core_;

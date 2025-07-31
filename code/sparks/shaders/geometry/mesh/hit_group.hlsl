@@ -17,7 +17,7 @@ struct GeometryHeader {
 };
 
 [shader("closesthit")] void ClosestHitMain(inout HitRecord hit_group, in BuiltInTriangleIntersectionAttributes attr) {
-  ByteAddressBuffer geometry_buffer = geometry_data[InstanceID()];
+  BufferReference<ByteAddressBuffer> geometry_buffer = MakeBufferReference(data_buffers[InstanceID()], 0);
   GeometryHeader header;
   header.num_vertices = geometry_buffer.Load(0);
   header.num_indices = geometry_buffer.Load(4);
@@ -33,10 +33,8 @@ struct GeometryHeader {
   header.signal_stride = geometry_buffer.Load(44);
   header.index_offset = geometry_buffer.Load(48);
 
-  uint vid[3];
-  vid[0] = geometry_buffer.Load(header.index_offset + PrimitiveIndex() * 3 * 4);
-  vid[1] = geometry_buffer.Load(header.index_offset + PrimitiveIndex() * 3 * 4 + 4);
-  vid[2] = geometry_buffer.Load(header.index_offset + PrimitiveIndex() * 3 * 4 + 8);
+  uint3 vid;
+  vid = geometry_buffer.Load3(header.index_offset + PrimitiveIndex() * 3 * 4);
 
   float3 pos[3] = {LoadFloat3(geometry_buffer, header.position_offset + header.position_stride * vid[0]),
                    LoadFloat3(geometry_buffer, header.position_offset + header.position_stride * vid[1]),

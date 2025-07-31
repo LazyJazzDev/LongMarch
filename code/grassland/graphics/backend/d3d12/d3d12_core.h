@@ -97,6 +97,8 @@ class D3D12Core : public Core {
 
   void WaitGPU() override;
 
+  uint32_t WaveSize() const override;
+
   d3d12::DXGIFactory *DXGIFactory() const {
     return dxgi_factory_.get();
   }

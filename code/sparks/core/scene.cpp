@@ -25,9 +25,8 @@ void Scene::Render(Camera *camera, Film *film) {
   cmd_context->CmdBindResources(2, {tlas_.get()}, graphics::BIND_POINT_RAYTRACING);
   cmd_context->CmdBindResources(3, {scene_settings_buffer_.get()}, graphics::BIND_POINT_RAYTRACING);
   cmd_context->CmdBindResources(4, {camera->Buffer()}, graphics::BIND_POINT_RAYTRACING);
-  cmd_context->CmdBindResources(5, geometry_buffers_, graphics::BIND_POINT_RAYTRACING);
-  cmd_context->CmdBindResources(6, surface_buffers_, graphics::BIND_POINT_RAYTRACING);
-  cmd_context->CmdBindResources(7, {mat_reg_buffer_.get()}, graphics::BIND_POINT_RAYTRACING);
+  cmd_context->CmdBindResources(5, buffers_, graphics::BIND_POINT_RAYTRACING);
+  cmd_context->CmdBindResources(6, {entity_info_buffer_.get()}, graphics::BIND_POINT_RAYTRACING);
   cmd_context->CmdDispatchRays(film->accumulated_color_->Extent().width, film->accumulated_samples_->Extent().height,
                                1);
   core_->GraphicsCore()->SubmitCommandContext(cmd_context.get());
@@ -43,12 +42,7 @@ GeometryRegistration Scene::RegisterGeometry(Geometry *geometry) {
   auto data = geometry->Buffer();
   auto blas = geometry->BLAS();
   auto hit_group = geometry->HitGroup();
-
-  if (!geometry_buffer_map_.count(data)) {
-    geometry_buffer_map_[data] = static_cast<int32_t>(geometry_buffers_.size());
-    geometry_buffers_.emplace_back(data);
-  }
-  geom_reg.data_index = geometry_buffer_map_[data];
+  geom_reg.data_index = RegisterBuffer(data);
 
   geom_reg.blas = blas;
 
@@ -64,24 +58,18 @@ GeometryRegistration Scene::RegisterGeometry(Geometry *geometry) {
 SurfaceRegistration Scene::RegisterSurface(Surface *surface) {
   SurfaceRegistration surf_reg{};
   surf_reg.shader_index = RegisterCallableShader(surface->CallableShader());
-
-  if (!surface_buffer_map_.count(surface->Buffer())) {
-    surface_buffer_map_[surface->Buffer()] = static_cast<int32_t>(surface_buffers_.size());
-    surface_buffers_.emplace_back(surface->Buffer());
-  }
-  surf_reg.buffer_index = surface_buffer_map_[surface->Buffer()];
-
+  surf_reg.data_index = RegisterBuffer(surface->Buffer());
   return surf_reg;
 }
 
 InstanceRegistration Scene::RegisterInstance(GeometryRegistration geom_reg,
-                                             const glm::mat4 &transformation,
-                                             SurfaceRegistration mat_reg) {
+                                             const glm::mat4x3 &transformation,
+                                             SurfaceRegistration surf_reg) {
   InstanceRegistration instance_reg;
   instance_reg.instance_index = instances_.size();
 
   instances_.push_back(geom_reg.blas->MakeInstance(transformation, geom_reg.data_index, 255, geom_reg.hit_group_index));
-  surfaces_registrations_.push_back(mat_reg);
+  surfaces_registrations_.push_back(surf_reg);
 
   return instance_reg;
 }
@@ -94,6 +82,14 @@ int32_t Scene::RegisterCallableShader(graphics::Shader *callable_shader) {
   return callable_shader_map_[callable_shader];
 }
 
+int32_t Scene::RegisterBuffer(graphics::Buffer *buffer) {
+  if (!buffer_map_.count(buffer)) {
+    buffer_map_[buffer] = static_cast<int32_t>(buffers_.size());
+    buffers_.emplace_back(buffer);
+  }
+  return buffer_map_[buffer];
+}
+
 void Scene::UpdatePipeline(Camera *camera) {
   rt_program_.reset();
   tlas_.reset();
@@ -101,12 +97,10 @@ void Scene::UpdatePipeline(Camera *camera) {
   miss_shader_indices_ = {0};
   hit_groups_.clear();
   hit_group_map_.clear();
-  geometry_buffers_.clear();
-  geometry_buffer_map_.clear();
+  buffers_.clear();
+  buffer_map_.clear();
   callable_shaders_.clear();
   callable_shader_map_.clear();
-  surface_buffers_.clear();
-  surface_buffer_map_.clear();
   instances_.clear();
   surfaces_registrations_.clear();
 
@@ -122,19 +116,18 @@ void Scene::UpdatePipeline(Camera *camera) {
 
   core_->GraphicsCore()->CreateTopLevelAccelerationStructure(instances_, &tlas_);
 
-  mat_reg_buffer_.reset();
+  entity_info_buffer_.reset();
   core_->GraphicsCore()->CreateBuffer(sizeof(SurfaceRegistration) * surfaces_registrations_.size(),
-                                      graphics::BUFFER_TYPE_STATIC, &mat_reg_buffer_);
-  mat_reg_buffer_->UploadData(surfaces_registrations_.data(),
-                              sizeof(SurfaceRegistration) * surfaces_registrations_.size());
+                                      graphics::BUFFER_TYPE_STATIC, &entity_info_buffer_);
+  entity_info_buffer_->UploadData(surfaces_registrations_.data(),
+                                  sizeof(SurfaceRegistration) * surfaces_registrations_.size());
 
   rt_program_->AddResourceBinding(graphics::RESOURCE_TYPE_IMAGE, 1);
   rt_program_->AddResourceBinding(graphics::RESOURCE_TYPE_IMAGE, 1);
   rt_program_->AddResourceBinding(graphics::RESOURCE_TYPE_ACCELERATION_STRUCTURE, 1);
   rt_program_->AddResourceBinding(graphics::RESOURCE_TYPE_UNIFORM_BUFFER, 1);
   rt_program_->AddResourceBinding(graphics::RESOURCE_TYPE_STORAGE_BUFFER, 1);
-  rt_program_->AddResourceBinding(graphics::RESOURCE_TYPE_STORAGE_BUFFER, geometry_buffers_.size());
-  rt_program_->AddResourceBinding(graphics::RESOURCE_TYPE_STORAGE_BUFFER, surface_buffers_.size());
+  rt_program_->AddResourceBinding(graphics::RESOURCE_TYPE_STORAGE_BUFFER, buffers_.size());
   rt_program_->AddResourceBinding(graphics::RESOURCE_TYPE_STORAGE_BUFFER, 1);
 
   rt_program_->AddRayGenShader(raygen_shader_.get());

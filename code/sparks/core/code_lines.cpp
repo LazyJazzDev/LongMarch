@@ -28,6 +28,12 @@ CodeLines::CodeLines(const std::vector<uint8_t> &code_data)
 CodeLines::CodeLines(const std::string &code) : CodeLines(code.c_str()) {
 }
 
+CodeLines::CodeLines(const VirtualFileSystem &vfs, const std::string &file_path) {
+  std::vector<uint8_t> code_data;
+  vfs.ReadFile(file_path, code_data);
+  *this = CodeLines(code_data);
+}
+
 void CodeLines::InsertAfter(const CodeLines &other, const std::string &after_line) {
   // find the line after which to insert
   auto it = std::find(lines_.begin(), lines_.end(), after_line);
@@ -50,12 +56,22 @@ void CodeLines::InsertIndent(int num_spaces) {
 CodeLines::operator std::string() const {
   // convert back to string
   std::string result;
-  int i = 0;
   for (const auto &line : lines_) {
-    result += std::to_string(i) + ": " + line + "\n";
-    i++;
+    result += line + "\n";
   }
   return result;
+}
+
+CodeLines::operator bool() const {
+  return !lines_.empty();
+}
+
+std::ostream &operator<<(std::ostream &os, const CodeLines &lines) {
+  // output the code with line numbers
+  for (size_t i = 0; i < lines.lines_.size(); ++i) {
+    os << std::setw(4) << i + 1 << ": " << lines.lines_[i] << "\n";
+  }
+  return os;
 }
 
 }  // namespace sparks

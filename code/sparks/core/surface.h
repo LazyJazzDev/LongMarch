@@ -9,6 +9,7 @@ class Surface {
 
   virtual graphics::Buffer *Buffer() = 0;
   virtual graphics::Shader *CallableShader() = 0;
+  virtual const CodeLines &SamplerImplementation() const;
 
  protected:
   Core *core_;

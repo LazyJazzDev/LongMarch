@@ -457,6 +457,10 @@ void D3D12Core::WaitGPU() {
   }
 }
 
+uint32_t D3D12Core::WaveSize() const {
+  return device_->WaveLaneCountMax();
+}
+
 void D3D12Core::SingleTimeCommand(std::function<void(ID3D12GraphicsCommandList *)> command) {
   single_time_allocator_->ResetCommandRecord(single_time_command_list_.get());
   command(single_time_command_list_->Handle());

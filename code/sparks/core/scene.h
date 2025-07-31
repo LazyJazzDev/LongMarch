@@ -16,8 +16,8 @@ class Scene {
   SurfaceRegistration RegisterSurface(Surface *surface);
 
   InstanceRegistration RegisterInstance(GeometryRegistration geom_reg,
-                                        const glm::mat4 &transformation,
-                                        SurfaceRegistration mat_reg);
+                                        const glm::mat4x3 &transformation,
+                                        SurfaceRegistration surf_reg);
 
   struct HitGroupComparator {
     bool operator()(const graphics::HitGroup &lhs, const graphics::HitGroup &rhs) const {
@@ -31,8 +31,10 @@ class Scene {
     int max_bounces = 32;
   } settings;
 
- private:
   int32_t RegisterCallableShader(graphics::Shader *callable_shader);
+  int32_t RegisterBuffer(graphics::Buffer *buffer);
+
+ private:
   void UpdatePipeline(Camera *camera);
   Core *core_;
   std::unique_ptr<graphics::Shader> raygen_shader_;
@@ -49,19 +51,16 @@ class Scene {
   std::vector<graphics::HitGroup> hit_groups_;
   std::map<graphics::HitGroup, int32_t, HitGroupComparator> hit_group_map_;
 
-  std::vector<graphics::Buffer *> geometry_buffers_;
-  std::map<graphics::Buffer *, int32_t> geometry_buffer_map_;
+  std::vector<graphics::Buffer *> buffers_;
+  std::map<graphics::Buffer *, int32_t> buffer_map_;
 
   std::vector<graphics::Shader *> callable_shaders_;
   std::map<graphics::Shader *, int32_t> callable_shader_map_;
 
-  std::vector<graphics::Buffer *> surface_buffers_;
-  std::map<graphics::Buffer *, int32_t> surface_buffer_map_;
-
   std::vector<graphics::RayTracingInstance> instances_;
   std::vector<SurfaceRegistration> surfaces_registrations_;
 
-  std::unique_ptr<graphics::Buffer> mat_reg_buffer_;
+  std::unique_ptr<graphics::Buffer> entity_info_buffer_;
 };
 
 }  // namespace sparks

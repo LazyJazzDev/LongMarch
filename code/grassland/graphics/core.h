@@ -108,6 +108,8 @@ class Core {
 
   virtual void WaitGPU() = 0;
 
+  virtual uint32_t WaveSize() const = 0;
+
   int InitializeLogicalDeviceAutoSelect(bool require_ray_tracing);
 
   int FramesInFlight() const;

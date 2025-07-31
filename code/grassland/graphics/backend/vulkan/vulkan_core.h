@@ -89,6 +89,8 @@ class VulkanCore : public Core {
 
   void WaitGPU() override;
 
+  uint32_t WaveSize() const override;
+
   vulkan::Instance *Instance() const {
     return instance_.get();
   }

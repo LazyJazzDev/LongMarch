@@ -547,6 +547,10 @@ void VulkanCore::WaitGPU() {
   }
 }
 
+uint32_t VulkanCore::WaveSize() const {
+  return device_->SubGroupSize();
+}
+
 void VulkanCore::SingleTimeCommand(std::function<void(VkCommandBuffer)> command) {
   VkSubmitInfo submit_info{};
   submit_info.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
