@@ -410,12 +410,12 @@ void D3D12CmdDispatchRays::CompileCommand(D3D12CommandContext *context, ID3D12Gr
     dispatch_desc.Height = height_;
     dispatch_desc.Depth = depth_;
     dxr_command_list->DispatchRays(&dispatch_desc);
-    D3D12_RESOURCE_BARRIER uavBarrier = {};
-    uavBarrier.Type = D3D12_RESOURCE_BARRIER_TYPE_UAV;
-    uavBarrier.Flags = D3D12_RESOURCE_BARRIER_FLAG_NONE;
-    uavBarrier.UAV.pResource = nullptr;  // This barrier is a placeholder, it will be set by the program
 
-    command_list->ResourceBarrier(1, &uavBarrier);
+    D3D12_RESOURCE_BARRIER uav_barrier = {};
+    uav_barrier.Type = D3D12_RESOURCE_BARRIER_TYPE_UAV;
+    uav_barrier.Flags = D3D12_RESOURCE_BARRIER_FLAG_NONE;
+    uav_barrier.UAV.pResource = nullptr;  // This barrier is a placeholder, it will be set by the program
+    command_list->ResourceBarrier(1, &uav_barrier);
   }
 }
 
@@ -425,12 +425,12 @@ D3D12CmdDispatch::D3D12CmdDispatch(uint32_t group_count_x, uint32_t group_count_
 
 void D3D12CmdDispatch::CompileCommand(D3D12CommandContext *context, ID3D12GraphicsCommandList *command_list) {
   command_list->Dispatch(group_count_x_, group_count_y_, group_count_z_);
-  D3D12_RESOURCE_BARRIER uavBarrier = {};
-  uavBarrier.Type = D3D12_RESOURCE_BARRIER_TYPE_UAV;
-  uavBarrier.Flags = D3D12_RESOURCE_BARRIER_FLAG_NONE;
-  uavBarrier.UAV.pResource = nullptr;  // This barrier is a placeholder, it will be set by the program
 
-  command_list->ResourceBarrier(1, &uavBarrier);
+  D3D12_RESOURCE_BARRIER uav_barrier = {};
+  uav_barrier.Type = D3D12_RESOURCE_BARRIER_TYPE_UAV;
+  uav_barrier.Flags = D3D12_RESOURCE_BARRIER_FLAG_NONE;
+  uav_barrier.UAV.pResource = nullptr;  // This barrier is a placeholder, it will be set by the program
+  command_list->ResourceBarrier(1, &uav_barrier);
 }
 
 D3D12CmdCopyBuffer::D3D12CmdCopyBuffer(D3D12Buffer *dst_buffer,

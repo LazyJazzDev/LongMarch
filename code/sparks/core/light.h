@@ -8,7 +8,8 @@ class Light {
   virtual ~Light() = default;
   virtual graphics::Shader *SamplerShader() = 0;
   virtual graphics::Buffer *SamplerData() = 0;
-  virtual void Update(Scene *scene, uint32_t light_index) = 0;
+  virtual uint32_t SamplerPreprocess(graphics::CommandContext *cmd_ctx) = 0;
+  virtual graphics::Buffer *GeometryData();
 
  protected:
   Core *core_;

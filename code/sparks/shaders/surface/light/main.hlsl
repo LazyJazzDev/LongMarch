@@ -1,7 +1,8 @@
 #include "bindings.hlsli"
 
 [shader("callable")] void CallableMain(inout RenderContext context) {
-  ByteAddressBuffer surface_buffer = data_buffers[context.surface_buffer_index];
+  InstanceMetadata instance_meta = instance_metadatas[context.hit_record.object_id];
+  ByteAddressBuffer surface_buffer = data_buffers[instance_meta.surface_data_index];
   float3 emission = LoadFloat3(surface_buffer, 0);
   int two_sided = surface_buffer.Load(12);
   int block_ray = surface_buffer.Load(16);

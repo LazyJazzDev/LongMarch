@@ -16,7 +16,7 @@ int main() {
   sparks_core.GetShadersVFS().Print();
 
   sparks::Scene scene(&sparks_core);
-  scene.settings.samples_per_dispatch = 128;
+  scene.settings.samples_per_dispatch = 8;
   sparks::Film film(&sparks_core, 1024, 1024);
   sparks::Camera camera(&sparks_core,
                         glm::lookAt(glm::vec3{278.0f, 273.0f, -800.0f}, glm::vec3{278.0f, 273.0f, -800.0f + 1.0f},
@@ -114,10 +114,17 @@ int main() {
 
   Mesh<float> sphere_mesh = Mesh<>::Sphere(10);
   sparks::GeometryMesh geometry_sphere(&sparks_core, sphere_mesh);
-  sparks::EntityGeometryLight entity_sphere(
-      &sparks_core, &geometry_sphere, {1.0f, 1.0f, 1.0f}, true, true,
-      glm::translate(glm::mat4{1.0f}, glm::vec3{250, 400, 300}) * glm::scale(glm::mat4{1.0f}, glm::vec3{10.0f}));
-  scene.AddEntity(&entity_sphere);
+  const int num_sphere_lights = 100;
+  std::unique_ptr<sparks::EntityGeometryLight> entity_spheres[num_sphere_lights];
+  for (int i = 0; i < num_sphere_lights; i++) {
+    int x = i % 10;
+    int y = (i / 10) % 10;
+    entity_spheres[i].reset(
+        new sparks::EntityGeometryLight(&sparks_core, &geometry_sphere, {1.0f, 1.0f, 1.0f}, true, false,
+                                        glm::translate(glm::mat4{1.0f}, glm::vec3{205 + x * 10, 355 + y * 10, 300}) *
+                                            glm::scale(glm::mat4{1.0f}, glm::vec3{3.0f})));
+    scene.AddEntity(entity_spheres[i].get());
+  }
 
   std::unique_ptr<graphics::Image> image;
   core_->CreateImage(film.GetWidth(), film.GetHeight(), graphics::IMAGE_FORMAT_R8G8B8A8_UNORM, &image);

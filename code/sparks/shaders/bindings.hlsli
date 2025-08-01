@@ -11,4 +11,7 @@ ConstantBuffer<SceneSettings> scene_settings : register(b0, space3);
 
 ByteAddressBuffer camera_data : register(t0, space4);
 ByteAddressBuffer data_buffers[] : register(t0, space5);
-StructuredBuffer<SurfaceRegistration> surface_regs : register(t0, space6);
+StructuredBuffer<InstanceMetadata> instance_metadatas : register(t0, space6);
+
+ByteAddressBuffer light_selector_data : register(t0, space7);
+StructuredBuffer<LightMetadata> light_metadatas : register(t0, space8);

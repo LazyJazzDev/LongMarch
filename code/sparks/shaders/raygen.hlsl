@@ -35,11 +35,10 @@
       HitRecord hit_record = context.hit_record;
       TraceRay(as, RAY_FLAG_NONE, 0xFF, 0, 0, 0, ray, hit_record);
       context.hit_record = hit_record;
-      SurfaceRegistration mat_reg = surface_regs[context.hit_record.object_id];
-      context.surface_buffer_index = mat_reg.buffer_index;
+      InstanceMetadata instance_meta = instance_metadatas[context.hit_record.object_id];
       if (context.hit_record.object_id >= 0) {
         // call the surface shader
-        CallShader(mat_reg.shader_index, context);
+        CallShader(instance_meta.surface_shader_index, context);
         // CallableMain(context);
       } else {
         // if no object was hit, set the background color

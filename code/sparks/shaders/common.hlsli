@@ -28,7 +28,6 @@ struct RenderContext {
   float3 radiance;
   float3 throughput;
   HitRecord hit_record;
-  int surface_buffer_index;
   RandomDevice rd;
 };
 
@@ -38,22 +37,28 @@ struct RayGenPayload {
   float3 direction;
 };
 
-struct SurfaceRegistration {
-  int shader_index;
-  int buffer_index;
-};
-
 struct SceneSettings {
   int samples_per_dispatch;
   int max_bounces;
 };
 
-struct LightRegistration {
-  int shader_index;
-  int buffer_index;
+struct InstanceMetadata {
+  int geom_data_index;
+  int surface_shader_index;
+  int surface_data_index;
+  int light_data_index;
 };
 
-struct EntityInfo {
-  SurfaceRegistration surface_registration;
-  LightRegistration light_registration;
+struct LightMetadata {
+  int sampler_shader_index;
+  int sampler_data_index;
+  int geometry_data_index;
+  uint power_offset;
+};
+
+struct SampleDirectionLightingPayload {
+  float3 position; // in
+  float3 eval; // out
+  float3 omega_in; // out
+  float pdf; // out
 };

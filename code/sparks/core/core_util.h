@@ -26,19 +26,29 @@ struct InstanceRegistration {
 };
 
 struct SurfaceRegistration {
-  int32_t shader_index;
-  int32_t data_index;
+  int32_t shader_index{-1};
+  int32_t data_index{-1};
 };
 
-struct LightRegistration {
-  int32_t shader_index;
-  int32_t data_index;
+struct LightMetadata {
+  int sampler_shader_index{-1};
+  int sampler_data_index{-1};
+  int geometry_data_index{-1};
+  uint32_t power_offset{0};
 };
 
-struct EntityMetadata {
-  GeometryRegistration geom_reg;
-  SurfaceRegistration surf_reg;
-  LightRegistration light_reg;
+struct InstanceMetadata {
+  int geom_data_index{-1};
+  int surface_shader_index{-1};
+  int surface_data_index{-1};
+  int light_sampler_data_index{-1};
+};
+
+struct BlellochScanMetadata {
+  uint32_t offset;
+  uint32_t stride;
+  uint32_t element_count;
+  uint32_t padding[61];
 };
 
 }  // namespace sparks

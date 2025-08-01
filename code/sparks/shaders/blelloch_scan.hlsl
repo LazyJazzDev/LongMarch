@@ -31,9 +31,14 @@ ConstantBuffer<Metadata> metadata : register(b0, space1);
       element = asfloat(buffer.Load(metadata.offset + index * metadata.stride));
     }
     uint add_index = (index / WaveGetLaneCount() - 1) * WaveGetLaneCount() + WaveGetLaneCount() - 1;
-    element += asfloat(buffer.Load(metadata.offset + add_index * metadata.stride));
+    float added_element = 0.0f;
+    if (add_index < metadata.element_count) {
+      added_element = asfloat(buffer.Load(metadata.offset + add_index * metadata.stride));
+    }
+    element += added_element;
     if (index < metadata.element_count && index % WaveGetLaneCount() != WaveGetLaneCount() - 1) {
       buffer.Store(metadata.offset + index * metadata.stride, asuint(element));
+      // buffer.Store(metadata.offset + index * metadata.stride, asuint(element));
     }
   }  //*/
 }

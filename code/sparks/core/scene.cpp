@@ -12,6 +12,8 @@ Scene::Scene(Core *core) : core_(core) {
   core_->GraphicsCore()->CreateShader(core_->GetShadersVFS(), "raygen.hlsl", "Main", "lib_6_3", &raygen_shader_);
   core_->GraphicsCore()->CreateShader(core_->GetShadersVFS(), "raygen.hlsl", "MissMain", "lib_6_3", &miss_shader_);
   core_->GraphicsCore()->CreateBuffer(sizeof(Settings), graphics::BUFFER_TYPE_STATIC, &scene_settings_buffer_);
+  core_->GraphicsCore()->CreateShader(core_->GetShadersVFS(), "gather_light_power.hlsl", "GatherLightPowerKernel",
+                                      "cs_6_3", &gather_light_power_shader_);
 }
 
 void Scene::Render(Camera *camera, Film *film) {
@@ -26,7 +28,9 @@ void Scene::Render(Camera *camera, Film *film) {
   cmd_context->CmdBindResources(3, {scene_settings_buffer_.get()}, graphics::BIND_POINT_RAYTRACING);
   cmd_context->CmdBindResources(4, {camera->Buffer()}, graphics::BIND_POINT_RAYTRACING);
   cmd_context->CmdBindResources(5, buffers_, graphics::BIND_POINT_RAYTRACING);
-  cmd_context->CmdBindResources(6, {entity_info_buffer_.get()}, graphics::BIND_POINT_RAYTRACING);
+  cmd_context->CmdBindResources(6, {instance_metadata_buffer_.get()}, graphics::BIND_POINT_RAYTRACING);
+  cmd_context->CmdBindResources(7, {light_selector_buffer_.get()}, graphics::BIND_POINT_RAYTRACING);
+  cmd_context->CmdBindResources(8, {light_metadatas_buffer_.get()}, graphics::BIND_POINT_RAYTRACING);
   cmd_context->CmdDispatchRays(film->accumulated_color_->Extent().width, film->accumulated_samples_->Extent().height,
                                1);
   core_->GraphicsCore()->SubmitCommandContext(cmd_context.get());
@@ -62,19 +66,35 @@ SurfaceRegistration Scene::RegisterSurface(Surface *surface) {
   return surf_reg;
 }
 
-InstanceRegistration Scene::RegisterInstance(GeometryRegistration geom_reg,
-                                             const glm::mat4x3 &transformation,
-                                             SurfaceRegistration surf_reg) {
-  InstanceRegistration instance_reg;
-  instance_reg.instance_index = instances_.size();
+LightMetadata Scene::RegisterLight(Light *light) {
+  LightMetadata light_reg{};
+  light_reg.sampler_data_index = RegisterBuffer(light->SamplerData());
+  light_reg.sampler_shader_index = RegisterCallableShader(light->SamplerShader());
+  light_reg.geometry_data_index = RegisterBuffer(light->GeometryData());
+  light_reg.power_offset = light->SamplerPreprocess(preprocess_cmd_context_.get());
+  light_metadatas_.push_back(light_reg);
+  return light_reg;
+}
 
+int32_t Scene::RegisterInstance(GeometryRegistration geom_reg,
+                                const glm::mat4x3 &transformation,
+                                SurfaceRegistration surf_reg,
+                                LightMetadata light_reg) {
+  int32_t instance_reg = instances_.size();
+  InstanceMetadata entity_metadata{};
+  entity_metadata.geom_data_index = geom_reg.data_index;
+  entity_metadata.surface_data_index = surf_reg.data_index;
+  entity_metadata.surface_shader_index = surf_reg.shader_index;
+  entity_metadata.light_sampler_data_index = light_reg.sampler_data_index;
   instances_.push_back(geom_reg.blas->MakeInstance(transformation, geom_reg.data_index, 255, geom_reg.hit_group_index));
-  surfaces_registrations_.push_back(surf_reg);
+  instance_metadatas_.push_back(entity_metadata);
 
   return instance_reg;
 }
 
 int32_t Scene::RegisterCallableShader(graphics::Shader *callable_shader) {
+  if (!callable_shader)
+    return -1;
   if (!callable_shader_map_.count(callable_shader)) {
     callable_shader_map_[callable_shader] = static_cast<int32_t>(callable_shaders_.size());
     callable_shaders_.emplace_back(callable_shader);
@@ -83,6 +103,8 @@ int32_t Scene::RegisterCallableShader(graphics::Shader *callable_shader) {
 }
 
 int32_t Scene::RegisterBuffer(graphics::Buffer *buffer) {
+  if (!buffer)
+    return -1;
   if (!buffer_map_.count(buffer)) {
     buffer_map_[buffer] = static_cast<int32_t>(buffers_.size());
     buffers_.emplace_back(buffer);
@@ -102,13 +124,25 @@ void Scene::UpdatePipeline(Camera *camera) {
   callable_shaders_.clear();
   callable_shader_map_.clear();
   instances_.clear();
-  surfaces_registrations_.clear();
+  instance_metadatas_.clear();
+  light_selector_buffer_.reset();
+  light_metadatas_.clear();
+  light_metadatas_buffer_.reset();
+
+  blelloch_metadatas_.clear();
+  blelloch_metadata_buffer_.reset();
+
+  gather_light_power_program_.reset();
 
   RegisterCallableShader(camera->Shader());
+
+  preprocess_cmd_context_.reset();
+  core_->GraphicsCore()->CreateCommandContext(&preprocess_cmd_context_);
 
   for (auto entity : entities_) {
     entity->Update(this);
   }
+
   callable_shader_indices_.resize(callable_shaders_.size());
   std::iota(callable_shader_indices_.begin(), callable_shader_indices_.end(), 0);
   hit_group_indices_.resize(hit_groups_.size());
@@ -116,11 +150,25 @@ void Scene::UpdatePipeline(Camera *camera) {
 
   core_->GraphicsCore()->CreateTopLevelAccelerationStructure(instances_, &tlas_);
 
-  entity_info_buffer_.reset();
-  core_->GraphicsCore()->CreateBuffer(sizeof(SurfaceRegistration) * surfaces_registrations_.size(),
-                                      graphics::BUFFER_TYPE_STATIC, &entity_info_buffer_);
-  entity_info_buffer_->UploadData(surfaces_registrations_.data(),
-                                  sizeof(SurfaceRegistration) * surfaces_registrations_.size());
+  instance_metadata_buffer_.reset();
+  core_->GraphicsCore()->CreateBuffer(sizeof(InstanceMetadata) * instance_metadatas_.size(),
+                                      graphics::BUFFER_TYPE_STATIC, &instance_metadata_buffer_);
+  instance_metadata_buffer_->UploadData(instance_metadatas_.data(),
+                                        sizeof(InstanceMetadata) * instance_metadatas_.size());
+
+  core_->GraphicsCore()->CreateBuffer(sizeof(uint32_t) + sizeof(float) * light_metadatas_.size(),
+                                      graphics::BUFFER_TYPE_STATIC, &light_selector_buffer_);
+  core_->GraphicsCore()->CreateBuffer(sizeof(LightMetadata) * light_metadatas_.size(), graphics::BUFFER_TYPE_STATIC,
+                                      &light_metadatas_buffer_);
+  light_metadatas_buffer_->UploadData(light_metadatas_.data(), sizeof(LightMetadata) * light_metadatas_.size());
+  uint32_t light_count = static_cast<uint32_t>(light_metadatas_.size());
+  light_selector_buffer_->UploadData(&light_count, sizeof(uint32_t), 0);
+
+  core_->GraphicsCore()->CreateComputeProgram(gather_light_power_shader_.get(), &gather_light_power_program_);
+  gather_light_power_program_->AddResourceBinding(graphics::RESOURCE_TYPE_STORAGE_BUFFER, 1);
+  gather_light_power_program_->AddResourceBinding(graphics::RESOURCE_TYPE_WRITABLE_STORAGE_BUFFER, 1);
+  gather_light_power_program_->AddResourceBinding(graphics::RESOURCE_TYPE_STORAGE_BUFFER, buffers_.size());
+  gather_light_power_program_->Finalize();
 
   rt_program_->AddResourceBinding(graphics::RESOURCE_TYPE_IMAGE, 1);
   rt_program_->AddResourceBinding(graphics::RESOURCE_TYPE_IMAGE, 1);
@@ -128,6 +176,8 @@ void Scene::UpdatePipeline(Camera *camera) {
   rt_program_->AddResourceBinding(graphics::RESOURCE_TYPE_UNIFORM_BUFFER, 1);
   rt_program_->AddResourceBinding(graphics::RESOURCE_TYPE_STORAGE_BUFFER, 1);
   rt_program_->AddResourceBinding(graphics::RESOURCE_TYPE_STORAGE_BUFFER, buffers_.size());
+  rt_program_->AddResourceBinding(graphics::RESOURCE_TYPE_STORAGE_BUFFER, 1);
+  rt_program_->AddResourceBinding(graphics::RESOURCE_TYPE_STORAGE_BUFFER, 1);
   rt_program_->AddResourceBinding(graphics::RESOURCE_TYPE_STORAGE_BUFFER, 1);
 
   rt_program_->AddRayGenShader(raygen_shader_.get());
@@ -139,6 +189,52 @@ void Scene::UpdatePipeline(Camera *camera) {
     rt_program_->AddCallableShader(callable_shader);
   }
   rt_program_->Finalize(miss_shader_indices_, hit_group_indices_, callable_shader_indices_);
+
+  preprocess_cmd_context_->CmdBindComputeProgram(gather_light_power_program_.get());
+  preprocess_cmd_context_->CmdBindResources(0, {light_metadatas_buffer_.get()}, graphics::BIND_POINT_COMPUTE);
+  preprocess_cmd_context_->CmdBindResources(1, {light_selector_buffer_.get()}, graphics::BIND_POINT_COMPUTE);
+  preprocess_cmd_context_->CmdBindResources(2, buffers_, graphics::BIND_POINT_COMPUTE);
+  preprocess_cmd_context_->CmdDispatch((light_metadatas_.size() + 63) / 64, 1, 1);
+
+  auto blelloch_scan_up_program = core_->GetComputeProgram("blelloch_scan_up");
+  auto blelloch_scan_down_program = core_->GetComputeProgram("blelloch_scan_down");
+  blelloch_metadatas_.clear();
+  BlellochScanMetadata metadata{4, 4, static_cast<uint32_t>(light_metadatas_.size())};
+  uint32_t wave_size = core_->GraphicsCore()->WaveSize();
+  while (metadata.element_count > 1) {
+    blelloch_metadatas_.push_back(metadata);
+    metadata = {metadata.offset + (wave_size - 1) * metadata.stride, metadata.stride * wave_size,
+                metadata.element_count / wave_size};
+  }
+  if (!blelloch_metadatas_.empty()) {
+    core_->GraphicsCore()->CreateBuffer(sizeof(BlellochScanMetadata) * blelloch_metadatas_.size(),
+                                        graphics::BUFFER_TYPE_STATIC, &blelloch_metadata_buffer_);
+    blelloch_metadata_buffer_->UploadData(blelloch_metadatas_.data(),
+                                          sizeof(BlellochScanMetadata) * blelloch_metadatas_.size());
+    preprocess_cmd_context_->CmdBindComputeProgram(blelloch_scan_up_program);
+    preprocess_cmd_context_->CmdBindResources(0, {light_selector_buffer_.get()}, graphics::BIND_POINT_COMPUTE);
+    for (size_t i = 1; i < blelloch_metadatas_.size(); i++) {
+      preprocess_cmd_context_->CmdBindResources(1, {blelloch_metadata_buffer_->Range(sizeof(BlellochScanMetadata) * i)},
+                                                graphics::BIND_POINT_COMPUTE);
+      preprocess_cmd_context_->CmdDispatch((blelloch_metadatas_[i].element_count + 63) / 64, 1, 1);
+    }
+    preprocess_cmd_context_->CmdBindComputeProgram(blelloch_scan_down_program);
+    for (size_t i = blelloch_metadatas_.size() - 1; i < blelloch_metadatas_.size(); i--) {
+      if (blelloch_metadatas_[i].element_count <= wave_size) {
+        continue;
+      }
+      preprocess_cmd_context_->CmdBindResources(1, {blelloch_metadata_buffer_->Range(sizeof(BlellochScanMetadata) * i)},
+                                                graphics::BIND_POINT_COMPUTE);
+      preprocess_cmd_context_->CmdDispatch((blelloch_metadatas_[i].element_count + 63) / 64, 1, 1);
+    }
+  }
+  core_->GraphicsCore()->SubmitCommandContext(preprocess_cmd_context_.get());
+  std::vector<float> light_power_cdf(light_metadatas_.size(), 0.0f);
+  light_selector_buffer_->DownloadData(light_power_cdf.data(), light_power_cdf.size() * sizeof(float),
+                                       sizeof(uint32_t));
+  for (size_t i = 0; i < light_power_cdf.size(); i++) {
+    std::cout << "Light " << i << " Power CDF: " << light_power_cdf[i] << std::endl;
+  }
 }
 
 }  // namespace sparks

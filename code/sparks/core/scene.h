@@ -15,9 +15,12 @@ class Scene {
 
   SurfaceRegistration RegisterSurface(Surface *surface);
 
-  InstanceRegistration RegisterInstance(GeometryRegistration geom_reg,
-                                        const glm::mat4x3 &transformation,
-                                        SurfaceRegistration surf_reg);
+  LightMetadata RegisterLight(Light *light);
+
+  int32_t RegisterInstance(GeometryRegistration geom_reg,
+                           const glm::mat4x3 &transformation,
+                           SurfaceRegistration surf_reg,
+                           LightMetadata light_reg = {});
 
   struct HitGroupComparator {
     bool operator()(const graphics::HitGroup &lhs, const graphics::HitGroup &rhs) const {
@@ -58,9 +61,22 @@ class Scene {
   std::map<graphics::Shader *, int32_t> callable_shader_map_;
 
   std::vector<graphics::RayTracingInstance> instances_;
-  std::vector<SurfaceRegistration> surfaces_registrations_;
 
-  std::unique_ptr<graphics::Buffer> entity_info_buffer_;
+  std::vector<InstanceMetadata> instance_metadatas_;
+  std::unique_ptr<graphics::Buffer> instance_metadata_buffer_;
+
+  std::unique_ptr<graphics::Buffer> light_selector_buffer_;
+
+  std::vector<LightMetadata> light_metadatas_;
+  std::unique_ptr<graphics::Buffer> light_metadatas_buffer_;
+
+  std::vector<BlellochScanMetadata> blelloch_metadatas_;
+  std::unique_ptr<graphics::Buffer> blelloch_metadata_buffer_;
+
+  std::unique_ptr<graphics::Shader> gather_light_power_shader_;
+  std::unique_ptr<graphics::ComputeProgram> gather_light_power_program_;
+
+  std::unique_ptr<graphics::CommandContext> preprocess_cmd_context_;
 };
 
 }  // namespace sparks
