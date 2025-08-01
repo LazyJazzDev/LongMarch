@@ -9,7 +9,6 @@ class LightGeometrySurface : public Light {
   graphics::Shader *SamplerShader() override;
   graphics::Buffer *SamplerData() override;
   uint32_t SamplerPreprocess(graphics::CommandContext *cmd_ctx) override;
-  graphics::Buffer *GeometryData() override;
 
  private:
   Geometry *geometry_;

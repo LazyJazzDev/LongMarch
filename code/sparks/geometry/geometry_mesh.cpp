@@ -56,13 +56,12 @@ GeometryMesh::GeometryMesh(Core *core, const Mesh<float> &mesh) : Geometry(core)
       header.num_vertices, header.position_stride, header.num_indices / 3, graphics::RAYTRACING_GEOMETRY_FLAG_NONE,
       &blas_);
 
-  auto vfs = core_->GetShadersVFS();
+  auto &vfs = core_->GetShadersVFS();
   core_->GraphicsCore()->CreateShader(vfs, "geometry/mesh/hit_group.hlsl", "ClosestHitMain", "lib_6_3", {"-I."},
                                       &closest_hit_shader_);
   primitive_count_ = header.num_indices / 3;
-  std::vector<uint8_t> sampler_impl_code_data;
-  vfs.ReadFile("geometry/mesh/geometry_sampler.hlsli", sampler_impl_code_data);
-  sampler_implementation_ = CodeLines(sampler_impl_code_data);
+  sampler_implementation_ = CodeLines(vfs, "geometry/mesh/geometry_sampler.hlsli");
+  closest_hit_shader_implementation_ = CodeLines(vfs, "geometry/mesh/hit_group.hlsl");
 }
 
 graphics::Buffer *GeometryMesh::Buffer() {
@@ -73,11 +72,15 @@ graphics::HitGroup GeometryMesh::HitGroup() {
   return graphics::HitGroup{closest_hit_shader_.get(), nullptr, nullptr, false};
 }
 
+const CodeLines &GeometryMesh::ClosestHitShaderImpl() const {
+  return closest_hit_shader_implementation_;
+}
+
 int GeometryMesh::PrimitiveCount() {
   return primitive_count_;
 }
 
-const CodeLines &GeometryMesh::SamplerImplementation() const {
+const CodeLines &GeometryMesh::SamplerImpl() const {
   return sampler_implementation_;
 }
 

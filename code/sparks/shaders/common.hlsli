@@ -10,15 +10,15 @@ struct CameraData {
 
 struct HitRecord {
   float t;
-  int primitive_index;
   float3 position;
   float2 tex_coord;
   float3 normal;
   float3 geom_normal;
   float3 tangent;
   float signal;
-  int object_id;
-  int primitive_id;
+  float pdf;
+  int primitive_index;
+  int object_index;
   bool front_facing;
 };
 
@@ -29,6 +29,7 @@ struct RenderContext {
   float3 throughput;
   HitRecord hit_record;
   RandomDevice rd;
+  float bsdf_pdf;
 };
 
 struct RayGenPayload {
@@ -43,22 +44,27 @@ struct SceneSettings {
 };
 
 struct InstanceMetadata {
-  int geom_data_index;
+  int geometry_data_index;
   int surface_shader_index;
   int surface_data_index;
-  int light_data_index;
+  int custom_index;
 };
 
 struct LightMetadata {
   int sampler_shader_index;
   int sampler_data_index;
-  int geometry_data_index;
+  int custom_index;
   uint power_offset;
 };
 
-struct SampleDirectionLightingPayload {
-  float3 position; // in
-  float3 eval; // out
-  float3 omega_in; // out
-  float pdf; // out
+struct SampleDirectLightingPayload {
+  uint4 low;
+  uint4 high;
+};
+
+struct GeometryPrimitiveSample {
+  float3 position;
+  float3 normal;
+  float2 tex_coord;
+  float pdf;
 };

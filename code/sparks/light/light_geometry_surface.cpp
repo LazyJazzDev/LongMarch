@@ -14,15 +14,24 @@ LightGeometrySurface::LightGeometrySurface(Core *core,
   core_->GraphicsCore()->CreateBuffer(
       sizeof(glm::mat4x3) + sizeof(uint32_t) + geometry->PrimitiveCount() * sizeof(float), graphics::BUFFER_TYPE_STATIC,
       &direct_lighting_sampler_data_);
-  CodeLines gather_primitive_power_kernel(core_->GetShadersVFS(), "light/geometry_surface/gather_primitive_power.hlsl");
-  gather_primitive_power_kernel.InsertAfter(geometry_->SamplerImplementation(), "// Geometry Sampler Implementation");
-  gather_primitive_power_kernel.InsertAfter(surface_->SamplerImplementation(), "// Surface Sampler Implementation");
-  // std::cout << gather_primitive_power_kernel << std::endl;
 
   auto vfs = core_->GetShadersVFS();
+  CodeLines gather_primitive_power_kernel(vfs, "light/geometry_surface/gather_primitive_power.hlsl");
+  gather_primitive_power_kernel.InsertAfter(geometry_->SamplerImpl(), "// Geometry Sampler Implementation");
+  gather_primitive_power_kernel.InsertAfter(surface_->SamplerImplementation(), "// Surface Evaluator Implementation");
+  // std::cout << gather_primitive_power_kernel << std::endl;
+  CodeLines direct_lighting_sampler_callable(vfs, "light/geometry_surface/direct_lighting_sampler.hlsl");
+  direct_lighting_sampler_callable.InsertAfter(geometry_->SamplerImpl(), "// Geometry Sampler Implementation");
+  direct_lighting_sampler_callable.InsertAfter(surface_->SamplerImplementation(),
+                                               "// Surface Evaluator Implementation");
+
   vfs.WriteFile("light/geometry_surface/gather_primitive_power.hlsl", std::string(gather_primitive_power_kernel));
+  vfs.WriteFile("light/geometry_surface/direct_lighting_sampler.hlsl", std::string(direct_lighting_sampler_callable));
+
   core_->GraphicsCore()->CreateShader(vfs, "light/geometry_surface/gather_primitive_power.hlsl",
                                       "GatherPrimitivePowerKernel", "cs_6_3", {"-I."}, &gather_primitive_power_shader_);
+  core_->GraphicsCore()->CreateShader(vfs, "light/geometry_surface/direct_lighting_sampler.hlsl",
+                                      "SampleDirectLightingCallable", "lib_6_3", {"-I."}, &direct_lighting_sampler_);
 
   uint32_t primitive_count = geometry_->PrimitiveCount();
   uint32_t wave_size = core_->GraphicsCore()->WaveSize();
@@ -50,19 +59,7 @@ LightGeometrySurface::LightGeometrySurface(Core *core,
 }
 
 graphics::Shader *LightGeometrySurface::SamplerShader() {
-  // uint32_t wave_size = core_->GraphicsCore()->WaveSize();
-  // std::unique_ptr<graphics::CommandContext> cmd_context;
-  // core_->GraphicsCore()->CreateCommandContext(&cmd_context);
-  //
-  //
-  // core_->GraphicsCore()->SubmitCommandContext(cmd_context.get());
-  // std::vector<float> primitive_power(geometry_->PrimitiveCount(), 0.0f);
-  // direct_lighting_sampler_data_->DownloadData(primitive_power.data(), geometry_->PrimitiveCount() * sizeof(float),
-  //                                             sizeof(glm::mat4x3) + sizeof(uint32_t));
-  // float total_power = 0.0f;
-  // total_power = primitive_power.back();
-  // std::cout << "Total Power: " << total_power << std::endl;
-  return nullptr;
+  return direct_lighting_sampler_.get();
 }
 
 graphics::Buffer *LightGeometrySurface::SamplerData() {
@@ -96,10 +93,6 @@ uint32_t LightGeometrySurface::SamplerPreprocess(graphics::CommandContext *cmd_c
     cmd_context->CmdDispatch((metadatas_[i].element_count + 63) / 64, 1, 1);
   }
   return sizeof(glm::mat4x3) + sizeof(uint32_t) + (geometry_->PrimitiveCount() - 1) * sizeof(float);
-}
-
-graphics::Buffer *LightGeometrySurface::GeometryData() {
-  return geometry_->Buffer();
 }
 
 }  // namespace sparks

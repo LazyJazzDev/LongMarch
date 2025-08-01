@@ -26,8 +26,9 @@ class GeometryMesh : public Geometry {
   graphics::Buffer *Buffer() override;
   graphics::AccelerationStructure *BLAS() override;
   graphics::HitGroup HitGroup() override;
+  const CodeLines &ClosestHitShaderImpl() const override;
   int PrimitiveCount() override;
-  const CodeLines &SamplerImplementation() const override;
+  const CodeLines &SamplerImpl() const override;
 
  private:
   std::unique_ptr<graphics::Buffer> geometry_buffer_;
@@ -35,6 +36,7 @@ class GeometryMesh : public Geometry {
   std::unique_ptr<graphics::Shader> closest_hit_shader_;
   int primitive_count_;
   CodeLines sampler_implementation_;
+  CodeLines closest_hit_shader_implementation_;
 };
 
 }  // namespace sparks

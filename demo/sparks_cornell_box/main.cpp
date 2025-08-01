@@ -39,9 +39,9 @@ int main() {
                     reinterpret_cast<Vector3<float> *>(positions.data()), nullptr,
                     reinterpret_cast<Vector2<float> *>(tex_coords.data()), nullptr);
   sparks::GeometryMesh geometry_light(&sparks_core, light);
-  sparks::EntityGeometrySurface entity_light(&sparks_core, &geometry_light, &material_light);
-  // sparks::EntityGeometryLight entity_light(&sparks_core, &geometry_light, {30.0f, 30.0f, 30.0f}, true, true,
-  //                                                 glm::mat4x3(1.0f));
+  // sparks::EntityGeometrySurface entity_light(&sparks_core, &geometry_light, &material_light);
+  sparks::EntityGeometryLight entity_light(&sparks_core, &geometry_light, {30.0f, 30.0f, 30.0f}, true, true,
+                                           glm::mat4x3(1.0f));
 
   positions = {{552.8f, 0.0f, 0.0f}, {0.0f, 0.0f, 0.0f}, {0.0f, 0.0f, 559.2f}, {549.6f, 0.0f, 559.2f}};
   Mesh<float> floor(positions.size(), indices.size(), indices.data(),
@@ -112,19 +112,19 @@ int main() {
   scene.AddEntity(&entity_short_box);
   scene.AddEntity(&entity_tall_box);
 
-  Mesh<float> sphere_mesh = Mesh<>::Sphere(10);
-  sparks::GeometryMesh geometry_sphere(&sparks_core, sphere_mesh);
-  const int num_sphere_lights = 100;
-  std::unique_ptr<sparks::EntityGeometryLight> entity_spheres[num_sphere_lights];
-  for (int i = 0; i < num_sphere_lights; i++) {
-    int x = i % 10;
-    int y = (i / 10) % 10;
-    entity_spheres[i].reset(
-        new sparks::EntityGeometryLight(&sparks_core, &geometry_sphere, {1.0f, 1.0f, 1.0f}, true, false,
-                                        glm::translate(glm::mat4{1.0f}, glm::vec3{205 + x * 10, 355 + y * 10, 300}) *
-                                            glm::scale(glm::mat4{1.0f}, glm::vec3{3.0f})));
-    scene.AddEntity(entity_spheres[i].get());
-  }
+  // Mesh<float> sphere_mesh = Mesh<>::Sphere(10);
+  // sparks::GeometryMesh geometry_sphere(&sparks_core, sphere_mesh);
+  // const int num_sphere_lights = 100;
+  // std::unique_ptr<sparks::EntityGeometryLight> entity_spheres[num_sphere_lights];
+  // for (int i = 0; i < num_sphere_lights; i++) {
+  //   int x = i % 10;
+  //   int y = (i / 10) % 10;
+  //   entity_spheres[i].reset(
+  //       new sparks::EntityGeometryLight(&sparks_core, &geometry_sphere, {1.0f, 1.0f, 1.0f}, true, false,
+  //                                       glm::translate(glm::mat4{1.0f}, glm::vec3{205 + x * 10, 355 + y * 10, 300}) *
+  //                                           glm::scale(glm::mat4{1.0f}, glm::vec3{3.0f})));
+  //   scene.AddEntity(entity_spheres[i].get());
+  // }
 
   std::unique_ptr<graphics::Image> image;
   core_->CreateImage(film.GetWidth(), film.GetHeight(), graphics::IMAGE_FORMAT_R8G8B8A8_UNORM, &image);

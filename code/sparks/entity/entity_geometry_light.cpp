@@ -28,8 +28,10 @@ void EntityGeometryLight::Update(Scene *scene) {
   surface_light_.two_sided = two_sided;
   surface_light_.block_ray = block_ray;
   light_geom_surf_.SamplerShader();
-  scene->RegisterInstance(scene->RegisterGeometry(geometry_), transformation_, scene->RegisterSurface(&surface_light_),
-                          scene->RegisterLight(&light_geom_surf_));
+  int32_t light_index = scene->RegisterLight(&light_geom_surf_);
+  int32_t instance_index = scene->RegisterInstance(scene->RegisterGeometry(geometry_), transformation_,
+                                                   scene->RegisterSurface(&surface_light_), light_index);
+  scene->LightCustomIndex(light_index) = instance_index;
 }
 
 }  // namespace sparks

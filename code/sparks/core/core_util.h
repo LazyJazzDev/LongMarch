@@ -33,15 +33,15 @@ struct SurfaceRegistration {
 struct LightMetadata {
   int sampler_shader_index{-1};
   int sampler_data_index{-1};
-  int geometry_data_index{-1};
+  int custom_index{-1};
   uint32_t power_offset{0};
 };
 
 struct InstanceMetadata {
-  int geom_data_index{-1};
+  int geometry_data_index{-1};
   int surface_shader_index{-1};
   int surface_data_index{-1};
-  int light_sampler_data_index{-1};
+  int custom_index{-1};
 };
 
 struct BlellochScanMetadata {

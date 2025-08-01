@@ -15,12 +15,16 @@ class Scene {
 
   SurfaceRegistration RegisterSurface(Surface *surface);
 
-  LightMetadata RegisterLight(Light *light);
+  int32_t RegisterLight(Light *light, int custom_index = -1);
 
   int32_t RegisterInstance(GeometryRegistration geom_reg,
                            const glm::mat4x3 &transformation,
                            SurfaceRegistration surf_reg,
-                           LightMetadata light_reg = {});
+                           int custom_index = -1);
+
+  int &LightCustomIndex(int32_t light_index);
+
+  int &InstanceCustomIndex(int32_t instance_index);
 
   struct HitGroupComparator {
     bool operator()(const graphics::HitGroup &lhs, const graphics::HitGroup &rhs) const {
@@ -36,6 +40,7 @@ class Scene {
 
   int32_t RegisterCallableShader(graphics::Shader *callable_shader);
   int32_t RegisterBuffer(graphics::Buffer *buffer);
+  int32_t RegisterHitGroup(const graphics::HitGroup &hit_group);
 
  private:
   void UpdatePipeline(Camera *camera);

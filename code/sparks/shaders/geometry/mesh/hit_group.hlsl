@@ -1,4 +1,7 @@
 #include "bindings.hlsli"
+#include "direct_lighting.hlsli"
+
+// Surface Main Implementation
 
 struct GeometryHeader {
   uint num_vertices;
@@ -47,6 +50,7 @@ struct GeometryHeader {
   hit_group.position = pos[0] * barycentrics[0] + pos[1] * barycentrics[1] + pos[2] * barycentrics[2];
   hit_group.position = mul(ObjectToWorld3x4(), float4(hit_group.position, 1.0));
   hit_group.geom_normal = normalize(mul(WorldToObject4x3(), cross(pos[1] - pos[0], pos[2] - pos[0])).xyz);
+  hit_group.pdf = 1.0f / (length(cross(pos[1] - pos[0], pos[2] - pos[0])) * 0.5f);
 
   if (header.normal_offset != 0) {
     hit_group.normal =
@@ -94,6 +98,6 @@ struct GeometryHeader {
     hit_group.signal = -hit_group.signal;
   }
 
-  hit_group.object_id = InstanceIndex();
-  hit_group.primitive_id = PrimitiveIndex();
+  hit_group.object_index = InstanceIndex();
+  hit_group.primitive_index = PrimitiveIndex();
 }

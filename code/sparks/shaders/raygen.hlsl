@@ -24,6 +24,7 @@
       context.direction = payload.direction;
       context.radiance = float3(0.0, 0.0, 0.0);
       context.throughput = float3(1.0, 1.0, 1.0);
+      context.bsdf_pdf = INF;
     }
 
     for (int bounce = 0; bounce < scene_settings.max_bounces; bounce++) {
@@ -35,8 +36,8 @@
       HitRecord hit_record = context.hit_record;
       TraceRay(as, RAY_FLAG_NONE, 0xFF, 0, 0, 0, ray, hit_record);
       context.hit_record = hit_record;
-      InstanceMetadata instance_meta = instance_metadatas[context.hit_record.object_id];
-      if (context.hit_record.object_id >= 0) {
+      InstanceMetadata instance_meta = instance_metadatas[context.hit_record.object_index];
+      if (context.hit_record.object_index >= 0) {
         // call the surface shader
         CallShader(instance_meta.surface_shader_index, context);
         // CallableMain(context);
@@ -69,9 +70,10 @@
   hit_record.tangent = float3(0.0, 0.0, 1.0);
   hit_record.tex_coord = float2(0.0, 0.0);
   hit_record.signal = 1.0;
-  hit_record.object_id = -1;
-  hit_record.primitive_id = -1;
+  hit_record.object_index = -1;
+  hit_record.primitive_index = -1;
   hit_record.geom_normal = float3(0.0, 0.0, 0.0);
+  hit_record.pdf = 0.0;
   // set the front facing flag to true by default
   hit_record.front_facing = true;
 }

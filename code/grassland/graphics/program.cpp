@@ -61,6 +61,21 @@ class CustomVFSIncludeHandler : public IDxcIncludeHandler {
     // Convert LPCWSTR to std::wstring
     std::string filename = WStringToString(pFilename);
 
+    if (accessed_paths_.count(filename)) {
+      HRESULT hr = S_OK;
+      IDxcBlobEncoding *source_blob = nullptr;
+      hr = dxc_utils_->CreateBlob(nullptr, 0, CP_UTF8, &source_blob);
+      if (hr) {
+        LogError("Failed to create empty blob for include file: {}", filename);
+        return hr;
+      }
+      source_blob->QueryInterface(IID_PPV_ARGS(ppIncludeSource));
+      source_blob->Release();
+      return hr;  // Already accessed this file, return success
+    } else {
+      accessed_paths_.insert(filename);
+    }
+
     std::vector<uint8_t> data;
     if (vfs_->ReadFile(filename, data)) {
 #ifndef NDEBUG
@@ -85,6 +100,7 @@ class CustomVFSIncludeHandler : public IDxcIncludeHandler {
   const VirtualFileSystem *vfs_;
   IDxcUtils *dxc_utils_;
   std::filesystem::path source_path_;
+  std::set<std::filesystem::path> accessed_paths_;
 };
 
 void RayTracingProgram::AddHitGroup(Shader *closest_hit_shader,

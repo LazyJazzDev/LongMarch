@@ -1,4 +1,5 @@
 #include "buffer_helper.hlsli"
+#include "common.hlsli"
 #include "constants.hlsli"
 
 #define GROUP_SIZE 128
@@ -9,7 +10,7 @@ RWByteAddressBuffer direct_lighting_sampler_data : register(u0, space2);
 
 // Geometry Sampler Implementation
 
-// Surface Sampler Implementation
+// Surface Evaluator Implementation
 
 [numthreads(GROUP_SIZE, 1, 1)] void GatherPrimitivePowerKernel(uint3 GID
                                                                : SV_GroupID, uint3 DTID
@@ -22,11 +23,11 @@ RWByteAddressBuffer direct_lighting_sampler_data : register(u0, space2);
   GeometrySampler<ByteAddressBuffer> geometry_sampler;
   geometry_sampler.geometry_data = geometry_data;
   geometry_sampler.SetTransform(transform);
-  SurfaceSampler<ByteAddressBuffer> surface_sampler;
-  surface_sampler.surface_data = surface_data;
+  SurfaceEvaluator<ByteAddressBuffer> surface_evaluator;
+  surface_evaluator.surface_data = surface_data;
   // calculate the prefix sum of primitive_power_shared with WavePrefixSum
   if (DTID.x < primitive_count) {
-    primitive_power = surface_sampler.PrimitivePower(geometry_sampler, DTID.x);
+    primitive_power = surface_evaluator.PrimitivePower(geometry_sampler, DTID.x);
   }
 
   primitive_power += WavePrefixSum(primitive_power);

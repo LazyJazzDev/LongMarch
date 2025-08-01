@@ -1,29 +1,29 @@
-
-template <class T>
-float4 LoadFloat4(T buf, uint baseOffset) {
+#pragma once
+template <class BufferType>
+float4 LoadFloat4(BufferType buf, uint baseOffset) {
     uint4 vals = buf.Load4(baseOffset); // 16 bytes per float4
     return asfloat(vals);
 }
 
-template <class T>
-float3 LoadFloat3(T buf, uint baseOffset) {
+template <class BufferType>
+float3 LoadFloat3(BufferType buf, uint baseOffset) {
     uint3 vals = buf.Load3(baseOffset); // 16 bytes per float3
     return asfloat(vals);
 }
 
-template <class T>
-float2 LoadFloat2(T buf, uint baseOffset) {
+template <class BufferType>
+float2 LoadFloat2(BufferType buf, uint baseOffset) {
     uint2 vals = buf.Load2(baseOffset); // 16 bytes per float2
     return asfloat(vals);
 }
 
-template <class T>
-float LoadFloat(T buf, uint baseOffset) {
+template <class BufferType>
+float LoadFloat(BufferType buf, uint baseOffset) {
     return asfloat(buf.Load(baseOffset)); // 4 bytes per float
 }
 
-template <class T>
-float4x4 LoadFloat4x4(T buf, uint baseOffset) {
+template <class BufferType>
+float4x4 LoadFloat4x4(BufferType buf, uint baseOffset) {
     float4x4 mat;
     mat[0] = LoadFloat4(buf, baseOffset + 0);
     mat[1] = LoadFloat4(buf, baseOffset + 16);
@@ -32,8 +32,8 @@ float4x4 LoadFloat4x4(T buf, uint baseOffset) {
     return transpose(mat); // Transpose for row-major order
 }
 
-template <class T>
-float4x3 LoadFloat4x3(T buf, uint baseOffset) {
+template <class BufferType>
+float4x3 LoadFloat4x3(BufferType buf, uint baseOffset) {
     float3x4 mat;
     mat[0] = LoadFloat4(buf, baseOffset + 0);
     mat[1] = LoadFloat4(buf, baseOffset + 16);
@@ -41,16 +41,16 @@ float4x3 LoadFloat4x3(T buf, uint baseOffset) {
     return transpose(mat); // Transpose for row-major order
 }
 
-template <class T>
-float4x2 LoadFloat4x2(T buf, uint baseOffset) {
+template <class BufferType>
+float4x2 LoadFloat4x2(BufferType buf, uint baseOffset) {
     float2x4 mat;
     mat[0] = LoadFloat4(buf, baseOffset + 0);
     mat[1] = LoadFloat4(buf, baseOffset + 16);
     return transpose(mat); // Transpose for row-major order
 }
 
-template <class T>
-float3x4 LoadFloat3x4(T buf, uint baseOffset) {
+template <class BufferType>
+float3x4 LoadFloat3x4(BufferType buf, uint baseOffset) {
     float4x3 mat;
     mat[0] = LoadFloat3(buf, baseOffset + 0);
     mat[1] = LoadFloat3(buf, baseOffset + 12);
@@ -59,8 +59,8 @@ float3x4 LoadFloat3x4(T buf, uint baseOffset) {
     return transpose(mat); // Transpose for row-major order
 }
 
-template <class T>
-float3x3 LoadFloat3x3(T buf, uint baseOffset) {
+template <class BufferType>
+float3x3 LoadFloat3x3(BufferType buf, uint baseOffset) {
     float3x3 mat;
     mat[0] = LoadFloat3(buf, baseOffset + 0);
     mat[1] = LoadFloat3(buf, baseOffset + 12);
@@ -69,9 +69,9 @@ float3x3 LoadFloat3x3(T buf, uint baseOffset) {
 }
 
 
-template <class T>
+template <class BufferType>
 class BufferReference {
-  T m_buffer;
+  BufferType m_buffer;
   uint m_offset;
 
   uint Load(uint offset) {
@@ -91,9 +91,9 @@ class BufferReference {
   }
 };
 
-template <class T>
-BufferReference<T> MakeBufferReference(T buffer, uint offset) {
-    BufferReference<T> buf;
+template <class BufferType>
+BufferReference<BufferType> MakeBufferReference(BufferType buffer, uint offset) {
+    BufferReference<BufferType> buf;
     buf.m_buffer = buffer;
     buf.m_offset = offset;
     return buf;

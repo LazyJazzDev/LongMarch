@@ -6,7 +6,7 @@ namespace sparks {
 
 SurfaceLambertian::SurfaceLambertian(Core *core, const glm::vec3 &base_color, const glm::vec3 &emission)
     : Surface(core), base_color(base_color), emission(emission) {
-  core_->GraphicsCore()->CreateShader(core_->GetShadersVFS(), "surface/lambertian/main.hlsl", "CallableMain", "lib_6_3",
+  core_->GraphicsCore()->CreateShader(core_->GetShadersVFS(), "surface/lambertian/main.hlsl", "SurfaceMain", "lib_6_3",
                                       {"-I."}, &callable_shader_);
   core_->GraphicsCore()->CreateBuffer(sizeof(base_color) + sizeof(emission), graphics::BUFFER_TYPE_STATIC,
                                       &surface_buffer_);

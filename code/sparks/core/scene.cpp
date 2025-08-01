@@ -66,30 +66,38 @@ SurfaceRegistration Scene::RegisterSurface(Surface *surface) {
   return surf_reg;
 }
 
-LightMetadata Scene::RegisterLight(Light *light) {
+int32_t Scene::RegisterLight(Light *light, int custom_index) {
+  int32_t light_reg_index = light_metadatas_.size();
   LightMetadata light_reg{};
   light_reg.sampler_data_index = RegisterBuffer(light->SamplerData());
   light_reg.sampler_shader_index = RegisterCallableShader(light->SamplerShader());
-  light_reg.geometry_data_index = RegisterBuffer(light->GeometryData());
+  light_reg.custom_index = custom_index;
   light_reg.power_offset = light->SamplerPreprocess(preprocess_cmd_context_.get());
   light_metadatas_.push_back(light_reg);
-  return light_reg;
+  return light_reg_index;
 }
 
 int32_t Scene::RegisterInstance(GeometryRegistration geom_reg,
                                 const glm::mat4x3 &transformation,
                                 SurfaceRegistration surf_reg,
-                                LightMetadata light_reg) {
+                                int custom_index) {
   int32_t instance_reg = instances_.size();
   InstanceMetadata entity_metadata{};
-  entity_metadata.geom_data_index = geom_reg.data_index;
+  entity_metadata.geometry_data_index = geom_reg.data_index;
   entity_metadata.surface_data_index = surf_reg.data_index;
   entity_metadata.surface_shader_index = surf_reg.shader_index;
-  entity_metadata.light_sampler_data_index = light_reg.sampler_data_index;
+  entity_metadata.custom_index = custom_index;
   instances_.push_back(geom_reg.blas->MakeInstance(transformation, geom_reg.data_index, 255, geom_reg.hit_group_index));
   instance_metadatas_.push_back(entity_metadata);
-
   return instance_reg;
+}
+
+int &Scene::LightCustomIndex(int32_t light_index) {
+  return light_metadatas_[light_index].custom_index;
+}
+
+int &Scene::InstanceCustomIndex(int32_t instance_index) {
+  return instance_metadatas_[instance_index].custom_index;
 }
 
 int32_t Scene::RegisterCallableShader(graphics::Shader *callable_shader) {
@@ -110,6 +118,14 @@ int32_t Scene::RegisterBuffer(graphics::Buffer *buffer) {
     buffers_.emplace_back(buffer);
   }
   return buffer_map_[buffer];
+}
+
+int32_t Scene::RegisterHitGroup(const graphics::HitGroup &hit_group) {
+  if (!hit_group_map_.count(hit_group)) {
+    hit_group_map_[hit_group] = static_cast<int32_t>(hit_groups_.size());
+    hit_groups_.emplace_back(hit_group);
+  }
+  return hit_group_map_[hit_group];
 }
 
 void Scene::UpdatePipeline(Camera *camera) {
@@ -229,12 +245,12 @@ void Scene::UpdatePipeline(Camera *camera) {
     }
   }
   core_->GraphicsCore()->SubmitCommandContext(preprocess_cmd_context_.get());
-  std::vector<float> light_power_cdf(light_metadatas_.size(), 0.0f);
-  light_selector_buffer_->DownloadData(light_power_cdf.data(), light_power_cdf.size() * sizeof(float),
-                                       sizeof(uint32_t));
-  for (size_t i = 0; i < light_power_cdf.size(); i++) {
-    std::cout << "Light " << i << " Power CDF: " << light_power_cdf[i] << std::endl;
-  }
+  // std::vector<float> light_power_cdf(light_metadatas_.size(), 0.0f);
+  // light_selector_buffer_->DownloadData(light_power_cdf.data(), light_power_cdf.size() * sizeof(float),
+  //                                      sizeof(uint32_t));
+  // for (size_t i = 0; i < light_power_cdf.size(); i++) {
+  //   std::cout << "Light " << i << " Power CDF: " << light_power_cdf[i] << std::endl;
+  // }
 }
 
 }  // namespace sparks
