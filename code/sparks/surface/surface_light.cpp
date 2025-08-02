@@ -6,12 +6,12 @@ namespace sparks {
 
 SurfaceLight::SurfaceLight(Core *core, const glm::vec3 &emission, bool two_sided, bool block_ray)
     : Surface(core), emission(emission), two_sided(two_sided), block_ray(block_ray) {
-  core_->GraphicsCore()->CreateShader(core_->GetShadersVFS(), "surface/light/main.hlsl", "SurfaceMain", "lib_6_3",
+  core_->GraphicsCore()->CreateShader(core_->GetShadersVFS(), "surface/light/sampler.hlsl", "SurfaceSampler", "lib_6_3",
                                       {"-I."}, &callable_shader_);
   core_->GraphicsCore()->CreateBuffer(sizeof(emission) + sizeof(int) * 2, graphics::BUFFER_TYPE_STATIC,
                                       &surface_buffer_);
-  std::vector<uint8_t> sampler_impl_data;
-  sampler_implementation_ = CodeLines(core_->GetShadersVFS(), "surface/light/surface_sampler.hlsli");
+  sampler_implementation_ = CodeLines(core_->GetShadersVFS(), "surface/light/sampler.hlsl");
+  evaluator_implementation_ = CodeLines(core_->GetShadersVFS(), "surface/light/evaluator.hlsli");
   SyncSurfaceData();
 }
 
@@ -24,8 +24,12 @@ graphics::Shader *SurfaceLight::CallableShader() {
   return callable_shader_.get();
 }
 
-const CodeLines &SurfaceLight::SamplerImplementation() const {
+const CodeLines &SurfaceLight::SamplerImpl() const {
   return sampler_implementation_;
+}
+
+const CodeLines &SurfaceLight::EvaluatorImpl() const {
+  return evaluator_implementation_;
 }
 
 void SurfaceLight::SyncSurfaceData() {

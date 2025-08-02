@@ -6,13 +6,12 @@ namespace sparks {
 
 SurfaceLambertian::SurfaceLambertian(Core *core, const glm::vec3 &base_color, const glm::vec3 &emission)
     : Surface(core), base_color(base_color), emission(emission) {
-  core_->GraphicsCore()->CreateShader(core_->GetShadersVFS(), "surface/lambertian/main.hlsl", "SurfaceMain", "lib_6_3",
-                                      {"-I."}, &callable_shader_);
+  core_->GraphicsCore()->CreateShader(core_->GetShadersVFS(), "surface/lambertian/sampler.hlsl", "SurfaceSampler",
+                                      "lib_6_3", {"-I."}, &callable_shader_);
   core_->GraphicsCore()->CreateBuffer(sizeof(base_color) + sizeof(emission), graphics::BUFFER_TYPE_STATIC,
                                       &surface_buffer_);
-  std::vector<uint8_t> sampler_impl_data;
-  core_->GetShadersVFS().ReadFile("surface/lambertian/surface_sampler.hlsli", sampler_impl_data);
-  sampler_implementation_ = sampler_impl_data;
+  sampler_implementation_ = CodeLines(core_->GetShadersVFS(), "surface/lambertian/sampler.hlsl");
+  evaluator_implementation_ = CodeLines(core_->GetShadersVFS(), "surface/lambertian/evaluator.hlsli");
   SyncSurfaceData();
 }
 
@@ -25,8 +24,12 @@ graphics::Shader *SurfaceLambertian::CallableShader() {
   return callable_shader_.get();
 }
 
-const CodeLines &SurfaceLambertian::SamplerImplementation() const {
+const CodeLines &SurfaceLambertian::SamplerImpl() const {
   return sampler_implementation_;
+}
+
+const CodeLines &SurfaceLambertian::EvaluatorImpl() const {
+  return evaluator_implementation_;
 }
 
 void SurfaceLambertian::SyncSurfaceData() {

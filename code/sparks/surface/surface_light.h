@@ -9,7 +9,8 @@ class SurfaceLight : public Surface {
 
   graphics::Buffer *Buffer() override;
   graphics::Shader *CallableShader() override;
-  const CodeLines &SamplerImplementation() const override;
+  const CodeLines &SamplerImpl() const override;
+  const CodeLines &EvaluatorImpl() const override;
 
   glm::vec3 emission{0.0f};
   int two_sided = 0;
@@ -21,6 +22,7 @@ class SurfaceLight : public Surface {
   std::unique_ptr<graphics::Buffer> surface_buffer_;
   std::unique_ptr<graphics::Shader> callable_shader_;
   CodeLines sampler_implementation_;
+  CodeLines evaluator_implementation_;
 };
 
 }  // namespace sparks

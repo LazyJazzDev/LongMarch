@@ -19,6 +19,7 @@ class EntityGeometrySurface : public Entity {
   Geometry *geometry_{nullptr};
   Surface *surface_{nullptr};
   glm::mat4x3 transformation_;
+  std::unique_ptr<graphics::Shader> closest_hit_shader_;
 };
 
 }  // namespace sparks

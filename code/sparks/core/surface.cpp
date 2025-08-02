@@ -7,7 +7,7 @@ namespace sparks {
 Surface::Surface(Core *core) : core_(core) {
 }
 
-const CodeLines &Surface::SamplerImplementation() const {
+const CodeLines &Surface::EvaluatorImpl() const {
   return {};
 }
 

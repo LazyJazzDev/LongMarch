@@ -18,12 +18,11 @@ LightGeometrySurface::LightGeometrySurface(Core *core,
   auto vfs = core_->GetShadersVFS();
   CodeLines gather_primitive_power_kernel(vfs, "light/geometry_surface/gather_primitive_power.hlsl");
   gather_primitive_power_kernel.InsertAfter(geometry_->SamplerImpl(), "// Geometry Sampler Implementation");
-  gather_primitive_power_kernel.InsertAfter(surface_->SamplerImplementation(), "// Surface Evaluator Implementation");
+  gather_primitive_power_kernel.InsertAfter(surface_->EvaluatorImpl(), "// Surface Evaluator Implementation");
   // std::cout << gather_primitive_power_kernel << std::endl;
   CodeLines direct_lighting_sampler_callable(vfs, "light/geometry_surface/direct_lighting_sampler.hlsl");
   direct_lighting_sampler_callable.InsertAfter(geometry_->SamplerImpl(), "// Geometry Sampler Implementation");
-  direct_lighting_sampler_callable.InsertAfter(surface_->SamplerImplementation(),
-                                               "// Surface Evaluator Implementation");
+  direct_lighting_sampler_callable.InsertAfter(surface_->EvaluatorImpl(), "// Surface Evaluator Implementation");
 
   vfs.WriteFile("light/geometry_surface/gather_primitive_power.hlsl", std::string(gather_primitive_power_kernel));
   vfs.WriteFile("light/geometry_surface/direct_lighting_sampler.hlsl", std::string(direct_lighting_sampler_callable));

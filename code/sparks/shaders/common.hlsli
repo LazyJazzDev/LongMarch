@@ -27,7 +27,16 @@ struct RenderContext {
   float3 direction;
   float3 radiance;
   float3 throughput;
+  RandomDevice rd;
+  float bsdf_pdf;
   HitRecord hit_record;
+};
+
+struct RenderContext2 {
+  float3 origin;
+  float3 direction;
+  float3 radiance;
+  float3 throughput;
   RandomDevice rd;
   float bsdf_pdf;
 };
