@@ -1,7 +1,6 @@
 #include "bindings.hlsli"
 #include "direct_lighting.hlsli"
-
-// Surface Sampler Implementation
+#include "material_sampler.hlsli"
 
 struct GeometryHeader {
   uint num_vertices;
@@ -19,7 +18,9 @@ struct GeometryHeader {
   uint index_offset;
 };
 
-[shader("closesthit")] void ClosestHitMain(inout HitRecord hit_group, in BuiltInTriangleIntersectionAttributes attr) {
+[shader("closesthit")] void RenderClosestHit(inout RenderContext context,
+                                             in BuiltInTriangleIntersectionAttributes attr) {
+  HitRecord hit_group;
   BufferReference<ByteAddressBuffer> geometry_buffer = MakeBufferReference(data_buffers[InstanceID()], 0);
   GeometryHeader header;
   header.num_vertices = geometry_buffer.Load(0);
@@ -100,9 +101,11 @@ struct GeometryHeader {
 
   hit_group.object_index = InstanceIndex();
   hit_group.primitive_index = PrimitiveIndex();
+
+  SampleMaterial(context, hit_group);
 }
 
-    [shader("closesthit")] void EntityClosestHit(inout RenderContext2 context,
+    [shader("closesthit")] void ShadowClosestHit(inout ShadowRayPayload payload,
                                                  in BuiltInTriangleIntersectionAttributes attr) {
   HitRecord hit_group;
   BufferReference<ByteAddressBuffer> geometry_buffer = MakeBufferReference(data_buffers[InstanceID()], 0);
@@ -186,7 +189,5 @@ struct GeometryHeader {
   hit_group.object_index = InstanceIndex();
   hit_group.primitive_index = PrimitiveIndex();
 
-#ifdef SurfaceSample
-  SurfaceSample(context, hit_group);
-#endif
+  ShadowSample(payload, hit_group);
 }

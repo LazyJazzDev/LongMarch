@@ -29,16 +29,10 @@ struct RenderContext {
   float3 throughput;
   RandomDevice rd;
   float bsdf_pdf;
-  HitRecord hit_record;
 };
 
-struct RenderContext2 {
-  float3 origin;
-  float3 direction;
-  float3 radiance;
-  float3 throughput;
-  RandomDevice rd;
-  float bsdf_pdf;
+struct ShadowRayPayload {
+  float shadow;
 };
 
 struct RayGenPayload {
@@ -54,8 +48,8 @@ struct SceneSettings {
 
 struct InstanceMetadata {
   int geometry_data_index;
-  int surface_shader_index;
-  int surface_data_index;
+  int material_shader_index;
+  int material_data_index;
   int custom_index;
 };
 

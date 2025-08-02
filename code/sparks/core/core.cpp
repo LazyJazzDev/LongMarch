@@ -4,8 +4,8 @@
 #include "sparks/core/entity.h"
 #include "sparks/core/film.h"
 #include "sparks/core/geometry.h"
+#include "sparks/core/material.h"
 #include "sparks/core/scene.h"
-#include "sparks/core/surface.h"
 
 namespace sparks {
 Core::Core(graphics::Core *core) : core_(core) {

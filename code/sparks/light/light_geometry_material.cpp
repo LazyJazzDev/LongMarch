@@ -1,35 +1,27 @@
-#include "light_geometry_surface.h"
+#include "light_geometry_material.h"
 
 #include "sparks/core/core.h"
 #include "sparks/core/geometry.h"
-#include "sparks/core/surface.h"
-#include "sparks/light/light_geometry_surface.h"
+#include "sparks/core/material.h"
+#include "sparks/light/light_geometry_material.h"
 
 namespace sparks {
-LightGeometrySurface::LightGeometrySurface(Core *core,
-                                           Geometry *geometry,
-                                           Surface *surface,
-                                           const glm::mat4x3 &transform)
-    : Light(core), geometry_(geometry), surface_(surface), transform_(transform) {
+LightGeometryMaterial::LightGeometryMaterial(Core *core,
+                                             Geometry *geometry,
+                                             Material *material,
+                                             const glm::mat4x3 &transform)
+    : Light(core), geometry_(geometry), material_(material), transform_(transform) {
   core_->GraphicsCore()->CreateBuffer(
       sizeof(glm::mat4x3) + sizeof(uint32_t) + geometry->PrimitiveCount() * sizeof(float), graphics::BUFFER_TYPE_STATIC,
       &direct_lighting_sampler_data_);
 
   auto vfs = core_->GetShadersVFS();
-  CodeLines gather_primitive_power_kernel(vfs, "light/geometry_surface/gather_primitive_power.hlsl");
-  gather_primitive_power_kernel.InsertAfter(geometry_->SamplerImpl(), "// Geometry Sampler Implementation");
-  gather_primitive_power_kernel.InsertAfter(surface_->EvaluatorImpl(), "// Surface Evaluator Implementation");
-  // std::cout << gather_primitive_power_kernel << std::endl;
-  CodeLines direct_lighting_sampler_callable(vfs, "light/geometry_surface/direct_lighting_sampler.hlsl");
-  direct_lighting_sampler_callable.InsertAfter(geometry_->SamplerImpl(), "// Geometry Sampler Implementation");
-  direct_lighting_sampler_callable.InsertAfter(surface_->EvaluatorImpl(), "// Surface Evaluator Implementation");
+  vfs.WriteFile("geometry_sampler.hlsli", geometry_->SamplerImpl());
+  vfs.WriteFile("material_evaluator.hlsli", material_->EvaluatorImpl());
 
-  vfs.WriteFile("light/geometry_surface/gather_primitive_power.hlsl", std::string(gather_primitive_power_kernel));
-  vfs.WriteFile("light/geometry_surface/direct_lighting_sampler.hlsl", std::string(direct_lighting_sampler_callable));
-
-  core_->GraphicsCore()->CreateShader(vfs, "light/geometry_surface/gather_primitive_power.hlsl",
+  core_->GraphicsCore()->CreateShader(vfs, "light/geometry_material/gather_primitive_power.hlsl",
                                       "GatherPrimitivePowerKernel", "cs_6_3", {"-I."}, &gather_primitive_power_shader_);
-  core_->GraphicsCore()->CreateShader(vfs, "light/geometry_surface/direct_lighting_sampler.hlsl",
+  core_->GraphicsCore()->CreateShader(vfs, "light/geometry_material/direct_lighting_sampler.hlsl",
                                       "SampleDirectLightingCallable", "lib_6_3", {"-I."}, &direct_lighting_sampler_);
 
   uint32_t primitive_count = geometry_->PrimitiveCount();
@@ -57,19 +49,19 @@ LightGeometrySurface::LightGeometrySurface(Core *core,
   blelloch_scan_down_program_ = core_->GetComputeProgram("blelloch_scan_down");
 }
 
-graphics::Shader *LightGeometrySurface::SamplerShader() {
+graphics::Shader *LightGeometryMaterial::SamplerShader() {
   return direct_lighting_sampler_.get();
 }
 
-graphics::Buffer *LightGeometrySurface::SamplerData() {
+graphics::Buffer *LightGeometryMaterial::SamplerData() {
   return direct_lighting_sampler_data_.get();
 }
 
-uint32_t LightGeometrySurface::SamplerPreprocess(graphics::CommandContext *cmd_context) {
+uint32_t LightGeometryMaterial::SamplerPreprocess(graphics::CommandContext *cmd_context) {
   uint32_t wave_size = core_->GraphicsCore()->WaveSize();
   cmd_context->CmdBindComputeProgram(gather_primitive_power_program_.get());
   cmd_context->CmdBindResources(0, {geometry_->Buffer()}, graphics::BIND_POINT_COMPUTE);
-  cmd_context->CmdBindResources(1, {surface_->Buffer()}, graphics::BIND_POINT_COMPUTE);
+  cmd_context->CmdBindResources(1, {material_->Buffer()}, graphics::BIND_POINT_COMPUTE);
   cmd_context->CmdBindResources(2, {direct_lighting_sampler_data_.get()}, graphics::BIND_POINT_COMPUTE);
   cmd_context->CmdDispatch((geometry_->PrimitiveCount() + 127) / 128, 1, 1);
   cmd_context->CmdBindComputeProgram(blelloch_scan_up_program_);

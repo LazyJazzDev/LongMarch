@@ -3,12 +3,12 @@
 
 namespace sparks {
 
-class EntityGeometrySurface : public Entity {
+class EntityGeometryMaterial : public Entity {
  public:
-  EntityGeometrySurface(Core *core,
-                        Geometry *geometry,
-                        Surface *surface,
-                        const glm::mat4x3 &transformation = glm::mat4x3{1.0f});
+  EntityGeometryMaterial(Core *core,
+                         Geometry *geometry,
+                         Material *material,
+                         const glm::mat4x3 &transformation = glm::mat4x3{1.0f});
   void Update(Scene *scene) override;
 
   void SetTransformation(const glm::mat4x3 &transformation) {
@@ -17,9 +17,10 @@ class EntityGeometrySurface : public Entity {
 
  private:
   Geometry *geometry_{nullptr};
-  Surface *surface_{nullptr};
+  Material *material_{nullptr};
   glm::mat4x3 transformation_;
   std::unique_ptr<graphics::Shader> closest_hit_shader_;
+  std::unique_ptr<graphics::Shader> shadow_closest_hit_shader_;
 };
 
 }  // namespace sparks

@@ -57,8 +57,6 @@ GeometryMesh::GeometryMesh(Core *core, const Mesh<float> &mesh) : Geometry(core)
       &blas_);
 
   auto &vfs = core_->GetShadersVFS();
-  core_->GraphicsCore()->CreateShader(vfs, "geometry/mesh/hit_group.hlsl", "ClosestHitMain", "lib_6_3", {"-I."},
-                                      &closest_hit_shader_);
   primitive_count_ = header.num_indices / 3;
   sampler_implementation_ = CodeLines(vfs, "geometry/mesh/geometry_sampler.hlsli");
   closest_hit_shader_implementation_ = CodeLines(vfs, "geometry/mesh/hit_group.hlsl");
@@ -66,10 +64,6 @@ GeometryMesh::GeometryMesh(Core *core, const Mesh<float> &mesh) : Geometry(core)
 
 graphics::Buffer *GeometryMesh::Buffer() {
   return geometry_buffer_.get();
-}
-
-graphics::HitGroup GeometryMesh::HitGroup() {
-  return graphics::HitGroup{closest_hit_shader_.get(), nullptr, nullptr, false};
 }
 
 const CodeLines &GeometryMesh::ClosestHitShaderImpl() const {
