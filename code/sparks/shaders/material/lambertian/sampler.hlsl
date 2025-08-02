@@ -47,6 +47,8 @@ void SampleMaterial(inout RenderContext context, HitRecord hit_record) {
   context.bsdf_pdf = pdf;
 }
 
-void ShadowSample(inout ShadowRayPayload payload, HitRecord hit_record) {
+#define SAMPLE_SHADOW_NO_HITRECORD
+
+void SampleShadow(inout ShadowRayPayload payload) {
   payload.shadow = 0.0f;
 }

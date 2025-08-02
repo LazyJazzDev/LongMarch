@@ -41,7 +41,18 @@ void Scene::Render(Camera *camera, Film *film) {
 }
 
 void Scene::AddEntity(Entity *entity) {
-  entities_.insert(entity);
+  entities_.insert({entity, true});
+}
+
+void Scene::DeleteEntity(Entity *entity) {
+  entities_.erase(entity);
+  buffers_dirty_ = true;
+  hit_groups_dirty_ = true;
+  callable_shaders_dirty_ = true;
+}
+
+void Scene::SetEntityActive(Entity *entity, bool active) {
+  entities_.at(entity) = active;
 }
 
 int32_t Scene::RegisterLight(Light *light, int custom_index) {
@@ -85,6 +96,7 @@ int32_t Scene::RegisterCallableShader(graphics::Shader *callable_shader) {
   if (!callable_shader_map_.count(callable_shader)) {
     callable_shader_map_[callable_shader] = static_cast<int32_t>(callable_shaders_.size());
     callable_shaders_.emplace_back(callable_shader);
+    callable_shaders_dirty_ = true;
   }
   return callable_shader_map_[callable_shader];
 }
@@ -95,6 +107,7 @@ int32_t Scene::RegisterBuffer(graphics::Buffer *buffer) {
   if (!buffer_map_.count(buffer)) {
     buffer_map_[buffer] = static_cast<int32_t>(buffers_.size());
     buffers_.emplace_back(buffer);
+    buffers_dirty_ = true;
   }
   return buffer_map_[buffer];
 }
@@ -103,89 +116,118 @@ int32_t Scene::RegisterHitGroup(const InstanceHitGroups &hit_group) {
   if (!hit_group_map_.count(hit_group)) {
     hit_group_map_[hit_group] = static_cast<int32_t>(hit_groups_.size());
     hit_groups_.emplace_back(hit_group);
+    hit_groups_dirty_ = true;
   }
   return hit_group_map_[hit_group];
 }
 
 void Scene::UpdatePipeline(Camera *camera) {
-  rt_program_.reset();
-  tlas_.reset();
-  core_->GraphicsCore()->CreateRayTracingProgram(&rt_program_);
-  miss_shader_indices_ = {0, 1};
-  hit_groups_.clear();
-  hit_group_map_.clear();
-  buffers_.clear();
-  buffer_map_.clear();
-  callable_shaders_.clear();
-  callable_shader_map_.clear();
   instances_.clear();
   instance_metadatas_.clear();
-  light_selector_buffer_.reset();
   light_metadatas_.clear();
-  light_metadatas_buffer_.reset();
-
-  blelloch_metadatas_.clear();
-  blelloch_metadata_buffer_.reset();
-
-  gather_light_power_program_.reset();
-
-  RegisterCallableShader(camera->Shader());
 
   preprocess_cmd_context_.reset();
   core_->GraphicsCore()->CreateCommandContext(&preprocess_cmd_context_);
 
-  for (auto entity : entities_) {
-    entity->Update(this);
+  bool &clean_buffers = buffers_dirty_;
+  bool &clean_hit_groups = hit_groups_dirty_;
+  bool &clean_callable_shaders = callable_shaders_dirty_;
+
+  for (auto [entity, active] : entities_) {
+    clean_buffers |= entity->ExpiredBuffer();
+    clean_hit_groups |= entity->ExpiredHitGroup();
+    clean_callable_shaders |= entity->ExpiredCallableShader();
   }
 
-  callable_shader_indices_.resize(callable_shaders_.size());
-  std::iota(callable_shader_indices_.begin(), callable_shader_indices_.end(), 0);
-  hit_group_indices_.resize(hit_groups_.size() * 2);
-  std::iota(hit_group_indices_.begin(), hit_group_indices_.end(), 0);
+  if (clean_buffers) {
+    buffers_.clear();
+    buffer_map_.clear();
+  }
 
+  if (clean_hit_groups) {
+    hit_groups_.clear();
+    hit_group_map_.clear();
+  }
+
+  if (clean_callable_shaders) {
+    callable_shaders_.clear();
+    callable_shader_map_.clear();
+    RegisterCallableShader(camera->Shader());
+  }
+
+  for (auto [entity, active] : entities_) {
+    if (active) {
+      entity->Update(this);
+    }
+  }
+
+  tlas_.reset();
   core_->GraphicsCore()->CreateTopLevelAccelerationStructure(instances_, &tlas_);
 
-  instance_metadata_buffer_.reset();
-  core_->GraphicsCore()->CreateBuffer(sizeof(InstanceMetadata) * instance_metadatas_.size(),
-                                      graphics::BUFFER_TYPE_STATIC, &instance_metadata_buffer_);
+  if (!instance_metadata_buffer_ ||
+      sizeof(InstanceMetadata) * instance_metadatas_.size() > instance_metadata_buffer_->Size()) {
+    instance_metadata_buffer_.reset();
+    core_->GraphicsCore()->CreateBuffer(sizeof(InstanceMetadata) * instance_metadatas_.size(),
+                                        graphics::BUFFER_TYPE_STATIC, &instance_metadata_buffer_);
+  }
   instance_metadata_buffer_->UploadData(instance_metadatas_.data(),
                                         sizeof(InstanceMetadata) * instance_metadatas_.size());
 
-  core_->GraphicsCore()->CreateBuffer(sizeof(uint32_t) + sizeof(float) * light_metadatas_.size(),
-                                      graphics::BUFFER_TYPE_STATIC, &light_selector_buffer_);
-  core_->GraphicsCore()->CreateBuffer(sizeof(LightMetadata) * light_metadatas_.size(), graphics::BUFFER_TYPE_STATIC,
-                                      &light_metadatas_buffer_);
+  if (!light_selector_buffer_ ||
+      sizeof(uint32_t) + sizeof(float) * light_metadatas_.size() > light_selector_buffer_->Size()) {
+    core_->GraphicsCore()->CreateBuffer(sizeof(uint32_t) + sizeof(float) * light_metadatas_.size(),
+                                        graphics::BUFFER_TYPE_STATIC, &light_selector_buffer_);
+  }
+  if (!light_metadatas_buffer_ || sizeof(LightMetadata) * light_metadatas_.size() > light_metadatas_buffer_->Size()) {
+    core_->GraphicsCore()->CreateBuffer(sizeof(LightMetadata) * light_metadatas_.size(), graphics::BUFFER_TYPE_STATIC,
+                                        &light_metadatas_buffer_);
+  }
   light_metadatas_buffer_->UploadData(light_metadatas_.data(), sizeof(LightMetadata) * light_metadatas_.size());
   uint32_t light_count = static_cast<uint32_t>(light_metadatas_.size());
   light_selector_buffer_->UploadData(&light_count, sizeof(uint32_t), 0);
 
-  core_->GraphicsCore()->CreateComputeProgram(gather_light_power_shader_.get(), &gather_light_power_program_);
-  gather_light_power_program_->AddResourceBinding(graphics::RESOURCE_TYPE_STORAGE_BUFFER, 1);
-  gather_light_power_program_->AddResourceBinding(graphics::RESOURCE_TYPE_WRITABLE_STORAGE_BUFFER, 1);
-  gather_light_power_program_->AddResourceBinding(graphics::RESOURCE_TYPE_STORAGE_BUFFER, buffers_.size());
-  gather_light_power_program_->Finalize();
-
-  rt_program_->AddResourceBinding(graphics::RESOURCE_TYPE_IMAGE, 1);
-  rt_program_->AddResourceBinding(graphics::RESOURCE_TYPE_IMAGE, 1);
-  rt_program_->AddResourceBinding(graphics::RESOURCE_TYPE_ACCELERATION_STRUCTURE, 1);
-  rt_program_->AddResourceBinding(graphics::RESOURCE_TYPE_UNIFORM_BUFFER, 1);
-  rt_program_->AddResourceBinding(graphics::RESOURCE_TYPE_STORAGE_BUFFER, 1);
-  rt_program_->AddResourceBinding(graphics::RESOURCE_TYPE_STORAGE_BUFFER, buffers_.size());
-  rt_program_->AddResourceBinding(graphics::RESOURCE_TYPE_STORAGE_BUFFER, 1);
-  rt_program_->AddResourceBinding(graphics::RESOURCE_TYPE_STORAGE_BUFFER, 1);
-  rt_program_->AddResourceBinding(graphics::RESOURCE_TYPE_STORAGE_BUFFER, 1);
-
-  rt_program_->AddRayGenShader(raygen_shader_.get());
-  rt_program_->AddMissShader(default_miss_shader_.get());
-  rt_program_->AddMissShader(shadow_miss_shader_.get());
-  for (const auto &hit_group : hit_groups_) {
-    rt_program_->AddHitGroup(hit_group.render_group);
-    rt_program_->AddHitGroup(hit_group.shadow_group);
+  if (buffers_dirty_ || !gather_light_power_program_) {
+    gather_light_power_program_.reset();
+    core_->GraphicsCore()->CreateComputeProgram(gather_light_power_shader_.get(), &gather_light_power_program_);
+    gather_light_power_program_->AddResourceBinding(graphics::RESOURCE_TYPE_STORAGE_BUFFER, 1);
+    gather_light_power_program_->AddResourceBinding(graphics::RESOURCE_TYPE_WRITABLE_STORAGE_BUFFER, 1);
+    gather_light_power_program_->AddResourceBinding(graphics::RESOURCE_TYPE_STORAGE_BUFFER, buffers_.size());
+    gather_light_power_program_->Finalize();
   }
-  for (const auto &callable_shader : callable_shaders_) {
-    rt_program_->AddCallableShader(callable_shader);
+
+  if (hit_groups_dirty_ || callable_shaders_dirty_ || buffers_dirty_ || !rt_program_) {
+    rt_program_.reset();
+    core_->GraphicsCore()->CreateRayTracingProgram(&rt_program_);
+    miss_shader_indices_ = {0, 1};
+    callable_shader_indices_.resize(callable_shaders_.size());
+    std::iota(callable_shader_indices_.begin(), callable_shader_indices_.end(), 0);
+    hit_group_indices_.resize(hit_groups_.size() * 2);
+    std::iota(hit_group_indices_.begin(), hit_group_indices_.end(), 0);
+    rt_program_->AddResourceBinding(graphics::RESOURCE_TYPE_IMAGE, 1);
+    rt_program_->AddResourceBinding(graphics::RESOURCE_TYPE_IMAGE, 1);
+    rt_program_->AddResourceBinding(graphics::RESOURCE_TYPE_ACCELERATION_STRUCTURE, 1);
+    rt_program_->AddResourceBinding(graphics::RESOURCE_TYPE_UNIFORM_BUFFER, 1);
+    rt_program_->AddResourceBinding(graphics::RESOURCE_TYPE_STORAGE_BUFFER, 1);
+    rt_program_->AddResourceBinding(graphics::RESOURCE_TYPE_STORAGE_BUFFER, buffers_.size());
+    rt_program_->AddResourceBinding(graphics::RESOURCE_TYPE_STORAGE_BUFFER, 1);
+    rt_program_->AddResourceBinding(graphics::RESOURCE_TYPE_STORAGE_BUFFER, 1);
+    rt_program_->AddResourceBinding(graphics::RESOURCE_TYPE_STORAGE_BUFFER, 1);
+
+    rt_program_->AddRayGenShader(raygen_shader_.get());
+    rt_program_->AddMissShader(default_miss_shader_.get());
+    rt_program_->AddMissShader(shadow_miss_shader_.get());
+    for (const auto &hit_group : hit_groups_) {
+      rt_program_->AddHitGroup(hit_group.render_group);
+      rt_program_->AddHitGroup(hit_group.shadow_group);
+    }
+    for (const auto &callable_shader : callable_shaders_) {
+      rt_program_->AddCallableShader(callable_shader);
+    }
+    rt_program_->Finalize(miss_shader_indices_, hit_group_indices_, callable_shader_indices_);
+    hit_groups_dirty_ = false;
+    callable_shaders_dirty_ = false;
+    buffers_dirty_ = false;
   }
-  rt_program_->Finalize(miss_shader_indices_, hit_group_indices_, callable_shader_indices_);
 
   preprocess_cmd_context_->CmdBindComputeProgram(gather_light_power_program_.get());
   preprocess_cmd_context_->CmdBindResources(0, {light_metadatas_buffer_.get()}, graphics::BIND_POINT_COMPUTE);
@@ -193,8 +235,6 @@ void Scene::UpdatePipeline(Camera *camera) {
   preprocess_cmd_context_->CmdBindResources(2, buffers_, graphics::BIND_POINT_COMPUTE);
   preprocess_cmd_context_->CmdDispatch((light_metadatas_.size() + 63) / 64, 1, 1);
 
-  auto blelloch_scan_up_program = core_->GetComputeProgram("blelloch_scan_up");
-  auto blelloch_scan_down_program = core_->GetComputeProgram("blelloch_scan_down");
   blelloch_metadatas_.clear();
   BlellochScanMetadata metadata{4, 4, static_cast<uint32_t>(light_metadatas_.size())};
   uint32_t wave_size = core_->GraphicsCore()->WaveSize();
@@ -204,8 +244,13 @@ void Scene::UpdatePipeline(Camera *camera) {
                 metadata.element_count / wave_size};
   }
   if (!blelloch_metadatas_.empty()) {
-    core_->GraphicsCore()->CreateBuffer(sizeof(BlellochScanMetadata) * blelloch_metadatas_.size(),
-                                        graphics::BUFFER_TYPE_STATIC, &blelloch_metadata_buffer_);
+    auto blelloch_scan_up_program = core_->GetComputeProgram("blelloch_scan_up");
+    auto blelloch_scan_down_program = core_->GetComputeProgram("blelloch_scan_down");
+    if (!blelloch_metadata_buffer_ ||
+        sizeof(BlellochScanMetadata) * blelloch_metadatas_.size() > blelloch_metadata_buffer_->Size()) {
+      core_->GraphicsCore()->CreateBuffer(sizeof(BlellochScanMetadata) * blelloch_metadatas_.size(),
+                                          graphics::BUFFER_TYPE_STATIC, &blelloch_metadata_buffer_);
+    }
     blelloch_metadata_buffer_->UploadData(blelloch_metadatas_.data(),
                                           sizeof(BlellochScanMetadata) * blelloch_metadatas_.size());
     preprocess_cmd_context_->CmdBindComputeProgram(blelloch_scan_up_program);
@@ -226,12 +271,6 @@ void Scene::UpdatePipeline(Camera *camera) {
     }
   }
   core_->GraphicsCore()->SubmitCommandContext(preprocess_cmd_context_.get());
-  // std::vector<float> light_power_cdf(light_metadatas_.size(), 0.0f);
-  // light_selector_buffer_->DownloadData(light_power_cdf.data(), light_power_cdf.size() * sizeof(float),
-  //                                      sizeof(uint32_t));
-  // for (size_t i = 0; i < light_power_cdf.size(); i++) {
-  //   std::cout << "Light " << i << " Power CDF: " << light_power_cdf[i] << std::endl;
-  // }
 }
 
 }  // namespace sparks

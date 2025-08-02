@@ -37,7 +37,6 @@ struct LightMetadata {
 
 struct InstanceMetadata {
   int geometry_data_index{-1};
-  int material_shader_index{-1};
   int material_data_index{-1};
   int custom_index{-1};
 };

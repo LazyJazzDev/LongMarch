@@ -10,6 +10,10 @@ class Entity {
   }
   virtual ~Entity() = default;
   virtual void Update(Scene *scene) = 0;
+  virtual bool ExpiredBuffer();
+  virtual bool ExpiredImage();
+  virtual bool ExpiredHitGroup();
+  virtual bool ExpiredCallableShader();
 
  protected:
   Core *core_;

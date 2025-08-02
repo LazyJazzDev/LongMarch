@@ -48,7 +48,6 @@ struct SceneSettings {
 
 struct InstanceMetadata {
   int geometry_data_index;
-  int material_shader_index;
   int material_data_index;
   int custom_index;
 };

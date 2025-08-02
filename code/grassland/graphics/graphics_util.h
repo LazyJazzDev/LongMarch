@@ -25,7 +25,7 @@ typedef enum BackendAPI {
   BACKEND_API_VULKAN = 0,
   BACKEND_API_D3D12 = 1,
   BACKEND_API_DEFAULT =
-#ifdef _WIN64
+#if defined(_WIN64) && defined(NDEBUG)
       BACKEND_API_D3D12
 #else
       BACKEND_API_VULKAN

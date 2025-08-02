@@ -37,11 +37,9 @@ void SampleMaterial(inout RenderContext context, HitRecord hit_record) {
   context.origin = hit_record.position;
 }
 
-void ShadowSample(inout ShadowRayPayload payload, HitRecord hit_record) {
+void SampleShadow(inout ShadowRayPayload payload, HitRecord hit_record) {
   InstanceMetadata instance_meta = instance_metadatas[hit_record.object_index];
   ByteAddressBuffer material_buffer = data_buffers[instance_meta.material_data_index];
-  float3 emission = LoadFloat3(material_buffer, 0);
-  int two_sided = material_buffer.Load(12);
   int block_ray = material_buffer.Load(16);
   if (block_ray) {
     payload.shadow = 0.0f;

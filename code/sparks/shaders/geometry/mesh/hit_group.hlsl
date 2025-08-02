@@ -107,6 +107,9 @@ struct GeometryHeader {
 
     [shader("closesthit")] void ShadowClosestHit(inout ShadowRayPayload payload,
                                                  in BuiltInTriangleIntersectionAttributes attr) {
+#if defined(SAMPLE_SHADOW_NO_HITRECORD)
+  SampleShadow(payload);
+#else
   HitRecord hit_group;
   BufferReference<ByteAddressBuffer> geometry_buffer = MakeBufferReference(data_buffers[InstanceID()], 0);
   GeometryHeader header;
@@ -189,5 +192,6 @@ struct GeometryHeader {
   hit_group.object_index = InstanceIndex();
   hit_group.primitive_index = PrimitiveIndex();
 
-  ShadowSample(payload, hit_group);
+  SampleShadow(payload, hit_group);
+#endif
 }
