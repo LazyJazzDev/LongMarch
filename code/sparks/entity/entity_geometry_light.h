@@ -1,7 +1,7 @@
 #pragma once
 #include "sparks/core/entity.h"
-#include "sparks/light/light_geometry_surface.h"
-#include "sparks/surface/surface_light.h"
+#include "sparks/light/light_geometry_material.h"
+#include "sparks/material/material_light.h"
 
 namespace sparks {
 
@@ -22,9 +22,11 @@ class EntityGeometryLight : public Entity {
 
  private:
   Geometry *geometry_;
-  SurfaceLight surface_light_;
-  LightGeometrySurface light_geom_surf_;
+  MaterialLight material_light_;
+  LightGeometryMaterial light_geom_surf_;
   glm::mat4x3 transformation_;
+  std::unique_ptr<graphics::Shader> closest_hit_shader_;
+  std::unique_ptr<graphics::Shader> shadow_closest_hit_shader_;
 };
 
 }  // namespace sparks

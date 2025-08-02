@@ -164,6 +164,12 @@ CompiledShaderBlob CompileShader(const VirtualFileSystem &vfs,
   for (const auto &arg : args) {
     wargs.push_back(StringToWString(arg));
   }
+
+  if (target[0] == 'l' && target[1] == 'i' && target[2] == 'b') {
+    wargs.push_back(StringToWString("-exports"));
+    wargs.push_back(StringToWString(entry_point));
+  }
+
   std::vector<LPCWSTR> warg_ptrs;
   for (const auto &arg : wargs) {
     warg_ptrs.push_back(arg.c_str());

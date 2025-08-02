@@ -7,10 +7,8 @@ float ShadowRay(float3 origin, float3 direction, float dist) {
   ray.Direction = direction;
   ray.TMin = T_MIN * length(origin);
   ray.TMax = dist;
-  HitRecord hit_record;
-  TraceRay(as, RAY_FLAG_NONE, 0xFF, 0, 0, 0, ray, hit_record);
-  if (hit_record.t != -1.0) {
-    return 0.0;
-  }
-  return 1.0;
+  ShadowRayPayload payload;
+  payload.shadow = 1.0;
+  TraceRay(as, RAY_FLAG_NONE, 0xFF, 1, 0, 1, ray, payload);
+  return payload.shadow;
 }

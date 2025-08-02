@@ -3,16 +3,16 @@
 
 namespace sparks {
 
-class LightGeometrySurface : public Light {
+class LightGeometryMaterial : public Light {
  public:
-  LightGeometrySurface(Core *core, Geometry *geometry, Surface *surface, const glm::mat4x3 &transform);
+  LightGeometryMaterial(Core *core, Geometry *geometry, Material *material, const glm::mat4x3 &transform);
   graphics::Shader *SamplerShader() override;
   graphics::Buffer *SamplerData() override;
   uint32_t SamplerPreprocess(graphics::CommandContext *cmd_ctx) override;
 
  private:
   Geometry *geometry_;
-  Surface *surface_;
+  Material *material_;
   glm::mat4x3 transform_;
   std::unique_ptr<graphics::Shader> direct_lighting_sampler_;
   std::unique_ptr<graphics::Buffer> direct_lighting_sampler_data_;

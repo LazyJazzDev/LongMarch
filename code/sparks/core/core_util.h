@@ -8,7 +8,7 @@ using namespace grassland;
 
 class Core;
 class Geometry;
-class Surface;
+class Material;
 class Entity;
 class Film;
 class Scene;
@@ -16,7 +16,6 @@ class Camera;
 class Light;
 
 struct GeometryRegistration {
-  int32_t hit_group_index;
   int32_t data_index;
   graphics::AccelerationStructure *blas;
 };
@@ -25,8 +24,7 @@ struct InstanceRegistration {
   int32_t instance_index;
 };
 
-struct SurfaceRegistration {
-  int32_t shader_index{-1};
+struct MaterialRegistration {
   int32_t data_index{-1};
 };
 
@@ -39,8 +37,8 @@ struct LightMetadata {
 
 struct InstanceMetadata {
   int geometry_data_index{-1};
-  int surface_shader_index{-1};
-  int surface_data_index{-1};
+  int material_shader_index{-1};
+  int material_data_index{-1};
   int custom_index{-1};
 };
 
@@ -49,6 +47,11 @@ struct BlellochScanMetadata {
   uint32_t stride;
   uint32_t element_count;
   uint32_t padding[61];
+};
+
+struct InstanceHitGroups {
+  graphics::HitGroup render_group;
+  graphics::HitGroup shadow_group;
 };
 
 }  // namespace sparks

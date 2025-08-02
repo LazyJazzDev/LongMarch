@@ -5,12 +5,15 @@
 #include "sparks/core/entity.h"
 #include "sparks/core/film.h"
 #include "sparks/core/geometry.h"
-#include "sparks/core/surface.h"
+#include "sparks/core/material.h"
 
 namespace sparks {
 Scene::Scene(Core *core) : core_(core) {
   core_->GraphicsCore()->CreateShader(core_->GetShadersVFS(), "raygen.hlsl", "Main", "lib_6_3", &raygen_shader_);
-  core_->GraphicsCore()->CreateShader(core_->GetShadersVFS(), "raygen.hlsl", "MissMain", "lib_6_3", &miss_shader_);
+  core_->GraphicsCore()->CreateShader(core_->GetShadersVFS(), "raygen.hlsl", "MissMain", "lib_6_3",
+                                      &default_miss_shader_);
+  core_->GraphicsCore()->CreateShader(core_->GetShadersVFS(), "raygen.hlsl", "ShadowMiss", "lib_6_3",
+                                      &shadow_miss_shader_);
   core_->GraphicsCore()->CreateBuffer(sizeof(Settings), graphics::BUFFER_TYPE_STATIC, &scene_settings_buffer_);
   core_->GraphicsCore()->CreateShader(core_->GetShadersVFS(), "gather_light_power.hlsl", "GatherLightPowerKernel",
                                       "cs_6_3", &gather_light_power_shader_);
@@ -41,31 +44,6 @@ void Scene::AddEntity(Entity *entity) {
   entities_.insert(entity);
 }
 
-GeometryRegistration Scene::RegisterGeometry(Geometry *geometry) {
-  GeometryRegistration geom_reg{};
-  auto data = geometry->Buffer();
-  auto blas = geometry->BLAS();
-  auto hit_group = geometry->HitGroup();
-  geom_reg.data_index = RegisterBuffer(data);
-
-  geom_reg.blas = blas;
-
-  if (!hit_group_map_.count(hit_group)) {
-    hit_group_map_[hit_group] = static_cast<int32_t>(hit_groups_.size());
-    hit_groups_.emplace_back(hit_group);
-  }
-  geom_reg.hit_group_index = hit_group_map_[hit_group];
-
-  return geom_reg;
-}
-
-SurfaceRegistration Scene::RegisterSurface(Surface *surface) {
-  SurfaceRegistration surf_reg{};
-  surf_reg.shader_index = RegisterCallableShader(surface->CallableShader());
-  surf_reg.data_index = RegisterBuffer(surface->Buffer());
-  return surf_reg;
-}
-
 int32_t Scene::RegisterLight(Light *light, int custom_index) {
   int32_t light_reg_index = light_metadatas_.size();
   LightMetadata light_reg{};
@@ -77,17 +55,18 @@ int32_t Scene::RegisterLight(Light *light, int custom_index) {
   return light_reg_index;
 }
 
-int32_t Scene::RegisterInstance(GeometryRegistration geom_reg,
+int32_t Scene::RegisterInstance(graphics::AccelerationStructure *blas,
                                 const glm::mat4x3 &transformation,
-                                SurfaceRegistration surf_reg,
-                                int custom_index) {
+                                int32_t hit_group_index,
+                                int32_t geometry_data_index,
+                                int32_t material_data_index,
+                                int32_t custom_index) {
   int32_t instance_reg = instances_.size();
   InstanceMetadata entity_metadata{};
-  entity_metadata.geometry_data_index = geom_reg.data_index;
-  entity_metadata.surface_data_index = surf_reg.data_index;
-  entity_metadata.surface_shader_index = surf_reg.shader_index;
+  instances_.push_back(blas->MakeInstance(transformation, geometry_data_index, 255, hit_group_index * 2));
+  entity_metadata.geometry_data_index = geometry_data_index;
+  entity_metadata.material_data_index = material_data_index;
   entity_metadata.custom_index = custom_index;
-  instances_.push_back(geom_reg.blas->MakeInstance(transformation, geom_reg.data_index, 255, geom_reg.hit_group_index));
   instance_metadatas_.push_back(entity_metadata);
   return instance_reg;
 }
@@ -120,7 +99,7 @@ int32_t Scene::RegisterBuffer(graphics::Buffer *buffer) {
   return buffer_map_[buffer];
 }
 
-int32_t Scene::RegisterHitGroup(const graphics::HitGroup &hit_group) {
+int32_t Scene::RegisterHitGroup(const InstanceHitGroups &hit_group) {
   if (!hit_group_map_.count(hit_group)) {
     hit_group_map_[hit_group] = static_cast<int32_t>(hit_groups_.size());
     hit_groups_.emplace_back(hit_group);
@@ -132,7 +111,7 @@ void Scene::UpdatePipeline(Camera *camera) {
   rt_program_.reset();
   tlas_.reset();
   core_->GraphicsCore()->CreateRayTracingProgram(&rt_program_);
-  miss_shader_indices_ = {0};
+  miss_shader_indices_ = {0, 1};
   hit_groups_.clear();
   hit_group_map_.clear();
   buffers_.clear();
@@ -161,7 +140,7 @@ void Scene::UpdatePipeline(Camera *camera) {
 
   callable_shader_indices_.resize(callable_shaders_.size());
   std::iota(callable_shader_indices_.begin(), callable_shader_indices_.end(), 0);
-  hit_group_indices_.resize(hit_groups_.size());
+  hit_group_indices_.resize(hit_groups_.size() * 2);
   std::iota(hit_group_indices_.begin(), hit_group_indices_.end(), 0);
 
   core_->GraphicsCore()->CreateTopLevelAccelerationStructure(instances_, &tlas_);
@@ -197,9 +176,11 @@ void Scene::UpdatePipeline(Camera *camera) {
   rt_program_->AddResourceBinding(graphics::RESOURCE_TYPE_STORAGE_BUFFER, 1);
 
   rt_program_->AddRayGenShader(raygen_shader_.get());
-  rt_program_->AddMissShader(miss_shader_.get());
+  rt_program_->AddMissShader(default_miss_shader_.get());
+  rt_program_->AddMissShader(shadow_miss_shader_.get());
   for (const auto &hit_group : hit_groups_) {
-    rt_program_->AddHitGroup(hit_group);
+    rt_program_->AddHitGroup(hit_group.render_group);
+    rt_program_->AddHitGroup(hit_group.shadow_group);
   }
   for (const auto &callable_shader : callable_shaders_) {
     rt_program_->AddCallableShader(callable_shader);

@@ -1,8 +1,5 @@
 #include "bindings.hlsli"
 #include "common.hlsli"
-#include "surface/lambertian/main.hlsl"
-
-// sample bsdf
 
 [shader("raygeneration")] void Main() {
   // get the pixel coordinates
@@ -33,18 +30,7 @@
       ray.TMin = T_MIN * length(context.origin);
       ray.Direction = context.direction;
       ray.TMax = 1e16;
-      HitRecord hit_record = context.hit_record;
-      TraceRay(as, RAY_FLAG_NONE, 0xFF, 0, 0, 0, ray, hit_record);
-      context.hit_record = hit_record;
-      InstanceMetadata instance_meta = instance_metadatas[context.hit_record.object_index];
-      if (context.hit_record.object_index >= 0) {
-        // call the surface shader
-        CallShader(instance_meta.surface_shader_index, context);
-        // CallableMain(context);
-      } else {
-        // if no object was hit, set the background color
-        break;
-      }
+      TraceRay(as, RAY_FLAG_NONE, 0xFF, 0, 0, 0, ray, context);
 
       // russian roulette
       float p = max(max(context.throughput.x, context.throughput.y), context.throughput.z);
@@ -63,17 +49,10 @@
   }
 }
 
-    [shader("miss")] void MissMain(inout HitRecord hit_record) {
-  hit_record.t = -1;
-  hit_record.position = float3(0.0, 0.0, 0.0);
-  hit_record.normal = float3(0.0, 0.0, 0.0);
-  hit_record.tangent = float3(0.0, 0.0, 1.0);
-  hit_record.tex_coord = float2(0.0, 0.0);
-  hit_record.signal = 1.0;
-  hit_record.object_index = -1;
-  hit_record.primitive_index = -1;
-  hit_record.geom_normal = float3(0.0, 0.0, 0.0);
-  hit_record.pdf = 0.0;
-  // set the front facing flag to true by default
-  hit_record.front_facing = true;
+    [shader("miss")] void MissMain(inout RenderContext context) {
+  context.throughput = float3(0.0, 0.0, 0.0);
+}
+
+[shader("miss")] void ShadowMiss(inout ShadowRayPayload payload) {
+  payload.shadow = 1.0f;  // light is blocked
 }

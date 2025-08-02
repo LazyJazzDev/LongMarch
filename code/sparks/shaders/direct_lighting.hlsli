@@ -1,7 +1,8 @@
 #pragma once
 #include "bindings.hlsli"
+#include "shadow_ray.hlsli"
 
-void SampleDirectLighting(in RenderContext context, out float3 eval, out float3 omega_in, out float pdf) {
+void SampleDirectLighting(in RenderContext context, HitRecord hit_record, out float3 eval, out float3 omega_in, out float pdf) {
   uint light_count = light_selector_data.Load(0);
   BufferReference<ByteAddressBuffer> power_cdf = MakeBufferReference(light_selector_data, 4);
   float total_power = power_cdf.Load(light_count * 4 - 4);
@@ -23,14 +24,16 @@ void SampleDirectLighting(in RenderContext context, out float3 eval, out float3 
 
   LightMetadata light_meta = light_metadatas[L];
   SampleDirectLightingPayload payload;
-  payload.low.xyz = asuint(context.hit_record.position);
+  payload.low.xyz = asuint(hit_record.position);
   payload.low.w = light_meta.sampler_data_index;
   payload.high.xyz = asuint(float3(r1, RandomFloat(context.rd), RandomFloat(context.rd)));
   payload.high.w = light_meta.custom_index;
   CallShader(light_meta.sampler_shader_index, payload);
   eval = asfloat(payload.low.xyz);
+  float shadow_length = asfloat(payload.low.w);
   omega_in = asfloat(payload.high.xyz);
   pdf = asfloat(payload.high.w) * prob;
+  eval *= ShadowRay(hit_record.position, omega_in, shadow_length);
 }
 
 float DirectLightingProbability(uint light_index) {

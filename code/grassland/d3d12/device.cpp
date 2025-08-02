@@ -529,7 +529,7 @@ HRESULT Device::CreateRayTracingPipeline(RootSignature *root_signature,
   global_root_signature->SetRootSignature(root_signature->Handle());
 
   auto pipeline_config = pipeline_desc.CreateSubobject<CD3DX12_RAYTRACING_PIPELINE_CONFIG_SUBOBJECT>();
-  pipeline_config->Config(1);
+  pipeline_config->Config(31);
 
   ComPtr<ID3D12StateObject> pipeline;
 
