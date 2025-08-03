@@ -11,7 +11,7 @@ EntityGeometryMaterial::EntityGeometryMaterial(Core *core,
                                                Geometry *geometry,
                                                Material *material,
                                                const glm::mat4x3 &transformation)
-    : Entity(core) {
+    : Entity(core), light_geom_mat_(core, geometry, material, transformation) {
   geometry_ = geometry;
   material_ = material;
   transformation_ = transformation;
@@ -26,9 +26,12 @@ EntityGeometryMaterial::EntityGeometryMaterial(Core *core,
 }
 
 void EntityGeometryMaterial::Update(Scene *scene) {
-  scene->RegisterInstance(geometry_->BLAS(), transformation_,
-                          scene->RegisterHitGroup({{closest_hit_shader_.get()}, {shadow_closest_hit_shader_.get()}}),
-                          scene->RegisterBuffer(geometry_->Buffer()), scene->RegisterBuffer(material_->Buffer()));
+  int32_t light_index = scene->RegisterLight(&light_geom_mat_);
+  int32_t instance_index = scene->RegisterInstance(
+      geometry_->BLAS(), transformation_,
+      scene->RegisterHitGroup({{closest_hit_shader_.get()}, {shadow_closest_hit_shader_.get()}}),
+      scene->RegisterBuffer(geometry_->Buffer()), scene->RegisterBuffer(material_->Buffer()), light_index);
+  scene->LightCustomIndex(light_index) = instance_index;
 }
 
 }  // namespace sparks

@@ -26,7 +26,7 @@ int main() {
   sparks::MaterialLambertian material_white(&sparks_core, {0.725, 0.71, 0.68});
   sparks::MaterialLambertian material_red(&sparks_core, {0.63, 0.065, 0.05});
   sparks::MaterialLambertian material_green(&sparks_core, {0.14, 0.45, 0.091});
-  sparks::MaterialLight material_light(&sparks_core, {30.0f, 30.0f, 30.0f}, true, true);
+  sparks::MaterialLambertian material_light(&sparks_core, {0.0f, 0.0f, 0.0f}, {30.0f, 30.0f, 30.0f});
 
   std::vector<glm::vec3> positions;
   std::vector<glm::vec2> tex_coords;
@@ -39,9 +39,9 @@ int main() {
                     reinterpret_cast<Vector3<float> *>(positions.data()), nullptr,
                     reinterpret_cast<Vector2<float> *>(tex_coords.data()), nullptr);
   sparks::GeometryMesh geometry_light(&sparks_core, light);
-  // sparks::EntityGeometryMaterial entity_light(&sparks_core, &geometry_light, &material_light);
-  sparks::EntityGeometryLight entity_light(&sparks_core, &geometry_light, {30.0f, 30.0f, 30.0f}, true, true,
-                                           glm::mat4x3(1.0f));
+  sparks::EntityGeometryMaterial entity_light(&sparks_core, &geometry_light, &material_light);
+  // sparks::EntityGeometryLight entity_light(&sparks_core, &geometry_light, {30.0f, 30.0f, 30.0f}, true, true,
+  //                                          glm::mat4x3(1.0f));
 
   positions = {{552.8f, 0.0f, 0.0f}, {0.0f, 0.0f, 0.0f}, {0.0f, 0.0f, 559.2f}, {549.6f, 0.0f, 559.2f}};
   Mesh<float> floor(positions.size(), indices.size(), indices.data(),

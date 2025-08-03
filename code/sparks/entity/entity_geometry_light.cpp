@@ -15,7 +15,7 @@ EntityGeometryLight::EntityGeometryLight(Core *core,
                                          const glm::mat4x3 &transform)
     : Entity(core),
       material_light_(core, emission, two_sided, block_ray),
-      light_geom_surf_(core, geometry, &material_light_, transform),
+      light_geom_mat_(core, geometry, &material_light_, transform),
       geometry_(geometry),
       emission(emission),
       two_sided(two_sided),
@@ -34,8 +34,7 @@ void EntityGeometryLight::Update(Scene *scene) {
   material_light_.emission = emission;
   material_light_.two_sided = two_sided;
   material_light_.block_ray = block_ray;
-  light_geom_surf_.SamplerShader();
-  int32_t light_index = scene->RegisterLight(&light_geom_surf_);
+  int32_t light_index = scene->RegisterLight(&light_geom_mat_);
   int32_t instance_index = scene->RegisterInstance(
       geometry_->BLAS(), transformation_,
       scene->RegisterHitGroup({{closest_hit_shader_.get()}, {shadow_closest_hit_shader_.get()}}),
