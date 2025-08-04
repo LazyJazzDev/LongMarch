@@ -1,5 +1,6 @@
 #include "bindings.hlsli"
 #include "direct_lighting.hlsli"
+#include "geometry_primitive_sampler.hlsli"
 
 float3 EvalLambertianBSDF(float3 base_color, float3 N, float3 L, out float pdf) {
   float cos_pi = max(dot(N, L), 0.0f) * INV_PI;
@@ -44,14 +45,8 @@ void SampleMaterial(inout RenderContext context, HitRecord hit_record) {
 
     if (instance_meta.custom_index != -1) {
       LightMetadata light_meta = light_metadatas[instance_meta.custom_index];
-      ByteAddressBuffer direct_lighting_sampler_data = data_buffers[light_meta.sampler_data_index];
-      uint primitive_index = hit_record.primitive_index;
-      uint primitive_count = direct_lighting_sampler_data.Load(48);
-      BufferReference<ByteAddressBuffer> power_cdf = MakeBufferReference(direct_lighting_sampler_data, 52);
-      float total_power = asfloat(power_cdf.Load(primitive_count * 4 - 4));
-      float high_prob = asfloat(power_cdf.Load(primitive_index * 4)) / total_power;
-      float low_prob = (primitive_index > 0) ? asfloat(power_cdf.Load((primitive_index - 1) * 4)) / total_power : 0.0f;
-      float pdf = (high_prob - low_prob) * hit_record.pdf;
+      float pdf = hit_record.pdf *
+                  EvaluatePrimitiveProbability(data_buffers[light_meta.sampler_data_index], hit_record.primitive_index);
       pdf *= DirectLightingProbability(instance_meta.custom_index);
       float3 omega_in = hit_record.position - context.origin;
       pdf *= dot(omega_in, omega_in);
