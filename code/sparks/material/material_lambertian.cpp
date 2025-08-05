@@ -10,7 +10,6 @@ MaterialLambertian::MaterialLambertian(Core *core, const glm::vec3 &base_color, 
                                       &material_buffer_);
   sampler_implementation_ = CodeLines(core_->GetShadersVFS(), "material/lambertian/sampler.hlsl");
   evaluator_implementation_ = CodeLines(core_->GetShadersVFS(), "material/lambertian/evaluator.hlsli");
-  SyncMaterialData();
 }
 
 graphics::Buffer *MaterialLambertian::Buffer() {

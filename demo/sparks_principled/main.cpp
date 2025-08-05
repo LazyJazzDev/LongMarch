@@ -22,11 +22,13 @@ int main() {
                                     glm::vec3{0.0, 1.0, 0.0}),
                         glm::radians(40.0f), static_cast<float>(film.GetWidth()) / film.GetHeight());
 
-  sparks::MaterialLambertian material_white(&sparks_core, {0.725, 0.71, 0.68});
-  sparks::MaterialLambertian material_red(&sparks_core, {0.63, 0.065, 0.05});
-  sparks::MaterialLambertian material_green(&sparks_core, {0.14, 0.45, 0.091});
-  sparks::MaterialLambertian material_light(&sparks_core, {0.0f, 0.0f, 0.0f}, {30.0f, 30.0f, 30.0f});
-  sparks::MaterialSpecular material_specular(&sparks_core, {0.8f, 0.8f, 0.8f});
+  sparks::MaterialPrincipled material_white(&sparks_core, {0.725, 0.71, 0.68});
+  sparks::MaterialPrincipled material_red(&sparks_core, {0.63, 0.065, 0.05});
+  sparks::MaterialPrincipled material_green(&sparks_core, {0.14, 0.45, 0.091});
+  sparks::MaterialPrincipled material_light(&sparks_core, {0.725, 0.71, 0.68});
+  material_light.emission_color = {1.0f, 1.0f, 1.0f};
+  material_light.emission_strength = 30.0f;
+  sparks::MaterialPrincipled material_principled(&sparks_core, {0.725, 0.71, 0.68});
 
   std::vector<glm::vec3> positions;
   std::vector<glm::vec2> tex_coords;
@@ -102,7 +104,7 @@ int main() {
                        reinterpret_cast<Vector3<float> *>(positions.data()), nullptr,
                        reinterpret_cast<Vector2<float> *>(tex_coords.data()), nullptr);
   sparks::GeometryMesh geometry_tall_box(&sparks_core, tall_box);
-  sparks::EntityGeometryMaterial entity_tall_box(&sparks_core, &geometry_tall_box, &material_specular);
+  sparks::EntityGeometryMaterial entity_tall_box(&sparks_core, &geometry_tall_box, &material_principled);
   scene.AddEntity(&entity_light);
   scene.AddEntity(&entity_floor);
   scene.AddEntity(&entity_ceiling);
@@ -118,7 +120,53 @@ int main() {
   std::unique_ptr<graphics::Window> window;
   core_->CreateWindowObject(film.GetWidth(), film.GetHeight(), "Sparks Cornell Box", &window);
   FPSCounter fps_counter;
+  window->InitImGui(nullptr, 20.0f);
   while (!window->ShouldClose()) {
+    bool updated = false;
+
+    window->BeginImGuiFrame();
+    ImVec2 window_size = ImVec2{};
+    ImGui::SetNextWindowPos({0, 0}, ImGuiCond_Once);
+    ImGui::SetNextWindowBgAlpha(0.3);
+    ImGui::Begin("Settings", nullptr, ImGuiWindowFlags_AlwaysAutoResize);
+    ImGui::Text("Global");
+    ImGui::Separator();
+    ImGui::SliderInt("Samples per frame", &scene.settings.samples_per_dispatch, 1, 256);
+    updated |= ImGui::SliderInt("Max Bounces", &scene.settings.max_bounces, 1, 128);
+    updated |= ImGui::SliderFloat("Light Strength", &material_light.emission_strength, 0.0f, 1e6f, nullptr,
+                                  ImGuiSliderFlags_Logarithmic);
+    ImGui::NewLine();
+    ImGui::Text("Material");
+    ImGui::Separator();
+    updated |= ImGui::ColorEdit3("Base Color", &material_principled.base_color[0], ImGuiColorEditFlags_Float);
+    updated |= ImGui::SliderFloat("Metallic", &material_principled.metallic, 0.0f, 1.0f);
+    updated |= ImGui::SliderFloat("Roughness", &material_principled.roughness, 0.0f, 1.0f);
+    updated |= ImGui::SliderFloat("Specular", &material_principled.specular, 0.0f, 1.0f);
+    updated |= ImGui::SliderFloat("Specular Tint", &material_principled.specular_tint, 0.0f, 1.0f);
+    updated |= ImGui::SliderFloat("Anisotropic", &material_principled.anisotropic, 0.0f, 1.0f);
+    updated |= ImGui::SliderFloat("Anisotropic Rotation", &material_principled.anisotropic_rotation, 0.0f, 1.0f);
+    updated |= ImGui::SliderFloat("Sheen", &material_principled.sheen, 0.0f, 1.0f);
+    updated |= ImGui::SliderFloat("Sheen Tint", &material_principled.sheen_tint, 0.0f, 1.0f);
+    updated |= ImGui::SliderFloat("Clearcoat", &material_principled.clearcoat, 0.0f, 1.0f);
+    updated |= ImGui::SliderFloat("Clearcoat Roughness", &material_principled.clearcoat_roughness, 0.0f, 1.0f);
+    updated |= ImGui::SliderFloat("Transmission", &material_principled.transmission, 0.0f, 1.0f);
+    updated |= ImGui::SliderFloat("Transmission Roughness", &material_principled.transmission_roughness, 0.0f, 1.0f);
+    updated |= ImGui::SliderFloat("IOR", &material_principled.ior, 1.0f, 2.5f);
+    updated |= ImGui::SliderFloat("Subsurface", &material_principled.subsurface, 0.0f, 1.0f);
+    updated |=
+        ImGui::ColorEdit3("Subsurface Color", &material_principled.subsurface_color[0], ImGuiColorEditFlags_Float);
+    updated |= ImGui::SliderFloat3("Subsurface Radius", &material_principled.subsurface_radius[0], 0.0f, 10.0f);
+    updated |= ImGui::ColorEdit3("Emission Color", &material_principled.emission_color[0], ImGuiColorEditFlags_Float);
+    updated |= ImGui::SliderFloat("Emission Strength", &material_principled.emission_strength, 0.0f, 1e6f, nullptr,
+                                  ImGuiSliderFlags_Logarithmic);
+
+    ImGui::End();
+    window->EndImGuiFrame();
+
+    if (updated) {
+      film.Reset();
+    }
+
     scene.Render(&camera, &film);
     sparks_core.ConvertFilmToImage(film, image.get());
     std::unique_ptr<graphics::CommandContext> cmd_context;
@@ -134,6 +182,7 @@ int main() {
     sprintf(rps_buf, "%.2f", rps * 1e-6f);
     window->SetTitle(std::string("Sparks Cornell Box - ") + fps_buf + "frams/s" + " - " + rps_buf + "Mrays/s");
   }
+  window->TerminateImGui();
 
   sparks_core.ConvertFilmToImage(film, image.get());
   std::vector<uint8_t> image_data(film.GetWidth() * film.GetHeight() * 4);

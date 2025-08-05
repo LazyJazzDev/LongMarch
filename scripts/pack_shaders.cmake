@@ -19,7 +19,7 @@ function(PACK_SHADER_CODE TARGET_NAME)
 
     # Find all the shader files under current directory
     file(GLOB_RECURSE SHADER_FILES
-            ${CMAKE_CURRENT_SOURCE_DIR}/*.glsl
+            ${CMAKE_CURRENT_SOURCE_DIR}/*.hlsli
             ${CMAKE_CURRENT_SOURCE_DIR}/*.vert
             ${CMAKE_CURRENT_SOURCE_DIR}/*.frag
             ${CMAKE_CURRENT_SOURCE_DIR}/*.tesc
