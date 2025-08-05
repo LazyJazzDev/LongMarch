@@ -59,6 +59,10 @@ void SampleMaterial(inout RenderContext context, HitRecord hit_record) {
   }
 
   SampleLambertianBSDF(color, context.rd, hit_record, eval, omega_in, pdf);
+  if (pdf < EPSILON) {
+    context.throughput = float3(0, 0, 0);
+    return;
+  }
   context.throughput *= eval / pdf;
   context.origin = hit_record.position;
   context.direction = omega_in;

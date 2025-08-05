@@ -22,10 +22,12 @@ int main() {
                                     glm::vec3{0.0, 1.0, 0.0}),
                         glm::radians(40.0f), static_cast<float>(film.GetWidth()) / film.GetHeight());
 
-  sparks::MaterialLambertian material_white(&sparks_core, {0.725, 0.71, 0.68});
-  sparks::MaterialLambertian material_red(&sparks_core, {0.63, 0.065, 0.05});
-  sparks::MaterialLambertian material_green(&sparks_core, {0.14, 0.45, 0.091});
-  sparks::MaterialLambertian material_light(&sparks_core, {0.0f, 0.0f, 0.0f}, {30.0f, 30.0f, 30.0f});
+  sparks::MaterialPrincipled material_white(&sparks_core, {0.725, 0.71, 0.68});
+  sparks::MaterialPrincipled material_red(&sparks_core, {0.63, 0.065, 0.05});
+  sparks::MaterialPrincipled material_green(&sparks_core, {0.14, 0.45, 0.091});
+  sparks::MaterialPrincipled material_light(&sparks_core, {0.725, 0.71, 0.68});
+  material_light.emission_color = {1.0f, 1.0f, 1.0f};
+  material_light.emission_strength = 30.0f;
   sparks::MaterialPrincipled material_principled(&sparks_core, {0.725, 0.71, 0.68});
 
   std::vector<glm::vec3> positions;
@@ -131,6 +133,8 @@ int main() {
     ImGui::Separator();
     ImGui::SliderInt("Samples per frame", &scene.settings.samples_per_dispatch, 1, 256);
     updated |= ImGui::SliderInt("Max Bounces", &scene.settings.max_bounces, 1, 128);
+    updated |= ImGui::SliderFloat("Light Strength", &material_light.emission_strength, 0.0f, 1e6f, nullptr,
+                                  ImGuiSliderFlags_Logarithmic);
     ImGui::NewLine();
     ImGui::Text("Material");
     ImGui::Separator();
@@ -152,6 +156,9 @@ int main() {
     updated |=
         ImGui::ColorEdit3("Subsurface Color", &material_principled.subsurface_color[0], ImGuiColorEditFlags_Float);
     updated |= ImGui::SliderFloat3("Subsurface Radius", &material_principled.subsurface_radius[0], 0.0f, 10.0f);
+    updated |= ImGui::ColorEdit3("Emission Color", &material_principled.emission_color[0], ImGuiColorEditFlags_Float);
+    updated |= ImGui::SliderFloat("Emission Strength", &material_principled.emission_strength, 0.0f, 1e6f, nullptr,
+                                  ImGuiSliderFlags_Logarithmic);
 
     ImGui::End();
     window->EndImGuiFrame();

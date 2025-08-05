@@ -20,7 +20,11 @@ void SampleDirectLighting(in RenderContext context, HitRecord hit_record, out fl
   float high_prob = power_cdf.Load(L * 4) / total_power;
   float low_prob = (L > 0) ? power_cdf.Load((L - 1) * 4) / total_power : 0.0f;
   float prob = high_prob - low_prob;
-  r1 = (r1 - low_prob) / prob;
+  if (prob > EPSILON) {
+    r1 = (r1 - low_prob) / prob;
+  } else {
+    r1 = 0.0f; // Avoid division by zero
+  }
 
   LightMetadata light_meta = light_metadatas[L];
   SampleDirectLightingPayload payload;
@@ -49,5 +53,8 @@ float DirectLightingProbability(uint light_index) {
 }
 
 float PowerHeuristic(float base, float ref) {
+  if (ref < EPSILON) {
+    return 1.0f; // Avoid division by zero
+  }
   return (base * base) / (base * base + ref * ref);
 }
