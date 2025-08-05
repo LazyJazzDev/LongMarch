@@ -22,7 +22,7 @@ LightGeometryMaterial::LightGeometryMaterial(Core *core,
   core_->GraphicsCore()->CreateShader(vfs, "light/geometry_material/gather_primitive_power.hlsl",
                                       "GatherPrimitivePowerKernel", "cs_6_3", {"-I."}, &gather_primitive_power_shader_);
   core_->GraphicsCore()->CreateShader(vfs, "light/geometry_material/direct_lighting_sampler.hlsl",
-                                      "SampleDirectLightingCallable", "lib_6_3", {"-I."}, &direct_lighting_sampler_);
+                                      "SampleDirectLightingCallable", "lib_6_5", {"-I."}, &direct_lighting_sampler_);
 
   uint32_t primitive_count = geometry_->PrimitiveCount();
   uint32_t wave_size = core_->GraphicsCore()->WaveSize();

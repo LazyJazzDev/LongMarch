@@ -22,9 +22,9 @@ int main() {
                                     glm::vec3{0.0, 1.0, 0.0}),
                         glm::radians(40.0f), static_cast<float>(film.GetWidth()) / film.GetHeight());
 
-  sparks::MaterialPrincipled material_white(&sparks_core, {0.725, 0.71, 0.68});
-  sparks::MaterialPrincipled material_red(&sparks_core, {0.63, 0.065, 0.05});
-  sparks::MaterialPrincipled material_green(&sparks_core, {0.14, 0.45, 0.091});
+  sparks::MaterialLambertian material_white(&sparks_core, {0.725, 0.71, 0.68});
+  sparks::MaterialLambertian material_red(&sparks_core, {0.63, 0.065, 0.05});
+  sparks::MaterialLambertian material_green(&sparks_core, {0.14, 0.45, 0.091});
   sparks::MaterialPrincipled material_light(&sparks_core, {0.725, 0.71, 0.68});
   material_light.emission_color = {1.0f, 1.0f, 1.0f};
   material_light.emission_strength = 30.0f;
@@ -125,7 +125,6 @@ int main() {
     bool updated = false;
 
     window->BeginImGuiFrame();
-    ImVec2 window_size = ImVec2{};
     ImGui::SetNextWindowPos({0, 0}, ImGuiCond_Once);
     ImGui::SetNextWindowBgAlpha(0.3);
     ImGui::Begin("Settings", nullptr, ImGuiWindowFlags_AlwaysAutoResize);
@@ -135,6 +134,7 @@ int main() {
     updated |= ImGui::SliderInt("Max Bounces", &scene.settings.max_bounces, 1, 128);
     updated |= ImGui::SliderFloat("Light Strength", &material_light.emission_strength, 0.0f, 1e6f, nullptr,
                                   ImGuiSliderFlags_Logarithmic);
+    updated |= ImGui::Checkbox("Alpha Shadow", reinterpret_cast<bool *>(&scene.settings.alpha_shadow));
     ImGui::NewLine();
     ImGui::Text("Material");
     ImGui::Separator();

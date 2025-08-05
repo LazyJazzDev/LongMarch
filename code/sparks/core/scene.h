@@ -44,6 +44,7 @@ class Scene {
   struct Settings {
     int samples_per_dispatch = 128;
     int max_bounces = 32;
+    int alpha_shadow = false;
   } settings;
 
   int32_t RegisterCallableShader(graphics::Shader *callable_shader);

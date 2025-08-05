@@ -44,6 +44,7 @@ struct RayGenPayload {
 struct SceneSettings {
   int samples_per_dispatch;
   int max_bounces;
+  bool alpha_shadow;
 };
 
 struct InstanceMetadata {

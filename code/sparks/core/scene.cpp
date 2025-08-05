@@ -9,10 +9,10 @@
 
 namespace sparks {
 Scene::Scene(Core *core) : core_(core) {
-  core_->GraphicsCore()->CreateShader(core_->GetShadersVFS(), "raygen.hlsl", "Main", "lib_6_3", &raygen_shader_);
-  core_->GraphicsCore()->CreateShader(core_->GetShadersVFS(), "raygen.hlsl", "MissMain", "lib_6_3",
+  core_->GraphicsCore()->CreateShader(core_->GetShadersVFS(), "raygen.hlsl", "Main", "lib_6_5", &raygen_shader_);
+  core_->GraphicsCore()->CreateShader(core_->GetShadersVFS(), "raygen.hlsl", "MissMain", "lib_6_5",
                                       &default_miss_shader_);
-  core_->GraphicsCore()->CreateShader(core_->GetShadersVFS(), "raygen.hlsl", "ShadowMiss", "lib_6_3",
+  core_->GraphicsCore()->CreateShader(core_->GetShadersVFS(), "raygen.hlsl", "ShadowMiss", "lib_6_5",
                                       &shadow_miss_shader_);
   core_->GraphicsCore()->CreateBuffer(sizeof(Settings), graphics::BUFFER_TYPE_STATIC, &scene_settings_buffer_);
   core_->GraphicsCore()->CreateShader(core_->GetShadersVFS(), "gather_light_power.hlsl", "GatherLightPowerKernel",

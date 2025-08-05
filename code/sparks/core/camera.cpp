@@ -4,7 +4,7 @@
 
 namespace sparks {
 Camera::Camera(Core *core, const glm::mat4 &view, float fovy, float aspect) : core_(core) {
-  core_->GraphicsCore()->CreateShader(core_->GetShadersVFS(), "camera.hlsl", "CameraPinhole", "lib_6_3",
+  core_->GraphicsCore()->CreateShader(core_->GetShadersVFS(), "camera.hlsl", "CameraPinhole", "lib_6_5",
                                       &camera_shader_);
   core_->GraphicsCore()->CreateBuffer(sizeof(CameraData), graphics::BUFFER_TYPE_STATIC, &camera_buffer_);
   camera_data_.world_to_camera = view;

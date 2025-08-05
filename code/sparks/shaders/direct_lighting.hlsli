@@ -37,7 +37,11 @@ void SampleDirectLighting(in RenderContext context, HitRecord hit_record, out fl
   float shadow_length = asfloat(payload.low.w);
   omega_in = asfloat(payload.high.xyz);
   pdf = asfloat(payload.high.w) * prob;
-  eval *= ShadowRay(hit_record.position, omega_in, shadow_length);
+  if (scene_settings.alpha_shadow) {
+    eval *= ShadowRay(hit_record.position, omega_in, shadow_length);
+  } else {
+    eval *= ShadowRayNoAlpha(hit_record.position, omega_in, shadow_length);
+  }
 }
 
 float DirectLightingProbability(uint light_index) {
