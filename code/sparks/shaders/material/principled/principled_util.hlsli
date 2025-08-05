@@ -19,11 +19,11 @@
 #define saturatef(x) clamp(x, 0.0, 1.0)
 #define saturate(x) clamp(x, 0.0, 1.0)
 #define PREPARE_BSDF(sc, weight_in)                 \
-  Spectrum weight = weight_in;                      \
-  weight = max(weight, float3(0, 0, 0));            \
-  const float sample_weight = abs(average(weight)); \
+  Spectrum weight_spec = weight_in;                      \
+  weight_spec = max(weight_spec, float3(0, 0, 0));            \
+  const float sample_weight = abs(average(weight_spec)); \
   if (sample_weight >= CLOSURE_WEIGHT_CUTOFF) {     \
-    sc.weight = weight;                             \
+    sc.weight = weight_spec;                             \
     sc.sample_weight = sample_weight;               \
   } else {                                          \
     sc.sample_weight = 0.0;                         \
