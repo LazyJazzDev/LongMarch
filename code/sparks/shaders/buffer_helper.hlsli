@@ -136,3 +136,43 @@ class BufferReference<RWByteAddressBuffer> {
     return m_buffer.Store4(m_offset + offset, asuint(value));
   }
 };
+
+
+template <class BufferType>
+class StreamedBufferReference {
+  BufferType m_buffer;
+  uint m_offset;
+
+  float LoadFloat() {
+    float result = asfloat(m_buffer.Load(m_offset));
+    m_offset += 4; // Move to the next float
+        return result;
+  }
+
+float2 LoadFloat2() {
+        float2 result = asfloat(m_buffer.Load2(m_offset));
+        m_offset += 8; // Move to the next float2
+        return result;
+        }
+
+float3 LoadFloat3() {
+        float3 result = asfloat(m_buffer.Load3(m_offset));
+        m_offset += 12; // Move to the next float3
+        return result;
+        }
+
+float4 LoadFloat4() {
+        float4 result = asfloat(m_buffer.Load4(m_offset));
+        m_offset += 16; // Move to the next float4
+        return result;
+        }
+
+};
+
+template <class BufferType>
+StreamedBufferReference<BufferType> MakeStreamedBufferReference(BufferType buffer, uint offset) {
+    StreamedBufferReference<BufferType> buf;
+        buf.m_buffer = buffer;
+        buf.m_offset = offset;
+        return buf;
+}
