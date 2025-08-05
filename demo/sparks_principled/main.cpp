@@ -118,11 +118,14 @@ int main() {
   std::unique_ptr<graphics::Window> window;
   core_->CreateWindowObject(film.GetWidth(), film.GetHeight(), "Sparks Cornell Box", &window);
   FPSCounter fps_counter;
-  window->InitImGui(nullptr, 32.0f);
+  window->InitImGui(nullptr, 20.0f);
   while (!window->ShouldClose()) {
     bool updated = false;
 
     window->BeginImGuiFrame();
+    ImVec2 window_size = ImVec2{};
+    ImGui::SetNextWindowPos({0, 0}, ImGuiCond_Once);
+    ImGui::SetNextWindowBgAlpha(0.3);
     ImGui::Begin("Settings", nullptr, ImGuiWindowFlags_AlwaysAutoResize);
     ImGui::Text("Global");
     ImGui::Separator();
@@ -132,6 +135,24 @@ int main() {
     ImGui::Text("Material");
     ImGui::Separator();
     updated |= ImGui::ColorEdit3("Base Color", &material_principled.base_color[0], ImGuiColorEditFlags_Float);
+    updated |= ImGui::SliderFloat("Metallic", &material_principled.metallic, 0.0f, 1.0f);
+    updated |= ImGui::SliderFloat("Roughness", &material_principled.roughness, 0.0f, 1.0f);
+    updated |= ImGui::SliderFloat("Specular", &material_principled.specular, 0.0f, 1.0f);
+    updated |= ImGui::SliderFloat("Specular Tint", &material_principled.specular_tint, 0.0f, 1.0f);
+    updated |= ImGui::SliderFloat("Anisotropic", &material_principled.anisotropic, 0.0f, 1.0f);
+    updated |= ImGui::SliderFloat("Anisotropic Rotation", &material_principled.anisotropic_rotation, 0.0f, 1.0f);
+    updated |= ImGui::SliderFloat("Sheen", &material_principled.sheen, 0.0f, 1.0f);
+    updated |= ImGui::SliderFloat("Sheen Tint", &material_principled.sheen_tint, 0.0f, 1.0f);
+    updated |= ImGui::SliderFloat("Clearcoat", &material_principled.clearcoat, 0.0f, 1.0f);
+    updated |= ImGui::SliderFloat("Clearcoat Roughness", &material_principled.clearcoat_roughness, 0.0f, 1.0f);
+    updated |= ImGui::SliderFloat("Transmission", &material_principled.transmission, 0.0f, 1.0f);
+    updated |= ImGui::SliderFloat("Transmission Roughness", &material_principled.transmission_roughness, 0.0f, 1.0f);
+    updated |= ImGui::SliderFloat("IOR", &material_principled.ior, 1.0f, 2.5f);
+    updated |= ImGui::SliderFloat("Subsurface", &material_principled.subsurface, 0.0f, 1.0f);
+    updated |=
+        ImGui::ColorEdit3("Subsurface Color", &material_principled.subsurface_color[0], ImGuiColorEditFlags_Float);
+    updated |= ImGui::SliderFloat3("Subsurface Radius", &material_principled.subsurface_radius[0], 0.0f, 10.0f);
+
     ImGui::End();
     window->EndImGuiFrame();
 
