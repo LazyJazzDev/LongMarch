@@ -127,7 +127,7 @@ int main() {
     ImGui::Text("Global");
     ImGui::Separator();
     ImGui::SliderInt("Samples per frame", &scene.settings.samples_per_dispatch, 1, 256);
-    ImGui::SliderInt("Max Bounces", &scene.settings.max_bounces, 1, 128);
+    updated |= ImGui::SliderInt("Max Bounces", &scene.settings.max_bounces, 1, 128);
     ImGui::NewLine();
     ImGui::Text("Material");
     ImGui::Separator();
