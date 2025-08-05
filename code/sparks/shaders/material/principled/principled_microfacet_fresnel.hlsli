@@ -1,6 +1,4 @@
 #pragma once
-
-
 #define CLOSURE_BSDF_MICROFACET_GGX_FRESNEL_ID 0
 #define CLOSURE_BSDF_MICROFACET_GGX_CLEARCOAT_ID 1
 #define CLOSURE_BSDF_MICROFACET_GGX_REFRACTION_ID 2
@@ -27,7 +25,7 @@ void bsdf_microfacet_fresnel_color(inout FresnelBsdf bsdf) {
 }
 
 Spectrum reflection_color(const FresnelBsdf bsdf, float3 L, float3 H) {
-  Spectrum F = float3(1, 1, 1);
+  Spectrum F = make_float3(1);
   float F0 = fresnel_dielectric_cos(1.0f, bsdf.ior);
   F = interpolate_fresnel_color(L, H, bsdf.ior, F0, bsdf.cspec0);
   return F;
@@ -51,7 +49,7 @@ Spectrum bsdf_microfacet_ggx_eval_reflect_fresnel(const FresnelBsdf bsdf,
                                                   const float cosNI) {
   if (!(cosNI > 0 && cosNO > 0)) {
     pdf = 0.0f;
-    return float3(0, 0, 0);
+    return make_float3(0);
   }
 
   /* get half vector */
@@ -82,7 +80,7 @@ Spectrum bsdf_microfacet_ggx_eval_reflect_fresnel(const FresnelBsdf bsdf,
     make_orthonormals_tangent(Z, bsdf.T, X, Y);
 
     /* distribution */
-    float3 local_m = float3(dot(X, m), dot(Y, m), dot(Z, m));
+    float3 local_m = make_float3(dot(X, m), dot(Y, m), dot(Z, m));
     float slope_x = -local_m.x / (local_m.z * alpha_x);
     float slope_y = -local_m.y / (local_m.z * alpha_y);
     float slope_len = 1 + slope_x * slope_x + slope_y * slope_y;
@@ -147,7 +145,7 @@ Spectrum bsdf_microfacet_ggx_eval_fresnel(const FresnelBsdf bsdf,
 
   if (cosNI < 0.0f || alpha_x * alpha_y <= 1e-7f) {
     pdf = 0.0f;
-    return float3(0, 0, 0);
+    return make_float3(0.0);
   }
 
   return bsdf_microfacet_ggx_eval_reflect_fresnel(
@@ -179,7 +177,7 @@ int bsdf_microfacet_ggx_sample_fresnel(const FresnelBsdf bsdf,
 
     /* importance sampling with distribution of visible normals. vectors are
      * transformed to local space before and after */
-    float3 local_I = float3(dot(X, I), dot(Y, I), cosNO);
+    float3 local_I = make_float3(dot(X, I), dot(Y, I), cosNO);
     float3 local_m;
     float G1o;
 
@@ -201,7 +199,7 @@ int bsdf_microfacet_ggx_sample_fresnel(const FresnelBsdf bsdf,
         if (alpha_x * alpha_y <= 1e-7f) {
           /* some high number for MIS */
           pdf = 1e6f;
-          eval = float3(1e6f, 1e6f, 1e6f) * reflection_color(bsdf, omega_in, m);
+          eval = make_float3(1e6f) * reflection_color(bsdf, omega_in, m);
 
           label = LABEL_REFLECT | LABEL_SINGULAR;
         } else {
@@ -227,7 +225,7 @@ int bsdf_microfacet_ggx_sample_fresnel(const FresnelBsdf bsdf,
                                               (cosNI * cosNI)));
           } else {
             /* anisotropic distribution */
-            float3 local_m = float3(dot(X, m), dot(Y, m), dot(Z, m));
+            float3 local_m = make_float3(dot(X, m), dot(Y, m), dot(Z, m));
             float slope_x = -local_m.x / (local_m.z * alpha_x);
             float slope_y = -local_m.y / (local_m.z * alpha_y);
             float slope_len = 1 + slope_x * slope_x + slope_y * slope_y;
@@ -261,7 +259,7 @@ int bsdf_microfacet_ggx_sample_fresnel(const FresnelBsdf bsdf,
           eval = G1i * common_ * F;
         }
       } else {
-        eval = float3(0, 0, 0);
+        eval = make_float3(0);
         pdf = 0.0f;
       }
     }

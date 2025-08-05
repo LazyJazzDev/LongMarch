@@ -22,7 +22,7 @@ Spectrum bsdf_microfacet_ggx_eval_transmit_refraction(const RefractionBsdf bsdf,
                                                       const float cosNI) {
   if (cosNO <= 0 || cosNI >= 0) {
     pdf = 0.0f;
-    return float3(0, 0, 0); /* vectors on same side -- not possible */
+    return make_float3(0); /* vectors on same side -- not possible */
   }
   /* compute half-vector of the refraction (eq. 16) */
   float m_eta = bsdf.ior;
@@ -62,7 +62,7 @@ Spectrum bsdf_microfacet_ggx_eval_transmit_refraction(const RefractionBsdf bsdf,
   float out_ = G * abs(cosHI * cosHO) * common_;
   pdf = G1o * abs(cosHO * cosHI) * common_;
 
-  return float3(out_, out_, out_);
+  return make_float3(out_);
 }
 
 Spectrum bsdf_microfacet_ggx_eval_refraction(const RefractionBsdf bsdf,
@@ -76,7 +76,7 @@ Spectrum bsdf_microfacet_ggx_eval_refraction(const RefractionBsdf bsdf,
 
   if (!(cosNI < 0.0f) || alpha * alpha <= 1e-7f) {
     pdf = 0.0f;
-    return float3(0, 0, 0);
+    return make_float3(0.0);
   }
 
   return bsdf_microfacet_ggx_eval_transmit_refraction(bsdf, N, I, omega_in, pdf,
@@ -104,7 +104,7 @@ int bsdf_microfacet_ggx_sample_refraction(const RefractionBsdf bsdf,
 
     /* importance sampling with distribution of visible normals. vectors are
      * transformed to local space before and after */
-    float3 local_I = float3(dot(X, I), dot(Y, I), cosNO);
+    float3 local_I = make_float3(dot(X, I), dot(Y, I), cosNO);
     float3 local_m;
     float G1o;
 
@@ -130,7 +130,7 @@ int bsdf_microfacet_ggx_sample_refraction(const RefractionBsdf bsdf,
       if (alpha * alpha <= 1e-7f || abs(m_eta - 1.0f) < 1e-4f) {
         /* some high number for MIS */
         pdf = 1e6f;
-        eval = float3(1e6f, 1e6f, 1e6f);
+        eval = make_float3(1e6f);
         label = LABEL_TRANSMIT | LABEL_SINGULAR;
       } else {
         /* eq. 33 */
@@ -159,10 +159,10 @@ int bsdf_microfacet_ggx_sample_refraction(const RefractionBsdf bsdf,
         float out_ = G1i * abs(cosHI * cosHO) * common_;
         pdf = cosHO * abs(cosHI) * common_;
 
-        eval = float3(out_, out_, out_);
+        eval = make_float3(out_);
       }
     } else {
-      eval = float3(0, 0, 0);
+      eval = make_float3(0);
       pdf = 0.0f;
     }
   } else {

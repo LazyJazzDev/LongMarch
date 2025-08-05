@@ -1,8 +1,15 @@
 #pragma once
-
 #ifndef Spectrum
 #define Spectrum float3
 #endif
+
+float3 make_float3(float v) {
+  return float3(v, v, v);
+}
+
+float3 make_float3(float x, float y, float z) {
+  return float3(x, y, z);
+}
 
 #define LABEL_NONE 0
 #define LABEL_TRANSMIT 1
@@ -19,11 +26,11 @@
 #define saturatef(x) clamp(x, 0.0, 1.0)
 #define saturate(x) clamp(x, 0.0, 1.0)
 #define PREPARE_BSDF(sc, weight_in)                 \
-  Spectrum weight_spec = weight_in;                      \
-  weight_spec = max(weight_spec, float3(0, 0, 0));            \
-  const float sample_weight = abs(average(weight_spec)); \
+  Spectrum weight_spectrum = weight_in;                      \
+  weight_spectrum = max(weight_spectrum, make_float3(0.0));                  \
+  const float sample_weight = abs(average(weight_spectrum)); \
   if (sample_weight >= CLOSURE_WEIGHT_CUTOFF) {     \
-    sc.weight = weight_spec;                             \
+    sc.weight = weight_spectrum;                             \
     sc.sample_weight = sample_weight;               \
   } else {                                          \
     sc.sample_weight = 0.0;                         \
@@ -61,7 +68,7 @@ float fresnel_dielectric(float eta,
 
   float arg = 1 - (neta * neta * (1 - (cos * cos)));
   if (arg < 0) {
-    T = float3(0.0f, 0.0f, 0.0f);
+    T = make_float3(0.0f, 0.0f, 0.0f);
     return 1;  // total internal reflection
   } else {
     float dnp = max(sqrt(arg), 1e-7f);
@@ -107,7 +114,7 @@ Spectrum interpolate_fresnel_color(float3 L,
   float FH = (fresnel_dielectric_cos(dot(L, H), ior) - F0) * F0_norm;
 
   /* Blend between white and a specular color with respect to the fresnel */
-  return cspec0 * (1.0f - FH) + float3(FH, FH, FH);
+  return cspec0 * (1.0f - FH) + make_float3(FH);
 }
 
 float safe_sqrtf(float f) {

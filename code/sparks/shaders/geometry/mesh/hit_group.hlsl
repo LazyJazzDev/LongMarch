@@ -79,7 +79,11 @@ struct GeometryHeader {
         LoadFloat3(geometry_buffer, header.tangent_offset + header.tangent_stride * vid[2]) * barycentrics[2];
     hit_group.tangent = normalize(mul(ObjectToWorld3x4(), float4(hit_group.tangent, 0.0)).xyz);
   } else {
-    hit_group.tangent = float3(0.0, 0.0, 0.0);
+    hit_group.tangent = cross(hit_group.normal, float3(0.0, 0.0, 1.0));
+    if (length(hit_group.tangent) < 0.001) {
+      hit_group.tangent = cross(hit_group.normal, float3(1.0, 0.0, 0.0));
+    }
+    hit_group.tangent = normalize(hit_group.tangent);
   }
 
   if (header.signal_offset != 0) {

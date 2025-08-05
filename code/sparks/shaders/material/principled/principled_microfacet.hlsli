@@ -1,5 +1,4 @@
 #pragma once
-
 #define CLOSURE_BSDF_MICROFACET_GGX_FRESNEL_ID 0
 #define CLOSURE_BSDF_MICROFACET_GGX_CLEARCOAT_ID 1
 #define CLOSURE_BSDF_MICROFACET_GGX_REFRACTION_ID 2
@@ -138,7 +137,7 @@ float3 microfacet_sample_stretched(const float3 omega_i,
                                    bool beckmann,
                                    inout float G1i) {
   /* 1. stretch omega_i */
-  float3 omega_i_ = float3(alpha_x * omega_i.x, alpha_y * omega_i.y, omega_i.z);
+  float3 omega_i_ = make_float3(alpha_x * omega_i.x, alpha_y * omega_i.y, omega_i.z);
   omega_i_ = normalize(omega_i_);
 
   /* get polar coordinates of omega_i_ */
@@ -177,5 +176,5 @@ float3 microfacet_sample_stretched(const float3 omega_i,
   slope_y = alpha_y * slope_y;
 
   /* 5. compute normal */
-  return normalize(float3(-slope_x, -slope_y, 1.0f));
+  return normalize(make_float3(-slope_x, -slope_y, 1.0f));
 }

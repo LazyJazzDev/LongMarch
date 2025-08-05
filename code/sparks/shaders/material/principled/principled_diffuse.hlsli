@@ -1,7 +1,4 @@
 #pragma once
-#include "principled_util.hlsli"
-#include "random.hlsli"
-
 struct PrincipledDiffuseBsdf {
   Spectrum weight;
   float sample_weight;
@@ -17,7 +14,7 @@ Spectrum bsdf_principled_diffuse_compute_brdf(const PrincipledDiffuseBsdf bsdf,
   const float NdotL = dot(N, L);
 
   if (NdotL <= 0) {
-    return float3(0, 0, 0);
+    return make_float3(0);
   }
 
   const float NdotV = dot(N, V);
@@ -42,7 +39,7 @@ Spectrum bsdf_principled_diffuse_compute_brdf(const PrincipledDiffuseBsdf bsdf,
 
   float value = INV_PI * NdotL * f;
 
-  return Spectrum(value, value, value);
+  return make_float3(value);
 }
 
 Spectrum bsdf_principled_diffuse_eval(PrincipledDiffuseBsdf bsdf,
@@ -58,7 +55,7 @@ Spectrum bsdf_principled_diffuse_eval(PrincipledDiffuseBsdf bsdf,
     return bsdf_principled_diffuse_compute_brdf(bsdf, N, V, L, pdf);
   } else {
     pdf = 0.0f;
-    return float3(0, 0, 0);
+    return make_float3(0);
   }
 }
 
@@ -78,6 +75,6 @@ void bsdf_principled_diffuse_sample(PrincipledDiffuseBsdf bsdf,
     eval = bsdf_principled_diffuse_compute_brdf(bsdf, N, I, omega_in, pdf);
   } else {
     pdf = 0.0f;
-    eval = float3(0, 0, 0);
+    eval = make_float3(0);
   }
 }

@@ -17,14 +17,14 @@ Spectrum calculate_principled_sheen_brdf(float3 N,
 
   if (NdotL < 0 || NdotV < 0) {
     pdf = 0.0f;
-    return float3(0, 0, 0);
+    return make_float3(0);
   }
 
   float LdotH = dot(L, H);
 
   float value = schlick_fresnel(LdotH) * NdotL;
 
-  return float3(value, value, value);
+  return make_float3(value);
 }
 
 float calculate_avg_principled_sheen_brdf(float3 N, float3 I) {
@@ -59,7 +59,7 @@ Spectrum bsdf_principled_sheen_eval(const PrincipledSheenBsdf bsdf,
     return calculate_principled_sheen_brdf(N, V, L, H, pdf);
   } else {
     pdf = 0.0f;
-    return float3(0, 0, 0);
+    return make_float3(0);
   }
 }
 
@@ -79,7 +79,7 @@ int bsdf_principled_sheen_sample(const PrincipledSheenBsdf bsdf,
     float3 H = normalize(I + omega_in);
     eval = calculate_principled_sheen_brdf(N, I, omega_in, H, pdf);
   } else {
-    eval = float3(0, 0, 0);
+    eval = make_float3(0.0);
     pdf = 0.0f;
   }
   return LABEL_REFLECT | LABEL_DIFFUSE;
