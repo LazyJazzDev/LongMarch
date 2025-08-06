@@ -538,7 +538,7 @@ int VulkanCore::InitializeLogicalDevice(int device_index) {
 }
 
 void VulkanCore::WaitGPU() {
-  device_->WaitIdle();
+  graphics_queue_->WaitIdle();
   for (auto &post_execute : post_execute_functions_) {
     for (auto &callback : post_execute) {
       callback();
