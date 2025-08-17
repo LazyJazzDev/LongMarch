@@ -114,8 +114,10 @@ int main() {
   scene.AddEntity(&entity_short_box);
   scene.AddEntity(&entity_tall_box);
 
-  std::unique_ptr<graphics::Image> image;
-  core_->CreateImage(film.GetWidth(), film.GetHeight(), graphics::IMAGE_FORMAT_R8G8B8A8_UNORM, &image);
+  std::unique_ptr<graphics::Image> raw_image;
+  core_->CreateImage(film.GetWidth(), film.GetHeight(), graphics::IMAGE_FORMAT_R32G32B32A32_SFLOAT, &raw_image);
+  std::unique_ptr<graphics::Image> srgb_image;
+  core_->CreateImage(film.GetWidth(), film.GetHeight(), graphics::IMAGE_FORMAT_R8G8B8A8_UNORM, &srgb_image);
 
   std::unique_ptr<graphics::Window> window;
   core_->CreateWindowObject(film.GetWidth(), film.GetHeight(), "Sparks Cornell Box", &window);
@@ -168,10 +170,11 @@ int main() {
     }
 
     scene.Render(&camera, &film);
-    sparks_core.ConvertFilmToImage(film, image.get());
+    sparks_core.ConvertFilmToRawImage(film, raw_image.get());
+    sparks_core.ToneMapping(raw_image.get(), srgb_image.get());
     std::unique_ptr<graphics::CommandContext> cmd_context;
     core_->CreateCommandContext(&cmd_context);
-    cmd_context->CmdPresent(window.get(), image.get());
+    cmd_context->CmdPresent(window.get(), srgb_image.get());
     core_->SubmitCommandContext(cmd_context.get());
     glfwPollEvents();
     float fps = fps_counter.TickFPS();
@@ -180,12 +183,13 @@ int main() {
     float rps = film.GetWidth() * film.GetHeight() * fps * scene.settings.samples_per_dispatch;
     char rps_buf[16];
     sprintf(rps_buf, "%.2f", rps * 1e-6f);
-    window->SetTitle(std::string("Sparks Cornell Box - ") + fps_buf + "frams/s" + " - " + rps_buf + "Mrays/s");
+    window->SetTitle(std::string("Sparks Principled BSDF - ") + fps_buf + "frams/s" + " - " + rps_buf + "Mrays/s");
   }
   window->TerminateImGui();
 
-  sparks_core.ConvertFilmToImage(film, image.get());
+  sparks_core.ConvertFilmToRawImage(film, raw_image.get());
+  sparks_core.ToneMapping(raw_image.get(), srgb_image.get());
   std::vector<uint8_t> image_data(film.GetWidth() * film.GetHeight() * 4);
-  image->DownloadData(image_data.data());
+  srgb_image->DownloadData(image_data.data());
   stbi_write_bmp("output.bmp", film.GetWidth(), film.GetHeight(), 4, image_data.data());
 }

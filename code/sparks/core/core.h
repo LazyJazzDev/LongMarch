@@ -10,7 +10,9 @@ class Core {
 
   const VirtualFileSystem &GetShadersVFS() const;
 
-  void ConvertFilmToImage(const Film &film, graphics::Image *image);
+  void ConvertFilmToRawImage(const Film &film, graphics::Image *image);
+
+  void ToneMapping(graphics::Image *raw_image, graphics::Image *output_image);
 
   graphics::Shader *GetShader(const std::string &name);
 
@@ -21,8 +23,6 @@ class Core {
 
   VirtualFileSystem shaders_vfs_;
 
-  std::unique_ptr<graphics::Shader> film2img_shader_;
-  std::unique_ptr<graphics::ComputeProgram> film2img_program_;
   std::map<std::string, std::unique_ptr<graphics::Shader>> shaders_;
   std::map<std::string, std::unique_ptr<graphics::ComputeProgram>> compute_programs_;
 };

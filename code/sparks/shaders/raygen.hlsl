@@ -45,7 +45,7 @@
     }
 
     accumulated_color[DispatchRaysIndex().xy] += float4(context.radiance, 1.0);
-    accumulated_samples[DispatchRaysIndex().xy] += 1;
+    accumulated_samples[DispatchRaysIndex().xy] += 1.0;
   }
 }
 

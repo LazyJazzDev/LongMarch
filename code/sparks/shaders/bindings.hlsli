@@ -3,7 +3,7 @@
 #include "buffer_helper.hlsli"
 
 RWTexture2D<float4> accumulated_color : register(u0, space0);
-RWTexture2D<int> accumulated_samples : register(u0, space1);
+RWTexture2D<float> accumulated_samples : register(u0, space1);
 
 RaytracingAccelerationStructure as : register(t0, space2);
 
