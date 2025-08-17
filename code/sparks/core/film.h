@@ -13,6 +13,11 @@ class Film {
   int GetWidth() const;
   int GetHeight() const;
 
+  struct Info {
+    int accumulated_samples{0};
+    float persistence{1.0};
+  } info;
+
  private:
   friend Scene;
   friend Core;

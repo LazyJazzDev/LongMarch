@@ -1,5 +1,6 @@
 #include "sparks/core/scene.h"
 
+#include "film.h"
 #include "sparks/core/camera.h"
 #include "sparks/core/core.h"
 #include "sparks/core/entity.h"
@@ -14,7 +15,8 @@ Scene::Scene(Core *core) : core_(core) {
                                       &default_miss_shader_);
   core_->GraphicsCore()->CreateShader(core_->GetShadersVFS(), "raygen.hlsl", "ShadowMiss", "lib_6_5",
                                       &shadow_miss_shader_);
-  core_->GraphicsCore()->CreateBuffer(sizeof(Settings), graphics::BUFFER_TYPE_STATIC, &scene_settings_buffer_);
+  core_->GraphicsCore()->CreateBuffer(sizeof(Settings) + sizeof(Film::Info), graphics::BUFFER_TYPE_STATIC,
+                                      &scene_settings_buffer_);
   core_->GraphicsCore()->CreateShader(core_->GetShadersVFS(), "gather_light_power.hlsl", "GatherLightPowerKernel",
                                       "cs_6_3", &gather_light_power_shader_);
 }
@@ -22,6 +24,8 @@ Scene::Scene(Core *core) : core_(core) {
 void Scene::Render(Camera *camera, Film *film) {
   UpdatePipeline(camera);
   scene_settings_buffer_->UploadData(&settings, sizeof(Settings));
+  scene_settings_buffer_->UploadData(&film->info, sizeof(Film::Info), sizeof(Settings));
+  film->info.accumulated_samples += settings.samples_per_dispatch;
   std::unique_ptr<graphics::CommandContext> cmd_context;
   core_->GraphicsCore()->CreateCommandContext(&cmd_context);
   cmd_context->CmdBindRayTracingProgram(rt_program_.get());
@@ -271,6 +275,13 @@ void Scene::UpdatePipeline(Camera *camera) {
     }
   }
   core_->GraphicsCore()->SubmitCommandContext(preprocess_cmd_context_.get());
+
+  std::vector<float> light_power_cdf(light_metadatas_.size());
+  light_selector_buffer_->DownloadData(light_power_cdf.data(), sizeof(float) * light_metadatas_.size(),
+                                       sizeof(uint32_t));
+  for (int i = 0; i < light_power_cdf.size(); i++) {
+    std::cout << "Light " << i << " power CDF: " << light_power_cdf[i] << std::endl;
+  }
 }
 
 }  // namespace sparks

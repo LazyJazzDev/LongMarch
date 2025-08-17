@@ -5,20 +5,20 @@
 void SampleDirectLighting(in RenderContext context, HitRecord hit_record, out float3 eval, out float3 omega_in, out float pdf) {
   uint light_count = light_selector_data.Load(0);
   BufferReference<ByteAddressBuffer> power_cdf = MakeBufferReference(light_selector_data, 4);
-  float total_power = power_cdf.Load(light_count * 4 - 4);
+  float total_power = asfloat(power_cdf.Load(light_count * 4 - 4));
   uint L = 0, R = light_count - 1;
   float r1 = RandomFloat(context.rd);
   while (L < R) {
     uint mid = (L + R) / 2;
-    float mid_power = power_cdf.Load(mid * 4);
+    float mid_power = asfloat(power_cdf.Load(mid * 4));
     if (r1 <= mid_power / total_power) {
       R = mid;
     } else {
       L = mid + 1;
     }
   }
-  float high_prob = power_cdf.Load(L * 4) / total_power;
-  float low_prob = (L > 0) ? power_cdf.Load((L - 1) * 4) / total_power : 0.0f;
+  float high_prob = asfloat(power_cdf.Load(L * 4)) / total_power;
+  float low_prob = (L > 0) ? asfloat(power_cdf.Load((L - 1) * 4)) / total_power : 0.0f;
   float prob = high_prob - low_prob;
   if (prob > EPSILON) {
     r1 = (r1 - low_prob) / prob;
@@ -37,7 +37,7 @@ void SampleDirectLighting(in RenderContext context, HitRecord hit_record, out fl
   float shadow_length = asfloat(payload.low.w);
   omega_in = asfloat(payload.high.xyz);
   pdf = asfloat(payload.high.w) * prob;
-  if (scene_settings.alpha_shadow) {
+  if (render_settings.alpha_shadow) {
     eval *= ShadowRay(hit_record.position, omega_in, shadow_length);
   } else {
     eval *= ShadowRayNoAlpha(hit_record.position, omega_in, shadow_length);
@@ -50,9 +50,9 @@ float DirectLightingProbability(uint light_index) {
     return 0.0f;
   }
   BufferReference<ByteAddressBuffer> power_cdf = MakeBufferReference(light_selector_data, 4);
-  float total_power = power_cdf.Load(light_count * 4 - 4);
-  float high_prob = power_cdf.Load(light_index * 4) / total_power;
-  float low_prob = (light_index > 0) ? power_cdf.Load((light_index - 1) * 4) / total_power : 0.0f;
+  float total_power = asfloat(power_cdf.Load(light_count * 4 - 4));
+  float high_prob = asfloat(power_cdf.Load(light_index * 4)) / total_power;
+  float low_prob = (light_index > 0) ? asfloat(power_cdf.Load((light_index - 1) * 4)) / total_power : 0.0f;
   return high_prob - low_prob;
 }
 

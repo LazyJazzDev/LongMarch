@@ -41,10 +41,14 @@ struct RayGenPayload {
   float3 direction;
 };
 
-struct SceneSettings {
+struct RenderSettings {
+  // Scene Settings
   int samples_per_dispatch;
   int max_bounces;
   bool alpha_shadow;
+  // Film Info
+  int accumulated_samples;
+  float persistence;
 };
 
 struct InstanceMetadata {

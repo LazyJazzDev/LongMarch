@@ -12,6 +12,7 @@ void Film::Reset() {
   cmd_context->CmdClearImage(accumulated_color_.get(), {0.0f, 0.0f, 0.0f, 0.0f});
   cmd_context->CmdClearImage(accumulated_samples_.get(), {});
   core_->GraphicsCore()->SubmitCommandContext(cmd_context.get());
+  info.accumulated_samples = 0;
 }
 
 int Film::GetWidth() const {

@@ -3,9 +3,9 @@
 
 [shader("raygeneration")] void Main() {
   // get the pixel coordinates
-  uint sample_ind = accumulated_samples[DispatchRaysIndex().xy];
+  uint sample_ind = render_settings.accumulated_samples;
   RenderContext context;
-  for (int i = 0; i < scene_settings.samples_per_dispatch; i++, sample_ind++) {
+  for (int i = 0; i < render_settings.samples_per_dispatch; i++, sample_ind++) {
     {
       uint2 pixel_coords = DispatchRaysIndex().xy;
       uint2 image_size = DispatchRaysDimensions().xy;
@@ -24,7 +24,7 @@
       context.bsdf_pdf = INF;
     }
 
-    for (int bounce = 0; bounce < scene_settings.max_bounces; bounce++) {
+    for (int bounce = 0; bounce < render_settings.max_bounces; bounce++) {
       RayDesc ray;
       ray.Origin = context.origin;
       ray.TMin = T_MIN * length(context.origin);

@@ -9,6 +9,7 @@
 #include "grassland/util/fps_counter.h"
 #include "grassland/util/log.h"
 #include "grassland/util/metronome.h"
+#include "grassland/util/sobol.h"
 #include "grassland/util/string_convert.h"
 #include "grassland/util/util_util.h"
 #include "grassland/util/vendor_id.h"

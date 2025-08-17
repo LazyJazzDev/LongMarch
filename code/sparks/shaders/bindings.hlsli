@@ -7,7 +7,7 @@ RWTexture2D<float> accumulated_samples : register(u0, space1);
 
 RaytracingAccelerationStructure as : register(t0, space2);
 
-ConstantBuffer<SceneSettings> scene_settings : register(b0, space3);
+ConstantBuffer<RenderSettings> render_settings : register(b0, space3);
 
 ByteAddressBuffer camera_data : register(t0, space4);
 ByteAddressBuffer data_buffers[] : register(t0, space5);
