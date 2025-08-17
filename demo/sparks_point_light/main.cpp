@@ -17,8 +17,9 @@ int main() {
   sparks_core.GetShadersVFS().Print();
 
   sparks::Scene scene(&sparks_core);
-  scene.settings.samples_per_dispatch = 32;
+  scene.settings.samples_per_dispatch = 1;
   sparks::Film film(&sparks_core, 1024, 1024);
+  film.info.persistence = 0.98f;
   sparks::Camera camera(&sparks_core,
                         glm::lookAt(glm::vec3{0.0f, 2.0f, 7.0f}, glm::vec3{0.0f}, glm::vec3{0.0, 1.0, 0.0}),
                         glm::radians(60.0f), static_cast<float>(film.GetWidth()) / film.GetHeight());
@@ -62,10 +63,18 @@ int main() {
   std::unique_ptr<graphics::Window> window;
   core_->CreateWindowObject(film.GetWidth(), film.GetHeight(), "Sparks Cornell Box", &window);
   FPSCounter fps_counter;
+  float rotation_angle = 0.0f;
   while (!window->ShouldClose()) {
     for (int i = 0; i < num_lights; i++) {
+      float frac = float(i) / num_lights;
+      float theta = 2.0f * std::acos(-1.0f) * frac + rotation_angle;
+      float sin_theta = std::sin(theta);
+      float cos_theta = std::cos(theta);
+      float x = 3.0f;
+      positions[i] = {sin_theta * x, 2.0f, cos_theta * x};
       point_lights[i]->position = positions[i];
     }
+    rotation_angle += glm::radians(0.1f);
     scene.Render(&camera, &film);
     sparks_core.ConvertFilmToRawImage(film, raw_image.get());
     sparks_core.ToneMapping(raw_image.get(), srgb_image.get());

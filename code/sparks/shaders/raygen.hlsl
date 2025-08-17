@@ -45,6 +45,8 @@
       }
     }
 
+    accumulated_color[DispatchRaysIndex().xy] *= render_settings.persistence;
+    accumulated_samples[DispatchRaysIndex().xy] *= render_settings.persistence;
     accumulated_color[DispatchRaysIndex().xy] += float4(context.radiance, 1.0);
     accumulated_samples[DispatchRaysIndex().xy] += 1.0;
   }
