@@ -1,12 +1,7 @@
 #pragma once
 #include "constants.hlsli"
+#include "bindings.hlsli"
 
-struct RandomDevice {
-  uint offset;
-  uint samp;
-  uint seed;
-  uint dim;
-} random_device;
 
 uint WangHash(inout uint seed) {
   seed = uint(seed ^ uint(61)) ^ uint(seed >> uint(16));
@@ -35,11 +30,18 @@ RandomDevice InitRandomSeed(uint x, uint y, uint s) {
   return random_device;
 }
 
+uint SobolUint(inout RandomDevice random_device) {
+ uint result = sobol_table[random_device.samp * 1024 + (random_device.dim)]
+ ^
+WangHash(random_device.offset);
+random_device.dim++;
+return result;
+}
 
-uint RandomUint(inout RandomDevice rd) {
-  //  if (random_device.dim < 1024 && random_device.samp < 65536)
-  //    return SobolUint();
-  return WangHash(rd.seed);
+uint RandomUint(inout RandomDevice random_device) {
+  if (random_device.dim < 1024 && random_device.samp < 65536)
+    return SobolUint(random_device);
+  return WangHash(random_device.seed);
 }
 
 float RandomFloat(inout RandomDevice rd) {

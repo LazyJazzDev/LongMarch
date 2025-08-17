@@ -9,34 +9,8 @@
 
 namespace sparks {
 Core::Core(graphics::Core *core) : core_(core) {
-  shaders_vfs_ = VirtualFileSystem::LoadDirectory(LONGMARCH_SPARKS_SHADERS);
-  core_->CreateShader(shaders_vfs_, "film2img.hlsl", "Main", "cs_6_0", &shaders_["film2img"]);
-  auto &film2img_program = compute_programs_["film2img"];
-  core_->CreateComputeProgram(shaders_["film2img"].get(), &film2img_program);
-  film2img_program->AddResourceBinding(graphics::RESOURCE_TYPE_TEXTURE, 1);
-  film2img_program->AddResourceBinding(graphics::RESOURCE_TYPE_TEXTURE, 1);
-  film2img_program->AddResourceBinding(graphics::RESOURCE_TYPE_IMAGE, 1);
-  film2img_program->Finalize();
-
-  core_->CreateShader(shaders_vfs_, "tone_mapping.hlsl", "Main", "cs_6_0", &shaders_["tone_mapping"]);
-  auto &tone_mapping_program = compute_programs_["tone_mapping"];
-  core_->CreateComputeProgram(shaders_["tone_mapping"].get(), &tone_mapping_program);
-  tone_mapping_program->AddResourceBinding(graphics::RESOURCE_TYPE_TEXTURE, 1);
-  tone_mapping_program->AddResourceBinding(graphics::RESOURCE_TYPE_IMAGE, 1);
-  tone_mapping_program->Finalize();
-
-  core_->CreateShader(shaders_vfs_, "blelloch_scan.hlsl", "BlellochUpSweep", "cs_6_3", {"-I."},
-                      &shaders_["blelloch_scan_up"]);
-  core_->CreateShader(shaders_vfs_, "blelloch_scan.hlsl", "BlellochDownSweep", "cs_6_3", {"-I."},
-                      &shaders_["blelloch_scan_down"]);
-  core_->CreateComputeProgram(shaders_["blelloch_scan_up"].get(), &compute_programs_["blelloch_scan_up"]);
-  core_->CreateComputeProgram(shaders_["blelloch_scan_down"].get(), &compute_programs_["blelloch_scan_down"]);
-  compute_programs_["blelloch_scan_up"]->AddResourceBinding(graphics::RESOURCE_TYPE_WRITABLE_STORAGE_BUFFER, 1);
-  compute_programs_["blelloch_scan_up"]->AddResourceBinding(graphics::RESOURCE_TYPE_UNIFORM_BUFFER, 1);
-  compute_programs_["blelloch_scan_up"]->Finalize();
-  compute_programs_["blelloch_scan_down"]->AddResourceBinding(graphics::RESOURCE_TYPE_WRITABLE_STORAGE_BUFFER, 1);
-  compute_programs_["blelloch_scan_down"]->AddResourceBinding(graphics::RESOURCE_TYPE_UNIFORM_BUFFER, 1);
-  compute_programs_["blelloch_scan_down"]->Finalize();
+  LoadPublicShaders();
+  LoadSobolBuffer();
 }
 
 graphics::Core *Core::GraphicsCore() const {
@@ -76,6 +50,48 @@ graphics::Shader *Core::GetShader(const std::string &name) {
 
 graphics::ComputeProgram *Core::GetComputeProgram(const std::string &name) {
   return compute_programs_[name].get();
+}
+
+graphics::Buffer *Core::SobolBuffer() {
+  return sobol_buffer_.get();
+}
+
+void Core::LoadPublicShaders() {
+  shaders_vfs_ = VirtualFileSystem::LoadDirectory(LONGMARCH_SPARKS_SHADERS);
+  core_->CreateShader(shaders_vfs_, "film2img.hlsl", "Main", "cs_6_0", &shaders_["film2img"]);
+  auto &film2img_program = compute_programs_["film2img"];
+  core_->CreateComputeProgram(shaders_["film2img"].get(), &film2img_program);
+  film2img_program->AddResourceBinding(graphics::RESOURCE_TYPE_TEXTURE, 1);
+  film2img_program->AddResourceBinding(graphics::RESOURCE_TYPE_TEXTURE, 1);
+  film2img_program->AddResourceBinding(graphics::RESOURCE_TYPE_IMAGE, 1);
+  film2img_program->Finalize();
+
+  core_->CreateShader(shaders_vfs_, "tone_mapping.hlsl", "Main", "cs_6_0", &shaders_["tone_mapping"]);
+  auto &tone_mapping_program = compute_programs_["tone_mapping"];
+  core_->CreateComputeProgram(shaders_["tone_mapping"].get(), &tone_mapping_program);
+  tone_mapping_program->AddResourceBinding(graphics::RESOURCE_TYPE_TEXTURE, 1);
+  tone_mapping_program->AddResourceBinding(graphics::RESOURCE_TYPE_IMAGE, 1);
+  tone_mapping_program->Finalize();
+
+  core_->CreateShader(shaders_vfs_, "blelloch_scan.hlsl", "BlellochUpSweep", "cs_6_3", {"-I."},
+                      &shaders_["blelloch_scan_up"]);
+  core_->CreateShader(shaders_vfs_, "blelloch_scan.hlsl", "BlellochDownSweep", "cs_6_3", {"-I."},
+                      &shaders_["blelloch_scan_down"]);
+  core_->CreateComputeProgram(shaders_["blelloch_scan_up"].get(), &compute_programs_["blelloch_scan_up"]);
+  core_->CreateComputeProgram(shaders_["blelloch_scan_down"].get(), &compute_programs_["blelloch_scan_down"]);
+  compute_programs_["blelloch_scan_up"]->AddResourceBinding(graphics::RESOURCE_TYPE_WRITABLE_STORAGE_BUFFER, 1);
+  compute_programs_["blelloch_scan_up"]->AddResourceBinding(graphics::RESOURCE_TYPE_UNIFORM_BUFFER, 1);
+  compute_programs_["blelloch_scan_up"]->Finalize();
+  compute_programs_["blelloch_scan_down"]->AddResourceBinding(graphics::RESOURCE_TYPE_WRITABLE_STORAGE_BUFFER, 1);
+  compute_programs_["blelloch_scan_down"]->AddResourceBinding(graphics::RESOURCE_TYPE_UNIFORM_BUFFER, 1);
+  compute_programs_["blelloch_scan_down"]->Finalize();
+}
+
+void Core::LoadSobolBuffer() {
+  auto path = FindAssetFile("data/new-joe-kuo-7.21201");
+  auto data = SobolTableGen(65536, 1024, path);
+  core_->CreateBuffer(data.size() * sizeof(float), graphics::BUFFER_TYPE_STATIC, &sobol_buffer_);
+  sobol_buffer_->UploadData(data.data(), data.size() * sizeof(float));
 }
 
 }  // namespace sparks

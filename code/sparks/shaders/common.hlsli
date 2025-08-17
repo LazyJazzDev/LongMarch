@@ -1,6 +1,12 @@
 #pragma once
 #include "constants.hlsli"
-#include "random.hlsli"
+
+struct RandomDevice {
+  uint offset;
+  uint samp;
+  uint seed;
+  uint dim;
+} random_device;
 
 struct CameraData {
  float4x4 world_to_camera;

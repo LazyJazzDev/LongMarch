@@ -1,5 +1,6 @@
 #include "bindings.hlsli"
 #include "common.hlsli"
+#include "random.hlsli"
 
 [shader("raygeneration")] void Main() {
   // get the pixel coordinates

@@ -23,7 +23,7 @@ int main() {
                         glm::lookAt(glm::vec3{0.0f, 2.0f, 7.0f}, glm::vec3{0.0f}, glm::vec3{0.0, 1.0, 0.0}),
                         glm::radians(60.0f), static_cast<float>(film.GetWidth()) / film.GetHeight());
 
-  sparks::MaterialLambertian material_white(&sparks_core, {0.725, 0.71, 0.68});
+  sparks::MaterialLambertian material_white(&sparks_core, {0.8f, 0.8f, 0.8f});
 
   sparks::GeometryMesh geometry_mesh(&sparks_core, Mesh<>::Sphere(30));
   sparks::EntityGeometryMaterial entity_mesh(&sparks_core, &geometry_mesh, &material_white);

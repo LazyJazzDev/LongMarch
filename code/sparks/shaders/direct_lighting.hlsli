@@ -1,6 +1,7 @@
 #pragma once
 #include "bindings.hlsli"
 #include "shadow_ray.hlsli"
+#include "random.hlsli"
 
 void SampleDirectLighting(in RenderContext context, HitRecord hit_record, out float3 eval, out float3 omega_in, out float pdf) {
   uint light_count = light_selector_data.Load(0);

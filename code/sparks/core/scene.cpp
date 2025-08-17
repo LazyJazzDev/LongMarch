@@ -33,11 +33,12 @@ void Scene::Render(Camera *camera, Film *film) {
   cmd_context->CmdBindResources(1, {film->accumulated_samples_.get()}, graphics::BIND_POINT_RAYTRACING);
   cmd_context->CmdBindResources(2, {tlas_.get()}, graphics::BIND_POINT_RAYTRACING);
   cmd_context->CmdBindResources(3, {scene_settings_buffer_.get()}, graphics::BIND_POINT_RAYTRACING);
-  cmd_context->CmdBindResources(4, {camera->Buffer()}, graphics::BIND_POINT_RAYTRACING);
-  cmd_context->CmdBindResources(5, buffers_, graphics::BIND_POINT_RAYTRACING);
-  cmd_context->CmdBindResources(6, {instance_metadata_buffer_.get()}, graphics::BIND_POINT_RAYTRACING);
-  cmd_context->CmdBindResources(7, {light_selector_buffer_.get()}, graphics::BIND_POINT_RAYTRACING);
-  cmd_context->CmdBindResources(8, {light_metadatas_buffer_.get()}, graphics::BIND_POINT_RAYTRACING);
+  cmd_context->CmdBindResources(4, {core_->SobolBuffer()}, graphics::BIND_POINT_RAYTRACING);
+  cmd_context->CmdBindResources(5, {camera->Buffer()}, graphics::BIND_POINT_RAYTRACING);
+  cmd_context->CmdBindResources(6, buffers_, graphics::BIND_POINT_RAYTRACING);
+  cmd_context->CmdBindResources(7, {instance_metadata_buffer_.get()}, graphics::BIND_POINT_RAYTRACING);
+  cmd_context->CmdBindResources(8, {light_selector_buffer_.get()}, graphics::BIND_POINT_RAYTRACING);
+  cmd_context->CmdBindResources(9, {light_metadatas_buffer_.get()}, graphics::BIND_POINT_RAYTRACING);
   cmd_context->CmdDispatchRays(film->accumulated_color_->Extent().width, film->accumulated_samples_->Extent().height,
                                1);
   core_->GraphicsCore()->SubmitCommandContext(cmd_context.get());
@@ -212,6 +213,7 @@ void Scene::UpdatePipeline(Camera *camera) {
     rt_program_->AddResourceBinding(graphics::RESOURCE_TYPE_ACCELERATION_STRUCTURE, 1);
     rt_program_->AddResourceBinding(graphics::RESOURCE_TYPE_UNIFORM_BUFFER, 1);
     rt_program_->AddResourceBinding(graphics::RESOURCE_TYPE_STORAGE_BUFFER, 1);
+    rt_program_->AddResourceBinding(graphics::RESOURCE_TYPE_STORAGE_BUFFER, 1);
     rt_program_->AddResourceBinding(graphics::RESOURCE_TYPE_STORAGE_BUFFER, buffers_.size());
     rt_program_->AddResourceBinding(graphics::RESOURCE_TYPE_STORAGE_BUFFER, 1);
     rt_program_->AddResourceBinding(graphics::RESOURCE_TYPE_STORAGE_BUFFER, 1);
@@ -275,13 +277,6 @@ void Scene::UpdatePipeline(Camera *camera) {
     }
   }
   core_->GraphicsCore()->SubmitCommandContext(preprocess_cmd_context_.get());
-
-  std::vector<float> light_power_cdf(light_metadatas_.size());
-  light_selector_buffer_->DownloadData(light_power_cdf.data(), sizeof(float) * light_metadatas_.size(),
-                                       sizeof(uint32_t));
-  for (int i = 0; i < light_power_cdf.size(); i++) {
-    std::cout << "Light " << i << " power CDF: " << light_power_cdf[i] << std::endl;
-  }
 }
 
 }  // namespace sparks
