@@ -49,7 +49,7 @@ int main() {
     float x = 3.0f;
     positions[i] = {sin_theta * x, 2.0f, cos_theta * x};
     point_lights[i]->color = graphics::HSVtoRGB({frac, 1.0f, 1.0f});
-    point_lights[i]->strength = 720.0f / num_lights;
+    point_lights[i]->strength = 1080.0f / num_lights / graphics::GreyScale(point_lights[i]->color);
   }
 
   scene.AddEntity(&entity_mesh);
@@ -70,8 +70,8 @@ int main() {
       float theta = 2.0f * std::acos(-1.0f) * frac + rotation_angle;
       float sin_theta = std::sin(theta);
       float cos_theta = std::cos(theta);
-      float x = 3.0f;
-      positions[i] = {sin_theta * x, 2.0f, cos_theta * x};
+      float x = 6.0f;
+      positions[i] = {sin_theta * x, 4.0f, cos_theta * x};
       point_lights[i]->position = positions[i];
     }
     rotation_angle += glm::radians(0.1f);

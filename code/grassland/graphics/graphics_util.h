@@ -287,6 +287,8 @@ bool IsDepthFormat(ImageFormat format);
 
 glm::vec3 HSVtoRGB(glm::vec3 hsv);
 
+float GreyScale(glm::vec3 rgb);
+
 uint32_t PixelSize(ImageFormat format);
 
 #if defined(LONGMARCH_CUDA_RUNTIME)

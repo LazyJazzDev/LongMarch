@@ -9,21 +9,14 @@ SamplerInfo::SamplerInfo()
       address_mode_w(ADDRESS_MODE_REPEAT) {
 }
 
-SamplerInfo::SamplerInfo(FilterMode filter)
-    : SamplerInfo(filter, ADDRESS_MODE_REPEAT) {
+SamplerInfo::SamplerInfo(FilterMode filter) : SamplerInfo(filter, ADDRESS_MODE_REPEAT) {
 }
 
-SamplerInfo::SamplerInfo(AddressMode address_mode)
-    : SamplerInfo(FILTER_MODE_LINEAR, address_mode) {
+SamplerInfo::SamplerInfo(AddressMode address_mode) : SamplerInfo(FILTER_MODE_LINEAR, address_mode) {
 }
 
 SamplerInfo::SamplerInfo(FilterMode filter, AddressMode address_mode)
-    : SamplerInfo(filter,
-                  filter,
-                  filter,
-                  address_mode,
-                  address_mode,
-                  address_mode) {
+    : SamplerInfo(filter, filter, filter, address_mode, address_mode, address_mode) {
 }
 
 SamplerInfo::SamplerInfo(FilterMode min_filter,
@@ -83,7 +76,7 @@ bool IsDepthFormat(ImageFormat format) {
   }
 }
 
-glm::vec3 HSVtoRGB(glm::vec3 hsv) {
+glm::vec3 HSVtoRGB(const glm::vec3 hsv) {
   float c = hsv.z * hsv.y;
   float h = hsv.x * 360.0 / 60.0f;
   float x = c * (1.0f - std::abs(std::fmod(h, 2.0f) - 1.0f));
@@ -103,6 +96,10 @@ glm::vec3 HSVtoRGB(glm::vec3 hsv) {
     rgb = glm::vec3(c, 0.0f, x);
   }
   return rgb + glm::vec3(m);
+}
+
+float GreyScale(const glm::vec3 rgb) {
+  return 0.299f * rgb.r + 0.587f * rgb.g + 0.114f * rgb.b;
 }
 
 uint32_t PixelSize(ImageFormat format) {

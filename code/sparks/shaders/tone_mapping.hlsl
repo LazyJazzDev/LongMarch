@@ -20,6 +20,8 @@ Texture2D<float4> accumulated_color : register(t0, space0);
   // Apply tone mapping
   float3 mapped_color = Linear2sRGB(color.xyz, 2.2);
 
+  mapped_color /= max(1.0, max(mapped_color.x, max(mapped_color.y, mapped_color.z)));
+
   // Write the result to the output image
   output[pixel_coords] = float4(mapped_color, color.w);
 }

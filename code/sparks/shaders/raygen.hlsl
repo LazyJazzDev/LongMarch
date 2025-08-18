@@ -28,9 +28,9 @@
     for (int bounce = 0; bounce < render_settings.max_bounces; bounce++) {
       RayDesc ray;
       ray.Origin = context.origin;
-      ray.TMin = T_MIN * length(context.origin);
+      ray.TMin = T_MIN * max(length(context.origin), 1.0);
       ray.Direction = context.direction;
-      ray.TMax = 1e16;
+      ray.TMax = T_MAX;
       TraceRay(as, RAY_FLAG_NONE, 0xFF, 0, 0, 0, ray, context);
 
       // russian roulette

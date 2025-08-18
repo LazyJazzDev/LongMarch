@@ -5,7 +5,7 @@ float ShadowRayNoAlpha(float3 origin, float3 direction, float dist) {
   RayDesc ray;
   ray.Origin = origin;
   ray.Direction = direction;
-  ray.TMin = T_MIN * length(origin);
+  ray.TMin = T_MIN * max(length(origin), 1.0);
   ray.TMax = dist;
   RayQuery<RAY_FLAG_NONE> rq;
   rq.TraceRayInline(
@@ -28,7 +28,7 @@ float ShadowRay(float3 origin, float3 direction, float dist) {
   RayDesc ray;
   ray.Origin = origin;
   ray.Direction = direction;
-  ray.TMin = T_MIN * length(origin);
+  ray.TMin = T_MIN * max(length(origin), 1.0);
   ray.TMax = dist;
   ShadowRayPayload payload;
   payload.shadow = 1.0;
