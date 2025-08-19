@@ -5,6 +5,7 @@ namespace sparks {
 
 class MaterialLight : public Material {
  public:
+  MaterialLight() = default;
   MaterialLight(Core *core,
                 const glm::vec3 &emission = glm::vec3{0.0f},
                 bool two_sided = false,

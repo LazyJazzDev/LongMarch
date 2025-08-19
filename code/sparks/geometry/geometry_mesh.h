@@ -21,6 +21,7 @@ struct GeometryMeshHeader {
 
 class GeometryMesh : public Geometry {
  public:
+  GeometryMesh() = default;
   GeometryMesh(Core *core, const Mesh<float> &mesh);
 
   graphics::Buffer *Buffer() override;

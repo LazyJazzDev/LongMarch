@@ -55,6 +55,7 @@ struct RenderSettings {
   // Film Info
   int accumulated_samples;
   float persistence;
+  float clamping;
 };
 
 struct InstanceMetadata {

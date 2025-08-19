@@ -16,6 +16,7 @@ class Film {
   struct Info {
     int accumulated_samples{0};
     float persistence{1.0};
+    float clamping{100.0f};
   } info;
 
  private:

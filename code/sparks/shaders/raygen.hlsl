@@ -45,6 +45,9 @@
       }
     }
 
+    context.radiance *= render_settings.clamping / max(max(render_settings.clamping, context.radiance.r),
+                                                       max(context.radiance.g, context.radiance.b));
+
     accumulated_color[DispatchRaysIndex().xy] *= render_settings.persistence;
     accumulated_samples[DispatchRaysIndex().xy] *= render_settings.persistence;
     accumulated_color[DispatchRaysIndex().xy] += float4(context.radiance, 1.0);

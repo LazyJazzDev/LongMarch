@@ -35,7 +35,7 @@ void SampleDirectLighting(in RenderContext context, HitRecord hit_record, out fl
   payload.high.w = light_meta.custom_index;
   CallShader(light_meta.sampler_shader_index, payload);
   eval = asfloat(payload.low.xyz);
-  float shadow_length = asfloat(payload.low.w);
+  float shadow_length = asfloat(payload.low.w) * 0.9999;
   omega_in = asfloat(payload.high.xyz);
   pdf = asfloat(payload.high.w) * prob;
   if (render_settings.alpha_shadow) {

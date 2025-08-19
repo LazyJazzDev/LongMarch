@@ -15,6 +15,10 @@ class Entity {
   virtual bool ExpiredHitGroup();
   virtual bool ExpiredCallableShader();
 
+  operator bool() const {
+    return core_ != nullptr;
+  }
+
  protected:
   Core *core_;
 };

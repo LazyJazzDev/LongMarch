@@ -17,14 +17,14 @@ int main() {
   sparks_core.GetShadersVFS().Print();
 
   sparks::Scene scene(&sparks_core);
-  scene.settings.samples_per_dispatch = 1;
+  scene.settings.samples_per_dispatch = 16;
   sparks::Film film(&sparks_core, 1024, 1024);
-  film.info.persistence = 0.98f;
+  film.info.persistence = 0.95f;
   sparks::Camera camera(&sparks_core,
                         glm::lookAt(glm::vec3{0.0f, 2.0f, 7.0f}, glm::vec3{0.0f}, glm::vec3{0.0, 1.0, 0.0}),
                         glm::radians(60.0f), static_cast<float>(film.GetWidth()) / film.GetHeight());
 
-  sparks::MaterialLambertian material_white(&sparks_core, {0.8f, 0.8f, 0.8f});
+  sparks::MaterialPrincipled material_white(&sparks_core, {0.8f, 0.8f, 0.8f});
 
   sparks::GeometryMesh geometry_mesh(&sparks_core, Mesh<>::Sphere(30));
   sparks::EntityGeometryMaterial entity_mesh(&sparks_core, &geometry_mesh, &material_white);
@@ -35,21 +35,25 @@ int main() {
   entity_point_light.position = {0.0f, 5.0f, 0.0f};
   entity_point_light.strength = 100.0f;
 
-  const int num_lights = 12;
-  std::unique_ptr<sparks::EntityPointLight> point_lights[num_lights];
+  const int num_lights = 6;
+  std::unique_ptr<sparks::EntityAreaLight> area_lights[num_lights];
   glm::vec3 positions[num_lights];
 
   for (int i = 0; i < num_lights; ++i) {
-    point_lights[i] = std::make_unique<sparks::EntityPointLight>(&sparks_core, glm::vec3{}, glm::vec3{1.0f}, 1.0f);
-    scene.AddEntity(point_lights[i].get());
+    area_lights[i] = std::make_unique<sparks::EntityAreaLight>(&sparks_core, glm::vec3{1.0f, 1.0f, 1.0f}, 1.0f,
+                                                               glm::vec3{0.0f, 0.0f, 0.0f});
+    scene.AddEntity(area_lights[i].get());
     float frac = float(i) / num_lights;
     float theta = 2.0f * std::acos(-1.0f) * frac;
     float sin_theta = std::sin(theta);
     float cos_theta = std::cos(theta);
     float x = 3.0f;
     positions[i] = {sin_theta * x, 2.0f, cos_theta * x};
-    point_lights[i]->color = graphics::HSVtoRGB({frac, 1.0f, 1.0f});
-    point_lights[i]->strength = 1440.0f / num_lights / graphics::GreyScale(point_lights[i]->color);
+    area_lights[i]->size = 0.6f;
+    area_lights[i]->emission = graphics::HSVtoRGB({frac, 1.0f, 1.0f});
+    area_lights[i]->emission =
+        area_lights[i]->emission * (40.0f / num_lights / graphics::GreyScale(area_lights[i]->emission) /
+                                    area_lights[i]->size / area_lights[i]->size);
   }
 
   scene.AddEntity(&entity_mesh);
@@ -72,7 +76,8 @@ int main() {
       float cos_theta = std::cos(theta);
       float x = 6.0f;
       positions[i] = {sin_theta * x, 4.0f, cos_theta * x};
-      point_lights[i]->position = positions[i];
+      area_lights[i]->position = positions[i];
+      area_lights[i]->direction = -area_lights[i]->position;
     }
     rotation_angle += glm::radians(0.1f);
     scene.Render(&camera, &film);
@@ -89,7 +94,7 @@ int main() {
     float rps = film.GetWidth() * film.GetHeight() * fps * scene.settings.samples_per_dispatch;
     char rps_buf[16];
     sprintf(rps_buf, "%.2f", rps * 1e-6f);
-    window->SetTitle(std::string("Sparks Point Light - ") + fps_buf + "frams/s" + " - " + rps_buf + "Mrays/s");
+    window->SetTitle(std::string("Sparks Area Light - ") + fps_buf + "frams/s" + " - " + rps_buf + "Mrays/s");
   }
 
   sparks_core.ConvertFilmToRawImage(film, raw_image.get());

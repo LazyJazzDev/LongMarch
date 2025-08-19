@@ -20,7 +20,7 @@ EntityGeometryLight::EntityGeometryLight(Core *core,
       emission(emission),
       two_sided(two_sided),
       block_ray(block_ray),
-      transformation_(transform) {
+      transform(transform) {
   auto vfs = core_->GetShadersVFS();
   vfs.WriteFile("entity_chit.hlsl", geometry_->ClosestHitShaderImpl());
   vfs.WriteFile("material_sampler.hlsli", material_light_.SamplerImpl());
@@ -34,9 +34,10 @@ void EntityGeometryLight::Update(Scene *scene) {
   material_light_.emission = emission;
   material_light_.two_sided = two_sided;
   material_light_.block_ray = block_ray;
+  light_geom_mat_.transform = transform;
   int32_t light_index = scene->RegisterLight(&light_geom_mat_);
   int32_t instance_index = scene->RegisterInstance(
-      geometry_->BLAS(), transformation_,
+      geometry_->BLAS(), transform,
       scene->RegisterHitGroup({{closest_hit_shader_.get()}, {shadow_closest_hit_shader_.get()}}),
       scene->RegisterBuffer(geometry_->Buffer()), scene->RegisterBuffer(material_light_.Buffer()), light_index);
   scene->LightCustomIndex(light_index) = instance_index;
