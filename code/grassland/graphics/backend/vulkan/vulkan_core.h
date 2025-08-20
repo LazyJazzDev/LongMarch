@@ -131,6 +131,9 @@ class VulkanCore : public Core {
 
   uint32_t FindMemoryType(uint32_t type_filter, VkMemoryPropertyFlags properties);
 
+  vulkan::Buffer *RequestUploadStagingBuffer(size_t size);
+  vulkan::Buffer *RequestDownloadStagingBuffer(size_t size);
+
 #if defined(LONGMARCH_CUDA_RUNTIME)
   void ImportCudaExternalMemory(cudaExternalMemory_t &cuda_memory, VkDeviceMemory &vulkan_memory, VkDeviceSize size);
   void CUDABeginExecutionBarrier(cudaStream_t stream) override;
@@ -169,6 +172,9 @@ class VulkanCore : public Core {
   void *GetMemoryHandle(VkDeviceMemory memory);
   void *GetSemaphoreHandle(VkSemaphore semaphore);
 #endif
+
+  std::unique_ptr<vulkan::Buffer> upload_staging_buffer_;
+  std::unique_ptr<vulkan::Buffer> download_staging_buffer_;
 };
 
 }  // namespace grassland::graphics::backend

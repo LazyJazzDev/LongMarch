@@ -145,6 +145,9 @@ class D3D12Core : public Core {
     return dsv_descriptor_heaps_[current_frame_].get();
   }
 
+  d3d12::Buffer *RequestUploadStagingBuffer(size_t size);
+  d3d12::Buffer *RequestDownloadStagingBuffer(size_t size);
+
 #if defined(LONGMARCH_CUDA_RUNTIME)
   void ImportCudaExternalMemory(cudaExternalMemory_t &cuda_memory, d3d12::Buffer *buffer);
   void CUDABeginExecutionBarrier(cudaStream_t stream) override;
@@ -185,6 +188,9 @@ class D3D12Core : public Core {
   uint32_t cuda_device_node_mask_;
   cudaExternalSemaphore_t cuda_semaphore_{};
 #endif
+
+  std::unique_ptr<d3d12::Buffer> upload_staging_buffer_;
+  std::unique_ptr<d3d12::Buffer> download_staging_buffer_;
 };
 
 }  // namespace grassland::graphics::backend

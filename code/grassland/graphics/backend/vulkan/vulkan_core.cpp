@@ -33,6 +33,8 @@ VulkanCore::~VulkanCore() {
     vkDestroySemaphore(device_->Handle(), cuda_synchronization_semaphore_, nullptr);
   }
 #endif
+  upload_staging_buffer_.reset();
+  download_staging_buffer_.reset();
 
   for (auto &descriptor_set : descriptor_sets_) {
     while (!descriptor_set.empty()) {
@@ -585,6 +587,23 @@ uint32_t VulkanCore::FindMemoryType(uint32_t type_filter, VkMemoryPropertyFlags 
     }
   }
   return ~0;
+}
+
+vulkan::Buffer *VulkanCore::RequestUploadStagingBuffer(size_t size) {
+  if (!upload_staging_buffer_ || upload_staging_buffer_->Size() < size) {
+    upload_staging_buffer_.reset();
+    device_->CreateBuffer(size, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VMA_MEMORY_USAGE_CPU_TO_GPU, &upload_staging_buffer_);
+  }
+  return upload_staging_buffer_.get();
+}
+
+vulkan::Buffer *VulkanCore::RequestDownloadStagingBuffer(size_t size) {
+  if (!download_staging_buffer_ || download_staging_buffer_->Size() < size) {
+    download_staging_buffer_.reset();
+    device_->CreateBuffer(size, VK_BUFFER_USAGE_TRANSFER_DST_BIT, VMA_MEMORY_USAGE_GPU_TO_CPU,
+                          &download_staging_buffer_);
+  }
+  return download_staging_buffer_.get();
 }
 
 #if defined(LONGMARCH_CUDA_RUNTIME)

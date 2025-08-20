@@ -473,6 +473,22 @@ void D3D12Core::SingleTimeCommand(std::function<void(ID3D12GraphicsCommandList *
   fence_->Wait();
 }
 
+d3d12::Buffer *D3D12Core::RequestUploadStagingBuffer(size_t size) {
+  if (!upload_staging_buffer_ || upload_staging_buffer_->Size() < size) {
+    upload_staging_buffer_.reset();
+    device_->CreateBuffer(size, D3D12_HEAP_TYPE_UPLOAD, &upload_staging_buffer_);
+  }
+  return upload_staging_buffer_.get();
+}
+
+d3d12::Buffer *D3D12Core::RequestDownloadStagingBuffer(size_t size) {
+  if (!download_staging_buffer_ || download_staging_buffer_->Size() < size) {
+    download_staging_buffer_.reset();
+    device_->CreateBuffer(size, D3D12_HEAP_TYPE_READBACK, &download_staging_buffer_);
+  }
+  return download_staging_buffer_.get();
+}
+
 #if defined(LONGMARCH_CUDA_RUNTIME)
 void D3D12Core::ImportCudaExternalMemory(cudaExternalMemory_t &cuda_memory, d3d12::Buffer *buffer) {
   HANDLE sharedHandle;

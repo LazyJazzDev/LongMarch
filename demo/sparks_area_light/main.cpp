@@ -17,7 +17,7 @@ int main() {
   sparks_core.GetShadersVFS().Print();
 
   sparks::Scene scene(&sparks_core);
-  scene.settings.samples_per_dispatch = 16;
+  scene.settings.samples_per_dispatch = 1;
   sparks::Film film(&sparks_core, 1024, 1024);
   film.info.persistence = 0.95f;
   sparks::Camera camera(&sparks_core,

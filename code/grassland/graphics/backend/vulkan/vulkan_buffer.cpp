@@ -51,8 +51,7 @@ void VulkanStaticBuffer::Resize(size_t new_size) {
 
 void VulkanStaticBuffer::UploadData(const void *data, size_t size, size_t offset) {
   core_->WaitGPU();
-  std::unique_ptr<vulkan::Buffer> staging_buffer;
-  core_->Device()->CreateBuffer(size, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VMA_MEMORY_USAGE_CPU_ONLY, &staging_buffer);
+  auto staging_buffer = core_->RequestUploadStagingBuffer(size);
   std::memcpy(staging_buffer->Map(), data, size);
   staging_buffer->Unmap();
   core_->SingleTimeCommand([&](VkCommandBuffer command_buffer) {
@@ -65,8 +64,7 @@ void VulkanStaticBuffer::UploadData(const void *data, size_t size, size_t offset
 
 void VulkanStaticBuffer::DownloadData(void *data, size_t size, size_t offset) {
   core_->WaitGPU();
-  std::unique_ptr<vulkan::Buffer> staging_buffer;
-  core_->Device()->CreateBuffer(size, VK_BUFFER_USAGE_TRANSFER_DST_BIT, VMA_MEMORY_USAGE_CPU_ONLY, &staging_buffer);
+  auto staging_buffer = core_->RequestDownloadStagingBuffer(size);
   core_->SingleTimeCommand([&](VkCommandBuffer command_buffer) {
     VkBufferCopy copy_region{};
     copy_region.size = size;
