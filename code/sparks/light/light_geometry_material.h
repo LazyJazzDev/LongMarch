@@ -5,7 +5,6 @@ namespace sparks {
 
 class LightGeometryMaterial : public Light {
  public:
-  LightGeometryMaterial() = default;
   LightGeometryMaterial(Core *core, Geometry *geometry, Material *material, const glm::mat4x3 &transform);
   graphics::Shader *SamplerShader() override;
   graphics::Buffer *SamplerData() override;

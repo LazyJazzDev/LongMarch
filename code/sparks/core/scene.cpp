@@ -166,8 +166,11 @@ void Scene::UpdatePipeline(Camera *camera) {
     }
   }
 
-  tlas_.reset();
-  core_->GraphicsCore()->CreateTopLevelAccelerationStructure(instances_, &tlas_);
+  if (!tlas_) {
+    core_->GraphicsCore()->CreateTopLevelAccelerationStructure(instances_, &tlas_);
+  } else {
+    tlas_->UpdateInstances(instances_);
+  }
 
   if (!instance_metadata_buffer_ ||
       sizeof(InstanceMetadata) * instance_metadatas_.size() > instance_metadata_buffer_->Size()) {

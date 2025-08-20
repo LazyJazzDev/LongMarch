@@ -15,12 +15,12 @@ class AccelerationStructure {
   HRESULT UpdateInstances(const std::vector<D3D12_RAYTRACING_INSTANCE_DESC> &instances,
                           CommandQueue *queue,
                           Fence *fence,
-                          CommandAllocator *allocator) const;
+                          CommandAllocator *allocator);
 
   HRESULT UpdateInstances(const std::vector<std::pair<AccelerationStructure *, glm::mat4>> &objects,
                           CommandQueue *queue,
                           Fence *fence,
-                          CommandAllocator *allocator) const;
+                          CommandAllocator *allocator);
 
  private:
   Device *device_;

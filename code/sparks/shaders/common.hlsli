@@ -56,6 +56,7 @@ struct RenderSettings {
   int accumulated_samples;
   float persistence;
   float clamping;
+  float max_exposure;
 };
 
 struct InstanceMetadata {

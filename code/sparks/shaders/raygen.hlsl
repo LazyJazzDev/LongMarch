@@ -3,6 +3,9 @@
 #include "random.hlsli"
 
 [shader("raygeneration")] void Main() {
+  float4 accum_color = accumulated_color[DispatchRaysIndex().xy];
+  float accum_samples = accumulated_samples[DispatchRaysIndex().xy];
+
   // get the pixel coordinates
   uint sample_ind = render_settings.accumulated_samples;
   RenderContext context;
@@ -47,12 +50,16 @@
 
     context.radiance *= render_settings.clamping / max(max(render_settings.clamping, context.radiance.r),
                                                        max(context.radiance.g, context.radiance.b));
-
-    accumulated_color[DispatchRaysIndex().xy] *= render_settings.persistence;
-    accumulated_samples[DispatchRaysIndex().xy] *= render_settings.persistence;
-    accumulated_color[DispatchRaysIndex().xy] += float4(context.radiance, 1.0);
-    accumulated_samples[DispatchRaysIndex().xy] += 1.0;
+    accum_color *= render_settings.persistence;
+    accum_samples *= render_settings.persistence;
+    accum_color += float4(context.radiance, 1.0);
+    accum_samples += 1.0;
+    float exposure_clamping = accum_samples * render_settings.max_exposure;
+    accum_color *= exposure_clamping / max(max(exposure_clamping, accum_color.r), max(accum_color.g, accum_color.b));
   }
+
+  accumulated_color[DispatchRaysIndex().xy] = accum_color;
+  accumulated_samples[DispatchRaysIndex().xy] = accum_samples;
 }
 
     [shader("miss")] void MissMain(inout RenderContext context) {

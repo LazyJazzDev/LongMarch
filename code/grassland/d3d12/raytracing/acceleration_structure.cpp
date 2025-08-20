@@ -11,7 +11,7 @@ AccelerationStructure::AccelerationStructure(Device *device, const ComPtr<ID3D12
 HRESULT AccelerationStructure::UpdateInstances(const std::vector<D3D12_RAYTRACING_INSTANCE_DESC> &instances,
                                                CommandQueue *queue,
                                                Fence *fence,
-                                               CommandAllocator *allocator) const {
+                                               CommandAllocator *allocator) {
   ID3D12Device5 *device = device_->DXRDevice();
   RETURN_IF_FAILED_HR(as_->GetDevice(IID_PPV_ARGS(&device)), "failed to get DXR device.");
 
@@ -34,6 +34,14 @@ HRESULT AccelerationStructure::UpdateInstances(const std::vector<D3D12_RAYTRACIN
   D3D12_RAYTRACING_ACCELERATION_STRUCTURE_PREBUILD_INFO as_prebuild_info = {};
   device->GetRaytracingAccelerationStructurePrebuildInfo(&as_inputs, &as_prebuild_info);
 
+  if (!as_ || as_->GetDesc().Width < as_prebuild_info.ResultDataMaxSizeInBytes) {
+    RETURN_IF_FAILED_HR(
+        d3d12::CreateBuffer(device_->Handle(), as_prebuild_info.ResultDataMaxSizeInBytes, D3D12_HEAP_TYPE_DEFAULT,
+                            D3D12_RESOURCE_STATE_RAYTRACING_ACCELERATION_STRUCTURE,
+                            D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS, as_),
+        "failed to create acceleration structure buffer.");
+  }
+
   ID3D12Resource *scratch_buffer = device_->RequestScratchBuffer(as_prebuild_info.ScratchDataSizeInBytes);
   D3D12_BUILD_RAYTRACING_ACCELERATION_STRUCTURE_DESC as_desc = {};
   as_desc.Inputs = as_inputs;
@@ -55,7 +63,7 @@ HRESULT AccelerationStructure::UpdateInstances(
     const std::vector<std::pair<AccelerationStructure *, glm::mat4>> &objects,
     CommandQueue *queue,
     Fence *fence,
-    CommandAllocator *allocator) const {
+    CommandAllocator *allocator) {
   ID3D12Device5 *device = device_->DXRDevice();
   RETURN_IF_FAILED_HR(as_->GetDevice(IID_PPV_ARGS(&device)), "failed to get DXR device.");
 

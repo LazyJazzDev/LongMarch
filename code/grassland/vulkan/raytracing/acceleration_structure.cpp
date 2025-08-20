@@ -117,7 +117,7 @@ VkResult BuildAccelerationStructure(const Device *device,
       device->Handle(), VK_ACCELERATION_STRUCTURE_BUILD_TYPE_DEVICE_KHR, &build_geometry_info, &primitive_count,
       &build_sizes_info);
 
-  if (!(*pp_buffer) || pp_buffer->Size() != build_sizes_info.accelerationStructureSize) {
+  if (!(*pp_buffer) || pp_buffer->Size() < build_sizes_info.accelerationStructureSize) {
     // Create a buffer to hold the acceleration structure
     RETURN_IF_FAILED_VK(device->CreateBuffer(build_sizes_info.accelerationStructureSize,
                                              VK_BUFFER_USAGE_ACCELERATION_STRUCTURE_STORAGE_BIT_KHR |

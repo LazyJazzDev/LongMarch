@@ -163,24 +163,23 @@ void D3D12CUDABuffer::Resize(size_t new_size) {
 
 void D3D12CUDABuffer::UploadData(const void *data, size_t size, size_t offset) {
   core_->WaitGPU();
-  std::unique_ptr<d3d12::Buffer> staging_buffer;
-  core_->Device()->CreateBuffer(size, D3D12_HEAP_TYPE_UPLOAD, &staging_buffer);
+  auto staging_buffer = core_->RequestUploadStagingBuffer(size);
   std::memcpy(staging_buffer->Map(), data, size);
   staging_buffer->Unmap();
   core_->SingleTimeCommand([&](ID3D12GraphicsCommandList *command_list) {
     void *mapped_data = staging_buffer->Map();
     std::memcpy(mapped_data, data, size);
     staging_buffer->Unmap();
-    d3d12::CopyBuffer(command_list, staging_buffer.get(), buffer_.get(), size, 0, offset);
+    d3d12::CopyBuffer(command_list, staging_buffer, buffer_.get(), size, 0, offset);
   });
 }
 
 void D3D12CUDABuffer::DownloadData(void *data, size_t size, size_t offset) {
   core_->WaitGPU();
-  std::unique_ptr<d3d12::Buffer> staging_buffer;
+  auto staging_buffer = core_->RequestDownloadStagingBuffer(size);
   core_->Device()->CreateBuffer(size, D3D12_HEAP_TYPE_READBACK, &staging_buffer);
   core_->SingleTimeCommand([&](ID3D12GraphicsCommandList *command_list) {
-    d3d12::CopyBuffer(command_list, buffer_.get(), staging_buffer.get(), size, offset);
+    d3d12::CopyBuffer(command_list, buffer_.get(), staging_buffer, size, offset);
   });
   std::memcpy(data, staging_buffer->Map(), size);
   staging_buffer->Unmap();
