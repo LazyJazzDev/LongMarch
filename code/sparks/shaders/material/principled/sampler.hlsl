@@ -1,8 +1,8 @@
 #include "bindings.hlsli"
+#include "bsdf/principled_material.hlsli"
 #include "buffer_helper.hlsli"
 #include "direct_lighting.hlsli"
 #include "geometry_primitive_sampler.hlsli"
-#include "material/principled/principled_material.hlsli"
 
 void SampleMaterial(inout RenderContext context, HitRecord hit_record) {
   InstanceMetadata instance_meta = instance_metadatas[hit_record.object_index];

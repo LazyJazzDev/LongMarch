@@ -89,6 +89,11 @@ class BufferReference {
   uint4 Load4(uint offset) {
     return m_buffer.Load4(m_offset + offset);
   }
+
+  template <class T>
+  T Load(uint offset) {
+    return m_buffer.template Load<T>(m_offset + offset);
+  }
 };
 
 template <class BufferType>
@@ -120,21 +125,16 @@ class BufferReference<RWByteAddressBuffer> {
     return m_buffer.Load4(m_offset + offset);
   }
 
-  void Store(uint offset, uint value) {
-    return m_buffer.Store(m_offset + offset, value);
+  template <class T>
+  T Load(uint offset) {
+    return m_buffer.template Load<T>(m_offset + offset);
   }
 
-  void Store2(uint offset, uint2 value) {
-    return m_buffer.Store2(m_offset + offset, asuint(value));
+  template <class T>
+  void Store(uint offset, T value) {
+    return m_buffer.template Store<T>(m_offset + offset, value);
   }
 
-  void Store3(uint offset, uint3 value) {
-    return m_buffer.Store3(m_offset + offset, asuint(value));
-  }
-
-  void Store4(uint offset, uint4 value) {
-    return m_buffer.Store4(m_offset + offset, asuint(value));
-  }
 };
 
 

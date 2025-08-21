@@ -24,19 +24,7 @@ struct GeometryHeader {
   HitRecord hit_group;
   BufferReference<ByteAddressBuffer> geometry_buffer = MakeBufferReference(data_buffers[InstanceID()], 0);
   GeometryHeader header;
-  header.num_vertices = geometry_buffer.Load(0);
-  header.num_indices = geometry_buffer.Load(4);
-  header.position_offset = geometry_buffer.Load(8);
-  header.position_stride = geometry_buffer.Load(12);
-  header.normal_offset = geometry_buffer.Load(16);
-  header.normal_stride = geometry_buffer.Load(20);
-  header.tex_coord_offset = geometry_buffer.Load(24);
-  header.tex_coord_stride = geometry_buffer.Load(28);
-  header.tangent_offset = geometry_buffer.Load(32);
-  header.tangent_stride = geometry_buffer.Load(36);
-  header.signal_offset = geometry_buffer.Load(40);
-  header.signal_stride = geometry_buffer.Load(44);
-  header.index_offset = geometry_buffer.Load(48);
+  header = geometry_buffer.Load<GeometryHeader>(0);
 
   uint3 vid;
   vid = geometry_buffer.Load3(header.index_offset + PrimitiveIndex() * 3 * 4);
