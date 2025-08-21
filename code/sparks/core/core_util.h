@@ -16,8 +16,8 @@ class Camera;
 class Light;
 
 struct GeometryRegistration {
-  int32_t data_index;
-  graphics::AccelerationStructure *blas;
+  int data_index;
+  int shader_index;
 };
 
 struct InstanceRegistration {
@@ -37,7 +37,9 @@ struct LightMetadata {
 
 struct InstanceMetadata {
   int geometry_data_index{-1};
+  int geometry_shader_index{-1};
   int material_data_index{-1};
+  int material_shader_index{-1};
   int custom_index{-1};
 };
 

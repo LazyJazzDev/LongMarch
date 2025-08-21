@@ -26,6 +26,7 @@ EntityGeometryMaterial::EntityGeometryMaterial(Core *core,
 }
 
 void EntityGeometryMaterial::Update(Scene *scene) {
+  auto geom_reg = scene->RegisterGeometry(geometry_);
   int32_t light_index = scene->RegisterLight(&light_geom_mat_);
   int32_t instance_index = scene->RegisterInstance(
       geometry_->BLAS(), transformation_,

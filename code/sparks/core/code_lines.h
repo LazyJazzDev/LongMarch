@@ -12,6 +12,8 @@ class CodeLines {
   CodeLines(const grassland::VirtualFileSystem &vfs, const std::string &file_path);
   void InsertAfter(const CodeLines &other, const std::string &after_line);
   void InsertIndent(int num_spaces);
+  void InsertFront(const CodeLines &other);
+  void InsertBack(const CodeLines &other);
   operator std::string() const;
   operator bool() const;
 

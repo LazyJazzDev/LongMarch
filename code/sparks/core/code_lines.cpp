@@ -53,6 +53,16 @@ void CodeLines::InsertIndent(int num_spaces) {
   }
 }
 
+void CodeLines::InsertFront(const CodeLines &other) {
+  // insert the other code lines at the front
+  lines_.insert(lines_.begin(), other.lines_.begin(), other.lines_.end());
+}
+
+void CodeLines::InsertBack(const CodeLines &other) {
+  // insert the other code lines at the back
+  lines_.insert(lines_.end(), other.lines_.begin(), other.lines_.end());
+}
+
 CodeLines::operator std::string() const {
   // convert back to string
   std::string result;

@@ -19,22 +19,17 @@
   ByteAddressBuffer material_data = data_buffers[instance_meta.material_data_index];
 
   float3x4 transform = LoadFloat3x4(direct_lighting_sampler_data, 0);
-  GeometrySampler<ByteAddressBuffer> geometry_sampler;
-  geometry_sampler.geometry_data = geometry_data;
-  geometry_sampler.SetTransform(transform);
-  MaterialEvaluator<ByteAddressBuffer> material_evaluator;
-  material_evaluator.material_data = material_data;
 
   uint primitive_id;
   float prob;
   SamplePrimitivePower(direct_lighting_sampler_data, rv.x, primitive_id, prob);
 
-  GeometryPrimitiveSample primitive_sample = geometry_sampler.SamplePrimitive(primitive_id, rv.yz);
+  GeometryPrimitiveSample primitive_sample = SamplePrimitive(geometry_data, transform, primitive_id, rv.yz);
 
   float3 omega_in = primitive_sample.position - position;
   float shadow_length = length(omega_in);
 
-  float3 eval = material_evaluator.EvaluateDirectLighting(position, primitive_sample);
+  float3 eval = EvaluateDirectLighting(material_data, position, primitive_sample);
   float pdf = primitive_sample.pdf * dot(omega_in, omega_in) * prob;
   omega_in = normalize(omega_in);
   float NdotL = abs(dot(primitive_sample.normal, omega_in));

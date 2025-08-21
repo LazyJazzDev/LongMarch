@@ -51,6 +51,8 @@ class Scene {
   int32_t RegisterBuffer(graphics::Buffer *buffer);
   int32_t RegisterHitGroup(const InstanceHitGroups &hit_group);
 
+  GeometryRegistration RegisterGeometry(Geometry *geometry);
+
  private:
   void UpdatePipeline(Camera *camera);
   Core *core_;
@@ -95,6 +97,10 @@ class Scene {
   std::unique_ptr<graphics::ComputeProgram> gather_light_power_program_;
 
   std::unique_ptr<graphics::CommandContext> preprocess_cmd_context_;
+
+  CodeLines geometry_sampler_assembled_;
+  std::unordered_map<std::string, int> geometry_sampler_map_;
+  int geometry_sampler_index_{0};
 };
 
 }  // namespace sparks

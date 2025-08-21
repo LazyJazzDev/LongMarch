@@ -1,14 +1,6 @@
 
-template <class BufferType>
-class GeometrySampler {
-  BufferType geometry_data;
-  float3x4 transform;
-
-  void SetTransform(float3x4 new_transform) {
-    transform = new_transform;
-  }
-
-  float PrimitiveArea(uint primitive_id) {
+  template <class BufferType>
+  float PrimitiveArea(BufferType geometry_data, float3x4 transform, uint primitive_id) {
     uint num_indices = geometry_data.Load(4);
     uint position_offset = geometry_data.Load(8);
     uint position_stride = geometry_data.Load(12);
@@ -22,7 +14,8 @@ class GeometrySampler {
     return length(cross(pos[1] - pos[0], pos[2] - pos[0])) * 0.5f;
   }
 
-  GeometryPrimitiveSample SamplePrimitive(uint primitive_id, float2 sample) {
+  template <class BufferType>
+  GeometryPrimitiveSample SamplePrimitive(BufferType geometry_data, float3x4 transform, uint primitive_id, float2 sample) {
         uint num_indices = geometry_data.Load(4);
         uint position_offset = geometry_data.Load(8);
         uint position_stride = geometry_data.Load(12);
@@ -54,5 +47,3 @@ class GeometrySampler {
         sample_result.pdf = 1.0f / (length(cross(pos[1] - pos[0], pos[2] - pos[0])) * 0.5f);
         return sample_result;
   }
-
-};

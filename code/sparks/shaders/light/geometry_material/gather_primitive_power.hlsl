@@ -21,14 +21,9 @@ RWByteAddressBuffer direct_lighting_sampler_data : register(u0, space2);
   uint primitive_count = direct_lighting_sampler_data.Load(48);
   BufferReference<RWByteAddressBuffer> power_pdf = MakeBufferReference(direct_lighting_sampler_data, 52);
   float primitive_power = 0.0f;
-  GeometrySampler<ByteAddressBuffer> geometry_sampler;
-  geometry_sampler.geometry_data = geometry_data;
-  geometry_sampler.SetTransform(transform);
-  MaterialEvaluator<ByteAddressBuffer> material_evaluator;
-  material_evaluator.material_data = material_data;
   // calculate the prefix sum of primitive_power_shared with WavePrefixSum
   if (DTID.x < primitive_count) {
-    primitive_power = material_evaluator.PrimitivePower(geometry_sampler, DTID.x);
+    primitive_power = PrimitivePower(material_data, geometry_data, transform, DTID.x);
   }
 
   primitive_power += WavePrefixSum(primitive_power);

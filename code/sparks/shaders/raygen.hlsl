@@ -1,5 +1,6 @@
 #include "bindings.hlsli"
 #include "common.hlsli"
+#include "geometry_sampler.hlsli"
 #include "random.hlsli"
 
 [shader("raygeneration")] void Main() {
