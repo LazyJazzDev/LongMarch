@@ -28,6 +28,15 @@ struct HitRecord {
   bool front_facing;
 };
 
+struct RayPayload {
+  float t;
+  float3 primitive_coord;
+  float3x4 transform;
+  uint instance_id;
+  uint instance_index;
+  uint primitive_index;
+};
+
 struct RenderContext {
   float3 origin;
   float3 direction;

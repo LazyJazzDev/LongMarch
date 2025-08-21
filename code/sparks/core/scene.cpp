@@ -238,7 +238,7 @@ void Scene::UpdatePipeline(Camera *camera) {
   if (hit_groups_dirty_ || callable_shaders_dirty_ || buffers_dirty_ || !rt_program_) {
     auto vfs = core_->GetShadersVFS();
     vfs.WriteFile("geometry_sampler.hlsli", geometry_sampler_assembled_);
-    std::cout << geometry_sampler_assembled_ << std::endl;
+    // std::cout << geometry_sampler_assembled_ << std::endl;
     raygen_shader_.reset();
     core_->GraphicsCore()->CreateShader(vfs, "raygen.hlsl", "Main", "lib_6_5", &raygen_shader_);
     rt_program_.reset();
