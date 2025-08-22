@@ -28,12 +28,14 @@ class GeometryMesh : public Geometry {
   const CodeLines &ClosestHitShaderImpl() const override;
   int PrimitiveCount() override;
   const CodeLines &SamplerImpl() const override;
+  const CodeLines &HitRecordImpl() const override;
 
  private:
   std::unique_ptr<graphics::Buffer> geometry_buffer_;
   std::unique_ptr<graphics::AccelerationStructure> blas_;
   int primitive_count_;
   CodeLines sampler_implementation_;
+  CodeLines hit_record_implementation_;
   CodeLines closest_hit_shader_implementation_;
 };
 

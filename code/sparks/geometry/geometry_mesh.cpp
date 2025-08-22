@@ -59,6 +59,7 @@ GeometryMesh::GeometryMesh(Core *core, const Mesh<float> &mesh) : Geometry(core)
   auto &vfs = core_->GetShadersVFS();
   primitive_count_ = header.num_indices / 3;
   sampler_implementation_ = CodeLines(vfs, "geometry/mesh/geometry_sampler.hlsli");
+  hit_record_implementation_ = CodeLines(vfs, "geometry/mesh/hit_record.hlsli");
   closest_hit_shader_implementation_ = CodeLines(vfs, "geometry/mesh/hit_group.hlsl");
 }
 
@@ -76,6 +77,10 @@ int GeometryMesh::PrimitiveCount() {
 
 const CodeLines &GeometryMesh::SamplerImpl() const {
   return sampler_implementation_;
+}
+
+const CodeLines &GeometryMesh::HitRecordImpl() const {
+  return hit_record_implementation_;
 }
 
 graphics::AccelerationStructure *GeometryMesh::BLAS() {

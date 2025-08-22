@@ -130,27 +130,38 @@ GeometryRegistration Scene::RegisterGeometry(Geometry *geometry) {
   GeometryRegistration reg;
   reg.data_index = RegisterBuffer(geometry->Buffer());
   auto sampler_impl = geometry->SamplerImpl();
+  auto hit_record_impl = geometry->HitRecordImpl();
   std::string sampler_code = sampler_impl;
-  if (!geometry_sampler_map_.count(sampler_code)) {
-    sampler_impl.InsertFront("#define PrimitiveArea PrimitiveArea" + std::to_string(geometry_sampler_index_));
-    sampler_impl.InsertFront("#define SamplePrimitive SamplePrimitive" + std::to_string(geometry_sampler_index_));
+  if (!geometry_shader_map_.count(sampler_code)) {
+    sampler_impl.InsertFront("#define PrimitiveArea PrimitiveArea" + std::to_string(geometry_shader_index_));
+    sampler_impl.InsertFront("#define SamplePrimitive SamplePrimitive" + std::to_string(geometry_shader_index_));
 
     sampler_impl.InsertBack("#undef PrimitiveArea");
     sampler_impl.InsertBack("#undef SamplePrimitive");
     geometry_sampler_assembled_.InsertAfter(sampler_impl, "// Geometry Sampler Implementation");
-    geometry_sampler_assembled_.InsertAfter("    return PrimitiveArea" + std::to_string(geometry_sampler_index_) +
+    geometry_sampler_assembled_.InsertAfter("    return PrimitiveArea" + std::to_string(geometry_shader_index_) +
                                                 "(geometry_data, transform, primitive_id);",
                                             "// PrimitiveArea Switch List");
-    geometry_sampler_assembled_.InsertAfter("  case " + std::to_string(geometry_sampler_index_) + ":",
+    geometry_sampler_assembled_.InsertAfter("  case " + std::to_string(geometry_shader_index_) + ":",
                                             "// PrimitiveArea Switch List");
-    geometry_sampler_assembled_.InsertAfter("    return SamplePrimitive" + std::to_string(geometry_sampler_index_) +
+    geometry_sampler_assembled_.InsertAfter("    return SamplePrimitive" + std::to_string(geometry_shader_index_) +
                                                 "(geometry_data, transform, primitive_id, sample);",
                                             "// SamplePrimitive Switch List");
-    geometry_sampler_assembled_.InsertAfter("  case " + std::to_string(geometry_sampler_index_) + ":",
+    geometry_sampler_assembled_.InsertAfter("  case " + std::to_string(geometry_shader_index_) + ":",
                                             "// SamplePrimitive Switch List");
-    geometry_sampler_map_[sampler_code] = geometry_sampler_index_++;
+
+    hit_record_impl.InsertFront("#define GetHitRecord GetHitRecord" + std::to_string(geometry_shader_index_));
+    hit_record_impl.InsertBack("#undef GetHitRecord");
+
+    hit_record_assembled_.InsertAfter(hit_record_impl, "// Hit Record Implementation");
+    hit_record_assembled_.InsertAfter("    return GetHitRecord" + std::to_string(geometry_shader_index_) + "(payload);",
+                                      "// GetHitRecord Switch List");
+    hit_record_assembled_.InsertAfter("  case " + std::to_string(geometry_shader_index_) + ":",
+                                      "// GetHitRecord Switch List");
+
+    geometry_shader_map_[sampler_code] = geometry_shader_index_++;
   }
-  reg.shader_index = geometry_sampler_map_[sampler_code];
+  reg.shader_index = geometry_shader_map_[sampler_code];
   return reg;
 }
 
@@ -189,8 +200,9 @@ void Scene::UpdatePipeline(Camera *camera) {
   }
 
   geometry_sampler_assembled_ = {core_->GetShadersVFS(), "geometry_sampler.hlsli"};
-  geometry_sampler_map_.clear();
-  geometry_sampler_index_ = 0;
+  hit_record_assembled_ = {core_->GetShadersVFS(), "hit_record.hlsli"};
+  geometry_shader_map_.clear();
+  geometry_shader_index_ = 0;
 
   for (auto [entity, active] : entities_) {
     if (active) {
@@ -238,7 +250,8 @@ void Scene::UpdatePipeline(Camera *camera) {
   if (hit_groups_dirty_ || callable_shaders_dirty_ || buffers_dirty_ || !rt_program_) {
     auto vfs = core_->GetShadersVFS();
     vfs.WriteFile("geometry_sampler.hlsli", geometry_sampler_assembled_);
-    // std::cout << geometry_sampler_assembled_ << std::endl;
+    vfs.WriteFile("hit_record.hlsli", hit_record_assembled_);
+    std::cout << hit_record_assembled_ << std::endl;
     raygen_shader_.reset();
     core_->GraphicsCore()->CreateShader(vfs, "raygen.hlsl", "Main", "lib_6_5", &raygen_shader_);
     rt_program_.reset();

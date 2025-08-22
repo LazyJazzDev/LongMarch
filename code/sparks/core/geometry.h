@@ -13,6 +13,7 @@ class Geometry {
   virtual const CodeLines &ClosestHitShaderImpl() const = 0;
   virtual int PrimitiveCount() = 0;
   virtual const CodeLines &SamplerImpl() const = 0;
+  virtual const CodeLines &HitRecordImpl() const = 0;
 
  protected:
   Core *core_;
