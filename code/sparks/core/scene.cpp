@@ -13,8 +13,6 @@ Scene::Scene(Core *core) : core_(core) {
   core_->GraphicsCore()->CreateShader(core_->GetShadersVFS(), "raygen.hlsl", "Main", "lib_6_5", &raygen_shader_);
   core_->GraphicsCore()->CreateShader(core_->GetShadersVFS(), "raygen.hlsl", "MissMain", "lib_6_5",
                                       &default_miss_shader_);
-  core_->GraphicsCore()->CreateShader(core_->GetShadersVFS(), "raygen.hlsl", "ShadowMiss", "lib_6_5",
-                                      &shadow_miss_shader_);
   core_->GraphicsCore()->CreateBuffer(sizeof(Settings) + sizeof(Film::Info), graphics::BUFFER_TYPE_STATIC,
                                       &scene_settings_buffer_);
   core_->GraphicsCore()->CreateShader(core_->GetShadersVFS(), "gather_light_power.hlsl", "GatherLightPowerKernel",
@@ -79,7 +77,7 @@ int32_t Scene::RegisterInstance(graphics::AccelerationStructure *blas,
                                 int32_t custom_index) {
   int32_t instance_reg = instances_.size();
   InstanceMetadata entity_metadata{};
-  instances_.push_back(blas->MakeInstance(transformation, geometry_data_index, 255, hit_group_index * 2));
+  instances_.push_back(blas->MakeInstance(transformation, geometry_data_index, 255, hit_group_index));
   entity_metadata.geometry_data_index = geometry_data_index;
   entity_metadata.material_data_index = material_data_index;
   entity_metadata.custom_index = custom_index;
@@ -117,7 +115,7 @@ int32_t Scene::RegisterBuffer(graphics::Buffer *buffer) {
   return buffer_map_[buffer];
 }
 
-int32_t Scene::RegisterHitGroup(const InstanceHitGroups &hit_group) {
+int32_t Scene::RegisterHitGroup(const graphics::HitGroup &hit_group) {
   if (!hit_group_map_.count(hit_group)) {
     hit_group_map_[hit_group] = static_cast<int32_t>(hit_groups_.size());
     hit_groups_.emplace_back(hit_group);
@@ -251,12 +249,12 @@ void Scene::UpdatePipeline(Camera *camera) {
     auto vfs = core_->GetShadersVFS();
     vfs.WriteFile("geometry_sampler.hlsli", geometry_sampler_assembled_);
     vfs.WriteFile("hit_record.hlsli", hit_record_assembled_);
-    std::cout << hit_record_assembled_ << std::endl;
+    // std::cout << hit_record_assembled_ << std::endl;
     raygen_shader_.reset();
     core_->GraphicsCore()->CreateShader(vfs, "raygen.hlsl", "Main", "lib_6_5", &raygen_shader_);
     rt_program_.reset();
     core_->GraphicsCore()->CreateRayTracingProgram(&rt_program_);
-    miss_shader_indices_ = {0, 1};
+    miss_shader_indices_ = {0};
     callable_shader_indices_.resize(callable_shaders_.size());
     std::iota(callable_shader_indices_.begin(), callable_shader_indices_.end(), 0);
     hit_group_indices_.resize(hit_groups_.size() * 2);
@@ -274,10 +272,8 @@ void Scene::UpdatePipeline(Camera *camera) {
 
     rt_program_->AddRayGenShader(raygen_shader_.get());
     rt_program_->AddMissShader(default_miss_shader_.get());
-    rt_program_->AddMissShader(shadow_miss_shader_.get());
     for (const auto &hit_group : hit_groups_) {
-      rt_program_->AddHitGroup(hit_group.render_group);
-      rt_program_->AddHitGroup(hit_group.shadow_group);
+      rt_program_->AddHitGroup(hit_group);
     }
     for (const auto &callable_shader : callable_shaders_) {
       rt_program_->AddCallableShader(callable_shader);

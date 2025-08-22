@@ -67,7 +67,3 @@
     [shader("miss")] void MissMain(inout RenderContext context) {
   context.throughput = float3(0.0, 0.0, 0.0);
 }
-
-[shader("miss")] void ShadowMiss(inout ShadowRayPayload payload) {
-  payload.shadow = 1.0f;  // light is blocked
-}

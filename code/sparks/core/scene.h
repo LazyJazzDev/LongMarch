@@ -29,15 +29,9 @@ class Scene {
   int &InstanceCustomIndex(int32_t instance_index);
 
   struct HitGroupComparator {
-    bool operator()(const InstanceHitGroups &lhs, const InstanceHitGroups &rhs) const {
-      return std::tie(lhs.render_group.closest_hit_shader, lhs.render_group.any_hit_shader,
-                      lhs.render_group.intersection_shader, lhs.render_group.procedure,
-                      lhs.shadow_group.closest_hit_shader, lhs.shadow_group.any_hit_shader,
-                      lhs.shadow_group.intersection_shader, lhs.shadow_group.procedure) <
-             std::tie(rhs.render_group.closest_hit_shader, rhs.render_group.any_hit_shader,
-                      rhs.render_group.intersection_shader, rhs.render_group.procedure,
-                      rhs.shadow_group.closest_hit_shader, rhs.shadow_group.any_hit_shader,
-                      rhs.shadow_group.intersection_shader, rhs.shadow_group.procedure);
+    bool operator()(const graphics::HitGroup &lhs, const graphics::HitGroup &rhs) const {
+      return std::tie(lhs.closest_hit_shader, lhs.any_hit_shader, lhs.intersection_shader, lhs.procedure) <
+             std::tie(rhs.closest_hit_shader, rhs.any_hit_shader, rhs.intersection_shader, rhs.procedure);
     }
   };
 
@@ -49,7 +43,7 @@ class Scene {
 
   int32_t RegisterCallableShader(graphics::Shader *callable_shader);
   int32_t RegisterBuffer(graphics::Buffer *buffer);
-  int32_t RegisterHitGroup(const InstanceHitGroups &hit_group);
+  int32_t RegisterHitGroup(const graphics::HitGroup &hit_group);
 
   GeometryRegistration RegisterGeometry(Geometry *geometry);
 
@@ -58,7 +52,6 @@ class Scene {
   Core *core_;
   std::unique_ptr<graphics::Shader> raygen_shader_;
   std::unique_ptr<graphics::Shader> default_miss_shader_;
-  std::unique_ptr<graphics::Shader> shadow_miss_shader_;
   std::unique_ptr<graphics::RayTracingProgram> rt_program_;
   std::unique_ptr<graphics::AccelerationStructure> tlas_;
   std::unique_ptr<graphics::Buffer> scene_settings_buffer_;
@@ -68,8 +61,8 @@ class Scene {
   std::vector<int32_t> hit_group_indices_;
   std::vector<int32_t> callable_shader_indices_;
 
-  std::vector<InstanceHitGroups> hit_groups_;
-  std::map<InstanceHitGroups, int32_t, HitGroupComparator> hit_group_map_;
+  std::vector<graphics::HitGroup> hit_groups_;
+  std::map<graphics::HitGroup, int32_t, HitGroupComparator> hit_group_map_;
   bool hit_groups_dirty_{true};
 
   std::vector<graphics::Buffer *> buffers_;

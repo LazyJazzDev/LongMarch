@@ -46,10 +46,6 @@ struct RenderContext {
   float bsdf_pdf;
 };
 
-struct ShadowRayPayload {
-  float shadow;
-};
-
 struct RayGenPayload {
   float2 uv;
   float3 origin;

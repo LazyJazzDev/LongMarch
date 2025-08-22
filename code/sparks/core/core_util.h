@@ -50,9 +50,4 @@ struct BlellochScanMetadata {
   uint32_t padding[61];
 };
 
-struct InstanceHitGroups {
-  graphics::HitGroup render_group;
-  graphics::HitGroup shadow_group;
-};
-
 }  // namespace sparks

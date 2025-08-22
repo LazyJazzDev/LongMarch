@@ -21,16 +21,13 @@ EntityGeometryMaterial::EntityGeometryMaterial(Core *core,
   vfs.WriteFile("entity_chit.hlsl", geometry_->ClosestHitShaderImpl());
   core_->GraphicsCore()->CreateShader(vfs, "entity_chit.hlsl", "RenderClosestHit", "lib_6_5", {"-I."},
                                       &closest_hit_shader_);
-  core_->GraphicsCore()->CreateShader(vfs, "entity_chit.hlsl", "ShadowClosestHit", "lib_6_5", {"-I."},
-                                      &shadow_closest_hit_shader_);
 }
 
 void EntityGeometryMaterial::Update(Scene *scene) {
   auto geom_reg = scene->RegisterGeometry(geometry_);
   int32_t light_index = scene->RegisterLight(&light_geom_mat_);
   int32_t instance_index = scene->RegisterInstance(
-      geometry_->BLAS(), transformation_,
-      scene->RegisterHitGroup({{closest_hit_shader_.get()}, {shadow_closest_hit_shader_.get()}}),
+      geometry_->BLAS(), transformation_, scene->RegisterHitGroup({closest_hit_shader_.get()}),
       scene->RegisterBuffer(geometry_->Buffer()), scene->RegisterBuffer(material_->Buffer()), light_index);
   scene->LightCustomIndex(light_index) = instance_index;
 }

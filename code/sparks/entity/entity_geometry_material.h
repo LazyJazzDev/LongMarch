@@ -22,7 +22,6 @@ class EntityGeometryMaterial : public Entity {
   LightGeometryMaterial light_geom_mat_;
   glm::mat4x3 transformation_;
   std::unique_ptr<graphics::Shader> closest_hit_shader_;
-  std::unique_ptr<graphics::Shader> shadow_closest_hit_shader_;
 };
 
 }  // namespace sparks
