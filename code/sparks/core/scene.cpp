@@ -160,6 +160,8 @@ GeometryRegistration Scene::RegisterGeometry(Geometry *geometry) {
     geometry_shader_map_[sampler_code] = geometry_shader_index_++;
   }
   reg.shader_index = geometry_shader_map_[sampler_code];
+  reg.hit_group_index = RegisterHitGroup(geometry->HitGroup());
+  reg.blas = geometry->BLAS();
   return reg;
 }
 
@@ -257,7 +259,7 @@ void Scene::UpdatePipeline(Camera *camera) {
     miss_shader_indices_ = {0};
     callable_shader_indices_.resize(callable_shaders_.size());
     std::iota(callable_shader_indices_.begin(), callable_shader_indices_.end(), 0);
-    hit_group_indices_.resize(hit_groups_.size() * 2);
+    hit_group_indices_.resize(hit_groups_.size());
     std::iota(hit_group_indices_.begin(), hit_group_indices_.end(), 0);
     rt_program_->AddResourceBinding(graphics::RESOURCE_TYPE_IMAGE, 1);
     rt_program_->AddResourceBinding(graphics::RESOURCE_TYPE_IMAGE, 1);

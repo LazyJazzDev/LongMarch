@@ -16,8 +16,10 @@ class Camera;
 class Light;
 
 struct GeometryRegistration {
+  graphics::AccelerationStructure *blas;
   int data_index;
   int shader_index;
+  int hit_group_index;
 };
 
 struct InstanceRegistration {
