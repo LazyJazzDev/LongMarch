@@ -11,6 +11,7 @@ RWByteAddressBuffer direct_lighting_sampler_data : register(u0, space2);
 // clang-format off
 #include "geometry_sampler.hlsli"
 #include "material_evaluator.hlsli"
+#include "material_power_sampler.hlsli"
 // clang-format on
 
 [numthreads(GROUP_SIZE, 1, 1)] void GatherPrimitivePowerKernel(uint3 GID
@@ -23,7 +24,7 @@ RWByteAddressBuffer direct_lighting_sampler_data : register(u0, space2);
   float primitive_power = 0.0f;
   // calculate the prefix sum of primitive_power_shared with WavePrefixSum
   if (DTID.x < primitive_count) {
-    primitive_power = PrimitivePower(material_data, geometry_data, transform, DTID.x);
+    primitive_power = PowerSampler(material_data, geometry_data, transform, DTID.x);
   }
 
   primitive_power += WavePrefixSum(primitive_power);

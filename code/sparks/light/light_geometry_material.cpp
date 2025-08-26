@@ -18,6 +18,7 @@ LightGeometryMaterial::LightGeometryMaterial(Core *core,
   auto vfs = core_->GetShadersVFS();
   vfs.WriteFile("geometry_sampler.hlsli", geometry_->SamplerImpl());
   vfs.WriteFile("material_evaluator.hlsli", material_->EvaluatorImpl());
+  vfs.WriteFile("material_power_sampler.hlsli", material_->PowerSamplerImpl());
 
   core_->GraphicsCore()->CreateShader(vfs, "light/geometry_material/gather_primitive_power.hlsl",
                                       "GatherPrimitivePowerKernel", "cs_6_3", {"-I."}, &gather_primitive_power_shader_);

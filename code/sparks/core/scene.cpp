@@ -165,6 +165,12 @@ GeometryRegistration Scene::RegisterGeometry(Geometry *geometry) {
   return reg;
 }
 
+MaterialRegistration Scene::RegisterMaterial(Material *material) {
+  MaterialRegistration reg;
+  reg.data_index = RegisterBuffer(material->Buffer());
+  return reg;
+}
+
 void Scene::UpdatePipeline(Camera *camera) {
   instances_.clear();
   instance_metadatas_.clear();

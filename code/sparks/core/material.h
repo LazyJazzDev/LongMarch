@@ -10,7 +10,8 @@ class Material {
 
   virtual graphics::Buffer *Buffer() = 0;
   virtual const CodeLines &SamplerImpl() const = 0;
-  virtual const CodeLines &EvaluatorImpl() const;
+  virtual const CodeLines &EvaluatorImpl() const = 0;
+  virtual const CodeLines &PowerSamplerImpl() const;
 
  protected:
   Core *core_;

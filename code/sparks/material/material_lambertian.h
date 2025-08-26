@@ -12,6 +12,7 @@ class MaterialLambertian : public Material {
   graphics::Buffer *Buffer() override;
   const CodeLines &SamplerImpl() const override;
   const CodeLines &EvaluatorImpl() const override;
+  const CodeLines &PowerSamplerImpl() const override;
 
   glm::vec3 base_color{0.8f};
   glm::vec3 emission{0.0f};
@@ -22,6 +23,7 @@ class MaterialLambertian : public Material {
   std::unique_ptr<graphics::Buffer> material_buffer_;
   CodeLines sampler_implementation_;
   CodeLines evaluator_implementation_;
+  CodeLines power_sampler_implementation_;
 };
 
 }  // namespace sparks

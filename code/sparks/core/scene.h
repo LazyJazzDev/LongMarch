@@ -46,6 +46,7 @@ class Scene {
   int32_t RegisterHitGroup(const graphics::HitGroup &hit_group);
 
   GeometryRegistration RegisterGeometry(Geometry *geometry);
+  MaterialRegistration RegisterMaterial(Material *material);
 
  private:
   void UpdatePipeline(Camera *camera);
@@ -95,6 +96,10 @@ class Scene {
   CodeLines hit_record_assembled_;
   std::unordered_map<std::string, int> geometry_shader_map_;
   int geometry_shader_index_{0};
+
+  CodeLines material_shader_assembled_;
+  std::unordered_map<std::string, int> material_shader_map_;
+  int material_shader_index_{0};
 };
 
 }  // namespace sparks

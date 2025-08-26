@@ -7,7 +7,7 @@ namespace sparks {
 Material::Material(Core *core) : core_(core) {
 }
 
-const CodeLines &Material::EvaluatorImpl() const {
+const CodeLines &Material::PowerSamplerImpl() const {
   return {};
 }
 

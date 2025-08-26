@@ -27,7 +27,8 @@ struct InstanceRegistration {
 };
 
 struct MaterialRegistration {
-  int32_t data_index{-1};
+  int data_index{-1};
+  int shader_index{-1};
 };
 
 struct LightMetadata {
