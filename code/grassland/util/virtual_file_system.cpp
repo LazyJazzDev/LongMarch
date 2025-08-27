@@ -1,6 +1,7 @@
 #include "grassland/util/virtual_file_system.h"
 
 #include <fstream>
+#include <stack>
 
 namespace grassland {
 class VirtualFileSystemFile;
@@ -33,6 +34,14 @@ class VirtualFileSystemDirectory : public VirtualFileSystemEntry {
     }
     return copy;
   }
+
+  void SaveToPath(const std::filesystem::path &path) const override {
+    // make sure path directory exists
+    std::filesystem::create_directories(path);
+    for (const auto &[name, entry] : subentries_) {
+      entry->SaveToPath(path / name);
+    }
+  }
   std::map<std::string, std::unique_ptr<VirtualFileSystemEntry>> subentries_;
 };
 
@@ -45,6 +54,12 @@ class VirtualFileSystemFile : public VirtualFileSystemEntry {
     std::unique_ptr<VirtualFileSystemFile> copy = std::make_unique<VirtualFileSystemFile>(parent);
     copy->data = data;  // Copy the file data
     return copy;
+  }
+
+  void SaveToPath(const std::filesystem::path &path) const override {
+    std::ofstream file(path, std::ios::binary);
+    file.write(reinterpret_cast<const char *>(data.data()), data.size());
+    file.close();
   }
 
   std::vector<uint8_t> data;
@@ -177,6 +192,10 @@ VirtualFileSystem VirtualFileSystem::LoadDirectory(const std::filesystem::path &
   }
 
   return vfs;
+}
+
+void VirtualFileSystem::SaveToDirectory(const std::filesystem::path &path) const {
+  root_->SaveToPath(path);
 }
 
 }  // namespace grassland

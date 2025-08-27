@@ -2,6 +2,9 @@
 #include "bindings.hlsli"
 #include "shadow_ray.hlsli"
 #include "random.hlsli"
+#include "light_shaders.hlsli"
+
+void LightSampler(int shader_index, inout SampleDirectLightingPayload payload);
 
 void SampleDirectLighting(in RenderContext context, HitRecord hit_record, out float3 eval, out float3 omega_in, out float pdf) {
   uint light_count = light_selector_data.Load(0);
@@ -33,7 +36,7 @@ void SampleDirectLighting(in RenderContext context, HitRecord hit_record, out fl
   payload.low.w = light_meta.sampler_data_index;
   payload.high.xyz = asuint(float3(r1, RandomFloat(context.rd), RandomFloat(context.rd)));
   payload.high.w = light_meta.custom_index;
-  CallShader(light_meta.sampler_shader_index, payload);
+  LightSampler(light_meta.sampler_shader_index, payload);
   eval = asfloat(payload.low.xyz);
   float shadow_length = asfloat(payload.low.w) * 0.9999;
   omega_in = asfloat(payload.high.xyz);

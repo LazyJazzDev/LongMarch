@@ -14,6 +14,8 @@ class VirtualFileSystemEntry {
 
   virtual std::unique_ptr<VirtualFileSystemEntry> deep_copy(VirtualFileSystemEntry *parent = nullptr) const = 0;
 
+  virtual void SaveToPath(const std::filesystem::path &path) const = 0;
+
  protected:
   VirtualFileSystemEntry *parent_;
 };
@@ -37,6 +39,8 @@ class VirtualFileSystem {
   void Print() const;
 
   static VirtualFileSystem LoadDirectory(const std::filesystem::path &path);
+
+  void SaveToDirectory(const std::filesystem::path &path) const;
 
  private:
   VirtualFileSystemEntry *AccessFile(const std::string &path, bool create_if_not_exists = false) const;

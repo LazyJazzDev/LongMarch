@@ -171,7 +171,8 @@ CompiledShaderBlob CompileShader(const VirtualFileSystem &vfs,
   }
 
 #if !defined(NDEBUG)
-  wargs.push_back(StringToWString("-Zi"));
+  wargs.emplace_back(L"-Zi");
+  wargs.emplace_back(L"-Qembed_debug");
 #endif
 
   std::vector<LPCWSTR> warg_ptrs;

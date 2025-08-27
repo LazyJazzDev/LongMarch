@@ -216,7 +216,6 @@ int32_t Scene::RegisterLight(Light *light, int custom_index) {
   light_reg.sampler_shader_index = RegisterCallableShader(light->SamplerShader());
   light_reg.custom_index = custom_index;
   light_reg.power_offset = light->SamplerPreprocess(preprocess_cmd_context_.get());
-  light_metadatas_.push_back(light_reg);
 
   CodeLines light_sampler_impl = light->SamplerImpl();
   std::string light_code = std::string(light_sampler_impl);
@@ -232,7 +231,9 @@ int32_t Scene::RegisterLight(Light *light, int custom_index) {
 
     light_shader_map_[light_code] = light_shader_index_++;
   }
+  light_reg.sampler_shader_index = light_shader_map_[light_code];
 
+  light_metadatas_.push_back(light_reg);
   return light_reg_index;
 }
 
@@ -332,7 +333,9 @@ void Scene::UpdatePipeline(Camera *camera) {
     vfs.WriteFile("hit_record.hlsli", hit_record_assembled_);
     vfs.WriteFile("material_shaders.hlsli", material_shader_assembled_);
     vfs.WriteFile("light_shaders.hlsli", light_shader_assembled_);
-    std::cout << material_shader_assembled_ << std::endl;
+#if !defined(NDEBUG)
+    vfs.SaveToDirectory("shaders");
+#endif
     raygen_shader_.reset();
     core_->GraphicsCore()->CreateShader(vfs, "raygen.hlsl", "Main", "lib_6_5", &raygen_shader_);
     rt_program_.reset();
