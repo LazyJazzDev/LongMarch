@@ -130,6 +130,9 @@ int D3D12Core::CreateShader(const VirtualFileSystem &vfs,
                             const std::vector<std::string> &args,
                             double_ptr<Shader> pp_shader) {
   std::vector<std::string> compile_args = {"-Wno-ignored-attributes"};
+#if !defined(NDEBUG)
+  compile_args.push_back("-Qembed_debug");
+#endif
   compile_args.insert(compile_args.end(), args.begin(), args.end());
   pp_shader.construct<D3D12Shader>(this, CompileShader(vfs, source_file, entry_point, target, compile_args));
   return 0;
