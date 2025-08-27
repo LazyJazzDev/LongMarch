@@ -129,37 +129,38 @@ GeometryRegistration Scene::RegisterGeometry(Geometry *geometry) {
   reg.data_index = RegisterBuffer(geometry->Buffer());
   auto sampler_impl = geometry->SamplerImpl();
   auto hit_record_impl = geometry->HitRecordImpl();
-  std::string sampler_code = sampler_impl;
-  if (!geometry_shader_map_.count(sampler_code)) {
+  std::string geometry_code = sampler_impl;
+  geometry_code += std::string(hit_record_impl);
+  if (!geometry_shader_map_.count(geometry_code)) {
     sampler_impl.InsertFront("#define PrimitiveArea PrimitiveArea" + std::to_string(geometry_shader_index_));
     sampler_impl.InsertFront("#define SamplePrimitive SamplePrimitive" + std::to_string(geometry_shader_index_));
 
     sampler_impl.InsertBack("#undef PrimitiveArea");
     sampler_impl.InsertBack("#undef SamplePrimitive");
-    geometry_sampler_assembled_.InsertAfter(sampler_impl, "// Geometry Sampler Implementation");
-    geometry_sampler_assembled_.InsertAfter("    return PrimitiveArea" + std::to_string(geometry_shader_index_) +
-                                                "(geometry_data, transform, primitive_id);",
-                                            "// PrimitiveArea Switch List");
-    geometry_sampler_assembled_.InsertAfter("  case " + std::to_string(geometry_shader_index_) + ":",
-                                            "// PrimitiveArea Switch List");
-    geometry_sampler_assembled_.InsertAfter("    return SamplePrimitive" + std::to_string(geometry_shader_index_) +
-                                                "(geometry_data, transform, primitive_id, sample);",
-                                            "// SamplePrimitive Switch List");
-    geometry_sampler_assembled_.InsertAfter("  case " + std::to_string(geometry_shader_index_) + ":",
-                                            "// SamplePrimitive Switch List");
+    geometry_shader_assembled_.InsertAfter(sampler_impl, "// Geometry Sampler Implementation");
+    geometry_shader_assembled_.InsertAfter("    return PrimitiveArea" + std::to_string(geometry_shader_index_) +
+                                               "(geometry_data, transform, primitive_id);",
+                                           "// PrimitiveArea Function List");
+    geometry_shader_assembled_.InsertAfter("  case " + std::to_string(geometry_shader_index_) + ":",
+                                           "// PrimitiveArea Function List");
+    geometry_shader_assembled_.InsertAfter("    return SamplePrimitive" + std::to_string(geometry_shader_index_) +
+                                               "(geometry_data, transform, primitive_id, sample);",
+                                           "// SamplePrimitive Function List");
+    geometry_shader_assembled_.InsertAfter("  case " + std::to_string(geometry_shader_index_) + ":",
+                                           "// SamplePrimitive Function List");
 
     hit_record_impl.InsertFront("#define GetHitRecord GetHitRecord" + std::to_string(geometry_shader_index_));
     hit_record_impl.InsertBack("#undef GetHitRecord");
 
     hit_record_assembled_.InsertAfter(hit_record_impl, "// Hit Record Implementation");
     hit_record_assembled_.InsertAfter("    return GetHitRecord" + std::to_string(geometry_shader_index_) + "(payload);",
-                                      "// GetHitRecord Switch List");
+                                      "// GetHitRecord Function List");
     hit_record_assembled_.InsertAfter("  case " + std::to_string(geometry_shader_index_) + ":",
-                                      "// GetHitRecord Switch List");
+                                      "// GetHitRecord Function List");
 
-    geometry_shader_map_[sampler_code] = geometry_shader_index_++;
+    geometry_shader_map_[geometry_code] = geometry_shader_index_++;
   }
-  reg.shader_index = geometry_shader_map_[sampler_code];
+  reg.shader_index = geometry_shader_map_[geometry_code];
   reg.hit_group_index = RegisterHitGroup(geometry->HitGroup());
   reg.blas = geometry->BLAS();
   return reg;
@@ -168,6 +169,37 @@ GeometryRegistration Scene::RegisterGeometry(Geometry *geometry) {
 MaterialRegistration Scene::RegisterMaterial(Material *material) {
   MaterialRegistration reg;
   reg.data_index = RegisterBuffer(material->Buffer());
+  auto material_sampler_impl = material->SamplerImpl();
+  auto material_direct_lighting_evaluate_impl = material->EvaluatorImpl();
+  std::string material_code = std::string(material_sampler_impl) + std::string(material_direct_lighting_evaluate_impl);
+  if (!material_shader_map_.count(material_code)) {
+    material_sampler_impl.InsertFront("#define SampleMaterial SampleMaterial" + std::to_string(material_shader_index_));
+    material_sampler_impl.InsertBack("#undef SampleMaterial");
+
+    material_shader_assembled_.InsertAfter(material_sampler_impl, "// Material Sampler Implementation");
+    material_shader_assembled_.InsertAfter(
+        "    return SampleMaterial" + std::to_string(material_shader_index_) + "(context, hit_record);",
+        "// SampleMaterial Function List");
+    material_shader_assembled_.InsertAfter("  case " + std::to_string(material_shader_index_) + ":",
+                                           "// SampleMaterial Function List");
+
+    material_direct_lighting_evaluate_impl.InsertFront("#define EvaluateDirectLighting EvaluateDirectLighting" +
+                                                       std::to_string(material_shader_index_));
+    material_direct_lighting_evaluate_impl.InsertBack("#undef EvaluateDirectLighting");
+
+    material_shader_assembled_.InsertAfter(material_direct_lighting_evaluate_impl,
+                                           "// Evaluate Direct Lighting Implementation");
+
+    material_shader_assembled_.InsertAfter("    return EvaluateDirectLighting" +
+                                               std::to_string(material_shader_index_) +
+                                               "(material_data, position, primitive_sample);",
+                                           "// EvaluateDirectLighting Function List");
+    material_shader_assembled_.InsertAfter("  case " + std::to_string(material_shader_index_) + ":",
+                                           "// EvaluateDirectLighting Function List");
+
+    material_shader_map_[material_code] = geometry_shader_index_++;
+  }
+  reg.shader_index = material_shader_map_[material_code];
   return reg;
 }
 
@@ -205,10 +237,14 @@ void Scene::UpdatePipeline(Camera *camera) {
     RegisterCallableShader(camera->Shader());
   }
 
-  geometry_sampler_assembled_ = {core_->GetShadersVFS(), "geometry_sampler.hlsli"};
+  geometry_shader_assembled_ = {core_->GetShadersVFS(), "geometry_shaders.hlsli"};
   hit_record_assembled_ = {core_->GetShadersVFS(), "hit_record.hlsli"};
   geometry_shader_map_.clear();
   geometry_shader_index_ = 0;
+
+  material_shader_assembled_ = {core_->GetShadersVFS(), "material_shaders.hlsli"};
+  material_shader_map_.clear();
+  material_shader_index_ = 0;
 
   for (auto [entity, active] : entities_) {
     if (active) {
@@ -255,9 +291,10 @@ void Scene::UpdatePipeline(Camera *camera) {
 
   if (hit_groups_dirty_ || callable_shaders_dirty_ || buffers_dirty_ || !rt_program_) {
     auto vfs = core_->GetShadersVFS();
-    vfs.WriteFile("geometry_sampler.hlsli", geometry_sampler_assembled_);
+    vfs.WriteFile("geometry_shaders.hlsli", geometry_shader_assembled_);
+    vfs.WriteFile("material_shaders.hlsli", material_shader_assembled_);
     vfs.WriteFile("hit_record.hlsli", hit_record_assembled_);
-    // std::cout << hit_record_assembled_ << std::endl;
+    std::cout << material_shader_assembled_ << std::endl;
     raygen_shader_.reset();
     core_->GraphicsCore()->CreateShader(vfs, "raygen.hlsl", "Main", "lib_6_5", &raygen_shader_);
     rt_program_.reset();

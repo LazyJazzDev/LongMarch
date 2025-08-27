@@ -92,7 +92,7 @@ class Scene {
 
   std::unique_ptr<graphics::CommandContext> preprocess_cmd_context_;
 
-  CodeLines geometry_sampler_assembled_;
+  CodeLines geometry_shader_assembled_;
   CodeLines hit_record_assembled_;
   std::unordered_map<std::string, int> geometry_shader_map_;
   int geometry_shader_index_{0};

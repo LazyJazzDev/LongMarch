@@ -4,7 +4,7 @@
 
 HitRecord GetHitRecord(int geometry_shader_index, RayPayload payload) {
   switch (geometry_shader_index) {
-// GetHitRecord Switch List
+// GetHitRecord Function List
   default:
     break;
   }

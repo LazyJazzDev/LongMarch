@@ -3,7 +3,7 @@
 template <class BufferType>
 float PrimitiveArea(int shader_index, BufferType geometry_data, float3x4 transform, uint primitive_id) {
   switch (shader_index) {
-// PrimitiveArea Switch List
+// PrimitiveArea Function List
   default:
     return 0.0f;
   }
@@ -12,7 +12,7 @@ float PrimitiveArea(int shader_index, BufferType geometry_data, float3x4 transfo
 template <class BufferType>
 GeometryPrimitiveSample SamplePrimitive(int shader_index, BufferType geometry_data, float3x4 transform, uint primitive_id, float2 sample) {
   switch (shader_index) {
-// SamplePrimitive Switch List
+// SamplePrimitive Function List
   default:
     break;
   }
