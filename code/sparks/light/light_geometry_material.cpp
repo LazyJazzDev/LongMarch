@@ -20,6 +20,8 @@ LightGeometryMaterial::LightGeometryMaterial(Core *core,
   vfs.WriteFile("material_evaluator.hlsli", material_->EvaluatorImpl());
   vfs.WriteFile("material_power_sampler.hlsli", material_->PowerSamplerImpl());
 
+  sampler_implementation_ = {vfs, "light/geometry_material/direct_lighting_sampler.hlsli"};
+
   core_->GraphicsCore()->CreateShader(vfs, "light/geometry_material/gather_primitive_power.hlsl",
                                       "GatherPrimitivePowerKernel", "cs_6_3", {"-I."}, &gather_primitive_power_shader_);
   core_->GraphicsCore()->CreateShader(vfs, "light/geometry_material/direct_lighting_sampler.hlsl",
@@ -86,6 +88,10 @@ uint32_t LightGeometryMaterial::SamplerPreprocess(graphics::CommandContext *cmd_
     cmd_context->CmdDispatch((metadatas_[i].element_count + 63) / 64, 1, 1);
   }
   return sizeof(glm::mat4x3) + sizeof(uint32_t) + (geometry_->PrimitiveCount() - 1) * sizeof(float);
+}
+
+const CodeLines &LightGeometryMaterial::SamplerImpl() const {
+  return sampler_implementation_;
 }
 
 }  // namespace sparks

@@ -58,17 +58,6 @@ void Scene::SetEntityActive(Entity *entity, bool active) {
   entities_.at(entity) = active;
 }
 
-int32_t Scene::RegisterLight(Light *light, int custom_index) {
-  int32_t light_reg_index = light_metadatas_.size();
-  LightMetadata light_reg{};
-  light_reg.sampler_data_index = RegisterBuffer(light->SamplerData());
-  light_reg.sampler_shader_index = RegisterCallableShader(light->SamplerShader());
-  light_reg.custom_index = custom_index;
-  light_reg.power_offset = light->SamplerPreprocess(preprocess_cmd_context_.get());
-  light_metadatas_.push_back(light_reg);
-  return light_reg_index;
-}
-
 int32_t Scene::RegisterInstance(graphics::AccelerationStructure *blas,
                                 const glm::mat4x3 &transformation,
                                 int32_t hit_group_index,
@@ -203,6 +192,33 @@ MaterialRegistration Scene::RegisterMaterial(Material *material) {
   return reg;
 }
 
+int32_t Scene::RegisterLight(Light *light, int custom_index) {
+  int32_t light_reg_index = light_metadatas_.size();
+  LightMetadata light_reg{};
+  light_reg.sampler_data_index = RegisterBuffer(light->SamplerData());
+  light_reg.sampler_shader_index = RegisterCallableShader(light->SamplerShader());
+  light_reg.custom_index = custom_index;
+  light_reg.power_offset = light->SamplerPreprocess(preprocess_cmd_context_.get());
+  light_metadatas_.push_back(light_reg);
+
+  CodeLines light_sampler_impl = light->SamplerImpl();
+  std::string light_code = std::string(light_sampler_impl);
+  if (!light_shader_map_.count(light_code)) {
+    light_sampler_impl.InsertFront("#define LightSampler LightSampler" + std::to_string(light_shader_index_));
+    light_sampler_impl.InsertBack("#undef LightSampler");
+
+    light_shader_assembled_.InsertAfter(light_sampler_impl, "// Light Sampler Implementation");
+    light_shader_assembled_.InsertAfter("    return LightSampler" + std::to_string(light_shader_index_) + "(payload);",
+                                        "// LightSampler Function List");
+    light_shader_assembled_.InsertAfter("  case " + std::to_string(light_shader_index_) + ":",
+                                        "// LightSampler Function List");
+
+    light_shader_map_[light_code] = light_shader_index_++;
+  }
+
+  return light_reg_index;
+}
+
 void Scene::UpdatePipeline(Camera *camera) {
   instances_.clear();
   instance_metadatas_.clear();
@@ -245,6 +261,10 @@ void Scene::UpdatePipeline(Camera *camera) {
   material_shader_assembled_ = {core_->GetShadersVFS(), "material_shaders.hlsli"};
   material_shader_map_.clear();
   material_shader_index_ = 0;
+
+  light_shader_assembled_ = {core_->GetShadersVFS(), "light_shaders.hlsli"};
+  light_shader_map_.clear();
+  light_shader_index_ = 0;
 
   for (auto [entity, active] : entities_) {
     if (active) {
@@ -292,9 +312,10 @@ void Scene::UpdatePipeline(Camera *camera) {
   if (hit_groups_dirty_ || callable_shaders_dirty_ || buffers_dirty_ || !rt_program_) {
     auto vfs = core_->GetShadersVFS();
     vfs.WriteFile("geometry_shaders.hlsli", geometry_shader_assembled_);
-    vfs.WriteFile("material_shaders.hlsli", material_shader_assembled_);
     vfs.WriteFile("hit_record.hlsli", hit_record_assembled_);
-    std::cout << material_shader_assembled_ << std::endl;
+    vfs.WriteFile("material_shaders.hlsli", material_shader_assembled_);
+    vfs.WriteFile("light_shaders.hlsli", light_shader_assembled_);
+    std::cout << light_shader_assembled_ << std::endl;
     raygen_shader_.reset();
     core_->GraphicsCore()->CreateShader(vfs, "raygen.hlsl", "Main", "lib_6_5", &raygen_shader_);
     rt_program_.reset();

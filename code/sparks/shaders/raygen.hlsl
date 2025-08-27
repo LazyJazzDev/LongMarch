@@ -2,6 +2,7 @@
 #include "common.hlsli"
 #include "geometry_shaders.hlsli"
 #include "hit_record.hlsli"
+#include "light_shaders.hlsli"
 #include "material_shaders.hlsli"
 #include "random.hlsli"
 

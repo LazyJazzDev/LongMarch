@@ -15,8 +15,6 @@ class Scene {
 
   void SetEntityActive(Entity *entity, bool active);
 
-  int32_t RegisterLight(Light *light, int custom_index = -1);
-
   int32_t RegisterInstance(graphics::AccelerationStructure *blas,
                            const glm::mat4x3 &transformation,
                            int32_t hit_group_index,
@@ -47,6 +45,7 @@ class Scene {
 
   GeometryRegistration RegisterGeometry(Geometry *geometry);
   MaterialRegistration RegisterMaterial(Material *material);
+  int32_t RegisterLight(Light *light, int custom_index = -1);
 
  private:
   void UpdatePipeline(Camera *camera);
@@ -100,6 +99,10 @@ class Scene {
   CodeLines material_shader_assembled_;
   std::unordered_map<std::string, int> material_shader_map_;
   int material_shader_index_{0};
+
+  CodeLines light_shader_assembled_;
+  std::unordered_map<std::string, int> light_shader_map_;
+  int light_shader_index_{0};
 };
 
 }  // namespace sparks
