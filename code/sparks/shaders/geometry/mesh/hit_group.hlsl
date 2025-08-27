@@ -15,6 +15,6 @@
   payload.instance_id = InstanceID();
   payload.primitive_index = PrimitiveIndex();
 
-  HitRecord hit_record = GetHitRecord(payload);
+  HitRecord hit_record = GetHitRecord(payload, WorldRayDirection());
   SampleMaterial(context, hit_record);
 }

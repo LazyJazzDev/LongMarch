@@ -5,6 +5,12 @@ namespace sparks {
 
 class Scene {
  public:
+  struct Settings {
+    int samples_per_dispatch = 128;
+    int max_bounces = 32;
+    int alpha_shadow = false;
+  } settings;
+
   Scene(Core *core);
 
   void Render(Camera *camera, Film *film);
@@ -21,24 +27,14 @@ class Scene {
                            int32_t geometry_data_index,
                            int32_t material_data_index,
                            int32_t custom_index = -1);
+  int32_t RegisterInstance(const GeometryRegistration &geom_reg,
+                           const glm::mat4x3 &transformation,
+                           const MaterialRegistration &mat_reg,
+                           int32_t custom_index = -1);
 
   int &LightCustomIndex(int32_t light_index);
 
   int &InstanceCustomIndex(int32_t instance_index);
-
-  struct HitGroupComparator {
-    bool operator()(const graphics::HitGroup &lhs, const graphics::HitGroup &rhs) const {
-      return std::tie(lhs.closest_hit_shader, lhs.any_hit_shader, lhs.intersection_shader, lhs.procedure) <
-             std::tie(rhs.closest_hit_shader, rhs.any_hit_shader, rhs.intersection_shader, rhs.procedure);
-    }
-  };
-
-  struct Settings {
-    int samples_per_dispatch = 128;
-    int max_bounces = 32;
-    int alpha_shadow = false;
-  } settings;
-
   int32_t RegisterCallableShader(graphics::Shader *callable_shader);
   int32_t RegisterBuffer(graphics::Buffer *buffer);
   int32_t RegisterHitGroup(const graphics::HitGroup &hit_group);
@@ -46,6 +42,13 @@ class Scene {
   GeometryRegistration RegisterGeometry(Geometry *geometry);
   MaterialRegistration RegisterMaterial(Material *material);
   int32_t RegisterLight(Light *light, int custom_index = -1);
+
+  struct HitGroupComparator {
+    bool operator()(const graphics::HitGroup &lhs, const graphics::HitGroup &rhs) const {
+      return std::tie(lhs.closest_hit_shader, lhs.any_hit_shader, lhs.intersection_shader, lhs.procedure) <
+             std::tie(rhs.closest_hit_shader, rhs.any_hit_shader, rhs.intersection_shader, rhs.procedure);
+    }
+  };
 
  private:
   void UpdatePipeline(Camera *camera);

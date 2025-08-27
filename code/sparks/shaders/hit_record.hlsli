@@ -3,7 +3,7 @@
 
 // Hit Record Implementation
 
-HitRecord GetHitRecord(int geometry_shader_index, RayPayload payload) {
+HitRecord GetHitRecord(int geometry_shader_index, RayPayload payload, float3 direction) {
   switch (geometry_shader_index) {
 // GetHitRecord Function List
   default:

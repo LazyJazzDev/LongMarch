@@ -74,6 +74,22 @@ int32_t Scene::RegisterInstance(graphics::AccelerationStructure *blas,
   return instance_reg;
 }
 
+int32_t Scene::RegisterInstance(const GeometryRegistration &geom_reg,
+                                const glm::mat4x3 &transformation,
+                                const MaterialRegistration &mat_reg,
+                                int32_t custom_index) {
+  int instance_reg = instances_.size();
+  InstanceMetadata metadata{};
+  metadata.material_data_index = mat_reg.data_index;
+  metadata.material_shader_index = mat_reg.shader_index;
+  metadata.geometry_data_index = geom_reg.data_index;
+  metadata.geometry_shader_index = geom_reg.shader_index;
+  metadata.custom_index = custom_index;
+  instances_.push_back(geom_reg.blas->MakeInstance(transformation, geom_reg.data_index, 255, geom_reg.hit_group_index));
+  instance_metadatas_.push_back(metadata);
+  return instance_reg;
+}
+
 int &Scene::LightCustomIndex(int32_t light_index) {
   return light_metadatas_[light_index].custom_index;
 }
@@ -142,8 +158,9 @@ GeometryRegistration Scene::RegisterGeometry(Geometry *geometry) {
     hit_record_impl.InsertBack("#undef GetHitRecord");
 
     hit_record_assembled_.InsertAfter(hit_record_impl, "// Hit Record Implementation");
-    hit_record_assembled_.InsertAfter("    return GetHitRecord" + std::to_string(geometry_shader_index_) + "(payload);",
-                                      "// GetHitRecord Function List");
+    hit_record_assembled_.InsertAfter(
+        "    return GetHitRecord" + std::to_string(geometry_shader_index_) + "(payload, direction);",
+        "// GetHitRecord Function List");
     hit_record_assembled_.InsertAfter("  case " + std::to_string(geometry_shader_index_) + ":",
                                       "// GetHitRecord Function List");
 
@@ -186,7 +203,7 @@ MaterialRegistration Scene::RegisterMaterial(Material *material) {
     material_shader_assembled_.InsertAfter("  case " + std::to_string(material_shader_index_) + ":",
                                            "// EvaluateDirectLighting Function List");
 
-    material_shader_map_[material_code] = geometry_shader_index_++;
+    material_shader_map_[material_code] = material_shader_index_++;
   }
   reg.shader_index = material_shader_map_[material_code];
   return reg;
@@ -315,7 +332,7 @@ void Scene::UpdatePipeline(Camera *camera) {
     vfs.WriteFile("hit_record.hlsli", hit_record_assembled_);
     vfs.WriteFile("material_shaders.hlsli", material_shader_assembled_);
     vfs.WriteFile("light_shaders.hlsli", light_shader_assembled_);
-    std::cout << light_shader_assembled_ << std::endl;
+    std::cout << material_shader_assembled_ << std::endl;
     raygen_shader_.reset();
     core_->GraphicsCore()->CreateShader(vfs, "raygen.hlsl", "Main", "lib_6_5", &raygen_shader_);
     rt_program_.reset();

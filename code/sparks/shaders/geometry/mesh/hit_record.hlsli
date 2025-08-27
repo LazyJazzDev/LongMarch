@@ -1,4 +1,5 @@
 #include "common.hlsli"
+#include "inverse.hlsli"
 
 struct GeometryHeader {
   uint num_vertices;
@@ -16,14 +17,15 @@ struct GeometryHeader {
   uint index_offset;
 };
 
-HitRecord GetHitRecord(RayPayload payload) {
+HitRecord GetHitRecord(RayPayload payload, float3 direction) {
   HitRecord hit_record;
-  BufferReference<ByteAddressBuffer> geometry_buffer = MakeBufferReference(data_buffers[InstanceID()], 0);
+  BufferReference<ByteAddressBuffer> geometry_buffer = MakeBufferReference(data_buffers[payload.instance_id], 0);
   GeometryHeader header;
   header = geometry_buffer.Load<GeometryHeader>(0);
+  float4x3 world_to_object = transpose(inverse(payload.transform));
 
   uint3 vid;
-  vid = geometry_buffer.Load3(header.index_offset + PrimitiveIndex() * 3 * 4);
+  vid = geometry_buffer.Load3(header.index_offset + payload.primitive_index * 3 * 4);
 
   float3 pos[3] = {LoadFloat3(geometry_buffer, header.position_offset + header.position_stride * vid[0]),
                    LoadFloat3(geometry_buffer, header.position_offset + header.position_stride * vid[1]),
@@ -33,8 +35,8 @@ HitRecord GetHitRecord(RayPayload payload) {
 
   hit_record.front_facing = true;
   hit_record.position = pos[0] * barycentrics[0] + pos[1] * barycentrics[1] + pos[2] * barycentrics[2];
-  hit_record.position = mul(ObjectToWorld3x4(), float4(hit_record.position, 1.0));
-  hit_record.geom_normal = normalize(mul(WorldToObject4x3(), cross(pos[1] - pos[0], pos[2] - pos[0])).xyz);
+  hit_record.position = mul(payload.transform, float4(hit_record.position, 1.0));
+  hit_record.geom_normal = normalize(mul(world_to_object, cross(pos[1] - pos[0], pos[2] - pos[0])).xyz);
   hit_record.pdf = 1.0f / (length(cross(pos[1] - pos[0], pos[2] - pos[0])) * 0.5f);
 
   if (header.normal_offset != 0) {
@@ -42,7 +44,7 @@ HitRecord GetHitRecord(RayPayload payload) {
         LoadFloat3(geometry_buffer, header.normal_offset + header.normal_stride * vid[0]) * barycentrics[0] +
         LoadFloat3(geometry_buffer, header.normal_offset + header.normal_stride * vid[1]) * barycentrics[1] +
         LoadFloat3(geometry_buffer, header.normal_offset + header.normal_stride * vid[2]) * barycentrics[2];
-    hit_record.normal = normalize(mul(WorldToObject4x3(), hit_record.normal).xyz);
+    hit_record.normal = normalize(mul(world_to_object, hit_record.normal).xyz);
   } else {
     hit_record.normal = hit_record.geom_normal;
   }
@@ -61,7 +63,7 @@ HitRecord GetHitRecord(RayPayload payload) {
         LoadFloat3(geometry_buffer, header.tangent_offset + header.tangent_stride * vid[0]) * barycentrics[0] +
         LoadFloat3(geometry_buffer, header.tangent_offset + header.tangent_stride * vid[1]) * barycentrics[1] +
         LoadFloat3(geometry_buffer, header.tangent_offset + header.tangent_stride * vid[2]) * barycentrics[2];
-    hit_record.tangent = normalize(mul(ObjectToWorld3x4(), float4(hit_record.tangent, 0.0)).xyz);
+    hit_record.tangent = normalize(mul(payload.transform, float4(hit_record.tangent, 0.0)).xyz);
   } else {
     hit_record.tangent = cross(hit_record.normal, float3(0.0, 0.0, 1.0));
     if (length(hit_record.tangent) < 0.001) {
@@ -79,7 +81,7 @@ HitRecord GetHitRecord(RayPayload payload) {
     hit_record.signal = 1.0;
   }
 
-  if (dot(WorldRayDirection(), hit_record.normal) > 0.0) {
+  if (dot(direction, hit_record.normal) > 0.0) {
     hit_record.front_facing = false;
     hit_record.geom_normal = -hit_record.geom_normal;
     hit_record.normal = -hit_record.normal;
@@ -87,7 +89,7 @@ HitRecord GetHitRecord(RayPayload payload) {
     hit_record.signal = -hit_record.signal;
   }
 
-  hit_record.object_index = InstanceIndex();
-  hit_record.primitive_index = PrimitiveIndex();
+  hit_record.object_index = payload.instance_index;
+  hit_record.primitive_index = payload.primitive_index;
   return hit_record;
 }

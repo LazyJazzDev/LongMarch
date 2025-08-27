@@ -88,3 +88,16 @@ float4x4 inverse(float4x4 m) {
   // If determinant is zero, matrix is not invertable, so leave it unchanged.
   return (det != 0.0f) ? (adj * (1.0f / det)) : m;
 }
+
+float3x4 inverse(float3x4 m) {
+  // m = (A t)
+  // m^-1 = (A^-1 -A^-1 t)
+  float3x3 A = float3x3(m[0].xyz, m[1].xyz, m[2].xyz);
+  float3 t = m[3].xyz;
+  A = inverse(A);
+  m[0].xyz = A[0];
+  m[1].xyz = A[1];
+  m[2].xyz = A[2];
+  m[3].xyz = -mul(A, t);
+  return m;
+}

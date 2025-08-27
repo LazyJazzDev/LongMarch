@@ -27,9 +27,10 @@ void EntityGeometryMaterial::Update(Scene *scene) {
   auto geom_reg = scene->RegisterGeometry(geometry_);
   auto mat_reg = scene->RegisterMaterial(material_);
   int32_t light_index = scene->RegisterLight(&light_geom_mat_);
-  int32_t instance_index = scene->RegisterInstance(
-      geometry_->BLAS(), transformation_, scene->RegisterHitGroup({closest_hit_shader_.get()}),
-      scene->RegisterBuffer(geometry_->Buffer()), scene->RegisterBuffer(material_->Buffer()), light_index);
+  // int32_t instance_index = scene->RegisterInstance(
+  //     geometry_->BLAS(), transformation_, scene->RegisterHitGroup({closest_hit_shader_.get()}),
+  //     scene->RegisterBuffer(geometry_->Buffer()), scene->RegisterBuffer(material_->Buffer()), light_index);
+  int instance_index = scene->RegisterInstance(geom_reg, transformation_, mat_reg, light_index);
   scene->LightCustomIndex(light_index) = instance_index;
 }
 

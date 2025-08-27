@@ -38,7 +38,23 @@
       ray.TMin = T_MIN * max(length(context.origin), 1.0);
       ray.Direction = context.direction;
       ray.TMax = T_MAX;
-      TraceRay(as, RAY_FLAG_NONE, 0xFF, 0, 0, 0, ray, context);
+      RayPayload payload;
+
+      payload.t = -1.0;
+      payload.instance_id = -1;
+      payload.instance_index = -1;
+      payload.primitive_index = -1;
+      payload.primitive_coord = float3(0.0, 0.0, 0.0);
+      payload.transform = float3x4(1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0);
+
+      TraceRay(as, RAY_FLAG_NONE, 0xFF, 0, 0, 0, ray, payload);
+      if (payload.t == -1.0) {
+        break;
+      }
+
+      InstanceMetadata metadata = instance_metadatas[payload.instance_index];
+      HitRecord hit_record = GetHitRecord(metadata.geometry_shader_index, payload, context.direction);
+      SampleMaterial(metadata.material_shader_index, context, hit_record);
 
       // russian roulette
       float p = max(max(context.throughput.x, context.throughput.y), context.throughput.z);
@@ -66,6 +82,15 @@
   accumulated_samples[DispatchRaysIndex().xy] = accum_samples;
 }
 
-    [shader("miss")] void MissMain(inout RenderContext context) {
-  context.throughput = float3(0.0, 0.0, 0.0);
+    /*[shader("miss")] void MissMain(inout RenderContext context) {
+      context.throughput = float3(0.0, 0.0, 0.0);
+    }//*/
+
+    [shader("miss")] void MissMain(inout RayPayload payload) {
+  payload.t = -1.0;
+  payload.instance_id = -1;
+  payload.instance_index = -1;
+  payload.primitive_index = -1;
+  payload.primitive_coord = float3(0.0, 0.0, 0.0);
+  payload.transform = float3x4(1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0);
 }

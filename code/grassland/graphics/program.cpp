@@ -170,6 +170,10 @@ CompiledShaderBlob CompileShader(const VirtualFileSystem &vfs,
     wargs.push_back(StringToWString(entry_point));
   }
 
+#if !defined(NDEBUG)
+  wargs.push_back(StringToWString("-Zi"));
+#endif
+
   std::vector<LPCWSTR> warg_ptrs;
   for (const auto &arg : wargs) {
     warg_ptrs.push_back(arg.c_str());
