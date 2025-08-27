@@ -28,7 +28,13 @@ void LightSampler(inout SampleDirectLightingPayload payload) {
   float pdf = primitive_sample.pdf * dot(omega_in, omega_in) * prob;
   omega_in = normalize(omega_in);
   float NdotL = abs(dot(primitive_sample.normal, omega_in));
-  pdf /= NdotL;
+
+  if (NdotL < EPSILON) {
+    eval = float3(0.0, 0.0, 0.0);
+    pdf = 1.0;
+  } else {
+    pdf /= NdotL;
+  }
 
   payload.low.xyz = asuint(eval);
   payload.low.w = asuint(shadow_length);

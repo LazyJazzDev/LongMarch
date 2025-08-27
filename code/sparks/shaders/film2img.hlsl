@@ -23,6 +23,12 @@ RWTexture2D<float4> output : register(u0, space2);
   float4 color = accumulated_color.Load(int3(pixel_coords, 0));
   int samples = accumulated_samples.Load(int3(pixel_coords, 0));
 
+  // If color has NaN components, output white
+  if (any(isnan(color.xyz))) {
+    output[pixel_coords] = float4(1.0, 1.0, 1.0, 1.0);
+    return;
+  }
+
   // If no samples were taken, output black
   if (samples == 0) {
     output[pixel_coords] = float4(0.0, 0.0, 0.0, 1.0);
