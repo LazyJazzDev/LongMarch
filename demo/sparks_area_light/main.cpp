@@ -17,14 +17,14 @@ int main() {
   sparks_core.GetShadersVFS().Print();
 
   sparks::Scene scene(&sparks_core);
-  scene.settings.samples_per_dispatch = 1;
+  scene.settings.samples_per_dispatch = 32;
   sparks::Film film(&sparks_core, 1024, 1024);
-  film.info.persistence = 0.95f;
+  film.info.persistence = 0.98f;
   sparks::Camera camera(&sparks_core,
                         glm::lookAt(glm::vec3{0.0f, 2.0f, 7.0f}, glm::vec3{0.0f}, glm::vec3{0.0, 1.0, 0.0}),
                         glm::radians(60.0f), static_cast<float>(film.GetWidth()) / film.GetHeight());
 
-  sparks::MaterialPrincipled material_white(&sparks_core, {0.8f, 0.8f, 0.8f});
+  sparks::MaterialLambertian material_white(&sparks_core, {0.8f, 0.8f, 0.8f});
 
   sparks::GeometryMesh geometry_mesh(&sparks_core, Mesh<>::Sphere(30));
   sparks::EntityGeometryMaterial entity_mesh(&sparks_core, &geometry_mesh, &material_white);
