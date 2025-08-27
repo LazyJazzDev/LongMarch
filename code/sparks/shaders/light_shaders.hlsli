@@ -1,3 +1,5 @@
+#pragma once
+#include "material_shaders.hlsli"
 
 // Light Sampler Implementation
 

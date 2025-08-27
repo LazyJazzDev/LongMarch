@@ -1,3 +1,4 @@
+#pragma once
 
 // Evaluate Direct Lighting Implementation
 

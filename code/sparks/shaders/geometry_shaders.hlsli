@@ -1,3 +1,4 @@
+#pragma once
 // Geometry Sampler Implementation
 
 template <class BufferType>
