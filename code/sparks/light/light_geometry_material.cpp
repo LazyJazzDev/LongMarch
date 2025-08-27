@@ -24,8 +24,6 @@ LightGeometryMaterial::LightGeometryMaterial(Core *core,
 
   core_->GraphicsCore()->CreateShader(vfs, "light/geometry_material/gather_primitive_power.hlsl",
                                       "GatherPrimitivePowerKernel", "cs_6_3", {"-I."}, &gather_primitive_power_shader_);
-  core_->GraphicsCore()->CreateShader(vfs, "light/geometry_material/direct_lighting_sampler.hlsl",
-                                      "SampleDirectLightingCallable", "lib_6_5", {"-I."}, &direct_lighting_sampler_);
 
   uint32_t primitive_count = geometry_->PrimitiveCount();
   uint32_t wave_size = core_->GraphicsCore()->WaveSize();
@@ -50,10 +48,6 @@ LightGeometryMaterial::LightGeometryMaterial(Core *core,
   direct_lighting_sampler_data_->UploadData(&primitive_count, sizeof(uint32_t), sizeof(glm::mat4x3));
   blelloch_scan_up_program_ = core_->GetComputeProgram("blelloch_scan_up");
   blelloch_scan_down_program_ = core_->GetComputeProgram("blelloch_scan_down");
-}
-
-graphics::Shader *LightGeometryMaterial::SamplerShader() {
-  return direct_lighting_sampler_.get();
 }
 
 graphics::Buffer *LightGeometryMaterial::SamplerData() {

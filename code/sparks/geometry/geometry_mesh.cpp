@@ -60,17 +60,12 @@ GeometryMesh::GeometryMesh(Core *core, const Mesh<float> &mesh) : Geometry(core)
   primitive_count_ = header.num_indices / 3;
   sampler_implementation_ = CodeLines(vfs, "geometry/mesh/geometry_sampler.hlsli");
   hit_record_implementation_ = CodeLines(vfs, "geometry/mesh/hit_record.hlsli");
-  closest_hit_shader_implementation_ = CodeLines(vfs, "geometry/mesh/hit_group.hlsl");
   core_->GraphicsCore()->CreateShader(vfs, "geometry/mesh/closest_hit.hlsl", "ClosestHit", "lib_6_5", {"-I."},
                                       &closest_hit_shader_);
 }
 
 graphics::Buffer *GeometryMesh::Buffer() {
   return geometry_buffer_.get();
-}
-
-const CodeLines &GeometryMesh::ClosestHitShaderImpl() const {
-  return closest_hit_shader_implementation_;
 }
 
 int GeometryMesh::PrimitiveCount() {

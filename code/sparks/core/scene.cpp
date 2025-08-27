@@ -213,7 +213,6 @@ int32_t Scene::RegisterLight(Light *light, int custom_index) {
   int32_t light_reg_index = light_metadatas_.size();
   LightMetadata light_reg{};
   light_reg.sampler_data_index = RegisterBuffer(light->SamplerData());
-  light_reg.sampler_shader_index = RegisterCallableShader(light->SamplerShader());
   light_reg.custom_index = custom_index;
   light_reg.power_offset = light->SamplerPreprocess(preprocess_cmd_context_.get());
 

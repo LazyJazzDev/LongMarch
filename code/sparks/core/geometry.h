@@ -10,7 +10,6 @@ class Geometry {
 
   virtual graphics::Buffer *Buffer() = 0;
   virtual graphics::AccelerationStructure *BLAS() = 0;
-  virtual const CodeLines &ClosestHitShaderImpl() const = 0;
   virtual int PrimitiveCount() = 0;
   virtual const CodeLines &SamplerImpl() const = 0;
   virtual const CodeLines &HitRecordImpl() const = 0;

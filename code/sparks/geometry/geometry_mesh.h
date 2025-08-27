@@ -25,7 +25,6 @@ class GeometryMesh : public Geometry {
 
   graphics::Buffer *Buffer() override;
   graphics::AccelerationStructure *BLAS() override;
-  const CodeLines &ClosestHitShaderImpl() const override;
   int PrimitiveCount() override;
   const CodeLines &SamplerImpl() const override;
   const CodeLines &HitRecordImpl() const override;
@@ -37,7 +36,6 @@ class GeometryMesh : public Geometry {
   int primitive_count_;
   CodeLines sampler_implementation_;
   CodeLines hit_record_implementation_;
-  CodeLines closest_hit_shader_implementation_;
   std::unique_ptr<graphics::Shader> closest_hit_shader_;
 };
 
