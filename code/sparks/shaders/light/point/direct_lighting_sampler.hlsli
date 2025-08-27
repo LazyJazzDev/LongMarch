@@ -2,7 +2,7 @@
 #include "common.hlsli"
 
 // callable shader to sample direct lighting
-[shader("callable")] void SampleDirectLightingCallable(inout SampleDirectLightingPayload payload) {
+void LightSampler(inout SampleDirectLightingPayload payload) {
   float3 position = asfloat(payload.low.xyz);
   uint sampler_data_index = payload.low.w;
   ByteAddressBuffer direct_lighting_sampler_data = data_buffers[sampler_data_index];
