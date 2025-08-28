@@ -54,10 +54,6 @@ LightGeometryMaterial::LightGeometryMaterial(Core *core,
   blelloch_scan_down_program_ = core_->GetComputeProgram("blelloch_scan_down");
 }
 
-graphics::Shader *LightGeometryMaterial::SamplerShader() {
-  return direct_lighting_sampler_.get();
-}
-
 int LightGeometryMaterial::SamplerShader(Scene *scene) {
   if (dynamic_cast<GeometryMesh *>(geometry_)) {
     if (dynamic_cast<MaterialLight *>(material_)) {

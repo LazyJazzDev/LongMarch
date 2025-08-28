@@ -9,7 +9,7 @@ using namespace long_march;
 int main() {
   std::unique_ptr<graphics::Core> core_;
 
-  graphics::CreateCore(graphics::BACKEND_API_VULKAN, graphics::Core::Settings{2, false}, &core_);
+  graphics::CreateCore(graphics::BACKEND_API_DEFAULT, graphics::Core::Settings{2, false}, &core_);
   core_->InitializeLogicalDeviceAutoSelect(true);
   sparks::Core sparks_core(core_.get());
   sparks_core.GetShadersVFS().Print();

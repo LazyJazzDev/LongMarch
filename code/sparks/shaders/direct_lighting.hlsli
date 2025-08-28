@@ -16,6 +16,9 @@ void LightSampler(int shader_index, inout SampleDirectLightingPayload payload) {
     MeshLightSampler(shader_index, payload);
     break;
   default:
+    // From what we know, calling a callable shader from closest hit shader is very slow.
+    // So we only support a few hard-coded light samplers here.
+    // Better to inline the light sampler code here if you want to support more light types.
     CallShader(shader_index, payload);
     break;
   }

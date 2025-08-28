@@ -12,10 +12,6 @@ LightPoint::LightPoint(Core *core, const glm::vec3 &position, const glm::vec3 &c
                                       "SampleDirectLightingCallable", "lib_6_5", {"-I."}, &direct_lighting_sampler_);
 }
 
-graphics::Shader *LightPoint::SamplerShader() {
-  return direct_lighting_sampler_.get();
-}
-
 int LightPoint::SamplerShader(Scene *scene) {
   return 0x1000000;
 }
