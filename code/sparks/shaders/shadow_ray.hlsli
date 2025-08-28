@@ -7,6 +7,12 @@ float ShadowRayNoAlpha(float3 origin, float3 direction, float dist) {
   ray.Direction = direction;
   ray.TMin = T_MIN * max(length(origin), 1.0);
   ray.TMax = dist;
+#if defined(__spirv__) && defined(DEBUG_SHADER)
+  ShadowRayPayload payload;
+  payload.shadow = 1.0;
+  TraceRay(as, RAY_FLAG_NONE, 0xFF, 1, 0, 1, ray, payload);
+  return payload.shadow;
+#else
   RayQuery<RAY_FLAG_NONE> rq;
   rq.TraceRayInline(
       as,
@@ -20,6 +26,7 @@ float ShadowRayNoAlpha(float3 origin, float3 direction, float dist) {
       return 0.0f;
     }
   }
+#endif
   return 1.0;
 }
 

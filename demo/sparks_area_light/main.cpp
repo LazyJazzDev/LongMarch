@@ -11,20 +11,20 @@ using namespace long_march;
 int main() {
   std::unique_ptr<graphics::Core> core_;
 
-  graphics::CreateCore(graphics::BACKEND_API_DEFAULT, graphics::Core::Settings{2}, &core_);
+  graphics::CreateCore(graphics::BACKEND_API_D3D12, graphics::Core::Settings{2, false}, &core_);
   core_->InitializeLogicalDeviceAutoSelect(true);
   sparks::Core sparks_core(core_.get());
   sparks_core.GetShadersVFS().Print();
 
   sparks::Scene scene(&sparks_core);
-  scene.settings.samples_per_dispatch = 1;
+  scene.settings.samples_per_dispatch = 64;
   sparks::Film film(&sparks_core, 1024, 1024);
-  film.info.persistence = 0.95f;
+  film.info.persistence = 0.99f;
   sparks::Camera camera(&sparks_core,
                         glm::lookAt(glm::vec3{0.0f, 2.0f, 7.0f}, glm::vec3{0.0f}, glm::vec3{0.0, 1.0, 0.0}),
                         glm::radians(60.0f), static_cast<float>(film.GetWidth()) / film.GetHeight());
 
-  sparks::MaterialPrincipled material_white(&sparks_core, {0.8f, 0.8f, 0.8f});
+  sparks::MaterialLambertian material_white(&sparks_core, {0.8f, 0.8f, 0.8f});
 
   sparks::GeometryMesh geometry_mesh(&sparks_core, Mesh<>::Sphere(30));
   sparks::EntityGeometryMaterial entity_mesh(&sparks_core, &geometry_mesh, &material_white);

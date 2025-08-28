@@ -1,3 +1,4 @@
+#pragma once
 #include "principled_util.hlsli"
 #include "random.hlsli"
 
