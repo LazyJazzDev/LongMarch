@@ -26,6 +26,10 @@ int main() {
   sparks::MaterialLambertian material_red(&sparks_core, {0.63, 0.065, 0.05});
   sparks::MaterialLambertian material_green(&sparks_core, {0.14, 0.45, 0.091});
   sparks::MaterialPrincipled material_light(&sparks_core, {0.725, 0.71, 0.68});
+  // sparks::MaterialLambertian material_white(&sparks_core, {0.8, 0.8, 0.8});
+  // sparks::MaterialLambertian material_red(&sparks_core, {0.8, 0.0, 0.0});
+  // sparks::MaterialLambertian material_green(&sparks_core, {0.0, 0.8, 0.0});
+  // sparks::MaterialPrincipled material_light(&sparks_core, {0.8, 0.8, 0.8});
   material_light.emission_color = {1.0f, 1.0f, 1.0f};
   material_light.emission_strength = 30.0f;
   sparks::MaterialPrincipled material_principled(&sparks_core, {0.725, 0.71, 0.68});

@@ -1,3 +1,4 @@
+#pragma once
 #include "bindings.hlsli"
 #include "direct_lighting.hlsli"
 #include "geometry_primitive_sampler.hlsli"

@@ -7,6 +7,7 @@ class LightGeometryMaterial : public Light {
  public:
   LightGeometryMaterial(Core *core, Geometry *geometry, Material *material, const glm::mat4x3 &transform);
   graphics::Shader *SamplerShader() override;
+  int SamplerShader(Scene *scene) override;
   graphics::Buffer *SamplerData() override;
   uint32_t SamplerPreprocess(graphics::CommandContext *cmd_ctx) override;
 

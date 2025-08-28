@@ -1,9 +1,14 @@
-#include "light_geometry_material.h"
+
+#include "sparks/light/light_geometry_material.h"
 
 #include "sparks/core/core.h"
 #include "sparks/core/geometry.h"
 #include "sparks/core/material.h"
-#include "sparks/light/light_geometry_material.h"
+#include "sparks/core/scene.h"
+#include "sparks/geometry/geometry_mesh.h"
+#include "sparks/material/material_lambertian.h"
+#include "sparks/material/material_light.h"
+#include "sparks/material/material_principled.h"
 
 namespace sparks {
 LightGeometryMaterial::LightGeometryMaterial(Core *core,
@@ -51,6 +56,21 @@ LightGeometryMaterial::LightGeometryMaterial(Core *core,
 
 graphics::Shader *LightGeometryMaterial::SamplerShader() {
   return direct_lighting_sampler_.get();
+}
+
+int LightGeometryMaterial::SamplerShader(Scene *scene) {
+  if (dynamic_cast<GeometryMesh *>(geometry_)) {
+    if (dynamic_cast<MaterialLight *>(material_)) {
+      return 0x1000001;
+    }
+    if (dynamic_cast<MaterialLambertian *>(material_)) {
+      return 0x1000002;
+    }
+    if (dynamic_cast<MaterialPrincipled *>(material_)) {
+      return 0x1000003;
+    }
+  }
+  return scene->RegisterCallableShader(direct_lighting_sampler_.get());
 }
 
 graphics::Buffer *LightGeometryMaterial::SamplerData() {

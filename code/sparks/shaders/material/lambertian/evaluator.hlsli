@@ -1,4 +1,6 @@
+#pragma once
 #include "common.hlsli"
+#include "material/lambertian/eval_direct_light.hlsli"
 
 template <class BufferType>
 class MaterialEvaluator {
@@ -12,7 +14,6 @@ class MaterialEvaluator {
   }
 
   float3 EvaluateDirectLighting(float3 position, GeometryPrimitiveSample primitive_sample) {
-    float3 emission = LoadFloat3(material_data, 12);
-    return emission;
+    return MaterialLambertianEvaluateDirectLighting(material_data, position, primitive_sample);
   }
 };

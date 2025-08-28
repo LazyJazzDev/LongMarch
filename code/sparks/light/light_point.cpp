@@ -16,6 +16,10 @@ graphics::Shader *LightPoint::SamplerShader() {
   return direct_lighting_sampler_.get();
 }
 
+int LightPoint::SamplerShader(Scene *scene) {
+  return 0x1000000;
+}
+
 graphics::Buffer *LightPoint::SamplerData() {
   return direct_lighting_sampler_data_.get();
 }

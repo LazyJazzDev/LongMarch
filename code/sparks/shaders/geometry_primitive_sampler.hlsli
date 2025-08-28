@@ -1,4 +1,4 @@
-
+#pragma once
 
 template <class BufferType>
 void SamplePrimitivePower(BufferType direct_lighting_sampler_data, inout float r, out uint primitive_id, out float prob) {

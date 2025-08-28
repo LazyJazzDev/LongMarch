@@ -1,3 +1,4 @@
+#pragma once
 #include "common.hlsli"
 
 template <class BufferType>

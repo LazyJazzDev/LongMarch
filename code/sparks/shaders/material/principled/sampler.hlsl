@@ -1,3 +1,4 @@
+#pragma once
 #include "bindings.hlsli"
 #include "bsdf/principled_material.hlsli"
 #include "buffer_helper.hlsli"

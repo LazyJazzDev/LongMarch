@@ -1,3 +1,4 @@
+#pragma once
 #include "bindings.hlsli"
 #include "bsdf/lambertian.hlsli"
 #include "direct_lighting.hlsli"

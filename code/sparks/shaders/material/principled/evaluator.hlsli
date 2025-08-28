@@ -1,4 +1,6 @@
+#pragma once
 #include "common.hlsli"
+#include "material/principled/eval_direct_light.hlsli"
 
 template <class BufferType>
 class MaterialEvaluator {
@@ -12,7 +14,6 @@ class MaterialEvaluator {
   }
 
   float3 EvaluateDirectLighting(float3 position, GeometryPrimitiveSample primitive_sample) {
-    float4 emission = LoadFloat4(material_data, 92);
-    return emission.xyz * emission.w; // Scale by the emission intensity
+    return MaterialPrincipledEvaluateDirectLighting(material_data, position, primitive_sample);
   }
 };
