@@ -1,3 +1,4 @@
+#pragma once
 #include "random.hlsli"
 
 float3 EvalLambertianBSDF(float3 base_color, float3 N, float3 L, out float pdf) {

@@ -11,13 +11,13 @@ using namespace long_march;
 int main() {
   std::unique_ptr<graphics::Core> core_;
 
-  graphics::CreateCore(graphics::BACKEND_API_DEFAULT, graphics::Core::Settings{2}, &core_);
+  graphics::CreateCore(graphics::BACKEND_API_DEFAULT, graphics::Core::Settings{2, false}, &core_);
   core_->InitializeLogicalDeviceAutoSelect(true);
   sparks::Core sparks_core(core_.get());
   sparks_core.GetShadersVFS().Print();
 
   sparks::Scene scene(&sparks_core);
-  scene.settings.samples_per_dispatch = 32;
+  scene.settings.samples_per_dispatch = 1;
   sparks::Film film(&sparks_core, 1024, 1024);
   film.info.persistence = 0.98f;
   sparks::Camera camera(&sparks_core,

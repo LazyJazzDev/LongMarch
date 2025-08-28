@@ -1,4 +1,5 @@
 #include "bindings.hlsli"
+#include "bsdf/lambertian.hlsli"
 #include "bsdf/principled_material.hlsli"
 #include "buffer_helper.hlsli"
 #include "direct_lighting.hlsli"
@@ -38,7 +39,7 @@ void SampleMaterial(inout RenderContext context, HitRecord hit_record) {
   {
     SampleDirectLighting(context, hit_record, eval, omega_in, pdf);
     float bsdf_pdf;
-    float3 bsdf_eval = material.EvalPrincipledBSDF(omega_in, bsdf_pdf);
+    float3 bsdf_eval = EvalLambertianBSDF(material.base_color, hit_record.normal, omega_in, bsdf_pdf);
     float mis_weight = PowerHeuristic(pdf, bsdf_pdf);
     if (pdf > EPSILON && !isnan(eval.x) && !isnan(eval.y) && !isnan(eval.z)) {
       eval /= pdf;
@@ -71,7 +72,7 @@ void SampleMaterial(inout RenderContext context, HitRecord hit_record) {
     context.radiance += emission * context.throughput * mis_weight;
   }
 
-  material.SamplePrincipledBSDF(RandomFloat(context.rd), RandomFloat(context.rd), eval, omega_in, pdf);
+  SampleLambertianBSDF(material.base_color, context.rd, hit_record, eval, omega_in, pdf);
   if (pdf < 1e-5) {
     context.throughput = float3(0, 0, 0);
   } else {

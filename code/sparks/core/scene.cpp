@@ -136,7 +136,7 @@ GeometryRegistration Scene::RegisterGeometry(Geometry *geometry) {
   auto hit_record_impl = geometry->HitRecordImpl();
   std::string geometry_code = sampler_impl;
   geometry_code += std::string(hit_record_impl);
-  if (!geometry_shader_map_.count(geometry_code)) {
+  if (!geometry_shader_map_.count(geometry_code) || true) {
     sampler_impl.InsertFront("#define PrimitiveArea PrimitiveArea" + std::to_string(geometry_shader_index_));
     sampler_impl.InsertFront("#define SamplePrimitive SamplePrimitive" + std::to_string(geometry_shader_index_));
 
@@ -178,7 +178,7 @@ MaterialRegistration Scene::RegisterMaterial(Material *material) {
   auto material_sampler_impl = material->SamplerImpl();
   auto material_direct_lighting_evaluate_impl = material->EvaluatorImpl();
   std::string material_code = std::string(material_sampler_impl) + std::string(material_direct_lighting_evaluate_impl);
-  if (!material_shader_map_.count(material_code)) {
+  if (!material_shader_map_.count(material_code) || true) {
     material_sampler_impl.InsertFront("#define SampleMaterial SampleMaterial" + std::to_string(material_shader_index_));
     material_sampler_impl.InsertBack("#undef SampleMaterial");
 
@@ -218,7 +218,7 @@ int32_t Scene::RegisterLight(Light *light, int custom_index) {
 
   CodeLines light_sampler_impl = light->SamplerImpl();
   std::string light_code = std::string(light_sampler_impl);
-  if (!light_shader_map_.count(light_code)) {
+  if (!light_shader_map_.count(light_code) || true) {
     light_sampler_impl.InsertFront("#define LightSampler LightSampler" + std::to_string(light_shader_index_));
     light_sampler_impl.InsertBack("#undef LightSampler");
 
