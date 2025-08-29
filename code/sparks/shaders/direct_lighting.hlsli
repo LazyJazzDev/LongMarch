@@ -24,7 +24,7 @@ void LightSampler(int shader_index, inout SampleDirectLightingPayload payload) {
   }
 }
 
-void SampleDirectLighting(in RenderContext context, HitRecord hit_record, out float3 eval, out float3 omega_in, out float pdf) {
+void SampleDirectLighting(inout RenderContext context, HitRecord hit_record, out float3 eval, out float3 omega_in, out float pdf) {
   uint light_count = light_selector_data.Load(0);
   BufferReference<ByteAddressBuffer> power_cdf = MakeBufferReference(light_selector_data, 4);
   float total_power = asfloat(power_cdf.Load(light_count * 4 - 4));
@@ -59,11 +59,9 @@ void SampleDirectLighting(in RenderContext context, HitRecord hit_record, out fl
   float shadow_length = asfloat(payload.low.w) * 0.9999;
   omega_in = asfloat(payload.high.xyz);
   pdf = asfloat(payload.high.w) * prob;
-  if (render_settings.alpha_shadow) {
-    eval *= ShadowRay(hit_record.position, omega_in, shadow_length);
-  } else {
-    eval *= ShadowRayNoAlpha(hit_record.position, omega_in, shadow_length);
-  }
+  context.shadow_eval = eval;
+  context.shadow_dir = omega_in;
+  context.shadow_length = shadow_length;
 }
 
 float DirectLightingProbability(uint light_index) {

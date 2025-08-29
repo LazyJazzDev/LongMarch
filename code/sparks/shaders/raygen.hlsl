@@ -1,6 +1,7 @@
 #include "bindings.hlsli"
 #include "common.hlsli"
 #include "random.hlsli"
+#include "shadow_ray.hlsli"
 
 [shader("raygeneration")] void Main() {
   float4 accum_color = accumulated_color[DispatchRaysIndex().xy];
@@ -34,7 +35,22 @@
       ray.TMin = T_MIN * max(length(context.origin), 1.0);
       ray.Direction = context.direction;
       ray.TMax = T_MAX;
+
+      context.shadow_eval = float3(0.0, 0.0, 0.0);
+      context.shadow_dir = float3(0.0, 0.0, 0.0);
+      context.shadow_length = 0.0;
+
       TraceRay(as, RAY_FLAG_NONE, 0xFF, 0, 0, 0, ray, context);
+
+      if (context.shadow_eval.x > 0.0 || context.shadow_eval.y > 0.0 || context.shadow_eval.z > 0.0) {
+        if (render_settings.alpha_shadow) {
+          context.radiance +=
+              context.shadow_eval * ShadowRay(context.origin, context.shadow_dir, context.shadow_length);
+        } else {
+          context.radiance +=
+              context.shadow_eval * ShadowRayNoAlpha(context.origin, context.shadow_dir, context.shadow_length);
+        }
+      }
 
       // russian roulette
       float p = max(max(context.throughput.x, context.throughput.y), context.throughput.z);

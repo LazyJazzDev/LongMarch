@@ -19,7 +19,7 @@ void SampleMaterial(inout RenderContext context, HitRecord hit_record) {
     float3 bsdf_eval = EvalLambertianBSDF(color, hit_record.normal, omega_in, bsdf_pdf);
     float mis_weight = PowerHeuristic(pdf, bsdf_pdf);
     eval /= pdf;
-    context.radiance += mis_weight * eval * bsdf_eval * context.throughput;
+    context.shadow_eval = mis_weight * eval * bsdf_eval * context.throughput;
   }
 
   if (max(emission.x, max(emission.y, emission.z)) > 0.0f) {

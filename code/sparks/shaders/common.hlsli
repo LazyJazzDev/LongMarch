@@ -35,6 +35,9 @@ struct RenderContext {
   float3 throughput;
   RandomDevice rd;
   float bsdf_pdf;
+  float3 shadow_eval;
+  float3 shadow_dir;
+  float shadow_length;
 };
 
 struct ShadowRayPayload {

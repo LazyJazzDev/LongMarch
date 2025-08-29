@@ -43,7 +43,7 @@ void SampleMaterial(inout RenderContext context, HitRecord hit_record) {
     float mis_weight = PowerHeuristic(pdf, bsdf_pdf);
     if (pdf > EPSILON && !isnan(eval.x) && !isnan(eval.y) && !isnan(eval.z)) {
       eval /= pdf;
-      context.radiance += mis_weight * eval * bsdf_eval * context.throughput;
+      context.shadow_eval = mis_weight * eval * bsdf_eval * context.throughput;
     }
   }
 
