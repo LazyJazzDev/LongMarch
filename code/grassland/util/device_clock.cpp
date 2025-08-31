@@ -2,8 +2,6 @@
 
 #include "grassland/util/device_clock.h"
 
-#include "grassland/math/math_basics.h"
-
 namespace grassland {
 
 namespace {

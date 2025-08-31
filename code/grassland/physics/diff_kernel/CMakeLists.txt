@@ -10,4 +10,4 @@ add_library(grassland_physics_diff_kernel ${SOURCES})
 
 target_include_directories(grassland_physics_diff_kernel PUBLIC ${LONGMARCH_INCLUDE_DIR})
 
-target_link_libraries(grassland_physics_diff_kernel PUBLIC grassland_util)
+target_link_libraries(grassland_physics_diff_kernel PUBLIC grassland_util grassland_math)
