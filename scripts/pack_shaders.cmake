@@ -51,6 +51,10 @@ function(PACK_SHADER_CODE TARGET_NAME)
     # Use the XXD cmake function generate header files in corresponding build directory
     foreach (SHADER_FILE ${SHADER_FILES})
         set(HEADER_FILE ${CMAKE_CURRENT_BINARY_DIR}/${SHADER_FILE}.h)
+        # get header file directory
+        get_filename_component(HEADER_DIR ${HEADER_FILE} DIRECTORY)
+        # create the directory if not exist
+        file(MAKE_DIRECTORY ${HEADER_DIR})
         XXD(${SHADER_FILE} ${HEADER_FILE} ${CMAKE_CURRENT_SOURCE_DIR})
         list(APPEND HEADER_FILES ${HEADER_FILE})
     endforeach ()

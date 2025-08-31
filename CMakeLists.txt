@@ -21,6 +21,17 @@ if (UNIX AND NOT APPLE)
 endif ()
 
 if (CUDAToolkit_FOUND)
+    # If CUDA Version >= 13.0
+    set(CUDA_INC_DIR ${CUDAToolkit_INCLUDE_DIR})
+    if (CUDAToolkit_VERSION VERSION_GREATER_EQUAL "13.0")
+        message(STATUS "CUDA Version >= 13.0 detected. Thrust has moved to cccl subdirectory.")
+        foreach (CUDAToolkit_INCLUDE_DIR ${CUDAToolkit_INCLUDE_DIRS})
+            message(STATUS "CUDAToolkit_INCLUDE_DIR: ${CUDAToolkit_INCLUDE_DIR}")
+
+            set(CUDA_INC_DIR ${CUDAToolkit_INCLUDE_DIR}/cccl)
+            list(APPEND INC_LIST ${CUDA_INC_DIR})
+        endforeach ()
+    endif ()
     set(CUDART_LIB_NAME CUDA::cudart)
     list(APPEND LIB_LIST ${CUDART_LIB_NAME})
     set(LONGMARCH_CUDA_RUNTIME ON)
