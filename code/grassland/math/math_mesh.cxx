@@ -164,17 +164,18 @@ int Mesh<Scalar>::LoadObjFile(const std::string &filename) {
   bool have_texcoord = false;
 
   // Loop over shapes
+  size_t global_index_offset = 0;
   for (size_t s = 0; s < shapes.size(); s++) {
-    // Loop over faces(polygon)
     size_t index_offset = 0;
+    // Loop over faces(polygon)
     for (size_t f = 0; f < shapes[s].mesh.num_face_vertices.size(); f++) {
       size_t fv = size_t(shapes[s].mesh.num_face_vertices[f]);
 
       // Loop over vertices in the face.
       for (size_t v = 0; v < fv; v++) {
-        Vector3<Scalar> position;
-        Vector3<Scalar> normal;
-        Vector2<Scalar> tex_coord;
+        Vector3<Scalar> position{};
+        Vector3<Scalar> normal{};
+        Vector2<Scalar> tex_coord{};
 
         // access to vertex
         tinyobj::index_t idx = shapes[s].mesh.indices[index_offset + v];
@@ -211,13 +212,14 @@ int Mesh<Scalar>::LoadObjFile(const std::string &filename) {
         // tinyobj::real_t green = attrib.colors[3*size_t(idx.vertex_index)+1];
         // tinyobj::real_t blue  = attrib.colors[3*size_t(idx.vertex_index)+2];
         if (v >= 2) {
-          indices.push_back(index_offset);
-          indices.push_back(index_offset + v - 1);
-          indices.push_back(index_offset + v);
+          indices.push_back(global_index_offset);
+          indices.push_back(global_index_offset + v - 1);
+          indices.push_back(global_index_offset + v);
         }
       }
 
       index_offset += fv;
+      global_index_offset += fv;
 
       // per-face material
       // shapes[s].mesh.material_ids[f];

@@ -6,6 +6,8 @@ if (LONGMARCH_CUDA_ENABLED)
     endforeach ()
 endif ()
 
+file(GLOB_RECURSE SOURCES "*.cpp" "*.cxx")
+
 add_library(${GRASSLAND_SUBLIB_NAME} ${SOURCES})
 
 list(APPEND GRASSLAND_LIBS ${GRASSLAND_SUBLIB_NAME})

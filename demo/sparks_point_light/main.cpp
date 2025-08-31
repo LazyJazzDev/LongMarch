@@ -25,9 +25,14 @@ int main() {
                         glm::radians(60.0f), static_cast<float>(film.GetWidth()) / film.GetHeight());
 
   sparks::MaterialLambertian material_white(&sparks_core, {0.8f, 0.8f, 0.8f});
+  Mesh<> matball_mesh;
+  matball_mesh.LoadObjFile(FindAssetFile("meshes/matball.obj"));
 
   sparks::GeometryMesh geometry_mesh(&sparks_core, Mesh<>::Sphere(30));
-  sparks::EntityGeometryMaterial entity_mesh(&sparks_core, &geometry_mesh, &material_white);
+  sparks::GeometryMesh geometry_matball(&sparks_core, matball_mesh);
+  sparks::EntityGeometryMaterial entity_mesh(&sparks_core, &geometry_matball, &material_white,
+                                             glm::translate(glm::mat4{1.0f}, glm::vec3{0.0f, -1.0f, 0.0f}) *
+                                                 glm::scale(glm::mat4(1.0f), glm::vec3(1.0f / 80.0f)));
   sparks::EntityGeometryMaterial entity_shell(&sparks_core, &geometry_mesh, &material_white,
                                               glm::translate(glm::mat4{1.0f}, glm::vec3{0.0f, -1001.0f, 0.0f}) *
                                                   glm::scale(glm::mat4(1.0f), glm::vec3(1000.0f)));
@@ -74,7 +79,7 @@ int main() {
       positions[i] = {sin_theta * x, 4.0f, cos_theta * x};
       point_lights[i]->position = positions[i];
     }
-    rotation_angle += glm::radians(0.1f);
+    rotation_angle += glm::radians(0.3f);
     scene.Render(&camera, &film);
     sparks_core.ConvertFilmToRawImage(film, raw_image.get());
     sparks_core.ToneMapping(raw_image.get(), srgb_image.get());

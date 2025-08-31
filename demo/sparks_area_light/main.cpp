@@ -26,8 +26,14 @@ int main() {
 
   sparks::MaterialLambertian material_white(&sparks_core, {0.8f, 0.8f, 0.8f});
 
+  Mesh<> matball_mesh;
+  matball_mesh.LoadObjFile(FindAssetFile("meshes/matball.obj"));
+
   sparks::GeometryMesh geometry_mesh(&sparks_core, Mesh<>::Sphere(30));
-  sparks::EntityGeometryMaterial entity_mesh(&sparks_core, &geometry_mesh, &material_white);
+  sparks::GeometryMesh geometry_matball(&sparks_core, matball_mesh);
+  sparks::EntityGeometryMaterial entity_mesh(&sparks_core, &geometry_matball, &material_white,
+                                             glm::translate(glm::mat4{1.0f}, glm::vec3{0.0f, -1.0f, 0.0f}) *
+                                                 glm::scale(glm::mat4(1.0f), glm::vec3(1.0f / 80.0f)));
   sparks::EntityGeometryMaterial entity_shell(&sparks_core, &geometry_mesh, &material_white,
                                               glm::translate(glm::mat4{1.0f}, glm::vec3{0.0f, -1001.0f, 0.0f}) *
                                                   glm::scale(glm::mat4(1.0f), glm::vec3(1000.0f)));
@@ -52,7 +58,7 @@ int main() {
     area_lights[i]->size = 0.6f;
     area_lights[i]->emission = graphics::HSVtoRGB({frac, 1.0f, 1.0f});
     area_lights[i]->emission =
-        area_lights[i]->emission * (40.0f / num_lights / graphics::GreyScale(area_lights[i]->emission) /
+        area_lights[i]->emission * (20.0f / num_lights / graphics::GreyScale(area_lights[i]->emission) /
                                     area_lights[i]->size / area_lights[i]->size);
   }
 
@@ -79,7 +85,7 @@ int main() {
       area_lights[i]->position = positions[i];
       area_lights[i]->direction = -area_lights[i]->position;
     }
-    rotation_angle += glm::radians(0.1f);
+    rotation_angle += glm::radians(0.3f);
     scene.Render(&camera, &film);
     sparks_core.ConvertFilmToRawImage(film, raw_image.get());
     sparks_core.ToneMapping(raw_image.get(), srgb_image.get());
