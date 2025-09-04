@@ -46,18 +46,16 @@ void Scene::Render(Camera *camera, Film *film) {
 }
 
 void Scene::AddEntity(Entity *entity) {
-  entities_.insert({entity, true});
+  entities_.insert({entity, {}});
 }
 
 void Scene::DeleteEntity(Entity *entity) {
   entities_.erase(entity);
-  buffers_dirty_ = true;
-  hit_groups_dirty_ = true;
-  callable_shaders_dirty_ = true;
+  pipeline_dirty_ = true;
 }
 
 void Scene::SetEntityActive(Entity *entity, bool active) {
-  entities_.at(entity) = active;
+  entities_.at(entity).active = active;
 }
 
 int32_t Scene::RegisterLight(Light *light, int custom_index) {
@@ -101,7 +99,7 @@ int32_t Scene::RegisterCallableShader(graphics::Shader *callable_shader) {
   if (!callable_shader_map_.count(callable_shader)) {
     callable_shader_map_[callable_shader] = static_cast<int32_t>(callable_shaders_.size());
     callable_shaders_.emplace_back(callable_shader);
-    callable_shaders_dirty_ = true;
+    pipeline_dirty_ = true;
   }
   return callable_shader_map_[callable_shader];
 }
@@ -112,7 +110,6 @@ int32_t Scene::RegisterBuffer(graphics::Buffer *buffer) {
   if (!buffer_map_.count(buffer)) {
     buffer_map_[buffer] = static_cast<int32_t>(buffers_.size());
     buffers_.emplace_back(buffer);
-    buffers_dirty_ = true;
   }
   return buffer_map_[buffer];
 }
@@ -121,7 +118,7 @@ int32_t Scene::RegisterHitGroup(const InstanceHitGroups &hit_group) {
   if (!hit_group_map_.count(hit_group)) {
     hit_group_map_[hit_group] = static_cast<int32_t>(hit_groups_.size());
     hit_groups_.emplace_back(hit_group);
-    hit_groups_dirty_ = true;
+    pipeline_dirty_ = true;
   }
   return hit_group_map_[hit_group];
 }
@@ -134,34 +131,21 @@ void Scene::UpdatePipeline(Camera *camera) {
   preprocess_cmd_context_.reset();
   core_->GraphicsCore()->CreateCommandContext(&preprocess_cmd_context_);
 
-  bool &clean_buffers = buffers_dirty_;
-  bool &clean_hit_groups = hit_groups_dirty_;
-  bool &clean_callable_shaders = callable_shaders_dirty_;
+  bool &pipeline_dirty = pipeline_dirty_;
 
-  for (auto [entity, active] : entities_) {
-    clean_buffers |= entity->ExpiredBuffer();
-    clean_hit_groups |= entity->ExpiredHitGroup();
-    clean_callable_shaders |= entity->ExpiredCallableShader();
-  }
+  buffers_.clear();
+  buffer_map_.clear();
 
-  if (clean_buffers) {
-    buffers_.clear();
-    buffer_map_.clear();
-  }
-
-  if (clean_hit_groups) {
+  if (pipeline_dirty) {
     hit_groups_.clear();
     hit_group_map_.clear();
-  }
-
-  if (clean_callable_shaders) {
     callable_shaders_.clear();
     callable_shader_map_.clear();
     RegisterCallableShader(camera->Shader());
   }
 
-  for (auto [entity, active] : entities_) {
-    if (active) {
+  for (auto [entity, status] : entities_) {
+    if (status.active) {
       entity->Update(this);
     }
   }
@@ -194,16 +178,7 @@ void Scene::UpdatePipeline(Camera *camera) {
   uint32_t light_count = static_cast<uint32_t>(light_metadatas_.size());
   light_selector_buffer_->UploadData(&light_count, sizeof(uint32_t), 0);
 
-  if (buffers_dirty_ || !gather_light_power_program_) {
-    gather_light_power_program_.reset();
-    core_->GraphicsCore()->CreateComputeProgram(gather_light_power_shader_.get(), &gather_light_power_program_);
-    gather_light_power_program_->AddResourceBinding(graphics::RESOURCE_TYPE_STORAGE_BUFFER, 1);
-    gather_light_power_program_->AddResourceBinding(graphics::RESOURCE_TYPE_WRITABLE_STORAGE_BUFFER, 1);
-    gather_light_power_program_->AddResourceBinding(graphics::RESOURCE_TYPE_STORAGE_BUFFER, buffers_.size());
-    gather_light_power_program_->Finalize();
-  }
-
-  if (hit_groups_dirty_ || callable_shaders_dirty_ || buffers_dirty_ || !rt_program_) {
+  if (pipeline_dirty_ || buffers_.size() > buffer_capacity_ || !rt_program_) {
     rt_program_.reset();
     core_->GraphicsCore()->CreateRayTracingProgram(&rt_program_);
     miss_shader_indices_ = {0, 1};
@@ -233,9 +208,18 @@ void Scene::UpdatePipeline(Camera *camera) {
       rt_program_->AddCallableShader(callable_shader);
     }
     rt_program_->Finalize(miss_shader_indices_, hit_group_indices_, callable_shader_indices_);
-    hit_groups_dirty_ = false;
-    callable_shaders_dirty_ = false;
-    buffers_dirty_ = false;
+
+    if (buffers_.size() > buffer_capacity_ || !gather_light_power_program_) {
+      gather_light_power_program_.reset();
+      core_->GraphicsCore()->CreateComputeProgram(gather_light_power_shader_.get(), &gather_light_power_program_);
+      gather_light_power_program_->AddResourceBinding(graphics::RESOURCE_TYPE_STORAGE_BUFFER, 1);
+      gather_light_power_program_->AddResourceBinding(graphics::RESOURCE_TYPE_WRITABLE_STORAGE_BUFFER, 1);
+      gather_light_power_program_->AddResourceBinding(graphics::RESOURCE_TYPE_STORAGE_BUFFER, buffers_.size());
+      gather_light_power_program_->Finalize();
+    }
+
+    buffer_capacity_ = buffers_.size();
+    pipeline_dirty_ = false;
   }
 
   preprocess_cmd_context_->CmdBindComputeProgram(gather_light_power_program_.get());

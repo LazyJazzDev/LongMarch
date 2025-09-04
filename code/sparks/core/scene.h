@@ -47,6 +47,11 @@ class Scene {
     int alpha_shadow = false;
   } settings;
 
+  struct EntityStatus {
+    bool active{true};
+    int shader_version{0};
+  };
+
   int32_t RegisterCallableShader(graphics::Shader *callable_shader);
   int32_t RegisterBuffer(graphics::Buffer *buffer);
   int32_t RegisterHitGroup(const InstanceHitGroups &hit_group);
@@ -60,7 +65,7 @@ class Scene {
   std::unique_ptr<graphics::RayTracingProgram> rt_program_;
   std::unique_ptr<graphics::AccelerationStructure> tlas_;
   std::unique_ptr<graphics::Buffer> scene_settings_buffer_;
-  std::map<Entity *, bool> entities_;
+  std::map<Entity *, EntityStatus> entities_;
 
   std::vector<int32_t> miss_shader_indices_;
   std::vector<int32_t> hit_group_indices_;
@@ -68,15 +73,14 @@ class Scene {
 
   std::vector<InstanceHitGroups> hit_groups_;
   std::map<InstanceHitGroups, int32_t, HitGroupComparator> hit_group_map_;
-  bool hit_groups_dirty_{true};
 
   std::vector<graphics::Buffer *> buffers_;
   std::map<graphics::Buffer *, int32_t> buffer_map_;
-  bool buffers_dirty_{true};
 
   std::vector<graphics::Shader *> callable_shaders_;
   std::map<graphics::Shader *, int32_t> callable_shader_map_;
-  bool callable_shaders_dirty_{true};
+  bool pipeline_dirty_{true};
+  int buffer_capacity_{0};
 
   std::vector<graphics::RayTracingInstance> instances_;
 
