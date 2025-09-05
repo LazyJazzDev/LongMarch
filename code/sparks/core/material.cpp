@@ -7,6 +7,9 @@ namespace sparks {
 Material::Material(Core *core) : core_(core) {
 }
 
+void Material::Update(Scene *scene) {
+}
+
 const CodeLines &Material::EvaluatorImpl() const {
   return {};
 }

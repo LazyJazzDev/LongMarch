@@ -17,7 +17,7 @@ EntityGeometryMaterial::EntityGeometryMaterial(Core *core,
   transformation_ = transformation;
 
   auto vfs = core_->GetShadersVFS();
-  vfs.WriteFile("material_sampler.hlsli", material->SamplerImpl());
+  vfs.WriteFile("material_sampler.hlsli", material_->SamplerImpl());
   vfs.WriteFile("entity_chit.hlsl", geometry_->ClosestHitShaderImpl());
   core_->GraphicsCore()->CreateShader(vfs, "entity_chit.hlsl", "RenderClosestHit", "lib_6_5", {"-I."},
                                       &closest_hit_shader_);
@@ -26,6 +26,7 @@ EntityGeometryMaterial::EntityGeometryMaterial(Core *core,
 }
 
 void EntityGeometryMaterial::Update(Scene *scene) {
+  material_->Update(scene);
   int32_t light_index = scene->RegisterLight(&light_geom_mat_);
   int32_t instance_index = scene->RegisterInstance(
       geometry_->BLAS(), transformation_,

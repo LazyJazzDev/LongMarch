@@ -54,6 +54,7 @@ class Scene {
 
   int32_t RegisterCallableShader(graphics::Shader *callable_shader);
   int32_t RegisterBuffer(graphics::Buffer *buffer);
+  int32_t RegisterImage(graphics::Image *image);
   int32_t RegisterHitGroup(const InstanceHitGroups &hit_group);
 
  private:
@@ -79,8 +80,17 @@ class Scene {
 
   std::vector<graphics::Shader *> callable_shaders_;
   std::map<graphics::Shader *, int32_t> callable_shader_map_;
+
+  std::vector<graphics::Image *> sdr_images_;
+  std::map<graphics::Image *, int32_t> sdr_image_map_;
+
+  std::vector<graphics::Image *> hdr_images_;
+  std::map<graphics::Image *, int32_t> hdr_image_map_;
+
   bool pipeline_dirty_{true};
   int buffer_capacity_{0};
+  int sdr_image_capacity_{0};
+  int hdr_image_capacity_{0};
 
   std::vector<graphics::RayTracingInstance> instances_;
 
@@ -99,6 +109,9 @@ class Scene {
   std::unique_ptr<graphics::ComputeProgram> gather_light_power_program_;
 
   std::unique_ptr<graphics::CommandContext> preprocess_cmd_context_;
+
+  std::unique_ptr<graphics::Sampler> linear_sampler_;
+  std::unique_ptr<graphics::Sampler> nearest_sampler_;
 };
 
 }  // namespace sparks

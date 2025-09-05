@@ -10,7 +10,8 @@
 namespace sparks {
 Core::Core(graphics::Core *core) : core_(core) {
   LoadPublicShaders();
-  LoadSobolBuffer();
+  LoadPublicBuffers();
+  LoadPublicImages();
 }
 
 graphics::Core *Core::GraphicsCore() const {
@@ -52,8 +53,12 @@ graphics::ComputeProgram *Core::GetComputeProgram(const std::string &name) {
   return compute_programs_[name].get();
 }
 
-graphics::Buffer *Core::SobolBuffer() {
-  return sobol_buffer_.get();
+graphics::Buffer *Core::GetBuffer(const std::string &name) {
+  return buffers_[name].get();
+}
+
+graphics::Image *Core::GetImage(const std::string &name) {
+  return images_[name].get();
 }
 
 void Core::LoadPublicShaders() {
@@ -87,11 +92,20 @@ void Core::LoadPublicShaders() {
   compute_programs_["blelloch_scan_down"]->Finalize();
 }
 
-void Core::LoadSobolBuffer() {
+void Core::LoadPublicBuffers() {
   auto path = FindAssetFile("data/new-joe-kuo-7.21201");
   auto data = SobolTableGen(65536, 1024, path);
-  core_->CreateBuffer(data.size() * sizeof(float), graphics::BUFFER_TYPE_STATIC, &sobol_buffer_);
-  sobol_buffer_->UploadData(data.data(), data.size() * sizeof(float));
+  core_->CreateBuffer(data.size() * sizeof(float), graphics::BUFFER_TYPE_STATIC, &buffers_["sobol"]);
+  buffers_["sobol"]->UploadData(data.data(), data.size() * sizeof(float));
+}
+
+void Core::LoadPublicImages() {
+  uint32_t white_pixel = 0xFFFFFFFF;
+  float white_hdr_pixel[] = {1.0f, 1.0f, 1.0f, 1.0f};
+  core_->CreateImage(1, 1, graphics::IMAGE_FORMAT_R8G8B8A8_UNORM, &images_["white"]);
+  core_->CreateImage(1, 1, graphics::IMAGE_FORMAT_R32G32B32A32_SFLOAT, &images_["white_hdr"]);
+  images_["white"]->UploadData(&white_pixel);
+  images_["white_hdr"]->UploadData(white_hdr_pixel);
 }
 
 }  // namespace sparks

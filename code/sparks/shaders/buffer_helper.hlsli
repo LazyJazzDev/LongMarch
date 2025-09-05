@@ -149,23 +149,72 @@ class StreamedBufferReference {
         return result;
   }
 
-float2 LoadFloat2() {
-        float2 result = asfloat(m_buffer.Load2(m_offset));
-        m_offset += 8; // Move to the next float2
-        return result;
-        }
+  float2 LoadFloat2() {
+    float2 result = asfloat(m_buffer.Load2(m_offset));
+    m_offset += 8; // Move to the next float2
+    return result;
+  }
 
-float3 LoadFloat3() {
-        float3 result = asfloat(m_buffer.Load3(m_offset));
-        m_offset += 12; // Move to the next float3
-        return result;
-        }
+  float3 LoadFloat3() {
+    float3 result = asfloat(m_buffer.Load3(m_offset));
+    m_offset += 12; // Move to the next float3
+    return result;
+  }
 
-float4 LoadFloat4() {
-        float4 result = asfloat(m_buffer.Load4(m_offset));
-        m_offset += 16; // Move to the next float4
-        return result;
-        }
+  float4 LoadFloat4() {
+    float4 result = asfloat(m_buffer.Load4(m_offset));
+    m_offset += 16; // Move to the next float4
+    return result;
+  }
+
+  uint LoadUint() {
+    uint result = m_buffer.Load(m_offset);
+    m_offset += 4; // Move to the next float
+    return result;
+  }
+
+  uint2 LoadUint2() {
+    uint2 result = m_buffer.Load2(m_offset);
+    m_offset += 8; // Move to the next float
+    return result;
+  }
+
+  uint3 LoadUint3() {
+    uint3 result = m_buffer.Load3(m_offset);
+    m_offset += 12; // Move to the next float
+    return result;
+  }
+
+  uint4 LoadUint4() {
+    uint4 result = m_buffer.Load4(m_offset);
+    m_offset += 16; // Move to the next float
+    return result;
+  }
+
+
+  int LoadInt() {
+    int result = m_buffer.Load(m_offset);
+    m_offset += 4; // Move to the next float
+    return result;
+  }
+
+  int2 LoadInt2() {
+    int2 result = m_buffer.Load2(m_offset);
+    m_offset += 8; // Move to the next float
+    return result;
+  }
+
+  int3 LoadInt3() {
+    int3 result = m_buffer.Load3(m_offset);
+    m_offset += 12; // Move to the next float
+    return result;
+  }
+
+  int4 LoadInt4() {
+    int4 result = m_buffer.Load4(m_offset);
+    m_offset += 16; // Move to the next float
+    return result;
+  }
 
 };
 

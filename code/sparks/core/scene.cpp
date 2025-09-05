@@ -19,6 +19,8 @@ Scene::Scene(Core *core) : core_(core) {
                                       &scene_settings_buffer_);
   core_->GraphicsCore()->CreateShader(core_->GetShadersVFS(), "gather_light_power.hlsl", "GatherLightPowerKernel",
                                       "cs_6_3", &gather_light_power_shader_);
+  core_->GraphicsCore()->CreateSampler({graphics::FILTER_MODE_LINEAR}, &linear_sampler_);
+  core_->GraphicsCore()->CreateSampler({graphics::FILTER_MODE_NEAREST}, &nearest_sampler_);
 }
 
 void Scene::Render(Camera *camera, Film *film) {
@@ -33,12 +35,16 @@ void Scene::Render(Camera *camera, Film *film) {
   cmd_context->CmdBindResources(1, {film->accumulated_samples_.get()}, graphics::BIND_POINT_RAYTRACING);
   cmd_context->CmdBindResources(2, {tlas_.get()}, graphics::BIND_POINT_RAYTRACING);
   cmd_context->CmdBindResources(3, {scene_settings_buffer_.get()}, graphics::BIND_POINT_RAYTRACING);
-  cmd_context->CmdBindResources(4, {core_->SobolBuffer()}, graphics::BIND_POINT_RAYTRACING);
+  cmd_context->CmdBindResources(4, {core_->GetBuffer("sobol")}, graphics::BIND_POINT_RAYTRACING);
   cmd_context->CmdBindResources(5, {camera->Buffer()}, graphics::BIND_POINT_RAYTRACING);
   cmd_context->CmdBindResources(6, buffers_, graphics::BIND_POINT_RAYTRACING);
   cmd_context->CmdBindResources(7, {instance_metadata_buffer_.get()}, graphics::BIND_POINT_RAYTRACING);
   cmd_context->CmdBindResources(8, {light_selector_buffer_.get()}, graphics::BIND_POINT_RAYTRACING);
   cmd_context->CmdBindResources(9, {light_metadatas_buffer_.get()}, graphics::BIND_POINT_RAYTRACING);
+  cmd_context->CmdBindResources(10, sdr_images_, graphics::BIND_POINT_RAYTRACING);
+  cmd_context->CmdBindResources(11, hdr_images_, graphics::BIND_POINT_RAYTRACING);
+  cmd_context->CmdBindResources(12, std::vector{linear_sampler_.get(), nearest_sampler_.get()},
+                                graphics::BIND_POINT_RAYTRACING);
   cmd_context->CmdDispatchRays(film->accumulated_color_->Extent().width, film->accumulated_samples_->Extent().height,
                                1);
   core_->GraphicsCore()->SubmitCommandContext(cmd_context.get());
@@ -114,6 +120,24 @@ int32_t Scene::RegisterBuffer(graphics::Buffer *buffer) {
   return buffer_map_[buffer];
 }
 
+int32_t Scene::RegisterImage(graphics::Image *image) {
+  if (image->Format() == graphics::IMAGE_FORMAT_R8G8B8A8_UNORM) {
+    if (!sdr_image_map_.count(image)) {
+      sdr_image_map_[image] = static_cast<int32_t>(sdr_images_.size());
+      sdr_images_.emplace_back(image);
+    }
+    return sdr_image_map_[image];
+  }
+  if (image->Format() == graphics::IMAGE_FORMAT_R32G32B32A32_SFLOAT) {
+    if (!hdr_image_map_.count(image)) {
+      hdr_image_map_[image] = static_cast<int32_t>(hdr_images_.size());
+      hdr_images_.emplace_back(image);
+    }
+    return hdr_image_map_[image] + 0x1000000;
+  }
+  return -1;
+}
+
 int32_t Scene::RegisterHitGroup(const InstanceHitGroups &hit_group) {
   if (!hit_group_map_.count(hit_group)) {
     hit_group_map_[hit_group] = static_cast<int32_t>(hit_groups_.size());
@@ -135,6 +159,14 @@ void Scene::UpdatePipeline(Camera *camera) {
 
   buffers_.clear();
   buffer_map_.clear();
+
+  sdr_images_.clear();
+  sdr_image_map_.clear();
+
+  hdr_images_.clear();
+  hdr_image_map_.clear();
+  RegisterImage(core_->GetImage("white"));
+  RegisterImage(core_->GetImage("white_hdr"));
 
   if (pipeline_dirty) {
     hit_groups_.clear();
@@ -178,7 +210,8 @@ void Scene::UpdatePipeline(Camera *camera) {
   uint32_t light_count = static_cast<uint32_t>(light_metadatas_.size());
   light_selector_buffer_->UploadData(&light_count, sizeof(uint32_t), 0);
 
-  if (pipeline_dirty_ || buffers_.size() > buffer_capacity_ || !rt_program_) {
+  if (pipeline_dirty_ || buffers_.size() > buffer_capacity_ || sdr_images_.size() > sdr_image_capacity_ ||
+      hdr_images_.size() > hdr_image_capacity_ || !rt_program_) {
     rt_program_.reset();
     core_->GraphicsCore()->CreateRayTracingProgram(&rt_program_);
     miss_shader_indices_ = {0, 1};
@@ -196,6 +229,9 @@ void Scene::UpdatePipeline(Camera *camera) {
     rt_program_->AddResourceBinding(graphics::RESOURCE_TYPE_STORAGE_BUFFER, 1);
     rt_program_->AddResourceBinding(graphics::RESOURCE_TYPE_STORAGE_BUFFER, 1);
     rt_program_->AddResourceBinding(graphics::RESOURCE_TYPE_STORAGE_BUFFER, 1);
+    rt_program_->AddResourceBinding(graphics::RESOURCE_TYPE_TEXTURE, sdr_images_.size());
+    rt_program_->AddResourceBinding(graphics::RESOURCE_TYPE_TEXTURE, hdr_images_.size());
+    rt_program_->AddResourceBinding(graphics::RESOURCE_TYPE_SAMPLER, 2);
 
     rt_program_->AddRayGenShader(raygen_shader_.get());
     rt_program_->AddMissShader(default_miss_shader_.get());
@@ -219,6 +255,8 @@ void Scene::UpdatePipeline(Camera *camera) {
     }
 
     buffer_capacity_ = buffers_.size();
+    sdr_image_capacity_ = sdr_images_.size();
+    hdr_image_capacity_ = hdr_images_.size();
     pipeline_dirty_ = false;
   }
 

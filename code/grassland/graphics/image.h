@@ -14,4 +14,6 @@ class Image {
   static void PyBind(pybind11::module &m);
 };
 
+int LoadImageFromFile(Core *core, const std::string &file_path, double_ptr<Image> pp_image);
+
 }  // namespace grassland::graphics

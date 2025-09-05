@@ -6,6 +6,7 @@
 #include "geometry_primitive_sampler.hlsli"
 
 void SampleMaterial(inout RenderContext context, HitRecord hit_record) {
+  // hit_record.tex_coord *= 2.0;
   InstanceMetadata instance_meta = instance_metadatas[hit_record.object_index];
   StreamedBufferReference<ByteAddressBuffer> material_buffer =
       MakeStreamedBufferReference(data_buffers[instance_meta.material_data_index], 0);
@@ -32,6 +33,43 @@ void SampleMaterial(inout RenderContext context, HitRecord hit_record) {
   material.transmission = material_buffer.LoadFloat();
   material.transmission_roughness = material_buffer.LoadFloat();
 
+  float3 emission = material_buffer.LoadFloat3();
+  float strength = material_buffer.LoadFloat();
+
+  int normal_texture_index = material_buffer.LoadInt();
+  float y_signal = material_buffer.LoadFloat();
+  if (normal_texture_index != -1) {
+    float3 tbn = SampleTexture(normal_texture_index, hit_record.tex_coord).xyz * 2.0f - 1.0f;
+    float3x3 TBN =
+        float3x3(hit_record.tangent, cross(hit_record.normal, hit_record.tangent) * hit_record.signal * y_signal,
+                 hit_record.normal);
+    material.hit_record.normal = hit_record.normal = normalize(mul(tbn, TBN));
+  }
+
+  int base_color_texture_index = material_buffer.LoadInt();
+  if (base_color_texture_index != -1)
+    material.base_color = SampleTexture(base_color_texture_index, hit_record.tex_coord).xyz;
+
+  int metallic_texture_index = material_buffer.LoadInt();
+  if (metallic_texture_index != -1)
+    material.metallic = SampleTexture(metallic_texture_index, hit_record.tex_coord).x;
+
+  int specular_texture_index = material_buffer.LoadInt();
+  if (specular_texture_index != -1)
+    material.specular = SampleTexture(specular_texture_index, hit_record.tex_coord).x;
+
+  int roughness_texture_index = material_buffer.LoadInt();
+  if (roughness_texture_index != -1)
+    material.roughness = SampleTexture(roughness_texture_index, hit_record.tex_coord).x;
+
+  int anisotropic_texture_index = material_buffer.LoadInt();
+  if (anisotropic_texture_index != -1)
+    material.anisotropic = SampleTexture(anisotropic_texture_index, hit_record.tex_coord).x;
+
+  int anisotropic_rotation_texture_index = material_buffer.LoadInt();
+  if (anisotropic_rotation_texture_index != -1)
+    material.anisotropic_rotation = SampleTexture(anisotropic_rotation_texture_index, hit_record.tex_coord).x;
+
   float3 eval;
   float3 omega_in;
   float pdf;
@@ -47,8 +85,6 @@ void SampleMaterial(inout RenderContext context, HitRecord hit_record) {
     }
   }
 
-  float3 emission = material_buffer.LoadFloat3();
-  float strength = material_buffer.LoadFloat();
   emission *= strength;
   if (max(emission.x, max(emission.y, emission.z)) > 0.0f) {
     float mis_weight = 1.0;

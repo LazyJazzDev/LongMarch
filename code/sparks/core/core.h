@@ -18,11 +18,14 @@ class Core {
 
   graphics::ComputeProgram *GetComputeProgram(const std::string &name);
 
-  graphics::Buffer *SobolBuffer();
+  graphics::Buffer *GetBuffer(const std::string &name);
+
+  graphics::Image *GetImage(const std::string &name);
 
  private:
   void LoadPublicShaders();
-  void LoadSobolBuffer();
+  void LoadPublicBuffers();
+  void LoadPublicImages();
 
   graphics::Core *core_{nullptr};
 
@@ -30,6 +33,7 @@ class Core {
 
   std::map<std::string, std::unique_ptr<graphics::Shader>> shaders_;
   std::map<std::string, std::unique_ptr<graphics::ComputeProgram>> compute_programs_;
-  std::unique_ptr<graphics::Buffer> sobol_buffer_;
+  std::map<std::string, std::unique_ptr<graphics::Buffer>> buffers_;
+  std::map<std::string, std::unique_ptr<graphics::Image>> images_;
 };
 }  // namespace sparks
