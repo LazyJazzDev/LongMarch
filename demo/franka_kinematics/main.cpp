@@ -27,6 +27,9 @@ struct CombinedMesh {
         node->mTransformation.a2, node->mTransformation.b2, node->mTransformation.c2, node->mTransformation.d2,
         node->mTransformation.a3, node->mTransformation.b3, node->mTransformation.c3, node->mTransformation.d3,
         node->mTransformation.a4, node->mTransformation.b4, node->mTransformation.c4, node->mTransformation.d4};
+    if (scene->mRootNode == node) {
+      local_transform = glm::mat4{1.0f};
+    }
     local_transform = transformation * local_transform;
     // LogInfo("{} {} {} {}", local_transform[0][0], local_transform[1][0], local_transform[2][0],
     // local_transform[3][0]); LogInfo("{} {} {} {}", local_transform[0][1], local_transform[1][1],
@@ -115,7 +118,13 @@ struct CombinedMesh {
     }
   }
 
-} combined_mesh[8];
+  void Clear() {
+    entities.clear();
+    meshes.clear();
+    materials.clear();
+  }
+
+} combined_mesh[11];
 
 glm::mat4 xyz_rpy_trans(const glm::vec3 &xyz, const glm::vec3 &rpy) {
   glm::mat4 t = glm::translate(glm::mat4(1.0f), xyz);
@@ -125,12 +134,24 @@ glm::mat4 xyz_rpy_trans(const glm::vec3 &xyz, const glm::vec3 &rpy) {
   return t * r;
 }
 
+struct JointInfo {
+  float lower_bound{0.0f};
+  float upper_bound{0.0f};
+  float value{0.0f};
+};
+
 int main() {
-  std::string link_paths[] = {
-      FindAssetFile("meshes/franka_fr3/visual/link0.dae"), FindAssetFile("meshes/franka_fr3/visual/link1.dae"),
-      FindAssetFile("meshes/franka_fr3/visual/link2.dae"), FindAssetFile("meshes/franka_fr3/visual/link3.dae"),
-      FindAssetFile("meshes/franka_fr3/visual/link4.dae"), FindAssetFile("meshes/franka_fr3/visual/link5.dae"),
-      FindAssetFile("meshes/franka_fr3/visual/link6.dae"), FindAssetFile("meshes/franka_fr3/visual/link7.dae")};
+  std::string link_paths[] = {FindAssetFile("meshes/franka_fr3/visual/link0.dae"),
+                              FindAssetFile("meshes/franka_fr3/visual/link1.dae"),
+                              FindAssetFile("meshes/franka_fr3/visual/link2.dae"),
+                              FindAssetFile("meshes/franka_fr3/visual/link3.dae"),
+                              FindAssetFile("meshes/franka_fr3/visual/link4.dae"),
+                              FindAssetFile("meshes/franka_fr3/visual/link5.dae"),
+                              FindAssetFile("meshes/franka_fr3/visual/link6.dae"),
+                              FindAssetFile("meshes/franka_fr3/visual/link7.dae"),
+                              FindAssetFile("meshes/franka_hand_white/visual/hand.dae"),
+                              FindAssetFile("meshes/franka_hand_white/visual/finger.dae"),
+                              FindAssetFile("meshes/franka_hand_white/visual/finger.dae")};
 
   std::unique_ptr<graphics::Core> core_;
 
@@ -140,12 +161,12 @@ int main() {
   sparks_core.GetShadersVFS().Print();
 
   sparks::Scene scene(&sparks_core);
-  scene.settings.samples_per_dispatch = 16;
-  sparks::Film film(&sparks_core, 2048, 1024);
-  film.info.persistence = 1.0f;
-  sparks::Camera camera(&sparks_core,
-                        glm::lookAt(glm::vec3{2.0f, 0.3f, 1.0f}, glm::vec3{0.0f, 0.5f, 0.0f}, glm::vec3{0.0, 1.0, 0.0}),
-                        glm::radians(30.0f), static_cast<float>(film.GetWidth()) / film.GetHeight());
+  scene.settings.samples_per_dispatch = 32;
+  sparks::Film film(&sparks_core, 1024, 512);
+  film.info.persistence = 0.98f;
+  sparks::Camera camera(
+      &sparks_core, glm::lookAt(glm::vec3{2.0f, -1.0f, 0.3f}, glm::vec3{0.0f, 0.0f, 0.5f}, glm::vec3{0.0, 0.0, 1.0}),
+      glm::radians(30.0f), static_cast<float>(film.GetWidth()) / film.GetHeight());
 
   Mesh<> matball_mesh;
   matball_mesh.LoadObjFile(FindAssetFile("meshes/preview_sphere.obj"));
@@ -160,40 +181,25 @@ int main() {
   material_ground.roughness = 0.2f;
   material_ground.metallic = 0.0f;
   sparks::EntityGeometryMaterial entity_ground(&sparks_core, &geometry_cube, &material_ground,
-                                               glm::translate(glm::mat4{1.0f}, glm::vec3{0.0f, -1000.0f, 0.0f}) *
+                                               glm::translate(glm::mat4{1.0f}, glm::vec3{0.0f, 0.0f, -1000.0f}) *
                                                    glm::scale(glm::mat4(1.0f), glm::vec3(1000.0f)));
 
   sparks::MaterialLight material_sky(&sparks_core, {0.8f, 0.8f, 0.8f}, true, false);
   sparks::EntityGeometryMaterial entity_sky(
       &sparks_core, &geometry_sphere, &material_sky,
       glm::translate(glm::mat4{1.0f}, glm::vec3{0.0f, 0.0f, 0.0f}) * glm::scale(glm::mat4(1.0f), glm::vec3(60.0f)));
-  sparks::EntityAreaLight area_light(&sparks_core, glm::vec3{1.0f, 1.0f, 1.0f}, 1.0f, glm::vec3{40.0f, 30.0f, 30.0f},
-                                     glm::normalize(glm::vec3{0.0f, -3.0f, -5.0f}), glm::vec3{0.0f, 1.0f, 0.0f});
+  sparks::EntityAreaLight area_light(&sparks_core, glm::vec3{1.0f, 1.0f, 1.0f}, 1.0f, glm::vec3{40.0f, -30.0f, 30.0f},
+                                     glm::normalize(glm::vec3{-4.0f, 3.0f, -3.0f}), glm::vec3{0.0f, 0.0f, 1.0f});
   area_light.emission = glm::vec3{1000.0f};
 
   scene.AddEntity(&entity_ground);
   scene.AddEntity(&entity_sky);
   scene.AddEntity(&area_light);
 
-  for (int i = 0; i < 8; i++) {
+  for (int i = 0; i < 11; i++) {
     combined_mesh[i].LoadModel(&sparks_core, link_paths[i]);
     combined_mesh[i].PutInScene(&scene);
   }
-  glm::mat4 combined_mat = glm::mat4(1.0f);
-  combined_mat = combined_mat * xyz_rpy_trans({0.0f, 0.333f, 0.0f}, {});
-  combined_mesh[1].SetTransformation(combined_mat);
-  combined_mat = combined_mat * xyz_rpy_trans({0.0f, 0.0f, 0.0f}, {-1.570796326794897f, 0.0f, 0.0f});
-  combined_mesh[2].SetTransformation(combined_mat);
-  combined_mat = combined_mat * xyz_rpy_trans({0.0f, 0.0f, 0.316f}, {1.570796326794897f, 0.0f, 0.0f});
-  combined_mesh[3].SetTransformation(combined_mat);
-  combined_mat = combined_mat * xyz_rpy_trans({0.0825f, 0.0f, 0.0f}, {1.570796326794897f, 0.0f, 0.0f});
-  combined_mesh[4].SetTransformation(combined_mat);
-  combined_mat = combined_mat * xyz_rpy_trans({-0.0825f, 0.0f, -0.384f}, {-1.570796326794897f, 0.0f, 0.0f});
-  combined_mesh[5].SetTransformation(combined_mat);
-  combined_mat = combined_mat * xyz_rpy_trans({0.0f, 0.0f, 0.0f}, {1.570796326794897f, 0.0f, 0.0f});
-  combined_mesh[6].SetTransformation(combined_mat);
-  combined_mat = combined_mat * xyz_rpy_trans({0.088f, 0.0f, 0.0f}, {1.570796326794897f, 0.0f, 0.0f});
-  combined_mesh[7].SetTransformation(combined_mat);
 
   std::unique_ptr<graphics::Image> raw_image;
   core_->CreateImage(film.GetWidth(), film.GetHeight(), graphics::IMAGE_FORMAT_R32G32B32A32_SFLOAT, &raw_image);
@@ -203,9 +209,65 @@ int main() {
   std::unique_ptr<graphics::Window> window;
   core_->CreateWindowObject(film.GetWidth(), film.GetHeight(), "Sparks", &window);
   FPSCounter fps_counter;
+
+  JointInfo joints[] = {{-2.7437f, 2.7437f, 0.0f},      {-1.7837f, 1.7837f, 0.0f}, {-2.9007f, 2.9007f, 0.0f},
+                        {-3.0421f, -0.1518f, -0.1518f}, {-2.8065f, 2.8065f, 0.0f}, {0.5445f, 4.5169f, 0.5445f},
+                        {-3.0159f, 3.01599f, 0.0f},     {0.0f, 0.04f, 0.0f}};
+
+  window->InitImGui(nullptr, 26.0f);
   while (!window->ShouldClose()) {
-    // area_light.position = glm::mat3{glm::rotate(glm::mat4{1.0f}, glm::radians(0.3f), glm::vec3{0.0f, 1.0f, 0.0f})} *
-    // area_light.position; if (area_light.position.y < 0.0) area_light.position = -area_light.position;
+    window->BeginImGuiFrame();
+    if (ImGui::Begin("Franka Joint Control", nullptr, ImGuiWindowFlags_AlwaysAutoResize)) {
+      if (ImGui::Button("Center")) {
+        for (auto &j : joints) {
+          j.value = (j.upper_bound + j.lower_bound) * 0.5f;
+        }
+      }
+      for (int i = 0; i < 8; i++) {
+        ImGui::SliderFloat(("Joint " + std::to_string(i + 1)).c_str(), &joints[i].value, joints[i].lower_bound,
+                           joints[i].upper_bound);
+      }
+    }
+    ImGui::End();
+    window->EndImGuiFrame();
+    glm::mat4 combined_mat = glm::mat4(1.0f);
+    combined_mesh[1].SetTransformation(combined_mat);
+    combined_mat *= xyz_rpy_trans({0.0f, 0.0f, 0.333f}, {});
+    combined_mat *= xyz_rpy_trans({0.0f, 0.0f, 0.0f}, {0.0f, 0.0f, joints[0].value});
+    combined_mesh[1].SetTransformation(combined_mat);
+    combined_mat *= xyz_rpy_trans({0.0f, 0.0f, 0.0f}, {-1.570796326794897f, 0.0f, 0.0f});
+    combined_mat *= xyz_rpy_trans({0.0f, 0.0f, 0.0f}, {0.0f, 0.0f, joints[1].value});
+    combined_mesh[2].SetTransformation(combined_mat);
+    combined_mat *= xyz_rpy_trans({0.0f, -0.316f, 0.0f}, {1.570796326794897f, 0.0f, 0.0f});
+    combined_mat *= xyz_rpy_trans({0.0f, 0.0f, 0.0f}, {0.0f, 0.0f, joints[2].value});
+    combined_mesh[3].SetTransformation(combined_mat);
+    combined_mat *= xyz_rpy_trans({0.0825f, 0.0f, 0.0f}, {1.570796326794897f, 0.0f, 0.0f});
+    combined_mat *= xyz_rpy_trans({0.0f, 0.0f, 0.0f}, {0.0f, 0.0f, joints[3].value});
+    combined_mesh[4].SetTransformation(combined_mat);
+    combined_mat *= xyz_rpy_trans({-0.0825f, 0.384f, 0.0f}, {-1.570796326794897f, 0.0f, 0.0f});
+    combined_mat *= xyz_rpy_trans({0.0f, 0.0f, 0.0f}, {0.0f, 0.0f, joints[4].value});
+    combined_mesh[5].SetTransformation(combined_mat);
+    combined_mat *= xyz_rpy_trans({0.0f, 0.0f, 0.0f}, {1.570796326794897f, 0.0f, 0.0f});
+    combined_mat *= xyz_rpy_trans({0.0f, 0.0f, 0.0f}, {0.0f, 0.0f, joints[5].value});
+    combined_mesh[6].SetTransformation(combined_mat);
+    combined_mat *= xyz_rpy_trans({0.088f, 0.0f, 0.0f}, {1.570796326794897f, 0.0f, 0.0f});
+    combined_mat *= xyz_rpy_trans({0.0f, 0.0f, 0.0f}, {0.0f, 0.0f, joints[6].value});
+    combined_mesh[7].SetTransformation(combined_mat);
+    combined_mat *= xyz_rpy_trans({0.0f, 0.0f, 0.107f}, {0.0f, 0.0f, 0.0f});
+    combined_mat *= xyz_rpy_trans({0.0f, 0.0f, 0.0f}, {0.0f, 0.0f, -0.7853981633974483f});
+    combined_mesh[8].SetTransformation(combined_mat);
+    auto hand_link = combined_mat;
+    combined_mat *= xyz_rpy_trans({0.0f, 0.0f, 0.1034f}, {0.0f, 0.0f, 0.0f});
+    auto hand_tcp_link = combined_mat;
+    combined_mat = hand_link * xyz_rpy_trans({0.0f, 0.0f, 0.0584f}, {0.0f, 0.0f, 0.0f});
+    combined_mat *= xyz_rpy_trans({0.0f, joints[7].value, 0.0f}, {0.0f, 0.0f, 0.0f});
+    combined_mesh[9].SetTransformation(combined_mat);
+    combined_mat = hand_link * xyz_rpy_trans({0.0f, 0.0f, 0.0584f}, {0.0f, 0.0f, 3.141592653589793f});
+    combined_mat *= xyz_rpy_trans({0.0f, joints[7].value, 0.0f}, {0.0f, 0.0f, 0.0f});
+    combined_mesh[10].SetTransformation(combined_mat);
+
+    // area_light.position = glm::mat3{glm::rotate(glm::mat4{1.0f}, glm::radians(0.3f), glm::vec3{0.0f, 1.0f,
+    // 0.0f})} * area_light.position; if (area_light.position.y < 0.0) area_light.position = -area_light.position;
     // area_light.direction = -area_light.position;
     scene.Render(&camera, &film);
     sparks_core.ConvertFilmToRawImage(film, raw_image.get());
@@ -222,6 +284,10 @@ int main() {
     char rps_buf[16];
     sprintf(rps_buf, "%.2f", rps * 1e-6f);
     window->SetTitle(std::string("Franka Kinematics - ") + fps_buf + "frams/s" + " - " + rps_buf + "Mrays/s");
+  }
+
+  for (auto &cm : combined_mesh) {
+    cm.Clear();
   }
 
   sparks_core.ConvertFilmToRawImage(film, raw_image.get());
