@@ -124,7 +124,7 @@ int main() {
 
   sparks::MaterialPrincipled material_ground(&sparks_core, {0.1f, 0.2f, 0.4f});
   material_ground.roughness = 0.2f;
-  material_ground.metallic = 1.0f;
+  material_ground.metallic = 0.0f;
   sparks::EntityGeometryMaterial entity_ground(&sparks_core, &geometry_cube, &material_ground,
                                                glm::translate(glm::mat4{1.0f}, glm::vec3{0.0f, -1001.0f, 0.0f}) *
                                                    glm::scale(glm::mat4(1.0f), glm::vec3(1000.0f)));
@@ -167,7 +167,7 @@ int main() {
     float rps = film.GetWidth() * film.GetHeight() * fps * scene.settings.samples_per_dispatch;
     char rps_buf[16];
     sprintf(rps_buf, "%.2f", rps * 1e-6f);
-    window->SetTitle(std::string("Sparks Area Light - ") + fps_buf + "frams/s" + " - " + rps_buf + "Mrays/s");
+    window->SetTitle(std::string("Sparks Textured PBR - ") + fps_buf + "frams/s" + " - " + rps_buf + "Mrays/s");
   }
 
   sparks_core.ConvertFilmToRawImage(film, raw_image.get());

@@ -121,6 +121,10 @@ find_package(Stb REQUIRED)
 set(STB_INC_DIR ${Stb_INCLUDE_DIR})
 list(APPEND INC_LIST ${STB_INC_DIR})
 
+find_package(assimp CONFIG REQUIRED)
+set(ASSIMP_LIB_NAME assimp::assimp)
+list(APPEND LIB_LIST ${ASSIMP_LIB_NAME})
+
 if (WIN32)
     find_path(D3DX12_INCLUDE_DIRS "d3dx12.h")
     list(APPEND INC_LIST ${D3DX12_INCLUDE_DIRS})
