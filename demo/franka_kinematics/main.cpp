@@ -141,17 +141,17 @@ struct JointInfo {
 };
 
 int main() {
-  std::string link_paths[] = {FindAssetFile("meshes/franka_fr3/visual/link0.dae"),
-                              FindAssetFile("meshes/franka_fr3/visual/link1.dae"),
-                              FindAssetFile("meshes/franka_fr3/visual/link2.dae"),
-                              FindAssetFile("meshes/franka_fr3/visual/link3.dae"),
-                              FindAssetFile("meshes/franka_fr3/visual/link4.dae"),
-                              FindAssetFile("meshes/franka_fr3/visual/link5.dae"),
-                              FindAssetFile("meshes/franka_fr3/visual/link6.dae"),
-                              FindAssetFile("meshes/franka_fr3/visual/link7.dae"),
-                              FindAssetFile("meshes/franka_hand_white/visual/hand.dae"),
-                              FindAssetFile("meshes/franka_hand_white/visual/finger.dae"),
-                              FindAssetFile("meshes/franka_hand_white/visual/finger.dae")};
+  std::string link_paths[] = {FindAssetFile("urdfs/franka_fr3/meshes/robot_arms/fr3/visual/link0.dae"),
+                              FindAssetFile("urdfs/franka_fr3/meshes/robot_arms/fr3/visual/link1.dae"),
+                              FindAssetFile("urdfs/franka_fr3/meshes/robot_arms/fr3/visual/link2.dae"),
+                              FindAssetFile("urdfs/franka_fr3/meshes/robot_arms/fr3/visual/link3.dae"),
+                              FindAssetFile("urdfs/franka_fr3/meshes/robot_arms/fr3/visual/link4.dae"),
+                              FindAssetFile("urdfs/franka_fr3/meshes/robot_arms/fr3/visual/link5.dae"),
+                              FindAssetFile("urdfs/franka_fr3/meshes/robot_arms/fr3/visual/link6.dae"),
+                              FindAssetFile("urdfs/franka_fr3/meshes/robot_arms/fr3/visual/link7.dae"),
+                              FindAssetFile("urdfs/franka_fr3/meshes/robot_ee/franka_hand_white/visual/hand.dae"),
+                              FindAssetFile("urdfs/franka_fr3/meshes/robot_ee/franka_hand_white/visual/finger.dae"),
+                              FindAssetFile("urdfs/franka_fr3/meshes/robot_ee/franka_hand_white/visual/finger.dae")};
 
   std::unique_ptr<graphics::Core> core_;
 
