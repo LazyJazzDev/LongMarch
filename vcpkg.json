@@ -14,6 +14,7 @@
     "stb",
     "mikktspace",
     "tinyobjloader",
+    "assimp",
     {
       "name": "d3dx12",
       "platform": "windows"
