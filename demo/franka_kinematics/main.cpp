@@ -21,7 +21,6 @@ struct CombinedMesh {
                     const aiNode *node,
                     const glm::mat4 transformation = {1.0f}) {
     // Show transformation
-    LogInfo("Node name: " + std::string(node->mName.C_Str()));
     glm::mat4 local_transform{
         node->mTransformation.a1, node->mTransformation.b1, node->mTransformation.c1, node->mTransformation.d1,
         node->mTransformation.a2, node->mTransformation.b2, node->mTransformation.c2, node->mTransformation.d2,
@@ -46,7 +45,6 @@ struct CombinedMesh {
       auto entity = std::make_unique<sparks::EntityGeometryMaterial>(core, mesh.get(), material.get(), local_transform);
       entities.emplace_back(std::move(entity), local_transform);
     }
-    LogInfo("End node name: " + std::string(node->mName.C_Str()));
   }
 
   void LoadModel(sparks::Core *core, const std::string &path) {
