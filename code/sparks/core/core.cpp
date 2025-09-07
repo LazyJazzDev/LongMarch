@@ -90,6 +90,30 @@ void Core::LoadPublicShaders() {
   compute_programs_["blelloch_scan_down"]->AddResourceBinding(graphics::RESOURCE_TYPE_WRITABLE_STORAGE_BUFFER, 1);
   compute_programs_["blelloch_scan_down"]->AddResourceBinding(graphics::RESOURCE_TYPE_UNIFORM_BUFFER, 1);
   compute_programs_["blelloch_scan_down"]->Finalize();
+
+  auto vfs = shaders_vfs_;
+  vfs.WriteFile("material_sampler.hlsli", CodeLines{shaders_vfs_, "material/lambertian/sampler.hlsl"});
+  vfs.WriteFile("entity_chit.hlsl", CodeLines{shaders_vfs_, "geometry/mesh/hit_group.hlsl"});
+  core_->CreateShader(vfs, "entity_chit.hlsl", "RenderClosestHit", "lib_6_5", {"-I."},
+                      &shaders_["mesh_lambertian_chit"]);
+  core_->CreateShader(vfs, "entity_chit.hlsl", "ShadowClosestHit", "lib_6_5", {"-I."},
+                      &shaders_["mesh_lambertian_shadow_chit"]);
+
+  vfs.WriteFile("material_sampler.hlsli", CodeLines{shaders_vfs_, "material/light/sampler.hlsl"});
+  core_->CreateShader(vfs, "entity_chit.hlsl", "RenderClosestHit", "lib_6_5", {"-I."}, &shaders_["mesh_light_chit"]);
+  core_->CreateShader(vfs, "entity_chit.hlsl", "ShadowClosestHit", "lib_6_5", {"-I."},
+                      &shaders_["mesh_light_shadow_chit"]);
+
+  vfs.WriteFile("material_sampler.hlsli", CodeLines{shaders_vfs_, "material/principled/sampler.hlsl"});
+  core_->CreateShader(vfs, "entity_chit.hlsl", "RenderClosestHit", "lib_6_5", {"-I."},
+                      &shaders_["mesh_principled_chit"]);
+  core_->CreateShader(vfs, "entity_chit.hlsl", "ShadowClosestHit", "lib_6_5", {"-I."},
+                      &shaders_["mesh_principled_shadow_chit"]);
+
+  vfs.WriteFile("material_sampler.hlsli", CodeLines{shaders_vfs_, "material/specular/sampler.hlsl"});
+  core_->CreateShader(vfs, "entity_chit.hlsl", "RenderClosestHit", "lib_6_5", {"-I."}, &shaders_["mesh_specular_chit"]);
+  core_->CreateShader(vfs, "entity_chit.hlsl", "ShadowClosestHit", "lib_6_5", {"-I."},
+                      &shaders_["mesh_specular_shadow_chit"]);
 }
 
 void Core::LoadPublicBuffers() {

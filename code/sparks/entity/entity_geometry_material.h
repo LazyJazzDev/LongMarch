@@ -12,9 +12,7 @@ class EntityGeometryMaterial : public Entity {
                          const glm::mat4x3 &transformation = glm::mat4x3{1.0f});
   void Update(Scene *scene) override;
 
-  void SetTransformation(const glm::mat4x3 &transformation) {
-    transformation_ = transformation;
-  }
+  void SetTransformation(const glm::mat4x3 &transformation);
 
  private:
   Geometry *geometry_{nullptr};
@@ -23,6 +21,7 @@ class EntityGeometryMaterial : public Entity {
   glm::mat4x3 transformation_;
   std::unique_ptr<graphics::Shader> closest_hit_shader_;
   std::unique_ptr<graphics::Shader> shadow_closest_hit_shader_;
+  InstanceHitGroups hit_groups_;
 };
 
 }  // namespace sparks
