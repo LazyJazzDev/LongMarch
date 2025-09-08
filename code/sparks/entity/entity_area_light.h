@@ -3,7 +3,7 @@
 #include "sparks/entity/entity_geometry_light.h"
 #include "sparks/geometry/geometry_mesh.h"
 
-namespace sparks {
+namespace XH {
 class EntityAreaLight : public Entity {
  public:
   EntityAreaLight(Core *core,
@@ -24,4 +24,4 @@ class EntityAreaLight : public Entity {
   std::unique_ptr<GeometryMesh> mesh_;
   std::unique_ptr<EntityGeometryLight> geometry_light_;
 };
-}  // namespace sparks
+}  // namespace XH

@@ -1,6 +1,6 @@
 #include "snow_mount/solver/solver_util.h"
 
-namespace snow_mount::solver {
+namespace XS::solver {
 
 LM_DEVICE_FUNC RigidObjectState RigidObjectState::NextState(float dt) const {
   RigidObjectState new_state = *this;
@@ -58,4 +58,4 @@ DirectoryDevice::operator DirectoryRef() const {
 }
 
 #endif
-}  // namespace snow_mount::solver
+}  // namespace XS::solver

@@ -1,7 +1,7 @@
 #pragma once
 #include "snow_mount/visualizer/visualizer_util.h"
 
-namespace snow_mount::visualizer {
+namespace XS::visualizer {
 class Mesh {
   friend class Core;
   Mesh(const std::shared_ptr<Core> &core);
@@ -29,4 +29,4 @@ class Mesh {
   int num_vertices_;
   int num_indices_;
 };
-}  // namespace snow_mount::visualizer
+}  // namespace XS::visualizer

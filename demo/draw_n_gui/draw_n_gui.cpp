@@ -32,9 +32,9 @@ void DrawNGUI::OnInit() {
     core_->CreateImage(width, height, CD::graphics::IMAGE_FORMAT_R32G32B32A32_SFLOAT, &color_image_);
   });
 
-  snow_mount::draw::CreateCore(core_.get(), &draw_core_);
+  XS::draw::CreateCore(core_.get(), &draw_core_);
   draw_core_->CreateModel(&model_);
-  std::vector<snow_mount::draw::Vertex> vertices;
+  std::vector<XS::draw::Vertex> vertices;
   std::vector<uint32_t> indices;
   const int precision = 100;
   const float inv_precision = 1.0f / precision;

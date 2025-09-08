@@ -2,7 +2,7 @@
 #include "core.h"
 #include "sparks/core/core_util.h"
 
-namespace sparks {
+namespace XH {
 
 class Film {
  public:
@@ -28,4 +28,4 @@ class Film {
   Core *core_;
 };
 
-}  // namespace sparks
+}  // namespace XH

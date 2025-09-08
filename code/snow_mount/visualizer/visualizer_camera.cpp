@@ -3,7 +3,7 @@
 #include "glm/gtc/matrix_transform.hpp"
 #include "snow_mount/visualizer/visualizer_core.h"
 
-namespace snow_mount::visualizer {
+namespace XS::visualizer {
 
 Camera::Camera(const std::shared_ptr<Core> &core) : core_(core) {
   proj = glm::mat4{1.0f};
@@ -71,4 +71,4 @@ void Camera::PyBind(pybind11::module_ &m) {
         pybind11::arg("far"));
 }
 
-}  // namespace snow_mount::visualizer
+}  // namespace XS::visualizer

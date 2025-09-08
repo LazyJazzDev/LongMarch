@@ -3,7 +3,7 @@
 #include "snow_mount/draw/draw_model.h"
 #include "snow_mount/draw/draw_texture.h"
 
-namespace snow_mount::draw {
+namespace XS::draw {
 
 DrawCmdSetDrawRegion::DrawCmdSetDrawRegion(int x, int y, int width, int height)
     : x_(x), y_(y), width_(width), height_(height) {
@@ -29,18 +29,14 @@ DrawCmdDrawInstance::DrawCmdDrawInstance(Model *model,
                                          graphics::Image *texture,
                                          uint32_t instance_base,
                                          uint32_t instance_count)
-    : model_(model),
-      texture_(texture),
-      instance_base_(instance_base),
-      instance_count_(instance_count) {
+    : model_(model), texture_(texture), instance_base_(instance_base), instance_count_(instance_count) {
 }
 
 void DrawCmdDrawInstance::Execute(graphics::CommandContext *ctx) {
   ctx->CmdBindResources(1, {texture_});
   ctx->CmdBindVertexBuffers(0, {model_->VertexBuffer()}, {0});
   ctx->CmdBindIndexBuffer(model_->IndexBuffer(), 0);
-  ctx->CmdDrawIndexed(model_->IndexCount(), instance_count_, 0, 0,
-                      instance_base_);
+  ctx->CmdDrawIndexed(model_->IndexCount(), instance_count_, 0, 0, instance_base_);
 }
 
-}  // namespace snow_mount::draw
+}  // namespace XS::draw

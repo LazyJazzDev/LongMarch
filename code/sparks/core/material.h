@@ -1,7 +1,7 @@
 #pragma once
 #include "sparks/core/core_util.h"
 
-namespace sparks {
+namespace XH {
 
 class Material {
  public:
@@ -17,4 +17,4 @@ class Material {
   Core *core_;
 };
 
-}  // namespace sparks
+}  // namespace XH

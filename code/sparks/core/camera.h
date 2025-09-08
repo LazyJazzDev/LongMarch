@@ -1,7 +1,7 @@
 #pragma once
 #include "sparks/core/core_util.h"
 
-namespace sparks {
+namespace XH {
 
 struct CameraData {
   glm::mat4 world_to_camera;
@@ -28,4 +28,4 @@ class Camera {
   CameraData camera_data_;
 };
 
-}  // namespace sparks
+}  // namespace XH

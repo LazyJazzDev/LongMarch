@@ -1,6 +1,6 @@
 #include "snow_mount/solver/solver_element.h"
 
-namespace snow_mount::solver {
+namespace XS::solver {
 
 void element::PyBind(pybind11::module_ &m) {
   pybind11::class_<ElementStretching> element_stretching(m, "ElementStretching");
@@ -56,4 +56,4 @@ void element::PyBind(pybind11::module_ &m) {
   element_bending.def_readwrite("elastic_limit", &ElementBending::elastic_limit);
 }
 
-}  // namespace snow_mount::solver
+}  // namespace XS::solver

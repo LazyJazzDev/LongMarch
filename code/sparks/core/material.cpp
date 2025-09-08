@@ -2,7 +2,7 @@
 
 #include "sparks/core/core.h"
 
-namespace sparks {
+namespace XH {
 
 Material::Material(Core *core) : core_(core) {
 }
@@ -14,4 +14,4 @@ const CodeLines &Material::EvaluatorImpl() const {
   return {};
 }
 
-}  // namespace sparks
+}  // namespace XH

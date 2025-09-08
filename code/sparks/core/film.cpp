@@ -1,6 +1,6 @@
 #include "sparks/core/film.h"
 
-namespace sparks {
+namespace XH {
 Film::Film(Core *core, int width, int height) : core_(core) {
   core_->GraphicsCore()->CreateImage(width, height, graphics::IMAGE_FORMAT_R32G32B32A32_SFLOAT, &accumulated_color_);
   core_->GraphicsCore()->CreateImage(width, height, graphics::IMAGE_FORMAT_R32_SFLOAT, &accumulated_samples_);
@@ -23,4 +23,4 @@ int Film::GetHeight() const {
   return accumulated_color_->Extent().height;
 }
 
-}  // namespace sparks
+}  // namespace XH

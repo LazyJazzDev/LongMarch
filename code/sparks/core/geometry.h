@@ -1,7 +1,7 @@
 #pragma once
 #include "sparks/core/core_util.h"
 
-namespace sparks {
+namespace XH {
 
 class Geometry {
  public:
@@ -18,4 +18,4 @@ class Geometry {
   Core *core_;
 };
 
-}  // namespace sparks
+}  // namespace XH

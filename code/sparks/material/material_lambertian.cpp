@@ -2,7 +2,7 @@
 
 #include "sparks/core/core.h"
 
-namespace sparks {
+namespace XH {
 
 MaterialLambertian::MaterialLambertian(Core *core, const glm::vec3 &base_color, const glm::vec3 &emission)
     : Material(core), base_color(base_color), emission(emission) {
@@ -32,4 +32,4 @@ void MaterialLambertian::SyncMaterialData() {
   material_buffer_->UploadData(data.data(), data.size());
 }
 
-}  // namespace sparks
+}  // namespace XH

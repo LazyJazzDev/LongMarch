@@ -7,7 +7,7 @@
 #include "sparks/geometry/geometries.h"
 #include "sparks/material/materials.h"
 
-namespace sparks {
+namespace XH {
 
 EntityGeometryMaterial::EntityGeometryMaterial(Core *core,
                                                Geometry *geometry,
@@ -60,4 +60,4 @@ void EntityGeometryMaterial::SetTransformation(const glm::mat4x3 &transformation
   light_geom_mat_.transform = transformation_;
 }
 
-}  // namespace sparks
+}  // namespace XH

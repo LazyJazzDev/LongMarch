@@ -1,7 +1,7 @@
 #pragma once
 #include "sparks/core/geometry.h"
 
-namespace sparks {
+namespace XH {
 
 struct GeometryMeshHeader {
   uint32_t num_vertices;
@@ -37,4 +37,4 @@ class GeometryMesh : public Geometry {
   CodeLines closest_hit_shader_implementation_;
 };
 
-}  // namespace sparks
+}  // namespace XH

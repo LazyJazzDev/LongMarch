@@ -1,6 +1,6 @@
 #include "snow_mount/draw/draw_util.h"
 
-namespace snow_mount::draw {
+namespace XS::draw {
 
 Transform PixelCoordToNDC(int width, int height) {
   Transform transform(1.0f);
@@ -11,4 +11,4 @@ Transform PixelCoordToNDC(int width, int height) {
   return transform;
 }
 
-}  // namespace snow_mount::draw
+}  // namespace XS::draw

@@ -1,6 +1,6 @@
 #include "snow_mount/visualizer/visualizer_ownership_holder.h"
 
-namespace snow_mount::visualizer {
+namespace XS::visualizer {
 
 void OwnershipHolder::Clear() {
   held_films_.clear();
@@ -25,4 +25,4 @@ void OwnershipHolder::AddEntity(std::shared_ptr<Entity> entity) {
   held_entities_.emplace_back(std::move(entity));
 }
 
-}  // namespace snow_mount::visualizer
+}  // namespace XS::visualizer

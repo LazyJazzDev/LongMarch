@@ -5,7 +5,7 @@
 #include "sparks/core/material.h"
 #include "sparks/core/scene.h"
 
-namespace sparks {
+namespace XH {
 
 EntityGeometryLight::EntityGeometryLight(Core *core,
                                          Geometry *geometry,
@@ -31,4 +31,4 @@ void EntityGeometryLight::Update(Scene *scene) {
   entity_->Update(scene);
 }
 
-}  // namespace sparks
+}  // namespace XH

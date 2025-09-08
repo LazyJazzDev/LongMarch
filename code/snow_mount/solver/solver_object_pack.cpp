@@ -1,6 +1,6 @@
 #include "snow_mount/solver/solver_object_pack.h"
 
-namespace snow_mount::solver {
+namespace XS::solver {
 
 ObjectPack ObjectPack::CreateFromMesh(const std::vector<Vector3<float>> &positions,
                                       const std::vector<uint32_t> &indices,
@@ -239,4 +239,4 @@ void ObjectPack::PushBending(int a, int b, int c, int d, float stiffness, float 
   bending_indices.push_back(d);
 }
 
-}  // namespace snow_mount::solver
+}  // namespace XS::solver

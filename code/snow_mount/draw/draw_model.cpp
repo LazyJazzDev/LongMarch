@@ -2,7 +2,7 @@
 
 #include "snow_mount/draw/draw_core.h"
 
-namespace snow_mount::draw {
+namespace XS::draw {
 
 Model::Model(Core *core) : core_(core) {
   core_->GraphicsCore()->CreateBuffer(sizeof(Vertex), graphics::BUFFER_TYPE_DYNAMIC, &vertex_buffer_);
@@ -21,4 +21,4 @@ void Model::SetModelData(const std::vector<Vertex> &vertices, const std::vector<
   index_count_ = indices.size();
 }
 
-}  // namespace snow_mount::draw
+}  // namespace XS::draw

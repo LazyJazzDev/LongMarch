@@ -1,7 +1,7 @@
 #pragma once
 #include "snow_mount/visualizer/visualizer_util.h"
 
-namespace snow_mount::visualizer {
+namespace XS::visualizer {
 
 class OwnershipHolder {
  public:
@@ -19,4 +19,4 @@ class OwnershipHolder {
   std::vector<std::shared_ptr<Entity>> held_entities_;
 };
 
-}  // namespace snow_mount::visualizer
+}  // namespace XS::visualizer

@@ -7,7 +7,7 @@
 #include "sparks/core/material.h"
 #include "sparks/core/scene.h"
 
-namespace sparks {
+namespace XH {
 Core::Core(graphics::Core *core) : core_(core) {
   LoadPublicShaders();
   LoadPublicBuffers();
@@ -132,4 +132,4 @@ void Core::LoadPublicImages() {
   images_["white_hdr"]->UploadData(white_hdr_pixel);
 }
 
-}  // namespace sparks
+}  // namespace XH

@@ -2,7 +2,7 @@
 
 #include "sparks/core/core.h"
 
-namespace sparks {
+namespace XH {
 
 MaterialSpecular::MaterialSpecular(Core *core, const glm::vec3 &base_color) : Material(core), base_color(base_color) {
   core_->GraphicsCore()->CreateBuffer(sizeof(base_color), graphics::BUFFER_TYPE_STATIC, &material_buffer_);
@@ -29,4 +29,4 @@ void MaterialSpecular::SyncMaterialData() {
   material_buffer_->UploadData(data.data(), data.size());
 }
 
-}  // namespace sparks
+}  // namespace XH

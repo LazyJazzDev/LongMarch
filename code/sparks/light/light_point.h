@@ -1,7 +1,7 @@
 #pragma once
 #include "sparks/core/light.h"
 
-namespace sparks {
+namespace XH {
 
 class LightPoint : public Light {
  public:
@@ -20,4 +20,4 @@ class LightPoint : public Light {
   std::unique_ptr<graphics::Buffer> direct_lighting_sampler_data_;
 };
 
-}  // namespace sparks
+}  // namespace XH

@@ -1,6 +1,6 @@
 #include "snow_mount/visualizer/visualizer_util.h"
 
-namespace snow_mount::visualizer {
+namespace XS::visualizer {
 
 void Material::PyBind(pybind11::module_ &m) {
   pybind11::class_<Material> material(m, "Material");
@@ -43,4 +43,4 @@ graphics::ImageFormat FilmChannelImageFormat(FilmChannel channel) {
   }
 }
 
-}  // namespace snow_mount::visualizer
+}  // namespace XS::visualizer

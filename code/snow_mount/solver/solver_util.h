@@ -1,7 +1,7 @@
 #pragma once
 #include "grassland/grassland.h"
 
-namespace snow_mount::solver {
+namespace XS::solver {
 
 using namespace CD;
 
@@ -48,4 +48,4 @@ struct DirectoryDevice {
 };
 #endif
 
-}  // namespace snow_mount::solver
+}  // namespace XS::solver

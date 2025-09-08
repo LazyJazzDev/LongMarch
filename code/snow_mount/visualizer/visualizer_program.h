@@ -1,7 +1,7 @@
 #pragma once
 #include "snow_mount/visualizer/visualizer_util.h"
 
-namespace snow_mount::visualizer {
+namespace XS::visualizer {
 class Program {
  public:
   virtual ~Program() = default;
@@ -26,4 +26,4 @@ class ProgramWithGeometryShader : public Program {
   std::unique_ptr<graphics::Program> program_;
 };
 
-}  // namespace snow_mount::visualizer
+}  // namespace XS::visualizer

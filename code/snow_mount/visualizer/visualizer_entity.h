@@ -2,7 +2,7 @@
 #include "snow_mount/visualizer/visualizer_program.h"
 #include "snow_mount/visualizer/visualizer_util.h"
 
-namespace snow_mount::visualizer {
+namespace XS::visualizer {
 
 class Entity {
   friend class Core;
@@ -88,4 +88,4 @@ class EntityDirectionalLight : public Entity {
   Vector3<float> intensity_;
 };
 
-}  // namespace snow_mount::visualizer
+}  // namespace XS::visualizer

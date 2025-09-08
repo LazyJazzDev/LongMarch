@@ -3,7 +3,7 @@
 #include "random"
 #include "vector"
 
-using namespace long_march;
+using namespace CZ;
 
 template <typename Scalar>
 std::vector<Scalar> PolynomialMul(const std::vector<Scalar> &poly1, const std::vector<Scalar> &poly2) {

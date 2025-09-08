@@ -6,46 +6,45 @@
 #include "glm/gtc/matrix_transform.hpp"
 #include "stb_image_write.h"
 
-using namespace long_march;
+using namespace CZ;
 
 int main() {
   std::unique_ptr<graphics::Core> core_;
 
   graphics::CreateCore(graphics::BACKEND_API_DEFAULT, graphics::Core::Settings{2, false}, &core_);
   core_->InitializeLogicalDeviceAutoSelect(true);
-  sparks::Core sparks_core(core_.get());
+  XH::Core sparks_core(core_.get());
   sparks_core.GetShadersVFS().Print();
 
-  sparks::Scene scene(&sparks_core);
+  XH::Scene scene(&sparks_core);
   scene.settings.samples_per_dispatch = 64;
-  sparks::Film film(&sparks_core, 1024, 1024);
+  XH::Film film(&sparks_core, 1024, 1024);
   film.info.persistence = 0.99f;
-  sparks::Camera camera(&sparks_core,
-                        glm::lookAt(glm::vec3{0.0f, 2.0f, 7.0f}, glm::vec3{0.0f}, glm::vec3{0.0, 1.0, 0.0}),
-                        glm::radians(60.0f), static_cast<float>(film.GetWidth()) / film.GetHeight());
+  XH::Camera camera(&sparks_core, glm::lookAt(glm::vec3{0.0f, 2.0f, 7.0f}, glm::vec3{0.0f}, glm::vec3{0.0, 1.0, 0.0}),
+                    glm::radians(60.0f), static_cast<float>(film.GetWidth()) / film.GetHeight());
 
-  sparks::MaterialLambertian material_white(&sparks_core, {0.8f, 0.8f, 0.8f});
+  XH::MaterialLambertian material_white(&sparks_core, {0.8f, 0.8f, 0.8f});
 
   Mesh<> matball_mesh;
   matball_mesh.LoadObjFile(FindAssetFile("meshes/preview_sphere.obj"));
 
-  sparks::GeometryMesh geometry_mesh(&sparks_core, Mesh<>::Sphere(30));
-  sparks::GeometryMesh geometry_matball(&sparks_core, matball_mesh);
-  sparks::EntityGeometryMaterial entity_mesh(&sparks_core, &geometry_matball, &material_white);
-  sparks::EntityGeometryMaterial entity_shell(&sparks_core, &geometry_mesh, &material_white,
-                                              glm::translate(glm::mat4{1.0f}, glm::vec3{0.0f, -1001.0f, 0.0f}) *
-                                                  glm::scale(glm::mat4(1.0f), glm::vec3(1000.0f)));
-  sparks::EntityPointLight entity_point_light(&sparks_core, glm::vec3{0.0f, 2.0f, 0.0f}, glm::vec3{1.0f}, 10.0f);
+  XH::GeometryMesh geometry_mesh(&sparks_core, Mesh<>::Sphere(30));
+  XH::GeometryMesh geometry_matball(&sparks_core, matball_mesh);
+  XH::EntityGeometryMaterial entity_mesh(&sparks_core, &geometry_matball, &material_white);
+  XH::EntityGeometryMaterial entity_shell(&sparks_core, &geometry_mesh, &material_white,
+                                          glm::translate(glm::mat4{1.0f}, glm::vec3{0.0f, -1001.0f, 0.0f}) *
+                                              glm::scale(glm::mat4(1.0f), glm::vec3(1000.0f)));
+  XH::EntityPointLight entity_point_light(&sparks_core, glm::vec3{0.0f, 2.0f, 0.0f}, glm::vec3{1.0f}, 10.0f);
   entity_point_light.position = {0.0f, 5.0f, 0.0f};
   entity_point_light.strength = 100.0f;
 
   const int num_lights = 6;
-  std::unique_ptr<sparks::EntityAreaLight> area_lights[num_lights];
+  std::unique_ptr<XH::EntityAreaLight> area_lights[num_lights];
   glm::vec3 positions[num_lights];
 
   for (int i = 0; i < num_lights; ++i) {
-    area_lights[i] = std::make_unique<sparks::EntityAreaLight>(&sparks_core, glm::vec3{1.0f, 1.0f, 1.0f}, 1.0f,
-                                                               glm::vec3{0.0f, 0.0f, 0.0f});
+    area_lights[i] = std::make_unique<XH::EntityAreaLight>(&sparks_core, glm::vec3{1.0f, 1.0f, 1.0f}, 1.0f,
+                                                           glm::vec3{0.0f, 0.0f, 0.0f});
     scene.AddEntity(area_lights[i].get());
     float frac = float(i) / num_lights;
     float theta = 2.0f * std::acos(-1.0f) * frac;

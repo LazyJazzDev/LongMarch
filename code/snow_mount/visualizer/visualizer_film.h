@@ -1,7 +1,7 @@
 #pragma once
 #include "snow_mount/visualizer/visualizer_util.h"
 
-namespace snow_mount::visualizer {
+namespace XS::visualizer {
 class Film {
   Film(const std::shared_ptr<Core> &core, int width, int height);
   friend class Core;
@@ -19,4 +19,4 @@ class Film {
   std::shared_ptr<Core> core_;
   std::unique_ptr<graphics::Image> images_[FILM_CHANNEL_COUNT];
 };
-}  // namespace snow_mount::visualizer
+}  // namespace XS::visualizer

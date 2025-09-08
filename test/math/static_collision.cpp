@@ -3,7 +3,7 @@
 #include "random"
 #include "vector"
 
-using namespace long_march;
+using namespace CZ;
 
 template <class Real>
 void DistancePointPlaneCorrectnessTest() {

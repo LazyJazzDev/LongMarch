@@ -2,7 +2,7 @@
 #include "sparks/core/entity.h"
 #include "sparks/light/light_geometry_material.h"
 
-namespace sparks {
+namespace XH {
 
 class EntityGeometryMaterial : public Entity {
  public:
@@ -24,4 +24,4 @@ class EntityGeometryMaterial : public Entity {
   InstanceHitGroups hit_groups_;
 };
 
-}  // namespace sparks
+}  // namespace XH

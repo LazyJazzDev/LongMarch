@@ -7,7 +7,7 @@
 #include "snow_mount/visualizer/visualizer_mesh.h"
 #include "snow_mount/visualizer/visualizer_scene.h"
 
-namespace snow_mount::visualizer {
+namespace XS::visualizer {
 
 void PyBind(pybind11::module_ &m) {
   pybind11::enum_<FilmChannel> film_channel(m, "FilmChannel");
@@ -27,4 +27,4 @@ void PyBind(pybind11::module_ &m) {
   Entity::PyBind(m);
 }
 
-}  // namespace snow_mount::visualizer
+}  // namespace XS::visualizer

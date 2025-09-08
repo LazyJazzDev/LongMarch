@@ -6,7 +6,7 @@
 #include "snow_mount/visualizer/visualizer_ownership_holder.h"
 #include "snow_mount/visualizer/visualizer_render_context.h"
 
-namespace snow_mount::visualizer {
+namespace XS::visualizer {
 
 namespace {
 #include "built_in_shaders.inl"
@@ -246,4 +246,4 @@ void EntityDirectionalLight::PyBind(pybind11::module &m) {
                                pybind11::arg("direction") = Vector3<float>{3.0f, 1.0f, 2.0f});
 }
 
-}  // namespace snow_mount::visualizer
+}  // namespace XS::visualizer

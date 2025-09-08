@@ -1,7 +1,7 @@
 #pragma once
 #include "snow_mount/draw/draw_util.h"
 
-namespace snow_mount::draw {
+namespace XS::draw {
 
 class Model {
  public:
@@ -23,8 +23,7 @@ class Model {
     return index_count_;
   }
 
-  void SetModelData(const std::vector<Vertex> &vertices,
-                    const std::vector<uint32_t> &indices);
+  void SetModelData(const std::vector<Vertex> &vertices, const std::vector<uint32_t> &indices);
 
  private:
   Core *core_;
@@ -33,4 +32,4 @@ class Model {
   uint32_t index_count_{0};
 };
 
-}  // namespace snow_mount::draw
+}  // namespace XS::draw

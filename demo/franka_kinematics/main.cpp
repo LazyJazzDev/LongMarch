@@ -9,17 +9,14 @@
 #include "glm/gtc/matrix_transform.hpp"
 #include "stb_image_write.h"
 
-using namespace long_march;
+using namespace CZ;
 
 struct CombinedMesh {
-  std::vector<std::unique_ptr<sparks::GeometryMesh>> meshes;
-  std::vector<std::unique_ptr<sparks::MaterialPrincipled>> materials;
-  std::vector<std::pair<std::unique_ptr<sparks::EntityGeometryMaterial>, glm::mat4>> entities;
+  std::vector<std::unique_ptr<XH::GeometryMesh>> meshes;
+  std::vector<std::unique_ptr<XH::MaterialPrincipled>> materials;
+  std::vector<std::pair<std::unique_ptr<XH::EntityGeometryMaterial>, glm::mat4>> entities;
 
-  void LoadEntities(sparks::Core *core,
-                    const aiScene *scene,
-                    const aiNode *node,
-                    const glm::mat4 transformation = {1.0f}) {
+  void LoadEntities(XH::Core *core, const aiScene *scene, const aiNode *node, const glm::mat4 transformation = {1.0f}) {
     // Show transformation
     glm::mat4 local_transform{
         node->mTransformation.a1, node->mTransformation.b1, node->mTransformation.c1, node->mTransformation.d1,
@@ -42,12 +39,12 @@ struct CombinedMesh {
       int mesh_index = node->mMeshes[i];
       auto &mesh = meshes[mesh_index];
       auto &material = materials[scene->mMeshes[mesh_index]->mMaterialIndex];
-      auto entity = std::make_unique<sparks::EntityGeometryMaterial>(core, mesh.get(), material.get(), local_transform);
+      auto entity = std::make_unique<XH::EntityGeometryMaterial>(core, mesh.get(), material.get(), local_transform);
       entities.emplace_back(std::move(entity), local_transform);
     }
   }
 
-  void LoadModel(sparks::Core *core, const std::string &path) {
+  void LoadModel(XH::Core *core, const std::string &path) {
     Assimp::Importer importer;
     const aiScene *scene = importer.ReadFile(path, aiProcess_Triangulate);
     if (!scene || scene->mFlags & AI_SCENE_FLAGS_INCOMPLETE || !scene->mRootNode) {
@@ -61,7 +58,7 @@ struct CombinedMesh {
       material->Get(AI_MATKEY_COLOR_DIFFUSE, color);
       float reflectivity = 0.0f;
       material->Get(AI_MATKEY_REFLECTIVITY, reflectivity);
-      auto mat = std::make_unique<sparks::MaterialPrincipled>(core, glm::vec3{color.r, color.g, color.b});
+      auto mat = std::make_unique<XH::MaterialPrincipled>(core, glm::vec3{color.r, color.g, color.b});
       mat->specular = reflectivity;
       mat->roughness = reflectivity;
       materials.emplace_back(std::move(mat));
@@ -94,7 +91,7 @@ struct CombinedMesh {
       Mesh<> m(positions.size(), indices.size(), indices.data(), reinterpret_cast<Vector3<float> *>(positions.data()),
                mesh->HasNormals() ? reinterpret_cast<Vector3<float> *>(normals.data()) : nullptr,
                mesh->HasTextureCoords(0) ? reinterpret_cast<Vector2<float> *>(tex_coords.data()) : nullptr, nullptr);
-      auto geom = std::make_unique<sparks::GeometryMesh>(core, m);
+      auto geom = std::make_unique<XH::GeometryMesh>(core, m);
       meshes.emplace_back(std::move(geom));
     }
 
@@ -110,7 +107,7 @@ struct CombinedMesh {
     }
   }
 
-  void PutInScene(sparks::Scene *scene) {
+  void PutInScene(XH::Scene *scene) {
     for (auto &[entity, _] : entities) {
       scene->AddEntity(entity.get());
     }
@@ -155,39 +152,39 @@ int main() {
 
   graphics::CreateCore(graphics::BACKEND_API_DEFAULT, graphics::Core::Settings{2, false}, &core_);
   core_->InitializeLogicalDeviceAutoSelect(true);
-  sparks::Core sparks_core(core_.get());
+  XH::Core sparks_core(core_.get());
   sparks_core.GetShadersVFS().Print();
 
-  sparks::Scene scene(&sparks_core);
+  XH::Scene scene(&sparks_core);
   scene.settings.samples_per_dispatch = 32;
-  sparks::Film film(&sparks_core, 1024, 512);
+  XH::Film film(&sparks_core, 1024, 512);
   film.info.persistence = 0.98f;
-  sparks::Camera camera(
-      &sparks_core, glm::lookAt(glm::vec3{2.0f, -1.0f, 0.3f}, glm::vec3{0.0f, 0.0f, 0.5f}, glm::vec3{0.0, 0.0, 1.0}),
-      glm::radians(30.0f), static_cast<float>(film.GetWidth()) / film.GetHeight());
+  XH::Camera camera(&sparks_core,
+                    glm::lookAt(glm::vec3{2.0f, -1.0f, 0.3f}, glm::vec3{0.0f, 0.0f, 0.5f}, glm::vec3{0.0, 0.0, 1.0}),
+                    glm::radians(30.0f), static_cast<float>(film.GetWidth()) / film.GetHeight());
 
   Mesh<> matball_mesh;
   matball_mesh.LoadObjFile(FindAssetFile("meshes/preview_sphere.obj"));
   matball_mesh.GenerateTangents();
   Mesh<> cube_mesh;
   cube_mesh.LoadObjFile(FindAssetFile("meshes/cube.obj"));
-  sparks::GeometryMesh geometry_sphere(&sparks_core, Mesh<>::Sphere(30));
-  sparks::GeometryMesh geometry_matball(&sparks_core, matball_mesh);
-  sparks::GeometryMesh geometry_cube(&sparks_core, cube_mesh);
+  XH::GeometryMesh geometry_sphere(&sparks_core, Mesh<>::Sphere(30));
+  XH::GeometryMesh geometry_matball(&sparks_core, matball_mesh);
+  XH::GeometryMesh geometry_cube(&sparks_core, cube_mesh);
 
-  sparks::MaterialPrincipled material_ground(&sparks_core, {0.1f, 0.2f, 0.4f});
+  XH::MaterialPrincipled material_ground(&sparks_core, {0.1f, 0.2f, 0.4f});
   material_ground.roughness = 0.2f;
   material_ground.metallic = 0.0f;
-  sparks::EntityGeometryMaterial entity_ground(&sparks_core, &geometry_cube, &material_ground,
-                                               glm::translate(glm::mat4{1.0f}, glm::vec3{0.0f, 0.0f, -1000.0f}) *
-                                                   glm::scale(glm::mat4(1.0f), glm::vec3(1000.0f)));
+  XH::EntityGeometryMaterial entity_ground(&sparks_core, &geometry_cube, &material_ground,
+                                           glm::translate(glm::mat4{1.0f}, glm::vec3{0.0f, 0.0f, -1000.0f}) *
+                                               glm::scale(glm::mat4(1.0f), glm::vec3(1000.0f)));
 
-  sparks::MaterialLight material_sky(&sparks_core, {0.8f, 0.8f, 0.8f}, true, false);
-  sparks::EntityGeometryMaterial entity_sky(
+  XH::MaterialLight material_sky(&sparks_core, {0.8f, 0.8f, 0.8f}, true, false);
+  XH::EntityGeometryMaterial entity_sky(
       &sparks_core, &geometry_sphere, &material_sky,
       glm::translate(glm::mat4{1.0f}, glm::vec3{0.0f, 0.0f, 0.0f}) * glm::scale(glm::mat4(1.0f), glm::vec3(60.0f)));
-  sparks::EntityAreaLight area_light(&sparks_core, glm::vec3{1.0f, 1.0f, 1.0f}, 1.0f, glm::vec3{40.0f, -30.0f, 30.0f},
-                                     glm::normalize(glm::vec3{-4.0f, 3.0f, -3.0f}), glm::vec3{0.0f, 0.0f, 1.0f});
+  XH::EntityAreaLight area_light(&sparks_core, glm::vec3{1.0f, 1.0f, 1.0f}, 1.0f, glm::vec3{40.0f, -30.0f, 30.0f},
+                                 glm::normalize(glm::vec3{-4.0f, 3.0f, -3.0f}), glm::vec3{0.0f, 0.0f, 1.0f});
   area_light.emission = glm::vec3{1000.0f};
 
   scene.AddEntity(&entity_ground);

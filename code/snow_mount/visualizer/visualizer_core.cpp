@@ -10,7 +10,7 @@
 #include "snow_mount/visualizer/visualizer_render_context.h"
 #include "snow_mount/visualizer/visualizer_scene.h"
 
-namespace snow_mount::visualizer {
+namespace XS::visualizer {
 Core::Core(graphics::Core *core) : core_(core) {
   ownership_holders_.resize(core->FramesInFlight());
 }
@@ -141,4 +141,4 @@ void Core::PyBind(pybind11::module_ &m) {
                  pybind11::arg("film"));
 }
 
-}  // namespace snow_mount::visualizer
+}  // namespace XS::visualizer

@@ -2,7 +2,7 @@
 #include "grassland/grassland.h"
 #include "sparks/core/code_lines.h"
 
-namespace sparks {
+namespace XH {
 
 using namespace CD;
 
@@ -53,4 +53,4 @@ struct InstanceHitGroups {
   graphics::HitGroup shadow_group;
 };
 
-}  // namespace sparks
+}  // namespace XH

@@ -8,7 +8,7 @@
 #include "thrust/device_vector.h"
 #endif
 
-namespace snow_mount::solver {
+namespace XS::solver {
 
 struct SceneRef {
   int num_particle;
@@ -137,4 +137,4 @@ class SceneDevice {
 };
 #endif
 
-}  // namespace snow_mount::solver
+}  // namespace XS::solver

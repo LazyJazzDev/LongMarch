@@ -2,7 +2,7 @@
 
 #include "sparks/core/core.h"
 
-namespace sparks {
+namespace XH {
 Geometry::Geometry(Core *core) : core_(core) {
 }
-}  // namespace sparks
+}  // namespace XH

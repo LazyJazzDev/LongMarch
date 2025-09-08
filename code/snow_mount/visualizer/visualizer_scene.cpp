@@ -3,7 +3,7 @@
 #include "snow_mount/visualizer/visualizer_core.h"
 #include "snow_mount/visualizer/visualizer_entity.h"
 
-namespace snow_mount::visualizer {
+namespace XS::visualizer {
 Scene::Scene(const std::shared_ptr<Core> &core) : core_(core) {
 }
 
@@ -23,4 +23,4 @@ void Scene::PyBind(pybind11::module_ &m) {
   scene.def("add_entity", &Scene::AddEntity, pybind11::arg("entity"));
 }
 
-}  // namespace snow_mount::visualizer
+}  // namespace XS::visualizer

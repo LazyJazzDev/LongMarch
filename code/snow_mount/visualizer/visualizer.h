@@ -9,6 +9,6 @@
 #include "snow_mount/visualizer/visualizer_scene.h"
 #include "snow_mount/visualizer/visualizer_util.h"
 
-namespace snow_mount::visualizer {
+namespace XS::visualizer {
 void PyBind(pybind11::module_ &m);
 }

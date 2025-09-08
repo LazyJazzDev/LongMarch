@@ -2,7 +2,7 @@
 #include "sparks/core/entity.h"
 #include "sparks/light/light_point.h"
 
-namespace sparks {
+namespace XH {
 
 class EntityPointLight : public Entity {
  public:
@@ -21,4 +21,4 @@ class EntityPointLight : public Entity {
   LightPoint light_point_;
 };
 
-}  // namespace sparks
+}  // namespace XH

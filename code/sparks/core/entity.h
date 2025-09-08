@@ -2,7 +2,7 @@
 #include "sparks/core/core_util.h"
 #include "sparks/core/light.h"
 
-namespace sparks {
+namespace XH {
 
 class Entity {
  public:
@@ -19,4 +19,4 @@ class Entity {
   Core *core_;
 };
 
-}  // namespace sparks
+}  // namespace XH

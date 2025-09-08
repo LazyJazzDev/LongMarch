@@ -5,7 +5,7 @@
 #include "params.h"
 #include "random"
 
-using namespace long_march;
+using namespace CZ;
 
 struct GlobalUniformObject {
   glm::mat4 world_to_screen;

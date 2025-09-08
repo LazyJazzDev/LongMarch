@@ -1,7 +1,7 @@
 #pragma once
 #include "sparks/core/light.h"
 
-namespace sparks {
+namespace XH {
 
 class LightGeometryMaterial : public Light {
  public:
@@ -32,4 +32,4 @@ class LightGeometryMaterial : public Light {
   // uint cdf[num_primitive];
 };
 
-}  // namespace sparks
+}  // namespace XH

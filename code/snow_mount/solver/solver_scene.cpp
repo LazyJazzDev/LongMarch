@@ -1,6 +1,6 @@
 #include "snow_mount/solver/solver_scene.h"
 
-namespace snow_mount::solver {
+namespace XS::solver {
 LM_DEVICE_FUNC int SceneRef::ParticleIndex(int particle_id) const {
   return BinarySearch(particle_ids, num_particle, particle_id);
 }
@@ -320,4 +320,4 @@ SceneDevice::operator SceneRef() {
 }
 #endif
 
-}  // namespace snow_mount::solver
+}  // namespace XS::solver

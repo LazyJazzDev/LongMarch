@@ -6,34 +6,34 @@
 #include "glm/gtc/matrix_transform.hpp"
 #include "stb_image_write.h"
 
-using namespace long_march;
+using namespace CZ;
 
 int main() {
   std::unique_ptr<graphics::Core> core_;
 
   graphics::CreateCore(graphics::BACKEND_API_DEFAULT, graphics::Core::Settings{2, false}, &core_);
   core_->InitializeLogicalDeviceAutoSelect(true);
-  sparks::Core sparks_core(core_.get());
+  XH::Core sparks_core(core_.get());
   sparks_core.GetShadersVFS().Print();
 
-  sparks::Scene scene(&sparks_core);
+  XH::Scene scene(&sparks_core);
   scene.settings.samples_per_dispatch = 16;
-  sparks::Film film(&sparks_core, 2048, 1024);
+  XH::Film film(&sparks_core, 2048, 1024);
   film.info.persistence = 1.0f;
-  sparks::Camera camera(
-      &sparks_core, glm::lookAt(glm::vec3{-5.0f, 0.3f, 7.0f}, glm::vec3{0.0f, 0.0f, 0.0f}, glm::vec3{0.0, 1.0, 0.0}),
-      glm::radians(30.0f), static_cast<float>(film.GetWidth()) / film.GetHeight());
+  XH::Camera camera(&sparks_core,
+                    glm::lookAt(glm::vec3{-5.0f, 0.3f, 7.0f}, glm::vec3{0.0f, 0.0f, 0.0f}, glm::vec3{0.0, 1.0, 0.0}),
+                    glm::radians(30.0f), static_cast<float>(film.GetWidth()) / film.GetHeight());
 
   Mesh<> matball_mesh;
   matball_mesh.LoadObjFile(FindAssetFile("meshes/preview_sphere.obj"));
   matball_mesh.GenerateTangents();
   Mesh<> cube_mesh;
   cube_mesh.LoadObjFile(FindAssetFile("meshes/cube.obj"));
-  sparks::GeometryMesh geometry_sphere(&sparks_core, Mesh<>::Sphere(30));
-  sparks::GeometryMesh geometry_matball(&sparks_core, matball_mesh);
-  sparks::GeometryMesh geometry_cube(&sparks_core, cube_mesh);
+  XH::GeometryMesh geometry_sphere(&sparks_core, Mesh<>::Sphere(30));
+  XH::GeometryMesh geometry_matball(&sparks_core, matball_mesh);
+  XH::GeometryMesh geometry_cube(&sparks_core, cube_mesh);
 
-  sparks::MaterialPrincipled material_matball0(&sparks_core, {0.8f, 0.8f, 0.8f});
+  XH::MaterialPrincipled material_matball0(&sparks_core, {0.8f, 0.8f, 0.8f});
   std::unique_ptr<graphics::Image> base_color_texture0;
   std::unique_ptr<graphics::Image> roughness_texture0;
   std::unique_ptr<graphics::Image> metallic_texture0;
@@ -52,11 +52,11 @@ int main() {
   material_matball0.textures.roughness = roughness_texture0.get();
   material_matball0.textures.metallic = metallic_texture0.get();
   material_matball0.textures.normal = normal_texture0.get();
-  sparks::EntityGeometryMaterial entity_matball0(&sparks_core, &geometry_matball, &material_matball0,
-                                                 glm::translate(glm::mat4{1.0f}, glm::vec3{-2.2f, 0.0f, 0.0f}));
+  XH::EntityGeometryMaterial entity_matball0(&sparks_core, &geometry_matball, &material_matball0,
+                                             glm::translate(glm::mat4{1.0f}, glm::vec3{-2.2f, 0.0f, 0.0f}));
   scene.AddEntity(&entity_matball0);
 
-  sparks::MaterialPrincipled material_matball1(&sparks_core, {0.8f, 0.8f, 0.8f});
+  XH::MaterialPrincipled material_matball1(&sparks_core, {0.8f, 0.8f, 0.8f});
   std::unique_ptr<graphics::Image> base_color_texture1;
   std::unique_ptr<graphics::Image> roughness_texture1;
   std::unique_ptr<graphics::Image> metallic_texture1;
@@ -82,11 +82,11 @@ int main() {
   material_matball1.textures.roughness = roughness_texture1.get();
   material_matball1.textures.metallic = metallic_texture1.get();
   material_matball1.textures.normal = normal_texture1.get();
-  sparks::EntityGeometryMaterial entity_matball1(&sparks_core, &geometry_matball, &material_matball1,
-                                                 glm::translate(glm::mat4{1.0f}, glm::vec3{0.0f, 0.0f, 0.0f}));
+  XH::EntityGeometryMaterial entity_matball1(&sparks_core, &geometry_matball, &material_matball1,
+                                             glm::translate(glm::mat4{1.0f}, glm::vec3{0.0f, 0.0f, 0.0f}));
   scene.AddEntity(&entity_matball1);
 
-  sparks::MaterialPrincipled material_matball2(&sparks_core, {0.8f, 0.8f, 0.8f});
+  XH::MaterialPrincipled material_matball2(&sparks_core, {0.8f, 0.8f, 0.8f});
   std::unique_ptr<graphics::Image> base_color_texture2;
   std::unique_ptr<graphics::Image> roughness_texture2;
   std::unique_ptr<graphics::Image> metallic_texture2;
@@ -110,31 +110,31 @@ int main() {
   material_matball2.textures.normal = normal_texture2.get();
   material_matball2.textures.anisotropic = anisotropic_texture2.get();
   material_matball2.textures.anisotropic_rotation = anisotropic_rotation_texture2.get();
-  sparks::EntityGeometryMaterial entity_matball2(&sparks_core, &geometry_matball, &material_matball2,
-                                                 glm::translate(glm::mat4{1.0f}, glm::vec3{2.2f, 0.0f, 0.0f}));
+  XH::EntityGeometryMaterial entity_matball2(&sparks_core, &geometry_matball, &material_matball2,
+                                             glm::translate(glm::mat4{1.0f}, glm::vec3{2.2f, 0.0f, 0.0f}));
   scene.AddEntity(&entity_matball2);
 
-  sparks::MaterialPrincipled material_matball3(&sparks_core, {1.0f, 1.0f, 1.0f});
+  XH::MaterialPrincipled material_matball3(&sparks_core, {1.0f, 1.0f, 1.0f});
   material_matball3.roughness = 0.1f;
   material_matball3.transmission = 1.0f;
   material_matball3.ior = 1.3f;
-  sparks::EntityGeometryMaterial entity_matball3(&sparks_core, &geometry_matball, &material_matball3,
-                                                 glm::translate(glm::mat4{1.0f}, glm::vec3{4.4f, 0.0f, 0.0f}));
+  XH::EntityGeometryMaterial entity_matball3(&sparks_core, &geometry_matball, &material_matball3,
+                                             glm::translate(glm::mat4{1.0f}, glm::vec3{4.4f, 0.0f, 0.0f}));
   scene.AddEntity(&entity_matball3);
 
-  sparks::MaterialPrincipled material_ground(&sparks_core, {0.1f, 0.2f, 0.4f});
+  XH::MaterialPrincipled material_ground(&sparks_core, {0.1f, 0.2f, 0.4f});
   material_ground.roughness = 0.2f;
   material_ground.metallic = 0.0f;
-  sparks::EntityGeometryMaterial entity_ground(&sparks_core, &geometry_cube, &material_ground,
-                                               glm::translate(glm::mat4{1.0f}, glm::vec3{0.0f, -1001.0f, 0.0f}) *
-                                                   glm::scale(glm::mat4(1.0f), glm::vec3(1000.0f)));
+  XH::EntityGeometryMaterial entity_ground(&sparks_core, &geometry_cube, &material_ground,
+                                           glm::translate(glm::mat4{1.0f}, glm::vec3{0.0f, -1001.0f, 0.0f}) *
+                                               glm::scale(glm::mat4(1.0f), glm::vec3(1000.0f)));
 
-  sparks::MaterialLight material_sky(&sparks_core, {0.8f, 0.8f, 0.8f}, true, false);
-  sparks::EntityGeometryMaterial entity_sky(
+  XH::MaterialLight material_sky(&sparks_core, {0.8f, 0.8f, 0.8f}, true, false);
+  XH::EntityGeometryMaterial entity_sky(
       &sparks_core, &geometry_sphere, &material_sky,
       glm::translate(glm::mat4{1.0f}, glm::vec3{0.0f, 0.0f, 0.0f}) * glm::scale(glm::mat4(1.0f), glm::vec3(60.0f)));
-  sparks::EntityAreaLight area_light(&sparks_core, glm::vec3{1.0f, 1.0f, 1.0f}, 1.0f, glm::vec3{0.0f, 30.0f, 50.0f},
-                                     glm::normalize(glm::vec3{0.0f, -3.0f, -5.0f}));
+  XH::EntityAreaLight area_light(&sparks_core, glm::vec3{1.0f, 1.0f, 1.0f}, 1.0f, glm::vec3{0.0f, 30.0f, 50.0f},
+                                 glm::normalize(glm::vec3{0.0f, -3.0f, -5.0f}));
   area_light.emission = glm::vec3{1000.0f};
 
   scene.AddEntity(&entity_ground);

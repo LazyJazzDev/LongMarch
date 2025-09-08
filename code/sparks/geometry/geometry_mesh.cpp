@@ -2,7 +2,7 @@
 
 #include "sparks/core/core.h"
 
-namespace sparks {
+namespace XH {
 
 GeometryMesh::GeometryMesh(Core *core, const Mesh<float> &mesh) : Geometry(core) {
   std::vector<uint8_t> data;
@@ -82,4 +82,4 @@ graphics::AccelerationStructure *GeometryMesh::BLAS() {
   return blas_.get();
 }
 
-}  // namespace sparks
+}  // namespace XH

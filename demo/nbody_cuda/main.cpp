@@ -1,6 +1,6 @@
 #include "nbody_cuda.h"
 
-using namespace long_march;
+using namespace CZ;
 
 void PrintArgHelper(const char *command_name) {
   printf("Usage: %s [-headless] [-nstep <num_steps>] [-device <device_id>]\n", command_name);

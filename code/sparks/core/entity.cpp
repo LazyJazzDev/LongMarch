@@ -2,4 +2,4 @@
 
 #include "sparks/core/scene.h"
 
-namespace sparks {}  // namespace sparks
+namespace XH {}  // namespace XH

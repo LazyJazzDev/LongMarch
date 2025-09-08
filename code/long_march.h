@@ -3,7 +3,8 @@
 #include "snow_mount/snow_mount.h"
 #include "sparks/sparks.h"
 
-namespace long_march {
+namespace CZ {
 using namespace CD;
-using namespace snow_mount;
-}  // namespace long_march
+using namespace XS;
+using namespace XH;
+}  // namespace CZ

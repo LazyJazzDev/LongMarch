@@ -1,8 +1,8 @@
 #include "sparks/core/light.h"
 
-namespace sparks {
+namespace XH {
 
 Light::Light(Core *core) : core_(core) {
 }
 
-}  // namespace sparks
+}  // namespace XH

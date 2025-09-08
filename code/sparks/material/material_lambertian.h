@@ -1,7 +1,7 @@
 #pragma once
 #include "sparks/core/material.h"
 
-namespace sparks {
+namespace XH {
 
 class MaterialLambertian : public Material {
  public:
@@ -24,4 +24,4 @@ class MaterialLambertian : public Material {
   CodeLines evaluator_implementation_;
 };
 
-}  // namespace sparks
+}  // namespace XH

@@ -1,7 +1,7 @@
 #pragma once
 #include "sparks/core/core_util.h"
 
-namespace sparks {
+namespace XH {
 
 class Scene {
  public:
@@ -114,4 +114,4 @@ class Scene {
   std::unique_ptr<graphics::Sampler> nearest_sampler_;
 };
 
-}  // namespace sparks
+}  // namespace XH

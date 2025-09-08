@@ -4,7 +4,7 @@
 #include "sparks/core/scene.h"
 #include "sparks/material/material_principled.h"
 
-namespace sparks {
+namespace XH {
 
 namespace {
 struct RegisteredTextures {
@@ -70,4 +70,4 @@ void MaterialPrincipled::SyncMaterialData() {
   material_buffer_->UploadData(&info, sizeof(info));
 }
 
-}  // namespace sparks
+}  // namespace XH

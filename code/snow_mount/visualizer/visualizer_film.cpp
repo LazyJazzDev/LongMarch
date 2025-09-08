@@ -2,7 +2,7 @@
 
 #include "snow_mount/visualizer/visualizer_core.h"
 
-namespace snow_mount::visualizer {
+namespace XS::visualizer {
 
 Film::Film(const std::shared_ptr<Core> &core, int width, int height) : core_(core) {
   core_->GraphicsCore()->CreateImage(width, height, FilmChannelImageFormat(FILM_CHANNEL_EXPOSURE),
@@ -36,4 +36,4 @@ void Film::PyBind(pybind11::module_ &m) {
            pybind11::arg("film_channel") = FILM_CHANNEL_EXPOSURE);
 }
 
-}  // namespace snow_mount::visualizer
+}  // namespace XS::visualizer

@@ -4,7 +4,7 @@
 #include "snow_mount/draw/draw_util.h"
 #include FT_FREETYPE_H
 
-namespace snow_mount::draw {
+namespace XS::draw {
 
 struct CharModel {
   Texture *char_tex_;
@@ -43,4 +43,4 @@ class FontCore {
   FaceMap face_map_;
   FT_Face active_ascii_face_{nullptr};
 };
-}  // namespace snow_mount::draw
+}  // namespace XS::draw

@@ -2,7 +2,7 @@
 
 #include <glm/ext/matrix_transform.hpp>
 
-namespace sparks {
+namespace XH {
 EntityAreaLight::EntityAreaLight(Core *core,
                                  const glm::vec3 &emission,
                                  float size,
@@ -26,4 +26,4 @@ void EntityAreaLight::Update(Scene *scene) {
   geometry_light_->transform = transform;
   geometry_light_->Update(scene);
 }
-}  // namespace sparks
+}  // namespace XH

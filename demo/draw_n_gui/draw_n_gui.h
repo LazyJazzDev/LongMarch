@@ -18,7 +18,7 @@ class DrawNGUI {
   std::unique_ptr<CD::graphics::Image> color_image_;
   std::unique_ptr<CD::graphics::Window> window_;
 
-  std::unique_ptr<snow_mount::draw::Core> draw_core_;
-  std::unique_ptr<snow_mount::draw::Model> model_;
-  std::unique_ptr<snow_mount::draw::Texture> texture_;
+  std::unique_ptr<XS::draw::Core> draw_core_;
+  std::unique_ptr<XS::draw::Model> model_;
+  std::unique_ptr<XS::draw::Texture> texture_;
 };

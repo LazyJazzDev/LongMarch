@@ -2,7 +2,7 @@
 
 #include "sparks/core/core.h"
 
-namespace sparks {
+namespace XH {
 
 LightPoint::LightPoint(Core *core, const glm::vec3 &position, const glm::vec3 &color, float strength)
     : Light(core), position(position), color(color), strength(strength) {
@@ -31,4 +31,4 @@ uint32_t LightPoint::SamplerPreprocess(graphics::CommandContext *cmd_ctx) {
   return sizeof(glm::vec3) + sizeof(glm::vec3);
 }
 
-}  // namespace sparks
+}  // namespace XH

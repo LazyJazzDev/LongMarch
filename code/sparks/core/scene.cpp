@@ -8,7 +8,7 @@
 #include "sparks/core/geometry.h"
 #include "sparks/core/material.h"
 
-namespace sparks {
+namespace XH {
 Scene::Scene(Core *core) : core_(core) {
   core_->GraphicsCore()->CreateShader(core_->GetShadersVFS(), "raygen.hlsl", "Main", "lib_6_5", &raygen_shader_);
   core_->GraphicsCore()->CreateShader(core_->GetShadersVFS(), "raygen.hlsl", "MissMain", "lib_6_5",
@@ -304,4 +304,4 @@ void Scene::UpdatePipeline(Camera *camera) {
   core_->GraphicsCore()->SubmitCommandContext(preprocess_cmd_context_.get());
 }
 
-}  // namespace sparks
+}  // namespace XH

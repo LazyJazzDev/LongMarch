@@ -2,7 +2,7 @@
 
 #include "snow_mount/visualizer/visualizer_core.h"
 
-namespace snow_mount::visualizer {
+namespace XS::visualizer {
 
 Mesh::Mesh(const std::shared_ptr<Core> &core) : core_(core) {
   auto graphics_core = core->GraphicsCore();
@@ -97,4 +97,4 @@ void Mesh::PyBind(pybind11::module_ &m) {
   mesh.def("index_count", &Mesh::IndexCount);
 }
 
-}  // namespace snow_mount::visualizer
+}  // namespace XS::visualizer

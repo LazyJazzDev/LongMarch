@@ -1,7 +1,7 @@
 #pragma once
 #include "grassland/grassland.h"
 
-namespace snow_mount::visualizer {
+namespace XS::visualizer {
 using namespace CD;
 
 class Core;
@@ -61,4 +61,4 @@ typedef enum ProgramID : uint64_t {
   PROGRAM_DIRECTION_LIGHTING_PASS = 2,
 } ProgramID;
 
-}  // namespace snow_mount::visualizer
+}  // namespace XS::visualizer

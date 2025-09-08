@@ -3,7 +3,7 @@
 #include "sparks/entity/entity_geometry_material.h"
 #include "sparks/material/material_light.h"
 
-namespace sparks {
+namespace XH {
 
 class EntityGeometryLight : public Entity {
  public:
@@ -27,4 +27,4 @@ class EntityGeometryLight : public Entity {
   std::unique_ptr<EntityGeometryMaterial> entity_;
 };
 
-}  // namespace sparks
+}  // namespace XH

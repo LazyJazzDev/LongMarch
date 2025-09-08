@@ -5,7 +5,7 @@
 #include "snow_mount/draw/draw_model.h"
 #include "snow_mount/draw/draw_texture.h"
 
-namespace snow_mount::draw {
+namespace XS::draw {
 
 FontCore::FontCore(Core *core) : core_(core) {
   FT_Init_FreeType(&library_);
@@ -75,8 +75,7 @@ CharModel FontCore::GetCharModel(uint32_t char_code) {
       std::vector<uint32_t> data(width * height);
       for (int y = 0; y < height; ++y) {
         for (int x = 0; x < width; ++x) {
-          data[y * width + x] =
-              (bitmap.buffer[y * width + x] << 24) | 0x00ffffff;
+          data[y * width + x] = (bitmap.buffer[y * width + x] << 24) | 0x00ffffff;
         }
       }
       tex->UploadData(data.data());
@@ -105,4 +104,4 @@ void FontCore::UpdateActiveCharMap() {
   }
 }
 
-}  // namespace snow_mount::draw
+}  // namespace XS::draw

@@ -1,7 +1,7 @@
 #pragma once
 #include "sparks/core/core_util.h"
 
-namespace sparks {
+namespace XH {
 class CodeLines {
  public:
   CodeLines() = default;
@@ -20,4 +20,4 @@ class CodeLines {
  private:
   std::vector<std::string> lines_;
 };
-}  // namespace sparks
+}  // namespace XH

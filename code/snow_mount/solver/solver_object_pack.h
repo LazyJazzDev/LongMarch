@@ -2,7 +2,7 @@
 #include "snow_mount/solver/solver_element.h"
 #include "snow_mount/solver/solver_util.h"
 
-namespace snow_mount::solver {
+namespace XS::solver {
 
 struct ObjectPack {
   std::vector<Vector3<float>> x;
@@ -53,4 +53,4 @@ struct ObjectPackView {
   std::vector<int> bending_ids;
 };
 
-}  // namespace snow_mount::solver
+}  // namespace XS::solver

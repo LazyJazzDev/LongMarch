@@ -1,3 +1,3 @@
 #include "sparks/core/core_util.h"
 
-namespace sparks {}
+namespace XH {}

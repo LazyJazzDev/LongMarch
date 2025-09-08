@@ -1,7 +1,7 @@
 #pragma once
 #include "sparks/core/core_util.h"
 
-namespace sparks {
+namespace XH {
 class Core {
  public:
   Core(graphics::Core *core);
@@ -36,4 +36,4 @@ class Core {
   std::map<std::string, std::unique_ptr<graphics::Buffer>> buffers_;
   std::map<std::string, std::unique_ptr<graphics::Image>> images_;
 };
-}  // namespace sparks
+}  // namespace XH

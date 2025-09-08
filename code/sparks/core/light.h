@@ -1,7 +1,7 @@
 #pragma once
 #include "sparks/core/core_util.h"
 
-namespace sparks {
+namespace XH {
 class Light {
  public:
   Light(Core *core);
@@ -16,4 +16,4 @@ class Light {
  protected:
   Core *core_;
 };
-}  // namespace sparks
+}  // namespace XH

@@ -1,7 +1,7 @@
 #pragma once
 #include "snow_mount/solver/solver_util.h"
 
-namespace snow_mount::solver {
+namespace XS::solver {
 
 struct RigidObjectRef {
   MeshSDFRef mesh_sdf;
@@ -32,4 +32,4 @@ struct RigidObjectDevice {
 };
 #endif
 
-}  // namespace snow_mount::solver
+}  // namespace XS::solver

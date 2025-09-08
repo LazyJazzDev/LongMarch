@@ -5,7 +5,7 @@
 #include "snow_mount/draw/draw_model.h"
 #include "snow_mount/draw/draw_texture.h"
 
-namespace snow_mount::draw {
+namespace XS::draw {
 
 namespace {
 #include "built_in_shaders.inl"
@@ -188,4 +188,4 @@ void CreateCore(graphics::Core *core, double_ptr<Core> draw_core) {
   draw_core.construct(core);
 }
 
-}  // namespace snow_mount::draw
+}  // namespace XS::draw

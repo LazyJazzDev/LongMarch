@@ -2,7 +2,7 @@
 #include "snow_mount/visualizer/visualizer_scene.h"
 #include "snow_mount/visualizer/visualizer_util.h"
 
-namespace snow_mount::visualizer {
+namespace XS::visualizer {
 
 class Core : public std::enable_shared_from_this<Core> {
   Core(graphics::Core *core);
@@ -49,4 +49,4 @@ class Core : public std::enable_shared_from_this<Core> {
 
 std::shared_ptr<Core> CreateCore(graphics::Core *graphics_core);
 
-}  // namespace snow_mount::visualizer
+}  // namespace XS::visualizer

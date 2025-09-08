@@ -5,4 +5,4 @@
 #include "snow_mount/draw/draw_texture.h"
 #include "snow_mount/draw/draw_util.h"
 
-namespace snow_mount::draw {}
+namespace XS::draw {}

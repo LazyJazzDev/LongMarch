@@ -10,5 +10,5 @@ PYBIND11_MODULE(long_march, m) {
   CD::PyBind(m_grassland);
 
   pybind11::module_ m_snow_mount = m.def_submodule("snow_mount", "SnowMount");
-  snow_mount::PyBind(m_snow_mount);
+  XS::PyBind(m_snow_mount);
 }

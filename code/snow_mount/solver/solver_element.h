@@ -1,7 +1,7 @@
 #pragma once
 #include "snow_mount/solver/solver_util.h"
 
-namespace snow_mount::solver {
+namespace XS::solver {
 
 struct ElementStretching {
   float mu{0.0f};
@@ -24,4 +24,4 @@ namespace element {
 void PyBind(pybind11::module_ &m);
 }
 
-}  // namespace snow_mount::solver
+}  // namespace XS::solver

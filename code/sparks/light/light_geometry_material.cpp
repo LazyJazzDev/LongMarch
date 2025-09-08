@@ -10,7 +10,7 @@
 #include "sparks/material/material_light.h"
 #include "sparks/material/material_principled.h"
 
-namespace sparks {
+namespace XH {
 LightGeometryMaterial::LightGeometryMaterial(Core *core,
                                              Geometry *geometry,
                                              Material *material,
@@ -103,4 +103,4 @@ uint32_t LightGeometryMaterial::SamplerPreprocess(graphics::CommandContext *cmd_
   return sizeof(glm::mat4x3) + sizeof(uint32_t) + (geometry_->PrimitiveCount() - 1) * sizeof(float);
 }
 
-}  // namespace sparks
+}  // namespace XH

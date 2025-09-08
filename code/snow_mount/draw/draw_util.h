@@ -1,7 +1,7 @@
 #pragma once
 #include "grassland/grassland.h"
 
-namespace snow_mount::draw {
+namespace XS::draw {
 
 using namespace CD;
 
@@ -26,4 +26,4 @@ struct DrawMetadata {
 
 Transform PixelCoordToNDC(int width, int height);
 
-}  // namespace snow_mount::draw
+}  // namespace XS::draw

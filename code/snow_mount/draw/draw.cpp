@@ -1,3 +1,3 @@
 #include "snow_mount/draw/draw.h"
 
-namespace snow_mount::draw {}
+namespace XS::draw {}

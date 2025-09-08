@@ -2,7 +2,7 @@
 
 #include "core.h"
 
-namespace sparks {
+namespace XH {
 Camera::Camera(Core *core, const glm::mat4 &view, float fovy, float aspect) : core_(core) {
   core_->GraphicsCore()->CreateShader(core_->GetShadersVFS(), "camera.hlsl", "CameraPinhole", "lib_6_5",
                                       &camera_shader_);
@@ -12,4 +12,4 @@ Camera::Camera(Core *core, const glm::mat4 &view, float fovy, float aspect) : co
   camera_data_.scale = glm::vec2(aspect * tan(fovy * 0.5f), tan(fovy * 0.5f));
   camera_buffer_->UploadData(&camera_data_, sizeof(camera_data_));
 }
-}  // namespace sparks
+}  // namespace XH

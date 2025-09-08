@@ -1,6 +1,6 @@
 #include "snow_mount/solver/solver_rigid_object.h"
 
-namespace snow_mount::solver {
+namespace XS::solver {
 
 void RigidObject::PyBind(pybind11::module_ &m) {
   pybind11::class_<RigidObject> rigid_object(m, "RigidObject");
@@ -54,4 +54,4 @@ RigidObjectDevice::operator RigidObjectRef() const {
   return rigid_object;
 }
 #endif
-}  // namespace snow_mount::solver
+}  // namespace XS::solver

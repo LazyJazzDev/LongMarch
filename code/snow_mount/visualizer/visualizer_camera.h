@@ -1,7 +1,7 @@
 #pragma once
 #include "snow_mount/visualizer/visualizer_util.h"
 
-namespace snow_mount::visualizer {
+namespace XS::visualizer {
 
 class Camera {
   friend class Core;
@@ -25,4 +25,4 @@ class Camera {
   std::unique_ptr<graphics::Buffer> camera_buffer_;
 };
 
-}  // namespace snow_mount::visualizer
+}  // namespace XS::visualizer

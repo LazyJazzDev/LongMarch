@@ -3,7 +3,7 @@
 #include "snow_mount/solver/solver.h"
 #include "snow_mount/visualizer/visualizer.h"
 
-namespace snow_mount {
+namespace XS {
 
 void PyBind(pybind11::module_ &m);
 

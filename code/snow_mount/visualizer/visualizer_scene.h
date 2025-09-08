@@ -1,7 +1,7 @@
 #pragma once
 #include "snow_mount/visualizer/visualizer_util.h"
 
-namespace snow_mount::visualizer {
+namespace XS::visualizer {
 
 class Scene {
   friend class Core;
@@ -20,4 +20,4 @@ class Scene {
   uint64_t entity_next_id_{0};
 };
 
-}  // namespace snow_mount::visualizer
+}  // namespace XS::visualizer

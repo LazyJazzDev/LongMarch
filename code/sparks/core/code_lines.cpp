@@ -1,6 +1,6 @@
 #include "sparks/core/code_lines.h"
 
-namespace sparks {
+namespace XH {
 
 CodeLines::CodeLines(const char *code) {
   // separate code into lines
@@ -74,4 +74,4 @@ std::ostream &operator<<(std::ostream &os, const CodeLines &lines) {
   return os;
 }
 
-}  // namespace sparks
+}  // namespace XH

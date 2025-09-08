@@ -4,7 +4,7 @@
 #include "snow_mount/draw/draw_texture.h"
 #include "snow_mount/draw/draw_util.h"
 
-namespace snow_mount::draw {
+namespace XS::draw {
 
 class Core {
  public:
@@ -15,10 +15,7 @@ class Core {
   void Render(graphics::CommandContext *context, graphics::Image *image);
 
   void CmdSetDrawRegion(int x, int y, int width, int height);
-  void CmdDrawInstance(Model *model,
-                       Texture *texture,
-                       const Transform &transform,
-                       glm::vec4 color);
+  void CmdDrawInstance(Model *model, Texture *texture, const Transform &transform, glm::vec4 color);
   void CmdDrawInstance(Model *model,
                        const Transform &transform = Transform{1.0f},
                        glm::vec4 color = glm::vec4{1.0f, 1.0f, 1.0f, 1.0f});
@@ -45,10 +42,7 @@ class Core {
   }
 
  private:
-  void CmdDrawInstance(Model *model,
-                       graphics::Image *texture,
-                       const Transform &transform,
-                       glm::vec4 color);
+  void CmdDrawInstance(Model *model, graphics::Image *texture, const Transform &transform, glm::vec4 color);
   graphics::Core *core_;
   std::unique_ptr<graphics::Shader> vertex_shader_;
   std::unique_ptr<graphics::Shader> fragment_shader_;
@@ -70,4 +64,4 @@ class Core {
 
 void CreateCore(graphics::Core *core, double_ptr<Core> draw_core);
 
-}  // namespace snow_mount::draw
+}  // namespace XS::draw

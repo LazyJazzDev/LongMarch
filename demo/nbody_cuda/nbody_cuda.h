@@ -6,7 +6,7 @@
 
 void UpdateStep(glm::vec3 *positions, glm::vec3 *velocities, glm::vec3 *positions_new, int n_particles, float delta_t);
 
-using namespace long_march;
+using namespace CZ;
 
 struct GlobalUniformObject {
   glm::mat4 world_to_screen;

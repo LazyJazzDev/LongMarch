@@ -1,7 +1,7 @@
 #pragma once
 #include "snow_mount/draw/draw_util.h"
 
-namespace snow_mount::draw {
+namespace XS::draw {
 
 class DrawCommand {
  public:
@@ -24,10 +24,7 @@ class DrawCmdSetDrawRegion : public DrawCommand {
 
 class DrawCmdDrawInstance : public DrawCommand {
  public:
-  DrawCmdDrawInstance(Model *model,
-                      graphics::Image *texture,
-                      uint32_t instance_base,
-                      uint32_t instance_count);
+  DrawCmdDrawInstance(Model *model, graphics::Image *texture, uint32_t instance_base, uint32_t instance_count);
 
   void Execute(graphics::CommandContext *ctx) override;
 
@@ -38,4 +35,4 @@ class DrawCmdDrawInstance : public DrawCommand {
   uint32_t instance_count_;
 };
 
-}  // namespace snow_mount::draw
+}  // namespace XS::draw
