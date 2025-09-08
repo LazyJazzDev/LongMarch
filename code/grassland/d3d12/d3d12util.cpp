@@ -1,6 +1,6 @@
 #include "grassland/d3d12/d3d12util.h"
 
-namespace grassland::d3d12 {
+namespace CD::d3d12 {
 
 std::string HRESULTToString(HRESULT hr) {
   char buffer[256] = {};
@@ -97,4 +97,4 @@ HRESULT CreateBuffer(ID3D12Device *device,
   return CreateBuffer(device, size, heap_type, D3D12_HEAP_FLAG_NONE, resource_state, resource_flags, buffer);
 }
 
-}  // namespace grassland::d3d12
+}  // namespace CD::d3d12

@@ -2,7 +2,7 @@
 #include "grassland/d3d12/command_queue.h"
 #include "grassland/d3d12/device.h"
 
-namespace grassland::d3d12 {
+namespace CD::d3d12 {
 
 class Fence {
  public:
@@ -38,4 +38,4 @@ class Fence {
   uint64_t value_;
 };
 
-}  // namespace grassland::d3d12
+}  // namespace CD::d3d12

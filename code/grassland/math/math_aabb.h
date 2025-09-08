@@ -1,7 +1,7 @@
 #pragma once
 #include "grassland/math/math_util.h"
 
-namespace grassland {
+namespace CD {
 template <typename Scalar, int dim>
 struct AxisAlignedBoundingBox;
 
@@ -84,4 +84,4 @@ using AxisAlignedBoundingBox3d = AxisAlignedBoundingBox3<double>;
 
 using AABB = AxisAlignedBoundingBox3f;
 
-}  // namespace grassland
+}  // namespace CD

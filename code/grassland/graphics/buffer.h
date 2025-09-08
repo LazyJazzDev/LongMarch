@@ -2,7 +2,7 @@
 #include "grassland/graphics/core.h"
 #include "grassland/graphics/graphics_util.h"
 
-namespace grassland::graphics {
+namespace CD::graphics {
 
 struct BufferRange {
   Buffer *buffer;
@@ -45,4 +45,4 @@ class CUDABuffer : virtual public Buffer {
 };
 #endif
 
-}  // namespace grassland::graphics
+}  // namespace CD::graphics

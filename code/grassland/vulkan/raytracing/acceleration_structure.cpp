@@ -4,7 +4,7 @@
 #include "grassland/vulkan/command_pool.h"
 #include "grassland/vulkan/queue.h"
 
-namespace grassland::vulkan {
+namespace CD::vulkan {
 
 AccelerationStructure::AccelerationStructure(const class Device *device,
                                              std::unique_ptr<class Buffer> buffer,
@@ -180,4 +180,4 @@ VkResult BuildAccelerationStructure(const Device *device,
 
   return VK_SUCCESS;
 }
-}  // namespace grassland::vulkan
+}  // namespace CD::vulkan

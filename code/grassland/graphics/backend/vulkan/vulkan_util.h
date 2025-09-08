@@ -2,7 +2,7 @@
 #include "grassland/graphics/interface.h"
 #include "grassland/vulkan/vulkan.h"
 
-namespace grassland::graphics::backend {
+namespace CD::graphics::backend {
 
 VkFormat ImageFormatToVkFormat(ImageFormat format);
 
@@ -63,4 +63,4 @@ struct VulkanResourceBinding {
 class VulkanCUDABuffer;
 #endif
 
-}  // namespace grassland::graphics::backend
+}  // namespace CD::graphics::backend

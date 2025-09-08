@@ -2,7 +2,7 @@
 #include "grassland/math/math_aabb.h"
 #include "grassland/math/math_util.h"
 
-namespace grassland {
+namespace CD {
 
 template <class Real>
 LM_DEVICE_FUNC Real DistancePointPoint(const Vector3<Real> &p0, const Vector3<Real> &p1);
@@ -119,4 +119,4 @@ LM_DEVICE_FUNC Real AnyHitRayTriangle(const Vector3<Real> &origin,
                                       Real t_min = Eps<Real>(),
                                       Real t_max = 1.0 / Eps<Real>());
 
-}  // namespace grassland
+}  // namespace CD

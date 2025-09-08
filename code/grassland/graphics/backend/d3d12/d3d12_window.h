@@ -3,7 +3,7 @@
 #include "grassland/graphics/backend/d3d12/d3d12_imgui_assets.h"
 #include "grassland/graphics/backend/d3d12/d3d12_util.h"
 
-namespace grassland::graphics::backend {
+namespace CD::graphics::backend {
 
 class D3D12Window : public Window {
  public:
@@ -38,4 +38,4 @@ class D3D12Window : public Window {
   D3D12ImGuiAssets imgui_assets_{};
 };
 
-}  // namespace grassland::graphics::backend
+}  // namespace CD::graphics::backend

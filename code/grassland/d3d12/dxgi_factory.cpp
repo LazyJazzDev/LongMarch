@@ -6,7 +6,7 @@
 #include "grassland/d3d12/device_feature_requirement.h"
 #include "grassland/d3d12/swap_chain.h"
 
-namespace grassland::d3d12 {
+namespace CD::d3d12 {
 
 void ThrowError(const std::string &message) {
   throw std::runtime_error(message);
@@ -212,4 +212,4 @@ HRESULT CreateDXGIFactory(DXGIFactoryCreateHint hint, double_ptr<DXGIFactory> pp
   pp_factory.construct(hint, factory);
   return S_OK;
 }
-}  // namespace grassland::d3d12
+}  // namespace CD::d3d12

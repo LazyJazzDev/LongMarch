@@ -5,7 +5,7 @@
 
 #include "grassland/graphics/graphics_util.h"
 
-namespace grassland::vulkan {
+namespace CD::vulkan {
 
 namespace {
 EShLanguage VkShaderStageToEShLanguage(VkShaderStageFlagBits stage) {
@@ -262,4 +262,4 @@ targetVersion);
 }
  */
 
-}  // namespace grassland::vulkan
+}  // namespace CD::vulkan

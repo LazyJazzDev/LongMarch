@@ -2,7 +2,7 @@
 
 #include <memory>
 
-namespace grassland {
+namespace CD {
 
 enum class double_ptr_type { raw = 0, shared, unique };
 
@@ -108,4 +108,4 @@ class double_ptr {
   };
   double_ptr_type type{double_ptr_type::raw};
 };
-}  // namespace grassland
+}  // namespace CD

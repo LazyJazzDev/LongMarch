@@ -1,7 +1,7 @@
 #pragma once
 #include "grassland/d3d12/device.h"
 
-namespace grassland::d3d12 {
+namespace CD::d3d12 {
 
 class CommandAllocator {
  public:
@@ -11,8 +11,7 @@ class CommandAllocator {
     return command_allocator_.Get();
   }
 
-  HRESULT CreateCommandList(D3D12_COMMAND_LIST_TYPE type,
-                            double_ptr<CommandList> pp_command_list);
+  HRESULT CreateCommandList(D3D12_COMMAND_LIST_TYPE type, double_ptr<CommandList> pp_command_list);
 
   HRESULT ResetCommandRecord(CommandList *command_list);
 
@@ -20,4 +19,4 @@ class CommandAllocator {
   ComPtr<ID3D12CommandAllocator> command_allocator_;
 };
 
-}  // namespace grassland::d3d12
+}  // namespace CD::d3d12

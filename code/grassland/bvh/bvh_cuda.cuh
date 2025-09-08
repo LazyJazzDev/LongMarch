@@ -4,7 +4,7 @@
 #include "grassland/bvh/bvh_host.h"
 #include "grassland/bvh/bvh_util.h"
 
-namespace grassland {
+namespace CD {
 
 class BVHCuda {
  public:
@@ -21,4 +21,4 @@ class BVHCuda {
   thrust::device_vector<BVHNode> nodes_;
 };
 
-}  // namespace grassland
+}  // namespace CD

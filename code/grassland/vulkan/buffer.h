@@ -1,7 +1,7 @@
 #pragma once
 #include "grassland/vulkan/device.h"
 
-namespace grassland::vulkan {
+namespace CD::vulkan {
 class Buffer {
  public:
   Buffer(const class Device *device, VkDeviceSize size, VkBuffer buffer, VmaAllocation allocation);
@@ -71,4 +71,4 @@ void CreateExternalBuffer(VkDevice device,
                           VkDeviceMemory &bufferMemory);
 #endif
 
-}  // namespace grassland::vulkan
+}  // namespace CD::vulkan

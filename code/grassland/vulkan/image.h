@@ -2,7 +2,7 @@
 
 #include "grassland/vulkan/device.h"
 
-namespace grassland::vulkan {
+namespace CD::vulkan {
 class Image {
  public:
   Image(const class Device *device,
@@ -56,18 +56,16 @@ class Image {
     return sample_count_;
   }
 
-  void ClearColor(VkCommandBuffer command_buffer,
-                  VkClearColorValue clear_color);
+  void ClearColor(VkCommandBuffer command_buffer, VkClearColorValue clear_color);
 
   VkResult Resize(VkExtent2D extent);
 
-  void FetchPixelData(
-      CommandPool *command_pool,
-      Queue *queue,
-      VkRect2D rect,
-      void *data,
-      VkDeviceSize size,
-      VkImageLayout image_layout = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL) const;
+  void FetchPixelData(CommandPool *command_pool,
+                      Queue *queue,
+                      VkRect2D rect,
+                      void *data,
+                      VkDeviceSize size,
+                      VkImageLayout image_layout = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL) const;
 
  private:
   const class Device *device_{};
@@ -91,11 +89,7 @@ void TransitImageLayout(VkCommandBuffer command_buffer,
                         VkAccessFlags dst_access_flags,
                         VkImageAspectFlags aspect = VK_IMAGE_ASPECT_COLOR_BIT);
 
-void UploadImage(Queue *queue,
-                 CommandPool *command_pool,
-                 Image *image,
-                 const void *data,
-                 VkDeviceSize size);
+void UploadImage(Queue *queue, CommandPool *command_pool, Image *image, const void *data, VkDeviceSize size);
 
 void BlitImage(VkCommandBuffer cmd_buffer,
                Image *src_image,
@@ -104,4 +98,4 @@ void BlitImage(VkCommandBuffer cmd_buffer,
                VkImageBlit *regions = nullptr,
                VkFilter filter = VK_FILTER_LINEAR);
 
-}  // namespace grassland::vulkan
+}  // namespace CD::vulkan

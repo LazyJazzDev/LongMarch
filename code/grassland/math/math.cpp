@@ -1,6 +1,6 @@
 #include "grassland/math/math.h"
 
-namespace grassland {
+namespace CD {
 
 void PyBindMath(pybind11::module_ &m) {
   pybind11::class_<MeshSDF> mesh_sdf(m, "MeshSDF");
@@ -21,4 +21,4 @@ void PyBindMath(pybind11::module_ &m) {
   });
 }
 
-}  // namespace grassland
+}  // namespace CD

@@ -6,7 +6,7 @@
 #include <thrust/device_vector.h>
 #endif
 
-namespace grassland {
+namespace CD {
 
 struct MeshSDFRef {
   const Vector3<float> *x;
@@ -80,4 +80,4 @@ class MeshSDFDevice {
 };
 #endif
 
-}  // namespace grassland
+}  // namespace CD

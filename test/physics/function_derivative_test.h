@@ -8,7 +8,7 @@
 #include "iostream"
 #include "random"
 
-using namespace grassland;
+using namespace CD;
 
 #if defined(__CUDACC__)
 template <typename FunctionSet>

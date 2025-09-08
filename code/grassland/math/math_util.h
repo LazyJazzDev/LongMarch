@@ -3,7 +3,7 @@
 #include "glm/glm.hpp"
 #include "grassland/util/util.h"
 
-namespace grassland {
+namespace CD {
 using Eigen::Matrix;
 using Eigen::Matrix2;
 using Eigen::Matrix3;
@@ -85,4 +85,4 @@ LM_DEVICE_FUNC Vector<Scalar, dim> GLMToEigen(const glm::vec<dim, Scalar> &v) {
   return result;
 }
 
-}  // namespace grassland
+}  // namespace CD

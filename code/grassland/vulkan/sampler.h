@@ -1,7 +1,7 @@
 #pragma once
 #include "grassland/vulkan/device.h"
 
-namespace grassland::vulkan {
+namespace CD::vulkan {
 class Sampler {
  public:
   Sampler(const class Device *device, VkSampler sampler);
@@ -20,4 +20,4 @@ class Sampler {
   const class Device *device_;
   VkSampler sampler_{};
 };
-}  // namespace grassland::vulkan
+}  // namespace CD::vulkan

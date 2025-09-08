@@ -1,7 +1,7 @@
 #pragma once
 #include "grassland/graphics/graphics_util.h"
 
-namespace grassland::graphics {
+namespace CD::graphics {
 class CommandContext {
  public:
   virtual ~CommandContext() = default;
@@ -64,4 +64,4 @@ class CommandContext {
  protected:
   std::vector<std::function<void()>> post_execution_callbacks_;
 };
-}  // namespace grassland::graphics
+}  // namespace CD::graphics

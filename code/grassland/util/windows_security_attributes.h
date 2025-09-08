@@ -2,7 +2,7 @@
 #ifdef _WIN64
 #include "grassland/util/util_util.h"
 
-namespace grassland {
+namespace CD {
 
 class WindowsSecurityAttributes {
  protected:
@@ -15,6 +15,6 @@ class WindowsSecurityAttributes {
   ~WindowsSecurityAttributes();
 };
 
-}  // namespace grassland
+}  // namespace CD
 
 #endif

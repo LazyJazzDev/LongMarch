@@ -2,7 +2,7 @@
 #include "grassland/graphics/backend/vulkan/vulkan_core.h"
 #include "grassland/graphics/backend/vulkan/vulkan_util.h"
 
-namespace grassland::graphics::backend {
+namespace CD::graphics::backend {
 
 class VulkanImage : public Image {
  public:
@@ -22,4 +22,4 @@ class VulkanImage : public Image {
   ImageFormat format_;
 };
 
-}  // namespace grassland::graphics::backend
+}  // namespace CD::graphics::backend

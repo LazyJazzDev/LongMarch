@@ -1,6 +1,6 @@
 #include "grassland/graphics/backend/d3d12/d3d12_program.h"
 
-namespace grassland::graphics::backend {
+namespace CD::graphics::backend {
 
 D3D12Shader::D3D12Shader(D3D12Core *core, const CompiledShaderBlob &blob) : core_(core), shader_module_(blob) {
 }
@@ -204,4 +204,4 @@ void D3D12RayTracingProgram::Finalize(const std::vector<int32_t> &miss_shader_in
                                      &shader_table_);
 }
 
-}  // namespace grassland::graphics::backend
+}  // namespace CD::graphics::backend

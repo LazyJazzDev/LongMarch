@@ -14,7 +14,7 @@ struct GlobalUniformBuffer {
 
 class Application {
  public:
-  Application(grassland::graphics::BackendAPI api = grassland::graphics::BACKEND_API_VULKAN);
+  Application(CD::graphics::BackendAPI api = CD::graphics::BACKEND_API_VULKAN);
 
   ~Application();
 
@@ -28,8 +28,8 @@ class Application {
   }
 
  private:
-  std::shared_ptr<grassland::graphics::Core> core_;
-  std::unique_ptr<grassland::graphics::Window> window_;
-  std::unique_ptr<grassland::graphics::Image> frame_image_;
+  std::shared_ptr<CD::graphics::Core> core_;
+  std::unique_ptr<CD::graphics::Window> window_;
+  std::unique_ptr<CD::graphics::Image> frame_image_;
   bool alive_{false};
 };

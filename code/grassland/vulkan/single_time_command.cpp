@@ -2,7 +2,7 @@
 
 #include "grassland/vulkan/command_buffer.h"
 
-namespace grassland::vulkan {
+namespace CD::vulkan {
 VkResult SingleTimeCommand(const Queue *queue,
                            const CommandPool *command_pool,
                            std::function<void(VkCommandBuffer)> function) {
@@ -44,4 +44,4 @@ VkResult SingleTimeCommand(const Queue *queue,
 
   return result;
 }
-}  // namespace grassland::vulkan
+}  // namespace CD::vulkan

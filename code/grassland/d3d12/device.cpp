@@ -13,7 +13,7 @@
 #include "grassland/d3d12/shader_module.h"
 #include "grassland/math/math_aabb.h"
 
-namespace grassland::d3d12 {
+namespace CD::d3d12 {
 
 Device::Device(const class Adapter &adapter, const D3D_FEATURE_LEVEL feature_level, ComPtr<ID3D12Device> device)
     : adapter_(adapter), feature_level_(feature_level), device_(std::move(device)) {
@@ -89,9 +89,9 @@ HRESULT Device::CreateBuffer(size_t size,
                              double_ptr<Buffer> pp_buffer) {
   ComPtr<ID3D12Resource> buffer;
 
-  RETURN_IF_FAILED_HR(::grassland::d3d12::CreateBuffer(device_.Get(), size, heap_type, heap_flags, resource_state,
-                                                       resource_flags, buffer),
-                      "failed to create buffer.");
+  RETURN_IF_FAILED_HR(
+      ::CD::d3d12::CreateBuffer(device_.Get(), size, heap_type, heap_flags, resource_state, resource_flags, buffer),
+      "failed to create buffer.");
 
   pp_buffer.construct(buffer, size);
 
@@ -648,4 +648,4 @@ ID3D12Resource *Device::RequestInstanceBuffer(size_t size) {
   return instance_buffer_.Get();
 }
 
-}  // namespace grassland::d3d12
+}  // namespace CD::d3d12

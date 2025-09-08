@@ -2,11 +2,10 @@
 #include "grassland/vulkan/command_pool.h"
 #include "grassland/vulkan/vulkan_util.h"
 
-namespace grassland::vulkan {
+namespace CD::vulkan {
 class CommandBuffer {
  public:
-  CommandBuffer(const class CommandPool *command_pool,
-                VkCommandBuffer command_buffer);
+  CommandBuffer(const class CommandPool *command_pool, VkCommandBuffer command_buffer);
 
   ~CommandBuffer();
 
@@ -26,4 +25,4 @@ class CommandBuffer {
   const class CommandPool *command_pool_;
   VkCommandBuffer command_buffer_{};
 };
-}  // namespace grassland::vulkan
+}  // namespace CD::vulkan

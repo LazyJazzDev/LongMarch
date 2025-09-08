@@ -4,7 +4,7 @@
 #include "imgui_impl_glfw.h"
 #include "imgui_impl_vulkan.h"
 
-namespace grassland::graphics::backend {
+namespace CD::graphics::backend {
 struct VulkanImGuiAssets {
   ImGuiContext *context;
   std::unique_ptr<vulkan::RenderPass> render_pass;
@@ -13,4 +13,4 @@ struct VulkanImGuiAssets {
   float font_size;
   bool draw_command;
 };
-}  // namespace grassland::graphics::backend
+}  // namespace CD::graphics::backend

@@ -4,7 +4,7 @@
 #include "thrust/device_vector.h"
 #include "thrust/host_vector.h"
 
-using namespace grassland;
+using namespace CD;
 
 using real = float;
 

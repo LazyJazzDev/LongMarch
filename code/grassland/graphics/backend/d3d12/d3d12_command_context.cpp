@@ -7,7 +7,7 @@
 #include "grassland/graphics/backend/d3d12/d3d12_sampler.h"
 #include "grassland/graphics/backend/d3d12/d3d12_window.h"
 
-namespace grassland::graphics::backend {
+namespace CD::graphics::backend {
 
 D3D12CommandContext::D3D12CommandContext(D3D12Core *core) : core_(core) {
   for (int i = 0; i < BIND_POINT_COUNT; i++) {
@@ -368,4 +368,4 @@ void D3D12CommandContext::RecordDynamicBuffer(D3D12Buffer *buffer) {
   }
 }
 
-}  // namespace grassland::graphics::backend
+}  // namespace CD::graphics::backend

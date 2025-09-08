@@ -2,7 +2,7 @@
 
 #include "filesystem"
 
-namespace grassland {
+namespace CD {
 
 FileProbe::FileProbe() {
 }
@@ -64,4 +64,4 @@ std::string FindAssetPath(const std::string &filename) {
   return FileProbe::GetInstance().FindPath(filename);
 }
 
-}  // namespace grassland
+}  // namespace CD

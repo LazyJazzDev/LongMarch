@@ -8,4 +8,4 @@
 #include "grassland/graphics/sampler.h"
 #include "grassland/graphics/window.h"
 
-namespace grassland::graphics {}
+namespace CD::graphics {}

@@ -1,7 +1,7 @@
 #pragma once
 #include "grassland/physics/diff_kernel/dk_basics.h"
 
-namespace grassland {
+namespace CD {
 
 template <typename Real>
 struct PointSDF {
@@ -129,4 +129,4 @@ struct LineSDF {
   Eigen::Vector3<Real> direction{0, 1, 0};
 };
 
-}  // namespace grassland
+}  // namespace CD

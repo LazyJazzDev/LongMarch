@@ -2,7 +2,7 @@
 #include "grassland/graphics/backend/vulkan/vulkan_core.h"
 #include "grassland/graphics/backend/vulkan/vulkan_util.h"
 
-namespace grassland::graphics::backend {
+namespace CD::graphics::backend {
 
 struct VulkanBufferRange {
   VulkanBuffer *buffer;
@@ -105,4 +105,4 @@ class VulkanCUDABuffer : public VulkanBuffer, public CUDABuffer {
 };
 #endif
 
-}  // namespace grassland::graphics::backend
+}  // namespace CD::graphics::backend

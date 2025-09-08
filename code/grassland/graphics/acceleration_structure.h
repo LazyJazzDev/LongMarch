@@ -1,7 +1,7 @@
 #pragma once
 #include "grassland/graphics/graphics_util.h"
 
-namespace grassland::graphics {
+namespace CD::graphics {
 
 class AccelerationStructure {
  public:
@@ -16,4 +16,4 @@ class AccelerationStructure {
                                   RayTracingInstanceFlag instance_flags = RAYTRACING_INSTANCE_FLAG_NONE);
 };
 
-}  // namespace grassland::graphics
+}  // namespace CD::graphics

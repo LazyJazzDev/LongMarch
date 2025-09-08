@@ -2,7 +2,7 @@
 #include "grassland/vulkan/device.h"
 #include "grassland/vulkan/vulkan_util.h"
 
-namespace grassland::vulkan {
+namespace CD::vulkan {
 class Fence {
  public:
   Fence(const class Device *device, VkFence fence);
@@ -21,4 +21,4 @@ class Fence {
   const class Device *device_{};
   VkFence fence_{};
 };
-}  // namespace grassland::vulkan
+}  // namespace CD::vulkan

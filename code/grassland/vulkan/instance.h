@@ -4,7 +4,7 @@
 #include "grassland/vulkan/surface.h"
 #include "grassland/vulkan/vulkan_util.h"
 
-namespace grassland::vulkan {
+namespace CD::vulkan {
 
 struct InstanceCreateHint {
   bool enable_validation_layers{kDefaultEnableValidationLayers};
@@ -89,4 +89,4 @@ class Instance {
 VkResult CreateInstance(InstanceCreateHint create_hint,
                         double_ptr<Instance> pp_instance = static_cast<Instance **>(nullptr));
 
-}  // namespace grassland::vulkan
+}  // namespace CD::vulkan

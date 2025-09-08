@@ -2,7 +2,7 @@
 #include "grassland/d3d12/device_feature_requirement.h"
 #include "grassland/d3d12/dxgi_factory.h"
 
-namespace grassland::d3d12 {
+namespace CD::d3d12 {
 class Adapter {
  public:
   Adapter(ComPtr<IDXGIAdapter1> adapter);
@@ -29,4 +29,4 @@ class Adapter {
   ComPtr<IDXGIAdapter1> adapter_;
   DXGI_ADAPTER_DESC1 desc_{};
 };
-}  // namespace grassland::d3d12
+}  // namespace CD::d3d12

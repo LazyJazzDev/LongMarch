@@ -2,7 +2,7 @@
 
 #include <utility>
 
-namespace grassland {
+namespace CD {
 
 AABB Join(const AABB &aabb0, const AABB &aabb1) {
   AABB result;
@@ -17,4 +17,4 @@ BVHNode::BVHNode(AABB aabb, int instance_index) : aabb(std::move(aabb)), instanc
   rch = -1;
 }
 
-}  // namespace grassland
+}  // namespace CD

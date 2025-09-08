@@ -2,7 +2,7 @@
 #ifdef _WIN64
 #include <aclapi.h>
 
-namespace grassland {
+namespace CD {
 
 WindowsSecurityAttributes::WindowsSecurityAttributes() {
   win_p_security_descriptor_ = (PSECURITY_DESCRIPTOR)calloc(1, SECURITY_DESCRIPTOR_MIN_LENGTH + 2 * sizeof(void **));
@@ -52,6 +52,6 @@ WindowsSecurityAttributes::~WindowsSecurityAttributes() {
   }
   free(win_p_security_descriptor_);
 }
-}  // namespace grassland
+}  // namespace CD
 
 #endif

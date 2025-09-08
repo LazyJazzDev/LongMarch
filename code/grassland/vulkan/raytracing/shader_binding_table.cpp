@@ -2,7 +2,7 @@
 
 #include "grassland/vulkan/buffer.h"
 
-namespace grassland::vulkan {
+namespace CD::vulkan {
 
 ShaderBindingTable::ShaderBindingTable(std::unique_ptr<Buffer> buffer,
                                        VkDeviceAddress ray_gen_address,
@@ -50,4 +50,4 @@ size_t ShaderBindingTable::CallableShaderCount() const {
   return callable_shader_count_;
 }
 
-}  // namespace grassland::vulkan
+}  // namespace CD::vulkan

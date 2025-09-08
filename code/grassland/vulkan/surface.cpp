@@ -2,10 +2,8 @@
 
 #include "grassland/vulkan/instance.h"
 
-namespace grassland::vulkan {
-Surface::Surface(const class Instance *instance,
-                 GLFWwindow *window,
-                 VkSurfaceKHR surface)
+namespace CD::vulkan {
+Surface::Surface(const class Instance *instance, GLFWwindow *window, VkSurfaceKHR surface)
     : instance_(instance), window_(window), surface_(surface) {
 }
 
@@ -24,4 +22,4 @@ GLFWwindow *Surface::Window() const {
 const Instance *Surface::Instance() const {
   return instance_;
 }
-}  // namespace grassland::vulkan
+}  // namespace CD::vulkan

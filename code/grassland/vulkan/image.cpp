@@ -3,7 +3,7 @@
 #include "grassland/vulkan/buffer.h"
 #include "grassland/vulkan/single_time_command.h"
 
-namespace grassland::vulkan {
+namespace CD::vulkan {
 Image::Image(const class Device *device,
              VkFormat format,
              VkExtent2D extent,
@@ -182,4 +182,4 @@ void BlitImage(VkCommandBuffer cmd_buffer,
   vkCmdBlitImage(cmd_buffer, src_image->Handle(), VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, dst_image->Handle(),
                  VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, num_region, regions, filter);
 }
-}  // namespace grassland::vulkan
+}  // namespace CD::vulkan

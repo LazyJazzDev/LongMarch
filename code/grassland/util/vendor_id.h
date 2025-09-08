@@ -2,7 +2,7 @@
 #include <cstdint>
 #include <string>
 
-namespace grassland {
+namespace CD {
 
 std::string PCIVendorIDToName(uint32_t vendor_id);
 

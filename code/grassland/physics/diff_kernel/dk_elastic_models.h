@@ -2,7 +2,7 @@
 #include "grassland/physics/diff_kernel/dk_basics.h"
 #include "grassland/physics/diff_kernel/dk_fem_elements.h"
 
-namespace grassland {
+namespace CD {
 template <typename Real>
 struct ElasticNeoHookean {
   typedef Real Scalar;
@@ -155,4 +155,4 @@ struct ElasticNeoHookeanSimpleTriangle {
   Eigen::Matrix2<Real> Dm;
 };
 
-}  // namespace grassland
+}  // namespace CD

@@ -1,7 +1,7 @@
 #pragma once
 #include "grassland/graphics/backend/d3d12/d3d12_util.h"
 
-namespace grassland::graphics::backend {
+namespace CD::graphics::backend {
 
 struct BlitPipeline {
   d3d12::Device *device_;
@@ -193,4 +193,4 @@ class D3D12Core : public Core {
   std::unique_ptr<d3d12::Buffer> download_staging_buffer_;
 };
 
-}  // namespace grassland::graphics::backend
+}  // namespace CD::graphics::backend

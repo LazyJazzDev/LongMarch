@@ -1,6 +1,6 @@
 #include "grassland/d3d12/raytracing/shader_table.h"
 
-namespace grassland::d3d12 {
+namespace CD::d3d12 {
 ShaderTable::ShaderTable(const ComPtr<ID3D12Resource> &buffer,
                          D3D12_GPU_VIRTUAL_ADDRESS ray_gen_offset,
                          D3D12_GPU_VIRTUAL_ADDRESS miss_offset,
@@ -47,4 +47,4 @@ size_t ShaderTable::CallableShaderCount() const {
   return callable_count_;
 }
 
-}  // namespace grassland::d3d12
+}  // namespace CD::d3d12

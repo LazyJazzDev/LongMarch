@@ -1,6 +1,6 @@
 #include "grassland/physics/diff_kernel/dk_dihedral_angle.h"
 
-namespace grassland {
+namespace CD {
 template <typename Real>
 LM_DEVICE_FUNC bool DihedralAngleAssistEdgesToNormalsAxis<Real>::ValidInput(const InputType &A) const {
   return A.col(0).cross(A.col(1)).norm() > Eps<Real>() * 100 && A.col(1).cross(A.col(2)).norm() > Eps<Real>() * 100;
@@ -894,4 +894,4 @@ LM_DEVICE_FUNC void DihedralAngleSubHessianJacobian(const Matrix<float, 3, 4> &V
   }
 }
 
-}  // namespace grassland
+}  // namespace CD

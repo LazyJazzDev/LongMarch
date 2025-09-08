@@ -7,7 +7,7 @@
 #include <dxgi1_2.h>
 #endif
 
-namespace grassland::vulkan {
+namespace CD::vulkan {
 Buffer::Buffer(const class Device *device, VkDeviceSize size, VkBuffer buffer, VmaAllocation allocation)
     : device_(device), size_(size), buffer_(buffer), allocation_(allocation) {
 }
@@ -136,4 +136,4 @@ void CreateExternalBuffer(VkDevice device,
 }
 #endif
 
-}  // namespace grassland::vulkan
+}  // namespace CD::vulkan

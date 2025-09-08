@@ -1,7 +1,7 @@
 #pragma once
 #include "grassland/physics/physics_util.h"
 
-namespace grassland {
+namespace CD {
 
 template <typename Real, int OutputDim, int InputDim>
 struct HessianTensor {
@@ -98,4 +98,4 @@ struct HessianTensor {
   }
 };
 
-}  // namespace grassland
+}  // namespace CD

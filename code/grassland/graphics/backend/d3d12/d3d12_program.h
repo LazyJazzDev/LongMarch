@@ -2,7 +2,7 @@
 #include "grassland/graphics/backend/d3d12/d3d12_core.h"
 #include "grassland/graphics/backend/d3d12/d3d12_util.h"
 
-namespace grassland::graphics::backend {
+namespace CD::graphics::backend {
 class D3D12Shader : public Shader {
  public:
   D3D12Shader(D3D12Core *core, const CompiledShaderBlob &shader_blob);
@@ -121,4 +121,4 @@ class D3D12RayTracingProgram : public RayTracingProgram, public D3D12ProgramBase
   std::unique_ptr<d3d12::ShaderTable> shader_table_;
 };
 
-}  // namespace grassland::graphics::backend
+}  // namespace CD::graphics::backend

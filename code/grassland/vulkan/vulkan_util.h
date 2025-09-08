@@ -23,7 +23,7 @@
 #include "grassland/graphics/graphics_util.h"
 #include "grassland/util/util.h"
 
-namespace grassland::vulkan {
+namespace CD::vulkan {
 #define GRASSLAND_VULKAN_PROCEDURE_VAR(function_name) PFN_##function_name function_name{};
 
 #ifdef NDEBUG
@@ -70,15 +70,15 @@ std::string GetErrorMessage();
 
 std::string VkResultToString(VkResult result);
 
-#define RETURN_IF_FAILED_VK(cmd, ...)                                                                   \
-  do {                                                                                                  \
-    VkResult res = cmd;                                                                                 \
-    if (res != VK_SUCCESS) {                                                                            \
-      ::grassland::vulkan::SetErrorMessage(__VA_ARGS__);                                                \
-      ::grassland::vulkan::SetErrorMessage("VkResult: {}", ::grassland::vulkan::VkResultToString(res)); \
-      return res;                                                                                       \
-    }                                                                                                   \
-                                                                                                        \
+#define RETURN_IF_FAILED_VK(cmd, ...)                                                     \
+  do {                                                                                    \
+    VkResult res = cmd;                                                                   \
+    if (res != VK_SUCCESS) {                                                              \
+      ::CD::vulkan::SetErrorMessage(__VA_ARGS__);                                         \
+      ::CD::vulkan::SetErrorMessage("VkResult: {}", ::CD::vulkan::VkResultToString(res)); \
+      return res;                                                                         \
+    }                                                                                     \
+                                                                                          \
   } while (false)
 
 class Instance;
@@ -111,4 +111,4 @@ bool IsDepthFormat(VkFormat format);
 
 using graphics::CompiledShaderBlob;
 
-}  // namespace grassland::vulkan
+}  // namespace CD::vulkan

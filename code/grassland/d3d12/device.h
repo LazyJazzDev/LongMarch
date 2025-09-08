@@ -1,7 +1,7 @@
 #pragma once
 #include "grassland/d3d12/adapter.h"
 
-namespace grassland::d3d12 {
+namespace CD::d3d12 {
 class Device {
  public:
   Device(const Adapter &adapter, D3D_FEATURE_LEVEL feature_level, ComPtr<ID3D12Device> device);
@@ -175,4 +175,4 @@ class Device {
   ComPtr<ID3D12Resource> scratch_buffer_;
   ComPtr<ID3D12Resource> instance_buffer_;
 };
-}  // namespace grassland::d3d12
+}  // namespace CD::d3d12

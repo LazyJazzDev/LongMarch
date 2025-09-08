@@ -8,7 +8,7 @@
 #include "grassland/graphics/backend/d3d12/d3d12_sampler.h"
 #include "grassland/graphics/backend/d3d12/d3d12_window.h"
 
-namespace grassland::graphics::backend {
+namespace CD::graphics::backend {
 
 namespace {
 #include "built_in_shaders.inl"
@@ -550,4 +550,4 @@ void D3D12Core::CUDAEndExecutionBarrier(cudaStream_t stream) {
 }
 #endif
 
-}  // namespace grassland::graphics::backend
+}  // namespace CD::graphics::backend

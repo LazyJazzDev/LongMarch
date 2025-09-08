@@ -1,6 +1,6 @@
 #include "grassland/graphics/backend/d3d12/d3d12_buffer.h"
 
-namespace grassland::graphics::backend {
+namespace CD::graphics::backend {
 
 D3D12BufferRange::D3D12BufferRange(const BufferRange &range)
     : buffer(dynamic_cast<D3D12Buffer *>(range.buffer)), offset(range.offset), size(range.size) {
@@ -202,4 +202,4 @@ void D3D12CUDABuffer::GetCUDAMemoryPointer(void **ptr) {
 }
 #endif
 
-}  // namespace grassland::graphics::backend
+}  // namespace CD::graphics::backend

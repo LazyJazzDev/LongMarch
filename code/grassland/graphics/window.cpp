@@ -1,6 +1,6 @@
 #include "grassland/graphics/window.h"
 
-namespace grassland::graphics {
+namespace CD::graphics {
 
 namespace {
 bool glfw_initialized_{false};
@@ -173,4 +173,4 @@ void Window::PyBind(pybind11::module &m) {
   m.def("glfw_poll_events", []() { glfwPollEvents(); });
 }
 
-}  // namespace grassland::graphics
+}  // namespace CD::graphics

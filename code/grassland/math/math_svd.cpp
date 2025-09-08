@@ -1,6 +1,6 @@
 #include "grassland/math/math_svd.h"
 
-namespace grassland {
+namespace CD {
 template <typename Real>
 LM_DEVICE_FUNC void EigenDecomp(const Matrix2<Real> &A, Matrix2<Real> &D, Matrix2<Real> &G) {
   Real a = A(0, 0);
@@ -67,4 +67,4 @@ LM_DEVICE_FUNC void SVD(const Matrix2<Real> &A, Matrix2<Real> &U, Matrix2<Real> 
 template LM_DEVICE_FUNC void SVD(const Matrix2<float> &A, Matrix2<float> &U, Matrix2<float> &S, Matrix2<float> &Vt);
 template LM_DEVICE_FUNC void SVD(const Matrix2<double> &A, Matrix2<double> &U, Matrix2<double> &S, Matrix2<double> &Vt);
 
-}  // namespace grassland
+}  // namespace CD

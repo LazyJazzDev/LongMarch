@@ -2,7 +2,7 @@
 #include <chrono>
 #include <thread>
 
-namespace grassland {
+namespace CD {
 
 class Metronome {
  public:
@@ -25,4 +25,4 @@ class Metronome {
   std::chrono::steady_clock::time_point start_;
 };
 
-}  // namespace grassland
+}  // namespace CD

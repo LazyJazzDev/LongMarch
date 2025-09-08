@@ -1,7 +1,7 @@
 #pragma once
 #include "grassland/graphics/graphics_util.h"
 
-namespace grassland::graphics {
+namespace CD::graphics {
 
 class Shader {
  public:
@@ -62,4 +62,4 @@ CompiledShaderBlob CompileShader(const VirtualFileSystem &vfs,
                                  const std::string &target,
                                  const std::vector<std::string> &args = {});
 
-}  // namespace grassland::graphics
+}  // namespace CD::graphics

@@ -2,7 +2,7 @@
 
 #include "grassland/d3d12/command_queue.h"
 
-namespace grassland::d3d12 {
+namespace CD::d3d12 {
 
 AccelerationStructure::AccelerationStructure(Device *device, const ComPtr<ID3D12Resource> &as)
     : device_(device), as_(as) {
@@ -95,4 +95,4 @@ HRESULT AccelerationStructure::UpdateInstances(
   return UpdateInstances(instance_descs, queue, fence, allocator);
 }
 
-}  // namespace grassland::d3d12
+}  // namespace CD::d3d12

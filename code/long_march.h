@@ -4,6 +4,6 @@
 #include "sparks/sparks.h"
 
 namespace long_march {
-using namespace grassland;
+using namespace CD;
 using namespace snow_mount;
 }  // namespace long_march

@@ -1,7 +1,7 @@
 #pragma once
 #include "grassland/physics/diff_kernel/dk_basics.h"
 
-namespace grassland {
+namespace CD {
 
 template <typename Real>
 struct FEMTetrahedronDeformationGradient {
@@ -213,4 +213,4 @@ struct FEMTriangleDeformationGradient3x3 {
   Eigen::Matrix2<Real> Dm;
 };
 
-}  // namespace grassland
+}  // namespace CD

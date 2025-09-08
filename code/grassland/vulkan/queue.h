@@ -1,12 +1,10 @@
 #pragma once
 #include "grassland/vulkan/instance.h"
 
-namespace grassland::vulkan {
+namespace CD::vulkan {
 class Queue {
  public:
-  explicit Queue(const class Device *device,
-                 uint32_t queue_family_index,
-                 VkQueue queue);
+  explicit Queue(const class Device *device, uint32_t queue_family_index, VkQueue queue);
 
   VkQueue Handle() const;
 
@@ -24,4 +22,4 @@ class Queue {
   uint32_t queue_family_index_{};
   VkQueue queue_{};
 };
-}  // namespace grassland::vulkan
+}  // namespace CD::vulkan

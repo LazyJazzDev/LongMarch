@@ -4,7 +4,7 @@
 #include "iomanip"
 #include "sstream"
 
-namespace grassland {
+namespace CD {
 std::string GetTimestamp() {
   auto now = std::chrono::system_clock::now();
   std::time_t current_time = std::chrono::system_clock::to_time_t(now);
@@ -32,4 +32,4 @@ void LogWarning(const std::string &message) {
 void LogError(const std::string &message) {
   std::cout << "[ERROR][" << GetTimestamp() << "] " << message << std::endl;
 }
-}  // namespace grassland
+}  // namespace CD

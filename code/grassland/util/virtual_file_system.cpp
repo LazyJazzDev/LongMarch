@@ -3,7 +3,7 @@
 #include <fstream>
 #include <stack>
 
-namespace grassland {
+namespace CD {
 class VirtualFileSystemFile;
 class VirtualFileSystemDirectory : public VirtualFileSystemEntry {
  public:
@@ -198,4 +198,4 @@ void VirtualFileSystem::SaveToDirectory(const std::filesystem::path &path) const
   root_->SaveToPath(path);
 }
 
-}  // namespace grassland
+}  // namespace CD

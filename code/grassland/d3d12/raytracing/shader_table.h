@@ -1,7 +1,7 @@
 #pragma once
 #include "grassland/d3d12/d3d12util.h"
 
-namespace grassland::d3d12 {
+namespace CD::d3d12 {
 
 class ShaderTable {
  public:
@@ -33,4 +33,4 @@ class ShaderTable {
   size_t callable_count_{0};
 };
 
-}  // namespace grassland::d3d12
+}  // namespace CD::d3d12

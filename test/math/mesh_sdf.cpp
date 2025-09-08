@@ -18,15 +18,15 @@ TEST(Math, MeshSDFCorrectness) {
     std::swap(indices[i], indices[i + 1]);
   }
 
-  grassland::VertexBufferView vbv = {positions.data()};
-  grassland::MeshSDF mesh_sdf(vbv, positions.size(), indices.data(), indices.size());
-  grassland::MeshSDFRef mesh_ref = mesh_sdf;
+  CD::VertexBufferView vbv = {positions.data()};
+  CD::MeshSDF mesh_sdf(vbv, positions.size(), indices.data(), indices.size());
+  CD::MeshSDFRef mesh_ref = mesh_sdf;
 
   for (int task = 0; task < 10000; task++) {
     Eigen::Vector3<float> t = Eigen::Vector3<float>::Random();
     float s = Eigen::Matrix<float, 1, 1>::Random().value() + 1.1;
     Eigen::Matrix<float, 3, 3> R = Eigen::Matrix<float, 3, 3>::Identity() * s;
-    grassland::CubeSDF<float> cube_sdf;
+    CD::CubeSDF<float> cube_sdf;
     cube_sdf.center = t;
     cube_sdf.size = s;
     for (int test = 0; test < 100; test++) {
@@ -35,8 +35,8 @@ TEST(Math, MeshSDFCorrectness) {
       do {
         p = Eigen::Vector3<float>::Random() * 4.0 * s + t;
         dp = (p - t).cwiseAbs();
-      } while (fabs(dp[0] - dp[1]) < grassland::Eps<float>() || fabs(dp[1] - dp[2]) < grassland::Eps<float>() ||
-               fabs(dp[0] - dp[2]) < grassland::Eps<float>());
+      } while (fabs(dp[0] - dp[1]) < CD::Eps<float>() || fabs(dp[1] - dp[2]) < CD::Eps<float>() ||
+               fabs(dp[0] - dp[2]) < CD::Eps<float>());
 
       Eigen::Vector3<float> mesh_jacobian;
       Eigen::Matrix<float, 3, 3> mesh_hessian;
@@ -78,7 +78,7 @@ TEST(Math, MeshSDFCorrectness) {
 
 #if defined(__CUDACC__)
 
-__global__ void MeshSDFDeviceKernel(grassland::MeshSDFRef mesh_sdf,
+__global__ void MeshSDFDeviceKernel(CD::MeshSDFRef mesh_sdf,
                                     const Eigen::Vector4<float> *mesh_refs,
                                     const Eigen::Vector3<float> *task_positions,
                                     float *results_t,
@@ -107,11 +107,11 @@ TEST(Math, MeshSDFDevice) {
     std::swap(indices[i], indices[i + 1]);
   }
 
-  grassland::VertexBufferView vbv = {positions.data()};
-  grassland::MeshSDF mesh_sdf(vbv, positions.size(), indices.data(), indices.size());
-  grassland::MeshSDFDevice mesh_sdf_device = mesh_sdf;
-  grassland::MeshSDFRef mesh_ref = mesh_sdf;
-  grassland::MeshSDFRef mesh_ref_device = mesh_sdf_device;
+  CD::VertexBufferView vbv = {positions.data()};
+  CD::MeshSDF mesh_sdf(vbv, positions.size(), indices.data(), indices.size());
+  CD::MeshSDFDevice mesh_sdf_device = mesh_sdf;
+  CD::MeshSDFRef mesh_ref = mesh_sdf;
+  CD::MeshSDFRef mesh_ref_device = mesh_sdf_device;
 
   std::vector<Eigen::Vector4<float>> mesh_refs;
   thrust::device_vector<Eigen::Vector4<float>> mesh_refs_device;
@@ -138,8 +138,8 @@ TEST(Math, MeshSDFDevice) {
       do {
         p = Eigen::Vector3<float>::Random() * 4.0 * s + t;
         dp = (p - t).cwiseAbs();
-      } while (fabs(dp[0] - dp[1]) < grassland::Eps<float>() || fabs(dp[1] - dp[2]) < grassland::Eps<float>() ||
-               fabs(dp[0] - dp[2]) < grassland::Eps<float>());
+      } while (fabs(dp[0] - dp[1]) < CD::Eps<float>() || fabs(dp[1] - dp[2]) < CD::Eps<float>() ||
+               fabs(dp[0] - dp[2]) < CD::Eps<float>());
       task_positions.push_back(p);
     }
   }

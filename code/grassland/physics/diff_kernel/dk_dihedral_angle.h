@@ -1,7 +1,7 @@
 #pragma once
 #include "grassland/physics/diff_kernel/dk_basics.h"
 
-namespace grassland {
+namespace CD {
 
 template <typename Real>
 struct DihedralAngleAssistEdgesToNormalsAxis {
@@ -111,4 +111,4 @@ LM_DEVICE_FUNC void DihedralAngleSubHessianJacobian(const Matrix<float, 3, 4> &V
                                                     Matrix3<float> &hessian,
                                                     int subdim);
 
-}  // namespace grassland
+}  // namespace CD

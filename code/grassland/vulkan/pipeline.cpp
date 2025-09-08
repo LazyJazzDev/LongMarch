@@ -2,7 +2,7 @@
 
 #include <utility>
 
-namespace grassland::vulkan {
+namespace CD::vulkan {
 
 PipelineSettings::PipelineSettings(const RenderPass *render_pass, const PipelineLayout *pipeline_layout, int subpass)
     : render_pass(render_pass), pipeline_layout(pipeline_layout), subpass(subpass) {
@@ -202,4 +202,4 @@ RayTracingPipeline::RayTracingPipeline(const class vulkan::Device *device,
       callable_shader_count_(callable_shader_count) {
 }
 
-}  // namespace grassland::vulkan
+}  // namespace CD::vulkan

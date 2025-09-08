@@ -4,7 +4,7 @@
 #include "core.h"
 #include "stb_image.h"
 
-namespace grassland::graphics {
+namespace CD::graphics {
 
 void Image::PyBind(pybind11::module &m) {
   pybind11::class_<Image, std::shared_ptr<Image>> image(m, "Image");
@@ -38,4 +38,4 @@ int LoadImageFromFile(Core *core, const std::string &file_path, double_ptr<Image
   return -1;
 }
 
-}  // namespace grassland::graphics
+}  // namespace CD::graphics

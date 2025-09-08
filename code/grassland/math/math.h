@@ -12,6 +12,6 @@
 #include "grassland/math/math_triangle.h"
 #include "grassland/math/math_util.h"
 
-namespace grassland {
+namespace CD {
 void PyBindMath(pybind11::module_ &m);
-}  // namespace grassland
+}  // namespace CD

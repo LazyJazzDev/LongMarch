@@ -4,7 +4,7 @@
 
 #include "grassland/vulkan/device.h"
 
-namespace grassland::vulkan {
+namespace CD::vulkan {
 struct SubpassSettings {
   std::vector<VkAttachmentReference> input_attachment_references{};
   std::vector<VkAttachmentReference> color_attachment_references{};
@@ -14,21 +14,15 @@ struct SubpassSettings {
 
   SubpassSettings() = default;
 
-  SubpassSettings(
-      const std::vector<VkAttachmentReference> &color_attachment_references,
-      const std::optional<VkAttachmentReference> &depth_attachment_reference =
-          std::nullopt,
-      const std::vector<VkAttachmentReference> &resolve_attachment_references =
-          {});
+  SubpassSettings(const std::vector<VkAttachmentReference> &color_attachment_references,
+                  const std::optional<VkAttachmentReference> &depth_attachment_reference = std::nullopt,
+                  const std::vector<VkAttachmentReference> &resolve_attachment_references = {});
 
-  SubpassSettings(
-      const std::vector<VkAttachmentReference> &input_attachment_references,
-      const std::vector<VkAttachmentReference> &color_attachment_references,
-      const std::optional<VkAttachmentReference> &depth_attachment_reference =
-          std::nullopt,
-      const std::vector<VkAttachmentReference> &resolve_attachment_references =
-          {},
-      const std::vector<uint32_t> &preserve_attachment_references = {});
+  SubpassSettings(const std::vector<VkAttachmentReference> &input_attachment_references,
+                  const std::vector<VkAttachmentReference> &color_attachment_references,
+                  const std::optional<VkAttachmentReference> &depth_attachment_reference = std::nullopt,
+                  const std::vector<VkAttachmentReference> &resolve_attachment_references = {},
+                  const std::vector<uint32_t> &preserve_attachment_references = {});
 
   VkSubpassDescription Description() const;
 
@@ -44,8 +38,7 @@ struct SubpassSettings {
     return depth_attachment_reference;
   }
 
-  const std::vector<VkAttachmentReference> &ResolveAttachmentReferences()
-      const {
+  const std::vector<VkAttachmentReference> &ResolveAttachmentReferences() const {
     return resolve_attachment_references;
   }
 
@@ -89,4 +82,4 @@ class RenderPass {
   std::vector<struct SubpassSettings> subpass_settings_{};
   VkRenderPass render_pass_{};
 };
-}  // namespace grassland::vulkan
+}  // namespace CD::vulkan

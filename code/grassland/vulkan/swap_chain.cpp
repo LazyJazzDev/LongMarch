@@ -1,8 +1,8 @@
 #include "grassland/vulkan/swap_chain.h"
 
-namespace grassland::vulkan {
-Swapchain::Swapchain(const class grassland::vulkan::Device *device,
-                     const class grassland::vulkan::Surface *surface,
+namespace CD::vulkan {
+Swapchain::Swapchain(const class CD::vulkan::Device *device,
+                     const class CD::vulkan::Surface *surface,
                      VkSwapchainKHR swapchain,
                      VkFormat format,
                      VkExtent2D extent)
@@ -122,4 +122,4 @@ VkResult Swapchain::AcquireNextImage(uint64_t timeout,
                                      uint32_t *image_index) const {
   return vkAcquireNextImageKHR(device_->Handle(), swapchain_, timeout, semaphore, fence, image_index);
 }
-}  // namespace grassland::vulkan
+}  // namespace CD::vulkan

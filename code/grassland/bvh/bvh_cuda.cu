@@ -1,6 +1,6 @@
 #include "grassland/bvh/bvh_cuda.cuh"
 
-namespace grassland {
+namespace CD {
 BVHCuda::BVHCuda(const BVHHost &bvh) {
   nodes_ = bvh.Nodes();
 }
@@ -12,4 +12,4 @@ BVHRef BVHCuda::GetRef() const {
 BVHCuda::operator BVHRef() const {
   return GetRef();
 }
-}  // namespace grassland
+}  // namespace CD

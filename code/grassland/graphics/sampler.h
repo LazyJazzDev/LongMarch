@@ -2,11 +2,11 @@
 #include "grassland/graphics/core.h"
 #include "grassland/graphics/graphics_util.h"
 
-namespace grassland::graphics {
+namespace CD::graphics {
 
 class Sampler {
  public:
   virtual ~Sampler() = default;
 };
 
-}  // namespace grassland::graphics
+}  // namespace CD::graphics

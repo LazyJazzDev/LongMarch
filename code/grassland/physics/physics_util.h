@@ -5,7 +5,7 @@
 #include "grassland/math/math.h"
 #include "grassland/util/util.h"
 
-namespace grassland {
+namespace CD {
 
 template <typename Real>
 LM_DEVICE_FUNC Eigen::Matrix3<Real> Skew3(const Eigen::Matrix<Real, 3, 1> &v) {
@@ -14,4 +14,4 @@ LM_DEVICE_FUNC Eigen::Matrix3<Real> Skew3(const Eigen::Matrix<Real, 3, 1> &v) {
   return m;
 }
 
-}  // namespace grassland
+}  // namespace CD

@@ -14,7 +14,7 @@
 #include "grassland/graphics/graphics_util.h"
 #include "grassland/util/util.h"
 
-namespace grassland::d3d12 {
+namespace CD::d3d12 {
 
 using Microsoft::WRL::ComPtr;
 
@@ -54,15 +54,15 @@ size_t SizeByFormat(DXGI_FORMAT format);
 
 size_t SizeAlignTo(size_t size, size_t alignment);
 
-#define RETURN_IF_FAILED_HR(cmd, ...)                                                               \
-  do {                                                                                              \
-    HRESULT res = cmd;                                                                              \
-    if (FAILED(res)) {                                                                              \
-      ::grassland::d3d12::SetErrorMessage(__VA_ARGS__);                                             \
-      ::grassland::d3d12::SetErrorMessage("HRESULT: {}", ::grassland::d3d12::HRESULTToString(res)); \
-      return res;                                                                                   \
-    }                                                                                               \
-                                                                                                    \
+#define RETURN_IF_FAILED_HR(cmd, ...)                                                 \
+  do {                                                                                \
+    HRESULT res = cmd;                                                                \
+    if (FAILED(res)) {                                                                \
+      ::CD::d3d12::SetErrorMessage(__VA_ARGS__);                                      \
+      ::CD::d3d12::SetErrorMessage("HRESULT: {}", ::CD::d3d12::HRESULTToString(res)); \
+      return res;                                                                     \
+    }                                                                                 \
+                                                                                      \
   } while (false)
 
 struct DeviceFeatureRequirement;
@@ -111,4 +111,4 @@ HRESULT CreateBuffer(ID3D12Device *device,
 
 using graphics::CompiledShaderBlob;
 
-}  // namespace grassland::d3d12
+}  // namespace CD::d3d12

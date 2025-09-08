@@ -3,7 +3,7 @@
 #include "grassland/graphics/acceleration_structure.h"
 #include "grassland/graphics/backend/backend.h"
 
-namespace grassland::graphics {
+namespace CD::graphics {
 
 Core::Core(const Settings &settings) : settings_(settings) {
 }
@@ -201,4 +201,4 @@ int CreateCore(BackendAPI api, const Core::Settings &settings, double_ptr<Core> 
   return 0;
 }
 
-}  // namespace grassland::graphics
+}  // namespace CD::graphics

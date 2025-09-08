@@ -2,7 +2,7 @@
 
 #include "grassland/math/math_util.h"
 
-namespace grassland {
+namespace CD {
 
 template <typename Scalar, int dim>
 Matrix<Scalar, dim, dim> SPDProjection(const Matrix<Scalar, dim, dim> &A) {
@@ -12,4 +12,4 @@ Matrix<Scalar, dim, dim> SPDProjection(const Matrix<Scalar, dim, dim> &A) {
   return V * la.cwiseMax(Vector<Scalar, dim>::Zero()).asDiagonal() * V.transpose();
 }
 
-}  // namespace grassland
+}  // namespace CD

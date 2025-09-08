@@ -4,7 +4,7 @@
 #include <VersionHelpers.h>
 #endif
 
-namespace grassland::vulkan {
+namespace CD::vulkan {
 Semaphore::Semaphore(const struct Device *device, VkSemaphore semaphore) : device_(device), semaphore_(semaphore) {
 }
 
@@ -22,4 +22,4 @@ VkExternalSemaphoreHandleTypeFlagBits GetDefaultExternalSemaphoreHandleType() {
 }
 #endif
 
-}  // namespace grassland::vulkan
+}  // namespace CD::vulkan

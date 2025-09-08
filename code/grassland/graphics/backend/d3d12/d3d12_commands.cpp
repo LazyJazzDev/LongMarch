@@ -6,7 +6,7 @@
 #include "grassland/graphics/backend/d3d12/d3d12_sampler.h"
 #include "grassland/graphics/backend/d3d12/d3d12_window.h"
 
-namespace grassland::graphics::backend {
+namespace CD::graphics::backend {
 
 D3D12CmdBindProgram::D3D12CmdBindProgram(D3D12Program *program) : program_(program) {
 }
@@ -448,4 +448,4 @@ void D3D12CmdCopyBuffer::CompileCommand(D3D12CommandContext *context, ID3D12Grap
                                  src_offset_, size_);
 }
 
-}  // namespace grassland::graphics::backend
+}  // namespace CD::graphics::backend

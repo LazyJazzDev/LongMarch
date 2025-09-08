@@ -3,7 +3,7 @@
 #include "grassland/graphics/backend/d3d12/d3d12_util.h"
 #include "imgui_impl_dx12.h"
 
-namespace grassland::graphics::backend {
+namespace CD::graphics::backend {
 
 struct ExampleDescriptorHeapAllocator {
   ID3D12DescriptorHeap *heap = nullptr;
@@ -58,4 +58,4 @@ struct D3D12ImGuiAssets {
   float font_size;
   bool draw_command;
 };
-}  // namespace grassland::graphics::backend
+}  // namespace CD::graphics::backend

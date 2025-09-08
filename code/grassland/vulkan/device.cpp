@@ -21,7 +21,7 @@
 #include "grassland/vulkan/shader_module.h"
 #include "grassland/vulkan/swap_chain.h"
 
-namespace grassland::vulkan {
+namespace CD::vulkan {
 Device::Device(const class Instance *instance,
                const class PhysicalDevice &physical_device,
                DeviceCreateInfo create_info,
@@ -319,7 +319,7 @@ VkResult Device::CreateDescriptorSetLayout(const std::vector<VkDescriptorSetLayo
 VkResult Device::CreateRenderPass(const std::vector<VkAttachmentDescription> &attachment_descriptions,
                                   const std::vector<struct SubpassSettings> &subpass_settings,
                                   const std::vector<VkSubpassDependency> &dependencies,
-                                  grassland::double_ptr<grassland::vulkan::RenderPass> pp_render_pass) const {
+                                  CD::double_ptr<CD::vulkan::RenderPass> pp_render_pass) const {
   if (!pp_render_pass) {
     SetErrorMessage("pp_render_pass is nullptr");
     return VK_ERROR_INITIALIZATION_FAILED;
@@ -1351,4 +1351,4 @@ void Device::NameObject(VkAccelerationStructureKHR acceleration_structure, const
 #endif
 }
 
-}  // namespace grassland::vulkan
+}  // namespace CD::vulkan

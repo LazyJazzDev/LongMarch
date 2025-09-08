@@ -8,7 +8,7 @@
 #include "grassland/graphics/backend/vulkan/vulkan_sampler.h"
 #include "grassland/graphics/backend/vulkan/vulkan_window.h"
 
-namespace grassland::graphics::backend {
+namespace CD::graphics::backend {
 
 VulkanCmdBindProgram::VulkanCmdBindProgram(VulkanProgram *program) : program_(program) {
 }
@@ -525,4 +525,4 @@ void VulkanCmdCopyBuffer::CompileCommand(VulkanCommandContext *context, VkComman
   vkCmdCopyBuffer(command_buffer, src_buffer_->Buffer(), dst_buffer_->Buffer(), 1, &copy_region);
 }
 
-}  // namespace grassland::graphics::backend
+}  // namespace CD::graphics::backend

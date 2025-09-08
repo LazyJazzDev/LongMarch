@@ -6,7 +6,7 @@
 #include "grassland/vulkan/instance.h"
 #include "grassland/vulkan/physical_device.h"
 
-namespace grassland::vulkan {
+namespace CD::vulkan {
 
 class Device {
  public:
@@ -258,4 +258,4 @@ class Device {
   VmaAllocator allocator_{};
 };
 
-}  // namespace grassland::vulkan
+}  // namespace CD::vulkan

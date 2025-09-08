@@ -11,7 +11,7 @@
 #include "cuda_runtime.h"
 #endif
 
-namespace grassland::graphics {
+namespace CD::graphics {
 
 class Core {
  public:
@@ -147,4 +147,4 @@ class Core {
 
 int CreateCore(BackendAPI api, const Core::Settings &settings, double_ptr<Core> pp_core);
 
-}  // namespace grassland::graphics
+}  // namespace CD::graphics

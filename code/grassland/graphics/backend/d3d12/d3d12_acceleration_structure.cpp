@@ -2,7 +2,7 @@
 
 #include "grassland/graphics/backend/d3d12/d3d12_core.h"
 
-namespace grassland::graphics::backend {
+namespace CD::graphics::backend {
 
 D3D12AccelerationStructure::D3D12AccelerationStructure(
     D3D12Core *core,
@@ -21,4 +21,4 @@ int D3D12AccelerationStructure::UpdateInstances(const std::vector<RayTracingInst
   return 0;
 }
 
-}  // namespace grassland::graphics::backend
+}  // namespace CD::graphics::backend

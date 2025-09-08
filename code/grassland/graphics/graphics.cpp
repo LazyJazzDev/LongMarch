@@ -1,6 +1,6 @@
 #include "grassland/graphics/graphics.h"
 
-namespace grassland::graphics {
+namespace CD::graphics {
 
 void PyBind(pybind11::module_ &m) {
   pybind11::enum_<BackendAPI> backend_api(m, "BackendAPI");
@@ -69,4 +69,4 @@ void PyBind(pybind11::module_ &m) {
   CommandContext::PyBind(m);
 }
 
-}  // namespace grassland::graphics
+}  // namespace CD::graphics

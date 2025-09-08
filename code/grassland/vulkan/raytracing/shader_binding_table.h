@@ -1,7 +1,7 @@
 #pragma once
 #include "grassland/vulkan/device.h"
 
-namespace grassland::vulkan {
+namespace CD::vulkan {
 
 class ShaderBindingTable {
  public:
@@ -32,4 +32,4 @@ class ShaderBindingTable {
   size_t callable_shader_count_{};
 };
 
-}  // namespace grassland::vulkan
+}  // namespace CD::vulkan

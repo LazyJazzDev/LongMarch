@@ -1,7 +1,7 @@
 #pragma once
 #include "grassland/math/math_util.h"
 
-namespace grassland {
+namespace CD {
 template <typename Scalar, int dim>
 struct Ray;
 
@@ -27,4 +27,4 @@ using Ray2d = Ray2<double>;
 
 using Ray3f = Ray3<float>;
 using Ray3d = Ray3<double>;
-}  // namespace grassland
+}  // namespace CD

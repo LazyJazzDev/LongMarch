@@ -2,7 +2,7 @@
 #include "grassland/d3d12/d3d12util.h"
 #include "grassland/util/double_ptr.h"
 
-namespace grassland::d3d12 {
+namespace CD::d3d12 {
 
 struct DXGIFactoryCreateHint {
   bool enable_debug{kDefaultEnableDebugLayer};
@@ -46,4 +46,4 @@ class DXGIFactory {
 
 HRESULT CreateDXGIFactory(DXGIFactoryCreateHint hint, double_ptr<DXGIFactory> pp_factory);
 
-}  // namespace grassland::d3d12
+}  // namespace CD::d3d12

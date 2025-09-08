@@ -2,7 +2,7 @@
 #include <string>
 #include <vector>
 
-namespace grassland {
+namespace CD {
 class FileProbe {
  public:
   FileProbe();
@@ -23,4 +23,4 @@ class FileProbe {
 
 std::string FindAssetFile(const std::string &filename);
 std::string FindAssetPath(const std::string &filename);
-}  // namespace grassland
+}  // namespace CD

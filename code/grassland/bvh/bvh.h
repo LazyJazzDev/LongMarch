@@ -4,4 +4,4 @@
 #include "grassland/bvh/bvh_cuda.cuh"
 #endif
 
-namespace grassland {}  // namespace grassland
+namespace CD {}  // namespace CD

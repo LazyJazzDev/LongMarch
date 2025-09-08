@@ -1,6 +1,6 @@
 #include "grassland/graphics/backend/d3d12/d3d12_image.h"
 
-namespace grassland::graphics::backend {
+namespace CD::graphics::backend {
 
 D3D12Image::D3D12Image(D3D12Core *core, int width, int height, ImageFormat format) : core_(core), format_(format) {
   core_->Device()->CreateImage(width, height, ImageFormatToDXGIFormat(format), &image_);
@@ -86,4 +86,4 @@ d3d12::Image *D3D12Image::Image() const {
   return image_.get();
 }
 
-}  // namespace grassland::graphics::backend
+}  // namespace CD::graphics::backend

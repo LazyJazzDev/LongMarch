@@ -4,7 +4,7 @@
 #include "grassland/vulkan/surface.h"
 #include "grassland/vulkan/vulkan_util.h"
 
-namespace grassland::vulkan {
+namespace CD::vulkan {
 
 struct SwapChainSupportDetails {
   VkSurfaceCapabilitiesKHR capabilities;
@@ -88,4 +88,4 @@ class Swapchain {
   std::vector<VkImage> images_;
   std::vector<VkImageView> image_views_;
 };
-}  // namespace grassland::vulkan
+}  // namespace CD::vulkan

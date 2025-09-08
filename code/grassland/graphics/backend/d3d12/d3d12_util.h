@@ -2,7 +2,7 @@
 #include "grassland/d3d12/direct3d12.h"
 #include "grassland/graphics/interface.h"
 
-namespace grassland::graphics::backend {
+namespace CD::graphics::backend {
 
 DXGI_FORMAT ImageFormatToDXGIFormat(ImageFormat format);
 
@@ -56,4 +56,4 @@ struct D3D12ResourceBinding {
 class D3D12CUDABuffer;
 #endif
 
-}  // namespace grassland::graphics::backend
+}  // namespace CD::graphics::backend

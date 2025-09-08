@@ -1,7 +1,7 @@
 #pragma once
 #include "grassland/util/util_util.h"
 
-namespace grassland {
+namespace CD {
 
 template <class T>
 LM_DEVICE_FUNC int BinarySearch(const T *keys, int num_key, T key) {
@@ -20,4 +20,4 @@ LM_DEVICE_FUNC int BinarySearch(const T *keys, int num_key, T key) {
   return l;
 }
 
-}  // namespace grassland
+}  // namespace CD

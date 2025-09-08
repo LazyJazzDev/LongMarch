@@ -3,7 +3,7 @@
 #include "grassland/vulkan/render_pass.h"
 #include "grassland/vulkan/shader_module.h"
 
-namespace grassland::vulkan {
+namespace CD::vulkan {
 struct PipelineSettings {
   explicit PipelineSettings(const RenderPass *render_pass = nullptr,
                             const PipelineLayout *pipeline_layout = nullptr,
@@ -133,4 +133,4 @@ class RayTracingPipeline : public Pipeline {
   size_t callable_shader_count_{};
 };
 
-}  // namespace grassland::vulkan
+}  // namespace CD::vulkan

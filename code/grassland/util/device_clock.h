@@ -5,7 +5,7 @@
 #include <queue>
 #include <string>
 
-namespace grassland {
+namespace CD {
 class DeviceClock {
  public:
   DeviceClock();
@@ -18,6 +18,6 @@ class DeviceClock {
   std::queue<cudaEvent_t> events_;
   std::queue<std::string> event_names_;
 };
-}  // namespace grassland
+}  // namespace CD
 
 #endif

@@ -2,7 +2,7 @@
 #include "grassland/graphics/backend/vulkan/vulkan_core.h"
 #include "grassland/graphics/backend/vulkan/vulkan_util.h"
 
-namespace grassland::graphics::backend {
+namespace CD::graphics::backend {
 class VulkanShader : public Shader {
  public:
   VulkanShader(VulkanCore *core, const CompiledShaderBlob &shader_blob);
@@ -130,4 +130,4 @@ class VulkanRayTracingProgram : public RayTracingProgram, public VulkanProgramBa
   std::unique_ptr<vulkan::ShaderBindingTable> shader_binding_table_;
 };
 
-}  // namespace grassland::graphics::backend
+}  // namespace CD::graphics::backend

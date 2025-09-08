@@ -1,7 +1,7 @@
 #pragma once
 #include "grassland/vulkan/device.h"
 
-namespace grassland::vulkan {
+namespace CD::vulkan {
 class PipelineLayout {
  public:
   PipelineLayout(const class Device *device, VkPipelineLayout pipeline_layout);
@@ -20,4 +20,4 @@ class PipelineLayout {
   const class Device *device_{};
   VkPipelineLayout pipeline_layout_{};
 };
-}  // namespace grassland::vulkan
+}  // namespace CD::vulkan

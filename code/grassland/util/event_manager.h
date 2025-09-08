@@ -3,12 +3,11 @@
 #include "map"
 #include "set"
 
-namespace grassland {
+namespace CD {
 template <class Func>
 class EventManager {
  public:
-  uint32_t RegisterCallback(const std::function<Func> &callback,
-                            int priority = 100) {
+  uint32_t RegisterCallback(const std::function<Func> &callback, int priority = 100) {
     callbacks_[callback_counter_] = std::make_pair(callback, priority);
     priority_map_[priority].insert(callback_counter_);
     return callback_counter_++;
@@ -36,4 +35,4 @@ class EventManager {
   std::map<uint32_t, std::pair<std::function<Func>, int>> callbacks_{};
   std::map<int, std::set<uint32_t>, std::greater<>> priority_map_{};
 };
-}  // namespace grassland
+}  // namespace CD

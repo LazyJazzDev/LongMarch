@@ -1,7 +1,7 @@
 #pragma once
 #include "grassland/graphics/backend/d3d12/d3d12_util.h"
 
-namespace grassland::graphics::backend {
+namespace CD::graphics::backend {
 
 class D3D12AccelerationStructure : public AccelerationStructure {
  public:
@@ -18,4 +18,4 @@ class D3D12AccelerationStructure : public AccelerationStructure {
   std::unique_ptr<d3d12::AccelerationStructure> acceleration_structure_;
 };
 
-}  // namespace grassland::graphics::backend
+}  // namespace CD::graphics::backend

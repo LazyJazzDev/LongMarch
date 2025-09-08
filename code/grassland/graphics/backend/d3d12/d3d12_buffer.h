@@ -2,7 +2,7 @@
 #include "grassland/graphics/backend/d3d12/d3d12_core.h"
 #include "grassland/graphics/backend/d3d12/d3d12_util.h"
 
-namespace grassland::graphics::backend {
+namespace CD::graphics::backend {
 
 struct D3D12BufferRange {
   D3D12Buffer *buffer;
@@ -100,4 +100,4 @@ class D3D12CUDABuffer : public D3D12Buffer, public CUDABuffer {
 };
 #endif
 
-}  // namespace grassland::graphics::backend
+}  // namespace CD::graphics::backend

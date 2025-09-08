@@ -2,7 +2,7 @@
 
 #include "cstdint"
 
-namespace grassland {
+namespace CD {
 std::string WStringToString(const std::wstring &wstr) {
   // Convert the WString to String, encode as utf-8
   uint8_t c;
@@ -69,4 +69,4 @@ std::wstring StringToWString(const std::string &str) {
   }
   return wstr;
 }
-}  // namespace grassland
+}  // namespace CD

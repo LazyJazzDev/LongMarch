@@ -2,13 +2,12 @@
 #include "grassland/vulkan/descriptor_pool.h"
 #include "grassland/vulkan/device.h"
 
-namespace grassland::vulkan {
+namespace CD::vulkan {
 class DescriptorSetLayout {
  public:
-  DescriptorSetLayout(
-      const class Device *device,
-      VkDescriptorSetLayout layout,
-      const std::vector<VkDescriptorSetLayoutBinding> &bindings);
+  DescriptorSetLayout(const class Device *device,
+                      VkDescriptorSetLayout layout,
+                      const std::vector<VkDescriptorSetLayoutBinding> &bindings);
 
   ~DescriptorSetLayout();
 
@@ -33,4 +32,4 @@ class DescriptorSetLayout {
 
   std::vector<VkDescriptorSetLayoutBinding> bindings_{};
 };
-}  // namespace grassland::vulkan
+}  // namespace CD::vulkan

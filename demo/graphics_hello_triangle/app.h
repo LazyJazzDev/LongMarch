@@ -9,7 +9,7 @@ struct Vertex {
 
 class Application {
  public:
-  Application(grassland::graphics::BackendAPI api = grassland::graphics::BACKEND_API_VULKAN);
+  Application(CD::graphics::BackendAPI api = CD::graphics::BACKEND_API_VULKAN);
 
   ~Application();
 
@@ -23,14 +23,14 @@ class Application {
   }
 
  private:
-  std::shared_ptr<grassland::graphics::Core> core_;
-  std::unique_ptr<grassland::graphics::Window> window_;
-  std::unique_ptr<grassland::graphics::Buffer> vertex_buffer_;
-  std::unique_ptr<grassland::graphics::Buffer> index_buffer_;
-  std::unique_ptr<grassland::graphics::Shader> vertex_shader_;
-  std::unique_ptr<grassland::graphics::Shader> fragment_shader_;
-  std::unique_ptr<grassland::graphics::Image> color_image_;
-  std::unique_ptr<grassland::graphics::Program> program_;
+  std::shared_ptr<CD::graphics::Core> core_;
+  std::unique_ptr<CD::graphics::Window> window_;
+  std::unique_ptr<CD::graphics::Buffer> vertex_buffer_;
+  std::unique_ptr<CD::graphics::Buffer> index_buffer_;
+  std::unique_ptr<CD::graphics::Shader> vertex_shader_;
+  std::unique_ptr<CD::graphics::Shader> fragment_shader_;
+  std::unique_ptr<CD::graphics::Image> color_image_;
+  std::unique_ptr<CD::graphics::Program> program_;
   bool alive_{false};
   bool first_frame_{true};
 };

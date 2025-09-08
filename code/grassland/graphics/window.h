@@ -2,7 +2,7 @@
 #include "grassland/graphics/graphics_util.h"
 #include "imgui.h"
 
-namespace grassland::graphics {
+namespace CD::graphics {
 
 class Window {
  public:
@@ -80,4 +80,4 @@ class Window {
   bool enable_hdr_;
 };
 
-}  // namespace grassland::graphics
+}  // namespace CD::graphics

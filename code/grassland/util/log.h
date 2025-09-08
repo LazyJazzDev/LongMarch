@@ -11,7 +11,7 @@ std::string format(const std::string &format_str, Args &&...args) {
 #endif
 #include "iostream"
 
-namespace grassland {
+namespace CD {
 std::string GetTimestamp();
 
 void LogInfo(const std::string &message);
@@ -34,4 +34,4 @@ template <class... Args>
 void LogError(const std::string &message, Args &&...args) {
   LogError(fmt::format(message, std::forward<Args>(args)...));
 }
-}  // namespace grassland
+}  // namespace CD

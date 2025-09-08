@@ -1,7 +1,7 @@
 #pragma once
 #include "grassland/math/math_util.h"
 
-namespace grassland {
+namespace CD {
 
 namespace {
 template <typename Scalar>
@@ -209,4 +209,4 @@ LM_DEVICE_FUNC bool FacePointCCD(const Vector3<Scalar> &p0,
   return false;
 }
 
-}  // namespace grassland
+}  // namespace CD

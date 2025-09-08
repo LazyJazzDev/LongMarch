@@ -3,7 +3,7 @@
 #include "imgui_impl_dx12.h"
 #include "imgui_impl_glfw.h"
 
-namespace grassland::graphics::backend {
+namespace CD::graphics::backend {
 D3D12Window::D3D12Window(D3D12Core *core,
                          int width,
                          int height,
@@ -154,4 +154,4 @@ void D3D12Window::SetupImGuiContext() {
   imgui_assets_.draw_command = false;
 }
 
-}  // namespace grassland::graphics::backend
+}  // namespace CD::graphics::backend

@@ -1,9 +1,9 @@
 #pragma once
 #include "string"
 
-namespace grassland {
+namespace CD {
 std::string WStringToString(const std::wstring &wstr);
 
 std::wstring StringToWString(const std::string &str);
 
-}  // namespace grassland
+}  // namespace CD

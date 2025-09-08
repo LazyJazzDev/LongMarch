@@ -2,7 +2,7 @@
 
 #include "grassland/vulkan/instance.h"
 
-namespace grassland::vulkan {
+namespace CD::vulkan {
 
 // Physical Device
 class PhysicalDevice {
@@ -60,4 +60,4 @@ class PhysicalDevice {
   VkPhysicalDevice physical_device_{};
 };
 
-}  // namespace grassland::vulkan
+}  // namespace CD::vulkan

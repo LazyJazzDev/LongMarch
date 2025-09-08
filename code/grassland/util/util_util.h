@@ -21,7 +21,7 @@
 #include "thrust/sort.h"
 #endif
 
-namespace grassland {
+namespace CD {
 
 #if defined(LONGMARCH_CUDA_RUNTIME)
 void CUDAThrowIfFailed(cudaError_t error, const std::string &message);
@@ -63,4 +63,4 @@ struct VertexBufferView {
   }
 };
 
-}  // namespace grassland
+}  // namespace CD

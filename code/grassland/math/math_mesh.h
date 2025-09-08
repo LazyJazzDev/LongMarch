@@ -7,7 +7,7 @@
 #include "mikktspace.h"
 #include "tiny_obj_loader.h"
 
-namespace grassland {
+namespace CD {
 template <typename Scalar = float>
 class Mesh {
  public:
@@ -119,4 +119,4 @@ class Mesh {
   size_t num_indices_{0};
 };
 
-}  // namespace grassland
+}  // namespace CD

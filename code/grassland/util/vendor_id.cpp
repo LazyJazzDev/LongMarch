@@ -2,7 +2,7 @@
 
 #include "fmt/format.h"
 
-namespace grassland {
+namespace CD {
 
 std::string PCIVendorIDToName(uint32_t vendor_id) {
   switch (vendor_id) {
@@ -29,4 +29,4 @@ std::string PCIVendorIDToName(uint32_t vendor_id) {
   }
 }
 
-}  // namespace grassland
+}  // namespace CD

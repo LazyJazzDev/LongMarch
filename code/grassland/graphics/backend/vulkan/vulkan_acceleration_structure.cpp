@@ -2,7 +2,7 @@
 
 #include "grassland/graphics/backend/vulkan/vulkan_core.h"
 
-namespace grassland::graphics::backend {
+namespace CD::graphics::backend {
 
 VulkanAccelerationStructure::VulkanAccelerationStructure(
     VulkanCore *core,
@@ -19,4 +19,4 @@ int VulkanAccelerationStructure::UpdateInstances(const std::vector<RayTracingIns
   acceleration_structure_->UpdateInstances(vulkan_instances, core_->GraphicsCommandPool(), core_->GraphicsQueue());
   return 0;
 }
-}  // namespace grassland::graphics::backend
+}  // namespace CD::graphics::backend

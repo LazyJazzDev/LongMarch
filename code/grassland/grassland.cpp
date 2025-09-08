@@ -1,6 +1,6 @@
 #include "grassland/grassland.h"
 
-namespace grassland {
+namespace CD {
 
 void PyBind(pybind11::module_ &m) {
   m.doc() = "Grassland library.";
@@ -12,4 +12,4 @@ void PyBind(pybind11::module_ &m) {
   PyBindUtil(m_util);
 }
 
-}  // namespace grassland
+}  // namespace CD

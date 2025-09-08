@@ -2,10 +2,9 @@
 
 #include "iostream"
 
-namespace grassland::vulkan {
+namespace CD::vulkan {
 
-const std::vector<const char *> validationLayers = {
-    "VK_LAYER_KHRONOS_validation"};
+const std::vector<const char *> validationLayers = {"VK_LAYER_KHRONOS_validation"};
 
 bool CheckValidationLayerSupport() {
   uint32_t layer_count;
@@ -32,11 +31,11 @@ bool CheckValidationLayerSupport() {
   return true;
 }
 
-VKAPI_ATTR VkBool32 VKAPI_CALL DebugUtilsMessengerUserCallback(
-    VkDebugUtilsMessageSeverityFlagBitsEXT message_severity,
-    VkDebugUtilsMessageTypeFlagsEXT message_type,
-    const VkDebugUtilsMessengerCallbackDataEXT *callback_data,
-    void *user_data) {
+VKAPI_ATTR VkBool32 VKAPI_CALL
+DebugUtilsMessengerUserCallback(VkDebugUtilsMessageSeverityFlagBitsEXT message_severity,
+                                VkDebugUtilsMessageTypeFlagsEXT message_type,
+                                const VkDebugUtilsMessengerCallbackDataEXT *callback_data,
+                                void *user_data) {
   if (message_severity <= VK_DEBUG_UTILS_MESSAGE_SEVERITY_VERBOSE_BIT_EXT) {
     return VK_FALSE;
   }
@@ -59,9 +58,7 @@ VKAPI_ATTR VkBool32 VKAPI_CALL DebugUtilsMessengerUserCallback(
   if (message_severity & VK_DEBUG_UTILS_MESSAGE_SEVERITY_VERBOSE_BIT_EXT) {
     add_tag("VERBOSE");
   }
-  std::cerr << fmt::format("validation layer ({}): {}", message_tag,
-                           callback_data->pMessage)
-            << std::endl;
+  std::cerr << fmt::format("validation layer ({}): {}", message_tag, callback_data->pMessage) << std::endl;
 
   if (message_severity > VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT) {
     throw std::runtime_error("validation layer error");
@@ -72,4 +69,4 @@ VKAPI_ATTR VkBool32 VKAPI_CALL DebugUtilsMessengerUserCallback(
 std::vector<const char *> GetValidationLayers() {
   return validationLayers;
 }
-}  // namespace grassland::vulkan
+}  // namespace CD::vulkan

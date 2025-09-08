@@ -3,7 +3,7 @@
 #include "fstream"
 #include "grassland/util/log.h"
 
-namespace grassland {
+namespace CD {
 std::vector<uint32_t> SobolTableGen(unsigned int N, unsigned int D, const std::string &dir_file) {
   std::ifstream infile(dir_file, std::ios::in);
   if (!infile) {
@@ -84,4 +84,4 @@ std::vector<uint32_t> SobolTableGen(unsigned int N, unsigned int D, const std::s
   return sobol_table;
 }
 
-}  // namespace grassland
+}  // namespace CD

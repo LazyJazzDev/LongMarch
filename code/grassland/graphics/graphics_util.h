@@ -3,7 +3,7 @@
 #include "glm/glm.hpp"
 #include "grassland/util/util.h"
 
-namespace grassland::graphics {
+namespace CD::graphics {
 
 class Core;
 class Buffer;
@@ -295,4 +295,4 @@ uint32_t PixelSize(ImageFormat format);
 class CUDABuffer;
 #endif
 
-}  // namespace grassland::graphics
+}  // namespace CD::graphics

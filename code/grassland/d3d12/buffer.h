@@ -1,7 +1,7 @@
 #pragma once
 #include "grassland/d3d12/device.h"
 
-namespace grassland::d3d12 {
+namespace CD::d3d12 {
 
 class Buffer {
  public:
@@ -30,4 +30,4 @@ void CopyBuffer(ID3D12GraphicsCommandList *command_list,
                 size_t src_offset = 0,
                 size_t dst_offset = 0);
 
-}  // namespace grassland::d3d12
+}  // namespace CD::d3d12

@@ -8,7 +8,7 @@
 #include "grassland/graphics/backend/vulkan/vulkan_sampler.h"
 #include "grassland/graphics/backend/vulkan/vulkan_window.h"
 
-namespace grassland::graphics::backend {
+namespace CD::graphics::backend {
 
 VulkanCore::VulkanCore(const Settings &settings) : Core(settings) {
   vulkan::InstanceCreateHint hint{};
@@ -419,7 +419,7 @@ int VulkanCore::InitializeLogicalDevice(int device_index) {
   cuda_device_ = physical_device.GetCUDADeviceIndex();
 #endif
 
-  grassland::vulkan::DeviceFeatureRequirement device_feature_requirement{};
+  CD::vulkan::DeviceFeatureRequirement device_feature_requirement{};
   device_feature_requirement.enable_raytracing_extension = physical_device.SupportRayTracing();
   auto create_info = device_feature_requirement.GenerateRecommendedDeviceCreateInfo(physical_device);
   if (instance_->CreateHint().IsEnabledExtension(VK_KHR_SURFACE_EXTENSION_NAME) &&
@@ -755,4 +755,4 @@ void *VulkanCore::GetSemaphoreHandle(VkSemaphore semaphore) {
 }
 #endif
 
-}  // namespace grassland::graphics::backend
+}  // namespace CD::graphics::backend

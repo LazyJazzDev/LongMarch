@@ -1,6 +1,6 @@
 #include "grassland/d3d12/raytracing/raytracing_pipeline.h"
 
-namespace grassland::d3d12 {
+namespace CD::d3d12 {
 
 RayTracingPipeline::RayTracingPipeline(const ComPtr<ID3D12StateObject> &state_object,
                                        size_t miss_shader_count,
@@ -12,4 +12,4 @@ RayTracingPipeline::RayTracingPipeline(const ComPtr<ID3D12StateObject> &state_ob
       callable_shader_count_(callable_shader_count) {
 }
 
-}  // namespace grassland::d3d12
+}  // namespace CD::d3d12

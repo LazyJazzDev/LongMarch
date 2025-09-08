@@ -3,7 +3,7 @@
 #include "grassland/vulkan/device.h"
 #include "grassland/vulkan/vulkan_util.h"
 
-namespace grassland::vulkan {
+namespace CD::vulkan {
 class Semaphore {
  public:
   Semaphore(const class Device *device, VkSemaphore semaphore);
@@ -27,4 +27,4 @@ class Semaphore {
 VkExternalSemaphoreHandleTypeFlagBits GetDefaultExternalSemaphoreHandleType();
 #endif
 
-}  // namespace grassland::vulkan
+}  // namespace CD::vulkan

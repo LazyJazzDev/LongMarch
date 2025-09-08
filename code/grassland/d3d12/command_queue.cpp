@@ -3,7 +3,7 @@
 #include "grassland/d3d12/command_allocator.h"
 #include "grassland/d3d12/fence.h"
 
-namespace grassland::d3d12 {
+namespace CD::d3d12 {
 
 CommandQueue::CommandQueue(const ComPtr<ID3D12CommandQueue> &command_queue) : command_queue_(command_queue) {
 }
@@ -62,4 +62,4 @@ HRESULT CommandQueue::SingleTimeCommand(const std::function<void(ID3D12GraphicsC
   return SingleTimeCommand(&fence_wrapper, function);
 }
 
-}  // namespace grassland::d3d12
+}  // namespace CD::d3d12

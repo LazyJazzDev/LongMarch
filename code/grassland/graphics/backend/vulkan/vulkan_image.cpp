@@ -1,6 +1,6 @@
 #include "grassland/graphics/backend/vulkan/vulkan_image.h"
 
-namespace grassland::graphics::backend {
+namespace CD::graphics::backend {
 
 VulkanImage::VulkanImage(VulkanCore *core, int width, int height, ImageFormat format) : core_(core), format_(format) {
   VkExtent2D extent;
@@ -85,4 +85,4 @@ void VulkanImage::DownloadData(void *data) const {
   staging_buffer->Unmap();
 }
 
-}  // namespace grassland::graphics::backend
+}  // namespace CD::graphics::backend

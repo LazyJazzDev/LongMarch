@@ -1,7 +1,7 @@
 #pragma once
 #include "grassland/math/math_util.h"
 
-namespace grassland {
+namespace CD {
 template <typename Scalar, int dim>
 struct Triangle;
 
@@ -49,4 +49,4 @@ using Triangle2d = Triangle2<double>;
 
 using Triangle3f = Triangle3<float>;
 using Triangle3d = Triangle3<double>;
-}  // namespace grassland
+}  // namespace CD

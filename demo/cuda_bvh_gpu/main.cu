@@ -27,7 +27,7 @@ __global__ void GenerateRandomNumber(float *x, int *y, int n) {
 }
 
 int main() {
-  grassland::DeviceClock clock;
+  CD::DeviceClock clock;
   const int n = 1000000;
   thrust::device_vector<float> x;
   thrust::device_vector<int> y;

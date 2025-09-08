@@ -27,9 +27,9 @@ int main() {
   }
   outfile.close();
 
-  grassland::VertexBufferView vbv = {positions.data()};
-  grassland::MeshSDF mesh_sdf(vbv, positions.size(), indices.data(), indices.size());
-  grassland::MeshSDFRef mesh_ref = mesh_sdf;
+  CD::VertexBufferView vbv = {positions.data()};
+  CD::MeshSDF mesh_sdf(vbv, positions.size(), indices.data(), indices.size());
+  CD::MeshSDFRef mesh_ref = mesh_sdf;
   std::cout << "num_points:" << mesh_ref.num_points << std::endl;
   std::cout << "num_triangles:" << mesh_ref.num_triangles << std::endl;
   std::cout << "num_edges:" << mesh_ref.num_edges << std::endl;

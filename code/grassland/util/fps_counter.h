@@ -4,7 +4,7 @@
 
 #include "grassland/util/util_util.h"
 
-namespace grassland {
+namespace CD {
 class FPSCounter {
  public:
   void TickFrame();
@@ -17,4 +17,4 @@ class FPSCounter {
  private:
   std::queue<std::chrono::high_resolution_clock::time_point> frames_;
 };
-}  // namespace grassland
+}  // namespace CD

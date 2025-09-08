@@ -6,7 +6,7 @@
 #include "map"
 #include "memory"
 
-namespace grassland::vulkan {
+namespace CD::vulkan {
 
 struct DeviceFeatureRequirement {
   bool enable_raytracing_extension{false};
@@ -77,4 +77,4 @@ struct DeviceCreateInfo {
 
   VkDeviceCreateInfo CompileVkDeviceCreateInfo(bool enable_validation_layers, const PhysicalDevice &physical_device);
 };
-}  // namespace grassland::vulkan
+}  // namespace CD::vulkan

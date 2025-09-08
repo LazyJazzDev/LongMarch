@@ -1,5 +1,5 @@
 #include "grassland/graphics/graphics_util.h"
-namespace grassland::graphics {
+namespace CD::graphics {
 SamplerInfo::SamplerInfo()
     : min_filter(FILTER_MODE_LINEAR),
       mag_filter(FILTER_MODE_LINEAR),
@@ -122,4 +122,4 @@ uint32_t PixelSize(ImageFormat format) {
       return 0;
   }
 }
-}  // namespace grassland::graphics
+}  // namespace CD::graphics

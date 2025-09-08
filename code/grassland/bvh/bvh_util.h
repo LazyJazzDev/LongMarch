@@ -4,7 +4,7 @@
 #include "grassland/math/math.h"
 #include "grassland/util/util.h"
 
-namespace grassland {
+namespace CD {
 
 AABB Join(const AABB &aabb0, const AABB &aabb1);
 
@@ -53,4 +53,4 @@ struct BVHRef {
   }
 };
 
-}  // namespace grassland
+}  // namespace CD

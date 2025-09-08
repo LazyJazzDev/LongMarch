@@ -1,6 +1,6 @@
 #include "grassland/util/fps_counter.h"
 
-namespace grassland {
+namespace CD {
 
 void FPSCounter::TickFrame() {
   auto tp = std::chrono::high_resolution_clock::now();
@@ -41,4 +41,4 @@ void FPSCounter::PyBind(pybind11::module_ &m) {
       .def("reset", &FPSCounter::Reset);
 }
 
-}  // namespace grassland
+}  // namespace CD

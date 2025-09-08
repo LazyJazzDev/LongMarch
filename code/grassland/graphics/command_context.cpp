@@ -5,7 +5,7 @@
 #include "grassland/graphics/image.h"
 #include "grassland/graphics/window.h"
 
-namespace grassland::graphics {
+namespace CD::graphics {
 
 void CommandContext::CmdBindResources(int slot, const std::vector<Buffer *> &buffers, BindPoint bind_point) {
   std::vector<BufferRange> buffer_ranges(buffers.size());
@@ -45,4 +45,4 @@ void CommandContext::PyBind(pybind11::module &m) {
   command_context.def("submit", [](CommandContext *context) { context->GetCore()->SubmitCommandContext(context); });
 }
 
-}  // namespace grassland::graphics
+}  // namespace CD::graphics

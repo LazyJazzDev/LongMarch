@@ -2,7 +2,7 @@
 
 #include "grassland/graphics/backend/vulkan/vulkan_acceleration_structure.h"
 
-namespace grassland::graphics::backend {
+namespace CD::graphics::backend {
 VkFormat ImageFormatToVkFormat(ImageFormat format) {
   switch (format) {
     case IMAGE_FORMAT_B8G8R8A8_UNORM:
@@ -248,4 +248,4 @@ VulkanResourceBinding::VulkanResourceBinding(VulkanBuffer *buffer) : buffer(buff
 VulkanResourceBinding::VulkanResourceBinding(VulkanImage *image) : buffer(nullptr), image(image) {
 }
 
-}  // namespace grassland::graphics::backend
+}  // namespace CD::graphics::backend

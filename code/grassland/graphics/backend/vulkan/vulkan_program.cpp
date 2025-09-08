@@ -1,6 +1,6 @@
 #include "grassland/graphics/backend/vulkan/vulkan_program.h"
 
-namespace grassland::graphics::backend {
+namespace CD::graphics::backend {
 
 namespace {
 std::vector<VkFormat> ConvertImageFormats(const std::vector<ImageFormat> &formats) {
@@ -182,4 +182,4 @@ void VulkanRayTracingProgram::Finalize(const std::vector<int32_t> &miss_shader_i
                                             callable_shader_indices, &shader_binding_table_);
 }
 
-}  // namespace grassland::graphics::backend
+}  // namespace CD::graphics::backend

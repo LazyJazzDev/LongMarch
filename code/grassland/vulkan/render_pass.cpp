@@ -2,7 +2,7 @@
 
 #include "grassland/vulkan/framebuffer.h"
 
-namespace grassland::vulkan {
+namespace CD::vulkan {
 
 VkSubpassDescription SubpassSettings::Description() const {
   VkSubpassDescription description{};
@@ -24,21 +24,19 @@ VkSubpassDescription SubpassSettings::Description() const {
   return description;
 }
 
-SubpassSettings::SubpassSettings(
-    const std::vector<VkAttachmentReference> &color_attachment_references,
-    const std::optional<VkAttachmentReference> &depth_attachment_reference,
-    const std::vector<VkAttachmentReference> &resolve_attachment_references)
+SubpassSettings::SubpassSettings(const std::vector<VkAttachmentReference> &color_attachment_references,
+                                 const std::optional<VkAttachmentReference> &depth_attachment_reference,
+                                 const std::vector<VkAttachmentReference> &resolve_attachment_references)
     : color_attachment_references(color_attachment_references),
       depth_attachment_reference(depth_attachment_reference),
       resolve_attachment_references(resolve_attachment_references) {
 }
 
-SubpassSettings::SubpassSettings(
-    const std::vector<VkAttachmentReference> &input_attachment_references,
-    const std::vector<VkAttachmentReference> &color_attachment_references,
-    const std::optional<VkAttachmentReference> &depth_attachment_reference,
-    const std::vector<VkAttachmentReference> &resolve_attachment_references,
-    const std::vector<uint32_t> &preserve_attachment_references)
+SubpassSettings::SubpassSettings(const std::vector<VkAttachmentReference> &input_attachment_references,
+                                 const std::vector<VkAttachmentReference> &color_attachment_references,
+                                 const std::optional<VkAttachmentReference> &depth_attachment_reference,
+                                 const std::vector<VkAttachmentReference> &resolve_attachment_references,
+                                 const std::vector<uint32_t> &preserve_attachment_references)
     : input_attachment_references(input_attachment_references),
       color_attachment_references(color_attachment_references),
       depth_attachment_reference(depth_attachment_reference),
@@ -46,11 +44,10 @@ SubpassSettings::SubpassSettings(
       preserve_attachment_references(preserve_attachment_references) {
 }
 
-RenderPass::RenderPass(
-    const struct Device *device,
-    std::vector<VkAttachmentDescription> attachment_descriptions,
-    std::vector<struct SubpassSettings> subpass_settings,
-    VkRenderPass render_pass)
+RenderPass::RenderPass(const struct Device *device,
+                       std::vector<VkAttachmentDescription> attachment_descriptions,
+                       std::vector<struct SubpassSettings> subpass_settings,
+                       VkRenderPass render_pass)
     : device_(device),
       attachment_descriptions_(std::move(attachment_descriptions)),
       subpass_settings_(std::move(subpass_settings)),
@@ -61,10 +58,9 @@ RenderPass::~RenderPass() {
   vkDestroyRenderPass(device_->Handle(), render_pass_, nullptr);
 }
 
-VkResult RenderPass::CreateFramebuffer(
-    const std::vector<VkImageView> &image_views,
-    VkExtent2D extent,
-    double_ptr<Framebuffer> pp_framebuffer) const {
+VkResult RenderPass::CreateFramebuffer(const std::vector<VkImageView> &image_views,
+                                       VkExtent2D extent,
+                                       double_ptr<Framebuffer> pp_framebuffer) const {
   if (!pp_framebuffer) {
     SetErrorMessage("pp_framebuffer is nullptr");
     return VK_ERROR_INITIALIZATION_FAILED;
@@ -73,21 +69,18 @@ VkResult RenderPass::CreateFramebuffer(
   VkFramebufferCreateInfo framebuffer_create_info{};
   framebuffer_create_info.sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO;
   framebuffer_create_info.renderPass = render_pass_;
-  framebuffer_create_info.attachmentCount =
-      static_cast<uint32_t>(image_views.size());
+  framebuffer_create_info.attachmentCount = static_cast<uint32_t>(image_views.size());
   framebuffer_create_info.pAttachments = image_views.data();
   framebuffer_create_info.width = extent.width;
   framebuffer_create_info.height = extent.height;
   framebuffer_create_info.layers = 1;
 
   VkFramebuffer framebuffer;
-  RETURN_IF_FAILED_VK(
-      vkCreateFramebuffer(device_->Handle(), &framebuffer_create_info, nullptr,
-                          &framebuffer),
-      "failed to create framebuffer!");
+  RETURN_IF_FAILED_VK(vkCreateFramebuffer(device_->Handle(), &framebuffer_create_info, nullptr, &framebuffer),
+                      "failed to create framebuffer!");
 
   pp_framebuffer.construct(this, extent, framebuffer);
 
   return VK_SUCCESS;
 }
-}  // namespace grassland::vulkan
+}  // namespace CD::vulkan

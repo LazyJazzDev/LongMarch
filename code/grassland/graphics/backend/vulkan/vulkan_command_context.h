@@ -4,7 +4,7 @@
 #include "grassland/graphics/backend/vulkan/vulkan_core.h"
 #include "grassland/graphics/backend/vulkan/vulkan_util.h"
 
-namespace grassland::graphics::backend {
+namespace CD::graphics::backend {
 
 class VulkanCommandContext : public CommandContext {
  public:
@@ -91,4 +91,4 @@ inline vulkan::DescriptorSet *VulkanCommandContext::AcquireDescriptorSet(VkDescr
   return descriptor_set;
 }
 
-}  // namespace grassland::graphics::backend
+}  // namespace CD::graphics::backend

@@ -1,6 +1,6 @@
 #include "grassland/bvh/bvh_host.h"
 
-namespace grassland {
+namespace CD {
 
 BVHHost::BVHHost(const AABB *aabbs, const int *instance_indices, int num_instance) {
   UpdateInstances(aabbs, instance_indices, num_instance);
@@ -64,4 +64,4 @@ int BVHHostBuilder::Build(std::pair<AABB, int> *build_contents, int num_contents
   return node_index;
 }
 
-}  // namespace grassland
+}  // namespace CD

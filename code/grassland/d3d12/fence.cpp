@@ -1,6 +1,6 @@
 #include "grassland/d3d12/fence.h"
 
-namespace grassland::d3d12 {
+namespace CD::d3d12 {
 
 Fence::Fence(const ComPtr<ID3D12Fence> &fence) : fence_(fence), value_(0) {
   fence_event_ = CreateEvent(nullptr, FALSE, FALSE, nullptr);
@@ -32,4 +32,4 @@ HRESULT Fence::Wait() {
   return WaitFor(value_);
 }
 
-}  // namespace grassland::d3d12
+}  // namespace CD::d3d12

@@ -2,7 +2,7 @@
 #define TINYOBJLOADER_IMPLEMENTATION
 #include "tiny_obj_loader.h"
 
-namespace grassland {
+namespace CD {
 
 template <typename Scalar>
 int Mesh<Scalar>::MergeVertices() {
@@ -542,4 +542,4 @@ Mesh<Scalar> Mesh<Scalar>::Sphere(int precision_lon, int precision_lat) {
 
 template class Mesh<float>;
 template class Mesh<double>;
-}  // namespace grassland
+}  // namespace CD

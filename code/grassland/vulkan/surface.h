@@ -2,12 +2,10 @@
 
 #include "grassland/vulkan/vulkan_util.h"
 
-namespace grassland::vulkan {
+namespace CD::vulkan {
 class Surface {
  public:
-  Surface(const class Instance *instance,
-          GLFWwindow *window,
-          VkSurfaceKHR surface);
+  Surface(const class Instance *instance, GLFWwindow *window, VkSurfaceKHR surface);
 
   ~Surface();
 
@@ -22,4 +20,4 @@ class Surface {
   GLFWwindow *window_{};
   VkSurfaceKHR surface_{};
 };
-}  // namespace grassland::vulkan
+}  // namespace CD::vulkan

@@ -3,12 +3,10 @@
 #include "grassland/vulkan/device.h"
 #include "grassland/vulkan/render_pass.h"
 
-namespace grassland::vulkan {
+namespace CD::vulkan {
 class Framebuffer {
  public:
-  Framebuffer(const class RenderPass *render_pass,
-              VkExtent2D extent,
-              VkFramebuffer framebuffer);
+  Framebuffer(const class RenderPass *render_pass, VkExtent2D extent, VkFramebuffer framebuffer);
 
   ~Framebuffer();
 
@@ -29,4 +27,4 @@ class Framebuffer {
   VkExtent2D extent_{};
   VkFramebuffer framebuffer_{};
 };
-}  // namespace grassland::vulkan
+}  // namespace CD::vulkan

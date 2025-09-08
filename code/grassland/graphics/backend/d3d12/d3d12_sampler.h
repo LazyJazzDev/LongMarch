@@ -2,7 +2,7 @@
 #include "grassland/graphics/backend/d3d12/d3d12_core.h"
 #include "grassland/graphics/backend/d3d12/d3d12_util.h"
 
-namespace grassland::graphics::backend {
+namespace CD::graphics::backend {
 
 class D3D12Sampler : public Sampler {
  public:
@@ -16,4 +16,4 @@ class D3D12Sampler : public Sampler {
   D3D12_SAMPLER_DESC sampler_desc_;
 };
 
-}  // namespace grassland::graphics::backend
+}  // namespace CD::graphics::backend

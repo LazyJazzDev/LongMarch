@@ -4,7 +4,7 @@
 
 #include "grassland/util/util_util.h"
 
-namespace grassland {
+namespace CD {
 
 class VirtualFileSystemEntry {
  public:
@@ -48,4 +48,4 @@ class VirtualFileSystem {
   std::unique_ptr<VirtualFileSystemEntry> root_;
 };
 
-}  // namespace grassland
+}  // namespace CD

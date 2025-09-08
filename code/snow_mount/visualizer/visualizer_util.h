@@ -2,7 +2,7 @@
 #include "grassland/grassland.h"
 
 namespace snow_mount::visualizer {
-using namespace grassland;
+using namespace CD;
 
 class Core;
 class Scene;

@@ -7,7 +7,7 @@
 #include "grassland/vulkan/surface.h"
 #include "grassland/vulkan/validation_layer.h"
 
-namespace grassland::vulkan {
+namespace CD::vulkan {
 InstanceCreateHint::InstanceCreateHint() {
   app_info.sType = VK_STRUCTURE_TYPE_APPLICATION_INFO;
   app_info.pApplicationName = "Grassland";
@@ -289,4 +289,4 @@ VkResult Instance::CreateDevice(const DeviceFeatureRequirement &device_feature_r
   return CreateDevice(device_feature_requirement, -1, pp_device);
 }
 
-}  // namespace grassland::vulkan
+}  // namespace CD::vulkan

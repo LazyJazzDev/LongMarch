@@ -27,7 +27,7 @@ Core::Core(graphics::Core *core) : core_(core) {
   core_->CreateImage(1, 1, graphics::IMAGE_FORMAT_R8G8B8A8_UNORM, &pure_white_texture_);
   uint32_t white = 0xFFFFFFFF;
   pure_white_texture_->UploadData(&white);
-  core_->CreateSampler({graphics::FILTER_MODE_LINEAR, grassland::graphics::AddressMode::ADDRESS_MODE_CLAMP_TO_EDGE},
+  core_->CreateSampler({graphics::FILTER_MODE_LINEAR, CD::graphics::AddressMode::ADDRESS_MODE_CLAMP_TO_EDGE},
                        &linear_sampler_);
   font_core_ = std::make_unique<FontCore>(this);
 

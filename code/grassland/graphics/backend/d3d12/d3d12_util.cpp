@@ -2,7 +2,7 @@
 
 #include "grassland/graphics/backend/d3d12/d3d12_acceleration_structure.h"
 
-namespace grassland::graphics::backend {
+namespace CD::graphics::backend {
 DXGI_FORMAT ImageFormatToDXGIFormat(ImageFormat format) {
   switch (format) {
     case IMAGE_FORMAT_B8G8R8A8_UNORM:
@@ -233,4 +233,4 @@ D3D12ResourceBinding::D3D12ResourceBinding(D3D12Buffer *buffer) : buffer(buffer)
 D3D12ResourceBinding::D3D12ResourceBinding(D3D12Image *image) : buffer(nullptr), image(image) {
 }
 
-}  // namespace grassland::graphics::backend
+}  // namespace CD::graphics::backend

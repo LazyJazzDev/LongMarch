@@ -1,7 +1,7 @@
 #pragma once
 #include "grassland/bvh/bvh_util.h"
 
-namespace grassland {
+namespace CD {
 
 class BVHHost {
  public:
@@ -29,4 +29,4 @@ struct BVHHostBuilder {
   int Build(std::pair<AABB, int> *build_contents, int num_contents, int cut_dim, int failure_next_node);
 };
 
-}  // namespace grassland
+}  // namespace CD

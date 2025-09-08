@@ -1,7 +1,7 @@
 #pragma once
 #include "grassland/d3d12/device.h"
 
-namespace grassland::d3d12 {
+namespace CD::d3d12 {
 
 class RootSignature {
  public:
@@ -15,4 +15,4 @@ class RootSignature {
   ComPtr<ID3D12RootSignature> root_signature_;
 };
 
-}  // namespace grassland::d3d12
+}  // namespace CD::d3d12

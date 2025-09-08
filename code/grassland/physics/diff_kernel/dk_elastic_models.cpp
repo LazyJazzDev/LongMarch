@@ -1,6 +1,6 @@
 #include "grassland/physics/diff_kernel/dk_elastic_models.h"
 
-namespace grassland {
+namespace CD {
 template <typename Real>
 LM_DEVICE_FUNC bool ElasticNeoHookean<Real>::ValidInput(const InputType &F) const {
   return F.determinant() > 0;
@@ -378,4 +378,4 @@ LM_DEVICE_FUNC HessianTensor<Real, 1, 9> ElasticNeoHookeanSimpleTriangle<Real>::
 
 template class ElasticNeoHookeanSimpleTriangle<float>;
 template class ElasticNeoHookeanSimpleTriangle<double>;
-}  // namespace grassland
+}  // namespace CD

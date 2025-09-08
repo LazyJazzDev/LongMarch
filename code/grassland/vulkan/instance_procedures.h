@@ -2,7 +2,7 @@
 
 #include "grassland/vulkan/vulkan_util.h"
 
-namespace grassland::vulkan {
+namespace CD::vulkan {
 class InstanceProcedures {
  public:
   InstanceProcedures() = default;
@@ -14,4 +14,4 @@ class InstanceProcedures {
   GRASSLAND_VULKAN_PROCEDURE_VAR(vkCmdEndRenderingKHR);
   GRASSLAND_VULKAN_PROCEDURE_VAR(vkCmdSetPrimitiveTopologyEXT);
 };
-}  // namespace grassland::vulkan
+}  // namespace CD::vulkan

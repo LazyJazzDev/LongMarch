@@ -2,7 +2,7 @@
 #include "grassland/vulkan/buffer.h"
 #include "grassland/vulkan/device.h"
 
-namespace grassland::vulkan {
+namespace CD::vulkan {
 class AccelerationStructure {
  public:
   AccelerationStructure(const class Device *device,
@@ -42,4 +42,4 @@ VkResult BuildAccelerationStructure(const Device *device,
                                     VkAccelerationStructureKHR *ptr_acceleration_structure,
                                     double_ptr<Buffer> pp_buffer);
 
-}  // namespace grassland::vulkan
+}  // namespace CD::vulkan

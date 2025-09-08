@@ -2,7 +2,7 @@
 #include "grassland/d3d12/command_allocator.h"
 #include "grassland/d3d12/d3d12util.h"
 
-namespace grassland::d3d12 {
+namespace CD::d3d12 {
 
 class AccelerationStructure {
  public:
@@ -27,4 +27,4 @@ class AccelerationStructure {
   ComPtr<ID3D12Resource> as_;
 };
 
-}  // namespace grassland::d3d12
+}  // namespace CD::d3d12

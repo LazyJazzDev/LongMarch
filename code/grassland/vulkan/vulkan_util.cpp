@@ -5,7 +5,7 @@
 #define VMA_IMPLEMENTATION
 #include <vk_mem_alloc.h>
 
-namespace grassland::vulkan {
+namespace CD::vulkan {
 
 std::string VkFormatToName(VkFormat format) {
   switch (format) {
@@ -225,8 +225,7 @@ std::string VkColorSpaceToName(VkColorSpaceKHR color_space) {
     case VK_COLOR_SPACE_DISPLAY_NATIVE_AMD:
       return "VK_COLOR_SPACE_DISPLAY_NATIVE_AMD";
     default:
-      return fmt::format("Unknown color space: {}",
-                         static_cast<uint64_t>(color_space));
+      return fmt::format("Unknown color space: {}", static_cast<uint64_t>(color_space));
   }
 }
 
@@ -245,8 +244,7 @@ std::string VkPresentModeToName(VkPresentModeKHR present_mode) {
     case VK_PRESENT_MODE_SHARED_CONTINUOUS_REFRESH_KHR:
       return "VK_PRESENT_MODE_SHARED_CONTINUOUS_REFRESH_KHR";
     default:
-      return fmt::format("Unknown present mode: {}",
-                         static_cast<uint64_t>(present_mode));
+      return fmt::format("Unknown present mode: {}", static_cast<uint64_t>(present_mode));
   }
 }
 
@@ -335,4 +333,4 @@ bool IsDepthFormat(VkFormat format) {
   }
 }
 
-}  // namespace grassland::vulkan
+}  // namespace CD::vulkan

@@ -1,6 +1,6 @@
 #include "grassland/util/deferred_process.h"
 
-namespace grassland {
+namespace CD {
 
 DeferredProcess::DeferredProcess(const std::function<void()> &func) : func_(func) {
 }
@@ -11,4 +11,4 @@ DeferredProcess::~DeferredProcess() {
   }
 }
 
-}  // namespace grassland
+}  // namespace CD

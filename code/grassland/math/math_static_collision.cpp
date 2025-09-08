@@ -1,6 +1,6 @@
 #include "grassland/math/math_static_collision.h"
 
-namespace grassland {
+namespace CD {
 
 template <class Real>
 LM_DEVICE_FUNC Real DistancePointPoint(const Vector3<Real> &p0, const Vector3<Real> &p1) {
@@ -524,4 +524,4 @@ template LM_DEVICE_FUNC double AnyHitRayTriangle(const Vector3<double> &origin,
                                                  double t_min,
                                                  double t_max);
 
-}  // namespace grassland
+}  // namespace CD

@@ -281,7 +281,7 @@ int main() {
     float rps = film.GetWidth() * film.GetHeight() * fps * scene.settings.samples_per_dispatch;
     char rps_buf[16];
     sprintf(rps_buf, "%.2f", rps * 1e-6f);
-    window->SetTitle(std::string("Franka Kinematics - ") + fps_buf + "frams/s" + " - " + rps_buf + "Mrays/s");
+    window->SetTitle(std::string("Franka Kinematics - ") + fps_buf + "frames/s" + " - " + rps_buf + "Mrays/s");
   }
 
   for (auto &cm : combined_mesh) {

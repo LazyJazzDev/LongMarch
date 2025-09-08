@@ -1,7 +1,7 @@
 #pragma once
 #include "grassland/math/math_util.h"
 
-namespace grassland {
+namespace CD {
 
 template <typename Scalar>
 Scalar EvaluateLinearPolynomial(Scalar a, Scalar b, Scalar x) {
@@ -152,4 +152,4 @@ void SolveCubicPolynomialLimitedRange(Scalar a,
     }
   }
 }
-}  // namespace grassland
+}  // namespace CD

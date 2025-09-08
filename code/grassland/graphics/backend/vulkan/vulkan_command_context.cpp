@@ -7,7 +7,7 @@
 #include "grassland/graphics/backend/vulkan/vulkan_sampler.h"
 #include "grassland/graphics/backend/vulkan/vulkan_window.h"
 
-namespace grassland::graphics::backend {
+namespace CD::graphics::backend {
 
 VulkanCommandContext::VulkanCommandContext(VulkanCore *core) : core_(core) {
   for (int i = 0; i < BIND_POINT_COUNT; i++) {
@@ -230,4 +230,4 @@ void VulkanCommandContext::RecordDynamicBuffer(VulkanBuffer *buffer) {
   }
 }
 
-}  // namespace grassland::graphics::backend
+}  // namespace CD::graphics::backend

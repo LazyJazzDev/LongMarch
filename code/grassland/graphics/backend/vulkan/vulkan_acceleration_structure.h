@@ -1,7 +1,7 @@
 #pragma once
 #include "grassland/graphics/backend/vulkan/vulkan_util.h"
 
-namespace grassland::graphics::backend {
+namespace CD::graphics::backend {
 
 class VulkanAccelerationStructure : public AccelerationStructure {
  public:
@@ -18,4 +18,4 @@ class VulkanAccelerationStructure : public AccelerationStructure {
   std::unique_ptr<vulkan::AccelerationStructure> acceleration_structure_;
 };
 
-}  // namespace grassland::graphics::backend
+}  // namespace CD::graphics::backend

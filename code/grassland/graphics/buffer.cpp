@@ -1,6 +1,6 @@
 #include "grassland/graphics/buffer.h"
 
-namespace grassland::graphics {
+namespace CD::graphics {
 
 BufferRange::BufferRange(Buffer *buffer, size_t offset, size_t size) : buffer(buffer), offset(offset), size(size) {
   if (buffer) {
@@ -8,4 +8,4 @@ BufferRange::BufferRange(Buffer *buffer, size_t offset, size_t size) : buffer(bu
   }
 }
 
-}  // namespace grassland::graphics
+}  // namespace CD::graphics

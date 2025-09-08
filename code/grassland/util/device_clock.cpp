@@ -2,7 +2,7 @@
 
 #include "grassland/util/device_clock.h"
 
-namespace grassland {
+namespace CD {
 
 namespace {
 cudaEvent_t CudaCreateAndRecordEvent() {
@@ -57,6 +57,6 @@ void DeviceClock::Finish() {
   }
 }
 
-}  // namespace grassland
+}  // namespace CD
 
 #endif

@@ -2,7 +2,7 @@
 
 #include "grassland/vulkan/device.h"
 
-namespace grassland::vulkan {
+namespace CD::vulkan {
 class ShaderModule {
  public:
   ShaderModule(const class Device *device, VkShaderModule shader_module, const std::string &entry_point);
@@ -35,4 +35,4 @@ struct HitGroup {
 };
 
 CompiledShaderBlob CompileGLSLToSPIRV(const std::string &glsl_code, VkShaderStageFlagBits shader_stage);
-}  // namespace grassland::vulkan
+}  // namespace CD::vulkan

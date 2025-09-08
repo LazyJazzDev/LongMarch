@@ -2,7 +2,7 @@
 
 #include <algorithm>
 
-namespace grassland {
+namespace CD {
 
 template <typename Real>
 LM_DEVICE_FUNC bool PointSDF<Real>::ValidInput(const InputType &v) const {
@@ -268,4 +268,4 @@ LM_DEVICE_FUNC HessianTensor<Real, 1, 3> LineSDF<Real>::Hessian(const InputType 
 template class LineSDF<float>;
 template class LineSDF<double>;
 
-}  // namespace grassland
+}  // namespace CD

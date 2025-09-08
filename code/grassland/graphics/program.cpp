@@ -9,7 +9,7 @@
 #endif
 #include "dxc/dxcapi.h"
 
-namespace grassland::graphics {
+namespace CD::graphics {
 
 namespace {
 #include "built_in_shaders.inl"
@@ -223,4 +223,4 @@ CompiledShaderBlob CompileShader(const VirtualFileSystem &vfs,
   return shader_blob;
 }
 
-}  // namespace grassland::graphics
+}  // namespace CD::graphics

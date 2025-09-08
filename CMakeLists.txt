@@ -163,8 +163,8 @@ add_subdirectory(code)
 # If current list is the root list
 if ("${CMAKE_CURRENT_SOURCE_DIR}" STREQUAL "${CMAKE_SOURCE_DIR}")
     if (NOT LONGMARCH_NO_DEMO)
-        add_subdirectory(demo EXCLUDE_FROM_ALL)
-        add_subdirectory(test EXCLUDE_FROM_ALL)
+        add_subdirectory(demo)
+        add_subdirectory(test)
     endif ()
 endif ()
 

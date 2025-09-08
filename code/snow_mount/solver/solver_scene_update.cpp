@@ -68,7 +68,7 @@ __global__ void SolveVBDParticlePosition(SceneRef scene_ref, const int *particle
       int stretching_id = scene_ref.stretching_directory.positions[scene_ref.stretching_directory.first[pid] + i] / 3;
       auto stretching = scene_ref.stretchings[stretching_id];
 
-      grassland::ElasticNeoHookeanSimpleTriangle<float> neo_hookean{stretching.mu, stretching.lambda, stretching.Dm};
+      CD::ElasticNeoHookeanSimpleTriangle<float> neo_hookean{stretching.mu, stretching.lambda, stretching.Dm};
       uint32_t u = scene_ref.stretching_indices[stretching_id * 3 + 0];
       uint32_t v = scene_ref.stretching_indices[stretching_id * 3 + 1];
       uint32_t w = scene_ref.stretching_indices[stretching_id * 3 + 2];
@@ -91,7 +91,7 @@ __global__ void SolveVBDParticlePosition(SceneRef scene_ref, const int *particle
       int bending_id = scene_ref.bending_directory.positions[scene_ref.bending_directory.first[pid] + i] / 4;
       auto bending = scene_ref.bendings[bending_id];
 
-      grassland::DihedralAngle<float> dihedral_angle;
+      CD::DihedralAngle<float> dihedral_angle;
       uint32_t u = scene_ref.bending_indices[bending_id * 4 + 0];
       uint32_t v = scene_ref.bending_indices[bending_id * 4 + 1];
       uint32_t w = scene_ref.bending_indices[bending_id * 4 + 2];
@@ -203,7 +203,7 @@ __global__ void SolveVBDParticlePositionBatched(const int *scene_offsets,
       int bending_id = scene_ref.bending_directory.positions[scene_ref.bending_directory.first[pid] + i] / 4;
       auto bending = scene_ref.bendings[bending_id];
 
-      grassland::DihedralAngle<float> dihedral_angle;
+      CD::DihedralAngle<float> dihedral_angle;
       uint32_t u = scene_ref.bending_indices[bending_id * 4 + 0];
       uint32_t v = scene_ref.bending_indices[bending_id * 4 + 1];
       uint32_t w = scene_ref.bending_indices[bending_id * 4 + 2];

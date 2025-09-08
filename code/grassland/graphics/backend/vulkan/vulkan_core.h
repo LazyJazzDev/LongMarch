@@ -3,7 +3,7 @@
 
 #include "grassland/graphics/backend/vulkan/vulkan_util.h"
 
-namespace grassland::graphics::backend {
+namespace CD::graphics::backend {
 
 class VulkanCore : public Core {
  public:
@@ -177,4 +177,4 @@ class VulkanCore : public Core {
   std::unique_ptr<vulkan::Buffer> download_staging_buffer_;
 };
 
-}  // namespace grassland::graphics::backend
+}  // namespace CD::graphics::backend

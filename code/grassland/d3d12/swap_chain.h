@@ -2,7 +2,7 @@
 #include "grassland/d3d12/descriptor_heap.h"
 #include "grassland/d3d12/dxgi_factory.h"
 
-namespace grassland::d3d12 {
+namespace CD::d3d12 {
 class SwapChain {
  public:
   SwapChain(const ComPtr<IDXGISwapChain3> &swap_chain);
@@ -16,15 +16,11 @@ class SwapChain {
   }
 
   CD3DX12_CPU_DESCRIPTOR_HANDLE RTVCPUHandle(uint32_t index) const {
-    return CD3DX12_CPU_DESCRIPTOR_HANDLE(
-        rtv_heap_->GetCPUDescriptorHandleForHeapStart(), index,
-        rtv_descriptor_size_);
+    return CD3DX12_CPU_DESCRIPTOR_HANDLE(rtv_heap_->GetCPUDescriptorHandleForHeapStart(), index, rtv_descriptor_size_);
   }
 
   CD3DX12_GPU_DESCRIPTOR_HANDLE RTVGPUHandle(uint32_t index) const {
-    return CD3DX12_GPU_DESCRIPTOR_HANDLE(
-        rtv_heap_->GetGPUDescriptorHandleForHeapStart(), index,
-        rtv_descriptor_size_);
+    return CD3DX12_GPU_DESCRIPTOR_HANDLE(rtv_heap_->GetGPUDescriptorHandleForHeapStart(), index, rtv_descriptor_size_);
   }
 
   DXGI_FORMAT BackBufferFormat() const;
@@ -46,4 +42,4 @@ class SwapChain {
   uint32_t width;
   uint32_t height;
 };
-}  // namespace grassland::d3d12
+}  // namespace CD::d3d12

@@ -3,7 +3,7 @@
 #include "grassland/physics/diff_kernel/dk_hessian_tensor.h"
 #include "grassland/physics/physics_util.h"
 
-namespace grassland {
+namespace CD {
 
 template <typename Func>
 using JacobianType =
@@ -494,4 +494,4 @@ struct RightMultiplyMatrix {
 template <typename Real>
 using CrossNormalized = Compose<Cross3<Real>, VecNormalized<Real>>;
 
-}  // namespace grassland
+}  // namespace CD

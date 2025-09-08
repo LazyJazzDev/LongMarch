@@ -8,7 +8,7 @@ struct SDFResult {
   Eigen::Matrix3<float> hessian;
 };
 
-LM_DEVICE_FUNC bool AnyHit(const Eigen::Vector3<float> &query, const SDFResult *result, const grassland::AABB &aabb) {
+LM_DEVICE_FUNC bool AnyHit(const Eigen::Vector3<float> &query, const SDFResult *result, const CD::AABB &aabb) {
   Eigen::Vector3<float> p;
   for (int i = 0; i < 3; i++) {
     if (query[i] < aabb.lower_bound[i]) {
@@ -45,7 +45,7 @@ LM_DEVICE_FUNC bool InstanceHit(const Eigen::Vector3<float> &position,
       }
       dist = d;
       hit = true;
-      grassland::PointSDF<float> point_sdf;
+      CD::PointSDF<float> point_sdf;
       point_sdf.position = p;
       result->jacobian = point_sdf.Jacobian(position).transpose();
       result->hessian = point_sdf.Hessian(position).m[0];
@@ -85,7 +85,7 @@ LM_DEVICE_FUNC bool InstanceHit(const Eigen::Vector3<float> &position,
     if (d < dist) {
       dist = d;
       hit = true;
-      grassland::PlaneSDF<float> plane_sdf;
+      CD::PlaneSDF<float> plane_sdf;
       plane_sdf.normal = n;
       plane_sdf.d = -n.dot(p0);
       result->jacobian = plane_sdf.Jacobian(position).transpose() * signal;
@@ -115,7 +115,7 @@ LM_DEVICE_FUNC bool InstanceHit(const Eigen::Vector3<float> &position,
       }
       dist = d;
       hit = true;
-      grassland::LineSDF<float> line_sdf;
+      CD::LineSDF<float> line_sdf;
       line_sdf.direction = n;
       line_sdf.origin = p0;
       result->jacobian = line_sdf.Jacobian(position).transpose();
@@ -126,7 +126,7 @@ LM_DEVICE_FUNC bool InstanceHit(const Eigen::Vector3<float> &position,
   return hit;
 }
 
-void BatchQuery(const grassland::BVHRef &bvh,
+void BatchQuery(const CD::BVHRef &bvh,
                 const Eigen::Vector3<float> *queries,
                 SDFResult *result,
                 const AttachedInfo &attached_info,
@@ -136,7 +136,7 @@ void BatchQuery(const grassland::BVHRef &bvh,
   }
 }
 
-__global__ void BatchQueryDevKernel(const grassland::BVHRef bvh,
+__global__ void BatchQueryDevKernel(const CD::BVHRef bvh,
                                     const Eigen::Vector3<float> *queries,
                                     SDFResult *result,
                                     const AttachedInfo attached_info,
@@ -151,7 +151,7 @@ __global__ void BatchQueryDevKernel(const grassland::BVHRef bvh,
   result[tid] = result_dev;
 }
 
-void BatchQueryDev(const grassland::BVHHost &bvh,
+void BatchQueryDev(const CD::BVHHost &bvh,
                    const Eigen::Vector3<float> *queries,
                    SDFResult *result,
                    const AttachedInfo &attached_info,
@@ -167,9 +167,9 @@ void BatchQueryDev(const grassland::BVHHost &bvh,
   attached_dev.num_vertices = attached_info.num_vertices;
   attached_dev.num_indices = attached_info.num_indices;
 
-  grassland::BVHCuda bvh_dev(bvh);
+  CD::BVHCuda bvh_dev(bvh);
 
-  grassland::DeviceClock clock;
+  CD::DeviceClock clock;
   BatchQueryDevKernel<<<(num_tasks + 255) / 256, 256>>>(bvh_dev, thrust::raw_pointer_cast(queries_dev.data()),
                                                         thrust::raw_pointer_cast(result_dev.data()), attached_dev,
                                                         num_tasks);
@@ -208,10 +208,10 @@ TEST(BVH, SphereSDF) {
     }
   }
 
-  std::vector<grassland::AABB> aabbs;
+  std::vector<CD::AABB> aabbs;
   std::vector<int> instance_indices;
   for (size_t i = 0; i < indices.size(); i += 3) {
-    grassland::AABB aabb;
+    CD::AABB aabb;
     aabb.lower_bound = vertices[indices[i]];
     aabb.upper_bound = vertices[indices[i]];
     for (size_t j = 1; j < 3; ++j) {
@@ -222,7 +222,7 @@ TEST(BVH, SphereSDF) {
     instance_indices.push_back(i / 3);
   }
 
-  grassland::BVHHost bvh{aabbs.data(), instance_indices.data(), static_cast<int>(aabbs.size())};
+  CD::BVHHost bvh{aabbs.data(), instance_indices.data(), static_cast<int>(aabbs.size())};
 
   AttachedInfo attached;
   attached.vertices = vertices.data();

@@ -7,7 +7,7 @@ PYBIND11_MODULE(long_march, m) {
   m.attr("BUILD_TIME") = __DATE__ " " __TIME__;
 
   pybind11::module_ m_grassland = m.def_submodule("grassland", "Grassland");
-  grassland::PyBind(m_grassland);
+  CD::PyBind(m_grassland);
 
   pybind11::module_ m_snow_mount = m.def_submodule("snow_mount", "SnowMount");
   snow_mount::PyBind(m_snow_mount);

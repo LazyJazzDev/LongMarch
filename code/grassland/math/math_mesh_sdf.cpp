@@ -5,7 +5,7 @@
 #include "grassland/math/math_basics.h"
 #include "grassland/math/math_static_collision.h"
 
-namespace grassland {
+namespace CD {
 
 LM_DEVICE_FUNC void MeshSDFRef::SDF(const Vector3<float> &position,
                                     const Matrix3<float> &R,
@@ -187,4 +187,4 @@ MeshSDFDevice::operator MeshSDF() const {
 }
 #endif
 
-}  // namespace grassland
+}  // namespace CD

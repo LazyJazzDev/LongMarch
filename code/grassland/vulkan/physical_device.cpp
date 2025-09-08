@@ -3,7 +3,7 @@
 #include "grassland/vulkan/device.h"
 #include "grassland/vulkan/surface.h"
 
-namespace grassland::vulkan {
+namespace CD::vulkan {
 PhysicalDevice::PhysicalDevice(VkPhysicalDevice physical_device) {
   physical_device_ = physical_device;
 }
@@ -261,4 +261,4 @@ int PhysicalDevice::GetCUDADeviceIndex() const {
 }
 #endif
 
-}  // namespace grassland::vulkan
+}  // namespace CD::vulkan

@@ -48,7 +48,7 @@ class ComputeTask {
 };
 
 int main() {
-  grassland::DeviceClock clock;
+  CD::DeviceClock clock;
   constexpr int n_subtask = 4096;
   constexpr int n_task = 1024;
   ComputeTask task(n_task * n_subtask);
@@ -62,7 +62,7 @@ int main() {
     streams.emplace_back(stream);
   }
 
-  grassland::DeviceClock device_clock;
+  CD::DeviceClock device_clock;
   task.SubmitTask(128);
   device_clock.Record("Full-concurrent task");
   for (int i = 0; i < n_task; i++) {

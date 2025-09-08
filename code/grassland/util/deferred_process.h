@@ -1,7 +1,7 @@
 #pragma once
 #include "functional"
 
-namespace grassland {
+namespace CD {
 class DeferredProcess {
  public:
   DeferredProcess(const std::function<void()> &func);
@@ -14,4 +14,4 @@ class DeferredProcess {
  private:
   std::function<void()> func_;
 };
-}  // namespace grassland
+}  // namespace CD

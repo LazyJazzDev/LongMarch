@@ -1,6 +1,6 @@
 #include "grassland/vulkan/device_creation_assist.h"
 
-namespace grassland::vulkan {
+namespace CD::vulkan {
 
 VkDeviceCreateInfo DeviceCreateInfo::CompileVkDeviceCreateInfo(bool enable_validation_layers,
                                                                const PhysicalDevice &physical_device) {
@@ -131,4 +131,4 @@ VmaAllocatorCreateFlags DeviceFeatureRequirement::GetVmaAllocatorCreateFlags() c
   }
   return flags;
 }
-}  // namespace grassland::vulkan
+}  // namespace CD::vulkan

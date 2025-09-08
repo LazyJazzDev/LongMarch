@@ -2,7 +2,7 @@
 
 #include <utility>
 
-namespace grassland::d3d12 {
+namespace CD::d3d12 {
 
 Adapter::Adapter(ComPtr<IDXGIAdapter1> adapter) : adapter_(std::move(adapter)) {
   adapter_->GetDesc1(&desc_);
@@ -77,4 +77,4 @@ int Adapter::CUDADeviceIndex() const {
 }
 #endif
 
-}  // namespace grassland::d3d12
+}  // namespace CD::d3d12

@@ -7,7 +7,7 @@
 #include "grassland/graphics/backend/d3d12/d3d12_util.h"
 #include "grassland/graphics/backend/d3d12/d3d12_window.h"
 
-namespace grassland::graphics::backend {
+namespace CD::graphics::backend {
 
 class D3D12CommandContext : public CommandContext {
  public:
@@ -99,4 +99,4 @@ class D3D12CommandContext : public CommandContext {
   CD3DX12_GPU_DESCRIPTOR_HANDLE sampler_descriptor_gpu_base_{};
 };
 
-}  // namespace grassland::graphics::backend
+}  // namespace CD::graphics::backend

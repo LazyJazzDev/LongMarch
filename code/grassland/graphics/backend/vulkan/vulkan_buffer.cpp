@@ -1,6 +1,6 @@
 #include "grassland/graphics/backend/vulkan/vulkan_buffer.h"
 
-namespace grassland::graphics::backend {
+namespace CD::graphics::backend {
 
 VulkanBufferRange::VulkanBufferRange(const BufferRange &range)
     : buffer(dynamic_cast<VulkanBuffer *>(range.buffer)), offset(range.offset), size(range.size) {
@@ -289,4 +289,4 @@ void VulkanCUDABuffer::GetCUDAMemoryPointer(void **ptr) {
 
 #endif
 
-}  // namespace grassland::graphics::backend
+}  // namespace CD::graphics::backend

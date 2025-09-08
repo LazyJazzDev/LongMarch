@@ -1,7 +1,7 @@
 #pragma once
 #include "grassland/math/math_util.h"
 
-namespace grassland {
+namespace CD {
 
 template <typename Scalar>
 LM_DEVICE_FUNC Scalar PolygonArea(const Vector2<Scalar> *vertices, int n) {
@@ -31,4 +31,4 @@ LM_DEVICE_FUNC Scalar SolidAngle(const Vector3<Scalar> &v0, const Vector3<Scalar
                   (v0_norm * v1_norm * v2_norm + v0.dot(v1) * v2_norm + v1.dot(v2) * v0_norm + v2.dot(v0) * v1_norm));
 }
 
-}  // namespace grassland
+}  // namespace CD

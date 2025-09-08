@@ -1,6 +1,6 @@
 #include "grassland/graphics/acceleration_structure.h"
 
-namespace grassland::graphics {
+namespace CD::graphics {
 
 int AccelerationStructure::UpdateInstances(
     const std::vector<std::pair<AccelerationStructure *, glm::mat4x3>> &instances) {
@@ -32,4 +32,4 @@ RayTracingInstance AccelerationStructure::MakeInstance(const glm::mat4x3 &transf
   return instance;
 }
 
-}  // namespace grassland::graphics
+}  // namespace CD::graphics

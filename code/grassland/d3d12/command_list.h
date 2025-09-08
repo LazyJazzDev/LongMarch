@@ -1,7 +1,7 @@
 #pragma once
 #include "grassland/d3d12/device.h"
 
-namespace grassland::d3d12 {
+namespace CD::d3d12 {
 
 class CommandList {
  public:
@@ -15,4 +15,4 @@ class CommandList {
   ComPtr<ID3D12GraphicsCommandList> command_list_;
 };
 
-}  // namespace grassland::d3d12
+}  // namespace CD::d3d12
