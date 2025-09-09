@@ -115,7 +115,7 @@ int VulkanCore::CreateShader(const VirtualFileSystem &vfs,
                              const std::vector<std::string> &args,
                              double_ptr<Shader> pp_shader) {
   std::vector<std::string> compile_args = {"-spirv", "-fspv-target-env=vulkan1.2", "-fvk-use-dx-layout"};
-#if !defined(NDEBUG)
+#if !defined(NDEBUG) && !defined(__APPLE__)
   compile_args.push_back("-Qembed_debug");
   compile_args.push_back("-fspv-debug=vulkan-with-source");
 #endif
