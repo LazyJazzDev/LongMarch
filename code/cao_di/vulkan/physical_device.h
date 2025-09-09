@@ -52,7 +52,7 @@ class PhysicalDevice {
 
   bool CheckFeatureSupport(const struct DeviceFeatureRequirement &feature_requirement) const;
 
-#if defined(LONGMARCH_CUDA_RUNTIME)
+#if defined(CHANGZHENG_CUDA_RUNTIME)
   int GetCUDADeviceIndex() const;
 #endif
 

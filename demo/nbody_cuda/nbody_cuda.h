@@ -1,6 +1,6 @@
 #pragma once
+#include "chang_zheng.h"
 #include "glm/gtc/matrix_transform.hpp"
-#include "long_march.h"
 #include "params.h"
 #include "random"
 

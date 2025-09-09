@@ -59,7 +59,7 @@ struct VulkanResourceBinding {
   VulkanImage *image;
 };
 
-#if defined(LONGMARCH_CUDA_RUNTIME)
+#if defined(CHANGZHENG_CUDA_RUNTIME)
 class VulkanCUDABuffer;
 #endif
 

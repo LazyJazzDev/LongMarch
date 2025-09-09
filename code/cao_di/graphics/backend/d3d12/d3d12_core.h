@@ -24,7 +24,7 @@ class D3D12Core : public Core {
 
   int CreateBuffer(size_t size, BufferType type, double_ptr<Buffer> pp_buffer) override;
 
-#if defined(LONGMARCH_CUDA_RUNTIME)
+#if defined(CHANGZHENG_CUDA_RUNTIME)
   int CreateCUDABuffer(size_t size, double_ptr<CUDABuffer> pp_buffer) override;
 #endif
 
@@ -148,7 +148,7 @@ class D3D12Core : public Core {
   d3d12::Buffer *RequestUploadStagingBuffer(size_t size);
   d3d12::Buffer *RequestDownloadStagingBuffer(size_t size);
 
-#if defined(LONGMARCH_CUDA_RUNTIME)
+#if defined(CHANGZHENG_CUDA_RUNTIME)
   void ImportCudaExternalMemory(cudaExternalMemory_t &cuda_memory, d3d12::Buffer *buffer);
   void CUDABeginExecutionBarrier(cudaStream_t stream) override;
   void CUDAEndExecutionBarrier(cudaStream_t stream) override;
@@ -184,7 +184,7 @@ class D3D12Core : public Core {
 
   std::vector<std::vector<std::function<void()>>> post_execute_functions_;
 
-#if defined(LONGMARCH_CUDA_RUNTIME)
+#if defined(CHANGZHENG_CUDA_RUNTIME)
   uint32_t cuda_device_node_mask_;
   cudaExternalSemaphore_t cuda_semaphore_{};
 #endif

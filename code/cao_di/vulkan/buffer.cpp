@@ -57,7 +57,7 @@ void DownloadBuffer(Queue *queue, CommandPool *command_pool, Buffer *buffer, voi
   staging_buffer->Unmap();
 }
 
-#if defined(LONGMARCH_CUDA_RUNTIME)
+#if defined(CHANGZHENG_CUDA_RUNTIME)
 VkExternalMemoryHandleTypeFlagBits GetDefaultExternalMemoryHandleType() {
 #ifdef _WIN64
   return IsWindows8Point1OrGreater() ? VK_EXTERNAL_MEMORY_HANDLE_TYPE_OPAQUE_WIN32_BIT

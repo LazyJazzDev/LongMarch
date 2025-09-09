@@ -16,7 +16,7 @@ class VulkanCore : public Core {
 
   int CreateBuffer(size_t size, BufferType type, double_ptr<Buffer> pp_buffer) override;
 
-#if defined(LONGMARCH_CUDA_RUNTIME)
+#if defined(CHANGZHENG_CUDA_RUNTIME)
   int CreateCUDABuffer(size_t size, double_ptr<CUDABuffer> pp_buffer) override;
 #endif
 
@@ -134,7 +134,7 @@ class VulkanCore : public Core {
   vulkan::Buffer *RequestUploadStagingBuffer(size_t size);
   vulkan::Buffer *RequestDownloadStagingBuffer(size_t size);
 
-#if defined(LONGMARCH_CUDA_RUNTIME)
+#if defined(CHANGZHENG_CUDA_RUNTIME)
   void ImportCudaExternalMemory(cudaExternalMemory_t &cuda_memory, VkDeviceMemory &vulkan_memory, VkDeviceSize size);
   void CUDABeginExecutionBarrier(cudaStream_t stream) override;
   void CUDAEndExecutionBarrier(cudaStream_t stream) override;
@@ -164,7 +164,7 @@ class VulkanCore : public Core {
 
   std::vector<std::vector<std::function<void()>>> post_execute_functions_;
 
-#if defined(LONGMARCH_CUDA_RUNTIME)
+#if defined(CHANGZHENG_CUDA_RUNTIME)
   VkSemaphore cuda_synchronization_semaphore_{VK_NULL_HANDLE};
   uint64_t cuda_synchronization_value_{0};
   cudaExternalSemaphore_t cuda_external_semaphore_{nullptr};

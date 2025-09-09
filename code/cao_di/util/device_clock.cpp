@@ -1,4 +1,4 @@
-#if defined(LONGMARCH_CUDA_RUNTIME)
+#if defined(CHANGZHENG_CUDA_RUNTIME)
 
 #include "cao_di/util/device_clock.h"
 

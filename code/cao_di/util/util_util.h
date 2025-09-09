@@ -14,7 +14,7 @@
 #include "pybind11/pybind11.h"
 #include "pybind11/stl.h"
 
-#if defined(LONGMARCH_CUDA_RUNTIME)
+#if defined(CHANGZHENG_CUDA_RUNTIME)
 #include "cuda_runtime.h"
 #include "thrust/device_vector.h"
 #include "thrust/host_vector.h"
@@ -23,7 +23,7 @@
 
 namespace CD {
 
-#if defined(LONGMARCH_CUDA_RUNTIME)
+#if defined(CHANGZHENG_CUDA_RUNTIME)
 void CUDAThrowIfFailed(cudaError_t error, const std::string &message);
 #endif
 

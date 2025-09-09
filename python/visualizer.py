@@ -1,9 +1,9 @@
 import math
 
 import numpy as np
-from long_march import grassland
-from long_march import snow_mount
-from long_march.grassland import graphics
+from chang_zheng import cao_di
+from chang_zheng import xue_shan
+from chang_zheng.cao_di import graphics
 
 import open3d as o3d
 
@@ -13,29 +13,29 @@ from camera_controller import CameraController
 def main():
     graphics_core_settings = graphics.CoreSettings(frames_in_flight=2)
     graphics_core = graphics.Core(graphics.BACKEND_API_D3D12, graphics_core_settings)
-    vis_core = snow_mount.visualizer.Core(graphics_core)
+    vis_core = xue_shan.visualizer.Core(graphics_core)
 
     window = graphics_core.create_window(1280, 720, "Visualizer", resizable=True)
 
     scene = vis_core.create_scene()
     film = vis_core.create_film(1280, 720)
-    camera = vis_core.create_camera(proj=snow_mount.visualizer.perspective(math.radians(60.0), 1280 / 720, 0.1, 100.0),
-                                    view=snow_mount.visualizer.look_at([0, 1, 5], [0, 0, 0], [0, 1, 0]))
+    camera = vis_core.create_camera(proj=xue_shan.visualizer.perspective(math.radians(60.0), 1280 / 720, 0.1, 100.0),
+                                    view=xue_shan.visualizer.look_at([0, 1, 5], [0, 0, 0], [0, 1, 0]))
 
     def on_resize(width, height):
         nonlocal film, camera
         film = vis_core.create_film(width, height)
-        camera.proj = snow_mount.visualizer.perspective(math.radians(60.0), width / height, 0.1, 100.0)
+        camera.proj = xue_shan.visualizer.perspective(math.radians(60.0), width / height, 0.1, 100.0)
 
     window.reg_resize_callback(on_resize)
 
     mesh = vis_core.create_mesh()
     # load form "meshes/cube.obj"
-    o3d_cube_mesh = o3d.io.read_triangle_mesh(grassland.util.find_asset_file("meshes/cube.obj"))
+    o3d_cube_mesh = o3d.io.read_triangle_mesh(cao_di.util.find_asset_file("meshes/cube.obj"))
     mesh.set_vertices(o3d_cube_mesh.vertices)
     mesh.set_indices(np.asarray(o3d_cube_mesh.triangles).flatten())
 
-    entity = vis_core.create_entity_mesh_object(mesh, snow_mount.visualizer.Material([0.8, 0.8, 0.8, 1.0]), np.identity(4))
+    entity = vis_core.create_entity_mesh_object(mesh, xue_shan.visualizer.Material([0.8, 0.8, 0.8, 1.0]), np.identity(4))
     scene.add_entity(entity)
 
     ambient_light = vis_core.create_entity_ambient_light([0.5, 0.5, 0.5])
@@ -49,7 +49,7 @@ def main():
     camera_controller = CameraController(window, camera)
     camera_controller.set_camera_position([0., 1., 5.], [0., 0., 0.])
 
-    fps_counter = grassland.util.FPSCounter()
+    fps_counter = cao_di.util.FPSCounter()
 
     while not window.should_close():
         camera_controller.update(True)

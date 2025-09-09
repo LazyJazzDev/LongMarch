@@ -75,7 +75,7 @@ std::string Core::DeviceName() const {
   return device_name_;
 }
 
-#if defined(LONGMARCH_CUDA_RUNTIME)
+#if defined(CHANGZHENG_CUDA_RUNTIME)
 int Core::CUDADeviceIndex() const {
   return cuda_device_;
 }

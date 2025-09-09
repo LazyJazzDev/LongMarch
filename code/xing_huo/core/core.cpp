@@ -62,7 +62,7 @@ graphics::Image *Core::GetImage(const std::string &name) {
 }
 
 void Core::LoadPublicShaders() {
-  shaders_vfs_ = VirtualFileSystem::LoadDirectory(LONGMARCH_XING_HUO_SHADERS);
+  shaders_vfs_ = VirtualFileSystem::LoadDirectory(CHANGZHENG_XING_HUO_SHADERS);
   core_->CreateShader(shaders_vfs_, "film2img.hlsl", "Main", "cs_6_0", &shaders_["film2img"]);
   auto &film2img_program = compute_programs_["film2img"];
   core_->CreateComputeProgram(shaders_["film2img"].get(), &film2img_program);

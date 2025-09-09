@@ -9,7 +9,7 @@ if (NOT DEFINED CMAKE_TOOLCHAIN_FILE)
     message(FATAL_ERROR "You must set CMAKE_TOOLCHAIN_FILE to your vcpkg script.\nYou may use VCPKG_PATH pointing to your vcpkg root directory for convenience.\ne.g. cmake -S . -B build -DVCPKG_PATH=/path/to/vcpkg")
 endif ()
 
-project(LongMarch)
+project(ChangZheng)
 
 set(CMAKE_CXX_STANDARD 17)
 
@@ -34,11 +34,11 @@ if (CUDAToolkit_FOUND)
     endif ()
     set(CUDART_LIB_NAME CUDA::cudart)
     list(APPEND LIB_LIST ${CUDART_LIB_NAME})
-    set(LONGMARCH_CUDA_RUNTIME ON)
-    if (NOT LONGMARCH_DISABLE_CUDA)
+    set(CHANGZHENG_CUDA_RUNTIME ON)
+    if (NOT CHANGZHENG_DISABLE_CUDA)
         enable_language(CUDA)
         set(CMAKE_CUDA_STANDARD 17)
-        set(LONGMARCH_CUDA_ENABLED ON)
+        set(CHANGZHENG_CUDA_ENABLED ON)
         set(CMAKE_CUDA_SEPARABLE_COMPILATION ON)
         set(CMAKE_CUDA_ARCHITECTURES 75)
         add_compile_options("$<$<COMPILE_LANGUAGE:CUDA>:--expt-relaxed-constexpr>")
@@ -130,7 +130,7 @@ if (WIN32)
     list(APPEND INC_LIST ${D3DX12_INCLUDE_DIRS})
 endif ()
 
-set(LONGMARCH_IMGUI_DIR ${CMAKE_CURRENT_LIST_DIR}/external/imgui)
+set(CHANGZHENG_IMGUI_DIR ${CMAKE_CURRENT_LIST_DIR}/external/imgui)
 
 message(STATUS "CMAKE_ARCHIVE_OUTPUT_DIRECTORY : ${CMAKE_ARCHIVE_OUTPUT_DIRECTORY}")
 message(STATUS "CMAKE_LIBRARY_OUTPUT_DIRECTORY : ${CMAKE_LIBRARY_OUTPUT_DIRECTORY}")
@@ -151,23 +151,23 @@ list(APPEND LIB_LIST ${PYBIND11_LIB_NAME})
 add_subdirectory(scripts)
 include(scripts/pack_shaders.cmake)
 
-set(LONGMARCH_ASSETS_DIR ${CMAKE_CURRENT_SOURCE_DIR}/assets/)
+set(CHANGZHENG_ASSETS_DIR ${CMAKE_CURRENT_SOURCE_DIR}/assets/)
 
 add_subdirectory(code)
 
-#get_target_property(SHARED_LIB_PATH LongMarch IMPORTED_LOCATION)
+#get_target_property(SHARED_LIB_PATH ChangZheng IMPORTED_LOCATION)
 #message(STATUS "SHARED_LIB_PATH : ${SHARED_LIB_PATH}")
-#message("Executable output folder: $<TARGET_FILE_DIR:LongMarch>")
+#message("Executable output folder: $<TARGET_FILE_DIR:ChangZheng>")
 #file(GET_RUNTIME_DEPENDENCIES)
 
 # If current list is the root list
 if ("${CMAKE_CURRENT_SOURCE_DIR}" STREQUAL "${CMAKE_SOURCE_DIR}")
-    if (NOT LONGMARCH_NO_DEMO)
+    if (NOT CHANGZHENG_NO_DEMO)
         add_subdirectory(demo)
         add_subdirectory(test)
     endif ()
 endif ()
 
 
-get_target_property(bin_path LongMarch INTERFACE_LINK_LIBRARIES)
+get_target_property(bin_path ChangZheng INTERFACE_LINK_LIBRARIES)
 message(STATUS "bin_path : ${bin_path}")

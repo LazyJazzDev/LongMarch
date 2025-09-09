@@ -13,7 +13,7 @@ namespace CD::graphics::backend {
 VulkanCore::VulkanCore(const Settings &settings) : Core(settings) {
   vulkan::InstanceCreateHint hint{};
   hint.SetValidationLayersEnabled(DebugEnabled());
-#if defined(LONGMARCH_CUDA_RUNTIME)
+#if defined(CHANGZHENG_CUDA_RUNTIME)
   hint.AddExtension(VK_KHR_EXTERNAL_MEMORY_CAPABILITIES_EXTENSION_NAME);
   hint.AddExtension(VK_KHR_EXTERNAL_SEMAPHORE_CAPABILITIES_EXTENSION_NAME);
 #endif
@@ -21,7 +21,7 @@ VulkanCore::VulkanCore(const Settings &settings) : Core(settings) {
 }
 
 VulkanCore::~VulkanCore() {
-#if defined(LONGMARCH_CUDA_RUNTIME)
+#if defined(CHANGZHENG_CUDA_RUNTIME)
   if (cuda_synchronization_semaphore_) {
     VkSemaphoreWaitInfo semaphore_wait_info{};
     semaphore_wait_info.sType = VK_STRUCTURE_TYPE_SEMAPHORE_WAIT_INFO;
@@ -57,7 +57,7 @@ int VulkanCore::CreateBuffer(size_t size, BufferType type, double_ptr<Buffer> pp
   return 0;
 }
 
-#if defined(LONGMARCH_CUDA_RUNTIME)
+#if defined(CHANGZHENG_CUDA_RUNTIME)
 int VulkanCore::CreateCUDABuffer(size_t size, double_ptr<CUDABuffer> pp_buffer) {
   pp_buffer.construct<VulkanCUDABuffer>(this, size);
   return 0;
@@ -264,7 +264,7 @@ int VulkanCore::SubmitCommandContext(CommandContext *p_command_context) {
     submit_info.commandBufferCount = 1;
     submit_info.pCommandBuffers = command_buffers;
 
-#if defined(LONGMARCH_CUDA_RUNTIME)
+#if defined(CHANGZHENG_CUDA_RUNTIME)
     VkTimelineSemaphoreSubmitInfo timeline_info = {};
     uint64_t wait_value;
     uint64_t signal_value;
@@ -330,7 +330,7 @@ int VulkanCore::SubmitCommandContext(CommandContext *p_command_context) {
   submit_info.commandBufferCount = 1;
   submit_info.pCommandBuffers = &command_buffer;
 
-#if defined(LONGMARCH_CUDA_RUNTIME)
+#if defined(CHANGZHENG_CUDA_RUNTIME)
   VkTimelineSemaphoreSubmitInfo timeline_info = {};
   std::vector<uint64_t> wait_values(wait_semaphores.size() + 1, 0);
   std::vector<uint64_t> signal_values(signal_semaphores.size() + 1, 0);
@@ -394,7 +394,7 @@ int VulkanCore::GetPhysicalDeviceProperties(PhysicalDeviceProperties *p_physical
     properties.score = physical_device.Evaluate();
     properties.ray_tracing_support = physical_device.SupportRayTracing();
     properties.geometry_shader_support = physical_device.SupportGeometryShader();
-#if defined(LONGMARCH_CUDA_RUNTIME)
+#if defined(CHANGZHENG_CUDA_RUNTIME)
     properties.cuda_device_index = physical_device.GetCUDADeviceIndex();
 #endif
     if (p_physical_device_properties) {
@@ -415,7 +415,7 @@ int VulkanCore::InitializeLogicalDevice(int device_index) {
 
   auto physical_device = physical_devices[device_index];
 
-#if defined(LONGMARCH_CUDA_RUNTIME)
+#if defined(CHANGZHENG_CUDA_RUNTIME)
   cuda_device_ = physical_device.GetCUDADeviceIndex();
 #endif
 
@@ -426,7 +426,7 @@ int VulkanCore::InitializeLogicalDevice(int device_index) {
       physical_device.IsExtensionSupported(VK_KHR_SWAPCHAIN_EXTENSION_NAME)) {
     create_info.AddExtension(VK_KHR_SWAPCHAIN_EXTENSION_NAME);
   }
-#if defined(LONGMARCH_CUDA_RUNTIME)
+#if defined(CHANGZHENG_CUDA_RUNTIME)
   if (cuda_device_ >= 0) {
     create_info.AddExtension(VK_KHR_EXTERNAL_MEMORY_EXTENSION_NAME);
     create_info.AddExtension(VK_KHR_EXTERNAL_SEMAPHORE_EXTENSION_NAME);
@@ -488,7 +488,7 @@ int VulkanCore::InitializeLogicalDevice(int device_index) {
   }
   transfer_command_pool_->AllocateCommandBuffer(VK_COMMAND_BUFFER_LEVEL_PRIMARY, &transfer_command_buffer_);
 
-#if defined(LONGMARCH_CUDA_RUNTIME)
+#if defined(CHANGZHENG_CUDA_RUNTIME)
 
   if (cuda_device_ >= 0) {
     // Create a timeline semaphore
@@ -560,7 +560,7 @@ uint32_t VulkanCore::WaveSize() const {
 void VulkanCore::SingleTimeCommand(std::function<void(VkCommandBuffer)> command) {
   VkSubmitInfo submit_info{};
   submit_info.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
-#if defined(LONGMARCH_CUDA_RUNTIME)
+#if defined(CHANGZHENG_CUDA_RUNTIME)
   VkTimelineSemaphoreSubmitInfo timeline_info = {};
   uint64_t wait_value;
   uint64_t signal_value;
@@ -609,7 +609,7 @@ vulkan::Buffer *VulkanCore::RequestDownloadStagingBuffer(size_t size) {
   return download_staging_buffer_.get();
 }
 
-#if defined(LONGMARCH_CUDA_RUNTIME)
+#if defined(CHANGZHENG_CUDA_RUNTIME)
 
 void VulkanCore::ImportCudaExternalMemory(cudaExternalMemory_t &cuda_memory,
                                           VkDeviceMemory &vulkan_memory,

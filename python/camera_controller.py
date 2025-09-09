@@ -1,9 +1,9 @@
 import time
 import glfw
 glfw.init()
-from long_march.grassland import graphics
-from long_march.snow_mount import visualizer
-from long_march.grassland.math import rotation
+from chang_zheng.cao_di import graphics
+from chang_zheng.xue_shan import visualizer
+from chang_zheng.cao_di.math import rotation
 import numpy as np
 import math
 class CameraController:

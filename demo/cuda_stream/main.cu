@@ -2,10 +2,10 @@
 #include <thrust/device_vector.h>
 #include <thrust/host_vector.h>
 
+#include "chang_zheng.h"
 #include "cub/cub.cuh"
 #include "cuda_runtime.h"
 #include "curand.h"
-#include "long_march.h"
 
 #define KERNEL_LAUNCH_SIZE(n, nthread) (n + nthread - 1) / nthread, nthread
 

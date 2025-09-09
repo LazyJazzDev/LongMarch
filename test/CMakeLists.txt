@@ -17,6 +17,6 @@ foreach (subdir ${subdirs})
     endif()
 endforeach()
 
-target_link_libraries(test_main PRIVATE LongMarch GTest::gtest GTest::gtest_main)
+target_link_libraries(test_main PRIVATE ChangZheng GTest::gtest GTest::gtest_main)
 
 file(GLOB_RECURSE SOURCES "*.cpp")

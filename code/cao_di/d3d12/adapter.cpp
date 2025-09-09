@@ -59,7 +59,7 @@ bool Adapter::CheckFeatureSupport(const DeviceFeatureRequirement &feature_requir
   return true;
 }
 
-#if defined(LONGMARCH_CUDA_RUNTIME)
+#if defined(CHANGZHENG_CUDA_RUNTIME)
 int Adapter::CUDADeviceIndex() const {
   DXGI_ADAPTER_DESC1 adapter_desc = {};
   adapter_->GetDesc1(&adapter_desc);

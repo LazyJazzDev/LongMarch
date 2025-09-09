@@ -1,5 +1,5 @@
+#include "chang_zheng.h"
 #include "gtest/gtest.h"
-#include "long_march.h"
 #include "random"
 #include "vector"
 

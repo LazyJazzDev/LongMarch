@@ -1,15 +1,5 @@
 #pragma once
-#ifdef WIN32
-#include <d3dcommon.h>
-#include <wrl/client.h>
-#endif
-
-#include "cao_di/graphics/buffer.h"
 #include "cao_di/graphics/graphics_util.h"
-
-#if defined(LONGMARCH_CUDA_RUNTIME)
-#include "cuda_runtime.h"
-#endif
 
 namespace CD::graphics {
 
@@ -122,7 +112,7 @@ class Core {
 
   std::string DeviceName() const;
 
-#if defined(LONGMARCH_CUDA_RUNTIME)
+#if defined(CHANGZHENG_CUDA_RUNTIME)
   int CUDADeviceIndex() const;
   virtual int InitializeLogicalDeviceByCUDADeviceID(int cuda_device_id);
 
@@ -140,7 +130,7 @@ class Core {
   std::string device_name_{};
   bool ray_tracing_support_{false};
 
-#if defined(LONGMARCH_CUDA_RUNTIME)
+#if defined(CHANGZHENG_CUDA_RUNTIME)
   int cuda_device_{-1};
 #endif
 };

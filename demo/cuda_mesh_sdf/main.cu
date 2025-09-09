@@ -1,9 +1,9 @@
 
 
+#include "chang_zheng.h"
 #include "cub/cub.cuh"
 #include "cuda_runtime.h"
 #include "curand.h"
-#include "long_march.h"
 
 int main() {
   // Define a cube [-1, 1]^3

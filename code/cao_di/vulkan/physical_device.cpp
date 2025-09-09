@@ -237,7 +237,7 @@ bool PhysicalDevice::CheckFeatureSupport(const DeviceFeatureRequirement &feature
   return true;
 }
 
-#if defined(LONGMARCH_CUDA_RUNTIME)
+#if defined(CHANGZHENG_CUDA_RUNTIME)
 int PhysicalDevice::GetCUDADeviceIndex() const {
   VkPhysicalDeviceIDProperties id_properties{};
   id_properties.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_ID_PROPERTIES;

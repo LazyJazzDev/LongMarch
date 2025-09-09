@@ -1,5 +1,5 @@
 #pragma once
-#if defined(LONGMARCH_CUDA_RUNTIME)
+#if defined(CHANGZHENG_CUDA_RUNTIME)
 #include <cuda_runtime.h>
 
 #include <queue>

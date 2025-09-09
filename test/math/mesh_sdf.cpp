@@ -3,8 +3,8 @@
 #include <thrust/host_vector.h>
 #endif
 
+#include "chang_zheng.h"
 #include "gtest/gtest.h"
-#include "long_march.h"
 
 TEST(Math, MeshSDFCorrectness) {
   std::vector<Eigen::Vector3f> positions = {

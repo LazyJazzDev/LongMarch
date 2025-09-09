@@ -71,7 +71,7 @@ class VulkanDynamicBuffer : public VulkanBuffer {
   std::unique_ptr<vulkan::Buffer> staging_buffer_;
 };
 
-#if defined(LONGMARCH_CUDA_RUNTIME)
+#if defined(CHANGZHENG_CUDA_RUNTIME)
 class VulkanCUDABuffer : public VulkanBuffer, public CUDABuffer {
  public:
   VulkanCUDABuffer(VulkanCore *core, size_t size);

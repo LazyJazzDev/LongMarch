@@ -1,4 +1,4 @@
-if (LONGMARCH_CUDA_ENABLED)
+if (CHANGZHENG_CUDA_ENABLED)
     file(GLOB SOURCES "*.cpp" "*.h" "*.cu" "*.cuh")
 else ()
     file(GLOB SOURCES "*.cpp" "*.h")

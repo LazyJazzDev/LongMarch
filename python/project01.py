@@ -3,12 +3,12 @@ import time
 from math import isnan
 from typing import Any, SupportsFloat
 
-import long_march
+import chang_zheng
 from gymnasium.core import ObsType, ActType
-from long_march.grassland import graphics
-from long_march.snow_mount import solver
-from long_march.snow_mount import visualizer
-from long_march.grassland.math import rotation
+from chang_zheng.cao_di import graphics
+from chang_zheng.xue_shan import solver
+from chang_zheng.xue_shan import visualizer
+from chang_zheng.cao_di.math import rotation
 import glfw
 import open3d as o3d
 
@@ -46,7 +46,7 @@ class RigidObject:
         self.vis_mesh = scene.vis_scene.get_core().create_mesh()
         self.vis_mesh.set_vertices(vertices)
         self.vis_mesh.set_indices(indices)
-        mesh_sdf = long_march.grassland.math.MeshSDF(vertices, indices)
+        mesh_sdf = chang_zheng.cao_di.math.MeshSDF(vertices, indices)
         sol_rigid_object = solver.RigidObject(mesh_sdf, stiffness=stiffness, friction=friction)
         self.sol_rigid_id = scene.sol_scene.add_rigid_object(sol_rigid_object)
         self.vis_entity = scene.vis_scene.get_core().create_entity_mesh_object()
@@ -81,7 +81,7 @@ class RigidObject:
 
     @staticmethod
     def load_from_mesh(scene: Scene, path: str, stiffness=1e5, friction=0.3):
-        full_path = long_march.grassland.util.find_asset_file(path)
+        full_path = chang_zheng.cao_di.util.find_asset_file(path)
         # load obj mesh from full_path, use open3d
         mesh = o3d.io.read_triangle_mesh(full_path)
         vertices = np.asarray(mesh.vertices)
@@ -189,7 +189,7 @@ class Environment:
         # cloth_vertices = np.asarray(cloth_vertices)
         # np.save("assets/proj01/cloth_target_poses.npy", cloth_vertices)
 
-        self.target_poses = np.load(long_march.grassland.util.find_asset_file("assets/proj01/cloth_target_poses.npy"))
+        self.target_poses = np.load(chang_zheng.cao_di.util.find_asset_file("assets/proj01/cloth_target_poses.npy"))
         # print("target_poses: {}".format(self.target_poses))
         self.vis_core = vis_core
         self.scene = None

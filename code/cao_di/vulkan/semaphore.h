@@ -23,7 +23,7 @@ class Semaphore {
   VkSemaphore semaphore_{};
 };
 
-#if defined(LONGMARCH_CUDA_RUNTIME)
+#if defined(CHANGZHENG_CUDA_RUNTIME)
 VkExternalSemaphoreHandleTypeFlagBits GetDefaultExternalSemaphoreHandleType();
 #endif
 

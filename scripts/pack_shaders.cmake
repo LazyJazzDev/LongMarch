@@ -1,13 +1,13 @@
 
-set(LONG_MARCH_SOURCE_DIR ${CMAKE_CURRENT_SOURCE_DIR} CACHE STRING "CaoDi Source Dir")
-set(LONG_MARCH_INCLUDE_DIR ${LONG_MARCH_SOURCE_DIR}/src CACHE STRING "CaoDi Include Dir")
-set(LONG_MARCH_BINARY_DIR ${CMAKE_CURRENT_BINARY_DIR} CACHE STRING "CaoDi Binary Dir")
+set(CHANG_ZHENG_SOURCE_DIR ${CMAKE_CURRENT_SOURCE_DIR} CACHE STRING "CaoDi Source Dir")
+set(CHANG_ZHENG_INCLUDE_DIR ${CHANG_ZHENG_SOURCE_DIR}/src CACHE STRING "CaoDi Include Dir")
+set(CHANG_ZHENG_BINARY_DIR ${CMAKE_CURRENT_BINARY_DIR} CACHE STRING "CaoDi Binary Dir")
 
 function(XXD input_file output_file dir_name)
     # Add command with relative path
     add_custom_command(
             OUTPUT ${output_file}
-            COMMAND ${LONG_MARCH_BINARY_DIR}/scripts/simple_xxd ${input_file} ${output_file}
+            COMMAND ${CHANG_ZHENG_BINARY_DIR}/scripts/simple_xxd ${input_file} ${output_file}
             COMMAND ${CMAKE_COMMAND} -E echo "Generating ${output_file} from ${input_file}"
             WORKING_DIRECTORY ${dir_name}
             DEPENDS simple_xxd ${input_file}

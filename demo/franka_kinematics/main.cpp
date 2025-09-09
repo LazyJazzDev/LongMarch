@@ -1,4 +1,4 @@
-#include <long_march.h>
+#include <chang_zheng.h>
 
 #define STB_IMAGE_WRITE_IMPLEMENTATION
 #include <random>
@@ -202,7 +202,7 @@ int main() {
   core_->CreateImage(film.GetWidth(), film.GetHeight(), graphics::IMAGE_FORMAT_R8G8B8A8_UNORM, &srgb_image);
 
   std::unique_ptr<graphics::Window> window;
-  core_->CreateWindowObject(film.GetWidth(), film.GetHeight(), "Sparks", &window);
+  core_->CreateWindowObject(film.GetWidth(), film.GetHeight(), "XueShan", &window);
   FPSCounter fps_counter;
 
   JointInfo joints[] = {{-2.7437f, 2.7437f, 0.0f},      {-1.7837f, 1.7837f, 0.0f}, {-2.9007f, 2.9007f, 0.0f},

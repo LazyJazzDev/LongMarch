@@ -39,7 +39,7 @@ FileProbe &FileProbe::GetInstance() {
   static bool initialized = false;
   if (!initialized) {
     instance.AddSearchPath("");
-    instance.AddSearchPath(LONGMARCH_ASSETS_DIR);
+    instance.AddSearchPath(CHANGZHENG_ASSETS_DIR);
     instance.AddSearchPath("./");
     instance.AddSearchPath("../");
     instance.AddSearchPath("../../");

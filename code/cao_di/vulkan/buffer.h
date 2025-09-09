@@ -59,7 +59,7 @@ class BufferObject {
   virtual Buffer *GetBuffer(uint32_t frame_index) const = 0;
 };
 
-#if defined(LONGMARCH_CUDA_RUNTIME)
+#if defined(CHANGZHENG_CUDA_RUNTIME)
 VkExternalMemoryHandleTypeFlagBits GetDefaultExternalMemoryHandleType();
 
 void CreateExternalBuffer(VkDevice device,

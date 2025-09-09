@@ -71,7 +71,7 @@ class D3D12DynamicBuffer : public D3D12Buffer {
   std::unique_ptr<d3d12::Buffer> staging_buffer_;
 };
 
-#if defined(LONGMARCH_CUDA_RUNTIME)
+#if defined(CHANGZHENG_CUDA_RUNTIME)
 class D3D12CUDABuffer : public D3D12Buffer, public CUDABuffer {
  public:
   D3D12CUDABuffer(D3D12Core *core, size_t size);

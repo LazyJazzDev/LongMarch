@@ -95,7 +95,7 @@ struct PhysicalDeviceProperties {
   uint64_t score;
   bool ray_tracing_support;
   bool geometry_shader_support;
-#if defined(LONGMARCH_CUDA_RUNTIME)
+#if defined(CHANGZHENG_CUDA_RUNTIME)
   int cuda_device_index = -1;  // CUDA device index, -1 if not applicable
 #endif
 };
@@ -291,7 +291,7 @@ float GreyScale(glm::vec3 rgb);
 
 uint32_t PixelSize(ImageFormat format);
 
-#if defined(LONGMARCH_CUDA_RUNTIME)
+#if defined(CHANGZHENG_CUDA_RUNTIME)
 class CUDABuffer;
 #endif
 

@@ -1,5 +1,5 @@
 #pragma once
-#include "long_march.h"
+#include "chang_zheng.h"
 #include "xue_shan/draw/draw.h"
 
 class DrawNGUI {

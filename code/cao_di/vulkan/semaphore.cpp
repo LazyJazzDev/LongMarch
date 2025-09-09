@@ -11,7 +11,7 @@ Semaphore::Semaphore(const struct Device *device, VkSemaphore semaphore) : devic
 Semaphore::~Semaphore() {
   vkDestroySemaphore(device_->Handle(), semaphore_, nullptr);
 }
-#if defined(LONGMARCH_CUDA_RUNTIME)
+#if defined(CHANGZHENG_CUDA_RUNTIME)
 VkExternalSemaphoreHandleTypeFlagBits GetDefaultExternalSemaphoreHandleType() {
 #ifdef _WIN64
   return IsWindows8OrGreater() ? VK_EXTERNAL_SEMAPHORE_HANDLE_TYPE_OPAQUE_WIN32_BIT

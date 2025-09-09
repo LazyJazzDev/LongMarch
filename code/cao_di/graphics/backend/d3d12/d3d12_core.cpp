@@ -79,7 +79,7 @@ int D3D12Core::CreateBuffer(size_t size, BufferType type, double_ptr<Buffer> pp_
   return 0;
 }
 
-#if defined(LONGMARCH_CUDA_RUNTIME)
+#if defined(CHANGZHENG_CUDA_RUNTIME)
 int D3D12Core::CreateCUDABuffer(size_t size, double_ptr<CUDABuffer> pp_buffer) {
   pp_buffer.construct<D3D12CUDABuffer>(this, size);
   return 0;
@@ -369,7 +369,7 @@ int D3D12Core::GetPhysicalDeviceProperties(PhysicalDeviceProperties *p_physical_
       properties.score = adapter.Evaluate();
       properties.ray_tracing_support = adapter.SupportRayTracing();
       properties.geometry_shader_support = true;
-#if defined(LONGMARCH_CUDA_RUNTIME)
+#if defined(CHANGZHENG_CUDA_RUNTIME)
       properties.cuda_device_index = adapter.CUDADeviceIndex();
 #endif
       p_physical_device_properties[i] = properties;
@@ -417,7 +417,7 @@ int D3D12Core::InitializeLogicalDevice(int device_index) {
 
   blit_pipeline_.Initialize(device_.get());
 
-#if defined(LONGMARCH_CUDA_RUNTIME)
+#if defined(CHANGZHENG_CUDA_RUNTIME)
   cuda_device_ = device_->Adapter().CUDADeviceIndex();
   cudaDeviceProp device_prop{};
   cudaGetDeviceProperties(&device_prop, device_index);
@@ -492,7 +492,7 @@ d3d12::Buffer *D3D12Core::RequestDownloadStagingBuffer(size_t size) {
   return download_staging_buffer_.get();
 }
 
-#if defined(LONGMARCH_CUDA_RUNTIME)
+#if defined(CHANGZHENG_CUDA_RUNTIME)
 void D3D12Core::ImportCudaExternalMemory(cudaExternalMemory_t &cuda_memory, d3d12::Buffer *buffer) {
   HANDLE sharedHandle;
   WindowsSecurityAttributes windowsSecurityAttributes;

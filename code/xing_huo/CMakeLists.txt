@@ -1,9 +1,9 @@
 
 add_library(XingHuo)
 
-target_sources(XingHuo PRIVATE sparks.cpp)
+target_sources(XingHuo PRIVATE xing_huo.cpp)
 
-set(LONGMARCH_XING_HUO_SHADERS ${CMAKE_CURRENT_LIST_DIR}/shaders)
+set(CHANGZHENG_XING_HUO_SHADERS ${CMAKE_CURRENT_LIST_DIR}/shaders)
 
 
 file(GLOB subdirs RELATIVE ${CMAKE_CURRENT_SOURCE_DIR} *)

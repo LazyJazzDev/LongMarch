@@ -1,27 +1,27 @@
-list(APPEND LONGMARCH_INCLUDE_DIR ${CMAKE_CURRENT_LIST_DIR})
-list(APPEND LONGMARCH_INCLUDE_DIR ${INC_DIR})
-set(LONGMARCH_INCLUDE_DIR ${CMAKE_CURRENT_LIST_DIR} PARENT_SCOPE)
+list(APPEND CHANGZHENG_INCLUDE_DIR ${CMAKE_CURRENT_LIST_DIR})
+list(APPEND CHANGZHENG_INCLUDE_DIR ${INC_DIR})
+set(CHANGZHENG_INCLUDE_DIR ${CMAKE_CURRENT_LIST_DIR} PARENT_SCOPE)
 
-add_library(LongMarch long_march.cpp)
+add_library(ChangZheng chang_zheng.cpp)
 
 add_subdirectory(cao_di)
 add_subdirectory(xue_shan)
 add_subdirectory(xing_huo)
 
-target_include_directories(LongMarch PUBLIC ${LONGMARCH_INCLUDE_DIR})
-target_link_libraries(LongMarch PUBLIC CaoDi XueShan XingHuo)
+target_include_directories(ChangZheng PUBLIC ${CHANGZHENG_INCLUDE_DIR})
+target_link_libraries(ChangZheng PUBLIC CaoDi XueShan XingHuo)
 
-pybind11_add_module(long_march long_march_pybind.cpp)
-target_include_directories(long_march PUBLIC ${LONGMARCH_INCLUDE_DIR})
-target_link_libraries(long_march PUBLIC LongMarch)
+pybind11_add_module(chang_zheng chang_zheng_pybind.cpp)
+target_include_directories(chang_zheng PUBLIC ${CHANGZHENG_INCLUDE_DIR})
+target_link_libraries(chang_zheng PUBLIC ChangZheng)
 
 # copy all related dll files to the destination too.
-install(TARGETS long_march
-        RUNTIME_DEPENDENCY_SET long_march_deps
+install(TARGETS chang_zheng
+        RUNTIME_DEPENDENCY_SET chang_zheng_deps
         LIBRARY DESTINATION ${Python3_SITEARCH})
 
 install(
-        RUNTIME_DEPENDENCY_SET long_march_deps
+        RUNTIME_DEPENDENCY_SET chang_zheng_deps
         DESTINATION ${Python3_SITEARCH}
         PRE_EXCLUDE_REGEXES
         [=[api-ms-]=]
@@ -32,5 +32,5 @@ install(
         POST_EXCLUDE_REGEXES
         [=[.*system32\/.*\.dll]=]
         [=[^\/(lib|usr\/lib|usr\/local\/lib)]=]
-        DIRECTORIES "$<TARGET_FILE_DIR:long_march>"
+        DIRECTORIES "$<TARGET_FILE_DIR:chang_zheng>"
 )
