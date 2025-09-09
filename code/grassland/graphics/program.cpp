@@ -7,7 +7,11 @@
 #if defined(__APPLE__)
 #define __EMULATE_UUID
 #endif
+#if defined(LONGMARCH_VULKAN_ENABLED)
 #include "dxc/dxcapi.h"
+#else
+#include "dxcapi.h"
+#endif
 
 namespace grassland::graphics {
 

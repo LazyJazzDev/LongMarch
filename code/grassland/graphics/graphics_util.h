@@ -32,6 +32,10 @@ typedef enum BackendAPI {
 #endif
 } BackendAPI;
 
+const char *BackendAPIString(BackendAPI api);
+
+bool SupportBackendAPI(BackendAPI api);
+
 typedef enum ImageFormat {
   IMAGE_FORMAT_UNDEFINED = 0,
   IMAGE_FORMAT_B8G8R8A8_UNORM = 1,

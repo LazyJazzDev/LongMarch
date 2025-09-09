@@ -181,22 +181,37 @@ void Core::PyBind(pybind11::module &m) {
   core_class.def("submit_command_context", &Core::SubmitCommandContext);
 }
 
+#if defined(LONGMARCH_D3D12_ENABLED)
+#define DEFAULT_API 0
+#elif defined(LONGMARCH_VULKAN_ENABLED)
+#define DEFAULT_API 1
+#endif
+
 int CreateCore(BackendAPI api, const Core::Settings &settings, double_ptr<Core> pp_core) {
   switch (api) {
-#ifdef _WIN64
+#ifdef LONGMARCH_D3D12_ENABLED
+#if DEFAULT_API == 0
+    default:
+      LogWarning("[graphics] Unsupported backend API <{}>, falling back to D3D12", BackendAPIString(api));
+#endif
     case BACKEND_API_D3D12:
       pp_core.construct<backend::D3D12Core>(settings);
       break;
-#else
-    case BACKEND_API_D3D12:
-      LogInfo("D3D12 is not supported on this platform, falling back to Vulkan");
+#endif
+#ifdef LONGMARCH_VULKAN_ENABLED
+#if DEFAULT_API == 1
+    default:
+      LogWarning("[graphics] Unsupported backend API <{}>, falling back to Vulkan", BackendAPIString(api));
 #endif
     case BACKEND_API_VULKAN:
       pp_core.construct<backend::VulkanCore>(settings);
       break;
+#endif
+#if !defined(DEFAULT_API)
     default:
-      throw std::runtime_error("Unsupported backend API");
+      LogError("[graphics] No supported graphics API", BackendAPIString(api));
       return -1;
+#endif
   }
   return 0;
 }

@@ -1,5 +1,32 @@
 #include "grassland/graphics/graphics_util.h"
 namespace grassland::graphics {
+
+const char *BackendAPIString(BackendAPI api) {
+  switch (api) {
+    case BACKEND_API_VULKAN:
+      return "Vulkan";
+    case BACKEND_API_D3D12:
+      return "Direct3D 12";
+    default:
+      return "Unknown";
+  }
+}
+
+bool SupportBackendAPI(BackendAPI api) {
+  switch (api) {
+#if LONGMARCH_D3D12_ENABLED
+    case BACKEND_API_D3D12:
+      return true;
+#endif
+#if LONGMARCH_VULKAN_ENABLED
+    case BACKEND_API_VULKAN:
+      return true;
+#endif
+    default:
+      return false;
+  }
+}
+
 SamplerInfo::SamplerInfo()
     : min_filter(FILTER_MODE_LINEAR),
       mag_filter(FILTER_MODE_LINEAR),

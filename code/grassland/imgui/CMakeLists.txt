@@ -1,8 +1,11 @@
 set(SOURCES "")
 list(APPEND SOURCES ${LONGMARCH_IMGUI_DIR}/backends/imgui_impl_glfw.cpp)
-list(APPEND SOURCES ${LONGMARCH_IMGUI_DIR}/backends/imgui_impl_vulkan.cpp)
 
-if (WIN32)
+if (LONGMARCH_VULKAN_ENABLED)
+    list(APPEND SOURCES ${LONGMARCH_IMGUI_DIR}/backends/imgui_impl_vulkan.cpp)
+endif ()
+
+if (LONGMARCH_D3D12_ENABLED)
     list(APPEND SOURCES ${LONGMARCH_IMGUI_DIR}/backends/imgui_impl_dx12.cpp)
 endif ()
 

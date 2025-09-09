@@ -2,8 +2,10 @@ file(GLOB SOURCES "*.cpp" "*.h")
 
 target_sources(grassland_graphics PRIVATE ${SOURCES})
 
-add_subdirectory(vulkan)
+if (LONGMARCH_VULKAN_ENABLED)
+    add_subdirectory(vulkan)
+endif ()
 
-if (WIN32)
+if (LONGMARCH_D3D12_ENABLED)
     add_subdirectory(d3d12)
 endif ()
