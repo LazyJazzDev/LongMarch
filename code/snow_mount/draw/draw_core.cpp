@@ -163,7 +163,7 @@ graphics::Program *Core::GetProgram(graphics::ImageFormat format) {
     program->AddInputAttribute(0, graphics::INPUT_TYPE_FLOAT2, offsetof(Vertex, position));
     program->AddInputAttribute(0, graphics::INPUT_TYPE_FLOAT2, offsetof(Vertex, tex_coord));
     program->AddInputAttribute(0, graphics::INPUT_TYPE_FLOAT4, offsetof(Vertex, color));
-    program->AddInputAttribute(1, graphics::INPUT_TYPE_UINT4, 0);
+    program->AddInputAttribute(1, graphics::INPUT_TYPE_UINT, 0);
     program->SetBlendState(0, true);
     program->SetCullMode(graphics::CULL_MODE_NONE);
     program->AddResourceBinding(graphics::RESOURCE_TYPE_STORAGE_BUFFER, 1);

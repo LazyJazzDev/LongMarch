@@ -14,11 +14,11 @@ const char *BackendAPIString(BackendAPI api) {
 
 bool SupportBackendAPI(BackendAPI api) {
   switch (api) {
-#if LONGMARCH_D3D12_ENABLED
+#if defined(LONGMARCH_D3D12_ENABLED)
     case BACKEND_API_D3D12:
       return true;
 #endif
-#if LONGMARCH_VULKAN_ENABLED
+#if defined(LONGMARCH_VULKAN_ENABLED)
     case BACKEND_API_VULKAN:
       return true;
 #endif
