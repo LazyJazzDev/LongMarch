@@ -103,6 +103,7 @@ class D3D12RayTracingProgram : public RayTracingProgram, public D3D12ProgramBase
   void Finalize(const std::vector<int32_t> &miss_shader_indices,
                 const std::vector<int32_t> &hit_group_indices,
                 const std::vector<int32_t> &callable_shader_indices) override;
+  void Finalize() override;
 
   d3d12::RayTracingPipeline *PipelineState() const {
     return pipeline_.get();

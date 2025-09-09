@@ -42,6 +42,7 @@ class RayTracingProgram {
   virtual void Finalize(const std::vector<int32_t> &miss_shader_indices,
                         const std::vector<int32_t> &hit_group_indices,
                         const std::vector<int32_t> &callable_shader_indices) = 0;
+  virtual void Finalize() = 0;
 };
 
 struct HitGroup {

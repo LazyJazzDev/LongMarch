@@ -204,4 +204,14 @@ void D3D12RayTracingProgram::Finalize(const std::vector<int32_t> &miss_shader_in
                                      &shader_table_);
 }
 
+void D3D12RayTracingProgram::Finalize() {
+  std::vector<int32_t> miss_shader_indices(miss_shaders_.size());
+  std::iota(miss_shader_indices.begin(), miss_shader_indices.end(), 0);
+  std::vector<int32_t> hit_group_indices(hit_groups_.size());
+  std::iota(hit_group_indices.begin(), hit_group_indices.end(), 0);
+  std::vector<int32_t> callable_shader_indices(callable_shaders_.size());
+  std::iota(callable_shader_indices.begin(), callable_shader_indices.end(), 0);
+  Finalize(miss_shader_indices, hit_group_indices, callable_shader_indices);
+}
+
 }  // namespace grassland::graphics::backend

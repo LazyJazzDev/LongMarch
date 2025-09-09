@@ -62,7 +62,8 @@ void Application::OnInit() {
 
   core_->CreateBottomLevelAccelerationStructure(vertex_buffer.get(), index_buffer.get(), sizeof(glm::vec3),
                                                 &triangle_blas_);
-  core_->CreateBottomLevelAccelerationStructure(aabb_buffer.get(), sizeof(grassland::graphics::RayTracingAABB), 1,
+  core_->CreateBottomLevelAccelerationStructure(grassland::graphics::BufferRange{aabb_buffer.get()},
+                                                sizeof(grassland::graphics::RayTracingAABB), 1,
                                                 grassland::graphics::RAYTRACING_GEOMETRY_FLAG_OPAQUE, &sphere_blas_);
   core_->CreateTopLevelAccelerationStructure(
       {triangle_blas_->MakeInstance(glm::mat4{1.0f}, 0, 0xFF, 0, grassland::graphics::RAYTRACING_INSTANCE_FLAG_NONE),
