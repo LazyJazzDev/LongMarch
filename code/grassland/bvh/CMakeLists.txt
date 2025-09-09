@@ -4,11 +4,11 @@ else ()
     file(GLOB_RECURSE SOURCES "*.cpp")
 endif ()
 
-add_library(${GRASSLAND_SUBLIB_NAME} ${SOURCES})
+add_library(${CAO_DI_SUBLIB_NAME} ${SOURCES})
 
-list(APPEND GRASSLAND_LIBS ${GRASSLAND_SUBLIB_NAME})
-set(GRASSLAND_LIBS ${GRASSLAND_LIBS} PARENT_SCOPE)
+list(APPEND CAO_DI_LIBS ${CAO_DI_SUBLIB_NAME})
+set(CAO_DI_LIBS ${CAO_DI_LIBS} PARENT_SCOPE)
 
-target_include_directories(${GRASSLAND_SUBLIB_NAME} PUBLIC ${LONGMARCH_INCLUDE_DIR})
+target_include_directories(${CAO_DI_SUBLIB_NAME} PUBLIC ${LONGMARCH_INCLUDE_DIR})
 
-target_link_libraries(${GRASSLAND_SUBLIB_NAME} PUBLIC ${EIGEN3_LIB_NAME} grassland_util)
+target_link_libraries(${CAO_DI_SUBLIB_NAME} PUBLIC ${EIGEN3_LIB_NAME} cao_di_util)

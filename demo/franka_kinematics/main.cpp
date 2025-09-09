@@ -152,14 +152,14 @@ int main() {
 
   graphics::CreateCore(graphics::BACKEND_API_DEFAULT, graphics::Core::Settings{2, false}, &core_);
   core_->InitializeLogicalDeviceAutoSelect(true);
-  XH::Core sparks_core(core_.get());
-  sparks_core.GetShadersVFS().Print();
+  XH::Core xh_core(core_.get());
+  xh_core.GetShadersVFS().Print();
 
-  XH::Scene scene(&sparks_core);
+  XH::Scene scene(&xh_core);
   scene.settings.samples_per_dispatch = 32;
-  XH::Film film(&sparks_core, 1024, 512);
+  XH::Film film(&xh_core, 1024, 512);
   film.info.persistence = 0.98f;
-  XH::Camera camera(&sparks_core,
+  XH::Camera camera(&xh_core,
                     glm::lookAt(glm::vec3{2.0f, -1.0f, 0.3f}, glm::vec3{0.0f, 0.0f, 0.5f}, glm::vec3{0.0, 0.0, 1.0}),
                     glm::radians(30.0f), static_cast<float>(film.GetWidth()) / film.GetHeight());
 
@@ -168,22 +168,22 @@ int main() {
   matball_mesh.GenerateTangents();
   Mesh<> cube_mesh;
   cube_mesh.LoadObjFile(FindAssetFile("meshes/cube.obj"));
-  XH::GeometryMesh geometry_sphere(&sparks_core, Mesh<>::Sphere(30));
-  XH::GeometryMesh geometry_matball(&sparks_core, matball_mesh);
-  XH::GeometryMesh geometry_cube(&sparks_core, cube_mesh);
+  XH::GeometryMesh geometry_sphere(&xh_core, Mesh<>::Sphere(30));
+  XH::GeometryMesh geometry_matball(&xh_core, matball_mesh);
+  XH::GeometryMesh geometry_cube(&xh_core, cube_mesh);
 
-  XH::MaterialPrincipled material_ground(&sparks_core, {0.1f, 0.2f, 0.4f});
+  XH::MaterialPrincipled material_ground(&xh_core, {0.1f, 0.2f, 0.4f});
   material_ground.roughness = 0.2f;
   material_ground.metallic = 0.0f;
-  XH::EntityGeometryMaterial entity_ground(&sparks_core, &geometry_cube, &material_ground,
+  XH::EntityGeometryMaterial entity_ground(&xh_core, &geometry_cube, &material_ground,
                                            glm::translate(glm::mat4{1.0f}, glm::vec3{0.0f, 0.0f, -1000.0f}) *
                                                glm::scale(glm::mat4(1.0f), glm::vec3(1000.0f)));
 
-  XH::MaterialLight material_sky(&sparks_core, {0.8f, 0.8f, 0.8f}, true, false);
+  XH::MaterialLight material_sky(&xh_core, {0.8f, 0.8f, 0.8f}, true, false);
   XH::EntityGeometryMaterial entity_sky(
-      &sparks_core, &geometry_sphere, &material_sky,
+      &xh_core, &geometry_sphere, &material_sky,
       glm::translate(glm::mat4{1.0f}, glm::vec3{0.0f, 0.0f, 0.0f}) * glm::scale(glm::mat4(1.0f), glm::vec3(60.0f)));
-  XH::EntityAreaLight area_light(&sparks_core, glm::vec3{1.0f, 1.0f, 1.0f}, 1.0f, glm::vec3{40.0f, -30.0f, 30.0f},
+  XH::EntityAreaLight area_light(&xh_core, glm::vec3{1.0f, 1.0f, 1.0f}, 1.0f, glm::vec3{40.0f, -30.0f, 30.0f},
                                  glm::normalize(glm::vec3{-4.0f, 3.0f, -3.0f}), glm::vec3{0.0f, 0.0f, 1.0f});
   area_light.emission = glm::vec3{1000.0f};
 
@@ -192,7 +192,7 @@ int main() {
   scene.AddEntity(&area_light);
 
   for (int i = 0; i < 11; i++) {
-    combined_mesh[i].LoadModel(&sparks_core, link_paths[i]);
+    combined_mesh[i].LoadModel(&xh_core, link_paths[i]);
     combined_mesh[i].PutInScene(&scene);
   }
 
@@ -265,8 +265,8 @@ int main() {
     // 0.0f})} * area_light.position; if (area_light.position.y < 0.0) area_light.position = -area_light.position;
     // area_light.direction = -area_light.position;
     scene.Render(&camera, &film);
-    sparks_core.ConvertFilmToRawImage(film, raw_image.get());
-    sparks_core.ToneMapping(raw_image.get(), srgb_image.get());
+    xh_core.ConvertFilmToRawImage(film, raw_image.get());
+    xh_core.ToneMapping(raw_image.get(), srgb_image.get());
     std::unique_ptr<graphics::CommandContext> cmd_context;
     core_->CreateCommandContext(&cmd_context);
     cmd_context->CmdPresent(window.get(), srgb_image.get());
@@ -285,8 +285,8 @@ int main() {
     cm.Clear();
   }
 
-  sparks_core.ConvertFilmToRawImage(film, raw_image.get());
-  sparks_core.ToneMapping(raw_image.get(), srgb_image.get());
+  xh_core.ConvertFilmToRawImage(film, raw_image.get());
+  xh_core.ToneMapping(raw_image.get(), srgb_image.get());
   std::vector<uint8_t> image_data(film.GetWidth() * film.GetHeight() * 4);
   srgb_image->DownloadData(image_data.data());
   stbi_write_bmp("output.bmp", film.GetWidth(), film.GetHeight(), 4, image_data.data());

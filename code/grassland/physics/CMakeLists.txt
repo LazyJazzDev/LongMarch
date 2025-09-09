@@ -9,11 +9,11 @@ file(GLOB SOURCES "*.cpp")
 
 add_subdirectory(diff_kernel)
 
-add_library(${GRASSLAND_SUBLIB_NAME} ${SOURCES})
+add_library(${CAO_DI_SUBLIB_NAME} ${SOURCES})
 
-list(APPEND GRASSLAND_LIBS ${GRASSLAND_SUBLIB_NAME})
-set(GRASSLAND_LIBS ${GRASSLAND_LIBS} PARENT_SCOPE)
+list(APPEND CAO_DI_LIBS ${CAO_DI_SUBLIB_NAME})
+set(CAO_DI_LIBS ${CAO_DI_LIBS} PARENT_SCOPE)
 
-target_include_directories(${GRASSLAND_SUBLIB_NAME} PUBLIC ${LONGMARCH_INCLUDE_DIR})
+target_include_directories(${CAO_DI_SUBLIB_NAME} PUBLIC ${LONGMARCH_INCLUDE_DIR})
 
-target_link_libraries(${GRASSLAND_SUBLIB_NAME} PUBLIC grassland_util grassland_math grassland_physics_diff_kernel)
+target_link_libraries(${CAO_DI_SUBLIB_NAME} PUBLIC cao_di_util cao_di_math cao_di_physics_diff_kernel)

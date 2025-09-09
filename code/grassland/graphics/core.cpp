@@ -157,7 +157,7 @@ void Core::PyBind(pybind11::module &m) {
         core->CreateWindowObject(width, height, title, fullscreen, resizable, &window);
         return window;
       },
-      pybind11::arg("width") = 800, pybind11::arg("height") = 600, pybind11::arg("title") = "Grassland",
+      pybind11::arg("width") = 800, pybind11::arg("height") = 600, pybind11::arg("title") = "CaoDi",
       pybind11::arg("fullscreen") = false, pybind11::arg("resizable") = false, pybind11::keep_alive<0, 1>{});
 
   core_class.def(

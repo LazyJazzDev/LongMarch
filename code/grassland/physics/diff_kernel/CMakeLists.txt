@@ -6,8 +6,8 @@ if (LONGMARCH_CUDA_ENABLED)
     endforeach ()
 endif ()
 
-add_library(grassland_physics_diff_kernel ${SOURCES})
+add_library(cao_di_physics_diff_kernel ${SOURCES})
 
-target_include_directories(grassland_physics_diff_kernel PUBLIC ${LONGMARCH_INCLUDE_DIR})
+target_include_directories(cao_di_physics_diff_kernel PUBLIC ${LONGMARCH_INCLUDE_DIR})
 
-target_link_libraries(grassland_physics_diff_kernel PUBLIC grassland_util grassland_math)
+target_link_libraries(cao_di_physics_diff_kernel PUBLIC cao_di_util cao_di_math)

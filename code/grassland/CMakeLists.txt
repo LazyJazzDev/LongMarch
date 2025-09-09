@@ -4,17 +4,17 @@ else ()
     file(GLOB SOURCES "*.cpp" "*.h")
 endif ()
 
-add_library(Grassland ${SOURCES})
+add_library(CaoDi ${SOURCES})
 
 file(GLOB subdirs RELATIVE ${CMAKE_CURRENT_SOURCE_DIR} *)
 
 foreach (subdir ${subdirs})
     if (IS_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/${subdir})
-        set(GRASSLAND_SUBLIB_NAME grassland_${subdir})
+        set(CAO_DI_SUBLIB_NAME cao_di_${subdir})
         add_subdirectory(${subdir})
     endif ()
 endforeach ()
 
-message(STATUS "GRASSLAND_LIBS: ${GRASSLAND_LIBS}")
+message(STATUS "CAO_DI_LIBS: ${CAO_DI_LIBS}")
 
-target_link_libraries(Grassland PUBLIC ${GRASSLAND_LIBS})
+target_link_libraries(CaoDi PUBLIC ${CAO_DI_LIBS})

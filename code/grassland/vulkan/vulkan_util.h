@@ -24,7 +24,7 @@
 #include "grassland/util/util.h"
 
 namespace CD::vulkan {
-#define GRASSLAND_VULKAN_PROCEDURE_VAR(function_name) PFN_##function_name function_name{};
+#define CD_VULKAN_PROCEDURE_VAR(function_name) PFN_##function_name function_name{};
 
 #ifdef NDEBUG
 constexpr bool kDefaultEnableValidationLayers = false;

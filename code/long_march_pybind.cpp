@@ -6,9 +6,9 @@ PYBIND11_MODULE(long_march, m) {
   m.attr("__version__") = "0.0.1";
   m.attr("BUILD_TIME") = __DATE__ " " __TIME__;
 
-  pybind11::module_ m_grassland = m.def_submodule("grassland", "Grassland");
+  pybind11::module_ m_grassland = m.def_submodule("grassland", "CaoDi");
   CD::PyBind(m_grassland);
 
-  pybind11::module_ m_snow_mount = m.def_submodule("snow_mount", "SnowMount");
+  pybind11::module_ m_snow_mount = m.def_submodule("snow_mount", "XueShan");
   XS::PyBind(m_snow_mount);
 }

@@ -10,9 +10,9 @@
 namespace CD::vulkan {
 InstanceCreateHint::InstanceCreateHint() {
   app_info.sType = VK_STRUCTURE_TYPE_APPLICATION_INFO;
-  app_info.pApplicationName = "Grassland";
+  app_info.pApplicationName = "CaoDi";
   app_info.applicationVersion = VK_MAKE_VERSION(1, 0, 0);
-  app_info.pEngineName = "Grassland";
+  app_info.pEngineName = "CaoDi";
   app_info.engineVersion = VK_MAKE_VERSION(1, 0, 0);
   app_info.apiVersion = VK_API_VERSION_1_2;
 

@@ -8,14 +8,14 @@ class DeviceProcedures {
   void GetRayTracingProcedures(VkDevice device);
 
   /** Ray Tracing Procedures */
-  GRASSLAND_VULKAN_PROCEDURE_VAR(vkCmdBuildAccelerationStructuresKHR);
-  GRASSLAND_VULKAN_PROCEDURE_VAR(vkCreateAccelerationStructureKHR);
-  GRASSLAND_VULKAN_PROCEDURE_VAR(vkGetAccelerationStructureBuildSizesKHR);
-  GRASSLAND_VULKAN_PROCEDURE_VAR(vkGetBufferDeviceAddressKHR);
-  GRASSLAND_VULKAN_PROCEDURE_VAR(vkDestroyAccelerationStructureKHR);
-  GRASSLAND_VULKAN_PROCEDURE_VAR(vkGetAccelerationStructureDeviceAddressKHR);
-  GRASSLAND_VULKAN_PROCEDURE_VAR(vkCreateRayTracingPipelinesKHR);
-  GRASSLAND_VULKAN_PROCEDURE_VAR(vkGetRayTracingShaderGroupHandlesKHR);
-  GRASSLAND_VULKAN_PROCEDURE_VAR(vkCmdTraceRaysKHR);
+  CD_VULKAN_PROCEDURE_VAR(vkCmdBuildAccelerationStructuresKHR);
+  CD_VULKAN_PROCEDURE_VAR(vkCreateAccelerationStructureKHR);
+  CD_VULKAN_PROCEDURE_VAR(vkGetAccelerationStructureBuildSizesKHR);
+  CD_VULKAN_PROCEDURE_VAR(vkGetBufferDeviceAddressKHR);
+  CD_VULKAN_PROCEDURE_VAR(vkDestroyAccelerationStructureKHR);
+  CD_VULKAN_PROCEDURE_VAR(vkGetAccelerationStructureDeviceAddressKHR);
+  CD_VULKAN_PROCEDURE_VAR(vkCreateRayTracingPipelinesKHR);
+  CD_VULKAN_PROCEDURE_VAR(vkGetRayTracingShaderGroupHandlesKHR);
+  CD_VULKAN_PROCEDURE_VAR(vkCmdTraceRaysKHR);
 };
 }  // namespace CD::vulkan

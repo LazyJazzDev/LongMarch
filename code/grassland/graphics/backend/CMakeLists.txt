@@ -1,6 +1,6 @@
 file(GLOB SOURCES "*.cpp" "*.h")
 
-target_sources(grassland_graphics PRIVATE ${SOURCES})
+target_sources(cao_di_graphics PRIVATE ${SOURCES})
 
 add_subdirectory(vulkan)
 
