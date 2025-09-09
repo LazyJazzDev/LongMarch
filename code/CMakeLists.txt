@@ -4,9 +4,9 @@ set(LONGMARCH_INCLUDE_DIR ${CMAKE_CURRENT_LIST_DIR} PARENT_SCOPE)
 
 add_library(LongMarch long_march.cpp)
 
-add_subdirectory(grassland)
-add_subdirectory(snow_mount)
-add_subdirectory(sparks)
+add_subdirectory(cao_di)
+add_subdirectory(xue_shan)
+add_subdirectory(xing_huo)
 
 target_include_directories(LongMarch PUBLIC ${LONGMARCH_INCLUDE_DIR})
 target_link_libraries(LongMarch PUBLIC CaoDi XueShan XingHuo)

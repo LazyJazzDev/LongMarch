@@ -1,6 +1,6 @@
 #pragma once
 #include "long_march.h"
-#include "snow_mount/draw/draw.h"
+#include "xue_shan/draw/draw.h"
 
 class DrawNGUI {
  public:
