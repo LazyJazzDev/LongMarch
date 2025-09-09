@@ -1,6 +1,6 @@
 #pragma once
 #include "long_march.h"
-#include "snow_mount/draw/draw.h"
+#include "snowberg/draw/draw.h"
 
 class DrawNGUI {
  public:
@@ -18,7 +18,7 @@ class DrawNGUI {
   std::unique_ptr<grassland::graphics::Image> color_image_;
   std::unique_ptr<grassland::graphics::Window> window_;
 
-  std::unique_ptr<snow_mount::draw::Core> draw_core_;
-  std::unique_ptr<snow_mount::draw::Model> model_;
-  std::unique_ptr<snow_mount::draw::Texture> texture_;
+  std::unique_ptr<snowberg::draw::Core> draw_core_;
+  std::unique_ptr<snowberg::draw::Model> model_;
+  std::unique_ptr<snowberg::draw::Texture> texture_;
 };

@@ -2,7 +2,7 @@ import time
 import glfw
 glfw.init()
 from long_march.grassland import graphics
-from long_march.snow_mount import visualizer
+from long_march.snowberg import visualizer
 from long_march.grassland.math import rotation
 import numpy as np
 import math

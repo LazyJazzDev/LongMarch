@@ -6,8 +6,8 @@ from typing import Any, SupportsFloat
 import long_march
 from gymnasium.core import ObsType, ActType
 from long_march.grassland import graphics
-from long_march.snow_mount import solver
-from long_march.snow_mount import visualizer
+from long_march.snowberg import solver
+from long_march.snowberg import visualizer
 from long_march.grassland.math import rotation
 import glfw
 import open3d as o3d

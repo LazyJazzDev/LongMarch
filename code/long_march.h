@@ -1,9 +1,9 @@
 #pragma once
 #include "grassland/grassland.h"
-#include "snow_mount/snow_mount.h"
+#include "snowberg/snowberg.h"
 #include "sparks/sparks.h"
 
 namespace long_march {
 using namespace grassland;
-using namespace snow_mount;
+using namespace snowberg;
 }  // namespace long_march

@@ -1,8 +1,8 @@
 import math
 import long_march
 from long_march.grassland import graphics
-from long_march.snow_mount import visualizer
-from long_march.snow_mount import solver
+from long_march.snowberg import visualizer
+from long_march.snowberg import solver
 import scipy
 import glfw
 import time

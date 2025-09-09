@@ -1,7 +1,7 @@
 ﻿#include "draw_n_gui.h"
 
 #include "glm/gtc/matrix_transform.hpp"
-#include "snow_mount/draw/draw_font.h"
+#include "snowberg/draw/draw_font.h"
 
 DrawNGUI::DrawNGUI(grassland::graphics::BackendAPI api) {
   grassland::graphics::CreateCore(api, {}, &core_);
@@ -32,9 +32,9 @@ void DrawNGUI::OnInit() {
     core_->CreateImage(width, height, grassland::graphics::IMAGE_FORMAT_R32G32B32A32_SFLOAT, &color_image_);
   });
 
-  snow_mount::draw::CreateCore(core_.get(), &draw_core_);
+  snowberg::draw::CreateCore(core_.get(), &draw_core_);
   draw_core_->CreateModel(&model_);
-  std::vector<snow_mount::draw::Vertex> vertices;
+  std::vector<snowberg::draw::Vertex> vertices;
   std::vector<uint32_t> indices;
   const int precision = 100;
   const float inv_precision = 1.0f / precision;
