@@ -1,10 +1,5 @@
 #pragma once
-#ifdef WIN32
-#include <d3dcommon.h>
-#include <wrl/client.h>
-#endif
 
-#include "grassland/graphics/buffer.h"
 #include "grassland/graphics/graphics_util.h"
 
 #if defined(LONGMARCH_CUDA_RUNTIME)
