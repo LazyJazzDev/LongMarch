@@ -9,7 +9,6 @@
     "fmt",
     "freetype",
     "vulkan-memory-allocator",
-    "glslang",
     "gtest",
     "stb",
     "mikktspace",

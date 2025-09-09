@@ -34,5 +34,4 @@ struct HitGroup {
   bool procedure{false};
 };
 
-CompiledShaderBlob CompileGLSLToSPIRV(const std::string &glsl_code, VkShaderStageFlagBits shader_stage);
 }  // namespace grassland::vulkan
