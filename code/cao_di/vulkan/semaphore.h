@@ -1,0 +1,30 @@
+#pragma once
+
+#include "cao_di/vulkan/device.h"
+#include "cao_di/vulkan/vulkan_util.h"
+
+namespace CD::vulkan {
+class Semaphore {
+ public:
+  Semaphore(const class Device *device, VkSemaphore semaphore);
+
+  ~Semaphore();
+
+  VkSemaphore Handle() const {
+    return semaphore_;
+  }
+
+  const class Device *Device() const {
+    return device_;
+  }
+
+ private:
+  const class Device *device_{};
+  VkSemaphore semaphore_{};
+};
+
+#if defined(LONGMARCH_CUDA_RUNTIME)
+VkExternalSemaphoreHandleTypeFlagBits GetDefaultExternalSemaphoreHandleType();
+#endif
+
+}  // namespace CD::vulkan

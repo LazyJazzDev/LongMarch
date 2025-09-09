@@ -1,0 +1,19 @@
+#pragma once
+#include "cao_di/graphics/backend/vulkan/vulkan_core.h"
+#include "cao_di/graphics/backend/vulkan/vulkan_util.h"
+
+namespace CD::graphics::backend {
+
+class VulkanSampler : public Sampler {
+ public:
+  VulkanSampler(VulkanCore *core, const SamplerInfo &info);
+  vulkan::Sampler *Sampler() const {
+    return sampler_.get();
+  }
+
+ private:
+  VulkanCore *core_;
+  std::unique_ptr<vulkan::Sampler> sampler_;
+};
+
+}  // namespace CD::graphics::backend

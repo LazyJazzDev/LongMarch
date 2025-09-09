@@ -1,0 +1,7 @@
+file(GLOB SOURCES "*.cpp" "*.h")
+
+add_library(${XING_HUO_SUBLIB_NAME} ${SOURCES})
+
+target_link_libraries(${XING_HUO_SUBLIB_NAME} PUBLIC LongMarch)
+list(APPEND XING_HUO_LIBS ${XING_HUO_SUBLIB_NAME})
+set(XING_HUO_LIBS ${XING_HUO_LIBS} PARENT_SCOPE)

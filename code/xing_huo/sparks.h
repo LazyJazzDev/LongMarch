@@ -1,0 +1,12 @@
+#pragma once
+#include "xing_huo/core/camera.h"
+#include "xing_huo/core/core.h"
+#include "xing_huo/core/entity.h"
+#include "xing_huo/core/film.h"
+#include "xing_huo/core/geometry.h"
+#include "xing_huo/core/material.h"
+#include "xing_huo/core/scene.h"
+#include "xing_huo/entity/entities.h"
+#include "xing_huo/geometry/geometries.h"
+#include "xing_huo/light/lights.h"
+#include "xing_huo/material/materials.h"

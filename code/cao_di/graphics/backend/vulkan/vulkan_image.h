@@ -1,0 +1,25 @@
+#pragma once
+#include "cao_di/graphics/backend/vulkan/vulkan_core.h"
+#include "cao_di/graphics/backend/vulkan/vulkan_util.h"
+
+namespace CD::graphics::backend {
+
+class VulkanImage : public Image {
+ public:
+  VulkanImage(VulkanCore *core, int width, int height, ImageFormat format);
+  Extent2D Extent() const override;
+  ImageFormat Format() const override;
+  void UploadData(const void *data) const override;
+  void DownloadData(void *data) const override;
+
+  vulkan::Image *Image() {
+    return image_.get();
+  }
+
+ private:
+  VulkanCore *core_;
+  std::unique_ptr<vulkan::Image> image_;
+  ImageFormat format_;
+};
+
+}  // namespace CD::graphics::backend
