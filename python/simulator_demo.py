@@ -1,8 +1,8 @@
 import math
-import long_march
-from long_march.grassland import graphics
-from long_march.snow_mount import visualizer
-from long_march.snow_mount import solver
+import chang_zheng
+from chang_zheng.cao_di import graphics
+from chang_zheng.xue_shan import visualizer
+from chang_zheng.xue_shan import solver
 import scipy
 import glfw
 import time
@@ -140,12 +140,12 @@ def main():
                     0, 1, 5]
     mesh_vertices = np.array(mesh_vertices)
 
-    cube_mesh_sdf = long_march.grassland.math.MeshSDF(mesh_vertices * 10, mesh_indices)
+    cube_mesh_sdf = chang_zheng.cao_di.math.MeshSDF(mesh_vertices * 10, mesh_indices)
     cube_mesh = vis_core.create_mesh()
     cube_mesh.set_vertices(mesh_vertices)
     cube_mesh.set_indices(mesh_indices)
 
-    block_mesh_sdf = long_march.grassland.math.MeshSDF(mesh_vertices * 0.5, mesh_indices)
+    block_mesh_sdf = chang_zheng.cao_di.math.MeshSDF(mesh_vertices * 0.5, mesh_indices)
 
     cube_rigid = solver.RigidObject(mesh_sdf=cube_mesh_sdf, t=[0, -11, 0])
     print(cube_rigid)

@@ -1,10 +1,10 @@
 ﻿#include "draw_n_gui.h"
 
 #include "glm/gtc/matrix_transform.hpp"
-#include "snow_mount/draw/draw_font.h"
+#include "xue_shan/draw/draw_font.h"
 
-DrawNGUI::DrawNGUI(grassland::graphics::BackendAPI api) {
-  grassland::graphics::CreateCore(api, {}, &core_);
+DrawNGUI::DrawNGUI(CD::graphics::BackendAPI api) {
+  CD::graphics::CreateCore(api, {}, &core_);
   core_->InitializeLogicalDeviceAutoSelect(false);
 }
 
@@ -25,16 +25,16 @@ void DrawNGUI::Run() {
 
 void DrawNGUI::OnInit() {
   core_->CreateWindowObject(1280, 720, "Draw & GUI", false, true, &window_);
-  core_->CreateImage(1280, 720, grassland::graphics::IMAGE_FORMAT_R32G32B32A32_SFLOAT, &color_image_);
+  core_->CreateImage(1280, 720, CD::graphics::IMAGE_FORMAT_R32G32B32A32_SFLOAT, &color_image_);
   window_->ResizeEvent().RegisterCallback([this](int width, int height) {
     core_->WaitGPU();
     color_image_.reset();
-    core_->CreateImage(width, height, grassland::graphics::IMAGE_FORMAT_R32G32B32A32_SFLOAT, &color_image_);
+    core_->CreateImage(width, height, CD::graphics::IMAGE_FORMAT_R32G32B32A32_SFLOAT, &color_image_);
   });
 
-  snow_mount::draw::CreateCore(core_.get(), &draw_core_);
+  XS::draw::CreateCore(core_.get(), &draw_core_);
   draw_core_->CreateModel(&model_);
-  std::vector<snow_mount::draw::Vertex> vertices;
+  std::vector<XS::draw::Vertex> vertices;
   std::vector<uint32_t> indices;
   const int precision = 100;
   const float inv_precision = 1.0f / precision;
@@ -58,8 +58,8 @@ void DrawNGUI::OnInit() {
   texture_->UploadData(texture_data.data());
   model_->SetModelData(vertices, indices);
 
-  draw_core_->SetFontTypeFile(grassland::FindAssetFile("fonts/simhei.ttf"));
-  draw_core_->SetASCIIFontTypeFile(grassland::FindAssetFile("fonts/georgia.ttf"));
+  draw_core_->SetFontTypeFile(CD::FindAssetFile("fonts/simhei.ttf"));
+  draw_core_->SetASCIIFontTypeFile(CD::FindAssetFile("fonts/georgia.ttf"));
 }
 
 void DrawNGUI::OnClose() {
@@ -103,7 +103,7 @@ void DrawNGUI::OnUpdate() {
 }
 
 void DrawNGUI::OnRender() {
-  std::unique_ptr<grassland::graphics::CommandContext> ctx;
+  std::unique_ptr<CD::graphics::CommandContext> ctx;
   core_->CreateCommandContext(&ctx);
   ctx->CmdClearImage(color_image_.get(), {0.6f, 0.7f, 0.8f, 1.0f});
   draw_core_->Render(ctx.get(), color_image_.get());

@@ -1,9 +1,9 @@
+#include "chang_zheng.h"
 #include "gtest/gtest.h"
-#include "long_march.h"
 #include "random"
 #include "vector"
 
-using namespace long_march;
+using namespace CZ;
 
 template <class Real>
 void DistancePointPlaneCorrectnessTest() {

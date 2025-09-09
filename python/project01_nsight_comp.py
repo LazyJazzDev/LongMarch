@@ -1,10 +1,10 @@
 import math
 import time
 import scipy
-import long_march
-from long_march.grassland import graphics
-from long_march.snow_mount import solver
-from long_march.snow_mount import visualizer
+import chang_zheng
+from chang_zheng.cao_di import graphics
+from chang_zheng.xue_shan import solver
+from chang_zheng.xue_shan import visualizer
 import glfw
 
 glfw.init()
@@ -30,7 +30,7 @@ class RigidObject:
         self.vis_mesh = scene.vis_scene.get_core().create_mesh()
         self.vis_mesh.set_vertices(vertices)
         self.vis_mesh.set_indices(indices)
-        mesh_sdf = long_march.grassland.math.MeshSDF(vertices, indices)
+        mesh_sdf = chang_zheng.cao_di.math.MeshSDF(vertices, indices)
         self.sol_rigid_object = solver.RigidObject(mesh_sdf)
         self.sol_rigid_id = scene.sol_scene.add_rigid_object(self.sol_rigid_object)
         self.vis_entity = scene.vis_scene.get_core().create_entity_mesh_object()

@@ -1,12 +1,12 @@
 #pragma once
+#include "chang_zheng.h"
 #include "glm/gtc/matrix_transform.hpp"
-#include "long_march.h"
 #include "params.h"
 #include "random"
 
 void UpdateStep(glm::vec3 *positions, glm::vec3 *velocities, glm::vec3 *positions_new, int n_particles, float delta_t);
 
-using namespace long_march;
+using namespace CZ;
 
 struct GlobalUniformObject {
   glm::mat4 world_to_screen;

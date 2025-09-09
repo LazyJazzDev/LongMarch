@@ -2,13 +2,13 @@
 #include <glm/ext/scalar_constants.hpp>
 #include <glm/glm.hpp>
 
+#include "cao_di/physics/physics.h"
 #include "cmath"
-#include "grassland/physics/physics.h"
 #include "gtest/gtest.h"
 #include "iostream"
 #include "random"
 
-using namespace grassland;
+using namespace CD;
 
 #if defined(__CUDACC__)
 template <typename FunctionSet>

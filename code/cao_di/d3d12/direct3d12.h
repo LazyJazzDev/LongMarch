@@ -1,0 +1,17 @@
+#pragma once
+
+#include "cao_di/d3d12/adapter.h"
+#include "cao_di/d3d12/buffer.h"
+#include "cao_di/d3d12/command_allocator.h"
+#include "cao_di/d3d12/command_list.h"
+#include "cao_di/d3d12/command_queue.h"
+#include "cao_di/d3d12/descriptor_heap.h"
+#include "cao_di/d3d12/device.h"
+#include "cao_di/d3d12/dxgi_factory.h"
+#include "cao_di/d3d12/fence.h"
+#include "cao_di/d3d12/image.h"
+#include "cao_di/d3d12/pipeline_state.h"
+#include "cao_di/d3d12/raytracing/raytracing.h"
+#include "cao_di/d3d12/root_signature.h"
+#include "cao_di/d3d12/shader_module.h"
+#include "cao_di/d3d12/swap_chain.h"

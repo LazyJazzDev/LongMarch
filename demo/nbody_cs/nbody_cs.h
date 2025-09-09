@@ -1,11 +1,11 @@
 #pragma once
+#include "chang_zheng.h"
 #include "glm/gtc/matrix_transform.hpp"
 #include "imgui.h"
-#include "long_march.h"
 #include "params.h"
 #include "random"
 
-using namespace long_march;
+using namespace CZ;
 
 struct GlobalUniformObject {
   glm::mat4 world_to_screen;
