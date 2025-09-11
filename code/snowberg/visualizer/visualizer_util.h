@@ -24,8 +24,6 @@ struct Vertex {
 
 struct Material {
   glm::vec4 albedo;
-
-  static void PyBind(pybind11::module_ &m);
 };
 
 struct CameraInfo {

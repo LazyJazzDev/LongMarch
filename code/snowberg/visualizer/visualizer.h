@@ -9,6 +9,4 @@
 #include "snowberg/visualizer/visualizer_scene.h"
 #include "snowberg/visualizer/visualizer_util.h"
 
-namespace snowberg::visualizer {
-void PyBind(pybind11::module_ &m);
-}
+namespace snowberg::visualizer {}

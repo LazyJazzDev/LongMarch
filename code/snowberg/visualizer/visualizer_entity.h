@@ -14,8 +14,6 @@ class Entity {
 
   virtual int ExecuteStage(RenderStage render_stage, const RenderContext &ctx);
 
-  static void PyBind(pybind11::module &m);
-
  protected:
   Entity(const std::shared_ptr<Core> &core);
   std::shared_ptr<Core> core_;
@@ -36,8 +34,6 @@ class EntityMeshObject : public Entity {
 
   void SetTransform(const Matrix4<float> &transform);
 
-  static void PyBind(pybind11::module &m);
-
  private:
   std::shared_ptr<ProgramWithGeometryShader> program_;
   std::weak_ptr<Mesh> mesh_;
@@ -52,8 +48,6 @@ class EntityAmbientLight : public Entity {
   int ExecuteStage(RenderStage render_stage, const RenderContext &ctx) override;
 
   void SetIntensity(const Vector3<float> &intensity);
-
-  static void PyBind(pybind11::module &m);
 
  private:
   std::shared_ptr<ProgramCommonRaster> program_;
@@ -78,8 +72,6 @@ class EntityDirectionalLight : public Entity {
   void SetIntensity(const Vector3<float> &intensity);
 
   void SetDirection(const Vector3<float> &direction);
-
-  static void PyBind(pybind11::module &m);
 
  private:
   std::shared_ptr<ProgramCommonRaster> program_;

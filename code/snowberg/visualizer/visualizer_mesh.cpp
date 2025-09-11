@@ -56,45 +56,4 @@ graphics::Buffer *Mesh::GetIndexBuffer() const {
   return index_buffer_.get();
 }
 
-void Mesh::PyBind(pybind11::module_ &m) {
-  pybind11::class_<Mesh, std::shared_ptr<Mesh>> mesh(m, "Mesh");
-  mesh.def("get_core", &Mesh::GetCore);
-  mesh.def("set_vertices", [](Mesh &mesh, pybind11::array_t<float> vertices) {
-    auto r = vertices.unchecked<2>();
-    std::vector<Vertex> vertex_data;
-    if (r.shape(1) == 3) {
-      vertex_data.resize(r.shape(0));
-      for (size_t i = 0; i < r.shape(0); i++) {
-        vertex_data[i].position = {r(i, 0), r(i, 1), r(i, 2)};
-        vertex_data[i].normal = {};
-        vertex_data[i].tex_coord = {};
-        vertex_data[i].color = {1.0, 1.0, 1.0, 1.0};
-      }
-    } else if (r.shape(1) == 12) {
-      vertex_data.resize(r.shape(0));
-      for (size_t i = 0; i < r.shape(0); i++) {
-        vertex_data[i].position = {r(i, 0), r(i, 1), r(i, 2)};
-        vertex_data[i].normal = {r(i, 3), r(i, 4), r(i, 5)};
-        vertex_data[i].tex_coord = {r(i, 6), r(i, 7)};
-        vertex_data[i].color = {r(i, 8), r(i, 9), r(i, 10), r(i, 11)};
-      }
-    } else {
-      throw std::runtime_error("Number of dimensions must be 3 or 12");
-    }
-    mesh.SetVertices(vertex_data.data(), vertex_data.size());
-  });
-
-  mesh.def("set_indices", [](Mesh &mesh, pybind11::array_t<uint32_t> indices) {
-    auto r = indices.unchecked<1>();
-    std::vector<uint32_t> index_data(r.shape(0));
-    for (size_t i = 0; i < r.shape(0); i++) {
-      index_data[i] = r(i);
-    }
-    mesh.SetIndices(index_data.data(), index_data.size());
-  });
-
-  mesh.def("vertex_count", &Mesh::VertexCount);
-  mesh.def("index_count", &Mesh::IndexCount);
-}
-
 }  // namespace snowberg::visualizer

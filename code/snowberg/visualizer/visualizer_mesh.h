@@ -20,8 +20,6 @@ class Mesh {
   graphics::Buffer *GetVertexBuffer() const;
   graphics::Buffer *GetIndexBuffer() const;
 
-  static void PyBind(pybind11::module_ &m);
-
  private:
   std::shared_ptr<Core> core_;
   std::unique_ptr<graphics::Buffer> vertex_buffer_;

@@ -126,8 +126,6 @@ class Core {
   virtual void CUDAEndExecutionBarrier(cudaStream_t stream = 0) = 0;
 #endif
 
-  static void PyBind(pybind11::module &m);
-
  private:
   Settings settings_;
 

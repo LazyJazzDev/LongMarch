@@ -39,8 +39,6 @@ class Core : public std::enable_shared_from_this<Core> {
              const std::shared_ptr<Camera> &camera,
              const std::shared_ptr<Film> &film);
 
-  static void PyBind(pybind11::module_ &m);
-
  private:
   graphics::Core *core_;
   std::map<uint64_t, std::shared_ptr<Program>> programs_;

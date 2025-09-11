@@ -20,8 +20,4 @@ struct ElementBending {
   float elastic_limit{4.0f};  // any value larger than pi
 };
 
-namespace element {
-void PyBind(pybind11::module_ &m);
-}
-
 }  // namespace snowberg::solver

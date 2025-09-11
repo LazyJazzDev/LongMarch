@@ -5,8 +5,4 @@
 #include "snowberg/solver/solver_scene.h"
 #include "snowberg/solver/solver_util.h"
 
-namespace snowberg::solver {
-
-void PyBind(pybind11::module_ &m);
-
-}
+namespace snowberg::solver {}

@@ -52,8 +52,6 @@ class Scene {
 
   std::vector<Vector3<float>> GetPositions(const std::vector<int> &particle_ids) const;
 
-  static void PyBind(pybind11::module_ &m);
-
  private:
   friend class SceneDevice;
   std::vector<Vector3<float>> x_;

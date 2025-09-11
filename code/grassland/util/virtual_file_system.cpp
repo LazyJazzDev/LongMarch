@@ -1,6 +1,7 @@
 #include "grassland/util/virtual_file_system.h"
 
 #include <fstream>
+#include <functional>
 #include <stack>
 
 namespace grassland {

@@ -59,8 +59,6 @@ class CommandContext {
   void PushPostExecutionCallback(std::function<void()> callback);
   const std::vector<std::function<void()>> &GetPostExecutionCallbacks() const;
 
-  static void PyBind(pybind11::module &m);
-
  protected:
   std::vector<std::function<void()>> post_execution_callbacks_;
 };

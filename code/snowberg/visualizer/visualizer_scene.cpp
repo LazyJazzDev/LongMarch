@@ -17,10 +17,4 @@ uint64_t Scene::AddEntity(const std::shared_ptr<Entity> &entity) {
   return id;
 }
 
-void Scene::PyBind(pybind11::module_ &m) {
-  pybind11::class_<Scene, std::shared_ptr<Scene>> scene(m, "Scene");
-  scene.def("get_core", &Scene::GetCore);
-  scene.def("add_entity", &Scene::AddEntity, pybind11::arg("entity"));
-}
-
 }  // namespace snowberg::visualizer

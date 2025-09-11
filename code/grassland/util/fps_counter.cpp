@@ -32,13 +32,4 @@ void FPSCounter::Reset() {
   }
 }
 
-void FPSCounter::PyBind(pybind11::module_ &m) {
-  pybind11::class_<FPSCounter> fps_counter(m, "FPSCounter");
-  fps_counter.def(pybind11::init<>())
-      .def("tick_frame", &FPSCounter::TickFrame)
-      .def("get_fps", &FPSCounter::GetFPS)
-      .def("tick_fps", &FPSCounter::TickFPS)
-      .def("reset", &FPSCounter::Reset);
-}
-
 }  // namespace grassland

@@ -1,5 +1,7 @@
 #include "grassland/d3d12/device.h"
 
+#include <numeric>
+
 #include "grassland/d3d12/buffer.h"
 #include "grassland/d3d12/command_allocator.h"
 #include "grassland/d3d12/command_list.h"

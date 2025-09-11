@@ -16,8 +16,6 @@ struct RigidObject {
   float stiffness;
   float friction;
 
-  static void PyBind(pybind11::module_ &m);
-
   operator RigidObjectRef() const;
 };
 

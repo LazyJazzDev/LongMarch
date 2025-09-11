@@ -142,47 +142,6 @@ ObjectPack ObjectPack::CreateGridCloth(const std::vector<Vector3<float>> &pos_gr
   return object_pack;
 }
 
-void ObjectPack::PyBind(pybind11::module_ &m) {
-  pybind11::class_<ObjectPack> object_pack(m, "ObjectPack");
-  object_pack.def(pybind11::init<>());
-  object_pack.def("__repr__", [](const ObjectPack &obj_pack) {
-    return pybind11::str(
-               "ObjectPack(\n x={}\n v={}\n m={}\n stretchings={}\n stretching_indices={}\n bendings={}\n "
-               "bending_indices={}\n)")
-        .format(obj_pack.x, obj_pack.v, obj_pack.m, obj_pack.stretchings, obj_pack.stretching_indices,
-                obj_pack.bendings, obj_pack.bending_indices);
-  });
-  object_pack.def_readwrite("x", &ObjectPack::x);
-  object_pack.def_readwrite("v", &ObjectPack::v);
-  object_pack.def_readwrite("m", &ObjectPack::m);
-  object_pack.def_readwrite("stretchings", &ObjectPack::stretchings);
-  object_pack.def_readwrite("stretching_indices", &ObjectPack::stretching_indices);
-  object_pack.def_readwrite("bendings", &ObjectPack::bendings);
-  object_pack.def_readwrite("bending_indices", &ObjectPack::bending_indices);
-
-  pybind11::class_<ObjectPackView> object_pack_view(m, "ObjectPackView");
-  object_pack_view.def(pybind11::init<>());
-  object_pack_view.def("__repr__", [](const ObjectPackView &view) {
-    return pybind11::str("ObjectPackView(\n particle_ids={}\n bending_ids={}\n stretching_ids={}\n)")
-        .format(view.particle_ids, view.bending_ids, view.stretching_ids);
-  });
-  object_pack_view.def_readwrite("particle_ids", &ObjectPackView::particle_ids);
-  object_pack_view.def_readwrite("stretching_ids", &ObjectPackView::stretching_ids);
-  object_pack_view.def_readwrite("bending_ids", &ObjectPackView::bending_ids);
-
-  object_pack.def_static(
-      "create_from_mesh", &CreateFromMesh, pybind11::arg("positions"), pybind11::arg("indices"),
-      pybind11::arg("rotation") = Matrix3<float>::Identity(), pybind11::arg("translation") = Vector3<float>::Zero(),
-      pybind11::arg("mesh_mass") = 1.0f, pybind11::arg("young") = 3e3f, pybind11::arg("poisson") = 0.2f,
-      pybind11::arg("bending_stiffness") = 0.03f, pybind11::arg("damping") = 1e-6f, pybind11::arg("sigma_lb") = -1.0f,
-      pybind11::arg("sigma_ub") = -1.0f, pybind11::arg("elastic_limit") = 4.0f);
-  object_pack.def_static("create_grid_cloth", &CreateGridCloth, pybind11::arg("pos_grid"), pybind11::arg("n_row"),
-                         pybind11::arg("n_col"), pybind11::arg("total_mass") = 1.0f, pybind11::arg("young") = 3e3f,
-                         pybind11::arg("poisson") = 0.2f, pybind11::arg("bending_stiffness") = 0.03f,
-                         pybind11::arg("damping") = 1e-6f, pybind11::arg("sigma_lb") = -1.0f,
-                         pybind11::arg("sigma_ub") = -1.0f, pybind11::arg("elastic_limit") = 4.0f);
-}
-
 void ObjectPack::PushStretching(int u,
                                 int v,
                                 int w,

@@ -1,6 +1,7 @@
 #include "sparks/core/scene.h"
 
-#include "film.h"
+#include <numeric>
+
 #include "sparks/core/camera.h"
 #include "sparks/core/core.h"
 #include "sparks/core/entity.h"

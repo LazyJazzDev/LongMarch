@@ -13,8 +13,6 @@ class Film {
 
   graphics::Image *GetImage(FilmChannel film_channel);
 
-  static void PyBind(pybind11::module_ &m);
-
  private:
   std::shared_ptr<Core> core_;
   std::unique_ptr<graphics::Image> images_[FILM_CHANNEL_COUNT];

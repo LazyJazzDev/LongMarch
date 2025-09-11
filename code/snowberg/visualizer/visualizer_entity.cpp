@@ -23,15 +23,6 @@ int Entity::ExecuteStage(RenderStage render_stage, const RenderContext &ctx) {
   return 0;
 }
 
-void Entity::PyBind(pybind11::module &m) {
-  pybind11::class_<Entity, std::shared_ptr<Entity>> entity(m, "Entity");
-  entity.def("get_core", &Entity::GetCore);
-
-  EntityMeshObject::PyBind(m);
-  EntityAmbientLight::PyBind(m);
-  EntityDirectionalLight::PyBind(m);
-}
-
 EntityMeshObject::EntityMeshObject(const std::shared_ptr<Core> &core,
                                    const std::weak_ptr<Mesh> &mesh,
                                    const Material &material,
@@ -102,15 +93,6 @@ void EntityMeshObject::SetTransform(const Matrix4<float> &transform) {
   info_.model = EigenToGLM(transform);
 }
 
-void EntityMeshObject::PyBind(pybind11::module &m) {
-  pybind11::class_<EntityMeshObject, Entity, std::shared_ptr<EntityMeshObject>> entity_mesh_object(m,
-                                                                                                   "EntityMeshObject");
-  entity_mesh_object.def("set_mesh", &EntityMeshObject::SetMesh, pybind11::arg("mesh") = nullptr);
-  entity_mesh_object.def("set_material", &EntityMeshObject::SetMaterial, pybind11::arg("material") = Material{});
-  entity_mesh_object.def("set_transform", &EntityMeshObject::SetTransform,
-                         pybind11::arg("transform") = Matrix4<float>::Identity());
-}
-
 EntityAmbientLight::EntityAmbientLight(const std::shared_ptr<Core> &core, const Vector3<float> &intensity)
     : Entity(core) {
   program_ = core_->LoadProgram<ProgramCommonRaster>(PROGRAM_AMBIENT_LIGHTING_PASS, [&]() {
@@ -163,13 +145,6 @@ int EntityAmbientLight::ExecuteStage(RenderStage render_stage, const RenderConte
 
 void EntityAmbientLight::SetIntensity(const Vector3<float> &intensity) {
   intensity_ = intensity;
-}
-
-void EntityAmbientLight::PyBind(pybind11::module &m) {
-  pybind11::class_<EntityAmbientLight, Entity, std::shared_ptr<EntityAmbientLight>> entity_ambient_light(
-      m, "EntityAmbientLight");
-  entity_ambient_light.def("set_intensity", &EntityAmbientLight::SetIntensity,
-                           pybind11::arg("intensity") = Vector3<float>{0.8f, 0.8f, 0.8f});
 }
 
 EntityDirectionalLight::EntityDirectionalLight(const std::shared_ptr<Core> &core,
@@ -235,15 +210,6 @@ void EntityDirectionalLight::SetIntensity(const Vector3<float> &intensity) {
 
 void EntityDirectionalLight::SetDirection(const Vector3<float> &direction) {
   direction_ = direction.normalized();
-}
-
-void EntityDirectionalLight::PyBind(pybind11::module &m) {
-  pybind11::class_<EntityDirectionalLight, Entity, std::shared_ptr<EntityDirectionalLight>> entity_directional_light(
-      m, "EntityDirectionalLight");
-  entity_directional_light.def("set_intensity", &EntityDirectionalLight::SetIntensity,
-                               pybind11::arg("intensity") = Vector3<float>{0.8f, 0.8f, 0.8f});
-  entity_directional_light.def("set_direction", &EntityDirectionalLight::SetDirection,
-                               pybind11::arg("direction") = Vector3<float>{3.0f, 1.0f, 2.0f});
 }
 
 }  // namespace snowberg::visualizer

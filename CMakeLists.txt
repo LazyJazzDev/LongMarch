@@ -142,13 +142,6 @@ find_package(Python3 REQUIRED COMPONENTS Interpreter Development)
 set(PYTHON3_LIB_NAME Python3::Python)
 list(APPEND LIB_LIST ${PYTHON3_LIB_NAME})
 
-message(STATUS "Python3_EXECUTABLE: ${Python3_EXECUTABLE}")
-
-# find_package(pybind11 CONFIG)
-add_subdirectory(external/pybind11)
-set(PYBIND11_LIB_NAME pybind11::headers)
-list(APPEND LIB_LIST ${PYBIND11_LIB_NAME})
-
 add_subdirectory(scripts)
 include(scripts/pack_shaders.cmake)
 

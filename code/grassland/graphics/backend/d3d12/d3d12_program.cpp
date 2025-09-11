@@ -1,5 +1,7 @@
 #include "grassland/graphics/backend/d3d12/d3d12_program.h"
 
+#include <numeric>
+
 namespace grassland::graphics::backend {
 
 D3D12Shader::D3D12Shader(D3D12Core *core, const CompiledShaderBlob &blob) : core_(core), shader_module_(blob) {

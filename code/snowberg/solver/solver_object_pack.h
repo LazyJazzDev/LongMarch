@@ -40,8 +40,6 @@ struct ObjectPack {
                                     float sigma_ub = -1.0f,
                                     float elastic_limit = 4.0f);
 
-  static void PyBind(pybind11::module_ &m);
-
  private:
   void PushStretching(int u, int v, int w, float mu, float lambda, float damping, float sigma_lb, float sigma_ub);
   void PushBending(int a, int b, int c, int d, float stiffness, float damping, float elastic_limit);

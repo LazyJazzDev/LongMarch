@@ -1,5 +1,7 @@
 #include "grassland/graphics/backend/vulkan/vulkan_program.h"
 
+#include <numeric>
+
 namespace grassland::graphics::backend {
 
 namespace {

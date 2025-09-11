@@ -12,8 +12,6 @@ class Scene {
 
   uint64_t AddEntity(const std::shared_ptr<Entity> &entity);
 
-  static void PyBind(pybind11::module_ &m);
-
  private:
   std::shared_ptr<Core> core_;
   std::map<uint64_t, std::weak_ptr<Entity>> entities_;

@@ -7,13 +7,6 @@
 #include <windows.h>
 #endif
 
-#include "pybind11/chrono.h"
-#include "pybind11/eigen.h"
-#include "pybind11/functional.h"
-#include "pybind11/numpy.h"
-#include "pybind11/pybind11.h"
-#include "pybind11/stl.h"
-
 #if defined(LONGMARCH_CUDA_RUNTIME)
 #include "cuda_runtime.h"
 #include "thrust/device_vector.h"

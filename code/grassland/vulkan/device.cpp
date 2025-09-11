@@ -1,5 +1,6 @@
 #include "grassland/vulkan/device.h"
 
+#include <numeric>
 #include <utility>
 
 #include "grassland/vulkan/buffer.h"

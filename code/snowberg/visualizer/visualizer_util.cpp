@@ -2,23 +2,6 @@
 
 namespace snowberg::visualizer {
 
-void Material::PyBind(pybind11::module_ &m) {
-  pybind11::class_<Material> material(m, "Material");
-  material.def(pybind11::init([](const Vector4<float> &albedo) {
-                 Material material;
-                 material.albedo = EigenToGLM(albedo);
-                 return material;
-               }),
-               pybind11::arg("albedo") = Vector4<float>{0.8f, 0.8f, 0.8f, 1.0f});
-  material.def_property(
-      "albedo", [](const Material &material) { return GLMToEigen(material.albedo); },
-      [](Material &material, const Vector4<float> &albedo) { material.albedo = EigenToGLM(albedo); });
-  material.def("__repr__", [](const Material &material) {
-    return fmt::format("Material(albedo=<{}, {}, {}, {}>)", material.albedo.r, material.albedo.g, material.albedo.b,
-                       material.albedo.a);
-  });
-}
-
 graphics::ImageFormat TextureTypeToImageFormat(TextureType type) {
   switch (type) {
     case TEXTURE_TYPE_HDR:

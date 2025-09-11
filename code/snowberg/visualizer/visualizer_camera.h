@@ -18,7 +18,6 @@ class Camera {
 
   static Matrix4<float> LookAt(const Vector3<float> &eye, const Vector3<float> &center, const Vector3<float> &up);
   static Matrix4<float> Perspective(float fovy, float aspect, float z_near, float z_far);
-  static void PyBind(pybind11::module_ &m);
 
  private:
   std::shared_ptr<Core> core_;

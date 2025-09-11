@@ -99,32 +99,6 @@ std::vector<Vector3<float>> Scene::GetPositions(const std::vector<int> &particle
   return positions;
 }
 
-void Scene::PyBind(pybind11::module_ &m) {
-  pybind11::class_<Scene, std::shared_ptr<Scene>> scene(m, "Scene");
-  scene.def(pybind11::init<>());
-  scene.def("add_object", &Scene::AddObject);
-  scene.def("add_rigid_object", &Scene::AddRigidBody);
-  scene.def("get_positions", &Scene::GetPositions);
-
-#if defined(__CUDACC__)
-  pybind11::class_<SceneDevice, std::shared_ptr<SceneDevice>> scene_device(m, "SceneDevice");
-  scene_device.def(pybind11::init<const Scene &>(), pybind11::arg("scene"));
-  scene_device.def("get_positions", &SceneDevice::GetPositions);
-  scene_device.def("get_rigid_object_state", &SceneDevice::GetRigidObjectState, pybind11::arg("rigid_object_id"));
-  scene_device.def("set_rigid_object_state", &SceneDevice::SetRigidObjectState, pybind11::arg("rigid_object_id"),
-                   pybind11::arg("state"));
-  scene_device.def("get_rigid_object_stiffness", &SceneDevice::GetRigidObjectStiffness,
-                   pybind11::arg("rigid_object_id"));
-  scene_device.def("set_rigid_object_stiffness", &SceneDevice::SetRigidObjectStiffness,
-                   pybind11::arg("rigid_object_id"), pybind11::arg("stiffness"));
-  scene_device.def("get_rigid_object_friction", &SceneDevice::GetRigidObjectFriction, pybind11::arg("rigid_object_id"));
-  scene_device.def("set_rigid_object_friction", &SceneDevice::SetRigidObjectFriction, pybind11::arg("rigid_object_id"),
-                   pybind11::arg("friction"));
-  m.def("update_scene", &SceneDevice::Update);
-  m.def("update_scene_batch", &SceneDevice::UpdateBatch);
-#endif
-}
-
 #if defined(__CUDACC__)
 SceneDevice::SceneDevice(const Scene &scene) {
   x_prev_ = scene.x_;

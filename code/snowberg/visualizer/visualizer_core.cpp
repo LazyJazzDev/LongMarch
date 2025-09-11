@@ -112,33 +112,4 @@ int Core::Render(graphics::CommandContext *context,
   return 0;
 }
 
-void Core::PyBind(pybind11::module_ &m) {
-  pybind11::class_<Core, std::shared_ptr<Core>> core_class(m, "Core");
-  core_class.def(
-      pybind11::init([](graphics::Core *graphics_core) { return std::shared_ptr<Core>(new Core(graphics_core)); }),
-      pybind11::arg("graphics_core"), pybind11::keep_alive<1, 2>());
-  core_class.def("get_core", &Core::GraphicsCore, pybind11::return_value_policy::reference);
-  core_class.def("create_camera", &Core::CreateCamera, pybind11::keep_alive<0, 1>(),
-                 pybind11::arg("proj") = Matrix4<float>::Identity(),
-                 pybind11::arg("view") = Matrix4<float>::Identity());
-  core_class.def("create_mesh", &Core::CreateMesh, pybind11::keep_alive<0, 1>());
-  core_class.def("create_film", &Core::CreateFilm, pybind11::keep_alive<0, 1>(), pybind11::arg("width"),
-                 pybind11::arg("height"));
-  core_class.def("create_scene", &Core::CreateScene, pybind11::keep_alive<0, 1>());
-  core_class.def(
-      "create_entity_mesh_object",
-      &Core::CreateEntity<EntityMeshObject, const std::shared_ptr<Mesh> &, const Material &, const Matrix4<float> &>,
-      pybind11::keep_alive<0, 1>(), pybind11::arg("mesh") = nullptr,
-      pybind11::arg("material") = Material{{0.8, 0.8, 0.8, 1.0}},
-      pybind11::arg("transform") = Matrix4<float>::Identity());
-  core_class.def("create_entity_ambient_light", &Core::CreateEntity<EntityAmbientLight, const Vector3<float> &>,
-                 pybind11::keep_alive<0, 1>(), pybind11::arg("intensity") = Vector3<float>{0.5, 0.5, 0.5});
-  core_class.def("create_entity_directional_light",
-                 &Core::CreateEntity<EntityDirectionalLight, const Vector3<float> &, const Vector3<float> &>,
-                 pybind11::keep_alive<0, 1>(), pybind11::arg("direction") = Vector3<float>{3.0, 1.0, 2.0},
-                 pybind11::arg("intensity") = Vector3<float>{0.5, 0.5, 0.5});
-  core_class.def("render", &Core::Render, pybind11::arg("context"), pybind11::arg("scene"), pybind11::arg("camera"),
-                 pybind11::arg("film"));
-}
-
 }  // namespace snowberg::visualizer
