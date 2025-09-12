@@ -113,4 +113,7 @@ void Window::SetHDR(bool enable_hdr) {
   resize_event_.InvokeCallbacks(GetWidth(), GetHeight());
 }
 
+void Window::PybindModuleRegistration(py::module_ &m) {
+}
+
 }  // namespace grassland::graphics

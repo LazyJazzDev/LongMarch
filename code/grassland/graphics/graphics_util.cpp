@@ -149,4 +149,73 @@ uint32_t PixelSize(ImageFormat format) {
       return 0;
   }
 }
+
+void util::PybindModuleRegistration(py::module_ &m) {
+  py::enum_<BackendAPI> backend_api(m, "BackendAPI");
+  backend_api.value("BACKEND_API_VULKAN", BACKEND_API_VULKAN, "Backend API: Vulkan");
+  backend_api.value("BACKEND_API_D3D12", BACKEND_API_D3D12, "Backend API: Direct3D 12");
+  backend_api.export_values();
+  m.attr("BACKEND_API_DEFAULT") = py::cast(BACKEND_API_DEFAULT);
+
+  py::enum_<ImageFormat> image_format(m, "ImageFormat");
+  image_format.value("IMAGE_FORMAT_UNDEFINED", IMAGE_FORMAT_UNDEFINED, "Image Format: Undefined");
+  image_format.value("IMAGE_FORMAT_B8G8R8A8_UNORM", IMAGE_FORMAT_B8G8R8A8_UNORM, "Image Format: B8G8R8A8 Unorm");
+  image_format.value("IMAGE_FORMAT_R8G8B8A8_UNORM", IMAGE_FORMAT_R8G8B8A8_UNORM, "Image Format: R8G8B8A8 Unorm");
+  image_format.value("IMAGE_FORMAT_R32G32B32A32_SFLOAT", IMAGE_FORMAT_R32G32B32A32_SFLOAT,
+                     "Image Format: R32G32B32A32 Float");
+  image_format.value("IMAGE_FORMAT_R32G32B32_SFLOAT", IMAGE_FORMAT_R32G32B32_SFLOAT, "Image Format: R32G32B32 Float");
+  image_format.value("IMAGE_FORMAT_R32G32_SFLOAT", IMAGE_FORMAT_R32G32_SFLOAT, "Image Format: R32G32 Float");
+  image_format.value("IMAGE_FORMAT_R32_SFLOAT", IMAGE_FORMAT_R32_SFLOAT, "Image Format: R32 Float");
+  image_format.value("IMAGE_FORMAT_D32_SFLOAT", IMAGE_FORMAT_D32_SFLOAT, "Image Format: D32 Float");
+  image_format.value("IMAGE_FORMAT_R16G16B16A16_SFLOAT", IMAGE_FORMAT_R16G16B16A16_SFLOAT,
+                     "Image Format: R16G16B16A16 Float");
+  image_format.value("IMAGE_FORMAT_R32_UINT", IMAGE_FORMAT_R32_UINT, "Image Format: R32 Uint");
+  image_format.value("IMAGE_FORMAT_R32_SINT", IMAGE_FORMAT_R32_SINT, "Image Format: R32 Sint");
+  image_format.export_values();
+
+  py::enum_<InputType> input_type(m, "InputType");
+  input_type.value("INPUT_TYPE_UINT", INPUT_TYPE_UINT, "Input Type: uint");
+  input_type.value("INPUT_TYPE_INT", INPUT_TYPE_INT, "Input Type: int");
+  input_type.value("INPUT_TYPE_FLOAT", INPUT_TYPE_FLOAT, "Input Type: float");
+  input_type.value("INPUT_TYPE_UINT2", INPUT_TYPE_UINT2, "Input Type: uint2");
+  input_type.value("INPUT_TYPE_INT2", INPUT_TYPE_INT2, "Input Type: int2");
+  input_type.value("INPUT_TYPE_FLOAT2", INPUT_TYPE_FLOAT2, "Input Type: float2");
+  input_type.value("INPUT_TYPE_UINT3", INPUT_TYPE_UINT3, "Input Type: uint3");
+  input_type.value("INPUT_TYPE_INT3", INPUT_TYPE_INT3, "Input Type: int3");
+  input_type.value("INPUT_TYPE_FLOAT3", INPUT_TYPE_FLOAT3, "Input Type: float3");
+  input_type.value("INPUT_TYPE_UINT4", INPUT_TYPE_UINT4, "Input Type: uint4");
+  input_type.value("INPUT_TYPE_INT4", INPUT_TYPE_INT4, "Input Type: int4");
+  input_type.value("INPUT_TYPE_FLOAT4", INPUT_TYPE_FLOAT4, "Input Type: float4");
+  input_type.export_values();
+
+  py::enum_<BufferType> buffer_type(m, "BufferType");
+  buffer_type.value("BUFFER_TYPE_STATIC", BUFFER_TYPE_STATIC, "Buffer Type: Static");
+  buffer_type.value("BUFFER_TYPE_DYNAMIC", BUFFER_TYPE_DYNAMIC, "Buffer Type: Dynamic");
+  buffer_type.value("BUFFER_TYPE_ONETIME", BUFFER_TYPE_ONETIME, "Buffer Type: One-Time");
+  buffer_type.export_values();
+
+  py::enum_<ResourceType> resource_type(m, "ResourceType");
+  resource_type.value("RESOURCE_TYPE_UNIFORM_BUFFER", RESOURCE_TYPE_UNIFORM_BUFFER, "Resource Type: Uniform Buffer");
+  resource_type.value("RESOURCE_TYPE_STORAGE_BUFFER", RESOURCE_TYPE_STORAGE_BUFFER, "Resource Type: Storage Buffer");
+  resource_type.value("RESOURCE_TYPE_IMAGE", RESOURCE_TYPE_IMAGE, "Resource Type: Image (read-only)");
+  resource_type.value("RESOURCE_TYPE_WRITABLE_IMAGE", RESOURCE_TYPE_WRITABLE_IMAGE, "Resource Type: Writable Image");
+  resource_type.value("RESOURCE_TYPE_SAMPLER", RESOURCE_TYPE_SAMPLER, "Resource Type: Sampler");
+  resource_type.value("RESOURCE_TYPE_ACCELERATION_STRUCTURE", RESOURCE_TYPE_ACCELERATION_STRUCTURE,
+                      "Resource Type: Acceleration Structure");
+  resource_type.value("RESOURCE_TYPE_WRITABLE_STORAGE_BUFFER", RESOURCE_TYPE_WRITABLE_STORAGE_BUFFER,
+                      "Resource Type: Writable Storage Buffer");
+  resource_type.export_values();
+
+  py::enum_<ShaderType> shader_type(m, "ShaderType");
+  shader_type.value("SHADER_TYPE_VERTEX", SHADER_TYPE_VERTEX, "Shader Type: Vertex Shader");
+  shader_type.value("SHADER_TYPE_FRAGMENT", SHADER_TYPE_FRAGMENT, "Shader Type: Fragment Shader");
+  shader_type.value("SHADER_TYPE_GEOMETRY", SHADER_TYPE_GEOMETRY, "Shader Type: Geometry Shader");
+  shader_type.export_values();
+
+  py::enum_<BindPoint> bind_point(m, "BindPoint");
+  bind_point.value("BIND_POINT_GRAPHICS", BIND_POINT_GRAPHICS, "Bind Point: Graphics Pipeline");
+  bind_point.value("BIND_POINT_COMPUTE", BIND_POINT_COMPUTE, "Bind Point: Compute Pipeline");
+  bind_point.value("BIND_POINT_RAYTRACING", BIND_POINT_RAYTRACING, "Bind Point: Ray Tracing Pipeline");
+}
+
 }  // namespace grassland::graphics

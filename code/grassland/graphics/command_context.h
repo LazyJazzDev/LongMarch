@@ -61,5 +61,8 @@ class CommandContext {
 
  protected:
   std::vector<std::function<void()>> post_execution_callbacks_;
+
+ public:
+  static void PybindModuleRegistration(py::module_ &m);
 };
 }  // namespace grassland::graphics

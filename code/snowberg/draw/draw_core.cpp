@@ -167,7 +167,7 @@ graphics::Program *Core::GetProgram(graphics::ImageFormat format) {
     program->SetBlendState(0, true);
     program->SetCullMode(graphics::CULL_MODE_NONE);
     program->AddResourceBinding(graphics::RESOURCE_TYPE_STORAGE_BUFFER, 1);
-    program->AddResourceBinding(graphics::RESOURCE_TYPE_TEXTURE, 1);
+    program->AddResourceBinding(graphics::RESOURCE_TYPE_IMAGE, 1);
     program->AddResourceBinding(graphics::RESOURCE_TYPE_SAMPLER, 1);
     program->Finalize();
   }

@@ -63,7 +63,7 @@ void Application::OnInit() {
   program_->AddInputBinding(sizeof(Vertex), false);
   program_->AddInputAttribute(0, grassland::graphics::INPUT_TYPE_FLOAT3, 0);
   program_->AddInputAttribute(0, grassland::graphics::INPUT_TYPE_FLOAT2, sizeof(float) * 3);
-  program_->AddResourceBinding(grassland::graphics::RESOURCE_TYPE_TEXTURE, 1);
+  program_->AddResourceBinding(grassland::graphics::RESOURCE_TYPE_IMAGE, 1);
   program_->AddResourceBinding(grassland::graphics::RESOURCE_TYPE_SAMPLER, 1);
   // program_->SetCullMode(grassland::graphics::CULL_MODE_NONE);
   program_->BindShader(vertex_shader_.get(), grassland::graphics::SHADER_TYPE_VERTEX);

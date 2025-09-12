@@ -55,7 +55,7 @@ void Application::OnInit() {
 
   core_->CreateRayTracingProgram(raygen_shader_.get(), miss_shader_.get(), closest_hit_shader_.get(), &program_);
   program_->AddResourceBinding(grassland::graphics::RESOURCE_TYPE_ACCELERATION_STRUCTURE, 1);
-  program_->AddResourceBinding(grassland::graphics::RESOURCE_TYPE_IMAGE, 1);
+  program_->AddResourceBinding(grassland::graphics::RESOURCE_TYPE_WRITABLE_IMAGE, 1);
   program_->AddResourceBinding(grassland::graphics::RESOURCE_TYPE_UNIFORM_BUFFER, 1);
   program_->Finalize();
 }

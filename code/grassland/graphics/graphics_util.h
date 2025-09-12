@@ -74,8 +74,8 @@ typedef enum BufferType {
 typedef enum ResourceType {
   RESOURCE_TYPE_UNIFORM_BUFFER = 0,
   RESOURCE_TYPE_STORAGE_BUFFER = 1,
-  RESOURCE_TYPE_TEXTURE = 2,
-  RESOURCE_TYPE_IMAGE = 3,
+  RESOURCE_TYPE_IMAGE = 2,
+  RESOURCE_TYPE_WRITABLE_IMAGE = 3,
   RESOURCE_TYPE_SAMPLER = 4,
   RESOURCE_TYPE_ACCELERATION_STRUCTURE = 5,
   RESOURCE_TYPE_WRITABLE_STORAGE_BUFFER = 6,
@@ -298,5 +298,9 @@ uint32_t PixelSize(ImageFormat format);
 #if defined(LONGMARCH_CUDA_RUNTIME)
 class CUDABuffer;
 #endif
+
+namespace util {
+void PybindModuleRegistration(py::module_ &m);
+}
 
 }  // namespace grassland::graphics

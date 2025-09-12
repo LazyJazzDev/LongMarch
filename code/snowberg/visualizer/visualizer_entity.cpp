@@ -105,13 +105,13 @@ EntityAmbientLight::EntityAmbientLight(const std::shared_ptr<Core> &core, const 
                                          graphics::IMAGE_FORMAT_UNDEFINED, &program->program_);
     program->program_->BindShader(program->vertex_shader_.get(), graphics::SHADER_TYPE_VERTEX);
     program->program_->BindShader(program->fragment_shader_.get(), graphics::SHADER_TYPE_FRAGMENT);
-    program->program_->AddResourceBinding(graphics::RESOURCE_TYPE_TEXTURE,
+    program->program_->AddResourceBinding(graphics::RESOURCE_TYPE_IMAGE,
                                           1);  // Albedo
-    program->program_->AddResourceBinding(graphics::RESOURCE_TYPE_TEXTURE,
+    program->program_->AddResourceBinding(graphics::RESOURCE_TYPE_IMAGE,
                                           1);  // Position
-    program->program_->AddResourceBinding(graphics::RESOURCE_TYPE_TEXTURE,
+    program->program_->AddResourceBinding(graphics::RESOURCE_TYPE_IMAGE,
                                           1);  // Normal
-    program->program_->AddResourceBinding(graphics::RESOURCE_TYPE_TEXTURE,
+    program->program_->AddResourceBinding(graphics::RESOURCE_TYPE_IMAGE,
                                           1);  // Depth
     program->program_->AddResourceBinding(graphics::RESOURCE_TYPE_UNIFORM_BUFFER,
                                           1);  // Camera Info
@@ -163,13 +163,13 @@ EntityDirectionalLight::EntityDirectionalLight(const std::shared_ptr<Core> &core
                                          graphics::IMAGE_FORMAT_UNDEFINED, &program->program_);
     program->program_->BindShader(program->vertex_shader_.get(), graphics::SHADER_TYPE_VERTEX);
     program->program_->BindShader(program->fragment_shader_.get(), graphics::SHADER_TYPE_FRAGMENT);
-    program->program_->AddResourceBinding(graphics::RESOURCE_TYPE_TEXTURE,
+    program->program_->AddResourceBinding(graphics::RESOURCE_TYPE_IMAGE,
                                           1);  // Albedo
-    program->program_->AddResourceBinding(graphics::RESOURCE_TYPE_TEXTURE,
+    program->program_->AddResourceBinding(graphics::RESOURCE_TYPE_IMAGE,
                                           1);  // Position
-    program->program_->AddResourceBinding(graphics::RESOURCE_TYPE_TEXTURE,
+    program->program_->AddResourceBinding(graphics::RESOURCE_TYPE_IMAGE,
                                           1);  // Normal
-    program->program_->AddResourceBinding(graphics::RESOURCE_TYPE_TEXTURE,
+    program->program_->AddResourceBinding(graphics::RESOURCE_TYPE_IMAGE,
                                           1);  // Depth
     program->program_->AddResourceBinding(graphics::RESOURCE_TYPE_UNIFORM_BUFFER,
                                           1);  // Camera Info

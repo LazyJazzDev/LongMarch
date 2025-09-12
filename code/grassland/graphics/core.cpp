@@ -105,6 +105,9 @@ int Core::InitializeLogicalDeviceByCUDADeviceID(int cuda_device_id) {
 #define DEFAULT_API 1
 #endif
 
+void Core::PybindModuleRegistration(py::module_ &m) {
+}
+
 int CreateCore(BackendAPI api, const Core::Settings &settings, double_ptr<Core> pp_core) {
   switch (api) {
 #ifdef LONGMARCH_D3D12_ENABLED

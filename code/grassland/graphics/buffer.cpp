@@ -8,4 +8,7 @@ BufferRange::BufferRange(Buffer *buffer, size_t offset, size_t size) : buffer(bu
   }
 }
 
+void Buffer::PybindModuleRegistration(py::module_ &m) {
+}
+
 }  // namespace grassland::graphics

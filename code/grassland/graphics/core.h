@@ -136,6 +136,9 @@ class Core {
 #if defined(LONGMARCH_CUDA_RUNTIME)
   int cuda_device_{-1};
 #endif
+
+ public:
+  static void PybindModuleRegistration(py::module_ &m);
 };
 
 int CreateCore(BackendAPI api, const Core::Settings &settings, double_ptr<Core> pp_core);

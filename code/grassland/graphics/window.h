@@ -76,6 +76,9 @@ class Window {
 
  protected:
   bool enable_hdr_;
+
+ public:
+  static void PybindModuleRegistration(py::module_ &m);
 };
 
 }  // namespace grassland::graphics
