@@ -85,3 +85,5 @@ install(
         "${DXC_DLL_DIR}"
         COMPONENT python_package
 )
+
+message(STATUS "DXC_DLL_DIR: ${DXC_DLL_DIR}")

@@ -1,5 +1,8 @@
+import pathlib
+
 from long_march import graphics
 import numpy as np
+import sys
 
 def main():
     core_settings=graphics.CoreSettings()
@@ -12,7 +15,9 @@ def main():
     window=core.create_window(800, 600, "Hello Triangle", resizable=True)
 
     # load file shaders/hello_triangle.hlsl into a str
-    with open("shaders/hello_triangle.hlsl", "r") as f:
+    # get current working directory
+    print(pathlib.Path("./shaders/hello_triangle.hlsl").exists())
+    with open("./shaders/hello_triangle.hlsl", "r") as f:
         shader_code = f.read()
     vertex_shader=core.create_shader(shader_code, "VSMain", "vs_6_0")
     pixel_shader=core.create_shader(shader_code, "PSMain", "ps_6_0")

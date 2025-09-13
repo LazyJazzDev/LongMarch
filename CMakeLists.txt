@@ -161,8 +161,10 @@ message(STATUS "CMAKE_RUNTIME_OUTPUT_DIRECTORY : ${CMAKE_RUNTIME_OUTPUT_DIRECTOR
 message(STATUS "PROJECT_BINARY_DIR : ${PROJECT_BINARY_DIR}")
 
 find_package(Python3 REQUIRED COMPONENTS Interpreter Development)
-set(PYTHON3_LIB_NAME Python3::Python)
-list(APPEND LIB_LIST ${PYTHON3_LIB_NAME})
+
+message(STATUS "Python3_EXECUTABLE: ${Python3_EXECUTABLE}")
+message(STATUS "Python3_INCLUDE_DIRS: ${Python3_INCLUDE_DIRS}")
+message(STATUS "Python3_LIBRARIES: ${Python3_LIBRARIES}")
 
 add_subdirectory(external/pybind11)
 set(PYBIND11_LIB_NAME pybind11::headers)

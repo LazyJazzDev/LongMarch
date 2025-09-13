@@ -133,8 +133,6 @@ void Core::PybindClassRegistration(py::classh<Core> &c) {
   c.def("init", &Core::InitializeLogicalDevice, py::arg("device_index"), "Initialize logical device by device index");
   c.def("init_auto", &Core::InitializeLogicalDeviceAutoSelect, py::arg("require_ray_tracing") = false,
         "Auto select and initialize logical device, will select device with raytracing support if required");
-  c.def("init_cuda", &Core::InitializeLogicalDeviceByCUDADeviceID, py::arg("cuda_device_id"),
-        "Initialize logical device by CUDA device index");
   c.def("api", &Core::API, "Get the backend API");
   c.def("device_name", &Core::DeviceName, "Get the device name");
   c.def("ray_tracing_support", &Core::DeviceRayTracingSupport, "Check if the device supports ray tracing");
@@ -216,6 +214,11 @@ void Core::PybindClassRegistration(py::classh<Core> &c) {
 
   c.def("submit_command_context", &Core::SubmitCommandContext, py::arg("command_context"),
         "Submit a command context to the GPU queue");
+
+#if defined(LONGMARCH_CUDA_RUNTIME)
+  c.def("init_cuda", &Core::InitializeLogicalDeviceByCUDADeviceID, py::arg("cuda_device_id"),
+        "Initialize logical device by CUDA device index");
+#endif
 }
 
 int CreateCore(BackendAPI api, const Core::Settings &settings, double_ptr<Core> pp_core) {
