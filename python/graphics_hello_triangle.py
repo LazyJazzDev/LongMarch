@@ -41,6 +41,13 @@ def main():
 
     frame_image=core.create_image(window.get_width(), window.get_height(), graphics.IMAGE_FORMAT_R8G8B8A8_UNORM)
 
+    def on_resize(width, height):
+        print(f"Window resized to {width}x{height}")
+        nonlocal frame_image
+        frame_image=core.create_image(window.get_width(), window.get_height(), graphics.IMAGE_FORMAT_R8G8B8A8_UNORM)
+
+    window.register_resize_event(on_resize)
+
     print(window)
     while not window.should_close():
         cmd_ctx=core.create_command_context()
