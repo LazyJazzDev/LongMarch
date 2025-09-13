@@ -34,5 +34,6 @@ install(
         [=[.*system32\/.*\.dll]=]
         [=[^\/(lib|usr\/lib|usr\/local\/lib)]=]
         DIRECTORIES "$<TARGET_FILE_DIR:long_march>"
+        "${DXC_DLL_DIR}"
         COMPONENT python_package
 )

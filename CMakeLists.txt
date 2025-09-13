@@ -132,12 +132,26 @@ endif ()
 if (LONGMARCH_VULKAN_ENABLED)
     set(DXC_LIB_NAME Vulkan::dxc_lib)
     list(APPEND LIB_LIST ${DXC_LIB_NAME})
+
+    get_filename_component(VULKAN_DXC_DIR "${Vulkan_dxc_EXECUTABLE}" DIRECTORY)
+
+    set(DXC_DLL_DIR "${VULKAN_DXC_DIR}")
 elseif (LONGMARCH_D3D12_ENABLED)
     set(DXC_LIB_NAME dxcompiler)
     list(APPEND LIB_LIST ${DXC_LIB_NAME})
-endif ()
 
-message(STATUS "Vulkan_dxc_LIBRARY: ${Vulkan_LIBRARY}")
+    if(DEFINED ENV{WindowsSdkVerBinPath})
+        # e.g., C:\Program Files (x86)\Windows Kits\10\bin\10.0.22621.0\
+        set(_BASE "$ENV{WindowsSdkVerBinPath}")
+        if(CMAKE_SIZEOF_VOID_P EQUAL 8)
+            set(WINSDK_BIN_DIR "${_BASE}x64")
+        else()
+            set(WINSDK_BIN_DIR "${_BASE}x86")
+        endif()
+    endif()
+
+    set(DXC_DLL_DIR "${WINSDK_BIN_DIR}")
+endif ()
 
 set(LONGMARCH_IMGUI_DIR ${CMAKE_CURRENT_LIST_DIR}/external/imgui)
 

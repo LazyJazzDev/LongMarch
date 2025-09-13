@@ -8,10 +8,10 @@ set(GRASSLAND_LIBS ${GRASSLAND_LIBS} PARENT_SCOPE)
 
 target_include_directories(${GRASSLAND_SUBLIB_NAME} PUBLIC ${LONGMARCH_INCLUDE_DIR} ${STB_INC_DIR})
 
-target_link_libraries(${GRASSLAND_SUBLIB_NAME} PUBLIC grassland_imgui)
+target_link_libraries(${GRASSLAND_SUBLIB_NAME} PUBLIC grassland_imgui ${DXC_LIB_NAME})
 
 if (LONGMARCH_VULKAN_ENABLED)
-    target_link_libraries(${GRASSLAND_SUBLIB_NAME} PUBLIC grassland_vulkan ${DXC_LIB_NAME})
+    target_link_libraries(${GRASSLAND_SUBLIB_NAME} PUBLIC grassland_vulkan)
 endif ()
 
 if (LONGMARCH_D3D12_ENABLED)
