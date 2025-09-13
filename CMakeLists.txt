@@ -165,6 +165,7 @@ find_package(Python3 REQUIRED COMPONENTS Interpreter Development)
 message(STATUS "Python3_EXECUTABLE: ${Python3_EXECUTABLE}")
 message(STATUS "Python3_INCLUDE_DIRS: ${Python3_INCLUDE_DIRS}")
 message(STATUS "Python3_LIBRARIES: ${Python3_LIBRARIES}")
+message(STATUS "Python3_RUNTIME_LIBRARY_DIRS: ${Python3_RUNTIME_LIBRARY_DIRS}")
 
 add_subdirectory(external/pybind11)
 set(PYBIND11_LIB_NAME pybind11::headers)

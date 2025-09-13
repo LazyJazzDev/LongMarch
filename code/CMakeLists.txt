@@ -83,6 +83,7 @@ install(
         ${_post_excludes}
         DIRECTORIES "$<TARGET_FILE_DIR:long_march>"
         "${DXC_DLL_DIR}"
+        "${Python3_RUNTIME_LIBRARY_DIRS}"
         COMPONENT python_package
 )
 
