@@ -86,4 +86,11 @@ install(
         COMPONENT python_package
 )
 
+if (APPLE)
+    set_target_properties(long_march PROPERTIES
+            INSTALL_RPATH "@loader_path;${Python3_SITEARCH}"
+            BUILD_WITH_INSTALL_RPATH TRUE
+    )
+endif ()
+
 message(STATUS "DXC_DLL_DIR: ${DXC_DLL_DIR}")
