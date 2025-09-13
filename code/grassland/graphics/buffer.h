@@ -28,6 +28,8 @@ class Buffer {
   BufferRange Range(size_t offset = 0, size_t size = ~0ull) {
     return BufferRange(this, offset, size);
   }
+
+  static void PybindClassRegistration(py::classh<Buffer> &c);
 };
 
 #if defined(LONGMARCH_CUDA_RUNTIME)

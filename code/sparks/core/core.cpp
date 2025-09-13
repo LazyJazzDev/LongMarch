@@ -66,16 +66,16 @@ void Core::LoadPublicShaders() {
   core_->CreateShader(shaders_vfs_, "film2img.hlsl", "Main", "cs_6_0", &shaders_["film2img"]);
   auto &film2img_program = compute_programs_["film2img"];
   core_->CreateComputeProgram(shaders_["film2img"].get(), &film2img_program);
-  film2img_program->AddResourceBinding(graphics::RESOURCE_TYPE_TEXTURE, 1);
-  film2img_program->AddResourceBinding(graphics::RESOURCE_TYPE_TEXTURE, 1);
   film2img_program->AddResourceBinding(graphics::RESOURCE_TYPE_IMAGE, 1);
+  film2img_program->AddResourceBinding(graphics::RESOURCE_TYPE_IMAGE, 1);
+  film2img_program->AddResourceBinding(graphics::RESOURCE_TYPE_WRITABLE_IMAGE, 1);
   film2img_program->Finalize();
 
   core_->CreateShader(shaders_vfs_, "tone_mapping.hlsl", "Main", "cs_6_0", &shaders_["tone_mapping"]);
   auto &tone_mapping_program = compute_programs_["tone_mapping"];
   core_->CreateComputeProgram(shaders_["tone_mapping"].get(), &tone_mapping_program);
-  tone_mapping_program->AddResourceBinding(graphics::RESOURCE_TYPE_TEXTURE, 1);
   tone_mapping_program->AddResourceBinding(graphics::RESOURCE_TYPE_IMAGE, 1);
+  tone_mapping_program->AddResourceBinding(graphics::RESOURCE_TYPE_WRITABLE_IMAGE, 1);
   tone_mapping_program->Finalize();
 
   core_->CreateShader(shaders_vfs_, "blelloch_scan.hlsl", "BlellochUpSweep", "cs_6_3", {"-I."},

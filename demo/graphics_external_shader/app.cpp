@@ -77,7 +77,7 @@ void Application::OnInit() {
   program_->AddHitGroup(sphere_closest_hit_shader_.get(), nullptr, sphere_intersection_shader_.get(), true);
   program_->AddCallableShader(callable_shader_.get());
   program_->AddResourceBinding(grassland::graphics::RESOURCE_TYPE_ACCELERATION_STRUCTURE, 1);
-  program_->AddResourceBinding(grassland::graphics::RESOURCE_TYPE_IMAGE, 1);
+  program_->AddResourceBinding(grassland::graphics::RESOURCE_TYPE_WRITABLE_IMAGE, 1);
   program_->AddResourceBinding(grassland::graphics::RESOURCE_TYPE_UNIFORM_BUFFER, 1);
   program_->Finalize({0}, {0, 1}, {0});
 }

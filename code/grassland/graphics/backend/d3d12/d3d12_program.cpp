@@ -88,7 +88,7 @@ void D3D12Program::BindShader(Shader *shader, ShaderType type) {
       case SHADER_TYPE_VERTEX:
         pipeline_state_desc_.VS = d3d12_shader->ShaderModule().Handle();
         break;
-      case SHADER_TYPE_FRAGMENT:
+      case SHADER_TYPE_PIXEL:
         pipeline_state_desc_.PS = d3d12_shader->ShaderModule().Handle();
         break;
       case SHADER_TYPE_GEOMETRY:

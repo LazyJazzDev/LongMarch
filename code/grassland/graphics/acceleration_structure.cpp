@@ -32,4 +32,7 @@ RayTracingInstance AccelerationStructure::MakeInstance(const glm::mat4x3 &transf
   return instance;
 }
 
+void AccelerationStructure::PybindClassRegistration(py::classh<AccelerationStructure> &c) {
+}
+
 }  // namespace grassland::graphics

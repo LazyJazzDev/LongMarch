@@ -6,6 +6,9 @@
 
 namespace grassland::graphics {
 
+void Image::PybindClassRegistration(py::classh<Image> &c) {
+}
+
 int LoadImageFromFile(Core *core, const std::string &file_path, double_ptr<Image> pp_image) {
   int w, h, c;
   {

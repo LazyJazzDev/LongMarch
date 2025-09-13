@@ -6,4 +6,9 @@
 namespace long_march {
 using namespace grassland;
 using namespace snowberg;
+
+namespace sparks = sparks;
+
+void PybindModuleRegistration(py::module_ &m);
+
 }  // namespace long_march

@@ -157,7 +157,7 @@ graphics::Program *Core::GetProgram(graphics::ImageFormat format) {
 
     auto &program = programs_[format];
     program->BindShader(vertex_shader_.get(), graphics::SHADER_TYPE_VERTEX);
-    program->BindShader(fragment_shader_.get(), graphics::SHADER_TYPE_FRAGMENT);
+    program->BindShader(fragment_shader_.get(), graphics::SHADER_TYPE_PIXEL);
     program->AddInputBinding(sizeof(Vertex));
     program->AddInputBinding(sizeof(uint32_t), true);
     program->AddInputAttribute(0, graphics::INPUT_TYPE_FLOAT2, offsetof(Vertex, position));
@@ -167,7 +167,7 @@ graphics::Program *Core::GetProgram(graphics::ImageFormat format) {
     program->SetBlendState(0, true);
     program->SetCullMode(graphics::CULL_MODE_NONE);
     program->AddResourceBinding(graphics::RESOURCE_TYPE_STORAGE_BUFFER, 1);
-    program->AddResourceBinding(graphics::RESOURCE_TYPE_TEXTURE, 1);
+    program->AddResourceBinding(graphics::RESOURCE_TYPE_IMAGE, 1);
     program->AddResourceBinding(graphics::RESOURCE_TYPE_SAMPLER, 1);
     program->Finalize();
   }

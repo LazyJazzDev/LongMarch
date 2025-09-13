@@ -5,6 +5,16 @@
 
 namespace grassland::graphics {
 
+void Core::Settings::PybindClassRegistration(py::classh<Settings> &c) {
+  c.def(py::init<int, bool>(), py::arg("frames_in_flight") = 2, py::arg("enable_debug") = kEnableDebug);
+  c.def("__repr__", [](const Settings &settings) {
+    return py::str("Core.Settings(frames_in_flight={}, enable_debug={})")
+        .format(settings.frames_in_flight, settings.enable_debug);
+  });
+  c.def_readwrite("frames_in_flight", &Settings::frames_in_flight, "Number of frames buffer");
+  c.def_readwrite("enable_debug", &Settings::enable_debug, "Enable debug mode, which may have performance impact");
+}
+
 Core::Core(const Settings &settings) : settings_(settings) {
 }
 
@@ -104,6 +114,112 @@ int Core::InitializeLogicalDeviceByCUDADeviceID(int cuda_device_id) {
 #elif defined(LONGMARCH_VULKAN_ENABLED)
 #define DEFAULT_API 1
 #endif
+
+void Core::PybindClassRegistration(py::classh<Core> &c) {
+  c.doc() = "Core class for resource managements";
+  c.def(py::init([](BackendAPI api, const Settings &settings) {
+          std::shared_ptr<Core> core_;
+          CreateCore(api, settings, &core_);
+          return core_;
+        }),
+        py::arg_v("api", BACKEND_API_DEFAULT, "BackendAPI.BACKEND_API_DEFAULT"), py::arg("settings") = Settings{});
+  c.def("__repr__", [](Core *core) {
+    if (core->device_name_.empty()) {
+      return py::str("Core(<Not Initialized>)");
+    } else {
+      return py::str("Core(api={}, device='{}')").format(BackendAPIString(core->API()), core->device_name_);
+    }
+  });
+  c.def("init", &Core::InitializeLogicalDevice, py::arg("device_index"), "Initialize logical device by device index");
+  c.def("init_auto", &Core::InitializeLogicalDeviceAutoSelect, py::arg("require_ray_tracing") = false,
+        "Auto select and initialize logical device, will select device with raytracing support if required");
+  c.def("api", &Core::API, "Get the backend API");
+  c.def("device_name", &Core::DeviceName, "Get the device name");
+  c.def("ray_tracing_support", &Core::DeviceRayTracingSupport, "Check if the device supports ray tracing");
+  c.def("debug_enabled", &Core::DebugEnabled, "Check if debug mode is enabled");
+  c.def("frames_in_flight", &Core::FramesInFlight, "Get number of frames in flight");
+  c.def("current_frame", &Core::CurrentFrame, "Get current frame index");
+  c.def("wave_size", &Core::WaveSize, "Get the wave size of the device");
+  c.def("wait_gpu", &Core::WaitGPU, "Wait for the GPU to finish all operations");
+
+  c.def(
+      "create_window",
+      [](Core *core, int width, int height, const std::string &title, bool fullscreen, bool resizable) {
+        std::shared_ptr<Window> window_;
+        core->CreateWindowObject(width, height, title, fullscreen, resizable, &window_);
+        return window_;
+      },
+      py::arg("width"), py::arg("height"), py::arg("title"), py::arg("fullscreen") = false,
+      py::arg("resizable") = false, "Create a window", py::keep_alive<0, 1>{});
+
+  c.def(
+      "create_buffer",
+      [](Core *core, size_t buffer, BufferType type) {
+        std::shared_ptr<Buffer> buffer_;
+        core->CreateBuffer(buffer, type, &buffer_);
+        return buffer_;
+      },
+      py::arg("size"), py::arg_v("type", BUFFER_TYPE_STATIC, "type"), "Create a buffer", py::keep_alive<0, 1>{});
+
+  c.def(
+      "create_image",
+      [](Core *core, int width, int height, ImageFormat format) {
+        std::shared_ptr<Image> image_;
+        core->CreateImage(width, height, format, &image_);
+        return image_;
+      },
+      py::arg("width"), py::arg("height"), py::arg_v("format", IMAGE_FORMAT_R8G8B8A8_UNORM, "format"),
+      "Create an image", py::keep_alive<0, 1>{});
+
+  c.def(
+      "create_sampler",
+      [](Core *core, const SamplerInfo &info) {
+        std::shared_ptr<Sampler> sampler_;
+        core->CreateSampler(info, &sampler_);
+        return sampler_;
+      },
+      py::arg_v("info", SamplerInfo{}, "SamplerInfo()"), "Create a sampler", py::keep_alive<0, 1>{});
+
+  c.def(
+      "create_shader",
+      [](Core *core, const std::string &source_code, const std::string &entry_point, const std::string &target,
+         const std::vector<std::string> &args) {
+        std::shared_ptr<Shader> shader_;
+        VirtualFileSystem vfs;
+        vfs.WriteFile("main.hlsl", source_code);
+        core->CreateShader(vfs, "main.hlsl", entry_point, target, args, &shader_);
+        return shader_;
+      },
+      py::arg("source_code"), py::arg("entry_point"), py::arg("target"), py::arg("args") = std::vector<std::string>{},
+      "Create shader from source code", py::keep_alive<0, 1>{});
+
+  c.def(
+      "create_program",
+      [](Core *core, const std::vector<ImageFormat> &color_formats, ImageFormat depth_format) {
+        std::shared_ptr<Program> program_;
+        core->CreateProgram(color_formats, depth_format, &program_);
+        return program_;
+      },
+      py::arg("color_formats"), py::arg_v("depth_format", IMAGE_FORMAT_UNDEFINED, "depth_format"),
+      "Create a graphics program", py::keep_alive<0, 1>{});
+
+  c.def(
+      "create_command_context",
+      [](Core *core) {
+        std::shared_ptr<CommandContext> command_context_;
+        core->CreateCommandContext(&command_context_);
+        return command_context_;
+      },
+      "Create a command context", py::keep_alive<0, 1>{});
+
+  c.def("submit_command_context", &Core::SubmitCommandContext, py::arg("command_context"),
+        "Submit a command context to the GPU queue");
+
+#if defined(LONGMARCH_CUDA_RUNTIME)
+  c.def("init_cuda", &Core::InitializeLogicalDeviceByCUDADeviceID, py::arg("cuda_device_id"),
+        "Initialize logical device by CUDA device index");
+#endif
+}
 
 int CreateCore(BackendAPI api, const Core::Settings &settings, double_ptr<Core> pp_core) {
   switch (api) {

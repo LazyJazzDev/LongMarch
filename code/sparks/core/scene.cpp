@@ -220,8 +220,8 @@ void Scene::UpdatePipeline(Camera *camera) {
     std::iota(callable_shader_indices_.begin(), callable_shader_indices_.end(), 0);
     hit_group_indices_.resize(hit_groups_.size() * 2);
     std::iota(hit_group_indices_.begin(), hit_group_indices_.end(), 0);
-    rt_program_->AddResourceBinding(graphics::RESOURCE_TYPE_IMAGE, 1);
-    rt_program_->AddResourceBinding(graphics::RESOURCE_TYPE_IMAGE, 1);
+    rt_program_->AddResourceBinding(graphics::RESOURCE_TYPE_WRITABLE_IMAGE, 1);
+    rt_program_->AddResourceBinding(graphics::RESOURCE_TYPE_WRITABLE_IMAGE, 1);
     rt_program_->AddResourceBinding(graphics::RESOURCE_TYPE_ACCELERATION_STRUCTURE, 1);
     rt_program_->AddResourceBinding(graphics::RESOURCE_TYPE_UNIFORM_BUFFER, 1);
     rt_program_->AddResourceBinding(graphics::RESOURCE_TYPE_STORAGE_BUFFER, 1);
@@ -230,8 +230,8 @@ void Scene::UpdatePipeline(Camera *camera) {
     rt_program_->AddResourceBinding(graphics::RESOURCE_TYPE_STORAGE_BUFFER, 1);
     rt_program_->AddResourceBinding(graphics::RESOURCE_TYPE_STORAGE_BUFFER, 1);
     rt_program_->AddResourceBinding(graphics::RESOURCE_TYPE_STORAGE_BUFFER, 1);
-    rt_program_->AddResourceBinding(graphics::RESOURCE_TYPE_TEXTURE, sdr_images_.size());
-    rt_program_->AddResourceBinding(graphics::RESOURCE_TYPE_TEXTURE, hdr_images_.size());
+    rt_program_->AddResourceBinding(graphics::RESOURCE_TYPE_IMAGE, sdr_images_.size());
+    rt_program_->AddResourceBinding(graphics::RESOURCE_TYPE_IMAGE, hdr_images_.size());
     rt_program_->AddResourceBinding(graphics::RESOURCE_TYPE_SAMPLER, 2);
 
     rt_program_->AddRayGenShader(raygen_shader_.get());

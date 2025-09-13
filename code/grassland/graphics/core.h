@@ -13,6 +13,8 @@ class Core {
   struct Settings {
     int frames_in_flight{2};
     bool enable_debug{kEnableDebug};
+
+    static void PybindClassRegistration(py::classh<Settings> &c);
   };
 
   Core(const Settings &settings);
@@ -136,6 +138,9 @@ class Core {
 #if defined(LONGMARCH_CUDA_RUNTIME)
   int cuda_device_{-1};
 #endif
+
+ public:
+  static void PybindClassRegistration(py::classh<Core> &c);
 };
 
 int CreateCore(BackendAPI api, const Core::Settings &settings, double_ptr<Core> pp_core);

@@ -55,7 +55,7 @@ void Application::OnInit() {
   program_->AddResourceBinding(grassland::graphics::RESOURCE_TYPE_UNIFORM_BUFFER, 1);
   program_->SetCullMode(grassland::graphics::CULL_MODE_NONE);
   program_->BindShader(vertex_shader_.get(), grassland::graphics::SHADER_TYPE_VERTEX);
-  program_->BindShader(fragment_shader_.get(), grassland::graphics::SHADER_TYPE_FRAGMENT);
+  program_->BindShader(fragment_shader_.get(), grassland::graphics::SHADER_TYPE_PIXEL);
   program_->Finalize();
 }
 

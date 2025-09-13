@@ -14,6 +14,8 @@ class AccelerationStructure {
                                   uint32_t instance_mask = 0xFF,
                                   uint32_t instance_hit_group_offset = 0,
                                   RayTracingInstanceFlag instance_flags = RAYTRACING_INSTANCE_FLAG_NONE);
+
+  static void PybindClassRegistration(py::classh<AccelerationStructure> &c);
 };
 
 }  // namespace grassland::graphics

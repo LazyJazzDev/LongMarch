@@ -6,6 +6,8 @@ namespace grassland::graphics {
 class Shader {
  public:
   virtual ~Shader() = default;
+
+  static void PybindClassRegistration(py::classh<Shader> &c);
 };
 
 class Program {
@@ -18,6 +20,8 @@ class Program {
   virtual void SetBlendState(int target_id, const BlendState &state) = 0;
   virtual void BindShader(Shader *shader, ShaderType type) = 0;
   virtual void Finalize() = 0;
+
+  static void PybindClassRegistration(py::classh<Program> &c);
 };
 
 class ComputeProgram {

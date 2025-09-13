@@ -65,7 +65,7 @@ VkShaderStageFlagBits ShaderTypeToVkShaderStageFlags(ShaderType type) {
   switch (type) {
     case SHADER_TYPE_VERTEX:
       return VK_SHADER_STAGE_VERTEX_BIT;
-    case SHADER_TYPE_FRAGMENT:
+    case SHADER_TYPE_PIXEL:
       return VK_SHADER_STAGE_FRAGMENT_BIT;
     case SHADER_TYPE_GEOMETRY:
       return VK_SHADER_STAGE_GEOMETRY_BIT;
@@ -76,9 +76,9 @@ VkShaderStageFlagBits ShaderTypeToVkShaderStageFlags(ShaderType type) {
 
 VkDescriptorType ResourceTypeToVkDescriptorType(ResourceType type) {
   switch (type) {
-    case RESOURCE_TYPE_IMAGE:
+    case RESOURCE_TYPE_WRITABLE_IMAGE:
       return VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
-    case RESOURCE_TYPE_TEXTURE:
+    case RESOURCE_TYPE_IMAGE:
       return VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE;
     case RESOURCE_TYPE_UNIFORM_BUFFER:
       return VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;

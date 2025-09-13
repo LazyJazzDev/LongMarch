@@ -32,7 +32,7 @@ if (CUDAToolkit_FOUND)
             list(APPEND INC_LIST ${CUDA_INC_DIR})
         endforeach ()
     endif ()
-    set(CUDART_LIB_NAME CUDA::cudart)
+    set(CUDART_LIB_NAME CUDA::cudart_static)
     list(APPEND LIB_LIST ${CUDART_LIB_NAME})
     set(LONGMARCH_CUDA_RUNTIME ON)
     if (NOT LONGMARCH_DISABLE_CUDA)
@@ -81,8 +81,6 @@ if (Vulkan_FOUND)
     set(LONGMARCH_VULKAN_ENABLED ON)
     set(VULKAN_LIB_NAME ${Vulkan_LIBRARIES})
     list(APPEND LIB_LIST ${VULKAN_LIB_NAME})
-    set(DXC_LIB_NAME Vulkan::dxc_lib)
-    list(APPEND LIB_LIST ${DXC_LIB_NAME})
 
     find_package(VulkanMemoryAllocator CONFIG REQUIRED)
     set(VMA_LIB_NAME Vulkan::Headers GPUOpen::VulkanMemoryAllocator)
@@ -131,6 +129,30 @@ if (WIN32)
     list(APPEND INC_LIST ${D3DX12_INCLUDE_DIRS})
 endif ()
 
+if (LONGMARCH_VULKAN_ENABLED)
+    set(DXC_LIB_NAME Vulkan::dxc_lib)
+    list(APPEND LIB_LIST ${DXC_LIB_NAME})
+
+    get_filename_component(VULKAN_DXC_DIR "${Vulkan_dxc_EXECUTABLE}" DIRECTORY)
+
+    set(DXC_DLL_DIR "${VULKAN_DXC_DIR}")
+elseif (LONGMARCH_D3D12_ENABLED)
+    set(DXC_LIB_NAME dxcompiler)
+    list(APPEND LIB_LIST ${DXC_LIB_NAME})
+
+    if(DEFINED ENV{WindowsSdkVerBinPath})
+        # e.g., C:\Program Files (x86)\Windows Kits\10\bin\10.0.22621.0\
+        set(_BASE "$ENV{WindowsSdkVerBinPath}")
+        if(CMAKE_SIZEOF_VOID_P EQUAL 8)
+            set(WINSDK_BIN_DIR "${_BASE}x64")
+        else()
+            set(WINSDK_BIN_DIR "${_BASE}x86")
+        endif()
+    endif()
+
+    set(DXC_DLL_DIR "${WINSDK_BIN_DIR}")
+endif ()
+
 set(LONGMARCH_IMGUI_DIR ${CMAKE_CURRENT_LIST_DIR}/external/imgui)
 
 message(STATUS "CMAKE_ARCHIVE_OUTPUT_DIRECTORY : ${CMAKE_ARCHIVE_OUTPUT_DIRECTORY}")
@@ -139,8 +161,15 @@ message(STATUS "CMAKE_RUNTIME_OUTPUT_DIRECTORY : ${CMAKE_RUNTIME_OUTPUT_DIRECTOR
 message(STATUS "PROJECT_BINARY_DIR : ${PROJECT_BINARY_DIR}")
 
 find_package(Python3 REQUIRED COMPONENTS Interpreter Development)
-set(PYTHON3_LIB_NAME Python3::Python)
-list(APPEND LIB_LIST ${PYTHON3_LIB_NAME})
+
+message(STATUS "Python3_EXECUTABLE: ${Python3_EXECUTABLE}")
+message(STATUS "Python3_INCLUDE_DIRS: ${Python3_INCLUDE_DIRS}")
+message(STATUS "Python3_LIBRARIES: ${Python3_LIBRARIES}")
+message(STATUS "Python3_RUNTIME_LIBRARY_DIRS: ${Python3_RUNTIME_LIBRARY_DIRS}")
+
+add_subdirectory(external/pybind11)
+set(PYBIND11_LIB_NAME pybind11::headers)
+list(APPEND LIB_LIST ${PYBIND11_LIB_NAME})
 
 add_subdirectory(scripts)
 include(scripts/pack_shaders.cmake)
@@ -157,8 +186,14 @@ add_subdirectory(code)
 # If current list is the root list
 if ("${CMAKE_CURRENT_SOURCE_DIR}" STREQUAL "${CMAKE_SOURCE_DIR}")
     if (NOT LONGMARCH_NO_DEMO)
-        add_subdirectory(demo)
-        add_subdirectory(test)
+        if(CMAKE_GENERATOR MATCHES "^Visual Studio")
+            message(STATUS "Using a Visual Studio generator")
+            add_subdirectory(demo)
+            add_subdirectory(test)
+        else ()
+            add_subdirectory(demo EXCLUDE_FROM_ALL)
+            add_subdirectory(test EXCLUDE_FROM_ALL)
+        endif()
     endif ()
 endif ()
 

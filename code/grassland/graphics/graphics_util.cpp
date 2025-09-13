@@ -6,7 +6,7 @@ const char *BackendAPIString(BackendAPI api) {
     case BACKEND_API_VULKAN:
       return "Vulkan";
     case BACKEND_API_D3D12:
-      return "Direct3D 12";
+      return "D3D12";
     default:
       return "Unknown";
   }
@@ -149,4 +149,208 @@ uint32_t PixelSize(ImageFormat format) {
       return 0;
   }
 }
+
+void util::PybindModuleRegistration(py::module_ &m) {
+  py::enum_<BackendAPI> backend_api(m, "BackendAPI");
+  backend_api.value("BACKEND_API_VULKAN", BACKEND_API_VULKAN, "Backend API: Vulkan");
+  backend_api.value("BACKEND_API_D3D12", BACKEND_API_D3D12, "Backend API: Direct3D 12");
+  backend_api.export_values();
+  m.attr("BACKEND_API_DEFAULT") = py::cast(BACKEND_API_DEFAULT);
+
+  py::enum_<ImageFormat> image_format(m, "ImageFormat");
+  image_format.value("IMAGE_FORMAT_UNDEFINED", IMAGE_FORMAT_UNDEFINED, "Image Format: Undefined");
+  image_format.value("IMAGE_FORMAT_B8G8R8A8_UNORM", IMAGE_FORMAT_B8G8R8A8_UNORM, "Image Format: B8G8R8A8 Unorm");
+  image_format.value("IMAGE_FORMAT_R8G8B8A8_UNORM", IMAGE_FORMAT_R8G8B8A8_UNORM, "Image Format: R8G8B8A8 Unorm");
+  image_format.value("IMAGE_FORMAT_R32G32B32A32_SFLOAT", IMAGE_FORMAT_R32G32B32A32_SFLOAT,
+                     "Image Format: R32G32B32A32 Float");
+  image_format.value("IMAGE_FORMAT_R32G32B32_SFLOAT", IMAGE_FORMAT_R32G32B32_SFLOAT, "Image Format: R32G32B32 Float");
+  image_format.value("IMAGE_FORMAT_R32G32_SFLOAT", IMAGE_FORMAT_R32G32_SFLOAT, "Image Format: R32G32 Float");
+  image_format.value("IMAGE_FORMAT_R32_SFLOAT", IMAGE_FORMAT_R32_SFLOAT, "Image Format: R32 Float");
+  image_format.value("IMAGE_FORMAT_D32_SFLOAT", IMAGE_FORMAT_D32_SFLOAT, "Image Format: D32 Float");
+  image_format.value("IMAGE_FORMAT_R16G16B16A16_SFLOAT", IMAGE_FORMAT_R16G16B16A16_SFLOAT,
+                     "Image Format: R16G16B16A16 Float");
+  image_format.value("IMAGE_FORMAT_R32_UINT", IMAGE_FORMAT_R32_UINT, "Image Format: R32 Uint");
+  image_format.value("IMAGE_FORMAT_R32_SINT", IMAGE_FORMAT_R32_SINT, "Image Format: R32 Sint");
+  image_format.export_values();
+
+  py::enum_<InputType> input_type(m, "InputType");
+  input_type.value("INPUT_TYPE_UINT", INPUT_TYPE_UINT, "Input Type: uint");
+  input_type.value("INPUT_TYPE_INT", INPUT_TYPE_INT, "Input Type: int");
+  input_type.value("INPUT_TYPE_FLOAT", INPUT_TYPE_FLOAT, "Input Type: float");
+  input_type.value("INPUT_TYPE_UINT2", INPUT_TYPE_UINT2, "Input Type: uint2");
+  input_type.value("INPUT_TYPE_INT2", INPUT_TYPE_INT2, "Input Type: int2");
+  input_type.value("INPUT_TYPE_FLOAT2", INPUT_TYPE_FLOAT2, "Input Type: float2");
+  input_type.value("INPUT_TYPE_UINT3", INPUT_TYPE_UINT3, "Input Type: uint3");
+  input_type.value("INPUT_TYPE_INT3", INPUT_TYPE_INT3, "Input Type: int3");
+  input_type.value("INPUT_TYPE_FLOAT3", INPUT_TYPE_FLOAT3, "Input Type: float3");
+  input_type.value("INPUT_TYPE_UINT4", INPUT_TYPE_UINT4, "Input Type: uint4");
+  input_type.value("INPUT_TYPE_INT4", INPUT_TYPE_INT4, "Input Type: int4");
+  input_type.value("INPUT_TYPE_FLOAT4", INPUT_TYPE_FLOAT4, "Input Type: float4");
+  input_type.export_values();
+
+  py::enum_<BufferType> buffer_type(m, "BufferType");
+  buffer_type.value("BUFFER_TYPE_STATIC", BUFFER_TYPE_STATIC, "Buffer Type: Static");
+  buffer_type.value("BUFFER_TYPE_DYNAMIC", BUFFER_TYPE_DYNAMIC, "Buffer Type: Dynamic");
+  buffer_type.value("BUFFER_TYPE_ONETIME", BUFFER_TYPE_ONETIME, "Buffer Type: One-Time");
+  buffer_type.export_values();
+
+  py::enum_<ResourceType> resource_type(m, "ResourceType");
+  resource_type.value("RESOURCE_TYPE_UNIFORM_BUFFER", RESOURCE_TYPE_UNIFORM_BUFFER, "Resource Type: Uniform Buffer");
+  resource_type.value("RESOURCE_TYPE_STORAGE_BUFFER", RESOURCE_TYPE_STORAGE_BUFFER, "Resource Type: Storage Buffer");
+  resource_type.value("RESOURCE_TYPE_IMAGE", RESOURCE_TYPE_IMAGE, "Resource Type: Image (read-only)");
+  resource_type.value("RESOURCE_TYPE_WRITABLE_IMAGE", RESOURCE_TYPE_WRITABLE_IMAGE, "Resource Type: Writable Image");
+  resource_type.value("RESOURCE_TYPE_SAMPLER", RESOURCE_TYPE_SAMPLER, "Resource Type: Sampler");
+  resource_type.value("RESOURCE_TYPE_ACCELERATION_STRUCTURE", RESOURCE_TYPE_ACCELERATION_STRUCTURE,
+                      "Resource Type: Acceleration Structure");
+  resource_type.value("RESOURCE_TYPE_WRITABLE_STORAGE_BUFFER", RESOURCE_TYPE_WRITABLE_STORAGE_BUFFER,
+                      "Resource Type: Writable Storage Buffer");
+  resource_type.export_values();
+
+  py::enum_<ShaderType> shader_type(m, "ShaderType");
+  shader_type.value("SHADER_TYPE_VERTEX", SHADER_TYPE_VERTEX, "Shader Type: Vertex Shader");
+  shader_type.value("SHADER_TYPE_PIXEL", SHADER_TYPE_PIXEL, "Shader Type: Pixel Shader");
+  shader_type.value("SHADER_TYPE_GEOMETRY", SHADER_TYPE_GEOMETRY, "Shader Type: Geometry Shader");
+  shader_type.export_values();
+  m.attr("SHADER_TYPE_FRAGMENT") = py::cast(SHADER_TYPE_PIXEL);
+
+  py::enum_<BindPoint> bind_point(m, "BindPoint");
+  bind_point.value("BIND_POINT_GRAPHICS", BIND_POINT_GRAPHICS, "Bind Point: Graphics Pipeline");
+  bind_point.value("BIND_POINT_COMPUTE", BIND_POINT_COMPUTE, "Bind Point: Compute Pipeline");
+  bind_point.value("BIND_POINT_RAYTRACING", BIND_POINT_RAYTRACING, "Bind Point: Ray Tracing Pipeline");
+  bind_point.export_values();
+
+  py::enum_<CullMode> cull_mode(m, "CullMode");
+  cull_mode.value("CULL_MODE_NONE", CULL_MODE_NONE, "Cull Mode: None");
+  cull_mode.value("CULL_MODE_FRONT", CULL_MODE_FRONT, "Cull Mode: Front Face");
+  cull_mode.value("CULL_MODE_BACK", CULL_MODE_BACK, "Cull Mode: Back Face");
+  cull_mode.export_values();
+
+  py::enum_<FilterMode> filter_mode(m, "FilterMode");
+  filter_mode.value("FILTER_MODE_NEAREST", FILTER_MODE_NEAREST, "Filter Mode: Nearest");
+  filter_mode.value("FILTER_MODE_LINEAR", FILTER_MODE_LINEAR, "Filter Mode: Linear");
+  filter_mode.export_values();
+
+  py::enum_<AddressMode> address_mode(m, "AddressMode");
+  address_mode.value("ADDRESS_MODE_REPEAT", ADDRESS_MODE_REPEAT, "Address Mode: Repeat");
+  address_mode.value("ADDRESS_MODE_MIRRORED_REPEAT", ADDRESS_MODE_MIRRORED_REPEAT, "Address Mode: Mirrored Repeat");
+  address_mode.value("ADDRESS_MODE_CLAMP_TO_EDGE", ADDRESS_MODE_CLAMP_TO_EDGE, "Address Mode: Clamp to Edge");
+  address_mode.value("ADDRESS_MODE_CLAMP_TO_BORDER", ADDRESS_MODE_CLAMP_TO_BORDER, "Address Mode: Clamp to Border");
+  address_mode.export_values();
+
+  py::class_<SamplerInfo> sampler_info(m, "SamplerInfo");
+
+  sampler_info.def(py::init([](FilterMode filter_mode) {
+                     SamplerInfo info{filter_mode};
+                     return info;
+                   }),
+                   py::arg_v("filter", FILTER_MODE_LINEAR, "FilterMode()"), "Create a sampler info");
+  sampler_info.def(py::init([](AddressMode address_mode) {
+                     SamplerInfo info{address_mode};
+                     return info;
+                   }),
+                   py::arg_v("address_mode", ADDRESS_MODE_REPEAT, "AddressMode()"), "Create a sampler info");
+  sampler_info.def(py::init([](FilterMode filter_mode, AddressMode address_mode) {
+                     SamplerInfo info{filter_mode, address_mode};
+                     return info;
+                   }),
+                   py::arg_v("filter", FILTER_MODE_LINEAR, "FilterMode()"),
+                   py::arg_v("address_mode", ADDRESS_MODE_REPEAT, "AddressMode()"), "Create a sampler info");
+  sampler_info.def(py::init([](FilterMode min_filter, FilterMode mag_filter, FilterMode mip_filter,
+                               AddressMode address_mode_u, AddressMode address_mode_v, AddressMode address_mode_w) {
+                     SamplerInfo info{min_filter,     mag_filter,     mip_filter,
+                                      address_mode_u, address_mode_v, address_mode_w};
+                     return info;
+                   }),
+                   py::arg_v("min_filter", FILTER_MODE_LINEAR, "FilterMode()"),
+                   py::arg_v("mag_filter", FILTER_MODE_LINEAR, "FilterMode()"),
+                   py::arg_v("mip_filter", FILTER_MODE_LINEAR, "FilterMode()"),
+                   py::arg_v("address_mode_u", ADDRESS_MODE_REPEAT, "AddressMode()"),
+                   py::arg_v("address_mode_v", ADDRESS_MODE_REPEAT, "AddressMode()"),
+                   py::arg_v("address_mode_w", ADDRESS_MODE_REPEAT, "AddressMode()"), "Create a sampler info");
+  sampler_info.def_readwrite("min_filter", &SamplerInfo::min_filter, "Minification filter mode");
+  sampler_info.def_readwrite("mag_filter", &SamplerInfo::mag_filter, "Magnification filter mode");
+  sampler_info.def_readwrite("mip_filter", &SamplerInfo::mip_filter, "Mipmap filter mode");
+  sampler_info.def_readwrite("address_mode_u", &SamplerInfo::address_mode_u, "Address mode for U coordinate");
+  sampler_info.def_readwrite("address_mode_v", &SamplerInfo::address_mode_v, "Address mode for V coordinate");
+  sampler_info.def_readwrite("address_mode_w", &SamplerInfo::address_mode_w, "Address mode for W coordinate");
+  sampler_info.def("__repr__", [](const SamplerInfo &info) {
+    return py::str(
+               "SamplerInfo(min_filter={}, mag_filter={}, mip_filter={}, address_mode_u={}, address_mode_v={}, "
+               "address_mode_w={})")
+        .format(info.min_filter, info.mag_filter, info.mip_filter, info.address_mode_u, info.address_mode_v,
+                info.address_mode_w);
+  });
+
+  py::enum_<PrimitiveTopology> primitive_topology(m, "PrimitiveTopology");
+  primitive_topology.value("PRIMITIVE_TOPOLOGY_TRIANGLE_LIST", PRIMITIVE_TOPOLOGY_TRIANGLE_LIST,
+                           "Primitive Topology: Triangle List");
+  primitive_topology.value("PRIMITIVE_TOPOLOGY_TRIANGLE_STRIP", PRIMITIVE_TOPOLOGY_TRIANGLE_STRIP,
+                           "Primitive Topology: Triangle Strip");
+  primitive_topology.value("PRIMITIVE_TOPOLOGY_LINE_LIST", PRIMITIVE_TOPOLOGY_LINE_LIST,
+                           "Primitive Topology: Line List");
+  primitive_topology.value("PRIMITIVE_TOPOLOGY_LINE_STRIP", PRIMITIVE_TOPOLOGY_LINE_STRIP,
+                           "Primitive Topology: Line Strip");
+  primitive_topology.value("PRIMITIVE_TOPOLOGY_POINT_LIST", PRIMITIVE_TOPOLOGY_POINT_LIST,
+                           "Primitive Topology: Point List");
+  primitive_topology.export_values();
+
+  py::enum_<BlendFactor> blend_factor(m, "BlendFactor");
+  blend_factor.value("BLEND_FACTOR_ZERO", BLEND_FACTOR_ZERO, "Blend Factor: Zero");
+  blend_factor.value("BLEND_FACTOR_ONE", BLEND_FACTOR_ONE, "Blend Factor: One");
+  blend_factor.value("BLEND_FACTOR_SRC_COLOR", BLEND_FACTOR_SRC_COLOR, "Blend Factor: Source Color");
+  blend_factor.value("BLEND_FACTOR_ONE_MINUS_SRC_COLOR", BLEND_FACTOR_ONE_MINUS_SRC_COLOR,
+                     "Blend Factor: One Minus Source Color");
+  blend_factor.value("BLEND_FACTOR_DST_COLOR", BLEND_FACTOR_DST_COLOR, "Blend Factor: Destination Color");
+  blend_factor.value("BLEND_FACTOR_ONE_MINUS_DST_COLOR", BLEND_FACTOR_ONE_MINUS_DST_COLOR,
+                     "Blend Factor: One Minus Destination Color");
+  blend_factor.value("BLEND_FACTOR_SRC_ALPHA", BLEND_FACTOR_SRC_ALPHA, "Blend Factor: Source Alpha");
+  blend_factor.value("BLEND_FACTOR_ONE_MINUS_SRC_ALPHA", BLEND_FACTOR_ONE_MINUS_SRC_ALPHA,
+                     "Blend Factor: One Minus Source Alpha");
+  blend_factor.value("BLEND_FACTOR_DST_ALPHA", BLEND_FACTOR_DST_ALPHA, "Blend Factor: Destination Alpha");
+  blend_factor.value("BLEND_FACTOR_ONE_MINUS_DST_ALPHA", BLEND_FACTOR_ONE_MINUS_DST_ALPHA,
+                     "Blend Factor: One Minus Destination Alpha");
+  blend_factor.export_values();
+
+  py::enum_<BlendOp> blend_op(m, "BlendOp");
+  blend_op.value("BLEND_OP_ADD", BLEND_OP_ADD, "Blend Operation: Add");
+  blend_op.value("BLEND_OP_SUBTRACT", BLEND_OP_SUBTRACT, "Blend Operation: Subtract");
+  blend_op.value("BLEND_OP_REVERSE_SUBTRACT", BLEND_OP_REVERSE_SUBTRACT, "Blend Operation: Reverse Subtract");
+  blend_op.value("BLEND_OP_MIN", BLEND_OP_MIN, "Blend Operation: Min");
+  blend_op.value("BLEND_OP_MAX", BLEND_OP_MAX, "Blend Operation: Max");
+  blend_op.export_values();
+
+  py::class_<BlendState> blend_state(m, "BlendState");
+  blend_state.def(py::init<>(), "Create a default blend state (no blending)");
+  blend_state.def(py::init([](bool blend_enable) {
+                    BlendState state{blend_enable};
+                    return state;
+                  }),
+                  py::arg("blend_enable"), "Create a default blend state");
+  blend_state.def(py::init([](BlendFactor src_color, BlendFactor dst_color, BlendOp color_op, BlendFactor src_alpha,
+                              BlendFactor dst_alpha, BlendOp alpha_op) {
+                    BlendState state{src_color, dst_color, color_op, src_alpha, dst_alpha, alpha_op};
+                    return state;
+                  }),
+                  py::arg_v("src_color", BLEND_FACTOR_SRC_ALPHA, "src_color"),
+                  py::arg_v("dst_color", BLEND_FACTOR_ONE_MINUS_SRC_ALPHA, "dst_color"),
+                  py::arg_v("color_op", BLEND_OP_ADD, "color_op"),
+                  py::arg_v("src_alpha", BLEND_FACTOR_ONE, "src_alpha"),
+                  py::arg_v("dst_alpha", BLEND_FACTOR_ONE_MINUS_SRC_ALPHA, "dst_alpha"),
+                  py::arg_v("alpha_op", BLEND_OP_ADD, "alpha_op"), "Create a custom blend state");
+  blend_state.def("__repr__", [](const BlendState &state) {
+    return py::str(
+               "BlendState(blend_enable={}, src_color={}, dst_color={}, color_op={}, src_alpha={}, dst_alpha={}, "
+               "alpha_op={})")
+        .format(state.blend_enable, state.src_color, state.dst_color, state.color_op, state.src_alpha, state.dst_alpha,
+                state.alpha_op);
+  });
+  blend_state.def_readwrite("blend_enable", &BlendState::blend_enable, "Enable or disable blending");
+  blend_state.def_readwrite("src_color", &BlendState::src_color, "Source color blend factor");
+  blend_state.def_readwrite("dst_color", &BlendState::dst_color, "Destination color blend factor");
+  blend_state.def_readwrite("color_op", &BlendState::color_op, "Color blend operation");
+  blend_state.def_readwrite("src_alpha", &BlendState::src_alpha, "Source alpha blend factor");
+  blend_state.def_readwrite("dst_alpha", &BlendState::dst_alpha, "Destination alpha blend factor");
+  blend_state.def_readwrite("alpha_op", &BlendState::alpha_op, "Alpha blend operation");
+}
+
 }  // namespace grassland::graphics
