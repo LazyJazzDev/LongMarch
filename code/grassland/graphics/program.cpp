@@ -108,6 +108,7 @@ class CustomVFSIncludeHandler : public IDxcIncludeHandler {
 };
 
 void Shader::PybindModuleRegistration(py::module_ &m) {
+  py::class_<Shader, py::smart_holder> shader(m, "Shader");
 }
 
 void Program::PybindModuleRegistration(py::module_ &m) {

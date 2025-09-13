@@ -106,6 +106,22 @@ int Core::InitializeLogicalDeviceByCUDADeviceID(int cuda_device_id) {
 #endif
 
 void Core::PybindModuleRegistration(py::module_ &m) {
+  py::class_<Settings> core_settings(m, "CoreSettings");
+  core_settings.def(py::init<int, bool>(), py::arg("frams_in_flight") = 2, py::arg("enable_debug") = kEnableDebug);
+  py::class_<Core, py::smart_holder> core(m, "Core");
+  core.def(py::init([](BackendAPI api, const Settings &settings) {
+    std::shared_ptr<Core> core_;
+    CreateCore(api, settings, &core_);
+    return core_;
+  }));
+  core.def(
+      "create_shader",
+      [](Core *core, const std::string &source_code, const std::string &entry_point, const std::string &target) {
+        std::shared_ptr<Shader> shader_;
+        core->CreateShader(source_code, entry_point, target, &shader_);
+        return shader_;
+      },
+      py::arg("source_code"), py::arg("entry_point"), py::arg("target"));
 }
 
 int CreateCore(BackendAPI api, const Core::Settings &settings, double_ptr<Core> pp_core) {
