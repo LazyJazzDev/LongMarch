@@ -33,7 +33,7 @@ void Application::OnInit() {
   core_->CreateProgram({grassland::graphics::IMAGE_FORMAT_R32G32B32A32_SFLOAT},
                        grassland::graphics::IMAGE_FORMAT_UNDEFINED, &program_);
   program_->BindShader(vertex_shader_.get(), grassland::graphics::SHADER_TYPE_VERTEX);
-  program_->BindShader(fragment_shader_.get(), grassland::graphics::SHADER_TYPE_FRAGMENT);
+  program_->BindShader(fragment_shader_.get(), grassland::graphics::SHADER_TYPE_PIXEL);
   program_->Finalize();
 }
 

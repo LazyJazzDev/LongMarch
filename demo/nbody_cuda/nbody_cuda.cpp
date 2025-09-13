@@ -87,7 +87,7 @@ void NBodyCUDA::OnInit() {
       program_->AddInputAttribute(0, graphics::INPUT_TYPE_FLOAT3, 0);
       program_->AddResourceBinding(graphics::RESOURCE_TYPE_UNIFORM_BUFFER, 1);
       program_->BindShader(vertex_shader_.get(), graphics::SHADER_TYPE_VERTEX);
-      program_->BindShader(fragment_shader_.get(), graphics::SHADER_TYPE_FRAGMENT);
+      program_->BindShader(fragment_shader_.get(), graphics::SHADER_TYPE_PIXEL);
       program_->Finalize();
     });
 
@@ -192,7 +192,7 @@ void NBodyCUDA::BuildRenderNode() {
   program_->AddInputAttribute(0, graphics::INPUT_TYPE_FLOAT3, 0);
   program_->AddResourceBinding(graphics::RESOURCE_TYPE_UNIFORM_BUFFER, 1);
   program_->BindShader(vertex_shader_.get(), graphics::SHADER_TYPE_VERTEX);
-  program_->BindShader(fragment_shader_.get(), graphics::SHADER_TYPE_FRAGMENT);
+  program_->BindShader(fragment_shader_.get(), graphics::SHADER_TYPE_PIXEL);
   program_->Finalize();
 
   if (!headless_) {
@@ -202,7 +202,7 @@ void NBodyCUDA::BuildRenderNode() {
     hdr_program_->AddResourceBinding(graphics::RESOURCE_TYPE_UNIFORM_BUFFER, 1);
     hdr_program_->AddResourceBinding(graphics::RESOURCE_TYPE_WRITABLE_IMAGE, 1);
     hdr_program_->BindShader(hdr_vertex_shader_.get(), graphics::SHADER_TYPE_VERTEX);
-    hdr_program_->BindShader(hdr_fragment_shader_.get(), graphics::SHADER_TYPE_FRAGMENT);
+    hdr_program_->BindShader(hdr_fragment_shader_.get(), graphics::SHADER_TYPE_PIXEL);
     hdr_program_->Finalize();
   }
 }

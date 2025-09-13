@@ -157,7 +157,7 @@ graphics::Program *Core::GetProgram(graphics::ImageFormat format) {
 
     auto &program = programs_[format];
     program->BindShader(vertex_shader_.get(), graphics::SHADER_TYPE_VERTEX);
-    program->BindShader(fragment_shader_.get(), graphics::SHADER_TYPE_FRAGMENT);
+    program->BindShader(fragment_shader_.get(), graphics::SHADER_TYPE_PIXEL);
     program->AddInputBinding(sizeof(Vertex));
     program->AddInputBinding(sizeof(uint32_t), true);
     program->AddInputAttribute(0, graphics::INPUT_TYPE_FLOAT2, offsetof(Vertex, position));

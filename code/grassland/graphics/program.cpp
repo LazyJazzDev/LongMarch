@@ -111,6 +111,18 @@ void Shader::PybindClassRegistration(py::classh<Shader> &c) {
 }
 
 void Program::PybindClassRegistration(py::classh<Program> &c) {
+  c.def("add_input_binding", &Program::AddInputBinding, py::arg("stride"), py::arg("input_per_instance") = false,
+        "Add an input binding");
+  c.def("add_input_attribute", &Program::AddInputAttribute, py::arg("binding"), py::arg("type"), py::arg("offset"),
+        "Add an input attribute");
+  c.def("add_resource_binding", &Program::AddResourceBinding, py::arg("type"), py::arg("count"),
+        "Add a resource binding");
+  c.def("set_cull_mode", &Program::SetCullMode, py::arg("mode"), "Set cull mode");
+  c.def("set_blend_state", &Program::SetBlendState, py::arg("target_id"), py::arg("state"),
+        "Set blend state for a render target");
+  c.def("bind_shader", &Program::BindShader, py::arg("shader"), py::arg("type"), "Bind a shader to the program",
+        py::keep_alive<1, 2>{});
+  c.def("finalize", &Program::Finalize, "Finalize the program");
 }
 
 void RayTracingProgram::AddHitGroup(Shader *closest_hit_shader,

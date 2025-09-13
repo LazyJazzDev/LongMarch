@@ -93,7 +93,7 @@ void NBodyCS::OnInit() {
     program_->AddInputAttribute(0, graphics::INPUT_TYPE_FLOAT3, 0);
     program_->AddResourceBinding(graphics::RESOURCE_TYPE_UNIFORM_BUFFER, 1);
     program_->BindShader(vertex_shader_.get(), graphics::SHADER_TYPE_VERTEX);
-    program_->BindShader(fragment_shader_.get(), graphics::SHADER_TYPE_FRAGMENT);
+    program_->BindShader(fragment_shader_.get(), graphics::SHADER_TYPE_PIXEL);
     program_->Finalize();
   });
 
@@ -155,7 +155,7 @@ void NBodyCS::BuildRenderNode() {
   program_->AddInputAttribute(0, graphics::INPUT_TYPE_FLOAT3, 0);
   program_->AddResourceBinding(graphics::RESOURCE_TYPE_UNIFORM_BUFFER, 1);
   program_->BindShader(vertex_shader_.get(), graphics::SHADER_TYPE_VERTEX);
-  program_->BindShader(fragment_shader_.get(), graphics::SHADER_TYPE_FRAGMENT);
+  program_->BindShader(fragment_shader_.get(), graphics::SHADER_TYPE_PIXEL);
   program_->Finalize();
 
   core_->CreateShader(GetShaderVirtualFileSystem(), "shaders/hdr.hlsl", "VSMain", "vs_6_0", &hdr_vertex_shader_);
@@ -164,7 +164,7 @@ void NBodyCS::BuildRenderNode() {
   hdr_program_->AddResourceBinding(graphics::RESOURCE_TYPE_UNIFORM_BUFFER, 1);
   hdr_program_->AddResourceBinding(graphics::RESOURCE_TYPE_WRITABLE_IMAGE, 1);
   hdr_program_->BindShader(hdr_vertex_shader_.get(), graphics::SHADER_TYPE_VERTEX);
-  hdr_program_->BindShader(hdr_fragment_shader_.get(), graphics::SHADER_TYPE_FRAGMENT);
+  hdr_program_->BindShader(hdr_fragment_shader_.get(), graphics::SHADER_TYPE_PIXEL);
   hdr_program_->Finalize();
 
   core_->CreateShader(GetShaderCode("shaders/nbody.hlsl"), "CSMain", "cs_6_0", &nbody_compute_shader_);

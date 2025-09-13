@@ -83,7 +83,8 @@ typedef enum ResourceType {
 
 typedef enum ShaderType {
   SHADER_TYPE_VERTEX = 0,
-  SHADER_TYPE_FRAGMENT = 1,
+  SHADER_TYPE_PIXEL = 1,
+  SHADER_TYPE_FRAGMENT = SHADER_TYPE_PIXEL,
   SHADER_TYPE_GEOMETRY = 2,
 } ShaderType;
 
@@ -223,20 +224,6 @@ typedef enum BlendOp {
   BLEND_OP_MAX = 4,
 } BlendOp;
 
-typedef enum RayTracingGeometryFlag : uint32_t {
-  RAYTRACING_GEOMETRY_FLAG_NONE = 0,
-  RAYTRACING_GEOMETRY_FLAG_OPAQUE = 0x00000001,
-  RAYTRACING_GEOMETRY_FLAG_NO_DUPLICATE_ANYHIT_INVOCATION = 0x00000002,
-} RayTracingGeometryFlag;
-
-typedef enum RayTracingInstanceFlag : uint32_t {
-  RAYTRACING_INSTANCE_FLAG_NONE = 0,
-  RAYTRACING_INSTANCE_FLAG_TRIANGLE_FACING_CULL_DISABLE = 0x00000001,
-  RAYTRACING_INSTANCE_FLAG_TRIANGLE_FLIP_FACING = 0x00000002,
-  RAYTRACING_INSTANCE_FLAG_OPAQUE = 0x00000004,
-  RAYTRACING_INSTANCE_FLAG_NO_OPAQUE = 0x00000008
-} RayTracingInstanceFlag;
-
 struct BlendState {
   bool blend_enable;
   BlendFactor src_color;
@@ -262,6 +249,20 @@ struct CompiledShaderBlob {
   std::vector<uint8_t> data;
   std::string entry_point;
 };
+
+typedef enum RayTracingGeometryFlag : uint32_t {
+  RAYTRACING_GEOMETRY_FLAG_NONE = 0,
+  RAYTRACING_GEOMETRY_FLAG_OPAQUE = 0x00000001,
+  RAYTRACING_GEOMETRY_FLAG_NO_DUPLICATE_ANYHIT_INVOCATION = 0x00000002,
+} RayTracingGeometryFlag;
+
+typedef enum RayTracingInstanceFlag : uint32_t {
+  RAYTRACING_INSTANCE_FLAG_NONE = 0,
+  RAYTRACING_INSTANCE_FLAG_TRIANGLE_FACING_CULL_DISABLE = 0x00000001,
+  RAYTRACING_INSTANCE_FLAG_TRIANGLE_FLIP_FACING = 0x00000002,
+  RAYTRACING_INSTANCE_FLAG_OPAQUE = 0x00000004,
+  RAYTRACING_INSTANCE_FLAG_NO_OPAQUE = 0x00000008
+} RayTracingInstanceFlag;
 
 struct RayTracingInstance {
   float transform[3][4];

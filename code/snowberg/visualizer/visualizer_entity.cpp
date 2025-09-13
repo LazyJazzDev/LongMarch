@@ -42,7 +42,7 @@ EntityMeshObject::EntityMeshObject(const std::shared_ptr<Core> &core,
         FilmChannelImageFormat(FILM_CHANNEL_DEPTH), &program->program_);
     program->program_->BindShader(program->vertex_shader_.get(), graphics::SHADER_TYPE_VERTEX);
     program->program_->BindShader(program->geometry_shader_.get(), graphics::SHADER_TYPE_GEOMETRY);
-    program->program_->BindShader(program->fragment_shader_.get(), graphics::SHADER_TYPE_FRAGMENT);
+    program->program_->BindShader(program->fragment_shader_.get(), graphics::SHADER_TYPE_PIXEL);
     program->program_->AddInputBinding(sizeof(Vertex), false);
     program->program_->AddInputAttribute(0, graphics::INPUT_TYPE_FLOAT3, offsetof(Vertex, position));
     program->program_->AddInputAttribute(0, graphics::INPUT_TYPE_FLOAT3, offsetof(Vertex, normal));
@@ -104,7 +104,7 @@ EntityAmbientLight::EntityAmbientLight(const std::shared_ptr<Core> &core, const 
     core_->GraphicsCore()->CreateProgram({FilmChannelImageFormat(FILM_CHANNEL_EXPOSURE)},
                                          graphics::IMAGE_FORMAT_UNDEFINED, &program->program_);
     program->program_->BindShader(program->vertex_shader_.get(), graphics::SHADER_TYPE_VERTEX);
-    program->program_->BindShader(program->fragment_shader_.get(), graphics::SHADER_TYPE_FRAGMENT);
+    program->program_->BindShader(program->fragment_shader_.get(), graphics::SHADER_TYPE_PIXEL);
     program->program_->AddResourceBinding(graphics::RESOURCE_TYPE_IMAGE,
                                           1);  // Albedo
     program->program_->AddResourceBinding(graphics::RESOURCE_TYPE_IMAGE,
@@ -162,7 +162,7 @@ EntityDirectionalLight::EntityDirectionalLight(const std::shared_ptr<Core> &core
     core_->GraphicsCore()->CreateProgram({FilmChannelImageFormat(FILM_CHANNEL_EXPOSURE)},
                                          graphics::IMAGE_FORMAT_UNDEFINED, &program->program_);
     program->program_->BindShader(program->vertex_shader_.get(), graphics::SHADER_TYPE_VERTEX);
-    program->program_->BindShader(program->fragment_shader_.get(), graphics::SHADER_TYPE_FRAGMENT);
+    program->program_->BindShader(program->fragment_shader_.get(), graphics::SHADER_TYPE_PIXEL);
     program->program_->AddResourceBinding(graphics::RESOURCE_TYPE_IMAGE,
                                           1);  // Albedo
     program->program_->AddResourceBinding(graphics::RESOURCE_TYPE_IMAGE,

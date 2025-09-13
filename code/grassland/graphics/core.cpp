@@ -145,16 +145,6 @@ void Core::PybindClassRegistration(py::classh<Core> &c) {
   c.def("wait_gpu", &Core::WaitGPU, "Wait for the GPU to finish all operations");
 
   c.def(
-      "create_shader",
-      [](Core *core, const std::string &source_code, const std::string &entry_point, const std::string &target) {
-        std::shared_ptr<Shader> shader_;
-        core->CreateShader(source_code, entry_point, target, &shader_);
-        return shader_;
-      },
-      py::arg("source_code"), py::arg("entry_point"), py::arg("target"), "Create shader from source code",
-      py::keep_alive<0, 1>{});
-
-  c.def(
       "create_window",
       [](Core *core, int width, int height, const std::string &title, bool fullscreen, bool resizable) {
         std::shared_ptr<Window> window_;
@@ -163,6 +153,69 @@ void Core::PybindClassRegistration(py::classh<Core> &c) {
       },
       py::arg("width"), py::arg("height"), py::arg("title"), py::arg("fullscreen") = false,
       py::arg("resizable") = false, "Create a window", py::keep_alive<0, 1>{});
+
+  c.def(
+      "create_buffer",
+      [](Core *core, size_t buffer, BufferType type) {
+        std::shared_ptr<Buffer> buffer_;
+        core->CreateBuffer(buffer, type, &buffer_);
+        return buffer_;
+      },
+      py::arg("size"), py::arg_v("type", BUFFER_TYPE_STATIC, "type"), "Create a buffer", py::keep_alive<0, 1>{});
+
+  c.def(
+      "create_image",
+      [](Core *core, int width, int height, ImageFormat format) {
+        std::shared_ptr<Image> image_;
+        core->CreateImage(width, height, format, &image_);
+        return image_;
+      },
+      py::arg("width"), py::arg("height"), py::arg_v("format", IMAGE_FORMAT_R8G8B8A8_UNORM, "format"),
+      "Create an image", py::keep_alive<0, 1>{});
+
+  c.def(
+      "create_sampler",
+      [](Core *core, const SamplerInfo &info) {
+        std::shared_ptr<Sampler> sampler_;
+        core->CreateSampler(info, &sampler_);
+        return sampler_;
+      },
+      py::arg_v("info", SamplerInfo{}, "SamplerInfo()"), "Create a sampler", py::keep_alive<0, 1>{});
+
+  c.def(
+      "create_shader",
+      [](Core *core, const std::string &source_code, const std::string &entry_point, const std::string &target,
+         const std::vector<std::string> &args) {
+        std::shared_ptr<Shader> shader_;
+        VirtualFileSystem vfs;
+        vfs.WriteFile("main.hlsl", source_code);
+        core->CreateShader(vfs, "main.hlsl", entry_point, target, args, &shader_);
+        return shader_;
+      },
+      py::arg("source_code"), py::arg("entry_point"), py::arg("target"), py::arg("args") = std::vector<std::string>{},
+      "Create shader from source code", py::keep_alive<0, 1>{});
+
+  c.def(
+      "create_program",
+      [](Core *core, const std::vector<ImageFormat> &color_formats, ImageFormat depth_format) {
+        std::shared_ptr<Program> program_;
+        core->CreateProgram(color_formats, depth_format, &program_);
+        return program_;
+      },
+      py::arg("color_formats"), py::arg_v("depth_format", IMAGE_FORMAT_UNDEFINED, "depth_format"),
+      "Create a graphics program", py::keep_alive<0, 1>{});
+
+  c.def(
+      "create_command_context",
+      [](Core *core) {
+        std::shared_ptr<CommandContext> command_context_;
+        core->CreateCommandContext(&command_context_);
+        return command_context_;
+      },
+      "Create a command context", py::keep_alive<0, 1>{});
+
+  c.def("submit_command_context", &Core::SubmitCommandContext, py::arg("command_context"),
+        "Submit a command context to the GPU queue");
 }
 
 int CreateCore(BackendAPI api, const Core::Settings &settings, double_ptr<Core> pp_core) {

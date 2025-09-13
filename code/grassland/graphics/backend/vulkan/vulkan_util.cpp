@@ -65,7 +65,7 @@ VkShaderStageFlagBits ShaderTypeToVkShaderStageFlags(ShaderType type) {
   switch (type) {
     case SHADER_TYPE_VERTEX:
       return VK_SHADER_STAGE_VERTEX_BIT;
-    case SHADER_TYPE_FRAGMENT:
+    case SHADER_TYPE_PIXEL:
       return VK_SHADER_STAGE_FRAGMENT_BIT;
     case SHADER_TYPE_GEOMETRY:
       return VK_SHADER_STAGE_GEOMETRY_BIT;

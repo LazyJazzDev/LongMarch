@@ -7,7 +7,6 @@ class Shader {
  public:
   virtual ~Shader() = default;
 
- public:
   static void PybindClassRegistration(py::classh<Shader> &c);
 };
 

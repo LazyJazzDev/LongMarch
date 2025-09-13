@@ -47,7 +47,7 @@ void Application::OnInit() {
   program_->AddInputAttribute(0, grassland::graphics::INPUT_TYPE_FLOAT3, 0);
   program_->AddInputAttribute(0, grassland::graphics::INPUT_TYPE_FLOAT4, sizeof(float) * 3);
   program_->BindShader(vertex_shader_.get(), grassland::graphics::SHADER_TYPE_VERTEX);
-  program_->BindShader(fragment_shader_.get(), grassland::graphics::SHADER_TYPE_FRAGMENT);
+  program_->BindShader(fragment_shader_.get(), grassland::graphics::SHADER_TYPE_PIXEL);
   program_->SetBlendState(0, true);
   program_->Finalize();
 }
