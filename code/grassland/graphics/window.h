@@ -78,7 +78,7 @@ class Window {
   bool enable_hdr_;
 
  public:
-  static void PybindModuleRegistration(py::module_ &m);
+  static void PybindClassRegistration(py::classh<Window> &c);
 };
 
 }  // namespace grassland::graphics

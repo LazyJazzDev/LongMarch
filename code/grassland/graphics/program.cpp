@@ -107,11 +107,10 @@ class CustomVFSIncludeHandler : public IDxcIncludeHandler {
   std::set<std::filesystem::path> accessed_paths_;
 };
 
-void Shader::PybindModuleRegistration(py::module_ &m) {
-  py::class_<Shader, py::smart_holder> shader(m, "Shader");
+void Shader::PybindClassRegistration(py::classh<Shader> &c) {
 }
 
-void Program::PybindModuleRegistration(py::module_ &m) {
+void Program::PybindClassRegistration(py::classh<Program> &c) {
 }
 
 void RayTracingProgram::AddHitGroup(Shader *closest_hit_shader,

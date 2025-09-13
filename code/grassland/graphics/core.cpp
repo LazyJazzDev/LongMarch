@@ -5,6 +5,16 @@
 
 namespace grassland::graphics {
 
+void Core::Settings::PybindClassRegistration(py::classh<Settings> &c) {
+  c.def(py::init<int, bool>(), py::arg("frames_in_flight") = 2, py::arg("enable_debug") = kEnableDebug);
+  c.def("__repr__", [](const Settings &settings) {
+    return py::str("Core.Settings(frames_in_flight={}, enable_debug={})")
+        .format(settings.frames_in_flight, settings.enable_debug);
+  });
+  c.def_readwrite("frames_in_flight", &Settings::frames_in_flight, "Number of frames buffer");
+  c.def_readwrite("enable_debug", &Settings::enable_debug, "Enable debug mode, which may have performance impact");
+}
+
 Core::Core(const Settings &settings) : settings_(settings) {
 }
 
@@ -105,23 +115,54 @@ int Core::InitializeLogicalDeviceByCUDADeviceID(int cuda_device_id) {
 #define DEFAULT_API 1
 #endif
 
-void Core::PybindModuleRegistration(py::module_ &m) {
-  py::class_<Settings> core_settings(m, "CoreSettings");
-  core_settings.def(py::init<int, bool>(), py::arg("frams_in_flight") = 2, py::arg("enable_debug") = kEnableDebug);
-  py::class_<Core, py::smart_holder> core(m, "Core");
-  core.def(py::init([](BackendAPI api, const Settings &settings) {
-    std::shared_ptr<Core> core_;
-    CreateCore(api, settings, &core_);
-    return core_;
-  }));
-  core.def(
+void Core::PybindClassRegistration(py::classh<Core> &c) {
+  c.doc() = "Core class for resource managements";
+  c.def(py::init([](BackendAPI api, const Settings &settings) {
+          std::shared_ptr<Core> core_;
+          CreateCore(api, settings, &core_);
+          return core_;
+        }),
+        py::arg_v("api", BACKEND_API_DEFAULT, "BackendAPI.BACKEND_API_DEFAULT"), py::arg("settings") = Settings{});
+  c.def("__repr__", [](Core *core) {
+    if (core->device_name_.empty()) {
+      return py::str("Core(<Not Initialized>)");
+    } else {
+      return py::str("Core(api={}, device='{}')").format(BackendAPIString(core->API()), core->device_name_);
+    }
+  });
+  c.def("init", &Core::InitializeLogicalDevice, py::arg("device_index"), "Initialize logical device by device index");
+  c.def("init_auto", &Core::InitializeLogicalDeviceAutoSelect, py::arg("require_ray_tracing") = false,
+        "Auto select and initialize logical device, will select device with raytracing support if required");
+  c.def("init_cuda", &Core::InitializeLogicalDeviceByCUDADeviceID, py::arg("cuda_device_id"),
+        "Initialize logical device by CUDA device index");
+  c.def("api", &Core::API, "Get the backend API");
+  c.def("device_name", &Core::DeviceName, "Get the device name");
+  c.def("ray_tracing_support", &Core::DeviceRayTracingSupport, "Check if the device supports ray tracing");
+  c.def("debug_enabled", &Core::DebugEnabled, "Check if debug mode is enabled");
+  c.def("frames_in_flight", &Core::FramesInFlight, "Get number of frames in flight");
+  c.def("current_frame", &Core::CurrentFrame, "Get current frame index");
+  c.def("wave_size", &Core::WaveSize, "Get the wave size of the device");
+  c.def("wait_gpu", &Core::WaitGPU, "Wait for the GPU to finish all operations");
+
+  c.def(
       "create_shader",
       [](Core *core, const std::string &source_code, const std::string &entry_point, const std::string &target) {
         std::shared_ptr<Shader> shader_;
         core->CreateShader(source_code, entry_point, target, &shader_);
         return shader_;
       },
-      py::arg("source_code"), py::arg("entry_point"), py::arg("target"));
+      py::arg("source_code"), py::arg("entry_point"), py::arg("target"), "Create shader from source code",
+      py::keep_alive<0, 1>{});
+
+  c.def(
+      "create_window",
+      [](Core *core, int width, int height, const std::string &title, bool fullscreen, bool resizable) {
+        std::shared_ptr<Window> window_;
+        core->CreateWindowObject(width, height, title, fullscreen, resizable, &window_);
+        return window_;
+      },
+      py::arg("width"), py::arg("height"), py::arg("title"), py::arg("fullscreen") = false,
+      py::arg("resizable") = false, "Create a window", py::keep_alive<0, 1>{});
 }
 
 int CreateCore(BackendAPI api, const Core::Settings &settings, double_ptr<Core> pp_core) {

@@ -23,7 +23,7 @@ const std::vector<std::function<void()>> &CommandContext::GetPostExecutionCallba
   return post_execution_callbacks_;
 }
 
-void CommandContext::PybindModuleRegistration(py::module_ &m) {
+void CommandContext::PybindClassRegistration(py::classh<CommandContext> &c) {
 }
 
 }  // namespace grassland::graphics

@@ -11,8 +11,7 @@ class Image {
   virtual void UploadData(const void *data) const = 0;
   virtual void DownloadData(void *data) const = 0;
 
- public:
-  static void PybindModuleRegistration(py::module_ &m);
+  static void PybindClassRegistration(py::classh<Image> &c);
 };
 
 int LoadImageFromFile(Core *core, const std::string &file_path, double_ptr<Image> pp_image);

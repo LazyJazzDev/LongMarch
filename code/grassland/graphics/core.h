@@ -13,6 +13,8 @@ class Core {
   struct Settings {
     int frames_in_flight{2};
     bool enable_debug{kEnableDebug};
+
+    static void PybindClassRegistration(py::classh<Settings> &c);
   };
 
   Core(const Settings &settings);
@@ -138,7 +140,7 @@ class Core {
 #endif
 
  public:
-  static void PybindModuleRegistration(py::module_ &m);
+  static void PybindClassRegistration(py::classh<Core> &c);
 };
 
 int CreateCore(BackendAPI api, const Core::Settings &settings, double_ptr<Core> pp_core);

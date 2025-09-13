@@ -6,7 +6,7 @@ const char *BackendAPIString(BackendAPI api) {
     case BACKEND_API_VULKAN:
       return "Vulkan";
     case BACKEND_API_D3D12:
-      return "Direct3D 12";
+      return "D3D12";
     default:
       return "Unknown";
   }

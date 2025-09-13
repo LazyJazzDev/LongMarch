@@ -8,7 +8,7 @@ class Shader {
   virtual ~Shader() = default;
 
  public:
-  static void PybindModuleRegistration(py::module_ &m);
+  static void PybindClassRegistration(py::classh<Shader> &c);
 };
 
 class Program {
@@ -22,8 +22,7 @@ class Program {
   virtual void BindShader(Shader *shader, ShaderType type) = 0;
   virtual void Finalize() = 0;
 
- public:
-  static void PybindModuleRegistration(py::module_ &m);
+  static void PybindClassRegistration(py::classh<Program> &c);
 };
 
 class ComputeProgram {

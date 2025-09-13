@@ -7,7 +7,7 @@ class Sampler {
  public:
   virtual ~Sampler() = default;
 
-  static void PybindModuleRegistration(py::module_ &m);
+  static void PybindClassRegistration(py::classh<Sampler> &c);
 };
 
 }  // namespace grassland::graphics
