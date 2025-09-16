@@ -19,7 +19,7 @@ def main():
     print(f"Core Initialized: {core}")
 
     print("Creating window...")
-    window = core.create_window(800, 600, "Hello Triangle", resizable=True)
+    window = core.create_window(800, 600, "[Python] Graphics Hello Triangle", resizable=True)
     print(f"Window Created: {window}")
 
     # Load shader file
