@@ -278,7 +278,31 @@ void Core::PybindClassRegistration(py::classh<Core> &c) {
 
   c.def(
       "create_tlas",
-      [](Core *core, const std::vector<std::pair<AccelerationStructure *, glm::mat4>> &objects) {
+      [](Core *core, py::list objects_list) {
+        std::vector<std::pair<AccelerationStructure *, glm::mat4>> objects;
+        for (auto item : objects_list) {
+          py::tuple pair = item.cast<py::tuple>();
+          if (pair.size() != 2) {
+            throw std::runtime_error("Each object must be a pair of (AccelerationStructure, transform)");
+          }
+          AccelerationStructure *as = pair[0].cast<AccelerationStructure *>();
+          py::list transform_list = pair[1].cast<py::list>();
+
+          if (transform_list.size() != 4) {
+            throw std::runtime_error("Transform matrix must have 4 rows");
+          }
+          glm::mat4 transform;
+          for (int i = 0; i < 4; i++) {
+            py::list row = transform_list[i].cast<py::list>();
+            if (row.size() != 4) {
+              throw std::runtime_error("Transform matrix rows must have 4 columns");
+            }
+            for (int j = 0; j < 4; j++) {
+              transform[i][j] = row[j].cast<float>();
+            }
+          }
+          objects.emplace_back(as, transform);
+        }
         std::shared_ptr<AccelerationStructure> tlas_;
         core->CreateTopLevelAccelerationStructure(objects, &tlas_);
         return tlas_;

@@ -8,10 +8,7 @@ D3D12Shader::D3D12Shader(D3D12Core *core, const CompiledShaderBlob &blob) : core
 }
 
 const std::string &D3D12Shader::EntryPoint() const {
-  if (entry_point_.empty()) {
-    entry_point_ = WStringToString(shader_module_.EntryPoint());
-  }
-  return entry_point_;
+  return WStringToString(shader_module_.EntryPoint());
 }
 
 }  // namespace grassland::graphics::backend

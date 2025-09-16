@@ -2,8 +2,6 @@
 
 namespace grassland::graphics {
 void PybindModuleRegistration(py::module_ &m) {
-  util::PybindModuleRegistration(m);
-
   // Core classes
   py::classh<Core> c_core(m, "Core");
   py::classh<Core::Settings> c_core_settings(m, "CoreSettings");
@@ -27,6 +25,7 @@ void PybindModuleRegistration(py::module_ &m) {
   py::classh<Window> c_window(m, "Window");
 
   // Register all classes
+  util::PybindModuleRegistration(m);
   Core::Settings::PybindClassRegistration(c_core_settings);
   Core::PybindClassRegistration(c_core);
   Shader::PybindClassRegistration(c_shader);

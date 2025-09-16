@@ -223,6 +223,11 @@ void util::PybindModuleRegistration(py::module_ &m) {
   bind_point.value("BIND_POINT_RAYTRACING", BIND_POINT_RAYTRACING, "Bind Point: Ray Tracing Pipeline");
   bind_point.export_values();
 
+  // Add module-level constants for better stub generation
+  m.attr("BIND_POINT_GRAPHICS") = py::cast(BIND_POINT_GRAPHICS);
+  m.attr("BIND_POINT_COMPUTE") = py::cast(BIND_POINT_COMPUTE);
+  m.attr("BIND_POINT_RAYTRACING") = py::cast(BIND_POINT_RAYTRACING);
+
   py::enum_<CullMode> cull_mode(m, "CullMode");
   cull_mode.value("CULL_MODE_NONE", CULL_MODE_NONE, "Cull Mode: None");
   cull_mode.value("CULL_MODE_FRONT", CULL_MODE_FRONT, "Cull Mode: Front Face");
@@ -365,6 +370,63 @@ void util::PybindModuleRegistration(py::module_ &m) {
   ray_tracing_geometry_flag.value("RAYTRACING_GEOMETRY_FLAG_NO_DUPLICATE_ANYHIT_INVOCATION",
                                   RAYTRACING_GEOMETRY_FLAG_NO_DUPLICATE_ANYHIT_INVOCATION,
                                   "Ray Tracing Geometry Flag: No Duplicate Any Hit Invocation");
+
+  // Add bitwise operations for flag enum
+  ray_tracing_geometry_flag.def(
+      "__or__",
+      [](RayTracingGeometryFlag a, RayTracingGeometryFlag b) {
+        return static_cast<RayTracingGeometryFlag>(static_cast<uint32_t>(a) | static_cast<uint32_t>(b));
+      },
+      py::is_operator());
+  ray_tracing_geometry_flag.def(
+      "__and__",
+      [](RayTracingGeometryFlag a, RayTracingGeometryFlag b) {
+        return static_cast<RayTracingGeometryFlag>(static_cast<uint32_t>(a) & static_cast<uint32_t>(b));
+      },
+      py::is_operator());
+  ray_tracing_geometry_flag.def(
+      "__xor__",
+      [](RayTracingGeometryFlag a, RayTracingGeometryFlag b) {
+        return static_cast<RayTracingGeometryFlag>(static_cast<uint32_t>(a) ^ static_cast<uint32_t>(b));
+      },
+      py::is_operator());
+  ray_tracing_geometry_flag.def(
+      "__invert__",
+      [](RayTracingGeometryFlag a) { return static_cast<RayTracingGeometryFlag>(~static_cast<uint32_t>(a)); },
+      py::is_operator());
+  ray_tracing_geometry_flag.def("__bool__", [](RayTracingGeometryFlag a) { return static_cast<uint32_t>(a) != 0; });
+
+  // Add custom string representation for composed flags
+  ray_tracing_geometry_flag.def("__str__", [](RayTracingGeometryFlag a) {
+    uint32_t value = static_cast<uint32_t>(a);
+    if (value == 0) {
+      return std::string("RayTracingGeometryFlag.RAYTRACING_GEOMETRY_FLAG_NONE");
+    }
+
+    std::vector<std::string> flags;
+    if (value & RAYTRACING_GEOMETRY_FLAG_OPAQUE) {
+      flags.push_back("RAYTRACING_GEOMETRY_FLAG_OPAQUE");
+    }
+    if (value & RAYTRACING_GEOMETRY_FLAG_NO_DUPLICATE_ANYHIT_INVOCATION) {
+      flags.push_back("RAYTRACING_GEOMETRY_FLAG_NO_DUPLICATE_ANYHIT_INVOCATION");
+    }
+
+    if (flags.empty()) {
+      return std::string("RayTracingGeometryFlag(0x") + std::to_string(value) + ")";
+    } else if (flags.size() == 1) {
+      return std::string("RayTracingGeometryFlag.") + flags[0];
+    } else {
+      std::string result = "RayTracingGeometryFlag(";
+      for (size_t i = 0; i < flags.size(); ++i) {
+        if (i > 0)
+          result += " | ";
+        result += flags[i];
+      }
+      result += ")";
+      return result;
+    }
+  });
+
   ray_tracing_geometry_flag.export_values();
 
   py::enum_<RayTracingInstanceFlag> ray_tracing_instance_flag(m, "RayTracingInstanceFlag");
@@ -380,12 +442,84 @@ void util::PybindModuleRegistration(py::module_ &m) {
                                   "Ray Tracing Instance Flag: Force Opaque");
   ray_tracing_instance_flag.value("RAYTRACING_INSTANCE_FLAG_NO_OPAQUE", RAYTRACING_INSTANCE_FLAG_NO_OPAQUE,
                                   "Ray Tracing Instance Flag: Force Non-Opaque");
+
+  // Add bitwise operations for flag enum
+  ray_tracing_instance_flag.def(
+      "__or__",
+      [](RayTracingInstanceFlag a, RayTracingInstanceFlag b) {
+        return static_cast<RayTracingInstanceFlag>(static_cast<uint32_t>(a) | static_cast<uint32_t>(b));
+      },
+      py::is_operator());
+  ray_tracing_instance_flag.def(
+      "__and__",
+      [](RayTracingInstanceFlag a, RayTracingInstanceFlag b) {
+        return static_cast<RayTracingInstanceFlag>(static_cast<uint32_t>(a) & static_cast<uint32_t>(b));
+      },
+      py::is_operator());
+  ray_tracing_instance_flag.def(
+      "__xor__",
+      [](RayTracingInstanceFlag a, RayTracingInstanceFlag b) {
+        return static_cast<RayTracingInstanceFlag>(static_cast<uint32_t>(a) ^ static_cast<uint32_t>(b));
+      },
+      py::is_operator());
+  ray_tracing_instance_flag.def(
+      "__invert__",
+      [](RayTracingInstanceFlag a) { return static_cast<RayTracingInstanceFlag>(~static_cast<uint32_t>(a)); },
+      py::is_operator());
+  ray_tracing_instance_flag.def("__bool__", [](RayTracingInstanceFlag a) { return static_cast<uint32_t>(a) != 0; });
+
+  // Add custom string representation for composed flags
+  ray_tracing_instance_flag.def("__str__", [](RayTracingInstanceFlag a) {
+    uint32_t value = static_cast<uint32_t>(a);
+    if (value == 0) {
+      return std::string("RayTracingInstanceFlag.RAYTRACING_INSTANCE_FLAG_NONE");
+    }
+
+    std::vector<std::string> flags;
+    if (value & RAYTRACING_INSTANCE_FLAG_TRIANGLE_FACING_CULL_DISABLE) {
+      flags.push_back("RAYTRACING_INSTANCE_FLAG_TRIANGLE_FACING_CULL_DISABLE");
+    }
+    if (value & RAYTRACING_INSTANCE_FLAG_TRIANGLE_FLIP_FACING) {
+      flags.push_back("RAYTRACING_INSTANCE_FLAG_TRIANGLE_FLIP_FACING");
+    }
+    if (value & RAYTRACING_INSTANCE_FLAG_OPAQUE) {
+      flags.push_back("RAYTRACING_INSTANCE_FLAG_OPAQUE");
+    }
+    if (value & RAYTRACING_INSTANCE_FLAG_NO_OPAQUE) {
+      flags.push_back("RAYTRACING_INSTANCE_FLAG_NO_OPAQUE");
+    }
+
+    if (flags.empty()) {
+      return std::string("RayTracingInstanceFlag(0x") + std::to_string(value) + ")";
+    } else if (flags.size() == 1) {
+      return std::string("RayTracingInstanceFlag.") + flags[0];
+    } else {
+      std::string result = "RayTracingInstanceFlag(";
+      for (size_t i = 0; i < flags.size(); ++i) {
+        if (i > 0)
+          result += " | ";
+        result += flags[i];
+      }
+      result += ")";
+      return result;
+    }
+  });
+
   ray_tracing_instance_flag.export_values();
+
+  // Add module-level constants for better stub generation
+  m.attr("RAYTRACING_INSTANCE_FLAG_NONE") = py::cast(RAYTRACING_INSTANCE_FLAG_NONE);
+  m.attr("RAYTRACING_INSTANCE_FLAG_TRIANGLE_FACING_CULL_DISABLE") =
+      py::cast(RAYTRACING_INSTANCE_FLAG_TRIANGLE_FACING_CULL_DISABLE);
+  m.attr("RAYTRACING_INSTANCE_FLAG_TRIANGLE_FLIP_FACING") = py::cast(RAYTRACING_INSTANCE_FLAG_TRIANGLE_FLIP_FACING);
+  m.attr("RAYTRACING_INSTANCE_FLAG_OPAQUE") = py::cast(RAYTRACING_INSTANCE_FLAG_OPAQUE);
+  m.attr("RAYTRACING_INSTANCE_FLAG_NO_OPAQUE") = py::cast(RAYTRACING_INSTANCE_FLAG_NO_OPAQUE);
 
   // Struct Classes
   py::class_<BufferRange> buffer_range(m, "BufferRange");
-  buffer_range.def(py::init<Buffer *, uint64_t, uint64_t>(), py::arg("buffer"), py::arg("offset") = 0,
-                   py::arg("size") = 0, "Create a buffer range");
+  buffer_range.def(
+      py::init([](Buffer *buffer, uint64_t offset, uint64_t size) { return BufferRange(buffer, offset, size); }),
+      py::arg("buffer"), py::arg("offset") = 0, py::arg("size") = 0, "Create a buffer range");
   buffer_range.def_readwrite("buffer", &BufferRange::buffer, "Buffer object");
   buffer_range.def_readwrite("offset", &BufferRange::offset, "Offset in bytes");
   buffer_range.def_readwrite("size", &BufferRange::size, "Size in bytes");
@@ -482,8 +616,13 @@ void util::PybindModuleRegistration(py::module_ &m) {
       [](RayTracingInstance &instance, RayTracingInstanceFlag value) { instance.instance_flags = value; },
       "Instance flags (8-bit)");
 
-  ray_tracing_instance.def_readwrite("acceleration_structure", &RayTracingInstance::acceleration_structure,
-                                     "Acceleration structure");
+  ray_tracing_instance.def_property(
+      "acceleration_structure",
+      [](const RayTracingInstance &instance) { return py::cast(instance.acceleration_structure); },
+      [](RayTracingInstance &instance, py::object as_obj) {
+        instance.acceleration_structure = as_obj.cast<AccelerationStructure *>();
+      },
+      "Acceleration structure");
 
   ray_tracing_instance.def("__repr__", [](const RayTracingInstance &instance) {
     return py::str(

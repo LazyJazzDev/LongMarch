@@ -41,23 +41,28 @@ void CommandContext::PybindClassRegistration(py::classh<CommandContext> &c) {
   // Resource binding methods
   c.def("cmd_bind_resources",
         py::overload_cast<int, const std::vector<BufferRange> &, BindPoint>(&CommandContext::CmdBindResources),
-        py::arg("slot"), py::arg("buffers"), py::arg("bind_point") = BIND_POINT_GRAPHICS,
+        py::arg("slot"), py::arg("buffers"),
+        py::arg_v("bind_point", BIND_POINT_GRAPHICS, "BindPoint.BIND_POINT_GRAPHICS"),
         "Bind buffer ranges as resources", py::keep_alive<1, 2>{});
   c.def("cmd_bind_resources",
         py::overload_cast<int, const std::vector<Buffer *> &, BindPoint>(&CommandContext::CmdBindResources),
-        py::arg("slot"), py::arg("buffers"), py::arg("bind_point") = BIND_POINT_GRAPHICS, "Bind buffers as resources",
+        py::arg("slot"), py::arg("buffers"),
+        py::arg_v("bind_point", BIND_POINT_GRAPHICS, "BindPoint.BIND_POINT_GRAPHICS"), "Bind buffers as resources",
         py::keep_alive<1, 2>{});
   c.def("cmd_bind_resources",
         py::overload_cast<int, const std::vector<Image *> &, BindPoint>(&CommandContext::CmdBindResources),
-        py::arg("slot"), py::arg("images"), py::arg("bind_point") = BIND_POINT_GRAPHICS, "Bind images as resources",
+        py::arg("slot"), py::arg("images"),
+        py::arg_v("bind_point", BIND_POINT_GRAPHICS, "BindPoint.BIND_POINT_GRAPHICS"), "Bind images as resources",
         py::keep_alive<1, 2>{});
   c.def("cmd_bind_resources",
         py::overload_cast<int, const std::vector<Sampler *> &, BindPoint>(&CommandContext::CmdBindResources),
-        py::arg("slot"), py::arg("samplers"), py::arg("bind_point") = BIND_POINT_GRAPHICS, "Bind samplers as resources",
+        py::arg("slot"), py::arg("samplers"),
+        py::arg_v("bind_point", BIND_POINT_GRAPHICS, "BindPoint.BIND_POINT_GRAPHICS"), "Bind samplers as resources",
         py::keep_alive<1, 2>{});
   c.def("cmd_bind_resources",
         py::overload_cast<int, AccelerationStructure *, BindPoint>(&CommandContext::CmdBindResources), py::arg("slot"),
-        py::arg("acceleration_structure"), py::arg("bind_point") = BIND_POINT_RAYTRACING,
+        py::arg("acceleration_structure"),
+        py::arg_v("bind_point", BIND_POINT_RAYTRACING, "BindPoint.BIND_POINT_RAYTRACING"),
         "Bind acceleration structure as resource", py::keep_alive<1, 2>{});
 
   c.def("cmd_begin_rendering", &CommandContext::CmdBeginRendering, py::arg("color_targets"),

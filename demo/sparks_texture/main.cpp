@@ -122,9 +122,9 @@ int main() {
                                                  glm::translate(glm::mat4{1.0f}, glm::vec3{4.4f, 0.0f, 0.0f}));
   scene.AddEntity(&entity_matball3);
 
-  sparks::MaterialPrincipled material_ground(&sparks_core, {0.1f, 0.2f, 0.4f});
+  sparks::MaterialPrincipled material_ground(&sparks_core, {0.7f, 0.7f, 0.7f});
   material_ground.roughness = 0.2f;
-  material_ground.metallic = 0.0f;
+  material_ground.metallic = 1.0f;
   sparks::EntityGeometryMaterial entity_ground(&sparks_core, &geometry_cube, &material_ground,
                                                glm::translate(glm::mat4{1.0f}, glm::vec3{0.0f, -1001.0f, 0.0f}) *
                                                    glm::scale(glm::mat4(1.0f), glm::vec3(1000.0f)));

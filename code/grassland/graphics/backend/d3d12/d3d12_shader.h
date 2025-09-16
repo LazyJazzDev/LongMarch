@@ -9,9 +9,7 @@ class D3D12Shader : public Shader {
   D3D12Shader(D3D12Core *core, const CompiledShaderBlob &shader_blob);
   ~D3D12Shader() override = default;
 
-  const std::string &EntryPoint() const override {
-    return entry_point_;
-  }
+  const std::string &EntryPoint() const override;
 
   d3d12::ShaderModule &ShaderModule() {
     return shader_module_;
@@ -24,7 +22,6 @@ class D3D12Shader : public Shader {
  private:
   D3D12Core *core_;
   d3d12::ShaderModule shader_module_;
-  mutable std::string entry_point_;
 };
 
 }  // namespace grassland::graphics::backend
