@@ -1,14 +1,8 @@
 #pragma once
 #include "grassland/graphics/graphics_util.h"
+#include "grassland/graphics/shader.h"
 
 namespace grassland::graphics {
-
-class Shader {
- public:
-  virtual ~Shader() = default;
-
-  static void PybindClassRegistration(py::classh<Shader> &c);
-};
 
 class Program {
  public:
@@ -29,6 +23,8 @@ class ComputeProgram {
   virtual ~ComputeProgram() = default;
   virtual void AddResourceBinding(ResourceType type, int count) = 0;
   virtual void Finalize() = 0;
+
+  static void PybindClassRegistration(py::classh<ComputeProgram> &c);
 };
 
 class RayTracingProgram {
@@ -47,6 +43,8 @@ class RayTracingProgram {
                         const std::vector<int32_t> &hit_group_indices,
                         const std::vector<int32_t> &callable_shader_indices) = 0;
   virtual void Finalize() = 0;
+
+  static void PybindClassRegistration(py::classh<RayTracingProgram> &c);
 };
 
 struct HitGroup {
@@ -55,16 +53,5 @@ struct HitGroup {
   Shader *intersection_shader{nullptr};
   bool procedure{false};
 };
-
-CompiledShaderBlob CompileShader(const std::string &source_code,
-                                 const std::string &entry_point,
-                                 const std::string &target,
-                                 const std::vector<std::string> &args = {});
-
-CompiledShaderBlob CompileShader(const VirtualFileSystem &vfs,
-                                 const std::string &source_file,
-                                 const std::string &entry_point,
-                                 const std::string &target,
-                                 const std::vector<std::string> &args = {});
 
 }  // namespace grassland::graphics

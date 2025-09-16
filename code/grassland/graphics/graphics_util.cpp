@@ -1,4 +1,8 @@
 #include "grassland/graphics/graphics_util.h"
+
+#include "grassland/graphics/acceleration_structure.h"
+#include "grassland/graphics/buffer.h"
+#include "grassland/graphics/image.h"
 namespace grassland::graphics {
 
 const char *BackendAPIString(BackendAPI api) {
@@ -351,6 +355,157 @@ void util::PybindModuleRegistration(py::module_ &m) {
   blend_state.def_readwrite("src_alpha", &BlendState::src_alpha, "Source alpha blend factor");
   blend_state.def_readwrite("dst_alpha", &BlendState::dst_alpha, "Destination alpha blend factor");
   blend_state.def_readwrite("alpha_op", &BlendState::alpha_op, "Alpha blend operation");
+
+  // Ray Tracing Enums
+  py::enum_<RayTracingGeometryFlag> ray_tracing_geometry_flag(m, "RayTracingGeometryFlag");
+  ray_tracing_geometry_flag.value("RAYTRACING_GEOMETRY_FLAG_NONE", RAYTRACING_GEOMETRY_FLAG_NONE,
+                                  "Ray Tracing Geometry Flag: None");
+  ray_tracing_geometry_flag.value("RAYTRACING_GEOMETRY_FLAG_OPAQUE", RAYTRACING_GEOMETRY_FLAG_OPAQUE,
+                                  "Ray Tracing Geometry Flag: Opaque");
+  ray_tracing_geometry_flag.value("RAYTRACING_GEOMETRY_FLAG_NO_DUPLICATE_ANYHIT_INVOCATION",
+                                  RAYTRACING_GEOMETRY_FLAG_NO_DUPLICATE_ANYHIT_INVOCATION,
+                                  "Ray Tracing Geometry Flag: No Duplicate Any Hit Invocation");
+  ray_tracing_geometry_flag.export_values();
+
+  py::enum_<RayTracingInstanceFlag> ray_tracing_instance_flag(m, "RayTracingInstanceFlag");
+  ray_tracing_instance_flag.value("RAYTRACING_INSTANCE_FLAG_NONE", RAYTRACING_INSTANCE_FLAG_NONE,
+                                  "Ray Tracing Instance Flag: None");
+  ray_tracing_instance_flag.value("RAYTRACING_INSTANCE_FLAG_TRIANGLE_FACING_CULL_DISABLE",
+                                  RAYTRACING_INSTANCE_FLAG_TRIANGLE_FACING_CULL_DISABLE,
+                                  "Ray Tracing Instance Flag: Triangle Cull Disable");
+  ray_tracing_instance_flag.value("RAYTRACING_INSTANCE_FLAG_TRIANGLE_FLIP_FACING",
+                                  RAYTRACING_INSTANCE_FLAG_TRIANGLE_FLIP_FACING,
+                                  "Ray Tracing Instance Flag: Triangle Front Counterclockwise");
+  ray_tracing_instance_flag.value("RAYTRACING_INSTANCE_FLAG_OPAQUE", RAYTRACING_INSTANCE_FLAG_OPAQUE,
+                                  "Ray Tracing Instance Flag: Force Opaque");
+  ray_tracing_instance_flag.value("RAYTRACING_INSTANCE_FLAG_NO_OPAQUE", RAYTRACING_INSTANCE_FLAG_NO_OPAQUE,
+                                  "Ray Tracing Instance Flag: Force Non-Opaque");
+  ray_tracing_instance_flag.export_values();
+
+  // Struct Classes
+  py::class_<BufferRange> buffer_range(m, "BufferRange");
+  buffer_range.def(py::init<Buffer *, uint64_t, uint64_t>(), py::arg("buffer"), py::arg("offset") = 0,
+                   py::arg("size") = 0, "Create a buffer range");
+  buffer_range.def_readwrite("buffer", &BufferRange::buffer, "Buffer object");
+  buffer_range.def_readwrite("offset", &BufferRange::offset, "Offset in bytes");
+  buffer_range.def_readwrite("size", &BufferRange::size, "Size in bytes");
+  buffer_range.def("__repr__", [](const BufferRange &range) {
+    return py::str("BufferRange(buffer={}, offset={}, size={})").format(range.buffer, range.offset, range.size);
+  });
+
+  py::class_<Extent2D> extent2d(m, "Extent2D");
+  extent2d.def(py::init<uint32_t, uint32_t>(), py::arg("width"), py::arg("height"), "Create a 2D extent");
+  extent2d.def_readwrite("width", &Extent2D::width, "Width");
+  extent2d.def_readwrite("height", &Extent2D::height, "Height");
+  extent2d.def("__repr__", [](const Extent2D &extent) {
+    return py::str("Extent2D(width={}, height={})").format(extent.width, extent.height);
+  });
+
+  py::class_<Offset2D> offset2d(m, "Offset2D");
+  offset2d.def(py::init<int, int>(), py::arg("x"), py::arg("y"), "Create a 2D offset");
+  offset2d.def_readwrite("x", &Offset2D::x, "X coordinate");
+  offset2d.def_readwrite("y", &Offset2D::y, "Y coordinate");
+  offset2d.def("__repr__",
+               [](const Offset2D &offset) { return py::str("Offset2D(x={}, y={})").format(offset.x, offset.y); });
+
+  py::class_<Viewport> viewport(m, "Viewport");
+  viewport.def(py::init<float, float, float, float, float, float>(), py::arg("x"), py::arg("y"), py::arg("width"),
+               py::arg("height"), py::arg("min_depth") = 0.0f, py::arg("max_depth") = 1.0f, "Create a viewport");
+  viewport.def_readwrite("x", &Viewport::x, "X coordinate");
+  viewport.def_readwrite("y", &Viewport::y, "Y coordinate");
+  viewport.def_readwrite("width", &Viewport::width, "Width");
+  viewport.def_readwrite("height", &Viewport::height, "Height");
+  viewport.def_readwrite("min_depth", &Viewport::min_depth, "Minimum depth");
+  viewport.def_readwrite("max_depth", &Viewport::max_depth, "Maximum depth");
+  viewport.def("__repr__", [](const Viewport &vp) {
+    return py::str("Viewport(x={}, y={}, width={}, height={}, min_depth={}, max_depth={})")
+        .format(vp.x, vp.y, vp.width, vp.height, vp.min_depth, vp.max_depth);
+  });
+
+  py::class_<Scissor> scissor(m, "Scissor");
+  scissor.def(py::init<Offset2D, Extent2D>(), py::arg("offset"), py::arg("extent"), "Create a scissor");
+  scissor.def_readwrite("offset", &Scissor::offset, "Offset");
+  scissor.def_readwrite("extent", &Scissor::extent, "Extent");
+  scissor.def("__repr__",
+              [](const Scissor &s) { return py::str("Scissor(offset={}, extent={})").format(s.offset, s.extent); });
+
+  py::class_<RayTracingInstance> ray_tracing_instance(m, "RayTracingInstance");
+  ray_tracing_instance.def(py::init<>(), "Create a ray tracing instance");
+
+  // Transform matrix property (3x4 array)
+  ray_tracing_instance.def_property(
+      "transform",
+      [](const RayTracingInstance &instance) {
+        py::list result;
+        for (int i = 0; i < 3; i++) {
+          py::list row;
+          for (int j = 0; j < 4; j++) {
+            row.append(instance.transform[i][j]);
+          }
+          result.append(row);
+        }
+        return result;
+      },
+      [](RayTracingInstance &instance, py::list transform_list) {
+        if (transform_list.size() != 3) {
+          throw std::runtime_error("Transform matrix must have 3 rows");
+        }
+        for (int i = 0; i < 3; i++) {
+          py::list row = transform_list[i].cast<py::list>();
+          if (row.size() != 4) {
+            throw std::runtime_error("Transform matrix rows must have 4 columns");
+          }
+          for (int j = 0; j < 4; j++) {
+            instance.transform[i][j] = row[j].cast<float>();
+          }
+        }
+      },
+      "Transform matrix (3x4)");
+
+  // Bit field properties
+  ray_tracing_instance.def_property(
+      "instance_id", [](const RayTracingInstance &instance) { return instance.instance_id; },
+      [](RayTracingInstance &instance, uint32_t value) { instance.instance_id = value; }, "Instance ID (24-bit)");
+
+  ray_tracing_instance.def_property(
+      "instance_mask", [](const RayTracingInstance &instance) { return instance.instance_mask; },
+      [](RayTracingInstance &instance, uint32_t value) { instance.instance_mask = value; }, "Instance mask (8-bit)");
+
+  ray_tracing_instance.def_property(
+      "instance_hit_group_offset",
+      [](const RayTracingInstance &instance) { return instance.instance_hit_group_offset; },
+      [](RayTracingInstance &instance, uint32_t value) { instance.instance_hit_group_offset = value; },
+      "Instance hit group offset (24-bit)");
+
+  ray_tracing_instance.def_property(
+      "instance_flags", [](const RayTracingInstance &instance) { return instance.instance_flags; },
+      [](RayTracingInstance &instance, RayTracingInstanceFlag value) { instance.instance_flags = value; },
+      "Instance flags (8-bit)");
+
+  ray_tracing_instance.def_readwrite("acceleration_structure", &RayTracingInstance::acceleration_structure,
+                                     "Acceleration structure");
+
+  ray_tracing_instance.def("__repr__", [](const RayTracingInstance &instance) {
+    return py::str(
+               "RayTracingInstance(instance_id={}, instance_mask={}, instance_hit_group_offset={}, instance_flags={})")
+        .format(instance.instance_id, instance.instance_mask, instance.instance_hit_group_offset,
+                instance.instance_flags);
+  });
+
+  py::class_<RayTracingAABB> ray_tracing_aabb(m, "RayTracingAABB");
+  ray_tracing_aabb.def(py::init<float, float, float, float, float, float>(), py::arg("min_x"), py::arg("min_y"),
+                       py::arg("min_z"), py::arg("max_x"), py::arg("max_y"), py::arg("max_z"),
+                       "Create a ray tracing AABB");
+  ray_tracing_aabb.def_readwrite("min_x", &RayTracingAABB::min_x, "Minimum X coordinate");
+  ray_tracing_aabb.def_readwrite("min_y", &RayTracingAABB::min_y, "Minimum Y coordinate");
+  ray_tracing_aabb.def_readwrite("min_z", &RayTracingAABB::min_z, "Minimum Z coordinate");
+  ray_tracing_aabb.def_readwrite("max_x", &RayTracingAABB::max_x, "Maximum X coordinate");
+  ray_tracing_aabb.def_readwrite("max_y", &RayTracingAABB::max_y, "Maximum Y coordinate");
+  ray_tracing_aabb.def_readwrite("max_z", &RayTracingAABB::max_z, "Maximum Z coordinate");
+  ray_tracing_aabb.def("__repr__", [](const RayTracingAABB &aabb) {
+    return py::str("RayTracingAABB(min=({}, {}, {}), max=({}, {}, {}))")
+        .format(aabb.min_x, aabb.min_y, aabb.min_z, aabb.max_x, aabb.max_y, aabb.max_z);
+  });
 }
 
 }  // namespace grassland::graphics

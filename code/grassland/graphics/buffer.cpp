@@ -12,6 +12,24 @@ void Buffer::PybindClassRegistration(py::classh<Buffer> &c) {
   c.def("type", &Buffer::Type);
   c.def("size", &Buffer::Size);
   c.def("resize", &Buffer::Resize, py::arg("new_size"));
+  c.def("__repr__", [](Buffer *buffer) {
+    std::string type_str;
+    switch (buffer->Type()) {
+      case BUFFER_TYPE_STATIC:
+        type_str = "STATIC";
+        break;
+      case BUFFER_TYPE_DYNAMIC:
+        type_str = "DYNAMIC";
+        break;
+      case BUFFER_TYPE_ONETIME:
+        type_str = "ONETIME";
+        break;
+      default:
+        type_str = "UNKNOWN";
+        break;
+    }
+    return py::str("DeviceBuffer(size={}, {})").format(buffer->Size(), type_str);
+  });
   c.def(
       "upload_data",
       [](Buffer *buffer, py::bytes data, size_t size, size_t offset) {

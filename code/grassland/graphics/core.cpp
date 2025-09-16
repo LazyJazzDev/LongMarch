@@ -204,6 +204,89 @@ void Core::PybindClassRegistration(py::classh<Core> &c) {
       "Create a graphics program", py::keep_alive<0, 1>{});
 
   c.def(
+      "create_compute_program",
+      [](Core *core, Shader *compute_shader) {
+        std::shared_ptr<ComputeProgram> program_;
+        core->CreateComputeProgram(compute_shader, &program_);
+        return program_;
+      },
+      py::arg("compute_shader"), "Create a compute program", py::keep_alive<0, 1>{}, py::keep_alive<0, 2>{});
+
+  c.def(
+      "create_raytracing_program",
+      [](Core *core) {
+        std::shared_ptr<RayTracingProgram> program_;
+        core->CreateRayTracingProgram(&program_);
+        return program_;
+      },
+      "Create a ray tracing program", py::keep_alive<0, 1>{});
+
+  c.def(
+      "create_raytracing_program",
+      [](Core *core, Shader *raygen_shader, Shader *miss_shader, Shader *closest_hit_shader) {
+        std::shared_ptr<RayTracingProgram> program_;
+        core->CreateRayTracingProgram(raygen_shader, miss_shader, closest_hit_shader, &program_);
+        return program_;
+      },
+      py::arg("raygen_shader"), py::arg("miss_shader"), py::arg("closest_hit_shader"),
+      "Create a ray tracing program with shaders", py::keep_alive<0, 1>{}, py::keep_alive<0, 2>{},
+      py::keep_alive<0, 3>{}, py::keep_alive<0, 4>{});
+
+  c.def(
+      "create_blas",
+      [](Core *core, BufferRange aabb_buffer, uint32_t stride, uint32_t num_aabb, RayTracingGeometryFlag flags) {
+        std::shared_ptr<AccelerationStructure> blas_;
+        core->CreateBottomLevelAccelerationStructure(aabb_buffer, stride, num_aabb, flags, &blas_);
+        return blas_;
+      },
+      py::arg("aabb_buffer"), py::arg("stride"), py::arg("num_aabb"), py::arg("flags"),
+      "Create bottom-level acceleration structure from AABB buffer", py::keep_alive<0, 1>{});
+
+  c.def(
+      "create_blas",
+      [](Core *core, BufferRange vertex_buffer, BufferRange index_buffer, uint32_t num_vertex, uint32_t stride,
+         uint32_t num_primitive, RayTracingGeometryFlag flags) {
+        std::shared_ptr<AccelerationStructure> blas_;
+        core->CreateBottomLevelAccelerationStructure(vertex_buffer, index_buffer, num_vertex, stride, num_primitive,
+                                                     flags, &blas_);
+        return blas_;
+      },
+      py::arg("vertex_buffer"), py::arg("index_buffer"), py::arg("num_vertex"), py::arg("stride"),
+      py::arg("num_primitive"), py::arg("flags"),
+      "Create bottom-level acceleration structure from vertex and index buffers", py::keep_alive<0, 1>{});
+
+  c.def(
+      "create_blas",
+      [](Core *core, Buffer *vertex_buffer, Buffer *index_buffer, uint32_t stride) {
+        std::shared_ptr<AccelerationStructure> blas_;
+        core->CreateBottomLevelAccelerationStructure(vertex_buffer, index_buffer, stride, &blas_);
+        return blas_;
+      },
+      py::arg("vertex_buffer"), py::arg("index_buffer"), py::arg("stride"),
+      "Create bottom-level acceleration structure from vertex and index buffer objects", py::keep_alive<0, 1>{},
+      py::keep_alive<0, 2>{}, py::keep_alive<0, 3>{});
+
+  c.def(
+      "create_tlas",
+      [](Core *core, const std::vector<RayTracingInstance> &instances) {
+        std::shared_ptr<AccelerationStructure> tlas_;
+        core->CreateTopLevelAccelerationStructure(instances, &tlas_);
+        return tlas_;
+      },
+      py::arg("instances"), "Create top-level acceleration structure from ray tracing instances",
+      py::keep_alive<0, 1>{});
+
+  c.def(
+      "create_tlas",
+      [](Core *core, const std::vector<std::pair<AccelerationStructure *, glm::mat4>> &objects) {
+        std::shared_ptr<AccelerationStructure> tlas_;
+        core->CreateTopLevelAccelerationStructure(objects, &tlas_);
+        return tlas_;
+      },
+      py::arg("objects"), "Create top-level acceleration structure from acceleration structure and transform pairs",
+      py::keep_alive<0, 1>{});
+
+  c.def(
       "create_command_context",
       [](Core *core) {
         std::shared_ptr<CommandContext> command_context_;

@@ -4,9 +4,6 @@
 
 namespace grassland::graphics::backend {
 
-D3D12Shader::D3D12Shader(D3D12Core *core, const CompiledShaderBlob &blob) : core_(core), shader_module_(blob) {
-}
-
 D3D12ProgramBase::D3D12ProgramBase(D3D12Core *core) : core_(core) {
 }
 

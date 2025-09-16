@@ -14,10 +14,6 @@ std::vector<VkFormat> ConvertImageFormats(const std::vector<ImageFormat> &format
 }
 }  // namespace
 
-VulkanShader::VulkanShader(VulkanCore *core, const CompiledShaderBlob &shader_blob) : core_(core) {
-  core_->Device()->CreateShaderModule(shader_blob, &shader_module_);
-}
-
 VulkanProgramBase::VulkanProgramBase(VulkanCore *core) : core_(core) {
 }
 

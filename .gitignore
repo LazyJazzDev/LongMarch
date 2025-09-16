@@ -9,3 +9,14 @@ CMakeSettings.json
 *.exe
 *.dll
 *.zip
+
+# Python cache files
+*.pyc
+__pycache__/
+*.pyo
+*.pyd
+.Python
+*.so
+.pytest_cache/
+.coverage
+htmlcov/

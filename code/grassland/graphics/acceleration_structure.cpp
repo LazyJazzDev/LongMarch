@@ -33,6 +33,18 @@ RayTracingInstance AccelerationStructure::MakeInstance(const glm::mat4x3 &transf
 }
 
 void AccelerationStructure::PybindClassRegistration(py::classh<AccelerationStructure> &c) {
+  c.def("update_instances",
+        py::overload_cast<const std::vector<RayTracingInstance> &>(&AccelerationStructure::UpdateInstances),
+        py::arg("instances"), "Update instances with RayTracingInstance objects");
+  c.def("update_instances",
+        py::overload_cast<const std::vector<std::pair<AccelerationStructure *, glm::mat4x3>> &>(
+            &AccelerationStructure::UpdateInstances),
+        py::arg("instances"), "Update instances with acceleration structure and transform pairs");
+  c.def("make_instance", &AccelerationStructure::MakeInstance, py::arg("transform"), py::arg("instance_id") = 0,
+        py::arg("instance_mask") = 0xFF, py::arg("instance_hit_group_offset") = 0,
+        py::arg("instance_flags") = RAYTRACING_INSTANCE_FLAG_NONE, "Create a ray tracing instance",
+        py::keep_alive<0, 1>{});
+  c.def("__repr__", [](AccelerationStructure *as) { return py::str("AccelerationStructure()"); });
 }
 
 }  // namespace grassland::graphics
