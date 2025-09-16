@@ -2,18 +2,20 @@ list(APPEND LONGMARCH_INCLUDE_DIR ${CMAKE_CURRENT_LIST_DIR})
 list(APPEND LONGMARCH_INCLUDE_DIR ${INC_DIR})
 set(LONGMARCH_INCLUDE_DIR ${CMAKE_CURRENT_LIST_DIR} PARENT_SCOPE)
 
-add_library(LongMarch long_march.cpp)
+add_library(LongMarchCommon long_march.cpp)
 
 add_subdirectory(grassland)
 add_subdirectory(snowberg)
 add_subdirectory(sparks)
 
-target_include_directories(LongMarch PUBLIC ${LONGMARCH_INCLUDE_DIR})
-target_link_libraries(LongMarch PUBLIC Grassland Snowberg Sparks)
+target_include_directories(LongMarchCommon PUBLIC ${LONGMARCH_INCLUDE_DIR})
+target_link_libraries(LongMarchCommon PUBLIC Grassland Snowberg Sparks)
+add_library(LongMarch INTERFACE)
+target_link_libraries(LongMarch INTERFACE LongMarchCommon Python3::Python)
 
 pybind11_add_module(long_march long_march_pybind.cpp)
 
-target_link_libraries(long_march PUBLIC LongMarch)
+target_link_libraries(long_march PUBLIC LongMarchCommon)
 
 # copy all related dll files to the destination too.
 install(TARGETS long_march
