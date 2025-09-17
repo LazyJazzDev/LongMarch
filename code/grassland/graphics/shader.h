@@ -6,7 +6,7 @@ namespace grassland::graphics {
 class Shader {
  public:
   virtual ~Shader() = default;
-  virtual const std::string &EntryPoint() const = 0;
+  virtual std::string EntryPoint() const = 0;
 
   static void PybindClassRegistration(py::classh<Shader> &c);
 };

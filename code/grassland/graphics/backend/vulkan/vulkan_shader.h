@@ -13,7 +13,7 @@ class VulkanShader : public Shader {
     return shader_module_.get();
   }
 
-  const std::string &EntryPoint() const override {
+  std::string EntryPoint() const override {
     return shader_module_->EntryPoint();
   }
 

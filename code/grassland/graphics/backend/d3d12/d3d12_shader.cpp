@@ -7,7 +7,7 @@ namespace grassland::graphics::backend {
 D3D12Shader::D3D12Shader(D3D12Core *core, const CompiledShaderBlob &blob) : core_(core), shader_module_(blob) {
 }
 
-const std::string &D3D12Shader::EntryPoint() const {
+std::string D3D12Shader::EntryPoint() const {
   return WStringToString(shader_module_.EntryPoint());
 }
 
