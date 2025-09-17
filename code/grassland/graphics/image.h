@@ -11,6 +11,10 @@ class Image {
   virtual void UploadData(const void *data) const = 0;
   virtual void DownloadData(void *data) const = 0;
 
+  // Partial image data operations
+  virtual void UploadData(const void *data, const Offset2D &offset, const Extent2D &extent) const = 0;
+  virtual void DownloadData(void *data, const Offset2D &offset, const Extent2D &extent) const = 0;
+
   static void PybindClassRegistration(py::classh<Image> &c);
 };
 

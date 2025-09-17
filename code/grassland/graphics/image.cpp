@@ -6,40 +6,23 @@
 
 namespace grassland::graphics {
 
-namespace {
-// Utility function to get bytes per pixel for image formats
-size_t GetImageFormatBytesPerPixel(ImageFormat format) {
-  switch (format) {
-    case IMAGE_FORMAT_R8G8B8A8_UNORM:
-    case IMAGE_FORMAT_B8G8R8A8_UNORM:
-      return 4;
-    case IMAGE_FORMAT_R32G32B32A32_SFLOAT:
-      return 16;
-    case IMAGE_FORMAT_R32G32B32_SFLOAT:
-      return 12;
-    case IMAGE_FORMAT_R32G32_SFLOAT:
-      return 8;
-    case IMAGE_FORMAT_R32_SFLOAT:
-    case IMAGE_FORMAT_D32_SFLOAT:
-      return 4;
-    case IMAGE_FORMAT_R16G16B16A16_SFLOAT:
-      return 8;
-    case IMAGE_FORMAT_R32_UINT:
-    case IMAGE_FORMAT_R32_SINT:
-      return 4;
-    case IMAGE_FORMAT_UNDEFINED:
-    default:
-      return 4;  // Default fallback
-  }
-}
-}  // namespace
-
 void Image::PybindClassRegistration(py::classh<Image> &c) {
   c.def("extent", &Image::Extent, "Get the image extent (width, height)");
   c.def("format", &Image::Format, "Get the image format");
+
+  // Overloaded upload_data function
   c.def(
       "upload_data", [](Image *image, py::bytes data) { image->UploadData(PyBytes_AsString(data.ptr())); },
-      py::arg("data"), "Upload data to the image");
+      py::arg("data"), "Upload full data to the image");
+  c.def(
+      "upload_data",
+      [](Image *image, py::bytes data, const Offset2D &offset, const Extent2D &extent) {
+        image->UploadData(PyBytes_AsString(data.ptr()), offset, extent);
+      },
+      py::arg("data"), py::arg("offset"), py::arg("extent"),
+      "Upload partial data to the image at specified offset and extent");
+
+  // Overloaded download_data function
   c.def(
       "download_data",
       [](Image *image) {
@@ -47,7 +30,7 @@ void Image::PybindClassRegistration(py::classh<Image> &c) {
         auto extent = image->Extent();
         auto format = image->Format();
 
-        size_t bytes_per_pixel = GetImageFormatBytesPerPixel(format);
+        size_t bytes_per_pixel = PixelSize(format);
         size_t total_size = extent.width * extent.height * bytes_per_pixel;
 
         // Download data to vector first
@@ -57,7 +40,24 @@ void Image::PybindClassRegistration(py::classh<Image> &c) {
         // Create py::bytes from vector data
         return py::bytes(reinterpret_cast<const char *>(data.data()), data.size());
       },
-      "Download data from the image");
+      "Download full data from the image");
+  c.def(
+      "download_data",
+      [](Image *image, const Offset2D &offset, const Extent2D &extent) {
+        // Calculate expected data size based on image format and partial dimensions
+        auto format = image->Format();
+        size_t bytes_per_pixel = PixelSize(format);
+        size_t partial_size = extent.width * extent.height * bytes_per_pixel;
+
+        // Download partial data to vector first
+        std::vector<uint8_t> data(partial_size);
+        image->DownloadData(data.data(), offset, extent);
+
+        // Create py::bytes from vector data
+        return py::bytes(reinterpret_cast<const char *>(data.data()), data.size());
+      },
+      py::arg("offset"), py::arg("extent"), "Download partial data from the image at specified offset and extent");
+
   c.def("__repr__", [](Image *image) {
     auto extent = image->Extent();
     return py::str("Image(width={}, height={})").format(extent.width, extent.height);

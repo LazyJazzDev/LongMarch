@@ -11,6 +11,8 @@ class VulkanImage : public Image {
   ImageFormat Format() const override;
   void UploadData(const void *data) const override;
   void DownloadData(void *data) const override;
+  void UploadData(const void *data, const Offset2D &offset, const Extent2D &extent) const override;
+  void DownloadData(void *data, const Offset2D &offset, const Extent2D &extent) const override;
 
   vulkan::Image *Image() {
     return image_.get();
