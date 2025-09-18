@@ -1,13 +1,13 @@
 #pragma once
 #include "grassland/grassland.h"
 #include "snowberg/snowberg.h"
-#include "sparks/sparks.h"
+#include "sparkium/sparkium.h"
 
 namespace long_march {
 using namespace grassland;
 using namespace snowberg;
 
-namespace sparks = sparks;
+namespace sparkium = sparkium;
 
 void PybindModuleRegistration(py::module_ &m);
 

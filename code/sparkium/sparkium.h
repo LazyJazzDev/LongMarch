@@ -1,0 +1,12 @@
+#pragma once
+#include "sparkium/core/camera.h"
+#include "sparkium/core/core.h"
+#include "sparkium/core/entity.h"
+#include "sparkium/core/film.h"
+#include "sparkium/core/geometry.h"
+#include "sparkium/core/material.h"
+#include "sparkium/core/scene.h"
+#include "sparkium/entity/entities.h"
+#include "sparkium/geometry/geometries.h"
+#include "sparkium/light/lights.h"
+#include "sparkium/material/materials.h"

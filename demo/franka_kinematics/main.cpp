@@ -12,11 +12,11 @@
 using namespace long_march;
 
 struct CombinedMesh {
-  std::vector<std::unique_ptr<sparks::GeometryMesh>> meshes;
-  std::vector<std::unique_ptr<sparks::MaterialPrincipled>> materials;
-  std::vector<std::pair<std::unique_ptr<sparks::EntityGeometryMaterial>, glm::mat4>> entities;
+  std::vector<std::unique_ptr<sparkium::GeometryMesh>> meshes;
+  std::vector<std::unique_ptr<sparkium::MaterialPrincipled>> materials;
+  std::vector<std::pair<std::unique_ptr<sparkium::EntityGeometryMaterial>, glm::mat4>> entities;
 
-  void LoadEntities(sparks::Core *core,
+  void LoadEntities(sparkium::Core *core,
                     const aiScene *scene,
                     const aiNode *node,
                     const glm::mat4 transformation = {1.0f}) {
@@ -42,12 +42,13 @@ struct CombinedMesh {
       int mesh_index = node->mMeshes[i];
       auto &mesh = meshes[mesh_index];
       auto &material = materials[scene->mMeshes[mesh_index]->mMaterialIndex];
-      auto entity = std::make_unique<sparks::EntityGeometryMaterial>(core, mesh.get(), material.get(), local_transform);
+      auto entity =
+          std::make_unique<sparkium::EntityGeometryMaterial>(core, mesh.get(), material.get(), local_transform);
       entities.emplace_back(std::move(entity), local_transform);
     }
   }
 
-  void LoadModel(sparks::Core *core, const std::string &path) {
+  void LoadModel(sparkium::Core *core, const std::string &path) {
     Assimp::Importer importer;
     const aiScene *scene = importer.ReadFile(path, aiProcess_Triangulate);
     if (!scene || scene->mFlags & AI_SCENE_FLAGS_INCOMPLETE || !scene->mRootNode) {
@@ -61,7 +62,7 @@ struct CombinedMesh {
       material->Get(AI_MATKEY_COLOR_DIFFUSE, color);
       float reflectivity = 0.0f;
       material->Get(AI_MATKEY_REFLECTIVITY, reflectivity);
-      auto mat = std::make_unique<sparks::MaterialPrincipled>(core, glm::vec3{color.r, color.g, color.b});
+      auto mat = std::make_unique<sparkium::MaterialPrincipled>(core, glm::vec3{color.r, color.g, color.b});
       mat->specular = reflectivity;
       mat->roughness = reflectivity;
       materials.emplace_back(std::move(mat));
@@ -94,7 +95,7 @@ struct CombinedMesh {
       Mesh<> m(positions.size(), indices.size(), indices.data(), reinterpret_cast<Vector3<float> *>(positions.data()),
                mesh->HasNormals() ? reinterpret_cast<Vector3<float> *>(normals.data()) : nullptr,
                mesh->HasTextureCoords(0) ? reinterpret_cast<Vector2<float> *>(tex_coords.data()) : nullptr, nullptr);
-      auto geom = std::make_unique<sparks::GeometryMesh>(core, m);
+      auto geom = std::make_unique<sparkium::GeometryMesh>(core, m);
       meshes.emplace_back(std::move(geom));
     }
 
@@ -110,7 +111,7 @@ struct CombinedMesh {
     }
   }
 
-  void PutInScene(sparks::Scene *scene) {
+  void PutInScene(sparkium::Scene *scene) {
     for (auto &[entity, _] : entities) {
       scene->AddEntity(entity.get());
     }
@@ -155,15 +156,15 @@ int main() {
 
   graphics::CreateCore(graphics::BACKEND_API_DEFAULT, graphics::Core::Settings{2, false}, &core_);
   core_->InitializeLogicalDeviceAutoSelect(true);
-  sparks::Core sparks_core(core_.get());
-  sparks_core.GetShadersVFS().Print();
+  sparkium::Core sparkium_core(core_.get());
+  sparkium_core.GetShadersVFS().Print();
 
-  sparks::Scene scene(&sparks_core);
+  sparkium::Scene scene(&sparkium_core);
   scene.settings.samples_per_dispatch = 32;
-  sparks::Film film(&sparks_core, 1024, 512);
+  sparkium::Film film(&sparkium_core, 1024, 512);
   film.info.persistence = 0.98f;
-  sparks::Camera camera(
-      &sparks_core, glm::lookAt(glm::vec3{2.0f, -1.0f, 0.3f}, glm::vec3{0.0f, 0.0f, 0.5f}, glm::vec3{0.0, 0.0, 1.0}),
+  sparkium::Camera camera(
+      &sparkium_core, glm::lookAt(glm::vec3{2.0f, -1.0f, 0.3f}, glm::vec3{0.0f, 0.0f, 0.5f}, glm::vec3{0.0, 0.0, 1.0}),
       glm::radians(30.0f), static_cast<float>(film.GetWidth()) / film.GetHeight());
 
   Mesh<> matball_mesh;
@@ -171,23 +172,24 @@ int main() {
   matball_mesh.GenerateTangents();
   Mesh<> cube_mesh;
   cube_mesh.LoadObjFile(FindAssetFile("meshes/cube.obj"));
-  sparks::GeometryMesh geometry_sphere(&sparks_core, Mesh<>::Sphere(30));
-  sparks::GeometryMesh geometry_matball(&sparks_core, matball_mesh);
-  sparks::GeometryMesh geometry_cube(&sparks_core, cube_mesh);
+  sparkium::GeometryMesh geometry_sphere(&sparkium_core, Mesh<>::Sphere(30));
+  sparkium::GeometryMesh geometry_matball(&sparkium_core, matball_mesh);
+  sparkium::GeometryMesh geometry_cube(&sparkium_core, cube_mesh);
 
-  sparks::MaterialPrincipled material_ground(&sparks_core, {0.1f, 0.2f, 0.4f});
+  sparkium::MaterialPrincipled material_ground(&sparkium_core, {0.1f, 0.2f, 0.4f});
   material_ground.roughness = 0.2f;
   material_ground.metallic = 0.0f;
-  sparks::EntityGeometryMaterial entity_ground(&sparks_core, &geometry_cube, &material_ground,
-                                               glm::translate(glm::mat4{1.0f}, glm::vec3{0.0f, 0.0f, -1000.0f}) *
-                                                   glm::scale(glm::mat4(1.0f), glm::vec3(1000.0f)));
+  sparkium::EntityGeometryMaterial entity_ground(&sparkium_core, &geometry_cube, &material_ground,
+                                                 glm::translate(glm::mat4{1.0f}, glm::vec3{0.0f, 0.0f, -1000.0f}) *
+                                                     glm::scale(glm::mat4(1.0f), glm::vec3(1000.0f)));
 
-  sparks::MaterialLight material_sky(&sparks_core, {0.8f, 0.8f, 0.8f}, true, false);
-  sparks::EntityGeometryMaterial entity_sky(
-      &sparks_core, &geometry_sphere, &material_sky,
+  sparkium::MaterialLight material_sky(&sparkium_core, {0.8f, 0.8f, 0.8f}, true, false);
+  sparkium::EntityGeometryMaterial entity_sky(
+      &sparkium_core, &geometry_sphere, &material_sky,
       glm::translate(glm::mat4{1.0f}, glm::vec3{0.0f, 0.0f, 0.0f}) * glm::scale(glm::mat4(1.0f), glm::vec3(60.0f)));
-  sparks::EntityAreaLight area_light(&sparks_core, glm::vec3{1.0f, 1.0f, 1.0f}, 1.0f, glm::vec3{40.0f, -30.0f, 30.0f},
-                                     glm::normalize(glm::vec3{-4.0f, 3.0f, -3.0f}), glm::vec3{0.0f, 0.0f, 1.0f});
+  sparkium::EntityAreaLight area_light(&sparkium_core, glm::vec3{1.0f, 1.0f, 1.0f}, 1.0f,
+                                       glm::vec3{40.0f, -30.0f, 30.0f}, glm::normalize(glm::vec3{-4.0f, 3.0f, -3.0f}),
+                                       glm::vec3{0.0f, 0.0f, 1.0f});
   area_light.emission = glm::vec3{1000.0f};
 
   scene.AddEntity(&entity_ground);
@@ -195,7 +197,7 @@ int main() {
   scene.AddEntity(&area_light);
 
   for (int i = 0; i < 11; i++) {
-    combined_mesh[i].LoadModel(&sparks_core, link_paths[i]);
+    combined_mesh[i].LoadModel(&sparkium_core, link_paths[i]);
     combined_mesh[i].PutInScene(&scene);
   }
 
@@ -205,7 +207,7 @@ int main() {
   core_->CreateImage(film.GetWidth(), film.GetHeight(), graphics::IMAGE_FORMAT_R8G8B8A8_UNORM, &srgb_image);
 
   std::unique_ptr<graphics::Window> window;
-  core_->CreateWindowObject(film.GetWidth(), film.GetHeight(), "Sparks", &window);
+  core_->CreateWindowObject(film.GetWidth(), film.GetHeight(), "Sparkium", &window);
   FPSCounter fps_counter;
 
   JointInfo joints[] = {{-2.7437f, 2.7437f, 0.0f},      {-1.7837f, 1.7837f, 0.0f}, {-2.9007f, 2.9007f, 0.0f},
@@ -268,8 +270,8 @@ int main() {
     // 0.0f})} * area_light.position; if (area_light.position.y < 0.0) area_light.position = -area_light.position;
     // area_light.direction = -area_light.position;
     scene.Render(&camera, &film);
-    sparks_core.ConvertFilmToRawImage(film, raw_image.get());
-    sparks_core.ToneMapping(raw_image.get(), srgb_image.get());
+    sparkium_core.ConvertFilmToRawImage(film, raw_image.get());
+    sparkium_core.ToneMapping(raw_image.get(), srgb_image.get());
     std::unique_ptr<graphics::CommandContext> cmd_context;
     core_->CreateCommandContext(&cmd_context);
     cmd_context->CmdPresent(window.get(), srgb_image.get());
@@ -288,8 +290,8 @@ int main() {
     cm.Clear();
   }
 
-  sparks_core.ConvertFilmToRawImage(film, raw_image.get());
-  sparks_core.ToneMapping(raw_image.get(), srgb_image.get());
+  sparkium_core.ConvertFilmToRawImage(film, raw_image.get());
+  sparkium_core.ToneMapping(raw_image.get(), srgb_image.get());
   std::vector<uint8_t> image_data(film.GetWidth() * film.GetHeight() * 4);
   srgb_image->DownloadData(image_data.data());
   stbi_write_bmp("output.bmp", film.GetWidth(), film.GetHeight(), 4, image_data.data());
