@@ -3,7 +3,7 @@
 
 namespace practium {
 
-class Core {
+class Scene {
  public:
  private:
 };
