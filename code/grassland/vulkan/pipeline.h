@@ -15,7 +15,7 @@ struct PipelineSettings {
 
   void PipelineSettingsCommon();
 
-  void AddShaderStage(ShaderModule *shader_module, VkShaderStageFlagBits stage, const char *entry_point = "main");
+  void AddShaderStage(ShaderModule *shader_module, VkShaderStageFlagBits stage);
 
   void AddInputBinding(uint32_t binding, uint32_t stride, VkVertexInputRate input_rate = VK_VERTEX_INPUT_RATE_VERTEX);
 
@@ -56,6 +56,7 @@ struct PipelineSettings {
 
   // Shader stages
   std::vector<VkPipelineShaderStageCreateInfo> shader_stage_create_infos;
+  std::vector<std::unique_ptr<char[]>> shader_entry_points_storage;
 
   // Vertex input
   std::vector<VkVertexInputBindingDescription> vertex_input_binding_descriptions;

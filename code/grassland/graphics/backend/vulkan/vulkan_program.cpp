@@ -72,8 +72,7 @@ void VulkanProgram::SetBlendState(int target_id, const BlendState &state) {
 void VulkanProgram::BindShader(Shader *shader, ShaderType type) {
   VulkanShader *vulkan_shader = dynamic_cast<VulkanShader *>(shader);
   if (vulkan_shader) {
-    pipeline_settings_.AddShaderStage(vulkan_shader->ShaderModule(), ShaderTypeToVkShaderStageFlags(type),
-                                      vulkan_shader->EntryPoint().c_str());
+    pipeline_settings_.AddShaderStage(vulkan_shader->ShaderModule(), ShaderTypeToVkShaderStageFlags(type));
   } else {
     throw std::runtime_error("Invalid shader object, expected VulkanShader");
   }

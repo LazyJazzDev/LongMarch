@@ -9,7 +9,7 @@ struct Vertex {
 
 class Application {
  public:
-  Application(grassland::graphics::BackendAPI api = grassland::graphics::BACKEND_API_VULKAN);
+  Application(grassland::graphics::BackendAPI api = grassland::graphics::BACKEND_API_DEFAULT);
 
   ~Application();
 
