@@ -76,7 +76,7 @@ find_package(glfw3 CONFIG REQUIRED)
 set(GLFW3_LIB_NAME glfw)
 list(APPEND LIB_LIST ${GLFW3_LIB_NAME})
 
-find_package(Vulkan REQUIRED COMPONENTS dxc)
+find_package(Vulkan COMPONENTS dxc)
 if (Vulkan_FOUND)
     set(LONGMARCH_VULKAN_ENABLED ON)
     set(VULKAN_LIB_NAME ${Vulkan_LIBRARIES})
@@ -130,6 +130,7 @@ if (WIN32)
 endif ()
 
 if (LONGMARCH_VULKAN_ENABLED)
+    set(ENABLE_SPIRV_CODEGEN ON)
     set(DXC_LIB_NAME Vulkan::dxc_lib)
     list(APPEND LIB_LIST ${DXC_LIB_NAME})
 
@@ -152,6 +153,9 @@ elseif (LONGMARCH_D3D12_ENABLED)
 
     set(DXC_DLL_DIR "${WINSDK_BIN_DIR}")
 endif ()
+
+message(STATUS "DXC_LIB_NAME: ${DXC_LIB_NAME}")
+message(STATUS "DXC_DLL_DIR: ${DXC_DLL_DIR}")
 
 set(LONGMARCH_IMGUI_DIR ${CMAKE_CURRENT_LIST_DIR}/external/imgui)
 

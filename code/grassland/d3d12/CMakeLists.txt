@@ -6,7 +6,7 @@ if (LONGMARCH_D3D12_ENABLED)
     list(APPEND GRASSLAND_LIBS ${GRASSLAND_SUBLIB_NAME})
     set(GRASSLAND_LIBS ${GRASSLAND_LIBS} PARENT_SCOPE)
 
-    target_include_directories(${GRASSLAND_SUBLIB_NAME} PUBLIC ${LONGMARCH_INCLUDE_DIR} ${Vulkan_INCLUDE_DIRS})
+    target_include_directories(${GRASSLAND_SUBLIB_NAME} PUBLIC ${LONGMARCH_INCLUDE_DIR})
 
     target_link_libraries(${GRASSLAND_SUBLIB_NAME} PUBLIC dxgi d3d12 dxguid ${GLFW3_LIB_NAME} ${FMT_LIB_NAME} ${GLM_LIB_NAME} ${IMGUI_LIB_NAME} grassland_util grassland_imgui)
 
