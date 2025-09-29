@@ -4,7 +4,7 @@
 
 namespace sparkium {
 
-class Film {
+class Film : public Object {
  public:
   Film(Core *core, int width, int height);
 
@@ -20,12 +20,11 @@ class Film {
     float max_exposure{1.0f};
   } info;
 
+  void Develop(graphics::Image *targ_image);
+
  private:
-  friend Scene;
-  friend Core;
-  std::unique_ptr<graphics::Image> accumulated_color_;
-  std::unique_ptr<graphics::Image> accumulated_samples_;
   Core *core_;
+  graphics::Extent2D extent_;
 };
 
 }  // namespace sparkium

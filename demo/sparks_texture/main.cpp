@@ -14,7 +14,6 @@ int main() {
   graphics::CreateCore(graphics::BACKEND_API_DEFAULT, graphics::Core::Settings{2, false}, &core_);
   core_->InitializeLogicalDeviceAutoSelect(true);
   sparkium::Core sparkium_core(core_.get());
-  sparkium_core.GetShadersVFS().Print();
 
   sparkium::Scene scene(&sparkium_core);
   scene.settings.samples_per_dispatch = 16;
@@ -154,8 +153,7 @@ int main() {
     // area_light.position; if (area_light.position.y < 0.0) area_light.position = -area_light.position;
     // area_light.direction = -area_light.position;
     scene.Render(&camera, &film);
-    sparkium_core.ConvertFilmToRawImage(film, raw_image.get());
-    sparkium_core.ToneMapping(raw_image.get(), srgb_image.get());
+    film.Develop(srgb_image.get());
     std::unique_ptr<graphics::CommandContext> cmd_context;
     core_->CreateCommandContext(&cmd_context);
     cmd_context->CmdPresent(window.get(), srgb_image.get());
@@ -170,8 +168,7 @@ int main() {
     window->SetTitle(std::string("Sparkium Textured PBR - ") + fps_buf + "frames/s" + " - " + rps_buf + "Mrays/s");
   }
 
-  sparkium_core.ConvertFilmToRawImage(film, raw_image.get());
-  sparkium_core.ToneMapping(raw_image.get(), srgb_image.get());
+  film.Develop(srgb_image.get());
   std::vector<uint8_t> image_data(film.GetWidth() * film.GetHeight() * 4);
   srgb_image->DownloadData(image_data.data());
   stbi_write_bmp("output.bmp", film.GetWidth(), film.GetHeight(), 4, image_data.data());

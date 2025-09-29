@@ -1,15 +1,13 @@
 #pragma once
 #include "sparkium/core/core_util.h"
-#include "sparkium/core/light.h"
 
 namespace sparkium {
 
-class Entity {
+class Entity : public Object {
  public:
   Entity(Core *core) : core_(core) {
   }
-  virtual ~Entity() = default;
-  virtual void Update(Scene *scene) = 0;
+  ~Entity() override = default;
 
   operator bool() const {
     return core_ != nullptr;
