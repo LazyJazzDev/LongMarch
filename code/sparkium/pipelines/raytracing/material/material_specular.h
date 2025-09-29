@@ -1,8 +1,4 @@
-//
-// Created by zijian on 2025/9/29.
-//
+#pragma once
+#include "sparkium/pipelines/raytracing/core/material.h"
 
-#ifndef LONGMARCH_MATERIAL_SPECULAR_H
-#define LONGMARCH_MATERIAL_SPECULAR_H
-
-#endif  // LONGMARCH_MATERIAL_SPECULAR_H
+namespace sparkium::raytracing {}

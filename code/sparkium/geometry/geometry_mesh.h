@@ -24,6 +24,8 @@ class GeometryMesh : public Geometry {
   GeometryMesh(Core *core, const Mesh<float> &mesh);
 
   int PrimitiveCount() override;
+  graphics::Buffer *GetBuffer() const;
+  const Header &GetHeader() const;
 
  private:
   Header header_;

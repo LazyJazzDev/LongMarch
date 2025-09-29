@@ -1,5 +1,3 @@
-//
-// Created by zijian on 2025/9/29.
-//
+#include "sparkium/pipelines/raytracing/light/lights.h"
 
-#include "lights.h"
+namespace sparkium::raytracing {}

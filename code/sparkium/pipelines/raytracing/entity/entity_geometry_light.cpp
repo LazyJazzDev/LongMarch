@@ -1,5 +1,3 @@
-//
-// Created by zijian on 2025/9/29.
-//
+#include "sparkium/pipelines/raytracing/entity/entity_geometry_light.h"
 
-#include "entity_geometry_light.h"
+namespace sparkium::raytracing {}

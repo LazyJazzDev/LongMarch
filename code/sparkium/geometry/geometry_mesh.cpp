@@ -57,4 +57,12 @@ int GeometryMesh::PrimitiveCount() {
   return primitive_count_;
 }
 
+graphics::Buffer *GeometryMesh::GetBuffer() const {
+  return geometry_buffer_.get();
+}
+
+const GeometryMesh::Header &GeometryMesh::GetHeader() const {
+  return header_;
+}
+
 }  // namespace sparkium

@@ -1,8 +1,8 @@
-//
-// Created by zijian on 2025/9/29.
-//
+#pragma once
+#include "sparkium/pipelines/raytracing/geometry/geometry_mesh.h"
 
-#ifndef LONGMARCH_GEOMETRIES_H
-#define LONGMARCH_GEOMETRIES_H
+namespace sparkium::raytracing {
 
-#endif  // LONGMARCH_GEOMETRIES_H
+Geometry *DedicatedCast(sparkium::Geometry *entity);
+
+}

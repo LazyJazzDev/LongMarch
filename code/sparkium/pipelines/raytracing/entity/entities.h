@@ -1,8 +1,9 @@
-//
-// Created by zijian on 2025/9/29.
-//
+#pragma once
+#include "sparkium/pipelines/raytracing/entity/entity_area_light.h"
+#include "sparkium/pipelines/raytracing/entity/entity_geometry_light.h"
+#include "sparkium/pipelines/raytracing/entity/entity_geometry_meterial.h"
+#include "sparkium/pipelines/raytracing/entity/entity_point_light.h"
 
-#ifndef LONGMARCH_ENTITIES_H
-#define LONGMARCH_ENTITIES_H
-
-#endif  // LONGMARCH_ENTITIES_H
+namespace sparkium::raytracing {
+Entity *DedicatedCast(sparkium::Entity *entity);
+}

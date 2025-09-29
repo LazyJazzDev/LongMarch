@@ -1,8 +1,10 @@
-//
-// Created by zijian on 2025/9/29.
-//
+#pragma once
+#include "sparkium/pipelines/raytracing/material/material_lambertian.h"
+#include "sparkium/pipelines/raytracing/material/material_principled.h"
+#include "sparkium/pipelines/raytracing/material/material_specular.h"
 
-#ifndef LONGMARCH_MATERIALS_H
-#define LONGMARCH_MATERIALS_H
+namespace sparkium::raytracing {
 
-#endif  // LONGMARCH_MATERIALS_H
+Material *DedicatedCast(sparkium::Material *material);
+
+}

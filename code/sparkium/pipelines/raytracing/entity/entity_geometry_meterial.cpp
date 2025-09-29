@@ -1,5 +1,3 @@
-//
-// Created by zijian on 2025/9/29.
-//
+#include "sparkium/pipelines/raytracing/entity/entity_geometry_meterial.h"
 
-#include "entity_geometry_meterial.h"
+namespace sparkium::raytracing {}

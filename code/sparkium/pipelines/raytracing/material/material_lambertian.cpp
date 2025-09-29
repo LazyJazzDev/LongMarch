@@ -1,5 +1,3 @@
-//
-// Created by zijian on 2025/9/29.
-//
+#include "sparkium/pipelines/raytracing/material/material_lambertian.h"
 
-#include "material_lambertian.h"
+namespace sparkium::raytracing {}

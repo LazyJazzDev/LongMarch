@@ -1,8 +1,5 @@
-//
-// Created by zijian on 2025/9/29.
-//
+#pragma once
+#include "sparkium/pipelines/raytracing/light/light_geometry_material.h"
+#include "sparkium/pipelines/raytracing/light/light_point.h"
 
-#ifndef LONGMARCH_LIGHTS_H
-#define LONGMARCH_LIGHTS_H
-
-#endif  // LONGMARCH_LIGHTS_H
+namespace sparkium::raytracing {}

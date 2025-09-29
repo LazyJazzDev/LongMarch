@@ -1,8 +1,4 @@
-//
-// Created by zijian on 2025/9/29.
-//
+#pragma once
+#include "sparkium/pipelines/raytracing/core/entity.h"
 
-#ifndef LONGMARCH_ENTITY_GEOMETRY_LIGHT_H
-#define LONGMARCH_ENTITY_GEOMETRY_LIGHT_H
-
-#endif  // LONGMARCH_ENTITY_GEOMETRY_LIGHT_H
+namespace sparkium::raytracing {}

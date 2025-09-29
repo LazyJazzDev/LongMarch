@@ -1,5 +1,9 @@
-//
-// Created by zijian on 2025/9/29.
-//
+#include "sparkium/pipelines/raytracing/material/materials.h"
 
-#include "materials.h"
+namespace sparkium::raytracing {
+
+Material *DedicatedCast(sparkium::Material *material) {
+  return nullptr;
+}
+
+}  // namespace sparkium::raytracing

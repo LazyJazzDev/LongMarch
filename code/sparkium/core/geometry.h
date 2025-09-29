@@ -6,6 +6,9 @@ namespace sparkium {
 class Geometry : public Object {
  public:
   Geometry(Core *core);
+
+  Core *GetCore() const;
+
   virtual ~Geometry() = default;
 
   virtual int PrimitiveCount() = 0;

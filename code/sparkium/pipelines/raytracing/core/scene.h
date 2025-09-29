@@ -55,6 +55,7 @@ class Scene : public Object {
  private:
   void UpdatePipeline(Camera *camera);
   sparkium::Scene &scene_;
+  Core *core_;
 
   std::unique_ptr<graphics::Shader> raygen_shader_;
   std::unique_ptr<graphics::Shader> default_miss_shader_;
