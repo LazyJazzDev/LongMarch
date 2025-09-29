@@ -29,7 +29,10 @@ class Object {
   template <typename T, typename... Args>
   T *AddComponent(Args &&...args) {
     auto &tail = FindTail();
-    tail = std::make_unique<T>(std::forward<Args>(args)...);
+    auto obj = std::make_unique<T>(std::forward<Args>(args)...);
+    auto res = obj.get();
+    tail = std::move(obj);
+    return res;
   }
 
  private:
@@ -39,5 +42,7 @@ class Object {
     return next->FindTail();
   }
 };
+
+typedef enum RenderPipeline { RENDER_PIPELINE_RASTERIZATION = 0, RENDER_PIPELINE_RAY_TRACING = 1 } RenderPipeline;
 
 }  // namespace sparkium

@@ -13,7 +13,8 @@ namespace sparkium {
 Scene::Scene(Core *core) : core_(core) {
 }
 
-void Scene::Render(Camera *camera, Film *film) {
+Core *Scene::GetCore() const {
+  return core_;
 }
 
 void Scene::AddEntity(Entity *entity) {
@@ -26,6 +27,10 @@ void Scene::DeleteEntity(Entity *entity) {
 
 void Scene::SetEntityActive(Entity *entity, bool active) {
   entities_.at(entity).active = active;
+}
+
+const std::map<Entity *, Scene::EntityStatus> &Scene::GetEntities() const {
+  return entities_;
 }
 
 }  // namespace sparkium

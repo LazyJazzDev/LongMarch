@@ -1,0 +1,8 @@
+//
+// Created by zijian on 2025/9/29.
+//
+
+#ifndef LONGMARCH_ENTITY_POINT_LIGHT_H
+#define LONGMARCH_ENTITY_POINT_LIGHT_H
+
+#endif  // LONGMARCH_ENTITY_POINT_LIGHT_H

@@ -3,15 +3,11 @@
 
 namespace sparkium {
 
-struct CameraData {
-  glm::mat4 world_to_camera;
-  glm::mat4 camera_to_world;
-  glm::vec2 scale;
-};
-
 class Camera : public Object {
  public:
   Camera(Core *core, const glm::mat4 &view, float fovy, float aspect);
+  Core *GetCore() const;
+
   glm::mat4 view;
   float fovy;
   float aspect;

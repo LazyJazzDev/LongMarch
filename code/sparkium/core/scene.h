@@ -7,7 +7,7 @@ class Scene : public Object {
  public:
   Scene(Core *core);
 
-  void Render(Camera *camera, Film *film);
+  Core *GetCore() const;
 
   void AddEntity(Entity *entity);
 
@@ -23,8 +23,9 @@ class Scene : public Object {
 
   struct EntityStatus {
     bool active{true};
-    int shader_version{0};
   };
+
+  const std::map<Entity *, EntityStatus> &GetEntities() const;
 
  private:
   Core *core_;

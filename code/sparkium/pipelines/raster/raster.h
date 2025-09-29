@@ -1,8 +1,8 @@
-//
-// Created by zijian on 2025/9/29.
-//
+#pragma once
 
-#ifndef LONGMARCH_RASTER_H
-#define LONGMARCH_RASTER_H
+#include "sparkium/pipelines/raster/core/core.h"
+#include "sparkium/pipelines/raster/entity/entities.h"
+#include "sparkium/pipelines/raster/geometry/geometries.h"
+#include "sparkium/pipelines/raster/material/materials.h"
 
-#endif  // LONGMARCH_RASTER_H
+namespace sparkium::raster {}
