@@ -4,6 +4,8 @@
 #include "sparkium/pipelines/raytracing/core/geometry.h"
 #include "sparkium/pipelines/raytracing/core/material.h"
 #include "sparkium/pipelines/raytracing/core/scene.h"
+#include "sparkium/pipelines/raytracing/geometry/geometries.h"
+#include "sparkium/pipelines/raytracing/material/materials.h"
 
 namespace sparkium::raytracing {
 LightGeometryMaterial::LightGeometryMaterial(Core *core,

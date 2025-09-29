@@ -14,6 +14,8 @@ class Core : public Object {
 
   void ToneMapping(graphics::Image *raw_image, graphics::Image *output_image);
 
+  void Render(Scene *scene, Camera *camera, Film *film);
+
   graphics::Shader *GetShader(const std::string &name);
 
   graphics::ComputeProgram *GetComputeProgram(const std::string &name);

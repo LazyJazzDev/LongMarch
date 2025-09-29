@@ -13,6 +13,8 @@ class Film : public Object {
   int GetWidth() const;
   int GetHeight() const;
 
+  void Develop(graphics::Image *targ_img);
+
   struct Info {
     int accumulated_samples{0};
     float persistence{1.0};
@@ -23,6 +25,7 @@ class Film : public Object {
  private:
   friend Scene;
   friend Core;
+  std::unique_ptr<graphics::Image> raw_image_;
   std::unique_ptr<graphics::Image> accumulated_color_;
   std::unique_ptr<graphics::Image> accumulated_samples_;
   Core *core_;

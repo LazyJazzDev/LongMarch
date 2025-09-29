@@ -48,6 +48,12 @@ void Scene::Render(Camera *camera, Film *film) {
                                 graphics::BIND_POINT_RAYTRACING);
   cmd_context->CmdDispatchRays(film->accumulated_color_->Extent().width, film->accumulated_samples_->Extent().height,
                                1);
+
+  cmd_context->CmdBindComputeProgram(core_->GetComputeProgram("film2img"));
+  cmd_context->CmdBindResources(0, {film->accumulated_color_.get()}, graphics::BIND_POINT_COMPUTE);
+  cmd_context->CmdBindResources(1, {film->accumulated_samples_.get()}, graphics::BIND_POINT_COMPUTE);
+  cmd_context->CmdBindResources(2, {film->raw_image_.get()}, graphics::BIND_POINT_COMPUTE);
+  cmd_context->CmdDispatch((film->raw_image_->Extent().width + 7) / 8, (film->raw_image_->Extent().height + 7) / 8, 1);
   core_->GraphicsCore()->SubmitCommandContext(cmd_context.get());
   core_->GraphicsCore()->WaitGPU();
 }

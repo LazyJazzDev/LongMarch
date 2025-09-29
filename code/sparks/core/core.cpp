@@ -45,6 +45,10 @@ void Core::ToneMapping(graphics::Image *raw_image, graphics::Image *output_image
   core_->WaitGPU();
 }
 
+void Core::Render(Scene *scene, Camera *camera, Film *film) {
+  scene->Render(camera, film);
+}
+
 graphics::Shader *Core::GetShader(const std::string &name) {
   return shaders_[name].get();
 }
