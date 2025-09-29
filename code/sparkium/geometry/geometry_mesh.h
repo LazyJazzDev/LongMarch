@@ -28,7 +28,7 @@ class GeometryMesh : public Geometry {
   const Header &GetHeader() const;
 
  private:
-  Header header_;
+  Header header_{};
   std::unique_ptr<graphics::Buffer> geometry_buffer_;
   int primitive_count_;
 };
