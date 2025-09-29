@@ -35,11 +35,8 @@ class Scene : public Object {
     }
   };
 
-  struct Settings {
-    int samples_per_dispatch = 128;
-    int max_bounces = 32;
-    int alpha_shadow = false;
-  } settings;
+  using Settings = sparkium::Scene::Settings;
+  Settings &settings;
 
   struct EntityStatus {
     bool active{true};

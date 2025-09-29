@@ -14,7 +14,7 @@
 
 namespace sparkium::raytracing {
 
-Scene::Scene(sparkium::Scene &scene) : scene_(scene) {
+Scene::Scene(sparkium::Scene &scene) : scene_(scene), settings(scene.settings) {
   core_ = DedicatedCast(scene_.GetCore());
   core_->GraphicsCore()->CreateShader(core_->GetShadersVFS(), "raygen.hlsl", "Main", "lib_6_5", &raygen_shader_);
   core_->GraphicsCore()->CreateShader(core_->GetShadersVFS(), "raygen.hlsl", "MissMain", "lib_6_5",
