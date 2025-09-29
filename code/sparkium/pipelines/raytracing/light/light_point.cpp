@@ -4,7 +4,7 @@
 
 namespace sparkium::raytracing {
 
-LightPoint::LightPoint(Core *core, const glm::vec3 &position, const glm::vec3 &color, float strength)
+LightPoint::LightPoint(Core *core, glm::vec3 &position, glm::vec3 &color, float &strength)
     : Light(core), position(position), color(color), strength(strength) {
   core_->GraphicsCore()->CreateBuffer(sizeof(glm::vec3) + sizeof(glm::vec3) + sizeof(float),
                                       graphics::BUFFER_TYPE_STATIC, &direct_lighting_sampler_data_);

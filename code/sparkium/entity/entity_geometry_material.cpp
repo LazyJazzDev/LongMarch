@@ -13,11 +13,23 @@ EntityGeometryMaterial::EntityGeometryMaterial(Core *core,
                                                Geometry *geometry,
                                                Material *material,
                                                const glm::mat4x3 &transformation)
-    : Entity(core), geometry_(geometry), material_(material), transformation_(transformation) {
+    : Entity(core), geometry_(geometry), material_(material), transform(transformation) {
 }
 
 void EntityGeometryMaterial::SetTransformation(const glm::mat4x3 &transformation) {
-  transformation_ = transformation;
+  transform = transformation;
+}
+
+glm::mat4x3 EntityGeometryMaterial::GetTransformation() const {
+  return transform;
+}
+
+Geometry *EntityGeometryMaterial::GetGeometry() const {
+  return geometry_;
+}
+
+Material *EntityGeometryMaterial::GetMaterial() const {
+  return material_;
 }
 
 }  // namespace sparkium

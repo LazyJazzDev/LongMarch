@@ -120,9 +120,8 @@ int main() {
   core_->CreateWindowObject(film.GetWidth(), film.GetHeight(), "Sparkium Cornell Box", &window);
   FPSCounter fps_counter;
   while (!window->ShouldClose()) {
-    scene.Render(&camera, &film);
-    sparkium_core.ConvertFilmToRawImage(film, raw_image.get());
-    sparkium_core.ToneMapping(raw_image.get(), srgb_image.get());
+    sparkium_core.Render(&scene, &camera, &film);
+    film.Develop(srgb_image.get());
     std::unique_ptr<graphics::CommandContext> cmd_context;
     core_->CreateCommandContext(&cmd_context);
     cmd_context->CmdPresent(window.get(), srgb_image.get());
@@ -137,8 +136,7 @@ int main() {
     window->SetTitle(std::string("Sparkium Cornell Box - ") + fps_buf + "frames/s" + " - " + rps_buf + "Mrays/s");
   }
 
-  sparkium_core.ConvertFilmToRawImage(film, raw_image.get());
-  sparkium_core.ToneMapping(raw_image.get(), srgb_image.get());
+  film.Develop(srgb_image.get());
   std::vector<uint8_t> image_data(film.GetWidth() * film.GetHeight() * 4);
   srgb_image->DownloadData(image_data.data());
   stbi_write_bmp("output.bmp", film.GetWidth(), film.GetHeight(), 4, image_data.data());

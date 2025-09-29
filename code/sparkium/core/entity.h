@@ -5,8 +5,10 @@ namespace sparkium {
 
 class Entity : public Object {
  public:
-  Entity(Core *core) : core_(core) {
-  }
+  Entity(Core *core);
+
+  Core *GetCore() const;
+
   ~Entity() override = default;
 
   operator bool() const {

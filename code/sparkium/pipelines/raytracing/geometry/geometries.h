@@ -3,6 +3,6 @@
 
 namespace sparkium::raytracing {
 
-Geometry *DedicatedCast(sparkium::Geometry *entity);
+Geometry *DedicatedCast(sparkium::Geometry *geometry);
 
 }
