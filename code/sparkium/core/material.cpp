@@ -7,4 +7,8 @@ namespace sparkium {
 Material::Material(Core *core) : core_(core) {
 }
 
+Core *Material::GetCore() const {
+  return core_;
+}
+
 }  // namespace sparkium

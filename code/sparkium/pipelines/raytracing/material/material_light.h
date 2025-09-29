@@ -3,9 +3,9 @@
 
 namespace sparkium::raytracing {
 
-class MaterialLambertian : public Material {
+class MaterialLight : public Material {
  public:
-  MaterialLambertian(sparkium::MaterialLambertian &material);
+  MaterialLight(sparkium::MaterialLight &material);
 
   graphics::Buffer *Buffer() override;
   const CodeLines &SamplerImpl() const override;
@@ -14,7 +14,7 @@ class MaterialLambertian : public Material {
   void SyncMaterialData();
 
  private:
-  sparkium::MaterialLambertian &material_;
+  sparkium::MaterialLight &material_;
   std::unique_ptr<graphics::Buffer> material_buffer_;
   CodeLines sampler_implementation_;
   CodeLines evaluator_implementation_;

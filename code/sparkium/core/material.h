@@ -6,6 +6,9 @@ namespace sparkium {
 class Material : public Object {
  public:
   Material(Core *core);
+
+  Core *GetCore() const;
+
   virtual ~Material() = default;
 
  protected:
