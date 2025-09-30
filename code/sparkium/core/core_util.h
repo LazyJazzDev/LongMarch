@@ -43,6 +43,26 @@ class Object {
   }
 };
 
-typedef enum RenderPipeline { RENDER_PIPELINE_RASTERIZATION = 0, RENDER_PIPELINE_RAY_TRACING = 1 } RenderPipeline;
+#define COMPONENT_CAST(obj, cast_type)                   \
+  if (auto component = obj->GetComponent<cast_type>()) { \
+    return component;                                    \
+  } else {                                               \
+    return obj->AddComponent<cast_type>(*obj);           \
+  }
+
+#define DEDICATED_CAST(obj, is_type, cast_type)            \
+  if (auto ptr = dynamic_cast<is_type *>(obj)) {           \
+    if (auto component = ptr->GetComponent<cast_type>()) { \
+      return component;                                    \
+    } else {                                               \
+      return ptr->AddComponent<cast_type>(*ptr);           \
+    }                                                      \
+  }
+
+typedef enum RenderPipeline {
+  RENDER_PIPELINE_RASTERIZATION = 0,
+  RENDER_PIPELINE_RAY_TRACING = 1,
+  RENDER_PIPELINE_AUTO = 2  // Uae raytracing if it could
+} RenderPipeline;
 
 }  // namespace sparkium

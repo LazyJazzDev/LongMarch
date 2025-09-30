@@ -8,7 +8,7 @@ class Core : public Object {
 
   graphics::Core *GraphicsCore() const;
 
-  void Render(Scene *scene, Camera *camera, Film *film, RenderPipeline render_pipeline = RENDER_PIPELINE_RAY_TRACING);
+  void Render(Scene *scene, Camera *camera, Film *film, RenderPipeline render_pipeline = RENDER_PIPELINE_AUTO);
 
   const VirtualFileSystem &GetShadersVFS() const;
 
