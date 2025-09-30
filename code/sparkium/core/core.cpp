@@ -6,6 +6,7 @@
 #include "sparkium/core/geometry.h"
 #include "sparkium/core/material.h"
 #include "sparkium/core/scene.h"
+#include "sparkium/pipelines/pipelines.h"
 
 namespace sparkium {
 Core::Core(graphics::Core *core) : core_(core) {
@@ -18,31 +19,25 @@ graphics::Core *Core::GraphicsCore() const {
   return core_;
 }
 
+void Core::Render(Scene *scene, Camera *camera, Film *film, RenderPipeline render_pipeline) {
+  switch (render_pipeline) {
+    case RENDER_PIPELINE_RASTERIZATION:
+      raster::Render(this, scene, camera, film);
+      break;
+    case RENDER_PIPELINE_RAY_TRACING:
+      if (!core_->DeviceRayTracingSupport()) {
+        LogError("Ray tracing not supported on this device");
+        return;
+      }
+      raytracing::Render(this, scene, camera, film);
+      break;
+    default:
+      LogError("Unknown render pipeline");
+  }
+}
+
 const VirtualFileSystem &Core::GetShadersVFS() const {
   return shaders_vfs_;
-}
-
-void Core::ConvertFilmToRawImage(const Film &film, graphics::Image *image) {
-  std::unique_ptr<graphics::CommandContext> cmd_context;
-  core_->CreateCommandContext(&cmd_context);
-  cmd_context->CmdBindComputeProgram(compute_programs_["film2img"].get());
-  cmd_context->CmdBindResources(0, {film.accumulated_color_.get()}, graphics::BIND_POINT_COMPUTE);
-  cmd_context->CmdBindResources(1, {film.accumulated_samples_.get()}, graphics::BIND_POINT_COMPUTE);
-  cmd_context->CmdBindResources(2, {image}, graphics::BIND_POINT_COMPUTE);
-  cmd_context->CmdDispatch((image->Extent().width + 7) / 8, (image->Extent().height + 7) / 8, 1);
-  core_->SubmitCommandContext(cmd_context.get());
-  core_->WaitGPU();
-}
-
-void Core::ToneMapping(graphics::Image *raw_image, graphics::Image *output_image) {
-  std::unique_ptr<graphics::CommandContext> cmd_context;
-  core_->CreateCommandContext(&cmd_context);
-  cmd_context->CmdBindComputeProgram(compute_programs_["tone_mapping"].get());
-  cmd_context->CmdBindResources(0, {raw_image}, graphics::BIND_POINT_COMPUTE);
-  cmd_context->CmdBindResources(1, {output_image}, graphics::BIND_POINT_COMPUTE);
-  cmd_context->CmdDispatch((output_image->Extent().width + 7) / 8, (output_image->Extent().height + 7) / 8, 1);
-  core_->SubmitCommandContext(cmd_context.get());
-  core_->WaitGPU();
 }
 
 graphics::Shader *Core::GetShader(const std::string &name) {
@@ -61,75 +56,58 @@ graphics::Image *Core::GetImage(const std::string &name) {
   return images_[name].get();
 }
 
+void Core::SetPublicResource(const std::string &name, std::unique_ptr<graphics::Shader> &&shader) {
+  shaders_[name] = std::move(shader);
+}
+
+void Core::SetPublicResource(const std::string &name, std::unique_ptr<graphics::ComputeProgram> &&program) {
+  compute_programs_[name] = std::move(program);
+}
+
+void Core::SetPublicResource(const std::string &name, std::unique_ptr<graphics::Buffer> &&buffer) {
+  buffers_[name] = std::move(buffer);
+}
+
+void Core::SetPublicResource(const std::string &name, std::unique_ptr<graphics::Image> &&image) {
+  images_[name] = std::move(image);
+}
+
 void Core::LoadPublicShaders() {
   shaders_vfs_ = VirtualFileSystem::LoadDirectory(LONGMARCH_SPARKIUM_SHADERS);
-  core_->CreateShader(shaders_vfs_, "film2img.hlsl", "Main", "cs_6_0", &shaders_["film2img"]);
-  auto &film2img_program = compute_programs_["film2img"];
-  core_->CreateComputeProgram(shaders_["film2img"].get(), &film2img_program);
-  film2img_program->AddResourceBinding(graphics::RESOURCE_TYPE_IMAGE, 1);
-  film2img_program->AddResourceBinding(graphics::RESOURCE_TYPE_IMAGE, 1);
-  film2img_program->AddResourceBinding(graphics::RESOURCE_TYPE_WRITABLE_IMAGE, 1);
-  film2img_program->Finalize();
+  std::unique_ptr<graphics::Shader> shader;
+  std::unique_ptr<graphics::ComputeProgram> compute_program;
 
-  core_->CreateShader(shaders_vfs_, "tone_mapping.hlsl", "Main", "cs_6_0", &shaders_["tone_mapping"]);
-  auto &tone_mapping_program = compute_programs_["tone_mapping"];
-  core_->CreateComputeProgram(shaders_["tone_mapping"].get(), &tone_mapping_program);
-  tone_mapping_program->AddResourceBinding(graphics::RESOURCE_TYPE_IMAGE, 1);
-  tone_mapping_program->AddResourceBinding(graphics::RESOURCE_TYPE_WRITABLE_IMAGE, 1);
-  tone_mapping_program->Finalize();
+  core_->CreateShader(shaders_vfs_, "tone_mapping.hlsl", "Main", "cs_6_0", &shader);
+  SetPublicResource("tone_mapping", std::move(shader));
 
-  core_->CreateShader(shaders_vfs_, "blelloch_scan.hlsl", "BlellochUpSweep", "cs_6_3", {"-I."},
-                      &shaders_["blelloch_scan_up"]);
-  core_->CreateShader(shaders_vfs_, "blelloch_scan.hlsl", "BlellochDownSweep", "cs_6_3", {"-I."},
-                      &shaders_["blelloch_scan_down"]);
-  core_->CreateComputeProgram(shaders_["blelloch_scan_up"].get(), &compute_programs_["blelloch_scan_up"]);
-  core_->CreateComputeProgram(shaders_["blelloch_scan_down"].get(), &compute_programs_["blelloch_scan_down"]);
-  compute_programs_["blelloch_scan_up"]->AddResourceBinding(graphics::RESOURCE_TYPE_WRITABLE_STORAGE_BUFFER, 1);
-  compute_programs_["blelloch_scan_up"]->AddResourceBinding(graphics::RESOURCE_TYPE_UNIFORM_BUFFER, 1);
-  compute_programs_["blelloch_scan_up"]->Finalize();
-  compute_programs_["blelloch_scan_down"]->AddResourceBinding(graphics::RESOURCE_TYPE_WRITABLE_STORAGE_BUFFER, 1);
-  compute_programs_["blelloch_scan_down"]->AddResourceBinding(graphics::RESOURCE_TYPE_UNIFORM_BUFFER, 1);
-  compute_programs_["blelloch_scan_down"]->Finalize();
-
-  auto vfs = shaders_vfs_;
-  vfs.WriteFile("material_sampler.hlsli", CodeLines{shaders_vfs_, "material/lambertian/sampler.hlsl"});
-  vfs.WriteFile("entity_chit.hlsl", CodeLines{shaders_vfs_, "geometry/mesh/hit_group.hlsl"});
-  core_->CreateShader(vfs, "entity_chit.hlsl", "RenderClosestHit", "lib_6_5", {"-I."},
-                      &shaders_["mesh_lambertian_chit"]);
-  core_->CreateShader(vfs, "entity_chit.hlsl", "ShadowClosestHit", "lib_6_5", {"-I."},
-                      &shaders_["mesh_lambertian_shadow_chit"]);
-
-  vfs.WriteFile("material_sampler.hlsli", CodeLines{shaders_vfs_, "material/light/sampler.hlsl"});
-  core_->CreateShader(vfs, "entity_chit.hlsl", "RenderClosestHit", "lib_6_5", {"-I."}, &shaders_["mesh_light_chit"]);
-  core_->CreateShader(vfs, "entity_chit.hlsl", "ShadowClosestHit", "lib_6_5", {"-I."},
-                      &shaders_["mesh_light_shadow_chit"]);
-
-  vfs.WriteFile("material_sampler.hlsli", CodeLines{shaders_vfs_, "material/principled/sampler.hlsl"});
-  core_->CreateShader(vfs, "entity_chit.hlsl", "RenderClosestHit", "lib_6_5", {"-I."},
-                      &shaders_["mesh_principled_chit"]);
-  core_->CreateShader(vfs, "entity_chit.hlsl", "ShadowClosestHit", "lib_6_5", {"-I."},
-                      &shaders_["mesh_principled_shadow_chit"]);
-
-  vfs.WriteFile("material_sampler.hlsli", CodeLines{shaders_vfs_, "material/specular/sampler.hlsl"});
-  core_->CreateShader(vfs, "entity_chit.hlsl", "RenderClosestHit", "lib_6_5", {"-I."}, &shaders_["mesh_specular_chit"]);
-  core_->CreateShader(vfs, "entity_chit.hlsl", "ShadowClosestHit", "lib_6_5", {"-I."},
-                      &shaders_["mesh_specular_shadow_chit"]);
+  core_->CreateComputeProgram(GetShader("tone_mapping"), &compute_program);
+  compute_program->AddResourceBinding(graphics::RESOURCE_TYPE_IMAGE, 1);
+  compute_program->AddResourceBinding(graphics::RESOURCE_TYPE_WRITABLE_IMAGE, 1);
+  compute_program->Finalize();
+  SetPublicResource("tone_mapping", std::move(compute_program));
 }
 
 void Core::LoadPublicBuffers() {
   auto path = FindAssetFile("data/new-joe-kuo-7.21201");
   auto data = SobolTableGen(65536, 1024, path);
-  core_->CreateBuffer(data.size() * sizeof(float), graphics::BUFFER_TYPE_STATIC, &buffers_["sobol"]);
-  buffers_["sobol"]->UploadData(data.data(), data.size() * sizeof(float));
+  std::unique_ptr<graphics::Buffer> buffer;
+  core_->CreateBuffer(data.size() * sizeof(float), graphics::BUFFER_TYPE_STATIC, &buffer);
+  buffer->UploadData(data.data(), data.size() * sizeof(float));
+  SetPublicResource("sobol", std::move(buffer));
 }
 
 void Core::LoadPublicImages() {
   uint32_t white_pixel = 0xFFFFFFFF;
   float white_hdr_pixel[] = {1.0f, 1.0f, 1.0f, 1.0f};
-  core_->CreateImage(1, 1, graphics::IMAGE_FORMAT_R8G8B8A8_UNORM, &images_["white"]);
-  core_->CreateImage(1, 1, graphics::IMAGE_FORMAT_R32G32B32A32_SFLOAT, &images_["white_hdr"]);
-  images_["white"]->UploadData(&white_pixel);
-  images_["white_hdr"]->UploadData(white_hdr_pixel);
+
+  std::unique_ptr<graphics::Image> image;
+  core_->CreateImage(1, 1, graphics::IMAGE_FORMAT_R8G8B8A8_UNORM, &image);
+  image->UploadData(&white_pixel);
+  SetPublicResource("white", std::move(image));
+
+  core_->CreateImage(1, 1, graphics::IMAGE_FORMAT_R32G32B32A32_SFLOAT, &image);
+  image->UploadData(white_hdr_pixel);
+  SetPublicResource("white_hdr", std::move(image));
 }
 
 }  // namespace sparkium

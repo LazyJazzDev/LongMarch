@@ -13,44 +13,36 @@ class Entity;
 class Film;
 class Scene;
 class Camera;
-class Light;
 
-struct GeometryRegistration {
-  int32_t data_index;
-  graphics::AccelerationStructure *blas;
+class Object {
+ public:
+  virtual ~Object() = default;
+  std::unique_ptr<Object> next{nullptr};
+  template <typename T>
+  T *GetComponent() {
+    if (auto ptr = dynamic_cast<T *>(this)) {
+      return ptr;
+    }
+    return next ? next->GetComponent<T>() : nullptr;
+  }
+
+  template <typename T, typename... Args>
+  T *AddComponent(Args &&...args) {
+    auto &tail = FindTail();
+    auto obj = std::make_unique<T>(std::forward<Args>(args)...);
+    auto res = obj.get();
+    tail = std::move(obj);
+    return res;
+  }
+
+ private:
+  std::unique_ptr<Object> &FindTail() {
+    if (!next)
+      return next;
+    return next->FindTail();
+  }
 };
 
-struct InstanceRegistration {
-  int32_t instance_index;
-};
-
-struct MaterialRegistration {
-  int32_t data_index{-1};
-};
-
-struct LightMetadata {
-  int sampler_shader_index{-1};
-  int sampler_data_index{-1};
-  int custom_index{-1};
-  uint32_t power_offset{0};
-};
-
-struct InstanceMetadata {
-  int geometry_data_index{-1};
-  int material_data_index{-1};
-  int custom_index{-1};
-};
-
-struct BlellochScanMetadata {
-  uint32_t offset;
-  uint32_t stride;
-  uint32_t element_count;
-  uint32_t padding[61];
-};
-
-struct InstanceHitGroups {
-  graphics::HitGroup render_group;
-  graphics::HitGroup shadow_group;
-};
+typedef enum RenderPipeline { RENDER_PIPELINE_RASTERIZATION = 0, RENDER_PIPELINE_RAY_TRACING = 1 } RenderPipeline;
 
 }  // namespace sparkium

@@ -4,12 +4,15 @@
 
 namespace sparkium {
 
-class Film {
+class Film : public Object {
  public:
   Film(Core *core, int width, int height);
 
   void Reset();
 
+  Core *GetCore() const;
+
+  graphics::Extent2D GetExtent();
   int GetWidth() const;
   int GetHeight() const;
 
@@ -20,12 +23,22 @@ class Film {
     float max_exposure{1.0f};
   } info;
 
+  void Develop(graphics::Image *targ_image);
+
+  void RegisterResetCallback(const std::function<void()> &callback);
+
+  graphics::Image *GetRawImage() const;
+  graphics::Image *GetDepthImage() const;
+  graphics::Image *GetStencilImage() const;
+
  private:
-  friend Scene;
-  friend Core;
-  std::unique_ptr<graphics::Image> accumulated_color_;
-  std::unique_ptr<graphics::Image> accumulated_samples_;
   Core *core_;
+  graphics::Extent2D extent_;
+  std::unique_ptr<graphics::Image> raw_image_;
+  std::unique_ptr<graphics::Image> depth_image_;
+  std::unique_ptr<graphics::Image> stencil_image_;
+
+  std::vector<std::function<void()>> reset_callbacks_;
 };
 
 }  // namespace sparkium

@@ -112,7 +112,7 @@ void VulkanComputeProgram::Finalize() {
   pipeline_create_info.stage.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
   pipeline_create_info.stage.stage = VK_SHADER_STAGE_COMPUTE_BIT;
   pipeline_create_info.stage.module = compute_shader_->ShaderModule()->Handle();
-  pipeline_create_info.stage.pName = compute_shader_->EntryPoint().c_str();
+  pipeline_create_info.stage.pName = compute_shader_->ShaderModule()->EntryPoint().c_str();
   pipeline_create_info.stage.pSpecializationInfo = nullptr;
   vkCreateComputePipelines(core_->Device()->Handle(), VK_NULL_HANDLE, 1, &pipeline_create_info, nullptr, &pipeline_);
 }

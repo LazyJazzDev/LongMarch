@@ -7,11 +7,6 @@ class MaterialPrincipled : public Material {
  public:
   MaterialPrincipled(Core *core, const glm::vec3 &base_color = glm::vec3{0.8f});
 
-  graphics::Buffer *Buffer() override;
-  const CodeLines &SamplerImpl() const override;
-  const CodeLines &EvaluatorImpl() const override;
-  void Update(Scene *scene) override;
-
   struct Info {
     glm::vec3 base_color{0.8f};
 
@@ -73,13 +68,6 @@ class MaterialPrincipled : public Material {
 
   glm::vec3 &emission_color{info.emission_color};
   float &emission_strength{info.emission_strength};
-
-  void SyncMaterialData();
-
- private:
-  std::unique_ptr<graphics::Buffer> material_buffer_;
-  CodeLines sampler_implementation_;
-  CodeLines evaluator_implementation_;
 };
 
 }  // namespace sparkium

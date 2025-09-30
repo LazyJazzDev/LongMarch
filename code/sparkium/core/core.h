@@ -2,17 +2,15 @@
 #include "sparkium/core/core_util.h"
 
 namespace sparkium {
-class Core {
+class Core : public Object {
  public:
   Core(graphics::Core *core);
 
   graphics::Core *GraphicsCore() const;
 
+  void Render(Scene *scene, Camera *camera, Film *film, RenderPipeline render_pipeline = RENDER_PIPELINE_RAY_TRACING);
+
   const VirtualFileSystem &GetShadersVFS() const;
-
-  void ConvertFilmToRawImage(const Film &film, graphics::Image *image);
-
-  void ToneMapping(graphics::Image *raw_image, graphics::Image *output_image);
 
   graphics::Shader *GetShader(const std::string &name);
 
@@ -21,6 +19,11 @@ class Core {
   graphics::Buffer *GetBuffer(const std::string &name);
 
   graphics::Image *GetImage(const std::string &name);
+
+  void SetPublicResource(const std::string &name, std::unique_ptr<graphics::Shader> &&shader);
+  void SetPublicResource(const std::string &name, std::unique_ptr<graphics::ComputeProgram> &&program);
+  void SetPublicResource(const std::string &name, std::unique_ptr<graphics::Buffer> &&buffer);
+  void SetPublicResource(const std::string &name, std::unique_ptr<graphics::Image> &&image);
 
  private:
   void LoadPublicShaders();
