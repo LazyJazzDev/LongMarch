@@ -10,7 +10,7 @@ class LightGeometryMaterial : public Light {
   graphics::Buffer *SamplerData() override;
   uint32_t SamplerPreprocess(graphics::CommandContext *cmd_ctx) override;
 
-  glm::mat4x3 transform;
+  const glm::mat4x3 &transform;
 
  private:
   Geometry *geometry_;

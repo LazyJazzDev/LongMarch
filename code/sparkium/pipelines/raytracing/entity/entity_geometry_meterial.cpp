@@ -12,7 +12,7 @@ EntityGeometryMaterial::EntityGeometryMaterial(sparkium::EntityGeometryMaterial 
   geometry_ = DedicatedCast(entity_.GetGeometry());
   material_ = DedicatedCast(entity_.GetMaterial());
 
-  light_geom_mat_ = std::make_unique<LightGeometryMaterial>(core_, geometry_, material_, entity_.GetTransformation());
+  light_geom_mat_ = std::make_unique<LightGeometryMaterial>(core_, geometry_, material_, entity_.transform);
 
   if (dynamic_cast<GeometryMesh *>(geometry_)) {
     if (dynamic_cast<MaterialLambertian *>(material_)) {
