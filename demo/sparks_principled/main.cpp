@@ -118,8 +118,6 @@ int main() {
   scene.AddEntity(&entity_short_box);
   scene.AddEntity(&entity_tall_box);
 
-  std::unique_ptr<graphics::Image> raw_image;
-  core_->CreateImage(film.GetWidth(), film.GetHeight(), graphics::IMAGE_FORMAT_R32G32B32A32_SFLOAT, &raw_image);
   std::unique_ptr<graphics::Image> srgb_image;
   core_->CreateImage(film.GetWidth(), film.GetHeight(), graphics::IMAGE_FORMAT_R8G8B8A8_UNORM, &srgb_image);
 
