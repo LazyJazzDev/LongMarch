@@ -7,6 +7,8 @@ class Core : public Object {
  public:
   Core(sparkium::Core &core);
 
+  graphics::Core *GraphicsCore() const;
+
  private:
   sparkium::Core &core_;
 };

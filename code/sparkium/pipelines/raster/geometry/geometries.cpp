@@ -1,5 +1,10 @@
-//
-// Created by zijian on 2025/9/29.
-//
+#include "sparkium/pipelines/raster/geometry/geometries.h"
 
-#include "geometries.h"
+namespace sparkium::raster {
+
+Geometry *DedicatedCast(sparkium::Geometry *geometry) {
+  DEDICATED_CAST(geometry, sparkium::GeometryMesh, GeometryMesh);
+  return nullptr;
+}
+
+}  // namespace sparkium::raster

@@ -1,5 +1,7 @@
 #include "sparkium/core/film.h"
 
+#include "sparkium/core/core.h"
+
 namespace sparkium {
 Film::Film(Core *core, int width, int height)
     : core_(core), extent_{static_cast<uint32_t>(width), static_cast<uint32_t>(height)} {

@@ -1,8 +1,9 @@
-//
-// Created by zijian on 2025/9/29.
-//
+#pragma once
+#include "sparkium/pipelines/raster/entity/entity_geometry_material.h"
+#include "sparkium/pipelines/raster/entity/entity_point_light.h"
 
-#ifndef LONGMARCH_ENTITIES_H
-#define LONGMARCH_ENTITIES_H
+namespace sparkium::raster {
 
-#endif  // LONGMARCH_ENTITIES_H
+Entity *DedicatedCast(sparkium::Entity *entity);
+
+}

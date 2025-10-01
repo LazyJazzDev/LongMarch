@@ -1,8 +1,17 @@
-//
-// Created by 吕紫剑 on 2025/9/30.
-//
+#pragma once
+#include "sparkium/pipelines/raster/core/core_util.h"
 
-#ifndef MATERIAL_H
-#define MATERIAL_H
+namespace sparkium::raster {
 
-#endif  // MATERIAL_H
+class Material : public Object {
+ public:
+  explicit Material(Core *core) : core_(core) {
+  }
+  virtual ~Material() = default;
+  virtual graphics::Shader *PixelShader() = 0;
+
+ protected:
+  Core *core_{};
+};
+
+}  // namespace sparkium::raster

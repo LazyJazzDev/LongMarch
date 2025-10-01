@@ -1,5 +1,4 @@
 #pragma once
-#include "core.h"
 #include "sparkium/core/core_util.h"
 
 namespace sparkium {

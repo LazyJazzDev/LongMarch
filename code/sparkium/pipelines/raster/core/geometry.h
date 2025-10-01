@@ -1,8 +1,19 @@
-//
-// Created by 吕紫剑 on 2025/9/30.
-//
+#pragma once
+#include "sparkium/pipelines/raster/core/core_util.h"
 
-#ifndef GEOMETRY_H
-#define GEOMETRY_H
+namespace sparkium::raster {
 
-#endif  // GEOMETRY_H
+class Geometry : public Object {
+ public:
+  explicit Geometry(Core *core) : core_(core) {
+  }
+  virtual ~Geometry() = default;
+  virtual graphics::Buffer *VertexBuffer() = 0;
+  virtual graphics::Buffer *IndexBuffer() = 0;
+  virtual graphics::Shader *VertexShader() = 0;
+
+ protected:
+  Core *core_{};
+};
+
+}  // namespace sparkium::raster

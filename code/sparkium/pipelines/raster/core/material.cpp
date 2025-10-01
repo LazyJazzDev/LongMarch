@@ -1,5 +1,3 @@
-//
-// Created by 吕紫剑 on 2025/9/30.
-//
+#include "sparkium/pipelines/raster/core/material.h"
 
-#include "material.h"
+namespace sparkium::raster {}  // namespace sparkium::raster
