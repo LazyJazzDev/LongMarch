@@ -15,7 +15,7 @@ class Camera : public Object {
 
   graphics::Shader *Shader() const;
 
-  graphics::Buffer *Buffer() const;
+  graphics::Buffer *Buffer();
 
  private:
   sparkium::Camera &camera_;

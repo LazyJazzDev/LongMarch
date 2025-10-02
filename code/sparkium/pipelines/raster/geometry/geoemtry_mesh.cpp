@@ -42,7 +42,7 @@ void GeometryMesh::SetupProgram(graphics::Program *program) {
     program->AddInputBinding(header.tangent_stride);
     program->AddInputAttribute(binding++, graphics::INPUT_TYPE_FLOAT3, 0);
     program->AddInputBinding(header.signal_stride);
-    program->AddInputAttribute(binding++, graphics::INPUT_TYPE_FLOAT, 0);
+    program->AddInputAttribute(binding, graphics::INPUT_TYPE_FLOAT, 0);
   }
 }
 

@@ -197,7 +197,7 @@ int main() {
   core_->CreateWindowObject(film.GetWidth(), film.GetHeight(), "Sparkium", &window);
   FPSCounter fps_counter;
   while (!window->ShouldClose()) {
-    sparkium_core.Render(&scene, &camera, &film);
+    sparkium_core.Render(&scene, &camera, &film, sparkium::RENDER_PIPELINE_RASTERIZATION);
     film.Develop(srgb_image.get());
     std::unique_ptr<graphics::CommandContext> cmd_context;
     core_->CreateCommandContext(&cmd_context);
@@ -211,6 +211,45 @@ int main() {
     char rps_buf[16];
     sprintf(rps_buf, "%.2f", rps * 1e-6f);
     window->SetTitle(std::string("Sparkium Textured PBR - ") + fps_buf + "frames/s" + " - " + rps_buf + "Mrays/s");
+
+    glm::mat4 inv_view = glm::inverse(camera.view);
+    glm::vec3 x = inv_view[0];
+    glm::vec3 y = inv_view[1];
+    glm::vec3 z = inv_view[2];
+    glm::vec3 pos = inv_view[3];
+    bool changed = false;
+    if (glfwGetKey(window->GLFWWindow(), GLFW_KEY_W) == GLFW_PRESS) {
+      pos = pos - z * 0.1f;
+      changed = true;
+    }
+    if (glfwGetKey(window->GLFWWindow(), GLFW_KEY_S) == GLFW_PRESS) {
+      pos = pos + z * 0.1f;
+      changed = true;
+    }
+    if (glfwGetKey(window->GLFWWindow(), GLFW_KEY_A) == GLFW_PRESS) {
+      pos = pos - x * 0.1f;
+      changed = true;
+    }
+    if (glfwGetKey(window->GLFWWindow(), GLFW_KEY_D) == GLFW_PRESS) {
+      pos = pos + x * 0.1f;
+      changed = true;
+    }
+    if (glfwGetKey(window->GLFWWindow(), GLFW_KEY_Q) == GLFW_PRESS) {
+      pos = pos - y * 0.1f;
+      changed = true;
+    }
+    if (glfwGetKey(window->GLFWWindow(), GLFW_KEY_E) == GLFW_PRESS) {
+      pos = pos + y * 0.1f;
+      changed = true;
+    }
+    inv_view[0] = glm::vec4(x, 0.0f);
+    inv_view[1] = glm::vec4(y, 0.0f);
+    inv_view[2] = glm::vec4(z, 0.0f);
+    inv_view[3] = glm::vec4(pos, 1.0f);
+    camera.view = glm::inverse(inv_view);
+    if (changed) {
+      film.Reset();
+    }
   }
 
   film.Develop(srgb_image.get());

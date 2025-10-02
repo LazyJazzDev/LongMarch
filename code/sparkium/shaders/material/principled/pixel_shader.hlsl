@@ -5,6 +5,8 @@ struct PSInput {
   [[vk::location(0)]] float3 world_position : TEXCOORD0;
   [[vk::location(1)]] float3 world_normal : TEXCOORD1;
   [[vk::location(2)]] float2 tex_coord : TEXCOORD2;
+  [[vk::location(3)]] float3 tangent : TEXCOORD3;
+  [[vk::location(4)]] float signal : TEXCOORD4;
 };
 
 struct PSOutput {
@@ -30,6 +32,12 @@ PSOutput PSMain(PSInput input) {
     input.world_normal = geom_normal;
   }
   float3 N = normalize(input.world_normal);
+  float3 T = input.tangent;
+  float3 B = float3(0, 0, 0);
+  if (length(T) > 0.001) {
+    T = normalize(T - dot(T, N) * N);
+    B = cross(N, T) * input.signal;
+  }
 
   StreamedBufferReference<ByteAddressBuffer> material_buffer = MakeStreamedBufferReference(material_data, 0);
 
@@ -54,13 +62,27 @@ PSOutput PSMain(PSInput input) {
   float3 emission = material_buffer.LoadFloat3();
   float strength = material_buffer.LoadFloat();
 
+  float y_signal = material_buffer.LoadFloat();
+
   input.tex_coord.y = 1.0 - input.tex_coord.y;
   base_color *= textures[0].Sample(S, input.tex_coord).xyz;
   roughness *= textures[1].Sample(S, input.tex_coord).x;
   specular *= textures[2].Sample(S, input.tex_coord).x;
   metallic *= textures[3].Sample(S, input.tex_coord).x;
 
+  float3 tbn = textures[4].Sample(S, input.tex_coord).xyz;
+
+  if (length(tbn) > 0.001 && length(B) > 0.001) {
+    tbn = tbn * 2.0f - 1.0f;
+    tbn = normalize(tbn);
+    N = normalize(mul(tbn, float3x3(T, B * y_signal, N)));
+  }
+
   output.radiance = float4(emission * strength, 0.0);
+  // base_color = float3(max(input.signal, 0.0), 0.0, max(-input.signal, 0.0));
+  // base_color = T * 0.5 + 0.5;
+  // base_color = B * 0.5 + 0.5;
+  // base_color = float3(input.tex_coord, 0.0);
   output.albedo_roughness = float4(base_color, roughness);
   output.position_specular = float4(input.world_position, specular);
   output.normal_metallic = float4(N * 0.5 + 0.5, metallic);

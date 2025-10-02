@@ -41,8 +41,7 @@ void SampleMaterial(inout RenderContext context, HitRecord hit_record) {
   if (normal_texture_index != -1) {
     float3 tbn = SampleTexture(normal_texture_index, hit_record.tex_coord).xyz * 2.0f - 1.0f;
     float3x3 TBN =
-        float3x3(hit_record.tangent, cross(hit_record.normal, hit_record.tangent) * hit_record.signal * y_signal,
-                 hit_record.normal);
+        float3x3(hit_record.tangent, cross(hit_record.normal, hit_record.tangent) * y_signal, hit_record.normal);
     material.hit_record.normal = hit_record.normal = normalize(mul(tbn, TBN));
   }
 

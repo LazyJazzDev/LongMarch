@@ -8,7 +8,8 @@ MaterialPrincipled::MaterialPrincipled(sparkium::MaterialPrincipled &material)
     : material_(material), Material(DedicatedCast(material.GetCore())) {
   core_->GraphicsCore()->CreateShader(core_->GetShadersVFS(), "material/principled/pixel_shader.hlsl", "PSMain",
                                       "ps_6_0", {"-I."}, &pixel_shader_);
-  core_->GraphicsCore()->CreateBuffer(sizeof(material_.info), graphics::BUFFER_TYPE_STATIC, &material_buffer_);
+  core_->GraphicsCore()->CreateBuffer(sizeof(material_.info) + sizeof(float), graphics::BUFFER_TYPE_STATIC,
+                                      &material_buffer_);
   core_->GraphicsCore()->CreateSampler(graphics::SamplerInfo{}, &sampler_);
 }
 
@@ -17,7 +18,9 @@ graphics::Shader *MaterialPrincipled::PixelShader() {
 }
 
 void MaterialPrincipled::Sync() {
+  float signal = material_.textures.normal_reverse_y ? -1.0f : 1.0f;
   material_buffer_->UploadData(&material_.info, sizeof(material_.info));
+  material_buffer_->UploadData(&signal, sizeof(signal), sizeof(material_.info));
 }
 
 glm::vec3 MaterialPrincipled::Emission() const {
@@ -25,13 +28,13 @@ glm::vec3 MaterialPrincipled::Emission() const {
 }
 
 void MaterialPrincipled::SetupProgram(graphics::Program *program) {
-  program->AddResourceBinding(graphics::RESOURCE_TYPE_IMAGE, 4);    // Material Data
+  program->AddResourceBinding(graphics::RESOURCE_TYPE_IMAGE, 5);    // Material Data
   program->AddResourceBinding(graphics::RESOURCE_TYPE_SAMPLER, 1);  // Material Data
 }
 
 void MaterialPrincipled::BindMaterialResources(graphics::CommandContext *cmd_ctx) {
   cmd_ctx->CmdBindResources(2, {material_buffer_.get()}, graphics::BIND_POINT_GRAPHICS);
-  std::vector<graphics::Image *> textures(4);
+  std::vector<graphics::Image *> textures(5);
   textures[0] = material_.textures.base_color;
   if (!textures[0])
     textures[0] = core_->GetImage("white");
@@ -44,6 +47,10 @@ void MaterialPrincipled::BindMaterialResources(graphics::CommandContext *cmd_ctx
   textures[3] = material_.textures.metallic;
   if (!textures[3])
     textures[3] = core_->GetImage("black");
+  textures[4] = material_.textures.normal;
+  if (!textures[4]) {
+    textures[4] = core_->GetImage("normal_default");
+  }
   cmd_ctx->CmdBindResources(3, textures, graphics::BIND_POINT_GRAPHICS);
   cmd_ctx->CmdBindResources(4, {sampler_.get()}, graphics::BIND_POINT_GRAPHICS);
 }

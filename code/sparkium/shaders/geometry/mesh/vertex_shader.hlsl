@@ -47,6 +47,8 @@ struct VSOutput {
   [[vk::location(0)]] float3 world_position : TEXCOORD0;
   [[vk::location(1)]] float3 world_normal : TEXCOORD1;
   [[vk::location(2)]] float2 tex_coord : TEXCOORD2;
+  [[vk::location(3)]] float3 tangent : TEXCOORD3;
+  [[vk::location(4)]] float signal : TEXCOORD4;
 };
 
 struct CameraData {
@@ -79,6 +81,13 @@ VSOutput VSMain(VSInput input) {
   output.tex_coord = input.tex_coord;
 #else
   output.tex_coord = float2(0, 0);
+#endif
+#if defined(HAS_TANGENT)
+  output.tangent = normalize(mul(geometry_data.model, float4(input.tangent, 0)).xyz);
+  output.signal = input.signal;
+#else
+  output.tangent = float3(0, 0, 0);
+  output.signal = 1.0;
 #endif
   output.position = mul(camera_data.view_proj, float4(output.world_position, 1.0));
   return output;

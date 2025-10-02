@@ -26,13 +26,13 @@ graphics::Buffer *Camera::FarFieldBuffer() const {
 
 void Camera::Update() {
   data_.view = camera_.view;
-  data_.proj = glm::perspective(camera_.fovy, camera_.aspect, 0.1f, 100.0f);
+  data_.proj = glm::perspectiveZO(camera_.fovy, camera_.aspect, 0.1f, 100.0f);
   data_.view_proj = data_.proj * data_.view;
   data_.inv_view = glm::inverse(data_.view);
   data_.inv_proj = glm::inverse(data_.proj);
   data_.inv_view_proj = glm::inverse(data_.view_proj);
   near_field_buffer_->UploadData(&data_, sizeof(CameraData));
-  data_.proj = glm::perspective(camera_.fovy, camera_.aspect, 100.0f, 10000.0f);
+  data_.proj = glm::perspectiveZO(camera_.fovy, camera_.aspect, 100.0f, 10000.0f);
   data_.view_proj = data_.proj * data_.view;
   data_.inv_proj = glm::inverse(data_.proj);
   data_.inv_view_proj = glm::inverse(data_.view_proj);

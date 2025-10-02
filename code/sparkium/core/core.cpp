@@ -129,6 +129,11 @@ void Core::LoadPublicImages() {
   core_->CreateImage(1, 1, graphics::IMAGE_FORMAT_R32G32B32A32_SFLOAT, &image);
   image->UploadData(hdr_pixel);
   SetPublicResource("black_hdr", std::move(image));
+
+  pixel = 0xFFFF8080;  // Normal map default value (0.5, 0.5, 1.0)
+  core_->CreateImage(1, 1, graphics::IMAGE_FORMAT_R8G8B8A8_UNORM, &image);
+  image->UploadData(&pixel);
+  SetPublicResource("normal_default", std::move(image));
 }
 
 }  // namespace sparkium
