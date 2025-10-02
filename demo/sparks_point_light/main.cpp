@@ -11,8 +11,8 @@ using namespace long_march;
 int main() {
   std::unique_ptr<graphics::Core> core_;
 
-  graphics::CreateCore(graphics::BACKEND_API_DEFAULT, graphics::Core::Settings{2, false}, &core_);
-  core_->InitializeLogicalDeviceAutoSelect(true);
+  graphics::CreateCore(graphics::BACKEND_API_DEFAULT, graphics::Core::Settings{2}, &core_);
+  core_->InitializeLogicalDeviceAutoSelect(false);
   sparkium::Core sparkium_core(core_.get());
 
   sparkium::Scene scene(&sparkium_core);
@@ -51,7 +51,7 @@ int main() {
     float x = 3.0f;
     positions[i] = {sin_theta * x, 2.0f, cos_theta * x};
     point_lights[i]->color = graphics::HSVtoRGB({frac, 1.0f, 1.0f});
-    point_lights[i]->strength = 1440.0f / num_lights / graphics::GreyScale(point_lights[i]->color);
+    point_lights[i]->strength = 1000.0f / num_lights / graphics::GreyScale(point_lights[i]->color);
   }
 
   scene.AddEntity(&entity_mesh);

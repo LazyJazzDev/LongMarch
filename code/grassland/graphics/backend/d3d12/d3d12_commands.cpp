@@ -59,7 +59,7 @@ void D3D12CmdBindVertexBuffers::CompileCommand(D3D12CommandContext *context, ID3
     vertex_buffer_views[i].SizeInBytes = buffers_[i]->Size() - offsets_[i];
 
     context->RequireResourceState(command_list, buffers_[i]->Buffer()->Handle(),
-                                  D3D12_RESOURCE_STATE_VERTEX_AND_CONSTANT_BUFFER);
+                                  D3D12_RESOURCE_STATE_VERTEX_AND_CONSTANT_BUFFER | D3D12_RESOURCE_STATE_INDEX_BUFFER);
   }
   command_list->IASetVertexBuffers(first_binding_, buffers_.size(), vertex_buffer_views.data());
 }
@@ -74,7 +74,8 @@ void D3D12CmdBindIndexBuffer::CompileCommand(D3D12CommandContext *context, ID3D1
   index_buffer_view.SizeInBytes = buffer_->Size() - offset_;
   index_buffer_view.Format = DXGI_FORMAT_R32_UINT;
 
-  context->RequireResourceState(command_list, buffer_->Buffer()->Handle(), D3D12_RESOURCE_STATE_INDEX_BUFFER);
+  context->RequireResourceState(command_list, buffer_->Buffer()->Handle(),
+                                D3D12_RESOURCE_STATE_VERTEX_AND_CONSTANT_BUFFER | D3D12_RESOURCE_STATE_INDEX_BUFFER);
   command_list->IASetIndexBuffer(&index_buffer_view);
 }
 

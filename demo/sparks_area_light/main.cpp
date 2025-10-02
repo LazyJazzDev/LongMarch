@@ -59,12 +59,12 @@ int main() {
   std::unique_ptr<graphics::Core> core_;
 
   graphics::CreateCore(graphics::BACKEND_API_DEFAULT, graphics::Core::Settings{2, true}, &core_);
-  core_->InitializeLogicalDeviceAutoSelect(true);
+  core_->InitializeLogicalDeviceAutoSelect(false);
   sparkium::Core sparkium_core(core_.get());
   sparkium_core.GetShadersVFS().Print();
 
   sparkium::Scene scene(&sparkium_core);
-  scene.settings.samples_per_dispatch = 64;
+  scene.settings.samples_per_dispatch = 8;
   sparkium::Film film(&sparkium_core, 1024, 1024);
   film.info.persistence = 0.99f;
   sparkium::Camera camera(&sparkium_core,

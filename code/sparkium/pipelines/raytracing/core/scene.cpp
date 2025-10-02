@@ -21,8 +21,8 @@ Scene::Scene(sparkium::Scene &scene) : scene_(scene), settings(scene.settings) {
                                       &default_miss_shader_);
   core_->GraphicsCore()->CreateShader(core_->GetShadersVFS(), "raygen.hlsl", "ShadowMiss", "lib_6_5",
                                       &shadow_miss_shader_);
-  core_->GraphicsCore()->CreateBuffer(sizeof(Settings) + sizeof(sparkium::Film::Info), graphics::BUFFER_TYPE_STATIC,
-                                      &scene_settings_buffer_);
+  core_->GraphicsCore()->CreateBuffer(sizeof(Settings::RayTracing) + sizeof(sparkium::Film::Info),
+                                      graphics::BUFFER_TYPE_STATIC, &scene_settings_buffer_);
   core_->GraphicsCore()->CreateShader(core_->GetShadersVFS(), "gather_light_power.hlsl", "GatherLightPowerKernel",
                                       "cs_6_3", &gather_light_power_shader_);
   core_->GraphicsCore()->CreateSampler({graphics::FILTER_MODE_LINEAR}, &linear_sampler_);
@@ -31,9 +31,9 @@ Scene::Scene(sparkium::Scene &scene) : scene_(scene), settings(scene.settings) {
 
 void Scene::Render(Camera *camera, Film *film) {
   UpdatePipeline(camera);
-  scene_settings_buffer_->UploadData(&settings, sizeof(Settings));
-  scene_settings_buffer_->UploadData(&film->film_.info, sizeof(sparkium::Film::Info), sizeof(Settings));
-  film->film_.info.accumulated_samples += settings.samples_per_dispatch;
+  scene_settings_buffer_->UploadData(&settings.raytracing, sizeof(Settings::RayTracing));
+  scene_settings_buffer_->UploadData(&film->film_.info, sizeof(sparkium::Film::Info), sizeof(Settings::RayTracing));
+  film->film_.info.accumulated_samples += settings.raytracing.samples_per_dispatch;
   std::unique_ptr<graphics::CommandContext> cmd_context;
   core_->GraphicsCore()->CreateCommandContext(&cmd_context);
   cmd_context->CmdBindRayTracingProgram(rt_program_.get());

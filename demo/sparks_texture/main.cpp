@@ -59,7 +59,7 @@ int main() {
   std::unique_ptr<graphics::Core> core_;
 
   graphics::CreateCore(graphics::BACKEND_API_DEFAULT, graphics::Core::Settings{2, false}, &core_);
-  core_->InitializeLogicalDeviceAutoSelect(true);
+  core_->InitializeLogicalDeviceAutoSelect(false);
   sparkium::Core sparkium_core(core_.get());
 
   sparkium::Scene scene(&sparkium_core);
@@ -179,6 +179,9 @@ int main() {
   sparkium::EntityGeometryMaterial entity_sky(
       &sparkium_core, &geometry_sphere, &material_sky,
       glm::translate(glm::mat4{1.0f}, glm::vec3{0.0f, 0.0f, 0.0f}) * glm::scale(glm::mat4(1.0f), glm::vec3(60.0f)));
+  entity_sky.raster_light = false;
+  scene.settings.raster.ambient_light = glm::vec3{0.2f, 0.2f, 0.2f};
+
   AreaLight area_light(&sparkium_core, glm::vec3{1.0f, 1.0f, 1.0f}, 1.0f, glm::vec3{0.0f, 30.0f, 50.0f},
                        glm::normalize(glm::vec3{0.0f, -3.0f, -5.0f}));
   area_light.emission = glm::vec3{1000.0f};
@@ -193,8 +196,21 @@ int main() {
   std::unique_ptr<graphics::Window> window;
   core_->CreateWindowObject(film.GetWidth(), film.GetHeight(), "Sparkium", &window);
   FPSCounter fps_counter;
+  bool ray_tracing = true;
+  window->InitImGui(nullptr, 20.0f);
   while (!window->ShouldClose()) {
-    sparkium_core.Render(&scene, &camera, &film);
+    window->BeginImGuiFrame();
+    ImGui::SetNextWindowPos({0, 0}, ImGuiCond_Once);
+    ImGui::SetNextWindowBgAlpha(0.3);
+    ImGui::Begin("Settings", nullptr, ImGuiWindowFlags_AlwaysAutoResize);
+    ImGui::Checkbox("Ray Tracing", &ray_tracing);
+    if (ray_tracing && !core_->DeviceRayTracingSupport()) {
+      ImGui::Text("Ray Tracing not supported on this device!");
+    }
+    ImGui::End();
+    window->EndImGuiFrame();
+    sparkium_core.Render(&scene, &camera, &film,
+                         ray_tracing ? sparkium::RENDER_PIPELINE_AUTO : sparkium::RENDER_PIPELINE_RASTERIZATION);
     film.Develop(srgb_image.get());
     std::unique_ptr<graphics::CommandContext> cmd_context;
     core_->CreateCommandContext(&cmd_context);
@@ -208,6 +224,45 @@ int main() {
     char rps_buf[16];
     sprintf(rps_buf, "%.2f", rps * 1e-6f);
     window->SetTitle(std::string("Sparkium Textured PBR - ") + fps_buf + "frames/s" + " - " + rps_buf + "Mrays/s");
+
+    glm::mat4 inv_view = glm::inverse(camera.view);
+    glm::vec3 x = inv_view[0];
+    glm::vec3 y = inv_view[1];
+    glm::vec3 z = inv_view[2];
+    glm::vec3 pos = inv_view[3];
+    bool changed = false;
+    if (glfwGetKey(window->GLFWWindow(), GLFW_KEY_W) == GLFW_PRESS) {
+      pos = pos - z * 0.1f;
+      changed = true;
+    }
+    if (glfwGetKey(window->GLFWWindow(), GLFW_KEY_S) == GLFW_PRESS) {
+      pos = pos + z * 0.1f;
+      changed = true;
+    }
+    if (glfwGetKey(window->GLFWWindow(), GLFW_KEY_A) == GLFW_PRESS) {
+      pos = pos - x * 0.1f;
+      changed = true;
+    }
+    if (glfwGetKey(window->GLFWWindow(), GLFW_KEY_D) == GLFW_PRESS) {
+      pos = pos + x * 0.1f;
+      changed = true;
+    }
+    if (glfwGetKey(window->GLFWWindow(), GLFW_KEY_Q) == GLFW_PRESS) {
+      pos = pos - y * 0.1f;
+      changed = true;
+    }
+    if (glfwGetKey(window->GLFWWindow(), GLFW_KEY_E) == GLFW_PRESS) {
+      pos = pos + y * 0.1f;
+      changed = true;
+    }
+    inv_view[0] = glm::vec4(x, 0.0f);
+    inv_view[1] = glm::vec4(y, 0.0f);
+    inv_view[2] = glm::vec4(z, 0.0f);
+    inv_view[3] = glm::vec4(pos, 1.0f);
+    camera.view = glm::inverse(inv_view);
+    if (changed) {
+      film.Reset();
+    }
   }
 
   film.Develop(srgb_image.get());

@@ -13,7 +13,7 @@ GeometryMesh::GeometryMesh(Core *core, const Mesh<float> &mesh) : Geometry(core)
 
   Mesh<float> mesh_copy;
   const Mesh<float> *mesh_ptr = &mesh;
-  if (mesh.Normals() && mesh.TexCoords()) {
+  if (mesh.Normals() && mesh.TexCoords() && !mesh.Tangents()) {
     mesh_copy = mesh;
     mesh_copy.GenerateTangents();
     mesh_ptr = &mesh_copy;
@@ -40,7 +40,10 @@ GeometryMesh::GeometryMesh(Core *core, const Mesh<float> &mesh) : Geometry(core)
     write_data(mesh_ptr->TexCoords(), mesh_ptr->NumVertices() * sizeof(float) * 2);
   }
 
-  if (mesh_ptr->Signals()) {
+  if (mesh_ptr->Tangents()) {
+    header_.tangent_offset = data.size();
+    header_.tangent_stride = sizeof(float) * 3;
+    write_data(mesh_ptr->Tangents(), mesh_ptr->NumVertices() * sizeof(float) * 3);
     header_.signal_offset = data.size();
     header_.signal_stride = sizeof(float);
     write_data(mesh_ptr->Signals(), mesh_ptr->NumVertices() * sizeof(float));

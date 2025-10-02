@@ -86,3 +86,27 @@ struct GeometryPrimitiveSample {
   float2 tex_coord;
   float pdf;
 };
+
+
+void MakeOrthonormals(const float3 N, out float3 a, out float3 b) {
+  if (N.x != N.y || N.x != N.z)
+    a = float3(N.z - N.y, N.x - N.z, N.y - N.x);
+  else
+    a = float3(N.z - N.y, N.x + N.z, -N.y - N.x);
+
+  a = normalize(a);
+  b = cross(N, a);
+}
+
+void sample_cos_hemisphere(const float3 N,
+                           float r1,
+                           const float r2,
+                           out float3 omega_in,
+                           out float pdf) {
+  r1 *= PI * 2.0;
+  float3 T, B;
+  MakeOrthonormals(N, T, B);
+  omega_in = float3(float2(sin(r1), cos(r1)) * sqrt(1.0 - r2), sqrt(r2));
+  pdf = omega_in.z * INV_PI;
+  omega_in = mul(omega_in, float3x3(T, B, N));
+}
