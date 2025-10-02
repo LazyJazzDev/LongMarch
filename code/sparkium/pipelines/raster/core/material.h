@@ -11,6 +11,7 @@ class Material : public Object {
   virtual graphics::Shader *PixelShader() = 0;
   virtual graphics::Buffer *Buffer() = 0;
   virtual void Sync() = 0;
+  virtual glm::vec3 Emission() const;
 
  protected:
   Core *core_{};

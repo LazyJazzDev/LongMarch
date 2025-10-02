@@ -6,8 +6,8 @@ namespace sparkium::raster {
 
 MaterialPrincipled::MaterialPrincipled(sparkium::MaterialPrincipled &material)
     : material_(material), Material(DedicatedCast(material.GetCore())) {
-  core_->GraphicsCore()->CreateShader(core_->GetShadersVFS(), "material/light/pixel_shader.hlsl", "PSMain", "ps_6_0",
-                                      &pixel_shader_);
+  core_->GraphicsCore()->CreateShader(core_->GetShadersVFS(), "material/principled/pixel_shader.hlsl", "PSMain",
+                                      "ps_6_0", {"-I."}, &pixel_shader_);
   core_->GraphicsCore()->CreateBuffer(sizeof(material_.info), graphics::BUFFER_TYPE_STATIC, &material_buffer_);
 }
 
@@ -21,6 +21,10 @@ graphics::Buffer *MaterialPrincipled::Buffer() {
 
 void MaterialPrincipled::Sync() {
   material_buffer_->UploadData(&material_.info, sizeof(material_.info));
+}
+
+glm::vec3 MaterialPrincipled::Emission() const {
+  return material_.emission_color * material_.emission_strength;
 }
 
 }  // namespace sparkium::raster

@@ -23,4 +23,8 @@ void MaterialLight::Sync() {
   material_buffer_->UploadData(&material_.emission, sizeof(material_.emission));
 }
 
+glm::vec3 MaterialLight::Emission() const {
+  return material_.emission;
+}
+
 }  // namespace sparkium::raster

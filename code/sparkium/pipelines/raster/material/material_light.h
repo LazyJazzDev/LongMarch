@@ -13,6 +13,8 @@ class MaterialLight : public Material {
 
   void Sync() override;
 
+  glm::vec3 Emission() const override;
+
  private:
   sparkium::MaterialLight &material_;
   std::unique_ptr<graphics::Shader> pixel_shader_;

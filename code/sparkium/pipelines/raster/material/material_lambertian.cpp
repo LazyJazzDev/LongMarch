@@ -31,4 +31,8 @@ void MaterialLambertian::Sync() {
   material_buffer_->UploadData(data, sizeof(data));
 }
 
+glm::vec3 MaterialLambertian::Emission() const {
+  return material_.emission;
+}
+
 }  // namespace sparkium::raster
