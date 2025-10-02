@@ -72,4 +72,25 @@ void GeometryMesh::DispatchDrawCalls(graphics::CommandContext *cmd_ctx) {
   cmd_ctx->CmdDrawIndexed(geometry_.PrimitiveCount() * 3, 1, 0, 0, 0);
 }
 
+glm::vec4 GeometryMesh::CentricArea(const glm::mat4x3 &affine) {
+  glm::vec3 centric{0.0f};
+  auto header = geometry_.GetHeader();
+  std::vector<glm::vec3> positions(header.num_vertices);
+  geometry_.GetBuffer()->DownloadData(positions.data(), header.num_vertices * sizeof(glm::vec3),
+                                      header.position_offset);
+  std::vector<uint32_t> indices(header.num_indices);
+  geometry_.GetBuffer()->DownloadData(indices.data(), header.num_indices * sizeof(uint32_t), header.index_offset);
+  float total_area = 0.0f;
+  for (size_t i = 0; i < header.num_indices; i += 3) {
+    glm::vec3 v0 = affine * glm::vec4{positions[indices[i]], 1.0};
+    glm::vec3 v1 = affine * glm::vec4{positions[indices[i + 1]], 1.0};
+    glm::vec3 v2 = affine * glm::vec4{positions[indices[i + 2]], 1.0};
+    float area = glm::length(glm::cross(v1 - v0, v2 - v0)) * 0.5f;
+    centric += area * (v0 + v1 + v2) * 0.3333333f;
+    total_area += area;
+  }
+  centric /= total_area;
+  return glm::vec4(centric, total_area);
+}
+
 }  // namespace sparkium::raster

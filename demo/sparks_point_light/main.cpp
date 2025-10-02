@@ -75,7 +75,7 @@ int main() {
       point_lights[i]->position = positions[i];
     }
     rotation_angle += glm::radians(0.3f);
-    sparkium_core.Render(&scene, &camera, &film, sparkium::RENDER_PIPELINE_AUTO);
+    sparkium_core.Render(&scene, &camera, &film);
     film.Develop(srgb_image.get());
     std::unique_ptr<graphics::CommandContext> cmd_context;
     core_->CreateCommandContext(&cmd_context);

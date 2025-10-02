@@ -1,5 +1,6 @@
 #include "sparkium/pipelines/raster/entity/entity_geometry_material.h"
 
+#include "glm/gtc/matrix_transform.hpp"
 #include "sparkium/pipelines/raster/core/core.h"
 #include "sparkium/pipelines/raster/core/scene.h"
 #include "sparkium/pipelines/raster/geometry/geometries.h"
@@ -25,6 +26,24 @@ EntityGeometryMaterial::EntityGeometryMaterial(sparkium::EntityGeometryMaterial 
   render_program_->AddResourceBinding(graphics::RESOURCE_TYPE_UNIFORM_BUFFER, 1);  // Instance Data
   render_program_->AddResourceBinding(graphics::RESOURCE_TYPE_STORAGE_BUFFER, 1);  // Material Data
   render_program_->Finalize();
+
+  core_->GraphicsCore()->CreateBuffer(sizeof(PointLightData), graphics::BUFFER_TYPE_DYNAMIC, &point_light_buffer_);
+  core_->GraphicsCore()->CreateShader(core_->GetShadersVFS(), "light/point/lighting.hlsl", "VSMain", "vs_6_0", {"-I."},
+                                      &point_light_vs_);
+  core_->GraphicsCore()->CreateShader(core_->GetShadersVFS(), "light/point/lighting.hlsl", "PSMain", "ps_6_0", {"-I."},
+                                      &point_light_ps_);
+  core_->GraphicsCore()->CreateProgram({graphics::IMAGE_FORMAT_R32G32B32A32_SFLOAT}, graphics::IMAGE_FORMAT_UNDEFINED,
+                                       &point_light_program_);
+  point_light_program_->BindShader(point_light_vs_.get(), graphics::SHADER_TYPE_VERTEX);
+  point_light_program_->BindShader(point_light_ps_.get(), graphics::SHADER_TYPE_PIXEL);
+  point_light_program_->SetBlendState(
+      0, graphics::BlendState{graphics::BLEND_FACTOR_ONE, graphics::BLEND_FACTOR_ONE, graphics::BLEND_OP_ADD,
+                              graphics::BLEND_FACTOR_ONE, graphics::BLEND_FACTOR_ONE, graphics::BLEND_OP_ADD});
+  point_light_program_->AddResourceBinding(graphics::RESOURCE_TYPE_IMAGE, 1);           // AlbedoRoughness
+  point_light_program_->AddResourceBinding(graphics::RESOURCE_TYPE_IMAGE, 1);           // PositionSpecular
+  point_light_program_->AddResourceBinding(graphics::RESOURCE_TYPE_IMAGE, 1);           // NormalMetallic
+  point_light_program_->AddResourceBinding(graphics::RESOURCE_TYPE_STORAGE_BUFFER, 1);  // PointLightData
+  point_light_program_->Finalize();
 }
 
 void EntityGeometryMaterial::Update(Scene *scene) {
@@ -44,6 +63,21 @@ void EntityGeometryMaterial::Update(Scene *scene) {
     cmd_ctx->CmdBindResources(2, {material_->Buffer()}, graphics::BIND_POINT_GRAPHICS);
     geometry_->DispatchDrawCalls(cmd_ctx);
   });
+
+  if (entity_.raster_light) {
+    glm::vec3 emission = material_->Emission();
+    if (emission.r > 0.0f || emission.g > 0.0f || emission.b > 0.0f) {
+      glm::vec4 centric_area = geometry_->CentricArea(entity_.transform);
+      point_light_data.emission = emission * glm::max(0.0f, centric_area.w) * 4.0f * glm::pi<float>();
+      point_light_data.position = {centric_area.x, centric_area.y, centric_area.z};
+      point_light_buffer_->UploadData(&point_light_data, sizeof(PointLightData));
+      scene->RegisterLightingCallback([this](graphics::CommandContext *cmd_ctx) {
+        cmd_ctx->CmdBindProgram(point_light_program_.get());
+        cmd_ctx->CmdBindResources(3, {point_light_buffer_.get()}, graphics::BIND_POINT_GRAPHICS);
+        cmd_ctx->CmdDraw(6, 1, 0, 0);
+      });
+    }
+  }
 }
 
 }  // namespace sparkium::raster

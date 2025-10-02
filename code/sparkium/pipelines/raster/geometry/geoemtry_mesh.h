@@ -9,6 +9,7 @@ class GeometryMesh : public Geometry {
   graphics::Shader *VertexShader() override;
   void SetupProgram(graphics::Program *program) override;
   void DispatchDrawCalls(graphics::CommandContext *cmd_ctx) override;
+  glm::vec4 CentricArea(const glm::mat4x3 &affine) override;
 
  private:
   sparkium::GeometryMesh &geometry_;

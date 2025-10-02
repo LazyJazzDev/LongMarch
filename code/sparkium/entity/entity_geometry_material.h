@@ -11,6 +11,7 @@ class EntityGeometryMaterial : public Entity {
                          const glm::mat4x3 &transformation = glm::mat4x3{1.0f});
 
   glm::mat4x3 transform;
+  bool raster_light{true};
 
   void SetTransformation(const glm::mat4x3 &transformation);
 

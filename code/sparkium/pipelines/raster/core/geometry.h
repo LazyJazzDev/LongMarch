@@ -11,6 +11,7 @@ class Geometry : public Object {
   virtual graphics::Shader *VertexShader() = 0;
   virtual void SetupProgram(graphics::Program *program);
   virtual void DispatchDrawCalls(graphics::CommandContext *cmd_ctx);
+  virtual glm::vec4 CentricArea(const glm::mat4x3 &affine) = 0;
 
  protected:
   Core *core_{};

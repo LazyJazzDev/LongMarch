@@ -139,6 +139,53 @@ struct JointInfo {
   float value{0.0f};
 };
 
+class AreaLight {
+  const uint32_t indices[6] = {0, 2, 1, 0, 3, 2};
+  const Vector3<float> vertices[4] = {{-1.0f, -1.0f, 0.0f},
+                                      {1.0f, -1.0f, 0.0f},
+                                      {1.0f, 1.0f, 0.0f},
+                                      {-1.0f, 1.0f, 0.0f}};
+
+ public:
+  AreaLight(sparkium::Core *core,
+            const glm::vec3 &emission = {1.0f, 1.0f, 1.0f},
+            float size = 1.0f,
+            const glm::vec3 &position = {0.0f, 0.0f, 0.0f},
+            const glm::vec3 &direction = {0.0f, 0.0f, 1.0f},
+            const glm::vec3 &up = {0.0f, 1.0f, 0.0f})
+      : light_(core, emission, false, false),
+        emission(light_.emission),
+        position(position),
+        size(size),
+        direction(direction),
+        up(up) {
+    mesh_ = std::make_unique<sparkium::GeometryMesh>(core, Mesh<>{4, 6, indices, vertices});
+    entity_geometry_material_ = std::make_unique<sparkium::EntityGeometryMaterial>(core, mesh_.get(), &light_);
+    Sync();
+  }
+
+  void Sync() {
+    entity_geometry_material_->SetTransformation(glm::inverse(glm::lookAt(position, position + direction, up)) *
+                                                 glm::scale(glm::mat4{1.0f}, glm::vec3{size}));
+  }
+
+  operator sparkium::Entity *() {
+    return entity_geometry_material_.get();
+  }
+
+  glm::vec3 &emission;
+  float size{1.0f};
+  glm::vec3 position{0.0f, 0.0f, 0.0f};
+  glm::vec3 direction{0.0f, -1.0f, 0.0f};
+  glm::vec3 up{0.0f, 1.0f, 0.0f};
+
+  std::unique_ptr<sparkium::EntityGeometryMaterial> entity_geometry_material_;
+
+ private:
+  std::unique_ptr<sparkium::GeometryMesh> mesh_;
+  sparkium::MaterialLight light_;
+};
+
 int main() {
   std::string link_paths[] = {FindAssetFile("urdfs/franka_fr3/meshes/robot_arms/fr3/visual/link0.dae"),
                               FindAssetFile("urdfs/franka_fr3/meshes/robot_arms/fr3/visual/link1.dae"),
@@ -187,22 +234,21 @@ int main() {
   sparkium::EntityGeometryMaterial entity_sky(
       &sparkium_core, &geometry_sphere, &material_sky,
       glm::translate(glm::mat4{1.0f}, glm::vec3{0.0f, 0.0f, 0.0f}) * glm::scale(glm::mat4(1.0f), glm::vec3(60.0f)));
-  sparkium::EntityAreaLight area_light(&sparkium_core, glm::vec3{1.0f, 1.0f, 1.0f}, 1.0f,
-                                       glm::vec3{40.0f, -30.0f, 30.0f}, glm::normalize(glm::vec3{-4.0f, 3.0f, -3.0f}),
-                                       glm::vec3{0.0f, 0.0f, 1.0f});
+  entity_sky.raster_light = false;
+  scene.settings.raster.ambient_light = glm::vec3{0.8f, 0.8f, 0.8f};
+  AreaLight area_light(&sparkium_core, glm::vec3{1.0f, 1.0f, 1.0f}, 1.0f, glm::vec3{40.0f, -30.0f, 30.0f},
+                       glm::normalize(glm::vec3{-4.0f, 3.0f, -3.0f}), glm::vec3{0.0f, 0.0f, 1.0f});
   area_light.emission = glm::vec3{1000.0f};
 
   scene.AddEntity(&entity_ground);
   scene.AddEntity(&entity_sky);
-  scene.AddEntity(&area_light);
+  scene.AddEntity(area_light);
 
   for (int i = 0; i < 11; i++) {
     combined_mesh[i].LoadModel(&sparkium_core, link_paths[i]);
     combined_mesh[i].PutInScene(&scene);
   }
 
-  std::unique_ptr<graphics::Image> raw_image;
-  core_->CreateImage(film.GetWidth(), film.GetHeight(), graphics::IMAGE_FORMAT_R32G32B32A32_SFLOAT, &raw_image);
   std::unique_ptr<graphics::Image> srgb_image;
   core_->CreateImage(film.GetWidth(), film.GetHeight(), graphics::IMAGE_FORMAT_R8G8B8A8_UNORM, &srgb_image);
 
@@ -269,9 +315,8 @@ int main() {
     // area_light.position = glm::mat3{glm::rotate(glm::mat4{1.0f}, glm::radians(0.3f), glm::vec3{0.0f, 1.0f,
     // 0.0f})} * area_light.position; if (area_light.position.y < 0.0) area_light.position = -area_light.position;
     // area_light.direction = -area_light.position;
-    scene.Render(&camera, &film);
-    sparkium_core.ConvertFilmToRawImage(film, raw_image.get());
-    sparkium_core.ToneMapping(raw_image.get(), srgb_image.get());
+    sparkium_core.Render(&scene, &camera, &film);
+    film.Develop(srgb_image.get());
     std::unique_ptr<graphics::CommandContext> cmd_context;
     core_->CreateCommandContext(&cmd_context);
     cmd_context->CmdPresent(window.get(), srgb_image.get());
@@ -290,8 +335,7 @@ int main() {
     cm.Clear();
   }
 
-  sparkium_core.ConvertFilmToRawImage(film, raw_image.get());
-  sparkium_core.ToneMapping(raw_image.get(), srgb_image.get());
+  film.Develop(srgb_image.get());
   std::vector<uint8_t> image_data(film.GetWidth() * film.GetHeight() * 4);
   srgb_image->DownloadData(image_data.data());
   stbi_write_bmp("output.bmp", film.GetWidth(), film.GetHeight(), 4, image_data.data());

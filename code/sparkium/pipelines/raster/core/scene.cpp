@@ -73,6 +73,9 @@ void Scene::Render(Camera *camera, Film *film) {
 
   // Render Pass
 
+  cmd_context->CmdClearImage(
+      film->film_.GetRawImage(),
+      {scene_.settings.ambient_light.r, scene_.settings.ambient_light.g, scene_.settings.ambient_light.b, 0.0f});
   cmd_context->CmdClearImage(film->film_.GetDepthImage(), {1.0f, 0.0f, 0.0f, 0.0f});
   cmd_context->CmdBeginRendering(
       {film->film_.GetRawImage(), film->albedo_roughness_buffer_.get(), film->position_specular_buffer_.get(),
