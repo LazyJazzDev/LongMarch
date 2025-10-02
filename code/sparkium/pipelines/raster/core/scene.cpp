@@ -99,17 +99,15 @@ void Scene::Render(Camera *camera, Film *film) {
     callback(cmd_context.get(), camera->FarFieldBuffer());
   }
   cmd_context->CmdEndRendering();
+  cmd_context->CmdClearImage(film->film_.GetDepthImage(),
+                             {1.0f, 0.0f, 0.0f, 0.0f});  // Clear depth to 1.0 for the near field rendering
   cmd_context->CmdBeginRendering(
       {film->film_.GetRawImage(), film->albedo_roughness_buffer_.get(), film->position_specular_buffer_.get(),
        film->normal_metallic_buffer_.get(), film->film_.GetStencilImage()},
       film->film_.GetDepthImage());
   cmd_context->CmdSetPrimitiveTopology(graphics::PRIMITIVE_TOPOLOGY_TRIANGLE_LIST);
   cmd_context->CmdSetScissor(scissor);
-  viewport.min_depth = -1.0f;
-  viewport.max_depth = 0.0f;
   cmd_context->CmdSetViewport(viewport);
-  viewport.min_depth = 0.0f;
-  viewport.max_depth = 1.0f;
   for (auto &callback : render_callbacks_) {
     callback(cmd_context.get(), camera->NearFieldBuffer());
   }
