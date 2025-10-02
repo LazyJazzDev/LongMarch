@@ -9,6 +9,7 @@ Buffer::Buffer(const ComPtr<ID3D12Resource> &buffer, size_t allocated_size)
 void *Buffer::Map() const {
   void *data;
   buffer_->Map(0, nullptr, &data);
+  assert(data);
   return data;
 }
 

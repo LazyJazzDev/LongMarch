@@ -13,7 +13,7 @@ Film::Film(Core *core, int width, int height)
 void Film::Reset() {
   std::unique_ptr<graphics::CommandContext> cmd_context;
   core_->GraphicsCore()->CreateCommandContext(&cmd_context);
-  cmd_context->CmdClearImage(raw_image_.get(), {1.0f, 0.0f, 1.0f, 1.0f});
+  cmd_context->CmdClearImage(raw_image_.get(), {0.0f, 0.0f, 0.0f, 1.0f});
   core_->GraphicsCore()->SubmitCommandContext(cmd_context.get());
 
   for (auto &callback : reset_callbacks_) {

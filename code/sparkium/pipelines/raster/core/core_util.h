@@ -1,5 +1,6 @@
 #pragma once
 #include "sparkium/core/core.h"
+#include "sparkium/core/scene.h"
 #include "sparkium/entity/entities.h"
 #include "sparkium/geometry/geometries.h"
 #include "sparkium/material/materials.h"

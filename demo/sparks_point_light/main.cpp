@@ -11,12 +11,13 @@ using namespace long_march;
 int main() {
   std::unique_ptr<graphics::Core> core_;
 
-  graphics::CreateCore(graphics::BACKEND_API_DEFAULT, graphics::Core::Settings{2, false}, &core_);
+  graphics::CreateCore(graphics::BACKEND_API_DEFAULT, graphics::Core::Settings{2, true}, &core_);
   core_->InitializeLogicalDeviceAutoSelect(false);
   sparkium::Core sparkium_core(core_.get());
 
   sparkium::Scene scene(&sparkium_core);
   scene.settings.samples_per_dispatch = 32;
+  scene.settings.raster.ambient_light = {0.0f, 0.0f, 0.0f};
   sparkium::Film film(&sparkium_core, 1024, 1024);
   film.info.persistence = 0.98f;
   sparkium::Camera camera(&sparkium_core,
@@ -51,7 +52,7 @@ int main() {
     float x = 3.0f;
     positions[i] = {sin_theta * x, 2.0f, cos_theta * x};
     point_lights[i]->color = graphics::HSVtoRGB({frac, 1.0f, 1.0f});
-    point_lights[i]->strength = 1440.0f / num_lights / graphics::GreyScale(point_lights[i]->color);
+    point_lights[i]->strength = 1000.0f / num_lights / graphics::GreyScale(point_lights[i]->color);
   }
 
   scene.AddEntity(&entity_mesh);
@@ -75,7 +76,7 @@ int main() {
       point_lights[i]->position = positions[i];
     }
     rotation_angle += glm::radians(0.3f);
-    sparkium_core.Render(&scene, &camera, &film, sparkium::RENDER_PIPELINE_RASTERIZATION);
+    sparkium_core.Render(&scene, &camera, &film, sparkium::RENDER_PIPELINE_AUTO);
     film.Develop(srgb_image.get());
     std::unique_ptr<graphics::CommandContext> cmd_context;
     core_->CreateCommandContext(&cmd_context);

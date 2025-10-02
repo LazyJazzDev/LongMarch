@@ -9,6 +9,8 @@ class Material : public Object {
   }
   virtual ~Material() = default;
   virtual graphics::Shader *PixelShader() = 0;
+  virtual graphics::Buffer *Buffer() = 0;
+  virtual void Sync() = 0;
 
  protected:
   Core *core_{};

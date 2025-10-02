@@ -9,6 +9,8 @@ class Core : public Object {
 
   graphics::Core *GraphicsCore() const;
 
+  const VirtualFileSystem &GetShadersVFS() const;
+
  private:
   sparkium::Core &core_;
 };

@@ -12,4 +12,11 @@ graphics::Shader *MaterialPrincipled::PixelShader() {
   return nullptr;
 }
 
+graphics::Buffer *MaterialPrincipled::Buffer() {
+  return nullptr;
+}
+
+void MaterialPrincipled::Sync() {
+}
+
 }  // namespace sparkium::raster

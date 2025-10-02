@@ -15,9 +15,8 @@ struct CameraData {
 class Camera : public Object {
  public:
   explicit Camera(sparkium::Camera &camera);
-  graphics::Buffer *NearFieldBuffer() const {
-    return near_field_buffer_.get();
-  }
+  graphics::Buffer *NearFieldBuffer() const;
+  graphics::Buffer *FarFieldBuffer() const;
   void Update();
 
  private:

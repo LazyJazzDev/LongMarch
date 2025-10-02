@@ -64,7 +64,7 @@ int main() {
   sparkium_core.GetShadersVFS().Print();
 
   sparkium::Scene scene(&sparkium_core);
-  scene.settings.samples_per_dispatch = 64;
+  scene.settings.raytracing.samples_per_dispatch = 8;
   sparkium::Film film(&sparkium_core, 1024, 1024);
   film.info.persistence = 0.99f;
   sparkium::Camera camera(&sparkium_core,
@@ -142,7 +142,7 @@ int main() {
     float fps = fps_counter.TickFPS();
     char fps_buf[16];
     sprintf(fps_buf, "%.2f", fps);
-    float rps = film.GetWidth() * film.GetHeight() * fps * scene.settings.samples_per_dispatch;
+    float rps = film.GetWidth() * film.GetHeight() * fps * scene.settings.raytracing.samples_per_dispatch;
     char rps_buf[16];
     sprintf(rps_buf, "%.2f", rps * 1e-6f);
     window->SetTitle(std::string("Sparkium Area Light - ") + fps_buf + "frames/s" + " - " + rps_buf + "Mrays/s");

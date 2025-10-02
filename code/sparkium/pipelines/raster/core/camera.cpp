@@ -16,6 +16,14 @@ Camera::Camera(sparkium::Camera &camera) : camera_(camera) {
   }
 }
 
+graphics::Buffer *Camera::NearFieldBuffer() const {
+  return near_field_buffer_.get();
+}
+
+graphics::Buffer *Camera::FarFieldBuffer() const {
+  return far_field_buffer_.get();
+}
+
 void Camera::Update() {
   data_.view = camera_.view;
   data_.proj = glm::perspective(camera_.fovy, camera_.aspect, 0.1f, 100.0f);

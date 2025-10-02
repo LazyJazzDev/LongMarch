@@ -12,4 +12,11 @@ graphics::Shader *MaterialLight::PixelShader() {
   return nullptr;
 }
 
+graphics::Buffer *MaterialLight::Buffer() {
+  return nullptr;
+}
+
+void MaterialLight::Sync() {
+}
+
 }  // namespace sparkium::raster

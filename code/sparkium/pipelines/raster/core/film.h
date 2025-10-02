@@ -8,6 +8,8 @@ class Film : public Object {
   Film(sparkium::Film &film);
 
  private:
+  friend Scene;
+  friend Core;
   sparkium::Film &film_;
   Core *core_;
 

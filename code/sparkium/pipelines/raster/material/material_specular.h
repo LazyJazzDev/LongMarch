@@ -9,6 +9,10 @@ class MaterialSpecular : public Material {
 
   graphics::Shader *PixelShader() override;
 
+  graphics::Buffer *Buffer() override;
+
+  void Sync() override;
+
  private:
   sparkium::MaterialSpecular &material_;
 };

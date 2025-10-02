@@ -8,9 +8,9 @@ class Geometry : public Object {
   explicit Geometry(Core *core) : core_(core) {
   }
   virtual ~Geometry() = default;
-  virtual graphics::Buffer *VertexBuffer() = 0;
-  virtual graphics::Buffer *IndexBuffer() = 0;
   virtual graphics::Shader *VertexShader() = 0;
+  virtual void SetupProgram(graphics::Program *program);
+  virtual void DispatchDrawCalls(graphics::CommandContext *cmd_ctx);
 
  protected:
   Core *core_{};

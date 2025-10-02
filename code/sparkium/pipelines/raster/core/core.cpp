@@ -13,6 +13,10 @@ graphics::Core *Core::GraphicsCore() const {
   return core_.GraphicsCore();
 }
 
+const VirtualFileSystem &Core::GetShadersVFS() const {
+  return core_.GetShadersVFS();
+}
+
 void Render(sparkium::Core *core, sparkium::Scene *scene, sparkium::Camera *camera, sparkium::Film *film) {
   auto raster_core = DedicatedCast(core);
   auto raster_scene = DedicatedCast(scene);

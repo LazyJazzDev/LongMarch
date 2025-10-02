@@ -1,23 +1,8 @@
 #include "bindings.hlsli"
 #include "direct_lighting.hlsli"
+#include "geometry/mesh/geometry_header.hlsli"
 #include "material_sampler.hlsli"
 #include "random.hlsli"
-
-struct GeometryHeader {
-  uint num_vertices;
-  uint num_indices;
-  uint position_offset;
-  uint position_stride;
-  uint normal_offset;
-  uint normal_stride;
-  uint tex_coord_offset;
-  uint tex_coord_stride;
-  uint tangent_offset;
-  uint tangent_stride;
-  uint signal_offset;
-  uint signal_stride;
-  uint index_offset;
-};
 
 [shader("closesthit")] void RenderClosestHit(inout RenderContext context,
                                              in BuiltInTriangleIntersectionAttributes attr) {
