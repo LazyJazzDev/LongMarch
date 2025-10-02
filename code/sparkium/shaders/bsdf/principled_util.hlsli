@@ -1,4 +1,5 @@
 #pragma once
+#include "common.hlsli"
 #ifndef Spectrum
 #define Spectrum float3
 #endif
