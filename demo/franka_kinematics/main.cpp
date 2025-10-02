@@ -202,7 +202,7 @@ int main() {
   std::unique_ptr<graphics::Core> core_;
 
   graphics::CreateCore(graphics::BACKEND_API_DEFAULT, graphics::Core::Settings{2, false}, &core_);
-  core_->InitializeLogicalDeviceAutoSelect(true);
+  core_->InitializeLogicalDeviceAutoSelect(false);
   sparkium::Core sparkium_core(core_.get());
   sparkium_core.GetShadersVFS().Print();
 
@@ -261,7 +261,7 @@ int main() {
                         {-3.0159f, 3.01599f, 0.0f},     {0.0f, 0.04f, 0.0f}};
 
   bool ray_tracing = true;
-  window->InitImGui(nullptr, 26.0f);
+  window->InitImGui(nullptr, 20.0f);
   while (!window->ShouldClose()) {
     window->BeginImGuiFrame();
     if (ImGui::Begin("Franka Joint Control", nullptr, ImGuiWindowFlags_AlwaysAutoResize)) {
