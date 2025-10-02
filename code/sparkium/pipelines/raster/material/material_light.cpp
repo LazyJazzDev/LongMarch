@@ -6,17 +6,21 @@ namespace sparkium::raster {
 
 MaterialLight::MaterialLight(sparkium::MaterialLight &material)
     : material_(material), Material(DedicatedCast(material.GetCore())) {
+  core_->GraphicsCore()->CreateShader(core_->GetShadersVFS(), "material/light/pixel_shader.hlsl", "PSMain", "ps_6_0",
+                                      &pixel_shader_);
+  core_->GraphicsCore()->CreateBuffer(sizeof(glm::vec3), graphics::BUFFER_TYPE_STATIC, &material_buffer_);
 }
 
 graphics::Shader *MaterialLight::PixelShader() {
-  return nullptr;
+  return pixel_shader_.get();
 }
 
 graphics::Buffer *MaterialLight::Buffer() {
-  return nullptr;
+  return material_buffer_.get();
 }
 
 void MaterialLight::Sync() {
+  material_buffer_->UploadData(&material_.emission, sizeof(material_.emission));
 }
 
 }  // namespace sparkium::raster

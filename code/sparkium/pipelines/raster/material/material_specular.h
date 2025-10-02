@@ -15,6 +15,8 @@ class MaterialSpecular : public Material {
 
  private:
   sparkium::MaterialSpecular &material_;
+  std::unique_ptr<graphics::Shader> pixel_shader_;
+  std::unique_ptr<graphics::Buffer> material_buffer_;
 };
 
 }  // namespace sparkium::raster

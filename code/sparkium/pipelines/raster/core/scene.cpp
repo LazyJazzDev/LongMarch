@@ -66,6 +66,8 @@ void Scene::Render(Camera *camera, Film *film) {
 
   camera->Update();
 
+  film->film_.Reset();
+
   std::unique_ptr<graphics::CommandContext> cmd_context;
   core_->GraphicsCore()->CreateCommandContext(&cmd_context);
 
