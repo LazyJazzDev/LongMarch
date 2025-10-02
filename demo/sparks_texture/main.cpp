@@ -180,7 +180,7 @@ int main() {
       &sparkium_core, &geometry_sphere, &material_sky,
       glm::translate(glm::mat4{1.0f}, glm::vec3{0.0f, 0.0f, 0.0f}) * glm::scale(glm::mat4(1.0f), glm::vec3(60.0f)));
   entity_sky.raster_light = false;
-  scene.settings.raster.ambient_light = glm::vec3{0.8f, 0.8f, 0.8f};
+  scene.settings.raster.ambient_light = glm::vec3{0.2f, 0.2f, 0.2f};
 
   AreaLight area_light(&sparkium_core, glm::vec3{1.0f, 1.0f, 1.0f}, 1.0f, glm::vec3{0.0f, 30.0f, 50.0f},
                        glm::normalize(glm::vec3{0.0f, -3.0f, -5.0f}));
@@ -196,8 +196,21 @@ int main() {
   std::unique_ptr<graphics::Window> window;
   core_->CreateWindowObject(film.GetWidth(), film.GetHeight(), "Sparkium", &window);
   FPSCounter fps_counter;
+  bool ray_tracing = true;
+  window->InitImGui(nullptr, 20.0f);
   while (!window->ShouldClose()) {
-    sparkium_core.Render(&scene, &camera, &film, sparkium::RENDER_PIPELINE_RASTERIZATION);
+    window->BeginImGuiFrame();
+    ImGui::SetNextWindowPos({0, 0}, ImGuiCond_Once);
+    ImGui::SetNextWindowBgAlpha(0.3);
+    ImGui::Begin("Settings", nullptr, ImGuiWindowFlags_AlwaysAutoResize);
+    ImGui::Checkbox("Ray Tracing", &ray_tracing);
+    if (ray_tracing && !core_->DeviceRayTracingSupport()) {
+      ImGui::Text("Ray Tracing not supported on this device!");
+    }
+    ImGui::End();
+    window->EndImGuiFrame();
+    sparkium_core.Render(&scene, &camera, &film,
+                         ray_tracing ? sparkium::RENDER_PIPELINE_AUTO : sparkium::RENDER_PIPELINE_RASTERIZATION);
     film.Develop(srgb_image.get());
     std::unique_ptr<graphics::CommandContext> cmd_context;
     core_->CreateCommandContext(&cmd_context);

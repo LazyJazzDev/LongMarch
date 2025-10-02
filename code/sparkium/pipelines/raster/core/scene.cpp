@@ -21,10 +21,11 @@ Scene::Scene(sparkium::Scene &scene) : scene_(scene), core_(DedicatedCast(scene.
   ambient_light_program_->SetBlendState(
       0, graphics::BlendState{graphics::BLEND_FACTOR_ONE, graphics::BLEND_FACTOR_ONE, graphics::BLEND_OP_ADD,
                               graphics::BLEND_FACTOR_ONE, graphics::BLEND_FACTOR_ONE, graphics::BLEND_OP_ADD});
-  ambient_light_program_->AddResourceBinding(graphics::RESOURCE_TYPE_IMAGE, 1);           // Camera Data
-  ambient_light_program_->AddResourceBinding(graphics::RESOURCE_TYPE_IMAGE, 1);           // Camera Data
-  ambient_light_program_->AddResourceBinding(graphics::RESOURCE_TYPE_IMAGE, 1);           // Camera Data
+  ambient_light_program_->AddResourceBinding(graphics::RESOURCE_TYPE_IMAGE, 1);           // AlbedoRoughness
+  ambient_light_program_->AddResourceBinding(graphics::RESOURCE_TYPE_IMAGE, 1);           // PositionSpecular
+  ambient_light_program_->AddResourceBinding(graphics::RESOURCE_TYPE_IMAGE, 1);           // NormalMetallic
   ambient_light_program_->AddResourceBinding(graphics::RESOURCE_TYPE_UNIFORM_BUFFER, 1);  // Camera Data
+  ambient_light_program_->AddResourceBinding(graphics::RESOURCE_TYPE_UNIFORM_BUFFER, 1);  // Ambient Light Data
   ambient_light_program_->Finalize();
 
   core_->GraphicsCore()->CreateBuffer(sizeof(glm::vec3), graphics::BUFFER_TYPE_DYNAMIC, &ambient_light_buffer_);
@@ -123,7 +124,8 @@ void Scene::Render(Camera *camera, Film *film) {
   cmd_context->CmdBindResources(0, {film->albedo_roughness_buffer_.get()}, graphics::BIND_POINT_GRAPHICS);
   cmd_context->CmdBindResources(1, {film->position_specular_buffer_.get()}, graphics::BIND_POINT_GRAPHICS);
   cmd_context->CmdBindResources(2, {film->normal_metallic_buffer_.get()}, graphics::BIND_POINT_GRAPHICS);
-  cmd_context->CmdBindResources(3, {ambient_light_buffer_.get()}, graphics::BIND_POINT_GRAPHICS);
+  cmd_context->CmdBindResources(3, {camera->NearFieldBuffer()}, graphics::BIND_POINT_GRAPHICS);
+  cmd_context->CmdBindResources(4, {ambient_light_buffer_.get()}, graphics::BIND_POINT_GRAPHICS);
   cmd_context->CmdDraw(6, 1, 0, 0);
 
   for (auto &callback : lighting_callbacks_) {

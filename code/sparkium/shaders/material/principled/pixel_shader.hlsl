@@ -65,17 +65,29 @@ PSOutput PSMain(PSInput input) {
   float y_signal = material_buffer.LoadFloat();
 
   input.tex_coord.y = 1.0 - input.tex_coord.y;
-  base_color *= textures[0].Sample(S, input.tex_coord).xyz;
-  roughness *= textures[1].Sample(S, input.tex_coord).x;
-  specular *= textures[2].Sample(S, input.tex_coord).x;
-  metallic *= textures[3].Sample(S, input.tex_coord).x;
 
-  float3 tbn = textures[4].Sample(S, input.tex_coord).xyz;
+  int use_texture;
+  use_texture = material_buffer.LoadInt();
+  if (use_texture)
+    base_color = textures[0].Sample(S, input.tex_coord).xyz;
+  use_texture = material_buffer.LoadInt();
+  if (use_texture)
+    roughness = textures[1].Sample(S, input.tex_coord).x;
+  use_texture = material_buffer.LoadInt();
+  if (use_texture)
+    specular = textures[2].Sample(S, input.tex_coord).x;
+  use_texture = material_buffer.LoadInt();
+  if (use_texture)
+    metallic = textures[3].Sample(S, input.tex_coord).x;
+  use_texture = material_buffer.LoadInt();
+  if (use_texture) {
+    float3 tbn = textures[4].Sample(S, input.tex_coord).xyz;
 
-  if (length(tbn) > 0.001 && length(B) > 0.001) {
-    tbn = tbn * 2.0f - 1.0f;
-    tbn = normalize(tbn);
-    N = normalize(mul(tbn, float3x3(T, B * y_signal, N)));
+    if (length(tbn) > 0.001 && length(B) > 0.001) {
+      tbn = tbn * 2.0f - 1.0f;
+      tbn = normalize(tbn);
+      N = normalize(mul(tbn, float3x3(T, B * y_signal, N)));
+    }
   }
 
   output.radiance = float4(emission * strength, 0.0);

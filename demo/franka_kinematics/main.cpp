@@ -235,7 +235,7 @@ int main() {
       &sparkium_core, &geometry_sphere, &material_sky,
       glm::translate(glm::mat4{1.0f}, glm::vec3{0.0f, 0.0f, 0.0f}) * glm::scale(glm::mat4(1.0f), glm::vec3(60.0f)));
   entity_sky.raster_light = false;
-  scene.settings.raster.ambient_light = glm::vec3{0.8f, 0.8f, 0.8f};
+  scene.settings.raster.ambient_light = glm::vec3{0.5f, 0.5f, 0.5f};
   AreaLight area_light(&sparkium_core, glm::vec3{1.0f, 1.0f, 1.0f}, 1.0f, glm::vec3{40.0f, -30.0f, 30.0f},
                        glm::normalize(glm::vec3{-4.0f, 3.0f, -3.0f}), glm::vec3{0.0f, 0.0f, 1.0f});
   area_light.emission = glm::vec3{1000.0f};
@@ -260,10 +260,16 @@ int main() {
                         {-3.0421f, -0.1518f, -0.1518f}, {-2.8065f, 2.8065f, 0.0f}, {0.5445f, 4.5169f, 0.5445f},
                         {-3.0159f, 3.01599f, 0.0f},     {0.0f, 0.04f, 0.0f}};
 
+  bool ray_tracing = true;
   window->InitImGui(nullptr, 26.0f);
   while (!window->ShouldClose()) {
     window->BeginImGuiFrame();
     if (ImGui::Begin("Franka Joint Control", nullptr, ImGuiWindowFlags_AlwaysAutoResize)) {
+      ImGui::Checkbox("Ray Tracing", &ray_tracing);
+      if (ray_tracing && !core_->DeviceRayTracingSupport()) {
+        ImGui::Text("Ray Tracing not supported on this device!");
+      }
+      ImGui::Separator();
       if (ImGui::Button("Center")) {
         for (auto &j : joints) {
           j.value = (j.upper_bound + j.lower_bound) * 0.5f;
@@ -315,7 +321,8 @@ int main() {
     // area_light.position = glm::mat3{glm::rotate(glm::mat4{1.0f}, glm::radians(0.3f), glm::vec3{0.0f, 1.0f,
     // 0.0f})} * area_light.position; if (area_light.position.y < 0.0) area_light.position = -area_light.position;
     // area_light.direction = -area_light.position;
-    sparkium_core.Render(&scene, &camera, &film);
+    sparkium_core.Render(&scene, &camera, &film,
+                         ray_tracing ? sparkium::RENDER_PIPELINE_AUTO : sparkium::RENDER_PIPELINE_RASTERIZATION);
     film.Develop(srgb_image.get());
     std::unique_ptr<graphics::CommandContext> cmd_context;
     core_->CreateCommandContext(&cmd_context);

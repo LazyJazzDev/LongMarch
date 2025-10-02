@@ -43,6 +43,7 @@ EntityGeometryMaterial::EntityGeometryMaterial(sparkium::EntityGeometryMaterial 
   point_light_program_->AddResourceBinding(graphics::RESOURCE_TYPE_IMAGE, 1);           // AlbedoRoughness
   point_light_program_->AddResourceBinding(graphics::RESOURCE_TYPE_IMAGE, 1);           // PositionSpecular
   point_light_program_->AddResourceBinding(graphics::RESOURCE_TYPE_IMAGE, 1);           // NormalMetallic
+  point_light_program_->AddResourceBinding(graphics::RESOURCE_TYPE_UNIFORM_BUFFER, 1);  // Camera Data
   point_light_program_->AddResourceBinding(graphics::RESOURCE_TYPE_STORAGE_BUFFER, 1);  // PointLightData
   point_light_program_->Finalize();
 }
@@ -74,7 +75,7 @@ void EntityGeometryMaterial::Update(Scene *scene) {
       point_light_buffer_->UploadData(&point_light_data, sizeof(PointLightData));
       scene->RegisterLightingCallback([this](graphics::CommandContext *cmd_ctx) {
         cmd_ctx->CmdBindProgram(point_light_program_.get());
-        cmd_ctx->CmdBindResources(3, {point_light_buffer_.get()}, graphics::BIND_POINT_GRAPHICS);
+        cmd_ctx->CmdBindResources(4, {point_light_buffer_.get()}, graphics::BIND_POINT_GRAPHICS);
         cmd_ctx->CmdDraw(6, 1, 0, 0);
       });
     }

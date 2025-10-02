@@ -3,10 +3,20 @@ struct SceneSettings {
   float3 ambient_light;
 };
 
+struct CameraInfo {
+  float4x4 view;
+  float4x4 proj;
+  float4x4 view_proj;
+  float4x4 inv_view;
+  float4x4 inv_proj;
+  float4x4 inv_view_proj;
+};
+
 Texture2D<float4> albedo_roughness : register(t0, space0);
 Texture2D<float4> position_specular : register(t0, space1);
 Texture2D<float4> normal_metallic : register(t0, space2);
-ConstantBuffer<SceneSettings> scene_settings : register(b0, space3);
+ConstantBuffer<CameraInfo> camera_data : register(b0, space3);
+ConstantBuffer<SceneSettings> scene_settings : register(b0, space4);
 
 struct VSOutput {
   float4 position : SV_POSITION;

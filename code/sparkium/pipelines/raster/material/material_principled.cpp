@@ -4,11 +4,24 @@
 
 namespace sparkium::raster {
 
+namespace {
+
+struct TextureInfo {
+  float y_signal;
+  int use_base_color_texture;
+  int use_roughness_texture;
+  int use_specular_texture;
+  int use_metallic_texture;
+  int use_normal_texture;
+};
+
+}  // namespace
+
 MaterialPrincipled::MaterialPrincipled(sparkium::MaterialPrincipled &material)
     : material_(material), Material(DedicatedCast(material.GetCore())) {
   core_->GraphicsCore()->CreateShader(core_->GetShadersVFS(), "material/principled/pixel_shader.hlsl", "PSMain",
                                       "ps_6_0", {"-I."}, &pixel_shader_);
-  core_->GraphicsCore()->CreateBuffer(sizeof(material_.info) + sizeof(float), graphics::BUFFER_TYPE_STATIC,
+  core_->GraphicsCore()->CreateBuffer(sizeof(material_.info) + sizeof(TextureInfo), graphics::BUFFER_TYPE_STATIC,
                                       &material_buffer_);
   core_->GraphicsCore()->CreateSampler(graphics::SamplerInfo{}, &sampler_);
 }
@@ -18,9 +31,15 @@ graphics::Shader *MaterialPrincipled::PixelShader() {
 }
 
 void MaterialPrincipled::Sync() {
-  float signal = material_.textures.normal_reverse_y ? -1.0f : 1.0f;
+  TextureInfo info;
+  info.y_signal = material_.textures.normal_reverse_y ? -1.0f : 1.0f;
+  info.use_base_color_texture = material_.textures.base_color ? 1 : 0;
+  info.use_roughness_texture = material_.textures.roughness ? 1 : 0;
+  info.use_specular_texture = material_.textures.specular ? 1 : 0;
+  info.use_metallic_texture = material_.textures.metallic ? 1 : 0;
+  info.use_normal_texture = material_.textures.normal ? 1 : 0;
   material_buffer_->UploadData(&material_.info, sizeof(material_.info));
-  material_buffer_->UploadData(&signal, sizeof(signal), sizeof(material_.info));
+  material_buffer_->UploadData(&info, sizeof(info), sizeof(material_.info));
 }
 
 glm::vec3 MaterialPrincipled::Emission() const {
