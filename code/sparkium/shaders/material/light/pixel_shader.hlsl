@@ -25,7 +25,7 @@ PSOutput PSMain(PSInput input) {
   // compute geometry normal from position derivatives
   float3 dp1 = ddx(input.world_position);
   float3 dp2 = ddy(input.world_position);
-  geom_normal = normalize(cross(dp1, dp2));
+  geom_normal = normalize(cross(dp2, dp1));
   if (length(input.world_normal) < 0.001) {
     input.world_normal = geom_normal;
   }

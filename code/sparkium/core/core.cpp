@@ -104,17 +104,31 @@ void Core::LoadPublicBuffers() {
 }
 
 void Core::LoadPublicImages() {
-  uint32_t white_pixel = 0xFFFFFFFF;
-  float white_hdr_pixel[] = {1.0f, 1.0f, 1.0f, 1.0f};
+  uint32_t pixel = 0xFFFFFFFF;
+  float hdr_pixel[] = {1.0f, 1.0f, 1.0f, 1.0f};
 
   std::unique_ptr<graphics::Image> image;
   core_->CreateImage(1, 1, graphics::IMAGE_FORMAT_R8G8B8A8_UNORM, &image);
-  image->UploadData(&white_pixel);
+  image->UploadData(&pixel);
   SetPublicResource("white", std::move(image));
 
   core_->CreateImage(1, 1, graphics::IMAGE_FORMAT_R32G32B32A32_SFLOAT, &image);
-  image->UploadData(white_hdr_pixel);
+  image->UploadData(hdr_pixel);
   SetPublicResource("white_hdr", std::move(image));
+
+  pixel = 0;
+  hdr_pixel[0] = 0.0f;
+  hdr_pixel[1] = 0.0f;
+  hdr_pixel[2] = 0.0f;
+  hdr_pixel[3] = 1.0f;
+
+  core_->CreateImage(1, 1, graphics::IMAGE_FORMAT_R8G8B8A8_UNORM, &image);
+  image->UploadData(&pixel);
+  SetPublicResource("black", std::move(image));
+
+  core_->CreateImage(1, 1, graphics::IMAGE_FORMAT_R32G32B32A32_SFLOAT, &image);
+  image->UploadData(hdr_pixel);
+  SetPublicResource("black_hdr", std::move(image));
 }
 
 }  // namespace sparkium

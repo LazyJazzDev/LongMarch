@@ -9,11 +9,11 @@ class MaterialLight : public Material {
 
   graphics::Shader *PixelShader() override;
 
-  graphics::Buffer *Buffer() override;
-
   void Sync() override;
 
   glm::vec3 Emission() const override;
+
+  void BindMaterialResources(graphics::CommandContext *cmd_ctx) override;
 
  private:
   sparkium::MaterialLight &material_;

@@ -8,9 +8,9 @@ class MaterialLambertian : public Material {
   MaterialLambertian(sparkium::MaterialLambertian &material);
 
   graphics::Shader *PixelShader() override;
-  graphics::Buffer *Buffer() override;
   void Sync() override;
   glm::vec3 Emission() const override;
+  void BindMaterialResources(graphics::CommandContext *cmd_ctx) override;
 
  private:
   sparkium::MaterialLambertian &material_;

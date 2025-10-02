@@ -25,6 +25,7 @@ EntityGeometryMaterial::EntityGeometryMaterial(sparkium::EntityGeometryMaterial 
   render_program_->AddResourceBinding(graphics::RESOURCE_TYPE_UNIFORM_BUFFER, 1);  // Camera Data
   render_program_->AddResourceBinding(graphics::RESOURCE_TYPE_UNIFORM_BUFFER, 1);  // Instance Data
   render_program_->AddResourceBinding(graphics::RESOURCE_TYPE_STORAGE_BUFFER, 1);  // Material Data
+  material_->SetupProgram(render_program_.get());
   render_program_->Finalize();
 
   core_->GraphicsCore()->CreateBuffer(sizeof(PointLightData), graphics::BUFFER_TYPE_DYNAMIC, &point_light_buffer_);
@@ -60,7 +61,7 @@ void EntityGeometryMaterial::Update(Scene *scene) {
     cmd_ctx->CmdBindProgram(render_program_.get());
     cmd_ctx->CmdBindResources(0, {camera_buffer}, graphics::BIND_POINT_GRAPHICS);
     cmd_ctx->CmdBindResources(1, {instance_buffer_.get()}, graphics::BIND_POINT_GRAPHICS);
-    cmd_ctx->CmdBindResources(2, {material_->Buffer()}, graphics::BIND_POINT_GRAPHICS);
+    material_->BindMaterialResources(cmd_ctx);
     geometry_->DispatchDrawCalls(cmd_ctx);
   });
 

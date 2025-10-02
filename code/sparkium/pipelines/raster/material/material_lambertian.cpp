@@ -16,10 +16,6 @@ graphics::Shader *MaterialLambertian::PixelShader() {
   return pixel_shader_.get();
 }
 
-graphics::Buffer *MaterialLambertian::Buffer() {
-  return material_buffer_.get();
-}
-
 void MaterialLambertian::Sync() {
   float data[6];
   data[0] = material_.base_color.r;
@@ -33,6 +29,10 @@ void MaterialLambertian::Sync() {
 
 glm::vec3 MaterialLambertian::Emission() const {
   return material_.emission;
+}
+
+void MaterialLambertian::BindMaterialResources(graphics::CommandContext *cmd_ctx) {
+  cmd_ctx->CmdBindResources(2, {material_buffer_.get()}, graphics::BIND_POINT_GRAPHICS);
 }
 
 }  // namespace sparkium::raster

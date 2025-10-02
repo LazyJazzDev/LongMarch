@@ -16,6 +16,8 @@ struct PSOutput {
 };
 
 ByteAddressBuffer material_data : register(t0, space2);
+Texture2D<float4> textures[] : register(t0, space3);
+SamplerState S : register(s0, space4);
 
 PSOutput PSMain(PSInput input) {
   PSOutput output;
@@ -23,7 +25,7 @@ PSOutput PSMain(PSInput input) {
   // compute geometry normal from position derivatives
   float3 dp1 = ddx(input.world_position);
   float3 dp2 = ddy(input.world_position);
-  geom_normal = normalize(cross(dp1, dp2));
+  geom_normal = normalize(cross(dp2, dp1));
   if (length(input.world_normal) < 0.001) {
     input.world_normal = geom_normal;
   }
@@ -38,7 +40,6 @@ PSOutput PSMain(PSInput input) {
   float metallic = material_buffer.LoadFloat();
   float specular = material_buffer.LoadFloat();
   float specular_tint = material_buffer.LoadFloat();
-
   float roughness = material_buffer.LoadFloat();
   float anisotropic = material_buffer.LoadFloat();
   float anisotropic_rotation = material_buffer.LoadFloat();
@@ -52,6 +53,12 @@ PSOutput PSMain(PSInput input) {
 
   float3 emission = material_buffer.LoadFloat3();
   float strength = material_buffer.LoadFloat();
+
+  input.tex_coord.y = 1.0 - input.tex_coord.y;
+  base_color *= textures[0].Sample(S, input.tex_coord).xyz;
+  roughness *= textures[1].Sample(S, input.tex_coord).x;
+  specular *= textures[2].Sample(S, input.tex_coord).x;
+  metallic *= textures[3].Sample(S, input.tex_coord).x;
 
   output.radiance = float4(emission * strength, 0.0);
   output.albedo_roughness = float4(base_color, roughness);

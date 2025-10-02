@@ -15,16 +15,16 @@ graphics::Shader *MaterialLight::PixelShader() {
   return pixel_shader_.get();
 }
 
-graphics::Buffer *MaterialLight::Buffer() {
-  return material_buffer_.get();
-}
-
 void MaterialLight::Sync() {
   material_buffer_->UploadData(&material_.emission, sizeof(material_.emission));
 }
 
 glm::vec3 MaterialLight::Emission() const {
   return material_.emission;
+}
+
+void MaterialLight::BindMaterialResources(graphics::CommandContext *cmd_ctx) {
+  cmd_ctx->CmdBindResources(2, {material_buffer_.get()}, graphics::BIND_POINT_GRAPHICS);
 }
 
 }  // namespace sparkium::raster

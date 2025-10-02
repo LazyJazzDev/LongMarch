@@ -9,7 +9,8 @@ class Material : public Object {
   }
   virtual ~Material() = default;
   virtual graphics::Shader *PixelShader() = 0;
-  virtual graphics::Buffer *Buffer() = 0;
+  virtual void SetupProgram(graphics::Program *program);
+  virtual void BindMaterialResources(graphics::CommandContext *cmd_ctx);
   virtual void Sync() = 0;
   virtual glm::vec3 Emission() const;
 

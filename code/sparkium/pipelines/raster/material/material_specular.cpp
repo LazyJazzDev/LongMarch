@@ -15,12 +15,12 @@ graphics::Shader *MaterialSpecular::PixelShader() {
   return pixel_shader_.get();
 }
 
-graphics::Buffer *MaterialSpecular::Buffer() {
-  return material_buffer_.get();
-}
-
 void MaterialSpecular::Sync() {
   material_buffer_->UploadData(&material_.base_color, sizeof(material_.base_color));
+}
+
+void MaterialSpecular::BindMaterialResources(graphics::CommandContext *cmd_ctx) {
+  cmd_ctx->CmdBindResources(2, {material_buffer_.get()}, graphics::BIND_POINT_GRAPHICS);
 }
 
 }  // namespace sparkium::raster

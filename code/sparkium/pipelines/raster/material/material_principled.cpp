@@ -9,14 +9,11 @@ MaterialPrincipled::MaterialPrincipled(sparkium::MaterialPrincipled &material)
   core_->GraphicsCore()->CreateShader(core_->GetShadersVFS(), "material/principled/pixel_shader.hlsl", "PSMain",
                                       "ps_6_0", {"-I."}, &pixel_shader_);
   core_->GraphicsCore()->CreateBuffer(sizeof(material_.info), graphics::BUFFER_TYPE_STATIC, &material_buffer_);
+  core_->GraphicsCore()->CreateSampler(graphics::SamplerInfo{}, &sampler_);
 }
 
 graphics::Shader *MaterialPrincipled::PixelShader() {
   return pixel_shader_.get();
-}
-
-graphics::Buffer *MaterialPrincipled::Buffer() {
-  return material_buffer_.get();
 }
 
 void MaterialPrincipled::Sync() {
@@ -25,6 +22,30 @@ void MaterialPrincipled::Sync() {
 
 glm::vec3 MaterialPrincipled::Emission() const {
   return material_.emission_color * material_.emission_strength;
+}
+
+void MaterialPrincipled::SetupProgram(graphics::Program *program) {
+  program->AddResourceBinding(graphics::RESOURCE_TYPE_IMAGE, 4);    // Material Data
+  program->AddResourceBinding(graphics::RESOURCE_TYPE_SAMPLER, 1);  // Material Data
+}
+
+void MaterialPrincipled::BindMaterialResources(graphics::CommandContext *cmd_ctx) {
+  cmd_ctx->CmdBindResources(2, {material_buffer_.get()}, graphics::BIND_POINT_GRAPHICS);
+  std::vector<graphics::Image *> textures(4);
+  textures[0] = material_.textures.base_color;
+  if (!textures[0])
+    textures[0] = core_->GetImage("white");
+  textures[1] = material_.textures.roughness;
+  if (!textures[1])
+    textures[1] = core_->GetImage("white");
+  textures[2] = material_.textures.specular;
+  if (!textures[2])
+    textures[2] = core_->GetImage("black");
+  textures[3] = material_.textures.metallic;
+  if (!textures[3])
+    textures[3] = core_->GetImage("black");
+  cmd_ctx->CmdBindResources(3, textures, graphics::BIND_POINT_GRAPHICS);
+  cmd_ctx->CmdBindResources(4, {sampler_.get()}, graphics::BIND_POINT_GRAPHICS);
 }
 
 }  // namespace sparkium::raster

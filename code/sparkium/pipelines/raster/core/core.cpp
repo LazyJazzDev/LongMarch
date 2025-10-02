@@ -17,6 +17,22 @@ const VirtualFileSystem &Core::GetShadersVFS() const {
   return core_.GetShadersVFS();
 }
 
+graphics::Shader *Core::GetShader(const std::string &name) {
+  return core_.GetShader(name);
+}
+
+graphics::ComputeProgram *Core::GetComputeProgram(const std::string &name) {
+  return core_.GetComputeProgram(name);
+}
+
+graphics::Buffer *Core::GetBuffer(const std::string &name) {
+  return core_.GetBuffer(name);
+}
+
+graphics::Image *Core::GetImage(const std::string &name) {
+  return core_.GetImage(name);
+}
+
 void Render(sparkium::Core *core, sparkium::Scene *scene, sparkium::Camera *camera, sparkium::Film *film) {
   auto raster_core = DedicatedCast(core);
   auto raster_scene = DedicatedCast(scene);

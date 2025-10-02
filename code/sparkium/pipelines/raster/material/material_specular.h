@@ -9,9 +9,9 @@ class MaterialSpecular : public Material {
 
   graphics::Shader *PixelShader() override;
 
-  graphics::Buffer *Buffer() override;
-
   void Sync() override;
+
+  void BindMaterialResources(graphics::CommandContext *cmd_ctx) override;
 
  private:
   sparkium::MaterialSpecular &material_;

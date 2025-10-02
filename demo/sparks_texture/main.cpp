@@ -179,6 +179,9 @@ int main() {
   sparkium::EntityGeometryMaterial entity_sky(
       &sparkium_core, &geometry_sphere, &material_sky,
       glm::translate(glm::mat4{1.0f}, glm::vec3{0.0f, 0.0f, 0.0f}) * glm::scale(glm::mat4(1.0f), glm::vec3(60.0f)));
+  entity_sky.raster_light = false;
+  scene.settings.raster.ambient_light = glm::vec3{0.8f, 0.8f, 0.8f};
+
   AreaLight area_light(&sparkium_core, glm::vec3{1.0f, 1.0f, 1.0f}, 1.0f, glm::vec3{0.0f, 30.0f, 50.0f},
                        glm::normalize(glm::vec3{0.0f, -3.0f, -5.0f}));
   area_light.emission = glm::vec3{1000.0f};
