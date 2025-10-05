@@ -38,7 +38,7 @@ void Scene::RegisterEntity(Entity *entity) {
 
 void Scene::Step() {
   if (pbd_solver_) {
-    pbd_solver_->Step(3e-2f);
+    pbd_solver_->Step(1e-2f);
   }
 
   for (auto entity : entities_) {

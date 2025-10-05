@@ -102,7 +102,8 @@ void PBDSolver::Step(float dt) {
     auto &helper = step_helper_.back();
 
     helper.x_new = entity.x_ + dt * entity.v_;
-    if (entity.w_.norm() > 0.0f) {
+
+    if (entity.w_.norm() > 1e-6f) {
       Eigen::AngleAxis<float> angle_axis(dt * entity.w_.norm(), entity.w_.normalized());
       Quaternion<float> delta_q{angle_axis};
       helper.q_new = (delta_q * entity.q_).normalized();
@@ -120,6 +121,13 @@ void PBDSolver::Step(float dt) {
       MeshSDFRef mesh_sdf = step_helper_[i].entity.mesh_sdf;
       Matrix<float, 3, 3> R = step_helper_[i].q_new.toRotationMatrix();
       Vector3<float> t = step_helper_[i].x_new;
+      AABB aabb_A;
+      for (int k = 0; k < step_helper_[i].entity.mesh.NumVertices(); k++) {
+        Vector3<float> p_A = step_helper_[i].entity.mesh.Positions()[k];
+        Vector3<float> r_A = step_helper_[i].q_new * p_A + step_helper_[i].x_new;
+        aabb_A.Expand(r_A);
+      }
+
       auto &helper_A = step_helper_[i];
       for (int j = 0; j < step_helper_.size(); j++) {
         if (j == i) {
@@ -131,6 +139,9 @@ void PBDSolver::Step(float dt) {
         for (int k = 0; k < helper_B.entity.mesh.NumVertices(); k++) {
           Vector3<float> p_B = helper_B.entity.mesh.Positions()[k];
           Vector3<float> r_B = helper_B.q_new * p_B + helper_B.x_new;
+          if (!aabb_A.Contain(r_B)) {
+            continue;
+          }
           float sdf;
           Vector3<float> jacobian;
           mesh_sdf.SDF(r_B, R, t, &sdf, &jacobian, nullptr);
@@ -158,7 +169,7 @@ void PBDSolver::Step(float dt) {
     for (auto &helper : step_helper_) {
       if (helper.num_contacts > 0) {
         helper.x_new += helper.delta_x / helper.num_contacts;
-        if (helper.delta_theta.norm() > 0.0f) {
+        if (helper.delta_theta.norm() > 1e-6f) {
           Eigen::AngleAxis<float> angle_axis(helper.delta_theta.norm() / helper.num_contacts,
                                              helper.delta_theta.normalized());
           Quaternion<float> delta_q{angle_axis};

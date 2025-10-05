@@ -37,6 +37,11 @@ struct AxisAlignedBoundingBox<Scalar, 3> {
   Vector3<Scalar> Size() const {
     return upper_bound - lower_bound;
   }
+
+  bool Contain(const Vector3<Scalar> &point) const {
+    return (point[0] >= lower_bound[0] && point[0] <= upper_bound[0] && point[1] >= lower_bound[1] &&
+            point[1] <= upper_bound[1] && point[2] >= lower_bound[2] && point[2] <= upper_bound[2]);
+  }
 };
 
 template <typename Scalar>

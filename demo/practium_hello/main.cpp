@@ -1,5 +1,7 @@
 #include <long_march.h>
 
+#include <random>
+
 #include "glm/gtc/matrix_transform.hpp"
 
 using namespace long_march;
@@ -64,27 +66,75 @@ int main() {
   Mesh<> cube_mesh;
   cube_mesh.LoadObjFile(FindAssetFile("meshes/cube.obj"));
 
+  Mesh<> sphere_mesh = Mesh<>::Sphere(30);
+  Mesh<> sphere_collision = Mesh<>::Sphere(6, 6);
+
   Matrix<float, 3, 4> transform;
-  transform << 100.0f, 0.0f, 0.0f, 0.0f, 0.0f, 100.0f, 0.0f, -101.0f, 0.0f, 0.0f, 100.0f, 0.0f;
+  transform << 100.0f, 0.0f, 0.0f, 0.0f, 0.0f, 100.0f, 0.0f, 0.0f, 0.0f, 0.0f, 100.0f, 0.0f;
   sparkium::MaterialPrincipled ground_surface(practium_core.GetRenderCore(), {0.8f, 0.8f, 0.8f});
   practium::ModelMesh ground_model(&practium_core, cube_mesh.Transformed(transform), &ground_surface);
   practium::MaterialPBDRigid ground_material(&practium_core, 0.0f, 0.0f, true);
   auto ground_entity = scene.AddEntity(&ground_model, &ground_material);
+  auto ground_pbd_entity = dynamic_cast<practium::EntityPBDRigid *>(ground_entity.get());
+  ground_pbd_entity->SetPosition({0.0f, -101.0f, 0.0f});
 
-  transform << 0.2f, 0.0f, 0.0f, 0.0f, 0.0f, 0.2f, 0.0f, 0.0f, 0.0f, 0.0f, 0.2f, 0.0f;
-  sparkium::MaterialPrincipled box_surface(practium_core.GetRenderCore(), {0.8f, 0.0f, 0.0f});
-  practium::ModelMesh box_model(&practium_core, cube_mesh.Transformed(transform), &box_surface);
-  practium::MaterialPBDRigid box_material(&practium_core);
-  auto box_entity = scene.AddEntity(&box_model, &box_material);
-  // dynamic cast to EntityPBDRigid
-  auto box_pbd_entity = dynamic_cast<practium::EntityPBDRigid *>(box_entity.get());
-  box_pbd_entity->SetInertia(0.04f);
-  box_pbd_entity->SetAngularVelocity({3.0f, 0.0f, 0.0f});
+  sparkium::MaterialPrincipled wall_surface0(practium_core.GetRenderCore(), {0.8f, 0.8f, 0.8f});
+  wall_surface0.roughness = 0.0f;
+  wall_surface0.specular = 1.0f;
+  ground_model.material_ = &wall_surface0;
+  auto wall_entity0 = scene.AddEntity(&ground_model, &ground_material);
+  auto wall_pbd_entity0 = dynamic_cast<practium::EntityPBDRigid *>(wall_entity0.get());
+  wall_pbd_entity0->SetPosition({102.0f, 0.0f, 0.0f});
+
+  sparkium::MaterialPrincipled wall_surface1(practium_core.GetRenderCore(), {0.8f, 0.8f, 0.8f});
+  wall_surface1.roughness = 0.0f;
+  wall_surface1.specular = 1.0f;
+  ground_model.material_ = &wall_surface1;
+  auto wall_entity1 = scene.AddEntity(&ground_model, &ground_material);
+  auto wall_pbd_entity1 = dynamic_cast<practium::EntityPBDRigid *>(wall_entity1.get());
+  wall_pbd_entity1->SetPosition({0.0f, 0.0f, -102.0f});
+
+  const int num_spheres = 32;
+  std::unique_ptr<practium::Entity> sphere_entities[num_spheres];
+  std::unique_ptr<sparkium::MaterialPrincipled> sphere_surfaces[num_spheres];
+
+  std::mt19937 rng{1234567};
+  for (int i = 0; i < num_spheres; i++) {
+    Vector3<float> position{std::uniform_real_distribution<float>(-1.0f, 1.0f)(rng), i * 0.4f + 0.3f,
+                            std::uniform_real_distribution<float>(-1.0f, 1.0f)(rng)};
+    transform << 0.2f, 0.0f, 0.0f, 0.0f, 0.0f, 0.2f, 0.0f, 0.0f, 0.0f, 0.0f, 0.2f, 0.0f;
+
+    sphere_surfaces[i] = std::make_unique<sparkium::MaterialPrincipled>(
+        practium_core.GetRenderCore(), glm::vec3{std::uniform_real_distribution<float>(0.0f, 1.0f)(rng),
+                                                 std::uniform_real_distribution<float>(0.0f, 1.0f)(rng),
+                                                 std::uniform_real_distribution<float>(0.0f, 1.0f)(rng)} *
+                                               0.5f +
+                                           0.5f);
+    sphere_surfaces[i]->roughness = std::uniform_real_distribution<float>(0.0f, 1.0f)(rng);
+    sphere_surfaces[i]->metallic = std::uniform_real_distribution<float>(0.0f, 1.0f)(rng);
+    sphere_surfaces[i]->specular = std::uniform_real_distribution<float>(0.0f, 1.0f)(rng);
+    if ((i & 3) == 3) {
+      sphere_surfaces[i]->emission_color = sphere_surfaces[i]->base_color;
+      sphere_surfaces[i]->emission_strength = std::uniform_real_distribution<float>(0.0f, 1.0f)(rng);
+    }
+
+    practium::ModelMesh sphere_model(&practium_core, sphere_mesh.Transformed(transform),
+                                     sphere_collision.Transformed(transform), sphere_surfaces[i].get());
+    practium::MaterialPBDRigid sphere_material(&practium_core);
+    auto &sphere_entity = sphere_entities[i];
+    sphere_entity = scene.AddEntity(&sphere_model, &sphere_material);
+    // dynamic cast to EntityPBDRigid
+    auto sphere_pbd_entity = dynamic_cast<practium::EntityPBDRigid *>(sphere_entity.get());
+    sphere_pbd_entity->SetPosition(position);
+    sphere_pbd_entity->SetMass(0.03351f);
+    sphere_pbd_entity->SetInertia(0.000536f);
+    sphere_pbd_entity->SetAngularVelocity({0.0f, 0.0f, 0.0f});
+  }
 
   graphics::Extent2D extent{1280, 720};
 
   sparkium::Film film(practium_core.GetRenderCore(), extent.width, extent.height);
-  scene.GetRenderScene()->settings.raytracing.samples_per_dispatch = 1;
+  scene.GetRenderScene()->settings.raytracing.samples_per_dispatch = 16;
   film.info.persistence = 0.9f;
   sparkium::Camera camera(
       practium_core.GetRenderCore(),
@@ -102,10 +152,40 @@ int main() {
   area_light.emission = glm::vec3{1000.0f};
   scene.GetRenderScene()->AddEntity(area_light);
 
-  while (!window->ShouldClose()) {
-    scene.Step();
+  bool ray_tracing = false;
+  bool pause = true;
+  window->InitImGui(nullptr, 20.0f);
 
-    practium_core.GetRenderCore()->Render(scene.GetRenderScene(), &camera, &film);
+  while (!window->ShouldClose()) {
+    if (!pause) {
+      scene.Step();
+    }
+
+    window->BeginImGuiFrame();
+    ImGui::SetNextWindowPos({0, 0}, ImGuiCond_Once);
+    ImGui::SetNextWindowBgAlpha(0.3);
+    ImGui::Begin("Settings", nullptr, ImGuiWindowFlags_AlwaysAutoResize);
+    ImGui::Checkbox("Pause", &pause);
+    ImGui::Checkbox("Ray Tracing", &ray_tracing);
+    if (ray_tracing && !core_->DeviceRayTracingSupport()) {
+      ImGui::Text("Ray Tracing not supported on this device!");
+    }
+    if (ImGui::Button("Reset")) {
+      for (int i = 0; i < num_spheres; i++) {
+        Vector3<float> position{std::uniform_real_distribution<float>(-1.0f, 1.0f)(rng), i * 0.4f + 0.3f,
+                                std::uniform_real_distribution<float>(-1.0f, 1.0f)(rng)};
+        auto sphere_pbd_entity = dynamic_cast<practium::EntityPBDRigid *>(sphere_entities[i].get());
+        sphere_pbd_entity->SetPosition(position);
+        sphere_pbd_entity->SetVelocity({0.0f, 0.0f, 0.0f});
+        sphere_pbd_entity->SetAngularVelocity({0.0f, 0.0f, 0.0f});
+      }
+    }
+    ImGui::End();
+    window->EndImGuiFrame();
+
+    practium_core.GetRenderCore()->Render(
+        scene.GetRenderScene(), &camera, &film,
+        ray_tracing ? sparkium::RENDER_PIPELINE_AUTO : sparkium::RENDER_PIPELINE_RASTERIZATION);
     film.Develop(srgb_image.get());
 
     std::unique_ptr<graphics::CommandContext> cmd_ctx;
