@@ -1,3 +1,8 @@
 #include "practium/core/scene.h"
 
-namespace practium {}
+namespace practium {
+
+Scene::Scene(Core *core) {
+}
+
+}  // namespace practium

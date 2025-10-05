@@ -8,6 +8,7 @@ using Eigen::Matrix;
 using Eigen::Matrix2;
 using Eigen::Matrix3;
 using Eigen::Matrix4;
+using Eigen::Quaternion;
 using Eigen::RowVector2;
 using Eigen::RowVector3;
 using Eigen::RowVector4;

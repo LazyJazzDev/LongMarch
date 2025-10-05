@@ -6,6 +6,8 @@
 
 namespace practium {
 
+using namespace grassland;
+
 class Core;
 class Scene;
 class Renderer;

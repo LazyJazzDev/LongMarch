@@ -1,8 +1,9 @@
 #pragma once
 #include "grassland/grassland.h"
-#include "snowberg/snowberg.h"
 
 namespace contradium {
+
+using namespace grassland;
 
 class RigidSolver;
 class PBDSolver;
