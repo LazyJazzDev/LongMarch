@@ -3,8 +3,16 @@
 namespace practium {
 
 Core::Core(graphics::Core *core) : core_(core) {
-  renderer_core_ = std::make_unique<sparkium::Core>(core_);
+  render_core_ = std::make_unique<sparkium::Core>(core_);
   physics_core_ = std::make_unique<contradium::Core>(core_);
+}
+
+sparkium::Core *Core::GetRenderCore() const {
+  return render_core_.get();
+}
+
+contradium::Core *Core::GetPhysicsCore() const {
+  return physics_core_.get();
 }
 
 }  // namespace practium

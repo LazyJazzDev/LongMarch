@@ -1,5 +1,3 @@
-//
-// Created by zijian on 2025/9/25.
-//
+#include "practium/model/model_util.h"
 
-#include "model_util.h"
+namespace practium {}

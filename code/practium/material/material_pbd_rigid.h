@@ -1,8 +1,13 @@
-//
-// Created by zijian on 2025/10/5.
-//
+#pragma once
+#include "practium/material/material_util.h"
 
-#ifndef LONGMARCH_MATERIAL_PBD_RIGID_H
-#define LONGMARCH_MATERIAL_PBD_RIGID_H
+namespace practium {
 
-#endif  // LONGMARCH_MATERIAL_PBD_RIGID_H
+class MaterialPBDRigid : public Material {
+ public:
+  MaterialPBDRigid(Core *core, float mass = 1.0f, float inertia = 1.0f, bool fixed = false);
+  float mass;
+  float inertia;
+};
+
+}  // namespace practium

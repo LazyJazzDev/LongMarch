@@ -540,6 +540,32 @@ Mesh<Scalar> Mesh<Scalar>::Sphere(int precision_lon, int precision_lat) {
   return sphere_mesh;
 }
 
+template <typename Scalar>
+int Mesh<Scalar>::MakeCollisionMesh() {
+  normals_.clear();
+  tex_coords_.clear();
+  tangents_.clear();
+  signals_.clear();
+  return MergeVertices();
+}
+
+template <typename Scalar>
+Mesh<Scalar> Mesh<Scalar>::Transformed(const Matrix<Scalar, 3, 4> &transform) const {
+  Mesh<Scalar> mesh = *this;
+  Matrix<Scalar, 3, 3> affine_transform = transform.block(0, 0, 3, 3);
+  Matrix<Scalar, 3, 3> normal_transform = affine_transform.inverse().transpose();
+  for (size_t i = 0; i < mesh.num_vertices_; i++) {
+    mesh.positions_[i] = (affine_transform * mesh.positions_[i]) + transform.col(3);
+    if (!mesh.normals_.empty()) {
+      mesh.normals_[i] = (normal_transform * mesh.normals_[i]).normalized();
+    }
+    if (!mesh.tangents_.empty()) {
+      mesh.tangents_[i] = (affine_transform * mesh.tangents_[i]).normalized();
+    }
+  }
+  return mesh;
+}
+
 template class Mesh<float>;
 template class Mesh<double>;
 }  // namespace grassland

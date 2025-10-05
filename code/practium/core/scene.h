@@ -5,7 +5,19 @@ namespace practium {
 
 class Scene {
  public:
+  struct Settings {
+    float dt{0.003f};
+  };
+
   Scene(Core *core);
+
+  Core *GetCore() const;
+
+  sparkium::Scene *GetRenderScene() const;
+
+  contradium::PBDSolver *GetPBDSolver();
+
+  std::unique_ptr<Entity> AddEntity(Model *model, Material *material);
 
  private:
   Core *core_;

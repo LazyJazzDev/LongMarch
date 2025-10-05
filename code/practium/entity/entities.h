@@ -1,8 +1,4 @@
-//
-// Created by zijian on 2025/9/25.
-//
+#pragma once
+#include "practium/entity/entity_pbd_rigid.h"
 
-#ifndef LONGMARCH_ENTITIES_H
-#define LONGMARCH_ENTITIES_H
-
-#endif  // LONGMARCH_ENTITIES_H
+namespace practium {}

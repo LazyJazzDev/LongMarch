@@ -1,8 +1,4 @@
-//
-// Created by zijian on 2025/9/25.
-//
+#pragma once
+#include "practium/core/model.h"
 
-#ifndef LONGMARCH_MODEL_UTIL_H
-#define LONGMARCH_MODEL_UTIL_H
-
-#endif  // LONGMARCH_MODEL_UTIL_H
+namespace practium {}

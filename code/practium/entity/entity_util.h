@@ -1,8 +1,6 @@
-//
-// Created by zijian on 2025/9/25.
-//
+#pragma once
+#include "practium/core/entity.h"
+#include "practium/material/materials.h"
+#include "practium/model/models.h"
 
-#ifndef LONGMARCH_ENTITY_UTIL_H
-#define LONGMARCH_ENTITY_UTIL_H
-
-#endif  // LONGMARCH_ENTITY_UTIL_H
+namespace practium {}

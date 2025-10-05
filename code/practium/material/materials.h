@@ -1,8 +1,4 @@
-//
-// Created by zijian on 2025/10/5.
-//
+#pragma once
+#include "practium/material/material_pbd_rigid.h"
 
-#ifndef LONGMARCH_MATERIALS_H
-#define LONGMARCH_MATERIALS_H
-
-#endif  // LONGMARCH_MATERIALS_H
+namespace practium {}

@@ -1,5 +1,3 @@
-//
-// Created by zijian on 2025/10/5.
-//
+#include "practium/material/material_util.h"
 
-#include "material_util.h"
+namespace practium {}

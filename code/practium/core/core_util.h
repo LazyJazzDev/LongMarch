@@ -10,7 +10,6 @@ using namespace grassland;
 
 class Core;
 class Scene;
-class Renderer;
 class Model;
 class Material;
 class Entity;

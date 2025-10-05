@@ -1,5 +1,8 @@
-//
-// Created by zijian on 2025/9/25.
-//
+#include "practium/core/material.h"
 
-#include "material.h"
+namespace practium {
+
+Material::Material(Core *core) : core_(core) {
+}
+
+}  // namespace practium

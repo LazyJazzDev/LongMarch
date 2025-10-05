@@ -108,6 +108,10 @@ class Mesh {
 
   static Mesh<Scalar> Sphere(int precision_lon = 10, int precision_lat = -1);
 
+  int MakeCollisionMesh();
+
+  Mesh<Scalar> Transformed(const Matrix<Scalar, 3, 4> &transform) const;
+
  private:
   std::vector<Vector3<Scalar>> positions_;
   std::vector<Vector3<Scalar>> normals_;

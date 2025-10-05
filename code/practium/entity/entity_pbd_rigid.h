@@ -1,8 +1,19 @@
-//
-// Created by zijian on 2025/10/5.
-//
+#pragma once
+#include "practium/entity/entity_util.h"
 
-#ifndef LONGMARCH_ENTITY_PBD_RIGID_H
-#define LONGMARCH_ENTITY_PBD_RIGID_H
+namespace practium {
 
-#endif  // LONGMARCH_ENTITY_PBD_RIGID_H
+class EntityPBDRigid : public Entity {
+ public:
+  EntityPBDRigid(Scene *scene, Model *model, MaterialPBDRigid *material);
+
+  virtual ~EntityPBDRigid() = default;
+
+ private:
+  std::unique_ptr<sparkium::GeometryMesh> geometry_mesh_;
+  sparkium::Material *material_;
+  std::unique_ptr<sparkium::EntityGeometryMaterial> entity_geometry_material_;
+  int pbd_rigid_id_{-1};
+};
+
+}  // namespace practium

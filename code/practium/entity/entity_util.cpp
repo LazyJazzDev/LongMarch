@@ -1,5 +1,3 @@
-//
-// Created by zijian on 2025/9/25.
-//
+#include "practium/entity/entity_util.h"
 
-#include "entity_util.h"
+namespace practium {}
