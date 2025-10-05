@@ -78,13 +78,14 @@ int main() {
   auto box_entity = scene.AddEntity(&box_model, &box_material);
   // dynamic cast to EntityPBDRigid
   auto box_pbd_entity = dynamic_cast<practium::EntityPBDRigid *>(box_entity.get());
-  box_pbd_entity->SetAngularVelocity({0.0f, 0.0f, 0.0f});
+  box_pbd_entity->SetInertia(0.04f);
+  box_pbd_entity->SetAngularVelocity({3.0f, 0.0f, 0.0f});
 
   graphics::Extent2D extent{1280, 720};
 
   sparkium::Film film(practium_core.GetRenderCore(), extent.width, extent.height);
   scene.GetRenderScene()->settings.raytracing.samples_per_dispatch = 1;
-  film.info.persistence = 0.95f;
+  film.info.persistence = 0.9f;
   sparkium::Camera camera(
       practium_core.GetRenderCore(),
       glm::lookAt(glm::vec3{-5.0f, 0.3f, 7.0f}, glm::vec3{0.0f, 0.0f, 0.0f}, glm::vec3{0.0, 1.0, 0.0}),
