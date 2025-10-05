@@ -71,15 +71,20 @@ int main() {
   practium::MaterialPBDRigid ground_material(&practium_core, 0.0f, 0.0f, true);
   auto ground_entity = scene.AddEntity(&ground_model, &ground_material);
 
-  transform << 1.0f, 0.0f, 0.0f, 0.0f, 0.0f, 1.0f, 0.0f, 0.0f, 0.0f, 0.0f, 1.0f, 0.0f;
+  transform << 0.2f, 0.0f, 0.0f, 0.0f, 0.0f, 0.2f, 0.0f, 0.0f, 0.0f, 0.0f, 0.2f, 0.0f;
   sparkium::MaterialPrincipled box_surface(practium_core.GetRenderCore(), {0.8f, 0.0f, 0.0f});
   practium::ModelMesh box_model(&practium_core, cube_mesh.Transformed(transform), &box_surface);
-  practium::MaterialPBDRigid box_material(&practium_core, 0.0f, 0.0f, true);
+  practium::MaterialPBDRigid box_material(&practium_core);
   auto box_entity = scene.AddEntity(&box_model, &box_material);
+  // dynamic cast to EntityPBDRigid
+  auto box_pbd_entity = dynamic_cast<practium::EntityPBDRigid *>(box_entity.get());
+  box_pbd_entity->SetAngularVelocity({0.0f, 0.0f, 0.0f});
 
   graphics::Extent2D extent{1280, 720};
 
   sparkium::Film film(practium_core.GetRenderCore(), extent.width, extent.height);
+  scene.GetRenderScene()->settings.raytracing.samples_per_dispatch = 1;
+  film.info.persistence = 0.95f;
   sparkium::Camera camera(
       practium_core.GetRenderCore(),
       glm::lookAt(glm::vec3{-5.0f, 0.3f, 7.0f}, glm::vec3{0.0f, 0.0f, 0.0f}, glm::vec3{0.0, 1.0, 0.0}),
@@ -97,6 +102,8 @@ int main() {
   scene.GetRenderScene()->AddEntity(area_light);
 
   while (!window->ShouldClose()) {
+    scene.Step();
+
     practium_core.GetRenderCore()->Render(scene.GetRenderScene(), &camera, &film);
     film.Develop(srgb_image.get());
 

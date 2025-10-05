@@ -32,4 +32,17 @@ std::unique_ptr<Entity> Scene::AddEntity(Model *model, Material *material) {
   return nullptr;
 }
 
+void Scene::RegisterEntity(Entity *entity) {
+  entities_.push_back(entity);
+}
+
+void Scene::Step() {
+  if (pbd_solver_) {
+    pbd_solver_->Step(3e-3f);
+  }
+  for (auto entity : entities_) {
+    entity->SyncRenderState();
+  }
+}
+
 }  // namespace practium

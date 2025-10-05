@@ -7,7 +7,16 @@ class EntityPBDRigid : public Entity {
  public:
   EntityPBDRigid(Scene *scene, Model *model, MaterialPBDRigid *material);
 
-  virtual ~EntityPBDRigid() = default;
+  ~EntityPBDRigid() override = default;
+
+  void SyncRenderState() const override;
+
+  void SetPosition(const Vector3<float> &x);
+  void SetOrientation(const Quaternion<float> &q);
+  void SetMass(float mass);
+  void SetInertia(float inertia);
+  void SetVelocity(const Vector3<float> &v);
+  void SetAngularVelocity(const Vector3<float> &w);
 
  private:
   std::unique_ptr<sparkium::GeometryMesh> geometry_mesh_;

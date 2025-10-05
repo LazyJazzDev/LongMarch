@@ -11,6 +11,8 @@ class Entity {
 
   Scene *GetScene() const;
 
+  virtual void SyncRenderState() const = 0;
+
  protected:
   Scene *scene_;
 };

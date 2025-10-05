@@ -73,6 +73,20 @@ const PBDSolver::RigidEntity &PBDSolver::GetEntity(int rigid_entity_id) const {
 }
 
 void PBDSolver::Step(float dt) {
+  Vector3<float> gravity{0.0f, -9.81f, 0.0f};
+  for (auto &[id, entity] : rigid_entities_) {
+    if (entity.mass_) {
+      // Semi-implicit Euler integration
+      entity.v_ += dt * gravity;
+      entity.x_ += dt * entity.v_;
+
+      if (entity.w_.norm() > 0.0f) {
+        Eigen::AngleAxis<float> angle_axis(dt * entity.w_.norm(), entity.w_.normalized());
+        Quaternion<float> delta_q{angle_axis};
+        entity.q_ = (delta_q * entity.q_).normalized();
+      }
+    }
+  }
 }
 
 }  // namespace contradium
