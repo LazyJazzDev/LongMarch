@@ -67,7 +67,7 @@ int main() {
   cube_mesh.LoadObjFile(FindAssetFile("meshes/cube.obj"));
 
   Mesh<> sphere_mesh = Mesh<>::Sphere(30);
-  Mesh<> sphere_collision = Mesh<>::Sphere(6, 6);
+  Mesh<> sphere_collision = Mesh<>::Sphere(10);
 
   Matrix<float, 3, 4> transform;
   transform << 100.0f, 0.0f, 0.0f, 0.0f, 0.0f, 100.0f, 0.0f, 0.0f, 0.0f, 0.0f, 100.0f, 0.0f;
@@ -79,7 +79,7 @@ int main() {
   ground_pbd_entity->SetPosition({0.0f, -101.0f, 0.0f});
 
   sparkium::MaterialPrincipled wall_surface0(practium_core.GetRenderCore(), {0.8f, 0.8f, 0.8f});
-  wall_surface0.roughness = 0.0f;
+  wall_surface0.roughness = 0.3f;
   wall_surface0.specular = 1.0f;
   ground_model.material_ = &wall_surface0;
   auto wall_entity0 = scene.AddEntity(&ground_model, &ground_material);
@@ -87,7 +87,7 @@ int main() {
   wall_pbd_entity0->SetPosition({102.0f, 0.0f, 0.0f});
 
   sparkium::MaterialPrincipled wall_surface1(practium_core.GetRenderCore(), {0.8f, 0.8f, 0.8f});
-  wall_surface1.roughness = 0.0f;
+  wall_surface1.roughness = 0.3f;
   wall_surface1.specular = 1.0f;
   ground_model.material_ = &wall_surface1;
   auto wall_entity1 = scene.AddEntity(&ground_model, &ground_material);
@@ -115,7 +115,7 @@ int main() {
     sphere_surfaces[i]->specular = std::uniform_real_distribution<float>(0.0f, 1.0f)(rng);
     if ((i & 3) == 3) {
       sphere_surfaces[i]->emission_color = sphere_surfaces[i]->base_color;
-      sphere_surfaces[i]->emission_strength = std::uniform_real_distribution<float>(0.0f, 1.0f)(rng);
+      sphere_surfaces[i]->emission_strength = std::uniform_real_distribution<float>(0.0f, 1.0f)(rng) * 5.0f;
     }
 
     practium::ModelMesh sphere_model(&practium_core, sphere_mesh.Transformed(transform),
@@ -134,8 +134,7 @@ int main() {
   graphics::Extent2D extent{1280, 720};
 
   sparkium::Film film(practium_core.GetRenderCore(), extent.width, extent.height);
-  scene.GetRenderScene()->settings.raytracing.samples_per_dispatch = 16;
-  film.info.persistence = 0.9f;
+  scene.GetRenderScene()->settings.raytracing.samples_per_dispatch = 32;
   sparkium::Camera camera(
       practium_core.GetRenderCore(),
       glm::lookAt(glm::vec3{-5.0f, 0.3f, 7.0f}, glm::vec3{0.0f, 0.0f, 0.0f}, glm::vec3{0.0, 1.0, 0.0}),
@@ -150,7 +149,7 @@ int main() {
   AreaLight area_light(practium_core.GetRenderCore(), glm::vec3{1.0f, 1.0f, 1.0f}, 1.0f, glm::vec3{0.0f, 30.0f, 50.0f},
                        glm::normalize(glm::vec3{0.0f, -3.0f, -5.0f}));
   area_light.emission = glm::vec3{1000.0f};
-  scene.GetRenderScene()->AddEntity(area_light);
+  // scene.GetRenderScene()->AddEntity(area_light);
 
   bool ray_tracing = false;
   bool pause = true;
@@ -159,6 +158,9 @@ int main() {
   while (!window->ShouldClose()) {
     if (!pause) {
       scene.Step();
+      film.info.persistence = 0.98f;
+    } else {
+      film.info.persistence = 1.0f;
     }
 
     window->BeginImGuiFrame();
@@ -172,8 +174,8 @@ int main() {
     }
     if (ImGui::Button("Reset")) {
       for (int i = 0; i < num_spheres; i++) {
-        Vector3<float> position{std::uniform_real_distribution<float>(-1.0f, 1.0f)(rng), i * 0.4f + 0.3f,
-                                std::uniform_real_distribution<float>(-1.0f, 1.0f)(rng)};
+        Vector3<float> position{std::uniform_real_distribution<float>(-0.5f, 0.5f)(rng), i * 0.4f + 0.3f,
+                                std::uniform_real_distribution<float>(-0.5f, 0.5f)(rng)};
         auto sphere_pbd_entity = dynamic_cast<practium::EntityPBDRigid *>(sphere_entities[i].get());
         sphere_pbd_entity->SetPosition(position);
         sphere_pbd_entity->SetVelocity({0.0f, 0.0f, 0.0f});
