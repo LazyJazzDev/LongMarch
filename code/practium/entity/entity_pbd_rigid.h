@@ -1,0 +1,8 @@
+//
+// Created by zijian on 2025/10/5.
+//
+
+#ifndef LONGMARCH_ENTITY_PBD_RIGID_H
+#define LONGMARCH_ENTITY_PBD_RIGID_H
+
+#endif  // LONGMARCH_ENTITY_PBD_RIGID_H
