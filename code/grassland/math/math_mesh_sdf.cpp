@@ -122,7 +122,7 @@ MeshSDF::MeshSDF(VertexBufferView vertex_buffer_view, size_t num_vertex, const u
         Vector3<float> dw = pw_other - pw;
         edge_indices_.push_back(u);
         edge_indices_.push_back(v);
-        edge_inside_.push_back(dw.dot(n) > 0);
+        edge_inside_.push_back(dw.dot(n) > 1e-7f);
       }
     }
   }
