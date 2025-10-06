@@ -40,7 +40,9 @@ void Scene::Step() {
   if (pbd_solver_) {
     pbd_solver_->Step(1e-2f);
   }
+}
 
+void Scene::SyncRenderState() {
   for (auto entity : entities_) {
     entity->SyncRenderState();
   }

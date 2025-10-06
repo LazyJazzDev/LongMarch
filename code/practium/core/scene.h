@@ -23,6 +23,8 @@ class Scene {
 
   void Step();
 
+  void SyncRenderState();
+
  private:
   Core *core_;
   std::unique_ptr<sparkium::Scene> scene_;

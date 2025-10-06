@@ -100,8 +100,8 @@ int main() {
 
   std::mt19937 rng{1234567};
   for (int i = 0; i < num_spheres; i++) {
-    Vector3<float> position{std::uniform_real_distribution<float>(-1.0f, 1.0f)(rng), i * 0.4f + 0.3f,
-                            std::uniform_real_distribution<float>(-1.0f, 1.0f)(rng)};
+    Vector3<float> position{std::uniform_real_distribution<float>(-0.5f, 0.5f)(rng), i * 0.4f + 0.3f,
+                            std::uniform_real_distribution<float>(-0.5f, 0.5f)(rng)};
     transform << 0.2f, 0.0f, 0.0f, 0.0f, 0.0f, 0.2f, 0.0f, 0.0f, 0.0f, 0.0f, 0.2f, 0.0f;
 
     sphere_surfaces[i] = std::make_unique<sparkium::MaterialPrincipled>(
@@ -131,7 +131,7 @@ int main() {
     sphere_pbd_entity->SetAngularVelocity({0.0f, 0.0f, 0.0f});
   }
 
-  graphics::Extent2D extent{1280, 720};
+  graphics::Extent2D extent{640, 480};
 
   sparkium::Film film(practium_core.GetRenderCore(), extent.width, extent.height);
   scene.GetRenderScene()->settings.raytracing.samples_per_dispatch = 32;
@@ -149,7 +149,7 @@ int main() {
   AreaLight area_light(practium_core.GetRenderCore(), glm::vec3{1.0f, 1.0f, 1.0f}, 1.0f, glm::vec3{0.0f, 30.0f, 50.0f},
                        glm::normalize(glm::vec3{0.0f, -3.0f, -5.0f}));
   area_light.emission = glm::vec3{1000.0f};
-  // scene.GetRenderScene()->AddEntity(area_light);
+  scene.GetRenderScene()->AddEntity(area_light);
 
   bool ray_tracing = false;
   bool pause = true;
@@ -185,6 +185,7 @@ int main() {
     ImGui::End();
     window->EndImGuiFrame();
 
+    scene.SyncRenderState();
     practium_core.GetRenderCore()->Render(
         scene.GetRenderScene(), &camera, &film,
         ray_tracing ? sparkium::RENDER_PIPELINE_AUTO : sparkium::RENDER_PIPELINE_RASTERIZATION);
