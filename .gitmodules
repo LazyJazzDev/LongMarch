@@ -1,6 +1,6 @@
 [submodule "assets"]
 	path = assets
-	url = git@github.com:LazyJazzDev/LongMarchAssets.git
+	url = https://github.com/LazyJazzDev/LongMarchAssets.git
 [submodule "external/imgui"]
 	path = external/imgui
 	url = https://github.com/ocornut/imgui.git
