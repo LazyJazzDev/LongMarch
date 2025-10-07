@@ -286,6 +286,18 @@ void Scene::UpdatePipeline(Camera *camera) {
     pipeline_dirty_ = false;
   }
 
+  while (buffers_.size() < buffer_capacity_) {
+    buffers_.push_back(camera->Buffer());
+  }
+
+  while (sdr_images_.size() < sdr_image_capacity_) {
+    sdr_images_.push_back(core_->GetImage("white"));
+  }
+
+  while (hdr_images_.size() < hdr_image_capacity_) {
+    hdr_images_.push_back(core_->GetImage("white_hdr"));
+  }
+
   preprocess_cmd_context_->CmdBindComputeProgram(gather_light_power_program_.get());
   preprocess_cmd_context_->CmdBindResources(0, {light_metadatas_buffer_.get()}, graphics::BIND_POINT_COMPUTE);
   preprocess_cmd_context_->CmdBindResources(1, {light_selector_buffer_.get()}, graphics::BIND_POINT_COMPUTE);

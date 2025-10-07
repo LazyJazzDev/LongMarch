@@ -9,8 +9,13 @@ namespace grassland::vulkan {
 AccelerationStructure::AccelerationStructure(const class Device *device,
                                              std::unique_ptr<class Buffer> buffer,
                                              VkDeviceAddress device_address,
-                                             VkAccelerationStructureKHR as)
-    : device_(device), buffer_(std::move(buffer)), device_address_(device_address), as_(as) {
+                                             VkAccelerationStructureKHR as,
+                                             int num_instance)
+    : device_(device),
+      buffer_(std::move(buffer)),
+      device_address_(device_address),
+      as_(as),
+      num_instance_(num_instance) {
 }
 
 AccelerationStructure::~AccelerationStructure() {
@@ -50,10 +55,17 @@ VkResult AccelerationStructure::UpdateInstances(const std::vector<VkAcceleration
   acceleration_structure_geometry.geometry.instances.arrayOfPointers = VK_FALSE;
   acceleration_structure_geometry.geometry.instances.data = instance_data_device_address;
 
+  VkBuildAccelerationStructureModeKHR build_acceleration_structure_mode{
+      VK_BUILD_ACCELERATION_STRUCTURE_MODE_UPDATE_KHR};
+  if (num_instance_ != instances.size()) {
+    build_acceleration_structure_mode = VK_BUILD_ACCELERATION_STRUCTURE_MODE_BUILD_KHR;
+    num_instance_ = instances.size();
+  }
+
   BuildAccelerationStructure(
       device_, acceleration_structure_geometry, VK_ACCELERATION_STRUCTURE_TYPE_TOP_LEVEL_KHR,
       VK_BUILD_ACCELERATION_STRUCTURE_PREFER_FAST_TRACE_BIT_KHR | VK_BUILD_ACCELERATION_STRUCTURE_ALLOW_UPDATE_BIT_KHR,
-      VK_BUILD_ACCELERATION_STRUCTURE_MODE_UPDATE_KHR, instances.size(), command_pool, queue, &as_, &buffer_);
+      build_acceleration_structure_mode, instances.size(), command_pool, queue, &as_, &buffer_);
 
   // Get the top acceleration structure's handle, which will be used to setup
   // it's descriptor

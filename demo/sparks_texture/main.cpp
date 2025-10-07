@@ -58,7 +58,7 @@ class AreaLight {
 int main() {
   std::unique_ptr<graphics::Core> core_;
 
-  graphics::CreateCore(graphics::BACKEND_API_DEFAULT, graphics::Core::Settings{2, false}, &core_);
+  graphics::CreateCore(graphics::BACKEND_API_DEFAULT, graphics::Core::Settings{}, &core_);
   core_->InitializeLogicalDeviceAutoSelect(false);
   sparkium::Core sparkium_core(core_.get());
 

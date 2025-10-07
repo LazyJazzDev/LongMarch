@@ -720,7 +720,7 @@ VkResult Device::CreateBottomLevelAccelerationStructure(VkDeviceAddress aabb_add
   acceleration_device_address_info.accelerationStructure = acceleration_structure;
   VkDeviceAddress device_address =
       procedures_.vkGetAccelerationStructureDeviceAddressKHR(device_, &acceleration_device_address_info);
-  pp_blas.construct(this, std::move(buffer), device_address, acceleration_structure);
+  pp_blas.construct(this, std::move(buffer), device_address, acceleration_structure, num_aabb);
   return VK_SUCCESS;
 }
 
@@ -783,7 +783,7 @@ VkResult Device::CreateBottomLevelAccelerationStructure(VkDeviceAddress vertex_b
   acceleration_device_address_info.accelerationStructure = acceleration_structure;
   VkDeviceAddress device_address =
       procedures_.vkGetAccelerationStructureDeviceAddressKHR(device_, &acceleration_device_address_info);
-  pp_blas.construct(this, std::move(buffer), device_address, acceleration_structure);
+  pp_blas.construct(this, std::move(buffer), device_address, acceleration_structure, primitive_count);
   return VK_SUCCESS;
 }
 
@@ -854,7 +854,7 @@ VkResult Device::CreateTopLevelAccelerationStructure(const std::vector<VkAcceler
   acceleration_device_address_info.accelerationStructure = acceleration_structure;
   VkDeviceAddress device_address =
       procedures_.vkGetAccelerationStructureDeviceAddressKHR(device_, &acceleration_device_address_info);
-  pp_tlas.construct(this, std::move(buffer), device_address, acceleration_structure);
+  pp_tlas.construct(this, std::move(buffer), device_address, acceleration_structure, instances.size());
   return VK_SUCCESS;
 }
 

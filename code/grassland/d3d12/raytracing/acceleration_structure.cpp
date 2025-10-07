@@ -4,8 +4,8 @@
 
 namespace grassland::d3d12 {
 
-AccelerationStructure::AccelerationStructure(Device *device, const ComPtr<ID3D12Resource> &as)
-    : device_(device), as_(as) {
+AccelerationStructure::AccelerationStructure(Device *device, const ComPtr<ID3D12Resource> &as, int num_instance)
+    : device_(device), as_(as), num_instance_(num_instance) {
 }
 
 HRESULT AccelerationStructure::UpdateInstances(const std::vector<D3D12_RAYTRACING_INSTANCE_DESC> &instances,
@@ -35,11 +35,14 @@ HRESULT AccelerationStructure::UpdateInstances(const std::vector<D3D12_RAYTRACIN
   device->GetRaytracingAccelerationStructurePrebuildInfo(&as_inputs, &as_prebuild_info);
 
   if (!as_ || as_->GetDesc().Width < as_prebuild_info.ResultDataMaxSizeInBytes) {
+    LogInfo("Rebuilding acceleration structure with invalid results.");
     RETURN_IF_FAILED_HR(
         d3d12::CreateBuffer(device_->Handle(), as_prebuild_info.ResultDataMaxSizeInBytes, D3D12_HEAP_TYPE_DEFAULT,
                             D3D12_RESOURCE_STATE_RAYTRACING_ACCELERATION_STRUCTURE,
                             D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS, as_),
         "failed to create acceleration structure buffer.");
+    as_inputs.Flags = D3D12_RAYTRACING_ACCELERATION_STRUCTURE_BUILD_FLAG_PREFER_FAST_TRACE |
+                      D3D12_RAYTRACING_ACCELERATION_STRUCTURE_BUILD_FLAG_ALLOW_UPDATE;
   }
 
   ID3D12Resource *scratch_buffer = device_->RequestScratchBuffer(as_prebuild_info.ScratchDataSizeInBytes);
@@ -48,6 +51,13 @@ HRESULT AccelerationStructure::UpdateInstances(const std::vector<D3D12_RAYTRACIN
   as_desc.ScratchAccelerationStructureData = scratch_buffer->GetGPUVirtualAddress();
   as_desc.DestAccelerationStructureData = as_->GetGPUVirtualAddress();
   as_desc.SourceAccelerationStructureData = as_->GetGPUVirtualAddress();
+
+  if (num_instance_ != instances.size()) {
+    as_desc.Inputs.Flags = D3D12_RAYTRACING_ACCELERATION_STRUCTURE_BUILD_FLAG_PREFER_FAST_TRACE |
+                           D3D12_RAYTRACING_ACCELERATION_STRUCTURE_BUILD_FLAG_ALLOW_UPDATE;
+    as_desc.SourceAccelerationStructureData = 0;
+    num_instance_ = instances.size();
+  }
 
   queue->SingleTimeCommand(fence, allocator, [&](ID3D12GraphicsCommandList *command_list) {
     ComPtr<ID3D12GraphicsCommandList4> command_list4;

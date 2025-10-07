@@ -56,7 +56,7 @@ class AreaLight {
 int main() {
   std::unique_ptr<graphics::Core> core_;
 
-  graphics::CreateCore(graphics::BACKEND_API_DEFAULT, graphics::Core::Settings{2, false}, &core_);
+  graphics::CreateCore(graphics::BACKEND_API_DEFAULT, graphics::Core::Settings{}, &core_);
   core_->InitializeLogicalDeviceAutoSelect(false);
 
   practium::Core practium_core(core_.get());
@@ -153,6 +153,7 @@ int main() {
 
   bool ray_tracing = false;
   bool pause = true;
+  bool day_light = true;
   window->InitImGui(nullptr, 20.0f);
 
   while (!window->ShouldClose()) {
@@ -167,6 +168,9 @@ int main() {
     ImGui::SetNextWindowPos({0, 0}, ImGuiCond_Once);
     ImGui::SetNextWindowBgAlpha(0.3);
     ImGui::Begin("Settings", nullptr, ImGuiWindowFlags_AlwaysAutoResize);
+    if (ImGui::Checkbox("Day Light", &day_light)) {
+      scene.GetRenderScene()->SetEntityActive(area_light, day_light);
+    }
     ImGui::Checkbox("Pause", &pause);
     ImGui::Checkbox("Ray Tracing", &ray_tracing);
     if (ray_tracing && !core_->DeviceRayTracingSupport()) {

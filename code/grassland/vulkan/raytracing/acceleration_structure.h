@@ -8,7 +8,8 @@ class AccelerationStructure {
   AccelerationStructure(const class Device *device,
                         std::unique_ptr<class Buffer> buffer,
                         VkDeviceAddress device_address,
-                        VkAccelerationStructureKHR as);
+                        VkAccelerationStructureKHR as,
+                        int num_instance);
   ~AccelerationStructure();
   class Buffer *Buffer() const;
   VkDeviceAddress DeviceAddress() const;
@@ -29,6 +30,7 @@ class AccelerationStructure {
   std::unique_ptr<class Buffer> buffer_;
   VkDeviceAddress device_address_{};
   VkAccelerationStructureKHR as_{};
+  int num_instance_;
 };
 
 VkResult BuildAccelerationStructure(const Device *device,

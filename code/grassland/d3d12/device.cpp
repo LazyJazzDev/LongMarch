@@ -291,7 +291,7 @@ HRESULT Device::CreateBottomLevelAccelerationStructure(D3D12_GPU_VIRTUAL_ADDRESS
     }
   });
 
-  pp_as.construct(this, as);
+  pp_as.construct(this, as, num_aabb);
   return S_OK;
 }
 
@@ -350,7 +350,7 @@ HRESULT Device::CreateBottomLevelAccelerationStructure(D3D12_GPU_VIRTUAL_ADDRESS
     }
   });
 
-  pp_as.construct(this, as);
+  pp_as.construct(this, as, primitive_count);
   return S_OK;
 }
 
@@ -424,7 +424,7 @@ HRESULT Device::CreateTopLevelAccelerationStructure(const std::vector<D3D12_RAYT
     }
   });
 
-  pp_tlas.construct(this, as);
+  pp_tlas.construct(this, as, instances.size());
   return S_OK;
 }
 

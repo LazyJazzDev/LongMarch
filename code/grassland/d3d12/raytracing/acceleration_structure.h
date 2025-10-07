@@ -6,7 +6,7 @@ namespace grassland::d3d12 {
 
 class AccelerationStructure {
  public:
-  AccelerationStructure(Device *device, const ComPtr<ID3D12Resource> &as);
+  AccelerationStructure(Device *device, const ComPtr<ID3D12Resource> &as, int num_instance);
 
   ID3D12Resource *Handle() const {
     return as_.Get();
@@ -25,6 +25,7 @@ class AccelerationStructure {
  private:
   Device *device_;
   ComPtr<ID3D12Resource> as_;
+  int num_instance_;
 };
 
 }  // namespace grassland::d3d12
