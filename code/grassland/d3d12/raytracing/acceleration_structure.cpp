@@ -35,7 +35,6 @@ HRESULT AccelerationStructure::UpdateInstances(const std::vector<D3D12_RAYTRACIN
   device->GetRaytracingAccelerationStructurePrebuildInfo(&as_inputs, &as_prebuild_info);
 
   if (!as_ || as_->GetDesc().Width < as_prebuild_info.ResultDataMaxSizeInBytes) {
-    LogInfo("Rebuilding acceleration structure with invalid results.");
     RETURN_IF_FAILED_HR(
         d3d12::CreateBuffer(device_->Handle(), as_prebuild_info.ResultDataMaxSizeInBytes, D3D12_HEAP_TYPE_DEFAULT,
                             D3D12_RESOURCE_STATE_RAYTRACING_ACCELERATION_STRUCTURE,
