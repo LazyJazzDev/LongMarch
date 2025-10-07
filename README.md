@@ -1,5 +1,14 @@
 # Long March
 
+<!-- TOC -->
+* [Long March](#long-march)
+  * [Description](#description)
+  * [How to Build](#how-to-build)
+    * [Windows](#windows)
+    * [Linux](#linux)
+    * [macOS](#macos)
+<!-- TOC -->
+
 ## Description
 
 **LongMarch (长征)** is an integration of rendering and physics simulation algorithms.
