@@ -108,7 +108,7 @@ LM_DEVICE_FUNC Real DistancePointPlane(const Vector3<Real> &p,
   // Ax = b
   Matrix<Real, 2, 2> A;
   A << d, f, f, e;
-  A = A.inverse();
+  A = A.inverse().eval();
   u = A(0, 0) * b + A(0, 1) * c;
   v = A(1, 0) * b + A(1, 1) * c;
   return (dp - u * ds0 - v * ds1).norm();
