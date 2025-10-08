@@ -154,6 +154,7 @@ uint32_t PixelSize(ImageFormat format) {
   }
 }
 
+#if defined(LONGMARCH_PYTHON_ENABLED)
 void util::PybindModuleRegistration(py::module_ &m) {
   py::enum_<BackendAPI> backend_api(m, "BackendAPI");
   backend_api.value("BACKEND_API_VULKAN", BACKEND_API_VULKAN, "Backend API: Vulkan");
@@ -646,5 +647,6 @@ void util::PybindModuleRegistration(py::module_ &m) {
         .format(aabb.min_x, aabb.min_y, aabb.min_z, aabb.max_x, aabb.max_y, aabb.max_z);
   });
 }
+#endif
 
 }  // namespace grassland::graphics

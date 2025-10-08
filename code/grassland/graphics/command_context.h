@@ -63,6 +63,8 @@ class CommandContext {
   std::vector<std::function<void()>> post_execution_callbacks_;
 
  public:
+#if defined(LONGMARCH_PYTHON_ENABLED)
   static void PybindClassRegistration(py::classh<CommandContext> &c);
+#endif
 };
 }  // namespace grassland::graphics

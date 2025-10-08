@@ -7,7 +7,9 @@ class Sampler {
  public:
   virtual ~Sampler() = default;
 
-  static void PybindClassRegistration(py::classh<Sampler> &c);
+#if defined(LONGMARCH_PYTHON_ENABLED)
+  static void PybindClassRegistration *(py::classh<Sampler> &c);
+#endif
 };
 
 }  // namespace grassland::graphics

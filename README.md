@@ -36,13 +36,13 @@ We strongly recommend using [CLion](https://www.jetbrains.com/clion/) as the IDE
 
 #### Step 0: Prerequisites
 
-- [Python3](https://python.org): Install anywhere you like (System-wide, User-only, Conda, Homebrew, etc.). We will refer the python executable path as `<PYTHON_EXECUTABLE_PATH>` in the following instructions.
 - [vcpkg](https://github.com/microsoft/vcpkg): The C++ package manager. Clone the vcpkg repo to anywhere you like, we will refer tha vcpkg path as
   `<VCPKG_ROOT>` in the following instructions (the path ends in `vcpkg`, not its parent directory).
 - [MSVC with Windows SDK (version 10+)](https://visualstudio.microsoft.com/downloads/): We usually install this via Visual Studio installer. You should select the following workloads during installation:
   - Desktop development with C++
 
   Then everything should be installed automatically.
+- [[optional] Python3](https://python.org): We provide python package with pybind11. Such functionality requires Python3 installation. You may install anywhere you like (System-wide, User-only, Conda, Homebrew, etc.). We will refer the python executable path as `<PYTHON_EXECUTABLE_PATH>` in the following instructions.
 - [[optional] Vulkan SDK](https://vulkan.lunarg.com/sdk/home): Vulkan is the latest cross-platform graphics API. Since D3D12 is available on Windows, this is optional. Install the SDK [Caution: not the Runtime (RT)] via the official **SDK installer**. You should be able to run `vulkaninfo` command in a new terminal after installation. **No optional components are needed for this project**.
 - [[optional] CUDA Toolkit](https://developer.nvidia.com/cuda-downloads): CUDA is optional, however, some functions such as most of the GPU-accelerated physics simulation features will require CUDA. Install the toolkit with the official **exe (local)** installer. You should be able to run `nvcc --version` command in a new terminal after installation.
 
@@ -88,10 +88,10 @@ The compiled executable should be located at `build/demo/graphics_hello_triangle
 
 #### Step 0: Prerequisites
 
-- [Python3](https://python.org): Install anywhere you like (System-wide, User-only, Conda, Homebrew, etc.). We will refer the python executable path as `<PYTHON_EXECUTABLE_PATH>` in the following instructions.
 - [vcpkg](https://github.com/microsoft/vcpkg): The C++ package manager. Clone the vcpkg repo to anywhere you like, we will refer tha vcpkg path as
   `<VCPKG_ROOT>` in the following instructions (the path ends in `vcpkg`, not its parent directory).
 - [Vulkan SDK](https://vulkan.lunarg.com/sdk/home): Vulkan is the latest cross-platform graphics API. Install the lastest Vulkan SDK via Tarball file, follow [this guide](https://vulkan.lunarg.com/doc/sdk/latest/linux/getting_started.html). You should be able to run `vulkaninfo` command in a new terminal after installation.
+- [[optional] Python3](https://python.org): We provide python package with pybind11. Such functionality requires Python3 installation. You may install anywhere you like (System-wide, User-only, Conda, Homebrew, etc.). We will refer the python executable path as `<PYTHON_EXECUTABLE_PATH>` in the following instructions.
 - [[optional] CUDA Toolkit](https://developer.nvidia.com/cuda-downloads): CUDA is optional, however, some functions such as most of the GPU-accelerated physics simulation features will require CUDA. Install the toolkit following the official instructions. You should be able to run `nvcc --version` command in a new terminal after installation.
 
 #### Step 1: Clone the repo
@@ -137,10 +137,10 @@ The compiled executable should be located at `build/demo/graphics_hello_triangle
 
 #### Step 0: Prerequisites
 
-- [Python3](https://python.org): Install anywhere you like (System-wide, User-only, Conda, Homebrew, etc.). We will refer the python executable path as `<PYTHON_EXECUTABLE_PATH>` in the following instructions.
 - [vcpkg](https://github.com/microsoft/vcpkg): The C++ package manager. Clone the vcpkg repo to anywhere you like, we will refer tha vcpkg path as
   `<VCPKG_ROOT>` in the following instructions (the path ends in `vcpkg`, not its parent directory).
 - [Vulkan SDK](https://vulkan.lunarg.com/sdk/home): Vulkan is the latest cross-platform graphics API. Install the SDK [Caution: not the Runtime (RT)] via the official **SDK installer**. You should be able to run `vulkaninfo` command in a new terminal after installation. **No optional components are needed for this project**.
+- [[optional] Python3](https://python.org): We provide python package with pybind11. Such functionality requires Python3 installation. You may install anywhere you like (System-wide, User-only, Conda, Homebrew, etc.). We will refer the python executable path as `<PYTHON_EXECUTABLE_PATH>` in the following instructions.
 
 CUDA is not available on macOS since Apple has deprecated NVIDIA GPU support.
 

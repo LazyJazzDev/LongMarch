@@ -5,6 +5,7 @@
 
 namespace grassland::graphics {
 
+#if defined(LONGMARCH_PYTHON_ENABLED)
 void Core::Settings::PybindClassRegistration(py::classh<Settings> &c) {
   c.def(py::init<int, bool>(), py::arg("frames_in_flight") = 2, py::arg("enable_debug") = kEnableDebug);
   c.def("__repr__", [](const Settings &settings) {
@@ -14,6 +15,7 @@ void Core::Settings::PybindClassRegistration(py::classh<Settings> &c) {
   c.def_readwrite("frames_in_flight", &Settings::frames_in_flight, "Number of frames buffer");
   c.def_readwrite("enable_debug", &Settings::enable_debug, "Enable debug mode, which may have performance impact");
 }
+#endif
 
 Core::Core(const Settings &settings) : settings_(settings) {
 }
@@ -115,6 +117,7 @@ int Core::InitializeLogicalDeviceByCUDADeviceID(int cuda_device_id) {
 #define DEFAULT_API 1
 #endif
 
+#if defined(LONGMARCH_PYTHON_ENABLED)
 void Core::PybindClassRegistration(py::classh<Core> &c) {
   c.doc() = "Core class for resource managements";
   c.def(py::init([](BackendAPI api, const Settings &settings) {
@@ -327,6 +330,7 @@ void Core::PybindClassRegistration(py::classh<Core> &c) {
         "Initialize logical device by CUDA device index");
 #endif
 }
+#endif
 
 int CreateCore(BackendAPI api, const Core::Settings &settings, double_ptr<Core> pp_core) {
   switch (api) {

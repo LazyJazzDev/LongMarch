@@ -13,6 +13,8 @@ namespace sparkium = sparkium;
 namespace contradium = contradium;
 namespace practium = practium;
 
+#if defined(LONGMARCH_PYTHON_ENABLED)
 void PybindModuleRegistration(py::module_ &m);
+#endif
 
 }  // namespace long_march

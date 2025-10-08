@@ -94,14 +94,14 @@ list(APPEND LIB_LIST ${GLM_LIB_NAME})
 
 add_library(imgui)
 target_sources(imgui
-    PRIVATE
+        PRIVATE
         external/imgui/imgui.cpp
         external/imgui/imgui_draw.cpp
         external/imgui/imgui_widgets.cpp
         external/imgui/imgui_demo.cpp
         external/imgui/imgui_tables.cpp)
 target_include_directories(imgui
-    PUBLIC
+        PUBLIC
         $<BUILD_INTERFACE:${CMAKE_CURRENT_LIST_DIR}/external/imgui>
         $<INSTALL_INTERFACE:include>)
 set(IMGUI_LIB_NAME imgui)
@@ -119,9 +119,11 @@ find_package(Stb REQUIRED)
 set(STB_INC_DIR ${Stb_INCLUDE_DIR})
 list(APPEND INC_LIST ${STB_INC_DIR})
 
-find_package(assimp CONFIG REQUIRED)
-set(ASSIMP_LIB_NAME assimp::assimp)
-list(APPEND LIB_LIST ${ASSIMP_LIB_NAME})
+find_package(assimp CONFIG)
+if (assimp_FOUND)
+    set(ASSIMP_LIB_NAME assimp::assimp)
+    list(APPEND LIB_LIST ${ASSIMP_LIB_NAME})
+endif ()
 
 if (WIN32)
     set(LONGMARCH_D3D12_ENABLED ON)
@@ -141,15 +143,15 @@ elseif (LONGMARCH_D3D12_ENABLED)
     set(DXC_LIB_NAME dxcompiler)
     list(APPEND LIB_LIST ${DXC_LIB_NAME})
 
-    if(DEFINED ENV{WindowsSdkVerBinPath})
+    if (DEFINED ENV{WindowsSdkVerBinPath})
         # e.g., C:\Program Files (x86)\Windows Kits\10\bin\10.0.22621.0\
         set(_BASE "$ENV{WindowsSdkVerBinPath}")
-        if(CMAKE_SIZEOF_VOID_P EQUAL 8)
+        if (CMAKE_SIZEOF_VOID_P EQUAL 8)
             set(WINSDK_BIN_DIR "${_BASE}x64")
-        else()
+        else ()
             set(WINSDK_BIN_DIR "${_BASE}x86")
-        endif()
-    endif()
+        endif ()
+    endif ()
 
     set(DXC_DLL_DIR "${WINSDK_BIN_DIR}")
 endif ()
@@ -161,18 +163,26 @@ set(LONGMARCH_IMGUI_DIR ${CMAKE_CURRENT_LIST_DIR}/external/imgui)
 
 message(STATUS "PROJECT_BINARY_DIR : ${PROJECT_BINARY_DIR}")
 
-find_package(Python3 REQUIRED COMPONENTS Interpreter Development)
 
-message(STATUS "Python3_EXECUTABLE: ${Python3_EXECUTABLE}")
-message(STATUS "Python3_INCLUDE_DIRS: ${Python3_INCLUDE_DIRS}")
-message(STATUS "Python3_LIBRARIES: ${Python3_LIBRARIES}")
-message(STATUS "Python3_RUNTIME_LIBRARY_DIRS: ${Python3_RUNTIME_LIBRARY_DIRS}")
-message(STATUS "Python3_VERSION: ${Python3_VERSION}")
-message(STATUS "Python3_SITEARCH: ${Python3_SITEARCH}")
+if (NOT LONGMARCH_DISABLE_PYTHON)
 
-add_subdirectory(external/pybind11)
-set(PYBIND11_LIB_NAME pybind11::headers)
-list(APPEND LIB_LIST ${PYBIND11_LIB_NAME})
+    find_package(Python3 COMPONENTS Interpreter Development)
+
+    if (Python3_FOUND)
+        message(STATUS "Python3_EXECUTABLE: ${Python3_EXECUTABLE}")
+        message(STATUS "Python3_INCLUDE_DIRS: ${Python3_INCLUDE_DIRS}")
+        message(STATUS "Python3_LIBRARIES: ${Python3_LIBRARIES}")
+        message(STATUS "Python3_RUNTIME_LIBRARY_DIRS: ${Python3_RUNTIME_LIBRARY_DIRS}")
+        message(STATUS "Python3_VERSION: ${Python3_VERSION}")
+        message(STATUS "Python3_SITEARCH: ${Python3_SITEARCH}")
+
+        add_subdirectory(external/pybind11)
+        set(PYBIND11_LIB_NAME pybind11::headers)
+        list(APPEND LIB_LIST ${PYBIND11_LIB_NAME})
+
+        set(LONGMARCH_PYTHON_ENABLED ON)
+    endif ()
+endif ()
 
 add_subdirectory(scripts)
 include(scripts/pack_shaders.cmake)
@@ -189,14 +199,14 @@ add_subdirectory(code)
 # If current list is the root list
 if ("${CMAKE_CURRENT_SOURCE_DIR}" STREQUAL "${CMAKE_SOURCE_DIR}")
     if (NOT LONGMARCH_NO_DEMO)
-        if(CMAKE_GENERATOR MATCHES "^Visual Studio")
+        if (CMAKE_GENERATOR MATCHES "^Visual Studio")
             message(STATUS "Using a Visual Studio generator")
             add_subdirectory(demo)
             add_subdirectory(test)
         else ()
             add_subdirectory(demo EXCLUDE_FROM_ALL)
             add_subdirectory(test EXCLUDE_FROM_ALL)
-        endif()
+        endif ()
     endif ()
 endif ()
 

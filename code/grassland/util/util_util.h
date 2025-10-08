@@ -14,6 +14,7 @@
 #include "thrust/sort.h"
 #endif
 
+#if defined(LONGMARCH_PYTHON_ENABLED)
 #include "pybind11/chrono.h"
 #include "pybind11/eigen.h"
 #include "pybind11/functional.h"
@@ -22,6 +23,7 @@
 #include "pybind11/stl.h"
 
 namespace py = pybind11;
+#endif
 
 namespace grassland {
 

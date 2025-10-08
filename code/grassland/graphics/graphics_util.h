@@ -301,7 +301,9 @@ class CUDABuffer;
 #endif
 
 namespace util {
+#if defined(LONGMARCH_PYTHON_ENABLED)
 void PybindModuleRegistration(py::module_ &m);
-}
+#endif
+}  // namespace util
 
 }  // namespace grassland::graphics

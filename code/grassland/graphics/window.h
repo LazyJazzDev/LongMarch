@@ -78,7 +78,9 @@ class Window {
   bool enable_hdr_;
 
  public:
+#if defined(LONGMARCH_PYTHON_ENABLED)
   static void PybindClassRegistration(py::classh<Window> &c);
+#endif
 };
 
 }  // namespace grassland::graphics

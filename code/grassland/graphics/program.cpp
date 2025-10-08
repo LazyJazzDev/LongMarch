@@ -2,6 +2,7 @@
 
 namespace grassland::graphics {
 
+#if defined(LONGMARCH_PYTHON_ENABLED)
 void Program::PybindClassRegistration(py::classh<Program> &c) {
   c.def("add_input_binding", &Program::AddInputBinding, py::arg("stride"), py::arg("input_per_instance") = false,
         "Add an input binding");
@@ -17,6 +18,7 @@ void Program::PybindClassRegistration(py::classh<Program> &c) {
   c.def("finalize", &Program::Finalize, "Finalize the program");
   c.def("__repr__", [](Program *program) { return py::str("Program()"); });
 }
+#endif
 
 void RayTracingProgram::AddHitGroup(Shader *closest_hit_shader,
                                     Shader *any_hit_shader,
@@ -31,13 +33,16 @@ void RayTracingProgram::AddHitGroup(Shader *closest_hit_shader,
   AddHitGroup(hit_group);
 }
 
+#if defined(LONGMARCH_PYTHON_ENABLED)
 void ComputeProgram::PybindClassRegistration(py::classh<ComputeProgram> &c) {
   c.def("add_resource_binding", &ComputeProgram::AddResourceBinding, py::arg("type"), py::arg("count"),
         "Add a resource binding");
   c.def("finalize", &ComputeProgram::Finalize, "Finalize the compute program");
   c.def("__repr__", [](ComputeProgram *program) { return py::str("ComputeProgram()"); });
 }
+#endif
 
+#if defined(LONGMARCH_PYTHON_ENABLED)
 void RayTracingProgram::PybindClassRegistration(py::classh<RayTracingProgram> &c) {
   c.def("add_resource_binding", &RayTracingProgram::AddResourceBinding, py::arg("type"), py::arg("count"),
         "Add a resource binding");
@@ -59,5 +64,6 @@ void RayTracingProgram::PybindClassRegistration(py::classh<RayTracingProgram> &c
   c.def("finalize", py::overload_cast<>(&RayTracingProgram::Finalize), "Finalize the ray tracing program");
   c.def("__repr__", [](RayTracingProgram *program) { return py::str("RayTracingProgram()"); });
 }
+#endif
 
 }  // namespace grassland::graphics

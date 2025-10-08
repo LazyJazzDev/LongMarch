@@ -14,7 +14,9 @@ class Core {
     int frames_in_flight{2};
     bool enable_debug{kEnableDebug};
 
+#if defined(LONGMARCH_PYTHON_ENABLED)
     static void PybindClassRegistration(py::classh<Settings> &c);
+#endif
   };
 
   Core(const Settings &settings);
@@ -140,7 +142,9 @@ class Core {
 #endif
 
  public:
+#if defined(LONGMARCH_PYTHON_ENABLED)
   static void PybindClassRegistration(py::classh<Core> &c);
+#endif
 };
 
 int CreateCore(BackendAPI api, const Core::Settings &settings, double_ptr<Core> pp_core);

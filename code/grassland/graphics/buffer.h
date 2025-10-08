@@ -29,7 +29,9 @@ class Buffer {
     return BufferRange(this, offset, size);
   }
 
+#if defined(LONGMARCH_PYTHON_ENABLED)
   static void PybindClassRegistration(py::classh<Buffer> &c);
+#endif
 };
 
 #if defined(LONGMARCH_CUDA_RUNTIME)

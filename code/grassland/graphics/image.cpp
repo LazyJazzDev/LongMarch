@@ -6,6 +6,7 @@
 
 namespace grassland::graphics {
 
+#if defined(LONGMARCH_PYTHON_ENABLED)
 void Image::PybindClassRegistration(py::classh<Image> &c) {
   c.def("extent", &Image::Extent, "Get the image extent (width, height)");
   c.def("format", &Image::Format, "Get the image format");
@@ -63,6 +64,7 @@ void Image::PybindClassRegistration(py::classh<Image> &c) {
     return py::str("Image(width={}, height={})").format(extent.width, extent.height);
   });
 }
+#endif
 
 int LoadImageFromFile(Core *core, const std::string &file_path, double_ptr<Image> pp_image) {
   int w, h, c;

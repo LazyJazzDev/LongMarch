@@ -15,7 +15,9 @@ class AccelerationStructure {
                                   uint32_t instance_hit_group_offset = 0,
                                   RayTracingInstanceFlag instance_flags = RAYTRACING_INSTANCE_FLAG_NONE);
 
+#if defined(LONGMARCH_PYTHON_ENABLED)
   static void PybindClassRegistration(py::classh<AccelerationStructure> &c);
+#endif
 };
 
 }  // namespace grassland::graphics

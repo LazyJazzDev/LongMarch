@@ -32,6 +32,7 @@ RayTracingInstance AccelerationStructure::MakeInstance(const glm::mat4x3 &transf
   return instance;
 }
 
+#if defined(LONGMARCH_PYTHON_ENABLED)
 void AccelerationStructure::PybindClassRegistration(py::classh<AccelerationStructure> &c) {
   c.def("update_instances",
         py::overload_cast<const std::vector<RayTracingInstance> &>(&AccelerationStructure::UpdateInstances),
@@ -94,5 +95,6 @@ void AccelerationStructure::PybindClassRegistration(py::classh<AccelerationStruc
       "Create a ray tracing instance", py::keep_alive<0, 1>{});
   c.def("__repr__", [](AccelerationStructure *as) { return py::str("AccelerationStructure()"); });
 }
+#endif
 
 }  // namespace grassland::graphics

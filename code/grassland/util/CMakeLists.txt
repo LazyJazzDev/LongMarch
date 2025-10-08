@@ -18,3 +18,7 @@ endif ()
 if (LONGMARCH_CUDA_RUNTIME)
     target_compile_definitions(${GRASSLAND_SUBLIB_NAME} PUBLIC LONGMARCH_CUDA_RUNTIME)
 endif ()
+
+if (LONGMARCH_PYTHON_ENABLED)
+    target_compile_definitions(${GRASSLAND_SUBLIB_NAME} PUBLIC LONGMARCH_PYTHON_ENABLED)
+endif ()

@@ -26,6 +26,7 @@ const std::vector<std::function<void()>> &CommandContext::GetPostExecutionCallba
   return post_execution_callbacks_;
 }
 
+#if defined(LONGMARCH_PYTHON_ENABLED)
 void CommandContext::PybindClassRegistration(py::classh<CommandContext> &c) {
   c.def("cmd_bind_program", &CommandContext::CmdBindProgram, py::arg("program"), "Bind a graphics program",
         py::keep_alive<1, 2>{});
@@ -112,5 +113,6 @@ void CommandContext::PybindClassRegistration(py::classh<CommandContext> &c) {
         py::keep_alive<1, 2>{});
   c.def("__repr__", [](CommandContext *ctx) { return py::str("CommandContext()"); });
 }
+#endif
 
 }  // namespace grassland::graphics

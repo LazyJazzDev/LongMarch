@@ -113,6 +113,7 @@ void Window::SetHDR(bool enable_hdr) {
   resize_event_.InvokeCallbacks(GetWidth(), GetHeight());
 }
 
+#if defined(LONGMARCH_PYTHON_ENABLED)
 void Window::PybindClassRegistration(py::classh<Window> &c) {
   c.def("__repr__", [](Window *window) {
     return py::str("Window(width={}, height={}, title='{}', hdr={})")
@@ -184,5 +185,6 @@ void Window::PybindClassRegistration(py::classh<Window> &c) {
 
   c.def_static("poll_events", &glfwPollEvents);
 }
+#endif
 
 }  // namespace grassland::graphics

@@ -8,6 +8,7 @@ BufferRange::BufferRange(Buffer *buffer, size_t offset, size_t size) : buffer(bu
   }
 }
 
+#if defined(LONGMARCH_PYTHON_ENABLED)
 void Buffer::PybindClassRegistration(py::classh<Buffer> &c) {
   c.def("type", &Buffer::Type);
   c.def("size", &Buffer::Size);
@@ -57,5 +58,6 @@ void Buffer::PybindClassRegistration(py::classh<Buffer> &c) {
       },
       py::arg("size") = ~0ull, py::arg("offset") = 0);
 }
+#endif
 
 }  // namespace grassland::graphics

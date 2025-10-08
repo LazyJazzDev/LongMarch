@@ -1,6 +1,7 @@
 #include "grassland/graphics/graphics.h"
 
 namespace grassland::graphics {
+#if defined(LONGMARCH_PYTHON_ENABLED)
 void PybindModuleRegistration(py::module_ &m) {
   // Core classes
   py::classh<Core> c_core(m, "Core");
@@ -39,4 +40,5 @@ void PybindModuleRegistration(py::module_ &m) {
   Sampler::PybindClassRegistration(c_sampler);
   Window::PybindClassRegistration(c_window);
 }
+#endif
 }  // namespace grassland::graphics

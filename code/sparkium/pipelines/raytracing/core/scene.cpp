@@ -1,5 +1,7 @@
 #include "sparkium/pipelines/raytracing/core/scene.h"
 
+#include <numeric>
+
 #include "sparkium/pipelines/raytracing/core/camera.h"
 #include "sparkium/pipelines/raytracing/core/core.h"
 #include "sparkium/pipelines/raytracing/core/entity.h"

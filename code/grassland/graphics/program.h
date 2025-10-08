@@ -15,7 +15,9 @@ class Program {
   virtual void BindShader(Shader *shader, ShaderType type) = 0;
   virtual void Finalize() = 0;
 
+#if defined(LONGMARCH_PYTHON_ENABLED)
   static void PybindClassRegistration(py::classh<Program> &c);
+#endif
 };
 
 class ComputeProgram {
@@ -24,7 +26,9 @@ class ComputeProgram {
   virtual void AddResourceBinding(ResourceType type, int count) = 0;
   virtual void Finalize() = 0;
 
+#if defined(LONGMARCH_PYTHON_ENABLED)
   static void PybindClassRegistration(py::classh<ComputeProgram> &c);
+#endif
 };
 
 class RayTracingProgram {
@@ -44,7 +48,9 @@ class RayTracingProgram {
                         const std::vector<int32_t> &callable_shader_indices) = 0;
   virtual void Finalize() = 0;
 
+#if defined(LONGMARCH_PYTHON_ENABLED)
   static void PybindClassRegistration(py::classh<RayTracingProgram> &c);
+#endif
 };
 
 struct HitGroup {
