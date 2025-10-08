@@ -16,7 +16,7 @@ add_library(LongMarch INTERFACE)
 target_link_libraries(LongMarch INTERFACE LongMarchCommon)
 
 if (LONGMARCH_PYTHON_ENABLED)
-    target_link_libraries(LongMarch INTERFACE LongMarchCommon)
+    target_link_libraries(LongMarch INTERFACE Python3::Python)
 
     pybind11_add_module(long_march long_march_pybind.cpp)
 

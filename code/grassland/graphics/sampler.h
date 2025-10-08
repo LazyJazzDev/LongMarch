@@ -8,7 +8,7 @@ class Sampler {
   virtual ~Sampler() = default;
 
 #if defined(LONGMARCH_PYTHON_ENABLED)
-  static void PybindClassRegistration *(py::classh<Sampler> &c);
+  static void PybindClassRegistration(py::classh<Sampler> &c);
 #endif
 };
 
