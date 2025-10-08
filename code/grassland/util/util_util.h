@@ -25,6 +25,11 @@
 namespace py = pybind11;
 #endif
 
+#include <cstdlib>
+#include <cstring>
+#include <string>
+#include <vector>
+
 namespace grassland {
 
 #if defined(LONGMARCH_CUDA_RUNTIME)
