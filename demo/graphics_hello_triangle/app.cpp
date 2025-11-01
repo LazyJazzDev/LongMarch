@@ -8,7 +8,7 @@ namespace {
 
 Application::Application(grassland::graphics::BackendAPI api) {
   grassland::graphics::CreateCore(api, grassland::graphics::Core::Settings{}, &core_);
-  core_->InitializeLogicalDeviceAutoSelect(false);
+  core_->InitializeLogicalDevice(0);
 
   grassland::LogInfo("Device Name: {}", core_->DeviceName());
   grassland::LogInfo("- Ray Tracing Support: {}", core_->DeviceRayTracingSupport());

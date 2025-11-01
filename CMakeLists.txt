@@ -87,7 +87,6 @@ if (Vulkan_FOUND)
     list(APPEND LIB_LIST ${VMA_LIB_NAME})
 endif ()
 
-
 find_package(glm CONFIG REQUIRED)
 set(GLM_LIB_NAME glm::glm)
 list(APPEND LIB_LIST ${GLM_LIB_NAME})
