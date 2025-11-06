@@ -2,6 +2,8 @@
 
 #include "grassland/graphics/acceleration_structure.h"
 #include "grassland/graphics/backend/backend.h"
+#include "grassland/graphics/program.h"
+#include "grassland/graphics/shader.h"
 
 namespace grassland::graphics {
 
