@@ -118,9 +118,8 @@ void D3D12DynamicBuffer::TransferData(ID3D12GraphicsCommandList *command_list) {
     buffers_[core_->CurrentFrame()].reset();
     core_->Device()->CreateBuffer(staging_buffer_->Size(), D3D12_HEAP_TYPE_DEFAULT, &buffers_[core_->CurrentFrame()]);
   }
-  // command_list->CopyBufferRegion(buffers_[core_->CurrentFrame()]->Handle(), 0, staging_buffer_->Handle(), 0,
-  //                                staging_buffer_->Size());
-  d3d12::CopyBuffer(command_list, staging_buffer_.get(), buffers_[core_->CurrentFrame()].get(), staging_buffer_->Size(), 0, 0);
+  d3d12::CopyBuffer(command_list, staging_buffer_.get(), buffers_[core_->CurrentFrame()].get(), staging_buffer_->Size(),
+                    0, 0);
 }
 
 #if defined(LONGMARCH_CUDA_RUNTIME)
