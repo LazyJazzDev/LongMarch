@@ -121,7 +121,7 @@ HRESULT Device::CreateBuffer(size_t size,
 HRESULT Device::CreateBuffer(size_t size, D3D12_HEAP_TYPE heap_type, double_ptr<Buffer> pp_buffer) {
   return CreateBuffer(
       size, heap_type,
-      (heap_type == D3D12_HEAP_TYPE_DEFAULT) ? D3D12_RESOURCE_STATE_GENERIC_READ : D3D12_RESOURCE_STATE_COMMON,
+      HeapTypeDefaultResourceState(heap_type),
       pp_buffer);
 }
 

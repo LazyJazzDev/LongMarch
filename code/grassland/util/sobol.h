@@ -1,4 +1,5 @@
 #pragma once
+#include <cstdint>
 #include "grassland/util/util_util.h"
 
 namespace grassland {
