@@ -118,20 +118,6 @@ HRESULT Device::CreateBuffer(size_t size,
       pp_buffer);
 }
 
-namespace {
-D3D12_RESOURCE_STATES HeapTypeDefaultResourceState(D3D12_HEAP_TYPE heap_type) {
-  switch (heap_type) {
-    case D3D12_HEAP_TYPE_UPLOAD:
-    case D3D12_HEAP_TYPE_DEFAULT:
-      return D3D12_RESOURCE_STATE_GENERIC_READ;
-    case D3D12_HEAP_TYPE_READBACK:
-      return D3D12_RESOURCE_STATE_COPY_DEST;
-    default:
-      return D3D12_RESOURCE_STATE_COMMON;
-  }
-}
-}
-
 HRESULT Device::CreateBuffer(size_t size, D3D12_HEAP_TYPE heap_type, double_ptr<Buffer> pp_buffer) {
   return CreateBuffer(
       size, heap_type,

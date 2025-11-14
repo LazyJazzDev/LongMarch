@@ -37,7 +37,6 @@ void D3D12StaticBuffer::Resize(size_t new_size) {
 void D3D12StaticBuffer::UploadData(const void *data, size_t size, size_t offset) {
   core_->WaitGPU();
   auto staging_buffer = core_->RequestUploadStagingBuffer(size);
-  LogInfo("staging buffer: {} size: {}", (void *)staging_buffer, size);
   std::memcpy(staging_buffer->Map(), data, size);
   staging_buffer->Unmap();
   core_->SingleTimeCommand([&](ID3D12GraphicsCommandList *command_list) {
@@ -165,9 +164,6 @@ void D3D12CUDABuffer::UploadData(const void *data, size_t size, size_t offset) {
   std::memcpy(staging_buffer->Map(), data, size);
   staging_buffer->Unmap();
   core_->SingleTimeCommand([&](ID3D12GraphicsCommandList *command_list) {
-    void *mapped_data = staging_buffer->Map();
-    std::memcpy(mapped_data, data, size);
-    staging_buffer->Unmap();
     d3d12::CopyBuffer(command_list, staging_buffer, buffer_.get(), size, 0, offset);
   });
 }

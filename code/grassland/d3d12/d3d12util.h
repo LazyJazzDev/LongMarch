@@ -109,6 +109,9 @@ HRESULT CreateBuffer(ID3D12Device *device,
                      D3D12_RESOURCE_FLAGS resource_flags,
                      ComPtr<ID3D12Resource> &buffer);
 
+
+D3D12_RESOURCE_STATES HeapTypeDefaultResourceState(D3D12_HEAP_TYPE heap_type);
+
 using graphics::CompiledShaderBlob;
 
 }  // namespace grassland::d3d12

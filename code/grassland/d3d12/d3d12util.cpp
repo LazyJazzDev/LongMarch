@@ -97,4 +97,15 @@ HRESULT CreateBuffer(ID3D12Device *device,
   return CreateBuffer(device, size, heap_type, D3D12_HEAP_FLAG_NONE, resource_state, resource_flags, buffer);
 }
 
+D3D12_RESOURCE_STATES HeapTypeDefaultResourceState(D3D12_HEAP_TYPE heap_type) {
+  switch (heap_type) {
+    case D3D12_HEAP_TYPE_UPLOAD:
+      return D3D12_RESOURCE_STATE_GENERIC_READ;
+    case D3D12_HEAP_TYPE_READBACK:
+      return D3D12_RESOURCE_STATE_COPY_DEST;
+    default:
+      return D3D12_RESOURCE_STATE_COMMON;
+  }
+}
+
 }  // namespace grassland::d3d12
