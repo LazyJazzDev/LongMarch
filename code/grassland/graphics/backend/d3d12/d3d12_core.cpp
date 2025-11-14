@@ -478,8 +478,9 @@ void D3D12Core::SingleTimeCommand(std::function<void(ID3D12GraphicsCommandList *
 
 d3d12::Buffer *D3D12Core::RequestUploadStagingBuffer(size_t size) {
   if (!upload_staging_buffer_ || upload_staging_buffer_->Size() < size) {
+    LogInfo("Buffer created.");
     upload_staging_buffer_.reset();
-    device_->CreateBuffer(size, D3D12_HEAP_TYPE_UPLOAD, &upload_staging_buffer_);
+    device_->CreateBuffer(size, D3D12_HEAP_TYPE_UPLOAD, D3D12_RESOURCE_STATE_GENERIC_READ, &upload_staging_buffer_);
   }
   return upload_staging_buffer_.get();
 }
