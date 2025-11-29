@@ -146,6 +146,13 @@ class Device {
                         VkBufferUsageFlags usage,
                         VmaMemoryUsage memory_usage,
                         VmaAllocationCreateFlags flags,
+                        VkDeviceSize alignment,
+                        double_ptr<Buffer> pp_buffer) const;
+
+  VkResult CreateBuffer(VkDeviceSize size,
+                        VkBufferUsageFlags usage,
+                        VmaMemoryUsage memory_usage,
+                        VmaAllocationCreateFlags flags,
                         double_ptr<Buffer> pp_buffer) const;
 
   VkResult CreateBuffer(VkDeviceSize size,

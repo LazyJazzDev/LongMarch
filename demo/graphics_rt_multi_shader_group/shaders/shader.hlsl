@@ -39,11 +39,13 @@ struct RayPayload {
   payload.hit = false;
   payload.a = 1.0;
   payload.b = float3(0, 0, 0);
-  TraceRay(as, RAY_FLAG_CULL_BACK_FACING_TRIANGLES, 0xFF, 0, 1, 0, ray, payload);
+  TraceRay(as, RAY_FLAG_CULL_BACK_FACING_TRIANGLES | RAY_FLAG_ACCEPT_FIRST_HIT_AND_END_SEARCH, 0xFF, 0, 1, 0, ray,
+           payload);
 
   payload.a = -1.0;
   payload.b = float3(1, 1, 1);
-  TraceRay(as, RAY_FLAG_CULL_FRONT_FACING_TRIANGLES, 0xFF, 0, 1, 0, ray, payload);
+  TraceRay(as, RAY_FLAG_CULL_FRONT_FACING_TRIANGLES | RAY_FLAG_ACCEPT_FIRST_HIT_AND_END_SEARCH, 0xFF, 0, 1, 0, ray,
+           payload);
 
   output[DispatchRaysIndex().xy] = float4(payload.color, 1);
 }

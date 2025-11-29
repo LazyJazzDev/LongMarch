@@ -1,31 +1,22 @@
 #include "app.h"
 
 int main() {
-  Application app_d3d12{grassland::graphics::BACKEND_API_D3D12};
-  Application app_vulkan{grassland::graphics::BACKEND_API_VULKAN};
+  Application app{grassland::graphics::BACKEND_API_DEFAULT};
 
-  app_d3d12.OnInit();
-  app_vulkan.OnInit();
+  app.OnInit();
 
-  while (app_d3d12.IsAlive() || app_vulkan.IsAlive()) {
-    if (app_d3d12.IsAlive()) {
-      app_d3d12.OnUpdate();
+  while (app.IsAlive()) {
+    if (app.IsAlive()) {
+      app.OnUpdate();
     }
-    if (app_d3d12.IsAlive()) {
-      app_d3d12.OnRender();
-    }
-    if (app_vulkan.IsAlive()) {
-      app_vulkan.OnUpdate();
-    }
-    if (app_vulkan.IsAlive()) {
-      app_vulkan.OnRender();
+    if (app.IsAlive()) {
+      app.OnRender();
     }
 
     glfwPollEvents();
   }
 
-  app_d3d12.OnClose();
-  app_vulkan.OnClose();
+  app.OnClose();
 
   return 0;
 }

@@ -525,6 +525,7 @@ VkResult Device::CreateBuffer(VkDeviceSize size,
                               VkBufferUsageFlags usage,
                               VmaMemoryUsage memory_usage,
                               VmaAllocationCreateFlags flags,
+                              VkDeviceSize alignment,
                               double_ptr<Buffer> pp_buffer) const {
   if (!pp_buffer) {
     SetErrorMessage("pp_buffer is nullptr");
@@ -544,12 +545,26 @@ VkResult Device::CreateBuffer(VkDeviceSize size,
   VkBuffer buffer;
   VmaAllocation allocation;
 
-  RETURN_IF_FAILED_VK(vmaCreateBuffer(allocator_, &buffer_info, &alloc_info, &buffer, &allocation, nullptr),
-                      "failed to create buffer!");
+  if (alignment) {
+    RETURN_IF_FAILED_VK(
+        vmaCreateBufferWithAlignment(allocator_, &buffer_info, &alloc_info, alignment, &buffer, &allocation, nullptr),
+        "failed to create buffer!");
+  } else {
+    RETURN_IF_FAILED_VK(vmaCreateBuffer(allocator_, &buffer_info, &alloc_info, &buffer, &allocation, nullptr),
+                        "failed to create buffer!");
+  }
 
   pp_buffer.construct(this, size, buffer, allocation);
 
   return VK_SUCCESS;
+}
+
+VkResult Device::CreateBuffer(VkDeviceSize size,
+                              VkBufferUsageFlags usage,
+                              VmaMemoryUsage memory_usage,
+                              VmaAllocationCreateFlags flags,
+                              double_ptr<Buffer> pp_buffer) const {
+  return CreateBuffer(size, usage, memory_usage, flags, 0, pp_buffer);
 }
 
 VkResult Device::CreateBuffer(VkDeviceSize size,
@@ -740,9 +755,9 @@ VkResult Device::CreateBottomLevelAccelerationStructure(VkDeviceAddress vertex_b
   // whole geometry for a single bottom level acceleration structure
   VkTransformMatrixKHR transform_matrix = {1.0f, 0.0f, 0.0f, 0.0f, 0.0f, 1.0f, 0.0f, 0.0f, 0.0f, 0.0f, 1.0f, 0.0f};
   std::unique_ptr<Buffer> transform_matrix_buffer;
-  RETURN_IF_FAILED_VK(
-      CreateBuffer(sizeof(transform_matrix), buffer_usage_flags, VMA_MEMORY_USAGE_CPU_TO_GPU, &transform_matrix_buffer),
-      "failed to create transform matrix buffer!");
+  RETURN_IF_FAILED_VK(CreateBuffer(sizeof(transform_matrix), buffer_usage_flags, VMA_MEMORY_USAGE_CPU_TO_GPU, 0, 16,
+                                   &transform_matrix_buffer),
+                      "failed to create transform matrix buffer!");
   std::memcpy(transform_matrix_buffer->Map(), &transform_matrix, sizeof(transform_matrix));
   transform_matrix_buffer->Unmap();
 
@@ -819,7 +834,7 @@ VkResult Device::CreateTopLevelAccelerationStructure(const std::vector<VkAcceler
   CreateBuffer(
       sizeof(VkAccelerationStructureInstanceKHR) * std::max(instances.size(), static_cast<size_t>(1)),
       VK_BUFFER_USAGE_ACCELERATION_STRUCTURE_BUILD_INPUT_READ_ONLY_BIT_KHR | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
-      VMA_MEMORY_USAGE_CPU_TO_GPU, &instances_buffer);
+      VMA_MEMORY_USAGE_CPU_TO_GPU, 0, 16, &instances_buffer);
   std::memcpy(instances_buffer->Map(), instances.data(), instances.size() * sizeof(VkAccelerationStructureInstanceKHR));
   instances_buffer->Unmap();
 
@@ -1073,7 +1088,7 @@ VkResult Device::CreateShaderBindingTable(RayTracingPipeline *ray_tracing_pipeli
   // Ray_gen
   // Create binding table buffers for each shader type
   std::unique_ptr<Buffer> buffer;
-  CreateBuffer(sbt_size, sbt_buffer_usage_flags, VMA_MEMORY_USAGE_CPU_TO_GPU, &buffer);
+  CreateBuffer(sbt_size, sbt_buffer_usage_flags, VMA_MEMORY_USAGE_CPU_TO_GPU, 0, base_alignment, &buffer);
 
   VkDeviceAddress buffer_address = buffer->GetDeviceAddress();
 

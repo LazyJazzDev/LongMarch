@@ -37,7 +37,7 @@ VkResult AccelerationStructure::UpdateInstances(const std::vector<VkAcceleration
   device_->CreateBuffer(
       sizeof(VkAccelerationStructureInstanceKHR) * instances.size(),
       VK_BUFFER_USAGE_ACCELERATION_STRUCTURE_BUILD_INPUT_READ_ONLY_BIT_KHR | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
-      VMA_MEMORY_USAGE_CPU_TO_GPU, &instances_buffer);
+      VMA_MEMORY_USAGE_CPU_TO_GPU, 0, 16, &instances_buffer);
   std::memcpy(instances_buffer->Map(), instances.data(), instances.size() * sizeof(VkAccelerationStructureInstanceKHR));
   instances_buffer->Unmap();
 
