@@ -4,9 +4,9 @@ struct GlobalSettings {
   float gravity;
 };
 
-StructuredBuffer<float3> positions : register(t0, space0);
-RWStructuredBuffer<float3> velocities : register(u0, space1);
-RWStructuredBuffer<float3> positions_new : register(u0, space2);
+ByteAddressBuffer positions : register(t0, space0);
+RWByteAddressBuffer velocities : register(u0, space1);
+RWByteAddressBuffer positions_new : register(u0, space2);
 ConstantBuffer<GlobalSettings> g_param : register(b0, space3);
 
 #define blocksize 128
@@ -18,13 +18,13 @@ groupshared float3 shared_pos[blocksize];
                                           : SV_DispatchThreadID, uint3 GTid
                                           : SV_GroupThreadID, uint GI
                                           : SV_GroupIndex) {
-  float3 pos = positions[DTid.x];
-  float3 vel = velocities[DTid.x];
+  float3 pos = positions.Load<float3>(DTid.x * sizeof(float3));
+  float3 vel = velocities.Load<float3>(DTid.x * sizeof(float3));
 
   float3 accel = float3(0.0, 0.0, 0.0);
 
   for (int i = 0; i < g_param.num_particle / blocksize; i++) {
-    shared_pos[GI] = positions[i * blocksize + GI];
+    shared_pos[GI] = positions.Load<float3>((i * blocksize + GI) * sizeof(float3));
     GroupMemoryBarrierWithGroupSync();
     [unroll] for (int j = 0; j < blocksize; j++) {
       float3 pos_j = shared_pos[j];
@@ -37,9 +37,8 @@ groupshared float3 shared_pos[blocksize];
   }
 
   vel += accel;
-
   pos += vel * g_param.delta_t;
 
-  velocities[DTid.x] = vel;
-  positions_new[DTid.x] = pos;
+  velocities.Store<float3>(DTid.x * sizeof(float3), vel);  //*/
+  positions_new.Store<float3>(DTid.x * sizeof(float3), pos);
 }

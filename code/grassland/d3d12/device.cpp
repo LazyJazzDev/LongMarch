@@ -72,7 +72,7 @@ HRESULT Device::CreateDescriptorHeap(D3D12_DESCRIPTOR_HEAP_TYPE type,
 HRESULT Device::CreateFence(D3D12_FENCE_FLAGS fence_flags, double_ptr<Fence> pp_fence) {
   ComPtr<ID3D12Fence> fence;
 
-  device_->CreateFence(0, fence_flags, IID_PPV_ARGS(&fence));
+  device_->CreateFence(1, fence_flags, IID_PPV_ARGS(&fence));
 
   pp_fence.construct(fence);
 
@@ -119,10 +119,7 @@ HRESULT Device::CreateBuffer(size_t size,
 }
 
 HRESULT Device::CreateBuffer(size_t size, D3D12_HEAP_TYPE heap_type, double_ptr<Buffer> pp_buffer) {
-  return CreateBuffer(
-      size, heap_type,
-      HeapTypeDefaultResourceState(heap_type),
-      pp_buffer);
+  return CreateBuffer(size, heap_type, HeapTypeDefaultResourceState(heap_type), pp_buffer);
 }
 
 HRESULT Device::CreateBuffer(size_t size, double_ptr<Buffer> pp_buffer) {

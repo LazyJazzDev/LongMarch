@@ -2,7 +2,7 @@
 
 namespace grassland::d3d12 {
 
-Fence::Fence(const ComPtr<ID3D12Fence> &fence) : fence_(fence), value_(0) {
+Fence::Fence(const ComPtr<ID3D12Fence> &fence) : fence_(fence), value_(1) {
   fence_event_ = CreateEvent(nullptr, FALSE, FALSE, nullptr);
   if (fence_event_ == nullptr) {
     throw std::runtime_error("failed to create fence event.");
