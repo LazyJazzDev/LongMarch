@@ -48,7 +48,7 @@ void D3D12StaticBuffer::DownloadData(void *data, size_t size, size_t offset) {
   core_->WaitGPU();
   auto staging_buffer = core_->RequestDownloadStagingBuffer(size);
   core_->SingleTimeCommand([&](ID3D12GraphicsCommandList *command_list) {
-    d3d12::CopyBuffer(command_list, buffer_.get(), staging_buffer, size, offset);
+    d3d12::CopyBuffer(command_list, buffer_.get(), staging_buffer, size, offset, 0, D3D12_RESOURCE_STATE_COPY_DEST);
   });
   std::memcpy(data, staging_buffer->Map(), size);
   staging_buffer->Unmap();

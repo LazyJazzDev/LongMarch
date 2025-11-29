@@ -28,6 +28,7 @@ void CopyBuffer(ID3D12GraphicsCommandList *command_list,
                 Buffer *dst_buffer,
                 size_t size,
                 size_t src_offset = 0,
-                size_t dst_offset = 0);
+                size_t dst_offset = 0,
+                D3D12_RESOURCE_STATES dst_original_state = D3D12_RESOURCE_STATE_GENERIC_READ);
 
 }  // namespace grassland::d3d12

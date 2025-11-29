@@ -55,6 +55,8 @@ if (MSVC)
     add_compile_options("$<$<COMPILE_LANGUAGE:CXX>:/bigobj>")
     add_compile_options("$<$<COMPILE_LANGUAGE:CUDA>:-Xcompiler=\"/bigobj\">")
 
+    set(CMAKE_CUDA_FLAGS "${CMAKE_CUDA_FLAGS} -allow-unsupported-compiler")
+
     set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} /wd4068")
     set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} /wd4068")
     add_compile_options("$<$<COMPILE_LANGUAGE:CUDA>:-Xcompiler=\"/wd4068\">")

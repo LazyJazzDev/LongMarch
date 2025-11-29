@@ -22,20 +22,23 @@ void CopyBuffer(ID3D12GraphicsCommandList *command_list,
                 Buffer *dst_buffer,
                 size_t size,
                 size_t src_offset,
-                size_t dst_offset) {
-  CD3DX12_RESOURCE_BARRIER barrier = CD3DX12_RESOURCE_BARRIER::Transition(
-      dst_buffer->Handle(), D3D12_RESOURCE_STATE_GENERIC_READ,
-      D3D12_RESOURCE_STATE_COPY_DEST);
+                size_t dst_offset,
+                D3D12_RESOURCE_STATES dst_original_state) {
+  CD3DX12_RESOURCE_BARRIER barrier;
 
-  command_list->ResourceBarrier(1, &barrier);
+  if (dst_original_state != D3D12_RESOURCE_STATE_COPY_DEST) {
+    barrier =
+        CD3DX12_RESOURCE_BARRIER::Transition(dst_buffer->Handle(), dst_original_state, D3D12_RESOURCE_STATE_COPY_DEST);
+    command_list->ResourceBarrier(1, &barrier);
+  }
 
   command_list->CopyBufferRegion(dst_buffer->Handle(), dst_offset, src_buffer->Handle(), src_offset, size);
 
-  barrier = CD3DX12_RESOURCE_BARRIER::Transition(
-      dst_buffer->Handle(), D3D12_RESOURCE_STATE_COPY_DEST,
-      D3D12_RESOURCE_STATE_GENERIC_READ);
-
-  command_list->ResourceBarrier(1, &barrier);
+  if (dst_original_state != D3D12_RESOURCE_STATE_COPY_DEST) {
+    barrier =
+        CD3DX12_RESOURCE_BARRIER::Transition(dst_buffer->Handle(), D3D12_RESOURCE_STATE_COPY_DEST, dst_original_state);
+    command_list->ResourceBarrier(1, &barrier);
+  }
 }
 
 }  // namespace grassland::d3d12
