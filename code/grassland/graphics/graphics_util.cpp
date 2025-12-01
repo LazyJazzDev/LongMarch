@@ -149,6 +149,12 @@ uint32_t PixelSize(ImageFormat format) {
       return 4;
     case IMAGE_FORMAT_D32_SFLOAT:
       return 4;
+    case IMAGE_FORMAT_R16G16B16A16_SFLOAT:
+      return 8;
+    case IMAGE_FORMAT_R32_UINT:
+      return 4;
+    case IMAGE_FORMAT_R32_SINT:
+      return 4;
     default:
       return 0;
   }
