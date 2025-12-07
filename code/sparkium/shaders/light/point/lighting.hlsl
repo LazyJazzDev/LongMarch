@@ -20,7 +20,7 @@ Texture2D<float4> albedo_roughness_buffer : register(t0, space0);
 Texture2D<float4> position_specular_buffer : register(t0, space1);
 Texture2D<float4> normal_metallic_buffer : register(t0, space2);
 ConstantBuffer<CameraInfo> camera_data : register(b0, space3);
-StructuredBuffer<PointLightSettings> settings : register(t0, space4);
+ByteAddressBuffer settings : register(t0, space4);
 
 struct VSOutput {
   float4 position : SV_POSITION;
@@ -55,7 +55,7 @@ PSOutput PSMain(PSInput input) {
   float3 normal = normal_metallic.xyz * 2.0 - 1.0;
   float metallic = normal_metallic.w;
   float3 N = normalize(normal);
-  float3 L = settings[0].light_position - position;
+  float3 L = settings.Load<PointLightSettings>(0).light_position - position;
   float3 camera_position = transpose(camera_data.inv_view)[3].xyz;
   float3 V = normalize(camera_position - position);
 
@@ -95,7 +95,7 @@ PSOutput PSMain(PSInput input) {
   float pdf;
 
   // Ambient lighting
-  float3 strength = settings[0].emission / (dot(L, L) * 4.0 * PI);
+  float3 strength = settings.Load<PointLightSettings>(0).emission / (dot(L, L) * 4.0 * PI);
   L = normalize(L);
   albedo = material.EvalPrincipledBSDF(L, pdf);
   // strength *= max(dot(N, L), 0.0);

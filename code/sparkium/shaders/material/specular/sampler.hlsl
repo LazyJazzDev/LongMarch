@@ -5,8 +5,9 @@
 #include "geometry_primitive_sampler.hlsli"
 
 void SampleMaterial(inout RenderContext context, HitRecord hit_record) {
-  InstanceMetadata instance_meta = instance_metadatas[hit_record.object_index];
-  ByteAddressBuffer material_buffer = data_buffers[instance_meta.material_data_index];
+  InstanceMetadata instance_meta =
+      instance_metadatas.Load<InstanceMetadata>(sizeof(InstanceMetadata) * hit_record.object_index);
+  ByteAddressBuffer material_buffer = data_buffers[NonUniformResourceIndex(instance_meta.material_data_index)];
   float3 color = LoadFloat3(material_buffer, 0);
 
   float3 eval;

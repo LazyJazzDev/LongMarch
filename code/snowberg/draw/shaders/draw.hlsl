@@ -16,12 +16,12 @@ struct DrawMetadata {
   float4 color;
 };
 
-[[vk::binding(0, 0)]] StructuredBuffer<DrawMetadata> draw_metadata : register(t0, space0);
+[[vk::binding(0, 0)]] ByteAddressBuffer draw_metadata : register(t0, space0);
 [[vk::binding(0, 1)]] Texture2D texture : register(t0, space1);
 [[vk::binding(0, 2)]] SamplerState samp : register(s0, space2);
 
 PSInput VSMain(VSInput input) {
-  DrawMetadata metadata = draw_metadata[input.instance_id];  //.Load<DrawMetadata>(0 * 80);
+  DrawMetadata metadata = draw_metadata.Load<DrawMetadata>(sizeof(DrawMetadata) * input.instance_id);
   PSInput output;
   output.position = mul(metadata.model, float4(input.position, 0.0, 1.0));
   output.tex_coord = input.tex_coord;

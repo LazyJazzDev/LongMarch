@@ -48,7 +48,7 @@ void SampleDirectLighting(inout RenderContext context, HitRecord hit_record, out
     r1 = 0.0f; // Avoid division by zero
   }
 
-  LightMetadata light_meta = light_metadatas[L];
+  LightMetadata light_meta = light_metadatas.Load<LightMetadata>(sizeof(LightMetadata) * L);
   SampleDirectLightingPayload payload;
   payload.low.xyz = asuint(hit_record.position);
   payload.low.w = light_meta.sampler_data_index;

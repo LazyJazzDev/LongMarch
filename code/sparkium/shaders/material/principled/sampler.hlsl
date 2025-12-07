@@ -7,9 +7,10 @@
 
 void SampleMaterial(inout RenderContext context, HitRecord hit_record) {
   // hit_record.tex_coord *= 2.0;
-  InstanceMetadata instance_meta = instance_metadatas[hit_record.object_index];
+  InstanceMetadata instance_meta =
+      instance_metadatas.Load<InstanceMetadata>(sizeof(InstanceMetadata) * hit_record.object_index);
   StreamedBufferReference<ByteAddressBuffer> material_buffer =
-      MakeStreamedBufferReference(data_buffers[instance_meta.material_data_index], 0);
+      MakeStreamedBufferReference(data_buffers[NonUniformResourceIndex(instance_meta.material_data_index)], 0);
 
   PrincipledMaterial material;
   material.hit_record = hit_record;
@@ -89,9 +90,11 @@ void SampleMaterial(inout RenderContext context, HitRecord hit_record) {
     float mis_weight = 1.0;
 
     if (instance_meta.custom_index != -1) {
-      LightMetadata light_meta = light_metadatas[instance_meta.custom_index];
+      LightMetadata light_meta =
+          light_metadatas.Load<LightMetadata>(sizeof(LightMetadata) * instance_meta.custom_index);
       float pdf = hit_record.pdf *
-                  EvaluatePrimitiveProbability(data_buffers[light_meta.sampler_data_index], hit_record.primitive_index);
+                  EvaluatePrimitiveProbability(data_buffers[NonUniformResourceIndex(light_meta.sampler_data_index)],
+                                               hit_record.primitive_index);
       pdf *= DirectLightingProbability(instance_meta.custom_index);
       float3 omega_in = hit_record.position - context.origin;
       pdf *= dot(omega_in, omega_in);

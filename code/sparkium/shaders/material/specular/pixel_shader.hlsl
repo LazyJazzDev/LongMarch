@@ -17,7 +17,7 @@ struct MaterialSpecular {
   float3 base_color;
 };
 
-StructuredBuffer<MaterialLight> material_data : register(t0, space2);
+ByteAddressBuffer material_data : register(t0, space2);
 
 PSOutput PSMain(PSInput input) {
   PSOutput output;
@@ -30,7 +30,7 @@ PSOutput PSMain(PSInput input) {
     input.world_normal = geom_normal;
   }
   float3 N = normalize(input.world_normal);
-  float3 base_color = material_data[0].base_color;
+  float3 base_color = material_data.Load<MaterialSpecular>(0).base_color;
   output.radiance = float4(0.0, 0.0, 0.0, 1.0);
   output.albedo_roughness = float4(base_color, 0.0);
   output.position_specular = float4(input.world_position, 0.0);

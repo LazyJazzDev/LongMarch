@@ -5,7 +5,7 @@
 void PointLightSampler(inout SampleDirectLightingPayload payload) {
   float3 position = asfloat(payload.low.xyz);
   uint sampler_data_index = payload.low.w;
-  ByteAddressBuffer direct_lighting_sampler_data = data_buffers[sampler_data_index];
+  ByteAddressBuffer direct_lighting_sampler_data = data_buffers[NonUniformResourceIndex(sampler_data_index)];
 
   float3 light_position = LoadFloat3(direct_lighting_sampler_data, 0);
   float3 light_emission = LoadFloat3(direct_lighting_sampler_data, 12);

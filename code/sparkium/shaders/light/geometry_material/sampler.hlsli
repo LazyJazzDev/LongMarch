@@ -11,11 +11,11 @@ void MeshLightSampler(int shader_index, inout SampleDirectLightingPayload payloa
   float3 position = asfloat(payload.low.xyz);
   uint sampler_data_index = payload.low.w;
   uint custom_index = payload.high.w;
-  InstanceMetadata instance_meta = instance_metadatas[custom_index];
+  InstanceMetadata instance_meta = instance_metadatas.Load<InstanceMetadata>( sizeof(InstanceMetadata) * custom_index);
   float3 rv = asfloat(payload.high.xyz);
-  ByteAddressBuffer direct_lighting_sampler_data = data_buffers[sampler_data_index];
-  ByteAddressBuffer geometry_data = data_buffers[instance_meta.geometry_data_index];
-  ByteAddressBuffer material_data = data_buffers[instance_meta.material_data_index];
+  ByteAddressBuffer direct_lighting_sampler_data = data_buffers[NonUniformResourceIndex(sampler_data_index)];
+  ByteAddressBuffer geometry_data = data_buffers[NonUniformResourceIndex(instance_meta.geometry_data_index)];
+  ByteAddressBuffer material_data = data_buffers[NonUniformResourceIndex(instance_meta.material_data_index)];
 
   float3x4 transform = LoadFloat3x4(direct_lighting_sampler_data, 0);
 

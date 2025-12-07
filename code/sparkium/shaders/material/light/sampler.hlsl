@@ -4,8 +4,9 @@
 #include "geometry_primitive_sampler.hlsli"
 
 void SampleMaterial(inout RenderContext context, HitRecord hit_record) {
-  InstanceMetadata instance_meta = instance_metadatas[hit_record.object_index];
-  ByteAddressBuffer material_buffer = data_buffers[instance_meta.material_data_index];
+  InstanceMetadata instance_meta =
+      instance_metadatas.Load<InstanceMetadata>(sizeof(InstanceMetadata) * hit_record.object_index);
+  ByteAddressBuffer material_buffer = data_buffers[NonUniformResourceIndex(instance_meta.material_data_index)];
   float3 emission = LoadFloat3(material_buffer, 0);
   int two_sided = material_buffer.Load(12);
   int block_ray = material_buffer.Load(16);
@@ -13,9 +14,11 @@ void SampleMaterial(inout RenderContext context, HitRecord hit_record) {
     float mis_weight = 1.0;
 
     if (instance_meta.custom_index != -1) {
-      LightMetadata light_meta = light_metadatas[instance_meta.custom_index];
+      LightMetadata light_meta =
+          light_metadatas.Load<LightMetadata>(sizeof(LightMetadata) * instance_meta.custom_index);
       float pdf = hit_record.pdf *
-                  EvaluatePrimitiveProbability(data_buffers[light_meta.sampler_data_index], hit_record.primitive_index);
+                  EvaluatePrimitiveProbability(data_buffers[NonUniformResourceIndex(light_meta.sampler_data_index)],
+                                               hit_record.primitive_index);
       pdf *= DirectLightingProbability(instance_meta.custom_index);
       float3 omega_in = hit_record.position - context.origin;
       pdf *= dot(omega_in, omega_in);
@@ -34,8 +37,9 @@ void SampleMaterial(inout RenderContext context, HitRecord hit_record) {
 }
 
 void SampleShadow(inout ShadowRayPayload payload, HitRecord hit_record) {
-  InstanceMetadata instance_meta = instance_metadatas[hit_record.object_index];
-  ByteAddressBuffer material_buffer = data_buffers[instance_meta.material_data_index];
+  InstanceMetadata instance_meta =
+      instance_metadatas.Load<InstanceMetadata>(sizeof(InstanceMetadata) * hit_record.object_index);
+  ByteAddressBuffer material_buffer = data_buffers[NonUniformResourceIndex(instance_meta.material_data_index)];
   int block_ray = material_buffer.Load(16);
   if (block_ray) {
     payload.shadow = 0.0f;

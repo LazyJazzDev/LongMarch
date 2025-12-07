@@ -31,7 +31,7 @@ RandomDevice InitRandomSeed(uint x, uint y, uint s) {
 }
 
 uint SobolUint(inout RandomDevice random_device) {
- uint result = sobol_table[random_device.samp * 1024 + (random_device.dim)]
+ uint result = sobol_table.Load((random_device.samp * 1024 + (random_device.dim)) * 4)
  ^
 WangHash(random_device.offset);
 random_device.dim++;

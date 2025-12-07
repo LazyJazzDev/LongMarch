@@ -7,7 +7,8 @@
 [shader("closesthit")] void RenderClosestHit(inout RenderContext context,
                                              in BuiltInTriangleIntersectionAttributes attr) {
   HitRecord hit_record;
-  BufferReference<ByteAddressBuffer> geometry_buffer = MakeBufferReference(data_buffers[InstanceID()], 0);
+  BufferReference<ByteAddressBuffer> geometry_buffer =
+      MakeBufferReference(data_buffers[NonUniformResourceIndex(InstanceID())], 0);
   GeometryHeader header;
   header.num_vertices = geometry_buffer.Load(0);
   header.num_indices = geometry_buffer.Load(4);
@@ -101,7 +102,8 @@
   SampleShadow(payload);
 #else
   HitRecord hit_record;
-  BufferReference<ByteAddressBuffer> geometry_buffer = MakeBufferReference(data_buffers[InstanceID()], 0);
+  BufferReference<ByteAddressBuffer> geometry_buffer =
+      MakeBufferReference(data_buffers[NonUniformResourceIndex(InstanceID())], 0);
   GeometryHeader header;
   header.num_vertices = geometry_buffer.Load(0);
   header.num_indices = geometry_buffer.Load(4);
