@@ -308,11 +308,11 @@ void Scene::UpdatePipeline(Camera *camera) {
 
   blelloch_metadatas_.clear();
   BlellochScanMetadata metadata{4, 4, static_cast<uint32_t>(light_metadatas_.size())};
-  uint32_t wave_size = core_->GraphicsCore()->WaveSize();
+  uint32_t group_size = 64;
   while (metadata.element_count > 1) {
     blelloch_metadatas_.push_back(metadata);
-    metadata = {metadata.offset + (wave_size - 1) * metadata.stride, metadata.stride * wave_size,
-                metadata.element_count / wave_size};
+    metadata = {metadata.offset + (group_size - 1) * metadata.stride, metadata.stride * group_size,
+                metadata.element_count / group_size};
   }
   if (!blelloch_metadatas_.empty()) {
     auto blelloch_scan_up_program = core_->GetComputeProgram("blelloch_scan_up");
@@ -333,7 +333,7 @@ void Scene::UpdatePipeline(Camera *camera) {
     }
     preprocess_cmd_context_->CmdBindComputeProgram(blelloch_scan_down_program);
     for (size_t i = blelloch_metadatas_.size() - 1; i < blelloch_metadatas_.size(); i--) {
-      if (blelloch_metadatas_[i].element_count <= wave_size) {
+      if (blelloch_metadatas_[i].element_count <= group_size) {
         continue;
       }
       preprocess_cmd_context_->CmdBindResources(1, {blelloch_metadata_buffer_->Range(sizeof(BlellochScanMetadata) * i)},

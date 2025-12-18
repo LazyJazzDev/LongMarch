@@ -2,7 +2,8 @@
 #include "common.hlsli"
 #include "constants.hlsli"
 
-#define GROUP_SIZE 128
+#define GROUP_SIZE 64
+groupshared float group_element[GROUP_SIZE];
 
 ByteAddressBuffer geometry_data : register(t0, space0);
 ByteAddressBuffer material_data : register(t0, space1);
@@ -32,6 +33,16 @@ RWByteAddressBuffer direct_lighting_sampler_data : register(u0, space2);
   }
 
   primitive_power += WavePrefixSum(primitive_power);
+
+  group_element[GTID.x] = primitive_power;
+  GroupMemoryBarrierWithGroupSync();
+  for (uint prefix_range = WaveGetLaneCount() * 2; prefix_range <= GROUP_SIZE; prefix_range *= 2) {
+    if (GTID.x % prefix_range >= prefix_range / 2) {
+      group_element[GTID.x] += group_element[GTID.x / prefix_range * prefix_range + prefix_range / 2 - 1];
+    }
+    GroupMemoryBarrierWithGroupSync();
+  }
+  primitive_power = group_element[GTID.x];
 
   if (DTID.x < primitive_count) {
     power_pdf.Store(DTID.x * 4, asuint(primitive_power));

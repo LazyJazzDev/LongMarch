@@ -27,7 +27,7 @@ LightGeometryMaterial::LightGeometryMaterial(Core *core,
                                       "SampleDirectLightingCallable", "lib_6_5", {"-I."}, &direct_lighting_sampler_);
 
   uint32_t primitive_count = geometry_->PrimitiveCount();
-  uint32_t wave_size = core_->GraphicsCore()->WaveSize();
+  uint32_t group_size = 64;
 
   core_->GraphicsCore()->CreateComputeProgram(gather_primitive_power_shader_.get(), &gather_primitive_power_program_);
   gather_primitive_power_program_->AddResourceBinding(graphics::RESOURCE_TYPE_STORAGE_BUFFER, 1);
@@ -38,8 +38,8 @@ LightGeometryMaterial::LightGeometryMaterial(Core *core,
   BlellochScanMetadata metadata{52, 4, primitive_count};
   while (metadata.element_count > 1) {
     metadatas_.emplace_back(metadata);
-    metadata = {metadata.offset + (wave_size - 1) * metadata.stride, metadata.stride * wave_size,
-                metadata.element_count / wave_size};
+    metadata = {metadata.offset + (group_size - 1) * metadata.stride, metadata.stride * group_size,
+                metadata.element_count / group_size};
   }
   core_->GraphicsCore()->CreateBuffer(metadatas_.size() * sizeof(BlellochScanMetadata), graphics::BUFFER_TYPE_STATIC,
                                       &metadata_buffer_);
@@ -72,12 +72,12 @@ graphics::Buffer *LightGeometryMaterial::SamplerData() {
 }
 
 uint32_t LightGeometryMaterial::SamplerPreprocess(graphics::CommandContext *cmd_context) {
-  uint32_t wave_size = core_->GraphicsCore()->WaveSize();
+  uint32_t group_size = 64;
   cmd_context->CmdBindComputeProgram(gather_primitive_power_program_.get());
   cmd_context->CmdBindResources(0, {geometry_->Buffer()}, graphics::BIND_POINT_COMPUTE);
   cmd_context->CmdBindResources(1, {material_->Buffer()}, graphics::BIND_POINT_COMPUTE);
   cmd_context->CmdBindResources(2, {direct_lighting_sampler_data_.get()}, graphics::BIND_POINT_COMPUTE);
-  cmd_context->CmdDispatch((geometry_->PrimitiveCount() + 127) / 128, 1, 1);
+  cmd_context->CmdDispatch((geometry_->PrimitiveCount() + 63) / 64, 1, 1);
   cmd_context->CmdBindComputeProgram(blelloch_scan_up_program_);
   cmd_context->CmdBindResources(0, {direct_lighting_sampler_data_.get()}, graphics::BIND_POINT_COMPUTE);
 
@@ -90,7 +90,7 @@ uint32_t LightGeometryMaterial::SamplerPreprocess(graphics::CommandContext *cmd_
   cmd_context->CmdBindComputeProgram(blelloch_scan_down_program_);
 
   for (size_t i = metadatas_.size() - 1; i < metadatas_.size(); i--) {
-    if (metadatas_[i].element_count < wave_size) {
+    if (metadatas_[i].element_count < group_size) {
       continue;
     }
     cmd_context->CmdBindResources(1, {metadata_buffer_->Range(sizeof(BlellochScanMetadata) * i)},
