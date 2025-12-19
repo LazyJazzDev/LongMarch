@@ -119,15 +119,15 @@ void Scene::Render(Camera *camera, Film *film) {
   cmd_context->CmdSetScissor(scissor);
   cmd_context->CmdSetViewport(viewport);
   cmd_context->CmdBindProgram(ambient_light_program_.get());
-  cmd_context->CmdBindResources(0, {film->albedo_roughness_buffer_.get()}, graphics::BIND_POINT_GRAPHICS);
-  cmd_context->CmdBindResources(1, {film->position_specular_buffer_.get()}, graphics::BIND_POINT_GRAPHICS);
-  cmd_context->CmdBindResources(2, {film->normal_metallic_buffer_.get()}, graphics::BIND_POINT_GRAPHICS);
+  cmd_context->CmdBindResources(0, {film->GetAlbedoRoughnessBuffer()}, graphics::BIND_POINT_GRAPHICS);
+  cmd_context->CmdBindResources(1, {film->GetPositionSpecularBuffer()}, graphics::BIND_POINT_GRAPHICS);
+  cmd_context->CmdBindResources(2, {film->GetNormalMetallicBuffer()}, graphics::BIND_POINT_GRAPHICS);
   cmd_context->CmdBindResources(3, {camera->NearFieldBuffer()}, graphics::BIND_POINT_GRAPHICS);
   cmd_context->CmdBindResources(4, {ambient_light_buffer_.get()}, graphics::BIND_POINT_GRAPHICS);
   cmd_context->CmdDraw(6, 1, 0, 0);
 
   for (auto &callback : lighting_callbacks_) {
-    callback(cmd_context.get());
+    callback(cmd_context.get(), camera, film);
   }
 
   cmd_context->CmdEndRendering();
@@ -145,7 +145,8 @@ void Scene::RegisterShadowMapCallback(const std::function<void(graphics::Command
   shadow_map_callbacks_.push_back(callback);
 }
 
-void Scene::RegisterLightingCallback(const std::function<void(graphics::CommandContext *)> &callback) {
+void Scene::RegisterLightingCallback(
+    const std::function<void(graphics::CommandContext *, Camera *camera, Film *film)> &callback) {
   lighting_callbacks_.push_back(callback);
 }
 

@@ -7,6 +7,10 @@ class Film : public Object {
  public:
   Film(sparkium::Film &film);
 
+  graphics::Image *GetAlbedoRoughnessBuffer() const;
+  graphics::Image *GetPositionSpecularBuffer() const;
+  graphics::Image *GetNormalMetallicBuffer() const;
+
  private:
   friend Scene;
   friend Core;

@@ -24,6 +24,18 @@ Film::Film(sparkium::Film &film) : film_(film), core_(DedicatedCast(film.GetCore
   });
 }
 
+graphics::Image *Film::GetAlbedoRoughnessBuffer() const {
+  return albedo_roughness_buffer_.get();
+}
+
+graphics::Image *Film::GetPositionSpecularBuffer() const {
+  return position_specular_buffer_.get();
+}
+
+graphics::Image *Film::GetNormalMetallicBuffer() const {
+  return normal_metallic_buffer_.get();
+}
+
 Film *DedicatedCast(sparkium::Film *film) {
   COMPONENT_CAST(film, Film);
 }

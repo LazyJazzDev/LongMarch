@@ -21,7 +21,8 @@ class Scene : public Object {
 
   void RegisterRenderCallback(const std::function<void(graphics::CommandContext *, graphics::Buffer *)> &callback);
   void RegisterShadowMapCallback(const std::function<void(graphics::CommandContext *)> &callback);
-  void RegisterLightingCallback(const std::function<void(graphics::CommandContext *)> &callback);
+  void RegisterLightingCallback(
+      const std::function<void(graphics::CommandContext *, Camera *camera, Film *film)> &callback);
 
  private:
   sparkium::Scene &scene_;
@@ -29,7 +30,7 @@ class Scene : public Object {
 
   std::vector<std::function<void(graphics::CommandContext *, graphics::Buffer *)>> render_callbacks_;
   std::vector<std::function<void(graphics::CommandContext *)>> shadow_map_callbacks_;
-  std::vector<std::function<void(graphics::CommandContext *)>> lighting_callbacks_;
+  std::vector<std::function<void(graphics::CommandContext *, Camera *camera, Film *film)>> lighting_callbacks_;
 
   std::unique_ptr<graphics::Shader> ambient_light_vs_;
   std::unique_ptr<graphics::Shader> ambient_light_ps_;
