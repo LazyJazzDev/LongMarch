@@ -17,10 +17,12 @@ Texture2D<float4> accumulated_color : register(t0, space0);
   // Read the accumulated color
   float4 color = accumulated_color.Load(int3(pixel_coords, 0));
 
-  // Apply tone mapping
-  float3 mapped_color = Linear2sRGB(color.xyz, 2.2);
-
-  mapped_color /= max(1.0, max(mapped_color.x, max(mapped_color.y, mapped_color.z)));
+  // Clamp over-range pixels without changing their RGB ratios, then encode
+  // the bounded linear color for display.
+  float3 linear_color = max(color.xyz, 0.0);
+  float max_channel = max(linear_color.x, max(linear_color.y, linear_color.z));
+  linear_color /= max(1.0, max_channel);
+  float3 mapped_color = Linear2sRGB(linear_color, 2.2);
 
   // Write the result to the output image
   output[pixel_coords] = float4(mapped_color, color.w);
