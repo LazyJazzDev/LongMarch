@@ -9,3 +9,4 @@
 #include "sparkium/entity/entities.h"
 #include "sparkium/geometry/geometries.h"
 #include "sparkium/material/materials.h"
+#include "sparkium/scene_io/json_scene.h"
