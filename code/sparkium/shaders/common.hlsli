@@ -17,7 +17,9 @@ struct CameraData {
 struct HitRecord {
   float t;
   float3 position;
+  float3 object_position;
   float2 tex_coord;
+  float3 color;
   float3 normal;
   float3 geom_normal;
   float3 tangent;
@@ -38,7 +40,22 @@ struct RenderContext {
   float3 shadow_eval;
   float3 shadow_dir;
   float shadow_length;
+  int bounce;
+  int ray_type;
+  // Homogeneous random-walk state. A negative object index means that the
+  // path is outside a participating subsurface medium.
+  int medium_object_index;
+  int medium_channel;
+  float3 medium_sigma_t;
+  float3 medium_albedo;
+  float medium_ior;
+  float medium_sample_distance;
 };
+
+#define RAY_TYPE_CAMERA 0
+#define RAY_TYPE_REFLECTION 1
+#define RAY_TYPE_TRANSMISSION 2
+#define RAY_TYPE_VOLUME 3
 
 struct ShadowRayPayload {
   float shadow;
@@ -46,6 +63,7 @@ struct ShadowRayPayload {
 
 struct RayGenPayload {
   float2 uv;
+  float2 lens_sample;
   float3 origin;
   float3 direction;
 };
@@ -55,11 +73,17 @@ struct RenderSettings {
   int samples_per_dispatch;
   int max_bounces;
   bool alpha_shadow;
+  int _settings_padding;
+  float3 background_color;
   // Film Info
   int accumulated_samples;
   float persistence;
   float clamping;
   float max_exposure;
+  int view_transform;
+  float exposure;
+  float gamma;
+  float contrast;
 };
 
 struct InstanceMetadata {
@@ -78,6 +102,7 @@ struct LightMetadata {
 struct SampleDirectLightingPayload {
   uint4 low;
   uint4 high;
+  uint4 extra;
 };
 
 struct GeometryPrimitiveSample {

@@ -70,6 +70,10 @@ void SampleMaterial(inout RenderContext context, HitRecord hit_record) {
   if (anisotropic_rotation_texture_index != -1)
     material.anisotropic_rotation = SampleTexture(anisotropic_rotation_texture_index, hit_record.tex_coord).x;
 
+  int emission_texture_index = material_buffer.LoadInt();
+  if (emission_texture_index != -1)
+    emission *= SampleTexture(emission_texture_index, hit_record.tex_coord).xyz;
+
   float3 eval;
   float3 omega_in;
   float pdf;
@@ -118,6 +122,7 @@ void SampleMaterial(inout RenderContext context, HitRecord hit_record) {
     context.origin = hit_record.position;
     context.direction = omega_in;
     context.bsdf_pdf = pdf;
+    context.ray_type = dot(omega_in, hit_record.geom_normal) < 0.0f ? RAY_TYPE_TRANSMISSION : RAY_TYPE_REFLECTION;
   }
 }
 

@@ -17,7 +17,9 @@ TEST(Physics, FunctionDerivativeFEMTriangleNeoHookeanElement) {
   do {
     Dm = Eigen::Matrix2<double>::Random();
   } while (Dm.determinant() < 0.5);
-  Fp = Eigen::Matrix<double, 3, 3>::Random();
+  do {
+    Fp = Eigen::Matrix<double, 3, 3>::Random();
+  } while (Fp.determinant() <= 0);
   TestFunctionSet<Compose<RightMultiplyMatrix<FEMTriangleDeformationGradient3x3<double>, Eigen::Matrix<double, 3, 3>>,
                           ElasticNeoHookean<double>>>({{{Dm}, Fp}, {1.0, 1.0}});
 }

@@ -15,6 +15,7 @@ struct RegisteredTextures {
   int roughness{-1};
   int anisotropic{-1};
   int anisotropic_rotation{-1};
+  int emission{-1};
 };
 }  // namespace
 
@@ -62,6 +63,9 @@ void MaterialPrincipled::Update(Scene *scene) {
   }
   if (material_.textures.anisotropic_rotation) {
     registered_textures.anisotropic_rotation = scene->RegisterImage(material_.textures.anisotropic_rotation);
+  }
+  if (material_.textures.emission) {
+    registered_textures.emission = scene->RegisterImage(material_.textures.emission);
   }
   material_buffer_->UploadData(&registered_textures, sizeof(RegisteredTextures), sizeof(material_.info));
 }

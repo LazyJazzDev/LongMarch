@@ -62,6 +62,7 @@ PSOutput PSMain(PSInput input) {
   PrincipledMaterial material;
   material.hit_record.t = 0.0;
   material.hit_record.position = position;
+  material.hit_record.object_position = position;
   material.hit_record.tex_coord = float2(0.0, 0.0);
   material.hit_record.normal = N;
   material.hit_record.geom_normal = N;

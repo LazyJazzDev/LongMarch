@@ -8,6 +8,9 @@ Film::Film(Core *core, int width, int height)
   core_->GraphicsCore()->CreateImage(width, height, graphics::IMAGE_FORMAT_R32G32B32A32_SFLOAT, &raw_image_);
   core_->GraphicsCore()->CreateImage(width, height, graphics::IMAGE_FORMAT_D32_SFLOAT, &depth_image_);
   core_->GraphicsCore()->CreateImage(width, height, graphics::IMAGE_FORMAT_R32_SINT, &stencil_image_);
+  core_->GraphicsCore()->CreateBuffer(sizeof(int) + sizeof(float) * 3,
+                                      graphics::BUFFER_TYPE_STATIC,
+                                      &tone_mapping_buffer_);
 }
 
 void Film::Reset() {
@@ -43,6 +46,10 @@ void Film::Develop(graphics::Image *targ_image) {
   cmd_context->CmdBindComputeProgram(core_->GetComputeProgram("tone_mapping"));
   cmd_context->CmdBindResources(0, {raw_image_.get()}, graphics::BIND_POINT_COMPUTE);
   cmd_context->CmdBindResources(1, {targ_image}, graphics::BIND_POINT_COMPUTE);
+  tone_mapping_buffer_->UploadData(&info.view_transform,
+                                   sizeof(int) + sizeof(float) * 3);
+  cmd_context->CmdBindResources(2, {tone_mapping_buffer_.get()},
+                                graphics::BIND_POINT_COMPUTE);
   cmd_context->CmdDispatch((targ_image->Extent().width + 7) / 8, (targ_image->Extent().height + 7) / 8, 1);
   core_->GraphicsCore()->SubmitCommandContext(cmd_context.get());
   core_->GraphicsCore()->WaitGPU();

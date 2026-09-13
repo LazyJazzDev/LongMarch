@@ -7,6 +7,11 @@ struct CameraData {
   glm::mat4 world_to_camera;
   glm::mat4 camera_to_world;
   glm::vec2 scale;
+  float aperture_radius;
+  float focus_distance;
+  int aperture_blades;
+  float aperture_rotation;
+  float aperture_ratio;
 };
 
 class Camera : public Object {

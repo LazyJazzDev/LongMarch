@@ -10,7 +10,16 @@ void SampleMaterial(inout RenderContext context, HitRecord hit_record) {
   float3 emission = LoadFloat3(material_buffer, 0);
   int two_sided = material_buffer.Load(12);
   int block_ray = material_buffer.Load(16);
-  if (two_sided || hit_record.front_facing) {
+  int camera_visible = material_buffer.Load(20);
+  float falloff_distance = asfloat(material_buffer.Load(24));
+  if (falloff_distance > 0.0f)
+    emission *= saturate(1.0f - hit_record.t / falloff_distance);
+  // camera_visible only controls the primary camera path.  A non-blocking
+  // emitter does not scatter the ray, so crossing one or more coplanar light
+  // triangles must keep camera visibility disabled.  Actual reflection and
+  // transmission events update ray_type and can see the emitter normally.
+  if ((camera_visible || context.ray_type != RAY_TYPE_CAMERA) &&
+      (two_sided || hit_record.front_facing)) {
     float mis_weight = 1.0;
 
     if (instance_meta.custom_index != -1) {

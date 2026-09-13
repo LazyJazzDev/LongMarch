@@ -89,6 +89,9 @@ PSOutput PSMain(PSInput input) {
       N = normalize(mul(tbn, float3x3(T, B * y_signal, N)));
     }
   }
+  use_texture = material_buffer.LoadInt();
+  if (use_texture)
+    emission *= textures[5].Sample(S, input.tex_coord).xyz;
 
   output.radiance = float4(emission * strength, 0.0);
   // base_color = float3(max(input.signal, 0.0), 0.0, max(-input.signal, 0.0));

@@ -49,6 +49,12 @@ GeometryMesh::GeometryMesh(Core *core, const Mesh<float> &mesh) : Geometry(core)
     write_data(mesh_ptr->Signals(), mesh_ptr->NumVertices() * sizeof(float));
   }
 
+  if (mesh_ptr->Colors()) {
+    header_.color_offset = data.size();
+    header_.color_stride = sizeof(float) * 3;
+    write_data(mesh_ptr->Colors(), mesh_ptr->NumVertices() * sizeof(float) * 3);
+  }
+
   std::memcpy(data.data(), &header_, sizeof(header_));
 
   core_->GraphicsCore()->CreateBuffer(data.size(), graphics::BUFFER_TYPE_STATIC, &geometry_buffer_);

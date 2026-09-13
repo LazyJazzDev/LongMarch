@@ -36,7 +36,8 @@ TEST(Math, MeshSDFCorrectness) {
         p = Eigen::Vector3<float>::Random() * 4.0 * s + t;
         dp = (p - t).cwiseAbs();
       } while (fabs(dp[0] - dp[1]) < grassland::Eps<float>() || fabs(dp[1] - dp[2]) < grassland::Eps<float>() ||
-               fabs(dp[0] - dp[2]) < grassland::Eps<float>());
+               fabs(dp[0] - dp[2]) < grassland::Eps<float>() ||
+               (dp.array() - s).abs().minCoeff() < grassland::Eps<float>());
 
       Eigen::Vector3<float> mesh_jacobian;
       Eigen::Matrix<float, 3, 3> mesh_hessian;
@@ -139,7 +140,8 @@ TEST(Math, MeshSDFDevice) {
         p = Eigen::Vector3<float>::Random() * 4.0 * s + t;
         dp = (p - t).cwiseAbs();
       } while (fabs(dp[0] - dp[1]) < grassland::Eps<float>() || fabs(dp[1] - dp[2]) < grassland::Eps<float>() ||
-               fabs(dp[0] - dp[2]) < grassland::Eps<float>());
+               fabs(dp[0] - dp[2]) < grassland::Eps<float>() ||
+               (dp.array() - s).abs().minCoeff() < grassland::Eps<float>());
       task_positions.push_back(p);
     }
   }

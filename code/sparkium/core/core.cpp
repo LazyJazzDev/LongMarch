@@ -90,6 +90,7 @@ void Core::LoadPublicShaders() {
   core_->CreateComputeProgram(GetShader("tone_mapping"), &compute_program);
   compute_program->AddResourceBinding(graphics::RESOURCE_TYPE_IMAGE, 1);
   compute_program->AddResourceBinding(graphics::RESOURCE_TYPE_WRITABLE_IMAGE, 1);
+  compute_program->AddResourceBinding(graphics::RESOURCE_TYPE_UNIFORM_BUFFER, 1);
   compute_program->Finalize();
   SetPublicResource("tone_mapping", std::move(compute_program));
 }

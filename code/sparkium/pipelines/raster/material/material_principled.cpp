@@ -13,6 +13,7 @@ struct TextureInfo {
   int use_specular_texture;
   int use_metallic_texture;
   int use_normal_texture;
+  int use_emission_texture;
 };
 
 }  // namespace
@@ -38,6 +39,7 @@ void MaterialPrincipled::Sync() {
   info.use_specular_texture = material_.textures.specular ? 1 : 0;
   info.use_metallic_texture = material_.textures.metallic ? 1 : 0;
   info.use_normal_texture = material_.textures.normal ? 1 : 0;
+  info.use_emission_texture = material_.textures.emission ? 1 : 0;
   material_buffer_->UploadData(&material_.info, sizeof(material_.info));
   material_buffer_->UploadData(&info, sizeof(info), sizeof(material_.info));
 }
@@ -47,13 +49,13 @@ glm::vec3 MaterialPrincipled::Emission() const {
 }
 
 void MaterialPrincipled::SetupProgram(graphics::Program *program) {
-  program->AddResourceBinding(graphics::RESOURCE_TYPE_IMAGE, 5);    // Material Data
+  program->AddResourceBinding(graphics::RESOURCE_TYPE_IMAGE, 6);    // Material textures
   program->AddResourceBinding(graphics::RESOURCE_TYPE_SAMPLER, 1);  // Material Data
 }
 
 void MaterialPrincipled::BindMaterialResources(graphics::CommandContext *cmd_ctx) {
   cmd_ctx->CmdBindResources(2, {material_buffer_.get()}, graphics::BIND_POINT_GRAPHICS);
-  std::vector<graphics::Image *> textures(5);
+  std::vector<graphics::Image *> textures(6);
   textures[0] = material_.textures.base_color;
   if (!textures[0])
     textures[0] = core_->GetImage("white");
@@ -70,6 +72,9 @@ void MaterialPrincipled::BindMaterialResources(graphics::CommandContext *cmd_ctx
   if (!textures[4]) {
     textures[4] = core_->GetImage("normal_default");
   }
+  textures[5] = material_.textures.emission;
+  if (!textures[5])
+    textures[5] = core_->GetImage("white");
   cmd_ctx->CmdBindResources(3, textures, graphics::BIND_POINT_GRAPHICS);
   cmd_ctx->CmdBindResources(4, {sampler_.get()}, graphics::BIND_POINT_GRAPHICS);
 }

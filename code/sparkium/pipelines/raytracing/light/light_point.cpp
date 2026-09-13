@@ -4,9 +4,16 @@
 
 namespace sparkium::raytracing {
 
-LightPoint::LightPoint(Core *core, glm::vec3 &position, glm::vec3 &color, float &strength)
-    : Light(core), position(position), color(color), strength(strength) {
-  core_->GraphicsCore()->CreateBuffer(sizeof(glm::vec3) + sizeof(glm::vec3) + sizeof(float),
+LightPoint::LightPoint(Core *core,
+                       glm::vec3 &position,
+                       glm::vec3 &color,
+                       float &strength,
+                       float &radius,
+                       int &soft_falloff,
+                       float &sampling_weight)
+    : Light(core), position(position), color(color), strength(strength), radius(radius),
+      soft_falloff(soft_falloff), sampling_weight(sampling_weight) {
+  core_->GraphicsCore()->CreateBuffer(sizeof(float) * 9,
                                       graphics::BUFFER_TYPE_STATIC, &direct_lighting_sampler_data_);
   core_->GraphicsCore()->CreateShader(core_->GetShadersVFS(), "light/point/direct_lighting_sampler.hlsl",
                                       "SampleDirectLightingCallable", "lib_6_5", {"-I."}, &direct_lighting_sampler_);
@@ -21,12 +28,14 @@ graphics::Buffer *LightPoint::SamplerData() {
 }
 
 uint32_t LightPoint::SamplerPreprocess(graphics::CommandContext *cmd_ctx) {
-  float data[7];
+  float data[9];
   glm::vec3 power = color * strength;
   float max_power = std::max(std::max(power.r, power.g), power.b);
   std::memcpy(data, &position, sizeof(glm::vec3));
   std::memcpy(data + 3, &power, sizeof(glm::vec3));
-  data[6] = max_power;
+  data[6] = sampling_weight >= 0.0f ? sampling_weight : max_power;
+  data[7] = std::max(radius, 0.0f);
+  std::memcpy(data + 8, &soft_falloff, sizeof(int));
   direct_lighting_sampler_data_->UploadData(data, sizeof(data), 0);
   return sizeof(glm::vec3) + sizeof(glm::vec3);
 }

@@ -13,4 +13,6 @@ struct GeometryHeader {
   uint signal_offset;
   uint signal_stride;
   uint index_offset;
+  uint color_offset;
+  uint color_stride;
 };

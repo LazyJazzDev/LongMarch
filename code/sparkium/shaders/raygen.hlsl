@@ -21,15 +21,24 @@
                   float2(1, -1);
       RayGenPayload payload;
       payload.uv = uv;
+      payload.lens_sample = float2(RandomFloat(context.rd), RandomFloat(context.rd));
       CallShader(0, payload);
       context.origin = payload.origin;
       context.direction = payload.direction;
       context.radiance = float3(0.0, 0.0, 0.0);
       context.throughput = float3(1.0, 1.0, 1.0);
       context.bsdf_pdf = INF;
+      context.ray_type = RAY_TYPE_CAMERA;
+      context.medium_object_index = -1;
+      context.medium_channel = 0;
+      context.medium_sigma_t = float3(0.0f, 0.0f, 0.0f);
+      context.medium_albedo = float3(0.0f, 0.0f, 0.0f);
+      context.medium_ior = 1.0f;
+      context.medium_sample_distance = INF;
     }
 
     for (int bounce = 0; bounce < render_settings.max_bounces; bounce++) {
+      context.bounce = bounce;
       RayDesc ray;
       ray.Origin = context.origin;
       ray.TMin = T_MIN * max(length(context.origin), 1.0);
@@ -79,9 +88,14 @@
 }
 
     [shader("miss")] void MissMain(inout RenderContext context) {
+  if (context.medium_object_index >= 0) {
+    context.throughput = float3(0.0f, 0.0f, 0.0f);
+    return;
+  }
+  context.radiance += render_settings.background_color * context.throughput;
   context.throughput = float3(0.0, 0.0, 0.0);
 }
 
 [shader("miss")] void ShadowMiss(inout ShadowRayPayload payload) {
-  payload.shadow = 1.0f;  // light is blocked
+  // Keep transmittance accumulated by transparent any-hit shaders.
 }

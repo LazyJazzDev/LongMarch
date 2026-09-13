@@ -54,15 +54,20 @@ void CalculateClosureWeight() {
   float3 T = hit_record.tangent;
   if (anisotropic_rotation != 0.0f)
     T = rotate_around_axis(T, N, anisotropic_rotation * 2.0 * PI);
-  ior = hit_record.front_facing ? ior : 1.0f / ior;
+  // CalculateClosureWeight is called once for direct evaluation and again for
+  // path sampling.  Keep the material parameter immutable so back-face calls
+  // do not alternate between eta and 1/eta.
+  const float interface_ior =
+      hit_record.front_facing ? ior : 1.0f / max(ior, 1e-6f);
 
   // calculate fresnel for refraction
   float cosNO = dot(N, I);
-  float fresnel = fresnel_dielectric_cos(cosNO, ior);
+  float fresnel = fresnel_dielectric_cos(cosNO, interface_ior);
 
   // calculate weights of the diffuse and specular part
   float diffuse_weight =
-      (1.0f - saturatef(metallic)) * (1.0f - saturatef(transmission));
+      (1.0f - saturatef(metallic)) * (1.0f - saturatef(transmission)) *
+      (1.0f - saturatef(subsurface));
 
   float final_transmission =
       saturatef(transmission) * (1.0f - saturatef(metallic));
@@ -141,6 +146,10 @@ void CalculateClosureWeight() {
 
     /* reflection */
     {
+      // This renderer represents transmission as separate reflection and
+      // refraction closures. Weight the reflection closure by the interface
+      // Fresnel term before its microfacet response, matching the coefficient
+      // used by the original Principled implementation.
       PREPARE_BSDF(microfacet_bsdf_reflect_closure, glass_weight * fresnel);
 
       {
@@ -151,7 +160,7 @@ void CalculateClosureWeight() {
             refl_roughness * refl_roughness;
         microfacet_bsdf_reflect_closure.alpha_y =
             refl_roughness * refl_roughness;
-        microfacet_bsdf_reflect_closure.ior = ior;
+        microfacet_bsdf_reflect_closure.ior = interface_ior;
 
         microfacet_bsdf_reflect_closure.color = base_color;
         microfacet_bsdf_reflect_closure.cspec0 = cspec0;
@@ -170,11 +179,11 @@ void CalculateClosureWeight() {
       {
         microfacet_bsdf_refract_closure.N = N;
 
-        transmission_roughness =
+        const float refract_roughness =
             1.0f - (1.0f - refl_roughness) * (1.0f - transmission_roughness);
         microfacet_bsdf_refract_closure.alpha =
-            saturatef(transmission_roughness * transmission_roughness);
-        microfacet_bsdf_refract_closure.ior = ior;
+            saturatef(refract_roughness * refract_roughness);
+        microfacet_bsdf_refract_closure.ior = interface_ior;
       }
     }
   }
@@ -264,6 +273,44 @@ float3 EvalPrincipledBSDF(in float3 omega_in, out float pdf) {
   CalculateClosureWeight();
   pdf = 0.0;
   return EvalPrincipledBSDFKernel(omega_in, pdf, make_float3(0.0), 0.0, -1);
+}
+
+float PrincipledThinReflectionProbability() {
+  CalculateClosureWeight();
+  float reflection_weight = microfacet_bsdf_reflect_closure.sample_weight;
+  float transmission_weight = microfacet_bsdf_refract_closure.sample_weight;
+  return reflection_weight / max(reflection_weight + transmission_weight,
+                                 CLOSURE_WEIGHT_CUTOFF);
+}
+
+void SamplePrincipledThinReflection(float r1,
+                                    float r2,
+                                    out float3 eval,
+                                    out float3 omega_in,
+                                    out float pdf) {
+  eval = make_float3(0.0f);
+  omega_in = make_float3(0.0f);
+  pdf = 0.0f;
+
+  CalculateClosureWeight();
+  float reflection_weight = microfacet_bsdf_reflect_closure.sample_weight;
+  float transmission_weight = microfacet_bsdf_refract_closure.sample_weight;
+  float total_weight = reflection_weight + transmission_weight;
+  if (reflection_weight < CLOSURE_WEIGHT_CUTOFF ||
+      total_weight < CLOSURE_WEIGHT_CUTOFF) {
+    return;
+  }
+
+  bsdf_microfacet_ggx_sample_fresnel(
+      microfacet_bsdf_reflect_closure, hit_record.geom_normal, omega_v, r1,
+      r2, eval, omega_in, pdf);
+  eval *= microfacet_bsdf_reflect_closure.weight;
+
+  // The thin-glass sampler is a mixture of this glossy reflection and a
+  // delta null-transmission event.  Use the full mixture probability for MIS
+  // while evaluating only the continuous reflection at this direction.
+  float reflection_probability = reflection_weight / total_weight;
+  pdf *= reflection_probability;
 }
 
 void SamplePrincipledBSDF(float r1, float r2, out float3 eval, out float3 omega_in, out float pdf) {
