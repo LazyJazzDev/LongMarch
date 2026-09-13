@@ -41,9 +41,10 @@ float3 FilmicCurve(float3 color) {
     mapped_color = saturate((mapped_color - 0.18f) * settings.contrast + 0.18f);
     mapped_color = pow(mapped_color, 1.0f / max(settings.gamma, 1.0e-4f));
   } else {
+    float max_channel = max(linear_color.x,
+                            max(linear_color.y, linear_color.z));
+    linear_color /= max(1.0f, max_channel);
     mapped_color = Linear2sRGB(linear_color);
-    mapped_color /= max(1.0f, max(mapped_color.x,
-                                  max(mapped_color.y, mapped_color.z)));
   }
 
   // Write the result to the output image

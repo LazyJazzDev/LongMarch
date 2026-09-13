@@ -80,7 +80,8 @@
     accum_color += float4(context.radiance, 1.0);
     accum_samples += 1.0;
     float exposure_clamping = accum_samples * render_settings.max_exposure;
-    accum_color *= exposure_clamping / max(max(exposure_clamping, accum_color.r), max(accum_color.g, accum_color.b));
+    accum_color.rgb *=
+        exposure_clamping / max(max(exposure_clamping, accum_color.r), max(accum_color.g, accum_color.b));
   }
 
   accumulated_color[DispatchRaysIndex().xy] = accum_color;
