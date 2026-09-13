@@ -98,7 +98,9 @@ HitRecord MakeHitRecord(in BuiltInTriangleIntersectionAttributes attr) {
         LoadFloat(geometry_buffer, header.signal_offset + header.signal_stride * vid[1]) * barycentrics[1] +
         LoadFloat(geometry_buffer, header.signal_offset + header.signal_stride * vid[2]) * barycentrics[2];
   } else {
-    hit_record.signal = 1.0;
+    // Zero marks the absence of a valid tangent frame. Tangent-space normal
+    // maps must then leave the interpolated surface normal unchanged.
+    hit_record.signal = 0.0;
   }
 
   if (dot(WorldRayDirection(), hit_record.normal) > 0.0) {

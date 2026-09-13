@@ -448,7 +448,8 @@ GraphSurface EvaluateShaderGraph(HitRecord hit_record, float3 view_direction, in
       auto c=Input(node,"color","float4(0.5,0.5,1,1)");
       auto strength=Input(node,"strength",one);
       std::string tangent_normal="normalize(lerp(float3(0,0,1),("+c+").xyz*2.0f-1.0f,saturate(("+strength+").x)))";
-      expression="float4(normalize(mul("+tangent_normal+",float3x3(hit_record.tangent,cross(hit_record.normal,hit_record.tangent)*hit_record.signal,hit_record.normal))),0)";
+      std::string mapped_normal="normalize(mul("+tangent_normal+",float3x3(hit_record.tangent,cross(hit_record.normal,hit_record.tangent)*hit_record.signal,hit_record.normal)))";
+      expression="float4(abs(hit_record.signal)>0.5f?"+mapped_normal+":hit_record.normal,0)";
     } else if (type == "bump") {
       expression=Input(node,"normal","float4(hit_record.normal,0)");
     } else if (type == "combine") {

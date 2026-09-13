@@ -612,10 +612,11 @@ def write_binary_mesh(mesh, material_index, path, attribute_name=None):
     indices = array("I", (index - 1 for face in faces for index in face))
     positions = array("f", (value for r in records for value in r[0:3]))
     normals = array("f", (value for r in records for value in r[3:6]))
-    tex_coords = array("f", (value for r in records for value in r[6:8]))
+    tex_coords = array("f", (value for r in records for value in r[6:8])) if uv_layer else None
     colors = array("f", (value for r in records for value in r[8:11])) if color_layer else None
     with path.open("wb") as stream:
-        stream.write(struct.pack("<8sIII", b"SPKMESH1", len(records), len(indices), 3 | (4 if colors else 0)))
+        flags = 1 | (2 if tex_coords else 0) | (4 if colors else 0)
+        stream.write(struct.pack("<8sIII", b"SPKMESH1", len(records), len(indices), flags))
         for values in (indices, positions, normals, tex_coords, colors):
             if values is None:
                 continue
