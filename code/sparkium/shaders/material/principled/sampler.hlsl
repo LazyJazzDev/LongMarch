@@ -70,6 +70,8 @@ void SampleMaterial(inout RenderContext context, HitRecord hit_record) {
   if (anisotropic_rotation_texture_index != -1)
     material.anisotropic_rotation = SampleTexture(anisotropic_rotation_texture_index, hit_record.tex_coord).x;
 
+  material.CalculateClosureWeight();
+
   float3 eval;
   float3 omega_in;
   float pdf;
