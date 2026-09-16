@@ -1,5 +1,6 @@
 #pragma once
 #include "sparkium/pipelines/raytracing/core/core_util.h"
+#include "sparkium/pipelines/raytracing/core/software_pipeline.h"
 
 namespace sparkium::raytracing {
 
@@ -7,7 +8,14 @@ class Scene : public Object {
  public:
   Scene(sparkium::Scene &scene);
 
-  void Render(Camera *camera, Film *film);
+  void Render(Camera *camera, Film *film, bool software = false);
+  bool SoftwareTracing() const {
+    return software_tracing_;
+  }
+  int32_t RegisterSoftwareInstance(Geometry *geometry,
+                                   Material *material,
+                                   const glm::mat4x3 &transform,
+                                   int32_t custom_index);
 
   int32_t RegisterLight(Light *light, int custom_index = -1);
 
@@ -51,6 +59,9 @@ class Scene : public Object {
 
  private:
   void UpdatePipeline(Camera *camera);
+  bool software_tracing_{false};
+  bool rendered_{false};
+  std::unique_ptr<SoftwarePipeline> software_pipeline_;
   sparkium::Scene &scene_;
   Core *core_;
 

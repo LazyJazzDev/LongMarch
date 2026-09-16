@@ -1,4 +1,4 @@
-file(GLOB SOURCES "*.cpp" "*.h")
+file(GLOB SOURCES CONFIGURE_DEPENDS "*.cpp" "*.h")
 
 add_library(${SPARKIUM_RAYTRACING_SUBLIB_NAME} ${SOURCES})
 

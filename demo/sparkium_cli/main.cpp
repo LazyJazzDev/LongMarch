@@ -11,11 +11,13 @@ using namespace long_march;
 namespace {
 void Usage(const char *program) {
   std::cerr << "Usage: " << program << " <scene.json> [-o image.png] [--frames N] "
-            << "[--pipeline auto|rasterization|ray_tracing]\n"
+            << "[--pipeline auto|rasterization|ray_tracing|rt_fallback] [--require-hardware-rt] [--debug]\n"
             << "       " << program << " --list [scene-directory]\n";
 }
 
 sparkium::RenderPipeline ParsePipeline(const std::string &name) {
+  if (name == "rt_fallback")
+    return sparkium::RENDER_PIPELINE_RT_FALLBACK;
   if (name == "auto") return sparkium::RENDER_PIPELINE_AUTO;
   if (name == "rasterization") return sparkium::RENDER_PIPELINE_RASTERIZATION;
   if (name == "ray_tracing") return sparkium::RENDER_PIPELINE_RAY_TRACING;
@@ -40,10 +42,17 @@ int main(int argc, char **argv) {
     std::filesystem::path output = "output.png";
     int frames = 1;
     bool override_pipeline = false;
+    bool require_hardware_rt = false;
+    bool debug = false;
     sparkium::RenderPipeline pipeline = sparkium::RENDER_PIPELINE_AUTO;
     for (int i = 2; i < argc; ++i) {
       std::string argument = argv[i];
-      if ((argument == "-o" || argument == "--output") && i + 1 < argc) output = argv[++i];
+      if (argument == "--require-hardware-rt")
+        require_hardware_rt = true;
+      else if (argument == "--debug")
+        debug = true;
+      else if ((argument == "-o" || argument == "--output") && i + 1 < argc)
+        output = argv[++i];
       else if (argument == "--frames" && i + 1 < argc) frames = std::stoi(argv[++i]);
       else if (argument == "--pipeline" && i + 1 < argc) {
         pipeline = ParsePipeline(argv[++i]);
@@ -55,9 +64,11 @@ int main(int argc, char **argv) {
     if (frames <= 0) throw std::runtime_error("--frames must be positive");
 
     std::unique_ptr<graphics::Core> graphics_core;
-    if (graphics::CreateCore(graphics::BACKEND_API_DEFAULT, graphics::Core::Settings{}, &graphics_core) != 0)
+    if (graphics::CreateCore(graphics::BACKEND_API_DEFAULT, graphics::Core::Settings{2, debug}, &graphics_core) != 0)
       throw std::runtime_error("failed to create graphics core");
     graphics_core->InitializeLogicalDeviceAutoSelect(false);
+    if (require_hardware_rt && !graphics_core->DeviceRayTracingSupport())
+      throw std::runtime_error("hardware ray tracing is unavailable on the selected device");
     sparkium::Core core(graphics_core.get());
     std::string error;
     auto loaded = sparkium::JsonScene::Load(&core, scene_path, &error);

@@ -6,13 +6,6 @@ namespace sparkium::raytracing {
 
 GeometryMesh::GeometryMesh(sparkium::GeometryMesh &geometry)
     : geometry_(geometry), Geometry(DedicatedCast(geometry.GetCore())) {
-  auto header = geometry_.GetHeader();
-
-  core_->GraphicsCore()->CreateBottomLevelAccelerationStructure(
-      geometry_.GetBuffer()->Range(header.position_offset), geometry_.GetBuffer()->Range(header.index_offset),
-      header.num_vertices, header.position_stride, header.num_indices / 3, graphics::RAYTRACING_GEOMETRY_FLAG_NONE,
-      &blas_);
-
   auto &vfs = core_->GetShadersVFS();
   sampler_implementation_ = CodeLines(vfs, "geometry/mesh/geometry_sampler.hlsli");
   closest_hit_shader_implementation_ = CodeLines(vfs, "geometry/mesh/hit_group.hlsl");
@@ -35,6 +28,14 @@ const CodeLines &GeometryMesh::SamplerImpl() const {
 }
 
 graphics::AccelerationStructure *GeometryMesh::BLAS() {
+  if (!blas_) {
+    auto header = geometry_.GetHeader();
+
+    core_->GraphicsCore()->CreateBottomLevelAccelerationStructure(
+        geometry_.GetBuffer()->Range(header.position_offset), geometry_.GetBuffer()->Range(header.index_offset),
+        header.num_vertices, header.position_stride, header.num_indices / 3, graphics::RAYTRACING_GEOMETRY_FLAG_NONE,
+        &blas_);
+  }
   return blas_.get();
 }
 

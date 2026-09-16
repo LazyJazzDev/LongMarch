@@ -1,5 +1,5 @@
 
-function(ADD_TEST)
+function(LONGMARCH_ADD_TEST)
     file(GLOB_RECURSE SOURCES "*.cpp")
 
     if (LONGMARCH_CUDA_ENABLED)

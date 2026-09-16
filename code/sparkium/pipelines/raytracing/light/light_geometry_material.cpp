@@ -23,8 +23,9 @@ LightGeometryMaterial::LightGeometryMaterial(Core *core,
 
   core_->GraphicsCore()->CreateShader(vfs, "light/geometry_material/gather_primitive_power.hlsl",
                                       "GatherPrimitivePowerKernel", "cs_6_3", {"-I."}, &gather_primitive_power_shader_);
-  core_->GraphicsCore()->CreateShader(vfs, "light/geometry_material/direct_lighting_sampler.hlsl",
-                                      "SampleDirectLightingCallable", "lib_6_5", {"-I."}, &direct_lighting_sampler_);
+  if (core_->GraphicsCore()->DeviceRayTracingSupport())
+    core_->GraphicsCore()->CreateShader(vfs, "light/geometry_material/direct_lighting_sampler.hlsl",
+                                        "SampleDirectLightingCallable", "lib_6_5", {"-I."}, &direct_lighting_sampler_);
 
   uint32_t primitive_count = geometry_->PrimitiveCount();
   uint32_t group_size = 64;
@@ -41,9 +42,10 @@ LightGeometryMaterial::LightGeometryMaterial(Core *core,
     metadata = {metadata.offset + (group_size - 1) * metadata.stride, metadata.stride * group_size,
                 metadata.element_count / group_size};
   }
-  core_->GraphicsCore()->CreateBuffer(metadatas_.size() * sizeof(BlellochScanMetadata), graphics::BUFFER_TYPE_STATIC,
-                                      &metadata_buffer_);
-  metadata_buffer_->UploadData(metadatas_.data(), metadatas_.size() * sizeof(BlellochScanMetadata));
+  core_->GraphicsCore()->CreateBuffer(std::max<size_t>(1, metadatas_.size()) * sizeof(BlellochScanMetadata),
+                                      graphics::BUFFER_TYPE_STATIC, &metadata_buffer_);
+  if (!metadatas_.empty())
+    metadata_buffer_->UploadData(metadatas_.data(), metadatas_.size() * sizeof(BlellochScanMetadata));
 
   direct_lighting_sampler_data_->UploadData(&transform, sizeof(glm::mat4x3), 0);
   direct_lighting_sampler_data_->UploadData(&primitive_count, sizeof(uint32_t), sizeof(glm::mat4x3));
@@ -62,6 +64,10 @@ int LightGeometryMaterial::SamplerShader(Scene *scene) {
     if (dynamic_cast<MaterialPrincipled *>(material_)) {
       return 0x1000003;
     }
+    if (dynamic_cast<MaterialShaderGraph *>(material_))
+      return 0x1000004;
+    if (dynamic_cast<MaterialSpecular *>(material_))
+      return 0x1000005;
   }
   return scene->RegisterCallableShader(direct_lighting_sampler_.get());
 }

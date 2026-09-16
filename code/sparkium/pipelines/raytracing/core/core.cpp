@@ -66,6 +66,9 @@ void Core::LoadPublicShaders() {
   compute_program->Finalize();
   core_.SetPublicResource("blelloch_scan_down", std::move(compute_program));
 
+  if (!core_.GraphicsCore()->DeviceRayTracingSupport())
+    return;
+
   auto vfs = shaders_vfs;
   vfs.WriteFile("material_sampler.hlsli", CodeLines{shaders_vfs, "material/lambertian/sampler.hlsl"});
   vfs.WriteFile("entity_chit.hlsl", CodeLines{shaders_vfs, "geometry/mesh/hit_group.hlsl"});
@@ -98,12 +101,16 @@ Core *DedicatedCast(sparkium::Core *core) {
   return nullptr;
 }
 
-void Render(sparkium::Core *core, sparkium::Scene *scene, sparkium::Camera *camera, sparkium::Film *film) {
+void Render(sparkium::Core *core,
+            sparkium::Scene *scene,
+            sparkium::Camera *camera,
+            sparkium::Film *film,
+            bool software) {
   auto rt_core = DedicatedCast(core);
   auto rt_scene = DedicatedCast(scene);
   auto rt_film = DedicatedCast(film);
   auto rt_camera = DedicatedCast(camera);
-  rt_scene->Render(rt_camera, rt_film);
+  rt_scene->Render(rt_camera, rt_film, software);
 }
 
 }  // namespace sparkium::raytracing

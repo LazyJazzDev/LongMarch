@@ -1,6 +1,10 @@
 #pragma once
 #include "bindings.hlsli"
 
+#ifdef SPARKIUM_SOFTWARE_RT
+float ShadowRayNoAlpha(float3 origin, float3 direction, float dist);
+float ShadowRay(float3 origin, float3 direction, float dist);
+#else
 float ShadowRayNoAlpha(float3 origin, float3 direction, float dist) {
   RayDesc ray;
   ray.Origin = origin;
@@ -42,3 +46,5 @@ float ShadowRay(float3 origin, float3 direction, float dist) {
   TraceRay(as, RAY_FLAG_NONE, 0xFF, 1, 0, 1, ray, payload);
   return payload.shadow;
 }
+
+#endif

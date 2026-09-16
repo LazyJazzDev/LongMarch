@@ -8,8 +8,9 @@ LightPoint::LightPoint(Core *core, glm::vec3 &position, glm::vec3 &color, float 
     : Light(core), position(position), color(color), strength(strength) {
   core_->GraphicsCore()->CreateBuffer(sizeof(glm::vec3) + sizeof(glm::vec3) + sizeof(float),
                                       graphics::BUFFER_TYPE_STATIC, &direct_lighting_sampler_data_);
-  core_->GraphicsCore()->CreateShader(core_->GetShadersVFS(), "light/point/direct_lighting_sampler.hlsl",
-                                      "SampleDirectLightingCallable", "lib_6_5", {"-I."}, &direct_lighting_sampler_);
+  if (core_->GraphicsCore()->DeviceRayTracingSupport())
+    core_->GraphicsCore()->CreateShader(core_->GetShadersVFS(), "light/point/direct_lighting_sampler.hlsl",
+                                        "SampleDirectLightingCallable", "lib_6_5", {"-I."}, &direct_lighting_sampler_);
 }
 
 int LightPoint::SamplerShader(Scene *scene) {

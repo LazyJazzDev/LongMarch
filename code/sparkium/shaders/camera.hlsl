@@ -1,7 +1,10 @@
 #include "bindings.hlsli"
 #include "common.hlsli"
 
-[shader("callable")] void CameraPinhole(inout RayGenPayload raygen_payload) {
+#ifndef SPARKIUM_SOFTWARE_RT
+[shader("callable")]
+#endif
+void CameraPinhole(inout RayGenPayload raygen_payload) {
   float4x4 camera_to_world;
   float2 scale;
   camera_to_world = LoadFloat4x4(camera_data, 64);

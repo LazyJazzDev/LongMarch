@@ -122,7 +122,9 @@ int VulkanCore::CreateShader(const VirtualFileSystem &vfs,
   }
 #endif
   compile_args.insert(compile_args.end(), args.begin(), args.end());
-  pp_shader.construct<VulkanShader>(this, CompileShader(vfs, source_file, entry_point, target, compile_args));
+  auto blob = CompileShader(vfs, source_file, entry_point, target, compile_args);
+  if (blob.data.empty()) return -1;
+  pp_shader.construct<VulkanShader>(this, blob);
   return 0;
 }
 

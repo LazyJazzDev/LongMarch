@@ -13,21 +13,36 @@ void LightSampler(int shader_index, inout SampleDirectLightingPayload payload) {
   case 0x1000001:
   case 0x1000002:
   case 0x1000003:
+  case 0x1000004:
+  case 0x1000005:
     MeshLightSampler(shader_index, payload);
     break;
   default:
     // From what we know, calling a callable shader from closest hit shader is very slow.
     // So we only support a few hard-coded light samplers here.
     // Better to inline the light sampler code here if you want to support more light types.
+#ifndef SPARKIUM_SOFTWARE_RT
     CallShader(shader_index, payload);
+#else
+    payload.low = uint4(0, 0, 0, asuint(0.0f));
+    payload.high = uint4(0, 0, 0, asuint(0.0f));
+#endif
     break;
   }
 }
 
 void SampleDirectLighting(inout RenderContext context, HitRecord hit_record, out float3 eval, out float3 omega_in, out float pdf) {
   uint light_count = light_selector_data.Load(0);
+  eval = omega_in = float3(0, 0, 0);
+  pdf = 0.0f;
+  context.shadow_eval = context.shadow_dir = float3(0, 0, 0);
+  context.shadow_length = 0.0f;
+  if (light_count == 0)
+    return;
   BufferReference<ByteAddressBuffer> power_cdf = MakeBufferReference(light_selector_data, 4);
   float total_power = asfloat(power_cdf.Load(light_count * 4 - 4));
+  if (!(total_power > 0.0f))
+    return;
   uint L = 0, R = light_count - 1;
   float r1 = RandomFloat(context.rd);
   while (L < R) {
@@ -71,6 +86,8 @@ float DirectLightingProbability(uint light_index) {
   }
   BufferReference<ByteAddressBuffer> power_cdf = MakeBufferReference(light_selector_data, 4);
   float total_power = asfloat(power_cdf.Load(light_count * 4 - 4));
+  if (!(total_power > 0.0f))
+    return 0.0f;
   float high_prob = asfloat(power_cdf.Load(light_index * 4)) / total_power;
   float low_prob = (light_index > 0) ? asfloat(power_cdf.Load((light_index - 1) * 4)) / total_power : 0.0f;
   return high_prob - low_prob;

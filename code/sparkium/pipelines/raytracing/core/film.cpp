@@ -12,6 +12,7 @@ Film::Film(sparkium::Film &film) : film_(film) {
                                      &accumulated_color_);
   core_->GraphicsCore()->CreateImage(film_.GetWidth(), film_.GetHeight(), graphics::IMAGE_FORMAT_R32_SFLOAT,
                                      &accumulated_samples_);
+  Reset();
 }
 
 void Film::Reset() {
