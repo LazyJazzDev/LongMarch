@@ -1,4 +1,5 @@
 #include <long_march.h>
+#include "../sparkium_backend.h"
 
 #define STB_IMAGE_WRITE_IMPLEMENTATION
 #include <filesystem>
@@ -14,7 +15,7 @@ using namespace long_march;
 namespace {
 void Usage(const char *program) {
   std::cerr << "Usage: " << program << " <scene.json> [-o image.png] [--frames N] "
-            << "[--pipeline auto|rasterization|ray_tracing|rt_fallback] [--require-hardware-rt] [--debug] [--profile "
+            << "[--backend auto|metal|vulkan|d3d12] [--pipeline auto|rasterization|ray_tracing|rt_fallback] [--require-hardware-rt] [--debug] [--profile "
                "timings.csv] [--profile-cpu-only|--profile-alternate-gpu]\n"
             << "       " << program << " --list [scene-directory]\n";
 }
@@ -45,6 +46,7 @@ int main(int argc, char **argv) {
     std::filesystem::path scene_path = argv[1];
     std::filesystem::path output = "output.png";
     int frames = 1;
+    auto backend = graphics::BACKEND_API_DEFAULT;
     std::filesystem::path profile_path;
     bool profile_cpu_only = false;
     bool profile_alternate_gpu = false;
@@ -56,6 +58,8 @@ int main(int argc, char **argv) {
       std::string argument = argv[i];
       if (argument == "--require-hardware-rt")
         require_hardware_rt = true;
+      else if (argument == "--backend" && i + 1 < argc)
+        backend = ParseSparkiumBackend(argv[++i]);
       else if (argument == "--debug")
         debug = true;
       else if ((argument == "-o" || argument == "--output") && i + 1 < argc)
@@ -81,9 +85,11 @@ int main(int argc, char **argv) {
     if (frames <= 0) throw std::runtime_error("--frames must be positive");
 
     std::unique_ptr<graphics::Core> graphics_core;
-    if (graphics::CreateCore(graphics::BACKEND_API_DEFAULT, graphics::Core::Settings{2, debug}, &graphics_core) != 0)
+    if (graphics::CreateCore(backend, graphics::Core::Settings{2, debug}, &graphics_core) != 0)
       throw std::runtime_error("failed to create graphics core");
-    graphics_core->InitializeLogicalDeviceAutoSelect(false);
+    if (graphics_core->InitializeLogicalDeviceAutoSelect(false) != 0)
+      throw std::runtime_error("failed to initialize graphics device");
+    std::cout << "Backend: " << graphics::BackendAPIString(graphics_core->API()) << ", device: " << graphics_core->DeviceName() << '\n';
     if (require_hardware_rt && !graphics_core->DeviceRayTracingSupport())
       throw std::runtime_error("hardware ray tracing is unavailable on the selected device");
     sparkium::Core core(graphics_core.get());
@@ -104,7 +110,7 @@ int main(int argc, char **argv) {
       if (!profile_output)
         throw std::runtime_error("cannot open profile output");
       profile_output << "frame,domain,stage,value\n" << std::fixed << std::setprecision(6);
-      std::cout << "Profiling GPU: " << profiler->device_name << '\n';
+      std::cout << "Profiling device: " << profiler->device_name << '\n';
     }
     for (int frame = 0; frame < frames; ++frame) {
       if (profiler)

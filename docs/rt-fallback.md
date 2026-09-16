@@ -134,3 +134,10 @@ timestamps and host wall-time scopes. `scripts/profile_rt_fallback.py` runs the
 six basic scenes with warmup exclusion and produces CSV / JSON results.
 See [the M5 performance analysis](rt-fallback-profile.md) for measurements,
 profiling overhead checks, and the distinction between GPU work and host waits.
+
+## Native Apple Silicon backend
+
+Sparkium also runs the compute fallback and raster pipeline through metal-cpp.
+Use `--backend metal`; tier 2 argument buffers remove the 31 direct-buffer-slot
+constraint of the tested MoltenVK path. See [Metal backend details](metal-backend.md)
+for builds, comparisons, diagnostics, and limitations.

@@ -18,15 +18,16 @@ namespace grassland::graphics {
 class FrameProfile {
  public:
   explicit FrameProfile(graphics::Core *core, bool gpu_timestamps = true) {
+    device_name = core->DeviceName();
+    if (!gpu_timestamps)
+      return;
 #if defined(LONGMARCH_VULKAN_ENABLED)
     auto vk = dynamic_cast<graphics::backend::VulkanCore *>(core);
     if (!vk)
-      throw std::runtime_error("frame GPU profiling currently requires Vulkan");
+      throw std::runtime_error("frame GPU profiling currently requires Vulkan; use --profile-cpu-only for Metal");
     device_ = vk->Device()->Handle();
     const auto properties = vk->Device()->PhysicalDevice().GetPhysicalDeviceProperties();
     device_name = properties.deviceName;
-    if (!gpu_timestamps)
-      return;
     period_ = properties.limits.timestampPeriod;
     bits_ = vk->Device()
                 ->PhysicalDevice()
@@ -41,7 +42,7 @@ class FrameProfile {
     if (vkCreateQueryPool(device_, &info, nullptr, &pool_) != VK_SUCCESS)
       throw std::runtime_error("could not create timestamp query pool");
 #else
-    throw std::runtime_error("frame GPU profiling currently requires Vulkan");
+    throw std::runtime_error("frame GPU profiling currently requires Vulkan; use --profile-cpu-only for Metal");
 #endif
   }
   ~FrameProfile() {

@@ -293,6 +293,21 @@ TEST_F(SoftwareBVHTest, SharedShadersCompileForNativeRayTracingAndCompute) {
   }
 }
 
+TEST_F(SoftwareBVHTest, RasterPointLightsLeaveEmptyBackgroundUnchanged) {
+  sparkium::Scene scene(core.get());
+  scene.settings.ambient_light = glm::vec3(0.2f);
+  sparkium::EntityPointLight light(core.get(), glm::vec3(0, 0, 1), glm::vec3(1), 100.0f);
+  scene.AddEntity(&light);
+  sparkium::Camera camera(core.get(), glm::lookAt(glm::vec3(0, 0, 4), glm::vec3(0), glm::vec3(0, 1, 0)),
+                          glm::radians(45.0f), 17.0f / 13.0f);
+  sparkium::Film film(core.get(), 17, 13);
+  core->Render(&scene, &camera, &film, sparkium::RENDER_PIPELINE_RASTERIZATION);
+  std::vector<glm::vec4> pixels(17 * 13);
+  film.GetRawImage()->DownloadData(pixels.data());
+  for (const auto &pixel : pixels)
+    for (int c = 0; c < 3; ++c) EXPECT_NEAR(pixel[c], 0.2f, 1e-6f);
+}
+
 TEST_F(SoftwareBVHTest, HardwareImageParity) {
   if (!graphics->DeviceRayTracingSupport())
     GTEST_SKIP() << "requires a hardware ray tracing device";

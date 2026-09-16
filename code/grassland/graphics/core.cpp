@@ -113,7 +113,9 @@ int Core::InitializeLogicalDeviceByCUDADeviceID(int cuda_device_id) {
 }
 #endif
 
-#if defined(LONGMARCH_D3D12_ENABLED)
+#if defined(LONGMARCH_METAL_ENABLED)
+#define DEFAULT_API 2
+#elif defined(LONGMARCH_D3D12_ENABLED)
 #define DEFAULT_API 0
 #elif defined(LONGMARCH_VULKAN_ENABLED)
 #define DEFAULT_API 1
@@ -336,6 +338,15 @@ void Core::PybindClassRegistration(py::classh<Core> &c) {
 
 int CreateCore(BackendAPI api, const Core::Settings &settings, double_ptr<Core> pp_core) {
   switch (api) {
+#ifdef LONGMARCH_METAL_ENABLED
+    case BACKEND_API_METAL:
+      pp_core.construct<backend::MetalCore>(settings);
+      break;
+#if DEFAULT_API == 2
+    default:
+      return -1;
+#endif
+#endif
 #ifdef LONGMARCH_D3D12_ENABLED
 #if DEFAULT_API == 0
     default:

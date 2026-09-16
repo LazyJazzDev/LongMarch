@@ -1,5 +1,6 @@
 #pragma once
 #include "glm/gtc/matrix_transform.hpp"
+#include "grassland/graphics/frame_profile.h"
 #include "imgui.h"
 #include "long_march.h"
 #include "params.h"
@@ -20,9 +21,18 @@ struct NBodyGlobalSettings {
   float gravity;
 };
 
+struct NBodyOptions {
+  graphics::BackendAPI backend = graphics::BACKEND_API_DEFAULT;
+  int particles = NUM_PARTICLE, frames = 120, warmup = 20;
+  int width = 1920, height = 1080;
+  uint32_t seed = 1;
+  bool debug = false, gpu_timing = true;
+  std::string mode = "interactive", csv, state_output;
+};
+
 class NBodyCS {
  public:
-  explicit NBodyCS(int n_particles = NUM_PARTICLE);
+  explicit NBodyCS(const NBodyOptions &options = {});
   void Run();
 
  private:
@@ -63,6 +73,12 @@ class NBodyCS {
   std::unique_ptr<graphics::Shader> nbody_compute_shader_;
   std::unique_ptr<graphics::ComputeProgram> nbody_compute_program_;
 
+  NBodyOptions options_;
+  bool Benchmark() const {
+    return options_.mode != "interactive";
+  }
+  double gpu_ms_ = 0, record_ms_ = 0, submit_ms_ = 0, wait_ms_ = 0;
+  std::unique_ptr<graphics::FrameProfile> profiler_;
   int n_particles_;
   std::mt19937 random_device_{uint32_t(std::time(nullptr))};
   glm::mat4 rotation{1.0f};

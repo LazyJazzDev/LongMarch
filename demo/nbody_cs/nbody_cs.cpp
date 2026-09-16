@@ -1,36 +1,93 @@
 #include "nbody_cs.h"
 
+#include <fstream>
+#include <iomanip>
+#include <iostream>
+#include <numeric>
+#if defined(LONGMARCH_METAL_ENABLED)
+#include "grassland/graphics/backend/metal/metal_command_context.h"
+#endif
+
 namespace {
 #include "built_in_shaders.inl"
 }
 
-NBodyCS::NBodyCS(int n_particles) : n_particles_(n_particles) {
-  graphics::Core::Settings settings;
-  graphics::CreateCore(graphics::BACKEND_API_DEFAULT, settings, &core_);
-  core_->InitializeLogicalDeviceAutoSelect(false);
-  core_->CreateWindowObject(1920, 1080, "NBodyCS", false, true, &window_);
+NBodyCS::NBodyCS(const NBodyOptions &options) : options_(options), n_particles_(options.particles) {
+  random_device_.seed(options.seed);
+  graphics::Core::Settings settings{2, options.debug};
+  if (graphics::CreateCore(options.backend, settings, &core_) || core_->InitializeLogicalDeviceAutoSelect(false))
+    throw std::runtime_error("could not initialize graphics backend");
+  if (options.mode == "interactive" || options.mode == "window")
+    core_->CreateWindowObject(options.width, options.height, "NBodyCS", false, true, &window_);
 }
 
 void NBodyCS::Run() {
   OnInit();
-  while (!glfwWindowShouldClose(window_->GLFWWindow())) {
+  std::cout << "Backend: " << graphics::BackendAPIString(core_->API()) << ", device: " << core_->DeviceName() << '\n';
+  if (Benchmark() && options_.gpu_timing && core_->API() == graphics::BACKEND_API_VULKAN)
+    profiler_ = std::make_unique<graphics::FrameProfile>(core_.get());
+  std::ofstream csv;
+  if (!options_.csv.empty()) {
+    csv.open(options_.csv);
+    if (!csv)
+      throw std::runtime_error("cannot open timing CSV");
+    csv << "frame,wall_ms,gpu_ms,record_ms,submit_ms,wait_ms\n" << std::fixed << std::setprecision(6);
+  }
+  std::vector<double> wall_times, gpu_times;
+  int frame = -options_.warmup;
+  while ((!window_ || !window_->ShouldClose()) && (!Benchmark() || frame < options_.frames)) {
+    auto start = std::chrono::steady_clock::now();
     OnUpdate();
     OnRender();
-    glfwPollEvents();
+    if (window_)
+      glfwPollEvents();
+    double wall = std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - start).count();
+    if (Benchmark() && frame >= 0) {
+      wall_times.push_back(wall);
+      gpu_times.push_back(gpu_ms_);
+      if (csv)
+        csv << frame << ',' << wall << ',' << gpu_ms_ << ',' << record_ms_ << ',' << submit_ms_ << ',' << wait_ms_
+            << '\n';
+    }
+    ++frame;
   }
   core_->WaitGPU();
+  if (!options_.state_output.empty()) {
+    std::vector<glm::vec3> positions(n_particles_), velocities(n_particles_);
+    particles_pos_->DownloadData(positions.data(), positions.size() * sizeof(glm::vec3));
+    particles_vel_->DownloadData(velocities.data(), velocities.size() * sizeof(glm::vec3));
+    std::ofstream output(options_.state_output, std::ios::binary);
+    output.write(reinterpret_cast<const char *>(positions.data()), positions.size() * sizeof(glm::vec3));
+    output.write(reinterpret_cast<const char *>(velocities.data()), velocities.size() * sizeof(glm::vec3));
+    if (!output)
+      throw std::runtime_error("cannot write particle state");
+  }
+  if (!wall_times.empty()) {
+    auto mean = [](const std::vector<double> &v) { return std::accumulate(v.begin(), v.end(), 0.0) / v.size(); };
+    std::cout << std::fixed << std::setprecision(6) << "RESULT {\"backend\":\""
+              << graphics::BackendAPIString(core_->API()) << "\",\"mode\":\"" << options_.mode
+              << "\",\"particles\":" << n_particles_ << ",\"frames\":" << wall_times.size()
+              << ",\"warmup\":" << options_.warmup << ",\"seed\":" << options_.seed << ",\"width\":" << options_.width
+              << ",\"height\":" << options_.height << ",\"wall_ms\":" << mean(wall_times)
+              << ",\"gpu_ms\":" << mean(gpu_times) << ",\"fps_equivalent\":" << 1000.0 / mean(wall_times) << "}\n";
+  }
+  if (window_)
+    window_->TerminateImGui();
   OnClose();
 }
 
 void NBodyCS::OnUpdate() {
-  UpdateImGui();
+  if (window_)
+    UpdateImGui();
   auto world_to_cam =
       glm::lookAt(glm::vec3{glm::vec4{10.0f, 20.0f, 30.0f, 0.0f}}, glm::vec3{0.0f}, glm::vec3{0.0f, 1.0f, 0.0f}) *
       rotation;
-  GlobalUniformObject ubo{
-      glm::perspective(glm::radians(60.0f), float(window_->GetWidth()) / float(window_->GetHeight()), 0.1f, 100.0f) *
-          world_to_cam,
-      glm::inverse(world_to_cam), PARTICLE_SIZE, hdr_};
+  GlobalUniformObject ubo{glm::perspective(glm::radians(60.0f),
+                                           float(frame_image_ ? frame_image_->Extent().width : options_.width) /
+                                               float(frame_image_ ? frame_image_->Extent().height : options_.height),
+                                           0.1f, 100.0f) *
+                              world_to_cam,
+                          glm::inverse(world_to_cam), PARTICLE_SIZE, hdr_};
   global_uniform_buffer_->UploadData(&ubo, sizeof(ubo));
 
   NBodyGlobalSettings global_settings;
@@ -40,12 +97,18 @@ void NBodyCS::OnUpdate() {
   global_settings_buffer_->UploadData(&global_settings, sizeof(global_settings));
 
   static FPSCounter fps_counter;
-  window_->SetTitle("NBody Compute Shader FPS: " + std::to_string(fps_counter.TickFPS()));
+  if (window_ && !Benchmark())
+    window_->SetTitle("NBody Compute Shader FPS: " + std::to_string(fps_counter.TickFPS()));
 }
 
 void NBodyCS::OnRender() {
+  using Clock = std::chrono::steady_clock;
+  auto start = Clock::now();
+  if (profiler_)
+    profiler_->Begin();
   std::unique_ptr<graphics::CommandContext> ctx;
   core_->CreateCommandContext(&ctx);
+  int gpu_scope = profiler_ ? profiler_->BeginGpu(ctx.get(), "frame") : -1;
   if (step_) {
     ctx->CmdBindComputeProgram(nbody_compute_program_.get());
     ctx->CmdBindResources(0, {particles_pos_.get()}, graphics::BIND_POINT_COMPUTE);
@@ -55,47 +118,78 @@ void NBodyCS::OnRender() {
     ctx->CmdDispatch(n_particles_ / 128, 1, 1);
     ctx->CmdCopyBuffer(particles_pos_.get(), particles_pos_new_.get(), particles_pos_->Size());
   }
-  ctx->CmdClearImage(frame_image_.get(), {{0.0f, 0.0f, 0.0f, 0.0f}});
-  ctx->CmdBeginRendering({frame_image_.get()}, nullptr);
-  ctx->CmdBindProgram(program_.get());
-  ctx->CmdSetPrimitiveTopology(graphics::PRIMITIVE_TOPOLOGY_TRIANGLE_LIST);
-  graphics::Scissor scissor{0, 0, uint32_t(window_->GetWidth()), uint32_t(window_->GetHeight())};
-  graphics::Viewport viewport{0, 0, float(window_->GetWidth()), float(window_->GetHeight())};
-  ctx->CmdSetScissor(scissor);
-  ctx->CmdSetViewport(viewport);
-  ctx->CmdBindVertexBuffers(0, {particles_pos_.get()}, {0});
-  ctx->CmdBindResources(0, {global_uniform_buffer_.get()});
-  ctx->CmdDraw(6, n_particles_, 0, 0);
-  ctx->CmdEndRendering();
-  ctx->CmdBeginRendering({}, nullptr);
-  ctx->CmdBindProgram(hdr_program_.get());
-  ctx->CmdBindResources(0, {global_uniform_buffer_.get()});
-  ctx->CmdBindResources(1, {frame_image_.get()});
-  ctx->CmdDraw(6, 1, 0, 0);
-  ctx->CmdEndRendering();
-  ctx->CmdPresent(window_.get(), frame_image_.get());
+  if (options_.mode != "compute") {
+    ctx->CmdClearImage(frame_image_.get(), {{0.0f, 0.0f, 0.0f, 0.0f}});
+    ctx->CmdBeginRendering({frame_image_.get()}, nullptr);
+    ctx->CmdBindProgram(program_.get());
+    ctx->CmdSetPrimitiveTopology(graphics::PRIMITIVE_TOPOLOGY_TRIANGLE_LIST);
+    graphics::Scissor scissor{0, 0, frame_image_->Extent().width, frame_image_->Extent().height};
+    graphics::Viewport viewport{0, 0, float(frame_image_->Extent().width), float(frame_image_->Extent().height)};
+    ctx->CmdSetScissor(scissor);
+    ctx->CmdSetViewport(viewport);
+    ctx->CmdBindVertexBuffers(0, {particles_pos_.get()}, {0});
+    ctx->CmdBindResources(0, {global_uniform_buffer_.get()});
+    ctx->CmdDraw(6, n_particles_, 0, 0);
+    ctx->CmdEndRendering();
+    ctx->CmdBeginRendering({}, nullptr);
+    ctx->CmdBindProgram(hdr_program_.get());
+    ctx->CmdBindResources(0, {global_uniform_buffer_.get()});
+    ctx->CmdBindResources(1, {frame_image_.get()});
+    ctx->CmdDraw(6, 1, 0, 0);
+    ctx->CmdEndRendering();
+  }
+  if (window_)
+    ctx->CmdPresent(window_.get(), frame_image_.get());
+  if (profiler_)
+    profiler_->EndGpu(ctx.get(), gpu_scope);
+  auto recorded = Clock::now();
   core_->SubmitCommandContext(ctx.get());
+  auto submitted = Clock::now();
+  if (Benchmark()) {
+    core_->WaitGPU();
+    auto completed = Clock::now();
+    record_ms_ = std::chrono::duration<double, std::milli>(recorded - start).count();
+    submit_ms_ = std::chrono::duration<double, std::milli>(submitted - recorded).count();
+    wait_ms_ = std::chrono::duration<double, std::milli>(completed - submitted).count();
+    gpu_ms_ = -1;
+    if (profiler_) {
+      profiler_->Finish();
+      gpu_ms_ = profiler_->gpu_ms.at("frame");
+    }
+#if defined(LONGMARCH_METAL_ENABLED)
+    if (options_.gpu_timing && core_->API() == graphics::BACKEND_API_METAL) {
+      auto native = dynamic_cast<graphics::backend::MetalCommandContext *>(ctx.get())->Handle();
+      gpu_ms_ = (native->GPUEndTime() - native->GPUStartTime()) * 1000.0;
+      if (gpu_ms_ <= 0)
+        throw std::runtime_error("Metal GPU timestamps unavailable");
+    }
+#endif
+  }
 }
 
 void NBodyCS::OnInit() {
-  core_->CreateImage(window_->GetWidth(), window_->GetHeight(), graphics::IMAGE_FORMAT_R32G32B32A32_SFLOAT,
-                     &frame_image_);
+  if (options_.mode != "compute")
+    core_->CreateImage(options_.width, options_.height, graphics::IMAGE_FORMAT_R32G32B32A32_SFLOAT, &frame_image_);
 
-  window_->ResizeEvent().RegisterCallback([this](int width, int height) {
-    frame_image_.reset();
-    core_->CreateImage(width, height, graphics::IMAGE_FORMAT_R32G32B32A32_SFLOAT, &frame_image_);
-    core_->CreateProgram({frame_image_->Format()}, graphics::IMAGE_FORMAT_UNDEFINED, &program_);
-    program_->SetBlendState(
-        0, graphics::BlendState(graphics::BLEND_FACTOR_ONE, graphics::BLEND_FACTOR_ONE, graphics::BLEND_OP_ADD,
-                                graphics::BLEND_FACTOR_ONE, graphics::BLEND_FACTOR_ONE_MINUS_SRC_ALPHA,
-                                graphics::BLEND_OP_ADD));
-    program_->AddInputBinding(sizeof(glm::vec3), true);
-    program_->AddInputAttribute(0, graphics::INPUT_TYPE_FLOAT3, 0);
-    program_->AddResourceBinding(graphics::RESOURCE_TYPE_UNIFORM_BUFFER, 1);
-    program_->BindShader(vertex_shader_.get(), graphics::SHADER_TYPE_VERTEX);
-    program_->BindShader(fragment_shader_.get(), graphics::SHADER_TYPE_PIXEL);
-    program_->Finalize();
-  });
+  if (window_)
+    window_->ResizeEvent().RegisterCallback([this](int width, int height) {
+      core_->WaitGPU();
+      if (width <= 0 || height <= 0)
+        return;
+      frame_image_.reset();
+      core_->CreateImage(width, height, graphics::IMAGE_FORMAT_R32G32B32A32_SFLOAT, &frame_image_);
+      core_->CreateProgram({frame_image_->Format()}, graphics::IMAGE_FORMAT_UNDEFINED, &program_);
+      program_->SetBlendState(
+          0, graphics::BlendState(graphics::BLEND_FACTOR_ONE, graphics::BLEND_FACTOR_ONE, graphics::BLEND_OP_ADD,
+                                  graphics::BLEND_FACTOR_ONE, graphics::BLEND_FACTOR_ONE_MINUS_SRC_ALPHA,
+                                  graphics::BLEND_OP_ADD));
+      program_->AddInputBinding(sizeof(glm::vec3), true);
+      program_->AddInputAttribute(0, graphics::INPUT_TYPE_FLOAT3, 0);
+      program_->AddResourceBinding(graphics::RESOURCE_TYPE_UNIFORM_BUFFER, 1);
+      program_->BindShader(vertex_shader_.get(), graphics::SHADER_TYPE_VERTEX);
+      program_->BindShader(fragment_shader_.get(), graphics::SHADER_TYPE_PIXEL);
+      program_->Finalize();
+    });
 
   core_->CreateBuffer(sizeof(GlobalUniformObject), graphics::BUFFER_TYPE_DYNAMIC, &global_uniform_buffer_);
   core_->CreateBuffer(sizeof(glm::vec3) * n_particles_, graphics::BUFFER_TYPE_STATIC, &particles_pos_);
@@ -106,24 +200,31 @@ void NBodyCS::OnInit() {
 
   ResetParticles();
 
-  window_->InitImGui(FileProbe::GetInstance().FindFile("fonts/simhei.ttf").c_str(), 20.0f);
-  BuildRenderNode();
-  window_->MouseMoveEvent().RegisterCallback([this](double xpos, double ypos) {
-    ImGui::SetCurrentContext(window_->GetImGuiContext());
-
-    static auto last_xpos = xpos;
-    static auto last_ypos = ypos;
-    if (glfwGetMouseButton(window_->GLFWWindow(), GLFW_MOUSE_BUTTON_LEFT) == GLFW_PRESS) {
-      auto diffx = xpos - last_xpos;
-      auto diffy = ypos - last_ypos;
-      if (!ImGui::GetIO().WantCaptureMouse) {
-        rotation = glm::rotate(glm::mat4{1.0f}, glm::radians(float(diffx)), glm::vec3{0.0f, 1.0f, 0.0f}) * rotation;
-        rotation = glm::rotate(glm::mat4{1.0f}, glm::radians(float(diffy)), glm::vec3{1.0f, 0.0f, 0.0f}) * rotation;
-      }
+  if (window_) {
+    window_->InitImGui(FileProbe::GetInstance().FindFile("fonts/simhei.ttf").c_str(), 20.0f);
+    if (Benchmark()) {
+      ImGui::SetCurrentContext(window_->GetImGuiContext());
+      ImGui::GetIO().IniFilename = nullptr;
     }
-    last_xpos = xpos;
-    last_ypos = ypos;
-  });
+  }
+  BuildRenderNode();
+  if (window_)
+    window_->MouseMoveEvent().RegisterCallback([this](double xpos, double ypos) {
+      ImGui::SetCurrentContext(window_->GetImGuiContext());
+
+      static auto last_xpos = xpos;
+      static auto last_ypos = ypos;
+      if (glfwGetMouseButton(window_->GLFWWindow(), GLFW_MOUSE_BUTTON_LEFT) == GLFW_PRESS) {
+        auto diffx = xpos - last_xpos;
+        auto diffy = ypos - last_ypos;
+        if (!ImGui::GetIO().WantCaptureMouse) {
+          rotation = glm::rotate(glm::mat4{1.0f}, glm::radians(float(diffx)), glm::vec3{0.0f, 1.0f, 0.0f}) * rotation;
+          rotation = glm::rotate(glm::mat4{1.0f}, glm::radians(float(diffy)), glm::vec3{1.0f, 0.0f, 0.0f}) * rotation;
+        }
+      }
+      last_xpos = xpos;
+      last_ypos = ypos;
+    });
 }
 
 void NBodyCS::OnClose() {
@@ -145,6 +246,16 @@ void NBodyCS::OnClose() {
 }
 
 void NBodyCS::BuildRenderNode() {
+  core_->CreateShader(GetShaderCode("shaders/nbody.hlsl"), "CSMain", "cs_6_0", &nbody_compute_shader_);
+  core_->CreateComputeProgram(nbody_compute_shader_.get(), &nbody_compute_program_);
+  nbody_compute_program_->AddResourceBinding(graphics::RESOURCE_TYPE_STORAGE_BUFFER, 1);
+  nbody_compute_program_->AddResourceBinding(graphics::RESOURCE_TYPE_WRITABLE_STORAGE_BUFFER, 1);
+  nbody_compute_program_->AddResourceBinding(graphics::RESOURCE_TYPE_WRITABLE_STORAGE_BUFFER, 1);
+  nbody_compute_program_->AddResourceBinding(graphics::RESOURCE_TYPE_UNIFORM_BUFFER, 1);
+  nbody_compute_program_->Finalize();
+  if (options_.mode == "compute")
+    return;
+
   core_->CreateShader(GetShaderVirtualFileSystem(), "shaders/particle.hlsl", "VSMain", "vs_6_0", &vertex_shader_);
   core_->CreateShader(GetShaderVirtualFileSystem(), "shaders/particle.hlsl", "PSMain", "ps_6_0", &fragment_shader_);
   core_->CreateProgram({frame_image_->Format()}, graphics::IMAGE_FORMAT_UNDEFINED, &program_);
@@ -166,14 +277,6 @@ void NBodyCS::BuildRenderNode() {
   hdr_program_->BindShader(hdr_vertex_shader_.get(), graphics::SHADER_TYPE_VERTEX);
   hdr_program_->BindShader(hdr_fragment_shader_.get(), graphics::SHADER_TYPE_PIXEL);
   hdr_program_->Finalize();
-
-  core_->CreateShader(GetShaderCode("shaders/nbody.hlsl"), "CSMain", "cs_6_0", &nbody_compute_shader_);
-  core_->CreateComputeProgram(nbody_compute_shader_.get(), &nbody_compute_program_);
-  nbody_compute_program_->AddResourceBinding(graphics::RESOURCE_TYPE_STORAGE_BUFFER, 1);
-  nbody_compute_program_->AddResourceBinding(graphics::RESOURCE_TYPE_WRITABLE_STORAGE_BUFFER, 1);
-  nbody_compute_program_->AddResourceBinding(graphics::RESOURCE_TYPE_WRITABLE_STORAGE_BUFFER, 1);
-  nbody_compute_program_->AddResourceBinding(graphics::RESOURCE_TYPE_UNIFORM_BUFFER, 1);
-  nbody_compute_program_->Finalize();
 }
 
 float NBodyCS::RandomFloat() {
@@ -238,6 +341,7 @@ void NBodyCS::UpdateImGui() {
   if (ImGui::Begin("NBodyCS", nullptr, ImGuiWindowFlags_NoMove)) {
     ImGui::Text("Statistics");
     ImGui::Separator();
+    ImGui::Text("Backend: %s", graphics::BackendAPIString(core_->API()));
     auto current_tp = std::chrono::steady_clock::now();
     static auto last_frame_tp = current_tp;
     auto duration = current_tp - last_frame_tp;

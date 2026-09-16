@@ -13,11 +13,11 @@ groupshared float group_element[GROUP_SIZE];
                                                            : SV_GroupThreadID) {
   uint light_count = light_selector_data.Load(0);
   BufferReference<RWByteAddressBuffer> power_pdf = MakeBufferReference(light_selector_data, 4);
-  uint light_sampler_data_index =
-      light_metadatas.Load<LightMetadata>(sizeof(LightMetadata) * DTID.x).sampler_data_index;
-  uint power_offset = light_metadatas.Load<LightMetadata>(sizeof(LightMetadata) * DTID.x).power_offset;
   float power = 0.0f;
   if (DTID.x < light_count) {
+    LightMetadata metadata = light_metadatas.Load<LightMetadata>(sizeof(LightMetadata) * DTID.x);
+    uint light_sampler_data_index = metadata.sampler_data_index;
+    uint power_offset = metadata.power_offset;
     power = data_buffers[NonUniformResourceIndex(light_sampler_data_index)].Load<float>(power_offset);
   }
   power += WavePrefixSum(power);
@@ -32,5 +32,9 @@ groupshared float group_element[GROUP_SIZE];
   }
   power = group_element[GTID.x];
 
-  power_pdf.Store(DTID.x * 4, asuint(power));
+  // The last workgroup can contain inactive lanes. Metal argument-buffer
+  // pointers do not provide Vulkan's robust out-of-bounds buffer accesses.
+  if (DTID.x < light_count) {
+    power_pdf.Store(DTID.x * 4, asuint(power));
+  }
 }

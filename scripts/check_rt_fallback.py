@@ -39,6 +39,9 @@ def main():
 
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--cli", type=Path, required=True)
+    parser.add_argument("--backend", choices=("auto", "metal", "vulkan", "d3d12"), default="auto")
+    parser.add_argument("--compare-backend", choices=("metal", "vulkan", "d3d12"))
+    parser.add_argument("--pipeline", choices=("rt_fallback", "rasterization"), default="rt_fallback")
     parser.add_argument("--output", type=Path, default=ROOT / "out/rt-fallback")
     parser.add_argument("--scenes", nargs="+", default=list(DEMOS), help="names under assets/scenes")
     parser.add_argument("--size", type=int, default=96)
@@ -50,8 +53,10 @@ def main():
     args = parser.parse_args()
     if min(args.size, args.spp, args.bounces) <= 0:
         parser.error("size, spp and bounces must be positive")
-    if args.max_rmse is not None and not args.compare_hardware:
-        parser.error("--max-rmse requires --compare-hardware")
+    if args.compare_hardware and (args.compare_backend or args.pipeline != "rt_fallback"):
+        parser.error("--compare-hardware requires rt_fallback without --compare-backend")
+    if args.max_rmse is not None and not (args.compare_hardware or args.compare_backend):
+        parser.error("--max-rmse requires a comparison")
     args.output = args.output.resolve()
     args.output.mkdir(parents=True, exist_ok=True)
     cli = str(args.cli.resolve())
@@ -64,13 +69,18 @@ def main():
         path = args.output / f"{name}.json"
         path.write_text(json.dumps(scene, indent=2) + "\n")
         item = {"scene": name, "width": args.size, "height": args.size, "spp": args.spp, "bounces": args.bounces}
-        pipelines = ["rt_fallback", "ray_tracing"] if args.compare_hardware else ["rt_fallback"]
+        runs = [(args.pipeline, args.backend)]
+        if args.compare_hardware:
+            runs.append(("ray_tracing", args.backend))
+        if args.compare_backend:
+            runs.append((args.pipeline, args.compare_backend))
         images = []
-        for pipeline in pipelines:
-            stem = f"{name}-{pipeline}"
+        for pipeline, backend in runs:
+            label = f"{pipeline}-{backend}" if args.compare_backend else pipeline
+            stem = f"{name}-{label}"
             png, log = args.output / f"{stem}.png", args.output / f"{stem}.log"
             png.unlink(missing_ok=True)
-            command = [cli, str(path), "--pipeline", pipeline, "-o", str(png)]
+            command = [cli, str(path), "--pipeline", pipeline, "--backend", backend, "-o", str(png)]
             if pipeline == "ray_tracing":
                 command.append("--require-hardware-rt")
             if args.debug:
@@ -78,7 +88,7 @@ def main():
             started = time.monotonic()
             with log.open("w") as stream:
                 run = subprocess.run(command, stdout=stream, stderr=subprocess.STDOUT, cwd=ROOT)
-            item[pipeline] = {"returncode": run.returncode, "wall_seconds": time.monotonic() - started}
+            item[label] = {"returncode": run.returncode, "wall_seconds": time.monotonic() - started}
             if run.returncode:
                 failed = True
                 print(f"FAIL {stem}: {log}", flush=True)
@@ -87,7 +97,7 @@ def main():
                 images.append(image.convert("RGB"))
             tile = Image.new("RGB", (args.size, args.size + 32), "#202020")
             tile.paste(images[-1], (0, 32))
-            ImageDraw.Draw(tile).text((3, 2), name + "\n" + pipeline, fill="white")
+            ImageDraw.Draw(tile).text((3, 2), name + "\n" + label, fill="white")
             tiles.append(tile)
         if len(images) == 2:
             stats = ImageStat.Stat(ImageChops.difference(*images))
