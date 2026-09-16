@@ -100,7 +100,7 @@ int main(int argc, char **argv) {
     auto loaded = sparkium::JsonScene::Load(&core, scene_path, &error);
     if (!loaded) throw std::runtime_error(error);
     if (!override_pipeline) pipeline = loaded->GetRenderPipeline();
-    if (pipeline == sparkium::RENDER_PIPELINE_RAY_QUERY)
+    if (core.ResolveRenderPipeline(pipeline) == sparkium::RENDER_PIPELINE_RAY_QUERY)
       std::cout << "Tracing: native ray query (compute, native AS)\n";
 
     auto *film = loaded->GetFilm();

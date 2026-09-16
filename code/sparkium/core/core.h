@@ -8,6 +8,9 @@ class Core : public Object {
 
   graphics::Core *GraphicsCore() const;
 
+  // Resolve automatic selection and supported fallbacks for rendering and UI display.
+  RenderPipeline ResolveRenderPipeline(RenderPipeline render_pipeline) const;
+
   void Render(Scene *scene, Camera *camera, Film *film, RenderPipeline render_pipeline = RENDER_PIPELINE_AUTO);
 
   const VirtualFileSystem &GetShadersVFS() const;

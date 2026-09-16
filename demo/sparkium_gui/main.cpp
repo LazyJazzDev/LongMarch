@@ -135,7 +135,9 @@ int main(int argc, char **argv) {
         ImGui::EndCombo();
       }
       int pipeline_index = static_cast<int>(pipeline);
-      const char *pipelines[] = {"Rasterization", "Ray tracing", "Auto", "RT Fallback", "Native ray query"};
+      const std::string auto_label =
+          std::string("Auto (") + PipelineName(core.ResolveRenderPipeline(sparkium::RENDER_PIPELINE_AUTO)) + ")";
+      const char *pipelines[] = {"Rasterization", "Ray tracing", auto_label.c_str(), "RT Fallback", "Native ray query"};
       if (ImGui::Combo("Pipeline", &pipeline_index, pipelines, graphics_core->DeviceRayQuerySupport() ? 5 : 4)) {
         pipeline = static_cast<sparkium::RenderPipeline>(pipeline_index);
         loaded->GetFilm()->Reset();
@@ -147,7 +149,11 @@ int main(int argc, char **argv) {
       if (ImGui::Button("Reset film")) loaded->GetFilm()->Reset();
       ImGui::Text("%s", scene_files[selected].string().c_str());
       ImGui::Text("Backend: %s", graphics::BackendAPIString(graphics_core->API()));
-      ImGui::Text("Pipeline: %s", PipelineName(pipeline));
+      const auto resolved_pipeline = core.ResolveRenderPipeline(pipeline);
+      if (resolved_pipeline != pipeline)
+        ImGui::Text("Pipeline: %s (%s)", PipelineName(pipeline), PipelineName(resolved_pipeline));
+      else
+        ImGui::Text("Pipeline: %s", PipelineName(pipeline));
       if (!load_error.empty()) ImGui::TextColored({1, .3f, .3f, 1}, "%s", load_error.c_str());
       ImGui::Text("%.1f FPS", fps_counter.TickFPS());
       ImGui::End();

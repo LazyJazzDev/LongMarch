@@ -238,6 +238,7 @@ TEST_P(ComputeTraversalTest, EmptySceneAccumulationAndReset) {
   EXPECT_EQ(film.info.accumulated_samples, 3);
   check(glm::vec3(0.0f));
   if (ray_query && !graphics->DeviceRayTracingSupport()) {
+    EXPECT_EQ(core->ResolveRenderPipeline(sparkium::RENDER_PIPELINE_AUTO), sparkium::RENDER_PIPELINE_RAY_QUERY);
     graphics::FrameProfile profile(graphics.get(), false);
     profile.Begin();
     core->Render(&scene, &camera, &film, sparkium::RENDER_PIPELINE_AUTO);

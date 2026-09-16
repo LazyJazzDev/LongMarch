@@ -19,7 +19,7 @@ graphics::Core *Core::GraphicsCore() const {
   return core_;
 }
 
-void Core::Render(Scene *scene, Camera *camera, Film *film, RenderPipeline render_pipeline) {
+RenderPipeline Core::ResolveRenderPipeline(RenderPipeline render_pipeline) const {
   if (render_pipeline == RENDER_PIPELINE_AUTO) {
     if (core_->DeviceRayTracingSupport()) {
       render_pipeline = RENDER_PIPELINE_RAY_TRACING;
@@ -29,15 +29,18 @@ void Core::Render(Scene *scene, Camera *camera, Film *film, RenderPipeline rende
       render_pipeline = RENDER_PIPELINE_RT_FALLBACK;
     }
   }
+  if (render_pipeline == RENDER_PIPELINE_RAY_TRACING && !core_->DeviceRayTracingSupport())
+    return RENDER_PIPELINE_RT_FALLBACK;
+  return render_pipeline;
+}
+
+void Core::Render(Scene *scene, Camera *camera, Film *film, RenderPipeline render_pipeline) {
+  render_pipeline = ResolveRenderPipeline(render_pipeline);
   switch (render_pipeline) {
     case RENDER_PIPELINE_RASTERIZATION:
       raster::Render(this, scene, camera, film);
       break;
     case RENDER_PIPELINE_RAY_TRACING:
-      if (!core_->DeviceRayTracingSupport()) {
-        raytracing::Render(this, scene, camera, film, true);
-        break;
-      }
       raytracing::Render(this, scene, camera, film);
       break;
     case RENDER_PIPELINE_RAY_QUERY:
