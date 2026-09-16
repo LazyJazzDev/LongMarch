@@ -39,7 +39,7 @@ void SampleMaterial(inout RenderContext context, HitRecord hit_record) {
 
   int normal_texture_index = material_buffer.LoadInt();
   float y_signal = material_buffer.LoadFloat();
-  if (normal_texture_index != -1) {
+  if (normal_texture_index != -1 && abs(hit_record.signal) > 0.5f) {
     float3 tbn = SampleTexture(normal_texture_index, hit_record.tex_coord).xyz * 2.0f - 1.0f;
     float3x3 TBN =
         float3x3(hit_record.tangent, cross(hit_record.normal, hit_record.tangent) * y_signal, hit_record.normal);
@@ -70,7 +70,9 @@ void SampleMaterial(inout RenderContext context, HitRecord hit_record) {
   if (anisotropic_rotation_texture_index != -1)
     material.anisotropic_rotation = SampleTexture(anisotropic_rotation_texture_index, hit_record.tex_coord).x;
 
-  material.CalculateClosureWeight();
+  int emission_texture_index = material_buffer.LoadInt();
+  if (emission_texture_index != -1)
+    emission *= SampleTexture(emission_texture_index, hit_record.tex_coord).xyz;
 
   float3 eval;
   float3 omega_in;
@@ -120,6 +122,7 @@ void SampleMaterial(inout RenderContext context, HitRecord hit_record) {
     context.origin = hit_record.position;
     context.direction = omega_in;
     context.bsdf_pdf = pdf;
+    context.ray_type = dot(omega_in, hit_record.geom_normal) < 0.0f ? RAY_TYPE_TRANSMISSION : RAY_TYPE_REFLECTION;
   }
 }
 

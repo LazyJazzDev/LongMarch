@@ -13,6 +13,7 @@ void LightSampler(int shader_index, inout SampleDirectLightingPayload payload) {
   case 0x1000001:
   case 0x1000002:
   case 0x1000003:
+  case 0x1000004:
   case 0x1000005:
     MeshLightSampler(shader_index, payload);
     break;
@@ -68,6 +69,8 @@ void SampleDirectLighting(inout RenderContext context, HitRecord hit_record, out
   payload.low.w = light_meta.sampler_data_index;
   payload.high.xyz = asuint(float3(r1, RandomFloat(context.rd), RandomFloat(context.rd)));
   payload.high.w = light_meta.custom_index;
+  payload.extra.xyz = asuint(hit_record.normal);
+  payload.extra.w = context.ray_type;
   LightSampler(light_meta.sampler_shader_index, payload);
   eval = asfloat(payload.low.xyz);
   float shadow_length = asfloat(payload.low.w) * 0.9999;

@@ -19,6 +19,8 @@ class GeometryMesh : public Geometry {
     uint32_t signal_offset;
     uint32_t signal_stride;
     uint32_t index_offset;
+    uint32_t color_offset;
+    uint32_t color_stride;
   };
 
   GeometryMesh(Core *core, const Mesh<float> &mesh);

@@ -17,7 +17,8 @@ class Mesh {
        const Vector3<Scalar> *positions = nullptr,
        const Vector3<Scalar> *normals = nullptr,
        const Vector2<Scalar> *tex_coords = nullptr,
-       const Vector3<Scalar> *tangents = nullptr);
+       const Vector3<Scalar> *tangents = nullptr,
+       const Vector3<Scalar> *colors = nullptr);
 
   size_t NumVertices() const {
     return num_vertices_;
@@ -81,6 +82,9 @@ class Mesh {
     return tex_coords_.data();
   }
 
+  Vector3<Scalar> *Colors() { return colors_.empty() ? nullptr : colors_.data(); }
+  const Vector3<Scalar> *Colors() const { return colors_.empty() ? nullptr : colors_.data(); }
+
   const float *Signals() const {
     if (signals_.empty())
       return nullptr;
@@ -117,6 +121,7 @@ class Mesh {
   std::vector<Vector3<Scalar>> normals_;
   std::vector<Vector3<Scalar>> tangents_;
   std::vector<Vector2<Scalar>> tex_coords_;
+  std::vector<Vector3<Scalar>> colors_;
   std::vector<float> signals_;
   std::vector<uint32_t> indices_;
   size_t num_vertices_{0};

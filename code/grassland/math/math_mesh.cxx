@@ -10,6 +10,7 @@ int Mesh<Scalar>::MergeVertices() {
   std::vector<Vector3<Scalar>> new_normals;
   std::vector<Vector3<Scalar>> new_tangents;
   std::vector<Vector2<Scalar>> new_tex_coords;
+  std::vector<Vector3<Scalar>> new_colors;
   std::vector<float> new_signals;
   auto vector_comparator = [](const Vector3<Scalar> &a, const Vector3<Scalar> &b) {
     if (a[0] != b[0]) {
@@ -37,6 +38,9 @@ int Mesh<Scalar>::MergeVertices() {
     if (!signals_.empty() && signals_[a] != signals_[b]) {
       return signals_[a] < signals_[b];
     }
+    if (!colors_.empty() && colors_[a] != colors_[b]) {
+      return vector_comparator(colors_[a], colors_[b]);
+    }
     return false;
   };
   std::map<uint32_t, uint32_t, decltype(vertex_index_comparator)> vertex_map(vertex_index_comparator);
@@ -57,6 +61,9 @@ int Mesh<Scalar>::MergeVertices() {
       if (!signals_.empty()) {
         new_signals.push_back(signals_[i]);
       }
+      if (!colors_.empty()) {
+        new_colors.push_back(colors_[i]);
+      }
       vertex_map[i] = new_positions.size() - 1;
       index_map.push_back(new_positions.size() - 1);
     } else {
@@ -69,6 +76,7 @@ int Mesh<Scalar>::MergeVertices() {
   tangents_ = new_tangents;
   tex_coords_ = new_tex_coords;
   signals_ = new_signals;
+  colors_ = new_colors;
 
   for (size_t i = 0; i < num_indices_; i++) {
     indices_[i] = index_map[indices_[i]];
@@ -101,7 +109,8 @@ Mesh<Scalar>::Mesh(size_t num_vertices,
                    const Vector3<Scalar> *positions,
                    const Vector3<Scalar> *normals,
                    const Vector2<Scalar> *tex_coords,
-                   const Vector3<Scalar> *tangents) {
+                   const Vector3<Scalar> *tangents,
+                   const Vector3<Scalar> *colors) {
   num_vertices_ = num_vertices;
   num_indices_ = num_indices;
   indices_.resize(num_indices);
@@ -125,6 +134,10 @@ Mesh<Scalar>::Mesh(size_t num_vertices,
   if (tex_coords) {
     tex_coords_.resize(num_vertices);
     std::copy(tex_coords, tex_coords + num_vertices, tex_coords_.begin());
+  }
+  if (colors) {
+    colors_.resize(num_vertices);
+    std::copy(colors, colors + num_vertices, colors_.begin());
   }
 }
 
@@ -295,6 +308,7 @@ int Mesh<Scalar>::SplitVertices() {
   std::vector<Vector3<Scalar>> new_normals;
   std::vector<Vector3<Scalar>> new_tangents;
   std::vector<Vector2<Scalar>> new_tex_coords;
+  std::vector<Vector3<Scalar>> new_colors;
   std::vector<float> new_signals;
 
   for (size_t i = 0; i < num_indices_; i++) {
@@ -309,6 +323,9 @@ int Mesh<Scalar>::SplitVertices() {
     if (!tex_coords_.empty()) {
       new_tex_coords.push_back(tex_coords_[indices_[i]]);
     }
+    if (!colors_.empty()) {
+      new_colors.push_back(colors_[indices_[i]]);
+    }
     indices_[i] = i;
   }
 
@@ -317,6 +334,7 @@ int Mesh<Scalar>::SplitVertices() {
   tangents_ = new_tangents;
   tex_coords_ = new_tex_coords;
   signals_ = new_signals;
+  colors_ = new_colors;
   num_vertices_ = num_indices_;
 
   return 0;
@@ -352,6 +370,7 @@ int Mesh<Scalar>::GenerateNormals(Scalar merging_threshold) {
   std::vector<Vector3<Scalar>> new_positions = positions_;
   std::vector<Vector3<Scalar>> new_normals(num_vertices_);
   std::vector<Vector2<Scalar>> new_tex_coords = tex_coords_;
+  std::vector<Vector3<Scalar>> new_colors = colors_;
   std::vector<uint32_t> split_count(num_vertices_, 0);
   std::vector<uint32_t> new_indices;
 
@@ -389,6 +408,9 @@ int Mesh<Scalar>::GenerateNormals(Scalar merging_threshold) {
         if (!tex_coords_.empty()) {
           new_tex_coords.push_back(tex_coords_[vi]);
         }
+        if (!colors_.empty()) {
+          new_colors.push_back(colors_[vi]);
+        }
         new_indices.push_back(new_positions.size() - 1);
       }
       split_count[vi]++;
@@ -398,6 +420,7 @@ int Mesh<Scalar>::GenerateNormals(Scalar merging_threshold) {
   positions_ = new_positions;
   normals_ = new_normals;
   tex_coords_ = new_tex_coords;
+  colors_ = new_colors;
   indices_ = new_indices;
 
   tangents_.clear();
@@ -546,6 +569,7 @@ int Mesh<Scalar>::MakeCollisionMesh() {
   tex_coords_.clear();
   tangents_.clear();
   signals_.clear();
+  colors_.clear();
   return MergeVertices();
 }
 

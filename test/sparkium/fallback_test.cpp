@@ -208,12 +208,13 @@ INSTANTIATE_TEST_SUITE_P(TreeSizes, SoftwareBVHSizeTest, testing::Combine(testin
 class ComputeTraversalTest : public SoftwareBVHTest, public testing::WithParamInterface<bool> {};
 INSTANTIATE_TEST_SUITE_P(TraversalModes, ComputeTraversalTest, testing::Bool());
 
-TEST_P(ComputeTraversalTest, EmptySceneAccumulationAndReset) {
+TEST_P(ComputeTraversalTest, EmptySceneBackgroundAccumulationAndReset) {
   bool ray_query = GetParam();
   if (ray_query && !graphics->DeviceRayQuerySupport())
     GTEST_SKIP() << "native ray query unavailable";
   sparkium::Scene scene(core.get());
   scene.settings.samples_per_dispatch = 3;
+  scene.settings.background_color = glm::vec3(0.2f, 0.4f, 0.7f);
   sparkium::Camera camera(core.get(), glm::mat4(1), glm::radians(45.0f), 17.0f / 13.0f);
   sparkium::Film film(core.get(), 17, 13);
   auto check = [&](glm::vec3 expected) {
@@ -229,14 +230,15 @@ TEST_P(ComputeTraversalTest, EmptySceneAccumulationAndReset) {
     core->Render(&scene, &camera, &film,
                  ray_query ? sparkium::RENDER_PIPELINE_RAY_QUERY : sparkium::RENDER_PIPELINE_RT_FALLBACK);
     EXPECT_EQ(film.info.accumulated_samples, frame * 3);
-    check(glm::vec3(0.0f));
+    check(scene.settings.background_color);
   }
+  scene.settings.background_color = glm::vec3(0.1f, 0.3f, 0.9f);
   film.Reset();
   EXPECT_EQ(film.info.accumulated_samples, 0);
   core->Render(&scene, &camera, &film,
                ray_query ? sparkium::RENDER_PIPELINE_RAY_QUERY : sparkium::RENDER_PIPELINE_RT_FALLBACK);
   EXPECT_EQ(film.info.accumulated_samples, 3);
-  check(glm::vec3(0.0f));
+  check(scene.settings.background_color);
   if (ray_query && !graphics->DeviceRayTracingSupport()) {
     EXPECT_EQ(core->ResolveRenderPipeline(sparkium::RENDER_PIPELINE_AUTO), sparkium::RENDER_PIPELINE_RAY_QUERY);
     graphics::FrameProfile profile(graphics.get(), false);
@@ -246,7 +248,15 @@ TEST_P(ComputeTraversalTest, EmptySceneAccumulationAndReset) {
     EXPECT_EQ(profile.counters["native_ray_query"], 1u);
     // Auto must reuse the selected native pipeline and preserve its accumulation.
     EXPECT_EQ(film.info.accumulated_samples, 6);
-    check(glm::vec3(0.0f));
+    check(scene.settings.background_color);
+    // Legacy JSON requests must select the same native query pipeline as Auto.
+    EXPECT_EQ(core->ResolveRenderPipeline(sparkium::RENDER_PIPELINE_RAY_TRACING), sparkium::RENDER_PIPELINE_RAY_QUERY);
+    profile.Begin();
+    core->Render(&scene, &camera, &film, sparkium::RENDER_PIPELINE_RAY_TRACING);
+    profile.Finish();
+    EXPECT_EQ(profile.counters["native_ray_query"], 1u);
+    EXPECT_EQ(film.info.accumulated_samples, 9);
+    check(scene.settings.background_color);
   }
   if (graphics->DeviceRayQuerySupport()) {
     // Switching traversal implementations must discard accumulation in both directions.
@@ -254,7 +264,7 @@ TEST_P(ComputeTraversalTest, EmptySceneAccumulationAndReset) {
       core->Render(&scene, &camera, &film,
                    query ? sparkium::RENDER_PIPELINE_RAY_QUERY : sparkium::RENDER_PIPELINE_RT_FALLBACK);
       EXPECT_EQ(film.info.accumulated_samples, 3);
-      check(glm::vec3(0.0f));
+      check(scene.settings.background_color);
     }
   }
 }
@@ -354,6 +364,21 @@ TEST_F(SoftwareBVHTest, SharedShadersCompileForNativeRayTracingAndCompute) {
       compile("geometry/mesh/hit_group.hlsl", "RenderClosestHit", "lib_6_5");
       compile("geometry/mesh/hit_group.hlsl", "ShadowClosestHit", "lib_6_5");
     }
+    sparkium::CodeLines graph(vfs, "material/shader_graph/sampler.hlsl");
+    graph.InsertAfter(sparkium::CodeLines(R"(
+GraphSurface EvaluateShaderGraph(HitRecord hit, float3 direction, int bounce, uint ray_type,
+                                 bool shadow, ByteAddressBuffer material) {
+  GraphSurface surface = (GraphSurface)0;
+  surface.normal = hit.normal;
+  surface.opacity = 0.5f; surface.shadow_opacity = -1.0f;
+  surface.ior = 1.45f; surface.roughness = 0.5f;
+  return surface;
+}
+)"),
+                      "// SHADER_GRAPH_IMPLEMENTATION");
+    vfs.WriteFile("material_sampler.hlsli", graph);
+    for (auto entry : {"RenderClosestHit", "ShadowClosestHit", "ShadowAnyHit"})
+      compile("geometry/mesh/hit_group.hlsl", entry, "lib_6_5");
     for (auto entry : {"InitLeaves", "ReduceNodes", "MortonKeys", "BitonicSort", "SortLeaves"})
       compile("software/build.hlsl", entry, "cs_6_0");
   }
@@ -387,6 +412,7 @@ TEST_F(SoftwareBVHTest, HardwareImageParity) {
   scene.AddEntity(&entity);
   scene.settings.samples_per_dispatch = 16;
   scene.settings.max_bounces = 4;
+  scene.settings.background_color = glm::vec3(0.1f);
   sparkium::Camera camera(core.get(), glm::lookAt(glm::vec3(0, 0, 4), glm::vec3(0), glm::vec3(0, 1, 0)),
                           glm::radians(45.0f), 1.0f);
   sparkium::Film software(core.get(), 32, 32), hardware(core.get(), 32, 32);

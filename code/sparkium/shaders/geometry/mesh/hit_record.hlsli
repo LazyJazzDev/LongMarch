@@ -2,9 +2,14 @@
 #include "bindings.hlsli"
 #include "geometry/mesh/geometry_header.hlsli"
 
-HitRecord MakeMeshHitRecord(uint geometry_index, uint object_index, uint primitive_index,
-                            float2 barycentric, float distance, float3 ray_direction,
-                            float3x4 object_to_world, float4x3 world_to_object) {
+HitRecord MakeMeshHitRecord(uint geometry_index,
+                            uint object_index,
+                            uint primitive_index,
+                            float2 barycentric,
+                            float distance,
+                            float3 ray_direction,
+                            float3x4 object_to_world,
+                            float4x3 world_to_object) {
   HitRecord hit_record;
   BufferReference<ByteAddressBuffer> geometry_buffer =
       MakeBufferReference(data_buffers[NonUniformResourceIndex(geometry_index)], 0);
@@ -22,6 +27,8 @@ HitRecord MakeMeshHitRecord(uint geometry_index, uint object_index, uint primiti
   header.signal_offset = geometry_buffer.Load(40);
   header.signal_stride = geometry_buffer.Load(44);
   header.index_offset = geometry_buffer.Load(48);
+  header.color_offset = geometry_buffer.Load(52);
+  header.color_stride = geometry_buffer.Load(56);
 
   uint3 vid;
   vid = geometry_buffer.Load3(header.index_offset + primitive_index * 3 * 4);
@@ -30,15 +37,22 @@ HitRecord MakeMeshHitRecord(uint geometry_index, uint object_index, uint primiti
                    LoadFloat3(geometry_buffer, header.position_offset + header.position_stride * vid[1]),
                    LoadFloat3(geometry_buffer, header.position_offset + header.position_stride * vid[2])};
 
-  float3 barycentrics =
-      float3(1.0 - barycentric.x - barycentric.y, barycentric.x, barycentric.y);
+  float3 barycentrics = float3(1.0 - barycentric.x - barycentric.y, barycentric.x, barycentric.y);
 
   hit_record.t = distance;
   hit_record.front_facing = true;
   hit_record.position = pos[0] * barycentrics[0] + pos[1] * barycentrics[1] + pos[2] * barycentrics[2];
-  hit_record.position = mul(object_to_world, float4(hit_record.position, 1.0));
+  hit_record.object_position = hit_record.position;
+  hit_record.object_origin = mul(object_to_world, float4(0, 0, 0, 1));
+  float3 world_pos[3] = {mul(object_to_world, float4(pos[0], 1.0)).xyz, mul(object_to_world, float4(pos[1], 1.0)).xyz,
+                         mul(object_to_world, float4(pos[2], 1.0)).xyz};
+  hit_record.position =
+      world_pos[0] * barycentrics[0] + world_pos[1] * barycentrics[1] + world_pos[2] * barycentrics[2];
   hit_record.geom_normal = normalize(mul(world_to_object, cross(pos[1] - pos[0], pos[2] - pos[0])).xyz);
-  hit_record.pdf = 1.0f / (length(cross(pos[1] - pos[0], pos[2] - pos[0])) * 0.5f);
+  // Light-hit MIS is evaluated in world-space solid angle. Using the local
+  // triangle area here loses most of the BSDF-sampled contribution for scaled
+  // emitters (for example a unit quad scaled to a 30 x 30 area light).
+  hit_record.pdf = 1.0f / (length(cross(world_pos[1] - world_pos[0], world_pos[2] - world_pos[0])) * 0.5f);
 
   if (header.normal_offset != 0) {
     hit_record.normal =
@@ -57,6 +71,14 @@ HitRecord MakeMeshHitRecord(uint geometry_index, uint object_index, uint primiti
         LoadFloat2(geometry_buffer, header.tex_coord_offset + header.tex_coord_stride * vid[2]) * barycentrics[2];
   } else {
     hit_record.tex_coord = float2(0.0, 0.0);
+  }
+  if (header.color_offset != 0) {
+    hit_record.color =
+        LoadFloat3(geometry_buffer, header.color_offset + header.color_stride * vid[0]) * barycentrics[0] +
+        LoadFloat3(geometry_buffer, header.color_offset + header.color_stride * vid[1]) * barycentrics[1] +
+        LoadFloat3(geometry_buffer, header.color_offset + header.color_stride * vid[2]) * barycentrics[2];
+  } else {
+    hit_record.color = float3(1.0, 1.0, 1.0);
   }
 
   if (header.tangent_offset != 0) {
@@ -79,7 +101,9 @@ HitRecord MakeMeshHitRecord(uint geometry_index, uint object_index, uint primiti
         LoadFloat(geometry_buffer, header.signal_offset + header.signal_stride * vid[1]) * barycentrics[1] +
         LoadFloat(geometry_buffer, header.signal_offset + header.signal_stride * vid[2]) * barycentrics[2];
   } else {
-    hit_record.signal = 1.0;
+    // Zero marks the absence of a valid tangent frame. Tangent-space normal
+    // maps must then leave the interpolated surface normal unchanged.
+    hit_record.signal = 0.0;
   }
 
   if (dot(ray_direction, hit_record.normal) > 0.0) {

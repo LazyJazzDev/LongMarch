@@ -50,8 +50,15 @@ class SoftwarePipeline {
     BuildParameters parameters;
     uint32_t count;
   };
+  struct MaterialCode {
+    bool shader_graph;
+    std::string source;
+    bool operator==(const MaterialCode &other) const {
+      return shader_graph == other.shader_graph && source == other.source;
+    }
+  };
   void CompileBuilders(uint32_t buffer_count);
-  void CompileRenderer(const std::vector<std::string> &materials,
+  void CompileRenderer(const std::vector<MaterialCode> &materials,
                        uint32_t buffers,
                        uint32_t sdr_count,
                        uint32_t hdr_count);
@@ -63,7 +70,7 @@ class SoftwarePipeline {
   std::vector<Instance> instances_;
   std::vector<GeometryLayout> geometries_;
   uint32_t tlas_leaves_{};
-  std::vector<std::string> material_sources_;
+  std::vector<MaterialCode> material_sources_;
   uint32_t buffer_count_{}, sdr_count_{}, hdr_count_{};
   uint32_t builder_buffer_count_{};
   std::unique_ptr<graphics::Buffer> nodes_, keys_, instances_buffer_, parameters_buffer_;
