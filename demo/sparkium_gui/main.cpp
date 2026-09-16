@@ -171,8 +171,24 @@ int main(int argc, char **argv) {
         ImGui::Text("Pipeline: %s (%s)", PipelineName(pipeline), PipelineName(resolved_pipeline));
       else
         ImGui::Text("Pipeline: %s", PipelineName(pipeline));
-      if (!load_error.empty()) ImGui::TextColored({1, .3f, .3f, 1}, "%s", load_error.c_str());
-      ImGui::Text("%.1f FPS", fps_counter.TickFPS());
+      const float fps = fps_counter.TickFPS();
+      if (resolved_pipeline == sparkium::RENDER_PIPELINE_RASTERIZATION) {
+        ImGui::TextUnformatted("Ray/s: N/A");
+        ImGui::TextUnformatted("Accumulated spp: N/A");
+      } else {
+        const auto *film = loaded->GetFilm();
+        const double camera_rays_per_second = film->info.accumulated_samples > 0
+                                                  ? static_cast<double>(film->GetWidth()) * film->GetHeight() *
+                                                        loaded->GetScene()->settings.samples_per_dispatch * fps
+                                                  : 0.0;
+        ImGui::Text("Ray/s: %.2f M", camera_rays_per_second / 1e6);
+        if (ImGui::IsItemHovered())
+          ImGui::SetTooltip("Camera rays: width x height x samples per frame x FPS.");
+        ImGui::Text("Accumulated spp: %d", film->info.accumulated_samples);
+      }
+      if (!load_error.empty())
+        ImGui::TextColored({1, .3f, .3f, 1}, "%s", load_error.c_str());
+      ImGui::Text("%.1f FPS", fps);
       ImGui::End();
       window->EndImGuiFrame();
 
