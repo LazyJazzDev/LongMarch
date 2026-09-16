@@ -40,7 +40,8 @@ def main():
     parser.add_argument("--cli", type=Path, required=True)
     parser.add_argument("--backend", choices=("auto", "metal", "vulkan", "d3d12"), default="auto")
     parser.add_argument("--compare-backend", choices=("metal", "vulkan", "d3d12"))
-    parser.add_argument("--pipeline", choices=("rt_fallback", "rasterization"), default="rt_fallback")
+    parser.add_argument("--pipeline", choices=("rt_fallback", "ray_query", "rasterization"), default="rt_fallback")
+    parser.add_argument("--compare-pipeline", choices=("rt_fallback", "ray_query"))
     parser.add_argument("--output", type=Path, default=ROOT / "out/rt-fallback")
     parser.add_argument("--scenes", nargs="+", default=list(DEMOS), help="names under assets/scenes")
     parser.add_argument("--size", type=int, default=96)
@@ -52,9 +53,13 @@ def main():
     args = parser.parse_args()
     if min(args.size, args.spp, args.bounces) <= 0:
         parser.error("size, spp and bounces must be positive")
-    if args.compare_hardware and (args.compare_backend or args.pipeline != "rt_fallback"):
+    if args.compare_hardware and (args.compare_backend or args.compare_pipeline or args.pipeline != "rt_fallback"):
         parser.error("--compare-hardware requires rt_fallback without --compare-backend")
-    if args.max_rmse is not None and not (args.compare_hardware or args.compare_backend):
+    if args.compare_backend and args.compare_pipeline:
+        parser.error("choose either --compare-backend or --compare-pipeline")
+    if args.compare_pipeline == args.pipeline:
+        parser.error("comparison pipelines must differ")
+    if args.max_rmse is not None and not (args.compare_hardware or args.compare_backend or args.compare_pipeline):
         parser.error("--max-rmse requires a comparison")
     args.output = args.output.resolve()
     args.output.mkdir(parents=True, exist_ok=True)
@@ -73,6 +78,8 @@ def main():
             runs.append(("ray_tracing", args.backend))
         if args.compare_backend:
             runs.append((args.pipeline, args.compare_backend))
+        if args.compare_pipeline:
+            runs.append((args.compare_pipeline, args.backend))
         images = []
         for pipeline, backend in runs:
             label = f"{pipeline}-{backend}" if args.compare_backend else pipeline

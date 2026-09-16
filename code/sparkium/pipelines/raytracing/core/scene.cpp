@@ -34,7 +34,15 @@ Scene::Scene(sparkium::Scene &scene) : scene_(scene), settings(scene.settings) {
   core_->GraphicsCore()->CreateSampler({graphics::FILTER_MODE_NEAREST}, &nearest_sampler_);
 }
 
-void Scene::Render(Camera *camera, Film *film, bool software) {
+void Scene::Render(Camera *camera, Film *film, bool software, bool ray_query) {
+  software = software || ray_query;
+  if (ray_query != ray_query_) {
+    ray_query_ = ray_query;
+    software_pipeline_.reset();
+    pipeline_dirty_ = true;
+    if (rendered_)
+      film->Reset();
+  }
   if (software != software_tracing_) {
     software_tracing_ = software;
     pipeline_dirty_ = true;
@@ -42,7 +50,7 @@ void Scene::Render(Camera *camera, Film *film, bool software) {
       film->Reset();
   }
   if (software && !software_pipeline_)
-    software_pipeline_ = std::make_unique<SoftwarePipeline>(core_);
+    software_pipeline_ = std::make_unique<SoftwarePipeline>(core_, ray_query_);
   graphics::CpuProfileScope update_profile("scene_update");
   UpdatePipeline(camera);
   update_profile.End();
@@ -62,7 +70,10 @@ void Scene::Render(Camera *camera, Film *film, bool software) {
   cmd_context->CmdBindResources(0, {film->accumulated_color_.get()}, bind_point);
   cmd_context->CmdBindResources(1, {film->accumulated_samples_.get()}, bind_point);
   if (software) {
-    cmd_context->CmdBindResources(2, {software_pipeline_->Nodes()}, bind_point);
+    if (ray_query_)
+      cmd_context->CmdBindResources(2, software_pipeline_->AccelerationStructure(), bind_point);
+    else
+      cmd_context->CmdBindResources(2, {software_pipeline_->Nodes()}, bind_point);
   } else
     cmd_context->CmdBindResources(2, tlas_.get(), bind_point);
   cmd_context->CmdBindResources(3, {scene_settings_buffer_.get()}, bind_point);

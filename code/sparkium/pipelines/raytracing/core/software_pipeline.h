@@ -3,10 +3,11 @@
 
 namespace sparkium::raytracing {
 
-// Compute-only traversal backend. Geometry/light/material registration is shared with DXR/Vulkan RT.
+// Shared compute path tracer: software BVH by default, or native inline ray queries.
+// Geometry/light/material registration is shared with DXR/Vulkan pipeline RT.
 class SoftwarePipeline {
  public:
-  explicit SoftwarePipeline(Core *core);
+  explicit SoftwarePipeline(Core *core, bool ray_query = false);
   void ClearInstances();
   void AddInstance(Geometry *geometry, Material *material, const glm::mat4x3 &transform, uint32_t geometry_index);
   void Update(graphics::CommandContext *commands,
@@ -15,6 +16,9 @@ class SoftwarePipeline {
               uint32_t hdr_count);
   graphics::ComputeProgram *Program() const {
     return render_program_.get();
+  }
+  graphics::AccelerationStructure *AccelerationStructure() const {
+    return native_tlas_.get();
   }
   graphics::Buffer *Nodes() const {
     return nodes_.get();
@@ -54,6 +58,8 @@ class SoftwarePipeline {
   void AppendBuild(std::vector<BuildPass> &passes, BuildParameters parameters);
 
   Core *core_;
+  bool ray_query_;
+  std::unique_ptr<graphics::AccelerationStructure> native_tlas_;
   std::vector<Instance> instances_;
   std::vector<GeometryLayout> geometries_;
   uint32_t tlas_leaves_{};

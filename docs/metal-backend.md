@@ -16,16 +16,19 @@ before writing, then copy directly into unified memory without a staging command
 submission per upload. Texture transfers use private textures and staging blits.
 
 `auto`, `ray_tracing`, and `rt_fallback` use Sparkium's compute BVH construction
-and traversal on Metal. Native Metal acceleration structures / intersection
-functions are not implemented in this backend; `--require-hardware-rt` rejects
-Metal even on chips with hardware ray tracing. Geometry shaders and HDR window
+and traversal on Metal. The experimental `ray_query` pipeline uses native Metal
+triangle acceleration structures and inline queries; see [Metal ray query](metal-ray-query.md)
+for implementation, validation, and performance results. Pipeline RT/SBT and custom
+intersection functions remain unsupported. `--require-hardware-rt` checks pipeline RT
+and still rejects Metal, including devices with hardware ray tracing; omit it for
+`ray_query`. Geometry shaders and HDR window
 presentation are not supported. Offscreen floating-point film buffers are supported.
 
 ## Source layout
 
 `code/grassland/graphics/backend/metal` follows the other graphics backends:
 `metal_backend.h` is the entry header; `metal_core`, `metal_buffer`, `metal_image`,
-`metal_sampler`, `metal_shader`, `metal_program`, `metal_command_context`,
+`metal_sampler`, `metal_shader`, `metal_program`, `metal_acceleration_structure`, `metal_command_context`,
 `metal_window`, and `metal_util` have separate headers and implementation files.
 Window integration uses `.mm`; the other implementations use `.cpp`.
 SPIRV-Cross translation lives in `metal_shader.cpp`, and the metal-cpp private

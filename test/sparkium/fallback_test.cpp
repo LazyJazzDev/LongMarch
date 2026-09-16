@@ -4,6 +4,7 @@
 #include <glm/gtc/matrix_transform.hpp>
 #include <numeric>
 #include <random>
+#include <tuple>
 
 #include "sparkium/pipelines/raytracing/core/core.h"
 #include "sparkium/pipelines/raytracing/core/software_pipeline.h"
@@ -65,22 +66,25 @@ Hit Oracle(const Ray &ray, const std::vector<Vector3<float>> &positions, const s
   return hit;
 }
 
-class SoftwareBVHSizeTest : public SoftwareBVHTest, public testing::WithParamInterface<int> {};
+class SoftwareBVHSizeTest : public SoftwareBVHTest, public testing::WithParamInterface<std::tuple<int, bool>> {};
 
 TEST_P(SoftwareBVHSizeTest, ComputeConstructionAndTraversalMatchDoublePrecisionOracle) {
+  auto [triangle_count, ray_query] = GetParam();
+  if (ray_query && !graphics->DeviceRayQuerySupport())
+    GTEST_SKIP() << "native ray query unavailable";
   // Five triangles: a non-power-of-two tree, duplicate centroids and a degenerate leaf.
   std::vector<Vector3<float>> positions{{-1, -1, 0}, {1, -1, 0},  {0, 1, 0},  {-1, -1, -1}, {1, -1, -1},
                                         {0, 1, -1},  {-2, -1, 0}, {-2, 1, 0}, {-2, 0, 2},   {-1, -1, 0},
                                         {0, 1, 0},   {1, -1, 0},  {0, 0, 0},  {0, 0, 0},    {0, 0, 0}};
   std::mt19937 geometry_random(951);
   std::uniform_real_distribution<float> coordinate(-3.0f, 3.0f);
-  while (positions.size() < GetParam() * 3) {
+  while (positions.size() < triangle_count * 3) {
     Vector3<float> center(coordinate(geometry_random), coordinate(geometry_random), coordinate(geometry_random));
     positions.push_back(center + Vector3<float>(-0.3f, -0.2f, 0));
     positions.push_back(center + Vector3<float>(0.3f, -0.2f, 0.1f));
     positions.push_back(center + Vector3<float>(0, 0.3f, -0.1f));
   }
-  positions.resize(GetParam() * 3);
+  positions.resize(triangle_count * 3);
   std::vector<uint32_t> indices(positions.size());
   std::iota(indices.begin(), indices.end(), 0);
   Mesh<> mesh(positions.size(), indices.size(), indices.data(), positions.data());
@@ -88,14 +92,15 @@ TEST_P(SoftwareBVHSizeTest, ComputeConstructionAndTraversalMatchDoublePrecisionO
   sparkium::MaterialLambertian material(core.get());
   sparkium::raytracing::GeometryMesh rt_geometry(geometry);
   sparkium::raytracing::MaterialLambertian rt_material(material);
-  sparkium::raytracing::SoftwarePipeline pipeline(sparkium::raytracing::DedicatedCast(core.get()));
+  sparkium::raytracing::SoftwarePipeline pipeline(sparkium::raytracing::DedicatedCast(core.get()), ray_query);
   std::vector<graphics::Buffer *> buffers{rt_geometry.Buffer()};
 
   std::mt19937 random(7411);
   std::uniform_real_distribution<float> position(-5.0f, 5.0f);
-  std::vector<Ray> rays{{{0, 0, 4}, 0, {0, 0, -1}, 100}, {{0, 0, 4}, 0, {0, 0, 1}, 100},
-                        {{0, 0, 0}, 0, {0, 0, -1}, 100}, {{0, 0, 4}, 0, {0, 0, -1}, 1},
-                        {{10, 0, 0}, 0, {0, 1, 0}, 100}, {{0, 0, 4}, 4.1f, {0, 0, -1}, 100}};
+  // Match renderer self-intersection exclusion; exact t=0 acceptance differs across traversal APIs.
+  std::vector<Ray> rays{{{0, 0, 4}, 0, {0, 0, -1}, 100},      {{0, 0, 4}, 0, {0, 0, 1}, 100},
+                        {{0, 0, 0}, 0.001f, {0, 0, -1}, 100}, {{0, 0, 4}, 0, {0, 0, -1}, 1},
+                        {{10, 0, 0}, 0, {0, 1, 0}, 100},      {{0, 0, 4}, 4.1f, {0, 0, -1}, 100}};
   for (int i = 0; i < 1024; ++i) {
     glm::vec3 origin(position(random), position(random), 4.0f);
     glm::vec3 target(position(random), position(random), -1.0f);
@@ -111,12 +116,20 @@ TEST_P(SoftwareBVHSizeTest, ComputeConstructionAndTraversalMatchDoublePrecisionO
   auto vfs = core->GetShadersVFS();
   vfs.WriteFile("bvh_test.hlsl", R"(
 #define SOFTWARE_EXTERNAL_BINDINGS
+#ifdef NATIVE_QUERY
+RaytracingAccelerationStructure query_scene : register(t0, space0);
+#else
 ByteAddressBuffer software_nodes : register(t0, space0);
+#endif
 ByteAddressBuffer software_instances : register(t0, space1);
 ByteAddressBuffer data_buffers[] : register(t0, space2);
 ByteAddressBuffer rays : register(t0, space3);
 RWByteAddressBuffer results : register(u0, space4);
+#ifdef NATIVE_QUERY
+#include "ray_query/traversal.hlsli"
+#else
 #include "software/traversal.hlsli"
+#endif
 [numthreads(64, 1, 1)] void Main(uint3 id : SV_DispatchThreadID) {
   if (id.x >= rays.Load(0)) return;
   uint offset = 16 + id.x * 32;
@@ -130,11 +143,16 @@ RWByteAddressBuffer results : register(u0, space4);
 }
 )");
   std::unique_ptr<graphics::Shader> shader;
-  ASSERT_EQ(graphics->CreateShader(vfs, "bvh_test.hlsl", "Main", "cs_6_0", {"-I."}, &shader), 0);
+  std::vector<std::string> args{"-I."};
+  if (ray_query)
+    args.push_back("-DNATIVE_QUERY");
+  ASSERT_EQ(graphics->CreateShader(vfs, "bvh_test.hlsl", "Main", ray_query ? "cs_6_5" : "cs_6_0", args, &shader), 0);
   std::unique_ptr<graphics::ComputeProgram> program;
   graphics->CreateComputeProgram(shader.get(), &program);
   for (int i = 0; i < 4; ++i)
-    program->AddResourceBinding(graphics::RESOURCE_TYPE_STORAGE_BUFFER, 1);
+    program->AddResourceBinding(
+        ray_query && i == 0 ? graphics::RESOURCE_TYPE_ACCELERATION_STRUCTURE : graphics::RESOURCE_TYPE_STORAGE_BUFFER,
+        1);
   program->AddResourceBinding(graphics::RESOURCE_TYPE_WRITABLE_STORAGE_BUFFER, 1);
   program->Finalize();
 
@@ -156,7 +174,10 @@ RWByteAddressBuffer results : register(u0, space4);
     graphics->CreateCommandContext(&commands);
     pipeline.Update(commands.get(), buffers, 1, 1);
     commands->CmdBindComputeProgram(program.get());
-    commands->CmdBindResources(0, {pipeline.Nodes()}, graphics::BIND_POINT_COMPUTE);
+    if (ray_query)
+      commands->CmdBindResources(0, pipeline.AccelerationStructure(), graphics::BIND_POINT_COMPUTE);
+    else
+      commands->CmdBindResources(0, {pipeline.Nodes()}, graphics::BIND_POINT_COMPUTE);
     commands->CmdBindResources(1, {pipeline.Instances()}, graphics::BIND_POINT_COMPUTE);
     commands->CmdBindResources(2, buffers, graphics::BIND_POINT_COMPUTE);
     commands->CmdBindResources(3, {ray_buffer.get()}, graphics::BIND_POINT_COMPUTE);
@@ -182,9 +203,14 @@ RWByteAddressBuffer results : register(u0, space4);
   }
 }
 
-INSTANTIATE_TEST_SUITE_P(TreeSizes, SoftwareBVHSizeTest, testing::Values(1, 5, 257));
+INSTANTIATE_TEST_SUITE_P(TreeSizes, SoftwareBVHSizeTest, testing::Combine(testing::Values(1, 5, 257), testing::Bool()));
+class ComputeTraversalTest : public SoftwareBVHTest, public testing::WithParamInterface<bool> {};
+INSTANTIATE_TEST_SUITE_P(TraversalModes, ComputeTraversalTest, testing::Bool());
 
-TEST_F(SoftwareBVHTest, EmptySceneAccumulationAndReset) {
+TEST_P(ComputeTraversalTest, EmptySceneAccumulationAndReset) {
+  bool ray_query = GetParam();
+  if (ray_query && !graphics->DeviceRayQuerySupport())
+    GTEST_SKIP() << "native ray query unavailable";
   sparkium::Scene scene(core.get());
   scene.settings.samples_per_dispatch = 3;
   sparkium::Camera camera(core.get(), glm::mat4(1), glm::radians(45.0f), 17.0f / 13.0f);
@@ -199,18 +225,32 @@ TEST_F(SoftwareBVHTest, EmptySceneAccumulationAndReset) {
       }
   };
   for (int frame = 1; frame <= 2; ++frame) {
-    core->Render(&scene, &camera, &film, sparkium::RENDER_PIPELINE_RT_FALLBACK);
+    core->Render(&scene, &camera, &film,
+                 ray_query ? sparkium::RENDER_PIPELINE_RAY_QUERY : sparkium::RENDER_PIPELINE_RT_FALLBACK);
     EXPECT_EQ(film.info.accumulated_samples, frame * 3);
     check(glm::vec3(0.0f));
   }
   film.Reset();
   EXPECT_EQ(film.info.accumulated_samples, 0);
-  core->Render(&scene, &camera, &film, sparkium::RENDER_PIPELINE_RT_FALLBACK);
+  core->Render(&scene, &camera, &film,
+               ray_query ? sparkium::RENDER_PIPELINE_RAY_QUERY : sparkium::RENDER_PIPELINE_RT_FALLBACK);
   EXPECT_EQ(film.info.accumulated_samples, 3);
   check(glm::vec3(0.0f));
+  if (graphics->DeviceRayQuerySupport()) {
+    // Switching traversal implementations must discard accumulation in both directions.
+    for (bool query : {!ray_query, ray_query}) {
+      core->Render(&scene, &camera, &film,
+                   query ? sparkium::RENDER_PIPELINE_RAY_QUERY : sparkium::RENDER_PIPELINE_RT_FALLBACK);
+      EXPECT_EQ(film.info.accumulated_samples, 3);
+      check(glm::vec3(0.0f));
+    }
+  }
 }
 
-TEST_F(SoftwareBVHTest, TransparentShadowLayers) {
+TEST_P(ComputeTraversalTest, TransparentShadowLayers) {
+  bool ray_query = GetParam();
+  if (ray_query && !graphics->DeviceRayQuerySupport())
+    GTEST_SKIP() << "native ray query unavailable";
   std::vector<Vector3<float>> positions{{-2, -2, 0}, {2, -2, 0}, {0, 2, 0}, {-2, -2, -1}, {2, -2, -1}, {0, 2, -1}};
   uint32_t indices[]{0, 1, 2, 3, 4, 5};
   Mesh<> mesh(6, 6, indices, positions.data());
@@ -218,17 +258,25 @@ TEST_F(SoftwareBVHTest, TransparentShadowLayers) {
   sparkium::MaterialLambertian material(core.get());
   sparkium::raytracing::GeometryMesh rt_geometry(geometry);
   sparkium::raytracing::MaterialLambertian rt_material(material);
-  sparkium::raytracing::SoftwarePipeline pipeline(sparkium::raytracing::DedicatedCast(core.get()));
+  sparkium::raytracing::SoftwarePipeline pipeline(sparkium::raytracing::DedicatedCast(core.get()), ray_query);
   pipeline.AddInstance(&rt_geometry, &rt_material, glm::mat4x3(1), 0);
   auto vfs = core->GetShadersVFS();
   vfs.WriteFile("shadow_test.hlsl", R"(
 #define SOFTWARE_EXTERNAL_BINDINGS
 #include "common.hlsli"
+#ifdef NATIVE_QUERY
+RaytracingAccelerationStructure query_scene : register(t0, space0);
+#else
 ByteAddressBuffer software_nodes : register(t0, space0);
+#endif
 ByteAddressBuffer software_instances : register(t0, space1);
 ByteAddressBuffer data_buffers[] : register(t0, space2);
 RWByteAddressBuffer results : register(u0, space3);
+#ifdef NATIVE_QUERY
+#include "ray_query/traversal.hlsli"
+#else
 #include "software/traversal.hlsli"
+#endif
 HitRecord SoftwareHitRecord(SoftwareHit hit, float3 direction) { return (HitRecord)0; }
 float SoftwareShadowTransmission(uint material, HitRecord hit, float3 direction) { return 0.5f; }
 #include "software/shadow.hlsli"
@@ -239,11 +287,16 @@ float SoftwareShadowTransmission(uint material, HitRecord hit, float3 direction)
 }
 )");
   std::unique_ptr<graphics::Shader> shader;
-  ASSERT_EQ(graphics->CreateShader(vfs, "shadow_test.hlsl", "Main", "cs_6_0", {"-I."}, &shader), 0);
+  std::vector<std::string> args{"-I."};
+  if (ray_query)
+    args.push_back("-DNATIVE_QUERY");
+  ASSERT_EQ(graphics->CreateShader(vfs, "shadow_test.hlsl", "Main", ray_query ? "cs_6_5" : "cs_6_0", args, &shader), 0);
   std::unique_ptr<graphics::ComputeProgram> program;
   graphics->CreateComputeProgram(shader.get(), &program);
   for (int i = 0; i < 3; ++i)
-    program->AddResourceBinding(graphics::RESOURCE_TYPE_STORAGE_BUFFER, 1);
+    program->AddResourceBinding(
+        ray_query && i == 0 ? graphics::RESOURCE_TYPE_ACCELERATION_STRUCTURE : graphics::RESOURCE_TYPE_STORAGE_BUFFER,
+        1);
   program->AddResourceBinding(graphics::RESOURCE_TYPE_WRITABLE_STORAGE_BUFFER, 1);
   program->Finalize();
   std::unique_ptr<graphics::Buffer> output;
@@ -252,7 +305,10 @@ float SoftwareShadowTransmission(uint material, HitRecord hit, float3 direction)
   graphics->CreateCommandContext(&commands);
   pipeline.Update(commands.get(), {rt_geometry.Buffer()}, 1, 1);
   commands->CmdBindComputeProgram(program.get());
-  commands->CmdBindResources(0, {pipeline.Nodes()}, graphics::BIND_POINT_COMPUTE);
+  if (ray_query)
+    commands->CmdBindResources(0, pipeline.AccelerationStructure(), graphics::BIND_POINT_COMPUTE);
+  else
+    commands->CmdBindResources(0, {pipeline.Nodes()}, graphics::BIND_POINT_COMPUTE);
   commands->CmdBindResources(1, {pipeline.Instances()}, graphics::BIND_POINT_COMPUTE);
   commands->CmdBindResources(2, {rt_geometry.Buffer()}, graphics::BIND_POINT_COMPUTE);
   commands->CmdBindResources(3, {output.get()}, graphics::BIND_POINT_COMPUTE);

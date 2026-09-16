@@ -38,6 +38,11 @@ void Core::Render(Scene *scene, Camera *camera, Film *film, RenderPipeline rende
       }
       raytracing::Render(this, scene, camera, film);
       break;
+    case RENDER_PIPELINE_RAY_QUERY:
+      if (!core_->DeviceRayQuerySupport())
+        throw std::runtime_error("ray_query is unavailable on the selected graphics backend");
+      raytracing::Render(this, scene, camera, film, true, true);
+      break;
     case RENDER_PIPELINE_RT_FALLBACK:
       raytracing::Render(this, scene, camera, film, true);
       break;

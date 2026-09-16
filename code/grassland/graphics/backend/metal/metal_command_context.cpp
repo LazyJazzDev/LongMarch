@@ -2,6 +2,7 @@
 
 #include <stdexcept>
 
+#include "grassland/graphics/backend/metal/metal_acceleration_structure.h"
 #include "grassland/graphics/backend/metal/metal_buffer.h"
 #include "grassland/graphics/backend/metal/metal_core.h"
 #include "grassland/graphics/backend/metal/metal_image.h"
@@ -52,8 +53,13 @@ void MetalCommandContext::CmdBindComputeProgram(ComputeProgram *program) {
 void MetalCommandContext::CmdBindRayTracingProgram(RayTracingProgram *) {
   CheckPoint(BIND_POINT_RAYTRACING);
 }
-void MetalCommandContext::CmdBindResources(int, AccelerationStructure *, BindPoint) {
-  CheckPoint(BIND_POINT_RAYTRACING);
+void MetalCommandContext::CmdBindResources(int slot, AccelerationStructure *structure, BindPoint point) {
+  if (point != BIND_POINT_COMPUTE)
+    throw std::invalid_argument("Metal acceleration structures currently support compute bindings only");
+  auto native = dynamic_cast<MetalAccelerationStructure *>(structure);
+  if (!native)
+    throw std::invalid_argument("expected Metal acceleration structure");
+  resources_[point][slot] = {{}, {}, {}, structure};
 }
 void MetalCommandContext::CmdDispatchRays(uint32_t, uint32_t, uint32_t) {
   CheckPoint(BIND_POINT_RAYTRACING);
@@ -94,9 +100,23 @@ void MetalCommandContext::BindStage(MetalStage &stage,
       else
         render_->useResource(resource, usage, vertex ? MTL::RenderStageVertex : MTL::RenderStageFragment);
     };
-    size_t count = resources.buffers.size() + resources.images.size() + resources.samplers.size();
+    size_t count = resources.buffers.size() + resources.images.size() + resources.samplers.size() +
+                   (resources.acceleration_structure ? 1 : 0);
     if (count != binding.count)
       throw std::runtime_error("Metal resource count mismatch at set " + std::to_string(slot));
+    if (resources.acceleration_structure) {
+      if (binding.type != RESOURCE_TYPE_ACCELERATION_STRUCTURE)
+        throw std::invalid_argument("Metal AS bound to a non-AS resource slot");
+      auto structure = dynamic_cast<MetalAccelerationStructure *>(resources.acceleration_structure);
+      encoder->setAccelerationStructure(structure->Handle(), 0);
+      use(structure->Handle());
+      for (const auto &child : structure->Children())
+        use(child.get());
+      // Capture the exact AS generation and dependencies until this submission completes.
+      PushPostExecutionCallback([storage = NS::RetainPtr(structure->Handle()), children = structure->Children()] {});
+    } else if (binding.type == RESOURCE_TYPE_ACCELERATION_STRUCTURE) {
+      throw std::invalid_argument("Metal AS slot requires an acceleration structure");
+    }
     for (size_t i = 0; i < resources.buffers.size(); ++i) {
       auto &range = resources.buffers[i];
       auto buffer = dynamic_cast<MetalBuffer *>(range.buffer);

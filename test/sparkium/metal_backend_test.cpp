@@ -4,6 +4,8 @@
 #include <cstring>
 #include <numeric>
 
+#include "grassland/graphics/frame_profile.h"
+
 #if defined(LONGMARCH_METAL_ENABLED)
 using namespace grassland;
 namespace {
@@ -15,6 +17,81 @@ class MetalBackendTest : public testing::Test {
   }
   std::unique_ptr<graphics::Core> core;
 };
+TEST_F(MetalBackendTest, RayQueryMasksIDsUpdatesAndBindingSnapshots) {
+  if (!core->DeviceRayQuerySupport())
+    GTEST_SKIP() << "native ray query unavailable";
+  EXPECT_FALSE(core->DeviceRayTracingSupport());  // Query support must not enable pipeline RT.
+  const float vertices[]{-1, -1, 0, 1, -1, 0, 0, 1, 0};
+  const uint32_t indices[]{0, 1, 2};
+  std::unique_ptr<graphics::Buffer> vertex, index, before, after;
+  core->CreateBuffer(sizeof(vertices), graphics::BUFFER_TYPE_STATIC, &vertex);
+  core->CreateBuffer(sizeof(indices), graphics::BUFFER_TYPE_STATIC, &index);
+  vertex->UploadData(vertices, sizeof(vertices));
+  index->UploadData(indices, sizeof(indices));
+  core->CreateBuffer(32, graphics::BUFFER_TYPE_STATIC, &before);
+  core->CreateBuffer(32, graphics::BUFFER_TYPE_STATIC, &after);
+  std::unique_ptr<graphics::AccelerationStructure> blas, tlas;
+  ASSERT_EQ(core->CreateBottomLevelAccelerationStructure(vertex.get(), index.get(), 12, &blas), 0);
+  std::vector<graphics::RayTracingInstance> instances{blas->MakeInstance(glm::mat4x3(1), 42, 1)};
+  ASSERT_EQ(core->CreateTopLevelAccelerationStructure(instances, &tlas), 0);
+  {
+    graphics::FrameProfile profile(core.get(), false);
+    profile.Begin();
+    ASSERT_EQ(tlas->UpdateInstances(instances), 0);
+    profile.Finish();
+    EXPECT_EQ(profile.counters["native_tlas_builds"], 0u);
+  }
+  std::unique_ptr<graphics::Shader> shader;
+  ASSERT_EQ(core->CreateShader(R"(
+RaytracingAccelerationStructure scene : register(t0, space0);
+RWStructuredBuffer<float4> output : register(u0, space1);
+[numthreads(1,1,1)] void Main(uint3 id : SV_DispatchThreadID) {
+  RayDesc ray; ray.Origin=float3(0,0,1); ray.Direction=float3(0,0,-1); ray.TMin=0.001; ray.TMax=100;
+  RayQuery<RAY_FLAG_FORCE_OPAQUE | RAY_FLAG_CULL_BACK_FACING_TRIANGLES> query;
+  query.TraceRayInline(scene, 0, 1u << id.x, ray);
+  while (query.Proceed()) {}
+  output[id.x] = query.CommittedStatus() == COMMITTED_TRIANGLE_HIT
+    ? float4(query.CommittedRayT(), query.CommittedInstanceID(), query.CommittedPrimitiveIndex(), query.CommittedTriangleFrontFace())
+    : float4(-1,0,0,0);
+})",
+                               "Main", "cs_6_5", &shader),
+            0);
+  std::unique_ptr<graphics::ComputeProgram> program;
+  core->CreateComputeProgram(shader.get(), &program);
+  program->AddResourceBinding(graphics::RESOURCE_TYPE_ACCELERATION_STRUCTURE, 1);
+  program->AddResourceBinding(graphics::RESOURCE_TYPE_WRITABLE_STORAGE_BUFFER, 1);
+  program->Finalize();
+  std::unique_ptr<graphics::CommandContext> commands;
+  core->CreateCommandContext(&commands);
+  commands->CmdBindComputeProgram(program.get());
+  commands->CmdBindResources(0, tlas.get(), graphics::BIND_POINT_COMPUTE);
+  commands->CmdBindResources(1, {before.get()}, graphics::BIND_POINT_COMPUTE);
+  commands->CmdDispatch(2, 1, 1);
+  // Change AS storage after encoding, before submission. Both generations must survive.
+  instances[0].transform[2][3] = -1;
+  instances[0].instance_id = 17;
+  instances[0].instance_mask = 2;
+  ASSERT_EQ(tlas->UpdateInstances(instances), 0);
+  commands->CmdBindResources(1, {after.get()}, graphics::BIND_POINT_COMPUTE);
+  commands->CmdDispatch(2, 1, 1);
+  tlas.reset();
+  blas.reset();
+  ASSERT_EQ(core->SubmitCommandContext(commands.get()), 0);
+  commands.reset();
+  float original[8], updated[8];
+  before->DownloadData(original, sizeof(original));
+  after->DownloadData(updated, sizeof(updated));
+  EXPECT_FLOAT_EQ(original[0], 1);
+  EXPECT_FLOAT_EQ(original[1], 42);
+  EXPECT_FLOAT_EQ(original[2], 0);
+  EXPECT_FLOAT_EQ(original[3], 1);
+  EXPECT_FLOAT_EQ(original[4], -1);
+  EXPECT_FLOAT_EQ(updated[0], -1);
+  EXPECT_FLOAT_EQ(updated[4], 2);
+  EXPECT_FLOAT_EQ(updated[5], 17);
+  EXPECT_FLOAT_EQ(updated[7], 1);
+}
+
 TEST_F(MetalBackendTest, LargeArgumentArraysAndBindingSnapshots) {
   constexpr int count = 80;  // Deliberately exceeds the 31 direct Metal buffer slots.
   std::vector<std::unique_ptr<graphics::Buffer>> inputs(count);

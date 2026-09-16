@@ -14,6 +14,10 @@ class MetalCore : public Core {
     return BACKEND_API_METAL;
   }
 
+  bool DeviceRayQuerySupport() const override {
+    return device_ && device_->supportsRaytracing();
+  }
+
   int CreateBuffer(size_t size, BufferType type, double_ptr<Buffer> pp_buffer) override;
 
   int CreateImage(int width, int height, ImageFormat format, double_ptr<Image> pp_image) override;
