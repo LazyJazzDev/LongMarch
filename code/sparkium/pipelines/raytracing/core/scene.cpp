@@ -221,11 +221,16 @@ void Scene::UpdatePipeline(Camera *camera) {
     status.keep = false;
   }
 
-  for (auto [entity, status] : scene_.GetEntities()) {
+  std::vector<std::pair<sparkium::Entity *, sparkium::Scene::EntityStatus>> source_entities(
+      scene_.GetEntities().begin(), scene_.GetEntities().end());
+  std::sort(source_entities.begin(), source_entities.end(),
+            [](const auto &a, const auto &b) { return a.second.order < b.second.order; });
+  for (auto [entity, status] : source_entities) {
     auto rt_entity = DedicatedCast(entity);
     if (rt_entity) {
       entities_[rt_entity].keep = true;
       entities_[rt_entity].active = status.active;
+      entities_[rt_entity].order = status.order;
     }
   }
 
@@ -273,7 +278,10 @@ void Scene::UpdatePipeline(Camera *camera) {
   }
 
   graphics::GpuProfileScope geometry_light_profile(preprocess_cmd_context_.get(), "light_geometry");
-  for (auto [entity, status] : entities_) {
+  std::vector<std::pair<Entity *, EntityStatus>> ordered_entities(entities_.begin(), entities_.end());
+  std::sort(ordered_entities.begin(), ordered_entities.end(),
+            [](const auto &a, const auto &b) { return a.second.order < b.second.order; });
+  for (auto [entity, status] : ordered_entities) {
     if (status.active) {
       entity->Update(this);
     }

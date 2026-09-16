@@ -130,6 +130,21 @@ int VirtualFileSystem::ReadFile(const std::string &file_name, std::vector<uint8_
   return 0;
 }
 
+std::vector<std::string> VirtualFileSystem::ListFiles() const {
+  std::vector<std::string> files;
+  std::function<void(const std::string &, const VirtualFileSystemDirectory *)> visit;
+  visit = [&](const std::string &path, const VirtualFileSystemDirectory *dir) {
+    for (const auto &[name, entry] : dir->subentries_) {
+      if (auto subdir = dynamic_cast<const VirtualFileSystemDirectory *>(entry.get()))
+        visit(path + name + "/", subdir);
+      else
+        files.push_back(path + name);
+    }
+  };
+  visit("", static_cast<const VirtualFileSystemDirectory *>(root_.get()));
+  return files;
+}
+
 void VirtualFileSystem::Print() const {
   std::function<void(const std::string &, const VirtualFileSystemDirectory *)> print_directory;
   print_directory = [&](const std::string &cwd, const VirtualFileSystemDirectory *dir) -> void {

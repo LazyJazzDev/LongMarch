@@ -49,6 +49,7 @@ class Scene : public Object {
   struct EntityStatus {
     bool active{true};
     bool keep{false};
+    uint64_t order{0};
     int shader_version{0};
   };
 

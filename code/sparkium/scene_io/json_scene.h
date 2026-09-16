@@ -19,7 +19,10 @@ namespace sparkium {
 // the document are resolved against the directory containing the JSON file.
 class JsonScene {
  public:
-  static std::unique_ptr<JsonScene> Load(Core *core, const std::filesystem::path &path, std::string *error = nullptr);
+  static std::unique_ptr<JsonScene> Load(Core *core,
+                                         const std::filesystem::path &path,
+                                         std::string *error = nullptr,
+                                         int max_dimension = 0);
 
   Scene *GetScene() const { return scene_.get(); }
   Camera *GetCamera() const { return camera_.get(); }

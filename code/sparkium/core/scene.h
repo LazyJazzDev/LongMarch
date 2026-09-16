@@ -35,11 +35,13 @@ class Scene : public Object {
 
   struct EntityStatus {
     bool active{true};
+    uint64_t order{0};
   };
 
   const std::map<Entity *, EntityStatus> &GetEntities() const;
 
  private:
+  uint64_t next_entity_order_{0};
   Core *core_;
   std::map<Entity *, EntityStatus> entities_;
 };

@@ -661,7 +661,10 @@ GraphSurface EvaluateShaderGraph(HitRecord hit_record, float3 view_direction, in
 };
 }  // namespace
 
-std::unique_ptr<JsonScene> JsonScene::Load(Core *core, const std::filesystem::path &input_path, std::string *error) {
+std::unique_ptr<JsonScene> JsonScene::Load(Core *core,
+                                           const std::filesystem::path &input_path,
+                                           std::string *error,
+                                           int max_dimension) {
   try {
     auto path = std::filesystem::absolute(input_path).lexically_normal();
     std::ifstream stream(path);
@@ -720,6 +723,11 @@ std::unique_ptr<JsonScene> JsonScene::Load(Core *core, const std::filesystem::pa
     int height = ReadInt(Member(film, "height"));
     if (width <= 0 || height <= 0)
       throw std::runtime_error("film dimensions must be positive");
+    if (max_dimension > 0 && std::max(width, height) > max_dimension) {
+      double scale = static_cast<double>(max_dimension) / std::max(width, height);
+      width = std::max(1, static_cast<int>(std::lround(width * scale)));
+      height = std::max(1, static_cast<int>(std::lround(height * scale)));
+    }
     result->film_ = std::make_unique<Film>(core, width, height);
     result->film_->info.persistence = FloatMember(film, "persistence", 1.0f);
     result->film_->info.clamping = FloatMember(film, "clamping", 100.0f);

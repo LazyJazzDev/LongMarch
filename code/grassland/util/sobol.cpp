@@ -1,5 +1,7 @@
 #include "grassland/util/sobol.h"
 
+#include <stdexcept>
+
 #include "fstream"
 #include "grassland/util/log.h"
 
@@ -7,7 +9,7 @@ namespace grassland {
 std::vector<uint32_t> SobolTableGen(unsigned int N, unsigned int D, const std::string &dir_file) {
   std::ifstream infile(dir_file, std::ios::in);
   if (!infile) {
-    LogError("Input file containing direction numbers cannot be found!\n");
+    throw std::runtime_error("Cannot open Sobol direction numbers: " + dir_file);
   }
   char buffer[1000];
   infile.getline(buffer, 1000, '\n');

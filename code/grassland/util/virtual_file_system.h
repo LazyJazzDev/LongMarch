@@ -36,6 +36,8 @@ class VirtualFileSystem {
 
   int ReadFile(const std::string &file_name, std::vector<uint8_t> &data) const;
 
+  std::vector<std::string> ListFiles() const;
+
   void Print() const;
 
   static VirtualFileSystem LoadDirectory(const std::filesystem::path &path);

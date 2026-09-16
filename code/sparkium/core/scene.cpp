@@ -18,7 +18,8 @@ Core *Scene::GetCore() const {
 }
 
 void Scene::AddEntity(Entity *entity) {
-  entities_.insert({entity, {}});
+  if (!entities_.count(entity))
+    entities_.insert({entity, {true, next_entity_order_++}});
 }
 
 void Scene::DeleteEntity(Entity *entity) {

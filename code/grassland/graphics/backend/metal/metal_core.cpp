@@ -1,5 +1,7 @@
 #include "grassland/graphics/backend/metal/metal_core.h"
 
+#include <TargetConditionals.h>
+
 #include <cstdlib>
 #include <filesystem>
 #include <stdexcept>
@@ -11,7 +13,9 @@
 #include "grassland/graphics/backend/metal/metal_program.h"
 #include "grassland/graphics/backend/metal/metal_sampler.h"
 #include "grassland/graphics/backend/metal/metal_shader.h"
+#ifndef LONGMARCH_HEADLESS
 #include "grassland/graphics/backend/metal/metal_window.h"
+#endif
 
 namespace grassland::graphics::backend {
 
@@ -26,6 +30,12 @@ MetalCore::~MetalCore() {
 }
 int MetalCore::GetPhysicalDeviceProperties(PhysicalDeviceProperties *properties) {
   MetalPool pool;
+#if TARGET_OS_IPHONE
+  auto device = NS::TransferPtr(MTL::CreateSystemDefaultDevice());
+  if (device && properties)
+    properties[0] = {device->name()->utf8String(), 1000ull, false, false};
+  return device ? 1 : 0;
+#else
   auto devices = NS::TransferPtr(MTL::CopyAllDevices());
   if (properties)
     for (NS::UInteger i = 0; i < devices->count(); ++i) {
@@ -33,15 +43,29 @@ int MetalCore::GetPhysicalDeviceProperties(PhysicalDeviceProperties *properties)
       properties[i] = {device->name()->utf8String(), device->hasUnifiedMemory() ? 1000ull : 100ull, false, false};
     }
   return static_cast<int>(devices->count());
+#endif
 }
 int MetalCore::InitializeLogicalDevice(int index) {
   MetalPool pool;
+#if TARGET_OS_IPHONE
+  if (index != 0)
+    return -1;
+  device_ = NS::TransferPtr(MTL::CreateSystemDefaultDevice());
+  if (!device_)
+    return -1;
+#else
   auto devices = NS::TransferPtr(MTL::CopyAllDevices());
   if (index < 0 || index >= devices->count())
     return -1;
   device_ = NS::RetainPtr(devices->object<MTL::Device>(index));
-  if (device_->argumentBuffersSupport() != MTL::ArgumentBuffersTier2 || !device_->hasUnifiedMemory())
+#endif
+  if (device_->argumentBuffersSupport() != MTL::ArgumentBuffersTier2 || !device_->hasUnifiedMemory()) {
+#if TARGET_OS_SIMULATOR
+    throw std::runtime_error("This iOS Simulator does not expose the Metal features required by Sparkium. Run on a compatible iPhone or iPad.");
+#else
     throw std::runtime_error("Metal backend requires Apple Silicon with tier 2 argument buffers");
+#endif
+  }
   queue_ = NS::TransferPtr(device_->newCommandQueue());
   MetalCheck(queue_.get(), nullptr, "newCommandQueue");
   device_name_ = device_->name()->utf8String();
@@ -110,8 +134,12 @@ int MetalCore::CreateWindowObject(int width,
                                   bool fullscreen,
                                   bool resizable,
                                   double_ptr<Window> pp_window) {
+#ifdef LONGMARCH_HEADLESS
+  return -1;
+#else
   pp_window.construct<MetalWindow>(this, width, height, title, fullscreen, resizable);
   return 0;
+#endif
 }
 
 int MetalCore::CreateShader(const std::string &source_code,

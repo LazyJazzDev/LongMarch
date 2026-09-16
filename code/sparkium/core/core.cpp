@@ -9,6 +9,11 @@
 #include "sparkium/pipelines/pipelines.h"
 
 namespace sparkium {
+#ifdef LONGMARCH_HEADLESS
+namespace {
+#include "built_in_shaders.inl"
+}
+#endif
 Core::Core(graphics::Core *core) : core_(core) {
   LoadPublicShaders();
   LoadPublicBuffers();
@@ -95,7 +100,11 @@ void Core::SetPublicResource(const std::string &name, std::unique_ptr<graphics::
 }
 
 void Core::LoadPublicShaders() {
+#ifdef LONGMARCH_HEADLESS
+  shaders_vfs_ = GetShaderVirtualFileSystem();
+#else
   shaders_vfs_ = VirtualFileSystem::LoadDirectory(LONGMARCH_SPARKIUM_SHADERS);
+#endif
   std::unique_ptr<graphics::Shader> shader;
   std::unique_ptr<graphics::ComputeProgram> compute_program;
 
