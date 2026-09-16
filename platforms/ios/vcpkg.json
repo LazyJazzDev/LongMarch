@@ -1,0 +1,5 @@
+{
+  "name": "sparkium-mobile-headers",
+  "version-string": "0.1.0",
+  "dependencies": ["eigen3", "fmt", "glm", "rapidjson", "stb", "tinyobjloader"]
+}
