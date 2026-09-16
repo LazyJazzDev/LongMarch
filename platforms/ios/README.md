@@ -22,6 +22,11 @@ maximum bounces. Ray/s is width × height × samples per frame × FPS, matching 
 desktop camera-ray estimate. Blender scene names are Blender Classroom, Blender
 Junkshop and Blender Monster. Asset JSON files remain unchanged.
 
+The application icon is the bundled Cornell Box rendered at 1024 × 1024 and
+1024 spp through the Metal ray-query pipeline. Its opaque PNG is stored in
+`Assets.xcassets/AppIcon.appiconset`; Xcode generates the iPhone and iPad icon sizes
+when building the application.
+
 Large Blender scenes still load their original geometry and textures and may exceed
 an iPhone's memory budget. Start with Cornell Box on a real device.
 
