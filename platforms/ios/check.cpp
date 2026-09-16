@@ -7,9 +7,9 @@ int main(int argc, char **argv) {
   try {
     if (argc < 4)
       throw std::runtime_error(
-          "usage: sparkium_mobile_check <resources> <scene> <output.png> [prepare|replay] [dimension] [spp]");
+          "usage: sparkium_mobile_check <resources> <scene> <output.png> [prepare|replay] [dimension] [spp] [aspect-ratio]");
     RenderSession session(argv[1], argv[2], argc > 5 ? std::stoi(argv[5]) : 128,
-                          argc > 4 && std::string(argv[4]) == "prepare");
+                          argc > 4 && std::string(argv[4]) == "prepare", argc > 7 ? std::stod(argv[7]) : 0.0);
     std::vector<uint8_t> pixels;
     int spp = argc > 6 ? std::stoi(argv[6]) : 2;
     if (spp < 1)

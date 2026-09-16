@@ -19,10 +19,12 @@ namespace sparkium {
 // the document are resolved against the directory containing the JSON file.
 class JsonScene {
  public:
+  // An optional viewport aspect ratio overrides film shape while retaining camera pose and vertical FOV.
   static std::unique_ptr<JsonScene> Load(Core *core,
                                          const std::filesystem::path &path,
                                          std::string *error = nullptr,
-                                         int max_dimension = 0);
+                                         int max_dimension = 0,
+                                         double aspect_ratio = 0.0);
 
   Scene *GetScene() const { return scene_.get(); }
   Camera *GetCamera() const { return camera_.get(); }

@@ -9,7 +9,8 @@ class RenderSession {
   RenderSession(const std::filesystem::path &resources,
                 const std::string &scene,
                 int max_dimension,
-                bool prepare = false);
+                bool prepare = false,
+                double aspect_ratio = 0.0);
   ~RenderSession();
   std::vector<uint8_t> Step();
   int Width() const;

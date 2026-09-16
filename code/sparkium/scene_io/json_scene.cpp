@@ -664,7 +664,8 @@ GraphSurface EvaluateShaderGraph(HitRecord hit_record, float3 view_direction, in
 std::unique_ptr<JsonScene> JsonScene::Load(Core *core,
                                            const std::filesystem::path &input_path,
                                            std::string *error,
-                                           int max_dimension) {
+                                           int max_dimension,
+                                           double aspect_ratio) {
   try {
     auto path = std::filesystem::absolute(input_path).lexically_normal();
     std::ifstream stream(path);
@@ -723,7 +724,13 @@ std::unique_ptr<JsonScene> JsonScene::Load(Core *core,
     int height = ReadInt(Member(film, "height"));
     if (width <= 0 || height <= 0)
       throw std::runtime_error("film dimensions must be positive");
-    if (max_dimension > 0 && std::max(width, height) > max_dimension) {
+    if (!std::isfinite(aspect_ratio) || aspect_ratio < 0.0)
+      throw std::runtime_error("viewport aspect ratio must be finite and nonnegative");
+    if (aspect_ratio > 0.0) {
+      int longest = max_dimension > 0 ? max_dimension : std::max(width, height);
+      width = aspect_ratio >= 1.0 ? longest : std::max(1, static_cast<int>(std::lround(longest * aspect_ratio)));
+      height = aspect_ratio >= 1.0 ? std::max(1, static_cast<int>(std::lround(longest / aspect_ratio))) : longest;
+    } else if (max_dimension > 0 && std::max(width, height) > max_dimension) {
       double scale = static_cast<double>(max_dimension) / std::max(width, height);
       width = std::max(1, static_cast<int>(std::lround(width * scale)));
       height = std::max(1, static_cast<int>(std::lround(height * scale)));
