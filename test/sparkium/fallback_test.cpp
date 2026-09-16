@@ -138,7 +138,7 @@ RWByteAddressBuffer results : register(u0, space4);
   ray.Origin = asfloat(rays.Load3(offset)); ray.TMin = asfloat(rays.Load(offset + 12));
   ray.Direction = asfloat(rays.Load3(offset + 16)); ray.TMax = asfloat(rays.Load(offset + 28));
   SoftwareHit hit;
-  bool found = SoftwareIntersect(ray, false, hit);
+  bool found = InlineIntersect(ray, false, hit);
   results.Store4(id.x * 32, uint4(asuint(hit.distance), hit.instance, hit.primitive, uint(found)));
   results.Store4(id.x * 32 + 16, uint4(asuint(hit.barycentric), 0, 0));
 }
