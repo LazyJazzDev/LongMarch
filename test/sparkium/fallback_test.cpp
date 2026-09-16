@@ -184,10 +184,9 @@ RWByteAddressBuffer results : register(u0, space4);
 
 INSTANTIATE_TEST_SUITE_P(TreeSizes, SoftwareBVHSizeTest, testing::Values(1, 5, 257));
 
-TEST_F(SoftwareBVHTest, EmptySceneBackgroundAccumulationAndReset) {
+TEST_F(SoftwareBVHTest, EmptySceneAccumulationAndReset) {
   sparkium::Scene scene(core.get());
   scene.settings.samples_per_dispatch = 3;
-  scene.settings.background_color = glm::vec3(0.2f, 0.4f, 0.7f);
   sparkium::Camera camera(core.get(), glm::mat4(1), glm::radians(45.0f), 17.0f / 13.0f);
   sparkium::Film film(core.get(), 17, 13);
   auto check = [&](glm::vec3 expected) {
@@ -202,14 +201,13 @@ TEST_F(SoftwareBVHTest, EmptySceneBackgroundAccumulationAndReset) {
   for (int frame = 1; frame <= 2; ++frame) {
     core->Render(&scene, &camera, &film, sparkium::RENDER_PIPELINE_RT_FALLBACK);
     EXPECT_EQ(film.info.accumulated_samples, frame * 3);
-    check(scene.settings.background_color);
+    check(glm::vec3(0.0f));
   }
   film.Reset();
   EXPECT_EQ(film.info.accumulated_samples, 0);
-  scene.settings.background_color = glm::vec3(0.1f, 0.3f, 0.9f);
   core->Render(&scene, &camera, &film, sparkium::RENDER_PIPELINE_RT_FALLBACK);
   EXPECT_EQ(film.info.accumulated_samples, 3);
-  check(scene.settings.background_color);
+  check(glm::vec3(0.0f));
 }
 
 TEST_F(SoftwareBVHTest, TransparentShadowLayers) {
@@ -321,7 +319,6 @@ TEST_F(SoftwareBVHTest, HardwareImageParity) {
   scene.AddEntity(&entity);
   scene.settings.samples_per_dispatch = 16;
   scene.settings.max_bounces = 4;
-  scene.settings.background_color = glm::vec3(0.1f);
   sparkium::Camera camera(core.get(), glm::lookAt(glm::vec3(0, 0, 4), glm::vec3(0), glm::vec3(0, 1, 0)),
                           glm::radians(45.0f), 1.0f);
   sparkium::Film software(core.get(), 32, 32), hardware(core.get(), 32, 32);

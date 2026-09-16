@@ -64,8 +64,6 @@ int LightGeometryMaterial::SamplerShader(Scene *scene) {
     if (dynamic_cast<MaterialPrincipled *>(material_)) {
       return 0x1000003;
     }
-    if (dynamic_cast<MaterialShaderGraph *>(material_))
-      return 0x1000004;
     if (dynamic_cast<MaterialSpecular *>(material_))
       return 0x1000005;
   }

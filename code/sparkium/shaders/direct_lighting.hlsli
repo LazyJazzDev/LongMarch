@@ -13,7 +13,6 @@ void LightSampler(int shader_index, inout SampleDirectLightingPayload payload) {
   case 0x1000001:
   case 0x1000002:
   case 0x1000003:
-  case 0x1000004:
   case 0x1000005:
     MeshLightSampler(shader_index, payload);
     break;

@@ -33,6 +33,7 @@ HitRecord MakeMeshHitRecord(uint geometry_index, uint object_index, uint primiti
   float3 barycentrics =
       float3(1.0 - barycentric.x - barycentric.y, barycentric.x, barycentric.y);
 
+  hit_record.t = distance;
   hit_record.front_facing = true;
   hit_record.position = pos[0] * barycentrics[0] + pos[1] * barycentrics[1] + pos[2] * barycentrics[2];
   hit_record.position = mul(object_to_world, float4(hit_record.position, 1.0));
