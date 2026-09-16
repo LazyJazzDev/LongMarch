@@ -107,7 +107,7 @@ bool SoftwareTraceMesh(SoftwareInstance instance,
   }
   return found;
 }
-bool SoftwareIntersect(RayDesc ray, bool any_hit, out SoftwareHit hit) {
+bool InlineIntersect(RayDesc ray, bool any_hit, out SoftwareHit hit) {
   hit = (SoftwareHit)0;
   hit.distance = ray.TMax;
   hit.instance = hit.primitive = SOFTWARE_INVALID;

@@ -23,7 +23,7 @@ HitRecord SoftwareHitRecord(SoftwareHit hit, float3 direction) {
 void ApplyPathMiss(inout RenderContext context);
 void SoftwareTracePath(RayDesc ray, inout RenderContext context) {
   SoftwareHit hit;
-  if (!SoftwareIntersect(ray, false, hit)) {
+  if (!InlineIntersect(ray, false, hit)) {
     ApplyPathMiss(context);
     return;
   }
