@@ -12,11 +12,11 @@ namespace {
 const char *PipelineName(sparkium::RenderPipeline pipeline) {
   switch (pipeline) {
     case sparkium::RENDER_PIPELINE_RAY_QUERY:
-      return "Native ray query";
+      return "Path Tracing - Ray Query";
     case sparkium::RENDER_PIPELINE_RT_FALLBACK:
-      return "RT Fallback";
+      return "Path Tracing - Fallback";
     case sparkium::RENDER_PIPELINE_RASTERIZATION: return "Rasterization";
-    case sparkium::RENDER_PIPELINE_RAY_TRACING: return "Ray tracing";
+    case sparkium::RENDER_PIPELINE_RAY_TRACING: return "Path Tracing";
     default: return "Auto";
   }
 }

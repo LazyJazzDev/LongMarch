@@ -14,7 +14,7 @@ and importer extensions follow in `blender-align`, based on this branch.
 | `ray_query` | Experimental native inline queries on Metal; see [research and measurements](metal-ray-query.md) |
 | `rasterization` | Existing raster renderer |
 
-Use `renderer.pipeline` in scene JSON, the GUI's **RT Fallback** option,
+Use `renderer.pipeline` in scene JSON, the GUI's **Path Tracing - Fallback** option,
 or `sparkium::RENDER_PIPELINE_RT_FALLBACK` in C++. The CLI accepts:
 
 ```sh
