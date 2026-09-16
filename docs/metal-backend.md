@@ -76,25 +76,23 @@ MTL_DEBUG_LAYER=1 python3 scripts/check_rt_fallback.py \
   --debug --max-rmse 0.03 --output out/metal-compute
 ```
 
-Validated on Apple M5:
+The checks cover GPU BVH construction/traversal against a CPU oracle,
+transparent shadows, accumulation/reset, odd image sizes, partial texture
+transfers, buffer copies/resizing, completion callbacks, 80-resource argument
+arrays, binding snapshots, and light-selection workgroup tail bounds. An
+attachmentless raster pass checks inherited viewport/scissor state. Hardware RT
+parity explicitly skips on this device.
 
-- Dual API and Metal-only builds of CLI, GUI, and tests; the Metal-only CLI
-  links Metal and DXC, with no Vulkan runtime dependency.
-- 12 tests pass with Metal API and shader validation; hardware RT parity skips.
-  Tests cover GPU BVH versus an independent double-precision oracle, transparent
-  shadows, accumulation/reset, odd image sizes, partial RGB/depth/integer texture
-  transfers, buffer copies/resizing, completion callbacks, 80-resource argument
-  arrays, binding snapshots, and light-selection workgroup tail bounds.
-  An attachmentless raster pass regression checks inherited viewport/scissor state.
-- Six 96×96 raster scenes: five identical PNGs; area-light scene normalized RGB
-  RMSE 0.000024 against Vulkan.
-- Six compute scenes at 96×96, 256 spp, 12 bounces pass an RMSE threshold
-  of 0.03. Area light / point light / texture normalized RGB RMSE is
-  0.0064 / 0.0106 / 0.0000. Floating-point differences
-  can change Monte Carlo paths; these are image comparisons, not bitwise parity.
-- Cornell GUI presentation and ImGui complete five frames under API validation.
-- With Metal disabled, seven Vulkan regression tests pass and hardware RT parity
-  skips. Metal-only CPU profiling and three-frame rendering also complete.
+The commands above compare the six basic scenes at 96×96. Raster output must
+pass a normalized RGB RMSE threshold of 0.001; compute output at 256 spp and
+12 bounces must pass 0.03. Floating-point differences can change Monte Carlo
+paths; these image comparisons do not establish bitwise parity.
+
+After separating the branch from Blender extensions and rebasing onto the
+merged JSON loader, the CLI/GUI/nbody/test targets build on Apple M5. With Metal
+API and shader validation, 12 tests pass and hardware RT parity skips. All six
+raster comparisons are identical; the maximum compute RMSE is 0.01120 (point
+light), below 0.03. Results are in `out/stack-rt/{raster,compute}` when reproduced.
 
 The port exposed an existing light-selection shader bounds bug: inactive lanes
 in the final 64-thread workgroup read metadata and wrote beyond the selector
@@ -115,11 +113,5 @@ Frame profiling supports `--profile timings.csv --profile-cpu-only` on Metal.
 Per-stage GPU timestamps still require Vulkan; Metal timings are not inferred
 from Vulkan measurements. Use Xcode GPU tools for native GPU captures.
 
-The full Blender Monster scene currently hits a **DXC SPIR-V compiler
-crash** (SDK build `1.10(5180-e3554182)(1.9.0.5180)`) while compiling the combined material shader, in
-`spvtools::opt::AggressiveDCEPass::AddToWorklist`. This occurs before Metal
-pipeline creation or GPU dispatch; `-Od`, `-O1`, and
-`-fspv-reduce-load-size` also reproduce it in standalone DXC. Full Monster
-rendering is therefore not validated. The smaller Blender material-graph smoke
-scene renders successfully (96×96, 256 spp, normalized RGB RMSE 0.0001 vs Vulkan).
-Large argument-array binding is separately covered by the 80-buffer GPU test.
+Blender scene import, material graphs, and hair are added by the dependent
+`blender-align` branch. Their validation and scene-specific limits belong there.

@@ -12,7 +12,6 @@ import subprocess
 import time
 
 
-
 ROOT = Path(__file__).resolve().parents[1]
 DEMOS = ("cornell_box", "area_light", "point_light", "principled", "specular", "texture")
 

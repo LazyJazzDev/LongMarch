@@ -120,4 +120,4 @@ python3 scripts/profile_nbody.py \
   --particles 65536 --output out/nbody-profile/metal-fast-math
 ```
 
-开启后再次启用 Metal API / shader validation：12 项测试通过，1 项硬件光追测试跳过。Sparkium 与 Vulkan 的图像对照全部通过：6 个光栅场景（RMSE 阈值 0.001），以及 6 个 compute fallback 场景加 1 个 Blender 材质图场景（96×96、256 spp、12 次反弹，阈值 0.03）。光栅最大归一化 RGB RMSE 为 0.000024；compute fallback 最大值为 0.010625。图像及对照结果分别保存在 `out/metal/fast-math-raster` 和 `out/metal/fast-math-compute`。
+以下 Sparkium 回归结果来自分支拆分前、包含 Blender 扩展的实现；nbody 实现不受本次拆分影响。开启后再次启用 Metal API / shader validation：12 项测试通过，1 项硬件光追测试跳过。Sparkium 与 Vulkan 的图像对照全部通过：6 个光栅场景（RMSE 阈值 0.001），以及 6 个 compute fallback 场景加 1 个 Blender 材质图场景（96×96、256 spp、12 次反弹，阈值 0.03）。光栅最大归一化 RGB RMSE 为 0.000024；compute fallback 最大值为 0.010625。图像及对照结果分别保存在 `out/metal/fast-math-raster` 和 `out/metal/fast-math-compute`。

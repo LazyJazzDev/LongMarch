@@ -1,9 +1,8 @@
 # Sparkium compute ray tracing fallback
 
-The `rt-fallback` branch is based on `blender-align` and keeps its JSON scenes,
-Blender material graphs and triangulated hair. Its `assets` submodule points to
-the `blender-align` snapshot in `LazyJazzDev/LongMarchAssetsLFS`; the old assets
-repository and its history are unchanged.
+The `rt-fallback` branch builds on `main` after the basic JSON loader (#37).
+It uses the `sparks-json` LFS asset snapshot. Blender material graphs, hair,
+and importer extensions follow in `blender-align`, based on this branch.
 
 ## Selecting the backend
 
@@ -52,12 +51,10 @@ directions retain their length so that intersection distances remain correct
 under nonuniform and mirrored scales. Transparent shadows accumulate material
 transmission across intersections; opaque shadows stop at the first hit.
 
-The two tracing backends share hit-record construction, camera/lens sampling,
-the path loop, BSDFs, direct lighting, shader graph code, subsurface random walks,
-film accumulation and tone mapping. Shader graph samplers are compiled into
-namespaces in the compute shader. The existing hair representation consists of
-triangle tubes and uses the same mesh path. This is a compute path tracer, so it
-retains indirect lighting and reflections from the RT renderer.
+The two tracing backends share hit-record construction, camera sampling,
+the path loop, BSDFs, direct lighting, film accumulation and tone mapping.
+This is a compute path tracer and retains indirect lighting and reflections
+from the RT renderer.
 
 ## Validation
 
@@ -69,21 +66,20 @@ cmake --build cmake-build-rt-fallback \
 ctest --test-dir cmake-build-rt-fallback/test -R sparkium_fallback --output-on-failure
 python3 scripts/check_rt_fallback.py \
   --cli cmake-build-rt-fallback/demo/sparkium_cli/demo_sparkium_cli \
-  --graph-smoke --debug
+  --debug
 ```
 
 The snapshot script requires Pillow and writes scene copies with absolute asset
 paths, images, logs, a contact sheet and `results.json` under `out/rt-fallback`.
 Its default scenes are Cornell box, area light, point light, principled,
-specular and texture. `--graph-smoke` adds real Blender Monster material graphs
-to Cornell geometry, plus opacity and random-walk subsurface parameters.
+specular and texture.
 
 For comparisons on an RT device:
 
 ```sh
 python3 scripts/check_rt_fallback.py \
   --cli cmake-build-rt-fallback/demo/sparkium_cli/demo_sparkium_cli \
-  --graph-smoke --compare-hardware --spp 256 --output out/rt-comparison
+  --compare-hardware --spp 256 --output out/rt-comparison
 ```
 
 The script reports normalized RGB MAE/RMSE of tone-mapped PNGs. An optional
@@ -91,7 +87,7 @@ The script reports normalized RGB MAE/RMSE of tone-mapped PNGs. An optional
 they do not establish HDR equivalence. The C++ parity test compares raw HDR
 output for a small emissive scene and skips explicitly without RT hardware.
 
-Verified on Apple M5 / MoltenVK 1.4.1:
+GPU regression coverage on Apple M5:
 
 - GPU intersections against an independent double-precision CPU oracle: 1, 5
   and 257 triangles, 1,030 rays per configuration, four instance-update phases
@@ -99,8 +95,8 @@ Verified on Apple M5 / MoltenVK 1.4.1:
 - Empty-scene background, accumulation/reset, 17×13 output, and two transparent
   shadow layers with expected transmission of 0.25.
 - Hardware RT libraries and five compute BVH kernels compile to SPIR-V and DXIL.
-- All six basic scenes and the graph smoke render at 96×96, 32 spp, 12 bounces,
-  with graphics validation enabled and no reported validation errors.
+- The six basic scenes are compared across Metal and Vulkan using the
+  commands and thresholds in [Metal backend details](metal-backend.md).
 
 Hardware image parity remains unverified locally because the device exposes no
 hardware RT. D3D12 runtime behavior also needs verification on Windows. Snapshot
@@ -113,19 +109,12 @@ wall times include scene loading and shader compilation and are not benchmarks.
 - Each tree accepts at most 2,097,152 leaves to stay within baseline dispatch
   dimensions; total node byte addresses must fit in 32 bits. Singular instance
   transforms are rejected. Procedural/custom geometry needs a traversal adapter.
-- Descriptor limits still apply. Full Blender Monster exceeds the regular
-  storage-buffer binding limit of 31 on the tested MoltenVK configuration. Merely
-  setting `MVK_CONFIG_USE_METAL_ARGUMENT_BUFFERS=1` did not remove this limit.
-  Resource packing or an update-after-bind descriptor path is future work.
+- Descriptor limits still apply. The tested MoltenVK configuration has a
+  regular storage-buffer binding limit of 31; native Metal uses tier 2 argument
+  buffers. Larger scenes may require additional resource packing on Vulkan.
 - Coincident transparent surfaces and edge ties can resolve differently between
   software and native traversal. Monte Carlo path divergence prevents a general
   promise of bit-identical output.
-
-The classroom lamp meshes use distinct names on case-insensitive filesystems:
-`blackboard_lamp_fixture_m0.spmesh` for the fixture and
-`blackboard_lamp_emitter_m0.spmesh` for the emitting surface. Their original
-binary contents are preserved, and scene geometry IDs and references match
-these names.
 
 ## Frame profiling
 
