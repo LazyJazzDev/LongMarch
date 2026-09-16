@@ -78,13 +78,15 @@ if(SPARKIUM_APP)
   # as a legacy macOS bundle and overlook its root Info.plist.
   set(bundle_resources "${CMAKE_CURRENT_BINARY_DIR}/SparkiumResources")
   file(CREATE_LINK "${SPARKIUM_RESOURCES}" "${bundle_resources}" SYMBOLIC)
-  add_executable(Sparkium MACOSX_BUNDLE SparkiumApp.swift SparkiumBridge.mm SparkiumBridge.h "${bundle_resources}")
-  set_source_files_properties("${bundle_resources}" PROPERTIES MACOSX_PACKAGE_LOCATION Resources)
+  add_executable(Sparkium MACOSX_BUNDLE SparkiumApp.swift SparkiumBridge.mm SparkiumBridge.h
+    "${bundle_resources}" Assets.xcassets)
+  set_source_files_properties("${bundle_resources}" Assets.xcassets PROPERTIES MACOSX_PACKAGE_LOCATION Resources)
   target_link_libraries(Sparkium PRIVATE sparkium_mobile "-framework SwiftUI" "-framework CoreGraphics")
   target_compile_options(Sparkium PRIVATE "$<$<COMPILE_LANGUAGE:OBJCXX>:-fobjc-arc>")
   set_target_properties(Sparkium PROPERTIES
     MACOSX_BUNDLE_INFO_PLIST "${CMAKE_CURRENT_SOURCE_DIR}/Info.plist"
     XCODE_ATTRIBUTE_PRODUCT_BUNDLE_IDENTIFIER "dev.lazyjazz.sparkium"
+    XCODE_ATTRIBUTE_ASSETCATALOG_COMPILER_APPICON_NAME "AppIcon"
     XCODE_ATTRIBUTE_SWIFT_OBJC_BRIDGING_HEADER "${CMAKE_CURRENT_SOURCE_DIR}/SparkiumBridge.h"
     XCODE_ATTRIBUTE_SWIFT_VERSION "5.0"
     XCODE_ATTRIBUTE_TARGETED_DEVICE_FAMILY "1,2"
