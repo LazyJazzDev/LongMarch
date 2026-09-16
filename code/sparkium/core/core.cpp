@@ -23,6 +23,8 @@ void Core::Render(Scene *scene, Camera *camera, Film *film, RenderPipeline rende
   if (render_pipeline == RENDER_PIPELINE_AUTO) {
     if (core_->DeviceRayTracingSupport()) {
       render_pipeline = RENDER_PIPELINE_RAY_TRACING;
+    } else if (core_->DeviceRayQuerySupport()) {
+      render_pipeline = RENDER_PIPELINE_RAY_QUERY;
     } else {
       render_pipeline = RENDER_PIPELINE_RT_FALLBACK;
     }

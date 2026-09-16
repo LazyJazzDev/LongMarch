@@ -15,9 +15,10 @@ cmake-build-metal/demo/sparkium_cli/demo_sparkium_cli \
 ```
 
 Scene JSON accepts `renderer.pipeline: "ray_query"`; the GUI exposes **Native
-ray query** when the backend supports it. `auto`, `ray_tracing`, and
-`rt_fallback` retain their previous selection behavior. In particular, selecting
-Metal alone does not enable native queries. Vulkan and D3D12 query support is
+ray query** when the backend supports it. `auto` selects pipeline RT first,
+then native ray query, then software fallback. On supported Metal devices,
+`auto` therefore uses native queries. Explicit `ray_tracing` and `rt_fallback`
+retain their previous behavior. Vulkan and D3D12 query support is
 not enabled by this experiment and requesting it is rejected.
 
 `DeviceRayQuerySupport()` is separate from `DeviceRayTracingSupport()`, which

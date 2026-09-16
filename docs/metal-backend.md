@@ -15,8 +15,9 @@ Tier 2 argument buffers hold resource arrays, including scenes with more than
 before writing, then copy directly into unified memory without a staging command
 submission per upload. Texture transfers use private textures and staging blits.
 
-`auto`, `ray_tracing`, and `rt_fallback` use Sparkium's compute BVH construction
-and traversal on Metal. The experimental `ray_query` pipeline uses native Metal
+`auto` selects native ray query on supported Metal devices, otherwise software
+fallback. Explicit `ray_tracing` and `rt_fallback` use Sparkium's compute BVH
+construction and traversal on Metal. The `ray_query` pipeline uses native Metal
 triangle acceleration structures and inline queries; see [Metal ray query](metal-ray-query.md)
 for implementation, validation, and performance results. Pipeline RT/SBT and custom
 intersection functions remain unsupported. `--require-hardware-rt` checks pipeline RT

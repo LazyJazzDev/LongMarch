@@ -6,6 +6,7 @@
 #include <random>
 #include <tuple>
 
+#include "grassland/graphics/frame_profile.h"
 #include "sparkium/pipelines/raytracing/core/core.h"
 #include "sparkium/pipelines/raytracing/core/software_pipeline.h"
 #include "sparkium/pipelines/raytracing/geometry/geometry_mesh.h"
@@ -236,6 +237,16 @@ TEST_P(ComputeTraversalTest, EmptySceneAccumulationAndReset) {
                ray_query ? sparkium::RENDER_PIPELINE_RAY_QUERY : sparkium::RENDER_PIPELINE_RT_FALLBACK);
   EXPECT_EQ(film.info.accumulated_samples, 3);
   check(glm::vec3(0.0f));
+  if (ray_query && !graphics->DeviceRayTracingSupport()) {
+    graphics::FrameProfile profile(graphics.get(), false);
+    profile.Begin();
+    core->Render(&scene, &camera, &film, sparkium::RENDER_PIPELINE_AUTO);
+    profile.Finish();
+    EXPECT_EQ(profile.counters["native_ray_query"], 1u);
+    // Auto must reuse the selected native pipeline and preserve its accumulation.
+    EXPECT_EQ(film.info.accumulated_samples, 6);
+    check(glm::vec3(0.0f));
+  }
   if (graphics->DeviceRayQuerySupport()) {
     // Switching traversal implementations must discard accumulation in both directions.
     for (bool query : {!ray_query, ray_query}) {
