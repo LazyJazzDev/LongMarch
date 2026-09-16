@@ -1,0 +1,12 @@
+{
+  "clangd.path": "clangd",
+  "clangd.arguments": [
+    "--background-index",
+    "--compile-commands-dir=${workspaceFolder}/cmake-build-metal"
+  ],
+  "cmake.buildDirectory": "${workspaceFolder}/cmake-build-metal",
+  "cmake.configureOnOpen": false,
+  "cmake.configureSettings": {
+    "CMAKE_EXPORT_COMPILE_COMMANDS": true
+  }
+}
