@@ -27,5 +27,9 @@ class Core : public Object {
 
 Core *DedicatedCast(sparkium::Core *core);
 
-void Render(sparkium::Core *core, sparkium::Scene *scene, sparkium::Camera *camera, sparkium::Film *film);
+void Render(sparkium::Core *core,
+            sparkium::Scene *scene,
+            sparkium::Camera *camera,
+            sparkium::Film *film,
+            bool software = false);
 }  // namespace sparkium::raytracing

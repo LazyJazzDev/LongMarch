@@ -1,6 +1,7 @@
 #include "grassland/graphics/backend/vulkan/vulkan_program.h"
 
 #include <numeric>
+#include <stdexcept>
 
 namespace grassland::graphics::backend {
 
@@ -29,6 +30,28 @@ void VulkanProgramBase::AddResourceBindingImpl(ResourceType type, int count) {
 }
 
 void VulkanProgramBase::FinalizePipelineLayout() {
+  // Bindings currently use VK_SHADER_STAGE_ALL and ordinary descriptor sets.
+  // Reject oversized scenes even when validation is disabled.
+  const auto limits = core_->Device()->PhysicalDevice().GetPhysicalDeviceProperties().limits;
+  uint64_t storage_buffers = 0, sampled_images = 0;
+  for (const auto &layout : descriptor_set_layouts_) {
+    for (const auto &binding : layout->Bindings()) {
+      if (binding.descriptorType == VK_DESCRIPTOR_TYPE_STORAGE_BUFFER)
+        storage_buffers += binding.descriptorCount;
+      if (binding.descriptorType == VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE)
+        sampled_images += binding.descriptorCount;
+    }
+  }
+  if (descriptor_set_layouts_.size() > limits.maxBoundDescriptorSets ||
+      storage_buffers > limits.maxPerStageDescriptorStorageBuffers ||
+      sampled_images > limits.maxPerStageDescriptorSampledImages)
+    throw std::runtime_error("pipeline exceeds Vulkan descriptor limits: " +
+                             std::to_string(storage_buffers) + " storage buffers (limit " +
+                             std::to_string(limits.maxPerStageDescriptorStorageBuffers) + "), " +
+                             std::to_string(sampled_images) + " sampled images (limit " +
+                             std::to_string(limits.maxPerStageDescriptorSampledImages) + "), " +
+                             std::to_string(descriptor_set_layouts_.size()) + " sets (limit " +
+                             std::to_string(limits.maxBoundDescriptorSets) + ")");
   std::vector<VkDescriptorSetLayout> descriptor_set_layouts;
   descriptor_set_layouts.reserve(descriptor_set_layouts_.size());
   for (auto &descriptor_set_layout : descriptor_set_layouts_) {
@@ -114,7 +137,10 @@ void VulkanComputeProgram::Finalize() {
   pipeline_create_info.stage.module = compute_shader_->ShaderModule()->Handle();
   pipeline_create_info.stage.pName = compute_shader_->ShaderModule()->EntryPoint().c_str();
   pipeline_create_info.stage.pSpecializationInfo = nullptr;
-  vkCreateComputePipelines(core_->Device()->Handle(), VK_NULL_HANDLE, 1, &pipeline_create_info, nullptr, &pipeline_);
+  const VkResult result = vkCreateComputePipelines(core_->Device()->Handle(), VK_NULL_HANDLE, 1,
+                                                    &pipeline_create_info, nullptr, &pipeline_);
+  if (result != VK_SUCCESS)
+    throw std::runtime_error("failed to create Vulkan compute pipeline: " + std::to_string(result));
 }
 
 VulkanRayTracingProgram::VulkanRayTracingProgram(VulkanCore *core) : VulkanProgramBase(core) {

@@ -1,4 +1,5 @@
 #include <long_march.h>
+#include "../sparkium_backend.h"
 
 #include <algorithm>
 #include <cmath>
@@ -10,6 +11,8 @@ using namespace long_march;
 namespace {
 const char *PipelineName(sparkium::RenderPipeline pipeline) {
   switch (pipeline) {
+    case sparkium::RENDER_PIPELINE_RT_FALLBACK:
+      return "Compute ray tracing";
     case sparkium::RENDER_PIPELINE_RASTERIZATION: return "Rasterization";
     case sparkium::RENDER_PIPELINE_RAY_TRACING: return "Ray tracing";
     default: return "Auto";
@@ -61,15 +64,26 @@ void ResizeWindowForFilm(graphics::Window *window, sparkium::Film *film) {
 int main(int argc, char **argv) {
   try {
     std::filesystem::path input = argc > 1 ? argv[1] : std::filesystem::path(FindAssetPath("scenes"));
+    auto backend = graphics::BACKEND_API_DEFAULT;
+    int frame_limit = 0;
+    for (int i = 2; i < argc; ++i) {
+      std::string arg = argv[i];
+      if (arg == "--backend" && i + 1 < argc) backend = ParseSparkiumBackend(argv[++i]);
+      else if (arg == "--frames" && i + 1 < argc) {
+        frame_limit = std::stoi(argv[++i]);
+        if (frame_limit <= 0) throw std::invalid_argument("--frames must be positive");
+      } else throw std::invalid_argument("unknown or incomplete argument: " + arg);
+    }
     std::vector<std::filesystem::path> scene_files;
     if (std::filesystem::is_regular_file(input)) scene_files.push_back(std::filesystem::absolute(input));
     else scene_files = sparkium::FindJsonScenes(input);
     if (scene_files.empty()) throw std::runtime_error("no scene.json files found under: " + input.string());
 
     std::unique_ptr<graphics::Core> graphics_core;
-    if (graphics::CreateCore(graphics::BACKEND_API_DEFAULT, graphics::Core::Settings{}, &graphics_core) != 0)
+    if (graphics::CreateCore(backend, graphics::Core::Settings{}, &graphics_core) != 0)
       throw std::runtime_error("failed to create graphics core");
-    graphics_core->InitializeLogicalDeviceAutoSelect(false);
+    if (graphics_core->InitializeLogicalDeviceAutoSelect(false) != 0)
+      throw std::runtime_error("failed to initialize graphics device");
     sparkium::Core core(graphics_core.get());
 
     std::unique_ptr<sparkium::JsonScene> loaded;
@@ -100,7 +114,8 @@ int main(int argc, char **argv) {
     FPSCounter fps_counter;
     bool show_browser = true;
 
-    while (!window->ShouldClose()) {
+    int rendered_frames = 0;
+    while (!window->ShouldClose() && (!frame_limit || rendered_frames++ < frame_limit)) {
       window->BeginImGuiFrame();
       ImGui::SetNextWindowPos({10, 10}, ImGuiCond_Once);
       ImGui::SetNextWindowBgAlpha(0.85f);
@@ -118,8 +133,8 @@ int main(int argc, char **argv) {
         ImGui::EndCombo();
       }
       int pipeline_index = static_cast<int>(pipeline);
-      const char *pipelines[] = {"Rasterization", "Ray tracing", "Auto"};
-      if (ImGui::Combo("Pipeline", &pipeline_index, pipelines, 3)) {
+      const char *pipelines[] = {"Rasterization", "Ray tracing", "Auto", "Compute ray tracing"};
+      if (ImGui::Combo("Pipeline", &pipeline_index, pipelines, 4)) {
         pipeline = static_cast<sparkium::RenderPipeline>(pipeline_index);
         loaded->GetFilm()->Reset();
       }
@@ -129,6 +144,7 @@ int main(int argc, char **argv) {
       ImGui::SameLine();
       if (ImGui::Button("Reset film")) loaded->GetFilm()->Reset();
       ImGui::Text("%s", scene_files[selected].string().c_str());
+      ImGui::Text("Backend: %s", graphics::BackendAPIString(graphics_core->API()));
       ImGui::Text("Pipeline: %s", PipelineName(pipeline));
       if (!load_error.empty()) ImGui::TextColored({1, .3f, .3f, 1}, "%s", load_error.c_str());
       ImGui::Text("%.1f FPS", fps_counter.TickFPS());

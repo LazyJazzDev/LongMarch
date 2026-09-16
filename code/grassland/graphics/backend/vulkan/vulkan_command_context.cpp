@@ -9,6 +9,28 @@
 
 namespace grassland::graphics::backend {
 
+namespace {
+class TimestampCommand : public VulkanCommand {
+ public:
+  TimestampCommand(VkQueryPool pool, uint32_t index, uint32_t reset_count)
+      : pool_(pool), index_(index), reset_count_(reset_count) {
+  }
+  void CompileCommand(VulkanCommandContext *, VkCommandBuffer buffer) override {
+    if (reset_count_)
+      vkCmdResetQueryPool(buffer, pool_, 0, reset_count_);
+    vkCmdWriteTimestamp(buffer, VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT, pool_, index_);
+  }
+
+ private:
+  VkQueryPool pool_;
+  uint32_t index_, reset_count_;
+};
+}  // namespace
+
+void VulkanCommandContext::CmdTimestamp(VkQueryPool pool, uint32_t index, uint32_t reset_count) {
+  commands_.push_back(std::make_unique<TimestampCommand>(pool, index, reset_count));
+}
+
 VulkanCommandContext::VulkanCommandContext(VulkanCore *core) : core_(core) {
   for (int i = 0; i < BIND_POINT_COUNT; i++) {
     program_bases_[i] = nullptr;

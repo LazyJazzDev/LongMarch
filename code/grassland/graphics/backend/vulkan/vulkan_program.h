@@ -74,7 +74,7 @@ class VulkanComputeProgram : public ComputeProgram, public VulkanProgramBase {
 
  private:
   VulkanShader *compute_shader_;
-  VkPipeline pipeline_;
+  VkPipeline pipeline_{VK_NULL_HANDLE};
 };
 
 class VulkanRayTracingProgram : public RayTracingProgram, public VulkanProgramBase {

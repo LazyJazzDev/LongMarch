@@ -19,13 +19,17 @@ simulation).
 
 **Components:**
 
-- **Grassland (草地):** Basic libraries for math, physics, and wrapping graphics APIs (Vulkan & D3D12).
+- **Grassland (草地):** Basic libraries for math, physics, and wrapping graphics APIs (Vulkan, D3D12 & Metal).
 - **Snowberg (雪山):** [NOT AVAILABLE: Still under planning] Planned to be a functional layer for supporting higher
   applications.
 - **Sparkium   (星火):** The renderer library, a multi-pipeline renderer with common front-end interface. (Now supports
   rasterization and path tracing)
 - **Contradium (矛盾):** [Work in progress] The physics simulation library.
 - **Practium   (实践):**: An simulation engine for robotics and other applications.
+
+Sparkium also has an experimental [compute ray tracing fallback](docs/rt-fallback.md)
+for GPUs without hardware ray tracing. It shares the path tracer's materials,
+lighting and JSON scenes and builds its acceleration structures with compute shaders.
 
 ## How to Build
 
@@ -172,6 +176,10 @@ The compiled executable should be located at `build/demo/graphics_hello_triangle
 
 
 ### macOS
+
+Apple Silicon builds now default to the native **metal-cpp** backend for Sparkium.
+See [Metal backend setup and validation](docs/metal-backend.md) for build options,
+API selection, and the compute ray tracing path.
 
 #### Step 0: Prerequisites
 

@@ -12,7 +12,13 @@ EntityGeometryMaterial::EntityGeometryMaterial(sparkium::EntityGeometryMaterial 
   geometry_ = DedicatedCast(entity_.GetGeometry());
   material_ = DedicatedCast(entity_.GetMaterial());
 
+  if (!geometry_ || !material_)
+    throw std::runtime_error("ray tracing requires supported geometry and material components");
+
   light_geom_mat_ = std::make_unique<LightGeometryMaterial>(core_, geometry_, material_, entity_.transform);
+
+  if (!core_->GraphicsCore()->DeviceRayTracingSupport())
+    return;
 
   if (dynamic_cast<GeometryMesh *>(geometry_)) {
     if (dynamic_cast<MaterialLambertian *>(material_)) {
@@ -44,11 +50,20 @@ EntityGeometryMaterial::EntityGeometryMaterial(sparkium::EntityGeometryMaterial 
 }
 
 void EntityGeometryMaterial::Update(Scene *scene) {
+  if (!geometry_ || !material_ || geometry_->PrimitiveCount() == 0)
+    return;
   material_->Update(scene);
   int32_t light_index = scene->RegisterLight(light_geom_mat_.get());
-  int32_t instance_index = scene->RegisterInstance(
-      geometry_->BLAS(), entity_.GetTransformation(), scene->RegisterHitGroup(hit_groups_),
-      scene->RegisterBuffer(geometry_->Buffer()), scene->RegisterBuffer(material_->Buffer()), light_index);
+  int32_t instance_index;
+  if (scene->SoftwareTracing()) {
+    if (!dynamic_cast<GeometryMesh *>(geometry_))
+      throw std::runtime_error("compute ray tracing currently requires triangle geometry");
+    instance_index = scene->RegisterSoftwareInstance(geometry_, material_, entity_.GetTransformation(), light_index);
+  } else {
+    instance_index = scene->RegisterInstance(
+        geometry_->BLAS(), entity_.GetTransformation(), scene->RegisterHitGroup(hit_groups_),
+        scene->RegisterBuffer(geometry_->Buffer()), scene->RegisterBuffer(material_->Buffer()), light_index);
+  }
   scene->LightCustomIndex(light_index) = instance_index;
 }
 

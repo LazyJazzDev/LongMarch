@@ -24,7 +24,7 @@ void Core::Render(Scene *scene, Camera *camera, Film *film, RenderPipeline rende
     if (core_->DeviceRayTracingSupport()) {
       render_pipeline = RENDER_PIPELINE_RAY_TRACING;
     } else {
-      render_pipeline = RENDER_PIPELINE_RASTERIZATION;
+      render_pipeline = RENDER_PIPELINE_RT_FALLBACK;
     }
   }
   switch (render_pipeline) {
@@ -33,10 +33,13 @@ void Core::Render(Scene *scene, Camera *camera, Film *film, RenderPipeline rende
       break;
     case RENDER_PIPELINE_RAY_TRACING:
       if (!core_->DeviceRayTracingSupport()) {
-        LogError("Ray tracing not supported on this device");
-        return;
+        raytracing::Render(this, scene, camera, film, true);
+        break;
       }
       raytracing::Render(this, scene, camera, film);
+      break;
+    case RENDER_PIPELINE_RT_FALLBACK:
+      raytracing::Render(this, scene, camera, film, true);
       break;
     default:
       LogError("Unknown render pipeline");

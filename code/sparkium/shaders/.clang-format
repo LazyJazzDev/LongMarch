@@ -1,0 +1,3 @@
+BasedOnStyle: InheritParentConfig
+# HLSL declarations in these includes depend on their source order.
+SortIncludes: Never

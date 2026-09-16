@@ -7,6 +7,8 @@ namespace grassland::graphics {
 
 const char *BackendAPIString(BackendAPI api) {
   switch (api) {
+    case BACKEND_API_METAL:
+      return "Metal";
     case BACKEND_API_VULKAN:
       return "Vulkan";
     case BACKEND_API_D3D12:
@@ -18,6 +20,9 @@ const char *BackendAPIString(BackendAPI api) {
 
 bool SupportBackendAPI(BackendAPI api) {
   switch (api) {
+#if defined(LONGMARCH_METAL_ENABLED)
+    case BACKEND_API_METAL: return true;
+#endif
 #if defined(LONGMARCH_D3D12_ENABLED)
     case BACKEND_API_D3D12:
       return true;
@@ -163,6 +168,7 @@ uint32_t PixelSize(ImageFormat format) {
 #if defined(LONGMARCH_PYTHON_ENABLED)
 void util::PybindModuleRegistration(py::module_ &m) {
   py::enum_<BackendAPI> backend_api(m, "BackendAPI");
+  backend_api.value("BACKEND_API_METAL", BACKEND_API_METAL, "Backend API: Metal");
   backend_api.value("BACKEND_API_VULKAN", BACKEND_API_VULKAN, "Backend API: Vulkan");
   backend_api.value("BACKEND_API_D3D12", BACKEND_API_D3D12, "Backend API: Direct3D 12");
   backend_api.export_values();
