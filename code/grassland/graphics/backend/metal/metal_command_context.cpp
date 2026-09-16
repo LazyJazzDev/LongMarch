@@ -8,7 +8,9 @@
 #include "grassland/graphics/backend/metal/metal_image.h"
 #include "grassland/graphics/backend/metal/metal_program.h"
 #include "grassland/graphics/backend/metal/metal_sampler.h"
+#ifndef LONGMARCH_HEADLESS
 #include "grassland/graphics/backend/metal/metal_window.h"
+#endif
 
 namespace grassland::graphics::backend {
 
@@ -339,8 +341,12 @@ void MetalCommandContext::CmdCopyBuffer(Buffer *dst,
 }
 
 void MetalCommandContext::CmdPresent(Window *window, Image *image) {
+#ifndef LONGMARCH_HEADLESS
   EndEncoder();
   dynamic_cast<MetalWindow *>(window)->Present(command_.get(), dynamic_cast<MetalImage *>(image));
+#else
+  throw std::runtime_error("Window presentation is unavailable in a headless build");
+#endif
 }
 
 }  // namespace grassland::graphics::backend

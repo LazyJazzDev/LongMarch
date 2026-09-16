@@ -1,5 +1,9 @@
 #pragma once
+#ifndef LONGMARCH_HEADLESS
 #include "GLFW/glfw3.h"
+#else
+struct GLFWwindow;
+#endif
 #include "glm/glm.hpp"
 #include "grassland/util/util.h"
 

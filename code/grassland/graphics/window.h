@@ -1,6 +1,10 @@
 #pragma once
 #include "grassland/graphics/graphics_util.h"
+#ifndef LONGMARCH_HEADLESS
 #include "imgui.h"
+#else
+struct ImGuiContext;
+#endif
 
 namespace grassland::graphics {
 

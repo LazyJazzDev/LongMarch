@@ -1,5 +1,8 @@
 #include "grassland/graphics/shader.h"
 
+#include "grassland/graphics/shader_cache.h"
+
+#ifndef LONGMARCH_OFFLINE_SHADERS
 #ifdef _WIN64
 #include "d3dcompiler.h"
 #endif
@@ -13,12 +16,15 @@
 #include "dxcapi.h"
 #endif
 
+#endif
+
 namespace grassland::graphics {
 
 namespace {
 #include "built_in_shaders.inl"
 }
 
+#ifndef LONGMARCH_OFFLINE_SHADERS
 #define SAFE_RELEASE(p) \
   if (p) {              \
     p->Release();       \
@@ -107,6 +113,8 @@ class CustomVFSIncludeHandler : public IDxcIncludeHandler {
   std::set<std::filesystem::path> accessed_paths_;
 };
 
+#endif
+
 #if defined(LONGMARCH_PYTHON_ENABLED)
 void Shader::PybindClassRegistration(py::classh<Shader> &c) {
   c.def("entry_point", &Shader::EntryPoint, "Get the shader entry point");
@@ -128,10 +136,20 @@ CompiledShaderBlob CompileShader(const VirtualFileSystem &vfs,
                                  const std::string &entry_point,
                                  const std::string &target,
                                  const std::vector<std::string> &args) {
-  HRESULT hr;
-
   CompiledShaderBlob shader_blob;
   shader_blob.entry_point = entry_point;
+#ifdef __APPLE__
+  std::string cache_key;
+  if (!GetShaderCacheSettings().directory.empty()) {
+    cache_key = ShaderRequestKey(vfs, source_file, entry_point, target, args);
+    if (ReadShaderCache(cache_key, shader_blob.data))
+      return shader_blob;
+  }
+#endif
+#ifdef LONGMARCH_OFFLINE_SHADERS
+  throw std::runtime_error("Offline shaders require a prepared shader cache");
+#else
+  HRESULT hr;
 
 #if defined(_DEBUG)
   // Enable better shader debugging with the graphics debugging tools.
@@ -218,7 +236,12 @@ CompiledShaderBlob CompileShader(const VirtualFileSystem &vfs,
     LogError("Failed to compile shader.");
   }
 
+#ifdef __APPLE__
+  if (!cache_key.empty() && !shader_blob.data.empty())
+    WriteShaderCache(cache_key, shader_blob.data);
+#endif
   return shader_blob;
+#endif
 }
 
 }  // namespace grassland::graphics
