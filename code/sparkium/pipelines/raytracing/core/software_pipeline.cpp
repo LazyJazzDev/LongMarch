@@ -6,6 +6,7 @@
 #include <sstream>
 #include <stdexcept>
 
+#include "grassland/graphics/frame_profile.h"
 #include "sparkium/pipelines/raytracing/core/core.h"
 #include "sparkium/pipelines/raytracing/core/geometry.h"
 #include "sparkium/pipelines/raytracing/core/material.h"
@@ -55,6 +56,7 @@ void SoftwarePipeline::AddInstance(Geometry *geometry,
   instances_.push_back({geometry, material, transform, geometry_index});
 }
 void SoftwarePipeline::CompileBuilders(uint32_t buffer_count) {
+  graphics::CpuProfileScope compile_profile("compile_builders");
   auto graphics = core_->GraphicsCore();
   builders_.clear();
   if (builder_shaders_.empty()) {
@@ -82,6 +84,7 @@ void SoftwarePipeline::CompileRenderer(const std::vector<std::string> &materials
                                        uint32_t buffers,
                                        uint32_t sdr_count,
                                        uint32_t hdr_count) {
+  graphics::CpuProfileScope compile_profile("compile_renderer");
   std::ostringstream source;
   for (size_t i = 0; i < materials.size(); ++i) {
     source << "namespace SoftwareMaterial" << i << " {\n"
@@ -166,6 +169,7 @@ void SoftwarePipeline::Update(graphics::CommandContext *commands,
                               uint32_t sdr_count,
                               uint32_t hdr_count) {
   auto graphics = core_->GraphicsCore();
+  graphics::CpuProfileScope prepare_profile("software_prepare");
   std::vector<GeometryLayout> geometries;
   std::vector<GPUInstance> gpu_instances;
   std::vector<std::string> materials;
@@ -239,6 +243,15 @@ void SoftwarePipeline::Update(graphics::CommandContext *commands,
   if (!parameters_buffer_ || parameters_buffer_->Size() < parameter_bytes)
     graphics->CreateBuffer(parameter_bytes, graphics::BUFFER_TYPE_STATIC, &parameters_buffer_);
   parameters_buffer_->UploadData(parameters.data(), parameter_bytes);
+  prepare_profile.End();
+  if (graphics::FrameProfile::active) {
+    graphics::FrameProfile::active->counters["bvh_dispatches"] = passes.size();
+    graphics::FrameProfile::active->counters["blas_rebuilt"] = rebuild;
+    graphics::FrameProfile::active->counters["instances"] = instances_.size();
+    graphics::FrameProfile::active->counters["bvh_nodes"] = node_count;
+  }
+  graphics::CpuProfileScope record_profile("bvh_record");
+  graphics::GpuProfileScope build_profile(commands, "bvh_build");
   for (size_t i = 0; i < passes.size(); ++i) {
     commands->CmdBindComputeProgram(builders_[passes[i].kernel].get());
     commands->CmdBindResources(0, {nodes_.get()}, graphics::BIND_POINT_COMPUTE);

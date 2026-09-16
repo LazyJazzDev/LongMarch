@@ -120,7 +120,17 @@ wall times include scene loading and shader compilation and are not benchmarks.
 - Coincident transparent surfaces and edge ties can resolve differently between
   software and native traversal. Monte Carlo path divergence prevents a general
   promise of bit-identical output.
-- The assets snapshot contains two classroom mesh names differing only by case
-  (`blackBoardLamp_m0.spmesh` and `blackboardLamp_m0.spmesh`). Case-insensitive
-  checkouts cannot represent both and report a dirty submodule. This branch does
-  not modify that asset content; the six basic demo checks are unaffected.
+
+The classroom lamp meshes use distinct names on case-insensitive filesystems:
+`blackboard_lamp_fixture_m0.spmesh` for the fixture and
+`blackboard_lamp_emitter_m0.spmesh` for the emitting surface. Their original
+binary contents are preserved, and scene geometry IDs and references match
+these names.
+
+## Frame profiling
+
+Use `--frames 24 --profile timings.csv` with the CLI for optional Vulkan GPU
+timestamps and host wall-time scopes. `scripts/profile_rt_fallback.py` runs the
+six basic scenes with warmup exclusion and produces CSV / JSON results.
+See [the M5 performance analysis](rt-fallback-profile.md) for measurements,
+profiling overhead checks, and the distinction between GPU work and host waits.

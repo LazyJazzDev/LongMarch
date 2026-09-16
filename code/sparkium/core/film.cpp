@@ -1,5 +1,6 @@
 #include "sparkium/core/film.h"
 
+#include "grassland/graphics/frame_profile.h"
 #include "sparkium/core/core.h"
 
 namespace sparkium {
@@ -38,13 +39,19 @@ int Film::GetHeight() const {
 }
 
 void Film::Develop(graphics::Image *targ_image) {
+  graphics::CpuProfileScope develop_profile("develop");
   std::unique_ptr<graphics::CommandContext> cmd_context;
   core_->GraphicsCore()->CreateCommandContext(&cmd_context);
+  graphics::GpuProfileScope tone_profile(cmd_context.get(), "tone_map");
   cmd_context->CmdBindComputeProgram(core_->GetComputeProgram("tone_mapping"));
   cmd_context->CmdBindResources(0, {raw_image_.get()}, graphics::BIND_POINT_COMPUTE);
   cmd_context->CmdBindResources(1, {targ_image}, graphics::BIND_POINT_COMPUTE);
   cmd_context->CmdDispatch((targ_image->Extent().width + 7) / 8, (targ_image->Extent().height + 7) / 8, 1);
+  tone_profile.End();
+  graphics::CpuProfileScope submit_profile("develop_submit");
   core_->GraphicsCore()->SubmitCommandContext(cmd_context.get());
+  submit_profile.End();
+  graphics::CpuProfileScope wait_profile("develop_wait");
   core_->GraphicsCore()->WaitGPU();
 }
 

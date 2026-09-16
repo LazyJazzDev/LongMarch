@@ -11,7 +11,6 @@ from pathlib import Path
 import subprocess
 import time
 
-from PIL import Image, ImageChops, ImageDraw, ImageStat
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -36,6 +35,8 @@ def read_scene(path):
 
 
 def main():
+    from PIL import Image, ImageChops, ImageDraw, ImageStat
+
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--cli", type=Path, required=True)
     parser.add_argument("--output", type=Path, default=ROOT / "out/rt-fallback")
