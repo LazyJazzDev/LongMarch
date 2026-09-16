@@ -134,13 +134,30 @@ int main(int argc, char **argv) {
         }
         ImGui::EndCombo();
       }
-      int pipeline_index = static_cast<int>(pipeline);
       const std::string auto_label =
           std::string("Auto (") + PipelineName(core.ResolveRenderPipeline(sparkium::RENDER_PIPELINE_AUTO)) + ")";
-      const char *pipelines[] = {"Rasterization", "Ray tracing", auto_label.c_str(), "RT Fallback", "Native ray query"};
-      if (ImGui::Combo("Pipeline", &pipeline_index, pipelines, graphics_core->DeviceRayQuerySupport() ? 5 : 4)) {
-        pipeline = static_cast<sparkium::RenderPipeline>(pipeline_index);
-        loaded->GetFilm()->Reset();
+      const auto selected_pipeline =
+          pipeline == sparkium::RENDER_PIPELINE_AUTO ? pipeline : core.ResolveRenderPipeline(pipeline);
+      const char *pipeline_label =
+          selected_pipeline == sparkium::RENDER_PIPELINE_AUTO ? auto_label.c_str() : PipelineName(selected_pipeline);
+      if (ImGui::BeginCombo("Pipeline", pipeline_label)) {
+        for (auto option : {sparkium::RENDER_PIPELINE_AUTO, sparkium::RENDER_PIPELINE_RASTERIZATION,
+                            sparkium::RENDER_PIPELINE_RAY_TRACING, sparkium::RENDER_PIPELINE_RT_FALLBACK,
+                            sparkium::RENDER_PIPELINE_RAY_QUERY}) {
+          if (option == sparkium::RENDER_PIPELINE_RAY_TRACING && !graphics_core->DeviceRayTracingSupport())
+            continue;
+          if (option == sparkium::RENDER_PIPELINE_RAY_QUERY && !graphics_core->DeviceRayQuerySupport())
+            continue;
+          const bool current = option == selected_pipeline;
+          const char *label = option == sparkium::RENDER_PIPELINE_AUTO ? auto_label.c_str() : PipelineName(option);
+          if (ImGui::Selectable(label, current) && pipeline != option) {
+            pipeline = option;
+            loaded->GetFilm()->Reset();
+          }
+          if (current)
+            ImGui::SetItemDefaultFocus();
+        }
+        ImGui::EndCombo();
       }
       int &samples = loaded->GetScene()->settings.samples_per_dispatch;
       if (ImGui::SliderInt("Samples / frame", &samples, 1, 256)) loaded->GetFilm()->Reset();

@@ -22,7 +22,9 @@ retain their previous behavior. Vulkan and D3D12 query support is
 not enabled by this experiment and requesting it is rejected.
 
 The GUI displays the resolved pipeline in the Auto option and status, for
-example `Auto (Native ray query)`. Its separate Backend label shows the actual
+example `Auto (Native ray query)`. Auto is the first option; pipeline RT and
+native ray query options are shown only when their respective capabilities are
+supported. Its separate Backend label shows the actual
 graphics API, such as Metal. Both rendering and display use
 `Core::ResolveRenderPipeline()` so that the reported choice matches execution.
 
