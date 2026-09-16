@@ -1,0 +1,7 @@
+interface:
+  display_name: "LongMarch 项目原则"
+  short_description: "LongMarch commit, squash merge, and asset conventions"
+  default_prompt: "Use $longmarch-project-principles to follow the project conventions for this LongMarch task."
+
+policy:
+  allow_implicit_invocation: true
