@@ -15,12 +15,15 @@ using namespace long_march;
 namespace {
 void Usage(const char *program) {
   std::cerr << "Usage: " << program << " <scene.json> [-o image.png] [--frames N] "
-            << "[--backend auto|metal|vulkan|d3d12] [--pipeline auto|rasterization|ray_tracing|rt_fallback] [--require-hardware-rt] [--debug] [--profile "
+            << "[--backend auto|metal|vulkan|d3d12] [--pipeline auto|rasterization|ray_tracing|rt_fallback|ray_query] "
+               "[--require-hardware-rt] [--debug] [--profile "
                "timings.csv] [--profile-cpu-only|--profile-alternate-gpu]\n"
             << "       " << program << " --list [scene-directory]\n";
 }
 
 sparkium::RenderPipeline ParsePipeline(const std::string &name) {
+  if (name == "ray_query")
+    return sparkium::RENDER_PIPELINE_RAY_QUERY;
   if (name == "rt_fallback")
     return sparkium::RENDER_PIPELINE_RT_FALLBACK;
   if (name == "auto") return sparkium::RENDER_PIPELINE_AUTO;
@@ -97,6 +100,8 @@ int main(int argc, char **argv) {
     auto loaded = sparkium::JsonScene::Load(&core, scene_path, &error);
     if (!loaded) throw std::runtime_error(error);
     if (!override_pipeline) pipeline = loaded->GetRenderPipeline();
+    if (core.ResolveRenderPipeline(pipeline) == sparkium::RENDER_PIPELINE_RAY_QUERY)
+      std::cout << "Tracing: native ray query (compute, native AS)\n";
 
     auto *film = loaded->GetFilm();
     std::unique_ptr<graphics::Image> image;

@@ -7,7 +7,11 @@ RWTexture2D<float> accumulated_samples : register(u0, space1);
 ConstantBuffer<RenderSettings> render_settings : register(b0, space3);
 #define SOBOL_TABLE
 #ifdef SPARKIUM_SOFTWARE_RT
+#ifdef SPARKIUM_RAY_QUERY
+RaytracingAccelerationStructure query_scene : register(t0, space2);
+#else
 ByteAddressBuffer software_nodes : register(t0, space2);
+#endif
 ByteAddressBuffer data_buffers[] : register(t0, space4);
 #define sobol_table data_buffers[SOFTWARE_DATA_BUFFER_COUNT]
 #define camera_data data_buffers[SOFTWARE_DATA_BUFFER_COUNT + 1]

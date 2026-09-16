@@ -8,7 +8,7 @@ namespace grassland::graphics::backend {
 
 namespace {
 void AddBinding(std::vector<MetalBinding> &bindings, ResourceType type, int count) {
-  if (count <= 0 || type == RESOURCE_TYPE_ACCELERATION_STRUCTURE)
+  if (count <= 0 || (type == RESOURCE_TYPE_ACCELERATION_STRUCTURE && count != 1))
     throw std::invalid_argument("unsupported Metal resource binding");
   bindings.push_back({type, count});
 }

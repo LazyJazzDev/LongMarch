@@ -4,6 +4,7 @@
 #include <filesystem>
 #include <stdexcept>
 
+#include "grassland/graphics/backend/metal/metal_acceleration_structure.h"
 #include "grassland/graphics/backend/metal/metal_buffer.h"
 #include "grassland/graphics/backend/metal/metal_command_context.h"
 #include "grassland/graphics/backend/metal/metal_image.h"
@@ -171,21 +172,30 @@ int MetalCore::CreateBottomLevelAccelerationStructure(BufferRange,
                                                       double_ptr<AccelerationStructure>) {
   return -1;
 }
-int MetalCore::CreateBottomLevelAccelerationStructure(BufferRange,
-                                                      BufferRange,
-                                                      uint32_t,
-                                                      uint32_t,
-                                                      uint32_t,
-                                                      RayTracingGeometryFlag,
-                                                      double_ptr<AccelerationStructure>) {
-  return -1;
+int MetalCore::CreateBottomLevelAccelerationStructure(BufferRange vertices,
+                                                      BufferRange indices,
+                                                      uint32_t vertex_count,
+                                                      uint32_t stride,
+                                                      uint32_t triangle_count,
+                                                      RayTracingGeometryFlag flags,
+                                                      double_ptr<AccelerationStructure> result) {
+  result.construct<MetalAccelerationStructure>(this, vertices, indices, vertex_count, stride, triangle_count, flags);
+  return 0;
 }
-int MetalCore::CreateBottomLevelAccelerationStructure(Buffer *, Buffer *, uint32_t, double_ptr<AccelerationStructure>) {
-  return -1;
+int MetalCore::CreateBottomLevelAccelerationStructure(Buffer *vertices,
+                                                      Buffer *indices,
+                                                      uint32_t stride,
+                                                      double_ptr<AccelerationStructure> result) {
+  if (!vertices || !indices || stride < 12 || vertices->Size() / stride > UINT32_MAX ||
+      indices->Size() / 12 > UINT32_MAX)
+    throw std::invalid_argument("invalid Metal mesh buffers");
+  return CreateBottomLevelAccelerationStructure(vertices->Range(), indices->Range(), vertices->Size() / stride, stride,
+                                                indices->Size() / 12, RAYTRACING_GEOMETRY_FLAG_NONE, result);
 }
-int MetalCore::CreateTopLevelAccelerationStructure(const std::vector<RayTracingInstance> &,
-                                                   double_ptr<AccelerationStructure>) {
-  return -1;
+int MetalCore::CreateTopLevelAccelerationStructure(const std::vector<RayTracingInstance> &instances,
+                                                   double_ptr<AccelerationStructure> result) {
+  result.construct<MetalAccelerationStructure>(this, instances);
+  return 0;
 }
 int MetalCore::CreateRayTracingProgram(double_ptr<RayTracingProgram>) {
   return -1;

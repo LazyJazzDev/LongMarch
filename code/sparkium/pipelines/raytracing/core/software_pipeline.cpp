@@ -43,7 +43,9 @@ struct GPUInstance {
 static_assert(sizeof(GPUInstance) == 112, "HLSL software instance layout changed");
 }  // namespace
 
-SoftwarePipeline::SoftwarePipeline(Core *core) : core_(core) {
+SoftwarePipeline::SoftwarePipeline(Core *core, bool ray_query) : core_(core), ray_query_(ray_query) {
+  if (ray_query_ && !core_->GraphicsCore()->DeviceRayQuerySupport())
+    throw std::runtime_error("native ray queries are unavailable on the selected backend");
   static_assert(sizeof(BuildParameters) == 256, "uniform buffer alignment");
 }
 void SoftwarePipeline::ClearInstances() {
@@ -120,20 +122,22 @@ float Transmission(HitRecord hit, float3 direction) {
   auto vfs = core_->GetShadersVFS();
   vfs.WriteFile("software_materials.hlsli", source.str());
   render_program_.reset();
-  if (core_->GraphicsCore()->CreateShader(vfs, "software/render.hlsl", "Main", "cs_6_0",
-                                          {"-I.", "-DSOFTWARE_DATA_BUFFER_COUNT=" + std::to_string(buffers)},
+  std::vector<std::string> args{"-I.", "-DSOFTWARE_DATA_BUFFER_COUNT=" + std::to_string(buffers)};
+  if (ray_query_)
+    args.push_back("-DSPARKIUM_RAY_QUERY");
+  if (core_->GraphicsCore()->CreateShader(vfs, "software/render.hlsl", "Main", ray_query_ ? "cs_6_5" : "cs_6_0", args,
                                           &render_shader_))
     throw std::runtime_error("failed to compile compute ray tracing shader");
   core_->GraphicsCore()->CreateComputeProgram(render_shader_.get(), &render_program_);
-  for (auto binding :
-       std::vector<std::pair<graphics::ResourceType, uint32_t>>{{graphics::RESOURCE_TYPE_WRITABLE_IMAGE, 1},
-                                                                {graphics::RESOURCE_TYPE_WRITABLE_IMAGE, 1},
-                                                                {graphics::RESOURCE_TYPE_STORAGE_BUFFER, 1},
-                                                                {graphics::RESOURCE_TYPE_UNIFORM_BUFFER, 1},
-                                                                {graphics::RESOURCE_TYPE_STORAGE_BUFFER, buffers + 6},
-                                                                {graphics::RESOURCE_TYPE_IMAGE, sdr_count},
-                                                                {graphics::RESOURCE_TYPE_IMAGE, hdr_count},
-                                                                {graphics::RESOURCE_TYPE_SAMPLER, 2}})
+  for (auto binding : std::vector<std::pair<graphics::ResourceType, uint32_t>>{
+           {graphics::RESOURCE_TYPE_WRITABLE_IMAGE, 1},
+           {graphics::RESOURCE_TYPE_WRITABLE_IMAGE, 1},
+           {ray_query_ ? graphics::RESOURCE_TYPE_ACCELERATION_STRUCTURE : graphics::RESOURCE_TYPE_STORAGE_BUFFER, 1},
+           {graphics::RESOURCE_TYPE_UNIFORM_BUFFER, 1},
+           {graphics::RESOURCE_TYPE_STORAGE_BUFFER, buffers + 6},
+           {graphics::RESOURCE_TYPE_IMAGE, sdr_count},
+           {graphics::RESOURCE_TYPE_IMAGE, hdr_count},
+           {graphics::RESOURCE_TYPE_SAMPLER, 2}})
     render_program_->AddResourceBinding(binding.first, binding.second);
   render_program_->Finalize();
   material_sources_ = materials;
@@ -172,17 +176,18 @@ void SoftwarePipeline::Update(graphics::CommandContext *commands,
   graphics::CpuProfileScope prepare_profile("software_prepare");
   std::vector<GeometryLayout> geometries;
   std::vector<GPUInstance> gpu_instances;
+  std::vector<graphics::RayTracingInstance> native_instances;
   std::vector<std::string> materials;
   if (16ull + instances_.size() * sizeof(GPUInstance) > std::numeric_limits<uint32_t>::max())
     throw std::runtime_error("software instance byte address overflow");
-  const uint32_t tlas_leaves = LeafCount(instances_.size());
+  const uint32_t tlas_leaves = ray_query_ ? 1 : LeafCount(instances_.size());
   uint64_t node_count = uint64_t(tlas_leaves) * 2 - 1;
   uint32_t max_leaves = tlas_leaves;
   for (const auto &instance : instances_) {
     auto geometry = std::find_if(geometries.begin(), geometries.end(),
                                  [&](const GeometryLayout &g) { return g.geometry == instance.geometry; });
     if (geometry == geometries.end()) {
-      const uint32_t count = instance.geometry->PrimitiveCount(), leaves = LeafCount(count);
+      const uint32_t count = instance.geometry->PrimitiveCount(), leaves = ray_query_ ? 1 : LeafCount(count);
       if (node_count + uint64_t(leaves) * 2 - 1 > std::numeric_limits<uint32_t>::max() / 32u)
         throw std::runtime_error("software BVH node address overflow");
       geometries.push_back(
@@ -201,11 +206,18 @@ void SoftwarePipeline::Update(graphics::CommandContext *commands,
       throw std::runtime_error("software ray tracing requires invertible instance transforms");
     gpu_instances.push_back({instance.transform, glm::mat4x3(glm::inverse(object_to_world)), geometry->root,
                              instance.geometry_index, material_index, geometry->count});
+    if (ray_query_) {
+      auto blas = instance.geometry->BLAS();
+      if (!blas)
+        throw std::runtime_error("failed to build native triangle BLAS");
+      native_instances.push_back(
+          blas->MakeInstance(instance.transform, static_cast<uint32_t>(native_instances.size())));
+    }
   }
   bool rebuild = !nodes_ || tlas_leaves != tlas_leaves_ || geometries.size() != geometries_.size();
   for (size_t i = 0; !rebuild && i < geometries.size(); ++i)
     rebuild = geometries[i].geometry != geometries_[i].geometry || geometries[i].count != geometries_[i].count;
-  if (rebuild) {
+  if (rebuild && !ray_query_) {
     graphics->CreateBuffer(node_count * 32, graphics::BUFFER_TYPE_STATIC, &nodes_);
     graphics->CreateBuffer(uint64_t(max_leaves) * 8, graphics::BUFFER_TYPE_STATIC, &keys_);
   }
@@ -216,6 +228,22 @@ void SoftwarePipeline::Update(graphics::CommandContext *commands,
   instances_buffer_->UploadData(header.data(), sizeof(header));
   if (!gpu_instances.empty())
     instances_buffer_->UploadData(gpu_instances.data(), gpu_instances.size() * sizeof(GPUInstance), 16);
+  if (ray_query_) {
+    if (!native_tlas_) {
+      if (graphics->CreateTopLevelAccelerationStructure(native_instances, &native_tlas_))
+        throw std::runtime_error("failed to create native TLAS");
+    } else if (native_tlas_->UpdateInstances(native_instances)) {
+      throw std::runtime_error("failed to update native TLAS");
+    }
+    if (!render_program_ || materials != material_sources_ || buffer_count_ != buffers.size() ||
+        sdr_count_ != sdr_count || hdr_count_ != hdr_count)
+      CompileRenderer(materials, buffers.size(), sdr_count, hdr_count);
+    if (graphics::FrameProfile::active) {
+      graphics::FrameProfile::active->counters["native_ray_query"] = 1;
+      graphics::FrameProfile::active->counters["instances"] = instances_.size();
+    }
+    return;
+  }
   if (builders_.empty() || builder_buffer_count_ != buffers.size())
     CompileBuilders(buffers.size());
   if (!render_program_ || materials != material_sources_ || buffer_count_ != buffers.size() ||

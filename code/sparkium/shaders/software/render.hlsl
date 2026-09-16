@@ -7,7 +7,11 @@
 #include "direct_lighting.hlsli"
 #include "geometry/mesh/hit_record.hlsli"
 #include "random.hlsli"
+#ifdef SPARKIUM_RAY_QUERY
+#include "ray_query/traversal.hlsli"
+#else
 #include "software/traversal.hlsli"
+#endif
 
 #include "software_materials.hlsli"
 

@@ -8,12 +8,13 @@ and importer extensions follow in `blender-align`, based on this branch.
 
 | Pipeline | Behavior |
 | --- | --- |
-| `auto` | Hardware ray tracing when available, otherwise compute ray tracing |
+| `auto` | Pipeline RT when available, otherwise native ray query, otherwise software compute tracing |
 | `ray_tracing` | Hardware ray tracing when available, otherwise compute ray tracing |
 | `rt_fallback` | Force compute ray tracing, including on hardware RT devices |
+| `ray_query` | Experimental native inline queries on Metal; see [research and measurements](metal-ray-query.md) |
 | `rasterization` | Existing raster renderer |
 
-Use `renderer.pipeline` in scene JSON, the GUI's **Compute ray tracing** option,
+Use `renderer.pipeline` in scene JSON, the GUI's **Path Tracing - Fallback** option,
 or `sparkium::RENDER_PIPELINE_RT_FALLBACK` in C++. The CLI accepts:
 
 ```sh
@@ -21,10 +22,11 @@ cmake-build-rt-fallback/demo/sparkium_cli/demo_sparkium_cli \
   assets/scenes/cornell_box/scene.json --pipeline rt_fallback -o output.png
 ```
 
-For hardware comparisons, always add `--require-hardware-rt` to a
+For pipeline RT comparisons, always add `--require-hardware-rt` to a
 `--pipeline ray_tracing` run. It fails if the selected device lacks hardware RT,
 preventing accidental comparison of the fallback against itself. `--debug`
-enables graphics validation.
+enables graphics validation. This flag checks pipeline RT support and is not
+applicable to Metal `ray_query` (whether selected explicitly or by `auto`).
 
 The fallback requires the engine's existing compute, descriptor-array and
 storage-image support. It does not create native acceleration structures or

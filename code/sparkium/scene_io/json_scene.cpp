@@ -176,12 +176,14 @@ std::unique_ptr<JsonScene> JsonScene::Load(Core *core, const std::filesystem::pa
       result->render_pipeline_ = RENDER_PIPELINE_RASTERIZATION;
     else if (pipeline == "ray_tracing")
       result->render_pipeline_ = RENDER_PIPELINE_RAY_TRACING;
+    else if (pipeline == "ray_query")
+      result->render_pipeline_ = RENDER_PIPELINE_RAY_QUERY;
     else if (pipeline == "rt_fallback")
       result->render_pipeline_ = RENDER_PIPELINE_RT_FALLBACK;
     else if (pipeline == "auto")
       result->render_pipeline_ = RENDER_PIPELINE_AUTO;
     else
-      throw std::runtime_error("renderer.pipeline must be auto, rasterization, ray_tracing, or rt_fallback");
+      throw std::runtime_error("renderer.pipeline must be auto, rasterization, ray_tracing, rt_fallback, or ray_query");
 
     const auto &film = RequireObject(Member(document, "film"));
     int width = ReadInt(Member(film, "width"));

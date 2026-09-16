@@ -1,0 +1,21 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "LongMarch: refresh Metal compile commands",
+      "type": "process",
+      "command": "cmake",
+      "args": ["-S", "${workspaceFolder}", "-B", "${workspaceFolder}/cmake-build-metal", "-DCMAKE_EXPORT_COMPILE_COMMANDS=ON"],
+      "problemMatcher": []
+    },
+    {
+      "label": "LongMarch: build Sparkium Metal",
+      "type": "process",
+      "command": "cmake",
+      "args": ["--build", "${workspaceFolder}/cmake-build-metal", "--target", "demo_sparkium_cli", "demo_sparkium_gui", "sparkium_fallback_test", "-j", "8"],
+      "dependsOn": "LongMarch: refresh Metal compile commands",
+      "group": {"kind": "build", "isDefault": true},
+      "problemMatcher": "$gcc"
+    }
+  ]
+}

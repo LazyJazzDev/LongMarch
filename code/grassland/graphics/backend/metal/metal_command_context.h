@@ -67,6 +67,7 @@ class MetalCommandContext : public CommandContext {
     std::vector<BufferRange> buffers;
     std::vector<Image *> images;
     std::vector<Sampler *> samplers;
+    AccelerationStructure *acceleration_structure = nullptr;
   };
   void BindStage(MetalStage &stage, const std::vector<MetalBinding> &layout, BindPoint point, bool vertex = false);
   void PrepareDraw();

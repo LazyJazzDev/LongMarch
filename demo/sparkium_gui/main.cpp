@@ -11,10 +11,12 @@ using namespace long_march;
 namespace {
 const char *PipelineName(sparkium::RenderPipeline pipeline) {
   switch (pipeline) {
+    case sparkium::RENDER_PIPELINE_RAY_QUERY:
+      return "Path Tracing - Ray Query";
     case sparkium::RENDER_PIPELINE_RT_FALLBACK:
-      return "Compute ray tracing";
+      return "Path Tracing - Fallback";
     case sparkium::RENDER_PIPELINE_RASTERIZATION: return "Rasterization";
-    case sparkium::RENDER_PIPELINE_RAY_TRACING: return "Ray tracing";
+    case sparkium::RENDER_PIPELINE_RAY_TRACING: return "Path Tracing";
     default: return "Auto";
   }
 }
@@ -132,11 +134,30 @@ int main(int argc, char **argv) {
         }
         ImGui::EndCombo();
       }
-      int pipeline_index = static_cast<int>(pipeline);
-      const char *pipelines[] = {"Rasterization", "Ray tracing", "Auto", "Compute ray tracing"};
-      if (ImGui::Combo("Pipeline", &pipeline_index, pipelines, 4)) {
-        pipeline = static_cast<sparkium::RenderPipeline>(pipeline_index);
-        loaded->GetFilm()->Reset();
+      const std::string auto_label =
+          std::string("Auto (") + PipelineName(core.ResolveRenderPipeline(sparkium::RENDER_PIPELINE_AUTO)) + ")";
+      const auto selected_pipeline =
+          pipeline == sparkium::RENDER_PIPELINE_AUTO ? pipeline : core.ResolveRenderPipeline(pipeline);
+      const char *pipeline_label =
+          selected_pipeline == sparkium::RENDER_PIPELINE_AUTO ? auto_label.c_str() : PipelineName(selected_pipeline);
+      if (ImGui::BeginCombo("Pipeline", pipeline_label)) {
+        for (auto option : {sparkium::RENDER_PIPELINE_AUTO, sparkium::RENDER_PIPELINE_RASTERIZATION,
+                            sparkium::RENDER_PIPELINE_RAY_TRACING, sparkium::RENDER_PIPELINE_RT_FALLBACK,
+                            sparkium::RENDER_PIPELINE_RAY_QUERY}) {
+          if (option == sparkium::RENDER_PIPELINE_RAY_TRACING && !graphics_core->DeviceRayTracingSupport())
+            continue;
+          if (option == sparkium::RENDER_PIPELINE_RAY_QUERY && !graphics_core->DeviceRayQuerySupport())
+            continue;
+          const bool current = option == selected_pipeline;
+          const char *label = option == sparkium::RENDER_PIPELINE_AUTO ? auto_label.c_str() : PipelineName(option);
+          if (ImGui::Selectable(label, current) && pipeline != option) {
+            pipeline = option;
+            loaded->GetFilm()->Reset();
+          }
+          if (current)
+            ImGui::SetItemDefaultFocus();
+        }
+        ImGui::EndCombo();
       }
       int &samples = loaded->GetScene()->settings.samples_per_dispatch;
       if (ImGui::SliderInt("Samples / frame", &samples, 1, 256)) loaded->GetFilm()->Reset();
@@ -145,9 +166,29 @@ int main(int argc, char **argv) {
       if (ImGui::Button("Reset film")) loaded->GetFilm()->Reset();
       ImGui::Text("%s", scene_files[selected].string().c_str());
       ImGui::Text("Backend: %s", graphics::BackendAPIString(graphics_core->API()));
-      ImGui::Text("Pipeline: %s", PipelineName(pipeline));
-      if (!load_error.empty()) ImGui::TextColored({1, .3f, .3f, 1}, "%s", load_error.c_str());
-      ImGui::Text("%.1f FPS", fps_counter.TickFPS());
+      const auto resolved_pipeline = core.ResolveRenderPipeline(pipeline);
+      if (resolved_pipeline != pipeline)
+        ImGui::Text("Pipeline: %s (%s)", PipelineName(pipeline), PipelineName(resolved_pipeline));
+      else
+        ImGui::Text("Pipeline: %s", PipelineName(pipeline));
+      const float fps = fps_counter.TickFPS();
+      if (resolved_pipeline == sparkium::RENDER_PIPELINE_RASTERIZATION) {
+        ImGui::TextUnformatted("Ray/s: N/A");
+        ImGui::TextUnformatted("Accumulated spp: N/A");
+      } else {
+        const auto *film = loaded->GetFilm();
+        const double camera_rays_per_second = film->info.accumulated_samples > 0
+                                                  ? static_cast<double>(film->GetWidth()) * film->GetHeight() *
+                                                        loaded->GetScene()->settings.samples_per_dispatch * fps
+                                                  : 0.0;
+        ImGui::Text("Ray/s: %.2f M", camera_rays_per_second / 1e6);
+        if (ImGui::IsItemHovered())
+          ImGui::SetTooltip("Camera rays: width x height x samples per frame x FPS.");
+        ImGui::Text("Accumulated spp: %d", film->info.accumulated_samples);
+      }
+      if (!load_error.empty())
+        ImGui::TextColored({1, .3f, .3f, 1}, "%s", load_error.c_str());
+      ImGui::Text("%.1f FPS", fps);
       ImGui::End();
       window->EndImGuiFrame();
 

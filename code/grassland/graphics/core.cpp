@@ -142,6 +142,7 @@ void Core::PybindClassRegistration(py::classh<Core> &c) {
         "Auto select and initialize logical device, will select device with raytracing support if required");
   c.def("api", &Core::API, "Get the backend API");
   c.def("device_name", &Core::DeviceName, "Get the device name");
+  c.def("ray_query_support", &Core::DeviceRayQuerySupport, "Check native inline ray query support");
   c.def("ray_tracing_support", &Core::DeviceRayTracingSupport, "Check if the device supports ray tracing");
   c.def("debug_enabled", &Core::DebugEnabled, "Check if debug mode is enabled");
   c.def("frames_in_flight", &Core::FramesInFlight, "Get number of frames in flight");
