@@ -4,6 +4,7 @@
 * [Long March](#long-march)
   * [Description](#description)
   * [How to Build](#how-to-build)
+    * [Asset downloads (Git LFS)](#asset-downloads-git-lfs)
     * [Windows](#windows)
     * [Linux](#linux)
     * [macOS](#macos)
@@ -31,6 +32,43 @@ simulation).
 We strongly recommend using [CLion](https://www.jetbrains.com/clion/) as the IDE for development. It has great CMake support for editing, building, and debugging.
 
 [Visual Studio](https://visualstudio.microsoft.com/), [VSCode](https://code.visualstudio.com/), or other IDEs are also fine.
+
+### Asset downloads (Git LFS)
+
+The `assets` submodule uses [Git LFS](https://git-lfs.com/) for models, textures,
+fonts, and binary data. Install Git LFS before cloning with submodules:
+
+- Windows: install Git LFS using the installer linked above.
+- macOS: `brew install git-lfs`.
+- Ubuntu/Debian: `sudo apt install git-lfs`.
+
+Then run `git lfs install` once for your user account. The clone and submodule
+commands below will download the assets required by the checked-out version.
+
+For an existing checkout, run from the repository root:
+
+```bash
+git lfs install
+git submodule sync -- assets
+git submodule update --init --recursive
+git -C assets lfs pull
+```
+
+To defer large asset downloads, use `GIT_LFS_SKIP_SMUDGE=1` with the clone or
+submodule update command (Bash/zsh), then run `git -C assets lfs pull` when needed.
+On PowerShell, set `$env:GIT_LFS_SKIP_SMUDGE = "1"` before cloning and remove it
+with `Remove-Item Env:GIT_LFS_SKIP_SMUDGE` afterward. Build and run demos only
+after downloading their assets; LFS pointer files are not usable models or images.
+
+Use `git submodule update` to follow the asset version pinned by this repository.
+`git submodule update --remote` instead follows an upstream branch and can select
+a different asset version.
+
+The asset URL now points to `LazyJazzDev/LongMarchAssetsLFS`, which starts with
+fresh history. The original `LongMarchAssets` repository is retained for older
+LongMarch commits. Run `git submodule sync -- assets` after switching between
+those revisions, before updating the submodule. Existing clones may retain old
+Git objects locally; fresh clones do not download the old asset repository.
 
 ### Windows
 
