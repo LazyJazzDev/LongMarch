@@ -1,5 +1,7 @@
 #include "grassland/graphics/backend/d3d12/d3d12_commands.h"
 
+#include <algorithm>
+
 #include "grassland/graphics/backend/d3d12/d3d12_command_context.h"
 #include "grassland/graphics/backend/d3d12/d3d12_image.h"
 #include "grassland/graphics/backend/d3d12/d3d12_program.h"
@@ -356,16 +358,25 @@ void D3D12CmdPresent::CompileCommand(D3D12CommandContext *context, ID3D12Graphic
   Extent2D extent;
   extent.width = window_->SwapChain()->Width();
   extent.height = window_->SwapChain()->Height();
+  auto image_extent = image_->Extent();
+  const float scale = std::min(static_cast<float>(extent.width) / image_extent.width,
+                               static_cast<float>(extent.height) / image_extent.height);
+  const float target_width = image_extent.width * scale;
+  const float target_height = image_extent.height * scale;
+  const float target_x = (extent.width - target_width) * 0.5f;
+  const float target_y = (extent.height - target_height) * 0.5f;
   command_list->SetPipelineState(pso->Handle());
   command_list->SetGraphicsRootSignature(root_signature);
   command_list->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
 
   D3D12_RECT scissor_rect = {0, 0, LONG(extent.width), LONG(extent.height)};
   command_list->RSSetScissorRects(1, &scissor_rect);
-  D3D12_VIEWPORT viewport = {0.0f, 0.0f, FLOAT(extent.width), FLOAT(extent.height), 0.0f, 1.0f};
+  D3D12_VIEWPORT viewport = {target_x, target_y, target_width, target_height, 0.0f, 1.0f};
   command_list->RSSetViewports(1, &viewport);
   const auto rtv = context->RTVHandle(window_->CurrentBackBuffer());
   command_list->OMSetRenderTargets(1, &rtv, FALSE, nullptr);
+  const float clear_color[4] = {0.0f, 0.0f, 0.0f, 1.0f};
+  command_list->ClearRenderTargetView(rtv, clear_color, 0, nullptr);
   command_list->SetGraphicsRootDescriptorTable(0, gpu_descriptor);
   command_list->DrawInstanced(6, 1, 0, 0);
 

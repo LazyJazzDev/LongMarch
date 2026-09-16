@@ -1,5 +1,8 @@
 #include "grassland/graphics/backend/vulkan/vulkan_commands.h"
 
+#include <algorithm>
+#include <cmath>
+
 #include "grassland/graphics/backend/vulkan/vulkan_acceleration_structure.h"
 #include "grassland/graphics/backend/vulkan/vulkan_buffer.h"
 #include "grassland/graphics/backend/vulkan/vulkan_command_context.h"
@@ -392,6 +395,24 @@ void VulkanCmdPresent::CompileCommand(VulkanCommandContext *context, VkCommandBu
   auto image_extent = image_->Extent();
   auto window_extent = window_->SwapChain()->Extent();
 
+  VkClearColorValue clear_color{};
+  clear_color.float32[3] = 1.0f;
+  VkImageSubresourceRange clear_range{};
+  clear_range.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+  clear_range.baseMipLevel = 0;
+  clear_range.levelCount = 1;
+  clear_range.baseArrayLayer = 0;
+  clear_range.layerCount = 1;
+  vkCmdClearColorImage(command_buffer, window_->CurrentImage(), VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, &clear_color, 1,
+                       &clear_range);
+
+  const float scale = std::min(static_cast<float>(window_extent.width) / image_extent.width,
+                               static_cast<float>(window_extent.height) / image_extent.height);
+  const int32_t target_width = std::max(1, static_cast<int32_t>(std::round(image_extent.width * scale)));
+  const int32_t target_height = std::max(1, static_cast<int32_t>(std::round(image_extent.height * scale)));
+  const int32_t target_x = (static_cast<int32_t>(window_extent.width) - target_width) / 2;
+  const int32_t target_y = (static_cast<int32_t>(window_extent.height) - target_height) / 2;
+
   VkImageBlit blit{};
   blit.srcOffsets[0] = {0, 0, 0};
   blit.srcOffsets[1] = {static_cast<int32_t>(image_extent.width), static_cast<int32_t>(image_extent.height), 1};
@@ -399,8 +420,8 @@ void VulkanCmdPresent::CompileCommand(VulkanCommandContext *context, VkCommandBu
   blit.srcSubresource.mipLevel = 0;
   blit.srcSubresource.baseArrayLayer = 0;
   blit.srcSubresource.layerCount = 1;
-  blit.dstOffsets[0] = {0, 0, 0};
-  blit.dstOffsets[1] = {static_cast<int32_t>(window_extent.width), static_cast<int32_t>(window_extent.height), 1};
+  blit.dstOffsets[0] = {target_x, target_y, 0};
+  blit.dstOffsets[1] = {target_x + target_width, target_y + target_height, 1};
   blit.dstSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
   blit.dstSubresource.mipLevel = 0;
   blit.dstSubresource.baseArrayLayer = 0;

@@ -54,11 +54,11 @@ void CalculateClosureWeight() {
   float3 T = hit_record.tangent;
   if (anisotropic_rotation != 0.0f)
     T = rotate_around_axis(T, N, anisotropic_rotation * 2.0 * PI);
-  ior = hit_record.front_facing ? ior : 1.0f / ior;
+  const float effective_ior = hit_record.front_facing ? ior : 1.0f / ior;
 
   // calculate fresnel for refraction
   float cosNO = dot(N, I);
-  float fresnel = fresnel_dielectric_cos(cosNO, ior);
+  float fresnel = fresnel_dielectric_cos(cosNO, effective_ior);
 
   // calculate weights of the diffuse and specular part
   float diffuse_weight =
@@ -151,7 +151,7 @@ void CalculateClosureWeight() {
             refl_roughness * refl_roughness;
         microfacet_bsdf_reflect_closure.alpha_y =
             refl_roughness * refl_roughness;
-        microfacet_bsdf_reflect_closure.ior = ior;
+        microfacet_bsdf_reflect_closure.ior = effective_ior;
 
         microfacet_bsdf_reflect_closure.color = base_color;
         microfacet_bsdf_reflect_closure.cspec0 = cspec0;
@@ -170,11 +170,11 @@ void CalculateClosureWeight() {
       {
         microfacet_bsdf_refract_closure.N = N;
 
-        transmission_roughness =
+        const float effective_transmission_roughness =
             1.0f - (1.0f - refl_roughness) * (1.0f - transmission_roughness);
         microfacet_bsdf_refract_closure.alpha =
-            saturatef(transmission_roughness * transmission_roughness);
-        microfacet_bsdf_refract_closure.ior = ior;
+            saturatef(effective_transmission_roughness * effective_transmission_roughness);
+        microfacet_bsdf_refract_closure.ior = effective_ior;
       }
     }
   }
@@ -261,7 +261,6 @@ float3 EvalPrincipledBSDFKernel(in float3 omega_in,
 }
 
 float3 EvalPrincipledBSDF(in float3 omega_in, out float pdf) {
-  CalculateClosureWeight();
   pdf = 0.0;
   return EvalPrincipledBSDFKernel(omega_in, pdf, make_float3(0.0), 0.0, -1);
 }
@@ -274,7 +273,6 @@ void SamplePrincipledBSDF(float r1, float r2, out float3 eval, out float3 omega_
   const float3 N = hit_record.normal;
   const float3 I = omega_v;
 
-  CalculateClosureWeight();
   float weight_cdf[CLOSURE_COUNT];
   float total_cdf;
   weight_cdf[0] = diffuse_closure.sample_weight;

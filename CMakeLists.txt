@@ -116,6 +116,8 @@ find_package(tinyobjloader CONFIG REQUIRED)
 set(TINYOBJLOADER_LIB_NAME tinyobjloader::tinyobjloader)
 list(APPEND LIB_LIST ${TINYOBJLOADER_LIB_NAME})
 
+find_package(RapidJSON CONFIG REQUIRED)
+
 find_package(Stb REQUIRED)
 set(STB_INC_DIR ${Stb_INCLUDE_DIR})
 list(APPEND INC_LIST ${STB_INC_DIR})
@@ -139,7 +141,11 @@ if (LONGMARCH_VULKAN_ENABLED)
 
     get_filename_component(VULKAN_DXC_DIR "${Vulkan_dxc_EXECUTABLE}" DIRECTORY)
 
-    set(DXC_DLL_DIR "${VULKAN_DXC_DIR}")
+    if (WIN32)
+        set(DXC_DLL_DIR "${VULKAN_DXC_DIR}")
+    else ()
+        get_filename_component(DXC_DLL_DIR "${Vulkan_dxc_LIBRARY}" DIRECTORY)
+    endif ()
 elseif (LONGMARCH_D3D12_ENABLED)
     set(DXC_LIB_NAME dxcompiler)
     list(APPEND LIB_LIST ${DXC_LIB_NAME})
@@ -159,6 +165,55 @@ endif ()
 
 message(STATUS "DXC_LIB_NAME: ${DXC_LIB_NAME}")
 message(STATUS "DXC_DLL_DIR: ${DXC_DLL_DIR}")
+
+# Deploy non-system runtime libraries beside an executable so build-tree
+# programs can be launched directly from their output directory.
+function(LONGMARCH_DEPLOY_RUNTIME_DEPENDENCIES TARGET_NAME)
+    if (NOT TARGET ${TARGET_NAME})
+        return()
+    endif ()
+
+    if (LONGMARCH_VULKAN_ENABLED)
+        if (WIN32)
+            find_file(DXC_RUNTIME_LIBRARY
+                    NAMES dxcompiler.dll
+                    HINTS "${DXC_DLL_DIR}" "${VULKAN_DXC_DIR}")
+        else ()
+            set(DXC_RUNTIME_LIBRARY "${Vulkan_dxc_LIBRARY}")
+        endif ()
+
+        if (DXC_RUNTIME_LIBRARY AND EXISTS "${DXC_RUNTIME_LIBRARY}")
+            add_custom_command(TARGET ${TARGET_NAME} POST_BUILD
+                    COMMAND ${CMAKE_COMMAND} -E copy_if_different
+                    "${DXC_RUNTIME_LIBRARY}" "$<TARGET_FILE_DIR:${TARGET_NAME}>"
+                    COMMENT "Deploying DXC runtime for ${TARGET_NAME}")
+        endif ()
+
+        if (WIN32)
+            get_filename_component(VULKAN_LIBRARY_DIR "${Vulkan_LIBRARY}" DIRECTORY)
+            find_file(VULKAN_RUNTIME_LIBRARY
+                    NAMES vulkan-1.dll
+                    HINTS "${VULKAN_LIBRARY_DIR}/../bin" "${VULKAN_DXC_DIR}")
+            if (VULKAN_RUNTIME_LIBRARY)
+                add_custom_command(TARGET ${TARGET_NAME} POST_BUILD
+                        COMMAND ${CMAKE_COMMAND} -E copy_if_different
+                        "${VULKAN_RUNTIME_LIBRARY}" "$<TARGET_FILE_DIR:${TARGET_NAME}>"
+                        COMMENT "Deploying Vulkan runtime for ${TARGET_NAME}")
+            endif ()
+        elseif (UNIX AND NOT APPLE AND Vulkan_LIBRARY)
+            file(REAL_PATH "${Vulkan_LIBRARY}" VULKAN_RUNTIME_LIBRARY)
+            add_custom_command(TARGET ${TARGET_NAME} POST_BUILD
+                    COMMAND ${CMAKE_COMMAND} -E copy_if_different
+                    "${VULKAN_RUNTIME_LIBRARY}" "$<TARGET_FILE_DIR:${TARGET_NAME}>/libvulkan.so.1"
+                    COMMENT "Deploying Vulkan runtime for ${TARGET_NAME}")
+        endif ()
+    endif ()
+
+    if (UNIX)
+        set_property(TARGET ${TARGET_NAME} APPEND PROPERTY BUILD_RPATH "$ORIGIN")
+        set_property(TARGET ${TARGET_NAME} APPEND PROPERTY INSTALL_RPATH "$ORIGIN")
+    endif ()
+endfunction()
 
 set(LONGMARCH_IMGUI_DIR ${CMAKE_CURRENT_LIST_DIR}/external/imgui)
 

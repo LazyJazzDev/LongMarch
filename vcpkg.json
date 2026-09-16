@@ -13,6 +13,7 @@
     "stb",
     "mikktspace",
     "tinyobjloader",
+    "rapidjson",
     "assimp",
     {
       "name": "d3dx12",
