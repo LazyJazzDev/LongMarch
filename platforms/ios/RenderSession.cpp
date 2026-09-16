@@ -5,7 +5,8 @@ using namespace grassland;
 RenderSession::RenderSession(const std::filesystem::path &resources,
                              const std::string &scene,
                              int max_dimension,
-                             bool prepare) {
+                             bool prepare,
+                             double aspect_ratio) {
   graphics::ConfigureShaderCache({resources / "shaders", !prepare, true});
   if (graphics::CreateCore(graphics::BACKEND_API_METAL, graphics::Core::Settings{1, false}, &graphics_) ||
       graphics_->InitializeLogicalDeviceAutoSelect(false))
@@ -21,11 +22,11 @@ RenderSession::RenderSession(const std::filesystem::path &resources,
   core_ = std::make_unique<sparkium::Core>(graphics_.get());
   std::string error;
   scene_ = sparkium::JsonScene::Load(core_.get(), resources / "assets" / "scenes" / scene / "scene.json", &error,
-                                     max_dimension);
+                                     max_dimension, aspect_ratio);
   if (!scene_)
     throw std::runtime_error(error);
   scene_->GetScene()->settings.samples_per_dispatch = 1;
-  // Retain the scene's camera, material, exposure and bounce settings.
+  // Retain camera pose and vertical FOV, materials, exposure and bounce settings.
   graphics_->CreateImage(Width(), Height(), graphics::IMAGE_FORMAT_R8G8B8A8_UNORM, &image_);
 }
 RenderSession::~RenderSession() {

@@ -3,10 +3,16 @@
 Native SwiftUI app sharing Sparkium's JSON loader, materials, camera, accumulation,
 film development and Metal ray-query pipeline with `sparkium_cli`. The scene picker
 includes the original six demos and Blender Classroom, Junkshop and Monster.
+The app runs full-screen in landscape. The film and camera aspect ratio follow
+the full viewport, retaining the scene's camera pose and vertical field of view. A translucent left sidebar overlays the image,
+following the desktop scene-control layout, and can be opened or dismissed without
+resizing the viewport. Starting a render hides the sidebar; its corner button brings
+it back, including while rendering. Controls remain native SwiftUI.
 The existing JSON and scene assets are bundled unchanged, with the Sobol table.
 Rendering uses one sample per dispatch on a serial background queue; Stop and
-backgrounding request cancellation after the current operation. The longest image
-edge defaults to 256 pixels, preserving aspect ratio, camera and scene settings.
+backgrounding request cancellation after the current operation. The render
+resolution automatically uses the full viewport size in physical pixels
+(SwiftUI size × display scale); the sidebar displays that resolution.
 Large Blender scenes still load their original geometry and textures and may exceed
 an iPhone's memory budget. Start with Cornell Box on a real device.
 
@@ -91,7 +97,7 @@ build-ios-replay/sparkium_mobile_check out/ios/Resources cornell_box out/ios/cor
 ```
 
 For automated simulator/device smoke runs, launch with environment variable
-`SPARKIUM_SMOKE_SCENE=cornell_box`. The normal SwiftUI render flow runs at 128 pixels
+`SPARKIUM_SMOKE_SCENE=cornell_box`. The normal SwiftUI render flow runs at the native viewport resolution
 and 2 spp, then saves `SmokeResult.json` and `SmokeResult.png` in the app's Documents
 directory. For `simctl launch`, prefix this variable with `SIMCTL_CHILD_`.
 This records unsupported-device errors as well as successful renders. Without the

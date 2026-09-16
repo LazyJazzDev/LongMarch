@@ -2,6 +2,7 @@
 #include "RenderSession.h"
 #include <atomic>
 #include <chrono>
+#include <cmath>
 
 @implementation SparkiumRenderer {
   dispatch_queue_t _queue;
@@ -17,12 +18,14 @@
 }
 - (void)cancel { _cancelled = true; }
 - (void)renderResources:(NSURL *)resources scene:(NSString *)scene dimension:(NSInteger)dimension
+           aspectRatio:(double)aspectRatio
                samples:(NSInteger)samples
               progress:(void (^)(CGImageRef, NSInteger, double, NSString *))progress
             completion:(void (^)(NSString * _Nullable, BOOL))completion {
   NSAssert([NSThread isMainThread], @"Start rendering on the main thread");
   if (_busy) { completion(@"A render is already running", NO); return; }
-  if (dimension < 64 || dimension > 1024 || samples < 1 || samples > 4096 ||
+  if (!std::isfinite(aspectRatio) || aspectRatio < 0.25 || aspectRatio > 4.0 || dimension < 64 || dimension > 16384 ||
+      samples < 1 || samples > 4096 ||
       [scene containsString:@"/"] || [scene containsString:@".."] || !resources.isFileURL) {
     completion(@"Invalid render settings", NO); return;
   }
@@ -33,7 +36,8 @@
       NSString *failure = nil;
       try {
         const auto start = std::chrono::steady_clock::now();
-        RenderSession session(resources.fileSystemRepresentation, scene.UTF8String, static_cast<int>(dimension));
+        RenderSession session(resources.fileSystemRepresentation, scene.UTF8String, static_cast<int>(dimension),
+                              false, aspectRatio);
         for (NSInteger i = 0; i < samples && !self->_cancelled; ++i) {
           @autoreleasepool {
             auto pixels = session.Step();
