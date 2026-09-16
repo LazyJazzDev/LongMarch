@@ -1,12 +1,15 @@
 #include <gtest/gtest.h>
 #include <long_march.h>
 
+#include <algorithm>
+#include <cstring>
 #include <glm/gtc/matrix_transform.hpp>
 #include <numeric>
 #include <random>
 #include <tuple>
 
 #include "grassland/graphics/frame_profile.h"
+#include "grassland/graphics/backend/backend.h"
 #include "sparkium/pipelines/raytracing/core/core.h"
 #include "sparkium/pipelines/raytracing/core/software_pipeline.h"
 #include "sparkium/pipelines/raytracing/geometry/geometry_mesh.h"
@@ -37,6 +40,42 @@ class SoftwareBVHTest : public testing::Test {
   std::unique_ptr<graphics::Core> graphics;
   std::unique_ptr<sparkium::Core> core;
 };
+
+TEST_F(SoftwareBVHTest, RayQueryCapabilityMatchesDevice) {
+#if defined(LONGMARCH_VULKAN_ENABLED)
+  if (auto *vk = dynamic_cast<graphics::backend::VulkanCore *>(graphics.get())) {
+    const auto &physical = vk->Device()->PhysicalDevice();
+    EXPECT_EQ(graphics->DeviceRayQuerySupport(), physical.SupportRayQuery());
+    if (physical.SupportRayQuery()) {
+      vulkan::DeviceFeatureRequirement requirement{};
+      requirement.enable_rayquery_extension = true;
+      auto info = requirement.GenerateRecommendedDeviceCreateInfo(physical);
+      auto has_extension = [&](const char *name) {
+        return std::any_of(info.extensions.begin(), info.extensions.end(),
+                           [&](const char *extension) { return std::strcmp(extension, name) == 0; });
+      };
+      EXPECT_TRUE(has_extension(VK_KHR_RAY_QUERY_EXTENSION_NAME));
+      EXPECT_TRUE(has_extension(VK_KHR_ACCELERATION_STRUCTURE_EXTENSION_NAME));
+      EXPECT_FALSE(has_extension(VK_KHR_RAY_TRACING_PIPELINE_EXTENSION_NAME));
+      EXPECT_NE(requirement.GetVmaAllocatorCreateFlags() & VMA_ALLOCATOR_CREATE_BUFFER_DEVICE_ADDRESS_BIT, 0);
+      std::unique_ptr<vulkan::Device> query_device;
+      ASSERT_EQ(vk->Instance()->CreateDevice(physical, info, requirement.GetVmaAllocatorCreateFlags(), &query_device),
+                VK_SUCCESS);
+      EXPECT_NE(query_device->Procedures().vkCmdBuildAccelerationStructuresKHR, nullptr);
+      EXPECT_EQ(query_device->Procedures().vkCmdTraceRaysKHR, nullptr);
+    }
+  }
+#endif
+#if defined(LONGMARCH_D3D12_ENABLED)
+  if (auto *dx = dynamic_cast<graphics::backend::D3D12Core *>(graphics.get())) {
+    D3D12_FEATURE_DATA_D3D12_OPTIONS5 options{};
+    const auto result = dx->Device()->Handle()->CheckFeatureSupport(
+        D3D12_FEATURE_D3D12_OPTIONS5, &options, sizeof(options));
+    EXPECT_EQ(graphics->DeviceRayQuerySupport(),
+              SUCCEEDED(result) && options.RaytracingTier >= D3D12_RAYTRACING_TIER_1_1);
+  }
+#endif
+}
 
 Hit Oracle(const Ray &ray, const std::vector<Vector3<float>> &positions, const std::vector<glm::mat4x3> &transforms) {
   Hit hit{};

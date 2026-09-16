@@ -19,7 +19,8 @@ HRESULT AccelerationStructure::UpdateInstances(const std::vector<D3D12_RAYTRACIN
       device_->RequestInstanceBuffer(sizeof(D3D12_RAYTRACING_INSTANCE_DESC) * instances.size());
   void *instance_buffer_ptr{};
   RETURN_IF_FAILED_HR(instance_buffer->Map(0, nullptr, &instance_buffer_ptr), "failed to map instance buffer.");
-  std::memcpy(instance_buffer_ptr, instances.data(), instances.size() * sizeof(D3D12_RAYTRACING_INSTANCE_DESC));
+  if (!instances.empty())
+    std::memcpy(instance_buffer_ptr, instances.data(), instances.size() * sizeof(D3D12_RAYTRACING_INSTANCE_DESC));
   instance_buffer->Unmap(0, nullptr);
 
   D3D12_BUILD_RAYTRACING_ACCELERATION_STRUCTURE_INPUTS as_inputs = {};
