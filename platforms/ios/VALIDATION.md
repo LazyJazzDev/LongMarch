@@ -25,7 +25,7 @@ Local artifacts are generated under `out/ios/`: preparation previews,
 `validation/report.json`, `metal-validation/`, and simulator screenshots. Reproduce
 these checks using the commands in [README.md](README.md).
 
-## Full-screen viewport and floating controls
+## Full-screen viewport and floating controls (previous behavior)
 
 The subsequent UI update was built for the simulator and signed for the connected
 iPhone 16 Plus (Apple A18 GPU), using the existing local signing team.
@@ -46,3 +46,32 @@ iPhone 16 Plus (Apple A18 GPU), using the existing local signing team.
 
 This verifies the viewport and native-resolution path on this device, not the
 memory requirements or performance of every scene at native resolution.
+
+## Scene presets, automatic accumulation and image navigation
+
+This update supersedes the viewport-derived resolution above. The app now renders
+with the original JSON film dimensions and camera aspect ratio, then fits the image
+to the screen. Asset JSON files and the asset submodule reference are unchanged.
+
+- Debug device and Release simulator builds pass with the existing signing setup.
+- The installed app on iPhone 16 Plus automatically renders Cornell Box at its
+  original 1024 × 1024 resolution. The 2-spp smoke report records 0.215 s, Apple A18
+  GPU and no error. A subsequent normal launch automatically reaches the default
+  32-spp cap in about 2.4 s, with 14.76 M camera Ray/s and 14.1 FPS for its last frame.
+  These timings cover rendering and readback, excluding scene loading and pauses.
+- The normal-launch screenshot confirms the square image fits the landscape screen
+  without changing aspect, with the floating sidebar showing the scene picker,
+  sample cap, Ray/s, FPS, accumulated spp, time and device. Further statistics remain
+  accessible by scrolling. There is no Start/Render button.
+- The actual Objective-C++ render controller passes its macOS GPU integration check:
+  original Cornell Box and Texture dimensions, increasing/decreasing the cap without
+  reloading or losing accumulation, pause/resume, two rapid film resets reproducing
+  the first sample exactly, and superseded scene requests suppressing old callbacks.
+- Native UIScrollView implements pinch zoom, pan and double-tap to fit. Progressive
+  pixel updates retain the same viewer and transform. Physical gesture behavior has
+  not been exercised automatically; this check does not establish successful loading
+  of every large Blender scene on the phone.
+- Python syntax checks and `git diff --check` pass.
+
+Reproduce the controller check using [README.md](README.md). Local evidence:
+`out/ios/preset-scene-phone-result.json` and `out/ios/preset-scene-phone-fit.png`.
