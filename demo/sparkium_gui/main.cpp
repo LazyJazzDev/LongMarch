@@ -14,7 +14,7 @@ const char *PipelineName(sparkium::RenderPipeline pipeline) {
     case sparkium::RENDER_PIPELINE_RAY_QUERY:
       return "Native ray query";
     case sparkium::RENDER_PIPELINE_RT_FALLBACK:
-      return "Compute ray tracing";
+      return "RT Fallback";
     case sparkium::RENDER_PIPELINE_RASTERIZATION: return "Rasterization";
     case sparkium::RENDER_PIPELINE_RAY_TRACING: return "Ray tracing";
     default: return "Auto";
@@ -135,7 +135,7 @@ int main(int argc, char **argv) {
         ImGui::EndCombo();
       }
       int pipeline_index = static_cast<int>(pipeline);
-      const char *pipelines[] = {"Rasterization", "Ray tracing", "Auto", "Compute ray tracing", "Native ray query"};
+      const char *pipelines[] = {"Rasterization", "Ray tracing", "Auto", "RT Fallback", "Native ray query"};
       if (ImGui::Combo("Pipeline", &pipeline_index, pipelines, graphics_core->DeviceRayQuerySupport() ? 5 : 4)) {
         pipeline = static_cast<sparkium::RenderPipeline>(pipeline_index);
         loaded->GetFilm()->Reset();
