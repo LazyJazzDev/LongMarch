@@ -53,6 +53,14 @@ int RenderSession::Height() const {
 int RenderSession::Samples() const {
   return scene_->GetFilm()->info.accumulated_samples;
 }
+int RenderSession::MaxBounces() const {
+  return scene_->GetScene()->settings.max_bounces;
+}
+void RenderSession::ResetFilm() {
+  graphics_->WaitGPU();
+  scene_->GetFilm()->Reset();
+  graphics_->WaitGPU();
+}
 std::string RenderSession::Device() const {
   return graphics_->DeviceName();
 }

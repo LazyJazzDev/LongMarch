@@ -16,6 +16,8 @@ class RenderSession {
   int Width() const;
   int Height() const;
   int Samples() const;
+  int MaxBounces() const;
+  void ResetFilm();
   std::string Device() const;
 
  private:

@@ -3,16 +3,25 @@
 Native SwiftUI app sharing Sparkium's JSON loader, materials, camera, accumulation,
 film development and Metal ray-query pipeline with `sparkium_cli`. The scene picker
 includes the original six demos and Blender Classroom, Junkshop and Monster.
-The app runs full-screen in landscape. The film and camera aspect ratio follow
-the full viewport, retaining the scene's camera pose and vertical field of view. A translucent left sidebar overlays the image,
-following the desktop scene-control layout, and can be opened or dismissed without
-resizing the viewport. Starting a render hides the sidebar; its corner button brings
-it back, including while rendering. Controls remain native SwiftUI.
-The existing JSON and scene assets are bundled unchanged, with the Sobol table.
-Rendering uses one sample per dispatch on a serial background queue; Stop and
-backgrounding request cancellation after the current operation. The render
-resolution automatically uses the full viewport size in physical pixels
-(SwiftUI size × display scale); the sidebar displays that resolution.
+The app runs full-screen in landscape and renders at the resolution and camera
+aspect ratio stored in each scene JSON. The image initially fits the screen.
+Pinch to zoom, drag to pan, and double-tap to fit again. Progressive image updates
+preserve the viewing transform; gestures never change the render camera.
+
+A translucent left sidebar follows the desktop control layout using native UI.
+The initial scene and every newly selected scene start rendering automatically.
+The spp picker controls only the accumulation limit: raising it continues the
+existing film; lowering it preserves accumulated samples and finishes any sample
+already in flight. Reload loads the scene again; Reset film clears accumulation
+without reloading scene resources. Backgrounding pauses after the current sample,
+and returning resumes toward the current limit.
+
+The sidebar reports camera Ray/s and FPS for the last rendered frame, accumulated
+spp, render time, backend, device, pipeline, resolution, samples per frame and
+maximum bounces. Ray/s is width × height × samples per frame × FPS, matching the
+desktop camera-ray estimate. Blender scene names are Blender Classroom, Blender
+Junkshop and Blender Monster. Asset JSON files remain unchanged.
+
 Large Blender scenes still load their original geometry and textures and may exceed
 an iPhone's memory budget. Start with Cornell Box on a real device.
 
@@ -97,11 +106,11 @@ build-ios-replay/sparkium_mobile_check out/ios/Resources cornell_box out/ios/cor
 ```
 
 For automated simulator/device smoke runs, launch with environment variable
-`SPARKIUM_SMOKE_SCENE=cornell_box`. The normal SwiftUI render flow runs at the native viewport resolution
+`SPARKIUM_SMOKE_SCENE=cornell_box`. The normal SwiftUI render flow runs at the scene's preset resolution
 and 2 spp, then saves `SmokeResult.json` and `SmokeResult.png` in the app's Documents
 directory. For `simctl launch`, prefix this variable with `SIMCTL_CHILD_`.
 This records unsupported-device errors as well as successful renders. Without the
-variable the app waits for the user to select a scene and tap Render.
+variable the initial scene also starts automatically, with the normal sample limit.
 
 Automated bundle checks compare all nine replay images with the preparation images,
 check a different resolution and 32-spp accumulation, and exercise missing/corrupt
@@ -112,4 +121,14 @@ python3 platforms/ios/validate_bundle.py --renderer build-ios-replay/sparkium_mo
   --resources out/ios/Resources --output out/ios/validation
 xcodebuild -downloadComponent MetalToolchain
 python3 platforms/ios/validate_msl.py --resources out/ios/Resources --output out/ios/metal-validation
+```
+
+The render-controller check exercises preset resolutions, retaining accumulation
+when changing limits, pause/resume, rapid film resets and superseded scene loads:
+
+```sh
+cmake -S platforms/ios -B build-ios-replay -DCMAKE_EXPORT_COMPILE_COMMANDS=ON
+cmake --build build-ios-replay
+python3 platforms/ios/tests/check_render_controller.py \
+  --build build-ios-replay --resources out/ios/Resources
 ```

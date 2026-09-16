@@ -2,16 +2,23 @@
 #import <CoreGraphics/CoreGraphics.h>
 
 NS_ASSUME_NONNULL_BEGIN
-// Objective-C++ contains all C++ exceptions and owns the serial rendering queue.
+// Callbacks run on the main queue; progress applies synchronous back pressure.
+// A nil image announces loaded/reset metadata.
+typedef void (^SparkiumProgress)(CGImageRef _Nullable image, NSInteger spp, double seconds,
+                                double frameSeconds, NSString *device, NSInteger width,
+                                NSInteger height, NSInteger maxBounces);
+typedef void (^SparkiumCompletion)(NSString * _Nullable error, BOOL paused);
+
+// Call public methods on the main thread. GPU resources live exclusively on the rendering queue.
 @interface SparkiumRenderer : NSObject
-- (void)renderResources:(NSURL *)resources
-                 scene:(NSString *)scene
-             dimension:(NSInteger)dimension
-           aspectRatio:(double)aspectRatio
-               samples:(NSInteger)samples
-              progress:(void (^)(CGImageRef image, NSInteger spp, double seconds, NSString *device))progress
-            completion:(void (^)(NSString * _Nullable error, BOOL cancelled))completion
-    NS_SWIFT_NAME(render(resources:scene:dimension:aspectRatio:samples:progress:completion:));
-- (void)cancel;
+- (void)loadResources:(NSURL *)resources
+               scene:(NSString *)scene
+             samples:(NSInteger)samples
+            progress:(SparkiumProgress)progress
+          completion:(SparkiumCompletion)completion
+    NS_SWIFT_NAME(load(resources:scene:samples:progress:completion:));
+- (void)setSampleLimit:(NSInteger)samples;
+- (void)setPaused:(BOOL)paused;
+- (void)resetFilm;
 @end
 NS_ASSUME_NONNULL_END

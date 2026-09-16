@@ -34,7 +34,10 @@ with tempfile.TemporaryDirectory(prefix='sparkium-bundle-', dir=args.output.pare
     for scene in scenes:
         print('Bundling', scene.parent.name, flush=True)
         document = json.loads(scene.read_text())
-        catalog.append({'id': scene.parent.name, 'name': document['name']})
+        name = ('Blender ' + scene.parent.name.removeprefix('blender_').replace('_', ' ').title()
+                if scene.parent.name.startswith('blender_') else document['name'])
+        catalog.append({'id': scene.parent.name, 'name': name,
+                        'width': document['film']['width'], 'height': document['film']['height']})
         for source in sorted(scene.parent.rglob('*')):
             if not source.is_file() or source.name == 'conversion-report.json':
                 continue
