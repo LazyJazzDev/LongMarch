@@ -1,11 +1,17 @@
 ---
 name: longmarch-project-principles
-description: Apply the user-confirmed commit-message, squash-merge, PR-history, and asset conventions for LazyJazzDev/LongMarch and LongMarchAssetsLFS. Use when editing these projects, creating commits, preparing or merging PRs, or changing branch history and asset references.
+description: Apply the user-confirmed working-directory, commit-message, squash-merge, PR-history, and asset conventions for LazyJazzDev/LongMarch and LongMarchAssetsLFS. Use when editing these projects, switching branches, creating commits, preparing or merging PRs, or changing branch history and asset references.
 ---
 
 # LongMarch 项目原则
 
 这些是用户已确认的项目约定。适用于 LongMarch 及其 LongMarchAssetsLFS 素材库；不要套用到无关项目。当前用户明确提出的新要求优先于本文件。
+
+## 工作目录
+
+- 能在用户的主工作目录完成的操作，都在主工作目录内完成，包括切换分支、编辑、构建和验证。需要区分构建产物时，使用主工作目录内的不同构建子目录。
+- 不自行在主工作目录之外新建 worktree、克隆或复制分支文件，也不因切换分支或隔离任务而将开发迁到外部目录；用户明确要求外部工作目录时除外。
+- 切换前检查未提交修改和已有 worktree 的分支占用，保留用户文件；已有外部 worktree 不作为继续在外部开发的默认理由。
 
 ## 提交信息
 
