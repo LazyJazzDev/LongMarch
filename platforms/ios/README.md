@@ -1,9 +1,29 @@
-# Sparkium on iOS (experimental)
+# LongMarch Demos on iOS (experimental)
+
+The app opens a native demo list. Choose Sparkium to access its scene picker, or
+run Hello Triangle, Hello Texture, Hello Blend, Hello Resize, Hello SDR Sample,
+and NBody CS independently. The Demos button returns to the list and releases the
+current demo's GPU resources. Backgrounding pauses rendering and simulation.
+
+Graphics demos reuse their desktop HLSL, vertex data and LongMarch graphics API.
+An MTKView presents the rendered Metal texture directly, without per-frame CPU
+image downloads. Resize and NBody follow the drawable size and offer a render
+scale control; the other graphics tests retain their desktop 1280 × 720 target,
+fitted to the screen. NBody includes particle count, galaxy count, time step,
+pause/resume, reset and drag-to-rotate controls. It defaults to 4096 particles;
+65536 remains selectable. Gravity is normalized by the selected count so total
+mass remains constant. Frame render time, GPU time and throughput are displayed.
+
+Hello Ray Tracing and RT Multi Shader Group are listed as unavailable because
+the current Metal backend does not implement full RT pipelines, procedural AABB
+intersections or callable shaders. Sparkium's Metal Ray Query remains available.
+
+## Sparkium
 
 Native SwiftUI app sharing Sparkium's JSON loader, materials, camera, accumulation,
 film development and Metal ray-query pipeline with `sparkium_cli`. The scene picker
 includes the original six demos and Blender Classroom, Junkshop and Monster.
-The app runs full-screen in landscape and renders at the resolution and camera
+The Sparkium demo runs full-screen in landscape and renders at the resolution and camera
 aspect ratio stored in each scene JSON. The image initially fits the screen.
 Pinch to zoom, drag to pan, and double-tap to fit again. Progressive image updates
 preserve the viewing transform; gestures never change the render camera.
@@ -33,9 +53,9 @@ an iPhone's memory budget. Start with Cornell Box on a real device.
 ## Requirements
 
 - Full Xcode with iOS SDK, macOS on Apple Silicon for resource preparation.
-- iOS 18+ and a Metal device supporting ray queries and tier-2 argument buffers.
-  This experiment requires ray queries; it does not substitute the software fallback.
-  Simulator ray-query support depends on the runtime. Unsupported devices show an error.
+- iOS 18+ and a Metal device supporting tier-2 argument buffers and unified memory.
+  Sparkium additionally requires ray queries; graphics/NBody do not. The current
+  simulator may lack the required Metal capabilities; unsupported devices show an error.
 - CMake 3.25+, Ninja, Python 3, the existing project DXC and SPIRV-Cross installation.
   DXC and SPIRV-Cross are used **only on the Mac**, and are not linked into the app.
 - Material edits or shader edits require regenerating the resource bundle.
@@ -73,6 +93,8 @@ open build-ios-device/SparkiumMobile.xcodeproj
 For a device install, select the `Sparkium` target, choose your signing team and
 connected iPhone/iPad in Xcode, and Run. The unsigned build is at
 `build-ios-device/Release-iphoneos/Sparkium.app`.
+The existing target, bundle identifier and build-product names are retained for
+signing compatibility; the installed application is named **LongMarch Demos**.
 For the simulator use a separate `build-ios-simulator` directory and
 `-DCMAKE_OSX_SYSROOT=iphonesimulator`. The generated project supports both Debug
 and Release; embedded HLSL uses the same release shader variant in both.
@@ -115,7 +137,22 @@ For automated simulator/device smoke runs, launch with environment variable
 and 2 spp, then saves `SmokeResult.json` and `SmokeResult.png` in the app's Documents
 directory. For `simctl launch`, prefix this variable with `SIMCTL_CHILD_`.
 This records unsupported-device errors as well as successful renders. Without the
-variable the initial scene also starts automatically, with the normal sample limit.
+variable the application opens the demo list. Entering Sparkium automatically
+starts its initial scene with the normal sample limit.
+
+Set `LONGMARCH_SMOKE_DEMO=nbody_cs` (or one of the graphics directory names) to
+open that demo directly. After three frames it writes `DemoSmokeResult.json` to
+Documents, including device, render dimensions and frame/GPU times.
+
+The preparation build also produces `mobile_demo_check`. Resource preparation
+uses it to cache the graphics and compute shaders. Verify all six demos using:
+
+```sh
+build-ios-replay/mobile_demo_check out/ios/Resources all out/ios/demos-replay
+```
+
+This runs actual raster/compute work, checks finite pixels and particle positions,
+and verifies NBody motion, pause and deterministic reset, plus render-target resize.
 
 Automated bundle checks compare all nine replay images with the preparation images,
 check a different resolution and 32-spp accumulation, and exercise missing/corrupt

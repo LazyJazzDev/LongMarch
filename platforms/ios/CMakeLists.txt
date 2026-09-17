@@ -27,10 +27,10 @@ list(FILTER GRAPHICS EXCLUDE REGEX "/window.cpp$")
 file(GLOB METAL "${ROOT}/code/grassland/graphics/backend/metal/*.cpp")
 file(GLOB_RECURSE SPARKIUM "${ROOT}/code/sparkium/*.cpp")
 add_library(sparkium_mobile STATIC ${UTIL} ${GRAPHICS} ${METAL} ${SPARKIUM}
-  "${ROOT}/code/grassland/math/math_mesh.cxx" "${mikktspace_SOURCE_DIR}/mikktspace.c" RenderSession.cpp)
+  "${ROOT}/code/grassland/math/math_mesh.cxx" "${mikktspace_SOURCE_DIR}/mikktspace.c" RenderSession.cpp demos/DemoSession.cpp)
 target_include_directories(sparkium_mobile PUBLIC "${ROOT}/code" "${SPARKIUM_HEADERS}"
   "${SPARKIUM_HEADERS}/eigen3" "${SPARKIUM_HEADERS}/stb" "${metal_cpp_SOURCE_DIR}" "${CMAKE_CURRENT_SOURCE_DIR}"
-  "${mikktspace_SOURCE_DIR}")
+  "${mikktspace_SOURCE_DIR}" "${ROOT}")
 target_compile_definitions(sparkium_mobile PUBLIC LONGMARCH_METAL_ENABLED LONGMARCH_HEADLESS
   FMT_HEADER_ONLY NDEBUG LONGMARCH_ASSETS_DIR="")
 target_link_libraries(sparkium_mobile PUBLIC "-framework Metal" "-framework Foundation" "-framework QuartzCore")
@@ -47,6 +47,13 @@ foreach(pair "grassland/graphics" "sparkium/shaders")
     DEPENDS ${shaders} embed_shaders.py VERBATIM)
   target_sources(sparkium_mobile PRIVATE "${generated}/built_in_shaders.inl")
 endforeach()
+file(GLOB_RECURSE demo_shaders CONFIGURE_DEPENDS "${ROOT}/demo/*.hlsl" "${ROOT}/demo/*.hlsli")
+add_custom_command(OUTPUT "${CMAKE_CURRENT_BINARY_DIR}/demo_shaders.inl"
+  COMMAND "${Python3_EXECUTABLE}" "${CMAKE_CURRENT_SOURCE_DIR}/embed_shaders.py"
+    "${ROOT}/demo" "${CMAKE_CURRENT_BINARY_DIR}/demo_shaders.inl"
+  DEPENDS ${demo_shaders} embed_shaders.py VERBATIM)
+target_sources(sparkium_mobile PRIVATE "${CMAKE_CURRENT_BINARY_DIR}/demo_shaders.inl")
+set_source_files_properties(demos/DemoSession.cpp PROPERTIES INCLUDE_DIRECTORIES "${CMAKE_CURRENT_BINARY_DIR}")
 set_source_files_properties("${ROOT}/code/grassland/graphics/shader.cpp" PROPERTIES
   INCLUDE_DIRECTORIES "${CMAKE_CURRENT_BINARY_DIR}/grassland_graphics")
 # Sparkium's generated include is used by core/core_util.cpp.
@@ -68,6 +75,8 @@ endif()
 if(NOT CMAKE_SYSTEM_NAME STREQUAL "iOS")
   add_executable(sparkium_mobile_check check.cpp)
   target_link_libraries(sparkium_mobile_check PRIVATE sparkium_mobile)
+  add_executable(mobile_demo_check demos/check.cpp)
+  target_link_libraries(mobile_demo_check PRIVATE sparkium_mobile)
 endif()
 if(SPARKIUM_APP)
   enable_language(Swift)
@@ -78,10 +87,11 @@ if(SPARKIUM_APP)
   # as a legacy macOS bundle and overlook its root Info.plist.
   set(bundle_resources "${CMAKE_CURRENT_BINARY_DIR}/SparkiumResources")
   file(CREATE_LINK "${SPARKIUM_RESOURCES}" "${bundle_resources}" SYMBOLIC)
-  add_executable(Sparkium MACOSX_BUNDLE SparkiumApp.swift SparkiumBridge.mm SparkiumBridge.h
+  add_executable(Sparkium MACOSX_BUNDLE SparkiumApp.swift DemosApp.swift demos/DemoView.swift
+    demos/DemoBridge.mm demos/DemoBridge.h SparkiumBridge.mm SparkiumBridge.h RenderQueue.h
     "${bundle_resources}" Assets.xcassets)
   set_source_files_properties("${bundle_resources}" Assets.xcassets PROPERTIES MACOSX_PACKAGE_LOCATION Resources)
-  target_link_libraries(Sparkium PRIVATE sparkium_mobile "-framework SwiftUI" "-framework CoreGraphics")
+  target_link_libraries(Sparkium PRIVATE sparkium_mobile "-framework SwiftUI" "-framework CoreGraphics" "-framework MetalKit")
   target_compile_options(Sparkium PRIVATE "$<$<COMPILE_LANGUAGE:OBJCXX>:-fobjc-arc>")
   set_target_properties(Sparkium PROPERTIES
     MACOSX_BUNDLE_INFO_PLIST "${CMAKE_CURRENT_SOURCE_DIR}/Info.plist"
