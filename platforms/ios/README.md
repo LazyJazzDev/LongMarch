@@ -47,8 +47,12 @@ The application icon is the bundled Cornell Box rendered at 1024 × 1024 and
 `Assets.xcassets/AppIcon.appiconset`; Xcode generates the iPhone and iPad icon sizes
 when building the application.
 
-Large Blender scenes still load their original geometry and textures and may exceed
-an iPhone's memory budget. Start with Cornell Box on a real device.
+The iOS packager limits PNG/JPEG textures to a 1024-pixel longest edge by default,
+preserving aspect ratio and PNG alpha. Smaller textures are copied unchanged.
+This reduces decoded texture memory, especially for Blender Junkshop; it is
+texture downsampling, not ASTC GPU compression. Source assets, JSON references,
+geometry and scene render resolutions remain unchanged. HDR/EXR files are copied
+unchanged. Large scenes can still exceed a device's memory budget.
 
 ## Requirements
 
@@ -58,6 +62,7 @@ an iPhone's memory budget. Start with Cornell Box on a real device.
   simulator may lack the required Metal capabilities; unsupported devices show an error.
 - CMake 3.25+, Ninja, Python 3, the existing project DXC and SPIRV-Cross installation.
   DXC and SPIRV-Cross are used **only on the Mac**, and are not linked into the app.
+- Pillow for resizing textures during packaging: `python3 -m pip install -r platforms/ios/requirements.txt`.
 - Material edits or shader edits require regenerating the resource bundle.
 
 ## Build
@@ -104,6 +109,10 @@ and Release; embedded HLSL uses the same release shader variant in both.
 Resource preparation refuses to overwrite an existing output. Use `--output` to
 prepare another bundle and `-DSPARKIUM_RESOURCES` to select it. Generated resources,
 previews and build products remain outside Git; assets stay in the LFS submodule.
+Use `--texture-max-dimension 512` for a smaller texture budget, or `0` to preserve
+original texture files. `texture-report.json` records original/packaged dimensions
+and estimated RGBA8 storage per texture. `asset-hashes.json` hashes the actual
+packaged files, and shader preparation renders those same files.
 
 ## Shader architecture
 
@@ -122,6 +131,12 @@ Missing/stale/corrupt entries produce a visible error. The app never writes into
 its signed resource bundle.
 
 ## Validation
+
+Check texture packaging independently with:
+
+```sh
+python3 -m unittest discover -s platforms/ios/tests -p 'test_texture_assets.py'
+```
 
 Build a macOS replay executable with `SPARKIUM_PREPARE=OFF` and `SPARKIUM_APP=OFF`,
 then render from the prepared bundle. This executable has the same no-DXC/no-SPIRV-Cross
@@ -154,7 +169,9 @@ build-ios-replay/mobile_demo_check out/ios/Resources all out/ios/demos-replay
 ```
 
 This runs actual raster/compute work, checks finite pixels and particle positions,
-and verifies NBody motion, pause and deterministic reset, plus render-target resize.
+and verifies NBody motion, pause and fresh particle distributions on consecutive resets,
+plus render-target resize. Like the desktop demo, NBody seeds its random generator
+once at startup and advances the sequence across resets.
 
 Automated bundle checks compare all nine replay images with the preparation images,
 check a different resolution and 32-spp accumulation, and exercise missing/corrupt

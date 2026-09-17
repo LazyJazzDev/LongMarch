@@ -29,8 +29,20 @@ int main(int argc, char **argv) {
         if (session.Positions() != after)
           throw std::runtime_error("Paused simulation moved");
         session.Configure(4096, 10, .03f, false, 0, 0, 1);
-        if (session.Positions() != before)
-          throw std::runtime_error("Reset was not deterministic");
+        auto first_reset = session.Positions();
+        if (first_reset == before || first_reset == after)
+          throw std::runtime_error("Reset did not generate a new particle distribution");
+        session.Configure(4096, 10, .03f, false, 0, 0, 1);
+        session.Render();
+        if (session.Positions() != first_reset)
+          throw std::runtime_error("Unchanged settings reset the paused simulation");
+        session.Configure(4096, 10, .03f, false, 0, 0, 2);
+        auto second_reset = session.Positions();
+        if (second_reset == first_reset || second_reset == before)
+          throw std::runtime_error("Consecutive resets reused a particle distribution");
+        session.Render();
+        if (session.Positions() != second_reset)
+          throw std::runtime_error("Reset resumed the paused simulation");
       }
       if (name == "graphics_hello_resize") {
         session.Resize(900, 600);
