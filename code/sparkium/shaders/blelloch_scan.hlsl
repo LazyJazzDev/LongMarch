@@ -10,11 +10,23 @@ struct Metadata {
 ConstantBuffer<Metadata> metadata : register(b0, space1);
 
 #define GROUP_SIZE 64
+#ifndef SPARKIUM_NATIVE_CPU
 groupshared float group_element[GROUP_SIZE];
+#endif
 
 [numthreads(GROUP_SIZE, 1, 1)] void BlellochUpSweep(uint3 DTID
                                                     : SV_DispatchThreadID, uint3 GTID
                                                     : SV_GroupThreadID) {
+#ifdef SPARKIUM_NATIVE_CPU
+  if (GTID.x != 0) return;
+  float prefix = 0.0f;
+  uint first = DTID.x;
+  for (uint i = first; i < min(first + GROUP_SIZE, metadata.element_count); ++i) {
+    uint address = metadata.offset + i * metadata.stride;
+    prefix += asfloat(buffer.Load(address));
+    buffer.Store(address, asuint(prefix));
+  }
+#else
   uint index = DTID.x;
   float element = 0.0;
   if (index < metadata.element_count) {
@@ -35,6 +47,7 @@ groupshared float group_element[GROUP_SIZE];
   if (index < metadata.element_count) {
     buffer.Store(metadata.offset + index * metadata.stride, asuint(element));
   }
+#endif
 }
 
     [numthreads(GROUP_SIZE, 1, 1)] void BlellochDownSweep(uint3 DTID

@@ -6,13 +6,24 @@ RWByteAddressBuffer light_selector_data : register(u0, space1);
 ByteAddressBuffer data_buffers[] : register(t0, space2);
 
 #define GROUP_SIZE 64
+#ifndef SPARKIUM_NATIVE_CPU
 groupshared float group_element[GROUP_SIZE];
+#endif
 
 [numthreads(GROUP_SIZE, 1, 1)] void GatherLightPowerKernel(uint3 DTID
                                                            : SV_DispatchThreadID, uint3 GTID
                                                            : SV_GroupThreadID) {
   uint light_count = light_selector_data.Load(0);
   BufferReference<RWByteAddressBuffer> power_pdf = MakeBufferReference(light_selector_data, 4);
+#ifdef SPARKIUM_NATIVE_CPU
+  if (GTID.x != 0) return;
+  float prefix = 0.0f;
+  for (uint i = DTID.x; i < min(DTID.x + GROUP_SIZE, light_count); ++i) {
+    LightMetadata metadata = light_metadatas.Load<LightMetadata>(sizeof(LightMetadata) * i);
+    prefix += data_buffers[metadata.sampler_data_index].Load<float>(metadata.power_offset);
+    power_pdf.Store(i * 4, asuint(prefix));
+  }
+#else
   float power = 0.0f;
   if (DTID.x < light_count) {
     LightMetadata metadata = light_metadatas.Load<LightMetadata>(sizeof(LightMetadata) * DTID.x);
@@ -37,4 +48,5 @@ groupshared float group_element[GROUP_SIZE];
   if (DTID.x < light_count) {
     power_pdf.Store(DTID.x * 4, asuint(power));
   }
+#endif
 }

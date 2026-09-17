@@ -6,6 +6,7 @@
 #include <fstream>
 #include <iomanip>
 #include <iostream>
+#include <cmath>
 
 #include "grassland/graphics/frame_profile.h"
 #include "stb_image_write.h"
@@ -15,9 +16,9 @@ using namespace long_march;
 namespace {
 void Usage(const char *program) {
   std::cerr << "Usage: " << program << " <scene.json> [-o image.png] [--frames N] "
-            << "[--backend auto|metal|vulkan|d3d12] [--pipeline auto|rasterization|ray_tracing|rt_fallback|ray_query] "
+            << "[--backend auto|metal|vulkan|d3d12|cpu|cuda] [--pipeline auto|rasterization|ray_tracing|rt_fallback|ray_query] "
                "[--require-hardware-rt] [--debug] [--profile "
-               "timings.csv] [--profile-cpu-only|--profile-alternate-gpu]\n"
+               "timings.csv] [--profile-cpu-only|--profile-alternate-gpu] [--linear-output image.pfm]\n"
             << "       " << program << " --list [scene-directory]\n";
 }
 
@@ -48,6 +49,7 @@ int main(int argc, char **argv) {
 
     std::filesystem::path scene_path = argv[1];
     std::filesystem::path output = "output.png";
+    std::filesystem::path linear_output;
     int frames = 1;
     auto backend = graphics::BACKEND_API_DEFAULT;
     std::filesystem::path profile_path;
@@ -67,6 +69,8 @@ int main(int argc, char **argv) {
         debug = true;
       else if ((argument == "-o" || argument == "--output") && i + 1 < argc)
         output = argv[++i];
+      else if (argument == "--linear-output" && i + 1 < argc)
+        linear_output = argv[++i];
       else if (argument == "--profile-alternate-gpu")
         profile_alternate_gpu = true;
       else if (argument == "--profile-cpu-only")
@@ -100,6 +104,13 @@ int main(int argc, char **argv) {
     auto loaded = sparkium::JsonScene::Load(&core, scene_path, &error);
     if (!loaded) throw std::runtime_error(error);
     if (!override_pipeline) pipeline = loaded->GetRenderPipeline();
+    if (backend == graphics::BACKEND_API_CPU || backend == graphics::BACKEND_API_CUDA) {
+      if (pipeline == sparkium::RENDER_PIPELINE_RASTERIZATION ||
+          pipeline == sparkium::RENDER_PIPELINE_RAY_QUERY)
+        throw std::runtime_error("CPU/CUDA support the shared path tracer, not rasterization or native ray queries");
+      std::cout << "Tracing: native " << graphics::BackendAPIString(backend)
+                << " kernels (shared path tracer and BVH; no graphics API dispatch)\n";
+    }
     if (core.ResolveRenderPipeline(pipeline) == sparkium::RENDER_PIPELINE_RAY_QUERY)
       std::cout << "Tracing: native ray query (compute, native AS)\n";
 
@@ -143,6 +154,28 @@ int main(int argc, char **argv) {
     }
     if (!profiler)
       film->Develop(image.get());
+    if (!linear_output.empty()) {
+      // PFM preserves pre-display linear RGB for numerical regression checks.
+      // Reject NaNs instead of hiding them in the UNORM display conversion.
+      std::vector<glm::vec4> linear(static_cast<size_t>(film->GetWidth()) * film->GetHeight());
+      film->GetRawImage()->DownloadData(linear.data());
+      std::filesystem::create_directories(linear_output.has_parent_path() ? linear_output.parent_path() : ".");
+      std::ofstream stream(linear_output, std::ios::binary);
+      const uint32_t endian = 1;
+      stream << "PF\n" << film->GetWidth() << ' ' << film->GetHeight()
+             << "\n" << (*reinterpret_cast<const uint8_t *>(&endian) ? "-1.0\n" : "1.0\n");
+      for (int y = film->GetHeight() - 1; y >= 0; --y)
+        for (int x = 0; x < film->GetWidth(); ++x) {
+          const auto &pixel = linear[static_cast<size_t>(y) * film->GetWidth() + x];
+          for (int c = 0; c < 3; ++c)
+            if (!std::isfinite(pixel[c]))
+              throw std::runtime_error("non-finite linear radiance at pixel " + std::to_string(x) + "," +
+                                       std::to_string(y));
+          stream.write(reinterpret_cast<const char *>(&pixel), sizeof(float) * 3);
+        }
+      if (!stream)
+        throw std::runtime_error("failed to write linear image: " + linear_output.string());
+    }
     std::vector<uint8_t> pixels(static_cast<size_t>(film->GetWidth()) * film->GetHeight() * 4);
     image->DownloadData(pixels.data());
     std::filesystem::create_directories(output.has_parent_path() ? output.parent_path() : ".");

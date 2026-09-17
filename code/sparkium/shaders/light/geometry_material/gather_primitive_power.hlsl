@@ -3,7 +3,9 @@
 #include "constants.hlsli"
 
 #define GROUP_SIZE 64
+#ifndef SPARKIUM_NATIVE_CPU
 groupshared float group_element[GROUP_SIZE];
+#endif
 
 ByteAddressBuffer geometry_data : register(t0, space0);
 ByteAddressBuffer material_data : register(t0, space1);
@@ -27,6 +29,14 @@ RWByteAddressBuffer direct_lighting_sampler_data : register(u0, space2);
   geometry_sampler.SetTransform(transform);
   MaterialEvaluator<ByteAddressBuffer> material_evaluator;
   material_evaluator.material_data = material_data;
+#ifdef SPARKIUM_NATIVE_CPU
+  if (GTID.x != 0) return;
+  float prefix = 0.0f;
+  for (uint i = DTID.x; i < min(DTID.x + GROUP_SIZE, primitive_count); ++i) {
+    prefix += material_evaluator.PrimitivePower(geometry_sampler, i);
+    power_pdf.Store(i * 4, asuint(prefix));
+  }
+#else
   // calculate the prefix sum of primitive_power_shared with WavePrefixSum
   if (DTID.x < primitive_count) {
     primitive_power = material_evaluator.PrimitivePower(geometry_sampler, DTID.x);
@@ -47,4 +57,5 @@ RWByteAddressBuffer direct_lighting_sampler_data : register(u0, space2);
   if (DTID.x < primitive_count) {
     power_pdf.Store(DTID.x * 4, asuint(primitive_power));
   }
+#endif
 }

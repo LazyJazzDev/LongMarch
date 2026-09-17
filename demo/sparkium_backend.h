@@ -12,6 +12,10 @@ inline grassland::graphics::BackendAPI ParseSparkiumBackend(const std::string &n
     api = BACKEND_API_METAL;
   else if (name == "vulkan")
     api = BACKEND_API_VULKAN;
+  else if (name == "cpu")
+    api = BACKEND_API_CPU;
+  else if (name == "cuda")
+    api = BACKEND_API_CUDA;
   else if (name == "d3d12")
     api = BACKEND_API_D3D12;
   else
