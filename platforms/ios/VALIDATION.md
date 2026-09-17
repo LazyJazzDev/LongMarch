@@ -112,3 +112,17 @@ Local device reports and screenshots are under `out/ios/device-demos/`; Mac
 outputs are in `out/ios/demos-prepare/` and `out/ios/demos-replay/`. These tests
 do not cover every finger gesture or eliminate the known large-Blender-scene
 memory limitation.
+
+## LongMarch project and application identity
+
+The Xcode project, application target, executable and app bundle are now named
+`LongMarch`. Automatic signing uses `dev.lazyjazz.longmarch` with the existing
+development team, while the display name remains LongMarch Demos.
+
+- Debug iPhone and Release simulator builds pass after project regeneration.
+- `codesign --verify --strict` passes; the signed application identifier contains
+  the new `dev.lazyjazz.longmarch` bundle ID under the existing team.
+- The new automatically provisioned app installs and launches successfully on
+  the connected iPhone 16 Plus.
+- This bundle ID installs independently of the previous Sparkium app, preserving
+  the old application's data.

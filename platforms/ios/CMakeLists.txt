@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.25)
-project(SparkiumMobile LANGUAGES C CXX OBJCXX)
+project(LongMarch LANGUAGES C CXX OBJCXX)
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_OBJCXX_STANDARD 17)
 option(SPARKIUM_PREPARE "Build macOS shader preparation tool (requires DXC and SPIRV-Cross)" OFF)
@@ -7,7 +7,7 @@ option(SPARKIUM_APP "Build native SwiftUI application" ON)
 set(SPARKIUM_HEADERS "" CACHE PATH "Portable dependency headers (vcpkg installed/<triplet>/include)")
 set(SPARKIUM_RESOURCES "${CMAKE_CURRENT_SOURCE_DIR}/../../out/ios/Resources" CACHE PATH "Prepared resource bundle")
 if(NOT APPLE)
-  message(FATAL_ERROR "SparkiumMobile requires an Apple SDK")
+  message(FATAL_ERROR "LongMarch requires an Apple SDK")
 endif()
 if(SPARKIUM_PREPARE AND CMAKE_SYSTEM_NAME STREQUAL "iOS")
   message(FATAL_ERROR "Run shader preparation on macOS")
@@ -87,15 +87,15 @@ if(SPARKIUM_APP)
   # as a legacy macOS bundle and overlook its root Info.plist.
   set(bundle_resources "${CMAKE_CURRENT_BINARY_DIR}/SparkiumResources")
   file(CREATE_LINK "${SPARKIUM_RESOURCES}" "${bundle_resources}" SYMBOLIC)
-  add_executable(Sparkium MACOSX_BUNDLE SparkiumApp.swift DemosApp.swift demos/DemoView.swift
+  add_executable(LongMarch MACOSX_BUNDLE SparkiumApp.swift DemosApp.swift demos/DemoView.swift
     demos/DemoBridge.mm demos/DemoBridge.h SparkiumBridge.mm SparkiumBridge.h RenderQueue.h
     "${bundle_resources}" Assets.xcassets)
   set_source_files_properties("${bundle_resources}" Assets.xcassets PROPERTIES MACOSX_PACKAGE_LOCATION Resources)
-  target_link_libraries(Sparkium PRIVATE sparkium_mobile "-framework SwiftUI" "-framework CoreGraphics" "-framework MetalKit")
-  target_compile_options(Sparkium PRIVATE "$<$<COMPILE_LANGUAGE:OBJCXX>:-fobjc-arc>")
-  set_target_properties(Sparkium PROPERTIES
+  target_link_libraries(LongMarch PRIVATE sparkium_mobile "-framework SwiftUI" "-framework CoreGraphics" "-framework MetalKit")
+  target_compile_options(LongMarch PRIVATE "$<$<COMPILE_LANGUAGE:OBJCXX>:-fobjc-arc>")
+  set_target_properties(LongMarch PROPERTIES
     MACOSX_BUNDLE_INFO_PLIST "${CMAKE_CURRENT_SOURCE_DIR}/Info.plist"
-    XCODE_ATTRIBUTE_PRODUCT_BUNDLE_IDENTIFIER "dev.lazyjazz.sparkium"
+    XCODE_ATTRIBUTE_PRODUCT_BUNDLE_IDENTIFIER "dev.lazyjazz.longmarch"
     XCODE_ATTRIBUTE_ASSETCATALOG_COMPILER_APPICON_NAME "AppIcon"
     XCODE_ATTRIBUTE_SWIFT_OBJC_BRIDGING_HEADER "${CMAKE_CURRENT_SOURCE_DIR}/SparkiumBridge.h"
     XCODE_ATTRIBUTE_SWIFT_VERSION "5.0"

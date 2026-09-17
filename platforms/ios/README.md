@@ -87,14 +87,16 @@ cmake -S platforms/ios -B build-ios-device -G Xcode \
   -DCMAKE_OSX_ARCHITECTURES=arm64 -DCMAKE_OSX_DEPLOYMENT_TARGET=18.0 \
   -DSPARKIUM_HEADERS="$PWD/out/ios/deps/arm64-osx/include"
 cmake --build build-ios-device --config Release -- CODE_SIGNING_ALLOWED=NO
-open build-ios-device/SparkiumMobile.xcodeproj
+open build-ios-device/LongMarch.xcodeproj
 ```
 
-For a device install, select the `Sparkium` target, choose your signing team and
+For a device install, select the `LongMarch` target, choose your signing team and
 connected iPhone/iPad in Xcode, and Run. The unsigned build is at
-`build-ios-device/Release-iphoneos/Sparkium.app`.
-The existing target, bundle identifier and build-product names are retained for
-signing compatibility; the installed application is named **LongMarch Demos**.
+`build-ios-device/Release-iphoneos/LongMarch.app`.
+The Xcode project and application target are `LongMarch`; the bundle identifier
+is `dev.lazyjazz.longmarch`. The installed display name remains **LongMarch Demos**.
+Select your existing Apple development team for automatic signing. The new bundle
+identifier installs separately from the earlier `dev.lazyjazz.sparkium` app.
 For the simulator use a separate `build-ios-simulator` directory and
 `-DCMAKE_OSX_SYSROOT=iphonesimulator`. The generated project supports both Debug
 and Release; embedded HLSL uses the same release shader variant in both.
