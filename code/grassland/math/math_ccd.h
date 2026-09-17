@@ -1,4 +1,5 @@
 #pragma once
+#include "grassland/math/math_polynomial.h"
 #include "grassland/math/math_util.h"
 
 namespace grassland {

@@ -107,6 +107,24 @@ VkPhysicalDeviceRayTracingPipelineFeaturesKHR PhysicalDevice::GetPhysicalDeviceR
   return features;
 }
 
+bool PhysicalDevice::SupportRayQuery() const {
+  if (!IsExtensionSupported(VK_KHR_RAY_QUERY_EXTENSION_NAME) ||
+      !IsExtensionSupported(VK_KHR_ACCELERATION_STRUCTURE_EXTENSION_NAME) ||
+      !IsExtensionSupported(VK_KHR_DEFERRED_HOST_OPERATIONS_EXTENSION_NAME) ||
+      !IsExtensionSupported(VK_KHR_BUFFER_DEVICE_ADDRESS_EXTENSION_NAME))
+    return false;
+  VkPhysicalDeviceBufferDeviceAddressFeatures address{VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_BUFFER_DEVICE_ADDRESS_FEATURES};
+  VkPhysicalDeviceAccelerationStructureFeaturesKHR acceleration{
+      VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_ACCELERATION_STRUCTURE_FEATURES_KHR};
+  VkPhysicalDeviceRayQueryFeaturesKHR query{VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_RAY_QUERY_FEATURES_KHR};
+  VkPhysicalDeviceFeatures2 features{VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2};
+  features.pNext = &query;
+  query.pNext = &acceleration;
+  acceleration.pNext = &address;
+  vkGetPhysicalDeviceFeatures2(physical_device_, &features);
+  return query.rayQuery && acceleration.accelerationStructure && address.bufferDeviceAddress;
+}
+
 bool PhysicalDevice::SupportRayTracing() const {
   VkPhysicalDeviceRayTracingPipelineFeaturesKHR features = GetPhysicalDeviceRayTracingPipelineFeatures();
   return features.rayTracingPipeline;
@@ -234,6 +252,8 @@ bool PhysicalDevice::CheckFeatureSupport(const DeviceFeatureRequirement &feature
     }
   }
 
+  if (feature_requirement.enable_rayquery_extension && !SupportRayQuery())
+    return false;
   return true;
 }
 

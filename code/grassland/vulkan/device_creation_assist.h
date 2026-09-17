@@ -10,6 +10,7 @@ namespace grassland::vulkan {
 
 struct DeviceFeatureRequirement {
   bool enable_raytracing_extension{false};
+  bool enable_rayquery_extension{false};
 
   class DeviceCreateInfo GenerateRecommendedDeviceCreateInfo(const PhysicalDevice &physical_device) const;
 

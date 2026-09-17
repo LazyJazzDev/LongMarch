@@ -5,11 +5,13 @@ Requires Pillow. All generated scenes, logs and images go to --output.
 """
 
 import argparse
+import copy
 import json
 import math
 from pathlib import Path
 import subprocess
 import time
+
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -33,6 +35,23 @@ def read_scene(path):
     return absolute_assets(json.loads(path.read_text()), path.parent)
 
 
+def graph_smoke():
+    scene = read_scene(ROOT / "assets/scenes/cornell_box/scene.json")
+    materials = read_scene(ROOT / "assets/scenes/blender_monster/scene.json")["materials"]
+    for target, source in (("light", "light_softboxes"), ("white", "Laminate_floor"), ("tall", "Wood_plinth")):
+        scene["materials"][target] = copy.deepcopy(materials[source])
+    scene["materials"]["red"] = {
+        "type": "shader_graph",
+        "graph": {"nodes": {}, "surface": {
+            "base_color": [0.63, 0.065, 0.05, 1], "opacity": 0.5,
+            "subsurface": 0.3, "subsurface_method": 1, "subsurface_scale": 20,
+        }},
+    }
+    scene["renderer"]["alpha_shadow"] = True
+    scene["name"] = "Blender material graph smoke"
+    return scene
+
+
 def main():
     from PIL import Image, ImageChops, ImageDraw, ImageStat
 
@@ -47,6 +66,7 @@ def main():
     parser.add_argument("--size", type=int, default=96)
     parser.add_argument("--spp", type=int, default=32)
     parser.add_argument("--bounces", type=int, default=12)
+    parser.add_argument("--graph-smoke", action="store_true")
     parser.add_argument("--compare-hardware", action="store_true")
     parser.add_argument("--max-rmse", type=float, help="optional failure threshold for normalized PNG RGB RMSE")
     parser.add_argument("--debug", action="store_true")
@@ -65,6 +85,8 @@ def main():
     args.output.mkdir(parents=True, exist_ok=True)
     cli = str(args.cli.resolve())
     scenes = [(name, read_scene(ROOT / "assets/scenes" / name / "scene.json")) for name in args.scenes]
+    if args.graph_smoke:
+        scenes.append(("graph_smoke", graph_smoke()))
     results, tiles = [], []
     failed = False
     for name, scene in scenes:

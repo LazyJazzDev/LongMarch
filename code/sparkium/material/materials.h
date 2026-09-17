@@ -2,4 +2,5 @@
 #include "sparkium/material/material_lambertian.h"
 #include "sparkium/material/material_light.h"
 #include "sparkium/material/material_principled.h"
+#include "sparkium/material/material_shader_graph.h"
 #include "sparkium/material/material_specular.h"

@@ -29,8 +29,10 @@ RenderPipeline Core::ResolveRenderPipeline(RenderPipeline render_pipeline) const
       render_pipeline = RENDER_PIPELINE_RT_FALLBACK;
     }
   }
+  // Older Blender scenes request pipeline RT. Keep them on native traversal
+  // when the device supports inline queries instead of a full RT pipeline.
   if (render_pipeline == RENDER_PIPELINE_RAY_TRACING && !core_->DeviceRayTracingSupport())
-    return RENDER_PIPELINE_RT_FALLBACK;
+    return core_->DeviceRayQuerySupport() ? RENDER_PIPELINE_RAY_QUERY : RENDER_PIPELINE_RT_FALLBACK;
   return render_pipeline;
 }
 
@@ -103,6 +105,7 @@ void Core::LoadPublicShaders() {
   core_->CreateComputeProgram(GetShader("tone_mapping"), &compute_program);
   compute_program->AddResourceBinding(graphics::RESOURCE_TYPE_IMAGE, 1);
   compute_program->AddResourceBinding(graphics::RESOURCE_TYPE_WRITABLE_IMAGE, 1);
+  compute_program->AddResourceBinding(graphics::RESOURCE_TYPE_UNIFORM_BUFFER, 1);
   compute_program->Finalize();
   SetPublicResource("tone_mapping", std::move(compute_program));
 }

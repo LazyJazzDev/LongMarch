@@ -12,7 +12,11 @@
 #else
 #include "software/traversal.hlsli"
 #endif
+#include "subsurface_random_walk.hlsli"
 
+#ifdef SPARKIUM_SHADER_GRAPHS
+#include "material/shader_graph/surface_sampler.hlsli"
+#endif
 #include "software_materials.hlsli"
 
 HitRecord SoftwareHitRecord(SoftwareHit hit, float3 direction) {
@@ -28,7 +32,8 @@ void SoftwareTracePath(RayDesc ray, inout RenderContext context) {
     return;
   }
   HitRecord record = SoftwareHitRecord(hit, ray.Direction);
-  SoftwareSampleMaterial(LoadSoftwareInstance(software_instances, hit.instance).material, context, record);
+  if (!ContinueSubsurfaceRandomWalk(context, record))
+    SoftwareSampleMaterial(LoadSoftwareInstance(software_instances, hit.instance).material, context, record);
 }
 #include "raygen.hlsl"
 #include "software/shadow.hlsli"

@@ -1,12 +1,15 @@
 #include <gtest/gtest.h>
 #include <long_march.h>
 
+#include <algorithm>
+#include <cstring>
 #include <glm/gtc/matrix_transform.hpp>
 #include <numeric>
 #include <random>
 #include <tuple>
 
 #include "grassland/graphics/frame_profile.h"
+#include "grassland/graphics/backend/backend.h"
 #include "sparkium/pipelines/raytracing/core/core.h"
 #include "sparkium/pipelines/raytracing/core/software_pipeline.h"
 #include "sparkium/pipelines/raytracing/geometry/geometry_mesh.h"
@@ -37,6 +40,42 @@ class SoftwareBVHTest : public testing::Test {
   std::unique_ptr<graphics::Core> graphics;
   std::unique_ptr<sparkium::Core> core;
 };
+
+TEST_F(SoftwareBVHTest, RayQueryCapabilityMatchesDevice) {
+#if defined(LONGMARCH_VULKAN_ENABLED)
+  if (auto *vk = dynamic_cast<graphics::backend::VulkanCore *>(graphics.get())) {
+    const auto &physical = vk->Device()->PhysicalDevice();
+    EXPECT_EQ(graphics->DeviceRayQuerySupport(), physical.SupportRayQuery());
+    if (physical.SupportRayQuery()) {
+      vulkan::DeviceFeatureRequirement requirement{};
+      requirement.enable_rayquery_extension = true;
+      auto info = requirement.GenerateRecommendedDeviceCreateInfo(physical);
+      auto has_extension = [&](const char *name) {
+        return std::any_of(info.extensions.begin(), info.extensions.end(),
+                           [&](const char *extension) { return std::strcmp(extension, name) == 0; });
+      };
+      EXPECT_TRUE(has_extension(VK_KHR_RAY_QUERY_EXTENSION_NAME));
+      EXPECT_TRUE(has_extension(VK_KHR_ACCELERATION_STRUCTURE_EXTENSION_NAME));
+      EXPECT_FALSE(has_extension(VK_KHR_RAY_TRACING_PIPELINE_EXTENSION_NAME));
+      EXPECT_NE(requirement.GetVmaAllocatorCreateFlags() & VMA_ALLOCATOR_CREATE_BUFFER_DEVICE_ADDRESS_BIT, 0);
+      std::unique_ptr<vulkan::Device> query_device;
+      ASSERT_EQ(vk->Instance()->CreateDevice(physical, info, requirement.GetVmaAllocatorCreateFlags(), &query_device),
+                VK_SUCCESS);
+      EXPECT_NE(query_device->Procedures().vkCmdBuildAccelerationStructuresKHR, nullptr);
+      EXPECT_EQ(query_device->Procedures().vkCmdTraceRaysKHR, nullptr);
+    }
+  }
+#endif
+#if defined(LONGMARCH_D3D12_ENABLED)
+  if (auto *dx = dynamic_cast<graphics::backend::D3D12Core *>(graphics.get())) {
+    D3D12_FEATURE_DATA_D3D12_OPTIONS5 options{};
+    const auto result = dx->Device()->Handle()->CheckFeatureSupport(
+        D3D12_FEATURE_D3D12_OPTIONS5, &options, sizeof(options));
+    EXPECT_EQ(graphics->DeviceRayQuerySupport(),
+              SUCCEEDED(result) && options.RaytracingTier >= D3D12_RAYTRACING_TIER_1_1);
+  }
+#endif
+}
 
 Hit Oracle(const Ray &ray, const std::vector<Vector3<float>> &positions, const std::vector<glm::mat4x3> &transforms) {
   Hit hit{};
@@ -208,12 +247,13 @@ INSTANTIATE_TEST_SUITE_P(TreeSizes, SoftwareBVHSizeTest, testing::Combine(testin
 class ComputeTraversalTest : public SoftwareBVHTest, public testing::WithParamInterface<bool> {};
 INSTANTIATE_TEST_SUITE_P(TraversalModes, ComputeTraversalTest, testing::Bool());
 
-TEST_P(ComputeTraversalTest, EmptySceneAccumulationAndReset) {
+TEST_P(ComputeTraversalTest, EmptySceneBackgroundAccumulationAndReset) {
   bool ray_query = GetParam();
   if (ray_query && !graphics->DeviceRayQuerySupport())
     GTEST_SKIP() << "native ray query unavailable";
   sparkium::Scene scene(core.get());
   scene.settings.samples_per_dispatch = 3;
+  scene.settings.background_color = glm::vec3(0.2f, 0.4f, 0.7f);
   sparkium::Camera camera(core.get(), glm::mat4(1), glm::radians(45.0f), 17.0f / 13.0f);
   sparkium::Film film(core.get(), 17, 13);
   auto check = [&](glm::vec3 expected) {
@@ -229,14 +269,15 @@ TEST_P(ComputeTraversalTest, EmptySceneAccumulationAndReset) {
     core->Render(&scene, &camera, &film,
                  ray_query ? sparkium::RENDER_PIPELINE_RAY_QUERY : sparkium::RENDER_PIPELINE_RT_FALLBACK);
     EXPECT_EQ(film.info.accumulated_samples, frame * 3);
-    check(glm::vec3(0.0f));
+    check(scene.settings.background_color);
   }
+  scene.settings.background_color = glm::vec3(0.1f, 0.3f, 0.9f);
   film.Reset();
   EXPECT_EQ(film.info.accumulated_samples, 0);
   core->Render(&scene, &camera, &film,
                ray_query ? sparkium::RENDER_PIPELINE_RAY_QUERY : sparkium::RENDER_PIPELINE_RT_FALLBACK);
   EXPECT_EQ(film.info.accumulated_samples, 3);
-  check(glm::vec3(0.0f));
+  check(scene.settings.background_color);
   if (ray_query && !graphics->DeviceRayTracingSupport()) {
     EXPECT_EQ(core->ResolveRenderPipeline(sparkium::RENDER_PIPELINE_AUTO), sparkium::RENDER_PIPELINE_RAY_QUERY);
     graphics::FrameProfile profile(graphics.get(), false);
@@ -246,7 +287,15 @@ TEST_P(ComputeTraversalTest, EmptySceneAccumulationAndReset) {
     EXPECT_EQ(profile.counters["native_ray_query"], 1u);
     // Auto must reuse the selected native pipeline and preserve its accumulation.
     EXPECT_EQ(film.info.accumulated_samples, 6);
-    check(glm::vec3(0.0f));
+    check(scene.settings.background_color);
+    // Legacy JSON requests must select the same native query pipeline as Auto.
+    EXPECT_EQ(core->ResolveRenderPipeline(sparkium::RENDER_PIPELINE_RAY_TRACING), sparkium::RENDER_PIPELINE_RAY_QUERY);
+    profile.Begin();
+    core->Render(&scene, &camera, &film, sparkium::RENDER_PIPELINE_RAY_TRACING);
+    profile.Finish();
+    EXPECT_EQ(profile.counters["native_ray_query"], 1u);
+    EXPECT_EQ(film.info.accumulated_samples, 9);
+    check(scene.settings.background_color);
   }
   if (graphics->DeviceRayQuerySupport()) {
     // Switching traversal implementations must discard accumulation in both directions.
@@ -254,7 +303,7 @@ TEST_P(ComputeTraversalTest, EmptySceneAccumulationAndReset) {
       core->Render(&scene, &camera, &film,
                    query ? sparkium::RENDER_PIPELINE_RAY_QUERY : sparkium::RENDER_PIPELINE_RT_FALLBACK);
       EXPECT_EQ(film.info.accumulated_samples, 3);
-      check(glm::vec3(0.0f));
+      check(scene.settings.background_color);
     }
   }
 }
@@ -354,6 +403,21 @@ TEST_F(SoftwareBVHTest, SharedShadersCompileForNativeRayTracingAndCompute) {
       compile("geometry/mesh/hit_group.hlsl", "RenderClosestHit", "lib_6_5");
       compile("geometry/mesh/hit_group.hlsl", "ShadowClosestHit", "lib_6_5");
     }
+    sparkium::CodeLines graph(vfs, "material/shader_graph/sampler.hlsl");
+    graph.InsertAfter(sparkium::CodeLines(R"(
+GraphSurface EvaluateShaderGraph(HitRecord hit, float3 direction, int bounce, uint ray_type,
+                                 bool shadow, ByteAddressBuffer material) {
+  GraphSurface surface = (GraphSurface)0;
+  surface.normal = hit.normal;
+  surface.opacity = 0.5f; surface.shadow_opacity = -1.0f;
+  surface.ior = 1.45f; surface.roughness = 0.5f;
+  return surface;
+}
+)"),
+                      "// SHADER_GRAPH_IMPLEMENTATION");
+    vfs.WriteFile("material_sampler.hlsli", graph);
+    for (auto entry : {"RenderClosestHit", "ShadowClosestHit", "ShadowAnyHit"})
+      compile("geometry/mesh/hit_group.hlsl", entry, "lib_6_5");
     for (auto entry : {"InitLeaves", "ReduceNodes", "MortonKeys", "BitonicSort", "SortLeaves"})
       compile("software/build.hlsl", entry, "cs_6_0");
   }
@@ -387,6 +451,7 @@ TEST_F(SoftwareBVHTest, HardwareImageParity) {
   scene.AddEntity(&entity);
   scene.settings.samples_per_dispatch = 16;
   scene.settings.max_bounces = 4;
+  scene.settings.background_color = glm::vec3(0.1f);
   sparkium::Camera camera(core.get(), glm::lookAt(glm::vec3(0, 0, 4), glm::vec3(0), glm::vec3(0, 1, 0)),
                           glm::radians(45.0f), 1.0f);
   sparkium::Film software(core.get(), 32, 32), hardware(core.get(), 32, 32);

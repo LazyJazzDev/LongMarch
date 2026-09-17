@@ -20,6 +20,10 @@ class Film : public Object {
     float persistence{1.0};
     float clamping{100.0f};
     float max_exposure{1.0f};
+    int view_transform{0};
+    float exposure{0.0f};
+    float gamma{1.0f};
+    float contrast{1.0f};
   } info;
 
   void Develop(graphics::Image *targ_image);
@@ -36,6 +40,7 @@ class Film : public Object {
   std::unique_ptr<graphics::Image> raw_image_;
   std::unique_ptr<graphics::Image> depth_image_;
   std::unique_ptr<graphics::Image> stencil_image_;
+  std::unique_ptr<graphics::Buffer> tone_mapping_buffer_;
 
   std::vector<std::function<void()>> reset_callbacks_;
 };

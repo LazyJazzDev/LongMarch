@@ -5,7 +5,13 @@ namespace sparkium::raytracing {
 
 class LightPoint : public Light {
  public:
-  LightPoint(Core *core, glm::vec3 &position, glm::vec3 &color, float &strength);
+  LightPoint(Core *core,
+             glm::vec3 &position,
+             glm::vec3 &color,
+             float &strength,
+             float &radius,
+             int &soft_falloff,
+             float &sampling_weight);
 
   int SamplerShader(Scene *scene) override;
   graphics::Buffer *SamplerData() override;
@@ -14,6 +20,9 @@ class LightPoint : public Light {
   glm::vec3 &position;
   glm::vec3 &color;
   float &strength;
+  float &radius;
+  int &soft_falloff;
+  float &sampling_weight;
 
  private:
   std::unique_ptr<graphics::Shader> direct_lighting_sampler_;

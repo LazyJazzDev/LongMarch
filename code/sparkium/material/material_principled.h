@@ -44,6 +44,7 @@ class MaterialPrincipled : public Material {
     graphics::Image *roughness{nullptr};
     graphics::Image *anisotropic{nullptr};
     graphics::Image *anisotropic_rotation{nullptr};
+    graphics::Image *emission{nullptr};
   } textures{};
 
   glm::vec3 &base_color{info.base_color};

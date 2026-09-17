@@ -52,6 +52,7 @@ void SampleMaterial(inout RenderContext context, HitRecord hit_record) {
   context.origin = hit_record.position;
   context.direction = omega_in;
   context.bsdf_pdf = pdf;
+  context.ray_type = RAY_TYPE_REFLECTION;
 }
 
 #define SAMPLE_SHADOW_NO_HITRECORD

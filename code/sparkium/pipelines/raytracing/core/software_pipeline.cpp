@@ -82,15 +82,21 @@ void SoftwarePipeline::CompileBuilders(uint32_t buffer_count) {
   }
   builder_buffer_count_ = buffer_count;
 }
-void SoftwarePipeline::CompileRenderer(const std::vector<std::string> &materials,
+void SoftwarePipeline::CompileRenderer(const std::vector<MaterialCode> &materials,
                                        uint32_t buffers,
                                        uint32_t sdr_count,
                                        uint32_t hdr_count) {
   graphics::CpuProfileScope compile_profile("compile_renderer");
+  const bool has_graph = std::any_of(materials.begin(), materials.end(),
+                                     [](const MaterialCode &material) { return material.shader_graph; });
   std::ostringstream source;
   for (size_t i = 0; i < materials.size(); ++i) {
-    source << "namespace SoftwareMaterial" << i << " {\n"
-           << materials[i] << R"(
+    source << "namespace SoftwareMaterial" << i << " {\n" << materials[i].source;
+    if (materials[i].shader_graph) {
+      source << "}\n";
+      continue;
+    }
+    source << R"(
 float Transmission(HitRecord hit, float3 direction) {
 #ifdef SAMPLE_SHADOW_ANY_HIT
   return 1.0f - saturate(SampleShadowOpacity(hit, direction));
@@ -110,21 +116,62 @@ float Transmission(HitRecord hit, float3 direction) {
 #undef SAMPLE_SHADOW_NO_HITRECORD
 )";
   }
-  source << "void SoftwareSampleMaterial(uint material, inout RenderContext context, HitRecord hit) {\n"
-            "switch (material) {\n";
-  for (size_t i = 0; i < materials.size(); ++i)
-    source << "case " << i << ": SoftwareMaterial" << i << "::SampleMaterial(context, hit); return;\n";
-  source << "default: context.throughput = float3(0, 0, 0); break;\n}}\n"
-            "float SoftwareShadowTransmission(uint material, HitRecord hit, float3 direction) {\nswitch (material) {\n";
-  for (size_t i = 0; i < materials.size(); ++i)
-    source << "case " << i << ": return SoftwareMaterial" << i << "::Transmission(hit, direction);\n";
-  source << "default: return 0.0f;\n}}\n";
+  if (has_graph) {
+    source << R"(
+  ByteAddressBuffer SoftwareMaterialData(HitRecord hit) {
+    InstanceMetadata metadata = instance_metadatas.Load<InstanceMetadata>(sizeof(InstanceMetadata) * hit.object_index);
+    return data_buffers[NonUniformResourceIndex(metadata.material_data_index)];
+  }
+  void SoftwareSampleMaterial(uint material, inout RenderContext context, HitRecord hit) {
+    GraphSurface graph;
+    switch (material) {
+  )";
+    for (size_t i = 0; i < materials.size(); ++i) {
+      source << "case " << i << ": ";
+      if (materials[i].shader_graph)
+        source << "graph = SoftwareMaterial" << i
+               << "::EvaluateShaderGraph(hit, -context.direction, context.bounce, context.ray_type, false, "
+                  "SoftwareMaterialData(hit)); break;\n";
+      else
+        source << "SoftwareMaterial" << i << "::SampleMaterial(context, hit); return;\n";
+    }
+    source << R"(
+      default: context.throughput = float3(0, 0, 0); return;
+    }
+    SampleGraphSurface(context, hit, graph);
+  }
+  float SoftwareShadowTransmission(uint material, HitRecord hit, float3 direction) {
+    switch (material) {
+  )";
+    for (size_t i = 0; i < materials.size(); ++i) {
+      source << "case " << i << ": return ";
+      if (materials[i].shader_graph)
+        source << "1.0f - saturate(GraphShadowOpacity(SoftwareMaterial" << i
+               << "::EvaluateShaderGraph(hit, -direction, 1, RAY_TYPE_REFLECTION, true, SoftwareMaterialData(hit))));\n";
+      else
+        source << "SoftwareMaterial" << i << "::Transmission(hit, direction);\n";
+    }
+    source << "default: return 0.0f;\n}}\n";
+  } else {
+    // Preserve the compact dispatch for scenes without material graphs.
+    source << "void SoftwareSampleMaterial(uint material, inout RenderContext context, HitRecord hit) {\n"
+              "switch (material) {\n";
+    for (size_t i = 0; i < materials.size(); ++i)
+      source << "case " << i << ": SoftwareMaterial" << i << "::SampleMaterial(context, hit); return;\n";
+    source << "default: context.throughput = float3(0, 0, 0); break;\n}}\n"
+              "float SoftwareShadowTransmission(uint material, HitRecord hit, float3 direction) {\nswitch (material) {\n";
+    for (size_t i = 0; i < materials.size(); ++i)
+      source << "case " << i << ": return SoftwareMaterial" << i << "::Transmission(hit, direction);\n";
+    source << "default: return 0.0f;\n}}\n";
+  }
   auto vfs = core_->GetShadersVFS();
   vfs.WriteFile("software_materials.hlsli", source.str());
   render_program_.reset();
   std::vector<std::string> args{"-I.", "-DSOFTWARE_DATA_BUFFER_COUNT=" + std::to_string(buffers)};
   if (ray_query_)
     args.push_back("-DSPARKIUM_RAY_QUERY");
+  if (has_graph)
+    args.push_back("-DSPARKIUM_SHADER_GRAPHS");
   if (core_->GraphicsCore()->CreateShader(vfs, "software/render.hlsl", "Main", ray_query_ ? "cs_6_5" : "cs_6_0", args,
                                           &render_shader_))
     throw std::runtime_error("failed to compile compute ray tracing shader");
@@ -177,7 +224,7 @@ void SoftwarePipeline::Update(graphics::CommandContext *commands,
   std::vector<GeometryLayout> geometries;
   std::vector<GPUInstance> gpu_instances;
   std::vector<graphics::RayTracingInstance> native_instances;
-  std::vector<std::string> materials;
+  std::vector<MaterialCode> materials;
   if (16ull + instances_.size() * sizeof(GPUInstance) > std::numeric_limits<uint32_t>::max())
     throw std::runtime_error("software instance byte address overflow");
   const uint32_t tlas_leaves = ray_query_ ? 1 : LeafCount(instances_.size());
@@ -196,7 +243,8 @@ void SoftwarePipeline::Update(graphics::CommandContext *commands,
       node_count += uint64_t(leaves) * 2 - 1;
       max_leaves = std::max(max_leaves, leaves);
     }
-    std::string source = MaterialSource(instance.material->SamplerImpl());
+    const auto *graph = instance.material->GraphImpl();
+    MaterialCode source{graph != nullptr, MaterialSource(graph ? *graph : instance.material->SamplerImpl())};
     auto material = std::find(materials.begin(), materials.end(), source);
     uint32_t material_index = std::distance(materials.begin(), material);
     if (material == materials.end())

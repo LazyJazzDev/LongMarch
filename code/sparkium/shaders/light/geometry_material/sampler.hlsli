@@ -36,6 +36,9 @@ void MeshLightSampler(int shader_index, inout SampleDirectLightingPayload payloa
     case 0x1000002:
       eval = MaterialLambertianEvaluateDirectLighting(material_data, position, primitive_sample);
       break;
+    case 0x1000004:
+      eval = LoadFloat3(material_data, 0);
+      break;
     case 0x1000005:
       eval = float3(0, 0, 0);
       break;

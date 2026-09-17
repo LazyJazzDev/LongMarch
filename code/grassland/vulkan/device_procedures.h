@@ -6,6 +6,7 @@ class DeviceProcedures {
  public:
   explicit DeviceProcedures();
   void GetRayTracingProcedures(VkDevice device);
+  void GetAccelerationStructureProcedures(VkDevice device);
 
   /** Ray Tracing Procedures */
   GRASSLAND_VULKAN_PROCEDURE_VAR(vkCmdBuildAccelerationStructuresKHR);

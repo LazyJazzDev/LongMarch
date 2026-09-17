@@ -35,7 +35,7 @@ __global__ void DeviceHessianKernel(FunctionSet f,
 template <typename FunctionSet>
 typename FunctionSet::OutputType DeviceValue(FunctionSet f, const typename FunctionSet::InputType &x) {
   typename FunctionSet::OutputType *out;
-  cudaMallocManaged(&out, sizeof(FunctionSet::OutputType));
+  cudaMallocManaged(&out, sizeof(typename FunctionSet::OutputType));
   DeviceValueKernel<<<1, 1>>>(f, x, out);
   cudaDeviceSynchronize();
   typename FunctionSet::OutputType result = *out;

@@ -22,11 +22,8 @@ VkDeviceCreateInfo DeviceCreateInfo::CompileVkDeviceCreateInfo(bool enable_valid
     pNext = feature->LinkNext(pNext);
   }
 
-  if (enable_validation_layers) {
-    enabled_layers_ = GetValidationLayers();
-  } else {
-    enabled_layers_.clear();
-  }
+  // Validation layers are enabled on the instance, never on the device.
+  enabled_layers_.clear();
 
   VkDeviceCreateInfo create_info{};
 
@@ -70,12 +67,14 @@ class DeviceCreateInfo DeviceFeatureRequirement::GenerateRecommendedDeviceCreate
   create_info.AddFeature(physical_device_extended_dynamic_state_features);
   create_info.AddFeature(scalar_block_layout_features);
 
-  if (enable_raytracing_extension) {
+  if (enable_raytracing_extension || enable_rayquery_extension) {
     create_info.AddExtension(VK_KHR_BUFFER_DEVICE_ADDRESS_EXTENSION_NAME);
-    create_info.AddExtension(VK_KHR_RAY_TRACING_PIPELINE_EXTENSION_NAME);
+    if (enable_raytracing_extension)
+      create_info.AddExtension(VK_KHR_RAY_TRACING_PIPELINE_EXTENSION_NAME);
     create_info.AddExtension(VK_KHR_ACCELERATION_STRUCTURE_EXTENSION_NAME);
     create_info.AddExtension(VK_KHR_DEFERRED_HOST_OPERATIONS_EXTENSION_NAME);
-    create_info.AddExtension(VK_KHR_RAY_QUERY_EXTENSION_NAME);
+    if (enable_rayquery_extension)
+      create_info.AddExtension(VK_KHR_RAY_QUERY_EXTENSION_NAME);
 
     VkPhysicalDeviceBufferDeviceAddressFeatures physical_device_buffer_device_address_features{};
     VkPhysicalDeviceRayTracingPipelineFeaturesKHR physical_device_ray_tracing_pipeline_features{};
@@ -98,9 +97,11 @@ class DeviceCreateInfo DeviceFeatureRequirement::GenerateRecommendedDeviceCreate
     physical_device_ray_query_features.rayQuery = VK_TRUE;
 
     create_info.AddFeature(physical_device_buffer_device_address_features);
-    create_info.AddFeature(physical_device_ray_tracing_pipeline_features);
+    if (enable_raytracing_extension)
+      create_info.AddFeature(physical_device_ray_tracing_pipeline_features);
     create_info.AddFeature(physical_device_acceleration_structure_features);
-    create_info.AddFeature(physical_device_ray_query_features);
+    if (enable_rayquery_extension)
+      create_info.AddFeature(physical_device_ray_query_features);
   }
 
   VkPhysicalDeviceDescriptorIndexingFeaturesEXT physical_device_descriptor_indexing_features{};
@@ -126,7 +127,7 @@ class DeviceCreateInfo DeviceFeatureRequirement::GenerateRecommendedDeviceCreate
 
 VmaAllocatorCreateFlags DeviceFeatureRequirement::GetVmaAllocatorCreateFlags() const {
   VmaAllocatorCreateFlags flags = 0;
-  if (enable_raytracing_extension) {
+  if (enable_raytracing_extension || enable_rayquery_extension) {
     flags |= VMA_ALLOCATOR_CREATE_BUFFER_DEVICE_ADDRESS_BIT;
   }
   return flags;

@@ -20,13 +20,17 @@ FuncTy GetProcedure(VkDevice device, const char *function_name) {
 
 DeviceProcedures::DeviceProcedures() = default;
 
-void DeviceProcedures::GetRayTracingProcedures(VkDevice device) {
+void DeviceProcedures::GetAccelerationStructureProcedures(VkDevice device) {
   GET_PROCEDURE(device, vkGetBufferDeviceAddressKHR);
   GET_PROCEDURE(device, vkGetAccelerationStructureBuildSizesKHR);
   GET_PROCEDURE(device, vkCreateAccelerationStructureKHR);
   GET_PROCEDURE(device, vkCmdBuildAccelerationStructuresKHR);
   GET_PROCEDURE(device, vkDestroyAccelerationStructureKHR);
   GET_PROCEDURE(device, vkGetAccelerationStructureDeviceAddressKHR);
+}
+
+void DeviceProcedures::GetRayTracingProcedures(VkDevice device) {
+  GetAccelerationStructureProcedures(device);
   GET_PROCEDURE(device, vkCreateRayTracingPipelinesKHR);
   GET_PROCEDURE(device, vkGetRayTracingShaderGroupHandlesKHR);
   GET_PROCEDURE(device, vkCmdTraceRaysKHR);

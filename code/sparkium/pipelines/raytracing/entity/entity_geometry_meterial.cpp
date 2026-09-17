@@ -33,6 +33,10 @@ EntityGeometryMaterial::EntityGeometryMaterial(sparkium::EntityGeometryMaterial 
     } else if (dynamic_cast<MaterialSpecular *>(material_)) {
       hit_groups_.render_group.closest_hit_shader = core_->GetShader("mesh_specular_chit");
       hit_groups_.shadow_group.closest_hit_shader = core_->GetShader("mesh_specular_shadow_chit");
+    } else if (auto graph = dynamic_cast<MaterialShaderGraph *>(material_)) {
+      hit_groups_.render_group.closest_hit_shader = graph->RenderClosestHitShader();
+      hit_groups_.shadow_group.closest_hit_shader = graph->ShadowClosestHitShader();
+      hit_groups_.shadow_group.any_hit_shader = graph->ShadowAnyHitShader();
     }
   }
 

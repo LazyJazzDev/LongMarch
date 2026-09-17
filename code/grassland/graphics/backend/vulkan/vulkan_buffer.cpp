@@ -12,7 +12,7 @@ VulkanStaticBuffer::VulkanStaticBuffer(VulkanCore *core, size_t size) : core_(co
   auto usage = VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_TRANSFER_SRC_BIT |
                VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT | VK_BUFFER_USAGE_STORAGE_BUFFER_BIT |
                VK_BUFFER_USAGE_INDEX_BUFFER_BIT | VK_BUFFER_USAGE_VERTEX_BUFFER_BIT;
-  if (core_->DeviceRayTracingSupport()) {
+  if (core_->DeviceRayTracingSupport() || core_->DeviceRayQuerySupport()) {
     usage |= VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
              VK_BUFFER_USAGE_ACCELERATION_STRUCTURE_BUILD_INPUT_READ_ONLY_BIT_KHR;
   }
@@ -37,7 +37,7 @@ void VulkanStaticBuffer::Resize(size_t new_size) {
   auto usage = VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_TRANSFER_SRC_BIT |
                VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT | VK_BUFFER_USAGE_STORAGE_BUFFER_BIT |
                VK_BUFFER_USAGE_INDEX_BUFFER_BIT | VK_BUFFER_USAGE_VERTEX_BUFFER_BIT;
-  if (core_->DeviceRayTracingSupport()) {
+  if (core_->DeviceRayTracingSupport() || core_->DeviceRayQuerySupport()) {
     usage |= VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
              VK_BUFFER_USAGE_ACCELERATION_STRUCTURE_BUILD_INPUT_READ_ONLY_BIT_KHR;
   }
@@ -92,7 +92,7 @@ VkDeviceAddress VulkanStaticBuffer::DeviceAddress() const {
 
 VulkanDynamicBuffer::VulkanDynamicBuffer(VulkanCore *core, size_t size) : core_(core) {
   auto usage = VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_TRANSFER_SRC_BIT;
-  if (core_->DeviceRayTracingSupport()) {
+  if (core_->DeviceRayTracingSupport() || core_->DeviceRayQuerySupport()) {
     usage |= VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
              VK_BUFFER_USAGE_ACCELERATION_STRUCTURE_BUILD_INPUT_READ_ONLY_BIT_KHR;
   }
@@ -124,7 +124,7 @@ BufferType VulkanDynamicBuffer::Type() const {
 void VulkanDynamicBuffer::Resize(size_t new_size) {
   std::unique_ptr<vulkan::Buffer> new_buffer;
   auto usage = VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_TRANSFER_SRC_BIT;
-  if (core_->DeviceRayTracingSupport()) {
+  if (core_->DeviceRayTracingSupport() || core_->DeviceRayQuerySupport()) {
     usage |= VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
              VK_BUFFER_USAGE_ACCELERATION_STRUCTURE_BUILD_INPUT_READ_ONLY_BIT_KHR;
   }
@@ -176,7 +176,7 @@ VulkanCUDABuffer::VulkanCUDABuffer(VulkanCore *core, size_t size) : core_(core),
   auto usage = VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_TRANSFER_SRC_BIT |
                VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT | VK_BUFFER_USAGE_STORAGE_BUFFER_BIT |
                VK_BUFFER_USAGE_INDEX_BUFFER_BIT | VK_BUFFER_USAGE_VERTEX_BUFFER_BIT;
-  if (core_->DeviceRayTracingSupport()) {
+  if (core_->DeviceRayTracingSupport() || core_->DeviceRayQuerySupport()) {
     usage |= VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
              VK_BUFFER_USAGE_ACCELERATION_STRUCTURE_BUILD_INPUT_READ_ONLY_BIT_KHR;
   }
@@ -223,7 +223,7 @@ void VulkanCUDABuffer::Resize(size_t new_size) {
   auto usage = VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_TRANSFER_SRC_BIT |
                VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT | VK_BUFFER_USAGE_STORAGE_BUFFER_BIT |
                VK_BUFFER_USAGE_INDEX_BUFFER_BIT | VK_BUFFER_USAGE_VERTEX_BUFFER_BIT;
-  if (core_->DeviceRayTracingSupport()) {
+  if (core_->DeviceRayTracingSupport() || core_->DeviceRayQuerySupport()) {
     usage |= VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
              VK_BUFFER_USAGE_ACCELERATION_STRUCTURE_BUILD_INPUT_READ_ONLY_BIT_KHR;
   }
