@@ -1,5 +1,6 @@
 #import <Foundation/Foundation.h>
 #import <CoreGraphics/CoreGraphics.h>
+#import <TargetConditionals.h>
 
 NS_ASSUME_NONNULL_BEGIN
 // Callbacks run on the main queue; progress applies synchronous back pressure.
@@ -20,5 +21,10 @@ typedef void (^SparkiumCompletion)(NSString * _Nullable error, BOOL paused);
 - (void)setSampleLimit:(NSInteger)samples;
 - (void)setPaused:(BOOL)paused;
 - (void)resetFilm;
+- (void)stop;
 @end
 NS_ASSUME_NONNULL_END
+
+#if TARGET_OS_IOS
+#import "demos/DemoBridge.h"
+#endif

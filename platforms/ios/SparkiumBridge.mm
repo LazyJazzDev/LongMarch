@@ -1,5 +1,6 @@
 #import "SparkiumBridge.h"
 #include "RenderSession.h"
+#include "RenderQueue.h"
 #include <atomic>
 #include <chrono>
 
@@ -20,12 +21,20 @@
 }
 - (instancetype)init {
   if ((self = [super init])) {
-    _queue = dispatch_queue_create("dev.lazyjazz.sparkium.render", DISPATCH_QUEUE_SERIAL);
+    _queue = LongMarchRenderQueue();
     _generation = 0;
     _sampleLimit = 32;
     _paused = false;
   }
   return self;
+}
+- (void)stop {
+  NSAssert([NSThread isMainThread], @"Stop rendering on main");
+  ++_generation;
+  _paused = true;
+  _progress = nil;
+  _completion = nil;
+  dispatch_async(_queue, ^{ self->_session.reset(); });
 }
 - (void)notifyMetadata:(uint64_t)generation progress:(SparkiumProgress)progress {
   NSString *device = [NSString stringWithUTF8String:_session->Device().c_str()];

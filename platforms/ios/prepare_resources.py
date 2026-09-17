@@ -10,6 +10,7 @@ import tempfile
 
 parser = argparse.ArgumentParser()
 parser.add_argument('--renderer', type=Path, required=True, help='SPARKIUM_PREPARE build of sparkium_mobile_check')
+parser.add_argument('--demo-renderer', type=Path, help='SPARKIUM_PREPARE mobile_demo_check (defaults to renderer sibling)')
 parser.add_argument('--assets', type=Path, default=Path(__file__).resolve().parents[2] / 'assets')
 parser.add_argument('--output', type=Path, default=Path(__file__).resolve().parents[2] / 'out/ios/Resources')
 args = parser.parse_args()
@@ -69,6 +70,8 @@ with tempfile.TemporaryDirectory(prefix='sparkium-bundle-', dir=args.output.pare
         print('Preparing shaders:', scene['id'], flush=True)
         subprocess.run([str(args.renderer.resolve()), str(staging), scene['id'],
                         str(previews / (scene['id'] + '.png')), 'prepare', '128', '2'], check=True)
+    demo_renderer = args.demo_renderer or args.renderer.with_name('mobile_demo_check')
+    subprocess.run([str(demo_renderer.resolve()), str(staging), 'all', str(previews / 'demos'), 'prepare'], check=True)
     if not list((staging / 'shaders').glob('msl-*')):
         raise RuntimeError('No Metal shaders were prepared')
     staging.rename(args.output)

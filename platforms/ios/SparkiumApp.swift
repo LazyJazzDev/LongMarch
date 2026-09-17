@@ -131,6 +131,14 @@ private final class RenderModel: ObservableObject {
       })
   }
 
+  func stop() {
+    request += 1
+    renderer.stop()
+    started = false
+    active = false
+    image = nil
+  }
+
   func resetFilm() {
     guard loaded, error == nil else { return }
     spp = 0
@@ -379,15 +387,23 @@ private struct RenderViewport: View {
   }
 }
 
-@main
-struct SparkiumApp: App {
+struct SparkiumDemoView: View {
+  let onExit: () -> Void
   @StateObject private var model = RenderModel()
   @Environment(\.scenePhase) private var phase
-  var body: some Scene {
-    WindowGroup {
-      RenderViewport(model: model)
-        .onChange(of: phase) { _, phase in model.setActive(phase == .active) }
-        .task { model.setActive(phase == .active) }
-    }
+  var body: some View {
+    RenderViewport(model: model)
+      .onChange(of: phase) { _, phase in model.setActive(phase == .active) }
+      .task { model.setActive(phase == .active) }
+      .onDisappear { model.stop() }
+      .overlay(alignment: .topTrailing) {
+        Button {
+          model.stop()
+          onExit()
+        } label: {
+          Label("Demos", systemImage: "list.bullet")
+        }
+        .buttonStyle(.borderedProminent).padding(12)
+      }
   }
 }

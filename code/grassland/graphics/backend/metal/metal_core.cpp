@@ -61,7 +61,7 @@ int MetalCore::InitializeLogicalDevice(int index) {
 #endif
   if (device_->argumentBuffersSupport() != MTL::ArgumentBuffersTier2 || !device_->hasUnifiedMemory()) {
 #if TARGET_OS_SIMULATOR
-    throw std::runtime_error("This iOS Simulator does not expose the Metal features required by Sparkium. Run on a compatible iPhone or iPad.");
+    throw std::runtime_error("This iOS Simulator does not expose the Metal features required by LongMarch. Run on a compatible iPhone or iPad.");
 #else
     throw std::runtime_error("Metal backend requires Apple Silicon with tier 2 argument buffers");
 #endif

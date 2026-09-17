@@ -75,3 +75,40 @@ to the screen. Asset JSON files and the asset submodule reference are unchanged.
 
 Reproduce the controller check using [README.md](README.md). Local evidence:
 `out/ios/preset-scene-phone-result.json` and `out/ios/preset-scene-phone-fit.png`.
+
+## LongMarch Demos browser
+
+Integrated `main` at `ee01050`, including stable entity registration and the
+nonblocking-emitter shadow fix. Refreshed all nine Sparkium scene shader variants
+through the preparation tool; all nine rendered successfully at 128 pixels / 2 spp.
+
+- The installed display name is LongMarch Demos, using the existing Cornell Box
+  icon, bundle identifier and signing configuration. The entry list groups
+  Sparkium, NBody CS and graphics demos. Sparkium's nine-scene picker is inside
+  the Sparkium demo, with automatic rendering and its existing spp controls.
+- Debug iPhone and Release simulator builds pass. The simulator entry list and
+  physical-device list, triangle, Resize controls and NBody view were inspected.
+- All six graphics/compute adapters run with the preparation build and the
+  offline replay build. Their PNG outputs match byte for byte. Checks cover
+  finite pixels, NBody motion, finite particle coordinates, pause, deterministic
+  reset, and Resize at 900 × 600. Sparkium's render-controller regression check
+  also passes after introducing the shared serial render queue.
+- Each of the six new demos was independently launched on iPhone 16 Plus
+  (Apple A18 GPU) and successfully presented at least three frames. Triangle,
+  Texture, Blend and SDR use 1280 × 720; Resize and NBody use 2796 × 1290.
+  The NBody smoke frame with 4096 particles took 2.41 ms GPU time and 5.87 ms
+  render/presentation time. This is a smoke sample, not a sustained benchmark.
+- Sparkium also passes a fresh physical-device smoke run after the main update:
+  Cornell Box at its original 1024 × 1024 resolution, 2 spp, 0.202 s render time,
+  with no error. Its scene picker and Demos return button were visually inspected.
+- Graphics/compute frames are presented from GPU textures through MTKView without
+  CPU image readback. The sidebar reports actual completed-frame FPS separately
+  from render time and GPU time; the display is capped at 60 Hz.
+- Full RT Pipeline demos are explicitly unavailable on the current Metal backend;
+  the list explains the missing pipeline/procedural-intersection support.
+  Sparkium continues to use hardware Ray Query.
+
+Local device reports and screenshots are under `out/ios/device-demos/`; Mac
+outputs are in `out/ios/demos-prepare/` and `out/ios/demos-replay/`. These tests
+do not cover every finger gesture or eliminate the known large-Blender-scene
+memory limitation.
