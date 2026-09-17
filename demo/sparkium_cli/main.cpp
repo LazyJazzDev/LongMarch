@@ -15,7 +15,8 @@ using namespace long_march;
 namespace {
 void Usage(const char *program) {
   std::cerr << "Usage: " << program << " <scene.json> [-o image.png] [--frames N] "
-            << "[--backend auto|metal|vulkan|d3d12] [--pipeline auto|rasterization|ray_tracing|rt_fallback|ray_query] "
+            << "[--backend auto|metal|vulkan|d3d12|cpu|cuda] "
+               "[--pipeline auto|rasterization|ray_tracing|rt_fallback|ray_query] "
                "[--require-hardware-rt] [--debug] [--profile "
                "timings.csv] [--profile-cpu-only|--profile-alternate-gpu]\n"
             << "       " << program << " --list [scene-directory]\n";
@@ -50,6 +51,8 @@ int main(int argc, char **argv) {
     std::filesystem::path output = "output.png";
     int frames = 1;
     auto backend = graphics::BACKEND_API_DEFAULT;
+    // Non-empty when --backend selected the CPU or CUDA offline renderer.
+    std::string offline_backend;
     std::filesystem::path profile_path;
     bool profile_cpu_only = false;
     bool profile_alternate_gpu = false;
@@ -61,8 +64,15 @@ int main(int argc, char **argv) {
       std::string argument = argv[i];
       if (argument == "--require-hardware-rt")
         require_hardware_rt = true;
-      else if (argument == "--backend" && i + 1 < argc)
-        backend = ParseSparkiumBackend(argv[++i]);
+      else if (argument == "--backend" && i + 1 < argc) {
+        const std::string name = argv[++i];
+        // "cpu"/"cuda" render with sparkium_backends instead of the graphics
+        // device; every other name selects a graphics API.
+        if (IsSparkiumOfflineBackend(name))
+          offline_backend = name;
+        else
+          backend = ParseSparkiumBackend(name);
+      }
       else if (argument == "--debug")
         debug = true;
       else if ((argument == "-o" || argument == "--output") && i + 1 < argc)
@@ -85,6 +95,10 @@ int main(int argc, char **argv) {
       throw std::runtime_error("profiling mode requires --profile");
     if (profile_cpu_only && profile_alternate_gpu)
       throw std::runtime_error("choose one profiling mode");
+    if (!offline_backend.empty() && !profile_path.empty())
+      throw std::runtime_error("profiling is not available for the offline cpu/cuda backends");
+    if (!offline_backend.empty() && require_hardware_rt)
+      throw std::runtime_error("--require-hardware-rt applies to hardware ray tracing backends only");
     if (frames <= 0) throw std::runtime_error("--frames must be positive");
 
     std::unique_ptr<graphics::Core> graphics_core;
@@ -104,6 +118,26 @@ int main(int argc, char **argv) {
       std::cout << "Tracing: native ray query (compute, native AS)\n";
 
     auto *film = loaded->GetFilm();
+    if (!offline_backend.empty()) {
+      // The offline backends render the same JSON scene without dispatching any
+      // graphics work: the graphics device is only the scene's resource store.
+      if (override_pipeline)
+        std::cout << "Ignoring --pipeline for the offline backend " << offline_backend << "\n";
+      auto offline = sparkium::backends::CreateOfflineBackend(offline_backend);
+      sparkium::backends::OfflineRenderResult result =
+          sparkium::backends::RenderOfflineScene(offline.get(), loaded->GetScene(), loaded->GetCamera(), film,
+                                                 static_cast<uint32_t>(frames));
+      std::filesystem::create_directories(output.has_parent_path() ? output.parent_path() : ".");
+      if (!stbi_write_png(output.string().c_str(), static_cast<int>(result.width), static_cast<int>(result.height), 4,
+                          result.rgba8.data(), static_cast<int>(result.width) * 4))
+        throw std::runtime_error("failed to write image: " + output.string());
+      std::cout << "Rendered '" << loaded->GetName() << "' (" << result.width << 'x' << result.height << ", " << frames
+                << " frame(s), " << result.stats.accumulated_samples << " spp) with the " << result.stats.backend
+                << " backend on " << result.stats.device << " to " << output.string() << '\n';
+      std::cout << "Scene: " << result.stats.scene << '\n';
+      std::cout << "Render time: " << std::fixed << std::setprecision(3) << result.stats.seconds << " s\n";
+      return 0;
+    }
     std::unique_ptr<graphics::Image> image;
     graphics_core->CreateImage(film->GetWidth(), film->GetHeight(), graphics::IMAGE_FORMAT_R8G8B8A8_UNORM, &image);
     std::unique_ptr<graphics::FrameProfile> profiler;
