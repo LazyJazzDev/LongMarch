@@ -126,3 +126,30 @@ development team, while the display name remains LongMarch Demos.
   the connected iPhone 16 Plus.
 - This bundle ID installs independently of the previous Sparkium app, preserving
   the old application's data.
+
+## Mobile texture packaging (2026-09-17)
+
+The packager now limits PNG/JPEG texture dimensions to a 1024-pixel longest edge
+by default. Original source assets, JSON paths, geometry and film dimensions are
+preserved. Five texture tests pass, covering PNG alpha (including palette and
+color-key transparency), JPEG format/aspect ratio, source preservation and
+unchanged copies of small textures and nontexture assets.
+
+- The generated bundle contains 225 textures within the configured size limit.
+  All 677 packaged asset hashes match; all nontexture assets match their sources.
+- All nine scene replay images match the preparation images. Resolution/sample
+  changes and missing/corrupt shader-cache checks also pass. All six graphics
+  and compute demos pass during resource preparation.
+- Junkshop's 145 texture allocations shrink from 2944 MiB to 580 MiB of estimated
+  base RGBA8 storage. The signed Release app installs and renders Junkshop on
+  iPhone 16 Plus / Apple A18 at its original 2000 × 1000 resolution, completing
+  2 spp with no error (3.55 seconds of render time, including first-render setup).
+- A 20-second Instruments Activity Monitor recording completes without app
+  termination. Sampled peak physical footprint is 2.03 GiB, settling to 1.72 GiB.
+  Before downsampling, the last recorded sample was 3.24 GiB before termination;
+  that value is not an exact system memory limit.
+
+The tested bundle is `out/ios/Resources-mobile`. Packaging reports live inside
+that bundle; device images, results and memory traces use the
+`out/ios/mobile-textures-*` prefix. This verifies startup and 2-spp rendering,
+not an extended stress test of every Blender scene.

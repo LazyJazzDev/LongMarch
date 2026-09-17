@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Copy existing LFS scenes and compile the mobile shader variants on a Mac."""
+"""Package LFS scenes with smaller textures and compile mobile shaders on a Mac."""
 import argparse
 import hashlib
 import json
@@ -8,12 +8,18 @@ import shutil
 import subprocess
 import tempfile
 
+from texture_assets import copy_asset
+
 parser = argparse.ArgumentParser()
 parser.add_argument('--renderer', type=Path, required=True, help='SPARKIUM_PREPARE build of sparkium_mobile_check')
 parser.add_argument('--demo-renderer', type=Path, help='SPARKIUM_PREPARE mobile_demo_check (defaults to renderer sibling)')
 parser.add_argument('--assets', type=Path, default=Path(__file__).resolve().parents[2] / 'assets')
 parser.add_argument('--output', type=Path, default=Path(__file__).resolve().parents[2] / 'out/ios/Resources')
+parser.add_argument('--texture-max-dimension', type=int, default=1024,
+                    help='Maximum PNG/JPEG texture edge in pixels (default: 1024; 0 keeps originals)')
 args = parser.parse_args()
+if args.texture_max_dimension < 0:
+    parser.error('texture-max-dimension must be nonnegative')
 args.output = args.output.resolve()
 args.output.parent.mkdir(parents=True, exist_ok=True)
 if args.output.exists():
@@ -28,6 +34,7 @@ with tempfile.TemporaryDirectory(prefix='sparkium-bundle-', dir=args.output.pare
     data.mkdir(parents=True)
     shutil.copy2(args.assets / 'data/new-joe-kuo-7.21201', data)
     catalog = []
+    texture_report = {'max_dimension': args.texture_max_dimension, 'textures': {}}
     table = data / 'new-joe-kuo-7.21201'
     if table.read_bytes().startswith(b'version https://git-lfs.github.com/spec/v1'):
         raise RuntimeError('Sobol LFS object is missing; run git lfs pull in assets')
@@ -48,7 +55,9 @@ with tempfile.TemporaryDirectory(prefix='sparkium-bundle-', dir=args.output.pare
             with source.open('rb') as stream:
                 if stream.read(128).startswith(b'version https://git-lfs.github.com/spec/v1'):
                     raise RuntimeError(f'LFS object missing: {source}. Run git lfs pull in assets.')
-            shutil.copy2(source, target)
+            texture = copy_asset(source, target, args.texture_max_dimension)
+            if texture is not None:
+                texture_report['textures'][relative.as_posix()] = texture
             manifest[relative.as_posix()] = hashlib.sha256(target.read_bytes()).hexdigest()
         # Existing JSON paths are relative to the scene, and remain byte-for-byte unchanged.
         def check_paths(value):
@@ -64,6 +73,7 @@ with tempfile.TemporaryDirectory(prefix='sparkium-bundle-', dir=args.output.pare
         check_paths(document)
     (staging / 'catalog.json').write_text(json.dumps(catalog, indent=2) + '\n')
     (staging / 'asset-hashes.json').write_text(json.dumps(manifest, indent=2) + '\n')
+    (staging / 'texture-report.json').write_text(json.dumps(texture_report, indent=2) + '\n')
     previews = Path(temp) / 'previews'
     previews.mkdir()
     for scene in catalog:

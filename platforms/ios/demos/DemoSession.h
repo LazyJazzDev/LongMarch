@@ -1,6 +1,7 @@
 #pragma once
 #include <filesystem>
 #include <memory>
+#include <random>
 #include <string>
 
 #include "grassland/graphics/graphics.h"
@@ -45,6 +46,7 @@ class DemoSession {
   std::unique_ptr<grassland::graphics::ComputeProgram> compute_program_;
   int width_ = 1280, height_ = 720, index_count_ = 3;
   int particles_ = 4096, galaxies_ = 10, reset_ = 0;
+  std::mt19937 random_{1};
   float delta_time_ = 0.03f, theta_ = 0, yaw_ = 0, pitch_ = 0;
   bool simulate_ = true;
   double gpu_ms_ = 0;

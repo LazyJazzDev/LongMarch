@@ -3,7 +3,6 @@
 #include <algorithm>
 #include <cmath>
 #include <glm/gtc/matrix_transform.hpp>
-#include <random>
 #include <stdexcept>
 
 #include "demo/nbody_cs/params.h"
@@ -160,9 +159,8 @@ void DemoSession::InitializeNBody() {
   ResetParticles();
 }
 void DemoSession::ResetParticles() {
-  // Same deterministic ten-galaxy initial distribution as the desktop demo (seed 1).
-  std::mt19937 random(1);
-  auto scalar = [&]() { return std::uniform_real_distribution<float>()(random); };
+  // Like the desktop demo, seed once and advance the random sequence across resets.
+  auto scalar = [&]() { return std::uniform_real_distribution<float>()(random_); };
   auto sphere = [&]() {
     float z = scalar() * 2 - 1, r = std::sqrt(1 - z * z), angle = scalar() * glm::pi<float>() * 2;
     return glm::vec3{r * std::sin(angle), r * std::cos(angle), z} * std::pow(scalar(), 1.0f / 3.0f);
@@ -181,7 +179,7 @@ void DemoSession::ResetParticles() {
     initial_velocities[i] -= average_vel / float(galaxies_);
   }
   for (int i = 0; i < particles_; ++i) {
-    int galaxy = std::uniform_int_distribution<int>(0, galaxies_ - 1)(random);
+    int galaxy = std::uniform_int_distribution<int>(0, galaxies_ - 1)(random_);
     positions[i] = sphere() * INITIAL_RADIUS * .2f * std::pow(10.0f / galaxies_, 1.0f / 3.0f) + origins[galaxy];
     velocities[i] = sphere() * INITIAL_SPEED + initial_velocities[galaxy];
   }
