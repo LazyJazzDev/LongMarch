@@ -1,6 +1,7 @@
 #include "sparkium/core/scene.h"
 
 #include <numeric>
+#include <algorithm>
 
 #include "sparkium/core/camera.h"
 #include "sparkium/core/core.h"
@@ -18,12 +19,13 @@ Core *Scene::GetCore() const {
 }
 
 void Scene::AddEntity(Entity *entity) {
-  if (!entities_.count(entity))
-    entities_.insert({entity, {true, next_entity_order_++}});
+  if (entities_.insert({entity, {}}).second)
+    entity_order_.push_back(entity);
 }
 
 void Scene::DeleteEntity(Entity *entity) {
   entities_.erase(entity);
+  entity_order_.erase(std::remove(entity_order_.begin(), entity_order_.end(), entity), entity_order_.end());
 }
 
 void Scene::SetEntityActive(Entity *entity, bool active) {
@@ -32,6 +34,10 @@ void Scene::SetEntityActive(Entity *entity, bool active) {
 
 const std::map<Entity *, Scene::EntityStatus> &Scene::GetEntities() const {
   return entities_;
+}
+
+const std::vector<Entity *> &Scene::GetEntityOrder() const {
+  return entity_order_;
 }
 
 }  // namespace sparkium

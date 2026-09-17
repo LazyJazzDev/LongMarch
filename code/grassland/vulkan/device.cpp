@@ -38,16 +38,20 @@ Device::Device(const class Instance *instance,
   vmaCreateAllocator(&allocator_info, &allocator_);
 
   bool ray_tracing_enabled = false;
+  bool acceleration_structure_enabled = false;
 
   for (auto extension : create_info_.extensions) {
     if (strcmp(extension, VK_KHR_RAY_TRACING_PIPELINE_EXTENSION_NAME) == 0) {
       ray_tracing_enabled = true;
-      break;
     }
+    if (strcmp(extension, VK_KHR_ACCELERATION_STRUCTURE_EXTENSION_NAME) == 0)
+      acceleration_structure_enabled = true;
   }
 
   if (ray_tracing_enabled) {
     procedures_.GetRayTracingProcedures(device_);
+  } else if (acceleration_structure_enabled) {
+    procedures_.GetAccelerationStructureProcedures(device_);
   }
 
   subgroup_properties_ = {};

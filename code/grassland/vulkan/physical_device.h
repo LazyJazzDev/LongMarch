@@ -37,6 +37,7 @@ class PhysicalDevice {
   bool SupportGeometryShader() const;
 
   bool SupportRayTracing() const;
+  bool SupportRayQuery() const;
 
   uint64_t Evaluate() const;
 

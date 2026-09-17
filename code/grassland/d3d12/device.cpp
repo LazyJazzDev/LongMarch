@@ -386,7 +386,8 @@ HRESULT Device::CreateTopLevelAccelerationStructure(const std::vector<D3D12_RAYT
   ID3D12Resource *instance_buffer = RequestInstanceBuffer(sizeof(D3D12_RAYTRACING_INSTANCE_DESC) * instances.size());
   void *instance_buffer_ptr{};
   RETURN_IF_FAILED_HR(instance_buffer->Map(0, nullptr, &instance_buffer_ptr), "failed to map instance buffer.");
-  std::memcpy(instance_buffer_ptr, instances.data(), instances.size() * sizeof(D3D12_RAYTRACING_INSTANCE_DESC));
+  if (!instances.empty())
+    std::memcpy(instance_buffer_ptr, instances.data(), instances.size() * sizeof(D3D12_RAYTRACING_INSTANCE_DESC));
   instance_buffer->Unmap(0, nullptr);
 
   D3D12_BUILD_RAYTRACING_ACCELERATION_STRUCTURE_INPUTS as_inputs = {};
@@ -639,6 +640,7 @@ ID3D12Resource *Device::RequestScratchBuffer(size_t size) {
 }
 
 ID3D12Resource *Device::RequestInstanceBuffer(size_t size) {
+  size = std::max(size, sizeof(D3D12_RAYTRACING_INSTANCE_DESC));
   if (!instance_buffer_ || instance_buffer_->GetDesc().Width < size) {
     instance_buffer_.Reset();
     d3d12::CreateBuffer(Handle(), size, D3D12_HEAP_TYPE_UPLOAD, D3D12_RESOURCE_STATE_GENERIC_READ,

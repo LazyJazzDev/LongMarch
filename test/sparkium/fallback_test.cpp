@@ -1,16 +1,22 @@
 #include <gtest/gtest.h>
 #include <long_march.h>
 
+#include <algorithm>
+#include <cstring>
+#include <cstdlib>
 #include <glm/gtc/matrix_transform.hpp>
 #include <numeric>
 #include <random>
 #include <tuple>
 
 #include "grassland/graphics/frame_profile.h"
+#include "grassland/graphics/backend/backend.h"
 #include "sparkium/pipelines/raytracing/core/core.h"
 #include "sparkium/pipelines/raytracing/core/software_pipeline.h"
 #include "sparkium/pipelines/raytracing/geometry/geometry_mesh.h"
 #include "sparkium/pipelines/raytracing/material/material_lambertian.h"
+#include "sparkium/pipelines/raytracing/entity/entities.h"
+#include "../../demo/sparkium_backend.h"
 
 using namespace grassland;
 namespace {
@@ -30,13 +36,161 @@ static_assert(sizeof(Ray) == 32 && sizeof(Hit) == 32);
 class SoftwareBVHTest : public testing::Test {
  protected:
   void SetUp() override {
-    ASSERT_EQ(graphics::CreateCore(graphics::BACKEND_API_DEFAULT, graphics::Core::Settings{2, false}, &graphics), 0);
+    const char *backend = std::getenv("SPARKIUM_TEST_BACKEND");
+    const bool debug = std::getenv("SPARKIUM_TEST_DEBUG") != nullptr;
+    ASSERT_EQ(graphics::CreateCore(backend ? ParseSparkiumBackend(backend) : graphics::BACKEND_API_DEFAULT,
+                                  graphics::Core::Settings{2, debug}, &graphics), 0);
     ASSERT_EQ(graphics->InitializeLogicalDeviceAutoSelect(false), 0);
     core = std::make_unique<sparkium::Core>(graphics.get());
   }
   std::unique_ptr<graphics::Core> graphics;
   std::unique_ptr<sparkium::Core> core;
 };
+
+TEST_F(SoftwareBVHTest, LightSamplingIsIndependentOfEntityAddresses) {
+  std::vector<std::unique_ptr<sparkium::EntityPointLight>> owned;
+  std::vector<std::pair<sparkium::raytracing::Entity *, sparkium::EntityPointLight *>> lights;
+  for (int i = 0; i < 4; ++i) {
+    owned.push_back(std::make_unique<sparkium::EntityPointLight>(core.get()));
+    lights.emplace_back(sparkium::raytracing::DedicatedCast(owned.back().get()), owned.back().get());
+  }
+  std::sort(lights.begin(), lights.end(), [](const auto &a, const auto &b) {
+    return std::less<sparkium::raytracing::Entity *>{}(a.first, b.first);
+  });
+  // Equivalent light lists, deliberately opposite address ordering in the
+  // renderer's component cache. Sampling must follow insertion, not addresses.
+  for (int i = 0; i < 4; ++i) {
+    const bool red = i == 0 || i == 2;
+    lights[i].second->position = red ? glm::vec3(-1, 1, 2) : glm::vec3(2, 0, 1);
+    lights[i].second->color = red ? glm::vec3(1, 0.1f, 0.2f) : glm::vec3(0.1f, 0.2f, 1);
+    lights[i].second->strength = red ? 10.0f : 40.0f;
+  }
+  std::vector<Vector3<float>> positions{{-2, -2, 0}, {2, -2, 0}, {0, 2, 0}};
+  uint32_t indices[]{0, 1, 2};
+  Mesh<> mesh(3, 3, indices, positions.data());
+  sparkium::GeometryMesh geometry(core.get(), mesh);
+  sparkium::MaterialLambertian material(core.get(), glm::vec3(0.6f));
+  sparkium::EntityGeometryMaterial entity(core.get(), &geometry, &material);
+  sparkium::Scene first(core.get()), second(core.get());
+  for (auto *scene : {&first, &second}) {
+    scene->AddEntity(&entity);
+    scene->settings.samples_per_dispatch = 1;
+    scene->settings.max_bounces = 2;
+  }
+  first.AddEntity(lights[0].second);
+  first.AddEntity(lights[3].second);
+  second.AddEntity(lights[2].second);
+  second.AddEntity(lights[1].second);
+  first.AddEntity(lights[0].second);  // Duplicate adds must not register twice.
+  first.SetEntityActive(lights[0].second, false);
+  first.SetEntityActive(lights[0].second, true);
+  sparkium::Camera camera(core.get(), glm::lookAt(glm::vec3(0, 0, 4), glm::vec3(0), glm::vec3(0, 1, 0)),
+                          glm::radians(45.0f), 1.0f);
+  for (auto pipeline : {sparkium::RENDER_PIPELINE_RT_FALLBACK, sparkium::RENDER_PIPELINE_RAY_QUERY,
+                        sparkium::RENDER_PIPELINE_RAY_TRACING, sparkium::RENDER_PIPELINE_RASTERIZATION}) {
+    if (pipeline == sparkium::RENDER_PIPELINE_RAY_QUERY && !graphics->DeviceRayQuerySupport()) continue;
+    if (pipeline == sparkium::RENDER_PIPELINE_RAY_TRACING && !graphics->DeviceRayTracingSupport()) continue;
+    SCOPED_TRACE(static_cast<int>(pipeline));
+    sparkium::Film a(core.get(), 32, 32), b(core.get(), 32, 32);
+    core->Render(&first, &camera, &a, pipeline);
+    core->Render(&second, &camera, &b, pipeline);
+    std::vector<glm::vec4> left(1024), right(1024);
+    a.GetRawImage()->DownloadData(left.data());
+    b.GetRawImage()->DownloadData(right.data());
+    double radiance = 0;
+    for (size_t i = 0; i < left.size(); ++i)
+      for (int c = 0; c < 3; ++c) {
+        EXPECT_NEAR(left[i][c], right[i][c], 1e-6f);
+        radiance += left[i][c];
+      }
+    EXPECT_GT(radiance, 1.0);
+  }
+}
+
+TEST_F(SoftwareBVHTest, NonblockingEmittersDoNotHideShadowOccluders) {
+  uint32_t indices[]{0, 1, 2, 0, 2, 3};
+  std::vector<Vector3<float>> receiver_positions{{-2, -2, 0}, {2, -2, 0}, {2, 2, 0}, {-2, 2, 0}};
+  std::vector<Vector3<float>> wall_positions{{0, -10, -10}, {0, 10, -10}, {0, 10, 10}, {0, -10, 10}};
+  Mesh<> receiver_mesh(4, 6, indices, receiver_positions.data());
+  Mesh<> wall_mesh(4, 6, indices, wall_positions.data());
+  sparkium::GeometryMesh receiver_geometry(core.get(), receiver_mesh), wall_geometry(core.get(), wall_mesh);
+  sparkium::MaterialLambertian diffuse(core.get(), glm::vec3(0.7f));
+  sparkium::MaterialLight invisible(core.get(), glm::vec3(0), false, false, false);
+  sparkium::EntityGeometryMaterial receiver(core.get(), &receiver_geometry, &diffuse);
+  sparkium::EntityGeometryMaterial emitter(core.get(), &wall_geometry, &invisible,
+      glm::mat4x3(glm::translate(glm::mat4(1), glm::vec3(0.75f, 0, 0))));
+  sparkium::EntityGeometryMaterial occluder(core.get(), &wall_geometry, &diffuse,
+      glm::mat4x3(glm::translate(glm::mat4(1), glm::vec3(1.5f, 0, 0))));
+  sparkium::EntityPointLight light(core.get(), glm::vec3(3, 0, 3), glm::vec3(1), 100.0f);
+  sparkium::Scene scene(core.get());
+  scene.AddEntity(&receiver);
+  scene.AddEntity(&emitter);
+  scene.AddEntity(&occluder);
+  scene.AddEntity(&light);
+  scene.settings.samples_per_dispatch = 16;
+  scene.settings.max_bounces = 1;
+  scene.settings.alpha_shadow = true;
+  sparkium::Camera camera(core.get(), glm::lookAt(glm::vec3(0, 0, 4), glm::vec3(0), glm::vec3(0, 1, 0)),
+                          glm::radians(20.0f), 1.0f);
+  for (auto pipeline : {sparkium::RENDER_PIPELINE_RT_FALLBACK, sparkium::RENDER_PIPELINE_RAY_QUERY,
+                        sparkium::RENDER_PIPELINE_RAY_TRACING}) {
+    if (pipeline == sparkium::RENDER_PIPELINE_RAY_QUERY && !graphics->DeviceRayQuerySupport()) continue;
+    if (pipeline == sparkium::RENDER_PIPELINE_RAY_TRACING && !graphics->DeviceRayTracingSupport()) continue;
+    for (int mode = 0; mode < 3; ++mode) {
+      SCOPED_TRACE(testing::Message() << "pipeline=" << pipeline << ", mode=" << mode);
+      scene.SetEntityActive(&occluder, mode == 0);
+      invisible.block_ray = mode == 2;
+      sparkium::Film film(core.get(), 32, 32);
+      core->Render(&scene, &camera, &film, pipeline);
+      std::vector<glm::vec4> pixels(1024);
+      film.GetRawImage()->DownloadData(pixels.data());
+      double radiance = 0;
+      for (const auto &pixel : pixels)
+        for (int c = 0; c < 3; ++c) {
+          ASSERT_TRUE(std::isfinite(pixel[c]));
+          radiance += pixel[c];
+          if (mode != 1) EXPECT_NEAR(pixel[c], 0.0f, 1e-6f);
+        }
+      if (mode == 1) EXPECT_GT(radiance, 1.0);
+    }
+  }
+}
+
+TEST_F(SoftwareBVHTest, RayQueryCapabilityMatchesDevice) {
+#if defined(LONGMARCH_VULKAN_ENABLED)
+  if (auto *vk = dynamic_cast<graphics::backend::VulkanCore *>(graphics.get())) {
+    const auto &physical = vk->Device()->PhysicalDevice();
+    EXPECT_EQ(graphics->DeviceRayQuerySupport(), physical.SupportRayQuery());
+    if (physical.SupportRayQuery()) {
+      vulkan::DeviceFeatureRequirement requirement{};
+      requirement.enable_rayquery_extension = true;
+      auto info = requirement.GenerateRecommendedDeviceCreateInfo(physical);
+      auto has_extension = [&](const char *name) {
+        return std::any_of(info.extensions.begin(), info.extensions.end(),
+                           [&](const char *extension) { return std::strcmp(extension, name) == 0; });
+      };
+      EXPECT_TRUE(has_extension(VK_KHR_RAY_QUERY_EXTENSION_NAME));
+      EXPECT_TRUE(has_extension(VK_KHR_ACCELERATION_STRUCTURE_EXTENSION_NAME));
+      EXPECT_FALSE(has_extension(VK_KHR_RAY_TRACING_PIPELINE_EXTENSION_NAME));
+      EXPECT_NE(requirement.GetVmaAllocatorCreateFlags() & VMA_ALLOCATOR_CREATE_BUFFER_DEVICE_ADDRESS_BIT, 0);
+      std::unique_ptr<vulkan::Device> query_device;
+      ASSERT_EQ(vk->Instance()->CreateDevice(physical, info, requirement.GetVmaAllocatorCreateFlags(), &query_device),
+                VK_SUCCESS);
+      EXPECT_NE(query_device->Procedures().vkCmdBuildAccelerationStructuresKHR, nullptr);
+      EXPECT_EQ(query_device->Procedures().vkCmdTraceRaysKHR, nullptr);
+    }
+  }
+#endif
+#if defined(LONGMARCH_D3D12_ENABLED)
+  if (auto *dx = dynamic_cast<graphics::backend::D3D12Core *>(graphics.get())) {
+    D3D12_FEATURE_DATA_D3D12_OPTIONS5 options{};
+    const auto result = dx->Device()->Handle()->CheckFeatureSupport(
+        D3D12_FEATURE_D3D12_OPTIONS5, &options, sizeof(options));
+    EXPECT_EQ(graphics->DeviceRayQuerySupport(),
+              SUCCEEDED(result) && options.RaytracingTier >= D3D12_RAYTRACING_TIER_1_1);
+  }
+#endif
+}
 
 Hit Oracle(const Ray &ray, const std::vector<Vector3<float>> &positions, const std::vector<glm::mat4x3> &transforms) {
   Hit hit{};

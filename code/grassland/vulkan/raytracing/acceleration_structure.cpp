@@ -34,11 +34,13 @@ VkResult AccelerationStructure::UpdateInstances(const std::vector<VkAcceleration
                                                 CommandPool *command_pool,
                                                 Queue *queue) {
   std::unique_ptr<class Buffer> instances_buffer;
-  device_->CreateBuffer(
-      sizeof(VkAccelerationStructureInstanceKHR) * instances.size(),
+  RETURN_IF_FAILED_VK(device_->CreateBuffer(
+      sizeof(VkAccelerationStructureInstanceKHR) * std::max(instances.size(), size_t(1)),
       VK_BUFFER_USAGE_ACCELERATION_STRUCTURE_BUILD_INPUT_READ_ONLY_BIT_KHR | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
-      VMA_MEMORY_USAGE_CPU_TO_GPU, 0, 16, &instances_buffer);
-  std::memcpy(instances_buffer->Map(), instances.data(), instances.size() * sizeof(VkAccelerationStructureInstanceKHR));
+      VMA_MEMORY_USAGE_CPU_TO_GPU, 0, 16, &instances_buffer), "failed to create instance buffer");
+  auto mapped_instances = instances_buffer->Map();
+  if (!instances.empty())
+    std::memcpy(mapped_instances, instances.data(), instances.size() * sizeof(VkAccelerationStructureInstanceKHR));
   instances_buffer->Unmap();
 
   VkDeviceOrHostAddressConstKHR instance_data_device_address{};

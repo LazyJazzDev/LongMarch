@@ -27,6 +27,7 @@ EntityGeometryMaterial::EntityGeometryMaterial(sparkium::EntityGeometryMaterial 
     } else if (dynamic_cast<MaterialLight *>(material_)) {
       hit_groups_.render_group.closest_hit_shader = core_->GetShader("mesh_light_chit");
       hit_groups_.shadow_group.closest_hit_shader = core_->GetShader("mesh_light_shadow_chit");
+      hit_groups_.shadow_group.any_hit_shader = core_->GetShader("mesh_light_shadow_ahit");
     } else if (dynamic_cast<MaterialPrincipled *>(material_)) {
       hit_groups_.render_group.closest_hit_shader = core_->GetShader("mesh_principled_chit");
       hit_groups_.shadow_group.closest_hit_shader = core_->GetShader("mesh_principled_shadow_chit");

@@ -17,6 +17,14 @@ class D3D12Core : public Core {
  public:
   D3D12Core(const Settings &settings);
   ~D3D12Core() override;
+  bool DeviceRayQuerySupport() const override {
+    if (!device_)
+      return false;
+    D3D12_FEATURE_DATA_D3D12_OPTIONS5 options{};
+    return SUCCEEDED(device_->Handle()->CheckFeatureSupport(
+               D3D12_FEATURE_D3D12_OPTIONS5, &options, sizeof(options))) &&
+           options.RaytracingTier >= D3D12_RAYTRACING_TIER_1_1;
+  }
 
   BackendAPI API() const override {
     return BACKEND_API_D3D12;

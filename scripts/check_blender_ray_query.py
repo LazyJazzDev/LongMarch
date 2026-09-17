@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Render complete Blender scenes with native ray queries and Metal validation.
+"""Render complete Blender scenes with native ray queries and backend validation.
 
 Requires Pillow and the Blender LFS asset snapshot. Saves images, per-frame native
 query counters, logs, and results; any failed render or silent fallback fails.
@@ -20,6 +20,7 @@ def main():
 
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--cli', type=Path, required=True)
+    parser.add_argument('--backend', choices=('metal', 'vulkan', 'd3d12'), default='metal')
     parser.add_argument('--output', type=Path, default=ROOT / 'out/blender-ray-query')
     parser.add_argument('--scenes', nargs='+', default=['blender_monster', 'blender_classroom', 'blender_junkshop'])
     parser.add_argument('--pipeline', choices=('ray_query', 'auto', 'scene'), default='ray_query')
@@ -33,7 +34,9 @@ def main():
         parser.error('size, spp, frames, bounces and timeout must be positive')
     cli, output = args.cli.resolve(), args.output.resolve()
     output.mkdir(parents=True, exist_ok=True)
-    env = dict(os.environ, MTL_DEBUG_LAYER='1', MTL_SHADER_VALIDATION='1')
+    env = dict(os.environ)
+    if args.backend == 'metal':
+        env.update(MTL_DEBUG_LAYER='1', MTL_SHADER_VALIDATION='1')
     results, tiles = [], []
     for name in args.scenes:
         scene = read_scene(ROOT / 'assets/scenes' / name / 'scene.json')
@@ -43,7 +46,7 @@ def main():
         path.write_text(json.dumps(scene, indent=2) + '\n')
         png.unlink(missing_ok=True)
         profile.unlink(missing_ok=True)
-        command = [str(cli), str(path), '--backend', 'metal',
+        command = [str(cli), str(path), '--backend', args.backend,
                    '--frames', str(args.frames), '--debug', '--profile', str(profile),
                    '--profile-cpu-only', '-o', str(png)]
         if args.pipeline != 'scene':
@@ -55,7 +58,7 @@ def main():
                                     stderr=subprocess.STDOUT, timeout=args.timeout).returncode
             except subprocess.TimeoutExpired:
                 rc = 'timeout'
-        result = dict(scene=name, pipeline=args.pipeline, size=args.size, spp_per_frame=args.spp,
+        result = dict(scene=name, backend=args.backend, pipeline=args.pipeline, size=args.size, spp_per_frame=args.spp,
                       frames=args.frames, bounces=args.bounces, returncode=rc,
                       wall_seconds=time.monotonic() - started, passed=False)
         if rc == 0 and png.exists() and profile.exists():

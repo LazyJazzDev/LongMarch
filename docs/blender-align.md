@@ -33,6 +33,32 @@ An explicit `rt_fallback` request still selects software traversal.
 
 ## Local validation
 
+Inline ray queries are also exposed by Vulkan (the `rayQuery`,
+`accelerationStructure`, and `bufferDeviceAddress` features) and D3D12 (DXR tier
+1.1). Vulkan enables query and full RT pipeline features independently, including
+loading acceleration-structure functions on query-only devices. Auto still
+prefers the full RT pipeline; use `--pipeline ray_query` to select inline queries.
+
+The scene checker accepts `--backend metal|vulkan|d3d12` (default: Metal):
+
+```sh
+python3 scripts/check_blender_ray_query.py \
+  --cli build/demo/sparkium_cli/demo_sparkium_cli \
+  --backend vulkan --output out/vulkan-ray-query
+```
+
+The explicit `ray_query` mode requires native query counters on every frame.
+`auto` and `scene` retain that requirement, so they will fail the query check on
+devices where those requests resolve to a full RT pipeline.
+
+Linux/RTX 3090 Ti validation (Vulkan SDK 1.4.350, NVIDIA 595.91.07):
+all 14 GPU tests passed, including query-only device creation, native query
+intersections against the double-precision oracle, empty-scene updates, and
+transparent shadows. Monster, Classroom, and Junkshop passed the checker with
+Vulkan validation at 128×128, one sample per dispatch, two frames, and four
+bounces. These are smoke tests, not a Cycles image-equivalence or full-quality
+rendering claim. D3D12 requires separate Windows build and runtime validation.
+
 Reconfigure CMake when adding the new shader file, then build the CLI, GUI, and
 `sparkium_fallback_test`. The complete-scene check requires Pillow and the Blender
 LFS assets:

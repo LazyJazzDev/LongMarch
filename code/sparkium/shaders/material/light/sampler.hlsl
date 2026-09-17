@@ -45,12 +45,17 @@ void SampleMaterial(inout RenderContext context, HitRecord hit_record) {
   context.origin = hit_record.position;
 }
 
-void SampleShadow(inout ShadowRayPayload payload, HitRecord hit_record) {
+#define SAMPLE_SHADOW_ANY_HIT
+
+float SampleShadowOpacity(HitRecord hit_record, float3 ray_direction) {
   InstanceMetadata instance_meta =
       instance_metadatas.Load<InstanceMetadata>(sizeof(InstanceMetadata) * hit_record.object_index);
   ByteAddressBuffer material_buffer = data_buffers[NonUniformResourceIndex(instance_meta.material_data_index)];
-  int block_ray = material_buffer.Load(16);
-  if (block_ray) {
-    payload.shadow = 0.0f;
-  }
+  return material_buffer.Load(16) ? 1.0f : 0.0f;
+}
+
+void SampleShadow(inout ShadowRayPayload payload, HitRecord hit_record) {
+  // Non-blocking emitters are ignored by ShadowAnyHit so traversal can find
+  // occluders behind them. Only blocking emitters reach closest-hit.
+  payload.shadow = 0.0f;
 }
