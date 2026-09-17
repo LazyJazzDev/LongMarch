@@ -82,6 +82,8 @@ void Core::LoadPublicShaders() {
   core_.SetPublicResource("mesh_light_chit", std::move(shader));
   core_.GraphicsCore()->CreateShader(vfs, "entity_chit.hlsl", "ShadowClosestHit", "lib_6_5", {"-I."}, &shader);
   core_.SetPublicResource("mesh_light_shadow_chit", std::move(shader));
+  core_.GraphicsCore()->CreateShader(vfs, "entity_chit.hlsl", "ShadowAnyHit", "lib_6_5", {"-I."}, &shader);
+  core_.SetPublicResource("mesh_light_shadow_ahit", std::move(shader));
 
   vfs.WriteFile("material_sampler.hlsli", CodeLines{shaders_vfs, "material/principled/sampler.hlsl"});
   core_.GraphicsCore()->CreateShader(vfs, "entity_chit.hlsl", "RenderClosestHit", "lib_6_5", {"-I."}, &shader);

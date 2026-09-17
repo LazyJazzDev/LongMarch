@@ -35,11 +35,14 @@ void Scene::Render(Camera *camera, Film *film) {
   for (auto &[entity, status] : entities_) {
     status.keep = false;
   }
-  for (auto [entity, status] : scene_.GetEntities()) {
+  std::vector<Entity *> ordered_entities;
+  for (auto *entity : scene_.GetEntityOrder()) {
+    const auto &status = scene_.GetEntities().at(entity);
     auto actual_entity = DedicatedCast(entity);
     if (actual_entity) {
       entities_[actual_entity].keep = true;
       entities_[actual_entity].active = status.active;
+      ordered_entities.push_back(actual_entity);
     }
   }
   std::vector<Entity *> to_remove;
@@ -59,8 +62,8 @@ void Scene::Render(Camera *camera, Film *film) {
 
   ambient_light_buffer_->UploadData(&settings.ambient_light, sizeof(glm::vec3));
 
-  for (auto &[entity, status] : entities_) {
-    if (status.active) {
+  for (auto *entity : ordered_entities) {
+    if (entities_.at(entity).active) {
       entity->Update(this);
     }
   }

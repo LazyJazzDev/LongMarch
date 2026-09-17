@@ -39,9 +39,14 @@ class Scene : public Object {
 
   const std::map<Entity *, EntityStatus> &GetEntities() const;
 
+  // Stable registration order for instance IDs and light sampling. Pointer
+  // addresses differ across processes and graphics backends.
+  const std::vector<Entity *> &GetEntityOrder() const;
+
  private:
   Core *core_;
   std::map<Entity *, EntityStatus> entities_;
+  std::vector<Entity *> entity_order_;
 };
 
 }  // namespace sparkium

@@ -221,11 +221,14 @@ void Scene::UpdatePipeline(Camera *camera) {
     status.keep = false;
   }
 
-  for (auto [entity, status] : scene_.GetEntities()) {
+  std::vector<Entity *> ordered_entities;
+  for (auto *entity : scene_.GetEntityOrder()) {
+    const auto &status = scene_.GetEntities().at(entity);
     auto rt_entity = DedicatedCast(entity);
     if (rt_entity) {
       entities_[rt_entity].keep = true;
       entities_[rt_entity].active = status.active;
+      ordered_entities.push_back(rt_entity);
     }
   }
 
@@ -273,8 +276,8 @@ void Scene::UpdatePipeline(Camera *camera) {
   }
 
   graphics::GpuProfileScope geometry_light_profile(preprocess_cmd_context_.get(), "light_geometry");
-  for (auto [entity, status] : entities_) {
-    if (status.active) {
+  for (auto *entity : ordered_entities) {
+    if (entities_.at(entity).active) {
       entity->Update(this);
     }
   }
