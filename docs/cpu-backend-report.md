@@ -23,7 +23,7 @@ shaders are never modified.
 
 ## Does it look the same?
 
-![Reference and CPU renders side by side](https://github.com/LazyJazzDev/LongMarchAssetsLFS/blob/main/docs/cpu-backend-comparison.png?raw=true)
+![Reference and CPU renders side by side](https://github.com/LazyJazzDev/LongMarchAssetsLFS/blob/blender-align/docs/cpu-backend-comparison.png?raw=true)
 
 *For each scene, the compute fallback on the left and the CPU backend on the
 right. Nine scenes at 1024×1024.*
@@ -32,7 +32,7 @@ The figure lives in the asset library rather than here, because binaries belong
 with the other LFS assets and a markdown image inside a submodule does not
 render on GitHub. `scripts/check_cpu_backend.py` regenerates it from the two
 renders it writes next to it; it is copied to `assets/docs/` and committed
-there.
+there, on the branch the `assets` submodule tracks.
 
 `scripts/check_cpu_backend.py` renders every basic scene both ways and compares
 the tone mapped images:
