@@ -2,3 +2,14 @@ add_executable(sparkium_fallback_test fallback_test.cpp metal_backend_test.cpp)
 target_link_libraries(sparkium_fallback_test PRIVATE LongMarch GTest::gtest_main)
 LONGMARCH_DEPLOY_RUNTIME_DEPENDENCIES(sparkium_fallback_test)
 add_test(NAME sparkium_fallback COMMAND sparkium_fallback_test)
+
+add_executable(sparkium_native_backend_test native_backend_test.cpp)
+target_link_libraries(sparkium_native_backend_test PRIVATE LongMarch GTest::gtest_main)
+LONGMARCH_DEPLOY_RUNTIME_DEPENDENCIES(sparkium_native_backend_test)
+add_test(NAME sparkium_native_backend COMMAND sparkium_native_backend_test)
+
+# Dumps the float accumulation film for image comparisons that must not be
+# affected by the 8-bit develop step.
+add_executable(sparkium_film_probe native/film_probe.cpp)
+target_link_libraries(sparkium_film_probe PRIVATE LongMarch)
+LONGMARCH_DEPLOY_RUNTIME_DEPENDENCIES(sparkium_film_probe)

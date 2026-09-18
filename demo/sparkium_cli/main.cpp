@@ -15,13 +15,18 @@ using namespace long_march;
 namespace {
 void Usage(const char *program) {
   std::cerr << "Usage: " << program << " <scene.json> [-o image.png] [--frames N] "
-            << "[--backend auto|metal|vulkan|d3d12] [--pipeline auto|rasterization|ray_tracing|rt_fallback|ray_query] "
+            << "[--backend auto|metal|vulkan|d3d12|cpu|cuda] "
+               "[--pipeline auto|rasterization|ray_tracing|rt_fallback|ray_query|cpu|cuda] "
                "[--require-hardware-rt] [--debug] [--profile "
                "timings.csv] [--profile-cpu-only|--profile-alternate-gpu]\n"
             << "       " << program << " --list [scene-directory]\n";
 }
 
 sparkium::RenderPipeline ParsePipeline(const std::string &name) {
+  if (name == "cpu")
+    return sparkium::RENDER_PIPELINE_NATIVE_CPU;
+  if (name == "cuda")
+    return sparkium::RENDER_PIPELINE_NATIVE_CUDA;
   if (name == "ray_query")
     return sparkium::RENDER_PIPELINE_RAY_QUERY;
   if (name == "rt_fallback")
@@ -61,8 +66,14 @@ int main(int argc, char **argv) {
       std::string argument = argv[i];
       if (argument == "--require-hardware-rt")
         require_hardware_rt = true;
-      else if (argument == "--backend" && i + 1 < argc)
-        backend = ParseSparkiumBackend(argv[++i]);
+      else if (argument == "--backend" && i + 1 < argc) {
+        const auto selection = ParseSparkiumBackendSelection(argv[++i]);
+        backend = selection.api;
+        if (selection.native) {
+          pipeline = selection.pipeline;
+          override_pipeline = true;
+        }
+      }
       else if (argument == "--debug")
         debug = true;
       else if ((argument == "-o" || argument == "--output") && i + 1 < argc)
@@ -102,8 +113,14 @@ int main(int argc, char **argv) {
     if (!override_pipeline) pipeline = loaded->GetRenderPipeline();
     if (core.ResolveRenderPipeline(pipeline) == sparkium::RENDER_PIPELINE_RAY_QUERY)
       std::cout << "Tracing: native ray query (compute, native AS)\n";
+    const bool native_pipeline = pipeline == sparkium::RENDER_PIPELINE_NATIVE_CPU ||
+                                 pipeline == sparkium::RENDER_PIPELINE_NATIVE_CUDA;
+    if (native_pipeline)
+      std::cout << "Tracing: native " << (pipeline == sparkium::RENDER_PIPELINE_NATIVE_CUDA ? "CUDA" : "CPU")
+                << " path tracer\n";
 
     auto *film = loaded->GetFilm();
+    std::vector<uint8_t> pixels(static_cast<size_t>(film->GetWidth()) * film->GetHeight() * 4);
     std::unique_ptr<graphics::Image> image;
     graphics_core->CreateImage(film->GetWidth(), film->GetHeight(), graphics::IMAGE_FORMAT_R8G8B8A8_UNORM, &image);
     std::unique_ptr<graphics::FrameProfile> profiler;
@@ -127,8 +144,12 @@ int main(int argc, char **argv) {
           core.Render(loaded->GetScene(), loaded->GetCamera(), film, pipeline);
         }
         // Profiling includes a developed display image for each frame, as in the GUI.
-        if (profiler)
-          film->Develop(image.get());
+        if (profiler) {
+          if (native_pipeline)
+            sparkium::native::DevelopToHost(film, pixels);
+          else
+            film->Develop(image.get());
+        }
       }
       if (profiler) {
         profiler->Finish();
@@ -141,10 +162,13 @@ int main(int argc, char **argv) {
         profile_output.flush();
       }
     }
-    if (!profiler)
-      film->Develop(image.get());
-    std::vector<uint8_t> pixels(static_cast<size_t>(film->GetWidth()) * film->GetHeight() * 4);
-    image->DownloadData(pixels.data());
+    if (native_pipeline) {
+      sparkium::native::DevelopToHost(film, pixels);
+    } else {
+      if (!profiler)
+        film->Develop(image.get());
+      image->DownloadData(pixels.data());
+    }
     std::filesystem::create_directories(output.has_parent_path() ? output.parent_path() : ".");
     if (!stbi_write_png(output.string().c_str(), film->GetWidth(), film->GetHeight(), 4, pixels.data(),
                         film->GetWidth() * 4))

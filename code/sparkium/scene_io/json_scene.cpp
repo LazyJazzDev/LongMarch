@@ -217,6 +217,11 @@ BinaryHairData BinaryHair(const std::filesystem::path &path) {
   return result;
 }
 
+// Compiles a JSON shader-node graph into two equivalent forms in a single
+// traversal: the HLSL used by the graphics pipelines, and the backend-neutral
+// instruction list (`ShaderGraphProgram`) interpreted by the native CPU/CUDA
+// backends. Every node emits one HLSL assignment and one instruction with the
+// same operands, so the two forms cannot drift apart.
 class ShaderGraphCompiler {
  public:
   ShaderGraphCompiler(const Value &graph, const std::map<std::string, int> &texture_slots)
@@ -296,6 +301,8 @@ GraphSurface EvaluateShaderGraph(HitRecord hit_record, float3 view_direction, in
         {"subsurface_scale", "surface.subsurface_scale"},
         {"subsurface_radius", "surface.subsurface_radius"},
         {"subsurface_method", "surface.subsurface_method"}};
+    static_assert(sizeof(outputs) / sizeof(outputs[0]) == kShaderGraphSurfaceOutputCount,
+                  "the HLSL and native surface output tables must stay in sync");
     lines_ << "  GraphSurface surface;\n"
            << "  surface.base_color=float3(0.8f,0.8f,0.8f); "
               "surface.metallic=0.0f; surface.specular=0.5f;\n"
@@ -313,12 +320,14 @@ GraphSurface EvaluateShaderGraph(HitRecord hit_record, float3 view_direction, in
            << "  surface.subsurface_radius=float3(1.0f,0.2f,0.1f); "
               "surface.subsurface_method=0.0f;\n";
     std::vector<std::pair<std::string, std::string>> assignments;
-    for (const auto &[name, target] : outputs) {
+    for (int index = 0; index < kShaderGraphSurfaceOutputCount; ++index) {
+      const auto &[name, target] = outputs[index];
       if (!surface.HasMember(name))
         continue;
       auto expression = Expression(surface[name]);
+      program_.outputs[index] = expression.slot;
       assignments.emplace_back(target,
-                               expression + ((std::string(name) == "base_color" || std::string(name) == "emission" ||
+                               expression.code + ((std::string(name) == "base_color" || std::string(name) == "emission" ||
                                               std::string(name) == "normal" || std::string(name) == "subsurface_radius")
                                                  ? ".xyz"
                                                  : ".x"));
@@ -326,10 +335,23 @@ GraphSurface EvaluateShaderGraph(HitRecord hit_record, float3 view_direction, in
     for (const auto &[target, expression] : assignments)
       lines_ << "  " << target << "=" << expression << ";\n";
     lines_ << "  return surface;\n}\n";
+    AllocateRegisters();
     return CodeLines(lines_.str());
   }
 
+  // Valid once `Compile()` has run.
+  const ShaderGraphProgram &Program() const {
+    return program_;
+  }
+
  private:
+  // An evaluated graph input: the HLSL expression and the operand-encoded
+  // source of the same value in the instruction list.
+  struct Expr {
+    std::string code;
+    int32_t slot{kShaderGraphOperandNone};
+  };
+
   std::string Number(double value) {
     std::ostringstream out;
     out << std::setprecision(9) << value;
@@ -339,10 +361,105 @@ GraphSurface EvaluateShaderGraph(HitRecord hit_record, float3 view_direction, in
     return text + "f";
   }
 
-  std::string Literal(const Value &value) {
+  int32_t Constant(const glm::vec4 &value) {
+    for (size_t i = 0; i < program_.constants.size(); ++i)
+      if (program_.constants[i] == value)
+        return -static_cast<int32_t>(i) - 2;
+    program_.constants.push_back(value);
+    return -static_cast<int32_t>(program_.constants.size() - 1) - 2;
+  }
+
+  Expr Const(const char *code, const glm::vec4 &value) {
+    return {code, Constant(value)};
+  }
+
+  int32_t Emit(ShaderGraphOp op,
+               uint32_t sub,
+               std::initializer_list<int32_t> operands,
+               uint32_t data_offset = 0,
+               uint32_t data_count = 0) {
+    ShaderGraphInstruction instruction;
+    instruction.op = op;
+    instruction.sub = sub;
+    int index = 0;
+    for (int32_t operand : operands) {
+      if (index >= kShaderGraphMaxOperands)
+        throw std::runtime_error("shader graph node uses too many operands");
+      instruction.operands[index++] = operand;
+    }
+    instruction.data_offset = data_offset;
+    instruction.data_count = data_count;
+    // Values are numbered by definition order while the program is built;
+    // `AllocateRegisters()` maps them onto the device register file.
+    instruction.dst = static_cast<int32_t>(program_.instructions.size());
+    program_.instructions.push_back(instruction);
+    return instruction.dst;
+  }
+
+  // Reuses a device register as soon as the value it holds is dead. Graphs in
+  // the shipped scenes reach fifty nodes but only a handful of live values.
+  void AllocateRegisters() {
+    const size_t count = program_.instructions.size();
+    std::vector<int> last_use(count);
+    for (size_t i = 0; i < count; ++i)
+      last_use[i] = static_cast<int>(i);
+    for (size_t i = 0; i < count; ++i)
+      for (int32_t operand : program_.instructions[i].operands)
+        if (operand >= 0)
+          last_use[operand] = static_cast<int>(i);
+    for (int32_t slot : program_.outputs)
+      if (slot >= 0)
+        last_use[slot] = static_cast<int>(count);
+    std::vector<int> physical(count, -1), free_list;
+    int next_register = 0;
+    for (size_t i = 0; i < count; ++i) {
+      int destination;
+      if (!free_list.empty()) {
+        destination = free_list.back();
+        free_list.pop_back();
+      } else {
+        destination = next_register++;
+        if (next_register > kShaderGraphMaxRegisters)
+          throw std::runtime_error("shader graph needs more registers than the native backends provide");
+      }
+      physical[i] = destination;
+      std::set<int32_t> released;
+      for (int32_t operand : program_.instructions[i].operands)
+        if (operand >= 0 && last_use[operand] == static_cast<int>(i) && released.insert(operand).second)
+          free_list.push_back(physical[operand]);
+      if (last_use[i] == static_cast<int>(i))
+        free_list.push_back(destination);
+    }
+    for (size_t i = 0; i < count; ++i) {
+      auto &instruction = program_.instructions[i];
+      instruction.dst = physical[i];
+      for (int32_t &operand : instruction.operands)
+        if (operand >= 0)
+          operand = physical[operand];
+    }
+    for (int32_t &slot : program_.outputs)
+      if (slot >= 0)
+        slot = physical[slot];
+    program_.register_count = next_register;
+  }
+
+  glm::vec4 LiteralValue(const Value &value) {
+    if (value.IsNumber()) {
+      float scalar = ReadNumber(value);
+      return {scalar, scalar, scalar, scalar};
+    }
+    std::vector<float> parts;
+    for (const auto &item : value.GetArray())
+      parts.push_back(ReadNumber(item));
+    while (parts.size() < 4)
+      parts.push_back(parts.size() == 3 ? 1.0f : parts.back());
+    return {parts[0], parts[1], parts[2], parts[3]};
+  }
+
+  Expr Literal(const Value &value) {
     if (value.IsNumber()) {
       auto n = Number(ReadNumber(value));
-      return "float4(" + n + "," + n + "," + n + "," + n + ")";
+      return {"float4(" + n + "," + n + "," + n + "," + n + ")", Constant(LiteralValue(value))};
     }
     if (!value.IsArray() || value.Empty() || value.Size() > 4)
       throw std::runtime_error("shader input must be a number, vector, or node reference");
@@ -351,22 +468,48 @@ GraphSurface EvaluateShaderGraph(HitRecord hit_record, float3 view_direction, in
       parts.push_back(Number(ReadNumber(item)));
     while (parts.size() < 4)
       parts.push_back(parts.size() == 3 ? "1.0f" : parts.back());
-    return "float4(" + parts[0] + "," + parts[1] + "," + parts[2] + "," + parts[3] + ")";
+    return {"float4(" + parts[0] + "," + parts[1] + "," + parts[2] + "," + parts[3] + ")",
+            Constant(LiteralValue(value))};
   }
 
-  std::string Input(const Value &node, const char *name, const std::string &fallback) {
+  Expr Input(const Value &node, const char *name, const Expr &fallback) {
     if (!node.HasMember("inputs") || !RequireObject(node["inputs"]).HasMember(name))
       return fallback;
     return Expression(node["inputs"][name]);
   }
 
-  std::string Expression(const Value &value) {
+  // Fallbacks that read the hit record have to be emitted as instructions, so
+  // they are only built when the input is actually missing.
+  template <typename Fallback>
+  Expr InputLazy(const Value &node, const char *name, Fallback &&fallback) {
+    if (!node.HasMember("inputs") || !RequireObject(node["inputs"]).HasMember(name))
+      return fallback();
+    return Expression(node["inputs"][name]);
+  }
+
+  Expr TexCoord() {
+    return {"float4(hit_record.tex_coord,0,0)", Emit(SHADER_GRAPH_OP_TEXTURE_COORDINATE, 0, {})};
+  }
+  Expr ShadingNormal() {
+    return {"float4(hit_record.normal,0)", Emit(SHADER_GRAPH_OP_TEXTURE_COORDINATE, 1, {})};
+  }
+  Expr ObjectPosition() {
+    return {"float4(hit_record.object_position,0)", Emit(SHADER_GRAPH_OP_TEXTURE_COORDINATE, 2, {})};
+  }
+
+  uint32_t PushData(const std::vector<float> &values) {
+    const auto offset = static_cast<uint32_t>(program_.data.size());
+    program_.data.insert(program_.data.end(), values.begin(), values.end());
+    return offset;
+  }
+
+  Expr Expression(const Value &value) {
     if (!value.IsObject() || !value.HasMember("node"))
       return Literal(value);
     return Node(ReadString(value["node"]), value.HasMember("output") ? ReadString(value["output"]) : "value");
   }
 
-  std::string Node(const std::string &id, const std::string &output) {
+  Expr Node(const std::string &id, const std::string &output) {
     const auto key = id + ":" + output;
     if (auto it = cache_.find(key); it != cache_.end())
       return it->second;
@@ -378,188 +521,290 @@ GraphSurface EvaluateShaderGraph(HitRecord hit_record, float3 view_direction, in
     const std::string type = ReadString(Member(node, "type"));
     const std::string var = "graph_v" + std::to_string(next_variable_++);
     std::string expression;
-    const auto zero = "float4(0,0,0,0)", one = "float4(1,1,1,1)";
+    int32_t slot = kShaderGraphOperandNone;
+    const Expr zero = Const("float4(0,0,0,0)", {0.0f, 0.0f, 0.0f, 0.0f});
+    const Expr one = Const("float4(1,1,1,1)", {1.0f, 1.0f, 1.0f, 1.0f});
+    const Expr half = Const("float4(0.5,0.5,0.5,0.5)", {0.5f, 0.5f, 0.5f, 0.5f});
+    const Expr five = Const("float4(5,5,5,5)", {5.0f, 5.0f, 5.0f, 5.0f});
     if (type == "value" || type == "rgb") {
-      expression = Input(node, "value", zero);
+      auto value = Input(node, "value", zero);
+      expression = value.code;
+      slot = Emit(SHADER_GRAPH_OP_COPY, 0, {value.slot});
     } else if (type == "texture_coordinate") {
-      if (output == "uv")
+      uint32_t sub = 2;
+      if (output == "uv") {
         expression = "float4(hit_record.tex_coord,0,0)";
-      else if (output == "normal")
+        sub = 0;
+      } else if (output == "normal") {
         expression = "float4(hit_record.normal,0)";
-      else
+        sub = 1;
+      } else {
         expression = "float4(hit_record.object_position,0)";
+      }
+      slot = Emit(SHADER_GRAPH_OP_TEXTURE_COORDINATE, sub, {});
     } else if (type == "image_texture") {
       auto it = texture_slots_.find(id);
       if (it == texture_slots_.end())
         throw std::runtime_error("image node has no loaded texture: " + id);
-      auto vector = Input(node, "vector", "float4(hit_record.tex_coord,0,0)");
-      expression = "SampleTexture(material_data.Load(" + std::to_string(12 + it->second * 4) + "),(" + vector + ").xy)";
-      if (output == "alpha")
+      auto vector = InputLazy(node, "vector", [&] { return TexCoord(); });
+      expression =
+          "SampleTexture(material_data.Load(" + std::to_string(12 + it->second * 4) + "),(" + vector.code + ").xy)";
+      uint32_t sub = 0;
+      if (output == "alpha") {
         expression = "(" + expression + ").wwww";
-      else if (node.HasMember("color_space") && std::string(ReadString(node["color_space"])) == "srgb")
+        sub = 1;
+      } else if (node.HasMember("color_space") && std::string(ReadString(node["color_space"])) == "srgb") {
         expression = "float4(GraphSrgbToLinear((" + expression + ").xyz),(" + expression + ").w)";
+        sub = 2;
+      }
+      slot = Emit(SHADER_GRAPH_OP_IMAGE_TEXTURE, sub, {vector.slot}, static_cast<uint32_t>(it->second));
     } else if (type == "mapping") {
       auto vector = Input(node, "vector", zero), location = Input(node, "location", zero);
       auto rotation = Input(node, "rotation", zero), scale = Input(node, "scale", one);
-      expression = "float4(GraphRotateXYZ((" + vector + ").xyz*(" + scale + ").xyz,(" + rotation + ").xyz)+(" +
-                   location + ").xyz,0)";
+      expression = "float4(GraphRotateXYZ((" + vector.code + ").xyz*(" + scale.code + ").xyz,(" + rotation.code +
+                   ").xyz)+(" + location.code + ").xyz,0)";
+      slot = Emit(SHADER_GRAPH_OP_MAPPING, 0, {vector.slot, location.slot, rotation.slot, scale.slot});
     } else if (type == "noise_texture") {
-      auto vector = Input(node, "vector", "float4(hit_record.object_position,0)");
-      auto scale = Input(node, "scale", "float4(5,5,5,5)");
-      expression = "GraphNoise((" + vector + ").xyz*(" + scale + ").x).xxxx";
+      auto vector = InputLazy(node, "vector", [&] { return ObjectPosition(); });
+      auto scale = Input(node, "scale", five);
+      expression = "GraphNoise((" + vector.code + ").xyz*(" + scale.code + ").x).xxxx";
+      slot = Emit(SHADER_GRAPH_OP_NOISE_TEXTURE, 0, {vector.slot, scale.slot});
     } else if (type == "voronoi_texture") {
-      auto vector = Input(node, "vector", "float4(hit_record.object_position,0)");
-      auto scale = Input(node, "scale", "float4(5,5,5,5)");
-      expression = "GraphVoronoi((" + vector + ").xyz*(" + scale + ").x).xxxx";
+      auto vector = InputLazy(node, "vector", [&] { return ObjectPosition(); });
+      auto scale = Input(node, "scale", five);
+      expression = "GraphVoronoi((" + vector.code + ").xyz*(" + scale.code + ").x).xxxx";
+      slot = Emit(SHADER_GRAPH_OP_VORONOI_TEXTURE, 0, {vector.slot, scale.slot});
     } else if (type == "gradient_texture") {
-      auto vector = Input(node, "vector", "float4(hit_record.object_position,0)");
-      expression = "(" + vector + ").xxxx";
+      auto vector = InputLazy(node, "vector", [&] { return ObjectPosition(); });
+      expression = "(" + vector.code + ").xxxx";
+      slot = Emit(SHADER_GRAPH_OP_GRADIENT_TEXTURE, 0, {vector.slot});
     } else if (type == "wave_texture") {
-      auto vector = Input(node, "vector", "float4(hit_record.object_position,0)");
-      auto scale = Input(node, "scale", "float4(5,5,5,5)");
+      auto vector = InputLazy(node, "vector", [&] { return ObjectPosition(); });
+      auto scale = Input(node, "scale", five);
       auto distortion = Input(node, "distortion", zero), phase = Input(node, "phase", zero);
       std::string wave_type = node.HasMember("wave_type") ? ReadString(node["wave_type"]) : "BANDS";
       std::string direction = node.HasMember("bands_direction") ? ReadString(node["bands_direction"]) : "X";
-      std::string p = "(" + vector + ").xyz*(" + scale + ").x";
+      std::string p = "(" + vector.code + ").xyz*(" + scale.code + ").x";
       std::string coordinate;
-      if (wave_type == "RINGS")
+      uint32_t sub = 0;
+      if (wave_type == "RINGS") {
         coordinate = "length(" + p + ")";
-      else if (direction == "Y")
+        sub = 4;
+      } else if (direction == "Y") {
         coordinate = "(" + p + ").y";
-      else if (direction == "Z")
+        sub = 1;
+      } else if (direction == "Z") {
         coordinate = "(" + p + ").z";
-      else if (direction == "DIAGONAL")
+        sub = 2;
+      } else if (direction == "DIAGONAL") {
         coordinate = "((" + p + ").x+(" + p + ").y+(" + p + ").z)*0.577350269f";
-      else
+        sub = 3;
+      } else {
         coordinate = "(" + p + ").x";
-      coordinate = "(" + coordinate + "+(" + distortion + ").x*GraphNoise(" + p + ")+(" + phase + ").x)";
+      }
+      coordinate = "(" + coordinate + "+(" + distortion.code + ").x*GraphNoise(" + p + ")+(" + phase.code + ").x)";
       expression = "(0.5f+0.5f*sin(" + coordinate + "*6.283185307f)).xxxx";
+      slot = Emit(SHADER_GRAPH_OP_WAVE_TEXTURE, sub, {vector.slot, scale.slot, distortion.slot, phase.slot});
     } else if (type == "sky_texture") {
-      auto vector = Input(node, "vector", "float4(0,0,1,0)");
-      auto sun = node.HasMember("sun_direction") ? Literal(node["sun_direction"]) : "float4(0,1,0,0)";
+      auto vector = Input(node, "vector", Const("float4(0,0,1,0)", {0.0f, 0.0f, 1.0f, 0.0f}));
+      auto sun = node.HasMember("sun_direction") ? Literal(node["sun_direction"])
+                                                 : Const("float4(0,1,0,0)", {0.0f, 1.0f, 0.0f, 0.0f});
       expression =
           "float4(lerp(float3(0.08f,0.16f,0.35f),float3(0.65f,0.78f,1."
           "0f),saturate(normalize((" +
-          vector + ").xyz).z*0.5f+0.5f))+pow(saturate(dot(normalize((" + vector + ").xyz),normalize((" + sun +
-          ").xyz))),512.0f)*float3(8,6,3),1)";
+          vector.code + ").xyz).z*0.5f+0.5f))+pow(saturate(dot(normalize((" + vector.code + ").xyz),normalize((" +
+          sun.code + ").xyz))),512.0f)*float3(8,6,3),1)";
+      slot = Emit(SHADER_GRAPH_OP_SKY_TEXTURE, 0, {vector.slot, sun.slot});
     } else if (type == "vertex_attribute") {
-      if (output == "alpha")
+      uint32_t sub = 0;
+      if (output == "alpha") {
         expression = "float4(1,1,1,1)";
-      else if (output == "factor")
+        sub = 2;
+      } else if (output == "factor") {
         expression = "hit_record.color.xxxx";
-      else
+        sub = 1;
+      } else {
         expression = "float4(hit_record.color,1)";
+      }
+      slot = Emit(SHADER_GRAPH_OP_VERTEX_ATTRIBUTE, sub, {});
     } else if (type == "object_info") {
-      if (output == "location")
+      uint32_t sub = 3;
+      if (output == "location") {
         expression = "float4(hit_record.object_origin,0)";
-      else if (output == "object_index" || output == "material_index")
+        sub = 0;
+      } else if (output == "object_index" || output == "material_index") {
         expression = "float(hit_record.object_index).xxxx";
-      else if (output == "random")
+        sub = 1;
+      } else if (output == "random") {
         expression = "GraphHash(float3(hit_record.object_index,17,31)).xxxx";
-      else
+        sub = 2;
+      } else {
         expression = "float4(1,1,1,1)";
+      }
+      slot = Emit(SHADER_GRAPH_OP_OBJECT_INFO, sub, {});
     } else if (type == "geometry_info") {
-      if (output == "position")
+      uint32_t sub = 4;
+      if (output == "position") {
         expression = "float4(hit_record.position,1)";
-      else if (output == "normal" || output == "true_normal")
+        sub = 0;
+      } else if (output == "normal" || output == "true_normal") {
         expression = "float4(hit_record.normal,0)";
-      else if (output == "incoming")
+        sub = 1;
+      } else if (output == "incoming") {
         expression = "float4(-view_direction,0)";
-      else if (output == "backfacing")
+        sub = 2;
+      } else if (output == "backfacing") {
         expression = "(hit_record.front_facing?0.0f:1.0f).xxxx";
-      else
-        expression = zero;
+        sub = 3;
+      } else {
+        expression = zero.code;
+      }
+      slot = Emit(SHADER_GRAPH_OP_GEOMETRY_INFO, sub, {});
     } else if (type == "light_path") {
-      if (output == "is_camera_ray")
+      uint32_t sub = SHADER_GRAPH_LIGHT_PATH_ZERO;
+      if (output == "is_camera_ray") {
         expression = "(!is_shadow_ray&&ray_type==RAY_TYPE_CAMERA?1.0f:0.0f).xxxx";
-      else if (output == "is_shadow_ray")
+        sub = SHADER_GRAPH_LIGHT_PATH_IS_CAMERA;
+      } else if (output == "is_shadow_ray") {
         expression = "(is_shadow_ray?1.0f:0.0f).xxxx";
-      else if (output == "is_reflection_ray")
+        sub = SHADER_GRAPH_LIGHT_PATH_IS_SHADOW;
+      } else if (output == "is_reflection_ray") {
         expression = "(!is_shadow_ray&&ray_type==RAY_TYPE_REFLECTION?1.0f:0.0f).xxxx";
-      else if (output == "is_transmission_ray")
+        sub = SHADER_GRAPH_LIGHT_PATH_IS_REFLECTION;
+      } else if (output == "is_transmission_ray") {
         expression = "(!is_shadow_ray&&ray_type==RAY_TYPE_TRANSMISSION?1.0f:0.0f).xxxx";
-      else if (output == "is_glossy_ray" || output == "is_diffuse_ray" || output == "is_singular_ray")
+        sub = SHADER_GRAPH_LIGHT_PATH_IS_TRANSMISSION;
+      } else if (output == "is_glossy_ray" || output == "is_diffuse_ray" || output == "is_singular_ray") {
         expression = "(!is_shadow_ray&&ray_type==RAY_TYPE_REFLECTION?1.0f:0.0f).xxxx";
-      else if (output == "ray_length")
+        sub = SHADER_GRAPH_LIGHT_PATH_IS_REFLECTION;
+      } else if (output == "ray_length") {
         expression = "hit_record.t.xxxx";
-      else
-        expression = zero;
+        sub = SHADER_GRAPH_LIGHT_PATH_RAY_LENGTH;
+      } else {
+        expression = zero.code;
+      }
+      slot = Emit(SHADER_GRAPH_OP_LIGHT_PATH, sub, {});
     } else if (type == "invert") {
-      expression = "lerp(" + Input(node, "color", zero) + ",1.0f-" + Input(node, "color", zero) + ",(" +
-                   Input(node, "factor", one) + ").x)";
+      auto color = Input(node, "color", zero);
+      auto factor = Input(node, "factor", one);
+      expression = "lerp(" + color.code + ",1.0f-" + color.code + ",(" + factor.code + ").x)";
+      slot = Emit(SHADER_GRAPH_OP_INVERT, 0, {color.slot, factor.slot});
     } else if (type == "mix") {
-      auto factor = Input(node, "factor", "float4(0.5,0.5,0.5,0.5)");
+      auto factor = Input(node, "factor", half);
       auto a = Input(node, "a", zero), b = Input(node, "b", one);
       std::string blend = node.HasMember("blend_type") ? ReadString(node["blend_type"]) : "MIX";
-      if (blend == "MULTIPLY")
-        expression = "lerp(" + a + "," + a + "*" + b + ",saturate((" + factor + ").x))";
-      else if (blend == "ADD")
-        expression = a + "+" + b + "*(" + factor + ").x";
-      else if (blend == "SUBTRACT")
-        expression = a + "-" + b + "*(" + factor + ").x";
-      else if (blend == "DARKEN")
-        expression = "lerp(" + a + ",min(" + a + "," + b + "),saturate((" + factor + ").x))";
-      else if (blend == "LIGHTEN")
-        expression = "lerp(" + a + ",max(" + a + "," + b + "),saturate((" + factor + ").x))";
-      else if (blend == "SCREEN")
-        expression = "lerp(" + a + ",1.0f-(1.0f-" + a + ")*(1.0f-" + b + "),saturate((" + factor + ").x))";
-      else if (blend == "DIFFERENCE")
-        expression = "lerp(" + a + ",abs(" + a + "-" + b + "),saturate((" + factor + ").x))";
-      else if (blend == "DIVIDE")
-        expression = "lerp(" + a + "," + a + "/max(abs(" + b + "),1e-8f),saturate((" + factor + ").x))";
-      else if (blend == "OVERLAY") {
-        auto overlay =
-            "lerp(2.0f*" + a + "*" + b + ",1.0f-2.0f*(1.0f-" + a + ")*(1.0f-" + b + "),step(0.5f," + a + "))";
-        expression = "lerp(" + a + "," + overlay + ",saturate((" + factor + ").x))";
-      } else
-        expression = "lerp(" + a + "," + b + ",saturate((" + factor + ").x))";
+      ShaderGraphBlendType blend_type = SHADER_GRAPH_BLEND_MIX;
+      if (blend == "MULTIPLY") {
+        expression = "lerp(" + a.code + "," + a.code + "*" + b.code + ",saturate((" + factor.code + ").x))";
+        blend_type = SHADER_GRAPH_BLEND_MULTIPLY;
+      } else if (blend == "ADD") {
+        expression = a.code + "+" + b.code + "*(" + factor.code + ").x";
+        blend_type = SHADER_GRAPH_BLEND_ADD;
+      } else if (blend == "SUBTRACT") {
+        expression = a.code + "-" + b.code + "*(" + factor.code + ").x";
+        blend_type = SHADER_GRAPH_BLEND_SUBTRACT;
+      } else if (blend == "DARKEN") {
+        expression = "lerp(" + a.code + ",min(" + a.code + "," + b.code + "),saturate((" + factor.code + ").x))";
+        blend_type = SHADER_GRAPH_BLEND_DARKEN;
+      } else if (blend == "LIGHTEN") {
+        expression = "lerp(" + a.code + ",max(" + a.code + "," + b.code + "),saturate((" + factor.code + ").x))";
+        blend_type = SHADER_GRAPH_BLEND_LIGHTEN;
+      } else if (blend == "SCREEN") {
+        expression = "lerp(" + a.code + ",1.0f-(1.0f-" + a.code + ")*(1.0f-" + b.code + "),saturate((" + factor.code +
+                     ").x))";
+        blend_type = SHADER_GRAPH_BLEND_SCREEN;
+      } else if (blend == "DIFFERENCE") {
+        expression = "lerp(" + a.code + ",abs(" + a.code + "-" + b.code + "),saturate((" + factor.code + ").x))";
+        blend_type = SHADER_GRAPH_BLEND_DIFFERENCE;
+      } else if (blend == "DIVIDE") {
+        expression =
+            "lerp(" + a.code + "," + a.code + "/max(abs(" + b.code + "),1e-8f),saturate((" + factor.code + ").x))";
+        blend_type = SHADER_GRAPH_BLEND_DIVIDE;
+      } else if (blend == "OVERLAY") {
+        auto overlay = "lerp(2.0f*" + a.code + "*" + b.code + ",1.0f-2.0f*(1.0f-" + a.code + ")*(1.0f-" + b.code +
+                       "),step(0.5f," + a.code + "))";
+        expression = "lerp(" + a.code + "," + overlay + ",saturate((" + factor.code + ").x))";
+        blend_type = SHADER_GRAPH_BLEND_OVERLAY;
+      } else {
+        expression = "lerp(" + a.code + "," + b.code + ",saturate((" + factor.code + ").x))";
+      }
+      slot = Emit(SHADER_GRAPH_OP_MIX, blend_type, {factor.slot, a.slot, b.slot});
     } else if (type == "math") {
       auto a = Input(node, "a", zero), b = Input(node, "b", zero), c = Input(node, "c", zero);
       std::string op = node.HasMember("operation") ? ReadString(node["operation"]) : "ADD";
-      std::string x = "(" + a + ").x", y = "(" + b + ").x", z = "(" + c + ").x", scalar;
-      if (op == "MULTIPLY")
+      std::string x = "(" + a.code + ").x", y = "(" + b.code + ").x", z = "(" + c.code + ").x", scalar;
+      ShaderGraphMathOp math_op = SHADER_GRAPH_MATH_ADD;
+      if (op == "MULTIPLY") {
         scalar = x + "*" + y;
-      else if (op == "SUBTRACT")
+        math_op = SHADER_GRAPH_MATH_MULTIPLY;
+      } else if (op == "SUBTRACT") {
         scalar = x + "-" + y;
-      else if (op == "DIVIDE")
+        math_op = SHADER_GRAPH_MATH_SUBTRACT;
+      } else if (op == "DIVIDE") {
         scalar = x + "/max(abs(" + y + "),1e-8f)";
-      else if (op == "POWER")
+        math_op = SHADER_GRAPH_MATH_DIVIDE;
+      } else if (op == "POWER") {
         scalar = "pow(max(" + x + ",0.0f)," + y + ")";
-      else if (op == "MINIMUM")
+        math_op = SHADER_GRAPH_MATH_POWER;
+      } else if (op == "MINIMUM") {
         scalar = "min(" + x + "," + y + ")";
-      else if (op == "MAXIMUM")
+        math_op = SHADER_GRAPH_MATH_MINIMUM;
+      } else if (op == "MAXIMUM") {
         scalar = "max(" + x + "," + y + ")";
-      else if (op == "LESS_THAN")
+        math_op = SHADER_GRAPH_MATH_MAXIMUM;
+      } else if (op == "LESS_THAN") {
         scalar = "(" + x + "<" + y + "?1.0f:0.0f)";
-      else if (op == "GREATER_THAN")
+        math_op = SHADER_GRAPH_MATH_LESS_THAN;
+      } else if (op == "GREATER_THAN") {
         scalar = "(" + x + ">" + y + "?1.0f:0.0f)";
-      else if (op == "MULTIPLY_ADD")
+        math_op = SHADER_GRAPH_MATH_GREATER_THAN;
+      } else if (op == "MULTIPLY_ADD") {
         scalar = x + "*" + y + "+" + z;
-      else if (op == "ABSOLUTE")
+        math_op = SHADER_GRAPH_MATH_MULTIPLY_ADD;
+      } else if (op == "ABSOLUTE") {
         scalar = "abs(" + x + ")";
-      else if (op == "SINE")
+        math_op = SHADER_GRAPH_MATH_ABSOLUTE;
+      } else if (op == "SINE") {
         scalar = "sin(" + x + ")";
-      else if (op == "COSINE")
+        math_op = SHADER_GRAPH_MATH_SINE;
+      } else if (op == "COSINE") {
         scalar = "cos(" + x + ")";
-      else if (op == "FRACT")
+        math_op = SHADER_GRAPH_MATH_COSINE;
+      } else if (op == "FRACT") {
         scalar = "frac(" + x + ")";
-      else if (op == "FLOOR")
+        math_op = SHADER_GRAPH_MATH_FRACT;
+      } else if (op == "FLOOR") {
         scalar = "floor(" + x + ")";
-      else
+        math_op = SHADER_GRAPH_MATH_FLOOR;
+      } else {
         scalar = x + "+" + y;
+      }
       expression = "(" + scalar + ").xxxx";
+      slot = Emit(SHADER_GRAPH_OP_MATH, math_op, {a.slot, b.slot, c.slot});
     } else if (type == "color_ramp") {
       auto factor = Input(node, "factor", zero);
-      if (!node.HasMember("elements") || !node["elements"].IsArray() || node["elements"].Empty())
-        expression = factor;
-      else {
+      if (!node.HasMember("elements") || !node["elements"].IsArray() || node["elements"].Empty()) {
+        expression = factor.code;
+        slot = Emit(SHADER_GRAPH_OP_COPY, 0, {factor.slot});
+      } else {
         const auto &elements = node["elements"];
-        expression = Literal(elements[0]["color"]);
+        expression = Literal(elements[0]["color"]).code;
+        // Payload: (position, span, r, g, b, a) per element, where `span` is
+        // the interval the HLSL bakes into the lerp for that element.
+        std::vector<float> payload;
+        auto append = [&payload](float position, float span, const glm::vec4 &color) {
+          payload.insert(payload.end(), {position, span, color.x, color.y, color.z, color.w});
+        };
+        append(ReadNumber(elements[0]["position"]), 1.0f, LiteralValue(elements[0]["color"]));
         for (rapidjson::SizeType i = 1; i < elements.Size(); ++i) {
           double lo = ReadNumber(elements[i - 1]["position"]), hi = ReadNumber(elements[i]["position"]);
-          auto t = "saturate(((" + factor + ").x-" + Number(lo) + ")/" + Number(std::max(hi - lo, 1e-8)) + ")";
-          expression = "lerp(" + expression + "," + Literal(elements[i]["color"]) + "," + t + ")";
+          auto t = "saturate(((" + factor.code + ").x-" + Number(lo) + ")/" + Number(std::max(hi - lo, 1e-8)) + ")";
+          expression = "lerp(" + expression + "," + Literal(elements[i]["color"]).code + "," + t + ")";
+          append(static_cast<float>(hi), static_cast<float>(std::max(hi - lo, 1e-8)),
+                 LiteralValue(elements[i]["color"]));
         }
+        slot = Emit(SHADER_GRAPH_OP_COLOR_RAMP, elements.Size(), {factor.slot}, PushData(payload),
+                    static_cast<uint32_t>(payload.size()));
       }
     } else if (type == "rgb_curves") {
       auto color = Input(node, "color", zero), factor = Input(node, "factor", one);
@@ -567,11 +812,14 @@ GraphSurface EvaluateShaderGraph(HitRecord hit_record, float3 view_direction, in
         throw std::runtime_error("rgb_curves requires three sample arrays");
       std::array<std::string, 3> channels;
       const char *swizzle[] = {"x", "y", "z"};
+      // Payload: one block per channel, `count, scale, count samples, count
+      // sample positions`, holding the same constants the HLSL bakes in.
+      std::vector<float> payload;
       for (int channel = 0; channel < 3; ++channel) {
         const auto &samples = node["samples"][channel];
         if (!samples.IsArray() || samples.Size() < 2)
           throw std::runtime_error("rgb_curves sample array is too short");
-        std::string x = "saturate((" + color + ")." + swizzle[channel] + ")";
+        std::string x = "saturate((" + color.code + ")." + swizzle[channel] + ")";
         std::string curve = Number(ReadNumber(samples[0]));
         for (rapidjson::SizeType i = 1; i < samples.Size(); ++i) {
           auto t = "saturate((" + x + "-" + Number(double(i - 1) / double(samples.Size() - 1)) + ")*" +
@@ -579,85 +827,118 @@ GraphSurface EvaluateShaderGraph(HitRecord hit_record, float3 view_direction, in
           curve = "lerp(" + curve + "," + Number(ReadNumber(samples[i])) + "," + t + ")";
         }
         channels[channel] = curve;
+        payload.push_back(static_cast<float>(samples.Size()));
+        payload.push_back(static_cast<float>(double(samples.Size() - 1)));
+        for (rapidjson::SizeType i = 0; i < samples.Size(); ++i)
+          payload.push_back(ReadNumber(samples[i]));
+        for (rapidjson::SizeType i = 0; i < samples.Size(); ++i)
+          payload.push_back(static_cast<float>(double(i) / double(samples.Size() - 1)));
       }
-      std::string curved = "float4(" + channels[0] + "," + channels[1] + "," + channels[2] + ",(" + color + ").w)";
-      expression = "lerp(" + color + "," + curved + ",saturate((" + factor + ").x))";
+      std::string curved =
+          "float4(" + channels[0] + "," + channels[1] + "," + channels[2] + ",(" + color.code + ").w)";
+      expression = "lerp(" + color.code + "," + curved + ",saturate((" + factor.code + ").x))";
+      slot = Emit(SHADER_GRAPH_OP_RGB_CURVES, 0, {color.slot, factor.slot}, PushData(payload),
+                  static_cast<uint32_t>(payload.size()));
     } else if (type == "hue_saturation") {
       auto color = Input(node, "color", zero), factor = Input(node, "factor", one);
-      auto hue = Input(node, "hue", "float4(0.5,0.5,0.5,0.5)");
+      auto hue = Input(node, "hue", half);
       auto saturation = Input(node, "saturation", one), value = Input(node, "value", one);
-      std::string hsv = "GraphRgbToHsv((" + color + ").xyz)";
-      std::string adjusted = "GraphHsvToRgb(float3(frac((" + hsv + ").x+(" + hue + ").x-0.5f),max(0.0f,(" + hsv +
-                             ").y*(" + saturation + ").x),(" + hsv + ").z*(" + value + ").x))";
-      expression = "float4(lerp((" + color + ").xyz," + adjusted + ",saturate((" + factor + ").x)),(" + color + ").w)";
+      std::string hsv = "GraphRgbToHsv((" + color.code + ").xyz)";
+      std::string adjusted = "GraphHsvToRgb(float3(frac((" + hsv + ").x+(" + hue.code + ").x-0.5f),max(0.0f,(" + hsv +
+                             ").y*(" + saturation.code + ").x),(" + hsv + ").z*(" + value.code + ").x))";
+      expression = "float4(lerp((" + color.code + ").xyz," + adjusted + ",saturate((" + factor.code + ").x)),(" +
+                   color.code + ").w)";
+      slot = Emit(SHADER_GRAPH_OP_HUE_SATURATION, 0,
+                  {color.slot, factor.slot, hue.slot, saturation.slot, value.slot});
     } else if (type == "gamma") {
       auto color = Input(node, "color", one), gamma = Input(node, "gamma", one);
-      expression = "float4(pow(max((" + color + ").xyz,0.0f),max((" + gamma + ").xxx,1e-6f)),(" + color + ").w)";
+      expression =
+          "float4(pow(max((" + color.code + ").xyz,0.0f),max((" + gamma.code + ").xxx,1e-6f)),(" + color.code + ").w)";
+      slot = Emit(SHADER_GRAPH_OP_GAMMA, 0, {color.slot, gamma.slot});
     } else if (type == "bright_contrast") {
       auto color = Input(node, "color", one), brightness = Input(node, "brightness", zero),
            contrast = Input(node, "contrast", zero);
-      expression = "float4((" + color + ").xyz*(1.0f+(" + contrast + ").x)+(" + brightness + ").xxx,(" + color + ").w)";
+      expression = "float4((" + color.code + ").xyz*(1.0f+(" + contrast.code + ").x)+(" + brightness.code +
+                   ").xxx,(" + color.code + ").w)";
+      slot = Emit(SHADER_GRAPH_OP_BRIGHT_CONTRAST, 0, {color.slot, brightness.slot, contrast.slot});
     } else if (type == "layer_weight") {
-      auto blend = Input(node, "blend", "float4(0.5,0.5,0.5,0.5)");
-      if (output == "facing")
+      auto blend = Input(node, "blend", half);
+      uint32_t sub = 0;
+      if (output == "facing") {
         expression =
             "(1.0f-abs(dot(normalize(hit_record.normal),normalize("
             "view_direction)))).xxxx";
-      else
+        sub = 1;
+      } else {
         expression =
             "pow(1.0f-saturate(abs(dot(normalize(hit_record.normal),"
             "normalize(view_direction)))),max(0.01f,(" +
-            blend + ").x*5.0f)).xxxx";
+            blend.code + ").x*5.0f)).xxxx";
+      }
+      slot = Emit(SHADER_GRAPH_OP_LAYER_WEIGHT, sub, {blend.slot});
     } else if (type == "normal_map") {
-      auto c = Input(node, "color", "float4(0.5,0.5,1,1)");
+      auto c = Input(node, "color", Const("float4(0.5,0.5,1,1)", {0.5f, 0.5f, 1.0f, 1.0f}));
       auto strength = Input(node, "strength", one);
       std::string tangent_normal =
-          "normalize(lerp(float3(0,0,1),(" + c + ").xyz*2.0f-1.0f,saturate((" + strength + ").x)))";
+          "normalize(lerp(float3(0,0,1),(" + c.code + ").xyz*2.0f-1.0f,saturate((" + strength.code + ").x)))";
       std::string mapped_normal = "normalize(mul(" + tangent_normal +
                                   ",float3x3(hit_record.tangent,cross(hit_record.normal,hit_record."
                                   "tangent)*hit_record.signal,hit_record.normal)))";
       expression = "float4(abs(hit_record.signal)>0.5f?" + mapped_normal + ":hit_record.normal,0)";
+      slot = Emit(SHADER_GRAPH_OP_NORMAL_MAP, 0, {c.slot, strength.slot});
     } else if (type == "bump") {
-      expression = Input(node, "normal", "float4(hit_record.normal,0)");
+      auto normal = InputLazy(node, "normal", [&] { return ShadingNormal(); });
+      expression = normal.code;
+      slot = Emit(SHADER_GRAPH_OP_COPY, 0, {normal.slot});
     } else if (type == "combine") {
-      expression = "float4((" + Input(node, "x", zero) + ").x,(" + Input(node, "y", zero) + ").x,(" +
-                   Input(node, "z", zero) + ").x,1.0f)";
+      auto x = Input(node, "x", zero), y = Input(node, "y", zero), z = Input(node, "z", zero);
+      expression = "float4((" + x.code + ").x,(" + y.code + ").x,(" + z.code + ").x,1.0f)";
+      slot = Emit(SHADER_GRAPH_OP_COMBINE, 0, {x.slot, y.slot, z.slot});
     } else if (type == "separate") {
       auto c = Input(node, "color", zero);
       int component = (output == "green" || output == "y") ? 1 : (output == "blue" || output == "z") ? 2 : 0;
       const char *swizzle = component == 1 ? ".yyyy" : component == 2 ? ".zzzz" : ".xxxx";
-      expression = "(" + c + ")" + swizzle;
+      expression = "(" + c.code + ")" + swizzle;
+      slot = Emit(SHADER_GRAPH_OP_SEPARATE, static_cast<uint32_t>(component), {c.slot});
     } else if (type == "passthrough") {
-      expression = Input(node, "value", zero);
+      auto value = Input(node, "value", zero);
+      expression = value.code;
+      slot = Emit(SHADER_GRAPH_OP_COPY, 0, {value.slot});
     } else if (type == "invert_y") {
       auto vector = Input(node, "vector", zero);
-      expression = "float4((" + vector + ").x,1.0f-(" + vector + ").y,(" + vector + ").z,(" + vector + ").w)";
+      expression = "float4((" + vector.code + ").x,1.0f-(" + vector.code + ").y,(" + vector.code + ").z,(" +
+                   vector.code + ").w)";
+      slot = Emit(SHADER_GRAPH_OP_INVERT_Y, 0, {vector.slot});
     } else if (type == "brick_texture") {
-      auto p = Input(node, "vector", "float4(hit_record.object_position,0)");
-      auto scale = Input(node, "scale", "float4(5,5,5,5)");
-      auto mortar_size = Input(node, "mortar_size", "float4(0.02,0.02,0.02,0.02)");
+      auto p = InputLazy(node, "vector", [&] { return ObjectPosition(); });
+      auto scale = Input(node, "scale", five);
+      auto mortar_size = Input(node, "mortar_size", Const("float4(0.02,0.02,0.02,0.02)", {0.02f, 0.02f, 0.02f, 0.02f}));
       auto c1 = Input(node, "color1", zero), c2 = Input(node, "color2", one), mortar = Input(node, "mortar", zero);
-      std::string q = "frac((" + p + ").xy*(" + scale + ").x)";
+      std::string q = "frac((" + p.code + ").xy*(" + scale.code + ").x)";
       std::string edge =
-          "(min(min(" + q + ".x," + q + ".y),min(1.0f-" + q + ".x,1.0f-" + q + ".y))<(" + mortar_size + ").x)";
-      expression = "(" + edge + "?" + mortar + ":lerp(" + c1 + "," + c2 + ",fmod(floor((" + p + ").x*(" + scale +
-                   ").x)+floor((" + p + ").y*(" + scale + ").x),2.0f)))";
+          "(min(min(" + q + ".x," + q + ".y),min(1.0f-" + q + ".x,1.0f-" + q + ".y))<(" + mortar_size.code + ").x)";
+      expression = "(" + edge + "?" + mortar.code + ":lerp(" + c1.code + "," + c2.code + ",fmod(floor((" + p.code +
+                   ").x*(" + scale.code + ").x)+floor((" + p.code + ").y*(" + scale.code + ").x),2.0f)))";
+      slot = Emit(SHADER_GRAPH_OP_BRICK_TEXTURE, 0,
+                  {p.slot, scale.slot, mortar_size.slot, c1.slot, c2.slot, mortar.slot});
     } else {
       throw std::runtime_error("unsupported shader node type: " + type);
     }
     lines_ << "  float4 " << var << "=" << expression << ";\n";
     active_.erase(key);
-    cache_[key] = var;
-    return var;
+    const Expr result{var, slot};
+    cache_[key] = result;
+    return result;
   }
 
   const Value &graph_;
   const Value &nodes_;
   const std::map<std::string, int> &texture_slots_;
   std::ostringstream lines_;
-  std::map<std::string, std::string> cache_;
+  std::map<std::string, Expr> cache_;
   std::set<std::string> active_;
   int next_variable_ = 0;
+  ShaderGraphProgram program_;
 };
 }  // namespace
 
@@ -832,8 +1113,10 @@ std::unique_ptr<JsonScene> JsonScene::Load(Core *core, const std::filesystem::pa
           textures.push_back(image.get());
           result->images_.push_back(std::move(image));
         }
-        auto code = ShaderGraphCompiler(graph, texture_slots).Compile();
-        material = std::make_unique<MaterialShaderGraph>(core, code, textures, Vec3Member(spec, "emission_hint"));
+        ShaderGraphCompiler compiler(graph, texture_slots);
+        auto code = compiler.Compile();
+        material = std::make_unique<MaterialShaderGraph>(core, code, textures, Vec3Member(spec, "emission_hint"),
+                                                         compiler.Program());
       } else {
         throw std::runtime_error("unknown material type: " + type);
       }

@@ -15,6 +15,10 @@ const char *PipelineName(sparkium::RenderPipeline pipeline) {
       return "Path Tracing - Ray Query";
     case sparkium::RENDER_PIPELINE_RT_FALLBACK:
       return "Path Tracing - Fallback";
+    case sparkium::RENDER_PIPELINE_NATIVE_CPU:
+      return "Path Tracing - Native CPU";
+    case sparkium::RENDER_PIPELINE_NATIVE_CUDA:
+      return "Path Tracing - Native CUDA";
     case sparkium::RENDER_PIPELINE_RASTERIZATION: return "Rasterization";
     case sparkium::RENDER_PIPELINE_RAY_TRACING: return "Path Tracing";
     default: return "Auto";
@@ -68,9 +72,16 @@ int main(int argc, char **argv) {
     std::filesystem::path input = argc > 1 ? argv[1] : std::filesystem::path(FindAssetPath("scenes"));
     auto backend = graphics::BACKEND_API_DEFAULT;
     int frame_limit = 0;
+    // A native selection only preloads the pipeline combo; the graphics API
+    // stays at its default because the window and the display image need it.
+    auto startup_pipeline = sparkium::RENDER_PIPELINE_AUTO;
     for (int i = 2; i < argc; ++i) {
       std::string arg = argv[i];
-      if (arg == "--backend" && i + 1 < argc) backend = ParseSparkiumBackend(argv[++i]);
+      if (arg == "--backend" && i + 1 < argc) {
+        const auto selection = ParseSparkiumBackendSelection(argv[++i]);
+        backend = selection.api;
+        if (selection.native) startup_pipeline = selection.pipeline;
+      }
       else if (arg == "--frames" && i + 1 < argc) {
         frame_limit = std::stoi(argv[++i]);
         if (frame_limit <= 0) throw std::invalid_argument("--frames must be positive");
@@ -100,7 +111,7 @@ int main(int argc, char **argv) {
       auto next = sparkium::JsonScene::Load(&core, scene_files[selected], &load_error);
       if (!next) return false;
       loaded = std::move(next);
-      pipeline = loaded->GetRenderPipeline();
+      pipeline = startup_pipeline == sparkium::RENDER_PIPELINE_AUTO ? loaded->GetRenderPipeline() : startup_pipeline;
       auto *film = loaded->GetFilm();
       graphics_core->CreateImage(film->GetWidth(), film->GetHeight(), graphics::IMAGE_FORMAT_R8G8B8A8_UNORM, &image);
       resize_pending = true;
@@ -143,10 +154,13 @@ int main(int argc, char **argv) {
       if (ImGui::BeginCombo("Pipeline", pipeline_label)) {
         for (auto option : {sparkium::RENDER_PIPELINE_AUTO, sparkium::RENDER_PIPELINE_RASTERIZATION,
                             sparkium::RENDER_PIPELINE_RAY_TRACING, sparkium::RENDER_PIPELINE_RT_FALLBACK,
-                            sparkium::RENDER_PIPELINE_RAY_QUERY}) {
+                            sparkium::RENDER_PIPELINE_RAY_QUERY, sparkium::RENDER_PIPELINE_NATIVE_CPU,
+                            sparkium::RENDER_PIPELINE_NATIVE_CUDA}) {
           if (option == sparkium::RENDER_PIPELINE_RAY_TRACING && !graphics_core->DeviceRayTracingSupport())
             continue;
           if (option == sparkium::RENDER_PIPELINE_RAY_QUERY && !graphics_core->DeviceRayQuerySupport())
+            continue;
+          if (option == sparkium::RENDER_PIPELINE_NATIVE_CUDA && !sparkium::native::CudaAvailable())
             continue;
           const bool current = option == selected_pipeline;
           const char *label = option == sparkium::RENDER_PIPELINE_AUTO ? auto_label.c_str() : PipelineName(option);
