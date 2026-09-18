@@ -1,4 +1,5 @@
-#pragma once
+#ifndef SPARKIUM_SHADER_GEOMETRY_PRIMITIVE_SAMPLER_HLSLI_
+#define SPARKIUM_SHADER_GEOMETRY_PRIMITIVE_SAMPLER_HLSLI_
 
 template <class BufferType>
 void SamplePrimitivePower(BufferType direct_lighting_sampler_data, inout float r, out uint primitive_id, out float prob) {
@@ -34,3 +35,5 @@ float EvaluatePrimitiveProbability(BufferType direct_lighting_sampler_data, uint
     float low_prob = (primitive_id > 0) ? asfloat(power_cdf.Load((primitive_id - 1) * 4)) : 0.0f;
     return (high_prob - low_prob) / total_power;
 }
+
+#endif  // SPARKIUM_SHADER_GEOMETRY_PRIMITIVE_SAMPLER_HLSLI_

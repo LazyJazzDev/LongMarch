@@ -1,4 +1,5 @@
-#pragma once
+#ifndef SPARKIUM_SHADER_BSDF_PRINCIPLED_BSDF_HLSLI_
+#define SPARKIUM_SHADER_BSDF_PRINCIPLED_BSDF_HLSLI_
 
 void CalculateClosureWeight() {
   diffuse_closure.weight = make_float3(0);
@@ -388,3 +389,5 @@ void SamplePrincipledBSDF(float r1, float r2, out float3 eval, out float3 omega_
   pdf *= accum_weight;
   eval = EvalPrincipledBSDFKernel(omega_in, pdf, eval, accum_weight, exclude);
 }
+
+#endif  // SPARKIUM_SHADER_BSDF_PRINCIPLED_BSDF_HLSLI_

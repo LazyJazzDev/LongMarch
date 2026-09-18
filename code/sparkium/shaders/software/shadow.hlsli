@@ -1,4 +1,5 @@
-#pragma once
+#ifndef SPARKIUM_SHADER_SOFTWARE_SHADOW_HLSLI_
+#define SPARKIUM_SHADER_SOFTWARE_SHADOW_HLSLI_
 float ShadowRayNoAlpha(float3 origin, float3 direction, float dist) {
   RayDesc ray;
   ray.Origin = origin;
@@ -24,3 +25,5 @@ float ShadowRay(float3 origin, float3 direction, float dist) {
   }
   return transmission;
 }
+
+#endif  // SPARKIUM_SHADER_SOFTWARE_SHADOW_HLSLI_

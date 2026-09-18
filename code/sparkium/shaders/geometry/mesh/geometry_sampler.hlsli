@@ -1,4 +1,5 @@
-#pragma once
+#ifndef SPARKIUM_SHADER_GEOMETRY_MESH_GEOMETRY_SAMPLER_HLSLI_
+#define SPARKIUM_SHADER_GEOMETRY_MESH_GEOMETRY_SAMPLER_HLSLI_
 #include "geometry/mesh/sample_primitive.hlsli"
 
 template <class BufferType>
@@ -29,3 +30,5 @@ class GeometrySampler {
   }
 
 };
+
+#endif  // SPARKIUM_SHADER_GEOMETRY_MESH_GEOMETRY_SAMPLER_HLSLI_

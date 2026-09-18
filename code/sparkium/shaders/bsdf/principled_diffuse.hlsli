@@ -1,4 +1,5 @@
-#pragma once
+#ifndef SPARKIUM_SHADER_BSDF_PRINCIPLED_DIFFUSE_HLSLI_
+#define SPARKIUM_SHADER_BSDF_PRINCIPLED_DIFFUSE_HLSLI_
 struct PrincipledDiffuseBsdf {
   Spectrum weight;
   float sample_weight;
@@ -78,3 +79,5 @@ void bsdf_principled_diffuse_sample(PrincipledDiffuseBsdf bsdf,
     eval = make_float3(0);
   }
 }
+
+#endif  // SPARKIUM_SHADER_BSDF_PRINCIPLED_DIFFUSE_HLSLI_

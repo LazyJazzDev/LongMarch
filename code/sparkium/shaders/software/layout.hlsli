@@ -1,4 +1,5 @@
-#pragma once
+#ifndef SPARKIUM_SHADER_SOFTWARE_LAYOUT_HLSLI_
+#define SPARKIUM_SHADER_SOFTWARE_LAYOUT_HLSLI_
 #include "buffer_helper.hlsli"
 
 // Explicit byte layouts shared with SoftwarePipeline. All indices are node indices.
@@ -35,3 +36,5 @@ SoftwareInstance LoadSoftwareInstance(ByteAddressBuffer instances, uint index) {
   result.primitive_count = info.w;
   return result;
 }
+
+#endif  // SPARKIUM_SHADER_SOFTWARE_LAYOUT_HLSLI_

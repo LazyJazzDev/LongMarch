@@ -1,4 +1,5 @@
-#pragma once
+#ifndef SPARKIUM_SHADER_MATERIAL_PRINCIPLED_EVALUATOR_HLSLI_
+#define SPARKIUM_SHADER_MATERIAL_PRINCIPLED_EVALUATOR_HLSLI_
 #include "common.hlsli"
 #include "material/principled/eval_direct_light.hlsli"
 
@@ -17,3 +18,5 @@ class MaterialEvaluator {
     return MaterialPrincipledEvaluateDirectLighting(material_data, position, primitive_sample);
   }
 };
+
+#endif  // SPARKIUM_SHADER_MATERIAL_PRINCIPLED_EVALUATOR_HLSLI_

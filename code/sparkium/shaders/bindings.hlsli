@@ -2,6 +2,7 @@
 #include "common.hlsli"
 #include "buffer_helper.hlsli"
 
+#ifndef SOFTWARE_EXTERNAL_BINDINGS
 RWTexture2D<float4> accumulated_color : register(u0, space0);
 RWTexture2D<float> accumulated_samples : register(u0, space1);
 ConstantBuffer<RenderSettings> render_settings : register(b0, space3);
@@ -34,7 +35,11 @@ Texture2D<float4> sdr_textures[] : register(t0, space10);
 Texture2D<float4> hdr_textures[] : register(t0, space11);
 SamplerState samplers[] : register(s0, space12);
 #endif
+#endif  // !SOFTWARE_EXTERNAL_BINDINGS
 
+#ifndef SPARKIUM_PORTABLE
+// The portable compilation provides its own SampleTexture() (hlsl_compat.h)
+// with identical semantics; the transpiler maps calls onto it.
 float4 SampleTexture(int texture_index, float2 uv) {
   if (texture_index & 0x1000000) {
     return hdr_textures[NonUniformResourceIndex(texture_index & 0xFFFFFF)].SampleLevel(samplers[0], float2(uv.x, 1.0 - uv.y), 0.0);
@@ -43,3 +48,4 @@ float4 SampleTexture(int texture_index, float2 uv) {
   }
   return float4(1.0, 0.0, 1.0, 1.0);
 }
+#endif  // !SPARKIUM_PORTABLE

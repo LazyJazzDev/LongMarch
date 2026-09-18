@@ -1,7 +1,10 @@
-#pragma once
+#ifndef SPARKIUM_SHADER_SHADOW_RAY_HLSLI_
+#define SPARKIUM_SHADER_SHADOW_RAY_HLSLI_
+#ifndef SPARKIUM_PORTABLE
 #include "bindings.hlsli"
+#endif
 
-#ifdef SPARKIUM_SOFTWARE_RT
+#if defined(SPARKIUM_PORTABLE) || defined(SPARKIUM_SOFTWARE_RT)
 float ShadowRayNoAlpha(float3 origin, float3 direction, float dist);
 float ShadowRay(float3 origin, float3 direction, float dist);
 #else
@@ -48,3 +51,5 @@ float ShadowRay(float3 origin, float3 direction, float dist) {
 }
 
 #endif
+
+#endif  // SPARKIUM_SHADER_SHADOW_RAY_HLSLI_

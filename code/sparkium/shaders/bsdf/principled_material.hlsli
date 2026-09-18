@@ -1,4 +1,5 @@
-#pragma once
+#ifndef SPARKIUM_SHADER_BSDF_PRINCIPLED_MATERIAL_HLSLI_
+#define SPARKIUM_SHADER_BSDF_PRINCIPLED_MATERIAL_HLSLI_
 #include "principled_util.hlsli"
 
 #define CLOSURE_COUNT 6
@@ -44,3 +45,5 @@ class PrincipledMaterial {
   float transmission;
   float transmission_roughness;
 };
+
+#endif  // SPARKIUM_SHADER_BSDF_PRINCIPLED_MATERIAL_HLSLI_

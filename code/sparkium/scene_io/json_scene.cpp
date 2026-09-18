@@ -15,6 +15,7 @@
 #include "rapidjson/error/en.h"
 #include "rapidjson/istreamwrapper.h"
 #include "sparkium/core/core.h"
+#include "stb_image.h"
 
 namespace sparkium {
 namespace {
@@ -661,6 +662,47 @@ GraphSurface EvaluateShaderGraph(HitRecord hit_record, float3 view_direction, in
 };
 }  // namespace
 
+void JsonScene::LoadTexture(Core *core, const std::filesystem::path &texture_path, graphics::Image **image_out) {
+  int w = 0, h = 0, c = 0;
+  if (auto data = stbi_load(texture_path.string().c_str(), &w, &h, &c, 4)) {
+    std::unique_ptr<graphics::Image> image;
+    if (core->GraphicsCore()->CreateImage(w, h, graphics::IMAGE_FORMAT_R8G8B8A8_UNORM, &image) != 0)
+      throw std::runtime_error("cannot create texture image: " + texture_path.string());
+    image->UploadData(data);
+    auto host = std::make_unique<HostImageData>();
+    host->width = w;
+    host->height = h;
+    host->format = graphics::IMAGE_FORMAT_R8G8B8A8_UNORM;
+    host->pixels.assign(data, data + static_cast<size_t>(w) * h * 4);
+    stbi_image_free(data);
+    *image_out = image.get();
+    host_images_[image.get()] = host.get();
+    host_image_storage_.push_back(std::move(host));
+    images_.push_back(std::move(image));
+    return;
+  }
+  if (auto data = stbi_loadf(texture_path.string().c_str(), &w, &h, &c, 4)) {
+    std::unique_ptr<graphics::Image> image;
+    if (core->GraphicsCore()->CreateImage(w, h, graphics::IMAGE_FORMAT_R32G32B32A32_SFLOAT, &image) != 0)
+      throw std::runtime_error("cannot create texture image: " + texture_path.string());
+    image->UploadData(data);
+    auto host = std::make_unique<HostImageData>();
+    host->width = w;
+    host->height = h;
+    host->format = graphics::IMAGE_FORMAT_R32G32B32A32_SFLOAT;
+    const size_t byte_count = static_cast<size_t>(w) * h * 4 * sizeof(float);
+    host->pixels.resize(byte_count);
+    std::memcpy(host->pixels.data(), data, byte_count);
+    stbi_image_free(data);
+    *image_out = image.get();
+    host_images_[image.get()] = host.get();
+    host_image_storage_.push_back(std::move(host));
+    images_.push_back(std::move(image));
+    return;
+  }
+  throw std::runtime_error("cannot load texture: " + texture_path.string());
+}
+
 std::unique_ptr<JsonScene> JsonScene::Load(Core *core, const std::filesystem::path &input_path, std::string *error) {
   try {
     auto path = std::filesystem::absolute(input_path).lexically_normal();
@@ -805,12 +847,8 @@ std::unique_ptr<JsonScene> JsonScene::Load(Core *core, const std::filesystem::pa
           for (auto [slot, destination] : slots) {
             if (!textures.HasMember(slot))
               continue;
-            auto image = std::unique_ptr<graphics::Image>{};
             auto asset = Resolve(path, ReadString(textures[slot]));
-            if (graphics::LoadImageFromFile(core->GraphicsCore(), asset.string(), &image) != 0)
-              throw std::runtime_error("cannot load texture: " + asset.string());
-            *destination = image.get();
-            result->images_.push_back(std::move(image));
+            result->LoadTexture(core, asset, destination);
           }
           principled->textures.normal_reverse_y = BoolMember(textures, "normal_reverse_y", false);
         }
@@ -825,12 +863,10 @@ std::unique_ptr<JsonScene> JsonScene::Load(Core *core, const std::filesystem::pa
               std::string(ReadString(node->value["type"])) != "image_texture")
             continue;
           auto asset = Resolve(path, ReadString(Member(node->value, "path")));
-          auto image = std::unique_ptr<graphics::Image>{};
-          if (graphics::LoadImageFromFile(core->GraphicsCore(), asset.string(), &image) != 0)
-            throw std::runtime_error("cannot load shader graph texture: " + asset.string());
+          graphics::Image *image = nullptr;
+          result->LoadTexture(core, asset, &image);
           texture_slots[ReadString(node->name)] = static_cast<int>(textures.size());
-          textures.push_back(image.get());
-          result->images_.push_back(std::move(image));
+          textures.push_back(image);
         }
         auto code = ShaderGraphCompiler(graph, texture_slots).Compile();
         material = std::make_unique<MaterialShaderGraph>(core, code, textures, Vec3Member(spec, "emission_hint"));

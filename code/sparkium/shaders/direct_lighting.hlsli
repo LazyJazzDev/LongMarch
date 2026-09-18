@@ -1,5 +1,8 @@
-#pragma once
+#ifndef SPARKIUM_SHADER_DIRECT_LIGHTING_HLSLI_
+#define SPARKIUM_SHADER_DIRECT_LIGHTING_HLSLI_
+#ifndef SPARKIUM_PORTABLE
 #include "bindings.hlsli"
+#endif
 #include "shadow_ray.hlsli"
 #include "random.hlsli"
 #include "light/point/sampler.hlsli"
@@ -21,7 +24,10 @@ void LightSampler(int shader_index, inout SampleDirectLightingPayload payload) {
     // From what we know, calling a callable shader from closest hit shader is very slow.
     // So we only support a few hard-coded light samplers here.
     // Better to inline the light sampler code here if you want to support more light types.
-#ifndef SPARKIUM_SOFTWARE_RT
+#if defined(SPARKIUM_PORTABLE)
+    payload.low = uint4(0, 0, 0, asuint(0.0f));
+    payload.high = uint4(0, 0, 0, asuint(0.0f));
+#elif !defined(SPARKIUM_SOFTWARE_RT)
     CallShader(shader_index, payload);
 #else
     payload.low = uint4(0, 0, 0, asuint(0.0f));
@@ -101,3 +107,5 @@ float PowerHeuristic(float base, float ref) {
   }
   return (base * base) / (base * base + ref * ref);
 }
+
+#endif  // SPARKIUM_SHADER_DIRECT_LIGHTING_HLSLI_

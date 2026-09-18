@@ -3,6 +3,10 @@
 
 #include "grassland/graphics/graphics_util.h"
 
+inline bool IsPortableComputeBackend(const std::string &name) {
+  return name == "cpu" || name == "cuda";
+}
+
 inline grassland::graphics::BackendAPI ParseSparkiumBackend(const std::string &name) {
   using namespace grassland::graphics;
   BackendAPI api;

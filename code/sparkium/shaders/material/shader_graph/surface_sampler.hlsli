@@ -1,5 +1,8 @@
-#pragma once
+#ifndef SPARKIUM_SHADER_MATERIAL_SHADER_GRAPH_SURFACE_SAMPLER_HLSLI_
+#define SPARKIUM_SHADER_MATERIAL_SHADER_GRAPH_SURFACE_SAMPLER_HLSLI_
+#ifndef SPARKIUM_PORTABLE
 #include "bindings.hlsli"
+#endif
 #include "bsdf/principled_material.hlsli"
 #include "buffer_helper.hlsli"
 #include "direct_lighting.hlsli"
@@ -306,3 +309,5 @@ float GraphShadowOpacity(GraphSurface graph) {
   float shadow_opacity = graph.shadow_opacity >= 0.0f ? graph.shadow_opacity : graph.opacity;
   return shadow_opacity * (1.0f - random_walk_weight);
 }
+
+#endif  // SPARKIUM_SHADER_MATERIAL_SHADER_GRAPH_SURFACE_SAMPLER_HLSLI_

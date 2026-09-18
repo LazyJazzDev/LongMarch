@@ -1,4 +1,5 @@
-#pragma once
+#ifndef SPARKIUM_SHADER_MATERIAL_LIGHT_EVALUATOR_HLSLI_
+#define SPARKIUM_SHADER_MATERIAL_LIGHT_EVALUATOR_HLSLI_
 #include "material/light/eval_direct_light.hlsli"
 template <class BufferType>
 class MaterialEvaluator {
@@ -20,3 +21,5 @@ class MaterialEvaluator {
     return MaterialLightEvaluateDirectLighting(material_data, position, primitive_sample);
   }
 };
+
+#endif  // SPARKIUM_SHADER_MATERIAL_LIGHT_EVALUATOR_HLSLI_

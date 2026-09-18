@@ -1,4 +1,5 @@
-#pragma once
+#ifndef SPARKIUM_SHADER_GEOMETRY_MESH_SAMPLE_PRIMITIVE_HLSLI_
+#define SPARKIUM_SHADER_GEOMETRY_MESH_SAMPLE_PRIMITIVE_HLSLI_
 #include "common.hlsli"
 
 template <class BufferType>
@@ -34,3 +35,5 @@ GeometryPrimitiveSample MeshSamplePrimitive(BufferType geometry_data, float3x4 t
   sample_result.pdf = 1.0f / (length(cross(pos[1] - pos[0], pos[2] - pos[0])) * 0.5f);
   return sample_result;
 }
+
+#endif  // SPARKIUM_SHADER_GEOMETRY_MESH_SAMPLE_PRIMITIVE_HLSLI_

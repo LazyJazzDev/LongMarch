@@ -7,6 +7,11 @@ namespace sparkium::raytracing {
 // Geometry/light/material registration is shared with DXR/Vulkan pipeline RT.
 class SoftwarePipeline {
  public:
+  // Same stripped code emitted into the generated compute renderer
+  // (preprocessor directives removed). Shared with the portable CPU/CUDA
+  // transpiler so both consume identical material sampler sources.
+  static std::string SharedMaterialSource(const CodeLines &source);
+
   explicit SoftwarePipeline(Core *core, bool ray_query = false);
   void ClearInstances();
   void AddInstance(Geometry *geometry, Material *material, const glm::mat4x3 &transform, uint32_t geometry_index);

@@ -1,7 +1,11 @@
+#ifndef SPARKIUM_SHADER_CAMERA_HLSL_
+#define SPARKIUM_SHADER_CAMERA_HLSL_
+#ifndef SPARKIUM_PORTABLE
 #include "bindings.hlsli"
+#endif
 #include "common.hlsli"
 
-#ifndef SPARKIUM_SOFTWARE_RT
+#if !defined(SPARKIUM_SOFTWARE_RT) && !defined(SPARKIUM_PORTABLE)
 [shader("callable")]
 #endif
 void CameraPinhole(inout RayGenPayload raygen_payload) {
@@ -42,3 +46,4 @@ void CameraPinhole(inout RayGenPayload raygen_payload) {
   raygen_payload.origin = mul(camera_to_world, float4(raygen_payload.origin, 1.0)).xyz;
   raygen_payload.direction = normalize(mul(camera_to_world, float4(raygen_payload.direction, 0.0)).xyz);
 }
+#endif  // SPARKIUM_SHADER_CAMERA_HLSL_

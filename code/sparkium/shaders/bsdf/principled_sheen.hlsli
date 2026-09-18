@@ -1,4 +1,5 @@
-#pragma once
+#ifndef SPARKIUM_SHADER_BSDF_PRINCIPLED_SHEEN_HLSLI_
+#define SPARKIUM_SHADER_BSDF_PRINCIPLED_SHEEN_HLSLI_
 
 struct PrincipledSheenBsdf {
   Spectrum weight;
@@ -84,3 +85,5 @@ int bsdf_principled_sheen_sample(const PrincipledSheenBsdf bsdf,
   }
   return LABEL_REFLECT | LABEL_DIFFUSE;
 }
+
+#endif  // SPARKIUM_SHADER_BSDF_PRINCIPLED_SHEEN_HLSLI_

@@ -113,9 +113,10 @@ void Core::LoadPublicShaders() {
 void Core::LoadPublicBuffers() {
   auto path = FindAssetFile("data/new-joe-kuo-7.21201");
   auto data = SobolTableGen(65536, 1024, path);
+  sobol_table_ = std::move(data);
   std::unique_ptr<graphics::Buffer> buffer;
-  core_->CreateBuffer(data.size() * sizeof(float), graphics::BUFFER_TYPE_STATIC, &buffer);
-  buffer->UploadData(data.data(), data.size() * sizeof(float));
+  core_->CreateBuffer(sobol_table_.size() * sizeof(float), graphics::BUFFER_TYPE_STATIC, &buffer);
+  buffer->UploadData(sobol_table_.data(), sobol_table_.size() * sizeof(float));
   SetPublicResource("sobol", std::move(buffer));
 }
 

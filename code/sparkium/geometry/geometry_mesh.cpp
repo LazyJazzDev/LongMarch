@@ -57,8 +57,9 @@ GeometryMesh::GeometryMesh(Core *core, const Mesh<float> &mesh) : Geometry(core)
 
   std::memcpy(data.data(), &header_, sizeof(header_));
 
-  core_->GraphicsCore()->CreateBuffer(data.size(), graphics::BUFFER_TYPE_STATIC, &geometry_buffer_);
-  geometry_buffer_->UploadData(data.data(), data.size());
+  data_ = std::move(data);
+  core_->GraphicsCore()->CreateBuffer(data_.size(), graphics::BUFFER_TYPE_STATIC, &geometry_buffer_);
+  geometry_buffer_->UploadData(data_.data(), data_.size());
   primitive_count_ = header_.num_indices / 3;
 }
 
@@ -72,6 +73,10 @@ graphics::Buffer *GeometryMesh::GetBuffer() const {
 
 const GeometryMesh::Header &GeometryMesh::GetHeader() const {
   return header_;
+}
+
+const std::vector<uint8_t> &GeometryMesh::GetData() const {
+  return data_;
 }
 
 }  // namespace sparkium

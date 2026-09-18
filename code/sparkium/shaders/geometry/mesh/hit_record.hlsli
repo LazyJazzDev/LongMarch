@@ -1,5 +1,8 @@
-#pragma once
+#ifndef SPARKIUM_SHADER_GEOMETRY_MESH_HIT_RECORD_HLSLI_
+#define SPARKIUM_SHADER_GEOMETRY_MESH_HIT_RECORD_HLSLI_
+#ifndef SPARKIUM_PORTABLE
 #include "bindings.hlsli"
+#endif
 #include "geometry/mesh/geometry_header.hlsli"
 
 HitRecord MakeMeshHitRecord(uint geometry_index,
@@ -119,3 +122,5 @@ HitRecord MakeMeshHitRecord(uint geometry_index,
 
   return hit_record;
 }
+
+#endif  // SPARKIUM_SHADER_GEOMETRY_MESH_HIT_RECORD_HLSLI_

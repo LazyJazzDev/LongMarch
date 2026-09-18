@@ -1,4 +1,5 @@
-#pragma once
+#ifndef SPARKIUM_SHADER_GEOMETRY_MESH_GEOMETRY_HEADER_HLSLI_
+#define SPARKIUM_SHADER_GEOMETRY_MESH_GEOMETRY_HEADER_HLSLI_
 struct GeometryHeader {
   uint num_vertices;
   uint num_indices;
@@ -16,3 +17,5 @@ struct GeometryHeader {
   uint color_offset;
   uint color_stride;
 };
+
+#endif  // SPARKIUM_SHADER_GEOMETRY_MESH_GEOMETRY_HEADER_HLSLI_

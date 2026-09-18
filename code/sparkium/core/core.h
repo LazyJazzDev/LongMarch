@@ -23,6 +23,10 @@ class Core : public Object {
 
   graphics::Image *GetImage(const std::string &name);
 
+  const std::vector<uint32_t> &SobolTable() const {
+    return sobol_table_;
+  }
+
   void SetPublicResource(const std::string &name, std::unique_ptr<graphics::Shader> &&shader);
   void SetPublicResource(const std::string &name, std::unique_ptr<graphics::ComputeProgram> &&program);
   void SetPublicResource(const std::string &name, std::unique_ptr<graphics::Buffer> &&buffer);
@@ -41,5 +45,6 @@ class Core : public Object {
   std::map<std::string, std::unique_ptr<graphics::ComputeProgram>> compute_programs_;
   std::map<std::string, std::unique_ptr<graphics::Buffer>> buffers_;
   std::map<std::string, std::unique_ptr<graphics::Image>> images_;
+  std::vector<uint32_t> sobol_table_;
 };
 }  // namespace sparkium

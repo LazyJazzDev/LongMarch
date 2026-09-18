@@ -1,4 +1,5 @@
-#pragma once
+#ifndef SPARKIUM_SHADER_COMMON_HLSLI_
+#define SPARKIUM_SHADER_COMMON_HLSLI_
 #include "constants.hlsli"
 
 struct RandomDevice {
@@ -69,6 +70,7 @@ struct RayGenPayload {
   float3 direction;
 };
 
+#ifndef SPARKIUM_PORTABLE
 struct RenderSettings {
   // Scene Settings
   int samples_per_dispatch;
@@ -86,6 +88,7 @@ struct RenderSettings {
   float gamma;
   float contrast;
 };
+#endif
 
 struct InstanceMetadata {
   int geometry_data_index;
@@ -136,3 +139,5 @@ void sample_cos_hemisphere(const float3 N,
   pdf = omega_in.z * INV_PI;
   omega_in = mul(omega_in, float3x3(T, B, N));
 }
+
+#endif  // SPARKIUM_SHADER_COMMON_HLSLI_

@@ -1,4 +1,5 @@
-#pragma once
+#ifndef SPARKIUM_SHADER_MATERIAL_LIGHT_EVAL_DIRECT_LIGHT_HLSLI_
+#define SPARKIUM_SHADER_MATERIAL_LIGHT_EVAL_DIRECT_LIGHT_HLSLI_
 template <class BufferType>
 float3 MaterialLightEvaluateDirectLighting(BufferType material_data, float3 position, GeometryPrimitiveSample primitive_sample) {
   float3 emission = LoadFloat3(material_data, 0);
@@ -14,3 +15,5 @@ float3 MaterialLightEvaluateDirectLighting(BufferType material_data, float3 posi
   }
   return float3(0.0f, 0.0f, 0.0f); // If back-facing, return zero contribution
 }
+
+#endif  // SPARKIUM_SHADER_MATERIAL_LIGHT_EVAL_DIRECT_LIGHT_HLSLI_

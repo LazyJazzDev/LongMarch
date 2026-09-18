@@ -1,6 +1,9 @@
-#pragma once
+#ifndef SPARKIUM_SHADER_RANDOM_HLSLI_
+#define SPARKIUM_SHADER_RANDOM_HLSLI_
 #include "constants.hlsli"
+#ifndef SPARKIUM_PORTABLE
 #include "bindings.hlsli"
+#endif
 
 
 uint WangHash(inout uint seed) {
@@ -70,3 +73,5 @@ float3 RandomInSphere(inout RandomDevice rd) {
 void SampleCosHemisphere(inout RandomDevice rd, const float3 N, out float3 omega_in, out float pdf) {
   sample_cos_hemisphere(N, RandomFloat(rd), RandomFloat(rd), omega_in, pdf);
 }
+
+#endif  // SPARKIUM_SHADER_RANDOM_HLSLI_

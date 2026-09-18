@@ -24,6 +24,17 @@ uint32_t LeafCount(size_t count) {
   return result;
 }
 std::string MaterialSource(const CodeLines &source) {
+  return SoftwarePipeline::SharedMaterialSource(source);
+}
+struct GPUInstance {
+  glm::mat4x3 object_to_world;
+  glm::mat4x3 world_to_object;
+  uint32_t root, geometry, material, primitive_count;
+};
+static_assert(sizeof(GPUInstance) == 112, "HLSL software instance layout changed");
+}  // namespace
+
+std::string SoftwarePipeline::SharedMaterialSource(const CodeLines &source) {
   std::istringstream input(static_cast<std::string>(source));
   std::string line, result;
   while (std::getline(input, line)) {
@@ -35,13 +46,6 @@ std::string MaterialSource(const CodeLines &source) {
   }
   return result;
 }
-struct GPUInstance {
-  glm::mat4x3 object_to_world;
-  glm::mat4x3 world_to_object;
-  uint32_t root, geometry, material, primitive_count;
-};
-static_assert(sizeof(GPUInstance) == 112, "HLSL software instance layout changed");
-}  // namespace
 
 SoftwarePipeline::SoftwarePipeline(Core *core, bool ray_query) : core_(core), ray_query_(ray_query) {
   if (ray_query_ && !core_->GraphicsCore()->DeviceRayQuerySupport())

@@ -15,9 +15,11 @@ using namespace long_march;
 namespace {
 void Usage(const char *program) {
   std::cerr << "Usage: " << program << " <scene.json> [-o image.png] [--frames N] "
-            << "[--backend auto|metal|vulkan|d3d12] [--pipeline auto|rasterization|ray_tracing|rt_fallback|ray_query] "
+            << "[--backend auto|metal|vulkan|d3d12|cpu|cuda] [--pipeline auto|rasterization|ray_tracing|rt_fallback|ray_query] "
                "[--require-hardware-rt] [--debug] [--profile "
                "timings.csv] [--profile-cpu-only|--profile-alternate-gpu]\n"
+            << "       cpu/cuda render through the portable path-tracing kernels and ignore "
+               "--pipeline/--profile options.\n"
             << "       " << program << " --list [scene-directory]\n";
 }
 
@@ -30,6 +32,49 @@ sparkium::RenderPipeline ParsePipeline(const std::string &name) {
   if (name == "rasterization") return sparkium::RENDER_PIPELINE_RASTERIZATION;
   if (name == "ray_tracing") return sparkium::RENDER_PIPELINE_RAY_TRACING;
   throw std::runtime_error("unknown pipeline: " + name);
+}
+
+// CPU/CUDA path: renders with the portable transpiled kernels (no graphics
+// device required for the rendering computation).
+int RunPortable(const std::filesystem::path &scene_path,
+                const std::filesystem::path &output,
+                int frames,
+                const std::string &backend_name) {
+  using namespace sparkium;
+  ComputeBackendKind kind = backend_name == "cuda" ? BACKEND_KIND_CUDA : BACKEND_KIND_HOST;
+  if (kind == BACKEND_KIND_CUDA && !portable::CudaAvailable())
+    throw std::runtime_error(
+        "CUDA backend requested but unavailable (built without CUDA or no usable CUDA device)");
+
+  std::unique_ptr<graphics::Core> graphics_core;
+  if (graphics::CreateCore(graphics::BACKEND_API_DEFAULT, graphics::Core::Settings{}, &graphics_core) != 0)
+    throw std::runtime_error("failed to create graphics core for asset upload");
+  if (graphics_core->InitializeLogicalDeviceAutoSelect(false) != 0)
+    throw std::runtime_error("failed to initialize graphics device for asset upload");
+  Core core(graphics_core.get());
+  std::string error;
+  auto loaded = JsonScene::Load(&core, scene_path, &error);
+  if (!loaded)
+    throw std::runtime_error(error);
+
+  auto *film = loaded->GetFilm();
+  const size_t pixel_count = size_t(film->GetWidth()) * film->GetHeight();
+  std::vector<float> accumulation_color(pixel_count * 4, 0.0f);
+  std::vector<float> accumulation_samples(pixel_count, 0.0f);
+  uint32_t seed = 0;
+  for (int frame = 0; frame < frames; ++frame) {
+    portable::RenderFrame(kind, loaded->GetScene(), loaded->GetCamera(), film, loaded->HostImages(),
+                          core.SobolTable(), &seed, accumulation_color, accumulation_samples);
+  }
+  std::vector<uint8_t> pixels;
+  portable::Develop(film, accumulation_color, accumulation_samples, pixels);
+  std::filesystem::create_directories(output.has_parent_path() ? output.parent_path() : ".");
+  if (!stbi_write_png(output.string().c_str(), film->GetWidth(), film->GetHeight(), 4, pixels.data(),
+                      film->GetWidth() * 4))
+    throw std::runtime_error("failed to write image: " + output.string());
+  std::cout << "Rendered '" << loaded->GetName() << "' (" << film->GetWidth() << 'x' << film->GetHeight() << ", "
+            << frames << " frame(s), backend " << backend_name << ") to " << output.string() << '\n';
+  return 0;
 }
 }  // namespace
 
@@ -50,6 +95,7 @@ int main(int argc, char **argv) {
     std::filesystem::path output = "output.png";
     int frames = 1;
     auto backend = graphics::BACKEND_API_DEFAULT;
+    std::string backend_name;
     std::filesystem::path profile_path;
     bool profile_cpu_only = false;
     bool profile_alternate_gpu = false;
@@ -61,8 +107,11 @@ int main(int argc, char **argv) {
       std::string argument = argv[i];
       if (argument == "--require-hardware-rt")
         require_hardware_rt = true;
-      else if (argument == "--backend" && i + 1 < argc)
-        backend = ParseSparkiumBackend(argv[++i]);
+      else if (argument == "--backend" && i + 1 < argc) {
+        backend_name = argv[++i];
+        if (!IsPortableComputeBackend(backend_name))
+          backend = ParseSparkiumBackend(backend_name);
+      }
       else if (argument == "--debug")
         debug = true;
       else if ((argument == "-o" || argument == "--output") && i + 1 < argc)
@@ -86,6 +135,16 @@ int main(int argc, char **argv) {
     if (profile_cpu_only && profile_alternate_gpu)
       throw std::runtime_error("choose one profiling mode");
     if (frames <= 0) throw std::runtime_error("--frames must be positive");
+
+    if (IsPortableComputeBackend(backend_name)) {
+      if (require_hardware_rt)
+        throw std::runtime_error("--require-hardware-rt does not apply to portable backends");
+      if (!profile_path.empty())
+        throw std::runtime_error("--profile does not apply to portable backends");
+      if (override_pipeline)
+        std::cerr << "sparkium_cli: --pipeline is ignored with --backend " << backend_name << '\n';
+      return RunPortable(scene_path, output, frames, backend_name);
+    }
 
     std::unique_ptr<graphics::Core> graphics_core;
     if (graphics::CreateCore(backend, graphics::Core::Settings{2, debug}, &graphics_core) != 0)

@@ -1,5 +1,6 @@
 add_subdirectory(raster)
 add_subdirectory(raytracing)
+add_subdirectory(portable)
 
 file(GLOB SOURCES "*.cpp" "*.h")
 

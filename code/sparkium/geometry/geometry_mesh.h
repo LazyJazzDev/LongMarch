@@ -1,4 +1,7 @@
 #pragma once
+#include <cstdint>
+#include <vector>
+
 #include "sparkium/core/geometry.h"
 
 namespace sparkium {
@@ -28,9 +31,13 @@ class GeometryMesh : public Geometry {
   int PrimitiveCount() override;
   graphics::Buffer *GetBuffer() const;
   const Header &GetHeader() const;
+  // Raw serialized mesh payload (header, indices, vertex streams), kept for
+  // backends that do not consume graphics::Buffer objects (CPU/CUDA).
+  const std::vector<uint8_t> &GetData() const;
 
  private:
   Header header_{};
+  std::vector<uint8_t> data_;
   std::unique_ptr<graphics::Buffer> geometry_buffer_;
   int primitive_count_;
 };

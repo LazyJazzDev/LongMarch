@@ -1,5 +1,8 @@
-#pragma once
+#ifndef SPARKIUM_SHADER_LIGHT_POINT_SAMPLER_HLSLI_
+#define SPARKIUM_SHADER_LIGHT_POINT_SAMPLER_HLSLI_
+#ifndef SPARKIUM_PORTABLE
 #include "bindings.hlsli"
+#endif
 #include "common.hlsli"
 
 void PointLightSampler(inout SampleDirectLightingPayload payload) {
@@ -84,3 +87,5 @@ void PointLightSampler(inout SampleDirectLightingPayload payload) {
   payload.high.xyz = asuint(omega_in);
   payload.high.w = asuint(pdf);
 }
+
+#endif  // SPARKIUM_SHADER_LIGHT_POINT_SAMPLER_HLSLI_

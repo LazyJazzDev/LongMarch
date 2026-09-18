@@ -1,4 +1,5 @@
-#pragma once
+#ifndef SPARKIUM_SHADER_BUFFER_HELPER_HLSLI_
+#define SPARKIUM_SHADER_BUFFER_HELPER_HLSLI_
 template <class BufferType>
 float4 LoadFloat4(BufferType buf, uint baseOffset) {
     uint4 vals = buf.Load4(baseOffset); // 16 bytes per float4
@@ -225,3 +226,5 @@ StreamedBufferReference<BufferType> MakeStreamedBufferReference(BufferType buffe
         buf.m_offset = offset;
         return buf;
 }
+
+#endif  // SPARKIUM_SHADER_BUFFER_HELPER_HLSLI_

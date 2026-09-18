@@ -1,5 +1,8 @@
-#pragma once
+#ifndef SPARKIUM_SHADER_LIGHT_GEOMETRY_MATERIAL_SAMPLER_HLSLI_
+#define SPARKIUM_SHADER_LIGHT_GEOMETRY_MATERIAL_SAMPLER_HLSLI_
+#ifndef SPARKIUM_PORTABLE
 #include "bindings.hlsli"
+#endif
 #include "common.hlsli"
 #include "geometry/mesh/sample_primitive.hlsli"
 #include "material/light/eval_direct_light.hlsli"
@@ -57,3 +60,5 @@ void MeshLightSampler(int shader_index, inout SampleDirectLightingPayload payloa
   payload.high.xyz = asuint(omega_in);
   payload.high.w = asuint(pdf);
 }
+
+#endif  // SPARKIUM_SHADER_LIGHT_GEOMETRY_MATERIAL_SAMPLER_HLSLI_

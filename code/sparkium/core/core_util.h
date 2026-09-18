@@ -67,4 +67,13 @@ typedef enum RenderPipeline {
   RENDER_PIPELINE_RAY_QUERY = 4     // Compute path tracing with native acceleration structures
 } RenderPipeline;
 
+// Execution backends for the shared portable path-tracing kernels. The
+// kernels are generated from the same HLSL-style sources used by the GPU
+// pipelines; BACKEND_KIND_HOST runs them on the CPU and BACKEND_KIND_CUDA
+// runs them as native CUDA kernels.
+typedef enum ComputeBackendKind {
+  BACKEND_KIND_HOST = 0,
+  BACKEND_KIND_CUDA = 1
+} ComputeBackendKind;
+
 }  // namespace sparkium

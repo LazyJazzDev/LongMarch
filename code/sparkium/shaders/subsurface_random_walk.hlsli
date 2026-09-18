@@ -1,4 +1,5 @@
-#pragma once
+#ifndef SPARKIUM_SHADER_SUBSURFACE_RANDOM_WALK_HLSLI_
+#define SPARKIUM_SHADER_SUBSURFACE_RANDOM_WALK_HLSLI_
 
 #include "bsdf/principled_util.hlsli"
 
@@ -120,3 +121,5 @@ bool ContinueSubsurfaceRandomWalk(inout RenderContext context,
   context.medium_sample_distance = INF;
   return false;
 }
+
+#endif  // SPARKIUM_SHADER_SUBSURFACE_RANDOM_WALK_HLSLI_

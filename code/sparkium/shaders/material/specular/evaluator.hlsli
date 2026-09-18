@@ -1,4 +1,5 @@
-#pragma once
+#ifndef SPARKIUM_SHADER_MATERIAL_SPECULAR_EVALUATOR_HLSLI_
+#define SPARKIUM_SHADER_MATERIAL_SPECULAR_EVALUATOR_HLSLI_
 #include "common.hlsli"
 
 template <class BufferType>
@@ -14,3 +15,5 @@ class MaterialEvaluator {
     return float3(0.0f, 0.0f, 0.0f); // Return zero contribution
   }
 };
+
+#endif  // SPARKIUM_SHADER_MATERIAL_SPECULAR_EVALUATOR_HLSLI_

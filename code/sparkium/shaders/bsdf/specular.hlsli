@@ -1,4 +1,5 @@
-#pragma once
+#ifndef SPARKIUM_SHADER_BSDF_SPECULAR_HLSLI_
+#define SPARKIUM_SHADER_BSDF_SPECULAR_HLSLI_
 
 void SampleSpecularBSDF(float3 base_color, float3 direction, float3 normal, float3 geom_normal, out float3 eval, out float3 L, out float pdf) {
   L = reflect(direction, normal);
@@ -9,3 +10,5 @@ void SampleSpecularBSDF(float3 base_color, float3 direction, float3 normal, floa
     eval = float3(0, 0, 0);
   }
 }
+
+#endif  // SPARKIUM_SHADER_BSDF_SPECULAR_HLSLI_

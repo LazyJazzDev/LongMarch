@@ -1,4 +1,5 @@
-#pragma once
+#ifndef SPARKIUM_SHADER_BSDF_LAMBERTIAN_HLSLI_
+#define SPARKIUM_SHADER_BSDF_LAMBERTIAN_HLSLI_
 #include "random.hlsli"
 
 float3 EvalLambertianBSDF(float3 base_color, float3 N, float3 L, out float pdf) {
@@ -20,3 +21,5 @@ void SampleLambertianBSDF(float3 base_color,
     eval = float3(0, 0, 0);
   }
 }
+
+#endif  // SPARKIUM_SHADER_BSDF_LAMBERTIAN_HLSLI_

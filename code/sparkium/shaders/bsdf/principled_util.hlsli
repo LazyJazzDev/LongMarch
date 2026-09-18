@@ -1,9 +1,13 @@
-#pragma once
+#ifndef SPARKIUM_SHADER_BSDF_PRINCIPLED_UTIL_HLSLI_
+#define SPARKIUM_SHADER_BSDF_PRINCIPLED_UTIL_HLSLI_
 #include "common.hlsli"
 #ifndef Spectrum
 #define Spectrum float3
 #endif
 
+#ifndef SPARKIUM_PORTABLE
+// In the portable (CPU/CUDA) compilation the floatN constructors already
+// cover these and CUDA predefines ::make_float3, so the helpers are skipped.
 float3 make_float3(float v) {
   return float3(v, v, v);
 }
@@ -11,6 +15,7 @@ float3 make_float3(float v) {
 float3 make_float3(float x, float y, float z) {
   return float3(x, y, z);
 }
+#endif  // !SPARKIUM_PORTABLE
 
 #define LABEL_NONE 0
 #define LABEL_TRANSMIT 1
@@ -232,3 +237,5 @@ float fast_erff(float x) {
   const float v = u * u; /* ^16 */
   return copysignf(1.0f - 1.0f / v, x);
 }
+
+#endif  // SPARKIUM_SHADER_BSDF_PRINCIPLED_UTIL_HLSLI_
