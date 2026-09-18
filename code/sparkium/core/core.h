@@ -13,6 +13,15 @@ class Core : public Object {
 
   void Render(Scene *scene, Camera *camera, Film *film, RenderPipeline render_pipeline = RENDER_PIPELINE_AUTO);
 
+  // Selects how the CPU pipeline evaluates shader graphs. Ignored by the other
+  // pipelines, which compile them with DXC at runtime.
+  void SetGraphEngine(GraphEngine engine) {
+    graph_engine_ = engine;
+  }
+  GraphEngine GetGraphEngine() const {
+    return graph_engine_;
+  }
+
   const VirtualFileSystem &GetShadersVFS() const;
 
   graphics::Shader *GetShader(const std::string &name);
@@ -34,6 +43,7 @@ class Core : public Object {
   void LoadPublicImages();
 
   graphics::Core *core_{nullptr};
+  GraphEngine graph_engine_{GRAPH_ENGINE_INTERPRETER};
 
   VirtualFileSystem shaders_vfs_;
 

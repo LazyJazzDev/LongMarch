@@ -406,14 +406,14 @@ GraphSurface EvaluateShaderGraph(HitRecord hit_record, float3 view_direction, in
     } else if (type == "noise_texture") {
       auto vector = Input(node, "vector", "float4(hit_record.object_position,0)");
       auto scale = Input(node, "scale", "float4(5,5,5,5)");
-      expression = "GraphNoise((" + vector + ").xyz*(" + scale + ").x).xxxx";
+      expression = "SPARKIUM_SPLAT4(GraphNoise((" + vector + ").xyz*(" + scale + ").x))";
     } else if (type == "voronoi_texture") {
       auto vector = Input(node, "vector", "float4(hit_record.object_position,0)");
       auto scale = Input(node, "scale", "float4(5,5,5,5)");
-      expression = "GraphVoronoi((" + vector + ").xyz*(" + scale + ").x).xxxx";
+      expression = "SPARKIUM_SPLAT4(GraphVoronoi((" + vector + ").xyz*(" + scale + ").x))";
     } else if (type == "gradient_texture") {
       auto vector = Input(node, "vector", "float4(hit_record.object_position,0)");
-      expression = "(" + vector + ").xxxx";
+      expression = "SPARKIUM_SPLAT4(" + vector + ")";
     } else if (type == "wave_texture") {
       auto vector = Input(node, "vector", "float4(hit_record.object_position,0)");
       auto scale = Input(node, "scale", "float4(5,5,5,5)");
@@ -433,7 +433,7 @@ GraphSurface EvaluateShaderGraph(HitRecord hit_record, float3 view_direction, in
       else
         coordinate = "(" + p + ").x";
       coordinate = "(" + coordinate + "+(" + distortion + ").x*GraphNoise(" + p + ")+(" + phase + ").x)";
-      expression = "(0.5f+0.5f*sin(" + coordinate + "*6.283185307f)).xxxx";
+      expression = "SPARKIUM_SPLAT4(0.5f+0.5f*sin(" + coordinate + "*6.283185307f))";
     } else if (type == "sky_texture") {
       auto vector = Input(node, "vector", "float4(0,0,1,0)");
       auto sun = node.HasMember("sun_direction") ? Literal(node["sun_direction"]) : "float4(0,1,0,0)";
@@ -446,16 +446,16 @@ GraphSurface EvaluateShaderGraph(HitRecord hit_record, float3 view_direction, in
       if (output == "alpha")
         expression = "float4(1,1,1,1)";
       else if (output == "factor")
-        expression = "hit_record.color.xxxx";
+        expression = "SPARKIUM_SPLAT4(hit_record.color)";
       else
         expression = "float4(hit_record.color,1)";
     } else if (type == "object_info") {
       if (output == "location")
         expression = "float4(hit_record.object_origin,0)";
       else if (output == "object_index" || output == "material_index")
-        expression = "float(hit_record.object_index).xxxx";
+        expression = "SPARKIUM_SPLAT4(float(hit_record.object_index))";
       else if (output == "random")
-        expression = "GraphHash(float3(hit_record.object_index,17,31)).xxxx";
+        expression = "SPARKIUM_SPLAT4(GraphHash(float3(hit_record.object_index,17,31)))";
       else
         expression = "float4(1,1,1,1)";
     } else if (type == "geometry_info") {
@@ -466,22 +466,22 @@ GraphSurface EvaluateShaderGraph(HitRecord hit_record, float3 view_direction, in
       else if (output == "incoming")
         expression = "float4(-view_direction,0)";
       else if (output == "backfacing")
-        expression = "(hit_record.front_facing?0.0f:1.0f).xxxx";
+        expression = "SPARKIUM_SPLAT4(hit_record.front_facing?0.0f:1.0f)";
       else
         expression = zero;
     } else if (type == "light_path") {
       if (output == "is_camera_ray")
-        expression = "(!is_shadow_ray&&ray_type==RAY_TYPE_CAMERA?1.0f:0.0f).xxxx";
+        expression = "SPARKIUM_SPLAT4(!is_shadow_ray&&ray_type==RAY_TYPE_CAMERA?1.0f:0.0f)";
       else if (output == "is_shadow_ray")
-        expression = "(is_shadow_ray?1.0f:0.0f).xxxx";
+        expression = "SPARKIUM_SPLAT4(is_shadow_ray?1.0f:0.0f)";
       else if (output == "is_reflection_ray")
-        expression = "(!is_shadow_ray&&ray_type==RAY_TYPE_REFLECTION?1.0f:0.0f).xxxx";
+        expression = "SPARKIUM_SPLAT4(!is_shadow_ray&&ray_type==RAY_TYPE_REFLECTION?1.0f:0.0f)";
       else if (output == "is_transmission_ray")
-        expression = "(!is_shadow_ray&&ray_type==RAY_TYPE_TRANSMISSION?1.0f:0.0f).xxxx";
+        expression = "SPARKIUM_SPLAT4(!is_shadow_ray&&ray_type==RAY_TYPE_TRANSMISSION?1.0f:0.0f)";
       else if (output == "is_glossy_ray" || output == "is_diffuse_ray" || output == "is_singular_ray")
-        expression = "(!is_shadow_ray&&ray_type==RAY_TYPE_REFLECTION?1.0f:0.0f).xxxx";
+        expression = "SPARKIUM_SPLAT4(!is_shadow_ray&&ray_type==RAY_TYPE_REFLECTION?1.0f:0.0f)";
       else if (output == "ray_length")
-        expression = "hit_record.t.xxxx";
+        expression = "SPARKIUM_SPLAT4(hit_record.t)";
       else
         expression = zero;
     } else if (type == "invert") {
@@ -547,7 +547,7 @@ GraphSurface EvaluateShaderGraph(HitRecord hit_record, float3 view_direction, in
         scalar = "floor(" + x + ")";
       else
         scalar = x + "+" + y;
-      expression = "(" + scalar + ").xxxx";
+      expression = "SPARKIUM_SPLAT4(" + scalar + ")";
     } else if (type == "color_ramp") {
       auto factor = Input(node, "factor", zero);
       if (!node.HasMember("elements") || !node["elements"].IsArray() || node["elements"].Empty())
@@ -601,13 +601,13 @@ GraphSurface EvaluateShaderGraph(HitRecord hit_record, float3 view_direction, in
       auto blend = Input(node, "blend", "float4(0.5,0.5,0.5,0.5)");
       if (output == "facing")
         expression =
-            "(1.0f-abs(dot(normalize(hit_record.normal),normalize("
-            "view_direction)))).xxxx";
+            "SPARKIUM_SPLAT4(1.0f-abs(dot(normalize(hit_record.normal),normalize("
+            "view_direction))))";
       else
         expression =
-            "pow(1.0f-saturate(abs(dot(normalize(hit_record.normal),"
+            "SPARKIUM_SPLAT4(pow(1.0f-saturate(abs(dot(normalize(hit_record.normal),"
             "normalize(view_direction)))),max(0.01f,(" +
-            blend + ").x*5.0f)).xxxx";
+            blend + ").x*5.0f)))";
     } else if (type == "normal_map") {
       auto c = Input(node, "color", "float4(0.5,0.5,1,1)");
       auto strength = Input(node, "strength", one);
@@ -625,8 +625,8 @@ GraphSurface EvaluateShaderGraph(HitRecord hit_record, float3 view_direction, in
     } else if (type == "separate") {
       auto c = Input(node, "color", zero);
       int component = (output == "green" || output == "y") ? 1 : (output == "blue" || output == "z") ? 2 : 0;
-      const char *swizzle = component == 1 ? ".yyyy" : component == 2 ? ".zzzz" : ".xxxx";
-      expression = "(" + c + ")" + swizzle;
+      const char *channel = component == 1 ? "y" : component == 2 ? "z" : "x";
+      expression = "SPARKIUM_SPLAT4((" + c + ")." + channel + ")";
     } else if (type == "passthrough") {
       expression = Input(node, "value", zero);
     } else if (type == "invert_y") {

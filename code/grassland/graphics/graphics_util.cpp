@@ -13,6 +13,8 @@ const char *BackendAPIString(BackendAPI api) {
       return "Vulkan";
     case BACKEND_API_D3D12:
       return "D3D12";
+    case BACKEND_API_HOST:
+      return "host";
     default:
       return "Unknown";
   }
@@ -20,6 +22,9 @@ const char *BackendAPIString(BackendAPI api) {
 
 bool SupportBackendAPI(BackendAPI api) {
   switch (api) {
+    case BACKEND_API_HOST:
+      // The host backend needs no optional dependency, so it is always available.
+      return true;
 #if defined(LONGMARCH_METAL_ENABLED)
     case BACKEND_API_METAL: return true;
 #endif

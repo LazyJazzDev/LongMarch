@@ -1,5 +1,9 @@
 #include "sparkium/core/film.h"
 
+#include <vector>
+
+#include "sparkium/pipelines/raytracing/cpu/cpu_shaders.h"
+
 #include "grassland/graphics/frame_profile.h"
 #include "sparkium/core/core.h"
 
@@ -43,6 +47,24 @@ int Film::GetHeight() const {
 
 void Film::Develop(graphics::Image *targ_image) {
   graphics::CpuProfileScope develop_profile("develop");
+  if (core_->GraphicsCore()->API() == graphics::BACKEND_API_HOST) {
+    // The host backend has no compute shaders, so the same tone mapping runs on
+    // the CPU. The shader itself is unchanged; the CPU backend compiles it, so
+    // both paths apply identical maths.
+    const size_t pixels = static_cast<size_t>(extent_.width) * extent_.height;
+    std::vector<float> raw(pixels * 4);
+    raw_image_->DownloadData(raw.data());
+    std::vector<uint8_t> developed(pixels * 4);
+    raytracing::cpu::ToneMappingSettingsView settings;
+    settings.view_transform = info.view_transform;
+    settings.exposure = info.exposure;
+    settings.gamma = info.gamma;
+    settings.contrast = info.contrast;
+    raytracing::cpu::ToneMap(raytracing::cpu::TextureView{raw.data(), extent_.width, extent_.height, 4}, developed.data(),
+                             settings);
+    targ_image->UploadData(developed.data());
+    return;
+  }
   std::unique_ptr<graphics::CommandContext> cmd_context;
   core_->GraphicsCore()->CreateCommandContext(&cmd_context);
   graphics::GpuProfileScope tone_profile(cmd_context.get(), "tone_map");

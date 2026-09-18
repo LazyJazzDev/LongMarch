@@ -60,7 +60,7 @@ void EntityGeometryMaterial::Update(Scene *scene) {
   material_->Update(scene);
   int32_t light_index = scene->RegisterLight(light_geom_mat_.get());
   int32_t instance_index;
-  if (scene->SoftwareTracing()) {
+  if (scene->SoftwareTracing() || scene->CpuTracing()) {
     if (!dynamic_cast<GeometryMesh *>(geometry_))
       throw std::runtime_error("compute ray tracing currently requires triangle geometry");
     instance_index = scene->RegisterSoftwareInstance(geometry_, material_, entity_.GetTransformation(), light_index);

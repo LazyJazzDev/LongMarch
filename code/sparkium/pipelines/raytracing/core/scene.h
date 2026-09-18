@@ -1,5 +1,6 @@
 #pragma once
 #include "sparkium/pipelines/raytracing/core/core_util.h"
+#include "sparkium/pipelines/raytracing/core/cpu_pipeline.h"
 #include "sparkium/pipelines/raytracing/core/software_pipeline.h"
 
 namespace sparkium::raytracing {
@@ -8,7 +9,11 @@ class Scene : public Object {
  public:
   Scene(sparkium::Scene &scene);
 
-  void Render(Camera *camera, Film *film, bool software = false, bool ray_query = false);
+  void Render(Camera *camera, Film *film, bool software = false, bool ray_query = false, bool cpu = false);
+  // True while the CPU execution path owns rendering.
+  bool CpuTracing() const {
+    return cpu_tracing_;
+  }
   bool SoftwareTracing() const {
     return software_tracing_;
   }
@@ -60,9 +65,11 @@ class Scene : public Object {
  private:
   void UpdatePipeline(Camera *camera);
   bool software_tracing_{false};
+  bool cpu_tracing_{false};
   bool ray_query_{false};
   bool rendered_{false};
   std::unique_ptr<SoftwarePipeline> software_pipeline_;
+  std::unique_ptr<CpuPipeline> cpu_pipeline_;
   sparkium::Scene &scene_;
   Core *core_;
 

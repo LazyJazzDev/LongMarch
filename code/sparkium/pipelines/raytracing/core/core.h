@@ -32,5 +32,6 @@ void Render(sparkium::Core *core,
             sparkium::Camera *camera,
             sparkium::Film *film,
             bool software = false,
-            bool ray_query = false);
+            bool ray_query = false,
+            bool cpu = false);
 }  // namespace sparkium::raytracing

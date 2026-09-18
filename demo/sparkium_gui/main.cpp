@@ -17,6 +17,7 @@ const char *PipelineName(sparkium::RenderPipeline pipeline) {
       return "Path Tracing - Fallback";
     case sparkium::RENDER_PIPELINE_RASTERIZATION: return "Rasterization";
     case sparkium::RENDER_PIPELINE_RAY_TRACING: return "Path Tracing";
+    case sparkium::RENDER_PIPELINE_CPU: return "Path Tracing - CPU";
     default: return "Auto";
   }
 }
@@ -143,7 +144,7 @@ int main(int argc, char **argv) {
       if (ImGui::BeginCombo("Pipeline", pipeline_label)) {
         for (auto option : {sparkium::RENDER_PIPELINE_AUTO, sparkium::RENDER_PIPELINE_RASTERIZATION,
                             sparkium::RENDER_PIPELINE_RAY_TRACING, sparkium::RENDER_PIPELINE_RT_FALLBACK,
-                            sparkium::RENDER_PIPELINE_RAY_QUERY}) {
+                            sparkium::RENDER_PIPELINE_RAY_QUERY, sparkium::RENDER_PIPELINE_CPU}) {
           if (option == sparkium::RENDER_PIPELINE_RAY_TRACING && !graphics_core->DeviceRayTracingSupport())
             continue;
           if (option == sparkium::RENDER_PIPELINE_RAY_QUERY && !graphics_core->DeviceRayQuerySupport())
@@ -158,6 +159,25 @@ int main(int argc, char **argv) {
             ImGui::SetItemDefaultFocus();
         }
         ImGui::EndCombo();
+      }
+      if (core.GetGraphEngine() != sparkium::GRAPH_ENGINE_INTERPRETER ||
+          core.ResolveRenderPipeline(pipeline) == sparkium::RENDER_PIPELINE_CPU) {
+        // Only the CPU pipeline evaluates shader graphs at runtime, so this is
+        // the only case where the choice matters.
+        const char *engine_label = core.GetGraphEngine() == sparkium::GRAPH_ENGINE_JIT ? "JIT" : "Interpreter";
+        if (ImGui::BeginCombo("Shader graphs", engine_label)) {
+          for (auto option : {sparkium::GRAPH_ENGINE_INTERPRETER, sparkium::GRAPH_ENGINE_JIT}) {
+            const bool current = option == core.GetGraphEngine();
+            const char *label = option == sparkium::GRAPH_ENGINE_JIT ? "JIT" : "Interpreter";
+            if (ImGui::Selectable(label, current) && !current) {
+              core.SetGraphEngine(option);
+              loaded->GetFilm()->Reset();
+            }
+            if (current)
+              ImGui::SetItemDefaultFocus();
+          }
+          ImGui::EndCombo();
+        }
       }
       int &samples = loaded->GetScene()->settings.samples_per_dispatch;
       if (ImGui::SliderInt("Samples / frame", &samples, 1, 256)) loaded->GetFilm()->Reset();
