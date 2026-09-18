@@ -339,6 +339,11 @@ void Core::PybindClassRegistration(py::classh<Core> &c) {
 
 int CreateCore(BackendAPI api, const Core::Settings &settings, double_ptr<Core> pp_core) {
   switch (api) {
+    // The host backend is listed first so that it is never swallowed by the
+    // fallback `default:` label of whichever backend is the default one.
+    case BACKEND_API_HOST:
+      pp_core.construct<backend::HostCore>(settings);
+      break;
 #ifdef LONGMARCH_METAL_ENABLED
     case BACKEND_API_METAL:
       pp_core.construct<backend::MetalCore>(settings);

@@ -51,13 +51,18 @@ void WriteLeaf(uint slot, uint primitive) {
   }
   nodes.Store<SoftwareNode>((root + leaf_count - 1 + slot) * SOFTWARE_NODE_BYTES, n);
 }
-[numthreads(64, 1, 1)] void InitLeaves(uint3 id : SV_DispatchThreadID) {
-  if (id.x < leaf_count)
-    WriteLeaf(id.x, id.x);
-}[numthreads(64, 1, 1)] void ReduceNodes(uint3 id : SV_DispatchThreadID) {
-  if (id.x >= level_count)
+// Each pass is written as a plain function over one element, with the compute
+// entry point kept as a thin wrapper. The CPU backend replays the same passes
+// on the host instead of dispatching them.
+void InitLeavesKernel(uint index) {
+  if (index < leaf_count)
+    WriteLeaf(index, index);
+}
+
+void ReduceNodesKernel(uint index) {
+  if (index >= level_count)
     return;
-  uint index = level_first + id.x;
+  index += level_first;
   SoftwareNode n;
   n.first = root + index * 2 + 1;
   n.second = n.first + 1;
@@ -66,27 +71,39 @@ void WriteLeaf(uint slot, uint primitive) {
   n.hi = max(a.hi, b.hi);
   nodes.Store<SoftwareNode>((root + index) * SOFTWARE_NODE_BYTES, n);
 }
+
+#ifndef SPARKIUM_CPU_SHADER
+[numthreads(64, 1, 1)] void InitLeaves(uint3 id : SV_DispatchThreadID) {
+  InitLeavesKernel(id.x);
+}
+[numthreads(64, 1, 1)] void ReduceNodes(uint3 id : SV_DispatchThreadID) {
+  ReduceNodesKernel(id.x);
+}
+#endif
+
 uint SpreadBits(uint v) {
   v = (v | (v << 16)) & 0x030000ff;
   v = (v | (v << 8)) & 0x0300f00f;
   v = (v | (v << 4)) & 0x030c30c3;
   return (v | (v << 2)) & 0x09249249;
 }
-[numthreads(64, 1, 1)] void MortonKeys(uint3 id : SV_DispatchThreadID) {
-  if (id.x >= leaf_count)
+void MortonKeysKernel(uint index) {
+  if (index >= leaf_count)
     return;
   uint code = SOFTWARE_INVALID;
-  if (id.x < primitive_count) {
-    SoftwareNode n = LoadSoftwareNode(nodes, root + leaf_count - 1 + id.x);
+  if (index < primitive_count) {
+    SoftwareNode n = LoadSoftwareNode(nodes, root + leaf_count - 1 + index);
     SoftwareNode bounds = LoadSoftwareNode(nodes, root);
     float3 center = (n.lo + n.hi) * 0.5f;
     float3 extent = max(bounds.hi - bounds.lo, 1.0e-20f);
     uint3 p = (uint3)(saturate((center - bounds.lo) / extent) * 1023.0f);
     code = SpreadBits(p.x) | (SpreadBits(p.y) << 1) | (SpreadBits(p.z) << 2);
   }
-  keys.Store2(id.x * 8, uint2(code, id.x));
-}[numthreads(64, 1, 1)] void BitonicSort(uint3 id : SV_DispatchThreadID) {
-  uint i = id.x, j = i ^ sort_stride;
+  keys.Store2(index * 8, uint2(code, index));
+}
+
+void BitonicSortKernel(uint i) {
+  uint j = i ^ sort_stride;
   if (i >= leaf_count || j <= i)
     return;
   uint2 a = keys.Load2(i * 8), b = keys.Load2(j * 8);
@@ -96,7 +113,20 @@ uint SpreadBits(uint v) {
     keys.Store2(j * 8, a);
   }
 }
-[numthreads(64, 1, 1)] void SortLeaves(uint3 id : SV_DispatchThreadID) {
-  if (id.x < leaf_count)
-    WriteLeaf(id.x, keys.Load(id.x * 8 + 4));
+
+void SortLeavesKernel(uint index) {
+  if (index < leaf_count)
+    WriteLeaf(index, keys.Load(index * 8 + 4));
 }
+
+#ifndef SPARKIUM_CPU_SHADER
+[numthreads(64, 1, 1)] void MortonKeys(uint3 id : SV_DispatchThreadID) {
+  MortonKeysKernel(id.x);
+}
+[numthreads(64, 1, 1)] void BitonicSort(uint3 id : SV_DispatchThreadID) {
+  BitonicSortKernel(id.x);
+}
+[numthreads(64, 1, 1)] void SortLeaves(uint3 id : SV_DispatchThreadID) {
+  SortLeavesKernel(id.x);
+}
+#endif

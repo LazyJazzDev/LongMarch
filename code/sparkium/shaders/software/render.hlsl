@@ -17,7 +17,12 @@
 #ifdef SPARKIUM_SHADER_GRAPHS
 #include "material/shader_graph/surface_sampler.hlsli"
 #endif
+#ifndef SPARKIUM_CPU_SHADER
+// The GPU paths assemble the material dispatch at runtime and write it into the
+// shader VFS. The CPU backend knows its material set at compile time and
+// supplies SoftwareSampleMaterial / SoftwareShadowTransmission itself.
 #include "software_materials.hlsli"
+#endif
 
 HitRecord SoftwareHitRecord(SoftwareHit hit, float3 direction) {
   SoftwareInstance instance = LoadSoftwareInstance(software_instances, hit.instance);
@@ -37,9 +42,18 @@ void SoftwareTracePath(RayDesc ray, inout RenderContext context) {
 }
 #include "raygen.hlsl"
 #include "software/shadow.hlsli"
+
+// The dispatch is per-backend; the per-pixel work is shared. The CPU backend
+// calls this once for each pixel it owns.
+void RenderDispatch(uint2 id, uint2 extent) {
+  if (id.x < extent.x && id.y < extent.y)
+    RenderPixel(id, extent);
+}
+
+#ifndef SPARKIUM_CPU_SHADER
 [numthreads(8, 8, 1)] void Main(uint3 id : SV_DispatchThreadID) {
   uint width, height;
   accumulated_color.GetDimensions(width, height);
-  if (id.x < width && id.y < height)
-    RenderPixel(id.xy, uint2(width, height));
+  RenderDispatch(id.xy, uint2(width, height));
 }
+#endif

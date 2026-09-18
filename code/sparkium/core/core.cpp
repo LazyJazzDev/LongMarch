@@ -53,6 +53,9 @@ void Core::Render(Scene *scene, Camera *camera, Film *film, RenderPipeline rende
     case RENDER_PIPELINE_RT_FALLBACK:
       raytracing::Render(this, scene, camera, film, true);
       break;
+    case RENDER_PIPELINE_CPU:
+      raytracing::Render(this, scene, camera, film, false, false, true);
+      break;
     default:
       LogError("Unknown render pipeline");
   }

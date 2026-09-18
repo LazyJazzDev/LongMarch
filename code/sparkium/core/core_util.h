@@ -64,7 +64,16 @@ typedef enum RenderPipeline {
   RENDER_PIPELINE_RAY_TRACING = 1,
   RENDER_PIPELINE_AUTO = 2,
   RENDER_PIPELINE_RT_FALLBACK = 3,  // Compute BVH traversal without hardware ray tracing
-  RENDER_PIPELINE_RAY_QUERY = 4     // Compute path tracing with native acceleration structures
+  RENDER_PIPELINE_RAY_QUERY = 4,    // Compute path tracing with native acceleration structures
+  RENDER_PIPELINE_CPU = 5           // Path tracing on the host, no graphics device involved
 } RenderPipeline;
+
+// How the CPU pipeline evaluates shader graphs. The interpreter is always
+// available; the JIT needs a build with LLVM and Clang.
+typedef enum GraphEngine {
+  GRAPH_ENGINE_INTERPRETER = 0,
+  GRAPH_ENGINE_JIT = 1,
+  GRAPH_ENGINE_AUTO = 2  // the JIT when this build has it, the interpreter otherwise
+} GraphEngine;
 
 }  // namespace sparkium

@@ -1,9 +1,12 @@
 #include "sparkium/pipelines/raytracing/light/light_geometry_material.h"
 
+#include <vector>
+
 #include "sparkium/pipelines/raytracing/core/core.h"
 #include "sparkium/pipelines/raytracing/core/geometry.h"
 #include "sparkium/pipelines/raytracing/core/material.h"
 #include "sparkium/pipelines/raytracing/core/scene.h"
+#include "sparkium/pipelines/raytracing/cpu/cpu_shaders.h"
 #include "sparkium/pipelines/raytracing/geometry/geometries.h"
 #include "sparkium/pipelines/raytracing/material/materials.h"
 
@@ -75,6 +78,51 @@ int LightGeometryMaterial::SamplerShader(Scene *scene) {
 graphics::Buffer *LightGeometryMaterial::SamplerData() {
   direct_lighting_sampler_data_->UploadData(&transform, sizeof(glm::mat4x3), 0);
   return direct_lighting_sampler_data_.get();
+}
+
+uint32_t LightGeometryMaterial::SamplerPreprocessHost() {
+  // The host equivalent of gather_primitive_power.hlsl followed by the Blelloch
+  // scan: per-primitive emitted power, then an inclusive prefix sum, written at
+  // the same offset the shader writes to. Returns the offset of the last entry,
+  // which holds the light's total power.
+  const uint32_t primitive_count = geometry_->PrimitiveCount();
+  if (primitive_count == 0)
+    return sizeof(glm::mat4x3) + sizeof(uint32_t);
+
+  std::vector<uint8_t> geometry_bytes(geometry_->Buffer()->Size());
+  geometry_->Buffer()->DownloadData(geometry_bytes.data(), geometry_bytes.size());
+  std::vector<uint8_t> material_bytes(material_->Buffer()->Size());
+  material_->Buffer()->DownloadData(material_bytes.data(), material_bytes.size());
+
+  const cpu::BufferView geometry_view{geometry_bytes.data(), geometry_bytes.size()};
+  const cpu::BufferView material_view{material_bytes.data(), material_bytes.size()};
+  const float *transform_floats = &transform[0][0];
+  const uint32_t kernel = MaterialKernelForEvaluator();
+
+  std::vector<float> power(primitive_count);
+  float running = 0.0f;
+  for (uint32_t i = 0; i < primitive_count; ++i) {
+    running += cpu::PrimitivePower(kernel, geometry_view, material_view, transform_floats, i);
+    power[i] = running;
+  }
+  direct_lighting_sampler_data_->UploadData(power.data(), primitive_count * sizeof(float), 52);
+  return 52 + (primitive_count - 1) * sizeof(float);
+}
+
+uint32_t LightGeometryMaterial::MaterialKernelForEvaluator() const {
+  // Which evaluator gather_primitive_power.hlsl is compiled with, which the GPU
+  // path selects by writing the material's evaluator into the shader VFS.
+  if (dynamic_cast<MaterialLight *>(material_))
+    return cpu::kMaterialKernelLight;
+  if (dynamic_cast<MaterialLambertian *>(material_))
+    return cpu::kMaterialKernelLambertian;
+  if (dynamic_cast<MaterialPrincipled *>(material_))
+    return cpu::kMaterialKernelPrincipled;
+  if (dynamic_cast<MaterialShaderGraph *>(material_))
+    return cpu::kMaterialKernelShaderGraph;
+  if (dynamic_cast<MaterialSpecular *>(material_))
+    return cpu::kMaterialKernelSpecular;
+  return cpu::kMaterialKernelLambertian;
 }
 
 uint32_t LightGeometryMaterial::SamplerPreprocess(graphics::CommandContext *cmd_context) {

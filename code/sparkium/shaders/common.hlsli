@@ -1,6 +1,15 @@
 #pragma once
 #include "constants.hlsli"
 
+// HLSL allows swizzles on scalars, so the generated shader graphs spell a
+// broadcast as `(x).xxxx`. C++ does not, and the CPU backend compiles the same
+// generated source, so the broadcast goes through this macro instead. On the
+// GPU it expands to the original text; the CPU compatibility layer defines it
+// to its own helper.
+#ifndef SPARKIUM_SPLAT4
+#define SPARKIUM_SPLAT4(x) ((x).xxxx)
+#endif
+
 struct RandomDevice {
   uint offset;
   uint samp;

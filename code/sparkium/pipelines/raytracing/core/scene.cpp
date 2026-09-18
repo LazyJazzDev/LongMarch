@@ -34,7 +34,7 @@ Scene::Scene(sparkium::Scene &scene) : scene_(scene), settings(scene.settings) {
   core_->GraphicsCore()->CreateSampler({graphics::FILTER_MODE_NEAREST}, &nearest_sampler_);
 }
 
-void Scene::Render(Camera *camera, Film *film, bool software, bool ray_query) {
+void Scene::Render(Camera *camera, Film *film, bool software, bool ray_query, bool cpu) {
   software = software || ray_query;
   if (ray_query != ray_query_) {
     ray_query_ = ray_query;
@@ -49,11 +49,35 @@ void Scene::Render(Camera *camera, Film *film, bool software, bool ray_query) {
     if (rendered_)
       film->Reset();
   }
+  if (cpu != cpu_tracing_) {
+    cpu_tracing_ = cpu;
+    pipeline_dirty_ = true;
+    if (rendered_)
+      film->Reset();
+  }
   if (software && !software_pipeline_)
     software_pipeline_ = std::make_unique<SoftwarePipeline>(core_, ray_query_);
+  if (cpu_tracing_ && !cpu_pipeline_) {
+    cpu_pipeline_ = std::make_unique<CpuPipeline>(core_);
+    const sparkium::GraphEngine engine = scene_.GetCore()->GetGraphEngine();
+    cpu_pipeline_->SetGraphEngine(engine == sparkium::GRAPH_ENGINE_JIT ? cpu::GraphEngine::Jit
+                                                                      : cpu::GraphEngine::Interpreter);
+    // The CPU path accumulates the film on the host, so resetting the film has
+    // to clear those accumulators as well.
+    film->film_.RegisterResetCallback([this]() {
+      if (cpu_pipeline_)
+        cpu_pipeline_->ResetFilm();
+    });
+  }
   graphics::CpuProfileScope update_profile("scene_update");
   UpdatePipeline(camera);
   update_profile.End();
+  if (cpu_tracing_) {
+    graphics::CpuProfileScope render_profile("render_cpu");
+    rendered_ = true;
+    cpu_pipeline_->Render(&film->film_, settings.raytracing);
+    return;
+  }
   graphics::CpuProfileScope setup_profile("render_setup");
   rendered_ = true;
   scene_settings_buffer_->UploadData(&settings.raytracing, sizeof(Settings::RayTracing));
@@ -127,7 +151,10 @@ int32_t Scene::RegisterLight(Light *light, int custom_index) {
   light_reg.sampler_data_index = RegisterBuffer(light->SamplerData());
   light_reg.sampler_shader_index = light->SamplerShader(this);
   light_reg.custom_index = custom_index;
-  light_reg.power_offset = light->SamplerPreprocess(preprocess_cmd_context_.get());
+  // The CPU path has no command context to dispatch the gather into, so it runs
+  // the same computation on the host.
+  light_reg.power_offset =
+      cpu_tracing_ ? light->SamplerPreprocessHost() : light->SamplerPreprocess(preprocess_cmd_context_.get());
   light_metadatas_.push_back(light_reg);
   return light_reg_index;
 }
@@ -155,7 +182,10 @@ int32_t Scene::RegisterSoftwareInstance(Geometry *geometry,
   const int32_t index = instance_metadatas_.size();
   const int32_t geometry_index = RegisterBuffer(geometry->Buffer());
   instance_metadatas_.push_back({geometry_index, RegisterBuffer(material->Buffer()), custom_index});
-  software_pipeline_->AddInstance(geometry, material, transform, geometry_index);
+  if (software_pipeline_)
+    software_pipeline_->AddInstance(geometry, material, transform, geometry_index);
+  if (cpu_pipeline_)
+    cpu_pipeline_->AddInstance(geometry, material, transform, geometry_index);
   return index;
 }
 
@@ -245,8 +275,10 @@ void Scene::UpdatePipeline(Camera *camera) {
     entities_.erase(entity);
   }
 
-  if (software_tracing_)
+  if (software_tracing_ && software_pipeline_)
     software_pipeline_->ClearInstances();
+  if (cpu_tracing_ && cpu_pipeline_)
+    cpu_pipeline_->ClearInstances();
   instances_.clear();
   instance_metadatas_.clear();
   light_metadatas_.clear();
@@ -285,7 +317,10 @@ void Scene::UpdatePipeline(Camera *camera) {
   geometry_light_profile.End();
   registration_profile.End();
   graphics::CpuProfileScope metadata_profile("scene_metadata");
-  if (!software_tracing_) {
+  // The CPU path, like the compute fallback, traverses its own BVH and never
+  // builds a hardware TLAS or an RT pipeline.
+  const bool host_tracing = software_tracing_ || cpu_tracing_;
+  if (!host_tracing) {
     if (!tlas_) {
       core_->GraphicsCore()->CreateTopLevelAccelerationStructure(instances_, &tlas_);
     } else {
@@ -321,8 +356,8 @@ void Scene::UpdatePipeline(Camera *camera) {
     RegisterBuffer(camera->Buffer());
 
   if (pipeline_dirty_ || buffers_.size() > buffer_capacity_ || sdr_images_.size() > sdr_image_capacity_ ||
-      hdr_images_.size() > hdr_image_capacity_ || (!software_tracing_ && !rt_program_)) {
-    if (!software_tracing_) {
+      hdr_images_.size() > hdr_image_capacity_ || (!host_tracing && !rt_program_)) {
+    if (!host_tracing) {
       rt_program_.reset();
       core_->GraphicsCore()->CreateRayTracingProgram(&rt_program_);
       miss_shader_indices_ = {0, 1};
@@ -387,6 +422,9 @@ void Scene::UpdatePipeline(Camera *camera) {
   metadata_profile.End();
   if (software_tracing_)
     software_pipeline_->Update(preprocess_cmd_context_.get(), buffers_, sdr_images_.size(), hdr_images_.size());
+  if (cpu_tracing_)
+    cpu_pipeline_->Update(buffers_, camera->Buffer(), core_->GetBuffer("sobol"), instance_metadata_buffer_.get(),
+                          light_selector_buffer_.get(), light_metadatas_buffer_.get(), sdr_images_, hdr_images_);
 
   graphics::CpuProfileScope light_record_profile("light_selection_record");
   graphics::GpuProfileScope light_selection_profile(preprocess_cmd_context_.get(), "light_selection");

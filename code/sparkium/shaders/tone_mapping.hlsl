@@ -1,6 +1,4 @@
 #include "tone_mapping.hlsli"
-Texture2D<float4> accumulated_color : register(t0, space0);
-[[vk::image_format("rgba8")]] RWTexture2D<float4> output : register(u0, space1);
 
 struct ToneMappingSettings {
   int view_transform;
@@ -8,7 +6,18 @@ struct ToneMappingSettings {
   float gamma;
   float contrast;
 };
+
+#ifdef SPARKIUM_CPU_SHADER
+// The CPU backend binds host views of the same slots the GPU branch declares.
+// The names live here so both backends share one list.
+Texture2D<float4> accumulated_color;
+RWTexture2D<float4> output;
+ConstantBuffer<ToneMappingSettings> settings;
+#else
+Texture2D<float4> accumulated_color : register(t0, space0);
+[[vk::image_format("rgba8")]] RWTexture2D<float4> output : register(u0, space1);
 ConstantBuffer<ToneMappingSettings> settings : register(b0, space2);
+#endif
 
 float3 FilmicCurve(float3 color) {
   // Smooth shoulder/toe approximation for legacy Blender Filmic scenes.
@@ -17,15 +26,11 @@ float3 FilmicCurve(float3 color) {
                   (color * (2.43f * color + 0.59f) + 0.14f));
 }
 
-[numthreads(8, 8, 1)] void Main(uint3 dispatch_thread_id
-                                : SV_DispatchThreadID) {
-  // Get the pixel coordinates
-  uint2 pixel_coords = dispatch_thread_id.xy;
-
+// The per-pixel body is shared; each backend supplies its own entry point. The
+// CPU backend calls this once per pixel it owns.
+void ToneMapPixel(uint2 pixel_coords, uint2 extent) {
   // edge check
-  uint width, height;
-  accumulated_color.GetDimensions(width, height);
-  if (pixel_coords.x >= width || pixel_coords.y >= height) {
+  if (pixel_coords.x >= extent.x || pixel_coords.y >= extent.y) {
     return;  // Out of bounds
   }
 
@@ -50,3 +55,12 @@ float3 FilmicCurve(float3 color) {
   // Write the result to the output image
   output[pixel_coords] = float4(mapped_color, color.w);
 }
+
+#ifndef SPARKIUM_CPU_SHADER
+[numthreads(8, 8, 1)] void Main(uint3 dispatch_thread_id
+                                : SV_DispatchThreadID) {
+  uint width, height;
+  accumulated_color.GetDimensions(width, height);
+  ToneMapPixel(dispatch_thread_id.xy, uint2(width, height));
+}
+#endif

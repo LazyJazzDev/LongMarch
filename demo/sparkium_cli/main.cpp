@@ -15,10 +15,17 @@ using namespace long_march;
 namespace {
 void Usage(const char *program) {
   std::cerr << "Usage: " << program << " <scene.json> [-o image.png] [--frames N] "
-            << "[--backend auto|metal|vulkan|d3d12] [--pipeline auto|rasterization|ray_tracing|rt_fallback|ray_query] "
-               "[--require-hardware-rt] [--debug] [--profile "
+            << "[--backend auto|metal|vulkan|d3d12|host] [--pipeline auto|rasterization|ray_tracing|rt_fallback|ray_query|cpu] "
+               "[--graph-engine auto|interpreter|jit] [--require-hardware-rt] [--debug] [--profile "
                "timings.csv] [--profile-cpu-only|--profile-alternate-gpu]\n"
             << "       " << program << " --list [scene-directory]\n";
+}
+
+sparkium::GraphEngine ParseGraphEngine(const std::string &name) {
+  if (name == "interpreter") return sparkium::GRAPH_ENGINE_INTERPRETER;
+  if (name == "jit") return sparkium::GRAPH_ENGINE_JIT;
+  if (name == "auto") return sparkium::GRAPH_ENGINE_AUTO;
+  throw std::runtime_error("unknown graph engine: " + name);
 }
 
 sparkium::RenderPipeline ParsePipeline(const std::string &name) {
@@ -26,6 +33,8 @@ sparkium::RenderPipeline ParsePipeline(const std::string &name) {
     return sparkium::RENDER_PIPELINE_RAY_QUERY;
   if (name == "rt_fallback")
     return sparkium::RENDER_PIPELINE_RT_FALLBACK;
+  if (name == "cpu")
+    return sparkium::RENDER_PIPELINE_CPU;
   if (name == "auto") return sparkium::RENDER_PIPELINE_AUTO;
   if (name == "rasterization") return sparkium::RENDER_PIPELINE_RASTERIZATION;
   if (name == "ray_tracing") return sparkium::RENDER_PIPELINE_RAY_TRACING;
@@ -57,6 +66,7 @@ int main(int argc, char **argv) {
     bool require_hardware_rt = false;
     bool debug = false;
     sparkium::RenderPipeline pipeline = sparkium::RENDER_PIPELINE_AUTO;
+    sparkium::GraphEngine graph_engine = sparkium::GRAPH_ENGINE_INTERPRETER;
     for (int i = 2; i < argc; ++i) {
       std::string argument = argv[i];
       if (argument == "--require-hardware-rt")
@@ -74,6 +84,8 @@ int main(int argc, char **argv) {
       else if (argument == "--profile" && i + 1 < argc)
         profile_path = argv[++i];
       else if (argument == "--frames" && i + 1 < argc) frames = std::stoi(argv[++i]);
+      else if (argument == "--graph-engine" && i + 1 < argc)
+        graph_engine = ParseGraphEngine(argv[++i]);
       else if (argument == "--pipeline" && i + 1 < argc) {
         pipeline = ParsePipeline(argv[++i]);
         override_pipeline = true;
@@ -96,6 +108,7 @@ int main(int argc, char **argv) {
     if (require_hardware_rt && !graphics_core->DeviceRayTracingSupport())
       throw std::runtime_error("hardware ray tracing is unavailable on the selected device");
     sparkium::Core core(graphics_core.get());
+    core.SetGraphEngine(graph_engine);
     std::string error;
     auto loaded = sparkium::JsonScene::Load(&core, scene_path, &error);
     if (!loaded) throw std::runtime_error(error);

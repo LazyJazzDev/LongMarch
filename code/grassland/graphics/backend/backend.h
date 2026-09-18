@@ -1,5 +1,7 @@
 #pragma once
 
+#include "grassland/graphics/backend/host/host_backend.h"
+
 #if defined(LONGMARCH_D3D12_ENABLED)
 #include "grassland/graphics/backend/d3d12/d3d12_backend.h"
 #endif

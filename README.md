@@ -31,6 +31,12 @@ Sparkium also has an experimental [compute ray tracing fallback](docs/rt-fallbac
 for GPUs without hardware ray tracing. It shares the path tracer's materials,
 lighting and JSON scenes and builds its acceleration structures with compute shaders.
 
+It can also render entirely on the CPU, with no graphics device involved, using
+the same shaders compiled as C++. See the [CPU backend](docs/cpu-backend.md)
+for how that works and how to run it, and the
+[results report](docs/cpu-backend-report.md) for how closely it matches the GPU
+and what it costs.
+
 ## How to Build
 
 We strongly recommend using [CLion](https://www.jetbrains.com/clion/) as the IDE for development. It has great CMake support for editing, building, and debugging.

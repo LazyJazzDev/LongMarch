@@ -9,10 +9,15 @@ class LightGeometryMaterial : public Light {
   int SamplerShader(Scene *scene) override;
   graphics::Buffer *SamplerData() override;
   uint32_t SamplerPreprocess(graphics::CommandContext *cmd_ctx) override;
+  uint32_t SamplerPreprocessHost() override;
 
   const glm::mat4x3 &transform;
 
  private:
+  // Selects the evaluator the CPU preprocess uses, mirroring how the GPU path
+  // picks it through SamplerShader.
+  uint32_t MaterialKernelForEvaluator() const;
+
   Geometry *geometry_;
   Material *material_;
   std::unique_ptr<graphics::Shader> direct_lighting_sampler_;
