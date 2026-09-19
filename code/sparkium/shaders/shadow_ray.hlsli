@@ -18,12 +18,9 @@ float ShadowRayNoAlpha(float3 origin, float3 direction, float dist) {
   return payload.shadow;
 #else
   RayQuery<RAY_FLAG_NONE> rq;
-  rq.TraceRayInline(
-      as,
-      RAY_FLAG_NONE,
-      0xFF,            // Instance mask (all)
-      ray
-  );
+  rq.TraceRayInline(as, RAY_FLAG_NONE,
+                    0xFF,  // Instance mask (all)
+                    ray);
   while (rq.Proceed()) {
     if (rq.CandidateType() == CANDIDATE_NON_OPAQUE_TRIANGLE) {
       rq.Abort();
@@ -33,7 +30,6 @@ float ShadowRayNoAlpha(float3 origin, float3 direction, float dist) {
 #endif
   return 1.0;
 }
-
 
 float ShadowRay(float3 origin, float3 direction, float dist) {
   RayDesc ray;

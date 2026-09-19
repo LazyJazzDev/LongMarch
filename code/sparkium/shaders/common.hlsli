@@ -9,9 +9,9 @@ struct RandomDevice {
 } random_device;
 
 struct CameraData {
- float4x4 world_to_camera;
- float4x4 camera_to_world;
- float2 scale;
+  float4x4 world_to_camera;
+  float4x4 camera_to_world;
+  float2 scale;
 };
 
 struct HitRecord {
@@ -113,7 +113,6 @@ struct GeometryPrimitiveSample {
   float pdf;
 };
 
-
 void MakeOrthonormals(const float3 N, out float3 a, out float3 b) {
   if (N.x != N.y || N.x != N.z)
     a = float3(N.z - N.y, N.x - N.z, N.y - N.x);
@@ -124,11 +123,7 @@ void MakeOrthonormals(const float3 N, out float3 a, out float3 b) {
   b = cross(N, a);
 }
 
-void sample_cos_hemisphere(const float3 N,
-                           float r1,
-                           const float r2,
-                           out float3 omega_in,
-                           out float pdf) {
+void sample_cos_hemisphere(const float3 N, float r1, const float r2, out float3 omega_in, out float pdf) {
   r1 *= PI * 2.0;
   float3 T, B;
   MakeOrthonormals(N, T, B);

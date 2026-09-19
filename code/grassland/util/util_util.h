@@ -50,14 +50,18 @@ typedef enum DeviceType {
 struct VertexBufferView {
   const void *data;
   size_t stride;
+
   VertexBufferView() : data(nullptr), stride(0) {
   }
+
   VertexBufferView(const void *data_, size_t stride_, size_t offset_ = 0)
-      : data(static_cast<const char *>(data_) + offset_), stride(stride_) {
+      : data(static_cast<const char *>(data_) + offset_),
+        stride(stride_) {
   }
 
   template <typename T>
-  VertexBufferView(const T *data_, size_t offset = 0) : data(data_), stride(sizeof(T)) {
+  VertexBufferView(const T *data_, size_t offset = 0) : data(data_),
+                                                        stride(sizeof(T)) {
     data = static_cast<const char *>(data) + offset;
   }
 

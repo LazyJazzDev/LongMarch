@@ -28,7 +28,10 @@ Device::Device(const class Instance *instance,
                DeviceCreateInfo create_info,
                VmaAllocatorCreateFlags allocator_flags,
                VkDevice device)
-    : instance_(instance), physical_device_(physical_device), create_info_(std::move(create_info)), device_(device) {
+    : instance_(instance),
+      physical_device_(physical_device),
+      create_info_(std::move(create_info)),
+      device_(device) {
   VmaAllocatorCreateInfo allocator_info = {};
   allocator_info.physicalDevice = physical_device_.Handle();
   allocator_info.device = device_;
@@ -75,6 +78,7 @@ VkResult Device::CreateSwapchain(const Surface *surface,
     SetErrorMessage("pp_swapchain is nullptr");
     return VK_ERROR_INITIALIZATION_FAILED;
   }
+
   SwapChainSupportDetails swapChainSupport =
       Swapchain::QuerySwapChainSupport(PhysicalDevice().Handle(), surface->Handle());
 
@@ -103,6 +107,7 @@ VkResult Device::CreateSwapchain(const Surface *surface,
   if (swapChainSupport.capabilities.maxImageCount > 0 && image_count > swapChainSupport.capabilities.maxImageCount) {
     image_count = swapChainSupport.capabilities.maxImageCount;
   }
+
   VkSwapchainCreateInfoKHR createInfo{};
   createInfo.sType = VK_STRUCTURE_TYPE_SWAPCHAIN_CREATE_INFO_KHR;
   createInfo.surface = surface->Handle();
@@ -607,6 +612,7 @@ VkResult Device::CreatePipeline(const struct PipelineSettings &settings, double_
     SetErrorMessage("pp_pipeline is nullptr");
     return VK_ERROR_INITIALIZATION_FAILED;
   }
+
   VkPipelineVertexInputStateCreateInfo vertex_input_info{};
   vertex_input_info.sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO;
   vertex_input_info.vertexBindingDescriptionCount = settings.vertex_input_binding_descriptions.size();
@@ -640,6 +646,7 @@ VkResult Device::CreatePipeline(const struct PipelineSettings &settings, double_
   if (settings.dynamic_primitive_topology) {
     dynamic_states.push_back(VK_DYNAMIC_STATE_PRIMITIVE_TOPOLOGY);
   }
+
   VkPipelineDynamicStateCreateInfo dynamic_state{};
   dynamic_state.sType = VK_STRUCTURE_TYPE_PIPELINE_DYNAMIC_STATE_CREATE_INFO;
   dynamic_state.dynamicStateCount = static_cast<uint32_t>(dynamic_states.size());
@@ -1152,6 +1159,7 @@ void Device::NameObject(VkImage image, const std::string &name) {
   if (instance_->Procedures().vkSetDebugUtilsObjectNameEXT == nullptr) {
     return;
   }
+
   VkDebugUtilsObjectNameInfoEXT name_info{};
   name_info.sType = VK_STRUCTURE_TYPE_DEBUG_UTILS_OBJECT_NAME_INFO_EXT;
   name_info.objectType = VK_OBJECT_TYPE_IMAGE;
@@ -1166,6 +1174,7 @@ void Device::NameObject(VkImageView image_view, const std::string &name) {
   if (instance_->Procedures().vkSetDebugUtilsObjectNameEXT == nullptr) {
     return;
   }
+
   VkDebugUtilsObjectNameInfoEXT name_info{};
   name_info.sType = VK_STRUCTURE_TYPE_DEBUG_UTILS_OBJECT_NAME_INFO_EXT;
   name_info.objectType = VK_OBJECT_TYPE_IMAGE_VIEW;
@@ -1180,6 +1189,7 @@ void Device::NameObject(VkBuffer buffer, const std::string &name) {
   if (instance_->Procedures().vkSetDebugUtilsObjectNameEXT == nullptr) {
     return;
   }
+
   VkDebugUtilsObjectNameInfoEXT name_info{};
   name_info.sType = VK_STRUCTURE_TYPE_DEBUG_UTILS_OBJECT_NAME_INFO_EXT;
   name_info.objectType = VK_OBJECT_TYPE_BUFFER;
@@ -1194,6 +1204,7 @@ void Device::NameObject(VkDeviceMemory memory, const std::string &name) {
   if (instance_->Procedures().vkSetDebugUtilsObjectNameEXT == nullptr) {
     return;
   }
+
   VkDebugUtilsObjectNameInfoEXT name_info{};
   name_info.sType = VK_STRUCTURE_TYPE_DEBUG_UTILS_OBJECT_NAME_INFO_EXT;
   name_info.objectType = VK_OBJECT_TYPE_DEVICE_MEMORY;
@@ -1208,6 +1219,7 @@ void Device::NameObject(VkDescriptorSet descriptor_set, const std::string &name)
   if (instance_->Procedures().vkSetDebugUtilsObjectNameEXT == nullptr) {
     return;
   }
+
   VkDebugUtilsObjectNameInfoEXT name_info{};
   name_info.sType = VK_STRUCTURE_TYPE_DEBUG_UTILS_OBJECT_NAME_INFO_EXT;
   name_info.objectType = VK_OBJECT_TYPE_DESCRIPTOR_SET;
@@ -1222,6 +1234,7 @@ void Device::NameObject(VkDescriptorSetLayout descriptor_set_layout, const std::
   if (instance_->Procedures().vkSetDebugUtilsObjectNameEXT == nullptr) {
     return;
   }
+
   VkDebugUtilsObjectNameInfoEXT name_info{};
   name_info.sType = VK_STRUCTURE_TYPE_DEBUG_UTILS_OBJECT_NAME_INFO_EXT;
   name_info.objectType = VK_OBJECT_TYPE_DESCRIPTOR_SET_LAYOUT;
@@ -1236,6 +1249,7 @@ void Device::NameObject(VkPipeline pipeline, const std::string &name) {
   if (instance_->Procedures().vkSetDebugUtilsObjectNameEXT == nullptr) {
     return;
   }
+
   VkDebugUtilsObjectNameInfoEXT name_info{};
   name_info.sType = VK_STRUCTURE_TYPE_DEBUG_UTILS_OBJECT_NAME_INFO_EXT;
   name_info.objectType = VK_OBJECT_TYPE_PIPELINE;
@@ -1250,6 +1264,7 @@ void Device::NameObject(VkPipelineLayout pipeline_layout, const std::string &nam
   if (instance_->Procedures().vkSetDebugUtilsObjectNameEXT == nullptr) {
     return;
   }
+
   VkDebugUtilsObjectNameInfoEXT name_info{};
   name_info.sType = VK_STRUCTURE_TYPE_DEBUG_UTILS_OBJECT_NAME_INFO_EXT;
   name_info.objectType = VK_OBJECT_TYPE_PIPELINE_LAYOUT;
@@ -1264,6 +1279,7 @@ void Device::NameObject(VkRenderPass render_pass, const std::string &name) {
   if (instance_->Procedures().vkSetDebugUtilsObjectNameEXT == nullptr) {
     return;
   }
+
   VkDebugUtilsObjectNameInfoEXT name_info{};
   name_info.sType = VK_STRUCTURE_TYPE_DEBUG_UTILS_OBJECT_NAME_INFO_EXT;
   name_info.objectType = VK_OBJECT_TYPE_RENDER_PASS;
@@ -1278,6 +1294,7 @@ void Device::NameObject(VkSampler sampler, const std::string &name) {
   if (instance_->Procedures().vkSetDebugUtilsObjectNameEXT == nullptr) {
     return;
   }
+
   VkDebugUtilsObjectNameInfoEXT name_info{};
   name_info.sType = VK_STRUCTURE_TYPE_DEBUG_UTILS_OBJECT_NAME_INFO_EXT;
   name_info.objectType = VK_OBJECT_TYPE_SAMPLER;
@@ -1292,6 +1309,7 @@ void Device::NameObject(VkCommandPool command_pool, const std::string &name) {
   if (instance_->Procedures().vkSetDebugUtilsObjectNameEXT == nullptr) {
     return;
   }
+
   VkDebugUtilsObjectNameInfoEXT name_info{};
   name_info.sType = VK_STRUCTURE_TYPE_DEBUG_UTILS_OBJECT_NAME_INFO_EXT;
   name_info.objectType = VK_OBJECT_TYPE_COMMAND_POOL;
@@ -1306,6 +1324,7 @@ void Device::NameObject(VkCommandBuffer command_buffer, const std::string &name)
   if (instance_->Procedures().vkSetDebugUtilsObjectNameEXT == nullptr) {
     return;
   }
+
   VkDebugUtilsObjectNameInfoEXT name_info{};
   name_info.sType = VK_STRUCTURE_TYPE_DEBUG_UTILS_OBJECT_NAME_INFO_EXT;
   name_info.objectType = VK_OBJECT_TYPE_COMMAND_BUFFER;
@@ -1320,6 +1339,7 @@ void Device::NameObject(VkFramebuffer framebuffer, const std::string &name) {
   if (instance_->Procedures().vkSetDebugUtilsObjectNameEXT == nullptr) {
     return;
   }
+
   VkDebugUtilsObjectNameInfoEXT name_info{};
   name_info.sType = VK_STRUCTURE_TYPE_DEBUG_UTILS_OBJECT_NAME_INFO_EXT;
   name_info.objectType = VK_OBJECT_TYPE_FRAMEBUFFER;
@@ -1334,6 +1354,7 @@ void Device::NameObject(VkDescriptorPool descriptor_pool, const std::string &nam
   if (instance_->Procedures().vkSetDebugUtilsObjectNameEXT == nullptr) {
     return;
   }
+
   VkDebugUtilsObjectNameInfoEXT name_info{};
   name_info.sType = VK_STRUCTURE_TYPE_DEBUG_UTILS_OBJECT_NAME_INFO_EXT;
   name_info.objectType = VK_OBJECT_TYPE_DESCRIPTOR_POOL;
@@ -1348,6 +1369,7 @@ void Device::NameObject(VkShaderModule shader_module, const std::string &name) {
   if (instance_->Procedures().vkSetDebugUtilsObjectNameEXT == nullptr) {
     return;
   }
+
   VkDebugUtilsObjectNameInfoEXT name_info{};
   name_info.sType = VK_STRUCTURE_TYPE_DEBUG_UTILS_OBJECT_NAME_INFO_EXT;
   name_info.objectType = VK_OBJECT_TYPE_SHADER_MODULE;
@@ -1362,6 +1384,7 @@ void Device::NameObject(VkAccelerationStructureKHR acceleration_structure, const
   if (instance_->Procedures().vkSetDebugUtilsObjectNameEXT == nullptr) {
     return;
   }
+
   VkDebugUtilsObjectNameInfoEXT name_info{};
   name_info.sType = VK_STRUCTURE_TYPE_DEBUG_UTILS_OBJECT_NAME_INFO_EXT;
   name_info.objectType = VK_OBJECT_TYPE_ACCELERATION_STRUCTURE_KHR;

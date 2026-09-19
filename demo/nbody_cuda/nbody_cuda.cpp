@@ -7,7 +7,9 @@ namespace {
 }
 
 NBodyCUDA::NBodyCUDA(Settings settings)
-    : n_particles_(settings.n_particles), headless_(settings.headless), num_step_(settings.num_step) {
+    : n_particles_(settings.n_particles),
+      headless_(settings.headless),
+      num_step_(settings.num_step) {
   graphics::Core::Settings graphics_settings;
   graphics::CreateCore(graphics::BACKEND_API_DEFAULT, graphics_settings, &core_);
   core_->InitializeLogicalDeviceByCUDADeviceID(settings.device_id);
@@ -360,6 +362,7 @@ void NBodyCUDA::UpdateImGui() {
     }
     last_frame_tp = current_tp;
   }
+
   ImGui::End();
   window_->EndImGuiFrame();
   if (trigger_hdr_switch) {

@@ -21,12 +21,29 @@ class JsonScene {
  public:
   static std::unique_ptr<JsonScene> Load(Core *core, const std::filesystem::path &path, std::string *error = nullptr);
 
-  Scene *GetScene() const { return scene_.get(); }
-  Camera *GetCamera() const { return camera_.get(); }
-  Film *GetFilm() const { return film_.get(); }
-  RenderPipeline GetRenderPipeline() const { return render_pipeline_; }
-  const std::string &GetName() const { return name_; }
-  const std::filesystem::path &GetPath() const { return path_; }
+  Scene *GetScene() const {
+    return scene_.get();
+  }
+
+  Camera *GetCamera() const {
+    return camera_.get();
+  }
+
+  Film *GetFilm() const {
+    return film_.get();
+  }
+
+  RenderPipeline GetRenderPipeline() const {
+    return render_pipeline_;
+  }
+
+  const std::string &GetName() const {
+    return name_;
+  }
+
+  const std::filesystem::path &GetPath() const {
+    return path_;
+  }
 
  private:
   Core *core_{};

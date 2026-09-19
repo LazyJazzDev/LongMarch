@@ -11,6 +11,7 @@ Semaphore::Semaphore(const struct Device *device, VkSemaphore semaphore) : devic
 Semaphore::~Semaphore() {
   vkDestroySemaphore(device_->Handle(), semaphore_, nullptr);
 }
+
 #if defined(LONGMARCH_CUDA_RUNTIME)
 VkExternalSemaphoreHandleTypeFlagBits GetDefaultExternalSemaphoreHandleType() {
 #ifdef _WIN64

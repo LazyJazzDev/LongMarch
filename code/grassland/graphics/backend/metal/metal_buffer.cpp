@@ -10,6 +10,7 @@ namespace grassland::graphics::backend {
 MetalBuffer::MetalBuffer(MetalCore *core, size_t size, BufferType type) : core_(core), type_(type) {
   Resize(size);
 }
+
 void MetalBuffer::Resize(size_t size) {
   if (buffer_ && size == size_)
     return;
@@ -23,6 +24,7 @@ void MetalBuffer::Resize(size_t size) {
   buffer_ = std::move(replacement);
   size_ = size;
 }
+
 void MetalBuffer::UploadData(const void *data, size_t size, size_t offset) {
   if (offset > size_ || size > size_ - offset)
     throw std::out_of_range("Metal buffer upload");
@@ -30,6 +32,7 @@ void MetalBuffer::UploadData(const void *data, size_t size, size_t offset) {
   if (size)
     std::memcpy(static_cast<char *>(buffer_->contents()) + offset, data, size);
 }
+
 void MetalBuffer::DownloadData(void *data, size_t size, size_t offset) {
   if (offset > size_ || size > size_ - offset)
     throw std::out_of_range("Metal buffer download");

@@ -1,4 +1,5 @@
 #pragma once
+
 struct GeometryHeader {
   uint num_vertices;
   uint num_indices;

@@ -5,7 +5,8 @@
 namespace sparkium::raytracing {
 
 GeometryMesh::GeometryMesh(sparkium::GeometryMesh &geometry)
-    : geometry_(geometry), Geometry(DedicatedCast(geometry.GetCore())) {
+    : geometry_(geometry),
+      Geometry(DedicatedCast(geometry.GetCore())) {
   auto &vfs = core_->GetShadersVFS();
   sampler_implementation_ = CodeLines(vfs, "geometry/mesh/geometry_sampler.hlsli");
   closest_hit_shader_implementation_ = CodeLines(vfs, "geometry/mesh/hit_group.hlsl");

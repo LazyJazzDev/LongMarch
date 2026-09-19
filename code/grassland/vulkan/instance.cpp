@@ -238,6 +238,7 @@ VkResult Instance::CreateDevice(const struct DeviceFeatureRequirement &device_fe
       physical_device.IsExtensionSupported(VK_KHR_SWAPCHAIN_EXTENSION_NAME)) {
     create_info.AddExtension(VK_KHR_SWAPCHAIN_EXTENSION_NAME);
   }
+
   VkResult result = CreateDevice(physical_device, device_feature_requirement, create_info, pp_device);
   if (result == VK_SUCCESS) {
     if (device_feature_requirement.enable_raytracing_extension) {

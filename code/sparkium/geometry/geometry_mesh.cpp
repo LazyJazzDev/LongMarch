@@ -9,6 +9,7 @@ GeometryMesh::GeometryMesh(Core *core, const Mesh<float> &mesh) : Geometry(core)
   auto write_data = [&](const void *data_ptr, size_t size) {
     data.insert(data.end(), static_cast<const uint8_t *>(data_ptr), static_cast<const uint8_t *>(data_ptr) + size);
   };
+
   write_data(&header_, sizeof(header_));
 
   Mesh<float> mesh_copy;

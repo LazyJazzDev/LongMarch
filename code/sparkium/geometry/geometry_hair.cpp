@@ -9,8 +9,8 @@ Mesh<float> BuildHairMesh(const std::vector<Vector3<float>> &points,
                           const std::vector<float> &radii,
                           const std::vector<uint32_t> &strand_offsets,
                           int radial_segments) {
-  if (points.size() != radii.size() || strand_offsets.size() < 2 ||
-      strand_offsets.front() != 0 || strand_offsets.back() != points.size() || radial_segments < 3)
+  if (points.size() != radii.size() || strand_offsets.size() < 2 || strand_offsets.front() != 0 ||
+      strand_offsets.back() != points.size() || radial_segments < 3)
     throw std::runtime_error("invalid hair geometry");
 
   std::vector<Vector3<float>> positions;
@@ -24,7 +24,8 @@ Mesh<float> BuildHairMesh(const std::vector<Vector3<float>> &points,
   for (size_t strand = 0; strand + 1 < strand_offsets.size(); ++strand) {
     const uint32_t begin = strand_offsets[strand];
     const uint32_t end = strand_offsets[strand + 1];
-    if (end <= begin + 1 || end > points.size()) throw std::runtime_error("invalid hair strand offsets");
+    if (end <= begin + 1 || end > points.size())
+      throw std::runtime_error("invalid hair strand offsets");
     const uint32_t vertex_base = static_cast<uint32_t>(positions.size());
     for (uint32_t i = begin; i < end; ++i) {
       Vector3<float> tangent;
@@ -35,8 +36,8 @@ Mesh<float> BuildHairMesh(const std::vector<Vector3<float>> &points,
       else
         tangent = points[i + 1] - points[i - 1];
       tangent.normalize();
-      Vector3<float> axis = std::abs(tangent.z()) < 0.9f ? Vector3<float>{0.0f, 0.0f, 1.0f}
-                                                          : Vector3<float>{0.0f, 1.0f, 0.0f};
+      Vector3<float> axis =
+          std::abs(tangent.z()) < 0.9f ? Vector3<float>{0.0f, 0.0f, 1.0f} : Vector3<float>{0.0f, 1.0f, 0.0f};
       Vector3<float> side = tangent.cross(axis).normalized();
       Vector3<float> up = side.cross(tangent).normalized();
       const float v = float(i - begin) / float(end - begin - 1);
@@ -69,6 +70,7 @@ GeometryHair::GeometryHair(Core *core,
                            const std::vector<float> &radii,
                            const std::vector<uint32_t> &strand_offsets,
                            int radial_segments)
-    : GeometryMesh(core, BuildHairMesh(points, radii, strand_offsets, radial_segments)) {}
+    : GeometryMesh(core, BuildHairMesh(points, radii, strand_offsets, radial_segments)) {
+}
 
 }  // namespace sparkium

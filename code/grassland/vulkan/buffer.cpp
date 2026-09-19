@@ -9,7 +9,10 @@
 
 namespace grassland::vulkan {
 Buffer::Buffer(const class Device *device, VkDeviceSize size, VkBuffer buffer, VmaAllocation allocation)
-    : device_(device), size_(size), buffer_(buffer), allocation_(allocation) {
+    : device_(device),
+      size_(size),
+      buffer_(buffer),
+      allocation_(allocation) {
 }
 
 Buffer::~Buffer() {

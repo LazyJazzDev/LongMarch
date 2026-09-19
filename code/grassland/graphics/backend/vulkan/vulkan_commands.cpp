@@ -37,7 +37,8 @@ void VulkanCmdBindRayTracingProgram::CompileCommand(VulkanCommandContext *contex
 VulkanCmdBindVertexBuffers::VulkanCmdBindVertexBuffers(uint32_t first_binding,
                                                        const std::vector<VulkanBuffer *> &buffers,
                                                        const std::vector<uint64_t> &offsets)
-    : first_binding_(first_binding), buffers_(buffers) {
+    : first_binding_(first_binding),
+      buffers_(buffers) {
   offsets_.resize(buffers_.size());
   for (size_t i = 0; i < buffers_.size(); ++i) {
     if (i < offsets.size()) {
@@ -57,7 +58,8 @@ void VulkanCmdBindVertexBuffers::CompileCommand(VulkanCommandContext *context, V
 }
 
 VulkanCmdBindIndexBuffer::VulkanCmdBindIndexBuffer(VulkanBuffer *buffer, uint64_t offset)
-    : buffer_(buffer), offset_(offset) {
+    : buffer_(buffer),
+      offset_(offset) {
 }
 
 void VulkanCmdBindIndexBuffer::CompileCommand(VulkanCommandContext *context, VkCommandBuffer command_buffer) {
@@ -66,7 +68,8 @@ void VulkanCmdBindIndexBuffer::CompileCommand(VulkanCommandContext *context, VkC
 
 VulkanCmdBeginRendering::VulkanCmdBeginRendering(const std::vector<VulkanImage *> &color_targets,
                                                  VulkanImage *depth_target)
-    : color_targets_(color_targets), depth_target_(depth_target) {
+    : color_targets_(color_targets),
+      depth_target_(depth_target) {
 }
 
 void VulkanCmdBeginRendering::CompileCommand(VulkanCommandContext *context, VkCommandBuffer command_buffer) {
@@ -100,6 +103,7 @@ void VulkanCmdBeginRendering::CompileCommand(VulkanCommandContext *context, VkCo
     extent.width = std::min(extent.width, target_extent.width);
     extent.height = std::min(extent.height, target_extent.height);
   }
+
   VkRenderingInfo rendering_info{};
   rendering_info.sType = VK_STRUCTURE_TYPE_RENDERING_INFO;
   rendering_info.pNext = nullptr;
@@ -137,7 +141,10 @@ VulkanCmdBindResourceBuffers::VulkanCmdBindResourceBuffers(int slot,
                                                            const std::vector<VulkanBufferRange> &buffers,
                                                            VulkanProgramBase *program_base,
                                                            BindPoint bind_point)
-    : slot_(slot), buffers_(buffers), program_base_(program_base), bind_point_(bind_point) {
+    : slot_(slot),
+      buffers_(buffers),
+      program_base_(program_base),
+      bind_point_(bind_point) {
 }
 
 void VulkanCmdBindResourceBuffers::CompileCommand(VulkanCommandContext *context, VkCommandBuffer command_buffer) {
@@ -147,6 +154,7 @@ void VulkanCmdBindResourceBuffers::CompileCommand(VulkanCommandContext *context,
     buffer_infos[i].offset = buffers_[i].offset;
     buffer_infos[i].range = buffers_[i].size;
   }
+
   auto descriptor_set = context->AcquireDescriptorSet(program_base_->DescriptorSetLayout(slot_)->Handle());
 
   auto binding = program_base_->DescriptorSetLayout(slot_)->Bindings()[0];
@@ -191,6 +199,7 @@ void VulkanCmdBindResourceImages::CompileCommand(VulkanCommandContext *context, 
                                  VK_ACCESS_MEMORY_READ_BIT | VK_ACCESS_MEMORY_WRITE_BIT, images_[i]->Image()->Aspect());
     }
   }
+
   auto descriptor_set = context->AcquireDescriptorSet(program_base_->DescriptorSetLayout(slot_)->Handle());
   VkDescriptorSet descriptor_sets[] = {descriptor_set->Handle()};
   auto binding = program_base_->DescriptorSetLayout(slot_)->Bindings()[0];
@@ -212,7 +221,10 @@ VulkanCmdBindResourceSamplers::VulkanCmdBindResourceSamplers(int slot,
                                                              const std::vector<VulkanSampler *> &samplers,
                                                              VulkanProgramBase *program_base,
                                                              BindPoint bind_point)
-    : slot_(slot), samplers_(samplers), program_base_(program_base), bind_point_(bind_point) {
+    : slot_(slot),
+      samplers_(samplers),
+      program_base_(program_base),
+      bind_point_(bind_point) {
 }
 
 void VulkanCmdBindResourceSamplers::CompileCommand(VulkanCommandContext *context, VkCommandBuffer command_buffer) {
@@ -222,6 +234,7 @@ void VulkanCmdBindResourceSamplers::CompileCommand(VulkanCommandContext *context
     sampler_infos[i].imageView = VK_NULL_HANDLE;
     sampler_infos[i].imageLayout = VK_IMAGE_LAYOUT_UNDEFINED;
   }
+
   auto descriptor_set = context->AcquireDescriptorSet(program_base_->DescriptorSetLayout(slot_)->Handle());
   VkDescriptorSet descriptor_sets[] = {descriptor_set->Handle()};
   auto binding = program_base_->DescriptorSetLayout(slot_)->Bindings()[0];
@@ -283,7 +296,8 @@ void VulkanCmdEndRendering::CompileCommand(VulkanCommandContext *context, VkComm
 }
 
 VulkanCmdClearImage::VulkanCmdClearImage(VulkanImage *image, const ClearValue &clear_value)
-    : image_(image), clear_value_(clear_value) {
+    : image_(image),
+      clear_value_(clear_value) {
 }
 
 void VulkanCmdClearImage::CompileCommand(VulkanCommandContext *context, VkCommandBuffer command_buffer) {
@@ -469,7 +483,10 @@ VulkanCmdDispatchRays::VulkanCmdDispatchRays(VulkanRayTracingProgram *program,
                                              uint32_t width,
                                              uint32_t height,
                                              uint32_t depth)
-    : program_(program), width_(width), height_(height), depth_(depth) {
+    : program_(program),
+      width_(width),
+      height_(height),
+      depth_(depth) {
 }
 
 void VulkanCmdDispatchRays::CompileCommand(VulkanCommandContext *context, VkCommandBuffer command_buffer) {
@@ -515,7 +532,9 @@ void VulkanCmdDispatchRays::CompileCommand(VulkanCommandContext *context, VkComm
 }
 
 VulkanCmdDispatch::VulkanCmdDispatch(uint32_t group_count_x, uint32_t group_count_y, uint32_t group_count_z)
-    : group_count_x_(group_count_x), group_count_y_(group_count_y), group_count_z_(group_count_z) {
+    : group_count_x_(group_count_x),
+      group_count_y_(group_count_y),
+      group_count_z_(group_count_z) {
 }
 
 void VulkanCmdDispatch::CompileCommand(VulkanCommandContext *context, VkCommandBuffer command_buffer) {
@@ -535,7 +554,11 @@ VulkanCmdCopyBuffer::VulkanCmdCopyBuffer(VulkanBuffer *dst_buffer,
                                          uint64_t size,
                                          uint64_t dst_offset,
                                          uint64_t src_offset)
-    : dst_buffer_(dst_buffer), src_buffer_(src_buffer), size_(size), dst_offset_(dst_offset), src_offset_(src_offset) {
+    : dst_buffer_(dst_buffer),
+      src_buffer_(src_buffer),
+      size_(size),
+      dst_offset_(dst_offset),
+      src_offset_(src_offset) {
 }
 
 void VulkanCmdCopyBuffer::CompileCommand(VulkanCommandContext *context, VkCommandBuffer command_buffer) {

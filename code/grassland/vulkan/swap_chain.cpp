@@ -6,7 +6,11 @@ Swapchain::Swapchain(const class grassland::vulkan::Device *device,
                      VkSwapchainKHR swapchain,
                      VkFormat format,
                      VkExtent2D extent)
-    : device_(device), surface_(surface), swapchain_(swapchain), format_(format), extent_(extent) {
+    : device_(device),
+      surface_(surface),
+      swapchain_(swapchain),
+      format_(format),
+      extent_(extent) {
   CreateImageViews();
 }
 
@@ -54,6 +58,7 @@ SwapChainSupportDetails Swapchain::QuerySwapChainSupport(VkPhysicalDevice device
     details.formats.resize(formatCount);
     vkGetPhysicalDeviceSurfaceFormatsKHR(device, surface, &formatCount, details.formats.data());
   }
+
   uint32_t presentModeCount;
   vkGetPhysicalDeviceSurfacePresentModesKHR(device, surface, &presentModeCount, nullptr);
 

@@ -18,7 +18,8 @@ MetalWindow::MetalWindow(MetalCore *core,
                          const std::string &title,
                          bool fullscreen,
                          bool resizable)
-    : Window(width, height, title, fullscreen, resizable, false), core_(core) {
+    : Window(width, height, title, fullscreen, resizable, false),
+      core_(core) {
   MetalPool pool;
   auto view = [glfwGetCocoaWindow(GLFWWindow()) contentView];
   layer_ = NS::RetainPtr(CA::MetalLayer::layer());
@@ -53,11 +54,13 @@ fragment float4 present_fragment(Vertex v [[stage_in]], texture2d<float> image [
   pipeline_ = NS::TransferPtr(core_->Device()->newRenderPipelineState(descriptor.get(), &error));
   MetalCheck(pipeline_.get(), error, "presentation pipeline");
 }
+
 MetalWindow::~MetalWindow() {
   core_->WaitGPU();
   TerminateImGui();
   [[glfwGetCocoaWindow(GLFWWindow()) contentView] setLayer:nil];
 }
+
 void MetalWindow::InitImGui(const char *font, float size) {
   if (imgui_)
     return;
@@ -70,6 +73,7 @@ void MetalWindow::InitImGui(const char *font, float size) {
   ImGui_ImplGlfw_InitForOther(GLFWWindow(), true);
   ImGui_ImplMetal_Init((__bridge id<MTLDevice>)core_->Device());
 }
+
 void MetalWindow::TerminateImGui() {
   if (!imgui_)
     return;
@@ -80,6 +84,7 @@ void MetalWindow::TerminateImGui() {
   ImGui::DestroyContext(imgui_);
   imgui_ = nullptr;
 }
+
 void MetalWindow::BeginImGuiFrame() {
   MetalPool pool;
   ImGui::SetCurrentContext(imgui_);
@@ -92,10 +97,12 @@ void MetalWindow::BeginImGuiFrame() {
   ImGui_ImplGlfw_NewFrame();
   ImGui::NewFrame();
 }
+
 void MetalWindow::EndImGuiFrame() {
   ImGui::SetCurrentContext(imgui_);
   ImGui::Render();
 }
+
 void MetalWindow::Present(MTL::CommandBuffer *command, MetalImage *image) {
   MetalPool pool;
   int width, height;

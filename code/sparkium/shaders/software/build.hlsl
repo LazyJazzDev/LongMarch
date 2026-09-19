@@ -1,6 +1,7 @@
 #include "software/layout.hlsli"
 RWByteAddressBuffer nodes : register(u0, space0);
 ByteAddressBuffer geometries[] : register(t0, space1);
+
 cbuffer BuildParameters : register(b0, space2) {
   uint root;
   uint leaf_count;
@@ -12,6 +13,7 @@ cbuffer BuildParameters : register(b0, space2) {
   uint sort_stride;
   uint instance_tree;
 };
+
 RWByteAddressBuffer keys : register(u0, space3);
 ByteAddressBuffer instances : register(t0, space4);
 
@@ -22,6 +24,7 @@ SoftwareNode EmptyNode() {
   n.first = n.second = SOFTWARE_INVALID;
   return n;
 }
+
 void WriteLeaf(uint slot, uint primitive) {
   SoftwareNode n = EmptyNode();
   if (primitive < primitive_count) {
@@ -51,10 +54,13 @@ void WriteLeaf(uint slot, uint primitive) {
   }
   nodes.Store<SoftwareNode>((root + leaf_count - 1 + slot) * SOFTWARE_NODE_BYTES, n);
 }
-[numthreads(64, 1, 1)] void InitLeaves(uint3 id : SV_DispatchThreadID) {
+
+[numthreads(64, 1, 1)] void InitLeaves(uint3 id
+                                       : SV_DispatchThreadID) {
   if (id.x < leaf_count)
     WriteLeaf(id.x, id.x);
-}[numthreads(64, 1, 1)] void ReduceNodes(uint3 id : SV_DispatchThreadID) {
+}[numthreads(64, 1, 1)] void ReduceNodes(uint3 id
+                                         : SV_DispatchThreadID) {
   if (id.x >= level_count)
     return;
   uint index = level_first + id.x;
@@ -66,13 +72,16 @@ void WriteLeaf(uint slot, uint primitive) {
   n.hi = max(a.hi, b.hi);
   nodes.Store<SoftwareNode>((root + index) * SOFTWARE_NODE_BYTES, n);
 }
+
 uint SpreadBits(uint v) {
   v = (v | (v << 16)) & 0x030000ff;
   v = (v | (v << 8)) & 0x0300f00f;
   v = (v | (v << 4)) & 0x030c30c3;
   return (v | (v << 2)) & 0x09249249;
 }
-[numthreads(64, 1, 1)] void MortonKeys(uint3 id : SV_DispatchThreadID) {
+
+[numthreads(64, 1, 1)] void MortonKeys(uint3 id
+                                       : SV_DispatchThreadID) {
   if (id.x >= leaf_count)
     return;
   uint code = SOFTWARE_INVALID;
@@ -85,7 +94,8 @@ uint SpreadBits(uint v) {
     code = SpreadBits(p.x) | (SpreadBits(p.y) << 1) | (SpreadBits(p.z) << 2);
   }
   keys.Store2(id.x * 8, uint2(code, id.x));
-}[numthreads(64, 1, 1)] void BitonicSort(uint3 id : SV_DispatchThreadID) {
+}[numthreads(64, 1, 1)] void BitonicSort(uint3 id
+                                         : SV_DispatchThreadID) {
   uint i = id.x, j = i ^ sort_stride;
   if (i >= leaf_count || j <= i)
     return;
@@ -96,7 +106,9 @@ uint SpreadBits(uint v) {
     keys.Store2(j * 8, a);
   }
 }
-[numthreads(64, 1, 1)] void SortLeaves(uint3 id : SV_DispatchThreadID) {
+
+[numthreads(64, 1, 1)] void SortLeaves(uint3 id
+                                       : SV_DispatchThreadID) {
   if (id.x < leaf_count)
     WriteLeaf(id.x, keys.Load(id.x * 8 + 4));
 }

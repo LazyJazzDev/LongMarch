@@ -24,6 +24,7 @@ FontCore::~FontCore() {
   for (auto &face : faces_) {
     FT_Done_Face(face.second);
   }
+
   FT_Done_FreeType(library_);
 }
 

@@ -37,7 +37,8 @@ SamplerState samplers[] : register(s0, space12);
 
 float4 SampleTexture(int texture_index, float2 uv) {
   if (texture_index & 0x1000000) {
-    return hdr_textures[NonUniformResourceIndex(texture_index & 0xFFFFFF)].SampleLevel(samplers[0], float2(uv.x, 1.0 - uv.y), 0.0);
+    return hdr_textures[NonUniformResourceIndex(texture_index & 0xFFFFFF)].SampleLevel(samplers[0],
+                                                                                       float2(uv.x, 1.0 - uv.y), 0.0);
   } else {
     return sdr_textures[NonUniformResourceIndex(texture_index)].SampleLevel(samplers[0], float2(uv.x, 1.0 - uv.y), 0.0);
   }

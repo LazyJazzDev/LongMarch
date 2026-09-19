@@ -10,6 +10,7 @@ class VirtualFileSystemEntry {
  public:
   VirtualFileSystemEntry(VirtualFileSystemEntry *parent = nullptr) : parent_(parent) {
   }
+
   virtual ~VirtualFileSystemEntry() = default;
 
   virtual std::unique_ptr<VirtualFileSystemEntry> deep_copy(VirtualFileSystemEntry *parent = nullptr) const = 0;

@@ -24,20 +24,25 @@ HitRecord SoftwareHitRecord(SoftwareHit hit, float3 direction) {
   return MakeMeshHitRecord(instance.geometry, hit.instance, hit.primitive, hit.barycentric, hit.distance, direction,
                            instance.object_to_world, transpose(instance.world_to_object));
 }
+
 void ApplyPathMiss(inout RenderContext context);
+
 void SoftwareTracePath(RayDesc ray, inout RenderContext context) {
   SoftwareHit hit;
   if (!InlineIntersect(ray, false, hit)) {
     ApplyPathMiss(context);
     return;
   }
+
   HitRecord record = SoftwareHitRecord(hit, ray.Direction);
   if (!ContinueSubsurfaceRandomWalk(context, record))
     SoftwareSampleMaterial(LoadSoftwareInstance(software_instances, hit.instance).material, context, record);
 }
+
 #include "raygen.hlsl"
 #include "software/shadow.hlsli"
-[numthreads(8, 8, 1)] void Main(uint3 id : SV_DispatchThreadID) {
+[numthreads(8, 8, 1)] void Main(uint3 id
+                                : SV_DispatchThreadID) {
   uint width, height;
   accumulated_color.GetDimensions(width, height);
   if (id.x < width && id.y < height)

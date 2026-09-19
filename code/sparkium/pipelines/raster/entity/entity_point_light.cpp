@@ -8,7 +8,8 @@
 namespace sparkium::raster {
 
 EntityPointLight::EntityPointLight(sparkium::EntityPointLight &entity)
-    : entity_(entity), Entity(DedicatedCast(entity.GetCore())) {
+    : entity_(entity),
+      Entity(DedicatedCast(entity.GetCore())) {
   core_->GraphicsCore()->CreateBuffer(sizeof(PointLightData), graphics::BUFFER_TYPE_DYNAMIC, &point_light_buffer_);
   core_->GraphicsCore()->CreateShader(core_->GetShadersVFS(), "light/point/lighting.hlsl", "VSMain", "vs_6_0", {"-I."},
                                       &point_light_vs_);

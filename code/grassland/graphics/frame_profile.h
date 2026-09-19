@@ -45,6 +45,7 @@ class FrameProfile {
     throw std::runtime_error("frame GPU profiling currently requires Vulkan; use --profile-cpu-only for Metal");
 #endif
   }
+
   ~FrameProfile() {
     if (active == this)
       active = nullptr;
@@ -55,8 +56,10 @@ class FrameProfile {
     }
 #endif
   }
+
   FrameProfile(const FrameProfile &) = delete;
   FrameProfile &operator=(const FrameProfile &) = delete;
+
   void Begin(bool gpu_timestamps = true) {
     if (active)
       throw std::runtime_error("frame profile already active");
@@ -70,6 +73,7 @@ class FrameProfile {
 #endif
     active = this;
   }
+
   void Finish() {
     active = nullptr;
 #if defined(LONGMARCH_VULKAN_ENABLED)
@@ -82,6 +86,7 @@ class FrameProfile {
       gpu_ms[names_[i]] += ((values[i * 2 + 1] - values[i * 2]) & mask) * period_ / 1e6;
 #endif
   }
+
   int BeginGpu(graphics::CommandContext *commands, const std::string &name) {
 #if defined(LONGMARCH_VULKAN_ENABLED)
     if (!pool_ || !timestamps_enabled_)
@@ -97,6 +102,7 @@ class FrameProfile {
     return 0;
 #endif
   }
+
   void EndGpu(graphics::CommandContext *commands, int index) {
 #if defined(LONGMARCH_VULKAN_ENABLED)
     if (index < 0)
@@ -104,6 +110,7 @@ class FrameProfile {
     dynamic_cast<graphics::backend::VulkanCommandContext *>(commands)->CmdTimestamp(pool_, index + 1);
 #endif
   }
+
   inline static thread_local FrameProfile *active = nullptr;
   std::map<std::string, double> cpu_ms, gpu_ms;
   std::map<std::string, uint64_t> counters;
@@ -127,9 +134,11 @@ class CpuProfileScope {
     if (profile_)
       start_ = std::chrono::steady_clock::now();
   }
+
   ~CpuProfileScope() {
     End();
   }
+
   void End() {
     if (profile_) {
       profile_->cpu_ms[name_] +=
@@ -147,13 +156,16 @@ class CpuProfileScope {
 class GpuProfileScope {
  public:
   GpuProfileScope(graphics::CommandContext *commands, const char *name)
-      : profile_(FrameProfile::active), commands_(commands) {
+      : profile_(FrameProfile::active),
+        commands_(commands) {
     if (profile_)
       index_ = profile_->BeginGpu(commands_, name);
   }
+
   ~GpuProfileScope() {
     End();
   }
+
   void End() {
     if (profile_) {
       profile_->EndGpu(commands_, index_);

@@ -1,9 +1,9 @@
 #include "grassland/vulkan/pipeline_layout.h"
 
 namespace grassland::vulkan {
-PipelineLayout::PipelineLayout(const struct Device *device,
-                               VkPipelineLayout pipeline_layout)
-    : device_(device), pipeline_layout_(pipeline_layout) {
+PipelineLayout::PipelineLayout(const struct Device *device, VkPipelineLayout pipeline_layout)
+    : device_(device),
+      pipeline_layout_(pipeline_layout) {
 }
 
 PipelineLayout::~PipelineLayout() {

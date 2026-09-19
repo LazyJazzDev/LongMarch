@@ -2,7 +2,6 @@
 #include "constants.hlsli"
 #include "bindings.hlsli"
 
-
 uint WangHash(inout uint seed) {
   seed = uint(seed ^ uint(61)) ^ uint(seed >> uint(16));
   seed *= uint(9);
@@ -31,11 +30,10 @@ RandomDevice InitRandomSeed(uint x, uint y, uint s) {
 }
 
 uint SobolUint(inout RandomDevice random_device) {
- uint result = sobol_table.Load((random_device.samp * 1024 + (random_device.dim)) * 4)
- ^
-WangHash(random_device.offset);
-random_device.dim++;
-return result;
+  uint result =
+      sobol_table.Load((random_device.samp * 1024 + (random_device.dim)) * 4) ^ WangHash(random_device.offset);
+  random_device.dim++;
+  return result;
 }
 
 uint RandomUint(inout RandomDevice random_device) {

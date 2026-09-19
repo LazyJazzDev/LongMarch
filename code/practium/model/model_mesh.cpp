@@ -12,7 +12,10 @@ ModelMesh::ModelMesh(Core *core,
                      const Mesh<float> &mesh,
                      const Mesh<float> &collision_mesh,
                      sparkium::Material *material)
-    : Model(core), mesh_(mesh), collision_mesh_(collision_mesh), material_(material) {
+    : Model(core),
+      mesh_(mesh),
+      collision_mesh_(collision_mesh),
+      material_(material) {
   collision_mesh_.MakeCollisionMesh();
 }
 

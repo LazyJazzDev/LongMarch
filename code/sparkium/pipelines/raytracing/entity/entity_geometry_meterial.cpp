@@ -8,7 +8,8 @@
 namespace sparkium::raytracing {
 
 EntityGeometryMaterial::EntityGeometryMaterial(sparkium::EntityGeometryMaterial &entity)
-    : entity_(entity), Entity(DedicatedCast(entity.GetCore())) {
+    : entity_(entity),
+      Entity(DedicatedCast(entity.GetCore())) {
   geometry_ = DedicatedCast(entity_.GetGeometry());
   material_ = DedicatedCast(entity_.GetMaterial());
 

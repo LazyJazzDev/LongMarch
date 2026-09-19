@@ -1,4 +1,5 @@
 #pragma once
+
 float ShadowRayNoAlpha(float3 origin, float3 direction, float dist) {
   RayDesc ray;
   ray.Origin = origin;
@@ -8,6 +9,7 @@ float ShadowRayNoAlpha(float3 origin, float3 direction, float dist) {
   SoftwareHit hit;
   return InlineIntersect(ray, true, hit) ? 0.0f : 1.0f;
 }
+
 float ShadowRay(float3 origin, float3 direction, float dist) {
   RayDesc ray;
   ray.Origin = origin;

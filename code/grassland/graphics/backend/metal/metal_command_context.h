@@ -57,9 +57,11 @@ class MetalCommandContext : public CommandContext {
                      uint64_t src_offset = 0) override;
 
   void EndEncoder();
+
   MTL::CommandBuffer *Handle() const {
     return command_.get();
   }
+
   bool submitted = false;
 
  private:
@@ -69,6 +71,7 @@ class MetalCommandContext : public CommandContext {
     std::vector<Sampler *> samplers;
     AccelerationStructure *acceleration_structure = nullptr;
   };
+
   void BindStage(MetalStage &stage, const std::vector<MetalBinding> &layout, BindPoint point, bool vertex = false);
   void PrepareDraw();
   MetalCore *core_;

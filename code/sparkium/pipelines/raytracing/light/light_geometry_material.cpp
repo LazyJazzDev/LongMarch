@@ -12,7 +12,10 @@ LightGeometryMaterial::LightGeometryMaterial(Core *core,
                                              Geometry *geometry,
                                              Material *material,
                                              const glm::mat4x3 &transform)
-    : Light(core), geometry_(geometry), material_(material), transform(transform) {
+    : Light(core),
+      geometry_(geometry),
+      material_(material),
+      transform(transform) {
   core_->GraphicsCore()->CreateBuffer(
       sizeof(glm::mat4x3) + sizeof(uint32_t) + geometry->PrimitiveCount() * sizeof(float), graphics::BUFFER_TYPE_STATIC,
       &direct_lighting_sampler_data_);

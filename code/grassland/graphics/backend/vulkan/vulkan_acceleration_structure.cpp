@@ -7,7 +7,8 @@ namespace grassland::graphics::backend {
 VulkanAccelerationStructure::VulkanAccelerationStructure(
     VulkanCore *core,
     std::unique_ptr<vulkan::AccelerationStructure> &&acceleration_structure)
-    : core_(core), acceleration_structure_(std::move(acceleration_structure)) {
+    : core_(core),
+      acceleration_structure_(std::move(acceleration_structure)) {
 }
 
 int VulkanAccelerationStructure::UpdateInstances(const std::vector<RayTracingInstance> &instances) {

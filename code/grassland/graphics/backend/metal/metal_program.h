@@ -8,6 +8,7 @@ class MetalComputeProgram : public ComputeProgram {
  public:
   MetalComputeProgram(MetalCore *core, MetalShader *shader) : core(core), shader(shader) {
   }
+
   void AddResourceBinding(ResourceType type, int count) override;
   void Finalize() override;
   MetalCore *core;
@@ -16,15 +17,18 @@ class MetalComputeProgram : public ComputeProgram {
   MetalStage stage;
   NS::SharedPtr<MTL::ComputePipelineState> pipeline;
 };
+
 class MetalProgram : public Program {
  public:
   MetalProgram(MetalCore *core, const std::vector<ImageFormat> &colors, ImageFormat depth);
   void AddInputBinding(uint32_t stride, bool per_instance = false) override;
   void AddInputAttribute(uint32_t binding, InputType type, uint32_t offset) override;
   void AddResourceBinding(ResourceType type, int count) override;
+
   void SetCullMode(CullMode mode) override {
     cull = mode;
   }
+
   void SetBlendState(int target, const BlendState &state) override;
   void BindShader(Shader *shader, ShaderType type) override;
   void Finalize() override;

@@ -8,10 +8,12 @@ namespace grassland::graphics::backend {
 // Every native owning reference is scoped, including autoreleased encoder objects.
 struct MetalPool {
   NS::AutoreleasePool *pool = NS::AutoreleasePool::alloc()->init();
+
   ~MetalPool() {
     pool->release();
   }
 };
+
 void MetalCheck(const void *object, NS::Error *error, const char *operation);
 MTL::PixelFormat MetalFormat(ImageFormat format);
 

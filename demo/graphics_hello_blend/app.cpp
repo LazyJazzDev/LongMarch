@@ -28,6 +28,7 @@ void Application::OnInit() {
       {{0.5f, -0.5f, 0.0f}, {1.0f, 0.0f, 1.0f, 0.5f}},   {{0.0f, 0.25f, 0.0f}, {1.0f, 0.0f, 0.0f, 1.0f}},
       {{-0.3f, -0.35f, 0.0f}, {0.0f, 0.0f, 1.0f, 1.0f}}, {{0.3f, -0.35f, 0.0f}, {0.0f, 1.0f, 0.0f, 1.0f}},
   };
+
   std::vector<uint32_t> indices = {0, 1, 2};
 
   core_->CreateBuffer(vertices.size() * sizeof(Vertex), grassland::graphics::BUFFER_TYPE_DYNAMIC, &vertex_buffer_);

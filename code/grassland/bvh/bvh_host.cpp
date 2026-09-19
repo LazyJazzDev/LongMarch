@@ -10,10 +10,12 @@ void BVHHost::UpdateInstances(const AABB *aabbs, const int *instance_indices, in
   if (nodes_.size() != num_instance * 2 - 1) {
     nodes_.resize(num_instance * 2 - 1);
   }
+
   std::vector<std::pair<AABB, int>> contents(num_instance);
   for (int i = 0; i < num_instance; i++) {
     contents[i] = {aabbs[i], instance_indices[i]};
   }
+
   BVHHostBuilder builder{nodes_.data(), 0};
   builder.Build(contents.data(), contents.size(), 0, -1);
 }

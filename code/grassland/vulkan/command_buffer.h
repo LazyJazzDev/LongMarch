@@ -5,8 +5,7 @@
 namespace grassland::vulkan {
 class CommandBuffer {
  public:
-  CommandBuffer(const class CommandPool *command_pool,
-                VkCommandBuffer command_buffer);
+  CommandBuffer(const class CommandPool *command_pool, VkCommandBuffer command_buffer);
 
   ~CommandBuffer();
 

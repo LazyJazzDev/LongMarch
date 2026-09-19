@@ -29,6 +29,7 @@ bool Adapter::SupportRayTracing() const {
   if (FAILED(D3D12CreateDevice(adapter_.Get(), D3D_FEATURE_LEVEL_12_0, IID_PPV_ARGS(&temporal_device)))) {
     return false;
   }
+
   D3D12_FEATURE_DATA_D3D12_OPTIONS5 feature_support{};
   temporal_device->CheckFeatureSupport(D3D12_FEATURE_D3D12_OPTIONS5, &feature_support, sizeof(feature_support));
   // Check if the adapter supports ray tracing tier 1.1

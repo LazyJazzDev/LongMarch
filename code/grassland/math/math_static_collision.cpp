@@ -256,6 +256,7 @@ LM_DEVICE_FUNC Real DistanceLineLine(const Vector3<Real> &p0,
     u = 0;
     return DistancePointLine(p0, q0, q1, v);
   }
+
   A = -A.inverse();
   u = A(0, 0) * b + A(0, 1) * c;
   v = A(1, 0) * b + A(1, 1) * c;

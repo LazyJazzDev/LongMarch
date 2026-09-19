@@ -10,6 +10,7 @@ struct SoftwareHit {
   uint instance;
   uint primitive;
 };
+
 // Keep the compute renderer's hit ABI and ordered transparent-shadow logic.
 // Force-opaque here means report triangle surfaces; material transmission is
 // evaluated by the shared shading code after each closest hit.

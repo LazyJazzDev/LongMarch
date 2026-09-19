@@ -29,6 +29,7 @@ void SolveLinearPolynomialLimitedRange(Scalar a,
     *num_roots = 0;
     return;
   }
+
   Scalar root = -b / a;
   if (root >= low_root && root <= high_root) {
     roots[0] = root;
@@ -134,6 +135,7 @@ void SolveCubicPolynomialLimitedRange(Scalar a,
     SolveQuadraticPolynomialLimitedRange(b, c, d, roots, num_roots, low_root, high_root);
     return;
   }
+
   Scalar derivative_a = 3 * a;
   Scalar derivative_b = 2 * b;
   Scalar derivative_c = c;

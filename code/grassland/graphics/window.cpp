@@ -4,6 +4,7 @@ namespace grassland::graphics {
 
 namespace {
 bool glfw_initialized_{false};
+
 void InitializeGLFW() {
   if (!glfw_initialized_) {
     if (!glfwInit()) {

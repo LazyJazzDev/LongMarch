@@ -1,4 +1,5 @@
 #pragma once
+
 struct PrincipledDiffuseBsdf {
   Spectrum weight;
   float sample_weight;

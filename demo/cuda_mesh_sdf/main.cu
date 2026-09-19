@@ -10,6 +10,7 @@ int main() {
   std::vector<Eigen::Vector3f> positions = {
       {-1, -1, -1}, {1, -1, -1}, {1, 1, -1}, {-1, 1, -1}, {-1, -1, 1}, {1, -1, 1}, {1, 1, 1}, {-1, 1, 1},
   };
+
   std::vector<uint32_t> indices = {
       0, 1, 2, 0, 2, 3, 1, 5, 6, 1, 6, 2, 5, 4, 7, 5, 7, 6, 4, 0, 3, 4, 3, 7, 3, 2, 6, 3, 6, 7, 0, 4, 5, 0, 5, 1,
   };
@@ -37,9 +38,11 @@ int main() {
   positions = {
       {1, 0, 0}, {0, 1, 0}, {0, 0, 1}, {0, -1, 0}, {0, 0, -1}, {-1, 0, 0},
   };
+
   indices = {
       0, 1, 2, 0, 2, 3, 0, 3, 4, 0, 4, 1, 1, 4, 5, 1, 5, 2, 2, 5, 3, 3, 5, 4,
   };
+
   outfile.open("octahedron.obj");
   for (const auto &pos : positions) {
     outfile << "v " << pos.x() << " " << pos.y() << " " << pos.z() << std::endl;

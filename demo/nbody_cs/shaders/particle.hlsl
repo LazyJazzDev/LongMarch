@@ -1,4 +1,5 @@
 #include "global_uniform_object.hlsli"
+
 struct PSInput {
   float4 position : SV_POSITION;
   [[vk::location(0)]] float2 frag_v : TEXCOORD0;

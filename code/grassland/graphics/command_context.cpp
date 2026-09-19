@@ -15,6 +15,7 @@ void CommandContext::CmdBindResources(int slot, const std::vector<Buffer *> &buf
   for (size_t i = 0; i < buffers.size(); ++i) {
     buffer_ranges[i] = buffers[i]->Range();
   }
+
   CmdBindResources(slot, buffer_ranges, bind_point);
 }
 

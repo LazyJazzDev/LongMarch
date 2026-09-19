@@ -9,9 +9,11 @@ class Scene : public Object {
   Scene(sparkium::Scene &scene);
 
   void Render(Camera *camera, Film *film, bool software = false, bool ray_query = false);
+
   bool SoftwareTracing() const {
     return software_tracing_;
   }
+
   int32_t RegisterSoftwareInstance(Geometry *geometry,
                                    Material *material,
                                    const glm::mat4x3 &transform,

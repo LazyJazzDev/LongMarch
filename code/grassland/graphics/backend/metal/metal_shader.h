@@ -9,9 +9,11 @@ class MetalShader : public Shader {
  public:
   explicit MetalShader(const CompiledShaderBlob &blob) : blob(blob) {
   }
+
   std::string EntryPoint() const override {
     return blob.entry_point;
   }
+
   CompiledShaderBlob blob;
 };
 
@@ -20,6 +22,7 @@ struct MetalStage {
   std::map<int, NS::SharedPtr<MTL::ArgumentEncoder>> arguments;
   MTL::Size threads{1, 1, 1};
 };
+
 MetalStage CompileMetalStage(MetalCore *core, MetalShader *shader, const std::vector<MetalBinding> &bindings);
 
 }  // namespace grassland::graphics::backend

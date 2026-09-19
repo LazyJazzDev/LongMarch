@@ -1,11 +1,11 @@
 repos:
   - repo: https://github.com/pre-commit/mirrors-clang-format
-    rev: v13.0.1
+    rev: v18.1.8
     hooks:
       - id: clang-format
-        files: '\.(glsl|frag|vert|cu|cuh|cc|cpp|hpp|h|c|cxx|hxx|rchit|rgen|rmiss|comp|proto|hlsl)$'
+        files: '\.(glsl|frag|vert|cu|cuh|cc|cpp|hpp|h|c|cxx|hxx|rchit|rgen|rmiss|comp|proto|hlsl|hlsli|m|mm)$'
         types_or: ['text']
-
+        args: ['--style=file']
 
   - repo: https://github.com/pre-commit/pre-commit-hooks
     rev: v6.0.0

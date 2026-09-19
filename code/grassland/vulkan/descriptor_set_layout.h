@@ -5,10 +5,9 @@
 namespace grassland::vulkan {
 class DescriptorSetLayout {
  public:
-  DescriptorSetLayout(
-      const class Device *device,
-      VkDescriptorSetLayout layout,
-      const std::vector<VkDescriptorSetLayoutBinding> &bindings);
+  DescriptorSetLayout(const class Device *device,
+                      VkDescriptorSetLayout layout,
+                      const std::vector<VkDescriptorSetLayoutBinding> &bindings);
 
   ~DescriptorSetLayout();
 

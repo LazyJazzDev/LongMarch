@@ -6,6 +6,7 @@ class Entity : public Object {
  public:
   Entity(Core *core) : core_(core) {
   }
+
   virtual ~Entity() = default;
   virtual void Update(Scene *scene) = 0;
 

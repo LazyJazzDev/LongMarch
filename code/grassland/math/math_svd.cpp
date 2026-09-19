@@ -19,11 +19,13 @@ LM_DEVICE_FUNC void EigenDecomp(const Matrix2<Real> &A, Matrix2<Real> &D, Matrix
   if (cs2[0] < 0) {
     cs2 = -cs2;
   }
+
   Real c = sqrt(2 + 2 * cs2[0]) / 2;
   Real s = sqrt(2 - 2 * cs2[0]) / 2;
   if (cs2[1] < 0) {
     s = -s;
   }
+
   G << c, -s, s, c;
   D = G * A * G.transpose();
   G(0, 1) = -G(0, 1);

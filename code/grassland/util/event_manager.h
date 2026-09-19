@@ -8,8 +8,7 @@ namespace grassland {
 template <class Func>
 class EventManager {
  public:
-  uint32_t RegisterCallback(const std::function<Func> &callback,
-                            int priority = 100) {
+  uint32_t RegisterCallback(const std::function<Func> &callback, int priority = 100) {
     callbacks_[callback_counter_] = std::make_pair(callback, priority);
     priority_map_[priority].insert(callback_counter_);
     return callback_counter_++;

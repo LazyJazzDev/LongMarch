@@ -5,6 +5,7 @@ struct Sphere {
   float cx{0.0f};
   float cy{0.0f};
   float cz{0.0f};
+
   __device__ __host__ float operator()(float x, float y, float z) const {
     x -= cx;
     y -= cy;
@@ -16,8 +17,10 @@ struct Sphere {
 template <class SDFOp>
 struct Reverse {
   SDFOp SDF;
+
   Reverse(const SDFOp &sdf) : SDF(sdf) {
   }
+
   __device__ __host__ float operator()(float x, float y, float z) const {
     return -SDF(x, y, z);
   }
@@ -30,6 +33,7 @@ struct Cube {
   float cx{0.0f};
   float cy{0.0f};
   float cz{0.0f};
+
   __device__ __host__ float operator()(float x, float y, float z) const {
     x -= cx;
     y -= cy;
@@ -51,8 +55,10 @@ template <class SDFOp>
 struct Extend {
   SDFOp SDF;
   float radius;
+
   Extend(const SDFOp &sdf, float radius = 0.0f) : SDF(sdf), radius(radius) {
   }
+
   __device__ __host__ float operator()(float x, float y, float z) const {
     return SDF(x, y, z) - radius;
   }
@@ -62,8 +68,10 @@ template <class Op1, class Op2>
 struct Union {
   Op1 op1;
   Op2 op2;
+
   Union(const Op1 &o1 = Op1(), const Op2 &o2 = Op2()) : op1(o1), op2(o2) {
   }
+
   __device__ __host__ float operator()(float x, float y, float z) const {
     float d1 = op1(x, y, z);
     float d2 = op2(x, y, z);
@@ -75,8 +83,10 @@ template <class Op1, class Op2>
 struct Intersection {
   Op1 op1;
   Op2 op2;
+
   Intersection(const Op1 &o1 = Op1(), const Op2 &o2 = Op2()) : op1(o1), op2(o2) {
   }
+
   __device__ __host__ float operator()(float x, float y, float z) const {
     float d1 = op1(x, y, z);
     float d2 = op2(x, y, z);

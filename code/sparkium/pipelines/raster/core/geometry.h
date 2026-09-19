@@ -7,6 +7,7 @@ class Geometry : public Object {
  public:
   explicit Geometry(Core *core) : core_(core) {
   }
+
   virtual ~Geometry() = default;
   virtual graphics::Shader *VertexShader() = 0;
   virtual void SetupProgram(graphics::Program *program);

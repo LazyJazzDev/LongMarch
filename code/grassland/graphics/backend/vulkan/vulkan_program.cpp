@@ -45,10 +45,9 @@ void VulkanProgramBase::FinalizePipelineLayout() {
   if (descriptor_set_layouts_.size() > limits.maxBoundDescriptorSets ||
       storage_buffers > limits.maxPerStageDescriptorStorageBuffers ||
       sampled_images > limits.maxPerStageDescriptorSampledImages)
-    throw std::runtime_error("pipeline exceeds Vulkan descriptor limits: " +
-                             std::to_string(storage_buffers) + " storage buffers (limit " +
-                             std::to_string(limits.maxPerStageDescriptorStorageBuffers) + "), " +
-                             std::to_string(sampled_images) + " sampled images (limit " +
+    throw std::runtime_error("pipeline exceeds Vulkan descriptor limits: " + std::to_string(storage_buffers) +
+                             " storage buffers (limit " + std::to_string(limits.maxPerStageDescriptorStorageBuffers) +
+                             "), " + std::to_string(sampled_images) + " sampled images (limit " +
                              std::to_string(limits.maxPerStageDescriptorSampledImages) + "), " +
                              std::to_string(descriptor_set_layouts_.size()) + " sets (limit " +
                              std::to_string(limits.maxBoundDescriptorSets) + ")");
@@ -116,7 +115,8 @@ const vulkan::PipelineSettings *VulkanProgram::PipelineSettings() const {
 }
 
 VulkanComputeProgram::VulkanComputeProgram(VulkanCore *core, VulkanShader *compute_shader)
-    : VulkanProgramBase(core), compute_shader_(compute_shader) {
+    : VulkanProgramBase(core),
+      compute_shader_(compute_shader) {
 }
 
 VulkanComputeProgram::~VulkanComputeProgram() {
@@ -137,8 +137,8 @@ void VulkanComputeProgram::Finalize() {
   pipeline_create_info.stage.module = compute_shader_->ShaderModule()->Handle();
   pipeline_create_info.stage.pName = compute_shader_->ShaderModule()->EntryPoint().c_str();
   pipeline_create_info.stage.pSpecializationInfo = nullptr;
-  const VkResult result = vkCreateComputePipelines(core_->Device()->Handle(), VK_NULL_HANDLE, 1,
-                                                    &pipeline_create_info, nullptr, &pipeline_);
+  const VkResult result = vkCreateComputePipelines(core_->Device()->Handle(), VK_NULL_HANDLE, 1, &pipeline_create_info,
+                                                   nullptr, &pipeline_);
   if (result != VK_SUCCESS)
     throw std::runtime_error("failed to create Vulkan compute pipeline: " + std::to_string(result));
 }
@@ -181,6 +181,7 @@ void VulkanRayTracingProgram::AddHitGroup(HitGroup hit_group) {
   if (vk_any_hit_shader) {
     vk_hit_group.any_hit_shader = vk_any_hit_shader->ShaderModule();
   }
+
   auto vk_intersection_shader = dynamic_cast<VulkanShader *>(hit_group.intersection_shader);
   if (vk_intersection_shader) {
     vk_hit_group.intersection_shader = vk_intersection_shader->ShaderModule();

@@ -5,7 +5,8 @@
 namespace sparkium::raster {
 
 GeometryMesh::GeometryMesh(sparkium::GeometryMesh &geometry)
-    : geometry_(geometry), Geometry(DedicatedCast(geometry.GetCore())) {
+    : geometry_(geometry),
+      Geometry(DedicatedCast(geometry.GetCore())) {
   auto header = geometry_.GetHeader();
   std::vector<std::string> args;
   if (header.normal_offset) {

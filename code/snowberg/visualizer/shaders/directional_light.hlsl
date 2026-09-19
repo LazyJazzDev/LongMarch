@@ -20,6 +20,7 @@ PSInput VSMain(uint vertex_index : SV_VertexID) {
       float2(-1.0f, -1.0f), float2(1.0f, -1.0f), float2(-1.0f, 1.0f),
       float2(1.0f, -1.0f),  float2(1.0f, 1.0f),  float2(-1.0f, 1.0f),
   };
+
   PSInput output;
   output.position = float4(rect_poses[vertex_index], 0.0f, 1.0f);
   return output;

@@ -18,8 +18,7 @@ void SampleMaterial(inout RenderContext context, HitRecord hit_record) {
   // emitter does not scatter the ray, so crossing one or more coplanar light
   // triangles must keep camera visibility disabled.  Actual reflection and
   // transmission events update ray_type and can see the emitter normally.
-  if ((camera_visible || context.ray_type != RAY_TYPE_CAMERA) &&
-      (two_sided || hit_record.front_facing)) {
+  if ((camera_visible || context.ray_type != RAY_TYPE_CAMERA) && (two_sided || hit_record.front_facing)) {
     float mis_weight = 1.0;
 
     if (instance_meta.custom_index != -1) {

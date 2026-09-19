@@ -18,17 +18,21 @@ void CheckPoint(BindPoint point) {
     throw std::runtime_error("Metal native ray tracing programs are unavailable; use Sparkium compute fallback");
 }
 }  // namespace
+
 MetalCommandContext::MetalCommandContext(MetalCore *core) : core_(core) {
   MetalPool pool;
   command_ = NS::RetainPtr(core_->Queue()->commandBuffer());
   MetalCheck(command_.get(), nullptr, "commandBuffer");
 }
+
 MetalCommandContext::~MetalCommandContext() {
   EndEncoder();
 }
+
 Core *MetalCommandContext::GetCore() const {
   return core_;
 }
+
 void MetalCommandContext::EndEncoder() {
   render_pass_.reset();
   if (compute_) {
@@ -40,19 +44,23 @@ void MetalCommandContext::EndEncoder() {
     render_.reset();
   }
 }
+
 void MetalCommandContext::CmdBindProgram(Program *program) {
   program_ = dynamic_cast<MetalProgram *>(program);
   if (!program_)
     throw std::invalid_argument("expected MetalProgram");
 }
+
 void MetalCommandContext::CmdBindComputeProgram(ComputeProgram *program) {
   compute_program_ = dynamic_cast<MetalComputeProgram *>(program);
   if (!compute_program_)
     throw std::invalid_argument("expected MetalComputeProgram");
 }
+
 void MetalCommandContext::CmdBindRayTracingProgram(RayTracingProgram *) {
   CheckPoint(BIND_POINT_RAYTRACING);
 }
+
 void MetalCommandContext::CmdBindResources(int slot, AccelerationStructure *structure, BindPoint point) {
   if (point != BIND_POINT_COMPUTE)
     throw std::invalid_argument("Metal acceleration structures currently support compute bindings only");
@@ -61,21 +69,26 @@ void MetalCommandContext::CmdBindResources(int slot, AccelerationStructure *stru
     throw std::invalid_argument("expected Metal acceleration structure");
   resources_[point][slot] = {{}, {}, {}, structure};
 }
+
 void MetalCommandContext::CmdDispatchRays(uint32_t, uint32_t, uint32_t) {
   CheckPoint(BIND_POINT_RAYTRACING);
 }
+
 void MetalCommandContext::CmdBindResources(int slot, const std::vector<BufferRange> &buffers, BindPoint point) {
   CheckPoint(point);
   resources_[point][slot] = {buffers, {}, {}};
 }
+
 void MetalCommandContext::CmdBindResources(int slot, const std::vector<Image *> &images, BindPoint point) {
   CheckPoint(point);
   resources_[point][slot] = {{}, images, {}};
 }
+
 void MetalCommandContext::CmdBindResources(int slot, const std::vector<Sampler *> &samplers, BindPoint point) {
   CheckPoint(point);
   resources_[point][slot] = {{}, {}, samplers};
 }
+
 void MetalCommandContext::BindStage(MetalStage &stage,
                                     const std::vector<MetalBinding> &layout,
                                     BindPoint point,
@@ -148,6 +161,7 @@ void MetalCommandContext::BindStage(MetalStage &stage,
       render_->setFragmentBuffer(argument.get(), 0, slot);
   }
 }
+
 void MetalCommandContext::CmdDispatch(uint32_t x, uint32_t y, uint32_t z) {
   if (!compute_program_)
     throw std::runtime_error("no compute program bound");
@@ -162,6 +176,7 @@ void MetalCommandContext::CmdDispatch(uint32_t x, uint32_t y, uint32_t z) {
   // BVH sorting/build/refit and traversal dispatches share storage buffers.
   compute_->memoryBarrier(MTL::BarrierScopeBuffers | MTL::BarrierScopeTextures);
 }
+
 void MetalCommandContext::CmdBeginRendering(const std::vector<Image *> &colors, Image *depth) {
   if (render_pass_)
     throw std::runtime_error("nested Metal render pass");
@@ -182,9 +197,11 @@ void MetalCommandContext::CmdBeginRendering(const std::vector<Image *> &colors, 
   render_pass_ = NS::RetainPtr(pass);
   attachmentless_ = colors.empty() && !depth;
 }
+
 void MetalCommandContext::CmdEndRendering() {
   EndEncoder();
 }
+
 void MetalCommandContext::CmdSetViewport(const Viewport &v) {
   if (!render_pass_)
     throw std::runtime_error("viewport outside render pass");
@@ -193,6 +210,7 @@ void MetalCommandContext::CmdSetViewport(const Viewport &v) {
   if (render_)
     render_->setViewport(viewport_);
 }
+
 void MetalCommandContext::CmdSetScissor(const Scissor &s) {
   if (!render_pass_ || s.offset.x < 0 || s.offset.y < 0)
     throw std::runtime_error("invalid Metal scissor");
@@ -201,6 +219,7 @@ void MetalCommandContext::CmdSetScissor(const Scissor &s) {
   if (render_)
     render_->setScissorRect(scissor_);
 }
+
 void MetalCommandContext::CmdSetPrimitiveTopology(PrimitiveTopology topology) {
   static const MTL::PrimitiveType types[] = {MTL::PrimitiveTypeTriangle, MTL::PrimitiveTypeTriangleStrip,
                                              MTL::PrimitiveTypeLine, MTL::PrimitiveTypeLineStrip,
@@ -209,6 +228,7 @@ void MetalCommandContext::CmdSetPrimitiveTopology(PrimitiveTopology topology) {
     throw std::invalid_argument("primitive topology");
   topology_ = types[topology];
 }
+
 void MetalCommandContext::CmdBindVertexBuffers(uint32_t first,
                                                const std::vector<Buffer *> &buffers,
                                                const std::vector<uint64_t> &offsets) {
@@ -217,9 +237,11 @@ void MetalCommandContext::CmdBindVertexBuffers(uint32_t first,
   for (size_t i = 0; i < buffers.size(); ++i)
     vertices_.insert_or_assign(first + i, BufferRange(buffers[i], offsets[i]));
 }
+
 void MetalCommandContext::CmdBindIndexBuffer(Buffer *buffer, uint64_t offset) {
   index_ = BufferRange(buffer, offset);
 }
+
 void MetalCommandContext::PrepareDraw() {
   if (!render_pass_ || !program_)
     throw std::runtime_error("draw needs a render pass and program");
@@ -252,13 +274,16 @@ void MetalCommandContext::PrepareDraw() {
       throw std::invalid_argument("expected Metal vertex buffer");
     render_->setVertexBuffer(buffer->Handle(), range.offset, 16 + slot);
   }
+
   BindStage(program_->vertex_stage, program_->bindings, BIND_POINT_GRAPHICS, true);
   BindStage(program_->fragment_stage, program_->bindings, BIND_POINT_GRAPHICS, false);
 }
+
 void MetalCommandContext::CmdDraw(uint32_t count, uint32_t instances, int32_t first, uint32_t base_instance) {
   PrepareDraw();
   render_->drawPrimitives(topology_, NS::UInteger(first), count, instances, base_instance);
 }
+
 void MetalCommandContext::CmdDrawIndexed(uint32_t count,
                                          uint32_t instances,
                                          uint32_t first,
@@ -271,6 +296,7 @@ void MetalCommandContext::CmdDrawIndexed(uint32_t count,
   render_->drawIndexedPrimitives(topology_, count, MTL::IndexTypeUInt32, buffer->Handle(), index_.offset + first * 4,
                                  instances, base_vertex, base_instance);
 }
+
 void MetalCommandContext::CmdClearImage(Image *image, const ClearValue &value) {
   if (render_pass_)
     throw std::runtime_error("clear inside render pass");
@@ -293,6 +319,7 @@ void MetalCommandContext::CmdClearImage(Image *image, const ClearValue &value) {
   }
   command_->renderCommandEncoder(pass)->endEncoding();
 }
+
 void MetalCommandContext::CmdCopyBuffer(Buffer *dst,
                                         Buffer *src,
                                         uint64_t size,
@@ -310,6 +337,7 @@ void MetalCommandContext::CmdCopyBuffer(Buffer *dst,
                        dynamic_cast<MetalBuffer *>(dst)->Handle(), dst_offset, size);
   blit->endEncoding();
 }
+
 void MetalCommandContext::CmdPresent(Window *window, Image *image) {
   EndEncoder();
   dynamic_cast<MetalWindow *>(window)->Present(command_.get(), dynamic_cast<MetalImage *>(image));

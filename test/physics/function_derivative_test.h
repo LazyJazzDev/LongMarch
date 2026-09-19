@@ -83,6 +83,7 @@ void TestFunctionSetWithInput(
   auto OutputTypeToOutputVec = [](const typename FunctionSet::OutputType &y) -> OutputVec {
     return Eigen::Map<const OutputVec>(y.data());
   };
+
   Real eps = Eps<Real>();
   OutputVec y = OutputTypeToOutputVec(f(InputVecToInputType(x)));
 #if defined(__CUDACC__)

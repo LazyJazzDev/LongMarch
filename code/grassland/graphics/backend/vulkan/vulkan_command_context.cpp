@@ -13,8 +13,11 @@ namespace {
 class TimestampCommand : public VulkanCommand {
  public:
   TimestampCommand(VkQueryPool pool, uint32_t index, uint32_t reset_count)
-      : pool_(pool), index_(index), reset_count_(reset_count) {
+      : pool_(pool),
+        index_(index),
+        reset_count_(reset_count) {
   }
+
   void CompileCommand(VulkanCommandContext *, VkCommandBuffer buffer) override {
     if (reset_count_)
       vkCmdResetQueryPool(buffer, pool_, 0, reset_count_);
@@ -107,6 +110,7 @@ void VulkanCommandContext::CmdBindResources(int slot, const std::vector<BufferRa
     LogError("[Graphics.Vulkan] Program on bind point {} is not set", int(bind_point));
     return;
   }
+
   std::vector<VulkanBufferRange> vk_buffers(buffers.size());
   for (size_t i = 0; i < buffers.size(); ++i) {
     vk_buffers[i] = buffers[i];
@@ -123,6 +127,7 @@ void VulkanCommandContext::CmdBindResources(int slot, const std::vector<Image *>
     LogError("[Graphics.Vulkan] Program on bind point {} is not set", int(bind_point));
     return;
   }
+
   std::vector<VulkanImage *> vk_images(images.size());
   bool update_layout = true;
   for (size_t i = 0; i < images.size(); ++i) {
@@ -144,6 +149,7 @@ void VulkanCommandContext::CmdBindResources(int slot, const std::vector<Sampler 
     LogError("[Graphics.Vulkan] Program on bind point {} is not set", int(bind_point));
     return;
   }
+
   std::vector<VulkanSampler *> vk_samplers(samplers.size());
   for (size_t i = 0; i < samplers.size(); ++i) {
     vk_samplers[i] = dynamic_cast<VulkanSampler *>(samplers[i]);
@@ -161,6 +167,7 @@ void VulkanCommandContext::CmdBindResources(int slot,
     LogError("[Graphics.Vulkan] Program on bind point {} is not set", int(bind_point));
     return;
   }
+
   auto vk_acceleration_structure = dynamic_cast<VulkanAccelerationStructure *>(acceleration_structure);
   commands_.push_back(std::make_unique<VulkanCmdBindResourceAccelerationStructure>(
       slot, vk_acceleration_structure, program_bases_[bind_point], bind_point));
@@ -240,6 +247,7 @@ void VulkanCommandContext::RequireImageState(VkCommandBuffer cmd_buffer,
   if (image_states_.count(image) == 0) {
     image_states_[image] = {VK_IMAGE_LAYOUT_GENERAL, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, VK_ACCESS_NONE};
   }
+
   auto &state = image_states_[image];
   vulkan::TransitImageLayout(cmd_buffer, image, state.layout, layout, state.stage, stage, state.access, access, aspect);
   state = {layout, stage, access, aspect};

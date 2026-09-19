@@ -79,6 +79,7 @@ PSOutput PSMain(PSInput input, bool is_front_facing
     normal = -normal;
     filter_color = float4(0.5, 0.5, 1.0, 1.0);
   }
+
   PSOutput output = (PSOutput)0;
   // out_exposure = vec4(frag_color.rgb * (max(0.0, dot(normal,
   // normalize(vec3(3.0, 1.0, 2.0)))) * 0.5 + 0.5), 1.0)

@@ -9,7 +9,8 @@ VulkanWindow::VulkanWindow(VulkanCore *core,
                            bool fullscreen,
                            bool resizable,
                            bool enable_hdr)
-    : Window(width, height, title, fullscreen, resizable, enable_hdr), core_(core) {
+    : Window(width, height, title, fullscreen, resizable, enable_hdr),
+      core_(core) {
   core_->Instance()->CreateSurfaceFromGLFWWindow(GLFWWindow(), &surface_);
   core_->Device()->CreateSwapchain(
       surface_.get(), enable_hdr_ ? VK_FORMAT_R16G16B16A16_SFLOAT : VK_FORMAT_R8G8B8A8_UNORM,

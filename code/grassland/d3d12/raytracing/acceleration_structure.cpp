@@ -5,7 +5,9 @@
 namespace grassland::d3d12 {
 
 AccelerationStructure::AccelerationStructure(Device *device, const ComPtr<ID3D12Resource> &as, int num_instance)
-    : device_(device), as_(as), num_instance_(num_instance) {
+    : device_(device),
+      as_(as),
+      num_instance_(num_instance) {
 }
 
 HRESULT AccelerationStructure::UpdateInstances(const std::vector<D3D12_RAYTRACING_INSTANCE_DESC> &instances,

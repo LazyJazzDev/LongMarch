@@ -14,15 +14,19 @@ class SoftwarePipeline {
               const std::vector<graphics::Buffer *> &buffers,
               uint32_t sdr_count,
               uint32_t hdr_count);
+
   graphics::ComputeProgram *Program() const {
     return render_program_.get();
   }
+
   graphics::AccelerationStructure *AccelerationStructure() const {
     return native_tlas_.get();
   }
+
   graphics::Buffer *Nodes() const {
     return nodes_.get();
   }
+
   graphics::Buffer *Instances() const {
     return instances_buffer_.get();
   }
@@ -34,6 +38,7 @@ class SoftwarePipeline {
     glm::mat4x3 transform;
     uint32_t geometry_index;
   };
+
   struct GeometryLayout {
     Geometry *geometry;
     uint32_t root;
@@ -41,22 +46,27 @@ class SoftwarePipeline {
     uint32_t count;
     uint32_t buffer_index;
   };
+
   struct BuildParameters {
     uint32_t root{}, leaves{}, count{}, geometry{}, first{}, level_count{}, stage{}, stride{}, instance_tree{};
     uint32_t padding[55]{};
   };
+
   struct BuildPass {
     uint32_t kernel;
     BuildParameters parameters;
     uint32_t count;
   };
+
   struct MaterialCode {
     bool shader_graph;
     std::string source;
+
     bool operator==(const MaterialCode &other) const {
       return shader_graph == other.shader_graph && source == other.source;
     }
   };
+
   void CompileBuilders(uint32_t buffer_count);
   void CompileRenderer(const std::vector<MaterialCode> &materials,
                        uint32_t buffers,

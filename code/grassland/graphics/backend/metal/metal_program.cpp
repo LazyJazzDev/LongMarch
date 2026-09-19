@@ -13,9 +13,11 @@ void AddBinding(std::vector<MetalBinding> &bindings, ResourceType type, int coun
   bindings.push_back({type, count});
 }
 }  // namespace
+
 void MetalComputeProgram::AddResourceBinding(ResourceType type, int count) {
   AddBinding(bindings, type, count);
 }
+
 void MetalComputeProgram::Finalize() {
   MetalPool pool;
   stage = CompileMetalStage(core, shader, bindings);
@@ -25,6 +27,7 @@ void MetalComputeProgram::Finalize() {
   if (stage.threads.width * stage.threads.height * stage.threads.depth > pipeline->maxTotalThreadsPerThreadgroup())
     throw std::runtime_error("shader threadgroup exceeds Metal pipeline limit");
 }
+
 MetalProgram::MetalProgram(MetalCore *core, const std::vector<ImageFormat> &colors, ImageFormat depth) : core(core) {
   MetalPool pool;
   descriptor = NS::TransferPtr(MTL::RenderPipelineDescriptor::alloc()->init());
@@ -40,6 +43,7 @@ MetalProgram::MetalProgram(MetalCore *core, const std::vector<ImageFormat> &colo
   depth_descriptor->setDepthWriteEnabled(depth != IMAGE_FORMAT_UNDEFINED);
   depth_state = NS::TransferPtr(core->Device()->newDepthStencilState(depth_descriptor.get()));
 }
+
 void MetalProgram::AddInputBinding(uint32_t stride, bool per_instance) {
   if (input_bindings >= 15)
     throw std::out_of_range("Metal vertex binding slots");
@@ -48,6 +52,7 @@ void MetalProgram::AddInputBinding(uint32_t stride, bool per_instance) {
   layout->setStepFunction(per_instance ? MTL::VertexStepFunctionPerInstance : MTL::VertexStepFunctionPerVertex);
   layout->setStepRate(1);
 }
+
 void MetalProgram::AddInputAttribute(uint32_t binding, InputType type, uint32_t offset) {
   static const MTL::VertexFormat formats[] = {MTL::VertexFormatUInt,  MTL::VertexFormatInt,  MTL::VertexFormatFloat,
                                               MTL::VertexFormatUInt2, MTL::VertexFormatInt2, MTL::VertexFormatFloat2,
@@ -60,9 +65,11 @@ void MetalProgram::AddInputAttribute(uint32_t binding, InputType type, uint32_t 
   attribute->setOffset(offset);
   attribute->setBufferIndex(16 + binding);
 }
+
 void MetalProgram::AddResourceBinding(ResourceType type, int count) {
   AddBinding(bindings, type, count);
 }
+
 void MetalProgram::SetBlendState(int target, const BlendState &state) {
   if (target < 0 || target >= 8)
     throw std::out_of_range("Metal blend target");
@@ -85,6 +92,7 @@ void MetalProgram::SetBlendState(int target, const BlendState &state) {
   attachment->setRgbBlendOperation(static_cast<MTL::BlendOperation>(state.color_op));
   attachment->setAlphaBlendOperation(static_cast<MTL::BlendOperation>(state.alpha_op));
 }
+
 void MetalProgram::BindShader(Shader *shader, ShaderType type) {
   auto metal = dynamic_cast<MetalShader *>(shader);
   if (!metal)
@@ -96,6 +104,7 @@ void MetalProgram::BindShader(Shader *shader, ShaderType type) {
   else
     throw std::runtime_error("Metal does not support geometry shaders");
 }
+
 void MetalProgram::Finalize() {
   MetalPool pool;
   vertex_stage = CompileMetalStage(core, vertex, bindings);
@@ -104,6 +113,7 @@ void MetalProgram::Finalize() {
     fragment_stage = CompileMetalStage(core, fragment, bindings);
     descriptor->setFragmentFunction(fragment_stage.function.get());
   }
+
   NS::Error *error = nullptr;
   pipeline = NS::TransferPtr(core->Device()->newRenderPipelineState(descriptor.get(), &error));
   MetalCheck(pipeline.get(), error, "newRenderPipelineState");

@@ -23,6 +23,7 @@ uint32_t LeafCount(size_t count) {
     result *= 2;
   return result;
 }
+
 std::string MaterialSource(const CodeLines &source) {
   std::istringstream input(static_cast<std::string>(source));
   std::string line, result;
@@ -35,11 +36,13 @@ std::string MaterialSource(const CodeLines &source) {
   }
   return result;
 }
+
 struct GPUInstance {
   glm::mat4x3 object_to_world;
   glm::mat4x3 world_to_object;
   uint32_t root, geometry, material, primitive_count;
 };
+
 static_assert(sizeof(GPUInstance) == 112, "HLSL software instance layout changed");
 }  // namespace
 
@@ -48,15 +51,18 @@ SoftwarePipeline::SoftwarePipeline(Core *core, bool ray_query) : core_(core), ra
     throw std::runtime_error("native ray queries are unavailable on the selected backend");
   static_assert(sizeof(BuildParameters) == 256, "uniform buffer alignment");
 }
+
 void SoftwarePipeline::ClearInstances() {
   instances_.clear();
 }
+
 void SoftwarePipeline::AddInstance(Geometry *geometry,
                                    Material *material,
                                    const glm::mat4x3 &transform,
                                    uint32_t geometry_index) {
   instances_.push_back({geometry, material, transform, geometry_index});
 }
+
 void SoftwarePipeline::CompileBuilders(uint32_t buffer_count) {
   graphics::CpuProfileScope compile_profile("compile_builders");
   auto graphics = core_->GraphicsCore();
@@ -82,6 +88,7 @@ void SoftwarePipeline::CompileBuilders(uint32_t buffer_count) {
   }
   builder_buffer_count_ = buffer_count;
 }
+
 void SoftwarePipeline::CompileRenderer(const std::vector<MaterialCode> &materials,
                                        uint32_t buffers,
                                        uint32_t sdr_count,
@@ -146,8 +153,9 @@ float Transmission(HitRecord hit, float3 direction) {
     for (size_t i = 0; i < materials.size(); ++i) {
       source << "case " << i << ": return ";
       if (materials[i].shader_graph)
-        source << "1.0f - saturate(GraphShadowOpacity(SoftwareMaterial" << i
-               << "::EvaluateShaderGraph(hit, -direction, 1, RAY_TYPE_REFLECTION, true, SoftwareMaterialData(hit))));\n";
+        source
+            << "1.0f - saturate(GraphShadowOpacity(SoftwareMaterial" << i
+            << "::EvaluateShaderGraph(hit, -direction, 1, RAY_TYPE_REFLECTION, true, SoftwareMaterialData(hit))));\n";
       else
         source << "SoftwareMaterial" << i << "::Transmission(hit, direction);\n";
     }
@@ -158,12 +166,14 @@ float Transmission(HitRecord hit, float3 direction) {
               "switch (material) {\n";
     for (size_t i = 0; i < materials.size(); ++i)
       source << "case " << i << ": SoftwareMaterial" << i << "::SampleMaterial(context, hit); return;\n";
-    source << "default: context.throughput = float3(0, 0, 0); break;\n}}\n"
-              "float SoftwareShadowTransmission(uint material, HitRecord hit, float3 direction) {\nswitch (material) {\n";
+    source
+        << "default: context.throughput = float3(0, 0, 0); break;\n}}\n"
+           "float SoftwareShadowTransmission(uint material, HitRecord hit, float3 direction) {\nswitch (material) {\n";
     for (size_t i = 0; i < materials.size(); ++i)
       source << "case " << i << ": return SoftwareMaterial" << i << "::Transmission(hit, direction);\n";
     source << "default: return 0.0f;\n}}\n";
   }
+
   auto vfs = core_->GetShadersVFS();
   vfs.WriteFile("software_materials.hlsli", source.str());
   render_program_.reset();
@@ -192,6 +202,7 @@ float Transmission(HitRecord hit, float3 direction) {
   sdr_count_ = sdr_count;
   hdr_count_ = hdr_count;
 }
+
 void SoftwarePipeline::AppendBuild(std::vector<BuildPass> &passes, BuildParameters parameters) {
   passes.push_back({0, parameters, parameters.leaves});
   auto reduce = [&]() {
@@ -201,6 +212,7 @@ void SoftwarePipeline::AppendBuild(std::vector<BuildPass> &passes, BuildParamete
       passes.push_back({1, parameters, count});
     }
   };
+
   reduce();
   if (parameters.leaves > 1) {
     passes.push_back({2, parameters, parameters.leaves});
@@ -215,6 +227,7 @@ void SoftwarePipeline::AppendBuild(std::vector<BuildPass> &passes, BuildParamete
     reduce();
   }
 }
+
 void SoftwarePipeline::Update(graphics::CommandContext *commands,
                               const std::vector<graphics::Buffer *> &buffers,
                               uint32_t sdr_count,
@@ -262,6 +275,7 @@ void SoftwarePipeline::Update(graphics::CommandContext *commands,
           blas->MakeInstance(instance.transform, static_cast<uint32_t>(native_instances.size())));
     }
   }
+
   bool rebuild = !nodes_ || tlas_leaves != tlas_leaves_ || geometries.size() != geometries_.size();
   for (size_t i = 0; !rebuild && i < geometries.size(); ++i)
     rebuild = geometries[i].geometry != geometries_[i].geometry || geometries[i].count != geometries_[i].count;
@@ -269,6 +283,7 @@ void SoftwarePipeline::Update(graphics::CommandContext *commands,
     graphics->CreateBuffer(node_count * 32, graphics::BUFFER_TYPE_STATIC, &nodes_);
     graphics->CreateBuffer(uint64_t(max_leaves) * 8, graphics::BUFFER_TYPE_STATIC, &keys_);
   }
+
   size_t instance_bytes = 16 + gpu_instances.size() * sizeof(GPUInstance);
   if (!instances_buffer_ || instances_buffer_->Size() < instance_bytes)
     graphics->CreateBuffer(instance_bytes, graphics::BUFFER_TYPE_STATIC, &instances_buffer_);

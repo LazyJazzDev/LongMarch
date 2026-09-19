@@ -38,6 +38,7 @@ __device__ void StretchingEnergy(const ElementStretching &stretching,
   } else {
     dXdxi = Dm_inv.row(1).transpose();
   }
+
   Vector3<float> Fz = F.col(0).cross(F.col(1));
   Vector3<float> n = Fz.normalized();
   float J = Fz.norm();

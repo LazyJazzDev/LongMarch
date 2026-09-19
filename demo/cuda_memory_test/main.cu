@@ -13,8 +13,8 @@ template <int block_size>
 struct MemoryBlock {
   uint32_t data[block_size >> 2]{};
   __host__ __device__ MemoryBlock() = default;
-  __host__ __device__ MemoryBlock<block_size> operator+(
-      const MemoryBlock<block_size> &other) const {
+
+  __host__ __device__ MemoryBlock<block_size> operator+(const MemoryBlock<block_size> &other) const {
     MemoryBlock<block_size> result;
 #pragma unroll
     for (int i = 0; i < block_size >> 2; i++) {
@@ -23,8 +23,7 @@ struct MemoryBlock {
     return result;
   }
 
-  __host__ __device__ MemoryBlock<block_size> operator-(
-      const MemoryBlock<block_size> &other) const {
+  __host__ __device__ MemoryBlock<block_size> operator-(const MemoryBlock<block_size> &other) const {
     MemoryBlock<block_size> result;
 #pragma unroll
     for (int i = 0; i < block_size >> 2; i++) {
@@ -33,8 +32,7 @@ struct MemoryBlock {
     return result;
   }
 
-  __host__ __device__ MemoryBlock<block_size> operator*(
-      const MemoryBlock<block_size> &other) const {
+  __host__ __device__ MemoryBlock<block_size> operator*(const MemoryBlock<block_size> &other) const {
     MemoryBlock<block_size> result;
 #pragma unroll
     for (int i = 0; i < block_size >> 2; i++) {
@@ -43,8 +41,7 @@ struct MemoryBlock {
     return result;
   }
 
-  __host__ __device__ MemoryBlock<block_size> operator^(
-      const MemoryBlock<block_size> &other) const {
+  __host__ __device__ MemoryBlock<block_size> operator^(const MemoryBlock<block_size> &other) const {
     MemoryBlock<block_size> result;
 #pragma unroll
     for (int i = 0; i < block_size >> 2; i++) {
@@ -53,8 +50,7 @@ struct MemoryBlock {
     return result;
   }
 
-  __host__ __device__ MemoryBlock<block_size> operator+=(
-      const MemoryBlock<block_size> &other) {
+  __host__ __device__ MemoryBlock<block_size> operator+=(const MemoryBlock<block_size> &other) {
 #pragma unroll
     for (int i = 0; i < block_size >> 2; i++) {
       data[i] += other.data[i];
@@ -62,8 +58,7 @@ struct MemoryBlock {
     return *this;
   }
 
-  __host__ __device__ MemoryBlock<block_size> operator-=(
-      const MemoryBlock<block_size> &other) {
+  __host__ __device__ MemoryBlock<block_size> operator-=(const MemoryBlock<block_size> &other) {
 #pragma unroll
     for (int i = 0; i < block_size >> 2; i++) {
       data[i] -= other.data[i];
@@ -71,8 +66,7 @@ struct MemoryBlock {
     return *this;
   }
 
-  __host__ __device__ MemoryBlock<block_size> operator*=(
-      const MemoryBlock<block_size> &other) {
+  __host__ __device__ MemoryBlock<block_size> operator*=(const MemoryBlock<block_size> &other) {
 #pragma unroll
     for (int i = 0; i < block_size >> 2; i++) {
       data[i] *= other.data[i];
@@ -80,8 +74,7 @@ struct MemoryBlock {
     return *this;
   }
 
-  __host__ __device__ MemoryBlock<block_size> operator^=(
-      const MemoryBlock<block_size> &other) {
+  __host__ __device__ MemoryBlock<block_size> operator^=(const MemoryBlock<block_size> &other) {
 #pragma unroll
     for (int i = 0; i < block_size >> 2; i++) {
       data[i] ^= other.data[i];
@@ -89,8 +82,7 @@ struct MemoryBlock {
     return *this;
   }
 
-  __host__ __device__ bool operator==(
-      const MemoryBlock<block_size> &other) const {
+  __host__ __device__ bool operator==(const MemoryBlock<block_size> &other) const {
 #pragma unroll
     for (int i = 0; i < block_size >> 2; i++) {
       if (data[i] != other.data[i]) {
@@ -102,8 +94,7 @@ struct MemoryBlock {
 };
 
 template <int block_size>
-__global__ void GenerateRandomBlocksKernel(MemoryBlock<block_size> *data,
-                                           int num_elements) {
+__global__ void GenerateRandomBlocksKernel(MemoryBlock<block_size> *data, int num_elements) {
   int idx = blockIdx.x * blockDim.x + threadIdx.x;
   if (idx >= num_elements) {
     return;
@@ -116,15 +107,15 @@ __global__ void GenerateRandomBlocksKernel(MemoryBlock<block_size> *data,
 }
 
 template <int block_size>
-__global__ void TestRandomAccessThroughputKernel(
-    const MemoryBlock<block_size> *data,
-    MemoryBlock<block_size> *result,
-    int num_elements,
-    int num_access) {
+__global__ void TestRandomAccessThroughputKernel(const MemoryBlock<block_size> *data,
+                                                 MemoryBlock<block_size> *result,
+                                                 int num_elements,
+                                                 int num_access) {
   int idx = blockIdx.x * blockDim.x + threadIdx.x;
   if (idx >= num_elements) {
     return;
   }
+
   MemoryBlock<block_size> sum{};
   curandState state{};
   //  curand_init(0, idx, 0, &state);
@@ -142,11 +133,9 @@ __global__ void TestRandomAccessThroughputKernel(
 
 template <int block_size>
 void TestRandomAccessThroughput(int num_elements, int num_access) {
-  uint64_t total_memory_load = static_cast<uint64_t>(num_elements) *
-                               sizeof(MemoryBlock<block_size>) * num_access;
+  uint64_t total_memory_load = static_cast<uint64_t>(num_elements) * sizeof(MemoryBlock<block_size>) * num_access;
   std::cout << "========================================================\n";
-  std::cout << "Testing Random Access - Block Size "
-            << sizeof(MemoryBlock<block_size>) << " Num Elements "
+  std::cout << "Testing Random Access - Block Size " << sizeof(MemoryBlock<block_size>) << " Num Elements "
             << num_elements << " Num Access " << num_access << std::endl;
   thrust::device_vector<MemoryBlock<block_size>> data(num_elements);
   thrust::device_vector<MemoryBlock<block_size>> result(num_elements);
@@ -155,23 +144,20 @@ void TestRandomAccessThroughput(int num_elements, int num_access) {
   float sum_throughput = 0;
   float elapsed_time = 0;
   for (int i = 0; i < 5; i++) {
-    GenerateRandomBlocksKernel<block_size><<<num_elements / 256 + 1, 256>>>(
-        thrust::raw_pointer_cast(data.data()), num_elements);
+    GenerateRandomBlocksKernel<block_size>
+        <<<num_elements / 256 + 1, 256>>>(thrust::raw_pointer_cast(data.data()), num_elements);
     cudaEvent_t start, stop;
     cudaEventCreate(&start);
     cudaEventCreate(&stop);
     cudaDeviceSynchronize();
     cudaEventRecord(start);
-    TestRandomAccessThroughputKernel<block_size>
-        <<<num_elements / 256 + 1, 256>>>(
-            thrust::raw_pointer_cast(data.data()),
-            thrust::raw_pointer_cast(result.data()), num_elements, num_access);
+    TestRandomAccessThroughputKernel<block_size><<<num_elements / 256 + 1, 256>>>(
+        thrust::raw_pointer_cast(data.data()), thrust::raw_pointer_cast(result.data()), num_elements, num_access);
     cudaEventRecord(stop);
     cudaEventSynchronize(stop);
     cudaEventElapsedTime(&elapsed_time, start, stop);
     elapsed_time /= 1000;
-    float throughput = static_cast<float>(total_memory_load) / elapsed_time /
-                       1024 / 1024 / 1024;
+    float throughput = static_cast<float>(total_memory_load) / elapsed_time / 1024 / 1024 / 1024;
     if (i == 0) {
       max_throughput = throughput;
       min_throughput = throughput;
@@ -181,21 +167,21 @@ void TestRandomAccessThroughput(int num_elements, int num_access) {
     }
     sum_throughput += throughput;
   }
-  std::cout << "Throughput: max - " << max_throughput << "GB/s min - "
-            << min_throughput << "GB/s mean - " << sum_throughput / 5 << "GB/s"
-            << std::endl;
+
+  std::cout << "Throughput: max - " << max_throughput << "GB/s min - " << min_throughput << "GB/s mean - "
+            << sum_throughput / 5 << "GB/s" << std::endl;
 }
 
 template <int block_size>
-__global__ void TestSequentialAccessThroughputKernel(
-    const MemoryBlock<block_size> *data,
-    MemoryBlock<block_size> *result,
-    int num_elements,
-    int num_access) {
+__global__ void TestSequentialAccessThroughputKernel(const MemoryBlock<block_size> *data,
+                                                     MemoryBlock<block_size> *result,
+                                                     int num_elements,
+                                                     int num_access) {
   int idx = blockIdx.x * blockDim.x + threadIdx.x;
   if (idx >= num_elements) {
     return;
   }
+
   MemoryBlock<block_size> sum{};
   curandState state{};
   curand_init(0, idx, 0, &state);
@@ -214,11 +200,9 @@ __global__ void TestSequentialAccessThroughputKernel(
 
 template <int block_size>
 void TestSequentialAccessThroughput(int num_elements, int num_access) {
-  uint64_t total_memory_load = static_cast<uint64_t>(num_elements) *
-                               sizeof(MemoryBlock<block_size>) * num_access;
+  uint64_t total_memory_load = static_cast<uint64_t>(num_elements) * sizeof(MemoryBlock<block_size>) * num_access;
   std::cout << "========================================================\n";
-  std::cout << "Testing Sequential Access - Block Size "
-            << sizeof(MemoryBlock<block_size>) << " Num Elements "
+  std::cout << "Testing Sequential Access - Block Size " << sizeof(MemoryBlock<block_size>) << " Num Elements "
             << num_elements << " Num Access " << num_access << std::endl;
   thrust::device_vector<MemoryBlock<block_size>> data(num_elements);
   thrust::device_vector<MemoryBlock<block_size>> result(num_elements);
@@ -227,23 +211,20 @@ void TestSequentialAccessThroughput(int num_elements, int num_access) {
   float sum_throughput = 0;
   float elapsed_time = 0;
   for (int i = 0; i < 5; i++) {
-    GenerateRandomBlocksKernel<block_size><<<num_elements / 256 + 1, 256>>>(
-        thrust::raw_pointer_cast(data.data()), num_elements);
+    GenerateRandomBlocksKernel<block_size>
+        <<<num_elements / 256 + 1, 256>>>(thrust::raw_pointer_cast(data.data()), num_elements);
     cudaEvent_t start, stop;
     cudaEventCreate(&start);
     cudaEventCreate(&stop);
     cudaDeviceSynchronize();
     cudaEventRecord(start);
-    TestSequentialAccessThroughputKernel<block_size>
-        <<<num_elements / 256 + 1, 256>>>(
-            thrust::raw_pointer_cast(data.data()),
-            thrust::raw_pointer_cast(result.data()), num_elements, num_access);
+    TestSequentialAccessThroughputKernel<block_size><<<num_elements / 256 + 1, 256>>>(
+        thrust::raw_pointer_cast(data.data()), thrust::raw_pointer_cast(result.data()), num_elements, num_access);
     cudaEventRecord(stop);
     cudaEventSynchronize(stop);
     cudaEventElapsedTime(&elapsed_time, start, stop);
     elapsed_time /= 1000;
-    float throughput = static_cast<float>(total_memory_load) / elapsed_time /
-                       1024 / 1024 / 1024;
+    float throughput = static_cast<float>(total_memory_load) / elapsed_time / 1024 / 1024 / 1024;
     if (i == 0) {
       max_throughput = throughput;
       min_throughput = throughput;
@@ -253,9 +234,9 @@ void TestSequentialAccessThroughput(int num_elements, int num_access) {
     }
     sum_throughput += throughput;
   }
-  std::cout << "Throughput: max - " << max_throughput << "GB/s min - "
-            << min_throughput << "GB/s mean - " << sum_throughput / 5 << "GB/s"
-            << std::endl;
+
+  std::cout << "Throughput: max - " << max_throughput << "GB/s min - " << min_throughput << "GB/s mean - "
+            << sum_throughput / 5 << "GB/s" << std::endl;
 }
 
 int main() {

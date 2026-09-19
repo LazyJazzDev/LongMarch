@@ -24,6 +24,7 @@ Scalar PolynomialEval(const std::vector<Scalar> &poly, Scalar x) {
     result += poly[i] * x_i;
     x_i *= x;
   }
+
   Scalar deri = 0;
   x_i = 1;
   for (size_t i = 1; i < poly.size(); ++i) {

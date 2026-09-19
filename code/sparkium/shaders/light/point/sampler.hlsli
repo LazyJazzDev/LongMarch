@@ -35,8 +35,7 @@ void PointLightSampler(inout SampleDirectLightingPayload payload) {
       MakeOrthonormals(light_normal, tangent, bitangent);
       float disk_radius = radius * sqrt(random_sample.x);
       float phi = 2.0f * PI * random_sample.y;
-      float3 sampled_position = light_position +
-                                disk_radius * (cos(phi) * tangent + sin(phi) * bitangent);
+      float3 sampled_position = light_position + disk_radius * (cos(phi) * tangent + sin(phi) * bitangent);
       float3 to_sample = sampled_position - position;
       shadow_length = length(to_sample);
       omega_in = to_sample / max(shadow_length, EPSILON);
@@ -52,8 +51,8 @@ void PointLightSampler(inout SampleDirectLightingPayload payload) {
       float phi = 2.0f * PI * random_sample.y;
       float3 tangent, bitangent;
       MakeOrthonormals(omega_in, tangent, bitangent);
-      omega_in = normalize(tangent * (cos(phi) * sin_theta) +
-                           bitangent * (sin(phi) * sin_theta) + omega_in * cos_theta);
+      omega_in =
+          normalize(tangent * (cos(phi) * sin_theta) + bitangent * (sin(phi) * sin_theta) + omega_in * cos_theta);
       pdf = 1.0f / (2.0f * PI * max(1.0f - cos_theta_max, EPSILON));
     } else {
       // From inside the source, Cycles samples the receiving surface's cosine
@@ -65,10 +64,9 @@ void PointLightSampler(inout SampleDirectLightingPayload payload) {
 
     if (!soft_falloff) {
       float center_projection = dot(to_center, omega_in);
-      float discriminant = max(0.0f, center_projection * center_projection +
-                                        radius_squared - distance_squared);
-      shadow_length = center_projection + (distance_squared > radius_squared ? -sqrt(discriminant)
-                                                                                : sqrt(discriminant));
+      float discriminant = max(0.0f, center_projection * center_projection + radius_squared - distance_squared);
+      shadow_length =
+          center_projection + (distance_squared > radius_squared ? -sqrt(discriminant) : sqrt(discriminant));
     }
     // Blender's normalized point-light power is converted to sphere radiance.
     eval = light_power / (4.0f * PI * PI * radius_squared);

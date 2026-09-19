@@ -11,8 +11,7 @@ class CommandAllocator {
     return command_allocator_.Get();
   }
 
-  HRESULT CreateCommandList(D3D12_COMMAND_LIST_TYPE type,
-                            double_ptr<CommandList> pp_command_list);
+  HRESULT CreateCommandList(D3D12_COMMAND_LIST_TYPE type, double_ptr<CommandList> pp_command_list);
 
   HRESULT ResetCommandRecord(CommandList *command_list);
 

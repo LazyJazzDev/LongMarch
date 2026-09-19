@@ -5,16 +5,19 @@
 static const uint SOFTWARE_NODE_BYTES = 32;
 static const uint SOFTWARE_INSTANCE_BYTES = 112;
 static const uint SOFTWARE_INVALID = 0xffffffff;
+
 struct SoftwareNode {
   float3 lo;
   uint first;
   float3 hi;
   uint second;
 };
+
 template <class B>
 SoftwareNode LoadSoftwareNode(B nodes, uint index) {
   return nodes.template Load<SoftwareNode>(index * SOFTWARE_NODE_BYTES);
 }
+
 struct SoftwareInstance {
   float3x4 object_to_world;
   float3x4 world_to_object;
@@ -23,6 +26,7 @@ struct SoftwareInstance {
   uint material;
   uint primitive_count;
 };
+
 SoftwareInstance LoadSoftwareInstance(ByteAddressBuffer instances, uint index) {
   uint offset = 16 + index * SOFTWARE_INSTANCE_BYTES;
   SoftwareInstance result;

@@ -2,11 +2,12 @@
 
 namespace grassland::vulkan {
 
-DescriptorSetLayout::DescriptorSetLayout(
-    const struct Device *device,
-    VkDescriptorSetLayout layout,
-    const std::vector<VkDescriptorSetLayoutBinding> &bindings)
-    : device_(device), layout_(layout), bindings_(bindings) {
+DescriptorSetLayout::DescriptorSetLayout(const struct Device *device,
+                                         VkDescriptorSetLayout layout,
+                                         const std::vector<VkDescriptorSetLayoutBinding> &bindings)
+    : device_(device),
+      layout_(layout),
+      bindings_(bindings) {
 }
 
 DescriptorSetLayout::~DescriptorSetLayout() {
@@ -16,8 +17,7 @@ DescriptorSetLayout::~DescriptorSetLayout() {
 DescriptorPoolSize DescriptorSetLayout::GetPoolSize() const {
   DescriptorPoolSize pool_size{};
   for (const auto &binding : bindings_) {
-    pool_size.descriptor_type_count[binding.descriptorType] +=
-        binding.descriptorCount;
+    pool_size.descriptor_type_count[binding.descriptorType] += binding.descriptorCount;
   }
   return pool_size;
 }

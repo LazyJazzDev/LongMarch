@@ -26,15 +26,15 @@ float3 make_float3(float x, float y, float z) {
 #define CLOSURE_WEIGHT_CUTOFF 1e-5f
 #define saturatef(x) clamp(x, 0.0, 1.0)
 #define saturate(x) clamp(x, 0.0, 1.0)
-#define PREPARE_BSDF(sc, weight_in)                 \
+#define PREPARE_BSDF(sc, weight_in)                          \
   Spectrum weight_spectrum = weight_in;                      \
-  weight_spectrum = max(weight_spectrum, make_float3(0.0));                  \
+  weight_spectrum = max(weight_spectrum, make_float3(0.0));  \
   const float sample_weight = abs(average(weight_spectrum)); \
-  if (sample_weight >= CLOSURE_WEIGHT_CUTOFF) {     \
+  if (sample_weight >= CLOSURE_WEIGHT_CUTOFF) {              \
     sc.weight = weight_spectrum;                             \
-    sc.sample_weight = sample_weight;               \
-  } else {                                          \
-    sc.sample_weight = 0.0;                         \
+    sc.sample_weight = sample_weight;                        \
+  } else {                                                   \
+    sc.sample_weight = 0.0;                                  \
   }
 
 float average(float3 v) {
@@ -102,11 +102,7 @@ float schlick_fresnel(float u) {
   return m2 * m2 * m;  // pow(m, 5)
 }
 
-Spectrum interpolate_fresnel_color(float3 L,
-                                   float3 H,
-                                   float ior,
-                                   float F0,
-                                   Spectrum cspec0) {
+Spectrum interpolate_fresnel_color(float3 L, float3 H, float ior, float F0, Spectrum cspec0) {
   /* Calculate the fresnel interpolation factor
    * The value from fresnel_dielectric_cos(...) has to be normalized because
    * the cspec0 keeps the F0 color
@@ -142,10 +138,7 @@ float3 rotate_around_axis(float3 p, float3 axis, float angle) {
   return r;
 }
 
-void make_orthonormals_tangent(const float3 N,
-                               const float3 T,
-                               out float3 a,
-                               out float3 b) {
+void make_orthonormals_tangent(const float3 N, const float3 T, out float3 a, out float3 b) {
   b = normalize(cross(N, T));
   a = cross(b, N);
 }
@@ -175,6 +168,7 @@ float fast_ierff(float x) {
   if (a > 0.99999994f) {
     a = 0.99999994f;
   }
+
   float w = -log((1.0f - a) * (1.0f + a)), p;
   if (w < 5.0f) {
     w = w - 2.5f;
@@ -222,10 +216,9 @@ float fast_erff(float x) {
   if (a >= 12.3f) {
     return copysignf(1.0f, x);
   }
+
   const float b = 1.0f - (1.0f - a); /* Crush denormals. */
-  const float r =
-      madd(madd(madd(madd(madd(madd(a6, b, a5), b, a4), b, a3), b, a2), b, a1),
-           b, 1.0f);
+  const float r = madd(madd(madd(madd(madd(madd(a6, b, a5), b, a4), b, a3), b, a2), b, a1), b, 1.0f);
   const float s = r * r; /* ^2 */
   const float t = s * s; /* ^4 */
   const float u = t * t; /* ^8 */

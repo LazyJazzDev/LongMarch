@@ -20,7 +20,8 @@ struct RegisteredTextures {
 }  // namespace
 
 MaterialPrincipled::MaterialPrincipled(sparkium::MaterialPrincipled &material)
-    : material_(material), Material(DedicatedCast(material.GetCore())) {
+    : material_(material),
+      Material(DedicatedCast(material.GetCore())) {
   core_->GraphicsCore()->CreateBuffer(sizeof(Info) + sizeof(RegisteredTextures), graphics::BUFFER_TYPE_STATIC,
                                       &material_buffer_);
   sampler_implementation_ = CodeLines(core_->GetShadersVFS(), "material/principled/sampler.hlsl");
