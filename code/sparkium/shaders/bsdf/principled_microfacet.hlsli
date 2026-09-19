@@ -28,8 +28,7 @@ void microfacet_beckmann_sample_slopes(const float cos_theta_i,
   const float erf_a = fast_erff(cot_theta_i);
   const float exp_a2 = exp(-cot_theta_i * cot_theta_i);
   const float SQRT_PI_INV = 0.56418958354f;
-  const float Lambda =
-      0.5f * (erf_a - 1.0f) + (0.5f * SQRT_PI_INV) * (exp_a2 * inv_a);
+  const float Lambda = 0.5f * (erf_a - 1.0f) + (0.5f * SQRT_PI_INV) * (exp_a2 * inv_a);
   const float G1 = 1.0f / (1.0f + Lambda); /* masking */
 
   G1i = G1;
@@ -51,8 +50,7 @@ void microfacet_beckmann_sample_slopes(const float cos_theta_i,
   float K = tan_theta_i * SQRT_PI_INV;
   float y_approx = randu * (1.0f + erf_a + K * (1 - erf_a * erf_a));
   float y_exact = randu * (1.0f + erf_a + K * exp_a2);
-  float b = K > 0 ? (0.5f - sqrt(K * (K - y_approx + 1.0f) + 0.25f)) / K
-                  : y_approx - 1.0f;
+  float b = K > 0 ? (0.5f - sqrt(K * (K - y_approx + 1.0f) + 0.25f)) / K : y_approx - 1.0f;
 
   /* Perform newton step to refine toward the true root. */
   float inv_erf = fast_ierff(b);
@@ -94,8 +92,7 @@ void microfacet_ggx_sample_slopes(const float cos_theta_i,
 
   /* precomputations */
   const float tan_theta_i = sin_theta_i / cos_theta_i;
-  const float G1_inv =
-      0.5f * (1.0f + safe_sqrtf(1.0f + tan_theta_i * tan_theta_i));
+  const float G1_inv = 0.5f * (1.0f + safe_sqrtf(1.0f + tan_theta_i * tan_theta_i));
 
   G1i = 1.0f / G1_inv;
 
@@ -108,8 +105,7 @@ void microfacet_ggx_sample_slopes(const float cos_theta_i,
   const float D = safe_sqrtf(BB * (tmp * tmp) - (AA - BB) * tmp);
   const float slope_x_1 = B * tmp - D;
   const float slope_x_2 = B * tmp + D;
-  slope_x =
-      (A < 0.0f || slope_x_2 * tan_theta_i > 1.0f) ? slope_x_1 : slope_x_2;
+  slope_x = (A < 0.0f || slope_x_2 * tan_theta_i > 1.0f) ? slope_x_1 : slope_x_2;
 
   /* sample slope_y */
   float S;
@@ -122,10 +118,8 @@ void microfacet_ggx_sample_slopes(const float cos_theta_i,
     randv = 2.0f * (0.5f - randv);
   }
 
-  const float z =
-      (randv * (randv * (randv * 0.27385f - 0.73369f) + 0.46341f)) /
-      (randv * (randv * (randv * 0.093073f + 0.309420f) - 1.000000f) +
-       0.597999f);
+  const float z = (randv * (randv * (randv * 0.27385f - 0.73369f) + 0.46341f)) /
+                  (randv * (randv * (randv * 0.093073f + 0.309420f) - 1.000000f) + 0.597999f);
   slope_y = S * z * safe_sqrtf(1.0f + (slope_x) * (slope_x));
 }
 
@@ -159,11 +153,9 @@ float3 microfacet_sample_stretched(const float3 omega_i,
   float slope_x, slope_y;
 
   if (beckmann) {
-    microfacet_beckmann_sample_slopes(costheta_, sintheta_, randu, randv,
-                                      slope_x, slope_y, G1i);
+    microfacet_beckmann_sample_slopes(costheta_, sintheta_, randu, randv, slope_x, slope_y, G1i);
   } else {
-    microfacet_ggx_sample_slopes(costheta_, sintheta_, randu, randv, slope_x,
-                                 slope_y, G1i);
+    microfacet_ggx_sample_slopes(costheta_, sintheta_, randu, randv, slope_x, slope_y, G1i);
   }
 
   /* 3. rotate */

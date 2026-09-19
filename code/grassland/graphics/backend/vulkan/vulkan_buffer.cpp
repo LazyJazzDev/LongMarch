@@ -5,7 +5,9 @@
 namespace grassland::graphics::backend {
 
 VulkanBufferRange::VulkanBufferRange(const BufferRange &range)
-    : buffer(dynamic_cast<VulkanBuffer *>(range.buffer)), offset(range.offset), size(range.size) {
+    : buffer(dynamic_cast<VulkanBuffer *>(range.buffer)),
+      offset(range.offset),
+      size(range.size) {
 }
 
 VulkanStaticBuffer::VulkanStaticBuffer(VulkanCore *core, size_t size) : core_(core) {
@@ -227,6 +229,7 @@ void VulkanCUDABuffer::Resize(size_t new_size) {
     usage |= VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
              VK_BUFFER_USAGE_ACCELERATION_STRUCTURE_BUILD_INPUT_READ_ONLY_BIT_KHR;
   }
+
   VkBuffer new_buffer;
   VkDeviceMemory new_memory;
   vulkan::CreateExternalBuffer(

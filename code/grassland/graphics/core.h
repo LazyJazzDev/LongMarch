@@ -119,6 +119,7 @@ class Core {
 
   // Pipeline RT (TraceRay/SBT) and inline ray queries are independent capabilities.
   bool DeviceRayTracingSupport() const;
+
   virtual bool DeviceRayQuerySupport() const {
     return false;
   }

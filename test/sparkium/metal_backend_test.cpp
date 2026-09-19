@@ -8,6 +8,7 @@
 
 #if defined(LONGMARCH_METAL_ENABLED)
 using namespace grassland;
+
 namespace {
 class MetalBackendTest : public testing::Test {
  protected:
@@ -15,8 +16,10 @@ class MetalBackendTest : public testing::Test {
     ASSERT_EQ(graphics::CreateCore(graphics::BACKEND_API_METAL, {}, &core), 0);
     ASSERT_EQ(core->InitializeLogicalDeviceAutoSelect(false), 0);
   }
+
   std::unique_ptr<graphics::Core> core;
 };
+
 TEST_F(MetalBackendTest, RayQueryMasksIDsUpdatesAndBindingSnapshots) {
   if (!core->DeviceRayQuerySupport())
     GTEST_SKIP() << "native ray query unavailable";
@@ -41,6 +44,7 @@ TEST_F(MetalBackendTest, RayQueryMasksIDsUpdatesAndBindingSnapshots) {
     profile.Finish();
     EXPECT_EQ(profile.counters["native_tlas_builds"], 0u);
   }
+
   std::unique_ptr<graphics::Shader> shader;
   ASSERT_EQ(core->CreateShader(R"(
 RaytracingAccelerationStructure scene : register(t0, space0);
@@ -102,6 +106,7 @@ TEST_F(MetalBackendTest, LargeArgumentArraysAndBindingSnapshots) {
     inputs[i]->UploadData(&value, 4);
     bindings.push_back(inputs[i].get());
   }
+
   std::unique_ptr<graphics::Buffer> output1, output2;
   core->CreateBuffer(count * 4, graphics::BUFFER_TYPE_STATIC, &output1);
   core->CreateBuffer(count * 4, graphics::BUFFER_TYPE_STATIC, &output2);
@@ -140,6 +145,7 @@ RWStructuredBuffer<uint> output : register(u0, space1);
   for (int i = 0; i < count; ++i)
     EXPECT_EQ(actual[i], count - i);
 }
+
 TEST_F(MetalBackendTest, LightSelectionPartialWorkgroupDoesNotOverwriteTail) {
   sparkium::Core renderer(core.get());
   std::unique_ptr<graphics::Shader> shader;
@@ -183,6 +189,7 @@ TEST_F(MetalBackendTest, LightSelectionPartialWorkgroupDoesNotOverwriteTail) {
       EXPECT_EQ(actual[i], 0xdeadbeef);
   }
 }
+
 TEST_F(MetalBackendTest, TextureRoundTripAndPartialRegion) {
   for (auto format : {graphics::IMAGE_FORMAT_R8G8B8A8_UNORM, graphics::IMAGE_FORMAT_R32G32B32A32_SFLOAT,
                       graphics::IMAGE_FORMAT_R32G32B32_SFLOAT, graphics::IMAGE_FORMAT_D32_SFLOAT,
@@ -208,6 +215,7 @@ TEST_F(MetalBackendTest, TextureRoundTripAndPartialRegion) {
     EXPECT_EQ(region, patch);
   }
 }
+
 TEST_F(MetalBackendTest, AttachmentlessRasterPassPreservesViewportAndScissor) {
   std::unique_ptr<graphics::Image> output;
   core->CreateImage(5, 4, graphics::IMAGE_FORMAT_R32G32B32A32_SFLOAT, &output);

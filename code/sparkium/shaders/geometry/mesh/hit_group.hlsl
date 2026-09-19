@@ -6,6 +6,7 @@
 
 #include "material_sampler.hlsli"
 #include "random.hlsli"
+
 HitRecord MakeHitRecord(in BuiltInTriangleIntersectionAttributes attr) {
   return MakeMeshHitRecord(InstanceID(), InstanceIndex(), PrimitiveIndex(), attr.barycentrics, RayTCurrent(),
                            WorldRayDirection(), ObjectToWorld3x4(), WorldToObject4x3());
@@ -14,7 +15,8 @@ HitRecord MakeHitRecord(in BuiltInTriangleIntersectionAttributes attr) {
 [shader("closesthit")] void RenderClosestHit(inout RenderContext context,
                                              in BuiltInTriangleIntersectionAttributes attr) {
   HitRecord hit_record = MakeHitRecord(attr);
-  if (ContinueSubsurfaceRandomWalk(context, hit_record)) return;
+  if (ContinueSubsurfaceRandomWalk(context, hit_record))
+    return;
   SampleMaterial(context, hit_record);
 }
 

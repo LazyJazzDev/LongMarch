@@ -7,11 +7,7 @@ struct PrincipledSheenBsdf {
   float avg_value;
 };
 
-Spectrum calculate_principled_sheen_brdf(float3 N,
-                                         float3 V,
-                                         float3 L,
-                                         float3 H,
-                                         inout float pdf) {
+Spectrum calculate_principled_sheen_brdf(float3 N, float3 V, float3 L, float3 H, inout float pdf) {
   float NdotL = dot(N, L);
   float NdotV = dot(N, V);
 
@@ -39,8 +35,7 @@ float calculate_avg_principled_sheen_brdf(float3 N, float3 I) {
 }
 
 void bsdf_principled_sheen_setup(inout PrincipledSheenBsdf bsdf) {
-  bsdf.avg_value =
-      calculate_avg_principled_sheen_brdf(bsdf.N, omega_v);
+  bsdf.avg_value = calculate_avg_principled_sheen_brdf(bsdf.N, omega_v);
   bsdf.sample_weight *= bsdf.avg_value;
 }
 

@@ -1,7 +1,7 @@
 #include "sparkium/core/scene.h"
 
-#include <numeric>
 #include <algorithm>
+#include <numeric>
 
 #include "sparkium/core/camera.h"
 #include "sparkium/core/core.h"

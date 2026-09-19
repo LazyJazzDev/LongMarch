@@ -39,7 +39,8 @@ DXGIFactoryCreateHint::DXGIFactoryCreateHint(bool enable_debug) : enable_debug(e
 }
 
 DXGIFactory::DXGIFactory(DXGIFactoryCreateHint hint, const ComPtr<IDXGIFactory4> &factory)
-    : hint_(hint), factory_(factory) {
+    : hint_(hint),
+      factory_(factory) {
 }
 
 std::vector<Adapter> DXGIFactory::EnumerateAdapters() const {

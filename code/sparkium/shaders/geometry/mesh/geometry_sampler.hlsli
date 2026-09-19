@@ -27,5 +27,4 @@ class GeometrySampler {
   GeometryPrimitiveSample SamplePrimitive(uint primitive_id, float2 sample) {
     return MeshSamplePrimitive(geometry_data, transform, primitive_id, sample);
   }
-
 };

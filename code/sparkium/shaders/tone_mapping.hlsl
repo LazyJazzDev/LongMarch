@@ -8,13 +8,13 @@ struct ToneMappingSettings {
   float gamma;
   float contrast;
 };
+
 ConstantBuffer<ToneMappingSettings> settings : register(b0, space2);
 
 float3 FilmicCurve(float3 color) {
   // Smooth shoulder/toe approximation for legacy Blender Filmic scenes.
   color = max(color, 0.0f);
-  return saturate((color * (2.51f * color + 0.03f)) /
-                  (color * (2.43f * color + 0.59f) + 0.14f));
+  return saturate((color * (2.51f * color + 0.03f)) / (color * (2.43f * color + 0.59f) + 0.14f));
 }
 
 [numthreads(8, 8, 1)] void Main(uint3 dispatch_thread_id
@@ -41,8 +41,7 @@ float3 FilmicCurve(float3 color) {
     mapped_color = saturate((mapped_color - 0.18f) * settings.contrast + 0.18f);
     mapped_color = pow(mapped_color, 1.0f / max(settings.gamma, 1.0e-4f));
   } else {
-    float max_channel = max(linear_color.x,
-                            max(linear_color.y, linear_color.z));
+    float max_channel = max(linear_color.x, max(linear_color.y, linear_color.z));
     linear_color /= max(1.0f, max_channel);
     mapped_color = Linear2sRGB(linear_color);
   }

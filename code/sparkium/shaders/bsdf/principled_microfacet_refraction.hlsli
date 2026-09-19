@@ -39,14 +39,11 @@ Spectrum bsdf_microfacet_ggx_eval_transmit_refraction(const RefractionBsdf bsdf,
   float cosThetaM2 = cosThetaM * cosThetaM;
   float tanThetaM2 = (1 - cosThetaM2) / cosThetaM2;
   float cosThetaM4 = cosThetaM2 * cosThetaM2;
-  D = alpha2 /
-      (PI * cosThetaM4 * (alpha2 + tanThetaM2) * (alpha2 + tanThetaM2));
+  D = alpha2 / (PI * cosThetaM4 * (alpha2 + tanThetaM2) * (alpha2 + tanThetaM2));
 
   /* eq. 34: now calculate G1(i,m) and G1(o,m) */
-  G1o =
-      2 / (1 + safe_sqrtf(1 + alpha2 * (1 - cosNO * cosNO) / (cosNO * cosNO)));
-  G1i =
-      2 / (1 + safe_sqrtf(1 + alpha2 * (1 - cosNI * cosNI) / (cosNI * cosNI)));
+  G1o = 2 / (1 + safe_sqrtf(1 + alpha2 * (1 - cosNO * cosNO) / (cosNO * cosNO)));
+  G1i = 2 / (1 + safe_sqrtf(1 + alpha2 * (1 - cosNI * cosNI) / (cosNI * cosNI)));
 
   float G = G1o * G1i;
 
@@ -79,8 +76,7 @@ Spectrum bsdf_microfacet_ggx_eval_refraction(const RefractionBsdf bsdf,
     return make_float3(0.0);
   }
 
-  return bsdf_microfacet_ggx_eval_transmit_refraction(bsdf, N, I, omega_in, pdf,
-                                                      alpha, cosNO, cosNI);
+  return bsdf_microfacet_ggx_eval_transmit_refraction(bsdf, N, I, omega_in, pdf, alpha, cosNO, cosNI);
 }
 
 int bsdf_microfacet_ggx_sample_refraction(const RefractionBsdf bsdf,
@@ -108,8 +104,7 @@ int bsdf_microfacet_ggx_sample_refraction(const RefractionBsdf bsdf,
     float3 local_m;
     float G1o;
 
-    local_m = microfacet_sample_stretched(local_I, alpha, alpha, randu, randv,
-                                          false, G1o);
+    local_m = microfacet_sample_stretched(local_I, alpha, alpha, randu, randv, false, G1o);
 
     float3 m = X * local_m.x + Y * local_m.y + Z * local_m.z;
     float cosThetaM = local_m.z;
@@ -138,15 +133,13 @@ int bsdf_microfacet_ggx_sample_refraction(const RefractionBsdf bsdf,
         float cosThetaM2 = cosThetaM * cosThetaM;
         float cosThetaM4 = cosThetaM2 * cosThetaM2;
         float tanThetaM2 = 1 / (cosThetaM2)-1;
-        float D = alpha2 / (PI * cosThetaM4 * (alpha2 + tanThetaM2) *
-                            (alpha2 + tanThetaM2));
+        float D = alpha2 / (PI * cosThetaM4 * (alpha2 + tanThetaM2) * (alpha2 + tanThetaM2));
 
         /* eval BRDF*cosNI */
         float cosNI = dot(N, omega_in);
 
         /* eq. 34: now calculate G1(i,m) */
-        float G1i = 2 / (1 + safe_sqrtf(1 + alpha2 * (1 - cosNI * cosNI) /
-                                                (cosNI * cosNI)));
+        float G1i = 2 / (1 + safe_sqrtf(1 + alpha2 * (1 - cosNI * cosNI) / (cosNI * cosNI)));
 
         /* eq. 21 */
         float cosHI = dot(m, omega_in);

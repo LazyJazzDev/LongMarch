@@ -2,10 +2,10 @@
 
 namespace grassland::vulkan {
 
-Framebuffer::Framebuffer(const struct RenderPass *render_pass,
-                         VkExtent2D extent,
-                         VkFramebuffer framebuffer)
-    : render_pass_(render_pass), extent_(extent), framebuffer_(framebuffer) {
+Framebuffer::Framebuffer(const struct RenderPass *render_pass, VkExtent2D extent, VkFramebuffer framebuffer)
+    : render_pass_(render_pass),
+      extent_(extent),
+      framebuffer_(framebuffer) {
 }
 
 Framebuffer::~Framebuffer() {

@@ -25,6 +25,7 @@ MetalSampler::MetalSampler(MetalCore *core, const SamplerInfo &info) {
         return MTL::SamplerAddressModeClampToEdge;
     }
   };
+
   descriptor->setSAddressMode(address(info.address_mode_u));
   descriptor->setTAddressMode(address(info.address_mode_v));
   descriptor->setRAddressMode(address(info.address_mode_w));

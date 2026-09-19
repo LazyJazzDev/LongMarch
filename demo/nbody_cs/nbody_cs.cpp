@@ -33,6 +33,7 @@ void NBodyCS::Run() {
       throw std::runtime_error("cannot open timing CSV");
     csv << "frame,wall_ms,gpu_ms,record_ms,submit_ms,wait_ms\n" << std::fixed << std::setprecision(6);
   }
+
   std::vector<double> wall_times, gpu_times;
   int frame = -options_.warmup;
   while ((!window_ || !window_->ShouldClose()) && (!Benchmark() || frame < options_.frames)) {
@@ -207,6 +208,7 @@ void NBodyCS::OnInit() {
       ImGui::GetIO().IniFilename = nullptr;
     }
   }
+
   BuildRenderNode();
   if (window_)
     window_->MouseMoveEvent().RegisterCallback([this](double xpos, double ypos) {
@@ -410,6 +412,7 @@ void NBodyCS::UpdateImGui() {
     }
     last_frame_tp = current_tp;
   }
+
   ImGui::End();
   window_->EndImGuiFrame();
   if (trigger_hdr_switch) {

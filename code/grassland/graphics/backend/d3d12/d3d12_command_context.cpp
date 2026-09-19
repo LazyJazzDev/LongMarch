@@ -67,6 +67,7 @@ void D3D12CommandContext::CmdBindResources(int slot, const std::vector<BufferRan
     LogError("[Graphics.D3D12] Program on bind point {} is not set", int(bind_point));
     return;
   }
+
   auto descriptor_range = program_bases_[bind_point]->DescriptorRange(slot);
   resource_descriptor_count_ += descriptor_range->NumDescriptors;
   std::vector<D3D12BufferRange> d3d12_buffers(buffers.size());
@@ -83,6 +84,7 @@ void D3D12CommandContext::CmdBindResources(int slot, const std::vector<Image *> 
     LogError("[Graphics.D3D12] Program on bind point {} is not set", int(bind_point));
     return;
   }
+
   auto descriptor_range = program_bases_[bind_point]->DescriptorRange(slot);
   resource_descriptor_count_ += descriptor_range->NumDescriptors;
   std::vector<D3D12Image *> d3d12_images(images.size());
@@ -98,6 +100,7 @@ void D3D12CommandContext::CmdBindResources(int slot, const std::vector<Sampler *
     LogError("[Graphics.D3D12] Program on bind point {} is not set", int(bind_point));
     return;
   }
+
   auto descriptor_range = program_bases_[bind_point]->DescriptorRange(slot);
   sampler_descriptor_count_ += descriptor_range->NumDescriptors;
   std::vector<D3D12Sampler *> d3d12_samplers(samplers.size());
@@ -115,6 +118,7 @@ void D3D12CommandContext::CmdBindResources(int slot,
     LogError("[Graphics.D3D12] Program on bind point {} is not set", int(bind_point));
     return;
   }
+
   auto desriptor_range = program_bases_[bind_point]->DescriptorRange(slot);
   resource_descriptor_count_ += desriptor_range->NumDescriptors;
   auto d3d12_as = dynamic_cast<D3D12AccelerationStructure *>(acceleration_structure);

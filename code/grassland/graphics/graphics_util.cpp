@@ -3,6 +3,7 @@
 #include "grassland/graphics/acceleration_structure.h"
 #include "grassland/graphics/buffer.h"
 #include "grassland/graphics/image.h"
+
 namespace grassland::graphics {
 
 const char *BackendAPIString(BackendAPI api) {
@@ -21,7 +22,8 @@ const char *BackendAPIString(BackendAPI api) {
 bool SupportBackendAPI(BackendAPI api) {
   switch (api) {
 #if defined(LONGMARCH_METAL_ENABLED)
-    case BACKEND_API_METAL: return true;
+    case BACKEND_API_METAL:
+      return true;
 #endif
 #if defined(LONGMARCH_D3D12_ENABLED)
     case BACKEND_API_D3D12:

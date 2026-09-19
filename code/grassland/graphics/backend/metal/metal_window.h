@@ -13,9 +13,11 @@ class MetalWindow : public Window {
   void TerminateImGui() override;
   void BeginImGuiFrame() override;
   void EndImGuiFrame() override;
+
   ImGuiContext *GetImGuiContext() const override {
     return imgui_;
   }
+
   void Present(MTL::CommandBuffer *command, MetalImage *image);
 
  private:

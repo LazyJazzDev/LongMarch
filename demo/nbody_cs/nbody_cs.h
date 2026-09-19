@@ -74,9 +74,11 @@ class NBodyCS {
   std::unique_ptr<graphics::ComputeProgram> nbody_compute_program_;
 
   NBodyOptions options_;
+
   bool Benchmark() const {
     return options_.mode != "interactive";
   }
+
   double gpu_ms_ = 0, record_ms_ = 0, submit_ms_ = 0, wait_ms_ = 0;
   std::unique_ptr<graphics::FrameProfile> profiler_;
   int n_particles_;

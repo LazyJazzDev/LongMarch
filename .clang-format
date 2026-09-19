@@ -1,53 +1,54 @@
 ---
-Language: Cpp
 BasedOnStyle: Google
+
+# Shared C++ / CUDA / shader style. Keep function and type boundaries readable.
+ColumnLimit: 120
+IndentWidth: 2
+ContinuationIndentWidth: 4
+TabWidth: 8
+UseTab: Never
+NamespaceIndentation: None
 AccessModifierOffset: -1
-AlignAfterOpenBracket: Align
-AlignConsecutiveAssignments: false
-AlignConsecutiveDeclarations: false
-AlignEscapedNewlinesLeft: true
-AlignOperands: true
-AlignTrailingComments: true
-AllowAllParametersOfDeclarationOnNextLine: false
-AllowShortBlocksOnASingleLine: false
-AllowShortCaseLabelsOnASingleLine: false
-AllowShortFunctionsOnASingleLine: false
-AllowShortIfStatementsOnASingleLine: false
+PointerAlignment: Right
+DerivePointerAlignment: false
+BreakBeforeBraces: Attach
+SeparateDefinitionBlocks: Always
+MaxEmptyLinesToKeep: 1
+KeepEmptyLinesAtTheStartOfBlocks: false
+AllowShortFunctionsOnASingleLine: None
+AllowShortBlocksOnASingleLine: Never
+AllowShortIfStatementsOnASingleLine: Never
 AllowShortLoopsOnASingleLine: false
-AlwaysBreakAfterDefinitionReturnType: None
-AlwaysBreakAfterReturnType: None
-AlwaysBreakBeforeMultilineStrings: true
-AlwaysBreakTemplateDeclarations: true
+AllowShortCaseLabelsOnASingleLine: false
+
+AlignAfterOpenBracket: Align
+AlignOperands: Align
+AlignEscapedNewlines: Left
+AlignConsecutiveAssignments: None
+AlignConsecutiveDeclarations: None
 BinPackArguments: true
 BinPackParameters: false
-BraceWrapping:
-  AfterClass: false
-  AfterControlStatement: false
-  AfterEnum: false
-  AfterFunction: false
-  AfterNamespace: false
-  AfterObjCDeclaration: false
-  AfterStruct: false
-  AfterUnion: false
-  BeforeCatch: false
-  BeforeElse: false
-  IndentBraces: false
-BreakBeforeBinaryOperators: None
-BreakBeforeBraces: Attach
-BreakBeforeTernaryOperators: true
-BreakConstructorInitializersBeforeComma: false
-BreakAfterJavaFieldAnnotations: false
-BreakStringLiterals: true
-ColumnLimit: 120
-CommentPragmas: '^ IWYU pragma:'
-ConstructorInitializerAllOnOneLineOrOnePerLine: true
+AllowAllParametersOfDeclarationOnNextLine: false
+AlwaysBreakTemplateDeclarations: Yes
+AlwaysBreakAfterReturnType: None
+PenaltyReturnTypeOnItsOwnLine: 200
+PenaltyBreakBeforeFirstCallParameter: 1
+PenaltyBreakComment: 300
+PenaltyBreakFirstLessLess: 120
+PenaltyBreakString: 1000
+PenaltyExcessCharacter: 1000000
+AlwaysBreakBeforeMultilineStrings: true
+BreakConstructorInitializers: BeforeColon
+PackConstructorInitializers: CurrentLine
 ConstructorInitializerIndentWidth: 4
-ContinuationIndentWidth: 4
-Cpp11BracedListStyle: true
-DerivePointerAlignment: false
-DisableFormat: false
-ExperimentalAutoDetectBinPacking: false
-ForEachMacros: [ foreach, Q_FOREACH, BOOST_FOREACH ]
+BreakBeforeBinaryOperators: None
+BreakBeforeTernaryOperators: true
+IndentCaseLabels: true
+
+# Embedded shader source and explanatory comments should retain their contents.
+BreakStringLiterals: false
+ReflowComments: false
+SortIncludes: CaseSensitive
 IncludeCategories:
   - Regex: '^<.*\.h>'
     Priority: 1
@@ -56,42 +57,11 @@ IncludeCategories:
   - Regex: '.*'
     Priority: 3
 IncludeIsMainRegex: '([-_](test|unittest))?$'
-IndentCaseLabels: true
-IndentWidth: 2
-IndentWrappedFunctionNames: false
-JavaScriptQuotes: Leave
-JavaScriptWrapImports: true
-KeepEmptyLinesAtTheStartOfBlocks: false
-MacroBlockBegin: ''
-MacroBlockEnd: ''
-MaxEmptyLinesToKeep: 1
-NamespaceIndentation: None
-ObjCBlockIndentWidth: 2
-ObjCSpaceAfterProperty: false
-ObjCSpaceBeforeProtocolList: false
-PenaltyBreakBeforeFirstCallParameter: 1
-PenaltyBreakComment: 300
-PenaltyBreakFirstLessLess: 120
-PenaltyBreakString: 1000
-PenaltyExcessCharacter: 1000000
-PenaltyReturnTypeOnItsOwnLine: 200
-PointerAlignment: Right
-ReflowComments: true
-SortIncludes: true
+SpacesBeforeTrailingComments: 2
 SpaceAfterCStyleCast: false
 SpaceAfterTemplateKeyword: true
-SpaceBeforeAssignmentOperators: true
 SpaceBeforeParens: ControlStatements
-SpaceInEmptyParentheses: false
-SpacesBeforeTrailingComments: 2
-SpacesInAngles: false
-SpacesInContainerLiterals: true
-SpacesInCStyleCastParentheses: false
-SpacesInParentheses: false
-SpacesInSquareBrackets: false
 Standard: Auto
-TabWidth: 8
-UseTab: Never
 ---
 Language: Proto
 BasedOnStyle: Google

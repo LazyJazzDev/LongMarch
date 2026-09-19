@@ -8,7 +8,9 @@
 namespace grassland::graphics::backend {
 
 MetalImage::MetalImage(MetalCore *core, int width, int height, ImageFormat format)
-    : core_(core), extent_{uint32_t(width), uint32_t(height)}, format_(format) {
+    : core_(core),
+      extent_{uint32_t(width), uint32_t(height)},
+      format_(format) {
   if (width <= 0 || height <= 0)
     throw std::invalid_argument("Metal image extent must be positive");
   MetalPool pool;
@@ -20,6 +22,7 @@ MetalImage::MetalImage(MetalCore *core, int width, int height, ImageFormat forma
   texture_ = NS::TransferPtr(core_->Device()->newTexture(descriptor));
   MetalCheck(texture_.get(), nullptr, "newTexture");
 }
+
 namespace {
 void CheckRegion(Extent2D full, Offset2D offset, Extent2D extent) {
   if (offset.x < 0 || offset.y < 0 || uint64_t(offset.x) + extent.width > full.width ||
@@ -27,6 +30,7 @@ void CheckRegion(Extent2D full, Offset2D offset, Extent2D extent) {
     throw std::out_of_range("Metal texture transfer");
 }
 }  // namespace
+
 void MetalImage::UploadData(const void *data, const Offset2D &offset, const Extent2D &extent) const {
   CheckRegion(extent_, offset, extent);
   if (!extent.width || !extent.height)
@@ -49,6 +53,7 @@ void MetalImage::UploadData(const void *data, const Offset2D &offset, const Exte
     } else
       std::memcpy(dst, src, extent.width * pixel_size);
   }
+
   auto command = core_->Queue()->commandBuffer();
   auto blit = command->blitCommandEncoder();
   blit->copyFromBuffer(staging.get(), 0, pitch, pitch * extent.height, MTL::Size(extent.width, extent.height, 1),
@@ -57,6 +62,7 @@ void MetalImage::UploadData(const void *data, const Offset2D &offset, const Exte
   core_->Commit(command);
   core_->WaitGPU();
 }
+
 void MetalImage::DownloadData(void *data, const Offset2D &offset, const Extent2D &extent) const {
   CheckRegion(extent_, offset, extent);
   if (!extent.width || !extent.height)

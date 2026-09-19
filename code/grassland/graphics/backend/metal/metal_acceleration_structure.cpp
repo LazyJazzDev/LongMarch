@@ -74,7 +74,8 @@ MetalAccelerationStructure::MetalAccelerationStructure(MetalCore *core,
 
 MetalAccelerationStructure::MetalAccelerationStructure(MetalCore *core,
                                                        const std::vector<RayTracingInstance> &instances)
-    : core_(core), top_level_(true) {
+    : core_(core),
+      top_level_(true) {
   UpdateInstances(instances);
 }
 
@@ -122,6 +123,7 @@ int MetalAccelerationStructure::UpdateInstances(const std::vector<RayTracingInst
     descriptor.accelerationStructureIndex = index;
     descriptors.push_back(descriptor);
   }
+
   bool same = structure_ && descriptors.size() == instances_.size() && children.size() == children_.size();
   if (same && !descriptors.empty())
     same = std::memcmp(descriptors.data(), instances_.data(), descriptors.size() * sizeof(descriptors[0])) == 0;

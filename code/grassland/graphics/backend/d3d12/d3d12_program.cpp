@@ -18,6 +18,7 @@ void D3D12ProgramBase::FinalizeRootSignature() {
   for (size_t i = 0; i < descriptor_ranges_.size(); i++) {
     root_parameters[i].InitAsDescriptorTable(1, &descriptor_ranges_[i], D3D12_SHADER_VISIBILITY_ALL);
   }
+
   CD3DX12_VERSIONED_ROOT_SIGNATURE_DESC root_signature_desc;
   root_signature_desc.Init_1_1(root_parameters.empty() ? 0 : static_cast<UINT>(root_parameters.size()),
                                root_parameters.empty() ? nullptr : root_parameters.data(), 0, nullptr,
@@ -27,7 +28,8 @@ void D3D12ProgramBase::FinalizeRootSignature() {
 }
 
 D3D12Program::D3D12Program(D3D12Core *core, const std::vector<ImageFormat> &color_formats, ImageFormat depth_format)
-    : D3D12ProgramBase(core), pipeline_state_desc_({}) {
+    : D3D12ProgramBase(core),
+      pipeline_state_desc_({}) {
   pipeline_state_desc_.NumRenderTargets = color_formats.size();
   for (size_t i = 0; i < color_formats.size(); i++) {
     pipeline_state_desc_.RTVFormats[i] = ImageFormatToDXGIFormat(color_formats[i]);
@@ -120,7 +122,8 @@ const D3D12_GRAPHICS_PIPELINE_STATE_DESC *D3D12Program::PipelineStateDesc() cons
 }
 
 D3D12ComputeProgram::D3D12ComputeProgram(D3D12Core *core, D3D12Shader *compute_shader)
-    : D3D12ProgramBase(core), compute_shader_(compute_shader) {
+    : D3D12ProgramBase(core),
+      compute_shader_(compute_shader) {
 }
 
 void D3D12ComputeProgram::AddResourceBinding(ResourceType type, int count) {
@@ -177,6 +180,7 @@ void D3D12RayTracingProgram::AddHitGroup(HitGroup hit_group) {
   if (d3d12_any_hit_shader) {
     d3d_hit_group.any_hit_shader = &d3d12_any_hit_shader->ShaderModule();
   }
+
   D3D12Shader *d3d12_intersection_shader = dynamic_cast<D3D12Shader *>(hit_group.intersection_shader);
   if (d3d12_intersection_shader) {
     d3d_hit_group.intersection_shader = &d3d12_intersection_shader->ShaderModule();

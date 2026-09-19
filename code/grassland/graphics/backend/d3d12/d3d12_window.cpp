@@ -11,7 +11,8 @@ D3D12Window::D3D12Window(D3D12Core *core,
                          bool fullscreen,
                          bool resizable,
                          bool enable_hdr)
-    : Window(width, height, title, fullscreen, resizable, enable_hdr), core_(core) {
+    : Window(width, height, title, fullscreen, resizable, enable_hdr),
+      core_(core) {
   HWND hwnd = glfwGetWin32Window(GLFWWindow());
   core_->DXGIFactory()->CreateSwapChain(
       *core_->CommandQueue(), hwnd, std::max(std::min(core_->FramesInFlight(), DXGI_MAX_SWAP_CHAIN_BUFFERS), 2),
@@ -64,6 +65,7 @@ void D3D12Window::InitImGui(const char *font_file_path, float font_size) {
   if (font_file_path) {
     imgui_assets_.font_path = font_file_path;
   }
+
   SetupImGuiContext();
 }
 
@@ -130,11 +132,13 @@ void D3D12Window::SetupImGuiContext() {
     auto assets = static_cast<D3D12ImGuiAssets *>(info->UserData);
     assets->descriptor_alloc.Alloc(out_cpu_desc_handle, out_gpu_desc_handle);
   };
+
   init_info.SrvDescriptorFreeFn = [](ImGui_ImplDX12_InitInfo *info, D3D12_CPU_DESCRIPTOR_HANDLE cpu_desc_handle,
                                      D3D12_GPU_DESCRIPTOR_HANDLE gpu_desc_handle) {
     auto assets = static_cast<D3D12ImGuiAssets *>(info->UserData);
     assets->descriptor_alloc.Free(cpu_desc_handle, gpu_desc_handle);
   };
+
   ImGui_ImplDX12_Init(&init_info);
 
   imgui_assets_.rtv_format = swap_chain_->BackBufferFormat();

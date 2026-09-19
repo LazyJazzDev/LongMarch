@@ -16,15 +16,11 @@ class SwapChain {
   }
 
   CD3DX12_CPU_DESCRIPTOR_HANDLE RTVCPUHandle(uint32_t index) const {
-    return CD3DX12_CPU_DESCRIPTOR_HANDLE(
-        rtv_heap_->GetCPUDescriptorHandleForHeapStart(), index,
-        rtv_descriptor_size_);
+    return CD3DX12_CPU_DESCRIPTOR_HANDLE(rtv_heap_->GetCPUDescriptorHandleForHeapStart(), index, rtv_descriptor_size_);
   }
 
   CD3DX12_GPU_DESCRIPTOR_HANDLE RTVGPUHandle(uint32_t index) const {
-    return CD3DX12_GPU_DESCRIPTOR_HANDLE(
-        rtv_heap_->GetGPUDescriptorHandleForHeapStart(), index,
-        rtv_descriptor_size_);
+    return CD3DX12_GPU_DESCRIPTOR_HANDLE(rtv_heap_->GetGPUDescriptorHandleForHeapStart(), index, rtv_descriptor_size_);
   }
 
   DXGI_FORMAT BackBufferFormat() const;

@@ -25,21 +25,25 @@ const Value &RequireObject(const Value &value) {
     throw std::runtime_error("expected a JSON object");
   return value;
 }
+
 const Value &RequireArray(const Value &value) {
   if (!value.IsArray())
     throw std::runtime_error("expected a JSON array");
   return value;
 }
+
 std::string ReadString(const Value &value) {
   if (!value.IsString())
     throw std::runtime_error("expected a string");
   return value.GetString();
 }
+
 int ReadInt(const Value &value) {
   if (!value.IsInt())
     throw std::runtime_error("expected a 32-bit integer");
   return value.GetInt();
 }
+
 float ReadNumber(const Value &value) {
   if (!value.IsNumber())
     throw std::runtime_error("expected a number");
@@ -48,6 +52,7 @@ float ReadNumber(const Value &value) {
     throw std::runtime_error("expected a finite float");
   return result;
 }
+
 bool ReadBool(const Value &value) {
   if (!value.IsBool())
     throw std::runtime_error("expected a boolean");
@@ -220,7 +225,9 @@ BinaryHairData BinaryHair(const std::filesystem::path &path) {
 class ShaderGraphCompiler {
  public:
   ShaderGraphCompiler(const Value &graph, const std::map<std::string, int> &texture_slots)
-      : graph_(graph), nodes_(Member(graph, "nodes")), texture_slots_(texture_slots) {
+      : graph_(graph),
+        nodes_(Member(graph, "nodes")),
+        texture_slots_(texture_slots) {
     if (!nodes_.IsObject())
       throw std::runtime_error("shader graph nodes must be an object");
   }
@@ -934,6 +941,7 @@ std::vector<std::filesystem::path> FindJsonScenes(const std::filesystem::path &d
     if (entry.is_regular_file() && entry.path().filename() == "scene.json")
       result.push_back(entry.path());
   }
+
   std::sort(result.begin(), result.end());
   return result;
 }

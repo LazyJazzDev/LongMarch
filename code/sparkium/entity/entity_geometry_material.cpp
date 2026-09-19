@@ -13,7 +13,10 @@ EntityGeometryMaterial::EntityGeometryMaterial(Core *core,
                                                Geometry *geometry,
                                                Material *material,
                                                const glm::mat4x3 &transformation)
-    : Entity(core), geometry_(geometry), material_(material), transform(transformation) {
+    : Entity(core),
+      geometry_(geometry),
+      material_(material),
+      transform(transformation) {
 }
 
 void EntityGeometryMaterial::SetTransformation(const glm::mat4x3 &transformation) {

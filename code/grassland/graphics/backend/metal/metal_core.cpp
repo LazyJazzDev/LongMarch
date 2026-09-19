@@ -17,6 +17,7 @@ namespace grassland::graphics::backend {
 
 MetalCore::MetalCore(const Settings &settings) : Core(settings) {
 }
+
 MetalCore::~MetalCore() {
   try {
     WaitGPU();
@@ -24,6 +25,7 @@ MetalCore::~MetalCore() {
     LogWarning("{}", e.what());
   }
 }
+
 int MetalCore::GetPhysicalDeviceProperties(PhysicalDeviceProperties *properties) {
   MetalPool pool;
   auto devices = NS::TransferPtr(MTL::CopyAllDevices());
@@ -34,6 +36,7 @@ int MetalCore::GetPhysicalDeviceProperties(PhysicalDeviceProperties *properties)
     }
   return static_cast<int>(devices->count());
 }
+
 int MetalCore::InitializeLogicalDevice(int index) {
   MetalPool pool;
   auto devices = NS::TransferPtr(MTL::CopyAllDevices());
@@ -48,9 +51,11 @@ int MetalCore::InitializeLogicalDevice(int index) {
   ray_tracing_support_ = false;  // Sparkium uses its compute BVH and traversal backend.
   return 0;
 }
+
 uint32_t MetalCore::WaveSize() const {
   return 32;
 }
+
 void MetalCore::Reap(bool wait) {
   while (!pending_.empty()) {
     auto &submission = pending_.front();
@@ -67,9 +72,11 @@ void MetalCore::Reap(bool wait) {
       callback();
   }
 }
+
 void MetalCore::WaitGPU() {
   Reap(true);
 }
+
 void MetalCore::Commit(MTL::CommandBuffer *buffer, std::vector<std::function<void()>> callbacks) {
   Reap(false);
   if (pending_.size() >= std::max(1, FramesInFlight())) {
@@ -80,6 +87,7 @@ void MetalCore::Commit(MTL::CommandBuffer *buffer, std::vector<std::function<voi
   buffer->commit();
   frame_ = (frame_ + 1) % std::max(1, FramesInFlight());
 }
+
 int MetalCore::SubmitCommandContext(CommandContext *context) {
   auto metal = dynamic_cast<MetalCommandContext *>(context);
   if (!metal || metal->GetCore() != this || metal->submitted)
@@ -89,6 +97,7 @@ int MetalCore::SubmitCommandContext(CommandContext *context) {
   metal->submitted = true;
   return 0;
 }
+
 int MetalCore::CreateBuffer(size_t size, BufferType type, double_ptr<Buffer> pp_buffer) {
   pp_buffer.construct<MetalBuffer>(this, size, type);
   return 0;
@@ -172,6 +181,7 @@ int MetalCore::CreateBottomLevelAccelerationStructure(BufferRange,
                                                       double_ptr<AccelerationStructure>) {
   return -1;
 }
+
 int MetalCore::CreateBottomLevelAccelerationStructure(BufferRange vertices,
                                                       BufferRange indices,
                                                       uint32_t vertex_count,
@@ -182,6 +192,7 @@ int MetalCore::CreateBottomLevelAccelerationStructure(BufferRange vertices,
   result.construct<MetalAccelerationStructure>(this, vertices, indices, vertex_count, stride, triangle_count, flags);
   return 0;
 }
+
 int MetalCore::CreateBottomLevelAccelerationStructure(Buffer *vertices,
                                                       Buffer *indices,
                                                       uint32_t stride,
@@ -192,11 +203,13 @@ int MetalCore::CreateBottomLevelAccelerationStructure(Buffer *vertices,
   return CreateBottomLevelAccelerationStructure(vertices->Range(), indices->Range(), vertices->Size() / stride, stride,
                                                 indices->Size() / 12, RAYTRACING_GEOMETRY_FLAG_NONE, result);
 }
+
 int MetalCore::CreateTopLevelAccelerationStructure(const std::vector<RayTracingInstance> &instances,
                                                    double_ptr<AccelerationStructure> result) {
   result.construct<MetalAccelerationStructure>(this, instances);
   return 0;
 }
+
 int MetalCore::CreateRayTracingProgram(double_ptr<RayTracingProgram>) {
   return -1;
 }

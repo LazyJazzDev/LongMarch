@@ -53,6 +53,7 @@ LM_DEVICE_FUNC HessianTensor<Real, 9, 9> DihedralAngleAssistEdgesToNormalsAxis<R
       }
     }
   }
+
   auto vec_normalized_hessian = vec_normalized.Hessian(E.col(1));
   for (int i = 0; i < 3; i++) {
     for (int j = 0; j < 3; j++) {

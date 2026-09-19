@@ -6,9 +6,7 @@
 namespace grassland::vulkan {
 class Framebuffer {
  public:
-  Framebuffer(const class RenderPass *render_pass,
-              VkExtent2D extent,
-              VkFramebuffer framebuffer);
+  Framebuffer(const class RenderPass *render_pass, VkExtent2D extent, VkFramebuffer framebuffer);
 
   ~Framebuffer();
 

@@ -8,7 +8,8 @@ namespace sparkium {
 // JSON shader-node graph. Texture indices are assigned when the scene updates.
 class MaterialShaderGraph : public Material {
  public:
-  MaterialShaderGraph(Core *core, const CodeLines &graph_code,
+  MaterialShaderGraph(Core *core,
+                      const CodeLines &graph_code,
                       const std::vector<graphics::Image *> &textures,
                       const glm::vec3 &emission_hint = {});
 

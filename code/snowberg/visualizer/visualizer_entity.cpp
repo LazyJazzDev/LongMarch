@@ -27,7 +27,8 @@ EntityMeshObject::EntityMeshObject(const std::shared_ptr<Core> &core,
                                    const std::weak_ptr<Mesh> &mesh,
                                    const Material &material,
                                    const Matrix4<float> &transform)
-    : Entity(core), mesh_(mesh) {
+    : Entity(core),
+      mesh_(mesh) {
   program_ = core_->LoadProgram<ProgramWithGeometryShader>(PROGRAM_ID_NO_NORMAL, [&]() {
     std::shared_ptr<ProgramWithGeometryShader> program = std::make_shared<ProgramWithGeometryShader>();
     core_->GraphicsCore()->CreateShader(GetShaderCode("shaders/entity.hlsl"), "VSMain", "vs_6_0",

@@ -90,6 +90,7 @@ MeshSDF::MeshSDF(VertexBufferView vertex_buffer_view, size_t num_vertex, const u
   for (int i = 0; i < num_vertex; i++) {
     x_[i] = vertex_buffer_view.Get<Vector3<float>>(i);
   }
+
   std::memcpy(triangle_indices_.data(), indices, num_indices * sizeof(uint32_t));
 
   for (int i = 0; i < triangle_indices_.size(); i += 3) {

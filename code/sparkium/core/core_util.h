@@ -18,6 +18,7 @@ class Object {
  public:
   virtual ~Object() = default;
   std::unique_ptr<Object> next{nullptr};
+
   template <typename T>
   T *GetComponent() {
     if (auto ptr = dynamic_cast<T *>(this)) {

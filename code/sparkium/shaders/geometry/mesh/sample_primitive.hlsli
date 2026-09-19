@@ -2,7 +2,10 @@
 #include "common.hlsli"
 
 template <class BufferType>
-GeometryPrimitiveSample MeshSamplePrimitive(BufferType geometry_data, float3x4 transform, uint primitive_id, float2 sample) {
+GeometryPrimitiveSample MeshSamplePrimitive(BufferType geometry_data,
+                                            float3x4 transform,
+                                            uint primitive_id,
+                                            float2 sample) {
   uint num_indices = geometry_data.Load(4);
   uint position_offset = geometry_data.Load(8);
   uint position_stride = geometry_data.Load(12);
@@ -25,9 +28,10 @@ GeometryPrimitiveSample MeshSamplePrimitive(BufferType geometry_data, float3x4 t
   sample_result.position = pos[0] * barycentrics[0] + pos[1] * barycentrics[1] + pos[2] * barycentrics[2];
   sample_result.normal = normalize(cross(pos[1] - pos[0], pos[2] - pos[0]));
   if (tex_coord_offset != 0) {
-    sample_result.tex_coord = LoadFloat2(geometry_data, tex_coord_offset + tex_coord_stride * vid[0]) * barycentrics[0] +
-                              LoadFloat2(geometry_data, tex_coord_offset + tex_coord_stride * vid[1]) * barycentrics[1] +
-                              LoadFloat2(geometry_data, tex_coord_offset + tex_coord_stride * vid[2]) * barycentrics[2];
+    sample_result.tex_coord =
+        LoadFloat2(geometry_data, tex_coord_offset + tex_coord_stride * vid[0]) * barycentrics[0] +
+        LoadFloat2(geometry_data, tex_coord_offset + tex_coord_stride * vid[1]) * barycentrics[1] +
+        LoadFloat2(geometry_data, tex_coord_offset + tex_coord_stride * vid[2]) * barycentrics[2];
   } else {
     sample_result.tex_coord = float2(0.0f, 0.0f);
   }

@@ -7,31 +7,35 @@
 
 void LightSampler(int shader_index, inout SampleDirectLightingPayload payload) {
   switch (shader_index) {
-  case 0x1000000: // PointLightSampler
-    PointLightSampler(payload);
-    break;
-  case 0x1000001:
-  case 0x1000002:
-  case 0x1000003:
-  case 0x1000004:
-  case 0x1000005:
-    MeshLightSampler(shader_index, payload);
-    break;
-  default:
-    // From what we know, calling a callable shader from closest hit shader is very slow.
-    // So we only support a few hard-coded light samplers here.
-    // Better to inline the light sampler code here if you want to support more light types.
+    case 0x1000000:  // PointLightSampler
+      PointLightSampler(payload);
+      break;
+    case 0x1000001:
+    case 0x1000002:
+    case 0x1000003:
+    case 0x1000004:
+    case 0x1000005:
+      MeshLightSampler(shader_index, payload);
+      break;
+    default:
+      // From what we know, calling a callable shader from closest hit shader is very slow.
+      // So we only support a few hard-coded light samplers here.
+      // Better to inline the light sampler code here if you want to support more light types.
 #ifndef SPARKIUM_SOFTWARE_RT
-    CallShader(shader_index, payload);
+      CallShader(shader_index, payload);
 #else
-    payload.low = uint4(0, 0, 0, asuint(0.0f));
-    payload.high = uint4(0, 0, 0, asuint(0.0f));
+      payload.low = uint4(0, 0, 0, asuint(0.0f));
+      payload.high = uint4(0, 0, 0, asuint(0.0f));
 #endif
-    break;
+      break;
   }
 }
 
-void SampleDirectLighting(inout RenderContext context, HitRecord hit_record, out float3 eval, out float3 omega_in, out float pdf) {
+void SampleDirectLighting(inout RenderContext context,
+                          HitRecord hit_record,
+                          out float3 eval,
+                          out float3 omega_in,
+                          out float pdf) {
   uint light_count = light_selector_data.Load(0);
   eval = omega_in = float3(0, 0, 0);
   pdf = 0.0f;
@@ -54,13 +58,14 @@ void SampleDirectLighting(inout RenderContext context, HitRecord hit_record, out
       L = mid + 1;
     }
   }
+
   float high_prob = asfloat(power_cdf.Load(L * 4)) / total_power;
   float low_prob = (L > 0) ? asfloat(power_cdf.Load((L - 1) * 4)) / total_power : 0.0f;
   float prob = high_prob - low_prob;
   if (prob > EPSILON) {
     r1 = (r1 - low_prob) / prob;
   } else {
-    r1 = 0.0f; // Avoid division by zero
+    r1 = 0.0f;  // Avoid division by zero
   }
 
   LightMetadata light_meta = light_metadatas.Load<LightMetadata>(sizeof(LightMetadata) * L);
@@ -86,6 +91,7 @@ float DirectLightingProbability(uint light_index) {
   if (light_index >= light_count) {
     return 0.0f;
   }
+
   BufferReference<ByteAddressBuffer> power_cdf = MakeBufferReference(light_selector_data, 4);
   float total_power = asfloat(power_cdf.Load(light_count * 4 - 4));
   if (!(total_power > 0.0f))
@@ -97,7 +103,7 @@ float DirectLightingProbability(uint light_index) {
 
 float PowerHeuristic(float base, float ref) {
   if (ref < EPSILON) {
-    return 1.0f; // Avoid division by zero
+    return 1.0f;  // Avoid division by zero
   }
   return (base * base) / (base * base + ref * ref);
 }

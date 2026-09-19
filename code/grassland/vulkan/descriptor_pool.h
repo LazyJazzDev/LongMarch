@@ -55,8 +55,7 @@ struct DescriptorPoolSize {
     return *this;
   }
 
-  friend DescriptorPoolSize operator*(uint32_t multiplier,
-                                      const DescriptorPoolSize &pool_size) {
+  friend DescriptorPoolSize operator*(uint32_t multiplier, const DescriptorPoolSize &pool_size) {
     return pool_size * multiplier;
   }
 
@@ -93,9 +92,7 @@ class DescriptorPool {
     return descriptor_pool_;
   }
 
-  VkResult AllocateDescriptorSet(
-      VkDescriptorSetLayout layout,
-      double_ptr<DescriptorSet> pp_descriptor_set) const;
+  VkResult AllocateDescriptorSet(VkDescriptorSetLayout layout, double_ptr<DescriptorSet> pp_descriptor_set) const;
 
   const DescriptorPoolSize &PoolSize() const {
     return pool_size_;

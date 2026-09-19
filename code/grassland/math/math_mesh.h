@@ -82,8 +82,13 @@ class Mesh {
     return tex_coords_.data();
   }
 
-  Vector3<Scalar> *Colors() { return colors_.empty() ? nullptr : colors_.data(); }
-  const Vector3<Scalar> *Colors() const { return colors_.empty() ? nullptr : colors_.data(); }
+  Vector3<Scalar> *Colors() {
+    return colors_.empty() ? nullptr : colors_.data();
+  }
+
+  const Vector3<Scalar> *Colors() const {
+    return colors_.empty() ? nullptr : colors_.data();
+  }
 
   const float *Signals() const {
     if (signals_.empty())

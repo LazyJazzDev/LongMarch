@@ -23,6 +23,7 @@ class NBodyCUDA {
     int num_step{200};
     int device_id{0};
   };
+
   explicit NBodyCUDA(Settings settings);
   ~NBodyCUDA();
   void Run();

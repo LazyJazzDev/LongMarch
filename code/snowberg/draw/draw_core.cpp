@@ -38,6 +38,7 @@ Core::Core(graphics::Core *core) : core_(core) {
       {{1.0f, 1.0f}, {1.0f, 0.0f}, {1.0f, 1.0f, 1.0f, 1.0f}},
       {{1.0f, -1.0f}, {1.0f, 1.0f}, {1.0f, 1.0f, 1.0f, 1.0f}},
   };
+
   std::vector<uint32_t> indices = {0, 1, 2, 2, 1, 3};
   text_model_->SetModelData(vertices, indices);
 }

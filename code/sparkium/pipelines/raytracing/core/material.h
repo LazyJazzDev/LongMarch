@@ -12,8 +12,11 @@ class Material : public Object {
   virtual graphics::Buffer *Buffer() = 0;
   virtual const CodeLines &SamplerImpl() const = 0;
   virtual const CodeLines &EvaluatorImpl() const;
+
   // Graph parameters can be dispatched separately from the shared BSDF sampler.
-  virtual const CodeLines *GraphImpl() const { return nullptr; }
+  virtual const CodeLines *GraphImpl() const {
+    return nullptr;
+  }
 
  protected:
   Core *core_;

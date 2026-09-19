@@ -6,10 +6,12 @@
 
 namespace grassland {
 class VirtualFileSystemFile;
+
 class VirtualFileSystemDirectory : public VirtualFileSystemEntry {
  public:
   VirtualFileSystemDirectory(VirtualFileSystemEntry *parent) : VirtualFileSystemEntry(parent) {
   }
+
   VirtualFileSystemDirectory *enter(const std::string &name, bool create_if_not_exists = false) {
     if (name == ".") {
       return this;
@@ -43,6 +45,7 @@ class VirtualFileSystemDirectory : public VirtualFileSystemEntry {
       entry->SaveToPath(path / name);
     }
   }
+
   std::map<std::string, std::unique_ptr<VirtualFileSystemEntry>> subentries_;
 };
 
@@ -144,6 +147,7 @@ void VirtualFileSystem::Print() const {
       }
     }
   };
+
   print_directory("", dynamic_cast<const VirtualFileSystemDirectory *>(root_.get()));
 }
 
@@ -152,10 +156,12 @@ VirtualFileSystemEntry *VirtualFileSystem::AccessFile(const std::string &path, b
   if (!cwd) {
     return nullptr;
   }
+
   std::filesystem::path p(path);
   if (p.begin() == p.end()) {
     return nullptr;
   }
+
   auto current = p.begin(), last = p.end();
   last--;
   while (current != last) {

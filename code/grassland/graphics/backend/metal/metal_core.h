@@ -94,22 +94,27 @@ class MetalCore : public Core {
   uint32_t CurrentFrame() const override {
     return frame_;
   }
+
   MTL::Device *Device() const {
     return device_.get();
   }
+
   MTL::CommandQueue *Queue() const {
     return queue_.get();
   }
+
   void Commit(MTL::CommandBuffer *buffer, std::vector<std::function<void()>> callbacks = {});
 
  private:
   void Reap(bool wait);
   NS::SharedPtr<MTL::Device> device_;
   NS::SharedPtr<MTL::CommandQueue> queue_;
+
   struct Submission {
     NS::SharedPtr<MTL::CommandBuffer> buffer;
     std::vector<std::function<void()>> callbacks;
   };
+
   std::deque<Submission> pending_;
   uint32_t frame_ = 0;
 };

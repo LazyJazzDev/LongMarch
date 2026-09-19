@@ -123,7 +123,8 @@ int VulkanCore::CreateShader(const VirtualFileSystem &vfs,
 #endif
   compile_args.insert(compile_args.end(), args.begin(), args.end());
   auto blob = CompileShader(vfs, source_file, entry_point, target, compile_args);
-  if (blob.data.empty()) return -1;
+  if (blob.data.empty())
+    return -1;
   pp_shader.construct<VulkanShader>(this, blob);
   return 0;
 }
@@ -195,6 +196,7 @@ int VulkanCore::CreateTopLevelAccelerationStructure(const std::vector<RayTracing
   for (const auto &instance : instances) {
     vk_instances.emplace_back(RayTracingInstanceToVkAccelerationStructureInstanceKHR(instance));
   }
+
   std::unique_ptr<vulkan::AccelerationStructure> tlas;
   device_->CreateTopLevelAccelerationStructure(vk_instances, graphics_command_pool_.get(), graphics_queue_.get(),
                                                &tlas);
@@ -389,6 +391,7 @@ int VulkanCore::GetPhysicalDeviceProperties(PhysicalDeviceProperties *p_physical
   if (physical_devices.empty()) {
     return 0;
   }
+
   int num_device = 0;
 
   for (int i = 0; i < physical_devices.size(); ++i) {

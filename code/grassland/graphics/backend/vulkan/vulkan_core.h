@@ -9,6 +9,7 @@ class VulkanCore : public Core {
  public:
   VulkanCore(const Settings &settings);
   ~VulkanCore() override;
+
   bool DeviceRayQuerySupport() const override {
     return device_ && device_->PhysicalDevice().SupportRayQuery();
   }

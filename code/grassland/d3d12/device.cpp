@@ -18,7 +18,9 @@
 namespace grassland::d3d12 {
 
 Device::Device(const class Adapter &adapter, const D3D_FEATURE_LEVEL feature_level, ComPtr<ID3D12Device> device)
-    : adapter_(adapter), feature_level_(feature_level), device_(std::move(device)) {
+    : adapter_(adapter),
+      feature_level_(feature_level),
+      device_(std::move(device)) {
   // Get DXR interfaces
   ThrowIfFailed(device_->QueryInterface(IID_PPV_ARGS(&dxr_device_)), "failed to get DXR device interface.");
   device_->CheckFeatureSupport(D3D12_FEATURE_D3D12_OPTIONS1, &d3d12_options1_, sizeof(d3d12_options1_));
@@ -138,6 +140,7 @@ HRESULT Device::CreateImage(const D3D12_RESOURCE_DESC &desc, double_ptr<Image> p
     clear_value.Color[2] = 0.0f;
     clear_value.Color[3] = 1.0f;
   }
+
   const CD3DX12_HEAP_PROPERTIES heap_properties(D3D12_HEAP_TYPE_DEFAULT);
   ComPtr<ID3D12Resource> image;
   RETURN_IF_FAILED_HR(

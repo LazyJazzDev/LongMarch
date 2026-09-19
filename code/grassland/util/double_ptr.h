@@ -106,6 +106,7 @@ class double_ptr {
     std::unique_ptr<ContentType> *unique_ptr;
     ContentType **raw_ptr;
   };
+
   double_ptr_type type{double_ptr_type::raw};
 };
 }  // namespace grassland

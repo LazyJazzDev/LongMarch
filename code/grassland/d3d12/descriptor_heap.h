@@ -28,15 +28,13 @@ class DescriptorHeap {
   }
 
   CD3DX12_CPU_DESCRIPTOR_HANDLE CPUHandle(uint32_t index) const {
-    return CD3DX12_CPU_DESCRIPTOR_HANDLE(
-        descriptor_heap_->GetCPUDescriptorHandleForHeapStart(), index,
-        descriptor_size_);
+    return CD3DX12_CPU_DESCRIPTOR_HANDLE(descriptor_heap_->GetCPUDescriptorHandleForHeapStart(), index,
+                                         descriptor_size_);
   }
 
   CD3DX12_GPU_DESCRIPTOR_HANDLE GPUHandle(uint32_t index) const {
-    return CD3DX12_GPU_DESCRIPTOR_HANDLE(
-        descriptor_heap_->GetGPUDescriptorHandleForHeapStart(), index,
-        descriptor_size_);
+    return CD3DX12_GPU_DESCRIPTOR_HANDLE(descriptor_heap_->GetGPUDescriptorHandleForHeapStart(), index,
+                                         descriptor_size_);
   }
 
  private:

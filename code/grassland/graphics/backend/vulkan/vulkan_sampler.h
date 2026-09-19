@@ -7,6 +7,7 @@ namespace grassland::graphics::backend {
 class VulkanSampler : public Sampler {
  public:
   VulkanSampler(VulkanCore *core, const SamplerInfo &info);
+
   vulkan::Sampler *Sampler() const {
     return sampler_.get();
   }

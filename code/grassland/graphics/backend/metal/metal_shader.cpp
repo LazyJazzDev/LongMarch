@@ -39,6 +39,7 @@ MetalStage CompileMetalStage(MetalCore *core, MetalShader *shader, const std::ve
     binding.msl_buffer = i;
     compiler.add_msl_resource_binding(binding);
   }
+
   auto source = compiler.compile();
   // Opt-in shader dumps make translator/compiler failures reproducible.
   if (const char *directory = std::getenv("LONGMARCH_METAL_SHADER_DUMP")) {
@@ -47,6 +48,7 @@ MetalStage CompileMetalStage(MetalCore *core, MetalShader *shader, const std::ve
                   (entry.name + "-" + std::to_string(std::hash<std::string>{}(source)) + ".metal"))
         << source;
   }
+
   NS::Error *error = nullptr;
   auto compile_options = NS::TransferPtr(MTL::CompileOptions::alloc()->init());
   compile_options->setLanguageVersion(MTL::LanguageVersion3_0);

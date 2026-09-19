@@ -19,8 +19,7 @@ struct FresnelBsdf {
 
 void bsdf_microfacet_fresnel_color(inout FresnelBsdf bsdf) {
   float F0 = fresnel_dielectric_cos(1.0f, bsdf.ior);
-  bsdf.fresnel_color = interpolate_fresnel_color(omega_v, bsdf.N,
-                                                 bsdf.ior, F0, bsdf.cspec0);
+  bsdf.fresnel_color = interpolate_fresnel_color(omega_v, bsdf.N, bsdf.ior, F0, bsdf.cspec0);
   bsdf.sample_weight *= average(bsdf.fresnel_color);
 }
 
@@ -66,14 +65,11 @@ Spectrum bsdf_microfacet_ggx_eval_reflect_fresnel(const FresnelBsdf bsdf,
     float cosThetaM4 = cosThetaM2 * cosThetaM2;
     float tanThetaM2 = (1 - cosThetaM2) / cosThetaM2;
 
-    D = alpha2 /
-        (PI * cosThetaM4 * (alpha2 + tanThetaM2) * (alpha2 + tanThetaM2));
+    D = alpha2 / (PI * cosThetaM4 * (alpha2 + tanThetaM2) * (alpha2 + tanThetaM2));
 
     /* eq. 34: now calculate G1(i,m) and G1(o,m) */
-    G1o = 2 /
-          (1 + safe_sqrtf(1 + alpha2 * (1 - cosNO * cosNO) / (cosNO * cosNO)));
-    G1i = 2 /
-          (1 + safe_sqrtf(1 + alpha2 * (1 - cosNI * cosNI) / (cosNI * cosNI)));
+    G1o = 2 / (1 + safe_sqrtf(1 + alpha2 * (1 - cosNO * cosNO) / (cosNO * cosNO)));
+    G1i = 2 / (1 + safe_sqrtf(1 + alpha2 * (1 - cosNI * cosNI) / (cosNI * cosNI)));
   } else {
     /* anisotropic */
     float3 X, Y, Z = N;
@@ -96,8 +92,7 @@ Spectrum bsdf_microfacet_ggx_eval_reflect_fresnel(const FresnelBsdf bsdf,
     float cosPhiO = dot(I, X);
     float sinPhiO = dot(I, Y);
 
-    float alphaO2 = (cosPhiO * cosPhiO) * (alpha_x * alpha_x) +
-                    (sinPhiO * sinPhiO) * (alpha_y * alpha_y);
+    float alphaO2 = (cosPhiO * cosPhiO) * (alpha_x * alpha_x) + (sinPhiO * sinPhiO) * (alpha_y * alpha_y);
     alphaO2 /= cosPhiO * cosPhiO + sinPhiO * sinPhiO;
 
     G1o = 2 / (1 + safe_sqrtf(1 + alphaO2 * tanThetaO2));
@@ -106,8 +101,7 @@ Spectrum bsdf_microfacet_ggx_eval_reflect_fresnel(const FresnelBsdf bsdf,
     float cosPhiI = dot(omega_in, X);
     float sinPhiI = dot(omega_in, Y);
 
-    float alphaI2 = (cosPhiI * cosPhiI) * (alpha_x * alpha_x) +
-                    (sinPhiI * sinPhiI) * (alpha_y * alpha_y);
+    float alphaI2 = (cosPhiI * cosPhiI) * (alpha_x * alpha_x) + (sinPhiI * sinPhiI) * (alpha_y * alpha_y);
     alphaI2 /= cosPhiI * cosPhiI + sinPhiI * sinPhiI;
 
     G1i = 2 / (1 + safe_sqrtf(1 + alphaI2 * tanThetaI2));
@@ -148,8 +142,7 @@ Spectrum bsdf_microfacet_ggx_eval_fresnel(const FresnelBsdf bsdf,
     return make_float3(0.0);
   }
 
-  return bsdf_microfacet_ggx_eval_reflect_fresnel(
-      bsdf, N, I, omega_in, pdf, alpha_x, alpha_y, cosNO, cosNI);
+  return bsdf_microfacet_ggx_eval_reflect_fresnel(bsdf, N, I, omega_in, pdf, alpha_x, alpha_y, cosNO, cosNI);
 }
 
 int bsdf_microfacet_ggx_sample_fresnel(const FresnelBsdf bsdf,
@@ -181,8 +174,7 @@ int bsdf_microfacet_ggx_sample_fresnel(const FresnelBsdf bsdf,
     float3 local_m;
     float G1o;
 
-    local_m = microfacet_sample_stretched(local_I, alpha_x, alpha_y, randu,
-                                          randv, false, G1o);
+    local_m = microfacet_sample_stretched(local_I, alpha_x, alpha_y, randu, randv, false, G1o);
 
     float3 m = X * local_m.x + Y * local_m.y + Z * local_m.z;
     float cosThetaM = local_m.z;
@@ -217,12 +209,10 @@ int bsdf_microfacet_ggx_sample_fresnel(const FresnelBsdf bsdf,
             /* eval BRDF*cosNI */
             float cosNI = dot(N, omega_in);
 
-            D = alpha2 / (PI * cosThetaM4 * (alpha2 + tanThetaM2) *
-                          (alpha2 + tanThetaM2));
+            D = alpha2 / (PI * cosThetaM4 * (alpha2 + tanThetaM2) * (alpha2 + tanThetaM2));
 
             /* eq. 34: now calculate G1(i,m) */
-            G1i = 2 / (1 + safe_sqrtf(1 + alpha2 * (1 - cosNI * cosNI) /
-                                              (cosNI * cosNI)));
+            G1i = 2 / (1 + safe_sqrtf(1 + alpha2 * (1 - cosNI * cosNI) / (cosNI * cosNI)));
           } else {
             /* anisotropic distribution */
             float3 local_m = make_float3(dot(X, m), dot(Y, m), dot(Z, m));
@@ -243,8 +233,7 @@ int bsdf_microfacet_ggx_sample_fresnel(const FresnelBsdf bsdf,
             float cosPhiI = dot(omega_in, X);
             float sinPhiI = dot(omega_in, Y);
 
-            float alphaI2 = (cosPhiI * cosPhiI) * (alpha_x * alpha_x) +
-                            (sinPhiI * sinPhiI) * (alpha_y * alpha_y);
+            float alphaI2 = (cosPhiI * cosPhiI) * (alpha_x * alpha_x) + (sinPhiI * sinPhiI) * (alpha_y * alpha_y);
             alphaI2 /= cosPhiI * cosPhiI + sinPhiI * sinPhiI;
 
             G1i = 2 / (1 + safe_sqrtf(1 + alphaI2 * tanThetaI2));

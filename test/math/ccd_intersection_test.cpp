@@ -32,6 +32,7 @@ bool RandomEdgeEdge(Vector3<Scalar> *edges) {
       neg_sig = true;
     }
   }
+
   Vector3<Scalar> random_axis_x;
   Vector3<Scalar> random_axis_y;
   do {

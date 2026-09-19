@@ -7,6 +7,7 @@ class Material : public Object {
  public:
   explicit Material(Core *core) : core_(core) {
   }
+
   virtual ~Material() = default;
   virtual graphics::Shader *PixelShader() = 0;
   virtual void SetupProgram(graphics::Program *program);

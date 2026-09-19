@@ -1,10 +1,11 @@
 #include <long_march.h>
-#include "../sparkium_backend.h"
 
 #include <algorithm>
 #include <cmath>
 #include <filesystem>
 #include <iostream>
+
+#include "../sparkium_backend.h"
 
 using namespace long_march;
 
@@ -15,9 +16,12 @@ const char *PipelineName(sparkium::RenderPipeline pipeline) {
       return "Path Tracing - Ray Query";
     case sparkium::RENDER_PIPELINE_RT_FALLBACK:
       return "Path Tracing - Fallback";
-    case sparkium::RENDER_PIPELINE_RASTERIZATION: return "Rasterization";
-    case sparkium::RENDER_PIPELINE_RAY_TRACING: return "Path Tracing";
-    default: return "Auto";
+    case sparkium::RENDER_PIPELINE_RASTERIZATION:
+      return "Rasterization";
+    case sparkium::RENDER_PIPELINE_RAY_TRACING:
+      return "Path Tracing";
+    default:
+      return "Auto";
   }
 }
 
@@ -70,16 +74,22 @@ int main(int argc, char **argv) {
     int frame_limit = 0;
     for (int i = 2; i < argc; ++i) {
       std::string arg = argv[i];
-      if (arg == "--backend" && i + 1 < argc) backend = ParseSparkiumBackend(argv[++i]);
+      if (arg == "--backend" && i + 1 < argc)
+        backend = ParseSparkiumBackend(argv[++i]);
       else if (arg == "--frames" && i + 1 < argc) {
         frame_limit = std::stoi(argv[++i]);
-        if (frame_limit <= 0) throw std::invalid_argument("--frames must be positive");
-      } else throw std::invalid_argument("unknown or incomplete argument: " + arg);
+        if (frame_limit <= 0)
+          throw std::invalid_argument("--frames must be positive");
+      } else
+        throw std::invalid_argument("unknown or incomplete argument: " + arg);
     }
     std::vector<std::filesystem::path> scene_files;
-    if (std::filesystem::is_regular_file(input)) scene_files.push_back(std::filesystem::absolute(input));
-    else scene_files = sparkium::FindJsonScenes(input);
-    if (scene_files.empty()) throw std::runtime_error("no scene.json files found under: " + input.string());
+    if (std::filesystem::is_regular_file(input))
+      scene_files.push_back(std::filesystem::absolute(input));
+    else
+      scene_files = sparkium::FindJsonScenes(input);
+    if (scene_files.empty())
+      throw std::runtime_error("no scene.json files found under: " + input.string());
 
     std::unique_ptr<graphics::Core> graphics_core;
     if (graphics::CreateCore(backend, graphics::Core::Settings{}, &graphics_core) != 0)
@@ -98,7 +108,8 @@ int main(int argc, char **argv) {
     auto load_selected = [&]() {
       load_error.clear();
       auto next = sparkium::JsonScene::Load(&core, scene_files[selected], &load_error);
-      if (!next) return false;
+      if (!next)
+        return false;
       loaded = std::move(next);
       pipeline = loaded->GetRenderPipeline();
       auto *film = loaded->GetFilm();
@@ -106,7 +117,8 @@ int main(int argc, char **argv) {
       resize_pending = true;
       return true;
     };
-    if (!load_selected()) throw std::runtime_error(load_error);
+    if (!load_selected())
+      throw std::runtime_error(load_error);
 
     graphics_core->CreateWindowObject(loaded->GetFilm()->GetWidth(), loaded->GetFilm()->GetHeight(),
                                       "Sparkium Scene Browser", false, true, &window);
@@ -128,9 +140,11 @@ int main(int argc, char **argv) {
           if (ImGui::Selectable(scene_files[i].parent_path().filename().string().c_str(), current)) {
             auto previous = selected;
             selected = i;
-            if (!load_selected()) selected = previous;
+            if (!load_selected())
+              selected = previous;
           }
-          if (current) ImGui::SetItemDefaultFocus();
+          if (current)
+            ImGui::SetItemDefaultFocus();
         }
         ImGui::EndCombo();
       }
@@ -160,10 +174,13 @@ int main(int argc, char **argv) {
         ImGui::EndCombo();
       }
       int &samples = loaded->GetScene()->settings.samples_per_dispatch;
-      if (ImGui::SliderInt("Samples / frame", &samples, 1, 256)) loaded->GetFilm()->Reset();
-      if (ImGui::Button("Reload")) load_selected();
+      if (ImGui::SliderInt("Samples / frame", &samples, 1, 256))
+        loaded->GetFilm()->Reset();
+      if (ImGui::Button("Reload"))
+        load_selected();
       ImGui::SameLine();
-      if (ImGui::Button("Reset film")) loaded->GetFilm()->Reset();
+      if (ImGui::Button("Reset film"))
+        loaded->GetFilm()->Reset();
       ImGui::Text("%s", scene_files[selected].string().c_str());
       ImGui::Text("Backend: %s", graphics::BackendAPIString(graphics_core->API()));
       const auto resolved_pipeline = core.ResolveRenderPipeline(pipeline);

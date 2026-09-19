@@ -15,9 +15,11 @@ class MetalAccelerationStructure : public AccelerationStructure {
                              RayTracingGeometryFlag flags);
   MetalAccelerationStructure(MetalCore *core, const std::vector<RayTracingInstance> &instances);
   int UpdateInstances(const std::vector<RayTracingInstance> &instances) override;
+
   MTL::AccelerationStructure *Handle() const {
     return structure_.get();
   }
+
   const std::vector<NS::SharedPtr<MTL::AccelerationStructure>> &Children() const {
     return children_;
   }

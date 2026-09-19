@@ -5,9 +5,7 @@
 namespace grassland::vulkan {
 class Surface {
  public:
-  Surface(const class Instance *instance,
-          GLFWwindow *window,
-          VkSurfaceKHR surface);
+  Surface(const class Instance *instance, GLFWwindow *window, VkSurfaceKHR surface);
 
   ~Surface();
 

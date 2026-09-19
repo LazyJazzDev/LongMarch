@@ -23,9 +23,11 @@ class Scene : public Object {
       int padding = 0;
       glm::vec3 background_color{0.0f, 0.0f, 0.0f};
     } raytracing;
+
     struct Rasterization {
       glm::vec3 ambient_light{0.1f, 0.1f, 0.1f};
     } raster;
+
     int &samples_per_dispatch{raytracing.samples_per_dispatch};
     int &max_bounces{raytracing.max_bounces};
     int &alpha_shadow{raytracing.alpha_shadow};

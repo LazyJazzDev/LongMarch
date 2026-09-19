@@ -82,7 +82,11 @@ struct PBDStepHelper {
   int num_contacts{0};
 
   PBDStepHelper(PBDSolver::RigidEntity &e)
-      : entity(e), x_new(e.x_), q_new(e.q_), delta_x(Vector3<float>::Zero()), delta_theta(Vector3<float>::Zero()) {
+      : entity(e),
+        x_new(e.x_),
+        q_new(e.q_),
+        delta_x(Vector3<float>::Zero()),
+        delta_theta(Vector3<float>::Zero()) {
   }
 };
 }  // namespace

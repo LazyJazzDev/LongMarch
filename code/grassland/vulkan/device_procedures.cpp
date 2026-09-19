@@ -5,8 +5,7 @@ namespace grassland::vulkan {
 namespace {
 template <class FuncTy>
 FuncTy GetProcedure(VkDevice device, const char *function_name) {
-  auto func =
-      reinterpret_cast<FuncTy>(vkGetDeviceProcAddr(device, function_name));
+  auto func = reinterpret_cast<FuncTy>(vkGetDeviceProcAddr(device, function_name));
   if (!func) {
     ThrowError("Failed to load device function: {}", function_name);
   }
@@ -14,9 +13,8 @@ FuncTy GetProcedure(VkDevice device, const char *function_name) {
 };
 }  // namespace
 
-#define GET_PROCEDURE(device, function_name)                            \
-  function_name = grassland::vulkan::GetProcedure<PFN_##function_name>( \
-      device, #function_name)
+#define GET_PROCEDURE(device, function_name) \
+  function_name = grassland::vulkan::GetProcedure<PFN_##function_name>(device, #function_name)
 
 DeviceProcedures::DeviceProcedures() = default;
 

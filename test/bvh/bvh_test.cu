@@ -145,6 +145,7 @@ __global__ void BatchQueryDevKernel(const grassland::BVHRef bvh,
   if (tid >= num_tasks) {
     return;
   }
+
   SDFResult result_dev = result[tid];
   auto query = queries[tid];
   bvh.Traversal(query, &result_dev, &attached_info, AnyHit, InstanceHit);
@@ -237,6 +238,7 @@ TEST(BVH, SphereSDF) {
     Eigen::Vector3<float> vec = Eigen::Vector3<float>::Random() * 10;
     queries.push_back(vec);
   }
+
   std::vector<SDFResult> results(queries.size());
   std::vector<SDFResult> results_dev;
   for (auto &result : results) {

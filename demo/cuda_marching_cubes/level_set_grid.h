@@ -31,24 +31,31 @@ class LevelSetBase {
   __device__ float &ClampAt(int x, int y, int z);
   __device__ const float &ClampAt(int x, int y, int z) const;
   __device__ float SampleAt(float x, float y, float z) const;
+
   __device__ __host__ int SizeX() const {
     return size_x_;
   }
+
   __device__ __host__ int SizeY() const {
     return size_y_;
   }
+
   __device__ __host__ int SizeZ() const {
     return size_z_;
   }
+
   __device__ __host__ float DeltaX() const {
     return delta_x_;
   }
+
   __device__ __host__ float OffsetX() const {
     return offset_x_;
   }
+
   __device__ __host__ float OffsetY() const {
     return offset_y_;
   }
+
   __device__ __host__ float OffsetZ() const {
     return offset_z_;
   }

@@ -30,6 +30,7 @@ void RayTracingProgram::AddHitGroup(Shader *closest_hit_shader,
       intersection_shader,
       procedure,
   };
+
   AddHitGroup(hit_group);
 }
 

@@ -12,9 +12,18 @@ class MaterialShaderGraph : public Material {
   const CodeLines &EvaluatorImpl() const override;
   const CodeLines *GraphImpl() const override;
   void Update(Scene *scene) override;
-  graphics::Shader *RenderClosestHitShader() const { return closest_hit_shader_.get(); }
-  graphics::Shader *ShadowClosestHitShader() const { return shadow_closest_hit_shader_.get(); }
-  graphics::Shader *ShadowAnyHitShader() const { return shadow_any_hit_shader_.get(); }
+
+  graphics::Shader *RenderClosestHitShader() const {
+    return closest_hit_shader_.get();
+  }
+
+  graphics::Shader *ShadowClosestHitShader() const {
+    return shadow_closest_hit_shader_.get();
+  }
+
+  graphics::Shader *ShadowAnyHitShader() const {
+    return shadow_any_hit_shader_.get();
+  }
 
  private:
   sparkium::MaterialShaderGraph &material_;

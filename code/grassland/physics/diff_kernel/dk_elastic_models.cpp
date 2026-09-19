@@ -229,6 +229,7 @@ LM_DEVICE_FUNC Eigen::Matrix3<Real> ElasticNeoHookeanTetrahedron<Real>::SubHessi
       J = {0.0, 0.0, 0.0};
       break;
   }
+
   Eigen::Matrix3<Real> Dm_inv = Dm.inverse();
   Eigen::Matrix3<Real> Dm_inv_t = Dm_inv.transpose();
   J = Dm.transpose().inverse() * J;
@@ -297,6 +298,7 @@ LM_DEVICE_FUNC Eigen::Matrix3<Real> ElasticNeoHookeanSimpleTetrahedron<Real>::Su
       J = {0.0, 0.0, 0.0};
       break;
   }
+
   Eigen::Matrix3<Real> Dm_inv = Dm.inverse();
   Eigen::Matrix3<Real> Dm_inv_t = Dm_inv.transpose();
   J = Dm.transpose().inverse() * J;

@@ -38,6 +38,7 @@ struct ExampleDescriptorHeapAllocator {
     out_cpu_desc_handle->ptr = heap_start_cpu.ptr + (idx * heap_handle_increment);
     out_gpu_desc_handle->ptr = heap_start_gpu.ptr + (idx * heap_handle_increment);
   }
+
   void Free(D3D12_CPU_DESCRIPTOR_HANDLE out_cpu_desc_handle, D3D12_GPU_DESCRIPTOR_HANDLE out_gpu_desc_handle) {
     int cpu_idx = (int)((out_cpu_desc_handle.ptr - heap_start_cpu.ptr) / heap_handle_increment);
     int gpu_idx = (int)((out_gpu_desc_handle.ptr - heap_start_gpu.ptr) / heap_handle_increment);

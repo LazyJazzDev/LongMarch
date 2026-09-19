@@ -42,7 +42,9 @@ D3D12CmdBindVertexBuffers::D3D12CmdBindVertexBuffers(uint32_t first_binding,
                                                      const std::vector<D3D12Buffer *> &buffers,
                                                      const std::vector<uint64_t> &offsets,
                                                      D3D12Program *program)
-    : first_binding_(first_binding), buffers_(buffers), program_(program) {
+    : first_binding_(first_binding),
+      buffers_(buffers),
+      program_(program) {
   offsets_.resize(buffers_.size());
   for (size_t i = 0; i < buffers_.size(); ++i) {
     if (i < offsets.size()) {
@@ -67,7 +69,8 @@ void D3D12CmdBindVertexBuffers::CompileCommand(D3D12CommandContext *context, ID3
 }
 
 D3D12CmdBindIndexBuffer::D3D12CmdBindIndexBuffer(D3D12Buffer *buffer, uint64_t offset)
-    : buffer_(buffer), offset_(offset) {
+    : buffer_(buffer),
+      offset_(offset) {
 }
 
 void D3D12CmdBindIndexBuffer::CompileCommand(D3D12CommandContext *context, ID3D12GraphicsCommandList *command_list) {
@@ -85,7 +88,10 @@ D3D12CmdBindResourceBuffers::D3D12CmdBindResourceBuffers(int slot,
                                                          const std::vector<D3D12BufferRange> &buffers,
                                                          D3D12ProgramBase *program,
                                                          BindPoint bind_point)
-    : slot_(slot), buffers_(buffers), program_(program), bind_point_(bind_point) {
+    : slot_(slot),
+      buffers_(buffers),
+      program_(program),
+      bind_point_(bind_point) {
 }
 
 void D3D12CmdBindResourceBuffers::CompileCommand(D3D12CommandContext *context,
@@ -140,7 +146,10 @@ D3D12CmdBindResourceImages::D3D12CmdBindResourceImages(int slot,
                                                        const std::vector<D3D12Image *> &images,
                                                        D3D12ProgramBase *program,
                                                        BindPoint bind_point)
-    : slot_(slot), images_(images), program_(program), bind_point_(bind_point) {
+    : slot_(slot),
+      images_(images),
+      program_(program),
+      bind_point_(bind_point) {
 }
 
 void D3D12CmdBindResourceImages::CompileCommand(D3D12CommandContext *context, ID3D12GraphicsCommandList *command_list) {
@@ -183,7 +192,10 @@ D3D12CmdBindResourceSamplers::D3D12CmdBindResourceSamplers(int slot,
                                                            const std::vector<D3D12Sampler *> &samplers,
                                                            D3D12ProgramBase *program,
                                                            BindPoint bind_point)
-    : slot_(slot), samplers_(samplers), program_(program), bind_point_(bind_point) {
+    : slot_(slot),
+      samplers_(samplers),
+      program_(program),
+      bind_point_(bind_point) {
 }
 
 void D3D12CmdBindResourceSamplers::CompileCommand(D3D12CommandContext *context,
@@ -212,7 +224,10 @@ D3D12CmdBindResourceAccelerationStructure::D3D12CmdBindResourceAccelerationStruc
     D3D12AccelerationStructure *acceleration_structure,
     D3D12ProgramBase *program,
     BindPoint bind_point)
-    : slot_(slot), acceleration_structure_(acceleration_structure), program_(program), bind_point_(bind_point) {
+    : slot_(slot),
+      acceleration_structure_(acceleration_structure),
+      program_(program),
+      bind_point_(bind_point) {
 }
 
 void D3D12CmdBindResourceAccelerationStructure::CompileCommand(D3D12CommandContext *context,
@@ -231,7 +246,8 @@ void D3D12CmdBindResourceAccelerationStructure::CompileCommand(D3D12CommandConte
 }
 
 D3D12CmdBeginRendering::D3D12CmdBeginRendering(const std::vector<D3D12Image *> &color_targets, D3D12Image *depth_target)
-    : color_targets_(color_targets), depth_target_(depth_target) {
+    : color_targets_(color_targets),
+      depth_target_(depth_target) {
 }
 
 void D3D12CmdBeginRendering::CompileCommand(D3D12CommandContext *context, ID3D12GraphicsCommandList *command_list) {
@@ -252,7 +268,8 @@ void D3D12CmdBeginRendering::CompileCommand(D3D12CommandContext *context, ID3D12
 }
 
 D3D12CmdClearImage::D3D12CmdClearImage(D3D12Image *image, const ClearValue &clear_value)
-    : image_(image), clear_value_(clear_value) {
+    : image_(image),
+      clear_value_(clear_value) {
 }
 
 void D3D12CmdClearImage::CompileCommand(D3D12CommandContext *context, ID3D12GraphicsCommandList *command_list) {
@@ -397,7 +414,10 @@ D3D12CmdDispatchRays::D3D12CmdDispatchRays(D3D12RayTracingProgram *program,
                                            uint32_t width,
                                            uint32_t height,
                                            uint32_t depth)
-    : program_(program), width_(width), height_(height), depth_(depth) {
+    : program_(program),
+      width_(width),
+      height_(height),
+      depth_(depth) {
 }
 
 void D3D12CmdDispatchRays::CompileCommand(D3D12CommandContext *context, ID3D12GraphicsCommandList *command_list) {
@@ -432,7 +452,9 @@ void D3D12CmdDispatchRays::CompileCommand(D3D12CommandContext *context, ID3D12Gr
 }
 
 D3D12CmdDispatch::D3D12CmdDispatch(uint32_t group_count_x, uint32_t group_count_y, uint32_t group_count_z)
-    : group_count_x_(group_count_x), group_count_y_(group_count_y), group_count_z_(group_count_z) {
+    : group_count_x_(group_count_x),
+      group_count_y_(group_count_y),
+      group_count_z_(group_count_z) {
 }
 
 void D3D12CmdDispatch::CompileCommand(D3D12CommandContext *context, ID3D12GraphicsCommandList *command_list) {
@@ -450,7 +472,11 @@ D3D12CmdCopyBuffer::D3D12CmdCopyBuffer(D3D12Buffer *dst_buffer,
                                        uint64_t size,
                                        uint64_t dst_offset,
                                        uint64_t src_offset)
-    : dst_buffer_(dst_buffer), src_buffer_(src_buffer), size_(size), dst_offset_(dst_offset), src_offset_(src_offset) {
+    : dst_buffer_(dst_buffer),
+      src_buffer_(src_buffer),
+      size_(size),
+      dst_offset_(dst_offset),
+      src_offset_(src_offset) {
 }
 
 void D3D12CmdCopyBuffer::CompileCommand(D3D12CommandContext *context, ID3D12GraphicsCommandList *command_list) {

@@ -1,6 +1,7 @@
 #include "app.h"
 
 #include <glm/gtc/matrix_transform.hpp>
+
 namespace {
 #include "built_in_shaders.inl"
 }

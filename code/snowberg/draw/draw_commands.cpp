@@ -6,7 +6,10 @@
 namespace snowberg::draw {
 
 DrawCmdSetDrawRegion::DrawCmdSetDrawRegion(int x, int y, int width, int height)
-    : x_(x), y_(y), width_(width), height_(height) {
+    : x_(x),
+      y_(y),
+      width_(width),
+      height_(height) {
 }
 
 void DrawCmdSetDrawRegion::Execute(graphics::CommandContext *ctx) {
@@ -29,7 +32,10 @@ DrawCmdDrawInstance::DrawCmdDrawInstance(Model *model,
                                          graphics::Image *texture,
                                          uint32_t instance_base,
                                          uint32_t instance_count)
-    : model_(model), texture_(texture), instance_base_(instance_base), instance_count_(instance_count) {
+    : model_(model),
+      texture_(texture),
+      instance_base_(instance_base),
+      instance_count_(instance_count) {
 }
 
 void DrawCmdDrawInstance::Execute(graphics::CommandContext *ctx) {

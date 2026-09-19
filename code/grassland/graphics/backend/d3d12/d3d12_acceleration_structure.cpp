@@ -7,7 +7,8 @@ namespace grassland::graphics::backend {
 D3D12AccelerationStructure::D3D12AccelerationStructure(
     D3D12Core *core,
     std::unique_ptr<d3d12::AccelerationStructure> &&acceleration_structure)
-    : core_(core), acceleration_structure_(std::move(acceleration_structure)) {
+    : core_(core),
+      acceleration_structure_(std::move(acceleration_structure)) {
 }
 
 int D3D12AccelerationStructure::UpdateInstances(const std::vector<RayTracingInstance> &instances) {

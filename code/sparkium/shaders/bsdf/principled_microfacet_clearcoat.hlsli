@@ -18,9 +18,7 @@ struct ClearcoatBsdf {
 
 void bsdf_microfacet_fresnel_color(inout ClearcoatBsdf bsdf) {
   float F0 = fresnel_dielectric_cos(1.0f, bsdf.ior);
-  bsdf.fresnel_color = interpolate_fresnel_color(omega_v, bsdf.N,
-                                                 bsdf.ior, F0, bsdf.cspec0) *
-                       0.25f * bsdf.clearcoat;
+  bsdf.fresnel_color = interpolate_fresnel_color(omega_v, bsdf.N, bsdf.ior, F0, bsdf.cspec0) * 0.25f * bsdf.clearcoat;
   bsdf.sample_weight *= average(bsdf.fresnel_color);
 }
 
@@ -71,10 +69,8 @@ Spectrum bsdf_microfacet_ggx_eval_reflect_clearcoat(const ClearcoatBsdf bsdf,
   alpha2 = 0.0625f;
 
   /* eq. 34: now calculate G1(i,m) and G1(o,m) */
-  G1o =
-      2 / (1 + safe_sqrtf(1 + alpha2 * (1 - cosNO * cosNO) / (cosNO * cosNO)));
-  G1i =
-      2 / (1 + safe_sqrtf(1 + alpha2 * (1 - cosNI * cosNI) / (cosNI * cosNI)));
+  G1o = 2 / (1 + safe_sqrtf(1 + alpha2 * (1 - cosNO * cosNO) / (cosNO * cosNO)));
+  G1i = 2 / (1 + safe_sqrtf(1 + alpha2 * (1 - cosNI * cosNI) / (cosNI * cosNI)));
 
   float G = G1o * G1i;
 
@@ -110,8 +106,7 @@ Spectrum bsdf_microfacet_ggx_eval_clearcoat(const ClearcoatBsdf bsdf,
     return make_float3(0.0);
   }
 
-  return bsdf_microfacet_ggx_eval_reflect_clearcoat(bsdf, N, I, omega_in, pdf,
-                                                    alpha, cosNO, cosNI);
+  return bsdf_microfacet_ggx_eval_reflect_clearcoat(bsdf, N, I, omega_in, pdf, alpha, cosNO, cosNI);
 }
 
 int bsdf_microfacet_ggx_sample_clearcoat(const ClearcoatBsdf bsdf,
@@ -139,8 +134,7 @@ int bsdf_microfacet_ggx_sample_clearcoat(const ClearcoatBsdf bsdf,
     float3 local_m;
     float G1o;
 
-    local_m = microfacet_sample_stretched(local_I, alpha, alpha, randu, randv,
-                                          false, G1o);
+    local_m = microfacet_sample_stretched(local_I, alpha, alpha, randu, randv, false, G1o);
 
     float3 m = X * local_m.x + Y * local_m.y + Z * local_m.z;
     float cosThetaM = local_m.z;
@@ -182,12 +176,10 @@ int bsdf_microfacet_ggx_sample_clearcoat(const ClearcoatBsdf bsdf,
           alpha2 = 0.0625f;
 
           /* recalculate G1o */
-          G1o = 2 / (1 + safe_sqrtf(1 + alpha2 * (1 - cosNO * cosNO) /
-                                            (cosNO * cosNO)));
+          G1o = 2 / (1 + safe_sqrtf(1 + alpha2 * (1 - cosNO * cosNO) / (cosNO * cosNO)));
 
           /* eq. 34: now calculate G1(i,m) */
-          G1i = 2 / (1 + safe_sqrtf(1 + alpha2 * (1 - cosNI * cosNI) /
-                                            (cosNI * cosNI)));
+          G1i = 2 / (1 + safe_sqrtf(1 + alpha2 * (1 - cosNI * cosNI) / (cosNI * cosNI)));
 
           /* see eval function for derivation */
           float common_ = (G1o * D) * 0.25f / cosNO;

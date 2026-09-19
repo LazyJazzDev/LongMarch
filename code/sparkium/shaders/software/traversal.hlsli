@@ -10,6 +10,7 @@ struct SoftwareHit {
   uint instance;
   uint primitive;
 };
+
 bool SoftwareBoxHit(SoftwareNode node, float3 origin, float3 direction, float t_min, float t_max) {
   if (any(node.lo > node.hi))
     return false;
@@ -28,6 +29,7 @@ bool SoftwareBoxHit(SoftwareNode node, float3 origin, float3 direction, float t_
   }
   return true;
 }
+
 bool SoftwareTriangleHit(ByteAddressBuffer geometry,
                          uint primitive,
                          float3 origin,
@@ -52,6 +54,7 @@ bool SoftwareTriangleHit(ByteAddressBuffer geometry,
     kx = ky;
     ky = swap_axis;
   }
+
   float sx = direction[kx] / direction[kz], sy = direction[ky] / direction[kz];
   float sz = 1.0f / direction[kz];
   a -= origin;
@@ -76,6 +79,7 @@ bool SoftwareTriangleHit(ByteAddressBuffer geometry,
   hit.primitive = primitive;
   return true;
 }
+
 bool SoftwareTraceMesh(SoftwareInstance instance,
                        uint instance_index,
                        RayDesc ray,
@@ -107,6 +111,7 @@ bool SoftwareTraceMesh(SoftwareInstance instance,
   }
   return found;
 }
+
 bool InlineIntersect(RayDesc ray, bool any_hit, out SoftwareHit hit) {
   hit = (SoftwareHit)0;
   hit.distance = ray.TMax;

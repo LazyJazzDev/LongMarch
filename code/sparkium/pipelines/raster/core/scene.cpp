@@ -35,6 +35,7 @@ void Scene::Render(Camera *camera, Film *film) {
   for (auto &[entity, status] : entities_) {
     status.keep = false;
   }
+
   std::vector<Entity *> ordered_entities;
   for (auto *entity : scene_.GetEntityOrder()) {
     const auto &status = scene_.GetEntities().at(entity);
@@ -45,6 +46,7 @@ void Scene::Render(Camera *camera, Film *film) {
       ordered_entities.push_back(actual_entity);
     }
   }
+
   std::vector<Entity *> to_remove;
   for (auto &[entity, status] : entities_) {
     if (!status.keep) {

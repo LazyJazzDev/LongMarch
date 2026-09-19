@@ -561,6 +561,7 @@ __global__ void GenerateIndicesKernel(const LevelSetBase grid,
     auto eis = edge_indices[grid.Index(idx, idy + 1, idz + 1)];
     edge_index[6] = eis.ex;
   }
+
   int cube_index = 0;
   for (int i = 0; i < 8; ++i) {
     if (value[i] >= 0.0f) {
