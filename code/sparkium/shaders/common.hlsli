@@ -1,12 +1,19 @@
+#include "native_contract.hlsli"
 #pragma once
 #include "constants.hlsli"
+
+// Slang 2026.7.1's LLVM CPU target miscompiles all(isfinite(float3)).
+// Scalar classification preserves the same finite-value contract on every target.
+bool AllFinite(float3 value) {
+  return isfinite(value.x) && isfinite(value.y) && isfinite(value.z);
+}
 
 struct RandomDevice {
   uint offset;
   uint samp;
   uint seed;
   uint dim;
-} random_device;
+};
 
 struct CameraData {
   float4x4 world_to_camera;

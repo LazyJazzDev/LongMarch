@@ -1,15 +1,16 @@
+#include "native_contract.hlsli"
 #pragma once
 
 #include "bsdf/principled_util.hlsli"
 
-float RandomWalkDistance(inout RenderContext context) {
+float RandomWalkDistance(SP_CONTEXT inout RenderContext context) {
   float sigma = max(context.medium_sigma_t[context.medium_channel], 1.0e-6f);
-  return -log(max(1.0f - RandomFloat(context.rd), 1.0e-6f)) / sigma;
+  return -log(max(1.0f - RandomFloat(SP_CONTEXT_ARG context.rd), 1.0e-6f)) / sigma;
 }
 
-float3 SampleUniformSphere(inout RenderContext context) {
-  float z = 1.0f - 2.0f * RandomFloat(context.rd);
-  float phi = 2.0f * PI * RandomFloat(context.rd);
+float3 SampleUniformSphere(SP_CONTEXT inout RenderContext context) {
+  float z = 1.0f - 2.0f * RandomFloat(SP_CONTEXT_ARG context.rd);
+  float phi = 2.0f * PI * RandomFloat(SP_CONTEXT_ARG context.rd);
   float radius = sqrt(max(0.0f, 1.0f - z * z));
   return float3(radius * cos(phi), radius * sin(phi), z);
 }
@@ -23,7 +24,7 @@ float3 RandomWalkSingleScatteringAlbedo(float3 color) {
   return clamp(1.0f - s * s, 0.0f, 0.999999f);
 }
 
-void StartSubsurfaceRandomWalk(inout RenderContext context,
+void StartSubsurfaceRandomWalk(SP_CONTEXT inout RenderContext context,
                                HitRecord hit_record,
                                float3 albedo,
                                float3 radius,
@@ -31,13 +32,13 @@ void StartSubsurfaceRandomWalk(inout RenderContext context,
                                float ior) {
   float3 mean_free_path = max(radius * max(scale, 1.0e-4f), float3(1.0e-4f, 1.0e-4f, 1.0e-4f));
   context.medium_object_index = hit_record.object_index;
-  context.medium_channel = min(int(RandomFloat(context.rd) * 3.0f), 2);
+  context.medium_channel = min(int(RandomFloat(SP_CONTEXT_ARG context.rd) * 3.0f), 2);
   context.medium_sigma_t = 1.0f / mean_free_path;
   context.medium_albedo = RandomWalkSingleScatteringAlbedo(albedo);
   context.medium_ior = max(ior, 1.0f);
   float3 channel_mask = float3(context.medium_channel == 0, context.medium_channel == 1, context.medium_channel == 2);
   context.throughput *= 3.0f * channel_mask;
-  context.medium_sample_distance = RandomWalkDistance(context);
+  context.medium_sample_distance = RandomWalkDistance(SP_CONTEXT_ARG context);
   context.origin = hit_record.position;
   // The caller has already sampled the diffuse-transmission surface interface.
   // Subsequent collisions sample the isotropic phase function.
@@ -45,7 +46,7 @@ void StartSubsurfaceRandomWalk(inout RenderContext context,
   context.ray_type = RAY_TYPE_VOLUME;
 }
 
-bool ContinueSubsurfaceRandomWalk(inout RenderContext context, HitRecord hit_record) {
+bool ContinueSubsurfaceRandomWalk(SP_CONTEXT inout RenderContext context, HitRecord hit_record) {
   if (context.medium_object_index < 0)
     return false;
 
@@ -58,10 +59,10 @@ bool ContinueSubsurfaceRandomWalk(inout RenderContext context, HitRecord hit_rec
     context.origin += context.direction * context.medium_sample_distance;
 
     const float phase = 1.0f / (4.0f * PI);
-    context.direction = SampleUniformSphere(context);
+    context.direction = SampleUniformSphere(SP_CONTEXT_ARG context);
     context.bsdf_pdf = phase;
     context.ray_type = RAY_TYPE_VOLUME;
-    context.medium_sample_distance = RandomWalkDistance(context);
+    context.medium_sample_distance = RandomWalkDistance(SP_CONTEXT_ARG context);
     return true;
   }
 
@@ -77,12 +78,12 @@ bool ContinueSubsurfaceRandomWalk(inout RenderContext context, HitRecord hit_rec
     // paths proceed through the diffuse-transmission surface layer below.
     float interface_fresnel = fresnel_dielectric_cos(abs(dot(hit_record.normal, -context.direction)),
                                                      1.0f / max(context.medium_ior, 1.0e-4f));
-    if (RandomFloat(context.rd) < interface_fresnel) {
+    if (RandomFloat(SP_CONTEXT_ARG context.rd) < interface_fresnel) {
       context.direction = reflect(context.direction, hit_record.normal);
       context.origin = hit_record.position;
       context.bsdf_pdf = INF;
       context.ray_type = RAY_TYPE_VOLUME;
-      context.medium_sample_distance = RandomWalkDistance(context);
+      context.medium_sample_distance = RandomWalkDistance(SP_CONTEXT_ARG context);
       return true;
     }
 
@@ -92,15 +93,15 @@ bool ContinueSubsurfaceRandomWalk(inout RenderContext context, HitRecord hit_rec
     exit_record.normal = exit_record.geom_normal = exit_normal;
     float3 light_eval, light_direction;
     float light_pdf;
-    SampleDirectLighting(context, exit_record, light_eval, light_direction, light_pdf);
+    SampleDirectLighting(SP_CONTEXT_ARG context, exit_record, light_eval, light_direction, light_pdf);
     float cosine = max(dot(exit_normal, light_direction), 0.0f);
-    if (light_pdf > EPSILON && all(isfinite(light_eval))) {
+    if (light_pdf > EPSILON && AllFinite(light_eval)) {
       context.shadow_eval = light_eval * (cosine / (PI * light_pdf)) * context.throughput;
     }
 
     float direction_pdf;
-    sample_cos_hemisphere(exit_normal, RandomFloat(context.rd), RandomFloat(context.rd), context.direction,
-                          direction_pdf);
+    sample_cos_hemisphere(exit_normal, RandomFloat(SP_CONTEXT_ARG context.rd), RandomFloat(SP_CONTEXT_ARG context.rd),
+                          context.direction, direction_pdf);
     context.origin = hit_record.position;
     context.bsdf_pdf = direction_pdf;
     context.ray_type = RAY_TYPE_REFLECTION;

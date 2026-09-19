@@ -1,3 +1,5 @@
+#include "../../native_contract.hlsli"
+
 struct PSInput {
   float4 position : SV_POSITION;
   [[vk::location(0)]] float3 world_position : TEXCOORD0;
@@ -17,10 +19,11 @@ struct MaterialSpecular {
   float3 base_color;
 };
 
-ByteAddressBuffer material_data : register(t0, space2);
+SP_RESOURCE(ByteAddressBuffer, material_data, t0, 2);
+#define SP_BINDING_material_data SP_RESOURCE_ACCESS(ByteAddressBuffer, material_data, 2)
 
 PSOutput PSMain(PSInput input) {
-  PSOutput output;
+  PSOutput SP_BINDING_output;
   float3 geom_normal;
   // compute geometry normal from position derivatives
   float3 dp1 = ddx(input.world_position);
@@ -30,11 +33,11 @@ PSOutput PSMain(PSInput input) {
     input.world_normal = geom_normal;
   }
   float3 N = normalize(input.world_normal);
-  float3 base_color = material_data.Load<MaterialSpecular>(0).base_color;
-  output.radiance = float4(0.0, 0.0, 0.0, 1.0);
-  output.albedo_roughness = float4(base_color, 0.0);
-  output.position_specular = float4(input.world_position, 0.0);
-  output.normal_metallic = float4(N * 0.5 + 0.5, 1.0);
-  output.stencil = 0;
-  return output;
+  float3 base_color = SP_BINDING_material_data.Load<MaterialSpecular>(0).base_color;
+  SP_BINDING_output.radiance = float4(0.0, 0.0, 0.0, 1.0);
+  SP_BINDING_output.albedo_roughness = float4(base_color, 0.0);
+  SP_BINDING_output.position_specular = float4(input.world_position, 0.0);
+  SP_BINDING_output.normal_metallic = float4(N * 0.5 + 0.5, 1.0);
+  SP_BINDING_output.stencil = 0;
+  return SP_BINDING_output;
 }

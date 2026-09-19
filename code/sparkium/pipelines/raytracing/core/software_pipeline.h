@@ -1,5 +1,6 @@
 #pragma once
 #include "sparkium/pipelines/raytracing/core/core_util.h"
+#include "sparkium/pipelines/raytracing/core/cpu_bvh.h"
 
 namespace sparkium::raytracing {
 
@@ -76,6 +77,9 @@ class SoftwarePipeline {
 
   Core *core_;
   bool ray_query_;
+  bool cpu_{};
+  std::vector<CpuBvhTree> cpu_meshes_;
+  std::vector<uint8_t> cpu_last_instances_;
   std::unique_ptr<graphics::AccelerationStructure> native_tlas_;
   std::vector<Instance> instances_;
   std::vector<GeometryLayout> geometries_;

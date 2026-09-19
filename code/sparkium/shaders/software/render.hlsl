@@ -1,3 +1,4 @@
+#include "native_contract.hlsli"
 #define SPARKIUM_SOFTWARE_RT
 #include "bindings.hlsli"
 #include "bsdf/lambertian.hlsli"
@@ -9,6 +10,8 @@
 #include "random.hlsli"
 #ifdef SPARKIUM_RAY_QUERY
 #include "ray_query/traversal.hlsli"
+#elif defined(SPARKIUM_CPU_SAH)
+#include "software/cpu_traversal.hlsli"
 #else
 #include "software/traversal.hlsli"
 #endif
@@ -19,32 +22,33 @@
 #endif
 #include "software_materials.hlsli"
 
-HitRecord SoftwareHitRecord(SoftwareHit hit, float3 direction) {
-  SoftwareInstance instance = LoadSoftwareInstance(software_instances, hit.instance);
-  return MakeMeshHitRecord(instance.geometry, hit.instance, hit.primitive, hit.barycentric, hit.distance, direction,
-                           instance.object_to_world, transpose(instance.world_to_object));
+HitRecord SoftwareHitRecord(SP_CONTEXT SoftwareHit hit, float3 direction) {
+  SoftwareInstance instance = LoadSoftwareInstance(SP_BINDING_software_instances, hit.instance);
+  return MakeMeshHitRecord(SP_CONTEXT_ARG instance.geometry, hit.instance, hit.primitive, hit.barycentric, hit.distance,
+                           direction, instance.object_to_world, transpose(instance.world_to_object));
 }
 
-void ApplyPathMiss(inout RenderContext context);
+void ApplyPathMiss(SP_CONTEXT inout RenderContext context);
 
-void SoftwareTracePath(RayDesc ray, inout RenderContext context) {
+void SoftwareTracePath(SP_CONTEXT SP_RAY ray, inout RenderContext context) {
   SoftwareHit hit;
-  if (!InlineIntersect(ray, false, hit)) {
-    ApplyPathMiss(context);
+  if (!InlineIntersect(SP_CONTEXT_ARG ray, false, hit)) {
+    ApplyPathMiss(SP_CONTEXT_ARG context);
     return;
   }
 
-  HitRecord record = SoftwareHitRecord(hit, ray.Direction);
-  if (!ContinueSubsurfaceRandomWalk(context, record))
-    SoftwareSampleMaterial(LoadSoftwareInstance(software_instances, hit.instance).material, context, record);
+  HitRecord record = SoftwareHitRecord(SP_CONTEXT_ARG hit, ray.Direction);
+  if (!ContinueSubsurfaceRandomWalk(SP_CONTEXT_ARG context, record))
+    SoftwareSampleMaterial(SP_CONTEXT_ARG LoadSoftwareInstance(SP_BINDING_software_instances, hit.instance).material,
+                           context, record);
 }
 
 #include "raygen.hlsl"
 #include "software/shadow.hlsli"
-[numthreads(8, 8, 1)] void Main(uint3 id
-                                : SV_DispatchThreadID) {
+
+SP_NUMTHREADS(8, 8, 1) void Main(SP_CONTEXT uint3 id : SV_DispatchThreadID) {
   uint width, height;
-  accumulated_color.GetDimensions(width, height);
+  SP_BINDING_accumulated_color.GetDimensions(width, height);
   if (id.x < width && id.y < height)
-    RenderPixel(id.xy, uint2(width, height));
+    RenderPixel(SP_CONTEXT_ARG id.xy, uint2(width, height));
 }

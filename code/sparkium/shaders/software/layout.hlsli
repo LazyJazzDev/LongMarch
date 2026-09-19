@@ -1,3 +1,4 @@
+#include "native_contract.hlsli"
 #pragma once
 #include "buffer_helper.hlsli"
 
@@ -13,9 +14,9 @@ struct SoftwareNode {
   uint second;
 };
 
-template <class B>
-SoftwareNode LoadSoftwareNode(B nodes, uint index) {
-  return nodes.template Load<SoftwareNode>(index * SOFTWARE_NODE_BYTES);
+SP_BUFFER_TEMPLATE
+SoftwareNode LoadSoftwareNode(SP_BUFFER_TYPE nodes, uint index) {
+  return nodes.SP_TEMPLATE_CALL Load<SoftwareNode>(index * SOFTWARE_NODE_BYTES);
 }
 
 struct SoftwareInstance {

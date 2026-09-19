@@ -170,11 +170,27 @@ endif ()
 message(STATUS "DXC_LIB_NAME: ${DXC_LIB_NAME}")
 message(STATUS "DXC_DLL_DIR: ${DXC_DLL_DIR}")
 
+option(LONGMARCH_ENABLE_NATIVE_RENDER "Enable Slang CPU/CUDA compute backends" ON)
+if (LONGMARCH_ENABLE_NATIVE_RENDER)
+    # Find at project scope so imported targets are visible to every executable.
+    find_package(slang 2026.7.1 CONFIG QUIET)
+endif ()
+
 # Deploy non-system runtime libraries beside an executable so build-tree
 # programs can be launched directly from their output directory.
 function(LONGMARCH_DEPLOY_RUNTIME_DEPENDENCIES TARGET_NAME)
     if (NOT TARGET ${TARGET_NAME})
         return()
+    endif ()
+
+    if (WIN32 AND LONGMARCH_ENABLE_NATIVE_RENDER AND TARGET slang::slang AND TARGET slang::slang-llvm)
+        # LLVM is loaded dynamically, so ordinary link-dependency deployment
+        # does not discover it. Deploy both from the same imported package.
+        add_custom_command(TARGET ${TARGET_NAME} POST_BUILD
+                COMMAND ${CMAKE_COMMAND} -E copy_if_different
+                "$<TARGET_FILE:slang::slang>" "$<TARGET_FILE:slang::slang-llvm>"
+                "$<TARGET_FILE_DIR:${TARGET_NAME}>"
+                COMMENT "Deploying Slang and embedded LLVM JIT for ${TARGET_NAME}")
     endif ()
 
     if (LONGMARCH_VULKAN_ENABLED OR LONGMARCH_METAL_ENABLED)

@@ -1,4 +1,7 @@
 #include "grassland/graphics/core.h"
+#ifdef LONGMARCH_NATIVE_ENABLED
+#include "grassland/graphics/backend/native/native_core.h"
+#endif
 
 #include "grassland/graphics/acceleration_structure.h"
 #include "grassland/graphics/backend/backend.h"
@@ -338,6 +341,16 @@ void Core::PybindClassRegistration(py::classh<Core> &c) {
 #endif
 
 int CreateCore(BackendAPI api, const Core::Settings &settings, double_ptr<Core> pp_core) {
+  // Never silently route an unavailable native backend through a graphics API.
+  if (api == BACKEND_API_CPU || api == BACKEND_API_CUDA) {
+#ifdef LONGMARCH_NATIVE_ENABLED
+    if (SupportBackendAPI(api)) {
+      pp_core.construct<backend::NativeCore>(api, settings);
+      return 0;
+    }
+#endif
+    return -1;
+  }
   switch (api) {
 #ifdef LONGMARCH_METAL_ENABLED
     case BACKEND_API_METAL:

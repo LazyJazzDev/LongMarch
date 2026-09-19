@@ -1,3 +1,4 @@
+#include "native_contract.hlsli"
 #pragma once
 #include "bindings.hlsli"
 #include "bsdf/principled_material.hlsli"
@@ -5,12 +6,12 @@
 #include "direct_lighting.hlsli"
 #include "geometry_primitive_sampler.hlsli"
 
-void SampleMaterial(inout RenderContext context, HitRecord hit_record) {
+void SampleMaterial(SP_CONTEXT inout RenderContext context, HitRecord hit_record) {
   // hit_record.tex_coord *= 2.0;
   InstanceMetadata instance_meta =
-      instance_metadatas.Load<InstanceMetadata>(sizeof(InstanceMetadata) * hit_record.object_index);
-  StreamedBufferReference<ByteAddressBuffer> material_buffer =
-      MakeStreamedBufferReference(data_buffers[NonUniformResourceIndex(instance_meta.material_data_index)], 0);
+      SP_BINDING_instance_metadatas.Load<InstanceMetadata>(sizeof(InstanceMetadata) * hit_record.object_index);
+  StreamedBufferReference SP_BUFFER_ARG(ByteAddressBuffer) material_buffer =
+      MakeStreamedBufferReference(SP_BINDING_data_buffers[SP_NONUNIFORM(instance_meta.material_data_index)], 0);
 
   PrincipledMaterial material;
   material.hit_record = hit_record;
@@ -40,7 +41,7 @@ void SampleMaterial(inout RenderContext context, HitRecord hit_record) {
   int normal_texture_index = material_buffer.LoadInt();
   float y_signal = material_buffer.LoadFloat();
   if (normal_texture_index != -1 && abs(hit_record.signal) > 0.5f) {
-    float3 tbn = SampleTexture(normal_texture_index, hit_record.tex_coord).xyz * 2.0f - 1.0f;
+    float3 tbn = SampleTexture(SP_CONTEXT_ARG normal_texture_index, hit_record.tex_coord).xyz * 2.0f - 1.0f;
     float3x3 TBN =
         float3x3(hit_record.tangent, cross(hit_record.normal, hit_record.tangent) * y_signal, hit_record.normal);
     material.hit_record.normal = hit_record.normal = normalize(mul(tbn, TBN));
@@ -48,38 +49,39 @@ void SampleMaterial(inout RenderContext context, HitRecord hit_record) {
 
   int base_color_texture_index = material_buffer.LoadInt();
   if (base_color_texture_index != -1)
-    material.base_color = SampleTexture(base_color_texture_index, hit_record.tex_coord).xyz;
+    material.base_color = SampleTexture(SP_CONTEXT_ARG base_color_texture_index, hit_record.tex_coord).xyz;
 
   int metallic_texture_index = material_buffer.LoadInt();
   if (metallic_texture_index != -1)
-    material.metallic = SampleTexture(metallic_texture_index, hit_record.tex_coord).x;
+    material.metallic = SampleTexture(SP_CONTEXT_ARG metallic_texture_index, hit_record.tex_coord).x;
 
   int specular_texture_index = material_buffer.LoadInt();
   if (specular_texture_index != -1)
-    material.specular = SampleTexture(specular_texture_index, hit_record.tex_coord).x;
+    material.specular = SampleTexture(SP_CONTEXT_ARG specular_texture_index, hit_record.tex_coord).x;
 
   int roughness_texture_index = material_buffer.LoadInt();
   if (roughness_texture_index != -1)
-    material.roughness = SampleTexture(roughness_texture_index, hit_record.tex_coord).x;
+    material.roughness = SampleTexture(SP_CONTEXT_ARG roughness_texture_index, hit_record.tex_coord).x;
 
   int anisotropic_texture_index = material_buffer.LoadInt();
   if (anisotropic_texture_index != -1)
-    material.anisotropic = SampleTexture(anisotropic_texture_index, hit_record.tex_coord).x;
+    material.anisotropic = SampleTexture(SP_CONTEXT_ARG anisotropic_texture_index, hit_record.tex_coord).x;
 
   int anisotropic_rotation_texture_index = material_buffer.LoadInt();
   if (anisotropic_rotation_texture_index != -1)
-    material.anisotropic_rotation = SampleTexture(anisotropic_rotation_texture_index, hit_record.tex_coord).x;
+    material.anisotropic_rotation =
+        SampleTexture(SP_CONTEXT_ARG anisotropic_rotation_texture_index, hit_record.tex_coord).x;
 
   int emission_texture_index = material_buffer.LoadInt();
   if (emission_texture_index != -1)
-    emission *= SampleTexture(emission_texture_index, hit_record.tex_coord).xyz;
+    emission *= SampleTexture(SP_CONTEXT_ARG emission_texture_index, hit_record.tex_coord).xyz;
 
   float3 eval;
   float3 omega_in;
   float pdf;
 
   {
-    SampleDirectLighting(context, hit_record, eval, omega_in, pdf);
+    SampleDirectLighting(SP_CONTEXT_ARG context, hit_record, eval, omega_in, pdf);
     float bsdf_pdf;
     float3 bsdf_eval = material.EvalPrincipledBSDF(omega_in, bsdf_pdf);
     float mis_weight = PowerHeuristic(pdf, bsdf_pdf);
@@ -95,11 +97,11 @@ void SampleMaterial(inout RenderContext context, HitRecord hit_record) {
 
     if (instance_meta.custom_index != -1) {
       LightMetadata light_meta =
-          light_metadatas.Load<LightMetadata>(sizeof(LightMetadata) * instance_meta.custom_index);
+          SP_BINDING_light_metadatas.Load<LightMetadata>(sizeof(LightMetadata) * instance_meta.custom_index);
       float pdf = hit_record.pdf *
-                  EvaluatePrimitiveProbability(data_buffers[NonUniformResourceIndex(light_meta.sampler_data_index)],
+                  EvaluatePrimitiveProbability(SP_BINDING_data_buffers[SP_NONUNIFORM(light_meta.sampler_data_index)],
                                                hit_record.primitive_index);
-      pdf *= DirectLightingProbability(instance_meta.custom_index);
+      pdf *= DirectLightingProbability(SP_CONTEXT_ARG instance_meta.custom_index);
       float3 omega_in = hit_record.position - context.origin;
       pdf *= dot(omega_in, omega_in);
       float NdotL = abs(dot(hit_record.geom_normal, normalize(omega_in)));
@@ -114,7 +116,8 @@ void SampleMaterial(inout RenderContext context, HitRecord hit_record) {
     context.radiance += emission * context.throughput * mis_weight;
   }
 
-  material.SamplePrincipledBSDF(RandomFloat(context.rd), RandomFloat(context.rd), eval, omega_in, pdf);
+  material.SamplePrincipledBSDF(RandomFloat(SP_CONTEXT_ARG context.rd), RandomFloat(SP_CONTEXT_ARG context.rd), eval,
+                                omega_in, pdf);
   if (pdf < 1e-5) {
     context.throughput = float3(0, 0, 0);
   } else {

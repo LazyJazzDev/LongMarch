@@ -1,11 +1,12 @@
+#include "native_contract.hlsli"
 #pragma once
 #include "bindings.hlsli"
 #include "common.hlsli"
 
-void PointLightSampler(inout SampleDirectLightingPayload payload) {
+void PointLightSampler(SP_CONTEXT inout SampleDirectLightingPayload payload) {
   float3 position = asfloat(payload.low.xyz);
   uint sampler_data_index = payload.low.w;
-  ByteAddressBuffer direct_lighting_sampler_data = data_buffers[NonUniformResourceIndex(sampler_data_index)];
+  ByteAddressBuffer direct_lighting_sampler_data = SP_BINDING_data_buffers[SP_NONUNIFORM(sampler_data_index)];
 
   float3 light_position = LoadFloat3(direct_lighting_sampler_data, 0);
   float3 light_power = LoadFloat3(direct_lighting_sampler_data, 12);

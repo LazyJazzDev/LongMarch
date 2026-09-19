@@ -1,3 +1,4 @@
+#include "../../native_contract.hlsli"
 #include "buffer_helper.hlsli"
 
 struct PSInput {
@@ -17,12 +18,15 @@ struct PSOutput {
   int stencil : SV_TARGET4;
 };
 
-ByteAddressBuffer material_data : register(t0, space2);
-Texture2D<float4> textures[] : register(t0, space3);
-SamplerState S : register(s0, space4);
+SP_RESOURCE(ByteAddressBuffer, material_data, t0, 2);
+#define SP_BINDING_material_data SP_RESOURCE_ACCESS(ByteAddressBuffer, material_data, 2)
+SP_ARRAY_RESOURCE(SP_TEXTURE(float4), textures, t0, 3);
+#define SP_BINDING_textures SP_ARRAY_ACCESS(SP_TEXTURE(float4), textures, 3)
+SP_RESOURCE(SP_SAMPLER, S, s0, 4);
+#define SP_BINDING_S SP_RESOURCE_ACCESS(SP_SAMPLER, S, 4)
 
 PSOutput PSMain(PSInput input) {
-  PSOutput output;
+  PSOutput SP_BINDING_output;
   float3 geom_normal;
   // compute geometry normal from position derivatives
   float3 dp1 = ddx(input.world_position);
@@ -39,7 +43,8 @@ PSOutput PSMain(PSInput input) {
     B = cross(N, T) * input.signal;
   }
 
-  StreamedBufferReference<ByteAddressBuffer> material_buffer = MakeStreamedBufferReference(material_data, 0);
+  StreamedBufferReference SP_BUFFER_ARG(ByteAddressBuffer) material_buffer =
+      MakeStreamedBufferReference(SP_BINDING_material_data, 0);
 
   float3 base_color = material_buffer.LoadFloat3();
   float3 subsurface_color = material_buffer.LoadFloat3();
@@ -69,19 +74,19 @@ PSOutput PSMain(PSInput input) {
   int use_texture;
   use_texture = material_buffer.LoadInt();
   if (use_texture)
-    base_color = textures[0].Sample(S, input.tex_coord).xyz;
+    base_color = SP_BINDING_textures[0].Sample(SP_BINDING_S, input.tex_coord).xyz;
   use_texture = material_buffer.LoadInt();
   if (use_texture)
-    roughness = textures[1].Sample(S, input.tex_coord).x;
+    roughness = SP_BINDING_textures[1].Sample(SP_BINDING_S, input.tex_coord).x;
   use_texture = material_buffer.LoadInt();
   if (use_texture)
-    specular = textures[2].Sample(S, input.tex_coord).x;
+    specular = SP_BINDING_textures[2].Sample(SP_BINDING_S, input.tex_coord).x;
   use_texture = material_buffer.LoadInt();
   if (use_texture)
-    metallic = textures[3].Sample(S, input.tex_coord).x;
+    metallic = SP_BINDING_textures[3].Sample(SP_BINDING_S, input.tex_coord).x;
   use_texture = material_buffer.LoadInt();
   if (use_texture) {
-    float3 tbn = textures[4].Sample(S, input.tex_coord).xyz;
+    float3 tbn = SP_BINDING_textures[4].Sample(SP_BINDING_S, input.tex_coord).xyz;
 
     if (length(tbn) > 0.001 && length(B) > 0.001) {
       tbn = tbn * 2.0f - 1.0f;
@@ -91,16 +96,16 @@ PSOutput PSMain(PSInput input) {
   }
   use_texture = material_buffer.LoadInt();
   if (use_texture)
-    emission *= textures[5].Sample(S, input.tex_coord).xyz;
+    emission *= SP_BINDING_textures[5].Sample(SP_BINDING_S, input.tex_coord).xyz;
 
-  output.radiance = float4(emission * strength, 0.0);
+  SP_BINDING_output.radiance = float4(emission * strength, 0.0);
   // base_color = float3(max(input.signal, 0.0), 0.0, max(-input.signal, 0.0));
   // base_color = T * 0.5 + 0.5;
   // base_color = B * 0.5 + 0.5;
   // base_color = float3(input.tex_coord, 0.0);
-  output.albedo_roughness = float4(base_color, roughness);
-  output.position_specular = float4(input.world_position, specular);
-  output.normal_metallic = float4(N * 0.5 + 0.5, metallic);
-  output.stencil = 0;
-  return output;
+  SP_BINDING_output.albedo_roughness = float4(base_color, roughness);
+  SP_BINDING_output.position_specular = float4(input.world_position, specular);
+  SP_BINDING_output.normal_metallic = float4(N * 0.5 + 0.5, metallic);
+  SP_BINDING_output.stencil = 0;
+  return SP_BINDING_output;
 }

@@ -1,8 +1,9 @@
+#include "native_contract.hlsli"
 #pragma once
 #include "common.hlsli"
 
-template <class BufferType>
-GeometryPrimitiveSample MeshSamplePrimitive(BufferType geometry_data,
+SP_BUFFER_TEMPLATE
+GeometryPrimitiveSample MeshSamplePrimitive(SP_BUFFER_TYPE geometry_data,
                                             float3x4 transform,
                                             uint primitive_id,
                                             float2 sample) {

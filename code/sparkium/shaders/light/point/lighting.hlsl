@@ -1,3 +1,4 @@
+#include "../../native_contract.hlsli"
 
 #include "bsdf/principled_material.hlsli"
 #include "common.hlsli"
@@ -16,11 +17,16 @@ struct CameraInfo {
   float4x4 inv_view_proj;
 };
 
-Texture2D<float4> albedo_roughness_buffer : register(t0, space0);
-Texture2D<float4> position_specular_buffer : register(t0, space1);
-Texture2D<float4> normal_metallic_buffer : register(t0, space2);
-ConstantBuffer<CameraInfo> camera_data : register(b0, space3);
-ByteAddressBuffer settings : register(t0, space4);
+SP_RESOURCE(SP_TEXTURE(float4), albedo_roughness_buffer, t0, 0);
+#define SP_BINDING_albedo_roughness_buffer SP_RESOURCE_ACCESS(SP_TEXTURE(float4), albedo_roughness_buffer, 0)
+SP_RESOURCE(SP_TEXTURE(float4), position_specular_buffer, t0, 1);
+#define SP_BINDING_position_specular_buffer SP_RESOURCE_ACCESS(SP_TEXTURE(float4), position_specular_buffer, 1)
+SP_RESOURCE(SP_TEXTURE(float4), normal_metallic_buffer, t0, 2);
+#define SP_BINDING_normal_metallic_buffer SP_RESOURCE_ACCESS(SP_TEXTURE(float4), normal_metallic_buffer, 2)
+SP_RESOURCE(ConstantBuffer<CameraInfo>, camera_data, b0, 3);
+#define SP_BINDING_camera_data SP_RESOURCE_ACCESS(ConstantBuffer<CameraInfo>, camera_data, 3)
+SP_RESOURCE(ByteAddressBuffer, settings, t0, 4);
+#define SP_BINDING_settings SP_RESOURCE_ACCESS(ByteAddressBuffer, settings, 4)
 
 struct VSOutput {
   float4 position : SV_POSITION;
@@ -29,9 +35,9 @@ struct VSOutput {
 VSOutput VSMain(uint vertex_id : SV_VertexID) {
   float2 pos[] = {float2(-1.0, -1.0), float2(1.0, -1.0), float2(-1.0, 1.0),
                   float2(-1.0, 1.0),  float2(1.0, -1.0), float2(1.0, 1.0)};
-  VSOutput output;
-  output.position = float4(pos[vertex_id], 0.0, 1.0);
-  return output;
+  VSOutput SP_BINDING_output;
+  SP_BINDING_output.position = float4(pos[vertex_id], 0.0, 1.0);
+  return SP_BINDING_output;
 }
 
 struct PSInput {
@@ -43,11 +49,11 @@ struct PSOutput {
 };
 
 PSOutput PSMain(PSInput input) {
-  PSOutput output;
+  PSOutput SP_BINDING_output;
   uint2 pixel_coords = uint2(input.position.xy);
-  float4 albedo_roughness = albedo_roughness_buffer.Load(int3(pixel_coords, 0));
-  float4 position_specular = position_specular_buffer.Load(int3(pixel_coords, 0));
-  float4 normal_metallic = normal_metallic_buffer.Load(int3(pixel_coords, 0));
+  float4 albedo_roughness = SP_BINDING_albedo_roughness_buffer.Load(int3(pixel_coords, 0));
+  float4 position_specular = SP_BINDING_position_specular_buffer.Load(int3(pixel_coords, 0));
+  float4 normal_metallic = SP_BINDING_normal_metallic_buffer.Load(int3(pixel_coords, 0));
   float3 albedo = albedo_roughness.xyz;
   float roughness = albedo_roughness.w;
   float3 position = position_specular.xyz;
@@ -55,8 +61,8 @@ PSOutput PSMain(PSInput input) {
   float3 normal = normal_metallic.xyz * 2.0 - 1.0;
   float metallic = normal_metallic.w;
   float3 N = normalize(normal);
-  float3 L = settings.Load<PointLightSettings>(0).light_position - position;
-  float3 camera_position = transpose(camera_data.inv_view)[3].xyz;
+  float3 L = SP_BINDING_settings.Load<PointLightSettings>(0).light_position - position;
+  float3 camera_position = transpose(SP_BINDING_camera_data.inv_view)[3].xyz;
   float3 V = normalize(camera_position - position);
 
   PrincipledMaterial material;
@@ -96,11 +102,11 @@ PSOutput PSMain(PSInput input) {
   float pdf;
 
   // Ambient lighting
-  float3 strength = settings.Load<PointLightSettings>(0).emission / (dot(L, L) * 4.0 * PI);
+  float3 strength = SP_BINDING_settings.Load<PointLightSettings>(0).emission / (dot(L, L) * 4.0 * PI);
   L = normalize(L);
   albedo = material.EvalPrincipledBSDF(L, pdf);
   // strength *= max(dot(N, L), 0.0);
   // Simple environment map (gradient)
-  output.radiance = float4(albedo * strength, 0.0);
-  return output;
+  SP_BINDING_output.radiance = float4(albedo * strength, 0.0);
+  return SP_BINDING_output;
 }

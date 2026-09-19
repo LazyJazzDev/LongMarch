@@ -1,3 +1,4 @@
+#include "native_contract.hlsli"
 #include "bindings.hlsli"
 #include "common.hlsli"
 #include "geometry_primitive_sampler.hlsli"
@@ -8,21 +9,21 @@
 // clang-format off
 
 // callable shader to sample direct lighting
-[shader("callable")] void SampleDirectLightingCallable(inout SampleDirectLightingPayload payload) {
+[shader("callable")] void SampleDirectLightingCallable(SP_CONTEXT inout SampleDirectLightingPayload payload) {
   float3 position = asfloat(payload.low.xyz);
   uint sampler_data_index = payload.low.w;
   uint custom_index = payload.high.w;
-  InstanceMetadata instance_meta = instance_metadatas.Load<InstanceMetadata>( sizeof(InstanceMetadata) * custom_index);
+  InstanceMetadata instance_meta = SP_BINDING_instance_metadatas.Load<InstanceMetadata>( sizeof(InstanceMetadata) * custom_index);
   float3 rv = asfloat(payload.high.xyz);
-  ByteAddressBuffer direct_lighting_sampler_data = data_buffers[NonUniformResourceIndex(sampler_data_index)];
-  ByteAddressBuffer geometry_data = data_buffers[NonUniformResourceIndex(instance_meta.geometry_data_index)];
-  ByteAddressBuffer material_data = data_buffers[NonUniformResourceIndex(instance_meta.material_data_index)];
+  ByteAddressBuffer direct_lighting_sampler_data = SP_BINDING_data_buffers[SP_NONUNIFORM(sampler_data_index)];
+  ByteAddressBuffer geometry_data = SP_BINDING_data_buffers[SP_NONUNIFORM(instance_meta.geometry_data_index)];
+  ByteAddressBuffer material_data = SP_BINDING_data_buffers[SP_NONUNIFORM(instance_meta.material_data_index)];
 
   float3x4 transform = LoadFloat3x4(direct_lighting_sampler_data, 0);
-  GeometrySampler<ByteAddressBuffer> geometry_sampler;
+  GeometrySampler SP_BUFFER_ARG(ByteAddressBuffer) geometry_sampler;
   geometry_sampler.geometry_data = geometry_data;
   geometry_sampler.SetTransform(transform);
-  MaterialEvaluator<ByteAddressBuffer> material_evaluator;
+  MaterialEvaluator SP_BUFFER_ARG(ByteAddressBuffer) material_evaluator;
   material_evaluator.material_data = material_data;
 
   uint primitive_id;

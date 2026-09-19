@@ -30,6 +30,8 @@ simulation).
 Sparkium also has an experimental [compute ray tracing fallback](docs/rt-fallback.md)
 for GPUs without hardware ray tracing. It shares the path tracer's materials,
 lighting and JSON scenes and builds its acceleration structures with compute shaders.
+The same path tracer is available through [native CPU and CUDA backends](docs/native-render-backends.md)
+using `sparkium_cli --backend cpu|cuda`, without Vulkan dispatch.
 
 ## How to Build
 

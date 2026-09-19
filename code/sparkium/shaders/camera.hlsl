@@ -1,3 +1,4 @@
+#include "native_contract.hlsli"
 #include "bindings.hlsli"
 #include "common.hlsli"
 
@@ -6,16 +7,16 @@
 #endif
 
     void
-    CameraPinhole(inout RayGenPayload raygen_payload) {
+    CameraPinhole(SP_CONTEXT inout RayGenPayload raygen_payload) {
       float4x4 camera_to_world;
       float2 scale;
-      camera_to_world = LoadFloat4x4(camera_data, 64);
-      scale = LoadFloat2(camera_data, 128);
-      float aperture_radius = LoadFloat(camera_data, 136);
-      float focus_distance = LoadFloat(camera_data, 140);
-      int aperture_blades = camera_data.Load<int>(144);
-      float aperture_rotation = LoadFloat(camera_data, 148);
-      float aperture_ratio = LoadFloat(camera_data, 152);
+      camera_to_world = LoadFloat4x4(SP_BINDING_camera_data, 64);
+      scale = LoadFloat2(SP_BINDING_camera_data, 128);
+      float aperture_radius = LoadFloat(SP_BINDING_camera_data, 136);
+      float focus_distance = LoadFloat(SP_BINDING_camera_data, 140);
+      int aperture_blades = SP_BINDING_camera_data.Load<int>(144);
+      float aperture_rotation = LoadFloat(SP_BINDING_camera_data, 148);
+      float aperture_ratio = LoadFloat(SP_BINDING_camera_data, 152);
 
       raygen_payload.origin = float3(0, 0, 0);
       raygen_payload.direction = normalize(float3(raygen_payload.uv * scale, -1));

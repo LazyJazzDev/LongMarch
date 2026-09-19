@@ -1,12 +1,13 @@
+#include "native_contract.hlsli"
 #pragma once
 
-template <class BufferType>
-void SamplePrimitivePower(BufferType direct_lighting_sampler_data,
+SP_BUFFER_TEMPLATE
+void SamplePrimitivePower(SP_BUFFER_TYPE direct_lighting_sampler_data,
                           inout float r,
                           out uint primitive_id,
                           out float prob) {
   uint primitive_count = direct_lighting_sampler_data.Load(48);
-  BufferReference<BufferType> power_cdf = MakeBufferReference(direct_lighting_sampler_data, 52);
+  BufferReference SP_BUFFER_ARG(SP_BUFFER_TYPE) power_cdf = MakeBufferReference(direct_lighting_sampler_data, 52);
   float total_power = asfloat(power_cdf.Load(primitive_count * 4 - 4));
 
   uint L = 0, R = primitive_count - 1;
@@ -28,10 +29,10 @@ void SamplePrimitivePower(BufferType direct_lighting_sampler_data,
   r = (r - low_prob) / prob;
 }
 
-template <class BufferType>
-float EvaluatePrimitiveProbability(BufferType direct_lighting_sampler_data, uint primitive_id) {
+SP_BUFFER_TEMPLATE
+float EvaluatePrimitiveProbability(SP_BUFFER_TYPE direct_lighting_sampler_data, uint primitive_id) {
   uint primitive_count = direct_lighting_sampler_data.Load(48);
-  BufferReference<BufferType> power_cdf = MakeBufferReference(direct_lighting_sampler_data, 52);
+  BufferReference SP_BUFFER_ARG(SP_BUFFER_TYPE) power_cdf = MakeBufferReference(direct_lighting_sampler_data, 52);
   float total_power = asfloat(power_cdf.Load(primitive_count * 4 - 4));
   float high_prob = asfloat(power_cdf.Load(primitive_id * 4));
   float low_prob = (primitive_id > 0) ? asfloat(power_cdf.Load((primitive_id - 1) * 4)) : 0.0f;

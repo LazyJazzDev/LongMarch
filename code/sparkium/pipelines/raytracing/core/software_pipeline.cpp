@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <array>
+#include <cstdlib>
 #include <limits>
 #include <sstream>
 #include <stdexcept>
@@ -49,6 +50,14 @@ static_assert(sizeof(GPUInstance) == 112, "HLSL software instance layout changed
 SoftwarePipeline::SoftwarePipeline(Core *core, bool ray_query) : core_(core), ray_query_(ray_query) {
   if (ray_query_ && !core_->GraphicsCore()->DeviceRayQuerySupport())
     throw std::runtime_error("native ray queries are unavailable on the selected backend");
+  cpu_ = core_->GraphicsCore()->API() == graphics::BACKEND_API_CPU;
+  if (cpu_)
+    if (const char *choice = std::getenv("SPARKIUM_CPU_BVH")) {
+      if (std::string(choice) == "heap")
+        cpu_ = false;  // Differential/ablation reference.
+      else if (std::string(choice) != "sah")
+        throw std::invalid_argument("SPARKIUM_CPU_BVH must be sah or heap");
+    }
   static_assert(sizeof(BuildParameters) == 256, "uniform buffer alignment");
 }
 
@@ -104,9 +113,9 @@ void SoftwarePipeline::CompileRenderer(const std::vector<MaterialCode> &material
       continue;
     }
     source << R"(
-float Transmission(HitRecord hit, float3 direction) {
+float Transmission(SP_CONTEXT HitRecord hit, float3 direction) {
 #ifdef SAMPLE_SHADOW_ANY_HIT
-  return 1.0f - saturate(SampleShadowOpacity(hit, direction));
+  return 1.0f - saturate(SampleShadowOpacity(SP_CONTEXT_ARG hit, direction));
 #else
   ShadowRayPayload payload;
   payload.shadow = 1.0f;
@@ -125,52 +134,53 @@ float Transmission(HitRecord hit, float3 direction) {
   }
   if (has_graph) {
     source << R"(
-  ByteAddressBuffer SoftwareMaterialData(HitRecord hit) {
-    InstanceMetadata metadata = instance_metadatas.Load<InstanceMetadata>(sizeof(InstanceMetadata) * hit.object_index);
-    return data_buffers[NonUniformResourceIndex(metadata.material_data_index)];
+  ByteAddressBuffer SoftwareMaterialData(SP_CONTEXT HitRecord hit) {
+    InstanceMetadata metadata = SP_BINDING_instance_metadatas.Load<InstanceMetadata>(sizeof(InstanceMetadata) * hit.object_index);
+    return SP_BINDING_data_buffers[SP_NONUNIFORM(metadata.material_data_index)];
   }
-  void SoftwareSampleMaterial(uint material, inout RenderContext context, HitRecord hit) {
+  void SoftwareSampleMaterial(SP_CONTEXT uint material, inout RenderContext context, HitRecord hit) {
     GraphSurface graph;
     switch (material) {
   )";
     for (size_t i = 0; i < materials.size(); ++i) {
       source << "case " << i << ": ";
       if (materials[i].shader_graph)
-        source << "graph = SoftwareMaterial" << i
-               << "::EvaluateShaderGraph(hit, -context.direction, context.bounce, context.ray_type, false, "
-                  "SoftwareMaterialData(hit)); break;\n";
+        source
+            << "graph = SoftwareMaterial" << i
+            << "::EvaluateShaderGraph(SP_CONTEXT_ARG hit, -context.direction, context.bounce, context.ray_type, false, "
+               "SoftwareMaterialData(SP_CONTEXT_ARG hit)); break;\n";
       else
-        source << "SoftwareMaterial" << i << "::SampleMaterial(context, hit); return;\n";
+        source << "SoftwareMaterial" << i << "::SampleMaterial(SP_CONTEXT_ARG context, hit); return;\n";
     }
     source << R"(
       default: context.throughput = float3(0, 0, 0); return;
     }
-    SampleGraphSurface(context, hit, graph);
+    SampleGraphSurface(SP_CONTEXT_ARG context, hit, graph);
   }
-  float SoftwareShadowTransmission(uint material, HitRecord hit, float3 direction) {
+  float SoftwareShadowTransmission(SP_CONTEXT uint material, HitRecord hit, float3 direction) {
     switch (material) {
   )";
     for (size_t i = 0; i < materials.size(); ++i) {
       source << "case " << i << ": return ";
       if (materials[i].shader_graph)
-        source
-            << "1.0f - saturate(GraphShadowOpacity(SoftwareMaterial" << i
-            << "::EvaluateShaderGraph(hit, -direction, 1, RAY_TYPE_REFLECTION, true, SoftwareMaterialData(hit))));\n";
+        source << "1.0f - saturate(GraphShadowOpacity(SoftwareMaterial" << i
+               << "::EvaluateShaderGraph(SP_CONTEXT_ARG hit, -direction, 1, RAY_TYPE_REFLECTION, true, "
+                  "SoftwareMaterialData(SP_CONTEXT_ARG hit))));\n";
       else
-        source << "SoftwareMaterial" << i << "::Transmission(hit, direction);\n";
+        source << "SoftwareMaterial" << i << "::Transmission(SP_CONTEXT_ARG hit, direction);\n";
     }
     source << "default: return 0.0f;\n}}\n";
   } else {
     // Preserve the compact dispatch for scenes without material graphs.
-    source << "void SoftwareSampleMaterial(uint material, inout RenderContext context, HitRecord hit) {\n"
+    source << "void SoftwareSampleMaterial(SP_CONTEXT uint material, inout RenderContext context, HitRecord hit) {\n"
               "switch (material) {\n";
     for (size_t i = 0; i < materials.size(); ++i)
-      source << "case " << i << ": SoftwareMaterial" << i << "::SampleMaterial(context, hit); return;\n";
-    source
-        << "default: context.throughput = float3(0, 0, 0); break;\n}}\n"
-           "float SoftwareShadowTransmission(uint material, HitRecord hit, float3 direction) {\nswitch (material) {\n";
+      source << "case " << i << ": SoftwareMaterial" << i << "::SampleMaterial(SP_CONTEXT_ARG context, hit); return;\n";
+    source << "default: context.throughput = float3(0, 0, 0); break;\n}}\n"
+              "float SoftwareShadowTransmission(SP_CONTEXT uint material, HitRecord hit, float3 direction) {\nswitch "
+              "(material) {\n";
     for (size_t i = 0; i < materials.size(); ++i)
-      source << "case " << i << ": return SoftwareMaterial" << i << "::Transmission(hit, direction);\n";
+      source << "case " << i << ": return SoftwareMaterial" << i << "::Transmission(SP_CONTEXT_ARG hit, direction);\n";
     source << "default: return 0.0f;\n}}\n";
   }
 
@@ -178,6 +188,8 @@ float Transmission(HitRecord hit, float3 direction) {
   vfs.WriteFile("software_materials.hlsli", source.str());
   render_program_.reset();
   std::vector<std::string> args{"-I.", "-DSOFTWARE_DATA_BUFFER_COUNT=" + std::to_string(buffers)};
+  if (cpu_)
+    args.push_back("-DSPARKIUM_CPU_SAH");
   if (ray_query_)
     args.push_back("-DSPARKIUM_RAY_QUERY");
   if (has_graph)
@@ -240,14 +252,14 @@ void SoftwarePipeline::Update(graphics::CommandContext *commands,
   std::vector<MaterialCode> materials;
   if (16ull + instances_.size() * sizeof(GPUInstance) > std::numeric_limits<uint32_t>::max())
     throw std::runtime_error("software instance byte address overflow");
-  const uint32_t tlas_leaves = ray_query_ ? 1 : LeafCount(instances_.size());
+  const uint32_t tlas_leaves = (ray_query_ || cpu_) ? 1 : LeafCount(instances_.size());
   uint64_t node_count = uint64_t(tlas_leaves) * 2 - 1;
   uint32_t max_leaves = tlas_leaves;
   for (const auto &instance : instances_) {
     auto geometry = std::find_if(geometries.begin(), geometries.end(),
                                  [&](const GeometryLayout &g) { return g.geometry == instance.geometry; });
     if (geometry == geometries.end()) {
-      const uint32_t count = instance.geometry->PrimitiveCount(), leaves = ray_query_ ? 1 : LeafCount(count);
+      const uint32_t count = instance.geometry->PrimitiveCount(), leaves = (ray_query_ || cpu_) ? 1 : LeafCount(count);
       if (node_count + uint64_t(leaves) * 2 - 1 > std::numeric_limits<uint32_t>::max() / 32u)
         throw std::runtime_error("software BVH node address overflow");
       geometries.push_back(
@@ -279,9 +291,68 @@ void SoftwarePipeline::Update(graphics::CommandContext *commands,
   bool rebuild = !nodes_ || tlas_leaves != tlas_leaves_ || geometries.size() != geometries_.size();
   for (size_t i = 0; !rebuild && i < geometries.size(); ++i)
     rebuild = geometries[i].geometry != geometries_[i].geometry || geometries[i].count != geometries_[i].count;
-  if (rebuild && !ray_query_) {
+  if (rebuild && !ray_query_ && !cpu_) {
     graphics->CreateBuffer(node_count * 32, graphics::BUFFER_TYPE_STATIC, &nodes_);
     graphics->CreateBuffer(uint64_t(max_leaves) * 8, graphics::BUFFER_TYPE_STATIC, &keys_);
+  }
+  if (cpu_) {
+    graphics::CpuProfileScope build_profile("cpu_bvh_build");
+    if (rebuild) {
+      cpu_meshes_.clear();
+      for (const auto &geometry : geometries) {
+        auto buffer = geometry.geometry->Buffer();
+        std::vector<uint8_t> bytes(buffer->Size());
+        buffer->DownloadData(bytes.data(), bytes.size());
+        cpu_meshes_.push_back(BuildCpuMeshBvh(bytes, geometry.count));
+      }
+    }
+    std::vector<CpuBounds> bounds;
+    // Reserve enough TLAS space to keep BLAS byte offsets stable across refits.
+    size_t offset = 16 + std::max<size_t>(1, gpu_instances.size() * 2) * sizeof(CpuBvhNode) +
+                    gpu_instances.size() * sizeof(uint32_t);
+    offset = (offset + 15) & ~size_t(15);
+    const size_t blas_offset = offset;
+    for (size_t i = 0; i < geometries.size(); ++i) {
+      if (offset + cpu_meshes_[i].bytes.size() > std::numeric_limits<uint32_t>::max())
+        throw std::overflow_error("CPU BVH byte offset overflow");
+      geometries[i].root = uint32_t(offset);
+      offset += cpu_meshes_[i].bytes.size();
+    }
+    for (size_t i = 0; i < instances_.size(); ++i) {
+      auto it = std::find_if(geometries.begin(), geometries.end(),
+                             [&](const GeometryLayout &g) { return g.geometry == instances_[i].geometry; });
+      size_t index = it - geometries.begin();
+      gpu_instances[i].root = it->root;
+      CpuBounds box;
+      const auto &local = cpu_meshes_[index].bounds;
+      if (it->count)
+        for (unsigned corner = 0; corner < 8; ++corner) {
+          glm::vec3 p{corner & 1 ? local.hi.x : local.lo.x, corner & 2 ? local.hi.y : local.lo.y,
+                      corner & 4 ? local.hi.z : local.lo.z};
+          box.Extend(instances_[i].transform * glm::vec4(p, 1));
+        }
+      bounds.push_back(box);
+    }
+    std::vector<uint8_t> instance_key(gpu_instances.size() * sizeof(GPUInstance));
+    if (!instance_key.empty())
+      std::memcpy(instance_key.data(), gpu_instances.data(), instance_key.size());
+    if (rebuild || instance_key != cpu_last_instances_) {
+      auto tlas = BuildCpuBvh(bounds, 1);
+      if (tlas.bytes.size() > blas_offset)
+        throw std::logic_error("CPU TLAS reserve too small");
+      if (!nodes_ || nodes_->Size() != offset)
+        graphics->CreateBuffer(offset, graphics::BUFFER_TYPE_STATIC, &nodes_);
+      nodes_->UploadData(tlas.bytes.data(), tlas.bytes.size());
+      if (rebuild || instance_key.size() != cpu_last_instances_.size())
+        for (size_t i = 0; i < geometries.size(); ++i)
+          nodes_->UploadData(cpu_meshes_[i].bytes.data(), cpu_meshes_[i].bytes.size(), geometries[i].root);
+      cpu_last_instances_ = std::move(instance_key);
+    }
+    if (graphics::FrameProfile::active) {
+      graphics::FrameProfile::active->counters["cpu_sah_bvh"] = 1;
+      graphics::FrameProfile::active->counters["blas_rebuilt"] = rebuild;
+      graphics::FrameProfile::active->counters["instances"] = instances_.size();
+    }
   }
 
   size_t instance_bytes = 16 + gpu_instances.size() * sizeof(GPUInstance);
@@ -305,6 +376,14 @@ void SoftwarePipeline::Update(graphics::CommandContext *commands,
       graphics::FrameProfile::active->counters["native_ray_query"] = 1;
       graphics::FrameProfile::active->counters["instances"] = instances_.size();
     }
+    return;
+  }
+  if (cpu_) {
+    if (!render_program_ || materials != material_sources_ || buffer_count_ != buffers.size() ||
+        sdr_count_ != sdr_count || hdr_count_ != hdr_count)
+      CompileRenderer(materials, buffers.size(), sdr_count, hdr_count);
+    geometries_ = std::move(geometries);
+    tlas_leaves_ = tlas_leaves;
     return;
   }
   if (builders_.empty() || builder_buffer_count_ != buffers.size())

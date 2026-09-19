@@ -1,0 +1,13 @@
+# Use one package for the compiler and LLVM plugin so their versions match.
+if (LONGMARCH_ENABLE_NATIVE_RENDER AND TARGET slang::slang AND TARGET slang::slang-llvm)
+    target_sources(grassland_graphics PRIVATE native_core.cpp native_shader.cpp native_shader_compat.cpp native_cpu_thread_pool.cpp)
+    find_package(Threads REQUIRED)
+    target_link_libraries(grassland_graphics PRIVATE slang::slang Threads::Threads)
+    target_compile_definitions(grassland_graphics PUBLIC LONGMARCH_NATIVE_ENABLED)
+    if (LONGMARCH_CUDA_ENABLED)
+        target_compile_definitions(grassland_graphics PUBLIC LONGMARCH_NATIVE_CUDA_ENABLED)
+        target_link_libraries(grassland_graphics PRIVATE CUDA::cuda_driver CUDA::nvrtc)
+    endif ()
+elseif (LONGMARCH_ENABLE_NATIVE_RENDER)
+    message(STATUS "Slang package with LLVM JIT not found: native CPU/CUDA rendering disabled")
+endif ()

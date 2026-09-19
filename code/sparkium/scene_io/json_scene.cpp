@@ -277,7 +277,7 @@ float3 GraphHsvToRgb(float3 c) {
   float3 p=abs(frac(c.xxx+float3(0.0f,2.0f/3.0f,1.0f/3.0f))*6.0f-3.0f);
   return c.z*lerp(float3(1,1,1),saturate(p-1.0f),c.y);
 }
-GraphSurface EvaluateShaderGraph(HitRecord hit_record, float3 view_direction, int bounce, int ray_type, bool is_shadow_ray,
+GraphSurface EvaluateShaderGraph(SP_CONTEXT HitRecord hit_record, float3 view_direction, int bounce, int ray_type, bool is_shadow_ray,
                                  ByteAddressBuffer material_data) {
 )";
     const auto &surface = RequireObject(Member(graph_, "surface"));
@@ -400,7 +400,8 @@ GraphSurface EvaluateShaderGraph(HitRecord hit_record, float3 view_direction, in
       if (it == texture_slots_.end())
         throw std::runtime_error("image node has no loaded texture: " + id);
       auto vector = Input(node, "vector", "float4(hit_record.tex_coord,0,0)");
-      expression = "SampleTexture(material_data.Load(" + std::to_string(12 + it->second * 4) + "),(" + vector + ").xy)";
+      expression = "SampleTexture(SP_CONTEXT_ARG material_data.Load(" + std::to_string(12 + it->second * 4) + "),(" +
+                   vector + ").xy)";
       if (output == "alpha")
         expression = "(" + expression + ").wwww";
       else if (node.HasMember("color_space") && std::string(ReadString(node["color_space"])) == "srgb")

@@ -1,3 +1,5 @@
+#include "../../native_contract.hlsli"
+
 struct VSInput {
   [[vk::location(0)]] float3 position : TEXCOORD0;
 #if defined(HAS_NORMAL)
@@ -66,29 +68,31 @@ struct GeometryData {
   float4x4 normal_matrix;
 };
 
-ConstantBuffer<CameraData> camera_data : register(b0, space0);
-ConstantBuffer<GeometryData> geometry_data : register(b0, space1);
+SP_RESOURCE(ConstantBuffer<CameraData>, camera_data, b0, 0);
+#define SP_BINDING_camera_data SP_RESOURCE_ACCESS(ConstantBuffer<CameraData>, camera_data, 0)
+SP_RESOURCE(ConstantBuffer<GeometryData>, geometry_data, b0, 1);
+#define SP_BINDING_geometry_data SP_RESOURCE_ACCESS(ConstantBuffer<GeometryData>, geometry_data, 1)
 
 VSOutput VSMain(VSInput input) {
-  VSOutput output;
-  output.world_position = mul(geometry_data.model, float4(input.position, 1.0)).xyz;
+  VSOutput SP_BINDING_output;
+  SP_BINDING_output.world_position = mul(SP_BINDING_geometry_data.model, float4(input.position, 1.0)).xyz;
 #if defined(HAS_NORMAL)
-  output.world_normal = normalize(mul(geometry_data.normal_matrix, float4(input.normal, 0)).xyz);
+  SP_BINDING_output.world_normal = normalize(mul(SP_BINDING_geometry_data.normal_matrix, float4(input.normal, 0)).xyz);
 #else
-  output.world_normal = float3(0, 0, 0);
+  SP_BINDING_output.world_normal = float3(0, 0, 0);
 #endif
 #if defined(HAS_TEXCOORD)
-  output.tex_coord = input.tex_coord;
+  SP_BINDING_output.tex_coord = input.tex_coord;
 #else
-  output.tex_coord = float2(0, 0);
+  SP_BINDING_output.tex_coord = float2(0, 0);
 #endif
 #if defined(HAS_TANGENT)
-  output.tangent = normalize(mul(geometry_data.model, float4(input.tangent, 0)).xyz);
-  output.signal = input.signal;
+  SP_BINDING_output.tangent = normalize(mul(SP_BINDING_geometry_data.model, float4(input.tangent, 0)).xyz);
+  SP_BINDING_output.signal = input.signal;
 #else
-  output.tangent = float3(0, 0, 0);
-  output.signal = 1.0;
+  SP_BINDING_output.tangent = float3(0, 0, 0);
+  SP_BINDING_output.signal = 1.0;
 #endif
-  output.position = mul(camera_data.view_proj, float4(output.world_position, 1.0));
-  return output;
+  SP_BINDING_output.position = mul(SP_BINDING_camera_data.view_proj, float4(SP_BINDING_output.world_position, 1.0));
+  return SP_BINDING_output;
 }

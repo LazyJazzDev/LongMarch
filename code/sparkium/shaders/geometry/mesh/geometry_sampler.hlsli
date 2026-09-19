@@ -1,12 +1,13 @@
+#include "native_contract.hlsli"
 #pragma once
 #include "geometry/mesh/sample_primitive.hlsli"
 
-template <class BufferType>
-class GeometrySampler {
-  BufferType geometry_data;
+SP_BUFFER_TEMPLATE
+SP_CLASS GeometrySampler {
+  SP_BUFFER_TYPE geometry_data;
   float3x4 transform;
 
-  void SetTransform(float3x4 new_transform) {
+  SP_MUTATING void SetTransform(float3x4 new_transform) {
     transform = new_transform;
   }
 

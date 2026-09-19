@@ -1,3 +1,4 @@
+#include "native_contract.hlsli"
 #pragma once
 #include "bindings.hlsli"
 #include "shadow_ray.hlsli"
@@ -5,17 +6,17 @@
 #include "light/point/sampler.hlsli"
 #include "light/geometry_material/sampler.hlsli"
 
-void LightSampler(int shader_index, inout SampleDirectLightingPayload payload) {
+void LightSampler(SP_CONTEXT int shader_index, inout SampleDirectLightingPayload payload) {
   switch (shader_index) {
     case 0x1000000:  // PointLightSampler
-      PointLightSampler(payload);
+      PointLightSampler(SP_CONTEXT_ARG payload);
       break;
     case 0x1000001:
     case 0x1000002:
     case 0x1000003:
     case 0x1000004:
     case 0x1000005:
-      MeshLightSampler(shader_index, payload);
+      MeshLightSampler(SP_CONTEXT_ARG shader_index, payload);
       break;
     default:
       // From what we know, calling a callable shader from closest hit shader is very slow.
@@ -31,24 +32,24 @@ void LightSampler(int shader_index, inout SampleDirectLightingPayload payload) {
   }
 }
 
-void SampleDirectLighting(inout RenderContext context,
+void SampleDirectLighting(SP_CONTEXT inout RenderContext context,
                           HitRecord hit_record,
                           out float3 eval,
                           out float3 omega_in,
                           out float pdf) {
-  uint light_count = light_selector_data.Load(0);
+  uint light_count = SP_BINDING_light_selector_data.Load(0);
   eval = omega_in = float3(0, 0, 0);
   pdf = 0.0f;
   context.shadow_eval = context.shadow_dir = float3(0, 0, 0);
   context.shadow_length = 0.0f;
   if (light_count == 0)
     return;
-  BufferReference<ByteAddressBuffer> power_cdf = MakeBufferReference(light_selector_data, 4);
+  BufferReference SP_BUFFER_ARG(ByteAddressBuffer) power_cdf = MakeBufferReference(SP_BINDING_light_selector_data, 4);
   float total_power = asfloat(power_cdf.Load(light_count * 4 - 4));
   if (!(total_power > 0.0f))
     return;
   uint L = 0, R = light_count - 1;
-  float r1 = RandomFloat(context.rd);
+  float r1 = RandomFloat(SP_CONTEXT_ARG context.rd);
   while (L < R) {
     uint mid = (L + R) / 2;
     float mid_power = asfloat(power_cdf.Load(mid * 4));
@@ -68,15 +69,15 @@ void SampleDirectLighting(inout RenderContext context,
     r1 = 0.0f;  // Avoid division by zero
   }
 
-  LightMetadata light_meta = light_metadatas.Load<LightMetadata>(sizeof(LightMetadata) * L);
+  LightMetadata light_meta = SP_BINDING_light_metadatas.Load<LightMetadata>(sizeof(LightMetadata) * L);
   SampleDirectLightingPayload payload;
   payload.low.xyz = asuint(hit_record.position);
   payload.low.w = light_meta.sampler_data_index;
-  payload.high.xyz = asuint(float3(r1, RandomFloat(context.rd), RandomFloat(context.rd)));
+  payload.high.xyz = asuint(float3(r1, RandomFloat(SP_CONTEXT_ARG context.rd), RandomFloat(SP_CONTEXT_ARG context.rd)));
   payload.high.w = light_meta.custom_index;
   payload.extra.xyz = asuint(hit_record.normal);
   payload.extra.w = context.ray_type;
-  LightSampler(light_meta.sampler_shader_index, payload);
+  LightSampler(SP_CONTEXT_ARG light_meta.sampler_shader_index, payload);
   eval = asfloat(payload.low.xyz);
   float shadow_length = asfloat(payload.low.w) * 0.9999;
   omega_in = asfloat(payload.high.xyz);
@@ -86,13 +87,13 @@ void SampleDirectLighting(inout RenderContext context,
   context.shadow_length = shadow_length;
 }
 
-float DirectLightingProbability(uint light_index) {
-  uint light_count = light_selector_data.Load(0);
+float DirectLightingProbability(SP_CONTEXT uint light_index) {
+  uint light_count = SP_BINDING_light_selector_data.Load(0);
   if (light_index >= light_count) {
     return 0.0f;
   }
 
-  BufferReference<ByteAddressBuffer> power_cdf = MakeBufferReference(light_selector_data, 4);
+  BufferReference SP_BUFFER_ARG(ByteAddressBuffer) power_cdf = MakeBufferReference(SP_BINDING_light_selector_data, 4);
   float total_power = asfloat(power_cdf.Load(light_count * 4 - 4));
   if (!(total_power > 0.0f))
     return 0.0f;

@@ -42,7 +42,7 @@ Mesh<float> BuildHairMesh(const std::vector<Vector3<float>> &points,
       Vector3<float> up = side.cross(tangent).normalized();
       const float v = float(i - begin) / float(end - begin - 1);
       for (int j = 0; j < radial_segments; ++j) {
-        const float angle = 2.0f * float(M_PI) * float(j) / float(radial_segments);
+        const float angle = 2.0f * grassland::PI<float>() * float(j) / float(radial_segments);
         const Vector3<float> normal = std::cos(angle) * side + std::sin(angle) * up;
         positions.push_back(points[i] + normal * radii[i]);
         normals.push_back(normal);

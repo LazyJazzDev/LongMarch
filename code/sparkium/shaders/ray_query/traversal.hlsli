@@ -1,7 +1,10 @@
+#include "native_contract.hlsli"
 #pragma once
 #include "software/layout.hlsli"
 #ifndef SOFTWARE_EXTERNAL_BINDINGS
 #include "bindings.hlsli"
+#else
+#define SP_BINDING_software_instances software_instances
 #endif
 
 struct SoftwareHit {
@@ -14,7 +17,7 @@ struct SoftwareHit {
 // Keep the compute renderer's hit ABI and ordered transparent-shadow logic.
 // Force-opaque here means report triangle surfaces; material transmission is
 // evaluated by the shared shading code after each closest hit.
-bool InlineIntersect(RayDesc ray, bool any_hit, out SoftwareHit hit) {
+bool InlineIntersect(SP_CONTEXT SP_RAY ray, bool any_hit, out SoftwareHit hit) {
   hit = (SoftwareHit)0;
   RayQuery<RAY_FLAG_FORCE_OPAQUE | RAY_FLAG_SKIP_PROCEDURAL_PRIMITIVES> query;
   query.TraceRayInline(query_scene, any_hit ? RAY_FLAG_ACCEPT_FIRST_HIT_AND_END_SEARCH : RAY_FLAG_NONE, 0xff, ray);

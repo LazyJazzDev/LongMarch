@@ -1,8 +1,9 @@
+#include "native_contract.hlsli"
 #pragma once
 #include "bindings.hlsli"
 #include "geometry/mesh/geometry_header.hlsli"
 
-HitRecord MakeMeshHitRecord(uint geometry_index,
+HitRecord MakeMeshHitRecord(SP_CONTEXT uint geometry_index,
                             uint object_index,
                             uint primitive_index,
                             float2 barycentric,
@@ -11,8 +12,8 @@ HitRecord MakeMeshHitRecord(uint geometry_index,
                             float3x4 object_to_world,
                             float4x3 world_to_object) {
   HitRecord hit_record;
-  BufferReference<ByteAddressBuffer> geometry_buffer =
-      MakeBufferReference(data_buffers[NonUniformResourceIndex(geometry_index)], 0);
+  BufferReference SP_BUFFER_ARG(ByteAddressBuffer) geometry_buffer =
+      MakeBufferReference(SP_BINDING_data_buffers[SP_NONUNIFORM(geometry_index)], 0);
   GeometryHeader header;
   header.num_vertices = geometry_buffer.Load(0);
   header.num_indices = geometry_buffer.Load(4);

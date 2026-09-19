@@ -1,9 +1,10 @@
+#include "native_contract.hlsli"
 #pragma once
 #include "principled_util.hlsli"
 
 #define CLOSURE_COUNT 6
 
-class PrincipledMaterial {
+SP_CLASS PrincipledMaterial {
 #include "principled_bsdf.hlsli"
 #include "principled_diffuse.hlsli"
 #include "principled_microfacet.hlsli"
