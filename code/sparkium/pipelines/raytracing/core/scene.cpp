@@ -20,18 +20,18 @@ namespace sparkium::raytracing {
 Scene::Scene(sparkium::Scene &scene) : scene_(scene), settings(scene.settings) {
   core_ = DedicatedCast(scene_.GetCore());
   if (core_->UsesGraphicsRayTracing()) {
-    core_->GraphicsCore()->CreateShader(core_->GetShadersVFS(), "raygen.hlsl", "Main", "lib_6_5", &raygen_shader_);
-    core_->GraphicsCore()->CreateShader(core_->GetShadersVFS(), "raygen.hlsl", "MissMain", "lib_6_5",
-                                        &default_miss_shader_);
-    core_->GraphicsCore()->CreateShader(core_->GetShadersVFS(), "raygen.hlsl", "ShadowMiss", "lib_6_5",
-                                        &shadow_miss_shader_);
+    core_->BackendDevice()->CreateShader(core_->GetShadersVFS(), "raygen.hlsl", "Main", "lib_6_5", &raygen_shader_);
+    core_->BackendDevice()->CreateShader(core_->GetShadersVFS(), "raygen.hlsl", "MissMain", "lib_6_5",
+                                         &default_miss_shader_);
+    core_->BackendDevice()->CreateShader(core_->GetShadersVFS(), "raygen.hlsl", "ShadowMiss", "lib_6_5",
+                                         &shadow_miss_shader_);
   }
-  core_->GraphicsCore()->CreateBuffer(sizeof(Settings::RayTracing) + sizeof(sparkium::Film::Info),
-                                      graphics::BUFFER_TYPE_STATIC, &scene_settings_buffer_);
-  core_->GraphicsCore()->CreateShader(core_->GetShadersVFS(), "gather_light_power.hlsl", "GatherLightPowerKernel",
-                                      "cs_6_3", &gather_light_power_shader_);
-  core_->GraphicsCore()->CreateSampler({graphics::FILTER_MODE_LINEAR}, &linear_sampler_);
-  core_->GraphicsCore()->CreateSampler({graphics::FILTER_MODE_NEAREST}, &nearest_sampler_);
+  core_->BackendDevice()->CreateBuffer(sizeof(Settings::RayTracing) + sizeof(sparkium::Film::Info),
+                                       graphics::BUFFER_TYPE_STATIC, &scene_settings_buffer_);
+  core_->BackendDevice()->CreateShader(core_->GetShadersVFS(), "gather_light_power.hlsl", "GatherLightPowerKernel",
+                                       "cs_6_3", &gather_light_power_shader_);
+  core_->BackendDevice()->CreateSampler({graphics::FILTER_MODE_LINEAR}, &linear_sampler_);
+  core_->BackendDevice()->CreateSampler({graphics::FILTER_MODE_NEAREST}, &nearest_sampler_);
 }
 
 void Scene::Render(Camera *camera, Film *film, bool software, bool ray_query, bool optix) {
@@ -61,7 +61,7 @@ void Scene::Render(Camera *camera, Film *film, bool software, bool ray_query, bo
   scene_settings_buffer_->UploadData(&film->film_.info, sizeof(sparkium::Film::Info), sizeof(Settings::RayTracing));
   film->film_.info.accumulated_samples += settings.raytracing.samples_per_dispatch;
   std::unique_ptr<graphics::CommandContext> cmd_context;
-  core_->GraphicsCore()->CreateCommandContext(&cmd_context);
+  core_->BackendDevice()->CreateCommandContext(&cmd_context);
   graphics::GpuProfileScope trace_profile(cmd_context.get(), "path_trace");
   const auto bind_point = software ? graphics::BIND_POINT_COMPUTE : graphics::BIND_POINT_RAYTRACING;
   if (software)
@@ -116,10 +116,10 @@ void Scene::Render(Camera *camera, Film *film, bool software, bool ray_query, bo
   resolve_profile.End();
   setup_profile.End();
   graphics::CpuProfileScope submit_profile("render_submit");
-  core_->GraphicsCore()->SubmitCommandContext(cmd_context.get());
+  core_->BackendDevice()->SubmitCommandContext(cmd_context.get());
   submit_profile.End();
   graphics::CpuProfileScope wait_profile("render_wait");
-  core_->GraphicsCore()->WaitGPU();
+  core_->BackendDevice()->WaitGPU();
 }
 
 int32_t Scene::RegisterLight(Light *light, int custom_index) {
@@ -253,7 +253,7 @@ void Scene::UpdatePipeline(Camera *camera) {
   light_metadatas_.clear();
 
   preprocess_cmd_context_.reset();
-  core_->GraphicsCore()->CreateCommandContext(&preprocess_cmd_context_);
+  core_->BackendDevice()->CreateCommandContext(&preprocess_cmd_context_);
 
   bool &pipeline_dirty = pipeline_dirty_;
 
@@ -288,7 +288,7 @@ void Scene::UpdatePipeline(Camera *camera) {
   graphics::CpuProfileScope metadata_profile("scene_metadata");
   if (!software_tracing_) {
     if (!tlas_) {
-      core_->GraphicsCore()->CreateTopLevelAccelerationStructure(instances_, &tlas_);
+      core_->BackendDevice()->CreateTopLevelAccelerationStructure(instances_, &tlas_);
     } else {
       tlas_->UpdateInstances(instances_);
     }
@@ -297,8 +297,8 @@ void Scene::UpdatePipeline(Camera *camera) {
   if (!instance_metadata_buffer_ ||
       sizeof(InstanceMetadata) * instance_metadatas_.size() > instance_metadata_buffer_->Size()) {
     instance_metadata_buffer_.reset();
-    core_->GraphicsCore()->CreateBuffer(sizeof(InstanceMetadata) * std::max<size_t>(1, instance_metadatas_.size()),
-                                        graphics::BUFFER_TYPE_STATIC, &instance_metadata_buffer_);
+    core_->BackendDevice()->CreateBuffer(sizeof(InstanceMetadata) * std::max<size_t>(1, instance_metadatas_.size()),
+                                         graphics::BUFFER_TYPE_STATIC, &instance_metadata_buffer_);
   }
   if (!instance_metadatas_.empty())
     instance_metadata_buffer_->UploadData(instance_metadatas_.data(),
@@ -306,12 +306,12 @@ void Scene::UpdatePipeline(Camera *camera) {
 
   if (!light_selector_buffer_ ||
       sizeof(uint32_t) + sizeof(float) * light_metadatas_.size() > light_selector_buffer_->Size()) {
-    core_->GraphicsCore()->CreateBuffer(sizeof(uint32_t) + sizeof(float) * light_metadatas_.size(),
-                                        graphics::BUFFER_TYPE_STATIC, &light_selector_buffer_);
+    core_->BackendDevice()->CreateBuffer(sizeof(uint32_t) + sizeof(float) * light_metadatas_.size(),
+                                         graphics::BUFFER_TYPE_STATIC, &light_selector_buffer_);
   }
   if (!light_metadatas_buffer_ || sizeof(LightMetadata) * light_metadatas_.size() > light_metadatas_buffer_->Size()) {
-    core_->GraphicsCore()->CreateBuffer(sizeof(LightMetadata) * std::max<size_t>(1, light_metadatas_.size()),
-                                        graphics::BUFFER_TYPE_STATIC, &light_metadatas_buffer_);
+    core_->BackendDevice()->CreateBuffer(sizeof(LightMetadata) * std::max<size_t>(1, light_metadatas_.size()),
+                                         graphics::BUFFER_TYPE_STATIC, &light_metadatas_buffer_);
   }
   if (!light_metadatas_.empty())
     light_metadatas_buffer_->UploadData(light_metadatas_.data(), sizeof(LightMetadata) * light_metadatas_.size());
@@ -325,7 +325,7 @@ void Scene::UpdatePipeline(Camera *camera) {
       hdr_images_.size() > hdr_image_capacity_ || (!software_tracing_ && !rt_program_)) {
     if (!software_tracing_) {
       rt_program_.reset();
-      core_->GraphicsCore()->CreateRayTracingProgram(&rt_program_);
+      core_->BackendDevice()->CreateRayTracingProgram(&rt_program_);
       miss_shader_indices_ = {0, 1};
       callable_shader_indices_.resize(callable_shaders_.size());
       std::iota(callable_shader_indices_.begin(), callable_shader_indices_.end(), 0);
@@ -360,7 +360,7 @@ void Scene::UpdatePipeline(Camera *camera) {
 
     if (buffers_.size() > buffer_capacity_ || !gather_light_power_program_) {
       gather_light_power_program_.reset();
-      core_->GraphicsCore()->CreateComputeProgram(gather_light_power_shader_.get(), &gather_light_power_program_);
+      core_->BackendDevice()->CreateComputeProgram(gather_light_power_shader_.get(), &gather_light_power_program_);
       gather_light_power_program_->AddResourceBinding(graphics::RESOURCE_TYPE_STORAGE_BUFFER, 1);
       gather_light_power_program_->AddResourceBinding(graphics::RESOURCE_TYPE_WRITABLE_STORAGE_BUFFER, 1);
       gather_light_power_program_->AddResourceBinding(graphics::RESOURCE_TYPE_STORAGE_BUFFER, buffers_.size());
@@ -411,8 +411,8 @@ void Scene::UpdatePipeline(Camera *camera) {
     auto blelloch_scan_down_program = core_->GetComputeProgram("blelloch_scan_down");
     if (!blelloch_metadata_buffer_ ||
         sizeof(BlellochScanMetadata) * blelloch_metadatas_.size() > blelloch_metadata_buffer_->Size()) {
-      core_->GraphicsCore()->CreateBuffer(sizeof(BlellochScanMetadata) * blelloch_metadatas_.size(),
-                                          graphics::BUFFER_TYPE_STATIC, &blelloch_metadata_buffer_);
+      core_->BackendDevice()->CreateBuffer(sizeof(BlellochScanMetadata) * blelloch_metadatas_.size(),
+                                           graphics::BUFFER_TYPE_STATIC, &blelloch_metadata_buffer_);
     }
     blelloch_metadata_buffer_->UploadData(blelloch_metadatas_.data(),
                                           sizeof(BlellochScanMetadata) * blelloch_metadatas_.size());
@@ -436,7 +436,7 @@ void Scene::UpdatePipeline(Camera *camera) {
   light_selection_profile.End();
   light_record_profile.End();
   graphics::CpuProfileScope preprocess_submit_profile("preprocess_submit");
-  core_->GraphicsCore()->SubmitCommandContext(preprocess_cmd_context_.get());
+  core_->BackendDevice()->SubmitCommandContext(preprocess_cmd_context_.get());
 }
 
 Scene *DedicatedCast(sparkium::Scene *scene) {

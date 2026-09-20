@@ -10,8 +10,8 @@ namespace sparkium::raster {
 Camera::Camera(sparkium::Camera &camera) : camera_(camera) {
   core_ = DedicatedCast(camera.GetCore());
   if (core_) {
-    core_->GraphicsCore()->CreateBuffer(sizeof(CameraData), graphics::BUFFER_TYPE_STATIC, &near_field_buffer_);
-    core_->GraphicsCore()->CreateBuffer(sizeof(CameraData), graphics::BUFFER_TYPE_STATIC, &far_field_buffer_);
+    core_->BackendDevice()->CreateBuffer(sizeof(CameraData), graphics::BUFFER_TYPE_STATIC, &near_field_buffer_);
+    core_->BackendDevice()->CreateBuffer(sizeof(CameraData), graphics::BUFFER_TYPE_STATIC, &far_field_buffer_);
     Update();
   }
 }

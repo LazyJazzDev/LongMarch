@@ -17,6 +17,9 @@ namespace grassland::graphics {
 // CPU scopes may nest: inclusive CPU and GPU durations must not be added together.
 class FrameProfile {
  public:
+  explicit FrameProfile(std::string name) : device_name(std::move(name)) {
+  }
+
   explicit FrameProfile(graphics::Core *core, bool gpu_timestamps = true) {
     device_name = core->DeviceName();
     if (!gpu_timestamps)

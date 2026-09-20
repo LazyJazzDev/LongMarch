@@ -41,8 +41,9 @@ class SoftwareBVHTest : public testing::Test {
   void SetUp() override {
     const char *backend = std::getenv("SPARKIUM_TEST_BACKEND");
     const bool debug = std::getenv("SPARKIUM_TEST_DEBUG") != nullptr;
-    ASSERT_EQ(graphics::CreateCore(backend ? ParseSparkiumBackend(backend) : graphics::BACKEND_API_DEFAULT,
-                                   graphics::Core::Settings{2, debug}, &graphics),
+    ASSERT_EQ(graphics::CreateCore(
+                  backend ? sparkium::ToGraphicsBackend(ParseSparkiumBackend(backend)) : graphics::BACKEND_API_DEFAULT,
+                  graphics::Core::Settings{2, debug}, &graphics),
               0);
     ASSERT_EQ(graphics->InitializeLogicalDeviceAutoSelect(false), 0);
     core = std::make_unique<sparkium::Core>(graphics.get());

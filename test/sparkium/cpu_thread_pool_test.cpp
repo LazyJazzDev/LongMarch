@@ -5,9 +5,9 @@
 #include <chrono>
 #include <set>
 
-#include "grassland/graphics/backend/native/native_cpu_thread_pool.h"
+#include "sparkium/backend/cpu/native_cpu_thread_pool.h"
 
-using grassland::graphics::backend::NativeCpuThreadPool;
+using sparkium::backend::NativeCpuThreadPool;
 
 TEST(NativeCpuThreadPoolTest, CoversTailExactlyOnceAndAcceptsEmptyDispatch) {
   NativeCpuThreadPool pool(4);

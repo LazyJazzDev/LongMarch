@@ -12,20 +12,20 @@
 using namespace grassland;
 
 namespace {
-class NativeBackendTest : public testing::TestWithParam<graphics::BackendAPI> {
+class NativeBackendTest : public testing::TestWithParam<sparkium::RenderBackend> {
  protected:
   void SetUp() override {
-    if (!graphics::SupportBackendAPI(GetParam()))
+    if (!sparkium::SupportBackend(GetParam()))
       GTEST_SKIP() << "backend not compiled";
-    ASSERT_EQ(graphics::CreateCore(GetParam(), {}, &core), 0);
+    ASSERT_EQ(sparkium::CreateDevice(GetParam(), {}, &core), 0);
     ASSERT_EQ(core->InitializeLogicalDeviceAutoSelect(false), 0);
-    if (GetParam() == graphics::BACKEND_API_CPU)
+    if (GetParam() == sparkium::RenderBackend::CPU)
       EXPECT_FALSE(core->DeviceRayTracingSupport());
     EXPECT_FALSE(core->DeviceRayQuerySupport());
     EXPECT_EQ(core->API(), GetParam());
   }
 
-  std::unique_ptr<graphics::Core> core;
+  std::unique_ptr<sparkium::backend::Device> core;
 };
 
 TEST_P(NativeBackendTest, DescriptorArraysRangesAndIndependentEntryPoints) {
@@ -308,7 +308,7 @@ TEST_P(NativeBackendTest, FrameAccumulationResetAndBackground) {
     EXPECT_EQ(film.info.accumulated_samples, 6);
   } else {
     EXPECT_EQ(renderer.ResolveRenderPipeline(sparkium::RENDER_PIPELINE_AUTO), sparkium::RENDER_PIPELINE_RT_FALLBACK);
-    if (GetParam() == graphics::BACKEND_API_CUDA)
+    if (GetParam() == sparkium::RenderBackend::CUDA)
       EXPECT_THROW(renderer.Render(&scene, &camera, &film, sparkium::RENDER_PIPELINE_RAY_TRACING), std::runtime_error);
   }
 }
@@ -441,7 +441,7 @@ SP_NUMTHREADS(2,3,2) void Main(SP_CONTEXT uint3 id : SV_DispatchThreadID) {
 }
 
 TEST_P(NativeBackendTest, CpuSahTraversalMatchesIndependentTriangleOracle) {
-  if (GetParam() != graphics::BACKEND_API_CPU)
+  if (GetParam() != sparkium::RenderBackend::CPU)
     GTEST_SKIP() << "CPU-specific acceleration structure";
   using namespace sparkium::raytracing;
   constexpr uint32_t triangles = 257, ray_count = 1024;
@@ -592,8 +592,8 @@ SP_NUMTHREADS(64,1,1) void Main(SP_CONTEXT uint3 id:SV_DispatchThreadID) {
 
 INSTANTIATE_TEST_SUITE_P(Native,
                          NativeBackendTest,
-                         testing::Values(graphics::BACKEND_API_CPU, graphics::BACKEND_API_CUDA),
-                         [](const testing::TestParamInfo<graphics::BackendAPI> &p) {
-                           return graphics::BackendAPIString(p.param);
+                         testing::Values(sparkium::RenderBackend::CPU, sparkium::RenderBackend::CUDA),
+                         [](const testing::TestParamInfo<sparkium::RenderBackend> &p) {
+                           return sparkium::BackendName(p.param);
                          });
 }  // namespace

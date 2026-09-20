@@ -58,7 +58,7 @@ GeometryMesh::GeometryMesh(Core *core, const Mesh<float> &mesh) : Geometry(core)
 
   std::memcpy(data.data(), &header_, sizeof(header_));
 
-  core_->GraphicsCore()->CreateBuffer(data.size(), graphics::BUFFER_TYPE_STATIC, &geometry_buffer_);
+  core_->BackendDevice()->CreateBuffer(data.size(), graphics::BUFFER_TYPE_STATIC, &geometry_buffer_);
   geometry_buffer_->UploadData(data.data(), data.size());
   primitive_count_ = header_.num_indices / 3;
 }

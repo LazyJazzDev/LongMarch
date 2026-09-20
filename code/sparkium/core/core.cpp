@@ -1,5 +1,6 @@
 #include "sparkium/core/core.h"
 
+#include "sparkium/backend/graphics/graphics_device.h"
 #include "sparkium/core/camera.h"
 #include "sparkium/core/entity.h"
 #include "sparkium/core/film.h"
@@ -9,23 +10,36 @@
 #include "sparkium/pipelines/pipelines.h"
 
 namespace sparkium {
-Core::Core(graphics::Core *core) : core_(core) {
+Core::Core(graphics::Core *core)
+    : owned_device_(std::make_unique<backend::GraphicsDevice>(core)),
+      core_(owned_device_.get()) {
   LoadPublicShaders();
   LoadPublicBuffers();
   LoadPublicImages();
 }
 
 graphics::Core *Core::GraphicsCore() const {
+  return core_->GraphicsCore();
+}
+
+Core::Core(backend::Device *device) : core_(device) {
+  LoadPublicShaders();
+  LoadPublicBuffers();
+  LoadPublicImages();
+}
+
+backend::Device *Core::BackendDevice() const {
   return core_;
 }
 
 RenderPipeline Core::ResolveRenderPipeline(RenderPipeline render_pipeline) const {
-  if (core_->API() == graphics::BACKEND_API_CUDA && render_pipeline == RENDER_PIPELINE_RAY_TRACING &&
+  if (core_->API() == RenderBackend::CUDA && render_pipeline == RENDER_PIPELINE_RAY_TRACING &&
       !core_->DeviceRayTracingSupport())
     throw std::runtime_error("CUDA ray_tracing requires available OptiX hardware support; use auto or rt_fallback");
   if (render_pipeline == RENDER_PIPELINE_AUTO) {
     const bool prefer_ray_query =
-        core_->API() == graphics::BACKEND_API_D3D12 || core_->API() == graphics::BACKEND_API_VULKAN;
+        core_->GraphicsCore() && (core_->GraphicsCore()->API() == graphics::BACKEND_API_D3D12 ||
+                                  core_->GraphicsCore()->API() == graphics::BACKEND_API_VULKAN);
     if (prefer_ray_query && core_->DeviceRayQuerySupport()) {
       render_pipeline = RENDER_PIPELINE_RAY_QUERY;
     } else if (core_->DeviceRayTracingSupport()) {
@@ -50,7 +64,7 @@ void Core::Render(Scene *scene, Camera *camera, Film *film, RenderPipeline rende
       raster::Render(this, scene, camera, film);
       break;
     case RENDER_PIPELINE_RAY_TRACING:
-      if (core_->API() == graphics::BACKEND_API_CUDA)
+      if (core_->API() == RenderBackend::CUDA)
         raytracing::Render(this, scene, camera, film, true, false, true);
       else
         raytracing::Render(this, scene, camera, film);

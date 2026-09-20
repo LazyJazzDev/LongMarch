@@ -815,7 +815,7 @@ std::unique_ptr<JsonScene> JsonScene::Load(Core *core, const std::filesystem::pa
               continue;
             auto image = std::unique_ptr<graphics::Image>{};
             auto asset = Resolve(path, ReadString(textures[slot]));
-            if (graphics::LoadImageFromFile(core->GraphicsCore(), asset.string(), &image) != 0)
+            if (core->BackendDevice()->LoadImage(asset.string(), &image) != 0)
               throw std::runtime_error("cannot load texture: " + asset.string());
             *destination = image.get();
             result->images_.push_back(std::move(image));
@@ -834,7 +834,7 @@ std::unique_ptr<JsonScene> JsonScene::Load(Core *core, const std::filesystem::pa
             continue;
           auto asset = Resolve(path, ReadString(Member(node->value, "path")));
           auto image = std::unique_ptr<graphics::Image>{};
-          if (graphics::LoadImageFromFile(core->GraphicsCore(), asset.string(), &image) != 0)
+          if (core->BackendDevice()->LoadImage(asset.string(), &image) != 0)
             throw std::runtime_error("cannot load shader graph texture: " + asset.string());
           texture_slots[ReadString(node->name)] = static_cast<int>(textures.size());
           textures.push_back(image.get());

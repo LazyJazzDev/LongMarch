@@ -32,7 +32,7 @@ graphics::AccelerationStructure *GeometryMesh::BLAS() {
   if (!blas_) {
     auto header = geometry_.GetHeader();
 
-    core_->GraphicsCore()->CreateBottomLevelAccelerationStructure(
+    core_->BackendDevice()->CreateBottomLevelAccelerationStructure(
         geometry_.GetBuffer()->Range(header.position_offset), geometry_.GetBuffer()->Range(header.index_offset),
         header.num_vertices, header.position_stride, header.num_indices / 3, graphics::RAYTRACING_GEOMETRY_FLAG_NONE,
         &blas_);

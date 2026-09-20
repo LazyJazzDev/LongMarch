@@ -1,5 +1,10 @@
 # CUDA ray tracing through OptiX
 
+OptiX belongs to Sparkium's `backend::CudaDevice`, under
+`code/sparkium/backend/cuda/`. It is not a graphics API backend and does not
+extend `graphics::Core` or the graphics backend enum. See the
+[rendering device boundary](native-render-backends.md#library-boundary-and-backend-selection).
+
 The headless `cuda` backend optionally uses NVIDIA OptiX for triangle GAS/IAS
 construction and RT-core traversal. It shares Sparkium's HLSL path tracer,
 material graphs, lighting, MIS, transparent shadows, film and sampling with the

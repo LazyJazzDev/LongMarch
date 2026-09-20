@@ -51,9 +51,9 @@ SoftwarePipeline::SoftwarePipeline(Core *core, bool ray_query, bool optix)
     : core_(core),
       ray_query_(ray_query),
       optix_(optix) {
-  if (ray_query_ && !core_->GraphicsCore()->DeviceRayQuerySupport())
+  if (ray_query_ && !core_->BackendDevice()->DeviceRayQuerySupport())
     throw std::runtime_error("native ray queries are unavailable on the selected backend");
-  cpu_ = core_->GraphicsCore()->API() == graphics::BACKEND_API_CPU;
+  cpu_ = core_->BackendDevice()->API() == RenderBackend::CPU;
   if (cpu_)
     if (const char *choice = std::getenv("SPARKIUM_CPU_BVH")) {
       if (std::string(choice) == "heap")
@@ -62,7 +62,7 @@ SoftwarePipeline::SoftwarePipeline(Core *core, bool ray_query, bool optix)
         throw std::invalid_argument("SPARKIUM_CPU_BVH must be sah or heap");
     }
   if (optix_ &&
-      (core_->GraphicsCore()->API() != graphics::BACKEND_API_CUDA || !core_->GraphicsCore()->DeviceRayTracingSupport()))
+      (core_->BackendDevice()->API() != RenderBackend::CUDA || !core_->BackendDevice()->DeviceRayTracingSupport()))
     throw std::runtime_error("OptiX traversal requires CUDA hardware ray tracing support");
   static_assert(sizeof(BuildParameters) == 256, "uniform buffer alignment");
 }
@@ -80,7 +80,7 @@ void SoftwarePipeline::AddInstance(Geometry *geometry,
 
 void SoftwarePipeline::CompileBuilders(uint32_t buffer_count) {
   graphics::CpuProfileScope compile_profile("compile_builders");
-  auto graphics = core_->GraphicsCore();
+  auto graphics = core_->BackendDevice();
   builders_.clear();
   if (builder_shaders_.empty()) {
     for (const char *entry : {"InitLeaves", "ReduceNodes", "MortonKeys", "BitonicSort", "SortLeaves"}) {
@@ -202,10 +202,10 @@ float Transmission(SP_CONTEXT HitRecord hit, float3 direction) {
     args.push_back("-DSPARKIUM_OPTIX");
   if (has_graph)
     args.push_back("-DSPARKIUM_SHADER_GRAPHS");
-  if (core_->GraphicsCore()->CreateShader(vfs, "software/render.hlsl", "Main", ray_query_ ? "cs_6_5" : "cs_6_0", args,
-                                          &render_shader_))
+  if (core_->BackendDevice()->CreateShader(vfs, "software/render.hlsl", "Main", ray_query_ ? "cs_6_5" : "cs_6_0", args,
+                                           &render_shader_))
     throw std::runtime_error("failed to compile compute ray tracing shader");
-  core_->GraphicsCore()->CreateComputeProgram(render_shader_.get(), &render_program_);
+  core_->BackendDevice()->CreateComputeProgram(render_shader_.get(), &render_program_);
   for (auto binding : std::vector<std::pair<graphics::ResourceType, uint32_t>>{
            {graphics::RESOURCE_TYPE_WRITABLE_IMAGE, 1},
            {graphics::RESOURCE_TYPE_WRITABLE_IMAGE, 1},
@@ -253,7 +253,7 @@ void SoftwarePipeline::Update(graphics::CommandContext *commands,
                               const std::vector<graphics::Buffer *> &buffers,
                               uint32_t sdr_count,
                               uint32_t hdr_count) {
-  auto graphics = core_->GraphicsCore();
+  auto graphics = core_->BackendDevice();
   graphics::CpuProfileScope prepare_profile("software_prepare");
   std::vector<GeometryLayout> geometries;
   std::vector<GPUInstance> gpu_instances;

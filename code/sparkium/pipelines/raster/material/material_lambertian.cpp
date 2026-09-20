@@ -7,10 +7,10 @@ namespace sparkium::raster {
 MaterialLambertian::MaterialLambertian(sparkium::MaterialLambertian &material)
     : material_(material),
       Material(DedicatedCast(material.GetCore())) {
-  core_->GraphicsCore()->CreateShader(core_->GetShadersVFS(), "material/lambertian/pixel_shader.hlsl", "PSMain",
-                                      "ps_6_0", &pixel_shader_);
-  core_->GraphicsCore()->CreateBuffer(sizeof(glm::vec3) + sizeof(glm::vec3), graphics::BUFFER_TYPE_STATIC,
-                                      &material_buffer_);
+  core_->BackendDevice()->CreateShader(core_->GetShadersVFS(), "material/lambertian/pixel_shader.hlsl", "PSMain",
+                                       "ps_6_0", &pixel_shader_);
+  core_->BackendDevice()->CreateBuffer(sizeof(glm::vec3) + sizeof(glm::vec3), graphics::BUFFER_TYPE_STATIC,
+                                       &material_buffer_);
 }
 
 graphics::Shader *MaterialLambertian::PixelShader() {

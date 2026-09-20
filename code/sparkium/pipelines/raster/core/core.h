@@ -7,7 +7,7 @@ class Core : public Object {
  public:
   Core(sparkium::Core &core);
 
-  graphics::Core *GraphicsCore() const;
+  backend::Device *BackendDevice() const;
 
   const VirtualFileSystem &GetShadersVFS() const;
 

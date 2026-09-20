@@ -48,10 +48,10 @@ class GuiSceneTest : public testing::Test {
   std::filesystem::path path;
 };
 
-class GuiWorkerTest : public GuiSceneTest, public testing::WithParamInterface<graphics::BackendAPI> {
+class GuiWorkerTest : public GuiSceneTest, public testing::WithParamInterface<sparkium::RenderBackend> {
  protected:
   void SetUp() override {
-    if (!graphics::SupportBackendAPI(GetParam()))
+    if (!sparkium::SupportBackend(GetParam()))
       GTEST_SKIP() << "render backend not compiled";
     GuiSceneTest::SetUp();
   }
@@ -66,9 +66,9 @@ TEST_F(GuiSceneTest, BackendSwitchRecreatesResourcesAndRecovers) {
   std::shared_ptr<const RenderFrame> previous;
   // Switching away from CUDA must release resources in its original context;
   // switching back must acquire a valid context on the same worker thread.
-  for (auto backend : {graphics::BACKEND_API_DEFAULT, graphics::BACKEND_API_CUDA, graphics::BACKEND_API_CPU,
-                       graphics::BACKEND_API_CUDA, graphics::BACKEND_API_DEFAULT}) {
-    if (!graphics::SupportBackendAPI(backend))
+  for (auto backend : {sparkium::RenderBackend::Graphics, sparkium::RenderBackend::CUDA, sparkium::RenderBackend::CPU,
+                       sparkium::RenderBackend::CUDA, sparkium::RenderBackend::Graphics}) {
+    if (!sparkium::SupportBackend(backend))
       continue;
     request.backend = backend;
     const auto revision = worker.Submit(request);
@@ -87,25 +87,46 @@ TEST_F(GuiSceneTest, BackendSwitchRecreatesResourcesAndRecovers) {
       EXPECT_EQ(previous->rgba.size(), 17 * 13 * 4);
     previous = status.frame;
   }
-  request.backend = static_cast<graphics::BackendAPI>(99);
+  request.backend = static_cast<sparkium::RenderBackend>(99);
   auto status = Wait(worker, worker.Submit(request));
   EXPECT_FALSE(status.error.empty());
   EXPECT_FALSE(status.frame);
-  request.backend = graphics::BACKEND_API_DEFAULT;
+  request.backend = sparkium::RenderBackend::Graphics;
   status = Wait(worker, worker.Submit(request));
   ASSERT_TRUE(status.error.empty()) << status.error;
   ASSERT_TRUE(status.frame);
   EXPECT_EQ(status.frame->accumulated_samples, 1);
 }
 
+TEST_F(GuiSceneTest, GraphicsApiSwitchRecreatesRenderDevice) {
+  RenderWorker worker(1);
+  RenderRequest request;
+  request.backend = sparkium::RenderBackend::Graphics;
+  request.scene = path;
+  request.pipeline = sparkium::RENDER_PIPELINE_RT_FALLBACK;
+  for (auto api : {graphics::BACKEND_API_D3D12, graphics::BACKEND_API_VULKAN, graphics::BACKEND_API_METAL}) {
+    if (!graphics::SupportBackendAPI(api))
+      continue;
+    request.graphics_api = api;
+    auto revision = worker.Submit(request);
+    auto status = Wait(worker, revision);
+    ASSERT_TRUE(status.error.empty()) << status.error;
+    ASSERT_NE(status.frame, nullptr);
+    EXPECT_EQ(status.backend, sparkium::RenderBackend::Graphics);
+    EXPECT_EQ(status.graphics_api, api);
+    EXPECT_EQ(status.frame->revision, revision);
+    EXPECT_EQ(status.frame->accumulated_samples, 2);
+  }
+}
+
 TEST_F(GuiSceneTest, OptixPipelineSwitchResetsAccumulation) {
-#ifndef LONGMARCH_OPTIX_ENABLED
+#ifndef SPARKIUM_OPTIX_ENABLED
   GTEST_SKIP() << "OptiX not built";
 #endif
   RenderWorker worker(1);
   RenderRequest request;
   request.scene = path;
-  request.backend = graphics::BACKEND_API_CUDA;
+  request.backend = sparkium::RenderBackend::CUDA;
   request.samples = 3;
   std::vector<uint8_t> reference;
   for (auto pipeline :
@@ -191,7 +212,7 @@ TEST_P(GuiWorkerTest, IndependentDisplayResetCoalescingAndRecovery) {
 
 INSTANTIATE_TEST_SUITE_P(Backends,
                          GuiWorkerTest,
-                         testing::Values(graphics::BACKEND_API_DEFAULT,
-                                         graphics::BACKEND_API_CPU,
-                                         graphics::BACKEND_API_CUDA));
+                         testing::Values(sparkium::RenderBackend::Graphics,
+                                         sparkium::RenderBackend::CPU,
+                                         sparkium::RenderBackend::CUDA));
 }  // namespace

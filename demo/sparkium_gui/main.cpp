@@ -72,7 +72,7 @@ void ResizeWindowForFilm(graphics::Window *window, int film_width, int film_heig
 int main(int argc, char **argv) {
   try {
     std::filesystem::path input = FindAssetPath("scenes");
-    auto backend = graphics::BACKEND_API_DEFAULT;
+    sparkium::BackendSelection backend;
     auto display_backend = graphics::BACKEND_API_DEFAULT;
     int frame_limit = 0;
     bool have_input = false;
@@ -81,7 +81,7 @@ int main(int argc, char **argv) {
       if (arg == "--backend" && i + 1 < argc)
         backend = ParseSparkiumBackend(argv[++i]);
       else if (arg == "--display-backend" && i + 1 < argc)
-        display_backend = ParseSparkiumBackend(argv[++i]);
+        display_backend = sparkium::ToGraphicsBackend(ParseSparkiumBackend(argv[++i]));
       else if (arg == "--frames" && i + 1 < argc) {
         frame_limit = std::stoi(argv[++i]);
         if (frame_limit <= 0)
@@ -96,8 +96,6 @@ int main(int argc, char **argv) {
       } else
         throw std::invalid_argument("unknown or incomplete argument: " + arg);
     }
-    if (display_backend == graphics::BACKEND_API_CPU || display_backend == graphics::BACKEND_API_CUDA)
-      throw std::invalid_argument("--display-backend must support windows: auto, d3d12, vulkan, or metal");
     std::vector<std::filesystem::path> scene_files;
     if (std::filesystem::is_regular_file(input))
       scene_files.push_back(std::filesystem::absolute(input));
@@ -128,7 +126,8 @@ int main(int argc, char **argv) {
     clear_preview();
     sparkium_gui::RenderWorker worker(frame_limit);
     sparkium_gui::RenderRequest request;
-    request.backend = backend;
+    request.backend = backend.backend;
+    request.graphics_api = backend.graphics_api;
     size_t selected = 0;
     request.scene = scene_files[selected];
     worker.Submit(request);
@@ -178,14 +177,14 @@ int main(int argc, char **argv) {
         }
         ImGui::EndCombo();
       }
-      const char *backend_label = graphics::BackendAPIString(request.backend);
+      const char *backend_label = sparkium::BackendName(request.backend);
       if (ImGui::BeginCombo("Render backend", backend_label)) {
-        for (auto option : {graphics::BACKEND_API_CPU, graphics::BACKEND_API_CUDA, graphics::BACKEND_API_D3D12,
-                            graphics::BACKEND_API_VULKAN, graphics::BACKEND_API_METAL}) {
-          if (!graphics::SupportBackendAPI(option))
+        for (auto option :
+             {sparkium::RenderBackend::Graphics, sparkium::RenderBackend::CPU, sparkium::RenderBackend::CUDA}) {
+          if (!sparkium::SupportBackend(option))
             continue;
           const bool current = option == request.backend;
-          const char *label = graphics::BackendAPIString(option);
+          const char *label = sparkium::BackendName(option);
           if (ImGui::Selectable(label, current) && !current) {
             request.backend = option;
             request.pipeline = sparkium::RENDER_PIPELINE_AUTO;
@@ -193,6 +192,20 @@ int main(int argc, char **argv) {
           }
           if (current)
             ImGui::SetItemDefaultFocus();
+        }
+        ImGui::EndCombo();
+      }
+      if (request.backend == sparkium::RenderBackend::Graphics &&
+          ImGui::BeginCombo("Graphics API", graphics::BackendAPIString(request.graphics_api))) {
+        for (auto api : {graphics::BACKEND_API_D3D12, graphics::BACKEND_API_VULKAN, graphics::BACKEND_API_METAL}) {
+          if (!graphics::SupportBackendAPI(api))
+            continue;
+          bool selected = api == request.graphics_api;
+          if (ImGui::Selectable(graphics::BackendAPIString(api), selected) && !selected) {
+            request.graphics_api = api;
+            request.pipeline = sparkium::RENDER_PIPELINE_AUTO;
+            submit();
+          }
         }
         ImGui::EndCombo();
       }
@@ -205,7 +218,8 @@ int main(int argc, char **argv) {
       const char *pipeline_label =
           pipeline == sparkium::RENDER_PIPELINE_AUTO ? auto_label.c_str() : PipelineName(pipeline);
       if (ImGui::BeginCombo("Pipeline", pipeline_label)) {
-        const bool native = status.backend == graphics::BACKEND_API_CPU || status.backend == graphics::BACKEND_API_CUDA;
+        const bool native =
+            status.backend == sparkium::RenderBackend::CPU || status.backend == sparkium::RenderBackend::CUDA;
         for (auto option : {sparkium::RENDER_PIPELINE_AUTO, sparkium::RENDER_PIPELINE_RASTERIZATION,
                             sparkium::RENDER_PIPELINE_RAY_TRACING, sparkium::RENDER_PIPELINE_RT_FALLBACK,
                             sparkium::RENDER_PIPELINE_RAY_QUERY}) {
@@ -240,7 +254,8 @@ int main(int argc, char **argv) {
         submit();
       }
       ImGui::Text("%s", scene_files[selected].string().c_str());
-      ImGui::Text("Active render backend: %s", graphics::BackendAPIString(status.backend));
+      ImGui::Text("Active render backend: %s",
+                  sparkium::BackendName(sparkium::BackendSelection{status.backend, status.graphics_api}));
       ImGui::Text("Display backend: %s", graphics::BackendAPIString(display->API()));
       if (!status.device.empty())
         ImGui::Text("Render device: %s", status.device.c_str());
@@ -275,7 +290,8 @@ int main(int argc, char **argv) {
           std::cerr << "sparkium_gui: " << status.error << '\n';
           exit_code = 1;
         } else if (shown) {
-          std::cout << "Rendered " << shown->number << " frames with " << graphics::BackendAPIString(status.backend)
+          std::cout << "Rendered " << shown->number << " frames with "
+                    << sparkium::BackendName(sparkium::BackendSelection{status.backend, status.graphics_api})
                     << "; displayed via " << graphics::BackendAPIString(display->API()) << '\n';
         }
         break;

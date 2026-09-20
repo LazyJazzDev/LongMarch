@@ -1,26 +1,24 @@
 #pragma once
 #include <stdexcept>
 
-#include "grassland/graphics/graphics_util.h"
+#include "sparkium/backend/device.h"
 
-inline grassland::graphics::BackendAPI ParseSparkiumBackend(const std::string &name) {
-  using namespace grassland::graphics;
-  BackendAPI api;
-  if (name == "auto")
-    api = BACKEND_API_DEFAULT;
-  else if (name == "metal")
-    api = BACKEND_API_METAL;
-  else if (name == "vulkan")
-    api = BACKEND_API_VULKAN;
-  else if (name == "cpu")
-    api = BACKEND_API_CPU;
+inline sparkium::BackendSelection ParseSparkiumBackend(const std::string &name) {
+  using namespace sparkium;
+  BackendSelection selection;
+  if (name == "cpu")
+    selection.backend = RenderBackend::CPU;
   else if (name == "cuda")
-    api = BACKEND_API_CUDA;
+    selection.backend = RenderBackend::CUDA;
+  else if (name == "vulkan")
+    selection.graphics_api = grassland::graphics::BACKEND_API_VULKAN;
   else if (name == "d3d12")
-    api = BACKEND_API_D3D12;
-  else
-    throw std::invalid_argument("unknown graphics backend: " + name);
-  if (!SupportBackendAPI(api))
-    throw std::runtime_error("graphics backend was not built: " + name);
-  return api;
+    selection.graphics_api = grassland::graphics::BACKEND_API_D3D12;
+  else if (name == "metal")
+    selection.graphics_api = grassland::graphics::BACKEND_API_METAL;
+  else if (name != "auto" && name != "graphics")
+    throw std::invalid_argument("unknown render backend: " + name);
+  if (!SupportBackend(selection))
+    throw std::runtime_error("render backend was not built: " + name);
+  return selection;
 }

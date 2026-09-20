@@ -13,5 +13,3 @@ endif ()
 if (LONGMARCH_METAL_ENABLED)
     add_subdirectory(metal)
 endif ()
-
-add_subdirectory(native)

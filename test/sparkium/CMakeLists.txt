@@ -3,7 +3,7 @@ target_link_libraries(sparkium_fallback_test PRIVATE LongMarch GTest::gtest_main
 LONGMARCH_DEPLOY_RUNTIME_DEPENDENCIES(sparkium_fallback_test)
 add_test(NAME sparkium_fallback COMMAND sparkium_fallback_test)
 
-add_executable(sparkium_native_test native_backend_test.cpp optix_backend_test.cpp)
+add_executable(sparkium_native_test native_backend_test.cpp optix_backend_test.cpp backend_device_test.cpp)
 target_link_libraries(sparkium_native_test PRIVATE LongMarch GTest::gtest_main)
 LONGMARCH_DEPLOY_RUNTIME_DEPENDENCIES(sparkium_native_test)
 add_test(NAME sparkium_native COMMAND sparkium_native_test)
@@ -17,7 +17,7 @@ endif ()
 
 find_package(Threads REQUIRED)
 add_executable(sparkium_cpu_thread_pool_test cpu_thread_pool_test.cpp
-        ../../code/grassland/graphics/backend/native/native_cpu_thread_pool.cpp)
+        ../../code/sparkium/backend/cpu/native_cpu_thread_pool.cpp)
 target_include_directories(sparkium_cpu_thread_pool_test PRIVATE ../../code)
 target_link_libraries(sparkium_cpu_thread_pool_test PRIVATE GTest::gtest_main Threads::Threads)
 LONGMARCH_DEPLOY_RUNTIME_DEPENDENCIES(sparkium_cpu_thread_pool_test)

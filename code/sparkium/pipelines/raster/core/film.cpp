@@ -7,20 +7,20 @@ namespace sparkium::raster {
 
 Film::Film(sparkium::Film &film) : film_(film), core_(DedicatedCast(film.GetCore())) {
   auto extent = film_.GetExtent();
-  core_->GraphicsCore()->CreateImage(extent.width, extent.height, graphics::IMAGE_FORMAT_R32G32B32A32_SFLOAT,
-                                     &albedo_roughness_buffer_);
-  core_->GraphicsCore()->CreateImage(extent.width, extent.height, graphics::IMAGE_FORMAT_R32G32B32A32_SFLOAT,
-                                     &position_specular_buffer_);
-  core_->GraphicsCore()->CreateImage(extent.width, extent.height, graphics::IMAGE_FORMAT_R32G32B32A32_SFLOAT,
-                                     &normal_metallic_buffer_);
+  core_->BackendDevice()->CreateImage(extent.width, extent.height, graphics::IMAGE_FORMAT_R32G32B32A32_SFLOAT,
+                                      &albedo_roughness_buffer_);
+  core_->BackendDevice()->CreateImage(extent.width, extent.height, graphics::IMAGE_FORMAT_R32G32B32A32_SFLOAT,
+                                      &position_specular_buffer_);
+  core_->BackendDevice()->CreateImage(extent.width, extent.height, graphics::IMAGE_FORMAT_R32G32B32A32_SFLOAT,
+                                      &normal_metallic_buffer_);
 
   film_.RegisterResetCallback([this]() {
     std::unique_ptr<graphics::CommandContext> cmd_ctx;
-    core_->GraphicsCore()->CreateCommandContext(&cmd_ctx);
+    core_->BackendDevice()->CreateCommandContext(&cmd_ctx);
     cmd_ctx->CmdClearImage(albedo_roughness_buffer_.get(), {0.0f, 0.0f, 0.0f, 0.0f});
     cmd_ctx->CmdClearImage(position_specular_buffer_.get(), {0.0f, 0.0f, 0.0f, 0.0f});
     cmd_ctx->CmdClearImage(normal_metallic_buffer_.get(), {0.0f, 0.0f, 0.0f, 0.0f});
-    core_->GraphicsCore()->SubmitCommandContext(cmd_ctx.get());
+    core_->BackendDevice()->SubmitCommandContext(cmd_ctx.get());
   });
 }
 

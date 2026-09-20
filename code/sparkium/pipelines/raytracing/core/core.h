@@ -7,7 +7,7 @@ class Core : public Object {
  public:
   Core(sparkium::Core &core);
 
-  graphics::Core *GraphicsCore() const;
+  backend::Device *BackendDevice() const;
 
   // Graphics APIs compile per-material hit/callable shaders. CUDA's OptiX
   // implementation compiles the shared tracer and its hit/miss programs together.

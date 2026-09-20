@@ -21,11 +21,11 @@ struct TextureInfo {
 MaterialPrincipled::MaterialPrincipled(sparkium::MaterialPrincipled &material)
     : material_(material),
       Material(DedicatedCast(material.GetCore())) {
-  core_->GraphicsCore()->CreateShader(core_->GetShadersVFS(), "material/principled/pixel_shader.hlsl", "PSMain",
-                                      "ps_6_0", {"-I."}, &pixel_shader_);
-  core_->GraphicsCore()->CreateBuffer(sizeof(material_.info) + sizeof(TextureInfo), graphics::BUFFER_TYPE_STATIC,
-                                      &material_buffer_);
-  core_->GraphicsCore()->CreateSampler(graphics::SamplerInfo{}, &sampler_);
+  core_->BackendDevice()->CreateShader(core_->GetShadersVFS(), "material/principled/pixel_shader.hlsl", "PSMain",
+                                       "ps_6_0", {"-I."}, &pixel_shader_);
+  core_->BackendDevice()->CreateBuffer(sizeof(material_.info) + sizeof(TextureInfo), graphics::BUFFER_TYPE_STATIC,
+                                       &material_buffer_);
+  core_->BackendDevice()->CreateSampler(graphics::SamplerInfo{}, &sampler_);
 }
 
 graphics::Shader *MaterialPrincipled::PixelShader() {

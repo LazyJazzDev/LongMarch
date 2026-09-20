@@ -7,8 +7,8 @@ namespace sparkium::raytracing {
 MaterialLambertian::MaterialLambertian(sparkium::MaterialLambertian &material)
     : material_(material),
       Material(DedicatedCast(material.GetCore())) {
-  core_->GraphicsCore()->CreateBuffer(sizeof(material_.base_color) + sizeof(material_.emission),
-                                      graphics::BUFFER_TYPE_STATIC, &material_buffer_);
+  core_->BackendDevice()->CreateBuffer(sizeof(material_.base_color) + sizeof(material_.emission),
+                                       graphics::BUFFER_TYPE_STATIC, &material_buffer_);
   sampler_implementation_ = CodeLines(core_->GetShadersVFS(), "material/lambertian/sampler.hlsl");
   evaluator_implementation_ = CodeLines(core_->GetShadersVFS(), "material/lambertian/evaluator.hlsli");
 }

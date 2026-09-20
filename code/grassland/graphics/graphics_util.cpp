@@ -8,10 +8,6 @@ namespace grassland::graphics {
 
 const char *BackendAPIString(BackendAPI api) {
   switch (api) {
-    case BACKEND_API_CPU:
-      return "CPU";
-    case BACKEND_API_CUDA:
-      return "CUDA";
     case BACKEND_API_METAL:
       return "Metal";
     case BACKEND_API_VULKAN:
@@ -25,15 +21,6 @@ const char *BackendAPIString(BackendAPI api) {
 
 bool SupportBackendAPI(BackendAPI api) {
   switch (api) {
-#ifdef LONGMARCH_NATIVE_ENABLED
-    case BACKEND_API_CPU:
-      return true;
-#endif
-#ifdef LONGMARCH_NATIVE_CUDA_ENABLED
-    case BACKEND_API_CUDA:
-      return true;
-#endif
-
 #if defined(LONGMARCH_METAL_ENABLED)
     case BACKEND_API_METAL:
       return true;
@@ -186,8 +173,6 @@ void util::PybindModuleRegistration(py::module_ &m) {
   backend_api.value("BACKEND_API_METAL", BACKEND_API_METAL, "Backend API: Metal");
   backend_api.value("BACKEND_API_VULKAN", BACKEND_API_VULKAN, "Backend API: Vulkan");
   backend_api.value("BACKEND_API_D3D12", BACKEND_API_D3D12, "Backend API: Direct3D 12");
-  backend_api.value("BACKEND_API_CPU", BACKEND_API_CPU, "Backend API: Native CPU compute");
-  backend_api.value("BACKEND_API_CUDA", BACKEND_API_CUDA, "Backend API: Native CUDA compute");
   backend_api.export_values();
   m.attr("BACKEND_API_DEFAULT") = py::cast(BACKEND_API_DEFAULT);
 

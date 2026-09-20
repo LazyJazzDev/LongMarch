@@ -15,8 +15,8 @@ EntityGeometryMaterial::EntityGeometryMaterial(sparkium::EntityGeometryMaterial 
       Entity(DedicatedCast(entity.GetCore())),
       geometry_(DedicatedCast(entity_.GetGeometry())),
       material_(DedicatedCast(entity_.GetMaterial())) {
-  core_->GraphicsCore()->CreateBuffer(sizeof(InstanceData), graphics::BUFFER_TYPE_DYNAMIC, &instance_buffer_);
-  core_->GraphicsCore()->CreateProgram(
+  core_->BackendDevice()->CreateBuffer(sizeof(InstanceData), graphics::BUFFER_TYPE_DYNAMIC, &instance_buffer_);
+  core_->BackendDevice()->CreateProgram(
       {graphics::IMAGE_FORMAT_R32G32B32A32_SFLOAT, graphics::IMAGE_FORMAT_R32G32B32A32_SFLOAT,
        graphics::IMAGE_FORMAT_R32G32B32A32_SFLOAT, graphics::IMAGE_FORMAT_R32G32B32A32_SFLOAT,
        graphics::IMAGE_FORMAT_R32_SINT},
@@ -30,13 +30,13 @@ EntityGeometryMaterial::EntityGeometryMaterial(sparkium::EntityGeometryMaterial 
   material_->SetupProgram(render_program_.get());
   render_program_->Finalize();
 
-  core_->GraphicsCore()->CreateBuffer(sizeof(PointLightData), graphics::BUFFER_TYPE_DYNAMIC, &point_light_buffer_);
-  core_->GraphicsCore()->CreateShader(core_->GetShadersVFS(), "light/point/lighting.hlsl", "VSMain", "vs_6_0", {"-I."},
-                                      &point_light_vs_);
-  core_->GraphicsCore()->CreateShader(core_->GetShadersVFS(), "light/point/lighting.hlsl", "PSMain", "ps_6_0", {"-I."},
-                                      &point_light_ps_);
-  core_->GraphicsCore()->CreateProgram({graphics::IMAGE_FORMAT_R32G32B32A32_SFLOAT}, graphics::IMAGE_FORMAT_UNDEFINED,
-                                       &point_light_program_);
+  core_->BackendDevice()->CreateBuffer(sizeof(PointLightData), graphics::BUFFER_TYPE_DYNAMIC, &point_light_buffer_);
+  core_->BackendDevice()->CreateShader(core_->GetShadersVFS(), "light/point/lighting.hlsl", "VSMain", "vs_6_0", {"-I."},
+                                       &point_light_vs_);
+  core_->BackendDevice()->CreateShader(core_->GetShadersVFS(), "light/point/lighting.hlsl", "PSMain", "ps_6_0", {"-I."},
+                                       &point_light_ps_);
+  core_->BackendDevice()->CreateProgram({graphics::IMAGE_FORMAT_R32G32B32A32_SFLOAT}, graphics::IMAGE_FORMAT_UNDEFINED,
+                                        &point_light_program_);
   point_light_program_->BindShader(point_light_vs_.get(), graphics::SHADER_TYPE_VERTEX);
   point_light_program_->BindShader(point_light_ps_.get(), graphics::SHADER_TYPE_PIXEL);
   point_light_program_->SetBlendState(

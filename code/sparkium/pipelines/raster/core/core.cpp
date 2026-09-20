@@ -9,8 +9,8 @@ namespace sparkium::raster {
 Core::Core(sparkium::Core &core) : core_(core) {
 }
 
-graphics::Core *Core::GraphicsCore() const {
-  return core_.GraphicsCore();
+backend::Device *Core::BackendDevice() const {
+  return core_.BackendDevice();
 }
 
 const VirtualFileSystem &Core::GetShadersVFS() const {

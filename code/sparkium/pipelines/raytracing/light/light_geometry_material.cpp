@@ -16,7 +16,7 @@ LightGeometryMaterial::LightGeometryMaterial(Core *core,
       geometry_(geometry),
       material_(material),
       transform(transform) {
-  core_->GraphicsCore()->CreateBuffer(
+  core_->BackendDevice()->CreateBuffer(
       sizeof(glm::mat4x3) + sizeof(uint32_t) + geometry->PrimitiveCount() * sizeof(float), graphics::BUFFER_TYPE_STATIC,
       &direct_lighting_sampler_data_);
 
@@ -24,16 +24,17 @@ LightGeometryMaterial::LightGeometryMaterial(Core *core,
   vfs.WriteFile("geometry_sampler.hlsli", geometry_->SamplerImpl());
   vfs.WriteFile("material_evaluator.hlsli", material_->EvaluatorImpl());
 
-  core_->GraphicsCore()->CreateShader(vfs, "light/geometry_material/gather_primitive_power.hlsl",
-                                      "GatherPrimitivePowerKernel", "cs_6_3", {"-I."}, &gather_primitive_power_shader_);
+  core_->BackendDevice()->CreateShader(vfs, "light/geometry_material/gather_primitive_power.hlsl",
+                                       "GatherPrimitivePowerKernel", "cs_6_3", {"-I."},
+                                       &gather_primitive_power_shader_);
   if (core_->UsesGraphicsRayTracing())
-    core_->GraphicsCore()->CreateShader(vfs, "light/geometry_material/direct_lighting_sampler.hlsl",
-                                        "SampleDirectLightingCallable", "lib_6_5", {"-I."}, &direct_lighting_sampler_);
+    core_->BackendDevice()->CreateShader(vfs, "light/geometry_material/direct_lighting_sampler.hlsl",
+                                         "SampleDirectLightingCallable", "lib_6_5", {"-I."}, &direct_lighting_sampler_);
 
   uint32_t primitive_count = geometry_->PrimitiveCount();
   uint32_t group_size = 64;
 
-  core_->GraphicsCore()->CreateComputeProgram(gather_primitive_power_shader_.get(), &gather_primitive_power_program_);
+  core_->BackendDevice()->CreateComputeProgram(gather_primitive_power_shader_.get(), &gather_primitive_power_program_);
   gather_primitive_power_program_->AddResourceBinding(graphics::RESOURCE_TYPE_STORAGE_BUFFER, 1);
   gather_primitive_power_program_->AddResourceBinding(graphics::RESOURCE_TYPE_STORAGE_BUFFER, 1);
   gather_primitive_power_program_->AddResourceBinding(graphics::RESOURCE_TYPE_WRITABLE_STORAGE_BUFFER, 1);
@@ -45,8 +46,8 @@ LightGeometryMaterial::LightGeometryMaterial(Core *core,
     metadata = {metadata.offset + (group_size - 1) * metadata.stride, metadata.stride * group_size,
                 metadata.element_count / group_size};
   }
-  core_->GraphicsCore()->CreateBuffer(std::max<size_t>(1, metadatas_.size()) * sizeof(BlellochScanMetadata),
-                                      graphics::BUFFER_TYPE_STATIC, &metadata_buffer_);
+  core_->BackendDevice()->CreateBuffer(std::max<size_t>(1, metadatas_.size()) * sizeof(BlellochScanMetadata),
+                                       graphics::BUFFER_TYPE_STATIC, &metadata_buffer_);
   if (!metadatas_.empty())
     metadata_buffer_->UploadData(metadatas_.data(), metadatas_.size() * sizeof(BlellochScanMetadata));
 

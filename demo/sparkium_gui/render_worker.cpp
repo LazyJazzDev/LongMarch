@@ -27,10 +27,12 @@ uint64_t RenderWorker::Submit(RenderRequest request) {
   if (request.samples && (*request.samples < 1 || *request.samples > 256))
     throw std::invalid_argument("samples per dispatch must be in [1, 256]");
   std::lock_guard<std::mutex> lock(mutex_);
-  if (request.backend != request_.backend)
+  if (request.backend != request_.backend || request.graphics_api != request_.graphics_api)
     status_ = RenderStatus{};
-  if (status_.name.empty())
+  if (status_.name.empty()) {
     status_.backend = request.backend;
+    status_.graphics_api = request.graphics_api;
+  }
   request_ = std::move(request);
   status_.revision = ++revision_;
   status_.updating = true;
@@ -62,11 +64,12 @@ bool RenderWorker::Publish(const RenderStatus &status) {
 void RenderWorker::Run(int frame_limit) {
   // Construction and destruction stay on this thread, including CUDA's
   // thread-local current context. The frontend never waits on this device.
-  std::unique_ptr<graphics::Core> device;
+  std::unique_ptr<sparkium::backend::Device> device;
   std::unique_ptr<sparkium::Core> renderer;
   std::unique_ptr<sparkium::JsonScene> scene;
   std::unique_ptr<graphics::Image> developed;
-  std::optional<graphics::BackendAPI> device_backend;
+  std::optional<sparkium::RenderBackend> device_backend;
+  auto device_graphics_api = graphics::BACKEND_API_DEFAULT;
   RenderRequest active;
   RenderStatus status;
   uint64_t applied = 0, frame_number = 0;
@@ -87,7 +90,7 @@ void RenderWorker::Run(int frame_limit) {
     try {
       if (revision != applied) {
         applied = revision;
-        if (!device_backend || *device_backend != request.backend) {
+        if (!device_backend || *device_backend != request.backend || device_graphics_api != request.graphics_api) {
           // Destroy every resource while its owning context is still current.
           // This runs only between dispatches, never on the window thread.
           if (device)
@@ -99,6 +102,7 @@ void RenderWorker::Run(int frame_limit) {
           device_backend.reset();
           status = RenderStatus{};
           status.backend = request.backend;
+          status.graphics_api = request.graphics_api;
         }
         status.revision = revision;
         status.error.clear();
@@ -107,15 +111,16 @@ void RenderWorker::Run(int frame_limit) {
         status.updating = true;
         Publish(status);
         if (!device) {
-          if (!graphics::SupportBackendAPI(request.backend))
+          if (!sparkium::SupportBackend({request.backend, request.graphics_api}))
             throw std::runtime_error("selected render backend was not built");
-          std::unique_ptr<graphics::Core> next_device;
-          if (graphics::CreateCore(request.backend, {}, &next_device) != 0 || !next_device ||
+          std::unique_ptr<sparkium::backend::Device> next_device;
+          if (sparkium::CreateDevice({request.backend, request.graphics_api}, {}, &next_device) != 0 || !next_device ||
               next_device->InitializeLogicalDeviceAutoSelect(false) != 0) {
             throw std::runtime_error("failed to initialize render backend");
           }
           device = std::move(next_device);
           device_backend = request.backend;
+          device_graphics_api = request.graphics_api;
         }
         if (!renderer)
           renderer = std::make_unique<sparkium::Core>(device.get());
@@ -132,7 +137,8 @@ void RenderWorker::Run(int frame_limit) {
         }
         auto *film = scene->GetFilm();
         auto pipeline = request.pipeline.value_or(scene->GetRenderPipeline());
-        const bool native = device->API() == graphics::BACKEND_API_CPU || device->API() == graphics::BACKEND_API_CUDA;
+        const bool native =
+            device->API() == sparkium::RenderBackend::CPU || device->API() == sparkium::RenderBackend::CUDA;
         if (native &&
             (pipeline == sparkium::RENDER_PIPELINE_RASTERIZATION || pipeline == sparkium::RENDER_PIPELINE_RAY_QUERY)) {
           // A scene's preferred graphics pipeline is not a restriction on
@@ -149,6 +155,7 @@ void RenderWorker::Run(int frame_limit) {
         film->Reset();
         active = request;
         status.backend = device->API();
+        status.graphics_api = request.graphics_api;
         status.device = device->DeviceName();
         status.name = scene->GetName();
         status.pipeline = pipeline;

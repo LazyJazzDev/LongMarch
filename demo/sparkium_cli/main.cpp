@@ -56,7 +56,7 @@ int main(int argc, char **argv) {
     std::filesystem::path output = "output.png";
     std::filesystem::path linear_output;
     int frames = 1;
-    auto backend = graphics::BACKEND_API_DEFAULT;
+    sparkium::BackendSelection backend;
     std::filesystem::path profile_path;
     bool profile_cpu_only = false;
     bool profile_alternate_gpu = false;
@@ -98,12 +98,12 @@ int main(int argc, char **argv) {
     if (frames <= 0)
       throw std::runtime_error("--frames must be positive");
 
-    std::unique_ptr<graphics::Core> graphics_core;
-    if (graphics::CreateCore(backend, graphics::Core::Settings{2, debug}, &graphics_core) != 0)
+    std::unique_ptr<sparkium::backend::Device> graphics_core;
+    if (sparkium::CreateDevice(backend, sparkium::backend::Device::Settings{2, debug}, &graphics_core) != 0)
       throw std::runtime_error("failed to create graphics core");
     if (graphics_core->InitializeLogicalDeviceAutoSelect(false) != 0)
       throw std::runtime_error("failed to initialize graphics device");
-    std::cout << "Backend: " << graphics::BackendAPIString(graphics_core->API())
+    std::cout << "Backend: " << sparkium::BackendName(graphics_core->API())
               << ", device: " << graphics_core->DeviceName() << '\n';
     if (require_hardware_rt && !graphics_core->DeviceRayTracingSupport())
       throw std::runtime_error("hardware ray tracing is unavailable on the selected device");
@@ -117,13 +117,13 @@ int main(int argc, char **argv) {
     const auto resolved_pipeline = core.ResolveRenderPipeline(pipeline);
     if (require_hardware_rt && resolved_pipeline != sparkium::RENDER_PIPELINE_RAY_TRACING)
       throw std::runtime_error("--require-hardware-rt requires the ray_tracing pipeline");
-    if (graphics_core->API() == graphics::BACKEND_API_CPU || graphics_core->API() == graphics::BACKEND_API_CUDA) {
+    if (graphics_core->API() == sparkium::RenderBackend::CPU || graphics_core->API() == sparkium::RenderBackend::CUDA) {
       if (pipeline == sparkium::RENDER_PIPELINE_RASTERIZATION || pipeline == sparkium::RENDER_PIPELINE_RAY_QUERY)
         throw std::runtime_error("CPU/CUDA support the shared path tracer, not rasterization or native ray queries");
       if (resolved_pipeline == sparkium::RENDER_PIPELINE_RAY_TRACING)
         std::cout << "Tracing: CUDA ray_tracing via OptiX (GAS/IAS, optixLaunch; shared path tracer)\n";
       else
-        std::cout << "Tracing: native " << graphics::BackendAPIString(graphics_core->API())
+        std::cout << "Tracing: native " << sparkium::BackendName(graphics_core->API())
                   << " kernels (shared path tracer and software BVH; no graphics API dispatch)\n";
     }
     if (core.ResolveRenderPipeline(pipeline) == sparkium::RENDER_PIPELINE_RAY_QUERY)
@@ -135,7 +135,13 @@ int main(int argc, char **argv) {
     std::unique_ptr<graphics::FrameProfile> profiler;
     std::ofstream profile_output;
     if (!profile_path.empty()) {
-      profiler = std::make_unique<graphics::FrameProfile>(graphics_core.get(), !profile_cpu_only);
+      if (auto *graphics_device = graphics_core->GraphicsCore())
+        profiler = std::make_unique<graphics::FrameProfile>(graphics_device, !profile_cpu_only);
+      else {
+        if (!profile_cpu_only)
+          throw std::runtime_error("native profiling requires --profile-cpu-only");
+        profiler = std::make_unique<graphics::FrameProfile>(graphics_core->DeviceName());
+      }
       std::filesystem::create_directories(profile_path.has_parent_path() ? profile_path.parent_path() : ".");
       profile_output.open(profile_path);
       if (!profile_output)

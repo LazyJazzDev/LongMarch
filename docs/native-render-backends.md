@@ -1,5 +1,54 @@
 # Native CPU and CUDA path tracing
 
+## Library boundary and backend selection
+
+Sparkium owns rendering backend selection through `sparkium::RenderBackend`
+(`Graphics`, `CPU`, `CUDA`) and `CreateDevice`. `BackendSelection` carries the
+graphics API separately; CLI names `d3d12`, `vulkan` and `metal` select that field.
+Its `backend::Device` is independent of `graphics::Core`:
+
+- `graphics/GraphicsDevice` adapts Vulkan, D3D12 and Metal devices from graphics.
+- `cpu/CpuDevice` owns CPU execution, with LLVM function JIT and a persistent
+  thread pool in the CPU backend directory.
+- `cuda/CudaDevice` owns the CUDA context, NVRTC compilation, kernel launches and
+  optional OptiX acceleration structures and pipelines.
+- `common/` contains shared resources, bindings, Slang frontend/reflection and
+  compatibility helpers. All live under `code/sparkium/backend/` and link into
+  `sparkium_backend`, not `grassland_graphics`.
+- Graphics retains only graphics API backend enums and factories. Its existing
+  CUDA interop is for sharing graphics resources, not a CUDA compute backend.
+
+Sparkium reuses the abstract Buffer, Image, Shader and CommandContext resource
+contracts to share rendering algorithms. Native implementations live in Sparkium;
+they do not derive from or instantiate `graphics::Core`. `Device::GraphicsCore()`
+returns the underlying graphics device for the adapter and null for CPU/CUDA.
+
+```cpp
+std::unique_ptr<sparkium::backend::Device> device;
+sparkium::CreateDevice(sparkium::RenderBackend::CPU, {}, &device);
+device->InitializeLogicalDeviceAutoSelect(false);
+sparkium::Core renderer(device.get());
+```
+
+The caller keeps `device` alive until the renderer and its resources are destroyed.
+Existing applications may still construct `sparkium::Core` from a borrowed
+`graphics::Core*`; Sparkium creates the adapter internally. The GUI display uses a
+separate graphics device, while its rendering worker owns a Sparkium device.
+OptiX remains a hardware traversal pipeline on the CUDA rendering backend.
+
+```mermaid
+flowchart TD
+    Renderer[Sparkium renderer] --> Device[Sparkium backend Device]
+    Device --> Graphics[graphics: GraphicsDevice]
+    Device --> CPU[cpu: CpuDevice]
+    Device --> CUDA[cuda: CudaDevice]
+    Graphics --> APIs[graphics library: Vulkan / D3D12 / Metal]
+    CPU --> LLVM[Slang LLVM JIT + std::thread pool]
+    CUDA --> NVRTC[NVRTC + CUDA kernels]
+    CUDA --> OptiX[OptiX GAS / IAS + ray tracing pipeline]
+    Display[GUI display] --> APIs
+```
+
 For NVIDIA hardware traversal on CUDA, see optional
 [OptiX ray tracing](optix-ray-tracing.md). Use `--pipeline rt_fallback` to
 explicitly select software BVH traversal on CUDA.
@@ -41,8 +90,9 @@ rendering; `--display-backend auto|d3d12|vulkan|metal` independently selects win
 presentation. The default display backend follows the platform default. CPU and
 CUDA cannot be selected as display backends.
 
-The ImGui **Render backend** dropdown switches between the compiled render
-backends without reopening the window. `--backend` sets the initial selection.
+The ImGui **Render backend** dropdown selects Graphics, CPU or CUDA without
+reopening the window. Graphics exposes a separate **Graphics API** dropdown for
+Vulkan, D3D12 and Metal. `--backend` sets the initial selection.
 Switching waits for the current dispatch on the worker thread, recreates the
 render device and scene there, resets accumulation, and selects the Auto
 pipeline for the new device. The scene and samples-per-dispatch selection are
@@ -155,8 +205,8 @@ test with known radiance, with compiler/linker child processes prohibited.
 
 ## Shared implementation
 
-`grassland/graphics/backend/native` implements the compute/resource subset of
-`graphics::Core`. JSON loading, mesh/hair conversion, shader-graph generation, material
+`sparkium/backend/{graphics,cpu,cuda,common}` implements Sparkium's rendering devices and
+resources. JSON loading, mesh/hair conversion, shader-graph generation, material
 registration, film and camera semantics remain shared. `SoftwarePipeline` selects
 a dedicated CPU acceleration-structure builder independently of the GPU path.
 

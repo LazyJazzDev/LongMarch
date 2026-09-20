@@ -10,12 +10,12 @@
 namespace sparkium::raster {
 
 Scene::Scene(sparkium::Scene &scene) : scene_(scene), core_(DedicatedCast(scene.GetCore())), settings(scene.settings) {
-  core_->GraphicsCore()->CreateShader(core_->GetShadersVFS(), "light/ambient/lighting.hlsl", "VSMain", "vs_6_0", {},
-                                      &ambient_light_vs_);
-  core_->GraphicsCore()->CreateShader(core_->GetShadersVFS(), "light/ambient/lighting.hlsl", "PSMain", "ps_6_0", {},
-                                      &ambient_light_ps_);
-  core_->GraphicsCore()->CreateProgram({graphics::IMAGE_FORMAT_R32G32B32A32_SFLOAT}, graphics::IMAGE_FORMAT_UNDEFINED,
-                                       &ambient_light_program_);
+  core_->BackendDevice()->CreateShader(core_->GetShadersVFS(), "light/ambient/lighting.hlsl", "VSMain", "vs_6_0", {},
+                                       &ambient_light_vs_);
+  core_->BackendDevice()->CreateShader(core_->GetShadersVFS(), "light/ambient/lighting.hlsl", "PSMain", "ps_6_0", {},
+                                       &ambient_light_ps_);
+  core_->BackendDevice()->CreateProgram({graphics::IMAGE_FORMAT_R32G32B32A32_SFLOAT}, graphics::IMAGE_FORMAT_UNDEFINED,
+                                        &ambient_light_program_);
   ambient_light_program_->BindShader(ambient_light_vs_.get(), graphics::SHADER_TYPE_VERTEX);
   ambient_light_program_->BindShader(ambient_light_ps_.get(), graphics::SHADER_TYPE_PIXEL);
   ambient_light_program_->SetBlendState(
@@ -28,7 +28,7 @@ Scene::Scene(sparkium::Scene &scene) : scene_(scene), core_(DedicatedCast(scene.
   ambient_light_program_->AddResourceBinding(graphics::RESOURCE_TYPE_UNIFORM_BUFFER, 1);  // Ambient Light Data
   ambient_light_program_->Finalize();
 
-  core_->GraphicsCore()->CreateBuffer(sizeof(glm::vec3), graphics::BUFFER_TYPE_DYNAMIC, &ambient_light_buffer_);
+  core_->BackendDevice()->CreateBuffer(sizeof(glm::vec3), graphics::BUFFER_TYPE_DYNAMIC, &ambient_light_buffer_);
 }
 
 void Scene::Render(Camera *camera, Film *film) {
@@ -75,7 +75,7 @@ void Scene::Render(Camera *camera, Film *film) {
   film->film_.Reset();
 
   std::unique_ptr<graphics::CommandContext> cmd_context;
-  core_->GraphicsCore()->CreateCommandContext(&cmd_context);
+  core_->BackendDevice()->CreateCommandContext(&cmd_context);
 
   // Render Pass
 
@@ -137,8 +137,8 @@ void Scene::Render(Camera *camera, Film *film) {
 
   cmd_context->CmdEndRendering();
 
-  core_->GraphicsCore()->SubmitCommandContext(cmd_context.get());
-  core_->GraphicsCore()->WaitGPU();
+  core_->BackendDevice()->SubmitCommandContext(cmd_context.get());
+  core_->BackendDevice()->WaitGPU();
 }
 
 void Scene::RegisterRenderCallback(

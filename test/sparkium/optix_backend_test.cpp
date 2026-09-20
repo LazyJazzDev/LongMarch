@@ -8,11 +8,11 @@
 using namespace grassland;
 
 TEST(CudaRayTracing, HardwareHitsTransformsMasksAndEmptyScene) {
-#ifndef LONGMARCH_OPTIX_ENABLED
+#ifndef SPARKIUM_OPTIX_ENABLED
   GTEST_SKIP() << "OptiX not built";
 #endif
-  std::unique_ptr<graphics::Core> core;
-  ASSERT_EQ(graphics::CreateCore(graphics::BACKEND_API_CUDA, {2, true}, &core), 0);
+  std::unique_ptr<sparkium::backend::Device> core;
+  ASSERT_EQ(sparkium::CreateDevice(sparkium::RenderBackend::CUDA, {2, true}, &core), 0);
   ASSERT_EQ(core->InitializeLogicalDeviceAutoSelect(true), 0);
   ASSERT_TRUE(core->DeviceRayTracingSupport());
   const float positions[]{-1, -1, 0, 1, -1, 0, 0, 1, 0};

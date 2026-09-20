@@ -10,7 +10,8 @@
 namespace sparkium_gui {
 
 struct RenderRequest {
-  grassland::graphics::BackendAPI backend = grassland::graphics::BACKEND_API_DEFAULT;
+  sparkium::RenderBackend backend = sparkium::RenderBackend::Graphics;
+  grassland::graphics::BackendAPI graphics_api = grassland::graphics::BACKEND_API_DEFAULT;
   std::filesystem::path scene;
   std::optional<sparkium::RenderPipeline> pipeline;
   std::optional<int> samples;
@@ -33,7 +34,8 @@ struct RenderStatus {
   bool updating = true;
   bool finished = false;
   bool ray_tracing = false, ray_query = false;
-  grassland::graphics::BackendAPI backend = grassland::graphics::BACKEND_API_DEFAULT;
+  sparkium::RenderBackend backend = sparkium::RenderBackend::Graphics;
+  grassland::graphics::BackendAPI graphics_api = grassland::graphics::BACKEND_API_DEFAULT;
   sparkium::RenderPipeline pipeline = sparkium::RENDER_PIPELINE_AUTO;
   sparkium::RenderPipeline resolved_pipeline = sparkium::RENDER_PIPELINE_AUTO;
   sparkium::RenderPipeline automatic_pipeline = sparkium::RENDER_PIPELINE_AUTO;

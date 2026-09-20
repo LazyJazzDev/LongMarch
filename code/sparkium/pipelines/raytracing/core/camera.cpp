@@ -8,9 +8,9 @@ namespace sparkium::raytracing {
 Camera::Camera(sparkium::Camera &camera) : camera_(camera) {
   core_ = DedicatedCast(camera_.GetCore());
   if (core_->UsesGraphicsRayTracing())
-    core_->GraphicsCore()->CreateShader(core_->GetShadersVFS(), "camera.hlsl", "CameraPinhole", "lib_6_5",
-                                        &camera_shader_);
-  core_->GraphicsCore()->CreateBuffer(sizeof(CameraData), graphics::BUFFER_TYPE_STATIC, &camera_buffer_);
+    core_->BackendDevice()->CreateShader(core_->GetShadersVFS(), "camera.hlsl", "CameraPinhole", "lib_6_5",
+                                         &camera_shader_);
+  core_->BackendDevice()->CreateBuffer(sizeof(CameraData), graphics::BUFFER_TYPE_STATIC, &camera_buffer_);
   camera_data_.world_to_camera = camera_.view;
   camera_data_.camera_to_world = glm::inverse(camera_.view);
   camera_data_.scale = glm::vec2(camera_.aspect * tan(camera_.fovy * 0.5f), tan(camera_.fovy * 0.5f));
