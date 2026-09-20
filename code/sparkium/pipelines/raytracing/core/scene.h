@@ -8,7 +8,7 @@ class Scene : public Object {
  public:
   Scene(sparkium::Scene &scene);
 
-  void Render(Camera *camera, Film *film, bool software = false, bool ray_query = false);
+  void Render(Camera *camera, Film *film, bool software = false, bool ray_query = false, bool optix = false);
 
   bool SoftwareTracing() const {
     return software_tracing_;
@@ -63,6 +63,7 @@ class Scene : public Object {
   void UpdatePipeline(Camera *camera);
   bool software_tracing_{false};
   bool ray_query_{false};
+  bool optix_{false};
   bool rendered_{false};
   std::unique_ptr<SoftwarePipeline> software_pipeline_;
   sparkium::Scene &scene_;

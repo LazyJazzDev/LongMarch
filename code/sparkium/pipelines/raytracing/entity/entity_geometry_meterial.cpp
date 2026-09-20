@@ -18,7 +18,7 @@ EntityGeometryMaterial::EntityGeometryMaterial(sparkium::EntityGeometryMaterial 
 
   light_geom_mat_ = std::make_unique<LightGeometryMaterial>(core_, geometry_, material_, entity_.transform);
 
-  if (!core_->GraphicsCore()->DeviceRayTracingSupport())
+  if (!core_->UsesGraphicsRayTracing())
     return;
 
   if (dynamic_cast<GeometryMesh *>(geometry_)) {

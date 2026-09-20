@@ -1,27 +1,31 @@
 # Native CPU and CUDA path tracing
 
+For NVIDIA hardware traversal on CUDA, see optional
+[OptiX ray tracing](optix-ray-tracing.md). Use `--pipeline rt_fallback` to
+explicitly select software BVH traversal on CUDA.
+
 Sparkium's headless path tracer can execute without a graphics API:
 
 ```sh
 build/demo/sparkium_cli/demo_sparkium_cli assets/scenes/cornell_box/scene.json \
   --backend cpu --frames 2 -o cpu.png --linear-output cpu.pfm
 build/demo/sparkium_cli/demo_sparkium_cli assets/scenes/cornell_box/scene.json \
-  --backend cuda --frames 2 -o cuda.png --linear-output cuda.pfm
+  --backend cuda --pipeline rt_fallback --frames 2 -o cuda.png --linear-output cuda.pfm
 ```
 
-`auto`, `ray_tracing` (including legacy JSON requests), and `rt_fallback`
-resolve to the shared compute path tracer on these devices. Here `rt_fallback`
-is a **pipeline identifier**, not a Vulkan device: CPU dispatch calls compiled
-host functions, and CUDA dispatch launches CUDA kernels. Neither creates a
-Vulkan instance or submits graphics commands. An explicit unavailable backend
-fails rather than silently selecting Vulkan. `--require-hardware-rt` is not
-appropriate for these backends; it specifically requires graphics pipeline RT.
+On CPU, `auto`, `ray_tracing` (including legacy JSON requests), and
+`rt_fallback` resolve to the shared compute path tracer. On CUDA, `ray_tracing`
+uses OptiX, `rt_fallback` uses software BVH, and `auto` selects hardware tracing
+when available. An explicit CUDA `ray_tracing` request fails if OptiX is
+unavailable; use `auto` to allow fallback. `--require-hardware-rt` accepts CUDA
+hardware tracing and rejects software traversal.
 
 Vulkan and D3D12 `auto` prefer Ray Query when supported, then pipeline RT,
 then software fallback. Explicit pipeline choices remain available. CPU/CUDA are
 headless compute devices, **not new rasterizers or window-system backends**.
-Native `rasterization`, `ray_query`, acceleration-structure commands, presentation
-and CUDA/graphics interop buffers are explicitly unsupported. The GUI uses a
+Native `rasterization`, inline `ray_query`, presentation and CUDA/graphics
+interop buffers are unsupported. CUDA supports triangle acceleration structures
+when OptiX is available. The GUI uses a
 separate graphics device to display their output.
 
 ## GUI preview
@@ -65,7 +69,8 @@ dispatch time, separately from GUI FPS. `--frames N` exits after the worker has
 completed N render dispatches and the final preview has been presented; errors
 produce a nonzero exit status in this mode.
 
-CPU/CUDA offer Auto and the fallback path tracer in the pipeline selector. A
+CPU offers Auto and the fallback path tracer in the pipeline selector. CUDA
+also offers Path Tracing when OptiX is available; Auto selects OptiX. A
 scene whose default is rasterization or ray query uses the fallback path tracer
 when viewed on CPU/CUDA.
 
@@ -78,7 +83,7 @@ through its registry baseline. This port packages official Slang binaries,
 including the LLVM plugin. No external C++ compiler or linker is used at runtime. CUDA additionally
 requires the CUDA driver and NVRTC. NVRTC
 selects the compute architecture of the actual selected device at runtime.
-There is no OptiX dependency.
+OptiX is optional and only needed for CUDA hardware ray tracing.
 
 ```sh
 cmake -S . -B build -G Ninja -DVCPKG_PATH=/opt/vcpkg \
@@ -179,7 +184,8 @@ at the hardware count, and is read when the pool is first used.
 per task (default 8), also read once. These are diagnostic tuning controls.
 
 CUDA compiles Slang's CUDA source through NVRTC to PTX,
-loads it with the CUDA driver, and calls `cuLaunchKernel`. BVH construction,
+loads it with the CUDA driver, and calls `cuLaunchKernel`. OptiX instead links
+the tracing module and calls `optixLaunch`. Software BVH construction,
 light preprocessing, path tracing, film resolve and tone mapping all execute
 on the selected device. CUDA descriptors and pixels use device memory, not
 managed CPU rendering followed by GPU copies. Submission is synchronous.

@@ -8,7 +8,7 @@ namespace sparkium::raytracing {
 // Geometry/light/material registration is shared with DXR/Vulkan pipeline RT.
 class SoftwarePipeline {
  public:
-  explicit SoftwarePipeline(Core *core, bool ray_query = false);
+  explicit SoftwarePipeline(Core *core, bool ray_query = false, bool optix = false);
   void ClearInstances();
   void AddInstance(Geometry *geometry, Material *material, const glm::mat4x3 &transform, uint32_t geometry_index);
   void Update(graphics::CommandContext *commands,
@@ -80,6 +80,12 @@ class SoftwarePipeline {
   bool cpu_{};
   std::vector<CpuBvhTree> cpu_meshes_;
   std::vector<uint8_t> cpu_last_instances_;
+  bool optix_;
+
+  bool NativeTraversal() const {
+    return ray_query_ || optix_;
+  }
+
   std::unique_ptr<graphics::AccelerationStructure> native_tlas_;
   std::vector<Instance> instances_;
   std::vector<GeometryLayout> geometries_;

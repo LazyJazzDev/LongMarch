@@ -18,7 +18,7 @@ void Replace(std::string &s, const std::string &a, const std::string &b) {
 // represent read-only and writable byte buffers by the same pointer/size ABI.
 // Erase only these known templates, not their function bodies or algorithms.
 // The original sources still compile unchanged through DXC on graphics devices.
-std::string LowerLegacySource(std::string s, const std::string &filename) {
+std::string LowerLegacySource(std::string s, const std::string &filename, bool optix) {
   // Native descriptor arrays are ordinary pointer-backed arrays, so this
   // graphics descriptor-indexing annotation has no native semantic effect.
   Replace(s, "NonUniformResourceIndex(", "(");
@@ -65,7 +65,7 @@ std::string LowerLegacySource(std::string s, const std::string &filename) {
   s = std::regex_replace(
       s,
       std::regex(
-          R"(((?:cbuffer|(?:RW)?ByteAddressBuffer|ConstantBuffer<\w+>|(?:RW)?Texture2D<\w+>|SamplerState)\s+\w+\s*(?:\[\s*\])?)\s*:\s*register\([but s][0-9]+,\s*space([0-9]+)\))"),
+          R"(((?:cbuffer|RaytracingAccelerationStructure|(?:RW)?ByteAddressBuffer|ConstantBuffer<\w+>|(?:RW)?Texture2D<\w+>|SamplerState)\s+\w+\s*(?:\[\s*\])?)\s*:\s*register\([but s][0-9]+,\s*space([0-9]+)\))"),
       "[NativeBinding($2)] $1");
   s = std::regex_replace(s, std::regex(R"(\[\[vk::image_format\("[^"]+"\)\]\])"), "");
   for (const char *type : {"float4", "float3", "float2", "float", "int", "uint"}) {
@@ -74,7 +74,8 @@ std::string LowerLegacySource(std::string s, const std::string &filename) {
   }
 
   Replace(s, "SamplerState", "NativeSamplerState");
-  s = std::regex_replace(s, std::regex(R"(\bRayDesc\b)"), "NativeRayDesc");
+  if (!optix)
+    s = std::regex_replace(s, std::regex(R"(\bRayDesc\b)"), "NativeRayDesc");
   // Use an explicit descriptor span. CUDA unsized resource arrays otherwise
   // receive a reflection layout that differs from the emitted C++ structure.
   s = std::regex_replace(s,

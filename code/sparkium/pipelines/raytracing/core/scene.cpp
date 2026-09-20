@@ -19,7 +19,7 @@ namespace sparkium::raytracing {
 
 Scene::Scene(sparkium::Scene &scene) : scene_(scene), settings(scene.settings) {
   core_ = DedicatedCast(scene_.GetCore());
-  if (core_->GraphicsCore()->DeviceRayTracingSupport()) {
+  if (core_->UsesGraphicsRayTracing()) {
     core_->GraphicsCore()->CreateShader(core_->GetShadersVFS(), "raygen.hlsl", "Main", "lib_6_5", &raygen_shader_);
     core_->GraphicsCore()->CreateShader(core_->GetShadersVFS(), "raygen.hlsl", "MissMain", "lib_6_5",
                                         &default_miss_shader_);
@@ -34,10 +34,11 @@ Scene::Scene(sparkium::Scene &scene) : scene_(scene), settings(scene.settings) {
   core_->GraphicsCore()->CreateSampler({graphics::FILTER_MODE_NEAREST}, &nearest_sampler_);
 }
 
-void Scene::Render(Camera *camera, Film *film, bool software, bool ray_query) {
-  software = software || ray_query;
-  if (ray_query != ray_query_) {
+void Scene::Render(Camera *camera, Film *film, bool software, bool ray_query, bool optix) {
+  software = software || ray_query || optix;
+  if (ray_query != ray_query_ || optix != optix_) {
     ray_query_ = ray_query;
+    optix_ = optix;
     software_pipeline_.reset();
     pipeline_dirty_ = true;
     if (rendered_)
@@ -50,7 +51,7 @@ void Scene::Render(Camera *camera, Film *film, bool software, bool ray_query) {
       film->Reset();
   }
   if (software && !software_pipeline_)
-    software_pipeline_ = std::make_unique<SoftwarePipeline>(core_, ray_query_);
+    software_pipeline_ = std::make_unique<SoftwarePipeline>(core_, ray_query_, optix_);
   graphics::CpuProfileScope update_profile("scene_update");
   UpdatePipeline(camera);
   update_profile.End();
@@ -70,7 +71,7 @@ void Scene::Render(Camera *camera, Film *film, bool software, bool ray_query) {
   cmd_context->CmdBindResources(0, {film->accumulated_color_.get()}, bind_point);
   cmd_context->CmdBindResources(1, {film->accumulated_samples_.get()}, bind_point);
   if (software) {
-    if (ray_query_)
+    if (ray_query_ || optix_)
       cmd_context->CmdBindResources(2, software_pipeline_->AccelerationStructure(), bind_point);
     else
       cmd_context->CmdBindResources(2, {software_pipeline_->Nodes()}, bind_point);

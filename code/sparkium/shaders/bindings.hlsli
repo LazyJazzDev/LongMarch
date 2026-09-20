@@ -11,8 +11,8 @@ SP_RESOURCE(ConstantBuffer<RenderSettings>, render_settings, b0, 3);
 #define SP_BINDING_render_settings SP_RESOURCE_ACCESS(ConstantBuffer<RenderSettings>, render_settings, 3)
 #define SOBOL_TABLE
 #ifdef SPARKIUM_SOFTWARE_RT
-#ifdef SPARKIUM_RAY_QUERY
-RaytracingAccelerationStructure query_scene : register(t0, space2);
+#if defined(SPARKIUM_RAY_QUERY) || defined(SPARKIUM_OPTIX)
+SP_RESOURCE(RaytracingAccelerationStructure, query_scene, t0, 2);
 #else
 SP_RESOURCE(ByteAddressBuffer, software_nodes, t0, 2);
 #define SP_BINDING_software_nodes SP_RESOURCE_ACCESS(ByteAddressBuffer, software_nodes, 2)

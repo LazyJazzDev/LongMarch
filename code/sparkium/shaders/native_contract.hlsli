@@ -13,7 +13,11 @@
 #define SP_TEXTURE(T) NativeTexture_##T
 #define SP_RW_TEXTURE(T) NativeTexture_##T
 #define SP_SAMPLER NativeSamplerState
+#ifdef SPARKIUM_OPTIX
+#define SP_RAY RayDesc
+#else
 #define SP_RAY NativeRayDesc
+#endif
 #define SP_NONUNIFORM(i) (i)
 #define SP_IMAGE_FORMAT(f)
 #define SP_RESOURCE(T, name, reg, slot) [NativeBinding(slot)] T name

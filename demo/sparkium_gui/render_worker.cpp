@@ -138,7 +138,7 @@ void RenderWorker::Run(int frame_limit) {
           // A scene's preferred graphics pipeline is not a restriction on
           // viewing it with a compute-only backend. Explicit requests fail.
           if (request.pipeline)
-            throw std::runtime_error("CPU/CUDA require Auto or Path Tracing - Fallback");
+            throw std::runtime_error("CPU/CUDA do not support rasterization or inline ray queries");
           pipeline = sparkium::RENDER_PIPELINE_RT_FALLBACK;
         }
         if (request.samples)

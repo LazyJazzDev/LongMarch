@@ -17,6 +17,9 @@
 #include "native_cpu_thread_pool.h"
 #include "native_internal.h"
 #include "native_shader_compat.h"
+#ifdef LONGMARCH_OPTIX_ENABLED
+#include "optix_backend.h"
+#endif
 
 namespace grassland::graphics::backend {
 namespace {
@@ -228,6 +231,10 @@ struct NativeShader::Impl {
   size_t global_size{};
   uint32_t threads[3]{};
   Slang::ComPtr<ISlangSharedLibrary> library;
+#ifdef LONGMARCH_OPTIX_ENABLED
+  std::unique_ptr<OptixLaunch> optix_launch;
+  OptixDevice *optix_device{};
+#endif
   HostFunction host{};
   ContextFunction context_host{};
   bool explicit_context{};
@@ -251,7 +258,8 @@ NativeShader::NativeShader(bool cuda,
                            const VirtualFileSystem &vfs,
                            const std::string &source,
                            const std::string &entry,
-                           const std::vector<std::string> &args)
+                           const std::vector<std::string> &args,
+                           OptixDevice *optix)
     : impl_(std::make_shared<Impl>()) {
   // The compiler session is shared; compilation is serialized, execution is not.
   Session();  // Outlives cached JIT libraries during static destruction.
@@ -261,6 +269,9 @@ NativeShader::NativeShader(bool cuda,
   auto start = std::chrono::steady_clock::now();
   impl_->cuda = cuda;
   impl_->entry = entry;
+  const bool optix_shader = std::find(args.begin(), args.end(), "-DSPARKIUM_OPTIX") != args.end();
+  if (optix_shader && !optix)
+    throw std::runtime_error("OptiX shaders require available CUDA hardware ray tracing support");
   // Unique function and resource names prevent interposition between JIT modules.
   static std::atomic<uint64_t> next_entry{0};
   const auto native_entry = "LongMarchNativeEntry" + std::to_string(next_entry++);
@@ -300,7 +311,7 @@ NativeShader::NativeShader(bool cuda,
   }
   for (const auto &file : std::filesystem::recursive_directory_iterator(directory.path)) {
     if (!explicit_context && file.is_regular_file()) {
-      auto lowered = LowerLegacySource(Read(file.path()), file.path().filename().string());
+      auto lowered = LowerLegacySource(Read(file.path()), file.path().filename().string(), optix_shader);
       lowered = RenameLegacyEntry(std::move(lowered), entry, native_entry);
       if (!cuda) {
         auto blocks = LegacyConstantBlocks(lowered);
@@ -314,6 +325,8 @@ NativeShader::NativeShader(bool cuda,
   RequestOwner owner;
   auto *request = owner.request;
   spSetCodeGenTarget(request, cuda ? SLANG_CUDA_SOURCE : SLANG_SHADER_HOST_CALLABLE);
+  if (optix_shader)
+    spSetTargetFlags(request, 0, SLANG_TARGET_FLAG_GENERATE_WHOLE_PROGRAM);
   spSetMatrixLayoutMode(request, SLANG_MATRIX_LAYOUT_ROW_MAJOR);
   spSetOptimizationLevel(request, SLANG_OPTIMIZATION_LEVEL_MAXIMAL);
   spSetTargetFloatingPointMode(request, 0, SLANG_FLOATING_POINT_MODE_PRECISE);
@@ -348,7 +361,11 @@ NativeShader::NativeShader(bool cuda,
 
   int unit = spAddTranslationUnit(request, SLANG_SOURCE_LANGUAGE_SLANG, "native_input");
   spAddTranslationUnitSourceFile(request, unit, (directory.path / "native_input.slang").string().c_str());
-  spAddEntryPoint(request, unit, native_entry.c_str(), SLANG_STAGE_COMPUTE);
+  spAddEntryPoint(request, unit, native_entry.c_str(), optix_shader ? SLANG_STAGE_RAY_GENERATION : SLANG_STAGE_COMPUTE);
+  if (optix_shader) {
+    spAddEntryPoint(request, unit, "LongMarchOptixClosest", SLANG_STAGE_CLOSEST_HIT);
+    spAddEntryPoint(request, unit, "LongMarchOptixMiss", SLANG_STAGE_MISS);
+  }
   // CPU pass 1 only type-checks and reflects resource layout and invocation semantics.
   // It emits no shader executable; pass 2 below compiles ordinary exported functions.
   if (!cuda)
@@ -368,8 +385,10 @@ NativeShader::NativeShader(bool cuda,
   // The global parameter type is a ConstantBuffer on native targets: its
   // reported size is a pointer, not the size of the pointed-to parameter block.
   impl_->global_size = 0;
-  SlangUInt threads[3];
-  reflection->getEntryPointByIndex(0)->getComputeThreadGroupSize(3, threads);
+  // The shared tracer records 8x8 compute groups; OptiX launches individual pixels.
+  SlangUInt threads[3]{8, 8, 1};
+  if (!optix_shader)
+    reflection->getEntryPointByIndex(0)->getComputeThreadGroupSize(3, threads);
   for (int i = 0; i < 3; ++i)
     impl_->threads[i] = uint32_t(threads[i]);
   std::string call_arguments;
@@ -431,7 +450,12 @@ NativeShader::NativeShader(bool cuda,
   if (cuda) {
 #ifdef LONGMARCH_NATIVE_CUDA_ENABLED
     Slang::ComPtr<ISlangBlob> blob;
-    SlangCheck(spGetEntryPointCodeBlob(request, 0, 0, blob.writeRef()), "cannot obtain native CUDA source");
+    const auto code_status = optix_shader ? spGetTargetCodeBlob(request, 0, blob.writeRef())
+                                          : spGetEntryPointCodeBlob(request, 0, 0, blob.writeRef());
+    if (SLANG_FAILED(code_status)) {
+      const char *diagnostic = spGetDiagnosticOutput(request);
+      throw std::runtime_error(std::string("cannot obtain native CUDA source: ") + (diagnostic ? diagnostic : ""));
+    }
     std::string code(static_cast<const char *>(blob->getBufferPointer()), blob->getBufferSize());
     if (const char *dump = std::getenv("SPARKIUM_NATIVE_DUMP")) {
       std::filesystem::create_directories(dump);
@@ -446,8 +470,14 @@ NativeShader::NativeShader(bool cuda,
     CheckCUDA(cuDeviceGetAttribute(&major, CU_DEVICE_ATTRIBUTE_COMPUTE_CAPABILITY_MAJOR, device));
     CheckCUDA(cuDeviceGetAttribute(&minor, CU_DEVICE_ATTRIBUTE_COMPUTE_CAPABILITY_MINOR, device));
     std::string arch = "--gpu-architecture=compute_" + std::to_string(major) + std::to_string(minor);
-    const char *options[] = {arch.c_str(), "--std=c++17", "--fmad=false"};
-    auto result = nvrtcCompileProgram(program, 3, options);
+    std::vector<const char *> options{arch.c_str(), "--std=c++17", "--fmad=false"};
+#ifdef LONGMARCH_OPTIX_ENABLED
+    if (optix_shader) {
+      options.insert(options.end(), {"-DSLANG_CUDA_ENABLE_OPTIX", "-I" LONGMARCH_OPTIX_INCLUDE_DIR,
+                                     "-I" LONGMARCH_NATIVE_CUDA_INCLUDE_DIR, "--relocatable-device-code=true"});
+    }
+#endif
+    auto result = nvrtcCompileProgram(program, static_cast<int>(options.size()), options.data());
     size_t log_size = 0;
     CheckNVRTC(nvrtcGetProgramLogSize(program, &log_size));
     std::string log(log_size, '\0');
@@ -458,12 +488,19 @@ NativeShader::NativeShader(bool cuda,
     CheckNVRTC(nvrtcGetPTXSize(program, &size));
     std::string ptx(size, '\0');
     CheckNVRTC(nvrtcGetPTX(program, ptx.data()));
-    CheckCUDA(cuModuleLoadData(&impl_->module, ptx.c_str()));
-    CheckCUDA(cuModuleGetFunction(&impl_->kernel, impl_->module, native_entry.c_str()));
-    CheckCUDA(
-        cuModuleGetGlobal(&impl_->global_device, &impl_->global_device_size, impl_->module, "SLANG_globalParams"));
-    if (impl_->global_device_size < impl_->global_size)
-      throw std::runtime_error("CUDA global parameter ABI mismatch");
+    if (optix_shader) {
+#ifdef LONGMARCH_OPTIX_ENABLED
+      impl_->optix_device = optix;
+      impl_->optix_launch = std::make_unique<OptixLaunch>(optix, ptx, native_entry, impl_->global_size);
+#endif
+    } else {
+      CheckCUDA(cuModuleLoadData(&impl_->module, ptx.c_str()));
+      CheckCUDA(cuModuleGetFunction(&impl_->kernel, impl_->module, native_entry.c_str()));
+      CheckCUDA(
+          cuModuleGetGlobal(&impl_->global_device, &impl_->global_device_size, impl_->module, "SLANG_globalParams"));
+      if (impl_->global_device_size < impl_->global_size)
+        throw std::runtime_error("CUDA global parameter ABI mismatch");
+    }
 #else
     throw std::runtime_error("native CUDA backend was not built");
 #endif
@@ -583,7 +620,11 @@ NativeShader::NativeShader(bool cuda,
     cache.emplace_back(std::move(cache_key), impl_);
   }
 
-  std::cout << "Compiled " << (cuda ? "CUDA kernel " : "CPU functions ") << source << ":" << entry << " ("
+  std::cout << "Compiled "
+            << (optix_shader ? "OptiX kernel "
+                : cuda       ? "CUDA kernel "
+                             : "CPU functions ")
+            << source << ":" << entry << " ("
             << std::chrono::duration<double>(std::chrono::steady_clock::now() - start).count() << " s)\n";
 }
 
@@ -626,7 +667,16 @@ void NativeShader::Dispatch(const NativeBindings &bindings, uint32_t x, uint32_t
       std::memcpy(elements.data() + old, &v, sizeof(v));
       ++count;
     };
-    if (auto it = bindings.buffers.find(p.slot); it != bindings.buffers.end()) {
+    if (auto it = bindings.acceleration_structures.find(p.slot); it != bindings.acceleration_structures.end()) {
+#ifdef LONGMARCH_OPTIX_ENABLED
+      auto *as = dynamic_cast<OptixAccelerationStructure *>(it->second);
+      if (!as || as->Device() != impl_->optix_device || !as->IsTopLevel())
+        throw std::runtime_error("foreign OptiX acceleration structure");
+      append(as->Handle());
+#else
+      NativeUnsupported();
+#endif
+    } else if (auto it = bindings.buffers.find(p.slot); it != bindings.buffers.end()) {
       for (const auto &range : it->second) {
         auto *b = dynamic_cast<NativeBuffer *>(range.buffer);
         if (!b)
@@ -679,6 +729,16 @@ void NativeShader::Dispatch(const NativeBindings &bindings, uint32_t x, uint32_t
   }
   if (impl_->cuda) {
 #ifdef LONGMARCH_NATIVE_CUDA_ENABLED
+#ifdef LONGMARCH_OPTIX_ENABLED
+    if (impl_->optix_launch) {
+      if (x > UINT32_MAX / impl_->threads[0] || y > UINT32_MAX / impl_->threads[1] ||
+          z > UINT32_MAX / impl_->threads[2])
+        throw std::overflow_error("OptiX launch dimensions overflow");
+      impl_->optix_launch->Dispatch(globals.data(), globals.size(), x * impl_->threads[0], y * impl_->threads[1],
+                                    z * impl_->threads[2]);
+      return;
+    }
+#endif
     // Slang 2026 uses CUDA module constant memory for global parameters.
     CheckCUDA(cuMemcpyHtoD(impl_->global_device, globals.data(), globals.size()));
     CheckCUDA(cuLaunchKernel(impl_->kernel, x, y, z, impl_->threads[0], impl_->threads[1], impl_->threads[2], 0,

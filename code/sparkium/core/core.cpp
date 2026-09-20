@@ -20,6 +20,9 @@ graphics::Core *Core::GraphicsCore() const {
 }
 
 RenderPipeline Core::ResolveRenderPipeline(RenderPipeline render_pipeline) const {
+  if (core_->API() == graphics::BACKEND_API_CUDA && render_pipeline == RENDER_PIPELINE_RAY_TRACING &&
+      !core_->DeviceRayTracingSupport())
+    throw std::runtime_error("CUDA ray_tracing requires available OptiX hardware support; use auto or rt_fallback");
   if (render_pipeline == RENDER_PIPELINE_AUTO) {
     const bool prefer_ray_query =
         core_->API() == graphics::BACKEND_API_D3D12 || core_->API() == graphics::BACKEND_API_VULKAN;
@@ -47,7 +50,10 @@ void Core::Render(Scene *scene, Camera *camera, Film *film, RenderPipeline rende
       raster::Render(this, scene, camera, film);
       break;
     case RENDER_PIPELINE_RAY_TRACING:
-      raytracing::Render(this, scene, camera, film);
+      if (core_->API() == graphics::BACKEND_API_CUDA)
+        raytracing::Render(this, scene, camera, film, true, false, true);
+      else
+        raytracing::Render(this, scene, camera, film);
       break;
     case RENDER_PIPELINE_RAY_QUERY:
       if (!core_->DeviceRayQuerySupport())

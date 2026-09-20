@@ -9,6 +9,10 @@ class Core : public Object {
 
   graphics::Core *GraphicsCore() const;
 
+  // Graphics APIs compile per-material hit/callable shaders. CUDA's OptiX
+  // implementation compiles the shared tracer and its hit/miss programs together.
+  bool UsesGraphicsRayTracing() const;
+
   const VirtualFileSystem &GetShadersVFS() const;
 
   graphics::Shader *GetShader(const std::string &name);
@@ -32,5 +36,6 @@ void Render(sparkium::Core *core,
             sparkium::Camera *camera,
             sparkium::Film *film,
             bool software = false,
-            bool ray_query = false);
+            bool ray_query = false,
+            bool optix = false);
 }  // namespace sparkium::raytracing

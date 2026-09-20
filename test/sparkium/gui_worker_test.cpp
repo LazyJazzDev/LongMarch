@@ -98,6 +98,33 @@ TEST_F(GuiSceneTest, BackendSwitchRecreatesResourcesAndRecovers) {
   EXPECT_EQ(status.frame->accumulated_samples, 1);
 }
 
+TEST_F(GuiSceneTest, OptixPipelineSwitchResetsAccumulation) {
+#ifndef LONGMARCH_OPTIX_ENABLED
+  GTEST_SKIP() << "OptiX not built";
+#endif
+  RenderWorker worker(1);
+  RenderRequest request;
+  request.scene = path;
+  request.backend = graphics::BACKEND_API_CUDA;
+  request.samples = 3;
+  std::vector<uint8_t> reference;
+  for (auto pipeline :
+       {sparkium::RENDER_PIPELINE_AUTO, sparkium::RENDER_PIPELINE_RT_FALLBACK, sparkium::RENDER_PIPELINE_RAY_TRACING}) {
+    request.pipeline = pipeline;
+    const auto status = Wait(worker, worker.Submit(request));
+    ASSERT_TRUE(status.error.empty()) << status.error;
+    ASSERT_TRUE(status.frame);
+    EXPECT_TRUE(status.ray_tracing);
+    EXPECT_EQ(status.resolved_pipeline,
+              pipeline == sparkium::RENDER_PIPELINE_AUTO ? sparkium::RENDER_PIPELINE_RAY_TRACING : pipeline);
+    EXPECT_EQ(status.frame->accumulated_samples, 3);
+    if (reference.empty())
+      reference = status.frame->rgba;
+    else
+      EXPECT_EQ(status.frame->rgba, reference);
+  }
+}
+
 TEST_P(GuiWorkerTest, IndependentDisplayResetCoalescingAndRecovery) {
   RenderWorker worker(3);
   RenderRequest request;

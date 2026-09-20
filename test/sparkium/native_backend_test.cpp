@@ -19,7 +19,8 @@ class NativeBackendTest : public testing::TestWithParam<graphics::BackendAPI> {
       GTEST_SKIP() << "backend not compiled";
     ASSERT_EQ(graphics::CreateCore(GetParam(), {}, &core), 0);
     ASSERT_EQ(core->InitializeLogicalDeviceAutoSelect(false), 0);
-    EXPECT_FALSE(core->DeviceRayTracingSupport());
+    if (GetParam() == graphics::BACKEND_API_CPU)
+      EXPECT_FALSE(core->DeviceRayTracingSupport());
     EXPECT_FALSE(core->DeviceRayQuerySupport());
     EXPECT_EQ(core->API(), GetParam());
   }
@@ -294,6 +295,22 @@ TEST_P(NativeBackendTest, FrameAccumulationResetAndBackground) {
     }
   EXPECT_THROW(renderer.Render(&scene, &camera, &film, sparkium::RENDER_PIPELINE_RASTERIZATION), std::runtime_error);
   EXPECT_THROW(renderer.Render(&scene, &camera, &film, sparkium::RENDER_PIPELINE_RAY_QUERY), std::runtime_error);
+  if (core->DeviceRayTracingSupport()) {
+    EXPECT_EQ(renderer.ResolveRenderPipeline(sparkium::RENDER_PIPELINE_AUTO), sparkium::RENDER_PIPELINE_RAY_TRACING);
+    EXPECT_EQ(renderer.ResolveRenderPipeline(sparkium::RENDER_PIPELINE_RAY_TRACING),
+              sparkium::RENDER_PIPELINE_RAY_TRACING);
+    // Switching traversal must reset accumulation; Auto must keep the OptiX path.
+    renderer.Render(&scene, &camera, &film, sparkium::RENDER_PIPELINE_RT_FALLBACK);
+    EXPECT_EQ(film.info.accumulated_samples, 3);
+    renderer.Render(&scene, &camera, &film, sparkium::RENDER_PIPELINE_RAY_TRACING);
+    EXPECT_EQ(film.info.accumulated_samples, 3);
+    renderer.Render(&scene, &camera, &film, sparkium::RENDER_PIPELINE_AUTO);
+    EXPECT_EQ(film.info.accumulated_samples, 6);
+  } else {
+    EXPECT_EQ(renderer.ResolveRenderPipeline(sparkium::RENDER_PIPELINE_AUTO), sparkium::RENDER_PIPELINE_RT_FALLBACK);
+    if (GetParam() == graphics::BACKEND_API_CUDA)
+      EXPECT_THROW(renderer.Render(&scene, &camera, &film, sparkium::RENDER_PIPELINE_RAY_TRACING), std::runtime_error);
+  }
 }
 
 TEST_P(NativeBackendTest, ShaderGraphDirectLightingMatchesPrincipled) {
