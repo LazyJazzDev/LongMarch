@@ -14,6 +14,10 @@ graphics::Core *Core::GraphicsCore() const {
   return core_.GraphicsCore();
 }
 
+bool Core::UsesGraphicsRayTracing() const {
+  return GraphicsCore()->DeviceRayTracingSupport() && GraphicsCore()->API() != graphics::BACKEND_API_CUDA;
+}
+
 const VirtualFileSystem &Core::GetShadersVFS() const {
   return core_.GetShadersVFS();
 }
@@ -66,7 +70,7 @@ void Core::LoadPublicShaders() {
   compute_program->Finalize();
   core_.SetPublicResource("blelloch_scan_down", std::move(compute_program));
 
-  if (!core_.GraphicsCore()->DeviceRayTracingSupport())
+  if (!UsesGraphicsRayTracing())
     return;
 
   auto vfs = shaders_vfs;
@@ -108,12 +112,13 @@ void Render(sparkium::Core *core,
             sparkium::Camera *camera,
             sparkium::Film *film,
             bool software,
-            bool ray_query) {
+            bool ray_query,
+            bool optix) {
   auto rt_core = DedicatedCast(core);
   auto rt_scene = DedicatedCast(scene);
   auto rt_film = DedicatedCast(film);
   auto rt_camera = DedicatedCast(camera);
-  rt_scene->Render(rt_camera, rt_film, software, ray_query);
+  rt_scene->Render(rt_camera, rt_film, software, ray_query, optix);
 }
 
 }  // namespace sparkium::raytracing

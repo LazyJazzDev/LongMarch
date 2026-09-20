@@ -16,7 +16,8 @@ using namespace long_march;
 namespace {
 void Usage(const char *program) {
   std::cerr << "Usage: " << program << " <scene.json> [-o image.png] [--frames N] "
-            << "[--backend auto|metal|vulkan|d3d12|cpu|cuda] [--pipeline auto|rasterization|ray_tracing|rt_fallback|ray_query] "
+            << "[--backend auto|metal|vulkan|d3d12|cpu|cuda] "
+               "[--pipeline auto|rasterization|ray_tracing|rt_fallback|ray_query] "
                "[--require-hardware-rt] [--debug] [--profile "
                "timings.csv] [--profile-cpu-only|--profile-alternate-gpu] [--linear-output image.pfm]\n"
             << "       " << program << " --list [scene-directory]\n";
@@ -104,12 +105,17 @@ int main(int argc, char **argv) {
     auto loaded = sparkium::JsonScene::Load(&core, scene_path, &error);
     if (!loaded) throw std::runtime_error(error);
     if (!override_pipeline) pipeline = loaded->GetRenderPipeline();
-    if (backend == graphics::BACKEND_API_CPU || backend == graphics::BACKEND_API_CUDA) {
-      if (pipeline == sparkium::RENDER_PIPELINE_RASTERIZATION ||
-          pipeline == sparkium::RENDER_PIPELINE_RAY_QUERY)
+    const auto resolved_pipeline = core.ResolveRenderPipeline(pipeline);
+    if (require_hardware_rt && resolved_pipeline != sparkium::RENDER_PIPELINE_RAY_TRACING)
+      throw std::runtime_error("--require-hardware-rt requires the ray_tracing pipeline");
+    if (graphics_core->API() == graphics::BACKEND_API_CPU || graphics_core->API() == graphics::BACKEND_API_CUDA) {
+      if (pipeline == sparkium::RENDER_PIPELINE_RASTERIZATION || pipeline == sparkium::RENDER_PIPELINE_RAY_QUERY)
         throw std::runtime_error("CPU/CUDA support the shared path tracer, not rasterization or native ray queries");
-      std::cout << "Tracing: native " << graphics::BackendAPIString(backend)
-                << " kernels (shared path tracer and BVH; no graphics API dispatch)\n";
+      if (resolved_pipeline == sparkium::RENDER_PIPELINE_RAY_TRACING)
+        std::cout << "Tracing: CUDA ray_tracing via OptiX (GAS/IAS, optixLaunch; shared path tracer)\n";
+      else
+        std::cout << "Tracing: native " << graphics::BackendAPIString(graphics_core->API())
+                  << " kernels (shared path tracer and software BVH; no graphics API dispatch)\n";
     }
     if (core.ResolveRenderPipeline(pipeline) == sparkium::RENDER_PIPELINE_RAY_QUERY)
       std::cout << "Tracing: native ray query (compute, native AS)\n";

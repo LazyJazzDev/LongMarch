@@ -23,7 +23,7 @@ LightGeometryMaterial::LightGeometryMaterial(Core *core,
 
   core_->GraphicsCore()->CreateShader(vfs, "light/geometry_material/gather_primitive_power.hlsl",
                                       "GatherPrimitivePowerKernel", "cs_6_3", {"-I."}, &gather_primitive_power_shader_);
-  if (core_->GraphicsCore()->DeviceRayTracingSupport())
+  if (core_->UsesGraphicsRayTracing())
     core_->GraphicsCore()->CreateShader(vfs, "light/geometry_material/direct_lighting_sampler.hlsl",
                                         "SampleDirectLightingCallable", "lib_6_5", {"-I."}, &direct_lighting_sampler_);
 

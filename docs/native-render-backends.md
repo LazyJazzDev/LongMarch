@@ -1,28 +1,31 @@
 # Native CPU and CUDA path tracing
 
+For NVIDIA hardware traversal on CUDA, see optional
+[OptiX ray tracing](optix-ray-tracing.md). Use `--pipeline rt_fallback` to
+explicitly select software BVH traversal on CUDA.
+
 Sparkium's headless path tracer can execute without a graphics API:
 
 ```sh
 build/demo/sparkium_cli/demo_sparkium_cli assets/scenes/cornell_box/scene.json \
   --backend cpu --frames 2 -o cpu.png --linear-output cpu.pfm
 build/demo/sparkium_cli/demo_sparkium_cli assets/scenes/cornell_box/scene.json \
-  --backend cuda --frames 2 -o cuda.png --linear-output cuda.pfm
+  --backend cuda --pipeline rt_fallback --frames 2 -o cuda.png --linear-output cuda.pfm
 ```
 
-`auto`, `ray_tracing` (including legacy JSON requests), and `rt_fallback`
-resolve to the shared compute path tracer on these devices. Here `rt_fallback`
-is a **pipeline identifier**, not a Vulkan device: CPU dispatch calls compiled
-host functions, and CUDA dispatch launches CUDA kernels. Neither creates a
-Vulkan instance or submits graphics commands. An explicit unavailable backend
-fails rather than silently selecting Vulkan. `--require-hardware-rt` is not
-appropriate for these backends; it specifically requires graphics pipeline RT.
+On CPU, `auto`, `ray_tracing` (including legacy JSON requests), and
+`rt_fallback` resolve to the shared compute path tracer. On CUDA, `ray_tracing`
+uses OptiX, `rt_fallback` uses software BVH, and `auto` selects hardware tracing
+when available. An explicit CUDA `ray_tracing` request fails if OptiX is
+unavailable; use `auto` to allow fallback. `--require-hardware-rt` accepts CUDA
+hardware tracing and rejects software traversal.
 
-Vulkan, D3D12, Metal, their default selection, and their existing raster,
-pipeline RT and inline-query implementations are unchanged. CPU/CUDA are
-headless compute devices, **not new rasterizers or window-system backends**.
-Native `rasterization`, `ray_query`, acceleration-structure commands, presentation
-and CUDA/graphics interop buffers are explicitly unsupported. Use a graphics
-backend for the GUI.
+CPU dispatch calls compiled host functions; CUDA software dispatch launches
+CUDA kernels and hardware tracing uses `optixLaunch`. Neither creates a Vulkan
+instance. CPU/CUDA are headless devices: rasterization, inline `ray_query`,
+presentation, general graphics ray-tracing program creation and CUDA/graphics
+interop buffers are unsupported. CUDA acceleration structures are available
+when OptiX initializes successfully. Use a graphics backend for the GUI.
 
 ## Build
 
@@ -31,7 +34,7 @@ plus its downstream C++ toolchain at runtime for CPU shaders. The Linux
 implementation has been exercised with Slang 2026.8 and GCC 13. CUDA additionally
 requires the CUDA driver and NVRTC (tested with Toolkit 13.2.1 on sm_86). NVRTC
 selects the compute architecture of the actual selected device at runtime.
-There is no OptiX dependency.
+OptiX is optional and only needed for CUDA hardware ray tracing.
 
 ```sh
 cmake -S . -B build -G Ninja -DVCPKG_PATH=/opt/vcpkg \
@@ -82,7 +85,9 @@ The **same HLSL sources** supply:
 CPU compiles these sources to a Slang host-callable C++ module. Workgroups are
 dispatched on the host, optionally with OpenMP (at most six workers, or fewer
 with `OMP_NUM_THREADS`). CUDA compiles Slang's CUDA source through NVRTC to PTX,
-loads it with the CUDA driver, and calls `cuLaunchKernel`. BVH construction,
+loads compute kernels with the CUDA driver, and calls `cuLaunchKernel`. The
+`ray_tracing` pipeline instead links its tracing module through OptiX and calls
+`optixLaunch`. Software BVH construction,
 light preprocessing, path tracing, film resolve and tone mapping all execute
 on the selected device. CUDA descriptors and pixels use device memory, not
 managed CPU rendering followed by GPU copies. Submission is synchronous.

@@ -2,7 +2,8 @@
 #include "grassland/graphics/core.h"
 
 namespace grassland::graphics::backend {
-// Headless compute devices. No graphics API, swapchain, or hardware RT delegation.
+class OptixDevice;
+// Headless CPU/CUDA compute, with optional OptiX hardware traversal.
 class NativeCore final : public Core {
  public:
   NativeCore(BackendAPI api, const Settings &settings);
@@ -62,8 +63,14 @@ class NativeCore final : public Core {
   void CUDAEndExecutionBarrier(cudaStream_t = 0) override;
 #endif
  private:
+  bool UsesCUDA() const {
+    return api_ != BACKEND_API_CPU;
+  }
   BackendAPI api_;
   void *cuda_context_{};
   int device_index_{-1};
+#ifdef LONGMARCH_OPTIX_ENABLED
+  std::unique_ptr<OptixDevice> optix_;
+#endif
 };
 }  // namespace grassland::graphics::backend

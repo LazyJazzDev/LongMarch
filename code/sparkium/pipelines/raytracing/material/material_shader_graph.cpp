@@ -16,7 +16,7 @@ MaterialShaderGraph::MaterialShaderGraph(sparkium::MaterialShaderGraph &material
   evaluator_implementation_ = CodeLines(core_->GetShadersVFS(), "material/shader_graph/evaluator.hlsli");
   auto vfs = core_->GetShadersVFS();
   vfs.WriteFile("material_sampler.hlsli", sampler_implementation_);
-  if (core_->GraphicsCore()->DeviceRayTracingSupport() &&
+  if (core_->UsesGraphicsRayTracing() &&
       (core_->GraphicsCore()->CreateShader(vfs, "geometry/mesh/hit_group.hlsl", "RenderClosestHit", "lib_6_5", {"-I."},
                                            &closest_hit_shader_) != 0 ||
        core_->GraphicsCore()->CreateShader(vfs, "geometry/mesh/hit_group.hlsl", "ShadowClosestHit", "lib_6_5", {"-I."},

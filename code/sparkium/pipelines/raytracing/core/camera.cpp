@@ -7,7 +7,7 @@ namespace sparkium::raytracing {
 
 Camera::Camera(sparkium::Camera &camera) : camera_(camera) {
   core_ = DedicatedCast(camera_.GetCore());
-  if (core_->GraphicsCore()->DeviceRayTracingSupport())
+  if (core_->UsesGraphicsRayTracing())
     core_->GraphicsCore()->CreateShader(core_->GetShadersVFS(), "camera.hlsl", "CameraPinhole", "lib_6_5",
                                         &camera_shader_);
   core_->GraphicsCore()->CreateBuffer(sizeof(CameraData), graphics::BUFFER_TYPE_STATIC, &camera_buffer_);

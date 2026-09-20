@@ -24,7 +24,7 @@ inline void CheckCUDA(CUresult result) {
 #endif
 [[noreturn]] inline void NativeUnsupported() {
   throw std::runtime_error(
-      "CPU/CUDA are headless compute backends; rasterization, native AS and presentation are unavailable");
+      "operation unavailable on this headless native backend; use a graphics backend for rasterization or presentation");
 }
 
 // Native target ABI: buffer/unsized array = pointer + byte size/element count.
@@ -50,6 +50,9 @@ class NativeMemory {
   }
   size_t Size() const {
     return size_;
+  }
+  bool IsCUDA() const {
+    return cuda_;
   }
 
  private:
@@ -118,6 +121,7 @@ struct NativeBindings {
   std::map<int, std::vector<BufferRange>> buffers;
   std::map<int, std::vector<Image *>> images;
   std::map<int, std::vector<Sampler *>> samplers;
+  std::map<int, AccelerationStructure *> acceleration_structures;
 };
 class NativeShader final : public Shader {
  public:
@@ -125,7 +129,8 @@ class NativeShader final : public Shader {
                const VirtualFileSystem &,
                const std::string &,
                const std::string &,
-               const std::vector<std::string> &);
+               const std::vector<std::string> &,
+               OptixDevice *optix = nullptr);
   ~NativeShader() override;
   std::string EntryPoint() const override;
   void Dispatch(const NativeBindings &, uint32_t, uint32_t, uint32_t);

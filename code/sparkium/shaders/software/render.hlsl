@@ -7,7 +7,9 @@
 #include "direct_lighting.hlsli"
 #include "geometry/mesh/hit_record.hlsli"
 #include "random.hlsli"
-#ifdef SPARKIUM_RAY_QUERY
+#ifdef SPARKIUM_OPTIX
+#include "optix/traversal.hlsli"
+#elif defined(SPARKIUM_RAY_QUERY)
 #include "ray_query/traversal.hlsli"
 #else
 #include "software/traversal.hlsli"
@@ -37,7 +39,12 @@ void SoftwareTracePath(RayDesc ray, inout RenderContext context) {
 }
 #include "raygen.hlsl"
 #include "software/shadow.hlsli"
+#ifdef SPARKIUM_OPTIX
+[shader("raygeneration")] void Main() {
+  uint3 id = DispatchRaysIndex();
+#else
 [numthreads(8, 8, 1)] void Main(uint3 id : SV_DispatchThreadID) {
+#endif
   uint width, height;
   accumulated_color.GetDimensions(width, height);
   if (id.x < width && id.y < height)

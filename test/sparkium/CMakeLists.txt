@@ -3,7 +3,7 @@ target_link_libraries(sparkium_fallback_test PRIVATE LongMarch GTest::gtest_main
 LONGMARCH_DEPLOY_RUNTIME_DEPENDENCIES(sparkium_fallback_test)
 add_test(NAME sparkium_fallback COMMAND sparkium_fallback_test)
 
-add_executable(sparkium_native_test native_backend_test.cpp)
+add_executable(sparkium_native_test native_backend_test.cpp optix_backend_test.cpp)
 target_link_libraries(sparkium_native_test PRIVATE LongMarch GTest::gtest_main)
 LONGMARCH_DEPLOY_RUNTIME_DEPENDENCIES(sparkium_native_test)
 add_test(NAME sparkium_native COMMAND sparkium_native_test)
