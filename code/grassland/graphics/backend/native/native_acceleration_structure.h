@@ -1,24 +1,9 @@
 #pragma once
-#include <optix.h>
-
 #include "grassland/graphics/acceleration_structure.h"
-#include "native_internal.h"
+#include "native_memory.h"
+#include "optix_device.h"
 
 namespace grassland::graphics::backend {
-class OptixDevice {
- public:
-  explicit OptixDevice(CUcontext context, bool debug);
-  ~OptixDevice();
-  OptixDevice(const OptixDevice &) = delete;
-  OptixDevice &operator=(const OptixDevice &) = delete;
-
-  OptixDeviceContext Context() const {
-    return context_;
-  }
-
- private:
-  OptixDeviceContext context_{};
-};
 
 class OptixAccelerationStructure final : public AccelerationStructure {
  public:
@@ -53,20 +38,4 @@ class OptixAccelerationStructure final : public AccelerationStructure {
   std::vector<OptixInstance> previous_instances_;
 };
 
-class OptixLaunch {
- public:
-  OptixLaunch(OptixDevice *, const std::string &ptx, const std::string &raygen_entry, size_t params_size);
-  ~OptixLaunch();
-  OptixLaunch(const OptixLaunch &) = delete;
-  OptixLaunch &operator=(const OptixLaunch &) = delete;
-  void Dispatch(const void *params, size_t size, uint32_t x, uint32_t y, uint32_t z);
-
- private:
-  void Destroy() noexcept;
-  OptixModule module_{};
-  OptixProgramGroup groups_[3]{};
-  OptixPipeline pipeline_{};
-  OptixShaderBindingTable sbt_{};
-  std::unique_ptr<NativeMemory> records_, params_;
-};
 }  // namespace grassland::graphics::backend

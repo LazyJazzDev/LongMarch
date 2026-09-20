@@ -1,3 +1,5 @@
+#include "native_shader.h"
+
 #include <slang-com-ptr.h>
 #include <slang.h>
 
@@ -14,11 +16,18 @@
 #include <set>
 #include <sstream>
 
+#include "native_buffer.h"
 #include "native_cpu_thread_pool.h"
-#include "native_internal.h"
+#include "native_image.h"
+#include "native_sampler.h"
+#include "native_util.h"
+#ifdef LONGMARCH_NATIVE_CUDA_ENABLED
+#include <nvrtc.h>
+#endif
 #include "native_shader_compat.h"
 #ifdef LONGMARCH_OPTIX_ENABLED
-#include "optix_backend.h"
+#include "native_acceleration_structure.h"
+#include "optix_launch.h"
 #endif
 
 namespace grassland::graphics::backend {

@@ -14,7 +14,17 @@ if (LONGMARCH_ENABLE_OPTIX AND
 endif ()
 # Use one package for the compiler and LLVM plugin so their versions match.
 if (LONGMARCH_ENABLE_NATIVE_RENDER AND TARGET slang::slang AND TARGET slang::slang-llvm)
-    target_sources(grassland_graphics PRIVATE native_core.cpp native_shader.cpp native_shader_compat.cpp native_cpu_thread_pool.cpp)
+    target_sources(grassland_graphics PRIVATE
+            native_buffer.cpp
+            native_command_context.cpp
+            native_core.cpp
+            native_cpu_thread_pool.cpp
+            native_image.cpp
+            native_memory.cpp
+            native_program.cpp
+            native_sampler.cpp
+            native_shader.cpp
+            native_shader_compat.cpp)
     find_package(Threads REQUIRED)
     target_link_libraries(grassland_graphics PRIVATE slang::slang Threads::Threads)
     target_compile_definitions(grassland_graphics PUBLIC LONGMARCH_NATIVE_ENABLED)
@@ -30,7 +40,7 @@ if (LONGMARCH_ENABLE_NATIVE_RENDER AND TARGET slang::slang AND TARGET slang::sla
         endif ()
     endif ()
     if (LONGMARCH_ENABLE_OPTIX)
-        target_sources(grassland_graphics PRIVATE optix_backend.cpp)
+        target_sources(grassland_graphics PRIVATE native_acceleration_structure.cpp optix_device.cpp optix_launch.cpp)
         target_include_directories(grassland_graphics PRIVATE ${LONGMARCH_OPTIX_INCLUDE_DIR})
         target_compile_definitions(grassland_graphics PUBLIC LONGMARCH_OPTIX_ENABLED)
         list(GET CUDAToolkit_INCLUDE_DIRS 0 _native_cuda_include)
