@@ -1,6 +1,6 @@
 #include "sparkium/backend/cpu/scene_objects.h"
 
-#include "sparkium/backend/common/shader_graph.h"
+#include "sparkium/backend/cpu/shader_graph.h"
 
 namespace sparkium::backend::cpu {
 SceneObjects::SceneObjects(Core *core, std::shared_ptr<const SceneDefinition> source) : definition(std::move(source)) {

@@ -1,5 +1,5 @@
 #pragma once
-#include "native_contract.hlsli"
+#include "compute_contract.hlsli"
 
 struct SoftwareHit {
   float distance;

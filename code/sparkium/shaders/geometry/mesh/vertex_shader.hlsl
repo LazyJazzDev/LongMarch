@@ -1,4 +1,4 @@
-#include "../../native_contract.hlsli"
+#include "../../compute_contract.hlsli"
 
 struct VSInput {
   [[vk::location(0)]] float3 position : TEXCOORD0;

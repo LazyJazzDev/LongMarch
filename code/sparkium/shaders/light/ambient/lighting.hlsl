@@ -1,4 +1,4 @@
-#include "../../native_contract.hlsli"
+#include "../../compute_contract.hlsli"
 
 struct SceneSettings {
   float3 ambient_light;

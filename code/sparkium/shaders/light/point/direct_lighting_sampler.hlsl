@@ -1,4 +1,4 @@
-#include "native_contract.hlsli"
+#include "compute_contract.hlsli"
 #include "light/point/sampler.hlsli"
 
 // callable shader to sample direct lighting

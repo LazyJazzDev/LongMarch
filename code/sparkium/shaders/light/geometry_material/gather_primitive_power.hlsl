@@ -1,10 +1,10 @@
-#include "native_contract.hlsli"
+#include "compute_contract.hlsli"
 #include "buffer_helper.hlsli"
 #include "common.hlsli"
 #include "constants.hlsli"
 
 #define GROUP_SIZE 64
-#ifndef SPARKIUM_NATIVE_CPU
+#ifndef SPARKIUM_CPU
 groupshared float group_element[GROUP_SIZE];
 #endif
 
@@ -36,7 +36,7 @@ void GatherPrimitivePowerKernel(SP_CONTEXT uint3 GID
   geometry_sampler.SetTransform(transform);
   MaterialEvaluator SP_BUFFER_ARG(ByteAddressBuffer) material_evaluator;
   material_evaluator.material_data = SP_BINDING_material_data;
-#ifdef SPARKIUM_NATIVE_CPU
+#ifdef SPARKIUM_CPU
   if (GTID.x != 0)
     return;
   float prefix = 0.0f;

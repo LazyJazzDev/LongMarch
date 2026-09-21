@@ -170,8 +170,8 @@ endif ()
 message(STATUS "DXC_LIB_NAME: ${DXC_LIB_NAME}")
 message(STATUS "DXC_DLL_DIR: ${DXC_DLL_DIR}")
 
-option(LONGMARCH_ENABLE_NATIVE_RENDER "Enable Slang CPU/CUDA compute backends" ON)
-if (LONGMARCH_ENABLE_NATIVE_RENDER)
+option(LONGMARCH_ENABLE_COMPUTE_RENDER "Enable Slang CPU/CUDA compute backends" ON)
+if (LONGMARCH_ENABLE_COMPUTE_RENDER)
     # Find at project scope so imported targets are visible to every executable.
     find_package(slang 2026.7.1 CONFIG QUIET)
 endif ()
@@ -183,7 +183,7 @@ function(LONGMARCH_DEPLOY_RUNTIME_DEPENDENCIES TARGET_NAME)
         return()
     endif ()
 
-    if (WIN32 AND LONGMARCH_ENABLE_NATIVE_RENDER AND TARGET slang::slang AND TARGET slang::slang-llvm)
+    if (WIN32 AND LONGMARCH_ENABLE_COMPUTE_RENDER AND TARGET slang::slang AND TARGET slang::slang-llvm)
         # LLVM is loaded dynamically, so ordinary link-dependency deployment
         # does not discover it. Deploy both from the same imported package.
         add_custom_command(TARGET ${TARGET_NAME} POST_BUILD

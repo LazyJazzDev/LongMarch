@@ -2,17 +2,19 @@
 
 #include <iostream>
 
-#include "sparkium/backend/common/native_util.h"
 #include "sparkium/backend/cuda/cuda_util.h"
+#include "sparkium/backend/cuda/driver_util.h"
 #ifdef SPARKIUM_OPTIX_ENABLED
-#include "sparkium/backend/cuda/native_acceleration_structure.h"
+#include "sparkium/backend/cuda/optix_acceleration_structure.h"
 #endif
 namespace sparkium::backend {
+using namespace cuda;
+
 CudaDevice::~CudaDevice() {
 #ifdef SPARKIUM_OPTIX_ENABLED
   optix_.reset();
 #endif
-#ifdef SPARKIUM_NATIVE_CUDA_ENABLED
+#ifdef SPARKIUM_CUDA_ENABLED
   if (cuda_context_) {
     cuCtxSynchronize();
     cuDevicePrimaryCtxRelease(device_index_);
@@ -21,7 +23,7 @@ CudaDevice::~CudaDevice() {
 }
 
 int CudaDevice::GetPhysicalDeviceProperties(PhysicalDeviceProperties *p) {
-#ifdef SPARKIUM_NATIVE_CUDA_ENABLED
+#ifdef SPARKIUM_CUDA_ENABLED
   CheckCUDA(cuInit(0));
   int count = 0;
   CheckCUDA(cuDeviceGetCount(&count));
@@ -66,7 +68,7 @@ int CudaDevice::InitializeLogicalDevice(int index) {
   GetPhysicalDeviceProperties(properties.data());
   device_name_ = properties[index].name;
   device_index_ = index;
-#ifdef SPARKIUM_NATIVE_CUDA_ENABLED
+#ifdef SPARKIUM_CUDA_ENABLED
   {
     CUcontext context;
     CheckCUDA(cuDevicePrimaryCtxRetain(&context, index));
@@ -88,7 +90,7 @@ int CudaDevice::InitializeLogicalDevice(int index) {
 }
 
 void CudaDevice::WaitGPU() {
-#ifdef SPARKIUM_NATIVE_CUDA_ENABLED
+#ifdef SPARKIUM_CUDA_ENABLED
   CheckCUDA(cuCtxSynchronize());
 #endif
 }
@@ -98,7 +100,7 @@ int CudaDevice::CreateBottomLevelAccelerationStructure(BufferRange,
                                                        uint32_t,
                                                        RayTracingGeometryFlag,
                                                        double_ptr<AccelerationStructure>) {
-  NativeUnsupported();
+  CudaUnsupported();
 }
 
 int CudaDevice::CreateBottomLevelAccelerationStructure(BufferRange vertices,
@@ -115,7 +117,7 @@ int CudaDevice::CreateBottomLevelAccelerationStructure(BufferRange vertices,
     return 0;
   }
 #endif
-  NativeUnsupported();
+  CudaUnsupported();
 }
 
 int CudaDevice::CreateBottomLevelAccelerationStructure(Buffer *vertices,
@@ -123,7 +125,7 @@ int CudaDevice::CreateBottomLevelAccelerationStructure(Buffer *vertices,
                                                        uint32_t stride,
                                                        double_ptr<AccelerationStructure> output) {
   if (!vertices || !indices || !stride || vertices->Size() / stride > UINT32_MAX || indices->Size() / 12 > UINT32_MAX)
-    throw std::invalid_argument("invalid native triangle geometry");
+    throw std::invalid_argument("invalid compute triangle geometry");
   return CreateBottomLevelAccelerationStructure(vertices->Range(), indices->Range(), vertices->Size() / stride, stride,
                                                 indices->Size() / 12, RAYTRACING_GEOMETRY_FLAG_NONE, output);
 }
@@ -136,7 +138,7 @@ int CudaDevice::CreateTopLevelAccelerationStructure(const std::vector<RayTracing
     return 0;
   }
 #endif
-  NativeUnsupported();
+  CudaUnsupported();
 }
 
 }  // namespace sparkium::backend

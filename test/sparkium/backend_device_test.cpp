@@ -2,8 +2,8 @@
 #include <long_march.h>
 
 #include <type_traits>
-#ifdef SPARKIUM_NATIVE_ENABLED
-#include "sparkium/backend/common/native_image.h"
+#ifdef SPARKIUM_CPU_ENABLED
+#include "sparkium/backend/cpu/cpu_image.h"
 #endif
 
 namespace {
@@ -11,7 +11,7 @@ using namespace grassland;
 
 static_assert(!std::is_base_of_v<graphics::Core, sparkium::backend::Device>);
 
-TEST(SparkiumBackend, NativeDevicesAreNotGraphicsDevices) {
+TEST(SparkiumBackend, ComputeDevicesAreNotGraphicsDevices) {
   EXPECT_THROW(sparkium::ToGraphicsBackend(sparkium::RenderBackend::CPU), std::invalid_argument);
   EXPECT_THROW(sparkium::ToGraphicsBackend(sparkium::RenderBackend::CUDA), std::invalid_argument);
   // The former graphics CPU/CUDA values must not silently select a graphics API.
@@ -46,12 +46,12 @@ TEST(SparkiumBackend, GraphicsAdapterPreservesDeviceIdentity) {
   EXPECT_EQ(device->DeviceRayQuerySupport(), device->GraphicsCore()->DeviceRayQuerySupport());
 }
 
-#ifdef SPARKIUM_NATIVE_ENABLED
+#ifdef SPARKIUM_CPU_ENABLED
 TEST(SparkiumBackend, CpuTextureBorrowsScenePixelsAndRetainsOwnership) {
   auto texture = std::make_shared<sparkium::TextureData>();
   texture->width = texture->height = 1;
   texture->rgba = {10, 20, 30, 255};
-  auto image = std::make_unique<sparkium::backend::NativeImage>(texture);
+  auto image = std::make_unique<sparkium::backend::cpu::CpuImage>(texture);
   EXPECT_EQ(image->memory->Data(), texture->rgba.data());
   EXPECT_THROW(image->UploadData(texture->rgba.data()), std::logic_error);
   std::weak_ptr<const sparkium::TextureData> weak = texture;

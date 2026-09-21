@@ -3,7 +3,7 @@
 OptiX belongs to Sparkium's `backend::CudaDevice`, under
 `code/sparkium/backend/cuda/`. It is not a graphics API backend and does not
 extend `graphics::Core` or the graphics backend enum. See the
-[rendering device boundary](native-render-backends.md#library-boundary-and-backend-selection).
+[rendering device boundary](compute-render-backends.md#library-boundary-and-backend-selection).
 
 The headless `cuda` backend optionally uses NVIDIA OptiX for triangle GAS/IAS
 construction and RT-core traversal. It shares Sparkium's HLSL path tracer,
@@ -22,11 +22,11 @@ provides the OptiX runtime; no separate OptiX binary library is linked.
 cmake -S . -B build-release -G Ninja \
   -DCMAKE_BUILD_TYPE=Release -DVCPKG_PATH=/path/to/vcpkg \
   -DLONGMARCH_ENABLE_OPTIX=ON -DOptiX_ROOT=/path/to/optix-sdk
-cmake --build build-release --target demo_sparkium_cli sparkium_native_test -j8
+cmake --build build-release --target demo_sparkium_cli sparkium_compute_test -j8
 ```
 
 `LONGMARCH_OPTIX_INCLUDE_DIR` may be set directly instead of `OptiX_ROOT`.
-OptiX is enabled by default when native rendering is enabled and Slang, CUDA,
+OptiX is enabled by default when CPU/CUDA rendering is enabled and Slang, CUDA,
 and the SDK headers are found. Explicitly
 enabling it without Slang, CUDA or SDK headers fails configuration with an
 actionable error. Use `-DLONGMARCH_ENABLE_OPTIX=OFF` to exclude CUDA hardware ray tracing;
@@ -70,7 +70,7 @@ CUDA reports `DeviceRayTracingSupport()` after successful OptiX initialization;
 physical-device enumeration also probes OptiX for hardware-only device selection.
 Inline `RayQuery` support remains false. This integration implements Sparkium's
 shared path tracer; the general graphics `CreateRayTracingProgram` API,
-rasterization and presentation are not implemented on the native CUDA backend.
+rasterization and presentation are not implemented on the CUDA backend.
 
 ## GUI preview
 
@@ -109,10 +109,10 @@ does not imply performance identical to Vulkan's complete graphics pipeline.
 ## Tests
 
 ```sh
-build-release/test/sparkium/sparkium_native_test
+build-release/test/sparkium/sparkium_compute_test
 ```
 
-Common native tests cover buffers, descriptors, texture addressing/filtering,
+Compute-backend tests cover buffers, descriptors, texture addressing/filtering,
 partial transfers, accumulation and reset on CPU/CUDA. The OptiX test
 also exercises actual hardware hits, nearest-hit selection, barycentrics,
 instance IDs, mirrored/nonuniform transforms, masks, invalid ranges, instance

@@ -1,4 +1,4 @@
-#include "native_contract.hlsli"
+#include "compute_contract.hlsli"
 #include "tone_mapping.hlsli"
 // readonly rgba32f accumulated_color image
 SP_RESOURCE(SP_TEXTURE(float4), accumulated_color, t0, 0);

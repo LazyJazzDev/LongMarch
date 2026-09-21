@@ -1,26 +1,28 @@
 #include <iostream>
 
-#include "sparkium/backend/common/native_buffer.h"
-#include "sparkium/backend/common/native_command_context.h"
-#include "sparkium/backend/common/native_image.h"
-#include "sparkium/backend/common/native_program.h"
-#include "sparkium/backend/common/native_sampler.h"
-#include "sparkium/backend/common/native_util.h"
+#include "sparkium/backend/cuda/cuda_buffer.h"
+#include "sparkium/backend/cuda/cuda_command_context.h"
 #include "sparkium/backend/cuda/cuda_device.h"
+#include "sparkium/backend/cuda/cuda_image.h"
+#include "sparkium/backend/cuda/cuda_program.h"
+#include "sparkium/backend/cuda/cuda_sampler.h"
+#include "sparkium/backend/cuda/cuda_util.h"
 
 namespace sparkium::backend {
+using namespace cuda;
+
 int CudaDevice::CreateBuffer(size_t s, BufferType t, double_ptr<Buffer> p) {
-  p.construct<NativeBuffer>(true, s, t);
+  p.construct<CudaBuffer>(s, t);
   return 0;
 }
 
 int CudaDevice::CreateImage(int w, int h, ImageFormat f, double_ptr<Image> p) {
-  p.construct<NativeImage>(true, w, h, f);
+  p.construct<CudaImage>(w, h, f);
   return 0;
 }
 
 int CudaDevice::CreateSampler(const SamplerInfo &i, double_ptr<Sampler> p) {
-  p.construct<NativeSampler>(i);
+  p.construct<CudaSampler>(i);
   return 0;
 }
 
@@ -45,29 +47,29 @@ int CudaDevice::CreateShader(const VirtualFileSystem &v,
                              const std::vector<std::string> &a,
                              double_ptr<Shader> p) {
   if (t.rfind("cs_", 0) != 0)
-    NativeUnsupported();
+    CudaUnsupported();
   OptixDevice *optix = Optix();
-  p.construct<NativeShader>(true, v, s, e, a, optix);
+  p.construct<CudaShader>(v, s, e, a, optix);
   return 0;
 }
 
 int CudaDevice::CreateComputeProgram(Shader *s, double_ptr<ComputeProgram> p) {
-  auto *n = dynamic_cast<NativeShader *>(s);
+  auto *n = dynamic_cast<CudaShader *>(s);
   if (!n)
-    throw std::runtime_error("foreign native shader");
-  p.construct<NativeProgram>(n);
+    throw std::runtime_error("foreign compute shader");
+  p.construct<CudaProgram>(n);
   return 0;
 }
 
 int CudaDevice::CreateCommandContext(double_ptr<CommandContext> p) {
-  p.construct<NativeCommandContext>(this);
+  p.construct<CudaCommandContext>(this);
   return 0;
 }
 
 int CudaDevice::SubmitCommandContext(CommandContext *p) {
-  auto *n = dynamic_cast<NativeCommandContext *>(p);
+  auto *n = dynamic_cast<CudaCommandContext *>(p);
   if (!n)
-    throw std::runtime_error("foreign native command context");
+    throw std::runtime_error("foreign compute command context");
   for (auto &f : n->commands)
     f();
   WaitGPU();
@@ -77,11 +79,11 @@ int CudaDevice::SubmitCommandContext(CommandContext *p) {
 }
 
 int CudaDevice::CreateProgram(const std::vector<ImageFormat> &, ImageFormat, double_ptr<Program>) {
-  NativeUnsupported();
+  CudaUnsupported();
 }
 
 int CudaDevice::CreateRayTracingProgram(double_ptr<RayTracingProgram>) {
-  NativeUnsupported();
+  CudaUnsupported();
 }
 
 }  // namespace sparkium::backend

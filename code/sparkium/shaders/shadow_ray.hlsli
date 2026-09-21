@@ -1,4 +1,4 @@
-#include "native_contract.hlsli"
+#include "compute_contract.hlsli"
 #pragma once
 #include "bindings.hlsli"
 

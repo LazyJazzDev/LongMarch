@@ -2,9 +2,9 @@
 
 #include "sparkium/backend/graphics/graphics_device.h"
 #include "stb_image.h"
-#ifdef SPARKIUM_NATIVE_ENABLED
+#ifdef SPARKIUM_CPU_ENABLED
 #include "sparkium/backend/cpu/cpu_device.h"
-#ifdef SPARKIUM_NATIVE_CUDA_ENABLED
+#ifdef SPARKIUM_CUDA_ENABLED
 #include "sparkium/backend/cuda/cuda_device.h"
 #endif
 #endif
@@ -38,13 +38,13 @@ graphics::BackendAPI ToGraphicsBackend(BackendSelection selection) {
 bool SupportBackend(BackendSelection selection) {
   switch (selection.backend) {
     case RenderBackend::CPU:
-#ifdef SPARKIUM_NATIVE_ENABLED
+#ifdef SPARKIUM_CPU_ENABLED
       return true;
 #else
       return false;
 #endif
     case RenderBackend::CUDA:
-#ifdef SPARKIUM_NATIVE_CUDA_ENABLED
+#ifdef SPARKIUM_CUDA_ENABLED
       return true;
 #else
       return false;
@@ -61,13 +61,13 @@ int CreateDevice(BackendSelection selection,
   if (!SupportBackend(selection))
     return -1;
   if (selection.backend == RenderBackend::CPU) {
-#ifdef SPARKIUM_NATIVE_ENABLED
+#ifdef SPARKIUM_CPU_ENABLED
     device.construct<backend::CpuDevice>(settings);
     return 0;
 #endif
   }
   if (selection.backend == RenderBackend::CUDA) {
-#ifdef SPARKIUM_NATIVE_CUDA_ENABLED
+#ifdef SPARKIUM_CUDA_ENABLED
     device.construct<backend::CudaDevice>(settings);
     return 0;
 #endif

@@ -1,4 +1,4 @@
-#include "native_contract.hlsli"
+#include "compute_contract.hlsli"
 #include "buffer_helper.hlsli"
 #include "common.hlsli"
 
@@ -10,7 +10,7 @@ SP_ARRAY_RESOURCE(ByteAddressBuffer, data_buffers, t0, 2);
 #define SP_BINDING_data_buffers SP_ARRAY_ACCESS(ByteAddressBuffer, data_buffers, 2)
 
 #define GROUP_SIZE 64
-#ifndef SPARKIUM_NATIVE_CPU
+#ifndef SPARKIUM_CPU
 groupshared float group_element[GROUP_SIZE];
 #endif
 
@@ -19,7 +19,7 @@ SP_NUMTHREADS(GROUP_SIZE, 1, 1)
 void GatherLightPowerKernel(SP_CONTEXT uint3 DTID : SV_DispatchThreadID, uint3 GTID : SV_GroupThreadID) {
   uint light_count = SP_BINDING_light_selector_data.Load(0);
   BufferReference SP_BUFFER_ARG(RWByteAddressBuffer) power_pdf = MakeBufferReference(SP_BINDING_light_selector_data, 4);
-#ifdef SPARKIUM_NATIVE_CPU
+#ifdef SPARKIUM_CPU
   if (GTID.x != 0)
     return;
   float prefix = 0.0f;

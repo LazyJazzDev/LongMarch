@@ -1,4 +1,4 @@
-#include "../../native_contract.hlsli"
+#include "../../compute_contract.hlsli"
 
 #include "bsdf/principled_material.hlsli"
 #include "common.hlsli"

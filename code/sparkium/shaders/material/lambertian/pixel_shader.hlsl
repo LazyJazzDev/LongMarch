@@ -1,4 +1,4 @@
-#include "../../native_contract.hlsli"
+#include "../../compute_contract.hlsli"
 
 struct PSInput {
   float4 position : SV_POSITION;

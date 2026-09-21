@@ -1,4 +1,4 @@
-#include "native_contract.hlsli"
+#include "compute_contract.hlsli"
 #include "bindings.hlsli"
 #include "direct_lighting.hlsli"
 #include "geometry/mesh/geometry_header.hlsli"

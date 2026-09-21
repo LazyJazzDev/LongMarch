@@ -1,6 +1,6 @@
 #pragma once
-#include "sparkium/backend/common/material_codegen.h"
 #include "sparkium/backend/cpu/cpu_bvh.h"
+#include "sparkium/backend/cpu/material_codegen.h"
 #include "sparkium/backend/cpu/path_tracing/core/core_util.h"
 
 namespace sparkium::cpu_tracing {
@@ -55,7 +55,7 @@ class SoftwarePipeline {
     uint32_t count;
   };
 
-  using MaterialCode = backend::MaterialCode;
+  using MaterialCode = backend::cpu::MaterialCode;
 
   void CompileBuilders(uint32_t buffer_count);
   void CompileRenderer(const std::vector<MaterialCode> &materials,

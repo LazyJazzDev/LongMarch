@@ -1,4 +1,4 @@
-#include "../../native_contract.hlsli"
+#include "../../compute_contract.hlsli"
 #include "buffer_helper.hlsli"
 
 struct PSInput {

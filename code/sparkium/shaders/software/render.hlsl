@@ -1,4 +1,4 @@
-#include "native_contract.hlsli"
+#include "compute_contract.hlsli"
 #define SPARKIUM_SOFTWARE_RT
 #include "bindings.hlsli"
 #include "bsdf/lambertian.hlsli"

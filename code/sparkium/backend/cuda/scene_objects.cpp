@@ -1,6 +1,6 @@
 #include "sparkium/backend/cuda/scene_objects.h"
 
-#include "sparkium/backend/common/shader_graph.h"
+#include "sparkium/backend/cuda/shader_graph.h"
 
 namespace sparkium::backend::cuda {
 SceneObjects::SceneObjects(Core *core, std::shared_ptr<const SceneDefinition> source) : definition(std::move(source)) {

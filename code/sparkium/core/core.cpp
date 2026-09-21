@@ -53,7 +53,7 @@ RenderPipeline Core::ResolveRenderPipeline(RenderPipeline render_pipeline) const
       render_pipeline = RENDER_PIPELINE_RT_FALLBACK;
     }
   }
-  // Older Blender scenes request pipeline RT. Keep them on native traversal
+  // Older Blender scenes request pipeline RT. Keep them on compute traversal
   // when the device supports inline queries instead of a full RT pipeline.
   if (render_pipeline == RENDER_PIPELINE_RAY_TRACING && !core_->DeviceRayTracingSupport())
     return core_->DeviceRayQuerySupport() ? RENDER_PIPELINE_RAY_QUERY : RENDER_PIPELINE_RT_FALLBACK;

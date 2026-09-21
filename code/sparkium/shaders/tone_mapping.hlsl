@@ -1,4 +1,4 @@
-#include "native_contract.hlsli"
+#include "compute_contract.hlsli"
 #include "tone_mapping.hlsli"
 SP_RESOURCE(SP_TEXTURE(float4), accumulated_color, t0, 0);
 #define SP_BINDING_accumulated_color SP_RESOURCE_ACCESS(SP_TEXTURE(float4), accumulated_color, 0)

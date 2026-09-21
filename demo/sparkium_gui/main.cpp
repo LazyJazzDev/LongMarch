@@ -218,12 +218,12 @@ int main(int argc, char **argv) {
       const char *pipeline_label =
           pipeline == sparkium::RENDER_PIPELINE_AUTO ? auto_label.c_str() : PipelineName(pipeline);
       if (ImGui::BeginCombo("Pipeline", pipeline_label)) {
-        const bool native =
+        const bool compute_backend =
             status.backend == sparkium::RenderBackend::CPU || status.backend == sparkium::RenderBackend::CUDA;
         for (auto option : {sparkium::RENDER_PIPELINE_AUTO, sparkium::RENDER_PIPELINE_RASTERIZATION,
                             sparkium::RENDER_PIPELINE_RAY_TRACING, sparkium::RENDER_PIPELINE_RT_FALLBACK,
                             sparkium::RENDER_PIPELINE_RAY_QUERY}) {
-          if (option == sparkium::RENDER_PIPELINE_RASTERIZATION && native)
+          if (option == sparkium::RENDER_PIPELINE_RASTERIZATION && compute_backend)
             continue;
           if (option == sparkium::RENDER_PIPELINE_RAY_TRACING && !status.ray_tracing)
             continue;

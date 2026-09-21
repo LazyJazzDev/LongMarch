@@ -8,11 +8,11 @@
 #include <stdexcept>
 
 #include "grassland/graphics/frame_profile.h"
-#include "sparkium/backend/common/trace_layout.h"
 #include "sparkium/backend/cpu/path_tracing/core/core.h"
 #include "sparkium/backend/cpu/path_tracing/core/geometry.h"
 #include "sparkium/backend/cpu/path_tracing/core/material.h"
 #include "sparkium/backend/cpu/path_tracing/geometry/geometry_mesh.h"
+#include "sparkium/backend/cpu/trace_layout.h"
 
 namespace sparkium::cpu_tracing {
 using namespace sparkium::raytracing;
@@ -42,7 +42,7 @@ std::string MaterialSource(const CodeLines &source) {
   return result;
 }
 
-using backend::GPUInstance;
+using backend::cpu::GPUInstance;
 }  // namespace
 
 SoftwarePipeline::SoftwarePipeline(Core *core) : core_(core) {
@@ -96,7 +96,7 @@ void SoftwarePipeline::CompileRenderer(const std::vector<MaterialCode> &material
                                        uint32_t sdr_count,
                                        uint32_t hdr_count) {
   graphics::CpuProfileScope compile_profile("compile_renderer");
-  const auto [source, has_graph] = backend::GenerateMaterialDispatch(materials);
+  const auto [source, has_graph] = backend::cpu::GenerateMaterialDispatch(materials);
   auto vfs = core_->GetShadersVFS();
   vfs.WriteFile("software_materials.hlsli", source);
   render_program_.reset();

@@ -1,5 +1,5 @@
 #pragma once
-#include "sparkium/backend/common/material_codegen.h"
+#include "sparkium/backend/cuda/material_codegen.h"
 #include "sparkium/backend/cuda/path_tracing/core/core_util.h"
 
 namespace sparkium::cuda_tracing {
@@ -20,7 +20,7 @@ class SoftwarePipeline {
   }
 
   graphics::AccelerationStructure *AccelerationStructure() const {
-    return native_tlas_.get();
+    return hardware_tlas_.get();
   }
 
   graphics::Buffer *Nodes() const {
@@ -58,7 +58,7 @@ class SoftwarePipeline {
     uint32_t count;
   };
 
-  using MaterialCode = backend::MaterialCode;
+  using MaterialCode = backend::cuda::MaterialCode;
 
   void CompileBuilders(uint32_t buffer_count);
   void CompileRenderer(const std::vector<MaterialCode> &materials,
@@ -70,11 +70,11 @@ class SoftwarePipeline {
   Core *core_;
   bool optix_;
 
-  bool NativeTraversal() const {
+  bool HardwareTraversal() const {
     return optix_;
   }
 
-  std::unique_ptr<graphics::AccelerationStructure> native_tlas_;
+  std::unique_ptr<graphics::AccelerationStructure> hardware_tlas_;
   std::vector<Instance> instances_;
   std::vector<GeometryLayout> geometries_;
   uint32_t tlas_leaves_{};

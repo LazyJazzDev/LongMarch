@@ -1,29 +1,35 @@
 #include "sparkium/backend/cuda/cuda_memory.h"
 
+#include <algorithm>
+#include <cstring>
+
 #include "sparkium/backend/cuda/cuda_util.h"
+#include "sparkium/backend/cuda/device_memory.h"
 
-namespace sparkium::backend {
-void *AllocateCudaMemory(size_t size) {
-  CUdeviceptr pointer;
-  CheckCUDA(cuMemAlloc(&pointer, size));
-  try {
-    CheckCUDA(cuMemsetD8(pointer, 0, size));
-  } catch (...) {
-    cuMemFree(pointer);
-    throw;
-  }
-  return reinterpret_cast<void *>(pointer);
+namespace sparkium::backend::cuda {
+
+CudaMemory::CudaMemory(size_t size) : size_(size) {
+  data_ = AllocateCudaMemory(std::max(size, size_t(16)));
 }
 
-void FreeCudaMemory(void *data) noexcept {
-  cuMemFree(reinterpret_cast<CUdeviceptr>(data));
+CudaMemory::~CudaMemory() {
+  FreeCudaMemory(data_);
 }
 
-void UploadCudaMemory(void *destination, const void *source, size_t size, size_t offset) {
-  CheckCUDA(cuMemcpyHtoD(reinterpret_cast<CUdeviceptr>(destination) + offset, source, size));
+void CudaMemory::Upload(const void *p, size_t size, size_t offset) const {
+  if (offset > size_ || size > size_ - offset)
+    throw std::out_of_range("compute buffer upload");
+  if (!size)
+    return;
+  UploadCudaMemory(data_, p, size, offset);
 }
 
-void DownloadCudaMemory(void *destination, const void *source, size_t size, size_t offset) {
-  CheckCUDA(cuMemcpyDtoH(destination, reinterpret_cast<CUdeviceptr>(source) + offset, size));
+void CudaMemory::Download(void *p, size_t size, size_t offset) const {
+  if (offset > size_ || size > size_ - offset)
+    throw std::out_of_range("compute buffer download");
+  if (!size)
+    return;
+  DownloadCudaMemory(p, data_, size, offset);
 }
-}  // namespace sparkium::backend
+
+}  // namespace sparkium::backend::cuda

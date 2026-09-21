@@ -2,10 +2,11 @@
 #include <memory>
 #include <string>
 
-#include "sparkium/backend/common/native_memory.h"
+#include "sparkium/backend/cuda/cuda_memory.h"
 #include "sparkium/backend/cuda/optix_device.h"
 
 namespace sparkium::backend {
+using namespace cuda;
 
 class OptixLaunch {
  public:
@@ -21,7 +22,7 @@ class OptixLaunch {
   OptixProgramGroup groups_[3]{};
   OptixPipeline pipeline_{};
   OptixShaderBindingTable sbt_{};
-  std::unique_ptr<NativeMemory> records_, params_;
+  std::unique_ptr<CudaMemory> records_, params_;
 };
 
 }  // namespace sparkium::backend

@@ -1,4 +1,4 @@
-#include "native_contract.hlsli"
+#include "compute_contract.hlsli"
 #pragma once
 #include "common.hlsli"
 #include "material/principled/eval_direct_light.hlsli"

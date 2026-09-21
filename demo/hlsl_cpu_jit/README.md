@@ -19,7 +19,7 @@ cmake --build cmake-build-ninja --target demo_hlsl_cpu_jit
 ```
 
 Linux/macOS 运行时省略 `.exe`。需要项目的 `shader-slang` 包及其 LLVM 插件；
-`LONGMARCH_ENABLE_NATIVE_RENDER` 保持默认的 `ON`，以启用根目录的 Slang 包发现。
+`LONGMARCH_ENABLE_COMPUTE_RENDER` 保持默认的 `ON`，以启用根目录的 Slang 包发现。
 默认读取本示例目录中的 `kernel.hlsl`，也可以传入另一个遵守同样接口的 HLSL 路径。
 
 预期输出：

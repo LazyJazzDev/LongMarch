@@ -1,4 +1,4 @@
-#include "native_contract.hlsli"
+#include "compute_contract.hlsli"
 #pragma once
 #include "material/light/eval_direct_light.hlsli"
 SP_BUFFER_TEMPLATE

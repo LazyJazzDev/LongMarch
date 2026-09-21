@@ -164,21 +164,21 @@ and CUDA has only software traversal and OptiX. CPU BVH construction is under
 Each backend selects and dispatches its supported pipelines. The old combined `JsonScene::Load(Core*, path)` entry point is
 removed: replace it with `LoadScene(path)` and `Renderer::SetScene(scene)`.
 
-## Shared implementation boundary
+## Independent backend implementations
 
-`backend/common` contains reusable primitives: material shader text generation,
-shader graph compilation, Slang support, the packed shader instance layout, and
-low-level resource/binding ABI helpers. These helpers do not own a Scene, Backend
-lifecycle or scene-rendering dispatch. There is no backend-enum dispatch in that
-directory. Memory/shader ABI adapters can still support both host and CUDA storage;
-that does not give them authority over scene preparation or pipeline selection.
+There is no `backend/common` directory. Graphics, CPU and CUDA each own their
+material shader generation, shader graph compiler and packed instance layout.
+CPU and CUDA have distinct resource classes, binding descriptors, compiler
+sessions and shader execution state. CPU memory uses host allocations or retained
+immutable scene pixels; CUDA memory uses device allocations. Neither resource
+constructor selects another backend with a boolean flag.
 
-The three backend implementations have separate CMake libraries. Their scene
-translation, accumulation/readback, capability policy, resource factories and
-path-tracing controllers are intentionally explicit. Shared HLSL algorithms and
-pure material-code generation remain reused; backend lifecycle is not hidden
-behind a common controller. The legacy Core entry point dispatches to these same
-concrete implementations for compatibility with older demos.
+Each backend has explicit scene translation, accumulation/readback, capability
+policy, resource factories and path-tracing controllers. Shared HLSL algorithms
+remain under `shaders/`, with `compute_contract.hlsli` declaring their compute ABI.
+CPU JIT and CUDA/OptiX compiler pipelines implement that contract independently.
+The legacy Core entry point dispatches to the concrete backend pipelines for
+compatibility with older demos.
 
 ## Frontends and validation
 

@@ -1,4 +1,4 @@
-#include "native_contract.hlsli"
+#include "compute_contract.hlsli"
 #pragma once
 
 SP_BUFFER_TEMPLATE
@@ -70,7 +70,7 @@ float3x3 LoadFloat3x3(SP_BUFFER_TYPE buf, uint baseOffset) {
   return transpose(mat);  // Transpose for row-major order
 }
 
-#ifndef SPARKIUM_NATIVE
+#ifndef SPARKIUM_COMPUTE
 SP_BUFFER_TEMPLATE
 SP_CLASS BufferReference {
   SP_BUFFER_TYPE m_buffer;
@@ -102,7 +102,7 @@ BufferReference SP_BUFFER_ARG(SP_BUFFER_TYPE) MakeBufferReference(SP_BUFFER_TYPE
 }
 
 #endif
-#ifndef SPARKIUM_NATIVE
+#ifndef SPARKIUM_COMPUTE
 template <>
 #endif
 
@@ -143,7 +143,7 @@ SP_CLASS BufferReference SP_BUFFER_ARG(RWByteAddressBuffer) {
   }
 };
 
-#ifdef SPARKIUM_NATIVE
+#ifdef SPARKIUM_COMPUTE
 #pragma once
 
 float4 LoadFloat4(BufferReference buf, uint baseOffset) {

@@ -4,9 +4,11 @@
 
 #include <array>
 
+#include "sparkium/backend/cuda/driver_util.h"
 #include "sparkium/backend/cuda/optix_util.h"
 
 namespace sparkium::backend {
+using namespace cuda;
 
 OptixLaunch::OptixLaunch(OptixDevice *device, const std::string &ptx, const std::string &entry, size_t params_size) {
   try {
@@ -16,7 +18,7 @@ OptixLaunch::OptixLaunch(OptixDevice *device, const std::string &ptx, const std:
     OptixPipelineCompileOptions options{};
     options.traversableGraphFlags = OPTIX_TRAVERSABLE_GRAPH_FLAG_ALLOW_SINGLE_LEVEL_INSTANCING;
     // Slang serializes the hit payload (float, float2, uint, uint) into registers;
-    // reserve eight to cover native float2 padding without imposing a C++ layout.
+    // reserve eight to cover CUDA float2 padding without imposing a C++ layout.
     options.numPayloadValues = 8;
     options.numAttributeValues = 2;
     options.pipelineLaunchParamsVariableName = "SLANG_globalParams";
@@ -60,7 +62,7 @@ OptixLaunch::OptixLaunch(OptixDevice *device, const std::string &ptx, const std:
     std::array<Record, 3> records{};
     for (size_t i = 0; i < records.size(); ++i)
       CheckOptix(optixSbtRecordPackHeader(groups_[i], &records[i]), "pack shader binding table");
-    records_ = std::make_unique<NativeMemory>(true, sizeof(records));
+    records_ = std::make_unique<CudaMemory>(sizeof(records));
     records_->Upload(records.data(), sizeof(records));
     sbt_.raygenRecord = Pointer(*records_);
     sbt_.missRecordBase = Pointer(*records_) + sizeof(Record);
@@ -69,7 +71,7 @@ OptixLaunch::OptixLaunch(OptixDevice *device, const std::string &ptx, const std:
     sbt_.hitgroupRecordBase = Pointer(*records_) + 2 * sizeof(Record);
     sbt_.hitgroupRecordStrideInBytes = sizeof(Record);
     sbt_.hitgroupRecordCount = 1;
-    params_ = std::make_unique<NativeMemory>(true, params_size);
+    params_ = std::make_unique<CudaMemory>(params_size);
   } catch (...) {
     Destroy();
     throw;

@@ -25,7 +25,7 @@ namespace backend {
 using namespace grassland;
 using namespace grassland::graphics;
 
-// Rendering resources use the existing abstract resource contracts. Native
+// Rendering resources use the existing abstract resource contracts. Compute
 // implementations and scheduling are owned by Sparkium, never graphics::Core.
 class Device {
  public:

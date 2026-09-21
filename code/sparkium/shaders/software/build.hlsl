@@ -1,4 +1,4 @@
-#include "native_contract.hlsli"
+#include "compute_contract.hlsli"
 #include "software/layout.hlsli"
 SP_RESOURCE(RWByteAddressBuffer, nodes, u0, 0);
 #define SP_BINDING_nodes SP_RESOURCE_ACCESS(RWByteAddressBuffer, nodes, 0)

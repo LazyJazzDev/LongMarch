@@ -71,7 +71,7 @@ python3 scripts/check_blender_ray_query.py \
 
 By default this renders Monster, Classroom, and Junkshop at 256×256, 32 samples
 per frame, two frames, and 32 bounces, with Metal API and shader validation. It
-checks that every frame reports `native_ray_query=1` and produces a nonconstant
+checks that every frame reports `hardware_ray_query=1` and produces a nonconstant
 image. Logs, profiles, images, and JSON results are retained in the output
 folder. `--pipeline scene` tests the original JSON pipeline request without an
 override; `--pipeline auto` tests automatic selection. Compilation, render,

@@ -33,7 +33,7 @@ lighting and JSON scenes and builds its acceleration structures with compute sha
 
 Optional [CUDA hardware ray tracing through OptiX](docs/optix-ray-tracing.md) runs the shared Sparkium path
 tracer with NVIDIA hardware ray traversal (`--backend cuda --pipeline ray_tracing`).
-The same path tracer is available through [native CPU and CUDA backends](docs/native-render-backends.md)
+The same path tracer is available through [CPU and CUDA backends](docs/compute-render-backends.md)
 using `sparkium_cli --backend cpu|cuda`, without Vulkan dispatch.
 
 ## How to Build

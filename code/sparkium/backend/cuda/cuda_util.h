@@ -1,15 +1,12 @@
 #pragma once
-#include <cuda.h>
-
 #include <stdexcept>
 #include <string>
 
-namespace sparkium::backend {
-inline void CheckCUDA(CUresult result) {
-  if (result != CUDA_SUCCESS) {
-    const char *text = nullptr;
-    cuGetErrorString(result, &text);
-    throw std::runtime_error(std::string("native CUDA: ") + (text ? text : "unknown driver error"));
-  }
+namespace sparkium::backend::cuda {
+
+[[noreturn]] inline void CudaUnsupported() {
+  throw std::runtime_error(
+      "operation unavailable on this headless compute backend; use a graphics backend for rasterization or presentation");
 }
-}  // namespace sparkium::backend
+
+}  // namespace sparkium::backend::cuda

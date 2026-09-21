@@ -1,26 +1,28 @@
 #include <iostream>
 
-#include "sparkium/backend/common/native_buffer.h"
-#include "sparkium/backend/common/native_command_context.h"
-#include "sparkium/backend/common/native_image.h"
-#include "sparkium/backend/common/native_program.h"
-#include "sparkium/backend/common/native_sampler.h"
-#include "sparkium/backend/common/native_util.h"
+#include "sparkium/backend/cpu/cpu_buffer.h"
+#include "sparkium/backend/cpu/cpu_command_context.h"
 #include "sparkium/backend/cpu/cpu_device.h"
+#include "sparkium/backend/cpu/cpu_image.h"
+#include "sparkium/backend/cpu/cpu_program.h"
+#include "sparkium/backend/cpu/cpu_sampler.h"
+#include "sparkium/backend/cpu/cpu_util.h"
 
 namespace sparkium::backend {
+using namespace cpu;
+
 int CpuDevice::CreateBuffer(size_t s, BufferType t, double_ptr<Buffer> p) {
-  p.construct<NativeBuffer>(false, s, t);
+  p.construct<CpuBuffer>(s, t);
   return 0;
 }
 
 int CpuDevice::CreateImage(int w, int h, ImageFormat f, double_ptr<Image> p) {
-  p.construct<NativeImage>(false, w, h, f);
+  p.construct<CpuImage>(w, h, f);
   return 0;
 }
 
 int CpuDevice::CreateSampler(const SamplerInfo &i, double_ptr<Sampler> p) {
-  p.construct<NativeSampler>(i);
+  p.construct<CpuSampler>(i);
   return 0;
 }
 
@@ -45,29 +47,28 @@ int CpuDevice::CreateShader(const VirtualFileSystem &v,
                             const std::vector<std::string> &a,
                             double_ptr<Shader> p) {
   if (t.rfind("cs_", 0) != 0)
-    NativeUnsupported();
-  OptixDevice *optix = nullptr;
-  p.construct<NativeShader>(false, v, s, e, a, optix);
+    CpuUnsupported();
+  p.construct<CpuShader>(v, s, e, a);
   return 0;
 }
 
 int CpuDevice::CreateComputeProgram(Shader *s, double_ptr<ComputeProgram> p) {
-  auto *n = dynamic_cast<NativeShader *>(s);
+  auto *n = dynamic_cast<CpuShader *>(s);
   if (!n)
-    throw std::runtime_error("foreign native shader");
-  p.construct<NativeProgram>(n);
+    throw std::runtime_error("foreign compute shader");
+  p.construct<CpuProgram>(n);
   return 0;
 }
 
 int CpuDevice::CreateCommandContext(double_ptr<CommandContext> p) {
-  p.construct<NativeCommandContext>(this);
+  p.construct<CpuCommandContext>(this);
   return 0;
 }
 
 int CpuDevice::SubmitCommandContext(CommandContext *p) {
-  auto *n = dynamic_cast<NativeCommandContext *>(p);
+  auto *n = dynamic_cast<CpuCommandContext *>(p);
   if (!n)
-    throw std::runtime_error("foreign native command context");
+    throw std::runtime_error("foreign compute command context");
   for (auto &f : n->commands)
     f();
   WaitGPU();
@@ -77,7 +78,7 @@ int CpuDevice::SubmitCommandContext(CommandContext *p) {
 }
 
 int CpuDevice::CreateProgram(const std::vector<ImageFormat> &, ImageFormat, double_ptr<Program>) {
-  NativeUnsupported();
+  CpuUnsupported();
 }
 
 int CpuDevice::CreateBottomLevelAccelerationStructure(BufferRange,
@@ -85,7 +86,7 @@ int CpuDevice::CreateBottomLevelAccelerationStructure(BufferRange,
                                                       uint32_t,
                                                       RayTracingGeometryFlag,
                                                       double_ptr<AccelerationStructure>) {
-  NativeUnsupported();
+  CpuUnsupported();
 }
 
 int CpuDevice::CreateBottomLevelAccelerationStructure(BufferRange vertices,
@@ -95,23 +96,23 @@ int CpuDevice::CreateBottomLevelAccelerationStructure(BufferRange vertices,
                                                       uint32_t primitive_count,
                                                       RayTracingGeometryFlag flags,
                                                       double_ptr<AccelerationStructure> output) {
-  NativeUnsupported();
+  CpuUnsupported();
 }
 
 int CpuDevice::CreateBottomLevelAccelerationStructure(Buffer *vertices,
                                                       Buffer *indices,
                                                       uint32_t stride,
                                                       double_ptr<AccelerationStructure> output) {
-  NativeUnsupported();
+  CpuUnsupported();
 }
 
 int CpuDevice::CreateTopLevelAccelerationStructure(const std::vector<RayTracingInstance> &instances,
                                                    double_ptr<AccelerationStructure> output) {
-  NativeUnsupported();
+  CpuUnsupported();
 }
 
 int CpuDevice::CreateRayTracingProgram(double_ptr<RayTracingProgram>) {
-  NativeUnsupported();
+  CpuUnsupported();
 }
 
 }  // namespace sparkium::backend

@@ -1,9 +1,28 @@
 #pragma once
 #include <cstddef>
+#include <memory>
 
-namespace sparkium::backend {
-void *AllocateCudaMemory(size_t size);
-void FreeCudaMemory(void *data) noexcept;
-void UploadCudaMemory(void *destination, const void *source, size_t size, size_t offset);
-void DownloadCudaMemory(void *destination, const void *source, size_t size, size_t offset);
-}  // namespace sparkium::backend
+namespace sparkium::backend::cuda {
+
+class CudaMemory {
+ public:
+  CudaMemory(size_t size);
+  ~CudaMemory();
+  CudaMemory(const CudaMemory &) = delete;
+  void Upload(const void *, size_t, size_t = 0) const;
+  void Download(void *, size_t, size_t = 0) const;
+
+  void *Data() const {
+    return data_;
+  }
+
+  size_t Size() const {
+    return size_;
+  }
+
+ private:
+  size_t size_;
+  void *data_{};
+};
+
+}  // namespace sparkium::backend::cuda

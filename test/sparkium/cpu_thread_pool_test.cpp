@@ -1,3 +1,5 @@
+#include "sparkium/backend/cpu/cpu_thread_pool.h"
+
 #include <gtest/gtest.h>
 
 #include <array>
@@ -5,12 +7,10 @@
 #include <chrono>
 #include <set>
 
-#include "sparkium/backend/cpu/native_cpu_thread_pool.h"
+using sparkium::backend::CpuThreadPool;
 
-using sparkium::backend::NativeCpuThreadPool;
-
-TEST(NativeCpuThreadPoolTest, CoversTailExactlyOnceAndAcceptsEmptyDispatch) {
-  NativeCpuThreadPool pool(4);
+TEST(CpuThreadPoolTest, CoversTailExactlyOnceAndAcceptsEmptyDispatch) {
+  CpuThreadPool pool(4);
   for (unsigned count : {0, 1, 16, 17, 97, 257}) {
     std::array<std::atomic<unsigned>, 257> hits{};
     for (auto &hit : hits)
@@ -24,8 +24,8 @@ TEST(NativeCpuThreadPoolTest, CoversTailExactlyOnceAndAcceptsEmptyDispatch) {
   }
 }
 
-TEST(NativeCpuThreadPoolTest, ReusesTheSameWorkersBetweenSubmissions) {
-  NativeCpuThreadPool pool(4);
+TEST(CpuThreadPoolTest, ReusesTheSameWorkersBetweenSubmissions) {
+  CpuThreadPool pool(4);
   std::set<std::thread::id> previous;
   for (int repeat = 0; repeat < 3; ++repeat) {
     std::mutex mutex;
@@ -45,16 +45,16 @@ TEST(NativeCpuThreadPoolTest, ReusesTheSameWorkersBetweenSubmissions) {
   }
 }
 
-TEST(NativeCpuThreadPoolTest, PropagatesFailureAndRemainsReusable) {
-  NativeCpuThreadPool pool(4);
+TEST(CpuThreadPoolTest, PropagatesFailureAndRemainsReusable) {
+  CpuThreadPool pool(4);
   EXPECT_THROW(pool.Run(100, [](uint64_t, uint64_t) { throw std::runtime_error("task failure"); }), std::runtime_error);
   std::atomic<unsigned> total{0};
   EXPECT_NO_THROW(pool.Run(103, [&](uint64_t begin, uint64_t end) { total += unsigned(end - begin); }));
   EXPECT_EQ(total.load(), 103);
 }
 
-TEST(NativeCpuThreadPoolTest, SerializesConcurrentSubmittersWithoutLosingWork) {
-  NativeCpuThreadPool pool(4);
+TEST(CpuThreadPoolTest, SerializesConcurrentSubmittersWithoutLosingWork) {
+  CpuThreadPool pool(4);
   std::array<std::atomic<unsigned>, 2> totals{};
   for (auto &total : totals)
     total.store(0);
@@ -70,9 +70,9 @@ TEST(NativeCpuThreadPoolTest, SerializesConcurrentSubmittersWithoutLosingWork) {
   EXPECT_EQ(totals[1].load(), 2020);
 }
 
-TEST(NativeCpuThreadPoolTest, SingleThreadRunsOnTheCaller) {
-  EXPECT_THROW(NativeCpuThreadPool(0), std::invalid_argument);
-  NativeCpuThreadPool pool(1);
+TEST(CpuThreadPoolTest, SingleThreadRunsOnTheCaller) {
+  EXPECT_THROW(CpuThreadPool(0), std::invalid_argument);
+  CpuThreadPool pool(1);
   const auto caller = std::this_thread::get_id();
   pool.Run(100, [&](uint64_t begin, uint64_t end) {
     EXPECT_EQ(std::this_thread::get_id(), caller);
@@ -81,10 +81,10 @@ TEST(NativeCpuThreadPoolTest, SingleThreadRunsOnTheCaller) {
   });
 }
 
-TEST(NativeCpuThreadPoolTest, ConfigurableGrainPreservesExactCoverage) {
-  EXPECT_THROW(NativeCpuThreadPool(4, 0), std::invalid_argument);
+TEST(CpuThreadPoolTest, ConfigurableGrainPreservesExactCoverage) {
+  EXPECT_THROW(CpuThreadPool(4, 0), std::invalid_argument);
   for (uint64_t grain : {1u, 7u, 32u, 1000u}) {
-    NativeCpuThreadPool pool(4, grain);
+    CpuThreadPool pool(4, grain);
     std::array<std::atomic<unsigned>, 97> hits{};
     for (auto &hit : hits)
       hit = 0;
