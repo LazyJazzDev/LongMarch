@@ -1,12 +1,13 @@
+#include "compute_contract.hlsli"
 #pragma once
 #include "bindings.hlsli"
 #include "direct_lighting.hlsli"
 #include "geometry_primitive_sampler.hlsli"
 
-void SampleMaterial(inout RenderContext context, HitRecord hit_record) {
+void SampleMaterial(SP_CONTEXT inout RenderContext context, HitRecord hit_record) {
   InstanceMetadata instance_meta =
-      instance_metadatas.Load<InstanceMetadata>(sizeof(InstanceMetadata) * hit_record.object_index);
-  ByteAddressBuffer material_buffer = data_buffers[NonUniformResourceIndex(instance_meta.material_data_index)];
+      SP_BINDING_instance_metadatas.Load<InstanceMetadata>(sizeof(InstanceMetadata) * hit_record.object_index);
+  ByteAddressBuffer material_buffer = SP_BINDING_data_buffers[SP_NONUNIFORM(instance_meta.material_data_index)];
   float3 emission = LoadFloat3(material_buffer, 0);
   int two_sided = material_buffer.Load(12);
   int block_ray = material_buffer.Load(16);
@@ -23,11 +24,11 @@ void SampleMaterial(inout RenderContext context, HitRecord hit_record) {
 
     if (instance_meta.custom_index != -1) {
       LightMetadata light_meta =
-          light_metadatas.Load<LightMetadata>(sizeof(LightMetadata) * instance_meta.custom_index);
+          SP_BINDING_light_metadatas.Load<LightMetadata>(sizeof(LightMetadata) * instance_meta.custom_index);
       float pdf = hit_record.pdf *
-                  EvaluatePrimitiveProbability(data_buffers[NonUniformResourceIndex(light_meta.sampler_data_index)],
+                  EvaluatePrimitiveProbability(SP_BINDING_data_buffers[SP_NONUNIFORM(light_meta.sampler_data_index)],
                                                hit_record.primitive_index);
-      pdf *= DirectLightingProbability(instance_meta.custom_index);
+      pdf *= DirectLightingProbability(SP_CONTEXT_ARG instance_meta.custom_index);
       float3 omega_in = hit_record.position - context.origin;
       pdf *= dot(omega_in, omega_in);
       float NdotL = abs(dot(hit_record.geom_normal, normalize(omega_in)));
@@ -46,10 +47,10 @@ void SampleMaterial(inout RenderContext context, HitRecord hit_record) {
 
 #define SAMPLE_SHADOW_ANY_HIT
 
-float SampleShadowOpacity(HitRecord hit_record, float3 ray_direction) {
+float SampleShadowOpacity(SP_CONTEXT HitRecord hit_record, float3 ray_direction) {
   InstanceMetadata instance_meta =
-      instance_metadatas.Load<InstanceMetadata>(sizeof(InstanceMetadata) * hit_record.object_index);
-  ByteAddressBuffer material_buffer = data_buffers[NonUniformResourceIndex(instance_meta.material_data_index)];
+      SP_BINDING_instance_metadatas.Load<InstanceMetadata>(sizeof(InstanceMetadata) * hit_record.object_index);
+  ByteAddressBuffer material_buffer = SP_BINDING_data_buffers[SP_NONUNIFORM(instance_meta.material_data_index)];
   return material_buffer.Load(16) ? 1.0f : 0.0f;
 }
 

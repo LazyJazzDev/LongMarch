@@ -5,8 +5,12 @@ namespace sparkium {
 class Core : public Object {
  public:
   Core(graphics::Core *core);
+  explicit Core(backend::Device *device);
 
+  // Available only for a graphics rendering backend; null for CPU/CUDA.
   graphics::Core *GraphicsCore() const;
+
+  backend::Device *BackendDevice() const;
 
   // Resolve automatic selection and supported fallbacks for rendering and UI display.
   RenderPipeline ResolveRenderPipeline(RenderPipeline render_pipeline) const;
@@ -33,7 +37,8 @@ class Core : public Object {
   void LoadPublicBuffers();
   void LoadPublicImages();
 
-  graphics::Core *core_{nullptr};
+  std::unique_ptr<backend::Device> owned_device_;
+  backend::Device *core_{nullptr};
 
   VirtualFileSystem shaders_vfs_;
 

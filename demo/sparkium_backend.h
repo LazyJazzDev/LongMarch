@@ -1,22 +1,45 @@
 #pragma once
 #include <stdexcept>
 
-#include "grassland/graphics/graphics_util.h"
+#include "sparkium/backend/device.h"
+#include "sparkium/renderer/renderer.h"
 
-inline grassland::graphics::BackendAPI ParseSparkiumBackend(const std::string &name) {
-  using namespace grassland::graphics;
-  BackendAPI api;
-  if (name == "auto")
-    api = BACKEND_API_DEFAULT;
-  else if (name == "metal")
-    api = BACKEND_API_METAL;
+inline sparkium::BackendSelection ParseSparkiumBackend(const std::string &name) {
+  using namespace sparkium;
+  BackendSelection selection;
+  if (name == "cpu")
+    selection.backend = RenderBackend::CPU;
+  else if (name == "cuda")
+    selection.backend = RenderBackend::CUDA;
   else if (name == "vulkan")
-    api = BACKEND_API_VULKAN;
+    selection.graphics_api = grassland::graphics::BACKEND_API_VULKAN;
   else if (name == "d3d12")
-    api = BACKEND_API_D3D12;
-  else
-    throw std::invalid_argument("unknown graphics backend: " + name);
-  if (!SupportBackendAPI(api))
-    throw std::runtime_error("graphics backend was not built: " + name);
-  return api;
+    selection.graphics_api = grassland::graphics::BACKEND_API_D3D12;
+  else if (name == "metal")
+    selection.graphics_api = grassland::graphics::BACKEND_API_METAL;
+  else if (name != "auto" && name != "graphics")
+    throw std::invalid_argument("unknown render backend: " + name);
+  if (!SupportBackend(selection))
+    throw std::runtime_error("render backend was not built: " + name);
+  return selection;
+}
+
+inline sparkium::RendererSettings SparkiumRendererSettings(sparkium::BackendSelection selection, bool debug = false) {
+  sparkium::RendererSettings settings;
+  settings.backend = selection.backend;
+  settings.debug = debug;
+  switch (selection.graphics_api) {
+    case grassland::graphics::BACKEND_API_D3D12:
+      settings.graphics_api = sparkium::GraphicsAPI::D3D12;
+      break;
+    case grassland::graphics::BACKEND_API_VULKAN:
+      settings.graphics_api = sparkium::GraphicsAPI::Vulkan;
+      break;
+    case grassland::graphics::BACKEND_API_METAL:
+      settings.graphics_api = sparkium::GraphicsAPI::Metal;
+      break;
+    default:
+      break;
+  }
+  return settings;
 }

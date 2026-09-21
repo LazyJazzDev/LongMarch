@@ -1,13 +1,14 @@
+#include "compute_contract.hlsli"
 #pragma once
 #include "common.hlsli"
 #include "material/principled/eval_direct_light.hlsli"
 
-template <class BufferType>
-class MaterialEvaluator {
-  BufferType material_data;
+SP_BUFFER_TEMPLATE
+SP_CLASS MaterialEvaluator {
+  SP_BUFFER_TYPE material_data;
 
-  template <class GeometrySamplerType>
-  float PrimitivePower(GeometrySamplerType geometry_sampler, uint primitive_id) {
+  SP_GEOMETRY_TEMPLATE
+  float PrimitivePower(SP_GEOMETRY_TYPE geometry_sampler, uint primitive_id) {
     float area = geometry_sampler.PrimitiveArea(primitive_id);
     float4 emission = LoadFloat4(material_data, 92);
     return max(max(emission.x, emission.y), emission.z) * emission.w * area * PI *

@@ -1,13 +1,14 @@
+#include "compute_contract.hlsli"
 #pragma once
 #include "bindings.hlsli"
 #include "bsdf/lambertian.hlsli"
 #include "direct_lighting.hlsli"
 #include "geometry_primitive_sampler.hlsli"
 
-void SampleMaterial(inout RenderContext context, HitRecord hit_record) {
+void SampleMaterial(SP_CONTEXT inout RenderContext context, HitRecord hit_record) {
   InstanceMetadata instance_meta =
-      instance_metadatas.Load<InstanceMetadata>(sizeof(InstanceMetadata) * hit_record.object_index);
-  ByteAddressBuffer material_buffer = data_buffers[NonUniformResourceIndex(instance_meta.material_data_index)];
+      SP_BINDING_instance_metadatas.Load<InstanceMetadata>(sizeof(InstanceMetadata) * hit_record.object_index);
+  ByteAddressBuffer material_buffer = SP_BINDING_data_buffers[SP_NONUNIFORM(instance_meta.material_data_index)];
   float3 color = LoadFloat3(material_buffer, 0);
   float3 emission = LoadFloat3(material_buffer, 12);
 
@@ -15,7 +16,7 @@ void SampleMaterial(inout RenderContext context, HitRecord hit_record) {
   float3 omega_in;
   float pdf;
   {
-    SampleDirectLighting(context, hit_record, eval, omega_in, pdf);
+    SampleDirectLighting(SP_CONTEXT_ARG context, hit_record, eval, omega_in, pdf);
     float bsdf_pdf;
     float3 bsdf_eval = EvalLambertianBSDF(color, hit_record.normal, omega_in, bsdf_pdf);
     float mis_weight = PowerHeuristic(pdf, bsdf_pdf);
@@ -28,11 +29,11 @@ void SampleMaterial(inout RenderContext context, HitRecord hit_record) {
 
     if (instance_meta.custom_index != -1) {
       LightMetadata light_meta =
-          light_metadatas.Load<LightMetadata>(sizeof(LightMetadata) * instance_meta.custom_index);
+          SP_BINDING_light_metadatas.Load<LightMetadata>(sizeof(LightMetadata) * instance_meta.custom_index);
       float pdf = hit_record.pdf *
-                  EvaluatePrimitiveProbability(data_buffers[NonUniformResourceIndex(light_meta.sampler_data_index)],
+                  EvaluatePrimitiveProbability(SP_BINDING_data_buffers[SP_NONUNIFORM(light_meta.sampler_data_index)],
                                                hit_record.primitive_index);
-      pdf *= DirectLightingProbability(instance_meta.custom_index);
+      pdf *= DirectLightingProbability(SP_CONTEXT_ARG instance_meta.custom_index);
       float3 omega_in = hit_record.position - context.origin;
       pdf *= dot(omega_in, omega_in);
       float NdotL = abs(dot(hit_record.geom_normal, normalize(omega_in)));
@@ -43,7 +44,7 @@ void SampleMaterial(inout RenderContext context, HitRecord hit_record) {
     context.radiance += emission * context.throughput * mis_weight;
   }
 
-  SampleLambertianBSDF(color, context.rd, hit_record, eval, omega_in, pdf);
+  SampleLambertianBSDF(SP_CONTEXT_ARG color, context.rd, hit_record, eval, omega_in, pdf);
   if (pdf < EPSILON) {
     context.throughput = float3(0, 0, 0);
     return;

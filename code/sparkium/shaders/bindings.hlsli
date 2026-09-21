@@ -1,46 +1,65 @@
+#include "compute_contract.hlsli"
 #pragma once
 #include "common.hlsli"
 #include "buffer_helper.hlsli"
 
-RWTexture2D<float4> accumulated_color : register(u0, space0);
-RWTexture2D<float> accumulated_samples : register(u0, space1);
-ConstantBuffer<RenderSettings> render_settings : register(b0, space3);
+SP_RESOURCE(SP_RW_TEXTURE(float4), accumulated_color, u0, 0);
+#define SP_BINDING_accumulated_color SP_RESOURCE_ACCESS(SP_RW_TEXTURE(float4), accumulated_color, 0)
+SP_RESOURCE(SP_RW_TEXTURE(float), accumulated_samples, u0, 1);
+#define SP_BINDING_accumulated_samples SP_RESOURCE_ACCESS(SP_RW_TEXTURE(float), accumulated_samples, 1)
+SP_RESOURCE(ConstantBuffer<RenderSettings>, render_settings, b0, 3);
+#define SP_BINDING_render_settings SP_RESOURCE_ACCESS(ConstantBuffer<RenderSettings>, render_settings, 3)
 #define SOBOL_TABLE
 #ifdef SPARKIUM_SOFTWARE_RT
-#ifdef SPARKIUM_RAY_QUERY
-RaytracingAccelerationStructure query_scene : register(t0, space2);
+#if defined(SPARKIUM_RAY_QUERY) || defined(SPARKIUM_OPTIX)
+SP_RESOURCE(RaytracingAccelerationStructure, query_scene, t0, 2);
 #else
-ByteAddressBuffer software_nodes : register(t0, space2);
+SP_RESOURCE(ByteAddressBuffer, software_nodes, t0, 2);
+#define SP_BINDING_software_nodes SP_RESOURCE_ACCESS(ByteAddressBuffer, software_nodes, 2)
 #endif
-ByteAddressBuffer data_buffers[] : register(t0, space4);
-#define sobol_table data_buffers[SOFTWARE_DATA_BUFFER_COUNT]
-#define camera_data data_buffers[SOFTWARE_DATA_BUFFER_COUNT + 1]
-#define instance_metadatas data_buffers[SOFTWARE_DATA_BUFFER_COUNT + 2]
-#define light_selector_data data_buffers[SOFTWARE_DATA_BUFFER_COUNT + 3]
-#define light_metadatas data_buffers[SOFTWARE_DATA_BUFFER_COUNT + 4]
-#define software_instances data_buffers[SOFTWARE_DATA_BUFFER_COUNT + 5]
-Texture2D<float4> sdr_textures[] : register(t0, space5);
-Texture2D<float4> hdr_textures[] : register(t0, space6);
-SamplerState samplers[] : register(s0, space7);
+SP_ARRAY_RESOURCE(ByteAddressBuffer, data_buffers, t0, 4);
+#define SP_BINDING_data_buffers SP_ARRAY_ACCESS(ByteAddressBuffer, data_buffers, 4)
+#define SP_BINDING_sobol_table SP_BINDING_data_buffers[SOFTWARE_DATA_BUFFER_COUNT]
+#define SP_BINDING_camera_data SP_BINDING_data_buffers[SOFTWARE_DATA_BUFFER_COUNT + 1]
+#define SP_BINDING_instance_metadatas SP_BINDING_data_buffers[SOFTWARE_DATA_BUFFER_COUNT + 2]
+#define SP_BINDING_light_selector_data SP_BINDING_data_buffers[SOFTWARE_DATA_BUFFER_COUNT + 3]
+#define SP_BINDING_light_metadatas SP_BINDING_data_buffers[SOFTWARE_DATA_BUFFER_COUNT + 4]
+#define SP_BINDING_software_instances SP_BINDING_data_buffers[SOFTWARE_DATA_BUFFER_COUNT + 5]
+SP_ARRAY_RESOURCE(SP_TEXTURE(float4), sdr_textures, t0, 5);
+#define SP_BINDING_sdr_textures SP_ARRAY_ACCESS(SP_TEXTURE(float4), sdr_textures, 5)
+SP_ARRAY_RESOURCE(SP_TEXTURE(float4), hdr_textures, t0, 6);
+#define SP_BINDING_hdr_textures SP_ARRAY_ACCESS(SP_TEXTURE(float4), hdr_textures, 6)
+SP_ARRAY_RESOURCE(SP_SAMPLER, samplers, s0, 7);
+#define SP_BINDING_samplers SP_ARRAY_ACCESS(SP_SAMPLER, samplers, 7)
 #else
 RaytracingAccelerationStructure as : register(t0, space2);
-ByteAddressBuffer sobol_table : register(t0, space4);
-ByteAddressBuffer camera_data : register(t0, space5);
-ByteAddressBuffer data_buffers[] : register(t0, space6);
-ByteAddressBuffer instance_metadatas : register(t0, space7);
-ByteAddressBuffer light_selector_data : register(t0, space8);
-ByteAddressBuffer light_metadatas : register(t0, space9);
-Texture2D<float4> sdr_textures[] : register(t0, space10);
-Texture2D<float4> hdr_textures[] : register(t0, space11);
-SamplerState samplers[] : register(s0, space12);
+SP_RESOURCE(ByteAddressBuffer, sobol_table, t0, 4);
+#define SP_BINDING_sobol_table SP_RESOURCE_ACCESS(ByteAddressBuffer, sobol_table, 4)
+SP_RESOURCE(ByteAddressBuffer, camera_data, t0, 5);
+#define SP_BINDING_camera_data SP_RESOURCE_ACCESS(ByteAddressBuffer, camera_data, 5)
+SP_ARRAY_RESOURCE(ByteAddressBuffer, data_buffers, t0, 6);
+#define SP_BINDING_data_buffers SP_ARRAY_ACCESS(ByteAddressBuffer, data_buffers, 6)
+SP_RESOURCE(ByteAddressBuffer, instance_metadatas, t0, 7);
+#define SP_BINDING_instance_metadatas SP_RESOURCE_ACCESS(ByteAddressBuffer, instance_metadatas, 7)
+SP_RESOURCE(ByteAddressBuffer, light_selector_data, t0, 8);
+#define SP_BINDING_light_selector_data SP_RESOURCE_ACCESS(ByteAddressBuffer, light_selector_data, 8)
+SP_RESOURCE(ByteAddressBuffer, light_metadatas, t0, 9);
+#define SP_BINDING_light_metadatas SP_RESOURCE_ACCESS(ByteAddressBuffer, light_metadatas, 9)
+SP_ARRAY_RESOURCE(SP_TEXTURE(float4), sdr_textures, t0, 10);
+#define SP_BINDING_sdr_textures SP_ARRAY_ACCESS(SP_TEXTURE(float4), sdr_textures, 10)
+SP_ARRAY_RESOURCE(SP_TEXTURE(float4), hdr_textures, t0, 11);
+#define SP_BINDING_hdr_textures SP_ARRAY_ACCESS(SP_TEXTURE(float4), hdr_textures, 11)
+SP_ARRAY_RESOURCE(SP_SAMPLER, samplers, s0, 12);
+#define SP_BINDING_samplers SP_ARRAY_ACCESS(SP_SAMPLER, samplers, 12)
 #endif
 
-float4 SampleTexture(int texture_index, float2 uv) {
+float4 SampleTexture(SP_CONTEXT int texture_index, float2 uv) {
   if (texture_index & 0x1000000) {
-    return hdr_textures[NonUniformResourceIndex(texture_index & 0xFFFFFF)].SampleLevel(samplers[0],
-                                                                                       float2(uv.x, 1.0 - uv.y), 0.0);
+    return SP_BINDING_hdr_textures[SP_NONUNIFORM(texture_index & 0xFFFFFF)].SampleLevel(SP_BINDING_samplers[0],
+                                                                                        float2(uv.x, 1.0 - uv.y), 0.0);
   } else {
-    return sdr_textures[NonUniformResourceIndex(texture_index)].SampleLevel(samplers[0], float2(uv.x, 1.0 - uv.y), 0.0);
+    return SP_BINDING_sdr_textures[SP_NONUNIFORM(texture_index)].SampleLevel(SP_BINDING_samplers[0],
+                                                                             float2(uv.x, 1.0 - uv.y), 0.0);
   }
   return float4(1.0, 0.0, 1.0, 1.0);
 }

@@ -4,6 +4,10 @@
 
 namespace sparkium {
 
+GeometryMesh::GeometryMesh(Core *core, std::shared_ptr<const Mesh<float>> mesh) : GeometryMesh(core, *mesh) {
+  host_mesh_ = std::move(mesh);
+}
+
 GeometryMesh::GeometryMesh(Core *core, const Mesh<float> &mesh) : Geometry(core) {
   std::vector<uint8_t> data;
   auto write_data = [&](const void *data_ptr, size_t size) {
@@ -58,7 +62,7 @@ GeometryMesh::GeometryMesh(Core *core, const Mesh<float> &mesh) : Geometry(core)
 
   std::memcpy(data.data(), &header_, sizeof(header_));
 
-  core_->GraphicsCore()->CreateBuffer(data.size(), graphics::BUFFER_TYPE_STATIC, &geometry_buffer_);
+  core_->BackendDevice()->CreateBuffer(data.size(), graphics::BUFFER_TYPE_STATIC, &geometry_buffer_);
   geometry_buffer_->UploadData(data.data(), data.size());
   primitive_count_ = header_.num_indices / 3;
 }

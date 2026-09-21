@@ -22,7 +22,7 @@ class MetalBackendTest : public testing::Test {
 
 TEST_F(MetalBackendTest, RayQueryMasksIDsUpdatesAndBindingSnapshots) {
   if (!core->DeviceRayQuerySupport())
-    GTEST_SKIP() << "native ray query unavailable";
+    GTEST_SKIP() << "hardware ray query unavailable";
   EXPECT_FALSE(core->DeviceRayTracingSupport());  // Query support must not enable pipeline RT.
   const float vertices[]{-1, -1, 0, 1, -1, 0, 0, 1, 0};
   const uint32_t indices[]{0, 1, 2};
@@ -136,7 +136,7 @@ RWStructuredBuffer<uint> output : register(u0, space1);
   commands->CmdBindResources(1, {output2.get()}, graphics::BIND_POINT_COMPUTE);
   commands->CmdDispatch(count, 1, 1);
   ASSERT_EQ(core->SubmitCommandContext(commands.get()), 0);
-  commands.reset();  // Native command retains argument snapshots until completion.
+  commands.reset();  // Compute command retains argument snapshots until completion.
   std::vector<uint32_t> actual(count);
   output1->DownloadData(actual.data(), count * 4);
   for (int i = 0; i < count; ++i)

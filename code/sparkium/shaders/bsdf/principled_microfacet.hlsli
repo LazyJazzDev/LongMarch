@@ -1,3 +1,4 @@
+#include "compute_contract.hlsli"
 #pragma once
 #define CLOSURE_BSDF_MICROFACET_GGX_FRESNEL_ID 0
 #define CLOSURE_BSDF_MICROFACET_GGX_CLEARCOAT_ID 1

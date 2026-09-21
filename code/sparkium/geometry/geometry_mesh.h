@@ -24,6 +24,11 @@ class GeometryMesh : public Geometry {
   };
 
   GeometryMesh(Core *core, const Mesh<float> &mesh);
+  GeometryMesh(Core *core, std::shared_ptr<const Mesh<float>> mesh);
+
+  const Mesh<float> *HostMesh() const {
+    return host_mesh_.get();
+  }
 
   int PrimitiveCount() override;
   graphics::Buffer *GetBuffer() const;
@@ -31,6 +36,7 @@ class GeometryMesh : public Geometry {
 
  private:
   Header header_{};
+  std::shared_ptr<const Mesh<float>> host_mesh_;
   std::unique_ptr<graphics::Buffer> geometry_buffer_;
   int primitive_count_;
 };

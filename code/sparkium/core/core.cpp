@@ -1,27 +1,51 @@
 #include "sparkium/core/core.h"
 
+#include "sparkium/backend/cpu/path_tracing/raytracing.h"
+#include "sparkium/backend/cuda/path_tracing/raytracing.h"
+#include "sparkium/backend/graphics/graphics_device.h"
+#include "sparkium/backend/graphics/path_tracing/raytracing.h"
+#include "sparkium/backend/graphics/raster/raster.h"
 #include "sparkium/core/camera.h"
 #include "sparkium/core/entity.h"
 #include "sparkium/core/film.h"
 #include "sparkium/core/geometry.h"
 #include "sparkium/core/material.h"
 #include "sparkium/core/scene.h"
-#include "sparkium/pipelines/pipelines.h"
 
 namespace sparkium {
-Core::Core(graphics::Core *core) : core_(core) {
+Core::Core(graphics::Core *core)
+    : owned_device_(std::make_unique<backend::GraphicsDevice>(core)),
+      core_(owned_device_.get()) {
   LoadPublicShaders();
   LoadPublicBuffers();
   LoadPublicImages();
 }
 
 graphics::Core *Core::GraphicsCore() const {
+  return core_->GraphicsCore();
+}
+
+Core::Core(backend::Device *device) : core_(device) {
+  LoadPublicShaders();
+  LoadPublicBuffers();
+  LoadPublicImages();
+}
+
+backend::Device *Core::BackendDevice() const {
   return core_;
 }
 
 RenderPipeline Core::ResolveRenderPipeline(RenderPipeline render_pipeline) const {
+  if (core_->API() == RenderBackend::CUDA && render_pipeline == RENDER_PIPELINE_RAY_TRACING &&
+      !core_->DeviceRayTracingSupport())
+    throw std::runtime_error("CUDA ray_tracing requires available OptiX hardware support; use auto or rt_fallback");
   if (render_pipeline == RENDER_PIPELINE_AUTO) {
-    if (core_->DeviceRayTracingSupport()) {
+    const bool prefer_ray_query =
+        core_->GraphicsCore() && (core_->GraphicsCore()->API() == graphics::BACKEND_API_D3D12 ||
+                                  core_->GraphicsCore()->API() == graphics::BACKEND_API_VULKAN);
+    if (prefer_ray_query && core_->DeviceRayQuerySupport()) {
+      render_pipeline = RENDER_PIPELINE_RAY_QUERY;
+    } else if (core_->DeviceRayTracingSupport()) {
       render_pipeline = RENDER_PIPELINE_RAY_TRACING;
     } else if (core_->DeviceRayQuerySupport()) {
       render_pipeline = RENDER_PIPELINE_RAY_QUERY;
@@ -29,7 +53,7 @@ RenderPipeline Core::ResolveRenderPipeline(RenderPipeline render_pipeline) const
       render_pipeline = RENDER_PIPELINE_RT_FALLBACK;
     }
   }
-  // Older Blender scenes request pipeline RT. Keep them on native traversal
+  // Older Blender scenes request pipeline RT. Keep them on compute traversal
   // when the device supports inline queries instead of a full RT pipeline.
   if (render_pipeline == RENDER_PIPELINE_RAY_TRACING && !core_->DeviceRayTracingSupport())
     return core_->DeviceRayQuerySupport() ? RENDER_PIPELINE_RAY_QUERY : RENDER_PIPELINE_RT_FALLBACK;
@@ -38,6 +62,17 @@ RenderPipeline Core::ResolveRenderPipeline(RenderPipeline render_pipeline) const
 
 void Core::Render(Scene *scene, Camera *camera, Film *film, RenderPipeline render_pipeline) {
   render_pipeline = ResolveRenderPipeline(render_pipeline);
+  if (core_->API() != RenderBackend::Graphics && render_pipeline != RENDER_PIPELINE_RT_FALLBACK &&
+      render_pipeline != RENDER_PIPELINE_RAY_TRACING)
+    throw std::runtime_error("selected compute backend does not support this pipeline");
+  if (core_->API() == RenderBackend::CPU) {
+    cpu_tracing::Render(this, scene, camera, film);
+    return;
+  }
+  if (core_->API() == RenderBackend::CUDA) {
+    cuda_tracing::Render(this, scene, camera, film, render_pipeline == RENDER_PIPELINE_RAY_TRACING);
+    return;
+  }
   switch (render_pipeline) {
     case RENDER_PIPELINE_RASTERIZATION:
       raster::Render(this, scene, camera, film);

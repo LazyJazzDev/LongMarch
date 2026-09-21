@@ -1,7 +1,5 @@
-file(GLOB SOURCES "*.cpp" "*.h")
-
-add_library(${SPARKIUM_SUBLIB_NAME} ${SOURCES})
-target_link_libraries(${SPARKIUM_SUBLIB_NAME} PUBLIC
-        Grassland Snowberg sparkium_core sparkium_entity sparkium_geometry sparkium_material RapidJSON)
+add_library(${SPARKIUM_SUBLIB_NAME} json_scene.cpp)
+target_include_directories(${SPARKIUM_SUBLIB_NAME} PRIVATE ${STB_INC_DIR})
+target_link_libraries(${SPARKIUM_SUBLIB_NAME} PUBLIC sparkium_scene PRIVATE RapidJSON grassland_util)
 list(APPEND SPARKIUM_LIBS ${SPARKIUM_SUBLIB_NAME})
 set(SPARKIUM_LIBS ${SPARKIUM_LIBS} PARENT_SCOPE)

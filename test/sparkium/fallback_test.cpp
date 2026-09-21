@@ -12,11 +12,11 @@
 #include "../../demo/sparkium_backend.h"
 #include "grassland/graphics/backend/backend.h"
 #include "grassland/graphics/frame_profile.h"
-#include "sparkium/pipelines/raytracing/core/core.h"
-#include "sparkium/pipelines/raytracing/core/software_pipeline.h"
-#include "sparkium/pipelines/raytracing/entity/entities.h"
-#include "sparkium/pipelines/raytracing/geometry/geometry_mesh.h"
-#include "sparkium/pipelines/raytracing/material/material_lambertian.h"
+#include "sparkium/backend/graphics/path_tracing/core/core.h"
+#include "sparkium/backend/graphics/path_tracing/core/software_pipeline.h"
+#include "sparkium/backend/graphics/path_tracing/entity/entities.h"
+#include "sparkium/backend/graphics/path_tracing/geometry/geometry_mesh.h"
+#include "sparkium/backend/graphics/path_tracing/material/material_lambertian.h"
 
 using namespace grassland;
 
@@ -41,8 +41,9 @@ class SoftwareBVHTest : public testing::Test {
   void SetUp() override {
     const char *backend = std::getenv("SPARKIUM_TEST_BACKEND");
     const bool debug = std::getenv("SPARKIUM_TEST_DEBUG") != nullptr;
-    ASSERT_EQ(graphics::CreateCore(backend ? ParseSparkiumBackend(backend) : graphics::BACKEND_API_DEFAULT,
-                                   graphics::Core::Settings{2, debug}, &graphics),
+    ASSERT_EQ(graphics::CreateCore(
+                  backend ? sparkium::ToGraphicsBackend(ParseSparkiumBackend(backend)) : graphics::BACKEND_API_DEFAULT,
+                  graphics::Core::Settings{2, debug}, &graphics),
               0);
     ASSERT_EQ(graphics->InitializeLogicalDeviceAutoSelect(false), 0);
     core = std::make_unique<sparkium::Core>(graphics.get());
@@ -238,7 +239,7 @@ class SoftwareBVHSizeTest : public SoftwareBVHTest, public testing::WithParamInt
 TEST_P(SoftwareBVHSizeTest, ComputeConstructionAndTraversalMatchDoublePrecisionOracle) {
   auto [triangle_count, ray_query] = GetParam();
   if (ray_query && !graphics->DeviceRayQuerySupport())
-    GTEST_SKIP() << "native ray query unavailable";
+    GTEST_SKIP() << "hardware ray query unavailable";
   // Five triangles: a non-power-of-two tree, duplicate centroids and a degenerate leaf.
   std::vector<Vector3<float>> positions{{-1, -1, 0}, {1, -1, 0},  {0, 1, 0},  {-1, -1, -1}, {1, -1, -1},
                                         {0, 1, -1},  {-2, -1, 0}, {-2, 1, 0}, {-2, 0, 2},   {-1, -1, 0},
@@ -284,7 +285,7 @@ TEST_P(SoftwareBVHSizeTest, ComputeConstructionAndTraversalMatchDoublePrecisionO
   auto vfs = core->GetShadersVFS();
   vfs.WriteFile("bvh_test.hlsl", R"(
 #define SOFTWARE_EXTERNAL_BINDINGS
-#ifdef NATIVE_QUERY
+#ifdef HARDWARE_QUERY
 RaytracingAccelerationStructure query_scene : register(t0, space0);
 #else
 ByteAddressBuffer software_nodes : register(t0, space0);
@@ -293,7 +294,7 @@ ByteAddressBuffer software_instances : register(t0, space1);
 ByteAddressBuffer data_buffers[] : register(t0, space2);
 ByteAddressBuffer rays : register(t0, space3);
 RWByteAddressBuffer results : register(u0, space4);
-#ifdef NATIVE_QUERY
+#ifdef HARDWARE_QUERY
 #include "ray_query/traversal.hlsli"
 #else
 #include "software/traversal.hlsli"
@@ -313,7 +314,7 @@ RWByteAddressBuffer results : register(u0, space4);
   std::unique_ptr<graphics::Shader> shader;
   std::vector<std::string> args{"-I."};
   if (ray_query)
-    args.push_back("-DNATIVE_QUERY");
+    args.push_back("-DHARDWARE_QUERY");
   ASSERT_EQ(graphics->CreateShader(vfs, "bvh_test.hlsl", "Main", ray_query ? "cs_6_5" : "cs_6_0", args, &shader), 0);
   std::unique_ptr<graphics::ComputeProgram> program;
   graphics->CreateComputeProgram(shader.get(), &program);
@@ -380,7 +381,7 @@ INSTANTIATE_TEST_SUITE_P(TraversalModes, ComputeTraversalTest, testing::Bool());
 TEST_P(ComputeTraversalTest, EmptySceneBackgroundAccumulationAndReset) {
   bool ray_query = GetParam();
   if (ray_query && !graphics->DeviceRayQuerySupport())
-    GTEST_SKIP() << "native ray query unavailable";
+    GTEST_SKIP() << "hardware ray query unavailable";
   sparkium::Scene scene(core.get());
   scene.settings.samples_per_dispatch = 3;
   scene.settings.background_color = glm::vec3(0.2f, 0.4f, 0.7f);
@@ -409,24 +410,31 @@ TEST_P(ComputeTraversalTest, EmptySceneBackgroundAccumulationAndReset) {
                ray_query ? sparkium::RENDER_PIPELINE_RAY_QUERY : sparkium::RENDER_PIPELINE_RT_FALLBACK);
   EXPECT_EQ(film.info.accumulated_samples, 3);
   check(scene.settings.background_color);
-  if (ray_query && !graphics->DeviceRayTracingSupport()) {
+  if (ray_query && (!graphics->DeviceRayTracingSupport() || graphics->API() == graphics::BACKEND_API_D3D12 ||
+                    graphics->API() == graphics::BACKEND_API_VULKAN)) {
     EXPECT_EQ(core->ResolveRenderPipeline(sparkium::RENDER_PIPELINE_AUTO), sparkium::RENDER_PIPELINE_RAY_QUERY);
     graphics::FrameProfile profile(graphics.get(), false);
     profile.Begin();
     core->Render(&scene, &camera, &film, sparkium::RENDER_PIPELINE_AUTO);
     profile.Finish();
-    EXPECT_EQ(profile.counters["native_ray_query"], 1u);
-    // Auto must reuse the selected native pipeline and preserve its accumulation.
+    EXPECT_EQ(profile.counters["hardware_ray_query"], 1u);
+    // Auto must reuse the selected hardware pipeline and preserve its accumulation.
     EXPECT_EQ(film.info.accumulated_samples, 6);
     check(scene.settings.background_color);
-    // Legacy JSON requests must select the same native query pipeline as Auto.
-    EXPECT_EQ(core->ResolveRenderPipeline(sparkium::RENDER_PIPELINE_RAY_TRACING), sparkium::RENDER_PIPELINE_RAY_QUERY);
-    profile.Begin();
-    core->Render(&scene, &camera, &film, sparkium::RENDER_PIPELINE_RAY_TRACING);
-    profile.Finish();
-    EXPECT_EQ(profile.counters["native_ray_query"], 1u);
-    EXPECT_EQ(film.info.accumulated_samples, 9);
-    check(scene.settings.background_color);
+    if (!graphics->DeviceRayTracingSupport()) {
+      // Legacy JSON requests must select the same hardware query pipeline as Auto.
+      EXPECT_EQ(core->ResolveRenderPipeline(sparkium::RENDER_PIPELINE_RAY_TRACING),
+                sparkium::RENDER_PIPELINE_RAY_QUERY);
+      profile.Begin();
+      core->Render(&scene, &camera, &film, sparkium::RENDER_PIPELINE_RAY_TRACING);
+      profile.Finish();
+      EXPECT_EQ(profile.counters["hardware_ray_query"], 1u);
+      EXPECT_EQ(film.info.accumulated_samples, 9);
+      check(scene.settings.background_color);
+    } else {
+      EXPECT_EQ(core->ResolveRenderPipeline(sparkium::RENDER_PIPELINE_RAY_TRACING),
+                sparkium::RENDER_PIPELINE_RAY_TRACING);
+    }
   }
   if (graphics->DeviceRayQuerySupport()) {
     // Switching traversal implementations must discard accumulation in both directions.
@@ -442,7 +450,7 @@ TEST_P(ComputeTraversalTest, EmptySceneBackgroundAccumulationAndReset) {
 TEST_P(ComputeTraversalTest, TransparentShadowLayers) {
   bool ray_query = GetParam();
   if (ray_query && !graphics->DeviceRayQuerySupport())
-    GTEST_SKIP() << "native ray query unavailable";
+    GTEST_SKIP() << "hardware ray query unavailable";
   std::vector<Vector3<float>> positions{{-2, -2, 0}, {2, -2, 0}, {0, 2, 0}, {-2, -2, -1}, {2, -2, -1}, {0, 2, -1}};
   uint32_t indices[]{0, 1, 2, 3, 4, 5};
   Mesh<> mesh(6, 6, indices, positions.data());
@@ -456,7 +464,7 @@ TEST_P(ComputeTraversalTest, TransparentShadowLayers) {
   vfs.WriteFile("shadow_test.hlsl", R"(
 #define SOFTWARE_EXTERNAL_BINDINGS
 #include "common.hlsli"
-#ifdef NATIVE_QUERY
+#ifdef HARDWARE_QUERY
 RaytracingAccelerationStructure query_scene : register(t0, space0);
 #else
 ByteAddressBuffer software_nodes : register(t0, space0);
@@ -464,7 +472,7 @@ ByteAddressBuffer software_nodes : register(t0, space0);
 ByteAddressBuffer software_instances : register(t0, space1);
 ByteAddressBuffer data_buffers[] : register(t0, space2);
 RWByteAddressBuffer results : register(u0, space3);
-#ifdef NATIVE_QUERY
+#ifdef HARDWARE_QUERY
 #include "ray_query/traversal.hlsli"
 #else
 #include "software/traversal.hlsli"
@@ -481,7 +489,7 @@ float SoftwareShadowTransmission(uint material, HitRecord hit, float3 direction)
   std::unique_ptr<graphics::Shader> shader;
   std::vector<std::string> args{"-I."};
   if (ray_query)
-    args.push_back("-DNATIVE_QUERY");
+    args.push_back("-DHARDWARE_QUERY");
   ASSERT_EQ(graphics->CreateShader(vfs, "shadow_test.hlsl", "Main", ray_query ? "cs_6_5" : "cs_6_0", args, &shader), 0);
   std::unique_ptr<graphics::ComputeProgram> program;
   graphics->CreateComputeProgram(shader.get(), &program);
@@ -515,7 +523,7 @@ float SoftwareShadowTransmission(uint material, HitRecord hit, float3 direction)
   EXPECT_FLOAT_EQ(actual[3], 1.0f);
 }
 
-TEST_F(SoftwareBVHTest, SharedShadersCompileForNativeRayTracingAndCompute) {
+TEST_F(SoftwareBVHTest, SharedShadersCompileForHardwareRayTracingAndCompute) {
   auto vfs = core->GetShadersVFS();
   for (bool spirv : {false, true}) {
     std::vector<std::string> args{"-I."};

@@ -1,3 +1,4 @@
+#include "compute_contract.hlsli"
 #pragma once
 #include "bindings.hlsli"
 #include "bsdf/principled_material.hlsli"
@@ -30,10 +31,10 @@ struct GraphSurface {
 };
 
 // Keep one BSDF sampling body after the compute material-graph dispatch.
-void SampleGraphSurface(inout RenderContext context, HitRecord hit_record, GraphSurface graph) {
+void SampleGraphSurface(SP_CONTEXT inout RenderContext context, HitRecord hit_record, GraphSurface graph) {
   // A Transparent BSDF continues the current path without changing direction.
   // Mixed closures use opacity as the probability of selecting the opaque branch.
-  if (graph.opacity < 1.0f && RandomFloat(context.rd) >= saturate(graph.opacity)) {
+  if (graph.opacity < 1.0f && RandomFloat(SP_CONTEXT_ARG context.rd) >= saturate(graph.opacity)) {
     context.origin = hit_record.position;
     context.bsdf_pdf = INF;
     return;
@@ -71,16 +72,16 @@ void SampleGraphSurface(inout RenderContext context, HitRecord hit_record, Graph
   if (graph.thin_walled > 1.5f && graph.transmission > 0.0f) {
     float3 light_eval, light_direction;
     float light_pdf;
-    SampleDirectLighting(context, hit_record, light_eval, light_direction, light_pdf);
+    SampleDirectLighting(SP_CONTEXT_ARG context, hit_record, light_eval, light_direction, light_pdf);
     float reflection_pdf;
     float3 reflection_eval = material.EvalPrincipledBSDF(light_direction, reflection_pdf);
     float mis_weight = PowerHeuristic(light_pdf, reflection_pdf);
-    if (light_pdf > EPSILON && all(isfinite(light_eval))) {
+    if (light_pdf > EPSILON && AllFinite(light_eval)) {
       context.shadow_eval = mis_weight * light_eval / light_pdf * reflection_eval * context.throughput;
     }
 
     float reflection_probability = material.PrincipledThinReflectionProbability();
-    float event_sample = RandomFloat(context.rd);
+    float event_sample = RandomFloat(SP_CONTEXT_ARG context.rd);
     if (event_sample >= reflection_probability) {
       context.throughput *= graph.base_color;
       context.origin = hit_record.position;
@@ -92,7 +93,7 @@ void SampleGraphSurface(inout RenderContext context, HitRecord hit_record, Graph
     float3 eval, omega_in;
     float pdf;
     material.SamplePrincipledThinReflection(event_sample / max(reflection_probability, CLOSURE_WEIGHT_CUTOFF),
-                                            RandomFloat(context.rd), eval, omega_in, pdf);
+                                            RandomFloat(SP_CONTEXT_ARG context.rd), eval, omega_in, pdf);
     if (pdf < 1e-5f) {
       context.throughput = float3(0.0f, 0.0f, 0.0f);
     } else {
@@ -119,18 +120,18 @@ void SampleGraphSurface(inout RenderContext context, HitRecord hit_record, Graph
 
     float3 light_eval, light_direction;
     float light_pdf;
-    SampleDirectLighting(context, hit_record, light_eval, light_direction, light_pdf);
+    SampleDirectLighting(SP_CONTEXT_ARG context, hit_record, light_eval, light_direction, light_pdf);
     float opaque_pdf, glass_pdf;
     float3 opaque_eval = opaque_material.EvalPrincipledBSDF(light_direction, opaque_pdf);
     float3 glass_eval = glass_material.EvalPrincipledBSDF(light_direction, glass_pdf);
     float combined_pdf = lerp(opaque_pdf, glass_pdf, thin_mix);
     float3 combined_eval = lerp(opaque_eval, glass_eval, thin_mix);
     float mis_weight = PowerHeuristic(light_pdf, combined_pdf);
-    if (light_pdf > EPSILON && all(isfinite(light_eval))) {
+    if (light_pdf > EPSILON && AllFinite(light_eval)) {
       context.shadow_eval = mis_weight * light_eval / light_pdf * combined_eval * context.throughput;
     }
 
-    float event_sample = RandomFloat(context.rd);
+    float event_sample = RandomFloat(SP_CONTEXT_ARG context.rd);
     float3 sampled_direction = float3(0.0f, 0.0f, 0.0f);
     float sampled_pdf = 0.0f;
     if (event_sample < thin_mix) {
@@ -145,12 +146,13 @@ void SampleGraphSurface(inout RenderContext context, HitRecord hit_record, Graph
       }
       float3 sampled_eval;
       glass_material.SamplePrincipledThinReflection(glass_sample / max(reflection_probability, CLOSURE_WEIGHT_CUTOFF),
-                                                    RandomFloat(context.rd), sampled_eval, sampled_direction,
-                                                    sampled_pdf);
+                                                    RandomFloat(SP_CONTEXT_ARG context.rd), sampled_eval,
+                                                    sampled_direction, sampled_pdf);
     } else {
       float3 sampled_eval;
       opaque_material.SamplePrincipledBSDF((event_sample - thin_mix) / max(1.0f - thin_mix, CLOSURE_WEIGHT_CUTOFF),
-                                           RandomFloat(context.rd), sampled_eval, sampled_direction, sampled_pdf);
+                                           RandomFloat(SP_CONTEXT_ARG context.rd), sampled_eval, sampled_direction,
+                                           sampled_pdf);
     }
 
     if (sampled_pdf < 1e-5f) {
@@ -181,21 +183,22 @@ void SampleGraphSurface(inout RenderContext context, HitRecord hit_record, Graph
     // the surface lobes before the path enters the random-walk medium.
     float3 light_eval, light_direction;
     float light_pdf;
-    SampleDirectLighting(context, hit_record, light_eval, light_direction, light_pdf);
+    SampleDirectLighting(SP_CONTEXT_ARG context, hit_record, light_eval, light_direction, light_pdf);
     float surface_pdf;
     float3 surface_eval = material.EvalPrincipledBSDF(light_direction, surface_pdf);
     float mis_weight = PowerHeuristic(light_pdf, surface_pdf);
-    if (light_pdf > EPSILON && all(isfinite(light_eval))) {
+    if (light_pdf > EPSILON && AllFinite(light_eval)) {
       context.shadow_eval = mis_weight * light_eval / light_pdf * surface_eval * context.throughput;
     }
 
     float interface_fresnel =
         fresnel_dielectric_cos(abs(dot(normalize(hit_record.normal), -context.direction)), max(graph.ior, 1.0e-4f));
     float surface_probability = saturate(interface_fresnel + graph.clearcoat * 0.04f * (1.0f - interface_fresnel));
-    if (RandomFloat(context.rd) < surface_probability) {
+    if (RandomFloat(SP_CONTEXT_ARG context.rd) < surface_probability) {
       float3 eval, reflected_direction;
       float pdf;
-      material.SamplePrincipledBSDF(RandomFloat(context.rd), RandomFloat(context.rd), eval, reflected_direction, pdf);
+      material.SamplePrincipledBSDF(RandomFloat(SP_CONTEXT_ARG context.rd), RandomFloat(SP_CONTEXT_ARG context.rd),
+                                    eval, reflected_direction, pdf);
       if (pdf < 1.0e-5f || surface_probability < 1.0e-5f) {
         context.throughput = float3(0.0f, 0.0f, 0.0f);
       } else {
@@ -214,8 +217,8 @@ void SampleGraphSurface(inout RenderContext context, HitRecord hit_record, Graph
     // is already accounted for by the Fresnel branch above.
     float3 diffuse_transmission;
     float diffuse_pdf;
-    sample_cos_hemisphere(-hit_record.normal, RandomFloat(context.rd), RandomFloat(context.rd), diffuse_transmission,
-                          diffuse_pdf);
+    sample_cos_hemisphere(-hit_record.normal, RandomFloat(SP_CONTEXT_ARG context.rd),
+                          RandomFloat(SP_CONTEXT_ARG context.rd), diffuse_transmission, diffuse_pdf);
     PrincipledMaterial::RefractionBsdf entry_bsdf;
     entry_bsdf.weight = float3(1.0f, 1.0f, 1.0f);
     entry_bsdf.sample_weight = 1.0f;
@@ -226,30 +229,31 @@ void SampleGraphSurface(inout RenderContext context, HitRecord hit_record, Graph
     float3 entry_eval = float3(0.0f, 0.0f, 0.0f);
     float3 refracted_direction = float3(0.0f, 0.0f, 0.0f);
     float entry_pdf = 0.0f;
-    material.bsdf_microfacet_ggx_sample_refraction(entry_bsdf, hit_record.geom_normal, -context.direction,
-                                                   RandomFloat(context.rd), RandomFloat(context.rd), entry_eval,
-                                                   refracted_direction, entry_pdf);
-    bool diffuse_skin_entry = graph.subsurface_method > 1.5f && RandomFloat(context.rd) < 0.5f;
+    material.bsdf_microfacet_ggx_sample_refraction(
+        entry_bsdf, hit_record.geom_normal, -context.direction, RandomFloat(SP_CONTEXT_ARG context.rd),
+        RandomFloat(SP_CONTEXT_ARG context.rd), entry_eval, refracted_direction, entry_pdf);
+    bool diffuse_skin_entry = graph.subsurface_method > 1.5f && RandomFloat(SP_CONTEXT_ARG context.rd) < 0.5f;
     context.direction = (entry_pdf > 0.0f && !diffuse_skin_entry) ? refracted_direction : diffuse_transmission;
     context.throughput *= (1.0f - interface_fresnel) / max(1.0f - surface_probability, 1.0e-5f);
-    StartSubsurfaceRandomWalk(context, hit_record, graph.base_color, graph.subsurface_radius, graph.subsurface_scale,
-                              graph.ior);
+    StartSubsurfaceRandomWalk(SP_CONTEXT_ARG context, hit_record, graph.base_color, graph.subsurface_radius,
+                              graph.subsurface_scale, graph.ior);
     return;
   }
 
   float3 eval, omega_in;
   float pdf;
-  SampleDirectLighting(context, hit_record, eval, omega_in, pdf);
+  SampleDirectLighting(SP_CONTEXT_ARG context, hit_record, eval, omega_in, pdf);
   float bsdf_pdf;
   float3 bsdf_eval = material.EvalPrincipledBSDF(omega_in, bsdf_pdf);
   float mis_weight = PowerHeuristic(pdf, bsdf_pdf);
-  if (pdf > EPSILON && all(isfinite(eval)))
+  if (pdf > EPSILON && AllFinite(eval))
     context.shadow_eval = mis_weight * eval / pdf * bsdf_eval * context.throughput;
 
   if (max(graph.emission.x, max(graph.emission.y, graph.emission.z)) > 0.0f)
     context.radiance += graph.emission * context.throughput;
 
-  material.SamplePrincipledBSDF(RandomFloat(context.rd), RandomFloat(context.rd), eval, omega_in, pdf);
+  material.SamplePrincipledBSDF(RandomFloat(SP_CONTEXT_ARG context.rd), RandomFloat(SP_CONTEXT_ARG context.rd), eval,
+                                omega_in, pdf);
   if (pdf < 1e-5f) {
     context.throughput = float3(0.0f, 0.0f, 0.0f);
   } else {

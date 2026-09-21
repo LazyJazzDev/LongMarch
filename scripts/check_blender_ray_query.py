@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
-"""Render complete Blender scenes with native ray queries and backend validation.
+"""Render complete Blender scenes with hardware ray queries and backend validation.
 
-Requires Pillow and the Blender LFS asset snapshot. Saves images, per-frame native
+Requires Pillow and the Blender LFS asset snapshot. Saves images, per-frame hardware
 query counters, logs, and results; any failed render or silent fallback fails.
 """
 import argparse
@@ -65,8 +65,8 @@ def main():
             with profile.open() as stream:
                 rows = list(csv.DictReader(stream))
             query_frames = [int(r['frame']) for r in rows if r['domain'] == 'count'
-                            and r['stage'] == 'native_ray_query' and float(r['value']) == 1]
-            result['native_query_frames'] = query_frames
+                            and r['stage'] == 'hardware_ray_query' and float(r['value']) == 1]
+            result['hardware_query_frames'] = query_frames
             with Image.open(png) as loaded:
                 image = loaded.convert('RGB')
             result['rgb_mean'] = ImageStat.Stat(image).mean

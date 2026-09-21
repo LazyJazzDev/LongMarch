@@ -338,6 +338,8 @@ void Core::PybindClassRegistration(py::classh<Core> &c) {
 #endif
 
 int CreateCore(BackendAPI api, const Core::Settings &settings, double_ptr<Core> pp_core) {
+  if (!SupportBackendAPI(api))
+    return -1;
   switch (api) {
 #ifdef LONGMARCH_METAL_ENABLED
     case BACKEND_API_METAL:

@@ -1,12 +1,13 @@
+#include "compute_contract.hlsli"
 #pragma once
 #include "bindings.hlsli"
 
 #ifdef SPARKIUM_SOFTWARE_RT
-float ShadowRayNoAlpha(float3 origin, float3 direction, float dist);
-float ShadowRay(float3 origin, float3 direction, float dist);
+float ShadowRayNoAlpha(SP_CONTEXT float3 origin, float3 direction, float dist);
+float ShadowRay(SP_CONTEXT float3 origin, float3 direction, float dist);
 #else
-float ShadowRayNoAlpha(float3 origin, float3 direction, float dist) {
-  RayDesc ray;
+float ShadowRayNoAlpha(SP_CONTEXT float3 origin, float3 direction, float dist) {
+  SP_RAY ray;
   ray.Origin = origin;
   ray.Direction = direction;
   ray.TMin = T_MIN * max(length(origin), 1.0);
@@ -31,8 +32,8 @@ float ShadowRayNoAlpha(float3 origin, float3 direction, float dist) {
   return 1.0;
 }
 
-float ShadowRay(float3 origin, float3 direction, float dist) {
-  RayDesc ray;
+float ShadowRay(SP_CONTEXT float3 origin, float3 direction, float dist) {
+  SP_RAY ray;
   ray.Origin = origin;
   ray.Direction = direction;
   ray.TMin = T_MIN * max(length(origin), 1.0);
