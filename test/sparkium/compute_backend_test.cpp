@@ -25,23 +25,47 @@ class ComputeBackendTest : public testing::TestWithParam<sparkium::RenderBackend
     EXPECT_EQ(core->API(), GetParam());
   }
 
+  int CreateContractShader(const std::string &source,
+                           const std::string &entry,
+                           const std::string &target,
+                           double_ptr<graphics::Shader> shader) {
+    sparkium::Core renderer(core.get());
+    auto vfs = renderer.GetShadersVFS();
+    vfs.WriteFile("test.hlsl", source);
+    return core->CreateShader(vfs, "test.hlsl", entry, target, shader);
+  }
+
   std::unique_ptr<sparkium::backend::Device> core;
 };
+
+TEST_P(ComputeBackendTest, MissingContractRejectsWithoutSourceRewriting) {
+  std::unique_ptr<graphics::Shader> shader;
+  EXPECT_THROW(
+      core->CreateShader("RWByteAddressBuffer output : register(u0, space0); "
+                         "[numthreads(1,1,1)] void Main(uint3 id : SV_DispatchThreadID) { output.Store(0, 7); }",
+                         "Main", "cs_6_0", &shader),
+      std::invalid_argument);
+  EXPECT_EQ(shader, nullptr);
+}
 
 TEST_P(ComputeBackendTest, DescriptorArraysRangesAndIndependentEntryPoints) {
   // Both modules deliberately use Main. Their generated host entry helpers
   // must not interpose on one another. Array and cbuffer offsets differ.
   const std::string prefix = R"(
-ByteAddressBuffer inputs[] : register(t0, space0);
+#include "compute_contract.hlsli"
+SP_ARRAY_RESOURCE(ByteAddressBuffer, inputs, t0, 0);
+#define INPUTS SP_ARRAY_ACCESS(ByteAddressBuffer, inputs, 0)
 struct Settings { uint count; uint value; };
-ConstantBuffer<Settings> settings : register(b0, space1);
-RWByteAddressBuffer output : register(u0, space2);
-[numthreads(8,1,1)] void Main(uint3 id : SV_DispatchThreadID) {
-  if (id.x < settings.count) output.Store(id.x*4,
+SP_RESOURCE(ConstantBuffer<Settings>, settings, b0, 1);
+#define SETTINGS SP_RESOURCE_ACCESS(ConstantBuffer<Settings>, settings, 1)
+SP_RESOURCE(RWByteAddressBuffer, output, u0, 2);
+#define OUTPUT SP_RESOURCE_ACCESS(RWByteAddressBuffer, output, 2)
+SP_NUMTHREADS(8,1,1) void Main(SP_CONTEXT uint3 id : SV_DispatchThreadID) {
+  if (id.x < SETTINGS.count) OUTPUT.Store(id.x*4,
 )";
   std::unique_ptr<graphics::Shader> a, b;
-  core->CreateShader(prefix + "inputs[0].Load(id.x*4)+settings.value); }", "Main", "cs_6_0", &a);
-  core->CreateShader(prefix + "inputs[1].Load(id.x*4)*settings.value); }", "Main", "cs_6_0", &b);
+  CreateContractShader(prefix + "INPUTS[0].Load(id.x*4)+SETTINGS.value); }", "Main", "cs_6_0", &a);
+  CreateContractShader(prefix + "INPUTS[1].Load(id.x*4)*SETTINGS.value); }", "Main", "cs_6_0", &b);
   std::unique_ptr<graphics::Buffer> input, output, settings;
   core->CreateBuffer(76, graphics::BUFFER_TYPE_STATIC, &input);
   core->CreateBuffer(76, graphics::BUFFER_TYPE_STATIC, &output);
@@ -86,17 +110,21 @@ RWByteAddressBuffer output : register(u0, space2);
 
 TEST_P(ComputeBackendTest, ThreeDimensionalInvocationIdsAndConstantBlock) {
   std::unique_ptr<graphics::Shader> shader;
-  core->CreateShader(R"(
-cbuffer Parameters : register(b0, space0) { uint scale; uint bias; };
-RWByteAddressBuffer output : register(u0, space1);
-[numthreads(2,3,2)] void Main(uint3 id : SV_DispatchThreadID,
+  CreateContractShader(R"(
+#include "compute_contract.hlsli"
+struct Parameters { uint scale; uint bias; };
+SP_RESOURCE(ConstantBuffer<Parameters>, parameters, b0, 0);
+#define PARAMETERS SP_RESOURCE_ACCESS(ConstantBuffer<Parameters>, parameters, 0)
+SP_RESOURCE(RWByteAddressBuffer, output, u0, 1);
+#define OUTPUT SP_RESOURCE_ACCESS(RWByteAddressBuffer, output, 1)
+SP_NUMTHREADS(2,3,2) void Main(SP_CONTEXT uint3 id : SV_DispatchThreadID,
                             uint3 local : SV_GroupThreadID,
                             uint3 group : SV_GroupID, uint lane : SV_GroupIndex) {
   uint index=id.x+10*(id.y+12*id.z);
-  output.Store3(index*12,uint3(index+bias,(group.x+5*(group.y+4*group.z))*scale,
+  OUTPUT.Store3(index*12,uint3(index+PARAMETERS.bias,(group.x+5*(group.y+4*group.z))*PARAMETERS.scale,
                              lane+100*(local.x+2*(local.y+3*local.z))));
 })",
-                     "Main", "cs_6_0", &shader);
+                       "Main", "cs_6_0", &shader);
   std::unique_ptr<graphics::ComputeProgram> program;
   core->CreateComputeProgram(shader.get(), &program);
   program->AddResourceBinding(graphics::RESOURCE_TYPE_UNIFORM_BUFFER, 1);
@@ -142,15 +170,19 @@ TEST_P(ComputeBackendTest, TextureArraysFilteringAndPartialImageTransfers) {
   EXPECT_EQ(partial, replacement);
   input->UploadData(texels.data());
   std::unique_ptr<graphics::Shader> shader;
-  core->CreateShader(R"(
-Texture2D<float4> images[] : register(t0,space0);
-SamplerState samplers[] : register(s0,space1);
-RWTexture2D<float4> output : register(u0,space2);
-[numthreads(8,8,1)] void Main(uint3 id : SV_DispatchThreadID) {
- uint w,h; output.GetDimensions(w,h);
- if(id.x<w && id.y<h) output[id.xy]=images[1].SampleLevel(samplers[0],float2(0.5,0.5),0);
+  CreateContractShader(R"(
+#include "compute_contract.hlsli"
+SP_ARRAY_RESOURCE(SP_TEXTURE(float4), images, t0, 0);
+#define IMAGES SP_ARRAY_ACCESS(SP_TEXTURE(float4), images, 0)
+SP_ARRAY_RESOURCE(SP_SAMPLER, samplers, s0, 1);
+#define SAMPLERS SP_ARRAY_ACCESS(SP_SAMPLER, samplers, 1)
+SP_RESOURCE(SP_RW_TEXTURE(float4), output, u0, 2);
+#define OUTPUT SP_RESOURCE_ACCESS(SP_RW_TEXTURE(float4), output, 2)
+SP_NUMTHREADS(8,8,1) void Main(SP_CONTEXT uint3 id : SV_DispatchThreadID) {
+ uint w,h; OUTPUT.GetDimensions(w,h);
+ if(id.x<w && id.y<h) OUTPUT[id.xy]=IMAGES[1].SampleLevel(SAMPLERS[0],float2(0.5,0.5),0);
 })",
-                     "Main", "cs_6_0", &shader);
+                       "Main", "cs_6_0", &shader);
   std::unique_ptr<graphics::Sampler> sampler;
   core->CreateSampler({graphics::FILTER_MODE_LINEAR}, &sampler);
   std::unique_ptr<graphics::ComputeProgram> program;
@@ -180,15 +212,19 @@ TEST_P(ComputeBackendTest, HDRFloat3AndNearestAddressModes) {
   const float texels[]{100, 101, 102, 200, 201, 202};
   input->UploadData(texels);
   std::unique_ptr<graphics::Shader> shader;
-  core->CreateShader(R"(
-Texture2D<float3> image : register(t0,space0);
-SamplerState samplers[] : register(s0,space1);
-RWTexture2D<float4> output : register(u0,space2);
-[numthreads(4,2,1)] void Main(uint3 id : SV_DispatchThreadID) {
+  CreateContractShader(R"(
+#include "compute_contract.hlsli"
+SP_RESOURCE(SP_TEXTURE(float3), image, t0, 0);
+#define IMAGE SP_RESOURCE_ACCESS(SP_TEXTURE(float3), image, 0)
+SP_ARRAY_RESOURCE(SP_SAMPLER, samplers, s0, 1);
+#define SAMPLERS SP_ARRAY_ACCESS(SP_SAMPLER, samplers, 1)
+SP_RESOURCE(SP_RW_TEXTURE(float4), output, u0, 2);
+#define OUTPUT SP_RESOURCE_ACCESS(SP_RW_TEXTURE(float4), output, 2)
+SP_NUMTHREADS(4,2,1) void Main(SP_CONTEXT uint3 id : SV_DispatchThreadID) {
   float u=id.y==0 ? -0.25f : 1.25f;
-  output[id.xy]=float4(image.SampleLevel(samplers[id.x],float2(u,0.5f),0),1);
+  OUTPUT[id.xy]=float4(IMAGE.SampleLevel(SAMPLERS[id.x],float2(u,0.5f),0),1);
 })",
-                     "Main", "cs_6_0", &shader);
+                       "Main", "cs_6_0", &shader);
   std::array<std::unique_ptr<graphics::Sampler>, 4> samplers;
   std::vector<graphics::Sampler *> bindings;
   for (int mode = 0; mode < 4; ++mode) {

@@ -196,7 +196,7 @@ The direct LLVM emitter is described as experimental by
 [Slang's LLVM target documentation](https://github.com/shader-slang/slang/blob/v2026.8/docs/llvm-target.md).
 It lacks native texture/sampler types and group barriers; this backend supplies
 its own texture representation and serial CPU scan variants. Graphics-only
-`NonUniformResourceIndex` annotations are removed for ordinary compute arrays.
+`SP_NONUNIFORM` expands to ordinary indexing for compute arrays.
 Existing buffer/image ABI checks continue to validate reflected layouts.
 
 On Windows, `sparkium_compute_no_subprocess_test` enables the OS
@@ -260,18 +260,36 @@ Each CPU call receives a `ComputeContext*` followed by the workgroup range and g
 sizes. The context stores descriptors inline in 64 fixed 32-byte slots (2 KiB total),
 avoiding repeated pointer chasing in resource access. It lives until the
 synchronous pool submission finishes. Resources are not JIT module
-globals, and explicit modules need no resource-binding mutex. Compute buffers use
+globals, and modules need no resource-binding mutex. Compute buffers use
 pointer/size spans, arrays use `ComputeArray<T>`, and typed constant buffers point
 to host data. Binding validates reflected descriptor sizes, required constant
-field ranges, resource ownership and slot presence. An exported ABI probe checks
+buffer size, resource ownership and slot presence. An exported ABI probe checks
 the plain context/sampler structures. Slang's `sizeof(resource)` reports its HLSL
 logical size, so resource descriptors are checked using reflection and integration
 tests, not that operator. CUDA continues to bind `SLANG_globalParams`.
 
-The older raw-HLSL `graphics::Core::CreateShader` interface retains its constrained
-adapter in `cpu_shader_compat.cpp / cuda_shader_compat.cpp`, including module-global bindings and a
-per-module mutex. This is compatibility debt; it is isolated and bypassed for the
-entire Sparkium renderer, not silently removed from existing callers.
+CPU/CUDA shader creation requires a VFS containing `compute_contract.hlsli` and
+sources written with its explicit resource/context macros. The raw-source overload
+without that contract is rejected with `std::invalid_argument`; use the VFS
+overload for compute shaders. There is no raw-HLSL compatibility adapter, regex
+source rewriting, cbuffer expansion, exported resource-global lookup or per-module
+resource-binding mutex. Constant data uses `ConstantBuffer<T>` through
+`SP_RESOURCE` and `SP_RESOURCE_ACCESS`. Graphics shader creation is unchanged.
+
+For example, starting with `Core::GetShadersVFS()`:
+
+```hlsl
+#include "compute_contract.hlsli"
+struct Parameters { uint value; };
+SP_RESOURCE(ConstantBuffer<Parameters>, parameters, b0, 0);
+SP_RESOURCE(RWByteAddressBuffer, output, u0, 1);
+#define PARAMETERS SP_RESOURCE_ACCESS(ConstantBuffer<Parameters>, parameters, 0)
+#define OUTPUT SP_RESOURCE_ACCESS(RWByteAddressBuffer, output, 1)
+SP_NUMTHREADS(1, 1, 1)
+void Main(SP_CONTEXT uint3 id : SV_DispatchThreadID) {
+  OUTPUT.Store(id.x * 4, PARAMETERS.value);
+}
+```
 
 CPU compilation is serialized around the shared Slang session. Up to 16 explicit
 CPU modules are retained in an LRU cache keyed by exact VFS contents, source,

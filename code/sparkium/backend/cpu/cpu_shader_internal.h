@@ -6,17 +6,10 @@
 
 namespace sparkium::backend::cpu {
 // Ordinary exported function: a half-open range of workgroups and grid dimensions.
-using HostFunction = void (*)(uint64_t, uint64_t, uint32_t, uint32_t);
 using ContextFunction = void (*)(void *, uint64_t, uint64_t, uint32_t, uint32_t);
 
 struct alignas(16) ComputeContext {
   uint64_t slots[256]{};
-};
-
-struct ConstantField {
-  std::string name;
-  size_t offset, size;
-  void *address{};
 };
 
 struct Parameter {
@@ -25,8 +18,6 @@ struct Parameter {
   bool array;
   SlangTypeKind kind;
   std::string name;
-  void *address{};
-  std::vector<ConstantField> constants;
   size_t constant_size{};
 };
 
@@ -36,10 +27,7 @@ struct CpuShader::Impl {
   size_t global_size{};
   uint32_t threads[3]{};
   Slang::ComPtr<ISlangSharedLibrary> library;
-  HostFunction host{};
   ContextFunction context_host{};
-  bool explicit_context{};
-  std::mutex dispatch_mutex;
 
   ~Impl();
   void CompileCPU(const std::filesystem::path &directory,

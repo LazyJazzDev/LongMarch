@@ -13,5 +13,4 @@ target_sources(sparkium_backend PRIVATE
         cuda_program.cpp
         cuda_sampler.cpp
         cuda_shader.cpp
-        cuda_shader_compat.cpp
         slang_compiler.cpp)

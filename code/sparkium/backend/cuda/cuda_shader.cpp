@@ -13,13 +13,11 @@
 #include <limits>
 #include <mutex>
 #include <random>
-#include <set>
 #include <sstream>
 
 #include "sparkium/backend/cuda/cuda_buffer.h"
 #include "sparkium/backend/cuda/cuda_image.h"
 #include "sparkium/backend/cuda/cuda_sampler.h"
-#include "sparkium/backend/cuda/cuda_shader_compat.h"
 #include "sparkium/backend/cuda/cuda_shader_internal.h"
 #include "sparkium/backend/cuda/cuda_util.h"
 #ifdef SPARKIUM_OPTIX_ENABLED
@@ -169,16 +167,9 @@ CudaShader::CudaShader(const VirtualFileSystem &vfs,
   const auto compute_entry = "LongMarchComputeEntry" + std::to_string(next_entry++);
   TempDirectory directory;
   vfs.SaveToDirectory(directory.path);
-  const bool explicit_context = std::filesystem::exists(directory.path / "compute_contract.hlsli");
-
-  for (const auto &file : std::filesystem::recursive_directory_iterator(directory.path)) {
-    if (!explicit_context && file.is_regular_file()) {
-      auto lowered = LowerLegacySource(Read(file.path()), file.path().filename().string(), optix_shader);
-      lowered = RenameLegacyEntry(std::move(lowered), entry, compute_entry);
-
-      Write(file.path(), lowered);
-    }
-  }
+  if (!std::filesystem::exists(directory.path / "compute_contract.hlsli"))
+    throw std::invalid_argument(
+        "compute shaders require compute_contract.hlsli and the SP_RESOURCE/SP_CONTEXT contract");
 
   Write(directory.path / "compute_input.slang", ImagePrelude() + "\n#include \"" + source + "\"\n");
   RequestOwner owner;
@@ -191,8 +182,7 @@ CudaShader::CudaShader(const VirtualFileSystem &vfs,
   spSetTargetFloatingPointMode(request, 0, SLANG_FLOATING_POINT_MODE_PRECISE);
   spAddSearchPath(request, directory.path.string().c_str());
   spAddPreprocessorDefine(request, "SPARKIUM_COMPUTE", "1");
-  if (explicit_context)
-    spAddPreprocessorDefine(request, entry.c_str(), compute_entry.c_str());
+  spAddPreprocessorDefine(request, entry.c_str(), compute_entry.c_str());
   // NVRTC uses --fmad=false; LLVM receives the precise target mode above.
   spAddPreprocessorDefine(request, "precise", "");
 
@@ -244,7 +234,7 @@ CudaShader::CudaShader(const VirtualFileSystem &vfs,
       throw std::runtime_error(std::string("compute shader parameter lacks register space: ") + p->getName());
     int slot = -1;
     SlangCheck(attribute->getArgumentValueInt(0, &slot), "invalid compute binding attribute");
-    if (slot < 0 || slot > (explicit_context ? 63 : 1024))
+    if (slot < 0 || slot > 63)
       throw std::runtime_error("compute binding slot out of range");
     auto *type = p->getTypeLayout();
     bool array = type->getType()->getName() && std::string(type->getType()->getName()) == "ComputeArray";

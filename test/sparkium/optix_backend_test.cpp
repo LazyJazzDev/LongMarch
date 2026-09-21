@@ -39,13 +39,15 @@ TEST(CudaRayTracing, HardwareHitsTransformsMasksAndEmptyScene) {
                                                       blas->MakeInstance(transform(3, 1), 31, 1),
                                                       blas->MakeInstance(transform(0, 0.5f), 18, 2)};
   ASSERT_EQ(core->CreateTopLevelAccelerationStructure(instances, &tlas), 0);
-  VirtualFileSystem vfs;
+  sparkium::Core renderer(core.get());
+  auto vfs = renderer.GetShadersVFS();
   vfs.WriteFile("probe.hlsl", R"(
+#include "compute_contract.hlsli"
 struct Hit { float distance; float2 bary; uint instance; uint primitive; };
-RaytracingAccelerationStructure scene : register(t0, space0);
-RWByteAddressBuffer output : register(u0, space1);
+SP_RESOURCE(RaytracingAccelerationStructure, scene, t0, 0);
+SP_RESOURCE(RWByteAddressBuffer, output, u0, 1);
 struct Settings { uint enabled; uint mask; uint2 pad; };
-ConstantBuffer<Settings> settings : register(b0, space2);
+SP_RESOURCE(ConstantBuffer<Settings>, settings, b0, 2);
 [shader("closesthit")]
 void LongMarchOptixClosest(inout Hit hit, BuiltInTriangleIntersectionAttributes attr) {
   hit.distance=RayTCurrent(); hit.bary=attr.barycentrics;

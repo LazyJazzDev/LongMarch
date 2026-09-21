@@ -10,5 +10,4 @@ target_sources(sparkium_backend PRIVATE
         cpu_program.cpp
         cpu_sampler.cpp
         cpu_shader.cpp
-        cpu_shader_compat.cpp
         slang_compiler.cpp)

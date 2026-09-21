@@ -13,13 +13,11 @@
 #include <limits>
 #include <mutex>
 #include <random>
-#include <set>
 #include <sstream>
 
 #include "sparkium/backend/cpu/cpu_buffer.h"
 #include "sparkium/backend/cpu/cpu_image.h"
 #include "sparkium/backend/cpu/cpu_sampler.h"
-#include "sparkium/backend/cpu/cpu_shader_compat.h"
 #include "sparkium/backend/cpu/cpu_shader_internal.h"
 #include "sparkium/backend/cpu/cpu_util.h"
 
@@ -159,13 +157,13 @@ CpuShader::CpuShader(const VirtualFileSystem &vfs,
   // Unique function and resource names prevent interposition between JIT modules.
   static std::atomic<uint64_t> next_entry{0};
   const auto compute_entry = "LongMarchComputeEntry" + std::to_string(next_entry++);
-  std::set<std::string> constant_blocks;
   TempDirectory directory;
   vfs.SaveToDirectory(directory.path);
-  const bool explicit_context = std::filesystem::exists(directory.path / "compute_contract.hlsli");
-  impl_->explicit_context = explicit_context;
+  if (!std::filesystem::exists(directory.path / "compute_contract.hlsli"))
+    throw std::invalid_argument(
+        "compute shaders require compute_contract.hlsli and the SP_RESOURCE/SP_CONTEXT contract");
   std::string cache_key;
-  if (explicit_context) {
+  {
     // Exact content keys: no stale modules after edits, no hash collision aliasing.
     std::vector<std::filesystem::path> files;
     for (const auto &file : std::filesystem::recursive_directory_iterator(directory.path))
@@ -193,18 +191,6 @@ CpuShader::CpuShader(const VirtualFileSystem &vfs,
       return;
     }
   }
-  for (const auto &file : std::filesystem::recursive_directory_iterator(directory.path)) {
-    if (!explicit_context && file.is_regular_file()) {
-      auto lowered = LowerLegacySource(Read(file.path()), file.path().filename().string());
-      lowered = RenameLegacyEntry(std::move(lowered), entry, compute_entry);
-
-      auto blocks = LegacyConstantBlocks(lowered);
-      constant_blocks.insert(blocks.begin(), blocks.end());
-
-      Write(file.path(), lowered);
-    }
-  }
-
   Write(directory.path / "compute_input.slang", ImagePrelude() + "\n#include \"" + source + "\"\n");
   RequestOwner owner;
   auto *request = owner.request;
@@ -214,8 +200,7 @@ CpuShader::CpuShader(const VirtualFileSystem &vfs,
   spSetTargetFloatingPointMode(request, 0, SLANG_FLOATING_POINT_MODE_PRECISE);
   spAddSearchPath(request, directory.path.string().c_str());
   spAddPreprocessorDefine(request, "SPARKIUM_COMPUTE", "1");
-  if (explicit_context)
-    spAddPreprocessorDefine(request, entry.c_str(), compute_entry.c_str());
+  spAddPreprocessorDefine(request, entry.c_str(), compute_entry.c_str());
   // NVRTC uses --fmad=false; LLVM receives the precise target mode above.
   spAddPreprocessorDefine(request, "precise", "");
 
@@ -298,7 +283,7 @@ CpuShader::CpuShader(const VirtualFileSystem &vfs,
       throw std::runtime_error(std::string("compute shader parameter lacks register space: ") + p->getName());
     int slot = -1;
     SlangCheck(attribute->getArgumentValueInt(0, &slot), "invalid compute binding attribute");
-    if (slot < 0 || slot > (explicit_context ? 63 : 1024))
+    if (slot < 0 || slot > 63)
       throw std::runtime_error("compute binding slot out of range");
     auto *type = p->getTypeLayout();
     bool array = type->getType()->getName() && std::string(type->getType()->getName()) == "ComputeArray";
@@ -313,19 +298,11 @@ CpuShader::CpuShader(const VirtualFileSystem &vfs,
             std::max(impl_->parameters.back().constant_size, field->getOffset() + field->getTypeLayout()->getSize());
       }
     }
-    if (constant_blocks.count(p->getName())) {
-      auto *fields = type->getElementTypeLayout();
-      for (unsigned j = 0; j < fields->getFieldCount(); ++j) {
-        auto *field = fields->getFieldByIndex(j);
-        impl_->parameters.back().constants.push_back(
-            {field->getName(), field->getOffset(), field->getTypeLayout()->getSize()});
-      }
-    }
   }
 
   impl_->CompileCPU(directory.path, source, compute_entry, call_arguments, args);
 
-  if (explicit_context) {
+  {
     if (cache.size() >= 16)
       cache.erase(cache.begin());
     cache.emplace_back(std::move(cache_key), impl_);
@@ -345,10 +322,6 @@ std::string CpuShader::EntryPoint() const {
 void CpuShader::Dispatch(const CpuBindings &bindings, uint32_t x, uint32_t y, uint32_t z) {
   if (!x || !y || !z)
     return;
-  // Exported resource descriptors are immutable while workers execute this module.
-  std::unique_lock<std::mutex> dispatch_lock(impl_->dispatch_mutex, std::defer_lock);
-  if (!impl_->explicit_context)
-    dispatch_lock.lock();
   const bool trace = std::getenv("SPARKIUM_COMPUTE_TRACE");
   if (trace)
     std::cerr << "Dispatch " << impl_->entry << " " << x << "," << y << "," << z << " globals=" << impl_->global_size
@@ -386,9 +359,6 @@ void CpuShader::Dispatch(const CpuBindings &bindings, uint32_t x, uint32_t y, ui
         if (p.kind == SLANG_TYPE_KIND_CONSTANT_BUFFER) {
           if (range.size < p.constant_size)
             throw std::out_of_range("compute constant buffer range");
-          for (const auto &field : p.constants)
-            if (field.offset > range.size || field.size > range.size - field.offset)
-              throw std::out_of_range("compute CPU constant buffer range");
           append(ptr);
         } else
           append(CpuSpan{ptr, range.size});
