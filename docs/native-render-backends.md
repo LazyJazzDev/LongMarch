@@ -2,52 +2,38 @@
 
 ## Library boundary and backend selection
 
-Sparkium owns rendering backend selection through `sparkium::RenderBackend`
-(`Graphics`, `CPU`, `CUDA`) and `CreateDevice`. `BackendSelection` carries the
-graphics API separately; CLI names `d3d12`, `vulkan` and `metal` select that field.
-Its `backend::Device` is independent of `graphics::Core`:
-
-- `graphics/GraphicsDevice` adapts Vulkan, D3D12 and Metal devices from graphics.
-- `cpu/CpuDevice` owns CPU execution, with LLVM function JIT and a persistent
-  thread pool in the CPU backend directory.
-- `cuda/CudaDevice` owns the CUDA context, NVRTC compilation, kernel launches and
-  optional OptiX acceleration structures and pipelines.
-- `common/` contains shared resources, bindings, Slang frontend/reflection and
-  compatibility helpers. All live under `code/sparkium/backend/` and link into
-  `sparkium_backend`, not `grassland_graphics`.
-- Graphics retains only graphics API backend enums and factories. Its existing
-  CUDA interop is for sharing graphics resources, not a CUDA compute backend.
-
-Sparkium reuses the abstract Buffer, Image, Shader and CommandContext resource
-contracts to share rendering algorithms. Native implementations live in Sparkium;
-they do not derive from or instantiate `graphics::Core`. `Device::GraphicsCore()`
-returns the underlying graphics device for the adapter and null for CPU/CUDA.
+Sparkium's public rendering interface consumes an independent in-memory
+`SceneDefinition`. The loader reads scene files and assets once; GUI, CLI and
+library clients then pass the same snapshot to `Renderer::SetScene`. Switching
+backends reconstructs execution state without reloading scene files.
+See [the scene API](sparkium-scene-api.md) for the complete ownership contract.
 
 ```cpp
-std::unique_ptr<sparkium::backend::Device> device;
-sparkium::CreateDevice(sparkium::RenderBackend::CPU, {}, &device);
-device->InitializeLogicalDeviceAutoSelect(false);
-sparkium::Core renderer(device.get());
+auto scene = sparkium::LoadScene("scene.json");
+auto renderer = sparkium::CreateRenderer({sparkium::RenderBackend::CPU});
+renderer->SetScene(scene);
+renderer->Render();
+auto image = renderer->ReadImage();
 ```
 
-The caller keeps `device` alive until the renderer and its resources are destroyed.
-Existing applications may still construct `sparkium::Core` from a borrowed
-`graphics::Core*`; Sparkium creates the adapter internally. The GUI display uses a
-separate graphics device, while its rendering worker owns a Sparkium device.
-OptiX remains a hardware traversal pipeline on the CUDA rendering backend.
+`RendererSettings` selects Graphics, CPU or CUDA and optionally the Graphics API.
+Neither the scene model nor the renderer interface exposes Buffer, Image, Shader,
+CommandContext or graphics device handles. The GUI owns a separate display device.
+CPU textures share immutable scene pixels; CPU BVH construction reads the host
+mesh directly. Shader geometry packing remains backend-derived data.
 
-```mermaid
-flowchart TD
-    Renderer[Sparkium renderer] --> Device[Sparkium backend Device]
-    Device --> Graphics[graphics: GraphicsDevice]
-    Device --> CPU[cpu: CpuDevice]
-    Device --> CUDA[cuda: CudaDevice]
-    Graphics --> APIs[graphics library: Vulkan / D3D12 / Metal]
-    CPU --> LLVM[Slang LLVM JIT + std::thread pool]
-    CUDA --> NVRTC[NVRTC + CUDA kernels]
-    CUDA --> OptiX[OptiX GAS / IAS + ray tracing pipeline]
-    Display[GUI display] --> APIs
-```
+The existing execution machinery remains under `code/sparkium/backend/`:
+
+- `graphics/` adapts Vulkan, D3D12 and Metal devices from graphics.
+- `cpu/` owns LLVM function JIT execution and the persistent thread pool.
+- `cuda/` owns CUDA context, NVRTC compilation, kernel launches and optional OptiX.
+- `common/` contains shared bindings, resources, Slang frontend and compatibility.
+
+These internal resource adapters still use Graphics abstract resource contracts
+to run the existing pipelines. They are not the scene-facing backend API.
+`detail::SceneInstance` creates private execution objects from the scene model;
+legacy `Core` callers remain supported. Graphics itself contains no CPU/CUDA
+compute backend. OptiX remains a CUDA traversal pipeline.
 
 For NVIDIA hardware traversal on CUDA, see optional
 [OptiX ray tracing](optix-ray-tracing.md). Use `--pipeline rt_fallback` to

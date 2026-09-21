@@ -2,6 +2,9 @@
 #include <long_march.h>
 
 #include <type_traits>
+#ifdef SPARKIUM_NATIVE_ENABLED
+#include "sparkium/backend/common/native_image.h"
+#endif
 
 namespace {
 using namespace grassland;
@@ -42,4 +45,23 @@ TEST(SparkiumBackend, GraphicsAdapterPreservesDeviceIdentity) {
   EXPECT_EQ(device->GraphicsCore()->API(), graphics::BACKEND_API_DEFAULT);
   EXPECT_EQ(device->DeviceRayQuerySupport(), device->GraphicsCore()->DeviceRayQuerySupport());
 }
+
+#ifdef SPARKIUM_NATIVE_ENABLED
+TEST(SparkiumBackend, CpuTextureBorrowsScenePixelsAndRetainsOwnership) {
+  auto texture = std::make_shared<sparkium::TextureData>();
+  texture->width = texture->height = 1;
+  texture->rgba = {10, 20, 30, 255};
+  auto image = std::make_unique<sparkium::backend::NativeImage>(texture);
+  EXPECT_EQ(image->memory->Data(), texture->rgba.data());
+  EXPECT_THROW(image->UploadData(texture->rgba.data()), std::logic_error);
+  std::weak_ptr<const sparkium::TextureData> weak = texture;
+  texture.reset();
+  EXPECT_FALSE(weak.expired());
+  std::array<uint8_t, 4> pixel{};
+  image->DownloadData(pixel.data());
+  EXPECT_EQ(pixel, (std::array<uint8_t, 4>{10, 20, 30, 255}));
+  image.reset();
+  EXPECT_TRUE(weak.expired());
+}
+#endif
 }  // namespace

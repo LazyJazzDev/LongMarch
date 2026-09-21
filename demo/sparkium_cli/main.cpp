@@ -9,7 +9,6 @@
 #include <iomanip>
 #include <iostream>
 
-#include "grassland/graphics/frame_profile.h"
 #include "stb_image_write.h"
 
 using namespace long_march;
@@ -98,97 +97,59 @@ int main(int argc, char **argv) {
     if (frames <= 0)
       throw std::runtime_error("--frames must be positive");
 
-    std::unique_ptr<sparkium::backend::Device> graphics_core;
-    if (sparkium::CreateDevice(backend, sparkium::backend::Device::Settings{2, debug}, &graphics_core) != 0)
-      throw std::runtime_error("failed to create graphics core");
-    if (graphics_core->InitializeLogicalDeviceAutoSelect(false) != 0)
-      throw std::runtime_error("failed to initialize graphics device");
-    std::cout << "Backend: " << sparkium::BackendName(graphics_core->API())
-              << ", device: " << graphics_core->DeviceName() << '\n';
-    if (require_hardware_rt && !graphics_core->DeviceRayTracingSupport())
-      throw std::runtime_error("hardware ray tracing is unavailable on the selected device");
-    sparkium::Core core(graphics_core.get());
-    std::string error;
-    auto loaded = sparkium::JsonScene::Load(&core, scene_path, &error);
-    if (!loaded)
-      throw std::runtime_error(error);
-    if (!override_pipeline)
-      pipeline = loaded->GetRenderPipeline();
-    const auto resolved_pipeline = core.ResolveRenderPipeline(pipeline);
-    if (require_hardware_rt && resolved_pipeline != sparkium::RENDER_PIPELINE_RAY_TRACING)
-      throw std::runtime_error("--require-hardware-rt requires the ray_tracing pipeline");
-    if (graphics_core->API() == sparkium::RenderBackend::CPU || graphics_core->API() == sparkium::RenderBackend::CUDA) {
-      if (pipeline == sparkium::RENDER_PIPELINE_RASTERIZATION || pipeline == sparkium::RENDER_PIPELINE_RAY_QUERY)
-        throw std::runtime_error("CPU/CUDA support the shared path tracer, not rasterization or native ray queries");
-      if (resolved_pipeline == sparkium::RENDER_PIPELINE_RAY_TRACING)
-        std::cout << "Tracing: CUDA ray_tracing via OptiX (GAS/IAS, optixLaunch; shared path tracer)\n";
-      else
-        std::cout << "Tracing: native " << sparkium::BackendName(graphics_core->API())
-                  << " kernels (shared path tracer and software BVH; no graphics API dispatch)\n";
-    }
-    if (core.ResolveRenderPipeline(pipeline) == sparkium::RENDER_PIPELINE_RAY_QUERY)
-      std::cout << "Tracing: native ray query (compute, native AS)\n";
-
-    auto *film = loaded->GetFilm();
-    std::unique_ptr<graphics::Image> image;
-    graphics_core->CreateImage(film->GetWidth(), film->GetHeight(), graphics::IMAGE_FORMAT_R8G8B8A8_UNORM, &image);
-    std::unique_ptr<graphics::FrameProfile> profiler;
+    auto scene = sparkium::LoadScene(scene_path);
+    auto renderer = sparkium::CreateRenderer(SparkiumRendererSettings(backend, debug));
+    renderer->SetScene(scene);
+    renderer->Configure({override_pipeline ? std::optional(pipeline) : std::nullopt, std::nullopt});
+    pipeline = renderer->Pipeline();
+    const auto info = renderer->Info();
+    const auto resolved_pipeline = renderer->ResolvePipeline(pipeline);
+    std::cout << "Backend: " << sparkium::BackendName(backend) << ", device: " << info.device << '\n';
+    if (require_hardware_rt && (!info.ray_tracing || resolved_pipeline != sparkium::RENDER_PIPELINE_RAY_TRACING))
+      throw std::runtime_error("--require-hardware-rt requires available hardware and the ray_tracing pipeline");
+    const char *pipeline_names[]{"rasterization", "ray_tracing", "auto", "rt_fallback", "ray_query"};
+    std::cout << "Tracing pipeline: " << pipeline_names[resolved_pipeline] << '\n';
+    sparkium::RenderImage image;
     std::ofstream profile_output;
     if (!profile_path.empty()) {
-      if (auto *graphics_device = graphics_core->GraphicsCore())
-        profiler = std::make_unique<graphics::FrameProfile>(graphics_device, !profile_cpu_only);
-      else {
-        if (!profile_cpu_only)
-          throw std::runtime_error("native profiling requires --profile-cpu-only");
-        profiler = std::make_unique<graphics::FrameProfile>(graphics_core->DeviceName());
-      }
       std::filesystem::create_directories(profile_path.has_parent_path() ? profile_path.parent_path() : ".");
       profile_output.open(profile_path);
       if (!profile_output)
         throw std::runtime_error("cannot open profile output");
       profile_output << "frame,domain,stage,value\n" << std::fixed << std::setprecision(6);
-      std::cout << "Profiling device: " << profiler->device_name << '\n';
+      std::cout << "Profiling device: " << info.device << '\n';
     }
     for (int frame = 0; frame < frames; ++frame) {
-      if (profiler)
-        profiler->Begin(!profile_alternate_gpu || frame % 4 == 0 || frame % 4 == 3);
-      {
-        graphics::CpuProfileScope frame_profile("frame_wall");
-        {
-          graphics::CpuProfileScope render_profile("render_wall");
-          core.Render(loaded->GetScene(), loaded->GetCamera(), film, pipeline);
-        }
-        // Profiling includes a developed display image for each frame, as in the GUI.
-        if (profiler)
-          film->Develop(image.get());
-      }
-      if (profiler) {
-        profiler->Finish();
-        for (const auto &[name, value] : profiler->cpu_ms)
+      if (!profile_path.empty())
+        renderer->BeginProfile(!profile_cpu_only && (!profile_alternate_gpu || frame % 4 == 0 || frame % 4 == 3));
+      renderer->Render();
+      if (!profile_path.empty()) {
+        image = renderer->ReadImage();
+        auto profile = renderer->EndProfile();
+        for (const auto &[name, value] : profile.cpu_ms)
           profile_output << frame << ",cpu_ms," << name << ',' << value << '\n';
-        for (const auto &[name, value] : profiler->gpu_ms)
+        for (const auto &[name, value] : profile.gpu_ms)
           profile_output << frame << ",gpu_ms," << name << ',' << value << '\n';
-        for (const auto &[name, value] : profiler->counters)
+        for (const auto &[name, value] : profile.counters)
           profile_output << frame << ",count," << name << ',' << value << '\n';
         profile_output.flush();
       }
     }
-    if (!profiler)
-      film->Develop(image.get());
+    if (profile_path.empty())
+      image = renderer->ReadImage();
     if (!linear_output.empty()) {
       // PFM preserves pre-display linear RGB for numerical regression checks.
       // Reject NaNs instead of hiding them in the UNORM display conversion.
-      std::vector<glm::vec4> linear(static_cast<size_t>(film->GetWidth()) * film->GetHeight());
-      film->GetRawImage()->DownloadData(linear.data());
+      auto linear = renderer->ReadLinearImage();
       std::filesystem::create_directories(linear_output.has_parent_path() ? linear_output.parent_path() : ".");
       std::ofstream stream(linear_output, std::ios::binary);
       const uint32_t endian = 1;
       stream << "PF\n"
-             << film->GetWidth() << ' ' << film->GetHeight() << "\n"
+             << image.width << ' ' << image.height << "\n"
              << (*reinterpret_cast<const uint8_t *>(&endian) ? "-1.0\n" : "1.0\n");
-      for (int y = film->GetHeight() - 1; y >= 0; --y)
-        for (int x = 0; x < film->GetWidth(); ++x) {
-          const auto &pixel = linear[static_cast<size_t>(y) * film->GetWidth() + x];
+      for (int y = image.height - 1; y >= 0; --y)
+        for (int x = 0; x < image.width; ++x) {
+          const auto &pixel = linear[static_cast<size_t>(y) * image.width + x];
           for (int c = 0; c < 3; ++c)
             if (!std::isfinite(pixel[c]))
               throw std::runtime_error("non-finite linear radiance at pixel " + std::to_string(x) + "," +
@@ -198,14 +159,12 @@ int main(int argc, char **argv) {
       if (!stream)
         throw std::runtime_error("failed to write linear image: " + linear_output.string());
     }
-    std::vector<uint8_t> pixels(static_cast<size_t>(film->GetWidth()) * film->GetHeight() * 4);
-    image->DownloadData(pixels.data());
+
     std::filesystem::create_directories(output.has_parent_path() ? output.parent_path() : ".");
-    if (!stbi_write_png(output.string().c_str(), film->GetWidth(), film->GetHeight(), 4, pixels.data(),
-                        film->GetWidth() * 4))
+    if (!stbi_write_png(output.string().c_str(), image.width, image.height, 4, image.rgba.data(), image.width * 4))
       throw std::runtime_error("failed to write image: " + output.string());
-    std::cout << "Rendered '" << loaded->GetName() << "' (" << film->GetWidth() << 'x' << film->GetHeight() << ", "
-              << frames << " frame(s)) to " << output.string() << '\n';
+    std::cout << "Rendered '" << scene->name << "' (" << image.width << 'x' << image.height << ", " << frames
+              << " frame(s)) to " << output.string() << '\n';
     return 0;
   } catch (const std::exception &exception) {
     std::cerr << "sparkium_cli: " << exception.what() << '\n';

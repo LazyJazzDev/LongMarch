@@ -8,6 +8,15 @@
 
 namespace sparkium::backend {
 
+NativeImage::NativeImage(std::shared_ptr<const TextureData> texture)
+    : extent_{uint32_t(texture->width), uint32_t(texture->height)},
+      format_(IMAGE_FORMAT_R8G8B8A8_UNORM),
+      channels_(4),
+      external_bytes_(4),
+      unorm_(true) {
+  memory = std::make_unique<NativeMemory>(texture, texture->rgba.data(), texture->rgba.size());
+}
+
 NativeImage::NativeImage(bool cuda, int width, int height, ImageFormat format)
     : extent_{uint32_t(width), uint32_t(height)},
       format_(format),

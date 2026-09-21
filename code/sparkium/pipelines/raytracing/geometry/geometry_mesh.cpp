@@ -16,6 +16,10 @@ graphics::Buffer *GeometryMesh::Buffer() {
   return geometry_.GetBuffer();
 }
 
+const Mesh<float> *GeometryMesh::HostMesh() const {
+  return geometry_.HostMesh();
+}
+
 const CodeLines &GeometryMesh::ClosestHitShaderImpl() const {
   return closest_hit_shader_implementation_;
 }

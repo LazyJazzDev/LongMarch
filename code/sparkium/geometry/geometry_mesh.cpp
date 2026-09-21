@@ -4,6 +4,10 @@
 
 namespace sparkium {
 
+GeometryMesh::GeometryMesh(Core *core, std::shared_ptr<const Mesh<float>> mesh) : GeometryMesh(core, *mesh) {
+  host_mesh_ = std::move(mesh);
+}
+
 GeometryMesh::GeometryMesh(Core *core, const Mesh<float> &mesh) : Geometry(core) {
   std::vector<uint8_t> data;
   auto write_data = [&](const void *data_ptr, size_t size) {

@@ -23,7 +23,18 @@ NativeMemory::NativeMemory(bool cuda, size_t size) : cuda_(cuda), size_(size) {
   std::memset(data_, 0, std::max(size, size_t(16)));
 }
 
+NativeMemory::NativeMemory(std::shared_ptr<const void> owner, const void *data, size_t size)
+    : cuda_(false),
+      size_(size),
+      data_(const_cast<void *>(data)),
+      owner_(std::move(owner)) {
+  if (!owner_ || (!data && size))
+    throw std::invalid_argument("invalid borrowed scene memory");
+}
+
 NativeMemory::~NativeMemory() {
+  if (owner_)
+    return;
 #ifdef SPARKIUM_NATIVE_CUDA_ENABLED
   if (cuda_) {
     FreeCudaMemory(data_);
@@ -34,6 +45,8 @@ NativeMemory::~NativeMemory() {
 }
 
 void NativeMemory::Upload(const void *p, size_t size, size_t offset) const {
+  if (owner_)
+    throw std::logic_error("scene memory is read-only");
   if (offset > size_ || size > size_ - offset)
     throw std::out_of_range("native buffer upload");
   if (!size)

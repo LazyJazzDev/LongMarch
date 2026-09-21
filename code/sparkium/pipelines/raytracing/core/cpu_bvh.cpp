@@ -134,6 +134,20 @@ CpuBvhTree BuildCpuBvh(const std::vector<CpuBounds> &bounds, uint32_t leaf_size)
   return result;
 }
 
+CpuBvhTree BuildCpuMeshBvh(const grassland::Mesh<float> &mesh) {
+  std::vector<CpuBounds> bounds(mesh.NumIndices() / 3);
+  for (size_t i = 0; i < mesh.NumIndices(); ++i) {
+    const auto index = mesh.Indices()[i];
+    if (index >= mesh.NumVertices())
+      throw std::invalid_argument("mesh index out of bounds");
+    const auto &p = mesh.Positions()[index];
+    if (!std::isfinite(p.x()) || !std::isfinite(p.y()) || !std::isfinite(p.z()))
+      throw std::runtime_error("CPU BVH requires finite positions");
+    bounds[i / 3].Extend(glm::vec3(p.x(), p.y(), p.z()));
+  }
+  return BuildCpuBvh(bounds);
+}
+
 CpuBvhTree BuildCpuMeshBvh(const std::vector<uint8_t> &geometry, uint32_t count) {
   uint32_t position = Read<uint32_t>(geometry, 8), stride = Read<uint32_t>(geometry, 12),
            indices = Read<uint32_t>(geometry, 48);

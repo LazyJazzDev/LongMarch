@@ -3,6 +3,8 @@
 #include <glm/glm.hpp>
 #include <vector>
 
+#include "grassland/math/math_mesh.h"
+
 namespace sparkium::raytracing {
 // CPU-only SAH tree. A tree starts with a 16-byte header, followed by 32-byte
 // nodes and a packed primitive-index array. GPU construction/layout is independent.
@@ -28,4 +30,5 @@ struct CpuBvhTree {
 
 CpuBvhTree BuildCpuBvh(const std::vector<CpuBounds> &bounds, uint32_t leaf_size = 4);
 CpuBvhTree BuildCpuMeshBvh(const std::vector<uint8_t> &geometry, uint32_t primitive_count);
+CpuBvhTree BuildCpuMeshBvh(const grassland::Mesh<float> &mesh);
 }  // namespace sparkium::raytracing

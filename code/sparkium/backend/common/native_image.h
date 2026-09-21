@@ -2,6 +2,7 @@
 #include "grassland/graphics/image.h"
 #include "sparkium/backend/common/native_bindings.h"
 #include "sparkium/backend/common/native_memory.h"
+#include "sparkium/scene/scene_definition.h"
 
 namespace sparkium::backend {
 using namespace grassland;
@@ -10,6 +11,7 @@ using namespace grassland::graphics;
 class NativeImage final : public Image {
  public:
   NativeImage(bool cuda, int width, int height, ImageFormat format);
+  explicit NativeImage(std::shared_ptr<const TextureData> texture);
 
   Extent2D Extent() const override {
     return extent_;

@@ -1,9 +1,9 @@
 #pragma once
 #include "grassland/graphics/core.h"
 #include "grassland/graphics/graphics.h"
+#include "sparkium/scene/render_types.h"
 
 namespace sparkium {
-enum class RenderBackend { Graphics, CPU, CUDA };
 
 struct BackendSelection {
   RenderBackend backend{RenderBackend::Graphics};

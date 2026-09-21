@@ -119,6 +119,33 @@ TEST_F(GuiSceneTest, GraphicsApiSwitchRecreatesRenderDevice) {
   }
 }
 
+TEST_F(GuiSceneTest, BackendSwitchUsesLoadedSceneUntilExplicitReload) {
+  RenderWorker worker(1);
+  RenderRequest request;
+  request.scene = path;
+  auto status = Wait(worker, worker.Submit(request));
+  ASSERT_TRUE(status.error.empty()) << status.error;
+  std::filesystem::remove(path);
+  for (auto backend :
+       {sparkium::RenderBackend::CPU, sparkium::RenderBackend::CUDA, sparkium::RenderBackend::Graphics}) {
+    if (!sparkium::SupportBackend(backend))
+      continue;
+    request.backend = backend;
+    status = Wait(worker, worker.Submit(request));
+    ASSERT_TRUE(status.error.empty()) << status.error;
+    ASSERT_TRUE(status.frame);
+    EXPECT_EQ(status.frame->width, 17);
+  }
+  ++request.reload;
+  status = Wait(worker, worker.Submit(request));
+  EXPECT_FALSE(status.error.empty());
+  WriteScene(19, 11);
+  status = Wait(worker, worker.Submit(request));
+  ASSERT_TRUE(status.error.empty()) << status.error;
+  ASSERT_TRUE(status.frame);
+  EXPECT_EQ(status.frame->width, 19);
+}
+
 TEST_F(GuiSceneTest, OptixPipelineSwitchResetsAccumulation) {
 #ifndef SPARKIUM_OPTIX_ENABLED
   GTEST_SKIP() << "OptiX not built";

@@ -64,6 +64,16 @@ TEST(CpuBvh, EmptyDegenerateAndCoincidentBounds) {
   Validate(std::vector<CpuBounds>(257, CpuBounds{{1, 2, 3}, {1, 2, 3}}));
 }
 
+TEST(CpuBvh, BuildsDirectlyFromImmutableHostMesh) {
+  auto mesh = grassland::Mesh<float>::Sphere(12, 6);
+  std::vector<CpuBounds> reference(mesh.NumIndices() / 3);
+  for (size_t i = 0; i < mesh.NumIndices(); ++i) {
+    const auto &p = mesh.Positions()[mesh.Indices()[i]];
+    reference[i / 3].Extend(glm::vec3(p.x(), p.y(), p.z()));
+  }
+  EXPECT_EQ(BuildCpuMeshBvh(mesh).bytes, BuildCpuBvh(reference).bytes);
+}
+
 TEST(CpuBvh, RandomAndHighlyUnbalancedDistributions) {
   std::mt19937 rng(123);
   std::uniform_real_distribution<float> d(-100, 100);

@@ -2,6 +2,8 @@
 
 #include <chrono>
 
+#include "../sparkium_backend.h"
+
 namespace sparkium_gui {
 using namespace grassland;
 
@@ -64,13 +66,12 @@ bool RenderWorker::Publish(const RenderStatus &status) {
 void RenderWorker::Run(int frame_limit) {
   // Construction and destruction stay on this thread, including CUDA's
   // thread-local current context. The frontend never waits on this device.
-  std::unique_ptr<sparkium::backend::Device> device;
-  std::unique_ptr<sparkium::Core> renderer;
-  std::unique_ptr<sparkium::JsonScene> scene;
-  std::unique_ptr<graphics::Image> developed;
+  std::unique_ptr<sparkium::Renderer> renderer;
+  std::shared_ptr<const sparkium::SceneDefinition> scene;
+  std::filesystem::path loaded_path;
+  uint64_t loaded_revision = 0;
   std::optional<sparkium::RenderBackend> device_backend;
   auto device_graphics_api = graphics::BACKEND_API_DEFAULT;
-  RenderRequest active;
   RenderStatus status;
   uint64_t applied = 0, frame_number = 0;
   bool waiting = true;
@@ -93,12 +94,7 @@ void RenderWorker::Run(int frame_limit) {
         if (!device_backend || *device_backend != request.backend || device_graphics_api != request.graphics_api) {
           // Destroy every resource while its owning context is still current.
           // This runs only between dispatches, never on the window thread.
-          if (device)
-            device->WaitGPU();
-          developed.reset();
-          scene.reset();
           renderer.reset();
-          device.reset();
           device_backend.reset();
           status = RenderStatus{};
           status.backend = request.backend;
@@ -110,69 +106,40 @@ void RenderWorker::Run(int frame_limit) {
         status.finished = false;
         status.updating = true;
         Publish(status);
-        if (!device) {
-          if (!sparkium::SupportBackend({request.backend, request.graphics_api}))
-            throw std::runtime_error("selected render backend was not built");
-          std::unique_ptr<sparkium::backend::Device> next_device;
-          if (sparkium::CreateDevice({request.backend, request.graphics_api}, {}, &next_device) != 0 || !next_device ||
-              next_device->InitializeLogicalDeviceAutoSelect(false) != 0) {
-            throw std::runtime_error("failed to initialize render backend");
-          }
-          device = std::move(next_device);
+        if (!scene || request.scene != loaded_path || request.reload != loaded_revision) {
+          auto next = sparkium::LoadScene(request.scene);
+          scene = std::move(next);
+          loaded_path = request.scene;
+          loaded_revision = request.reload;
+        }
+        if (Interrupted(revision))
+          continue;
+        if (!renderer) {
+          renderer = sparkium::CreateRenderer(SparkiumRendererSettings({request.backend, request.graphics_api}));
           device_backend = request.backend;
           device_graphics_api = request.graphics_api;
         }
-        if (!renderer)
-          renderer = std::make_unique<sparkium::Core>(device.get());
-        if (Interrupted(revision))
-          continue;
-        if (!scene || request.scene != active.scene || request.reload != active.reload) {
-          std::string error;
-          auto next = sparkium::JsonScene::Load(renderer.get(), request.scene, &error);
-          if (!next)
-            throw std::runtime_error(error);
-          device->WaitGPU();
-          developed.reset();
-          scene = std::move(next);
-        }
-        auto *film = scene->GetFilm();
-        auto pipeline = request.pipeline.value_or(scene->GetRenderPipeline());
-        const bool native =
-            device->API() == sparkium::RenderBackend::CPU || device->API() == sparkium::RenderBackend::CUDA;
-        if (native &&
-            (pipeline == sparkium::RENDER_PIPELINE_RASTERIZATION || pipeline == sparkium::RENDER_PIPELINE_RAY_QUERY)) {
-          // A scene's preferred graphics pipeline is not a restriction on
-          // viewing it with a compute-only backend. Explicit requests fail.
-          if (request.pipeline)
-            throw std::runtime_error("CPU/CUDA do not support rasterization or inline ray queries");
-          pipeline = sparkium::RENDER_PIPELINE_RT_FALLBACK;
-        }
-        if (request.samples)
-          scene->GetScene()->settings.samples_per_dispatch = *request.samples;
-        if (!developed && device->CreateImage(film->GetWidth(), film->GetHeight(),
-                                              graphics::IMAGE_FORMAT_R8G8B8A8_UNORM, &developed) != 0)
-          throw std::runtime_error("failed to create render image");
-        film->Reset();
-        active = request;
-        status.backend = device->API();
+        if (renderer->GetScene() != scene)
+          renderer->SetScene(scene);
+        renderer->Configure({request.pipeline, request.samples});
+        const auto info = renderer->Info();
+        status.backend = request.backend;
         status.graphics_api = request.graphics_api;
-        status.device = device->DeviceName();
-        status.name = scene->GetName();
-        status.pipeline = pipeline;
-        status.resolved_pipeline = renderer->ResolveRenderPipeline(pipeline);
-        status.automatic_pipeline = renderer->ResolveRenderPipeline(sparkium::RENDER_PIPELINE_AUTO);
-        status.ray_tracing = device->DeviceRayTracingSupport();
-        status.ray_query = device->DeviceRayQuerySupport();
-        status.samples = scene->GetScene()->settings.samples_per_dispatch;
+        status.device = info.device;
+        status.name = scene->name;
+        status.pipeline = renderer->Pipeline();
+        status.resolved_pipeline = renderer->ResolvePipeline(status.pipeline);
+        status.automatic_pipeline = renderer->ResolvePipeline(sparkium::RENDER_PIPELINE_AUTO);
+        status.ray_tracing = info.ray_tracing;
+        status.ray_query = info.ray_query;
+        status.samples = renderer->SamplesPerDispatch();
         Publish(status);
         waiting = false;
       }
       if (Interrupted(revision))
         continue;
       const auto start = std::chrono::steady_clock::now();
-      auto *film = scene->GetFilm();
-      renderer->Render(scene->GetScene(), scene->GetCamera(), film, status.pipeline);
-      device->WaitGPU();
+      renderer->Render();
       const auto end = std::chrono::steady_clock::now();
       ++frame_number;
       if (Interrupted(revision))
@@ -183,13 +150,12 @@ void RenderWorker::Run(int frame_limit) {
         auto frame = std::make_shared<RenderFrame>();
         frame->revision = revision;
         frame->number = frame_number;
-        frame->width = film->GetWidth();
-        frame->height = film->GetHeight();
-        frame->accumulated_samples = film->info.accumulated_samples;
+        auto image = renderer->ReadImage();
+        frame->width = image.width;
+        frame->height = image.height;
+        frame->accumulated_samples = image.accumulated_samples;
         frame->render_seconds = std::chrono::duration<double>(end - start).count();
-        frame->rgba.resize(static_cast<size_t>(frame->width) * frame->height * 4);
-        film->Develop(developed.get());
-        developed->DownloadData(frame->rgba.data());
+        frame->rgba = std::move(image.rgba);
         status.frame = std::move(frame);
         status.updating = false;
         Publish(status);
@@ -203,12 +169,6 @@ void RenderWorker::Run(int frame_limit) {
       status.finished = true;
       Publish(status);
       waiting = true;
-    }
-  }
-  if (device) {
-    try {
-      device->WaitGPU();
-    } catch (...) { /* Reported by the dispatch path. */
     }
   }
 }

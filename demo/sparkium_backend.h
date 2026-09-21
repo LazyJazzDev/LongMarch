@@ -2,6 +2,7 @@
 #include <stdexcept>
 
 #include "sparkium/backend/device.h"
+#include "sparkium/renderer/renderer.h"
 
 inline sparkium::BackendSelection ParseSparkiumBackend(const std::string &name) {
   using namespace sparkium;
@@ -21,4 +22,24 @@ inline sparkium::BackendSelection ParseSparkiumBackend(const std::string &name) 
   if (!SupportBackend(selection))
     throw std::runtime_error("render backend was not built: " + name);
   return selection;
+}
+
+inline sparkium::RendererSettings SparkiumRendererSettings(sparkium::BackendSelection selection, bool debug = false) {
+  sparkium::RendererSettings settings;
+  settings.backend = selection.backend;
+  settings.debug = debug;
+  switch (selection.graphics_api) {
+    case grassland::graphics::BACKEND_API_D3D12:
+      settings.graphics_api = sparkium::GraphicsAPI::D3D12;
+      break;
+    case grassland::graphics::BACKEND_API_VULKAN:
+      settings.graphics_api = sparkium::GraphicsAPI::Vulkan;
+      break;
+    case grassland::graphics::BACKEND_API_METAL:
+      settings.graphics_api = sparkium::GraphicsAPI::Metal;
+      break;
+    default:
+      break;
+  }
+  return settings;
 }

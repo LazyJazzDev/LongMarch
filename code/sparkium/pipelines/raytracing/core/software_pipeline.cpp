@@ -11,6 +11,7 @@
 #include "sparkium/pipelines/raytracing/core/core.h"
 #include "sparkium/pipelines/raytracing/core/geometry.h"
 #include "sparkium/pipelines/raytracing/core/material.h"
+#include "sparkium/pipelines/raytracing/geometry/geometry_mesh.h"
 
 namespace sparkium::raytracing {
 namespace {
@@ -310,6 +311,10 @@ void SoftwarePipeline::Update(graphics::CommandContext *commands,
     if (rebuild) {
       cpu_meshes_.clear();
       for (const auto &geometry : geometries) {
+        if (auto mesh = dynamic_cast<GeometryMesh *>(geometry.geometry); mesh && mesh->HostMesh()) {
+          cpu_meshes_.push_back(BuildCpuMeshBvh(*mesh->HostMesh()));
+          continue;
+        }
         auto buffer = geometry.geometry->Buffer();
         std::vector<uint8_t> bytes(buffer->Size());
         buffer->DownloadData(bytes.data(), bytes.size());

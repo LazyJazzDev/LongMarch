@@ -24,6 +24,7 @@ class GeometryMesh : public Geometry {
   };
 
   GeometryMesh(sparkium::GeometryMesh &geometry);
+  const Mesh<float> *HostMesh() const;
 
   graphics::Buffer *Buffer() override;
   graphics::AccelerationStructure *BLAS() override;
