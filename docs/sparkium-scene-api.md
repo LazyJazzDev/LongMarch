@@ -195,11 +195,11 @@ concurrent library rendering, per-renderer accumulation, and GUI switching/reloa
 Backend rendering tests exercise the available Graphics, CPU and CUDA paths;
 unavailable platform backends are not claimed as validated.
 
-The [independent-backend validation record](https://github.com/LazyJazzDev/LongMarchAssetsLFS/blob/34715e2036b86b10c5a759e4be351ac84628ecb5/reports/sparkium-native-backends/independent-backends/README.md)
+The [backend resource/compiler split validation record](https://github.com/LazyJazzDev/LongMarchAssetsLFS/blob/97ea9df13a240ecf132347119488212d941bfc00/reports/sparkium-backends/backend-split/README.md)
 contains before/after images at 64 x 64 and 16 spp, 82 passing tests (one expected
 skip), 31 CLI checks and executable provenance. Tests include retaining one
 Renderer while switching backends after deleting all scene source files, failed
 switch recovery, pipeline rejection and backend release without losing Scene.
 All five tested paths retained identical PNG pixels; this is not a new
 full-resolution Blender benchmark. The report was published through
-[assets PR10](https://github.com/LazyJazzDev/LongMarchAssetsLFS/pull/10).
+[assets PR11](https://github.com/LazyJazzDev/LongMarchAssetsLFS/pull/11).
