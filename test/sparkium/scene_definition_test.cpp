@@ -52,3 +52,14 @@ TEST(SceneDefinition, MissingFilesFailDuringLoad) {
   std::filesystem::remove(files.directory / "texture.tga");
   EXPECT_THROW(LoadScene(files.directory / "scene.json"), std::runtime_error);
 }
+
+TEST(SceneDefinition, FilePipelinePreferenceIsSeparateFromScene) {
+  sparkium_test::SceneFiles files;
+  auto document = sparkium::LoadSceneDocument(files.directory / "scene.json");
+  ASSERT_TRUE(document.scene);
+  auto identity = document.scene.get();
+  document.preferred_pipeline = sparkium::RENDER_PIPELINE_RASTERIZATION;
+  files.RemoveSources();
+  document.scene->Validate();
+  EXPECT_EQ(document.scene.get(), identity);
+}

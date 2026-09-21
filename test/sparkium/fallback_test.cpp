@@ -12,11 +12,11 @@
 #include "../../demo/sparkium_backend.h"
 #include "grassland/graphics/backend/backend.h"
 #include "grassland/graphics/frame_profile.h"
-#include "sparkium/pipelines/raytracing/core/core.h"
-#include "sparkium/pipelines/raytracing/core/software_pipeline.h"
-#include "sparkium/pipelines/raytracing/entity/entities.h"
-#include "sparkium/pipelines/raytracing/geometry/geometry_mesh.h"
-#include "sparkium/pipelines/raytracing/material/material_lambertian.h"
+#include "sparkium/backend/common/path_tracing/core/core.h"
+#include "sparkium/backend/common/path_tracing/core/software_pipeline.h"
+#include "sparkium/backend/common/path_tracing/entity/entities.h"
+#include "sparkium/backend/common/path_tracing/geometry/geometry_mesh.h"
+#include "sparkium/backend/common/path_tracing/material/material_lambertian.h"
 
 using namespace grassland;
 

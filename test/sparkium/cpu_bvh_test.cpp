@@ -1,4 +1,4 @@
-#include "sparkium/pipelines/raytracing/core/cpu_bvh.h"
+#include "sparkium/backend/cpu/cpu_bvh.h"
 
 #include <gtest/gtest.h>
 

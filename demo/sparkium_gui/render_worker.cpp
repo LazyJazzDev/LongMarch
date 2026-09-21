@@ -66,7 +66,8 @@ bool RenderWorker::Publish(const RenderStatus &status) {
 void RenderWorker::Run(int frame_limit) {
   // Construction and destruction stay on this thread, including CUDA's
   // thread-local current context. The frontend never waits on this device.
-  std::unique_ptr<sparkium::Renderer> renderer;
+  auto renderer = std::make_unique<sparkium::Renderer>();
+  auto preferred_pipeline = sparkium::RENDER_PIPELINE_AUTO;
   std::shared_ptr<const sparkium::SceneDefinition> scene;
   std::filesystem::path loaded_path;
   uint64_t loaded_revision = 0;
@@ -94,7 +95,7 @@ void RenderWorker::Run(int frame_limit) {
         if (!device_backend || *device_backend != request.backend || device_graphics_api != request.graphics_api) {
           // Destroy every resource while its owning context is still current.
           // This runs only between dispatches, never on the window thread.
-          renderer.reset();
+          renderer->ReleaseBackend();
           device_backend.reset();
           status = RenderStatus{};
           status.backend = request.backend;
@@ -107,21 +108,26 @@ void RenderWorker::Run(int frame_limit) {
         status.updating = true;
         Publish(status);
         if (!scene || request.scene != loaded_path || request.reload != loaded_revision) {
-          auto next = sparkium::LoadScene(request.scene);
-          scene = std::move(next);
+          auto next = sparkium::LoadSceneDocument(request.scene);
+          scene = std::move(next.scene);
+          preferred_pipeline = next.preferred_pipeline;
           loaded_path = request.scene;
           loaded_revision = request.reload;
         }
         if (Interrupted(revision))
           continue;
-        if (!renderer) {
-          renderer = sparkium::CreateRenderer(SparkiumRendererSettings({request.backend, request.graphics_api}));
+        if (renderer->GetScene() != scene)
+          renderer->SetScene(scene);
+        if (!renderer->HasBackend()) {
+          renderer->Configure({});
+          renderer->SetBackend(SparkiumRendererSettings({request.backend, request.graphics_api}));
           device_backend = request.backend;
           device_graphics_api = request.graphics_api;
         }
-        if (renderer->GetScene() != scene)
-          renderer->SetScene(scene);
-        renderer->Configure({request.pipeline, request.samples});
+        auto pipeline = request.pipeline;
+        if (!pipeline && renderer->SupportsPipeline(preferred_pipeline))
+          pipeline = preferred_pipeline;
+        renderer->Configure({pipeline, request.samples});
         const auto info = renderer->Info();
         status.backend = request.backend;
         status.graphics_api = request.graphics_api;

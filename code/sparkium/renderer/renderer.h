@@ -1,61 +1,50 @@
 #pragma once
+#include <thread>
 
-#include <optional>
-
-#include "sparkium/scene/scene_definition.h"
+#include "sparkium/renderer/render_settings.h"
 
 namespace sparkium {
+namespace backend {
+class Backend;
+}
 
-struct RendererSettings {
-  RenderBackend backend{RenderBackend::Graphics};
-  GraphicsAPI graphics_api{GraphicsAPI::Default};
-  bool debug{};
-};
-
-struct RendererInfo {
-  std::string device;
-  bool ray_tracing{}, ray_query{};
-};
-
-struct RenderSettings {
-  std::optional<RenderPipeline> pipeline;
-  std::optional<int> samples_per_dispatch;
-};
-
-struct RenderImage {
-  int width{}, height{}, accumulated_samples{};
-  std::vector<uint8_t> rgba;
-};
-
-struct RenderProfile {
-  std::map<std::string, double> cpu_ms, gpu_ms;
-  std::map<std::string, uint64_t> counters;
-};
-
-// Scene-level interface, identical for GUI, CLI and library clients.
-// Calls on one renderer are serialized on its creating thread. Independent
-// renderers may run on different threads and share an immutable scene snapshot.
+// Long-lived coordinator. All calls use its creating thread. Scene snapshots may
+// be shared by independent renderers; backend resources never cross renderers.
 class Renderer {
  public:
-  virtual ~Renderer() = default;
-  virtual RendererInfo Info() const = 0;
-  virtual void SetScene(std::shared_ptr<const SceneDefinition> scene) = 0;
-  virtual std::shared_ptr<const SceneDefinition> GetScene() const = 0;
-  virtual RenderPipeline ResolvePipeline(RenderPipeline pipeline) const = 0;
-  // Changing settings resets accumulation without rereading or rebuilding scene data.
-  virtual void Configure(const RenderSettings &settings) = 0;
-  virtual RenderPipeline Pipeline() const = 0;
-  virtual int SamplesPerDispatch() const = 0;
-  virtual void Reset() = 0;
-  virtual void Render() = 0;
-  virtual RenderImage ReadImage() = 0;
-  virtual std::vector<glm::vec4> ReadLinearImage() = 0;
-  // Profiling remains part of the renderer; clients do not access device handles.
-  virtual void BeginProfile(bool gpu_timestamps) = 0;
-  virtual RenderProfile EndProfile() = 0;
+  Renderer();
+  explicit Renderer(const RendererSettings &settings);
+  ~Renderer();
+  Renderer(const Renderer &) = delete;
+  Renderer &operator=(const Renderer &) = delete;
+  void SetBackend(const RendererSettings &settings);
+  void ReleaseBackend();
+  bool HasBackend() const;
+  void SetScene(std::shared_ptr<const SceneDefinition> scene);
+  std::shared_ptr<const SceneDefinition> GetScene() const;
+  RendererInfo Info() const;
+  bool SupportsPipeline(RenderPipeline pipeline) const;
+  RenderPipeline ResolvePipeline(RenderPipeline pipeline) const;
+  void Configure(const RenderSettings &settings);
+  RenderPipeline Pipeline() const;
+  int SamplesPerDispatch() const;
+  void Reset();
+  void Render();
+  RenderImage ReadImage();
+  std::vector<glm::vec4> ReadLinearImage();
+  void BeginProfile(bool gpu_timestamps);
+  RenderProfile EndProfile();
+
+ private:
+  void CheckThread() const;
+  backend::Backend &Execution() const;
+  std::thread::id thread_;
+  std::shared_ptr<const SceneDefinition> scene_;
+  RenderSettings settings_;
+  std::unique_ptr<backend::Backend> backend_;
+  bool profiling_{};
 };
 
 std::unique_ptr<Renderer> CreateRenderer(const RendererSettings &settings = {});
 bool SupportRenderer(const RendererSettings &settings);
-
 }  // namespace sparkium

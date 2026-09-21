@@ -6,18 +6,17 @@ source files again. GUI, CLI and library clients use the same API.
 
 ```mermaid
 flowchart TD
-    Files[Scene file and referenced assets] --> Loader[Sparkium format loader]
-    Code[Programmatic construction] --> Scene[Immutable SceneDefinition snapshot]
-    Loader --> Scene
-    Scene --> Graphics[Graphics renderer]
-    Scene --> CPU[CPU renderer]
-    Scene --> CUDA[CUDA / OptiX renderer]
-    Graphics --> GPU[Graphics resources and acceleration structures]
-    CPU --> Host[Shared host data and CPU BVH]
-    CUDA --> Device[CUDA resources and software BVH / OptiX GAS and IAS]
-    Graphics --> Result[Host image result]
-    CPU --> Result
-    CUDA --> Result
+    Files[Scene files and assets] --> Loader[LoadScene / LoadSceneDocument]
+    Loader --> Scene[Immutable SceneDefinition]
+    Code[Programmatic construction] --> Scene
+    Renderer[Renderer: scene, settings, scheduling] --> Scene
+    Renderer --> Backend[Replaceable Backend]
+    Backend --> Graphics[graphics: geometry / texture / material / entity]
+    Backend --> CPU[cpu: geometry / texture / material / entity]
+    Backend --> CUDA[cuda: geometry / texture / material / entity]
+    Graphics --> GP[Raster / Ray Query / pipeline RT / compute]
+    CPU --> CP[CPU BVH / JIT functions / thread pool]
+    CUDA --> CU[Software BVH / OptiX]
 ```
 
 ## Loading and ownership
@@ -51,20 +50,18 @@ snapshot through another non-const alias while a renderer uses it.
 #include <sparkium/scene_io/json_scene.h>
 #include <sparkium/renderer/renderer.h>
 
-auto scene = sparkium::LoadScene("scene.json");
+sparkium::Renderer renderer;
+renderer.SetScene(sparkium::LoadScene("scene.json"));
+renderer.Configure({sparkium::RENDER_PIPELINE_AUTO, 64});
+renderer.SetBackend({sparkium::RenderBackend::CPU});
+renderer.Render();
+auto cpu_image = renderer.ReadImage();
 
-auto cpu = sparkium::CreateRenderer({sparkium::RenderBackend::CPU});
-cpu->SetScene(scene);
-cpu->Configure({sparkium::RENDER_PIPELINE_RT_FALLBACK, 64});
-cpu->Render();
-auto cpu_image = cpu->ReadImage();
-
-// No scene files or texture decoding are needed here.
-auto cuda = sparkium::CreateRenderer({sparkium::RenderBackend::CUDA});
-cuda->SetScene(scene);
-cuda->Configure({sparkium::RENDER_PIPELINE_AUTO, 64});
-cuda->Render();
-auto cuda_image = cuda->ReadImage();
+// Renderer and Scene survive; all backend resources are rebuilt from memory.
+renderer.SetBackend({sparkium::RenderBackend::CUDA});
+renderer.Render();
+auto cuda_image = renderer.ReadImage();
+renderer.ReleaseBackend(); // retains scene and settings
 ```
 
 `ReadImage()` returns dimensions, accumulated sample count and owned RGBA8
@@ -99,7 +96,7 @@ definition->camera.aspect = 640.0f / 360.0f;
 definition->integrator.background_color = {0.1f, 0.2f, 0.3f};
 definition->Validate();
 std::shared_ptr<const sparkium::SceneDefinition> scene = definition;
-renderer->SetScene(scene);
+renderer.SetScene(scene);
 ```
 
 Link `sparkium_scene_io` for file loading and `sparkium_renderer` for rendering,
@@ -107,9 +104,38 @@ or use the existing aggregate `Sparkium` / `LongMarch` target. Loading does not
 require the Graphics library. The scene model uses Grassland's host mesh/math
 types; existing project-wide Python/CUDA math options still affect those targets.
 
+## Backend lifecycle and pipeline capabilities
+
+Default construction creates no device. `SetScene` and `Configure` can precede
+`SetBackend`; `CreateRenderer(settings)` is a convenience for device creation.
+`SetBackend` releases the old backend first and builds a new one from the retained
+scene/settings. Accumulation starts over. If initialization or translation fails,
+the renderer retains its scene/settings with no backend; fix settings and call
+`SetBackend` again. Calls requiring a backend then report an error until recovery.
+A backend cannot be replaced/released, or its scene changed, during profiling.
+
+`SupportsPipeline` reports support on the initialized device. Explicit unsupported
+requests throw; they do not silently choose another pipeline. `AUTO` selects
+D3D12/Vulkan Ray Query when available, CUDA OptiX when available, otherwise the
+backend's available tracing path. CPU supports `AUTO` and `RT_FALLBACK`.
+
+`RenderBackend`, `GraphicsAPI`, `RenderPipeline` and their settings belong to
+`renderer/`, not `scene/`. `SceneDefinition` has no pipeline field.
+`LoadSceneDocument` returns `{scene, preferred_pipeline}` to preserve a scene
+file's renderer preference separately. GUI/CLI use that preference when supported,
+otherwise `AUTO`; an explicit user selection remains strict. `LoadScene` returns
+only the independent scene entity. No file is reopened when switching backends.
+
 ## Backend implementation and CPU sharing
 
-Renderer implementations consume scene definitions and create private execution
+Renderer owns the scene snapshot, render settings and a replaceable `backend::Backend`.
+Each backend implements scene translation, pipeline capability reporting, dispatch
+and readback. `graphics/`, `cpu/` and `cuda/` each contain `geometry`, `texture`,
+`material`, `entity`, `scene_objects` and `render_backend` implementations. Their
+concrete object sets own execution resources and references to source semantics.
+Shared translation algorithms live in `backend/common/scene_objects_impl.h`.
+
+Backend implementations consume scene definitions and create private execution
 objects. Graphics uploads textures/geometry and constructs graphics acceleration
 structures. CUDA uploads data and constructs its software BVH or OptiX structures.
 CPU texture bindings reference the original immutable pixel memory directly and
@@ -124,15 +150,19 @@ backend execution state. This is not a claim that every CPU operation is zero-co
 
 Existing `Core`, `Scene`, `Film` and resource-level APIs remain for older
 programmatic demos and the current pipeline implementation. They are not the new
-scene data API. `detail::SceneInstance` adapts the new model to these execution
-objects internally; neither `SceneDefinition` nor `Renderer` exposes their
-Graphics types. The old combined `JsonScene::Load(Core*, path)` entry point is
+scene data API. The backend-specific semantic object sets adapt the model to
+these shared shader/resource bindings; neither `SceneDefinition` nor `Renderer`
+exposes their Graphics types. The old `detail::SceneInstance` is removed.
+Raster implementation is under `backend/graphics/raster`; shared path-tracing
+algorithms are under `backend/common/path_tracing`; CPU BVH construction is
+under `backend/cpu`. There is no top-level `sparkium/pipelines` directory.
+Each backend selects and dispatches its supported pipelines. The old combined `JsonScene::Load(Core*, path)` entry point is
 removed: replace it with `LoadScene(path)` and `Renderer::SetScene(scene)`.
 
 ## Frontends and validation
 
 The CLI loads a scene before constructing a renderer. The GUI worker retains
-the loaded scene across backend/API switches, pipeline changes and resets.
+the same Renderer and scene across backend/API switches, pipeline changes and resets.
 Only selecting another document or explicitly requesting reload reads scene
 files again. A failed reload does not invalidate the previously loaded snapshot.
 Display still uses a separate Graphics device and consumes host image results.
@@ -144,7 +174,7 @@ concurrent library rendering, per-renderer accumulation, and GUI switching/reloa
 Backend rendering tests exercise the available Graphics, CPU and CUDA paths;
 unavailable platform backends are not claimed as validated.
 
-The [illustrated validation record](https://github.com/LazyJazzDev/LongMarchAssetsLFS/blob/4779a2054322fd6be2fd68a1f13a885d30d015d8/reports/sparkium-native-backends/scene-api/README.md)
+The previous [illustrated validation record](https://github.com/LazyJazzDev/LongMarchAssetsLFS/blob/4779a2054322fd6be2fd68a1f13a885d30d015d8/reports/sparkium-native-backends/scene-api/README.md)
 contains before/after images at 64 x 64 and 16 spp, test counts and provenance.
 All five tested paths retained identical PNG pixels; this is not a new
 full-resolution Blender benchmark.

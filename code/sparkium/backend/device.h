@@ -1,7 +1,7 @@
 #pragma once
 #include "grassland/graphics/core.h"
 #include "grassland/graphics/graphics.h"
-#include "sparkium/scene/render_types.h"
+#include "sparkium/renderer/render_types.h"
 
 namespace sparkium {
 

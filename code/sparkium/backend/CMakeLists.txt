@@ -51,3 +51,18 @@ endif ()
 
 list(APPEND SPARKIUM_LIBS sparkium_backend)
 set(SPARKIUM_LIBS ${SPARKIUM_LIBS} PARENT_SCOPE)
+
+# Algorithm libraries belong to backend implementations, not the public scene API.
+add_subdirectory(graphics/raster)
+add_subdirectory(common/path_tracing)
+
+add_library(sparkium_execution render_backend.cpp common/shader_graph.cpp
+        graphics/render_backend.cpp graphics/geometry.cpp graphics/texture.cpp)
+target_link_libraries(sparkium_execution PUBLIC sparkium_scene
+        PRIVATE sparkium_core sparkium_geometry sparkium_material sparkium_entity RapidJSON)
+if (LONGMARCH_ENABLE_NATIVE_RENDER AND TARGET slang::slang AND TARGET slang::slang-llvm)
+    target_sources(sparkium_execution PRIVATE cpu/render_backend.cpp cpu/geometry.cpp cpu/texture.cpp)
+    if (LONGMARCH_CUDA_ENABLED)
+        target_sources(sparkium_execution PRIVATE cuda/render_backend.cpp cuda/geometry.cpp cuda/texture.cpp)
+    endif ()
+endif ()

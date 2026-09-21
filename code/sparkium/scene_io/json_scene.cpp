@@ -245,7 +245,8 @@ NodeValue ReadNodeValue(const Value &value) {
 }
 }  // namespace
 
-std::shared_ptr<const SceneDefinition> LoadScene(const std::filesystem::path &input_path) {
+SceneDocument LoadSceneDocument(const std::filesystem::path &input_path) {
+  RenderPipeline preferred_pipeline = RENDER_PIPELINE_AUTO;
   using namespace grassland;
   auto path = std::filesystem::absolute(input_path).lexically_normal();
   std::ifstream stream(path);
@@ -295,15 +296,15 @@ std::shared_ptr<const SceneDefinition> LoadScene(const std::filesystem::path &in
   result->integrator.background_color = Vec3Member(renderer, "background_color", result->integrator.ambient_light);
   std::string pipeline = renderer.HasMember("pipeline") ? ReadString(renderer["pipeline"]) : "auto";
   if (pipeline == "rasterization")
-    result->integrator.pipeline = RENDER_PIPELINE_RASTERIZATION;
+    preferred_pipeline = RENDER_PIPELINE_RASTERIZATION;
   else if (pipeline == "ray_tracing")
-    result->integrator.pipeline = RENDER_PIPELINE_RAY_TRACING;
+    preferred_pipeline = RENDER_PIPELINE_RAY_TRACING;
   else if (pipeline == "ray_query")
-    result->integrator.pipeline = RENDER_PIPELINE_RAY_QUERY;
+    preferred_pipeline = RENDER_PIPELINE_RAY_QUERY;
   else if (pipeline == "rt_fallback")
-    result->integrator.pipeline = RENDER_PIPELINE_RT_FALLBACK;
+    preferred_pipeline = RENDER_PIPELINE_RT_FALLBACK;
   else if (pipeline == "auto")
-    result->integrator.pipeline = RENDER_PIPELINE_AUTO;
+    preferred_pipeline = RENDER_PIPELINE_AUTO;
   else
     throw std::runtime_error("renderer.pipeline must be auto, rasterization, ray_tracing, rt_fallback, or ray_query");
 
@@ -497,7 +498,11 @@ std::shared_ptr<const SceneDefinition> LoadScene(const std::filesystem::path &in
     }
   }
   result->Validate();
-  return result;
+  return {result, preferred_pipeline};
+}
+
+std::shared_ptr<const SceneDefinition> LoadScene(const std::filesystem::path &path) {
+  return LoadSceneDocument(path).scene;
 }
 
 std::vector<std::filesystem::path> FindJsonScenes(const std::filesystem::path &directory) {

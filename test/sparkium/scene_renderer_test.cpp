@@ -97,3 +97,65 @@ TEST(SceneRenderer, OwnsSnapshotAndRejectsInvalidCalls) {
   renderer.reset();
   EXPECT_TRUE(weak.expired());
 }
+
+TEST(SceneRenderer, PersistentRendererRebuildsBackendsWithoutSceneFiles) {
+  sparkium_test::SceneFiles files;
+  auto document = LoadSceneDocument(files.directory / "scene.json");
+  Renderer renderer;
+  renderer.SetScene(document.scene);
+  renderer.Configure({RENDER_PIPELINE_AUTO, 1});
+  files.RemoveSources();
+  auto *identity = renderer.GetScene().get();
+  const std::vector<RendererSettings> backends{{RenderBackend::CPU},
+                                               {RenderBackend::Graphics, GraphicsAPI::D3D12},
+                                               {RenderBackend::CUDA},
+                                               {RenderBackend::Graphics, GraphicsAPI::Vulkan},
+                                               {RenderBackend::CPU}};
+  for (const auto &settings : backends) {
+    if (!SupportRenderer(settings))
+      continue;
+    renderer.SetBackend(settings);
+    ASSERT_TRUE(renderer.HasBackend());
+    EXPECT_EQ(renderer.GetScene().get(), identity);
+    EXPECT_TRUE(renderer.SupportsPipeline(RENDER_PIPELINE_AUTO));
+    EXPECT_EQ(renderer.SupportsPipeline(RENDER_PIPELINE_RASTERIZATION), settings.backend == RenderBackend::Graphics);
+    EXPECT_EQ(renderer.SupportsPipeline(RENDER_PIPELINE_RAY_TRACING), renderer.Info().ray_tracing);
+    renderer.Render();
+    auto image = renderer.ReadImage();
+    EXPECT_EQ(image.accumulated_samples, 1);
+    EXPECT_GT(image.rgba[(6 * 17 + 8) * 4], 180);
+    renderer.ReleaseBackend();
+    EXPECT_FALSE(renderer.HasBackend());
+    EXPECT_EQ(renderer.GetScene().get(), identity);
+    EXPECT_THROW(renderer.Render(), std::logic_error);
+  }
+}
+
+TEST(SceneRenderer, FailedBackendSwitchRetainsSceneAndCanRecover) {
+  if (!SupportRenderer({RenderBackend::CPU}))
+    GTEST_SKIP();
+  Renderer renderer;
+  auto scene = std::make_shared<SceneDefinition>();
+  scene->film.width = scene->film.height = 4;
+  renderer.SetScene(scene);
+  renderer.Configure({RENDER_PIPELINE_RASTERIZATION, 1});
+  EXPECT_THROW(renderer.SetBackend({RenderBackend::CPU}), std::invalid_argument);
+  EXPECT_FALSE(renderer.HasBackend());
+  EXPECT_EQ(renderer.GetScene(), scene);
+  renderer.Configure({RENDER_PIPELINE_AUTO, 2});
+  renderer.SetBackend({RenderBackend::CPU});
+  EXPECT_FALSE(renderer.SupportsPipeline(RENDER_PIPELINE_RAY_TRACING));
+  EXPECT_THROW(renderer.Configure({RENDER_PIPELINE_RAY_QUERY, 1}), std::invalid_argument);
+  EXPECT_EQ(renderer.SamplesPerDispatch(), 2);
+  renderer.BeginProfile(false);
+  EXPECT_THROW(renderer.ReleaseBackend(), std::logic_error);
+  EXPECT_THROW(renderer.SetBackend({RenderBackend::CPU}), std::logic_error);
+  renderer.Render();
+  renderer.EndProfile();
+  EXPECT_EQ(renderer.ReadImage().accumulated_samples, 2);
+  auto other = std::async(std::launch::async, [&] {
+    EXPECT_THROW(renderer.GetScene(), std::logic_error);
+    EXPECT_THROW(renderer.ReleaseBackend(), std::logic_error);
+  });
+  other.get();
+}

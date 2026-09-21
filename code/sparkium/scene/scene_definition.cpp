@@ -23,8 +23,6 @@ void SceneDefinition::Validate() const {
   Require(film.width > 0 && film.height > 0, "film dimensions must be positive");
   Require(uint64_t(film.width) * film.height <= std::numeric_limits<size_t>::max() / 16, "film dimensions overflow");
   Require(integrator.samples_per_dispatch > 0 && integrator.max_bounces > 0, "invalid integrator sample counts");
-  Require(integrator.pipeline >= RENDER_PIPELINE_RASTERIZATION && integrator.pipeline <= RENDER_PIPELINE_RAY_QUERY,
-          "invalid render pipeline");
   Require(camera.fovy > 0 && camera.fovy < grassland::PI<float>() && camera.aspect > 0, "invalid camera projection");
   Require(std::isfinite(glm::determinant(camera.view)) && std::abs(glm::determinant(camera.view)) > 1e-20f,
           "invalid camera transform");

@@ -4,8 +4,9 @@
 
 Sparkium's public rendering interface consumes an independent in-memory
 `SceneDefinition`. The loader reads scene files and assets once; GUI, CLI and
-library clients then pass the same snapshot to `Renderer::SetScene`. Switching
-backends reconstructs execution state without reloading scene files.
+library clients then pass the same snapshot to `Renderer::SetScene`. `Renderer::SetBackend`
+reconstructs execution state while retaining the Renderer and its Scene, without
+reloading scene files.
 See [the scene API](sparkium-scene-api.md) for the complete ownership contract.
 
 ```cpp
@@ -31,7 +32,7 @@ The existing execution machinery remains under `code/sparkium/backend/`:
 
 These internal resource adapters still use Graphics abstract resource contracts
 to run the existing pipelines. They are not the scene-facing backend API.
-`detail::SceneInstance` creates private execution objects from the scene model;
+Each backend owns a concrete geometry/texture/material/entity object set;
 legacy `Core` callers remain supported. Graphics itself contains no CPU/CUDA
 compute backend. OptiX remains a CUDA traversal pipeline.
 
@@ -48,8 +49,9 @@ build/demo/sparkium_cli/demo_sparkium_cli assets/scenes/cornell_box/scene.json \
   --backend cuda --pipeline rt_fallback --frames 2 -o cuda.png --linear-output cuda.pfm
 ```
 
-On CPU, `auto`, `ray_tracing` (including legacy JSON requests), and
-`rt_fallback` resolve to the shared compute path tracer. On CUDA, `ray_tracing`
+On CPU, `auto` and `rt_fallback` select the CPU path tracer. Explicit
+`ray_tracing` requests are unsupported. A legacy JSON pipeline preference is
+separate from Scene and falls back to `auto` when unsupported. On CUDA, `ray_tracing`
 uses OptiX, `rt_fallback` uses software BVH, and `auto` selects hardware tracing
 when available. An explicit CUDA `ray_tracing` request fails if OptiX is
 unavailable; use `auto` to allow fallback. `--require-hardware-rt` accepts CUDA

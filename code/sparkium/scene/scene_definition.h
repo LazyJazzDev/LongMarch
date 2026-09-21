@@ -9,7 +9,6 @@
 
 #include "glm/glm.hpp"
 #include "grassland/math/math_mesh.h"
-#include "sparkium/scene/render_types.h"
 
 namespace sparkium {
 
@@ -107,7 +106,6 @@ struct FilmDefinition {
 };
 
 struct IntegratorDefinition {
-  RenderPipeline pipeline{RENDER_PIPELINE_AUTO};
   int samples_per_dispatch{32}, max_bounces{32};
   bool alpha_shadow{};
   glm::vec3 background_color{0.1f}, ambient_light{0.1f};

@@ -1,202 +1,163 @@
 #include "sparkium/renderer/renderer.h"
 
-#include <chrono>
-#include <thread>
-
-#include "grassland/graphics/frame_profile.h"
-#include "sparkium/renderer/scene_instance.h"
+#include "sparkium/backend/device.h"
+#include "sparkium/backend/render_backend.h"
 
 namespace sparkium {
-namespace {
-graphics::BackendAPI GraphicsBackend(GraphicsAPI api) {
-  switch (api) {
-    case GraphicsAPI::Default:
-      return graphics::BACKEND_API_DEFAULT;
-    case GraphicsAPI::D3D12:
-      return graphics::BACKEND_API_D3D12;
-    case GraphicsAPI::Vulkan:
-      return graphics::BACKEND_API_VULKAN;
-    case GraphicsAPI::Metal:
-      return graphics::BACKEND_API_METAL;
-  }
-  throw std::invalid_argument("invalid graphics API");
+Renderer::Renderer() : thread_(std::this_thread::get_id()) {
 }
 
-class SceneRenderer final : public Renderer {
- public:
-  explicit SceneRenderer(const RendererSettings &settings) : thread_(std::this_thread::get_id()) {
-    if (CreateDevice({settings.backend, GraphicsBackend(settings.graphics_api)}, {2, settings.debug}, &device_) ||
-        device_->InitializeLogicalDeviceAutoSelect(false))
-      throw std::runtime_error("failed to initialize rendering backend");
-    core_ = std::make_unique<Core>(device_.get());
-  }
+Renderer::Renderer(const RendererSettings &settings) : Renderer() {
+  SetBackend(settings);
+}
 
-  ~SceneRenderer() override {
-    try {
-      device_->WaitGPU();
-    } catch (...) {
-    }
-  }
+Renderer::~Renderer() = default;
 
-  RendererInfo Info() const override {
-    CheckThread();
-    return {device_->DeviceName(), device_->DeviceRayTracingSupport(), device_->DeviceRayQuerySupport()};
-  }
+void Renderer::CheckThread() const {
+  if (std::this_thread::get_id() != thread_)
+    throw std::logic_error("renderer calls must use its creating thread");
+}
 
-  void SetScene(std::shared_ptr<const SceneDefinition> definition) override {
-    CheckThread();
-    if (!definition)
-      throw std::invalid_argument("null scene definition");
-    if (instance_ && instance_->definition == definition) {
-      Reset();
-      return;
-    }
-    auto next = std::make_unique<detail::SceneInstance>(core_.get(), std::move(definition));
-    device_->WaitGPU();
-    developed_.reset();
-    instance_ = std::move(next);
-    Configure({});
-  }
+backend::Backend &Renderer::Execution() const {
+  CheckThread();
+  if (!backend_)
+    throw std::logic_error("renderer has no backend");
+  return *backend_;
+}
 
-  std::shared_ptr<const SceneDefinition> GetScene() const override {
-    CheckThread();
-    return instance_ ? instance_->definition : nullptr;
+void Renderer::SetBackend(const RendererSettings &settings) {
+  CheckThread();
+  if (profiling_)
+    throw std::logic_error("cannot switch backend during profiling");
+  // Release resources before initializing another CUDA/graphics context.
+  // The scene and requested settings survive even if backend initialization fails.
+  backend_.reset();
+  auto next = backend::CreateBackend(settings);
+  if (settings_.pipeline)
+    next->ResolvePipeline(*settings_.pipeline);
+  if (scene_) {
+    next->SetScene(scene_);
+    next->Configure(settings_);
   }
+  backend_ = std::move(next);
+}
 
-  RenderPipeline ResolvePipeline(RenderPipeline pipeline) const override {
-    CheckThread();
-    if (pipeline < RENDER_PIPELINE_RASTERIZATION || pipeline > RENDER_PIPELINE_RAY_QUERY)
-      throw std::invalid_argument("invalid render pipeline");
-    if (device_->API() != RenderBackend::Graphics &&
-        (pipeline == RENDER_PIPELINE_RASTERIZATION || pipeline == RENDER_PIPELINE_RAY_QUERY))
-      throw std::invalid_argument("CPU/CUDA do not support rasterization or inline ray queries");
-    return core_->ResolveRenderPipeline(pipeline);
+void Renderer::ReleaseBackend() {
+  CheckThread();
+  if (profiling_)
+    throw std::logic_error("cannot release backend during profiling");
+  backend_.reset();
+}
+
+bool Renderer::HasBackend() const {
+  CheckThread();
+  return bool(backend_);
+}
+
+void Renderer::SetScene(std::shared_ptr<const SceneDefinition> scene) {
+  CheckThread();
+  if (profiling_)
+    throw std::logic_error("cannot change scene during profiling");
+  if (!scene)
+    throw std::invalid_argument("null scene definition");
+  scene->Validate();
+  if (backend_) {
+    backend_->SetScene(scene);
+    backend_->Configure(settings_);
   }
+  scene_ = std::move(scene);
+}
 
-  void Configure(const RenderSettings &settings) override {
-    CheckScene();
-    auto pipeline = settings.pipeline.value_or(instance_->definition->integrator.pipeline);
-    if (!settings.pipeline && device_->API() != RenderBackend::Graphics &&
-        (pipeline == RENDER_PIPELINE_RASTERIZATION || pipeline == RENDER_PIPELINE_RAY_QUERY ||
-         (pipeline == RENDER_PIPELINE_RAY_TRACING && !device_->DeviceRayTracingSupport())))
-      pipeline = RENDER_PIPELINE_AUTO;
-    ResolvePipeline(pipeline);
-    const int samples = settings.samples_per_dispatch.value_or(instance_->definition->integrator.samples_per_dispatch);
-    if (samples <= 0)
-      throw std::invalid_argument("samples per dispatch must be positive");
-    pipeline_ = pipeline;
-    instance_->scene->settings.samples_per_dispatch = samples;
-    Reset();
+std::shared_ptr<const SceneDefinition> Renderer::GetScene() const {
+  CheckThread();
+  return scene_;
+}
+
+RendererInfo Renderer::Info() const {
+  return Execution().Info();
+}
+
+bool Renderer::SupportsPipeline(RenderPipeline pipeline) const {
+  return Execution().SupportsPipeline(pipeline);
+}
+
+RenderPipeline Renderer::ResolvePipeline(RenderPipeline pipeline) const {
+  return Execution().ResolvePipeline(pipeline);
+}
+
+void Renderer::Configure(const RenderSettings &settings) {
+  CheckThread();
+  if (settings.samples_per_dispatch && *settings.samples_per_dispatch <= 0)
+    throw std::invalid_argument("samples per dispatch must be positive");
+  if (settings.pipeline &&
+      (*settings.pipeline < RENDER_PIPELINE_RASTERIZATION || *settings.pipeline > RENDER_PIPELINE_RAY_QUERY))
+    throw std::invalid_argument("invalid render pipeline");
+  if (backend_) {
+    if (settings.pipeline)
+      backend_->ResolvePipeline(*settings.pipeline);
+    if (scene_)
+      backend_->Configure(settings);
   }
+  settings_ = settings;
+}
 
-  RenderPipeline Pipeline() const override {
-    CheckScene();
-    return pipeline_;
-  }
+RenderPipeline Renderer::Pipeline() const {
+  return Execution().Pipeline();
+}
 
-  int SamplesPerDispatch() const override {
-    CheckScene();
-    return instance_->scene->settings.samples_per_dispatch;
-  }
+int Renderer::SamplesPerDispatch() const {
+  return Execution().SamplesPerDispatch();
+}
 
-  void Reset() override {
-    CheckScene();
-    device_->WaitGPU();
-    instance_->film->Reset();
-    instance_->film->info.accumulated_samples = 0;
-  }
+void Renderer::Reset() {
+  Execution().Reset();
+}
 
-  void Render() override {
-    CheckScene();
-    graphics::CpuProfileScope scope("render_wall");
-    core_->Render(instance_->scene.get(), instance_->camera.get(), instance_->film.get(), pipeline_);
-    device_->WaitGPU();
-  }
+void Renderer::Render() {
+  Execution().Render();
+}
 
-  RenderImage ReadImage() override {
-    CheckScene();
-    auto *film = instance_->film.get();
-    if (!developed_ &&
-        device_->CreateImage(film->GetWidth(), film->GetHeight(), graphics::IMAGE_FORMAT_R8G8B8A8_UNORM, &developed_))
-      throw std::runtime_error("failed to create developed image");
-    film->Develop(developed_.get());
-    RenderImage result{film->GetWidth(), film->GetHeight(), film->info.accumulated_samples, {}};
-    result.rgba.resize(size_t(result.width) * result.height * 4);
-    developed_->DownloadData(result.rgba.data());
-    return result;
-  }
+RenderImage Renderer::ReadImage() {
+  return Execution().ReadImage();
+}
 
-  std::vector<glm::vec4> ReadLinearImage() override {
-    CheckScene();
-    auto *film = instance_->film.get();
-    std::vector<glm::vec4> result(size_t(film->GetWidth()) * film->GetHeight());
-    device_->WaitGPU();
-    film->GetRawImage()->DownloadData(result.data());
-    return result;
-  }
+std::vector<glm::vec4> Renderer::ReadLinearImage() {
+  return Execution().ReadLinearImage();
+}
 
-  void BeginProfile(bool gpu_timestamps) override {
-    CheckThread();
-    if (profiling_)
-      throw std::logic_error("profile already active");
-    if (gpu_timestamps && !gpu_profile_) {
-      if (!device_->GraphicsCore())
-        throw std::invalid_argument("CPU/CUDA profiling requires CPU timings");
-      profile_ = std::make_unique<graphics::FrameProfile>(device_->GraphicsCore());
-      gpu_profile_ = true;
-    } else if (!profile_) {
-      profile_ = std::make_unique<graphics::FrameProfile>(device_->DeviceName());
-    }
-    profile_->Begin(gpu_timestamps);
-    profile_start_ = std::chrono::steady_clock::now();
-    profiling_ = true;
-  }
+void Renderer::BeginProfile(bool gpu_timestamps) {
+  Execution().BeginProfile(gpu_timestamps);
+  profiling_ = true;
+}
 
-  RenderProfile EndProfile() override {
-    CheckThread();
-    if (!profiling_)
-      throw std::logic_error("profile is not active");
-    device_->WaitGPU();
-    const auto elapsed = std::chrono::steady_clock::now() - profile_start_;
-    profile_->Finish();
-    RenderProfile result;
-    result.cpu_ms.insert(profile_->cpu_ms.begin(), profile_->cpu_ms.end());
-    result.gpu_ms.insert(profile_->gpu_ms.begin(), profile_->gpu_ms.end());
-    result.counters.insert(profile_->counters.begin(), profile_->counters.end());
-    result.cpu_ms["frame_wall"] = std::chrono::duration<double, std::milli>(elapsed).count();
-    profiling_ = false;
-    return result;
-  }
-
- private:
-  void CheckThread() const {
-    if (std::this_thread::get_id() != thread_)
-      throw std::logic_error("renderer calls must use its creating thread");
-  }
-
-  void CheckScene() const {
-    CheckThread();
-    if (!instance_)
-      throw std::logic_error("renderer has no scene");
-  }
-
-  std::thread::id thread_;
-  std::unique_ptr<backend::Device> device_;
-  std::unique_ptr<Core> core_;
-  std::unique_ptr<detail::SceneInstance> instance_;
-  std::unique_ptr<graphics::Image> developed_;
-  std::unique_ptr<graphics::FrameProfile> profile_;
-  bool profiling_{}, gpu_profile_{};
-  std::chrono::steady_clock::time_point profile_start_;
-  RenderPipeline pipeline_{RENDER_PIPELINE_AUTO};
-};
-}  // namespace
+RenderProfile Renderer::EndProfile() {
+  auto result = Execution().EndProfile();
+  profiling_ = false;
+  return result;
+}
 
 std::unique_ptr<Renderer> CreateRenderer(const RendererSettings &settings) {
-  return std::make_unique<SceneRenderer>(settings);
+  return std::make_unique<Renderer>(settings);
 }
 
 bool SupportRenderer(const RendererSettings &settings) {
-  return SupportBackend({settings.backend, GraphicsBackend(settings.graphics_api)});
+  grassland::graphics::BackendAPI api;
+  switch (settings.graphics_api) {
+    case GraphicsAPI::Default:
+      api = grassland::graphics::BACKEND_API_DEFAULT;
+      break;
+    case GraphicsAPI::D3D12:
+      api = grassland::graphics::BACKEND_API_D3D12;
+      break;
+    case GraphicsAPI::Vulkan:
+      api = grassland::graphics::BACKEND_API_VULKAN;
+      break;
+    case GraphicsAPI::Metal:
+      api = grassland::graphics::BACKEND_API_METAL;
+      break;
+    default:
+      return false;
+  }
+  return SupportBackend({settings.backend, api});
 }
 }  // namespace sparkium

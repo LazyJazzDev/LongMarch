@@ -1,13 +1,14 @@
 #include "sparkium/core/core.h"
 
+#include "sparkium/backend/common/path_tracing/raytracing.h"
 #include "sparkium/backend/graphics/graphics_device.h"
+#include "sparkium/backend/graphics/raster/raster.h"
 #include "sparkium/core/camera.h"
 #include "sparkium/core/entity.h"
 #include "sparkium/core/film.h"
 #include "sparkium/core/geometry.h"
 #include "sparkium/core/material.h"
 #include "sparkium/core/scene.h"
-#include "sparkium/pipelines/pipelines.h"
 
 namespace sparkium {
 Core::Core(graphics::Core *core)

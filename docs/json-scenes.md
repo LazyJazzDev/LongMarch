@@ -37,3 +37,12 @@ six basic demos at 96×96 from a different working directory, and 25 invalid-inp
 cases. Both CLI and GUI targets compiled. This check does not cover interactive
 GUI behavior, hardware ray tracing, or image equivalence with the C++ demos.
 Per-case logs, images, and `results.json` are written to the output directory.
+
+## Renderer preferences and backend switching
+
+`LoadSceneDocument(path)` returns the independent scene plus a separate
+`preferred_pipeline` parsed from `renderer.pipeline`. `LoadScene(path)` returns
+only the scene. Backend/API/pipeline selection is not stored in SceneDefinition.
+GUI and CLI honor a supported document preference and otherwise use `auto`;
+explicit user pipeline selections are checked strictly against the backend.
+`Renderer::SetBackend` rebuilds from the retained scene without reopening files.

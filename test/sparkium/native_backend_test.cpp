@@ -7,7 +7,7 @@
 #include <glm/gtc/matrix_transform.hpp>
 #include <random>
 
-#include "sparkium/pipelines/raytracing/core/cpu_bvh.h"
+#include "sparkium/backend/cpu/cpu_bvh.h"
 
 using namespace grassland;
 

@@ -97,10 +97,13 @@ int main(int argc, char **argv) {
     if (frames <= 0)
       throw std::runtime_error("--frames must be positive");
 
-    auto scene = sparkium::LoadScene(scene_path);
+    auto document = sparkium::LoadSceneDocument(scene_path);
+    auto scene = document.scene;
     auto renderer = sparkium::CreateRenderer(SparkiumRendererSettings(backend, debug));
     renderer->SetScene(scene);
-    renderer->Configure({override_pipeline ? std::optional(pipeline) : std::nullopt, std::nullopt});
+    auto preferred = renderer->SupportsPipeline(document.preferred_pipeline) ? document.preferred_pipeline
+                                                                             : sparkium::RENDER_PIPELINE_AUTO;
+    renderer->Configure({override_pipeline ? pipeline : preferred, std::nullopt});
     pipeline = renderer->Pipeline();
     const auto info = renderer->Info();
     const auto resolved_pipeline = renderer->ResolvePipeline(pipeline);
