@@ -133,7 +133,10 @@ Each backend implements scene translation, pipeline capability reporting, dispat
 and readback. `graphics/`, `cpu/` and `cuda/` each contain `geometry`, `texture`,
 `material`, `entity`, `scene_objects` and `render_backend` implementations. Their
 concrete object sets own execution resources and references to source semantics.
-Shared translation algorithms live in `backend/common/scene_objects_impl.h`.
+Each concrete `SceneObjects` translates its own scene, without a shared scene
+controller or inheritance template. Each Backend directly implements the public
+contract; there is no `ExecutionBackend` base. CPU and CUDA devices likewise
+implement their own resource factories and submission, without `ComputeDevice`.
 
 Backend implementations consume scene definitions and create private execution
 objects. Graphics uploads textures/geometry and constructs graphics acceleration
@@ -153,11 +156,29 @@ programmatic demos and the current pipeline implementation. They are not the new
 scene data API. The backend-specific semantic object sets adapt the model to
 these shared shader/resource bindings; neither `SceneDefinition` nor `Renderer`
 exposes their Graphics types. The old `detail::SceneInstance` is removed.
-Raster implementation is under `backend/graphics/raster`; shared path-tracing
-algorithms are under `backend/common/path_tracing`; CPU BVH construction is
-under `backend/cpu`. There is no top-level `sparkium/pipelines` directory.
+Raster implementation is under `backend/graphics/raster`. Each backend owns
+its own `path_tracing/` scene, pipeline state and dispatch implementation. CPU
+has no Ray Query/OptiX pipeline option, Graphics has no CPU BVH/OptiX branch,
+and CUDA has only software traversal and OptiX. CPU BVH construction is under
+`backend/cpu`. There is no top-level `sparkium/pipelines` directory.
 Each backend selects and dispatches its supported pipelines. The old combined `JsonScene::Load(Core*, path)` entry point is
 removed: replace it with `LoadScene(path)` and `Renderer::SetScene(scene)`.
+
+## Shared implementation boundary
+
+`backend/common` contains reusable primitives: material shader text generation,
+shader graph compilation, Slang support, the packed shader instance layout, and
+low-level resource/binding ABI helpers. These helpers do not own a Scene, Backend
+lifecycle or scene-rendering dispatch. There is no backend-enum dispatch in that
+directory. Memory/shader ABI adapters can still support both host and CUDA storage;
+that does not give them authority over scene preparation or pipeline selection.
+
+The three backend implementations have separate CMake libraries. Their scene
+translation, accumulation/readback, capability policy, resource factories and
+path-tracing controllers are intentionally explicit. Shared HLSL algorithms and
+pure material-code generation remain reused; backend lifecycle is not hidden
+behind a common controller. The legacy Core entry point dispatches to these same
+concrete implementations for compatibility with older demos.
 
 ## Frontends and validation
 

@@ -28,7 +28,10 @@ The existing execution machinery remains under `code/sparkium/backend/`:
 - `graphics/` adapts Vulkan, D3D12 and Metal devices from graphics.
 - `cpu/` owns LLVM function JIT execution and the persistent thread pool.
 - `cuda/` owns CUDA context, NVRTC compilation, kernel launches and optional OptiX.
-- `common/` contains shared bindings, resources, Slang frontend and compatibility.
+- `common/` contains resource/binding ABI helpers, Slang support, pure material
+  code generation and data layouts; it owns no scene or renderer controller.
+- Each backend owns its scene translator and path-tracing pipeline. CPU/CUDA
+  also own separate device resource factories and command submission.
 
 These internal resource adapters still use Graphics abstract resource contracts
 to run the existing pipelines. They are not the scene-facing backend API.

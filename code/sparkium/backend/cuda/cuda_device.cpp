@@ -67,7 +67,7 @@ int CudaDevice::InitializeLogicalDevice(int index) {
   device_name_ = properties[index].name;
   device_index_ = index;
 #ifdef SPARKIUM_NATIVE_CUDA_ENABLED
-  if (UsesCUDA()) {
+  {
     CUcontext context;
     CheckCUDA(cuDevicePrimaryCtxRetain(&context, index));
     cuda_context_ = context;
@@ -89,8 +89,7 @@ int CudaDevice::InitializeLogicalDevice(int index) {
 
 void CudaDevice::WaitGPU() {
 #ifdef SPARKIUM_NATIVE_CUDA_ENABLED
-  if (UsesCUDA())
-    CheckCUDA(cuCtxSynchronize());
+  CheckCUDA(cuCtxSynchronize());
 #endif
 }
 

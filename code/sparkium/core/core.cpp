@@ -1,7 +1,9 @@
 #include "sparkium/core/core.h"
 
-#include "sparkium/backend/common/path_tracing/raytracing.h"
+#include "sparkium/backend/cpu/path_tracing/raytracing.h"
+#include "sparkium/backend/cuda/path_tracing/raytracing.h"
 #include "sparkium/backend/graphics/graphics_device.h"
+#include "sparkium/backend/graphics/path_tracing/raytracing.h"
 #include "sparkium/backend/graphics/raster/raster.h"
 #include "sparkium/core/camera.h"
 #include "sparkium/core/entity.h"
@@ -60,15 +62,23 @@ RenderPipeline Core::ResolveRenderPipeline(RenderPipeline render_pipeline) const
 
 void Core::Render(Scene *scene, Camera *camera, Film *film, RenderPipeline render_pipeline) {
   render_pipeline = ResolveRenderPipeline(render_pipeline);
+  if (core_->API() != RenderBackend::Graphics && render_pipeline != RENDER_PIPELINE_RT_FALLBACK &&
+      render_pipeline != RENDER_PIPELINE_RAY_TRACING)
+    throw std::runtime_error("selected compute backend does not support this pipeline");
+  if (core_->API() == RenderBackend::CPU) {
+    cpu_tracing::Render(this, scene, camera, film);
+    return;
+  }
+  if (core_->API() == RenderBackend::CUDA) {
+    cuda_tracing::Render(this, scene, camera, film, render_pipeline == RENDER_PIPELINE_RAY_TRACING);
+    return;
+  }
   switch (render_pipeline) {
     case RENDER_PIPELINE_RASTERIZATION:
       raster::Render(this, scene, camera, film);
       break;
     case RENDER_PIPELINE_RAY_TRACING:
-      if (core_->API() == RenderBackend::CUDA)
-        raytracing::Render(this, scene, camera, film, true, false, true);
-      else
-        raytracing::Render(this, scene, camera, film);
+      raytracing::Render(this, scene, camera, film);
       break;
     case RENDER_PIPELINE_RAY_QUERY:
       if (!core_->DeviceRayQuerySupport())

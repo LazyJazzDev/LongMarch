@@ -6,12 +6,12 @@ namespace sparkium::backend {
 using namespace grassland;
 using namespace grassland::graphics;
 
-class ComputeDevice;
+class Device;
 class NativeProgram;
 
 class NativeCommandContext final : public CommandContext {
  public:
-  explicit NativeCommandContext(ComputeDevice *core);
+  explicit NativeCommandContext(Device *core);
 
   Core *GetCore() const override;
 
@@ -66,7 +66,7 @@ class NativeCommandContext final : public CommandContext {
 
   void ClearSlot(int s);
 
-  ComputeDevice *core_;
+  Device *core_;
   NativeProgram *program_{};
   NativeBindings bindings_;
 };

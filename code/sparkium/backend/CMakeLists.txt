@@ -54,15 +54,34 @@ set(SPARKIUM_LIBS ${SPARKIUM_LIBS} PARENT_SCOPE)
 
 # Algorithm libraries belong to backend implementations, not the public scene API.
 add_subdirectory(graphics/raster)
-add_subdirectory(common/path_tracing)
+add_subdirectory(graphics/path_tracing)
+add_subdirectory(cpu/path_tracing)
+add_subdirectory(cuda/path_tracing)
+add_library(sparkium_cpu_bvh cpu/cpu_bvh.cpp)
+target_link_libraries(sparkium_cpu_bvh PUBLIC grassland_math)
+target_link_libraries(sparkium_cpu_tracing_core PUBLIC sparkium_cpu_bvh)
 
-add_library(sparkium_execution render_backend.cpp common/shader_graph.cpp
-        graphics/render_backend.cpp graphics/geometry.cpp graphics/texture.cpp)
-target_link_libraries(sparkium_execution PUBLIC sparkium_scene
-        PRIVATE sparkium_core sparkium_geometry sparkium_material sparkium_entity RapidJSON)
+add_library(sparkium_shader_codegen common/shader_graph.cpp)
+target_link_libraries(sparkium_shader_codegen PUBLIC sparkium_scene PRIVATE sparkium_core RapidJSON)
+
+add_library(sparkium_graphics_renderer graphics/render_backend.cpp graphics/geometry.cpp graphics/texture.cpp graphics/scene_objects.cpp)
+target_link_libraries(sparkium_graphics_renderer PUBLIC sparkium_scene
+        PRIVATE sparkium_core sparkium_geometry sparkium_material sparkium_entity sparkium_shader_codegen sparkium_raytracing sparkium_raster)
+
+add_library(sparkium_execution render_backend.cpp)
+target_link_libraries(sparkium_execution PUBLIC sparkium_scene PRIVATE sparkium_backend sparkium_graphics_renderer)
 if (LONGMARCH_ENABLE_NATIVE_RENDER AND TARGET slang::slang AND TARGET slang::slang-llvm)
-    target_sources(sparkium_execution PRIVATE cpu/render_backend.cpp cpu/geometry.cpp cpu/texture.cpp)
+    add_library(sparkium_cpu_renderer cpu/render_backend.cpp cpu/geometry.cpp cpu/texture.cpp cpu/scene_objects.cpp)
+    target_link_libraries(sparkium_cpu_renderer PUBLIC sparkium_scene
+            PRIVATE sparkium_core sparkium_geometry sparkium_material sparkium_entity sparkium_shader_codegen sparkium_cpu_tracing)
+    target_link_libraries(sparkium_execution PRIVATE sparkium_cpu_renderer)
     if (LONGMARCH_CUDA_ENABLED)
-        target_sources(sparkium_execution PRIVATE cuda/render_backend.cpp cuda/geometry.cpp cuda/texture.cpp)
+        add_library(sparkium_cuda_renderer cuda/render_backend.cpp cuda/geometry.cpp cuda/texture.cpp cuda/scene_objects.cpp)
+        target_link_libraries(sparkium_cuda_renderer PUBLIC sparkium_scene
+                PRIVATE sparkium_core sparkium_geometry sparkium_material sparkium_entity sparkium_shader_codegen sparkium_cuda_tracing)
+        target_link_libraries(sparkium_execution PRIVATE sparkium_cuda_renderer)
+        if (LONGMARCH_ENABLE_OPTIX)
+            target_include_directories(sparkium_cuda_renderer PRIVATE ${LONGMARCH_OPTIX_INCLUDE_DIR})
+        endif ()
     endif ()
 endif ()

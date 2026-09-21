@@ -1,16 +1,16 @@
 #include "sparkium/backend/common/native_command_context.h"
 
-#include "sparkium/backend/common/compute_device.h"
 #include "sparkium/backend/common/native_image.h"
 #include "sparkium/backend/common/native_program.h"
 #include "sparkium/backend/common/native_util.h"
+#include "sparkium/backend/device.h"
 #ifdef SPARKIUM_OPTIX_ENABLED
 #include "sparkium/backend/cuda/native_acceleration_structure.h"
 #endif
 
 namespace sparkium::backend {
 
-NativeCommandContext::NativeCommandContext(ComputeDevice *core) : core_(core) {
+NativeCommandContext::NativeCommandContext(Device *core) : core_(core) {
 }
 
 Core *NativeCommandContext::GetCore() const {

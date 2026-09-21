@@ -1,5 +1,12 @@
 #pragma once
-#include "sparkium/backend/common/scene_objects.h"
+#include "sparkium/core/camera.h"
+#include "sparkium/core/core.h"
+#include "sparkium/core/film.h"
+#include "sparkium/core/scene.h"
+#include "sparkium/entity/entities.h"
+#include "sparkium/geometry/geometries.h"
+#include "sparkium/material/materials.h"
+#include "sparkium/scene/scene_definition.h"
 
 namespace sparkium::backend::cpu {
 struct Texture {
