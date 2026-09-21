@@ -144,7 +144,7 @@ concurrent library rendering, per-renderer accumulation, and GUI switching/reloa
 Backend rendering tests exercise the available Graphics, CPU and CUDA paths;
 unavailable platform backends are not claimed as validated.
 
-The [illustrated validation record](../assets/reports/sparkium-native-backends/scene-api/README.md)
+The [illustrated validation record](https://github.com/LazyJazzDev/LongMarchAssetsLFS/blob/4779a2054322fd6be2fd68a1f13a885d30d015d8/reports/sparkium-native-backends/scene-api/README.md)
 contains before/after images at 64 x 64 and 16 spp, test counts and provenance.
 All five tested paths retained identical PNG pixels; this is not a new
 full-resolution Blender benchmark.
