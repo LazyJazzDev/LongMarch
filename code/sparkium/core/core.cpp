@@ -103,15 +103,20 @@ void Core::LoadPublicShaders() {
   std::unique_ptr<graphics::Shader> shader;
   std::unique_ptr<graphics::ComputeProgram> compute_program;
 
-  core_->CreateShader(shaders_vfs_, "tone_mapping.hlsl", "Main", "cs_6_0", &shader);
-  SetPublicResource("tone_mapping", std::move(shader));
-
-  core_->CreateComputeProgram(GetShader("tone_mapping"), &compute_program);
-  compute_program->AddResourceBinding(graphics::RESOURCE_TYPE_IMAGE, 1);
-  compute_program->AddResourceBinding(graphics::RESOURCE_TYPE_WRITABLE_IMAGE, 1);
-  compute_program->AddResourceBinding(graphics::RESOURCE_TYPE_UNIFORM_BUFFER, 1);
-  compute_program->Finalize();
-  SetPublicResource("tone_mapping", std::move(compute_program));
+  for (bool hdr : {false, true}) {
+    const std::string name = hdr ? "tone_mapping_hdr" : "tone_mapping";
+    std::vector<std::string> args;
+    if (hdr)
+      args.push_back("-DSPARKIUM_HDR_OUTPUT=1");
+    core_->CreateShader(shaders_vfs_, "tone_mapping.hlsl", "Main", "cs_6_0", args, &shader);
+    SetPublicResource(name, std::move(shader));
+    core_->CreateComputeProgram(GetShader(name), &compute_program);
+    compute_program->AddResourceBinding(graphics::RESOURCE_TYPE_IMAGE, 1);
+    compute_program->AddResourceBinding(graphics::RESOURCE_TYPE_WRITABLE_IMAGE, 1);
+    compute_program->AddResourceBinding(graphics::RESOURCE_TYPE_UNIFORM_BUFFER, 1);
+    compute_program->Finalize();
+    SetPublicResource(name, std::move(compute_program));
+  }
 }
 
 void Core::LoadPublicBuffers() {

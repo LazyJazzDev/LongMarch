@@ -1,6 +1,10 @@
 #include "tone_mapping.hlsli"
 Texture2D<float4> accumulated_color : register(t0, space0);
+#ifdef SPARKIUM_HDR_OUTPUT
+[[vk::image_format("rgba32f")]] RWTexture2D<float4> output : register(u0, space1);
+#else
 [[vk::image_format("rgba8")]] RWTexture2D<float4> output : register(u0, space1);
+#endif
 
 struct ToneMappingSettings {
   int view_transform;
@@ -33,6 +37,11 @@ float3 FilmicCurve(float3 color) {
   float4 color = accumulated_color.Load(int3(pixel_coords, 0));
   float3 linear_color = max(color.xyz * exp2(settings.exposure), 0.0f);
 
+#ifdef SPARKIUM_HDR_OUTPUT
+  // Preserve extended brightness and avoid sRGB encoding or SDR tone mapping.
+  // Bound to the finite range of the RGBA16Float presentation surface.
+  output[pixel_coords] = float4(min(linear_color, 65504.0f), color.w);
+#else
   float3 mapped_color;
   if (settings.view_transform == 1) {
     mapped_color = saturate(Linear2sRGB(linear_color));
@@ -48,4 +57,5 @@ float3 FilmicCurve(float3 color) {
 
   // Write the result to the output image
   output[pixel_coords] = float4(mapped_color, color.w);
+#endif
 }

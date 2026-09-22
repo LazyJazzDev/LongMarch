@@ -69,17 +69,29 @@ void ResizeWindowForFilm(graphics::Window *window, sparkium::Film *film) {
 
 int main(int argc, char **argv) {
   try {
-    std::filesystem::path input = argc > 1 ? argv[1] : std::filesystem::path(FindAssetPath("scenes"));
+    std::filesystem::path input = FindAssetPath("scenes");
+    bool input_selected = false;
+    bool hdr_requested = false;
     auto backend = graphics::BACKEND_API_DEFAULT;
     int frame_limit = 0;
-    for (int i = 2; i < argc; ++i) {
+    for (int i = 1; i < argc; ++i) {
       std::string arg = argv[i];
-      if (arg == "--backend" && i + 1 < argc)
+      if (arg == "--help") {
+        std::cout
+            << "Usage: sparkium_gui [scene.json|directory] [--backend auto|metal|vulkan|d3d12] [--hdr] [--frames N]\n";
+        return 0;
+      }
+      if (arg == "--hdr")
+        hdr_requested = true;
+      else if (arg == "--backend" && i + 1 < argc)
         backend = ParseSparkiumBackend(argv[++i]);
       else if (arg == "--frames" && i + 1 < argc) {
         frame_limit = std::stoi(argv[++i]);
         if (frame_limit <= 0)
           throw std::invalid_argument("--frames must be positive");
+      } else if (!arg.empty() && arg[0] != '-' && !input_selected) {
+        input = arg;
+        input_selected = true;
       } else
         throw std::invalid_argument("unknown or incomplete argument: " + arg);
     }
@@ -96,6 +108,10 @@ int main(int argc, char **argv) {
       throw std::runtime_error("failed to create graphics core");
     if (graphics_core->InitializeLogicalDeviceAutoSelect(false) != 0)
       throw std::runtime_error("failed to initialize graphics device");
+    const bool hdr_available = graphics_core->API() == graphics::BACKEND_API_METAL;
+    if (hdr_requested && !hdr_available)
+      throw std::invalid_argument("HDR preview currently requires the Metal backend");
+    bool hdr_active = false;
     sparkium::Core core(graphics_core.get());
 
     std::unique_ptr<sparkium::JsonScene> loaded;
@@ -105,6 +121,13 @@ int main(int argc, char **argv) {
     bool resize_pending = true;
     sparkium::RenderPipeline pipeline = sparkium::RENDER_PIPELINE_AUTO;
     std::string load_error;
+    auto create_display_image = [&]() {
+      auto *film = loaded->GetFilm();
+      graphics_core->WaitGPU();
+      graphics_core->CreateImage(
+          film->GetWidth(), film->GetHeight(),
+          hdr_active ? graphics::IMAGE_FORMAT_R32G32B32A32_SFLOAT : graphics::IMAGE_FORMAT_R8G8B8A8_UNORM, &image);
+    };
     auto load_selected = [&]() {
       load_error.clear();
       auto next = sparkium::JsonScene::Load(&core, scene_files[selected], &load_error);
@@ -112,8 +135,7 @@ int main(int argc, char **argv) {
         return false;
       loaded = std::move(next);
       pipeline = loaded->GetRenderPipeline();
-      auto *film = loaded->GetFilm();
-      graphics_core->CreateImage(film->GetWidth(), film->GetHeight(), graphics::IMAGE_FORMAT_R8G8B8A8_UNORM, &image);
+      create_display_image();
       resize_pending = true;
       return true;
     };
@@ -130,6 +152,12 @@ int main(int argc, char **argv) {
 
     int rendered_frames = 0;
     while (!window->ShouldClose() && (!frame_limit || rendered_frames++ < frame_limit)) {
+      // Apply before BeginImGuiFrame so ImGui and presentation use the same format.
+      if (hdr_requested != hdr_active) {
+        window->SetHDR(hdr_requested);
+        hdr_active = hdr_requested;
+        create_display_image();
+      }
       window->BeginImGuiFrame();
       ImGui::SetNextWindowPos({10, 10}, ImGuiCond_Once);
       ImGui::SetNextWindowBgAlpha(0.85f);
@@ -173,6 +201,16 @@ int main(int argc, char **argv) {
         }
         ImGui::EndCombo();
       }
+      ImGui::BeginDisabled(!hdr_available);
+      ImGui::Checkbox("HDR preview", &hdr_requested);
+      ImGui::EndDisabled();
+      if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled))
+        ImGui::SetTooltip(
+            hdr_available
+                ? "Linear HDR with exposure; bypasses SDR view transform, gamma and contrast. Requires an HDR display."
+                : "HDR preview currently requires the Metal backend.");
+      ImGui::SliderFloat("Exposure (EV)", &loaded->GetFilm()->info.exposure, -8.0f, 8.0f, "%.2f");
+      ImGui::TextUnformatted(hdr_active ? "Display: HDR (linear)" : "Display: SDR (scene view transform)");
       int &samples = loaded->GetScene()->settings.samples_per_dispatch;
       if (ImGui::SliderInt("Samples / frame", &samples, 1, 256))
         loaded->GetFilm()->Reset();
@@ -210,7 +248,7 @@ int main(int argc, char **argv) {
       window->EndImGuiFrame();
 
       core.Render(loaded->GetScene(), loaded->GetCamera(), loaded->GetFilm(), pipeline);
-      loaded->GetFilm()->Develop(image.get());
+      loaded->GetFilm()->Develop(image.get(), hdr_active);
       std::unique_ptr<graphics::CommandContext> command_context;
       graphics_core->CreateCommandContext(&command_context);
       command_context->CmdPresent(window.get(), image.get());
