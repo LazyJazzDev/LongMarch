@@ -1,6 +1,7 @@
 #include <gtest/gtest.h>
 #include <long_march.h>
 
+#include <cstdlib>
 #include <cstring>
 #include <numeric>
 
@@ -19,6 +20,44 @@ class MetalBackendTest : public testing::Test {
 
   std::unique_ptr<graphics::Core> core;
 };
+
+// Window tests require an interactive macOS session; keep headless GPU test runs usable.
+TEST_F(MetalBackendTest, WindowCloseAfterPresent) {
+  if (!std::getenv("LONGMARCH_TEST_METAL_WINDOWS"))
+    GTEST_SKIP() << "Set LONGMARCH_TEST_METAL_WINDOWS=1 in an interactive macOS session";
+  for (bool imgui : {false, true}) {
+    for (bool explicit_close : {false, true}) {
+      SCOPED_TRACE(testing::Message() << "imgui=" << imgui << " explicit_close=" << explicit_close);
+      std::unique_ptr<graphics::Window> window;
+      ASSERT_EQ(core->CreateWindowObject(320, 240, "Metal window cleanup test", &window), 0);
+      if (imgui) {
+        window->InitImGui();
+        ImGui::GetIO().IniFilename = nullptr;
+        window->BeginImGuiFrame();
+        ImGui::TextUnformatted("Close after presenting");
+        window->EndImGuiFrame();
+      }
+      std::unique_ptr<graphics::Image> image;
+      core->CreateImage(320, 240, graphics::IMAGE_FORMAT_R8G8B8A8_UNORM, &image);
+      std::unique_ptr<graphics::CommandContext> commands;
+      core->CreateCommandContext(&commands);
+      commands->CmdClearImage(image.get(), {{0.2f, 0.3f, 0.4f, 1.0f}});
+      commands->CmdPresent(window.get(), image.get());
+      ASSERT_EQ(core->SubmitCommandContext(commands.get()), 0);
+      // Match hello demos: close request, explicit CloseWindow, then destruction.
+      if (explicit_close) {
+        glfwSetWindowShouldClose(window->GLFWWindow(), GLFW_TRUE);
+        ASSERT_TRUE(window->ShouldClose());
+        window->CloseWindow();
+        EXPECT_EQ(window->GLFWWindow(), nullptr);
+        EXPECT_EQ(window->GetImGuiContext(), nullptr);
+        window->CloseWindow();
+      }
+      window.reset();
+      core->WaitGPU();
+    }
+  }
+}
 
 TEST_F(MetalBackendTest, RayQueryMasksIDsUpdatesAndBindingSnapshots) {
   if (!core->DeviceRayQuerySupport())
