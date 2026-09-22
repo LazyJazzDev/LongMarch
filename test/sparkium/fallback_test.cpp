@@ -52,6 +52,17 @@ class SoftwareBVHTest : public testing::Test {
   std::unique_ptr<sparkium::Core> core;
 };
 
+TEST(GraphicsCoreCreation, UnsupportedAPIsDoNotFallBack) {
+  for (auto api : {graphics::BACKEND_API_METAL, graphics::BACKEND_API_D3D12, graphics::BACKEND_API_VULKAN,
+                   static_cast<graphics::BackendAPI>(99)}) {
+    if (graphics::SupportBackendAPI(api))
+      continue;
+    std::unique_ptr<graphics::Core> core;
+    EXPECT_EQ(graphics::CreateCore(api, graphics::Core::Settings{}, &core), -1);
+    EXPECT_EQ(core, nullptr);
+  }
+}
+
 TEST_F(SoftwareBVHTest, LightSamplingIsIndependentOfEntityAddresses) {
   std::vector<std::unique_ptr<sparkium::EntityPointLight>> owned;
   std::vector<std::pair<sparkium::raytracing::Entity *, sparkium::EntityPointLight *>> lights;
@@ -409,7 +420,8 @@ TEST_P(ComputeTraversalTest, EmptySceneBackgroundAccumulationAndReset) {
                ray_query ? sparkium::RENDER_PIPELINE_RAY_QUERY : sparkium::RENDER_PIPELINE_RT_FALLBACK);
   EXPECT_EQ(film.info.accumulated_samples, 3);
   check(scene.settings.background_color);
-  if (ray_query && !graphics->DeviceRayTracingSupport()) {
+  if (ray_query && (!graphics->DeviceRayTracingSupport() || graphics->API() == graphics::BACKEND_API_D3D12 ||
+                    graphics->API() == graphics::BACKEND_API_VULKAN)) {
     EXPECT_EQ(core->ResolveRenderPipeline(sparkium::RENDER_PIPELINE_AUTO), sparkium::RENDER_PIPELINE_RAY_QUERY);
     graphics::FrameProfile profile(graphics.get(), false);
     profile.Begin();
@@ -419,14 +431,20 @@ TEST_P(ComputeTraversalTest, EmptySceneBackgroundAccumulationAndReset) {
     // Auto must reuse the selected native pipeline and preserve its accumulation.
     EXPECT_EQ(film.info.accumulated_samples, 6);
     check(scene.settings.background_color);
-    // Legacy JSON requests must select the same native query pipeline as Auto.
-    EXPECT_EQ(core->ResolveRenderPipeline(sparkium::RENDER_PIPELINE_RAY_TRACING), sparkium::RENDER_PIPELINE_RAY_QUERY);
-    profile.Begin();
-    core->Render(&scene, &camera, &film, sparkium::RENDER_PIPELINE_RAY_TRACING);
-    profile.Finish();
-    EXPECT_EQ(profile.counters["native_ray_query"], 1u);
-    EXPECT_EQ(film.info.accumulated_samples, 9);
-    check(scene.settings.background_color);
+    if (!graphics->DeviceRayTracingSupport()) {
+      // Legacy JSON requests must select the same native query pipeline as Auto.
+      EXPECT_EQ(core->ResolveRenderPipeline(sparkium::RENDER_PIPELINE_RAY_TRACING),
+                sparkium::RENDER_PIPELINE_RAY_QUERY);
+      profile.Begin();
+      core->Render(&scene, &camera, &film, sparkium::RENDER_PIPELINE_RAY_TRACING);
+      profile.Finish();
+      EXPECT_EQ(profile.counters["native_ray_query"], 1u);
+      EXPECT_EQ(film.info.accumulated_samples, 9);
+      check(scene.settings.background_color);
+    } else {
+      EXPECT_EQ(core->ResolveRenderPipeline(sparkium::RENDER_PIPELINE_RAY_TRACING),
+                sparkium::RENDER_PIPELINE_RAY_TRACING);
+    }
   }
   if (graphics->DeviceRayQuerySupport()) {
     // Switching traversal implementations must discard accumulation in both directions.

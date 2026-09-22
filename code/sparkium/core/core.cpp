@@ -21,7 +21,11 @@ graphics::Core *Core::GraphicsCore() const {
 
 RenderPipeline Core::ResolveRenderPipeline(RenderPipeline render_pipeline) const {
   if (render_pipeline == RENDER_PIPELINE_AUTO) {
-    if (core_->DeviceRayTracingSupport()) {
+    const bool prefer_ray_query =
+        core_->API() == graphics::BACKEND_API_D3D12 || core_->API() == graphics::BACKEND_API_VULKAN;
+    if (prefer_ray_query && core_->DeviceRayQuerySupport()) {
+      render_pipeline = RENDER_PIPELINE_RAY_QUERY;
+    } else if (core_->DeviceRayTracingSupport()) {
       render_pipeline = RENDER_PIPELINE_RAY_TRACING;
     } else if (core_->DeviceRayQuerySupport()) {
       render_pipeline = RENDER_PIPELINE_RAY_QUERY;
