@@ -211,9 +211,49 @@ int main(int argc, char **argv) {
                 : "HDR preview currently requires the Metal backend.");
       ImGui::SliderFloat("Exposure (EV)", &loaded->GetFilm()->info.exposure, -8.0f, 8.0f, "%.2f");
       ImGui::TextUnformatted(hdr_active ? "Display: HDR (linear)" : "Display: SDR (scene view transform)");
-      int &samples = loaded->GetScene()->settings.samples_per_dispatch;
-      if (ImGui::SliderInt("Samples / frame", &samples, 1, 256))
-        loaded->GetFilm()->Reset();
+      auto *film = loaded->GetFilm();
+      auto &settings = loaded->GetScene()->settings;
+      const bool raster = core.ResolveRenderPipeline(pipeline) == sparkium::RENDER_PIPELINE_RASTERIZATION;
+      if (ImGui::CollapsingHeader("Render settings", ImGuiTreeNodeFlags_DefaultOpen)) {
+        bool reset = false;
+        if (raster) {
+          reset |= ImGui::ColorEdit3("Ambient light", &settings.ambient_light.x, ImGuiColorEditFlags_Float);
+        } else {
+          reset |= ImGui::SliderInt("Samples / frame", &settings.samples_per_dispatch, 1, 256, "%d",
+                                    ImGuiSliderFlags_AlwaysClamp);
+          reset |= ImGui::SliderInt("Max bounces", &settings.max_bounces, 1, 128, "%d", ImGuiSliderFlags_AlwaysClamp);
+          bool alpha_shadow = settings.alpha_shadow != 0;
+          if (ImGui::Checkbox("Alpha shadows", &alpha_shadow)) {
+            settings.alpha_shadow = alpha_shadow;
+            reset = true;
+          }
+          reset |= ImGui::ColorEdit3("Background", &settings.background_color.x, ImGuiColorEditFlags_Float);
+          reset |= ImGui::SliderFloat("Persistence", &film->info.persistence, 0.0f, 1.0f, "%.3f",
+                                      ImGuiSliderFlags_AlwaysClamp);
+          reset |= ImGui::SliderFloat("Sample clamp", &film->info.clamping, 0.01f, 10000.0f, "%.2f",
+                                      ImGuiSliderFlags_Logarithmic | ImGuiSliderFlags_AlwaysClamp);
+          if (ImGui::IsItemHovered())
+            ImGui::SetTooltip("Limits each sample's peak radiance before accumulation; reduces fireflies.");
+          reset |= ImGui::SliderFloat("Max exposure", &film->info.max_exposure, 0.01f, 10000.0f, "%.2f",
+                                      ImGuiSliderFlags_Logarithmic | ImGuiSliderFlags_AlwaysClamp);
+          if (ImGui::IsItemHovered())
+            ImGui::SetTooltip("Linear accumulated brightness limit, not EV. Use 30 or more for Cornell Box HDR.");
+          if (hdr_requested && film->info.max_exposure <= 1.0f)
+            ImGui::TextWrapped(
+                "Max exposure <= 1 clips scene highlights before HDR display. Raise it to preserve HDR.");
+        }
+        if (reset)
+          film->Reset();
+      }
+      if (ImGui::CollapsingHeader("SDR view settings")) {
+        ImGui::BeginDisabled(hdr_active);
+        ImGui::Combo("View transform", &film->info.view_transform, "Normalized\0Standard\0Filmic\0");
+        ImGui::BeginDisabled(film->info.view_transform != 2);
+        ImGui::SliderFloat("Gamma", &film->info.gamma, 0.1f, 4.0f, "%.2f", ImGuiSliderFlags_AlwaysClamp);
+        ImGui::SliderFloat("Contrast", &film->info.contrast, 0.0f, 4.0f, "%.2f", ImGuiSliderFlags_AlwaysClamp);
+        ImGui::EndDisabled();
+        ImGui::EndDisabled();
+      }
       if (ImGui::Button("Reload"))
         load_selected();
       ImGui::SameLine();

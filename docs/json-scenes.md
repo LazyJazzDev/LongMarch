@@ -61,3 +61,17 @@ The first version exposes HDR preview only on Metal. Visible HDR highlights
 require EDR headroom above 1.0 on the window's current screen; Metal logs current
 and potential headroom when HDR is enabled. A floating-point output path alone
 cannot make an SDR-only display brighter. See [Metal HDR presentation](metal-backend.md#hdr--edr-presentation).
+
+The **Render settings** panel exposes path-tracing samples per frame, maximum
+bounces, alpha shadows, background, persistence, per-sample clamping, and
+**Max exposure**. Changing these settings resets accumulation. Rasterization
+instead exposes ambient light. **SDR view settings** selects Normalized,
+Standard, or Filmic; gamma and contrast apply only to Filmic. Display settings
+do not reset accumulation and SDR controls are disabled during HDR preview.
+
+HDR development preserves the values it receives, but the renderer can already
+have clipped them: **Max exposure** is a linear accumulated brightness limit,
+not an EV adjustment. Cornell Box sets it to 1 even though its light emits 30.
+Raise it to at least 30 (for example, 100) to preserve the light's HDR brightness;
+keep **Sample clamp** high enough as well. These controls change the current
+session only; Reload restores scene-file settings.
