@@ -34,14 +34,7 @@ Scene::Scene(sparkium::Scene &scene) : scene_(scene), settings(scene.settings) {
   core_->GraphicsCore()->CreateSampler({graphics::FILTER_MODE_NEAREST}, &nearest_sampler_);
 }
 
-void Scene::Render(Camera *camera, Film *film, bool software, bool ray_query, bool realtime) {
-  if (realtime != realtime_) {
-    realtime_ = realtime;
-    software_pipeline_.reset();
-    pipeline_dirty_ = true;
-    if (rendered_)
-      film->Reset();
-  }
+void Scene::Render(Camera *camera, Film *film, bool software, bool ray_query) {
   software = software || ray_query;
   if (ray_query != ray_query_) {
     ray_query_ = ray_query;
@@ -57,104 +50,68 @@ void Scene::Render(Camera *camera, Film *film, bool software, bool ray_query, bo
       film->Reset();
   }
   if (software && !software_pipeline_)
-    software_pipeline_ = std::make_unique<SoftwarePipeline>(core_, ray_query_, realtime_);
+    software_pipeline_ = std::make_unique<SoftwarePipeline>(core_, ray_query_);
   graphics::CpuProfileScope update_profile("scene_update");
-  const uint64_t key = realtime_ ? RealtimeKey() : 0;
-  const bool scene_changed = !rendered_ || realtime_key_ != key || pipeline_dirty_;
-  if (!realtime_ || scene_changed || film->film_.info.accumulated_samples == 0) {
-    UpdatePipeline(camera);
-    if (realtime_ && scene_changed)
-      film->Reset();
-    realtime_key_ = key;
-  }
+  UpdatePipeline(camera);
   update_profile.End();
   graphics::CpuProfileScope setup_profile("render_setup");
   rendered_ = true;
-  auto trace_settings = settings.raytracing;
-  if (realtime_) {
-    trace_settings.samples_per_dispatch = 1;
-    trace_settings.max_bounces = std::clamp(settings.realtime.bounces, 1, 8);
-  }
-  const uint32_t frame = film->film_.info.accumulated_samples;
-  scene_settings_buffer_->UploadData(&trace_settings, sizeof(Settings::RayTracing));
+  scene_settings_buffer_->UploadData(&settings.raytracing, sizeof(Settings::RayTracing));
   scene_settings_buffer_->UploadData(&film->film_.info, sizeof(sparkium::Film::Info), sizeof(Settings::RayTracing));
-  film->film_.info.accumulated_samples += trace_settings.samples_per_dispatch;
+  film->film_.info.accumulated_samples += settings.raytracing.samples_per_dispatch;
   std::unique_ptr<graphics::CommandContext> cmd_context;
   core_->GraphicsCore()->CreateCommandContext(&cmd_context);
-  if (realtime_) {
-    if (!film->realtime_view_)
-      film->realtime_view_ = std::make_unique<RealtimeView>(core_);
-    film->realtime_view_->Begin(cmd_context.get(), software_pipeline_.get(), buffers_, camera, film->GetWidth(),
-                                film->GetHeight(), settings.realtime.scale, settings.realtime.history,
-                                settings.realtime.updates, frame);
-  }
-  graphics::GpuProfileScope trace_profile(cmd_context.get(), realtime_ ? "realtime_lighting" : "path_trace");
+  graphics::GpuProfileScope trace_profile(cmd_context.get(), "path_trace");
   const auto bind_point = software ? graphics::BIND_POINT_COMPUTE : graphics::BIND_POINT_RAYTRACING;
-  for (int phase = 0; phase < (realtime_ ? 2 : 1); ++phase) {
-    if (software)
-      cmd_context->CmdBindComputeProgram(realtime_ && phase == 0 ? software_pipeline_->ReprojectProgram()
-                                                                 : software_pipeline_->Program());
+  if (software)
+    cmd_context->CmdBindComputeProgram(software_pipeline_->Program());
+  else
+    cmd_context->CmdBindRayTracingProgram(rt_program_.get());
+  cmd_context->CmdBindResources(0, {film->accumulated_color_.get()}, bind_point);
+  cmd_context->CmdBindResources(1, {film->accumulated_samples_.get()}, bind_point);
+  if (software) {
+    if (ray_query_)
+      cmd_context->CmdBindResources(2, software_pipeline_->AccelerationStructure(), bind_point);
     else
-      cmd_context->CmdBindRayTracingProgram(rt_program_.get());
-    if (!realtime_) {
-      cmd_context->CmdBindResources(0, {film->accumulated_color_.get()}, bind_point);
-      cmd_context->CmdBindResources(1, {film->accumulated_samples_.get()}, bind_point);
-    }
-    if (software) {
-      if (ray_query_)
-        cmd_context->CmdBindResources(2, software_pipeline_->AccelerationStructure(), bind_point);
-      else
-        cmd_context->CmdBindResources(2, {software_pipeline_->Nodes()}, bind_point);
-    } else
-      cmd_context->CmdBindResources(2, tlas_.get(), bind_point);
-    cmd_context->CmdBindResources(3, {scene_settings_buffer_.get()}, bind_point);
-    if (software) {
-      auto resources = buffers_;
-      resources.insert(resources.end(),
-                       {core_->GetBuffer("sobol"), camera->Buffer(), instance_metadata_buffer_.get(),
-                        light_selector_buffer_.get(), light_metadatas_buffer_.get(), software_pipeline_->Instances()});
-      if (realtime_)
-        resources.push_back(film->realtime_view_->ParametersBuffer());
-      cmd_context->CmdBindResources(4, resources, bind_point);
-      cmd_context->CmdBindResources(5, sdr_images_, bind_point);
-      cmd_context->CmdBindResources(6, hdr_images_, bind_point);
-      cmd_context->CmdBindResources(7, std::vector{linear_sampler_.get(), nearest_sampler_.get()}, bind_point);
-    } else {
-      cmd_context->CmdBindResources(4, {core_->GetBuffer("sobol")}, bind_point);
-      cmd_context->CmdBindResources(5, {camera->Buffer()}, bind_point);
-      cmd_context->CmdBindResources(6, buffers_, bind_point);
-      cmd_context->CmdBindResources(7, {instance_metadata_buffer_.get()}, bind_point);
-      cmd_context->CmdBindResources(8, {light_selector_buffer_.get()}, bind_point);
-      cmd_context->CmdBindResources(9, {light_metadatas_buffer_.get()}, bind_point);
-      cmd_context->CmdBindResources(10, sdr_images_, bind_point);
-      cmd_context->CmdBindResources(11, hdr_images_, bind_point);
-      cmd_context->CmdBindResources(12, std::vector{linear_sampler_.get(), nearest_sampler_.get()}, bind_point);
-    }
-    if (realtime_) {
-      film->realtime_view_->BindTrace(cmd_context.get());
-      uint32_t trace_width = film->realtime_view_->Width();
-      if (phase == 1)
-        trace_width = (trace_width + std::clamp(settings.realtime.updates, 1, 16) - 1) /
-                      std::clamp(settings.realtime.updates, 1, 16);
-      cmd_context->CmdDispatch((trace_width + 7) / 8, (film->realtime_view_->Height() + 7) / 8, 1);
-    } else if (software)
-      cmd_context->CmdDispatch((film->GetWidth() + 7) / 8, (film->GetHeight() + 7) / 8, 1);
-    else
-      cmd_context->CmdDispatchRays(film->accumulated_color_->Extent().width,
-                                   film->accumulated_samples_->Extent().height, 1);
+      cmd_context->CmdBindResources(2, {software_pipeline_->Nodes()}, bind_point);
+  } else
+    cmd_context->CmdBindResources(2, tlas_.get(), bind_point);
+  cmd_context->CmdBindResources(3, {scene_settings_buffer_.get()}, bind_point);
+  if (software) {
+    auto resources = buffers_;
+    resources.insert(resources.end(),
+                     {core_->GetBuffer("sobol"), camera->Buffer(), instance_metadata_buffer_.get(),
+                      light_selector_buffer_.get(), light_metadatas_buffer_.get(), software_pipeline_->Instances()});
+    cmd_context->CmdBindResources(4, resources, bind_point);
+    cmd_context->CmdBindResources(5, sdr_images_, bind_point);
+    cmd_context->CmdBindResources(6, hdr_images_, bind_point);
+    cmd_context->CmdBindResources(7, std::vector{linear_sampler_.get(), nearest_sampler_.get()}, bind_point);
+  } else {
+    cmd_context->CmdBindResources(4, {core_->GetBuffer("sobol")}, bind_point);
+    cmd_context->CmdBindResources(5, {camera->Buffer()}, bind_point);
+    cmd_context->CmdBindResources(6, buffers_, bind_point);
+    cmd_context->CmdBindResources(7, {instance_metadata_buffer_.get()}, bind_point);
+    cmd_context->CmdBindResources(8, {light_selector_buffer_.get()}, bind_point);
+    cmd_context->CmdBindResources(9, {light_metadatas_buffer_.get()}, bind_point);
+    cmd_context->CmdBindResources(10, sdr_images_, bind_point);
+    cmd_context->CmdBindResources(11, hdr_images_, bind_point);
+    cmd_context->CmdBindResources(12, std::vector{linear_sampler_.get(), nearest_sampler_.get()}, bind_point);
   }
+  if (software)
+    cmd_context->CmdDispatch((film->GetWidth() + 7) / 8, (film->GetHeight() + 7) / 8, 1);
+  else
+    cmd_context->CmdDispatchRays(film->accumulated_color_->Extent().width, film->accumulated_samples_->Extent().height,
+                                 1);
+
   trace_profile.End();
   graphics::GpuProfileScope resolve_profile(cmd_context.get(), "film_resolve");
-  if (realtime_) {
-    film->realtime_view_->Resolve(cmd_context.get(), film->film_.GetRawImage(), software_pipeline_.get(), buffers_);
-  } else {
-    cmd_context->CmdBindComputeProgram(core_->GetComputeProgram("film2img"));
-    cmd_context->CmdBindResources(0, {film->accumulated_color_.get()}, graphics::BIND_POINT_COMPUTE);
-    cmd_context->CmdBindResources(1, {film->accumulated_samples_.get()}, graphics::BIND_POINT_COMPUTE);
-    cmd_context->CmdBindResources(2, {film->film_.GetRawImage()}, graphics::BIND_POINT_COMPUTE);
-    cmd_context->CmdDispatch((film->film_.GetRawImage()->Extent().width + 7) / 8,
-                             (film->film_.GetRawImage()->Extent().height + 7) / 8, 1);
-  }
+  cmd_context->CmdBindComputeProgram(core_->GetComputeProgram("film2img"));
+  cmd_context->CmdBindResources(0, {film->accumulated_color_.get()}, graphics::BIND_POINT_COMPUTE);
+  cmd_context->CmdBindResources(1, {film->accumulated_samples_.get()}, graphics::BIND_POINT_COMPUTE);
+  cmd_context->CmdBindResources(2, {film->film_.GetRawImage()}, graphics::BIND_POINT_COMPUTE);
+  cmd_context->CmdDispatch((film->film_.GetRawImage()->Extent().width + 7) / 8,
+                           (film->film_.GetRawImage()->Extent().height + 7) / 8, 1);
+
   resolve_profile.End();
   setup_profile.End();
   graphics::CpuProfileScope submit_profile("render_submit");
@@ -162,56 +119,6 @@ void Scene::Render(Camera *camera, Film *film, bool software, bool ray_query, bo
   submit_profile.End();
   graphics::CpuProfileScope wait_profile("render_wait");
   core_->GraphicsCore()->WaitGPU();
-}
-
-uint64_t Scene::RealtimeKey() const {
-  uint64_t key = 1469598103934665603ull;
-  auto add = [&](const auto &value) {
-    const auto *bytes = reinterpret_cast<const uint8_t *>(&value);
-    for (size_t i = 0; i < sizeof(value); ++i)
-      key = (key ^ bytes[i]) * 1099511628211ull;
-  };
-  add(settings.raytracing);
-  add(settings.realtime);
-  for (auto *entity : scene_.GetEntityOrder()) {
-    add(entity);
-    add(scene_.GetEntities().at(entity).active);
-    if (auto *instance = dynamic_cast<sparkium::EntityGeometryMaterial *>(entity)) {
-      add(instance->transform);
-      auto *geometry = instance->GetGeometry();
-      auto *material = instance->GetMaterial();
-      add(geometry);
-      add(material);
-      if (auto *m = dynamic_cast<sparkium::MaterialLambertian *>(material)) {
-        add(m->base_color);
-        add(m->emission);
-      }
-      if (auto *m = dynamic_cast<sparkium::MaterialPrincipled *>(material)) {
-        add(m->info);
-        add(m->textures);
-      }
-      if (auto *m = dynamic_cast<sparkium::MaterialSpecular *>(material))
-        add(m->base_color);
-      if (auto *m = dynamic_cast<sparkium::MaterialLight *>(material)) {
-        add(m->emission);
-        add(m->block_ray);
-        add(m->camera_visible);
-        add(m->two_sided);
-        add(m->falloff_distance);
-      }
-      if (auto *m = dynamic_cast<sparkium::MaterialShaderGraph *>(material))
-        add(m->emission_hint);
-    }
-    if (auto *light = dynamic_cast<sparkium::EntityPointLight *>(entity)) {
-      add(light->position);
-      add(light->color);
-      add(light->strength);
-      add(light->radius);
-      add(light->soft_falloff);
-      add(light->sampling_weight);
-    }
-  }
-  return key;
 }
 
 int32_t Scene::RegisterLight(Light *light, int custom_index) {

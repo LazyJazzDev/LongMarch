@@ -3,15 +3,18 @@
 
 namespace sparkium::raytracing {
 class SoftwarePipeline;
+}
+
+namespace sparkium::realtime {
 
 // Per-view history, separate from the scene's shared material and tracing data.
-class RealtimeView {
+class RealtimeView : public Object {
  public:
-  explicit RealtimeView(Core *core);
+  explicit RealtimeView(sparkium::Film &film);
   void Begin(graphics::CommandContext *commands,
-             SoftwarePipeline *pipeline,
+             raytracing::SoftwarePipeline *pipeline,
              const std::vector<graphics::Buffer *> &buffers,
-             Camera *camera,
+             raytracing::Camera *camera,
              uint32_t width,
              uint32_t height,
              int scale,
@@ -21,7 +24,7 @@ class RealtimeView {
   void BindTrace(graphics::CommandContext *commands);
   void Resolve(graphics::CommandContext *commands,
                graphics::Image *output,
-               SoftwarePipeline *pipeline,
+               raytracing::SoftwarePipeline *pipeline,
                const std::vector<graphics::Buffer *> &buffers);
 
   graphics::Buffer *ParametersBuffer() const {
@@ -45,7 +48,7 @@ class RealtimeView {
     glm::vec4 camera_position{};
   } parameters_;
 
-  Core *core_;
+  raytracing::Core *core_;
   uint32_t width_{}, height_{}, low_width_{}, low_height_{}, buffer_count_{};
   int index_{};
   uint32_t frame_index_{};
@@ -60,4 +63,4 @@ class RealtimeView {
   std::unique_ptr<graphics::Program> visibility_program_;
   std::unique_ptr<graphics::ComputeProgram> resolve_program_, filter_program_;
 };
-}  // namespace sparkium::raytracing
+}  // namespace sparkium::realtime

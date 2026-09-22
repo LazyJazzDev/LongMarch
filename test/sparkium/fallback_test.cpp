@@ -127,6 +127,15 @@ TEST_F(SoftwareBVHTest, RealtimeRasterVisibilityPreservesHDRAndRejectsStaleHisto
       EXPECT_EQ(pixel.a, 1);
     }
   }
+  // Independent pipelines must not inherit one another's film accumulation.
+  scene.settings.samples_per_dispatch = 1;
+  core->Render(&scene, &camera, &film, sparkium::RENDER_PIPELINE_RT_FALLBACK);
+  EXPECT_EQ(film.info.accumulated_samples, 1);
+  core->Render(&scene, &camera, &film, sparkium::RENDER_PIPELINE_REALTIME);
+  EXPECT_EQ(film.info.accumulated_samples, 1);
+  film.GetRawImage()->DownloadData(pixels.data());
+  for (auto pixel : pixels)
+    EXPECT_NEAR(pixel.r, 4, 0.002f);
   // Interleaved updates must cover the entire grid after one complete period.
   scene.settings.realtime.updates = 4;
   for (int frame = 0; frame < 4; ++frame)

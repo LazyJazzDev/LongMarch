@@ -2,13 +2,17 @@
 #include "sparkium/pipelines/raytracing/core/core_util.h"
 #include "sparkium/pipelines/raytracing/core/software_pipeline.h"
 
+namespace sparkium::realtime {
+class Scene;
+}
+
 namespace sparkium::raytracing {
 
 class Scene : public Object {
  public:
   Scene(sparkium::Scene &scene);
 
-  void Render(Camera *camera, Film *film, bool software = false, bool ray_query = false, bool realtime = false);
+  void Render(Camera *camera, Film *film, bool software = false, bool ray_query = false);
 
   bool SoftwareTracing() const {
     return software_tracing_;
@@ -61,11 +65,9 @@ class Scene : public Object {
 
  private:
   void UpdatePipeline(Camera *camera);
-  uint64_t RealtimeKey() const;
-  uint64_t realtime_key_{};
+  friend class sparkium::realtime::Scene;
   bool software_tracing_{false};
   bool ray_query_{false};
-  bool realtime_{false};
   bool rendered_{false};
   std::unique_ptr<SoftwarePipeline> software_pipeline_;
   sparkium::Scene &scene_;

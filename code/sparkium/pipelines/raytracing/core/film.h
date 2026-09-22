@@ -1,6 +1,5 @@
 #pragma once
 #include "sparkium/pipelines/raytracing/core/core_util.h"
-#include "sparkium/pipelines/raytracing/core/realtime_view.h"
 
 namespace sparkium::raytracing {
 
@@ -15,7 +14,6 @@ class Film : public Object {
  private:
   sparkium::Film &film_;
   Core *core_;
-  std::unique_ptr<RealtimeView> realtime_view_;
 
   friend Scene;
   friend Core;

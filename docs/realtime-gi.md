@@ -72,9 +72,18 @@ resource revision tracking is not yet a general scene API.
 
 This implementation is based on the current main-branch scene API; it does not
 merge pending PR #46 or duplicate its proposed SceneDefinition/Renderer API.
-The reusable boundary is shared scene registration, material evaluation and
-software traversal; the view-specific passes are in `realtime_view.*` and
-`shaders/realtime/`.
+The realtime pipeline has its own `sparkium_realtime` CMake target and
+`sparkium::realtime` namespace under `code/sparkium/pipelines/realtime/`:
+
+- `realtime.*`: pipeline entry, called directly by `Core::Render`.
+- `scene.*`: scene invalidation, lighting budget and pass scheduling.
+- `realtime_view.*`: per-film visibility, history, filtering and resolve resources.
+
+Shaders remain in `code/sparkium/shaders/realtime/`. Scene registration, material
+compilation, light sampling and software traversal reuse the raytracing backend;
+the realtime scene owns a separate registration context. The raytracing renderer
+no longer owns realtime view state or schedules realtime passes. Switching
+pipelines resets film accumulation at the common render entry.
 
 ## Validation and limitations
 

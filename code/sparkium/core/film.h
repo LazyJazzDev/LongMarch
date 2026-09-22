@@ -36,6 +36,8 @@ class Film : public Object {
   graphics::Image *GetStencilImage() const;
 
  private:
+  friend class Core;
+  RenderPipeline last_pipeline_{RENDER_PIPELINE_AUTO};
   Core *core_;
   graphics::Extent2D extent_;
   std::unique_ptr<graphics::Image> raw_image_;

@@ -108,13 +108,12 @@ void Render(sparkium::Core *core,
             sparkium::Camera *camera,
             sparkium::Film *film,
             bool software,
-            bool ray_query,
-            bool realtime) {
+            bool ray_query) {
   auto rt_core = DedicatedCast(core);
   auto rt_scene = DedicatedCast(scene);
   auto rt_film = DedicatedCast(film);
   auto rt_camera = DedicatedCast(camera);
-  rt_scene->Render(rt_camera, rt_film, software, ray_query, realtime);
+  rt_scene->Render(rt_camera, rt_film, software, ray_query);
 }
 
 }  // namespace sparkium::raytracing
