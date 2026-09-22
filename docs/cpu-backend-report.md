@@ -23,7 +23,7 @@ shaders are never modified.
 
 ## Does it look the same?
 
-![Reference and CPU renders side by side](https://github.com/LazyJazzDev/LongMarchAssetsLFS/blob/blender-align/docs/cpu-backend-comparison.png?raw=true)
+![Reference and CPU renders side by side](https://media.githubusercontent.com/media/LazyJazzDev/LongMarchAssetsLFS/0ee76e8611238a20d82098dbe74d075a8e7ebafa/docs/cpu-backend-comparison.png)
 
 *For each scene, the compute fallback on the left and the CPU backend on the
 right. Nine scenes at 1024×1024.*
