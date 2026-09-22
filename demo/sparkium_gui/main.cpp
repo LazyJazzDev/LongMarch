@@ -160,7 +160,7 @@ int main(int argc, char **argv) {
       }
       window->BeginImGuiFrame();
       ImGui::SetNextWindowPos({10, 10}, ImGuiCond_Once);
-      ImGui::SetNextWindowBgAlpha(0.85f);
+      ImGui::SetNextWindowBgAlpha(hdr_active ? 1.0f : 0.85f);
       ImGui::Begin("Sparkium scenes", &show_browser, ImGuiWindowFlags_AlwaysAutoResize);
       if (ImGui::BeginCombo("Scene", loaded->GetName().c_str())) {
         for (size_t i = 0; i < scene_files.size(); ++i) {
