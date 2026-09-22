@@ -1,6 +1,0 @@
-BasedOnStyle: InheritParentConfig
-# HLSL declarations in these includes depend on their source order.
-SortIncludes: Never
-
-# Native declarations annotate mutating Slang methods through this macro.
-AttributeMacros: [SP_MUTATING]

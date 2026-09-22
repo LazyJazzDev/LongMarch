@@ -7,7 +7,7 @@
 namespace sparkium::raytracing {
 
 Core::Core(sparkium::Core &core) : core_(core) {
-  shaders_vfs_ = VirtualFileSystem::LoadDirectory(LONGMARCH_RAYTRACING_SHADERS);
+  shaders_vfs_ = core_.CreatePipelineShadersVFS("raytracing");
   LoadPublicShaders();
 }
 

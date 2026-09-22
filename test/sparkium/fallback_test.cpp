@@ -150,6 +150,10 @@ TEST_F(SoftwareBVHTest, RealtimeRasterVisibilityPreservesHDRAndRejectsStaleHisto
   auto *path_material = material.GetComponent<sparkium::raytracing::MaterialLambertian>();
   ASSERT_NE(path_core, nullptr);
   ASSERT_NE(path_material, nullptr);
+  std::vector<uint8_t> realtime_bsdf, path_bsdf;
+  EXPECT_EQ(realtime_core->GetShadersVFS().ReadFile("bsdf/principled_bsdf.hlsli", realtime_bsdf), 0);
+  EXPECT_EQ(path_core->GetShadersVFS().ReadFile("bsdf/principled_bsdf.hlsli", path_bsdf), 0);
+  EXPECT_EQ(realtime_bsdf, path_bsdf);
   EXPECT_NE(path_material->Buffer(), realtime_material->Buffer());
   EXPECT_NE(path_core->GetComputeProgram("blelloch_scan_up"), realtime_scan);
   EXPECT_EQ(realtime_core->GetComputeProgram("blelloch_scan_up"), realtime_scan);

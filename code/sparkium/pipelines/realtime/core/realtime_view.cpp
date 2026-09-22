@@ -51,9 +51,9 @@ void RealtimeView::Begin(graphics::CommandContext *commands,
   }
   if (!visibility_program_ || buffer_count_ != buffers.size()) {
     const auto &vfs = core_->GetShadersVFS();
-    if (graphics->CreateShader(vfs, "realtime/visibility.hlsl", "VSMain", "vs_6_0", {"-I."}, &vertex_) ||
-        graphics->CreateShader(vfs, "realtime/visibility.hlsl", "PSMain", "ps_6_0", {"-I."}, &pixel_) ||
-        graphics->CreateShader(vfs, "realtime/resolve.hlsl", "Main", "cs_6_0", {"-I."}, &resolve_shader_))
+    if (graphics->CreateShader(vfs, "visibility.hlsl", "VSMain", "vs_6_0", {"-I."}, &vertex_) ||
+        graphics->CreateShader(vfs, "visibility.hlsl", "PSMain", "ps_6_0", {"-I."}, &pixel_) ||
+        graphics->CreateShader(vfs, "resolve.hlsl", "Main", "cs_6_0", {"-I."}, &resolve_shader_))
       throw std::runtime_error("failed to compile realtime visibility / reconstruction shaders");
     graphics->CreateProgram({graphics::IMAGE_FORMAT_R32G32B32A32_SFLOAT}, graphics::IMAGE_FORMAT_D32_SFLOAT,
                             &visibility_program_);
@@ -71,7 +71,7 @@ void RealtimeView::Begin(graphics::CommandContext *commands,
     resolve_program_->AddResourceBinding(graphics::RESOURCE_TYPE_IMAGE, 4);
     resolve_program_->AddResourceBinding(graphics::RESOURCE_TYPE_WRITABLE_IMAGE, 1);
     resolve_program_->Finalize();
-    if (graphics->CreateShader(vfs, "realtime/filter.hlsl", "Main", "cs_6_0", {"-I."}, &filter_shader_))
+    if (graphics->CreateShader(vfs, "filter.hlsl", "Main", "cs_6_0", {"-I."}, &filter_shader_))
       throw std::runtime_error("failed to compile realtime spatial filter");
     graphics->CreateComputeProgram(filter_shader_.get(), &filter_program_);
     filter_program_->AddResourceBinding(graphics::RESOURCE_TYPE_UNIFORM_BUFFER, 1);

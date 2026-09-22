@@ -185,7 +185,7 @@ float Transmission(HitRecord hit, float3 direction) {
   std::vector<std::string> args{"-I.", "-DSOFTWARE_DATA_BUFFER_COUNT=" + std::to_string(buffers)};
   if (has_graph)
     args.push_back("-DSPARKIUM_SHADER_GRAPHS");
-  if (core_->GraphicsCore()->CreateShader(vfs, "realtime/trace.hlsl", "Main", "cs_6_0", args, &render_shader_))
+  if (core_->GraphicsCore()->CreateShader(vfs, "trace.hlsl", "Main", "cs_6_0", args, &render_shader_))
     throw std::runtime_error("failed to compile compute ray tracing shader");
   core_->GraphicsCore()->CreateComputeProgram(render_shader_.get(), &render_program_);
   auto finalize = [&](graphics::ComputeProgram *program) {
@@ -202,7 +202,7 @@ float Transmission(HitRecord hit, float3 direction) {
     program->Finalize();
   };
   finalize(render_program_.get());
-  if (core_->GraphicsCore()->CreateShader(vfs, "realtime/trace.hlsl", "Reproject", "cs_6_0", args, &reproject_shader_))
+  if (core_->GraphicsCore()->CreateShader(vfs, "trace.hlsl", "Reproject", "cs_6_0", args, &reproject_shader_))
     throw std::runtime_error("failed to compile auxiliary compute shader");
   core_->GraphicsCore()->CreateComputeProgram(reproject_shader_.get(), &reproject_program_);
   finalize(reproject_program_.get());

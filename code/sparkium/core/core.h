@@ -15,6 +15,10 @@ class Core : public Object {
 
   const VirtualFileSystem &GetShadersVFS() const;
 
+  // Mount common sources and one pipeline's sources at their logical include
+  // paths. Compiled shaders/programs remain owned by the individual pipeline.
+  VirtualFileSystem CreatePipelineShadersVFS(const std::string &pipeline) const;
+
   graphics::Shader *GetShader(const std::string &name);
 
   graphics::ComputeProgram *GetComputeProgram(const std::string &name);

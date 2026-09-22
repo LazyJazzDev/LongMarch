@@ -22,6 +22,28 @@ const VirtualFileSystem &Core::GetShadersVFS() const {
   return shaders_vfs_;
 }
 
+VirtualFileSystem Core::CreatePipelineShadersVFS(const std::string &pipeline) const {
+  if (pipeline != "raytracing" && pipeline != "realtime")
+    throw std::invalid_argument("unknown shader pipeline: " + pipeline);
+  VirtualFileSystem result;
+  const std::filesystem::path root = LONGMARCH_SPARKIUM_SHADERS;
+  for (const auto &library : {std::string("common"), pipeline}) {
+    const auto directory = root / library;
+    for (const auto &entry : std::filesystem::recursive_directory_iterator(directory)) {
+      if (!entry.is_regular_file() || (entry.path().extension() != ".hlsl" && entry.path().extension() != ".hlsli"))
+        continue;
+      const auto logical_path = std::filesystem::relative(entry.path(), directory).generic_string();
+      std::vector<uint8_t> source;
+      if (result.ReadFile(logical_path, source) == 0)
+        throw std::runtime_error("duplicate shader include path: " + logical_path);
+      if (shaders_vfs_.ReadFile(library + "/" + logical_path, source) != 0)
+        throw std::runtime_error("missing shader source: " + library + "/" + logical_path);
+      result.WriteFile(logical_path, source);
+    }
+  }
+  return result;
+}
+
 graphics::Shader *Core::GetShader(const std::string &name) {
   return shaders_[name].get();
 }
@@ -64,7 +86,7 @@ void Core::LoadPublicShaders() {
     std::vector<std::string> args;
     if (hdr)
       args.push_back("-DSPARKIUM_HDR_OUTPUT=1");
-    core_->CreateShader(shaders_vfs_, "tone_mapping.hlsl", "Main", "cs_6_0", args, &shader);
+    core_->CreateShader(shaders_vfs_, "common/tone_mapping.hlsl", "Main", "cs_6_0", args, &shader);
     SetPublicResource(name, std::move(shader));
     core_->CreateComputeProgram(GetShader(name), &compute_program);
     compute_program->AddResourceBinding(graphics::RESOURCE_TYPE_IMAGE, 1);

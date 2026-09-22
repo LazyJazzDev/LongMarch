@@ -81,28 +81,41 @@ The realtime implementation lives entirely under
   software BVH construction, visibility, per-film history, filtering and resolve.
 - `material/`, `light/`, `geometry/`, `entity/`: independent adapters for the
   public scene definitions.
-- `shaders/`: private material, lighting, software traversal and realtime kernels.
 
-Ray tracing has a separate implementation and shader tree under
-`pipelines/raytracing/`. There is no `pipelines/common` implementation, shared
-renderer base class, cross-pipeline include, or link dependency. Each pipeline
-also owns its shader VFS, shader/program caches, material buffers and registration
-state. Editing one pipeline's shader files does not change the other's sources.
-The realtime implementation has no closest-hit/any-hit shaders, hit groups,
-callable shaders, native acceleration structures or hardware ray-query path.
+Ray tracing has a separate C++ implementation under `pipelines/raytracing/`.
+There is no common renderer base class, cross-pipeline C++ include, or link
+dependency. Each pipeline owns its shader/program caches, material buffers and
+registration state. Realtime uses software traversal without hardware hit groups,
+callable shaders, native acceleration structures or a hardware ray-query path.
+
+Shader source is centrally managed under `code/sparkium/shaders/`:
+
+- `common/`: BSDFs, material graphs, light sampling, mesh hit records, software
+  BVH kernels, mathematical helpers and film development.
+- `raytracing/`: path-tracing bindings, ray generation, hardware hit/callable
+  entry points and native ray-query traversal.
+- `realtime/`: realtime bindings, visibility, reprojection, sparse tracing,
+  filtering and resolve.
+
+`Core::CreatePipelineShadersVFS` mounts common sources and the selected pipeline
+at their logical include paths. Duplicate paths are rejected. This lets common
+material code include the selected pipeline's `bindings.hlsli` without importing
+the other renderer's bindings or entry points. Common shader changes must be
+validated against both pipelines; compiled program state remains independent.
 
 ```mermaid
 flowchart TD
-  D[Pipeline dispatch] --> R[Realtime implementation and shaders]
-  D --> P[Ray-tracing implementation and shaders]
+  D[Pipeline dispatch] --> R[Realtime C++ implementation]
+  D --> P[Ray-tracing C++ implementation]
   R --> S[Public scene definitions and graphics API]
   P --> S
+  R --> H[Common shader sources]
+  P --> H
 ```
 
-Only public scene definitions/assets and foundation services (graphics API,
-source mesh/texture data, default images and Sobol data) are reused. Equivalent
-material and lighting behavior is maintained by tests rather than a common
-pipeline implementation. Pipeline dispatch resides in `pipelines/dispatch.cpp`;
+Public scene definitions/assets, shader semantics, and foundation services
+(graphics API, source mesh/texture data, default images and Sobol data) are reused.
+C++ pipeline implementation and resource state remain separate. Pipeline dispatch resides in `pipelines/dispatch.cpp`;
 `sparkium_core` does not link concrete renderers. Switching pipelines resets film
 accumulation at that dispatch entry.
 
@@ -111,8 +124,8 @@ accumulation at that dispatch entry.
 The regression test covers HDR emitter radiance at a non-divisible resolution,
 background disocclusion on a camera cut, explicit history reset after a material
 edit, transform invalidation, and absence of native ray queries. The isolation regression also checks that realtime rendering creates no
-path-tracing components, that shader sources and program/material caches are
-independent, and that switching pipelines preserves rendering behavior. Existing
+path-tracing components, that common shader sources match while pipeline-specific sources and
+program/material caches remain isolated, and that switching pipelines preserves rendering behavior. Existing
 path-tracing tests cover its separate software BVH and native-query paths.
 
 Use the CLI profiler for render-and-develop wall time (Metal currently supports

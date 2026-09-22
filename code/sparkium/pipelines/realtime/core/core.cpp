@@ -6,7 +6,7 @@
 namespace sparkium::realtime {
 
 Core::Core(sparkium::Core &core) : core_(core) {
-  shaders_vfs_ = VirtualFileSystem::LoadDirectory(LONGMARCH_REALTIME_SHADERS);
+  shaders_vfs_ = core_.CreatePipelineShadersVFS("realtime");
   LoadPublicShaders();
 }
 
