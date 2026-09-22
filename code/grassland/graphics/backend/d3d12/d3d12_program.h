@@ -35,6 +35,7 @@ class D3D12Program : public Program, public D3D12ProgramBase {
   void AddResourceBinding(ResourceType type, int count) override;
   void SetCullMode(CullMode mode) override;
   void SetBlendState(int target_id, const BlendState &state) override;
+  using Program::BindShader;
   void BindShader(Shader *shader, ShaderType type) override;
   void Finalize() override;
 
@@ -47,6 +48,7 @@ class D3D12Program : public Program, public D3D12ProgramBase {
   }
 
  private:
+  std::map<ShaderType, Shader *> shader_stages_;
   std::vector<std::pair<uint32_t, bool>> input_bindings_;
   std::vector<D3D12_INPUT_ELEMENT_DESC> input_attributes_;
   D3D12_GRAPHICS_PIPELINE_STATE_DESC pipeline_state_desc_;
@@ -55,7 +57,13 @@ class D3D12Program : public Program, public D3D12ProgramBase {
 
 class D3D12ComputeProgram : public ComputeProgram, public D3D12ProgramBase {
  public:
-  D3D12ComputeProgram(D3D12Core *core, D3D12Shader *compute_shader);
+  using ComputeProgram::BindShader;
+
+  void BindShader(Shader *shader) override {
+    compute_shader_ = shader;
+  }
+
+  D3D12ComputeProgram(D3D12Core *core, Shader *compute_shader);
   ~D3D12ComputeProgram() override = default;
   void AddResourceBinding(ResourceType type, int count) override;
   void Finalize() override;
@@ -65,12 +73,16 @@ class D3D12ComputeProgram : public ComputeProgram, public D3D12ProgramBase {
   }
 
  private:
-  D3D12Shader *compute_shader_;
+  Shader *compute_shader_;
   d3d12::ComPtr<ID3D12PipelineState> pipeline_state_;
 };
 
 class D3D12RayTracingProgram : public RayTracingProgram, public D3D12ProgramBase {
  public:
+  using RayTracingProgram::AddCallableShader;
+  using RayTracingProgram::AddHitGroup;
+  using RayTracingProgram::AddMissShader;
+  using RayTracingProgram::AddRayGenShader;
   D3D12RayTracingProgram(D3D12Core *core,
                          D3D12Shader *raygen_shader,
                          D3D12Shader *miss_shader,
@@ -98,7 +110,11 @@ class D3D12RayTracingProgram : public RayTracingProgram, public D3D12ProgramBase
   }
 
  private:
-  d3d12::ShaderModule *raygen_shader_;
+  void ResolveShaders();
+  Shader *source_raygen_ = nullptr;
+  std::vector<Shader *> source_miss_, source_callable_;
+  std::vector<HitGroup> source_hit_groups_;
+  d3d12::ShaderModule *raygen_shader_ = nullptr;
   std::vector<d3d12::ShaderModule *> miss_shaders_;
   std::vector<d3d12::HitGroup> hit_groups_;
   std::vector<d3d12::ShaderModule *> callable_shaders_;

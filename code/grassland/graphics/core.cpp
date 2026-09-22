@@ -7,6 +7,16 @@
 
 namespace grassland::graphics {
 
+int Core::CreateComputeProgram(const ShaderCode &code, double_ptr<ComputeProgram> result) {
+  std::unique_ptr<ComputeProgram> program;
+  int status = CreateComputeProgram(static_cast<Shader *>(nullptr), &program);
+  if (status)
+    return status;
+  program->BindShader(code);
+  result = program.release();
+  return 0;
+}
+
 #if defined(LONGMARCH_PYTHON_ENABLED)
 void Core::Settings::PybindClassRegistration(py::classh<Settings> &c) {
   c.def(py::init<int, bool>(), py::arg("frames_in_flight") = 2, py::arg("enable_debug") = kEnableDebug);

@@ -6,13 +6,19 @@ namespace grassland::graphics::backend {
 
 class MetalComputeProgram : public ComputeProgram {
  public:
-  MetalComputeProgram(MetalCore *core, MetalShader *shader) : core(core), shader(shader) {
+  MetalComputeProgram(MetalCore *core, Shader *shader) : core(core), shader(shader) {
+  }
+
+  using ComputeProgram::BindShader;
+
+  void BindShader(Shader *value) override {
+    shader = value;
   }
 
   void AddResourceBinding(ResourceType type, int count) override;
   void Finalize() override;
   MetalCore *core;
-  MetalShader *shader;
+  Shader *shader;
   std::vector<MetalBinding> bindings;
   MetalStage stage;
   NS::SharedPtr<MTL::ComputePipelineState> pipeline;
@@ -30,11 +36,12 @@ class MetalProgram : public Program {
   }
 
   void SetBlendState(int target, const BlendState &state) override;
+  using Program::BindShader;
   void BindShader(Shader *shader, ShaderType type) override;
   void Finalize() override;
   MetalCore *core;
   std::vector<MetalBinding> bindings;
-  MetalShader *vertex = nullptr, *fragment = nullptr;
+  Shader *vertex = nullptr, *fragment = nullptr;
   MetalStage vertex_stage, fragment_stage;
   NS::SharedPtr<MTL::RenderPipelineDescriptor> descriptor;
   NS::SharedPtr<MTL::RenderPipelineState> pipeline;

@@ -1,6 +1,7 @@
 #include "grassland/graphics/backend/d3d12/d3d12_program.h"
 
 #include <numeric>
+#include <stdexcept>
 
 namespace grassland::graphics::backend {
 
@@ -68,6 +69,7 @@ void D3D12Program::AddInputBinding(uint32_t stride, bool input_per_instance) {
 }
 
 void D3D12Program::AddResourceBinding(ResourceType type, int count) {
+  RecordResourceBinding(type, count);
   AddResourceBindingImpl(type, count);
 }
 
@@ -81,25 +83,30 @@ void D3D12Program::SetBlendState(int target_id, const BlendState &state) {
 }
 
 void D3D12Program::BindShader(Shader *shader, ShaderType type) {
-  D3D12Shader *d3d12_shader = dynamic_cast<D3D12Shader *>(shader);
-  if (d3d12_shader) {
-    switch (type) {
-      case SHADER_TYPE_VERTEX:
-        pipeline_state_desc_.VS = d3d12_shader->ShaderModule().Handle();
-        break;
-      case SHADER_TYPE_PIXEL:
-        pipeline_state_desc_.PS = d3d12_shader->ShaderModule().Handle();
-        break;
-      case SHADER_TYPE_GEOMETRY:
-        pipeline_state_desc_.GS = d3d12_shader->ShaderModule().Handle();
-        break;
-    }
-  } else {
-    throw std::runtime_error("Invalid shader object, expected D3D12Shader");
-  }
+  if (!shader)
+    throw std::invalid_argument("missing graphics shader");
+  shader_stages_[type] = shader;
 }
 
 void D3D12Program::Finalize() {
+  for (auto [type, shader] : shader_stages_) {
+    D3D12Shader *d3d12_shader = dynamic_cast<D3D12Shader *>(ResolveShader(core_, shader));
+    if (d3d12_shader) {
+      switch (type) {
+        case SHADER_TYPE_VERTEX:
+          pipeline_state_desc_.VS = d3d12_shader->ShaderModule().Handle();
+          break;
+        case SHADER_TYPE_PIXEL:
+          pipeline_state_desc_.PS = d3d12_shader->ShaderModule().Handle();
+          break;
+        case SHADER_TYPE_GEOMETRY:
+          pipeline_state_desc_.GS = d3d12_shader->ShaderModule().Handle();
+          break;
+      }
+    } else {
+      throw std::runtime_error("Invalid shader object, expected D3D12Shader");
+    }
+  }
   FinalizeRootSignature();
 
   pipeline_state_desc_.InputLayout.pInputElementDescs = input_attributes_.data();
@@ -121,21 +128,25 @@ const D3D12_GRAPHICS_PIPELINE_STATE_DESC *D3D12Program::PipelineStateDesc() cons
   return &pipeline_state_desc_;
 }
 
-D3D12ComputeProgram::D3D12ComputeProgram(D3D12Core *core, D3D12Shader *compute_shader)
+D3D12ComputeProgram::D3D12ComputeProgram(D3D12Core *core, Shader *compute_shader)
     : D3D12ProgramBase(core),
       compute_shader_(compute_shader) {
 }
 
 void D3D12ComputeProgram::AddResourceBinding(ResourceType type, int count) {
+  RecordResourceBinding(type, count);
   AddResourceBindingImpl(type, count);
 }
 
 void D3D12ComputeProgram::Finalize() {
+  auto shader = dynamic_cast<D3D12Shader *>(ResolveShader(core_, compute_shader_));
+  if (!shader)
+    throw std::invalid_argument("invalid compute shader");
   FinalizeRootSignature();
 
   D3D12_COMPUTE_PIPELINE_STATE_DESC pipeline_desc{};
   pipeline_desc.pRootSignature = root_signature_->Handle();
-  pipeline_desc.CS = compute_shader_->ShaderModule().Handle();
+  pipeline_desc.CS = shader->ShaderModule().Handle();
 
   core_->Device()->Handle()->CreateComputePipelineState(&pipeline_desc, IID_PPV_ARGS(&pipeline_state_));
 }
@@ -154,50 +165,55 @@ D3D12RayTracingProgram::D3D12RayTracingProgram(D3D12Core *core) : D3D12ProgramBa
 }
 
 void D3D12RayTracingProgram::AddResourceBinding(ResourceType type, int count) {
+  RecordResourceBinding(type, count);
   AddResourceBindingImpl(type, count);
 }
 
-void D3D12RayTracingProgram::AddRayGenShader(Shader *ray_gen_shader) {
-  D3D12Shader *shader = dynamic_cast<D3D12Shader *>(ray_gen_shader);
-
-  assert(shader != nullptr);
-
-  raygen_shader_ = &shader->ShaderModule();
+void D3D12RayTracingProgram::AddRayGenShader(Shader *shader) {
+  source_raygen_ = shader;
 }
 
-void D3D12RayTracingProgram::AddMissShader(Shader *miss_shader) {
-  D3D12Shader *shader = dynamic_cast<D3D12Shader *>(miss_shader);
-  assert(shader != nullptr);
-  miss_shaders_.emplace_back(&shader->ShaderModule());
+void D3D12RayTracingProgram::AddMissShader(Shader *shader) {
+  source_miss_.push_back(shader);
 }
 
-void D3D12RayTracingProgram::AddHitGroup(HitGroup hit_group) {
-  d3d12::HitGroup d3d_hit_group;
-  D3D12Shader *d3d12_closest_hit_shader = dynamic_cast<D3D12Shader *>(hit_group.closest_hit_shader);
-  assert(d3d12_closest_hit_shader != nullptr);
-  d3d_hit_group.closest_hit_shader = &d3d12_closest_hit_shader->ShaderModule();
-  D3D12Shader *d3d12_any_hit_shader = dynamic_cast<D3D12Shader *>(hit_group.any_hit_shader);
-  if (d3d12_any_hit_shader) {
-    d3d_hit_group.any_hit_shader = &d3d12_any_hit_shader->ShaderModule();
+void D3D12RayTracingProgram::AddHitGroup(HitGroup group) {
+  source_hit_groups_.push_back(group);
+}
+
+void D3D12RayTracingProgram::AddCallableShader(Shader *shader) {
+  source_callable_.push_back(shader);
+}
+
+void D3D12RayTracingProgram::ResolveShaders() {
+  auto resolve = [&](Shader *source) -> d3d12::ShaderModule * {
+    auto shader = dynamic_cast<D3D12Shader *>(ResolveShader(core_, source));
+    if (!shader)
+      throw std::invalid_argument("invalid ray tracing shader");
+    return &shader->ShaderModule();
+  };
+  raygen_shader_ = resolve(source_raygen_);
+  miss_shaders_.clear();
+  hit_groups_.clear();
+  callable_shaders_.clear();
+  for (auto shader : source_miss_)
+    miss_shaders_.push_back(resolve(shader));
+  for (auto source : source_hit_groups_) {
+    d3d12::HitGroup group{};
+    group.closest_hit_shader = source.closest_hit_shader ? resolve(source.closest_hit_shader) : nullptr;
+    group.any_hit_shader = source.any_hit_shader ? resolve(source.any_hit_shader) : nullptr;
+    group.intersection_shader = source.intersection_shader ? resolve(source.intersection_shader) : nullptr;
+    group.procedure = source.procedure;
+    hit_groups_.push_back(group);
   }
-
-  D3D12Shader *d3d12_intersection_shader = dynamic_cast<D3D12Shader *>(hit_group.intersection_shader);
-  if (d3d12_intersection_shader) {
-    d3d_hit_group.intersection_shader = &d3d12_intersection_shader->ShaderModule();
-  }
-  d3d_hit_group.procedure = hit_group.procedure;
-  hit_groups_.emplace_back(d3d_hit_group);
-}
-
-void D3D12RayTracingProgram::AddCallableShader(Shader *callable_shader) {
-  D3D12Shader *shader = dynamic_cast<D3D12Shader *>(callable_shader);
-  assert(shader != nullptr);
-  callable_shaders_.emplace_back(&shader->ShaderModule());
+  for (auto shader : source_callable_)
+    callable_shaders_.push_back(resolve(shader));
 }
 
 void D3D12RayTracingProgram::Finalize(const std::vector<int32_t> &miss_shader_indices,
                                       const std::vector<int32_t> &hit_group_indices,
                                       const std::vector<int32_t> &callable_shader_indices) {
+  ResolveShaders();
   FinalizeRootSignature();
 
   core_->Device()->CreateRayTracingPipeline(root_signature_.get(), raygen_shader_, miss_shaders_, hit_groups_,
@@ -208,11 +224,11 @@ void D3D12RayTracingProgram::Finalize(const std::vector<int32_t> &miss_shader_in
 }
 
 void D3D12RayTracingProgram::Finalize() {
-  std::vector<int32_t> miss_shader_indices(miss_shaders_.size());
+  std::vector<int32_t> miss_shader_indices(source_miss_.size());
   std::iota(miss_shader_indices.begin(), miss_shader_indices.end(), 0);
-  std::vector<int32_t> hit_group_indices(hit_groups_.size());
+  std::vector<int32_t> hit_group_indices(source_hit_groups_.size());
   std::iota(hit_group_indices.begin(), hit_group_indices.end(), 0);
-  std::vector<int32_t> callable_shader_indices(callable_shaders_.size());
+  std::vector<int32_t> callable_shader_indices(source_callable_.size());
   std::iota(callable_shader_indices.begin(), callable_shader_indices.end(), 0);
   Finalize(miss_shader_indices, hit_group_indices, callable_shader_indices);
 }

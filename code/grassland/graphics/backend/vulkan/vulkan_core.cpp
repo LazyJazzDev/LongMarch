@@ -137,7 +137,7 @@ int VulkanCore::CreateProgram(const std::vector<ImageFormat> &color_formats,
 }
 
 int VulkanCore::CreateComputeProgram(Shader *compute_shader, double_ptr<ComputeProgram> pp_program) {
-  pp_program.construct<VulkanComputeProgram>(this, dynamic_cast<VulkanShader *>(compute_shader));
+  pp_program.construct<VulkanComputeProgram>(this, compute_shader);
   return 0;
 }
 

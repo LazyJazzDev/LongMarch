@@ -7,6 +7,7 @@ namespace grassland::graphics::backend {
 
 class VulkanCore : public Core {
  public:
+  using Core::CreateComputeProgram;
   VulkanCore(const Settings &settings);
   ~VulkanCore() override;
 

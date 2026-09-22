@@ -7,6 +7,7 @@ namespace grassland::graphics::backend {
 
 class MetalCore : public Core {
  public:
+  using Core::CreateComputeProgram;
   MetalCore(const Settings &settings);
   ~MetalCore() override;
 

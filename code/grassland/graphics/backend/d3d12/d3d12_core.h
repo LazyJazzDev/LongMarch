@@ -15,6 +15,7 @@ struct BlitPipeline {
 
 class D3D12Core : public Core {
  public:
+  using Core::CreateComputeProgram;
   D3D12Core(const Settings &settings);
   ~D3D12Core() override;
 

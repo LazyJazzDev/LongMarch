@@ -11,6 +11,7 @@ class Image;
 class Sampler;
 class Window;
 class Shader;
+class ShaderCode;
 class Program;
 class ComputeProgram;
 class CommandContext;

@@ -44,6 +44,7 @@ class VulkanProgram : public Program, public VulkanProgramBase {
   void AddResourceBinding(ResourceType type, int count) override;
   void SetCullMode(CullMode mode) override;
   void SetBlendState(int target_id, const BlendState &state) override;
+  using Program::BindShader;
   void BindShader(Shader *shader, ShaderType type) override;
   void Finalize() override;
 
@@ -55,13 +56,20 @@ class VulkanProgram : public Program, public VulkanProgramBase {
   }
 
  private:
+  std::map<ShaderType, Shader *> shader_stages_;
   vulkan::PipelineSettings pipeline_settings_;
   std::unique_ptr<vulkan::Pipeline> pipeline_;
 };
 
 class VulkanComputeProgram : public ComputeProgram, public VulkanProgramBase {
  public:
-  VulkanComputeProgram(VulkanCore *core, VulkanShader *compute_shader);
+  using ComputeProgram::BindShader;
+
+  void BindShader(Shader *shader) override {
+    compute_shader_ = shader;
+  }
+
+  VulkanComputeProgram(VulkanCore *core, Shader *compute_shader);
   ~VulkanComputeProgram() override;
 
   void AddResourceBinding(ResourceType type, int count) override;
@@ -73,12 +81,16 @@ class VulkanComputeProgram : public ComputeProgram, public VulkanProgramBase {
   }
 
  private:
-  VulkanShader *compute_shader_;
+  Shader *compute_shader_;
   VkPipeline pipeline_{VK_NULL_HANDLE};
 };
 
 class VulkanRayTracingProgram : public RayTracingProgram, public VulkanProgramBase {
  public:
+  using RayTracingProgram::AddCallableShader;
+  using RayTracingProgram::AddHitGroup;
+  using RayTracingProgram::AddMissShader;
+  using RayTracingProgram::AddRayGenShader;
   VulkanRayTracingProgram(VulkanCore *core);
   VulkanRayTracingProgram(VulkanCore *core,
                           VulkanShader *raygen_shader,
@@ -107,7 +119,11 @@ class VulkanRayTracingProgram : public RayTracingProgram, public VulkanProgramBa
   }
 
  private:
-  vulkan::ShaderModule *raygen_shader_;
+  void ResolveShaders();
+  Shader *source_raygen_ = nullptr;
+  std::vector<Shader *> source_miss_, source_callable_;
+  std::vector<HitGroup> source_hit_groups_;
+  vulkan::ShaderModule *raygen_shader_ = nullptr;
   std::vector<vulkan::ShaderModule *> miss_shaders_;
   std::vector<vulkan::HitGroup> hit_groups_;
   std::vector<vulkan::ShaderModule *> callable_shaders_;
