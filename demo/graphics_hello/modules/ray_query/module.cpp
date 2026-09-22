@@ -30,7 +30,7 @@ void ModuleRayQuery::OnInit() {
   camera_object.screen_to_camera = glm::inverse(
       glm::perspective(glm::radians(60.0f), (float)window_->GetWidth() / (float)window_->GetHeight(), 0.1f, 10.0f));
   camera_object.camera_to_world =
-      glm::inverse(glm::lookAt(glm::vec3{0.0f, 1.0f, 5.0f}, glm::vec3{0.0f, 0.0f, 0.0f}, glm::vec3{0.0f, 1.0f, 0.0f}));
+      glm::inverse(glm::lookAt(glm::vec3{0.0f, 0.0f, 5.0f}, glm::vec3{0.0f, 0.0f, 0.0f}, glm::vec3{0.0f, 1.0f, 0.0f}));
   camera_object_buffer_->UploadData(&camera_object, sizeof(CameraObject));
 
   core_->CreateImage(window_->GetWidth(), window_->GetHeight(), grassland::graphics::IMAGE_FORMAT_R32G32B32A32_SFLOAT,
@@ -38,9 +38,18 @@ void ModuleRayQuery::OnInit() {
 
   core_->CreateShader(LoadShader("modules/ray_query/shaders/shader.hlsl"), "CSMain", "cs_6_5", &compute_shader_);
 
-  core_->CreateBottomLevelAccelerationStructure(vertex_buffer_.get(), index_buffer_.get(), sizeof(glm::vec3), &blas_);
+  core_->CreateBottomLevelAccelerationStructure(vertex_buffer_.get(), index_buffer_.get(), sizeof(glm::vec3),
+                                                &triangle_blas_);
+  grassland::graphics::RayTracingAABB aabb{-1.0f, -1.0f, -1.0f, 1.0f, 1.0f, 1.0f};
+  std::unique_ptr<grassland::graphics::Buffer> aabb_buffer;
+  core_->CreateBuffer(sizeof(aabb), grassland::graphics::BUFFER_TYPE_STATIC, &aabb_buffer);
+  aabb_buffer->UploadData(&aabb, sizeof(aabb));
+  core_->CreateBottomLevelAccelerationStructure(aabb_buffer->Range(), sizeof(aabb), 1,
+                                                grassland::graphics::RAYTRACING_GEOMETRY_FLAG_OPAQUE, &sphere_blas_);
   core_->CreateTopLevelAccelerationStructure(
-      {blas_->MakeInstance(glm::mat4{1.0f}, 0, 0xFF, 0, grassland::graphics::RAYTRACING_INSTANCE_FLAG_NONE)}, &tlas_);
+      {triangle_blas_->MakeInstance(glm::mat4{1.0f}, 0, 0xFF, 0, grassland::graphics::RAYTRACING_INSTANCE_FLAG_NONE),
+       sphere_blas_->MakeInstance(glm::mat4{1.0f}, 0, 0xFF, 1, grassland::graphics::RAYTRACING_INSTANCE_FLAG_NONE)},
+      &tlas_);
 
   core_->CreateComputeProgram(compute_shader_.get(), &program_);
   program_->AddResourceBinding(grassland::graphics::RESOURCE_TYPE_ACCELERATION_STRUCTURE, 1);
@@ -55,7 +64,8 @@ void ModuleRayQuery::OnClose() {
   compute_shader_.reset();
 
   tlas_.reset();
-  blas_.reset();
+  sphere_blas_.reset();
+  triangle_blas_.reset();
 
   color_image_.reset();
   camera_object_buffer_.reset();
@@ -73,8 +83,13 @@ void ModuleRayQuery::OnUpdate() {
     theta += glm::radians(0.1f);
 
     tlas_->UpdateInstances(
-        std::vector{blas_->MakeInstance(glm::rotate(glm::mat4{1.0f}, theta, glm::vec3{0.0f, 1.0f, 0.0f}), 0, 0xFF, 0,
-                                        grassland::graphics::RAYTRACING_INSTANCE_FLAG_NONE)});
+        std::vector{triangle_blas_->MakeInstance(glm::translate(glm::mat4{1.0f}, glm::vec3{-2.0f, 0.0f, 0.0f}) *
+                                                     glm::rotate(glm::mat4{1.0f}, theta, glm::vec3{0.0f, 1.0f, 0.0f}),
+                                                 0, 0xFF, 0, grassland::graphics::RAYTRACING_INSTANCE_FLAG_NONE),
+                    sphere_blas_->MakeInstance(glm::translate(glm::mat4{1.0f}, glm::vec3{2.0f, 0.0f, 0.0f}) *
+                                                   glm::rotate(glm::mat4{1.0f}, theta, glm::vec3{0.0f, 1.0f, 0.0f}) *
+                                                   glm::scale(glm::mat4{1.0f}, glm::vec3{1.0f, 1.0f, 0.5f}),
+                                               0, 0xFF, 1, grassland::graphics::RAYTRACING_INSTANCE_FLAG_NONE)});
   }
 }
 

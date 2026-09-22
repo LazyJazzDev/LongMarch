@@ -38,7 +38,8 @@ class ModuleRayQuery final : public Module {
 
   std::unique_ptr<grassland::graphics::Shader> compute_shader_;
 
-  std::unique_ptr<grassland::graphics::AccelerationStructure> blas_;
+  std::unique_ptr<grassland::graphics::AccelerationStructure> triangle_blas_;
+  std::unique_ptr<grassland::graphics::AccelerationStructure> sphere_blas_;
   std::unique_ptr<grassland::graphics::AccelerationStructure> tlas_;
 
   std::unique_ptr<grassland::graphics::Image> color_image_;

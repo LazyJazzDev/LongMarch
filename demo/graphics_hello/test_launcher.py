@@ -8,7 +8,7 @@ import unittest
 EXECUTABLE = str(pathlib.Path(sys.argv.pop(1)).resolve())
 MODULES = (
     "triangle", "blend", "cube", "texture", "resize", "hdr", "sdr_sample",
-    "raytracing", "ray_query",
+    "raytracing", "rt_multi_shader_group", "external_shader", "ray_query",
 )
 
 
@@ -54,7 +54,7 @@ class LauncherTest(unittest.TestCase):
                 self.assertNotIn("Device Name:", result.stdout)
 
     def test_tui_invalid_selection_retries(self):
-        result = self.run_launcher("--tui", text="0\n10\nmissing\n\n q \n")
+        result = self.run_launcher("--tui", text="0\n12\nmissing\n\n q \n")
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertEqual(result.stdout.count("Invalid selection."), 3)
         self.assertNotIn("Device Name:", result.stdout)

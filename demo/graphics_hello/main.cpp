@@ -7,10 +7,12 @@
 #include "module.h"
 #include "modules/blend/module.h"
 #include "modules/cube/module.h"
+#include "modules/external_shader/module.h"
 #include "modules/hdr/module.h"
 #include "modules/ray_query/module.h"
 #include "modules/raytracing/module.h"
 #include "modules/resize/module.h"
+#include "modules/rt_multi_shader_group/module.h"
 #include "modules/sdr_sample/module.h"
 #include "modules/texture/module.h"
 #include "modules/triangle/module.h"
@@ -30,7 +32,7 @@ std::unique_ptr<Module> CreateModule(BackendAPI api) {
   return std::make_unique<T>(api);
 }
 
-const std::array<ModuleInfo, 9> modules{{
+const std::array<ModuleInfo, 11> modules{{
     {"triangle", "Colored triangle", CreateModule<triangle::ModuleTriangle>},
     {"blend", "Alpha blending", CreateModule<blend::ModuleBlend>},
     {"cube", "Rotating cube", CreateModule<cube::ModuleCube>},
@@ -39,6 +41,10 @@ const std::array<ModuleInfo, 9> modules{{
     {"hdr", "HDR gradient (SDR presentation on Metal)", CreateModule<hdr::ModuleHDR>},
     {"sdr_sample", "SDR sampling", CreateModule<sdr_sample::ModuleSDRSample>},
     {"raytracing", "Ray tracing pipeline (unavailable on Metal)", CreateModule<raytracing::ModuleRayTracing>},
+    {"rt_multi_shader_group", "Triangle + procedural sphere (requires RT pipelines)",
+     CreateModule<rt_multi_shader_group::ModuleRTMultiShaderGroup>},
+    {"external_shader", "RT scene with shaders loaded from assets (requires RT pipelines)",
+     CreateModule<external_shader::ModuleExternalShader>},
     {"ray_query", "Compute ray queries (requires device/backend support)", CreateModule<ray_query::ModuleRayQuery>},
 }};
 
@@ -72,7 +78,7 @@ BackendAPI ParseBackend(std::string_view name) {
 
 void ListModules() {
   for (size_t i = 0; i < modules.size(); ++i)
-    std::cout << fmt::format("  {}. {:<12} {}\n", i + 1, modules[i].name, modules[i].description);
+    std::cout << fmt::format("  {}. {:<21} {}\n", i + 1, modules[i].name, modules[i].description);
 }
 
 // A line-based TUI works in native terminals, IDE consoles and redirected input,
@@ -82,7 +88,7 @@ const ModuleInfo *SelectModule(BackendAPI api) {
             << "Backend API: " << grassland::graphics::BackendAPIString(api) << "\n\n";
   ListModules();
   for (;;) {
-    std::cout << "\nSelect module [1-9 or name], q to quit: " << std::flush;
+    std::cout << "\nSelect module [1-" << modules.size() << " or name], q to quit: " << std::flush;
     std::string input;
     if (!std::getline(std::cin, input))
       return nullptr;

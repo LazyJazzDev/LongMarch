@@ -1,25 +1,23 @@
-#include "app.h"
+#include "module.h"
 
 #include "glm/gtc/matrix_transform.hpp"
 
-Application::Application(grassland::graphics::BackendAPI api) {
-  grassland::graphics::CreateCore(api, grassland::graphics::Core::Settings{}, &core_);
-  core_->InitializeLogicalDeviceAutoSelect(true);
+namespace graphics_hello::rt_multi_shader_group {
 
-  grassland::LogInfo("Device Name: {}", core_->DeviceName());
-  grassland::LogInfo("- Ray Tracing Support: {}", core_->DeviceRayTracingSupport());
+ModuleRTMultiShaderGroup::ModuleRTMultiShaderGroup(grassland::graphics::BackendAPI api) {
+  if (api == grassland::graphics::BACKEND_API_METAL)
+    throw std::runtime_error("Metal has no ray tracing pipelines; use --module ray_query");
+  InitializeGraphicsHello(api, core_, true);
+  if (!core_->DeviceRayTracingSupport())
+    throw std::runtime_error("Ray tracing pipelines are unavailable on this device");
 }
 
-Application::~Application() {
-  core_.reset();
-}
+ModuleRTMultiShaderGroup::~ModuleRTMultiShaderGroup() = default;
 
-void Application::OnInit() {
+void ModuleRTMultiShaderGroup::OnInit() {
   alive_ = true;
-  core_->CreateWindowObject(1280, 720,
-                            ((core_->API() == grassland::graphics::BACKEND_API_VULKAN) ? "[Vulkan]" : "[D3D12]") +
-                                std::string(" Graphics External Shader"),
-                            &window_);
+  core_->CreateWindowObject(
+      1280, 720, GraphicsHelloTitle(core_->API()) + std::string(" Graphics Ray Tracing Multi Shader Group"), &window_);
 
   std::vector<glm::vec3> vertices = {{-1.0f, -1.0f, 0.0f}, {1.0f, -1.0f, 0.0f}, {0.0f, 1.0f, 0.0f}};
   std::vector<uint32_t> indices = {0, 1, 2};
@@ -48,16 +46,18 @@ void Application::OnInit() {
                       &aabb_buffer);
   aabb_buffer->UploadData(&aabb, sizeof(grassland::graphics::RayTracingAABB));
 
-  auto shader_vfs = grassland::VirtualFileSystem::LoadDirectory(grassland::FindAssetPath("shaders/raytracing"));
-
-  shader_vfs.Print();
-
-  core_->CreateShader(shader_vfs, "raygen.hlsl", "Main", "lib_6_3", &raygen_shader_);
-  core_->CreateShader(shader_vfs, "miss.hlsl", "Main", "lib_6_3", &miss_shader_);
-  core_->CreateShader(shader_vfs, "closest_hit.hlsl", "Main", "lib_6_3", &closest_hit_shader_);
-  core_->CreateShader(shader_vfs, "sphere_chit.hlsl", "Main", "lib_6_3", &sphere_closest_hit_shader_);
-  core_->CreateShader(shader_vfs, "sphere_int.hlsl", "Main", "lib_6_3", &sphere_intersection_shader_);
-  core_->CreateShader(shader_vfs, "callable.hlsl", "Main", "lib_6_3", &callable_shader_);
+  core_->CreateShader(LoadShader("modules/rt_multi_shader_group/shaders/shader.hlsl"), "RayGenMain", "lib_6_3",
+                      &raygen_shader_);
+  core_->CreateShader(LoadShader("modules/rt_multi_shader_group/shaders/shader.hlsl"), "MissMain", "lib_6_3",
+                      &miss_shader_);
+  core_->CreateShader(LoadShader("modules/rt_multi_shader_group/shaders/shader.hlsl"), "ClosestHitMain", "lib_6_3",
+                      &closest_hit_shader_);
+  core_->CreateShader(LoadShader("modules/rt_multi_shader_group/shaders/shader.hlsl"), "SphereClosestHitMain",
+                      "lib_6_3", &sphere_closest_hit_shader_);
+  core_->CreateShader(LoadShader("modules/rt_multi_shader_group/shaders/shader.hlsl"), "SphereIntersectionMain",
+                      "lib_6_3", &sphere_intersection_shader_);
+  core_->CreateShader(LoadShader("modules/rt_multi_shader_group/shaders/shader.hlsl"), "CallableMain", "lib_6_3",
+                      &callable_shader_);
   grassland::LogInfo("Shader compiled successfully");
 
   core_->CreateBottomLevelAccelerationStructure(vertex_buffer.get(), index_buffer.get(), sizeof(glm::vec3),
@@ -82,7 +82,8 @@ void Application::OnInit() {
   program_->Finalize({0}, {0, 1}, {0});
 }
 
-void Application::OnClose() {
+void ModuleRTMultiShaderGroup::OnClose() {
+  core_->WaitGPU();
   program_.reset();
   raygen_shader_.reset();
   miss_shader_.reset();
@@ -91,15 +92,15 @@ void Application::OnClose() {
   sphere_intersection_shader_.reset();
   callable_shader_.reset();
 
-  triangle_blas_.reset();
-  sphere_blas_.reset();
   tlas_.reset();
+  sphere_blas_.reset();
+  triangle_blas_.reset();
 
   color_image_.reset();
   camera_object_buffer_.reset();
 }
 
-void Application::OnUpdate() {
+void ModuleRTMultiShaderGroup::OnUpdate() {
   if (window_->ShouldClose()) {
     window_->CloseWindow();
     alive_ = false;
@@ -119,7 +120,7 @@ void Application::OnUpdate() {
   }
 }
 
-void Application::OnRender() {
+void ModuleRTMultiShaderGroup::OnRender() {
   std::unique_ptr<grassland::graphics::CommandContext> command_context;
   core_->CreateCommandContext(&command_context);
   command_context->CmdClearImage(color_image_.get(), {{0.6, 0.7, 0.8, 1.0}});
@@ -131,3 +132,5 @@ void Application::OnRender() {
   command_context->CmdPresent(window_.get(), color_image_.get());
   core_->SubmitCommandContext(command_context.get());
 }
+
+}  // namespace graphics_hello::rt_multi_shader_group

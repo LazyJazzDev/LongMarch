@@ -122,7 +122,7 @@ Run the following command to build the `hello triangle` demo:
 cmake --build build --target demo_graphics_hello
 ```
 
-Run with `--module triangle`, or omit `--module` to select one of nine demos in the terminal menu.
+Run with `--module triangle`, or omit `--module` to select one of eleven demos in the terminal menu.
 The code is under [demo/graphics_hello/modules/triangle](demo/graphics_hello/modules/triangle);
 see [launcher usage](demo/graphics_hello/README.md) for all modules and options.
 
@@ -172,7 +172,7 @@ Run the following command to build the `hello triangle` demo:
 cmake --build build --target demo_graphics_hello
 ```
 
-Run with `--module triangle`, or omit `--module` to select one of nine demos in the terminal menu.
+Run with `--module triangle`, or omit `--module` to select one of eleven demos in the terminal menu.
 The code is under [demo/graphics_hello/modules/triangle](demo/graphics_hello/modules/triangle);
 see [launcher usage](demo/graphics_hello/README.md) for all modules and options.
 
@@ -228,7 +228,7 @@ Run the following command to build the `hello triangle` demo:
 cmake --build build --target demo_graphics_hello
 ```
 
-Run with `--module triangle`, or omit `--module` to select one of nine demos in the terminal menu.
+Run with `--module triangle`, or omit `--module` to select one of eleven demos in the terminal menu.
 The code is under [demo/graphics_hello/modules/triangle](demo/graphics_hello/modules/triangle);
 see [launcher usage](demo/graphics_hello/README.md) for all modules and options.
 

@@ -38,7 +38,7 @@ that existing option checks pipeline RT and rejects Metal.
   and the existing SPIRV-Cross backend translates `RayQuery` into MSL 3.0
   `intersection_query`. The current compiler chain works without a new compiler
   or postprocessing generated MSL.
-- `metal_acceleration_structure.h/.cpp` builds native triangle BLAS and instance
+- `metal_acceleration_structure.h/.cpp` builds native triangle/AABB BLAS and instance
   TLAS with Metal command encoders. Geometry BLAS are cached; identical TLAS
   descriptors and child handles skip rebuilding. Changed instances rebuild the
   TLAS synchronously. Native AS memory is opaque and independent of the software
@@ -169,3 +169,19 @@ intersection kernel with GPU ray/hit queues is needed; unstructured replacement
 of generated MSL would make the shader compiler integration fragile. A queue
 design also adds memory traffic and dispatches, so measure it before committing
 to a broader wavefront renderer rewrite.
+
+## Procedural geometry demo
+
+The graphics hello launcher also supports inline procedural queries:
+
+```sh
+cmake --build cmake-build-metal-only --target demo_graphics_hello
+cmake-build-metal-only/demo/graphics_hello/demo_graphics_hello --module ray_query --backend metal
+```
+
+The demo pairs a triangle BLAS with an AABB BLAS. Bounding-box candidates are
+intersected with an analytic sphere in HLSL and committed through
+`CommitProceduralPrimitiveHit`. The sphere instance uses nonuniform scaling to
+exercise object-space rays and inverse-transpose normals. This is inline query
+support; Metal still does not implement the RT pipeline/intersection-shader/SBT
+API used by `rt_multi_shader_group` and `external_shader`.

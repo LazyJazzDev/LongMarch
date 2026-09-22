@@ -1,23 +1,29 @@
 #pragma once
-#include "long_march.h"
+#include "../../module.h"
+
+namespace graphics_hello::external_shader {
 
 struct CameraObject {
   glm::mat4 screen_to_camera;
   glm::mat4 camera_to_world;
 };
 
-class Application {
+class ModuleExternalShader final : public Module {
  public:
-  Application(grassland::graphics::BackendAPI api = grassland::graphics::BACKEND_API_DEFAULT);
+  ModuleExternalShader(grassland::graphics::BackendAPI api = grassland::graphics::BACKEND_API_DEFAULT);
 
-  ~Application();
+  ~ModuleExternalShader() override;
 
-  void OnInit();
-  void OnClose();
-  void OnUpdate();
-  void OnRender();
+  void OnInit() override;
+  void OnClose() override;
+  void OnUpdate() override;
+  void OnRender() override;
 
-  bool IsAlive() const {
+  grassland::graphics::Window *GetWindow() const override {
+    return window_.get();
+  }
+
+  bool IsAlive() const override {
     return alive_;
   }
 
@@ -44,3 +50,5 @@ class Application {
   std::unique_ptr<grassland::graphics::RayTracingProgram> program_;
   bool alive_{false};
 };
+
+}  // namespace graphics_hello::external_shader

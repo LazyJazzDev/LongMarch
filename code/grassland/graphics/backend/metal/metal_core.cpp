@@ -174,12 +174,13 @@ int MetalCore::CreateCommandContext(double_ptr<CommandContext> pp_command_contex
   return 0;
 }
 
-int MetalCore::CreateBottomLevelAccelerationStructure(BufferRange,
-                                                      uint32_t,
-                                                      uint32_t,
-                                                      RayTracingGeometryFlag,
-                                                      double_ptr<AccelerationStructure>) {
-  return -1;
+int MetalCore::CreateBottomLevelAccelerationStructure(BufferRange aabbs,
+                                                      uint32_t stride,
+                                                      uint32_t count,
+                                                      RayTracingGeometryFlag flags,
+                                                      double_ptr<AccelerationStructure> result) {
+  result.construct<MetalAccelerationStructure>(this, aabbs, stride, count, flags);
+  return 0;
 }
 
 int MetalCore::CreateBottomLevelAccelerationStructure(BufferRange vertices,
