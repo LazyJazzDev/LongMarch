@@ -39,6 +39,7 @@ class ModuleHDR final : public Module {
   std::unique_ptr<grassland::graphics::Image> color_image_;
   std::unique_ptr<grassland::graphics::Program> program_;
   bool alive_{false};
+  bool hdr_enabled_{true};
 };
 
 }  // namespace graphics_hello::hdr

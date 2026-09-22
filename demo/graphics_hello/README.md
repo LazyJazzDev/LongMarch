@@ -59,9 +59,16 @@ a monotonic clock from the first animation update, independently of frame rate.
 Metal supports the seven raster modules and `ray_query` on compatible devices.
 `raytracing`, `rt_multi_shader_group`, and `external_shader` require ray tracing
 pipelines, which Metal does not implement;
-its diagnostic recommends `--module ray_query`. Query support is checked
-separately using `DeviceRayQuerySupport()`. Metal presentation currently uses
-an SDR surface, so `hdr` warns that floating-point display values are clipped.
+their diagnostics recommend `--module ray_query`. Query support is checked
+separately using `DeviceRayQuerySupport()`. Metal supports HDR presentation through macOS EDR: `SetHDR(true)` switches to
+`RGBA16Float` with extended linear sRGB, retaining values above SDR white (1.0).
+The `hdr` module shows an HDR gradient above an SDR-white reference bar. Press
+**H** to switch HDR/SDR presentation while keeping the rendered image unchanged.
+Startup logs report the display's current and potential EDR headroom. Visible
+highlight brightness requires headroom above 1.0; macOS adjusts it with display
+capabilities, brightness, and system conditions. The HDR gradient retains the
+existing shader's `pow(color, 2.2)` response, reaching about 11.2 times reference
+white before the display's own range handling.
 
 The ray query module matches `rt_multi_shader_group`: a rotating triangle at
 x = -2 and a rotating, nonuniformly scaled sphere at x = +2, viewed from (0, 0, 5).

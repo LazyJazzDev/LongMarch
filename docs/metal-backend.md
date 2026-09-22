@@ -22,8 +22,8 @@ triangle acceleration structures and inline queries; see [Metal ray query](metal
 for implementation, validation, and performance results. Pipeline RT/SBT and custom
 intersection functions remain unsupported. `--require-hardware-rt` checks pipeline RT
 and still rejects Metal, including devices with hardware ray tracing; omit it for
-`ray_query`. Geometry shaders and HDR window
-presentation are not supported. Offscreen floating-point film buffers are supported.
+`ray_query`. Geometry shaders are not supported. Offscreen floating-point film
+buffers and HDR window presentation through macOS EDR are supported.
 
 ## Source layout
 
@@ -119,3 +119,29 @@ from Vulkan measurements. Use Xcode GPU tools for native GPU captures.
 
 Blender scene import, material graphs, and hair are added by the dependent
 `blender-align` branch. Their validation and scene-specific limits belong there.
+
+## HDR / EDR presentation
+
+`Window::SetHDR(true)` switches the Metal layer and presentation pipeline to
+`RGBA16Float`, tags the layer as extended linear sRGB, and enables
+`wantsExtendedDynamicRangeContent`. HDR source images must contain linear-light
+sRGB values: 1.0 is SDR reference white, and values above 1.0 request extended
+brightness. No application-side clamp or tone mapping is applied. Switching HDR
+off restores the existing 8-bit SDR path (`BGRA8Unorm`, sRGB). Pending GPU work
+is completed before the layer format changes; ImGui uses the current attachment
+format in both modes.
+
+```sh
+cmake --build cmake-build-metal-only --target demo_graphics_hello sparkium_fallback_test
+cmake-build-metal-only/demo/graphics_hello/demo_graphics_hello --module hdr --backend metal
+LONGMARCH_TEST_METAL_WINDOWS=1 MTL_DEBUG_LAYER=1 MTL_SHADER_VALIDATION=1 \
+  cmake-build-metal-only/test/sparkium/sparkium_fallback_test --gtest_filter='MetalWindowTest.*:MetalBackendTest.WindowCloseAfterPresent'
+```
+
+The demo has an HDR gradient and an SDR-white reference bar. Press **H** to
+compare HDR and SDR output. Logs report the current screen's EDR headroom and
+potential headroom at the time HDR is enabled. Current headroom can initially
+be 1.0 and increase after EDR content starts presenting. Physical brightness
+also depends on the screen, its brightness setting, and macOS power/thermal
+management. An SDR-only screen cannot show highlights above its white level;
+ordinary SDR screenshots cannot establish physical HDR brightness.

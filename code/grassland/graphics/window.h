@@ -27,7 +27,7 @@ class Window {
 
   bool ShouldClose() const;
 
-  void SetHDR(bool enable_hdr);
+  virtual void SetHDR(bool enable_hdr);
 
   virtual void InitImGui(const char *font_file_path = nullptr, float font_size = 13.0f) = 0;
   virtual void TerminateImGui() = 0;

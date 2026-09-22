@@ -24,10 +24,15 @@ MetalWindow::MetalWindow(MetalCore *core,
   auto view = [glfwGetCocoaWindow(GLFWWindow()) contentView];
   layer_ = NS::RetainPtr(CA::MetalLayer::layer());
   layer_->setDevice(core_->Device());
-  layer_->setPixelFormat(MTL::PixelFormatBGRA8Unorm);
   layer_->setFramebufferOnly(true);
   [view setWantsLayer:YES];
   [view setLayer:(CAMetalLayer *)layer_.get()];
+  ConfigurePresentation(false);
+}
+
+void MetalWindow::ConfigurePresentation(bool enable_hdr) {
+  MetalPool pool;
+  const auto format = enable_hdr ? MTL::PixelFormatRGBA16Float : MTL::PixelFormatBGRA8Unorm;
   const char *source = R"(
 #include <metal_stdlib>
 using namespace metal;
@@ -50,9 +55,40 @@ fragment float4 present_fragment(Vertex v [[stage_in]], texture2d<float> image [
   auto descriptor = NS::TransferPtr(MTL::RenderPipelineDescriptor::alloc()->init());
   descriptor->setVertexFunction(vertex.get());
   descriptor->setFragmentFunction(fragment.get());
-  descriptor->colorAttachments()->object(0)->setPixelFormat(MTL::PixelFormatBGRA8Unorm);
-  pipeline_ = NS::TransferPtr(core_->Device()->newRenderPipelineState(descriptor.get(), &error));
-  MetalCheck(pipeline_.get(), error, "presentation pipeline");
+  descriptor->colorAttachments()->object(0)->setPixelFormat(format);
+  auto pipeline = NS::TransferPtr(core_->Device()->newRenderPipelineState(descriptor.get(), &error));
+  MetalCheck(pipeline.get(), error, "presentation pipeline");
+  core_->WaitGPU();
+  auto colorspace = CGColorSpaceCreateWithName(enable_hdr ? kCGColorSpaceExtendedLinearSRGB : kCGColorSpaceSRGB);
+  if (!colorspace)
+    throw std::runtime_error("Failed to create Metal presentation color space");
+  auto native_layer = (CAMetalLayer *)layer_.get();
+  native_layer.pixelFormat = (MTLPixelFormat)format;
+  native_layer.colorspace = colorspace;
+  native_layer.wantsExtendedDynamicRangeContent = enable_hdr;
+  CGColorSpaceRelease(colorspace);
+  pipeline_ = std::move(pipeline);
+}
+
+void MetalWindow::SetHDR(bool enable_hdr) {
+  MetalPool pool;
+  if (enable_hdr_ == enable_hdr)
+    return;
+  if (!GLFWWindow())
+    throw std::runtime_error("Cannot change HDR on a closed Metal window");
+  ConfigurePresentation(enable_hdr);
+  Window::SetHDR(enable_hdr);
+  if (enable_hdr) {
+    auto screen = [glfwGetCocoaWindow(GLFWWindow()) screen];
+    LogInfo("Metal HDR enabled: linear sRGB, RGBA16Float; display {} EDR headroom {:.2f}, potential {:.2f}",
+            screen ? screen.localizedName.UTF8String : "unknown",
+            double(screen.maximumExtendedDynamicRangeColorComponentValue),
+            double(screen.maximumPotentialExtendedDynamicRangeColorComponentValue));
+    if (screen.maximumPotentialExtendedDynamicRangeColorComponentValue <= 1.0)
+      LogWarning("Current display has no HDR headroom; HDR output will be displayed within its SDR range");
+  } else {
+    LogInfo("Metal HDR disabled: sRGB, BGRA8Unorm");
+  }
 }
 
 MetalWindow::~MetalWindow() {
@@ -101,7 +137,7 @@ void MetalWindow::BeginImGuiFrame() {
   ImGui::SetCurrentContext(imgui_);
   auto pass = MTL::RenderPassDescriptor::renderPassDescriptor();
   // ImGui only reads the attachment format/sample count here. The drawable arrives at Present.
-  auto desc = MTL::TextureDescriptor::texture2DDescriptor(MTL::PixelFormatBGRA8Unorm, 1, 1, false);
+  auto desc = MTL::TextureDescriptor::texture2DDescriptor(layer_->pixelFormat(), 1, 1, false);
   auto texture = NS::TransferPtr(core_->Device()->newTexture(desc));
   pass->colorAttachments()->object(0)->setTexture(texture.get());
   ImGui_ImplMetal_NewFrame((__bridge MTLRenderPassDescriptor *)pass);

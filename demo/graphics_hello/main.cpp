@@ -38,7 +38,7 @@ const std::array<ModuleInfo, 11> modules{{
     {"cube", "Rotating cube", CreateModule<cube::ModuleCube>},
     {"texture", "Textured triangle", CreateModule<texture::ModuleTexture>},
     {"resize", "Resizable window", CreateModule<resize::ModuleResize>},
-    {"hdr", "HDR gradient (SDR presentation on Metal)", CreateModule<hdr::ModuleHDR>},
+    {"hdr", "HDR gradient and SDR reference (H toggles HDR/SDR)", CreateModule<hdr::ModuleHDR>},
     {"sdr_sample", "SDR sampling", CreateModule<sdr_sample::ModuleSDRSample>},
     {"raytracing", "Ray tracing pipeline (unavailable on Metal)", CreateModule<raytracing::ModuleRayTracing>},
     {"rt_multi_shader_group", "Triangle + procedural sphere (requires RT pipelines)",
