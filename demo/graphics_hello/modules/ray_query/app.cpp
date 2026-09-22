@@ -4,15 +4,15 @@
 
 namespace graphics_hello::ray_query {
 
-Application::Application(grassland::graphics::BackendAPI api) {
+ModuleRayQuery::ModuleRayQuery(grassland::graphics::BackendAPI api) {
   InitializeGraphicsHello(api, core_);
   if (!core_->DeviceRayQuerySupport())
     throw std::runtime_error("Ray queries are unavailable on the selected device/backend");
 }
 
-Application::~Application() = default;
+ModuleRayQuery::~ModuleRayQuery() = default;
 
-void Application::OnInit() {
+void ModuleRayQuery::OnInit() {
   alive_ = true;
   core_->CreateWindowObject(1280, 720, GraphicsHelloTitle(core_->API()) + std::string(" Graphics Hello Ray Query"),
                             &window_);
@@ -49,7 +49,7 @@ void Application::OnInit() {
   program_->Finalize();
 }
 
-void Application::OnClose() {
+void ModuleRayQuery::OnClose() {
   core_->WaitGPU();
   program_.reset();
   compute_shader_.reset();
@@ -63,7 +63,7 @@ void Application::OnClose() {
   vertex_buffer_.reset();
 }
 
-void Application::OnUpdate() {
+void ModuleRayQuery::OnUpdate() {
   if (window_->ShouldClose()) {
     window_->CloseWindow();
     alive_ = false;
@@ -78,7 +78,7 @@ void Application::OnUpdate() {
   }
 }
 
-void Application::OnRender() {
+void ModuleRayQuery::OnRender() {
   std::unique_ptr<grassland::graphics::CommandContext> command_context;
   core_->CreateCommandContext(&command_context);
   command_context->CmdClearImage(color_image_.get(), {{0.6, 0.7, 0.8, 1.0}});

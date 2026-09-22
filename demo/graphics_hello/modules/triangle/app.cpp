@@ -5,13 +5,13 @@
 
 namespace graphics_hello::triangle {
 
-Application::Application(grassland::graphics::BackendAPI api) {
+ModuleTriangle::ModuleTriangle(grassland::graphics::BackendAPI api) {
   InitializeGraphicsHello(api, core_);
 }
 
-Application::~Application() = default;
+ModuleTriangle::~ModuleTriangle() = default;
 
-void Application::OnInit() {
+void ModuleTriangle::OnInit() {
   alive_ = true;
   core_->CreateWindowObject(1280, 720, GraphicsHelloTitle(core_->API()) + std::string(" Graphics Hello Triangle"),
                             &window_);
@@ -44,7 +44,7 @@ void Application::OnInit() {
   program_->Finalize();
 }
 
-void Application::OnClose() {
+void ModuleTriangle::OnClose() {
   core_->WaitGPU();
   program_.reset();
   vertex_shader_.reset();
@@ -54,14 +54,14 @@ void Application::OnClose() {
   vertex_buffer_.reset();
 }
 
-void Application::OnUpdate() {
+void ModuleTriangle::OnUpdate() {
   if (window_->ShouldClose()) {
     window_->CloseWindow();
     alive_ = false;
   }
 }
 
-void Application::OnRender() {
+void ModuleTriangle::OnRender() {
   std::unique_ptr<grassland::graphics::CommandContext> command_context;
   core_->CreateCommandContext(&command_context);
   command_context->CmdClearImage(color_image_.get(), {{0.6, 0.7, 0.8, 1.0}});

@@ -15,11 +15,11 @@ struct GlobalUniformBuffer {
   glm::mat4 proj;
 };
 
-class Application final : public Module {
+class ModuleResize final : public Module {
  public:
-  Application(grassland::graphics::BackendAPI api = grassland::graphics::BACKEND_API_DEFAULT);
+  ModuleResize(grassland::graphics::BackendAPI api = grassland::graphics::BACKEND_API_DEFAULT);
 
-  ~Application() override;
+  ~ModuleResize() override;
 
   void OnInit() override;
   void OnClose() override;

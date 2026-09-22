@@ -31,15 +31,15 @@ std::unique_ptr<Module> CreateModule(BackendAPI api) {
 }
 
 const std::array<ModuleInfo, 9> modules{{
-    {"triangle", "Colored triangle", CreateModule<triangle::Application>},
-    {"blend", "Alpha blending", CreateModule<blend::Application>},
-    {"cube", "Rotating cube", CreateModule<cube::Application>},
-    {"texture", "Textured triangle", CreateModule<texture::Application>},
-    {"resize", "Resizable window", CreateModule<resize::Application>},
-    {"hdr", "HDR gradient (SDR presentation on Metal)", CreateModule<hdr::Application>},
-    {"sdr_sample", "SDR sampling", CreateModule<sdr_sample::Application>},
-    {"raytracing", "Ray tracing pipeline (unavailable on Metal)", CreateModule<raytracing::Application>},
-    {"ray_query", "Compute ray queries (requires device/backend support)", CreateModule<ray_query::Application>},
+    {"triangle", "Colored triangle", CreateModule<triangle::ModuleTriangle>},
+    {"blend", "Alpha blending", CreateModule<blend::ModuleBlend>},
+    {"cube", "Rotating cube", CreateModule<cube::ModuleCube>},
+    {"texture", "Textured triangle", CreateModule<texture::ModuleTexture>},
+    {"resize", "Resizable window", CreateModule<resize::ModuleResize>},
+    {"hdr", "HDR gradient (SDR presentation on Metal)", CreateModule<hdr::ModuleHDR>},
+    {"sdr_sample", "SDR sampling", CreateModule<sdr_sample::ModuleSDRSample>},
+    {"raytracing", "Ray tracing pipeline (unavailable on Metal)", CreateModule<raytracing::ModuleRayTracing>},
+    {"ray_query", "Compute ray queries (requires device/backend support)", CreateModule<ray_query::ModuleRayQuery>},
 }};
 
 const ModuleInfo *FindModule(std::string_view name) {

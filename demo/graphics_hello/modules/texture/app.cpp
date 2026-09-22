@@ -4,13 +4,13 @@
 
 namespace graphics_hello::texture {
 
-Application::Application(grassland::graphics::BackendAPI api) {
+ModuleTexture::ModuleTexture(grassland::graphics::BackendAPI api) {
   InitializeGraphicsHello(api, core_);
 }
 
-Application::~Application() = default;
+ModuleTexture::~ModuleTexture() = default;
 
-void Application::OnInit() {
+void ModuleTexture::OnInit() {
   alive_ = true;
   core_->CreateWindowObject(1280, 720, GraphicsHelloTitle(core_->API()) + std::string(" Graphics Hello Texture"),
                             &window_);
@@ -62,7 +62,7 @@ void Application::OnInit() {
   program_->Finalize();
 }
 
-void Application::OnClose() {
+void ModuleTexture::OnClose() {
   core_->WaitGPU();
   program_.reset();
   vertex_shader_.reset();
@@ -75,14 +75,14 @@ void Application::OnClose() {
   vertex_buffer_.reset();
 }
 
-void Application::OnUpdate() {
+void ModuleTexture::OnUpdate() {
   if (window_->ShouldClose()) {
     window_->CloseWindow();
     alive_ = false;
   }
 }
 
-void Application::OnRender() {
+void ModuleTexture::OnRender() {
   std::unique_ptr<grassland::graphics::CommandContext> command_context;
   core_->CreateCommandContext(&command_context);
   command_context->CmdClearImage(color_image_.get(), {{0.6, 0.7, 0.8, 1.0}});

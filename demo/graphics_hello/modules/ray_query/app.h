@@ -9,11 +9,11 @@ struct CameraObject {
   glm::mat4 camera_to_world;
 };
 
-class Application final : public Module {
+class ModuleRayQuery final : public Module {
  public:
-  Application(grassland::graphics::BackendAPI api = grassland::graphics::BACKEND_API_DEFAULT);
+  ModuleRayQuery(grassland::graphics::BackendAPI api = grassland::graphics::BACKEND_API_DEFAULT);
 
-  ~Application() override;
+  ~ModuleRayQuery() override;
 
   void OnInit() override;
   void OnClose() override;

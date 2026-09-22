@@ -10,11 +10,11 @@ struct Vertex {
   glm::vec3 color;
 };
 
-class Application final : public Module {
+class ModuleHDR final : public Module {
  public:
-  Application(grassland::graphics::BackendAPI api = grassland::graphics::BACKEND_API_DEFAULT);
+  ModuleHDR(grassland::graphics::BackendAPI api = grassland::graphics::BACKEND_API_DEFAULT);
 
-  ~Application() override;
+  ~ModuleHDR() override;
 
   void OnInit() override;
   void OnClose() override;

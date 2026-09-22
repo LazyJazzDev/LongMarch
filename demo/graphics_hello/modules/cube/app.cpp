@@ -4,13 +4,13 @@
 
 namespace graphics_hello::cube {
 
-Application::Application(grassland::graphics::BackendAPI api) {
+ModuleCube::ModuleCube(grassland::graphics::BackendAPI api) {
   InitializeGraphicsHello(api, core_);
 }
 
-Application::~Application() = default;
+ModuleCube::~ModuleCube() = default;
 
-void Application::OnInit() {
+void ModuleCube::OnInit() {
   alive_ = true;
   core_->CreateWindowObject(1280, 720, GraphicsHelloTitle(core_->API()) + std::string(" Graphics Hello Cube"),
                             &window_);
@@ -50,7 +50,7 @@ void Application::OnInit() {
   program_->Finalize();
 }
 
-void Application::OnClose() {
+void ModuleCube::OnClose() {
   core_->WaitGPU();
   program_.reset();
   vertex_shader_.reset();
@@ -62,7 +62,7 @@ void Application::OnClose() {
   uniform_buffer_.reset();
 }
 
-void Application::OnUpdate() {
+void ModuleCube::OnUpdate() {
   if (window_->ShouldClose()) {
     window_->CloseWindow();
     alive_ = false;
@@ -82,7 +82,7 @@ void Application::OnUpdate() {
   }
 }
 
-void Application::OnRender() {
+void ModuleCube::OnRender() {
   std::unique_ptr<grassland::graphics::CommandContext> command_context;
   core_->CreateCommandContext(&command_context);
   command_context->CmdClearImage(color_image_.get(), {{0.6, 0.7, 0.8, 1.0}});

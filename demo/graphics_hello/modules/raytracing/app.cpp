@@ -4,7 +4,7 @@
 
 namespace graphics_hello::raytracing {
 
-Application::Application(grassland::graphics::BackendAPI api) {
+ModuleRayTracing::ModuleRayTracing(grassland::graphics::BackendAPI api) {
   if (api == grassland::graphics::BACKEND_API_METAL)
     throw std::runtime_error("Metal has no ray tracing pipelines; use --module ray_query");
   InitializeGraphicsHello(api, core_, true);
@@ -12,9 +12,9 @@ Application::Application(grassland::graphics::BackendAPI api) {
     throw std::runtime_error("Ray tracing pipelines are unavailable; use --module ray_query on Metal");
 }
 
-Application::~Application() = default;
+ModuleRayTracing::~ModuleRayTracing() = default;
 
-void Application::OnInit() {
+void ModuleRayTracing::OnInit() {
   alive_ = true;
   core_->CreateWindowObject(1280, 720, GraphicsHelloTitle(core_->API()) + std::string(" Graphics Hello Ray Tracing"),
                             &window_);
@@ -55,7 +55,7 @@ void Application::OnInit() {
   program_->Finalize();
 }
 
-void Application::OnClose() {
+void ModuleRayTracing::OnClose() {
   core_->WaitGPU();
   program_.reset();
   raygen_shader_.reset();
@@ -71,7 +71,7 @@ void Application::OnClose() {
   vertex_buffer_.reset();
 }
 
-void Application::OnUpdate() {
+void ModuleRayTracing::OnUpdate() {
   if (window_->ShouldClose()) {
     window_->CloseWindow();
     alive_ = false;
@@ -86,7 +86,7 @@ void Application::OnUpdate() {
   }
 }
 
-void Application::OnRender() {
+void ModuleRayTracing::OnRender() {
   std::unique_ptr<grassland::graphics::CommandContext> command_context;
   core_->CreateCommandContext(&command_context);
   command_context->CmdClearImage(color_image_.get(), {{0.6, 0.7, 0.8, 1.0}});

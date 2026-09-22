@@ -2,13 +2,13 @@
 
 namespace graphics_hello::sdr_sample {
 
-Application::Application(grassland::graphics::BackendAPI api) {
+ModuleSDRSample::ModuleSDRSample(grassland::graphics::BackendAPI api) {
   InitializeGraphicsHello(api, core_);
 }
 
-Application::~Application() = default;
+ModuleSDRSample::~ModuleSDRSample() = default;
 
-void Application::OnInit() {
+void ModuleSDRSample::OnInit() {
   alive_ = true;
   core_->CreateWindowObject(1280, 720, GraphicsHelloTitle(core_->API()) + std::string(" Graphics Hello SDR Sample"),
                             &window_);
@@ -27,7 +27,7 @@ void Application::OnInit() {
   program_->Finalize();
 }
 
-void Application::OnClose() {
+void ModuleSDRSample::OnClose() {
   core_->WaitGPU();
   program_.reset();
   vertex_shader_.reset();
@@ -35,14 +35,14 @@ void Application::OnClose() {
   color_image_.reset();
 }
 
-void Application::OnUpdate() {
+void ModuleSDRSample::OnUpdate() {
   if (window_->ShouldClose()) {
     window_->CloseWindow();
     alive_ = false;
   }
 }
 
-void Application::OnRender() {
+void ModuleSDRSample::OnRender() {
   std::unique_ptr<grassland::graphics::CommandContext> command_context;
   core_->CreateCommandContext(&command_context);
   command_context->CmdClearImage(color_image_.get(), {{0.6, 0.7, 0.8, 1.0}});

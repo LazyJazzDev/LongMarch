@@ -10,11 +10,11 @@ struct Vertex {
   glm::vec3 color;
 };
 
-class Application final : public Module {
+class ModuleTriangle final : public Module {
  public:
-  Application(grassland::graphics::BackendAPI api = grassland::graphics::BACKEND_API_DEFAULT);
+  ModuleTriangle(grassland::graphics::BackendAPI api = grassland::graphics::BACKEND_API_DEFAULT);
 
-  ~Application() override;
+  ~ModuleTriangle() override;
 
   void OnInit() override;
   void OnClose() override;

@@ -4,13 +4,13 @@
 
 namespace graphics_hello::resize {
 
-Application::Application(grassland::graphics::BackendAPI api) {
+ModuleResize::ModuleResize(grassland::graphics::BackendAPI api) {
   InitializeGraphicsHello(api, core_);
 }
 
-Application::~Application() = default;
+ModuleResize::~ModuleResize() = default;
 
-void Application::OnInit() {
+void ModuleResize::OnInit() {
   alive_ = true;
   core_->CreateWindowObject(1280, 720, GraphicsHelloTitle(core_->API()) + std::string(" Graphics Hello Resize"), false,
                             true, &window_);
@@ -60,7 +60,7 @@ void Application::OnInit() {
   program_->Finalize();
 }
 
-void Application::OnClose() {
+void ModuleResize::OnClose() {
   core_->WaitGPU();
   program_.reset();
   vertex_shader_.reset();
@@ -72,7 +72,7 @@ void Application::OnClose() {
   uniform_buffer_.reset();
 }
 
-void Application::OnUpdate() {
+void ModuleResize::OnUpdate() {
   if (window_->ShouldClose()) {
     window_->CloseWindow();
     alive_ = false;
@@ -93,7 +93,7 @@ void Application::OnUpdate() {
   }
 }
 
-void Application::OnRender() {
+void ModuleResize::OnRender() {
   std::unique_ptr<grassland::graphics::CommandContext> command_context;
   core_->CreateCommandContext(&command_context);
   command_context->CmdClearImage(color_image_.get(), {{0.6, 0.7, 0.8, 1.0}});

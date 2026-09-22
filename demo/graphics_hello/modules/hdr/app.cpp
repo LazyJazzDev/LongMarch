@@ -2,13 +2,13 @@
 
 namespace graphics_hello::hdr {
 
-Application::Application(grassland::graphics::BackendAPI api) {
+ModuleHDR::ModuleHDR(grassland::graphics::BackendAPI api) {
   InitializeGraphicsHello(api, core_);
 }
 
-Application::~Application() = default;
+ModuleHDR::~ModuleHDR() = default;
 
-void Application::OnInit() {
+void ModuleHDR::OnInit() {
   alive_ = true;
   core_->CreateWindowObject(1280, 720, GraphicsHelloTitle(core_->API()) + std::string(" Graphics Hello HDR"), &window_);
   if (core_->API() == grassland::graphics::BACKEND_API_METAL) {
@@ -47,7 +47,7 @@ void Application::OnInit() {
   program_->Finalize();
 }
 
-void Application::OnClose() {
+void ModuleHDR::OnClose() {
   core_->WaitGPU();
   program_.reset();
   vertex_shader_.reset();
@@ -57,14 +57,14 @@ void Application::OnClose() {
   vertex_buffer_.reset();
 }
 
-void Application::OnUpdate() {
+void ModuleHDR::OnUpdate() {
   if (window_->ShouldClose()) {
     window_->CloseWindow();
     alive_ = false;
   }
 }
 
-void Application::OnRender() {
+void ModuleHDR::OnRender() {
   std::unique_ptr<grassland::graphics::CommandContext> command_context;
   core_->CreateCommandContext(&command_context);
   command_context->CmdClearImage(color_image_.get(), {{0.0, 0.0, 0.0, 1.0}});
