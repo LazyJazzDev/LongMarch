@@ -53,6 +53,8 @@ Shared options:
 
 Window titles retain the backend and demo name and show average FPS, refreshed
 every half second. The first interval displays `FPS: --`.
+All rotating geometry completes one revolution every two seconds, measured with
+a monotonic clock from the first animation update, independently of frame rate.
 
 Metal supports the seven raster modules and `ray_query` on compatible devices.
 `raytracing`, `rt_multi_shader_group`, and `external_shader` require ray tracing

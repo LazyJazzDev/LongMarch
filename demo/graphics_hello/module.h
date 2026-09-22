@@ -1,8 +1,12 @@
 #pragma once
 
+#include <chrono>
+#include <cmath>
+#include <optional>
 #include <stdexcept>
 #include <string>
 
+#include "glm/gtc/constants.hpp"
 #include "long_march.h"
 
 namespace graphics_hello {
@@ -34,6 +38,19 @@ class Module {
   virtual void OnRender() = 0;
   virtual grassland::graphics::Window *GetWindow() const = 0;
   virtual bool IsAlive() const = 0;
+
+ protected:
+  float RotationAngle() {
+    const auto now = std::chrono::steady_clock::now();
+    if (!animation_start_)
+      animation_start_ = now;
+    const double seconds = std::chrono::duration<double>(now - *animation_start_).count();
+    // Start at the first animation update, after loading. One revolution takes two seconds.
+    return static_cast<float>(std::fmod(seconds, 2.0) * glm::pi<double>());
+  }
+
+ private:
+  std::optional<std::chrono::steady_clock::time_point> animation_start_;
 };
 
 std::string LoadShader(const std::string &path);

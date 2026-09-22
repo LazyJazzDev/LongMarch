@@ -68,11 +68,7 @@ void ModuleCube::OnUpdate() {
     alive_ = false;
   }
   if (alive_) {
-    static float x = 0.0;
-    x += glm::radians(1.0f);
-    while (x > glm::radians(360.0f)) {
-      x -= glm::radians(360.0f);
-    }
+    const float x = RotationAngle();
 
     GlobalUniformBuffer ubo = {};
     ubo.model = glm::rotate(glm::mat4{1.0f}, x, glm::vec3{0.0f, 1.0f, 0.0f});

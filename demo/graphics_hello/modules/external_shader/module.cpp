@@ -104,8 +104,7 @@ void ModuleExternalShader::OnUpdate() {
     alive_ = false;
   }
   if (alive_) {
-    static float theta = 0.0f;
-    theta += glm::radians(0.1f);
+    const float theta = RotationAngle();
 
     tlas_->UpdateInstances(
         std::vector{triangle_blas_->MakeInstance(glm::translate(glm::mat4{1.0f}, glm::vec3{-2.0f, 0.0f, 0.0f}) *

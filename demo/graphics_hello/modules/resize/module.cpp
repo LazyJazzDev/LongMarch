@@ -78,11 +78,7 @@ void ModuleResize::OnUpdate() {
     alive_ = false;
   }
   if (alive_) {
-    static float x = 0.0;
-    x += glm::radians(1.0f);
-    while (x > glm::radians(360.0f)) {
-      x -= glm::radians(360.0f);
-    }
+    const float x = RotationAngle();
 
     auto extent = color_image_->Extent();
     GlobalUniformBuffer ubo = {};

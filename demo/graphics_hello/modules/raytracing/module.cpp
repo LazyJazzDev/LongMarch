@@ -77,8 +77,7 @@ void ModuleRayTracing::OnUpdate() {
     alive_ = false;
   }
   if (alive_) {
-    static float theta = 0.0f;
-    theta += glm::radians(0.1f);
+    const float theta = RotationAngle();
 
     tlas_->UpdateInstances(
         std::vector{blas_->MakeInstance(glm::rotate(glm::mat4{1.0f}, theta, glm::vec3{0.0f, 1.0f, 0.0f}), 0, 0xFF, 0,
