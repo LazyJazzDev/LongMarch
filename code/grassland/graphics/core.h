@@ -63,6 +63,7 @@ class Core {
                             double_ptr<Program> pp_program) = 0;
 
   virtual int CreateComputeProgram(Shader *compute_shader, double_ptr<ComputeProgram> pp_program) = 0;
+  int CreateComputeProgram(const ShaderCode &compute_shader, double_ptr<ComputeProgram> pp_program);
 
   virtual int CreateCommandContext(double_ptr<CommandContext> pp_command_context) = 0;
 

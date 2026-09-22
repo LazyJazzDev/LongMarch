@@ -15,12 +15,14 @@ void AddBinding(std::vector<MetalBinding> &bindings, ResourceType type, int coun
 }  // namespace
 
 void MetalComputeProgram::AddResourceBinding(ResourceType type, int count) {
+  RecordResourceBinding(type, count);
   AddBinding(bindings, type, count);
 }
 
 void MetalComputeProgram::Finalize() {
   MetalPool pool;
-  stage = CompileMetalStage(core, shader, bindings);
+  stage =
+      CompileMetalStage(core, dynamic_cast<MetalShader *>(ResolveShader(core, shader)), bindings, IsShaderCode(shader));
   NS::Error *error = nullptr;
   pipeline = NS::TransferPtr(core->Device()->newComputePipelineState(stage.function.get(), &error));
   MetalCheck(pipeline.get(), error, "newComputePipelineState");
@@ -67,6 +69,7 @@ void MetalProgram::AddInputAttribute(uint32_t binding, InputType type, uint32_t 
 }
 
 void MetalProgram::AddResourceBinding(ResourceType type, int count) {
+  RecordResourceBinding(type, count);
   AddBinding(bindings, type, count);
 }
 
@@ -95,22 +98,24 @@ void MetalProgram::SetBlendState(int target, const BlendState &state) {
 
 void MetalProgram::BindShader(Shader *shader, ShaderType type) {
   auto metal = dynamic_cast<MetalShader *>(shader);
-  if (!metal)
+  if (!metal && !IsShaderCode(shader))
     throw std::invalid_argument("expected MetalShader");
   if (type == SHADER_TYPE_VERTEX)
-    vertex = metal;
+    vertex = shader;
   else if (type == SHADER_TYPE_PIXEL)
-    fragment = metal;
+    fragment = shader;
   else
     throw std::runtime_error("Metal does not support geometry shaders");
 }
 
 void MetalProgram::Finalize() {
   MetalPool pool;
-  vertex_stage = CompileMetalStage(core, vertex, bindings);
+  vertex_stage =
+      CompileMetalStage(core, dynamic_cast<MetalShader *>(ResolveShader(core, vertex)), bindings, IsShaderCode(vertex));
   descriptor->setVertexFunction(vertex_stage.function.get());
   if (fragment) {
-    fragment_stage = CompileMetalStage(core, fragment, bindings);
+    fragment_stage = CompileMetalStage(core, dynamic_cast<MetalShader *>(ResolveShader(core, fragment)), bindings,
+                                       IsShaderCode(fragment));
     descriptor->setFragmentFunction(fragment_stage.function.get());
   }
 

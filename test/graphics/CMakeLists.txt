@@ -1,0 +1,4 @@
+add_executable(graphics_binding_test resource_binding_test.cpp)
+target_link_libraries(graphics_binding_test PRIVATE LongMarch GTest::gtest_main)
+LONGMARCH_DEPLOY_RUNTIME_DEPENDENCIES(graphics_binding_test)
+add_test(NAME graphics_binding COMMAND graphics_binding_test)

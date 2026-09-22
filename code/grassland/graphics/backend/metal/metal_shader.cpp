@@ -11,7 +11,10 @@
 
 namespace grassland::graphics::backend {
 
-MetalStage CompileMetalStage(MetalCore *core, MetalShader *shader, const std::vector<MetalBinding> &bindings) {
+MetalStage CompileMetalStage(MetalCore *core,
+                             MetalShader *shader,
+                             const std::vector<MetalBinding> &bindings,
+                             bool packed) {
   if (!shader || shader->blob.data.empty())
     throw std::invalid_argument("missing Metal shader");
   MetalPool pool;
@@ -25,18 +28,21 @@ MetalStage CompileMetalStage(MetalCore *core, MetalShader *shader, const std::ve
   options.argument_buffers = true;
   options.argument_buffers_tier = spirv_cross::CompilerMSL::Options::ArgumentBuffersTier::Tier2;
   compiler.set_msl_options(options);
-  if (bindings.size() > 16)
-    throw std::runtime_error("Metal supports at most 16 resource sets (vertex slots start at 16)");
+  if (!packed && bindings.size() > spirv_cross::kMaxArgumentBuffers)
+    throw std::runtime_error(
+        "legacy Metal resource layout exceeds the SPIRV-Cross argument-buffer limit; use ShaderCode to pack resource slots");
+  uint32_t argument_index = 0;
   for (uint32_t i = 0; i < bindings.size(); ++i) {
     spirv_cross::MSLResourceBinding binding;
     binding.stage = entry.execution_model;
-    binding.desc_set = i;
-    binding.binding = 0;
+    binding.desc_set = packed ? 0 : i;
+    binding.binding = packed ? i : 0;
     binding.count = bindings[i].count;
-    binding.msl_buffer = binding.msl_texture = binding.msl_sampler = 0;
+    binding.msl_buffer = binding.msl_texture = binding.msl_sampler = packed ? argument_index : 0;
+    argument_index += bindings[i].count;
     compiler.add_msl_resource_binding(binding);
     binding.binding = spirv_cross::kArgumentBufferBinding;
-    binding.msl_buffer = i;
+    binding.msl_buffer = packed ? 0 : i;
     compiler.add_msl_resource_binding(binding);
   }
 
@@ -57,15 +63,22 @@ MetalStage CompileMetalStage(MetalCore *core, MetalShader *shader, const std::ve
                                                             compile_options.get(), &error));
   MetalCheck(library.get(), error, "compile MSL");
   MetalStage result;
+  result.packed = packed;
   auto name = compiler.get_cleansed_entry_point_name(entry.name, entry.execution_model);
   result.function = NS::TransferPtr(library->newFunction(NS::String::string(name.c_str(), NS::UTF8StringEncoding)));
   MetalCheck(result.function.get(), nullptr, "Metal shader entry point");
+  argument_index = 0;
   for (uint32_t i = 0; i < bindings.size(); ++i) {
-    if (compiler.is_msl_resource_binding_used(entry.execution_model, i, 0)) {
-      auto encoder = NS::TransferPtr(result.function->newArgumentEncoder(i));
-      MetalCheck(encoder.get(), nullptr, "Metal argument encoder");
-      result.arguments.emplace(i, std::move(encoder));
+    if (compiler.is_msl_resource_binding_used(entry.execution_model, packed ? 0 : i, packed ? i : 0)) {
+      result.resource_indices.emplace(i, packed ? argument_index : 0);
+      auto buffer_slot = packed ? 0 : i;
+      if (!result.arguments.count(buffer_slot)) {
+        auto encoder = NS::TransferPtr(result.function->newArgumentEncoder(buffer_slot));
+        MetalCheck(encoder.get(), nullptr, "Metal argument encoder");
+        result.arguments.emplace(buffer_slot, std::move(encoder));
+      }
     }
+    argument_index += bindings[i].count;
   }
   if (entry.execution_model == spv::ExecutionModelGLCompute) {
     const auto &wg = compiler.get_entry_point(entry.name, entry.execution_model).workgroup_size;

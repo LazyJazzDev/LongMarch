@@ -165,7 +165,7 @@ int MetalCore::CreateProgram(const std::vector<ImageFormat> &color_formats,
 }
 
 int MetalCore::CreateComputeProgram(Shader *compute_shader, double_ptr<ComputeProgram> pp_program) {
-  pp_program.construct<MetalComputeProgram>(this, dynamic_cast<MetalShader *>(compute_shader));
+  pp_program.construct<MetalComputeProgram>(this, compute_shader);
   return 0;
 }
 

@@ -20,9 +20,14 @@ class MetalShader : public Shader {
 struct MetalStage {
   NS::SharedPtr<MTL::Function> function;
   std::map<int, NS::SharedPtr<MTL::ArgumentEncoder>> arguments;
+  bool packed = false;
+  std::map<int, uint32_t> resource_indices;
   MTL::Size threads{1, 1, 1};
 };
 
-MetalStage CompileMetalStage(MetalCore *core, MetalShader *shader, const std::vector<MetalBinding> &bindings);
+MetalStage CompileMetalStage(MetalCore *core,
+                             MetalShader *shader,
+                             const std::vector<MetalBinding> &bindings,
+                             bool packed = false);
 
 }  // namespace grassland::graphics::backend

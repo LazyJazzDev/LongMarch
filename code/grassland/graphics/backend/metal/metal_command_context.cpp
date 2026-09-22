@@ -94,71 +94,75 @@ void MetalCommandContext::BindStage(MetalStage &stage,
                                     BindPoint point,
                                     bool vertex) {
   MetalPool pool;
-  for (auto &[slot, encoder] : stage.arguments) {
-    auto it = resources_[point].find(slot);
-    if (it == resources_[point].end())
-      throw std::runtime_error("unbound Metal resource set " + std::to_string(slot));
-    auto &resources = it->second;
-    auto &binding = layout.at(slot);
+  for (auto &[buffer_slot, encoder] : stage.arguments) {
     auto argument =
         NS::TransferPtr(core_->Device()->newBuffer(encoder->encodedLength(), MTL::ResourceStorageModeShared));
     MetalCheck(argument.get(), nullptr, "argument buffer allocation");
     encoder->setArgumentBuffer(argument.get(), 0);
-    MTL::ResourceUsage usage = MTL::ResourceUsageRead;
-    if (binding.type == RESOURCE_TYPE_WRITABLE_IMAGE || binding.type == RESOURCE_TYPE_WRITABLE_STORAGE_BUFFER)
-      usage |= MTL::ResourceUsageWrite;
-    auto use = [&](MTL::Resource *resource) {
-      if (point == BIND_POINT_COMPUTE)
-        compute_->useResource(resource, usage);
-      else
-        render_->useResource(resource, usage, vertex ? MTL::RenderStageVertex : MTL::RenderStageFragment);
-    };
-    size_t count = resources.buffers.size() + resources.images.size() + resources.samplers.size() +
-                   (resources.acceleration_structure ? 1 : 0);
-    if (count != binding.count)
-      throw std::runtime_error("Metal resource count mismatch at set " + std::to_string(slot));
-    if (resources.acceleration_structure) {
-      if (binding.type != RESOURCE_TYPE_ACCELERATION_STRUCTURE)
-        throw std::invalid_argument("Metal AS bound to a non-AS resource slot");
-      auto structure = dynamic_cast<MetalAccelerationStructure *>(resources.acceleration_structure);
-      encoder->setAccelerationStructure(structure->Handle(), 0);
-      use(structure->Handle());
-      for (const auto &child : structure->Children())
-        use(child.get());
-      // Capture the exact AS generation and dependencies until this submission completes.
-      PushPostExecutionCallback([storage = NS::RetainPtr(structure->Handle()), children = structure->Children()] {});
-    } else if (binding.type == RESOURCE_TYPE_ACCELERATION_STRUCTURE) {
-      throw std::invalid_argument("Metal AS slot requires an acceleration structure");
-    }
-    for (size_t i = 0; i < resources.buffers.size(); ++i) {
-      auto &range = resources.buffers[i];
-      auto buffer = dynamic_cast<MetalBuffer *>(range.buffer);
-      if (!buffer || range.offset > buffer->Size() || range.size > buffer->Size() - range.offset)
-        throw std::invalid_argument("invalid Metal buffer range");
-      encoder->setBuffer(buffer->Handle(), range.offset, i);
-      use(buffer->Handle());
-    }
-    for (size_t i = 0; i < resources.images.size(); ++i) {
-      auto image = dynamic_cast<MetalImage *>(resources.images[i]);
-      if (!image)
-        throw std::invalid_argument("expected MetalImage");
-      encoder->setTexture(image->Handle(), i);
-      use(image->Handle());
-    }
-    for (size_t i = 0; i < resources.samplers.size(); ++i) {
-      auto sampler = dynamic_cast<MetalSampler *>(resources.samplers[i]);
-      if (!sampler)
-        throw std::invalid_argument("expected MetalSampler");
-      encoder->setSamplerState(sampler->state.get(), i);
-      // Samplers are indirect objects, not MTL::Resources. Retain through completion.
-      PushPostExecutionCallback([state = sampler->state]() {});
+    for (auto [slot, argument_index] : stage.resource_indices) {
+      if (!stage.packed && slot != buffer_slot)
+        continue;
+      auto it = resources_[point].find(slot);
+      if (it == resources_[point].end())
+        throw std::runtime_error("unbound Metal resource set " + std::to_string(slot));
+      auto &resources = it->second;
+      auto &binding = layout.at(slot);
+      MTL::ResourceUsage usage = MTL::ResourceUsageRead;
+      if (binding.type == RESOURCE_TYPE_WRITABLE_IMAGE || binding.type == RESOURCE_TYPE_WRITABLE_STORAGE_BUFFER)
+        usage |= MTL::ResourceUsageWrite;
+      auto use = [&](MTL::Resource *resource) {
+        if (point == BIND_POINT_COMPUTE)
+          compute_->useResource(resource, usage);
+        else
+          render_->useResource(resource, usage, vertex ? MTL::RenderStageVertex : MTL::RenderStageFragment);
+      };
+      size_t count = resources.buffers.size() + resources.images.size() + resources.samplers.size() +
+                     (resources.acceleration_structure ? 1 : 0);
+      if (count != binding.count)
+        throw std::runtime_error("Metal resource count mismatch at set " + std::to_string(slot));
+      if (resources.acceleration_structure) {
+        if (binding.type != RESOURCE_TYPE_ACCELERATION_STRUCTURE)
+          throw std::invalid_argument("Metal AS bound to a non-AS resource slot");
+        auto structure = dynamic_cast<MetalAccelerationStructure *>(resources.acceleration_structure);
+        encoder->setAccelerationStructure(structure->Handle(), argument_index);
+        use(structure->Handle());
+        for (const auto &child : structure->Children())
+          use(child.get());
+        // Capture the exact AS generation and dependencies until this submission completes.
+        PushPostExecutionCallback([storage = NS::RetainPtr(structure->Handle()), children = structure->Children()] {});
+      } else if (binding.type == RESOURCE_TYPE_ACCELERATION_STRUCTURE) {
+        throw std::invalid_argument("Metal AS slot requires an acceleration structure");
+      }
+      for (size_t i = 0; i < resources.buffers.size(); ++i) {
+        auto &range = resources.buffers[i];
+        auto buffer = dynamic_cast<MetalBuffer *>(range.buffer);
+        if (!buffer || range.offset > buffer->Size() || range.size > buffer->Size() - range.offset)
+          throw std::invalid_argument("invalid Metal buffer range");
+        encoder->setBuffer(buffer->Handle(), range.offset, argument_index + i);
+        use(buffer->Handle());
+      }
+      for (size_t i = 0; i < resources.images.size(); ++i) {
+        auto image = dynamic_cast<MetalImage *>(resources.images[i]);
+        if (!image)
+          throw std::invalid_argument("expected MetalImage");
+        encoder->setTexture(image->Handle(), argument_index + i);
+        use(image->Handle());
+      }
+      for (size_t i = 0; i < resources.samplers.size(); ++i) {
+        auto sampler = dynamic_cast<MetalSampler *>(resources.samplers[i]);
+        if (!sampler)
+          throw std::invalid_argument("expected MetalSampler");
+        encoder->setSamplerState(sampler->state.get(), argument_index + i);
+        // Samplers are indirect objects, not MTL::Resources. Retain through completion.
+        PushPostExecutionCallback([state = sampler->state]() {});
+      }
     }
     if (point == BIND_POINT_COMPUTE)
-      compute_->setBuffer(argument.get(), 0, slot);
+      compute_->setBuffer(argument.get(), 0, buffer_slot);
     else if (vertex)
-      render_->setVertexBuffer(argument.get(), 0, slot);
+      render_->setVertexBuffer(argument.get(), 0, buffer_slot);
     else
-      render_->setFragmentBuffer(argument.get(), 0, slot);
+      render_->setFragmentBuffer(argument.get(), 0, buffer_slot);
   }
 }
 
