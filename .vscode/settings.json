@@ -2,9 +2,10 @@
   "clangd.path": "clangd",
   "clangd.arguments": [
     "--background-index",
-    "--compile-commands-dir=${workspaceFolder}/cmake-build-metal"
+    "--compile-commands-dir=${workspaceFolder}/cmake-build-ninja"
   ],
-  "cmake.buildDirectory": "${workspaceFolder}/cmake-build-metal",
+  "cmake.generator": "Ninja",
+  "cmake.buildDirectory": "${workspaceFolder}/cmake-build-ninja",
   "cmake.configureOnOpen": false,
   "cmake.configureSettings": {
     "CMAKE_EXPORT_COMPILE_COMMANDS": true

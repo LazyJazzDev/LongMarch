@@ -8,10 +8,10 @@ and importer extensions follow in `blender-align`, based on this branch.
 
 | Pipeline | Behavior |
 | --- | --- |
-| `auto` | Pipeline RT when available, otherwise native ray query, otherwise software compute tracing |
+| `auto` | D3D12/Vulkan prefer Ray Query when supported; otherwise pipeline RT, then Ray Query, then software compute tracing |
 | `ray_tracing` | Hardware ray tracing when available, otherwise compute ray tracing |
 | `rt_fallback` | Force compute ray tracing, including on hardware RT devices |
-| `ray_query` | Experimental native inline queries on Metal; see [research and measurements](metal-ray-query.md) |
+| `ray_query` | Hardware inline queries on supported D3D12, Vulkan and Metal devices; see [Metal research and measurements](metal-ray-query.md) |
 | `rasterization` | Existing raster renderer |
 
 Use `renderer.pipeline` in scene JSON, the GUI's **Path Tracing - Fallback** option,
