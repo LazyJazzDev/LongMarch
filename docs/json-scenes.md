@@ -11,7 +11,7 @@ Supported scene data:
 - Lambertian, specular, emissive, and Principled materials with texture inputs.
 - OBJ meshes, inline triangle meshes, and generated spheres.
 - Mesh instances with matrix/TRS or look-at transforms, and point lights.
-- Automatic, rasterization, and hardware ray tracing pipeline selection.
+- Automatic, realtime GI, software path tracing, and hardware ray tracing pipeline selection.
 
 The loader reports malformed documents, wrong field types, unsupported formats,
 unknown references, and invalid camera/mesh settings through its error result.
@@ -30,9 +30,9 @@ python3 scripts/check_json_scenes.py \
 Use the equivalent target paths in your configured build directory. Initialize
 the matching LFS assets submodule before running the checker.
 
-On Apple M5, the Vulkan build passed scene discovery, raster rendering of all
-six basic demos at 96×96 from a different working directory, and 25 invalid-input
-cases. Both CLI and GUI targets compiled. This check does not cover interactive
+The checker exercises scene discovery, realtime GI rendering of all six basic
+demos at 96×96 from a different working directory, and invalid-input rejection
+(including the removed `rasterization` pipeline). It does not cover interactive
 GUI behavior, hardware ray tracing, or image equivalence with the C++ demos.
 Per-case logs, images, and `results.json` are written to the output directory.
 
@@ -64,8 +64,8 @@ cannot make an SDR-only display brighter. See [Metal HDR presentation](metal-bac
 
 The **Render settings** panel exposes path-tracing samples per frame, maximum
 bounces, alpha shadows, background, persistence, per-sample clamping, and
-**Max exposure**. Changing these settings resets accumulation. Rasterization
-instead exposes ambient light. **SDR view settings** selects Normalized,
+**Max exposure**. Changing these settings resets accumulation. Realtime GI
+exposes shading resolution, bounce count, update period, and history length. **SDR view settings** selects Normalized,
 Standard, or Filmic; gamma and contrast apply only to Filmic. Display settings
 do not reset accumulation and SDR controls are disabled during HDR preview.
 
@@ -106,3 +106,7 @@ view transform. Browser/OS/display HDR support and available EDR headroom are
 required to see extended brightness. GitHub image proxies may transform images;
 provide a direct original-file link as well as the inline image. SDR displays
 may tone-map the HDR file, so screenshots cannot verify physical HDR brightness.
+
+For the experimental software-traced realtime pipeline and its quality/budget
+controls, see [Realtime GI](realtime-gi.md). Both CLI and GUI accept
+`--pipeline realtime`.

@@ -234,8 +234,7 @@ int main() {
   sparkium::EntityGeometryMaterial entity_sky(
       &sparkium_core, &geometry_sphere, &material_sky,
       glm::translate(glm::mat4{1.0f}, glm::vec3{0.0f, 0.0f, 0.0f}) * glm::scale(glm::mat4(1.0f), glm::vec3(60.0f)));
-  entity_sky.raster_light = false;
-  scene.settings.raster.ambient_light = glm::vec3{0.5f, 0.5f, 0.5f};
+  scene.settings.background_color = glm::vec3{0.5f, 0.5f, 0.5f};
   AreaLight area_light(&sparkium_core, glm::vec3{1.0f, 1.0f, 1.0f}, 1.0f, glm::vec3{40.0f, -30.0f, 30.0f},
                        glm::normalize(glm::vec3{-4.0f, 3.0f, -3.0f}), glm::vec3{0.0f, 0.0f, 1.0f});
   area_light.emission = glm::vec3{1000.0f};
@@ -265,10 +264,7 @@ int main() {
   while (!window->ShouldClose()) {
     window->BeginImGuiFrame();
     if (ImGui::Begin("Franka Joint Control", nullptr, ImGuiWindowFlags_AlwaysAutoResize)) {
-      ImGui::Checkbox("Ray Tracing", &ray_tracing);
-      if (ray_tracing && !core_->DeviceRayTracingSupport()) {
-        ImGui::Text("Ray Tracing not supported on this device!");
-      }
+      ImGui::Checkbox("Path tracing (off: realtime GI)", &ray_tracing);
       ImGui::Separator();
       if (ImGui::Button("Center")) {
         for (auto &j : joints) {
@@ -322,7 +318,7 @@ int main() {
     // 0.0f})} * area_light.position; if (area_light.position.y < 0.0) area_light.position = -area_light.position;
     // area_light.direction = -area_light.position;
     sparkium_core.Render(&scene, &camera, &film,
-                         ray_tracing ? sparkium::RENDER_PIPELINE_AUTO : sparkium::RENDER_PIPELINE_RASTERIZATION);
+                         ray_tracing ? sparkium::RENDER_PIPELINE_AUTO : sparkium::RENDER_PIPELINE_REALTIME);
     film.Develop(srgb_image.get());
     std::unique_ptr<graphics::CommandContext> cmd_context;
     core_->CreateCommandContext(&cmd_context);

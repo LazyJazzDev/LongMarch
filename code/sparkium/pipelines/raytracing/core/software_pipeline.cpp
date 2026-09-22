@@ -52,6 +52,13 @@ SoftwarePipeline::SoftwarePipeline(Core *core, bool ray_query) : core_(core), ra
   static_assert(sizeof(BuildParameters) == 256, "uniform buffer alignment");
 }
 
+std::vector<uint32_t> SoftwarePipeline::VertexCounts() const {
+  std::vector<uint32_t> counts;
+  for (const auto &instance : instances_)
+    counts.push_back(instance.geometry->PrimitiveCount() * 3);
+  return counts;
+}
+
 void SoftwarePipeline::ClearInstances() {
   instances_.clear();
 }
@@ -186,17 +193,20 @@ float Transmission(HitRecord hit, float3 direction) {
                                           &render_shader_))
     throw std::runtime_error("failed to compile compute ray tracing shader");
   core_->GraphicsCore()->CreateComputeProgram(render_shader_.get(), &render_program_);
-  for (auto binding : std::vector<std::pair<graphics::ResourceType, uint32_t>>{
-           {graphics::RESOURCE_TYPE_WRITABLE_IMAGE, 1},
-           {graphics::RESOURCE_TYPE_WRITABLE_IMAGE, 1},
-           {ray_query_ ? graphics::RESOURCE_TYPE_ACCELERATION_STRUCTURE : graphics::RESOURCE_TYPE_STORAGE_BUFFER, 1},
-           {graphics::RESOURCE_TYPE_UNIFORM_BUFFER, 1},
-           {graphics::RESOURCE_TYPE_STORAGE_BUFFER, buffers + 6},
-           {graphics::RESOURCE_TYPE_IMAGE, sdr_count},
-           {graphics::RESOURCE_TYPE_IMAGE, hdr_count},
-           {graphics::RESOURCE_TYPE_SAMPLER, 2}})
-    render_program_->AddResourceBinding(binding.first, binding.second);
-  render_program_->Finalize();
+  auto finalize = [&](graphics::ComputeProgram *program) {
+    for (auto binding : std::vector<std::pair<graphics::ResourceType, uint32_t>>{
+             {graphics::RESOURCE_TYPE_WRITABLE_IMAGE, 1u},
+             {graphics::RESOURCE_TYPE_WRITABLE_IMAGE, 1u},
+             {ray_query_ ? graphics::RESOURCE_TYPE_ACCELERATION_STRUCTURE : graphics::RESOURCE_TYPE_STORAGE_BUFFER, 1},
+             {graphics::RESOURCE_TYPE_UNIFORM_BUFFER, 1},
+             {graphics::RESOURCE_TYPE_STORAGE_BUFFER, buffers + 6u},
+             {graphics::RESOURCE_TYPE_IMAGE, sdr_count},
+             {graphics::RESOURCE_TYPE_IMAGE, hdr_count},
+             {graphics::RESOURCE_TYPE_SAMPLER, 2}})
+      program->AddResourceBinding(binding.first, binding.second);
+    program->Finalize();
+  };
+  finalize(render_program_.get());
   material_sources_ = materials;
   buffer_count_ = buffers;
   sdr_count_ = sdr_count;
@@ -326,14 +336,22 @@ void SoftwarePipeline::Update(graphics::CommandContext *commands,
   tlas.leaves = tlas_leaves;
   tlas.count = gpu_instances.size();
   tlas.instance_tree = 1;
-  AppendBuild(passes, tlas);
+  const auto *bytes = reinterpret_cast<const uint8_t *>(gpu_instances.data());
+  std::vector<uint8_t> current_instances;
+  if (!gpu_instances.empty())
+    current_instances.assign(bytes, bytes + gpu_instances.size() * sizeof(GPUInstance));
+  if (rebuild || current_instances != previous_instances_)
+    AppendBuild(passes, tlas);
+  previous_instances_ = std::move(current_instances);
   std::vector<BuildParameters> parameters;
   for (const auto &pass : passes)
     parameters.push_back(pass.parameters);
   size_t parameter_bytes = parameters.size() * sizeof(BuildParameters);
+  parameter_bytes = std::max<size_t>(parameter_bytes, sizeof(BuildParameters));
   if (!parameters_buffer_ || parameters_buffer_->Size() < parameter_bytes)
     graphics->CreateBuffer(parameter_bytes, graphics::BUFFER_TYPE_STATIC, &parameters_buffer_);
-  parameters_buffer_->UploadData(parameters.data(), parameter_bytes);
+  if (!parameters.empty())
+    parameters_buffer_->UploadData(parameters.data(), parameters.size() * sizeof(BuildParameters));
   prepare_profile.End();
   if (graphics::FrameProfile::active) {
     graphics::FrameProfile::active->counters["bvh_dispatches"] = passes.size();

@@ -3,8 +3,7 @@
 
 namespace sparkium::raytracing {
 
-// Shared compute path tracer: software BVH by default, or native inline ray queries.
-// Geometry/light/material registration is shared with DXR/Vulkan pipeline RT.
+// Path-tracing compute kernels, with software BVH or native ray queries.
 class SoftwarePipeline {
  public:
   explicit SoftwarePipeline(Core *core, bool ray_query = false);
@@ -14,6 +13,8 @@ class SoftwarePipeline {
               const std::vector<graphics::Buffer *> &buffers,
               uint32_t sdr_count,
               uint32_t hdr_count);
+
+  std::vector<uint32_t> VertexCounts() const;
 
   graphics::ComputeProgram *Program() const {
     return render_program_.get();
@@ -76,6 +77,7 @@ class SoftwarePipeline {
 
   Core *core_;
   bool ray_query_;
+  std::vector<uint8_t> previous_instances_;
   std::unique_ptr<graphics::AccelerationStructure> native_tlas_;
   std::vector<Instance> instances_;
   std::vector<GeometryLayout> geometries_;

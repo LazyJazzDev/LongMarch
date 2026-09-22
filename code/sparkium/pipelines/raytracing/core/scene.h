@@ -7,7 +7,6 @@ namespace sparkium::raytracing {
 class Scene : public Object {
  public:
   Scene(sparkium::Scene &scene);
-
   void Render(Camera *camera, Film *film, bool software = false, bool ray_query = false);
 
   bool SoftwareTracing() const {
@@ -60,10 +59,10 @@ class Scene : public Object {
   int32_t RegisterHitGroup(const InstanceHitGroups &hit_group);
 
  private:
+  bool rendered_{};
   void UpdatePipeline(Camera *camera);
   bool software_tracing_{false};
   bool ray_query_{false};
-  bool rendered_{false};
   std::unique_ptr<SoftwarePipeline> software_pipeline_;
   sparkium::Scene &scene_;
   Core *core_;

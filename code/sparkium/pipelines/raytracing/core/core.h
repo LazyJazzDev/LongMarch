@@ -23,6 +23,9 @@ class Core : public Object {
   void LoadPublicShaders();
 
   sparkium::Core &core_;
+  VirtualFileSystem shaders_vfs_;
+  std::map<std::string, std::unique_ptr<graphics::Shader>> shaders_;
+  std::map<std::string, std::unique_ptr<graphics::ComputeProgram>> compute_programs_;
 };
 
 Core *DedicatedCast(sparkium::Core *core);

@@ -18,6 +18,10 @@ class Camera : public Object {
  public:
   Camera(sparkium::Camera &camera);
 
+  const sparkium::Camera &Source() const {
+    return camera_;
+  }
+
   graphics::Shader *Shader() const;
 
   graphics::Buffer *Buffer();

@@ -705,12 +705,21 @@ std::unique_ptr<JsonScene> JsonScene::Load(Core *core, const std::filesystem::pa
         result->scene_->settings.raytracing.max_bounces <= 0)
       throw std::runtime_error("samples_per_dispatch and max_bounces must be positive");
     result->scene_->settings.raytracing.alpha_shadow = BoolMember(renderer, "alpha_shadow", false);
-    result->scene_->settings.raster.ambient_light = Vec3Member(renderer, "ambient_light", {0.1f, 0.1f, 0.1f});
     result->scene_->settings.raytracing.background_color =
-        Vec3Member(renderer, "background_color", result->scene_->settings.raster.ambient_light);
+        Vec3Member(renderer, "background_color", Vec3Member(renderer, "ambient_light", {0.1f, 0.1f, 0.1f}));
     std::string pipeline = renderer.HasMember("pipeline") ? ReadString(renderer["pipeline"]) : "auto";
-    if (pipeline == "rasterization")
-      result->render_pipeline_ = RENDER_PIPELINE_RASTERIZATION;
+    auto realtime_setting = [&](const char *name, int fallback, int maximum) {
+      const int value = renderer.HasMember(name) ? ReadInt(renderer[name]) : fallback;
+      if (value < 1 || value > maximum)
+        throw std::runtime_error(std::string(name) + " is outside its supported range");
+      return value;
+    };
+    result->scene_->settings.realtime.scale = realtime_setting("realtime_scale", 4, 8);
+    result->scene_->settings.realtime.bounces = realtime_setting("realtime_bounces", 3, 8);
+    result->scene_->settings.realtime.history = realtime_setting("realtime_history", 64, 64);
+    result->scene_->settings.realtime.updates = realtime_setting("realtime_updates", 16, 16);
+    if (pipeline == "realtime")
+      result->render_pipeline_ = RENDER_PIPELINE_REALTIME;
     else if (pipeline == "ray_tracing")
       result->render_pipeline_ = RENDER_PIPELINE_RAY_TRACING;
     else if (pipeline == "ray_query")
@@ -720,7 +729,7 @@ std::unique_ptr<JsonScene> JsonScene::Load(Core *core, const std::filesystem::pa
     else if (pipeline == "auto")
       result->render_pipeline_ = RENDER_PIPELINE_AUTO;
     else
-      throw std::runtime_error("renderer.pipeline must be auto, rasterization, ray_tracing, rt_fallback, or ray_query");
+      throw std::runtime_error("renderer.pipeline must be auto, realtime, ray_tracing, rt_fallback, or ray_query");
 
     const auto &film = RequireObject(Member(document, "film"));
     int width = ReadInt(Member(film, "width"));
@@ -910,7 +919,6 @@ std::unique_ptr<JsonScene> JsonScene::Load(Core *core, const std::filesystem::pa
         }
         auto entity =
             std::make_unique<EntityGeometryMaterial>(core, geometry->second.get(), material->second.get(), transform);
-        entity->raster_light = BoolMember(spec, "raster_light", true);
         entity_ptr = entity.get();
         result->entities_.push_back(std::move(entity));
       } else if (type == "point_light") {

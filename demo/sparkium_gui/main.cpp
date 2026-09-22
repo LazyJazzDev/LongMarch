@@ -4,6 +4,7 @@
 #include <cmath>
 #include <filesystem>
 #include <iostream>
+#include <optional>
 
 #include "../sparkium_backend.h"
 
@@ -12,12 +13,12 @@ using namespace long_march;
 namespace {
 const char *PipelineName(sparkium::RenderPipeline pipeline) {
   switch (pipeline) {
+    case sparkium::RENDER_PIPELINE_REALTIME:
+      return "Realtime GI - Software";
     case sparkium::RENDER_PIPELINE_RAY_QUERY:
       return "Path Tracing - Ray Query";
     case sparkium::RENDER_PIPELINE_RT_FALLBACK:
       return "Path Tracing - Fallback";
-    case sparkium::RENDER_PIPELINE_RASTERIZATION:
-      return "Rasterization";
     case sparkium::RENDER_PIPELINE_RAY_TRACING:
       return "Path Tracing";
     default:
@@ -74,18 +75,33 @@ int main(int argc, char **argv) {
     bool hdr_requested = false;
     auto backend = graphics::BACKEND_API_DEFAULT;
     int frame_limit = 0;
+    std::optional<sparkium::RenderPipeline> requested_pipeline;
     for (int i = 1; i < argc; ++i) {
       std::string arg = argv[i];
       if (arg == "--help") {
         std::cout
-            << "Usage: sparkium_gui [scene.json|directory] [--backend auto|metal|vulkan|d3d12] [--hdr] [--frames N]\n";
+            << "Usage: sparkium_gui [scene.json|directory] [--backend auto|metal|vulkan|d3d12] [--hdr] [--pipeline auto|realtime|ray_query|rt_fallback|ray_tracing] [--frames N]\n";
         return 0;
       }
       if (arg == "--hdr")
         hdr_requested = true;
       else if (arg == "--backend" && i + 1 < argc)
         backend = ParseSparkiumBackend(argv[++i]);
-      else if (arg == "--frames" && i + 1 < argc) {
+      else if (arg == "--pipeline" && i + 1 < argc) {
+        const std::string name = argv[++i];
+        if (name == "auto")
+          requested_pipeline = sparkium::RENDER_PIPELINE_AUTO;
+        else if (name == "realtime")
+          requested_pipeline = sparkium::RENDER_PIPELINE_REALTIME;
+        else if (name == "ray_query")
+          requested_pipeline = sparkium::RENDER_PIPELINE_RAY_QUERY;
+        else if (name == "rt_fallback")
+          requested_pipeline = sparkium::RENDER_PIPELINE_RT_FALLBACK;
+        else if (name == "ray_tracing")
+          requested_pipeline = sparkium::RENDER_PIPELINE_RAY_TRACING;
+        else
+          throw std::invalid_argument("unknown pipeline: " + name);
+      } else if (arg == "--frames" && i + 1 < argc) {
         frame_limit = std::stoi(argv[++i]);
         if (frame_limit <= 0)
           throw std::invalid_argument("--frames must be positive");
@@ -134,7 +150,7 @@ int main(int argc, char **argv) {
       if (!next)
         return false;
       loaded = std::move(next);
-      pipeline = loaded->GetRenderPipeline();
+      pipeline = requested_pipeline.value_or(loaded->GetRenderPipeline());
       create_display_image();
       resize_pending = true;
       return true;
@@ -183,9 +199,9 @@ int main(int argc, char **argv) {
       const char *pipeline_label =
           selected_pipeline == sparkium::RENDER_PIPELINE_AUTO ? auto_label.c_str() : PipelineName(selected_pipeline);
       if (ImGui::BeginCombo("Pipeline", pipeline_label)) {
-        for (auto option : {sparkium::RENDER_PIPELINE_AUTO, sparkium::RENDER_PIPELINE_RASTERIZATION,
-                            sparkium::RENDER_PIPELINE_RAY_TRACING, sparkium::RENDER_PIPELINE_RT_FALLBACK,
-                            sparkium::RENDER_PIPELINE_RAY_QUERY}) {
+        for (auto option :
+             {sparkium::RENDER_PIPELINE_AUTO, sparkium::RENDER_PIPELINE_REALTIME, sparkium::RENDER_PIPELINE_RAY_TRACING,
+              sparkium::RENDER_PIPELINE_RT_FALLBACK, sparkium::RENDER_PIPELINE_RAY_QUERY}) {
           if (option == sparkium::RENDER_PIPELINE_RAY_TRACING && !graphics_core->DeviceRayTracingSupport())
             continue;
           if (option == sparkium::RENDER_PIPELINE_RAY_QUERY && !graphics_core->DeviceRayQuerySupport())
@@ -213,11 +229,15 @@ int main(int argc, char **argv) {
       ImGui::TextUnformatted(hdr_active ? "Display: HDR (linear)" : "Display: SDR (scene view transform)");
       auto *film = loaded->GetFilm();
       auto &settings = loaded->GetScene()->settings;
-      const bool raster = core.ResolveRenderPipeline(pipeline) == sparkium::RENDER_PIPELINE_RASTERIZATION;
       if (ImGui::CollapsingHeader("Render settings", ImGuiTreeNodeFlags_DefaultOpen)) {
         bool reset = false;
-        if (raster) {
-          reset |= ImGui::ColorEdit3("Ambient light", &settings.ambient_light.x, ImGuiColorEditFlags_Float);
+        if (pipeline == sparkium::RENDER_PIPELINE_REALTIME) {
+          reset |= ImGui::SliderInt("Shading divisor", &settings.realtime.scale, 1, 8);
+          reset |= ImGui::SliderInt("Lighting bounces", &settings.realtime.bounces, 1, 8);
+          reset |= ImGui::SliderInt("Lighting update period", &settings.realtime.updates, 1, 16);
+          reset |= ImGui::SliderInt("History samples", &settings.realtime.history, 1, 64);
+          ImGui::TextUnformatted("Software BVH; staggered lighting updates");
+
         } else {
           reset |= ImGui::SliderInt("Samples / frame", &settings.samples_per_dispatch, 1, 256, "%d",
                                     ImGuiSliderFlags_AlwaysClamp);
@@ -254,6 +274,20 @@ int main(int argc, char **argv) {
         ImGui::EndDisabled();
         ImGui::EndDisabled();
       }
+      if (ImGui::CollapsingHeader("Camera")) {
+        auto world = glm::inverse(loaded->GetCamera()->view);
+        if (ImGui::DragFloat3("Position", &world[3].x, 0.02f)) {
+          loaded->GetCamera()->view = glm::inverse(world);
+          if (pipeline != sparkium::RENDER_PIPELINE_REALTIME)
+            film->Reset();
+        }
+        float fov = glm::degrees(loaded->GetCamera()->fovy);
+        if (ImGui::SliderFloat("Field of view", &fov, 15.0f, 100.0f)) {
+          loaded->GetCamera()->fovy = glm::radians(fov);
+          if (pipeline != sparkium::RENDER_PIPELINE_REALTIME)
+            film->Reset();
+        }
+      }
       if (ImGui::Button("Reload"))
         load_selected();
       ImGui::SameLine();
@@ -267,9 +301,10 @@ int main(int argc, char **argv) {
       else
         ImGui::Text("Pipeline: %s", PipelineName(pipeline));
       const float fps = fps_counter.TickFPS();
-      if (resolved_pipeline == sparkium::RENDER_PIPELINE_RASTERIZATION) {
-        ImGui::TextUnformatted("Ray/s: N/A");
-        ImGui::TextUnformatted("Accumulated spp: N/A");
+      if (resolved_pipeline == sparkium::RENDER_PIPELINE_REALTIME) {
+        ImGui::Text("Lighting frames: %d", loaded->GetFilm()->info.accumulated_samples);
+        ImGui::Text("Frame time: %.2f ms (30 FPS budget: 33.33 ms)", 1000.0f / std::max(fps, 0.01f));
+
       } else {
         const auto *film = loaded->GetFilm();
         const double camera_rays_per_second = film->info.accumulated_samples > 0

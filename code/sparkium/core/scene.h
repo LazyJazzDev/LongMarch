@@ -24,15 +24,17 @@ class Scene : public Object {
       glm::vec3 background_color{0.0f, 0.0f, 0.0f};
     } raytracing;
 
-    struct Rasterization {
-      glm::vec3 ambient_light{0.1f, 0.1f, 0.1f};
-    } raster;
+    struct Realtime {
+      int scale{4};
+      int bounces{3};
+      int history{64};
+      int updates{16};
+    } realtime;
 
     int &samples_per_dispatch{raytracing.samples_per_dispatch};
     int &max_bounces{raytracing.max_bounces};
     int &alpha_shadow{raytracing.alpha_shadow};
     glm::vec3 &background_color{raytracing.background_color};
-    glm::vec3 &ambient_light{raster.ambient_light};
   } settings;
 
   struct EntityStatus {

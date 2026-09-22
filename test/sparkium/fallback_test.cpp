@@ -17,6 +17,9 @@
 #include "sparkium/pipelines/raytracing/entity/entities.h"
 #include "sparkium/pipelines/raytracing/geometry/geometry_mesh.h"
 #include "sparkium/pipelines/raytracing/material/material_lambertian.h"
+#include "sparkium/pipelines/realtime/core/core.h"
+#include "sparkium/pipelines/realtime/geometry/geometry_mesh.h"
+#include "sparkium/pipelines/realtime/material/material_lambertian.h"
 
 using namespace grassland;
 
@@ -94,6 +97,105 @@ TEST_F(SoftwareBVHTest, HDRFilmDevelopmentPreservesHighlightsAndAccumulation) {
   EXPECT_EQ(resets, 0);
 }
 
+TEST_F(SoftwareBVHTest, RealtimeRasterVisibilityPreservesHDRAndRejectsStaleHistory) {
+  uint32_t indices[]{0, 1, 2, 0, 2, 3};
+  std::vector<Vector3<float>> positions{{-20, -20, 0}, {20, -20, 0}, {20, 20, 0}, {-20, 20, 0}};
+  Mesh<> mesh(4, 6, indices, positions.data());
+  sparkium::GeometryMesh geometry(core.get(), mesh);
+  sparkium::MaterialLambertian material(core.get(), glm::vec3(0), glm::vec3(4, 0.5f, 0.25f));
+  sparkium::EntityGeometryMaterial entity(core.get(), &geometry, &material);
+  sparkium::Scene scene(core.get());
+  scene.AddEntity(&entity);
+  scene.settings.background_color = glm::vec3(0.125f);
+  scene.settings.realtime.bounces = 2;
+  scene.settings.realtime.updates = 1;
+  sparkium::Camera camera(core.get(), glm::lookAt(glm::vec3(0, 0, 4), glm::vec3(0), glm::vec3(0, 1, 0)),
+                          glm::radians(45.0f), 37.0f / 19.0f);
+  sparkium::Film film(core.get(), 37, 19);
+  std::vector<glm::vec4> pixels(37 * 19);
+  for (int frame = 0; frame < 3; ++frame) {
+    graphics::FrameProfile profile(graphics.get(), false);
+    profile.Begin();
+    core->Render(&scene, &camera, &film, sparkium::RENDER_PIPELINE_REALTIME);
+    profile.Finish();
+    EXPECT_EQ(profile.counters["realtime_software_gi"], 1);
+    EXPECT_EQ(profile.counters["native_ray_query"], 0);
+    if (frame > 0)
+      EXPECT_EQ(profile.counters["bvh_dispatches"], 0);
+    film.GetRawImage()->DownloadData(pixels.data());
+    for (auto pixel : pixels) {
+      EXPECT_NEAR(pixel.r, 4, 0.002f);
+      EXPECT_NEAR(pixel.g, 0.5f, 0.002f);
+      EXPECT_NEAR(pixel.b, 0.25f, 0.002f);
+      EXPECT_EQ(pixel.a, 1);
+    }
+  }
+  // Realtime rendering must not construct any path-tracing implementation.
+  EXPECT_EQ(core->GetComponent<sparkium::raytracing::Core>(), nullptr);
+  EXPECT_EQ(geometry.GetComponent<sparkium::raytracing::GeometryMesh>(), nullptr);
+  EXPECT_EQ(material.GetComponent<sparkium::raytracing::MaterialLambertian>(), nullptr);
+  auto *realtime_core = core->GetComponent<sparkium::realtime::Core>();
+  auto *realtime_material = material.GetComponent<sparkium::realtime::MaterialLambertian>();
+  ASSERT_NE(realtime_core, nullptr);
+  ASSERT_NE(realtime_material, nullptr);
+  ASSERT_NE(geometry.GetComponent<sparkium::realtime::GeometryMesh>(), nullptr);
+  auto *realtime_scan = realtime_core->GetComputeProgram("blelloch_scan_up");
+  ASSERT_NE(realtime_scan, nullptr);
+  std::vector<uint8_t> shader_source;
+  EXPECT_NE(realtime_core->GetShadersVFS().ReadFile("geometry/mesh/hit_group.hlsl", shader_source), 0);
+  // Independent pipelines must not inherit one another's film accumulation.
+  scene.settings.samples_per_dispatch = 1;
+  core->Render(&scene, &camera, &film, sparkium::RENDER_PIPELINE_RT_FALLBACK);
+  auto *path_core = core->GetComponent<sparkium::raytracing::Core>();
+  auto *path_material = material.GetComponent<sparkium::raytracing::MaterialLambertian>();
+  ASSERT_NE(path_core, nullptr);
+  ASSERT_NE(path_material, nullptr);
+  std::vector<uint8_t> realtime_bsdf, path_bsdf;
+  EXPECT_EQ(realtime_core->GetShadersVFS().ReadFile("bsdf/principled_bsdf.hlsli", realtime_bsdf), 0);
+  EXPECT_EQ(path_core->GetShadersVFS().ReadFile("bsdf/principled_bsdf.hlsli", path_bsdf), 0);
+  EXPECT_EQ(realtime_bsdf, path_bsdf);
+  EXPECT_NE(path_material->Buffer(), realtime_material->Buffer());
+  EXPECT_NE(path_core->GetComputeProgram("blelloch_scan_up"), realtime_scan);
+  EXPECT_EQ(realtime_core->GetComputeProgram("blelloch_scan_up"), realtime_scan);
+  EXPECT_EQ(path_core->GetShadersVFS().ReadFile("geometry/mesh/hit_group.hlsl", shader_source), 0);
+  EXPECT_EQ(film.info.accumulated_samples, 1);
+  core->Render(&scene, &camera, &film, sparkium::RENDER_PIPELINE_REALTIME);
+  EXPECT_EQ(film.info.accumulated_samples, 1);
+  film.GetRawImage()->DownloadData(pixels.data());
+  for (auto pixel : pixels)
+    EXPECT_NEAR(pixel.r, 4, 0.002f);
+  // Interleaved updates must cover the entire grid after one complete period.
+  scene.settings.realtime.updates = 4;
+  for (int frame = 0; frame < 4; ++frame)
+    core->Render(&scene, &camera, &film, sparkium::RENDER_PIPELINE_REALTIME);
+  film.GetRawImage()->DownloadData(pixels.data());
+  for (auto pixel : pixels)
+    EXPECT_NEAR(pixel.r, 4, 0.002f);
+  scene.settings.realtime.updates = 1;
+  // A camera cut reveals the background. Old radiance must not bleed into it.
+  camera.view = glm::lookAt(glm::vec3(100, 0, 4), glm::vec3(100, 0, 0), glm::vec3(0, 1, 0));
+  core->Render(&scene, &camera, &film, sparkium::RENDER_PIPELINE_REALTIME);
+  film.GetRawImage()->DownloadData(pixels.data());
+  for (auto pixel : pixels)
+    EXPECT_NEAR(pixel.r, 0.125f, 0.002f);
+  // Reset invalidates history after an explicit material edit.
+  camera.view = glm::lookAt(glm::vec3(0, 0, 4), glm::vec3(0), glm::vec3(0, 1, 0));
+  material.emission = glm::vec3(0.2f);
+  film.Reset();
+  core->Render(&scene, &camera, &film, sparkium::RENDER_PIPELINE_REALTIME);
+  film.GetRawImage()->DownloadData(pixels.data());
+  for (auto pixel : pixels)
+    EXPECT_NEAR(pixel.r, 0.2f, 0.002f);
+  EXPECT_EQ(film.info.accumulated_samples, 1);
+  // Transform edits update software visibility and reset per-view lighting history.
+  entity.transform = glm::mat4x3(glm::translate(glm::mat4(1), glm::vec3(100, 0, 0)));
+  core->Render(&scene, &camera, &film, sparkium::RENDER_PIPELINE_REALTIME);
+  film.GetRawImage()->DownloadData(pixels.data());
+  for (auto pixel : pixels)
+    EXPECT_NEAR(pixel.r, 0.125f, 0.002f);
+  EXPECT_EQ(film.info.accumulated_samples, 1);
+}
+
 TEST(GraphicsCoreCreation, UnsupportedAPIsDoNotFallBack) {
   for (auto api : {graphics::BACKEND_API_METAL, graphics::BACKEND_API_D3D12, graphics::BACKEND_API_VULKAN,
                    static_cast<graphics::BackendAPI>(99)}) {
@@ -146,7 +248,7 @@ TEST_F(SoftwareBVHTest, LightSamplingIsIndependentOfEntityAddresses) {
   sparkium::Camera camera(core.get(), glm::lookAt(glm::vec3(0, 0, 4), glm::vec3(0), glm::vec3(0, 1, 0)),
                           glm::radians(45.0f), 1.0f);
   for (auto pipeline : {sparkium::RENDER_PIPELINE_RT_FALLBACK, sparkium::RENDER_PIPELINE_RAY_QUERY,
-                        sparkium::RENDER_PIPELINE_RAY_TRACING, sparkium::RENDER_PIPELINE_RASTERIZATION}) {
+                        sparkium::RENDER_PIPELINE_RAY_TRACING, sparkium::RENDER_PIPELINE_REALTIME}) {
     if (pipeline == sparkium::RENDER_PIPELINE_RAY_QUERY && !graphics->DeviceRayQuerySupport())
       continue;
     if (pipeline == sparkium::RENDER_PIPELINE_RAY_TRACING && !graphics->DeviceRayTracingSupport())
@@ -334,7 +436,7 @@ TEST_P(SoftwareBVHSizeTest, ComputeConstructionAndTraversalMatchDoublePrecisionO
   ray_buffer->UploadData(rays.data(), rays.size() * sizeof(Ray), 16);
   graphics->CreateBuffer(rays.size() * sizeof(Hit), graphics::BUFFER_TYPE_STATIC, &output);
 
-  auto vfs = core->GetShadersVFS();
+  auto vfs = sparkium::raytracing::DedicatedCast(core.get())->GetShadersVFS();
   vfs.WriteFile("bvh_test.hlsl", R"(
 #define SOFTWARE_EXTERNAL_BINDINGS
 #ifdef NATIVE_QUERY
@@ -512,7 +614,7 @@ TEST_P(ComputeTraversalTest, TransparentShadowLayers) {
   sparkium::raytracing::MaterialLambertian rt_material(material);
   sparkium::raytracing::SoftwarePipeline pipeline(sparkium::raytracing::DedicatedCast(core.get()), ray_query);
   pipeline.AddInstance(&rt_geometry, &rt_material, glm::mat4x3(1), 0);
-  auto vfs = core->GetShadersVFS();
+  auto vfs = sparkium::raytracing::DedicatedCast(core.get())->GetShadersVFS();
   vfs.WriteFile("shadow_test.hlsl", R"(
 #define SOFTWARE_EXTERNAL_BINDINGS
 #include "common.hlsli"
@@ -576,7 +678,7 @@ float SoftwareShadowTransmission(uint material, HitRecord hit, float3 direction)
 }
 
 TEST_F(SoftwareBVHTest, SharedShadersCompileForNativeRayTracingAndCompute) {
-  auto vfs = core->GetShadersVFS();
+  auto vfs = sparkium::raytracing::DedicatedCast(core.get())->GetShadersVFS();
   for (bool spirv : {false, true}) {
     std::vector<std::string> args{"-I."};
     if (spirv)
@@ -614,15 +716,15 @@ GraphSurface EvaluateShaderGraph(HitRecord hit, float3 direction, int bounce, ui
   }
 }
 
-TEST_F(SoftwareBVHTest, RasterPointLightsLeaveEmptyBackgroundUnchanged) {
+TEST_F(SoftwareBVHTest, RealtimePointLightsLeaveEmptyBackgroundUnchanged) {
   sparkium::Scene scene(core.get());
-  scene.settings.ambient_light = glm::vec3(0.2f);
+  scene.settings.background_color = glm::vec3(0.2f);
   sparkium::EntityPointLight light(core.get(), glm::vec3(0, 0, 1), glm::vec3(1), 100.0f);
   scene.AddEntity(&light);
   sparkium::Camera camera(core.get(), glm::lookAt(glm::vec3(0, 0, 4), glm::vec3(0), glm::vec3(0, 1, 0)),
                           glm::radians(45.0f), 17.0f / 13.0f);
   sparkium::Film film(core.get(), 17, 13);
-  core->Render(&scene, &camera, &film, sparkium::RENDER_PIPELINE_RASTERIZATION);
+  core->Render(&scene, &camera, &film, sparkium::RENDER_PIPELINE_REALTIME);
   std::vector<glm::vec4> pixels(17 * 13);
   film.GetRawImage()->DownloadData(pixels.data());
   for (const auto &pixel : pixels)

@@ -6,7 +6,6 @@
 #include "sparkium/core/geometry.h"
 #include "sparkium/core/material.h"
 #include "sparkium/core/scene.h"
-#include "sparkium/pipelines/pipelines.h"
 
 namespace sparkium {
 Core::Core(graphics::Core *core) : core_(core) {
@@ -19,51 +18,30 @@ graphics::Core *Core::GraphicsCore() const {
   return core_;
 }
 
-RenderPipeline Core::ResolveRenderPipeline(RenderPipeline render_pipeline) const {
-  if (render_pipeline == RENDER_PIPELINE_AUTO) {
-    const bool prefer_ray_query =
-        core_->API() == graphics::BACKEND_API_D3D12 || core_->API() == graphics::BACKEND_API_VULKAN;
-    if (prefer_ray_query && core_->DeviceRayQuerySupport()) {
-      render_pipeline = RENDER_PIPELINE_RAY_QUERY;
-    } else if (core_->DeviceRayTracingSupport()) {
-      render_pipeline = RENDER_PIPELINE_RAY_TRACING;
-    } else if (core_->DeviceRayQuerySupport()) {
-      render_pipeline = RENDER_PIPELINE_RAY_QUERY;
-    } else {
-      render_pipeline = RENDER_PIPELINE_RT_FALLBACK;
-    }
-  }
-  // Older Blender scenes request pipeline RT. Keep them on native traversal
-  // when the device supports inline queries instead of a full RT pipeline.
-  if (render_pipeline == RENDER_PIPELINE_RAY_TRACING && !core_->DeviceRayTracingSupport())
-    return core_->DeviceRayQuerySupport() ? RENDER_PIPELINE_RAY_QUERY : RENDER_PIPELINE_RT_FALLBACK;
-  return render_pipeline;
-}
-
-void Core::Render(Scene *scene, Camera *camera, Film *film, RenderPipeline render_pipeline) {
-  render_pipeline = ResolveRenderPipeline(render_pipeline);
-  switch (render_pipeline) {
-    case RENDER_PIPELINE_RASTERIZATION:
-      raster::Render(this, scene, camera, film);
-      break;
-    case RENDER_PIPELINE_RAY_TRACING:
-      raytracing::Render(this, scene, camera, film);
-      break;
-    case RENDER_PIPELINE_RAY_QUERY:
-      if (!core_->DeviceRayQuerySupport())
-        throw std::runtime_error("ray_query is unavailable on the selected graphics backend");
-      raytracing::Render(this, scene, camera, film, true, true);
-      break;
-    case RENDER_PIPELINE_RT_FALLBACK:
-      raytracing::Render(this, scene, camera, film, true);
-      break;
-    default:
-      LogError("Unknown render pipeline");
-  }
-}
-
 const VirtualFileSystem &Core::GetShadersVFS() const {
   return shaders_vfs_;
+}
+
+VirtualFileSystem Core::CreatePipelineShadersVFS(const std::string &pipeline) const {
+  if (pipeline != "raytracing" && pipeline != "realtime")
+    throw std::invalid_argument("unknown shader pipeline: " + pipeline);
+  VirtualFileSystem result;
+  const std::filesystem::path root = LONGMARCH_SPARKIUM_SHADERS;
+  for (const auto &library : {std::string("common"), pipeline}) {
+    const auto directory = root / library;
+    for (const auto &entry : std::filesystem::recursive_directory_iterator(directory)) {
+      if (!entry.is_regular_file() || (entry.path().extension() != ".hlsl" && entry.path().extension() != ".hlsli"))
+        continue;
+      const auto logical_path = std::filesystem::relative(entry.path(), directory).generic_string();
+      std::vector<uint8_t> source;
+      if (result.ReadFile(logical_path, source) == 0)
+        throw std::runtime_error("duplicate shader include path: " + logical_path);
+      if (shaders_vfs_.ReadFile(library + "/" + logical_path, source) != 0)
+        throw std::runtime_error("missing shader source: " + library + "/" + logical_path);
+      result.WriteFile(logical_path, source);
+    }
+  }
+  return result;
 }
 
 graphics::Shader *Core::GetShader(const std::string &name) {
@@ -108,7 +86,7 @@ void Core::LoadPublicShaders() {
     std::vector<std::string> args;
     if (hdr)
       args.push_back("-DSPARKIUM_HDR_OUTPUT=1");
-    core_->CreateShader(shaders_vfs_, "tone_mapping.hlsl", "Main", "cs_6_0", args, &shader);
+    core_->CreateShader(shaders_vfs_, "common/tone_mapping.hlsl", "Main", "cs_6_0", args, &shader);
     SetPublicResource(name, std::move(shader));
     core_->CreateComputeProgram(GetShader(name), &compute_program);
     compute_program->AddResourceBinding(graphics::RESOURCE_TYPE_IMAGE, 1);
