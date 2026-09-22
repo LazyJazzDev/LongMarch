@@ -12,11 +12,11 @@
 #include "../../demo/sparkium_backend.h"
 #include "grassland/graphics/backend/backend.h"
 #include "grassland/graphics/frame_profile.h"
-#include "sparkium/pipelines/raytracing/core/core.h"
-#include "sparkium/pipelines/raytracing/core/software_pipeline.h"
-#include "sparkium/pipelines/raytracing/entity/entities.h"
-#include "sparkium/pipelines/raytracing/geometry/geometry_mesh.h"
-#include "sparkium/pipelines/raytracing/material/material_lambertian.h"
+#include "sparkium/pipelines/common/core/core.h"
+#include "sparkium/pipelines/common/core/software_pipeline.h"
+#include "sparkium/pipelines/common/entity/entities.h"
+#include "sparkium/pipelines/common/geometry/geometry_mesh.h"
+#include "sparkium/pipelines/common/material/material_lambertian.h"
 
 using namespace grassland;
 
@@ -181,14 +181,15 @@ TEST(GraphicsCoreCreation, UnsupportedAPIsDoNotFallBack) {
 
 TEST_F(SoftwareBVHTest, LightSamplingIsIndependentOfEntityAddresses) {
   std::vector<std::unique_ptr<sparkium::EntityPointLight>> owned;
-  std::vector<std::pair<sparkium::raytracing::Entity *, sparkium::EntityPointLight *>> lights;
+  std::vector<std::pair<sparkium::render_shared::Entity *, sparkium::EntityPointLight *>> lights;
   for (int i = 0; i < 4; ++i) {
     owned.push_back(std::make_unique<sparkium::EntityPointLight>(core.get()));
-    lights.emplace_back(sparkium::raytracing::DedicatedCast(owned.back().get()), owned.back().get());
+    lights.emplace_back(sparkium::render_shared::DedicatedCast(owned.back().get()), owned.back().get());
   }
 
-  std::sort(lights.begin(), lights.end(),
-            [](const auto &a, const auto &b) { return std::less<sparkium::raytracing::Entity *>{}(a.first, b.first); });
+  std::sort(lights.begin(), lights.end(), [](const auto &a, const auto &b) {
+    return std::less<sparkium::render_shared::Entity *>{}(a.first, b.first);
+  });
   // Equivalent light lists, deliberately opposite address ordering in the
   // renderer's component cache. Sampling must follow insertion, not addresses.
   for (int i = 0; i < 4; ++i) {
@@ -384,9 +385,9 @@ TEST_P(SoftwareBVHSizeTest, ComputeConstructionAndTraversalMatchDoublePrecisionO
   Mesh<> mesh(positions.size(), indices.size(), indices.data(), positions.data());
   sparkium::GeometryMesh geometry(core.get(), mesh);
   sparkium::MaterialLambertian material(core.get());
-  sparkium::raytracing::GeometryMesh rt_geometry(geometry);
-  sparkium::raytracing::MaterialLambertian rt_material(material);
-  sparkium::raytracing::SoftwarePipeline pipeline(sparkium::raytracing::DedicatedCast(core.get()), ray_query);
+  sparkium::render_shared::GeometryMesh rt_geometry(geometry);
+  sparkium::render_shared::MaterialLambertian rt_material(material);
+  sparkium::render_shared::SoftwarePipeline pipeline(sparkium::render_shared::DedicatedCast(core.get()), ray_query);
   std::vector<graphics::Buffer *> buffers{rt_geometry.Buffer()};
 
   std::mt19937 random(7411);
@@ -582,9 +583,9 @@ TEST_P(ComputeTraversalTest, TransparentShadowLayers) {
   Mesh<> mesh(6, 6, indices, positions.data());
   sparkium::GeometryMesh geometry(core.get(), mesh);
   sparkium::MaterialLambertian material(core.get());
-  sparkium::raytracing::GeometryMesh rt_geometry(geometry);
-  sparkium::raytracing::MaterialLambertian rt_material(material);
-  sparkium::raytracing::SoftwarePipeline pipeline(sparkium::raytracing::DedicatedCast(core.get()), ray_query);
+  sparkium::render_shared::GeometryMesh rt_geometry(geometry);
+  sparkium::render_shared::MaterialLambertian rt_material(material);
+  sparkium::render_shared::SoftwarePipeline pipeline(sparkium::render_shared::DedicatedCast(core.get()), ray_query);
   pipeline.AddInstance(&rt_geometry, &rt_material, glm::mat4x3(1), 0);
   auto vfs = core->GetShadersVFS();
   vfs.WriteFile("shadow_test.hlsl", R"(

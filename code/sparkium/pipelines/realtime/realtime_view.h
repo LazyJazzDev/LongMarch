@@ -1,7 +1,7 @@
 #pragma once
-#include "sparkium/pipelines/raytracing/core/core_util.h"
+#include "sparkium/pipelines/common/core/core_util.h"
 
-namespace sparkium::raytracing {
+namespace sparkium::render_shared {
 class SoftwarePipeline;
 }
 
@@ -12,9 +12,9 @@ class RealtimeView : public Object {
  public:
   explicit RealtimeView(sparkium::Film &film);
   void Begin(graphics::CommandContext *commands,
-             raytracing::SoftwarePipeline *pipeline,
+             render_shared::SoftwarePipeline *pipeline,
              const std::vector<graphics::Buffer *> &buffers,
-             raytracing::Camera *camera,
+             render_shared::Camera *camera,
              uint32_t width,
              uint32_t height,
              int scale,
@@ -24,7 +24,7 @@ class RealtimeView : public Object {
   void BindTrace(graphics::CommandContext *commands);
   void Resolve(graphics::CommandContext *commands,
                graphics::Image *output,
-               raytracing::SoftwarePipeline *pipeline,
+               render_shared::SoftwarePipeline *pipeline,
                const std::vector<graphics::Buffer *> &buffers);
 
   graphics::Buffer *ParametersBuffer() const {
@@ -48,7 +48,7 @@ class RealtimeView : public Object {
     glm::vec4 camera_position{};
   } parameters_;
 
-  raytracing::Core *core_;
+  render_shared::Core *core_;
   uint32_t width_{}, height_{}, low_width_{}, low_height_{}, buffer_count_{};
   int index_{};
   uint32_t frame_index_{};

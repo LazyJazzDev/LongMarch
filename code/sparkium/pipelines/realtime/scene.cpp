@@ -1,8 +1,8 @@
 #include "sparkium/pipelines/realtime/scene.h"
 
 #include "grassland/graphics/frame_profile.h"
-#include "sparkium/pipelines/raytracing/core/camera.h"
-#include "sparkium/pipelines/raytracing/core/core.h"
+#include "sparkium/pipelines/common/core/camera.h"
+#include "sparkium/pipelines/common/core/core.h"
 #include "sparkium/pipelines/realtime/realtime_view.h"
 
 namespace sparkium::realtime {
@@ -12,23 +12,30 @@ RealtimeView *View(sparkium::Film *film) {
 }
 }  // namespace
 
-Scene::Scene(sparkium::Scene &scene) : scene_(scene), tracing_scene_(scene) {
-  tracing_scene_.software_tracing_ = true;
-  tracing_scene_.software_pipeline_ = std::make_unique<raytracing::SoftwarePipeline>(tracing_scene_.core_, false, true);
+Scene::Scene(sparkium::Scene &scene) : render_shared::Scene(scene) {
+  software_tracing_ = true;
+  render_shared::ComputeShadingConfiguration shading;
+  shading.source = "realtime/trace.hlsl";
+  shading.definitions = {"-DSPARKIUM_REALTIME"};
+  shading.output_images = 3;
+  shading.input_type = graphics::RESOURCE_TYPE_IMAGE;
+  shading.input_images = 4;
+  shading.extra_buffers = 1;
+  shading.auxiliary_entry = "Reproject";
+  software_pipeline_ = std::make_unique<render_shared::SoftwarePipeline>(core_, false, std::move(shading));
 }
 
 void Scene::Render(sparkium::Camera *source_camera, sparkium::Film *film) {
-  auto &shared = tracing_scene_;
-  auto *core = shared.core_;
-  auto *camera = raytracing::DedicatedCast(source_camera);
+  auto *core = core_;
+  auto *camera = render_shared::DedicatedCast(source_camera);
   auto *view = View(film);
-  auto *pipeline = shared.software_pipeline_.get();
+  auto *pipeline = software_pipeline_.get();
   const auto &settings = scene_.settings;
   graphics::CpuProfileScope update_profile("scene_update");
   const uint64_t key = RealtimeKey();
-  const bool scene_changed = !rendered_ || realtime_key_ != key || shared.pipeline_dirty_;
+  const bool scene_changed = !rendered_ || realtime_key_ != key || pipeline_dirty_;
   if (scene_changed || film->info.accumulated_samples == 0) {
-    shared.UpdatePipeline(camera);
+    UpdatePipeline(camera);
     if (scene_changed)
       film->Reset();
     realtime_key_ = key;
@@ -40,28 +47,27 @@ void Scene::Render(sparkium::Camera *source_camera, sparkium::Film *film) {
   trace_settings.samples_per_dispatch = 1;
   trace_settings.max_bounces = std::clamp(settings.realtime.bounces, 1, 8);
   const uint32_t frame = film->info.accumulated_samples;
-  shared.scene_settings_buffer_->UploadData(&trace_settings, sizeof(trace_settings));
-  shared.scene_settings_buffer_->UploadData(&film->info, sizeof(sparkium::Film::Info), sizeof(trace_settings));
+  scene_settings_buffer_->UploadData(&trace_settings, sizeof(trace_settings));
+  scene_settings_buffer_->UploadData(&film->info, sizeof(sparkium::Film::Info), sizeof(trace_settings));
   ++film->info.accumulated_samples;
   std::unique_ptr<graphics::CommandContext> commands;
   core->GraphicsCore()->CreateCommandContext(&commands);
-  view->Begin(commands.get(), pipeline, shared.buffers_, camera, film->GetWidth(), film->GetHeight(),
-              settings.realtime.scale, settings.realtime.history, settings.realtime.updates, frame);
+  view->Begin(commands.get(), pipeline, buffers_, camera, film->GetWidth(), film->GetHeight(), settings.realtime.scale,
+              settings.realtime.history, settings.realtime.updates, frame);
   graphics::GpuProfileScope trace_profile(commands.get(), "realtime_lighting");
   for (int phase = 0; phase < 2; ++phase) {
-    commands->CmdBindComputeProgram(phase == 0 ? pipeline->ReprojectProgram() : pipeline->Program());
+    commands->CmdBindComputeProgram(phase == 0 ? pipeline->AuxiliaryProgram() : pipeline->Program());
     constexpr auto bind_point = graphics::BIND_POINT_COMPUTE;
     commands->CmdBindResources(2, {pipeline->Nodes()}, bind_point);
-    commands->CmdBindResources(3, {shared.scene_settings_buffer_.get()}, bind_point);
-    auto resources = shared.buffers_;
-    resources.insert(resources.end(),
-                     {core->GetBuffer("sobol"), camera->Buffer(), shared.instance_metadata_buffer_.get(),
-                      shared.light_selector_buffer_.get(), shared.light_metadatas_buffer_.get(), pipeline->Instances(),
-                      view->ParametersBuffer()});
+    commands->CmdBindResources(3, {scene_settings_buffer_.get()}, bind_point);
+    auto resources = buffers_;
+    resources.insert(resources.end(), {core->GetBuffer("sobol"), camera->Buffer(), instance_metadata_buffer_.get(),
+                                       light_selector_buffer_.get(), light_metadatas_buffer_.get(),
+                                       pipeline->Instances(), view->ParametersBuffer()});
     commands->CmdBindResources(4, resources, bind_point);
-    commands->CmdBindResources(5, shared.sdr_images_, bind_point);
-    commands->CmdBindResources(6, shared.hdr_images_, bind_point);
-    commands->CmdBindResources(7, std::vector{shared.linear_sampler_.get(), shared.nearest_sampler_.get()}, bind_point);
+    commands->CmdBindResources(5, sdr_images_, bind_point);
+    commands->CmdBindResources(6, hdr_images_, bind_point);
+    commands->CmdBindResources(7, std::vector{linear_sampler_.get(), nearest_sampler_.get()}, bind_point);
     view->BindTrace(commands.get());
     uint32_t trace_width = view->Width();
     if (phase == 1) {
@@ -72,7 +78,7 @@ void Scene::Render(sparkium::Camera *source_camera, sparkium::Film *film) {
   }
   trace_profile.End();
   graphics::GpuProfileScope resolve_profile(commands.get(), "film_resolve");
-  view->Resolve(commands.get(), film->GetRawImage(), pipeline, shared.buffers_);
+  view->Resolve(commands.get(), film->GetRawImage(), pipeline, buffers_);
   resolve_profile.End();
   setup_profile.End();
   graphics::CpuProfileScope submit_profile("render_submit");

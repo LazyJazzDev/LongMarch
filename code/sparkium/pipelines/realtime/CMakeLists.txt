@@ -1,2 +1,2 @@
 add_library(sparkium_realtime realtime.cpp scene.cpp realtime_view.cpp)
-target_link_libraries(sparkium_realtime PUBLIC sparkium_raytracing)
+target_link_libraries(sparkium_realtime PUBLIC sparkium_pipeline_common)

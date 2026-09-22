@@ -1,6 +1,6 @@
 #include "sparkium/pipelines/realtime/realtime.h"
 
-#include "sparkium/pipelines/raytracing/core/core.h"
+#include "sparkium/pipelines/common/core/core.h"
 #include "sparkium/pipelines/realtime/scene.h"
 
 namespace sparkium::realtime {
@@ -11,7 +11,7 @@ Scene *DedicatedCast(sparkium::Scene *scene) {
 }  // namespace
 
 void Render(sparkium::Core *core, sparkium::Scene *scene, sparkium::Camera *camera, sparkium::Film *film) {
-  raytracing::DedicatedCast(core);
+  render_shared::DedicatedCast(core);
   DedicatedCast(scene)->Render(camera, film);
 }
 }  // namespace sparkium::realtime

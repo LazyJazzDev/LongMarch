@@ -79,11 +79,37 @@ The realtime pipeline has its own `sparkium_realtime` CMake target and
 - `scene.*`: scene invalidation, lighting budget and pass scheduling.
 - `realtime_view.*`: per-film visibility, history, filtering and resolve resources.
 
-Shaders remain in `code/sparkium/shaders/realtime/`. Scene registration, material
-compilation, light sampling and software traversal reuse the raytracing backend;
-the realtime scene owns a separate registration context. The raytracing renderer
-no longer owns realtime view state or schedules realtime passes. Switching
-pipelines resets film accumulation at the common render entry.
+Shaders remain in `code/sparkium/shaders/realtime/`. The two renderer targets
+have no dependency on one another. Shared resource adapters now live under
+`code/sparkium/pipelines/common/`, in namespace `sparkium::render_shared` and
+CMake target `sparkium_pipeline_common`:
+
+- `core/`: graphics resources, camera data, scene registration and compute BVH.
+- `material/`: material buffers and shader graph compilation.
+- `geometry/`: mesh buffers and acceleration data.
+- `light/`: light descriptors, power and sampling data.
+- `entity/`: conversion from public scene entities into registration records.
+
+```mermaid
+flowchart TD
+  D[Pipeline dispatch] --> R[Realtime renderer]
+  D --> P[Ray-tracing renderer]
+  R --> C[Shared rendering resources]
+  P --> C
+  C --> S[Public scene definitions and graphics API]
+```
+
+The shared layer has no renderer entry or frame scheduling, no include/link back
+to either renderer, and no realtime-specific kernel selection. The realtime
+renderer supplies its kernel path, bindings and auxiliary reprojection entry
+through `ComputeShadingConfiguration`. Each renderer owns its registration
+context, frame scheduling and film/history state; shared adapters consume the
+same public scene definitions without duplicating material or light semantics.
+Changes to common GPU layouts still require validation of both consumers.
+
+Pipeline dispatch resides in `pipelines/dispatch.cpp`, above the public core;
+`sparkium_core` no longer links concrete renderers. Switching pipelines resets
+film accumulation at that common dispatch entry.
 
 ## Validation and limitations
 

@@ -1,8 +1,9 @@
+add_subdirectory(common)
 add_subdirectory(raster)
 add_subdirectory(raytracing)
 add_subdirectory(realtime)
 
-file(GLOB SOURCES "*.cpp" "*.h")
+file(GLOB SOURCES CONFIGURE_DEPENDS "*.cpp" "*.h")
 
 add_library(${SPARKIUM_SUBLIB_NAME} ${SOURCES})
 

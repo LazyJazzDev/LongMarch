@@ -1,12 +1,12 @@
 #include "sparkium/core/film.h"
 
-#include "sparkium/pipelines/raytracing/core/core.h"
+#include "sparkium/pipelines/common/core/core.h"
 #include "sparkium/pipelines/raytracing/core/film.h"
 
 namespace sparkium::raytracing {
 
 Film::Film(sparkium::Film &film) : film_(film) {
-  core_ = DedicatedCast(film_.GetCore());
+  core_ = render_shared::DedicatedCast(film_.GetCore());
   film_.RegisterResetCallback([this]() { Reset(); });
   core_->GraphicsCore()->CreateImage(film_.GetWidth(), film_.GetHeight(), graphics::IMAGE_FORMAT_R32G32B32A32_SFLOAT,
                                      &accumulated_color_);

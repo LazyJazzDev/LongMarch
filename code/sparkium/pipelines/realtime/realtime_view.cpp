@@ -6,19 +6,19 @@
 
 #include "grassland/graphics/frame_profile.h"
 #include "sparkium/core/camera.h"
-#include "sparkium/pipelines/raytracing/core/camera.h"
-#include "sparkium/pipelines/raytracing/core/core.h"
-#include "sparkium/pipelines/raytracing/core/software_pipeline.h"
+#include "sparkium/pipelines/common/core/camera.h"
+#include "sparkium/pipelines/common/core/core.h"
+#include "sparkium/pipelines/common/core/software_pipeline.h"
 
 namespace sparkium::realtime {
-RealtimeView::RealtimeView(sparkium::Film &film) : core_(raytracing::DedicatedCast(film.GetCore())) {
+RealtimeView::RealtimeView(sparkium::Film &film) : core_(render_shared::DedicatedCast(film.GetCore())) {
   core_->GraphicsCore()->CreateBuffer(sizeof(Parameters), graphics::BUFFER_TYPE_STATIC, &parameters_buffer_);
 }
 
 void RealtimeView::Begin(graphics::CommandContext *commands,
-                         raytracing::SoftwarePipeline *pipeline,
+                         render_shared::SoftwarePipeline *pipeline,
                          const std::vector<graphics::Buffer *> &buffers,
-                         raytracing::Camera *camera,
+                         render_shared::Camera *camera,
                          uint32_t width,
                          uint32_t height,
                          int scale,
@@ -144,7 +144,7 @@ void RealtimeView::BindTrace(graphics::CommandContext *commands) {
 
 void RealtimeView::Resolve(graphics::CommandContext *commands,
                            graphics::Image *output,
-                           raytracing::SoftwarePipeline *pipeline,
+                           render_shared::SoftwarePipeline *pipeline,
                            const std::vector<graphics::Buffer *> &buffers) {
   graphics::GpuProfileScope profile(commands, "realtime_reconstruct");
   commands->CmdBindComputeProgram(filter_program_.get());
