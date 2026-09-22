@@ -1,19 +1,19 @@
-#include "app.h"
+#include "module.h"
 
 #include <glm/gtc/matrix_transform.hpp>
 
-namespace graphics_hello::resize {
+namespace graphics_hello::cube {
 
-ModuleResize::ModuleResize(grassland::graphics::BackendAPI api) {
+ModuleCube::ModuleCube(grassland::graphics::BackendAPI api) {
   InitializeGraphicsHello(api, core_);
 }
 
-ModuleResize::~ModuleResize() = default;
+ModuleCube::~ModuleCube() = default;
 
-void ModuleResize::OnInit() {
+void ModuleCube::OnInit() {
   alive_ = true;
-  core_->CreateWindowObject(1280, 720, GraphicsHelloTitle(core_->API()) + std::string(" Graphics Hello Resize"), false,
-                            true, &window_);
+  core_->CreateWindowObject(1280, 720, GraphicsHelloTitle(core_->API()) + std::string(" Graphics Hello Cube"),
+                            &window_);
 
   std::vector<Vertex> vertices = {
       {{-1.0f, -1.0f, 1.0f}, {0.0f, 0.0f, 0.0f}},  {{1.0f, -1.0f, 1.0f}, {1.0f, 0.0f, 0.0f}},
@@ -34,18 +34,8 @@ void ModuleResize::OnInit() {
   core_->CreateImage(1280, 720, grassland::graphics::IMAGE_FORMAT_R32G32B32A32_SFLOAT, &color_image_);
   core_->CreateImage(1280, 720, grassland::graphics::IMAGE_FORMAT_D32_SFLOAT, &depth_image_);
 
-  window_->ResizeEvent().RegisterCallback([this](int width, int height) {
-    if (width <= 0 || height <= 0)
-      return;
-    core_->WaitGPU();
-    color_image_.reset();
-    depth_image_.reset();
-    core_->CreateImage(width, height, grassland::graphics::IMAGE_FORMAT_R32G32B32A32_SFLOAT, &color_image_);
-    core_->CreateImage(width, height, grassland::graphics::IMAGE_FORMAT_D32_SFLOAT, &depth_image_);
-  });
-
-  core_->CreateShader(LoadShader("modules/resize/shaders/shader.hlsl"), "VSMain", "vs_6_0", &vertex_shader_);
-  core_->CreateShader(LoadShader("modules/resize/shaders/shader.hlsl"), "PSMain", "ps_6_0", &fragment_shader_);
+  core_->CreateShader(LoadShader("modules/cube/shaders/shader.hlsl"), "VSMain", "vs_6_0", &vertex_shader_);
+  core_->CreateShader(LoadShader("modules/cube/shaders/shader.hlsl"), "PSMain", "ps_6_0", &fragment_shader_);
   grassland::LogInfo("Shader compiled successfully");
 
   core_->CreateProgram({grassland::graphics::IMAGE_FORMAT_R32G32B32A32_SFLOAT},
@@ -60,7 +50,7 @@ void ModuleResize::OnInit() {
   program_->Finalize();
 }
 
-void ModuleResize::OnClose() {
+void ModuleCube::OnClose() {
   core_->WaitGPU();
   program_.reset();
   vertex_shader_.reset();
@@ -72,7 +62,7 @@ void ModuleResize::OnClose() {
   uniform_buffer_.reset();
 }
 
-void ModuleResize::OnUpdate() {
+void ModuleCube::OnUpdate() {
   if (window_->ShouldClose()) {
     window_->CloseWindow();
     alive_ = false;
@@ -84,16 +74,15 @@ void ModuleResize::OnUpdate() {
       x -= glm::radians(360.0f);
     }
 
-    auto extent = color_image_->Extent();
     GlobalUniformBuffer ubo = {};
     ubo.model = glm::rotate(glm::mat4{1.0f}, x, glm::vec3{0.0f, 1.0f, 0.0f});
     ubo.view = glm::lookAt(glm::vec3{0.0f, 0.0f, 5.0f}, glm::vec3{0.0f, 0.0f, 0.0f}, glm::vec3{0.0f, 1.0f, 0.0f});
-    ubo.proj = glm::perspectiveZO(glm::radians(45.0f), float(extent.width) / float(extent.height), 3.5f, 6.5f);
+    ubo.proj = glm::perspectiveZO(glm::radians(45.0f), 1280.0f / 720.0f, 3.5f, 6.5f);
     uniform_buffer_->UploadData(&ubo, sizeof(GlobalUniformBuffer));
   }
 }
 
-void ModuleResize::OnRender() {
+void ModuleCube::OnRender() {
   std::unique_ptr<grassland::graphics::CommandContext> command_context;
   core_->CreateCommandContext(&command_context);
   command_context->CmdClearImage(color_image_.get(), {{0.6, 0.7, 0.8, 1.0}});
@@ -103,10 +92,8 @@ void ModuleResize::OnRender() {
   command_context->CmdBindVertexBuffers(0, {vertex_buffer_.get()}, {0});
   command_context->CmdBindIndexBuffer(index_buffer_.get(), 0);
   command_context->CmdBindResources(0, {uniform_buffer_.get()});
-
-  auto extent = color_image_->Extent();
-  command_context->CmdSetViewport({0, 0, float(extent.width), float(extent.height), 0.0f, 1.0f});
-  command_context->CmdSetScissor({0, 0, extent.width, extent.height});
+  command_context->CmdSetViewport({0, 0, 1280, 720, 0.0f, 1.0f});
+  command_context->CmdSetScissor({0, 0, 1280, 720});
   command_context->CmdSetPrimitiveTopology(grassland::graphics::PRIMITIVE_TOPOLOGY_TRIANGLE_LIST);
   command_context->CmdDrawIndexed(36, 1, 0, 0, 0);
   command_context->CmdEndRendering();
@@ -114,4 +101,4 @@ void ModuleResize::OnRender() {
   core_->SubmitCommandContext(command_context.get());
 }
 
-}  // namespace graphics_hello::resize
+}  // namespace graphics_hello::cube

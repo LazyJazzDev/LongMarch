@@ -1,4 +1,4 @@
-#include "app.h"
+#include "module.h"
 
 namespace graphics_hello::hdr {
 

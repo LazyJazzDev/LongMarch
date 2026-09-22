@@ -5,15 +5,15 @@
 #include <string_view>
 
 #include "module.h"
-#include "modules/blend/app.h"
-#include "modules/cube/app.h"
-#include "modules/hdr/app.h"
-#include "modules/ray_query/app.h"
-#include "modules/raytracing/app.h"
-#include "modules/resize/app.h"
-#include "modules/sdr_sample/app.h"
-#include "modules/texture/app.h"
-#include "modules/triangle/app.h"
+#include "modules/blend/module.h"
+#include "modules/cube/module.h"
+#include "modules/hdr/module.h"
+#include "modules/ray_query/module.h"
+#include "modules/raytracing/module.h"
+#include "modules/resize/module.h"
+#include "modules/sdr_sample/module.h"
+#include "modules/texture/module.h"
+#include "modules/triangle/module.h"
 
 namespace graphics_hello {
 namespace {
