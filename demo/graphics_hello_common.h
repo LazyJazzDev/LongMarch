@@ -18,6 +18,7 @@ inline void InitializeGraphicsHello(grassland::graphics::BackendAPI api,
     throw std::runtime_error("Requested graphics backend is unavailable");
   if (core->InitializeLogicalDeviceAutoSelect(require_ray_tracing) != 0)
     throw std::runtime_error("No compatible graphics device found");
+  grassland::LogInfo("Backend API: {}", BackendAPIString(core->API()));
   grassland::LogInfo("Device Name: {}", core->DeviceName());
   grassland::LogInfo("- Ray Tracing Support: {}", core->DeviceRayTracingSupport());
   grassland::LogInfo("- Ray Query Support: {}", core->DeviceRayQuerySupport());
