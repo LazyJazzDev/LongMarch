@@ -26,7 +26,8 @@ class Film : public Object {
     float contrast{1.0f};
   } info;
 
-  void Develop(graphics::Image *targ_image);
+  // HDR output is linear sRGB with exposure, without SDR view transforms.
+  void Develop(graphics::Image *targ_image, bool linear_hdr = false);
 
   void RegisterResetCallback(const std::function<void()> &callback);
 

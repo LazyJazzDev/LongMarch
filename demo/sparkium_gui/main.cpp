@@ -69,17 +69,29 @@ void ResizeWindowForFilm(graphics::Window *window, sparkium::Film *film) {
 
 int main(int argc, char **argv) {
   try {
-    std::filesystem::path input = argc > 1 ? argv[1] : std::filesystem::path(FindAssetPath("scenes"));
+    std::filesystem::path input = FindAssetPath("scenes");
+    bool input_selected = false;
+    bool hdr_requested = false;
     auto backend = graphics::BACKEND_API_DEFAULT;
     int frame_limit = 0;
-    for (int i = 2; i < argc; ++i) {
+    for (int i = 1; i < argc; ++i) {
       std::string arg = argv[i];
-      if (arg == "--backend" && i + 1 < argc)
+      if (arg == "--help") {
+        std::cout
+            << "Usage: sparkium_gui [scene.json|directory] [--backend auto|metal|vulkan|d3d12] [--hdr] [--frames N]\n";
+        return 0;
+      }
+      if (arg == "--hdr")
+        hdr_requested = true;
+      else if (arg == "--backend" && i + 1 < argc)
         backend = ParseSparkiumBackend(argv[++i]);
       else if (arg == "--frames" && i + 1 < argc) {
         frame_limit = std::stoi(argv[++i]);
         if (frame_limit <= 0)
           throw std::invalid_argument("--frames must be positive");
+      } else if (!arg.empty() && arg[0] != '-' && !input_selected) {
+        input = arg;
+        input_selected = true;
       } else
         throw std::invalid_argument("unknown or incomplete argument: " + arg);
     }
@@ -96,6 +108,10 @@ int main(int argc, char **argv) {
       throw std::runtime_error("failed to create graphics core");
     if (graphics_core->InitializeLogicalDeviceAutoSelect(false) != 0)
       throw std::runtime_error("failed to initialize graphics device");
+    const bool hdr_available = graphics_core->API() == graphics::BACKEND_API_METAL;
+    if (hdr_requested && !hdr_available)
+      throw std::invalid_argument("HDR preview currently requires the Metal backend");
+    bool hdr_active = false;
     sparkium::Core core(graphics_core.get());
 
     std::unique_ptr<sparkium::JsonScene> loaded;
@@ -105,6 +121,13 @@ int main(int argc, char **argv) {
     bool resize_pending = true;
     sparkium::RenderPipeline pipeline = sparkium::RENDER_PIPELINE_AUTO;
     std::string load_error;
+    auto create_display_image = [&]() {
+      auto *film = loaded->GetFilm();
+      graphics_core->WaitGPU();
+      graphics_core->CreateImage(
+          film->GetWidth(), film->GetHeight(),
+          hdr_active ? graphics::IMAGE_FORMAT_R32G32B32A32_SFLOAT : graphics::IMAGE_FORMAT_R8G8B8A8_UNORM, &image);
+    };
     auto load_selected = [&]() {
       load_error.clear();
       auto next = sparkium::JsonScene::Load(&core, scene_files[selected], &load_error);
@@ -112,8 +135,7 @@ int main(int argc, char **argv) {
         return false;
       loaded = std::move(next);
       pipeline = loaded->GetRenderPipeline();
-      auto *film = loaded->GetFilm();
-      graphics_core->CreateImage(film->GetWidth(), film->GetHeight(), graphics::IMAGE_FORMAT_R8G8B8A8_UNORM, &image);
+      create_display_image();
       resize_pending = true;
       return true;
     };
@@ -130,9 +152,15 @@ int main(int argc, char **argv) {
 
     int rendered_frames = 0;
     while (!window->ShouldClose() && (!frame_limit || rendered_frames++ < frame_limit)) {
+      // Apply before BeginImGuiFrame so ImGui and presentation use the same format.
+      if (hdr_requested != hdr_active) {
+        window->SetHDR(hdr_requested);
+        hdr_active = hdr_requested;
+        create_display_image();
+      }
       window->BeginImGuiFrame();
       ImGui::SetNextWindowPos({10, 10}, ImGuiCond_Once);
-      ImGui::SetNextWindowBgAlpha(0.85f);
+      ImGui::SetNextWindowBgAlpha(hdr_active ? 1.0f : 0.85f);
       ImGui::Begin("Sparkium scenes", &show_browser, ImGuiWindowFlags_AlwaysAutoResize);
       if (ImGui::BeginCombo("Scene", loaded->GetName().c_str())) {
         for (size_t i = 0; i < scene_files.size(); ++i) {
@@ -173,9 +201,59 @@ int main(int argc, char **argv) {
         }
         ImGui::EndCombo();
       }
-      int &samples = loaded->GetScene()->settings.samples_per_dispatch;
-      if (ImGui::SliderInt("Samples / frame", &samples, 1, 256))
-        loaded->GetFilm()->Reset();
+      ImGui::BeginDisabled(!hdr_available);
+      ImGui::Checkbox("HDR preview", &hdr_requested);
+      ImGui::EndDisabled();
+      if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled))
+        ImGui::SetTooltip(
+            hdr_available
+                ? "Linear HDR with exposure; bypasses SDR view transform, gamma and contrast. Requires an HDR display."
+                : "HDR preview currently requires the Metal backend.");
+      ImGui::SliderFloat("Exposure (EV)", &loaded->GetFilm()->info.exposure, -8.0f, 8.0f, "%.2f");
+      ImGui::TextUnformatted(hdr_active ? "Display: HDR (linear)" : "Display: SDR (scene view transform)");
+      auto *film = loaded->GetFilm();
+      auto &settings = loaded->GetScene()->settings;
+      const bool raster = core.ResolveRenderPipeline(pipeline) == sparkium::RENDER_PIPELINE_RASTERIZATION;
+      if (ImGui::CollapsingHeader("Render settings", ImGuiTreeNodeFlags_DefaultOpen)) {
+        bool reset = false;
+        if (raster) {
+          reset |= ImGui::ColorEdit3("Ambient light", &settings.ambient_light.x, ImGuiColorEditFlags_Float);
+        } else {
+          reset |= ImGui::SliderInt("Samples / frame", &settings.samples_per_dispatch, 1, 256, "%d",
+                                    ImGuiSliderFlags_AlwaysClamp);
+          reset |= ImGui::SliderInt("Max bounces", &settings.max_bounces, 1, 128, "%d", ImGuiSliderFlags_AlwaysClamp);
+          bool alpha_shadow = settings.alpha_shadow != 0;
+          if (ImGui::Checkbox("Alpha shadows", &alpha_shadow)) {
+            settings.alpha_shadow = alpha_shadow;
+            reset = true;
+          }
+          reset |= ImGui::ColorEdit3("Background", &settings.background_color.x, ImGuiColorEditFlags_Float);
+          reset |= ImGui::SliderFloat("Persistence", &film->info.persistence, 0.0f, 1.0f, "%.3f",
+                                      ImGuiSliderFlags_AlwaysClamp);
+          reset |= ImGui::SliderFloat("Sample clamp", &film->info.clamping, 0.01f, 10000.0f, "%.2f",
+                                      ImGuiSliderFlags_Logarithmic | ImGuiSliderFlags_AlwaysClamp);
+          if (ImGui::IsItemHovered())
+            ImGui::SetTooltip("Limits each sample's peak radiance before accumulation; reduces fireflies.");
+          reset |= ImGui::SliderFloat("Max exposure", &film->info.max_exposure, 0.01f, 10000.0f, "%.2f",
+                                      ImGuiSliderFlags_Logarithmic | ImGuiSliderFlags_AlwaysClamp);
+          if (ImGui::IsItemHovered())
+            ImGui::SetTooltip("Linear accumulated brightness limit, not EV. Use 30 or more for Cornell Box HDR.");
+          if (hdr_requested && film->info.max_exposure <= 1.0f)
+            ImGui::TextWrapped(
+                "Max exposure <= 1 clips scene highlights before HDR display. Raise it to preserve HDR.");
+        }
+        if (reset)
+          film->Reset();
+      }
+      if (ImGui::CollapsingHeader("SDR view settings")) {
+        ImGui::BeginDisabled(hdr_active);
+        ImGui::Combo("View transform", &film->info.view_transform, "Normalized\0Standard\0Filmic\0");
+        ImGui::BeginDisabled(film->info.view_transform != 2);
+        ImGui::SliderFloat("Gamma", &film->info.gamma, 0.1f, 4.0f, "%.2f", ImGuiSliderFlags_AlwaysClamp);
+        ImGui::SliderFloat("Contrast", &film->info.contrast, 0.0f, 4.0f, "%.2f", ImGuiSliderFlags_AlwaysClamp);
+        ImGui::EndDisabled();
+        ImGui::EndDisabled();
+      }
       if (ImGui::Button("Reload"))
         load_selected();
       ImGui::SameLine();
@@ -210,7 +288,7 @@ int main(int argc, char **argv) {
       window->EndImGuiFrame();
 
       core.Render(loaded->GetScene(), loaded->GetCamera(), loaded->GetFilm(), pipeline);
-      loaded->GetFilm()->Develop(image.get());
+      loaded->GetFilm()->Develop(image.get(), hdr_active);
       std::unique_ptr<graphics::CommandContext> command_context;
       graphics_core->CreateCommandContext(&command_context);
       command_context->CmdPresent(window.get(), image.get());

@@ -41,12 +41,14 @@ int Film::GetHeight() const {
   return extent_.height;
 }
 
-void Film::Develop(graphics::Image *targ_image) {
+void Film::Develop(graphics::Image *targ_image, bool linear_hdr) {
+  if (linear_hdr && targ_image->Format() != graphics::IMAGE_FORMAT_R32G32B32A32_SFLOAT)
+    throw std::invalid_argument("HDR film development requires an RGBA32Float image");
   graphics::CpuProfileScope develop_profile("develop");
   std::unique_ptr<graphics::CommandContext> cmd_context;
   core_->GraphicsCore()->CreateCommandContext(&cmd_context);
   graphics::GpuProfileScope tone_profile(cmd_context.get(), "tone_map");
-  cmd_context->CmdBindComputeProgram(core_->GetComputeProgram("tone_mapping"));
+  cmd_context->CmdBindComputeProgram(core_->GetComputeProgram(linear_hdr ? "tone_mapping_hdr" : "tone_mapping"));
   cmd_context->CmdBindResources(0, {raw_image_.get()}, graphics::BIND_POINT_COMPUTE);
   cmd_context->CmdBindResources(1, {targ_image}, graphics::BIND_POINT_COMPUTE);
   tone_mapping_buffer_->UploadData(&info.view_transform, sizeof(int) + sizeof(float) * 3);

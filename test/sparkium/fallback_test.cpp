@@ -52,6 +52,48 @@ class SoftwareBVHTest : public testing::Test {
   std::unique_ptr<sparkium::Core> core;
 };
 
+TEST_F(SoftwareBVHTest, HDRFilmDevelopmentPreservesHighlightsAndAccumulation) {
+  sparkium::Film film(core.get(), 9, 3);
+  std::vector<glm::vec4> source(27, glm::vec4(4.0f, 0.25f, -1.0f, 1.0f));
+  source.back() = glm::vec4(100000.0f, 1.0f, 0.0f, 1.0f);
+  film.GetRawImage()->UploadData(source.data());
+  film.info.accumulated_samples = 17;
+  film.info.exposure = 1.0f;
+  film.info.gamma = 0.4f;
+  film.info.contrast = 2.0f;
+  int resets = 0;
+  film.RegisterResetCallback([&]() { ++resets; });
+  std::unique_ptr<graphics::Image> sdr, hdr;
+  graphics->CreateImage(9, 3, graphics::IMAGE_FORMAT_R8G8B8A8_UNORM, &sdr);
+  graphics->CreateImage(9, 3, graphics::IMAGE_FORMAT_R32G32B32A32_SFLOAT, &hdr);
+  EXPECT_THROW(film.Develop(sdr.get(), true), std::invalid_argument);
+  for (int transform : {0, 1, 2}) {
+    film.info.view_transform = transform;
+    film.Develop(sdr.get());
+    std::vector<uint8_t> before(27 * 4), after(27 * 4);
+    sdr->DownloadData(before.data());
+    film.Develop(hdr.get(), true);
+    std::vector<glm::vec4> actual(27);
+    hdr->DownloadData(actual.data());
+    for (size_t i = 0; i + 1 < actual.size(); ++i) {
+      EXPECT_NEAR(actual[i].x, 8.0f, 1e-5f);
+      EXPECT_NEAR(actual[i].y, 0.5f, 1e-5f);
+      EXPECT_EQ(actual[i].z, 0.0f);
+      EXPECT_EQ(actual[i].w, 1.0f);
+    }
+    EXPECT_EQ(actual.back().x, 65504.0f);
+    film.Develop(sdr.get());
+    sdr->DownloadData(after.data());
+    EXPECT_EQ(before, after);
+    EXPECT_EQ(film.info.accumulated_samples, 17);
+    EXPECT_EQ(film.info.view_transform, transform);
+  }
+  std::vector<glm::vec4> unchanged(27);
+  film.GetRawImage()->DownloadData(unchanged.data());
+  EXPECT_EQ(unchanged, source);
+  EXPECT_EQ(resets, 0);
+}
+
 TEST(GraphicsCoreCreation, UnsupportedAPIsDoNotFallBack) {
   for (auto api : {graphics::BACKEND_API_METAL, graphics::BACKEND_API_D3D12, graphics::BACKEND_API_VULKAN,
                    static_cast<graphics::BackendAPI>(99)}) {
