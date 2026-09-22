@@ -1,5 +1,6 @@
 #pragma once
 
+#include <chrono>
 #include <iostream>
 #include <stdexcept>
 #include <string>
@@ -61,6 +62,11 @@ int RunGraphicsHello(int argc, char **argv) {
     }
     Application app{api};
     app.OnInit();
+    auto *window = app.GetWindow();
+    const std::string title = window->GetTitle();
+    window->SetTitle(title + " | FPS: --");
+    auto fps_start = std::chrono::steady_clock::now();
+    int fps_frames = 0;
     int rendered = 0;
     while (app.IsAlive() && (!frames || rendered < frames)) {
       glfwPollEvents();
@@ -68,6 +74,14 @@ int RunGraphicsHello(int argc, char **argv) {
       if (app.IsAlive()) {
         app.OnRender();
         ++rendered;
+        ++fps_frames;
+        const auto now = std::chrono::steady_clock::now();
+        const double seconds = std::chrono::duration<double>(now - fps_start).count();
+        if (seconds >= 0.5) {
+          window->SetTitle(fmt::format("{} | FPS: {:.1f}", title, fps_frames / seconds));
+          fps_start = now;
+          fps_frames = 0;
+        }
       }
     }
     app.OnClose();

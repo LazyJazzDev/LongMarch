@@ -17,6 +17,10 @@ class Application {
   void OnUpdate();
   void OnRender();
 
+  grassland::graphics::Window *GetWindow() const {
+    return window_.get();
+  }
+
   bool IsAlive() const {
     return alive_;
   }
