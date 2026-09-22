@@ -75,3 +75,34 @@ not an EV adjustment. Cornell Box sets it to 1 even though its light emits 30.
 Raise it to at least 30 (for example, 100) to preserve the light's HDR brightness;
 keep **Sample clamp** high enough as well. These controls change the current
 session only; Reload restores scene-file settings.
+
+### Saving HDR images
+
+The CLI can save an SDR PNG and a linear-sRGB Radiance RGBE `.hdr` from the
+**same accumulated film**, without a second render:
+
+```sh
+demo_sparkium_cli scene.json --backend metal --pipeline ray_query --frames 64 \
+  -o scene-sdr.png --hdr-output scene-linear.hdr
+```
+
+With 8 samples per dispatch this renders 512 spp. HDR export applies scene
+exposure, bypasses the SDR view transform, and preserves values above 1 (up to
+65504, as in GUI HDR development). RGBE is lossy, stores no alpha or embedded
+color profile, and this export uses linear sRGB primaries by convention.
+Accumulation limits (`max_exposure`, `clamping`) still apply upstream.
+
+For HDR-capable browsers, convert that file to PQ AVIF using NumPy and FFmpeg
+with the `libsvtav1` encoder:
+
+```sh
+python3 scripts/hdr_to_avif.py scene-linear.hdr scene-hdr.avif
+```
+
+This converts linear sRGB to BT.2020, maps linear 1 to 203 cd/m², applies ST 2084
+(PQ), and writes a tagged 10-bit AVIF (YUV 4:2:0). It does not apply SDR tone
+mapping; PQ luminance above 10000 cd/m² is clipped. The PNG uses the scene's SDR
+view transform. Browser/OS/display HDR support and available EDR headroom are
+required to see extended brightness. GitHub image proxies may transform images;
+provide a direct original-file link as well as the inline image. SDR displays
+may tone-map the HDR file, so screenshots cannot verify physical HDR brightness.
