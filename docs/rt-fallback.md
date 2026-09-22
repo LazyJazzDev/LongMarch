@@ -12,7 +12,7 @@ and importer extensions follow in `blender-align`, based on this branch.
 | `ray_tracing` | Hardware ray tracing when available, otherwise compute ray tracing |
 | `rt_fallback` | Force compute ray tracing, including on hardware RT devices |
 | `ray_query` | Hardware inline queries on supported D3D12, Vulkan and Metal devices; see [Metal research and measurements](metal-ray-query.md) |
-| `rasterization` | Existing raster renderer |
+| `realtime` | Raster visibility with software-traced realtime GI |
 
 Use `renderer.pipeline` in scene JSON, the GUI's **Path Tracing - Fallback** option,
 or `sparkium::RENDER_PIPELINE_RT_FALLBACK` in C++. The CLI accepts:
@@ -128,7 +128,7 @@ profiling overhead checks, and the distinction between GPU work and host waits.
 
 ## Native Apple Silicon backend
 
-Sparkium also runs the compute fallback and raster pipeline through metal-cpp.
+Sparkium also runs the compute fallback and realtime GI pipeline through metal-cpp.
 Use `--backend metal`; tier 2 argument buffers remove the 31 direct-buffer-slot
 constraint of the tested MoltenVK path. See [Metal backend details](metal-backend.md)
 for builds, comparisons, diagnostics, and limitations.

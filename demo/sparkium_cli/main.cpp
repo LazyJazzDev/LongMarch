@@ -15,12 +15,11 @@ using namespace long_march;
 
 namespace {
 void Usage(const char *program) {
-  std::cerr
-      << "Usage: " << program << " <scene.json> [-o image.png] [--hdr-output image.hdr] [--frames N] "
-      << "[--backend auto|metal|vulkan|d3d12] [--pipeline auto|realtime|rasterization|ray_tracing|rt_fallback|ray_query] "
-         "[--require-hardware-rt] [--debug] [--profile "
-         "timings.csv] [--profile-cpu-only|--profile-alternate-gpu]\n"
-      << "       " << program << " --list [scene-directory]\n";
+  std::cerr << "Usage: " << program << " <scene.json> [-o image.png] [--hdr-output image.hdr] [--frames N] "
+            << "[--backend auto|metal|vulkan|d3d12] [--pipeline auto|realtime|ray_tracing|rt_fallback|ray_query] "
+               "[--require-hardware-rt] [--debug] [--profile "
+               "timings.csv] [--profile-cpu-only|--profile-alternate-gpu]\n"
+            << "       " << program << " --list [scene-directory]\n";
 }
 
 sparkium::RenderPipeline ParsePipeline(const std::string &name) {
@@ -32,8 +31,6 @@ sparkium::RenderPipeline ParsePipeline(const std::string &name) {
     return sparkium::RENDER_PIPELINE_RT_FALLBACK;
   if (name == "auto")
     return sparkium::RENDER_PIPELINE_AUTO;
-  if (name == "rasterization")
-    return sparkium::RENDER_PIPELINE_RASTERIZATION;
   if (name == "ray_tracing")
     return sparkium::RENDER_PIPELINE_RAY_TRACING;
   throw std::runtime_error("unknown pipeline: " + name);

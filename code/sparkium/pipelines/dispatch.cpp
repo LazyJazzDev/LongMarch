@@ -34,9 +34,6 @@ void Core::Render(Scene *scene, Camera *camera, Film *film, RenderPipeline rende
     case RENDER_PIPELINE_REALTIME:
       realtime::Render(this, scene, camera, film);
       break;
-    case RENDER_PIPELINE_RASTERIZATION:
-      raster::Render(this, scene, camera, film);
-      break;
     case RENDER_PIPELINE_RAY_TRACING:
       raytracing::Render(this, scene, camera, film);
       break;

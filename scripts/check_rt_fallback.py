@@ -59,7 +59,7 @@ def main():
     parser.add_argument("--cli", type=Path, required=True)
     parser.add_argument("--backend", choices=("auto", "metal", "vulkan", "d3d12"), default="auto")
     parser.add_argument("--compare-backend", choices=("metal", "vulkan", "d3d12"))
-    parser.add_argument("--pipeline", choices=("rt_fallback", "ray_query", "rasterization"), default="rt_fallback")
+    parser.add_argument("--pipeline", choices=("rt_fallback", "ray_query", "realtime"), default="rt_fallback")
     parser.add_argument("--compare-pipeline", choices=("rt_fallback", "ray_query"))
     parser.add_argument("--output", type=Path, default=ROOT / "out/rt-fallback")
     parser.add_argument("--scenes", nargs="+", default=list(DEMOS), help="names under assets/scenes")

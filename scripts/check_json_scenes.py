@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Check basic JSON scene loading, relative assets, raster output, and invalid inputs."""
+"""Check basic JSON scene loading, relative assets, realtime output, and invalid inputs."""
 import argparse
 import copy
 import json
@@ -42,7 +42,7 @@ def main():
         document, png = output / f'{name}.json', output / f'{name}.png'
         document.write_text(raw if raw is not None else json.dumps(scene))
         png.unlink(missing_ok=True)
-        result = subprocess.run([str(cli), str(document), '--pipeline', 'rasterization', '-o', str(png)],
+        result = subprocess.run([str(cli), str(document), '--pipeline', 'realtime', '-o', str(png)],
                                 cwd=working_directory, capture_output=True, text=True, timeout=120)
         (output / f'{name}.log').write_text(result.stdout + result.stderr)
         if valid:
@@ -79,6 +79,7 @@ def main():
         ('wrong-object-type', lambda d: d.update(materials=[])),
         ('wrong-array-type', lambda d: d.update(entities={})),
         ('invalid-camera', lambda d: d['camera'].update(target=d['camera']['eye'])),
+        ('removed-raster-pipeline', lambda d: d['renderer'].update(pipeline='rasterization')),
         ('invalid-fov', lambda d: d['camera'].update(fov_degrees=180)),
         ('nonfinite-float', lambda d: d['camera'].update(fov_degrees=1e100)),
         ('zero-samples', lambda d: d['renderer'].update(samples_per_dispatch=0)),

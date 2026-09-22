@@ -244,7 +244,7 @@ TEST_F(SoftwareBVHTest, LightSamplingIsIndependentOfEntityAddresses) {
   sparkium::Camera camera(core.get(), glm::lookAt(glm::vec3(0, 0, 4), glm::vec3(0), glm::vec3(0, 1, 0)),
                           glm::radians(45.0f), 1.0f);
   for (auto pipeline : {sparkium::RENDER_PIPELINE_RT_FALLBACK, sparkium::RENDER_PIPELINE_RAY_QUERY,
-                        sparkium::RENDER_PIPELINE_RAY_TRACING, sparkium::RENDER_PIPELINE_RASTERIZATION}) {
+                        sparkium::RENDER_PIPELINE_RAY_TRACING, sparkium::RENDER_PIPELINE_REALTIME}) {
     if (pipeline == sparkium::RENDER_PIPELINE_RAY_QUERY && !graphics->DeviceRayQuerySupport())
       continue;
     if (pipeline == sparkium::RENDER_PIPELINE_RAY_TRACING && !graphics->DeviceRayTracingSupport())
@@ -712,15 +712,15 @@ GraphSurface EvaluateShaderGraph(HitRecord hit, float3 direction, int bounce, ui
   }
 }
 
-TEST_F(SoftwareBVHTest, RasterPointLightsLeaveEmptyBackgroundUnchanged) {
+TEST_F(SoftwareBVHTest, RealtimePointLightsLeaveEmptyBackgroundUnchanged) {
   sparkium::Scene scene(core.get());
-  scene.settings.ambient_light = glm::vec3(0.2f);
+  scene.settings.background_color = glm::vec3(0.2f);
   sparkium::EntityPointLight light(core.get(), glm::vec3(0, 0, 1), glm::vec3(1), 100.0f);
   scene.AddEntity(&light);
   sparkium::Camera camera(core.get(), glm::lookAt(glm::vec3(0, 0, 4), glm::vec3(0), glm::vec3(0, 1, 0)),
                           glm::radians(45.0f), 17.0f / 13.0f);
   sparkium::Film film(core.get(), 17, 13);
-  core->Render(&scene, &camera, &film, sparkium::RENDER_PIPELINE_RASTERIZATION);
+  core->Render(&scene, &camera, &film, sparkium::RENDER_PIPELINE_REALTIME);
   std::vector<glm::vec4> pixels(17 * 13);
   film.GetRawImage()->DownloadData(pixels.data());
   for (const auto &pixel : pixels)

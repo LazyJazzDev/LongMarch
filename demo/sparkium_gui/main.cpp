@@ -19,8 +19,6 @@ const char *PipelineName(sparkium::RenderPipeline pipeline) {
       return "Path Tracing - Ray Query";
     case sparkium::RENDER_PIPELINE_RT_FALLBACK:
       return "Path Tracing - Fallback";
-    case sparkium::RENDER_PIPELINE_RASTERIZATION:
-      return "Rasterization";
     case sparkium::RENDER_PIPELINE_RAY_TRACING:
       return "Path Tracing";
     default:
@@ -82,7 +80,7 @@ int main(int argc, char **argv) {
       std::string arg = argv[i];
       if (arg == "--help") {
         std::cout
-            << "Usage: sparkium_gui [scene.json|directory] [--backend auto|metal|vulkan|d3d12] [--hdr] [--pipeline auto|realtime|rasterization|ray_query|rt_fallback|ray_tracing] [--frames N]\n";
+            << "Usage: sparkium_gui [scene.json|directory] [--backend auto|metal|vulkan|d3d12] [--hdr] [--pipeline auto|realtime|ray_query|rt_fallback|ray_tracing] [--frames N]\n";
         return 0;
       }
       if (arg == "--hdr")
@@ -95,8 +93,6 @@ int main(int argc, char **argv) {
           requested_pipeline = sparkium::RENDER_PIPELINE_AUTO;
         else if (name == "realtime")
           requested_pipeline = sparkium::RENDER_PIPELINE_REALTIME;
-        else if (name == "rasterization")
-          requested_pipeline = sparkium::RENDER_PIPELINE_RASTERIZATION;
         else if (name == "ray_query")
           requested_pipeline = sparkium::RENDER_PIPELINE_RAY_QUERY;
         else if (name == "rt_fallback")
@@ -203,9 +199,9 @@ int main(int argc, char **argv) {
       const char *pipeline_label =
           selected_pipeline == sparkium::RENDER_PIPELINE_AUTO ? auto_label.c_str() : PipelineName(selected_pipeline);
       if (ImGui::BeginCombo("Pipeline", pipeline_label)) {
-        for (auto option : {sparkium::RENDER_PIPELINE_AUTO, sparkium::RENDER_PIPELINE_REALTIME,
-                            sparkium::RENDER_PIPELINE_RASTERIZATION, sparkium::RENDER_PIPELINE_RAY_TRACING,
-                            sparkium::RENDER_PIPELINE_RT_FALLBACK, sparkium::RENDER_PIPELINE_RAY_QUERY}) {
+        for (auto option :
+             {sparkium::RENDER_PIPELINE_AUTO, sparkium::RENDER_PIPELINE_REALTIME, sparkium::RENDER_PIPELINE_RAY_TRACING,
+              sparkium::RENDER_PIPELINE_RT_FALLBACK, sparkium::RENDER_PIPELINE_RAY_QUERY}) {
           if (option == sparkium::RENDER_PIPELINE_RAY_TRACING && !graphics_core->DeviceRayTracingSupport())
             continue;
           if (option == sparkium::RENDER_PIPELINE_RAY_QUERY && !graphics_core->DeviceRayQuerySupport())
@@ -233,7 +229,6 @@ int main(int argc, char **argv) {
       ImGui::TextUnformatted(hdr_active ? "Display: HDR (linear)" : "Display: SDR (scene view transform)");
       auto *film = loaded->GetFilm();
       auto &settings = loaded->GetScene()->settings;
-      const bool raster = core.ResolveRenderPipeline(pipeline) == sparkium::RENDER_PIPELINE_RASTERIZATION;
       if (ImGui::CollapsingHeader("Render settings", ImGuiTreeNodeFlags_DefaultOpen)) {
         bool reset = false;
         if (pipeline == sparkium::RENDER_PIPELINE_REALTIME) {
@@ -242,8 +237,7 @@ int main(int argc, char **argv) {
           reset |= ImGui::SliderInt("Lighting update period", &settings.realtime.updates, 1, 16);
           reset |= ImGui::SliderInt("History samples", &settings.realtime.history, 1, 64);
           ImGui::TextUnformatted("Software BVH; staggered lighting updates");
-        } else if (raster) {
-          reset |= ImGui::ColorEdit3("Ambient light", &settings.ambient_light.x, ImGuiColorEditFlags_Float);
+
         } else {
           reset |= ImGui::SliderInt("Samples / frame", &settings.samples_per_dispatch, 1, 256, "%d",
                                     ImGuiSliderFlags_AlwaysClamp);
@@ -310,9 +304,7 @@ int main(int argc, char **argv) {
       if (resolved_pipeline == sparkium::RENDER_PIPELINE_REALTIME) {
         ImGui::Text("Lighting frames: %d", loaded->GetFilm()->info.accumulated_samples);
         ImGui::Text("Frame time: %.2f ms (30 FPS budget: 33.33 ms)", 1000.0f / std::max(fps, 0.01f));
-      } else if (resolved_pipeline == sparkium::RENDER_PIPELINE_RASTERIZATION) {
-        ImGui::TextUnformatted("Ray/s: N/A");
-        ImGui::TextUnformatted("Accumulated spp: N/A");
+
       } else {
         const auto *film = loaded->GetFilm();
         const double camera_rays_per_second = film->info.accumulated_samples > 0

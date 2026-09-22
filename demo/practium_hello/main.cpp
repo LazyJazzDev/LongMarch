@@ -172,10 +172,7 @@ int main() {
       scene.GetRenderScene()->SetEntityActive(area_light, day_light);
     }
     ImGui::Checkbox("Pause", &pause);
-    ImGui::Checkbox("Ray Tracing", &ray_tracing);
-    if (ray_tracing && !core_->DeviceRayTracingSupport()) {
-      ImGui::Text("Ray Tracing not supported on this device!");
-    }
+    ImGui::Checkbox("Path tracing (off: realtime GI)", &ray_tracing);
     if (ImGui::Button("Reset")) {
       for (int i = 0; i < num_spheres; i++) {
         Vector3<float> position{std::uniform_real_distribution<float>(-0.5f, 0.5f)(rng), i * 0.4f + 0.3f,
@@ -192,7 +189,7 @@ int main() {
     scene.SyncRenderState();
     practium_core.GetRenderCore()->Render(
         scene.GetRenderScene(), &camera, &film,
-        ray_tracing ? sparkium::RENDER_PIPELINE_AUTO : sparkium::RENDER_PIPELINE_RASTERIZATION);
+        ray_tracing ? sparkium::RENDER_PIPELINE_AUTO : sparkium::RENDER_PIPELINE_REALTIME);
     film.Develop(srgb_image.get());
 
     std::unique_ptr<graphics::CommandContext> cmd_ctx;

@@ -71,11 +71,6 @@ MTL_DEBUG_LAYER=1 MTL_SHADER_VALIDATION=1 \
 # Requires Pillow and a build with both APIs.
 MTL_DEBUG_LAYER=1 python3 scripts/check_rt_fallback.py \
   --cli build-metal/demo/sparkium_cli/demo_sparkium_cli \
-  --backend metal --compare-backend vulkan --pipeline rasterization \
-  --debug --max-rmse 0.001 --output out/metal-raster
-
-MTL_DEBUG_LAYER=1 python3 scripts/check_rt_fallback.py \
-  --cli build-metal/demo/sparkium_cli/demo_sparkium_cli \
   --backend metal --compare-backend vulkan --spp 256 \
   --debug --max-rmse 0.03 --output out/metal-compute
 ```

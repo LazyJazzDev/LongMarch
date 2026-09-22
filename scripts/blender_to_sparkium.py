@@ -790,7 +790,7 @@ def export(output_dir):
                  "contrast": (1.2 if getattr(scene.view_settings, "look", "") == "High Contrast"
                               else 1.0)},
         "renderer": {"pipeline": "ray_tracing", "samples_per_dispatch": 8, "max_bounces": 16,
-                     "alpha_shadow": True, "ambient_light": [0.02, 0.02, 0.02],
+                     "alpha_shadow": True,
                      "background_color": world_background(scene)},
         "camera": {}, "materials": {}, "geometries": {}, "entities": []
     }
@@ -880,8 +880,7 @@ def export(output_dir):
         transform = {"matrix": convert_matrix(instance.matrix_world, coordinate_matrix)}
         for geometry_id, material_id in object_cache[cache_key]:
             document["entities"].append({"type": "mesh", "geometry": geometry_id,
-                                         "material": material_id, "transform": transform,
-                                         "raster_light": False})
+                                         "material": material_id, "transform": transform})
             instance_count += 1
 
     hair_strand_count = hair_point_count = 0
@@ -910,8 +909,7 @@ def export(output_dir):
             document["geometries"][name] = {"type": "hair", "path": relative, "radial_segments": 3}
             document["entities"].append({"type": "mesh", "geometry": name,
                                          "material": ensure_material(material),
-                                         "transform": {"matrix": convert_matrix(Matrix.Identity(4), coordinate_matrix)},
-                                         "raster_light": False})
+                                         "transform": {"matrix": convert_matrix(Matrix.Identity(4), coordinate_matrix)}})
             hair_strand_count += strands
             hair_point_count += points
             instance_count += 1
@@ -979,8 +977,7 @@ def export(output_dir):
             scaled = matrix @ Matrix.Diagonal((sx, sy, 1.0, 1.0))
             document["entities"].append({"type": "mesh", "geometry": "__area_light_quad",
                                          "material": material_id,
-                                         "transform": {"matrix": convert_matrix(scaled, coordinate_matrix)},
-                                         "raster_light": True})
+                                         "transform": {"matrix": convert_matrix(scaled, coordinate_matrix)}})
             if data.shape in {"DISK", "ELLIPSE"}:
                 warnings.append(f"area light '{obj.name}' shape {data.shape} exported as a rectangle")
         else:

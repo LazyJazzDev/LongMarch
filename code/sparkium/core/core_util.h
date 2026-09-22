@@ -61,7 +61,6 @@ class Object {
   }
 
 typedef enum RenderPipeline {
-  RENDER_PIPELINE_RASTERIZATION = 0,
   RENDER_PIPELINE_RAY_TRACING = 1,
   RENDER_PIPELINE_AUTO = 2,
   RENDER_PIPELINE_RT_FALLBACK = 3,  // Compute BVH traversal without hardware ray tracing

@@ -160,5 +160,6 @@ Known prototype limits:
 - Camera reprojection assumes static surfaces. Transform edits conservatively
   invalidate history rather than using per-object motion vectors. Graph/texture
   edits require the explicit reset noted above.
-- The old `rasterization` remains available for comparison; `auto` continues to
-  choose a path tracer. No scene file is silently migrated.
+- The old `rasterization` pipeline has been removed; use `realtime` explicitly.
+  `auto` continues to choose a path tracer. Legacy `ambient_light` JSON values
+  remain a fallback for `background_color`, but no ambient-light raster pass exists.
