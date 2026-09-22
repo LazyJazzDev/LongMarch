@@ -12,11 +12,14 @@
 #include "../../demo/sparkium_backend.h"
 #include "grassland/graphics/backend/backend.h"
 #include "grassland/graphics/frame_profile.h"
-#include "sparkium/pipelines/common/core/core.h"
-#include "sparkium/pipelines/common/core/software_pipeline.h"
-#include "sparkium/pipelines/common/entity/entities.h"
-#include "sparkium/pipelines/common/geometry/geometry_mesh.h"
-#include "sparkium/pipelines/common/material/material_lambertian.h"
+#include "sparkium/pipelines/raytracing/core/core.h"
+#include "sparkium/pipelines/raytracing/core/software_pipeline.h"
+#include "sparkium/pipelines/raytracing/entity/entities.h"
+#include "sparkium/pipelines/raytracing/geometry/geometry_mesh.h"
+#include "sparkium/pipelines/raytracing/material/material_lambertian.h"
+#include "sparkium/pipelines/realtime/core/core.h"
+#include "sparkium/pipelines/realtime/geometry/geometry_mesh.h"
+#include "sparkium/pipelines/realtime/material/material_lambertian.h"
 
 using namespace grassland;
 
@@ -127,9 +130,30 @@ TEST_F(SoftwareBVHTest, RealtimeRasterVisibilityPreservesHDRAndRejectsStaleHisto
       EXPECT_EQ(pixel.a, 1);
     }
   }
+  // Realtime rendering must not construct any path-tracing implementation.
+  EXPECT_EQ(core->GetComponent<sparkium::raytracing::Core>(), nullptr);
+  EXPECT_EQ(geometry.GetComponent<sparkium::raytracing::GeometryMesh>(), nullptr);
+  EXPECT_EQ(material.GetComponent<sparkium::raytracing::MaterialLambertian>(), nullptr);
+  auto *realtime_core = core->GetComponent<sparkium::realtime::Core>();
+  auto *realtime_material = material.GetComponent<sparkium::realtime::MaterialLambertian>();
+  ASSERT_NE(realtime_core, nullptr);
+  ASSERT_NE(realtime_material, nullptr);
+  ASSERT_NE(geometry.GetComponent<sparkium::realtime::GeometryMesh>(), nullptr);
+  auto *realtime_scan = realtime_core->GetComputeProgram("blelloch_scan_up");
+  ASSERT_NE(realtime_scan, nullptr);
+  std::vector<uint8_t> shader_source;
+  EXPECT_NE(realtime_core->GetShadersVFS().ReadFile("geometry/mesh/hit_group.hlsl", shader_source), 0);
   // Independent pipelines must not inherit one another's film accumulation.
   scene.settings.samples_per_dispatch = 1;
   core->Render(&scene, &camera, &film, sparkium::RENDER_PIPELINE_RT_FALLBACK);
+  auto *path_core = core->GetComponent<sparkium::raytracing::Core>();
+  auto *path_material = material.GetComponent<sparkium::raytracing::MaterialLambertian>();
+  ASSERT_NE(path_core, nullptr);
+  ASSERT_NE(path_material, nullptr);
+  EXPECT_NE(path_material->Buffer(), realtime_material->Buffer());
+  EXPECT_NE(path_core->GetComputeProgram("blelloch_scan_up"), realtime_scan);
+  EXPECT_EQ(realtime_core->GetComputeProgram("blelloch_scan_up"), realtime_scan);
+  EXPECT_EQ(path_core->GetShadersVFS().ReadFile("geometry/mesh/hit_group.hlsl", shader_source), 0);
   EXPECT_EQ(film.info.accumulated_samples, 1);
   core->Render(&scene, &camera, &film, sparkium::RENDER_PIPELINE_REALTIME);
   EXPECT_EQ(film.info.accumulated_samples, 1);
@@ -181,15 +205,14 @@ TEST(GraphicsCoreCreation, UnsupportedAPIsDoNotFallBack) {
 
 TEST_F(SoftwareBVHTest, LightSamplingIsIndependentOfEntityAddresses) {
   std::vector<std::unique_ptr<sparkium::EntityPointLight>> owned;
-  std::vector<std::pair<sparkium::render_shared::Entity *, sparkium::EntityPointLight *>> lights;
+  std::vector<std::pair<sparkium::raytracing::Entity *, sparkium::EntityPointLight *>> lights;
   for (int i = 0; i < 4; ++i) {
     owned.push_back(std::make_unique<sparkium::EntityPointLight>(core.get()));
-    lights.emplace_back(sparkium::render_shared::DedicatedCast(owned.back().get()), owned.back().get());
+    lights.emplace_back(sparkium::raytracing::DedicatedCast(owned.back().get()), owned.back().get());
   }
 
-  std::sort(lights.begin(), lights.end(), [](const auto &a, const auto &b) {
-    return std::less<sparkium::render_shared::Entity *>{}(a.first, b.first);
-  });
+  std::sort(lights.begin(), lights.end(),
+            [](const auto &a, const auto &b) { return std::less<sparkium::raytracing::Entity *>{}(a.first, b.first); });
   // Equivalent light lists, deliberately opposite address ordering in the
   // renderer's component cache. Sampling must follow insertion, not addresses.
   for (int i = 0; i < 4; ++i) {
@@ -385,9 +408,9 @@ TEST_P(SoftwareBVHSizeTest, ComputeConstructionAndTraversalMatchDoublePrecisionO
   Mesh<> mesh(positions.size(), indices.size(), indices.data(), positions.data());
   sparkium::GeometryMesh geometry(core.get(), mesh);
   sparkium::MaterialLambertian material(core.get());
-  sparkium::render_shared::GeometryMesh rt_geometry(geometry);
-  sparkium::render_shared::MaterialLambertian rt_material(material);
-  sparkium::render_shared::SoftwarePipeline pipeline(sparkium::render_shared::DedicatedCast(core.get()), ray_query);
+  sparkium::raytracing::GeometryMesh rt_geometry(geometry);
+  sparkium::raytracing::MaterialLambertian rt_material(material);
+  sparkium::raytracing::SoftwarePipeline pipeline(sparkium::raytracing::DedicatedCast(core.get()), ray_query);
   std::vector<graphics::Buffer *> buffers{rt_geometry.Buffer()};
 
   std::mt19937 random(7411);
@@ -409,7 +432,7 @@ TEST_P(SoftwareBVHSizeTest, ComputeConstructionAndTraversalMatchDoublePrecisionO
   ray_buffer->UploadData(rays.data(), rays.size() * sizeof(Ray), 16);
   graphics->CreateBuffer(rays.size() * sizeof(Hit), graphics::BUFFER_TYPE_STATIC, &output);
 
-  auto vfs = core->GetShadersVFS();
+  auto vfs = sparkium::raytracing::DedicatedCast(core.get())->GetShadersVFS();
   vfs.WriteFile("bvh_test.hlsl", R"(
 #define SOFTWARE_EXTERNAL_BINDINGS
 #ifdef NATIVE_QUERY
@@ -583,11 +606,11 @@ TEST_P(ComputeTraversalTest, TransparentShadowLayers) {
   Mesh<> mesh(6, 6, indices, positions.data());
   sparkium::GeometryMesh geometry(core.get(), mesh);
   sparkium::MaterialLambertian material(core.get());
-  sparkium::render_shared::GeometryMesh rt_geometry(geometry);
-  sparkium::render_shared::MaterialLambertian rt_material(material);
-  sparkium::render_shared::SoftwarePipeline pipeline(sparkium::render_shared::DedicatedCast(core.get()), ray_query);
+  sparkium::raytracing::GeometryMesh rt_geometry(geometry);
+  sparkium::raytracing::MaterialLambertian rt_material(material);
+  sparkium::raytracing::SoftwarePipeline pipeline(sparkium::raytracing::DedicatedCast(core.get()), ray_query);
   pipeline.AddInstance(&rt_geometry, &rt_material, glm::mat4x3(1), 0);
-  auto vfs = core->GetShadersVFS();
+  auto vfs = sparkium::raytracing::DedicatedCast(core.get())->GetShadersVFS();
   vfs.WriteFile("shadow_test.hlsl", R"(
 #define SOFTWARE_EXTERNAL_BINDINGS
 #include "common.hlsli"
@@ -651,7 +674,7 @@ float SoftwareShadowTransmission(uint material, HitRecord hit, float3 direction)
 }
 
 TEST_F(SoftwareBVHTest, SharedShadersCompileForNativeRayTracingAndCompute) {
-  auto vfs = core->GetShadersVFS();
+  auto vfs = sparkium::raytracing::DedicatedCast(core.get())->GetShadersVFS();
   for (bool spirv : {false, true}) {
     std::vector<std::string> args{"-I."};
     if (spirv)

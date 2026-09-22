@@ -1,5 +1,5 @@
 #pragma once
-#include "sparkium/pipelines/common/core/core_util.h"
+#include "sparkium/pipelines/raytracing/core/core_util.h"
 
 namespace sparkium::raytracing {
 class Scene;
@@ -14,7 +14,7 @@ class Film : public Object {
 
  private:
   sparkium::Film &film_;
-  render_shared::Core *core_;
+  Core *core_;
 
   friend Scene;
   std::unique_ptr<graphics::Image> accumulated_color_;

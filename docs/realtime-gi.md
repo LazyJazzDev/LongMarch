@@ -2,8 +2,8 @@
 
 `realtime` is a new, opt-in hybrid pipeline. It rasterizes primary visibility,
 then shades a bounded subset of a lower-resolution lighting grid using the
-existing **software BVH**, material graphs, BSDFs, light sampling and shadow
-semantics. It does not require or select hardware ray queries. Both direct and
+its own **software BVH**, material graphs, BSDFs, light sampling and shadow
+implementation. It does not require or select hardware ray queries. Both direct and
 indirect lighting are reconstructed; this prototype is not a diffuse-only GI
 pass added to the old raster renderer.
 
@@ -50,15 +50,15 @@ retains per-sample `clamping` to suppress fireflies but does not apply the path
 tracer's `max_exposure` accumulation clamp. Exposure and SDR tone mapping remain
 output-only. Depth of field is currently disabled in realtime primary visibility.
 
-## Data sharing and passes
+## Scene input and passes
 
-1. Shared path-tracing scene registration provides mesh/material/light buffers
+1. Realtime scene registration provides its own mesh/material/light bindings
    and software BVH nodes. Static scene registration is reused; unchanged software
    TLAS instances no longer rebuild. Transform/active/light/basic-material changes
    trigger an update and invalidate the view's lighting history.
 2. A single visibility draw uses shared geometry buffers and an instance-range
    table. It writes instance/primitive IDs and perspective-correct barycentrics,
-   allowing the same hit-record and shader-graph functions as path tracing.
+   consumed by this pipeline's hit-record and shader-graph functions.
 3. Full lighting-grid reprojection validates instance, world position and
    geometric normal. Invalid history is rejected, and the scheduled subset gets
    new software-traced lighting. The schedule advances independently of resets.
@@ -72,51 +72,48 @@ resource revision tracking is not yet a general scene API.
 
 This implementation is based on the current main-branch scene API; it does not
 merge pending PR #46 or duplicate its proposed SceneDefinition/Renderer API.
-The realtime pipeline has its own `sparkium_realtime` CMake target and
-`sparkium::realtime` namespace under `code/sparkium/pipelines/realtime/`:
+The realtime implementation lives entirely under
+`code/sparkium/pipelines/realtime/`, with its own `sparkium_realtime` target and
+`sparkium::realtime` namespace:
 
-- `realtime.*`: pipeline entry, called directly by `Core::Render`.
-- `scene.*`: scene invalidation, lighting budget and pass scheduling.
-- `realtime_view.*`: per-film visibility, history, filtering and resolve resources.
+- `realtime.*`: the pipeline entry.
+- `core/`: graphics resources, camera data, scene registration, frame scheduling,
+  software BVH construction, visibility, per-film history, filtering and resolve.
+- `material/`, `light/`, `geometry/`, `entity/`: independent adapters for the
+  public scene definitions.
+- `shaders/`: private material, lighting, software traversal and realtime kernels.
 
-Shaders remain in `code/sparkium/shaders/realtime/`. The two renderer targets
-have no dependency on one another. Shared resource adapters now live under
-`code/sparkium/pipelines/common/`, in namespace `sparkium::render_shared` and
-CMake target `sparkium_pipeline_common`:
-
-- `core/`: graphics resources, camera data, scene registration and compute BVH.
-- `material/`: material buffers and shader graph compilation.
-- `geometry/`: mesh buffers and acceleration data.
-- `light/`: light descriptors, power and sampling data.
-- `entity/`: conversion from public scene entities into registration records.
+Ray tracing has a separate implementation and shader tree under
+`pipelines/raytracing/`. There is no `pipelines/common` implementation, shared
+renderer base class, cross-pipeline include, or link dependency. Each pipeline
+also owns its shader VFS, shader/program caches, material buffers and registration
+state. Editing one pipeline's shader files does not change the other's sources.
+The realtime implementation has no closest-hit/any-hit shaders, hit groups,
+callable shaders, native acceleration structures or hardware ray-query path.
 
 ```mermaid
 flowchart TD
-  D[Pipeline dispatch] --> R[Realtime renderer]
-  D --> P[Ray-tracing renderer]
-  R --> C[Shared rendering resources]
-  P --> C
-  C --> S[Public scene definitions and graphics API]
+  D[Pipeline dispatch] --> R[Realtime implementation and shaders]
+  D --> P[Ray-tracing implementation and shaders]
+  R --> S[Public scene definitions and graphics API]
+  P --> S
 ```
 
-The shared layer has no renderer entry or frame scheduling, no include/link back
-to either renderer, and no realtime-specific kernel selection. The realtime
-renderer supplies its kernel path, bindings and auxiliary reprojection entry
-through `ComputeShadingConfiguration`. Each renderer owns its registration
-context, frame scheduling and film/history state; shared adapters consume the
-same public scene definitions without duplicating material or light semantics.
-Changes to common GPU layouts still require validation of both consumers.
-
-Pipeline dispatch resides in `pipelines/dispatch.cpp`, above the public core;
-`sparkium_core` no longer links concrete renderers. Switching pipelines resets
-film accumulation at that common dispatch entry.
+Only public scene definitions/assets and foundation services (graphics API,
+source mesh/texture data, default images and Sobol data) are reused. Equivalent
+material and lighting behavior is maintained by tests rather than a common
+pipeline implementation. Pipeline dispatch resides in `pipelines/dispatch.cpp`;
+`sparkium_core` does not link concrete renderers. Switching pipelines resets film
+accumulation at that dispatch entry.
 
 ## Validation and limitations
 
 The regression test covers HDR emitter radiance at a non-divisible resolution,
 background disocclusion on a camera cut, explicit history reset after a material
-edit, transform invalidation, and absence of native ray queries. Existing
-path-tracing tests also cover the shared software BVH optimization.
+edit, transform invalidation, and absence of native ray queries. The isolation regression also checks that realtime rendering creates no
+path-tracing components, that shader sources and program/material caches are
+independent, and that switching pipelines preserves rendering behavior. Existing
+path-tracing tests cover its separate software BVH and native-query paths.
 
 Use the CLI profiler for render-and-develop wall time (Metal currently supports
 CPU wall-time profiling here, not per-pass GPU timestamps):

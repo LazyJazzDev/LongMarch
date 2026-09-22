@@ -1,4 +1,3 @@
-add_subdirectory(common)
 add_subdirectory(raster)
 add_subdirectory(raytracing)
 add_subdirectory(realtime)
