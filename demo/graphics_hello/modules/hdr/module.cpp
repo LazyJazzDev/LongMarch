@@ -10,21 +10,30 @@ ModuleHDR::~ModuleHDR() = default;
 
 void ModuleHDR::OnInit() {
   alive_ = true;
-  core_->CreateWindowObject(1280, 720, GraphicsHelloTitle(core_->API()) + std::string(" Graphics Hello HDR"), &window_);
-  if (core_->API() == grassland::graphics::BACKEND_API_METAL) {
-    grassland::LogWarning("Metal presentation currently uses SDR; HDR values will be clipped for display");
-  } else {
-    window_->SetHDR(true);
-  }
+  core_->CreateWindowObject(
+      1280, 720, GraphicsHelloTitle(core_->API()) + std::string(" Graphics Hello HDR [H: toggle HDR/SDR]"), &window_);
+  window_->SetHDR(true);
+  window_->KeyEvent().RegisterCallback([this](int key, int scancode, int action, int mods) {
+    if (key == GLFW_KEY_H && action == GLFW_PRESS) {
+      hdr_enabled_ = !hdr_enabled_;
+      window_->SetHDR(hdr_enabled_);
+      grassland::LogInfo("HDR demo presentation: {}", hdr_enabled_ ? "HDR" : "SDR");
+    }
+  });
 
   std::vector<Vertex> vertices = {
-      {{-0.5f, -0.1f, 0.0f}, {0.0f, 0.0f, 0.0f}},
-      {{0.5f, -0.1f, 0.0f}, {3.0f, 3.0f, 3.0f}},
-      {{0.5f, 0.1f, 0.0f}, {3.0f, 3.0f, 3.0f}},
-      {{-0.5f, 0.1f, 0.0f}, {0.0f, 0.0f, 0.0f}},
+      {{-0.5f, 0.05f, 0.0f}, {0.0f, 0.0f, 0.0f}},
+      {{0.5f, 0.05f, 0.0f}, {3.0f, 3.0f, 3.0f}},
+      {{0.5f, 0.25f, 0.0f}, {3.0f, 3.0f, 3.0f}},
+      {{-0.5f, 0.25f, 0.0f}, {0.0f, 0.0f, 0.0f}},
+      // SDR reference white below the HDR gradient.
+      {{-0.5f, -0.25f, 0.0f}, {1.0f, 1.0f, 1.0f}},
+      {{0.5f, -0.25f, 0.0f}, {1.0f, 1.0f, 1.0f}},
+      {{0.5f, -0.05f, 0.0f}, {1.0f, 1.0f, 1.0f}},
+      {{-0.5f, -0.05f, 0.0f}, {1.0f, 1.0f, 1.0f}},
   };
 
-  std::vector<uint32_t> indices = {0, 1, 2, 0, 2, 3};
+  std::vector<uint32_t> indices = {0, 1, 2, 0, 2, 3, 4, 5, 6, 4, 6, 7};
 
   core_->CreateBuffer(vertices.size() * sizeof(Vertex), grassland::graphics::BUFFER_TYPE_DYNAMIC, &vertex_buffer_);
   core_->CreateBuffer(indices.size() * sizeof(uint32_t), grassland::graphics::BUFFER_TYPE_DYNAMIC, &index_buffer_);
@@ -75,7 +84,7 @@ void ModuleHDR::OnRender() {
   command_context->CmdSetViewport({0, 0, 1280, 720, 0.0f, 1.0f});
   command_context->CmdSetScissor({0, 0, 1280, 720});
   command_context->CmdSetPrimitiveTopology(grassland::graphics::PRIMITIVE_TOPOLOGY_TRIANGLE_LIST);
-  command_context->CmdDrawIndexed(6, 1, 0, 0, 0);
+  command_context->CmdDrawIndexed(12, 1, 0, 0, 0);
   command_context->CmdEndRendering();
   command_context->CmdPresent(window_.get(), color_image_.get());
   core_->SubmitCommandContext(command_context.get());

@@ -1,4 +1,7 @@
 add_executable(sparkium_fallback_test fallback_test.cpp metal_backend_test.cpp)
+if (LONGMARCH_METAL_ENABLED)
+    target_sources(sparkium_fallback_test PRIVATE metal_window_test.mm)
+endif ()
 target_link_libraries(sparkium_fallback_test PRIVATE LongMarch GTest::gtest_main)
 LONGMARCH_DEPLOY_RUNTIME_DEPENDENCIES(sparkium_fallback_test)
 add_test(NAME sparkium_fallback COMMAND sparkium_fallback_test)
