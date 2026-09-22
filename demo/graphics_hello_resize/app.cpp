@@ -2,28 +2,22 @@
 
 #include <glm/gtc/matrix_transform.hpp>
 
+#include "../graphics_hello_common.h"
+
 namespace {
 #include "built_in_shaders.inl"
 }
 
 Application::Application(grassland::graphics::BackendAPI api) {
-  grassland::graphics::CreateCore(api, grassland::graphics::Core::Settings{}, &core_);
-  core_->InitializeLogicalDeviceAutoSelect(false);
-
-  grassland::LogInfo("Device Name: {}", core_->DeviceName());
-  grassland::LogInfo("- Ray Tracing Support: {}", core_->DeviceRayTracingSupport());
+  InitializeGraphicsHello(api, core_);
 }
 
-Application::~Application() {
-  core_.reset();
-}
+Application::~Application() = default;
 
 void Application::OnInit() {
   alive_ = true;
-  core_->CreateWindowObject(1280, 720,
-                            ((core_->API() == grassland::graphics::BACKEND_API_VULKAN) ? "[Vulkan]" : "[D3D12]") +
-                                std::string(" Graphics Hello Resize"),
-                            false, true, &window_);
+  core_->CreateWindowObject(1280, 720, GraphicsHelloTitle(core_->API()) + std::string(" Graphics Hello Resize"), false,
+                            true, &window_);
 
   std::vector<Vertex> vertices = {
       {{-1.0f, -1.0f, 1.0f}, {0.0f, 0.0f, 0.0f}},  {{1.0f, -1.0f, 1.0f}, {1.0f, 0.0f, 0.0f}},
@@ -45,6 +39,8 @@ void Application::OnInit() {
   core_->CreateImage(1280, 720, grassland::graphics::IMAGE_FORMAT_D32_SFLOAT, &depth_image_);
 
   window_->ResizeEvent().RegisterCallback([this](int width, int height) {
+    if (width <= 0 || height <= 0)
+      return;
     core_->WaitGPU();
     color_image_.reset();
     depth_image_.reset();
@@ -69,6 +65,7 @@ void Application::OnInit() {
 }
 
 void Application::OnClose() {
+  core_->WaitGPU();
   program_.reset();
   vertex_shader_.reset();
   fragment_shader_.reset();

@@ -1,22 +1,6 @@
+#include "../graphics_hello_common.h"
 #include "app.h"
 
-int main() {
-  Application app{grassland::graphics::BACKEND_API_DEFAULT};
-
-  app.OnInit();
-
-  while (app.IsAlive()) {
-    if (app.IsAlive()) {
-      app.OnUpdate();
-    }
-    if (app.IsAlive()) {
-      app.OnRender();
-    }
-
-    glfwPollEvents();
-  }
-
-  app.OnClose();
-
-  return 0;
+int main(int argc, char **argv) {
+  return RunGraphicsHello<Application>(argc, argv);
 }

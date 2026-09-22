@@ -2,27 +2,21 @@
 
 #include <glm/gtc/matrix_transform.hpp>
 
+#include "../graphics_hello_common.h"
+
 namespace {
 #include "built_in_shaders.inl"
 }
 
 Application::Application(grassland::graphics::BackendAPI api) {
-  grassland::graphics::CreateCore(api, grassland::graphics::Core::Settings{}, &core_);
-  core_->InitializeLogicalDeviceAutoSelect(false);
-
-  grassland::LogInfo("Device Name: {}", core_->DeviceName());
-  grassland::LogInfo("- Ray Tracing Support: {}", core_->DeviceRayTracingSupport());
+  InitializeGraphicsHello(api, core_);
 }
 
-Application::~Application() {
-  core_.reset();
-}
+Application::~Application() = default;
 
 void Application::OnInit() {
   alive_ = true;
-  core_->CreateWindowObject(1280, 720,
-                            ((core_->API() == grassland::graphics::BACKEND_API_VULKAN) ? "[Vulkan]" : "[D3D12]") +
-                                std::string(" Graphics Hello Cube"),
+  core_->CreateWindowObject(1280, 720, GraphicsHelloTitle(core_->API()) + std::string(" Graphics Hello Cube"),
                             &window_);
 
   std::vector<Vertex> vertices = {
@@ -61,6 +55,7 @@ void Application::OnInit() {
 }
 
 void Application::OnClose() {
+  core_->WaitGPU();
   program_.reset();
   vertex_shader_.reset();
   fragment_shader_.reset();

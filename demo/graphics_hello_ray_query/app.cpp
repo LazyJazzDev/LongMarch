@@ -8,18 +8,16 @@ namespace {
 }
 
 Application::Application(grassland::graphics::BackendAPI api) {
-  if (api == grassland::graphics::BACKEND_API_METAL)
-    throw std::runtime_error("Metal has no ray tracing pipelines; use graphics_hello_ray_query");
-  InitializeGraphicsHello(api, core_, true);
-  if (!core_->DeviceRayTracingSupport())
-    throw std::runtime_error("Ray tracing pipelines are unavailable; use graphics_hello_ray_query on Metal");
+  InitializeGraphicsHello(api, core_);
+  if (!core_->DeviceRayQuerySupport())
+    throw std::runtime_error("Ray queries are unavailable on the selected device/backend");
 }
 
 Application::~Application() = default;
 
 void Application::OnInit() {
   alive_ = true;
-  core_->CreateWindowObject(1280, 720, GraphicsHelloTitle(core_->API()) + std::string(" Graphics Hello Ray Tracing"),
+  core_->CreateWindowObject(1280, 720, GraphicsHelloTitle(core_->API()) + std::string(" Graphics Hello Ray Query"),
                             &window_);
 
   std::vector<glm::vec3> vertices = {{-1.0f, -1.0f, 0.0f}, {1.0f, -1.0f, 0.0f}, {0.0f, 1.0f, 0.0f}};
@@ -41,16 +39,13 @@ void Application::OnInit() {
   core_->CreateImage(window_->GetWidth(), window_->GetHeight(), grassland::graphics::IMAGE_FORMAT_R32G32B32A32_SFLOAT,
                      &color_image_);
 
-  core_->CreateShader(GetShaderCode("shaders/shader.hlsl"), "RayGenMain", "lib_6_3", &raygen_shader_);
-  core_->CreateShader(GetShaderCode("shaders/shader.hlsl"), "MissMain", "lib_6_3", &miss_shader_);
-  core_->CreateShader(GetShaderCode("shaders/shader.hlsl"), "ClosestHitMain", "lib_6_3", &closest_hit_shader_);
-  grassland::LogInfo("Shader compiled successfully");
+  core_->CreateShader(GetShaderCode("shaders/shader.hlsl"), "CSMain", "cs_6_5", &compute_shader_);
 
   core_->CreateBottomLevelAccelerationStructure(vertex_buffer_.get(), index_buffer_.get(), sizeof(glm::vec3), &blas_);
   core_->CreateTopLevelAccelerationStructure(
       {blas_->MakeInstance(glm::mat4{1.0f}, 0, 0xFF, 0, grassland::graphics::RAYTRACING_INSTANCE_FLAG_NONE)}, &tlas_);
 
-  core_->CreateRayTracingProgram(raygen_shader_.get(), miss_shader_.get(), closest_hit_shader_.get(), &program_);
+  core_->CreateComputeProgram(compute_shader_.get(), &program_);
   program_->AddResourceBinding(grassland::graphics::RESOURCE_TYPE_ACCELERATION_STRUCTURE, 1);
   program_->AddResourceBinding(grassland::graphics::RESOURCE_TYPE_WRITABLE_IMAGE, 1);
   program_->AddResourceBinding(grassland::graphics::RESOURCE_TYPE_UNIFORM_BUFFER, 1);
@@ -60,12 +55,10 @@ void Application::OnInit() {
 void Application::OnClose() {
   core_->WaitGPU();
   program_.reset();
-  raygen_shader_.reset();
-  miss_shader_.reset();
-  closest_hit_shader_.reset();
+  compute_shader_.reset();
 
-  blas_.reset();
   tlas_.reset();
+  blas_.reset();
 
   color_image_.reset();
   camera_object_buffer_.reset();
@@ -92,11 +85,11 @@ void Application::OnRender() {
   std::unique_ptr<grassland::graphics::CommandContext> command_context;
   core_->CreateCommandContext(&command_context);
   command_context->CmdClearImage(color_image_.get(), {{0.6, 0.7, 0.8, 1.0}});
-  command_context->CmdBindRayTracingProgram(program_.get());
-  command_context->CmdBindResources(0, tlas_.get(), grassland::graphics::BIND_POINT_RAYTRACING);
-  command_context->CmdBindResources(1, {color_image_.get()}, grassland::graphics::BIND_POINT_RAYTRACING);
-  command_context->CmdBindResources(2, {camera_object_buffer_.get()}, grassland::graphics::BIND_POINT_RAYTRACING);
-  command_context->CmdDispatchRays(window_->GetWidth(), window_->GetHeight(), 1);
+  command_context->CmdBindComputeProgram(program_.get());
+  command_context->CmdBindResources(0, tlas_.get(), grassland::graphics::BIND_POINT_COMPUTE);
+  command_context->CmdBindResources(1, {color_image_.get()}, grassland::graphics::BIND_POINT_COMPUTE);
+  command_context->CmdBindResources(2, {camera_object_buffer_.get()}, grassland::graphics::BIND_POINT_COMPUTE);
+  command_context->CmdDispatch((color_image_->Extent().width + 7) / 8, (color_image_->Extent().height + 7) / 8, 1);
   command_context->CmdPresent(window_.get(), color_image_.get());
   core_->SubmitCommandContext(command_context.get());
 }
