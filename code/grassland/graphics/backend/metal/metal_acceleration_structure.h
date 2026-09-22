@@ -13,6 +13,11 @@ class MetalAccelerationStructure : public AccelerationStructure {
                              uint32_t stride,
                              uint32_t triangle_count,
                              RayTracingGeometryFlag flags);
+  MetalAccelerationStructure(MetalCore *core,
+                             BufferRange aabbs,
+                             uint32_t stride,
+                             uint32_t count,
+                             RayTracingGeometryFlag flags);
   MetalAccelerationStructure(MetalCore *core, const std::vector<RayTracingInstance> &instances);
   int UpdateInstances(const std::vector<RayTracingInstance> &instances) override;
 

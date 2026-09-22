@@ -1,6 +1,8 @@
 #include <gtest/gtest.h>
 #include <long_march.h>
 
+#include <array>
+#include <cstdlib>
 #include <cstring>
 #include <numeric>
 
@@ -19,6 +21,138 @@ class MetalBackendTest : public testing::Test {
 
   std::unique_ptr<graphics::Core> core;
 };
+
+// Window tests require an interactive macOS session; keep headless GPU test runs usable.
+TEST_F(MetalBackendTest, WindowCloseAfterPresent) {
+  if (!std::getenv("LONGMARCH_TEST_METAL_WINDOWS"))
+    GTEST_SKIP() << "Set LONGMARCH_TEST_METAL_WINDOWS=1 in an interactive macOS session";
+  for (bool imgui : {false, true}) {
+    for (bool explicit_close : {false, true}) {
+      SCOPED_TRACE(testing::Message() << "imgui=" << imgui << " explicit_close=" << explicit_close);
+      std::unique_ptr<graphics::Window> window;
+      ASSERT_EQ(core->CreateWindowObject(320, 240, "Metal window cleanup test", &window), 0);
+      if (imgui) {
+        window->InitImGui();
+        ImGui::GetIO().IniFilename = nullptr;
+        window->BeginImGuiFrame();
+        ImGui::TextUnformatted("Close after presenting");
+        window->EndImGuiFrame();
+      }
+      std::unique_ptr<graphics::Image> image;
+      core->CreateImage(320, 240, graphics::IMAGE_FORMAT_R8G8B8A8_UNORM, &image);
+      std::unique_ptr<graphics::CommandContext> commands;
+      core->CreateCommandContext(&commands);
+      commands->CmdClearImage(image.get(), {{0.2f, 0.3f, 0.4f, 1.0f}});
+      commands->CmdPresent(window.get(), image.get());
+      ASSERT_EQ(core->SubmitCommandContext(commands.get()), 0);
+      // Match hello demos: close request, explicit CloseWindow, then destruction.
+      if (explicit_close) {
+        glfwSetWindowShouldClose(window->GLFWWindow(), GLFW_TRUE);
+        ASSERT_TRUE(window->ShouldClose());
+        window->CloseWindow();
+        EXPECT_EQ(window->GLFWWindow(), nullptr);
+        EXPECT_EQ(window->GetImGuiContext(), nullptr);
+        window->CloseWindow();
+      }
+      window.reset();
+      core->WaitGPU();
+    }
+  }
+}
+
+TEST_F(MetalBackendTest, ProceduralSphereQueriesAndAABBRanges) {
+  if (!core->DeviceRayQuerySupport())
+    GTEST_SKIP() << "native ray query unavailable";
+  std::unique_ptr<graphics::Buffer> bounds, vertices, indices, output;
+  core->CreateBuffer(48, graphics::BUFFER_TYPE_STATIC, &bounds);
+  const graphics::RayTracingAABB box{-1, -1, -1, 1, 1, 1};
+  bounds->UploadData(&box, sizeof(box), 16);
+  std::unique_ptr<graphics::AccelerationStructure> sphere, triangle, scene;
+  auto range = bounds->Range(16, 32);
+  ASSERT_EQ(
+      core->CreateBottomLevelAccelerationStructure(range, 32, 1, graphics::RAYTRACING_GEOMETRY_FLAG_OPAQUE, &sphere),
+      0);
+  std::unique_ptr<graphics::AccelerationStructure> invalid;
+  EXPECT_THROW(
+      core->CreateBottomLevelAccelerationStructure(range, 20, 1, graphics::RAYTRACING_GEOMETRY_FLAG_OPAQUE, &invalid),
+      std::invalid_argument);
+  EXPECT_THROW(
+      core->CreateBottomLevelAccelerationStructure(range, 32, 2, graphics::RAYTRACING_GEOMETRY_FLAG_OPAQUE, &invalid),
+      std::invalid_argument);
+  EXPECT_THROW(core->CreateBottomLevelAccelerationStructure(bounds->Range(17, 24), 24, 1,
+                                                            graphics::RAYTRACING_GEOMETRY_FLAG_OPAQUE, &invalid),
+               std::invalid_argument);
+  EXPECT_THROW(
+      core->CreateBottomLevelAccelerationStructure(range, 32, 0, graphics::RAYTRACING_GEOMETRY_FLAG_OPAQUE, &invalid),
+      std::invalid_argument);
+  const float points[]{3, -1, 0, 5, -1, 0, 4, 1, 0};
+  const uint32_t faces[]{0, 1, 2};
+  core->CreateBuffer(sizeof(points), graphics::BUFFER_TYPE_STATIC, &vertices);
+  core->CreateBuffer(sizeof(faces), graphics::BUFFER_TYPE_STATIC, &indices);
+  vertices->UploadData(points, sizeof(points));
+  indices->UploadData(faces, sizeof(faces));
+  core->CreateBottomLevelAccelerationStructure(vertices.get(), indices.get(), 12, &triangle);
+  glm::mat4 transform{1.0f};
+  transform[0][0] = 2.0f;
+  transform[2][2] = 0.5f;
+  core->CreateTopLevelAccelerationStructure(
+      {sphere->MakeInstance(transform, 23), triangle->MakeInstance(glm::mat4{1.0f}, 42)}, &scene);
+  core->CreateBuffer(7 * sizeof(glm::vec4), graphics::BUFFER_TYPE_STATIC, &output);
+  std::unique_ptr<graphics::Shader> shader;
+  ASSERT_EQ(core->CreateShader(R"(
+RaytracingAccelerationStructure scene : register(t0, space0);
+RWStructuredBuffer<float4> output : register(u0, space1);
+[numthreads(1,1,1)] void Main(uint3 id : SV_DispatchThreadID) {
+  RayDesc ray;
+  ray.Origin = id.x == 1 ? float3(0,0,0) : id.x == 2 ? float3(1.8,0.9,3) :
+      id.x == 6 ? float3(4,0,3) : float3(0,0,3);
+  ray.Direction = id.x == 3 ? float3(0,0,2) : float3(0,0,-2);
+  ray.TMin = id.x == 4 ? 1.3 : 0.001;
+  ray.TMax = id.x == 5 ? 1 : 100;
+  RayQuery<RAY_FLAG_FORCE_OPAQUE> query;
+  query.TraceRayInline(scene, RAY_FLAG_NONE, 255, ray);
+  while(query.Proceed()) {
+    if(query.CandidateType() == CANDIDATE_PROCEDURAL_PRIMITIVE) {
+      float3 o = query.CandidateObjectRayOrigin(), d = query.CandidateObjectRayDirection();
+      float a = dot(d,d), b = dot(o,d), c = dot(o,o)-1, disc = b*b-a*c;
+      if(disc >= 0) {
+        float t = (-b-sqrt(disc))/a;
+        if(t <= ray.TMin) t = (-b+sqrt(disc))/a;
+        float closest = query.CommittedStatus() == COMMITTED_NOTHING ? ray.TMax : query.CommittedRayT();
+        if(t > ray.TMin && t <= closest) query.CommitProceduralPrimitiveHit(t);
+      }
+    }
+  }
+  output[id.x] = query.CommittedStatus() == COMMITTED_NOTHING ? float4(-1,0,0,0) :
+      float4(query.CommittedRayT(), query.CommittedInstanceID(), query.CommittedPrimitiveIndex(), query.CommittedStatus());
+})",
+                               "Main", "cs_6_5", &shader),
+            0);
+  std::unique_ptr<graphics::ComputeProgram> program;
+  core->CreateComputeProgram(shader.get(), &program);
+  program->AddResourceBinding(graphics::RESOURCE_TYPE_ACCELERATION_STRUCTURE, 1);
+  program->AddResourceBinding(graphics::RESOURCE_TYPE_WRITABLE_STORAGE_BUFFER, 1);
+  program->Finalize();
+  std::unique_ptr<graphics::CommandContext> commands;
+  core->CreateCommandContext(&commands);
+  commands->CmdBindComputeProgram(program.get());
+  commands->CmdBindResources(0, scene.get(), graphics::BIND_POINT_COMPUTE);
+  commands->CmdBindResources(1, {output.get()}, graphics::BIND_POINT_COMPUTE);
+  commands->CmdDispatch(7, 1, 1);
+  ASSERT_EQ(core->SubmitCommandContext(commands.get()), 0);
+  std::array<glm::vec4, 7> hits;
+  output->DownloadData(hits.data(), sizeof(hits));
+  const float expected[]{1.25f, 0.25f, -1, -1, 1.75f, -1, 1.5f};
+  for (int i = 0; i < 7; ++i) {
+    SCOPED_TRACE(i);
+    EXPECT_NEAR(hits[i].x, expected[i], 1e-5f);
+    if (expected[i] > 0) {
+      EXPECT_EQ(hits[i].y, i == 6 ? 42 : 23);
+      EXPECT_EQ(hits[i].z, 0);
+      EXPECT_EQ(hits[i].w, i == 6 ? 1 : 2);
+    }
+  }
+}
 
 TEST_F(MetalBackendTest, RayQueryMasksIDsUpdatesAndBindingSnapshots) {
   if (!core->DeviceRayQuerySupport())

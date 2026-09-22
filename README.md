@@ -119,12 +119,14 @@ In this process, the CMake script will check whether you have installed Vulkan S
 Run the following command to build the `hello triangle` demo:
 
 ```bash
-cmake --build build --target demo_graphics_hello_triangle
+cmake --build build --target demo_graphics_hello
 ```
 
-the code is under path [demo/graphics_hello_triangle](demo/graphics_hello_triangle)
+Run with `--module triangle`, or omit `--module` to select one of eleven demos in the terminal menu.
+The code is under [demo/graphics_hello/modules/triangle](demo/graphics_hello/modules/triangle);
+see [launcher usage](demo/graphics_hello/README.md) for all modules and options.
 
-The compiled executable should be located at `build/demo/graphics_hello_triangle/<Debug|Release>/graphics_hello_triangle.exe`.
+The compiled executable should be located at `build/demo/graphics_hello/<Debug|Release>/demo_graphics_hello.exe`.
 
 ### Linux
 
@@ -167,12 +169,14 @@ In this process, the CMake script will check whether you have installed Vulkan S
 Run the following command to build the `hello triangle` demo:
 
 ```bash
-cmake --build build --target demo_graphics_hello_triangle
+cmake --build build --target demo_graphics_hello
 ```
 
-the code is under path [demo/graphics_hello_triangle](demo/graphics_hello_triangle)
+Run with `--module triangle`, or omit `--module` to select one of eleven demos in the terminal menu.
+The code is under [demo/graphics_hello/modules/triangle](demo/graphics_hello/modules/triangle);
+see [launcher usage](demo/graphics_hello/README.md) for all modules and options.
 
-The compiled executable should be located at `build/demo/graphics_hello_triangle/graphics_hello_triangle`.
+The compiled executable should be located at `build/demo/graphics_hello/demo_graphics_hello`.
 
 
 ### macOS
@@ -221,9 +225,11 @@ In this process, the CMake script will check whether you have installed Vulkan S
 Run the following command to build the `hello triangle` demo:
 
 ```bash
-cmake --build build --target demo_graphics_hello_triangle
+cmake --build build --target demo_graphics_hello
 ```
 
-the code is under path [demo/graphics_hello_triangle](demo/graphics_hello_triangle)
+Run with `--module triangle`, or omit `--module` to select one of eleven demos in the terminal menu.
+The code is under [demo/graphics_hello/modules/triangle](demo/graphics_hello/modules/triangle);
+see [launcher usage](demo/graphics_hello/README.md) for all modules and options.
 
-The compiled executable should be located at `build/demo/graphics_hello_triangle/graphics_hello_triangle`.
+The compiled executable should be located at `build/demo/graphics_hello/demo_graphics_hello`.

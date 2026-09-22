@@ -36,6 +36,35 @@ void MetalAccelerationStructure::Build(MTL::AccelerationStructureDescriptor *des
 }
 
 MetalAccelerationStructure::MetalAccelerationStructure(MetalCore *core,
+                                                       BufferRange aabbs,
+                                                       uint32_t stride,
+                                                       uint32_t count,
+                                                       RayTracingGeometryFlag flags)
+    : core_(core) {
+  MetalPool pool;
+  auto buffer = dynamic_cast<MetalBuffer *>(aabbs.buffer);
+  if (!buffer || count == 0 || stride < sizeof(RayTracingAABB) || stride % 4 || aabbs.offset % 4 ||
+      aabbs.offset > buffer->Size() || aabbs.size > buffer->Size() - aabbs.offset ||
+      uint64_t(count - 1) * stride + sizeof(RayTracingAABB) > aabbs.size)
+    throw std::invalid_argument("invalid Metal AABB AS buffer range");
+  graphics::CpuProfileScope profile("native_blas_build");
+  auto geometry = MTL::AccelerationStructureBoundingBoxGeometryDescriptor::descriptor();
+  geometry->setBoundingBoxBuffer(buffer->Handle());
+  geometry->setBoundingBoxBufferOffset(aabbs.offset);
+  geometry->setBoundingBoxStride(stride);
+  geometry->setBoundingBoxCount(count);
+  geometry->setOpaque(flags & RAYTRACING_GEOMETRY_FLAG_OPAQUE);
+  geometry->setAllowDuplicateIntersectionFunctionInvocation(
+      !(flags & RAYTRACING_GEOMETRY_FLAG_NO_DUPLICATE_ANYHIT_INVOCATION));
+  auto descriptor = MTL::PrimitiveAccelerationStructureDescriptor::descriptor();
+  const NS::Object *geometries[] = {geometry};
+  descriptor->setGeometryDescriptors(NS::Array::array(geometries, 1));
+  Build(descriptor);
+  if (graphics::FrameProfile::active)
+    ++graphics::FrameProfile::active->counters["native_blas_builds"];
+}
+
+MetalAccelerationStructure::MetalAccelerationStructure(MetalCore *core,
                                                        BufferRange vertices,
                                                        BufferRange indices,
                                                        uint32_t vertex_count,

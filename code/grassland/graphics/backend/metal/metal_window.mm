@@ -56,9 +56,20 @@ fragment float4 present_fragment(Vertex v [[stage_in]], texture2d<float> image [
 }
 
 MetalWindow::~MetalWindow() {
+  CloseWindow();
+}
+
+void MetalWindow::CloseWindow() {
+  if (!GLFWWindow())
+    return;
+  MetalPool pool;
   core_->WaitGPU();
+  // ImGui and the layer still need the native window during teardown.
   TerminateImGui();
   [[glfwGetCocoaWindow(GLFWWindow()) contentView] setLayer:nil];
+  pipeline_.reset();
+  layer_.reset();
+  Window::CloseWindow();
 }
 
 void MetalWindow::InitImGui(const char *font, float size) {
