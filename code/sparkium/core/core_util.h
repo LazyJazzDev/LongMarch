@@ -65,7 +65,8 @@ typedef enum RenderPipeline {
   RENDER_PIPELINE_RAY_TRACING = 1,
   RENDER_PIPELINE_AUTO = 2,
   RENDER_PIPELINE_RT_FALLBACK = 3,  // Compute BVH traversal without hardware ray tracing
-  RENDER_PIPELINE_RAY_QUERY = 4     // Compute path tracing with native acceleration structures
+  RENDER_PIPELINE_RAY_QUERY = 4,    // Compute path tracing with native acceleration structures
+  RENDER_PIPELINE_REALTIME = 5      // Raster visibility with software-traced, temporally reconstructed lighting
 } RenderPipeline;
 
 }  // namespace sparkium

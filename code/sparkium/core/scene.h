@@ -24,6 +24,13 @@ class Scene : public Object {
       glm::vec3 background_color{0.0f, 0.0f, 0.0f};
     } raytracing;
 
+    struct Realtime {
+      int scale{4};
+      int bounces{3};
+      int history{64};
+      int updates{16};
+    } realtime;
+
     struct Rasterization {
       glm::vec3 ambient_light{0.1f, 0.1f, 0.1f};
     } raster;

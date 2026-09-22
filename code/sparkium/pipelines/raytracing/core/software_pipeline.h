@@ -7,13 +7,19 @@ namespace sparkium::raytracing {
 // Geometry/light/material registration is shared with DXR/Vulkan pipeline RT.
 class SoftwarePipeline {
  public:
-  explicit SoftwarePipeline(Core *core, bool ray_query = false);
+  explicit SoftwarePipeline(Core *core, bool ray_query = false, bool realtime = false);
   void ClearInstances();
   void AddInstance(Geometry *geometry, Material *material, const glm::mat4x3 &transform, uint32_t geometry_index);
   void Update(graphics::CommandContext *commands,
               const std::vector<graphics::Buffer *> &buffers,
               uint32_t sdr_count,
               uint32_t hdr_count);
+
+  std::vector<uint32_t> VertexCounts() const;
+
+  graphics::ComputeProgram *ReprojectProgram() const {
+    return reproject_program_.get();
+  }
 
   graphics::ComputeProgram *Program() const {
     return render_program_.get();
@@ -76,6 +82,8 @@ class SoftwarePipeline {
 
   Core *core_;
   bool ray_query_;
+  bool realtime_;
+  std::vector<uint8_t> previous_instances_;
   std::unique_ptr<graphics::AccelerationStructure> native_tlas_;
   std::vector<Instance> instances_;
   std::vector<GeometryLayout> geometries_;
@@ -86,7 +94,8 @@ class SoftwarePipeline {
   std::unique_ptr<graphics::Buffer> nodes_, keys_, instances_buffer_, parameters_buffer_;
   std::vector<std::unique_ptr<graphics::Shader>> builder_shaders_;
   std::vector<std::unique_ptr<graphics::ComputeProgram>> builders_;
-  std::unique_ptr<graphics::Shader> render_shader_;
+  std::unique_ptr<graphics::Shader> render_shader_, reproject_shader_;
+  std::unique_ptr<graphics::ComputeProgram> reproject_program_;
   std::unique_ptr<graphics::ComputeProgram> render_program_;
 };
 }  // namespace sparkium::raytracing

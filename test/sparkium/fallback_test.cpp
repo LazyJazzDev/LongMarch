@@ -94,6 +94,71 @@ TEST_F(SoftwareBVHTest, HDRFilmDevelopmentPreservesHighlightsAndAccumulation) {
   EXPECT_EQ(resets, 0);
 }
 
+TEST_F(SoftwareBVHTest, RealtimeRasterVisibilityPreservesHDRAndRejectsStaleHistory) {
+  uint32_t indices[]{0, 1, 2, 0, 2, 3};
+  std::vector<Vector3<float>> positions{{-20, -20, 0}, {20, -20, 0}, {20, 20, 0}, {-20, 20, 0}};
+  Mesh<> mesh(4, 6, indices, positions.data());
+  sparkium::GeometryMesh geometry(core.get(), mesh);
+  sparkium::MaterialLambertian material(core.get(), glm::vec3(0), glm::vec3(4, 0.5f, 0.25f));
+  sparkium::EntityGeometryMaterial entity(core.get(), &geometry, &material);
+  sparkium::Scene scene(core.get());
+  scene.AddEntity(&entity);
+  scene.settings.background_color = glm::vec3(0.125f);
+  scene.settings.realtime.bounces = 2;
+  scene.settings.realtime.updates = 1;
+  sparkium::Camera camera(core.get(), glm::lookAt(glm::vec3(0, 0, 4), glm::vec3(0), glm::vec3(0, 1, 0)),
+                          glm::radians(45.0f), 37.0f / 19.0f);
+  sparkium::Film film(core.get(), 37, 19);
+  std::vector<glm::vec4> pixels(37 * 19);
+  for (int frame = 0; frame < 3; ++frame) {
+    graphics::FrameProfile profile(graphics.get(), false);
+    profile.Begin();
+    core->Render(&scene, &camera, &film, sparkium::RENDER_PIPELINE_REALTIME);
+    profile.Finish();
+    EXPECT_EQ(profile.counters["realtime_software_gi"], 1);
+    EXPECT_EQ(profile.counters["native_ray_query"], 0);
+    if (frame > 0)
+      EXPECT_EQ(profile.counters["bvh_dispatches"], 0);
+    film.GetRawImage()->DownloadData(pixels.data());
+    for (auto pixel : pixels) {
+      EXPECT_NEAR(pixel.r, 4, 0.002f);
+      EXPECT_NEAR(pixel.g, 0.5f, 0.002f);
+      EXPECT_NEAR(pixel.b, 0.25f, 0.002f);
+      EXPECT_EQ(pixel.a, 1);
+    }
+  }
+  // Interleaved updates must cover the entire grid after one complete period.
+  scene.settings.realtime.updates = 4;
+  for (int frame = 0; frame < 4; ++frame)
+    core->Render(&scene, &camera, &film, sparkium::RENDER_PIPELINE_REALTIME);
+  film.GetRawImage()->DownloadData(pixels.data());
+  for (auto pixel : pixels)
+    EXPECT_NEAR(pixel.r, 4, 0.002f);
+  scene.settings.realtime.updates = 1;
+  // A camera cut reveals the background. Old radiance must not bleed into it.
+  camera.view = glm::lookAt(glm::vec3(100, 0, 4), glm::vec3(100, 0, 0), glm::vec3(0, 1, 0));
+  core->Render(&scene, &camera, &film, sparkium::RENDER_PIPELINE_REALTIME);
+  film.GetRawImage()->DownloadData(pixels.data());
+  for (auto pixel : pixels)
+    EXPECT_NEAR(pixel.r, 0.125f, 0.002f);
+  // Reset invalidates history after an explicit material edit.
+  camera.view = glm::lookAt(glm::vec3(0, 0, 4), glm::vec3(0), glm::vec3(0, 1, 0));
+  material.emission = glm::vec3(0.2f);
+  film.Reset();
+  core->Render(&scene, &camera, &film, sparkium::RENDER_PIPELINE_REALTIME);
+  film.GetRawImage()->DownloadData(pixels.data());
+  for (auto pixel : pixels)
+    EXPECT_NEAR(pixel.r, 0.2f, 0.002f);
+  EXPECT_EQ(film.info.accumulated_samples, 1);
+  // Transform edits update software visibility and reset per-view lighting history.
+  entity.transform = glm::mat4x3(glm::translate(glm::mat4(1), glm::vec3(100, 0, 0)));
+  core->Render(&scene, &camera, &film, sparkium::RENDER_PIPELINE_REALTIME);
+  film.GetRawImage()->DownloadData(pixels.data());
+  for (auto pixel : pixels)
+    EXPECT_NEAR(pixel.r, 0.125f, 0.002f);
+  EXPECT_EQ(film.info.accumulated_samples, 1);
+}
+
 TEST(GraphicsCoreCreation, UnsupportedAPIsDoNotFallBack) {
   for (auto api : {graphics::BACKEND_API_METAL, graphics::BACKEND_API_D3D12, graphics::BACKEND_API_VULKAN,
                    static_cast<graphics::BackendAPI>(99)}) {

@@ -15,14 +15,17 @@ using namespace long_march;
 
 namespace {
 void Usage(const char *program) {
-  std::cerr << "Usage: " << program << " <scene.json> [-o image.png] [--hdr-output image.hdr] [--frames N] "
-            << "[--backend auto|metal|vulkan|d3d12] [--pipeline auto|rasterization|ray_tracing|rt_fallback|ray_query] "
-               "[--require-hardware-rt] [--debug] [--profile "
-               "timings.csv] [--profile-cpu-only|--profile-alternate-gpu]\n"
-            << "       " << program << " --list [scene-directory]\n";
+  std::cerr
+      << "Usage: " << program << " <scene.json> [-o image.png] [--hdr-output image.hdr] [--frames N] "
+      << "[--backend auto|metal|vulkan|d3d12] [--pipeline auto|realtime|rasterization|ray_tracing|rt_fallback|ray_query] "
+         "[--require-hardware-rt] [--debug] [--profile "
+         "timings.csv] [--profile-cpu-only|--profile-alternate-gpu]\n"
+      << "       " << program << " --list [scene-directory]\n";
 }
 
 sparkium::RenderPipeline ParsePipeline(const std::string &name) {
+  if (name == "realtime")
+    return sparkium::RENDER_PIPELINE_REALTIME;
   if (name == "ray_query")
     return sparkium::RENDER_PIPELINE_RAY_QUERY;
   if (name == "rt_fallback")

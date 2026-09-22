@@ -106,3 +106,7 @@ view transform. Browser/OS/display HDR support and available EDR headroom are
 required to see extended brightness. GitHub image proxies may transform images;
 provide a direct original-file link as well as the inline image. SDR displays
 may tone-map the HDR file, so screenshots cannot verify physical HDR brightness.
+
+For the experimental software-traced realtime pipeline and its quality/budget
+controls, see [Realtime GI](realtime-gi.md). Both CLI and GUI accept
+`--pipeline realtime`.

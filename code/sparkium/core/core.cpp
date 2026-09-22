@@ -43,6 +43,9 @@ RenderPipeline Core::ResolveRenderPipeline(RenderPipeline render_pipeline) const
 void Core::Render(Scene *scene, Camera *camera, Film *film, RenderPipeline render_pipeline) {
   render_pipeline = ResolveRenderPipeline(render_pipeline);
   switch (render_pipeline) {
+    case RENDER_PIPELINE_REALTIME:
+      raytracing::Render(this, scene, camera, film, true, false, true);
+      break;
     case RENDER_PIPELINE_RASTERIZATION:
       raster::Render(this, scene, camera, film);
       break;

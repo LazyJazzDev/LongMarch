@@ -2,8 +2,14 @@
 #include "common.hlsli"
 #include "buffer_helper.hlsli"
 
+#ifdef SPARKIUM_REALTIME
+RWTexture2D<float4> realtime_outputs[] : register(u0, space0);
+#define accumulated_color realtime_outputs[0]
+Texture2D<float4> history_inputs[] : register(t0, space1);
+#else
 RWTexture2D<float4> accumulated_color : register(u0, space0);
 RWTexture2D<float> accumulated_samples : register(u0, space1);
+#endif
 ConstantBuffer<RenderSettings> render_settings : register(b0, space3);
 #define SOBOL_TABLE
 #ifdef SPARKIUM_SOFTWARE_RT

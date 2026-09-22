@@ -39,8 +39,17 @@ void SoftwareTracePath(RayDesc ray, inout RenderContext context) {
     SoftwareSampleMaterial(LoadSoftwareInstance(software_instances, hit.instance).material, context, record);
 }
 
+#ifndef SPARKIUM_REALTIME
 #include "raygen.hlsl"
+#else
+void ApplyPathMiss(inout RenderContext context) {
+  if (context.medium_object_index < 0)
+    context.radiance += render_settings.background_color * context.throughput;
+  context.throughput = float3(0, 0, 0);
+}
+#endif
 #include "software/shadow.hlsli"
+#ifndef SPARKIUM_REALTIME
 [numthreads(8, 8, 1)] void Main(uint3 id
                                 : SV_DispatchThreadID) {
   uint width, height;
@@ -48,3 +57,5 @@ void SoftwareTracePath(RayDesc ray, inout RenderContext context) {
   if (id.x < width && id.y < height)
     RenderPixel(id.xy, uint2(width, height));
 }
+
+#endif
