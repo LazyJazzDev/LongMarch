@@ -98,8 +98,10 @@ float4 SliderTheme(PSInput input) {
   float2 q = abs(input.local_position) * half_size - half_size + radius;
   float distance = length(max(q, 0.0)) + min(max(q.x, q.y), 0.0) - radius;
   clip(-distance);
-  // Match the buttons' upper-left light while preserving the slider palette's
-  // center brightness. Both color regions share the full bar's coordinates.
+  // Filled regions are raised like the buttons; the empty track reverses the
+  // light direction to read as recessed. Keep the same center brightness.
+  if (input.extra.x == 5)
+    input.local_position = -input.local_position;
   const float center_gain = 2.0 - sqrt(2.0) * 0.3;
   return float4(IconTheme(input).rgb / center_gain, 1.0);
 }
@@ -148,6 +150,7 @@ float4 PSMain(PSInput input) : SV_TARGET {
       color = DiceFaceTheme(input);
       break;
     case 4:
+    case 5:
       color = SliderTheme(input);
       break;
     case 2:

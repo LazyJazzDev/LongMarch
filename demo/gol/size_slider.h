@@ -30,7 +30,13 @@ class SizeSlider : public Listener {
   void DragTo(glm::vec2 p);
   void SetValue(int value);
   void RebuildLabel();
-  void RoundedRect(glm::vec2 position, glm::vec2 size, float radius, float depth, glm::vec4 color, glm::vec4 clip);
+  void RoundedRect(glm::vec2 position,
+                   glm::vec2 size,
+                   float radius,
+                   float depth,
+                   glm::vec4 color,
+                   glm::vec4 clip,
+                   bool recessed);
 
   char label_;
   int value_;

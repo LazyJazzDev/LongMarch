@@ -147,11 +147,12 @@ void SizeSlider::RoundedRect(glm::vec2 position,
                              float radius,
                              float depth,
                              glm::vec4 color,
-                             glm::vec4 clip) {
+                             glm::vec4 clip,
+                             bool recessed) {
   application_->DrawModel(rectangle_, {GetModelMatrix(position, size, depth),
                                        color,
-                                       {4u, glm::floatBitsToUint(size.x * 0.5f), glm::floatBitsToUint(size.y * 0.5f),
-                                        glm::floatBitsToUint(radius)},
+                                       {recessed ? 5u : 4u, glm::floatBitsToUint(size.x * 0.5f),
+                                        glm::floatBitsToUint(size.y * 0.5f), glm::floatBitsToUint(radius)},
                                        clip});
 }
 
@@ -163,7 +164,8 @@ void SizeSlider::Draw() {
   const float radius = thickness * 0.18f;
   const float fraction = float(value_ - grid_size::kMin) / float(grid_size::kMax - grid_size::kMin);
   const float highlight = dragging_ || hovered_ || focused_ ? 0.035f : 0.0f;
-  RoundedRect(position, size, radius, 0.5f, {0.20f + highlight, 0.23f + highlight, 0.28f + highlight, 1.0f}, bounds_);
+  RoundedRect(position, size, radius, 0.5f, {0.20f + highlight, 0.23f + highlight, 0.28f + highlight, 1.0f}, bounds_,
+              true);
   // Clip a second copy of the same rounded silhouette at the value boundary.
   // This produces a straight color division without a separate handle or seam.
   auto filled = bounds_;
@@ -172,7 +174,8 @@ void SizeSlider::Draw() {
   else
     filled.z = bounds_.x + size.x * fraction;
   if (fraction > 0.0f)
-    RoundedRect(position, size, radius, 0.45f, {0.34f + highlight, 0.42f + highlight, 0.53f + highlight, 1.0f}, filled);
+    RoundedRect(position, size, radius, 0.45f, {0.34f + highlight, 0.42f + highlight, 0.53f + highlight, 1.0f}, filled,
+                false);
 
   const float pixel = std::min(thickness * 0.36f / 7.0f, length * 0.8f / label_width_);
   auto transform = glm::translate(glm::mat4{1.0f}, glm::vec3{position + size * 0.5f, 0.4f}) *
