@@ -160,7 +160,7 @@ void SizeSlider::Draw() {
   const glm::vec2 size{bounds_.z - bounds_.x, bounds_.w - bounds_.y};
   const float thickness = vertical_ ? size.x : size.y;
   const float length = vertical_ ? size.y : size.x;
-  const float radius = thickness * 0.42f;
+  const float radius = thickness * 0.18f;
   const float fraction = float(value_ - grid_size::kMin) / float(grid_size::kMax - grid_size::kMin);
   const float highlight = dragging_ || hovered_ || focused_ ? 0.035f : 0.0f;
   RoundedRect(position, size, radius, 0.5f, {0.20f + highlight, 0.23f + highlight, 0.28f + highlight, 1.0f}, bounds_);
@@ -179,5 +179,5 @@ void SizeSlider::Draw() {
                    glm::rotate(glm::mat4{1.0f}, vertical_ ? -glm::half_pi<float>() : 0.0f, glm::vec3{0, 0, 1}) *
                    glm::scale(glm::mat4{1.0f}, glm::vec3{pixel, pixel, 1.0f}) *
                    glm::translate(glm::mat4{1.0f}, glm::vec3{-label_width_ * 0.5f, -3.5f, 0});
-  application_->DrawModel(label_model_.get(), {transform, {0.80f, 0.85f, 0.92f, 1.0f}, glm::uvec4{0}, bounds_});
+  application_->DrawModel(label_model_.get(), {transform, {0.55f, 0.60f, 0.67f, 1.0f}, glm::uvec4{0}, bounds_});
 }
