@@ -66,7 +66,7 @@ float4 DiceFaceTheme(PSInput input) {
     hole = min(hole, min(length(p - float2(-0.50, 0.50)), length(p - float2(0.50, -0.50))));
   if (value == 6)
     hole = min(hole, min(length(p - float2(-0.50, 0.0)), length(p - float2(0.50, 0.0))));
-  clip(hole - 0.15);
+  clip(hole - 0.20);
   return input.color;
 }
 

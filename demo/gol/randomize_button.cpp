@@ -59,18 +59,16 @@ void RandomizeButton::Draw() {
   auto placement = glm::translate(glm::mat4{1.0f}, glm::vec3{position + size * 0.5f, 0.4f}) *
                    glm::scale(glm::mat4{1.0f}, glm::vec3{size * 0.5f, 0.0f});
   auto orientation = glm::mat4_cast(orientation_);
-  auto light = glm::normalize(glm::vec3{-0.4f, -0.6f, -1.0f});
   for (size_t i = 0; i < kNormals.size(); ++i) {
     auto normal = kNormals[i];
     auto rotated_normal = glm::mat3(orientation) * normal;
     if (rotated_normal.z >= 0.0f)
       continue;
-    float shade = 0.60f + 0.40f * std::max(0.0f, glm::dot(rotated_normal, light));
     // A 0.38 half-width on faces spaced 0.43 from the center leaves open seams.
     auto transform =
         placement * orientation * FaceFrame(normal) * glm::scale(glm::mat4{1.0f}, glm::vec3{0.38f, 0.38f, 1});
-    application_->DrawModel(face_.get(), {transform, glm::vec4{glm::vec3{0.96f, 0.97f, 1.0f} * shade, 1},
-                                          glm::uvec4{3, kFaceValues[i], 0, 0}});
+    application_->DrawModel(face_.get(),
+                            {transform, glm::vec4{0.96f, 0.97f, 1.0f, 1.0f}, glm::uvec4{3, kFaceValues[i], 0, 0}});
   }
 }
 
