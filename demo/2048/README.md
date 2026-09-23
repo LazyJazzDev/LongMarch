@@ -12,8 +12,12 @@ build/demo/2048/demo_2048
 
 Use the arrow keys to move the blocks. **MENU** opens the menu with
 **KEEP GOING** and **NEW GAME**; a game-over screen offers **TRY AGAIN**.
-**AI: OFF** toggles the autoplay, which plays the game by itself until it is
-clicked again.
+
+Clicking the **SCORE** board five times in a row hands the game to the autoplay:
+the title becomes **AI**, the board fades to a red palette, and the arrow keys
+stop answering until the board is clicked once more. The clicks have to be
+consecutive; a pause longer than about a second starts the count over, so the
+gesture stays out of the way of ordinary play.
 
 Options:
 

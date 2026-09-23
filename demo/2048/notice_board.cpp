@@ -51,6 +51,28 @@ void NoticeBoard::Draw() {
   content_bar_->Draw();
 }
 
+void NoticeBoard::UpdateTitleText(const std::wstring &title_text) {
+  title_text_ = title_text;
+  title_bar_->UpdateText(title_text);
+  // The title keeps its own layout: the bar is sized from the board rectangle,
+  // not from the string, so a shorter title stays in the same place.
+  float separate_scale = 0.618;
+  float separate_line = top_ + (bottom_ - top_) * (1.0f - separate_scale);
+  title_bar_->Resize(
+      (separate_line - top_) * 0.618f,
+      glm::vec2{(left_ + right_) * 0.5f, separate_line + (top_ - separate_line) * (1.0f - 0.618f) * 0.8f});
+}
+
+void NoticeBoard::UpdateTitleColor(const glm::vec3 &title_color) {
+  title_bar_->UpdateColor(title_color);
+}
+
+void NoticeBoard::UpdateBackgroundColor(const glm::vec3 &background_color) {
+  background_color_ = background_color;
+  auto model = GenerateRoundedRectangle(left_, top_, right_, bottom_, arc_radius_, background_color_, 8);
+  background_model_ = std::make_unique<DeviceModel>(app_, model);
+}
+
 void NoticeBoard::UpdateContentText(const std::wstring &content_text) {
   content_text_ = content_text;
   content_bar_->UpdateText(content_text);

@@ -13,6 +13,9 @@ class NoticeBoard {
   void Resize(float left, float top, float right, float bottom, float arc_radius);
   void Draw();
   void UpdateContentText(const std::wstring &content_text);
+  void UpdateTitleText(const std::wstring &title_text);
+  void UpdateTitleColor(const glm::vec3 &title_color);
+  void UpdateBackgroundColor(const glm::vec3 &background_color);
 
  private:
   Application *app_{};

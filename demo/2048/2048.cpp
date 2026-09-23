@@ -4,14 +4,25 @@
 
 namespace {
 
-// The autoplay button carries its state in its color and its label: grey while
-// the strategy is paused, the accent color of the menu button while it plays.
-const glm::vec3 kAiButtonPausedColor{184.0f / 255.0f, 173.0f / 255.0f, 161.0f / 255.0f};
-const glm::vec3 kAiButtonRunningColor{225.0f / 255.0f, 156.0f / 255.0f, 102.0f / 255.0f};
+// The score board in its normal state, and the same board while the autoplay
+// owns the game. The autoplay palette is a muted brick red of about the same
+// lightness as the warm grey it replaces, with a tinted title, so the board
+// reads as the same object in a different mood instead of a warning banner.
+const glm::vec3 kScoreBoardColor{184.0f / 255.0f, 173.0f / 255.0f, 161.0f / 255.0f};
+const glm::vec3 kScoreBoardTitleColor{236.0f / 255.0f, 228.0f / 255.0f, 214.0f / 255.0f};
+const glm::vec3 kAiScoreBoardColor{174.0f / 255.0f, 70.0f / 255.0f, 56.0f / 255.0f};
+const glm::vec3 kAiScoreBoardTitleColor{240.0f / 255.0f, 196.0f / 255.0f, 178.0f / 255.0f};
 
-// How long one autoplay move may think. The search runs on its own thread, so
-// the budget only decides how deep it looks, not how smoothly the board moves.
+// How long the score board takes to fade between the two palettes, and how
+// long one autoplay move may think. The search runs on its own thread, so the
+// budget only decides how deep it looks, not how smoothly the board moves.
+constexpr float kAiThemeSeconds = 0.45f;
 constexpr float kAiSearchBudgetMs = 150.0f;
+
+// The clicks that start the autoplay have to be consecutive: a pause longer
+// than this window starts the count over.
+constexpr float kScoreBoardClickWindow = 1.2f;
+constexpr int kScoreBoardClicksToStartAi = 5;
 
 }  // namespace
 
@@ -19,6 +30,11 @@ TwentyFourEight::TwentyFourEight(const std::string &title, int width, int height
     : Application(title, width, height, api) {
   GetWindow()->KeyEvent().RegisterCallback([this](int key, int scancode, int action, int mods) {
     if (action != GLFW_PRESS) {
+      return;
+    }
+    // The autoplay takes the game over completely while it runs, so the arrow
+    // keys stop answering until the score board turns it off again.
+    if (ai_enabled_) {
       return;
     }
     switch (key) {
@@ -57,9 +73,9 @@ void TwentyFourEight::CustomOnInit() {
 
   font_factory_ = std::make_unique<font::Factory>(FindAssetFile("fonts/ClearSans-Bold-webfont.woff"));
   block_renderer_ = std::make_unique<BlockRenderer>(this, font_factory_.get());
-  score_board_ =
-      std::make_unique<NoticeBoard>(this, font_factory_.get(), glm::vec3{236.0f, 228.0f, 214.0f} / 255.0f,
-                                    glm::vec3{1.0f}, glm::vec3{184.0f, 173.0f, 161.0f} / 255.0f, L"SCORE", L"0");
+  score_board_ = std::make_unique<NoticeBoard>(this, font_factory_.get(), kScoreBoardTitleColor, glm::vec3{1.0f},
+                                               kScoreBoardColor, L"SCORE", L"0");
+  score_board_gesture_ = std::make_unique<ScoreBoardGesture>(this, this);
   game_over_bar_ = std::make_unique<TextBar>(this, font_factory_.get(), L"Game Over!", 1.0f,
                                              glm::vec3{117.0f, 110.0f, 102.0f} / 255.0f, glm::vec2{0.0f, 0.0f},
                                              TextBar::AlignMode::kMid);
@@ -114,21 +130,12 @@ void TwentyFourEight::CustomOnInit() {
         }
       },
       0.618f);
-  ai_button_ = std::make_unique<TextButton>(
-      this, font_factory_.get(), glm::vec3{1.0f}, kAiButtonPausedColor, L"AI: OFF",
-      [](Application *app) {
-        auto app_instance = dynamic_cast<TwentyFourEight *>(app);
-        if (app_instance) {
-          app_instance->ToggleAi();
-        } else {
-          LogError("The app is not a 2048 instance");
-        }
-      },
-      0.45f);
   OnWindowSize();
   ResetGame();
-  UpdateAiButton();
   SetAiEnabled(initial_ai_enabled_);
+  // A run started with `--ai` shows the theme it would have faded into.
+  ai_theme_mix_ = ai_enabled_ ? 1.0f : 0.0f;
+  UpdateScoreBoardTheme();
 }
 
 void TwentyFourEight::CustomOnUpdate() {
@@ -145,7 +152,7 @@ void TwentyFourEight::CustomOnUpdate() {
 void TwentyFourEight::CustomOnClose() {
   // Release resources in reverse order of creation.
   ai_player_.Reset();
-  ai_button_.reset();
+  score_board_gesture_.reset();
   menu_button_.reset();
   menu_new_game_button_.reset();
   menu_keep_going_button_.reset();
@@ -167,20 +174,38 @@ void TwentyFourEight::CustomOnClose() {
 void TwentyFourEight::SetAiEnabled(bool enabled) {
   ai_enabled_ = enabled;
   // The revision marks the position the strategy is answering about, so a move
-  // that was computed before this change is dropped instead of played.
+  // that was computed before this change is dropped instead of played. A move
+  // the player queued by hand is dropped with it: from here the strategy owns
+  // the board.
   board_revision_++;
   ai_player_.Reset();
-  UpdateAiButton();
-  LogInfo("2048 autoplay {}", ai_enabled_ ? "started" : "paused");
+  operation_buffer_.reset();
+  score_board_clicks_ = 0;
+  score_board_click_timer_ = 0.0f;
+  score_board_->UpdateTitleText(ai_enabled_ ? L"AI" : L"SCORE");
+  LogInfo("2048 autoplay {}", ai_enabled_ ? "started" : "stopped");
 }
 
-void TwentyFourEight::ToggleAi() {
-  SetAiEnabled(!ai_enabled_);
+void TwentyFourEight::OnScoreBoardClick() {
+  if (ai_enabled_) {
+    SetAiEnabled(false);
+    return;
+  }
+
+  score_board_clicks_++;
+  score_board_click_timer_ = kScoreBoardClickWindow;
+  if (score_board_clicks_ >= kScoreBoardClicksToStartAi) {
+    SetAiEnabled(true);
+  }
 }
 
-void TwentyFourEight::UpdateAiButton() {
-  ai_button_->UpdateBackgroundColor(ai_enabled_ ? kAiButtonRunningColor : kAiButtonPausedColor);
-  ai_button_->UpdateText(ai_enabled_ ? L"AI: ON" : L"AI: OFF");
+// The score board fades between the two palettes instead of switching, so the
+// autoplay taking over reads as the board itself changing.
+void TwentyFourEight::UpdateScoreBoardTheme() {
+  const glm::vec3 title_color = glm::mix(kScoreBoardTitleColor, kAiScoreBoardTitleColor, ai_theme_mix_);
+  const glm::vec3 background_color = glm::mix(kScoreBoardColor, kAiScoreBoardColor, ai_theme_mix_);
+  score_board_->UpdateTitleColor(title_color);
+  score_board_->UpdateBackgroundColor(background_color);
 }
 
 AiPlayer::Board TwentyFourEight::SnapshotBoard() const {
@@ -249,10 +274,12 @@ void TwentyFourEight::OnWindowSize() {
                        window_width * 0.5f + ui_unit * 50.0f - ui_unit * 8.75f,
                        top + 50.0f * title_scale * ui_unit + block_size * 0.5f - block_size * (1.0f / 16.0f),
                        block_size / 32.0f);
-  ai_button_->Resize(
-      window_width * 0.5f + ui_unit * 50.0f - ui_unit * 38.75f, top + 50.0f * title_scale * ui_unit + block_size * 0.5f,
+  // The click target of the score board gesture is the score board itself.
+  score_board_gesture_->Resize(
+      window_width * 0.5f + ui_unit * 50.0f - ui_unit * 38.75f,
+      top + 50.0f * title_scale * ui_unit + block_size * 0.5f - block_size * (1.0f - 1.0f / 16.0f),
       window_width * 0.5f + ui_unit * 50.0f - ui_unit * 8.75f,
-      top + 50.0f * title_scale * ui_unit + block_size * 0.5f + block_size * (3.0f / 16.0f), block_size / 32.0f);
+      top + 50.0f * title_scale * ui_unit + block_size * 0.5f - block_size * (5.0f / 16.0f));
 
   game_over_bar_->Resize(ui_unit * 7.0f, glm::vec2{window_width * 0.5f, window_height * 0.5f - ui_unit * 30.0f});
   game_over_score_board_->Resize(window_width * 0.5f - ui_unit * 15.0f, window_height * 0.5f - ui_unit * 25.0f,
@@ -276,14 +303,14 @@ void TwentyFourEight::OnTransitStage() {
   switch (game_stage_) {
     case GameStage::kGameGoing:
       menu_button_->Activate();
-      ai_button_->Activate();
+      score_board_gesture_->Activate();
       game_over_button_->Deactivate();
       menu_keep_going_button_->Deactivate();
       menu_new_game_button_->Deactivate();
       break;
     case GameStage::kMenu:
       menu_button_->Deactivate();
-      ai_button_->Deactivate();
+      score_board_gesture_->Deactivate();
       game_over_button_->Deactivate();
       menu_keep_going_button_->Activate();
       menu_new_game_button_->Activate();
@@ -298,7 +325,7 @@ void TwentyFourEight::OnTransitStage() {
         game_over_score_board_->UpdateContentText(number_str32);
       }();
       menu_button_->Deactivate();
-      ai_button_->Deactivate();
+      score_board_gesture_->Deactivate();
       game_over_button_->Activate();
       menu_keep_going_button_->Deactivate();
       menu_new_game_button_->Deactivate();
@@ -450,6 +477,23 @@ bool TwentyFourEight::IsGameOver() {
 }
 
 void TwentyFourEight::OnUpdate(float t) {
+  // The gesture window and the theme fade run on the frame clock; the board
+  // animation below runs on its own faster one.
+  if (score_board_click_timer_ > 0.0f) {
+    score_board_click_timer_ -= t;
+    if (score_board_click_timer_ <= 0.0f) {
+      score_board_click_timer_ = 0.0f;
+      score_board_clicks_ = 0;
+    }
+  }
+  const float theme_target = ai_enabled_ ? 1.0f : 0.0f;
+  if (ai_theme_mix_ != theme_target) {
+    const float step = t / kAiThemeSeconds;
+    ai_theme_mix_ = theme_target > ai_theme_mix_ ? std::min(theme_target, ai_theme_mix_ + step)
+                                                 : std::max(theme_target, ai_theme_mix_ - step);
+    UpdateScoreBoardTheme();
+  }
+
   if (target_game_stage_ != game_stage_) {
     OnTransitStage();
   }
@@ -613,5 +657,4 @@ void TwentyFourEight::OnDraw() {
   }
 
   menu_button_->Draw();
-  ai_button_->Draw();
 }

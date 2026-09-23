@@ -24,15 +24,6 @@ void TextButton::Resize(float left, float top, float right, float bottom, float 
   Button::Resize(left, top, right, bottom);
 }
 
-void TextButton::UpdateText(const std::wstring &text) {
-  text_bar_->UpdateText(text);
-}
-
-void TextButton::UpdateBackgroundColor(glm::vec3 color) {
-  background_color_ = color;
-  OnResize();
-}
-
 void TextButton::Draw() {
   application_->DrawModel(
       background_model_.get(),

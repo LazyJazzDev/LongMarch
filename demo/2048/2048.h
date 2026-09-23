@@ -40,11 +40,31 @@ class TwentyFourEight : public Application {
   void OnUpdate(float t);
   void OnDraw();
 
+  // Five consecutive clicks on the score board start the autoplay, and one
+  // click on a running autoplay stops it. The gesture is a click target over
+  // the score board, not a control of its own: it has no hover look and draws
+  // nothing, so the board keeps the layout it always had.
+  class ScoreBoardGesture : public Button {
+   public:
+    ScoreBoardGesture(Application *app, TwentyFourEight *owner) : Button(app, 0.0f, 0.0f, 1.0f, 1.0f), owner_(owner) {
+    }
+
+    void OnClick() override {
+      owner_->OnScoreBoardClick();
+    }
+
+    void OnStateChange(int state) override {
+    }
+
+   private:
+    TwentyFourEight *owner_;
+  };
+
   void OnWindowSize();
   void OnTransitStage();
   void SetAiEnabled(bool enabled);
-  void ToggleAi();
-  void UpdateAiButton();
+  void OnScoreBoardClick();
+  void UpdateScoreBoardTheme();
   [[nodiscard]] AiPlayer::Board SnapshotBoard() const;
   void OnMove(Direction direction);
   void AddBlock(int x, int y, int number);
@@ -76,7 +96,7 @@ class TwentyFourEight : public Application {
   std::unique_ptr<TextButton> menu_new_game_button_;
 
   std::unique_ptr<TextButton> menu_button_;
-  std::unique_ptr<TextButton> ai_button_;
+  std::unique_ptr<ScoreBoardGesture> score_board_gesture_;
 
   // The autoplay strategy and the position it was asked about: the revision
   // counts how often the board changed, so a result for an older position is
@@ -86,6 +106,13 @@ class TwentyFourEight : public Application {
   bool initial_ai_enabled_{false};
   int ai_stop_tile_{0};
   uint64_t board_revision_{0};
+
+  // Clicks on the score board that are still close enough together to count as
+  // one gesture, and how far the score board has shifted to the autoplay
+  // theme: zero keeps the original colors, one is fully red.
+  int score_board_clicks_{0};
+  float score_board_click_timer_{0.0f};
+  float ai_theme_mix_{0.0f};
 
   int program_texture_uniform_alpha_{0};
   GameStage game_stage_{GameStage::kGameGoing};

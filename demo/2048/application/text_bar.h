@@ -20,6 +20,8 @@ class TextBar : public Listener {
 
   void UpdateText(const std::wstring &text);
 
+  void UpdateColor(const glm::vec3 &color);
+
   void Draw();
 
   void Resize(float font_size, glm::vec2 origin);

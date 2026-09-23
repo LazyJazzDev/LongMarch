@@ -26,6 +26,11 @@ void TextBar::UpdateText(const std::wstring &text) {
   BuildMesh();
 }
 
+void TextBar::UpdateColor(const glm::vec3 &color) {
+  font_color_ = color;
+  BuildMesh();
+}
+
 void TextBar::BuildMesh() {
   auto triangles = font_factory_->GetString(text_);
   switch (align_mode_) {
