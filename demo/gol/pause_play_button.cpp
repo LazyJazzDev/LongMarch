@@ -1,6 +1,7 @@
 #include "pause_play_button.h"
 
 #include "application/model.h"
+#include "button_palette.h"
 
 PausePlayButton::PausePlayButton(Application *app,
                                  float left,
@@ -78,8 +79,8 @@ PausePlayButton::PausePlayButton(Application *app,
 
     std::vector<uint32_t> indices = {0, 1, 2, 0, 2, 3, 4, 5, 6, 4, 6, 7};
 
-    const auto pause_color = glm::vec4(0.5f, 0.24f, 0.24f, 1.0f);
-    const auto play_color = glm::vec4(0.24f, 0.5f, 0.24f, 1.0f);
+    const auto pause_color = button_palette::kPause;
+    const auto play_color = button_palette::kPlay;
 
     std::vector<std::vector<Vertex>> vertices = {
         ComposeVertices(positions[0], play_color), ComposeVertices(positions[1], pause_color),
@@ -89,8 +90,7 @@ PausePlayButton::PausePlayButton(Application *app,
     pause_play_model_ = std::make_unique<MixModel>(vertices, indices);
   }
 
-  background_color_ = MixValue<glm::vec4>(
-      {glm::vec4{glm::vec3(0.2), 1.0}, glm::vec4{glm::vec3(0.16), 1.0}, glm::vec4{glm::vec3(0.12), 1.0}});
+  background_color_ = button_palette::Background();
 
   pause_play_device_model_ =
       std::make_unique<DeviceModel>(application_, pause_play_model_->GetModel(0.0, MixStyle::kLinear));

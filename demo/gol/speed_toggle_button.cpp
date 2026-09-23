@@ -1,5 +1,7 @@
 #include "speed_toggle_button.h"
 
+#include "button_palette.h"
+
 SpeedToggleButton::SpeedToggleButton(Application *app,
                                      float left,
                                      float top,
@@ -11,8 +13,8 @@ SpeedToggleButton::SpeedToggleButton(Application *app,
   ResizeModel();
 
   {
-    const auto active_color = glm::vec4(0.5, 0.5, 0.5, 1.0);
-    const auto deactive_color = glm::vec4(0.1, 0.1, 0.1, 1.0);
+    const auto active_color = button_palette::kNeutral;
+    const auto deactive_color = button_palette::kInactive;
 
     const float content_width = (std::sqrt(5.0f) - 1.0f) * 0.5f;
     const float content_height = 0.48;
@@ -64,8 +66,7 @@ SpeedToggleButton::SpeedToggleButton(Application *app,
     speed_toggle_model_ = std::make_unique<MixModel>(vertices, indices);
   }
 
-  background_color_ = MixValue<glm::vec4>(
-      {glm::vec4{glm::vec3{0.2}, 1.0}, glm::vec4{glm::vec3{0.16}, 1.0}, glm::vec4{glm::vec3{0.12}, 1.0}});
+  background_color_ = button_palette::Background();
 
   speed_toggle_device_model_ =
       std::make_unique<DeviceModel>(application_, speed_toggle_model_->GetModel(0.0, MixStyle::kLinear));

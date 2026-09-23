@@ -2,6 +2,7 @@
 
 #include <array>
 
+#include "button_palette.h"
 #include "glm/gtc/matrix_transform.hpp"
 
 namespace {
@@ -32,8 +33,7 @@ RandomizeButton::RandomizeButton(Application *app, std::vector<uint8_t> *cells, 
   face_ = std::make_unique<DeviceModel>(
       app, Model(ComposeVertices({{-1, -1}, {1, -1}, {1, 1}, {-1, 1}}, glm::vec4{1.0f}), {0, 1, 2, 0, 2, 3}));
   orientation_ = start_orientation_ = target_orientation_ = DisplayOrientation(selected_face_, 0);
-  background_color_ =
-      MixValue<glm::vec4>({{0.10f, 0.16f, 0.24f, 1}, {0.12f, 0.20f, 0.30f, 1}, {0.18f, 0.28f, 0.40f, 1}});
+  background_color_ = button_palette::Background();
 }
 
 void RandomizeButton::Update(float delta_time) {
@@ -68,8 +68,7 @@ void RandomizeButton::Draw() {
     // A 0.38 half-width on faces spaced 0.43 from the center leaves open seams.
     auto transform =
         placement * orientation * FaceFrame(normal) * glm::scale(glm::mat4{1.0f}, glm::vec3{0.38f, 0.38f, 1});
-    application_->DrawModel(face_.get(),
-                            {transform, glm::vec4{0.74f, 0.76f, 0.80f, 1.0f}, glm::uvec4{3, kFaceValues[i], 0, 0}});
+    application_->DrawModel(face_.get(), {transform, button_palette::kDice, glm::uvec4{3, kFaceValues[i], 0, 0}});
   }
 }
 

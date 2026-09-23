@@ -1,5 +1,6 @@
 #include "refresh_button.h"
 
+#include "button_palette.h"
 #include "geometry/mesh.h"
 
 RefreshButton::RefreshButton(Application *app,
@@ -58,8 +59,8 @@ RefreshButton::RefreshButton(Application *app,
       indices[i] = i;
     }
 
-    // Same base gray as the lit speed arrows; the icon gradient brightens it by up to 1.8x.
-    auto color = glm::vec4{0.5f, 0.5f, 0.5f, 1.0f};
+    // Match the lit speed arrows, including their icon gradient.
+    auto color = button_palette::kNeutral;
 
     std::vector<std::vector<Vertex>> vertices = {
         ComposeVertices(refresh_logo, color),
@@ -75,8 +76,7 @@ RefreshButton::RefreshButton(Application *app,
     refresh_model_ = std::make_unique<MixModel>(vertices, indices);
   }
 
-  background_color_ = MixValue<glm::vec4>(
-      {glm::vec4(0.24, 0.1, 0.1, 1.0), glm::vec4(0.3, 0.12, 0.12, 1.0), glm::vec4(0.4, 0.18, 0.18, 1.0)});
+  background_color_ = button_palette::Background();
 
   refresh_device_model_ = std::make_unique<DeviceModel>(application_, refresh_model_->GetModel(0.0, MixStyle::kLinear));
   refresh_animation_var_ = AnimationVar(0.0, AnimationStyle::kPower5);
