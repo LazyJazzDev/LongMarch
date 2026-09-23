@@ -1,5 +1,20 @@
 #include "2048.h"
 
+#include <algorithm>
+
+namespace {
+
+// The autoplay button carries its state in its color and its label: grey while
+// the strategy is paused, the accent color of the menu button while it plays.
+const glm::vec3 kAiButtonPausedColor{184.0f / 255.0f, 173.0f / 255.0f, 161.0f / 255.0f};
+const glm::vec3 kAiButtonRunningColor{225.0f / 255.0f, 156.0f / 255.0f, 102.0f / 255.0f};
+
+// How long one autoplay move may think. The search runs on its own thread, so
+// the budget only decides how deep it looks, not how smoothly the board moves.
+constexpr float kAiSearchBudgetMs = 150.0f;
+
+}  // namespace
+
 TwentyFourEight::TwentyFourEight(const std::string &title, int width, int height, graphics::BackendAPI api)
     : Application(title, width, height, api) {
   GetWindow()->KeyEvent().RegisterCallback([this](int key, int scancode, int action, int mods) {
@@ -99,8 +114,21 @@ void TwentyFourEight::CustomOnInit() {
         }
       },
       0.618f);
+  ai_button_ = std::make_unique<TextButton>(
+      this, font_factory_.get(), glm::vec3{1.0f}, kAiButtonPausedColor, L"AI: OFF",
+      [](Application *app) {
+        auto app_instance = dynamic_cast<TwentyFourEight *>(app);
+        if (app_instance) {
+          app_instance->ToggleAi();
+        } else {
+          LogError("The app is not a 2048 instance");
+        }
+      },
+      0.45f);
   OnWindowSize();
   ResetGame();
+  UpdateAiButton();
+  SetAiEnabled(initial_ai_enabled_);
 }
 
 void TwentyFourEight::CustomOnUpdate() {
@@ -116,6 +144,8 @@ void TwentyFourEight::CustomOnUpdate() {
 
 void TwentyFourEight::CustomOnClose() {
   // Release resources in reverse order of creation.
+  ai_player_.Reset();
+  ai_button_.reset();
   menu_button_.reset();
   menu_new_game_button_.reset();
   menu_keep_going_button_.reset();
@@ -132,6 +162,41 @@ void TwentyFourEight::CustomOnClose() {
   block_renderer_.reset();
   font_factory_.reset();
   Application::CustomOnClose();
+}
+
+void TwentyFourEight::SetAiEnabled(bool enabled) {
+  ai_enabled_ = enabled;
+  // The revision marks the position the strategy is answering about, so a move
+  // that was computed before this change is dropped instead of played.
+  board_revision_++;
+  ai_player_.Reset();
+  UpdateAiButton();
+  LogInfo("2048 autoplay {}", ai_enabled_ ? "started" : "paused");
+}
+
+void TwentyFourEight::ToggleAi() {
+  SetAiEnabled(!ai_enabled_);
+}
+
+void TwentyFourEight::UpdateAiButton() {
+  ai_button_->UpdateBackgroundColor(ai_enabled_ ? kAiButtonRunningColor : kAiButtonPausedColor);
+  ai_button_->UpdateText(ai_enabled_ ? L"AI: ON" : L"AI: OFF");
+}
+
+AiPlayer::Board TwentyFourEight::SnapshotBoard() const {
+  // A position may still hold both blocks of a merge until the motion settles:
+  // the larger one is the tile that survives, and the strategy only ever sees
+  // the settled board.
+  AiPlayer::Board board{};
+  for (const auto &number_block : number_blocks_) {
+    if (number_block.IsDead() || number_block.x < 0 || number_block.x >= kBoardSize || number_block.y < 0 ||
+        number_block.y >= kBoardSize) {
+      continue;
+    }
+    const int cell = BoardCell(number_block.x, number_block.y);
+    board[cell] = std::max(board[cell], uint8_t(AiPlayer::RankOf(number_block.number)));
+  }
+  return board;
 }
 
 void TwentyFourEight::OnWindowSize() {
@@ -184,6 +249,10 @@ void TwentyFourEight::OnWindowSize() {
                        window_width * 0.5f + ui_unit * 50.0f - ui_unit * 8.75f,
                        top + 50.0f * title_scale * ui_unit + block_size * 0.5f - block_size * (1.0f / 16.0f),
                        block_size / 32.0f);
+  ai_button_->Resize(
+      window_width * 0.5f + ui_unit * 50.0f - ui_unit * 38.75f, top + 50.0f * title_scale * ui_unit + block_size * 0.5f,
+      window_width * 0.5f + ui_unit * 50.0f - ui_unit * 8.75f,
+      top + 50.0f * title_scale * ui_unit + block_size * 0.5f + block_size * (3.0f / 16.0f), block_size / 32.0f);
 
   game_over_bar_->Resize(ui_unit * 7.0f, glm::vec2{window_width * 0.5f, window_height * 0.5f - ui_unit * 30.0f});
   game_over_score_board_->Resize(window_width * 0.5f - ui_unit * 15.0f, window_height * 0.5f - ui_unit * 25.0f,
@@ -207,12 +276,14 @@ void TwentyFourEight::OnTransitStage() {
   switch (game_stage_) {
     case GameStage::kGameGoing:
       menu_button_->Activate();
+      ai_button_->Activate();
       game_over_button_->Deactivate();
       menu_keep_going_button_->Deactivate();
       menu_new_game_button_->Deactivate();
       break;
     case GameStage::kMenu:
       menu_button_->Deactivate();
+      ai_button_->Deactivate();
       game_over_button_->Deactivate();
       menu_keep_going_button_->Activate();
       menu_new_game_button_->Activate();
@@ -227,6 +298,7 @@ void TwentyFourEight::OnTransitStage() {
         game_over_score_board_->UpdateContentText(number_str32);
       }();
       menu_button_->Deactivate();
+      ai_button_->Deactivate();
       game_over_button_->Activate();
       menu_keep_going_button_->Deactivate();
       menu_new_game_button_->Deactivate();
@@ -239,6 +311,8 @@ void TwentyFourEight::TransitStage(GameStage stage) {
 }
 
 void TwentyFourEight::ResetGame() {
+  ai_player_.Reset();
+  board_revision_++;
   number_blocks_.clear();
   random_device_ = std::mt19937(int(std::time(nullptr)));
   GenRandomBlock();
@@ -307,6 +381,7 @@ void TwentyFourEight::OnMove(Direction direction) {
     }
     alpha_ = 0.0f;
     GenRandomBlock();
+    board_revision_++;
   }
   UpdateScoreBoard();
 }
@@ -316,25 +391,17 @@ void TwentyFourEight::AddBlock(int x, int y, int number) {
 }
 
 void TwentyFourEight::GenRandomBlock() {
-  bool on_use[4][4] = {};
-  for (auto number_block : number_blocks_) {
-    on_use[number_block.x][number_block.y] = true;
+  CellFlags occupied{};
+  for (const NumberBlock &number_block : number_blocks_) {
+    occupied[BoardCell(number_block.x, number_block.y)] = true;
   }
 
-  std::vector<std::pair<int, int>> blank_positions;
-
-  for (int i = 0; i < 4; i++) {
-    for (int j = 0; j < 4; j++) {
-      if (!on_use[i][j]) {
-        blank_positions.emplace_back(i, j);
-      }
-    }
-  }
-
-  if (!blank_positions.empty()) {
-    int pick = std::uniform_int_distribution<>(0, int(blank_positions.size()) - 1)(random_device_);
-    AddBlock(blank_positions[pick].first, blank_positions[pick].second,
-             std::uniform_real_distribution<>(0.0f, 1.0f)(random_device_) < 0.9f ? 2 : 4);
+  // The one spawn rule of the game, shared with the offline autoplay benchmark
+  // through game_rules.h: a uniform empty cell, then a 2 or a 4.
+  int number = 2;
+  const auto cell = PickSpawnCell(random_device_, occupied, &number);
+  if (cell.has_value()) {
+    AddBlock(cell->first, cell->second, number);
   }
 }
 
@@ -430,10 +497,32 @@ void TwentyFourEight::OnUpdate(float t) {
       number_blocks_.pop_back();
     }
 
+    if (ai_enabled_) {
+      // The strategy plays through the same buffer as the arrow keys: it only
+      // ever answers with a direction, and the blocks move through the very
+      // same update_step call. The random block generator stays untouched.
+      ai_player_.RequestMove(SnapshotBoard(), board_revision_, kAiSearchBudgetMs);
+      if (!operation_buffer_.has_value()) {
+        if (const auto ai_move = ai_player_.TakeMove(board_revision_)) {
+          operation_buffer_ = ai_move;
+        }
+      }
+    }
+
     while (alpha_ == 1.0f && operation_buffer_.has_value()) {
       auto op = operation_buffer_.value();
       operation_buffer_.reset();
       OnMove(op);
+    }
+
+    if (ai_enabled_ && ai_stop_tile_ > 0 && alpha_ == 1.0f) {
+      const auto reached = std::max_element(
+          number_blocks_.begin(), number_blocks_.end(),
+          [](const NumberBlock &left, const NumberBlock &right) { return left.number < right.number; });
+      if (reached != number_blocks_.end() && reached->number >= ai_stop_tile_) {
+        LogInfo("2048 autoplay reached {}, closing for the screenshot", reached->number);
+        glfwSetWindowShouldClose(GetWindow()->GLFWWindow(), GLFW_TRUE);
+      }
     }
 
     if (!alpha_eq_one && alpha_ == 1.0f) {
@@ -524,4 +613,5 @@ void TwentyFourEight::OnDraw() {
   }
 
   menu_button_->Draw();
+  ai_button_->Draw();
 }

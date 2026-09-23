@@ -1,5 +1,8 @@
 #pragma once
+#include <array>
+
 #include "2048_lib.h"
+#include "ai_player.h"
 #include "application/application.h"
 #include "application/button.h"
 #include "application/text_bar.h"
@@ -17,6 +20,18 @@ class TwentyFourEight : public Application {
   void TransitStage(GameStage stage);
   void ResetGame();
 
+  // Enables the autoplay before the application runs, which is how the `--ai`
+  // option starts the demo with the strategy already playing.
+  void SetInitialAiEnabled(bool enabled) {
+    initial_ai_enabled_ = enabled;
+  }
+
+  // Closes the window once the autoplay has built a block of this value, which
+  // is how a screenshot run stops on a board worth capturing. Zero never stops.
+  void SetAiStopTile(int tile) {
+    ai_stop_tile_ = tile;
+  }
+
  private:
   void CustomOnInit() override;
   void CustomOnUpdate() override;
@@ -27,6 +42,10 @@ class TwentyFourEight : public Application {
 
   void OnWindowSize();
   void OnTransitStage();
+  void SetAiEnabled(bool enabled);
+  void ToggleAi();
+  void UpdateAiButton();
+  [[nodiscard]] AiPlayer::Board SnapshotBoard() const;
   void OnMove(Direction direction);
   void AddBlock(int x, int y, int number);
   void GenRandomBlock();
@@ -57,6 +76,16 @@ class TwentyFourEight : public Application {
   std::unique_ptr<TextButton> menu_new_game_button_;
 
   std::unique_ptr<TextButton> menu_button_;
+  std::unique_ptr<TextButton> ai_button_;
+
+  // The autoplay strategy and the position it was asked about: the revision
+  // counts how often the board changed, so a result for an older position is
+  // never played.
+  AiPlayer ai_player_;
+  bool ai_enabled_{false};
+  bool initial_ai_enabled_{false};
+  int ai_stop_tile_{0};
+  uint64_t board_revision_{0};
 
   int program_texture_uniform_alpha_{0};
   GameStage game_stage_{GameStage::kGameGoing};

@@ -14,6 +14,8 @@ class TextButton : public Button {
              std::function<void(Application *app)> callback_func,
              float font_scale);
   void Resize(float left, float top, float right, float bottom, float arc_size);
+  void UpdateText(const std::wstring &text);
+  void UpdateBackgroundColor(glm::vec3 color);
   void Draw();
   void OnResize() override;
   void OnClick() override;
