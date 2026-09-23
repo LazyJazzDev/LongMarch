@@ -46,7 +46,9 @@ Application::Application(const std::string &name, int width, int height, graphic
   LogInfo("Backend API: {}", graphics::BackendAPIString(core_->API()));
   LogInfo("Device Name: {}", core_->DeviceName());
 
-  core_->CreateWindowObject(width, height, name_, false, true, &window_);
+  core_->CreateWindowObject(width, height,
+                            fmt::format("[{}] {} FPS: 0.0", graphics::BackendAPIString(core_->API()), name_), false,
+                            true, &window_);
 
   mouse_move_callback_ = window_->MouseMoveEvent().RegisterCallback(
       [this](double xpos, double ypos) { NotifyListeners(&Listener::OnCursorPos, xpos, ypos); });
@@ -321,7 +323,7 @@ void Application::UpdateTitle() {
   fps_frames_++;
   const double now = glfwGetTime();
   if (now - fps_start_time_ >= 1.0) {
-    window_->SetTitle(fmt::format("{} [{}] FPS: {:.1f}", name_, graphics::BackendAPIString(core_->API()),
+    window_->SetTitle(fmt::format("[{}] {} FPS: {:.1f}", graphics::BackendAPIString(core_->API()), name_,
                                   fps_frames_ / (now - fps_start_time_)));
     fps_frames_ = 0;
     fps_start_time_ = now;
