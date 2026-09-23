@@ -4,6 +4,18 @@
 
 namespace grassland::graphics {
 
+enum class MagnifyPhase { kBegin, kUpdate, kEnd, kCancel };
+
+// Incremental scale (1.0 = unchanged), with a focus in GLFW window coordinates:
+// logical units, origin at the top-left of the content area. Cancellation ends
+// the gesture without undoing previously delivered increments.
+struct MagnifyGesture {
+  double scale{1.0};
+  double x{};
+  double y{};
+  MagnifyPhase phase{MagnifyPhase::kUpdate};
+};
+
 class Window {
  public:
   Window(int width, int height, const std::string &title, bool fullscreen, bool resizable, bool enable_hdr);
@@ -51,6 +63,18 @@ class Window {
     return scroll_event_;
   }
 
+  // Native gesture support for this window/platform, not device availability.
+  // Unsupported platforms emit no magnify events. Ctrl + scroll stays a separate
+  // input path: driver-emulated scroll is never also synthesized as magnification.
+  bool SupportsMagnifyGestures() const {
+    return magnify_monitor_ != nullptr;
+  }
+
+  // Dispatched on the window event thread, just like ScrollEvent().
+  EventManager<void(const MagnifyGesture &)> &MagnifyEvent() {
+    return magnify_event_;
+  }
+
   EventManager<void(int, int, int, int)> &KeyEvent() {
     return key_event_;
   }
@@ -65,6 +89,8 @@ class Window {
 
  private:
   GLFWwindow *window_;
+  void *magnify_monitor_{};
+  EventManager<void(const MagnifyGesture &)> magnify_event_;
   // Resize, mouse, keyboard, etc.
   EventManager<void(int, int)> resize_event_;
   EventManager<void(double, double)> mouse_move_event_;

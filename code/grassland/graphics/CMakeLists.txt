@@ -1,6 +1,12 @@
 file(GLOB SOURCES "*.cpp" "*.h")
 
 add_library(${GRASSLAND_SUBLIB_NAME} ${SOURCES})
+if(APPLE)
+    enable_language(OBJCXX)
+    target_sources(${GRASSLAND_SUBLIB_NAME} PRIVATE window_gestures.mm)
+    target_link_libraries(${GRASSLAND_SUBLIB_NAME} PRIVATE "-framework Cocoa")
+    set_property(TARGET ${GRASSLAND_SUBLIB_NAME} PROPERTY OBJCXX_STANDARD 17)
+endif()
 add_subdirectory(backend)
 
 list(APPEND GRASSLAND_LIBS ${GRASSLAND_SUBLIB_NAME})

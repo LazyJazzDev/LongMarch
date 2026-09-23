@@ -1,5 +1,9 @@
 #include "grassland/graphics/window.h"
 
+#ifdef __APPLE__
+#include "grassland/graphics/window_gestures.h"
+#endif
+
 namespace grassland::graphics {
 
 namespace {
@@ -39,6 +43,9 @@ Window::Window(int width, int height, const std::string &title, bool fullscreen,
     throw std::runtime_error("Failed to create GLFW window");
   }
 
+#ifdef __APPLE__
+  magnify_monitor_ = detail::InstallMagnifyEvents(this);
+#endif
   glfwSetWindowUserPointer(window_, this);
   glfwSetWindowSizeCallback(window_, [](GLFWwindow *window, int width, int height) {
     Window *p_window = static_cast<Window *>(glfwGetWindowUserPointer(window));
@@ -101,6 +108,10 @@ void Window::Resize(int new_width, int new_height) {
 }
 
 void Window::CloseWindow() {
+#ifdef __APPLE__
+  detail::RemoveMagnifyEvents(magnify_monitor_);
+  magnify_monitor_ = nullptr;
+#endif
   glfwDestroyWindow(window_);
   window_ = nullptr;
 }

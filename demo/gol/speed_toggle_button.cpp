@@ -1,0 +1,121 @@
+#include "speed_toggle_button.h"
+
+#include "button_palette.h"
+#include "simulation_clock.h"
+
+SpeedToggleButton::SpeedToggleButton(Application *app,
+                                     float left,
+                                     float top,
+                                     float right,
+                                     float bottom,
+                                     DeviceModel *device_model)
+    : Button(app, left, top, right, bottom),
+      background_device_model_(device_model) {
+  ResizeModel();
+
+  {
+    const auto active_color = button_palette::kNeutral;
+    const auto deactive_color = button_palette::kInactive;
+
+    const float content_width = (std::sqrt(5.0f) - 1.0f) * 0.5f;
+    const float content_height = 0.48;
+
+    std::vector<std::vector<Vertex>> vertices = {
+        {
+            {{-content_width, content_height}, active_color},
+            {{-content_width, -content_height}, active_color},
+            {{-content_width / 3.0f, 0.0f}, active_color},
+            {{-content_width / 3.0f, content_height}, deactive_color},
+            {{-content_width / 3.0f, -content_height}, deactive_color},
+            {{content_width / 3.0f, 0.0f}, deactive_color},
+            {{content_width / 3.0f, content_height}, deactive_color},
+            {{content_width / 3.0f, -content_height}, deactive_color},
+            {{content_width, 0.0f}, deactive_color},
+        },
+        {
+            {{-content_width, content_height}, active_color},
+            {{-content_width, -content_height}, active_color},
+            {{-content_width / 3.0f, 0.0f}, active_color},
+            {{-content_width / 3.0f, content_height}, active_color},
+            {{-content_width / 3.0f, -content_height}, active_color},
+            {{content_width / 3.0f, 0.0f}, active_color},
+            {{content_width / 3.0f, content_height}, deactive_color},
+            {{content_width / 3.0f, -content_height}, deactive_color},
+            {{content_width, 0.0f}, deactive_color},
+        },
+        {
+            {{-content_width, content_height}, active_color},
+            {{-content_width, -content_height}, active_color},
+            {{-content_width / 3.0f, 0.0f}, active_color},
+            {{-content_width / 3.0f, content_height}, active_color},
+            {{-content_width / 3.0f, -content_height}, active_color},
+            {{content_width / 3.0f, 0.0f}, active_color},
+            {{content_width / 3.0f, content_height}, active_color},
+            {{content_width / 3.0f, -content_height}, active_color},
+            {{content_width, 0.0f}, active_color},
+        },
+    };
+
+    for (auto &model : vertices) {
+      for (auto &vertex : model) {
+        vertex.position.x += content_width / 8.0f;
+      }
+    }
+
+    // A fourth degenerate triangle lets the arrows morph into a six-corner bolt.
+    for (auto &model : vertices)
+      model.resize(12, model.back());
+    const glm::vec2 a{0.14f, -0.62f}, b{-0.42f, 0.10f}, c{-0.06f, 0.10f};
+    const glm::vec2 d{-0.20f, 0.62f}, e{0.42f, -0.12f}, f{0.08f, -0.12f};
+    vertices.push_back(ComposeVertices({a, b, f, b, c, f, c, e, f, c, d, e}, button_palette::kLightning));
+    std::vector<uint32_t> indices = {0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11};
+
+    speed_toggle_model_ = std::make_unique<MixModel>(vertices, indices);
+  }
+
+  background_color_ = button_palette::Background();
+
+  speed_toggle_device_model_ =
+      std::make_unique<DeviceModel>(application_, speed_toggle_model_->GetModel(0.0, MixStyle::kLinear));
+  speed_toggle_animation_var_ = AnimationVar(0.0, AnimationStyle::kPower5);
+
+  background_animation_var_ = AnimationVar(0.0, AnimationStyle::kPower5);
+}
+
+void SpeedToggleButton::Update(float t) {
+  speed_toggle_animation_var_.Update(t * 5.0f);
+  speed_toggle_device_model_->UploadVertices(
+      speed_toggle_model_->GetModel(float(speed_toggle_animation_var_), MixStyle::kLinear).Vertices());
+  background_animation_var_.Update(t * 10.0f);
+}
+
+void SpeedToggleButton::Draw() {
+  application_->DrawModel(background_device_model_,
+                          {GetModelMatrix(glm::vec2{left_, top_}, glm::vec2{right_ - left_, bottom_ - top_}, 0.6f),
+                           background_color_.GetValue(float(background_animation_var_)), glm::uvec4{1, 0, 0, 0}});
+
+  application_->DrawModel(speed_toggle_device_model_.get(),
+                          {GetModelMatrix(glm::vec2{left_, top_}, glm::vec2{right_ - left_, bottom_ - top_}, 0.4f),
+                           glm::vec4{1.0f}, glm::uvec4{1, 0, 0, 0}});
+}
+
+void SpeedToggleButton::OnResize() {
+  ResizeModel();
+}
+
+void SpeedToggleButton::OnClick() {
+  click_cnt_++;
+  click_cnt_ %= SimulationClock::kLightning + 1;
+  speed_toggle_animation_var_.AddTarget(1.0);
+}
+
+void SpeedToggleButton::OnStateChange(int state) {
+  background_animation_var_.UpdateTarget(float(state));
+}
+
+void SpeedToggleButton::ResizeModel() {
+}
+
+int SpeedToggleButton::SpeedLevel() const {
+  return click_cnt_;
+}
