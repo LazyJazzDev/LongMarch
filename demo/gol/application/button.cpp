@@ -92,6 +92,12 @@ void Button::OnWindowSize(int width, int height) {
   Listener::OnWindowSize(width, height);
 }
 
+void Button::SetClipBounds(glm::vec4 bounds) {
+  clip_bounds_ = bounds;
+  CalculateListenerBounds();
+  SetState(0);
+}
+
 void Button::Activate() {
   app_->RegisterListener(this);
 }
@@ -110,14 +116,14 @@ void Button::CalculateListenerBounds() {
   glfwGetWindowSize(app_->GLFWWindow(), &window_width, &window_height);
 
   // Scale from frame to window
-  float scale_x = float(window_width) / float(width);
-  float scale_y = float(window_height) / float(height);
+  float scale_x = float(window_width) / float(std::max(width, 1));
+  float scale_y = float(window_height) / float(std::max(height, 1));
 
   // Calculate listener bounds
-  listener_left_ = left_ * scale_x;
-  listener_top_ = top_ * scale_y;
-  listener_right_ = right_ * scale_x;
-  listener_bottom_ = bottom_ * scale_y;
+  listener_left_ = std::max(left_, clip_bounds_.x) * scale_x;
+  listener_top_ = std::max(top_, clip_bounds_.y) * scale_y;
+  listener_right_ = std::min(right_, clip_bounds_.z) * scale_x;
+  listener_bottom_ = std::min(bottom_, clip_bounds_.w) * scale_y;
 }
 
 bool Button::IsInsideListenerBounds(float x, float y) const {

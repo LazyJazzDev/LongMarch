@@ -3,6 +3,7 @@
 #include "application/application.h"
 #include "application/model.h"
 #include "cell_button.h"
+#include "grid_view.h"
 #include "pause_play_button.h"
 #include "randomize_button.h"
 #include "refresh_button.h"
@@ -16,6 +17,8 @@ class GameOfLife : public Application {
              int cell_grid_width,
              int cell_grid_height,
              graphics::BackendAPI api);
+
+  ~GameOfLife() override;
 
   // Fills the grid with random live cells, each alive with the given probability.
   void RandomizeCells(float density, uint32_t seed);
@@ -35,6 +38,18 @@ class GameOfLife : public Application {
   void OnWindowSize();
 
   void InitCells(int width, int height);
+  void LayoutCells();
+  glm::vec2 CursorPosition() const;
+  bool CursorInGrid() const;
+  void ZoomGrid(float factor);
+  void ScrollGrid(double x, double y);
+
+  GridView grid_view_;
+  uint32_t scroll_callback_{};
+  uint32_t key_callback_{};
+#ifdef __APPLE__
+  void *gesture_monitor_{};
+#endif
 
   std::unique_ptr<PausePlayButton> pause_play_button_;
   std::unique_ptr<SpeedToggleButton> speed_toggle_button_;

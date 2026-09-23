@@ -18,6 +18,7 @@ struct InstanceInfo {
   glm::mat4 model;
   glm::vec4 color;
   glm::uvec4 extra;
+  glm::vec4 clip_rect{-1.0e9f, -1.0e9f, 1.0e9f, 1.0e9f};
 };
 
 // A small 2D instanced renderer on top of grassland::graphics. Models are drawn

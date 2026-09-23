@@ -2,6 +2,7 @@ struct InstanceInfo {
   float4x4 model;
   float4 color;
   uint4 extra;
+  float4 clip_rect;
 };
 
 struct GlobalUniformObject {
@@ -27,6 +28,8 @@ struct PSInput {
   [[vk::location(0)]] float2 local_position : TEXCOORD0;
   [[vk::location(1)]] float4 color : TEXCOORD1;
   [[vk::location(2)]] nointerpolation uint4 extra : TEXCOORD2;
+  [[vk::location(3)]] float2 screen_position : TEXCOORD3;
+  [[vk::location(4)]] nointerpolation float4 clip_rect : TEXCOORD4;
 };
 
 PSInput VSMain(VSInput input) {
@@ -49,6 +52,8 @@ PSInput VSMain(VSInput input) {
   output.color = input.color * instance_info.color;
   output.local_position = input.position;
   output.extra = instance_info.extra;
+  output.screen_position = screen_pos.xy;
+  output.clip_rect = instance_info.clip_rect;
   return output;
 }
 
@@ -111,6 +116,8 @@ float4 ShakeColor(inout uint rng_state, float4 color, float shake) {
 }
 
 float4 PSMain(PSInput input) : SV_TARGET {
+  clip(input.screen_position - input.clip_rect.xy);
+  clip(input.clip_rect.zw - input.screen_position);
   // Init rng_state with the fragment position, one dimension at a time.
   uint rng_state = uint(input.position.x);
   rng_state = RandPCG(rng_state);

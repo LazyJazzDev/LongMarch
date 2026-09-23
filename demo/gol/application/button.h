@@ -15,6 +15,8 @@ class Button : public Listener {
   virtual void OnClick();
   virtual void OnResize();
 
+  void SetClipBounds(glm::vec4 bounds);
+
   void Activate();
   void Deactivate();
 
@@ -31,6 +33,8 @@ class Button : public Listener {
   float top_{0};
   float right_{0};
   float bottom_{0};
+
+  glm::vec4 clip_bounds_{-1.0e9f, -1.0e9f, 1.0e9f, 1.0e9f};
 
   float listener_left_{0};
   float listener_top_{0};

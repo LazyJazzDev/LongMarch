@@ -29,7 +29,8 @@ void CellButton::Draw() {
       {GetModelMatrix(glm::vec2{left_, top_}, glm::vec2{right_ - left_, bottom_ - top_}, 0.4f), glm::vec4{1.0f},
        glm::uvec4{2u, glm::floatBitsToUint(background_brightness_[0].GetValue(float(background_animation_var_))),
                   glm::floatBitsToUint(background_brightness_[1].GetValue(float(background_animation_var_))),
-                  glm::floatBitsToUint(float(light_animation_var_))}});
+                  glm::floatBitsToUint(float(light_animation_var_))},
+       clip_bounds_});
 }
 
 void CellButton::OnResize() {

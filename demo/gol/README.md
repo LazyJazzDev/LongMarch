@@ -18,6 +18,14 @@ in 3D and lands on a randomly chosen different face, tilted toward the viewer.
 Each click independently gives every cell a 50% chance of being alive; the
 play/pause state is preserved. The layout follows the window size.
 
+Grid navigation:
+
+- Two-finger scrolling pans the enlarged grid horizontally and vertically.
+- On macOS, pinch with two fingers to zoom around the pointer (1x–12x).
+- Ctrl/Cmd + wheel also zooms; Ctrl/Cmd + `+` / `-` zooms in/out.
+- Ctrl/Cmd + `0` restores the fitted, centered view; Shift + wheel pans horizontally.
+- The controls stay fixed; cells outside the grid viewport are clipped and cannot be clicked.
+
 Options:
 
 - `WIDTH HEIGHT`: cell grid size, each in [2, 100].

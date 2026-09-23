@@ -4,3 +4,10 @@ target_include_directories(${DEMO_NAME} PRIVATE ${CMAKE_CURRENT_SOURCE_DIR} ${CM
 target_link_libraries(${DEMO_NAME} PRIVATE LongMarch)
 PACK_SHADER_CODE(${DEMO_NAME})
 LONGMARCH_DEPLOY_RUNTIME_DEPENDENCIES(${DEMO_NAME})
+
+if(APPLE)
+  enable_language(OBJCXX)
+  target_sources(${DEMO_NAME} PRIVATE trackpad_gestures.mm)
+  target_link_libraries(${DEMO_NAME} PRIVATE "-framework Cocoa")
+  set_property(TARGET ${DEMO_NAME} PROPERTY OBJCXX_STANDARD 17)
+endif()

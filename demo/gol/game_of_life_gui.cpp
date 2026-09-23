@@ -2,6 +2,10 @@
 
 #include <random>
 
+#ifdef __APPLE__
+#include "trackpad_gestures.h"
+#endif
+
 #include "application/listener.h"
 #include "application/model.h"
 #include "game_of_life_lib.h"
@@ -16,6 +20,12 @@ GameOfLife::GameOfLife(const char *title,
     : Application(title, width, height, api),
       cell_grid_width_(cell_grid_width),
       cell_grid_height_(cell_grid_height) {
+}
+
+GameOfLife::~GameOfLife() {
+#ifdef __APPLE__
+  RemoveTrackpadGestures(gesture_monitor_);
+#endif
 }
 
 void GameOfLife::OnFramebufferResize() {
@@ -62,6 +72,29 @@ void GameOfLife::CustomOnInit() {
   randomize_button_ = std::make_unique<RandomizeButton>(this, &cell_grid_, &white_icon_model.value());
 
   OnWindowSize();
+  scroll_callback_ = GetWindow()->ScrollEvent().RegisterCallback([this](double x, double y) { ScrollGrid(x, y); });
+  key_callback_ = GetWindow()->KeyEvent().RegisterCallback([this](int key, int, int action, int mods) {
+    if (action != GLFW_PRESS && action != GLFW_REPEAT)
+      return;
+    if (!(mods & (GLFW_MOD_CONTROL | GLFW_MOD_SUPER)))
+      return;
+    if (key == GLFW_KEY_0 || key == GLFW_KEY_KP_0) {
+      grid_view_ = {};
+      LayoutCells();
+    } else if (key == GLFW_KEY_EQUAL || key == GLFW_KEY_KP_ADD) {
+      ZoomGrid(1.2f);
+    } else if (key == GLFW_KEY_MINUS || key == GLFW_KEY_KP_SUBTRACT) {
+      ZoomGrid(1.0f / 1.2f);
+    }
+  });
+#ifdef __APPLE__
+  gesture_monitor_ = InstallTrackpadGestures(GLFWWindow(), [this](float magnification) {
+    if (!CursorInGrid())
+      return false;
+    ZoomGrid(std::exp(magnification));
+    return true;
+  });
+#endif
 }
 
 void GameOfLife::CustomOnUpdate() {
@@ -138,6 +171,12 @@ void GameOfLife::CustomOnUpdate() {
 }
 
 void GameOfLife::CustomOnClose() {
+  GetWindow()->ScrollEvent().UnregisterCallback(scroll_callback_);
+  GetWindow()->KeyEvent().UnregisterCallback(key_callback_);
+#ifdef __APPLE__
+  RemoveTrackpadGestures(gesture_monitor_);
+  gesture_monitor_ = nullptr;
+#endif
   // Release all resources
   cell_button_grid_.clear();
   pause_play_button_.reset();
@@ -200,23 +239,68 @@ void GameOfLife::OnWindowSize() {
   playground_top_ = playground_top;
   playground_bottom_ = playground_bottom;
 
-  float cell_unit = std::min((playground_bottom - playground_top) / float(cell_grid_height_),
-                             (playground_right - playground_left) / float(cell_grid_width_)) *
-                    0.95;
+  LayoutCells();
+}
+
+void GameOfLife::LayoutCells() {
+  const glm::vec2 viewport{playground_right_ - playground_left_, playground_bottom_ - playground_top_};
+  const float fitted_unit = std::min(viewport.y / cell_grid_height_, viewport.x / cell_grid_width_) * 0.95f;
+  grid_view_.Clamp(viewport, glm::vec2{cell_grid_width_, cell_grid_height_} * fitted_unit);
+  const float cell_unit = fitted_unit * grid_view_.zoom;
   float cell_size = cell_unit * 0.8f;
   float cell_gap = (cell_unit - cell_size) * 0.5f;
 
   for (int x = 0; x < cell_grid_width_; x++) {
     for (int y = 0; y < cell_grid_height_; y++) {
       int index = y * cell_grid_width_ + x;
-      float origin_x = float(playground_left + playground_right) * 0.5f - float(cell_grid_width_) * cell_unit * 0.5f +
-                       float(x) * cell_unit;
-      float origin_y = float(playground_bottom + playground_top) * 0.5f - float(cell_grid_height_) * cell_unit * 0.5f +
-                       float(y) * cell_unit;
+      float origin_x = float(playground_left_ + playground_right_) * 0.5f - float(cell_grid_width_) * cell_unit * 0.5f +
+                       float(x) * cell_unit + grid_view_.pan.x;
+      float origin_y = float(playground_bottom_ + playground_top_) * 0.5f -
+                       float(cell_grid_height_) * cell_unit * 0.5f + float(y) * cell_unit + grid_view_.pan.y;
+      cell_button_grid_[index]->SetClipBounds(
+          {playground_left_, playground_top_, playground_right_, playground_bottom_});
       cell_button_grid_[index]->Resize(origin_x + cell_gap, origin_y + cell_gap, origin_x + cell_gap + cell_size,
                                        origin_y + cell_gap + cell_size);
     }
   }
+}
+
+glm::vec2 GameOfLife::CursorPosition() const {
+  double x, y;
+  int width, height;
+  glfwGetCursorPos(GLFWWindow(), &x, &y);
+  glfwGetWindowSize(GLFWWindow(), &width, &height);
+  return glm::vec2{float(x), float(y)} * glm::vec2(FramebufferSize()) /
+         glm::vec2{std::max(width, 1), std::max(height, 1)};
+}
+
+bool GameOfLife::CursorInGrid() const {
+  auto p = CursorPosition();
+  return p.x >= playground_left_ && p.x < playground_right_ && p.y >= playground_top_ && p.y < playground_bottom_;
+}
+
+void GameOfLife::ZoomGrid(float factor) {
+  const glm::vec2 center{(playground_left_ + playground_right_) * 0.5f, (playground_top_ + playground_bottom_) * 0.5f};
+  grid_view_.Zoom(factor, CursorInGrid() ? CursorPosition() - center : glm::vec2{0.0f});
+  LayoutCells();
+}
+
+void GameOfLife::ScrollGrid(double x, double y) {
+  if (!CursorInGrid())
+    return;
+  auto down = [this](int key) { return glfwGetKey(GLFWWindow(), key) == GLFW_PRESS; };
+  if (down(GLFW_KEY_LEFT_CONTROL) || down(GLFW_KEY_RIGHT_CONTROL) || down(GLFW_KEY_LEFT_SUPER) ||
+      down(GLFW_KEY_RIGHT_SUPER)) {
+    ZoomGrid(std::exp(float(y) * 0.08f));
+    return;
+  }
+  if ((down(GLFW_KEY_LEFT_SHIFT) || down(GLFW_KEY_RIGHT_SHIFT)) && x == 0.0)
+    std::swap(x, y);
+  int width, height;
+  glfwGetWindowSize(GLFWWindow(), &width, &height);
+  const glm::vec2 scale = glm::vec2(FramebufferSize()) / glm::vec2{std::max(width, 1), std::max(height, 1)};
+  grid_view_.pan += glm::vec2{float(x), float(y)} * scale * 10.0f;
+  LayoutCells();
 }
 
 void GameOfLife::RandomizeCells(float density, uint32_t seed) {
