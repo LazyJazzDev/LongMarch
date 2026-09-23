@@ -33,9 +33,12 @@ automatically fits and centers the resized grid. Playback state is preserved.
 Grid navigation:
 
 - Two-finger scrolling pans the enlarged grid horizontally and vertically.
-- On macOS, pinch with two fingers to zoom around the pointer (1x–12x).
-- Ctrl/Cmd + wheel also zooms; Ctrl/Cmd + `+` / `-` zooms in/out.
-- Ctrl/Cmd + `0` restores the fitted, centered view; Shift + wheel pans horizontally.
+- Ctrl + two-finger scrolling or mouse wheel zooms around the pointer (1x–12x).
+- Ctrl + `+` / `-` zooms in/out.
+- Ctrl + `0` restores the fitted, centered view; Shift + wheel pans horizontally.
+- Input uses GLFW on every platform. Native pinch gestures are not handled; pinch
+  only zooms if the system or driver translates it into scrolling with a Ctrl
+  key state that GLFW can observe.
 - The controls stay fixed; cells outside the grid viewport are clipped and cannot be clicked.
 
 Options:

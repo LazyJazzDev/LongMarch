@@ -2,10 +2,6 @@
 
 #include <random>
 
-#ifdef __APPLE__
-#include "trackpad_gestures.h"
-#endif
-
 #include "application/listener.h"
 #include "application/model.h"
 #include "game_of_life_lib.h"
@@ -22,11 +18,7 @@ GameOfLife::GameOfLife(const char *title,
       cell_grid_height_(cell_grid_height) {
 }
 
-GameOfLife::~GameOfLife() {
-#ifdef __APPLE__
-  RemoveTrackpadGestures(gesture_monitor_);
-#endif
-}
+GameOfLife::~GameOfLife() = default;
 
 void GameOfLife::OnFramebufferResize() {
   OnWindowSize();
@@ -82,7 +74,7 @@ void GameOfLife::CustomOnInit() {
   key_callback_ = GetWindow()->KeyEvent().RegisterCallback([this](int key, int, int action, int mods) {
     if (action != GLFW_PRESS && action != GLFW_REPEAT)
       return;
-    if (!(mods & (GLFW_MOD_CONTROL | GLFW_MOD_SUPER)))
+    if (!(mods & GLFW_MOD_CONTROL))
       return;
     if (key == GLFW_KEY_0 || key == GLFW_KEY_KP_0) {
       grid_view_ = {};
@@ -93,14 +85,6 @@ void GameOfLife::CustomOnInit() {
       ZoomGrid(1.0f / 1.2f);
     }
   });
-#ifdef __APPLE__
-  gesture_monitor_ = InstallTrackpadGestures(GLFWWindow(), [this](float magnification) {
-    if (!CursorInGrid())
-      return false;
-    ZoomGrid(std::exp(magnification));
-    return true;
-  });
-#endif
 }
 
 void GameOfLife::CustomOnUpdate() {
@@ -168,10 +152,6 @@ void GameOfLife::CustomOnUpdate() {
 void GameOfLife::CustomOnClose() {
   GetWindow()->ScrollEvent().UnregisterCallback(scroll_callback_);
   GetWindow()->KeyEvent().UnregisterCallback(key_callback_);
-#ifdef __APPLE__
-  RemoveTrackpadGestures(gesture_monitor_);
-  gesture_monitor_ = nullptr;
-#endif
   // Release all resources
   width_slider_.reset();
   height_slider_.reset();
@@ -305,8 +285,7 @@ void GameOfLife::ScrollGrid(double x, double y) {
   if (!CursorInGrid())
     return;
   auto down = [this](int key) { return glfwGetKey(GLFWWindow(), key) == GLFW_PRESS; };
-  if (down(GLFW_KEY_LEFT_CONTROL) || down(GLFW_KEY_RIGHT_CONTROL) || down(GLFW_KEY_LEFT_SUPER) ||
-      down(GLFW_KEY_RIGHT_SUPER)) {
+  if (down(GLFW_KEY_LEFT_CONTROL) || down(GLFW_KEY_RIGHT_CONTROL)) {
     ZoomGrid(std::exp(float(y) * 0.08f));
     return;
   }

@@ -58,9 +58,6 @@ class GameOfLife : public Application {
   bool sliders_were_dragging_{false};
   uint32_t scroll_callback_{};
   uint32_t key_callback_{};
-#ifdef __APPLE__
-  void *gesture_monitor_{};
-#endif
 
   std::unique_ptr<PausePlayButton> pause_play_button_;
   std::unique_ptr<SpeedToggleButton> speed_toggle_button_;
