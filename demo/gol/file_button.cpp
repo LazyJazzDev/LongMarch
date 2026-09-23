@@ -72,41 +72,56 @@ void FileButton::Update(float delta_time) {
   hover_.Update(delta_time * 10.0f);
   motion_ = std::min(1.0f, motion_ + delta_time / 0.65f);
   feedback_ = std::max(0.0f, feedback_ - delta_time);
+  const bool active = feedback_ > 0.0f;
+  check_transition_.TryUpdateTarget(active && success_ ? 1.0f : 0.0f);
+  success_tint_.TryUpdateTarget(active && success_ ? 1.0f : 0.0f);
+  error_tint_.TryUpdateTarget(active && !success_ ? 1.0f : 0.0f);
+  check_transition_.Update(delta_time / 0.42f);
+  success_tint_.Update(delta_time / 0.30f);
+  error_tint_.Update(delta_time / 0.30f);
+  shake_phase_ += delta_time * 36.0f;
 }
 
 void FileButton::Draw() {
   const glm::vec2 position{left_, top_}, size{right_ - left_, bottom_ - top_};
-  const float pulse = std::sin(glm::pi<float>() * motion_);
+  const float wave = std::sin(glm::pi<float>() * motion_);
+  const float pulse = wave * wave;
   auto background = background_color_.GetValue(float(hover_));
-  if (feedback_ > 0)
-    background = glm::mix(background, success_ ? glm::vec4{0.16f, 0.25f, 0.20f, 1} : glm::vec4{0.30f, 0.13f, 0.13f, 1},
-                          std::min(feedback_ * 2.0f, 0.65f));
+  background = glm::mix(background, glm::vec4{0.16f, 0.25f, 0.20f, 1}, 0.65f * float(success_tint_));
+  background = glm::mix(background, glm::vec4{0.30f, 0.13f, 0.13f, 1}, 0.65f * float(error_tint_));
   application_->DrawModel(background_, {GetModelMatrix(position, size, 0.6f), background, glm::uvec4{1, 0, 0, 0}});
-  float shake = feedback_ > 0 && !success_ ? std::sin(feedback_ * 45.0f) * std::min(feedback_, 0.3f) * 0.035f : 0;
+  const float shake = std::sin(shake_phase_) * float(error_tint_) * 0.008f;
   auto icon_position = position + glm::vec2{shake * size.x, 0};
   static const MixValue<float> brightness({1.0f, 1.08f, 0.90f});
   auto color = button_palette::kNeutral * brightness.GetValue(float(hover_));
   application_->DrawModel(frame_.get(), {GetModelMatrix(icon_position, size, 0.4f), color, glm::uvec4{1, 0, 0, 0}});
-  if (feedback_ > 0 && success_) {
-    const float scale = 0.80f + 0.20f * glm::smoothstep(0.0f, 0.18f, 1.2f - feedback_);
-    application_->DrawModel(check_.get(),
-                            {GetModelMatrix(icon_position + size * (1.0f - scale) * 0.5f, size * scale, 0.38f),
-                             button_palette::kPlay, glm::uvec4{1, 0, 0, 0}});
-  } else {
-    float direction = kind_ == Kind::kSave ? 1.0f : -1.0f;
+  // Collapse and expand through zero instead of swapping full-size silhouettes.
+  // Smoothstep keeps both ends and the midpoint at zero scale velocity.
+  const float transition = float(check_transition_);
+  const float check_scale = glm::smoothstep(0.5f, 1.0f, transition);
+  const float arrow_scale = 1.0f - glm::smoothstep(0.0f, 0.5f, transition);
+  if (check_scale > 0.0f)
+    application_->DrawModel(
+        check_.get(), {GetModelMatrix(icon_position + size * (1.0f - check_scale) * 0.5f, size * check_scale, 0.38f),
+                       button_palette::kPlay, glm::uvec4{1, 0, 0, 0}});
+  if (arrow_scale > 0.0f) {
+    const float direction = kind_ == Kind::kSave ? 1.0f : -1.0f;
     icon_position.y += direction * pulse * size.y * 0.07f;
-    application_->DrawModel(arrow_.get(), {GetModelMatrix(icon_position, size, 0.38f), color, glm::uvec4{1, 0, 0, 0}});
+    application_->DrawModel(
+        arrow_.get(), {GetModelMatrix(icon_position + size * (1.0f - arrow_scale) * 0.5f, size * arrow_scale, 0.38f),
+                       color, glm::uvec4{1, 0, 0, 0}});
   }
 }
 
 void FileButton::Feedback(bool success) {
   success_ = success;
   feedback_ = success ? 1.2f : 0.65f;
-  motion_ = 0.0f;
 }
 
 void FileButton::BeginAction() {
-  motion_ = 0.0f;
+  // Repeated activation must preserve the currently visible position.
+  if (motion_ >= 1.0f)
+    motion_ = 0.0f;
   feedback_ = 0.0f;
 }
 
