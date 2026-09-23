@@ -36,9 +36,11 @@ Grid navigation:
 - Ctrl + two-finger scrolling or mouse wheel zooms around the pointer (1x–12x).
 - Ctrl + `+` / `-` zooms in/out.
 - Ctrl + `0` restores the fitted, centered view; Shift + wheel pans horizontally.
-- Input uses GLFW on every platform. Native pinch gestures are not handled; pinch
-  only zooms if the system or driver translates it into scrolling with a Ctrl
-  key state that GLFW can observe.
+- Native pinch zoom uses `graphics::Window::MagnifyEvent()` (currently supported
+  on macOS). The game contains no platform-specific gesture code. See the
+  [window input API](../../docs/graphics-window-input.md) for event semantics.
+- Windows/Linux retain Ctrl + scrolling; driver-emulated pinch only works if
+  GLFW can observe both the scrolling and Ctrl key state.
 - The controls stay fixed; cells outside the grid viewport are clipped and cannot be clicked.
 
 Options:

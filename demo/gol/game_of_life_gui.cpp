@@ -70,6 +70,19 @@ void GameOfLife::CustomOnInit() {
   height_slider_ = std::make_unique<SizeSlider>(this, 'H', cell_grid_height_, &white_rect_model.value(),
                                                 [this](int value) { requested_height_ = value; });
   OnWindowSize();
+  magnify_callback_ = GetWindow()->MagnifyEvent().RegisterCallback([this](const graphics::MagnifyGesture &gesture) {
+    if (gesture.phase == graphics::MagnifyPhase::kCancel)
+      return;
+    const glm::vec2 point = glm::vec2{gesture.x, gesture.y} * glm::vec2(FramebufferSize()) /
+                            glm::vec2{std::max(GetWindow()->GetWidth(), 1), std::max(GetWindow()->GetHeight(), 1)};
+    if (point.x < playground_left_ || point.x >= playground_right_ || point.y < playground_top_ ||
+        point.y >= playground_bottom_)
+      return;
+    const glm::vec2 center{(playground_left_ + playground_right_) * 0.5f,
+                           (playground_top_ + playground_bottom_) * 0.5f};
+    grid_view_.Zoom(float(gesture.scale), point - center);
+    LayoutCells();
+  });
   scroll_callback_ = GetWindow()->ScrollEvent().RegisterCallback([this](double x, double y) { ScrollGrid(x, y); });
   key_callback_ = GetWindow()->KeyEvent().RegisterCallback([this](int key, int, int action, int mods) {
     if (action != GLFW_PRESS && action != GLFW_REPEAT)
@@ -150,6 +163,7 @@ void GameOfLife::CustomOnUpdate() {
 }
 
 void GameOfLife::CustomOnClose() {
+  GetWindow()->MagnifyEvent().UnregisterCallback(magnify_callback_);
   GetWindow()->ScrollEvent().UnregisterCallback(scroll_callback_);
   GetWindow()->KeyEvent().UnregisterCallback(key_callback_);
   // Release all resources

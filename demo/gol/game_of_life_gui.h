@@ -56,6 +56,7 @@ class GameOfLife : public Application {
   int requested_height_{};
   bool sidebar_{true};
   bool sliders_were_dragging_{false};
+  uint32_t magnify_callback_{};
   uint32_t scroll_callback_{};
   uint32_t key_callback_{};
 
