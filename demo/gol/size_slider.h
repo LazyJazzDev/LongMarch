@@ -11,6 +11,7 @@ class SizeSlider : public Listener {
   ~SizeSlider();
   void Resize(glm::vec4 bounds, bool vertical);
   void Draw();
+  void SetValue(int value);
 
   bool IsDragging() const {
     return dragging_;
@@ -28,7 +29,6 @@ class SizeSlider : public Listener {
   glm::vec2 FramePosition(double x, double y) const;
   bool Contains(glm::vec2 p) const;
   void DragTo(glm::vec2 p);
-  void SetValue(int value);
   void RebuildLabel();
   void RoundedRect(glm::vec2 position,
                    glm::vec2 size,

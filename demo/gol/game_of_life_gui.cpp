@@ -1,11 +1,14 @@
 #include "game_of_life_gui.h"
 
+#include <tinyfiledialogs.h>
+
 #include <random>
 #include <stdexcept>
 #include <utility>
 
 #include "application/listener.h"
 #include "application/model.h"
+#include "cells_pattern.h"
 #include "game_of_life_lib.h"
 #include "glm/gtc/matrix_transform.hpp"
 
@@ -71,6 +74,10 @@ void GameOfLife::CustomOnInit() {
       std::make_unique<RefreshButton>(this, 10.0f, 230.0f, 110.0f, 330.0f, &cell_grid_, &white_icon_model.value());
 
   randomize_button_ = std::make_unique<RandomizeButton>(this, &cell_grid_, &white_icon_model.value());
+  open_button_ = std::make_unique<FileButton>(this, &white_icon_model.value(), FileButton::Kind::kOpen,
+                                              [this] { RequestFileAction(FileAction::kOpen); });
+  save_button_ = std::make_unique<FileButton>(this, &white_icon_model.value(), FileButton::Kind::kSave,
+                                              [this] { RequestFileAction(FileAction::kSave); });
 
   requested_width_ = cell_grid_width_;
   requested_height_ = cell_grid_height_;
@@ -96,8 +103,12 @@ void GameOfLife::CustomOnInit() {
   key_callback_ = GetWindow()->KeyEvent().RegisterCallback([this](int key, int, int action, int mods) {
     if (action != GLFW_PRESS && action != GLFW_REPEAT)
       return;
-    if (!(mods & GLFW_MOD_CONTROL))
+    if (!(mods & (GLFW_MOD_CONTROL | GLFW_MOD_SUPER)))
       return;
+    if (action == GLFW_PRESS && (key == GLFW_KEY_O || key == GLFW_KEY_S)) {
+      RequestFileAction(key == GLFW_KEY_O ? FileAction::kOpen : FileAction::kSave);
+      return;
+    }
     if (key == GLFW_KEY_0 || key == GLFW_KEY_KP_0) {
       grid_view_ = {};
       LayoutCells();
@@ -124,6 +135,16 @@ void GameOfLife::CustomOnUpdate() {
   auto delta_time = static_cast<float>(current_frame_time - last_frame_time);
   last_frame_time = current_frame_time;
 
+  if (file_action_ != FileAction::kNone) {
+    file_action_delay_ -= delta_time;
+    if (file_action_delay_ <= 0.0f) {
+      ProcessFileAction();
+      // Modal dialogs must not accumulate simulation time or skip UI feedback.
+      last_frame_time = glfwGetTime();
+      delta_time = 0.0f;
+    }
+  }
+
   time_total += delta_time;
 
   // Update pause_play_button_
@@ -133,9 +154,12 @@ void GameOfLife::CustomOnUpdate() {
   // Update refresh_button_
   refresh_button_->Update(delta_time);
   randomize_button_->Update(delta_time);
+  open_button_->Update(delta_time);
+  save_button_->Update(delta_time);
 
   simulation_clock_.Advance(
-      delta_time, pause_play_button_->IsPlaying(), speed_toggle_button_->SpeedLevel(),
+      delta_time, pause_play_button_->IsPlaying() && file_action_ == FileAction::kNone,
+      speed_toggle_button_->SpeedLevel(),
       [this] { update_step(cell_grid_width_, cell_grid_height_, cell_grid_.data()); }, [] { return glfwGetTime(); });
 
   // Synchronize after stepping so the new generation is visible in this frame.
@@ -149,6 +173,8 @@ void GameOfLife::CustomOnUpdate() {
   // Draw refresh_button_
   refresh_button_->Draw();
   randomize_button_->Draw();
+  open_button_->Draw();
+  save_button_->Draw();
   width_slider_->Draw();
   height_slider_->Draw();
 
@@ -183,6 +209,8 @@ void GameOfLife::CustomOnClose() {
   speed_toggle_button_.reset();
   refresh_button_.reset();
   randomize_button_.reset();
+  open_button_.reset();
+  save_button_.reset();
   white_rect_model.reset();
   white_icon_model.reset();
 }
@@ -191,66 +219,55 @@ void GameOfLife::OnWindowSize() {
   auto window_width = float(FramebufferSize().x);
   auto window_height = float(FramebufferSize().y);
   auto ui_unit = std::min(window_width, window_height) * 0.01f * ui_scale_;
-  float blank_size = ui_unit * 5.0f;
-  float icon_size = ui_unit * 10.0f;
-  float icon_gap = ui_unit * 3.0f;
+  const float margin = ui_unit * 3.0f;
+  const float icon_size = ui_unit * 8.0f;
+  const float step = ui_unit * 10.0f;
+  const float panel_size = ui_unit * 24.0f;
 
   float playground_left = 0.0f;
   float playground_right = window_width;
   float playground_top = 0.0f;
   float playground_bottom = window_height;
-
-  panel_left_ = playground_left;
-  panel_right_ = playground_right;
-  panel_top_ = playground_top;
-  panel_bottom_ = playground_bottom;
+  panel_left_ = 0;
+  panel_right_ = window_width;
+  panel_top_ = 0;
+  panel_bottom_ = window_height;
 
   const bool prefer_sidebar =
-      std::min((playground_bottom - playground_top) / float(cell_grid_height_),
-               (playground_right - playground_left - ui_unit * 20.0f) / float(cell_grid_width_)) >
-      std::min((playground_bottom - playground_top - ui_unit * 20.0f) / float(cell_grid_height_),
-               (playground_right - playground_left) / float(cell_grid_width_));
+      std::min(window_height / cell_grid_height_, (window_width - panel_size) / cell_grid_width_) >
+      std::min((window_height - panel_size) / cell_grid_height_, window_width / cell_grid_width_);
   if (!width_slider_->IsDragging() && !height_slider_->IsDragging())
     sidebar_ = prefer_sidebar;
+  auto place = [icon_size](Button *button, float x, float y) { button->Resize(x, y, x + icon_size, y + icon_size); };
   if (sidebar_) {
-    playground_left += ui_unit * 20.0f;
-    panel_right_ = playground_left;
-
-    pause_play_button_->Resize(blank_size, window_height - blank_size - icon_size, blank_size + icon_size,
-                               window_height - blank_size);
-    speed_toggle_button_->Resize(blank_size, window_height - blank_size - icon_size - (icon_size + icon_gap),
-                                 blank_size + icon_size, window_height - blank_size - (icon_size + icon_gap));
-    refresh_button_->Resize(blank_size, blank_size, blank_size + icon_size, blank_size + icon_size);
-    randomize_button_->Resize(blank_size, blank_size + icon_size + icon_gap, blank_size + icon_size,
-                              blank_size + icon_size * 2.0f + icon_gap);
+    playground_left = panel_size;
+    panel_right_ = panel_size;
+    // File actions, board actions, dimension controls, then transport controls.
+    place(open_button_.get(), margin, margin);
+    place(save_button_.get(), margin + step, margin);
+    place(refresh_button_.get(), margin, margin + step);
+    place(randomize_button_.get(), margin + step, margin + step);
+    place(speed_toggle_button_.get(), margin, window_height - margin - icon_size);
+    place(pause_play_button_.get(), margin + step, window_height - margin - icon_size);
+    const float top = margin + step * 2.0f + ui_unit * 2.0f;
+    const float bottom = window_height - margin - step - ui_unit * 2.0f;
+    width_slider_->Resize({margin, top, margin + icon_size, bottom}, true);
+    height_slider_->Resize({margin + step, top, margin + step + icon_size, bottom}, true);
   } else {
-    playground_bottom -= ui_unit * 20.0f;
+    playground_bottom = window_height - panel_size;
     panel_top_ = playground_bottom;
-
-    pause_play_button_->Resize(blank_size, window_height - blank_size - icon_size, blank_size + icon_size,
-                               window_height - blank_size);
-    speed_toggle_button_->Resize(blank_size + icon_size + icon_gap, window_height - blank_size - icon_size,
-                                 blank_size + icon_size * 2.0f + icon_gap, window_height - blank_size);
-    refresh_button_->Resize(window_width - blank_size - icon_size, window_height - blank_size - icon_size,
-                            window_width - blank_size, window_height - blank_size);
-    randomize_button_->Resize(window_width - blank_size - icon_size * 2.0f - icon_gap,
-                              window_height - blank_size - icon_size, window_width - blank_size - icon_size - icon_gap,
-                              window_height - blank_size);
-  }
-
-  const float slider_gap = ui_unit * 1.5f;
-  const float thickness = (icon_size - slider_gap) * 0.5f;
-  if (sidebar_) {
-    const float top = blank_size + icon_size * 2.0f + icon_gap * 2.0f;
-    const float bottom = window_height - top;
-    width_slider_->Resize({blank_size, top, blank_size + thickness, bottom}, true);
-    height_slider_->Resize({blank_size + thickness + slider_gap, top, blank_size + icon_size, bottom}, true);
-  } else {
-    const float left = blank_size + icon_size * 2.0f + icon_gap * 2.0f;
-    const float right = window_width - left;
-    const float top = window_height - blank_size - icon_size;
-    width_slider_->Resize({left, top, right, top + thickness}, false);
-    height_slider_->Resize({left, top + thickness + slider_gap, right, top + icon_size}, false);
+    const float top = panel_top_ + margin;
+    const float actions_left = window_width - margin - step - icon_size;
+    place(open_button_.get(), actions_left, top);
+    place(save_button_.get(), actions_left + step, top);
+    place(refresh_button_.get(), actions_left, top + step);
+    place(randomize_button_.get(), actions_left + step, top + step);
+    place(speed_toggle_button_.get(), margin, top);
+    place(pause_play_button_.get(), margin, top + step);
+    const float left = margin + step + ui_unit * 2.0f;
+    const float right = actions_left - ui_unit * 4.0f;
+    width_slider_->Resize({left, top, right, top + icon_size}, false);
+    height_slider_->Resize({left, top + step, right, top + step + icon_size}, false);
   }
 
   playground_left_ = playground_left;
@@ -339,6 +356,80 @@ void GameOfLife::ResizeGrid(int width, int height) {
   }
   grid_view_ = {};
   OnWindowSize();
+}
+
+void GameOfLife::RequestFileAction(FileAction action) {
+  if (file_action_ != FileAction::kNone)
+    return;
+  file_action_ = action;
+  (action == FileAction::kSave ? save_button_.get() : open_button_.get())->BeginAction();
+  // Let the button start moving before opening a blocking native dialog.
+  file_action_delay_ = 0.12f;
+}
+
+void GameOfLife::ProcessFileAction() {
+  const auto action = std::exchange(file_action_, FileAction::kNone);
+  auto *button = action == FileAction::kSave ? save_button_.get() : open_button_.get();
+  const bool was_playing = pause_play_button_->IsPlaying();
+  pause_play_button_->SetPlaying(false);
+  bool loaded = false;
+#ifdef _WIN32
+  tinyfd_winUtf8 = 1;
+#endif
+  const char *filters[] = {"*.cells"};
+  try {
+    const char *selection =
+        action == FileAction::kSave
+            ? tinyfd_saveFileDialog("Save current grid", file_path_.c_str(), 1, filters, "Life pattern (*.cells)")
+            : tinyfd_openFileDialog("Open a Life grid", file_path_.c_str(), 1, filters, "Life pattern (*.cells)", 0);
+    if (selection) {
+      // Dialog results share an internal buffer; own the path before another call.
+      std::string path(selection);
+      bool accepted = true;
+      if (action == FileAction::kSave) {
+        if (std::filesystem::u8path(path).extension().empty()) {
+          path += ".cells";
+          if (std::filesystem::exists(std::filesystem::u8path(path)))
+            accepted = tinyfd_messageBox("Replace saved grid?", "The .cells file already exists. Replace it?", "yesno",
+                                         "question", 0) == 1;
+        }
+        if (accepted)
+          SaveCellsPattern(path, {cell_grid_width_, cell_grid_height_, cell_grid_});
+      } else {
+        auto pattern = LoadCellsPattern(path);
+        const int width = std::max(pattern.width, grid_size::kMin);
+        const int height = std::max(pattern.height, grid_size::kMin);
+        auto cells = CenterCellsPattern(pattern, width, height);
+        ResizeGrid(width, height);
+        // Copy into the bound storage; cell buttons retain pointers to these cells.
+        std::copy(cells.begin(), cells.end(), cell_grid_.begin());
+        requested_width_ = width;
+        requested_height_ = height;
+        width_slider_->SetValue(width);
+        height_slider_->SetValue(height);
+        loaded = true;
+      }
+      if (accepted) {
+        file_path_ = std::move(path);
+        button->Feedback(true);
+      }
+    }
+  } catch (const std::exception &error) {
+    LogError("Grid file operation failed: {}", error.what());
+    // tinyfiledialogs may use shell-backed dialogs; keep their message text literal.
+    const char *message =
+        action == FileAction::kSave
+            ? "Could not save the grid. Check that the folder exists, is writable, and has free disk space."
+            : "Could not read the grid. Choose a readable .cells file under 1 MiB, with equal-length rows of O and . and at most 200 rows and columns.";
+    tinyfd_messageBox(action == FileAction::kSave ? "Could not save grid" : "Could not open grid", message, "ok",
+                      "error", 1);
+    button->Feedback(false);
+  }
+  pause_play_button_->SetPlaying(loaded ? false : was_playing);
+  simulation_clock_ = {};
+  open_button_->OnCursorEnter(0);
+  save_button_->OnCursorEnter(0);
+  glfwFocusWindow(GLFWWindow());
 }
 
 void GameOfLife::RandomizeCells(float density, uint32_t seed) {

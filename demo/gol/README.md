@@ -23,6 +23,27 @@ in 3D and lands on a randomly chosen different face, tilted toward the viewer.
 Each click independently gives every cell a 50% chance of being alive; the
 play/pause state is preserved. The layout follows the window size.
 
+The folder/up-arrow button opens a `.cells` file; the tray/down-arrow button
+saves the current grid through **tinyfiledialogs**. Ctrl+O / Ctrl+S (Cmd+O / Cmd+S
+on macOS) provide the same actions. Saving preserves the exact grid dimensions,
+live cells, and empty borders, including completely empty grids. A `.cells`
+extension is added when omitted, with confirmation before replacing a file.
+Files are plain text: `O` for alive, `.` for dead, one complete row per line;
+lines starting with `!` are comments. Rows must have equal lengths and fit in
+200 x 200 cells; files larger than 1 MiB are rejected.
+
+Opening resizes the grid and sliders, fits the view, and leaves playback paused.
+Patterns only one cell wide or high are padded to the minimum grid size of two.
+Canceling or failing to open preserves the current grid and playback state.
+Saving resumes the previous playback state without advancing through time spent
+in the dialog. Neither playback speed nor the current zoom is stored in the file.
+Arrows move in the direction of the action; a brief green check confirms success,
+and errors show an explanatory dialog followed by a red pulse and a gentle shake.
+
+The toolbar groups file actions above board actions in a two-column block.
+Dimension sliders occupy the flexible middle space and playback controls sit at
+the opposite end. The same groups rearrange into a bottom panel for wide grids.
+
 The rounded `W` and `H` sliders between randomize and speed adjust the number of
 columns and rows from 2 to 200. They fill the space between the buttons: two
 vertical bars in the sidebar, two horizontal bars in the bottom panel. A straight

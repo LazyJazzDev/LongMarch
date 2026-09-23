@@ -3,6 +3,7 @@
 #include "application/application.h"
 #include "application/model.h"
 #include "cell_button.h"
+#include "file_button.h"
 #include "grid_size.h"
 #include "grid_view.h"
 #include "pause_play_button.h"
@@ -53,6 +54,9 @@ class GameOfLife : public Application {
   bool CursorInGrid() const;
   void ZoomGrid(float factor);
   void ScrollGrid(double x, double y);
+  enum class FileAction { kNone, kOpen, kSave };
+  void RequestFileAction(FileAction action);
+  void ProcessFileAction();
 
   SimulationClock simulation_clock_;
   GridView grid_view_;
@@ -70,6 +74,11 @@ class GameOfLife : public Application {
   std::unique_ptr<SpeedToggleButton> speed_toggle_button_;
   std::unique_ptr<RefreshButton> refresh_button_;
   std::unique_ptr<RandomizeButton> randomize_button_;
+  std::unique_ptr<FileButton> open_button_;
+  std::unique_ptr<FileButton> save_button_;
+  FileAction file_action_{FileAction::kNone};
+  float file_action_delay_{0.0f};
+  std::string file_path_{"life.cells"};
 
   std::optional<DeviceModel> white_icon_model;
   std::optional<DeviceModel> white_rect_model;
