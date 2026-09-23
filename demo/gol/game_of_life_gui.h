@@ -4,6 +4,7 @@
 #include "application/model.h"
 #include "cell_button.h"
 #include "pause_play_button.h"
+#include "randomize_button.h"
 #include "refresh_button.h"
 #include "speed_toggle_button.h"
 
@@ -38,6 +39,7 @@ class GameOfLife : public Application {
   std::unique_ptr<PausePlayButton> pause_play_button_;
   std::unique_ptr<SpeedToggleButton> speed_toggle_button_;
   std::unique_ptr<RefreshButton> refresh_button_;
+  std::unique_ptr<RandomizeButton> randomize_button_;
 
   std::optional<DeviceModel> white_icon_model;
   std::optional<DeviceModel> white_rect_model;

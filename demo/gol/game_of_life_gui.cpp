@@ -59,6 +59,8 @@ void GameOfLife::CustomOnInit() {
   refresh_button_ =
       std::make_unique<RefreshButton>(this, 10.0f, 230.0f, 110.0f, 330.0f, &cell_grid_, &white_icon_model.value());
 
+  randomize_button_ = std::make_unique<RandomizeButton>(this, &cell_grid_, &white_icon_model.value());
+
   OnWindowSize();
 }
 
@@ -77,6 +79,7 @@ void GameOfLife::CustomOnUpdate() {
   speed_toggle_button_->Update(delta_time);
   // Update refresh_button_
   refresh_button_->Update(delta_time);
+  randomize_button_->Update(delta_time);
 
   switch (speed_toggle_button_->SpeedLevel()) {
     case 1:
@@ -113,6 +116,7 @@ void GameOfLife::CustomOnUpdate() {
   speed_toggle_button_->Draw();
   // Draw refresh_button_
   refresh_button_->Draw();
+  randomize_button_->Draw();
 
   for (int x = 0; x < cell_grid_width_; x++) {
     for (int y = 0; y < cell_grid_height_; y++) {
@@ -139,6 +143,7 @@ void GameOfLife::CustomOnClose() {
   pause_play_button_.reset();
   speed_toggle_button_.reset();
   refresh_button_.reset();
+  randomize_button_.reset();
   white_rect_model.reset();
   white_icon_model.reset();
 }
@@ -173,6 +178,8 @@ void GameOfLife::OnWindowSize() {
     speed_toggle_button_->Resize(blank_size, window_height - blank_size - icon_size - (icon_size + icon_gap),
                                  blank_size + icon_size, window_height - blank_size - (icon_size + icon_gap));
     refresh_button_->Resize(blank_size, blank_size, blank_size + icon_size, blank_size + icon_size);
+    randomize_button_->Resize(blank_size, blank_size + icon_size + icon_gap, blank_size + icon_size,
+                              blank_size + icon_size * 2.0f + icon_gap);
   } else {
     playground_bottom -= ui_unit * 20.0f;
     panel_top_ = playground_bottom;
@@ -183,6 +190,9 @@ void GameOfLife::OnWindowSize() {
                                  blank_size + icon_size * 2.0f + icon_gap, window_height - blank_size);
     refresh_button_->Resize(window_width - blank_size - icon_size, window_height - blank_size - icon_size,
                             window_width - blank_size, window_height - blank_size);
+    randomize_button_->Resize(window_width - blank_size - icon_size * 2.0f - icon_gap,
+                              window_height - blank_size - icon_size, window_width - blank_size - icon_size - icon_gap,
+                              window_height - blank_size);
   }
 
   playground_left_ = playground_left;
