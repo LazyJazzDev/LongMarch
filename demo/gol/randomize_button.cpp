@@ -33,7 +33,7 @@ RandomizeButton::RandomizeButton(Application *app, std::vector<uint8_t> *cells, 
   face_ = std::make_unique<DeviceModel>(
       app, Model(ComposeVertices({{-1, -1}, {1, -1}, {1, 1}, {-1, 1}}, glm::vec4{1.0f}), {0, 1, 2, 0, 2, 3}));
   orientation_ = start_orientation_ = target_orientation_ = DisplayOrientation(selected_face_, 0);
-  background_color_ = button_palette::Background();
+  background_color_ = button_palette::RandomizeBackground();
 }
 
 void RandomizeButton::Update(float delta_time) {

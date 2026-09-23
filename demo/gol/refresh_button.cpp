@@ -76,7 +76,7 @@ RefreshButton::RefreshButton(Application *app,
     refresh_model_ = std::make_unique<MixModel>(vertices, indices);
   }
 
-  background_color_ = button_palette::Background();
+  background_color_ = button_palette::ResetBackground();
 
   refresh_device_model_ = std::make_unique<DeviceModel>(application_, refresh_model_->GetModel(0.0, MixStyle::kLinear));
   refresh_animation_var_ = AnimationVar(0.0, AnimationStyle::kPower5);
