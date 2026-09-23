@@ -105,10 +105,9 @@ float4 SliderTheme(PSInput input) {
   float2 edge_distance = half_size - abs(position);
   float2 slope = sign(position) * (1.0 - smoothstep(0.0, half_thickness, edge_distance));
   float relief = input.extra.x == 5 ? -1.0 : 1.0;
-  float3 normal = normalize(float3(slope * relief * 0.65, 1.0));
-  float3 light = normalize(float3(-0.5, -0.5, 1.0));
-  // Preserve the palette at the flat center, with soft ambient light in shadows.
-  float shade = 0.35 + 0.65 * saturate(dot(normal, light)) / light.z;
+  // A shallow, monotonic light ramp avoids the off-center highlight peaks of
+  // normalized curved normals. Keep opposite shading for raised/recessed areas.
+  float shade = 1.0 - relief * 0.065 * (slope.x + slope.y);
   return float4(input.color.rgb * shade, 1.0);
 }
 
