@@ -33,17 +33,20 @@ constexpr float kSumWeight = 11.0f;
 constexpr float kMergeWeight = 700.0f;
 constexpr float kEmptyWeight = 270.0f;
 
-// Spawn branches that carry less probability than this are replaced by the
-// heuristic: what they could contribute is irrelevant next to the number of
-// branches they would add.
 // A position without a legal move is over, and no heuristic value of a tidy
 // full board may make it look attractive.
 constexpr float kDeadBoardValue = -1.0e9f;
 
-constexpr float kProbabilityCutoff = 1.0e-6f;
+// The search carries a log2 probability budget instead of comparing a raw
+// probability: spawning a 2 costs ceil(-log2(0.9 / empty)) and a 4 costs
+// ceil(-log2(0.1 / empty)) units of the budget, and a line ends once its
+// budget is used up. Every unit is a factor of two, so a budget of 18 is a
+// probability of about 1 / 262144. The depth counts the spawn layers a line
+// may still see.
+constexpr int kSearchDepth = 6;
+constexpr int kSearchBudget = 18;
 constexpr float kTwoProbability = 0.9f;
 constexpr float kFourProbability = 0.1f;
-constexpr int kMaxDepth = 16;
 
 constexpr Direction kDirections[4] = {Direction::kUp, Direction::kDown, Direction::kLeft, Direction::kRight};
 
@@ -237,19 +240,34 @@ void InitTables() {
 }
 
 // Expectimax over the two kinds of nodes of the puzzle: the player picks a
-// move, then the game drops a 2 or a 4 into one of the free cells. Depths count
-// spawn layers, and an exhausted budget aborts the walk.
+// move, then the game drops a 2 or a 4 into one of the free cells. A line
+// carries a log2 probability budget and a spawn depth, and either running out
+// ends it at the heuristic. Player nodes are cached in a direct mapped table
+// keyed on the whole position, the depth and the budget, so a position reached
+// by two different orders of moves is searched once; a collision only discards
+// cached work, because the stored key is compared in full.
 class Expectimax {
  public:
   Expectimax(Clock::time_point begin, float budget_ms)
       : deadline_(begin +
-                  std::chrono::duration_cast<Clock::duration>(std::chrono::duration<float, std::milli>(budget_ms))) {
+                  std::chrono::duration_cast<Clock::duration>(std::chrono::duration<float, std::milli>(budget_ms))),
+        table_(1U << kTableBits) {
   }
 
-  float MaxValue(Bits board, int depth, float probability) {
-    if (depth <= 0 || probability < kProbabilityCutoff) {
+  float MaxValue(Bits board, int depth, int budget) {
+    if (IsDeadBoard(board)) {
+      return kDeadBoardValue;
+    }
+    if (depth <= 0 || budget <= 0) {
       return LeafValue(board);
     }
+
+    const TableKey key{board, depth, budget};
+    TableEntry &entry = table_[Hash(key) & (table_.size() - 1)];
+    if (entry.generation == generation_ && entry.key == key) {
+      return entry.value;
+    }
+
     ChargeNode();
     if (timed_out_) {
       return 0.0f;
@@ -261,47 +279,60 @@ class Expectimax {
       if (moved == board) {
         continue;
       }
-      best = std::max(best, ChanceValue(moved, depth, probability));
+      best = std::max(best, ChanceValue(moved, depth - 1, budget));
       if (timed_out_) {
         return 0.0f;
       }
     }
-    return best == -std::numeric_limits<float>::infinity() ? kDeadBoardValue : best;
+    if (best == -std::numeric_limits<float>::infinity()) {
+      return kDeadBoardValue;
+    }
+
+    entry = TableEntry{key, best, generation_};
+    return best;
   }
 
-  float ChanceValue(Bits board, int depth, float probability) {
-    if (depth <= 0 || probability < kProbabilityCutoff) {
+  float ChanceValue(Bits board, int depth, int budget) {
+    const int empty = CountEmptyCells(board);
+    if (empty == 0) {
+      return MaxValue(board, depth, budget);
+    }
+    if (depth <= 0 || budget <= 0) {
       return LeafValue(board);
     }
+
     ChargeNode();
     if (timed_out_) {
       return 0.0f;
     }
 
-    const int empty = CountEmptyCells(board);
-    if (empty == 0) {
-      return LeafValue(board);
-    }
+    // Spawning a 2 has probability 0.9 / empty and a 4 has 0.1 / empty; the
+    // budget is charged in whole log2 units, so the same lines survive that a
+    // fixed probability cutoff would keep.
+    const int two_cost = int(std::ceil(-std::log2(kTwoProbability / float(empty))));
+    const int four_cost = int(std::ceil(-std::log2(kFourProbability / float(empty))));
 
-    const float two_probability = kTwoProbability / float(empty);
-    const float four_probability = kFourProbability / float(empty);
     float total = 0.0f;
     for (int cell = 0; cell < kBoardCells; cell++) {
       if ((board >> (4 * cell)) & kCellMask) {
         continue;
       }
-      const Bits occupied = board | (Bits(1) << (4 * cell));
-      total += kTwoProbability * MaxValue(occupied, depth - 1, probability * two_probability);
+      const Bits two = board | (Bits(1) << (4 * cell));
+      total += kTwoProbability * MaxValue(two, depth, budget - two_cost);
       if (timed_out_) {
         return 0.0f;
       }
-      total +=
-          kFourProbability * MaxValue(occupied | (Bits(1) << (4 * cell)), depth - 1, probability * four_probability);
+      const Bits four = board | (Bits(2) << (4 * cell));
+      total += kFourProbability * MaxValue(four, depth, budget - four_cost);
       if (timed_out_) {
         return 0.0f;
       }
     }
     return total / float(empty);
+  }
+
+  void BeginSearch() {
+    generation_++;
   }
 
   [[nodiscard]] bool OutOfTime() const {
@@ -313,6 +344,31 @@ class Expectimax {
   }
 
  private:
+  static constexpr int kTableBits = 20;
+
+  struct TableKey {
+    Bits board{0};
+    int depth{0};
+    int budget{0};
+
+    [[nodiscard]] bool operator==(const TableKey &other) const {
+      return board == other.board && depth == other.depth && budget == other.budget;
+    }
+  };
+
+  struct TableEntry {
+    TableKey key{};
+    float value{0.0f};
+    uint32_t generation{0};
+  };
+
+  static uint64_t Hash(const TableKey &key) {
+    uint64_t hash = key.board ^ (uint64_t(key.depth * 32 + key.budget) * 0x9E3779B97F4A7C15ULL);
+    hash = (hash ^ (hash >> 30)) * 0xBF58476D1CE4E5B9ULL;
+    hash = (hash ^ (hash >> 27)) * 0x94D049BB133111EBULL;
+    return hash ^ (hash >> 31);
+  }
+
   void ChargeNode() {
     nodes_++;
     if ((nodes_ & 0x3F) == 0 && Clock::now() >= deadline_) {
@@ -323,7 +379,48 @@ class Expectimax {
   Clock::time_point deadline_;
   bool timed_out_{false};
   uint64_t nodes_{0};
+  uint32_t generation_{0};
+  std::vector<TableEntry> table_;
 };
+
+// The root: iterative deepening over the spawn depth. Every completed layer
+// replaces the answer, so a search that runs out of budget still leaves a
+// decision that is at least as deep as the greedy one.
+std::optional<Direction> GreedyMove(Bits board);
+
+std::optional<Direction> SearchRoot(Bits root, int max_depth, int budget, Expectimax *search, int *reached_depth) {
+  // A position without a legal move has no direction to return, and the greedy
+  // answer is the floor of every layer.
+  std::optional<Direction> best = GreedyMove(root);
+  *reached_depth = 0;
+  for (int depth = 1; depth <= max_depth; depth++) {
+    search->BeginSearch();
+    std::optional<Direction> candidate;
+    float candidate_value = -std::numeric_limits<float>::infinity();
+    for (Direction direction : kDirections) {
+      const Bits moved = MoveBoard(root, direction);
+      if (moved == root) {
+        continue;
+      }
+      const float value = search->ChanceValue(moved, depth - 1, budget);
+      if (search->OutOfTime()) {
+        break;
+      }
+      if (value > candidate_value) {
+        candidate_value = value;
+        candidate = direction;
+      }
+    }
+    if (search->OutOfTime()) {
+      break;
+    }
+    if (candidate.has_value()) {
+      best = candidate;
+      *reached_depth = depth;
+    }
+  }
+  return best;
+}
 
 // A cheap one-ply choice, used when the budget does not even cover one full
 // expectimax layer, so the strategy always has something to play.
@@ -335,7 +432,7 @@ std::optional<Direction> GreedyMove(Bits board) {
     if (moved == board) {
       continue;
     }
-    const float value = BoardHeuristic(moved);
+    const float value = LeafValue(moved);
     if (value > best_value) {
       best_value = value;
       best = direction;
@@ -344,7 +441,8 @@ std::optional<Direction> GreedyMove(Bits board) {
   return best;
 }
 
-// The move as the game computes it: update_step on the very same blocks.
+// Applies one move through the real game rules, which is how the move model of
+// the search is checked against the function the game moves blocks with.
 bool ReferenceMove(const AiPlayer::Board &board, Direction direction, AiPlayer::Board *result) {
   std::vector<Block> blocks;
   for (int cell = 0; cell < kBoardCells; cell++) {
@@ -363,8 +461,25 @@ bool ReferenceMove(const AiPlayer::Board &board, Direction direction, AiPlayer::
   *result = moved;
   return moved != board;
 }
-
 }  // namespace
+
+std::optional<Direction> AiPlayer::SearchBestMove(const Board &board, float budget_ms, SearchStats *stats) {
+  std::call_once(g_tables_once, InitTables);
+
+  const Bits root = ToBits(board);
+  const Clock::time_point begin = Clock::now();
+  Expectimax search(begin, budget_ms);
+
+  int reached_depth = 0;
+  const std::optional<Direction> best = SearchRoot(root, kSearchDepth, kSearchBudget, &search, &reached_depth);
+
+  if (stats) {
+    stats->depth = reached_depth;
+    stats->nodes = search.Nodes();
+    stats->seconds = std::chrono::duration<double>(Clock::now() - begin).count();
+  }
+  return best;
+}
 
 AiPlayer::AiPlayer() {
   worker_ = std::thread([this] { WorkerLoop(); });
@@ -433,50 +548,6 @@ void AiPlayer::WorkerLoop() {
       result_ = std::make_pair(request.revision, *move);
     }
   }
-}
-
-std::optional<Direction> AiPlayer::SearchBestMove(const Board &board, float budget_ms, SearchStats *stats) {
-  std::call_once(g_tables_once, InitTables);
-
-  const Bits root = ToBits(board);
-  const Clock::time_point begin = Clock::now();
-  Expectimax search(begin, budget_ms);
-
-  // Iterative deepening: every completed layer replaces the previous answer, so
-  // an interrupted search still leaves a decision that is at least as deep as
-  // the greedy one.
-  std::optional<Direction> best = GreedyMove(root);
-  int best_depth = 0;
-  for (int depth = 1; depth <= kMaxDepth; depth++) {
-    std::optional<Direction> candidate;
-    float candidate_value = -std::numeric_limits<float>::infinity();
-    for (Direction direction : kDirections) {
-      const Bits moved = MoveBoard(root, direction);
-      if (moved == root) {
-        continue;
-      }
-      const float value = search.ChanceValue(moved, depth, 1.0f);
-      if (search.OutOfTime()) {
-        break;
-      }
-      if (value > candidate_value) {
-        candidate_value = value;
-        candidate = direction;
-      }
-    }
-    if (search.OutOfTime() || !candidate.has_value()) {
-      break;
-    }
-    best = candidate;
-    best_depth = depth;
-  }
-
-  if (stats) {
-    stats->depth = best_depth;
-    stats->nodes = search.Nodes();
-    stats->seconds = std::chrono::duration<double>(Clock::now() - begin).count();
-  }
-  return best;
 }
 
 bool AiPlayer::ApplyMove(const Board &board, Direction direction, Board *result) {

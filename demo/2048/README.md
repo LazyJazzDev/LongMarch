@@ -41,16 +41,25 @@ exponent, and whole rows are resolved through lookup tables, so a move is a
 table lookup per row. The player picks the move with the highest expected value,
 the game averages over every empty cell a block could spawn in, and leaves are
 judged by a score that rewards free cells and merge potential and penalizes
-lines that are not monotonic. The walk stops at a depth limit or when the
-probability of a line drops below `kProbabilityCutoff`, and it runs with
-iterative deepening under a wall-clock budget, so an unfinished layer never
-changes the answer: the deepest completed layer decided the move.
+lines that are not monotonic, following the classic `nneonneo/2048-ai`
+heuristic and its parameters.
 
-The search runs on a worker thread with 150 ms per move, which keeps the frame
-rate independent of how long the strategy thinks. `AiPlayer::ValidateModel`
-replays random positions through both the search's move model and `update_step`
-and reports any disagreement; `demo_2048 --ai-benchmark` runs it before the
-games.
+A line carries a log2 probability budget instead of a raw probability cutoff:
+spawning a 2 costs `ceil(-log2(0.9 / empty))` units and a 4 costs
+`ceil(-log2(0.1 / empty))`, and the line falls back to the heuristic when its
+budget is used up, so every unit of the budget is a factor of two. Player nodes
+are cached in a direct mapped table keyed on the whole position, the remaining
+depth and the remaining budget; a collision only discards cached work, because
+the stored key is compared in full. That table is what makes the deeper search
+affordable: positions reached by different orders of moves are searched once.
+
+The search runs on a worker thread with 150 ms per move, and it deepens the
+spawn depth up to `kSearchDepth` while the budget lasts, so an unfinished layer
+never changes the answer: the deepest completed layer decided the move. The
+worker keeps the frame rate independent of how long the strategy thinks.
+`AiPlayer::ValidateModel` replays random positions through both the search's
+move model and `update_step` and reports any disagreement;
+`demo_2048 --ai-benchmark` runs it before the games.
 
 `2048_lib/` holds `update_step`, the part students implement in the assignment;
 the demo ships a reference implementation that passes the assignment's tests.
