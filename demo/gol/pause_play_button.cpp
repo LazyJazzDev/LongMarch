@@ -1,5 +1,8 @@
 #include "pause_play_button.h"
 
+#include <algorithm>
+#include <cmath>
+
 #include "application/model.h"
 #include "button_palette.h"
 
@@ -15,46 +18,6 @@ PausePlayButton::PausePlayButton(Application *app,
   {
     auto tan30 = std::tan(glm::pi<float>() / 6.0f);
     std::vector<std::vector<glm::vec2>> positions = {
-        {
-            {-0.24 / tan30, 0.48},
-            {-0.24 / tan30, 0.0},
-            {0.24 / tan30, 0.0},
-            {0.24 / tan30, 0.0},
-            {-0.24 / tan30, -0.48},
-            {-0.24 / tan30, 0.0},
-            {0.24 / tan30, 0.0},
-            {0.24 / tan30, 0.0},
-        },
-        {
-            {0.36, 0.48},
-            {0.12, 0.48},
-            {0.12, -0.48},
-            {0.36, -0.48},
-            {-0.36, 0.48},
-            {-0.12, 0.48},
-            {-0.12, -0.48},
-            {-0.36, -0.48},
-        },
-        {
-            {0.24 / tan30, 0.0},
-            {0.24 / tan30, 0.0},
-            {-0.24 / tan30, 0.0},
-            {-0.24 / tan30, -0.48},
-            {0.24 / tan30, 0.0},
-            {0.24 / tan30, 0.0},
-            {-0.24 / tan30, 0.0},
-            {-0.24 / tan30, 0.48},
-        },
-        {
-            {-0.36, -0.48},
-            {-0.12, -0.48},
-            {-0.12, 0.48},
-            {-0.36, 0.48},
-            {0.36, -0.48},
-            {0.12, -0.48},
-            {0.12, 0.48},
-            {0.36, 0.48},
-        },
         {
             {-0.24 / tan30, -0.48},
             {0.0, -0.24},
@@ -82,10 +45,8 @@ PausePlayButton::PausePlayButton(Application *app,
     const auto pause_color = button_palette::kPause;
     const auto play_color = button_palette::kPlay;
 
-    std::vector<std::vector<Vertex>> vertices = {
-        ComposeVertices(positions[0], play_color), ComposeVertices(positions[1], pause_color),
-        ComposeVertices(positions[2], play_color), ComposeVertices(positions[3], pause_color),
-        ComposeVertices(positions[4], play_color), ComposeVertices(positions[5], pause_color)};
+    std::vector<std::vector<Vertex>> vertices = {ComposeVertices(positions[0], play_color),
+                                                 ComposeVertices(positions[1], pause_color)};
 
     pause_play_model_ = std::make_unique<MixModel>(vertices, indices);
   }
@@ -94,25 +55,34 @@ PausePlayButton::PausePlayButton(Application *app,
 
   pause_play_device_model_ =
       std::make_unique<DeviceModel>(application_, pause_play_model_->GetModel(0.0, MixStyle::kLinear));
-  pause_play_animation_var_ = AnimationVar(0.0, AnimationStyle::kPower5);
 
   background_animation_var_ = AnimationVar(0.0, AnimationStyle::kPower5);
 }
 
 void PausePlayButton::Update(float t) {
-  pause_play_animation_var_.Update(t * 5.0f);
-  pause_play_device_model_->UploadVertices(
-      pause_play_model_
-          ->GetModel(float(pause_play_animation_var_),
-                     (click_cnt_ >= 4) ? MixStyle::kLinear : MixStyle::kAngularClockwise)
-          .Vertices());
+  const float target = is_playing_ ? 1.0f : 0.0f;
+  if (morph_ != target || morph_velocity_ != 0.0f) {
+    // Exact critically damped spring: preserve velocity on reversal and keep the
+    // response independent of frame rate. Most of the transition takes about 0.2 s.
+    constexpr float frequency = 24.0f;
+    const float dt = std::max(t, 0.0f);
+    const float offset = morph_ - target;
+    const float impulse = morph_velocity_ + frequency * offset;
+    const float decay = std::exp(-frequency * dt);
+    morph_ = target + (offset + impulse * dt) * decay;
+    morph_velocity_ = (morph_velocity_ - frequency * impulse * dt) * decay;
+    if (std::abs(morph_ - target) < 0.001f && std::abs(morph_velocity_) < 0.01f) {
+      morph_ = target;
+      morph_velocity_ = 0.0f;
+    }
+    pause_play_device_model_->UploadVertices(
+        pause_play_model_->GetModel(std::clamp(morph_, 0.0f, 1.0f), MixStyle::kLinear).Vertices());
+  }
   background_animation_var_.Update(t * 10.0f);
 }
 
 void PausePlayButton::OnClick() {
-  click_cnt_++;
-  click_cnt_ %= 6;
-  pause_play_animation_var_.AddTarget(1.0);
+  is_playing_ = !is_playing_;
 }
 
 void PausePlayButton::Draw() {
@@ -137,5 +107,5 @@ void PausePlayButton::ResizeModel() {
 }
 
 bool PausePlayButton::IsPlaying() const {
-  return click_cnt_ & 1;
+  return is_playing_;
 }

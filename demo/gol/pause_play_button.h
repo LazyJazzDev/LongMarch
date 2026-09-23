@@ -25,9 +25,10 @@ class PausePlayButton : public Button {
 
   std::unique_ptr<MixModel> pause_play_model_;
   std::unique_ptr<DeviceModel> pause_play_device_model_;
-  AnimationVar pause_play_animation_var_;
+  float morph_{0.0f};
+  float morph_velocity_{0.0f};
   MixValue<glm::vec4> background_color_;
   DeviceModel *background_device_model_;
   AnimationVar background_animation_var_;
-  int32_t click_cnt_{0};
+  bool is_playing_{false};
 };
