@@ -1,10 +1,10 @@
 #pragma once
-#include <array>
 #include <random>
 
 #include "application/animation_var.h"
 #include "application/button.h"
 #include "application/model.h"
+#include "glm/gtc/quaternion.hpp"
 
 class RandomizeButton : public Button {
  public:
@@ -19,9 +19,13 @@ class RandomizeButton : public Button {
   std::vector<uint8_t> *cells_;
   DeviceModel *background_;
   std::unique_ptr<DeviceModel> face_;
-  std::array<std::unique_ptr<DeviceModel>, 6> pips_;
   std::mt19937 random_engine_{std::random_device{}()};
-  AnimationVar rotation_{0.0f, AnimationStyle::kPower2};
+  glm::quat orientation_{1, 0, 0, 0};
+  glm::quat start_orientation_{1, 0, 0, 0};
+  glm::quat target_orientation_{1, 0, 0, 0};
+  glm::vec3 spin_axis_{1, 0, 0};
+  float rotation_progress_{1.0f};
+  int selected_face_{5};
   AnimationVar background_animation_{0.0f, AnimationStyle::kPower5};
   MixValue<glm::vec4> background_color_;
 };

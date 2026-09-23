@@ -13,7 +13,8 @@ build/demo/gol/demo_gol 60 40 --random 0.3   # random 60 x 40 grid
 
 Click cells to toggle them. The buttons play/pause the simulation, cycle the
 speed (1x, 2x, 5x), clear the grid, and randomize it with the dice button.
-The die has six shaded faces and tumbles in 3D when clicked.
+The die has six separated rounded faces with cut-out pips. Each click tumbles it
+in 3D and lands on a randomly chosen different face, tilted toward the viewer.
 Each click independently gives every cell a 50% chance of being alive; the
 play/pause state is preserved. The layout follows the window size.
 

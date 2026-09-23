@@ -31,9 +31,6 @@ PSInput VSMain(VSInput input) {
   output.position = mul(global_uniform.view, screen_pos);
   output.color = input.color * instance_info.color;
   output.local_position = input.position;
-  if (instance_info.extra.x == 3) {
-    output.local_position = screen_pos.xy;
-  }
   output.extra = instance_info.extra;
   return output;
 }
@@ -50,6 +47,27 @@ float4 CellTheme(PSInput input) {
   scale = 2.0 - length(input.local_position - float2(-1.0, -1.0)) * 0.3;
   float4 foreground_color = float4(input.color.rgb * scale * asfloat(input.extra.z), 1.0) * asfloat(input.extra.w);
   return float4(background_color.rgb * (1.0 - foreground_color.a) + foreground_color.rgb * foreground_color.a, 1.0);
+}
+
+// A rounded plate with real cutouts. Discard exposes the button background through
+// the holes and seams; the existing supersampled resolve antialiases their edges.
+float4 DiceFaceTheme(PSInput input) {
+  float2 p = input.local_position;
+  float2 q = abs(p) - 0.74;
+  float rounded_rect = length(max(q, 0.0)) + min(max(q.x, q.y), 0.0) - 0.26;
+  clip(-rounded_rect);
+  uint value = input.extra.y;
+  float hole = 10.0;
+  if ((value & 1) != 0)
+    hole = length(p);
+  if (value >= 2)
+    hole = min(hole, min(length(p - float2(-0.50, -0.50)), length(p - float2(0.50, 0.50))));
+  if (value >= 4)
+    hole = min(hole, min(length(p - float2(-0.50, 0.50)), length(p - float2(0.50, -0.50))));
+  if (value == 6)
+    hole = min(hole, min(length(p - float2(-0.50, 0.0)), length(p - float2(0.50, 0.0))));
+  clip(hole - 0.15);
+  return input.color;
 }
 
 uint RandPCG(inout uint rng_state) {
@@ -89,6 +107,9 @@ float4 PSMain(PSInput input) : SV_TARGET {
       break;
     case 1:
       color = IconTheme(input);
+      break;
+    case 3:
+      color = DiceFaceTheme(input);
       break;
     case 2:
       color = CellTheme(input);
