@@ -95,7 +95,7 @@ float4 DiceFaceTheme(PSInput input) {
     hole = min(hole, min(length(p - float2(-0.50, 0.0)), length(p - float2(0.50, 0.0))));
   clip(hole - 0.20);
   float2 projected = input.projected_die_position;
-  float shade = 1.0 - 0.25 * (projected.x + projected.y);
+  float shade = 1.0 - 0.16 * (projected.x + projected.y);
   return float4(input.color.rgb * shade, 1.0);
 }
 
