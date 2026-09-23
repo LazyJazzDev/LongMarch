@@ -222,8 +222,7 @@ void GameOfLife::OnWindowSize() {
   const float margin = ui_unit * 3.0f;
   const float icon_size = ui_unit * 8.0f;
   const float step = ui_unit * 10.0f;
-  const float slider_thickness = ui_unit * 4.5f;
-  const float slider_inset = (icon_size - slider_thickness) * 0.5f;
+  const float slider_thickness = ui_unit * 5.5f;
   const float panel_size = ui_unit * 24.0f;
 
   float playground_left = 0.0f;
@@ -244,18 +243,22 @@ void GameOfLife::OnWindowSize() {
   if (sidebar_) {
     playground_left = panel_size;
     panel_right_ = panel_size;
-    // Keep file actions above the slim controls and group colored board/transport actions below.
+    // Board actions anchor the outermost end of the toolbar.
     place(open_button_.get(), margin, margin);
     place(save_button_.get(), margin + step, margin);
-    place(refresh_button_.get(), margin, window_height - margin - icon_size - step);
-    place(randomize_button_.get(), margin + step, window_height - margin - icon_size - step);
-    place(speed_toggle_button_.get(), margin, window_height - margin - icon_size);
-    place(pause_play_button_.get(), margin + step, window_height - margin - icon_size);
-    const float top = margin + step + ui_unit * 2.0f;
-    const float bottom = window_height - margin - step * 2.0f - ui_unit * 2.0f;
-    width_slider_->Resize({margin + slider_inset, top, margin + slider_inset + slider_thickness, bottom}, true);
-    height_slider_->Resize({margin + step + slider_inset, top, margin + step + slider_inset + slider_thickness, bottom},
-                           true);
+    place(speed_toggle_button_.get(), margin, window_height - margin - icon_size - step);
+    place(pause_play_button_.get(), margin + step, window_height - margin - icon_size - step);
+    place(refresh_button_.get(), margin, window_height - margin - icon_size);
+    place(randomize_button_.get(), margin + step, window_height - margin - icon_size);
+    const float available_top = margin + step + ui_unit * 2.0f;
+    const float available_bottom = window_height - margin - step * 2.0f - ui_unit * 2.0f;
+    const float length = std::min(available_bottom - available_top, ui_unit * 36.0f);
+    const float top = (available_top + available_bottom - length) * 0.5f;
+    const float left = (panel_size - slider_thickness * 2.0f - ui_unit * 2.0f) * 0.5f;
+    width_slider_->Resize({left, top, left + slider_thickness, top + length}, true);
+    height_slider_->Resize(
+        {left + slider_thickness + ui_unit * 2.0f, top, left + slider_thickness * 2.0f + ui_unit * 2.0f, top + length},
+        true);
   } else {
     playground_bottom = window_height - panel_size;
     panel_top_ = playground_bottom;
@@ -263,14 +266,18 @@ void GameOfLife::OnWindowSize() {
     const float actions_left = window_width - margin - step - icon_size;
     place(open_button_.get(), margin, top);
     place(save_button_.get(), margin, top + step);
-    place(refresh_button_.get(), actions_left, top);
-    place(randomize_button_.get(), actions_left + step, top);
-    place(speed_toggle_button_.get(), actions_left, top + step);
-    place(pause_play_button_.get(), actions_left + step, top + step);
-    const float left = margin + step + ui_unit * 2.0f;
-    const float right = actions_left - ui_unit * 4.0f;
-    width_slider_->Resize({left, top + slider_inset, right, top + slider_inset + slider_thickness}, false);
-    height_slider_->Resize({left, top + step + slider_inset, right, top + step + slider_inset + slider_thickness},
+    place(speed_toggle_button_.get(), actions_left, top);
+    place(pause_play_button_.get(), actions_left, top + step);
+    place(refresh_button_.get(), actions_left + step, top);
+    place(randomize_button_.get(), actions_left + step, top + step);
+    const float available_left = margin + step + ui_unit * 2.0f;
+    const float available_right = actions_left - ui_unit * 4.0f;
+    const float length = std::min(available_right - available_left, ui_unit * 70.0f);
+    const float left = (available_left + available_right - length) * 0.5f;
+    const float slider_top = panel_top_ + (panel_size - slider_thickness * 2.0f - ui_unit * 2.0f) * 0.5f;
+    width_slider_->Resize({left, slider_top, left + length, slider_top + slider_thickness}, false);
+    height_slider_->Resize({left, slider_top + slider_thickness + ui_unit * 2.0f, left + length,
+                            slider_top + slider_thickness * 2.0f + ui_unit * 2.0f},
                            false);
   }
 
