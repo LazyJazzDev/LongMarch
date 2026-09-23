@@ -1,28 +1,23 @@
 #include "file_button.h"
 
 #include "button_palette.h"
+#include "geometry/mesh.h"
 
 namespace {
-// Stroke geometry uses the same model/shader path as the existing toolbar icons.
-class Icon {
- public:
-  void Line(glm::vec2 from, glm::vec2 to, float width = 0.095f) {
-    auto offset = glm::normalize(glm::vec2{from.y - to.y, to.x - from.x}) * width * 0.5f;
-    uint32_t base = uint32_t(vertices.size());
-    for (auto p : {from + offset, to + offset, to - offset, from - offset})
-      vertices.push_back({p, glm::vec4{1.0f}});
-    for (uint32_t i : {0u, 1u, 2u, 0u, 2u, 3u})
-      indices.push_back(base + i);
-  }
-
-  std::unique_ptr<DeviceModel> Build(Application *app) {
-    return std::make_unique<DeviceModel>(app, Model(vertices, indices));
-  }
-
- private:
+std::unique_ptr<DeviceModel> BuildIcon(Application *app, const std::vector<glm::vec2> &outline) {
+  // Triangulate one continuous silhouette, just like the reset icon. Shared
+  // boundaries eliminate the gaps and overlapping ends of separate line quads.
+  const geometry::Mesh mesh(outline);
   std::vector<Vertex> vertices;
   std::vector<uint32_t> indices;
-};
+  for (const auto &triangle : mesh.GetTriangles()) {
+    for (auto point : {triangle.v0, triangle.v1, triangle.v2}) {
+      indices.push_back(uint32_t(vertices.size()));
+      vertices.push_back({point, glm::vec4{1.0f}});
+    }
+  }
+  return std::make_unique<DeviceModel>(app, Model(vertices, indices));
+}
 }  // namespace
 
 FileButton::FileButton(Application *app, DeviceModel *background, Kind kind, std::function<void()> on_click)
@@ -31,40 +26,46 @@ FileButton::FileButton(Application *app, DeviceModel *background, Kind kind, std
       kind_(kind),
       on_click_(std::move(on_click)),
       background_color_(button_palette::Background()) {
-  Icon frame;
+  // A 0.20-wide stroke matches the reset icon's 0.40/0.60 inner/outer radii.
   if (kind == Kind::kOpen) {
-    // Open folder, with a raised tab and a sloping front flap.
-    frame.Line({-0.50f, 0.42f}, {-0.50f, -0.38f});
-    frame.Line({-0.50f, -0.38f}, {-0.24f, -0.38f});
-    frame.Line({-0.24f, -0.38f}, {-0.10f, -0.23f});
-    frame.Line({0.34f, -0.23f}, {0.44f, -0.23f});
-    frame.Line({0.44f, -0.23f}, {0.44f, -0.05f});
-    frame.Line({-0.50f, 0.42f}, {0.37f, 0.42f});
-    frame.Line({0.37f, 0.42f}, {0.53f, -0.02f});
-    frame.Line({-0.50f, 0.42f}, {-0.34f, -0.02f});
-    frame.Line({-0.34f, -0.02f}, {-0.20f, -0.02f});
-    frame.Line({0.30f, -0.02f}, {0.53f, -0.02f});
+    frame_ = BuildIcon(app, {{-0.10f, -0.24f},
+                             {-0.28f, -0.44f},
+                             {-0.58f, -0.44f},
+                             {-0.58f, 0.48f},
+                             {0.39f, 0.48f},
+                             {0.59f, -0.08f},
+                             {0.38f, -0.08f},
+                             {0.25f, 0.28f},
+                             {-0.38f, 0.28f},
+                             {-0.38f, -0.24f},
+                             {-0.36f, -0.24f},
+                             {-0.24f, -0.10f}});
   } else {
-    // Save tray, leaving the center open for the descending arrow.
-    frame.Line({-0.48f, 0.12f}, {-0.48f, 0.44f});
-    frame.Line({-0.48f, 0.44f}, {0.48f, 0.44f});
-    frame.Line({0.48f, 0.44f}, {0.48f, 0.12f});
-    frame.Line({-0.48f, 0.12f}, {-0.30f, 0.12f});
-    frame.Line({0.30f, 0.12f}, {0.48f, 0.12f});
+    frame_ = BuildIcon(app, {{-0.58f, 0.04f},
+                             {-0.38f, 0.04f},
+                             {-0.38f, 0.28f},
+                             {0.38f, 0.28f},
+                             {0.38f, 0.04f},
+                             {0.58f, 0.04f},
+                             {0.58f, 0.48f},
+                             {-0.58f, 0.48f}});
   }
-  frame_ = frame.Build(app);
-  Icon arrow;
-  const float direction = kind == Kind::kSave ? 1.0f : -1.0f;
-  const float arrow_x = kind == Kind::kOpen ? 0.10f : 0.0f;
-  arrow.Line({arrow_x, -0.42f}, {arrow_x, 0.13f});
-  const float tip = direction > 0 ? 0.13f : -0.42f;
-  arrow.Line({arrow_x - 0.16f, tip - direction * 0.16f}, {arrow_x, tip});
-  arrow.Line({arrow_x, tip}, {arrow_x + 0.16f, tip - direction * 0.16f});
-  arrow_ = arrow.Build(app);
-  Icon check;
-  check.Line({-0.22f, -0.16f}, {-0.06f, 0.02f}, 0.10f);
-  check.Line({-0.06f, 0.02f}, {0.28f, -0.34f}, 0.10f);
-  check_ = check.Build(app);
+  // Solid arrowhead and shaft form a single outline, with room for their motion.
+  std::vector<glm::vec2> arrow{{-0.10f, -0.50f}, {0.10f, -0.50f},  {0.10f, -0.18f}, {0.27f, -0.18f},
+                               {0.0f, 0.10f},    {-0.27f, -0.18f}, {-0.10f, -0.18f}};
+  if (kind == Kind::kOpen) {
+    for (auto &point : arrow) {
+      point.x += 0.17f;
+      point.y = -0.48f - point.y;
+    }
+  }
+  arrow_ = BuildIcon(app, arrow);
+  std::vector<glm::vec2> check{{-0.32f, -0.10f}, {-0.18f, -0.24f}, {-0.06f, -0.10f},
+                               {0.23f, -0.40f},  {0.37f, -0.26f},  {-0.06f, 0.18f}};
+  if (kind == Kind::kOpen)
+    for (auto &point : check)
+      point += glm::vec2{0.10f, 0.04f};
+  check_ = BuildIcon(app, check);
 }
 
 void FileButton::Update(float delta_time) {
