@@ -23,10 +23,16 @@ void CellButton::Rebind(uint8_t *cell) {
   SetState(0);
 }
 
-void CellButton::Update(float t) {
-  light_animation_var_.TryUpdateTarget(*cell_ ? 1.0f : 0.0f);
+void CellButton::Update(float t, bool animate_state) {
+  const float brightness = *cell_ ? 1.0f : 0.0f;
+  if (animate_state) {
+    light_animation_var_.TryUpdateTarget(brightness);
+    light_animation_var_.Update(t * 3.0f);
+  } else {
+    // Simulation generations switch immediately, without overlapping fades.
+    light_animation_var_ = AnimationVar(brightness, AnimationStyle::kPower5);
+  }
   background_animation_var_.Update(t * 10.0f);
-  light_animation_var_.Update(t * 3.0f);
 }
 
 void CellButton::Draw() {

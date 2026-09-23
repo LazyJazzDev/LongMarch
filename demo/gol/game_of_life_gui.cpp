@@ -138,13 +138,6 @@ void GameOfLife::CustomOnUpdate() {
     default:
       break;
   }
-  for (int x = 0; x < cell_grid_width_; x++) {
-    for (int y = 0; y < cell_grid_height_; y++) {
-      int index = y * cell_grid_width_ + x;
-      cell_button_grid_[index]->Update(delta_time);
-    }
-  }
-
   static float accumulate_time = 0.0;
   if (pause_play_button_->IsPlaying()) {
     accumulate_time += delta_time;
@@ -156,6 +149,10 @@ void GameOfLife::CustomOnUpdate() {
   } else {
     accumulate_time = 0.0;
   }
+
+  // Synchronize after stepping so the new generation is visible in this frame.
+  for (auto &cell : cell_button_grid_)
+    cell->Update(delta_time, !pause_play_button_->IsPlaying());
 
   // Draw pause_play_button_
   pause_play_button_->Draw();

@@ -14,7 +14,7 @@ class CellButton : public Button {
              uint8_t *cell,
              DeviceModel *device_model);
   void Rebind(uint8_t *cell);
-  void Update(float t);
+  void Update(float t, bool animate_state);
   void Draw();
 
  private:
