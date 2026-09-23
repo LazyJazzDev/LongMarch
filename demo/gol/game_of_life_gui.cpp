@@ -256,20 +256,19 @@ void GameOfLife::OnWindowSize() {
                               window_height - blank_size);
   }
 
+  const float slider_gap = ui_unit * 1.5f;
+  const float thickness = (icon_size - slider_gap) * 0.5f;
   if (sidebar_) {
-    const float slider_height = ui_unit * 7.0f;
-    const float top = window_height * 0.5f - slider_height - icon_gap * 0.5f;
-    width_slider_->Resize({blank_size, top, blank_size + icon_size, top + slider_height});
-    height_slider_->Resize(
-        {blank_size, top + slider_height + icon_gap, blank_size + icon_size, top + slider_height * 2.0f + icon_gap});
+    const float top = blank_size + icon_size * 2.0f + icon_gap * 2.0f;
+    const float bottom = window_height - top;
+    width_slider_->Resize({blank_size, top, blank_size + thickness, bottom}, true);
+    height_slider_->Resize({blank_size + thickness + slider_gap, top, blank_size + icon_size, bottom}, true);
   } else {
-    const float available = window_width - 2.0f * (blank_size + icon_size * 2.0f + icon_gap * 2.0f);
-    const float slider_width = std::min(ui_unit * 24.0f, (available - icon_gap) * 0.5f);
-    const float left = window_width * 0.5f - slider_width - icon_gap * 0.5f;
-    const float top = playground_bottom + (window_height - playground_bottom - ui_unit * 7.0f) * 0.5f;
-    width_slider_->Resize({left, top, left + slider_width, top + ui_unit * 7.0f});
-    height_slider_->Resize(
-        {left + slider_width + icon_gap, top, left + slider_width * 2.0f + icon_gap, top + ui_unit * 7.0f});
+    const float left = blank_size + icon_size * 2.0f + icon_gap * 2.0f;
+    const float right = window_width - left;
+    const float top = window_height - blank_size - icon_size;
+    width_slider_->Resize({left, top, right, top + thickness}, false);
+    height_slider_->Resize({left, top + thickness + slider_gap, right, top + icon_size}, false);
   }
 
   playground_left_ = playground_left;

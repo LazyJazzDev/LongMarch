@@ -9,7 +9,7 @@ class SizeSlider : public Listener {
  public:
   SizeSlider(Application *app, char label, int value, DeviceModel *rectangle, std::function<void(int)> on_change);
   ~SizeSlider();
-  void Resize(glm::vec4 bounds);
+  void Resize(glm::vec4 bounds, bool vertical);
   void Draw();
 
   bool IsDragging() const {
@@ -30,7 +30,7 @@ class SizeSlider : public Listener {
   void DragTo(glm::vec2 p);
   void SetValue(int value);
   void RebuildLabel();
-  void RoundedRect(glm::vec2 position, glm::vec2 size, float radius, float depth, glm::vec4 color);
+  void RoundedRect(glm::vec2 position, glm::vec2 size, float radius, float depth, glm::vec4 color, glm::vec4 clip);
 
   char label_;
   int value_;
@@ -38,6 +38,8 @@ class SizeSlider : public Listener {
   std::unique_ptr<DeviceModel> label_model_;
   std::function<void(int)> on_change_;
   glm::vec4 bounds_{0.0f};
+  bool vertical_{false};
+  float label_width_{};
   bool dragging_{false};
   bool hovered_{false};
   bool focused_{false};

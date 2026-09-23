@@ -36,8 +36,9 @@ SizeSlider::~SizeSlider() {
   application_->UnregisterListener(this);
 }
 
-void SizeSlider::Resize(glm::vec4 bounds) {
+void SizeSlider::Resize(glm::vec4 bounds, bool vertical) {
   bounds_ = bounds;
+  vertical_ = vertical;
 }
 
 glm::vec2 SizeSlider::FramePosition(double x, double y) const {
@@ -82,10 +83,10 @@ void SizeSlider::OnCursorEnter(int entered) {
 }
 
 void SizeSlider::DragTo(glm::vec2 p) {
-  const float inset = (bounds_.w - bounds_.y) * 0.16f;
-  const float width = bounds_.z - bounds_.x - inset * 2.0f;
-  if (width > 0.0f)
-    SetValue(grid_size::FromFraction((p.x - bounds_.x - inset) / width));
+  const float length = vertical_ ? bounds_.w - bounds_.y : bounds_.z - bounds_.x;
+  const float position = vertical_ ? bounds_.w - p.y : p.x - bounds_.x;
+  if (length > 0.0f)
+    SetValue(grid_size::FromFraction(position / length));
 }
 
 void SizeSlider::SetValue(int value) {
@@ -112,6 +113,7 @@ void SizeSlider::RebuildLabel() {
                                                                   {{17, 17, 17, 21, 21, 27, 17}},
                                                                   {{17, 17, 17, 31, 17, 17, 17}}}};
   std::string text = std::string(1, label_) + " " + std::to_string(value_);
+  label_width_ = float(text.size() * 6 - 1);
   std::vector<Vertex> vertices;
   std::vector<uint32_t> indices;
   for (size_t i = 0; i < text.size(); ++i) {
@@ -140,29 +142,42 @@ void SizeSlider::RebuildLabel() {
   }
 }
 
-void SizeSlider::RoundedRect(glm::vec2 position, glm::vec2 size, float radius, float depth, glm::vec4 color) {
+void SizeSlider::RoundedRect(glm::vec2 position,
+                             glm::vec2 size,
+                             float radius,
+                             float depth,
+                             glm::vec4 color,
+                             glm::vec4 clip) {
   application_->DrawModel(rectangle_, {GetModelMatrix(position, size, depth),
                                        color,
                                        {4u, glm::floatBitsToUint(size.x * 0.5f), glm::floatBitsToUint(size.y * 0.5f),
-                                        glm::floatBitsToUint(radius)}});
+                                        glm::floatBitsToUint(radius)},
+                                       clip});
 }
 
 void SizeSlider::Draw() {
-  const float width = bounds_.z - bounds_.x, height = bounds_.w - bounds_.y;
-  const float knob = height * 0.32f;
-  const float track_height = height * 0.12f;
-  const float center_y = bounds_.y + height * 0.74f;
+  const glm::vec2 position{bounds_.x, bounds_.y};
+  const glm::vec2 size{bounds_.z - bounds_.x, bounds_.w - bounds_.y};
+  const float thickness = vertical_ ? size.x : size.y;
+  const float length = vertical_ ? size.y : size.x;
+  const float radius = thickness * 0.42f;
   const float fraction = float(value_ - grid_size::kMin) / float(grid_size::kMax - grid_size::kMin);
-  const float center_x = bounds_.x + knob * 0.5f + fraction * (width - knob);
-  RoundedRect({bounds_.x, center_y - track_height * 0.5f}, {width, track_height}, track_height * 0.5f, 0.5f,
-              {0.23f, 0.26f, 0.31f, 1.0f});
-  RoundedRect({bounds_.x, center_y - track_height * 0.5f}, {center_x - bounds_.x, track_height}, track_height * 0.5f,
-              0.45f, {0.47f, 0.59f, 0.73f, 1.0f});
-  RoundedRect(
-      {center_x - knob * 0.5f, center_y - knob * 0.5f}, {knob, knob}, knob * 0.35f, 0.4f,
-      dragging_ || hovered_ || focused_ ? glm::vec4{0.87f, 0.92f, 0.98f, 1.0f} : glm::vec4{0.73f, 0.79f, 0.87f, 1.0f});
-  const float pixel = height * 0.28f / 7.0f;
-  auto transform = glm::translate(glm::mat4{1.0f}, glm::vec3{bounds_.x, bounds_.y, 0.4f}) *
-                   glm::scale(glm::mat4{1.0f}, glm::vec3{pixel, pixel, 1.0f});
-  application_->DrawModel(label_model_.get(), {transform, {0.66f, 0.72f, 0.80f, 1.0f}, glm::uvec4{0}});
+  const float highlight = dragging_ || hovered_ || focused_ ? 0.035f : 0.0f;
+  RoundedRect(position, size, radius, 0.5f, {0.20f + highlight, 0.23f + highlight, 0.28f + highlight, 1.0f}, bounds_);
+  // Clip a second copy of the same rounded silhouette at the value boundary.
+  // This produces a straight color division without a separate handle or seam.
+  auto filled = bounds_;
+  if (vertical_)
+    filled.y = bounds_.w - size.y * fraction;
+  else
+    filled.z = bounds_.x + size.x * fraction;
+  if (fraction > 0.0f)
+    RoundedRect(position, size, radius, 0.45f, {0.34f + highlight, 0.42f + highlight, 0.53f + highlight, 1.0f}, filled);
+
+  const float pixel = std::min(thickness * 0.36f / 7.0f, length * 0.8f / label_width_);
+  auto transform = glm::translate(glm::mat4{1.0f}, glm::vec3{position + size * 0.5f, 0.4f}) *
+                   glm::rotate(glm::mat4{1.0f}, vertical_ ? -glm::half_pi<float>() : 0.0f, glm::vec3{0, 0, 1}) *
+                   glm::scale(glm::mat4{1.0f}, glm::vec3{pixel, pixel, 1.0f}) *
+                   glm::translate(glm::mat4{1.0f}, glm::vec3{-label_width_ * 0.5f, -3.5f, 0});
+  application_->DrawModel(label_model_.get(), {transform, {0.80f, 0.85f, 0.92f, 1.0f}, glm::uvec4{0}, bounds_});
 }

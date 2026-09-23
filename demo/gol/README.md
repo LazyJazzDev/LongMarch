@@ -19,7 +19,10 @@ Each click independently gives every cell a 50% chance of being alive; the
 play/pause state is preserved. The layout follows the window size.
 
 The rounded `W` and `H` sliders between randomize and speed adjust the number of
-columns and rows from 2 to 200. Drag or click the tracks; after selecting a slider,
+columns and rows from 2 to 200. They fill the space between the buttons: two
+vertical bars in the sidebar, two horizontal bars in the bottom panel. A straight
+color boundary marks each value (increasing upward or rightward); centered pixel
+labels rotate with the bars. Drag or click anywhere on a bar; after selecting a slider,
 use arrow keys for single-cell steps or Home/End for the endpoints. Resizing keeps
 cells in the overlapping upper-left region and leaves new cells empty. The view
 automatically fits and centers the resized grid. Playback state is preserved.
