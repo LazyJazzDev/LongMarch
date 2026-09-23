@@ -1,6 +1,7 @@
 #include "speed_toggle_button.h"
 
 #include "button_palette.h"
+#include "simulation_clock.h"
 
 SpeedToggleButton::SpeedToggleButton(Application *app,
                                      float left,
@@ -61,7 +62,13 @@ SpeedToggleButton::SpeedToggleButton(Application *app,
       }
     }
 
-    std::vector<uint32_t> indices = {0, 1, 2, 3, 4, 5, 6, 7, 8};
+    // A fourth degenerate triangle lets the arrows morph into a six-corner bolt.
+    for (auto &model : vertices)
+      model.resize(12, model.back());
+    const glm::vec2 a{0.14f, -0.62f}, b{-0.42f, 0.10f}, c{-0.06f, 0.10f};
+    const glm::vec2 d{-0.20f, 0.62f}, e{0.42f, -0.12f}, f{0.08f, -0.12f};
+    vertices.push_back(ComposeVertices({a, b, f, b, c, f, c, e, f, c, d, e}, button_palette::kLightning));
+    std::vector<uint32_t> indices = {0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11};
 
     speed_toggle_model_ = std::make_unique<MixModel>(vertices, indices);
   }
@@ -98,7 +105,7 @@ void SpeedToggleButton::OnResize() {
 
 void SpeedToggleButton::OnClick() {
   click_cnt_++;
-  click_cnt_ %= 3;
+  click_cnt_ %= SimulationClock::kLightning + 1;
   speed_toggle_animation_var_.AddTarget(1.0);
 }
 

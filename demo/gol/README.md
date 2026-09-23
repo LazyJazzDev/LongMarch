@@ -12,7 +12,10 @@ build/demo/gol/demo_gol 60 40 --random 0.3   # random 60 x 40 grid
 ```
 
 Click cells to toggle them. The buttons play/pause the simulation, cycle the
-speed (1x, 2x, 5x), clear the grid, and randomize it with the dice button.
+speed (1x, 2x, 5x, lightning), clear the grid, and randomize it with the dice button.
+Lightning mode shows a warm yellow bolt and runs generations back-to-back without
+an iteration delay. It yields to input and rendering after roughly 8 ms of
+computation, so pause, speed changes, and grid editing remain responsive.
 The die has six separated rounded faces with cut-out pips. Each click tumbles it
 in 3D and lands on a randomly chosen different face, tilted toward the viewer.
 Each click independently gives every cell a 50% chance of being alive; the

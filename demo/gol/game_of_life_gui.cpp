@@ -128,27 +128,9 @@ void GameOfLife::CustomOnUpdate() {
   refresh_button_->Update(delta_time);
   randomize_button_->Update(delta_time);
 
-  switch (speed_toggle_button_->SpeedLevel()) {
-    case 1:
-      delta_time *= 2.0;
-      break;
-    case 2:
-      delta_time *= 5.0;
-      break;
-    default:
-      break;
-  }
-  static float accumulate_time = 0.0;
-  if (pause_play_button_->IsPlaying()) {
-    accumulate_time += delta_time;
-    float cost = 0.5;
-    while (accumulate_time > cost) {
-      update_step(cell_grid_width_, cell_grid_height_, cell_grid_.data());
-      accumulate_time -= cost;
-    }
-  } else {
-    accumulate_time = 0.0;
-  }
+  simulation_clock_.Advance(
+      delta_time, pause_play_button_->IsPlaying(), speed_toggle_button_->SpeedLevel(),
+      [this] { update_step(cell_grid_width_, cell_grid_height_, cell_grid_.data()); }, [] { return glfwGetTime(); });
 
   // Synchronize after stepping so the new generation is visible in this frame.
   for (auto &cell : cell_button_grid_)

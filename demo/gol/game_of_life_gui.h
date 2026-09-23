@@ -8,6 +8,7 @@
 #include "pause_play_button.h"
 #include "randomize_button.h"
 #include "refresh_button.h"
+#include "simulation_clock.h"
 #include "size_slider.h"
 #include "speed_toggle_button.h"
 
@@ -47,6 +48,7 @@ class GameOfLife : public Application {
   void ZoomGrid(float factor);
   void ScrollGrid(double x, double y);
 
+  SimulationClock simulation_clock_;
   GridView grid_view_;
   std::unique_ptr<SizeSlider> width_slider_;
   std::unique_ptr<SizeSlider> height_slider_;
