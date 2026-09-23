@@ -28,4 +28,5 @@ class RandomizeButton : public Button {
   int selected_face_{5};
   AnimationVar background_animation_{0.0f, AnimationStyle::kPower5};
   MixValue<glm::vec4> background_color_;
+  MixValue<glm::vec4> face_color_;
 };

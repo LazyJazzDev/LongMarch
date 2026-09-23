@@ -34,6 +34,7 @@ RandomizeButton::RandomizeButton(Application *app, std::vector<uint8_t> *cells, 
       app, Model(ComposeVertices({{-1, -1}, {1, -1}, {1, 1}, {-1, 1}}, glm::vec4{1.0f}), {0, 1, 2, 0, 2, 3}));
   orientation_ = start_orientation_ = target_orientation_ = DisplayOrientation(selected_face_, 0);
   background_color_ = button_palette::RandomizeBackground();
+  face_color_ = button_palette::Dice();
 }
 
 void RandomizeButton::Update(float delta_time) {
@@ -60,6 +61,7 @@ void RandomizeButton::Draw() {
   auto placement = glm::translate(glm::mat4{1.0f}, glm::vec3{position + size * 0.5f, 0.34f}) *
                    glm::scale(glm::mat4{1.0f}, glm::vec3{size * 0.5f, 0.10f});
   auto orientation = glm::mat4_cast(orientation_);
+  auto face_color = face_color_.GetValue(float(background_animation_));
   for (size_t i = 0; i < kNormals.size(); ++i) {
     auto normal = kNormals[i];
     auto rotated_normal = glm::mat3(orientation) * normal;
@@ -68,7 +70,7 @@ void RandomizeButton::Draw() {
     // A 0.38 half-width on faces spaced 0.43 from the center leaves open seams.
     auto transform =
         placement * orientation * FaceFrame(normal) * glm::scale(glm::mat4{1.0f}, glm::vec3{0.38f, 0.38f, 1});
-    application_->DrawModel(face_.get(), {transform, button_palette::kDice, glm::uvec4{3, kFaceValues[i], 0, 0}});
+    application_->DrawModel(face_.get(), {transform, face_color, glm::uvec4{3, kFaceValues[i], 0, 0}});
   }
 }
 
