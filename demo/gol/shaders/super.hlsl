@@ -98,12 +98,18 @@ float4 SliderTheme(PSInput input) {
   float2 q = abs(input.local_position) * half_size - half_size + radius;
   float distance = length(max(q, 0.0)) + min(max(q.x, q.y), 0.0) - radius;
   clip(-distance);
-  // Filled regions are raised like the buttons; the empty track reverses the
-  // light direction to read as recessed. Keep the same center brightness.
-  if (input.extra.x == 5)
-    input.local_position = -input.local_position;
-  const float center_gain = 2.0 - sqrt(2.0) * 0.3;
-  return float4(IconTheme(input).rgb / center_gain, 1.0);
+  // Shape the cross-section in framebuffer pixels, not stretched square UVs.
+  // The short side sets the rounding width on every edge, including the ends.
+  float2 position = input.local_position * half_size;
+  float half_thickness = max(min(half_size.x, half_size.y), 0.001);
+  float2 edge_distance = half_size - abs(position);
+  float2 slope = sign(position) * (1.0 - smoothstep(0.0, half_thickness, edge_distance));
+  float relief = input.extra.x == 5 ? -1.0 : 1.0;
+  float3 normal = normalize(float3(slope * relief * 0.65, 1.0));
+  float3 light = normalize(float3(-0.5, -0.5, 1.0));
+  // Preserve the palette at the flat center, with soft ambient light in shadows.
+  float shade = 0.35 + 0.65 * saturate(dot(normal, light)) / light.z;
+  return float4(input.color.rgb * shade, 1.0);
 }
 
 uint RandPCG(inout uint rng_state) {
