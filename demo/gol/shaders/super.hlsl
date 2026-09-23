@@ -89,7 +89,10 @@ float4 DiceFaceTheme(PSInput input) {
   if (value == 6)
     hole = min(hole, min(length(p - float2(-0.50, 0.0)), length(p - float2(0.50, 0.0))));
   clip(hole - 0.20);
-  return input.color;
+  // Match the button's upper-left light with a soft face gradient and a raised rim.
+  float2 rim = sign(p) * smoothstep(0.70, 1.0, abs(p));
+  float shade = 1.0 - 0.04 * (p.x + p.y) - 0.03 * (rim.x + rim.y);
+  return float4(input.color.rgb * shade, 1.0);
 }
 
 float4 SliderTheme(PSInput input) {
