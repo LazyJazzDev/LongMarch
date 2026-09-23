@@ -98,7 +98,10 @@ float4 SliderTheme(PSInput input) {
   float2 q = abs(input.local_position) * half_size - half_size + radius;
   float distance = length(max(q, 0.0)) + min(max(q.x, q.y), 0.0) - radius;
   clip(-distance);
-  return input.color;
+  // Match the buttons' upper-left light while preserving the slider palette's
+  // center brightness. Both color regions share the full bar's coordinates.
+  const float center_gain = 2.0 - sqrt(2.0) * 0.3;
+  return float4(IconTheme(input).rgb / center_gain, 1.0);
 }
 
 uint RandPCG(inout uint rng_state) {
