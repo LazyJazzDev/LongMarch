@@ -1,4 +1,5 @@
 #pragma once
+#include <array>
 #include <random>
 
 #include "application/animation_var.h"
@@ -17,9 +18,10 @@ class RandomizeButton : public Button {
 
   std::vector<uint8_t> *cells_;
   DeviceModel *background_;
-  std::unique_ptr<DeviceModel> icon_;
+  std::unique_ptr<DeviceModel> face_;
+  std::array<std::unique_ptr<DeviceModel>, 6> pips_;
   std::mt19937 random_engine_{std::random_device{}()};
-  AnimationVar rotation_{0.0f, AnimationStyle::kPower5};
+  AnimationVar rotation_{0.0f, AnimationStyle::kPower2};
   AnimationVar background_animation_{0.0f, AnimationStyle::kPower5};
   MixValue<glm::vec4> background_color_;
 };
