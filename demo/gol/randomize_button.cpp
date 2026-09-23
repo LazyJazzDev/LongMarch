@@ -54,10 +54,11 @@ void RandomizeButton::Draw() {
   application_->DrawModel(
       background_, {GetModelMatrix(position, size, 0.6f), background_color_.GetValue(float(background_animation_)),
                     glm::uvec4{1, 0, 0, 0}});
-  // All visible faces belong to a convex cube. Cull back faces and flatten UI depth:
-  // the die does not rely on depth sorting or depth testing between its faces.
-  auto placement = glm::translate(glm::mat4{1.0f}, glm::vec3{position + size * 0.5f, 0.4f}) *
-                   glm::scale(glm::mat4{1.0f}, glm::vec3{size * 0.5f, 0.0f});
+  // All visible faces belong to a convex cube, so cull back faces and let them share one
+  // depth: they never overlap and the die needs no sorting. The small depth extent below
+  // exists only so the shader can converge the plates toward a vanishing point.
+  auto placement = glm::translate(glm::mat4{1.0f}, glm::vec3{position + size * 0.5f, 0.34f}) *
+                   glm::scale(glm::mat4{1.0f}, glm::vec3{size * 0.5f, 0.10f});
   auto orientation = glm::mat4_cast(orientation_);
   for (size_t i = 0; i < kNormals.size(); ++i) {
     auto normal = kNormals[i];

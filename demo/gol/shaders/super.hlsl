@@ -8,6 +8,11 @@ struct GlobalUniformObject {
   float4x4 view;
 };
 
+// Distance of a die plate from the die centre, matching FaceFrame() in randomize_button.cpp,
+// and the virtual camera distance of the die's slight perspective divide.
+static const float kDicePlateOffset = 0.43;
+static const float kDicePerspectiveDistance = 0.6;
+
 [[vk::binding(0, 0)]] ByteAddressBuffer instance_infos : register(t0, space0);
 [[vk::binding(0, 1)]] ConstantBuffer<GlobalUniformObject> global_uniform : register(b0, space1);
 
@@ -29,6 +34,18 @@ PSInput VSMain(VSInput input) {
   float4 screen_pos = mul(instance_info.model, float4(input.position, 0.0, 1.0));
   PSInput output;
   output.position = mul(global_uniform.view, screen_pos);
+  if (instance_info.extra.x == 3) {
+    // The randomize die converges slightly toward a vanishing point. Every plate is offset
+    // from the shared die centre, so recovering that centre keeps the seams aligned while
+    // the die tumbles. Other instances keep the orthographic placement.
+    float4 plate_centre = mul(instance_info.model, float4(0.0, 0.0, 0.0, 1.0));
+    float4 die_centre = plate_centre - kDicePlateOffset * mul(instance_info.model, float4(0.0, 0.0, 1.0, 0.0));
+    float w = 1.0 + (screen_pos.z - die_centre.z) / kDicePerspectiveDistance;
+    float4 centre_clip = mul(global_uniform.view, die_centre);
+    output.position.xy += (w - 1.0) * centre_clip.xy;
+    output.position.z *= w;
+    output.position.w = w;
+  }
   output.color = input.color * instance_info.color;
   output.local_position = input.position;
   output.extra = instance_info.extra;
