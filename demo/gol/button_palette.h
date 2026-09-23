@@ -10,9 +10,9 @@ inline const glm::vec4 kPause{0.61f, 0.45f, 0.43f, 1.0f};
 inline const glm::vec4 kLightning{0.60f, 0.49f, 0.25f, 1.0f};
 inline const glm::vec4 kInactive{0.25f, 0.27f, 0.30f, 1.0f};
 
-// Dice faces use a gentler gradient than IconTheme; keep their base color bright.
+// Dice faces use a shallow screen-space gradient instead of IconTheme's stronger gain.
 inline MixValue<glm::vec4> Dice() {
-  return MixValue<glm::vec4>({{0.75f, 0.78f, 0.83f, 1.0f}, {0.82f, 0.85f, 0.88f, 1.0f}, {0.66f, 0.69f, 0.74f, 1.0f}});
+  return MixValue<glm::vec4>({{0.75f, 0.78f, 0.83f, 1.0f}, {0.83f, 0.86f, 0.89f, 1.0f}, {0.66f, 0.69f, 0.74f, 1.0f}});
 }
 
 inline MixValue<glm::vec4> Background() {
