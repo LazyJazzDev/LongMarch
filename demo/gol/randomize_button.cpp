@@ -69,7 +69,7 @@ void RandomizeButton::Draw() {
     auto transform =
         placement * orientation * FaceFrame(normal) * glm::scale(glm::mat4{1.0f}, glm::vec3{0.38f, 0.38f, 1});
     application_->DrawModel(face_.get(),
-                            {transform, glm::vec4{0.96f, 0.97f, 1.0f, 1.0f}, glm::uvec4{3, kFaceValues[i], 0, 0}});
+                            {transform, glm::vec4{0.74f, 0.76f, 0.80f, 1.0f}, glm::uvec4{3, kFaceValues[i], 0, 0}});
   }
 }
 

@@ -58,7 +58,8 @@ RefreshButton::RefreshButton(Application *app,
       indices[i] = i;
     }
 
-    auto color = glm::vec4{0.8f, 0.8f, 0.8f, 1.0f};
+    // Same base gray as the lit speed arrows; the icon gradient brightens it by up to 1.8x.
+    auto color = glm::vec4{0.5f, 0.5f, 0.5f, 1.0f};
 
     std::vector<std::vector<Vertex>> vertices = {
         ComposeVertices(refresh_logo, color),
