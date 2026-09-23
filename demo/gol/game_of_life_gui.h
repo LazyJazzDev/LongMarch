@@ -34,6 +34,10 @@ class GameOfLife : public Application {
 
   void SetInitialCells(std::vector<uint8_t> cells);
 
+  void SetInitialPlaying(bool playing) {
+    initial_playing_ = playing;
+  }
+
  private:
   void CustomOnInit() override;
   void CustomOnUpdate() override;
@@ -77,6 +81,7 @@ class GameOfLife : public Application {
   float ui_scale_{1.0};
   float random_density_{0.0f};
   uint32_t random_seed_{0};
+  bool initial_playing_{false};
   int cell_grid_width_{};
   int cell_grid_height_{};
 

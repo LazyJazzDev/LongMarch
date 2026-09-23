@@ -10,6 +10,7 @@ cmake --build build --target demo_gol
 build/demo/gol/demo_gol                      # 40 x 30 grid
 build/demo/gol/demo_gol 60 40 --random 0.3   # random 60 x 40 grid
 build/demo/gol/demo_gol 200 200 --pattern demo/gol/patterns/295P5H1V1.cells
+build/demo/gol/demo_gol 200 200 --pattern demo/gol/patterns/gosper-glider-gun.cells --play
 ```
 
 Click cells to toggle them. The buttons play/pause the simulation, cycle the
@@ -49,6 +50,7 @@ Options:
 - `WIDTH HEIGHT`: cell grid size, each in [2, 200].
 - `--random DENSITY`: start with random live cells, e.g. `0.3`.
 - `--pattern FILE`: center a Life `.cells` pattern on the grid, initially paused.
+- `--play`: start the simulation immediately.
 - `--backend auto|vulkan|d3d12|metal`: select the graphics backend.
 - `--frames N`: exit after `N` rendered frames.
 - `--screenshot FILE`: save the last frame as PNG on exit.
@@ -58,6 +60,11 @@ spaceship is a 52 x 52, 295-cell pattern from Stephen A. Silver's Life Lexicon
 (CC BY-SA 3.0). On a 200 x 200 grid it starts at cells (74, 74) through
 (125, 125). Press play to watch it travel up and left by one cell every five
 generations.
+
+The included [Gosper glider gun](https://conwaylife.com/wiki/Gosper_glider_gun)
+starts with 36 live cells and emits one glider every 30 generations. Load it
+on the 200 x 200 grid with `--play` to watch the stream. Gliders disappear
+when they reach the grid edge; the gun continues firing.
 
 `game_of_life_lib/` holds `update_step`, the part students implement in the
 assignment; the demo ships a reference implementation. The dead-boundary rule

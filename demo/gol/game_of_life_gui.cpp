@@ -64,6 +64,7 @@ void GameOfLife::CustomOnInit() {
 
   InitCells(cell_grid_width_, cell_grid_height_);
   pause_play_button_ = std::make_unique<PausePlayButton>(this, 10.0f, 10.0f, 110.0f, 110.0f, &white_icon_model.value());
+  pause_play_button_->SetPlaying(initial_playing_);
   speed_toggle_button_ =
       std::make_unique<SpeedToggleButton>(this, 10.0f, 120.0f, 110.0f, 220.0f, &white_icon_model.value());
   refresh_button_ =
