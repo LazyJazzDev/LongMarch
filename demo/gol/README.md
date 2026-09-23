@@ -18,6 +18,12 @@ in 3D and lands on a randomly chosen different face, tilted toward the viewer.
 Each click independently gives every cell a 50% chance of being alive; the
 play/pause state is preserved. The layout follows the window size.
 
+The rounded `W` and `H` sliders between randomize and speed adjust the number of
+columns and rows from 2 to 200. Drag or click the tracks; after selecting a slider,
+use arrow keys for single-cell steps or Home/End for the endpoints. Resizing keeps
+cells in the overlapping upper-left region and leaves new cells empty. The view
+automatically fits and centers the resized grid. Playback state is preserved.
+
 Grid navigation:
 
 - Two-finger scrolling pans the enlarged grid horizontally and vertically.
@@ -28,7 +34,7 @@ Grid navigation:
 
 Options:
 
-- `WIDTH HEIGHT`: cell grid size, each in [2, 100].
+- `WIDTH HEIGHT`: cell grid size, each in [2, 200].
 - `--random DENSITY`: start with random live cells, e.g. `0.3`.
 - `--backend auto|vulkan|d3d12|metal`: select the graphics backend.
 - `--frames N`: exit after `N` rendered frames.

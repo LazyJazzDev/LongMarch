@@ -17,6 +17,12 @@ CellButton::CellButton(Application *app,
   light_animation_var_ = AnimationVar(0.0, AnimationStyle::kPower5);
 }
 
+void CellButton::Rebind(uint8_t *cell) {
+  cell_ = cell;
+  light_animation_var_ = AnimationVar(*cell_ ? 1.0f : 0.0f, AnimationStyle::kPower5);
+  SetState(0);
+}
+
 void CellButton::Update(float t) {
   light_animation_var_.TryUpdateTarget(*cell_ ? 1.0f : 0.0f);
   background_animation_var_.Update(t * 10.0f);

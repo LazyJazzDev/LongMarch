@@ -25,7 +25,7 @@ graphics::BackendAPI ParseBackend(const std::string &name) {
 void PrintHelp(const char *executable) {
   std::cout << "Usage: " << executable << " [WIDTH HEIGHT] [--backend auto|vulkan|d3d12|metal]\n"
             << "       [--random DENSITY] [--frames N] [--screenshot FILE]\n"
-            << "  WIDTH HEIGHT       Cell grid size, each in [2, 100] (default 40 30)\n"
+            << "  WIDTH HEIGHT       Cell grid size, each in [2, 200] (default 40 30)\n"
             << "  --random DENSITY   Start with random live cells, e.g. 0.3\n"
             << "  --frames N         Exit after N rendered frames\n"
             << "  --screenshot FILE  Save the last frame as PNG on exit\n";
@@ -70,9 +70,10 @@ int main(int argc, char *argv[]) {
       throw std::invalid_argument("Expected both WIDTH and HEIGHT for the cell grid");
     }
 
-    // Report error if cell grid size is not in [2,100]*[2,100]
-    if (cell_grid_width < 2 || cell_grid_width > 100 || cell_grid_height < 2 || cell_grid_height > 100) {
-      LogError("Cell grid size must be in [2,100]*[2,100]");
+    // Report error if cell grid size is not in [2,200]*[2,200]
+    if (cell_grid_width < 2 || cell_grid_width > grid_size::kMax || cell_grid_height < 2 ||
+        cell_grid_height > grid_size::kMax) {
+      LogError("Cell grid size must be in [2,200]*[2,200]");
       return 1;
     }
 

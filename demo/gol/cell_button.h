@@ -13,6 +13,7 @@ class CellButton : public Button {
              float bottom,
              uint8_t *cell,
              DeviceModel *device_model);
+  void Rebind(uint8_t *cell);
   void Update(float t);
   void Draw();
 

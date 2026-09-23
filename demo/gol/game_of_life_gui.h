@@ -3,10 +3,12 @@
 #include "application/application.h"
 #include "application/model.h"
 #include "cell_button.h"
+#include "grid_size.h"
 #include "grid_view.h"
 #include "pause_play_button.h"
 #include "randomize_button.h"
 #include "refresh_button.h"
+#include "size_slider.h"
 #include "speed_toggle_button.h"
 
 class GameOfLife : public Application {
@@ -39,12 +41,19 @@ class GameOfLife : public Application {
 
   void InitCells(int width, int height);
   void LayoutCells();
+  void ResizeGrid(int width, int height);
   glm::vec2 CursorPosition() const;
   bool CursorInGrid() const;
   void ZoomGrid(float factor);
   void ScrollGrid(double x, double y);
 
   GridView grid_view_;
+  std::unique_ptr<SizeSlider> width_slider_;
+  std::unique_ptr<SizeSlider> height_slider_;
+  int requested_width_{};
+  int requested_height_{};
+  bool sidebar_{true};
+  bool sliders_were_dragging_{false};
   uint32_t scroll_callback_{};
   uint32_t key_callback_{};
 #ifdef __APPLE__

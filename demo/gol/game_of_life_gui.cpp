@@ -71,6 +71,12 @@ void GameOfLife::CustomOnInit() {
 
   randomize_button_ = std::make_unique<RandomizeButton>(this, &cell_grid_, &white_icon_model.value());
 
+  requested_width_ = cell_grid_width_;
+  requested_height_ = cell_grid_height_;
+  width_slider_ = std::make_unique<SizeSlider>(this, 'W', cell_grid_width_, &white_rect_model.value(),
+                                               [this](int value) { requested_width_ = value; });
+  height_slider_ = std::make_unique<SizeSlider>(this, 'H', cell_grid_height_, &white_rect_model.value(),
+                                                [this](int value) { requested_height_ = value; });
   OnWindowSize();
   scroll_callback_ = GetWindow()->ScrollEvent().RegisterCallback([this](double x, double y) { ScrollGrid(x, y); });
   key_callback_ = GetWindow()->KeyEvent().RegisterCallback([this](int key, int, int action, int mods) {
@@ -98,6 +104,14 @@ void GameOfLife::CustomOnInit() {
 }
 
 void GameOfLife::CustomOnUpdate() {
+  // Apply at most one resize per frame, outside listener event dispatch.
+  const bool dragging = width_slider_->IsDragging() || height_slider_->IsDragging();
+  if (requested_width_ != cell_grid_width_ || requested_height_ != cell_grid_height_)
+    ResizeGrid(requested_width_, requested_height_);
+  else if (sliders_were_dragging_ && !dragging)
+    OnWindowSize();
+  sliders_were_dragging_ = dragging;
+
   // Use static timestamp get last frame time (in second, float)
   static auto last_frame_time = glfwGetTime();
   auto current_frame_time = glfwGetTime();
@@ -150,6 +164,8 @@ void GameOfLife::CustomOnUpdate() {
   // Draw refresh_button_
   refresh_button_->Draw();
   randomize_button_->Draw();
+  width_slider_->Draw();
+  height_slider_->Draw();
 
   for (int x = 0; x < cell_grid_width_; x++) {
     for (int y = 0; y < cell_grid_height_; y++) {
@@ -178,6 +194,8 @@ void GameOfLife::CustomOnClose() {
   gesture_monitor_ = nullptr;
 #endif
   // Release all resources
+  width_slider_.reset();
+  height_slider_.reset();
   cell_button_grid_.clear();
   pause_play_button_.reset();
   speed_toggle_button_.reset();
@@ -205,10 +223,14 @@ void GameOfLife::OnWindowSize() {
   panel_top_ = playground_top;
   panel_bottom_ = playground_bottom;
 
-  if (std::min((playground_bottom - playground_top) / float(cell_grid_height_),
+  const bool prefer_sidebar =
+      std::min((playground_bottom - playground_top) / float(cell_grid_height_),
                (playground_right - playground_left - ui_unit * 20.0f) / float(cell_grid_width_)) >
       std::min((playground_bottom - playground_top - ui_unit * 20.0f) / float(cell_grid_height_),
-               (playground_right - playground_left) / float(cell_grid_width_))) {
+               (playground_right - playground_left) / float(cell_grid_width_));
+  if (!width_slider_->IsDragging() && !height_slider_->IsDragging())
+    sidebar_ = prefer_sidebar;
+  if (sidebar_) {
     playground_left += ui_unit * 20.0f;
     panel_right_ = playground_left;
 
@@ -232,6 +254,22 @@ void GameOfLife::OnWindowSize() {
     randomize_button_->Resize(window_width - blank_size - icon_size * 2.0f - icon_gap,
                               window_height - blank_size - icon_size, window_width - blank_size - icon_size - icon_gap,
                               window_height - blank_size);
+  }
+
+  if (sidebar_) {
+    const float slider_height = ui_unit * 7.0f;
+    const float top = window_height * 0.5f - slider_height - icon_gap * 0.5f;
+    width_slider_->Resize({blank_size, top, blank_size + icon_size, top + slider_height});
+    height_slider_->Resize(
+        {blank_size, top + slider_height + icon_gap, blank_size + icon_size, top + slider_height * 2.0f + icon_gap});
+  } else {
+    const float available = window_width - 2.0f * (blank_size + icon_size * 2.0f + icon_gap * 2.0f);
+    const float slider_width = std::min(ui_unit * 24.0f, (available - icon_gap) * 0.5f);
+    const float left = window_width * 0.5f - slider_width - icon_gap * 0.5f;
+    const float top = playground_bottom + (window_height - playground_bottom - ui_unit * 7.0f) * 0.5f;
+    width_slider_->Resize({left, top, left + slider_width, top + ui_unit * 7.0f});
+    height_slider_->Resize(
+        {left + slider_width + icon_gap, top, left + slider_width * 2.0f + icon_gap, top + ui_unit * 7.0f});
   }
 
   playground_left_ = playground_left;
@@ -301,6 +339,26 @@ void GameOfLife::ScrollGrid(double x, double y) {
   const glm::vec2 scale = glm::vec2(FramebufferSize()) / glm::vec2{std::max(width, 1), std::max(height, 1)};
   grid_view_.pan += glm::vec2{float(x), float(y)} * scale * 10.0f;
   LayoutCells();
+}
+
+void GameOfLife::ResizeGrid(int width, int height) {
+  width = std::clamp(width, grid_size::kMin, grid_size::kMax);
+  height = std::clamp(height, grid_size::kMin, grid_size::kMax);
+  auto resized = grid_size::Resize(cell_grid_, cell_grid_width_, cell_grid_height_, width, height);
+  cell_grid_ = std::move(resized);
+  cell_grid_width_ = width;
+  cell_grid_height_ = height;
+  // Reuse existing buttons, then rebind every pointer after vector reallocation.
+  if (cell_button_grid_.size() > cell_grid_.size())
+    cell_button_grid_.resize(cell_grid_.size());
+  for (size_t i = 0; i < cell_grid_.size(); ++i) {
+    if (i == cell_button_grid_.size())
+      cell_button_grid_.push_back(
+          std::make_unique<CellButton>(this, 0, 0, 100, 100, &cell_grid_[i], &white_icon_model.value()));
+    cell_button_grid_[i]->Rebind(&cell_grid_[i]);
+  }
+  grid_view_ = {};
+  OnWindowSize();
 }
 
 void GameOfLife::RandomizeCells(float density, uint32_t seed) {

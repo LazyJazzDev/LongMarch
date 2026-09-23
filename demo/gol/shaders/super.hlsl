@@ -92,6 +92,15 @@ float4 DiceFaceTheme(PSInput input) {
   return input.color;
 }
 
+float4 SliderTheme(PSInput input) {
+  float2 half_size = float2(asfloat(input.extra.y), asfloat(input.extra.z));
+  float radius = asfloat(input.extra.w);
+  float2 q = abs(input.local_position) * half_size - half_size + radius;
+  float distance = length(max(q, 0.0)) + min(max(q.x, q.y), 0.0) - radius;
+  clip(-distance);
+  return input.color;
+}
+
 uint RandPCG(inout uint rng_state) {
   uint state = rng_state;
   rng_state = rng_state * 747796405u + 2891336453u;
@@ -134,6 +143,9 @@ float4 PSMain(PSInput input) : SV_TARGET {
       break;
     case 3:
       color = DiceFaceTheme(input);
+      break;
+    case 4:
+      color = SliderTheme(input);
       break;
     case 2:
       color = CellTheme(input);
