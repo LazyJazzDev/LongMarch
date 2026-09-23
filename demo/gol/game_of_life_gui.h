@@ -32,6 +32,8 @@ class GameOfLife : public Application {
     random_seed_ = seed;
   }
 
+  void SetInitialCells(std::vector<uint8_t> cells);
+
  private:
   void CustomOnInit() override;
   void CustomOnUpdate() override;
@@ -69,6 +71,7 @@ class GameOfLife : public Application {
   std::optional<DeviceModel> white_rect_model;
 
   std::vector<uint8_t> cell_grid_;
+  std::vector<uint8_t> initial_cells_;
   std::vector<std::unique_ptr<CellButton>> cell_button_grid_;
   float time_total{0.0};
   float ui_scale_{1.0};

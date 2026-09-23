@@ -1,6 +1,8 @@
 #include "game_of_life_gui.h"
 
 #include <random>
+#include <stdexcept>
+#include <utility>
 
 #include "application/listener.h"
 #include "application/model.h"
@@ -19,6 +21,12 @@ GameOfLife::GameOfLife(const char *title,
 }
 
 GameOfLife::~GameOfLife() = default;
+
+void GameOfLife::SetInitialCells(std::vector<uint8_t> cells) {
+  if (cells.size() != static_cast<size_t>(cell_grid_width_ * cell_grid_height_))
+    throw std::invalid_argument("Initial cells must match the grid size");
+  initial_cells_ = std::move(cells);
+}
 
 void GameOfLife::OnFramebufferResize() {
   OnWindowSize();
@@ -344,7 +352,9 @@ void GameOfLife::InitCells(int width, int height) {
   cell_grid_width_ = width;
   cell_grid_height_ = height;
   cell_grid_.resize(cell_grid_width_ * cell_grid_height_);
-  if (random_density_ > 0.0f) {
+  if (!initial_cells_.empty()) {
+    cell_grid_ = std::move(initial_cells_);
+  } else if (random_density_ > 0.0f) {
     RandomizeCells(random_density_, random_seed_);
   }
   for (int y = 0; y < cell_grid_height_; y++) {

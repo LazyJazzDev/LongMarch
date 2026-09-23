@@ -14,7 +14,7 @@ CellButton::CellButton(Application *app,
   background_brightness_[1] = MixValue<float>({0.48f, 0.6f, 0.8f});
 
   background_animation_var_ = AnimationVar(0.0, AnimationStyle::kPower5);
-  light_animation_var_ = AnimationVar(0.0, AnimationStyle::kPower5);
+  light_animation_var_ = AnimationVar(*cell_ ? 1.0f : 0.0f, AnimationStyle::kPower5);
 }
 
 void CellButton::Rebind(uint8_t *cell) {
