@@ -15,9 +15,23 @@ build/demo/gol/demo_gol 200 200 --pattern demo/gol/patterns/gosper-glider-gun.ce
 
 Click cells to toggle them. The buttons play/pause the simulation, cycle the
 speed (1x, 2x, 5x, lightning), clear the grid, and randomize it with the dice button.
-Lightning mode shows a warm yellow bolt and runs generations back-to-back without
-an iteration delay. It yields to input and rendering after roughly 8 ms of
-computation, so pause, speed changes, and grid editing remain responsive.
+Lightning mode shows a warm yellow bolt and advances exactly one generation per
+frame while playing, without an additional iteration delay. Simulation speed
+therefore follows the frame rate, with input and rendering between generations.
+The boundary button next to speed toggles between **periodic** (four open portals,
+the default) and **fixed/dead** (a solid enclosure). A five-cell glider rests in the lower-left corner of a 4x4 icon grid.
+Switching to periodic opens the wall, then plays 16 recorded Life generations
+moving diagonally up and right before returning to the initial state. The masks
+come from empty-space evolution projected modulo 4. Only cells in the same
+checkerboard color of 4x4 tiles as the starting tile are shown: cells crossing
+one edge disappear, and cells crossing both axes reappear. This is an icon-only
+visibility filter; playback performs no simulation and main-grid rules are unchanged.
+Switching to fixed plays the recorded 4x4 dead-edge evolution: the glider hits
+the upper-right wall and settles into a block. After a brief hold, the icon
+restores the lower-left glider. Both sequences play only once per switch.
+Cells are full squares with no gaps or clipped halves, sharing the button-wide
+lighting gradient instead of shading each cell independently. The icon animation does
+not change the main grid or interrupt playback.
 The die has six separated rounded faces with cut-out pips. Each click tumbles it
 in 3D and lands on a randomly chosen different face, tilted toward the viewer.
 Each click independently gives every cell a 50% chance of being alive; the
@@ -32,7 +46,10 @@ Files are plain text: `O` for alive, `.` for dead, one complete row per line;
 lines starting with `!` are comments. Rows must have equal lengths and fit in
 200 x 200 cells; files larger than 1 MiB are rejected.
 
-Opening resizes the grid and sliders, fits the view, and leaves playback paused.
+Opening keeps each current grid dimension when it is larger than the file, and
+expands dimensions that are too small. The file is centered independently on both
+axes; any odd extra cell is placed on the right/bottom. The remaining cells are
+cleared, the sliders and fitted view are updated, and playback is paused.
 Patterns only one cell wide or high are padded to the minimum grid size of two.
 Canceling or failing to open preserves the current grid and playback state.
 Saving resumes the previous playback state without advancing through time spent
@@ -86,12 +103,15 @@ generations.
 
 The included [Gosper glider gun](https://conwaylife.com/wiki/Gosper_glider_gun)
 starts with 36 live cells and emits one glider every 30 generations. Load it
-on the 200 x 200 grid with `--play` to watch the stream. Gliders disappear
-when they reach the grid edge; the gun continues firing.
+on the 200 x 200 grid with `--play` to watch the stream. Gliders wrap around
+the grid edges and can eventually interact with the gun or other gliders.
 
 `game_of_life_lib/` holds `update_step`, the part students implement in the
-assignment; the demo ships a reference implementation. The dead-boundary rule
-matches the assignment's test data.
+assignment; this demo defaults to periodic boundaries, with a button to restore the
+assignment's fixed/dead boundaries. Left/right and top/bottom edges connect, including diagonal
+neighbors across corners. All eight directional offsets count; when an axis is
+two cells long, opposite directions count the same cell twice. Iteration still
+uses the existing buffer without allocating a second grid.
 
 The `application/` layer replaces the old Vulkan renderer: models are drawn as
 instances in framebuffer pixel coordinates with depth testing, rendered into a
