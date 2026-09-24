@@ -3,6 +3,7 @@
 #include "application/application.h"
 #include "application/model.h"
 #include "cell_button.h"
+#include "file_button.h"
 #include "grid_size.h"
 #include "grid_view.h"
 #include "pause_play_button.h"
@@ -32,6 +33,12 @@ class GameOfLife : public Application {
     random_seed_ = seed;
   }
 
+  void SetInitialCells(std::vector<uint8_t> cells);
+
+  void SetInitialPlaying(bool playing) {
+    initial_playing_ = playing;
+  }
+
  private:
   void CustomOnInit() override;
   void CustomOnUpdate() override;
@@ -47,6 +54,9 @@ class GameOfLife : public Application {
   bool CursorInGrid() const;
   void ZoomGrid(float factor);
   void ScrollGrid(double x, double y);
+  enum class FileAction { kNone, kOpen, kSave };
+  void RequestFileAction(FileAction action);
+  void ProcessFileAction();
 
   SimulationClock simulation_clock_;
   GridView grid_view_;
@@ -64,16 +74,23 @@ class GameOfLife : public Application {
   std::unique_ptr<SpeedToggleButton> speed_toggle_button_;
   std::unique_ptr<RefreshButton> refresh_button_;
   std::unique_ptr<RandomizeButton> randomize_button_;
+  std::unique_ptr<FileButton> open_button_;
+  std::unique_ptr<FileButton> save_button_;
+  FileAction file_action_{FileAction::kNone};
+  float file_action_delay_{0.0f};
+  std::string file_path_{"life.cells"};
 
   std::optional<DeviceModel> white_icon_model;
   std::optional<DeviceModel> white_rect_model;
 
   std::vector<uint8_t> cell_grid_;
+  std::vector<uint8_t> initial_cells_;
   std::vector<std::unique_ptr<CellButton>> cell_button_grid_;
   float time_total{0.0};
   float ui_scale_{1.0};
   float random_density_{0.0f};
   uint32_t random_seed_{0};
+  bool initial_playing_{false};
   int cell_grid_width_{};
   int cell_grid_height_{};
 

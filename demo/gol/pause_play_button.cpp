@@ -109,3 +109,7 @@ void PausePlayButton::ResizeModel() {
 bool PausePlayButton::IsPlaying() const {
   return is_playing_;
 }
+
+void PausePlayButton::SetPlaying(bool playing) {
+  is_playing_ = playing;
+}

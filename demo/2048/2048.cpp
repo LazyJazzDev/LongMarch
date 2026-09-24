@@ -338,8 +338,8 @@ void TwentyFourEight::TransitStage(GameStage stage) {
 }
 
 void TwentyFourEight::ResetGame() {
-  ai_player_.Reset();
-  board_revision_++;
+  // A new game always returns control to the player and cancels pending AI work.
+  SetAiEnabled(false);
   number_blocks_.clear();
   random_device_ = std::mt19937(int(std::time(nullptr)));
   GenRandomBlock();

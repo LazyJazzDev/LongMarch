@@ -30,6 +30,7 @@ struct PSInput {
   [[vk::location(2)]] nointerpolation uint4 extra : TEXCOORD2;
   [[vk::location(3)]] float2 screen_position : TEXCOORD3;
   [[vk::location(4)]] nointerpolation float4 clip_rect : TEXCOORD4;
+  [[vk::location(5)]] noperspective float2 projected_die_position : TEXCOORD5;
 };
 
 PSInput VSMain(VSInput input) {
@@ -37,6 +38,7 @@ PSInput VSMain(VSInput input) {
   float4 screen_pos = mul(instance_info.model, float4(input.position, 0.0, 1.0));
   PSInput output;
   output.position = mul(global_uniform.view, screen_pos);
+  output.projected_die_position = 0.0;
   if (instance_info.extra.x == 3) {
     // The randomize die converges slightly toward a vanishing point. Every plate is offset
     // from the shared die centre, so recovering that centre keeps the seams aligned while
@@ -48,6 +50,9 @@ PSInput VSMain(VSInput input) {
     output.position.xy += (w - 1.0) * centre_clip.xy;
     output.position.z *= w;
     output.position.w = w;
+    // Divide by the same perspective w as the clip position, then interpolate
+    // without perspective correction so the lighting stays fixed on screen.
+    output.projected_die_position = (screen_pos.xy - die_centre.xy) / (w * asfloat(instance_info.extra.zw));
   }
   output.color = input.color * instance_info.color;
   output.local_position = input.position;
@@ -89,7 +94,9 @@ float4 DiceFaceTheme(PSInput input) {
   if (value == 6)
     hole = min(hole, min(length(p - float2(-0.50, 0.0)), length(p - float2(0.50, 0.0))));
   clip(hole - 0.20);
-  return input.color;
+  float2 projected = input.projected_die_position;
+  float shade = 1.0 - 0.16 * (projected.x + projected.y);
+  return float4(input.color.rgb * shade, 1.0);
 }
 
 float4 SliderTheme(PSInput input) {

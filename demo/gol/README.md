@@ -9,6 +9,8 @@ wrapper; this version runs on every LongMarch backend (Vulkan, D3D12, Metal).
 cmake --build build --target demo_gol
 build/demo/gol/demo_gol                      # 40 x 30 grid
 build/demo/gol/demo_gol 60 40 --random 0.3   # random 60 x 40 grid
+build/demo/gol/demo_gol 200 200 --pattern demo/gol/patterns/295P5H1V1.cells
+build/demo/gol/demo_gol 200 200 --pattern demo/gol/patterns/gosper-glider-gun.cells --play
 ```
 
 Click cells to toggle them. The buttons play/pause the simulation, cycle the
@@ -20,6 +22,27 @@ The die has six separated rounded faces with cut-out pips. Each click tumbles it
 in 3D and lands on a randomly chosen different face, tilted toward the viewer.
 Each click independently gives every cell a 50% chance of being alive; the
 play/pause state is preserved. The layout follows the window size.
+
+The folder/up-arrow button opens a `.cells` file; the tray/down-arrow button
+saves the current grid through **tinyfiledialogs**. Ctrl+O / Ctrl+S (Cmd+O / Cmd+S
+on macOS) provide the same actions. Saving preserves the exact grid dimensions,
+live cells, and empty borders, including completely empty grids. A `.cells`
+extension is added when omitted, with confirmation before replacing a file.
+Files are plain text: `O` for alive, `.` for dead, one complete row per line;
+lines starting with `!` are comments. Rows must have equal lengths and fit in
+200 x 200 cells; files larger than 1 MiB are rejected.
+
+Opening resizes the grid and sliders, fits the view, and leaves playback paused.
+Patterns only one cell wide or high are padded to the minimum grid size of two.
+Canceling or failing to open preserves the current grid and playback state.
+Saving resumes the previous playback state without advancing through time spent
+in the dialog. Neither playback speed nor the current zoom is stored in the file.
+Arrows move in the direction of the action; a brief green check confirms success,
+and errors show an explanatory dialog followed by a red pulse and a gentle shake.
+
+The toolbar groups file actions above board actions in a two-column block.
+Dimension sliders occupy the flexible middle space and playback controls sit at
+the opposite end. The same groups rearrange into a bottom panel for wide grids.
 
 The rounded `W` and `H` sliders between randomize and speed adjust the number of
 columns and rows from 2 to 200. They fill the space between the buttons: two
@@ -47,9 +70,22 @@ Options:
 
 - `WIDTH HEIGHT`: cell grid size, each in [2, 200].
 - `--random DENSITY`: start with random live cells, e.g. `0.3`.
+- `--pattern FILE`: center a Life `.cells` pattern on the grid, initially paused.
+- `--play`: start the simulation immediately.
 - `--backend auto|vulkan|d3d12|metal`: select the graphics backend.
 - `--frames N`: exit after `N` rendered frames.
 - `--screenshot FILE`: save the last frame as PNG on exit.
+
+The included [295P5H1V1](https://playgameoflife.com/lexicon/295P5H1V1)
+spaceship is a 52 x 52, 295-cell pattern from Stephen A. Silver's Life Lexicon
+(CC BY-SA 3.0). On a 200 x 200 grid it starts at cells (74, 74) through
+(125, 125). Press play to watch it travel up and left by one cell every five
+generations.
+
+The included [Gosper glider gun](https://conwaylife.com/wiki/Gosper_glider_gun)
+starts with 36 live cells and emits one glider every 30 generations. Load it
+on the 200 x 200 grid with `--play` to watch the stream. Gliders disappear
+when they reach the grid edge; the gun continues firing.
 
 `game_of_life_lib/` holds `update_step`, the part students implement in the
 assignment; the demo ships a reference implementation. The dead-boundary rule

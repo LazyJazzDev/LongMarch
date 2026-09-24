@@ -14,6 +14,8 @@ class PausePlayButton : public Button {
 
   [[nodiscard]] bool IsPlaying() const;
 
+  void SetPlaying(bool playing);
+
  private:
   void OnResize() override;
 
