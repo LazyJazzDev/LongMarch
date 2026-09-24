@@ -27,7 +27,6 @@ void DesktopGameSession::Render() {
     life_->RenderHostedFrame();
   else
     puzzle_->RenderHostedFrame();
-  Core()->WaitGPU();
 }
 
 void DesktopGameSession::Resize(int width, int height) {
@@ -59,4 +58,15 @@ void DesktopGameSession::ResetClock() {
     life_->ResetFrameClock();
   else
     puzzle_->ResetFrameClock();
+}
+
+double DesktopGameSession::NextFrameDelay() const {
+  return life_ ? life_->NextFrameDelay() : puzzle_->NextFrameDelay();
+}
+
+void DesktopGameSession::PrepareInput(bool sleeping) {
+  if (sleeping)
+    ResetClock();
+  else if (life_)
+    life_->ResetAnimationClock();
 }

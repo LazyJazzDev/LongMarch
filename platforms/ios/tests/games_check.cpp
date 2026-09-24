@@ -1,9 +1,11 @@
 #include <algorithm>
 #include <chrono>
+#include <cmath>
 #include <iostream>
 #include <thread>
 
 #include "demo/gol/cells_pattern.h"
+#include "demo/gol/simulation_clock.h"
 #include "demos/DemoSession.h"
 #define GLFW_INCLUDE_NONE
 #include <GLFW/glfw3.h>
@@ -30,10 +32,20 @@ static std::vector<uint8_t> Pixels(DemoSession &session) {
 int main(int argc, char **argv) {
   try {
     Check(argc == 2, "usage: mobile_games_check <resources>");
+    SimulationClock clock;
+    int steps = 0;
+    clock.Advance(.2, true, 0, [&] { ++steps; });
+    Check(std::abs(clock.NextStepDelay(0) - .3) < 1e-6, "Slow Life wake deadline drifted");
+    clock.Advance(.3, true, 0, [&] { ++steps; });
+    Check(steps == 1 && clock.NextStepDelay(0) == .5, "Timed Life wake missed a generation");
+    clock.Advance(10, true, SimulationClock::kLightning, [&] { ++steps; });
+    Check(steps == 2 && clock.NextStepDelay(SimulationClock::kLightning) == 0,
+          "Lightning mode must advance only once per rendered frame");
     for (auto name : {"gol", "2048"}) {
       DemoSession game(argv[1], name);
       game.Resize(640, 800);
       Settle(game);
+      Check(std::isinf(game.Game()->NextFrameDelay()), "Settled game still requests continuous frames");
       auto before = Pixels(game);
       Check(*std::max_element(before.begin(), before.end()) > 200, "Shared UI produced no visible geometry");
       auto *window = game.Game()->Window();
@@ -43,6 +55,9 @@ int main(int argc, char **argv) {
         window->SendPointer(327, 407);
         window->SendMouseButton(GLFW_MOUSE_BUTTON_LEFT, GLFW_PRESS);
         window->SendMouseButton(GLFW_MOUSE_BUTTON_LEFT, GLFW_RELEASE);
+        game.Game()->ResetClock();
+        game.Render();
+        Check(game.Game()->NextFrameDelay() == 0, "Cell edit failed to wake its animation");
         Settle(game);
         Check(Pixels(game) != before, "Desktop cell interaction did not change the rendered grid");
         auto edited = Pixels(game);
@@ -74,10 +89,30 @@ int main(int argc, char **argv) {
         for (int key : {GLFW_KEY_LEFT, GLFW_KEY_UP, GLFW_KEY_RIGHT, GLFW_KEY_DOWN}) {
           window->SendKey(key, GLFW_PRESS);
           window->SendKey(key, GLFW_RELEASE);
+          game.Game()->ResetClock();
+          game.Render();
+          Check(game.Game()->NextFrameDelay() == 0, "Puzzle move failed to request animation frames");
           Settle(game);
         }
         Check(Pixels(game) != before, "Desktop puzzle moves did not change the rendered tiles");
+        auto board = Pixels(game);
+        window->SendPointer(488, 124);
+        window->SendMouseButton(GLFW_MOUSE_BUTTON_LEFT, GLFW_PRESS);
+        window->SendMouseButton(GLFW_MOUSE_BUTTON_LEFT, GLFW_RELEASE);
+        game.Game()->ResetClock();
+        game.Render();
+        Check(game.Game()->NextFrameDelay() == 0, "Menu transition did not wake rendering");
+        Settle(game);
+        Settle(game);
+        Check(Pixels(game) != board && std::isinf(game.Game()->NextFrameDelay()),
+              "Lazy overlay target failed to render or settle");
       }
+      // File feedback can last over a second; all animations must eventually sleep.
+      for (int i = 0; i < 150 && std::isfinite(game.Game()->NextFrameDelay()); ++i) {
+        std::this_thread::sleep_for(std::chrono::milliseconds(16));
+        game.Render();
+      }
+      Check(std::isinf(game.Game()->NextFrameDelay()), "Game did not sleep after interaction");
       window->SendFocus(false);
       Check(!window->IsFocused() && !window->IsMouseButtonDown(0), "Hosted focus did not release inputs");
       window->SendFocus(true);

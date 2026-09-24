@@ -14,7 +14,9 @@ class DesktopGameSession {
   DesktopGameSession(const std::string &name);
   ~DesktopGameSession();
   void Render();
+  double NextFrameDelay() const;
   void ResetClock();
+  void PrepareInput(bool sleeping);
   void Resize(int width, int height);
   grassland::graphics::Core *Core() const;
   grassland::graphics::Image *Image() const;

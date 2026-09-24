@@ -239,3 +239,20 @@ python3 platforms/ios/tests/check_render_controller.py \
 
 NBody uses a linear RGBA16Float EDR presentation surface and the desktop
 HDR particle brightness conversion. Its HDR switch preserves simulation state.
+
+### Game rendering power usage
+
+The shared game UI exposes its next frame deadline. The iOS host stops the
+MTKView display loop while a board is still, wakes on input/resize/focus/file
+completion, and schedules normal Life generations at their simulation deadlines.
+Animations and lightning mode retain a 60 Hz frame budget; lightning advances
+one generation per rendered frame. Hosted surfaces cap supersampling at 2x per axis to preserve rounded edges,
+and allocate the second full-screen color target only when an overlay transition
+uses it. At 1x sampling, frames without overlays bypass the resolve pass; the presentation command uses the same ordered Metal
+queue without a redundant wait between game rendering and presentation.
+
+`mobile_games_check` checks idle/animation transitions and Life deadlines.
+For device idle/wake checks, launch a game with `LONGMARCH_SMOKE_DEMO=gol` (or
+`2048`) and `LONGMARCH_SMOKE_IDLE=1`. `IdleSmoke0.json` and `IdleSmoke1.json` in
+Documents record frame counts across two idle seconds before and after injected
+input. These are rendering-work checks, not battery-life measurements.

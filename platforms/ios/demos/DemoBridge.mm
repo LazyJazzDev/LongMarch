@@ -3,6 +3,8 @@
 #include <array>
 #include <atomic>
 #include <chrono>
+#include <cmath>
+#include <limits>
 #define GLFW_INCLUDE_NONE
 #include <GLFW/glfw3.h>
 #include "DemoSession.h"
@@ -25,6 +27,9 @@
   std::unique_ptr<DemoSession> _session;
   id<MTLRenderPipelineState> _presentPipeline;
   NSInteger _frames;
+  BOOL _gameView, _gameSleeping;
+  uint64_t _wakeRevision, _inputRevision;
+  NSInteger _idleSmokeStage;
 }
 
 - (instancetype)init {
@@ -46,6 +51,10 @@
   _view = view;
   _progress = [progress copy];
   _demo = [demo copy];
+  _gameView = [demo isEqualToString:@"gol"] || [demo isEqualToString:@"2048"];
+  _gameSleeping = NO;
+  _idleSmokeStage = 0;
+  ++_wakeRevision;
   _failed = NO;
   _filePending = NO;
   _statsTime = 0;
@@ -63,7 +72,9 @@
   view.framebufferOnly = YES;
   view.preferredFramesPerSecond = 60;
   view.delegate = self;
-  view.paused = !_active;
+  view.paused = _gameView || !_active;
+  if (_gameView)
+    [self wakeGame];
   dispatch_async(LongMarchRenderQueue(), ^{
     @autoreleasepool {
       if (self->_generation != generation)
@@ -113,6 +124,23 @@
   });
 }
 
+// Only a requested game frame wakes the view; no display-link polling while idle.
+- (void)scheduleGameFrame:(double)delay {
+  uint64_t wake = ++_wakeRevision;
+  if (!_active || !_gameView || !std::isfinite(delay))
+    return;
+  dispatch_after(dispatch_time(DISPATCH_TIME_NOW, int64_t(std::max(0.0, delay) * NSEC_PER_SEC)),
+                 dispatch_get_main_queue(), ^{
+                   if (wake == self->_wakeRevision && self->_active && !self->_busy)
+                     [self->_view draw];
+                 });
+}
+
+- (void)wakeGame {
+  ++_inputRevision;
+  [self scheduleGameFrame:0];
+}
+
 - (void)setHDR:(BOOL)hdr {
   _hdr = hdr;
   if ([_demo isEqualToString:@"graphics_hello_hdr"] || [_demo isEqualToString:@"nbody_cs"])
@@ -121,9 +149,13 @@
 
 - (void)input:(NSInteger)kind x:(double)x y:(double)y value:(double)value {
   uint64_t generation = _generation;
+  BOOL resetClock = _gameSleeping;
+  _gameSleeping = NO;
+  [self wakeGame];
   dispatch_async(LongMarchRenderQueue(), ^{
     if (self->_generation != generation || !self->_session || !self->_session->Game())
       return;
+    self->_session->Game()->PrepareInput(resetClock);
     auto *window = self->_session->Game()->Window();
     auto size = window->GetFramebufferSize();
     if (kind <= 3 || kind == 6)
@@ -160,18 +192,23 @@
     NSString *message = error.empty() ? nil : [NSString stringWithUTF8String:error.c_str()];
     dispatch_async(dispatch_get_main_queue(), ^{
       self->_filePending = NO;
+      [self wakeGame];
       completion(message);
     });
   });
 }
 
 - (void)setActive:(BOOL)active {
+  if (_active == active)
+    return;
   if (_active != active)
     [self input:5 x:0 y:0 value:active];
   if (_active != active)
     _statsTime = 0;
   _active = active;
-  _view.paused = !active;
+  _view.paused = _gameView || !active;
+  if (_gameView)
+    [self wakeGame];
 }
 
 - (void)configureParticles:(NSInteger)particles
@@ -193,16 +230,21 @@
 }
 
 - (void)mtkView:(MTKView *)view drawableSizeWillChange:(CGSize)size {
+  [self wakeGame];
 }
 
 - (void)drawInMTKView:(MTKView *)view {
   if (!_active || _busy || _failed)
     return;
   id<CAMetalDrawable> drawable = view.currentDrawable;
-  if (!drawable)
+  if (!drawable) {
+    if (_gameView)
+      [self scheduleGameFrame:0.1];
     return;
+  }
   _busy = YES;
   uint64_t generation = _generation;
+  const uint64_t inputRevision = _inputRevision;
   auto particles = _particles, galaxies = _galaxies, reset = _reset;
   float dt = _deltaTime, yaw = _yaw, pitch = _pitch;
   BOOL simulate = _simulate;
@@ -219,6 +261,7 @@
     @autoreleasepool {
       NSString *failure = nil, *deviceName = @"—";
       double seconds = 0, gpuMS = 0;
+      double nextFrameDelay = 0;
       NSInteger frames = 0;
       try {
         if (self->_generation == generation && self->_session) {
@@ -227,6 +270,7 @@
           self->_session->Configure(int(particles), int(galaxies), dt, simulate, yaw, pitch, int(reset));
           self->_session->Render();
           if (auto game = self->_session->Game()) {
+            nextFrameDelay = game->NextFrameDelay();
             int action = game->FileRequest();
             dispatch_async(dispatch_get_main_queue(), ^{
               if (self->_generation == generation && action && !self->_filePending && self.fileRequest) {
@@ -263,13 +307,15 @@
           gpuMS = self->_session->GPUMilliseconds();
           frames = ++self->_frames;
           deviceName = [NSString stringWithUTF8String:core->DeviceName().c_str()];
-          if (frames == 3 && NSProcessInfo.processInfo.environment[@"LONGMARCH_SMOKE_DEMO"]) {
+          if ((frames == 3 || !std::isfinite(nextFrameDelay)) &&
+              NSProcessInfo.processInfo.environment[@"LONGMARCH_SMOKE_DEMO"]) {
             NSDictionary *result = @{
               @"demo" : self->_demo,
               @"width" : @(width),
               @"height" : @(height),
               @"frames" : @(frames),
               @"edr_enabled" : @(edrEnabled),
+              @"idle" : @(!std::isfinite(nextFrameDelay)),
               @"drawable_pixel_format" : @(drawable.texture.pixelFormat),
               @"device" : deviceName,
               @"gpu_ms" : @(gpuMS),
@@ -291,12 +337,49 @@
         if (self->_generation == generation) {
           if (failure)
             self->_failed = YES;
-          if ((frames > 0 && (frames <= 3 || frames % 15 == 0)) || failure) {
+          if (self->_gameView && !failure) {
+            bool inputPending = inputRevision != self->_inputRevision;
+            self->_gameSleeping = !inputPending && !std::isfinite(nextFrameDelay);
+            double delay = inputPending ? 0 : std::max(1.0 / 60.0, nextFrameDelay) - seconds;
+            [self scheduleGameFrame:delay];
+            if (self->_gameSleeping && self->_idleSmokeStage < 2 &&
+                NSProcessInfo.processInfo.environment[@"LONGMARCH_SMOKE_IDLE"]) {
+              NSInteger stage = self->_idleSmokeStage++;
+              dispatch_after(dispatch_time(DISPATCH_TIME_NOW, 2 * NSEC_PER_SEC), LongMarchRenderQueue(), ^{
+                if (self->_generation != generation)
+                  return;
+                NSDictionary *result = @{
+                  @"demo" : self->_demo,
+                  @"frames_before" : @(frames),
+                  @"frames_after" : @(self->_frames),
+                  @"seconds" : @2
+                };
+                NSURL *url = [NSFileManager.defaultManager URLsForDirectory:NSDocumentDirectory
+                                                                  inDomains:NSUserDomainMask]
+                                 .firstObject;
+                [[NSJSONSerialization dataWithJSONObject:result options:NSJSONWritingPrettyPrinted error:nil]
+                    writeToURL:[url URLByAppendingPathComponent:[NSString
+                                                                    stringWithFormat:@"IdleSmoke%ld.json", (long)stage]]
+                    atomically:YES];
+                if (stage == 0)
+                  dispatch_async(dispatch_get_main_queue(), ^{
+                    if (self->_generation != generation)
+                      return;
+                    if ([self->_demo isEqualToString:@"gol"]) {
+                      [self input:1 x:.5 y:.5 value:0];
+                      [self input:2 x:.5 y:.5 value:0];
+                    } else
+                      [self input:4 x:0 y:0 value:262];
+                  });
+              });
+            }
+          }
+          if ((frames > 0 && (frames <= 3 || frames % 15 == 0 || !std::isfinite(nextFrameDelay))) || failure) {
             CFTimeInterval now = CACurrentMediaTime();
             double fps = self->_statsTime > 0 ? (frames - self->_statsFrames) / (now - self->_statsTime) : 0;
             self->_statsTime = now;
             self->_statsFrames = frames;
-            progress(seconds, gpuMS, fps, deviceName, width, height, frames, failure);
+            progress(seconds, gpuMS, self->_gameSleeping ? 0 : fps, deviceName, width, height, frames, failure);
           }
         }
       });
@@ -306,6 +389,7 @@
 
 - (void)stop {
   ++_generation;
+  ++_wakeRevision;
   _active = NO;
   _view.paused = YES;
   _view.delegate = nil;
