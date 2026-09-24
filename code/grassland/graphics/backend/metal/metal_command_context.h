@@ -56,7 +56,7 @@ class MetalCommandContext : public CommandContext {
                      uint64_t dst_offset = 0,
                      uint64_t src_offset = 0) override;
 
-  void EndEncoder();
+  void EndEncoder(bool flush_clears = true);
 
   MTL::CommandBuffer *Handle() const {
     return command_.get();
@@ -74,6 +74,15 @@ class MetalCommandContext : public CommandContext {
 
   void BindStage(MetalStage &stage, const std::vector<MetalBinding> &layout, BindPoint point, bool vertex = false);
   void PrepareDraw();
+  void FlushClears();
+
+  struct PendingClear {
+    NS::SharedPtr<MTL::Texture> texture;
+    ClearValue value;
+    bool depth;
+  };
+
+  std::map<MTL::Texture *, PendingClear> pending_clears_;
   MetalCore *core_;
   NS::SharedPtr<MTL::CommandBuffer> command_;
   NS::SharedPtr<MTL::ComputeCommandEncoder> compute_;

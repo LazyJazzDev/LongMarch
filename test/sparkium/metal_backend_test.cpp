@@ -350,6 +350,65 @@ TEST_F(MetalBackendTest, TextureRoundTripAndPartialRegion) {
   }
 }
 
+TEST_F(MetalBackendTest, DeferredClearsPreserveOrderingAndEmptyPasses) {
+  std::unique_ptr<graphics::Image> color, depth, sampled;
+  core->CreateImage(4, 4, graphics::IMAGE_FORMAT_R32G32B32A32_SFLOAT, &color);
+  core->CreateImage(4, 4, graphics::IMAGE_FORMAT_R32G32B32A32_SFLOAT, &sampled);
+  core->CreateImage(4, 4, graphics::IMAGE_FORMAT_D32_SFLOAT, &depth);
+  std::unique_ptr<graphics::Buffer> output;
+  core->CreateBuffer(2 * sizeof(glm::vec4), graphics::BUFFER_TYPE_STATIC, &output);
+  std::unique_ptr<graphics::Shader> shader;
+  ASSERT_EQ(core->CreateShader(R"(
+Texture2D<float4> input_image : register(t0, space0);
+RWStructuredBuffer<float4> output : register(u0, space1);
+[numthreads(1,1,1)] void Main() {
+  output[0] = input_image.Load(int3(0,0,0));
+})",
+                               "Main", "cs_6_0", &shader),
+            0);
+  std::unique_ptr<graphics::ComputeProgram> program;
+  core->CreateComputeProgram(shader.get(), &program);
+  program->AddResourceBinding(graphics::RESOURCE_TYPE_IMAGE, 1);
+  program->AddResourceBinding(graphics::RESOURCE_TYPE_WRITABLE_STORAGE_BUFFER, 1);
+  program->Finalize();
+  std::unique_ptr<graphics::CommandContext> commands;
+  core->CreateCommandContext(&commands);
+  commands->CmdClearImage(color.get(), {{1, 0, 0, 1}});
+  commands->CmdClearImage(color.get(), {{0, 1, 0, 1}});
+  commands->CmdClearImage(depth.get(), {{0.375f}});
+  commands->CmdClearImage(sampled.get(), {{2, 3, 4, 1}});
+  // Consumed color/depth clears must survive a pass with no draw calls; the
+  // unrelated texture must also be available to subsequent shader reads.
+  commands->CmdBeginRendering({color.get()}, depth.get());
+  commands->CmdEndRendering();
+  commands->CmdBindComputeProgram(program.get());
+  commands->CmdBindResources(0, {sampled.get()}, graphics::BIND_POINT_COMPUTE);
+  commands->CmdBindResources(1, {output->Range(0, sizeof(glm::vec4))}, graphics::BIND_POINT_COMPUTE);
+  commands->CmdDispatch(1, 1, 1);
+  // This clear cannot move past the next compute read or before the first one.
+  commands->CmdClearImage(sampled.get(), {{5, 6, 7, 1}});
+  commands->CmdBindResources(1, {output->Range(sizeof(glm::vec4), sizeof(glm::vec4))}, graphics::BIND_POINT_COMPUTE);
+  commands->CmdDispatch(1, 1, 1);
+  // A trailing clear must execute on submission even without another pass.
+  commands->CmdClearImage(sampled.get(), {{8, 9, 10, 1}});
+  ASSERT_EQ(core->SubmitCommandContext(commands.get()), 0);
+  std::array<glm::vec4, 2> reads;
+  output->DownloadData(reads.data(), sizeof(reads));
+  EXPECT_EQ(reads[0], glm::vec4(2, 3, 4, 1));
+  EXPECT_EQ(reads[1], glm::vec4(5, 6, 7, 1));
+  std::array<glm::vec4, 16> pixels;
+  color->DownloadData(pixels.data());
+  for (auto pixel : pixels)
+    EXPECT_EQ(pixel, glm::vec4(0, 1, 0, 1));
+  sampled->DownloadData(pixels.data());
+  for (auto pixel : pixels)
+    EXPECT_EQ(pixel, glm::vec4(8, 9, 10, 1));
+  std::array<float, 16> depths;
+  depth->DownloadData(depths.data());
+  for (auto value : depths)
+    EXPECT_EQ(value, 0.375f);
+}
+
 TEST_F(MetalBackendTest, AttachmentlessRasterPassPreservesViewportAndScissor) {
   std::unique_ptr<graphics::Image> output;
   core->CreateImage(5, 4, graphics::IMAGE_FORMAT_R32G32B32A32_SFLOAT, &output);

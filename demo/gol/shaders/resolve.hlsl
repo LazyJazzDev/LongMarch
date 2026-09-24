@@ -24,7 +24,8 @@ float4 PSMain(float4 position : SV_POSITION) : SV_TARGET {
     for (uint x = 0; x < params.scale; x++) {
       int3 coord = int3(base + int2(x, y), 0);
       main_color += main_frame.Load(coord);
-      second_color += second_frame.Load(coord);
+      if (params.second_frame_alpha > 0.0)
+        second_color += second_frame.Load(coord);
     }
   }
   float inv_samples = 1.0 / float(params.scale * params.scale);
