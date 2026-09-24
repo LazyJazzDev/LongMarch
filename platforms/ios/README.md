@@ -256,3 +256,18 @@ For device idle/wake checks, launch a game with `LONGMARCH_SMOKE_DEMO=gol` (or
 `2048`) and `LONGMARCH_SMOKE_IDLE=1`. `IdleSmoke0.json` and `IdleSmoke1.json` in
 Documents record frame counts across two idle seconds before and after injected
 input. These are rendering-work checks, not battery-life measurements.
+
+Large Life grids use a four-vertex cell quad with the original eighth-power
+rounded contour evaluated in the fragment shader, replacing 120 triangles per
+cell. Fully clipped cells are culled on the CPU and placement matrices are
+cached across frames. Only the small list of contiguous drawing batches is
+sorted; the 40,000 instance records retain their original storage order. Input dispatch uses contiguous listener snapshots and
+only rechecks membership if a callback changes the listener set.
+
+`gol_benchmark <resources>` compares 40²/200² grids at 1290×2409, measuring
+CPU submission, GPU-completed frame time and pointer dispatch. On iPhone, launch
+with `LONGMARCH_SMOKE_DEMO=gol`, `LONGMARCH_SMOKE_GOL_SIZE=200` and
+`LONGMARCH_SMOKE_BENCHMARK=1` to collect 60 frames after 10 warm-up frames in
+Documents/BenchmarkResult.json. After frame 70 the benchmark resumes normal simulation scheduling. Set
+`LONGMARCH_SMOKE_AUTORUN=1` to record frame counts over two input-free seconds
+in Documents/AutorunSmoke.json and verify timer-driven updates.

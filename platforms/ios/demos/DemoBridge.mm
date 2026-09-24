@@ -30,6 +30,7 @@
   BOOL _gameView, _gameSleeping;
   uint64_t _wakeRevision, _inputRevision;
   NSInteger _idleSmokeStage;
+  double _benchmarkSeconds, _benchmarkRenderSeconds, _benchmarkStart;
 }
 
 - (instancetype)init {
@@ -54,6 +55,7 @@
   _gameView = [demo isEqualToString:@"gol"] || [demo isEqualToString:@"2048"];
   _gameSleeping = NO;
   _idleSmokeStage = 0;
+  _benchmarkSeconds = _benchmarkRenderSeconds = _benchmarkStart = 0;
   ++_wakeRevision;
   _failed = NO;
   _filePending = NO;
@@ -269,6 +271,7 @@
           self->_session->Resize(width, height);
           self->_session->Configure(int(particles), int(galaxies), dt, simulate, yaw, pitch, int(reset));
           self->_session->Render();
+          const double renderSeconds = std::chrono::duration<double>(std::chrono::steady_clock::now() - start).count();
           if (auto game = self->_session->Game()) {
             nextFrameDelay = game->NextFrameDelay();
             int action = game->FileRequest();
@@ -306,6 +309,54 @@
           seconds = std::chrono::duration<double>(std::chrono::steady_clock::now() - start).count();
           gpuMS = self->_session->GPUMilliseconds();
           frames = ++self->_frames;
+          if (frames == 1 && NSProcessInfo.processInfo.environment[@"LONGMARCH_SMOKE_AUTORUN"]) {
+            dispatch_after(dispatch_time(DISPATCH_TIME_NOW, NSEC_PER_SEC), LongMarchRenderQueue(), ^{
+              if (self->_generation != generation)
+                return;
+              NSInteger before = self->_frames;
+              dispatch_after(dispatch_time(DISPATCH_TIME_NOW, 2 * NSEC_PER_SEC), LongMarchRenderQueue(), ^{
+                if (self->_generation != generation)
+                  return;
+                NSDictionary *result =
+                    @{@"frames_before" : @(before),
+                      @"frames_after" : @(self->_frames),
+                      @"seconds" : @2};
+                NSURL *url = [NSFileManager.defaultManager URLsForDirectory:NSDocumentDirectory
+                                                                  inDomains:NSUserDomainMask]
+                                 .firstObject;
+                [[NSJSONSerialization dataWithJSONObject:result options:NSJSONWritingPrettyPrinted error:nil]
+                    writeToURL:[url URLByAppendingPathComponent:@"AutorunSmoke.json"]
+                    atomically:YES];
+              });
+            });
+          }
+          if (self->_session->Game() && NSProcessInfo.processInfo.environment[@"LONGMARCH_SMOKE_BENCHMARK"]) {
+            if (frames < 70)
+              nextFrameDelay = 0;
+            if (frames == 10)
+              self->_benchmarkStart = CACurrentMediaTime();
+            if (frames > 10 && frames <= 70) {
+              self->_benchmarkSeconds += seconds;
+              self->_benchmarkRenderSeconds += renderSeconds;
+            }
+            if (frames == 70) {
+              NSDictionary *result = @{
+                @"demo" : self->_demo,
+                @"frames" : @60,
+                @"width" : @(width),
+                @"height" : @(height),
+                @"mean_frame_ms" : @(self->_benchmarkSeconds * 1000 / 60),
+                @"mean_render_submit_ms" : @(self->_benchmarkRenderSeconds * 1000 / 60),
+                @"fps" : @(60 / (CACurrentMediaTime() - self->_benchmarkStart))
+              };
+              NSURL *url = [NSFileManager.defaultManager URLsForDirectory:NSDocumentDirectory
+                                                                inDomains:NSUserDomainMask]
+                               .firstObject;
+              [[NSJSONSerialization dataWithJSONObject:result options:NSJSONWritingPrettyPrinted error:nil]
+                  writeToURL:[url URLByAppendingPathComponent:@"BenchmarkResult.json"]
+                  atomically:YES];
+            }
+          }
           deviceName = [NSString stringWithUTF8String:core->DeviceName().c_str()];
           if ((frames == 3 || !std::isfinite(nextFrameDelay)) &&
               NSProcessInfo.processInfo.environment[@"LONGMARCH_SMOKE_DEMO"]) {

@@ -4,6 +4,7 @@
 #include <iostream>
 #include <thread>
 
+#include "demo/gol/application/listener.h"
 #include "demo/gol/cells_pattern.h"
 #include "demo/gol/simulation_clock.h"
 #include "demos/DemoSession.h"
@@ -29,9 +30,40 @@ static std::vector<uint8_t> Pixels(DemoSession &session) {
   return pixels;
 }
 
+static void CheckListenerMutation() {
+  life_demo::Application app("listener check", 32, 32, grassland::graphics::BACKEND_API_METAL, true);
+
+  struct Probe : life_demo::Listener {
+    explicit Probe(life_demo::Application *app) : Listener(app) {
+    }
+
+    std::function<void()> action;
+    int calls{};
+
+    void OnCursorPos(double, double) override {
+      ++calls;
+      if (action)
+        action();
+    }
+  } a(&app), b(&app);
+
+  auto first = std::less<life_demo::Listener *>{}(&a, &b) ? &a : &b;
+  auto second = first == &a ? &b : &a;
+  first->action = [&] { app.UnregisterListener(second); };
+  app.GetWindow()->SendPointer(1, 1);
+  Check(first->calls == 1 && second->calls == 0, "Removed listener received a stale snapshot event");
+  first->action = {};
+  app.RegisterListener(second);
+  app.GetWindow()->SendPointer(2, 2);
+  Check(first->calls == 2 && second->calls == 1, "Re-registered listener missed input");
+  app.UnregisterListener(&a);
+  app.UnregisterListener(&b);
+}
+
 int main(int argc, char **argv) {
   try {
     Check(argc == 2, "usage: mobile_games_check <resources>");
+    CheckListenerMutation();
     SimulationClock clock;
     int steps = 0;
     clock.Advance(.2, true, 0, [&] { ++steps; });
