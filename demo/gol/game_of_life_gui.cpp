@@ -226,11 +226,12 @@ void GameOfLife::OnWindowSize() {
   auto window_width = float(FramebufferSize().x);
   auto window_height = float(FramebufferSize().y);
   auto ui_unit = std::min(window_width, window_height) * 0.01f * ui_scale_;
-  const float margin = ui_unit * 3.0f;
-  const float icon_size = ui_unit * 8.0f;
-  const float step = ui_unit * 10.0f;
-  const float slider_thickness = ui_unit * 6.0f;
-  const float panel_size = ui_unit * 14.0f;
+  const float margin = ui_unit * 5.0f;
+  const float icon_size = ui_unit * 10.0f;
+  const float step = ui_unit * 13.0f;
+  const float slider_gap = ui_unit * 1.5f;
+  const float slider_thickness = (icon_size - slider_gap) * 0.5f;
+  const float panel_size = ui_unit * 20.0f;
 
   float playground_left = 0.0f;
   float playground_right = window_width;
@@ -257,13 +258,10 @@ void GameOfLife::OnWindowSize() {
     place(pause_play_button_.get(), margin, window_height - margin - icon_size);
     place(refresh_button_.get(), window_width - margin - icon_size, margin);
     place(randomize_button_.get(), window_width - margin - icon_size, window_height - margin - icon_size);
-    const float top = margin + step * 2.0f + ui_unit * 2.0f;
-    const float bottom = window_height - margin - step * 2.0f - ui_unit * 2.0f;
-    const float gap = ui_unit * 3.0f;
-    const float length = (bottom - top - gap) * 0.5f;
-    const float left = (panel_size - slider_thickness) * 0.5f;
-    width_slider_->Resize({left, top, left + slider_thickness, top + length}, true);
-    height_slider_->Resize({left, top + length + gap, left + slider_thickness, bottom}, true);
+    const float top = margin + step * 2.0f;
+    const float bottom = window_height - top;
+    width_slider_->Resize({margin, top, margin + slider_thickness, bottom}, true);
+    height_slider_->Resize({margin + slider_thickness + slider_gap, top, margin + icon_size, bottom}, true);
   } else {
     playground_top = panel_size;
     playground_bottom = window_height - panel_size;
@@ -275,13 +273,10 @@ void GameOfLife::OnWindowSize() {
     place(pause_play_button_.get(), window_width - margin - icon_size, top);
     place(refresh_button_.get(), margin, margin);
     place(randomize_button_.get(), window_width - margin - icon_size, margin);
-    const float left = margin + step * 2.0f + ui_unit * 2.0f;
-    const float right = window_width - margin - step * 2.0f - ui_unit * 2.0f;
-    const float gap = ui_unit * 3.0f;
-    const float length = (right - left - gap) * 0.5f;
-    const float slider_top = panel_top_ + (panel_size - slider_thickness) * 0.5f;
-    width_slider_->Resize({left, slider_top, left + length, slider_top + slider_thickness}, false);
-    height_slider_->Resize({left + length + gap, slider_top, right, slider_top + slider_thickness}, false);
+    const float left = margin + step * 2.0f;
+    const float right = window_width - left;
+    width_slider_->Resize({left, top, right, top + slider_thickness}, false);
+    height_slider_->Resize({left, top + slider_thickness + slider_gap, right, top + icon_size}, false);
   }
 
   playground_left_ = playground_left;
