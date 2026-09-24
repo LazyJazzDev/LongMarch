@@ -547,6 +547,23 @@ void GameOfLife::InitCells(int width, int height) {
   }
 }
 
+void GameOfLife::EnableNativeSizeControls() {
+  width_slider_->SetActivationHandler([this] { hosted_size_axis_ = 1; });
+  height_slider_->SetActivationHandler([this] { hosted_size_axis_ = 2; });
+}
+
+glm::ivec2 GameOfLife::TakeSizeControlRequest() {
+  const int axis = std::exchange(hosted_size_axis_, 0);
+  return {axis, axis == 1 ? width_slider_->Value() : height_slider_->Value()};
+}
+
+void GameOfLife::SetGridDimension(int axis, int value) {
+  if (axis == 1)
+    width_slider_->SetValue(value);
+  else if (axis == 2)
+    height_slider_->SetValue(value);
+}
+
 void GameOfLife::SetBottomControlInset(float height_fraction) {
   const float inset = std::clamp(height_fraction, 0.0f, 0.25f);
   if (bottom_control_inset_ != inset) {

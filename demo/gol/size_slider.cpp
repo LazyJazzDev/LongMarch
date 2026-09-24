@@ -60,19 +60,28 @@ void SizeSlider::OnMouseButton(int button, int action, int) {
   const auto p = FramePosition(cursor.x, cursor.y);
   if (action == GLFW_PRESS) {
     focused_ = Contains(p);
-    dragging_ = focused_;
+    activation_pressed_ = focused_ && bool(on_activate_);
+    activation_origin_ = p;
+    dragging_ = focused_ && !on_activate_;
     if (dragging_)
       DragTo(p);
   } else if (action == GLFW_RELEASE) {
     if (dragging_)
       DragTo(p);
     dragging_ = false;
+    const bool activate = activation_pressed_ && Contains(p);
+    activation_pressed_ = false;
+    if (activate)
+      on_activate_();
   }
 }
 
 void SizeSlider::OnCursorPos(double x, double y) {
   const auto p = FramePosition(x, y);
   hovered_ = Contains(p);
+  const auto extent = application_->FramebufferSize();
+  if (activation_pressed_ && glm::length(p - activation_origin_) > float(std::min(extent.x, extent.y)) * 0.03f)
+    activation_pressed_ = false;
   if (dragging_)
     DragTo(p);
 }
@@ -84,6 +93,7 @@ void SizeSlider::OnCursorEnter(int entered) {
 
 void SizeSlider::OnFocus(bool focused) {
   if (!focused) {
+    activation_pressed_ = false;
     dragging_ = false;
     hovered_ = false;
     focused_ = false;

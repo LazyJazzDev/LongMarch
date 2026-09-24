@@ -31,6 +31,9 @@ class GameOfLife : public Application {
   double NextFrameDelay() const override;
   void SetIconOrientation(float radians);
   void SetBottomControlInset(float height_fraction);
+  void EnableNativeSizeControls();
+  glm::ivec2 TakeSizeControlRequest();
+  void SetGridDimension(int axis, int value);
 
   void ResetFrameClock() {
     last_frame_time_ = last_simulation_time_ = grassland::GetTimeSeconds();
@@ -87,6 +90,7 @@ class GameOfLife : public Application {
   void ProcessFileAction();
 
   int hosted_file_action_{};
+  int hosted_size_axis_{};
   bool hosted_was_playing_{};
   SimulationClock simulation_clock_;
   AnimationVar icon_rotation_{0.0f, AnimationStyle::kPower2};
