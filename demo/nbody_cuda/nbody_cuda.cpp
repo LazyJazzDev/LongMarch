@@ -63,10 +63,10 @@ void NBodyCUDA::Run() {
     OnClose();
   } else {
     OnInit();
-    while (!glfwWindowShouldClose(window_->GLFWWindow())) {
+    while (!window_->ShouldClose()) {
       OnUpdate();
       OnRender();
-      glfwPollEvents();
+      grassland::graphics::Window::PollEvents();
     }
     core_->WaitGPU();
     OnClose();
@@ -75,9 +75,12 @@ void NBodyCUDA::Run() {
 
 void NBodyCUDA::OnInit() {
   if (!headless_) {
-    core_->CreateImage(window_->GetWidth(), window_->GetHeight(), graphics::IMAGE_FORMAT_R32G32B32A32_SFLOAT,
-                       &frame_image_);
-    window_->ResizeEvent().RegisterCallback([this](int width, int height) {
+    core_->CreateImage(window_->GetFramebufferSize().x, window_->GetFramebufferSize().y,
+                       graphics::IMAGE_FORMAT_R32G32B32A32_SFLOAT, &frame_image_);
+    window_->FramebufferResizeEvent().RegisterCallback([this](int width, int height) {
+      if (width <= 0 || height <= 0)
+        return;
+      core_->WaitGPU();
       frame_image_.reset();
       core_->CreateImage(width, height, graphics::IMAGE_FORMAT_R32G32B32A32_SFLOAT, &frame_image_);
       core_->CreateProgram({frame_image_->Format()}, graphics::IMAGE_FORMAT_UNDEFINED, &program_);
@@ -97,18 +100,19 @@ void NBodyCUDA::OnInit() {
     window_->MouseMoveEvent().RegisterCallback([this](double xpos, double ypos) {
       ImGui::SetCurrentContext(window_->GetImGuiContext());
 
-      static auto last_xpos = xpos;
-      static auto last_ypos = ypos;
-      if (glfwGetMouseButton(window_->GLFWWindow(), GLFW_MOUSE_BUTTON_LEFT) == GLFW_PRESS) {
-        auto diffx = xpos - last_xpos;
-        auto diffy = ypos - last_ypos;
+      if (!cursor_initialized_) {
+        last_cursor_ = {xpos, ypos};
+        cursor_initialized_ = true;
+      }
+      if (window_->IsMouseButtonDown(GLFW_MOUSE_BUTTON_LEFT)) {
+        auto diffx = xpos - last_cursor_.x;
+        auto diffy = ypos - last_cursor_.y;
         if (!ImGui::GetIO().WantCaptureMouse) {
           rotation = glm::rotate(glm::mat4{1.0f}, glm::radians(float(diffx)), glm::vec3{0.0f, 1.0f, 0.0f}) * rotation;
           rotation = glm::rotate(glm::mat4{1.0f}, glm::radians(float(diffy)), glm::vec3{1.0f, 0.0f, 0.0f}) * rotation;
         }
       }
-      last_xpos = xpos;
-      last_ypos = ypos;
+      last_cursor_ = {xpos, ypos};
     });
   } else {
     core_->CreateImage(960, 640, graphics::IMAGE_FORMAT_R8G8B8A8_UNORM, &frame_image_);

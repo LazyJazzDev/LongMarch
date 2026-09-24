@@ -12,10 +12,6 @@ namespace {
 
 #include "built_in_shaders.inl"
 
-// GLFW has no user data slot left for cursor-enter events: the graphics window
-// owns the window user pointer.
-Application *cursor_enter_application = nullptr;
-
 struct ResolveParams {
   float second_frame_alpha;
   uint32_t scale;
@@ -57,25 +53,24 @@ Application::Application(const std::string &name, int width, int height, graphic
         NotifyListeners(&Listener::OnMouseButton, button, action, mods);
       });
 
-  cursor_enter_application = this;
-  glfwSetCursorEnterCallback(window_->GLFWWindow(), [](GLFWwindow *, int entered) {
-    if (cursor_enter_application) {
-      cursor_enter_application->NotifyListeners(&Listener::OnCursorEnter, entered);
-    }
-  });
+  cursor_enter_callback_ = window_->CursorEnterEvent().RegisterCallback(
+      [this](bool entered) { NotifyListeners(&Listener::OnCursorEnter, int(entered)); });
+  focus_callback_ =
+      window_->FocusEvent().RegisterCallback([this](bool focused) { NotifyListeners(&Listener::OnFocus, focused); });
 }
 
 Application::~Application() {
-  if (cursor_enter_application == this) {
-    cursor_enter_application = nullptr;
-  }
+  window_->CursorEnterEvent().UnregisterCallback(cursor_enter_callback_);
+  window_->FocusEvent().UnregisterCallback(focus_callback_);
+  window_->MouseMoveEvent().UnregisterCallback(mouse_move_callback_);
+  window_->MouseButtonEvent().UnregisterCallback(mouse_button_callback_);
 }
 
 void Application::Run(int max_frames) {
   OnInit();
   int frames = 0;
   while (!window_->ShouldClose() && (max_frames <= 0 || frames < max_frames)) {
-    glfwPollEvents();
+    grassland::graphics::Window::PollEvents();
     OnUpdate();
     OnRender();
     frames++;
@@ -155,13 +150,13 @@ void Application::OnInit() {
 
   BuildScreenFrameObjects();
 
-  fps_start_time_ = glfwGetTime();
+  fps_start_time_ = grassland::GetTimeSeconds();
   CustomOnInit();
 }
 
 void Application::OnUpdate() {
-  int width = 0, height = 0;
-  glfwGetFramebufferSize(window_->GLFWWindow(), &width, &height);
+  const auto size = window_->GetFramebufferSize();
+  const int width = size.x, height = size.y;
   if (width > 0 && height > 0 && glm::ivec2{width, height} != framebuffer_size_) {
     BuildScreenFrameObjects();
     OnFramebufferResize();
@@ -176,8 +171,8 @@ void Application::OnUpdate() {
 }
 
 void Application::OnRender() {
-  int width = 0, height = 0;
-  glfwGetFramebufferSize(window_->GLFWWindow(), &width, &height);
+  const auto size = window_->GetFramebufferSize();
+  const int width = size.x, height = size.y;
   if (width <= 0 || height <= 0) {
     // Minimized windows have no framebuffer to present.
     return;
@@ -287,15 +282,11 @@ void Application::OnClose() {
   program_.reset();
   pixel_shader_.reset();
   vertex_shader_.reset();
-
-  glfwSetCursorEnterCallback(window_->GLFWWindow(), nullptr);
-  window_->MouseMoveEvent().UnregisterCallback(mouse_move_callback_);
-  window_->MouseButtonEvent().UnregisterCallback(mouse_button_callback_);
 }
 
 void Application::BuildScreenFrameObjects() {
-  int width = 0, height = 0;
-  glfwGetFramebufferSize(window_->GLFWWindow(), &width, &height);
+  const auto size = window_->GetFramebufferSize();
+  const int width = size.x, height = size.y;
   framebuffer_size_ = {std::max(width, 1), std::max(height, 1)};
   supersample_scale_ = ChooseSupersampleScale(framebuffer_size_);
   const auto sample_size = framebuffer_size_ * supersample_scale_;
@@ -321,7 +312,7 @@ void Application::BuildScreenFrameObjects() {
 
 void Application::UpdateTitle() {
   fps_frames_++;
-  const double now = glfwGetTime();
+  const double now = grassland::GetTimeSeconds();
   if (now - fps_start_time_ >= 1.0) {
     window_->SetTitle(fmt::format("[{}] {} FPS: {:.1f}", graphics::BackendAPIString(core_->API()), name_,
                                   fps_frames_ / (now - fps_start_time_)));

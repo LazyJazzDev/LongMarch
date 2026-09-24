@@ -26,34 +26,10 @@ const char *PipelineName(sparkium::RenderPipeline pipeline) {
 }
 
 void ResizeWindowForFilm(graphics::Window *window, sparkium::Film *film) {
-  int window_x = 0;
-  int window_y = 0;
-  int window_width = window->GetWidth();
-  int window_height = window->GetHeight();
-  glfwGetWindowPos(window->GLFWWindow(), &window_x, &window_y);
-
-  int monitor_count = 0;
-  GLFWmonitor **monitors = glfwGetMonitors(&monitor_count);
-  GLFWmonitor *monitor = glfwGetPrimaryMonitor();
-  int best_overlap = -1;
-  for (int i = 0; i < monitor_count; ++i) {
-    int monitor_x, monitor_y, monitor_width, monitor_height;
-    glfwGetMonitorWorkarea(monitors[i], &monitor_x, &monitor_y, &monitor_width, &monitor_height);
-    const int overlap_width =
-        std::max(0, std::min(window_x + window_width, monitor_x + monitor_width) - std::max(window_x, monitor_x));
-    const int overlap_height =
-        std::max(0, std::min(window_y + window_height, monitor_y + monitor_height) - std::max(window_y, monitor_y));
-    const int overlap = overlap_width * overlap_height;
-    if (overlap > best_overlap) {
-      best_overlap = overlap;
-      monitor = monitors[i];
-    }
-  }
-
-  int work_x, work_y, work_width, work_height;
-  glfwGetMonitorWorkarea(monitor, &work_x, &work_y, &work_width, &work_height);
-  int frame_left, frame_top, frame_right, frame_bottom;
-  glfwGetWindowFrameSize(window->GLFWWindow(), &frame_left, &frame_top, &frame_right, &frame_bottom);
+  const auto work = window->GetMonitorWorkArea();
+  const auto frame = window->GetFrameSize();
+  const int work_x = work.x, work_y = work.y, work_width = work.z, work_height = work.w;
+  const int frame_left = frame.x, frame_top = frame.y, frame_right = frame.z, frame_bottom = frame.w;
   const int available_width = std::max(1, work_width - frame_left - frame_right);
   const int available_height = std::max(1, work_height - frame_top - frame_bottom);
   const float scale = std::min({1.0f, static_cast<float>(available_width) / film->GetWidth(),
@@ -62,8 +38,8 @@ void ResizeWindowForFilm(graphics::Window *window, sparkium::Film *film) {
   const int target_height = std::max(1, static_cast<int>(std::floor(film->GetHeight() * scale)));
 
   window->Resize(target_width, target_height);
-  glfwSetWindowPos(window->GLFWWindow(), work_x + frame_left + (available_width - target_width) / 2,
-                   work_y + frame_top + (available_height - target_height) / 2);
+  window->SetPosition(work_x + frame_left + (available_width - target_width) / 2,
+                      work_y + frame_top + (available_height - target_height) / 2);
 }
 }  // namespace
 
@@ -293,7 +269,7 @@ int main(int argc, char **argv) {
       graphics_core->CreateCommandContext(&command_context);
       command_context->CmdPresent(window.get(), image.get());
       graphics_core->SubmitCommandContext(command_context.get());
-      glfwPollEvents();
+      grassland::graphics::Window::PollEvents();
       if (resize_pending) {
         ResizeWindowForFilm(window.get(), loaded->GetFilm());
         resize_pending = false;

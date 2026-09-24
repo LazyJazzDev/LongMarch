@@ -29,6 +29,26 @@ class Window {
 
   int GetHeight() const;
 
+  // Window size and cursor position use logical content coordinates; the
+  // framebuffer size uses physical pixels and can be zero when minimized.
+  glm::ivec2 GetSize() const;
+  glm::ivec2 GetFramebufferSize() const;
+  glm::dvec2 GetCursorPosition() const;
+  bool IsKeyDown(int key) const;
+  bool IsMouseButtonDown(int button) const;
+  bool IsFocused() const;
+  void Focus();
+  void RequestClose();
+
+  // Desktop coordinates and decoration widths use logical screen units.
+  glm::ivec2 GetPosition() const;
+  void SetPosition(int x, int y);
+  glm::ivec4 GetFrameSize() const;        // left, top, right, bottom
+  glm::ivec4 GetMonitorWorkArea() const;  // x, y, width, height; largest overlap
+
+  // Process events for all windows on the main thread.
+  static void PollEvents();
+
   void SetTitle(const std::string &title);
 
   std::string GetTitle() const;
@@ -49,6 +69,18 @@ class Window {
 
   EventManager<void(int, int)> &ResizeEvent() {
     return resize_event_;
+  }
+
+  EventManager<void(int, int)> &FramebufferResizeEvent() {
+    return framebuffer_resize_event_;
+  }
+
+  EventManager<void(bool)> &CursorEnterEvent() {
+    return cursor_enter_event_;
+  }
+
+  EventManager<void(bool)> &FocusEvent() {
+    return focus_event_;
   }
 
   EventManager<void(double, double)> &MouseMoveEvent() {
@@ -93,6 +125,9 @@ class Window {
   EventManager<void(const MagnifyGesture &)> magnify_event_;
   // Resize, mouse, keyboard, etc.
   EventManager<void(int, int)> resize_event_;
+  EventManager<void(int, int)> framebuffer_resize_event_;
+  EventManager<void(bool)> cursor_enter_event_;
+  EventManager<void(bool)> focus_event_;
   EventManager<void(double, double)> mouse_move_event_;
   EventManager<void(int, int, int, double, double)> mouse_button_event_;
   EventManager<void(double, double)> scroll_event_;

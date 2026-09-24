@@ -31,10 +31,12 @@ void ModuleResize::OnInit() {
 
   core_->CreateBuffer(sizeof(GlobalUniformBuffer), grassland::graphics::BUFFER_TYPE_DYNAMIC, &uniform_buffer_);
 
-  core_->CreateImage(1280, 720, grassland::graphics::IMAGE_FORMAT_R32G32B32A32_SFLOAT, &color_image_);
-  core_->CreateImage(1280, 720, grassland::graphics::IMAGE_FORMAT_D32_SFLOAT, &depth_image_);
+  core_->CreateImage(window_->GetFramebufferSize().x, window_->GetFramebufferSize().y,
+                     grassland::graphics::IMAGE_FORMAT_R32G32B32A32_SFLOAT, &color_image_);
+  core_->CreateImage(window_->GetFramebufferSize().x, window_->GetFramebufferSize().y,
+                     grassland::graphics::IMAGE_FORMAT_D32_SFLOAT, &depth_image_);
 
-  window_->ResizeEvent().RegisterCallback([this](int width, int height) {
+  window_->FramebufferResizeEvent().RegisterCallback([this](int width, int height) {
     if (width <= 0 || height <= 0)
       return;
     core_->WaitGPU();
