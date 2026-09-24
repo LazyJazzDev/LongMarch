@@ -48,8 +48,8 @@ private final class GameMetalView: MTKView {
     }
   }
   override func touchesCancelled(_ touches: Set<UITouch>, with event: UIEvent?) { cancelPointer() }
-  fileprivate func cancelPointer(force: Bool = false) {
-    if pointerDown || force {
+  private func cancelPointer() {
+    if pointerDown {
       renderer.input(5, x: 0, y: 0, value: 0)
       renderer.input(5, x: 0, y: 0, value: 1)
       pointerDown = false
@@ -75,53 +75,136 @@ private final class GameMetalView: MTKView {
   }
 }
 
-// Keep Life's canvas in the phone's physical portrait coordinates. UIKit maps
-// touches into the transformed Metal view, including pinch and two-finger pan.
+// The window stays in its entry orientation. Only the icon angle follows the
+// device: there is no counter-rotated rectangular view or relayout to animate.
 private final class GameCanvasView: UIView {
   let metal = GameMetalView(frame: .zero, device: nil)
-  private var canvasAngle: CGFloat?
+  private weak var lockedScene: UIWindowScene?
+  private var entryOrientation: UIInterfaceOrientation = .portrait
+  private var iconAngle: CGFloat?
+
   override init(frame: CGRect) {
     super.init(frame: frame)
     addSubview(metal)
   }
   required init?(coder: NSCoder) { fatalError() }
+
   override func layoutSubviews() {
     super.layoutSubviews()
-    var angle: CGFloat = 0
-    if metal.life {
-      switch window?.windowScene?.interfaceOrientation {
-      case .landscapeLeft: angle = -.pi / 2
-      case .landscapeRight: angle = .pi / 2
-      case .portraitUpsideDown: angle = .pi
-      default: break
-      }
-    }
-    if canvasAngle != angle {
-      metal.cancelPointer(force: true)
-      metal.renderer.setGameIconRotation(Float(-angle))
-      canvasAngle = angle
-    }
-    let sideways = abs(sin(angle)) > 0.5
-    metal.bounds = CGRect(
-      origin: .zero,
-      size: sideways
-        ? CGSize(width: bounds.height, height: bounds.width) : bounds.size)
-    metal.center = CGPoint(x: bounds.midX, y: bounds.midY)
-    metal.transform = CGAffineTransform(rotationAngle: angle)
+    metal.frame = bounds
   }
+
   override func didMoveToWindow() {
     super.didMoveToWindow()
-    setNeedsLayout()
-    // Exercise real scene rotation in headless simulator smoke runs.
-    if let direction = ProcessInfo.processInfo.environment["LONGMARCH_SMOKE_ORIENTATION"],
-      let scene = window?.windowScene
-    {
-      let orientation: UIInterfaceOrientationMask =
-        direction == "left"
-        ? .landscapeLeft
-        : direction == "right" ? .landscapeRight : .portrait
-      DispatchQueue.main.async {
-        scene.requestGeometryUpdate(.iOS(interfaceOrientations: orientation))
+    if window == nil {
+      stopOrientationTracking()
+    } else if metal.life, lockedScene == nil, let scene = window?.windowScene {
+      entryOrientation = scene.interfaceOrientation
+      if entryOrientation == .unknown { entryOrientation = .portrait }
+      lockedScene = scene
+      DemoAppDelegate.orientationMask = mask(for: entryOrientation)
+      scene.windows.first(where: { $0.isKeyWindow })?.rootViewController?
+        .setNeedsUpdateOfSupportedInterfaceOrientations()
+      UIDevice.current.beginGeneratingDeviceOrientationNotifications()
+      NotificationCenter.default.addObserver(
+        self, selector: #selector(deviceDidRotate),
+        name: UIDevice.orientationDidChangeNotification, object: nil)
+      deviceDidRotate()
+      if ProcessInfo.processInfo.environment["LONGMARCH_SMOKE_ORIENTATION"] != nil {
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.6) { [weak self] in
+          self?.checkOrientationLock()
+        }
+      }
+    }
+  }
+
+  func stopOrientationTracking() {
+    guard let scene = lockedScene else { return }
+    NotificationCenter.default.removeObserver(
+      self, name: UIDevice.orientationDidChangeNotification, object: nil)
+    UIDevice.current.endGeneratingDeviceOrientationNotifications()
+    lockedScene = nil
+    iconAngle = nil
+    DemoAppDelegate.orientationMask = .allButUpsideDown
+    scene.windows.first(where: { $0.isKeyWindow })?.rootViewController?
+      .setNeedsUpdateOfSupportedInterfaceOrientations()
+  }
+
+  private func mask(for orientation: UIInterfaceOrientation) -> UIInterfaceOrientationMask {
+    switch orientation {
+    case .landscapeLeft: return .landscapeLeft
+    case .landscapeRight: return .landscapeRight
+    case .portraitUpsideDown: return .portraitUpsideDown
+    default: return .portrait
+    }
+  }
+
+  private func angle(for orientation: UIInterfaceOrientation) -> CGFloat {
+    switch orientation {
+    case .landscapeLeft: return .pi / 2
+    case .landscapeRight: return -.pi / 2
+    case .portraitUpsideDown: return .pi
+    default: return 0
+    }
+  }
+
+  @objc func deviceDidRotate() {
+    // Supply sensor directions in headless smoke runs; production uses the
+    // real device notification even while interface rotation is locked.
+    switch ProcessInfo.processInfo.environment["LONGMARCH_SMOKE_ORIENTATION"] {
+    case "left": updateIcons(for: .landscapeLeft)
+    case "right", "exit": updateIcons(for: .landscapeRight)
+    case "portrait": updateIcons(for: .portrait)
+    default: updateIcons(for: UIDevice.current.orientation)
+    }
+  }
+
+  private func updateIcons(for deviceOrientation: UIDeviceOrientation) {
+    guard lockedScene != nil else { return }
+    let upright: UIInterfaceOrientation
+    switch deviceOrientation {
+    case .portrait: upright = .portrait
+    case .portraitUpsideDown: upright = .portraitUpsideDown
+    case .landscapeLeft: upright = .landscapeRight
+    case .landscapeRight: upright = .landscapeLeft
+    default: return  // Flat/unknown devices keep the last useful icon orientation.
+    }
+    let radians = angle(for: upright) - angle(for: entryOrientation)
+    guard iconAngle != radians else { return }
+    iconAngle = radians
+    metal.renderer.setGameIconRotation(Float(radians))
+  }
+
+  // Verify the actual UIWindowScene refuses rotation, not just that the final
+  // framebuffer looks upright after a system rotation animation.
+  private func checkOrientationLock() {
+    guard let scene = lockedScene else { return }
+    let before = scene.interfaceOrientation
+    let beforeBounds = bounds
+    let requested: UIInterfaceOrientationMask = before == .portrait ? .landscapeRight : .portrait
+    var rejected = false
+    scene.requestGeometryUpdate(.iOS(interfaceOrientations: requested)) { _ in rejected = true }
+    DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { [weak self] in
+      guard let self, self.lockedScene === scene else { return }
+      let result: [String: Any] = [
+        "rotation_rejected": rejected,
+        "interface_unchanged": scene.interfaceOrientation == before,
+        "bounds_unchanged": self.bounds == beforeBounds,
+        "view_transform_identity": self.metal.transform.isIdentity,
+        "icon_angle": self.iconAngle ?? 0,
+      ]
+      let url = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
+        .appendingPathComponent("OrientationSmoke.json")
+      try? JSONSerialization.data(withJSONObject: result).write(to: url)
+      if ProcessInfo.processInfo.environment["LONGMARCH_SMOKE_ORIENTATION"] == "exit" {
+        self.stopOrientationTracking()
+        scene.requestGeometryUpdate(.iOS(interfaceOrientations: requested))
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.6) {
+          let restored = ["rotation_restored": scene.interfaceOrientation != before]
+          let exitURL = url.deletingLastPathComponent().appendingPathComponent(
+            "OrientationExitSmoke.json")
+          try? JSONSerialization.data(withJSONObject: restored).write(to: exitURL)
+        }
       }
     }
   }
@@ -204,8 +287,10 @@ private struct DesktopGameView: UIViewRepresentable {
   }
   func updateUIView(_ view: GameCanvasView, context: Context) {
     view.metal.renderer.setActive(active)
+    if active { view.deviceDidRotate() }
   }
   static func dismantleUIView(_ view: GameCanvasView, coordinator: Coordinator) {
+    view.stopOrientationTracking()
     view.metal.renderer.stop()
   }
 }

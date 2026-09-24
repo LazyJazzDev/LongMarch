@@ -25,10 +25,11 @@ animation. Tap or draw to edit, use two fingers to pan, and pinch to zoom. Its
 width/height (2–200), 1×/2×/5×/lightning speed, periodic/fixed edges and file buttons
 are the same desktop controls. Lightning advances once per rendered frame.
 Sidebars follow the window's short edges rather than the grid aspect ratio. On
-iPhone, the canvas stays in physical portrait coordinates as the interface
-rotates: buttons, sliders and cells keep their physical placement, while button
-icons turn upright with a short animation. UIKit converts touch and gesture
-positions into that same canvas, and rotation cancels an in-progress drag.
+iPhone, GoL locks the entire interface to its entry orientation. Device direction
+notifications rotate only the button icons with a short animation; the page,
+button positions, sliders, grid and touch coordinates stay fixed, with no system
+window-rotation animation. Flat/unknown directions preserve the last icon angle.
+Leaving GoL restores normal interface rotation for the browser and other demos.
 Original open/save buttons launch native Files pickers; import retains larger
 axes and centers the pattern independently per dimension. Export saves the full
 grid, including dead borders. Returning from the background resets frame clocks
@@ -280,8 +281,11 @@ with `LONGMARCH_SMOKE_DEMO=gol`, `LONGMARCH_SMOKE_GOL_SIZE=200` and
 Documents/BenchmarkResult.json. After frame 70 the benchmark resumes normal simulation scheduling. Set
 `LONGMARCH_SMOKE_AUTORUN=1` to record frame counts over two input-free seconds
 in Documents/AutorunSmoke.json and verify timer-driven updates.
-`LONGMARCH_SMOKE_ORIENTATION=left|right|portrait` requests a real interface
-rotation for simulator checks. `mobile_games_check` also verifies that rotating
+`LONGMARCH_SMOKE_ORIENTATION=left|right|portrait` supplies a device direction
+and verifies that an actual scene rotation request is rejected while bounds and
+view transforms stay fixed, recorded in Documents/OrientationSmoke.json. Use
+`exit` to additionally verify rotation is restored after releasing the lock
+(Documents/OrientationExitSmoke.json). `mobile_games_check` also verifies that rotating
 icons leaves grid pixels unchanged and returns the paused renderer to idle.
 
 Device benchmark FPS uses wall-clock elapsed time; submission timings exclude
