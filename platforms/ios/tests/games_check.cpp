@@ -90,8 +90,8 @@ int main(int argc, char **argv) {
         Settle(game);
         const auto rotated = Pixels(game);
         Check(rotated != before, "Orientation did not rotate button icons");
-        for (int y = 0; y < 800; ++y)
-          for (int x = 128; x < 512; ++x)
+        for (int y = 128; y < 672; ++y)
+          for (int x = 0; x < 640; ++x)
             for (int c = 0; c < 4; ++c)
               Check(rotated[(y * 640 + x) * 4 + c] == before[(y * 640 + x) * 4 + c],
                     "Icon rotation changed the grid or its background");

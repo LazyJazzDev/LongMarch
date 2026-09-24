@@ -24,7 +24,7 @@ size sliders, rotating blue die, red reset, pause/play spring and boundary-glide
 animation. Tap or draw to edit, use two fingers to pan, and pinch to zoom. Its
 width/height (2–200), 1×/2×/5×/lightning speed, periodic/fixed edges and file buttons
 are the same desktop controls. Lightning advances once per rendered frame.
-Sidebars follow the window's long edges rather than the grid aspect ratio. On
+Sidebars follow the window's short edges rather than the grid aspect ratio. On
 iPhone, the canvas stays in physical portrait coordinates as the interface
 rotates: buttons, sliders and cells keep their physical placement, while button
 icons turn upright with a short animation. UIKit converts touch and gesture
