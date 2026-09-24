@@ -21,7 +21,7 @@ Model BoundaryIcon(bool periodic) {
     triangle({left, top}, {right, bottom}, {left, bottom});
   };
   // Keep a small cell grid visible in both states. Thick walls open at their
-  // centers, where paired arrows cross opposite edges in the same direction.
+  // centers, where symmetric double-headed links show adjacency across edges.
   for (float y : {-0.22f, 0.06f})
     for (float x : {-0.22f, 0.06f})
       rect(x, y, x + 0.16f, y + 0.16f);
@@ -43,9 +43,10 @@ Model BoundaryIcon(bool periodic) {
         const glm::vec2 p = axis == 0 ? glm::vec2{x, y} : glm::vec2{y, x};
         return center + (periodic ? p : glm::vec2{0});
       };
-      triangle(local(-0.25f, -0.08f), local(0.03f, -0.08f), local(0.03f, 0.08f));
-      triangle(local(-0.25f, -0.08f), local(0.03f, 0.08f), local(-0.25f, 0.08f));
-      triangle(local(-0.01f, -0.19f), local(0.25f, 0), local(-0.01f, 0.19f));
+      triangle(local(-0.10f, -0.08f), local(0.10f, -0.08f), local(0.10f, 0.08f));
+      triangle(local(-0.10f, -0.08f), local(0.10f, 0.08f), local(-0.10f, 0.08f));
+      triangle(local(0.07f, -0.17f), local(0.27f, 0), local(0.07f, 0.17f));
+      triangle(local(-0.07f, 0.17f), local(-0.27f, 0), local(-0.07f, -0.17f));
     }
   }
   return Model(vertices, indices);
