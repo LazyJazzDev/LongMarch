@@ -51,7 +51,13 @@ int main(int argc, char **argv) {
       }
       auto extent = session.Image()->Extent();
       std::vector<float> pixels(extent.width * extent.height * 4);
-      session.Image()->DownloadData(pixels.data());
+      if (session.Image()->Format() == grassland::graphics::IMAGE_FORMAT_R8G8B8A8_UNORM) {
+        std::vector<uint8_t> rgba(pixels.size());
+        session.Image()->DownloadData(rgba.data());
+        for (size_t i = 0; i < rgba.size(); ++i)
+          pixels[i] = rgba[i] / 255.f;
+      } else
+        session.Image()->DownloadData(pixels.data());
       if (name == "graphics_hello_hdr" && *std::max_element(pixels.begin(), pixels.end()) < 2.9f)
         throw std::runtime_error("HDR gradient was clipped to SDR");
       std::vector<uint8_t> bytes(pixels.size());

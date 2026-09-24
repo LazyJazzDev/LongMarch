@@ -27,7 +27,7 @@ list(FILTER GRAPHICS EXCLUDE REGEX "/window.cpp$")
 file(GLOB METAL "${ROOT}/code/grassland/graphics/backend/metal/*.cpp")
 file(GLOB_RECURSE SPARKIUM "${ROOT}/code/sparkium/*.cpp")
 add_library(sparkium_mobile STATIC ${UTIL} ${GRAPHICS} ${METAL} ${SPARKIUM}
-  "${ROOT}/code/grassland/math/math_mesh.cxx" "${mikktspace_SOURCE_DIR}/mikktspace.c" RenderSession.cpp demos/DemoSession.cpp
+  "${ROOT}/code/grassland/math/math_mesh.cxx" "${mikktspace_SOURCE_DIR}/mikktspace.c" RenderSession.cpp
   "${ROOT}/demo/gol/game_of_life_lib/game_of_life_lib.cpp"
   "${ROOT}/demo/2048/2048_lib/2048_lib.cpp" "${ROOT}/demo/2048/game_rules.cpp" "${ROOT}/demo/2048/ai_player.cpp")
 target_include_directories(sparkium_mobile PUBLIC "${ROOT}/code" "${SPARKIUM_HEADERS}"
@@ -36,6 +36,9 @@ target_include_directories(sparkium_mobile PUBLIC "${ROOT}/code" "${SPARKIUM_HEA
 target_compile_definitions(sparkium_mobile PUBLIC LONGMARCH_METAL_ENABLED LONGMARCH_HEADLESS
   FMT_HEADER_ONLY NDEBUG "$<$<NOT:$<COMPILE_LANGUAGE:Swift>>:LONGMARCH_ASSETS_DIR=\"\">")
 target_link_libraries(sparkium_mobile PUBLIC "-framework Metal" "-framework Foundation" "-framework QuartzCore")
+add_library(mobile_demos STATIC demos/DemoSession.cpp games/DesktopGameSession.cpp games/image_write.cpp)
+target_link_libraries(mobile_demos PUBLIC sparkium_mobile ios_gol_ui ios_2048_ui)
+target_include_directories(mobile_demos PRIVATE "${ROOT}/demo/gol/game_of_life_lib" "${ROOT}/demo/2048" "${ROOT}/demo/gol")
 find_package(Python3 REQUIRED COMPONENTS Interpreter)
 # Generate embedded HLSL on the host, without executing a cross-compiled helper.
 foreach(pair "grassland/graphics" "sparkium/shaders")
@@ -54,7 +57,7 @@ add_custom_command(OUTPUT "${CMAKE_CURRENT_BINARY_DIR}/demo_shaders.inl"
   COMMAND "${Python3_EXECUTABLE}" "${CMAKE_CURRENT_SOURCE_DIR}/embed_shaders.py"
     "${ROOT}/demo" "${CMAKE_CURRENT_BINARY_DIR}/demo_shaders.inl"
   DEPENDS ${demo_shaders} embed_shaders.py VERBATIM)
-target_sources(sparkium_mobile PRIVATE "${CMAKE_CURRENT_BINARY_DIR}/demo_shaders.inl")
+target_sources(mobile_demos PRIVATE "${CMAKE_CURRENT_BINARY_DIR}/demo_shaders.inl")
 set_source_files_properties(demos/DemoSession.cpp PROPERTIES INCLUDE_DIRECTORIES "${CMAKE_CURRENT_BINARY_DIR}")
 set_source_files_properties("${ROOT}/code/grassland/graphics/shader.cpp" PROPERTIES
   INCLUDE_DIRECTORIES "${CMAKE_CURRENT_BINARY_DIR}/grassland_graphics")
@@ -78,9 +81,9 @@ if(NOT CMAKE_SYSTEM_NAME STREQUAL "iOS")
   add_executable(sparkium_mobile_check check.cpp)
   target_link_libraries(sparkium_mobile_check PRIVATE sparkium_mobile)
   add_executable(mobile_games_check tests/games_check.cpp)
-  target_link_libraries(mobile_games_check PRIVATE sparkium_mobile)
+  target_link_libraries(mobile_games_check PRIVATE mobile_demos)
   add_executable(mobile_demo_check demos/check.cpp)
-  target_link_libraries(mobile_demo_check PRIVATE sparkium_mobile)
+  target_link_libraries(mobile_demo_check PRIVATE mobile_demos)
 endif()
 if(SPARKIUM_APP)
   if(CMAKE_GENERATOR STREQUAL "Ninja" AND CMAKE_SYSTEM_NAME STREQUAL "iOS")
@@ -100,11 +103,17 @@ if(SPARKIUM_APP)
   set(bundle_resources "${CMAKE_CURRENT_BINARY_DIR}/SparkiumResources")
   file(CREATE_LINK "${SPARKIUM_RESOURCES}" "${bundle_resources}" SYMBOLIC)
   add_executable(LongMarch MACOSX_BUNDLE SparkiumApp.swift DemosApp.swift demos/DemoView.swift
-    games/GamesView.swift games/GameBridge.mm games/GameBridge.h
+    games/GamesView.swift
     demos/DemoBridge.mm demos/DemoBridge.h SparkiumBridge.mm SparkiumBridge.h RenderQueue.h
     "${bundle_resources}" Assets.xcassets)
   set_source_files_properties("${bundle_resources}" Assets.xcassets PROPERTIES MACOSX_PACKAGE_LOCATION Resources)
-  target_link_libraries(LongMarch PRIVATE sparkium_mobile "-framework SwiftUI" "-framework CoreGraphics" "-framework MetalKit")
+  # Folder resources otherwise copy only at configure time; shader preparation can
+  # add nested cache files without changing the folder timestamp seen by Ninja.
+  add_custom_target(ios_app_resources
+    COMMAND "${CMAKE_COMMAND}" -E copy_directory "${SPARKIUM_RESOURCES}" "$<TARGET_BUNDLE_DIR:LongMarch>/SparkiumResources"
+    VERBATIM)
+  add_dependencies(LongMarch ios_app_resources)
+  target_link_libraries(LongMarch PRIVATE mobile_demos "-framework SwiftUI" "-framework CoreGraphics" "-framework MetalKit")
   target_compile_options(LongMarch PRIVATE "$<$<COMPILE_LANGUAGE:OBJCXX>:-fobjc-arc>")
   set_target_properties(LongMarch PROPERTIES
     MACOSX_BUNDLE_INFO_PLIST "${CMAKE_CURRENT_SOURCE_DIR}/Info.plist"
@@ -134,3 +143,30 @@ if(SPARKIUM_APP AND CMAKE_GENERATOR STREQUAL "Ninja")
       "$<TARGET_BUNDLE_DIR:LongMarch>" "${CMAKE_CURRENT_BINARY_DIR}/AppIcon.plist"
     VERBATIM)
 endif()
+
+# Compile the actual desktop UI, geometry, animation and HLSL for native hosts.
+# Game namespaces allow both original applications in one executable.
+set(FT_DISABLE_HARFBUZZ ON CACHE BOOL "" FORCE)
+set(FT_DISABLE_PNG ON CACHE BOOL "" FORCE)
+set(FT_DISABLE_BZIP2 ON CACHE BOOL "" FORCE)
+set(FT_DISABLE_BROTLI ON CACHE BOOL "" FORCE)
+FetchContent_Declare(freetype URL https://download.savannah.gnu.org/releases/freetype/freetype-2.13.3.tar.xz URL_HASH SHA256=0550350666d427c74daeb85d5ac7bb353acba5f76956395995311a9c6f063289 DOWNLOAD_EXTRACT_TIMESTAMP TRUE)
+FetchContent_MakeAvailable(freetype)
+foreach(game gol 2048)
+  file(GLOB_RECURSE game_sources CONFIGURE_DEPENDS "${ROOT}/demo/${game}/*.cpp")
+  list(FILTER game_sources EXCLUDE REGEX "/(main|ai_player|ai_benchmark|game_rules)\\.cpp$|/[^/]*_lib/")
+  add_library(ios_${game}_ui STATIC ${game_sources})
+  target_link_libraries(ios_${game}_ui PUBLIC sparkium_mobile freetype)
+  target_include_directories(ios_${game}_ui PRIVATE "${ROOT}/demo/${game}" "${ROOT}/demo/${game}/${game}_lib" "${ROOT}/demo/gol/game_of_life_lib")
+  target_compile_definitions(ios_${game}_ui PRIVATE LONGMARCH_HOSTED_GAMES GLFW_INCLUDE_NONE)
+  set(game_generated "${CMAKE_CURRENT_BINARY_DIR}/game_${game}")
+  file(MAKE_DIRECTORY "${game_generated}")
+  file(GLOB_RECURSE game_shaders CONFIGURE_DEPENDS "${ROOT}/demo/${game}/*.hlsl")
+  add_custom_command(OUTPUT "${game_generated}/built_in_shaders.inl"
+    COMMAND "${Python3_EXECUTABLE}" "${CMAKE_CURRENT_SOURCE_DIR}/embed_shaders.py"
+      "${ROOT}/demo/${game}" "${game_generated}/built_in_shaders.inl"
+    DEPENDS ${game_shaders} embed_shaders.py VERBATIM)
+  target_sources(ios_${game}_ui PRIVATE "${game_generated}/built_in_shaders.inl")
+  set_source_files_properties("${ROOT}/demo/${game}/application/application.cpp" PROPERTIES INCLUDE_DIRECTORIES "${game_generated}")
+endforeach()
+target_sources(sparkium_mobile PRIVATE "${ROOT}/code/grassland/graphics/window.cpp")

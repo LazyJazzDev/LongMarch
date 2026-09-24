@@ -46,10 +46,17 @@ using namespace grassland;
 using namespace grassland::graphics;
 
 const std::vector<std::string> &DemoSession::Names() {
-  static const std::vector<std::string> names{
-      "graphics_hello_triangle", "graphics_hello_texture",    "graphics_hello_blend",
-      "graphics_hello_resize",   "graphics_hello_sdr_sample", "graphics_hello_cube",
-      "graphics_hello_hdr",      "graphics_hello_ray_query",  "nbody_cs"};
+  static const std::vector<std::string> names{"gol",
+                                              "2048",
+                                              "graphics_hello_triangle",
+                                              "graphics_hello_texture",
+                                              "graphics_hello_blend",
+                                              "graphics_hello_resize",
+                                              "graphics_hello_sdr_sample",
+                                              "graphics_hello_cube",
+                                              "graphics_hello_hdr",
+                                              "graphics_hello_ray_query",
+                                              "nbody_cs"};
   return names;
 }
 
@@ -57,6 +64,11 @@ DemoSession::DemoSession(const std::filesystem::path &resources, const std::stri
   if (std::find(Names().begin(), Names().end(), demo) == Names().end())
     throw std::invalid_argument("Unknown graphics demo");
   ConfigureShaderCache({resources / "shaders", !prepare, true});
+  FileProbe::GetInstance().AddSearchPath((resources / "assets").string() + "/");
+  if (demo == "gol" || demo == "2048") {
+    game_ = std::make_unique<DesktopGameSession>(demo);
+    return;
+  }
   if (CreateCore(BACKEND_API_METAL, Core::Settings{1, false}, &core_) ||
       core_->InitializeLogicalDeviceAutoSelect(false))
     throw std::runtime_error("Cannot initialize Metal");
@@ -71,7 +83,7 @@ DemoSession::DemoSession(const std::filesystem::path &resources, const std::stri
 
 DemoSession::~DemoSession() {
   try {
-    core_->WaitGPU();
+    Core()->WaitGPU();
   } catch (...) {
   }
 }
@@ -236,6 +248,10 @@ void DemoSession::Configure(int particles, int galaxies, float dt, bool simulate
 }
 
 void DemoSession::Resize(int width, int height) {
+  if (game_) {
+    game_->Resize(width, height);
+    return;
+  }
   if (width == width_ && height == height_)
     return;
   if (width < 1 || height < 1 || width > 8192 || height > 8192)
@@ -249,6 +265,10 @@ void DemoSession::Resize(int width, int height) {
 }
 
 void DemoSession::Render() {
+  if (game_) {
+    game_->Render();
+    return;
+  }
   if (demo_ == "graphics_hello_ray_query") {
     RenderRayQuery();
     return;

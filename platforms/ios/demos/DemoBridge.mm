@@ -2,6 +2,8 @@
 #include <algorithm>
 #include <atomic>
 #include <chrono>
+#define GLFW_INCLUDE_NONE
+#include <GLFW/glfw3.h>
 #include "DemoSession.h"
 #include "RenderQueue.h"
 #include "grassland/graphics/backend/metal/metal_core.h"
@@ -11,7 +13,7 @@
   MTKView *_view;
   DemoProgress _progress;
   std::atomic<uint64_t> _generation;
-  BOOL _active, _busy, _failed;
+  BOOL _active, _busy, _failed, _filePending;
   NSString *_demo;
   NSInteger _particles, _galaxies, _reset;
   float _deltaTime, _yaw, _pitch, _resolutionScale;
@@ -44,6 +46,7 @@
   _progress = [progress copy];
   _demo = [demo copy];
   _failed = NO;
+  _filePending = NO;
   _statsTime = 0;
   _statsFrames = 0;
   view.device = MTLCreateSystemDefaultDevice();
@@ -110,7 +113,55 @@
     ((CAMetalLayer *)_view.layer).wantsExtendedDynamicRangeContent = hdr;
 }
 
+- (void)input:(NSInteger)kind x:(double)x y:(double)y value:(double)value {
+  uint64_t generation = _generation;
+  dispatch_async(LongMarchRenderQueue(), ^{
+    if (self->_generation != generation || !self->_session || !self->_session->Game())
+      return;
+    auto *window = self->_session->Game()->Window();
+    auto size = window->GetFramebufferSize();
+    if (kind <= 3 || kind == 6)
+      window->SendPointer(x * size.x, y * size.y);
+    if (kind == 1) {
+      window->CursorEnterEvent().InvokeCallbacks(true);
+      window->SendMouseButton(int(value), GLFW_PRESS);
+    }
+    if (kind == 2) {
+      window->SendMouseButton(int(value), GLFW_RELEASE);
+      window->CursorEnterEvent().InvokeCallbacks(false);
+    }
+    if (kind == 4) {
+      window->SendKey(int(value), GLFW_PRESS);
+      window->SendKey(int(value), GLFW_RELEASE);
+    }
+    if (kind == 5) {
+      window->SendFocus(value != 0);
+      if (value)
+        self->_session->Game()->ResetClock();
+    }
+    if (kind == 6)
+      window->MagnifyEvent().InvokeCallbacks(grassland::graphics::MagnifyGesture{
+          value, x * size.x, y * size.y, grassland::graphics::MagnifyPhase::kUpdate});
+  });
+}
+
+- (void)completeFile:(NSString *)path completion:(void (^)(NSString *))completion {
+  uint64_t generation = _generation;
+  dispatch_async(LongMarchRenderQueue(), ^{
+    std::string error;
+    if (self->_generation == generation && self->_session && self->_session->Game())
+      error = self->_session->Game()->CompleteFile(path.UTF8String);
+    NSString *message = error.empty() ? nil : [NSString stringWithUTF8String:error.c_str()];
+    dispatch_async(dispatch_get_main_queue(), ^{
+      self->_filePending = NO;
+      completion(message);
+    });
+  });
+}
+
 - (void)setActive:(BOOL)active {
+  if (_active != active)
+    [self input:5 x:0 y:0 value:active];
   if (_active != active)
     _statsTime = 0;
   _active = active;
@@ -151,7 +202,8 @@
   BOOL simulate = _simulate;
   uint32_t clampSDR = !_hdr;
   int width = 1280, height = 720;
-  if ([_demo isEqualToString:@"graphics_hello_resize"] || [_demo isEqualToString:@"nbody_cs"]) {
+  if ([_demo isEqualToString:@"graphics_hello_resize"] || [_demo isEqualToString:@"nbody_cs"] ||
+      [_demo isEqualToString:@"gol"] || [_demo isEqualToString:@"2048"]) {
     width = std::max(1, int(view.drawableSize.width * _resolutionScale));
     height = std::max(1, int(view.drawableSize.height * _resolutionScale));
   }
@@ -167,6 +219,15 @@
           self->_session->Resize(width, height);
           self->_session->Configure(int(particles), int(galaxies), dt, simulate, yaw, pitch, int(reset));
           self->_session->Render();
+          if (auto game = self->_session->Game()) {
+            int action = game->FileRequest();
+            dispatch_async(dispatch_get_main_queue(), ^{
+              if (self->_generation == generation && action && !self->_filePending && self.fileRequest) {
+                self->_filePending = YES;
+                self.fileRequest(action);
+              }
+            });
+          }
           auto core = static_cast<grassland::graphics::backend::MetalCore *>(self->_session->Core());
           auto image = static_cast<grassland::graphics::backend::MetalImage *>(self->_session->Image());
           id<MTLCommandQueue> queue = (__bridge id<MTLCommandQueue>)core->Queue();

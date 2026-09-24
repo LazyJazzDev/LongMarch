@@ -1,3 +1,34 @@
+# Shared desktop game UI validation (2026-09-24)
+
+This update replaces the earlier SwiftUI recreation with the actual desktop games.
+Both game UIs, glyph meshes, animations, original HLSL shaders and supersampled
+renderers are compiled into the iOS app. The shared Window API now supports a
+native host supplying framebuffer sizes and input. Native file pickers are hooked
+to the original GoL file buttons. The separate replacement game model is removed.
+
+- Ninja Release builds: desktop GoL/2048, iOS device and iOS Simulator.
+- Actual iPhone 18 Pro / iOS 27 Simulator GPU: GoL and 2048 each rendered and
+  presented frames at 1206 × 2226; the inspected running views reported about
+  60 FPS and use the desktop visual style. These are simulator measurements,
+  not physical-device HDR brightness tests.
+- The earlier simulator rejection was overly broad: tier-1 argument buffers and
+  its reported non-unified memory support the raster/compute paths used here.
+  Hello HDR also completed its simulator frame smoke test. Ray queries remain
+  subject to their own capability check.
+- Shared-renderer tests cover GoL cell edits, magnification and pattern import,
+  2048 directional input and animated board changes, focus-loss input release,
+  and portrait/landscape render-target recreation. Native-host file requests also
+  passed centered import and full-grid export through the original file actions.
+- All 45 cached MSL stages compiled for iOS 18. Desktop GoL smoke runs passed on
+  Metal and Vulkan; desktop 2048 passed on Metal after the namespace/host changes.
+- Shader preparation includes the two games; resource copying now refreshes
+  nested shader-cache files during incremental app builds.
+
+The historical validation below describes earlier revisions; its SwiftUI-game
+and simulator-unsupported statements have been superseded by this update.
+
+---
+
 # Current integration validation (2026-09-24)
 
 The `ios-app` branch was rebased onto `main` at `b87c27c`; the previous branch tip

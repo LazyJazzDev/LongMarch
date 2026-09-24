@@ -5,6 +5,7 @@
 #include <random>
 #include <string>
 
+#include "games/DesktopGameSession.h"
 #include "grassland/graphics/graphics.h"
 
 // Window-independent adapters for the desktop graphics demos. Rendering and NBody
@@ -18,11 +19,11 @@ class DemoSession {
   void Render();
 
   grassland::graphics::Core *Core() const {
-    return core_.get();
+    return game_ ? game_->Core() : core_.get();
   }
 
   grassland::graphics::Image *Image() const {
-    return color_.get();
+    return game_ ? game_->Image() : color_.get();
   }
 
   double GPUMilliseconds() const {
@@ -36,6 +37,10 @@ class DemoSession {
   std::vector<glm::vec3> Positions() const;
   static const std::vector<std::string> &Names();
 
+  DesktopGameSession *Game() const {
+    return game_.get();
+  }
+
  private:
   void InitializeRaster();
   void InitializeNBody();
@@ -44,6 +49,7 @@ class DemoSession {
   void ResetParticles();
   std::unique_ptr<grassland::graphics::Buffer> Buffer(const void *data, size_t size);
   std::string demo_;
+  std::unique_ptr<DesktopGameSession> game_;
   std::unique_ptr<grassland::graphics::Core> core_;
   std::unique_ptr<grassland::graphics::Image> color_, depth_, texture_;
   std::unique_ptr<grassland::graphics::Sampler> sampler_;

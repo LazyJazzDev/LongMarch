@@ -7,22 +7,27 @@ and landscape are supported.
 
 ## Games
 
-2048 supports swipe controls, score/best score, win/continue and game-over/retry.
-The AI toggle (also five taps on the score) runs the desktop expectimax worker.
-The app shares movement and spawn rules with the desktop game; searches do not
-block the UI or access the spawn RNG. Best score is retained across app launches.
+Both games compile their **original desktop UI and renderer** from `demo/2048`
+and `demo/gol`: the same geometry, HLSL lighting, font outlines, supersampled
+resolve, layouts, button states and transitions. They render directly to Metal;
+SwiftUI only supplies the native view container and navigation. The games have
+separate C++ namespaces so both can live in one app without duplicate symbols.
+`graphics::HostedWindow` supplies logical/drawable sizing and input events without
+creating a GLFW window.
 
-Game of Life shares the desktop in-place update, clock, `.cells` parser and
-boundary icon animation. Tap or draw with one finger to edit, pinch to zoom, use two fingers to pan,
-and double-tap to fit. Controls include reset, pause/play, randomization, width and
-height (2–200), 1×/2×/5×/lightning speed, and periodic/fixed boundaries. Lightning
-advances exactly once per display frame. Cell updates have no fade animation.
-Boundary changes play the recorded wrapping/collision glider animation.
-The folder menu includes the desktop 295P5H1V1 spaceship and Gosper glider gun.
-Import and export use the Files picker. Import preserves larger grid dimensions,
-expands smaller ones and centers the pattern independently along each axis; it
-pauses playback and fits the view. Export preserves the full grid and dead borders.
-The mobile controls use native touch layout, rather than a GLFW window.
+2048 uses its original Clear Sans vector font, palette, moving/merging tiles,
+scoreboard, menu, new game and game-over transitions. Swipe to move; five quick
+taps on the scoreboard enable the original AI worker, and one tap stops it.
+
+Game of Life preserves the original shaded cells, pixel icons, concave/convex
+size sliders, rotating blue die, red reset, pause/play spring and boundary-glider
+animation. Tap or draw to edit, use two fingers to pan, and pinch to zoom. Its
+width/height (2–200), 1×/2×/5×/lightning speed, periodic/fixed edges and file buttons
+are the same desktop controls. Lightning advances once per rendered frame.
+Original open/save buttons launch native Files pickers; import retains larger
+axes and centers the pattern independently per dimension. Export saves the full
+grid, including dead borders. Returning from the background resets frame clocks
+so inactive time is not simulated or applied to animations.
 
 ## Graphics Hello
 
@@ -87,8 +92,7 @@ unchanged. Large scenes can still exceed a device's memory budget.
 
 - Full Xcode with iOS SDK, macOS on Apple Silicon for resource preparation.
 - iOS 18+ and a Metal device supporting tier-2 argument buffers and unified memory.
-  Sparkium additionally requires ray queries; graphics/NBody do not. The current
-  simulator may lack the required Metal capabilities; unsupported devices show an error.
+  Sparkium additionally requires ray queries; graphics/NBody do not. The simulator supports the raster/compute game path; ray-query support is checked separately.
 - CMake 3.25+, Ninja, Python 3, the existing project DXC and SPIRV-Cross installation.
   DXC and SPIRV-Cross are used **only on the Mac**, and are not linked into the app.
 - Pillow for resizing textures during packaging: `python3 -m pip install -r platforms/ios/requirements.txt`.
@@ -194,12 +198,12 @@ Set `LONGMARCH_SMOKE_DEMO=nbody_cs` (or one of the graphics module identifiers) 
 open that demo directly. After three frames it writes `DemoSmokeResult.json` to
 Documents, including device, render dimensions and frame/GPU times.
 
-Run shared game adapter checks with `build-ios-replay/mobile_games_check`.
+Run shared game adapter checks with `build-ios-replay/mobile_games_check out/ios/Resources`.
 Each scene replay also checks finite HDR output, exposure scaling and retained
 sample counts while changing display settings.
 
 The preparation build also produces `mobile_demo_check`. Resource preparation
-uses it to cache the graphics and compute shaders. Verify all nine runnable demos using:
+uses it to cache the graphics and compute shaders. Verify all eleven runnable demos using:
 
 ```sh
 build-ios-replay/mobile_demo_check out/ios/Resources all out/ios/demos-replay

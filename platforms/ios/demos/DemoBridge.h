@@ -14,6 +14,9 @@ typedef void (^DemoProgress)(double frameSeconds,
         resources:(NSURL *)resources
              demo:(NSString *)demo
          progress:(DemoProgress)progress NS_SWIFT_NAME(start(view:resources:demo:progress:));
+@property(nonatomic, copy, nullable) void (^fileRequest)(NSInteger action);
+- (void)completeFile:(NSString *)path completion:(void (^)(NSString *_Nullable error))completion;
+- (void)input:(NSInteger)kind x:(double)x y:(double)y value:(double)value;
 - (void)setHDR:(BOOL)hdr;
 - (void)setActive:(BOOL)active;
 - (void)configureParticles:(NSInteger)particles

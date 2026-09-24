@@ -31,6 +31,7 @@ with tempfile.TemporaryDirectory(prefix='sparkium-bundle-', dir=args.output.pare
     staging = Path(temp) / 'Resources'
     staging.mkdir()
     shutil.copytree(Path(__file__).resolve().parents[2] / "demo/gol/patterns", staging / "Patterns")
+    shutil.copytree(args.assets / "fonts", staging / "assets/fonts")
     data = staging / 'assets/data'
     data.mkdir(parents=True)
     shutil.copy2(args.assets / 'data/new-joe-kuo-7.21201', data)

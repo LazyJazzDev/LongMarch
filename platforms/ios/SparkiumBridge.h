@@ -32,5 +32,4 @@ NS_ASSUME_NONNULL_END
 
 #if TARGET_OS_IOS
 #import "demos/DemoBridge.h"
-#import "games/GameBridge.h"
 #endif
