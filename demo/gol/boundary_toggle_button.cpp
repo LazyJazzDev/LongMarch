@@ -21,7 +21,7 @@ Model BoundaryIcon(bool periodic) {
     triangle({left, top}, {right, bottom}, {left, bottom});
   };
   // Keep a small cell grid visible in both states. Thick walls open at their
-  // centers, where symmetric double-headed links show adjacency across edges.
+  // centers, where plain symmetric bridges show adjacency across edges.
   for (float y : {-0.22f, 0.06f})
     for (float x : {-0.22f, 0.06f})
       rect(x, y, x + 0.16f, y + 0.16f);
@@ -34,7 +34,7 @@ Model BoundaryIcon(bool periodic) {
     rect(low, -0.42f, high, -gap);
     rect(low, gap, high, 0.42f);
   }
-  // Preserve the vertex topology for the spring morph; fixed-mode arrows
+  // Preserve the vertex topology for the spring morph; fixed-mode bridges
   // collapse into the wall centers instead of fading to disconnected shapes.
   for (int axis = 0; axis < 2; ++axis) {
     for (float side : {-1.0f, 1.0f}) {
@@ -43,10 +43,8 @@ Model BoundaryIcon(bool periodic) {
         const glm::vec2 p = axis == 0 ? glm::vec2{x, y} : glm::vec2{y, x};
         return center + (periodic ? p : glm::vec2{0});
       };
-      triangle(local(-0.10f, -0.08f), local(0.10f, -0.08f), local(0.10f, 0.08f));
-      triangle(local(-0.10f, -0.08f), local(0.10f, 0.08f), local(-0.10f, 0.08f));
-      triangle(local(0.07f, -0.17f), local(0.27f, 0), local(0.07f, 0.17f));
-      triangle(local(-0.07f, 0.17f), local(-0.27f, 0), local(-0.07f, -0.17f));
+      triangle(local(-0.24f, -0.10f), local(0.24f, -0.10f), local(0.24f, 0.10f));
+      triangle(local(-0.24f, -0.10f), local(0.24f, 0.10f), local(-0.24f, 0.10f));
     }
   }
   return Model(vertices, indices);
