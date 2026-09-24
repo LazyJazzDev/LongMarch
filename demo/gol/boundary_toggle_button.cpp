@@ -19,36 +19,14 @@ Model BoundaryIcon(bool periodic) {
     triangle({left, top}, {right, top}, {right, bottom}, color);
     triangle({left, top}, {right, bottom}, {left, bottom}, color);
   };
-  // A stable, irregular 3x3 sample makes the repeated neighbors recognizable.
-  // Keep the sample unchanged while toggling so only the boundary semantics move.
-  constexpr bool cells[3][3] = {{true, false, true}, {false, true, false}, {true, true, false}};
-  constexpr float pitch = 0.28f;
-  constexpr float radius = 0.075f;
-  for (int y = -1; y <= 3; ++y) {
-    for (int x = -1; x <= 3; ++x) {
-      if (!cells[(y + 3) % 3][(x + 3) % 3])
-        continue;
-      const bool outside = x < 0 || x > 2 || y < 0 || y > 2;
-      const glm::vec2 center{(x - 1) * pitch, (y - 1) * pitch};
-      const float half_size = outside && !periodic ? 0.0f : radius;
-      const auto color =
-          outside ? glm::vec4{glm::vec3(button_palette::kNeutral) * 0.5f, 1.0f} : button_palette::kNeutral;
-      rect(center.x - half_size, center.y - half_size, center.x + half_size, center.y + half_size, color);
-    }
-  }
-  // Contiguous wall segments shrink inward and separate into fine dashes.
-  // Both states retain identical topology for the reversible spring morph.
-  const float outer = periodic ? 0.425f : 0.62f;
-  const float thickness = periodic ? 0.055f : 0.20f;
-  const float gap = periodic ? 0.04f : 0.0f;
+  // The solid enclosure opens four portals without arrows or extra marks.
+  const float gap = periodic ? 0.30f : 0.0f;
   for (float side : {-1.0f, 1.0f}) {
-    const float low = side < 0 ? -outer : outer - thickness;
-    for (int segment = 0; segment < 4; ++segment) {
-      const float start = -outer + segment * outer * 0.5f + gap;
-      const float end = -outer + (segment + 1) * outer * 0.5f - gap;
-      rect(start, low, end, low + thickness, button_palette::kNeutral);
-      rect(low, start, low + thickness, end, button_palette::kNeutral);
-    }
+    const float low = side < 0 ? -0.62f : 0.42f;
+    rect(-0.62f, low, -gap, low + 0.20f, button_palette::kNeutral);
+    rect(gap, low, 0.62f, low + 0.20f, button_palette::kNeutral);
+    rect(low, -0.42f, low + 0.20f, -gap, button_palette::kNeutral);
+    rect(low, gap, low + 0.20f, 0.42f, button_palette::kNeutral);
   }
   return Model(vertices, indices);
 }
@@ -57,6 +35,8 @@ Model BoundaryIcon(bool periodic) {
 BoundaryToggleButton::BoundaryToggleButton(Application *app, DeviceModel *background)
     : Button(app, 0, 0, 1, 1),
       background_(background) {
+  cell_model_ = std::make_unique<DeviceModel>(
+      app, Model(ComposeVertices({{-1, -1}, {1, -1}, {1, 1}, {-1, 1}}, glm::vec4{1.0f}), {0, 1, 2, 0, 2, 3}));
   auto fixed = BoundaryIcon(false);
   auto periodic = BoundaryIcon(true);
   icon_ = std::make_unique<MixModel>(std::vector<std::vector<Vertex>>{fixed.Vertices(), periodic.Vertices()},
@@ -73,6 +53,13 @@ void BoundaryToggleButton::Update(float seconds) {
   morph_ = target + (offset + impulse * dt) * decay;
   velocity_ = (velocity_ - 24.0f * impulse * dt) * decay;
   device_icon_->UploadVertices(icon_->GetModel(std::clamp(morph_, 0.0f, 1.0f), MixStyle::kLinear).Vertices());
+  if (demo_active_) {
+    demo_time_ += dt;
+    if (demo_time_ >= 2.8f) {
+      demo_active_ = false;
+      demo_time_ = 0.0f;
+    }
+  }
   hover_.Update(dt * 10.0f);
 }
 
@@ -82,10 +69,35 @@ void BoundaryToggleButton::Draw() {
                                         button_palette::Background().GetValue(float(hover_)), glm::uvec4{1, 0, 0, 0}});
   application_->DrawModel(device_icon_.get(),
                           {GetModelMatrix(origin, size, 0.4f), glm::vec4{1.0f}, glm::uvec4{1, 0, 0, 0}});
+  // A 4x4-sized torus shows the five-cell silhouette crossing opposite edges.
+  // This is an explanatory translation, not a second Life simulation: actual
+  // evolution on such a tiny torus would interfere with the glider itself.
+  constexpr glm::vec2 cells[] = {{0, -1}, {1, 0}, {-1, 1}, {0, 1}, {1, 1}};
+  constexpr float extent = 0.40f;
+  constexpr float period = extent * 2.0f;
+  const float progress = demo_active_ ? std::clamp((demo_time_ - 0.3f) / 2.5f, 0.0f, 1.0f) : 0.0f;
+  const float travel = progress * progress * (3.0f - 2.0f * progress) * period;
+  const glm::vec2 center = origin + size * 0.5f;
+  for (const auto cell : cells) {
+    for (int y = -1; y <= 1; ++y) {
+      for (int x = -1; x <= 1; ++x) {
+        const auto p = cell * 0.20f + glm::vec2{travel} + glm::vec2{x, y} * period;
+        const auto lo = glm::max(p - glm::vec2{0.075f}, glm::vec2{-extent});
+        const auto hi = glm::min(p + glm::vec2{0.075f}, glm::vec2{extent});
+        if (lo.x >= hi.x || lo.y >= hi.y)
+          continue;
+        application_->DrawModel(cell_model_.get(),
+                                {GetModelMatrix(center + lo * size * 0.5f, (hi - lo) * size * 0.5f, 0.4f),
+                                 button_palette::kNeutral, glm::uvec4{1, 0, 0, 0}});
+      }
+    }
+  }
 }
 
 void BoundaryToggleButton::OnClick() {
   mode_ = mode_ == BoundaryMode::kPeriodic ? BoundaryMode::kFixed : BoundaryMode::kPeriodic;
+  demo_active_ = mode_ == BoundaryMode::kPeriodic;
+  demo_time_ = 0.0f;
 }
 
 void BoundaryToggleButton::OnStateChange(int state) {

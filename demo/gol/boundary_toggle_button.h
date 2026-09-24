@@ -23,6 +23,9 @@ class BoundaryToggleButton : public Button {
   DeviceModel *background_;
   std::unique_ptr<MixModel> icon_;
   std::unique_ptr<DeviceModel> device_icon_;
+  std::unique_ptr<DeviceModel> cell_model_;
+  bool demo_active_{};
+  float demo_time_{};
   AnimationVar hover_{0.0f, AnimationStyle::kPower5};
   float morph_{1.0f};
   float velocity_{};

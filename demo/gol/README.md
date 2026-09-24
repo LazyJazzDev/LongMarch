@@ -18,9 +18,11 @@ speed (1x, 2x, 5x, lightning), clear the grid, and randomize it with the dice bu
 Lightning mode shows a warm yellow bolt and advances exactly one generation per
 frame while playing, without an additional iteration delay. Simulation speed
 therefore follows the frame rate, with input and rendering between generations.
-The boundary button next to speed toggles between **periodic** (an inward dashed boundary with half-bright wrapped neighbors,
-the default) and **fixed/dead** (a sparse 3x3 grid enclosed by solid walls) boundaries. Its icon morphs
-smoothly without resetting the grid or interrupting playback.
+The boundary button next to speed toggles between **periodic** (four open portals,
+the default) and **fixed/dead** (a solid enclosure). A five-cell glider sits at
+its center. Switching to periodic opens the wall, then plays one illustrative
+wraparound trip before the glider rests at the center again. This icon animation
+does not evolve or reset the main grid or interrupt playback.
 The die has six separated rounded faces with cut-out pips. Each click tumbles it
 in 3D and lands on a randomly chosen different face, tilted toward the viewer.
 Each click independently gives every cell a 50% chance of being alive; the
