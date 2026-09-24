@@ -30,12 +30,14 @@
   BOOL _gameView, _gameSleeping;
   uint64_t _wakeRevision, _inputRevision;
   NSInteger _idleSmokeStage;
+  std::atomic<int> _presentInFlight;
   double _benchmarkSeconds, _benchmarkRenderSeconds, _benchmarkStart;
 }
 
 - (instancetype)init {
   if ((self = [super init])) {
     _generation = 0;
+    _presentInFlight = 0;
     _particles = 4096;
     _galaxies = 10;
     _deltaTime = .03f;
@@ -126,16 +128,25 @@
   });
 }
 
-// Only a requested game frame wakes the view; no display-link polling while idle.
+// Use the display link for animation pacing, and one-shot timers only for
+// slower simulation deadlines. Dispatch timers are not accurate frame clocks.
 - (void)scheduleGameFrame:(double)delay {
   uint64_t wake = ++_wakeRevision;
-  if (!_active || !_gameView || !std::isfinite(delay))
+  if (!_gameView)
     return;
-  dispatch_after(dispatch_time(DISPATCH_TIME_NOW, int64_t(std::max(0.0, delay) * NSEC_PER_SEC)),
-                 dispatch_get_main_queue(), ^{
-                   if (wake == self->_wakeRevision && self->_active && !self->_busy)
-                     [self->_view draw];
-                 });
+  if (!_active || !std::isfinite(delay)) {
+    _view.paused = YES;
+    return;
+  }
+  if (delay <= 1.0 / 60.0) {
+    _view.paused = NO;
+    return;
+  }
+  _view.paused = YES;
+  dispatch_after(dispatch_time(DISPATCH_TIME_NOW, int64_t(delay * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
+    if (wake == self->_wakeRevision && self->_active && !self->_busy)
+      [self->_view draw];
+  });
 }
 
 - (void)wakeGame {
@@ -238,6 +249,10 @@
 - (void)drawInMTKView:(MTKView *)view {
   if (!_active || _busy || _failed)
     return;
+  if (_gameView && _presentInFlight >= 2) {
+    [self scheduleGameFrame:1.0 / 120.0];
+    return;
+  }
   id<CAMetalDrawable> drawable = view.currentDrawable;
   if (!drawable) {
     if (_gameView)
@@ -302,10 +317,30 @@
           [encoder drawPrimitives:MTLPrimitiveTypeTriangle vertexStart:0 vertexCount:3];
           [encoder endEncoding];
           [command presentDrawable:drawable];
-          [command commit];
-          [command waitUntilCompleted];
-          if (command.error)
-            throw std::runtime_error(command.error.localizedDescription.UTF8String);
+          if (self->_session->Game()) {
+            // The presentation and game commands share one ordered Metal queue.
+            // The next frame may update CPU state while this one is presenting;
+            // Metal retains the encoded textures/pipeline until completion.
+            ++self->_presentInFlight;
+            [command addCompletedHandler:^(id<MTLCommandBuffer> completed) {
+              --self->_presentInFlight;
+              if (completed.error) {
+                NSString *message = completed.error.localizedDescription;
+                dispatch_async(dispatch_get_main_queue(), ^{
+                  if (self->_generation == generation) {
+                    self->_failed = YES;
+                    progress(0, 0, 0, @"—", width, height, 0, message);
+                  }
+                });
+              }
+            }];
+            [command commit];
+          } else {
+            [command commit];
+            [command waitUntilCompleted];
+            if (command.error)
+              throw std::runtime_error(command.error.localizedDescription.UTF8String);
+          }
           seconds = std::chrono::duration<double>(std::chrono::steady_clock::now() - start).count();
           gpuMS = self->_session->GPUMilliseconds();
           frames = ++self->_frames;
@@ -345,7 +380,7 @@
                 @"frames" : @60,
                 @"width" : @(width),
                 @"height" : @(height),
-                @"mean_frame_ms" : @(self->_benchmarkSeconds * 1000 / 60),
+                @"mean_submit_ms" : @(self->_benchmarkSeconds * 1000 / 60),
                 @"mean_render_submit_ms" : @(self->_benchmarkRenderSeconds * 1000 / 60),
                 @"fps" : @(60 / (CACurrentMediaTime() - self->_benchmarkStart))
               };

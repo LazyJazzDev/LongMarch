@@ -245,11 +245,14 @@ HDR particle brightness conversion. Its HDR switch preserves simulation state.
 The shared game UI exposes its next frame deadline. The iOS host stops the
 MTKView display loop while a board is still, wakes on input/resize/focus/file
 completion, and schedules normal Life generations at their simulation deadlines.
-Animations and lightning mode retain a 60 Hz frame budget; lightning advances
+Animations and lightning mode use the native 60 Hz display link;
+only slower simulation deadlines use one-shot timers; lightning advances
 one generation per rendered frame. Hosted surfaces cap supersampling at 2x per axis to preserve rounded edges,
 and allocate the second full-screen color target only when an overlay transition
 uses it. At 1x sampling, frames without overlays bypass the resolve pass; the presentation command uses the same ordered Metal
 queue without a redundant wait between game rendering and presentation.
+Presentation completion is asynchronous with at most two game frames in flight;
+Metal queue ordering protects shared textures and completion handlers report errors.
 
 `mobile_games_check` checks idle/animation transitions and Life deadlines.
 For device idle/wake checks, launch a game with `LONGMARCH_SMOKE_DEMO=gol` (or
@@ -260,7 +263,8 @@ input. These are rendering-work checks, not battery-life measurements.
 Large Life grids use a four-vertex cell quad with the original eighth-power
 rounded contour evaluated in the fragment shader, replacing 120 triangles per
 cell. Fully clipped cells are culled on the CPU and placement matrices are
-cached across frames. Only the small list of contiguous drawing batches is
+cached across frames. Settled cell appearance is cached as well, avoiding
+repeated interpolation for unchanged cells. Only the small list of contiguous drawing batches is
 sorted; the 40,000 instance records retain their original storage order. Input dispatch uses contiguous listener snapshots and
 only rechecks membership if a callback changes the listener set.
 
@@ -271,3 +275,9 @@ with `LONGMARCH_SMOKE_DEMO=gol`, `LONGMARCH_SMOKE_GOL_SIZE=200` and
 Documents/BenchmarkResult.json. After frame 70 the benchmark resumes normal simulation scheduling. Set
 `LONGMARCH_SMOKE_AUTORUN=1` to record frame counts over two input-free seconds
 in Documents/AutorunSmoke.json and verify timer-driven updates.
+
+Device benchmark FPS uses wall-clock elapsed time; submission timings exclude
+asynchronous presentation completion.
+
+The serial native render queue uses foreground interactive QoS for visible
+frames; idle games still schedule no work.
