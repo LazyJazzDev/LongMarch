@@ -82,6 +82,7 @@ private final class GameCanvasView: UIView {
   private weak var lockedScene: UIWindowScene?
   private var entryOrientation: UIInterfaceOrientation = .portrait
   private var iconAngle: CGFloat?
+  private var bottomControlInset: CGFloat?
 
   override init(frame: CGRect) {
     super.init(frame: frame)
@@ -92,6 +93,25 @@ private final class GameCanvasView: UIView {
   override func layoutSubviews() {
     super.layoutSubviews()
     metal.frame = bounds
+    if metal.life, let window, bounds.height > 0 {
+      // Read the window inset: this view deliberately ignores SwiftUI safe
+      // areas so its own inset can be zero. Keep an extra finger-sized gap.
+      let safeBottom = convert(
+        CGPoint(x: window.bounds.midX, y: window.bounds.maxY - window.safeAreaInsets.bottom),
+        from: window
+      ).y
+      let homeInset = max(0, bounds.maxY - safeBottom)
+      let fraction = homeInset > 0 ? (homeInset + 12) / bounds.height : 0
+      if bottomControlInset != fraction {
+        bottomControlInset = fraction
+        metal.renderer.setGameBottomControlInset(Float(fraction))
+      }
+    }
+  }
+
+  override func safeAreaInsetsDidChange() {
+    super.safeAreaInsetsDidChange()
+    setNeedsLayout()
   }
 
   override func didMoveToWindow() {
@@ -188,7 +208,13 @@ private final class GameCanvasView: UIView {
     scene.requestGeometryUpdate(.iOS(interfaceOrientations: requested)) { _ in rejected = true }
     DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { [weak self] in
       guard let self, self.lockedScene === scene else { return }
+      var gestureController = self.window?.rootViewController
+      while let child = gestureController?.childForScreenEdgesDeferringSystemGestures {
+        gestureController = child
+      }
       let result: [String: Any] = [
+        "defers_bottom_gestures": gestureController?.preferredScreenEdgesDeferringSystemGestures
+          .contains(.bottom) ?? false,
         "rotation_rejected": rejected,
         "interface_unchanged": scene.interfaceOrientation == before,
         "bounds_unchanged": self.bounds == beforeBounds,
@@ -197,6 +223,8 @@ private final class GameCanvasView: UIView {
           self.convert(self.bounds, to: $0).integral == $0.bounds.integral
         } ?? false,
         "icon_angle": self.iconAngle ?? 0,
+        "bottom_control_margin_points": (self.bottomControlInset ?? 0) * self.bounds.height,
+        "window_bottom_safe_area_points": self.window?.safeAreaInsets.bottom ?? 0,
       ]
       let url = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
         .appendingPathComponent("OrientationSmoke.json")
@@ -327,6 +355,7 @@ struct GamesView: View {
           .background(.black.opacity(0.45), in: Capsule())
           .padding(.top, 4)
         }
+        .defersSystemGestures(on: .bottom)
       } else {
         VStack(spacing: 0) {
           HStack {

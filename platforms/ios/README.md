@@ -32,6 +32,10 @@ notifications rotate only the button icons with a short animation; the page,
 button positions, sliders, grid and touch coordinates stay fixed, with no system
 window-rotation animation. Flat/unknown directions preserve the last icon angle.
 Leaving GoL restores normal interface rotation for the browser and other demos.
+GoL defers bottom-edge system gestures and keeps the lower controls above the
+window's home-indicator safe area plus 12 points. The canvas still fills the
+screen. This reduces accidental Home gestures; iOS still allows users to leave
+the app and does not permit ordinary apps to disable Home navigation entirely.
 Original open/save buttons launch native Files pickers; import retains larger
 axes and centers the pattern independently per dimension. Export saves the full
 grid, including dead borders. Returning from the background resets frame clocks

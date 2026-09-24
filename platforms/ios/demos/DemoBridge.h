@@ -19,6 +19,7 @@ typedef void (^DemoProgress)(double frameSeconds,
 - (void)input:(NSInteger)kind x:(double)x y:(double)y value:(double)value;
 - (void)setHDR:(BOOL)hdr;
 - (void)setGameIconRotation:(float)radians;
+- (void)setGameBottomControlInset:(float)heightFraction;
 - (void)setActive:(BOOL)active;
 - (void)configureParticles:(NSInteger)particles
                   galaxies:(NSInteger)galaxies

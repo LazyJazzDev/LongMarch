@@ -83,3 +83,8 @@ void DesktopGameSession::SetIconOrientation(float radians) {
   if (life_)
     life_->SetIconOrientation(radians);
 }
+
+void DesktopGameSession::SetBottomControlInset(float height_fraction) {
+  if (life_)
+    life_->SetBottomControlInset(height_fraction);
+}
