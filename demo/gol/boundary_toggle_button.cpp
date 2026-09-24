@@ -10,33 +10,43 @@ Model BoundaryIcon(bool periodic) {
   std::vector<Vertex> vertices;
   std::vector<uint32_t> indices;
   const glm::vec4 color = periodic ? glm::vec4{0.40f, 0.53f, 0.54f, 1.0f} : button_palette::kNeutral;
-  auto point = [periodic](float angle) {
-    glm::vec2 p{std::cos(angle), std::sin(angle)};
-    return p * (periodic ? 0.52f : 0.48f / std::max(std::abs(p.x), std::abs(p.y)));
-  };
   auto triangle = [&](glm::vec2 a, glm::vec2 b, glm::vec2 c) {
     const uint32_t start = vertices.size();
     auto v = ComposeVertices({a, b, c}, color);
     vertices.insert(vertices.end(), v.begin(), v.end());
     indices.insert(indices.end(), {start, start + 1, start + 2});
   };
-  // The square enclosure opens into two curved arrows, retaining mesh topology
-  // so rapid toggles can reverse the same continuous morph.
-  for (int half = 0; half < 2; ++half) {
-    const float start = half * glm::pi<float>() + (periodic ? 0.22f : 0.0f);
-    const float end = (half + 1) * glm::pi<float>() - (periodic ? 0.22f : 0.0f);
-    for (int i = 0; i < 24; ++i) {
-      const auto a = point(glm::mix(start, end, i / 24.0f));
-      const auto b = point(glm::mix(start, end, (i + 1) / 24.0f));
-      triangle(a * 0.87f, a * 1.13f, b * 1.13f);
-      triangle(a * 0.87f, b * 1.13f, b * 0.87f);
+  auto rect = [&](float left, float top, float right, float bottom) {
+    triangle({left, top}, {right, top}, {right, bottom});
+    triangle({left, top}, {right, bottom}, {left, bottom});
+  };
+  // Keep a small cell grid visible in both states. Thick walls open at their
+  // centers, where paired arrows cross opposite edges in the same direction.
+  for (float y : {-0.22f, 0.06f})
+    for (float x : {-0.22f, 0.06f})
+      rect(x, y, x + 0.16f, y + 0.16f);
+  const float gap = periodic ? 0.22f : 0.0f;
+  for (float side : {-1.0f, 1.0f}) {
+    const float low = side < 0 ? -0.62f : 0.42f;
+    const float high = low + 0.20f;
+    rect(-0.62f, low, -gap, high);
+    rect(gap, low, 0.62f, high);
+    rect(low, -0.42f, high, -gap);
+    rect(low, gap, high, 0.42f);
+  }
+  // Preserve the vertex topology for the spring morph; fixed-mode arrows
+  // collapse into the wall centers instead of fading to disconnected shapes.
+  for (int axis = 0; axis < 2; ++axis) {
+    for (float side : {-1.0f, 1.0f}) {
+      const glm::vec2 center = axis == 0 ? glm::vec2{side * 0.52f, 0} : glm::vec2{0, side * 0.52f};
+      auto local = [&](float x, float y) {
+        const glm::vec2 p = axis == 0 ? glm::vec2{x, y} : glm::vec2{y, x};
+        return center + (periodic ? p : glm::vec2{0});
+      };
+      triangle(local(-0.25f, -0.08f), local(0.03f, -0.08f), local(0.03f, 0.08f));
+      triangle(local(-0.25f, -0.08f), local(0.03f, 0.08f), local(-0.25f, 0.08f));
+      triangle(local(-0.01f, -0.19f), local(0.25f, 0), local(-0.01f, 0.19f));
     }
-    const auto tip = point(end);
-    const glm::vec2 tangent{-std::sin(end), std::cos(end)};
-    const glm::vec2 radial{std::cos(end), std::sin(end)};
-    const float size = periodic ? 1.0f : 0.0f;
-    triangle(tip + tangent * (0.19f * size), tip - tangent * (0.08f * size) + radial * (0.18f * size),
-             tip - tangent * (0.08f * size) - radial * (0.18f * size));
   }
   return Model(vertices, indices);
 }
