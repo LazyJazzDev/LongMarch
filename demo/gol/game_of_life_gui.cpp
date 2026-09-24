@@ -175,11 +175,9 @@ void GameOfLife::CustomOnUpdate() {
   open_button_->Update(delta_time);
   save_button_->Update(delta_time);
 
-  simulation_clock_.Advance(
-      delta_time, pause_play_button_->IsPlaying() && file_action_ == FileAction::kNone,
-      speed_toggle_button_->SpeedLevel(),
-      [this] { update_step(cell_grid_width_, cell_grid_height_, cell_grid_.data()); },
-      [] { return grassland::GetTimeSeconds(); });
+  simulation_clock_.Advance(delta_time, pause_play_button_->IsPlaying() && file_action_ == FileAction::kNone,
+                            speed_toggle_button_->SpeedLevel(),
+                            [this] { update_step(cell_grid_width_, cell_grid_height_, cell_grid_.data()); });
 
   // Synchronize after stepping so the new generation is visible in this frame.
   for (auto &cell : cell_button_grid_)
