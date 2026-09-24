@@ -24,6 +24,11 @@ size sliders, rotating blue die, red reset, pause/play spring and boundary-glide
 animation. Tap or draw to edit, use two fingers to pan, and pinch to zoom. Its
 width/height (2–200), 1×/2×/5×/lightning speed, periodic/fixed edges and file buttons
 are the same desktop controls. Lightning advances once per rendered frame.
+Sidebars follow the window's long edges rather than the grid aspect ratio. On
+iPhone, the canvas stays in physical portrait coordinates as the interface
+rotates: buttons, sliders and cells keep their physical placement, while button
+icons turn upright with a short animation. UIKit converts touch and gesture
+positions into that same canvas, and rotation cancels an in-progress drag.
 Original open/save buttons launch native Files pickers; import retains larger
 axes and centers the pattern independently per dimension. Export saves the full
 grid, including dead borders. Returning from the background resets frame clocks
@@ -275,6 +280,9 @@ with `LONGMARCH_SMOKE_DEMO=gol`, `LONGMARCH_SMOKE_GOL_SIZE=200` and
 Documents/BenchmarkResult.json. After frame 70 the benchmark resumes normal simulation scheduling. Set
 `LONGMARCH_SMOKE_AUTORUN=1` to record frame counts over two input-free seconds
 in Documents/AutorunSmoke.json and verify timer-driven updates.
+`LONGMARCH_SMOKE_ORIENTATION=left|right|portrait` requests a real interface
+rotation for simulator checks. `mobile_games_check` also verifies that rotating
+icons leaves grid pixels unchanged and returns the paused renderer to idle.
 
 Device benchmark FPS uses wall-clock elapsed time; submission timings exclude
 asynchronous presentation completion.

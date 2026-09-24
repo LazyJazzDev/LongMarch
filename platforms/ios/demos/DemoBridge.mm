@@ -154,6 +154,15 @@
   [self scheduleGameFrame:0];
 }
 
+- (void)setGameIconRotation:(float)radians {
+  const uint64_t generation = _generation;
+  [self wakeGame];
+  dispatch_async(LongMarchRenderQueue(), ^{
+    if (self->_generation == generation && self->_session && self->_session->Game())
+      self->_session->Game()->SetIconOrientation(radians);
+  });
+}
+
 - (void)setHDR:(BOOL)hdr {
   _hdr = hdr;
   if ([_demo isEqualToString:@"graphics_hello_hdr"] || [_demo isEqualToString:@"nbody_cs"])

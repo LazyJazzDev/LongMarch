@@ -48,8 +48,8 @@ private final class GameMetalView: MTKView {
     }
   }
   override func touchesCancelled(_ touches: Set<UITouch>, with event: UIEvent?) { cancelPointer() }
-  private func cancelPointer() {
-    if pointerDown {
+  fileprivate func cancelPointer(force: Bool = false) {
+    if pointerDown || force {
       renderer.input(5, x: 0, y: 0, value: 0)
       renderer.input(5, x: 0, y: 0, value: 1)
       pointerDown = false
@@ -71,6 +71,58 @@ private final class GameMetalView: MTKView {
       send(0, point)
     } else {
       send(2, point, 1)
+    }
+  }
+}
+
+// Keep Life's canvas in the phone's physical portrait coordinates. UIKit maps
+// touches into the transformed Metal view, including pinch and two-finger pan.
+private final class GameCanvasView: UIView {
+  let metal = GameMetalView(frame: .zero, device: nil)
+  private var canvasAngle: CGFloat?
+  override init(frame: CGRect) {
+    super.init(frame: frame)
+    addSubview(metal)
+  }
+  required init?(coder: NSCoder) { fatalError() }
+  override func layoutSubviews() {
+    super.layoutSubviews()
+    var angle: CGFloat = 0
+    if metal.life {
+      switch window?.windowScene?.interfaceOrientation {
+      case .landscapeLeft: angle = -.pi / 2
+      case .landscapeRight: angle = .pi / 2
+      case .portraitUpsideDown: angle = .pi
+      default: break
+      }
+    }
+    if canvasAngle != angle {
+      metal.cancelPointer(force: true)
+      metal.renderer.setGameIconRotation(Float(-angle))
+      canvasAngle = angle
+    }
+    let sideways = abs(sin(angle)) > 0.5
+    metal.bounds = CGRect(
+      origin: .zero,
+      size: sideways
+        ? CGSize(width: bounds.height, height: bounds.width) : bounds.size)
+    metal.center = CGPoint(x: bounds.midX, y: bounds.midY)
+    metal.transform = CGAffineTransform(rotationAngle: angle)
+  }
+  override func didMoveToWindow() {
+    super.didMoveToWindow()
+    setNeedsLayout()
+    // Exercise real scene rotation in headless simulator smoke runs.
+    if let direction = ProcessInfo.processInfo.environment["LONGMARCH_SMOKE_ORIENTATION"],
+      let scene = window?.windowScene
+    {
+      let orientation: UIInterfaceOrientationMask =
+        direction == "left"
+        ? .landscapeLeft
+        : direction == "right" ? .landscapeRight : .portrait
+      DispatchQueue.main.async {
+        scene.requestGeometryUpdate(.iOS(interfaceOrientations: orientation))
+      }
     }
   }
 }
@@ -135,8 +187,9 @@ private struct DesktopGameView: UIViewRepresentable {
     }
   }
   func makeCoordinator() -> Coordinator { Coordinator() }
-  func makeUIView(context: Context) -> GameMetalView {
-    let view = GameMetalView(frame: .zero, device: nil)
+  func makeUIView(context: Context) -> GameCanvasView {
+    let canvas = GameCanvasView(frame: .zero)
+    let view = canvas.metal
     view.life = life
     context.coordinator.view = view
     context.coordinator.error = { status(0, $0) }
@@ -147,11 +200,13 @@ private struct DesktopGameView: UIViewRepresentable {
     view.renderer.start(view: view, resources: resources, demo: life ? "gol" : "2048") {
       _, _, fps, _, _, _, _, error in status(fps, error)
     }
-    return view
+    return canvas
   }
-  func updateUIView(_ view: GameMetalView, context: Context) { view.renderer.setActive(active) }
-  static func dismantleUIView(_ view: GameMetalView, coordinator: Coordinator) {
-    view.renderer.stop()
+  func updateUIView(_ view: GameCanvasView, context: Context) {
+    view.metal.renderer.setActive(active)
+  }
+  static func dismantleUIView(_ view: GameCanvasView, coordinator: Coordinator) {
+    view.metal.renderer.stop()
   }
 }
 struct GamesView: View {

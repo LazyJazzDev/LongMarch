@@ -18,6 +18,7 @@ typedef void (^DemoProgress)(double frameSeconds,
 - (void)completeFile:(NSString *)path completion:(void (^)(NSString *_Nullable error))completion;
 - (void)input:(NSInteger)kind x:(double)x y:(double)y value:(double)value;
 - (void)setHDR:(BOOL)hdr;
+- (void)setGameIconRotation:(float)radians;
 - (void)setActive:(BOOL)active;
 - (void)configureParticles:(NSInteger)particles
                   galaxies:(NSInteger)galaxies

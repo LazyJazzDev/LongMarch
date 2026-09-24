@@ -18,6 +18,7 @@ class DesktopGameSession {
   void ResetClock();
   void PrepareInput(bool sleeping);
   void Resize(int width, int height);
+  void SetIconOrientation(float radians);
   grassland::graphics::Core *Core() const;
   grassland::graphics::Image *Image() const;
   grassland::graphics::Window *Window() const;

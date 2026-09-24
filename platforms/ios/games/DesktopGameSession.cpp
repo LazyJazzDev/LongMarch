@@ -78,3 +78,8 @@ void DesktopGameSession::PrepareInput(bool sleeping) {
   else if (life_)
     life_->ResetAnimationClock();
 }
+
+void DesktopGameSession::SetIconOrientation(float radians) {
+  if (life_)
+    life_->SetIconOrientation(radians);
+}

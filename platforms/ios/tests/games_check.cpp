@@ -1,6 +1,7 @@
 #include <algorithm>
 #include <chrono>
 #include <cmath>
+#include <glm/gtc/constants.hpp>
 #include <iostream>
 #include <thread>
 
@@ -84,6 +85,19 @@ int main(int argc, char **argv) {
       Check(window->IsHosted() && window->GetFramebufferSize() == glm::ivec2(640, 800), "Hosted resize failed");
       window->CursorEnterEvent().InvokeCallbacks(true);
       if (std::string(name) == "gol") {
+        game.Game()->SetIconOrientation(glm::half_pi<float>());
+        Check(game.Game()->NextFrameDelay() == 0, "Orientation failed to wake paused Life");
+        Settle(game);
+        const auto rotated = Pixels(game);
+        Check(rotated != before, "Orientation did not rotate button icons");
+        for (int y = 0; y < 800; ++y)
+          for (int x = 128; x < 512; ++x)
+            for (int c = 0; c < 4; ++c)
+              Check(rotated[(y * 640 + x) * 4 + c] == before[(y * 640 + x) * 4 + c],
+                    "Icon rotation changed the grid or its background");
+        Check(std::isinf(game.Game()->NextFrameDelay()), "Orientation animation did not return to idle");
+        game.Game()->SetIconOrientation(0);
+        Settle(game);
         window->SendPointer(327, 407);
         window->SendMouseButton(GLFW_MOUSE_BUTTON_LEFT, GLFW_PRESS);
         window->SendMouseButton(GLFW_MOUSE_BUTTON_LEFT, GLFW_RELEASE);
