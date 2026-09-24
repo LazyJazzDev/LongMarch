@@ -1,3 +1,45 @@
+# Current integration validation (2026-09-24)
+
+The `ios-app` branch was rebased onto `main` at `b87c27c`; the previous branch tip
+is retained in `backup/ios-app-before-main-rebase-20260924`. The repeated Blender
+and project-conventions commits were omitted because their changes are in main.
+
+- Ninja Release: unsigned arm64 iOS app and arm64 iOS Simulator app built.
+- Simulator (iPhone 18 Pro / iOS 27): installed and launched 2048 and Game of Life;
+  inspected their native layouts. The simulator rejects the backend's required
+  Metal capabilities with the expected visible error. It cannot validate HDR
+  screen brightness. The registered physical iPhone was unavailable.
+- macOS offline replay (Apple M5): all 9 bundled scenes matched preparation PNGs
+  byte-for-byte at 128 pixels / 2 spp. Cornell Box also passed 256 pixels / 32 spp.
+  Missing/corrupt shader caches produced the expected errors.
+- Float HDR output remained finite, including values above 1 (up to 19.70 in the
+  sampled scenes). Exposure +1 EV doubled linear pixel values while retaining
+  accumulated sample counts.
+- Actual Objective-C++ render-controller tests passed sample-limit changes,
+  pause/resume, film reset, superseded scene selection, HDR/SDR output formats and
+  redeveloping the paused film after the sample limit.
+- All 9 runnable graphics/compute adapters passed macOS GPU replay: Triangle,
+  Texture, Blend, Resize, SDR Sample, Cube, HDR, Ray Query and NBody. NBody checks
+  cover motion, pause and successive resets; Resize covers target recreation.
+- All 39 cached MSL stages compiled for `air64-apple-ios18.0`.
+- Shared mobile game adapter checks passed centered import/full-grid export,
+  periodic/fixed edges, one lightning generation per frame, pause, invalid import
+  preservation, dimensions, 2048 merge/score/win/continue/reset, and 1000 AI-model
+  comparisons. Five texture packaging unit tests passed.
+- Desktop `demo_gol`, `demo_2048` and `demo_graphics_hello` targets rebuilt against
+  the rebased graphics library.
+
+Generated resources: `out/ios/Resources-main-20260924` (not committed).
+Current app builds: `build-ios-device-ninja/LongMarch.app` and
+`build-ios-simulator-ninja/LongMarch.app`. These are local build paths, not release
+artifacts. Signing and HDR display brightness on a physical device remain untested
+in this update. Simulator snapshots are temporary layout checks, not PR images.
+
+---
+
+The following records describe earlier revisions of the iOS branch and do not
+replace the current validation above.
+
 # Initial iOS port validation
 
 Validated on an Apple M5 Mac with Xcode 27.0 (27A266a), iOS 27 SDK and an

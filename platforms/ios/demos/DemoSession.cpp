@@ -8,40 +8,51 @@
 #include "demo/nbody_cs/params.h"
 #include "grassland/graphics/backend/metal/metal_command_context.h"
 #include "grassland/graphics/shader_cache.h"
+
 namespace {
 #include "demo_shaders.inl"
+
 struct ColorVertex {
   glm::vec3 position, color;
 };
+
 struct BlendVertex {
   glm::vec3 position;
   glm::vec4 color;
 };
+
 struct TextureVertex {
   glm::vec3 position;
   glm::vec2 uv;
 };
+
 struct CubeUniform {
   glm::mat4 model, view, projection;
 };
+
 struct ParticleUniform {
   glm::mat4 world_to_screen, camera_to_world;
   float size;
   int hdr;
 };
+
 struct ParticleSettings {
   int count;
   float delta_time, gravity;
 };
 }  // namespace
+
 using namespace grassland;
 using namespace grassland::graphics;
+
 const std::vector<std::string> &DemoSession::Names() {
-  static const std::vector<std::string> names{"graphics_hello_triangle",   "graphics_hello_texture",
-                                              "graphics_hello_blend",      "graphics_hello_resize",
-                                              "graphics_hello_sdr_sample", "nbody_cs"};
+  static const std::vector<std::string> names{
+      "graphics_hello_triangle", "graphics_hello_texture",    "graphics_hello_blend",
+      "graphics_hello_resize",   "graphics_hello_sdr_sample", "graphics_hello_cube",
+      "graphics_hello_hdr",      "graphics_hello_ray_query",  "nbody_cs"};
   return names;
 }
+
 DemoSession::DemoSession(const std::filesystem::path &resources, const std::string &demo, bool prepare) : demo_(demo) {
   if (std::find(Names().begin(), Names().end(), demo) == Names().end())
     throw std::invalid_argument("Unknown graphics demo");
@@ -52,15 +63,19 @@ DemoSession::DemoSession(const std::filesystem::path &resources, const std::stri
   core_->CreateImage(width_, height_, IMAGE_FORMAT_R32G32B32A32_SFLOAT, &color_);
   if (demo_ == "nbody_cs")
     InitializeNBody();
+  else if (demo_ == "graphics_hello_ray_query")
+    InitializeRayQuery();
   else
     InitializeRaster();
 }
+
 DemoSession::~DemoSession() {
   try {
     core_->WaitGPU();
   } catch (...) {
   }
 }
+
 std::unique_ptr<Buffer> DemoSession::Buffer(const void *data, size_t size) {
   std::unique_ptr<graphics::Buffer> result;
   core_->CreateBuffer(size, BUFFER_TYPE_STATIC, &result);
@@ -68,12 +83,15 @@ std::unique_ptr<Buffer> DemoSession::Buffer(const void *data, size_t size) {
     result->UploadData(data, size);
   return result;
 }
+
 void DemoSession::InitializeRaster() {
   auto vfs = GetShaderVirtualFileSystem();
-  auto shader = demo_ + "/shaders/shader.hlsl";
+  auto shader =
+      "graphics_hello/modules/" + demo_.substr(std::string("graphics_hello_").size()) + "/shaders/shader.hlsl";
   core_->CreateShader(vfs, shader, "VSMain", "vs_6_0", &vertex_);
   core_->CreateShader(vfs, shader, "PSMain", "ps_6_0", &fragment_);
-  bool texture = demo_ == "graphics_hello_texture", cube = demo_ == "graphics_hello_resize";
+  bool texture = demo_ == "graphics_hello_texture",
+       cube = demo_ == "graphics_hello_resize" || demo_ == "graphics_hello_cube";
   bool blend = demo_ == "graphics_hello_blend", sdr = demo_ == "graphics_hello_sdr_sample";
   if (texture || cube)
     core_->CreateImage(width_, height_, IMAGE_FORMAT_D32_SFLOAT, &depth_);
@@ -121,6 +139,15 @@ void DemoSession::InitializeRaster() {
       uniform_ = Buffer(nullptr, sizeof(CubeUniform));
       program_->AddResourceBinding(RESOURCE_TYPE_UNIFORM_BUFFER, 1);
       program_->SetCullMode(CULL_MODE_NONE);
+    } else if (demo_ == "graphics_hello_hdr") {
+      const ColorVertex vertices[] = {{{-.5f, .05f, 0}, {0, 0, 0}},  {{.5f, .05f, 0}, {3, 3, 3}},
+                                      {{.5f, .25f, 0}, {3, 3, 3}},   {{-.5f, .25f, 0}, {0, 0, 0}},
+                                      {{-.5f, -.25f, 0}, {1, 1, 1}}, {{.5f, -.25f, 0}, {1, 1, 1}},
+                                      {{.5f, -.05f, 0}, {1, 1, 1}},  {{-.5f, -.05f, 0}, {1, 1, 1}}};
+      const uint32_t indices[] = {0, 1, 2, 0, 2, 3, 4, 5, 6, 4, 6, 7};
+      vertices_ = Buffer(vertices, sizeof(vertices));
+      indices_ = Buffer(indices, sizeof(indices));
+      index_count_ = 12;
     } else {
       const ColorVertex vertices[] = {
           {{0, .5f, 0}, {1, 0, 0}}, {{-.5f, -.5f, 0}, {0, 0, 1}}, {{.5f, -.5f, 0}, {0, 1, 0}}};
@@ -134,6 +161,7 @@ void DemoSession::InitializeRaster() {
   program_->BindShader(fragment_.get(), SHADER_TYPE_PIXEL);
   program_->Finalize();
 }
+
 void DemoSession::InitializeNBody() {
   auto vfs = GetShaderVirtualFileSystem();
   core_->CreateShader(vfs, "nbody_cs/shaders/nbody.hlsl", "CSMain", "cs_6_0", &compute_);
@@ -158,6 +186,7 @@ void DemoSession::InitializeNBody() {
   settings_ = Buffer(nullptr, sizeof(ParticleSettings));
   ResetParticles();
 }
+
 void DemoSession::ResetParticles() {
   // Like the desktop demo, seed once and advance the random sequence across resets.
   auto scalar = [&]() { return std::uniform_real_distribution<float>()(random_); };
@@ -187,6 +216,7 @@ void DemoSession::ResetParticles() {
   velocities_ = Buffer(velocities.data(), velocities.size() * sizeof(glm::vec3));
   next_positions_ = Buffer(nullptr, positions.size() * sizeof(glm::vec3));
 }
+
 void DemoSession::Configure(int particles, int galaxies, float dt, bool simulate, float yaw, float pitch, int reset) {
   if (particles < 128 || particles > 65536 || particles % 128 || galaxies < 1 || galaxies > 20 || !std::isfinite(dt) ||
       dt < .001f || dt > .1f || !std::isfinite(yaw) || !std::isfinite(pitch))
@@ -204,6 +234,7 @@ void DemoSession::Configure(int particles, int galaxies, float dt, bool simulate
     ResetParticles();
   }
 }
+
 void DemoSession::Resize(int width, int height) {
   if (width == width_ && height == height_)
     return;
@@ -216,7 +247,12 @@ void DemoSession::Resize(int width, int height) {
   if (depth_)
     core_->CreateImage(width, height, IMAGE_FORMAT_D32_SFLOAT, &depth_);
 }
+
 void DemoSession::Render() {
+  if (demo_ == "graphics_hello_ray_query") {
+    RenderRayQuery();
+    return;
+  }
   bool nbody = demo_ == "nbody_cs";
   if (nbody) {
     auto rotation =
@@ -228,9 +264,10 @@ void DemoSession::Render() {
     ParticleSettings settings{particles_, delta_time_, 100.0f / particles_};
     uniform_->UploadData(&ubo, sizeof(ubo));
     settings_->UploadData(&settings, sizeof(settings));
-  } else if (demo_ == "graphics_hello_resize") {
+  } else if (demo_ == "graphics_hello_resize" || demo_ == "graphics_hello_cube") {
     if (simulate_)
-      theta_ += glm::radians(1.f);
+      theta_ = float(std::chrono::duration<double>(std::chrono::steady_clock::now() - animation_start_).count() *
+                     glm::pi<double>());
     CubeUniform ubo{glm::rotate(glm::mat4(1), theta_, glm::vec3(0, 1, 0)),
                     glm::lookAt(glm::vec3(0, 0, 5), glm::vec3(0), glm::vec3(0, 1, 0)),
                     glm::perspectiveZO(glm::radians(45.f), float(width_) / height_, 3.5f, 6.5f)};
@@ -247,7 +284,8 @@ void DemoSession::Render() {
     ctx->CmdDispatch(particles_ / 128, 1, 1);
     ctx->CmdCopyBuffer(positions_.get(), next_positions_.get(), positions_->Size());
   }
-  ctx->CmdClearImage(color_.get(), nbody ? ClearValue{{0, 0, 0, 1}} : ClearValue{{.6f, .7f, .8f, 1}});
+  ctx->CmdClearImage(color_.get(), (nbody || demo_ == "graphics_hello_hdr") ? ClearValue{{0, 0, 0, 1}}
+                                                                            : ClearValue{{.6f, .7f, .8f, 1}});
   if (depth_)
     ctx->CmdClearImage(depth_.get(), {{1.0f}});
   ctx->CmdBeginRendering({color_.get()}, depth_.get());
@@ -280,9 +318,84 @@ void DemoSession::Render() {
   auto native = static_cast<backend::MetalCommandContext *>(ctx.get())->Handle();
   gpu_ms_ = std::max(0.0, (native->GPUEndTime() - native->GPUStartTime()) * 1000);
 }
+
 std::vector<glm::vec3> DemoSession::Positions() const {
   std::vector<glm::vec3> result(demo_ == "nbody_cs" ? particles_ : 0);
   if (!result.empty())
     positions_->DownloadData(result.data(), result.size() * sizeof(glm::vec3));
   return result;
+}
+
+void DemoSession::InitializeRayQuery() {
+  if (!core_->DeviceRayQuerySupport())
+    throw std::runtime_error("Ray Query requires a supported Metal device");
+
+  struct CameraObject {
+    glm::mat4 screen_to_camera, camera_to_world;
+  };
+
+  std::vector<glm::vec3> vertices = {{-1.0f, -1.0f, 0.0f}, {1.0f, -1.0f, 0.0f}, {0.0f, 1.0f, 0.0f}};
+  std::vector<uint32_t> indices = {0, 1, 2};
+
+  core_->CreateBuffer(vertices.size() * sizeof(glm::vec3), grassland::graphics::BUFFER_TYPE_DYNAMIC, &vertices_);
+  core_->CreateBuffer(indices.size() * sizeof(uint32_t), grassland::graphics::BUFFER_TYPE_DYNAMIC, &indices_);
+  vertices_->UploadData(vertices.data(), vertices.size() * sizeof(glm::vec3));
+  indices_->UploadData(indices.data(), indices.size() * sizeof(uint32_t));
+
+  core_->CreateBuffer(sizeof(CameraObject), grassland::graphics::BUFFER_TYPE_DYNAMIC, &uniform_);
+  CameraObject camera_object{};
+  camera_object.screen_to_camera =
+      glm::inverse(glm::perspective(glm::radians(60.0f), (float)width_ / (float)height_, 0.1f, 10.0f));
+  camera_object.camera_to_world =
+      glm::inverse(glm::lookAt(glm::vec3{0.0f, 0.0f, 5.0f}, glm::vec3{0.0f, 0.0f, 0.0f}, glm::vec3{0.0f, 1.0f, 0.0f}));
+  uniform_->UploadData(&camera_object, sizeof(CameraObject));
+
+  core_->CreateImage(width_, height_, grassland::graphics::IMAGE_FORMAT_R32G32B32A32_SFLOAT, &color_);
+
+  core_->CreateShader(GetShaderVirtualFileSystem(), "graphics_hello/modules/ray_query/shaders/shader.hlsl", "CSMain",
+                      "cs_6_5", &compute_);
+
+  core_->CreateBottomLevelAccelerationStructure(vertices_.get(), indices_.get(), sizeof(glm::vec3), &triangle_blas_);
+  grassland::graphics::RayTracingAABB aabb{-1.0f, -1.0f, -1.0f, 1.0f, 1.0f, 1.0f};
+  std::unique_ptr<grassland::graphics::Buffer> aabb_buffer;
+  core_->CreateBuffer(sizeof(aabb), grassland::graphics::BUFFER_TYPE_STATIC, &aabb_buffer);
+  aabb_buffer->UploadData(&aabb, sizeof(aabb));
+  core_->CreateBottomLevelAccelerationStructure(aabb_buffer->Range(), sizeof(aabb), 1,
+                                                grassland::graphics::RAYTRACING_GEOMETRY_FLAG_OPAQUE, &sphere_blas_);
+  core_->CreateTopLevelAccelerationStructure(
+      {triangle_blas_->MakeInstance(glm::mat4{1.0f}, 0, 0xFF, 0, grassland::graphics::RAYTRACING_INSTANCE_FLAG_NONE),
+       sphere_blas_->MakeInstance(glm::mat4{1.0f}, 0, 0xFF, 1, grassland::graphics::RAYTRACING_INSTANCE_FLAG_NONE)},
+      &tlas_);
+
+  core_->CreateComputeProgram(compute_.get(), &compute_program_);
+  compute_program_->AddResourceBinding(grassland::graphics::RESOURCE_TYPE_ACCELERATION_STRUCTURE, 1);
+  compute_program_->AddResourceBinding(grassland::graphics::RESOURCE_TYPE_WRITABLE_IMAGE, 1);
+  compute_program_->AddResourceBinding(grassland::graphics::RESOURCE_TYPE_UNIFORM_BUFFER, 1);
+  compute_program_->Finalize();
+}
+
+void DemoSession::RenderRayQuery() {
+  const float theta = float(std::chrono::duration<double>(std::chrono::steady_clock::now() - animation_start_).count() *
+                            glm::pi<double>());
+  tlas_->UpdateInstances(
+      std::vector{triangle_blas_->MakeInstance(glm::translate(glm::mat4{1.0f}, glm::vec3{-2.0f, 0.0f, 0.0f}) *
+                                                   glm::rotate(glm::mat4{1.0f}, theta, glm::vec3{0.0f, 1.0f, 0.0f}),
+                                               0, 0xFF, 0, grassland::graphics::RAYTRACING_INSTANCE_FLAG_NONE),
+                  sphere_blas_->MakeInstance(glm::translate(glm::mat4{1.0f}, glm::vec3{2.0f, 0.0f, 0.0f}) *
+                                                 glm::rotate(glm::mat4{1.0f}, theta, glm::vec3{0.0f, 1.0f, 0.0f}) *
+                                                 glm::scale(glm::mat4{1.0f}, glm::vec3{1.0f, 1.0f, 0.5f}),
+                                             0, 0xFF, 1, grassland::graphics::RAYTRACING_INSTANCE_FLAG_NONE)});
+  std::unique_ptr<grassland::graphics::CommandContext> command_context;
+  core_->CreateCommandContext(&command_context);
+  command_context->CmdClearImage(color_.get(), {{0.6, 0.7, 0.8, 1.0}});
+  command_context->CmdBindComputeProgram(compute_program_.get());
+  command_context->CmdBindResources(0, tlas_.get(), grassland::graphics::BIND_POINT_COMPUTE);
+  command_context->CmdBindResources(1, {color_.get()}, grassland::graphics::BIND_POINT_COMPUTE);
+  command_context->CmdBindResources(2, {uniform_.get()}, grassland::graphics::BIND_POINT_COMPUTE);
+  command_context->CmdDispatch((color_->Extent().width + 7) / 8, (color_->Extent().height + 7) / 8, 1);
+
+  core_->SubmitCommandContext(command_context.get());
+  core_->WaitGPU();
+  auto native = static_cast<backend::MetalCommandContext *>(command_context.get())->Handle();
+  gpu_ms_ = std::max(0.0, (native->GPUEndTime() - native->GPUStartTime()) * 1000);
 }

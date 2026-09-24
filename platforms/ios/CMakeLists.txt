@@ -27,12 +27,14 @@ list(FILTER GRAPHICS EXCLUDE REGEX "/window.cpp$")
 file(GLOB METAL "${ROOT}/code/grassland/graphics/backend/metal/*.cpp")
 file(GLOB_RECURSE SPARKIUM "${ROOT}/code/sparkium/*.cpp")
 add_library(sparkium_mobile STATIC ${UTIL} ${GRAPHICS} ${METAL} ${SPARKIUM}
-  "${ROOT}/code/grassland/math/math_mesh.cxx" "${mikktspace_SOURCE_DIR}/mikktspace.c" RenderSession.cpp demos/DemoSession.cpp)
+  "${ROOT}/code/grassland/math/math_mesh.cxx" "${mikktspace_SOURCE_DIR}/mikktspace.c" RenderSession.cpp demos/DemoSession.cpp
+  "${ROOT}/demo/gol/game_of_life_lib/game_of_life_lib.cpp"
+  "${ROOT}/demo/2048/2048_lib/2048_lib.cpp" "${ROOT}/demo/2048/game_rules.cpp" "${ROOT}/demo/2048/ai_player.cpp")
 target_include_directories(sparkium_mobile PUBLIC "${ROOT}/code" "${SPARKIUM_HEADERS}"
   "${SPARKIUM_HEADERS}/eigen3" "${SPARKIUM_HEADERS}/stb" "${metal_cpp_SOURCE_DIR}" "${CMAKE_CURRENT_SOURCE_DIR}"
-  "${mikktspace_SOURCE_DIR}" "${ROOT}")
+  "${mikktspace_SOURCE_DIR}" "${ROOT}" "${ROOT}/demo/2048/2048_lib")
 target_compile_definitions(sparkium_mobile PUBLIC LONGMARCH_METAL_ENABLED LONGMARCH_HEADLESS
-  FMT_HEADER_ONLY NDEBUG LONGMARCH_ASSETS_DIR="")
+  FMT_HEADER_ONLY NDEBUG "$<$<NOT:$<COMPILE_LANGUAGE:Swift>>:LONGMARCH_ASSETS_DIR=\"\">")
 target_link_libraries(sparkium_mobile PUBLIC "-framework Metal" "-framework Foundation" "-framework QuartzCore")
 find_package(Python3 REQUIRED COMPONENTS Interpreter)
 # Generate embedded HLSL on the host, without executing a cross-compiled helper.
@@ -75,10 +77,20 @@ endif()
 if(NOT CMAKE_SYSTEM_NAME STREQUAL "iOS")
   add_executable(sparkium_mobile_check check.cpp)
   target_link_libraries(sparkium_mobile_check PRIVATE sparkium_mobile)
+  add_executable(mobile_games_check tests/games_check.cpp)
+  target_link_libraries(mobile_games_check PRIVATE sparkium_mobile)
   add_executable(mobile_demo_check demos/check.cpp)
   target_link_libraries(mobile_demo_check PRIVATE sparkium_mobile)
 endif()
 if(SPARKIUM_APP)
+  if(CMAKE_GENERATOR STREQUAL "Ninja" AND CMAKE_SYSTEM_NAME STREQUAL "iOS")
+    set(swift_target "arm64-apple-ios${CMAKE_OSX_DEPLOYMENT_TARGET}")
+    string(TOLOWER "${CMAKE_OSX_SYSROOT}" ios_sysroot_lower)
+    if(ios_sysroot_lower MATCHES "simulator")
+      string(APPEND swift_target "-simulator")
+    endif()
+    set(CMAKE_Swift_FLAGS "${CMAKE_Swift_FLAGS} -target ${swift_target}")
+  endif()
   enable_language(Swift)
   if(NOT EXISTS "${SPARKIUM_RESOURCES}/catalog.json")
     message(FATAL_ERROR "Prepare resources first; see README.md")
@@ -88,6 +100,7 @@ if(SPARKIUM_APP)
   set(bundle_resources "${CMAKE_CURRENT_BINARY_DIR}/SparkiumResources")
   file(CREATE_LINK "${SPARKIUM_RESOURCES}" "${bundle_resources}" SYMBOLIC)
   add_executable(LongMarch MACOSX_BUNDLE SparkiumApp.swift DemosApp.swift demos/DemoView.swift
+    games/GamesView.swift games/GameBridge.mm games/GameBridge.h
     demos/DemoBridge.mm demos/DemoBridge.h SparkiumBridge.mm SparkiumBridge.h RenderQueue.h
     "${bundle_resources}" Assets.xcassets)
   set_source_files_properties("${bundle_resources}" Assets.xcassets PROPERTIES MACOSX_PACKAGE_LOCATION Resources)
@@ -102,4 +115,22 @@ if(SPARKIUM_APP)
     XCODE_ATTRIBUTE_TARGETED_DEVICE_FAMILY "1,2"
     XCODE_ATTRIBUTE_CODE_SIGN_STYLE Automatic
     XCODE_ATTRIBUTE_ENABLE_USER_SCRIPT_SANDBOXING NO)
+endif()
+
+if(SPARKIUM_APP AND CMAKE_GENERATOR STREQUAL "Ninja")
+  target_compile_options(LongMarch PRIVATE "$<$<COMPILE_LANGUAGE:Swift>:-import-objc-header;${CMAKE_CURRENT_SOURCE_DIR}/SparkiumBridge.h>")
+  target_link_options(LongMarch PRIVATE -sdk "${CMAKE_OSX_SYSROOT}")
+  set_target_properties(LongMarch PROPERTIES MACOSX_BUNDLE_GUI_IDENTIFIER "dev.lazyjazz.longmarch")
+  set(ios_platform iphoneos)
+  if(ios_sysroot_lower MATCHES "simulator")
+    set(ios_platform iphonesimulator)
+  endif()
+  add_custom_command(TARGET LongMarch POST_BUILD
+    COMMAND xcrun actool "${CMAKE_CURRENT_SOURCE_DIR}/Assets.xcassets" --compile "$<TARGET_BUNDLE_DIR:LongMarch>"
+      --platform ${ios_platform} --minimum-deployment-target ${CMAKE_OSX_DEPLOYMENT_TARGET}
+      --app-icon AppIcon --target-device iphone --target-device ipad
+      --output-partial-info-plist "${CMAKE_CURRENT_BINARY_DIR}/AppIcon.plist"
+    COMMAND "${Python3_EXECUTABLE}" "${CMAKE_CURRENT_SOURCE_DIR}/finish_bundle.py"
+      "$<TARGET_BUNDLE_DIR:LongMarch>" "${CMAKE_CURRENT_BINARY_DIR}/AppIcon.plist"
+    VERBATIM)
 endif()

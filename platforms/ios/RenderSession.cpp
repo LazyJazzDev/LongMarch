@@ -2,6 +2,7 @@
 
 #include <stdexcept>
 using namespace grassland;
+
 RenderSession::RenderSession(const std::filesystem::path &resources,
                              const std::string &scene,
                              int max_dimension,
@@ -26,9 +27,12 @@ RenderSession::RenderSession(const std::filesystem::path &resources,
   if (!scene_)
     throw std::runtime_error(error);
   scene_->GetScene()->settings.samples_per_dispatch = 1;
+  scene_exposure_ = scene_->GetFilm()->info.exposure;
+  graphics_->CreateImage(Width(), Height(), graphics::IMAGE_FORMAT_R32G32B32A32_SFLOAT, &hdr_image_);
   // Retain camera pose and vertical FOV, materials, exposure and bounce settings.
   graphics_->CreateImage(Width(), Height(), graphics::IMAGE_FORMAT_R8G8B8A8_UNORM, &image_);
 }
+
 RenderSession::~RenderSession() {
   // Complete queued uploads before releasing scene resources, including after a failed render.
   try {
@@ -37,30 +41,47 @@ RenderSession::~RenderSession() {
   } catch (...) {
   }
 }
-std::vector<uint8_t> RenderSession::Step() {
+
+void RenderSession::Render() {
   core_->Render(scene_->GetScene(), scene_->GetCamera(), scene_->GetFilm(), sparkium::RENDER_PIPELINE_RAY_QUERY);
-  scene_->GetFilm()->Develop(image_.get());
-  std::vector<uint8_t> pixels(static_cast<size_t>(Width()) * Height() * 4);
-  image_->DownloadData(pixels.data());
+}
+
+std::vector<uint8_t> RenderSession::Step() {
+  Render();
+  return Display(false);
+}
+
+std::vector<uint8_t> RenderSession::Display(bool hdr, float exposure) {
+  scene_->GetFilm()->info.exposure = scene_exposure_ + std::clamp(exposure, -10.f, 10.f);
+  auto *target = hdr ? hdr_image_.get() : image_.get();
+  scene_->GetFilm()->Develop(target, hdr);
+  std::vector<uint8_t> pixels(static_cast<size_t>(Width()) * Height() * (hdr ? 16 : 4));
+  target->DownloadData(pixels.data());
   return pixels;
 }
+
 int RenderSession::Width() const {
   return scene_->GetFilm()->GetWidth();
 }
+
 int RenderSession::Height() const {
   return scene_->GetFilm()->GetHeight();
 }
+
 int RenderSession::Samples() const {
   return scene_->GetFilm()->info.accumulated_samples;
 }
+
 int RenderSession::MaxBounces() const {
   return scene_->GetScene()->settings.max_bounces;
 }
+
 void RenderSession::ResetFilm() {
   graphics_->WaitGPU();
   scene_->GetFilm()->Reset();
   graphics_->WaitGPU();
 }
+
 std::string RenderSession::Device() const {
   return graphics_->DeviceName();
 }

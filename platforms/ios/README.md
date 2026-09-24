@@ -1,22 +1,43 @@
 # LongMarch Demos on iOS (experimental)
 
-The app opens a native demo list. Choose Sparkium to access its scene picker, or
-run Hello Triangle, Hello Texture, Hello Blend, Hello Resize, Hello SDR Sample,
-and NBody CS independently. The Demos button returns to the list and releases the
-current demo's GPU resources. Backgrounding pauses rendering and simulation.
+The app opens a native demo browser with **2048**, **Game of Life**, **Sparkium**,
+**Graphics Hello** modules and **NBody CS**. Returning to Demos releases the active
+renderer; backgrounding pauses rendering, simulation and game AI. Both portrait
+and landscape are supported.
 
-Graphics demos reuse their desktop HLSL, vertex data and LongMarch graphics API.
-An MTKView presents the rendered Metal texture directly, without per-frame CPU
-image downloads. Resize and NBody follow the drawable size and offer a render
-scale control; the other graphics tests retain their desktop 1280 × 720 target,
-fitted to the screen. NBody includes particle count, galaxy count, time step,
-pause/resume, reset and drag-to-rotate controls. It defaults to 4096 particles;
-65536 remains selectable. Gravity is normalized by the selected count so total
-mass remains constant. Frame render time, GPU time and throughput are displayed.
+## Games
 
-Hello Ray Tracing and RT Multi Shader Group are listed as unavailable because
-the current Metal backend does not implement full RT pipelines, procedural AABB
-intersections or callable shaders. Sparkium's Metal Ray Query remains available.
+2048 supports swipe controls, score/best score, win/continue and game-over/retry.
+The AI toggle (also five taps on the score) runs the desktop expectimax worker.
+The app shares movement and spawn rules with the desktop game; searches do not
+block the UI or access the spawn RNG. Best score is retained across app launches.
+
+Game of Life shares the desktop in-place update, clock, `.cells` parser and
+boundary icon animation. Tap or draw with one finger to edit, pinch to zoom, use two fingers to pan,
+and double-tap to fit. Controls include reset, pause/play, randomization, width and
+height (2–200), 1×/2×/5×/lightning speed, and periodic/fixed boundaries. Lightning
+advances exactly once per display frame. Cell updates have no fade animation.
+Boundary changes play the recorded wrapping/collision glider animation.
+The folder menu includes the desktop 295P5H1V1 spaceship and Gosper glider gun.
+Import and export use the Files picker. Import preserves larger grid dimensions,
+expands smaller ones and centers the pattern independently along each axis; it
+pauses playback and fits the view. Export preserves the full grid and dead borders.
+The mobile controls use native touch layout, rather than a GLFW window.
+
+## Graphics Hello
+
+Triangle, Texture, Blend, Cube, Resize, SDR Sample, HDR and Ray Query reuse the
+current `demo/graphics_hello/modules` HLSL. Ray Query displays the rotating triangle
+and procedural sphere and requires device ray-query support. The HDR module uses
+a floating-point EDR Metal drawable, a 0–3 linear gradient, reference white and an
+HDR/SDR toggle. Unsupported full RT pipeline modules (Ray Tracing, External Shader,
+RT Multi Shader Group) remain visible with their Metal limitation explained.
+
+MTKView presents GPU textures without a per-frame CPU download. Resize and NBody
+follow drawable size with a render scale control; other modules retain 1280 × 720,
+fitted to the screen. NBody includes particle/galaxy count, time step, pause, reset
+and drag-to-rotate controls. It defaults to 4096 particles and supports up to 65536.
+Frame time, GPU time and throughput are displayed.
 
 ## Sparkium
 
@@ -27,6 +48,14 @@ The Sparkium demo runs full-screen in landscape and renders at the resolution an
 aspect ratio stored in each scene JSON. The image initially fits the screen.
 Pinch to zoom, drag to pan, and double-tap to fit again. Progressive image updates
 preserve the viewing transform; gestures never change the render camera.
+
+HDR is enabled by default. Film development produces linear sRGB floating-point
+pixels (including values above 1), and the native image view requests high dynamic
+range. The actual brightness depends on the device’s available EDR headroom.
+The HDR toggle switches to the scene’s SDR view transform; exposure adjustments
+redevelop the existing film, even after reaching the sample limit or pausing,
+without clearing or adding samples. Pinch/pan transforms survive display changes.
+The CPU image preview is 32-bit float RGBA for HDR and 8-bit RGBA for SDR.
 
 A translucent left sidebar follows the desktop control layout using native UI.
 The initial scene and every newly selected scene start rendering automatically.
@@ -87,24 +116,28 @@ cmake --build build-ios-prepare
 python3 platforms/ios/prepare_resources.py \
   --renderer build-ios-prepare/sparkium_mobile_check
 
-cmake -S platforms/ios -B build-ios-device -G Xcode \
-  -DCMAKE_SYSTEM_NAME=iOS -DCMAKE_OSX_SYSROOT=iphoneos \
+cmake -S platforms/ios -B build-ios-device-ninja -G Ninja \
+  -DCMAKE_BUILD_TYPE=Release -DCMAKE_SYSTEM_NAME=iOS -DCMAKE_OSX_SYSROOT=iphoneos \
   -DCMAKE_OSX_ARCHITECTURES=arm64 -DCMAKE_OSX_DEPLOYMENT_TARGET=18.0 \
   -DSPARKIUM_HEADERS="$PWD/out/ios/deps/arm64-osx/include"
-cmake --build build-ios-device --config Release -- CODE_SIGNING_ALLOWED=NO
-open build-ios-device/LongMarch.xcodeproj
+cmake --build build-ios-device-ninja
 ```
 
-For a device install, select the `LongMarch` target, choose your signing team and
-connected iPhone/iPad in Xcode, and Run. The unsigned build is at
-`build-ios-device/Release-iphoneos/LongMarch.app`.
-The Xcode project and application target are `LongMarch`; the bundle identifier
-is `dev.lazyjazz.longmarch`. The installed display name remains **LongMarch Demos**.
-Select your existing Apple development team for automatic signing. The new bundle
-identifier installs separately from the earlier `dev.lazyjazz.sparkium` app.
-For the simulator use a separate `build-ios-simulator` directory and
-`-DCMAKE_OSX_SYSROOT=iphonesimulator`. The generated project supports both Debug
-and Release; embedded HLSL uses the same release shader variant in both.
+Ninja builds an unsigned `build-ios-device-ninja/LongMarch.app`, including the
+asset catalog and prepared resources. To build for Simulator use a separate
+`build-ios-simulator-ninja` directory and `-DCMAKE_OSX_SYSROOT=iphonesimulator`.
+Install on a booted simulator with:
+
+```sh
+codesign --force --sign - build-ios-simulator-ninja/LongMarch.app
+xcrun simctl install booted build-ios-simulator-ninja/LongMarch.app
+xcrun simctl launch booted dev.lazyjazz.longmarch
+```
+
+For a signed device install, the existing Xcode workflow is also supported: use
+`-G Xcode` in a **separate** directory, open `LongMarch.xcodeproj`, select your
+Apple development team and connected device, and Run. The bundle identifier is
+`dev.lazyjazz.longmarch`; the display name is **LongMarch Demos**.
 
 Resource preparation refuses to overwrite an existing output. Use `--output` to
 prepare another bundle and `-DSPARKIUM_RESOURCES` to select it. Generated resources,
@@ -157,12 +190,16 @@ This records unsupported-device errors as well as successful renders. Without th
 variable the application opens the demo list. Entering Sparkium automatically
 starts its initial scene with the normal sample limit.
 
-Set `LONGMARCH_SMOKE_DEMO=nbody_cs` (or one of the graphics directory names) to
+Set `LONGMARCH_SMOKE_DEMO=nbody_cs` (or one of the graphics module identifiers) to
 open that demo directly. After three frames it writes `DemoSmokeResult.json` to
 Documents, including device, render dimensions and frame/GPU times.
 
+Run shared game adapter checks with `build-ios-replay/mobile_games_check`.
+Each scene replay also checks finite HDR output, exposure scaling and retained
+sample counts while changing display settings.
+
 The preparation build also produces `mobile_demo_check`. Resource preparation
-uses it to cache the graphics and compute shaders. Verify all six demos using:
+uses it to cache the graphics and compute shaders. Verify all nine runnable demos using:
 
 ```sh
 build-ios-replay/mobile_demo_check out/ios/Resources all out/ios/demos-replay

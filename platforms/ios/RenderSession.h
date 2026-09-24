@@ -13,6 +13,8 @@ class RenderSession {
                 double aspect_ratio = 0.0);
   ~RenderSession();
   std::vector<uint8_t> Step();
+  void Render();
+  std::vector<uint8_t> Display(bool hdr, float exposure = 0);
   int Width() const;
   int Height() const;
   int Samples() const;
@@ -24,5 +26,6 @@ class RenderSession {
   std::unique_ptr<grassland::graphics::Core> graphics_;
   std::unique_ptr<sparkium::Core> core_;
   std::unique_ptr<sparkium::JsonScene> scene_;
-  std::unique_ptr<grassland::graphics::Image> image_;
+  std::unique_ptr<grassland::graphics::Image> image_, hdr_image_;
+  float scene_exposure_ = 0;
 };

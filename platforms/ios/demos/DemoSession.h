@@ -1,4 +1,5 @@
 #pragma once
+#include <chrono>
 #include <filesystem>
 #include <memory>
 #include <random>
@@ -15,24 +16,31 @@ class DemoSession {
   void Resize(int width, int height);
   void Configure(int particles, int galaxies, float delta_time, bool simulate, float yaw, float pitch, int reset);
   void Render();
+
   grassland::graphics::Core *Core() const {
     return core_.get();
   }
+
   grassland::graphics::Image *Image() const {
     return color_.get();
   }
+
   double GPUMilliseconds() const {
     return gpu_ms_;
   }
+
   int Particles() const {
     return particles_;
   }
+
   std::vector<glm::vec3> Positions() const;
   static const std::vector<std::string> &Names();
 
  private:
   void InitializeRaster();
   void InitializeNBody();
+  void InitializeRayQuery();
+  void RenderRayQuery();
   void ResetParticles();
   std::unique_ptr<grassland::graphics::Buffer> Buffer(const void *data, size_t size);
   std::string demo_;
@@ -50,4 +58,6 @@ class DemoSession {
   float delta_time_ = 0.03f, theta_ = 0, yaw_ = 0, pitch_ = 0;
   bool simulate_ = true;
   double gpu_ms_ = 0;
+  std::chrono::steady_clock::time_point animation_start_ = std::chrono::steady_clock::now();
+  std::unique_ptr<grassland::graphics::AccelerationStructure> triangle_blas_, sphere_blas_, tlas_;
 };

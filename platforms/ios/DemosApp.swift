@@ -9,6 +9,19 @@ struct DemoItem: Identifiable {
 
   static let graphics = [
     DemoItem(
+      id: "graphics_hello_cube", title: "Hello Cube", subtitle: "Depth-tested rotating cube",
+      symbol: "cube"),
+    DemoItem(
+      id: "graphics_hello_hdr", title: "Hello HDR",
+      subtitle: "Linear EDR gradient and SDR reference white", symbol: "sun.max.fill"),
+    DemoItem(
+      id: "graphics_hello_ray_query", title: "Hello Ray Query",
+      subtitle: "Animated triangle and procedural sphere", symbol: "rays"),
+    DemoItem(
+      id: "graphics_hello_external_shader", title: "External Shader",
+      subtitle: "External RT pipeline shaders", symbol: "doc.text",
+      unavailable: "Requires RT shader pipelines, unavailable on Metal; use Ray Query."),
+    DemoItem(
       id: "graphics_hello_triangle", title: "Hello Triangle",
       subtitle: "Indexed geometry and vertex colors", symbol: "triangle"),
     DemoItem(
@@ -37,6 +50,14 @@ struct DemoItem: Identifiable {
         "Requires RT shader groups and procedural intersection shaders, which the current Metal backend does not implement."
     ),
   ]
+  static let games = [
+    DemoItem(
+      id: "2048", title: "2048", subtitle: "Swipe to merge · Expectimax AI",
+      symbol: "square.grid.2x2"),
+    DemoItem(
+      id: "gol", title: "Game of Life", subtitle: "Editable cells · Boundary modes · Pattern files",
+      symbol: "squareshape.split.3x3"),
+  ]
   static let compute = [
     DemoItem(
       id: "nbody_cs", title: "NBody CS",
@@ -47,7 +68,7 @@ struct DemoItem: Identifiable {
       id: "sparkium", title: "Sparkium", subtitle: "Path tracing · 9 bundled scenes", symbol: "cube"
     )
   ]
-  static let all = graphics + compute + rendering
+  static let all = games + graphics + compute + rendering
 }
 
 private struct DemoBrowser: View {
@@ -61,12 +82,15 @@ private struct DemoBrowser: View {
       if let selected {
         if selected.id == "sparkium" {
           SparkiumDemoView { self.selected = nil }
+        } else if selected.id == "2048" || selected.id == "gol" {
+          GamesView(life: selected.id == "gol") { self.selected = nil }.id(selected.id)
         } else {
           GraphicsDemoView(demo: selected) { self.selected = nil }.id(selected.id)
         }
       } else {
         NavigationStack {
           List {
+            Section("Games") { rows(DemoItem.games) }
             Section("Rendering") { rows(DemoItem.rendering) }
             Section("Compute") { rows(DemoItem.compute) }
             Section("Graphics") { rows(DemoItem.graphics.filter { $0.unavailable == nil }) }

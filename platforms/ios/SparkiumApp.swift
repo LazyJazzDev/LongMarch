@@ -30,6 +30,8 @@ private final class RenderModel: ObservableObject {
       }
     }
   }
+  @Published var hdr = true { didSet { renderer.setHDR(hdr, exposure: Float(exposure)) } }
+  @Published var exposure = 0.0 { didSet { renderer.setHDR(hdr, exposure: Float(exposure)) } }
   @Published var image: CGImage?
   @Published var imageRevision = 0
   @Published var width = 0
@@ -210,6 +212,7 @@ private final class RenderImageScrollView: UIScrollView, UIScrollViewDelegate {
     showsHorizontalScrollIndicator = false
     showsVerticalScrollIndicator = false
     bouncesZoom = true
+    renderedImage.preferredImageDynamicRange = .high
     addSubview(renderedImage)
     let doubleTap = UITapGestureRecognizer(target: self, action: #selector(fitImage))
     doubleTap.numberOfTapsRequired = 2
@@ -291,8 +294,8 @@ private struct RenderViewport: View {
         if controlsVisible {
           controls
             .frame(width: min(350, max(0, available.size.width - 20)))
-            .frame(maxHeight: max(0, available.size.height - 20), alignment: .top)
-            .padding(10)
+            .frame(maxHeight: max(0, available.size.height - 74), alignment: .top)
+            .padding(10).padding(.top, 54)
             .transition(.move(edge: .leading).combined(with: .opacity))
         } else {
           Button {
@@ -342,6 +345,14 @@ private struct RenderViewport: View {
               }
             }.labelsHidden().accessibilityIdentifier("spp-limit")
           }.frame(minHeight: 38)
+          Toggle("HDR display", isOn: $model.hdr)
+          Text("Exposure: \(model.exposure, specifier: "%.1f") EV").font(.caption)
+          Slider(value: $model.exposure, in: -5...5, step: 0.1)
+          Text(
+            model.hdr
+              ? "Linear HDR · brightness follows the display’s EDR headroom"
+              : "SDR · scene view transform"
+          ).font(.caption).foregroundStyle(.secondary)
           HStack {
             Button("Reload") { model.loadSelectedScene() }
             Button("Reset film") { model.resetFilm() }.disabled(!model.loaded || model.error != nil)

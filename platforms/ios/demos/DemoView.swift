@@ -14,6 +14,7 @@ private final class DemoModel: ObservableObject {
   @Published var particles = 4096
   @Published var galaxies = 10
   @Published var deltaTime = 0.03
+  @Published var hdr = true
   @Published var simulate = true
   @Published var reset = 0
   @Published var yaw = 0.0
@@ -53,6 +54,7 @@ private struct MetalDemoView: UIViewRepresentable {
       deltaTime: Float(model.deltaTime), simulate: model.simulate, yaw: Float(model.yaw),
       pitch: Float(model.pitch),
       reset: model.reset, resolutionScale: Float(model.resolutionScale))
+    context.coordinator.renderer.setHDR(model.hdr)
     context.coordinator.renderer.setActive(active)
   }
   static func dismantleUIView(_ view: MTKView, coordinator: Coordinator) {
@@ -81,7 +83,8 @@ struct GraphicsDemoView: View {
       GeometryReader { geometry in
         if controlsVisible {
           controls.frame(width: min(350, geometry.size.width - 20))
-            .frame(maxHeight: geometry.size.height - 20, alignment: .top).padding(10)
+            .frame(maxHeight: max(0, geometry.size.height - 74), alignment: .top).padding(10)
+            .padding(.top, 54)
         } else {
           Button {
             controlsVisible = true
@@ -114,6 +117,7 @@ struct GraphicsDemoView: View {
       ScrollView {
         VStack(alignment: .leading, spacing: 12) {
           Text(demo.subtitle).font(.subheadline).foregroundStyle(.secondary)
+          if demo.id == "graphics_hello_hdr" { Toggle("HDR display", isOn: $model.hdr) }
           if nbody {
             LabeledContent("Particles") {
               Picker("Particles", selection: $model.particles) {

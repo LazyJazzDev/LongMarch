@@ -5,6 +5,7 @@
 #include "DemoSession.h"
 #define STB_IMAGE_WRITE_IMPLEMENTATION
 #include <stb_image_write.h>
+
 int main(int argc, char **argv) {
   try {
     if (argc < 4)
@@ -51,6 +52,8 @@ int main(int argc, char **argv) {
       auto extent = session.Image()->Extent();
       std::vector<float> pixels(extent.width * extent.height * 4);
       session.Image()->DownloadData(pixels.data());
+      if (name == "graphics_hello_hdr" && *std::max_element(pixels.begin(), pixels.end()) < 2.9f)
+        throw std::runtime_error("HDR gradient was clipped to SDR");
       std::vector<uint8_t> bytes(pixels.size());
       for (size_t i = 0; i < pixels.size(); ++i) {
         if (!std::isfinite(pixels[i]))
