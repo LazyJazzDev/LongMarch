@@ -53,13 +53,7 @@ void BoundaryToggleButton::Update(float seconds) {
   morph_ = target + (offset + impulse * dt) * decay;
   velocity_ = (velocity_ - 24.0f * impulse * dt) * decay;
   device_icon_->UploadVertices(icon_->GetModel(std::clamp(morph_, 0.0f, 1.0f), MixStyle::kLinear).Vertices());
-  if (demo_active_) {
-    demo_time_ += dt;
-    if (demo_time_ >= 2.8f) {
-      demo_active_ = false;
-      demo_time_ = 0.0f;
-    }
-  }
+  glider_.Update(dt);
   hover_.Update(dt * 10.0f);
 }
 
@@ -69,26 +63,27 @@ void BoundaryToggleButton::Draw() {
                                         button_palette::Background().GetValue(float(hover_)), glm::uvec4{1, 0, 0, 0}});
   application_->DrawModel(device_icon_.get(),
                           {GetModelMatrix(origin, size, 0.4f), glm::vec4{1.0f}, glm::uvec4{1, 0, 0, 0}});
-  // A 4x4-sized torus shows the five-cell silhouette crossing opposite edges.
-  // This is an explanatory translation, not a second Life simulation: actual
-  // evolution on such a tiny torus would interfere with the glider itself.
-  constexpr glm::vec2 cells[] = {{0, -1}, {1, 0}, {-1, 1}, {0, 1}, {1, 1}};
-  constexpr float extent = 0.40f;
-  constexpr float period = extent * 2.0f;
-  const float progress = demo_active_ ? std::clamp((demo_time_ - 0.3f) / 2.5f, 0.0f, 1.0f) : 0.0f;
-  const float travel = progress * progress * (3.0f - 2.0f * progress) * period;
+  const auto cells = glider_.ProjectedCells();
   const glm::vec2 center = origin + size * 0.5f;
-  for (const auto cell : cells) {
-    for (int y = -1; y <= 1; ++y) {
-      for (int x = -1; x <= 1; ++x) {
-        const auto p = cell * 0.20f + glm::vec2{travel} + glm::vec2{x, y} * period;
-        const auto lo = glm::max(p - glm::vec2{0.075f}, glm::vec2{-extent});
-        const auto hi = glm::min(p + glm::vec2{0.075f}, glm::vec2{extent});
-        if (lo.x >= hi.x || lo.y >= hi.y)
-          continue;
-        application_->DrawModel(cell_model_.get(),
-                                {GetModelMatrix(center + lo * size * 0.5f, (hi - lo) * size * 0.5f, 0.4f),
-                                 button_palette::kNeutral, glm::uvec4{1, 0, 0, 0}});
+  constexpr float pitch = 0.20f;
+  constexpr float half_size = 0.07f;
+  // Center the initial 3x3 silhouette; the fourth row/column straddles the
+  // periodic seam. Copies are clipped so wrapping cells remain full-sized.
+  for (int y = 0; y < 4; ++y) {
+    for (int x = 0; x < 4; ++x) {
+      if (!cells[y * 4 + x])
+        continue;
+      for (int copy_y = -1; copy_y <= 0; ++copy_y) {
+        for (int copy_x = -1; copy_x <= 0; ++copy_x) {
+          const glm::vec2 p{(x - 1 + copy_x * 4) * pitch, (y - 1 + copy_y * 4) * pitch};
+          const auto lo = glm::max(p - glm::vec2{half_size}, glm::vec2{-0.40f});
+          const auto hi = glm::min(p + glm::vec2{half_size}, glm::vec2{0.40f});
+          if (lo.x >= hi.x || lo.y >= hi.y)
+            continue;
+          application_->DrawModel(cell_model_.get(),
+                                  {GetModelMatrix(center + lo * size * 0.5f, (hi - lo) * size * 0.5f, 0.4f),
+                                   button_palette::kNeutral, glm::uvec4{1, 0, 0, 0}});
+        }
       }
     }
   }
@@ -96,8 +91,10 @@ void BoundaryToggleButton::Draw() {
 
 void BoundaryToggleButton::OnClick() {
   mode_ = mode_ == BoundaryMode::kPeriodic ? BoundaryMode::kFixed : BoundaryMode::kPeriodic;
-  demo_active_ = mode_ == BoundaryMode::kPeriodic;
-  demo_time_ = 0.0f;
+  if (mode_ == BoundaryMode::kPeriodic)
+    glider_.Start();
+  else
+    glider_.Reset();
 }
 
 void BoundaryToggleButton::OnStateChange(int state) {

@@ -3,6 +3,7 @@
 #include "application/animation_var.h"
 #include "application/button.h"
 #include "application/model.h"
+#include "boundary_glider.h"
 #include "game_of_life_lib/game_of_life_lib.h"
 
 class BoundaryToggleButton : public Button {
@@ -24,8 +25,7 @@ class BoundaryToggleButton : public Button {
   std::unique_ptr<MixModel> icon_;
   std::unique_ptr<DeviceModel> device_icon_;
   std::unique_ptr<DeviceModel> cell_model_;
-  bool demo_active_{};
-  float demo_time_{};
+  BoundaryGlider glider_;
   AnimationVar hover_{0.0f, AnimationStyle::kPower5};
   float morph_{1.0f};
   float velocity_{};

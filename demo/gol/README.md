@@ -20,9 +20,11 @@ frame while playing, without an additional iteration delay. Simulation speed
 therefore follows the frame rate, with input and rendering between generations.
 The boundary button next to speed toggles between **periodic** (four open portals,
 the default) and **fixed/dead** (a solid enclosure). A five-cell glider sits at
-its center. Switching to periodic opens the wall, then plays one illustrative
-wraparound trip before the glider rests at the center again. This icon animation
-does not evolve or reset the main grid or interrupt playback.
+its center. Switching to periodic opens the wall, then evolves the glider for 16 generations in empty space,
+projecting its live-cell coordinates modulo 4 onto the icon. Each generation is
+shown discretely; the glider returns to the center and stops after one trip.
+Projection never feeds back into evolution, avoiding self-interference on a
+small torus. This animation does not change the main grid or interrupt playback.
 The die has six separated rounded faces with cut-out pips. Each click tumbles it
 in 3D and lands on a randomly chosen different face, tilted toward the viewer.
 Each click independently gives every cell a 50% chance of being alive; the
