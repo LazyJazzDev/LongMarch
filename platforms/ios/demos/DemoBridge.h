@@ -15,6 +15,8 @@ typedef void (^DemoProgress)(double frameSeconds,
              demo:(NSString *)demo
          progress:(DemoProgress)progress NS_SWIFT_NAME(start(view:resources:demo:progress:));
 @property(nonatomic, copy, nullable) void (^fileRequest)(NSInteger action);
+@property(nonatomic, copy, nullable) void (^sizeRequest)(NSInteger axis, NSInteger value);
+- (void)setGridDimension:(NSInteger)axis value:(NSInteger)value;
 - (void)completeFile:(NSString *)path completion:(void (^)(NSString *_Nullable error))completion;
 - (void)input:(NSInteger)kind x:(double)x y:(double)y value:(double)value;
 - (void)setHDR:(BOOL)hdr;

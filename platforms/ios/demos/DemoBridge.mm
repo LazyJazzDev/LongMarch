@@ -88,6 +88,8 @@
       self->_frames = 0;
       try {
         self->_session = std::make_unique<DemoSession>(resources.fileSystemRepresentation, demo.UTF8String);
+        if (auto game = self->_session->Game())
+          game->EnableNativeSizeControls();
         auto core = static_cast<grassland::graphics::backend::MetalCore *>(self->_session->Core());
         id<MTLDevice> device = (__bridge id<MTLDevice>)core->Device();
         NSString *source =
@@ -152,6 +154,15 @@
 - (void)wakeGame {
   ++_inputRevision;
   [self scheduleGameFrame:0];
+}
+
+- (void)setGridDimension:(NSInteger)axis value:(NSInteger)value {
+  const uint64_t generation = _generation;
+  [self wakeGame];
+  dispatch_async(LongMarchRenderQueue(), ^{
+    if (self->_generation == generation && self->_session && self->_session->Game())
+      self->_session->Game()->SetGridDimension(int(axis), int(value));
+  });
 }
 
 - (void)setGameBottomControlInset:(float)heightFraction {
@@ -308,11 +319,14 @@
           if (auto game = self->_session->Game()) {
             nextFrameDelay = game->NextFrameDelay();
             int action = game->FileRequest();
+            const auto sizeRequest = game->TakeSizeControlRequest();
             dispatch_async(dispatch_get_main_queue(), ^{
               if (self->_generation == generation && action && !self->_filePending && self.fileRequest) {
                 self->_filePending = YES;
                 self.fileRequest(action);
               }
+              if (self->_generation == generation && sizeRequest.x && self.sizeRequest)
+                self.sizeRequest(sizeRequest.x, sizeRequest.y);
             });
           }
           auto core = static_cast<grassland::graphics::backend::MetalCore *>(self->_session->Core());

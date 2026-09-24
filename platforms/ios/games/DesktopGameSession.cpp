@@ -88,3 +88,17 @@ void DesktopGameSession::SetBottomControlInset(float height_fraction) {
   if (life_)
     life_->SetBottomControlInset(height_fraction);
 }
+
+void DesktopGameSession::EnableNativeSizeControls() {
+  if (life_)
+    life_->EnableNativeSizeControls();
+}
+
+glm::ivec2 DesktopGameSession::TakeSizeControlRequest() {
+  return life_ ? life_->TakeSizeControlRequest() : glm::ivec2{0};
+}
+
+void DesktopGameSession::SetGridDimension(int axis, int value) {
+  if (life_)
+    life_->SetGridDimension(axis, value);
+}

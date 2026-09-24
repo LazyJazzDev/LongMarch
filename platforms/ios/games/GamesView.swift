@@ -6,6 +6,7 @@ private final class GameMetalView: MTKView {
   let renderer = DemoRenderer()
   var life = false
   private var start = CGPoint.zero
+  private(set) var lastPointerPosition = CGPoint.zero
   private var pointerDown = false
   override init(frame: CGRect, device: MTLDevice?) {
     super.init(frame: frame, device: device)
@@ -22,12 +23,25 @@ private final class GameMetalView: MTKView {
     guard bounds.width > 0 && bounds.height > 0 else { return }
     renderer.input(kind, x: point.x / bounds.width, y: point.y / bounds.height, value: value)
   }
+  func smokeSizeTap(_ axis: Int) {
+    guard life, bounds.height > bounds.width else { return }
+    // Exercise the normal input -> readout -> native popover path in portrait.
+    let bottom = max(bounds.width * 0.05, (window?.safeAreaInsets.bottom ?? 0) + 12)
+    let point = CGPoint(
+      x: bounds.width * 0.435,
+      y: bounds.height - bottom - bounds.width * (axis == 1 ? 0.07875 : 0.02125))
+    lastPointerPosition = point
+    send(1, point)
+    send(2, point)
+  }
+
   override func touchesBegan(_ touches: Set<UITouch>, with event: UIEvent?) {
     guard event?.allTouches?.count == 1, let touch = touches.first else {
       cancelPointer()
       return
     }
     start = touch.location(in: self)
+    lastPointerPosition = start
     pointerDown = true
     send(1, start)
   }
@@ -243,15 +257,96 @@ private final class GameCanvasView: UIView {
   }
 }
 
+private struct GridDimensionPicker: View {
+  let axis: Int
+  @State var value: Double
+  let apply: (Int) -> Void
+  let close: () -> Void
+
+  var body: some View {
+    VStack(spacing: 16) {
+      HStack {
+        Text(axis == 1 ? "网格宽度" : "网格高度").font(.headline)
+        Spacer()
+        Button("完成") {
+          apply(Int(value))
+          close()
+        }
+      }
+      HStack {
+        Text("\(Int(value))").font(.title2.monospacedDigit())
+        Spacer()
+        Stepper(
+          "逐格微调",
+          value: Binding(
+            get: { Int(value) },
+            set: {
+              value = Double($0)
+              apply($0)
+            }),
+          in: 2...200
+        ).labelsHidden()
+      }
+      Slider(value: $value, in: 2...200, step: 1) { editing in
+        // Keep the native thumb responsive; resize the grid once the user
+        // finishes scrubbing instead of rebuilding thousands of cells per move.
+        if !editing { apply(Int(value)) }
+      }
+      .accessibilityLabel(axis == 1 ? "网格宽度" : "网格高度")
+      .accessibilityValue("\(Int(value))")
+      HStack {
+        Text("2")
+        Spacer()
+        Text("200")
+      }.font(.caption).foregroundStyle(.secondary)
+    }.padding(20)
+  }
+}
+
 private struct DesktopGameView: UIViewRepresentable {
   let life: Bool
   let active: Bool
   var status: (Double, String?) -> Void
-  final class Coordinator: NSObject, UIDocumentPickerDelegate {
+  final class Coordinator: NSObject, UIDocumentPickerDelegate,
+    UIPopoverPresentationControllerDelegate
+  {
     weak var view: GameMetalView?
     var error: (String?) -> Void = { _ in }
     private var exporting = false
     private var temporary: URL?
+    private weak var sizePopover: UIViewController?
+
+    func requestSize(_ axis: Int, value: Int) {
+      guard let view, let root = view.window?.rootViewController,
+        root.presentedViewController == nil
+      else { return }
+      let content = GridDimensionPicker(
+        axis: axis, value: Double(value),
+        apply: { [weak view] value in
+          view?.renderer.setGridDimension(axis, value: value)
+        },
+        close: { [weak self] in
+          self?.sizePopover?.dismiss(animated: true)
+        })
+      let controller = UIHostingController(rootView: content)
+      controller.modalPresentationStyle = .popover
+      controller.preferredContentSize = CGSize(width: min(340, view.bounds.width - 24), height: 216)
+      if let popover = controller.popoverPresentationController {
+        popover.sourceView = view
+        popover.sourceRect = CGRect(
+          origin: view.lastPointerPosition, size: CGSize(width: 1, height: 1))
+        popover.permittedArrowDirections = [.up, .down]
+        popover.delegate = self
+      }
+      sizePopover = controller
+      root.present(controller, animated: true)
+    }
+
+    func adaptivePresentationStyle(
+      for controller: UIPresentationController,
+      traitCollection: UITraitCollection
+    ) -> UIModalPresentationStyle { .none }
+
     func request(_ action: Int) {
       guard let view, let root = view.window?.rootViewController else { return }
       if action == 2 {
@@ -312,9 +407,17 @@ private struct DesktopGameView: UIViewRepresentable {
     view.renderer.fileRequest = { [weak coordinator = context.coordinator] action in
       coordinator?.request(action)
     }
+    view.renderer.sizeRequest = { [weak coordinator = context.coordinator] axis, value in
+      coordinator?.requestSize(axis, value: value)
+    }
     let resources = Bundle.main.resourceURL!.appendingPathComponent("SparkiumResources")
     view.renderer.start(view: view, resources: resources, demo: life ? "gol" : "2048") {
       _, _, fps, _, _, _, _, error in status(fps, error)
+    }
+    if let axis = ProcessInfo.processInfo.environment["LONGMARCH_SMOKE_SIZE_PICKER"] {
+      DispatchQueue.main.asyncAfter(deadline: .now() + 1) { [weak view] in
+        view?.smokeSizeTap(axis == "height" ? 2 : 1)
+      }
     }
     return canvas
   }

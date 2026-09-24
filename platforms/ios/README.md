@@ -36,6 +36,10 @@ GoL defers bottom-edge system gestures and keeps the lower controls above the
 window's home-indicator safe area plus 12 points. The canvas still fills the
 screen. This reduces accidental Home gestures; iOS still allows users to leave
 the app and does not permit ordinary apps to disable Home navigation entirely.
+On iOS, tap either W/H readout to open a system popover with a native 2–200 slider
+and single-cell stepper. Scrubbing updates the displayed value; release applies
+the new grid size once. Done or tapping outside closes the popover. The compact
+readouts do not change values when dragged; desktop sliders retain direct drag.
 Original open/save buttons launch native Files pickers; import retains larger
 axes and centers the pattern independently per dimension. Export saves the full
 grid, including dead borders. Returning from the background resets frame clocks
@@ -299,3 +303,7 @@ asynchronous presentation completion.
 
 The serial native render queue uses foreground interactive QoS for visible
 frames; idle games still schedule no work.
+
+`LONGMARCH_SMOKE_SIZE_PICKER=width|height` taps the corresponding portrait readout
+through the normal native input path for popover screenshots. `mobile_games_check`
+verifies tap-only activation, drag cancellation, range limits and selected values.
