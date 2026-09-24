@@ -18,6 +18,9 @@ speed (1x, 2x, 5x, lightning), clear the grid, and randomize it with the dice bu
 Lightning mode shows a warm yellow bolt and advances exactly one generation per
 frame while playing, without an additional iteration delay. Simulation speed
 therefore follows the frame rate, with input and rendering between generations.
+The boundary button next to speed toggles between **periodic** (two curved arrows,
+the default) and **fixed/dead** (a square enclosure) boundaries. Its icon morphs
+smoothly without resetting the grid or interrupting playback.
 The die has six separated rounded faces with cut-out pips. Each click tumbles it
 in 3D and lands on a randomly chosen different face, tilted toward the viewer.
 Each click independently gives every cell a 50% chance of being alive; the
@@ -32,7 +35,10 @@ Files are plain text: `O` for alive, `.` for dead, one complete row per line;
 lines starting with `!` are comments. Rows must have equal lengths and fit in
 200 x 200 cells; files larger than 1 MiB are rejected.
 
-Opening resizes the grid and sliders, fits the view, and leaves playback paused.
+Opening keeps each current grid dimension when it is larger than the file, and
+expands dimensions that are too small. The file is centered independently on both
+axes; any odd extra cell is placed on the right/bottom. The remaining cells are
+cleared, the sliders and fitted view are updated, and playback is paused.
 Patterns only one cell wide or high are padded to the minimum grid size of two.
 Canceling or failing to open preserves the current grid and playback state.
 Saving resumes the previous playback state without advancing through time spent
@@ -90,8 +96,8 @@ on the 200 x 200 grid with `--play` to watch the stream. Gliders wrap around
 the grid edges and can eventually interact with the gun or other gliders.
 
 `game_of_life_lib/` holds `update_step`, the part students implement in the
-assignment; this demo uses periodic boundaries instead of the assignment's
-dead boundaries. Left/right and top/bottom edges connect, including diagonal
+assignment; this demo defaults to periodic boundaries, with a button to restore the
+assignment's fixed/dead boundaries. Left/right and top/bottom edges connect, including diagonal
 neighbors across corners. All eight directional offsets count; when an axis is
 two cells long, opposite directions count the same cell twice. Iteration still
 uses the existing buffer without allocating a second grid.

@@ -80,3 +80,30 @@ TEST(CellsFile, SavesAndLoadsUnicodeFilePaths) {
   std::filesystem::remove(path);
   EXPECT_THROW(LoadCellsPattern(path.u8string()), std::runtime_error);
 }
+
+TEST(CellsFile, FitPreservesLargerDimensionsAndCentersEachAxis) {
+  const CellsPattern pattern{3, 2, {1, 0, 1, 0, 1, 0}};
+  for (auto dimensions : {std::pair{8, 7}, std::pair{8, 2}, std::pair{2, 7}, std::pair{2, 2}}) {
+    const auto fitted = FitCellsPattern(pattern, dimensions.first, dimensions.second);
+    const int width = std::max(3, dimensions.first);
+    const int height = std::max(2, dimensions.second);
+    EXPECT_EQ(fitted.width, width);
+    EXPECT_EQ(fitted.height, height);
+    for (int y = 0; y < height; ++y) {
+      for (int x = 0; x < width; ++x) {
+        const int px = x - (width - 3) / 2;
+        const int py = y - (height - 2) / 2;
+        const int expected = px >= 0 && px < 3 && py >= 0 && py < 2 ? pattern.cells[py * 3 + px] : 0;
+        EXPECT_EQ(fitted.cells[y * width + x], expected);
+      }
+    }
+  }
+}
+
+TEST(CellsFile, FitPadsSingleCellAndClearsSurroundingGrid) {
+  auto fitted = FitCellsPattern({1, 1, {1}}, 200, 200);
+  EXPECT_EQ(fitted.width, 200);
+  EXPECT_EQ(fitted.height, 200);
+  EXPECT_EQ(std::count(fitted.cells.begin(), fitted.cells.end(), 1), 1);
+  EXPECT_EQ(fitted.cells[99 * 200 + 99], 1);
+}

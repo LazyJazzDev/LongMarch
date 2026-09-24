@@ -2,6 +2,7 @@
 #include "application/animation_var.h"
 #include "application/application.h"
 #include "application/model.h"
+#include "boundary_toggle_button.h"
 #include "cell_button.h"
 #include "file_button.h"
 #include "grid_size.h"
@@ -78,6 +79,7 @@ class GameOfLife : public Application {
 
   std::unique_ptr<PausePlayButton> pause_play_button_;
   std::unique_ptr<SpeedToggleButton> speed_toggle_button_;
+  std::unique_ptr<BoundaryToggleButton> boundary_button_;
   std::unique_ptr<RefreshButton> refresh_button_;
   std::unique_ptr<RandomizeButton> randomize_button_;
   std::unique_ptr<FileButton> open_button_;
