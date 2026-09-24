@@ -26,6 +26,7 @@ class BoundaryToggleButton : public Button {
   std::unique_ptr<DeviceModel> device_icon_;
   std::unique_ptr<DeviceModel> cell_model_;
   BoundaryGlider glider_;
+  std::array<uint8_t, 16> drawn_cells_{};
   AnimationVar hover_{0.0f, AnimationStyle::kPower5};
   float morph_{1.0f};
   float velocity_{};

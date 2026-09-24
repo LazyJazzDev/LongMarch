@@ -7,7 +7,7 @@
 TEST(BoundaryGlider, RecordedFramesMatchEmptySpaceEvolutionAndMoveUpRight) {
   BoundaryGlider glider;
   std::array<uint8_t, 16> initial{};
-  for (int index : {1, 2, 3, 7, 10})
+  for (int index : {4, 5, 6, 10, 13})
     initial[index] = 1;
   EXPECT_EQ(glider.ProjectedCells(), initial);
   constexpr int size = 24, origin = 8;

@@ -30,13 +30,34 @@ Model BoundaryIcon(bool periodic) {
   }
   return Model(vertices, indices);
 }
+
+// Cell vertices use button-local coordinates, just like the enclosure, so
+// IconTheme evaluates one continuous light field across the complete icon.
+Model GliderModel(const std::array<uint8_t, 16> &cells) {
+  std::vector<Vertex> vertices;
+  std::vector<uint32_t> indices;
+  constexpr float pitch = 0.22f;
+  for (int y = 0; y < 4; ++y) {
+    for (int x = 0; x < 4; ++x) {
+      const glm::vec2 p{(x - 1.5f) * pitch, (y - 1.5f) * pitch};
+      const float radius = cells[y * 4 + x] ? pitch * 0.5f : 0.0f;
+      const uint32_t base = vertices.size();
+      auto quad = ComposeVertices({p + glm::vec2{-radius, -radius}, p + glm::vec2{radius, -radius},
+                                   p + glm::vec2{radius, radius}, p + glm::vec2{-radius, radius}},
+                                  glm::vec4{1.0f});
+      vertices.insert(vertices.end(), quad.begin(), quad.end());
+      indices.insert(indices.end(), {base, base + 1, base + 2, base, base + 2, base + 3});
+    }
+  }
+  return Model(vertices, indices);
+}
 }  // namespace
 
 BoundaryToggleButton::BoundaryToggleButton(Application *app, DeviceModel *background)
     : Button(app, 0, 0, 1, 1),
       background_(background) {
-  cell_model_ = std::make_unique<DeviceModel>(
-      app, Model(ComposeVertices({{-1, -1}, {1, -1}, {1, 1}, {-1, 1}}, glm::vec4{1.0f}), {0, 1, 2, 0, 2, 3}));
+  drawn_cells_ = glider_.ProjectedCells();
+  cell_model_ = std::make_unique<DeviceModel>(app, GliderModel(drawn_cells_));
   auto fixed = BoundaryIcon(false);
   auto periodic = BoundaryIcon(true);
   icon_ = std::make_unique<MixModel>(std::vector<std::vector<Vertex>>{fixed.Vertices(), periodic.Vertices()},
@@ -54,6 +75,11 @@ void BoundaryToggleButton::Update(float seconds) {
   velocity_ = (velocity_ - 24.0f * impulse * dt) * decay;
   device_icon_->UploadVertices(icon_->GetModel(std::clamp(morph_, 0.0f, 1.0f), MixStyle::kLinear).Vertices());
   glider_.Update(dt);
+  const auto cells = glider_.ProjectedCells();
+  if (cells != drawn_cells_) {
+    cell_model_->UploadVertices(GliderModel(cells).Vertices());
+    drawn_cells_ = cells;
+  }
   hover_.Update(dt * 10.0f);
 }
 
@@ -63,20 +89,8 @@ void BoundaryToggleButton::Draw() {
                                         button_palette::Background().GetValue(float(hover_)), glm::uvec4{1, 0, 0, 0}});
   application_->DrawModel(device_icon_.get(),
                           {GetModelMatrix(origin, size, 0.4f), glm::vec4{1.0f}, glm::uvec4{1, 0, 0, 0}});
-  const auto cells = glider_.ProjectedCells();
-  const glm::vec2 center = origin + size * 0.5f;
-  constexpr float pitch = 0.22f;
-  constexpr float half_size = pitch * 0.5f;
-  for (int y = 0; y < BoundaryGlider::kDisplaySize; ++y) {
-    for (int x = 0; x < BoundaryGlider::kDisplaySize; ++x) {
-      if (!cells[y * BoundaryGlider::kDisplaySize + x])
-        continue;
-      const glm::vec2 p{(x - 1.5f) * pitch, (y - 1.5f) * pitch};
-      application_->DrawModel(
-          cell_model_.get(), {GetModelMatrix(center + (p - glm::vec2{half_size}) * size * 0.5f, size * half_size, 0.4f),
-                              button_palette::kNeutral, glm::uvec4{1, 0, 0, 0}});
-    }
-  }
+  application_->DrawModel(cell_model_.get(),
+                          {GetModelMatrix(origin, size, 0.4f), button_palette::kNeutral, glm::uvec4{1, 0, 0, 0}});
 }
 
 void BoundaryToggleButton::OnClick() {

@@ -57,10 +57,10 @@ class BoundaryGlider {
 
  private:
   // Bit y*4+x: x increases rightward, y downward. The initial silhouette
-  // occupies the upper-right 3x3 area; every four frames it moves (+1, -1).
-  inline static constexpr std::array<uint16_t, kGenerations> kFrames{0x048e, 0x40ac, 0xc08a, 0xc049, 0xd081, 0x9805,
-                                                                     0x5901, 0x3908, 0x2b01, 0xa310, 0x2a30, 0x1630,
-                                                                     0x2470, 0x0562, 0x0456, 0x02c6};
+  // occupies the lower-left 3x3 area; every four frames it moves (+1, -1).
+  inline static constexpr std::array<uint16_t, kGenerations> kFrames{0x2470, 0x0562, 0x0456, 0x02c6, 0x048e, 0x40ac,
+                                                                     0xc08a, 0xc049, 0xd081, 0x9805, 0x5901, 0x3908,
+                                                                     0x2b01, 0xa310, 0x2a30, 0x1630};
   int generation_{};
   float elapsed_{};
   bool playing_{};
