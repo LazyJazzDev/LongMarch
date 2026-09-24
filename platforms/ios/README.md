@@ -25,7 +25,9 @@ animation. Tap or draw to edit, use two fingers to pan, and pinch to zoom. Its
 width/height (2–200), 1×/2×/5×/lightning speed, periodic/fixed edges and file buttons
 are the same desktop controls. Lightning advances once per rendered frame.
 Sidebars follow the window's short edges rather than the grid aspect ratio. On
-iPhone, GoL locks the entire interface to its entry orientation. Device direction
+iPhone, GoL fills the display, with reset/random at the two upper corners in
+portrait, dense controls below, and a compact status/exit overlay beneath the
+camera safe area. GoL locks the entire interface to its entry orientation. Device direction
 notifications rotate only the button icons with a short animation; the page,
 button positions, sliders, grid and touch coordinates stay fixed, with no system
 window-rotation animation. Flat/unknown directions preserve the last icon angle.

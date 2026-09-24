@@ -169,7 +169,9 @@ private final class GameCanvasView: UIView {
     case .landscapeRight: upright = .landscapeLeft
     default: return  // Flat/unknown devices keep the last useful icon orientation.
     }
-    let radians = angle(for: upright) - angle(for: entryOrientation)
+    // Framebuffer coordinates point down: compensate the device turn instead
+    // of applying the window-orientation transform to the icon a second time.
+    let radians = angle(for: entryOrientation) - angle(for: upright)
     guard iconAngle != radians else { return }
     iconAngle = radians
     metal.renderer.setGameIconRotation(Float(radians))
@@ -191,6 +193,9 @@ private final class GameCanvasView: UIView {
         "interface_unchanged": scene.interfaceOrientation == before,
         "bounds_unchanged": self.bounds == beforeBounds,
         "view_transform_identity": self.metal.transform.isIdentity,
+        "canvas_fills_window": self.window.map {
+          self.convert(self.bounds, to: $0).integral == $0.bounds.integral
+        } ?? false,
         "icon_angle": self.iconAngle ?? 0,
       ]
       let url = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
@@ -300,17 +305,37 @@ struct GamesView: View {
   @Environment(\.scenePhase) private var phase
   @State private var fps = 0.0
   @State private var error: String?
+  private var game: some View {
+    DesktopGameView(life: life, active: phase == .active) { value, message in
+      fps = value
+      error = message
+    }
+  }
   var body: some View {
-    VStack(spacing: 0) {
-      HStack {
-        Text("[Metal] \(life ? "Game of Life" : "2048") FPS: \(fps,specifier:"%.1f")").font(
-          .caption.monospaced())
-        Spacer()
-        Button("Demos", action: onExit)
-      }.padding(.horizontal, 12).frame(height: 36)
-      DesktopGameView(life: life, active: phase == .active) { value, message in
-        fps = value
-        error = message
+    Group {
+      if life {
+        ZStack(alignment: .top) {
+          game.ignoresSafeArea()
+          // Only this small overlay uses the safe area. The Metal canvas fills
+          // the display, with reset/random beside the island and controls below.
+          HStack(spacing: 12) {
+            Text("[Metal] GoL FPS: \(fps, specifier: "%.1f")")
+              .font(.caption2.monospaced())
+            Button("Demos", action: onExit).font(.caption)
+          }
+          .padding(.horizontal, 12).padding(.vertical, 6)
+          .background(.black.opacity(0.45), in: Capsule())
+          .padding(.top, 4)
+        }
+      } else {
+        VStack(spacing: 0) {
+          HStack {
+            Text("[Metal] 2048 FPS: \(fps,specifier:"%.1f")").font(.caption.monospaced())
+            Spacer()
+            Button("Demos", action: onExit)
+          }.padding(.horizontal, 12).frame(height: 36)
+          game
+        }
       }
     }.background(.black)
       .alert(
