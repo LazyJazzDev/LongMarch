@@ -4,6 +4,8 @@
 #include "application/text_bar.h"
 #include "rounded_rectangle.h"
 
+namespace puzzle_demo {
+
 class TextButton : public Button {
  public:
   TextButton(Application *app,
@@ -26,3 +28,5 @@ class TextButton : public Button {
   std::unique_ptr<DeviceModel> background_model_;
   std::unique_ptr<TextBar> text_bar_;
 };
+
+}  // namespace puzzle_demo

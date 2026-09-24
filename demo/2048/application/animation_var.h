@@ -2,6 +2,8 @@
 
 #include <cstdint>
 
+namespace puzzle_demo {
+
 enum class AnimationStyle : uint32_t { kLinear = 0, kPower2, kPower5 };
 
 class AnimationVar {
@@ -28,3 +30,5 @@ class AnimationVar {
   float alpha_{1.0};
   AnimationStyle animation_style_{AnimationStyle::kLinear};
 };
+
+}  // namespace puzzle_demo

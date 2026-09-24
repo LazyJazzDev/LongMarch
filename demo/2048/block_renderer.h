@@ -2,6 +2,8 @@
 #include "application/model.h"
 #include "font/factory.h"
 
+namespace puzzle_demo {
+
 class BlockRenderer {
  public:
   explicit BlockRenderer(Application *app, font::Factory *font_factory);
@@ -18,3 +20,5 @@ class BlockRenderer {
   std::map<int, std::unique_ptr<DeviceModel>> foreground_device_models_;
   std::unique_ptr<DeviceModel> background_device_model_;
 };
+
+}  // namespace puzzle_demo

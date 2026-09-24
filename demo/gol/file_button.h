@@ -6,6 +6,8 @@
 #include "application/button.h"
 #include "application/model.h"
 
+namespace life_demo {
+
 class FileButton : public Button {
  public:
   enum class Kind { kOpen, kSave };
@@ -35,3 +37,5 @@ class FileButton : public Button {
   float feedback_{0.0f};
   bool success_{false};
 };
+
+}  // namespace life_demo

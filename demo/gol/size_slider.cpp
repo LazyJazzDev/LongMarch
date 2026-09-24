@@ -5,6 +5,8 @@
 
 #include "grid_size.h"
 
+namespace life_demo {
+
 SizeSlider::SizeSlider(Application *app,
                        char label,
                        int value,
@@ -223,3 +225,5 @@ void SizeSlider::Draw() {
                    glm::translate(glm::mat4{1.0f}, glm::vec3{-label_width_ * 0.5f, -3.0f, 0});
   application_->DrawModel(label_model_.get(), {transform, {0.55f, 0.60f, 0.67f, 1.0f}, glm::uvec4{0}, bounds_});
 }
+
+}  // namespace life_demo

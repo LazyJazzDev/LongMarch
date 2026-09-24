@@ -3,6 +3,8 @@
 #include "application/application.h"
 #include "rounded_rectangle.h"
 
+namespace puzzle_demo {
+
 NoticeBoard::NoticeBoard(Application *app,
                          font::Factory *font_factory,
                          const glm::vec3 &title_color,
@@ -95,3 +97,5 @@ float NoticeBoard::GetFittingContentSize() {
   const float available_width = std::max(0.0f, right_ - left_) * 0.9f;
   return std::min(content_font_size_, available_width / width);
 }
+
+}  // namespace puzzle_demo

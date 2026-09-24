@@ -2,6 +2,8 @@
 
 #include <map>
 
+namespace puzzle_demo {
+
 TextBar::TextBar(Application *app,
                  font::Factory *font_factory,
                  const std::wstring &text,
@@ -67,3 +69,5 @@ void TextBar::Resize(float font_size, glm::vec2 origin) {
 font::Factory *TextBar::GetFontFactory() {
   return font_factory_;
 }
+
+}  // namespace puzzle_demo

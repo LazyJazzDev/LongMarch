@@ -14,6 +14,8 @@
 #include "size_slider.h"
 #include "speed_toggle_button.h"
 
+namespace life_demo {
+
 class GameOfLife : public Application {
  public:
   GameOfLife(const char *title,
@@ -21,9 +23,21 @@ class GameOfLife : public Application {
              int height,
              int cell_grid_width,
              int cell_grid_height,
-             graphics::BackendAPI api);
+             graphics::BackendAPI api,
+             bool hosted = false);
 
   ~GameOfLife() override;
+
+  void ResetFrameClock() {
+    last_frame_time_ = grassland::GetTimeSeconds();
+  }
+
+  // File pickers are asynchronous in native hosts. Buttons and feedback stay shared.
+  int HostedFileRequest() const {
+    return hosted_file_action_;
+  }
+
+  std::string CompleteHostedFile(const std::string &path);
 
   // Fills the grid with random live cells, each alive with the given probability.
   void RandomizeCells(float density, uint32_t seed);
@@ -60,6 +74,8 @@ class GameOfLife : public Application {
   void RequestFileAction(FileAction action);
   void ProcessFileAction();
 
+  int hosted_file_action_{};
+  bool hosted_was_playing_{};
   SimulationClock simulation_clock_;
   GridView grid_view_;
   std::unique_ptr<SizeSlider> width_slider_;
@@ -113,3 +129,5 @@ class GameOfLife : public Application {
   float playground_top_{};
   float playground_bottom_{};
 };
+
+}  // namespace life_demo

@@ -1,6 +1,8 @@
 #pragma once
 #include "application/text_bar.h"
 
+namespace puzzle_demo {
+
 class NoticeBoard {
  public:
   NoticeBoard(Application *app,
@@ -33,3 +35,5 @@ class NoticeBoard {
   std::wstring title_text_{L"TITLE"};
   std::wstring content_text_{L"CONTENT"};
 };
+
+}  // namespace puzzle_demo

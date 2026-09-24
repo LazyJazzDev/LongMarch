@@ -2,6 +2,8 @@
 
 #include "util.h"
 
+namespace life_demo {
+
 namespace geometry {
 using namespace glm;
 
@@ -26,3 +28,5 @@ glm::vec2 Intersection(const Line &line0, const Line &line1) {
   return -vec2(line0.d, line1.d) * inverse(mat2{line0.n.x, line0.n.y, line1.n.x, line1.n.y});
 }
 }  // namespace geometry
+
+}  // namespace life_demo

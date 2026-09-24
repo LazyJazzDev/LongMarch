@@ -1,5 +1,7 @@
 #include "cell_button.h"
 
+namespace life_demo {
+
 CellButton::CellButton(Application *app,
                        float left,
                        float top,
@@ -59,3 +61,5 @@ void CellButton::OnStateChange(int state) {
 
 void CellButton::ResizeModel() {
 }
+
+}  // namespace life_demo

@@ -5,6 +5,8 @@
 
 #include "triangle.h"
 
+namespace life_demo {
+
 namespace geometry {
 class Mesh {
  public:
@@ -19,3 +21,5 @@ class Mesh {
   std::vector<Triangle> triangles;
 };
 }  // namespace geometry
+
+}  // namespace life_demo

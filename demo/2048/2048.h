@@ -12,11 +12,18 @@
 #include "random"
 #include "text_button.h"
 
+namespace puzzle_demo {
+
 enum class GameStage { kGameGoing, kMenu, kGameOver };
 
 class TwentyFourEight : public Application {
  public:
-  TwentyFourEight(const std::string &title, int width, int height, graphics::BackendAPI api);
+  TwentyFourEight(const std::string &title, int width, int height, graphics::BackendAPI api, bool hosted = false);
+
+  void ResetFrameClock() {
+    last_step_time_point_ = std::chrono::steady_clock::now();
+  }
+
   void TransitStage(GameStage stage);
   void ResetGame();
 
@@ -72,6 +79,7 @@ class TwentyFourEight : public Application {
   void UpdateScoreBoard();
   bool IsGameOver();
 
+  std::chrono::steady_clock::time_point last_step_time_point_{std::chrono::steady_clock::now()};
   std::unique_ptr<font::Factory> font_factory_;
 
   std::unique_ptr<BlockRenderer> block_renderer_;
@@ -119,3 +127,5 @@ class TwentyFourEight : public Application {
   GameStage target_game_stage_{GameStage::kGameGoing};
   std::optional<Direction> operation_buffer_;
 };
+
+}  // namespace puzzle_demo

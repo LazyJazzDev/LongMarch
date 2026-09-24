@@ -2,6 +2,8 @@
 
 #include "listener.h"
 
+namespace puzzle_demo {
+
 class Button : public Listener {
  public:
   Button(Application *application, float left, float top, float right, float bottom);
@@ -37,3 +39,5 @@ class Button : public Listener {
   float listener_right_{0};
   float listener_bottom_{0};
 };
+
+}  // namespace puzzle_demo

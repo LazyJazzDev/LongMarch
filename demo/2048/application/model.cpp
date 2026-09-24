@@ -1,5 +1,7 @@
 #include "model.h"
 
+namespace puzzle_demo {
+
 Model::Model(const std::vector<Vertex> &vertices, const std::vector<uint32_t> &indices) {
   vertices_ = vertices;
   indices_ = indices;
@@ -111,3 +113,5 @@ Model &MixModel::GetModel(float alpha, MixStyle mix_style) {
   }
   return mixed_model_.value();
 }
+
+}  // namespace puzzle_demo

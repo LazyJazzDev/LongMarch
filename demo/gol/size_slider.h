@@ -5,6 +5,8 @@
 #include "application/listener.h"
 #include "application/model.h"
 
+namespace life_demo {
+
 class SizeSlider : public Listener {
  public:
   SizeSlider(Application *app, char label, int value, DeviceModel *rectangle, std::function<void(int)> on_change);
@@ -52,3 +54,5 @@ class SizeSlider : public Listener {
   bool focused_{false};
   uint32_t key_callback_{};
 };
+
+}  // namespace life_demo

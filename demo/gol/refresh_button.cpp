@@ -3,6 +3,8 @@
 #include "button_palette.h"
 #include "geometry/mesh.h"
 
+namespace life_demo {
+
 RefreshButton::RefreshButton(Application *app,
                              float left,
                              float top,
@@ -116,3 +118,5 @@ void RefreshButton::OnStateChange(int state) {
 
 void RefreshButton::ResizeModel() {
 }
+
+}  // namespace life_demo

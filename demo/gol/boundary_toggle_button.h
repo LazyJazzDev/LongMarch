@@ -6,6 +6,8 @@
 #include "boundary_glider.h"
 #include "game_of_life_lib/game_of_life_lib.h"
 
+namespace life_demo {
+
 class BoundaryToggleButton : public Button {
  public:
   BoundaryToggleButton(Application *app, DeviceModel *background);
@@ -31,3 +33,5 @@ class BoundaryToggleButton : public Button {
   float morph_{1.0f};
   float velocity_{};
 };
+
+}  // namespace life_demo

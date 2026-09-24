@@ -6,6 +6,8 @@
 
 #include FT_OUTLINE_H
 
+namespace puzzle_demo {
+
 namespace {
 const int arc_precision = 3;
 const int size_scale = 128;
@@ -530,3 +532,5 @@ Mesh Factory::GetString(const std::wstring &wide_str) {
 }
 
 }  // namespace font
+
+}  // namespace puzzle_demo

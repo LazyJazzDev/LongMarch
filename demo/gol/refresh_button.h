@@ -3,6 +3,8 @@
 #include "application/button.h"
 #include "application/model.h"
 
+namespace life_demo {
+
 class RefreshButton : public Button {
  public:
   RefreshButton(Application *app,
@@ -30,3 +32,5 @@ class RefreshButton : public Button {
   int32_t program_transformation_uniform_location_;
   std::vector<uint8_t> *game_buffer_;
 };
+
+}  // namespace life_demo

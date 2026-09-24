@@ -5,6 +5,8 @@
 #include "button_palette.h"
 #include "glm/gtc/matrix_transform.hpp"
 
+namespace life_demo {
+
 namespace {
 const std::array<glm::vec3, 6> kNormals{{{1, 0, 0}, {-1, 0, 0}, {0, 1, 0}, {0, -1, 0}, {0, 0, 1}, {0, 0, -1}}};
 constexpr std::array<uint32_t, 6> kFaceValues{1, 6, 2, 5, 3, 4};
@@ -98,3 +100,5 @@ void RandomizeButton::OnClick() {
 void RandomizeButton::OnStateChange(int state) {
   background_animation_.UpdateTarget(float(state));
 }
+
+}  // namespace life_demo

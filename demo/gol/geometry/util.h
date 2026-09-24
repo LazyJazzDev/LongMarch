@@ -7,6 +7,8 @@
 #define LOG_ERROR grassland::LogError
 #define LOG_WARN grassland::LogWarning
 
+namespace life_demo {
+
 namespace geometry {
 constexpr float eps = 1e-8;
 
@@ -22,3 +24,5 @@ bool Equal(const Ty &v0, const Ty &v1) {
 
 bool Between(float x0, float x1, float y);
 }  // namespace geometry
+
+}  // namespace life_demo

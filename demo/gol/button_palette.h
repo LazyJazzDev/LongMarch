@@ -2,6 +2,8 @@
 
 #include "application/model.h"
 
+namespace life_demo {
+
 namespace button_palette {
 // IconTheme multiplies these colors by roughly 1.6 at the icon center.
 inline const glm::vec4 kNeutral{0.47f, 0.49f, 0.52f, 1.0f};
@@ -29,3 +31,5 @@ inline MixValue<glm::vec4> RandomizeBackground() {
   return MixValue<glm::vec4>({{0.115f, 0.18f, 0.29f, 1.0f}, {0.155f, 0.22f, 0.34f, 1.0f}, {0.09f, 0.15f, 0.25f, 1.0f}});
 }
 }  // namespace button_palette
+
+}  // namespace life_demo

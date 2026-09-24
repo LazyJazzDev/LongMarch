@@ -4,6 +4,8 @@
 #include "listener.h"
 #include "model.h"
 
+namespace puzzle_demo {
+
 class TextBar : public Listener {
  public:
   enum class AlignMode : uint32_t { kLeft, kMid, kRight };
@@ -40,3 +42,5 @@ class TextBar : public Listener {
   std::unique_ptr<DeviceModel> device_model_;
   std::wstring text_;
 };
+
+}  // namespace puzzle_demo

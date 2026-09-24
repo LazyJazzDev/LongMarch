@@ -3,6 +3,8 @@
 #include "application/button.h"
 #include "application/model.h"
 
+namespace life_demo {
+
 class SpeedToggleButton : public Button {
  public:
   SpeedToggleButton(Application *app, float left, float top, float right, float bottom, DeviceModel *device_model);
@@ -25,3 +27,5 @@ class SpeedToggleButton : public Button {
   int32_t program_transformation_uniform_location_;
   int32_t click_cnt_{0};
 };
+
+}  // namespace life_demo

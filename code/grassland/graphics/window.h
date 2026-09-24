@@ -1,4 +1,6 @@
 #pragma once
+#include <set>
+
 #include "grassland/graphics/graphics_util.h"
 #ifndef LONGMARCH_HEADLESS
 #include "imgui.h"
@@ -24,6 +26,22 @@ class Window {
  public:
   Window(int width, int height, const std::string &title, bool fullscreen, bool resizable, bool enable_hdr);
   virtual ~Window();
+
+  // A host owns presentation and feeds logical input plus physical drawable sizes.
+  // This lets native mobile views use the same application-facing window events.
+  struct Hosted {};
+
+  Window(Hosted, int width, int height, const std::string &title);
+
+  bool IsHosted() const {
+    return hosted_;
+  }
+
+  void UpdateHostedSize(glm::ivec2 logical, glm::ivec2 framebuffer);
+  void SendPointer(double x, double y);
+  void SendMouseButton(int button, int action, int mods = 0);
+  void SendKey(int key, int action, int mods = 0);
+  void SendFocus(bool focused);
 
   GLFWwindow *GLFWWindow() const {
     return window_;
@@ -103,7 +121,7 @@ class Window {
   // Unsupported platforms emit no magnify events. Ctrl + scroll stays a separate
   // input path: driver-emulated scroll is never also synthesized as magnification.
   bool SupportsMagnifyGestures() const {
-    return magnify_monitor_ != nullptr;
+    return hosted_ || magnify_monitor_ != nullptr;
   }
 
   // Dispatched on the window event thread, just like ScrollEvent().
@@ -124,7 +142,12 @@ class Window {
   }
 
  private:
-  GLFWwindow *window_;
+  GLFWwindow *window_{};
+  bool hosted_{false}, hosted_closed_{false}, hosted_focused_{true};
+  glm::ivec2 hosted_size_{}, hosted_framebuffer_{};
+  glm::dvec2 hosted_cursor_{};
+  std::string hosted_title_;
+  std::set<int> hosted_keys_, hosted_buttons_;
   void *magnify_monitor_{};
   EventManager<void(const MagnifyGesture &)> magnify_event_;
   // Resize, mouse, keyboard, etc.
@@ -146,6 +169,30 @@ class Window {
 #if defined(LONGMARCH_PYTHON_ENABLED)
   static void PybindClassRegistration(py::classh<Window> &c);
 #endif
+};
+
+// No desktop window or ImGui context; the embedding host presents rendered images.
+class HostedWindow final : public Window {
+ public:
+  HostedWindow(int width, int height, const std::string &title) : Window(Hosted{}, width, height, title) {
+  }
+
+  void InitImGui(const char * = nullptr, float = 13) override {
+    throw std::runtime_error("Hosted ImGui is not configured");
+  }
+
+  void TerminateImGui() override {
+  }
+
+  void BeginImGuiFrame() override {
+  }
+
+  void EndImGuiFrame() override {
+  }
+
+  ImGuiContext *GetImGuiContext() const override {
+    return nullptr;
+  }
 };
 
 }  // namespace grassland::graphics

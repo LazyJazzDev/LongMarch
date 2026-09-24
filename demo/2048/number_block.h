@@ -5,6 +5,8 @@
 #include "application/text_bar.h"
 #include "block_renderer.h"
 
+namespace puzzle_demo {
+
 struct NumberBlock {
   enum class Stage { kStop, kAppear, kMove, kMerge, kBeMerged, kDead };
   int x;
@@ -25,3 +27,5 @@ struct NumberBlock {
   void Render(BlockRenderer *block_renderer, float alpha, float depth_offset) const;
   [[nodiscard]] Block GetBlock() const;
 };
+
+}  // namespace puzzle_demo

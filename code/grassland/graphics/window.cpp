@@ -1,11 +1,12 @@
 #include "grassland/graphics/window.h"
 
-#ifdef __APPLE__
+#if defined(__APPLE__) && !defined(LONGMARCH_HEADLESS)
 #include "grassland/graphics/window_gestures.h"
 #endif
 
 namespace grassland::graphics {
 
+#ifndef LONGMARCH_HEADLESS
 namespace {
 bool glfw_initialized_{false};
 
@@ -43,7 +44,7 @@ Window::Window(int width, int height, const std::string &title, bool fullscreen,
     throw std::runtime_error("Failed to create GLFW window");
   }
 
-#ifdef __APPLE__
+#if defined(__APPLE__) && !defined(LONGMARCH_HEADLESS)
   magnify_monitor_ = detail::InstallMagnifyEvents(this);
 #endif
   glfwSetWindowUserPointer(window_, this);
@@ -91,77 +92,256 @@ Window::Window(int width, int height, const std::string &title, bool fullscreen,
   });
 }
 
+#endif
+
+Window::Window(Hosted, int width, int height, const std::string &title)
+    : hosted_(true),
+      hosted_size_(width, height),
+      hosted_framebuffer_(width, height),
+      hosted_title_(title),
+      enable_hdr_(false) {
+}
+
+void Window::UpdateHostedSize(glm::ivec2 logical, glm::ivec2 framebuffer) {
+  if (!hosted_)
+    throw std::logic_error("Expected hosted window");
+  if (logical != hosted_size_) {
+    hosted_size_ = logical;
+    resize_event_.InvokeCallbacks(logical.x, logical.y);
+  }
+  if (framebuffer != hosted_framebuffer_) {
+    hosted_framebuffer_ = framebuffer;
+    framebuffer_resize_event_.InvokeCallbacks(framebuffer.x, framebuffer.y);
+  }
+}
+
+void Window::SendPointer(double x, double y) {
+  hosted_cursor_ = {x, y};
+  mouse_move_event_.InvokeCallbacks(x, y);
+}
+
+void Window::SendMouseButton(int button, int action, int mods) {
+  if (action)
+    hosted_buttons_.insert(button);
+  else
+    hosted_buttons_.erase(button);
+  mouse_button_event_.InvokeCallbacks(button, action, mods, hosted_cursor_.x, hosted_cursor_.y);
+}
+
+void Window::SendKey(int key, int action, int mods) {
+  if (action)
+    hosted_keys_.insert(key);
+  else
+    hosted_keys_.erase(key);
+  key_event_.InvokeCallbacks(key, 0, action, mods);
+}
+
+void Window::SendFocus(bool focused) {
+  hosted_focused_ = focused;
+  if (!focused) {
+    hosted_keys_.clear();
+    hosted_buttons_.clear();
+  }
+  focus_event_.InvokeCallbacks(focused);
+}
+
 Window::~Window() {
   CloseWindow();
 }
 
 int Window::GetWidth() const {
+  if (hosted_) {
+    return hosted_size_.x;
+  }
+#ifndef LONGMARCH_HEADLESS
+
   int width, height;
   glfwGetWindowSize(window_, &width, &height);
   return width;
+
+#else
+  return hosted_size_.x;
+#endif
 }
 
 int Window::GetHeight() const {
+  if (hosted_) {
+    return hosted_size_.y;
+  }
+#ifndef LONGMARCH_HEADLESS
+
   int width, height;
   glfwGetWindowSize(window_, &width, &height);
   return height;
+
+#else
+  return hosted_size_.y;
+#endif
 }
 
 glm::ivec2 Window::GetSize() const {
+  if (hosted_) {
+    return hosted_size_;
+  }
+#ifndef LONGMARCH_HEADLESS
+
   glm::ivec2 size;
   glfwGetWindowSize(window_, &size.x, &size.y);
   return size;
+
+#else
+  return hosted_size_;
+#endif
 }
 
 glm::ivec2 Window::GetFramebufferSize() const {
+  if (hosted_) {
+    return hosted_framebuffer_;
+  }
+#ifndef LONGMARCH_HEADLESS
+
   glm::ivec2 size;
   glfwGetFramebufferSize(window_, &size.x, &size.y);
   return size;
+
+#else
+  return hosted_framebuffer_;
+#endif
 }
 
 glm::dvec2 Window::GetCursorPosition() const {
+  if (hosted_) {
+    return hosted_cursor_;
+  }
+#ifndef LONGMARCH_HEADLESS
+
   glm::dvec2 position;
   glfwGetCursorPos(window_, &position.x, &position.y);
   return position;
+
+#else
+  return hosted_cursor_;
+#endif
 }
 
 bool Window::IsKeyDown(int key) const {
+  if (hosted_) {
+    return hosted_keys_.count(key);
+  }
+#ifndef LONGMARCH_HEADLESS
+
   return glfwGetKey(window_, key) == GLFW_PRESS;
+
+#else
+  return hosted_keys_.count(key);
+#endif
 }
 
 bool Window::IsMouseButtonDown(int button) const {
+  if (hosted_) {
+    return hosted_buttons_.count(button);
+  }
+#ifndef LONGMARCH_HEADLESS
+
   return glfwGetMouseButton(window_, button) == GLFW_PRESS;
+
+#else
+  return hosted_buttons_.count(button);
+#endif
 }
 
 bool Window::IsFocused() const {
+  if (hosted_) {
+    return hosted_focused_;
+  }
+#ifndef LONGMARCH_HEADLESS
+
   return glfwGetWindowAttrib(window_, GLFW_FOCUSED) == GLFW_TRUE;
+
+#else
+  return hosted_focused_;
+#endif
 }
 
 void Window::Focus() {
+  if (hosted_) {
+    SendFocus(true);
+    return;
+  }
+#ifndef LONGMARCH_HEADLESS
+
   glfwFocusWindow(window_);
+
+#else
+  SendFocus(true);
+  return;
+#endif
 }
 
 void Window::RequestClose() {
+  if (hosted_) {
+    hosted_closed_ = true;
+    return;
+  }
+#ifndef LONGMARCH_HEADLESS
+
   glfwSetWindowShouldClose(window_, GLFW_TRUE);
+
+#else
+  hosted_closed_ = true;
+  return;
+#endif
 }
 
 glm::ivec2 Window::GetPosition() const {
+  if (hosted_) {
+    return {0, 0};
+  }
+#ifndef LONGMARCH_HEADLESS
+
   glm::ivec2 position;
   glfwGetWindowPos(window_, &position.x, &position.y);
   return position;
+
+#else
+  return {0, 0};
+#endif
 }
 
 void Window::SetPosition(int x, int y) {
+  if (hosted_) {
+    return;
+  }
+#ifndef LONGMARCH_HEADLESS
+
   glfwSetWindowPos(window_, x, y);
+
+#else
+  return;
+#endif
 }
 
 glm::ivec4 Window::GetFrameSize() const {
+  if (hosted_) {
+    return {0, 0, 0, 0};
+  }
+#ifndef LONGMARCH_HEADLESS
+
   glm::ivec4 frame;
   glfwGetWindowFrameSize(window_, &frame.x, &frame.y, &frame.z, &frame.w);
   return frame;
+
+#else
+  return {0, 0, 0, 0};
+#endif
 }
 
 glm::ivec4 Window::GetMonitorWorkArea() const {
+  if (hosted_) {
+    return {0, 0, hosted_size_.x, hosted_size_.y};
+  }
+#ifndef LONGMARCH_HEADLESS
+
   const auto position = GetPosition();
   const auto size = GetSize();
   int count = 0;
@@ -185,35 +365,96 @@ glm::ivec4 Window::GetMonitorWorkArea() const {
   glm::ivec4 area;
   glfwGetMonitorWorkarea(monitor, &area.x, &area.y, &area.z, &area.w);
   return area;
+
+#else
+  return {0, 0, hosted_size_.x, hosted_size_.y};
+#endif
 }
 
 void Window::PollEvents() {
+#ifndef LONGMARCH_HEADLESS
+
   glfwPollEvents();
+
+#else
+  return;
+#endif
 }
 
 void Window::SetTitle(const std::string &title) {
+  if (hosted_) {
+    hosted_title_ = title;
+    return;
+  }
+#ifndef LONGMARCH_HEADLESS
+
   glfwSetWindowTitle(window_, title.c_str());
+
+#else
+  hosted_title_ = title;
+  return;
+#endif
 }
 
 std::string Window::GetTitle() const {
+  if (hosted_) {
+    return hosted_title_;
+  }
+#ifndef LONGMARCH_HEADLESS
+
   return glfwGetWindowTitle(window_);
+
+#else
+  return hosted_title_;
+#endif
 }
 
 void Window::Resize(int new_width, int new_height) {
+  if (hosted_) {
+    UpdateHostedSize({new_width, new_height}, {new_width, new_height});
+    return;
+  }
+#ifndef LONGMARCH_HEADLESS
+
   glfwSetWindowSize(window_, new_width, new_height);
+
+#else
+  UpdateHostedSize({new_width, new_height}, {new_width, new_height});
+  return;
+#endif
 }
 
 void Window::CloseWindow() {
-#ifdef __APPLE__
+  if (hosted_) {
+    hosted_closed_ = true;
+    return;
+  }
+#ifndef LONGMARCH_HEADLESS
+
+#if defined(__APPLE__) && !defined(LONGMARCH_HEADLESS)
   detail::RemoveMagnifyEvents(magnify_monitor_);
   magnify_monitor_ = nullptr;
 #endif
   glfwDestroyWindow(window_);
   window_ = nullptr;
+
+#else
+  hosted_closed_ = true;
+  return;
+#endif
 }
 
 bool Window::ShouldClose() const {
+  if (hosted_) {
+    return hosted_closed_;
+  }
+#ifndef LONGMARCH_HEADLESS
+
   return glfwWindowShouldClose(window_);
+
+#else
+  return hosted_closed_;
+#endif
 }
 
 void Window::SetHDR(bool enable_hdr) {

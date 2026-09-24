@@ -3,6 +3,8 @@
 #include "glm/gtc/matrix_transform.hpp"
 #include "interpolation.h"
 
+namespace puzzle_demo {
+
 struct Vertex {
   glm::vec2 position;
   glm::vec4 color;
@@ -73,3 +75,5 @@ std::vector<Vertex> ComposeVertices(const std::vector<glm::vec2> &positions, con
 glm::mat4 GetModelMatrix(const glm::vec2 &position, const glm::vec2 &scale, float depth = 0.5f);
 
 glm::mat4 GetModelMatrixZO(const glm::vec2 &position, const glm::vec2 &scale, float depth = 0.5f);
+
+}  // namespace puzzle_demo

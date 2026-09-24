@@ -7,6 +7,8 @@
 #include "ai_benchmark.h"
 #include "ai_player.h"
 
+using namespace puzzle_demo;
+
 namespace {
 
 graphics::BackendAPI ParseBackend(const std::string &name) {

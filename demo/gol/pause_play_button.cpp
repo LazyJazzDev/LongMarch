@@ -6,6 +6,8 @@
 #include "application/model.h"
 #include "button_palette.h"
 
+namespace life_demo {
+
 PausePlayButton::PausePlayButton(Application *app,
                                  float left,
                                  float top,
@@ -113,3 +115,5 @@ bool PausePlayButton::IsPlaying() const {
 void PausePlayButton::SetPlaying(bool playing) {
   is_playing_ = playing;
 }
+
+}  // namespace life_demo

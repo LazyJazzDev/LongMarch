@@ -3,6 +3,8 @@
 #include "button_palette.h"
 #include "simulation_clock.h"
 
+namespace life_demo {
+
 SpeedToggleButton::SpeedToggleButton(Application *app,
                                      float left,
                                      float top,
@@ -119,3 +121,5 @@ void SpeedToggleButton::ResizeModel() {
 int SpeedToggleButton::SpeedLevel() const {
   return click_cnt_;
 }
+
+}  // namespace life_demo

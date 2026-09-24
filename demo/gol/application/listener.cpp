@@ -1,5 +1,7 @@
 #include "listener.h"
 
+namespace life_demo {
+
 Listener::Listener(Application *application) : application_(application) {
   application_->RegisterListener(this);
 }
@@ -20,3 +22,5 @@ void Listener::OnMouseButton(int mouse_button, int state, int mods) {
 
 void Listener::OnWindowSize(int width, int height) {
 }
+
+}  // namespace life_demo

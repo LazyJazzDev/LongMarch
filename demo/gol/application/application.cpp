@@ -3,14 +3,25 @@
 #include <algorithm>
 #include <map>
 
+#ifndef LONGMARCH_HOSTED_GAMES
 #define STB_IMAGE_WRITE_IMPLEMENTATION
+#endif
 #include "listener.h"
 #include "model.h"
 #include "stb_image_write.h"
 
+namespace life_demo {
+
 namespace {
 
 #include "built_in_shaders.inl"
+#ifdef LONGMARCH_HOSTED_GAMES
+std::string GetShaderCode(const std::string &name) {
+  std::vector<uint8_t> bytes;
+  GetShaderVirtualFileSystem().ReadFile(name, bytes);
+  return {bytes.begin(), bytes.end()};
+}
+#endif
 
 struct ResolveParams {
   float second_frame_alpha;
@@ -31,7 +42,8 @@ int ChooseSupersampleScale(glm::ivec2 size) {
 
 }  // namespace
 
-Application::Application(const std::string &name, int width, int height, graphics::BackendAPI api) : name_(name) {
+Application::Application(const std::string &name, int width, int height, graphics::BackendAPI api, bool hosted)
+    : name_(name) {
   if (!graphics::SupportBackendAPI(api) || graphics::CreateCore(api, graphics::Core::Settings{}, &core_) != 0 ||
       !core_) {
     throw std::runtime_error("Requested graphics backend is unavailable");
@@ -42,9 +54,13 @@ Application::Application(const std::string &name, int width, int height, graphic
   LogInfo("Backend API: {}", graphics::BackendAPIString(core_->API()));
   LogInfo("Device Name: {}", core_->DeviceName());
 
-  core_->CreateWindowObject(width, height,
-                            fmt::format("[{}] {} FPS: 0.0", graphics::BackendAPIString(core_->API()), name_), false,
-                            true, &window_);
+  if (hosted)
+    window_ = std::make_unique<graphics::HostedWindow>(width, height, name);
+  else {
+    core_->CreateWindowObject(width, height,
+                              fmt::format("[{}] {} FPS: 0.0", graphics::BackendAPIString(core_->API()), name_), false,
+                              true, &window_);
+  }
 
   mouse_move_callback_ = window_->MouseMoveEvent().RegisterCallback(
       [this](double xpos, double ypos) { NotifyListeners(&Listener::OnCursorPos, xpos, ypos); });
@@ -214,7 +230,8 @@ void Application::OnRender() {
   context->CmdDraw(3, 1, 0, 0);
   context->CmdEndRendering();
 
-  context->CmdPresent(window_.get(), present_image_.get());
+  if (!window_->IsHosted())
+    context->CmdPresent(window_.get(), present_image_.get());
   core_->SubmitCommandContext(context.get());
 }
 
@@ -333,3 +350,5 @@ void Application::SaveScreenshot() {
     LogError("Failed to save screenshot to {}", screenshot_path_);
   }
 }
+
+}  // namespace life_demo

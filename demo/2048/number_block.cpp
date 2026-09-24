@@ -2,6 +2,8 @@
 
 #include "rounded_rectangle.h"
 
+namespace puzzle_demo {
+
 NumberBlock::NumberBlock(int new_x, int new_y, int new_number) {
   x = new_x;
   y = new_y;
@@ -82,3 +84,5 @@ void NumberBlock::Render(BlockRenderer *block_renderer, float alpha, float depth
 Block NumberBlock::GetBlock() const {
   return Block{x, y, number};
 }
+
+}  // namespace puzzle_demo

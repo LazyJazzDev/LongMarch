@@ -1,5 +1,7 @@
 #include "button.h"
 
+namespace life_demo {
+
 Button::Button(Application *app, float left, float top, float right, float bottom)
     : Listener(app),
       app_(app),
@@ -125,3 +127,5 @@ void Button::CalculateListenerBounds() {
 bool Button::IsInsideListenerBounds(float x, float y) const {
   return (listener_left_ <= x) && (x <= listener_right_) && (listener_top_ <= y) && (y <= listener_bottom_);
 }
+
+}  // namespace life_demo

@@ -2,6 +2,8 @@
 
 #include "application//interpolation.h"
 
+namespace puzzle_demo {
+
 Model GenerateRoundedRectangle(float left,
                                float top,
                                float right,
@@ -38,3 +40,5 @@ Model GenerateRoundedRectangle(float left,
 
   return Model{vertices, indices};
 }
+
+}  // namespace puzzle_demo

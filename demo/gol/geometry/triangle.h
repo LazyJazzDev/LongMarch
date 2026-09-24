@@ -2,6 +2,8 @@
 
 #include <glm/glm.hpp>
 
+namespace life_demo {
+
 namespace geometry {
 struct Triangle {
   glm::vec2 v0;
@@ -11,3 +13,5 @@ struct Triangle {
   [[nodiscard]] bool IsInside(glm::vec2 v) const;
 };
 }  // namespace geometry
+
+}  // namespace life_demo

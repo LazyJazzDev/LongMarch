@@ -1,6 +1,8 @@
 #pragma once
 #include "application.h"
 
+namespace puzzle_demo {
+
 class Listener {
  public:
   explicit Listener(Application *application);
@@ -14,3 +16,5 @@ class Listener {
  protected:
   Application *application_;
 };
+
+}  // namespace puzzle_demo

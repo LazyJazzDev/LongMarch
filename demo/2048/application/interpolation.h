@@ -7,6 +7,8 @@
 #include "glm/gtc/constants.hpp"
 #include "vector"
 
+namespace puzzle_demo {
+
 template <class Ty>
 Ty Mix(const Ty &v0, const Ty &v1, float alpha) {
   return v0 * (1.0f - alpha) + v1 * alpha;
@@ -37,3 +39,5 @@ class MixValue {
  private:
   std::vector<Ty> values_;
 };
+
+}  // namespace puzzle_demo

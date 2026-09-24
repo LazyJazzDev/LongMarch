@@ -1,5 +1,7 @@
 #include "model.h"
 
+namespace life_demo {
+
 Model::Model(const std::vector<Vertex> &vertices, const std::vector<uint32_t> &indices) {
   vertices_ = vertices;
   indices_ = indices;
@@ -89,3 +91,5 @@ Model &MixModel::GetModel(float alpha, MixStyle mix_style) {
   }
   return mixed_model_.value();
 }
+
+}  // namespace life_demo

@@ -2,6 +2,8 @@
 
 #include <algorithm>
 
+namespace puzzle_demo {
+
 namespace {
 
 // The score board in its normal state, and the same board while the autoplay
@@ -26,8 +28,8 @@ constexpr int kScoreBoardClicksToStartAi = 5;
 
 }  // namespace
 
-TwentyFourEight::TwentyFourEight(const std::string &title, int width, int height, graphics::BackendAPI api)
-    : Application(title, width, height, api) {
+TwentyFourEight::TwentyFourEight(const std::string &title, int width, int height, graphics::BackendAPI api, bool hosted)
+    : Application(title, width, height, api, hosted) {
   GetWindow()->KeyEvent().RegisterCallback([this](int key, int scancode, int action, int mods) {
     if (action != GLFW_PRESS) {
       return;
@@ -141,10 +143,9 @@ void TwentyFourEight::CustomOnInit() {
 void TwentyFourEight::CustomOnUpdate() {
   Application::CustomOnUpdate();
 
-  static auto last_step_time_point = std::chrono::steady_clock::now();
   auto time_point = std::chrono::steady_clock::now();
-  auto time_last_turn = static_cast<float>((time_point - last_step_time_point) / std::chrono::microseconds(1)) * 1e-6f;
-  last_step_time_point = time_point;
+  auto time_last_turn = static_cast<float>((time_point - last_step_time_point_) / std::chrono::microseconds(1)) * 1e-6f;
+  last_step_time_point_ = time_point;
   OnUpdate(time_last_turn);
   OnDraw();
 }
@@ -658,3 +659,5 @@ void TwentyFourEight::OnDraw() {
 
   menu_button_->Draw();
 }
+
+}  // namespace puzzle_demo

@@ -1,6 +1,8 @@
 #pragma once
 #include "application.h"
 
+namespace life_demo {
+
 class Listener {
  public:
   explicit Listener(Application *application);
@@ -13,3 +15,5 @@ class Listener {
  protected:
   Application *application_;
 };
+
+}  // namespace life_demo

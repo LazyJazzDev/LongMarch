@@ -4,6 +4,8 @@
 #include "application/button.h"
 #include "application/model.h"
 
+namespace life_demo {
+
 class PausePlayButton : public Button {
  public:
   PausePlayButton(Application *app, float left, float top, float right, float bottom, DeviceModel *device_model);
@@ -34,3 +36,5 @@ class PausePlayButton : public Button {
   AnimationVar background_animation_var_;
   bool is_playing_{false};
 };
+
+}  // namespace life_demo

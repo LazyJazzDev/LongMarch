@@ -6,6 +6,8 @@
 #include "cells_pattern.h"
 #include "game_of_life_gui.h"
 
+using namespace life_demo;
+
 namespace {
 
 graphics::BackendAPI ParseBackend(const std::string &name) {

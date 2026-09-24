@@ -62,13 +62,14 @@ int MetalCore::InitializeLogicalDevice(int index) {
     return -1;
   device_ = NS::RetainPtr(devices->object<MTL::Device>(index));
 #endif
+// Simulator exposes tier-1 argument buffers and reports non-unified memory,
+// but supports the shared-buffer raster/compute path. Ray queries retain their
+// separate device-capability check.
+#if !TARGET_OS_SIMULATOR
   if (device_->argumentBuffersSupport() != MTL::ArgumentBuffersTier2 || !device_->hasUnifiedMemory()) {
-#if TARGET_OS_SIMULATOR
-    throw std::runtime_error("This iOS Simulator does not expose the Metal features required by LongMarch. Run on a compatible iPhone or iPad.");
-#else
     throw std::runtime_error("Metal backend requires Apple Silicon with tier 2 argument buffers");
-#endif
   }
+#endif
   queue_ = NS::TransferPtr(device_->newCommandQueue());
   MetalCheck(queue_.get(), nullptr, "newCommandQueue");
   device_name_ = device_->name()->utf8String();

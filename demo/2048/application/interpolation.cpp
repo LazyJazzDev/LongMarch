@@ -1,5 +1,7 @@
 #include "interpolation.h"
 
+namespace puzzle_demo {
+
 float PowerInterpolation(float x, float index) {
   if (x < 0.5f)
     return std::pow(x * 2.0f, index) * 0.5f;
@@ -10,3 +12,5 @@ float PowerInterpolation(float x, float index) {
 float CosineInterpolation(float x) {
   return (std::cos(x * float(glm::pi<float>())) + 1.0f) * 0.5f;
 }
+
+}  // namespace puzzle_demo

@@ -2,6 +2,8 @@
 
 #include <utility>
 
+namespace puzzle_demo {
+
 TextButton::TextButton(Application *app,
                        font::Factory *font_factory,
                        glm::vec3 foreground_color,
@@ -43,3 +45,5 @@ void TextButton::OnResize() {
                                          bottom_ - (bottom_ - top_ - font_size) * 0.5f - font_size * 0.125f});
   background_model_ = std::make_unique<DeviceModel>(app_, model);
 }
+
+}  // namespace puzzle_demo

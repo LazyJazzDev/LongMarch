@@ -2,6 +2,8 @@
 
 #include "interpolation.h"
 
+namespace puzzle_demo {
+
 AnimationVar::AnimationVar(float val, AnimationStyle ani_style)
     : target_(val),
       origin_(val),
@@ -54,3 +56,5 @@ float AnimationVar::Value() const {
       return Mix(origin_, target_, alpha_);
   }
 }
+
+}  // namespace puzzle_demo

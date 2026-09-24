@@ -3,6 +3,8 @@
 #include "button_palette.h"
 #include "geometry/mesh.h"
 
+namespace life_demo {
+
 namespace {
 std::unique_ptr<DeviceModel> BuildIcon(Application *app, const std::vector<glm::vec2> &outline) {
   // Triangulate one continuous silhouette, just like the reset icon. Shared
@@ -132,3 +134,5 @@ void FileButton::OnClick() {
 void FileButton::OnStateChange(int state) {
   hover_.UpdateTarget(float(state));
 }
+
+}  // namespace life_demo

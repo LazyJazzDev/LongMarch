@@ -6,6 +6,8 @@
 #include "application/model.h"
 #include "glm/gtc/quaternion.hpp"
 
+namespace life_demo {
+
 class RandomizeButton : public Button {
  public:
   RandomizeButton(Application *app, std::vector<uint8_t> *cells, DeviceModel *background);
@@ -30,3 +32,5 @@ class RandomizeButton : public Button {
   MixValue<glm::vec4> background_color_;
   MixValue<glm::vec4> face_color_;
 };
+
+}  // namespace life_demo

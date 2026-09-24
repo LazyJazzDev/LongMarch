@@ -4,6 +4,8 @@
 #include "application/button.h"
 #include "application/model.h"
 
+namespace life_demo {
+
 class CellButton : public Button {
  public:
   CellButton(Application *app,
@@ -29,3 +31,5 @@ class CellButton : public Button {
   int32_t click_cnt_{0};
   uint8_t *cell_{nullptr};
 };
+
+}  // namespace life_demo

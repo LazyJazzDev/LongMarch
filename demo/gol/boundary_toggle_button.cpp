@@ -5,6 +5,8 @@
 
 #include "button_palette.h"
 
+namespace life_demo {
+
 namespace {
 Model BoundaryIcon(bool periodic) {
   std::vector<Vertex> vertices;
@@ -101,3 +103,5 @@ void BoundaryToggleButton::OnClick() {
 void BoundaryToggleButton::OnStateChange(int state) {
   hover_.UpdateTarget(float(state));
 }
+
+}  // namespace life_demo

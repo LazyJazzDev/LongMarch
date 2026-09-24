@@ -8,6 +8,8 @@
 #include "util.h"
 #define LAND_PI 3.14159265358979323846
 
+namespace life_demo {
+
 namespace geometry {
 
 using namespace glm;
@@ -284,3 +286,5 @@ Mesh &Mesh::operator+=(const Mesh &mesh) {
   return *this;
 }
 }  // namespace geometry
+
+}  // namespace life_demo

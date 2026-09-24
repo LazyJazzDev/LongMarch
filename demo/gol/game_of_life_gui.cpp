@@ -1,6 +1,8 @@
 #include "game_of_life_gui.h"
 
+#ifndef LONGMARCH_HOSTED_GAMES
 #include <tinyfiledialogs.h>
+#endif
 
 #include <random>
 #include <stdexcept>
@@ -12,13 +14,16 @@
 #include "game_of_life_lib.h"
 #include "glm/gtc/matrix_transform.hpp"
 
+namespace life_demo {
+
 GameOfLife::GameOfLife(const char *title,
                        int width,
                        int height,
                        int cell_grid_width,
                        int cell_grid_height,
-                       graphics::BackendAPI api)
-    : Application(title, width, height, api),
+                       graphics::BackendAPI api,
+                       bool hosted)
+    : Application(title, width, height, api, hosted),
       cell_grid_width_(cell_grid_width),
       cell_grid_height_(cell_grid_height) {
 }
@@ -403,6 +408,12 @@ void GameOfLife::RequestFileAction(FileAction action) {
 }
 
 void GameOfLife::ProcessFileAction() {
+#ifdef LONGMARCH_HOSTED_GAMES
+  hosted_file_action_ = file_action_ == FileAction::kSave ? 2 : 1;
+  file_action_ = FileAction::kNone;
+  hosted_was_playing_ = pause_play_button_->IsPlaying();
+  pause_play_button_->SetPlaying(false);
+#else
   const auto action = std::exchange(file_action_, FileAction::kNone);
   auto *button = action == FileAction::kSave ? save_button_.get() : open_button_.get();
   const bool was_playing = pause_play_button_->IsPlaying();
@@ -465,6 +476,41 @@ void GameOfLife::ProcessFileAction() {
   open_button_->OnCursorEnter(0);
   save_button_->OnCursorEnter(0);
   GetWindow()->Focus();
+#endif
+}
+
+std::string GameOfLife::CompleteHostedFile(const std::string &path) {
+  if (!hosted_file_action_)
+    return "No pending file operation";
+  auto *button = hosted_file_action_ == 2 ? save_button_.get() : open_button_.get();
+  bool loaded = false;
+  std::string error;
+  try {
+    if (!path.empty()) {
+      if (hosted_file_action_ == 2)
+        SaveCellsPattern(path, {cell_grid_width_, cell_grid_height_, cell_grid_});
+      else {
+        auto pattern = FitCellsPattern(LoadCellsPattern(path), cell_grid_width_, cell_grid_height_);
+        ResizeGrid(pattern.width, pattern.height);
+        std::copy(pattern.cells.begin(), pattern.cells.end(), cell_grid_.begin());
+        requested_width_ = pattern.width;
+        requested_height_ = pattern.height;
+        width_slider_->SetValue(pattern.width);
+        height_slider_->SetValue(pattern.height);
+        loaded = true;
+      }
+      button->Feedback(true);
+    }
+  } catch (const std::exception &e) {
+    error = e.what();
+    button->Feedback(false);
+  }
+  hosted_file_action_ = 0;
+  pause_play_button_->SetPlaying(loaded ? false : hosted_was_playing_);
+  simulation_clock_ = {};
+  open_button_->OnCursorEnter(0);
+  save_button_->OnCursorEnter(0);
+  return error;
 }
 
 void GameOfLife::RandomizeCells(float density, uint32_t seed) {
@@ -492,3 +538,5 @@ void GameOfLife::InitCells(int width, int height) {
     }
   }
 }
+
+}  // namespace life_demo

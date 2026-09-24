@@ -2,6 +2,8 @@
 
 #include "rounded_rectangle.h"
 
+namespace puzzle_demo {
+
 glm::vec3 BlockRenderer::GetNumberForegroundColor(int number) {
   switch (number) {
     case 2:
@@ -96,3 +98,5 @@ void BlockRenderer::Render(int number, float x, float y, float size, float alpha
 void BlockRenderer::SetBoardToWorld(glm::mat4 mat) {
   board_to_world_ = mat;
 }
+
+}  // namespace puzzle_demo

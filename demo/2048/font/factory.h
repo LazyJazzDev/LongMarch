@@ -5,8 +5,15 @@
 #include <vector>
 
 #include "ft2build.h"
-#include "long_march.h"
+#include "grassland/graphics/graphics.h"
+#include "grassland/math/math.h"
+#ifndef GLFW_INCLUDE_NONE
+#define GLFW_INCLUDE_NONE
+#endif
+#include <GLFW/glfw3.h>
 #include FT_FREETYPE_H
+
+namespace puzzle_demo {
 
 namespace font {
 
@@ -46,3 +53,5 @@ class Factory {
 };
 
 }  // namespace font
+
+}  // namespace puzzle_demo

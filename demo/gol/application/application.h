@@ -6,7 +6,14 @@
 #include <utility>
 #include <vector>
 
-#include "long_march.h"
+#include "grassland/graphics/graphics.h"
+#include "grassland/math/math.h"
+#ifndef GLFW_INCLUDE_NONE
+#define GLFW_INCLUDE_NONE
+#endif
+#include <GLFW/glfw3.h>
+
+namespace life_demo {
 
 using namespace grassland;
 
@@ -26,12 +33,30 @@ struct InstanceInfo {
 // testing, then resolved from a supersampled target for anti-aliasing.
 class Application {
  public:
-  Application(const std::string &name, int width, int height, graphics::BackendAPI api);
+  Application(const std::string &name, int width, int height, graphics::BackendAPI api, bool hosted = false);
 
   virtual ~Application();
 
   // Runs until the window closes, or after max_frames frames when positive.
   void Run(int max_frames = 0);
+
+  // Native hosts drive exactly the same initialization, update and draw path.
+  void InitializeHosted() {
+    OnInit();
+  }
+
+  void RenderHostedFrame() {
+    OnUpdate();
+    OnRender();
+  }
+
+  void CloseHosted() {
+    OnClose();
+  }
+
+  graphics::Image *PresentedImage() const {
+    return present_image_.get();
+  }
 
   // Saves the last presented frame as a PNG file when the application exits.
   void SetScreenshotPath(const std::string &path) {
@@ -146,3 +171,5 @@ class Application {
   int fps_frames_{0};
   double fps_start_time_{0.0};
 };
+
+}  // namespace life_demo
