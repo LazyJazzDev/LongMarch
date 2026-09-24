@@ -65,26 +65,16 @@ void BoundaryToggleButton::Draw() {
                           {GetModelMatrix(origin, size, 0.4f), glm::vec4{1.0f}, glm::uvec4{1, 0, 0, 0}});
   const auto cells = glider_.ProjectedCells();
   const glm::vec2 center = origin + size * 0.5f;
-  constexpr float pitch = 0.20f;
-  constexpr float half_size = 0.07f;
-  // Center the initial 3x3 silhouette; the fourth row/column straddles the
-  // periodic seam. Copies are clipped so wrapping cells remain full-sized.
-  for (int y = 0; y < 4; ++y) {
-    for (int x = 0; x < 4; ++x) {
-      if (!cells[y * 4 + x])
+  constexpr float pitch = 0.24f;
+  constexpr float half_size = 0.08f;
+  for (int y = 0; y < BoundaryGlider::kDisplaySize; ++y) {
+    for (int x = 0; x < BoundaryGlider::kDisplaySize; ++x) {
+      if (!cells[y * BoundaryGlider::kDisplaySize + x])
         continue;
-      for (int copy_y = -1; copy_y <= 0; ++copy_y) {
-        for (int copy_x = -1; copy_x <= 0; ++copy_x) {
-          const glm::vec2 p{(x - 1 + copy_x * 4) * pitch, (y - 1 + copy_y * 4) * pitch};
-          const auto lo = glm::max(p - glm::vec2{half_size}, glm::vec2{-0.40f});
-          const auto hi = glm::min(p + glm::vec2{half_size}, glm::vec2{0.40f});
-          if (lo.x >= hi.x || lo.y >= hi.y)
-            continue;
-          application_->DrawModel(cell_model_.get(),
-                                  {GetModelMatrix(center + lo * size * 0.5f, (hi - lo) * size * 0.5f, 0.4f),
-                                   button_palette::kNeutral, glm::uvec4{1, 0, 0, 0}});
-        }
-      }
+      const glm::vec2 p{(x - 1) * pitch, (y - 1) * pitch};
+      application_->DrawModel(
+          cell_model_.get(), {GetModelMatrix(center + (p - glm::vec2{half_size}) * size * 0.5f, size * half_size, 0.4f),
+                              button_palette::kNeutral, glm::uvec4{1, 0, 0, 0}});
     }
   }
 }

@@ -5,14 +5,14 @@
 
 #include "game_of_life_lib/game_of_life_lib.h"
 
-// Evolve in empty space, then project onto the 4x4 icon. The padded board
-// contains the complete 16-generation trip; projected cells never feed back.
+// Evolve in empty space, then project onto the 3x3 icon. The padded board
+// contains the complete 12-generation trip; projected cells never feed back.
 class BoundaryGlider {
  public:
-  static constexpr int kDisplaySize = 4;
-  static constexpr int kGenerations = 16;
+  static constexpr int kDisplaySize = 3;
+  static constexpr int kGenerations = 4 * kDisplaySize;
   static constexpr int kSpaceSize = 16;
-  static constexpr int kOrigin = 4;
+  static constexpr int kOrigin = 6;
 
   BoundaryGlider() {
     Reset();

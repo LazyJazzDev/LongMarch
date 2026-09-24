@@ -20,8 +20,8 @@ frame while playing, without an additional iteration delay. Simulation speed
 therefore follows the frame rate, with input and rendering between generations.
 The boundary button next to speed toggles between **periodic** (four open portals,
 the default) and **fixed/dead** (a solid enclosure). A five-cell glider sits at
-its center. Switching to periodic opens the wall, then evolves the glider for 16 generations in empty space,
-projecting its live-cell coordinates modulo 4 onto the icon. Each generation is
+its center. Switching to periodic opens the wall, then evolves the glider for 12 generations in empty space,
+projecting its live-cell coordinates modulo 3 onto the icon. Each generation is
 shown discretely; the glider returns to the center and stops after one trip.
 Projection never feeds back into evolution, avoiding self-interference on a
 small torus. This animation does not change the main grid or interrupt playback.

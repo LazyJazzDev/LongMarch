@@ -9,29 +9,29 @@ TEST(BoundaryGlider, EvolvesInEmptySpaceBeforeProjectingAndStopsAfterOneTrip) {
   glider.Update(0.29f);
   EXPECT_EQ(glider.Generation(), 0);
   glider.Update(0.02f);
-  // The real first generation has five cells. A 4x4 torus instead has eight.
-  std::array<uint8_t, 16> first{};
-  for (int index : {4, 6, 9, 10, 13})
+  // Evolve in empty space, then wrap the first generation onto the 3x3 display.
+  std::array<uint8_t, 9> first{};
+  for (int index : {3, 5, 7, 8, 1})
     first[index] = 1;
   EXPECT_EQ(glider.ProjectedCells(), first);
-  for (int generation = 2; generation <= 16; ++generation) {
+  for (int generation = 2; generation <= 12; ++generation) {
     glider.Update(0.13f);
     const auto cells = glider.ProjectedCells();
     EXPECT_EQ(std::count(cells.begin(), cells.end(), 1), 5);
     EXPECT_EQ(glider.Generation(), generation);
-    EXPECT_EQ(glider.Playing(), generation < 16);
+    EXPECT_EQ(glider.Playing(), generation < 12);
     if (generation % 4 == 0) {
-      std::array<uint8_t, 16> translated{};
+      std::array<uint8_t, 9> translated{};
       const int shift = generation / 4;
-      for (int y = 0; y < 4; ++y)
-        for (int x = 0; x < 4; ++x)
-          translated[((y + shift) % 4) * 4 + (x + shift) % 4] = initial[y * 4 + x];
+      for (int y = 0; y < 3; ++y)
+        for (int x = 0; x < 3; ++x)
+          translated[((y + shift) % 3) * 3 + (x + shift) % 3] = initial[y * 3 + x];
       EXPECT_EQ(cells, translated);
     }
   }
   EXPECT_EQ(glider.ProjectedCells(), initial);
   glider.Update(100.0f);
-  EXPECT_EQ(glider.Generation(), 16);
+  EXPECT_EQ(glider.Generation(), 12);
   EXPECT_EQ(glider.ProjectedCells(), initial);
 }
 
