@@ -278,8 +278,8 @@ void GameOfLife::OnWindowSize() {
   panel_top_ = 0;
   panel_bottom_ = window_height;
 
-  // Sidebars follow the window's long edges, independent of the grid aspect.
-  sidebar_ = window_height >= window_width;
+  // Sidebars follow the window's short edges, independent of the grid aspect.
+  sidebar_ = window_width >= window_height;
   auto place = [icon_size](Button *button, float x, float y) { button->Resize(x, y, x + icon_size, y + icon_size); };
   if (sidebar_) {
     playground_left = panel_size;
