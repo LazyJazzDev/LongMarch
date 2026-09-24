@@ -117,7 +117,7 @@ struct GraphicsDemoView: View {
       ScrollView {
         VStack(alignment: .leading, spacing: 12) {
           Text(demo.subtitle).font(.subheadline).foregroundStyle(.secondary)
-          if demo.id == "graphics_hello_hdr" { Toggle("HDR display", isOn: $model.hdr) }
+          if demo.id == "graphics_hello_hdr" || nbody { Toggle("HDR display", isOn: $model.hdr) }
           if nbody {
             LabeledContent("Particles") {
               Picker("Particles", selection: $model.particles) {

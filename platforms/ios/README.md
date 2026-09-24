@@ -55,8 +55,10 @@ Pinch to zoom, drag to pan, and double-tap to fit again. Progressive image updat
 preserve the viewing transform; gestures never change the render camera.
 
 HDR is enabled by default. Film development produces linear sRGB floating-point
-pixels (including values above 1), and the native image view requests high dynamic
-range. The actual brightness depends on the device’s available EDR headroom.
+pixels (including values above 1), presented directly as CGImage contents on a
+Core Animation layer requesting high dynamic range (without UIImage conversion).
+Images carry their exposed RGB content headroom so iOS can tone-map
+highlights to the available screen range instead of clipping them. The actual brightness depends on the device’s available EDR headroom.
 The HDR toggle switches to the scene’s SDR view transform; exposure adjustments
 redevelop the existing film, even after reaching the sample limit or pausing,
 without clearing or adding samples. Pinch/pan transforms survive display changes.
@@ -234,3 +236,6 @@ cmake --build build-ios-replay
 python3 platforms/ios/tests/check_render_controller.py \
   --build build-ios-replay --resources out/ios/Resources
 ```
+
+NBody uses a linear RGBA16Float EDR presentation surface and the desktop
+HDR particle brightness conversion. Its HDR switch preserves simulation state.

@@ -1,6 +1,7 @@
 #import "SparkiumBridge.h"
 #include <atomic>
 #include <chrono>
+#include "DisplayImage.h"
 #include "RenderQueue.h"
 #include "RenderSession.h"
 
@@ -81,18 +82,7 @@
           double frameSeconds = _lastFrameSeconds;
           if (_generation != generation)
             return;
-          NSData *data = [NSData dataWithBytes:pixels.data() length:pixels.size()];
-          CGDataProviderRef provider = CGDataProviderCreateWithCFData((__bridge CFDataRef)data);
-          CGColorSpaceRef colorSpace =
-              CGColorSpaceCreateWithName(hdr ? kCGColorSpaceExtendedLinearSRGB : kCGColorSpaceSRGB);
-          CGImageRef image =
-              CGImageCreate(_session->Width(), _session->Height(), hdr ? 32 : 8, hdr ? 128 : 32,
-                            _session->Width() * (hdr ? 16 : 4), colorSpace,
-                            hdr ? (kCGBitmapFloatComponents | kCGBitmapByteOrder32Little | kCGImageAlphaLast)
-                                : (kCGBitmapByteOrderDefault | kCGImageAlphaLast),
-                            provider, nullptr, false, kCGRenderingIntentDefault);
-          CGColorSpaceRelease(colorSpace);
-          CGDataProviderRelease(provider);
+          CGImageRef image = CreateDisplayImage(pixels, _session->Width(), _session->Height(), hdr);
           if (!image)
             throw std::runtime_error("Cannot create display image");
           NSString *device = [NSString stringWithUTF8String:_session->Device().c_str()];

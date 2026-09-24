@@ -1,5 +1,6 @@
 #import "DemoBridge.h"
 #include <algorithm>
+#include <array>
 #include <atomic>
 #include <chrono>
 #define GLFW_INCLUDE_NONE
@@ -50,7 +51,7 @@
   _statsTime = 0;
   _statsFrames = 0;
   view.device = MTLCreateSystemDefaultDevice();
-  BOOL hdrDemo = [demo isEqualToString:@"graphics_hello_hdr"];
+  BOOL hdrDemo = [demo isEqualToString:@"graphics_hello_hdr"] || [demo isEqualToString:@"nbody_cs"];
   view.colorPixelFormat = hdrDemo ? MTLPixelFormatRGBA16Float : MTLPixelFormatBGRA8Unorm;
   if (hdrDemo) {
     CAMetalLayer *layer = (CAMetalLayer *)view.layer;
@@ -79,9 +80,14 @@
              "struct V{float4 p [[position]];float2 uv;};\n"
              "vertex V present_vertex(uint i [[vertex_id]]){float2 p=float2((i<<1)&2,i&2);return "
              "{float4(p*float2(2,-2)+float2(-1,1),0,1),p};}\n"
-             "fragment float4 present_fragment(V v [[stage_in]],texture2d<float> image [[texture(0)]],constant uint &clampSDR [[buffer(0)]]){"
-             "constexpr sampler s(coord::normalized,address::clamp_to_edge,filter::linear);return "
-             "float4(clampSDR ? min(image.sample(s,v.uv).rgb,float3(1)) : image.sample(s,v.uv).rgb,1);}";
+             "fragment float4 present_fragment(V v [[stage_in]],texture2d<float> image [[texture(0)]],constant uint2 &settings [[buffer(0)]]){"
+             "constexpr sampler s(coord::normalized,address::clamp_to_edge,filter::linear);"
+             "float3 rgb=max(image.sample(s,v.uv).rgb,float3(0));"
+             "if(settings.x) rgb=min(rgb,float3(1));"
+             // Match desktop NBody's hdr.hlsl. Its accumulated particle colors
+             // are display-encoded; the EDR surface expects linear light.
+             "if(settings.y) rgb=pow(rgb,float3(2.2));"
+             "return float4(min(rgb,float3(65504)),1);}";
         NSError *error = nil;
         id<MTLLibrary> library = [device newLibraryWithSource:source options:nil error:&error];
         if (!library)
@@ -109,7 +115,7 @@
 
 - (void)setHDR:(BOOL)hdr {
   _hdr = hdr;
-  if ([_demo isEqualToString:@"graphics_hello_hdr"])
+  if ([_demo isEqualToString:@"graphics_hello_hdr"] || [_demo isEqualToString:@"nbody_cs"])
     ((CAMetalLayer *)_view.layer).wantsExtendedDynamicRangeContent = hdr;
 }
 
@@ -200,7 +206,8 @@
   auto particles = _particles, galaxies = _galaxies, reset = _reset;
   float dt = _deltaTime, yaw = _yaw, pitch = _pitch;
   BOOL simulate = _simulate;
-  uint32_t clampSDR = !_hdr;
+  const std::array<uint32_t, 2> displaySettings{uint32_t(!_hdr), uint32_t([_demo isEqualToString:@"nbody_cs"])};
+  const BOOL edrEnabled = ((CAMetalLayer *)view.layer).wantsExtendedDynamicRangeContent;
   int width = 1280, height = 720;
   if ([_demo isEqualToString:@"graphics_hello_resize"] || [_demo isEqualToString:@"nbody_cs"] ||
       [_demo isEqualToString:@"gol"] || [_demo isEqualToString:@"2048"]) {
@@ -243,7 +250,7 @@
               setViewport:MTLViewport{(drawable.texture.width - width * fit) / 2,
                                       (drawable.texture.height - height * fit) / 2, width * fit, height * fit, 0, 1}];
           [encoder setRenderPipelineState:self->_presentPipeline];
-          [encoder setFragmentBytes:&clampSDR length:sizeof(clampSDR) atIndex:0];
+          [encoder setFragmentBytes:displaySettings.data() length:sizeof(displaySettings) atIndex:0];
           [encoder setFragmentTexture:(__bridge id<MTLTexture>)image->Handle() atIndex:0];
           [encoder drawPrimitives:MTLPrimitiveTypeTriangle vertexStart:0 vertexCount:3];
           [encoder endEncoding];
@@ -262,6 +269,8 @@
               @"width" : @(width),
               @"height" : @(height),
               @"frames" : @(frames),
+              @"edr_enabled" : @(edrEnabled),
+              @"drawable_pixel_format" : @(drawable.texture.pixelFormat),
               @"device" : deviceName,
               @"gpu_ms" : @(gpuMS),
               @"frame_seconds" : @(seconds)

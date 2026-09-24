@@ -188,6 +188,8 @@ private final class RenderModel: ObservableObject {
         "scene": selection, "spp": spp, "status": status,
         "error": error ?? "", "device": device, "seconds": elapsed, "width": width,
         "height": height,
+        "content_headroom": image.map { $0.contentHeadroom } ?? 0,
+        "should_tone_map": image.map { $0.shouldToneMap } ?? false,
         "fps": fps, "camera_rays_per_second": raysPerSecond, "sample_limit": targetSamples,
       ]
       try JSONSerialization.data(withJSONObject: result, options: .prettyPrinted)
@@ -199,7 +201,7 @@ private final class RenderModel: ObservableObject {
 // UIKit's native scroll/zoom gestures keep the point between the fingers anchored during a pinch.
 // Replacing progressive image pixels never changes the zoom, offset, or render camera.
 private final class RenderImageScrollView: UIScrollView, UIScrollViewDelegate {
-  let renderedImage = UIImageView()
+  let renderedImage = UIView()
   private var revision = -1
   private var previousBounds = CGSize.zero
   private var needsFit = true
@@ -212,7 +214,15 @@ private final class RenderImageScrollView: UIScrollView, UIScrollViewDelegate {
     showsHorizontalScrollIndicator = false
     showsVerticalScrollIndicator = false
     bouncesZoom = true
-    renderedImage.preferredImageDynamicRange = .high
+    // Keep the tagged CGImage on Core Animation's HDR path. UIImage(cgImage:)
+    // does not reliably classify extended-linear float images as HDR.
+    renderedImage.layer.contentsFormat = .RGBA16Float
+    renderedImage.layer.toneMapMode = .ifSupported
+    if #available(iOS 26.0, *) {
+      renderedImage.layer.preferredDynamicRange = .high
+    } else {
+      renderedImage.layer.wantsExtendedDynamicRangeContent = true
+    }
     addSubview(renderedImage)
     let doubleTap = UITapGestureRecognizer(target: self, action: #selector(fitImage))
     doubleTap.numberOfTapsRequired = 2
@@ -225,7 +235,7 @@ private final class RenderImageScrollView: UIScrollView, UIScrollViewDelegate {
   func update(_ image: CGImage, revision: Int) {
     let imageSize = CGSize(width: image.width, height: image.height)
     let reset = self.revision != revision || renderedImage.bounds.size != imageSize
-    renderedImage.image = UIImage(cgImage: image)
+    renderedImage.layer.contents = image
     if reset {
       self.revision = revision
       setZoomScale(1, animated: false)
