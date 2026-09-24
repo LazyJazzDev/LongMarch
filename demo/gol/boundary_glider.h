@@ -2,26 +2,20 @@
 
 #include <algorithm>
 #include <array>
+#include <cstdint>
 
-#include "game_of_life_lib/game_of_life_lib.h"
-
-// Evolve in empty space, then project onto the 3x3 icon. The padded board
-// contains the complete 12-generation trip; projected cells never feed back.
+// Recorded empty-space Life generations, projected modulo 4 for the icon.
+// Playback only selects a mask; it does not run the simulation.
 class BoundaryGlider {
  public:
-  static constexpr int kDisplaySize = 3;
+  static constexpr int kDisplaySize = 4;
   static constexpr int kGenerations = 4 * kDisplaySize;
-  static constexpr int kSpaceSize = 16;
-  static constexpr int kOrigin = 6;
 
   BoundaryGlider() {
     Reset();
   }
 
   void Reset() {
-    cells_.fill(0);
-    for (auto offset : {1, kSpaceSize + 2, kSpaceSize * 2, kSpaceSize * 2 + 1, kSpaceSize * 2 + 2})
-      cells_[kOrigin * kSpaceSize + kOrigin + offset] = 1;
     generation_ = 0;
     elapsed_ = 0.0f;
     playing_ = false;
@@ -41,17 +35,15 @@ class BoundaryGlider {
     if (elapsed_ < (generation_ == 0 ? 0.3f : 0.12f))
       return;
     elapsed_ = 0.0f;
-    update_step(kSpaceSize, kSpaceSize, cells_.data(), BoundaryMode::kFixed);
     if (++generation_ == kGenerations)
       playing_ = false;
   }
 
   std::array<uint8_t, kDisplaySize * kDisplaySize> ProjectedCells() const {
     std::array<uint8_t, kDisplaySize * kDisplaySize> projected{};
-    for (int y = 0; y < kSpaceSize; ++y)
-      for (int x = 0; x < kSpaceSize; ++x)
-        if (cells_[y * kSpaceSize + x])
-          projected[(y % kDisplaySize) * kDisplaySize + x % kDisplaySize] = 1;
+    const uint16_t mask = kFrames[generation_ % kGenerations];
+    for (int i = 0; i < kDisplaySize * kDisplaySize; ++i)
+      projected[i] = (mask >> i) & 1;
     return projected;
   }
 
@@ -64,7 +56,11 @@ class BoundaryGlider {
   }
 
  private:
-  std::array<uint8_t, kSpaceSize * kSpaceSize> cells_{};
+  // Bit y*4+x: x increases rightward, y downward. The initial silhouette
+  // occupies the upper-right 3x3 area; every four frames it moves (+1, -1).
+  inline static constexpr std::array<uint16_t, kGenerations> kFrames{0x048e, 0x40ac, 0xc08a, 0xc049, 0xd081, 0x9805,
+                                                                     0x5901, 0x3908, 0x2b01, 0xa310, 0x2a30, 0x1630,
+                                                                     0x2470, 0x0562, 0x0456, 0x02c6};
   int generation_{};
   float elapsed_{};
   bool playing_{};

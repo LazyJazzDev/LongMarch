@@ -22,11 +22,11 @@ Model BoundaryIcon(bool periodic) {
   // The solid enclosure opens four portals without arrows or extra marks.
   const float gap = periodic ? 0.30f : 0.0f;
   for (float side : {-1.0f, 1.0f}) {
-    const float low = side < 0 ? -0.62f : 0.42f;
-    rect(-0.62f, low, -gap, low + 0.20f, button_palette::kNeutral);
-    rect(gap, low, 0.62f, low + 0.20f, button_palette::kNeutral);
-    rect(low, -0.42f, low + 0.20f, -gap, button_palette::kNeutral);
-    rect(low, gap, low + 0.20f, 0.42f, button_palette::kNeutral);
+    const float low = side < 0 ? -0.62f : 0.46f;
+    rect(-0.62f, low, -gap, low + 0.16f, button_palette::kNeutral);
+    rect(gap, low, 0.62f, low + 0.16f, button_palette::kNeutral);
+    rect(low, -0.46f, low + 0.16f, -gap, button_palette::kNeutral);
+    rect(low, gap, low + 0.16f, 0.46f, button_palette::kNeutral);
   }
   return Model(vertices, indices);
 }
@@ -65,13 +65,13 @@ void BoundaryToggleButton::Draw() {
                           {GetModelMatrix(origin, size, 0.4f), glm::vec4{1.0f}, glm::uvec4{1, 0, 0, 0}});
   const auto cells = glider_.ProjectedCells();
   const glm::vec2 center = origin + size * 0.5f;
-  constexpr float pitch = 0.24f;
-  constexpr float half_size = 0.08f;
+  constexpr float pitch = 0.22f;
+  constexpr float half_size = pitch * 0.5f;
   for (int y = 0; y < BoundaryGlider::kDisplaySize; ++y) {
     for (int x = 0; x < BoundaryGlider::kDisplaySize; ++x) {
       if (!cells[y * BoundaryGlider::kDisplaySize + x])
         continue;
-      const glm::vec2 p{(x - 1) * pitch, (y - 1) * pitch};
+      const glm::vec2 p{(x - 1.5f) * pitch, (y - 1.5f) * pitch};
       application_->DrawModel(
           cell_model_.get(), {GetModelMatrix(center + (p - glm::vec2{half_size}) * size * 0.5f, size * half_size, 0.4f),
                               button_palette::kNeutral, glm::uvec4{1, 0, 0, 0}});
