@@ -100,6 +100,26 @@ void GameOfLife::CustomOnInit() {
     LayoutCells();
   });
   scroll_callback_ = GetWindow()->ScrollEvent().RegisterCallback([this](double x, double y) { ScrollGrid(x, y); });
+  pan_button_callback_ =
+      GetWindow()->MouseButtonEvent().RegisterCallback([this](int button, int action, int, double, double) {
+        if (button != GLFW_MOUSE_BUTTON_RIGHT)
+          return;
+        panning_ = action == GLFW_PRESS && CursorInGrid();
+        pan_cursor_ = CursorPosition();
+      });
+  pan_move_callback_ = GetWindow()->MouseMoveEvent().RegisterCallback([this](double, double) {
+    if (!panning_)
+      return;
+    if (!glfwGetWindowAttrib(GLFWWindow(), GLFW_FOCUSED) ||
+        glfwGetMouseButton(GLFWWindow(), GLFW_MOUSE_BUTTON_RIGHT) != GLFW_PRESS) {
+      panning_ = false;
+      return;
+    }
+    const auto cursor = CursorPosition();
+    grid_view_.pan += cursor - pan_cursor_;
+    pan_cursor_ = cursor;
+    LayoutCells();
+  });
   key_callback_ = GetWindow()->KeyEvent().RegisterCallback([this](int key, int, int action, int mods) {
     if (action != GLFW_PRESS && action != GLFW_REPEAT)
       return;
@@ -205,6 +225,8 @@ void GameOfLife::CustomOnUpdate() {
 }
 
 void GameOfLife::CustomOnClose() {
+  GetWindow()->MouseButtonEvent().UnregisterCallback(pan_button_callback_);
+  GetWindow()->MouseMoveEvent().UnregisterCallback(pan_move_callback_);
   GetWindow()->MagnifyEvent().UnregisterCallback(magnify_callback_);
   GetWindow()->ScrollEvent().UnregisterCallback(scroll_callback_);
   GetWindow()->KeyEvent().UnregisterCallback(key_callback_);
@@ -223,6 +245,7 @@ void GameOfLife::CustomOnClose() {
 }
 
 void GameOfLife::OnWindowSize() {
+  panning_ = false;
   auto window_width = float(FramebufferSize().x);
   auto window_height = float(FramebufferSize().y);
   auto ui_unit = std::min(window_width, window_height) * 0.01f * ui_scale_;

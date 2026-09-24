@@ -11,7 +11,10 @@ struct GridView {
   glm::vec2 pan{0.0f};
 
   void Clamp(glm::vec2 viewport, glm::vec2 fitted_grid) {
-    auto limit = glm::max((fitted_grid * zoom - viewport) * 0.5f, glm::vec2{0.0f});
+    // Leave 5% of the viewport beyond each edge when panning an enlarged grid.
+    // At the fitted zoom, keep the original centered overview.
+    auto limit =
+        zoom <= 1.0f ? glm::vec2{0.0f} : glm::max((fitted_grid * zoom - viewport * 0.9f) * 0.5f, glm::vec2{0.0f});
     pan = glm::clamp(pan, -limit, limit);
   }
 

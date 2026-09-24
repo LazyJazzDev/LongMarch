@@ -69,6 +69,10 @@ class GameOfLife : public Application {
   uint32_t magnify_callback_{};
   uint32_t scroll_callback_{};
   uint32_t key_callback_{};
+  uint32_t pan_button_callback_{};
+  uint32_t pan_move_callback_{};
+  bool panning_{false};
+  glm::vec2 pan_cursor_{0.0f};
 
   std::unique_ptr<PausePlayButton> pause_play_button_;
   std::unique_ptr<SpeedToggleButton> speed_toggle_button_;
