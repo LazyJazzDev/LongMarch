@@ -19,23 +19,36 @@ Model BoundaryIcon(bool periodic) {
     triangle({left, top}, {right, top}, {right, bottom}, color);
     triangle({left, top}, {right, bottom}, {left, bottom}, color);
   };
-  // The cells stay neutral. Opposite portal edges share a color without
-  // arrows or bridges suggesting a preferred direction of travel.
-  for (float y : {-0.22f, 0.06f})
-    for (float x : {-0.22f, 0.06f})
-      rect(x, y, x + 0.16f, y + 0.16f, button_palette::kNeutral);
-  const glm::vec4 horizontal = periodic ? glm::vec4{0.58f, 0.46f, 0.30f, 1.0f} : button_palette::kNeutral;
-  const glm::vec4 vertical = periodic ? glm::vec4{0.32f, 0.50f, 0.62f, 1.0f} : button_palette::kNeutral;
-  const float thickness = periodic ? 0.10f : 0.20f;
-  // Small corner gaps distinguish the two portal pairs. In fixed mode the
-  // same four quads expand into a continuous wall, keeping the spring morph.
-  const float horizontal_extent = periodic ? 0.48f : 0.62f;
-  const float vertical_extent = periodic ? 0.48f : 0.42f;
+  // A stable, irregular 3x3 sample makes the repeated neighbors recognizable.
+  // Keep the sample unchanged while toggling so only the boundary semantics move.
+  constexpr bool cells[3][3] = {{true, false, true}, {false, true, false}, {true, true, false}};
+  constexpr float pitch = 0.28f;
+  constexpr float radius = 0.075f;
+  for (int y = -1; y <= 3; ++y) {
+    for (int x = -1; x <= 3; ++x) {
+      if (!cells[(y + 3) % 3][(x + 3) % 3])
+        continue;
+      const bool outside = x < 0 || x > 2 || y < 0 || y > 2;
+      const glm::vec2 center{(x - 1) * pitch, (y - 1) * pitch};
+      const float half_size = outside && !periodic ? 0.0f : radius;
+      const auto color =
+          outside ? glm::vec4{glm::vec3(button_palette::kNeutral) * 0.5f, 1.0f} : button_palette::kNeutral;
+      rect(center.x - half_size, center.y - half_size, center.x + half_size, center.y + half_size, color);
+    }
+  }
+  // Contiguous wall segments shrink inward and separate into fine dashes.
+  // Both states retain identical topology for the reversible spring morph.
+  const float outer = periodic ? 0.425f : 0.62f;
+  const float thickness = periodic ? 0.055f : 0.20f;
+  const float gap = periodic ? 0.04f : 0.0f;
   for (float side : {-1.0f, 1.0f}) {
-    const float low = side < 0 ? -0.62f : 0.62f - thickness;
-    const float high = low + thickness;
-    rect(-horizontal_extent, low, horizontal_extent, high, horizontal);
-    rect(low, -vertical_extent, high, vertical_extent, vertical);
+    const float low = side < 0 ? -outer : outer - thickness;
+    for (int segment = 0; segment < 4; ++segment) {
+      const float start = -outer + segment * outer * 0.5f + gap;
+      const float end = -outer + (segment + 1) * outer * 0.5f - gap;
+      rect(start, low, end, low + thickness, button_palette::kNeutral);
+      rect(low, start, low + thickness, end, button_palette::kNeutral);
+    }
   }
   return Model(vertices, indices);
 }
