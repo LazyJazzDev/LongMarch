@@ -1,16 +1,16 @@
 #include "game_of_life_lib.h"
 
 void update_step(int width, int height, uint8_t *buffer) {
-  // buffer[y * width + x] is the state of cell (x, y); cells outside the grid are dead.
+  // buffer[y * width + x] is the state of cell (x, y); both axes wrap periodically.
   // Read the current generation from bit 0 and stage the next one in bit 1.
   for (int y = 0; y < height; y++) {
     for (int x = 0; x < width; x++) {
       int alive_neighbors = 0;
       for (int dy = -1; dy <= 1; dy++) {
         for (int dx = -1; dx <= 1; dx++) {
-          const int nx = x + dx;
-          const int ny = y + dy;
-          if ((dx || dy) && 0 <= nx && nx < width && 0 <= ny && ny < height) {
+          const int nx = x + dx < 0 ? width - 1 : (x + dx == width ? 0 : x + dx);
+          const int ny = y + dy < 0 ? height - 1 : (y + dy == height ? 0 : y + dy);
+          if (dx || dy) {
             alive_neighbors += buffer[ny * width + nx] & 1;
           }
         }

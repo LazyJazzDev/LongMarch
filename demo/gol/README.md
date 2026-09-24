@@ -86,12 +86,15 @@ generations.
 
 The included [Gosper glider gun](https://conwaylife.com/wiki/Gosper_glider_gun)
 starts with 36 live cells and emits one glider every 30 generations. Load it
-on the 200 x 200 grid with `--play` to watch the stream. Gliders disappear
-when they reach the grid edge; the gun continues firing.
+on the 200 x 200 grid with `--play` to watch the stream. Gliders wrap around
+the grid edges and can eventually interact with the gun or other gliders.
 
 `game_of_life_lib/` holds `update_step`, the part students implement in the
-assignment; the demo ships a reference implementation. The dead-boundary rule
-matches the assignment's test data.
+assignment; this demo uses periodic boundaries instead of the assignment's
+dead boundaries. Left/right and top/bottom edges connect, including diagonal
+neighbors across corners. All eight directional offsets count; when an axis is
+two cells long, opposite directions count the same cell twice. Iteration still
+uses the existing buffer without allocating a second grid.
 
 The `application/` layer replaces the old Vulkan renderer: models are drawn as
 instances in framebuffer pixel coordinates with depth testing, rendered into a
