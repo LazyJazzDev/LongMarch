@@ -22,7 +22,10 @@ The boundary button next to speed toggles between **periodic** (four open portal
 the default) and **fixed/dead** (a solid enclosure). A five-cell glider rests in the lower-left corner of a 4x4 icon grid.
 Switching to periodic opens the wall, then plays 16 recorded Life generations
 moving diagonally up and right before returning to the initial state. The masks
-come from empty-space evolution projected modulo 4; playback performs no simulation.
+come from empty-space evolution projected modulo 4. Only cells in the same
+checkerboard color of 4x4 tiles as the starting tile are shown: cells crossing
+one edge disappear, and cells crossing both axes reappear. This is an icon-only
+visibility filter; playback performs no simulation and main-grid rules are unchanged.
 Switching to fixed plays the recorded 4x4 dead-edge evolution: the glider hits
 the upper-right wall and settles into a block. After a brief hold, the icon
 restores the lower-left glider. Both sequences play only once per switch.
