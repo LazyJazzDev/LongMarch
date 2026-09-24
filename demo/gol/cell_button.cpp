@@ -38,9 +38,13 @@ void CellButton::Update(float t, bool animate_state) {
 }
 
 void CellButton::Draw() {
+  // Clipping in the fragment shader is too late to avoid processing offscreen
+  // geometry. Pan/zoom keeps input bounds intact but emits only visible cells.
+  if (right_ <= clip_bounds_.x || bottom_ <= clip_bounds_.y || left_ >= clip_bounds_.z || top_ >= clip_bounds_.w)
+    return;
   application_->DrawModel(
       device_model_,
-      {GetModelMatrix(glm::vec2{left_, top_}, glm::vec2{right_ - left_, bottom_ - top_}, 0.4f), glm::vec4{1.0f},
+      {model_matrix_, glm::vec4{1.0f},
        glm::uvec4{2u, glm::floatBitsToUint(background_brightness_[0].GetValue(float(background_animation_var_))),
                   glm::floatBitsToUint(background_brightness_[1].GetValue(float(background_animation_var_))),
                   glm::floatBitsToUint(float(light_animation_var_))},
@@ -60,6 +64,7 @@ void CellButton::OnStateChange(int state) {
 }
 
 void CellButton::ResizeModel() {
+  model_matrix_ = GetModelMatrix(glm::vec2{left_, top_}, glm::vec2{right_ - left_, bottom_ - top_}, 0.4f);
 }
 
 }  // namespace life_demo

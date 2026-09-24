@@ -394,7 +394,7 @@ void GameOfLife::ResizeGrid(int width, int height) {
   for (size_t i = 0; i < cell_grid_.size(); ++i) {
     if (i == cell_button_grid_.size())
       cell_button_grid_.push_back(
-          std::make_unique<CellButton>(this, 0, 0, 100, 100, &cell_grid_[i], &white_icon_model.value()));
+          std::make_unique<CellButton>(this, 0, 0, 100, 100, &cell_grid_[i], &white_rect_model.value()));
     cell_button_grid_[i]->Rebind(&cell_grid_[i]);
   }
   grid_view_ = {};
@@ -538,7 +538,7 @@ void GameOfLife::InitCells(int width, int height) {
     for (int x = 0; x < cell_grid_width_; x++) {
       int index = y * cell_grid_width_ + x;
       cell_button_grid_.push_back(
-          std::make_unique<CellButton>(this, 0, 0, 100, 100, &cell_grid_[index], &white_icon_model.value()));
+          std::make_unique<CellButton>(this, 0, 0, 100, 100, &cell_grid_[index], &white_rect_model.value()));
     }
   }
 }

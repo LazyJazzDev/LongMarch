@@ -112,6 +112,7 @@ class Application {
     std::unique_ptr<graphics::Image> color_image;
     std::unique_ptr<graphics::Buffer> instance_buffer;
     std::vector<std::pair<DeviceModel *, InstanceInfo>> instances;
+    std::vector<InstanceInfo> upload_instances;
   };
 
   void OnInit();
@@ -131,9 +132,10 @@ class Application {
   template <class Func, class... Args>
   void NotifyListeners(Func func, Args... args) {
     // Listeners may register or unregister themselves while handling events.
-    auto listeners = listeners_;
+    const auto revision = listener_revision_;
+    const std::vector<Listener *> listeners(listeners_.begin(), listeners_.end());
     for (auto listener : listeners) {
-      if (listeners_.count(listener)) {
+      if (revision == listener_revision_ || listeners_.count(listener)) {
         (listener->*func)(args...);
       }
     }
@@ -168,6 +170,7 @@ class Application {
   bool direct_frame_{false};
 
   std::set<Listener *> listeners_{};
+  uint64_t listener_revision_{};
 
   uint32_t mouse_move_callback_{};
   uint32_t mouse_button_callback_{};

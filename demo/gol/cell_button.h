@@ -30,6 +30,7 @@ class CellButton : public Button {
   void ResizeModel();
   MixValue<float> background_brightness_[2];
   DeviceModel *device_model_{};
+  glm::mat4 model_matrix_{1.0f};
   AnimationVar background_animation_var_;
   AnimationVar light_animation_var_;
   int32_t click_cnt_{0};

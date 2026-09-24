@@ -68,6 +68,13 @@ float4 IconTheme(PSInput input) {
 }
 
 float4 CellTheme(PSInput input) {
+  // The original 120-triangle silhouette samples |x|^8 + |y|^8 = 1.
+  // Evaluate that same contour on a quad: four vertices per cell, preserving
+  // the existing lighting and supersampled edge coverage at every zoom level.
+  float2 p = input.local_position * input.local_position;
+  p *= p;
+  p *= p;
+  clip(1.0 - p.x - p.y);
   float scale = 1.0 + length(input.local_position - float2(-1.0, -1.0)) * 0.15;
   float4 background_color = float4(input.color.rgb * scale * asfloat(input.extra.y), 1.0);
 
