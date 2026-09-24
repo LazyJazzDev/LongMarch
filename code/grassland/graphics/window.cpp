@@ -47,6 +47,18 @@ Window::Window(int width, int height, const std::string &title, bool fullscreen,
   magnify_monitor_ = detail::InstallMagnifyEvents(this);
 #endif
   glfwSetWindowUserPointer(window_, this);
+  glfwSetFramebufferSizeCallback(window_, [](GLFWwindow *window, int width, int height) {
+    auto *owner = static_cast<Window *>(glfwGetWindowUserPointer(window));
+    owner->framebuffer_resize_event_.InvokeCallbacks(width, height);
+  });
+  glfwSetCursorEnterCallback(window_, [](GLFWwindow *window, int entered) {
+    auto *owner = static_cast<Window *>(glfwGetWindowUserPointer(window));
+    owner->cursor_enter_event_.InvokeCallbacks(entered == GLFW_TRUE);
+  });
+  glfwSetWindowFocusCallback(window_, [](GLFWwindow *window, int focused) {
+    auto *owner = static_cast<Window *>(glfwGetWindowUserPointer(window));
+    owner->focus_event_.InvokeCallbacks(focused == GLFW_TRUE);
+  });
   glfwSetWindowSizeCallback(window_, [](GLFWwindow *window, int width, int height) {
     Window *p_window = static_cast<Window *>(glfwGetWindowUserPointer(window));
     p_window->resize_event_.InvokeCallbacks(width, height);
@@ -93,6 +105,90 @@ int Window::GetHeight() const {
   int width, height;
   glfwGetWindowSize(window_, &width, &height);
   return height;
+}
+
+glm::ivec2 Window::GetSize() const {
+  glm::ivec2 size;
+  glfwGetWindowSize(window_, &size.x, &size.y);
+  return size;
+}
+
+glm::ivec2 Window::GetFramebufferSize() const {
+  glm::ivec2 size;
+  glfwGetFramebufferSize(window_, &size.x, &size.y);
+  return size;
+}
+
+glm::dvec2 Window::GetCursorPosition() const {
+  glm::dvec2 position;
+  glfwGetCursorPos(window_, &position.x, &position.y);
+  return position;
+}
+
+bool Window::IsKeyDown(int key) const {
+  return glfwGetKey(window_, key) == GLFW_PRESS;
+}
+
+bool Window::IsMouseButtonDown(int button) const {
+  return glfwGetMouseButton(window_, button) == GLFW_PRESS;
+}
+
+bool Window::IsFocused() const {
+  return glfwGetWindowAttrib(window_, GLFW_FOCUSED) == GLFW_TRUE;
+}
+
+void Window::Focus() {
+  glfwFocusWindow(window_);
+}
+
+void Window::RequestClose() {
+  glfwSetWindowShouldClose(window_, GLFW_TRUE);
+}
+
+glm::ivec2 Window::GetPosition() const {
+  glm::ivec2 position;
+  glfwGetWindowPos(window_, &position.x, &position.y);
+  return position;
+}
+
+void Window::SetPosition(int x, int y) {
+  glfwSetWindowPos(window_, x, y);
+}
+
+glm::ivec4 Window::GetFrameSize() const {
+  glm::ivec4 frame;
+  glfwGetWindowFrameSize(window_, &frame.x, &frame.y, &frame.z, &frame.w);
+  return frame;
+}
+
+glm::ivec4 Window::GetMonitorWorkArea() const {
+  const auto position = GetPosition();
+  const auto size = GetSize();
+  int count = 0;
+  auto **monitors = glfwGetMonitors(&count);
+  auto *monitor = glfwGetPrimaryMonitor();
+  int64_t best_overlap = 0;
+  for (int i = 0; i < count; ++i) {
+    glm::ivec4 area;
+    glfwGetMonitorWorkarea(monitors[i], &area.x, &area.y, &area.z, &area.w);
+    const auto overlap =
+        glm::max(glm::ivec2{0}, glm::min(position + size, glm::ivec2{area.x + area.z, area.y + area.w}) -
+                                    glm::max(position, glm::ivec2{area.x, area.y}));
+    const int64_t pixels = int64_t(overlap.x) * overlap.y;
+    if (pixels > best_overlap) {
+      best_overlap = pixels;
+      monitor = monitors[i];
+    }
+  }
+  if (!monitor)
+    return {position.x, position.y, size.x, size.y};
+  glm::ivec4 area;
+  glfwGetMonitorWorkarea(monitor, &area.x, &area.y, &area.z, &area.w);
+  return area;
+}
+
+void Window::PollEvents() {
+  glfwPollEvents();
 }
 
 void Window::SetTitle(const std::string &title) {
@@ -195,7 +291,60 @@ void Window::PybindClassRegistration(py::classh<Window> &c) {
       },
       py::arg("callback"), "Add a callback for drop event");
 
-  c.def_static("poll_events", &glfwPollEvents);
+  c.def("get_size", [](Window &w) {
+    auto v = w.GetSize();
+    return py::make_tuple(v.x, v.y);
+  });
+  c.def("get_framebuffer_size", [](Window &w) {
+    auto v = w.GetFramebufferSize();
+    return py::make_tuple(v.x, v.y);
+  });
+  c.def("get_cursor_position", [](Window &w) {
+    auto v = w.GetCursorPosition();
+    return py::make_tuple(v.x, v.y);
+  });
+  c.def("get_position", [](Window &w) {
+    auto v = w.GetPosition();
+    return py::make_tuple(v.x, v.y);
+  });
+  c.def("set_position", &Window::SetPosition, py::arg("x"), py::arg("y"));
+  c.def("get_frame_size", [](Window &w) {
+    auto v = w.GetFrameSize();
+    return py::make_tuple(v.x, v.y, v.z, v.w);
+  });
+  c.def("get_monitor_work_area", [](Window &w) {
+    auto v = w.GetMonitorWorkArea();
+    return py::make_tuple(v.x, v.y, v.z, v.w);
+  });
+  c.def("is_key_down", &Window::IsKeyDown, py::arg("key"));
+  c.def("is_mouse_button_down", &Window::IsMouseButtonDown, py::arg("button"));
+  c.def("is_focused", &Window::IsFocused);
+  c.def("focus", &Window::Focus);
+  c.def("request_close", &Window::RequestClose);
+  c.def(
+      "register_framebuffer_resize_event",
+      [](Window &w, py::function callback) {
+        return w.FramebufferResizeEvent().RegisterCallback(
+            [callback](int width, int height) { callback(width, height); });
+      },
+      py::arg("callback"));
+  c.def("unregister_framebuffer_resize_event",
+        [](Window &w, uint32_t id) { w.FramebufferResizeEvent().UnregisterCallback(id); });
+  c.def(
+      "register_cursor_enter_event",
+      [](Window &w, py::function callback) {
+        return w.CursorEnterEvent().RegisterCallback([callback](bool entered) { callback(entered); });
+      },
+      py::arg("callback"));
+  c.def("unregister_cursor_enter_event", [](Window &w, uint32_t id) { w.CursorEnterEvent().UnregisterCallback(id); });
+  c.def(
+      "register_focus_event",
+      [](Window &w, py::function callback) {
+        return w.FocusEvent().RegisterCallback([callback](bool focused) { callback(focused); });
+      },
+      py::arg("callback"));
+  c.def("unregister_focus_event", [](Window &w, uint32_t id) { w.FocusEvent().UnregisterCallback(id); });
+  c.def_static("poll_events", &Window::PollEvents);
 }
 #endif
 

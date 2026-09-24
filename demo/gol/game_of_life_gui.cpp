@@ -89,8 +89,7 @@ void GameOfLife::CustomOnInit() {
   magnify_callback_ = GetWindow()->MagnifyEvent().RegisterCallback([this](const graphics::MagnifyGesture &gesture) {
     if (gesture.phase == graphics::MagnifyPhase::kCancel)
       return;
-    const glm::vec2 point = glm::vec2{gesture.x, gesture.y} * glm::vec2(FramebufferSize()) /
-                            glm::vec2{std::max(GetWindow()->GetWidth(), 1), std::max(GetWindow()->GetHeight(), 1)};
+    const glm::vec2 point = FramePosition({gesture.x, gesture.y});
     if (point.x < playground_left_ || point.x >= playground_right_ || point.y < playground_top_ ||
         point.y >= playground_bottom_)
       return;
@@ -101,24 +100,24 @@ void GameOfLife::CustomOnInit() {
   });
   scroll_callback_ = GetWindow()->ScrollEvent().RegisterCallback([this](double x, double y) { ScrollGrid(x, y); });
   pan_button_callback_ =
-      GetWindow()->MouseButtonEvent().RegisterCallback([this](int button, int action, int, double, double) {
+      GetWindow()->MouseButtonEvent().RegisterCallback([this](int button, int action, int, double x, double y) {
         if (button != GLFW_MOUSE_BUTTON_RIGHT)
           return;
-        panning_ = action == GLFW_PRESS && CursorInGrid();
-        pan_cursor_ = CursorPosition();
+        pan_cursor_ = FramePosition({x, y});
+        panning_ = action == GLFW_PRESS && pan_cursor_.x >= playground_left_ && pan_cursor_.x < playground_right_ &&
+                   pan_cursor_.y >= playground_top_ && pan_cursor_.y < playground_bottom_;
       });
-  pan_move_callback_ = GetWindow()->MouseMoveEvent().RegisterCallback([this](double, double) {
+  pan_move_callback_ = GetWindow()->MouseMoveEvent().RegisterCallback([this](double x, double y) {
     if (!panning_)
       return;
-    if (!glfwGetWindowAttrib(GLFWWindow(), GLFW_FOCUSED) ||
-        glfwGetMouseButton(GLFWWindow(), GLFW_MOUSE_BUTTON_RIGHT) != GLFW_PRESS) {
-      panning_ = false;
-      return;
-    }
-    const auto cursor = CursorPosition();
+    const auto cursor = FramePosition({x, y});
     grid_view_.pan += cursor - pan_cursor_;
     pan_cursor_ = cursor;
     LayoutCells();
+  });
+  pan_focus_callback_ = GetWindow()->FocusEvent().RegisterCallback([this](bool focused) {
+    if (!focused)
+      panning_ = false;
   });
   key_callback_ = GetWindow()->KeyEvent().RegisterCallback([this](int key, int, int action, int mods) {
     if (action != GLFW_PRESS && action != GLFW_REPEAT)
@@ -138,6 +137,7 @@ void GameOfLife::CustomOnInit() {
       ZoomGrid(1.0f / 1.2f);
     }
   });
+  last_frame_time_ = grassland::GetTimeSeconds();
 }
 
 void GameOfLife::CustomOnUpdate() {
@@ -149,18 +149,16 @@ void GameOfLife::CustomOnUpdate() {
     OnWindowSize();
   sliders_were_dragging_ = dragging;
 
-  // Use static timestamp get last frame time (in second, float)
-  static auto last_frame_time = glfwGetTime();
-  auto current_frame_time = glfwGetTime();
-  auto delta_time = static_cast<float>(current_frame_time - last_frame_time);
-  last_frame_time = current_frame_time;
+  auto current_frame_time = grassland::GetTimeSeconds();
+  auto delta_time = static_cast<float>(current_frame_time - last_frame_time_);
+  last_frame_time_ = current_frame_time;
 
   if (file_action_ != FileAction::kNone) {
     file_action_delay_ -= delta_time;
     if (file_action_delay_ <= 0.0f) {
       ProcessFileAction();
       // Modal dialogs must not accumulate simulation time or skip UI feedback.
-      last_frame_time = glfwGetTime();
+      last_frame_time_ = grassland::GetTimeSeconds();
       delta_time = 0.0f;
     }
   }
@@ -180,7 +178,8 @@ void GameOfLife::CustomOnUpdate() {
   simulation_clock_.Advance(
       delta_time, pause_play_button_->IsPlaying() && file_action_ == FileAction::kNone,
       speed_toggle_button_->SpeedLevel(),
-      [this] { update_step(cell_grid_width_, cell_grid_height_, cell_grid_.data()); }, [] { return glfwGetTime(); });
+      [this] { update_step(cell_grid_width_, cell_grid_height_, cell_grid_.data()); },
+      [] { return grassland::GetTimeSeconds(); });
 
   // Synchronize after stepping so the new generation is visible in this frame.
   for (auto &cell : cell_button_grid_)
@@ -225,6 +224,7 @@ void GameOfLife::CustomOnUpdate() {
 }
 
 void GameOfLife::CustomOnClose() {
+  GetWindow()->FocusEvent().UnregisterCallback(pan_focus_callback_);
   GetWindow()->MouseButtonEvent().UnregisterCallback(pan_button_callback_);
   GetWindow()->MouseMoveEvent().UnregisterCallback(pan_move_callback_);
   GetWindow()->MagnifyEvent().UnregisterCallback(magnify_callback_);
@@ -334,12 +334,12 @@ void GameOfLife::LayoutCells() {
 }
 
 glm::vec2 GameOfLife::CursorPosition() const {
-  double x, y;
-  int width, height;
-  glfwGetCursorPos(GLFWWindow(), &x, &y);
-  glfwGetWindowSize(GLFWWindow(), &width, &height);
-  return glm::vec2{float(x), float(y)} * glm::vec2(FramebufferSize()) /
-         glm::vec2{std::max(width, 1), std::max(height, 1)};
+  return FramePosition(GetWindow()->GetCursorPosition());
+}
+
+glm::vec2 GameOfLife::FramePosition(glm::dvec2 position) const {
+  return glm::vec2(position) * glm::vec2(FramebufferSize()) /
+         glm::vec2(glm::max(GetWindow()->GetSize(), glm::ivec2{1}));
 }
 
 bool GameOfLife::CursorInGrid() const {
@@ -356,16 +356,14 @@ void GameOfLife::ZoomGrid(float factor) {
 void GameOfLife::ScrollGrid(double x, double y) {
   if (!CursorInGrid())
     return;
-  auto down = [this](int key) { return glfwGetKey(GLFWWindow(), key) == GLFW_PRESS; };
+  auto down = [this](int key) { return GetWindow()->IsKeyDown(key); };
   if (down(GLFW_KEY_LEFT_CONTROL) || down(GLFW_KEY_RIGHT_CONTROL)) {
     ZoomGrid(std::exp(float(y) * 0.08f));
     return;
   }
   if ((down(GLFW_KEY_LEFT_SHIFT) || down(GLFW_KEY_RIGHT_SHIFT)) && x == 0.0)
     std::swap(x, y);
-  int width, height;
-  glfwGetWindowSize(GLFWWindow(), &width, &height);
-  const glm::vec2 scale = glm::vec2(FramebufferSize()) / glm::vec2{std::max(width, 1), std::max(height, 1)};
+  const glm::vec2 scale = glm::vec2(FramebufferSize()) / glm::vec2(glm::max(GetWindow()->GetSize(), glm::ivec2{1}));
   grid_view_.pan += glm::vec2{float(x), float(y)} * scale * 10.0f;
   LayoutCells();
 }
@@ -461,7 +459,7 @@ void GameOfLife::ProcessFileAction() {
   simulation_clock_ = {};
   open_button_->OnCursorEnter(0);
   save_button_->OnCursorEnter(0);
-  glfwFocusWindow(GLFWWindow());
+  GetWindow()->Focus();
 }
 
 void GameOfLife::RandomizeCells(float density, uint32_t seed) {

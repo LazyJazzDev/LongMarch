@@ -328,7 +328,7 @@ int main() {
     core_->CreateCommandContext(&cmd_context);
     cmd_context->CmdPresent(window.get(), srgb_image.get());
     core_->SubmitCommandContext(cmd_context.get());
-    glfwPollEvents();
+    grassland::graphics::Window::PollEvents();
     float fps = fps_counter.TickFPS();
     char fps_buf[16];
     sprintf(fps_buf, "%.2f", fps);

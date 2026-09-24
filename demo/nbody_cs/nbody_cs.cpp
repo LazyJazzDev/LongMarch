@@ -41,7 +41,7 @@ void NBodyCS::Run() {
     OnUpdate();
     OnRender();
     if (window_)
-      glfwPollEvents();
+      grassland::graphics::Window::PollEvents();
     double wall = std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - start).count();
     if (Benchmark() && frame >= 0) {
       wall_times.push_back(wall);
@@ -169,11 +169,13 @@ void NBodyCS::OnRender() {
 }
 
 void NBodyCS::OnInit() {
-  if (options_.mode != "compute")
-    core_->CreateImage(options_.width, options_.height, graphics::IMAGE_FORMAT_R32G32B32A32_SFLOAT, &frame_image_);
+  if (options_.mode != "compute") {
+    const auto size = window_ ? window_->GetFramebufferSize() : glm::ivec2{options_.width, options_.height};
+    core_->CreateImage(size.x, size.y, graphics::IMAGE_FORMAT_R32G32B32A32_SFLOAT, &frame_image_);
+  }
 
   if (window_)
-    window_->ResizeEvent().RegisterCallback([this](int width, int height) {
+    window_->FramebufferResizeEvent().RegisterCallback([this](int width, int height) {
       core_->WaitGPU();
       if (width <= 0 || height <= 0)
         return;
@@ -214,18 +216,19 @@ void NBodyCS::OnInit() {
     window_->MouseMoveEvent().RegisterCallback([this](double xpos, double ypos) {
       ImGui::SetCurrentContext(window_->GetImGuiContext());
 
-      static auto last_xpos = xpos;
-      static auto last_ypos = ypos;
-      if (glfwGetMouseButton(window_->GLFWWindow(), GLFW_MOUSE_BUTTON_LEFT) == GLFW_PRESS) {
-        auto diffx = xpos - last_xpos;
-        auto diffy = ypos - last_ypos;
+      if (!cursor_initialized_) {
+        last_cursor_ = {xpos, ypos};
+        cursor_initialized_ = true;
+      }
+      if (window_->IsMouseButtonDown(GLFW_MOUSE_BUTTON_LEFT)) {
+        auto diffx = xpos - last_cursor_.x;
+        auto diffy = ypos - last_cursor_.y;
         if (!ImGui::GetIO().WantCaptureMouse) {
           rotation = glm::rotate(glm::mat4{1.0f}, glm::radians(float(diffx)), glm::vec3{0.0f, 1.0f, 0.0f}) * rotation;
           rotation = glm::rotate(glm::mat4{1.0f}, glm::radians(float(diffy)), glm::vec3{1.0f, 0.0f, 0.0f}) * rotation;
         }
       }
-      last_xpos = xpos;
-      last_ypos = ypos;
+      last_cursor_ = {xpos, ypos};
     });
 }
 

@@ -200,7 +200,7 @@ int main() {
     cmd_ctx->CmdPresent(window.get(), srgb_image.get());
     core_->SubmitCommandContext(cmd_ctx.get());
 
-    glfwPollEvents();
+    grassland::graphics::Window::PollEvents();
   }
 
   return 0;

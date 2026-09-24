@@ -51,6 +51,7 @@ class GameOfLife : public Application {
   void LayoutCells();
   void ResizeGrid(int width, int height);
   glm::vec2 CursorPosition() const;
+  glm::vec2 FramePosition(glm::dvec2 position) const;
   bool CursorInGrid() const;
   void ZoomGrid(float factor);
   void ScrollGrid(double x, double y);
@@ -71,6 +72,7 @@ class GameOfLife : public Application {
   uint32_t key_callback_{};
   uint32_t pan_button_callback_{};
   uint32_t pan_move_callback_{};
+  uint32_t pan_focus_callback_{};
   bool panning_{false};
   glm::vec2 pan_cursor_{0.0f};
 
@@ -91,6 +93,7 @@ class GameOfLife : public Application {
   std::vector<uint8_t> initial_cells_;
   std::vector<std::unique_ptr<CellButton>> cell_button_grid_;
   float time_total{0.0};
+  double last_frame_time_{};
   float ui_scale_{1.0};
   float random_density_{0.0f};
   uint32_t random_seed_{0};
