@@ -120,7 +120,7 @@ void SizeSlider::RebuildLabel() {
   std::vector<Vertex> vertices;
   std::vector<uint32_t> indices;
   auto capsule = [&](glm::vec2 from, glm::vec2 to) {
-    constexpr float radius = 0.70f;
+    constexpr float radius = 0.95f;
     constexpr int steps = 10;
     const float angle = std::atan2(to.y - from.y, to.x - from.x);
     const uint32_t base = uint32_t(vertices.size());
@@ -210,7 +210,7 @@ void SizeSlider::Draw() {
     RoundedRect(position, size, radius, 0.45f, {0.34f + highlight, 0.42f + highlight, 0.53f + highlight, 1.0f}, filled,
                 false);
 
-  const float pixel = std::min(thickness * 0.34f / 7.4f, length * 0.8f / label_width_);
+  const float pixel = std::min(thickness * 0.34f / 7.9f, length * 0.8f / label_width_);
   auto transform = glm::translate(glm::mat4{1.0f}, glm::vec3{position + size * 0.5f, 0.4f}) *
                    glm::rotate(glm::mat4{1.0f}, vertical_ ? -glm::half_pi<float>() : 0.0f, glm::vec3{0, 0, 1}) *
                    glm::scale(glm::mat4{1.0f}, glm::vec3{pixel, pixel, 1.0f}) *
