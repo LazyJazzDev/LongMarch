@@ -9,43 +9,33 @@ namespace {
 Model BoundaryIcon(bool periodic) {
   std::vector<Vertex> vertices;
   std::vector<uint32_t> indices;
-  const glm::vec4 color = periodic ? glm::vec4{0.40f, 0.53f, 0.54f, 1.0f} : button_palette::kNeutral;
-  auto triangle = [&](glm::vec2 a, glm::vec2 b, glm::vec2 c) {
+  auto triangle = [&](glm::vec2 a, glm::vec2 b, glm::vec2 c, glm::vec4 color) {
     const uint32_t start = vertices.size();
     auto v = ComposeVertices({a, b, c}, color);
     vertices.insert(vertices.end(), v.begin(), v.end());
     indices.insert(indices.end(), {start, start + 1, start + 2});
   };
-  auto rect = [&](float left, float top, float right, float bottom) {
-    triangle({left, top}, {right, top}, {right, bottom});
-    triangle({left, top}, {right, bottom}, {left, bottom});
+  auto rect = [&](float left, float top, float right, float bottom, glm::vec4 color) {
+    triangle({left, top}, {right, top}, {right, bottom}, color);
+    triangle({left, top}, {right, bottom}, {left, bottom}, color);
   };
-  // Keep a small cell grid visible in both states. Thick walls open at their
-  // centers, where plain symmetric bridges show adjacency across edges.
+  // The cells stay neutral. Opposite portal edges share a color without
+  // arrows or bridges suggesting a preferred direction of travel.
   for (float y : {-0.22f, 0.06f})
     for (float x : {-0.22f, 0.06f})
-      rect(x, y, x + 0.16f, y + 0.16f);
-  const float gap = periodic ? 0.22f : 0.0f;
+      rect(x, y, x + 0.16f, y + 0.16f, button_palette::kNeutral);
+  const glm::vec4 horizontal = periodic ? glm::vec4{0.58f, 0.46f, 0.30f, 1.0f} : button_palette::kNeutral;
+  const glm::vec4 vertical = periodic ? glm::vec4{0.32f, 0.50f, 0.62f, 1.0f} : button_palette::kNeutral;
+  const float thickness = periodic ? 0.10f : 0.20f;
+  // Small corner gaps distinguish the two portal pairs. In fixed mode the
+  // same four quads expand into a continuous wall, keeping the spring morph.
+  const float horizontal_extent = periodic ? 0.48f : 0.62f;
+  const float vertical_extent = periodic ? 0.48f : 0.42f;
   for (float side : {-1.0f, 1.0f}) {
-    const float low = side < 0 ? -0.62f : 0.42f;
-    const float high = low + 0.20f;
-    rect(-0.62f, low, -gap, high);
-    rect(gap, low, 0.62f, high);
-    rect(low, -0.42f, high, -gap);
-    rect(low, gap, high, 0.42f);
-  }
-  // Preserve the vertex topology for the spring morph; fixed-mode bridges
-  // collapse into the wall centers instead of fading to disconnected shapes.
-  for (int axis = 0; axis < 2; ++axis) {
-    for (float side : {-1.0f, 1.0f}) {
-      const glm::vec2 center = axis == 0 ? glm::vec2{side * 0.52f, 0} : glm::vec2{0, side * 0.52f};
-      auto local = [&](float x, float y) {
-        const glm::vec2 p = axis == 0 ? glm::vec2{x, y} : glm::vec2{y, x};
-        return center + (periodic ? p : glm::vec2{0});
-      };
-      triangle(local(-0.24f, -0.10f), local(0.24f, -0.10f), local(0.24f, 0.10f));
-      triangle(local(-0.24f, -0.10f), local(0.24f, 0.10f), local(-0.24f, 0.10f));
-    }
+    const float low = side < 0 ? -0.62f : 0.62f - thickness;
+    const float high = low + thickness;
+    rect(-horizontal_extent, low, horizontal_extent, high, horizontal);
+    rect(low, -vertical_extent, high, vertical_extent, vertical);
   }
   return Model(vertices, indices);
 }

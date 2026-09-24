@@ -18,7 +18,7 @@ speed (1x, 2x, 5x, lightning), clear the grid, and randomize it with the dice bu
 Lightning mode shows a warm yellow bolt and advances exactly one generation per
 frame while playing, without an additional iteration delay. Simulation speed
 therefore follows the frame rate, with input and rendering between generations.
-The boundary button next to speed toggles between **periodic** (plain symmetric bridges across open grid edges,
+The boundary button next to speed toggles between **periodic** (thin portal edges: left/right share blue, top/bottom share amber,
 the default) and **fixed/dead** (a grid enclosed by solid walls) boundaries. Its icon morphs
 smoothly without resetting the grid or interrupting playback.
 The die has six separated rounded faces with cut-out pips. Each click tumbles it
