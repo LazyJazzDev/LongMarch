@@ -14,6 +14,10 @@ class RandomizeButton : public Button {
   void Update(float delta_time);
   void Draw();
 
+  bool IsAnimating() const {
+    return rotation_progress_ < 1 || !background_animation_.IsFinished();
+  }
+
  private:
   void OnClick() override;
   void OnStateChange(int state) override;

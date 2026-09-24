@@ -1,4 +1,5 @@
 #pragma once
+#include <algorithm>
 
 class SimulationClock {
  public:
@@ -23,6 +24,13 @@ class SimulationClock {
       step();
       accumulated_ -= 0.5;
     }
+  }
+
+  double NextStepDelay(int speed) const {
+    if (speed == kLightning)
+      return 0;
+    const double multiplier = speed == 1 ? 2.0 : speed == 2 ? 5.0 : 1.0;
+    return std::max(0.0, (0.5 - accumulated_) / multiplier);
   }
 
  private:

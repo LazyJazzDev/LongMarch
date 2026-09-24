@@ -87,9 +87,9 @@ RefreshButton::RefreshButton(Application *app,
 }
 
 void RefreshButton::Update(float t) {
-  refresh_animation_var_.Update(t * 2.0f);
-  refresh_device_model_->UploadVertices(
-      refresh_model_->GetModel(float(refresh_animation_var_), MixStyle::kAngularClockwise).Vertices());
+  if (refresh_animation_var_.Update(t * 2.0f))
+    refresh_device_model_->UploadVertices(
+        refresh_model_->GetModel(float(refresh_animation_var_), MixStyle::kAngularClockwise).Vertices());
   background_animation_var_.Update(t * 10.0f);
 }
 

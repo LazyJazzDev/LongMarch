@@ -44,6 +44,11 @@ class Application {
     OnInit();
   }
 
+  // Seconds until another frame is needed; infinity means wait for input.
+  virtual double NextFrameDelay() const {
+    return 0;
+  }
+
   void RenderHostedFrame() {
     OnUpdate();
     OnRender();
@@ -54,7 +59,7 @@ class Application {
   }
 
   graphics::Image *PresentedImage() const {
-    return present_image_.get();
+    return direct_frame_ ? main_frame_.color_image.get() : present_image_.get();
   }
 
   // Saves the last presented frame as a PNG file when the application exits.
@@ -159,6 +164,7 @@ class Application {
 
   glm::ivec2 framebuffer_size_{0};
   int supersample_scale_{1};
+  bool direct_frame_{false};
 
   std::set<Listener *> listeners_{};
 

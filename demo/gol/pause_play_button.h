@@ -18,6 +18,10 @@ class PausePlayButton : public Button {
 
   void SetPlaying(bool playing);
 
+  bool IsAnimating() const {
+    return !background_animation_var_.IsFinished() || morph_ != (is_playing_ ? 1.f : 0.f) || morph_velocity_ != 0;
+  }
+
  private:
   void OnResize() override;
 

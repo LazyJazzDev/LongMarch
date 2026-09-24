@@ -28,8 +28,18 @@ class GameOfLife : public Application {
 
   ~GameOfLife() override;
 
+  double NextFrameDelay() const override;
+
   void ResetFrameClock() {
-    last_frame_time_ = grassland::GetTimeSeconds();
+    last_frame_time_ = last_simulation_time_ = grassland::GetTimeSeconds();
+  }
+
+  void ResetAnimationClock() {
+    const auto now = grassland::GetTimeSeconds();
+    // A new interaction after a timed sleep starts its animation now. Do not
+    // reset on every drag event or starve animations with high-rate input.
+    if (now - last_frame_time_ > 1.0 / 30.0)
+      last_frame_time_ = now;
   }
 
   // File pickers are asynchronous in native hosts. Buttons and feedback stay shared.
@@ -112,6 +122,7 @@ class GameOfLife : public Application {
   std::vector<std::unique_ptr<CellButton>> cell_button_grid_;
   float time_total{0.0};
   double last_frame_time_{};
+  double last_simulation_time_{};
   float ui_scale_{1.0};
   float random_density_{0.0f};
   uint32_t random_seed_{0};

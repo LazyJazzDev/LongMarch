@@ -211,9 +211,19 @@ void Application::OnRender() {
 
   const bool use_second_frame = second_frame_alpha_ > 0.0f;
   if (use_second_frame) {
+    if (!second_frame_.color_image) {
+      const auto extent = main_frame_.color_image->Extent();
+      core_->CreateImage(extent.width, extent.height, main_frame_.color_image->Format(), &second_frame_.color_image);
+    }
     RenderFrameTarget(context.get(), second_frame_);
   }
   RenderFrameTarget(context.get(), main_frame_);
+
+  direct_frame_ = window_->IsHosted() && supersample_scale_ == 1 && !use_second_frame;
+  if (direct_frame_) {
+    core_->SubmitCommandContext(context.get());
+    return;
+  }
 
   ResolveParams params{use_second_frame ? second_frame_alpha_ : 0.0f, static_cast<uint32_t>(supersample_scale_)};
   resolve_uniform_buffer_->UploadData(&params, sizeof(params));
@@ -306,6 +316,8 @@ void Application::BuildScreenFrameObjects() {
   const int width = size.x, height = size.y;
   framebuffer_size_ = {std::max(width, 1), std::max(height, 1)};
   supersample_scale_ = ChooseSupersampleScale(framebuffer_size_);
+  if (window_->IsHosted())
+    supersample_scale_ = std::min(supersample_scale_, 2);
   const auto sample_size = framebuffer_size_ * supersample_scale_;
 
   core_->WaitGPU();
@@ -314,7 +326,6 @@ void Application::BuildScreenFrameObjects() {
   depth_image_.reset();
   present_image_.reset();
   core_->CreateImage(sample_size.x, sample_size.y, graphics::IMAGE_FORMAT_R8G8B8A8_UNORM, &main_frame_.color_image);
-  core_->CreateImage(sample_size.x, sample_size.y, graphics::IMAGE_FORMAT_R8G8B8A8_UNORM, &second_frame_.color_image);
   core_->CreateImage(sample_size.x, sample_size.y, graphics::IMAGE_FORMAT_D32_SFLOAT, &depth_image_);
   core_->CreateImage(framebuffer_size_.x, framebuffer_size_.y, graphics::IMAGE_FORMAT_R8G8B8A8_UNORM, &present_image_);
 

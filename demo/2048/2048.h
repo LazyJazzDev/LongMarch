@@ -20,6 +20,8 @@ class TwentyFourEight : public Application {
  public:
   TwentyFourEight(const std::string &title, int width, int height, graphics::BackendAPI api, bool hosted = false);
 
+  double NextFrameDelay() const override;
+
   void ResetFrameClock() {
     last_step_time_point_ = std::chrono::steady_clock::now();
   }

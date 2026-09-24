@@ -17,6 +17,10 @@ class RefreshButton : public Button {
   void Update(float t);
   void Draw();
 
+  bool IsAnimating() const {
+    return !refresh_animation_var_.IsFinished() || !background_animation_var_.IsFinished();
+  }
+
  private:
   void OnResize() override;
   void OnClick() override;

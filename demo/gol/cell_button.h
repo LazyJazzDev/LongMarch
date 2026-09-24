@@ -19,6 +19,10 @@ class CellButton : public Button {
   void Update(float t, bool animate_state);
   void Draw();
 
+  bool IsAnimating() const {
+    return !background_animation_var_.IsFinished() || !light_animation_var_.IsFinished();
+  }
+
  private:
   void OnResize() override;
   void OnClick() override;

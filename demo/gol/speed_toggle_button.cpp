@@ -85,9 +85,9 @@ SpeedToggleButton::SpeedToggleButton(Application *app,
 }
 
 void SpeedToggleButton::Update(float t) {
-  speed_toggle_animation_var_.Update(t * 5.0f);
-  speed_toggle_device_model_->UploadVertices(
-      speed_toggle_model_->GetModel(float(speed_toggle_animation_var_), MixStyle::kLinear).Vertices());
+  if (speed_toggle_animation_var_.Update(t * 5.0f))
+    speed_toggle_device_model_->UploadVertices(
+        speed_toggle_model_->GetModel(float(speed_toggle_animation_var_), MixStyle::kLinear).Vertices());
   background_animation_var_.Update(t * 10.0f);
 }
 

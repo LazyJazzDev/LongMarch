@@ -1,6 +1,7 @@
 #include "2048.h"
 
 #include <algorithm>
+#include <limits>
 
 namespace puzzle_demo {
 
@@ -660,4 +661,12 @@ void TwentyFourEight::OnDraw() {
   menu_button_->Draw();
 }
 
+double TwentyFourEight::NextFrameDelay() const {
+  if (alpha_ < 1 || target_game_stage_ != game_stage_ || operation_buffer_ ||
+      ai_theme_mix_ != (ai_enabled_ ? 1.f : 0.f) || (ai_enabled_ && game_stage_ == GameStage::kGameGoing))
+    return 0;
+  if (score_board_click_timer_ > 0)
+    return score_board_click_timer_;
+  return std::numeric_limits<double>::infinity();
+}
 }  // namespace puzzle_demo

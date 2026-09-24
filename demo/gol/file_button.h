@@ -17,6 +17,11 @@ class FileButton : public Button {
   void BeginAction();
   void Feedback(bool success);
 
+  bool IsAnimating() const {
+    return motion_ < 1 || feedback_ > 0 || !hover_.IsFinished() || !check_transition_.IsFinished() ||
+           !success_tint_.IsFinished() || !error_tint_.IsFinished();
+  }
+
  private:
   void OnClick() override;
   void OnStateChange(int state) override;

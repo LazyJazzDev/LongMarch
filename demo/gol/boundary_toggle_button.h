@@ -21,6 +21,11 @@ class BoundaryToggleButton : public Button {
   void OnClick() override;
   void OnStateChange(int state) override;
 
+  bool IsAnimating() const {
+    return glider_.Playing() || !hover_.IsFinished() ||
+           std::abs(morph_ - (mode_ == BoundaryMode::kPeriodic ? 1.f : 0.f)) > .001f || std::abs(velocity_) > .01f;
+  }
+
  private:
   BoundaryMode mode_{BoundaryMode::kPeriodic};
   DeviceModel *background_;

@@ -1,5 +1,7 @@
 #include "game_of_life_gui.h"
 
+#include <limits>
+
 #ifndef LONGMARCH_HOSTED_GAMES
 #include <tinyfiledialogs.h>
 #endif
@@ -143,7 +145,7 @@ void GameOfLife::CustomOnInit() {
       ZoomGrid(1.0f / 1.2f);
     }
   });
-  last_frame_time_ = grassland::GetTimeSeconds();
+  last_frame_time_ = last_simulation_time_ = grassland::GetTimeSeconds();
 }
 
 void GameOfLife::CustomOnUpdate() {
@@ -157,14 +159,15 @@ void GameOfLife::CustomOnUpdate() {
 
   auto current_frame_time = grassland::GetTimeSeconds();
   auto delta_time = static_cast<float>(current_frame_time - last_frame_time_);
-  last_frame_time_ = current_frame_time;
+  const double simulation_elapsed = current_frame_time - last_simulation_time_;
+  last_frame_time_ = last_simulation_time_ = current_frame_time;
 
   if (file_action_ != FileAction::kNone) {
     file_action_delay_ -= delta_time;
     if (file_action_delay_ <= 0.0f) {
       ProcessFileAction();
       // Modal dialogs must not accumulate simulation time or skip UI feedback.
-      last_frame_time_ = grassland::GetTimeSeconds();
+      last_frame_time_ = last_simulation_time_ = grassland::GetTimeSeconds();
       delta_time = 0.0f;
     }
   }
@@ -183,7 +186,7 @@ void GameOfLife::CustomOnUpdate() {
   save_button_->Update(delta_time);
 
   simulation_clock_.Advance(
-      delta_time, pause_play_button_->IsPlaying() && file_action_ == FileAction::kNone,
+      simulation_elapsed, pause_play_button_->IsPlaying() && file_action_ == FileAction::kNone,
       speed_toggle_button_->SpeedLevel(),
       [this] { update_step(cell_grid_width_, cell_grid_height_, cell_grid_.data(), boundary_button_->Mode()); });
 
@@ -506,6 +509,7 @@ std::string GameOfLife::CompleteHostedFile(const std::string &path) {
     button->Feedback(false);
   }
   hosted_file_action_ = 0;
+  ResetFrameClock();
   pause_play_button_->SetPlaying(loaded ? false : hosted_was_playing_);
   simulation_clock_ = {};
   open_button_->OnCursorEnter(0);
@@ -539,4 +543,15 @@ void GameOfLife::InitCells(int width, int height) {
   }
 }
 
+double GameOfLife::NextFrameDelay() const {
+  if (file_action_ != FileAction::kNone || pause_play_button_->IsAnimating() || speed_toggle_button_->IsAnimating() ||
+      boundary_button_->IsAnimating() || refresh_button_->IsAnimating() || randomize_button_->IsAnimating() ||
+      open_button_->IsAnimating() || save_button_->IsAnimating())
+    return 0;
+  for (const auto &cell : cell_button_grid_)
+    if (cell->IsAnimating())
+      return 0;
+  return pause_play_button_->IsPlaying() ? simulation_clock_.NextStepDelay(speed_toggle_button_->SpeedLevel())
+                                         : std::numeric_limits<double>::infinity();
+}
 }  // namespace life_demo

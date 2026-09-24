@@ -12,6 +12,10 @@ class SpeedToggleButton : public Button {
   void Draw();
   [[nodiscard]] int SpeedLevel() const;
 
+  bool IsAnimating() const {
+    return !speed_toggle_animation_var_.IsFinished() || !background_animation_var_.IsFinished();
+  }
+
  private:
   void OnResize() override;
   void OnClick() override;
