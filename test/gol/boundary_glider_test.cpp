@@ -57,3 +57,27 @@ TEST(BoundaryGlider, ResetAndRestartDoNotRetainAnimationState) {
   glider.Update(0.1f);
   EXPECT_EQ(glider.ProjectedCells(), initial);
 }
+
+TEST(BoundaryGlider, FixedPlaybackHitsWallThenRestoresRestingGlider) {
+  BoundaryGlider glider;
+  const auto initial = glider.ProjectedCells();
+  auto expected = initial;
+  glider.Start(false);
+  for (int generation = 1; generation <= 7; ++generation) {
+    glider.Update(generation == 1 ? 0.31f : 0.13f);
+    update_step(4, 4, expected.data(), BoundaryMode::kFixed);
+    EXPECT_EQ(glider.ProjectedCells(), expected);
+    EXPECT_TRUE(glider.Playing());
+  }
+  auto stable = expected;
+  update_step(4, 4, stable.data(), BoundaryMode::kFixed);
+  EXPECT_EQ(stable, expected);
+  glider.Update(0.5f);
+  EXPECT_EQ(glider.ProjectedCells(), expected);
+  glider.Update(0.21f);
+  EXPECT_FALSE(glider.Playing());
+  EXPECT_EQ(glider.ProjectedCells(), initial);
+  glider.Start(true);
+  glider.Update(0.31f);
+  EXPECT_EQ(glider.Generation(), 1);
+}

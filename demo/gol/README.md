@@ -23,6 +23,9 @@ the default) and **fixed/dead** (a solid enclosure). A five-cell glider rests in
 Switching to periodic opens the wall, then plays 16 recorded Life generations
 moving diagonally up and right before returning to the initial state. The masks
 come from empty-space evolution projected modulo 4; playback performs no simulation.
+Switching to fixed plays the recorded 4x4 dead-edge evolution: the glider hits
+the upper-right wall and settles into a block. After a brief hold, the icon
+restores the lower-left glider. Both sequences play only once per switch.
 Cells are full squares with no gaps or clipped halves, sharing the button-wide
 lighting gradient instead of shading each cell independently. The icon animation does
 not change the main grid or interrupt playback.

@@ -36,7 +36,7 @@ Model BoundaryIcon(bool periodic) {
 Model GliderModel(const std::array<uint8_t, 16> &cells) {
   std::vector<Vertex> vertices;
   std::vector<uint32_t> indices;
-  constexpr float pitch = 0.22f;
+  constexpr float pitch = 0.18f;
   for (int y = 0; y < 4; ++y) {
     for (int x = 0; x < 4; ++x) {
       const glm::vec2 p{(x - 1.5f) * pitch, (y - 1.5f) * pitch};
@@ -95,10 +95,7 @@ void BoundaryToggleButton::Draw() {
 
 void BoundaryToggleButton::OnClick() {
   mode_ = mode_ == BoundaryMode::kPeriodic ? BoundaryMode::kFixed : BoundaryMode::kPeriodic;
-  if (mode_ == BoundaryMode::kPeriodic)
-    glider_.Start();
-  else
-    glider_.Reset();
+  glider_.Start(mode_ == BoundaryMode::kPeriodic);
 }
 
 void BoundaryToggleButton::OnStateChange(int state) {
