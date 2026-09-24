@@ -189,6 +189,13 @@ void GameOfLife::CustomOnUpdate() {
             {GetModelMatrix(glm::vec2{panel_left_, panel_top_},
                             glm::vec2{panel_right_ - panel_left_, panel_bottom_ - panel_top_}, 0.8f),
              glm::vec4{0.1, 0.1, 0.1, 1.0}, glm::uvec4{0}});
+  // Match the opposite action rail to the main toolbar background.
+  const auto framebuffer = glm::vec2(FramebufferSize());
+  const glm::vec2 action_position = sidebar_ ? glm::vec2{playground_right_, 0} : glm::vec2{0};
+  const glm::vec2 action_size = sidebar_ ? glm::vec2{framebuffer.x - playground_right_, framebuffer.y}
+                                         : glm::vec2{framebuffer.x, playground_top_};
+  DrawModel(&white_rect_model.value(),
+            {GetModelMatrix(action_position, action_size, 0.8f), glm::vec4{0.1, 0.1, 0.1, 1.0}, glm::uvec4{0}});
   DrawModel(
       &white_rect_model.value(),
       {GetModelMatrix(glm::vec2{playground_left_, playground_top_},
@@ -222,8 +229,8 @@ void GameOfLife::OnWindowSize() {
   const float margin = ui_unit * 3.0f;
   const float icon_size = ui_unit * 8.0f;
   const float step = ui_unit * 10.0f;
-  const float slider_thickness = ui_unit * 5.5f;
-  const float panel_size = ui_unit * 24.0f;
+  const float slider_thickness = ui_unit * 6.0f;
+  const float panel_size = ui_unit * 14.0f;
 
   float playground_left = 0.0f;
   float playground_right = window_width;
@@ -235,50 +242,46 @@ void GameOfLife::OnWindowSize() {
   panel_bottom_ = window_height;
 
   const bool prefer_sidebar =
-      std::min(window_height / cell_grid_height_, (window_width - panel_size) / cell_grid_width_) >
-      std::min((window_height - panel_size) / cell_grid_height_, window_width / cell_grid_width_);
+      std::min(window_height / cell_grid_height_, (window_width - panel_size * 2.0f) / cell_grid_width_) >
+      std::min((window_height - panel_size * 2.0f) / cell_grid_height_, window_width / cell_grid_width_);
   if (!width_slider_->IsDragging() && !height_slider_->IsDragging())
     sidebar_ = prefer_sidebar;
   auto place = [icon_size](Button *button, float x, float y) { button->Resize(x, y, x + icon_size, y + icon_size); };
   if (sidebar_) {
     playground_left = panel_size;
+    playground_right = window_width - panel_size;
     panel_right_ = panel_size;
-    // Board actions anchor the outermost end of the toolbar.
     place(open_button_.get(), margin, margin);
-    place(save_button_.get(), margin + step, margin);
+    place(save_button_.get(), margin, margin + step);
     place(speed_toggle_button_.get(), margin, window_height - margin - icon_size - step);
-    place(pause_play_button_.get(), margin + step, window_height - margin - icon_size - step);
-    place(refresh_button_.get(), margin, window_height - margin - icon_size);
-    place(randomize_button_.get(), margin + step, window_height - margin - icon_size);
-    const float available_top = margin + step + ui_unit * 2.0f;
-    const float available_bottom = window_height - margin - step * 2.0f - ui_unit * 2.0f;
-    const float length = std::min(available_bottom - available_top, ui_unit * 36.0f);
-    const float top = (available_top + available_bottom - length) * 0.5f;
-    const float left = (panel_size - slider_thickness * 2.0f - ui_unit * 2.0f) * 0.5f;
+    place(pause_play_button_.get(), margin, window_height - margin - icon_size);
+    place(refresh_button_.get(), window_width - margin - icon_size, margin);
+    place(randomize_button_.get(), window_width - margin - icon_size, window_height - margin - icon_size);
+    const float top = margin + step * 2.0f + ui_unit * 2.0f;
+    const float bottom = window_height - margin - step * 2.0f - ui_unit * 2.0f;
+    const float gap = ui_unit * 3.0f;
+    const float length = (bottom - top - gap) * 0.5f;
+    const float left = (panel_size - slider_thickness) * 0.5f;
     width_slider_->Resize({left, top, left + slider_thickness, top + length}, true);
-    height_slider_->Resize(
-        {left + slider_thickness + ui_unit * 2.0f, top, left + slider_thickness * 2.0f + ui_unit * 2.0f, top + length},
-        true);
+    height_slider_->Resize({left, top + length + gap, left + slider_thickness, bottom}, true);
   } else {
+    playground_top = panel_size;
     playground_bottom = window_height - panel_size;
     panel_top_ = playground_bottom;
     const float top = panel_top_ + margin;
-    const float actions_left = window_width - margin - step - icon_size;
     place(open_button_.get(), margin, top);
-    place(save_button_.get(), margin, top + step);
-    place(speed_toggle_button_.get(), actions_left, top);
-    place(pause_play_button_.get(), actions_left, top + step);
-    place(refresh_button_.get(), actions_left + step, top);
-    place(randomize_button_.get(), actions_left + step, top + step);
-    const float available_left = margin + step + ui_unit * 2.0f;
-    const float available_right = actions_left - ui_unit * 4.0f;
-    const float length = std::min(available_right - available_left, ui_unit * 70.0f);
-    const float left = (available_left + available_right - length) * 0.5f;
-    const float slider_top = panel_top_ + (panel_size - slider_thickness * 2.0f - ui_unit * 2.0f) * 0.5f;
+    place(save_button_.get(), margin + step, top);
+    place(speed_toggle_button_.get(), window_width - margin - icon_size - step, top);
+    place(pause_play_button_.get(), window_width - margin - icon_size, top);
+    place(refresh_button_.get(), margin, margin);
+    place(randomize_button_.get(), window_width - margin - icon_size, margin);
+    const float left = margin + step * 2.0f + ui_unit * 2.0f;
+    const float right = window_width - margin - step * 2.0f - ui_unit * 2.0f;
+    const float gap = ui_unit * 3.0f;
+    const float length = (right - left - gap) * 0.5f;
+    const float slider_top = panel_top_ + (panel_size - slider_thickness) * 0.5f;
     width_slider_->Resize({left, slider_top, left + length, slider_top + slider_thickness}, false);
-    height_slider_->Resize({left, slider_top + slider_thickness + ui_unit * 2.0f, left + length,
-                            slider_top + slider_thickness * 2.0f + ui_unit * 2.0f},
-                           false);
+    height_slider_->Resize({left + length + gap, slider_top, right, slider_top + slider_thickness}, false);
   }
 
   playground_left_ = playground_left;

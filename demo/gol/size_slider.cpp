@@ -99,44 +99,27 @@ void SizeSlider::SetValue(int value) {
 }
 
 void SizeSlider::RebuildLabel() {
-  // Rounded monoline glyphs: capsule strokes give every terminal and join
-  // the same soft profile as the controls, without a pixel-font texture.
+  // Wide, square glyphs with short rounded corners and uniform bold strokes.
   using Path = std::vector<glm::vec2>;
   static const std::array<std::vector<Path>, 12> glyphs{
-      {{{{1, 0}, {3, 0}, {4, 1}, {4, 5}, {3, 6}, {1, 6}, {0, 5}, {0, 1}, {1, 0}}},
-       {{{1, 1}, {2, 0}, {2, 6}}, {{0.5f, 6}, {3.5f, 6}}},
-       {{{0, 1}, {1, 0}, {3, 0}, {4, 1}, {4, 2}, {0, 6}, {4, 6}}},
-       {{{0, 0.5f}, {1, 0}, {3, 0}, {4, 1}, {4, 2}, {3, 3}, {1.5f, 3}},
-        {{3, 3}, {4, 4}, {4, 5}, {3, 6}, {1, 6}, {0, 5.5f}}},
-       {{{3, 6}, {3, 0}, {0, 4}, {4, 4}}},
-       {{{4, 0}, {0, 0}, {0, 3}, {3, 3}, {4, 4}, {4, 5}, {3, 6}, {1, 6}, {0, 5.5f}}},
-       {{{3.5f, 0}, {2, 0}, {0, 2}, {0, 5}, {1, 6}, {3, 6}, {4, 5}, {4, 4}, {3, 3}, {0, 3}}},
-       {{{0, 0}, {4, 0}, {1, 6}}},
-       {{{1, 3},
-         {0, 2},
-         {0, 1},
-         {1, 0},
-         {3, 0},
-         {4, 1},
-         {4, 2},
-         {3, 3},
-         {1, 3},
-         {0, 4},
-         {0, 5},
-         {1, 6},
-         {3, 6},
-         {4, 5},
-         {4, 4},
-         {3, 3}}},
-       {{{4, 3}, {1, 3}, {0, 2}, {0, 1}, {1, 0}, {3, 0}, {4, 1}, {4, 4}, {2, 6}, {0.5f, 6}}},
-       {{{0, 0}, {0.7f, 6}, {2, 3.5f}, {3.3f, 6}, {4, 0}}},
-       {{{0, 0}, {0, 6}}, {{4, 0}, {4, 6}}, {{0, 3}, {4, 3}}}}};
+      {{{{0, 0}, {6, 0}, {6, 6}, {0, 6}, {0, 0}}},
+       {{{1.5f, 1.5f}, {3, 0}, {3, 6}}, {{0, 6}, {6, 6}}},
+       {{{0, 0}, {6, 0}, {6, 3}, {0, 3}, {0, 6}, {6, 6}}},
+       {{{0, 0}, {6, 0}, {6, 6}, {0, 6}}, {{1.5f, 3}, {6, 3}}},
+       {{{0, 0}, {0, 3}, {6, 3}}, {{6, 0}, {6, 6}}},
+       {{{6, 0}, {0, 0}, {0, 3}, {6, 3}, {6, 6}, {0, 6}}},
+       {{{6, 0}, {0, 0}, {0, 6}, {6, 6}, {6, 3}, {0, 3}}},
+       {{{0, 0}, {6, 0}, {6, 6}}},
+       {{{0, 0}, {6, 0}, {6, 6}, {0, 6}, {0, 0}}, {{0, 3}, {6, 3}}},
+       {{{6, 3}, {0, 3}, {0, 0}, {6, 0}, {6, 6}, {0, 6}}},
+       {{{0, 0}, {0, 6}, {3, 6}, {3, 2.5f}}, {{3, 6}, {6, 6}, {6, 0}}},
+       {{{0, 0}, {0, 6}}, {{6, 0}, {6, 6}}, {{0, 3}, {6, 3}}}}};
   const std::string text = std::string(1, label_) + " " + std::to_string(value_);
-  label_width_ = float(text.size() * 6 - 2);
+  label_width_ = float(text.size() * 8 - 2);
   std::vector<Vertex> vertices;
   std::vector<uint32_t> indices;
   auto capsule = [&](glm::vec2 from, glm::vec2 to) {
-    constexpr float radius = 0.32f;
+    constexpr float radius = 0.44f;
     constexpr int steps = 10;
     const float angle = std::atan2(to.y - from.y, to.x - from.x);
     const uint32_t base = uint32_t(vertices.size());
@@ -166,7 +149,7 @@ void SizeSlider::RebuildLabel() {
         }
         const auto before = path[(j + count - 1) % count] - path[j];
         const auto after = path[(j + 1) % count] - path[j];
-        const float trim = std::min(0.55f, std::min(glm::length(before), glm::length(after)) * 0.4f);
+        const float trim = std::min(0.65f, std::min(glm::length(before), glm::length(after)) * 0.4f);
         const auto start = path[j] + glm::normalize(before) * trim;
         const auto end = path[j] + glm::normalize(after) * trim;
         for (int sample = 0; sample <= 6; ++sample) {
@@ -177,7 +160,7 @@ void SizeSlider::RebuildLabel() {
       if (closed)
         rounded.push_back(rounded.front());
       for (size_t j = 1; j < rounded.size(); ++j)
-        capsule(rounded[j - 1] + glm::vec2{float(i * 6), 0}, rounded[j] + glm::vec2{float(i * 6), 0});
+        capsule(rounded[j - 1] + glm::vec2{float(i * 8), 0}, rounded[j] + glm::vec2{float(i * 8), 0});
     }
   }
   if (!label_model_)
@@ -223,7 +206,7 @@ void SizeSlider::Draw() {
     RoundedRect(position, size, radius, 0.45f, {0.34f + highlight, 0.42f + highlight, 0.53f + highlight, 1.0f}, filled,
                 false);
 
-  const float pixel = std::min(thickness * 0.38f / 6.64f, length * 0.8f / label_width_);
+  const float pixel = std::min(thickness * 0.34f / 6.88f, length * 0.8f / label_width_);
   auto transform = glm::translate(glm::mat4{1.0f}, glm::vec3{position + size * 0.5f, 0.4f}) *
                    glm::rotate(glm::mat4{1.0f}, vertical_ ? -glm::half_pi<float>() : 0.0f, glm::vec3{0, 0, 1}) *
                    glm::scale(glm::mat4{1.0f}, glm::vec3{pixel, pixel, 1.0f}) *
