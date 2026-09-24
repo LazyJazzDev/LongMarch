@@ -84,9 +84,14 @@ void NoticeBoard::UpdateContentText(const std::wstring &content_text) {
 }
 
 float NoticeBoard::GetFittingContentSize() {
-  auto font_factory = content_bar_->GetFontFactory();
-  return content_font_size_ *
-         std::min(
-             (right_ - left_) * 0.9f / (font_factory->GetString(content_text_).advance * 1e-3f * content_font_size_),
-             1.0f);
+  const auto mesh = content_bar_->GetFontFactory()->GetString(content_text_);
+  // TextBar centers normalized geometry around half the advance. Include any
+  // glyph overhang so the rendered outline also stays inside the padded width.
+  float width = mesh.GetAdvance();
+  for (const auto &vertex : mesh.GetVertices())
+    width = std::max(width, 2.0f * std::abs(vertex.x - mesh.GetAdvance() * 0.5f));
+  if (width <= 0.0f)
+    return content_font_size_;
+  const float available_width = std::max(0.0f, right_ - left_) * 0.9f;
+  return std::min(content_font_size_, available_width / width);
 }
