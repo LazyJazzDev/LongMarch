@@ -8,7 +8,7 @@
 - 保存完整网格尺寸及空白边界；加载后同步 W/H 滑条、适配视图并暂停演化，便于检查局面。
 - 取消文件选择保留当前局面；无效文件给出错误提示。支持 Unicode 路径。
 
-![GOL 侧栏与 295P5H1V1 图案](https://media.githubusercontent.com/media/LazyJazzDev/LongMarchAssetsLFS/765432f9498e468628ec9dc3fe68b6fc82c6cf10/reports/pr56-demo-features/gol-sidebar.png)
+![GOL 侧栏与 295P5H1V1 图案](https://media.githubusercontent.com/media/LazyJazzDev/LongMarchAssetsLFS/4c025131f0f88306df9fe5073dcc0b36d10c0116/reports/pr56-demo-features/gol-sidebar.png)
 
 *100 × 100 网格中的 295P5H1V1 预设。左侧依次为文件操作、并排尺寸滑条、速度和播放；重置与随机化位于另一侧两个角。*
 
@@ -18,7 +18,7 @@
 - 文件图标采用粗线条连续轮廓；箭头与成功勾选平滑切换，成功／失败提示色渐入渐出。
 - 尺寸滑条使用粗笔画圆角字模；骰子明暗按透视投影后的屏幕坐标计算，并响应按钮状态。
 
-![GOL 顶部工具栏与 Gosper glider gun](https://media.githubusercontent.com/media/LazyJazzDev/LongMarchAssetsLFS/765432f9498e468628ec9dc3fe68b6fc82c6cf10/reports/pr56-demo-features/gol-horizontal.png)
+![GOL 顶部工具栏与 Gosper glider gun](https://media.githubusercontent.com/media/LazyJazzDev/LongMarchAssetsLFS/4c025131f0f88306df9fe5073dcc0b36d10c0116/reports/pr56-demo-features/gol-horizontal.png)
 
 *100 × 25 网格中的 Gosper glider gun 初始局面。双滑条上下排列，总高度与两侧按钮一致。静态截图展示最终布局，不代表动画时序。*
 
@@ -41,7 +41,7 @@ cmake-build-ninja/demo/gol/demo_gol 100 25 --pattern demo/gol/patterns/gosper-gl
 - **NEW GAME / TRY AGAIN** 关闭 AI，清除待执行动作与启动手势计数，分数栏恢复 **SCORE**；显式启动参数 `--ai` 仍可用于首次启动。
 - 分数根据背景框可用宽度自动缩小，保留左右留白；分数变化或窗口缩放时重新计算，小分数恢复默认字号。
 
-<img src="https://media.githubusercontent.com/media/LazyJazzDev/LongMarchAssetsLFS/765432f9498e468628ec9dc3fe68b6fc82c6cf10/reports/pr56-demo-features/2048-score-fit.png" alt="2048 游戏结束界面：十位分数自动适配背景框" width="480">
+<img src="https://media.githubusercontent.com/media/LazyJazzDev/LongMarchAssetsLFS/4c025131f0f88306df9fe5073dcc0b36d10c0116/reports/pr56-demo-features/2048-score-fit.png" alt="2048 游戏结束界面：十位分数自动适配背景框" width="480">
 
 *真实游戏结束界面渲染，分数 `2147483647` 由运行时探针注入，用于验证十位数字排版，并非实际游玩成绩。*
 
@@ -49,5 +49,5 @@ cmake-build-ninja/demo/gol/demo_gol 100 25 --pattern demo/gol/patterns/gosper-gl
 
 - Ninja Release 构建：`demo_gol`、`demo_2048` 通过；GOL 相关 **19 项测试全部通过**。
 - Metal 运行时验证：文件读写、取消／失败恢复、加载后的网格绑定、AI 新局重置，以及长分数、空文本和窗口缩放适配。文件读写探针使用模拟文件选择结果，未自动操作原生对话框。
-- 所有截图来自 macOS / Apple M4 / Metal，代码版本 `a23cf51`。GOL 输出 **2560 × 1440**，每轴 2× 超采样；2048 输出 **1440 × 1920**，每轴 3× 超采样。
-- 图片通过 Git LFS 发布，固定到素材提交 `765432f9498e468628ec9dc3fe68b6fc82c6cf10`；[素材 PR #25](https://github.com/LazyJazzDev/LongMarchAssetsLFS/pull/25) 已 squash 合并。[截图来源与复现说明](https://github.com/LazyJazzDev/LongMarchAssetsLFS/blob/765432f9498e468628ec9dc3fe68b6fc82c6cf10/reports/pr56-demo-features/README.md)。
+- 所有配图均通过 macOS 系统窗口截图命令 `screencapture -x -l` 生成，保留真实标题栏、窗口外框和系统阴影。环境为 macOS / Apple M4 / Metal，功能代码版本 `a23cf51`。包含窗口与阴影的 PNG 尺寸：GOL 侧栏 **2784 × 1728**、顶部工具栏 **2696 × 1640**，2048 **1664 × 2208**。应用渲染分别使用每轴 2×（GOL）和 3×（2048）超采样。
+- 图片通过 Git LFS 发布，固定到素材提交 `4c025131f0f88306df9fe5073dcc0b36d10c0116`；[素材 PR #26](https://github.com/LazyJazzDev/LongMarchAssetsLFS/pull/26) 已 squash 合并。[截图来源与复现说明](https://github.com/LazyJazzDev/LongMarchAssetsLFS/blob/4c025131f0f88306df9fe5073dcc0b36d10c0116/reports/pr56-demo-features/README.md)。
