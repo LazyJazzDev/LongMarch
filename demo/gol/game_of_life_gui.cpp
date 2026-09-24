@@ -191,9 +191,9 @@ void GameOfLife::CustomOnUpdate() {
              glm::vec4{0.1, 0.1, 0.1, 1.0}, glm::uvec4{0}});
   // Match the opposite action rail to the main toolbar background.
   const auto framebuffer = glm::vec2(FramebufferSize());
-  const glm::vec2 action_position = sidebar_ ? glm::vec2{playground_right_, 0} : glm::vec2{0};
+  const glm::vec2 action_position = sidebar_ ? glm::vec2{playground_right_, 0} : glm::vec2{0, playground_bottom_};
   const glm::vec2 action_size = sidebar_ ? glm::vec2{framebuffer.x - playground_right_, framebuffer.y}
-                                         : glm::vec2{framebuffer.x, playground_top_};
+                                         : glm::vec2{framebuffer.x, framebuffer.y - playground_bottom_};
   DrawModel(&white_rect_model.value(),
             {GetModelMatrix(action_position, action_size, 0.8f), glm::vec4{0.1, 0.1, 0.1, 1.0}, glm::uvec4{0}});
   DrawModel(
@@ -265,14 +265,14 @@ void GameOfLife::OnWindowSize() {
   } else {
     playground_top = panel_size;
     playground_bottom = window_height - panel_size;
-    panel_top_ = playground_bottom;
-    const float top = panel_top_ + margin;
+    panel_bottom_ = playground_top;
+    const float top = margin;
     place(open_button_.get(), margin, top);
     place(save_button_.get(), margin + step, top);
     place(speed_toggle_button_.get(), window_width - margin - icon_size - step, top);
     place(pause_play_button_.get(), window_width - margin - icon_size, top);
-    place(refresh_button_.get(), margin, margin);
-    place(randomize_button_.get(), window_width - margin - icon_size, margin);
+    place(refresh_button_.get(), margin, window_height - margin - icon_size);
+    place(randomize_button_.get(), window_width - margin - icon_size, window_height - margin - icon_size);
     const float left = margin + step * 2.0f;
     const float right = window_width - left;
     width_slider_->Resize({left, top, right, top + slider_thickness}, false);
