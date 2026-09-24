@@ -29,6 +29,7 @@ class GameOfLife : public Application {
   ~GameOfLife() override;
 
   double NextFrameDelay() const override;
+  void SetIconOrientation(float radians);
 
   void ResetFrameClock() {
     last_frame_time_ = last_simulation_time_ = grassland::GetTimeSeconds();
@@ -87,6 +88,7 @@ class GameOfLife : public Application {
   int hosted_file_action_{};
   bool hosted_was_playing_{};
   SimulationClock simulation_clock_;
+  AnimationVar icon_rotation_{0.0f, AnimationStyle::kPower2};
   GridView grid_view_;
   std::unique_ptr<SizeSlider> width_slider_;
   std::unique_ptr<SizeSlider> height_slider_;

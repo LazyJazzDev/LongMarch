@@ -92,9 +92,9 @@ void PausePlayButton::Draw() {
                           {GetModelMatrix(glm::vec2{left_, top_}, glm::vec2{right_ - left_, bottom_ - top_}, 0.6f),
                            background_color_.GetValue(float(background_animation_var_)), glm::uvec4{1, 0, 0, 0}});
 
-  application_->DrawModel(pause_play_device_model_.get(),
-                          {GetModelMatrix(glm::vec2{left_, top_}, glm::vec2{right_ - left_, bottom_ - top_}, 0.4f),
-                           glm::vec4{1.0f}, glm::uvec4{1, 0, 0, 0}});
+  DrawIcon(pause_play_device_model_.get(),
+           {GetModelMatrix(glm::vec2{left_, top_}, glm::vec2{right_ - left_, bottom_ - top_}, 0.4f), glm::vec4{1.0f},
+            glm::uvec4{1, 0, 0, 0}});
 }
 
 void PausePlayButton::OnResize() {

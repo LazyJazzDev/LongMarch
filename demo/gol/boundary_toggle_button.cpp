@@ -89,10 +89,8 @@ void BoundaryToggleButton::Draw() {
   const glm::vec2 origin{left_, top_}, size{right_ - left_, bottom_ - top_};
   application_->DrawModel(background_, {GetModelMatrix(origin, size, 0.6f),
                                         button_palette::Background().GetValue(float(hover_)), glm::uvec4{1, 0, 0, 0}});
-  application_->DrawModel(device_icon_.get(),
-                          {GetModelMatrix(origin, size, 0.4f), glm::vec4{1.0f}, glm::uvec4{1, 0, 0, 0}});
-  application_->DrawModel(cell_model_.get(),
-                          {GetModelMatrix(origin, size, 0.4f), button_palette::kNeutral, glm::uvec4{1, 0, 0, 0}});
+  DrawIcon(device_icon_.get(), {GetModelMatrix(origin, size, 0.4f), glm::vec4{1.0f}, glm::uvec4{1, 0, 0, 0}});
+  DrawIcon(cell_model_.get(), {GetModelMatrix(origin, size, 0.4f), button_palette::kNeutral, glm::uvec4{1, 0, 0, 0}});
 }
 
 void BoundaryToggleButton::OnClick() {

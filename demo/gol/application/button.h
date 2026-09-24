@@ -23,6 +23,7 @@ class Button : public Listener {
   void Deactivate();
 
  protected:
+  void DrawIcon(DeviceModel *model, InstanceInfo instance);
   void SetState(int state);
 
   void CalculateListenerBounds();

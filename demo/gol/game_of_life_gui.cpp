@@ -172,6 +172,8 @@ void GameOfLife::CustomOnUpdate() {
     }
   }
 
+  icon_rotation_.Update(delta_time / 0.25f);
+  SetIconRotation(float(icon_rotation_));
   time_total += delta_time;
 
   // Update pause_play_button_
@@ -276,11 +278,8 @@ void GameOfLife::OnWindowSize() {
   panel_top_ = 0;
   panel_bottom_ = window_height;
 
-  const bool prefer_sidebar =
-      std::min(window_height / cell_grid_height_, (window_width - panel_size * 2.0f) / cell_grid_width_) >
-      std::min((window_height - panel_size * 2.0f) / cell_grid_height_, window_width / cell_grid_width_);
-  if (!width_slider_->IsDragging() && !height_slider_->IsDragging())
-    sidebar_ = prefer_sidebar;
+  // Sidebars follow the window's long edges, independent of the grid aspect.
+  sidebar_ = window_height >= window_width;
   auto place = [icon_size](Button *button, float x, float y) { button->Resize(x, y, x + icon_size, y + icon_size); };
   if (sidebar_) {
     playground_left = panel_size;
@@ -543,10 +542,16 @@ void GameOfLife::InitCells(int width, int height) {
   }
 }
 
+void GameOfLife::SetIconOrientation(float radians) {
+  ResetAnimationClock();
+  const float current = float(icon_rotation_);
+  icon_rotation_.TryUpdateTarget(current + std::remainder(radians - current, glm::two_pi<float>()));
+}
+
 double GameOfLife::NextFrameDelay() const {
-  if (file_action_ != FileAction::kNone || pause_play_button_->IsAnimating() || speed_toggle_button_->IsAnimating() ||
-      boundary_button_->IsAnimating() || refresh_button_->IsAnimating() || randomize_button_->IsAnimating() ||
-      open_button_->IsAnimating() || save_button_->IsAnimating())
+  if (!icon_rotation_.IsFinished() || file_action_ != FileAction::kNone || pause_play_button_->IsAnimating() ||
+      speed_toggle_button_->IsAnimating() || boundary_button_->IsAnimating() || refresh_button_->IsAnimating() ||
+      randomize_button_->IsAnimating() || open_button_->IsAnimating() || save_button_->IsAnimating())
     return 0;
   for (const auto &cell : cell_button_grid_)
     if (cell->IsAnimating())

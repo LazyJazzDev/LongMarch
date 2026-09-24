@@ -87,6 +87,14 @@ class Application {
 
   void DrawModel(DeviceModel *device_model, const InstanceInfo &instance_info);
 
+  float IconRotation() const {
+    return icon_rotation_;
+  }
+
+  void SetIconRotation(float radians) {
+    icon_rotation_ = radians;
+  }
+
   // Moves every model drawn so far this frame into a second frame, which is
   // blended over the main frame with the given opacity.
   void CaptureSecondFrame(float alpha);
@@ -108,6 +116,8 @@ class Application {
   glm::vec4 clear_color_{0.0f, 0.0f, 0.0f, 1.0f};
 
  private:
+  float icon_rotation_{};
+
   struct FrameTarget {
     std::unique_ptr<graphics::Image> color_image;
     std::unique_ptr<graphics::Buffer> instance_buffer;

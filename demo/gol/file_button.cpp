@@ -96,22 +96,22 @@ void FileButton::Draw() {
   auto icon_position = position + glm::vec2{shake * size.x, 0};
   static const MixValue<float> brightness({1.0f, 1.08f, 0.90f});
   auto color = button_palette::kNeutral * brightness.GetValue(float(hover_));
-  application_->DrawModel(frame_.get(), {GetModelMatrix(icon_position, size, 0.4f), color, glm::uvec4{1, 0, 0, 0}});
+  DrawIcon(frame_.get(), {GetModelMatrix(icon_position, size, 0.4f), color, glm::uvec4{1, 0, 0, 0}});
   // Collapse and expand through zero instead of swapping full-size silhouettes.
   // Smoothstep keeps both ends and the midpoint at zero scale velocity.
   const float transition = float(check_transition_);
   const float check_scale = glm::smoothstep(0.5f, 1.0f, transition);
   const float arrow_scale = 1.0f - glm::smoothstep(0.0f, 0.5f, transition);
   if (check_scale > 0.0f)
-    application_->DrawModel(
-        check_.get(), {GetModelMatrix(icon_position + size * (1.0f - check_scale) * 0.5f, size * check_scale, 0.38f),
-                       button_palette::kPlay, glm::uvec4{1, 0, 0, 0}});
+    DrawIcon(check_.get(),
+             {GetModelMatrix(icon_position + size * (1.0f - check_scale) * 0.5f, size * check_scale, 0.38f),
+              button_palette::kPlay, glm::uvec4{1, 0, 0, 0}});
   if (arrow_scale > 0.0f) {
     const float direction = kind_ == Kind::kSave ? 1.0f : -1.0f;
     icon_position.y += direction * pulse * size.y * 0.07f;
-    application_->DrawModel(
-        arrow_.get(), {GetModelMatrix(icon_position + size * (1.0f - arrow_scale) * 0.5f, size * arrow_scale, 0.38f),
-                       color, glm::uvec4{1, 0, 0, 0}});
+    DrawIcon(arrow_.get(),
+             {GetModelMatrix(icon_position + size * (1.0f - arrow_scale) * 0.5f, size * arrow_scale, 0.38f), color,
+              glm::uvec4{1, 0, 0, 0}});
   }
 }
 
