@@ -30,6 +30,7 @@ class GameOfLife : public Application {
 
   double NextFrameDelay() const override;
   void SetIconOrientation(float radians);
+  void SetBottomControlInset(float height_fraction);
 
   void ResetFrameClock() {
     last_frame_time_ = last_simulation_time_ = grassland::GetTimeSeconds();
@@ -95,6 +96,7 @@ class GameOfLife : public Application {
   int requested_width_{};
   int requested_height_{};
   bool sidebar_{true};
+  float bottom_control_inset_{};
   bool sliders_were_dragging_{false};
   uint32_t magnify_callback_{};
   uint32_t scroll_callback_{};

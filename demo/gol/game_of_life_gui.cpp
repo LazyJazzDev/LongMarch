@@ -263,6 +263,9 @@ void GameOfLife::OnWindowSize() {
   auto window_height = float(FramebufferSize().y);
   auto ui_unit = std::min(window_width, window_height) * 0.01f * ui_scale_;
   const float margin = ui_unit * 5.0f;
+  // Native hosts reserve the home-gesture strip without shrinking the canvas.
+  const float bottom_margin = std::max(margin, window_height * bottom_control_inset_);
+  const float bottom_shift = bottom_margin - margin;
   const float icon_size = ui_unit * 10.0f;
   const float step = ui_unit * 13.0f;
   const float slider_gap = ui_unit * 1.5f;
@@ -287,20 +290,20 @@ void GameOfLife::OnWindowSize() {
     panel_right_ = panel_size;
     place(open_button_.get(), margin, margin);
     place(save_button_.get(), margin, margin + step);
-    place(boundary_button_.get(), margin, window_height - margin - icon_size - step * 2.0f);
-    place(speed_toggle_button_.get(), margin, window_height - margin - icon_size - step);
-    place(pause_play_button_.get(), margin, window_height - margin - icon_size);
+    place(boundary_button_.get(), margin, window_height - bottom_margin - icon_size - step * 2.0f);
+    place(speed_toggle_button_.get(), margin, window_height - bottom_margin - icon_size - step);
+    place(pause_play_button_.get(), margin, window_height - bottom_margin - icon_size);
     place(refresh_button_.get(), window_width - margin - icon_size, margin);
-    place(randomize_button_.get(), window_width - margin - icon_size, window_height - margin - icon_size);
+    place(randomize_button_.get(), window_width - margin - icon_size, window_height - bottom_margin - icon_size);
     const float top = margin + step * 2.0f;
-    const float bottom = window_height - top - step;
+    const float bottom = window_height - top - step - bottom_shift;
     width_slider_->Resize({margin, top, margin + slider_thickness, bottom}, true);
     height_slider_->Resize({margin + slider_thickness + slider_gap, top, margin + icon_size, bottom}, true);
   } else {
     playground_top = panel_size;
-    playground_bottom = window_height - panel_size;
+    playground_bottom = window_height - panel_size - bottom_shift;
     panel_top_ = playground_bottom;
-    const float top = window_height - margin - icon_size;
+    const float top = window_height - bottom_margin - icon_size;
     place(open_button_.get(), margin, top);
     place(save_button_.get(), margin + step, top);
     place(boundary_button_.get(), window_width - margin - icon_size - step * 2.0f, top);
@@ -541,6 +544,14 @@ void GameOfLife::InitCells(int width, int height) {
       cell_button_grid_.push_back(
           std::make_unique<CellButton>(this, 0, 0, 100, 100, &cell_grid_[index], &white_rect_model.value()));
     }
+  }
+}
+
+void GameOfLife::SetBottomControlInset(float height_fraction) {
+  const float inset = std::clamp(height_fraction, 0.0f, 0.25f);
+  if (bottom_control_inset_ != inset) {
+    bottom_control_inset_ = inset;
+    OnWindowSize();
   }
 }
 
