@@ -11,7 +11,8 @@ class TwentyFourEight;
 
 class DesktopGameSession {
  public:
-  DesktopGameSession(const std::string &name);
+  DesktopGameSession(const std::string &name,
+                     grassland::graphics::BackendAPI backend = grassland::graphics::BACKEND_API_DEFAULT);
   ~DesktopGameSession();
   void Render();
   double NextFrameDelay() const;

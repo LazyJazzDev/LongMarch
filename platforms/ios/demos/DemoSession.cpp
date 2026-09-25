@@ -6,7 +6,9 @@
 #include <stdexcept>
 
 #include "demo/nbody_cs/params.h"
+#ifdef LONGMARCH_METAL_ENABLED
 #include "grassland/graphics/backend/metal/metal_command_context.h"
+#endif
 #include "grassland/graphics/shader_cache.h"
 
 namespace {
@@ -60,18 +62,22 @@ const std::vector<std::string> &DemoSession::Names() {
   return names;
 }
 
-DemoSession::DemoSession(const std::filesystem::path &resources, const std::string &demo, bool prepare) : demo_(demo) {
+DemoSession::DemoSession(const std::filesystem::path &resources,
+                         const std::string &demo,
+                         bool prepare,
+                         BackendAPI backend)
+    : demo_(demo),
+      backend_(backend) {
   if (std::find(Names().begin(), Names().end(), demo) == Names().end())
     throw std::invalid_argument("Unknown graphics demo");
-  ConfigureShaderCache({resources / "shaders", !prepare, true});
+  ConfigureShaderCache({resources / "shaders", !prepare, backend == grassland::graphics::BACKEND_API_METAL});
   FileProbe::GetInstance().AddSearchPath((resources / "assets").string() + "/");
   if (demo == "gol" || demo == "2048") {
-    game_ = std::make_unique<DesktopGameSession>(demo);
+    game_ = std::make_unique<DesktopGameSession>(demo, backend);
     return;
   }
-  if (CreateCore(BACKEND_API_METAL, Core::Settings{1, false}, &core_) ||
-      core_->InitializeLogicalDeviceAutoSelect(false))
-    throw std::runtime_error("Cannot initialize Metal");
+  if (CreateCore(backend, Core::Settings{1, false}, &core_) || core_->InitializeLogicalDeviceAutoSelect(false))
+    throw std::runtime_error("Cannot initialize requested graphics backend");
   core_->CreateImage(width_, height_, IMAGE_FORMAT_R32G32B32A32_SFLOAT, &color_);
   if (demo_ == "nbody_cs")
     InitializeNBody();
@@ -335,8 +341,13 @@ void DemoSession::Render() {
   ctx->CmdEndRendering();
   core_->SubmitCommandContext(ctx.get());
   core_->WaitGPU();
-  auto native = static_cast<backend::MetalCommandContext *>(ctx.get())->Handle();
-  gpu_ms_ = std::max(0.0, (native->GPUEndTime() - native->GPUStartTime()) * 1000);
+  gpu_ms_ = 0;
+#ifdef LONGMARCH_METAL_ENABLED
+  if (backend_ == BACKEND_API_METAL) {
+    auto native = static_cast<backend::MetalCommandContext *>(ctx.get())->Handle();
+    gpu_ms_ = std::max(0.0, (native->GPUEndTime() - native->GPUStartTime()) * 1000);
+  }
+#endif
 }
 
 std::vector<glm::vec3> DemoSession::Positions() const {
@@ -348,7 +359,7 @@ std::vector<glm::vec3> DemoSession::Positions() const {
 
 void DemoSession::InitializeRayQuery() {
   if (!core_->DeviceRayQuerySupport())
-    throw std::runtime_error("Ray Query requires a supported Metal device");
+    throw std::runtime_error("Ray Query requires device ray-query support");
 
   struct CameraObject {
     glm::mat4 screen_to_camera, camera_to_world;
@@ -416,6 +427,11 @@ void DemoSession::RenderRayQuery() {
 
   core_->SubmitCommandContext(command_context.get());
   core_->WaitGPU();
-  auto native = static_cast<backend::MetalCommandContext *>(command_context.get())->Handle();
-  gpu_ms_ = std::max(0.0, (native->GPUEndTime() - native->GPUStartTime()) * 1000);
+  gpu_ms_ = 0;
+#ifdef LONGMARCH_METAL_ENABLED
+  if (backend_ == BACKEND_API_METAL) {
+    auto native = static_cast<backend::MetalCommandContext *>(command_context.get())->Handle();
+    gpu_ms_ = std::max(0.0, (native->GPUEndTime() - native->GPUStartTime()) * 1000);
+  }
+#endif
 }

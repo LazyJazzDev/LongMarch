@@ -7,15 +7,16 @@ RenderSession::RenderSession(const std::filesystem::path &resources,
                              const std::string &scene,
                              int max_dimension,
                              bool prepare,
-                             double aspect_ratio) {
-  graphics::ConfigureShaderCache({resources / "shaders", !prepare, true});
-  if (graphics::CreateCore(graphics::BACKEND_API_METAL, graphics::Core::Settings{1, false}, &graphics_) ||
+                             double aspect_ratio,
+                             graphics::BackendAPI backend,
+                             bool allow_compute_fallback) {
+  graphics::ConfigureShaderCache({resources / "shaders", !prepare, backend == grassland::graphics::BACKEND_API_METAL});
+  if (graphics::CreateCore(backend, graphics::Core::Settings{1, false}, &graphics_) ||
       graphics_->InitializeLogicalDeviceAutoSelect(false))
-    throw std::runtime_error("Cannot initialize Metal");
-  if (!graphics_->DeviceRayQuerySupport())
-    throw std::runtime_error(
-        "This device does not support Metal ray queries. Use a supported iPhone or iPad; the simulator may not support "
-        "ray tracing.");
+    throw std::runtime_error("Cannot initialize requested graphics backend");
+  compute_fallback_ = !graphics_->DeviceRayQuerySupport();
+  if (compute_fallback_ && !allow_compute_fallback)
+    throw std::runtime_error("This device does not support ray queries required by this render session.");
   auto sobol = resources / "assets/data/new-joe-kuo-7.21201";
   if (!std::filesystem::is_regular_file(sobol))
     throw std::runtime_error("Bundled Sobol table is missing");
@@ -43,7 +44,8 @@ RenderSession::~RenderSession() {
 }
 
 void RenderSession::Render() {
-  core_->Render(scene_->GetScene(), scene_->GetCamera(), scene_->GetFilm(), sparkium::RENDER_PIPELINE_RAY_QUERY);
+  core_->Render(scene_->GetScene(), scene_->GetCamera(), scene_->GetFilm(),
+                compute_fallback_ ? sparkium::RENDER_PIPELINE_RT_FALLBACK : sparkium::RENDER_PIPELINE_RAY_QUERY);
 }
 
 std::vector<uint8_t> RenderSession::Step() {
@@ -51,10 +53,15 @@ std::vector<uint8_t> RenderSession::Step() {
   return Display(false);
 }
 
-std::vector<uint8_t> RenderSession::Display(bool hdr, float exposure) {
+graphics::Image *RenderSession::Develop(bool hdr, float exposure) {
   scene_->GetFilm()->info.exposure = scene_exposure_ + std::clamp(exposure, -10.f, 10.f);
   auto *target = hdr ? hdr_image_.get() : image_.get();
   scene_->GetFilm()->Develop(target, hdr);
+  return target;
+}
+
+std::vector<uint8_t> RenderSession::Display(bool hdr, float exposure) {
+  auto *target = Develop(hdr, exposure);
   std::vector<uint8_t> pixels(static_cast<size_t>(Width()) * Height() * (hdr ? 16 : 4));
   target->DownloadData(pixels.data());
   return pixels;

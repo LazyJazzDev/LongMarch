@@ -32,7 +32,7 @@ static std::vector<uint8_t> Pixels(DemoSession &session) {
 }
 
 static void CheckListenerMutation() {
-  life_demo::Application app("listener check", 32, 32, grassland::graphics::BACKEND_API_METAL, true);
+  life_demo::Application app("listener check", 32, 32, grassland::graphics::BACKEND_API_DEFAULT, true);
 
   struct Probe : life_demo::Listener {
     explicit Probe(life_demo::Application *app) : Listener(app) {

@@ -5,21 +5,19 @@
 #include "demo/2048/2048.h"
 #include "demo/gol/game_of_life_gui.h"
 
-DesktopGameSession::DesktopGameSession(const std::string &name) {
+DesktopGameSession::DesktopGameSession(const std::string &name, grassland::graphics::BackendAPI backend) {
   if (name == "gol") {
     const char *size = std::getenv("LONGMARCH_SMOKE_GOL_SIZE");
     const int extent = size ? std::clamp(std::atoi(size), grid_size::kMin, grid_size::kMax) : 0;
     life_ = std::make_unique<life_demo::GameOfLife>("Game of Life", 1280, 720, extent ? extent : grid_size::kDefault,
-                                                    extent ? extent : grid_size::kDefault,
-                                                    grassland::graphics::BACKEND_API_METAL, true);
+                                                    extent ? extent : grid_size::kDefault, backend, true);
     if (extent) {
       life_->SetRandomInitialCells(.3f, 42);
       life_->SetInitialPlaying(true);
     }
     life_->InitializeHosted();
   } else {
-    puzzle_ =
-        std::make_unique<puzzle_demo::TwentyFourEight>("2048", 720, 960, grassland::graphics::BACKEND_API_METAL, true);
+    puzzle_ = std::make_unique<puzzle_demo::TwentyFourEight>("2048", 720, 960, backend, true);
     puzzle_->InitializeHosted();
   }
 }

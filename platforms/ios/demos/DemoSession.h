@@ -12,7 +12,10 @@
 // use the original HLSL through the same graphics API and Metal shader cache.
 class DemoSession {
  public:
-  DemoSession(const std::filesystem::path &resources, const std::string &demo, bool prepare = false);
+  DemoSession(const std::filesystem::path &resources,
+              const std::string &demo,
+              bool prepare = false,
+              grassland::graphics::BackendAPI backend = grassland::graphics::BACKEND_API_DEFAULT);
   ~DemoSession();
   void Resize(int width, int height);
   void Configure(int particles, int galaxies, float delta_time, bool simulate, float yaw, float pitch, int reset);
@@ -49,6 +52,7 @@ class DemoSession {
   void ResetParticles();
   std::unique_ptr<grassland::graphics::Buffer> Buffer(const void *data, size_t size);
   std::string demo_;
+  grassland::graphics::BackendAPI backend_;
   std::unique_ptr<DesktopGameSession> game_;
   std::unique_ptr<grassland::graphics::Core> core_;
   std::unique_ptr<grassland::graphics::Image> color_, depth_, texture_;
