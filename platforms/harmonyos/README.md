@@ -12,10 +12,12 @@ actual checks completed and remaining device limitations.
 
 ## Functionality
 
+- Immersive fullscreen throughout the app, with system status/navigation bars hidden.
+
 - Demo browser with 2048, Game of Life, Sparkium, Graphics Hello, and NBody CS.
 - Original game geometry, controls, animations, palette, AI, and life simulation.
   Swipe to move in 2048; five score taps start AI and one stops it. GoL supports
-  drawing, two-finger pan/pinch, native grid-size controls, and document pickers.
+  cell editing, two-finger pan/pinch, native grid-size controls, and document pickers.
 - Sparkium retains all nine scene presets and full scene resolution. It starts
   automatically, preserves accumulation when the SPP limit changes, supports
   film reset, scene reload, exposure, pause, and a persistent image pan/zoom.

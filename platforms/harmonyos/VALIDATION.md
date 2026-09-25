@@ -59,9 +59,17 @@ succeeded. A development-signed HAP is installed and running on Mate 70 RS.
   now move and merge 2048 tiles (score increased to 4); GoL's native width dialog
   opens and increments the board width from 64 to 65.
 - 2048 returned from Home to the active game without an initialization error.
+- Immersive fullscreen hides the status bar and navigation indicator; device
+  screenshots confirm the app fills the screen.
+- Double-tap recognition runs in parallel with pointer events. GoL's document
+  picker saved `Life.cells` into Documents and loaded it back without errors.
+- Cornell Box retained 32 SPP after changing exposure to +2.3 EV and after
+  Home/background/resume; film reset restarted accumulation (observed 3 SPP).
+- NBody pause held the displayed frame counter at 1363 across repeated reads;
+  resume advanced it to 1457. Particle reset completed without a visible error.
 - Frame statistics now use presentation intervals, including frame pacing,
   instead of reporting the reciprocal of render work time as display FPS.
-- Large Blender scenes, exhaustive scene controls, file pickers and physical
+- Large Blender scenes, exhaustive scene controls, physical
   multi-finger gestures still need broader runtime coverage.
 
 ## Observed host limitation
@@ -74,7 +82,7 @@ be measured; host success on Metal does not establish large-scene Vulkan support
 
 - Extended XComponent lifecycle stress, repeated navigation and surface
   destruction during a large scene sample.
-- Device game touch input, native size dialogs, document import/export, orientation
-  lock/icon rotation and bottom system gesture clearance.
+- Broader device touch and multi-finger coverage, orientation lock/icon rotation,
+  document cancellation/invalid-file handling, and system-edge gesture clearance.
 - Hardware ray-query coverage, all full-resolution scenes, memory use, GPU timings,
   HDR surface availability and actual display output on supported hardware.

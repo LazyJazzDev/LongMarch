@@ -13,7 +13,17 @@ export default class EntryAbility extends UIAbility {
     } catch (e) {
       AppStorage.setOrCreate('longmarchStartupError', `Initialization: ${e}`);
     }
-    stage.loadContent('pages/Index');
+    this.configureWindow(stage);
+  }
+  private async configureWindow(stage: window.WindowStage): Promise<void> {
+    try {
+      const win = await stage.getMainWindow();
+      await win.setWindowLayoutFullScreen(true);
+      await win.setWindowSystemBarEnable([]);
+      await stage.loadContent('pages/Index');
+    } catch (e) {
+      AppStorage.setOrCreate('longmarchStartupError', `Window setup: ${e}`);
+    }
   }
   onForeground(): void { native.command('{"type":"active","value":true}'); }
   onBackground(): void { native.command('{"type":"active","value":false}'); }

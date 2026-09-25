@@ -37,7 +37,7 @@ class NativeStatus {
 }
 const DEMOS: DemoInfo[] = [
   { id: '2048', name: '2048', detail: 'Swipe to move · tap the score five times for AI' },
-  { id: 'gol', name: 'Game of Life', detail: 'Draw cells · two fingers to pan and zoom' },
+  { id: 'gol', name: 'Game of Life', detail: 'Tap cells · two fingers to pan and zoom' },
   { id: 'sparkium', name: 'Sparkium', detail: 'Nine scenes · progressive path tracing' },
   { id: 'graphics_hello_triangle', name: 'Triangle', detail: 'Vertex colors' },
   { id: 'graphics_hello_texture', name: 'Texture', detail: 'Texture sampling' },
@@ -185,13 +185,18 @@ struct Index {
   }
   private touch(event: TouchEvent): void {
     const points = event.touches;
-    const ending = event.type === TouchType.Up || event.type === TouchType.Cancel;
-    if (points.length === 0 || event.type === TouchType.Cancel || (ending && points.length <= 1)) {
+    if (event.type === TouchType.Cancel) {
+      if (this.button >= 0) { this.pointer(5, 0, 0, 0); this.pointer(5, 0, 0, 1); }
+      this.button = -1; this.multi = false; this.distance = 0;
+      return;
+    }
+    const ending = event.type === TouchType.Up;
+    if (points.length === 0 || (ending && points.length <= 1)) {
       if (event.changedTouches.length > 0) {
         this.lastX = event.changedTouches[0].x; this.lastY = event.changedTouches[0].y;
       }
       if (this.button >= 0) this.pointer(2, this.lastX, this.lastY, this.button);
-      if (this.selected === '2048' && !this.multi && event.type !== TouchType.Cancel) {
+      if (this.selected === '2048' && !this.multi) {
         const dx = this.lastX - this.startX, dy = this.lastY - this.startY;
         if (Math.max(Math.abs(dx), Math.abs(dy)) > 24) {
           this.pointer(4, 0, 0, Math.abs(dx) > Math.abs(dy) ? (dx > 0 ? 262 : 263) : (dy > 0 ? 264 : 265));
@@ -374,7 +379,7 @@ struct Index {
           Column() {}.width('100%').height('100%').backgroundColor('#00000000')
             .hitTestBehavior(HitTestMode.Block)
             .onTouch((event: TouchEvent) => this.touch(event))
-            .gesture(TapGesture({ count: 2 }).onAction(() => {
+            .parallelGesture(TapGesture({ count: 2 }).onAction(() => {
               if (this.selected === 'sparkium') {
                 this.zoom = 1; this.panX = 0; this.panY = 0; this.send({ type: 'view', zoom: 1, x: 0, y: 0 });
               }
