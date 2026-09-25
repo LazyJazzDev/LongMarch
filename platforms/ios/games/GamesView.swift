@@ -460,13 +460,22 @@ struct GamesView: View {
         }
         .defersSystemGestures(on: .bottom)
       } else {
-        VStack(spacing: 0) {
-          HStack {
-            Text("[Metal] 2048 FPS: \(fps,specifier:"%.1f")").font(.caption.monospaced())
-            Spacer()
-            Button("Demos", action: onExit)
-          }.padding(.horizontal, 12).frame(height: 36)
-          game
+        ZStack {
+          // Match the renderer's cream background through the system safe areas.
+          Color(red: 250.0 / 255, green: 248.0 / 255, blue: 240.0 / 255)
+            .ignoresSafeArea()
+          VStack(spacing: 12) {
+            HStack(spacing: 12) {
+              Text("[Metal] 2048 FPS: \(fps, specifier: "%.1f")")
+                .font(.caption2.monospaced())
+                .foregroundStyle(Color(red: 0.47, green: 0.44, blue: 0.40))
+              Button("Demos", action: onExit).font(.caption)
+            }
+            .padding(.horizontal, 12).padding(.vertical, 6)
+            .background(.black.opacity(0.05), in: Capsule())
+            game
+          }
+          .padding(.top, 12).padding(.bottom, 12)
         }
       }
     }.background(.black)
