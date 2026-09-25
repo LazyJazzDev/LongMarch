@@ -138,14 +138,12 @@ CompiledShaderBlob CompileShader(const VirtualFileSystem &vfs,
                                  const std::vector<std::string> &args) {
   CompiledShaderBlob shader_blob;
   shader_blob.entry_point = entry_point;
-#ifdef __APPLE__
   std::string cache_key;
   if (!GetShaderCacheSettings().directory.empty()) {
     cache_key = ShaderRequestKey(vfs, source_file, entry_point, target, args);
     if (ReadShaderCache(cache_key, shader_blob.data))
       return shader_blob;
   }
-#endif
 #ifdef LONGMARCH_OFFLINE_SHADERS
   throw std::runtime_error("Offline shaders require a prepared shader cache");
 #else
@@ -236,10 +234,8 @@ CompiledShaderBlob CompileShader(const VirtualFileSystem &vfs,
     LogError("Failed to compile shader.");
   }
 
-#ifdef __APPLE__
   if (!cache_key.empty() && !shader_blob.data.empty())
     WriteShaderCache(cache_key, shader_blob.data);
-#endif
   return shader_blob;
 #endif
 }

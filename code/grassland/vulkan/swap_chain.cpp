@@ -108,7 +108,11 @@ VkExtent2D Swapchain::ChooseSwapExtent(const VkSurfaceCapabilitiesKHR &capabilit
     return capabilities.currentExtent;
   } else {
     int width, height;
+#ifndef LONGMARCH_HEADLESS
     glfwGetFramebufferSize(window, &width, &height);
+#else
+    throw std::logic_error("GLFW swapchains are unavailable in a headless build");
+#endif
 
     VkExtent2D actualExtent = {static_cast<uint32_t>(width), static_cast<uint32_t>(height)};
 

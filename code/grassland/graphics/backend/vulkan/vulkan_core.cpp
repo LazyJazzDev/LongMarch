@@ -6,18 +6,24 @@
 #include "grassland/graphics/backend/vulkan/vulkan_image.h"
 #include "grassland/graphics/backend/vulkan/vulkan_program.h"
 #include "grassland/graphics/backend/vulkan/vulkan_sampler.h"
+#ifndef LONGMARCH_HEADLESS
 #include "grassland/graphics/backend/vulkan/vulkan_window.h"
+#endif
 
 namespace grassland::graphics::backend {
 
 VulkanCore::VulkanCore(const Settings &settings) : Core(settings) {
   vulkan::InstanceCreateHint hint{};
   hint.SetValidationLayersEnabled(DebugEnabled());
+#ifdef __OHOS__
+  hint.AddExtension(VK_KHR_SURFACE_EXTENSION_NAME);
+  hint.AddExtension("VK_OHOS_surface");
+#endif
 #if defined(LONGMARCH_CUDA_RUNTIME)
   hint.AddExtension(VK_KHR_EXTERNAL_MEMORY_CAPABILITIES_EXTENSION_NAME);
   hint.AddExtension(VK_KHR_EXTERNAL_SEMAPHORE_CAPABILITIES_EXTENSION_NAME);
 #endif
-  vulkan::CreateInstance(hint, &instance_);
+  vulkan::ThrowIfFailed(vulkan::CreateInstance(hint, &instance_), "Cannot initialize Vulkan instance");
 }
 
 VulkanCore::~VulkanCore() {
@@ -87,8 +93,12 @@ int VulkanCore::CreateWindowObject(int width,
                                    bool fullscreen,
                                    bool resizable,
                                    double_ptr<Window> pp_window) {
+#ifndef LONGMARCH_HEADLESS
   pp_window.construct<VulkanWindow>(this, width, height, title, fullscreen, resizable, false);
   return 0;
+#else
+  return -1;
+#endif
 }
 
 int VulkanCore::CreateShader(const std::string &source_code,
@@ -247,9 +257,11 @@ int VulkanCore::SubmitCommandContext(CommandContext *p_command_context) {
   current_descriptor_pool_ = pool.get();
   current_descriptor_set_queue_ = &set_queue;
 
+#ifndef LONGMARCH_HEADLESS
   for (auto &window : command_context->windows_) {
     window->AcquireNextImage();
   }
+#endif
 
   if (command_context->dynamic_buffers_.size()) {
     vkResetCommandBuffer(transfer_command_buffer_->Handle(), 0);
@@ -322,11 +334,13 @@ int VulkanCore::SubmitCommandContext(CommandContext *p_command_context) {
   std::vector<VkSemaphore> signal_semaphores;
 
   std::vector<VkPipelineStageFlags> wait_stages{};
+#ifndef LONGMARCH_HEADLESS
   for (auto &window : command_context->windows_) {
     wait_semaphores.push_back(window->ImageAvailableSemaphore()->Handle());
     wait_stages.push_back(VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT);
     signal_semaphores.push_back(window->RenderFinishSemaphore()->Handle());
   }
+#endif
 
   VkFence fence = in_flight_fences_[current_frame_]->Handle();
   vkResetFences(device_->Handle(), 1, &fence);
@@ -366,9 +380,11 @@ int VulkanCore::SubmitCommandContext(CommandContext *p_command_context) {
 
   vkQueueSubmit(graphics_queue_->Handle(), 1, &submit_info, fence);
 
+#ifndef LONGMARCH_HEADLESS
   for (auto &window : command_context->windows_) {
     window->Present();
   }
+#endif
 
   post_execute_functions_[current_frame_] = p_command_context->GetPostExecutionCallbacks();
 

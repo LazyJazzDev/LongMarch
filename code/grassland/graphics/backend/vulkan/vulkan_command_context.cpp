@@ -5,7 +5,9 @@
 #include "grassland/graphics/backend/vulkan/vulkan_image.h"
 #include "grassland/graphics/backend/vulkan/vulkan_program.h"
 #include "grassland/graphics/backend/vulkan/vulkan_sampler.h"
+#ifndef LONGMARCH_HEADLESS
 #include "grassland/graphics/backend/vulkan/vulkan_window.h"
+#endif
 
 namespace grassland::graphics::backend {
 
@@ -213,10 +215,14 @@ void VulkanCommandContext::CmdClearImage(Image *image, const ClearValue &color) 
 }
 
 void VulkanCommandContext::CmdPresent(Window *window, Image *image) {
+#ifndef LONGMARCH_HEADLESS
   auto vulkan_window = dynamic_cast<VulkanWindow *>(window);
   auto vulkan_image = dynamic_cast<VulkanImage *>(image);
   commands_.push_back(std::make_unique<VulkanCmdPresent>(vulkan_window, vulkan_image));
   windows_.insert(vulkan_window);
+#else
+  throw std::logic_error("Headless rendering requires native-host presentation");
+#endif
 }
 
 void VulkanCommandContext::CmdDispatchRays(uint32_t width, uint32_t height, uint32_t depth) {

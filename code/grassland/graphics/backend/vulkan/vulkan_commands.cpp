@@ -9,7 +9,9 @@
 #include "grassland/graphics/backend/vulkan/vulkan_image.h"
 #include "grassland/graphics/backend/vulkan/vulkan_program.h"
 #include "grassland/graphics/backend/vulkan/vulkan_sampler.h"
+#ifndef LONGMARCH_HEADLESS
 #include "grassland/graphics/backend/vulkan/vulkan_window.h"
+#endif
 
 namespace grassland::graphics::backend {
 
@@ -394,6 +396,7 @@ void VulkanCmdDrawIndexed::CompileCommand(VulkanCommandContext *context, VkComma
   vkCmdDrawIndexed(command_buffer, index_count_, instance_count_, first_index_, vertex_offset_, first_instance_);
 }
 
+#ifndef LONGMARCH_HEADLESS
 VulkanCmdPresent::VulkanCmdPresent(VulkanWindow *window, VulkanImage *image) : image_(image), window_(window) {
 }
 
@@ -478,6 +481,8 @@ void VulkanCmdPresent::CompileCommand(VulkanCommandContext *context, VkCommandBu
                                VK_IMAGE_ASPECT_COLOR_BIT);
   }
 }
+
+#endif
 
 VulkanCmdDispatchRays::VulkanCmdDispatchRays(VulkanRayTracingProgram *program,
                                              uint32_t width,

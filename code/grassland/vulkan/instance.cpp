@@ -16,7 +16,9 @@ InstanceCreateHint::InstanceCreateHint() {
   app_info.engineVersion = VK_MAKE_VERSION(1, 0, 0);
   app_info.apiVersion = VK_API_VERSION_1_2;
 
+#ifndef LONGMARCH_HEADLESS
   ApplyGLFWSurfaceSupport();
+#endif
 }
 
 void InstanceCreateHint::SetValidationLayersEnabled(bool enabled) {
@@ -45,6 +47,7 @@ bool InstanceCreateHint::IsEnabledExtension(const char *extension) const {
   return false;
 }
 
+#ifndef LONGMARCH_HEADLESS
 void InstanceCreateHint::ApplyGLFWSurfaceSupport() {
   uint32_t glfw_extension_count = 0;
   const char **glfw_extensions;
@@ -72,6 +75,8 @@ void InstanceCreateHint::ApplyGLFWSurfaceSupport() {
     glfwTerminate();
   }
 }
+
+#endif
 
 VkResult CreateInstance(InstanceCreateHint create_hint, double_ptr<Instance> pp_instance) {
   VkInstanceCreateInfo instance_create_info{};
@@ -161,6 +166,7 @@ Instance::~Instance() {
   vkDestroyInstance(instance_, nullptr);
 }
 
+#ifndef LONGMARCH_HEADLESS
 VkResult Instance::CreateSurfaceFromGLFWWindow(GLFWwindow *window, double_ptr<Surface> pp_surface) const {
   VkSurfaceKHR surface{nullptr};
   VkResult result = glfwCreateWindowSurface(instance_, window, nullptr, &surface);
@@ -179,6 +185,8 @@ VkResult Instance::CreateSurfaceFromGLFWWindow(GLFWwindow *window, double_ptr<Su
 
   return VK_SUCCESS;
 }
+
+#endif
 
 std::vector<PhysicalDevice> Instance::EnumeratePhysicalDevices() const {
   uint32_t device_count = 0;

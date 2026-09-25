@@ -1,42 +1,33 @@
 #include "grassland/graphics/shader_cache.h"
 
-#ifdef __APPLE__
-#include <CommonCrypto/CommonDigest.h>
-
 #include <fstream>
 #include <stdexcept>
+
+#include "grassland/graphics/sha256.h"
 
 namespace grassland::graphics {
 namespace {
 thread_local ShaderCacheSettings settings;
 }
+
 void ConfigureShaderCache(const ShaderCacheSettings &value) {
   settings = value;
   if (!settings.directory.empty() && !settings.read_only)
     std::filesystem::create_directories(settings.directory);
 }
+
 const ShaderCacheSettings &GetShaderCacheSettings() {
   return settings;
 }
 
 std::string ShaderCacheKey(const std::vector<std::string> &parts) {
-  CC_SHA256_CTX hash;
-  CC_SHA256_Init(&hash);
+  detail::SHA256 hash;
   for (const auto &part : parts) {
-    // Decimal length plus separator makes field boundaries unambiguous on every architecture.
-    auto length = std::to_string(part.size()) + ":";
-    CC_SHA256_Update(&hash, length.data(), static_cast<CC_LONG>(length.size()));
-    CC_SHA256_Update(&hash, part.data(), static_cast<CC_LONG>(part.size()));
+    // Preserve the iOS cache format, including unambiguous field lengths.
+    hash.Update(std::to_string(part.size()) + ":");
+    hash.Update(part);
   }
-  unsigned char digest[CC_SHA256_DIGEST_LENGTH];
-  CC_SHA256_Final(digest, &hash);
-  const char *hex = "0123456789abcdef";
-  std::string result;
-  for (auto value : digest) {
-    result += hex[value >> 4];
-    result += hex[value & 15];
-  }
-  return result;
+  return hash.Finish();
 }
 
 bool ReadShaderCache(const std::string &key, std::vector<uint8_t> &data) {
@@ -45,7 +36,7 @@ bool ReadShaderCache(const std::string &key, std::vector<uint8_t> &data) {
   std::ifstream input(settings.directory / key, std::ios::binary | std::ios::ate);
   if (!input) {
     if (settings.read_only)
-      throw std::runtime_error("Missing bundled shader " + key + "; regenerate the iOS resource bundle on macOS");
+      throw std::runtime_error("Missing bundled shader " + key + "; regenerate the resource bundle for this backend");
     return false;
   }
   auto length = input.tellg();
@@ -60,6 +51,7 @@ bool ReadShaderCache(const std::string &key, std::vector<uint8_t> &data) {
     throw std::runtime_error("Corrupt bundled shader: " + key);
   return true;
 }
+
 void WriteShaderCache(const std::string &key, const std::vector<uint8_t> &data) {
   if (settings.directory.empty() || settings.read_only)
     return;
@@ -73,6 +65,7 @@ void WriteShaderCache(const std::string &key, const std::vector<uint8_t> &data) 
     throw std::runtime_error("Cannot write shader cache " + temporary);
   std::filesystem::rename(temporary, path);
 }
+
 std::string ShaderRequestKey(const VirtualFileSystem &vfs,
                              const std::string &file,
                              const std::string &entry,
@@ -90,4 +83,3 @@ std::string ShaderRequestKey(const VirtualFileSystem &vfs,
   return "hlsl-" + ShaderCacheKey(parts);
 }
 }  // namespace grassland::graphics
-#endif

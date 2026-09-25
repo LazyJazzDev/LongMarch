@@ -1,7 +1,11 @@
 #pragma once
 
+#ifndef LONGMARCH_HEADLESS
 #define GLFW_INCLUDE_VULKAN
 #include <GLFW/glfw3.h>
+#else
+struct GLFWwindow;
+#endif
 #define VMA_VULKAN_VERSION 1002000  // Specify using Vulkan 1.2
 #include <vk_mem_alloc.h>
 #include <vulkan/vulkan.h>
