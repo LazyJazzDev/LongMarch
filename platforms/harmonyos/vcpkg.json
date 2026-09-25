@@ -1,0 +1,4 @@
+{
+  "name": "longmarch-harmony-headers", "version-string": "1.0.0",
+  "dependencies": ["fmt", "glm", "eigen3", "rapidjson", "stb", "tinyobjloader", "vulkan-memory-allocator", "glfw3"]
+}

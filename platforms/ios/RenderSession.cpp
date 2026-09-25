@@ -9,12 +9,13 @@ RenderSession::RenderSession(const std::filesystem::path &resources,
                              bool prepare,
                              double aspect_ratio,
                              graphics::BackendAPI backend,
-                             bool allow_compute_fallback) {
+                             bool allow_compute_fallback,
+                             bool force_compute_fallback) {
   graphics::ConfigureShaderCache({resources / "shaders", !prepare, backend == grassland::graphics::BACKEND_API_METAL});
   if (graphics::CreateCore(backend, graphics::Core::Settings{1, false}, &graphics_) ||
       graphics_->InitializeLogicalDeviceAutoSelect(false))
     throw std::runtime_error("Cannot initialize requested graphics backend");
-  compute_fallback_ = !graphics_->DeviceRayQuerySupport();
+  compute_fallback_ = force_compute_fallback || !graphics_->DeviceRayQuerySupport();
   if (compute_fallback_ && !allow_compute_fallback)
     throw std::runtime_error("This device does not support ray queries required by this render session.");
   auto sobol = resources / "assets/data/new-joe-kuo-7.21201";

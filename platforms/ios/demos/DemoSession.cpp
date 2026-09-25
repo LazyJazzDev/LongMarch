@@ -10,6 +10,73 @@
 #include "grassland/graphics/backend/metal/metal_command_context.h"
 #endif
 #include "grassland/graphics/shader_cache.h"
+#ifdef LONGMARCH_VULKAN_ENABLED
+#include "grassland/graphics/backend/vulkan/vulkan_command_context.h"
+#endif
+
+// Timestamp queries measure actual GPU work. Unsupported queues report zero,
+// which the native UI displays as unavailable rather than CPU submission time.
+struct DemoGPUTimer {
+#ifdef LONGMARCH_VULKAN_ENABLED
+  grassland::graphics::backend::VulkanCore *core = nullptr;
+  VkQueryPool pool = VK_NULL_HANDLE;
+  float period = 0;
+  uint32_t valid_bits = 0;
+#endif
+  explicit DemoGPUTimer(grassland::graphics::Core *graphics) {
+#ifdef LONGMARCH_VULKAN_ENABLED
+    core = dynamic_cast<grassland::graphics::backend::VulkanCore *>(graphics);
+    if (!core)
+      return;
+    auto physical = core->Device()->PhysicalDevice().Handle();
+    VkPhysicalDeviceProperties properties{};
+    vkGetPhysicalDeviceProperties(physical, &properties);
+    period = properties.limits.timestampPeriod;
+    uint32_t count = 0;
+    vkGetPhysicalDeviceQueueFamilyProperties(physical, &count, nullptr);
+    std::vector<VkQueueFamilyProperties> families(count);
+    vkGetPhysicalDeviceQueueFamilyProperties(physical, &count, families.data());
+    valid_bits = families.at(core->GraphicsQueue()->QueueFamilyIndex()).timestampValidBits;
+    if (!valid_bits || !properties.limits.timestampComputeAndGraphics)
+      return;
+    VkQueryPoolCreateInfo info{};
+    info.sType = VK_STRUCTURE_TYPE_QUERY_POOL_CREATE_INFO;
+    info.queryType = VK_QUERY_TYPE_TIMESTAMP;
+    info.queryCount = 2;
+    if (vkCreateQueryPool(core->Device()->Handle(), &info, nullptr, &pool) != VK_SUCCESS)
+      pool = VK_NULL_HANDLE;
+#endif
+  }
+
+  ~DemoGPUTimer() {
+#ifdef LONGMARCH_VULKAN_ENABLED
+    if (pool)
+      vkDestroyQueryPool(core->Device()->Handle(), pool, nullptr);
+#endif
+  }
+
+  void Stamp(grassland::graphics::CommandContext *context, bool end) {
+#ifdef LONGMARCH_VULKAN_ENABLED
+    if (pool)
+      static_cast<grassland::graphics::backend::VulkanCommandContext *>(context)->CmdTimestamp(pool, end ? 1 : 0,
+                                                                                               end ? 0 : 2);
+#endif
+  }
+
+  double Milliseconds() const {
+#ifdef LONGMARCH_VULKAN_ENABLED
+    if (pool) {
+      uint64_t ticks[2]{};
+      if (vkGetQueryPoolResults(core->Device()->Handle(), pool, 0, 2, sizeof(ticks), ticks, sizeof(uint64_t),
+                                VK_QUERY_RESULT_64_BIT) == VK_SUCCESS) {
+        uint64_t mask = valid_bits == 64 ? UINT64_MAX : (uint64_t(1) << valid_bits) - 1;
+        return double((ticks[1] - ticks[0]) & mask) * period / 1e6;
+      }
+    }
+#endif
+    return 0;
+  }
+};
 
 namespace {
 #include "demo_shaders.inl"
@@ -78,6 +145,7 @@ DemoSession::DemoSession(const std::filesystem::path &resources,
   }
   if (CreateCore(backend, Core::Settings{1, false}, &core_) || core_->InitializeLogicalDeviceAutoSelect(false))
     throw std::runtime_error("Cannot initialize requested graphics backend");
+  timer_ = std::make_unique<DemoGPUTimer>(core_.get());
   core_->CreateImage(width_, height_, IMAGE_FORMAT_R32G32B32A32_SFLOAT, &color_);
   if (demo_ == "nbody_cs")
     InitializeNBody();
@@ -301,6 +369,7 @@ void DemoSession::Render() {
   }
   std::unique_ptr<CommandContext> ctx;
   core_->CreateCommandContext(&ctx);
+  timer_->Stamp(ctx.get(), false);
   if (nbody && simulate_) {
     ctx->CmdBindComputeProgram(compute_program_.get());
     ctx->CmdBindResources(0, {positions_.get()}, BIND_POINT_COMPUTE);
@@ -339,9 +408,10 @@ void DemoSession::Render() {
     ctx->CmdDrawIndexed(index_count_, 1, 0, 0, 0);
   }
   ctx->CmdEndRendering();
+  timer_->Stamp(ctx.get(), true);
   core_->SubmitCommandContext(ctx.get());
   core_->WaitGPU();
-  gpu_ms_ = 0;
+  gpu_ms_ = timer_->Milliseconds();
 #ifdef LONGMARCH_METAL_ENABLED
   if (backend_ == BACKEND_API_METAL) {
     auto native = static_cast<backend::MetalCommandContext *>(ctx.get())->Handle();
@@ -418,6 +488,7 @@ void DemoSession::RenderRayQuery() {
                                              0, 0xFF, 1, grassland::graphics::RAYTRACING_INSTANCE_FLAG_NONE)});
   std::unique_ptr<grassland::graphics::CommandContext> command_context;
   core_->CreateCommandContext(&command_context);
+  timer_->Stamp(command_context.get(), false);
   command_context->CmdClearImage(color_.get(), {{0.6, 0.7, 0.8, 1.0}});
   command_context->CmdBindComputeProgram(compute_program_.get());
   command_context->CmdBindResources(0, tlas_.get(), grassland::graphics::BIND_POINT_COMPUTE);
@@ -425,9 +496,10 @@ void DemoSession::RenderRayQuery() {
   command_context->CmdBindResources(2, {uniform_.get()}, grassland::graphics::BIND_POINT_COMPUTE);
   command_context->CmdDispatch((color_->Extent().width + 7) / 8, (color_->Extent().height + 7) / 8, 1);
 
+  timer_->Stamp(command_context.get(), true);
   core_->SubmitCommandContext(command_context.get());
   core_->WaitGPU();
-  gpu_ms_ = 0;
+  gpu_ms_ = timer_->Milliseconds();
 #ifdef LONGMARCH_METAL_ENABLED
   if (backend_ == BACKEND_API_METAL) {
     auto native = static_cast<backend::MetalCommandContext *>(command_context.get())->Handle();

@@ -12,7 +12,8 @@ class RenderSession {
                 bool prepare = false,
                 double aspect_ratio = 0.0,
                 grassland::graphics::BackendAPI backend = grassland::graphics::BACKEND_API_DEFAULT,
-                bool allow_compute_fallback = false);
+                bool allow_compute_fallback = false,
+                bool force_compute_fallback = false);
   ~RenderSession();
   std::vector<uint8_t> Step();
   void Render();

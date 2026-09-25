@@ -8,6 +8,8 @@
 #include "games/DesktopGameSession.h"
 #include "grassland/graphics/graphics.h"
 
+struct DemoGPUTimer;
+
 // Window-independent adapters for the desktop graphics demos. Rendering and NBody
 // use the original HLSL through the same graphics API and Metal shader cache.
 class DemoSession {
@@ -70,4 +72,5 @@ class DemoSession {
   double gpu_ms_ = 0;
   std::chrono::steady_clock::time_point animation_start_ = std::chrono::steady_clock::now();
   std::unique_ptr<grassland::graphics::AccelerationStructure> triangle_blas_, sphere_blas_, tlas_;
+  std::unique_ptr<DemoGPUTimer> timer_;
 };

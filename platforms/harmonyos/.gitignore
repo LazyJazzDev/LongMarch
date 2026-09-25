@@ -1,0 +1,8 @@
+.hvigor/
+.ohpm/
+oh_modules/
+local.properties
+entry/src/main/resources/rawfile/Resources/
+*.hap
+*.app
+.cxx/

@@ -1,0 +1,20 @@
+import { UIAbility, Want } from '@kit.AbilityKit';
+import { window } from '@kit.ArkUI';
+import native from 'liblongmarch.so';
+
+export default class EntryAbility extends UIAbility {
+  onCreate(want: Want): void {
+    AppStorage.setOrCreate('longmarchSmokeDemo', String(want.parameters?.demo ?? ''));
+  }
+  onWindowStageCreate(stage: window.WindowStage): void {
+    try {
+      native.initialize(this.context.resourceManager, this.context.filesDir);
+    } catch (e) {
+      AppStorage.setOrCreate('longmarchStartupError', `Initialization: ${e}`);
+    }
+    stage.loadContent('pages/Index');
+  }
+  onForeground(): void { native.command('{"type":"active","value":true}'); }
+  onBackground(): void { native.command('{"type":"active","value":false}'); }
+  onWindowStageDestroy(): void { native.command('{"type":"stop"}'); }
+}
