@@ -321,7 +321,9 @@ void Host::Frame() {
   auto *core = scene_ ? scene_->Graphics() : demo_->Core();
   if (!surface_)
     surface_ = std::make_unique<Surface>(core, window_);
-  surface_->Resize(width_, height_, hdr_);
+  // Match iOS: display-encoded game/UI colors belong on an SDR surface.
+  const bool hdr_content = scene_ || selection_ == "graphics_hello_hdr" || selection_ == "nbody_cs";
+  surface_->Resize(width_, height_, hdr_ && hdr_content);
   grassland::graphics::Image *image;
   bool sampled = false;
   if (scene_) {

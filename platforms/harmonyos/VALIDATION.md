@@ -78,6 +78,44 @@ MoltenVK rejected Blender Classroom's compute path because its 1370 storage
 buffer bindings exceed the host limit of 31. Native HarmonyOS device limits must
 be measured; host success on Metal does not establish large-scene Vulkan support.
 
+## Rendering correctness follow-up
+
+- SDR-encoded 2048/GoL and ordinary graphics demos now use an SDR swapchain,
+  matching the iOS presentation formats. Sending these colors to a linear HDR
+  surface caused the washed-out palette. HDR remains available for Sparkium,
+  the HDR demo and NBody.
+- Vulkan upload copies now use the graphics queue family, matching exclusive
+  buffer ownership, with an explicit memory dependency before shader reads.
+  Noncoherent mapped allocations are invalidated/flushed. This conservative
+  upload path waits for the shared queue; desktop multi-frame throughput has
+  not been benchmarked (the HarmonyOS host uses one frame in flight).
+- Image resource barriers cover compute stages. Attachment load operations
+  synchronize reads as well as writes, and depth barriers include both early
+  and late fragment tests. The game regression previously triggered attachment
+  read-after-write and depth write-after-write validation errors; the corrected
+  2048/GoL run passes with no validation errors using
+  `VK_INSTANCE_LAYERS=VK_LAYER_KHRONOS_validation VK_LAYER_VALIDATE_SYNC=1`.
+  Triangle, Texture, Blend, Cube, Resize, SDR Sample, HDR and NBody also pass
+  their host checks with synchronization validation enabled and no errors.
+- A DXC 1.10 minimal reproduction exposed lost `NonUniform` decorations on
+  storage-buffer access-chain results. The Vulkan shader loader restores these
+  decorations and the storage-buffer nonuniform-indexing capability, and the
+  device enables the corresponding feature. This also repairs read-only bundled
+  shaders without changing the cache files. The regression compiles direct and
+  local-variable buffer accesses, checks idempotence and unchanged uniform
+  accesses, and validates the repaired SPIR-V with `spirv-val`.
+- Cornell Box compute fallback at 256 x 256 / 32 SPP produces byte-identical SDR
+  output on the host Vulkan and Metal backends, including after the repair.
+  The Vulkan run also passes synchronization validation. This is a host
+  comparison, not a pixel-exact comparison against the phone's display.
+- On Mate 70 RS at 1024 x 1024 / 32 SPP / 0 EV, the nonuniform-indexing repair
+  removes Cornell Box's clustered black/white artifacts and block-shaped geometry edges; normal sampling noise
+  remains. Six screenshots during 2048 autoplay include moving/spawning/merging
+  tiles and a score increase from 12 to 76 without visible broken tiles. These
+  samples do not establish exhaustive frame-by-frame animation coverage.
+- Signed ARM64 HAP builds and installation succeed with these changes. Device
+  screenshots confirm the restored 2048/GoL palette.
+
 ## Pending
 
 - Extended XComponent lifecycle stress, repeated navigation and surface
