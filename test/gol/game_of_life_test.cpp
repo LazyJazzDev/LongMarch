@@ -48,8 +48,8 @@ TEST(GameOfLife, ExhaustiveSmallGridsMatchSynchronousUpdates) {
 
 TEST(GameOfLife, RepeatedUpdatesMatchAtMaximumAndThinDimensions) {
   std::mt19937 rng(42);
-  for (int width : {2, 31, 200}) {
-    for (int height : {2, 47, 200}) {
+  for (int width : {2, 31, 200, 256}) {
+    for (int height : {2, 47, 200, 256}) {
       std::vector<uint8_t> cells(width * height);
       for (auto &cell : cells)
         cell = rng() & 1;
@@ -103,8 +103,8 @@ TEST(GameOfLife, TwoCellAxesCountAllEightPeriodicOffsets) {
 
 TEST(GameOfLife, FixedBoundariesMatchReferenceAndCanSwitchWithoutReset) {
   std::mt19937 rng(73);
-  for (int width : {2, 3, 31, 200}) {
-    for (int height : {2, 3, 47, 200}) {
+  for (int width : {2, 3, 31, 200, 256}) {
+    for (int height : {2, 3, 47, 200, 256}) {
       std::vector<uint8_t> cells(width * height);
       for (auto &cell : cells)
         cell = rng() & 1;

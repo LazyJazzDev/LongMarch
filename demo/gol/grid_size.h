@@ -7,7 +7,8 @@
 
 namespace grid_size {
 inline constexpr int kMin = 2;
-inline constexpr int kMax = 200;
+inline constexpr int kMax = 256;
+inline constexpr int kDefault = 64;
 
 inline int FromFraction(float fraction) {
   return kMin + int(std::lround(std::clamp(fraction, 0.0f, 1.0f) * (kMax - kMin)));
