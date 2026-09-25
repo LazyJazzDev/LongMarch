@@ -98,7 +98,7 @@ int main(int argc, char **argv) {
         Check(std::isinf(game.Game()->NextFrameDelay()), "Orientation animation did not return to idle");
         game.Game()->SetIconOrientation(0);
         Settle(game);
-        window->SendPointer(327, 407);
+        window->SendPointer(324, 420);
         window->SendMouseButton(GLFW_MOUSE_BUTTON_LEFT, GLFW_PRESS);
         window->SendMouseButton(GLFW_MOUSE_BUTTON_LEFT, GLFW_RELEASE);
         game.Game()->ResetClock();
@@ -169,7 +169,7 @@ int main(int argc, char **argv) {
         }
         Check(Pixels(game) != before, "Desktop puzzle moves did not change the rendered tiles");
         auto board = Pixels(game);
-        window->SendPointer(488, 124);
+        window->SendPointer(488, 109);
         window->SendMouseButton(GLFW_MOUSE_BUTTON_LEFT, GLFW_PRESS);
         window->SendMouseButton(GLFW_MOUSE_BUTTON_LEFT, GLFW_RELEASE);
         game.Game()->ResetClock();

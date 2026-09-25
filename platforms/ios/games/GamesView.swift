@@ -464,7 +464,7 @@ struct GamesView: View {
           // Match the renderer's cream background through the system safe areas.
           Color(red: 250.0 / 255, green: 248.0 / 255, blue: 240.0 / 255)
             .ignoresSafeArea()
-          VStack(spacing: 12) {
+          VStack(spacing: 8) {
             HStack(spacing: 12) {
               Text("[Metal] 2048 FPS: \(fps, specifier: "%.1f")")
                 .font(.caption2.monospaced())
@@ -474,12 +474,11 @@ struct GamesView: View {
             .padding(.horizontal, 12).padding(.vertical, 6)
             .background(.black.opacity(0.05), in: Capsule())
             GeometryReader { geometry in
-              // The shared renderer fits a 4:5 title-and-board layout. Keep
-              // that canvas at the top instead of centering it in a tall phone.
-              game.frame(height: min(geometry.size.height, geometry.size.width * 1.25))
+              // Match the compact hosted layout's 88 x 118.5 units, top aligned.
+              game.frame(height: min(geometry.size.height, geometry.size.width * (118.5 / 88)))
             }
           }
-          .padding(.top, 12).padding(.bottom, 12)
+          .padding(.top, 8).padding(.bottom, 8)
         }
       }
     }.background(.black)
