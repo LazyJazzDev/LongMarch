@@ -106,7 +106,15 @@ if(NOT CMAKE_SYSTEM_NAME STREQUAL "OHOS")
 endif()
 
 if(CMAKE_SYSTEM_NAME STREQUAL "OHOS")
-  add_library(longmarch SHARED native/Bridge.cpp native/Host.cpp native/Surface.cpp)
+  add_library(longmarch SHARED native/Bridge.cpp native/Host.cpp native/Surface.cpp native/XEngineCapabilities.cpp)
   target_link_libraries(longmarch PRIVATE harmony_demos harmony_presentation ace_napi.z ace_ndk.z native_window rawfile.z hilog_ndk.z)
+  find_path(LONGMARCH_XENGINE_INCLUDE_DIR xengine/xeg_vulkan_extension.h
+    HINTS "${CMAKE_SYSROOT}/../../../hms/native/sysroot/usr/include"
+    NO_CMAKE_FIND_ROOT_PATH)
+  if(LONGMARCH_XENGINE_INCLUDE_DIR)
+    target_include_directories(longmarch PRIVATE "${LONGMARCH_XENGINE_INCLUDE_DIR}")
+    target_compile_definitions(longmarch PRIVATE LONGMARCH_HAVE_XENGINE_HEADERS)
+  endif()
+  target_link_libraries(longmarch PRIVATE dl)
   target_compile_definitions(longmarch PRIVATE VK_USE_PLATFORM_OHOS)
 endif()

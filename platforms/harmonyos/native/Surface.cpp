@@ -6,6 +6,8 @@
 #include <limits>
 #include <stdexcept>
 
+#include "XEngineCapabilities.h"
+
 using namespace grassland;
 
 namespace longmarch::harmony {
@@ -18,6 +20,28 @@ Surface::Surface(graphics::Core *core, OHNativeWindow *window)
       vkGetInstanceProcAddr(core_->Instance()->Handle(), "vkCreateSurfaceOHOS"));
   if (!create)
     throw std::runtime_error("VK_OHOS_surface is unavailable");
+  const auto &physical_device = core_->Device()->PhysicalDevice();
+  const auto properties = physical_device.GetPhysicalDeviceProperties();
+  OH_LOG_Print(
+      LOG_APP, LOG_INFO, 0, "LongMarchGPU",
+      "GPU=%{public}s API=%{public}u.%{public}u RTpipeline=%{public}u RayQuery=%{public}u storageBuffers=%{public}u sampledImages=%{public}u",
+      properties.deviceName, VK_VERSION_MAJOR(properties.apiVersion), VK_VERSION_MINOR(properties.apiVersion),
+      physical_device.SupportRayTracing(), physical_device.SupportRayQuery(),
+      properties.limits.maxPerStageDescriptorStorageBuffers, properties.limits.maxPerStageDescriptorSampledImages);
+  OH_LOG_Print(
+      LOG_APP, LOG_INFO, 0, "LongMarchGPU",
+      "RT pipeline extension=%{public}u ray query extension=%{public}u acceleration structure extension=%{public}u",
+      physical_device.IsExtensionSupported(VK_KHR_RAY_TRACING_PIPELINE_EXTENSION_NAME),
+      physical_device.IsExtensionSupported(VK_KHR_RAY_QUERY_EXTENSION_NAME),
+      physical_device.IsExtensionSupported(VK_KHR_ACCELERATION_STRUCTURE_EXTENSION_NAME));
+  LogXEngineCapabilities(physical_device.Handle());
+  uint32_t layer_count = 0;
+  if (vkEnumerateInstanceLayerProperties(&layer_count, nullptr) == VK_SUCCESS) {
+    std::vector<VkLayerProperties> layers(layer_count);
+    if (vkEnumerateInstanceLayerProperties(&layer_count, layers.data()) == VK_SUCCESS)
+      for (const auto &layer : layers)
+        OH_LOG_Print(LOG_APP, LOG_INFO, 0, "LongMarchGPU", "Vulkan layer %{public}s", layer.layerName);
+  }
   VkSurfaceCreateInfoOHOS info{};
   info.sType = VK_STRUCTURE_TYPE_SURFACE_CREATE_INFO_OHOS;
   info.window = window;
