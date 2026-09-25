@@ -1,9 +1,10 @@
-import { UIAbility, Want } from '@kit.AbilityKit';
+import { UIAbility, Want, ConfigurationConstant } from '@kit.AbilityKit';
 import { window } from '@kit.ArkUI';
 import native from 'liblongmarch.so';
 
 export default class EntryAbility extends UIAbility {
   onCreate(want: Want): void {
+    this.context.getApplicationContext().setColorMode(ConfigurationConstant.ColorMode.COLOR_MODE_DARK);
     AppStorage.setOrCreate('longmarchSmokeDemo', String(want.parameters?.demo ?? ''));
   }
   onWindowStageCreate(stage: window.WindowStage): void {

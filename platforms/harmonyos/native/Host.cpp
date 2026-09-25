@@ -178,6 +178,7 @@ void Host::Stop() {
   frames_ = 0;
   size_axis_ = 0;
   fps_ = elapsed_ = 0;
+  last_present_ = {};
 }
 
 void Host::Resize() {
@@ -199,6 +200,7 @@ void Host::Execute(const std::string &json) {
   const auto type = Text(c, "type");
   if (type == "active") {
     active_ = Boolean(c, "value");
+    last_present_ = {};
     if (Game()) {
       Game()->Window()->SendFocus(active_);
       Game()->ResetClock();
@@ -342,10 +344,17 @@ void Host::Frame() {
   }
   const double duration = std::chrono::duration<double>(std::chrono::steady_clock::now() - start).count();
   if (!scene_ || sampled) {
-    fps_ = duration > 0 ? 1 / duration : 0;
     elapsed_ += duration;
   }
   const bool presented = surface_->Present(image, scene_ ? zoom_ : 1, scene_ ? pan_x_ : 0, scene_ ? pan_y_ : 0);
+  const auto presented_at = std::chrono::steady_clock::now();
+  if (presented) {
+    const double interval =
+        std::chrono::duration<double>(presented_at - (last_present_.time_since_epoch().count() ? last_present_ : start))
+            .count();
+    fps_ = interval > 0 ? 1 / interval : 0;
+    last_present_ = presented_at;
+  }
   ++frames_;
   dirty_ = false;
   delay_ = Game() ? Game()->NextFrameDelay() : 1.0 / 60;
@@ -359,8 +368,8 @@ void Host::Frame() {
   // A replaced swapchain needs another presentation even when sampling is paused.
   if (!presented)
     delay_ = 1.0 / 60;
-  deadline_ = std::chrono::steady_clock::now() + std::chrono::duration_cast<std::chrono::steady_clock::duration>(
-                                                     std::chrono::duration<double>(std::max(1.0 / 60, delay_)));
+  deadline_ = start + std::chrono::duration_cast<std::chrono::steady_clock::duration>(
+                          std::chrono::duration<double>(std::max(1.0 / 60, delay_)));
 }
 
 void Host::Publish() {

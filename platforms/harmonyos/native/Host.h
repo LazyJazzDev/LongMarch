@@ -57,6 +57,6 @@ class Host {
   float step_ = .03f, yaw_ = 0, pitch_ = 0, exposure_ = 0, render_scale_ = 1;
   double zoom_ = 1, pan_x_ = 0, pan_y_ = 0, fps_ = 0, elapsed_ = 0;
   double delay_ = 0;
-  std::chrono::steady_clock::time_point deadline_{};
+  std::chrono::steady_clock::time_point deadline_{}, last_present_{};
 };
 }  // namespace longmarch::harmony

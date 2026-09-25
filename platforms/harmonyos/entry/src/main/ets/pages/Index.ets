@@ -366,15 +366,22 @@ struct Index {
       if (this.selected.length === 0) {
         this.browser()
       } else {
-        XComponent({ id: 'longmarchSurface', type: XComponentType.SURFACE, libraryname: 'longmarch' })
-          .width('100%').height('100%')
+        Stack() {
+          XComponent({ id: 'longmarchSurface', type: XComponentType.SURFACE, libraryname: 'longmarch' })
+            .width('100%').height('100%')
+          // Native-library XComponents dispatch touch to C++; a sibling ArkUI
+          // input layer keeps all multi-touch handling in the shared UI adapter.
+          Column() {}.width('100%').height('100%').backgroundColor('#00000000')
+            .hitTestBehavior(HitTestMode.Block)
+            .onTouch((event: TouchEvent) => this.touch(event))
+            .gesture(TapGesture({ count: 2 }).onAction(() => {
+              if (this.selected === 'sparkium') {
+                this.zoom = 1; this.panX = 0; this.panY = 0; this.send({ type: 'view', zoom: 1, x: 0, y: 0 });
+              }
+            }))
+        }.width('100%').height(this.selected === 'gol' || this.selected === '2048' ? 'calc(100% - 62vp)' : '100%')
+          .margin({ top: this.selected === 'gol' || this.selected === '2048' ? 62 : 0 })
           .onAreaChange((oldArea: Area, area: Area) => { this.areaWidth = Number(area.width); this.areaHeight = Number(area.height); })
-          .onTouch((event: TouchEvent) => this.touch(event))
-          .gesture(TapGesture({ count: 2 }).onAction(() => {
-            if (this.selected === 'sparkium') {
-              this.zoom = 1; this.panX = 0; this.panY = 0; this.send({ type: 'view', zoom: 1, x: 0, y: 0 });
-            }
-          }))
         Row({ space: 12 }) {
           Button('Demos').onClick(() => this.leave())
           Text(`${this.title} · ${this.stats.fps.toFixed(1)} FPS`).fontColor('#FFFFFF').fontSize(12)

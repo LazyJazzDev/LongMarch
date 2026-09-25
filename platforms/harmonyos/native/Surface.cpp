@@ -106,7 +106,10 @@ void Surface::Resize(uint32_t width, uint32_t height, bool hdr) {
   info.imageArrayLayers = 1;
   info.imageUsage = VK_IMAGE_USAGE_TRANSFER_DST_BIT;
   info.imageSharingMode = VK_SHARING_MODE_EXCLUSIVE;
-  info.preTransform = caps.currentTransform;
+  // Render in ArkUI's current orientation; let the compositor transform it.
+  info.preTransform = (caps.supportedTransforms & VK_SURFACE_TRANSFORM_IDENTITY_BIT_KHR)
+                          ? VK_SURFACE_TRANSFORM_IDENTITY_BIT_KHR
+                          : caps.currentTransform;
   info.compositeAlpha = VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR;
   for (auto alpha : {VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR, VK_COMPOSITE_ALPHA_INHERIT_BIT_KHR,
                      VK_COMPOSITE_ALPHA_PRE_MULTIPLIED_BIT_KHR, VK_COMPOSITE_ALPHA_POST_MULTIPLIED_BIT_KHR}) {

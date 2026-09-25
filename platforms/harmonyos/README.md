@@ -6,7 +6,8 @@ presentation. The mobile sessions in `platforms/ios` share the original desktop
 are not linked into the HarmonyOS application.
 
 The ARM64 native library, ArkTS application, and unsigned HAP build successfully
-with DevEco Studio 26.0.0.851. Emulator and device validation remain pending. See `VALIDATION.md` for the
+with DevEco Studio 26.0.0.851. A signed build runs on Mate 70 RS; broader
+device validation remains in progress. See `VALIDATION.md` for the
 actual checks completed and remaining device limitations.
 
 ## Functionality
