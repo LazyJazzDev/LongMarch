@@ -174,8 +174,9 @@ be measured; host success on Metal does not establish large-scene Vulkan support
 - The phone renders Texture at 2048 x 1024 after tiling, with nonzero finite
   HDR pixels. The host scene check now rejects an entirely black result.
   Vulkan synchronization validation passes for Texture at 259 x 130 / 2 SPP,
-  including partial edge tiles; its SDR output is byte-identical to the
-  untiled Metal result. Cornell Box at 256 x 256 / 32 SPP is also byte-identical
+  including partial edge tiles. The tiling-only SDR output was byte-identical
+  to the untiled Metal result; with the final function-boundary changes,
+  6 of 101010 channels differ (mean absolute error 0.00172/255). Cornell Box at 256 x 256 / 32 SPP is also byte-identical
   to the existing Metal reference. HDR conversion, shared game animation/input,
   and the standalone Texture raster demo pass host regression checks.
 - Complex shader graphs now retain function boundaries in the software path
@@ -191,10 +192,15 @@ be measured; host success on Metal does not establish large-scene Vulkan support
   All 162 packaged SPIR-V modules pass `spirv-val` for Vulkan 1.2 with scalar
   block layout. Resource, digest and NonUniform regression tests pass (5 tests).
 - The updated phone build displays Blender Monster at native 1024 x 1024 / 1 SPP.
-  An intermediate function-split build also displayed Classroom at its native
-  1920 x 1080. These are low-sample black-screen checks, not noise convergence
-  or interactive-performance acceptance. Junkshop and final Classroom device
-  checks are still in progress.
+  The final build also displayed Classroom at native 1920 x 1080 / 1 SPP;
+  its first frame took 117.277 seconds including pipeline preparation. Native
+  telemetry confirmed successful presentation and the UI reached 1 / 1 SPP.
+  These are low-sample black-screen checks, not noise convergence or
+  interactive-performance acceptance. Junkshop did not reach its first frame
+  during an approximately five-minute attempt; the worker remained CPU-bound
+  and no first-frame completion was logged. That scene remains unresolved on
+  the phone, despite passing the host check. The attempt was stopped to verify
+  Classroom; it is not counted as a device pass.
 - The signed app also successfully queried the public XEngine extension API.
   It returned four non-RT extensions and no RTGI, reflection or shadow/AO
   capability. See [RAY_TRACING.md](RAY_TRACING.md) for the exact results, SDK
