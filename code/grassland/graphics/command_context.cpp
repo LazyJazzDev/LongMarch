@@ -10,6 +10,17 @@
 
 namespace grassland::graphics {
 
+void CommandContext::CmdDispatchBase(uint32_t base_x,
+                                     uint32_t base_y,
+                                     uint32_t base_z,
+                                     uint32_t count_x,
+                                     uint32_t count_y,
+                                     uint32_t count_z) {
+  if (base_x || base_y || base_z)
+    throw std::runtime_error("Dispatch base is unsupported by this backend");
+  CmdDispatch(count_x, count_y, count_z);
+}
+
 void CommandContext::CmdBindResources(int slot, const std::vector<Buffer *> &buffers, BindPoint bind_point) {
   std::vector<BufferRange> buffer_ranges(buffers.size());
   for (size_t i = 0; i < buffers.size(); ++i) {

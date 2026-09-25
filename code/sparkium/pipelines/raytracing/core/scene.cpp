@@ -58,7 +58,6 @@ void Scene::Render(Camera *camera, Film *film, bool software, bool ray_query) {
   rendered_ = true;
   scene_settings_buffer_->UploadData(&settings.raytracing, sizeof(Settings::RayTracing));
   scene_settings_buffer_->UploadData(&film->film_.info, sizeof(sparkium::Film::Info), sizeof(Settings::RayTracing));
-  film->film_.info.accumulated_samples += settings.raytracing.samples_per_dispatch;
   std::unique_ptr<graphics::CommandContext> cmd_context;
   core_->GraphicsCore()->CreateCommandContext(&cmd_context);
   graphics::GpuProfileScope trace_profile(cmd_context.get(), "path_trace");
@@ -97,9 +96,19 @@ void Scene::Render(Camera *camera, Film *film, bool software, bool ray_query) {
     cmd_context->CmdBindResources(11, hdr_images_, bind_point);
     cmd_context->CmdBindResources(12, std::vector{linear_sampler_.get(), nearest_sampler_.get()}, bind_point);
   }
-  if (software)
-    cmd_context->CmdDispatch((film->GetWidth() + 7) / 8, (film->GetHeight() + 7) / 8, 1);
-  else
+  if (software) {
+    const uint32_t nx = (film->GetWidth() + 7) / 8, ny = (film->GetHeight() + 7) / 8;
+    if (!ray_query_ && core_->GraphicsCore()->API() == graphics::BACKEND_API_VULKAN) {
+      // Bound each software-tracing job to 128 x 128 pixels. A full-resolution
+      // dispatch can exceed mobile GPU watchdog limits even at one sample.
+      // DispatchBase preserves global pixel coordinates without changing shaders.
+      for (uint32_t y = 0; y < ny; y += 16)
+        for (uint32_t x = 0; x < nx; x += 16)
+          cmd_context->CmdDispatchBase(x, y, 0, std::min(16u, nx - x), std::min(16u, ny - y), 1);
+    } else {
+      cmd_context->CmdDispatch(nx, ny, 1);
+    }
+  } else
     cmd_context->CmdDispatchRays(film->accumulated_color_->Extent().width, film->accumulated_samples_->Extent().height,
                                  1);
 
@@ -119,6 +128,7 @@ void Scene::Render(Camera *camera, Film *film, bool software, bool ray_query) {
   submit_profile.End();
   graphics::CpuProfileScope wait_profile("render_wait");
   core_->GraphicsCore()->WaitGPU();
+  film->film_.info.accumulated_samples += settings.raytracing.samples_per_dispatch;
 }
 
 int32_t Scene::RegisterLight(Light *light, int custom_index) {

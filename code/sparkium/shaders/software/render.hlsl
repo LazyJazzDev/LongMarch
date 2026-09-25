@@ -27,14 +27,19 @@ HitRecord SoftwareHitRecord(SoftwareHit hit, float3 direction) {
 
 void ApplyPathMiss(inout RenderContext context);
 
-void SoftwareTracePath(RayDesc ray, inout RenderContext context) {
+#ifndef SPARKIUM_RAY_QUERY
+#define TRACE_NOINLINE [noinline]
+#else
+#define TRACE_NOINLINE
+#endif
+TRACE_NOINLINE void SoftwareTracePath(RayDesc path_ray, inout RenderContext context) {
   SoftwareHit hit;
-  if (!InlineIntersect(ray, false, hit)) {
+  if (!InlineIntersect(path_ray, false, hit)) {
     ApplyPathMiss(context);
     return;
   }
 
-  HitRecord record = SoftwareHitRecord(hit, ray.Direction);
+  HitRecord record = SoftwareHitRecord(hit, path_ray.Direction);
   if (!ContinueSubsurfaceRandomWalk(context, record))
     SoftwareSampleMaterial(LoadSoftwareInstance(software_instances, hit.instance).material, context, record);
 }

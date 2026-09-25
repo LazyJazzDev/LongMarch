@@ -30,7 +30,12 @@ struct GraphSurface {
 };
 
 // Keep one BSDF sampling body after the compute material-graph dispatch.
-void SampleGraphSurface(inout RenderContext context, HitRecord hit_record, GraphSurface graph) {
+#if defined(SPARKIUM_SOFTWARE_RT) && !defined(SPARKIUM_RAY_QUERY)
+#define GRAPH_NOINLINE [noinline]
+#else
+#define GRAPH_NOINLINE
+#endif
+GRAPH_NOINLINE void SampleGraphSurface(inout RenderContext context, HitRecord hit_record, GraphSurface graph) {
   // A Transparent BSDF continues the current path without changing direction.
   // Mixed closures use opacity as the probability of selecting the opaque branch.
   if (graph.opacity < 1.0f && RandomFloat(context.rd) >= saturate(graph.opacity)) {

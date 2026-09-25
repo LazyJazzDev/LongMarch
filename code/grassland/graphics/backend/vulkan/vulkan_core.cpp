@@ -315,7 +315,7 @@ int VulkanCore::SubmitCommandContext(CommandContext *p_command_context) {
     }
 #endif
 
-    vkQueueSubmit(transfer_queue_->Handle(), 1, &submit_info, nullptr);
+    vulkan::ThrowIfFailed(vkQueueSubmit(transfer_queue_->Handle(), 1, &submit_info, nullptr), "Submit Vulkan uploads");
   }
 
   VkCommandBuffer command_buffer = command_buffers_[current_frame_]->Handle();
@@ -397,7 +397,7 @@ int VulkanCore::SubmitCommandContext(CommandContext *p_command_context) {
     submit_info.pSignalSemaphores = signal_semaphores.data();
   }
 
-  vkQueueSubmit(graphics_queue_->Handle(), 1, &submit_info, fence);
+  vulkan::ThrowIfFailed(vkQueueSubmit(graphics_queue_->Handle(), 1, &submit_info, fence), "Submit Vulkan rendering");
 
 #ifndef LONGMARCH_HEADLESS
   for (auto &window : command_context->windows_) {
@@ -409,9 +409,10 @@ int VulkanCore::SubmitCommandContext(CommandContext *p_command_context) {
 
   current_frame_ = (current_frame_ + 1) % FramesInFlight();
   fence = in_flight_fences_[current_frame_]->Handle();
-  vkWaitForFences(device_->Handle(), 1, &fence, VK_TRUE, std::numeric_limits<uint64_t>::max());
+  vulkan::ThrowIfFailed(vkWaitForFences(device_->Handle(), 1, &fence, VK_TRUE, std::numeric_limits<uint64_t>::max()),
+                        "Wait for Vulkan rendering");
 
-  vkQueueWaitIdle(transfer_queue_->Handle());
+  vulkan::ThrowIfFailed(vkQueueWaitIdle(transfer_queue_->Handle()), "Wait for Vulkan uploads");
 
   for (auto &callback : post_execute_functions_[current_frame_]) {
     callback();
@@ -626,7 +627,9 @@ void VulkanCore::SingleTimeCommand(std::function<void(VkCommandBuffer)> command)
     submit_info.pWaitDstStageMask = wait_stages;
   }
 #endif
-  vulkan::SingleTimeCommand(graphics_queue_.get(), graphics_command_pool_.get(), command, submit_info);
+  vulkan::ThrowIfFailed(
+      vulkan::SingleTimeCommand(graphics_queue_.get(), graphics_command_pool_.get(), command, submit_info),
+      "Execute Vulkan transfer");
 }
 
 uint32_t VulkanCore::FindMemoryType(uint32_t type_filter, VkMemoryPropertyFlags properties) {

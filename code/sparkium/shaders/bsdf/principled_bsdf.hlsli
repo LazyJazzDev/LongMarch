@@ -1,6 +1,12 @@
+#if defined(SPARKIUM_SOFTWARE_RT) && !defined(SPARKIUM_RAY_QUERY)
+#define PRINCIPLED_NOINLINE [[noinline]]
+#else
+#define PRINCIPLED_NOINLINE
+#endif
+
 #pragma once
 
-void CalculateClosureWeight() {
+PRINCIPLED_NOINLINE void CalculateClosureWeight() {
   diffuse_closure.weight = make_float3(0);
   diffuse_closure.sample_weight = 0.0;
   diffuse_closure.N = make_float3(0);
@@ -188,11 +194,8 @@ void CalculateClosureWeight() {
   }
 }
 
-float3 EvalPrincipledBSDFKernel(in float3 omega_in,
-                                inout float pdf,
-                                in float3 eval,
-                                in float accum_weight,
-                                int exclude) {
+PRINCIPLED_NOINLINE float3
+EvalPrincipledBSDFKernel(in float3 omega_in, inout float pdf, in float3 eval, in float accum_weight, int exclude) {
   float local_pdf;
   if (exclude != 0 && diffuse_closure.sample_weight >= CLOSURE_WEIGHT_CUTOFF) {
     eval += bsdf_principled_diffuse_eval(diffuse_closure, omega_v, omega_in, local_pdf) * diffuse_closure.weight;
@@ -250,7 +253,11 @@ float PrincipledThinReflectionProbability() {
   return reflection_weight / max(reflection_weight + transmission_weight, CLOSURE_WEIGHT_CUTOFF);
 }
 
-void SamplePrincipledThinReflection(float r1, float r2, out float3 eval, out float3 omega_in, out float pdf) {
+PRINCIPLED_NOINLINE void SamplePrincipledThinReflection(float r1,
+                                                        float r2,
+                                                        out float3 eval,
+                                                        out float3 omega_in,
+                                                        out float pdf) {
   eval = make_float3(0.0f);
   omega_in = make_float3(0.0f);
   pdf = 0.0f;
@@ -274,7 +281,7 @@ void SamplePrincipledThinReflection(float r1, float r2, out float3 eval, out flo
   pdf *= reflection_probability;
 }
 
-void SamplePrincipledBSDF(float r1, float r2, out float3 eval, out float3 omega_in, out float pdf) {
+PRINCIPLED_NOINLINE void SamplePrincipledBSDF(float r1, float r2, out float3 eval, out float3 omega_in, out float pdf) {
   eval = make_float3(0);
   omega_in = make_float3(0);
   pdf = 0.0;

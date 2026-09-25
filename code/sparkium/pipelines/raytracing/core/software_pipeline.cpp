@@ -24,7 +24,7 @@ uint32_t LeafCount(size_t count) {
   return result;
 }
 
-std::string MaterialSource(const CodeLines &source) {
+std::string MaterialSource(const CodeLines &source, bool graph = false) {
   std::istringstream input(static_cast<std::string>(source));
   std::string line, result;
   while (std::getline(input, line)) {
@@ -33,6 +33,20 @@ std::string MaterialSource(const CodeLines &source) {
         (line.compare(first, 8, "#include") == 0 || line.compare(first, 7, "#pragma") == 0))
       continue;
     result += line + '\n';
+  }
+  if (graph) {
+    // Keep graph evaluators as separate functions without passing opaque
+    // buffer pointers across function boundaries (which needs VariablePointers).
+    const std::string declaration = "GraphSurface EvaluateShaderGraph(";
+    const auto start = result.find(declaration);
+    const std::string parameter = "ByteAddressBuffer material_data) {";
+    const auto data = result.find(parameter, start);
+    if (start == std::string::npos || data == std::string::npos)
+      throw std::runtime_error("Unsupported shader graph evaluator signature");
+    result.replace(data, parameter.size(),
+                   "uint material_data_index) {\nByteAddressBuffer material_data = "
+                   "data_buffers[NonUniformResourceIndex(material_data_index)];");
+    result.insert(start, "SOFTWARE_NOINLINE ");
   }
   return result;
 }
@@ -97,6 +111,8 @@ void SoftwarePipeline::CompileRenderer(const std::vector<MaterialCode> &material
   const bool has_graph = std::any_of(materials.begin(), materials.end(),
                                      [](const MaterialCode &material) { return material.shader_graph; });
   std::ostringstream source;
+  source << "#ifndef SPARKIUM_RAY_QUERY\n#define SOFTWARE_NOINLINE [[noinline]]\n"
+            "#else\n#define SOFTWARE_NOINLINE\n#endif\n";
   for (size_t i = 0; i < materials.size(); ++i) {
     source << "namespace SoftwareMaterial" << i << " {\n" << materials[i].source;
     if (materials[i].shader_graph) {
@@ -125,11 +141,11 @@ float Transmission(HitRecord hit, float3 direction) {
   }
   if (has_graph) {
     source << R"(
-  ByteAddressBuffer SoftwareMaterialData(HitRecord hit) {
+  uint SoftwareMaterialData(HitRecord hit) {
     InstanceMetadata metadata = instance_metadatas.Load<InstanceMetadata>(sizeof(InstanceMetadata) * hit.object_index);
-    return data_buffers[NonUniformResourceIndex(metadata.material_data_index)];
+    return metadata.material_data_index;
   }
-  void SoftwareSampleMaterial(uint material, inout RenderContext context, HitRecord hit) {
+  SOFTWARE_NOINLINE void SoftwareSampleMaterial(uint material, inout RenderContext context, HitRecord hit) {
     GraphSurface graph;
     switch (material) {
   )";
@@ -147,7 +163,7 @@ float Transmission(HitRecord hit, float3 direction) {
     }
     SampleGraphSurface(context, hit, graph);
   }
-  float SoftwareShadowTransmission(uint material, HitRecord hit, float3 direction) {
+  SOFTWARE_NOINLINE float SoftwareShadowTransmission(uint material, HitRecord hit, float3 direction) {
     switch (material) {
   )";
     for (size_t i = 0; i < materials.size(); ++i) {
@@ -162,13 +178,14 @@ float Transmission(HitRecord hit, float3 direction) {
     source << "default: return 0.0f;\n}}\n";
   } else {
     // Preserve the compact dispatch for scenes without material graphs.
-    source << "void SoftwareSampleMaterial(uint material, inout RenderContext context, HitRecord hit) {\n"
-              "switch (material) {\n";
+    source
+        << "SOFTWARE_NOINLINE void SoftwareSampleMaterial(uint material, inout RenderContext context, HitRecord hit) {\n"
+           "switch (material) {\n";
     for (size_t i = 0; i < materials.size(); ++i)
       source << "case " << i << ": SoftwareMaterial" << i << "::SampleMaterial(context, hit); return;\n";
     source
         << "default: context.throughput = float3(0, 0, 0); break;\n}}\n"
-           "float SoftwareShadowTransmission(uint material, HitRecord hit, float3 direction) {\nswitch (material) {\n";
+           "SOFTWARE_NOINLINE float SoftwareShadowTransmission(uint material, HitRecord hit, float3 direction) {\nswitch (material) {\n";
     for (size_t i = 0; i < materials.size(); ++i)
       source << "case " << i << ": return SoftwareMaterial" << i << "::Transmission(hit, direction);\n";
     source << "default: return 0.0f;\n}}\n";
@@ -257,7 +274,8 @@ void SoftwarePipeline::Update(graphics::CommandContext *commands,
       max_leaves = std::max(max_leaves, leaves);
     }
     const auto *graph = instance.material->GraphImpl();
-    MaterialCode source{graph != nullptr, MaterialSource(graph ? *graph : instance.material->SamplerImpl())};
+    MaterialCode source{graph != nullptr,
+                        MaterialSource(graph ? *graph : instance.material->SamplerImpl(), graph != nullptr)};
     auto material = std::find(materials.begin(), materials.end(), source);
     uint32_t material_index = std::distance(materials.begin(), material);
     if (material == materials.end())
