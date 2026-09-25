@@ -18,6 +18,16 @@ VulkanCore::VulkanCore(const Settings &settings) : Core(settings) {
 #ifdef __OHOS__
   hint.AddExtension(VK_KHR_SURFACE_EXTENSION_NAME);
   hint.AddExtension("VK_OHOS_surface");
+  uint32_t extension_count = 0;
+  if (vkEnumerateInstanceExtensionProperties(nullptr, &extension_count, nullptr) == VK_SUCCESS) {
+    std::vector<VkExtensionProperties> extensions(extension_count);
+    if (vkEnumerateInstanceExtensionProperties(nullptr, &extension_count, extensions.data()) == VK_SUCCESS) {
+      for (const auto &extension : extensions) {
+        if (std::strcmp(extension.extensionName, VK_EXT_SWAPCHAIN_COLOR_SPACE_EXTENSION_NAME) == 0)
+          hint.AddExtension(VK_EXT_SWAPCHAIN_COLOR_SPACE_EXTENSION_NAME);
+      }
+    }
+  }
 #endif
 #if defined(LONGMARCH_CUDA_RUNTIME)
   hint.AddExtension(VK_KHR_EXTERNAL_MEMORY_CAPABILITIES_EXTENSION_NAME);
