@@ -53,6 +53,9 @@ private final class GameMetalView: MTKView {
     let end = touch.location(in: self)
     send(2, end)
     pointerDown = false
+    puzzleSwipe(from: start, to: end)
+  }
+  func puzzleSwipe(from start: CGPoint, to end: CGPoint) {
     let dx = end.x - start.x
     let dy = end.y - start.y
     if !life && max(abs(dx), abs(dy)) > 24 {
@@ -93,6 +96,7 @@ private final class GameMetalView: MTKView {
 // device: there is no counter-rotated rectangular view or relayout to animate.
 private final class GameCanvasView: UIView {
   let metal = GameMetalView(frame: .zero, device: nil)
+  private var blankSwipeStart: CGPoint?
   private weak var lockedScene: UIWindowScene?
   private var entryOrientation: UIInterfaceOrientation = .portrait
   private var iconAngle: CGFloat?
@@ -100,6 +104,7 @@ private final class GameCanvasView: UIView {
 
   override init(frame: CGRect) {
     super.init(frame: frame)
+    isMultipleTouchEnabled = true
     addSubview(metal)
   }
   required init?(coder: NSCoder) { fatalError() }
@@ -107,6 +112,9 @@ private final class GameCanvasView: UIView {
   override func layoutSubviews() {
     super.layoutSubviews()
     metal.frame = bounds
+    if !metal.life {
+      metal.frame.size.height = min(bounds.height, bounds.width * (118.5 / 88))
+    }
     if metal.life, let window, bounds.height > 0 {
       // Read the window inset: this view deliberately ignores SwiftUI safe
       // areas so its own inset can be zero. Keep an extra finger-sized gap.
@@ -121,6 +129,25 @@ private final class GameCanvasView: UIView {
         metal.renderer.setGameBottomControlInset(Float(fraction))
       }
     }
+  }
+
+  // Touches that begin below the Metal canvas belong to this container. Reuse
+  // the board's swipe threshold without sending clicks to its menu or score.
+  override func touchesBegan(_ touches: Set<UITouch>, with event: UIEvent?) {
+    guard !metal.life, event?.allTouches?.count == 1, let touch = touches.first else {
+      blankSwipeStart = nil
+      return
+    }
+    blankSwipeStart = touch.location(in: self)
+  }
+  override func touchesEnded(_ touches: Set<UITouch>, with event: UIEvent?) {
+    if let start = blankSwipeStart, let touch = touches.first {
+      metal.puzzleSwipe(from: start, to: touch.location(in: self))
+    }
+    blankSwipeStart = nil
+  }
+  override func touchesCancelled(_ touches: Set<UITouch>, with event: UIEvent?) {
+    blankSwipeStart = nil
   }
 
   override func safeAreaInsetsDidChange() {
@@ -473,10 +500,9 @@ struct GamesView: View {
             }
             .padding(.horizontal, 12).padding(.vertical, 6)
             .background(.black.opacity(0.05), in: Capsule())
-            GeometryReader { geometry in
-              // Match the compact hosted layout's 88 x 118.5 units, top aligned.
-              game.frame(height: min(geometry.size.height, geometry.size.width * (118.5 / 88)))
-            }
+            // The native container fills the remaining space for swipe input;
+            // its Metal canvas keeps the compact, top-aligned board layout.
+            game
           }
           .padding(.top, 8).padding(.bottom, 8)
         }
