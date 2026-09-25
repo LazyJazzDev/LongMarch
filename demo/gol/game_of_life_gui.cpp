@@ -300,7 +300,9 @@ void GameOfLife::OnWindowSize() {
     width_slider_->Resize({margin, top, margin + slider_thickness, bottom}, true);
     height_slider_->Resize({margin + slider_thickness + slider_gap, top, margin + icon_size, bottom}, true);
   } else {
-    playground_top = panel_size;
+    // Give the sparse top actions more breathing room against rounded corners.
+    const float action_top_margin = margin * 2.0f;
+    playground_top = panel_size + action_top_margin - margin;
     playground_bottom = window_height - panel_size - bottom_shift;
     panel_top_ = playground_bottom;
     const float top = window_height - bottom_margin - icon_size;
@@ -311,8 +313,8 @@ void GameOfLife::OnWindowSize() {
     place(pause_play_button_.get(), window_width - margin - icon_size, top);
     // Keep the sparse action rail at the top, leaving its center clear for
     // phone camera cutouts. The dense controls occupy the opposite short edge.
-    place(refresh_button_.get(), margin, margin);
-    place(randomize_button_.get(), window_width - margin - icon_size, margin);
+    place(refresh_button_.get(), margin, action_top_margin);
+    place(randomize_button_.get(), window_width - margin - icon_size, action_top_margin);
     const float left = margin + step * 2.0f;
     const float right = window_width - left - step;
     width_slider_->Resize({left, top, right, top + slider_thickness}, false);
