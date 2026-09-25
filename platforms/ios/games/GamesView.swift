@@ -284,10 +284,10 @@ private struct GridDimensionPicker: View {
               value = Double($0)
               apply($0)
             }),
-          in: 2...200
+          in: 2...256
         ).labelsHidden()
       }
-      Slider(value: $value, in: 2...200, step: 1) { editing in
+      Slider(value: $value, in: 2...256, step: 1) { editing in
         // Keep the native thumb responsive; resize the grid once the user
         // finishes scrubbing instead of rebuilding thousands of cells per move.
         if !editing { apply(Int(value)) }
@@ -297,7 +297,7 @@ private struct GridDimensionPicker: View {
       HStack {
         Text("2")
         Spacer()
-        Text("200")
+        Text("256")
       }.font(.caption).foregroundStyle(.secondary)
     }.padding(20)
   }

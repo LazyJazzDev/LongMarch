@@ -129,7 +129,7 @@ int main(int argc, char **argv) {
         Check(game.Game()->CompleteFile(path.string()).empty(), "Hosted grid export failed");
         auto saved = LoadCellsPattern(path.string());
         std::filesystem::remove(path);
-        Check(saved.width == 40 && saved.height == 30 && std::count(saved.cells.begin(), saved.cells.end(), 1) == 36,
+        Check(saved.width == 64 && saved.height == 64 && std::count(saved.cells.begin(), saved.cells.end(), 1) == 36,
               "Import/export lost centered pattern cells or grid dimensions");
         game.Game()->EnableNativeSizeControls();
         auto tapSize = [&](double x, double y) {
@@ -138,7 +138,7 @@ int main(int argc, char **argv) {
           window->SendMouseButton(GLFW_MOUSE_BUTTON_LEFT, GLFW_RELEASE);
           return game.Game()->TakeSizeControlRequest();
         };
-        Check(tapSize(350, 716) == glm::ivec2(1, 40), "Tapping native width control changed its value");
+        Check(tapSize(350, 716) == glm::ivec2(1, 64), "Tapping native width control changed its value");
         Check(game.Game()->TakeSizeControlRequest().x == 0, "Size popup request was delivered twice");
         game.Game()->SetGridDimension(1, 137);
         game.Render();
@@ -149,14 +149,14 @@ int main(int argc, char **argv) {
         window->SendMouseButton(GLFW_MOUSE_BUTTON_LEFT, GLFW_RELEASE);
         Check(game.Game()->TakeSizeControlRequest().x == 0, "Dragging the readout opened a popup");
         Check(tapSize(250, 716) == glm::ivec2(1, 137), "Dragging the native readout changed grid width");
-        Check(tapSize(250, 752) == glm::ivec2(2, 30), "Height control opened the wrong dimension");
+        Check(tapSize(250, 752) == glm::ivec2(2, 64), "Height control opened the wrong dimension");
         game.Game()->SetGridDimension(1, 400);
         game.Game()->SetGridDimension(2, 1);
         game.Render();
-        Check(tapSize(250, 716) == glm::ivec2(1, 200) && tapSize(250, 752) == glm::ivec2(2, 2),
+        Check(tapSize(250, 716) == glm::ivec2(1, 256) && tapSize(250, 752) == glm::ivec2(2, 2),
               "Native grid sizes escaped the supported range");
-        game.Game()->SetGridDimension(1, 40);
-        game.Game()->SetGridDimension(2, 30);
+        game.Game()->SetGridDimension(1, 64);
+        game.Game()->SetGridDimension(2, 64);
         game.Render();
       } else {
         for (int key : {GLFW_KEY_LEFT, GLFW_KEY_UP, GLFW_KEY_RIGHT, GLFW_KEY_DOWN}) {

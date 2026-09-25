@@ -22,7 +22,7 @@ taps on the scoreboard enable the original AI worker, and one tap stops it.
 Game of Life preserves the original shaded cells, pixel icons, concave/convex
 size sliders, rotating blue die, red reset, pause/play spring and boundary-glider
 animation. Tap or draw to edit, use two fingers to pan, and pinch to zoom. Its
-width/height (2–200), 1×/2×/5×/lightning speed, periodic/fixed edges and file buttons
+width/height (2–256, initially 64×64), 1×/2×/5×/lightning speed, periodic/fixed edges and file buttons
 are the same desktop controls. Lightning advances once per rendered frame.
 Sidebars follow the window's short edges rather than the grid aspect ratio. On
 iPhone, GoL fills the display, with reset/random at the two upper corners in
@@ -36,7 +36,7 @@ GoL defers bottom-edge system gestures and keeps the lower controls above the
 window's home-indicator safe area plus 12 points. The canvas still fills the
 screen. This reduces accidental Home gestures; iOS still allows users to leave
 the app and does not permit ordinary apps to disable Home navigation entirely.
-On iOS, tap either W/H readout to open a system popover with a native 2–200 slider
+On iOS, tap either W/H readout to open a system popover with a native 2–256 slider
 and single-cell stepper. Scrubbing updates the displayed value; release applies
 the new grid size once. Done or tapping outside closes the popover. The compact
 readouts do not change values when dragged; desktop sliders retain direct drag.
