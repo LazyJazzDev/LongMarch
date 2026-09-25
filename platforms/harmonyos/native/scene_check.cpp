@@ -21,12 +21,17 @@ int main(int argc, char **argv) {
     auto pixels = session.Display(true);
     if (session.Samples() != samples || pixels.empty())
       throw std::runtime_error("No rendered sample");
+    double rgb_energy = 0;
     for (size_t offset = 0; offset < pixels.size(); offset += sizeof(float)) {
       float value;
       std::memcpy(&value, pixels.data() + offset, sizeof(value));
       if (!std::isfinite(value))
         throw std::runtime_error("Nonfinite HDR pixel");
+      if ((offset / sizeof(float)) % 4 != 3)
+        rgb_energy += std::abs(value);
     }
+    if (rgb_energy <= 0)
+      throw std::runtime_error("Rendered scene is entirely black");
     if (argc > 6) {
       const auto sdr = session.Display(false);
       std::ofstream out(argv[6], std::ios::binary);

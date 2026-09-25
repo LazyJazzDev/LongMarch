@@ -104,7 +104,16 @@ struct Index {
         if (value.ready && smoke.length > 0) {
           AppStorage.set('longmarchSmokeDemo', '');
           const demo = DEMOS.find((item: DemoInfo) => item.id === smoke);
-          if (demo) this.open(demo);
+          const scene = AppStorage.get<string>('longmarchSmokeScene') ?? '';
+          if (value.scenes.some((item: SceneInfo) => item.id === scene)) this.scene = scene;
+          if (demo) {
+            this.open(demo);
+            if (demo.id === 'sparkium') {
+              const samples = AppStorage.get<number>('longmarchSmokeSamples') ?? 32;
+              this.limit = Number.isFinite(samples) ? Math.max(1, Math.min(4096, Math.floor(samples))) : 32;
+              this.send({ type: 'limit', value: this.limit });
+            }
+          }
         }
         if (value.sizeAxis !== this.sizeAxis) {
           this.sizeAxis = value.sizeAxis;
@@ -310,6 +319,9 @@ struct Index {
           Button('Hide').onClick(() => this.controls = false)
         }.width('100%')
         if (this.selected === 'sparkium') {
+          if (this.stats.frames === 0 && this.stats.error.length === 0) {
+            Text('Preparing scene and first sample…').fontSize(14)
+          }
           Text('Scene').width('100%').textAlign(TextAlign.Start)
           Select(this.stats.scenes.map((s: SceneInfo): SelectOption => ({ value: s.name })))
             .value(this.stats.scenes.find((s: SceneInfo) => s.id === this.scene)?.name ?? this.scene)

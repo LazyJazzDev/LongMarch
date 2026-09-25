@@ -1,5 +1,6 @@
 #include "Host.h"
 
+#include <hilog/log.h>
 #include <rapidjson/document.h>
 #include <rapidjson/stringbuffer.h>
 #include <rapidjson/writer.h>
@@ -359,6 +360,11 @@ void Host::Frame() {
     last_present_ = presented_at;
   }
   ++frames_;
+  if (scene_ && (frames_ == 1 || (sampled && scene_->Samples() >= limit_)))
+    OH_LOG_Print(LOG_APP, LOG_INFO, 0, "LongMarchGPU",
+                 "Scene %{public}s frame=%{public}llu spp=%{public}u duration=%{public}.3f presented=%{public}d",
+                 scene_id_.c_str(), static_cast<unsigned long long>(frames_), static_cast<unsigned>(scene_->Samples()),
+                 duration, presented);
   dirty_ = false;
   delay_ = Game() ? Game()->NextFrameDelay() : 1.0 / 60;
   // Shared games use infinity, not a negative number, to report idle.

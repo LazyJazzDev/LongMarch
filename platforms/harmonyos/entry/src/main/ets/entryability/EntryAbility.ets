@@ -6,6 +6,8 @@ export default class EntryAbility extends UIAbility {
   onCreate(want: Want): void {
     this.context.getApplicationContext().setColorMode(ConfigurationConstant.ColorMode.COLOR_MODE_DARK);
     AppStorage.setOrCreate('longmarchSmokeDemo', String(want.parameters?.demo ?? ''));
+    AppStorage.setOrCreate('longmarchSmokeScene', String(want.parameters?.scene ?? ''));
+    AppStorage.setOrCreate('longmarchSmokeSamples', Number(want.parameters?.samples ?? 32));
   }
   onWindowStageCreate(stage: window.WindowStage): void {
     try {

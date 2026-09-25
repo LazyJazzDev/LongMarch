@@ -156,3 +156,46 @@ be measured; host success on Metal does not establish large-scene Vulkan support
   document cancellation/invalid-file handling, and system-edge gesture clearance.
 - Hardware ray-query coverage, all full-resolution scenes, memory use, GPU timings,
   HDR colorimetry/peak-brightness measurements and additional supported devices.
+
+## Complex compute scenes on MLN-AL00
+
+- The Maleoon 935F driver reports Vulkan 1.3, but does not advertise
+  `VK_KHR_ray_tracing_pipeline`, `VK_KHR_ray_query`, or
+  `VK_KHR_acceleration_structure`. Its ray-tracing pipeline feature is false.
+  This is an observation about the installed 6.1.0.135 driver/API exposure,
+  not a statement that the silicon lacks ray-tracing hardware. The app logs
+  these capabilities under `LongMarchGPU`.
+- The full-resolution Texture scene previously returned a black image while
+  the driver repeatedly reported GPU resets/device loss. Its monolithic compute
+  dispatch is now split into 128 x 128 pixel jobs using Vulkan dispatch bases.
+  Native resolution, global pixel coordinates, materials and bounce counts are
+  preserved. GPU submission/wait failures now propagate instead of silently
+  advancing sample counters.
+- The phone renders Texture at 2048 x 1024 after tiling, with nonzero finite
+  HDR pixels. The host scene check now rejects an entirely black result.
+  Vulkan synchronization validation passes for Texture at 259 x 130 / 2 SPP,
+  including partial edge tiles; its SDR output is byte-identical to the
+  untiled Metal result. Cornell Box at 256 x 256 / 32 SPP is also byte-identical
+  to the existing Metal reference. HDR conversion, shared game animation/input,
+  and the standalone Texture raster demo pass host regression checks.
+- Complex shader graphs now retain function boundaries in the software path
+  tracer, material evaluators and high-level Principled BSDF functions. The
+  previous fully inlined Blender kernel could spend several minutes inside
+  `vkCreateComputePipelines`. Buffer indices are passed between graph functions
+  instead of opaque buffer pointers, avoiding a VariablePointers requirement.
+  Ray Query retains its original inlining behavior.
+- All nine updated fallback scenes pass a 128-pixel-edge, 1-SPP Metal check;
+  all nine Ray Query scenes pass at 64-pixel edge / 1 SPP. Classroom and Monster
+  fallback images are byte-identical to their previous host references;
+  Junkshop differs in 11 of 24576 channels (mean absolute error 0.0139/255).
+  All 162 packaged SPIR-V modules pass `spirv-val` for Vulkan 1.2 with scalar
+  block layout. Resource, digest and NonUniform regression tests pass (5 tests).
+- The updated phone build displays Blender Monster at native 1024 x 1024 / 1 SPP.
+  An intermediate function-split build also displayed Classroom at its native
+  1920 x 1080. These are low-sample black-screen checks, not noise convergence
+  or interactive-performance acceptance. Junkshop and final Classroom device
+  checks are still in progress.
+- The signed app also successfully queried the public XEngine extension API.
+  It returned four non-RT extensions and no RTGI, reflection or shadow/AO
+  capability. See [RAY_TRACING.md](RAY_TRACING.md) for the exact results, SDK
+  contracts and implementation routes. No hardware RT execution is claimed.

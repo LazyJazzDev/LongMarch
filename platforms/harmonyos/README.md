@@ -145,3 +145,23 @@ Host Vulkan needs a Vulkan loader/SDK, and preparation needs DXC. To verify the
 read-only shader path, configure a separate build with `LONGMARCH_PREPARE=OFF` and
 run it against the staged bundle. Ray Query checks require a ray-query capable
 host backend; MoltenVK on macOS does not substitute for that device coverage.
+
+## Device scene checks and ray-tracing capabilities
+
+A signed development build can select a scene and sample limit at launch:
+
+```sh
+hdc shell aa force-stop dev.lazyjazz.longmarch
+hdc shell aa start -a EntryAbility -b dev.lazyjazz.longmarch \
+  --ps demo sparkium --ps scene blender_monster --pi samples 2
+hdc shell hilog -x -T LongMarchGPU
+```
+
+The scene must belong to the bundled catalog; the sample limit is clamped to
+1–4096. Omit these arguments for normal interactive startup. First/final sample
+logs complement screen inspection when a complex scene takes time to prepare.
+
+The native build optionally detects the installed HMS XEngine headers. Its
+public library is loaded only when present on the device. Standard Vulkan and
+XEngine capabilities are logged separately. See [the ray-tracing investigation](RAY_TRACING.md)
+for verified device results, SDK contracts and the proposed hardware RT routes.
