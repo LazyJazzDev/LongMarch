@@ -228,8 +228,10 @@ AiPlayer::Board TwentyFourEight::SnapshotBoard() const {
 
 void TwentyFourEight::OnWindowSize() {
   auto window_width = float(FramebufferSize().x), window_height = float(FramebufferSize().y);
-  float title_scale = 1.0f / 4.0f;
-  float ui_unit = std::min(window_width, window_height / (1.0f + title_scale)) * 1e-2f;
+  const bool compact = GetWindow()->IsHosted();
+  float title_scale = compact ? 0.185f : 0.25f;
+  // Native screens use about 3% side margins instead of the desktop's 8.75%.
+  float ui_unit = std::min(window_width / (compact ? 88.0f : 100.0f), window_height / (100.0f * (1.0f + title_scale)));
   float block_size = ui_unit * 20.0f;
   float left = window_width * 0.5f - ui_unit * 50.0f;
   float top = window_height * 0.5f - ui_unit * (1.0f + title_scale) * 50.0f;
