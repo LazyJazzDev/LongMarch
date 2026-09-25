@@ -1,0 +1,38 @@
+#version 450
+#extension GL_EXT_samplerless_texture_functions : require
+
+layout(local_size_x = 8, local_size_y = 8) in;
+layout(set = 0, binding = 0) uniform texture2D sourceImage;
+layout(rgba32f, set = 1, binding = 0) writeonly uniform image2D outputImage;
+
+layout(std140, set = 2, binding = 0) uniform Settings {
+  uint hdr10;
+  uint encodedParticles;
+};
+
+vec3 pqEncode(vec3 nits) {
+  const float m1 = 2610.0 / 16384.0, m2 = 2523.0 / 32.0;
+  const float c1 = 3424.0 / 4096.0, c2 = 2413.0 / 128.0, c3 = 2392.0 / 128.0;
+  vec3 p = pow(clamp(nits, 0.0, 1000.0) / 10000.0, vec3(m1));
+  return pow((c1 + c2 * p) / (1.0 + c3 * p), vec3(m2));
+}
+
+void main() {
+  ivec2 pixel = ivec2(gl_GlobalInvocationID.xy);
+  if (any(greaterThanEqual(pixel, imageSize(outputImage))))
+    return;
+  vec3 rgb = max(texelFetch(sourceImage, pixel, 0).rgb, vec3(0.0));
+  // Match the iOS NBody display-encoded particle-to-linear conversion.
+  if (encodedParticles != 0)
+    rgb = pow(rgb, vec3(2.2));
+  if (hdr10 != 0) {
+    // Linear Rec.709 -> Rec.2020; SDR reference white is 203 cd/m2.
+    vec3 rec2020 = vec3(dot(rgb, vec3(0.627404, 0.329283, 0.043313)), dot(rgb, vec3(0.069097, 0.919540, 0.011362)),
+                        dot(rgb, vec3(0.016391, 0.088013, 0.895595)));
+    rgb = pqEncode(rec2020 * 203.0);
+  } else {
+    rgb = clamp(rgb, 0.0, 1.0);
+    rgb = mix(1.055 * pow(rgb, vec3(1.0 / 2.4)) - 0.055, rgb * 12.92, lessThanEqual(rgb, vec3(0.0031308)));
+  }
+  imageStore(outputImage, pixel, vec4(rgb, 1.0));
+}

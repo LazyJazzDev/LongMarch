@@ -81,7 +81,18 @@ target_link_libraries(harmony_demos PUBLIC harmony_engine harmony_gol harmony_20
 target_include_directories(harmony_demos PRIVATE "${ROOT}/demo/gol/game_of_life_lib" "${ROOT}/demo/2048" "${ROOT}/demo/gol")
 embed_shaders(harmony_demos "${ROOT}/demo" "${CMAKE_CURRENT_BINARY_DIR}/demo_shaders.inl")
 set_source_files_properties("${MOBILE}/demos/DemoSession.cpp" PROPERTIES INCLUDE_DIRECTORIES "${CMAKE_CURRENT_BINARY_DIR}")
+find_program(LONGMARCH_GLSLANG_VALIDATOR glslangValidator HINTS /usr/local/bin /opt/homebrew/bin
+  NO_CMAKE_FIND_ROOT_PATH REQUIRED)
+add_custom_command(OUTPUT "${CMAKE_CURRENT_BINARY_DIR}/hdr_present.inc"
+  COMMAND "${LONGMARCH_GLSLANG_VALIDATOR}" -V --target-env vulkan1.2 --vn kHdrPresentShader
+    -o "${CMAKE_CURRENT_BINARY_DIR}/hdr_present.inc" "${CMAKE_CURRENT_SOURCE_DIR}/native/hdr_present.comp"
+  DEPENDS native/hdr_present.comp VERBATIM)
+add_library(harmony_presentation STATIC native/HdrPresentation.cpp "${CMAKE_CURRENT_BINARY_DIR}/hdr_present.inc")
+target_include_directories(harmony_presentation PRIVATE "${CMAKE_CURRENT_BINARY_DIR}")
+target_link_libraries(harmony_presentation PUBLIC harmony_engine)
 if(NOT CMAKE_SYSTEM_NAME STREQUAL "OHOS")
+  add_executable(harmony_hdr_check native/hdr_check.cpp)
+  target_link_libraries(harmony_hdr_check PRIVATE harmony_presentation)
   add_executable(sparkium_mobile_check "${MOBILE}/check.cpp")
   target_link_libraries(sparkium_mobile_check PRIVATE harmony_engine)
   add_executable(mobile_demo_check "${MOBILE}/demos/check.cpp")
@@ -96,6 +107,6 @@ endif()
 
 if(CMAKE_SYSTEM_NAME STREQUAL "OHOS")
   add_library(longmarch SHARED native/Bridge.cpp native/Host.cpp native/Surface.cpp)
-  target_link_libraries(longmarch PRIVATE harmony_demos ace_napi.z ace_ndk.z native_window rawfile.z)
+  target_link_libraries(longmarch PRIVATE harmony_demos harmony_presentation ace_napi.z ace_ndk.z native_window rawfile.z hilog_ndk.z)
   target_compile_definitions(longmarch PRIVATE VK_USE_PLATFORM_OHOS)
 endif()

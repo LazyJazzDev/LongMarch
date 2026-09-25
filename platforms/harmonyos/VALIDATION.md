@@ -49,8 +49,9 @@ succeeded. A development-signed HAP is installed and running on Mate 70 RS.
   frames and reported GPU timestamp measurements.
 - Ray Query reports unsupported on this driver. Sparkium Cornell Box uses
   compute fallback, rendering at 1024 x 1024 through the 32 SPP limit.
-- Linear extended-sRGB HDR swapchain creation succeeds. This establishes the
-  surface format, not measured HDR display brightness or color accuracy.
+- The original linear extended-sRGB HDR swapchain creation succeeded on this
+  device, but did not establish actual HDR display output. That presentation
+  path was subsequently replaced by HDR10; see the MLN-AL00 checks below.
 - Device screenshots exposed a rotated landscape presentation and unreadable
   light-theme text. Identity surface transform and application dark mode fixed
   both; Cornell Box now displays upright with a square aspect ratio.
@@ -116,6 +117,37 @@ be measured; host success on Metal does not establish large-scene Vulkan support
 - Signed ARM64 HAP builds and installation succeed with these changes. Device
   screenshots confirm the restored 2048/GoL palette.
 
+## HDR10 on MLN-AL00
+
+- Tested system 6.1.0.135(SP17C00E135R3P4), Vulkan Maleoon 935F, with a refreshed
+  development signature for this device. Signed HAP build/install pass.
+- The driver advertises `A2B10G10R10_UNORM_PACK32` with sRGB/P3 WSI color spaces,
+  but no `RGBA16Float + extended-linear-sRGB` pair. The previous selection thus
+  fell back to an 8-bit SDR buffer despite the HDR-capable display.
+- The new presentation pass encodes linear Rec.709 into BT.2020/PQ on the GPU.
+  Native-window color-space, HDR type and static-metadata setters all return
+  success. RenderService buffer dumps show 10-bit format 34, color metadata
+  2360324 (BT.2020/PQ), and metadata type 2 (HDR10). Off/on tests restore 8-bit
+  format 12, sRGB metadata 2294273 and type 0, then re-enable HDR10 correctly.
+- RenderService reported approximately 62.83 for the SDR layer's `displayNit`
+  and 309.52 for HDR after adaptation. These are system diagnostics, not measured
+  panel luminance. The user confirmed that the upper HDR gradient highlights
+  are visibly brighter than the lower reference-white bar on the actual screen.
+- Sparkium Cornell Box and NBody render using the same 10-bit/PQ/HDR10 buffer
+  metadata. Switching to 2048 restores the SDR buffer and its original palette.
+  Cornell Box's original scene settings cap `max_exposure` at 1.0; at default
+  display exposure it is not a strong super-white highlight test. These scene
+  settings remain aligned with iOS; the app's exposure control still applies.
+- The host `harmony_hdr_check` passes with Vulkan synchronization validation:
+  decoding the GPU output reproduces 203-nit reference white, 609-nit highlights,
+  the 1000-nit signal ceiling and transformed red primaries. SDR clipping and
+  NBody's gamma decoding also pass. The display ceiling is a content encoding
+  choice, not a claim about the panel's maximum brightness.
+- This replaces the original linear floating-point surface path. The public
+  [OpenHarmony 6.0 HDR classification implementation](https://github.com/openharmony/graphic_graphic_2d/blob/OpenHarmony-6.0-Release/rosen/modules/render_service/core/feature/hdr/rs_hdr_util.cpp)
+  checks supported 10-bit buffer formats and PQ/HLG transfer functions; selecting
+  a floating-point format alone does not establish HDR output.
+
 ## Pending
 
 - Extended XComponent lifecycle stress, repeated navigation and surface
@@ -123,4 +155,4 @@ be measured; host success on Metal does not establish large-scene Vulkan support
 - Broader device touch and multi-finger coverage, orientation lock/icon rotation,
   document cancellation/invalid-file handling, and system-edge gesture clearance.
 - Hardware ray-query coverage, all full-resolution scenes, memory use, GPU timings,
-  HDR surface availability and actual display output on supported hardware.
+  HDR colorimetry/peak-brightness measurements and additional supported devices.

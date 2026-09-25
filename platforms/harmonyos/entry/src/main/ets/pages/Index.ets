@@ -353,7 +353,7 @@ struct Index {
           Text('HDR display')
           Toggle({ type: ToggleType.Switch, isOn: this.hdr }).onChange((value: boolean) => { this.hdr = value; this.display(); })
         }
-        Text(this.stats.hdr ? 'Linear HDR surface' : 'SDR display · HDR requires a supported surface').fontSize(12)
+        Text(this.stats.hdr ? 'HDR10 · BT.2020 / PQ' : 'SDR output').fontSize(12)
         if (this.selected === 'sparkium' || this.selected === 'nbody_cs' || this.selected === 'graphics_hello_resize') {
           Button(this.paused ? 'Resume' : 'Pause').onClick(() => { this.paused = !this.paused; this.send({ type: 'pause', value: this.paused }); })
         }

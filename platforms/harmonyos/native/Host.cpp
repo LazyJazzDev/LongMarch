@@ -348,7 +348,8 @@ void Host::Frame() {
   if (!scene_ || sampled) {
     elapsed_ += duration;
   }
-  const bool presented = surface_->Present(image, scene_ ? zoom_ : 1, scene_ ? pan_x_ : 0, scene_ ? pan_y_ : 0);
+  const bool presented = surface_->Present(image, scene_ ? zoom_ : 1, scene_ ? pan_x_ : 0, scene_ ? pan_y_ : 0,
+                                           selection_ == "graphics_hello_hdr", selection_ == "nbody_cs");
   const auto presented_at = std::chrono::steady_clock::now();
   if (presented) {
     const double interval =

@@ -35,17 +35,23 @@ compute ray tracing on devices without ray queries. Scene resource requirements
 still apply: a device may reject a large Blender scene if descriptor or memory
 limits are exceeded. The error is shown in the app; another scene can be selected.
 
-HDR requests an extended linear sRGB floating-point Vulkan surface. Displays
-without that format use SDR and explicitly report it. HDR10-only surfaces are
-not advertised as linear HDR. Brightness/headroom and system display policy need
-real-device validation.
+HDR uses a 10-bit UNORM surface and a GPU presentation pass that converts linear
+Rec.709 to BT.2020/ST.2084 PQ. Native-window color space and HDR10 static metadata
+identify the content to HarmonyOS RenderService, including drivers that advertise
+10-bit WSI formats only with sRGB/P3 color spaces. The signal uses 203-nit reference
+white and a 1000-nit content ceiling; actual display brightness remains controlled
+by the system. Devices without the required 10-bit format report SDR output.
+NBody's display-encoded particles are decoded before HDR conversion; games retain
+their original SDR palette. Turning HDR off resets buffer metadata to SDR.
 
 ## Prerequisites
 
 - DevEco Studio with HarmonyOS SDK and native C++ toolchain; ARM64 phone/tablet.
 - Vulkan 1.2 with the engine's dynamic rendering, extended dynamic state, and
   descriptor-indexing features. Unsupported devices report initialization errors.
-- Python 3, CMake 3.25+, Ninja, and portable dependency headers.
+- Python 3, CMake 3.25+, Ninja, portable dependency headers, and host
+  `glslangValidator` (Vulkan SDK/glslang). CMake uses it to compile the presentation
+  shader into a build-generated header; no shader compiler is shipped in the HAP.
 - The assets submodule initialized with its real LFS objects.
 
 The first build fetches pinned MikkTSpace and FreeType sources. CMake
@@ -131,6 +137,7 @@ cmake -S platforms/harmonyos -B out/harmonyos/host-prepare -G Ninja \
 cmake --build out/harmonyos/host-prepare
 out/harmonyos/host-prepare/mobile_games_check /path/to/Resources
 out/harmonyos/host-prepare/mobile_demo_check /path/to/Resources nbody_cs out/harmonyos/replay
+out/harmonyos/host-prepare/harmony_hdr_check
 python3 -m unittest discover -s platforms/harmonyos/tests -v
 ```
 

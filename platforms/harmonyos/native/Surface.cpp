@@ -1,5 +1,7 @@
 #include "Surface.h"
 
+#include <hilog/log.h>
+
 #include <cmath>
 #include <limits>
 #include <stdexcept>
@@ -8,7 +10,8 @@ using namespace grassland;
 
 namespace longmarch::harmony {
 Surface::Surface(graphics::Core *core, OHNativeWindow *window)
-    : core_(dynamic_cast<graphics::backend::VulkanCore *>(core)) {
+    : core_(dynamic_cast<graphics::backend::VulkanCore *>(core)),
+      window_(window) {
   if (!core_ || !window)
     throw std::runtime_error("Missing Vulkan core or native window");
   auto create = reinterpret_cast<PFN_vkCreateSurfaceOHOS>(
@@ -71,14 +74,19 @@ void Surface::Resize(uint32_t width, uint32_t height, bool hdr) {
     throw std::runtime_error("Display has no Vulkan surface formats");
   auto format = formats.front();
   for (auto candidate : formats) {
-    if (candidate.format == VK_FORMAT_B8G8R8A8_UNORM && candidate.colorSpace == VK_COLOR_SPACE_SRGB_NONLINEAR_KHR)
+    if ((candidate.format == VK_FORMAT_B8G8R8A8_UNORM || candidate.format == VK_FORMAT_R8G8B8A8_UNORM) &&
+        candidate.colorSpace == VK_COLOR_SPACE_SRGB_NONLINEAR_KHR)
       format = candidate;
   }
   hdr_ = false;
   if (hdr) {
     for (auto candidate : formats) {
-      if (candidate.format == VK_FORMAT_R16G16B16A16_SFLOAT &&
-          candidate.colorSpace == VK_COLOR_SPACE_EXTENDED_SRGB_LINEAR_EXT) {
+      // Some OHOS drivers advertise 10-bit UNORM only with sRGB/P3 WSI color
+      // spaces. The public native-window API carries the actual BT.2020/PQ
+      // buffer metadata to RenderService independently of this WSI selection.
+      if (candidate.format == VK_FORMAT_A2B10G10R10_UNORM_PACK32 &&
+          (candidate.colorSpace == VK_COLOR_SPACE_HDR10_ST2084_EXT ||
+           candidate.colorSpace == VK_COLOR_SPACE_SRGB_NONLINEAR_KHR)) {
         format = candidate;
         hdr_ = true;
         break;
@@ -121,6 +129,30 @@ void Surface::Resize(uint32_t width, uint32_t height, bool hdr) {
   info.presentMode = VK_PRESENT_MODE_FIFO_KHR;
   info.clipped = VK_TRUE;
   vulkan::ThrowIfFailed(vkCreateSwapchainKHR(device, &info, nullptr, &swapchain_), "Create swapchain");
+  const auto color_space = hdr_ ? OH_COLORSPACE_BT2020_PQ_FULL : OH_COLORSPACE_SRGB_FULL;
+  auto metadata_type = hdr_ ? OH_VIDEO_HDR_HDR10 : OH_VIDEO_NONE;
+  OH_NativeBuffer_StaticMetadata metadata{};
+  if (hdr_) {
+    metadata.smpte2086.displayPrimaryRed = {0.708f, 0.292f};
+    metadata.smpte2086.displayPrimaryGreen = {0.170f, 0.797f};
+    metadata.smpte2086.displayPrimaryBlue = {0.131f, 0.046f};
+    metadata.smpte2086.whitePoint = {0.3127f, 0.3290f};
+    metadata.smpte2086.maxLuminance = 1000.0f;
+    metadata.smpte2086.minLuminance = 0.0001f;
+    // Bounds of the encoded signal, not measurements of the attached panel.
+    metadata.cta861.maxContentLightLevel = 1000.0f;
+    metadata.cta861.maxFrameAverageLightLevel = 1000.0f;
+  }
+  const int color_result = OH_NativeWindow_SetColorSpace(window_, color_space);
+  const int type_result = OH_NativeWindow_SetMetadataValue(window_, OH_HDR_METADATA_TYPE, sizeof(metadata_type),
+                                                           reinterpret_cast<uint8_t *>(&metadata_type));
+  const int static_result = OH_NativeWindow_SetMetadataValue(window_, OH_HDR_STATIC_METADATA, sizeof(metadata),
+                                                             reinterpret_cast<uint8_t *>(&metadata));
+  OH_LOG_Print(LOG_APP, LOG_INFO, 0, "LongMarchHDR",
+               "HDR10=%{public}d format=%{public}d nativeColor=%{public}d results=%{public}d/%{public}d/%{public}d",
+               int(hdr_), int(format.format), int(color_space), color_result, type_result, static_result);
+  if (hdr_ && (color_result || type_result || static_result))
+    throw std::runtime_error("Cannot configure native HDR10 color space/metadata");
   vulkan::ThrowIfFailed(vkGetSwapchainImagesKHR(device, swapchain_, &count, nullptr), "Swapchain images");
   images_.resize(count);
   vulkan::ThrowIfFailed(vkGetSwapchainImagesKHR(device, swapchain_, &count, images_.data()), "Swapchain images");
@@ -129,9 +161,19 @@ void Surface::Resize(uint32_t width, uint32_t height, bool hdr) {
   vulkan::ThrowIfFailed(vkCreateFence(device, &fence, nullptr, &acquire_fence_), "Acquire fence");
 }
 
-bool Surface::Present(graphics::Image *source, double zoom, double pan_x, double pan_y) {
+bool Surface::Present(graphics::Image *source,
+                      double zoom,
+                      double pan_x,
+                      double pan_y,
+                      bool linear_demo,
+                      bool encoded_particles) {
   if (!swapchain_ || !source)
     return false;
+  if (hdr_ || linear_demo || encoded_particles) {
+    if (!presentation_)
+      presentation_ = std::make_unique<HdrPresentation>(core_);
+    source = presentation_->Convert(source, hdr_, encoded_particles);
+  }
   auto *image = dynamic_cast<graphics::backend::VulkanImage *>(source);
   if (!image)
     throw std::runtime_error("Presentation requires a Vulkan image");
