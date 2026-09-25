@@ -27,10 +27,12 @@ class Buffer {
   void *Map() const {
     void *data;
     vmaMapMemory(device_->Allocator(), allocation_, &data);
+    vmaInvalidateAllocation(device_->Allocator(), allocation_, 0, VK_WHOLE_SIZE);
     return data;
   }
 
   void Unmap() const {
+    vmaFlushAllocation(device_->Allocator(), allocation_, 0, VK_WHOLE_SIZE);
     vmaUnmapMemory(device_->Allocator(), allocation_);
   }
 

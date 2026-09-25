@@ -86,8 +86,8 @@ int VulkanCore::CreateImage(int width, int height, ImageFormat format, double_pt
     VulkanImage *image = dynamic_cast<VulkanImage *>(*pp_image);
     vulkan::TransitImageLayout(command_buffer, image->Image()->Handle(), VK_IMAGE_LAYOUT_UNDEFINED,
                                VK_IMAGE_LAYOUT_GENERAL, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT,
-                               VK_PIPELINE_STAGE_ALL_GRAPHICS_BIT, VK_ACCESS_MEMORY_READ_BIT, 0,
-                               image->Image()->Aspect());
+                               VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, 0,
+                               VK_ACCESS_MEMORY_READ_BIT | VK_ACCESS_MEMORY_WRITE_BIT, image->Image()->Aspect());
   });
   return 0;
 }
@@ -327,13 +327,22 @@ int VulkanCore::SubmitCommandContext(CommandContext *p_command_context) {
     return -1;
   }
 
+  // Queue order alone does not make copied uniforms/instances visible to shaders.
+  // This also orders static uploads and previous dispatches before this context.
+  VkMemoryBarrier upload_barrier{};
+  upload_barrier.sType = VK_STRUCTURE_TYPE_MEMORY_BARRIER;
+  upload_barrier.srcAccessMask = VK_ACCESS_MEMORY_WRITE_BIT;
+  upload_barrier.dstAccessMask = VK_ACCESS_MEMORY_READ_BIT | VK_ACCESS_MEMORY_WRITE_BIT;
+  vkCmdPipelineBarrier(command_buffer, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, 0, 1,
+                       &upload_barrier, 0, nullptr, 0, nullptr);
+
   for (auto &command : command_context->commands_) {
     command->CompileCommand(command_context, command_buffer);
   }
 
   for (auto [image, state] : command_context->image_states_) {
     vulkan::TransitImageLayout(command_buffer, image, state.layout, VK_IMAGE_LAYOUT_GENERAL, state.stage,
-                               VK_PIPELINE_STAGE_ALL_GRAPHICS_BIT, state.access, VK_ACCESS_MEMORY_READ_BIT,
+                               VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, state.access, VK_ACCESS_MEMORY_READ_BIT,
                                state.aspect);
   }
   command_context->image_states_.clear();
@@ -492,12 +501,14 @@ int VulkanCore::InitializeLogicalDevice(int device_index) {
                                  VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT, &graphics_command_pool_),
       "failed to create graphics command pool");
   vulkan::ThrowIfFailed(
-      device_->CreateCommandPool(device_->PhysicalDevice().TransferFamilyIndex(),
+      device_->CreateCommandPool(device_->PhysicalDevice().GraphicsFamilyIndex(),
                                  VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT, &transfer_command_pool_),
       "failed to create transfer command pool");
 
   device_->GetQueue(device_->PhysicalDevice().GraphicsFamilyIndex(), 0, &graphics_queue_);
-  device_->GetQueue(device_->PhysicalDevice().TransferFamilyIndex(), 0, &transfer_queue_);
+  // Buffers use exclusive sharing. Upload and consume them on the same family;
+  // a dedicated transfer queue would require explicit ownership transfers.
+  device_->GetQueue(device_->PhysicalDevice().GraphicsFamilyIndex(), 0, &transfer_queue_);
 
   in_flight_fences_.resize(FramesInFlight());
   command_buffers_.resize(FramesInFlight());
