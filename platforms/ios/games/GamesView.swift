@@ -473,7 +473,11 @@ struct GamesView: View {
             }
             .padding(.horizontal, 12).padding(.vertical, 6)
             .background(.black.opacity(0.05), in: Capsule())
-            game
+            GeometryReader { geometry in
+              // The shared renderer fits a 4:5 title-and-board layout. Keep
+              // that canvas at the top instead of centering it in a tall phone.
+              game.frame(height: min(geometry.size.height, geometry.size.width * 1.25))
+            }
           }
           .padding(.top, 12).padding(.bottom, 12)
         }
