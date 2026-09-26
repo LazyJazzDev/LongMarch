@@ -80,6 +80,16 @@ TEST(HDRBrightnessTest, RefreshNotifiesAndUnknownReferenceFallsBack) {
   EXPECT_EQ(changes, 3);
   EXPECT_EQ(window.HDRReferenceWhiteScale(), 1.0f);
   EXPECT_FALSE(window.GetDisplayBrightness().reference_white_known);
+  // Capability-only changes must notify even when reference white is unchanged.
+  window.brightness.max_luminance_nits = 1000.0f;
+  window.brightness.reported_luminance_known = true;
+  window.RefreshDisplayBrightness();
+  EXPECT_EQ(changes, 4);
+  window.brightness.max_full_frame_luminance_nits = 400.0f;
+  window.RefreshDisplayBrightness();
+  EXPECT_EQ(changes, 5);
+  window.RefreshDisplayBrightness();
+  EXPECT_EQ(changes, 5);
 }
 
 #if defined(LONGMARCH_D3D12_ENABLED) || defined(LONGMARCH_VULKAN_ENABLED)
@@ -175,6 +185,22 @@ TEST_P(HDRWindowTest, ReferenceWhiteScalingPreservesSourceAndAlpha) {
     source[i + 3] = glm::packHalf1x16(0.5f);
   }
   composition->UploadData(source.data());
+  const auto brightness = window->GetDisplayBrightness();
+#ifdef _WIN32
+  if (brightness.reported_luminance_known) {
+    EXPECT_GT(brightness.max_luminance_nits, 0.0f);
+    RecordProperty("reported_peak_nits", brightness.max_luminance_nits);
+    RecordProperty("sdr_white_nits", brightness.sdr_white_nits);
+    if (brightness.reference_white_known) {
+      EXPECT_TRUE(brightness.hdr_headroom_estimated);
+      EXPECT_FLOAT_EQ(brightness.hdr_headroom,
+                      std::max(1.0f, brightness.max_luminance_nits / brightness.sdr_white_nits));
+    }
+  } else {
+    EXPECT_EQ(brightness.hdr_headroom, 0.0f);
+    EXPECT_FALSE(brightness.hdr_headroom_estimated);
+  }
+#endif
   const float scale = window->HDRReferenceWhiteScale();
   ASSERT_GT(scale, 0.0f);
   std::unique_ptr<graphics::CommandContext> commands;

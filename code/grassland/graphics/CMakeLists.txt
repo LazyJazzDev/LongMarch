@@ -24,4 +24,9 @@ if (LONGMARCH_D3D12_ENABLED)
     target_link_libraries(${GRASSLAND_SUBLIB_NAME} PUBLIC grassland_d3d12)
 endif ()
 
+if (WIN32)
+    # Display luminance queries are shared by every Windows rendering backend.
+    target_link_libraries(${GRASSLAND_SUBLIB_NAME} PRIVATE dxgi)
+endif ()
+
 PACK_SHADER_CODE(${GRASSLAND_SUBLIB_NAME})

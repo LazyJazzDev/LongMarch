@@ -203,7 +203,15 @@ int main(int argc, char **argv) {
         else if (!brightness.reference_white_known)
           ImGui::TextUnformatted("Reference white: unavailable (1x fallback)");
         if (brightness.hdr_headroom > 0.0f)
-          ImGui::Text("HDR headroom: %.2fx", brightness.hdr_headroom);
+          ImGui::Text(brightness.hdr_headroom_estimated ? "Estimated HDR headroom: %.2fx" : "HDR headroom: %.2fx",
+                      brightness.hdr_headroom);
+        else
+          ImGui::TextUnformatted("HDR headroom: unknown");
+        if (brightness.reported_luminance_known) {
+          ImGui::Text("Reported peak: %.0f nits", brightness.max_luminance_nits);
+          if (brightness.max_full_frame_luminance_nits > 0.0f)
+            ImGui::Text("Reported full-frame peak: %.0f nits", brightness.max_full_frame_luminance_nits);
+        }
       }
       auto *film = loaded->GetFilm();
       auto &settings = loaded->GetScene()->settings;

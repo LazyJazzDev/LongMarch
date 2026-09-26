@@ -9,6 +9,8 @@
 #ifdef _WIN32
 #define GLFW_EXPOSE_NATIVE_WIN32
 #include <GLFW/glfw3native.h>
+#include <dxgi1_6.h>
+#include <wrl/client.h>
 #endif
 
 #ifdef __APPLE__
@@ -50,7 +52,8 @@ DisplayBrightness Window::QueryDisplayBrightness() const {
     return result;
   MONITORINFOEXW monitor{};
   monitor.cbSize = sizeof(monitor);
-  if (!GetMonitorInfoW(MonitorFromWindow(glfwGetWin32Window(window_), MONITOR_DEFAULTTONEAREST), &monitor))
+  const auto native_monitor = MonitorFromWindow(glfwGetWin32Window(window_), MONITOR_DEFAULTTONEAREST);
+  if (!GetMonitorInfoW(native_monitor, &monitor))
     return result;
   UINT32 path_count{}, mode_count{};
   if (GetDisplayConfigBufferSizes(QDC_ONLY_ACTIVE_PATHS, &path_count, &mode_count) != ERROR_SUCCESS)
@@ -82,6 +85,42 @@ DisplayBrightness Window::QueryDisplayBrightness() const {
       result.sdr_white_nits = 80.0f * result.hdr_reference_white_scale;
       result.reference_white_known = true;
     }
+    // Match the window's display across all adapters, including hybrid GPUs.
+    // This is a Windows display query shared by Vulkan and D3D12.
+    Microsoft::WRL::ComPtr<IDXGIFactory1> factory;
+    if (FAILED(CreateDXGIFactory1(IID_PPV_ARGS(&factory))))
+      return result;
+    for (UINT adapter_index = 0;; ++adapter_index) {
+      Microsoft::WRL::ComPtr<IDXGIAdapter1> adapter;
+      if (FAILED(factory->EnumAdapters1(adapter_index, &adapter)))
+        break;
+      for (UINT output_index = 0;; ++output_index) {
+        Microsoft::WRL::ComPtr<IDXGIOutput> output;
+        if (FAILED(adapter->EnumOutputs(output_index, &output)))
+          break;
+        Microsoft::WRL::ComPtr<IDXGIOutput6> output6;
+        DXGI_OUTPUT_DESC1 desc{};
+        if (FAILED(output.As(&output6)) || FAILED(output6->GetDesc1(&desc)) || desc.Monitor != native_monitor)
+          continue;
+        if (!std::isfinite(desc.MaxLuminance) || desc.MaxLuminance <= 0.0f)
+          return result;
+        result.max_luminance_nits = desc.MaxLuminance;
+        result.reported_luminance_known = true;
+        if (std::isfinite(desc.MaxFullFrameLuminance) && desc.MaxFullFrameLuminance > 0.0f &&
+            desc.MaxFullFrameLuminance <= desc.MaxLuminance)
+          result.max_full_frame_luminance_nits = desc.MaxFullFrameLuminance;
+        if (std::isfinite(desc.MinLuminance) && desc.MinLuminance >= 0.0f && desc.MinLuminance <= desc.MaxLuminance)
+          result.min_luminance_nits = desc.MinLuminance;
+        if (result.reference_white_known && result.sdr_white_nits > 0.0f) {
+          const float ratio = result.max_luminance_nits / result.sdr_white_nits;
+          if (std::isfinite(ratio)) {
+            result.hdr_headroom = std::max(1.0f, ratio);
+            result.hdr_headroom_estimated = true;
+          }
+        }
+        return result;
+      }
+    }
     return result;
   }
 #endif
@@ -102,7 +141,11 @@ void Window::RefreshDisplayBrightness() {
   if (previous.sdr_white_nits != next.sdr_white_nits ||
       previous.hdr_reference_white_scale != next.hdr_reference_white_scale ||
       previous.hdr_headroom != next.hdr_headroom || previous.reference_white_known != next.reference_white_known ||
-      previous.hdr_enabled != next.hdr_enabled)
+      previous.hdr_enabled != next.hdr_enabled || previous.max_luminance_nits != next.max_luminance_nits ||
+      previous.max_full_frame_luminance_nits != next.max_full_frame_luminance_nits ||
+      previous.min_luminance_nits != next.min_luminance_nits ||
+      previous.reported_luminance_known != next.reported_luminance_known ||
+      previous.hdr_headroom_estimated != next.hdr_headroom_estimated)
     display_brightness_event_.InvokeCallbacks(display_brightness_);
 }
 
@@ -401,6 +444,11 @@ void Window::PybindClassRegistration(py::classh<Window> &c) {
     result["hdr_headroom"] = info.hdr_headroom;
     result["reference_white_known"] = info.reference_white_known;
     result["hdr_enabled"] = info.hdr_enabled;
+    result["max_luminance_nits"] = info.max_luminance_nits;
+    result["max_full_frame_luminance_nits"] = info.max_full_frame_luminance_nits;
+    result["min_luminance_nits"] = info.min_luminance_nits;
+    result["reported_luminance_known"] = info.reported_luminance_known;
+    result["hdr_headroom_estimated"] = info.hdr_headroom_estimated;
     return result;
   });
   c.def("__repr__", [](Window *window) {
