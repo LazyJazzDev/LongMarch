@@ -2,7 +2,7 @@
 
 The manifest uses these ports rather than CMake-managed downloads.
 
-`shader-slang` now comes from the upstream git registry selected in
+`shader-slang` now comes from the upstream builtin registry selected in
 `vcpkg-configuration.json`, with a minimum of 2026.18.1. The default registry
 baseline currently selects 2026.18.2. There is no Slang overlay or exact-version
 requirement; CMake checks the installed SDK version and accepts newer external SDKs. See the NonUniform boundary-version report

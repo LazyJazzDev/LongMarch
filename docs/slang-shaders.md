@@ -19,8 +19,8 @@ As checked on 2026-09-26:
 The default `slang` manifest feature uses the upstream vcpkg `shader-slang`
 port, currently **2026.18.2** at the registry baseline. The project-specific
 2026.18.3 overlay is removed. `vcpkg-configuration.json` selects a reproducible
-upstream registry revision for Slang and retains the existing baseline for other
-ports. This snapshot selects a default package; it is not an exact SDK requirement.
+upstream registry revision shared by Slang and the other ports (updated on
+2026-09-27, including FreeType 2.14.3). This snapshot selects a default package; it is not an exact SDK requirement.
 Windows, Linux and macOS ARM64/x86-64 remain supplied by the same upstream port.
 
 The minimum supported compiler is **2026.18.1**, established by
