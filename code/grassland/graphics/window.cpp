@@ -252,7 +252,6 @@ Window::Window(int width, int height, const std::string &title, bool fullscreen,
   glfwSetFramebufferSizeCallback(window_, [](GLFWwindow *window, int width, int height) {
     auto *owner = static_cast<Window *>(glfwGetWindowUserPointer(window));
     owner->framebuffer_resize_event_.InvokeCallbacks(width, height);
-    owner->NotifyResize();
   });
   glfwSetCursorEnterCallback(window_, [](GLFWwindow *window, int entered) {
     auto *owner = static_cast<Window *>(glfwGetWindowUserPointer(window));
@@ -436,7 +435,10 @@ void Window::NotifyResize() {
 
 void Window::Resize(int new_width, int new_height) {
   glfwSetWindowSize(window_, new_width, new_height);
-  NotifyResize();
+  // GLFW's Wayland backend can omit the logical-size callback here.
+  // NotifyResize deduplicates against any native callback already delivered.
+  if (glfwGetPlatform() == GLFW_PLATFORM_WAYLAND)
+    NotifyResize();
 }
 
 void Window::CloseWindow() {
