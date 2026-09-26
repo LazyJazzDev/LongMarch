@@ -2,6 +2,9 @@
 
 日期：2026-09-26。关联 [DXC 调查](dxc-nonuniform-investigation.md)。
 
+完整的 17 种写法、五个版本、两个优化等级逐项结果与全部源码见
+[DXC / Slang 完整对比](nonuniform-compiler-comparison.md)。
+
 ## 结论与版本
 
 旧版 Slang 同样存在最终资源指针缺少 `NonUniform` 和缺少

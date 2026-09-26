@@ -2,6 +2,9 @@
 
 日期：2026-09-26。关联 [graphics 兼容性修复报告](graphics-vulkan-compatibility.md)。
 
+完整的 17 种写法、五个版本、两个优化等级逐项结果与全部源码见
+[DXC / Slang 完整对比](nonuniform-compiler-comparison.md)。
+
 ## 结论
 
 目前不能通过升级到已测试的最新官方发布版本来移除
