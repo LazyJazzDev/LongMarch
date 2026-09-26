@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """Stage shared mobile assets and SPIR-V into a HarmonyOS rawfile bundle.
 
-The iOS preparation tool records DXC's Vulkan 1.2 SPIR-V before converting it
-into MSL. Both backends issue the same DXC requests. Only hlsl-* cache entries
+The iOS preparation tool records Slang's Vulkan 1.2 SPIR-V before converting it
+into MSL. Both backends issue the same Slang requests. Only slang-* cache entries
 are portable; MSL is never shipped to HarmonyOS.
 """
 import argparse
@@ -22,7 +22,7 @@ def stage(source: Path, output: Path, fallback_renderer: Path | None = None):
     catalog = json.loads((source / 'catalog.json').read_text())
     if not catalog:
         raise ValueError('Scene catalog is empty')
-    shaders = sorted((source / 'shaders').glob('hlsl-*'))
+    shaders = sorted((source / 'shaders').glob('slang-*'))
     if not shaders:
         raise ValueError('No SPIR-V shaders; prepare the iOS resource bundle first')
     for shader in shaders:

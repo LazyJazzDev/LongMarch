@@ -8,7 +8,7 @@ and landscape are supported.
 ## Games
 
 Both games compile their **original desktop UI and renderer** from `demo/2048`
-and `demo/gol`: the same geometry, HLSL lighting, font outlines, supersampled
+and `demo/gol`: the same geometry, Slang lighting, font outlines, supersampled
 resolve, layouts, button states and transitions. They render directly to Metal;
 SwiftUI only supplies the native view container and navigation. The games have
 separate C++ namespaces so both can live in one app without duplicate symbols.
@@ -48,7 +48,7 @@ so inactive time is not simulated or applied to animations.
 ## Graphics Hello
 
 Triangle, Texture, Blend, Cube, Resize, SDR Sample, HDR and Ray Query reuse the
-current `demo/graphics_hello/modules` HLSL. Ray Query displays the rotating triangle
+current `demo/graphics_hello/modules` Slang. Ray Query displays the rotating triangle
 and procedural sphere and requires device ray-query support. The HDR module uses
 a floating-point EDR Metal drawable, a 0–3 linear gradient, reference white and an
 HDR/SDR toggle. Unsupported full RT pipeline modules (Ray Tracing, External Shader,
@@ -111,37 +111,40 @@ unchanged. Large scenes can still exceed a device's memory budget.
 - Full Xcode with iOS SDK, macOS on Apple Silicon for resource preparation.
 - iOS 18+ and a Metal device supporting tier-2 argument buffers and unified memory.
   Sparkium additionally requires ray queries; graphics/NBody do not. The simulator supports the raster/compute game path; ray-query support is checked separately.
-- CMake 3.25+, Ninja, Python 3, the existing project DXC and SPIRV-Cross installation.
-  DXC and SPIRV-Cross are used **only on the Mac**, and are not linked into the app.
+- CMake 3.25+, Ninja, Python 3, the existing project Slang and SPIRV-Cross installation.
+  Slang and SPIRV-Cross are used **only on the Mac**, and are not linked into the app.
 - Pillow for resizing textures during packaging: `python3 -m pip install -r platforms/ios/requirements.txt`.
 - Material edits or shader edits require regenerating the resource bundle.
 
 ## Build
 
 Run from the repository root. Initialize `assets` and fetch its LFS objects first.
-Obtain the portable dependency headers using the small manifest in this directory:
+Install the shared host dependencies once (Slang 2026.18.3, metal-cpp,
+portable headers, and FreeType/MikkTSpace sources):
 
 ```sh
-/path/to/vcpkg/vcpkg install --x-manifest-root=platforms/ios \
-  --x-install-root=out/ios/deps --triplet=arm64-osx
+/path/to/vcpkg/vcpkg install --x-manifest-root=platforms/mobile \
+  --x-install-root=out/mobile/deps --triplet=arm64-osx
 ```
 
-You can also reuse an existing LongMarch vcpkg include directory. No host dependency
-libraries are linked: fmt is header-only and MikkTSpace is compiled from its pinned
-source. CMake fetches the pinned official metal-cpp headers.
+Both mobile projects discover this installation automatically. CMake never downloads
+SDKs or third-party sources. FreeType and MikkTSpace are compiled with the target
+SDK; no macOS library is linked into an iOS/HarmonyOS app. `LONGMARCH_MOBILE_DEPS`
+can select a nondefault installation; normal builds need no dependency path flags.
+The Slang library requires macOS 26+ on Apple Silicon. An external Slang SDK can be
+selected with `slang_DIR`; mobile preparation requires exactly 2026.18.3 so offline
+cache identities stay consistent.
 
 ```sh
 cmake -S platforms/ios -B build-ios-prepare -G Ninja \
-  -DCMAKE_BUILD_TYPE=Release -DSPARKIUM_PREPARE=ON -DSPARKIUM_APP=OFF \
-  -DSPARKIUM_HEADERS="$PWD/out/ios/deps/arm64-osx/include"
+  -DCMAKE_BUILD_TYPE=Release -DSPARKIUM_PREPARE=ON -DSPARKIUM_APP=OFF
 cmake --build build-ios-prepare
 python3 platforms/ios/prepare_resources.py \
   --renderer build-ios-prepare/sparkium_mobile_check
 
 cmake -S platforms/ios -B build-ios-device-ninja -G Ninja \
   -DCMAKE_BUILD_TYPE=Release -DCMAKE_SYSTEM_NAME=iOS -DCMAKE_OSX_SYSROOT=iphoneos \
-  -DCMAKE_OSX_ARCHITECTURES=arm64 -DCMAKE_OSX_DEPLOYMENT_TARGET=18.0 \
-  -DSPARKIUM_HEADERS="$PWD/out/ios/deps/arm64-osx/include"
+  -DCMAKE_OSX_ARCHITECTURES=arm64 -DCMAKE_OSX_DEPLOYMENT_TARGET=18.0
 cmake --build build-ios-device-ninja
 ```
 
@@ -172,15 +175,16 @@ packaged files, and shader preparation renders those same files.
 ## Shader architecture
 
 The Mac preparation tool loads and renders each bundled scene through the same
-`RenderSession` used by the app. It records HLSL → SPIR-V and SPIR-V → iOS MSL
+`RenderSession` used by the app. It records Slang → SPIR-V and SPIR-V → iOS MSL
 (including entry point, argument-buffer slots and thread-group size). Scene entity
 registration follows insertion order so generated material code and bindings are
 stable across processes and platforms.
 
-The mobile build embeds the HLSL VFS to reproduce shader request keys but never
-runs DXC or SPIRV-Cross. It loads the recorded shader and compiles its MSL using
+The mobile build embeds the Slang VFS to reproduce shader request keys but never
+runs Slang or SPIRV-Cross. It loads the recorded shader and compiles its MSL using
 Metal's runtime compiler. This retains first-use Metal compilation cost. Shader
-keys include all VFS file contents and compiler arguments; MSL keys also include
+keys use a Slang-specific, versioned namespace (old DXC bundles must be regenerated)
+and include all VFS file contents and compiler arguments; MSL keys also include
 SPIR-V, platform and resource bindings. Cache files carry SHA-256 integrity hashes.
 Missing/stale/corrupt entries produce a visible error. The app never writes into
 its signed resource bundle.
@@ -194,12 +198,12 @@ python3 -m unittest discover -s platforms/ios/tests -p 'test_texture_assets.py'
 ```
 
 Build a macOS replay executable with `SPARKIUM_PREPARE=OFF` and `SPARKIUM_APP=OFF`,
-then render from the prepared bundle. This executable has the same no-DXC/no-SPIRV-Cross
+then render from the prepared bundle. This executable has the same no-Slang/no-SPIRV-Cross
 configuration as iOS:
 
 ```sh
 cmake -S platforms/ios -B build-ios-replay -G Ninja -DCMAKE_BUILD_TYPE=Release \
-  -DSPARKIUM_APP=OFF -DSPARKIUM_HEADERS="$PWD/out/ios/deps/arm64-osx/include"
+  -DSPARKIUM_APP=OFF
 cmake --build build-ios-replay
 build-ios-replay/sparkium_mobile_check out/ios/Resources cornell_box out/ios/cornell.png replay 256 32
 ```

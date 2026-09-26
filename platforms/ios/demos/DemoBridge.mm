@@ -101,7 +101,7 @@
              "constexpr sampler s(coord::normalized,address::clamp_to_edge,filter::linear);"
              "float3 rgb=max(image.sample(s,v.uv).rgb,float3(0));"
              "if(settings.x) rgb=min(rgb,float3(1));"
-             // Match desktop NBody's hdr.hlsl. Its accumulated particle colors
+             // Match desktop NBody's hdr.slang. Its accumulated particle colors
              // are display-encoded; the EDR surface expects linear light.
              "if(settings.y) rgb=pow(rgb,float3(2.2));"
              "return float4(min(rgb,float3(65504)),1);}";

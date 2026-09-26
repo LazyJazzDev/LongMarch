@@ -173,7 +173,7 @@ std::unique_ptr<Buffer> DemoSession::Buffer(const void *data, size_t size) {
 void DemoSession::InitializeRaster() {
   auto vfs = GetShaderVirtualFileSystem();
   auto shader =
-      "graphics_hello/modules/" + demo_.substr(std::string("graphics_hello_").size()) + "/shaders/shader.hlsl";
+      "graphics_hello/modules/" + demo_.substr(std::string("graphics_hello_").size()) + "/shaders/shader.slang";
   core_->CreateShader(vfs, shader, "VSMain", "vs_6_0", &vertex_);
   core_->CreateShader(vfs, shader, "PSMain", "ps_6_0", &fragment_);
   bool texture = demo_ == "graphics_hello_texture",
@@ -250,15 +250,15 @@ void DemoSession::InitializeRaster() {
 
 void DemoSession::InitializeNBody() {
   auto vfs = GetShaderVirtualFileSystem();
-  core_->CreateShader(vfs, "nbody_cs/shaders/nbody.hlsl", "CSMain", "cs_6_0", &compute_);
+  core_->CreateShader(vfs, "nbody_cs/shaders/nbody.slang", "CSMain", "cs_6_0", &compute_);
   core_->CreateComputeProgram(compute_.get(), &compute_program_);
   compute_program_->AddResourceBinding(RESOURCE_TYPE_STORAGE_BUFFER, 1);
   compute_program_->AddResourceBinding(RESOURCE_TYPE_WRITABLE_STORAGE_BUFFER, 1);
   compute_program_->AddResourceBinding(RESOURCE_TYPE_WRITABLE_STORAGE_BUFFER, 1);
   compute_program_->AddResourceBinding(RESOURCE_TYPE_UNIFORM_BUFFER, 1);
   compute_program_->Finalize();
-  core_->CreateShader(vfs, "nbody_cs/shaders/particle.hlsl", "VSMain", "vs_6_0", &vertex_);
-  core_->CreateShader(vfs, "nbody_cs/shaders/particle.hlsl", "PSMain", "ps_6_0", &fragment_);
+  core_->CreateShader(vfs, "nbody_cs/shaders/particle.slang", "VSMain", "vs_6_0", &vertex_);
+  core_->CreateShader(vfs, "nbody_cs/shaders/particle.slang", "PSMain", "ps_6_0", &fragment_);
   core_->CreateProgram({color_->Format()}, IMAGE_FORMAT_UNDEFINED, &program_);
   program_->SetBlendState(0, BlendState(BLEND_FACTOR_ONE, BLEND_FACTOR_ONE, BLEND_OP_ADD, BLEND_FACTOR_ONE,
                                         BLEND_FACTOR_ONE_MINUS_SRC_ALPHA, BLEND_OP_ADD));
@@ -453,7 +453,7 @@ void DemoSession::InitializeRayQuery() {
 
   core_->CreateImage(width_, height_, grassland::graphics::IMAGE_FORMAT_R32G32B32A32_SFLOAT, &color_);
 
-  core_->CreateShader(GetShaderVirtualFileSystem(), "graphics_hello/modules/ray_query/shaders/shader.hlsl", "CSMain",
+  core_->CreateShader(GetShaderVirtualFileSystem(), "graphics_hello/modules/ray_query/shaders/shader.slang", "CSMain",
                       "cs_6_5", &compute_);
 
   core_->CreateBottomLevelAccelerationStructure(vertices_.get(), indices_.get(), sizeof(glm::vec3), &triangle_blas_);

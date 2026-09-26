@@ -21,7 +21,7 @@ class ResourceTests(unittest.TestCase):
         (source / 'assets' / 'sample.txt').write_text('asset data')
         payload = bytes.fromhex('03022307') + b'\x00' * 16
         digest = hashlib.sha256(str(len(payload)).encode() + b':' + payload).hexdigest().encode()
-        (source / 'shaders' / 'hlsl-test').write_bytes(digest + payload)
+        (source / 'shaders' / 'slang-test').write_bytes(digest + payload)
         (source / 'shaders' / 'msl-test').write_text('Metal only')
         return source
 
@@ -39,11 +39,20 @@ class ResourceTests(unittest.TestCase):
             with self.assertRaises(ValueError):
                 MODULE.stage(source, output)
 
+    def test_legacy_dxc_bundle_is_rejected(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            source = self.fixture(root)
+            (source / 'shaders' / 'slang-test').rename(source / 'shaders' / 'hlsl-test')
+            with self.assertRaisesRegex(ValueError, 'No SPIR-V shaders'):
+                MODULE.stage(source, root / 'output')
+            self.assertFalse((root / 'output').exists())
+
     def test_corrupt_shader_cannot_be_packaged(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
             source = self.fixture(root)
-            with (source / 'shaders' / 'hlsl-test').open('ab') as stream:
+            with (source / 'shaders' / 'slang-test').open('ab') as stream:
                 stream.write(b'corruption')
             with self.assertRaisesRegex(ValueError, 'Invalid SPIR-V'):
                 MODULE.stage(source, root / 'output')

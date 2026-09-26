@@ -1,0 +1,30 @@
+{
+  "name": "longmarch-mobile-host-dependencies",
+  "version-string": "1.0.0",
+  "dependencies": [
+    "eigen3",
+    "fmt",
+    "glfw3",
+    "glm",
+    "longmarch-mobile-sources",
+    {
+      "name": "metal-cpp",
+      "platform": "osx"
+    },
+    "rapidjson",
+    "stb",
+    "tinyobjloader",
+    "vulkan-memory-allocator"
+  ],
+  "default-features": [
+    "slang"
+  ],
+  "features": {
+    "slang": {
+      "description": "Supply the host shader compiler through vcpkg (disable for an external SDK).",
+      "dependencies": [
+        "shader-slang"
+      ]
+    }
+  }
+}

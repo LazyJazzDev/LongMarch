@@ -2,7 +2,7 @@ cmake_minimum_required(VERSION 3.25)
 project(LongMarch LANGUAGES C CXX OBJCXX)
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_OBJCXX_STANDARD 17)
-option(SPARKIUM_PREPARE "Build macOS shader preparation tool (requires DXC and SPIRV-Cross)" OFF)
+option(SPARKIUM_PREPARE "Build macOS shader preparation tool (requires Slang and SPIRV-Cross)" OFF)
 option(SPARKIUM_APP "Build native SwiftUI application" ON)
 set(SPARKIUM_HEADERS "" CACHE PATH "Portable dependency headers (vcpkg installed/<triplet>/include)")
 set(SPARKIUM_RESOURCES "${CMAKE_CURRENT_SOURCE_DIR}/../../out/ios/Resources" CACHE PATH "Prepared resource bundle")
@@ -13,11 +13,10 @@ if(SPARKIUM_PREPARE AND CMAKE_SYSTEM_NAME STREQUAL "iOS")
   message(FATAL_ERROR "Run shader preparation on macOS")
 endif()
 get_filename_component(ROOT "${CMAKE_CURRENT_SOURCE_DIR}/../.." ABSOLUTE)
-include(FetchContent)
-FetchContent_Declare(metal_cpp URL https://developer.apple.com/metal/cpp/files/metal-cpp_macOS15_iOS18.zip
-  URL_HASH SHA256=0433df1e0ab13c2b0becbd78665071e3fa28381e9714a3fce28a497892b8a184 DOWNLOAD_EXTRACT_TIMESTAMP TRUE)
-FetchContent_Declare(mikktspace URL https://github.com/mmikk/MikkTSpace/archive/3e895b49d05ea07e4c2133156cfa94369e19e409.tar.gz DOWNLOAD_EXTRACT_TIMESTAMP TRUE)
-FetchContent_MakeAvailable(metal_cpp mikktspace)
+include("${ROOT}/platforms/mobile/Dependencies.cmake")
+if(NOT SPARKIUM_HEADERS)
+  set(SPARKIUM_HEADERS "${LONGMARCH_MOBILE_HEADERS}")
+endif()
 if(NOT EXISTS "${SPARKIUM_HEADERS}/fmt/format.h" OR NOT EXISTS "${SPARKIUM_HEADERS}/eigen3/Eigen/Core")
   message(FATAL_ERROR "Set SPARKIUM_HEADERS to headers installed using platforms/ios/vcpkg.json")
 endif()
@@ -40,19 +39,19 @@ add_library(mobile_demos STATIC demos/DemoSession.cpp games/DesktopGameSession.c
 target_link_libraries(mobile_demos PUBLIC sparkium_mobile ios_gol_ui ios_2048_ui)
 target_include_directories(mobile_demos PRIVATE "${ROOT}/demo/gol/game_of_life_lib" "${ROOT}/demo/2048" "${ROOT}/demo/gol")
 find_package(Python3 REQUIRED COMPONENTS Interpreter)
-# Generate embedded HLSL on the host, without executing a cross-compiled helper.
+# Generate embedded Slang on the host, without executing a cross-compiled helper.
 foreach(pair "grassland/graphics" "sparkium/shaders")
   string(REPLACE "/" "_" name "${pair}")
   set(generated "${CMAKE_CURRENT_BINARY_DIR}/${name}")
   file(MAKE_DIRECTORY "${generated}")
-  file(GLOB_RECURSE shaders CONFIGURE_DEPENDS "${ROOT}/code/${pair}/*.hlsl" "${ROOT}/code/${pair}/*.hlsli")
+  file(GLOB_RECURSE shaders CONFIGURE_DEPENDS "${ROOT}/code/${pair}/*.slang")
   add_custom_command(OUTPUT "${generated}/built_in_shaders.inl"
     COMMAND "${Python3_EXECUTABLE}" "${CMAKE_CURRENT_SOURCE_DIR}/embed_shaders.py"
       "${ROOT}/code/${pair}" "${generated}/built_in_shaders.inl"
     DEPENDS ${shaders} embed_shaders.py VERBATIM)
   target_sources(sparkium_mobile PRIVATE "${generated}/built_in_shaders.inl")
 endforeach()
-file(GLOB_RECURSE demo_shaders CONFIGURE_DEPENDS "${ROOT}/demo/*.hlsl" "${ROOT}/demo/*.hlsli")
+file(GLOB_RECURSE demo_shaders CONFIGURE_DEPENDS "${ROOT}/demo/*.slang")
 add_custom_command(OUTPUT "${CMAKE_CURRENT_BINARY_DIR}/demo_shaders.inl"
   COMMAND "${Python3_EXECUTABLE}" "${CMAKE_CURRENT_SOURCE_DIR}/embed_shaders.py"
     "${ROOT}/demo" "${CMAKE_CURRENT_BINARY_DIR}/demo_shaders.inl"
@@ -65,11 +64,9 @@ set_source_files_properties("${ROOT}/code/grassland/graphics/shader.cpp" PROPERT
 file(GLOB_RECURSE spark_sources "${ROOT}/code/sparkium/*.cpp")
 set_source_files_properties(${spark_sources} PROPERTIES INCLUDE_DIRECTORIES "${CMAKE_CURRENT_BINARY_DIR}/sparkium_shaders")
 if(SPARKIUM_PREPARE)
-  find_path(DXC_INCLUDE_DIR dxc/dxcapi.h HINTS /usr/local/include REQUIRED)
-  find_library(DXC_LIBRARY dxcompiler HINTS /usr/local/lib REQUIRED)
+  longmarch_mobile_compiler(sparkium_mobile)
   find_path(SPIRV_CROSS_INCLUDE_DIR spirv_cross/spirv_msl.hpp HINTS /usr/local/include REQUIRED)
-  target_include_directories(sparkium_mobile PRIVATE "${DXC_INCLUDE_DIR}" "${SPIRV_CROSS_INCLUDE_DIR}")
-  target_link_libraries(sparkium_mobile PUBLIC "${DXC_LIBRARY}")
+  target_include_directories(sparkium_mobile PRIVATE "${SPIRV_CROSS_INCLUDE_DIR}")
   foreach(part msl glsl core)
     find_library(SPIRV_CROSS_${part} spirv-cross-${part} HINTS /usr/local/lib REQUIRED)
     target_link_libraries(sparkium_mobile PUBLIC "${SPIRV_CROSS_${part}}")
@@ -153,14 +150,8 @@ if(SPARKIUM_APP AND CMAKE_GENERATOR STREQUAL "Ninja")
     VERBATIM)
 endif()
 
-# Compile the actual desktop UI, geometry, animation and HLSL for native hosts.
+# Compile the actual desktop UI, geometry, animation and Slang for native hosts.
 # Game namespaces allow both original applications in one executable.
-set(FT_DISABLE_HARFBUZZ ON CACHE BOOL "" FORCE)
-set(FT_DISABLE_PNG ON CACHE BOOL "" FORCE)
-set(FT_DISABLE_BZIP2 ON CACHE BOOL "" FORCE)
-set(FT_DISABLE_BROTLI ON CACHE BOOL "" FORCE)
-FetchContent_Declare(freetype URL https://download.savannah.gnu.org/releases/freetype/freetype-2.13.3.tar.xz URL_HASH SHA256=0550350666d427c74daeb85d5ac7bb353acba5f76956395995311a9c6f063289 DOWNLOAD_EXTRACT_TIMESTAMP TRUE)
-FetchContent_MakeAvailable(freetype)
 foreach(game gol 2048)
   file(GLOB_RECURSE game_sources CONFIGURE_DEPENDS "${ROOT}/demo/${game}/*.cpp")
   list(FILTER game_sources EXCLUDE REGEX "/(main|ai_player|ai_benchmark|game_rules)\\.cpp$|/[^/]*_lib/")
@@ -170,7 +161,7 @@ foreach(game gol 2048)
   target_compile_definitions(ios_${game}_ui PRIVATE LONGMARCH_HOSTED_GAMES GLFW_INCLUDE_NONE)
   set(game_generated "${CMAKE_CURRENT_BINARY_DIR}/game_${game}")
   file(MAKE_DIRECTORY "${game_generated}")
-  file(GLOB_RECURSE game_shaders CONFIGURE_DEPENDS "${ROOT}/demo/${game}/*.hlsl")
+  file(GLOB_RECURSE game_shaders CONFIGURE_DEPENDS "${ROOT}/demo/${game}/*.slang")
   add_custom_command(OUTPUT "${game_generated}/built_in_shaders.inl"
     COMMAND "${Python3_EXECUTABLE}" "${CMAKE_CURRENT_SOURCE_DIR}/embed_shaders.py"
       "${ROOT}/demo/${game}" "${game_generated}/built_in_shaders.inl"
