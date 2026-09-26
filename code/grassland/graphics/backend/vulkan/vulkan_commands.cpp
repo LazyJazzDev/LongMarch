@@ -75,7 +75,7 @@ VulkanCmdBeginRendering::VulkanCmdBeginRendering(const std::vector<VulkanImage *
 void VulkanCmdBeginRendering::CompileCommand(VulkanCommandContext *context, VkCommandBuffer command_buffer) {
   for (auto &image : resource_images_) {
     context->RequireImageState(command_buffer, image->Image()->Handle(), VK_IMAGE_LAYOUT_GENERAL,
-                               VK_PIPELINE_STAGE_ALL_GRAPHICS_BIT,
+                               VK_PIPELINE_STAGE_ALL_COMMANDS_BIT,
                                VK_ACCESS_MEMORY_READ_BIT | VK_ACCESS_MEMORY_WRITE_BIT, image->Image()->Aspect());
   }
 
@@ -88,7 +88,8 @@ void VulkanCmdBeginRendering::CompileCommand(VulkanCommandContext *context, VkCo
     auto &color_target = color_targets_[i];
     context->RequireImageState(command_buffer, color_target->Image()->Handle(),
                                VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
-                               VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT, color_target->Image()->Aspect());
+                               VK_ACCESS_COLOR_ATTACHMENT_READ_BIT | VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT,
+                               color_target->Image()->Aspect());
 
     VkRenderingAttachmentInfo attachment_info{};
     attachment_info.sType = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO;
@@ -112,10 +113,11 @@ void VulkanCmdBeginRendering::CompileCommand(VulkanCommandContext *context, VkCo
   rendering_info.renderArea.offset = {0, 0};
   rendering_info.layerCount = 1;
   if (depth_target_) {
-    context->RequireImageState(command_buffer, depth_target_->Image()->Handle(),
-                               VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL,
-                               VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT, VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT,
-                               depth_target_->Image()->Aspect());
+    context->RequireImageState(
+        command_buffer, depth_target_->Image()->Handle(), VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL,
+        VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT | VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT,
+        VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_READ_BIT | VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT,
+        depth_target_->Image()->Aspect());
     depth_attachment_info.sType = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO;
     depth_attachment_info.pNext = nullptr;
     depth_attachment_info.imageView = depth_target_->Image()->ImageView();
@@ -195,7 +197,7 @@ void VulkanCmdBindResourceImages::CompileCommand(VulkanCommandContext *context, 
     image_infos[i].imageLayout = VK_IMAGE_LAYOUT_GENERAL;
     if (update_layout_) {
       context->RequireImageState(command_buffer, images_[i]->Image()->Handle(), VK_IMAGE_LAYOUT_GENERAL,
-                                 VK_PIPELINE_STAGE_ALL_GRAPHICS_BIT,
+                                 VK_PIPELINE_STAGE_ALL_COMMANDS_BIT,
                                  VK_ACCESS_MEMORY_READ_BIT | VK_ACCESS_MEMORY_WRITE_BIT, images_[i]->Image()->Aspect());
     }
   }
