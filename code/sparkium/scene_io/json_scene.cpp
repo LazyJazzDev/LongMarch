@@ -17,6 +17,23 @@
 #include "sparkium/core/core.h"
 
 namespace sparkium {
+
+bool JsonScene::ResizeFilm(int width, int height) {
+  if (width <= 0 || height <= 0)
+    throw std::invalid_argument("film dimensions must be positive");
+  if (width == film_->GetWidth() && height == film_->GetHeight())
+    return false;
+  core_->GraphicsCore()->WaitGPU();
+  auto next = std::make_unique<Film>(core_, width, height);
+  next->info = film_->info;
+  next->info.accumulated_samples = 0;
+  // Replace the Film rather than only its images: pipeline-specific components
+  // own accumulation and G-buffer images at the old resolution too.
+  film_ = std::move(next);
+  camera_->aspect = static_cast<float>(width) / height;
+  return true;
+}
+
 namespace {
 using Value = rapidjson::Value;
 
