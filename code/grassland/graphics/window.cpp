@@ -147,7 +147,7 @@ float Window::HDRReferenceWhiteScale() {
 }
 
 Image *Window::PrepareHDRComposition(Core *core, Extent2D extent) {
-  if (!enable_hdr_ || !align_hdr_brightness_)
+  if (!enable_hdr_ || (!align_hdr_brightness_ && !UsesPQOutput()))
     return nullptr;
   if (!hdr_presentation_) {
     auto pending = std::make_unique<HDRPresentation>();
@@ -156,13 +156,28 @@ Image *Window::PrepareHDRComposition(Core *core, Extent2D extent) {
     const char *source = R"(
 Texture2D<float4> source_image : register(t0, space0);
 [[vk::image_format("rgba16f")]] RWTexture2D<float4> output_image : register(u0, space1);
-cbuffer Settings : register(b0, space2) { float white_scale; float3 padding; };
+cbuffer Settings : register(b0, space2) { float white_scale; float pq_output; float white_nits; float padding; };
+float3 EncodePQ(float3 nits) {
+  float3 p = pow(saturate(nits / 10000.0), 2610.0 / 16384.0);
+  return pow((3424.0 / 4096.0 + (2413.0 / 128.0) * p) /
+             (1.0 + (2392.0 / 128.0) * p), 2523.0 / 32.0);
+}
 [numthreads(8,8,1)] void Main(uint3 id : SV_DispatchThreadID) {
   uint width, height;
   output_image.GetDimensions(width, height);
   if (id.x >= width || id.y >= height) return;
   float4 color = source_image.Load(int3(id.xy, 0));
-  output_image[id.xy] = float4(min(max(color.rgb, 0.0) * white_scale, 65504.0), color.a);
+  float3 rgb = max(color.rgb, 0.0);
+  if (pq_output != 0.0) {
+    // Linear BT.709/D65 to BT.2020/D65, then absolute-luminance ST 2084.
+    rgb = mul(float3x3(0.627404, 0.329283, 0.043313,
+                       0.069097, 0.919540, 0.011362,
+                       0.016391, 0.088013, 0.895595), rgb);
+    rgb = EncodePQ(rgb * white_nits);
+  } else {
+    rgb = min(rgb * white_scale, 65504.0);
+  }
+  output_image[id.xy] = float4(rgb, color.a);
 }
 )";
     if (core->CreateShader(source, "Main", "cs_6_0", &p.shader) ||
@@ -192,7 +207,9 @@ Image *Window::AlignHDRComposition(CommandContext *commands) {
   if (!hdr_presentation_ || !hdr_presentation_->composition)
     throw std::logic_error("Prepare HDR composition before aligning it");
   auto &p = *hdr_presentation_;
-  const float settings[4] = {HDRReferenceWhiteScale(), 0, 0, 0};
+  // PQ content reference white matches the WSI color-description default.
+  // Output reference white is mapped by the compositor, not applied here.
+  const float settings[4] = {HDRReferenceWhiteScale(), UsesPQOutput() ? 1.0f : 0.0f, 203.0f, 0};
   p.settings->UploadData(settings, sizeof(settings));
   commands->CmdBindComputeProgram(p.program.get());
   commands->CmdBindResources(0, {p.composition.get()}, BIND_POINT_COMPUTE);
@@ -202,22 +219,10 @@ Image *Window::AlignHDRComposition(CommandContext *commands) {
   return p.aligned.get();
 }
 
-namespace {
-bool glfw_initialized_{false};
-
-void InitializeGLFW() {
-  if (!glfw_initialized_) {
-    if (!glfwInit()) {
-      throw std::runtime_error("Failed to initialize GLFW");
-    }
-    glfw_initialized_ = true;
-  }
-}
-}  // namespace
-
 Window::Window(int width, int height, const std::string &title, bool fullscreen, bool resizable, bool enable_hdr)
     : enable_hdr_(enable_hdr) {
-  InitializeGLFW();
+  if (!Core::InitializeGLFW())
+    throw std::runtime_error("Failed to initialize GLFW");
 
   glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
   if (fullscreen) {
@@ -242,6 +247,7 @@ Window::Window(int width, int height, const std::string &title, bool fullscreen,
 #ifdef __APPLE__
   magnify_monitor_ = detail::InstallMagnifyEvents(this);
 #endif
+  resize_size_ = GetSize();
   glfwSetWindowUserPointer(window_, this);
   glfwSetFramebufferSizeCallback(window_, [](GLFWwindow *window, int width, int height) {
     auto *owner = static_cast<Window *>(glfwGetWindowUserPointer(window));
@@ -257,7 +263,7 @@ Window::Window(int width, int height, const std::string &title, bool fullscreen,
   });
   glfwSetWindowSizeCallback(window_, [](GLFWwindow *window, int width, int height) {
     Window *p_window = static_cast<Window *>(glfwGetWindowUserPointer(window));
-    p_window->resize_event_.InvokeCallbacks(width, height);
+    p_window->NotifyResize();
   });
   glfwSetMouseButtonCallback(window_, [](GLFWwindow *window, int button, int action, int mods) {
     Window *p_window = static_cast<Window *>(glfwGetWindowUserPointer(window));
@@ -342,22 +348,41 @@ void Window::RequestClose() {
 }
 
 glm::ivec2 Window::GetPosition() const {
-  glm::ivec2 position;
+  // Wayland intentionally does not expose global window coordinates.
+#if defined(__linux__) && defined(GLFW_PLATFORM)
+  if (glfwGetPlatform() == GLFW_PLATFORM_WAYLAND)
+    return {0, 0};
+#endif
+  glm::ivec2 position{};
   glfwGetWindowPos(window_, &position.x, &position.y);
   return position;
 }
 
 void Window::SetPosition(int x, int y) {
+#if defined(__linux__) && defined(GLFW_PLATFORM)
+  if (glfwGetPlatform() == GLFW_PLATFORM_WAYLAND)
+    return;
+#endif
   glfwSetWindowPos(window_, x, y);
 }
 
 glm::ivec4 Window::GetFrameSize() const {
-  glm::ivec4 frame;
+  glm::ivec4 frame{};
   glfwGetWindowFrameSize(window_, &frame.x, &frame.y, &frame.z, &frame.w);
   return frame;
 }
 
 glm::ivec4 Window::GetMonitorWorkArea() const {
+#if defined(__linux__) && defined(GLFW_PLATFORM)
+  if (glfwGetPlatform() == GLFW_PLATFORM_WAYLAND) {
+    // GLFW cannot locate an ordinary Wayland window in global coordinates.
+    // Use the primary output only as a sizing hint; let the compositor place it.
+    glm::ivec4 area{0, 0, GetWidth(), GetHeight()};
+    if (auto *monitor = glfwGetPrimaryMonitor())
+      glfwGetMonitorWorkarea(monitor, &area.x, &area.y, &area.z, &area.w);
+    return area;
+  }
+#endif
   const auto position = GetPosition();
   const auto size = GetSize();
   int count = 0;
@@ -395,8 +420,25 @@ std::string Window::GetTitle() const {
   return glfwGetWindowTitle(window_);
 }
 
+void Window::NotifyResize() {
+  if (!window_)
+    return;
+  const auto size = GetSize();
+  if (size == resize_size_)
+    return;
+  // Wayland programmatic resizing may omit the logical-size callback.
+  // Deduplicate both native callbacks and Resize() by logical size; pixel-only
+  // scaling remains exclusively a FramebufferResizeEvent.
+  resize_size_ = size;
+  resize_event_.InvokeCallbacks(size.x, size.y);
+}
+
 void Window::Resize(int new_width, int new_height) {
   glfwSetWindowSize(window_, new_width, new_height);
+  // GLFW's Wayland backend can omit the logical-size callback here.
+  // NotifyResize deduplicates against any native callback already delivered.
+  if (glfwGetPlatform() == GLFW_PLATFORM_WAYLAND)
+    NotifyResize();
 }
 
 void Window::CloseWindow() {
@@ -413,10 +455,20 @@ bool Window::ShouldClose() const {
   return glfwWindowShouldClose(window_);
 }
 
-void Window::SetHDR(bool enable_hdr) {
-  enable_hdr_ = enable_hdr;
-  RefreshDisplayBrightness();
-  resize_event_.InvokeCallbacks(GetWidth(), GetHeight());
+int Window::SetHDR(bool enable_hdr) {
+  if (!window_)
+    return -1;
+  const bool previous = enable_hdr_;
+  try {
+    enable_hdr_ = enable_hdr;
+    RefreshDisplayBrightness();
+    resize_event_.InvokeCallbacks(GetWidth(), GetHeight());
+    return 0;
+  } catch (const std::exception &error) {
+    enable_hdr_ = previous;
+    LogError("Failed to change HDR presentation: {}", error.what());
+    return -1;
+  }
 }
 
 #if defined(LONGMARCH_PYTHON_ENABLED)

@@ -82,7 +82,9 @@ class Window {
 
   bool ShouldClose() const;
 
-  virtual void SetHDR(bool enable_hdr);
+  // Request an application presentation mode (not the desktop HDR setting).
+  // Returns 0 on success, nonzero on failure; details are logged.
+  virtual int SetHDR(bool enable_hdr);
 
   // Main-thread query, refreshed at most every 500 ms, including monitor changes.
   DisplayBrightness GetDisplayBrightness();
@@ -162,6 +164,9 @@ class Window {
   }
 
  private:
+  void NotifyResize();
+  glm::ivec2 resize_size_{};  // Last notified logical window size.
+
   struct HDRPresentation;
   std::unique_ptr<HDRPresentation> hdr_presentation_;
   DisplayBrightness display_brightness_{};
@@ -184,6 +189,11 @@ class Window {
   EventManager<void(int, const char **)> drop_event_;
 
  protected:
+  // Presentation encoding is selected by the backend, never by callers.
+  virtual bool UsesPQOutput() const {
+    return false;
+  }
+
   virtual DisplayBrightness QueryDisplayBrightness() const;
   bool enable_hdr_;
 

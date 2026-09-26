@@ -121,11 +121,18 @@ int main(int argc, char **argv) {
     ResizeWindowForFilm(window.get(), loaded->GetFilm());
     resize_pending = false;
     if (hdr_requested) {
-      window->SetHDR(true);
-      hdr_active = true;
-      create_display_image();
+      if (window->SetHDR(true) == 0) {
+        hdr_active = true;
+        create_display_image();
+      } else {
+        hdr_error = "Requested HDR presentation mode is unavailable; see the application log.";
+        hdr_requested = false;
+        std::cerr << "HDR unavailable; continuing in SDR: " << hdr_error << '\n';
+      }
     }
+
     window->InitImGui(nullptr, 18.0f);
+    std::cout << "Display: " << (hdr_active ? "HDR" : "SDR") << std::endl;
     FPSCounter fps_counter;
     bool show_browser = true;
 
@@ -133,16 +140,16 @@ int main(int argc, char **argv) {
     while (!window->ShouldClose() && (!frame_limit || rendered_frames++ < frame_limit)) {
       // Apply before BeginImGuiFrame so ImGui and presentation use the same format.
       if (hdr_requested != hdr_active) {
-        try {
-          window->SetHDR(hdr_requested);
+        if (window->SetHDR(hdr_requested) == 0) {
           hdr_active = hdr_requested;
           hdr_error.clear();
           create_display_image();
-        } catch (const std::exception &error) {
-          hdr_error = error.what();
+        } else {
+          hdr_error = "Could not change HDR presentation; see the application log.";
           hdr_requested = hdr_active;
         }
       }
+
       window->BeginImGuiFrame();
       ImGui::SetNextWindowPos({10, 10}, ImGuiCond_Once);
       ImGui::SetNextWindowBgAlpha(hdr_active ? 1.0f : 0.85f);
@@ -194,14 +201,14 @@ int main(int argc, char **argv) {
       if (!hdr_error.empty())
         ImGui::TextWrapped("HDR unavailable: %s", hdr_error.c_str());
       ImGui::SliderFloat("Exposure (EV)", &loaded->GetFilm()->info.exposure, -8.0f, 8.0f, "%.2f");
-      ImGui::TextUnformatted(hdr_active ? "Display: HDR (linear)" : "Display: SDR (scene view transform)");
+      ImGui::TextUnformatted(hdr_active ? "Display: HDR" : "Display: SDR (scene view transform)");
       if (hdr_active) {
         const auto brightness = window->GetDisplayBrightness();
         if (brightness.sdr_white_nits > 0.0f)
           ImGui::Text("Reference white: %.0f nits (%.2fx)", brightness.sdr_white_nits,
                       window->HDRReferenceWhiteScale());
         else if (!brightness.reference_white_known)
-          ImGui::TextUnformatted("Reference white: unavailable (1x fallback)");
+          ImGui::TextUnformatted("Reference white: unavailable");
         if (brightness.hdr_headroom > 0.0f)
           ImGui::Text("HDR headroom: %.2fx", brightness.hdr_headroom);
         else
@@ -257,6 +264,7 @@ int main(int argc, char **argv) {
         loaded->GetFilm()->Reset();
       ImGui::Text("%s", scene_files[selected].string().c_str());
       ImGui::Text("Backend: %s", graphics::BackendAPIString(graphics_core->API()));
+      ImGui::Text("Resolution: %d x %d", loaded->GetFilm()->GetWidth(), loaded->GetFilm()->GetHeight());
       const auto resolved_pipeline = core.ResolveRenderPipeline(pipeline);
       if (resolved_pipeline != pipeline)
         ImGui::Text("Pipeline: %s (%s)", PipelineName(pipeline), PipelineName(resolved_pipeline));
@@ -289,7 +297,7 @@ int main(int argc, char **argv) {
       graphics_core->CreateCommandContext(&command_context);
       command_context->CmdPresent(window.get(), image.get());
       graphics_core->SubmitCommandContext(command_context.get());
-      grassland::graphics::Window::PollEvents();
+      graphics::Window::PollEvents();
       if (resize_pending) {
         ResizeWindowForFilm(window.get(), loaded->GetFilm());
         resize_pending = false;

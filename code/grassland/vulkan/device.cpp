@@ -73,7 +73,8 @@ Device::~Device() {
 VkResult Device::CreateSwapchain(const Surface *surface,
                                  VkFormat format,
                                  VkColorSpaceKHR color_space,
-                                 double_ptr<Swapchain> pp_swapchain) const {
+                                 double_ptr<Swapchain> pp_swapchain,
+                                 VkSwapchainKHR old_swapchain) const {
   if (!pp_swapchain) {
     SetErrorMessage("pp_swapchain is nullptr");
     return VK_ERROR_INITIALIZATION_FAILED;
@@ -91,6 +92,11 @@ VkResult Device::CreateSwapchain(const Surface *surface,
 #endif
 
   VkSurfaceFormatKHR surfaceFormat = Swapchain::ChooseSwapSurfaceFormat(swapChainSupport.formats, format, color_space);
+  if (color_space != VK_COLOR_SPACE_SRGB_NONLINEAR_KHR &&
+      (surfaceFormat.format != format || surfaceFormat.colorSpace != color_space)) {
+    SetErrorMessage("Requested HDR surface format is no longer available");
+    return VK_ERROR_FORMAT_NOT_SUPPORTED;
+  }
   VkPresentModeKHR presentMode = Swapchain::ChooseSwapPresentMode(swapChainSupport.presentModes);
   VkExtent2D extent = Swapchain::ChooseSwapExtent(swapChainSupport.capabilities, surface->Window());
 
@@ -134,7 +140,7 @@ VkResult Device::CreateSwapchain(const Surface *surface,
   createInfo.compositeAlpha = VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR;
   createInfo.presentMode = presentMode;
   createInfo.clipped = VK_TRUE;
-  createInfo.oldSwapchain = VK_NULL_HANDLE;
+  createInfo.oldSwapchain = old_swapchain;
 
   VkSwapchainKHR swapchain;
   RETURN_IF_FAILED_VK(vkCreateSwapchainKHR(device_, &createInfo, nullptr, &swapchain), "failed to create swap chain!");

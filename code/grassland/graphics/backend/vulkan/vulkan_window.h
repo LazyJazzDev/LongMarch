@@ -1,4 +1,6 @@
 #pragma once
+#include <optional>
+
 #include "grassland/graphics/backend/vulkan/vulkan_core.h"
 #include "grassland/graphics/backend/vulkan/vulkan_imgui_assets.h"
 #include "grassland/graphics/backend/vulkan/vulkan_util.h"
@@ -17,7 +19,10 @@ class VulkanWindow : public Window {
   ~VulkanWindow();
 
   virtual void CloseWindow() override;
-  void SetHDR(bool enable_hdr) override;
+  int SetHDR(bool enable_hdr) override;
+
+  // An HDR request must never silently select an SDR format.
+  static std::optional<VkSurfaceFormatKHR> ChooseHDRSurfaceFormat(const std::vector<VkSurfaceFormatKHR> &formats);
 
   vulkan::Swapchain *SwapChain() const;
 
@@ -27,7 +32,7 @@ class VulkanWindow : public Window {
 
   uint32_t AcquireNextImage();
 
-  void Rebuild();
+  int Rebuild();
 
   void Present();
 
@@ -51,6 +56,10 @@ class VulkanWindow : public Window {
   vulkan::Framebuffer *HDRFramebuffer(VulkanImage *image);
 
  private:
+  bool UsesPQOutput() const override;
+  std::optional<VkSurfaceFormatKHR> SelectSurfaceFormat(bool hdr) const;
+  VkFormat ImGuiFormat() const;
+  VkSurfaceFormatKHR surface_format_{};
   VkQueue present_queue_;
   VulkanCore *core_;
   std::unique_ptr<vulkan::Surface> surface_;
