@@ -636,7 +636,7 @@ float SoftwareShadowTransmission(uint material, HitRecord hit, float3 direction)
 TEST_F(SoftwareBVHTest, SharedShadersCompileForNativeRayTracingAndCompute) {
   auto vfs = core->GetShadersVFS();
   for (bool spirv : {false, true}) {
-    std::vector<std::string> args{"-I."};
+    std::vector<std::string> args{"-I.", "-warnings-as-errors", "all"};
     if (spirv)
       args.insert(args.end(), {"-target", "spirv", "-profile", "spirv_1_5", "-fvk-use-dx-layout"});
     auto compile = [&](const char *file, const char *entry, const char *target) {
@@ -669,6 +669,10 @@ GraphSurface EvaluateShaderGraph(HitRecord hit, float3 direction, int bounce, ui
       compile("geometry/mesh/hit_group.slang", entry, "lib_6_5");
     for (auto entry : {"InitLeaves", "ReduceNodes", "MortonKeys", "BitonicSort", "SortLeaves"})
       compile("software/build.slang", entry, "cs_6_0");
+    for (auto entry : {"BlellochUpSweep", "BlellochDownSweep"})
+      compile("blelloch_scan.slang", entry, "cs_6_0");
+    compile("film2img.slang", "Main", "cs_6_0");
+    compile("material/principled/pixel_shader.slang", "PSMain", "ps_6_0");
   }
 }
 

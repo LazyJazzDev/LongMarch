@@ -68,19 +68,19 @@ PSOutput PSMain(PSInput input) {
 
   int use_texture;
   use_texture = material_buffer.LoadInt();
-  if (use_texture)
+  if (use_texture != 0)
     base_color = textures[0].Sample(S, input.tex_coord).xyz;
   use_texture = material_buffer.LoadInt();
-  if (use_texture)
+  if (use_texture != 0)
     roughness = textures[1].Sample(S, input.tex_coord).x;
   use_texture = material_buffer.LoadInt();
-  if (use_texture)
+  if (use_texture != 0)
     specular = textures[2].Sample(S, input.tex_coord).x;
   use_texture = material_buffer.LoadInt();
-  if (use_texture)
+  if (use_texture != 0)
     metallic = textures[3].Sample(S, input.tex_coord).x;
   use_texture = material_buffer.LoadInt();
-  if (use_texture) {
+  if (use_texture != 0) {
     float3 tbn = textures[4].Sample(S, input.tex_coord).xyz;
 
     if (length(tbn) > 0.001 && length(B) > 0.001) {
@@ -90,7 +90,7 @@ PSOutput PSMain(PSInput input) {
     }
   }
   use_texture = material_buffer.LoadInt();
-  if (use_texture)
+  if (use_texture != 0)
     emission *= textures[5].Sample(S, input.tex_coord).xyz;
 
   output.radiance = float4(emission * strength, 0.0);

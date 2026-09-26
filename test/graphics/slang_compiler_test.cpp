@@ -36,8 +36,9 @@ TEST(SlangCompiler, StandaloneShaderCorpus) {
           }
         }
         SCOPED_TRACE(relative + " / " + entry);
-        auto code = graphics::CompileShader(vfs, relative, entry, profile,
-                                            {"-target", "spirv", "-profile", "spirv_1_5", "-fvk-use-dx-layout"});
+        auto code = graphics::CompileShader(
+            vfs, relative, entry, profile,
+            {"-target", "spirv", "-profile", "spirv_1_5", "-fvk-use-dx-layout", "-warnings-as-errors", "all"});
         EXPECT_FALSE(code.data.empty());
         ++compiled;
       }

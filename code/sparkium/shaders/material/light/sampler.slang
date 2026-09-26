@@ -8,9 +8,9 @@ void SampleMaterial(inout RenderContext context, HitRecord hit_record) {
       instance_metadatas.Load<InstanceMetadata>(sizeof(InstanceMetadata) * hit_record.object_index);
   ByteAddressBuffer material_buffer = data_buffers[NonUniformResourceIndex(instance_meta.material_data_index)];
   float3 emission = LoadFloat3(material_buffer, 0);
-  int two_sided = material_buffer.Load(12);
-  int block_ray = material_buffer.Load(16);
-  int camera_visible = material_buffer.Load(20);
+  bool two_sided = material_buffer.Load(12) != 0;
+  bool block_ray = material_buffer.Load(16) != 0;
+  bool camera_visible = material_buffer.Load(20) != 0;
   float falloff_distance = asfloat(material_buffer.Load(24));
   if (falloff_distance > 0.0f)
     emission *= saturate(1.0f - hit_record.t / falloff_distance);
@@ -50,7 +50,7 @@ float SampleShadowOpacity(HitRecord hit_record, float3 ray_direction) {
   InstanceMetadata instance_meta =
       instance_metadatas.Load<InstanceMetadata>(sizeof(InstanceMetadata) * hit_record.object_index);
   ByteAddressBuffer material_buffer = data_buffers[NonUniformResourceIndex(instance_meta.material_data_index)];
-  return material_buffer.Load(16) ? 1.0f : 0.0f;
+  return material_buffer.Load(16) != 0 ? 1.0f : 0.0f;
 }
 
 void SampleShadow(inout ShadowRayPayload payload, HitRecord hit_record) {

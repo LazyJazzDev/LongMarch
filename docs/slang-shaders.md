@@ -151,9 +151,39 @@ validation on the Windows / RTX 3090 Ti configuration above:
 
 These are short smoke runs (generally six frames; CLI two frames), not exhaustive
 interaction, long-running stability or calibrated HDR luminance measurements.
-Slang still emits existing implicit-conversion and possible-uninitialized-variable
-warnings. Linux deployment and Metal were not rerun during this Windows rebase
+This initial rebase run still emitted implicit-conversion, macro and
+possible-uninitialized-variable warnings; the cleanup below addresses them.
+Linux deployment and Metal were not rerun during this Windows rebase
 validation; the Apple Silicon results above describe the earlier revision.
+
+### Shader diagnostic cleanup
+
+Shared includes and generated material programs are compiled for multiple entry
+points and targets, so a small set of source issues produced thousands of repeated
+Slang diagnostics. The cleanup fixes the sources without suppressing diagnostics:
+
+- Test integer flags and bit masks explicitly, and convert channel selections to
+  explicit floating-point weights. Buffer layouts and nonzero flag semantics stay
+  unchanged.
+- Keep Film sample counts as floats, matching their R32F texture storage.
+- Initialize mesh-light emission to zero for unrecognized material shader IDs.
+- Remove unused, repeated microfacet closure macros and only undefine generated
+  shadow macros when they are defined.
+
+The standalone shader corpus and shared renderer compiler tests treat warnings
+as errors. Shared renderer tests compile DXIL and SPIR-V and additionally cover
+Film development, both prefix-scan kernels and the Principled raster pixel shader.
+Production compilation keeps its normal diagnostic policy.
+
+On Windows with Slang 2026.18.3, the standalone/compiler suite passed all three
+tests and each D3D12/Vulkan Sparkium regression run passed 32 tests (two
+unsupported-HDR cases skipped). These runs emitted no Slang warnings, including
+the generated material and software-tracing programs compiled at runtime.
+All 31 JSON checks, 24 basic-scene CLI runs (six scenes, raster and hardware ray
+tracing on both backends), and four GUI SDR/HDR smoke runs also passed without
+Slang warnings. With identical settings, the two-frame 96x96 Cornell PNG outputs
+matched the pre-cleanup images pixel-for-pixel on each backend. This is limited
+smoke/parity coverage; Metal was not rerun.
 
 ```sh
 cmake -S . -B out/slang-build -G Ninja -DCMAKE_BUILD_TYPE=Release \

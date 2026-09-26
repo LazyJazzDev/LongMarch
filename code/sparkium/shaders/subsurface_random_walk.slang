@@ -35,7 +35,8 @@ void StartSubsurfaceRandomWalk(inout RenderContext context,
   context.medium_sigma_t = 1.0f / mean_free_path;
   context.medium_albedo = RandomWalkSingleScatteringAlbedo(albedo);
   context.medium_ior = max(ior, 1.0f);
-  float3 channel_mask = float3(context.medium_channel == 0, context.medium_channel == 1, context.medium_channel == 2);
+  float3 channel_mask = float3(context.medium_channel == 0 ? 1.0f : 0.0f, context.medium_channel == 1 ? 1.0f : 0.0f,
+                               context.medium_channel == 2 ? 1.0f : 0.0f);
   context.throughput *= 3.0f * channel_mask;
   context.medium_sample_distance = RandomWalkDistance(context);
   context.origin = hit_record.position;

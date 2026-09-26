@@ -119,8 +119,12 @@ float Transmission(HitRecord hit, float3 direction) {
 #endif
 }
 }
+#ifdef SAMPLE_SHADOW_ANY_HIT
 #undef SAMPLE_SHADOW_ANY_HIT
+#endif
+#ifdef SAMPLE_SHADOW_NO_HITRECORD
 #undef SAMPLE_SHADOW_NO_HITRECORD
+#endif
 )";
   }
   if (has_graph) {
