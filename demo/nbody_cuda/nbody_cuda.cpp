@@ -153,8 +153,8 @@ void NBodyCUDA::OnUpdate() {
   UpdateParticles();
 
   if (!headless_) {
-    UpdateRenderAssets();
     UpdateImGui();
+    UpdateRenderAssets();
     static FPSCounter fps_counter;
     window_->SetTitle("NBody CUDA FPS: " + std::to_string(fps_counter.TickFPS()));
   }
@@ -370,7 +370,9 @@ void NBodyCUDA::UpdateImGui() {
   ImGui::End();
   window_->EndImGuiFrame();
   if (trigger_hdr_switch) {
-    hdr_ = !hdr_;
-    window_->SetHDR(hdr_);
+    if (window_->SetHDR(!hdr_) == 0)
+      hdr_ = !hdr_;
+    else
+      LogWarning("HDR mode change unavailable; keeping the current presentation mode.");
   }
 }

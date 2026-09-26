@@ -24,7 +24,12 @@ void PSMain(PSInput input) {
   output_image.GetDimensions(image_size.x, image_size.y);
   float4 color = output_image[uint2(uv * image_size)];
   if (ubo.hdr) {
-    color.rgb = pow(color.rgb, 2.2);
+    // Match SDR's sRGB midtones before Window applies reference-white alignment.
+    // Keep values above one unclipped so additive particles retain HDR highlights.
+    float3 srgb = max(color.rgb, 0.0);
+    color.rgb = float3(srgb.r <= 0.04045 ? srgb.r / 12.92 : pow((srgb.r + 0.055) / 1.055, 2.4),
+                       srgb.g <= 0.04045 ? srgb.g / 12.92 : pow((srgb.g + 0.055) / 1.055, 2.4),
+                       srgb.b <= 0.04045 ? srgb.b / 12.92 : pow((srgb.b + 0.055) / 1.055, 2.4));
   }
   output_image[uint2(uv * image_size)] = color;
 }
