@@ -25,7 +25,7 @@ MaterialShaderGraph::MaterialShaderGraph(sparkium::MaterialShaderGraph &material
        core_->GraphicsCore()->CreateShader(vfs, "geometry/mesh/hit_group.slang", "ShadowAnyHit", "lib_6_5", {"-I."},
                                            &shadow_any_hit_shader_) != 0))
     throw std::runtime_error("failed to compile shader graph material");
-  material_buffer_->UploadData(&material_.emission_hint, sizeof(material_.emission_hint));
+  UploadMaterialData(material_buffer_.get(), &material_.emission_hint, sizeof(material_.emission_hint));
 }
 
 const CodeLines *MaterialShaderGraph::GraphImpl() const {
@@ -50,7 +50,7 @@ void MaterialShaderGraph::Update(Scene *scene) {
   for (auto *texture : material_.textures)
     indices.push_back(scene->RegisterImage(texture));
   if (!indices.empty())
-    material_buffer_->UploadData(indices.data(), indices.size() * sizeof(int), 12);
+    UploadMaterialData(material_buffer_.get(), indices.data(), indices.size() * sizeof(int), 12);
 }
 
 }  // namespace sparkium::raytracing

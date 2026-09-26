@@ -68,11 +68,11 @@ void MaterialPrincipled::Update(Scene *scene) {
   if (material_.textures.emission) {
     registered_textures.emission = scene->RegisterImage(material_.textures.emission);
   }
-  material_buffer_->UploadData(&registered_textures, sizeof(RegisteredTextures), sizeof(material_.info));
+  UploadMaterialData(material_buffer_.get(), &registered_textures, sizeof(RegisteredTextures), sizeof(material_.info));
 }
 
 void MaterialPrincipled::SyncMaterialData() {
-  material_buffer_->UploadData(&material_.info, sizeof(material_.info));
+  UploadMaterialData(material_buffer_.get(), &material_.info, sizeof(material_.info));
 }
 
 }  // namespace sparkium::raytracing

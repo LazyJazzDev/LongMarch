@@ -14,10 +14,13 @@
 #include "grassland/graphics/backend/backend.h"
 #include "grassland/graphics/frame_profile.h"
 #include "sparkium/pipelines/raytracing/core/core.h"
+#include "sparkium/pipelines/raytracing/core/scene.h"
 #include "sparkium/pipelines/raytracing/core/software_pipeline.h"
 #include "sparkium/pipelines/raytracing/entity/entities.h"
+#include "sparkium/pipelines/raytracing/geometry/geometries.h"
 #include "sparkium/pipelines/raytracing/geometry/geometry_mesh.h"
-#include "sparkium/pipelines/raytracing/material/material_lambertian.h"
+#include "sparkium/pipelines/raytracing/light/light_geometry_material.h"
+#include "sparkium/pipelines/raytracing/material/materials.h"
 
 using namespace grassland;
 
@@ -52,6 +55,128 @@ class SoftwareBVHTest : public testing::Test {
   std::unique_ptr<graphics::Core> graphics;
   std::unique_ptr<sparkium::Core> core;
 };
+
+TEST_F(SoftwareBVHTest, MaterialUploadsPreservePublicEditsAndSceneTextureMappings) {
+  sparkium::MaterialLambertian diffuse(core.get());
+  sparkium::MaterialLight emission(core.get());
+  sparkium::MaterialSpecular specular(core.get());
+  sparkium::MaterialPrincipled principled(core.get());
+  std::vector<sparkium::Material *> materials{&diffuse, &emission, &specular, &principled};
+  auto read = [](sparkium::raytracing::Material *material) {
+    auto *buffer = material->Buffer();
+    std::vector<uint8_t> bytes(buffer->Size());
+    buffer->DownloadData(bytes.data(), bytes.size());
+    return bytes;
+  };
+  std::vector<std::vector<uint8_t>> originals;
+  for (auto *material : materials)
+    originals.push_back(read(sparkium::raytracing::DedicatedCast(material)));
+  graphics::FrameProfile profile(graphics.get(), false);
+  profile.Begin(false);
+  for (auto *material : materials)
+    for (int i = 0; i < 3; ++i)
+      sparkium::raytracing::DedicatedCast(material)->Buffer();
+  profile.Finish();
+  // Vulkan reports upload counters; both backends verify the GPU bytes below.
+  EXPECT_EQ(profile.counters["static_upload_calls"], 0u);
+
+  diffuse.base_color = {0.2f, 0.4f, 0.6f};
+  emission.emission = {2.0f, 3.0f, 4.0f};
+  specular.base_color = {0.3f, 0.5f, 0.7f};
+  principled.base_color = {0.6f, 0.4f, 0.2f};
+  std::vector<glm::vec3> expected{diffuse.base_color, emission.emission, specular.base_color, principled.base_color};
+  for (size_t i = 0; i < materials.size(); ++i) {
+    auto changed = read(sparkium::raytracing::DedicatedCast(materials[i]));
+    EXPECT_NE(changed, originals[i]);
+    EXPECT_EQ(std::memcmp(changed.data(), &expected[i], sizeof(glm::vec3)), 0);
+  }
+  diffuse.base_color = glm::vec3(0.8f);
+  EXPECT_EQ(read(sparkium::raytracing::DedicatedCast(&diffuse)), originals[0]);
+  emission.block_ray = 1;
+  emission.camera_visible = 0;
+  emission.falloff_distance = 3.0f;
+  auto changed = read(sparkium::raytracing::DedicatedCast(&emission));
+  int block = 0, visible = 1;
+  float falloff = 0;
+  std::memcpy(&block, changed.data() + 16, 4);
+  std::memcpy(&visible, changed.data() + 20, 4);
+  std::memcpy(&falloff, changed.data() + 24, 4);
+  EXPECT_EQ(block, 1);
+  EXPECT_EQ(visible, 0);
+  EXPECT_EQ(falloff, 3.0f);
+
+  std::unique_ptr<graphics::Image> texture, other;
+  ASSERT_EQ(graphics->CreateImage(1, 1, graphics::IMAGE_FORMAT_R8G8B8A8_UNORM, &texture), 0);
+  ASSERT_EQ(graphics->CreateImage(1, 1, graphics::IMAGE_FORMAT_R8G8B8A8_UNORM, &other), 0);
+  sparkium::Scene first(core.get()), second(core.get());
+  auto *a = sparkium::raytracing::DedicatedCast(&first);
+  auto *b = sparkium::raytracing::DedicatedCast(&second);
+  b->RegisterImage(other.get());
+  principled.textures.base_color = texture.get();
+  auto *rt_principled = sparkium::raytracing::DedicatedCast(&principled);
+  const sparkium::CodeLines graph_code(R"(
+GraphSurface EvaluateShaderGraph(HitRecord hit, float3 direction, int bounce, uint ray_type,
+                                 bool shadow, ByteAddressBuffer material) {
+  GraphSurface surface = (GraphSurface)0;
+  surface.normal = hit.normal;
+  surface.opacity = 1.0f; surface.shadow_opacity = -1.0f;
+  surface.ior = 1.45f; surface.roughness = 0.5f;
+  return surface;
+}
+)");
+  sparkium::MaterialShaderGraph graph(core.get(), graph_code, {texture.get()});
+  auto *rt_graph = sparkium::raytracing::DedicatedCast(&graph);
+  // The same material alternates between different scene-specific image indices.
+  for (auto *scene : {a, b, a}) {
+    rt_principled->Update(scene);
+    rt_graph->Update(scene);
+    const int index = scene->RegisterImage(texture.get());
+    int principled_index = -1, graph_index = -1;
+    rt_principled->Buffer()->DownloadData(&principled_index, sizeof(int), sizeof(principled.info) + 8);
+    rt_graph->Buffer()->DownloadData(&graph_index, sizeof(int), 12);
+    EXPECT_EQ(principled_index, index);
+    EXPECT_EQ(graph_index, index);
+    profile.Begin(false);
+    rt_principled->Update(scene);
+    rt_graph->Update(scene);
+    profile.Finish();
+    EXPECT_EQ(profile.counters["static_upload_calls"], 0u);
+  }
+  principled.textures.base_color = nullptr;
+  rt_principled->Update(a);
+  int removed_index = 0;
+  rt_principled->Buffer()->DownloadData(&removed_index, sizeof(int), sizeof(principled.info) + 8);
+  EXPECT_EQ(removed_index, -1);
+}
+
+TEST_F(SoftwareBVHTest, GeometryLightTransformUploadsTrackChangesAndReverts) {
+  std::vector<Vector3<float>> positions{{-1, -1, 0}, {1, -1, 0}, {0, 1, 0}};
+  uint32_t indices[]{0, 1, 2};
+  Mesh<> mesh(3, 3, indices, positions.data());
+  sparkium::GeometryMesh geometry(core.get(), mesh);
+  sparkium::MaterialLight material(core.get(), glm::vec3(2.0f));
+  glm::mat4x3 transform(1.0f);
+  sparkium::raytracing::LightGeometryMaterial light(sparkium::raytracing::DedicatedCast(core.get()),
+                                                    sparkium::raytracing::DedicatedCast(&geometry),
+                                                    sparkium::raytracing::DedicatedCast(&material), transform);
+  for (float scale : {1.0f, 2.0f, 1.0f}) {
+    transform[0][0] = scale;
+    transform[3][1] = scale - 1.0f;
+    auto *buffer = light.SamplerData();
+    glm::mat4x3 actual;
+    buffer->DownloadData(&actual, sizeof(actual));
+    EXPECT_EQ(actual, transform);
+    uint32_t primitive_count = 0;
+    buffer->DownloadData(&primitive_count, sizeof(primitive_count), sizeof(actual));
+    EXPECT_EQ(primitive_count, 1u);
+    graphics::FrameProfile profile(graphics.get(), false);
+    profile.Begin(false);
+    light.SamplerData();
+    light.SamplerData();
+    profile.Finish();
+    EXPECT_EQ(profile.counters["static_upload_calls"], 0u);
+  }
+}
 
 TEST_F(SoftwareBVHTest, HDRFilmDevelopmentPreservesHighlightsAndAccumulation) {
   sparkium::Film film(core.get(), 9, 3);

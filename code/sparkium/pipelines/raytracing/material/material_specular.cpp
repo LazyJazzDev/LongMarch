@@ -29,7 +29,7 @@ const CodeLines &MaterialSpecular::EvaluatorImpl() const {
 void MaterialSpecular::SyncMaterialData() {
   std::vector<uint8_t> data(material_buffer_->Size());
   std::memcpy(data.data(), &material_.base_color, sizeof(material_.base_color));
-  material_buffer_->UploadData(data.data(), data.size());
+  UploadMaterialData(material_buffer_.get(), data.data(), data.size());
 }
 
 }  // namespace sparkium::raytracing

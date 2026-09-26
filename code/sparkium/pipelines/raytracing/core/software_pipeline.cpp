@@ -5,6 +5,7 @@
 #include <limits>
 #include <sstream>
 #include <stdexcept>
+#include <unordered_map>
 
 #include "grassland/graphics/frame_profile.h"
 #include "sparkium/pipelines/raytracing/core/core.h"
@@ -242,6 +243,9 @@ void SoftwarePipeline::Update(graphics::CommandContext *commands,
   std::vector<GPUInstance> gpu_instances;
   std::vector<graphics::RayTracingInstance> native_instances;
   std::vector<MaterialCode> materials;
+  // Shared materials need source normalization only once per update. Keep this
+  // local so edits and component destruction cannot leave a stale source cache.
+  std::unordered_map<Material *, uint32_t> material_indices;
   if (16ull + instances_.size() * sizeof(GPUInstance) > std::numeric_limits<uint32_t>::max())
     throw std::runtime_error("software instance byte address overflow");
   const uint32_t tlas_leaves = ray_query_ ? 1 : LeafCount(instances_.size());
@@ -260,12 +264,16 @@ void SoftwarePipeline::Update(graphics::CommandContext *commands,
       node_count += uint64_t(leaves) * 2 - 1;
       max_leaves = std::max(max_leaves, leaves);
     }
-    const auto *graph = instance.material->GraphImpl();
-    MaterialCode source{graph != nullptr, MaterialSource(graph ? *graph : instance.material->SamplerImpl())};
-    auto material = std::find(materials.begin(), materials.end(), source);
-    uint32_t material_index = std::distance(materials.begin(), material);
-    if (material == materials.end())
-      materials.push_back(std::move(source));
+    auto [cached_material, inserted] = material_indices.try_emplace(instance.material, 0);
+    if (inserted) {
+      const auto *graph = instance.material->GraphImpl();
+      MaterialCode source{graph != nullptr, MaterialSource(graph ? *graph : instance.material->SamplerImpl())};
+      auto material = std::find(materials.begin(), materials.end(), source);
+      cached_material->second = static_cast<uint32_t>(std::distance(materials.begin(), material));
+      if (material == materials.end())
+        materials.push_back(std::move(source));
+    }
+    const uint32_t material_index = cached_material->second;
     glm::mat4 object_to_world(instance.transform);
     if (std::abs(glm::determinant(object_to_world)) < 1.0e-20f)
       throw std::runtime_error("software ray tracing requires invertible instance transforms");

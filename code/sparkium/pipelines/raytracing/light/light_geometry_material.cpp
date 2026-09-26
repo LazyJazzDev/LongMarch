@@ -1,5 +1,7 @@
 #include "sparkium/pipelines/raytracing/light/light_geometry_material.h"
 
+#include <cstring>
+
 #include "sparkium/pipelines/raytracing/core/core.h"
 #include "sparkium/pipelines/raytracing/core/geometry.h"
 #include "sparkium/pipelines/raytracing/core/material.h"
@@ -13,6 +15,7 @@ LightGeometryMaterial::LightGeometryMaterial(Core *core,
                                              Material *material,
                                              const glm::mat4x3 &transform)
     : Light(core),
+      uploaded_transform_(transform),
       geometry_(geometry),
       material_(material),
       transform(transform) {
@@ -76,7 +79,10 @@ int LightGeometryMaterial::SamplerShader(Scene *scene) {
 }
 
 graphics::Buffer *LightGeometryMaterial::SamplerData() {
-  direct_lighting_sampler_data_->UploadData(&transform, sizeof(glm::mat4x3), 0);
+  if (std::memcmp(&transform, &uploaded_transform_, sizeof(transform)) != 0) {
+    direct_lighting_sampler_data_->UploadData(&transform, sizeof(glm::mat4x3), 0);
+    uploaded_transform_ = transform;
+  }
   return direct_lighting_sampler_data_.get();
 }
 

@@ -37,7 +37,7 @@ void MaterialLight::SyncMaterialData() {
               sizeof(material_.camera_visible));
   std::memcpy(data.data() + sizeof(material_.emission) + sizeof(int) * 3, &material_.falloff_distance,
               sizeof(material_.falloff_distance));
-  material_buffer_->UploadData(data.data(), data.size());
+  UploadMaterialData(material_buffer_.get(), data.data(), data.size());
 }
 
 }  // namespace sparkium::raytracing

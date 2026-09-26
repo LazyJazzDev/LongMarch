@@ -30,7 +30,7 @@ void MaterialLambertian::SyncMaterialData() {
   std::vector<uint8_t> data(material_buffer_->Size());
   std::memcpy(data.data(), &material_.base_color, sizeof(material_.base_color));
   std::memcpy(data.data() + sizeof(material_.base_color), &material_.emission, sizeof(material_.emission));
-  material_buffer_->UploadData(data.data(), data.size());
+  UploadMaterialData(material_buffer_.get(), data.data(), data.size());
 }
 
 }  // namespace sparkium::raytracing
