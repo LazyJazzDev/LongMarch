@@ -197,7 +197,7 @@ void MetalWindow::Present(MTL::CommandBuffer *command, MetalImage *image) {
   encoder->drawPrimitives(MTL::PrimitiveTypeTriangle, NS::UInteger(0), NS::UInteger(3));
   if (imgui_) {
     ImGui::SetCurrentContext(imgui_);
-    ImGuiLinearColors linear_ui(enable_hdr_ && HDRBrightnessAlignment());
+    ImGuiLinearColors linear_ui(enable_hdr_);
     ImGui_ImplMetal_RenderDrawData(ImGui::GetDrawData(), (__bridge id<MTLCommandBuffer>)command,
                                    (__bridge id<MTLRenderCommandEncoder>)encoder);
   }

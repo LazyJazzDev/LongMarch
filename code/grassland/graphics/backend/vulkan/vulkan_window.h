@@ -55,7 +55,13 @@ class VulkanWindow : public Window {
   void BuildImGuiFramebuffers();
   vulkan::Framebuffer *HDRFramebuffer(VulkanImage *image);
 
+ protected:
+  virtual VkResult CreatePresentationSwapchain(VkSurfaceFormatKHR format,
+                                               std::unique_ptr<vulkan::Swapchain> *result,
+                                               VkSwapchainKHR old_swapchain);
+
  private:
+  bool presentation_failed_{false};
   bool UsesPQOutput() const override;
   std::optional<VkSurfaceFormatKHR> SelectSurfaceFormat(bool hdr) const;
   VkFormat ImGuiFormat() const;

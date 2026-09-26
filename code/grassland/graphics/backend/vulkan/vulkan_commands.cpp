@@ -486,7 +486,7 @@ void VulkanCmdPresent::CompileCommand(VulkanCommandContext *context, VkCommandBu
     renderPassInfo.pClearValues = nullptr;
 
     vkCmdBeginRenderPass(command_buffer, &renderPassInfo, VK_SUBPASS_CONTENTS_INLINE);
-    ImGuiLinearColors linear_ui(target_ != nullptr);
+    ImGuiLinearColors linear_ui(window_->IsHDR());
     ImGui_ImplVulkan_RenderDrawData(ImGui::GetDrawData(), command_buffer);
     vkCmdEndRenderPass(command_buffer);
 

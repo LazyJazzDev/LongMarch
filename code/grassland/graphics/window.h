@@ -29,14 +29,16 @@ struct DisplayBrightness {
 };
 
 // ImGui vertex colors are sRGB values; floating-point HDR targets are linear.
-// Restore the draw lists after the backend uploads them, so retries do not decode twice.
+// Select float vertex upload conversion without modifying the draw lists.
 class ImGuiLinearColors {
  public:
   explicit ImGuiLinearColors(bool enabled);
   ~ImGuiLinearColors();
 
  private:
-  std::vector<std::pair<ImDrawVert *, ImU32>> colors_;
+  bool previous_;
+  ImGuiLinearColors(const ImGuiLinearColors &) = delete;
+  ImGuiLinearColors &operator=(const ImGuiLinearColors &) = delete;
 };
 
 class Window {
@@ -85,6 +87,10 @@ class Window {
   // Request an application presentation mode (not the desktop HDR setting).
   // Returns 0 on success, nonzero on failure; details are logged.
   virtual int SetHDR(bool enable_hdr);
+
+  bool IsHDR() const {
+    return enable_hdr_;
+  }
 
   // Main-thread query, refreshed at most every 500 ms, including monitor changes.
   DisplayBrightness GetDisplayBrightness();

@@ -60,6 +60,8 @@ void VulkanWindow::CloseWindow() {
 int VulkanWindow::SetHDR(bool enable_hdr) {
   if (!GLFWWindow())
     return -1;
+  if (presentation_failed_)
+    return -1;
   if (enable_hdr == enable_hdr_)
     return 0;
   const bool previous = enable_hdr_;
@@ -122,6 +124,8 @@ VkFormat VulkanWindow::ImGuiFormat() const {
 }
 
 vulkan::Swapchain *VulkanWindow::SwapChain() const {
+  if (presentation_failed_)
+    throw std::runtime_error("Vulkan presentation unavailable after swapchain recovery failed");
   return swap_chain_.get();
 }
 
@@ -134,25 +138,57 @@ vulkan::Semaphore *VulkanWindow::ImageAvailableSemaphore() const {
 }
 
 uint32_t VulkanWindow::AcquireNextImage() {
+  if (presentation_failed_)
+    throw std::runtime_error("Vulkan presentation unavailable after swapchain recovery failed");
   swap_chain_->AcquireNextImage(std::numeric_limits<uint64_t>::max(),
                                 image_available_semaphores_[core_->CurrentFrame()]->Handle(), VK_NULL_HANDLE,
                                 &image_index_);
   return image_index_;
 }
 
+VkResult VulkanWindow::CreatePresentationSwapchain(VkSurfaceFormatKHR format,
+                                                   std::unique_ptr<vulkan::Swapchain> *result,
+                                                   VkSwapchainKHR old_swapchain) {
+  return core_->Device()->CreateSwapchain(surface_.get(), format.format, format.colorSpace, result, old_swapchain);
+}
+
 int VulkanWindow::Rebuild() {
+  if (presentation_failed_)
+    return -1;
   core_->WaitGPU();
   const auto format = SelectSurfaceFormat(enable_hdr_);
   if (!format)
     return -1;
+  const auto previous_format = surface_format_;
+  const bool previous_hdr = previous_format.colorSpace != VK_COLOR_SPACE_SRGB_NONLINEAR_KHR;
+  bool recovered = false;
   std::unique_ptr<vulkan::Swapchain> next;
-  if (core_->Device()->CreateSwapchain(surface_.get(), format->format, format->colorSpace, &next,
-                                       swap_chain_->Handle()) != VK_SUCCESS)
-    return -1;
+  auto create = [&](VkSurfaceFormatKHR requested, VkSwapchainKHR old) {
+    try {
+      return CreatePresentationSwapchain(requested, &next, old);
+    } catch (const std::exception &error) {
+      LogError("Vulkan swapchain creation failed: {}", error.what());
+      return VK_ERROR_INITIALIZATION_FAILED;
+    }
+  };
+  const auto status = create(*format, swap_chain_->Handle());
+  // vkCreateSwapchainKHR can retire oldSwapchain even when creation fails.
+  // Drop attachments before destroying it; never acquire from it again.
   hdr_framebuffer_.reset();
   imgui_assets_.framebuffers.clear();
+  swap_chain_.reset();
+  if (status != VK_SUCCESS) {
+    next.reset();
+    enable_hdr_ = previous_hdr;
+    if (create(previous_format, VK_NULL_HANDLE) != VK_SUCCESS) {
+      presentation_failed_ = true;
+      LogError("Vulkan presentation disabled: could not recreate the previous swapchain mode");
+      return -1;
+    }
+    recovered = true;
+  }
   swap_chain_ = std::move(next);
-  surface_format_ = *format;
+  surface_format_ = recovered ? previous_format : *format;
   if (imgui_assets_.context) {
     ImGui::SetCurrentContext(imgui_assets_.context);
     imgui_assets_.framebuffers.clear();
@@ -167,10 +203,12 @@ int VulkanWindow::Rebuild() {
 
     BuildImGuiFramebuffers();
   }
-  return 0;
+  return recovered ? -1 : 0;
 }
 
 void VulkanWindow::Present() {
+  if (presentation_failed_)
+    throw std::runtime_error("Vulkan presentation unavailable after swapchain recovery failed");
   VkSemaphore render_finish_semaphore = render_finish_semaphores_[core_->CurrentFrame()]->Handle();
 
   VkSwapchainKHR swap_chain = swap_chain_->Handle();
