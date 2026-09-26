@@ -132,11 +132,7 @@ int main(int argc, char **argv) {
       }
     }
     window->InitImGui(nullptr, 18.0f);
-    std::cout << "Display: "
-              << (hdr_active ? (window->GetHDROutputEncoding() == graphics::HDROutputEncoding::HDR10PQ ? "HDR10 (PQ)"
-                                                                                                       : "HDR (linear)")
-                             : "SDR")
-              << std::endl;
+    std::cout << "Display: " << (hdr_active ? "HDR" : "SDR") << std::endl;
     FPSCounter fps_counter;
     bool show_browser = true;
 
@@ -224,18 +220,14 @@ int main(int argc, char **argv) {
       if (!hdr_error.empty())
         ImGui::TextWrapped("HDR unavailable: %s", hdr_error.c_str());
       ImGui::SliderFloat("Exposure (EV)", &loaded->GetFilm()->info.exposure, -8.0f, 8.0f, "%.2f");
-      const bool hdr10 = window->GetHDROutputEncoding() == graphics::HDROutputEncoding::HDR10PQ;
-      ImGui::TextUnformatted(hdr_active ? (hdr10 ? "Display: HDR10 (PQ)" : "Display: HDR (linear)")
-                                        : "Display: SDR (scene view transform)");
+      ImGui::TextUnformatted(hdr_active ? "Display: HDR" : "Display: SDR (scene view transform)");
       if (hdr_active) {
         const auto brightness = window->GetDisplayBrightness();
-        if (hdr10) {
-          ImGui::Text("Content reference white: %.0f nits", window->HDR10WhiteNits());
-        } else if (brightness.sdr_white_nits > 0.0f)
+        if (brightness.sdr_white_nits > 0.0f)
           ImGui::Text("Reference white: %.0f nits (%.2fx)", brightness.sdr_white_nits,
                       window->HDRReferenceWhiteScale());
         else if (!brightness.reference_white_known)
-          ImGui::TextUnformatted("Reference white: unavailable (1x fallback)");
+          ImGui::TextUnformatted("Reference white: unavailable");
         if (brightness.hdr_headroom > 0.0f)
           ImGui::Text("HDR headroom: %.2fx", brightness.hdr_headroom);
         else

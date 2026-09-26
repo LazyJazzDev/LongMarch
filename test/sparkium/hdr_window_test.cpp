@@ -40,14 +40,27 @@ double PQ(double nits) {
   return std::pow((3424.0 / 4096.0 + 2413.0 / 128.0 * p) / (1.0 + 2392.0 / 128.0 * p), 2523.0 / 32.0);
 }
 
-glm::vec3 ExpectedOutput(graphics::Window *window, glm::vec3 linear) {
-  if (window->GetHDROutputEncoding() != graphics::HDROutputEncoding::HDR10PQ)
-    return linear * window->HDRReferenceWhiteScale();
+bool UsesPQSwapchain(graphics::Window *window) {
+#if defined(LONGMARCH_VULKAN_ENABLED)
+  if (auto *native = dynamic_cast<graphics::backend::VulkanWindow *>(window)) {
+    // Inspect the actual backend target, without a public encoding query.
+    auto format = native->SwapChain()->Format();
+    return format == VK_FORMAT_A2B10G10R10_UNORM_PACK32 || format == VK_FORMAT_A2R10G10B10_UNORM_PACK32;
+  }
+#endif
+  return false;
+}
+
+glm::vec3 ExpectedPQ(glm::vec3 linear) {
   const glm::dvec3 bt2020{0.627404 * linear.r + 0.329283 * linear.g + 0.043313 * linear.b,
                           0.069097 * linear.r + 0.919540 * linear.g + 0.011362 * linear.b,
                           0.016391 * linear.r + 0.088013 * linear.g + 0.895595 * linear.b};
-  const auto nits = bt2020 * double(window->HDR10WhiteNits());
+  const auto nits = bt2020 * 203.0;
   return {PQ(nits.r), PQ(nits.g), PQ(nits.b)};
+}
+
+glm::vec3 ExpectedOutput(graphics::Window *window, glm::vec3 linear) {
+  return UsesPQSwapchain(window) ? ExpectedPQ(linear) : linear * window->HDRReferenceWhiteScale();
 }
 }  // namespace
 
@@ -157,11 +170,7 @@ class BrightnessProbeWindow : public graphics::Window {
   }
 
   graphics::DisplayBrightness brightness;
-  graphics::HDROutputEncoding encoding{graphics::HDROutputEncoding::LinearSRGB};
-
-  graphics::HDROutputEncoding GetHDROutputEncoding() const override {
-    return encoding;
-  }
+  bool pq_output{false};
 
   void InitImGui(const char *, float) override {
   }
@@ -180,6 +189,10 @@ class BrightnessProbeWindow : public graphics::Window {
   }
 
  protected:
+  bool UsesPQOutput() const override {
+    return pq_output;
+  }
+
   graphics::DisplayBrightness QueryDisplayBrightness() const override {
     return brightness;
   }
@@ -251,11 +264,13 @@ TEST_P(HDRWindowTest, PresentationAndImGuiSwitching) {
 #if defined(LONGMARCH_VULKAN_ENABLED)
       if (GetParam() == graphics::BACKEND_API_VULKAN) {
         auto native = dynamic_cast<graphics::backend::VulkanWindow *>(window.get());
-        if (hdr && native->GetHDROutputEncoding() == graphics::HDROutputEncoding::HDR10PQ)
-          EXPECT_TRUE(native->SwapChain()->Format() == VK_FORMAT_A2B10G10R10_UNORM_PACK32 ||
-                      native->SwapChain()->Format() == VK_FORMAT_A2R10G10B10_UNORM_PACK32);
-        else
-          EXPECT_EQ(native->SwapChain()->Format(), hdr ? VK_FORMAT_R16G16B16A16_SFLOAT : VK_FORMAT_R8G8B8A8_UNORM);
+        auto *swapchain = native->SwapChain();
+        const auto support = vulkan::Swapchain::QuerySwapChainSupport(swapchain->Device()->PhysicalDevice().Handle(),
+                                                                      swapchain->Surface()->Handle());
+        const auto expected_format =
+            hdr ? graphics::backend::VulkanWindow::ChooseHDRSurfaceFormat(support.formats).format
+                : VK_FORMAT_R8G8B8A8_UNORM;
+        EXPECT_EQ(swapchain->Format(), expected_format);
       }
 #endif
       if (imgui) {
@@ -344,7 +359,7 @@ TEST_P(HDRWindowTest, ReferenceWhiteScalingPreservesSourceAndAlpha) {
   }
   window->SetHDRBrightnessAlignment(false);
   EXPECT_EQ(window->HDRReferenceWhiteScale(), 1.0f);
-  if (window->GetHDROutputEncoding() == graphics::HDROutputEncoding::HDR10PQ)
+  if (UsesPQSwapchain(window.get()))
     EXPECT_NE(window->PrepareHDRComposition(core.get(), {13, 7}), nullptr);
   else
     EXPECT_EQ(window->PrepareHDRComposition(core.get(), {13, 7}), nullptr);
@@ -392,9 +407,8 @@ TEST_P(HDRWindowTest, PQReadbackUsesAbsoluteNitsAndPreservesSource) {
   ASSERT_EQ(graphics::CreateCore(GetParam(), graphics::Core::Settings{2, true}, &core), 0);
   ASSERT_EQ(core->InitializeLogicalDeviceAutoSelect(false), 0);
   BrightnessProbeWindow window;
-  window.encoding = graphics::HDROutputEncoding::HDR10PQ;
+  window.pq_output = true;
   window.SetHDR(true);
-  EXPECT_FLOAT_EQ(window.HDR10WhiteNits(), 203.0f);
   // This numeric test works even on an SDR desktop, without presenting PQ there.
   const std::vector<glm::vec4> samples{{0, 0, 0, 0.25}, {1, 1, 1, 0.5}, {10, 10, 10, 1},         {1, 0, 0, 1},
                                        {0, 1, 0, 1},    {0, 0, 1, 1},   {65504, 65504, 65504, 1}};
@@ -402,37 +416,30 @@ TEST_P(HDRWindowTest, PQReadbackUsesAbsoluteNitsAndPreservesSource) {
   for (const auto &sample : samples)
     for (int c = 0; c < 4; ++c)
       source.push_back(glm::packHalf1x16(sample[c]));
-  EXPECT_THROW(window.SetHDR10WhiteNits(0), std::invalid_argument);
-  EXPECT_THROW(window.SetHDR10WhiteNits(std::numeric_limits<float>::infinity()), std::invalid_argument);
-  for (float white : {100.0f, 203.0f, 400.0f}) {
-    window.SetHDR10WhiteNits(white);
-    for (bool alignment : {false, true}) {
-      window.SetHDRBrightnessAlignment(alignment);
-      auto *composition = window.PrepareHDRComposition(core.get(), {uint32_t(samples.size()), 1});
-      ASSERT_NE(composition, nullptr);
-      composition->UploadData(source.data());
-      std::unique_ptr<graphics::CommandContext> commands;
-      ASSERT_EQ(core->CreateCommandContext(&commands), 0);
-      auto *encoded = window.AlignHDRComposition(commands.get());
-      ASSERT_EQ(core->SubmitCommandContext(commands.get()), 0);
-      core->WaitGPU();
-      std::vector<uint16_t> actual(source.size()), unchanged(source.size());
-      encoded->DownloadData(actual.data());
-      composition->DownloadData(unchanged.data());
-      EXPECT_EQ(source, unchanged);
-      for (size_t i = 0; i < samples.size(); ++i) {
-        const auto expected = ExpectedOutput(&window, glm::vec3(samples[i]));
-        for (int c = 0; c < 3; ++c)
-          EXPECT_NEAR(glm::unpackHalf1x16(actual[i * 4 + c]), expected[c], 0.001);
-        EXPECT_EQ(actual[i * 4 + 3], source[i * 4 + 3]);
-      }
-      if (white == 100.0f)
-        EXPECT_NEAR(glm::unpackHalf1x16(actual[4]), 0.508078, 0.001);  // ST 2084 100-nit gray.
+  for (bool alignment : {false, true}) {
+    window.SetHDRBrightnessAlignment(alignment);
+    auto *composition = window.PrepareHDRComposition(core.get(), {uint32_t(samples.size()), 1});
+    ASSERT_NE(composition, nullptr);
+    composition->UploadData(source.data());
+    std::unique_ptr<graphics::CommandContext> commands;
+    ASSERT_EQ(core->CreateCommandContext(&commands), 0);
+    auto *encoded = window.AlignHDRComposition(commands.get());
+    ASSERT_EQ(core->SubmitCommandContext(commands.get()), 0);
+    core->WaitGPU();
+    std::vector<uint16_t> actual(source.size()), unchanged(source.size());
+    encoded->DownloadData(actual.data());
+    composition->DownloadData(unchanged.data());
+    EXPECT_EQ(source, unchanged);
+    for (size_t i = 0; i < samples.size(); ++i) {
+      const auto expected = ExpectedPQ(glm::vec3(samples[i]));
+      for (int c = 0; c < 3; ++c)
+        EXPECT_NEAR(glm::unpackHalf1x16(actual[i * 4 + c]), expected[c], 0.001);
+      EXPECT_EQ(actual[i * 4 + 3], source[i * 4 + 3]);
     }
+    EXPECT_NEAR(glm::unpackHalf1x16(actual[4]), PQ(203.0), 0.001);
   }
   // PQ source white is not the compositor's output white. Applying the output
   // reference-white scale here as well would duplicate compositor mapping.
-  window.SetHDR10WhiteNits(203.0f);
   for (float output_white : {80.0f, 203.0f, 400.0f}) {
     window.brightness = {output_white, output_white / 80.0f, 0.0f, true, true};
     window.RefreshDisplayBrightness();
@@ -447,7 +454,7 @@ TEST_P(HDRWindowTest, PQReadbackUsesAbsoluteNitsAndPreservesSource) {
   }
   // Reuse the same pipeline with scRGB: the PQ white must not leak into the
   // Windows-style scaling path, and disabling alignment still bypasses it.
-  window.encoding = graphics::HDROutputEncoding::LinearSRGB;
+  window.pq_output = false;
   window.brightness = {240.0f, 3.0f, 0.0f, true, true};
   window.RefreshDisplayBrightness();
   auto *composition = window.PrepareHDRComposition(core.get(), {uint32_t(samples.size()), 1});

@@ -28,8 +28,6 @@ struct DisplayBrightness {
   bool hdr_enabled{false};
 };
 
-enum class HDROutputEncoding { LinearSRGB, HDR10PQ };
-
 // ImGui vertex colors are sRGB values; floating-point HDR targets are linear.
 // Restore the draw lists after the backend uploads them, so retries do not decode twice.
 class ImGuiLinearColors {
@@ -85,18 +83,6 @@ class Window {
   bool ShouldClose() const;
 
   virtual void SetHDR(bool enable_hdr);
-
-  virtual HDROutputEncoding GetHDROutputEncoding() const {
-    return HDROutputEncoding::LinearSRGB;
-  }
-
-  // Manual diffuse white for PQ output, not a measured display capability.
-  // It is independent of the scene exposure and the scRGB reference-white scale.
-  float HDR10WhiteNits() const {
-    return hdr10_white_nits_;
-  }
-
-  void SetHDR10WhiteNits(float nits);
 
   // Main-thread query, refreshed at most every 500 ms, including monitor changes.
   DisplayBrightness GetDisplayBrightness();
@@ -182,7 +168,6 @@ class Window {
   std::chrono::steady_clock::time_point brightness_query_time_{};
   EventManager<void(const DisplayBrightness &)> display_brightness_event_;
   bool align_hdr_brightness_{true};
-  float hdr10_white_nits_{203.0f};
   GLFWwindow *window_;
   void *magnify_monitor_{};
   EventManager<void(const MagnifyGesture &)> magnify_event_;
@@ -199,6 +184,11 @@ class Window {
   EventManager<void(int, const char **)> drop_event_;
 
  protected:
+  // Presentation encoding is selected by the backend, never by callers.
+  virtual bool UsesPQOutput() const {
+    return false;
+  }
+
   virtual DisplayBrightness QueryDisplayBrightness() const;
   bool enable_hdr_;
 

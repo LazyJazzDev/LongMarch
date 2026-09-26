@@ -53,7 +53,7 @@ LONGMARCH_WINDOW_SYSTEM=wayland \
   ./build-wayland/demo/sparkium_gui/demo_sparkium_gui --backend vulkan --hdr
 ```
 
-The GUI reports `HDR10 (PQ)` or `HDR (linear)` as appropriate. If the surface
+The GUI reports `HDR` without exposing the backend encoding. If the surface
 offers neither supported encoding, `--hdr` prints the reason and continues in
 SDR; the same reason is visible in the GUI. The interactive HDR toggle also
 preserves SDR when the request is unsupported.
@@ -71,7 +71,7 @@ HDR10 uses this pipeline:
 
 1. Develop the scene with its exposure and artistic grade into linear BT.709.
 2. Resize and compose the scene and linearized ImGui into a floating-point image.
-3. Convert BT.709 to BT.2020 and multiply by the chosen reference white in nits.
+3. Convert BT.709 to BT.2020 and multiply by the fixed 203-nit content reference white.
 4. Encode ST 2084/PQ and transfer the result into the 10-bit swapchain.
 
 PQ conversion is mandatory even when scRGB brightness alignment is disabled.
@@ -79,17 +79,19 @@ It never modifies the source film, accumulation, source image, or HDR export.
 The floating-point intermediate preserves alpha; the swapchain uses opaque
 desktop composition. UI blending happens before PQ encoding.
 
-The GUI uses **203 nits as PQ content reference white**, matching the default
-reference white for the Wayland protocol's ST 2084 transfer function. It displays
-this content value but provides no manual reference-white control. It is not a
+The presentation layer uses **203 nits as PQ content reference white**, matching
+the default reference white for the Wayland protocol's ST 2084 transfer function.
+Encoding and content reference white are internal; the GUI exposes neither an
+encoding choice nor a reference-white control. This content white is not a
 measurement of desktop white or the monitor's peak. On the locally verified
 NVIDIA/Mutter path, the driver declares PQ content with this default reference
 white, and the compositor maps content reference white to its output reference
 white. Substituting the output's reference white into the pixels without changing
 their content description would apply the adjustment twice.
 
-`Window::SetHDR10WhiteNits` remains a low-level encoding API (also used by numeric
-tests); changing it does not change WSI color metadata or query system brightness.
+Applications submit linear HDR images; the backend selects the encoding and
+performs any necessary conversion without a public output-encoding query or
+PQ-reference-white getter/setter.
 Linux display headroom remains unknown. The existing Windows scRGB reference-white
 alignment and Metal presentation paths remain separate.
 

@@ -98,13 +98,12 @@ VkSurfaceFormatKHR VulkanWindow::SelectSurfaceFormat(bool hdr) const {
   return format;
 }
 
-HDROutputEncoding VulkanWindow::GetHDROutputEncoding() const {
-  return enable_hdr_ && surface_format_.colorSpace == VK_COLOR_SPACE_HDR10_ST2084_EXT ? HDROutputEncoding::HDR10PQ
-                                                                                      : HDROutputEncoding::LinearSRGB;
+bool VulkanWindow::UsesPQOutput() const {
+  return enable_hdr_ && surface_format_.colorSpace == VK_COLOR_SPACE_HDR10_ST2084_EXT;
 }
 
 VkFormat VulkanWindow::ImGuiFormat() const {
-  return GetHDROutputEncoding() == HDROutputEncoding::HDR10PQ ? VK_FORMAT_R16G16B16A16_SFLOAT : swap_chain_->Format();
+  return UsesPQOutput() ? VK_FORMAT_R16G16B16A16_SFLOAT : swap_chain_->Format();
 }
 
 vulkan::Swapchain *VulkanWindow::SwapChain() const {
@@ -271,7 +270,7 @@ void VulkanWindow::SetupImGuiContext() {
 
 void VulkanWindow::BuildImGuiFramebuffers() {
   // PQ is encoded only after scene/UI blending in the floating-point target.
-  if (GetHDROutputEncoding() == HDROutputEncoding::HDR10PQ)
+  if (UsesPQOutput())
     return;
   imgui_assets_.framebuffers.resize(swap_chain_->ImageCount());
   for (int i = 0; i < swap_chain_->ImageCount(); i++) {

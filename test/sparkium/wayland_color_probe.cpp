@@ -191,9 +191,6 @@ int main(int argc, char **argv) {
     std::unique_ptr<graphics::Image> sdr_image, hdr_image;
     core->CreateImage(480, 240, graphics::IMAGE_FORMAT_R8G8B8A8_UNORM, &sdr_image);
     core->CreateImage(480, 240, graphics::IMAGE_FORMAT_R32G32B32A32_SFLOAT, &hdr_image);
-    std::cout << "HDR encoding: "
-              << (hdr->GetHDROutputEncoding() == graphics::HDROutputEncoding::HDR10PQ ? "PQ" : "linear scRGB")
-              << "; PQ content reference white: " << hdr->HDR10WhiteNits() << " nits\n";
     std::cout << "These windows show SDR white and HDR reference white. Protocol values and visual comparison "
                  "are not a physical luminance measurement.\n";
     const auto end = std::chrono::steady_clock::now() + std::chrono::seconds(seconds);

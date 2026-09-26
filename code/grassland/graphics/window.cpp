@@ -147,14 +147,8 @@ float Window::HDRReferenceWhiteScale() {
   return enable_hdr_ && align_hdr_brightness_ ? brightness.hdr_reference_white_scale : 1.0f;
 }
 
-void Window::SetHDR10WhiteNits(float nits) {
-  if (!std::isfinite(nits) || nits < 1.0f || nits > 10000.0f)
-    throw std::invalid_argument("HDR10 reference white must be between 1 and 10000 nits");
-  hdr10_white_nits_ = nits;
-}
-
 Image *Window::PrepareHDRComposition(Core *core, Extent2D extent) {
-  if (!enable_hdr_ || (!align_hdr_brightness_ && GetHDROutputEncoding() != HDROutputEncoding::HDR10PQ))
+  if (!enable_hdr_ || (!align_hdr_brightness_ && !UsesPQOutput()))
     return nullptr;
   if (!hdr_presentation_) {
     auto pending = std::make_unique<HDRPresentation>();
@@ -214,8 +208,9 @@ Image *Window::AlignHDRComposition(CommandContext *commands) {
   if (!hdr_presentation_ || !hdr_presentation_->composition)
     throw std::logic_error("Prepare HDR composition before aligning it");
   auto &p = *hdr_presentation_;
-  const float settings[4] = {HDRReferenceWhiteScale(),
-                             GetHDROutputEncoding() == HDROutputEncoding::HDR10PQ ? 1.0f : 0.0f, HDR10WhiteNits(), 0};
+  // PQ content reference white matches the WSI color-description default.
+  // Output reference white is mapped by the compositor, not applied here.
+  const float settings[4] = {HDRReferenceWhiteScale(), UsesPQOutput() ? 1.0f : 0.0f, 203.0f, 0};
   p.settings->UploadData(settings, sizeof(settings));
   commands->CmdBindComputeProgram(p.program.get());
   commands->CmdBindResources(0, {p.composition.get()}, BIND_POINT_COMPUTE);
