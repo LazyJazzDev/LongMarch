@@ -26,7 +26,13 @@ VulkanWindow::VulkanWindow(VulkanCore *core,
   }
   vkGetDeviceQueue(core_->Device()->Handle(), core_->Device()->PhysicalDevice().PresentFamilyIndex(surface_.get()), 0,
                    &present_queue_);
-  ResizeEvent().RegisterCallback([this](int width, int height) { Rebuild(); });
+  // Swapchains follow pixels, not logical window coordinates. In particular,
+  // GLFW on Wayland emits only a framebuffer callback for programmatic resizes
+  // and for fractional-scale changes without a logical size change.
+  FramebufferResizeEvent().RegisterCallback([this](int width, int height) {
+    if (width > 0 && height > 0)
+      Rebuild();
+  });
 }
 
 VulkanWindow::~VulkanWindow() {
@@ -56,6 +62,8 @@ void VulkanWindow::SetHDR(bool enable_hdr) {
   const bool previous = enable_hdr_;
   try {
     Window::SetHDR(enable_hdr);
+    // A format change needs a rebuild even when the framebuffer size is fixed.
+    Rebuild();
   } catch (...) {
     enable_hdr_ = previous;
     throw;

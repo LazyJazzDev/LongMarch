@@ -52,6 +52,73 @@ glm::vec3 ExpectedOutput(graphics::Window *window, glm::vec3 linear) {
 }  // namespace
 
 #if defined(LONGMARCH_VULKAN_ENABLED)
+// Reproduce the GUI's Cornell Box (square) -> Texture (wide) resize on the
+// same window. Do not toggle HDR between sizes: that would hide a missed resize
+// notification by forcing an unrelated swapchain rebuild.
+TEST(VulkanWindowResizeTest, ProgrammaticSquareToWideUpdatesPresentation) {
+  if (!InteractiveHDRTests())
+    GTEST_SKIP() << "Requires an interactive desktop session";
+  std::unique_ptr<graphics::Core> core;
+  ASSERT_EQ(graphics::CreateCore(graphics::BACKEND_API_VULKAN, graphics::Core::Settings{2, true}, &core), 0);
+  ASSERT_EQ(core->InitializeLogicalDeviceAutoSelect(false), 0);
+  for (bool hdr : {false, true}) {
+    auto window = std::unique_ptr<graphics::Window>{};
+    ASSERT_EQ(core->CreateWindowObject(1024, 1024, "Scene resize regression", &window), 0);
+    if (hdr && !HasHDRSurface(window.get()))
+      continue;  // X11 still exercises the complete SDR resize path.
+    window->SetHDR(hdr);
+    window->InitImGui();
+    ImGui::GetIO().IniFilename = nullptr;
+    auto *native = dynamic_cast<graphics::backend::VulkanWindow *>(window.get());
+    ASSERT_NE(native, nullptr);
+    for (auto size : {glm::ivec2{1024, 1024}, glm::ivec2{2048, 1024}, glm::ivec2{1024, 1024}}) {
+      window->Resize(size.x, size.y);
+      // X11 acknowledges asynchronously. Present through several event cycles
+      // to also cover Wayland fractional scaling and compositor configure events.
+      for (int frame = 0; frame < 4; ++frame) {
+        glfwWaitEventsTimeout(0.02);
+        auto fb = window->GetFramebufferSize();
+        auto extent = native->SwapChain()->Extent();
+        SCOPED_TRACE(testing::Message() << "hdr=" << hdr << " requested=" << size.x << "x" << size.y
+                                        << " framebuffer=" << fb.x << "x" << fb.y << " frame=" << frame);
+        ASSERT_EQ(extent.width, fb.x);
+        ASSERT_EQ(extent.height, fb.y);
+        std::unique_ptr<graphics::Image> source;
+        ASSERT_EQ(core->CreateImage(fb.x, fb.y, graphics::IMAGE_FORMAT_R32G32B32A32_SFLOAT, &source), 0);
+        window->BeginImGuiFrame();
+        ImGui::TextUnformatted("Scene resize regression");
+        window->EndImGuiFrame();
+        std::unique_ptr<graphics::CommandContext> commands;
+        ASSERT_EQ(core->CreateCommandContext(&commands), 0);
+        commands->CmdClearImage(source.get(), {{0.5f, 0.5f, 0.5f, 1.0f}});
+        commands->CmdPresent(window.get(), source.get());
+        ASSERT_EQ(core->SubmitCommandContext(commands.get()), 0);
+        core->WaitGPU();
+        if (hdr) {
+          std::unique_ptr<graphics::CommandContext> readback;
+          ASSERT_EQ(core->CreateCommandContext(&readback), 0);
+          auto *aligned = window->AlignHDRComposition(readback.get());
+          ASSERT_EQ(aligned->Extent().width, fb.x);
+          ASSERT_EQ(aligned->Extent().height, fb.y);
+          ASSERT_EQ(core->SubmitCommandContext(readback.get()), 0);
+          core->WaitGPU();
+          std::vector<uint16_t> pixels(size_t(fb.x) * fb.y * 4);
+          aligned->DownloadData(pixels.data());
+          // Check both bottom corners: a stale square target leaves a black
+          // border, crops the image or fails to write the newly exposed area.
+          for (int x : {0, fb.x - 1}) {
+            size_t offset = (size_t(fb.y - 1) * fb.x + x) * 4;
+            auto expected = ExpectedOutput(window.get(), glm::vec3{0.5f});
+            for (int c = 0; c < 3; ++c)
+              EXPECT_NEAR(glm::unpackHalf1x16(pixels[offset + c]), expected[c], 0.01f);
+          }
+        }
+      }
+    }
+    window->CloseWindow();
+  }
+}
+
 TEST(HDRSurfaceFormatTest, PreferredFormatWinsRegardlessOfEnumerationOrder) {
   const VkSurfaceFormatKHR hdr{VK_FORMAT_R16G16B16A16_SFLOAT, VK_COLOR_SPACE_EXTENDED_SRGB_LINEAR_EXT};
   const VkSurfaceFormatKHR sdr{VK_FORMAT_R8G8B8A8_UNORM, VK_COLOR_SPACE_SRGB_NONLINEAR_KHR};

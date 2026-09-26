@@ -120,6 +120,24 @@ continued SDR presentation after rejected HDR requests. HDR presentation tests
 skip on SDR-only surfaces; the SDR rejection test runs there instead. Numeric PQ
 readback is tested even on SDR desktops without presenting PQ images to them.
 
+The scene-size regression is also opt-in:
+
+```sh
+LONGMARCH_WINDOW_SYSTEM=wayland LONGMARCH_TEST_HDR=1 \
+  ./build-wayland/test/sparkium/sparkium_fallback_test --gtest_filter='VulkanWindowResizeTest.*'
+```
+
+It resizes one window through Cornell Box's 1024×1024 and Texture's 2048×1024
+logical dimensions and back, without toggling HDR between resizes. It checks
+framebuffer/swapchain dimensions in SDR and HDR, and reads back both lower corners
+of the HDR composition to detect stale targets or black borders. At 150% desktop
+scaling, the original Wayland code reproduced a 3072×1536 framebuffer with a stale
+1536×1536 swapchain. Vulkan now rebuilds on framebuffer-size notifications;
+GLFW's Wayland programmatic resize does not emit a logical-window-size callback.
+The regression passes on native Wayland (SDR and PQ) and the default X11-only
+build (SDR, via XWayland). It uses a uniform test image with ImGui, not a rendered
+scene or physical display measurement.
+
 ### Local validation, 2026-09-26
 
 GNOME 50.1 / Wayland, RTX 3090 Ti, NVIDIA 595.91.07, M27P20P at 3840×2160,
