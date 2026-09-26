@@ -57,42 +57,35 @@ under `out/slang-minimum/<version>/results/`. Five boundary/default SDK archives
 from official shader-slang GitHub releases and were verified against release
 SHA-256 metadata; 2026.18.3 reuses the previously verified official SDK.
 
-## Dependency and runtime policy
+## Dependency and configure-time policy
 
 - CMake finds installed Slang >= 2026.18.1 and never downloads it.
 - vcpkg uses the upstream `shader-slang` registry port instead of the project's
   2026.18.3 overlay. The registry snapshot keeps builds reproducible; the manifest
   requests the package by name. Upstream has no 2026.18.1 port entry, so CMake
-  and runtime enforce the compiler floor rather than a manifest constraint on
+  enforces the compiler floor rather than a manifest constraint on
   that unregistered version. Registry updates can select
-  newer packages without changing the runtime requirement.
-- Initialization checks the loaded library's `spGetBuildTagString()` before
-  creating any Slang sessions. It rejects too-old, malformed and prerelease
-  tags with an actionable exception. This also catches a mismatched old runtime
-  selected through dynamic-library search paths, provided the library can load.
-- Official release versions and git-describe builds based on a supported release
-  are accepted. The check runs once per process; compiler global sessions remain
-  thread-local. ABI/loader failures before initialization cannot be repaired by
-  this check. The minimum is shared between CMake and C++ via a build definition.
+  newer packages without changing the configure-time requirement.
+- Version validation happens exclusively in CMake against the selected SDK's
+  package version. Too-old or missing SDKs stop configuration with setup guidance.
+  There is no C++ version parser or runtime compiler-version check.
+- The lower-bound comparison allows newer calendar-year SDK versions, rather
+  than treating the year as an incompatible major version. Deployment must use
+  the selected SDK's libraries; no runtime mismatch detection is performed.
 
 ## Project validation at the minimum
 
 The official 2026.18.1 macOS ARM64 SDK configured and built Sparkium CLI,
-`test_slang_compiler` and `sparkium_fallback_test` in Ninja Release. Compiler/API
-coverage passed **4/4** (standalone shader corpus, shared-renderer backends,
-invalid-source handling and version parsing). Metal regression passed **27**
+`test_slang_compiler` and `sparkium_fallback_test` in Ninja Release. Before the configure-only adjustment, compiler/API
+coverage passed **4/4**, including the now-removed version parser test. Metal regression passed **27**
 tests, with **12 conditional skips** for desktop/window opt-ins and unavailable
 standalone ray-tracing pipeline parity; this was not a GUI test run. Three Blender scenes also completed native Metal
 ray-query smoke runs at 96×96, 2 spp and 4 bounces with the minimum SDK; these
 are compatibility checks, not repeat performance measurements.
 
-A negative runtime experiment loaded the actual 2026.18 dylib via an isolated
-`DYLD_LIBRARY_PATH` directory under `out/`. The application rejected it before
-creating a compiler session with `Loaded Slang compiler '2026.18' is unsupported;
-require 2026.18.1+ ... Check the Slang runtime library path.` No system library
-was changed. CMake also rejected the 2026.18 SDK with the minimum-version setup
-message. Newer release tags, git-describe tags and malformed/old/prerelease tags
-are covered by the version-parser test.
+CMake rejects the official 2026.18 SDK and accepts 2026.18.1 and the upstream
+vcpkg 2026.18.2 SDK. The earlier runtime-version guard and its parser test have
+been removed; compiler tests now contain the three shader/API tests only.
 
 ### Boundary SDK archive checksums
 
@@ -108,6 +101,7 @@ The default upstream registry SDK, 2026.18.2, was also run through the same
 58-case compiler-output corpus with the same results as 2026.18.1 and 2026.18.3.
 
 The upstream vcpkg registry installation of 2026.18.2 also configured and built
-Sparkium CLI and the compiler tests successfully. Compiler tests passed **4/4**,
+Sparkium CLI and the compiler tests successfully. After removing the runtime
+version guard, the rebuilt compiler tests passed **3/3**,
 and a Metal native-query Monster smoke run (96×96, 2 spp, 4 bounces) completed.
 This checks the default package provider as well as the minimum external SDK.

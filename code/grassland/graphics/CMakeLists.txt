@@ -1,8 +1,6 @@
 file(GLOB SOURCES "*.cpp" "*.h")
 
 add_library(${GRASSLAND_SUBLIB_NAME} ${SOURCES})
-target_compile_definitions(${GRASSLAND_SUBLIB_NAME} PRIVATE
-    LONGMARCH_MIN_SLANG_VERSION="${LONGMARCH_MIN_SLANG_VERSION}")
 if(APPLE)
     enable_language(OBJCXX)
     target_sources(${GRASSLAND_SUBLIB_NAME} PRIVATE window_gestures.mm)

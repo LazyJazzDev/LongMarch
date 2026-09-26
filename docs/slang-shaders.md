@@ -30,11 +30,9 @@ annotation needs 2026.18.1. Caller-only integer annotations across user function
 boundaries still require rewriting at the actual resource access.
 
 `cmake/Slang.cmake` finds an installed package (2026.18.1 or newer).
-Before the first compiler session, the runtime also checks `spGetBuildTagString()`
-from the loaded library. Old, unknown and prerelease tags fail with the required
-version and a runtime-library-path hint. Official release tags and git-describe
-builds based on an accepted release are supported. The version check cannot
-prove that every future compiler build is regression-free.
+The minimum is checked exclusively at CMake configure time using the discovered
+SDK package version. There is no C++ version parser or runtime version check.
+Newer calendar-year versions are allowed by an explicit lower-bound comparison.
 It never downloads Slang and fails with setup instructions if none is found.
 vcpkg manages downloads, installation and binary caching; for offline builds,
 populate the vcpkg caches/install tree beforehand. The system `slangc` and the
