@@ -75,8 +75,12 @@ packaging needs separate integration on its development branch.
 - D3D12: Slang emits DXIL. Slang may invoke downstream DXC for this target;
   removing direct DXC API integration does not remove that downstream tool.
   The official Windows Slang archive does not bundle DXC (verified from the
-  2026.18.3 x86-64 archive). The Windows-only vcpkg `directx-dxc` dependency
-  supplies dxcompiler.dll and dxil.dll; deployment copies these next to Slang.
+  2026.18.3 x86-64 archive). The Windows SDK supplies dxcompiler.dll and dxil.dll;
+  deployment copies this matching pair next to Slang. CMake prefers the selected
+  Windows SDK, then the newest installed SDK containing both DLLs for the target
+  architecture. Set `LONGMARCH_DXC_RUNTIME_DIR` to an SDK `bin/<version>/<arch>`
+  directory to select it explicitly. Install a recent Windows SDK if neither DLL
+  pair is available; DXC is no longer supplied by vcpkg.
   LongMarch does not link the DXC API.
 
 Column-major matrix layout, DirectX-compatible buffer layout, entry point names,

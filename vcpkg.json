@@ -8,10 +8,6 @@
       "name": "d3dx12",
       "platform": "windows"
     },
-    {
-      "name": "directx-dxc",
-      "platform": "windows"
-    },
     "eigen3",
     "fmt",
     "freetype",
