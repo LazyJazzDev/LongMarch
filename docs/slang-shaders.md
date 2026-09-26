@@ -126,7 +126,34 @@ Windows x64 / MSVC 19.44 / Ninja Release was also validated on an RTX 3090 Ti
   empty compilation results. Vulkan queries and enables supported
   `shaderDrawParameters`, required by Slang's vertex/instance ID lowering.
 
-Interactive Windows GUI behavior and Linux SDK deployment were not tested.
+### Windows validation after rebasing onto main
+
+Rebased onto `12c859d` (including the HDR presentation fixes) and repeated
+validation on the Windows / RTX 3090 Ti configuration above:
+
+- Built all 20 current demo targets and `test/all`, plus the explicitly excluded
+  Slang compiler, Vulkan compatibility and window-input tests, with Ninja Release.
+- All 47 automated demo runs exited successfully: all 11 graphics_hello modules,
+  2048, GoL, Sparkium CLI and Sparkium GUI SDR/HDR on both D3D12 and Vulkan;
+  NBody CS compute/offscreen/window on both backends; eight console/CUDA demos;
+  and CUDA NBody headless mode.
+- Opened ImGui, DrawNGUI, joystick_test, Practium, Franka and CUDA NBody windows,
+  inspected their rendered content and closed them normally (exit code zero).
+  No joystick was connected, so physical controller input was not checked.
+- Slang compiler tests (3), Vulkan compatibility tests (2), window-input tests (2)
+  and GoL tests (31) passed.
+- Sparkium regression runs with each of `SPARKIUM_TEST_BACKEND=d3d12` and
+  `vulkan` passed 32 tests and skipped two unsupported-HDR cases because this
+  desktop supports HDR. Backend debugging, Vulkan synchronization validation
+  and HDR window tests were enabled. No Vulkan validation errors were reported.
+- External ray tracing shaders use assets commit `f5d2bcd`, rebased onto the
+  assets main branch; both native backends ran the external_shader demo.
+
+These are short smoke runs (generally six frames; CLI two frames), not exhaustive
+interaction, long-running stability or calibrated HDR luminance measurements.
+Slang still emits existing implicit-conversion and possible-uninitialized-variable
+warnings. Linux deployment and Metal were not rerun during this Windows rebase
+validation; the Apple Silicon results above describe the earlier revision.
 
 ```sh
 cmake -S . -B out/slang-build -G Ninja -DCMAKE_BUILD_TYPE=Release \
