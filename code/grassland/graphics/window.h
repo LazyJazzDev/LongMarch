@@ -29,16 +29,14 @@ struct DisplayBrightness {
 };
 
 // ImGui vertex colors are sRGB values; floating-point HDR targets are linear.
-// Select float vertex upload conversion without modifying the draw lists.
+// Restore the draw lists after the backend uploads them, so retries do not decode twice.
 class ImGuiLinearColors {
  public:
   explicit ImGuiLinearColors(bool enabled);
   ~ImGuiLinearColors();
 
  private:
-  bool previous_;
-  ImGuiLinearColors(const ImGuiLinearColors &) = delete;
-  ImGuiLinearColors &operator=(const ImGuiLinearColors &) = delete;
+  std::vector<std::pair<ImDrawVert *, ImU32>> colors_;
 };
 
 class Window {

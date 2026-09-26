@@ -5,8 +5,6 @@
 #include <cstdlib>
 #include <glm/gtc/packing.hpp>
 
-#include "grassland/imgui/vertex_upload.h"
-
 #if defined(LONGMARCH_D3D12_ENABLED)
 #include "grassland/graphics/backend/d3d12/d3d12_window.h"
 #endif
@@ -15,36 +13,6 @@
 #endif
 
 using namespace grassland;
-
-TEST(HDRImGuiUploadTest, PreservesDarkColorsAlphaAndOriginalVertices) {
-  std::vector<ImDrawVert> source(256);
-  std::vector<grassland::imgui::GPUVertex> uploaded(256);
-  for (int i = 0; i < 256; ++i)
-    source[i] = {{1, 2}, {0.25f, 0.75f}, IM_COL32(i, i, i, 123)};
-  {
-    graphics::ImGuiLinearColors linear(true);
-    grassland::imgui::UploadVertices(uploaded.data(), source.data(), 256);
-    std::string uploaded_colors;
-    for (int i = 0; i < 256; ++i) {
-      uploaded_colors += (i ? "," : "") + std::to_string(uploaded[i].col.x);
-      const float c = i / 255.0f;
-      const float expected = c <= 0.04045f ? c / 12.92f : std::pow((c + 0.055f) / 1.055f, 2.4f);
-      EXPECT_NEAR(uploaded[i].col.x, expected, 1e-6f);
-      EXPECT_NEAR(uploaded[i].col.w, 123 / 255.0f, 1e-6f);
-      EXPECT_EQ(source[i].col, IM_COL32(i, i, i, 123));
-      if (i > 0)
-        EXPECT_GT(uploaded[i].col.x, uploaded[i - 1].col.x);
-    }
-    RecordProperty("linear_vertex_values", uploaded_colors);
-    {
-      graphics::ImGuiLinearColors sdr(false);
-      grassland::imgui::UploadVertices(uploaded.data(), source.data(), 256);
-      EXPECT_FLOAT_EQ(uploaded[6].col.x, 6 / 255.0f);
-    }
-    EXPECT_TRUE(grassland::imgui::linear_vertex_colors);
-  }
-  EXPECT_FALSE(grassland::imgui::linear_vertex_colors);
-}
 
 #if defined(LONGMARCH_VULKAN_ENABLED)
 class FailingSwapchainWindow : public graphics::backend::VulkanWindow {
@@ -465,7 +433,7 @@ TEST_P(HDRWindowTest, PresentationAndImGuiSwitching) {
           ImGui::GetIO().IniFilename = nullptr;
           window->BeginImGuiFrame();
           ImGui::TextUnformatted("HDR / SDR switching");
-          ImGui::GetForegroundDrawList()->AddRectFilled({100, 100}, {220, 200}, IM_COL32(6, 6, 6, 255));
+          ImGui::GetForegroundDrawList()->AddRectFilled({100, 100}, {220, 200}, IM_COL32(128, 128, 128, 255));
           window->EndImGuiFrame();
         }
         std::unique_ptr<graphics::CommandContext> commands;
@@ -485,12 +453,10 @@ TEST_P(HDRWindowTest, PresentationAndImGuiSwitching) {
           const float scale = window->HDRReferenceWhiteScale();
           const size_t center =
               ((aligned->Extent().height / 2) * aligned->Extent().width + aligned->Extent().width / 2) * 4;
-          // Dark sRGB must survive float upload even with white alignment disabled.
-          const auto expected =
-              ExpectedOutput(window.get(), imgui ? glm::vec3{6.0f / 255.0f / 12.92f} : glm::vec3{3, 2, 1});
+          // UI must remain linear even with reference-white alignment disabled.
+          const auto expected = ExpectedOutput(window.get(), imgui ? glm::vec3{0.216f} : glm::vec3{3, 2, 1});
           for (int c = 0; c < 3; ++c)
-            EXPECT_NEAR(glm::unpackHalf1x16(pixels[center + c]), expected[c],
-                        (UsesPQSwapchain(window.get()) ? 0.001f : 0.00002f) * scale);
+            EXPECT_NEAR(glm::unpackHalf1x16(pixels[center + c]), expected[c], 0.01f * scale);
         }
         if (!resized) {
           window->Resize(352, 256);

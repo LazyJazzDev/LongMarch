@@ -2,15 +2,15 @@ set(SOURCES "")
 list(APPEND SOURCES ${LONGMARCH_IMGUI_DIR}/backends/imgui_impl_glfw.cpp)
 
 if (LONGMARCH_VULKAN_ENABLED)
-    list(APPEND SOURCES backends/imgui_impl_vulkan.cpp)
+    list(APPEND SOURCES ${LONGMARCH_IMGUI_DIR}/backends/imgui_impl_vulkan.cpp)
 endif ()
 
 if (LONGMARCH_D3D12_ENABLED)
-    list(APPEND SOURCES backends/imgui_impl_dx12.cpp)
+    list(APPEND SOURCES ${LONGMARCH_IMGUI_DIR}/backends/imgui_impl_dx12.cpp)
 endif ()
 
 if (LONGMARCH_METAL_ENABLED)
-    list(APPEND SOURCES backends/imgui_impl_metal.mm)
+    list(APPEND SOURCES ${LONGMARCH_IMGUI_DIR}/backends/imgui_impl_metal.mm)
 endif ()
 add_library(${GRASSLAND_SUBLIB_NAME} ${SOURCES})
 if (LONGMARCH_METAL_ENABLED)

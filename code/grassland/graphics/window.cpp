@@ -6,7 +6,6 @@
 #include "grassland/graphics/image.h"
 #include "grassland/graphics/program.h"
 #include "grassland/graphics/shader.h"
-#include "grassland/imgui/vertex_upload.h"
 #ifdef _WIN32
 #define GLFW_EXPOSE_NATIVE_WIN32
 #include <GLFW/glfw3native.h>
@@ -20,12 +19,22 @@
 
 namespace grassland::graphics {
 
-ImGuiLinearColors::ImGuiLinearColors(bool enabled) : previous_(imgui::linear_vertex_colors) {
-  imgui::linear_vertex_colors = enabled;
+ImGuiLinearColors::ImGuiLinearColors(bool enabled) {
+  if (!enabled || !ImGui::GetDrawData())
+    return;
+  for (auto *list : ImGui::GetDrawData()->CmdLists) {
+    for (auto &vertex : list->VtxBuffer) {
+      colors_.emplace_back(&vertex, vertex.col);
+      auto color = ImGui::ColorConvertU32ToFloat4(vertex.col);
+      auto linear = [](float c) { return c <= 0.04045f ? c / 12.92f : std::pow((c + 0.055f) / 1.055f, 2.4f); };
+      vertex.col = ImGui::ColorConvertFloat4ToU32({linear(color.x), linear(color.y), linear(color.z), color.w});
+    }
+  }
 }
 
 ImGuiLinearColors::~ImGuiLinearColors() {
-  imgui::linear_vertex_colors = previous_;
+  for (const auto &entry : colors_)
+    entry.first->col = entry.second;
 }
 
 struct Window::HDRPresentation {
