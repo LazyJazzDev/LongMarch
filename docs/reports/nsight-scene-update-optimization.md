@@ -4,11 +4,21 @@ Measured on 2026-09-27, Windows x64, RTX 3090 Ti / driver 596.49,
 MSVC 19.44, Ninja Release, Slang 2026.18.2, Windows SDK 10.0.26100.0
 DXC 1.8.2502.11. This follows the [Classroom Nsight diagnosis](classroom-nsight-profile.md).
 
+![Measured D3D12 and Vulkan throughput before and after optimization](https://media.githubusercontent.com/media/LazyJazzDev/LongMarchAssetsLFS/3a7d62bd12ef307be500b0b4a5d2242c86326af3/reports/nsight-scene-updates/throughput.png)
+
+The chart is generated from the recorded frame data using
+`scripts/plot_scene_update_benchmark.py`; its content-only [asset PR #34](https://github.com/LazyJazzDev/LongMarchAssetsLFS/pull/34)
+is merged. Each panel uses its own vertical scale; bars within a panel share a scale.
+
 ## Change and scope
 
 Baseline: `ab8c5c1`; optimized implementation: `082d216` on
-`perf/nsight-scene-updates`, branched from PR60. Both executables use the same
-vcpkg baseline and compiler DLLs. Assets remain
+`perf/nsight-scene-updates`, originally branched from PR60. After PR60 merged,
+the optimization was replayed onto `e9e6ff1` as `84dbed6`, with identical code
+and tests. The merged scene assets are byte-identical to the measured revision;
+the current asset pointer additionally publishes the chart above.
+Both measured executables use the same
+vcpkg baseline and compiler DLLs. Measured scene assets:
 `f5d2bcde1b3712a3fd3bdd37c4575666f0661ee1`.
 
 The previous Nsight trace identified thousands of tiny synchronous uploads
