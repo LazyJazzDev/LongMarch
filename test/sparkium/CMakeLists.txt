@@ -1,4 +1,4 @@
-add_executable(sparkium_fallback_test fallback_test.cpp metal_backend_test.cpp)
+add_executable(sparkium_fallback_test fallback_test.cpp metal_backend_test.cpp hdr_window_test.cpp)
 if (LONGMARCH_METAL_ENABLED)
     target_sources(sparkium_fallback_test PRIVATE metal_window_test.mm)
 endif ()

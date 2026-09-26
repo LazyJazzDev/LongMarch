@@ -38,7 +38,11 @@ Per-case logs, images, and `results.json` are written to the output directory.
 
 ## HDR preview in the scene browser
 
-The GUI offers an experimental **HDR preview** checkbox on Metal and an
+All nine bundled scenes default to `renderer.pipeline: "auto"`, including the
+Blender scenes. The GUI shows the resolved pipeline; an explicit user selection
+can still override it.
+
+The GUI offers an experimental **HDR preview** checkbox on Metal, D3D12 and Vulkan and an
 **Exposure (EV)** slider. HDR preview develops the film into a floating-point
 linear-sRGB image and enables the window's HDR/EDR presentation. Values above
 1.0 are preserved rather than normalized or clipped to SDR white. For example,
@@ -57,10 +61,30 @@ turning it off restores those settings. The selected display mode persists when
 changing or reloading scenes, while exposure is loaded from the new scene.
 This preview does not change scene files or the CLI/export path.
 
-The first version exposes HDR preview only on Metal. Visible HDR highlights
-require EDR headroom above 1.0 on the window's current screen; Metal logs current
+On Windows, use `--backend d3d12 --hdr` or `--backend vulkan --hdr` and enable
+HDR in Windows display settings. Both backends use a floating-point RGBA16
+swapchain with linear scRGB presentation. Vulkan requires the surface to expose
+`VK_COLOR_SPACE_EXTENDED_SRGB_LINEAR_EXT`; an unsupported HDR request reports
+an error instead of silently presenting linear HDR through an SDR swapchain.
+Visible HDR highlights on Metal require EDR headroom above 1.0 on the window's current screen; Metal logs current
 and potential headroom when HDR is enabled. A floating-point output path alone
 cannot make an SDR-only display brighter. See [Metal HDR presentation](metal-backend.md#hdr--edr-presentation).
+
+Windows validation (RTX 3090 Ti, driver 596.49, Ninja Release): HDR film development,
+surface-format preference, and D3D12/Vulkan presentation with repeated HDR/SDR
+switching all pass (4 tests). The window tests exercise both ImGui and plain
+presentation with backend debugging and Vulkan synchronization validation enabled:
+
+```powershell
+$env:LONGMARCH_TEST_HDR_WINDOWS = '1'
+$env:VK_LAYER_VALIDATE_SYNC = '1'
+./cmake-build-ninja/test/sparkium/sparkium_fallback_test.exe --gtest_filter=*HDR*
+```
+
+Actual [D3D12 and Vulkan window captures](https://github.com/LazyJazzDev/LongMarchAssetsLFS/tree/4525201a838f8e02691144a1c05afe9452b49df6/reports/sparkium-hdr-windows)
+show the HDR control and resolved Auto pipeline at 768x768, 1 sample per frame,
+8 bounces and maximum exposure 100. The PNG captures do not measure physical HDR
+brightness or provide an equal-sample comparison. Metal was not retested here.
 
 The **Render settings** panel exposes path-tracing samples per frame, maximum
 bounces, alpha shadows, background, persistence, per-sample clamping, and

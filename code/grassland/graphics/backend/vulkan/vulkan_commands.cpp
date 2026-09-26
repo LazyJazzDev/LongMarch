@@ -421,6 +421,11 @@ void VulkanCmdPresent::CompileCommand(VulkanCommandContext *context, VkCommandBu
   clear_range.layerCount = 1;
   vkCmdClearColorImage(command_buffer, window_->CurrentImage(), VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, &clear_color, 1,
                        &clear_range);
+  // Clearing the letterbox and blitting both write the swapchain image.
+  vulkan::TransitImageLayout(command_buffer, window_->CurrentImage(), VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+                             VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_PIPELINE_STAGE_TRANSFER_BIT,
+                             VK_PIPELINE_STAGE_TRANSFER_BIT, VK_ACCESS_TRANSFER_WRITE_BIT, VK_ACCESS_TRANSFER_WRITE_BIT,
+                             VK_IMAGE_ASPECT_COLOR_BIT);
 
   const float scale = std::min(static_cast<float>(window_extent.width) / image_extent.width,
                                static_cast<float>(window_extent.height) / image_extent.height);
@@ -448,10 +453,10 @@ void VulkanCmdPresent::CompileCommand(VulkanCommandContext *context, VkCommandBu
   auto &imgui_assets = window_->ImGuiAssets();
   if (imgui_assets.context && imgui_assets.draw_command) {
     imgui_assets.draw_command = false;
-    vulkan::TransitImageLayout(command_buffer, window_->CurrentImage(), VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
-                               VK_IMAGE_LAYOUT_GENERAL, VK_PIPELINE_STAGE_TRANSFER_BIT,
-                               VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, VK_ACCESS_TRANSFER_WRITE_BIT,
-                               VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT, VK_IMAGE_ASPECT_COLOR_BIT);
+    vulkan::TransitImageLayout(
+        command_buffer, window_->CurrentImage(), VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_GENERAL,
+        VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, VK_ACCESS_TRANSFER_WRITE_BIT,
+        VK_ACCESS_COLOR_ATTACHMENT_READ_BIT | VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT, VK_IMAGE_ASPECT_COLOR_BIT);
 
     ImGui::SetCurrentContext(imgui_assets.context);
 

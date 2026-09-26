@@ -84,10 +84,8 @@ int main(int argc, char **argv) {
       throw std::runtime_error("failed to create graphics core");
     if (graphics_core->InitializeLogicalDeviceAutoSelect(false) != 0)
       throw std::runtime_error("failed to initialize graphics device");
-    const bool hdr_available = graphics_core->API() == graphics::BACKEND_API_METAL;
-    if (hdr_requested && !hdr_available)
-      throw std::invalid_argument("HDR preview currently requires the Metal backend");
     bool hdr_active = false;
+    std::string hdr_error;
     sparkium::Core core(graphics_core.get());
 
     std::unique_ptr<sparkium::JsonScene> loaded;
@@ -122,6 +120,11 @@ int main(int argc, char **argv) {
                                       "Sparkium Scene Browser", false, true, &window);
     ResizeWindowForFilm(window.get(), loaded->GetFilm());
     resize_pending = false;
+    if (hdr_requested) {
+      window->SetHDR(true);
+      hdr_active = true;
+      create_display_image();
+    }
     window->InitImGui(nullptr, 18.0f);
     FPSCounter fps_counter;
     bool show_browser = true;
@@ -130,9 +133,15 @@ int main(int argc, char **argv) {
     while (!window->ShouldClose() && (!frame_limit || rendered_frames++ < frame_limit)) {
       // Apply before BeginImGuiFrame so ImGui and presentation use the same format.
       if (hdr_requested != hdr_active) {
-        window->SetHDR(hdr_requested);
-        hdr_active = hdr_requested;
-        create_display_image();
+        try {
+          window->SetHDR(hdr_requested);
+          hdr_active = hdr_requested;
+          hdr_error.clear();
+          create_display_image();
+        } catch (const std::exception &error) {
+          hdr_error = error.what();
+          hdr_requested = hdr_active;
+        }
       }
       window->BeginImGuiFrame();
       ImGui::SetNextWindowPos({10, 10}, ImGuiCond_Once);
@@ -177,14 +186,13 @@ int main(int argc, char **argv) {
         }
         ImGui::EndCombo();
       }
-      ImGui::BeginDisabled(!hdr_available);
       ImGui::Checkbox("HDR preview", &hdr_requested);
-      ImGui::EndDisabled();
       if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled))
         ImGui::SetTooltip(
-            hdr_available
-                ? "Linear HDR with exposure; bypasses SDR view transform, gamma and contrast. Requires an HDR display."
-                : "HDR preview currently requires the Metal backend.");
+            "Linear HDR with exposure; bypasses SDR view transform, gamma and contrast. Requires an HDR display "
+            "and HDR enabled in the operating system.");
+      if (!hdr_error.empty())
+        ImGui::TextWrapped("HDR unavailable: %s", hdr_error.c_str());
       ImGui::SliderFloat("Exposure (EV)", &loaded->GetFilm()->info.exposure, -8.0f, 8.0f, "%.2f");
       ImGui::TextUnformatted(hdr_active ? "Display: HDR (linear)" : "Display: SDR (scene view transform)");
       auto *film = loaded->GetFilm();

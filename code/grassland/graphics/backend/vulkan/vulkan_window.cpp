@@ -44,6 +44,20 @@ void VulkanWindow::CloseWindow() {
   Window::CloseWindow();
 }
 
+void VulkanWindow::SetHDR(bool enable_hdr) {
+  if (enable_hdr == enable_hdr_)
+    return;
+  if (enable_hdr) {
+    const auto support =
+        vulkan::Swapchain::QuerySwapChainSupport(core_->Device()->PhysicalDevice().Handle(), surface_->Handle());
+    const auto format = vulkan::Swapchain::ChooseSwapSurfaceFormat(support.formats, VK_FORMAT_R16G16B16A16_SFLOAT,
+                                                                   VK_COLOR_SPACE_EXTENDED_SRGB_LINEAR_EXT);
+    if (format.format != VK_FORMAT_R16G16B16A16_SFLOAT || format.colorSpace != VK_COLOR_SPACE_EXTENDED_SRGB_LINEAR_EXT)
+      throw std::runtime_error("The Vulkan surface does not support linear scRGB HDR presentation");
+  }
+  Window::SetHDR(enable_hdr);
+}
+
 vulkan::Swapchain *VulkanWindow::SwapChain() const {
   return swap_chain_.get();
 }
@@ -65,6 +79,7 @@ uint32_t VulkanWindow::AcquireNextImage() {
 
 void VulkanWindow::Rebuild() {
   core_->WaitGPU();
+  imgui_assets_.framebuffers.clear();
   swap_chain_.reset();
   core_->Device()->CreateSwapchain(
       surface_.get(), enable_hdr_ ? VK_FORMAT_R16G16B16A16_SFLOAT : VK_FORMAT_R8G8B8A8_UNORM,
@@ -182,7 +197,7 @@ void VulkanWindow::SetupImGuiContext() {
   init_info.DescriptorPoolSize = 32;
   init_info.RenderPass = imgui_assets_.render_pass->Handle();
   init_info.MinImageCount = 2;
-  init_info.ImageCount = 3;
+  init_info.ImageCount = swap_chain_->ImageCount();
   init_info.MSAASamples = VK_SAMPLE_COUNT_1_BIT;
   ImGui_ImplVulkan_Init(&init_info);
 

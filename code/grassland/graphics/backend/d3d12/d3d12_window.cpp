@@ -17,7 +17,7 @@ D3D12Window::D3D12Window(D3D12Core *core,
   core_->DXGIFactory()->CreateSwapChain(
       *core_->CommandQueue(), hwnd, std::max(std::min(core_->FramesInFlight(), DXGI_MAX_SWAP_CHAIN_BUFFERS), 2),
       enable_hdr_ ? DXGI_FORMAT_R16G16B16A16_FLOAT : DXGI_FORMAT_R8G8B8A8_UNORM, &swap_chain_);
-  ResizeEvent().RegisterCallback([this](int width, int height) {
+  swap_chain_recreate_event_id_ = ResizeEvent().RegisterCallback([this](int width, int height) {
     core_->WaitGPU();
     swap_chain_.reset();
     HWND hwnd = glfwGetWin32Window(GLFWWindow());
@@ -25,6 +25,7 @@ D3D12Window::D3D12Window(D3D12Core *core,
         *core_->CommandQueue(), hwnd, std::max(std::min(core_->FramesInFlight(), DXGI_MAX_SWAP_CHAIN_BUFFERS), 2),
         enable_hdr_ ? DXGI_FORMAT_R16G16B16A16_FLOAT : DXGI_FORMAT_R8G8B8A8_UNORM, &swap_chain_);
     if (imgui_assets_.context && imgui_assets_.rtv_format != swap_chain_->BackBufferFormat()) {
+      ImGui::SetCurrentContext(imgui_assets_.context);
       ImGui_ImplDX12_Shutdown();
       ImGui_ImplGlfw_Shutdown();
 

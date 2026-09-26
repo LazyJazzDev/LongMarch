@@ -17,6 +17,7 @@ class VulkanWindow : public Window {
   ~VulkanWindow();
 
   virtual void CloseWindow() override;
+  void SetHDR(bool enable_hdr) override;
 
   vulkan::Swapchain *SwapChain() const;
 
