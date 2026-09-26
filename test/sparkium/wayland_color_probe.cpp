@@ -181,10 +181,8 @@ int main(int argc, char **argv) {
       return 77;
     }
     core->CreateWindowObject(480, 240, "HDR reference white (PQ/scRGB)", &hdr);
-    try {
-      hdr->SetHDR(true);
-    } catch (const std::runtime_error &error) {
-      std::cout << "SKIP: " << error.what() << '\n';
+    if (hdr->SetHDR(true) != 0) {
+      std::cout << "SKIP: HDR presentation is unavailable; see the application log\n";
       return 77;
     }
     Probe sdr_probe(sdr.get()), hdr_probe(hdr.get());

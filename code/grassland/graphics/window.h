@@ -82,7 +82,9 @@ class Window {
 
   bool ShouldClose() const;
 
-  virtual void SetHDR(bool enable_hdr);
+  // Request an application presentation mode (not the desktop HDR setting).
+  // Returns 0 on success, nonzero on failure; details are logged.
+  virtual int SetHDR(bool enable_hdr);
 
   // Main-thread query, refreshed at most every 500 ms, including monitor changes.
   DisplayBrightness GetDisplayBrightness();

@@ -25,11 +25,7 @@ bool HasHDRSurface(graphics::Window *window) {
     auto swapchain = native->SwapChain();
     const auto support = vulkan::Swapchain::QuerySwapChainSupport(swapchain->Device()->PhysicalDevice().Handle(),
                                                                   swapchain->Surface()->Handle());
-    try {
-      graphics::backend::VulkanWindow::ChooseHDRSurfaceFormat(support.formats);
-    } catch (const std::runtime_error &) {
-      return false;
-    }
+    return graphics::backend::VulkanWindow::ChooseHDRSurfaceFormat(support.formats).has_value();
   }
 #endif
   return true;
@@ -79,7 +75,7 @@ TEST(VulkanWindowResizeTest, ProgrammaticSquareToWideUpdatesPresentation) {
     ASSERT_EQ(core->CreateWindowObject(1024, 1024, "Scene resize regression", &window), 0);
     if (hdr && !HasHDRSurface(window.get()))
       continue;  // X11 still exercises the complete SDR resize path.
-    window->SetHDR(hdr);
+    ASSERT_EQ(window->SetHDR(hdr), 0);
     window->InitImGui();
     ImGui::GetIO().IniFilename = nullptr;
     auto *native = dynamic_cast<graphics::backend::VulkanWindow *>(window.get());
@@ -152,15 +148,14 @@ TEST(HDRSurfaceFormatTest, HDRNegotiationPreservesScRGBAndSupportsBothPQLayouts)
   const VkSurfaceFormatKHR pq{VK_FORMAT_A2B10G10R10_UNORM_PACK32, VK_COLOR_SPACE_HDR10_ST2084_EXT};
   const VkSurfaceFormatKHR pq_bgr{VK_FORMAT_A2R10G10B10_UNORM_PACK32, VK_COLOR_SPACE_HDR10_ST2084_EXT};
   const VkSurfaceFormatKHR sdr{VK_FORMAT_R8G8B8A8_UNORM, VK_COLOR_SPACE_SRGB_NONLINEAR_KHR};
-  EXPECT_EQ(VulkanWindow::ChooseHDRSurfaceFormat({pq, sdr, scrgb}).format, scrgb.format);
-  EXPECT_EQ(VulkanWindow::ChooseHDRSurfaceFormat({sdr, pq_bgr, pq}).format, pq.format);
-  EXPECT_EQ(VulkanWindow::ChooseHDRSurfaceFormat({sdr, pq_bgr}).format, pq_bgr.format);
-  EXPECT_THROW(VulkanWindow::ChooseHDRSurfaceFormat({sdr}), std::runtime_error);
-  EXPECT_THROW(VulkanWindow::ChooseHDRSurfaceFormat({}), std::runtime_error);
+  EXPECT_EQ(VulkanWindow::ChooseHDRSurfaceFormat({pq, sdr, scrgb})->format, scrgb.format);
+  EXPECT_EQ(VulkanWindow::ChooseHDRSurfaceFormat({sdr, pq_bgr, pq})->format, pq.format);
+  EXPECT_EQ(VulkanWindow::ChooseHDRSurfaceFormat({sdr, pq_bgr})->format, pq_bgr.format);
+  EXPECT_FALSE(VulkanWindow::ChooseHDRSurfaceFormat({sdr}));
+  EXPECT_FALSE(VulkanWindow::ChooseHDRSurfaceFormat({}));
   // Float storage or 10-bit precision alone does not establish HDR encoding.
-  EXPECT_THROW(VulkanWindow::ChooseHDRSurfaceFormat(
-                   {{scrgb.format, VK_COLOR_SPACE_BT709_LINEAR_EXT}, {pq.format, VK_COLOR_SPACE_SRGB_NONLINEAR_KHR}}),
-               std::runtime_error);
+  EXPECT_FALSE(VulkanWindow::ChooseHDRSurfaceFormat(
+      {{scrgb.format, VK_COLOR_SPACE_BT709_LINEAR_EXT}, {pq.format, VK_COLOR_SPACE_SRGB_NONLINEAR_KHR}}));
 }
 #endif
 
@@ -198,6 +193,24 @@ class BrightnessProbeWindow : public graphics::Window {
   }
 };
 
+TEST(HDRBrightnessTest, SetHDRReportsFailureWithoutThrowing) {
+  if (!InteractiveHDRTests())
+    GTEST_SKIP();
+  BrightnessProbeWindow window;
+  window.brightness = {240.0f, 3.0f, 0.0f, true, true};
+  ASSERT_EQ(window.SetHDR(true), 0);
+  auto callback = window.ResizeEvent().RegisterCallback(
+      [](int, int) { throw std::runtime_error("Injected presentation notification failure"); });
+  EXPECT_NE(window.SetHDR(false), 0);
+  EXPECT_FLOAT_EQ(window.HDRReferenceWhiteScale(), 3.0f);
+  window.ResizeEvent().UnregisterCallback(callback);
+  EXPECT_EQ(window.SetHDR(false), 0);
+  EXPECT_FLOAT_EQ(window.HDRReferenceWhiteScale(), 1.0f);
+  window.CloseWindow();
+  EXPECT_NE(window.SetHDR(true), 0);
+  EXPECT_NE(window.SetHDR(false), 0);
+}
+
 TEST(HDRBrightnessTest, RefreshNotifiesAndUnknownReferenceFallsBack) {
   if (!InteractiveHDRTests())
     GTEST_SKIP();
@@ -208,7 +221,7 @@ TEST(HDRBrightnessTest, RefreshNotifiesAndUnknownReferenceFallsBack) {
   window.RefreshDisplayBrightness();
   EXPECT_EQ(changes, 1);
   EXPECT_EQ(window.HDRReferenceWhiteScale(), 1.0f);  // SDR must never scale.
-  window.SetHDR(true);
+  ASSERT_EQ(window.SetHDR(true), 0);
   EXPECT_EQ(window.HDRReferenceWhiteScale(), 6.0f);
   EXPECT_EQ(changes, 1);
   window.brightness = {160.0f, 2.0f, 0.0f, true, true};
@@ -253,7 +266,7 @@ TEST_P(HDRWindowTest, PresentationAndImGuiSwitching) {
     ASSERT_EQ(core->CreateImage(320, 240, graphics::IMAGE_FORMAT_R32G32B32A32_SFLOAT, &image), 0);
     bool resized = false;
     for (bool hdr : {true, true, false, true, false}) {
-      window->SetHDR(hdr);
+      ASSERT_EQ(window->SetHDR(hdr), 0);
 #if defined(LONGMARCH_D3D12_ENABLED)
       if (GetParam() == graphics::BACKEND_API_D3D12) {
         auto native = dynamic_cast<graphics::backend::D3D12Window *>(window.get());
@@ -268,7 +281,7 @@ TEST_P(HDRWindowTest, PresentationAndImGuiSwitching) {
         const auto support = vulkan::Swapchain::QuerySwapChainSupport(swapchain->Device()->PhysicalDevice().Handle(),
                                                                       swapchain->Surface()->Handle());
         const auto expected_format =
-            hdr ? graphics::backend::VulkanWindow::ChooseHDRSurfaceFormat(support.formats).format
+            hdr ? graphics::backend::VulkanWindow::ChooseHDRSurfaceFormat(support.formats)->format
                 : VK_FORMAT_R8G8B8A8_UNORM;
         EXPECT_EQ(swapchain->Format(), expected_format);
       }
@@ -323,7 +336,7 @@ TEST_P(HDRWindowTest, ReferenceWhiteScalingPreservesSourceAndAlpha) {
   ASSERT_EQ(core->CreateWindowObject(320, 240, "HDR reference white test", &window), 0);
   if (!HasHDRSurface(window.get()))
     GTEST_SKIP() << "Desktop exposes no supported HDR surface";
-  window->SetHDR(true);
+  ASSERT_EQ(window->SetHDR(true), 0);
   auto *composition = window->PrepareHDRComposition(core.get(), {13, 7});
   ASSERT_NE(composition, nullptr);
   std::vector<uint16_t> source(13 * 7 * 4);
@@ -364,7 +377,7 @@ TEST_P(HDRWindowTest, ReferenceWhiteScalingPreservesSourceAndAlpha) {
   else
     EXPECT_EQ(window->PrepareHDRComposition(core.get(), {13, 7}), nullptr);
   window->SetHDRBrightnessAlignment(true);
-  window->SetHDR(false);
+  ASSERT_EQ(window->SetHDR(false), 0);
   EXPECT_EQ(window->HDRReferenceWhiteScale(), 1.0f);
   window->CloseWindow();
 }
@@ -382,7 +395,7 @@ TEST_P(HDRWindowTest, UnsupportedHDRLeavesSDRPresentationUsable) {
   window->InitImGui();
   ImGui::GetIO().IniFilename = nullptr;
   for (int i = 0; i < 3; ++i) {
-    EXPECT_THROW(window->SetHDR(true), std::runtime_error);
+    EXPECT_NE(window->SetHDR(true), 0);
     window->BeginImGuiFrame();
     ImGui::TextUnformatted("SDR remains usable");
     window->EndImGuiFrame();
@@ -408,7 +421,7 @@ TEST_P(HDRWindowTest, PQReadbackUsesAbsoluteNitsAndPreservesSource) {
   ASSERT_EQ(core->InitializeLogicalDeviceAutoSelect(false), 0);
   BrightnessProbeWindow window;
   window.pq_output = true;
-  window.SetHDR(true);
+  ASSERT_EQ(window.SetHDR(true), 0);
   // This numeric test works even on an SDR desktop, without presenting PQ there.
   const std::vector<glm::vec4> samples{{0, 0, 0, 0.25}, {1, 1, 1, 0.5}, {10, 10, 10, 1},         {1, 0, 0, 1},
                                        {0, 1, 0, 1},    {0, 0, 1, 1},   {65504, 65504, 65504, 1}};

@@ -121,16 +121,16 @@ int main(int argc, char **argv) {
     ResizeWindowForFilm(window.get(), loaded->GetFilm());
     resize_pending = false;
     if (hdr_requested) {
-      try {
-        window->SetHDR(true);
+      if (window->SetHDR(true) == 0) {
         hdr_active = true;
         create_display_image();
-      } catch (const std::exception &error) {
-        hdr_error = error.what();
+      } else {
+        hdr_error = "Requested HDR presentation mode is unavailable; see the application log.";
         hdr_requested = false;
         std::cerr << "HDR unavailable; continuing in SDR: " << hdr_error << '\n';
       }
     }
+
     window->InitImGui(nullptr, 18.0f);
     std::cout << "Display: " << (hdr_active ? "HDR" : "SDR") << std::endl;
     FPSCounter fps_counter;
@@ -159,16 +159,16 @@ int main(int argc, char **argv) {
       }
       // Apply before BeginImGuiFrame so ImGui and presentation use the same format.
       if (hdr_requested != hdr_active) {
-        try {
-          window->SetHDR(hdr_requested);
+        if (window->SetHDR(hdr_requested) == 0) {
           hdr_active = hdr_requested;
           hdr_error.clear();
           create_display_image();
-        } catch (const std::exception &error) {
-          hdr_error = error.what();
+        } else {
+          hdr_error = "Could not change HDR presentation; see the application log.";
           hdr_requested = hdr_active;
         }
       }
+
       window->BeginImGuiFrame();
       ImGui::SetNextWindowPos({10, 10}, ImGuiCond_Once);
       ImGui::SetNextWindowBgAlpha(hdr_active ? 1.0f : 0.85f);

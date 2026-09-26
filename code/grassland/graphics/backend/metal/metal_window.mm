@@ -85,24 +85,34 @@ fragment float4 present_fragment(Vertex v [[stage_in]], texture2d<float> image [
   pipeline_ = std::move(pipeline);
 }
 
-void MetalWindow::SetHDR(bool enable_hdr) {
-  MetalPool pool;
-  if (enable_hdr_ == enable_hdr)
-    return;
-  if (!GLFWWindow())
-    throw std::runtime_error("Cannot change HDR on a closed Metal window");
-  ConfigurePresentation(enable_hdr);
-  Window::SetHDR(enable_hdr);
-  if (enable_hdr) {
-    auto screen = [glfwGetCocoaWindow(GLFWWindow()) screen];
-    LogInfo("Metal HDR enabled: linear sRGB, RGBA16Float; display {} EDR headroom {:.2f}, potential {:.2f}",
-            screen ? screen.localizedName.UTF8String : "unknown",
-            double(screen.maximumExtendedDynamicRangeColorComponentValue),
-            double(screen.maximumPotentialExtendedDynamicRangeColorComponentValue));
-    if (screen.maximumPotentialExtendedDynamicRangeColorComponentValue <= 1.0)
-      LogWarning("Current display has no HDR headroom; HDR output will be displayed within its SDR range");
-  } else {
-    LogInfo("Metal HDR disabled: sRGB, BGRA8Unorm");
+int MetalWindow::SetHDR(bool enable_hdr) {
+  try {
+    MetalPool pool;
+    if (!GLFWWindow())
+      return -1;
+    if (enable_hdr_ == enable_hdr)
+      return 0;
+    const bool previous = enable_hdr_;
+    ConfigurePresentation(enable_hdr);
+    if (Window::SetHDR(enable_hdr) != 0) {
+      ConfigurePresentation(previous);
+      return -1;
+    }
+    if (enable_hdr) {
+      auto screen = [glfwGetCocoaWindow(GLFWWindow()) screen];
+      LogInfo("Metal HDR enabled: linear sRGB, RGBA16Float; display {} EDR headroom {:.2f}, potential {:.2f}",
+              screen ? screen.localizedName.UTF8String : "unknown",
+              double(screen.maximumExtendedDynamicRangeColorComponentValue),
+              double(screen.maximumPotentialExtendedDynamicRangeColorComponentValue));
+      if (screen.maximumPotentialExtendedDynamicRangeColorComponentValue <= 1.0)
+        LogWarning("Current display has no HDR headroom; HDR output will be displayed within its SDR range");
+    } else {
+      LogInfo("Metal HDR disabled: sRGB, BGRA8Unorm");
+    }
+    return 0;
+  } catch (const std::exception &error) {
+    LogError("Failed to change Metal HDR presentation: {}", error.what());
+    return -1;
   }
 }
 

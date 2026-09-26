@@ -450,10 +450,20 @@ bool Window::ShouldClose() const {
   return glfwWindowShouldClose(window_);
 }
 
-void Window::SetHDR(bool enable_hdr) {
-  enable_hdr_ = enable_hdr;
-  RefreshDisplayBrightness();
-  resize_event_.InvokeCallbacks(GetWidth(), GetHeight());
+int Window::SetHDR(bool enable_hdr) {
+  if (!window_)
+    return -1;
+  const bool previous = enable_hdr_;
+  try {
+    enable_hdr_ = enable_hdr;
+    RefreshDisplayBrightness();
+    resize_event_.InvokeCallbacks(GetWidth(), GetHeight());
+    return 0;
+  } catch (const std::exception &error) {
+    enable_hdr_ = previous;
+    LogError("Failed to change HDR presentation: {}", error.what());
+    return -1;
+  }
 }
 
 #if defined(LONGMARCH_PYTHON_ENABLED)

@@ -58,6 +58,13 @@ offers neither supported encoding, `--hdr` prints the reason and continues in
 SDR; the same reason is visible in the GUI. The interactive HDR toggle also
 preserves SDR when the request is unsupported.
 
+`Window::SetHDR(bool)` requests the application's presentation mode; it does not
+change the desktop HDR setting or scene exposure. It returns `0` on success and
+nonzero on failure, with diagnostic details in the log. Unsupported requests
+are rejected before changing the active Vulkan swapchain. Callers check the
+status instead of catching capability exceptions; HDR format negotiation returns
+an empty optional when no compatible format exists.
+
 For compatibility checks, run the same binary with `LONGMARCH_WINDOW_SYSTEM=x11`.
 An X11-only build does not gain native Wayland by changing environment variables.
 

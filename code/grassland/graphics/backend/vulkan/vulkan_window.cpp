@@ -14,7 +14,10 @@ VulkanWindow::VulkanWindow(VulkanCore *core,
     : Window(width, height, title, fullscreen, resizable, enable_hdr),
       core_(core) {
   core_->Instance()->CreateSurfaceFromGLFWWindow(GLFWWindow(), &surface_);
-  surface_format_ = SelectSurfaceFormat(enable_hdr_);
+  const auto format = SelectSurfaceFormat(enable_hdr_);
+  if (!format)
+    throw std::runtime_error("No supported Vulkan presentation format");
+  surface_format_ = *format;
   if (core_->Device()->CreateSwapchain(surface_.get(), surface_format_.format, surface_format_.colorSpace,
                                        &swap_chain_) != VK_SUCCESS)
     throw std::runtime_error("Failed to create Vulkan swapchain");
@@ -30,8 +33,8 @@ VulkanWindow::VulkanWindow(VulkanCore *core,
   // GLFW on Wayland emits only a framebuffer callback for programmatic resizes
   // and for fractional-scale changes without a logical size change.
   FramebufferResizeEvent().RegisterCallback([this](int width, int height) {
-    if (width > 0 && height > 0)
-      Rebuild();
+    if (width > 0 && height > 0 && Rebuild() != 0)
+      LogError("Failed to resize Vulkan presentation");
   });
 }
 
@@ -54,23 +57,33 @@ void VulkanWindow::CloseWindow() {
   Window::CloseWindow();
 }
 
-void VulkanWindow::SetHDR(bool enable_hdr) {
+int VulkanWindow::SetHDR(bool enable_hdr) {
+  if (!GLFWWindow())
+    return -1;
   if (enable_hdr == enable_hdr_)
-    return;
-  // Probe before changing state so an unsupported request leaves SDR usable.
-  SelectSurfaceFormat(enable_hdr);
+    return 0;
   const bool previous = enable_hdr_;
   try {
-    Window::SetHDR(enable_hdr);
+    // Reject unsupported requests before changing state or retiring a swapchain.
+    if (!SelectSurfaceFormat(enable_hdr)) {
+      LogWarning("Requested Vulkan HDR/SDR presentation mode is unavailable");
+      return -1;
+    }
+    enable_hdr_ = enable_hdr;
     // A format change needs a rebuild even when the framebuffer size is fixed.
-    Rebuild();
-  } catch (...) {
+    if (Rebuild() != 0) {
+      enable_hdr_ = previous;
+      return -1;
+    }
+    return Window::SetHDR(enable_hdr);
+  } catch (const std::exception &error) {
     enable_hdr_ = previous;
-    throw;
+    LogError("Failed to change Vulkan HDR presentation: {}", error.what());
+    return -1;
   }
 }
 
-VkSurfaceFormatKHR VulkanWindow::ChooseHDRSurfaceFormat(const std::vector<VkSurfaceFormatKHR> &formats) {
+std::optional<VkSurfaceFormatKHR> VulkanWindow::ChooseHDRSurfaceFormat(const std::vector<VkSurfaceFormatKHR> &formats) {
   for (const auto &candidate :
        {VkSurfaceFormatKHR{VK_FORMAT_R16G16B16A16_SFLOAT, VK_COLOR_SPACE_EXTENDED_SRGB_LINEAR_EXT},
         VkSurfaceFormatKHR{VK_FORMAT_A2B10G10R10_UNORM_PACK32, VK_COLOR_SPACE_HDR10_ST2084_EXT},
@@ -80,21 +93,23 @@ VkSurfaceFormatKHR VulkanWindow::ChooseHDRSurfaceFormat(const std::vector<VkSurf
         return format;
     }
   }
-  throw std::runtime_error(
-      "The Vulkan surface supports neither linear scRGB nor HDR10/PQ; "
-      "use an HDR-capable desktop and native Wayland on Linux (X11 remains available for SDR)");
+  return std::nullopt;
 }
 
-VkSurfaceFormatKHR VulkanWindow::SelectSurfaceFormat(bool hdr) const {
+std::optional<VkSurfaceFormatKHR> VulkanWindow::SelectSurfaceFormat(bool hdr) const {
   const auto support =
       vulkan::Swapchain::QuerySwapChainSupport(core_->Device()->PhysicalDevice().Handle(), surface_->Handle());
+  if (support.formats.empty())
+    return std::nullopt;
   auto format = hdr ? ChooseHDRSurfaceFormat(support.formats)
                     : vulkan::Swapchain::ChooseSwapSurfaceFormat(support.formats, VK_FORMAT_R8G8B8A8_UNORM,
                                                                  VK_COLOR_SPACE_SRGB_NONLINEAR_KHR);
+  if (!format)
+    return std::nullopt;
   VkFormatProperties properties{};
-  vkGetPhysicalDeviceFormatProperties(core_->Device()->PhysicalDevice().Handle(), format.format, &properties);
+  vkGetPhysicalDeviceFormatProperties(core_->Device()->PhysicalDevice().Handle(), format->format, &properties);
   if (!(properties.optimalTilingFeatures & VK_FORMAT_FEATURE_BLIT_DST_BIT))
-    throw std::runtime_error("Vulkan presentation format does not support image blits");
+    return std::nullopt;
   return format;
 }
 
@@ -125,17 +140,19 @@ uint32_t VulkanWindow::AcquireNextImage() {
   return image_index_;
 }
 
-void VulkanWindow::Rebuild() {
+int VulkanWindow::Rebuild() {
   core_->WaitGPU();
   const auto format = SelectSurfaceFormat(enable_hdr_);
+  if (!format)
+    return -1;
   std::unique_ptr<vulkan::Swapchain> next;
-  if (core_->Device()->CreateSwapchain(surface_.get(), format.format, format.colorSpace, &next,
+  if (core_->Device()->CreateSwapchain(surface_.get(), format->format, format->colorSpace, &next,
                                        swap_chain_->Handle()) != VK_SUCCESS)
-    throw std::runtime_error("Failed to rebuild Vulkan swapchain");
+    return -1;
   hdr_framebuffer_.reset();
   imgui_assets_.framebuffers.clear();
   swap_chain_ = std::move(next);
-  surface_format_ = format;
+  surface_format_ = *format;
   if (imgui_assets_.context) {
     ImGui::SetCurrentContext(imgui_assets_.context);
     imgui_assets_.framebuffers.clear();
@@ -150,6 +167,7 @@ void VulkanWindow::Rebuild() {
 
     BuildImGuiFramebuffers();
   }
+  return 0;
 }
 
 void VulkanWindow::Present() {
@@ -167,7 +185,8 @@ void VulkanWindow::Present() {
 
   auto result = vkQueuePresentKHR(present_queue_, &presentInfo);
   if (result == VK_ERROR_OUT_OF_DATE_KHR || result == VK_SUBOPTIMAL_KHR) {
-    Rebuild();
+    if (Rebuild() != 0)
+      throw std::runtime_error("Failed to rebuild Vulkan swapchain after presentation");
   } else if (result != VK_SUCCESS) {
     throw std::runtime_error("Failed to present swap chain image");
   }
