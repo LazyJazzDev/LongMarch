@@ -23,6 +23,10 @@ class Core {
 
   virtual ~Core() = default;
 
+  // Try platform initialization without creating a window. Failure still permits
+  // headless rendering; call before querying window-system-specific extensions.
+  static bool InitializeGLFW();
+
   virtual BackendAPI API() const = 0;
 
   virtual int CreateBuffer(size_t size, BufferType type, double_ptr<Buffer> pp_buffer) = 0;

@@ -1,8 +1,5 @@
 #include "grassland/graphics/window.h"
 
-#include <cstdlib>
-#include <cstring>
-
 #include "grassland/graphics/buffer.h"
 #include "grassland/graphics/command_context.h"
 #include "grassland/graphics/core.h"
@@ -222,46 +219,9 @@ Image *Window::AlignHDRComposition(CommandContext *commands) {
   return p.aligned.get();
 }
 
-bool Window::InitializeGLFW() {
-  static bool initialized = false;
-  if (initialized)
-    return true;
-#if defined(__linux__) && defined(GLFW_PLATFORM)
-  const char *platform = std::getenv("LONGMARCH_WINDOW_SYSTEM");
-  if (platform && std::strcmp(platform, "auto") != 0) {
-    int requested;
-    if (std::strcmp(platform, "x11") == 0)
-      requested = GLFW_PLATFORM_X11;
-    else if (std::strcmp(platform, "wayland") == 0)
-      requested = GLFW_PLATFORM_WAYLAND;
-    else {
-      LogError("LONGMARCH_WINDOW_SYSTEM must be auto, x11 or wayland");
-      return false;
-    }
-    if (!glfwPlatformSupported(requested)) {
-      LogError("Requested window system was not compiled into GLFW");
-      return false;
-    }
-    glfwInitHint(GLFW_PLATFORM, requested);
-    return initialized = glfwInit() == GLFW_TRUE;
-  }
-  // A Wayland-enabled binary must still run on X11-only desktops. A stale
-  // WAYLAND_DISPLAY must not prevent using an available X server either.
-  if (std::getenv("WAYLAND_DISPLAY") && glfwPlatformSupported(GLFW_PLATFORM_WAYLAND)) {
-    glfwInitHint(GLFW_PLATFORM, GLFW_PLATFORM_WAYLAND);
-    if (glfwInit())
-      return initialized = true;
-    glfwGetError(nullptr);
-  }
-  glfwInitHint(GLFW_PLATFORM, std::getenv("DISPLAY") && glfwPlatformSupported(GLFW_PLATFORM_X11) ? GLFW_PLATFORM_X11
-                                                                                                 : GLFW_ANY_PLATFORM);
-#endif
-  return initialized = glfwInit() == GLFW_TRUE;
-}
-
 Window::Window(int width, int height, const std::string &title, bool fullscreen, bool resizable, bool enable_hdr)
     : enable_hdr_(enable_hdr) {
-  if (!InitializeGLFW())
+  if (!Core::InitializeGLFW())
     throw std::runtime_error("Failed to initialize GLFW");
 
   glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);

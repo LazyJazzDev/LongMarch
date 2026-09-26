@@ -11,9 +11,9 @@
 namespace grassland::graphics::backend {
 
 VulkanCore::VulkanCore(const Settings &settings) : Core(settings) {
-  // Share Window's platform selection before gathering WSI extensions. Failure
+  // Select the platform before gathering WSI extensions. Failure
   // to initialize GLFW still permits headless Vulkan use.
-  Window::InitializeGLFW();
+  InitializeGLFW();
   vulkan::InstanceCreateHint hint{};
   hint.SetValidationLayersEnabled(DebugEnabled());
 #if defined(LONGMARCH_CUDA_RUNTIME)
