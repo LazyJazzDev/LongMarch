@@ -41,9 +41,12 @@
       ]
     },
     "slang": {
-      "description": "Use the pinned vcpkg Slang SDK (disable when supplying an external SDK).",
+      "description": "Use the upstream vcpkg Slang SDK (disable when supplying an external SDK).",
       "dependencies": [
-        "shader-slang"
+        {
+          "name": "shader-slang",
+          "version>=": "2026.18.1"
+        }
       ]
     },
     "wayland": {

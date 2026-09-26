@@ -16,15 +16,25 @@ As checked on 2026-09-26:
 | Upstream vcpkg `shader-slang` | `2026.18.2` |
 | Official Slang release | `2026.18.3` |
 
-The default `slang` manifest feature installs **2026.18.3** through vcpkg.
-`vcpkg-configuration.json` selects the project overlay port, so an older vcpkg
-checkout does not silently substitute its registry version. The port packages
-the official SDK with pinned SHA-512 hashes for Windows, Linux and macOS,
-each on ARM64 and x86-64. This is the same compiler release used in the
-[NonUniform comparison](reports/nonuniform-compiler-comparison.md).
-The overlay can be retired once the registry provides the required release.
+The default `slang` manifest feature uses the upstream vcpkg `shader-slang`
+port, currently **2026.18.2** at the registry baseline. The project-specific
+2026.18.3 overlay is removed. `vcpkg-configuration.json` selects a reproducible
+upstream registry revision for Slang and retains the existing baseline for other
+ports. This snapshot selects a default package; it is not an exact SDK requirement.
+Windows, Linux and macOS ARM64/x86-64 remain supplied by the same upstream port.
 
-`cmake/Slang.cmake` only finds an installed package (2026.18.3 or newer).
+The minimum supported compiler is **2026.18.1**, established by
+[boundary-version NonUniform tests](reports/slang-minimum-version.md).
+2026.11 fixes resource-operand propagation, but integer arithmetic after the
+annotation needs 2026.18.1. Caller-only integer annotations across user function
+boundaries still require rewriting at the actual resource access.
+
+`cmake/Slang.cmake` finds an installed package (2026.18.1 or newer).
+Before the first compiler session, the runtime also checks `spGetBuildTagString()`
+from the loaded library. Old, unknown and prerelease tags fail with the required
+version and a runtime-library-path hint. Official release tags and git-describe
+builds based on an accepted release are supported. The version check cannot
+prove that every future compiler build is regression-free.
 It never downloads Slang and fails with setup instructions if none is found.
 vcpkg manages downloads, installation and binary caching; for offline builds,
 populate the vcpkg caches/install tree beforehand. The system `slangc` and the

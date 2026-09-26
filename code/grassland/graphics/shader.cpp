@@ -5,6 +5,8 @@
 
 #include <atomic>
 
+#include "grassland/graphics/slang_version.h"
+
 namespace grassland::graphics {
 namespace {
 #include "built_in_shaders.inl"
@@ -156,6 +158,16 @@ CompiledShaderBlob CompileShader(const VirtualFileSystem &vfs,
   result.entry_point = entry_point;
   // Global sessions cache Slang's standard library. Separate sessions per thread
   // avoid concurrent access to the compiler's mutable state.
+  static const bool version_checked = [] {
+    const char *tag = spGetBuildTagString();
+    if (!detail::SlangVersionSupported(tag ? tag : ""))
+      throw std::runtime_error(
+          std::string("Loaded Slang compiler '") + (tag ? tag : "unknown") + "' is unsupported; require " +
+          detail::MinimumSlangVersion() +
+          "+ for SPIR-V NonUniform resource/index propagation. Check the Slang runtime library path.");
+    return true;
+  }();
+  (void)version_checked;
   thread_local Slang::ComPtr<slang::IGlobalSession> global;
   if (!global && SLANG_FAILED(slang::createGlobalSession(global.writeRef())))
     throw std::runtime_error("Cannot initialize Slang compiler");

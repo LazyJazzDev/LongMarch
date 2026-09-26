@@ -1,3 +1,19 @@
 {
-  "overlay-ports": ["vcpkg/ports"]
+  "overlay-ports": [
+    "vcpkg/ports"
+  ],
+  "registries": [
+    {
+      "kind": "git",
+      "repository": "https://github.com/microsoft/vcpkg",
+      "baseline": "ee6a47dac031930715bea2e6dfb9ad60caaa5d83",
+      "packages": [
+        "shader-slang"
+      ]
+    }
+  ],
+  "default-registry": {
+    "kind": "builtin",
+    "baseline": "f6735d5aa1537081e8d425372ea7e585b0ad65e8"
+  }
 }

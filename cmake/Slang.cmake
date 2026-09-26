@@ -1,10 +1,13 @@
 # Dependencies are supplied by vcpkg or an explicitly selected external SDK.
 # Never download a compiler during CMake package discovery.
-set(LONGMARCH_SLANG_VERSION "2026.18.3")
-find_package(slang ${LONGMARCH_SLANG_VERSION} CONFIG QUIET)
-if(NOT slang_FOUND)
+set(LONGMARCH_MIN_SLANG_VERSION "2026.18.1")
+# Slang's config version file restricts the calendar year as a major version.
+# Compare the lower bound ourselves so a compatible SDK from a later year is
+# not rejected solely because its year differs.
+find_package(slang CONFIG QUIET)
+if(NOT slang_FOUND OR NOT DEFINED slang_VERSION OR slang_VERSION VERSION_LESS LONGMARCH_MIN_SLANG_VERSION)
     message(FATAL_ERROR
-        "Slang ${LONGMARCH_SLANG_VERSION}+ is required. Install the default vcpkg "
+        "Slang ${LONGMARCH_MIN_SLANG_VERSION}+ is required. Install the default vcpkg "
         "slang feature, or set slang_DIR to an external SDK's CMake package directory. "
         "For an external SDK, use -DVCPKG_MANIFEST_NO_DEFAULT_FEATURES=ON. "
         "CMake will not download Slang.")

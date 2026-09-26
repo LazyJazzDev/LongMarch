@@ -4,6 +4,7 @@
 #include <regex>
 
 #include "grassland/graphics/graphics.h"
+#include "grassland/graphics/slang_version.h"
 
 using namespace grassland;
 
@@ -65,5 +66,18 @@ TEST(SlangCompiler, NativeBackendsCompileAndRejectInvalidSource) {
     shader.reset();
     EXPECT_NE(core->CreateShader("this is invalid source", "Main", "cs_6_0", &shader), 0);
     EXPECT_EQ(shader, nullptr);
+  }
+}
+
+TEST(SlangCompiler, LoadedVersionRequirement) {
+  for (const char *tag :
+       {"2026.18.1", "v2026.18.1", "2026.18.1-12-gabc123", "2026.18.2", "2026.18.3", "2026.18.1.1", "2027.1"}) {
+    SCOPED_TRACE(tag);
+    EXPECT_TRUE(graphics::detail::SlangVersionSupported(tag));
+  }
+  for (const char *tag : {"2026.1-52-gc8ddf20bb", "2026.11", "2026.18", "2026.18.0", "2026.18.1-rc1", "unknown", "",
+                          "2026.999999999999999999999999999999.1", "2026.18.1garbage"}) {
+    SCOPED_TRACE(tag);
+    EXPECT_FALSE(graphics::detail::SlangVersionSupported(tag));
   }
 }
