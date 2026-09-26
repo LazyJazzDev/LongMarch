@@ -23,11 +23,10 @@ Vulkan 库层问题，能够独立构建，不依赖 HarmonyOS 应用、iOS 宿�
 | 假定映射内存始终 host coherent | Map 后 invalidate、Unmap 前 flush VMA allocation | 支持非 coherent 内存上的 CPU/GPU 可见性；coherent 内存由 VMA 处理为无需额外操作 |
 | DXC 在 ByteAddressBuffer 数组经局部变量/辅助函数访问时，可能只保留索引上的 NonUniform，丢失 storage-buffer 访问指针上的装饰 | 创建 Vulkan shader module 前补全相关访问链的 NonUniform，并补齐所需 capability；启用 storage-buffer array nonuniform indexing feature | 修正分歧描述符访问，关联此前 Cornell Box 局部渲染瑕疵；仅处理 storage-buffer 指针访问链，不泛化修改所有 SPIR-V 指令 |
 | `vkQueueSubmit`、fence/transfer 等待和一次性传输的失败被忽略 | 通过现有 `ThrowIfFailed` 传播失败，错误包含数值 VkResult；shader module 创建同样检查返回值 | GPU reset/device lost 不再在这些位置被静默视为成功；本次并未重写所有 Vulkan 错误处理或析构路径 |
-| 大型软件追踪单次 compute dispatch 在手机上可能触发 GPU watchdog | 增加 `CommandContext::CmdDispatchBase`，Vulkan 实现使用 `vkCmdDispatchBase`，compute pipeline 设置相应创建标志 | 调用方可拆分工作量并保留全局线程坐标；本分支只提供库 API，不自动拆分所有 dispatch |
 
-`CmdDispatchBase` 的非零 base 当前仅由 Vulkan 实现。其他后端默认接受零 base 并转发
-普通 dispatch，对非零 base 显式抛出不支持错误。调用方应检查后端，且不能假设分块后的
-`NumWorkgroups` 与整帧 dispatch 相同。
+分块采用普通 `CmdDispatch` 与显式像素偏移常量，shader 将偏移加到局部线程坐标。
+每个块使用独立参数缓冲区并保留到 GPU 完成，避免所有块读取最后一次上传的偏移。
+库接口不引入 Vulkan 专用的 dispatch base；应用层分块策略保留在原开发分支。
 
 ## 刻意保留在应用分支的内容
 
@@ -54,16 +53,17 @@ VK_LAYER_VALIDATE_SYNC=1 \
 python3 -m unittest discover -s test/graphics -p 'test_spirv_nonuniform.py' -v
 ```
 
-- `TiledComputeSeesUploadsAndPreservesGlobalCoordinates`：259×130 图像，跨越多个
+- `TiledComputeUsesExplicitPixelOrigins`（Vulkan 与 Metal 各一项）：259×130 图像，跨越多个
   128×128 分块并包含不满块的边缘；连续两次更新动态参数，在 GPU 上累加，再逐像素
-  验证坐标、参数值和前一轮结果。覆盖普通图像上传、compute 读写、分块 base 和读回。
+  验证坐标、参数值和前一轮结果。覆盖普通图像上传、compute 读写、显式分块偏移和读回。
 - `DivergentStorageBuffersThroughHelperProduceCorrectValues`：同一工作组中交替访问
   两个 storage buffer，经辅助函数和局部 ByteAddressBuffer 获取数据；逐项验证 GPU
   结果，并覆盖静态上传、普通 dispatch 与缓冲读回。
 - Python 编译回归：直接/局部缓冲访问 × 均匀/分歧索引四种组合；验证修复后 SPIR-V
   通过 `spirv-val`、需要的装饰/capability 存在、重复修复幂等、均匀访问字节不变。
 
-本次结果：2 项 GPU 测试及 1 项 Python 回归（含 4 种编译组合）全部通过，
+显式偏移更新后：3 项 GPU 测试全部通过（Vulkan 分块、Metal 分块、Vulkan 非均匀索引）。
+此前 1 项 Python 回归（含 4 种编译组合）已通过，本次未修改其修补算法。
 Vulkan 同步验证未报告错误。非 coherent 内存、多个 queue family 和真实设备丢失
 不能由单台 MoltenVK 主机完整覆盖；D3D12 本次未构建或运行。构建出现本机 vcpkg 静态库
 使用较新 macOS deployment target 的链接警告，未阻止链接和测试运行。

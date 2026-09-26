@@ -533,22 +533,14 @@ void VulkanCmdDispatchRays::CompileCommand(VulkanCommandContext *context, VkComm
                        &memory_barrier, 0, nullptr, 0, nullptr);
 }
 
-VulkanCmdDispatch::VulkanCmdDispatch(uint32_t group_count_x,
-                                     uint32_t group_count_y,
-                                     uint32_t group_count_z,
-                                     uint32_t base_x,
-                                     uint32_t base_y,
-                                     uint32_t base_z)
-    : base_x_(base_x),
-      base_y_(base_y),
-      base_z_(base_z),
-      group_count_x_(group_count_x),
+VulkanCmdDispatch::VulkanCmdDispatch(uint32_t group_count_x, uint32_t group_count_y, uint32_t group_count_z)
+    : group_count_x_(group_count_x),
       group_count_y_(group_count_y),
       group_count_z_(group_count_z) {
 }
 
 void VulkanCmdDispatch::CompileCommand(VulkanCommandContext *context, VkCommandBuffer command_buffer) {
-  vkCmdDispatchBase(command_buffer, base_x_, base_y_, base_z_, group_count_x_, group_count_y_, group_count_z_);
+  vkCmdDispatch(command_buffer, group_count_x_, group_count_y_, group_count_z_);
 
   VkMemoryBarrier memory_barrier = {};
   memory_barrier.sType = VK_STRUCTURE_TYPE_MEMORY_BARRIER;

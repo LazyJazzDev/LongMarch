@@ -224,15 +224,6 @@ void VulkanCommandContext::CmdDispatchRays(uint32_t width, uint32_t height, uint
       dynamic_cast<VulkanRayTracingProgram *>(program_bases_[BIND_POINT_RAYTRACING]), width, height, depth));
 }
 
-void VulkanCommandContext::CmdDispatchBase(uint32_t base_x,
-                                           uint32_t base_y,
-                                           uint32_t base_z,
-                                           uint32_t count_x,
-                                           uint32_t count_y,
-                                           uint32_t count_z) {
-  commands_.push_back(std::make_unique<VulkanCmdDispatch>(count_x, count_y, count_z, base_x, base_y, base_z));
-}
-
 void VulkanCommandContext::CmdDispatch(uint32_t group_count_x, uint32_t group_count_y, uint32_t group_count_z) {
   commands_.push_back(std::make_unique<VulkanCmdDispatch>(group_count_x, group_count_y, group_count_z));
 }

@@ -245,17 +245,11 @@ class VulkanCmdDispatchRays : public VulkanCommand {
 
 class VulkanCmdDispatch : public VulkanCommand {
  public:
-  VulkanCmdDispatch(uint32_t group_count_x,
-                    uint32_t group_count_y,
-                    uint32_t group_count_z,
-                    uint32_t base_x = 0,
-                    uint32_t base_y = 0,
-                    uint32_t base_z = 0);
+  VulkanCmdDispatch(uint32_t group_count_x, uint32_t group_count_y, uint32_t group_count_z);
 
   void CompileCommand(VulkanCommandContext *context, VkCommandBuffer command_buffer) override;
 
  private:
-  uint32_t base_x_, base_y_, base_z_;
   uint32_t group_count_x_;
   uint32_t group_count_y_;
   uint32_t group_count_z_;

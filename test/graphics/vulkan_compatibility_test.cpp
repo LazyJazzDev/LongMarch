@@ -10,9 +10,9 @@ using namespace grassland::graphics;
 
 // No scene assets or mobile host are needed. Enable synchronization validation
 // with VK_LAYER_VALIDATE_SYNC=1 when running this explicit Vulkan GPU test.
-TEST(VulkanCompatibility, TiledComputeSeesUploadsAndPreservesGlobalCoordinates) {
+void CheckTiledComputeWithExplicitPixelOrigins(BackendAPI backend) {
   std::unique_ptr<Core> core;
-  ASSERT_EQ(CreateCore(BACKEND_API_VULKAN, Core::Settings{1, true}, &core), 0);
+  ASSERT_EQ(CreateCore(backend, Core::Settings{1, true}, &core), 0);
   ASSERT_EQ(core->InitializeLogicalDeviceAutoSelect(false), 0);
   constexpr uint32_t width = 259, height = 130;
   std::unique_ptr<Image> image;
@@ -23,7 +23,9 @@ TEST(VulkanCompatibility, TiledComputeSeesUploadsAndPreservesGlobalCoordinates) 
   ASSERT_EQ(core->CreateShader(R"(
 cbuffer Parameters : register(b0, space0) { uint width; uint height; uint value; uint unused; };
 RWTexture2D<float4> output : register(u0, space1);
+cbuffer Tile : register(b0, space2) { uint2 origin; uint2 padding; };
 [numthreads(8,8,1)] void Main(uint3 id : SV_DispatchThreadID) {
+  id.xy += origin;
   if (id.x < width && id.y < height)
     output[id.xy] += float4(id.x, id.y, value, 1);
 }
@@ -34,6 +36,7 @@ RWTexture2D<float4> output : register(u0, space1);
   ASSERT_EQ(core->CreateComputeProgram(shader.get(), &program), 0);
   program->AddResourceBinding(RESOURCE_TYPE_UNIFORM_BUFFER, 1);
   program->AddResourceBinding(RESOURCE_TYPE_WRITABLE_IMAGE, 1);
+  program->AddResourceBinding(RESOURCE_TYPE_UNIFORM_BUFFER, 1);
   program->Finalize();
   std::vector<std::array<float, 4>> pixels(width * height, {1, 2, 3, 4});
   image->UploadData(pixels.data());
@@ -46,9 +49,17 @@ RWTexture2D<float4> output : register(u0, space1);
     commands->CmdBindResources(0, std::vector<Buffer *>{parameters.get()}, BIND_POINT_COMPUTE);
     commands->CmdBindResources(1, std::vector<Image *>{image.get()}, BIND_POINT_COMPUTE);
     const uint32_t nx = (width + 7) / 8, ny = (height + 7) / 8;
+    std::vector<std::unique_ptr<Buffer>> origins;
     for (uint32_t y = 0; y < ny; y += 16)
-      for (uint32_t x = 0; x < nx; x += 16)
-        commands->CmdDispatchBase(x, y, 0, std::min(16u, nx - x), std::min(16u, ny - y), 1);
+      for (uint32_t x = 0; x < nx; x += 16) {
+        std::unique_ptr<Buffer> origin;
+        ASSERT_EQ(core->CreateBuffer(16, BUFFER_TYPE_DYNAMIC, &origin), 0);
+        const std::array<uint32_t, 4> tile{x * 8, y * 8, 0, 0};
+        origin->UploadData(tile.data(), sizeof(tile));
+        commands->CmdBindResources(2, std::vector<Buffer *>{origin.get()}, BIND_POINT_COMPUTE);
+        commands->CmdDispatch(std::min(16u, nx - x), std::min(16u, ny - y), 1);
+        origins.push_back(std::move(origin));
+      }
     ASSERT_EQ(core->SubmitCommandContext(commands.get()), 0);
     core->WaitGPU();
     image->DownloadData(pixels.data());
@@ -62,6 +73,16 @@ RWTexture2D<float4> output : register(u0, space1);
       }
   }
 }
+
+TEST(VulkanCompatibility, TiledComputeUsesExplicitPixelOrigins) {
+  CheckTiledComputeWithExplicitPixelOrigins(BACKEND_API_VULKAN);
+}
+
+#ifdef LONGMARCH_METAL_ENABLED
+TEST(MetalCompatibility, TiledComputeUsesExplicitPixelOrigins) {
+  CheckTiledComputeWithExplicitPixelOrigins(BACKEND_API_METAL);
+}
+#endif
 
 TEST(VulkanCompatibility, DivergentStorageBuffersThroughHelperProduceCorrectValues) {
   std::unique_ptr<Core> core;
