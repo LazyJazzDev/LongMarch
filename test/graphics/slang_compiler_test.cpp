@@ -49,3 +49,20 @@ TEST(SlangCompiler, StandaloneShaderCorpus) {
 TEST(SlangCompiler, InvalidSourceReturnsNoBytecode) {
   EXPECT_TRUE(graphics::CompileShader("this is invalid source", "Main", "cs_6_0", {"-target", "spirv"}).data.empty());
 }
+
+TEST(SlangCompiler, NativeBackendsCompileAndRejectInvalidSource) {
+  for (auto api : {graphics::BACKEND_API_D3D12, graphics::BACKEND_API_VULKAN}) {
+    if (!graphics::SupportBackendAPI(api))
+      continue;
+    SCOPED_TRACE(graphics::BackendAPIString(api));
+    std::unique_ptr<graphics::Core> core;
+    ASSERT_EQ(graphics::CreateCore(api, {}, &core), 0);
+    ASSERT_EQ(core->InitializeLogicalDeviceAutoSelect(false), 0);
+    std::unique_ptr<graphics::Shader> shader;
+    ASSERT_EQ(core->CreateShader("[numthreads(1,1,1)] void Main() {}", "Main", "cs_6_0", &shader), 0);
+    ASSERT_NE(shader, nullptr);
+    shader.reset();
+    EXPECT_NE(core->CreateShader("this is invalid source", "Main", "cs_6_0", &shader), 0);
+    EXPECT_EQ(shader, nullptr);
+  }
+}

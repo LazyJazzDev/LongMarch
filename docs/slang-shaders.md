@@ -109,8 +109,24 @@ Ninja / Release on Apple Silicon:
   identical to the previously tested official SDK. External SDK discovery and
   the missing-package failure path were also checked. The system Slang is unchanged.
 
-D3D12 execution and Windows/Linux SDK deployment have not been exercised on this
-macOS machine. DXIL compilation alone is not a D3D12 rendering test.
+Windows x64 / MSVC 19.44 / Ninja Release was also validated on an RTX 3090 Ti
+(driver 596.49), using the vcpkg Slang 2026.18.3 package:
+
+- The nine targets listed above build with Python enabled, including the graphics
+  tests that link Grassland directly. Python linkage propagates with its headers.
+- D3D12 and Vulkan each pass all 18 Sparkium regression tests, including hardware
+  image parity. Both runs enable backend debugging; Vulkan also enables
+  synchronization validation with `VK_LAYER_VALIDATE_SYNC=1`.
+- The default D3D12 CLI passes all 31 JSON scene/raster and invalid-input checks
+  at the script's 96x96 resolution.
+- All three Slang tests and both Vulkan compatibility tests pass. The native
+  backend compiler test requires a GPU and checks valid and invalid shader input
+  through the D3D12/Vulkan API on each compiled backend.
+- D3D12 no longer forwards DXC-only warning/debug options to Slang and rejects
+  empty compilation results. Vulkan queries and enables supported
+  `shaderDrawParameters`, required by Slang's vertex/instance ID lowering.
+
+Interactive Windows GUI behavior and Linux SDK deployment were not tested.
 
 ```sh
 cmake -S . -B out/slang-build -G Ninja -DCMAKE_BUILD_TYPE=Release \
