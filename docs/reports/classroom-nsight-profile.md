@@ -1,5 +1,7 @@
 # Classroom Nsight profiling
 
+Follow-up: [implemented scene-update optimization and measurements](nsight-scene-update-optimization.md).
+
 Profiled on 2026-09-26 at LongMarch `72f475c`, Windows x64, Ninja Release,
 RTX 3090 Ti / driver 596.49, Nsight Systems 2025.5.1 and Nsight Graphics 2025.5.0.
 Classroom uses native hardware ray query, 1920 x 1080, 8 samples/dispatch,
