@@ -3,12 +3,14 @@
 Sparkium loads version 1 `sparkium-scene` documents through `JsonScene::Load`.
 The CLI renders a document, and the GUI discovers, selects, and reloads scenes.
 
-The GUI uses each scene's film dimensions to choose its initial window size, then
-renders at the actual framebuffer resolution (including HiDPI scaling). Scene
-switches, automatic window fitting, and manual resizing update the film, display
-image, and camera aspect together. Resizing restarts accumulation while preserving
-exposure and other view settings. The `Resolution` row shows the current rendering
-size. The CLI continues to use the dimensions in the scene document.
+The GUI uses each scene's film dimensions to choose its initial window size.
+Window resizing and HiDPI scaling are handled by the presentation backend: it
+updates its swapchain and HDR composition targets, then fits the source image
+without changing its aspect ratio. Film resolution, camera parameters and
+accumulated samples are independent of the window size. Both GUI and CLI render
+at the dimensions in the scene document; the GUI's `Resolution` row shows that
+rendering size.
+
 Mesh and texture paths are relative to the JSON document, independently of the
 process working directory.
 

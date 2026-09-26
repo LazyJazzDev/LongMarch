@@ -80,11 +80,34 @@ TEST(VulkanWindowResizeTest, ProgrammaticSquareToWideUpdatesPresentation) {
     ImGui::GetIO().IniFilename = nullptr;
     auto *native = dynamic_cast<graphics::backend::VulkanWindow *>(window.get());
     ASSERT_NE(native, nullptr);
-    for (auto size : {glm::ivec2{1024, 1024}, glm::ivec2{2048, 1024}, glm::ivec2{1024, 1024}}) {
+    sparkium::Core scene_core(core.get());
+    for (const char *scene_name : {"cornell_box", "texture", "cornell_box"}) {
+      std::string error;
+      auto loaded = sparkium::JsonScene::Load(
+          &scene_core, FindAssetPath(std::string("scenes/") + scene_name + "/scene.json"), &error);
+      ASSERT_NE(loaded, nullptr) << error;
+      auto *film = loaded->GetFilm();
+      auto *camera = loaded->GetCamera();
+      const glm::ivec2 size{film->GetWidth(), film->GetHeight()};
+      const auto view = camera->view;
+      const auto aspect = camera->aspect;
+      loaded->GetScene()->settings.samples_per_dispatch = 1;
+      loaded->GetScene()->settings.max_bounces = 1;
+      scene_core.Render(loaded->GetScene(), camera, film, sparkium::RENDER_PIPELINE_AUTO);
+      const auto samples = film->info.accumulated_samples;
+      ASSERT_GT(samples, 0);
+      std::unique_ptr<graphics::Image> source;
+      ASSERT_EQ(core->CreateImage(size.x, size.y, graphics::IMAGE_FORMAT_R32G32B32A32_SFLOAT, &source), 0);
+      film->Develop(source.get(), hdr);
       window->Resize(size.x, size.y);
       // X11 acknowledges asynchronously. Present through several event cycles
       // to also cover Wayland fractional scaling and compositor configure events.
-      for (int frame = 0; frame < 4; ++frame) {
+      for (int frame = 0; frame < 6; ++frame) {
+        // Resize again without recreating the source image or touching Film.
+        if (frame == 2)
+          window->Resize(size.x / 2, size.y / 2);
+        if (frame == 4)
+          window->Resize(size.x, size.y);
         glfwWaitEventsTimeout(0.02);
         auto fb = window->GetFramebufferSize();
         auto extent = native->SwapChain()->Extent();
@@ -92,8 +115,6 @@ TEST(VulkanWindowResizeTest, ProgrammaticSquareToWideUpdatesPresentation) {
                                         << " framebuffer=" << fb.x << "x" << fb.y << " frame=" << frame);
         ASSERT_EQ(extent.width, fb.x);
         ASSERT_EQ(extent.height, fb.y);
-        std::unique_ptr<graphics::Image> source;
-        ASSERT_EQ(core->CreateImage(fb.x, fb.y, graphics::IMAGE_FORMAT_R32G32B32A32_SFLOAT, &source), 0);
         window->BeginImGuiFrame();
         ImGui::TextUnformatted("Scene resize regression");
         window->EndImGuiFrame();
@@ -103,6 +124,14 @@ TEST(VulkanWindowResizeTest, ProgrammaticSquareToWideUpdatesPresentation) {
         commands->CmdPresent(window.get(), source.get());
         ASSERT_EQ(core->SubmitCommandContext(commands.get()), 0);
         core->WaitGPU();
+        EXPECT_EQ(loaded->GetFilm(), film);
+        EXPECT_EQ(film->GetWidth(), size.x);
+        EXPECT_EQ(film->GetHeight(), size.y);
+        EXPECT_EQ(film->info.accumulated_samples, samples);
+        EXPECT_EQ(camera->view, view);
+        EXPECT_EQ(camera->aspect, aspect);
+        EXPECT_EQ(source->Extent().width, size.x);
+        EXPECT_EQ(source->Extent().height, size.y);
         if (hdr) {
           std::unique_ptr<graphics::CommandContext> readback;
           ASSERT_EQ(core->CreateCommandContext(&readback), 0);

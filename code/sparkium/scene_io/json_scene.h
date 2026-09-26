@@ -33,10 +33,6 @@ class JsonScene {
     return film_.get();
   }
 
-  // Recreate resolution-dependent film resources, preserving view settings.
-  // Returns false for an unchanged size; accumulation restarts on a resize.
-  bool ResizeFilm(int width, int height);
-
   RenderPipeline GetRenderPipeline() const {
     return render_pipeline_;
   }

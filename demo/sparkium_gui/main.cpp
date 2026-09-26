@@ -138,25 +138,6 @@ int main(int argc, char **argv) {
 
     int rendered_frames = 0;
     while (!window->ShouldClose() && (!frame_limit || rendered_frames++ < frame_limit)) {
-      // Window managers (especially Wayland) acknowledge requested sizes
-      // asynchronously. Use the actual framebuffer, including HiDPI scaling,
-      // rather than the requested logical window dimensions.
-      graphics::Window::PollEvents();
-      if (window->ShouldClose())
-        break;
-      if (resize_pending) {
-        ResizeWindowForFilm(window.get(), loaded->GetFilm());
-        resize_pending = false;
-      }
-      const auto framebuffer = window->GetFramebufferSize();
-      if (framebuffer.x <= 0 || framebuffer.y <= 0) {
-        glfwWaitEventsTimeout(0.05);
-        continue;
-      }
-      if (loaded->ResizeFilm(framebuffer.x, framebuffer.y)) {
-        create_display_image();
-        std::cout << "Render resolution: " << framebuffer.x << " x " << framebuffer.y << std::endl;
-      }
       // Apply before BeginImGuiFrame so ImGui and presentation use the same format.
       if (hdr_requested != hdr_active) {
         if (window->SetHDR(hdr_requested) == 0) {
@@ -310,17 +291,17 @@ int main(int argc, char **argv) {
       ImGui::End();
       window->EndImGuiFrame();
 
-      // A newly selected/reloaded scene first requests its preferred window
-      // size at the start of the next frame, before synchronizing its film.
-      if (resize_pending)
-        continue;
-
       core.Render(loaded->GetScene(), loaded->GetCamera(), loaded->GetFilm(), pipeline);
       loaded->GetFilm()->Develop(image.get(), hdr_active);
       std::unique_ptr<graphics::CommandContext> command_context;
       graphics_core->CreateCommandContext(&command_context);
       command_context->CmdPresent(window.get(), image.get());
       graphics_core->SubmitCommandContext(command_context.get());
+      graphics::Window::PollEvents();
+      if (resize_pending) {
+        ResizeWindowForFilm(window.get(), loaded->GetFilm());
+        resize_pending = false;
+      }
     }
     window->TerminateImGui();
     return 0;

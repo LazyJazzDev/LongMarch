@@ -53,64 +53,6 @@ class SoftwareBVHTest : public testing::Test {
   std::unique_ptr<sparkium::Core> core;
 };
 
-TEST_F(SoftwareBVHTest, SceneFilmResizeRebuildsPipelineBuffersAndPreservesViewSettings) {
-  std::string error;
-  auto loaded = sparkium::JsonScene::Load(core.get(), FindAssetPath("scenes/cornell_box/scene.json"), &error);
-  ASSERT_NE(loaded, nullptr) << error;
-  auto *scene = loaded->GetScene();
-  auto *camera = loaded->GetCamera();
-  const auto view = camera->view;
-  const float fovy = camera->fovy;
-  scene->settings.samples_per_dispatch = 1;
-  scene->settings.max_bounces = 1;
-  auto &info = loaded->GetFilm()->info;
-  info.persistence = 0.75f;
-  info.clamping = 123.0f;
-  info.max_exposure = 30.0f;
-  info.view_transform = 2;
-  info.exposure = 1.5f;
-  info.gamma = 1.15f;
-  info.contrast = 1.2f;
-  for (auto size : {glm::ivec2{64, 32}, glm::ivec2{32, 48}, glm::ivec2{64, 32}}) {
-    ASSERT_TRUE(loaded->ResizeFilm(size.x, size.y));
-    auto *film = loaded->GetFilm();
-    EXPECT_EQ(film->GetWidth(), size.x);
-    EXPECT_EQ(film->GetHeight(), size.y);
-    EXPECT_EQ(film->info.accumulated_samples, 0);
-    EXPECT_EQ(loaded->GetScene(), scene);
-    EXPECT_EQ(loaded->GetCamera(), camera);
-    EXPECT_EQ(camera->view, view);
-    EXPECT_EQ(camera->fovy, fovy);
-    EXPECT_FLOAT_EQ(camera->aspect, float(size.x) / size.y);
-    EXPECT_FLOAT_EQ(film->info.persistence, 0.75f);
-    EXPECT_FLOAT_EQ(film->info.clamping, 123.0f);
-    EXPECT_FLOAT_EQ(film->info.max_exposure, 30.0f);
-    EXPECT_EQ(film->info.view_transform, 2);
-    EXPECT_FLOAT_EQ(film->info.exposure, 1.5f);
-    EXPECT_FLOAT_EQ(film->info.gamma, 1.15f);
-    EXPECT_FLOAT_EQ(film->info.contrast, 1.2f);
-    // Both pipelines cache additional images on the Film. Render before the
-    // next resize to catch stale dimensions, descriptors and accumulation.
-    for (auto pipeline : {sparkium::RENDER_PIPELINE_RT_FALLBACK, sparkium::RENDER_PIPELINE_RASTERIZATION}) {
-      core->Render(scene, camera, film, pipeline);
-      std::unique_ptr<graphics::Image> output;
-      graphics->CreateImage(size.x, size.y, graphics::IMAGE_FORMAT_R32G32B32A32_SFLOAT, &output);
-      film->Develop(output.get(), true);
-      std::vector<glm::vec4> pixels(size.x * size.y);
-      output->DownloadData(pixels.data());
-      for (const auto &pixel : pixels)
-        for (int c = 0; c < 4; ++c)
-          ASSERT_TRUE(std::isfinite(pixel[c]));
-    }
-    const int samples = film->info.accumulated_samples;
-    EXPECT_FALSE(loaded->ResizeFilm(size.x, size.y));
-    EXPECT_EQ(loaded->GetFilm(), film);
-    EXPECT_EQ(film->info.accumulated_samples, samples);
-    EXPECT_THROW(loaded->ResizeFilm(0, size.y), std::invalid_argument);
-    EXPECT_EQ(loaded->GetFilm(), film);
-  }
-}
-
 TEST_F(SoftwareBVHTest, HDRFilmDevelopmentPreservesHighlightsAndAccumulation) {
   sparkium::Film film(core.get(), 9, 3);
   std::vector<glm::vec4> source(27, glm::vec4(4.0f, 0.25f, -1.0f, 1.0f));
