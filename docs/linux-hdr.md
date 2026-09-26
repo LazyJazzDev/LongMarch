@@ -31,12 +31,15 @@ On Linux, `LONGMARCH_WINDOW_SYSTEM` accepts:
 | `x11` | Explicitly use X11, including XWayland in a Wayland session. |
 | `wayland` | Require native Wayland; report an error if it is unavailable or not compiled in. |
 
-Set the variable before starting the process. `Core::InitializeGLFW()` owns
-platform selection without creating a window. The graphics Vulkan core calls it
-before gathering WSI extensions, and Window reuses it when creating a window. The low-level Vulkan library keeps its native
-GLFW initialization path without depending on the graphics/window layer. The automatic fallback concerns window
-system initialization, not HDR support: a valid SDR-only Wayland session stays
-on Wayland. Older GLFW versions retain their native platform selection.
+Set the variable before starting the process. Every graphics `Core` attempts
+GLFW initialization in its base constructor, before backend-specific setup
+(including Vulkan WSI extension queries). Failure does not prevent headless
+rendering. `Window` reuses the same initialization helper and requires success
+when actually creating a window. The low-level Vulkan library keeps its native
+GLFW initialization path without depending on the graphics/window layer.
+Automatic fallback concerns window-system initialization, not HDR support:
+a valid SDR-only Wayland session stays on Wayland. Older GLFW versions retain
+their native platform selection.
 
 X11 remains supported for SDR. HDR is determined by surface capabilities, rather
 than by a blanket platform ban. The Vulkan swapchain-color-space extension is

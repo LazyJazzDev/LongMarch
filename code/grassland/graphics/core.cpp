@@ -23,6 +23,9 @@ void Core::Settings::PybindClassRegistration(py::classh<Settings> &c) {
 #endif
 
 Core::Core(const Settings &settings) : settings_(settings) {
+  // Initialize the window system before backend-specific setup, but allow
+  // headless rendering when no window system is available.
+  InitializeGLFW();
 }
 
 bool Core::InitializeGLFW() {
