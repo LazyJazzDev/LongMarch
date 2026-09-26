@@ -230,11 +230,7 @@ int main(int argc, char **argv) {
       if (hdr_active) {
         const auto brightness = window->GetDisplayBrightness();
         if (hdr10) {
-          float white_nits = window->HDR10WhiteNits();
-          if (ImGui::SliderFloat("HDR white (nits)", &white_nits, 80.0f, 400.0f, "%.0f"))
-            window->SetHDR10WhiteNits(white_nits);
-          if (ImGui::IsItemHovered())
-            ImGui::SetTooltip("Manual scene/UI reference white; default 203 nits. Not a display measurement.");
+          ImGui::Text("Content reference white: %.0f nits", window->HDR10WhiteNits());
         } else if (brightness.sdr_white_nits > 0.0f)
           ImGui::Text("Reference white: %.0f nits (%.2fx)", brightness.sdr_white_nits,
                       window->HDRReferenceWhiteScale());

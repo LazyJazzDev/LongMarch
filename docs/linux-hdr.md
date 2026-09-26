@@ -79,15 +79,25 @@ It never modifies the source film, accumulation, source image, or HDR export.
 The floating-point intermediate preserves alpha; the swapchain uses opaque
 desktop composition. UI blending happens before PQ encoding.
 
-`HDR white (nits)` is a **manual** reference white, defaulting to 203 nits. It is
-not an automatic query of GNOME's SDR white setting or the monitor's peak.
-`Window::SetHDR10WhiteNits` accepts finite values from 1 to 10000 nits; the GUI
-offers 80–400 nits. Linux display headroom remains unknown. The existing Windows
-scRGB reference-white alignment and Metal presentation paths remain separate.
+The GUI uses **203 nits as PQ content reference white**, matching the default
+reference white for the Wayland protocol's ST 2084 transfer function. It displays
+this content value but provides no manual reference-white control. It is not a
+measurement of desktop white or the monitor's peak. On the locally verified
+NVIDIA/Mutter path, the driver declares PQ content with this default reference
+white, and the compositor maps content reference white to its output reference
+white. Substituting the output's reference white into the pixels without changing
+their content description would apply the adjustment twice.
+
+`Window::SetHDR10WhiteNits` remains a low-level encoding API (also used by numeric
+tests); changing it does not change WSI color metadata or query system brightness.
+Linux display headroom remains unknown. The existing Windows scRGB reference-white
+alignment and Metal presentation paths remain separate.
 
 PQ values are bounded at 10000 nits. This is not display-adaptive tone mapping;
-the compositor/display can perform further mapping. HDR metadata submission and
-Wayland preferred-image-description feedback are not implemented here.
+the compositor/display can perform further mapping. Application HDR metadata
+submission is not implemented. Preferred-image-description feedback is observed
+by the optional diagnostic below; the GUI does not override the compositor's
+mapping using those output-side values.
 
 For Cornell Box, raise `Max exposure` above the bundled value of 1 (for example,
 30–100) to retain scene highlights before presentation. An SDR screenshot cannot
@@ -130,13 +140,67 @@ GPU tests ran with Vulkan validation and synchronization validation enabled, wit
 no reported validation errors. The PQ test also switches its conversion pipeline
 back to a controlled 3× scRGB reference-white scale to check that PQ settings do
 not alter the existing linear path. The native Wayland GUI run used validation,
-Cornell Box at 768×768, 1 sample/frame, 8 bounces, max exposure 100, and manual
+Cornell Box at 768×768, 1 sample/frame, 8 bounces, max exposure 100, and content
 white 203 nits. This is a bounded rendering/presentation check, not a subjective
 image-quality judgment or a physical luminance measurement. The Wayland stack
 emitted a GTK `gtk_disable_setlocale` startup warning without failing the run.
 
 Windows/macOS, pure Xorg sessions, other GPUs/compositors, live desktop HDR
 changes, and moving windows between HDR/SDR monitors were not tested in this run.
+
+### Reference-white protocol validation
+
+An optional diagnostic opens an SDR white window and an HDR reference-white
+window, reads each mapped surface's preferred image description, and observes
+`preferred_changed` notifications. It does not set surface color descriptions
+(Vulkan WSI owns those), change display settings, or measure physical luminance.
+Only this opt-in target requires Wayland development tools and
+`wayland-protocols >= 1.41`; normal builds acquire no new dependency.
+
+```sh
+cmake -S . -B build-wayland -G Ninja -DCMAKE_BUILD_TYPE=Release \
+  -DVCPKG_PATH=/path/to/vcpkg -DVCPKG_MANIFEST_FEATURES=wayland \
+  -DLONGMARCH_ENABLE_WAYLAND_COLOR_PROBE=ON
+cmake --build build-wayland --target wayland_color_probe
+LONGMARCH_WINDOW_SYSTEM=wayland WAYLAND_DEBUG=client \
+  ./build-wayland/test/sparkium/wayland_color_probe --seconds 30
+```
+
+`WAYLAND_DEBUG=client` exposes the WSI driver's submitted source description as
+well as the probe's output-side feedback. Missing color-management support or
+an X11 session returns skip status 77. An unavailable/ICC-only preferred
+description is reported as unknown, not fabricated as a system reference white.
+The probe binds protocol version 1 for compatibility, even when version 2 is
+advertised. It does not require a new color-management version for the GUI.
+
+A subsequent local check on GNOME/Mutter 50.1 and NVIDIA 595.91.07 temporarily
+enabled desktop HDR and then restored the original SDR configuration. Both
+windows received the same feedback and both live transitions were observed:
+
+| Desktop mode | Preferred transfer / primaries | Preferred reference white | Primary-volume maximum |
+| --- | --- | --- | --- |
+| SDR, before | gamma 2.2 / BT.709 | 80 nits | 80 nits |
+| HDR | PQ / BT.2020 | 203 nits | 10000 nits |
+| SDR, restored | gamma 2.2 / BT.709 | 80 nits | 80 nits |
+
+The 10000-nit value is the PQ container's maximum, **not the monitor's peak**.
+PQ swapchains remained available with desktop HDR disabled, so format support
+alone cannot prove physical HDR output.
+
+The WSI trace showed `set_primaries_named(6)`, `set_tf_named(11)`, and perceptual
+render intent, with no explicit `set_luminances`. The protocol therefore gives
+this PQ source a 203-nit reference white. Mutter 50.1's
+[`get_lum_mapping`](https://github.com/GNOME/mutter/blob/50.1/clutter/clutter/clutter-color-state-params.c)
+uses `(target.ref / source.ref) * (source.max / target.max)` in normalized linear
+light. In the HDR state above, SDR full white and PQ content white consequently
+map to the same reference level. This is protocol/source-level validation, not
+compositor pixel readback, a photometric test, or proof for every compositor.
+No multi-monitor migration or SDR-white-slider sweep was performed.
+
+The GPU regression also varies a controlled output-reference query through
+80/203/400 nits and checks that PQ content white stays encoded at 203 nits, while
+the separate scRGB path still applies its reference-white scale. This prevents
+an accidental second output-white adjustment in the presentation shader.
 
 ## References
 

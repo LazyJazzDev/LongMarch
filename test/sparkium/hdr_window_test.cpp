@@ -327,6 +327,7 @@ TEST_P(HDRWindowTest, PQReadbackUsesAbsoluteNitsAndPreservesSource) {
   BrightnessProbeWindow window;
   window.encoding = graphics::HDROutputEncoding::HDR10PQ;
   window.SetHDR(true);
+  EXPECT_FLOAT_EQ(window.HDR10WhiteNits(), 203.0f);
   // This numeric test works even on an SDR desktop, without presenting PQ there.
   const std::vector<glm::vec4> samples{{0, 0, 0, 0.25}, {1, 1, 1, 0.5}, {10, 10, 10, 1},         {1, 0, 0, 1},
                                        {0, 1, 0, 1},    {0, 0, 1, 1},   {65504, 65504, 65504, 1}};
@@ -361,6 +362,21 @@ TEST_P(HDRWindowTest, PQReadbackUsesAbsoluteNitsAndPreservesSource) {
       if (white == 100.0f)
         EXPECT_NEAR(glm::unpackHalf1x16(actual[4]), 0.508078, 0.001);  // ST 2084 100-nit gray.
     }
+  }
+  // PQ source white is not the compositor's output white. Applying the output
+  // reference-white scale here as well would duplicate compositor mapping.
+  window.SetHDR10WhiteNits(203.0f);
+  for (float output_white : {80.0f, 203.0f, 400.0f}) {
+    window.brightness = {output_white, output_white / 80.0f, 0.0f, true, true};
+    window.RefreshDisplayBrightness();
+    std::unique_ptr<graphics::CommandContext> commands;
+    ASSERT_EQ(core->CreateCommandContext(&commands), 0);
+    auto *encoded = window.AlignHDRComposition(commands.get());
+    ASSERT_EQ(core->SubmitCommandContext(commands.get()), 0);
+    core->WaitGPU();
+    std::vector<uint16_t> actual(source.size());
+    encoded->DownloadData(actual.data());
+    EXPECT_NEAR(glm::unpackHalf1x16(actual[4]), PQ(203.0), 0.001);
   }
   // Reuse the same pipeline with scRGB: the PQ white must not leak into the
   // Windows-style scaling path, and disabling alignment still bypasses it.
