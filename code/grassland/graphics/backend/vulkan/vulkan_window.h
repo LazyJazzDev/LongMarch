@@ -18,6 +18,10 @@ class VulkanWindow : public Window {
 
   virtual void CloseWindow() override;
   void SetHDR(bool enable_hdr) override;
+  HDROutputEncoding GetHDROutputEncoding() const override;
+
+  // An HDR request must never silently select an SDR format.
+  static VkSurfaceFormatKHR ChooseHDRSurfaceFormat(const std::vector<VkSurfaceFormatKHR> &formats);
 
   vulkan::Swapchain *SwapChain() const;
 
@@ -51,6 +55,9 @@ class VulkanWindow : public Window {
   vulkan::Framebuffer *HDRFramebuffer(VulkanImage *image);
 
  private:
+  VkSurfaceFormatKHR SelectSurfaceFormat(bool hdr) const;
+  VkFormat ImGuiFormat() const;
+  VkSurfaceFormatKHR surface_format_{};
   VkQueue present_queue_;
   VulkanCore *core_;
   std::unique_ptr<vulkan::Surface> surface_;

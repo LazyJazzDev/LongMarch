@@ -121,11 +121,22 @@ int main(int argc, char **argv) {
     ResizeWindowForFilm(window.get(), loaded->GetFilm());
     resize_pending = false;
     if (hdr_requested) {
-      window->SetHDR(true);
-      hdr_active = true;
-      create_display_image();
+      try {
+        window->SetHDR(true);
+        hdr_active = true;
+        create_display_image();
+      } catch (const std::exception &error) {
+        hdr_error = error.what();
+        hdr_requested = false;
+        std::cerr << "HDR unavailable; continuing in SDR: " << hdr_error << '\n';
+      }
     }
     window->InitImGui(nullptr, 18.0f);
+    std::cout << "Display: "
+              << (hdr_active ? (window->GetHDROutputEncoding() == graphics::HDROutputEncoding::HDR10PQ ? "HDR10 (PQ)"
+                                                                                                       : "HDR (linear)")
+                             : "SDR")
+              << std::endl;
     FPSCounter fps_counter;
     bool show_browser = true;
 
@@ -194,10 +205,18 @@ int main(int argc, char **argv) {
       if (!hdr_error.empty())
         ImGui::TextWrapped("HDR unavailable: %s", hdr_error.c_str());
       ImGui::SliderFloat("Exposure (EV)", &loaded->GetFilm()->info.exposure, -8.0f, 8.0f, "%.2f");
-      ImGui::TextUnformatted(hdr_active ? "Display: HDR (linear)" : "Display: SDR (scene view transform)");
+      const bool hdr10 = window->GetHDROutputEncoding() == graphics::HDROutputEncoding::HDR10PQ;
+      ImGui::TextUnformatted(hdr_active ? (hdr10 ? "Display: HDR10 (PQ)" : "Display: HDR (linear)")
+                                        : "Display: SDR (scene view transform)");
       if (hdr_active) {
         const auto brightness = window->GetDisplayBrightness();
-        if (brightness.sdr_white_nits > 0.0f)
+        if (hdr10) {
+          float white_nits = window->HDR10WhiteNits();
+          if (ImGui::SliderFloat("HDR white (nits)", &white_nits, 80.0f, 400.0f, "%.0f"))
+            window->SetHDR10WhiteNits(white_nits);
+          if (ImGui::IsItemHovered())
+            ImGui::SetTooltip("Manual scene/UI reference white; default 203 nits. Not a display measurement.");
+        } else if (brightness.sdr_white_nits > 0.0f)
           ImGui::Text("Reference white: %.0f nits (%.2fx)", brightness.sdr_white_nits,
                       window->HDRReferenceWhiteScale());
         else if (!brightness.reference_white_known)

@@ -59,7 +59,8 @@ class Device {
   VkResult CreateSwapchain(const Surface *surface,
                            VkFormat format,
                            VkColorSpaceKHR color_space,
-                           double_ptr<Swapchain> pp_swapchain) const;
+                           double_ptr<Swapchain> pp_swapchain,
+                           VkSwapchainKHR old_swapchain = VK_NULL_HANDLE) const;
 
   VkResult CreateSwapchain(const Surface *surface, double_ptr<Swapchain> pp_swapchain) const;
 

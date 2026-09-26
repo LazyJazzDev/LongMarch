@@ -14,9 +14,10 @@ VulkanWindow::VulkanWindow(VulkanCore *core,
     : Window(width, height, title, fullscreen, resizable, enable_hdr),
       core_(core) {
   core_->Instance()->CreateSurfaceFromGLFWWindow(GLFWWindow(), &surface_);
-  core_->Device()->CreateSwapchain(
-      surface_.get(), enable_hdr_ ? VK_FORMAT_R16G16B16A16_SFLOAT : VK_FORMAT_R8G8B8A8_UNORM,
-      enable_hdr_ ? VK_COLOR_SPACE_EXTENDED_SRGB_LINEAR_EXT : VK_COLOR_SPACE_SRGB_NONLINEAR_KHR, &swap_chain_);
+  surface_format_ = SelectSurfaceFormat(enable_hdr_);
+  if (core_->Device()->CreateSwapchain(surface_.get(), surface_format_.format, surface_format_.colorSpace,
+                                       &swap_chain_) != VK_SUCCESS)
+    throw std::runtime_error("Failed to create Vulkan swapchain");
   image_available_semaphores_.resize(swap_chain_->ImageCount());
   render_finish_semaphores_.resize(swap_chain_->ImageCount());
   for (size_t i = 0; i < image_available_semaphores_.size(); ++i) {
@@ -50,15 +51,52 @@ void VulkanWindow::CloseWindow() {
 void VulkanWindow::SetHDR(bool enable_hdr) {
   if (enable_hdr == enable_hdr_)
     return;
-  if (enable_hdr) {
-    const auto support =
-        vulkan::Swapchain::QuerySwapChainSupport(core_->Device()->PhysicalDevice().Handle(), surface_->Handle());
-    const auto format = vulkan::Swapchain::ChooseSwapSurfaceFormat(support.formats, VK_FORMAT_R16G16B16A16_SFLOAT,
-                                                                   VK_COLOR_SPACE_EXTENDED_SRGB_LINEAR_EXT);
-    if (format.format != VK_FORMAT_R16G16B16A16_SFLOAT || format.colorSpace != VK_COLOR_SPACE_EXTENDED_SRGB_LINEAR_EXT)
-      throw std::runtime_error("The Vulkan surface does not support linear scRGB HDR presentation");
+  // Probe before changing state so an unsupported request leaves SDR usable.
+  SelectSurfaceFormat(enable_hdr);
+  const bool previous = enable_hdr_;
+  try {
+    Window::SetHDR(enable_hdr);
+  } catch (...) {
+    enable_hdr_ = previous;
+    throw;
   }
-  Window::SetHDR(enable_hdr);
+}
+
+VkSurfaceFormatKHR VulkanWindow::ChooseHDRSurfaceFormat(const std::vector<VkSurfaceFormatKHR> &formats) {
+  for (const auto &candidate :
+       {VkSurfaceFormatKHR{VK_FORMAT_R16G16B16A16_SFLOAT, VK_COLOR_SPACE_EXTENDED_SRGB_LINEAR_EXT},
+        VkSurfaceFormatKHR{VK_FORMAT_A2B10G10R10_UNORM_PACK32, VK_COLOR_SPACE_HDR10_ST2084_EXT},
+        VkSurfaceFormatKHR{VK_FORMAT_A2R10G10B10_UNORM_PACK32, VK_COLOR_SPACE_HDR10_ST2084_EXT}}) {
+    for (const auto &format : formats) {
+      if (format.format == candidate.format && format.colorSpace == candidate.colorSpace)
+        return format;
+    }
+  }
+  throw std::runtime_error(
+      "The Vulkan surface supports neither linear scRGB nor HDR10/PQ; "
+      "use an HDR-capable desktop and native Wayland on Linux (X11 remains available for SDR)");
+}
+
+VkSurfaceFormatKHR VulkanWindow::SelectSurfaceFormat(bool hdr) const {
+  const auto support =
+      vulkan::Swapchain::QuerySwapChainSupport(core_->Device()->PhysicalDevice().Handle(), surface_->Handle());
+  auto format = hdr ? ChooseHDRSurfaceFormat(support.formats)
+                    : vulkan::Swapchain::ChooseSwapSurfaceFormat(support.formats, VK_FORMAT_R8G8B8A8_UNORM,
+                                                                 VK_COLOR_SPACE_SRGB_NONLINEAR_KHR);
+  VkFormatProperties properties{};
+  vkGetPhysicalDeviceFormatProperties(core_->Device()->PhysicalDevice().Handle(), format.format, &properties);
+  if (!(properties.optimalTilingFeatures & VK_FORMAT_FEATURE_BLIT_DST_BIT))
+    throw std::runtime_error("Vulkan presentation format does not support image blits");
+  return format;
+}
+
+HDROutputEncoding VulkanWindow::GetHDROutputEncoding() const {
+  return enable_hdr_ && surface_format_.colorSpace == VK_COLOR_SPACE_HDR10_ST2084_EXT ? HDROutputEncoding::HDR10PQ
+                                                                                      : HDROutputEncoding::LinearSRGB;
+}
+
+VkFormat VulkanWindow::ImGuiFormat() const {
+  return GetHDROutputEncoding() == HDROutputEncoding::HDR10PQ ? VK_FORMAT_R16G16B16A16_SFLOAT : swap_chain_->Format();
 }
 
 vulkan::Swapchain *VulkanWindow::SwapChain() const {
@@ -82,16 +120,19 @@ uint32_t VulkanWindow::AcquireNextImage() {
 
 void VulkanWindow::Rebuild() {
   core_->WaitGPU();
+  const auto format = SelectSurfaceFormat(enable_hdr_);
+  std::unique_ptr<vulkan::Swapchain> next;
+  if (core_->Device()->CreateSwapchain(surface_.get(), format.format, format.colorSpace, &next,
+                                       swap_chain_->Handle()) != VK_SUCCESS)
+    throw std::runtime_error("Failed to rebuild Vulkan swapchain");
   hdr_framebuffer_.reset();
   imgui_assets_.framebuffers.clear();
-  swap_chain_.reset();
-  core_->Device()->CreateSwapchain(
-      surface_.get(), enable_hdr_ ? VK_FORMAT_R16G16B16A16_SFLOAT : VK_FORMAT_R8G8B8A8_UNORM,
-      enable_hdr_ ? VK_COLOR_SPACE_EXTENDED_SRGB_LINEAR_EXT : VK_COLOR_SPACE_SRGB_NONLINEAR_KHR, &swap_chain_);
+  swap_chain_ = std::move(next);
+  surface_format_ = format;
   if (imgui_assets_.context) {
     ImGui::SetCurrentContext(imgui_assets_.context);
     imgui_assets_.framebuffers.clear();
-    if (imgui_assets_.render_pass->AttachmentDescriptions()[0].format != swap_chain_->Format()) {
+    if (imgui_assets_.render_pass->AttachmentDescriptions()[0].format != ImGuiFormat()) {
       ImGui_ImplVulkan_Shutdown();
       ImGui_ImplGlfw_Shutdown();
 
@@ -178,7 +219,7 @@ void VulkanWindow::SetupImGuiContext() {
 
   VkAttachmentDescription attachment_desc{};
   attachment_desc.flags = 0;
-  attachment_desc.format = swap_chain_->Format();
+  attachment_desc.format = ImGuiFormat();
   attachment_desc.samples = VK_SAMPLE_COUNT_1_BIT;
   attachment_desc.loadOp = VK_ATTACHMENT_LOAD_OP_LOAD;
   attachment_desc.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
@@ -221,6 +262,9 @@ void VulkanWindow::SetupImGuiContext() {
 }
 
 void VulkanWindow::BuildImGuiFramebuffers() {
+  // PQ is encoded only after scene/UI blending in the floating-point target.
+  if (GetHDROutputEncoding() == HDROutputEncoding::HDR10PQ)
+    return;
   imgui_assets_.framebuffers.resize(swap_chain_->ImageCount());
   for (int i = 0; i < swap_chain_->ImageCount(); i++) {
     imgui_assets_.render_pass->CreateFramebuffer({swap_chain_->ImageViews()[i]}, swap_chain_->Extent(),

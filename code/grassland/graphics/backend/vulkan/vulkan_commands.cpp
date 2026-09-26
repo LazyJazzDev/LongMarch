@@ -481,7 +481,7 @@ void VulkanCmdPresent::CompileCommand(VulkanCommandContext *context, VkCommandBu
         (target_ ? window_->HDRFramebuffer(target_) : imgui_assets.framebuffers[window_->CurrentImageIndex()].get())
             ->Handle();
     renderPassInfo.renderArea.offset = {0, 0};
-    renderPassInfo.renderArea.extent = imgui_assets.framebuffers[window_->CurrentImageIndex()]->Extent();
+    renderPassInfo.renderArea.extent = window_extent;
     renderPassInfo.clearValueCount = 0;
     renderPassInfo.pClearValues = nullptr;
 

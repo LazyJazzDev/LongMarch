@@ -6,6 +6,7 @@
 #include "grassland/graphics/image.h"
 #include "grassland/graphics/program.h"
 #include "grassland/graphics/shader.h"
+#include "grassland/util/glfw.h"
 #ifdef _WIN32
 #define GLFW_EXPOSE_NATIVE_WIN32
 #include <GLFW/glfw3native.h>
@@ -146,8 +147,14 @@ float Window::HDRReferenceWhiteScale() {
   return enable_hdr_ && align_hdr_brightness_ ? brightness.hdr_reference_white_scale : 1.0f;
 }
 
+void Window::SetHDR10WhiteNits(float nits) {
+  if (!std::isfinite(nits) || nits < 1.0f || nits > 10000.0f)
+    throw std::invalid_argument("HDR10 reference white must be between 1 and 10000 nits");
+  hdr10_white_nits_ = nits;
+}
+
 Image *Window::PrepareHDRComposition(Core *core, Extent2D extent) {
-  if (!enable_hdr_ || !align_hdr_brightness_)
+  if (!enable_hdr_ || (!align_hdr_brightness_ && GetHDROutputEncoding() != HDROutputEncoding::HDR10PQ))
     return nullptr;
   if (!hdr_presentation_) {
     auto pending = std::make_unique<HDRPresentation>();
@@ -156,13 +163,28 @@ Image *Window::PrepareHDRComposition(Core *core, Extent2D extent) {
     const char *source = R"(
 Texture2D<float4> source_image : register(t0, space0);
 [[vk::image_format("rgba16f")]] RWTexture2D<float4> output_image : register(u0, space1);
-cbuffer Settings : register(b0, space2) { float white_scale; float3 padding; };
+cbuffer Settings : register(b0, space2) { float white_scale; float pq_output; float white_nits; float padding; };
+float3 EncodePQ(float3 nits) {
+  float3 p = pow(saturate(nits / 10000.0), 2610.0 / 16384.0);
+  return pow((3424.0 / 4096.0 + (2413.0 / 128.0) * p) /
+             (1.0 + (2392.0 / 128.0) * p), 2523.0 / 32.0);
+}
 [numthreads(8,8,1)] void Main(uint3 id : SV_DispatchThreadID) {
   uint width, height;
   output_image.GetDimensions(width, height);
   if (id.x >= width || id.y >= height) return;
   float4 color = source_image.Load(int3(id.xy, 0));
-  output_image[id.xy] = float4(min(max(color.rgb, 0.0) * white_scale, 65504.0), color.a);
+  float3 rgb = max(color.rgb, 0.0);
+  if (pq_output != 0.0) {
+    // Linear BT.709/D65 to BT.2020/D65, then absolute-luminance ST 2084.
+    rgb = mul(float3x3(0.627404, 0.329283, 0.043313,
+                       0.069097, 0.919540, 0.011362,
+                       0.016391, 0.088013, 0.895595), rgb);
+    rgb = EncodePQ(rgb * white_nits);
+  } else {
+    rgb = min(rgb * white_scale, 65504.0);
+  }
+  output_image[id.xy] = float4(rgb, color.a);
 }
 )";
     if (core->CreateShader(source, "Main", "cs_6_0", &p.shader) ||
@@ -192,7 +214,8 @@ Image *Window::AlignHDRComposition(CommandContext *commands) {
   if (!hdr_presentation_ || !hdr_presentation_->composition)
     throw std::logic_error("Prepare HDR composition before aligning it");
   auto &p = *hdr_presentation_;
-  const float settings[4] = {HDRReferenceWhiteScale(), 0, 0, 0};
+  const float settings[4] = {HDRReferenceWhiteScale(),
+                             GetHDROutputEncoding() == HDROutputEncoding::HDR10PQ ? 1.0f : 0.0f, HDR10WhiteNits(), 0};
   p.settings->UploadData(settings, sizeof(settings));
   commands->CmdBindComputeProgram(p.program.get());
   commands->CmdBindResources(0, {p.composition.get()}, BIND_POINT_COMPUTE);
@@ -207,7 +230,7 @@ bool glfw_initialized_{false};
 
 void InitializeGLFW() {
   if (!glfw_initialized_) {
-    if (!glfwInit()) {
+    if (!InitializeGLFWWithPlatform()) {
       throw std::runtime_error("Failed to initialize GLFW");
     }
     glfw_initialized_ = true;
@@ -342,22 +365,41 @@ void Window::RequestClose() {
 }
 
 glm::ivec2 Window::GetPosition() const {
-  glm::ivec2 position;
+  // Wayland intentionally does not expose global window coordinates.
+#if defined(__linux__) && defined(GLFW_PLATFORM)
+  if (glfwGetPlatform() == GLFW_PLATFORM_WAYLAND)
+    return {0, 0};
+#endif
+  glm::ivec2 position{};
   glfwGetWindowPos(window_, &position.x, &position.y);
   return position;
 }
 
 void Window::SetPosition(int x, int y) {
+#if defined(__linux__) && defined(GLFW_PLATFORM)
+  if (glfwGetPlatform() == GLFW_PLATFORM_WAYLAND)
+    return;
+#endif
   glfwSetWindowPos(window_, x, y);
 }
 
 glm::ivec4 Window::GetFrameSize() const {
-  glm::ivec4 frame;
+  glm::ivec4 frame{};
   glfwGetWindowFrameSize(window_, &frame.x, &frame.y, &frame.z, &frame.w);
   return frame;
 }
 
 glm::ivec4 Window::GetMonitorWorkArea() const {
+#if defined(__linux__) && defined(GLFW_PLATFORM)
+  if (glfwGetPlatform() == GLFW_PLATFORM_WAYLAND) {
+    // GLFW cannot locate an ordinary Wayland window in global coordinates.
+    // Use the primary output only as a sizing hint; let the compositor place it.
+    glm::ivec4 area{0, 0, GetWidth(), GetHeight()};
+    if (auto *monitor = glfwGetPrimaryMonitor())
+      glfwGetMonitorWorkarea(monitor, &area.x, &area.y, &area.z, &area.w);
+    return area;
+  }
+#endif
   const auto position = GetPosition();
   const auto size = GetSize();
   int count = 0;

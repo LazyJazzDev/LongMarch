@@ -14,6 +14,43 @@
 
 using namespace grassland;
 
+namespace {
+bool InteractiveHDRTests() {
+  return std::getenv("LONGMARCH_TEST_HDR") || std::getenv("LONGMARCH_TEST_HDR_WINDOWS");
+}
+
+bool HasHDRSurface(graphics::Window *window) {
+#if defined(LONGMARCH_VULKAN_ENABLED)
+  if (auto native = dynamic_cast<graphics::backend::VulkanWindow *>(window)) {
+    auto swapchain = native->SwapChain();
+    const auto support = vulkan::Swapchain::QuerySwapChainSupport(swapchain->Device()->PhysicalDevice().Handle(),
+                                                                  swapchain->Surface()->Handle());
+    try {
+      graphics::backend::VulkanWindow::ChooseHDRSurfaceFormat(support.formats);
+    } catch (const std::runtime_error &) {
+      return false;
+    }
+  }
+#endif
+  return true;
+}
+
+double PQ(double nits) {
+  const double p = std::pow(std::clamp(nits / 10000.0, 0.0, 1.0), 2610.0 / 16384.0);
+  return std::pow((3424.0 / 4096.0 + 2413.0 / 128.0 * p) / (1.0 + 2392.0 / 128.0 * p), 2523.0 / 32.0);
+}
+
+glm::vec3 ExpectedOutput(graphics::Window *window, glm::vec3 linear) {
+  if (window->GetHDROutputEncoding() != graphics::HDROutputEncoding::HDR10PQ)
+    return linear * window->HDRReferenceWhiteScale();
+  const glm::dvec3 bt2020{0.627404 * linear.r + 0.329283 * linear.g + 0.043313 * linear.b,
+                          0.069097 * linear.r + 0.919540 * linear.g + 0.011362 * linear.b,
+                          0.016391 * linear.r + 0.088013 * linear.g + 0.895595 * linear.b};
+  const auto nits = bt2020 * double(window->HDR10WhiteNits());
+  return {PQ(nits.r), PQ(nits.g), PQ(nits.b)};
+}
+}  // namespace
+
 #if defined(LONGMARCH_VULKAN_ENABLED)
 TEST(HDRSurfaceFormatTest, PreferredFormatWinsRegardlessOfEnumerationOrder) {
   const VkSurfaceFormatKHR hdr{VK_FORMAT_R16G16B16A16_SFLOAT, VK_COLOR_SPACE_EXTENDED_SRGB_LINEAR_EXT};
@@ -28,6 +65,23 @@ TEST(HDRSurfaceFormatTest, PreferredFormatWinsRegardlessOfEnumerationOrder) {
   }
   EXPECT_THROW(vulkan::Swapchain::ChooseSwapSurfaceFormat({}, hdr.format, hdr.colorSpace), std::runtime_error);
 }
+
+TEST(HDRSurfaceFormatTest, HDRNegotiationPreservesScRGBAndSupportsBothPQLayouts) {
+  using graphics::backend::VulkanWindow;
+  const VkSurfaceFormatKHR scrgb{VK_FORMAT_R16G16B16A16_SFLOAT, VK_COLOR_SPACE_EXTENDED_SRGB_LINEAR_EXT};
+  const VkSurfaceFormatKHR pq{VK_FORMAT_A2B10G10R10_UNORM_PACK32, VK_COLOR_SPACE_HDR10_ST2084_EXT};
+  const VkSurfaceFormatKHR pq_bgr{VK_FORMAT_A2R10G10B10_UNORM_PACK32, VK_COLOR_SPACE_HDR10_ST2084_EXT};
+  const VkSurfaceFormatKHR sdr{VK_FORMAT_R8G8B8A8_UNORM, VK_COLOR_SPACE_SRGB_NONLINEAR_KHR};
+  EXPECT_EQ(VulkanWindow::ChooseHDRSurfaceFormat({pq, sdr, scrgb}).format, scrgb.format);
+  EXPECT_EQ(VulkanWindow::ChooseHDRSurfaceFormat({sdr, pq_bgr, pq}).format, pq.format);
+  EXPECT_EQ(VulkanWindow::ChooseHDRSurfaceFormat({sdr, pq_bgr}).format, pq_bgr.format);
+  EXPECT_THROW(VulkanWindow::ChooseHDRSurfaceFormat({sdr}), std::runtime_error);
+  EXPECT_THROW(VulkanWindow::ChooseHDRSurfaceFormat({}), std::runtime_error);
+  // Float storage or 10-bit precision alone does not establish HDR encoding.
+  EXPECT_THROW(VulkanWindow::ChooseHDRSurfaceFormat(
+                   {{scrgb.format, VK_COLOR_SPACE_BT709_LINEAR_EXT}, {pq.format, VK_COLOR_SPACE_SRGB_NONLINEAR_KHR}}),
+               std::runtime_error);
+}
 #endif
 
 class BrightnessProbeWindow : public graphics::Window {
@@ -36,6 +90,11 @@ class BrightnessProbeWindow : public graphics::Window {
   }
 
   graphics::DisplayBrightness brightness;
+  graphics::HDROutputEncoding encoding{graphics::HDROutputEncoding::LinearSRGB};
+
+  graphics::HDROutputEncoding GetHDROutputEncoding() const override {
+    return encoding;
+  }
 
   void InitImGui(const char *, float) override {
   }
@@ -60,7 +119,7 @@ class BrightnessProbeWindow : public graphics::Window {
 };
 
 TEST(HDRBrightnessTest, RefreshNotifiesAndUnknownReferenceFallsBack) {
-  if (!std::getenv("LONGMARCH_TEST_HDR_WINDOWS"))
+  if (!InteractiveHDRTests())
     GTEST_SKIP();
   BrightnessProbeWindow window;
   int changes = 0;
@@ -96,14 +155,16 @@ TEST(HDRBrightnessTest, RefreshNotifiesAndUnknownReferenceFallsBack) {
 class HDRWindowTest : public testing::TestWithParam<graphics::BackendAPI> {};
 
 TEST_P(HDRWindowTest, PresentationAndImGuiSwitching) {
-  if (!std::getenv("LONGMARCH_TEST_HDR_WINDOWS"))
-    GTEST_SKIP() << "Set LONGMARCH_TEST_HDR_WINDOWS=1 in an interactive desktop session";
+  if (!InteractiveHDRTests())
+    GTEST_SKIP() << "Set LONGMARCH_TEST_HDR=1 in an interactive desktop session";
   std::unique_ptr<graphics::Core> core;
   ASSERT_EQ(graphics::CreateCore(GetParam(), graphics::Core::Settings{2, true}, &core), 0);
   ASSERT_EQ(core->InitializeLogicalDeviceAutoSelect(false), 0);
   for (bool imgui : {false, true}) {
     std::unique_ptr<graphics::Window> window;
     ASSERT_EQ(core->CreateWindowObject(320, 240, "HDR presentation test", &window), 0);
+    if (!HasHDRSurface(window.get()))
+      GTEST_SKIP() << "Desktop exposes no supported HDR surface (SDR fallback tested separately)";
     if (imgui) {
       window->InitImGui();
       ImGui::GetIO().IniFilename = nullptr;
@@ -123,7 +184,11 @@ TEST_P(HDRWindowTest, PresentationAndImGuiSwitching) {
 #if defined(LONGMARCH_VULKAN_ENABLED)
       if (GetParam() == graphics::BACKEND_API_VULKAN) {
         auto native = dynamic_cast<graphics::backend::VulkanWindow *>(window.get());
-        EXPECT_EQ(native->SwapChain()->Format(), hdr ? VK_FORMAT_R16G16B16A16_SFLOAT : VK_FORMAT_R8G8B8A8_UNORM);
+        if (hdr && native->GetHDROutputEncoding() == graphics::HDROutputEncoding::HDR10PQ)
+          EXPECT_TRUE(native->SwapChain()->Format() == VK_FORMAT_A2B10G10R10_UNORM_PACK32 ||
+                      native->SwapChain()->Format() == VK_FORMAT_A2R10G10B10_UNORM_PACK32);
+        else
+          EXPECT_EQ(native->SwapChain()->Format(), hdr ? VK_FORMAT_R16G16B16A16_SFLOAT : VK_FORMAT_R8G8B8A8_UNORM);
       }
 #endif
       if (imgui) {
@@ -151,9 +216,9 @@ TEST_P(HDRWindowTest, PresentationAndImGuiSwitching) {
         const size_t center =
             ((aligned->Extent().height / 2) * aligned->Extent().width + aligned->Extent().width / 2) * 4;
         // ImGui's 128/255 gray is sRGB, decoded to about 0.216 linear.
-        EXPECT_NEAR(glm::unpackHalf1x16(pixels[center]), (imgui ? 0.216f : 3.0f) * scale, 0.01f * scale);
-        EXPECT_NEAR(glm::unpackHalf1x16(pixels[center + 1]), (imgui ? 0.216f : 2.0f) * scale, 0.01f * scale);
-        EXPECT_NEAR(glm::unpackHalf1x16(pixels[center + 2]), (imgui ? 0.216f : 1.0f) * scale, 0.01f * scale);
+        const auto expected = ExpectedOutput(window.get(), imgui ? glm::vec3{0.216f} : glm::vec3{3, 2, 1});
+        for (int c = 0; c < 3; ++c)
+          EXPECT_NEAR(glm::unpackHalf1x16(pixels[center + c]), expected[c], 0.01f * scale);
       }
       if (!resized) {
         window->Resize(352, 256);
@@ -167,13 +232,15 @@ TEST_P(HDRWindowTest, PresentationAndImGuiSwitching) {
 }
 
 TEST_P(HDRWindowTest, ReferenceWhiteScalingPreservesSourceAndAlpha) {
-  if (!std::getenv("LONGMARCH_TEST_HDR_WINDOWS"))
+  if (!InteractiveHDRTests())
     GTEST_SKIP() << "Requires an interactive desktop session";
   std::unique_ptr<graphics::Core> core;
   ASSERT_EQ(graphics::CreateCore(GetParam(), graphics::Core::Settings{2, true}, &core), 0);
   ASSERT_EQ(core->InitializeLogicalDeviceAutoSelect(false), 0);
   std::unique_ptr<graphics::Window> window;
   ASSERT_EQ(core->CreateWindowObject(320, 240, "HDR reference white test", &window), 0);
+  if (!HasHDRSurface(window.get()))
+    GTEST_SKIP() << "Desktop exposes no supported HDR surface";
   window->SetHDR(true);
   auto *composition = window->PrepareHDRComposition(core.get(), {13, 7});
   ASSERT_NE(composition, nullptr);
@@ -201,17 +268,123 @@ TEST_P(HDRWindowTest, ReferenceWhiteScalingPreservesSourceAndAlpha) {
   composition->DownloadData(unchanged.data());
   EXPECT_EQ(source, unchanged);
   for (size_t i = 0; i < source.size(); i += 4) {
+    const auto expected = ExpectedOutput(
+        window.get(),
+        {glm::unpackHalf1x16(source[i]), glm::unpackHalf1x16(source[i + 1]), glm::unpackHalf1x16(source[i + 2])});
     for (size_t c = 0; c < 3; ++c)
-      EXPECT_NEAR(glm::unpackHalf1x16(actual[i + c]), glm::unpackHalf1x16(source[i + c]) * scale, 0.004f * scale);
+      EXPECT_NEAR(glm::unpackHalf1x16(actual[i + c]), expected[c], 0.004f * scale);
     EXPECT_EQ(actual[i + 3], source[i + 3]);
   }
   window->SetHDRBrightnessAlignment(false);
   EXPECT_EQ(window->HDRReferenceWhiteScale(), 1.0f);
-  EXPECT_EQ(window->PrepareHDRComposition(core.get(), {13, 7}), nullptr);
+  if (window->GetHDROutputEncoding() == graphics::HDROutputEncoding::HDR10PQ)
+    EXPECT_NE(window->PrepareHDRComposition(core.get(), {13, 7}), nullptr);
+  else
+    EXPECT_EQ(window->PrepareHDRComposition(core.get(), {13, 7}), nullptr);
   window->SetHDRBrightnessAlignment(true);
   window->SetHDR(false);
   EXPECT_EQ(window->HDRReferenceWhiteScale(), 1.0f);
   window->CloseWindow();
+}
+
+TEST_P(HDRWindowTest, UnsupportedHDRLeavesSDRPresentationUsable) {
+  if (!InteractiveHDRTests())
+    GTEST_SKIP();
+  std::unique_ptr<graphics::Core> core;
+  ASSERT_EQ(graphics::CreateCore(GetParam(), graphics::Core::Settings{2, true}, &core), 0);
+  ASSERT_EQ(core->InitializeLogicalDeviceAutoSelect(false), 0);
+  std::unique_ptr<graphics::Window> window;
+  ASSERT_EQ(core->CreateWindowObject(320, 240, "SDR compatibility test", &window), 0);
+  if (HasHDRSurface(window.get()))
+    GTEST_SKIP() << "Requires an SDR-only surface";
+  window->InitImGui();
+  ImGui::GetIO().IniFilename = nullptr;
+  for (int i = 0; i < 3; ++i) {
+    EXPECT_THROW(window->SetHDR(true), std::runtime_error);
+    window->BeginImGuiFrame();
+    ImGui::TextUnformatted("SDR remains usable");
+    window->EndImGuiFrame();
+    std::unique_ptr<graphics::Image> image;
+    ASSERT_EQ(core->CreateImage(320, 240, graphics::IMAGE_FORMAT_R8G8B8A8_UNORM, &image), 0);
+    std::unique_ptr<graphics::CommandContext> commands;
+    ASSERT_EQ(core->CreateCommandContext(&commands), 0);
+    commands->CmdClearImage(image.get(), {{0.2f, 0.4f, 0.6f, 1.0f}});
+    commands->CmdPresent(window.get(), image.get());
+    ASSERT_EQ(core->SubmitCommandContext(commands.get()), 0);
+    core->WaitGPU();
+    window->Resize(352 + i * 16, 256);
+    glfwPollEvents();
+  }
+  window->CloseWindow();
+}
+
+TEST_P(HDRWindowTest, PQReadbackUsesAbsoluteNitsAndPreservesSource) {
+  if (!InteractiveHDRTests())
+    GTEST_SKIP();
+  std::unique_ptr<graphics::Core> core;
+  ASSERT_EQ(graphics::CreateCore(GetParam(), graphics::Core::Settings{2, true}, &core), 0);
+  ASSERT_EQ(core->InitializeLogicalDeviceAutoSelect(false), 0);
+  BrightnessProbeWindow window;
+  window.encoding = graphics::HDROutputEncoding::HDR10PQ;
+  window.SetHDR(true);
+  // This numeric test works even on an SDR desktop, without presenting PQ there.
+  const std::vector<glm::vec4> samples{{0, 0, 0, 0.25}, {1, 1, 1, 0.5}, {10, 10, 10, 1},         {1, 0, 0, 1},
+                                       {0, 1, 0, 1},    {0, 0, 1, 1},   {65504, 65504, 65504, 1}};
+  std::vector<uint16_t> source;
+  for (const auto &sample : samples)
+    for (int c = 0; c < 4; ++c)
+      source.push_back(glm::packHalf1x16(sample[c]));
+  EXPECT_THROW(window.SetHDR10WhiteNits(0), std::invalid_argument);
+  EXPECT_THROW(window.SetHDR10WhiteNits(std::numeric_limits<float>::infinity()), std::invalid_argument);
+  for (float white : {100.0f, 203.0f, 400.0f}) {
+    window.SetHDR10WhiteNits(white);
+    for (bool alignment : {false, true}) {
+      window.SetHDRBrightnessAlignment(alignment);
+      auto *composition = window.PrepareHDRComposition(core.get(), {uint32_t(samples.size()), 1});
+      ASSERT_NE(composition, nullptr);
+      composition->UploadData(source.data());
+      std::unique_ptr<graphics::CommandContext> commands;
+      ASSERT_EQ(core->CreateCommandContext(&commands), 0);
+      auto *encoded = window.AlignHDRComposition(commands.get());
+      ASSERT_EQ(core->SubmitCommandContext(commands.get()), 0);
+      core->WaitGPU();
+      std::vector<uint16_t> actual(source.size()), unchanged(source.size());
+      encoded->DownloadData(actual.data());
+      composition->DownloadData(unchanged.data());
+      EXPECT_EQ(source, unchanged);
+      for (size_t i = 0; i < samples.size(); ++i) {
+        const auto expected = ExpectedOutput(&window, glm::vec3(samples[i]));
+        for (int c = 0; c < 3; ++c)
+          EXPECT_NEAR(glm::unpackHalf1x16(actual[i * 4 + c]), expected[c], 0.001);
+        EXPECT_EQ(actual[i * 4 + 3], source[i * 4 + 3]);
+      }
+      if (white == 100.0f)
+        EXPECT_NEAR(glm::unpackHalf1x16(actual[4]), 0.508078, 0.001);  // ST 2084 100-nit gray.
+    }
+  }
+  // Reuse the same pipeline with scRGB: the PQ white must not leak into the
+  // Windows-style scaling path, and disabling alignment still bypasses it.
+  window.encoding = graphics::HDROutputEncoding::LinearSRGB;
+  window.brightness = {240.0f, 3.0f, 0.0f, true, true};
+  window.RefreshDisplayBrightness();
+  auto *composition = window.PrepareHDRComposition(core.get(), {uint32_t(samples.size()), 1});
+  std::unique_ptr<graphics::CommandContext> commands;
+  ASSERT_EQ(core->CreateCommandContext(&commands), 0);
+  auto *linear = window.AlignHDRComposition(commands.get());
+  ASSERT_EQ(core->SubmitCommandContext(commands.get()), 0);
+  core->WaitGPU();
+  std::vector<uint16_t> actual(source.size()), unchanged(source.size());
+  linear->DownloadData(actual.data());
+  composition->DownloadData(unchanged.data());
+  EXPECT_EQ(source, unchanged);
+  for (size_t i = 0; i < samples.size(); ++i) {
+    for (int c = 0; c < 3; ++c)
+      EXPECT_NEAR(glm::unpackHalf1x16(actual[i * 4 + c]), std::min(samples[i][c] * 3.0f, 65504.0f), 0.01f);
+    EXPECT_EQ(actual[i * 4 + 3], source[i * 4 + 3]);
+  }
+  window.SetHDRBrightnessAlignment(false);
+  EXPECT_EQ(window.PrepareHDRComposition(core.get(), {uint32_t(samples.size()), 1}), nullptr);
+  window.CloseWindow();
 }
 
 #if defined(LONGMARCH_D3D12_ENABLED)

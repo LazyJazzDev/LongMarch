@@ -20,5 +20,17 @@
       "name": "d3dx12",
       "platform": "windows"
     }
-  ]
+  ],
+  "features": {
+    "wayland": {
+      "description": "Build native Wayland support alongside X11 on Linux",
+      "supports": "linux",
+      "dependencies": [
+        {
+          "name": "glfw3",
+          "features": ["wayland"]
+        }
+      ]
+    }
+  }
 }
