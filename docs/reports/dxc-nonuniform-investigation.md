@@ -12,6 +12,8 @@
 这针对 **HLSL → SPIR-V 的非均匀 storage-buffer 描述符索引**，不表示普通缓冲区读写
 都需要修补，也不将结论推广到 DXIL 或所有资源类型。
 
+Slang 新旧版本的同组测试见 [Slang 对比报告](slang-nonuniform-investigation.md)。
+
 ## 实测版本
 
 | 版本 | 来源提交 | 结果 |
