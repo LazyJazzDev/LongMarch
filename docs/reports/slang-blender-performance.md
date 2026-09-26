@@ -57,6 +57,10 @@ run. D3D12 remains faster than Vulkan in all three scenes. This is not a uniform
 speedup or slowdown from the migration. The historical single-run baseline and
 uncontrolled desktop load limit causal and statistical conclusions.
 
+The subsequent [Classroom Nsight profile](classroom-nsight-profile.md) identifies
+substantial per-frame scene maintenance and synchronous small-transfer overhead
+in these end-to-end numbers, with a D3D12 GPU/API timeline and source attribution.
+
 All 12 processes exited successfully and reported native ray query. No Slang
 warnings or shader compilation errors occurred. Output images were produced at
 full scene resolution, 960 accumulated samples; image inspection is a smoke
