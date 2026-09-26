@@ -181,3 +181,22 @@ session (`CUA_REPL_ENABLED_SURFACES is required`), including after a retry.
 
 Local build and logs: `out/pr61-metal/build`, `/tmp/pr61-metal-tests.log`,
 `/tmp/pr61-brightness-test.log`, `/tmp/pr61-gradient.log`, `/tmp/pr61-gui.log`.
+
+### HDR artistic grading
+
+HDR film development now retains exposure, artistic gamma and contrast. The
+legacy Filmic approximation matches the SDR curve up to scene-linear input 1,
+then continues along its tangent (matching value and first derivative) rather
+than clipping the highlights. Both paths share the Filmic grading operation;
+HDR omits its upper clamp and decodes the graded look back to linear sRGB for
+presentation. This is an extension of Sparkium's existing approximation, not
+Blender's full OCIO Filmic transform or a display-headroom-adaptive tone mapper.
+Standard and Normalized HDR previews also allow gamma/contrast; Normalized does
+not perform the SDR brightness normalization. SDR behavior remains unchanged.
+
+The GUI exposes these controls under View settings in HDR mode. GPU readback
+coverage checks Monster's gamma 1.15 / contrast 1.2, each control independently,
+SDR/HDR Filmic midtone agreement, continuity at the extension point, extended
+highlights, finite output under extreme grading, alpha and unchanged accumulation.
+Physical display appearance still requires visual review; these checks do not
+measure display luminance or establish an exact match to Blender.

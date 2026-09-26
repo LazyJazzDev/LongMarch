@@ -189,7 +189,7 @@ int main(int argc, char **argv) {
       ImGui::Checkbox("HDR preview", &hdr_requested);
       if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled))
         ImGui::SetTooltip(
-            "Linear HDR with exposure; bypasses SDR view transform, gamma and contrast. Requires an HDR display "
+            "Linear HDR retains exposure, gamma, contrast and an extended Filmic look. Requires an HDR display "
             "and HDR enabled in the operating system.");
       if (!hdr_error.empty())
         ImGui::TextWrapped("HDR unavailable: %s", hdr_error.c_str());
@@ -239,14 +239,14 @@ int main(int argc, char **argv) {
         if (reset)
           film->Reset();
       }
-      if (ImGui::CollapsingHeader("SDR view settings")) {
-        ImGui::BeginDisabled(hdr_active);
+      if (ImGui::CollapsingHeader("View settings")) {
         ImGui::Combo("View transform", &film->info.view_transform, "Normalized\0Standard\0Filmic\0");
-        ImGui::BeginDisabled(film->info.view_transform != 2);
+        ImGui::BeginDisabled(!hdr_active && film->info.view_transform != 2);
         ImGui::SliderFloat("Gamma", &film->info.gamma, 0.1f, 4.0f, "%.2f", ImGuiSliderFlags_AlwaysClamp);
         ImGui::SliderFloat("Contrast", &film->info.contrast, 0.0f, 4.0f, "%.2f", ImGuiSliderFlags_AlwaysClamp);
         ImGui::EndDisabled();
-        ImGui::EndDisabled();
+        if (hdr_active && film->info.view_transform == 0)
+          ImGui::TextWrapped("HDR preserves brightness without SDR normalization.");
       }
       if (ImGui::Button("Reload"))
         load_selected();

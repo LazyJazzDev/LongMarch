@@ -26,7 +26,7 @@ class Film : public Object {
     float contrast{1.0f};
   } info;
 
-  // HDR output is linear sRGB with exposure, without SDR view transforms.
+  // HDR output is linear sRGB with artistic grading and an extended Filmic look.
   void Develop(graphics::Image *targ_image, bool linear_hdr = false);
 
   void RegisterResetCallback(const std::function<void()> &callback);
