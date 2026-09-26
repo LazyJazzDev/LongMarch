@@ -20,10 +20,10 @@ rather than accepting a compiler known to drop marks in ordinary index math.
 
 The test includes the previous 17-case corpus plus add, subtract, multiply,
 divide, modulo, left/right shifts, bitwise AND/OR/XOR/NOT and unary negation after
-the annotation. Each is compiled at O0/O3: 58 outputs/version, 290 total.
+the annotation. Each is compiled at O0/O3: 58 outputs/version, 348 total.
 We inspect actual buffer-load pointers for NonUniform and storage-buffer
 nonuniform capability, and run `spirv-val --target-env vulkan1.2`. No SPIR-V
-patching is performed. All 290 modules pass validation; validation alone does
+patching is performed. All 348 modules pass validation; validation alone does
 not establish correct nonuniform semantics.
 
 | Release | Original supported cases (28) | Arithmetic cases (24) | Known caller-only failures (4) | Uniform controls (2) |
@@ -32,10 +32,11 @@ not establish correct nonuniform semantics.
 | 2026.11 | 28 | 0 | 4 | 2 |
 | 2026.18 | 28 | 0 | 4 | 2 |
 | 2026.18.1 | 28 | 24 | 4 | 2 |
+| 2026.18.2 | 28 | 24 | 4 | 2 |
 | 2026.18.3 | 28 | 24 | 4 | 2 |
 
 There is **no tested version that makes every possible annotation placement
-correct**. In all five versions, annotating only an integer argument in the
+correct**. In all six versions, annotating only an integer argument in the
 caller does not reliably propagate into user-defined callees (with or without
 `noinline`). Annotate at the actual descriptor access. Select/phi and arbitrary
 interprocedural data flow are not covered by the arithmetic fix or this report.
@@ -49,10 +50,10 @@ python3 test/graphics/check_slang_nonuniform_versions.py --family slang \
   --compiler /sdk/bin/slangc --output out/slang-version-results
 ```
 
-[All 290 results](slang-minimum-version-results.csv) include both optimization
+[All 348 results](slang-minimum-version-results.csv) include both optimization
 levels and the known failures. The script reuses the original corpus/parser and
 adds arithmetic cases; raw SPIR-V, assembly, validation logs and commands remain
-under `out/slang-minimum/<version>/results/`. Four boundary SDK archives came
+under `out/slang-minimum/<version>/results/`. Five boundary/default SDK archives came
 from official shader-slang GitHub releases and were verified against release
 SHA-256 metadata; 2026.18.3 reuses the previously verified official SDK.
 
@@ -61,7 +62,9 @@ SHA-256 metadata; 2026.18.3 reuses the previously verified official SDK.
 - CMake finds installed Slang >= 2026.18.1 and never downloads it.
 - vcpkg uses the upstream `shader-slang` registry port instead of the project's
   2026.18.3 overlay. The registry snapshot keeps builds reproducible; the manifest
-  expresses a lower bound, not an exact SDK version. Registry updates can select
+  requests the package by name. Upstream has no 2026.18.1 port entry, so CMake
+  and runtime enforce the compiler floor rather than a manifest constraint on
+  that unregistered version. Registry updates can select
   newer packages without changing the runtime requirement.
 - Initialization checks the loaded library's `spGetBuildTagString()` before
   creating any Slang sessions. It rejects too-old, malformed and prerelease
@@ -99,3 +102,12 @@ are covered by the version-parser test.
 | 2026.11 | `595f06cb9c1c306609cd61d9ced20dc75d56c0153d7c1bf1e509834edf133c75` |
 | 2026.18 | `83d4c3320d5ed87c10123e8253282bd68c3ab742561b1c71b8629a7679731c0c` |
 | 2026.18.1 | `44fa1b6882c242a554b47cc11e1646758a229d53230ee90a62dd0e477dfac500` |
+| 2026.18.2 | `cffb3a7eef12cabfc1e169271db4b7c9b982ed59aef6c3f138d02e392178bfbe` |
+
+The default upstream registry SDK, 2026.18.2, was also run through the same
+58-case compiler-output corpus with the same results as 2026.18.1 and 2026.18.3.
+
+The upstream vcpkg registry installation of 2026.18.2 also configured and built
+Sparkium CLI and the compiler tests successfully. Compiler tests passed **4/4**,
+and a Metal native-query Monster smoke run (96×96, 2 spp, 4 bounces) completed.
+This checks the default package provider as well as the minimum external SDK.
