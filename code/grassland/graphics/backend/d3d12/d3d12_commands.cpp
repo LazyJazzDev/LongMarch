@@ -413,7 +413,7 @@ void D3D12CmdPresent::CompileCommand(D3D12CommandContext *context, ID3D12Graphic
     ImGui::SetCurrentContext(imgui_assets.context);
     ImGuiLinearColors linear_ui(target_ != nullptr);
     ImGui_ImplDX12_RenderDrawData(ImGui::GetDrawData(), command_list);
-    context->RestoreDescriptorHeaps(command_list);
+    context->Core()->BindDescriptorHeaps(command_list);
   }
 
   if (target_)

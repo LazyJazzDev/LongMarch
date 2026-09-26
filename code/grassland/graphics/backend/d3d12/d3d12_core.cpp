@@ -10,6 +10,12 @@
 
 namespace grassland::graphics::backend {
 
+void D3D12Core::BindDescriptorHeaps(ID3D12GraphicsCommandList *commands) const {
+  ID3D12DescriptorHeap *heaps[] = {resource_descriptor_heaps_[current_frame_]->Handle(),
+                                   sampler_descriptor_heaps_[current_frame_]->Handle()};
+  commands->SetDescriptorHeaps(2, heaps);
+}
+
 namespace {
 #include "built_in_shaders.inl"
 }
@@ -310,10 +316,7 @@ int D3D12Core::SubmitCommandContext(CommandContext *p_command_context) {
     device_->Handle()->CreateDepthStencilView(resource, nullptr, dsv_handle);
   }
 
-  ID3D12DescriptorHeap *resource_heaps[] = {resource_descriptor_heaps_[current_frame_]->Handle(),
-                                            sampler_descriptor_heaps_[current_frame_]->Handle()};
-  command_list->SetDescriptorHeaps(2, resource_heaps);
-  std::copy(std::begin(resource_heaps), std::end(resource_heaps), command_context->bound_heaps_);
+  BindDescriptorHeaps(command_list);
 
   for (auto &command : command_context->commands_) {
     command->CompileCommand(command_context, command_list);
