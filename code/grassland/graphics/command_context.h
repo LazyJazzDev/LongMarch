@@ -50,14 +50,6 @@ class CommandContext {
 
   virtual void CmdDispatchRays(uint32_t width, uint32_t height, uint32_t depth) = 0;
   virtual void CmdDispatch(uint32_t group_count_x, uint32_t group_count_y, uint32_t group_count_z) = 0;
-  // Nonzero workgroup bases require backend support (currently Vulkan).
-  // The shader must not rely on NumWorkgroups matching an untiled dispatch.
-  virtual void CmdDispatchBase(uint32_t base_x,
-                               uint32_t base_y,
-                               uint32_t base_z,
-                               uint32_t count_x,
-                               uint32_t count_y,
-                               uint32_t count_z);
   virtual void CmdCopyBuffer(Buffer *dst_buffer,
                              Buffer *src_buffer,
                              uint64_t size,

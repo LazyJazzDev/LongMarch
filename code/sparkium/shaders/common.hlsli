@@ -85,6 +85,10 @@ struct RenderSettings {
   float exposure;
   float gamma;
   float contrast;
+#ifdef SPARKIUM_SOFTWARE_RT
+  uint dispatch_alignment_padding;
+  uint2 dispatch_origin;
+#endif
 };
 
 struct InstanceMetadata {

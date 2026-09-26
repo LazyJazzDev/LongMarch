@@ -131,7 +131,6 @@ void VulkanComputeProgram::Finalize() {
   FinalizePipelineLayout();
   VkComputePipelineCreateInfo pipeline_create_info = {};
   pipeline_create_info.sType = VK_STRUCTURE_TYPE_COMPUTE_PIPELINE_CREATE_INFO;
-  pipeline_create_info.flags = VK_PIPELINE_CREATE_DISPATCH_BASE_BIT;
   pipeline_create_info.layout = pipeline_layout_->Handle();
   pipeline_create_info.stage.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
   pipeline_create_info.stage.stage = VK_SHADER_STAGE_COMPUTE_BIT;

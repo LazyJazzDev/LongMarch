@@ -46,8 +46,10 @@ TRACE_NOINLINE void SoftwareTracePath(RayDesc path_ray, inout RenderContext cont
 
 #include "raygen.hlsl"
 #include "software/shadow.hlsli"
+
 [numthreads(8, 8, 1)] void Main(uint3 id
                                 : SV_DispatchThreadID) {
+  id.xy += render_settings.dispatch_origin;
   uint width, height;
   accumulated_color.GetDimensions(width, height);
   if (id.x < width && id.y < height)

@@ -98,15 +98,36 @@ void Scene::Render(Camera *camera, Film *film, bool software, bool ray_query) {
   }
   if (software) {
     const uint32_t nx = (film->GetWidth() + 7) / 8, ny = (film->GetHeight() + 7) / 8;
-    if (!ray_query_ && core_->GraphicsCore()->API() == graphics::BACKEND_API_VULKAN) {
-      // Bound each software-tracing job to 128 x 128 pixels. A full-resolution
-      // dispatch can exceed mobile GPU watchdog limits even at one sample.
-      // DispatchBase preserves global pixel coordinates without changing shaders.
+    // Each dispatch has its own immutable parameters until the GPU has finished.
+    // Re-uploading one shared buffer while recording would make every tile see
+    // the last origin. Cache separate buffers and reuse them after WaitGPU.
+    constexpr size_t origin_offset = 64;
+    static_assert(sizeof(Settings::RayTracing) + sizeof(sparkium::Film::Info) == 60,
+                  "Keep RenderSettings HLSL layout and dispatch origin aligned");
+    size_t tile = 0;
+    auto dispatch = [&](uint32_t x, uint32_t y, uint32_t count_x, uint32_t count_y) {
+      if (tile == dispatch_origins_.size()) {
+        std::unique_ptr<graphics::Buffer> origin;
+        if (core_->GraphicsCore()->CreateBuffer(origin_offset + 16, graphics::BUFFER_TYPE_DYNAMIC, &origin))
+          throw std::runtime_error("failed to create dispatch parameters");
+        dispatch_origins_.push_back(std::move(origin));
+      }
+      const uint32_t origin[4] = {x * 8, y * 8, 0, 0};
+      auto *parameters = dispatch_origins_[tile].get();
+      parameters->UploadData(&settings.raytracing, sizeof(Settings::RayTracing));
+      parameters->UploadData(&film->film_.info, sizeof(sparkium::Film::Info), sizeof(Settings::RayTracing));
+      parameters->UploadData(origin, sizeof(origin), origin_offset);
+      cmd_context->CmdBindResources(3, {parameters}, graphics::BIND_POINT_COMPUTE);
+      cmd_context->CmdDispatch(count_x, count_y, 1);
+      ++tile;
+    };
+    if (!ray_query_) {
+      // Bound software-tracing jobs to 128 x 128 pixels on every backend.
       for (uint32_t y = 0; y < ny; y += 16)
         for (uint32_t x = 0; x < nx; x += 16)
-          cmd_context->CmdDispatchBase(x, y, 0, std::min(16u, nx - x), std::min(16u, ny - y), 1);
+          dispatch(x, y, std::min(16u, nx - x), std::min(16u, ny - y));
     } else {
-      cmd_context->CmdDispatch(nx, ny, 1);
+      dispatch(0, 0, nx, ny);
     }
   } else
     cmd_context->CmdDispatchRays(film->accumulated_color_->Extent().width, film->accumulated_samples_->Extent().height,

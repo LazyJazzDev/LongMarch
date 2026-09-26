@@ -74,6 +74,7 @@ class Scene : public Object {
   std::unique_ptr<graphics::RayTracingProgram> rt_program_;
   std::unique_ptr<graphics::AccelerationStructure> tlas_;
   std::unique_ptr<graphics::Buffer> scene_settings_buffer_;
+  std::vector<std::unique_ptr<graphics::Buffer>> dispatch_origins_;
   std::map<Entity *, EntityStatus> entities_;
 
   std::vector<int32_t> miss_shader_indices_;
