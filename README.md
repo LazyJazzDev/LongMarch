@@ -130,6 +130,9 @@ The compiled executable should be located at `build/demo/graphics_hello/<Debug|R
 
 ### Linux
 
+For optional native Wayland support, Vulkan HDR10 output, and X11 compatibility,
+see [Linux HDR presentation](docs/linux-hdr.md).
+
 #### Step 0: Prerequisites
 
 - [vcpkg](https://github.com/microsoft/vcpkg): The C++ package manager. Clone the vcpkg repo to anywhere you like, we will refer tha vcpkg path as

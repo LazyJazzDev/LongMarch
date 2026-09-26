@@ -30,6 +30,21 @@ MetalWindow::MetalWindow(MetalCore *core,
   ConfigurePresentation(false);
 }
 
+DisplayBrightness MetalWindow::QueryDisplayBrightness() const {
+  DisplayBrightness result;
+  if (!GLFWWindow())
+    return result;
+  auto screen = [glfwGetCocoaWindow(GLFWWindow()) screen];
+  if (screen) {
+    // EDR linear 1.0 already follows the system's reference white.
+    result.reference_white_known = true;
+    result.hdr_reference_white_scale = 1.0f;
+    result.hdr_headroom = screen.maximumExtendedDynamicRangeColorComponentValue;
+    result.hdr_enabled = screen.maximumPotentialExtendedDynamicRangeColorComponentValue > 1.0;
+  }
+  return result;
+}
+
 void MetalWindow::ConfigurePresentation(bool enable_hdr) {
   MetalPool pool;
   const auto format = enable_hdr ? MTL::PixelFormatRGBA16Float : MTL::PixelFormatBGRA8Unorm;
@@ -70,24 +85,34 @@ fragment float4 present_fragment(Vertex v [[stage_in]], texture2d<float> image [
   pipeline_ = std::move(pipeline);
 }
 
-void MetalWindow::SetHDR(bool enable_hdr) {
-  MetalPool pool;
-  if (enable_hdr_ == enable_hdr)
-    return;
-  if (!GLFWWindow())
-    throw std::runtime_error("Cannot change HDR on a closed Metal window");
-  ConfigurePresentation(enable_hdr);
-  Window::SetHDR(enable_hdr);
-  if (enable_hdr) {
-    auto screen = [glfwGetCocoaWindow(GLFWWindow()) screen];
-    LogInfo("Metal HDR enabled: linear sRGB, RGBA16Float; display {} EDR headroom {:.2f}, potential {:.2f}",
-            screen ? screen.localizedName.UTF8String : "unknown",
-            double(screen.maximumExtendedDynamicRangeColorComponentValue),
-            double(screen.maximumPotentialExtendedDynamicRangeColorComponentValue));
-    if (screen.maximumPotentialExtendedDynamicRangeColorComponentValue <= 1.0)
-      LogWarning("Current display has no HDR headroom; HDR output will be displayed within its SDR range");
-  } else {
-    LogInfo("Metal HDR disabled: sRGB, BGRA8Unorm");
+int MetalWindow::SetHDR(bool enable_hdr) {
+  try {
+    MetalPool pool;
+    if (!GLFWWindow())
+      return -1;
+    if (enable_hdr_ == enable_hdr)
+      return 0;
+    const bool previous = enable_hdr_;
+    ConfigurePresentation(enable_hdr);
+    if (Window::SetHDR(enable_hdr) != 0) {
+      ConfigurePresentation(previous);
+      return -1;
+    }
+    if (enable_hdr) {
+      auto screen = [glfwGetCocoaWindow(GLFWWindow()) screen];
+      LogInfo("Metal HDR enabled: linear sRGB, RGBA16Float; display {} EDR headroom {:.2f}, potential {:.2f}",
+              screen ? screen.localizedName.UTF8String : "unknown",
+              double(screen.maximumExtendedDynamicRangeColorComponentValue),
+              double(screen.maximumPotentialExtendedDynamicRangeColorComponentValue));
+      if (screen.maximumPotentialExtendedDynamicRangeColorComponentValue <= 1.0)
+        LogWarning("Current display has no HDR headroom; HDR output will be displayed within its SDR range");
+    } else {
+      LogInfo("Metal HDR disabled: sRGB, BGRA8Unorm");
+    }
+    return 0;
+  } catch (const std::exception &error) {
+    LogError("Failed to change Metal HDR presentation: {}", error.what());
+    return -1;
   }
 }
 
@@ -152,6 +177,7 @@ void MetalWindow::EndImGuiFrame() {
 
 void MetalWindow::Present(MTL::CommandBuffer *command, MetalImage *image) {
   MetalPool pool;
+  GetDisplayBrightness();
   int width, height;
   glfwGetFramebufferSize(GLFWWindow(), &width, &height);
   if (width <= 0 || height <= 0)
@@ -171,6 +197,7 @@ void MetalWindow::Present(MTL::CommandBuffer *command, MetalImage *image) {
   encoder->drawPrimitives(MTL::PrimitiveTypeTriangle, NS::UInteger(0), NS::UInteger(3));
   if (imgui_) {
     ImGui::SetCurrentContext(imgui_);
+    ImGuiLinearColors linear_ui(enable_hdr_ && HDRBrightnessAlignment());
     ImGui_ImplMetal_RenderDrawData(ImGui::GetDrawData(), (__bridge id<MTLCommandBuffer>)command,
                                    (__bridge id<MTLRenderCommandEncoder>)encoder);
   }

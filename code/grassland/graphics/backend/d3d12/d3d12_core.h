@@ -145,6 +145,8 @@ class D3D12Core : public Core {
     return &blit_pipeline_;
   }
 
+  void BindDescriptorHeaps(ID3D12GraphicsCommandList *commands) const;
+
   d3d12::DescriptorHeap *RTVDescriptorHeap() const {
     return rtv_descriptor_heaps_[current_frame_].get();
   }

@@ -23,8 +23,19 @@ void PSMain(PSInput input) {
   uint2 image_size;
   output_image.GetDimensions(image_size.x, image_size.y);
   float4 color = output_image[uint2(uv * image_size)];
-  if (ubo.hdr) {
-    color.rgb = pow(color.rgb, 2.2);
+  // Dense particle overlap approaches white above reference white while
+  // preserving linear luminance and leaving ordinary particle tints unchanged.
+  float peak = max(color.r, max(color.g, color.b));
+  float highlight = 1.0 - rcp(max(peak, 1.0));
+  float luminance = dot(color.rgb, float3(0.2126, 0.7152, 0.0722));
+  color.rgb = lerp(color.rgb, luminance.xxx, highlight);
+  if (!ubo.hdr) {
+    // Particles accumulate linear radiance. Only SDR needs sRGB encoding;
+    // HDR stays linear, including highlights above reference white.
+    float3 radiance = saturate(color.rgb);
+    color.rgb = float3(radiance.r <= 0.0031308 ? 12.92 * radiance.r : 1.055 * pow(radiance.r, 1.0 / 2.4) - 0.055,
+                       radiance.g <= 0.0031308 ? 12.92 * radiance.g : 1.055 * pow(radiance.g, 1.0 / 2.4) - 0.055,
+                       radiance.b <= 0.0031308 ? 12.92 * radiance.b : 1.055 * pow(radiance.b, 1.0 / 2.4) - 0.055);
   }
   output_image[uint2(uv * image_size)] = color;
 }

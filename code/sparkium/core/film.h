@@ -19,14 +19,14 @@ class Film : public Object {
     int accumulated_samples{0};
     float persistence{1.0};
     float clamping{100.0f};
-    float max_exposure{1.0f};
+    float max_exposure{16.0f};
     int view_transform{0};
     float exposure{0.0f};
     float gamma{1.0f};
     float contrast{1.0f};
   } info;
 
-  // HDR output is linear sRGB with exposure, without SDR view transforms.
+  // HDR output is linear sRGB with artistic grading and an extended Filmic look.
   void Develop(graphics::Image *targ_image, bool linear_hdr = false);
 
   void RegisterResetCallback(const std::function<void()> &callback);

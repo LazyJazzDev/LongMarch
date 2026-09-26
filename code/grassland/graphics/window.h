@@ -1,4 +1,6 @@
 #pragma once
+#include <chrono>
+
 #include "grassland/graphics/graphics_util.h"
 #include "imgui.h"
 
@@ -14,6 +16,27 @@ struct MagnifyGesture {
   double x{};
   double y{};
   MagnifyPhase phase{MagnifyPhase::kUpdate};
+};
+
+struct DisplayBrightness {
+  // Zero means unknown. Scale is relative to the native linear HDR surface.
+  float sdr_white_nits{0.0f};
+  float hdr_reference_white_scale{1.0f};
+  // Windows estimates peak / SDR white; Metal reports current EDR headroom.
+  float hdr_headroom{0.0f};
+  bool reference_white_known{false};
+  bool hdr_enabled{false};
+};
+
+// ImGui vertex colors are sRGB values; floating-point HDR targets are linear.
+// Restore the draw lists after the backend uploads them, so retries do not decode twice.
+class ImGuiLinearColors {
+ public:
+  explicit ImGuiLinearColors(bool enabled);
+  ~ImGuiLinearColors();
+
+ private:
+  std::vector<std::pair<ImDrawVert *, ImU32>> colors_;
 };
 
 class Window {
@@ -59,7 +82,28 @@ class Window {
 
   bool ShouldClose() const;
 
-  virtual void SetHDR(bool enable_hdr);
+  // Request an application presentation mode (not the desktop HDR setting).
+  // Returns 0 on success, nonzero on failure; details are logged.
+  virtual int SetHDR(bool enable_hdr);
+
+  // Main-thread query, refreshed at most every 500 ms, including monitor changes.
+  DisplayBrightness GetDisplayBrightness();
+  void RefreshDisplayBrightness();
+  void SetHDRBrightnessAlignment(bool enabled);
+
+  bool HDRBrightnessAlignment() const {
+    return align_hdr_brightness_;
+  }
+
+  float HDRReferenceWhiteScale();
+
+  EventManager<void(const DisplayBrightness &)> &DisplayBrightnessEvent() {
+    return display_brightness_event_;
+  }
+
+  // Backend presentation helpers. These never modify the caller's image.
+  Image *PrepareHDRComposition(Core *core, Extent2D extent);
+  Image *AlignHDRComposition(CommandContext *commands);
 
   virtual void InitImGui(const char *font_file_path = nullptr, float font_size = 13.0f) = 0;
   virtual void TerminateImGui() = 0;
@@ -120,6 +164,15 @@ class Window {
   }
 
  private:
+  void NotifyResize();
+  glm::ivec2 resize_size_{};  // Last notified logical window size.
+
+  struct HDRPresentation;
+  std::unique_ptr<HDRPresentation> hdr_presentation_;
+  DisplayBrightness display_brightness_{};
+  std::chrono::steady_clock::time_point brightness_query_time_{};
+  EventManager<void(const DisplayBrightness &)> display_brightness_event_;
+  bool align_hdr_brightness_{true};
   GLFWwindow *window_;
   void *magnify_monitor_{};
   EventManager<void(const MagnifyGesture &)> magnify_event_;
@@ -136,6 +189,12 @@ class Window {
   EventManager<void(int, const char **)> drop_event_;
 
  protected:
+  // Presentation encoding is selected by the backend, never by callers.
+  virtual bool UsesPQOutput() const {
+    return false;
+  }
+
+  virtual DisplayBrightness QueryDisplayBrightness() const;
   bool enable_hdr_;
 
  public:

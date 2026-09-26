@@ -2,6 +2,7 @@
 #include <long_march.h>
 
 #include <algorithm>
+#include <cmath>
 #include <cstdlib>
 #include <cstring>
 #include <glm/gtc/matrix_transform.hpp>
@@ -59,8 +60,8 @@ TEST_F(SoftwareBVHTest, HDRFilmDevelopmentPreservesHighlightsAndAccumulation) {
   film.GetRawImage()->UploadData(source.data());
   film.info.accumulated_samples = 17;
   film.info.exposure = 1.0f;
-  film.info.gamma = 0.4f;
-  film.info.contrast = 2.0f;
+  film.info.gamma = 1.0f;
+  film.info.contrast = 1.0f;
   int resets = 0;
   film.RegisterResetCallback([&]() { ++resets; });
   std::unique_ptr<graphics::Image> sdr, hdr;
@@ -76,12 +77,17 @@ TEST_F(SoftwareBVHTest, HDRFilmDevelopmentPreservesHighlightsAndAccumulation) {
     std::vector<glm::vec4> actual(27);
     hdr->DownloadData(actual.data());
     for (size_t i = 0; i + 1 < actual.size(); ++i) {
-      EXPECT_NEAR(actual[i].x, 8.0f, 1e-5f);
-      EXPECT_NEAR(actual[i].y, 0.5f, 1e-5f);
+      if (transform == 2) {
+        EXPECT_GT(actual[i].x, 1.0f);
+        EXPECT_GT(actual[i].y, 0.0f);
+      } else {
+        EXPECT_NEAR(actual[i].x, 8.0f, 1e-4f);
+        EXPECT_NEAR(actual[i].y, 0.5f, 1e-5f);
+      }
       EXPECT_EQ(actual[i].z, 0.0f);
       EXPECT_EQ(actual[i].w, 1.0f);
     }
-    EXPECT_EQ(actual.back().x, 65504.0f);
+    EXPECT_NEAR(actual.back().x, 65504.0f, 0.01f);
     film.Develop(sdr.get());
     sdr->DownloadData(after.data());
     EXPECT_EQ(before, after);
@@ -92,6 +98,57 @@ TEST_F(SoftwareBVHTest, HDRFilmDevelopmentPreservesHighlightsAndAccumulation) {
   film.GetRawImage()->DownloadData(unchanged.data());
   EXPECT_EQ(unchanged, source);
   EXPECT_EQ(resets, 0);
+}
+
+TEST_F(SoftwareBVHTest, HDRArtisticGradeMatchesSDRMidtonesAndPreservesHighlights) {
+  sparkium::Film film(core.get(), 8, 1);
+  const std::vector<glm::vec4> source{{0.02f, 0.08f, 0.2f, 1.0f},     {0.1f, 0.4f, 0.8f, 1.0f},
+                                      {0.999f, 0.999f, 0.999f, 1.0f}, {1.0f, 1.0f, 1.0f, 1.0f},
+                                      {1.001f, 1.001f, 1.001f, 1.0f}, {4.0f, 2.0f, 1.0f, 1.0f},
+                                      {16.0f, 8.0f, 4.0f, 1.0f},      {100000.0f, 0.0f, -1.0f, 1.0f}};
+  film.GetRawImage()->UploadData(source.data());
+  std::unique_ptr<graphics::Image> sdr, hdr;
+  ASSERT_EQ(graphics->CreateImage(8, 1, graphics::IMAGE_FORMAT_R8G8B8A8_UNORM, &sdr), 0);
+  ASSERT_EQ(graphics->CreateImage(8, 1, graphics::IMAGE_FORMAT_R32G32B32A32_SFLOAT, &hdr), 0);
+  auto encode = [](float x) { return x <= 0.0031308f ? 12.92f * x : 1.055f * std::pow(x, 1.0f / 2.4f) - 0.055f; };
+  for (int transform : {0, 1, 2}) {
+    film.info.view_transform = transform;
+    film.info.gamma = 1.0f;
+    film.info.contrast = 1.0f;
+    film.Develop(hdr.get(), true);
+    std::vector<glm::vec4> neutral(8), graded(8);
+    hdr->DownloadData(neutral.data());
+    for (auto grade : {glm::vec2(1.15f, 1.0f), glm::vec2(1.0f, 1.2f), glm::vec2(1.15f, 1.2f), glm::vec2(0.1f, 4.0f)}) {
+      film.info.gamma = grade.x;
+      film.info.contrast = grade.y;
+      film.Develop(hdr.get(), true);
+      hdr->DownloadData(graded.data());
+      EXPECT_NE(graded[1].y, neutral[1].y);
+      EXPECT_GT(graded[5].x, 1.0f);
+      EXPECT_GE(graded[6].x, graded[5].x);
+      if (grade.x >= 1.0f)
+        EXPECT_GT(graded[6].x, graded[5].x);
+      for (const auto &pixel : graded) {
+        for (int channel = 0; channel < 3; ++channel) {
+          EXPECT_TRUE(std::isfinite(pixel[channel]));
+          EXPECT_GE(pixel[channel], 0.0f);
+          EXPECT_LE(pixel[channel], 65504.0f);
+        }
+        EXPECT_EQ(pixel.w, 1.0f);
+      }
+      if (transform == 2 && grade.x > 1.0f) {
+        film.Develop(sdr.get());
+        std::vector<uint8_t> bytes(32);
+        sdr->DownloadData(bytes.data());
+        for (int pixel = 0; pixel < 4; ++pixel)
+          for (int channel = 0; channel < 3; ++channel)
+            EXPECT_NEAR(encode(graded[pixel][channel]), bytes[pixel * 4 + channel] / 255.0f, 1.0f / 255.0f);
+        EXPECT_LT(graded[2].x, graded[3].x);
+        EXPECT_LT(graded[3].x, graded[4].x);
+        EXPECT_NEAR(graded[3].x - graded[2].x, graded[4].x - graded[3].x, 1e-5f);
+      }
+    }
+  }
 }
 
 TEST(GraphicsCoreCreation, UnsupportedAPIsDoNotFallBack) {

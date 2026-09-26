@@ -145,3 +145,58 @@ be 1.0 and increase after EDR content starts presenting. Physical brightness
 also depends on the screen, its brightness setting, and macOS power/thermal
 management. An SDR-only screen cannot show highlights above its white level;
 ordinary SDR screenshots cannot establish physical HDR brightness.
+
+## PR #61 reference-white validation on macOS (2026-09-26)
+
+Validated `fix/sparkium-hdr-auto` based on `84d8fed` on Apple M5 with the built-in
+3024 × 1964 Liquid Retina XDR display. Ninja / Release builds of Sparkium GUI,
+Graphics Hello and `sparkium_fallback_test` passed. An existing external metal-cpp
+installation was selected explicitly; CMake did not download that SDK.
+
+With Metal API and shader validation enabled, four selected tests passed:
+`MetalWindowTest.HDRPresentationAndImGuiSwitching`,
+`MetalBackendTest.WindowCloseAfterPresent`,
+`SoftwareBVHTest.HDRFilmDevelopmentPreservesHighlightsAndAccumulation`, and
+`HDRSurfaceFormatTest.PreferredFormatWinsRegardlessOfEnumerationOrder`.
+`HDRBrightnessTest.RefreshNotifiesAndUnknownReferenceFallsBack` passed separately.
+
+The Metal window regression now also checks the PR's display-brightness API:
+reference white is known, native EDR reference-white scale remains 1 with automatic
+alignment both on and off, absolute SDR nits remain unknown, and reported headroom
+and HDR capability match the window's actual `NSScreen`. Repeated HDR/SDR switching,
+with and without ImGui, verifies RGBA16Float / BGRA8Unorm, extended linear sRGB /
+sRGB, and the layer's extended-dynamic-range flag.
+
+The live HDR gradient demo and Sparkium GUI both ran with Metal validation. The
+GUI used a temporary Cornell scene: 768 × 768, Auto pipeline, 1 sample/frame,
+8 bounces, max exposure 100. The committed scene was not modified. GUI logs show
+repeated HDR/SDR transitions and an active screen headroom of **12.34×**, with
+potential headroom **16×**; initial headroom was 1× before EDR activation settled.
+No Metal validation errors were found in these test/application logs.
+
+This establishes the Metal HDR configuration, display query and rendering path;
+it is not a physical peak-luminance measurement or proof from an SDR screenshot.
+Automated visual interaction through Computer Use remained unavailable in this
+session (`CUA_REPL_ENABLED_SURFACES is required`), including after a retry.
+
+Local build and logs: `out/pr61-metal/build`, `/tmp/pr61-metal-tests.log`,
+`/tmp/pr61-brightness-test.log`, `/tmp/pr61-gradient.log`, `/tmp/pr61-gui.log`.
+
+### HDR artistic grading
+
+HDR film development now retains exposure, artistic gamma and contrast. The
+legacy Filmic approximation matches the SDR curve up to scene-linear input 1,
+then continues along its tangent (matching value and first derivative) rather
+than clipping the highlights. Both paths share the Filmic grading operation;
+HDR omits its upper clamp and decodes the graded look back to linear sRGB for
+presentation. This is an extension of Sparkium's existing approximation, not
+Blender's full OCIO Filmic transform or a display-headroom-adaptive tone mapper.
+Standard and Normalized HDR previews also allow gamma/contrast; Normalized does
+not perform the SDR brightness normalization. SDR behavior remains unchanged.
+
+The GUI exposes these controls under View settings in HDR mode. GPU readback
+coverage checks Monster's gamma 1.15 / contrast 1.2, each control independently,
+SDR/HDR Filmic midtone agreement, continuity at the extension point, extended
+highlights, finite output under extreme grading, alpha and unchanged accumulation.
+Physical display appearance still requires visual review; these checks do not
+measure display luminance or establish an exact match to Blender.

@@ -10,7 +10,7 @@ class MetalWindow : public Window {
   MetalWindow(MetalCore *core, int width, int height, const std::string &title, bool fullscreen, bool resizable);
   ~MetalWindow() override;
   void CloseWindow() override;
-  void SetHDR(bool enable_hdr) override;
+  int SetHDR(bool enable_hdr) override;
   void InitImGui(const char *font_file_path = nullptr, float font_size = 13) override;
   void TerminateImGui() override;
   void BeginImGuiFrame() override;
@@ -23,6 +23,7 @@ class MetalWindow : public Window {
   void Present(MTL::CommandBuffer *command, MetalImage *image);
 
  private:
+  DisplayBrightness QueryDisplayBrightness() const override;
   void ConfigurePresentation(bool enable_hdr);
   MetalCore *core_;
   NS::SharedPtr<CA::MetalLayer> layer_;

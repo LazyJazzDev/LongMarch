@@ -1,5 +1,7 @@
 #include "grassland/graphics/backend/vulkan/vulkan_window.h"
 
+#include "grassland/graphics/backend/vulkan/vulkan_image.h"
+
 namespace grassland::graphics::backend {
 
 VulkanWindow::VulkanWindow(VulkanCore *core,
@@ -12,9 +14,13 @@ VulkanWindow::VulkanWindow(VulkanCore *core,
     : Window(width, height, title, fullscreen, resizable, enable_hdr),
       core_(core) {
   core_->Instance()->CreateSurfaceFromGLFWWindow(GLFWWindow(), &surface_);
-  core_->Device()->CreateSwapchain(
-      surface_.get(), enable_hdr_ ? VK_FORMAT_R16G16B16A16_SFLOAT : VK_FORMAT_R8G8B8A8_UNORM,
-      enable_hdr_ ? VK_COLOR_SPACE_EXTENDED_SRGB_LINEAR_EXT : VK_COLOR_SPACE_SRGB_NONLINEAR_KHR, &swap_chain_);
+  const auto format = SelectSurfaceFormat(enable_hdr_);
+  if (!format)
+    throw std::runtime_error("No supported Vulkan presentation format");
+  surface_format_ = *format;
+  if (core_->Device()->CreateSwapchain(surface_.get(), surface_format_.format, surface_format_.colorSpace,
+                                       &swap_chain_) != VK_SUCCESS)
+    throw std::runtime_error("Failed to create Vulkan swapchain");
   image_available_semaphores_.resize(swap_chain_->ImageCount());
   render_finish_semaphores_.resize(swap_chain_->ImageCount());
   for (size_t i = 0; i < image_available_semaphores_.size(); ++i) {
@@ -23,7 +29,13 @@ VulkanWindow::VulkanWindow(VulkanCore *core,
   }
   vkGetDeviceQueue(core_->Device()->Handle(), core_->Device()->PhysicalDevice().PresentFamilyIndex(surface_.get()), 0,
                    &present_queue_);
-  ResizeEvent().RegisterCallback([this](int width, int height) { Rebuild(); });
+  // Swapchains follow pixels, not logical window coordinates. In particular,
+  // GLFW on Wayland emits only a framebuffer callback for programmatic resizes
+  // and for fractional-scale changes without a logical size change.
+  FramebufferResizeEvent().RegisterCallback([this](int width, int height) {
+    if (width > 0 && height > 0 && Rebuild() != 0)
+      LogError("Failed to resize Vulkan presentation");
+  });
 }
 
 VulkanWindow::~VulkanWindow() {
@@ -34,6 +46,7 @@ VulkanWindow::~VulkanWindow() {
 
 void VulkanWindow::CloseWindow() {
   core_->WaitGPU();
+  hdr_framebuffer_.reset();
   if (imgui_assets_.context) {
     TerminateImGui();
   }
@@ -42,6 +55,70 @@ void VulkanWindow::CloseWindow() {
   swap_chain_.reset();
   surface_.reset();
   Window::CloseWindow();
+}
+
+int VulkanWindow::SetHDR(bool enable_hdr) {
+  if (!GLFWWindow())
+    return -1;
+  if (enable_hdr == enable_hdr_)
+    return 0;
+  const bool previous = enable_hdr_;
+  try {
+    // Reject unsupported requests before changing state or retiring a swapchain.
+    if (!SelectSurfaceFormat(enable_hdr)) {
+      LogWarning("Requested Vulkan HDR/SDR presentation mode is unavailable");
+      return -1;
+    }
+    enable_hdr_ = enable_hdr;
+    // A format change needs a rebuild even when the framebuffer size is fixed.
+    if (Rebuild() != 0) {
+      enable_hdr_ = previous;
+      return -1;
+    }
+    return Window::SetHDR(enable_hdr);
+  } catch (const std::exception &error) {
+    enable_hdr_ = previous;
+    LogError("Failed to change Vulkan HDR presentation: {}", error.what());
+    return -1;
+  }
+}
+
+std::optional<VkSurfaceFormatKHR> VulkanWindow::ChooseHDRSurfaceFormat(const std::vector<VkSurfaceFormatKHR> &formats) {
+  for (const auto &candidate :
+       {VkSurfaceFormatKHR{VK_FORMAT_R16G16B16A16_SFLOAT, VK_COLOR_SPACE_EXTENDED_SRGB_LINEAR_EXT},
+        VkSurfaceFormatKHR{VK_FORMAT_A2B10G10R10_UNORM_PACK32, VK_COLOR_SPACE_HDR10_ST2084_EXT},
+        VkSurfaceFormatKHR{VK_FORMAT_A2R10G10B10_UNORM_PACK32, VK_COLOR_SPACE_HDR10_ST2084_EXT}}) {
+    for (const auto &format : formats) {
+      if (format.format == candidate.format && format.colorSpace == candidate.colorSpace)
+        return format;
+    }
+  }
+  return std::nullopt;
+}
+
+std::optional<VkSurfaceFormatKHR> VulkanWindow::SelectSurfaceFormat(bool hdr) const {
+  const auto support =
+      vulkan::Swapchain::QuerySwapChainSupport(core_->Device()->PhysicalDevice().Handle(), surface_->Handle());
+  if (support.formats.empty())
+    return std::nullopt;
+  auto format = hdr ? ChooseHDRSurfaceFormat(support.formats)
+                    : vulkan::Swapchain::ChooseSwapSurfaceFormat(support.formats, VK_FORMAT_R8G8B8A8_UNORM,
+                                                                 VK_COLOR_SPACE_SRGB_NONLINEAR_KHR);
+  if (!format)
+    return std::nullopt;
+  VkFormatProperties properties{};
+  vkGetPhysicalDeviceFormatProperties(core_->Device()->PhysicalDevice().Handle(), format->format, &properties);
+  if (!(properties.optimalTilingFeatures & VK_FORMAT_FEATURE_BLIT_DST_BIT))
+    return std::nullopt;
+  return format;
+}
+
+bool VulkanWindow::UsesPQOutput() const {
+  return enable_hdr_ && surface_format_.colorSpace == VK_COLOR_SPACE_HDR10_ST2084_EXT;
+}
+
+VkFormat VulkanWindow::ImGuiFormat() const {
+  return UsesPQOutput() ? VK_FORMAT_R16G16B16A16_SFLOAT : swap_chain_->Format();
 }
 
 vulkan::Swapchain *VulkanWindow::SwapChain() const {
@@ -63,16 +140,23 @@ uint32_t VulkanWindow::AcquireNextImage() {
   return image_index_;
 }
 
-void VulkanWindow::Rebuild() {
+int VulkanWindow::Rebuild() {
   core_->WaitGPU();
-  swap_chain_.reset();
-  core_->Device()->CreateSwapchain(
-      surface_.get(), enable_hdr_ ? VK_FORMAT_R16G16B16A16_SFLOAT : VK_FORMAT_R8G8B8A8_UNORM,
-      enable_hdr_ ? VK_COLOR_SPACE_EXTENDED_SRGB_LINEAR_EXT : VK_COLOR_SPACE_SRGB_NONLINEAR_KHR, &swap_chain_);
+  const auto format = SelectSurfaceFormat(enable_hdr_);
+  if (!format)
+    return -1;
+  std::unique_ptr<vulkan::Swapchain> next;
+  if (core_->Device()->CreateSwapchain(surface_.get(), format->format, format->colorSpace, &next,
+                                       swap_chain_->Handle()) != VK_SUCCESS)
+    return -1;
+  hdr_framebuffer_.reset();
+  imgui_assets_.framebuffers.clear();
+  swap_chain_ = std::move(next);
+  surface_format_ = *format;
   if (imgui_assets_.context) {
     ImGui::SetCurrentContext(imgui_assets_.context);
     imgui_assets_.framebuffers.clear();
-    if (imgui_assets_.render_pass->AttachmentDescriptions()[0].format != swap_chain_->Format()) {
+    if (imgui_assets_.render_pass->AttachmentDescriptions()[0].format != ImGuiFormat()) {
       ImGui_ImplVulkan_Shutdown();
       ImGui_ImplGlfw_Shutdown();
 
@@ -83,6 +167,7 @@ void VulkanWindow::Rebuild() {
 
     BuildImGuiFramebuffers();
   }
+  return 0;
 }
 
 void VulkanWindow::Present() {
@@ -100,7 +185,8 @@ void VulkanWindow::Present() {
 
   auto result = vkQueuePresentKHR(present_queue_, &presentInfo);
   if (result == VK_ERROR_OUT_OF_DATE_KHR || result == VK_SUBOPTIMAL_KHR) {
-    Rebuild();
+    if (Rebuild() != 0)
+      throw std::runtime_error("Failed to rebuild Vulkan swapchain after presentation");
   } else if (result != VK_SUCCESS) {
     throw std::runtime_error("Failed to present swap chain image");
   }
@@ -159,7 +245,7 @@ void VulkanWindow::SetupImGuiContext() {
 
   VkAttachmentDescription attachment_desc{};
   attachment_desc.flags = 0;
-  attachment_desc.format = swap_chain_->Format();
+  attachment_desc.format = ImGuiFormat();
   attachment_desc.samples = VK_SAMPLE_COUNT_1_BIT;
   attachment_desc.loadOp = VK_ATTACHMENT_LOAD_OP_LOAD;
   attachment_desc.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
@@ -182,7 +268,7 @@ void VulkanWindow::SetupImGuiContext() {
   init_info.DescriptorPoolSize = 32;
   init_info.RenderPass = imgui_assets_.render_pass->Handle();
   init_info.MinImageCount = 2;
-  init_info.ImageCount = 3;
+  init_info.ImageCount = swap_chain_->ImageCount();
   init_info.MSAASamples = VK_SAMPLE_COUNT_1_BIT;
   ImGui_ImplVulkan_Init(&init_info);
 
@@ -202,11 +288,21 @@ void VulkanWindow::SetupImGuiContext() {
 }
 
 void VulkanWindow::BuildImGuiFramebuffers() {
+  // PQ is encoded only after scene/UI blending in the floating-point target.
+  if (UsesPQOutput())
+    return;
   imgui_assets_.framebuffers.resize(swap_chain_->ImageCount());
   for (int i = 0; i < swap_chain_->ImageCount(); i++) {
     imgui_assets_.render_pass->CreateFramebuffer({swap_chain_->ImageViews()[i]}, swap_chain_->Extent(),
                                                  &imgui_assets_.framebuffers[i]);
   }
+}
+
+vulkan::Framebuffer *VulkanWindow::HDRFramebuffer(VulkanImage *image) {
+  if (!hdr_framebuffer_)
+    imgui_assets_.render_pass->CreateFramebuffer({image->Image()->ImageView()}, image->Image()->Extent(),
+                                                 &hdr_framebuffer_);
+  return hdr_framebuffer_.get();
 }
 
 }  // namespace grassland::graphics::backend

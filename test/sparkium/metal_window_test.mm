@@ -34,6 +34,19 @@ TEST(MetalWindowTest, HDRPresentationAndImGuiSwitching) {
         window->SetHDR(hdr);
         EXPECT_EQ(layer.pixelFormat, hdr ? MTLPixelFormatRGBA16Float : MTLPixelFormatBGRA8Unorm);
         EXPECT_EQ(bool(layer.wantsExtendedDynamicRangeContent), hdr);
+        auto screen = [glfwGetCocoaWindow(window->GLFWWindow()) screen];
+        ASSERT_NE(screen, nil);
+        window->RefreshDisplayBrightness();
+        const auto brightness = window->GetDisplayBrightness();
+        EXPECT_TRUE(brightness.reference_white_known);
+        EXPECT_FLOAT_EQ(brightness.hdr_reference_white_scale, 1.0f);
+        EXPECT_FLOAT_EQ(brightness.sdr_white_nits, 0.0f);  // macOS does not expose absolute SDR nits here.
+        EXPECT_NEAR(brightness.hdr_headroom, screen.maximumExtendedDynamicRangeColorComponentValue, 0.01);
+        EXPECT_EQ(brightness.hdr_enabled, screen.maximumPotentialExtendedDynamicRangeColorComponentValue > 1.0);
+        for (bool alignment : {false, true}) {
+          window->SetHDRBrightnessAlignment(alignment);
+          EXPECT_FLOAT_EQ(window->HDRReferenceWhiteScale(), 1.0f);
+        }
         auto expected = CGColorSpaceCreateWithName(hdr ? kCGColorSpaceExtendedLinearSRGB : kCGColorSpaceSRGB);
         EXPECT_TRUE(CFEqual(layer.colorspace, expected));
         CGColorSpaceRelease(expected);

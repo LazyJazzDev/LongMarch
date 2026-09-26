@@ -54,9 +54,10 @@ void InstanceCreateHint::ApplyGLFWSurfaceSupport() {
   if (!glfw_extensions) {
     int err = glfwGetError(nullptr);
     if (err == GLFW_NOT_INITIALIZED) {
-      glfwInit();
-      glfw_extensions = glfwGetRequiredInstanceExtensions(&glfw_extension_count);
-      local_init = true;
+      if (glfwInit()) {
+        glfw_extensions = glfwGetRequiredInstanceExtensions(&glfw_extension_count);
+        local_init = true;
+      }
     }
   }
 
@@ -66,7 +67,15 @@ void InstanceCreateHint::ApplyGLFWSurfaceSupport() {
     }
   }
 
-  AddExtension(VK_EXT_SWAPCHAIN_COLOR_SPACE_EXTENSION_NAME);
+  // HDR is optional; older SDR-only Vulkan implementations need not expose it.
+  uint32_t extension_count = 0;
+  vkEnumerateInstanceExtensionProperties(nullptr, &extension_count, nullptr);
+  std::vector<VkExtensionProperties> available_extensions(extension_count);
+  vkEnumerateInstanceExtensionProperties(nullptr, &extension_count, available_extensions.data());
+  for (const auto &extension : available_extensions) {
+    if (std::strcmp(extension.extensionName, VK_EXT_SWAPCHAIN_COLOR_SPACE_EXTENSION_NAME) == 0)
+      AddExtension(VK_EXT_SWAPCHAIN_COLOR_SPACE_EXTENSION_NAME);
+  }
 
   if (local_init) {
     glfwTerminate();

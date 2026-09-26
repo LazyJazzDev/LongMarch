@@ -54,7 +54,10 @@ void NBodyCUDA::Run() {
     UpdateRenderAssets();
     OnRender();
     std::vector<uint8_t> color_buffer_(frame_image_->Extent().width * frame_image_->Extent().height * 4);
-    frame_image_->DownloadData(color_buffer_.data());
+    std::vector<float> encoded(color_buffer_.size());
+    frame_image_->DownloadData(encoded.data());
+    for (size_t i = 0; i < encoded.size(); ++i)
+      color_buffer_[i] = static_cast<uint8_t>(glm::clamp(encoded[i], 0.0f, 1.0f) * 255.0f + 0.5f);
     stbi_write_jpg("final_frame.jpg", frame_image_->Extent().width, frame_image_->Extent().height, 4,
                    color_buffer_.data(), 100);
     LogInfo("Frames per second: {:.2f}", fps_counter.GetFPS());
@@ -115,7 +118,7 @@ void NBodyCUDA::OnInit() {
       last_cursor_ = {xpos, ypos};
     });
   } else {
-    core_->CreateImage(960, 640, graphics::IMAGE_FORMAT_R8G8B8A8_UNORM, &frame_image_);
+    core_->CreateImage(960, 640, graphics::IMAGE_FORMAT_R32G32B32A32_SFLOAT, &frame_image_);
   }
 
   LogInfo("Simulating {} particles...", n_particles_);
@@ -153,8 +156,8 @@ void NBodyCUDA::OnUpdate() {
   UpdateParticles();
 
   if (!headless_) {
-    UpdateRenderAssets();
     UpdateImGui();
+    UpdateRenderAssets();
     static FPSCounter fps_counter;
     window_->SetTitle("NBody CUDA FPS: " + std::to_string(fps_counter.TickFPS()));
   }
@@ -175,14 +178,15 @@ void NBodyCUDA::OnRender() {
   ctx->CmdBindResources(0, {global_uniform_buffer_.get()});
   ctx->CmdDraw(6, n_particles_, 0, 0);
   ctx->CmdEndRendering();
-  if (!headless_) {
+  {
     ctx->CmdBeginRendering({}, nullptr);
     ctx->CmdBindProgram(hdr_program_.get());
     ctx->CmdBindResources(0, {global_uniform_buffer_.get()});
     ctx->CmdBindResources(1, {frame_image_.get()});
     ctx->CmdDraw(6, 1, 0, 0);
     ctx->CmdEndRendering();
-    ctx->CmdPresent(window_.get(), frame_image_.get());
+    if (!headless_)
+      ctx->CmdPresent(window_.get(), frame_image_.get());
   }
   core_->SubmitCommandContext(ctx.get());
 }
@@ -201,7 +205,7 @@ void NBodyCUDA::BuildRenderNode() {
   program_->BindShader(fragment_shader_.get(), graphics::SHADER_TYPE_PIXEL);
   program_->Finalize();
 
-  if (!headless_) {
+  {
     core_->CreateShader(GetShaderVirtualFileSystem(), "shaders/hdr.hlsl", "VSMain", "vs_6_0", &hdr_vertex_shader_);
     core_->CreateShader(GetShaderVirtualFileSystem(), "shaders/hdr.hlsl", "PSMain", "ps_6_0", &hdr_fragment_shader_);
     core_->CreateProgram({}, graphics::IMAGE_FORMAT_UNDEFINED, &hdr_program_);
@@ -370,7 +374,9 @@ void NBodyCUDA::UpdateImGui() {
   ImGui::End();
   window_->EndImGuiFrame();
   if (trigger_hdr_switch) {
-    hdr_ = !hdr_;
-    window_->SetHDR(hdr_);
+    if (window_->SetHDR(!hdr_) == 0)
+      hdr_ = !hdr_;
+    else
+      LogWarning("HDR mode change unavailable; keeping the current presentation mode.");
   }
 }
