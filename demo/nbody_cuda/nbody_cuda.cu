@@ -44,5 +44,8 @@ __global__ void UpdateKernel(const glm::vec3 *positions,
 void UpdateStep(glm::vec3 *positions, glm::vec3 *velocities, glm::vec3 *positions_new, int n_particles, float delta_t) {
   UpdateKernel<<<GRID_SIZE, BLOCK_SIZE, BLOCK_SIZE * sizeof(glm::vec3)>>>(positions, positions_new, velocities,
                                                                           n_particles, delta_t);
-  cudaMemcpyAsync(positions, positions_new, sizeof(glm::vec3) * n_particles, cudaMemcpyDeviceToDevice);
+  CUDAThrowIfFailed(cudaGetLastError(), "Failed to launch NBody CUDA update kernel.");
+  CUDAThrowIfFailed(
+      cudaMemcpyAsync(positions, positions_new, sizeof(glm::vec3) * n_particles, cudaMemcpyDeviceToDevice),
+      "Failed to copy updated NBody positions.");
 }
