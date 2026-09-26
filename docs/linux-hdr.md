@@ -166,6 +166,18 @@ emitted a GTK `gtk_disable_setlocale` startup warning without failing the run.
 Windows/macOS, pure Xorg sessions, other GPUs/compositors, live desktop HDR
 changes, and moving windows between HDR/SDR monitors were not tested in this run.
 
+### X11 fallback capture
+
+Actual client-window capture from code `9ea197b7`: GNOME 50.1 / XWayland,
+Vulkan, Cornell Box at 768×768, Auto → Ray Query, 3652 accumulated spp,
+1 sample/frame, 8 bounces, 0 EV, max exposure 100. Launching with `--hdr`
+reports the unsupported surface and continues rendering in SDR. This shows
+X11 fallback, not native Wayland HDR output or physical display luminance.
+
+![X11 SDR fallback](https://media.githubusercontent.com/media/LazyJazzDev/LongMarchAssetsLFS/8ef3107d99e9f29b840fa89346378c9238823a08/reports/linux-hdr-compat/x11-sdr-fallback.png)
+
+Capture and metadata: [assets PR #31](https://github.com/LazyJazzDev/LongMarchAssetsLFS/pull/31).
+
 ### Reference-white protocol validation
 
 An optional diagnostic opens an SDR white window and an HDR reference-white
