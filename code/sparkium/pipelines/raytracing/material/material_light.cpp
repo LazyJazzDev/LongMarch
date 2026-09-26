@@ -9,8 +9,8 @@ MaterialLight::MaterialLight(sparkium::MaterialLight &material)
       Material(DedicatedCast(material.GetCore())) {
   core_->GraphicsCore()->CreateBuffer(sizeof(material_.emission) + sizeof(int) * 3 + sizeof(float),
                                       graphics::BUFFER_TYPE_STATIC, &material_buffer_);
-  sampler_implementation_ = CodeLines(core_->GetShadersVFS(), "material/light/sampler.hlsl");
-  evaluator_implementation_ = CodeLines(core_->GetShadersVFS(), "material/light/evaluator.hlsli");
+  sampler_implementation_ = CodeLines(core_->GetShadersVFS(), "material/light/sampler.slang");
+  evaluator_implementation_ = CodeLines(core_->GetShadersVFS(), "material/light/evaluator.slang");
   SyncMaterialData();
 }
 

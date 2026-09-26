@@ -31,8 +31,8 @@ void ModuleTriangle::OnInit() {
 
   core_->CreateImage(1280, 720, grassland::graphics::IMAGE_FORMAT_R8G8B8A8_UNORM, &color_image_);
 
-  core_->CreateShader(LoadShader("modules/triangle/shaders/shader.hlsl"), "VSMain", "vs_6_0", &vertex_shader_);
-  core_->CreateShader(LoadShader("modules/triangle/shaders/shader.hlsl"), "PSMain", "ps_6_0", &fragment_shader_);
+  core_->CreateShader(LoadShader("modules/triangle/shaders/shader.slang"), "VSMain", "vs_6_0", &vertex_shader_);
+  core_->CreateShader(LoadShader("modules/triangle/shaders/shader.slang"), "PSMain", "ps_6_0", &fragment_shader_);
   grassland::LogInfo("Shader compiled successfully");
 
   core_->CreateProgram({color_image_->Format()}, grassland::graphics::IMAGE_FORMAT_UNDEFINED, &program_);

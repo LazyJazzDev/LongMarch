@@ -21,7 +21,7 @@ struct TextureInfo {
 MaterialPrincipled::MaterialPrincipled(sparkium::MaterialPrincipled &material)
     : material_(material),
       Material(DedicatedCast(material.GetCore())) {
-  core_->GraphicsCore()->CreateShader(core_->GetShadersVFS(), "material/principled/pixel_shader.hlsl", "PSMain",
+  core_->GraphicsCore()->CreateShader(core_->GetShadersVFS(), "material/principled/pixel_shader.slang", "PSMain",
                                       "ps_6_0", {"-I."}, &pixel_shader_);
   core_->GraphicsCore()->CreateBuffer(sizeof(material_.info) + sizeof(TextureInfo), graphics::BUFFER_TYPE_STATIC,
                                       &material_buffer_);

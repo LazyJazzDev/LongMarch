@@ -46,17 +46,17 @@ void ModuleRTMultiShaderGroup::OnInit() {
                       &aabb_buffer);
   aabb_buffer->UploadData(&aabb, sizeof(grassland::graphics::RayTracingAABB));
 
-  core_->CreateShader(LoadShader("modules/rt_multi_shader_group/shaders/shader.hlsl"), "RayGenMain", "lib_6_3",
+  core_->CreateShader(LoadShader("modules/rt_multi_shader_group/shaders/shader.slang"), "RayGenMain", "lib_6_3",
                       &raygen_shader_);
-  core_->CreateShader(LoadShader("modules/rt_multi_shader_group/shaders/shader.hlsl"), "MissMain", "lib_6_3",
+  core_->CreateShader(LoadShader("modules/rt_multi_shader_group/shaders/shader.slang"), "MissMain", "lib_6_3",
                       &miss_shader_);
-  core_->CreateShader(LoadShader("modules/rt_multi_shader_group/shaders/shader.hlsl"), "ClosestHitMain", "lib_6_3",
+  core_->CreateShader(LoadShader("modules/rt_multi_shader_group/shaders/shader.slang"), "ClosestHitMain", "lib_6_3",
                       &closest_hit_shader_);
-  core_->CreateShader(LoadShader("modules/rt_multi_shader_group/shaders/shader.hlsl"), "SphereClosestHitMain",
+  core_->CreateShader(LoadShader("modules/rt_multi_shader_group/shaders/shader.slang"), "SphereClosestHitMain",
                       "lib_6_3", &sphere_closest_hit_shader_);
-  core_->CreateShader(LoadShader("modules/rt_multi_shader_group/shaders/shader.hlsl"), "SphereIntersectionMain",
+  core_->CreateShader(LoadShader("modules/rt_multi_shader_group/shaders/shader.slang"), "SphereIntersectionMain",
                       "lib_6_3", &sphere_intersection_shader_);
-  core_->CreateShader(LoadShader("modules/rt_multi_shader_group/shaders/shader.hlsl"), "CallableMain", "lib_6_3",
+  core_->CreateShader(LoadShader("modules/rt_multi_shader_group/shaders/shader.slang"), "CallableMain", "lib_6_3",
                       &callable_shader_);
   grassland::LogInfo("Shader compiled successfully");
 
