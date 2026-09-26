@@ -185,6 +185,10 @@ Slang warnings. With identical settings, the two-frame 96x96 Cornell PNG outputs
 matched the pre-cleanup images pixel-for-pixel on each backend. This is limited
 smoke/parity coverage; Metal was not rerun.
 
+The [Blender throughput comparison](reports/slang-blender-performance.md) records
+two full-resolution runs per scene/backend against the previous HLSL measurements,
+including the separate initialization costs and historical-baseline limitations.
+
 ```sh
 cmake -S . -B out/slang-build -G Ninja -DCMAKE_BUILD_TYPE=Release \
   -DVCPKG_PATH=/path/to/vcpkg -DLONGMARCH_DISABLE_PYTHON=ON
