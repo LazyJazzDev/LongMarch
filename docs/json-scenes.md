@@ -31,7 +31,7 @@ Use the equivalent target paths in your configured build directory. Initialize
 the matching LFS assets submodule before running the checker.
 
 On Apple M5, the Vulkan build passed scene discovery, raster rendering of all
-six basic demos at 96×96 from a different working directory, and 25 invalid-input
+six basic demos at 96脳96 from a different working directory, and 25 invalid-input
 cases. Both CLI and GUI targets compiled. This check does not cover interactive
 GUI behavior, hardware ray tracing, or image equivalence with the C++ demos.
 Per-case logs, images, and `results.json` are written to the output directory.
@@ -71,8 +71,9 @@ and potential headroom when HDR is enabled. A floating-point output path alone
 cannot make an SDR-only display brighter. See [Metal HDR presentation](metal-backend.md#hdr--edr-presentation).
 
 Windows validation (RTX 3090 Ti, driver 596.49, Ninja Release): HDR film development,
-surface-format preference, and D3D12/Vulkan presentation with repeated HDR/SDR
-switching all pass (4 tests). The window tests exercise both ImGui and plain
+surface-format preference, reference-white refresh/fallback, and D3D12/Vulkan
+presentation/readback all pass (7 tests). The window tests exercise resize,
+repeated HDR/SDR switching, both ImGui and plain
 presentation with backend debugging and Vulkan synchronization validation enabled:
 
 ```powershell
@@ -81,10 +82,46 @@ $env:VK_LAYER_VALIDATE_SYNC = '1'
 ./cmake-build-ninja/test/sparkium/sparkium_fallback_test.exe --gtest_filter=*HDR*
 ```
 
-Actual [D3D12 and Vulkan window captures](https://github.com/LazyJazzDev/LongMarchAssetsLFS/tree/4525201a838f8e02691144a1c05afe9452b49df6/reports/sparkium-hdr-windows)
+Actual [D3D12 and Vulkan window captures](https://github.com/LazyJazzDev/LongMarchAssetsLFS/tree/3c93adf40f8771e74bbd06b3d3935d8cdc54594a/reports/sparkium-hdr-windows)
 show the HDR control and resolved Auto pipeline at 768x768, 1 sample per frame,
 8 bounces and maximum exposure 100. The PNG captures do not measure physical HDR
 brightness or provide an equal-sample comparison. Metal was not retested here.
+
+### Automatic HDR reference white
+
+`Window` aligns HDR presentation to the system's current SDR reference white by
+default. On Windows scRGB, 1.0 means 80 nits; the queried SDR white may be different.
+For example, a configured 480-nit SDR white requires a 6x HDR presentation scale.
+This is a display conversion, not a change to scene exposure, Film data or HDR export.
+The GUI shows the queried white and the applied multiplier.
+
+D3D12 and Vulkan compose the scene and ImGui into a floating-point intermediate,
+then apply the reference-white multiplier once to RGB, preserving alpha. ImGui
+vertex colors are decoded from sRGB for linear composition and restored after
+upload. Custom ImGui textures on the HDR path must supply linear RGB. Incoming
+HDR scene images must already be linear; SDR presentation remains unchanged.
+
+The window API exposes:
+
+- `GetDisplayBrightness()`: reference white in nits, native HDR white multiplier,
+  HDR headroom, and validity/state flags. Zero nits or headroom means unknown.
+- `RefreshDisplayBrightness()` and `DisplayBrightnessEvent()`: refresh explicitly
+  and observe changes. Active HDR presentation also queries automatically, caching
+  results for 500 ms, so monitor moves and system setting changes are picked up.
+- `HDRReferenceWhiteScale()`: the applied scale (1 for SDR or disabled alignment).
+- `SetHDRBrightnessAlignment(false)`: opt out when a caller already provides
+  native display-scaled HDR values, avoiding double scaling.
+
+Windows queries the window's monitor through DisplayConfig. If unavailable it
+uses a 1x fallback with the reference marked unknown. Windows peak/headroom is
+currently unknown rather than inferred from the SDR white. Metal uses a 1x white
+scale because its EDR surface already follows the system reference, and exposes
+the screen's current EDR headroom; that path was not run on this Windows machine.
+
+This corrects reference-white mismatch, but does not add a highlight tone mapper
+or make HDR match the SDR Filmic look. Filmic/gamma/contrast still apply only to
+SDR. GPU tests check scene RGB scaling, linear UI gray, alpha preservation,
+unchanged input pixels, and refresh/fallback/opt-out behavior.
 
 The **Render settings** panel exposes path-tracing samples per frame, maximum
 bounces, alpha shadows, background, persistence, per-sample clamping, and
@@ -123,9 +160,9 @@ with the `libsvtav1` encoder:
 python3 scripts/hdr_to_avif.py scene-linear.hdr scene-hdr.avif
 ```
 
-This converts linear sRGB to BT.2020, maps linear 1 to 203 cd/m², applies ST 2084
+This converts linear sRGB to BT.2020, maps linear 1 to 203 cd/m虏, applies ST 2084
 (PQ), and writes a tagged 10-bit AVIF (YUV 4:2:0). It does not apply SDR tone
-mapping; PQ luminance above 10000 cd/m² is clipped. The PNG uses the scene's SDR
+mapping; PQ luminance above 10000 cd/m虏 is clipped. The PNG uses the scene's SDR
 view transform. Browser/OS/display HDR support and available EDR headroom are
 required to see extended brightness. GitHub image proxies may transform images;
 provide a direct original-file link as well as the inline image. SDR displays

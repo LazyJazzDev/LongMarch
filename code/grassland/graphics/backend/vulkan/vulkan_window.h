@@ -48,6 +48,7 @@ class VulkanWindow : public Window {
   VulkanImGuiAssets &ImGuiAssets();
   void SetupImGuiContext();
   void BuildImGuiFramebuffers();
+  vulkan::Framebuffer *HDRFramebuffer(VulkanImage *image);
 
  private:
   VkQueue present_queue_;
@@ -59,6 +60,7 @@ class VulkanWindow : public Window {
   uint32_t image_index_;
 
   VulkanImGuiAssets imgui_assets_{};
+  std::unique_ptr<vulkan::Framebuffer> hdr_framebuffer_;
 };
 
 }  // namespace grassland::graphics::backend

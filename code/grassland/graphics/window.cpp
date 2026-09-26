@@ -1,10 +1,175 @@
 #include "grassland/graphics/window.h"
 
+#include "grassland/graphics/buffer.h"
+#include "grassland/graphics/command_context.h"
+#include "grassland/graphics/core.h"
+#include "grassland/graphics/image.h"
+#include "grassland/graphics/program.h"
+#include "grassland/graphics/shader.h"
+#ifdef _WIN32
+#define GLFW_EXPOSE_NATIVE_WIN32
+#include <GLFW/glfw3native.h>
+#endif
+
 #ifdef __APPLE__
 #include "grassland/graphics/window_gestures.h"
 #endif
 
 namespace grassland::graphics {
+
+ImGuiLinearColors::ImGuiLinearColors(bool enabled) {
+  if (!enabled || !ImGui::GetDrawData())
+    return;
+  for (auto *list : ImGui::GetDrawData()->CmdLists) {
+    for (auto &vertex : list->VtxBuffer) {
+      colors_.emplace_back(&vertex, vertex.col);
+      auto color = ImGui::ColorConvertU32ToFloat4(vertex.col);
+      auto linear = [](float c) { return c <= 0.04045f ? c / 12.92f : std::pow((c + 0.055f) / 1.055f, 2.4f); };
+      vertex.col = ImGui::ColorConvertFloat4ToU32({linear(color.x), linear(color.y), linear(color.z), color.w});
+    }
+  }
+}
+
+ImGuiLinearColors::~ImGuiLinearColors() {
+  for (const auto &entry : colors_)
+    entry.first->col = entry.second;
+}
+
+struct Window::HDRPresentation {
+  Core *core{};
+  std::unique_ptr<Image> composition, aligned;
+  std::unique_ptr<Shader> shader;
+  std::unique_ptr<ComputeProgram> program;
+  std::unique_ptr<Buffer> settings;
+};
+
+DisplayBrightness Window::QueryDisplayBrightness() const {
+  DisplayBrightness result;
+#ifdef _WIN32
+  if (!window_)
+    return result;
+  MONITORINFOEXW monitor{};
+  monitor.cbSize = sizeof(monitor);
+  if (!GetMonitorInfoW(MonitorFromWindow(glfwGetWin32Window(window_), MONITOR_DEFAULTTONEAREST), &monitor))
+    return result;
+  UINT32 path_count{}, mode_count{};
+  if (GetDisplayConfigBufferSizes(QDC_ONLY_ACTIVE_PATHS, &path_count, &mode_count) != ERROR_SUCCESS)
+    return result;
+  std::vector<DISPLAYCONFIG_PATH_INFO> paths(path_count);
+  std::vector<DISPLAYCONFIG_MODE_INFO> modes(mode_count);
+  if (QueryDisplayConfig(QDC_ONLY_ACTIVE_PATHS, &path_count, paths.data(), &mode_count, modes.data(), nullptr) !=
+      ERROR_SUCCESS)
+    return result;
+  for (UINT32 i = 0; i < path_count; ++i) {
+    const auto &path = paths[i];
+    DISPLAYCONFIG_SOURCE_DEVICE_NAME source{};
+    source.header = {DISPLAYCONFIG_DEVICE_INFO_GET_SOURCE_NAME, sizeof(source), path.sourceInfo.adapterId,
+                     path.sourceInfo.id};
+    if (DisplayConfigGetDeviceInfo(&source.header) != ERROR_SUCCESS ||
+        wcscmp(source.viewGdiDeviceName, monitor.szDevice))
+      continue;
+    DISPLAYCONFIG_GET_ADVANCED_COLOR_INFO color{};
+    color.header = {DISPLAYCONFIG_DEVICE_INFO_GET_ADVANCED_COLOR_INFO, sizeof(color), path.targetInfo.adapterId,
+                    path.targetInfo.id};
+    if (DisplayConfigGetDeviceInfo(&color.header) != ERROR_SUCCESS || !color.advancedColorEnabled)
+      return result;
+    result.hdr_enabled = true;
+    DISPLAYCONFIG_SDR_WHITE_LEVEL white{};
+    white.header = {DISPLAYCONFIG_DEVICE_INFO_GET_SDR_WHITE_LEVEL, sizeof(white), path.targetInfo.adapterId,
+                    path.targetInfo.id};
+    if (DisplayConfigGetDeviceInfo(&white.header) == ERROR_SUCCESS && white.SDRWhiteLevel > 0) {
+      result.hdr_reference_white_scale = white.SDRWhiteLevel / 1000.0f;
+      result.sdr_white_nits = 80.0f * result.hdr_reference_white_scale;
+      result.reference_white_known = true;
+    }
+    return result;
+  }
+#endif
+  return result;
+}
+
+DisplayBrightness Window::GetDisplayBrightness() {
+  if (std::chrono::steady_clock::now() - brightness_query_time_ >= std::chrono::milliseconds(500))
+    RefreshDisplayBrightness();
+  return display_brightness_;
+}
+
+void Window::RefreshDisplayBrightness() {
+  auto next = QueryDisplayBrightness();
+  brightness_query_time_ = std::chrono::steady_clock::now();
+  const auto previous = display_brightness_;
+  display_brightness_ = next;
+  if (previous.sdr_white_nits != next.sdr_white_nits ||
+      previous.hdr_reference_white_scale != next.hdr_reference_white_scale ||
+      previous.hdr_headroom != next.hdr_headroom || previous.reference_white_known != next.reference_white_known ||
+      previous.hdr_enabled != next.hdr_enabled)
+    display_brightness_event_.InvokeCallbacks(display_brightness_);
+}
+
+void Window::SetHDRBrightnessAlignment(bool enabled) {
+  align_hdr_brightness_ = enabled;
+}
+
+float Window::HDRReferenceWhiteScale() {
+  const auto brightness = GetDisplayBrightness();
+  return enable_hdr_ && align_hdr_brightness_ ? brightness.hdr_reference_white_scale : 1.0f;
+}
+
+Image *Window::PrepareHDRComposition(Core *core, Extent2D extent) {
+  if (!enable_hdr_ || !align_hdr_brightness_)
+    return nullptr;
+  if (!hdr_presentation_) {
+    auto pending = std::make_unique<HDRPresentation>();
+    auto &p = *pending;
+    p.core = core;
+    const char *source = R"(
+Texture2D<float4> source_image : register(t0, space0);
+[[vk::image_format("rgba16f")]] RWTexture2D<float4> output_image : register(u0, space1);
+cbuffer Settings : register(b0, space2) { float white_scale; float3 padding; };
+[numthreads(8,8,1)] void Main(uint3 id : SV_DispatchThreadID) {
+  uint width, height;
+  output_image.GetDimensions(width, height);
+  if (id.x >= width || id.y >= height) return;
+  float4 color = source_image.Load(int3(id.xy, 0));
+  output_image[id.xy] = float4(min(max(color.rgb, 0.0) * white_scale, 65504.0), color.a);
+}
+)";
+    if (core->CreateShader(source, "Main", "cs_6_0", &p.shader) ||
+        core->CreateComputeProgram(p.shader.get(), &p.program))
+      throw std::runtime_error("Cannot create HDR reference-white presentation shader");
+    p.program->AddResourceBinding(RESOURCE_TYPE_IMAGE, 1);
+    p.program->AddResourceBinding(RESOURCE_TYPE_WRITABLE_IMAGE, 1);
+    p.program->AddResourceBinding(RESOURCE_TYPE_UNIFORM_BUFFER, 1);
+    p.program->Finalize();
+    if (core->CreateBuffer(16, BUFFER_TYPE_STATIC, &p.settings))
+      throw std::runtime_error("Cannot create HDR presentation settings");
+    hdr_presentation_ = std::move(pending);
+  }
+  auto &p = *hdr_presentation_;
+  if (p.core != core)
+    throw std::invalid_argument("HDR presentation belongs to a different graphics core");
+  if (!p.composition || p.composition->Extent().width != extent.width ||
+      p.composition->Extent().height != extent.height) {
+    core->WaitGPU();
+    core->CreateImage(extent.width, extent.height, IMAGE_FORMAT_R16G16B16A16_SFLOAT, &p.composition);
+    core->CreateImage(extent.width, extent.height, IMAGE_FORMAT_R16G16B16A16_SFLOAT, &p.aligned);
+  }
+  return p.composition.get();
+}
+
+Image *Window::AlignHDRComposition(CommandContext *commands) {
+  if (!hdr_presentation_ || !hdr_presentation_->composition)
+    throw std::logic_error("Prepare HDR composition before aligning it");
+  auto &p = *hdr_presentation_;
+  const float settings[4] = {HDRReferenceWhiteScale(), 0, 0, 0};
+  p.settings->UploadData(settings, sizeof(settings));
+  commands->CmdBindComputeProgram(p.program.get());
+  commands->CmdBindResources(0, {p.composition.get()}, BIND_POINT_COMPUTE);
+  commands->CmdBindResources(1, {p.aligned.get()}, BIND_POINT_COMPUTE);
+  commands->CmdBindResources(2, {p.settings.get()}, BIND_POINT_COMPUTE);
+  commands->CmdDispatch((p.aligned->Extent().width + 7) / 8, (p.aligned->Extent().height + 7) / 8, 1);
+  return p.aligned.get();
+}
 
 namespace {
 bool glfw_initialized_{false};
@@ -204,6 +369,7 @@ void Window::Resize(int new_width, int new_height) {
 }
 
 void Window::CloseWindow() {
+  hdr_presentation_.reset();
 #ifdef __APPLE__
   detail::RemoveMagnifyEvents(magnify_monitor_);
   magnify_monitor_ = nullptr;
@@ -218,11 +384,25 @@ bool Window::ShouldClose() const {
 
 void Window::SetHDR(bool enable_hdr) {
   enable_hdr_ = enable_hdr;
+  RefreshDisplayBrightness();
   resize_event_.InvokeCallbacks(GetWidth(), GetHeight());
 }
 
 #if defined(LONGMARCH_PYTHON_ENABLED)
 void Window::PybindClassRegistration(py::classh<Window> &c) {
+  c.def("set_hdr_brightness_alignment", &Window::SetHDRBrightnessAlignment);
+  c.def("hdr_reference_white_scale", &Window::HDRReferenceWhiteScale);
+  c.def("refresh_display_brightness", &Window::RefreshDisplayBrightness);
+  c.def("display_brightness", [](Window &window) {
+    const auto info = window.GetDisplayBrightness();
+    py::dict result;
+    result["sdr_white_nits"] = info.sdr_white_nits;
+    result["hdr_reference_white_scale"] = info.hdr_reference_white_scale;
+    result["hdr_headroom"] = info.hdr_headroom;
+    result["reference_white_known"] = info.reference_white_known;
+    result["hdr_enabled"] = info.hdr_enabled;
+    return result;
+  });
   c.def("__repr__", [](Window *window) {
     return py::str("Window(width={}, height={}, title='{}', hdr={})")
         .format(window->GetWidth(), window->GetHeight(), window->GetTitle(), window->enable_hdr_);

@@ -2,6 +2,7 @@
 #include <long_march.h>
 
 #include <cstdlib>
+#include <glm/gtc/packing.hpp>
 
 #if defined(LONGMARCH_D3D12_ENABLED)
 #include "grassland/graphics/backend/d3d12/d3d12_window.h"
@@ -28,6 +29,59 @@ TEST(HDRSurfaceFormatTest, PreferredFormatWinsRegardlessOfEnumerationOrder) {
 }
 #endif
 
+class BrightnessProbeWindow : public graphics::Window {
+ public:
+  BrightnessProbeWindow() : Window(64, 64, "Brightness query test", false, false, false) {
+  }
+
+  graphics::DisplayBrightness brightness;
+
+  void InitImGui(const char *, float) override {
+  }
+
+  void TerminateImGui() override {
+  }
+
+  void BeginImGuiFrame() override {
+  }
+
+  void EndImGuiFrame() override {
+  }
+
+  ImGuiContext *GetImGuiContext() const override {
+    return nullptr;
+  }
+
+ protected:
+  graphics::DisplayBrightness QueryDisplayBrightness() const override {
+    return brightness;
+  }
+};
+
+TEST(HDRBrightnessTest, RefreshNotifiesAndUnknownReferenceFallsBack) {
+  if (!std::getenv("LONGMARCH_TEST_HDR_WINDOWS"))
+    GTEST_SKIP();
+  BrightnessProbeWindow window;
+  int changes = 0;
+  window.DisplayBrightnessEvent().RegisterCallback([&](const graphics::DisplayBrightness &) { ++changes; });
+  window.brightness = {480.0f, 6.0f, 0.0f, true, true};
+  window.RefreshDisplayBrightness();
+  EXPECT_EQ(changes, 1);
+  EXPECT_EQ(window.HDRReferenceWhiteScale(), 1.0f);  // SDR must never scale.
+  window.SetHDR(true);
+  EXPECT_EQ(window.HDRReferenceWhiteScale(), 6.0f);
+  EXPECT_EQ(changes, 1);
+  window.brightness = {160.0f, 2.0f, 0.0f, true, true};
+  window.RefreshDisplayBrightness();
+  EXPECT_EQ(changes, 2);
+  EXPECT_EQ(window.HDRReferenceWhiteScale(), 2.0f);
+  window.brightness = {};
+  window.RefreshDisplayBrightness();
+  EXPECT_EQ(changes, 3);
+  EXPECT_EQ(window.HDRReferenceWhiteScale(), 1.0f);
+  EXPECT_FALSE(window.GetDisplayBrightness().reference_white_known);
+}
+
 #if defined(LONGMARCH_D3D12_ENABLED) || defined(LONGMARCH_VULKAN_ENABLED)
 class HDRWindowTest : public testing::TestWithParam<graphics::BackendAPI> {};
 
@@ -46,6 +100,7 @@ TEST_P(HDRWindowTest, PresentationAndImGuiSwitching) {
     }
     std::unique_ptr<graphics::Image> image;
     ASSERT_EQ(core->CreateImage(320, 240, graphics::IMAGE_FORMAT_R32G32B32A32_SFLOAT, &image), 0);
+    bool resized = false;
     for (bool hdr : {true, true, false, true, false}) {
       window->SetHDR(hdr);
 #if defined(LONGMARCH_D3D12_ENABLED)
@@ -65,6 +120,7 @@ TEST_P(HDRWindowTest, PresentationAndImGuiSwitching) {
         ImGui::GetIO().IniFilename = nullptr;
         window->BeginImGuiFrame();
         ImGui::TextUnformatted("HDR / SDR switching");
+        ImGui::GetForegroundDrawList()->AddRectFilled({100, 100}, {220, 200}, IM_COL32(128, 128, 128, 255));
         window->EndImGuiFrame();
       }
       std::unique_ptr<graphics::CommandContext> commands;
@@ -72,11 +128,76 @@ TEST_P(HDRWindowTest, PresentationAndImGuiSwitching) {
       commands->CmdClearImage(image.get(), {{3.0f, 2.0f, 1.0f, 1.0f}});
       commands->CmdPresent(window.get(), image.get());
       ASSERT_EQ(core->SubmitCommandContext(commands.get()), 0);
+      core->WaitGPU();
+      if (hdr) {
+        std::unique_ptr<graphics::CommandContext> readback_commands;
+        core->CreateCommandContext(&readback_commands);
+        auto *aligned = window->AlignHDRComposition(readback_commands.get());
+        ASSERT_EQ(core->SubmitCommandContext(readback_commands.get()), 0);
+        core->WaitGPU();
+        std::vector<uint16_t> pixels(aligned->Extent().width * aligned->Extent().height * 4);
+        aligned->DownloadData(pixels.data());
+        const float scale = window->HDRReferenceWhiteScale();
+        const size_t center =
+            ((aligned->Extent().height / 2) * aligned->Extent().width + aligned->Extent().width / 2) * 4;
+        // ImGui's 128/255 gray is sRGB, decoded to about 0.216 linear.
+        EXPECT_NEAR(glm::unpackHalf1x16(pixels[center]), (imgui ? 0.216f : 3.0f) * scale, 0.01f * scale);
+        EXPECT_NEAR(glm::unpackHalf1x16(pixels[center + 1]), (imgui ? 0.216f : 2.0f) * scale, 0.01f * scale);
+        EXPECT_NEAR(glm::unpackHalf1x16(pixels[center + 2]), (imgui ? 0.216f : 1.0f) * scale, 0.01f * scale);
+      }
+      if (!resized) {
+        window->Resize(352, 256);
+        resized = true;
+      }
       glfwPollEvents();
     }
     window->CloseWindow();
   }
   core->WaitGPU();
+}
+
+TEST_P(HDRWindowTest, ReferenceWhiteScalingPreservesSourceAndAlpha) {
+  if (!std::getenv("LONGMARCH_TEST_HDR_WINDOWS"))
+    GTEST_SKIP() << "Requires an interactive desktop session";
+  std::unique_ptr<graphics::Core> core;
+  ASSERT_EQ(graphics::CreateCore(GetParam(), graphics::Core::Settings{2, true}, &core), 0);
+  ASSERT_EQ(core->InitializeLogicalDeviceAutoSelect(false), 0);
+  std::unique_ptr<graphics::Window> window;
+  ASSERT_EQ(core->CreateWindowObject(320, 240, "HDR reference white test", &window), 0);
+  window->SetHDR(true);
+  auto *composition = window->PrepareHDRComposition(core.get(), {13, 7});
+  ASSERT_NE(composition, nullptr);
+  std::vector<uint16_t> source(13 * 7 * 4);
+  for (size_t i = 0; i < source.size(); i += 4) {
+    source[i] = glm::packHalf1x16(0.18f);
+    source[i + 1] = glm::packHalf1x16(1.0f);
+    source[i + 2] = glm::packHalf1x16(4.0f);
+    source[i + 3] = glm::packHalf1x16(0.5f);
+  }
+  composition->UploadData(source.data());
+  const float scale = window->HDRReferenceWhiteScale();
+  ASSERT_GT(scale, 0.0f);
+  std::unique_ptr<graphics::CommandContext> commands;
+  core->CreateCommandContext(&commands);
+  auto *aligned = window->AlignHDRComposition(commands.get());
+  ASSERT_EQ(core->SubmitCommandContext(commands.get()), 0);
+  core->WaitGPU();
+  std::vector<uint16_t> actual(source.size()), unchanged(source.size());
+  aligned->DownloadData(actual.data());
+  composition->DownloadData(unchanged.data());
+  EXPECT_EQ(source, unchanged);
+  for (size_t i = 0; i < source.size(); i += 4) {
+    for (size_t c = 0; c < 3; ++c)
+      EXPECT_NEAR(glm::unpackHalf1x16(actual[i + c]), glm::unpackHalf1x16(source[i + c]) * scale, 0.004f * scale);
+    EXPECT_EQ(actual[i + 3], source[i + 3]);
+  }
+  window->SetHDRBrightnessAlignment(false);
+  EXPECT_EQ(window->HDRReferenceWhiteScale(), 1.0f);
+  EXPECT_EQ(window->PrepareHDRComposition(core.get(), {13, 7}), nullptr);
+  window->SetHDRBrightnessAlignment(true);
+  window->SetHDR(false);
+  EXPECT_EQ(window->HDRReferenceWhiteScale(), 1.0f);
+  window->CloseWindow();
 }
 
 #if defined(LONGMARCH_D3D12_ENABLED)

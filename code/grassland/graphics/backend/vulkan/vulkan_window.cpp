@@ -1,5 +1,7 @@
 #include "grassland/graphics/backend/vulkan/vulkan_window.h"
 
+#include "grassland/graphics/backend/vulkan/vulkan_image.h"
+
 namespace grassland::graphics::backend {
 
 VulkanWindow::VulkanWindow(VulkanCore *core,
@@ -34,6 +36,7 @@ VulkanWindow::~VulkanWindow() {
 
 void VulkanWindow::CloseWindow() {
   core_->WaitGPU();
+  hdr_framebuffer_.reset();
   if (imgui_assets_.context) {
     TerminateImGui();
   }
@@ -79,6 +82,7 @@ uint32_t VulkanWindow::AcquireNextImage() {
 
 void VulkanWindow::Rebuild() {
   core_->WaitGPU();
+  hdr_framebuffer_.reset();
   imgui_assets_.framebuffers.clear();
   swap_chain_.reset();
   core_->Device()->CreateSwapchain(
@@ -222,6 +226,13 @@ void VulkanWindow::BuildImGuiFramebuffers() {
     imgui_assets_.render_pass->CreateFramebuffer({swap_chain_->ImageViews()[i]}, swap_chain_->Extent(),
                                                  &imgui_assets_.framebuffers[i]);
   }
+}
+
+vulkan::Framebuffer *VulkanWindow::HDRFramebuffer(VulkanImage *image) {
+  if (!hdr_framebuffer_)
+    imgui_assets_.render_pass->CreateFramebuffer({image->Image()->ImageView()}, image->Image()->Extent(),
+                                                 &hdr_framebuffer_);
+  return hdr_framebuffer_.get();
 }
 
 }  // namespace grassland::graphics::backend

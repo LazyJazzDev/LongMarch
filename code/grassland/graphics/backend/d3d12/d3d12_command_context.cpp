@@ -183,10 +183,21 @@ void D3D12CommandContext::CmdClearImage(Image *image, const ClearValue &color) {
 }
 
 void D3D12CommandContext::CmdPresent(Window *window, Image *image) {
-  auto d3d12_window = dynamic_cast<D3D12Window *>(window);
-  auto d3d12_image = dynamic_cast<D3D12Image *>(image);
-  commands_.push_back(std::make_unique<D3D12CmdPresent>(d3d12_window, d3d12_image));
-  windows_.insert(d3d12_window);
+  auto native_window = dynamic_cast<D3D12Window *>(window);
+  auto native_image = dynamic_cast<D3D12Image *>(image);
+  auto extent = native_window->SwapChain()->Width();
+  Extent2D window_extent{extent, native_window->SwapChain()->Height()};
+  auto composition = dynamic_cast<D3D12Image *>(window->PrepareHDRComposition(core_, window_extent));
+  if (composition) {
+    RecordRTVImage(composition);
+    commands_.push_back(std::make_unique<D3D12CmdPresent>(native_window, native_image, composition));
+    resource_descriptor_count_++;
+    auto aligned = dynamic_cast<D3D12Image *>(window->AlignHDRComposition(this));
+    commands_.push_back(std::make_unique<D3D12CmdPresent>(native_window, aligned, nullptr, false));
+  } else {
+    commands_.push_back(std::make_unique<D3D12CmdPresent>(native_window, native_image));
+  }
+  windows_.insert(native_window);
   resource_descriptor_count_++;
 }
 

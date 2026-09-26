@@ -195,6 +195,16 @@ int main(int argc, char **argv) {
         ImGui::TextWrapped("HDR unavailable: %s", hdr_error.c_str());
       ImGui::SliderFloat("Exposure (EV)", &loaded->GetFilm()->info.exposure, -8.0f, 8.0f, "%.2f");
       ImGui::TextUnformatted(hdr_active ? "Display: HDR (linear)" : "Display: SDR (scene view transform)");
+      if (hdr_active) {
+        const auto brightness = window->GetDisplayBrightness();
+        if (brightness.sdr_white_nits > 0.0f)
+          ImGui::Text("Reference white: %.0f nits (%.2fx)", brightness.sdr_white_nits,
+                      window->HDRReferenceWhiteScale());
+        else if (!brightness.reference_white_known)
+          ImGui::TextUnformatted("Reference white: unavailable (1x fallback)");
+        if (brightness.hdr_headroom > 0.0f)
+          ImGui::Text("HDR headroom: %.2fx", brightness.hdr_headroom);
+      }
       auto *film = loaded->GetFilm();
       auto &settings = loaded->GetScene()->settings;
       const bool raster = core.ResolveRenderPipeline(pipeline) == sparkium::RENDER_PIPELINE_RASTERIZATION;

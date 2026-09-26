@@ -30,6 +30,21 @@ MetalWindow::MetalWindow(MetalCore *core,
   ConfigurePresentation(false);
 }
 
+DisplayBrightness MetalWindow::QueryDisplayBrightness() const {
+  DisplayBrightness result;
+  if (!GLFWWindow())
+    return result;
+  auto screen = [glfwGetCocoaWindow(GLFWWindow()) screen];
+  if (screen) {
+    // EDR linear 1.0 already follows the system's reference white.
+    result.reference_white_known = true;
+    result.hdr_reference_white_scale = 1.0f;
+    result.hdr_headroom = screen.maximumExtendedDynamicRangeColorComponentValue;
+    result.hdr_enabled = screen.maximumPotentialExtendedDynamicRangeColorComponentValue > 1.0;
+  }
+  return result;
+}
+
 void MetalWindow::ConfigurePresentation(bool enable_hdr) {
   MetalPool pool;
   const auto format = enable_hdr ? MTL::PixelFormatRGBA16Float : MTL::PixelFormatBGRA8Unorm;
@@ -152,6 +167,7 @@ void MetalWindow::EndImGuiFrame() {
 
 void MetalWindow::Present(MTL::CommandBuffer *command, MetalImage *image) {
   MetalPool pool;
+  GetDisplayBrightness();
   int width, height;
   glfwGetFramebufferSize(GLFWWindow(), &width, &height);
   if (width <= 0 || height <= 0)
@@ -171,6 +187,7 @@ void MetalWindow::Present(MTL::CommandBuffer *command, MetalImage *image) {
   encoder->drawPrimitives(MTL::PrimitiveTypeTriangle, NS::UInteger(0), NS::UInteger(3));
   if (imgui_) {
     ImGui::SetCurrentContext(imgui_);
+    ImGuiLinearColors linear_ui(enable_hdr_ && HDRBrightnessAlignment());
     ImGui_ImplMetal_RenderDrawData(ImGui::GetDrawData(), (__bridge id<MTLCommandBuffer>)command,
                                    (__bridge id<MTLRenderCommandEncoder>)encoder);
   }

@@ -73,9 +73,14 @@ class D3D12CommandContext : public CommandContext {
 
   void RecordDynamicBuffer(D3D12Buffer *buffer);
 
+  void RestoreDescriptorHeaps(ID3D12GraphicsCommandList *commands) {
+    commands->SetDescriptorHeaps(2, bound_heaps_);
+  }
+
  private:
   friend D3D12Core;
   D3D12Core *core_;
+  ID3D12DescriptorHeap *bound_heaps_[2]{};
 
   D3D12ProgramBase *program_bases_[BIND_POINT_COUNT]{};
 

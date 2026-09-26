@@ -23,6 +23,7 @@ class MetalWindow : public Window {
   void Present(MTL::CommandBuffer *command, MetalImage *image);
 
  private:
+  DisplayBrightness QueryDisplayBrightness() const override;
   void ConfigurePresentation(bool enable_hdr);
   MetalCore *core_;
   NS::SharedPtr<CA::MetalLayer> layer_;

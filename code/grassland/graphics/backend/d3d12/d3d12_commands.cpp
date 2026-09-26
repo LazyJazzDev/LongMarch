@@ -357,7 +357,11 @@ void D3D12CmdDrawIndexed::CompileCommand(D3D12CommandContext *context, ID3D12Gra
   command_list->DrawIndexedInstanced(index_count_, instance_count_, first_index_, vertex_offset_, first_instance_);
 }
 
-D3D12CmdPresent::D3D12CmdPresent(D3D12Window *window, D3D12Image *image) : image_(image), window_(window) {
+D3D12CmdPresent::D3D12CmdPresent(D3D12Window *window, D3D12Image *image, D3D12Image *target, bool draw_ui)
+    : target_(target),
+      draw_ui_(draw_ui),
+      image_(image),
+      window_(window) {
 }
 
 void D3D12CmdPresent::CompileCommand(D3D12CommandContext *context, ID3D12GraphicsCommandList *command_list) {
@@ -365,10 +369,14 @@ void D3D12CmdPresent::CompileCommand(D3D12CommandContext *context, ID3D12Graphic
 
   context->RequireResourceState(command_list, image_->Image()->Handle(), D3D12_RESOURCE_STATE_GENERIC_READ);
 
-  CD3DX12_RESOURCE_BARRIER barrier = CD3DX12_RESOURCE_BARRIER::Transition(
-      window_->CurrentBackBuffer(), D3D12_RESOURCE_STATE_PRESENT, D3D12_RESOURCE_STATE_RENDER_TARGET);
+  auto destination = target_ ? target_->Image()->Handle() : window_->CurrentBackBuffer();
+  CD3DX12_RESOURCE_BARRIER barrier = CD3DX12_RESOURCE_BARRIER::Transition(destination, D3D12_RESOURCE_STATE_PRESENT,
+                                                                          D3D12_RESOURCE_STATE_RENDER_TARGET);
 
-  command_list->ResourceBarrier(1, &barrier);
+  if (target_)
+    context->RequireResourceState(command_list, destination, D3D12_RESOURCE_STATE_RENDER_TARGET);
+  else
+    command_list->ResourceBarrier(1, &barrier);
 
   auto root_signature = context->Core()->BlitPipeline()->root_signature->Handle();
   auto pso = context->Core()->BlitPipeline()->GetPipelineState(window_->SwapChain()->BackBufferFormat());
@@ -390,7 +398,7 @@ void D3D12CmdPresent::CompileCommand(D3D12CommandContext *context, ID3D12Graphic
   command_list->RSSetScissorRects(1, &scissor_rect);
   D3D12_VIEWPORT viewport = {target_x, target_y, target_width, target_height, 0.0f, 1.0f};
   command_list->RSSetViewports(1, &viewport);
-  const auto rtv = context->RTVHandle(window_->CurrentBackBuffer());
+  const auto rtv = context->RTVHandle(destination);
   command_list->OMSetRenderTargets(1, &rtv, FALSE, nullptr);
   const float clear_color[4] = {0.0f, 0.0f, 0.0f, 1.0f};
   command_list->ClearRenderTargetView(rtv, clear_color, 0, nullptr);
@@ -398,14 +406,19 @@ void D3D12CmdPresent::CompileCommand(D3D12CommandContext *context, ID3D12Graphic
   command_list->DrawInstanced(6, 1, 0, 0);
 
   auto &imgui_assets = window_->ImGuiAssets();
-  if (imgui_assets.context && imgui_assets.draw_command) {
+  if (draw_ui_ && imgui_assets.context && imgui_assets.draw_command) {
     imgui_assets.draw_command = false;
     auto binding_heap = imgui_assets.srv_heap->Handle();
     command_list->SetDescriptorHeaps(1, &binding_heap);
+    ImGui::SetCurrentContext(imgui_assets.context);
+    ImGuiLinearColors linear_ui(target_ != nullptr);
     ImGui_ImplDX12_RenderDrawData(ImGui::GetDrawData(), command_list);
+    context->RestoreDescriptorHeaps(command_list);
   }
 
-  barrier = CD3DX12_RESOURCE_BARRIER::Transition(window_->CurrentBackBuffer(), D3D12_RESOURCE_STATE_RENDER_TARGET,
+  if (target_)
+    return;
+  barrier = CD3DX12_RESOURCE_BARRIER::Transition(destination, D3D12_RESOURCE_STATE_RENDER_TARGET,
                                                  D3D12_RESOURCE_STATE_PRESENT);
   command_list->ResourceBarrier(1, &barrier);
 }

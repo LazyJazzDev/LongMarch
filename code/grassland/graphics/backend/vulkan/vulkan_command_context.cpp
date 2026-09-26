@@ -213,10 +213,18 @@ void VulkanCommandContext::CmdClearImage(Image *image, const ClearValue &color) 
 }
 
 void VulkanCommandContext::CmdPresent(Window *window, Image *image) {
-  auto vulkan_window = dynamic_cast<VulkanWindow *>(window);
-  auto vulkan_image = dynamic_cast<VulkanImage *>(image);
-  commands_.push_back(std::make_unique<VulkanCmdPresent>(vulkan_window, vulkan_image));
-  windows_.insert(vulkan_window);
+  auto native_window = dynamic_cast<VulkanWindow *>(window);
+  auto native_image = dynamic_cast<VulkanImage *>(image);
+  auto extent = native_window->SwapChain()->Extent();
+  auto composition = dynamic_cast<VulkanImage *>(window->PrepareHDRComposition(core_, {extent.width, extent.height}));
+  if (composition) {
+    commands_.push_back(std::make_unique<VulkanCmdPresent>(native_window, native_image, composition));
+    auto aligned = dynamic_cast<VulkanImage *>(window->AlignHDRComposition(this));
+    commands_.push_back(std::make_unique<VulkanCmdPresent>(native_window, aligned, nullptr, false));
+  } else {
+    commands_.push_back(std::make_unique<VulkanCmdPresent>(native_window, native_image));
+  }
+  windows_.insert(native_window);
 }
 
 void VulkanCommandContext::CmdDispatchRays(uint32_t width, uint32_t height, uint32_t depth) {

@@ -313,6 +313,7 @@ int D3D12Core::SubmitCommandContext(CommandContext *p_command_context) {
   ID3D12DescriptorHeap *resource_heaps[] = {resource_descriptor_heaps_[current_frame_]->Handle(),
                                             sampler_descriptor_heaps_[current_frame_]->Handle()};
   command_list->SetDescriptorHeaps(2, resource_heaps);
+  std::copy(std::begin(resource_heaps), std::end(resource_heaps), command_context->bound_heaps_);
 
   for (auto &command : command_context->commands_) {
     command->CompileCommand(command_context, command_list);
