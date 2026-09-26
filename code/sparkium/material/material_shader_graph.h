@@ -4,7 +4,7 @@
 
 namespace sparkium {
 
-// A material whose surface parameters are evaluated by HLSL generated from a
+// A material whose surface parameters are evaluated by Slang generated from a
 // JSON shader-node graph. Texture indices are assigned when the scene updates.
 class MaterialShaderGraph : public Material {
  public:

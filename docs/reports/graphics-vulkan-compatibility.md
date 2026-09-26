@@ -50,7 +50,6 @@ cmake -S . -B out/graphics-compat-build -G Ninja \
 cmake --build out/graphics-compat-build --target test_vulkan_compatibility -j 6
 VK_LAYER_VALIDATE_SYNC=1 \
   out/graphics-compat-build/test/graphics/test_vulkan_compatibility
-python3 -m unittest discover -s test/graphics -p 'test_spirv_nonuniform.py' -v
 ```
 
 - `TiledComputeUsesExplicitPixelOrigins`（Vulkan 与 Metal 各一项）：259×130 图像，跨越多个
@@ -74,6 +73,12 @@ Vulkan 同步验证未报告错误。非 coherent 内存、多个 queue family �
 出现 GPU reset/device lost；配合 Sparkium 分块调用后已出图。此前也验证了 2048/GoL、
 Cornell、HDR，以及低采样 Monster/Classroom。独立分支提取了相关通用库修复，没有复制
 应用呈现代码，也没有将这些集成验证夸大为所有 Vulkan 驱动、全部场景的覆盖。
+
+## Slang 迁移后的状态
+
+本报告记录 PR #59 的历史实现及验证。后续 Slang 迁移已删除 DXC NonUniform
+修补头文件及对应 Python 回归测试；下文的修补分析和上述测试结果仅描述当时版本。
+当前编译器验证见 [Slang 迁移说明](../slang-shaders.md)。
 
 ## DXC 后续核查
 

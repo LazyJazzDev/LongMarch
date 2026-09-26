@@ -15,3 +15,8 @@ if(LONGMARCH_VULKAN_ENABLED)
     target_link_libraries(test_vulkan_compatibility PRIVATE Grassland GTest::gtest_main)
     LONGMARCH_DEPLOY_RUNTIME_DEPENDENCIES(test_vulkan_compatibility)
 endif()
+
+add_executable(test_slang_compiler EXCLUDE_FROM_ALL slang_compiler_test.cpp)
+target_link_libraries(test_slang_compiler PRIVATE Grassland GTest::gtest_main)
+target_compile_definitions(test_slang_compiler PRIVATE LONGMARCH_SOURCE_ROOT="${PROJECT_SOURCE_DIR}")
+LONGMARCH_DEPLOY_RUNTIME_DEPENDENCIES(test_slang_compiler)

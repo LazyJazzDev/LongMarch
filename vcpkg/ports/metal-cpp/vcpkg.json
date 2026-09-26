@@ -1,0 +1,8 @@
+{
+  "name": "metal-cpp",
+  "version": "15.0",
+  "description": "Apple metal-cpp headers for macOS 15 / iOS 18",
+  "homepage": "https://developer.apple.com/metal/cpp/",
+  "license": "Apache-2.0",
+  "supports": "osx | ios"
+}

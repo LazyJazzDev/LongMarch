@@ -67,6 +67,16 @@ class DeviceCreateInfo DeviceFeatureRequirement::GenerateRecommendedDeviceCreate
   create_info.AddFeature(physical_device_extended_dynamic_state_features);
   create_info.AddFeature(scalar_block_layout_features);
 
+  // Slang uses DrawParameters for vertex/instance IDs. Enable the Vulkan 1.1
+  // feature when supported instead of relying on an advertised core version.
+  VkPhysicalDeviceShaderDrawParametersFeatures draw_parameters{};
+  draw_parameters.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SHADER_DRAW_PARAMETERS_FEATURES;
+  VkPhysicalDeviceFeatures2 supported_features{};
+  supported_features.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2;
+  supported_features.pNext = &draw_parameters;
+  vkGetPhysicalDeviceFeatures2(physical_device.Handle(), &supported_features);
+  create_info.AddFeature(draw_parameters);
+
   if (enable_raytracing_extension || enable_rayquery_extension) {
     create_info.AddExtension(VK_KHR_BUFFER_DEVICE_ADDRESS_EXTENSION_NAME);
     if (enable_raytracing_extension)

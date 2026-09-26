@@ -43,7 +43,7 @@ struct GPUInstance {
   uint32_t root, geometry, material, primitive_count;
 };
 
-static_assert(sizeof(GPUInstance) == 112, "HLSL software instance layout changed");
+static_assert(sizeof(GPUInstance) == 112, "Slang software instance layout changed");
 }  // namespace
 
 SoftwarePipeline::SoftwarePipeline(Core *core, bool ray_query) : core_(core), ray_query_(ray_query) {
@@ -70,7 +70,7 @@ void SoftwarePipeline::CompileBuilders(uint32_t buffer_count) {
   if (builder_shaders_.empty()) {
     for (const char *entry : {"InitLeaves", "ReduceNodes", "MortonKeys", "BitonicSort", "SortLeaves"}) {
       std::unique_ptr<graphics::Shader> shader;
-      if (graphics->CreateShader(core_->GetShadersVFS(), "software/build.hlsl", entry, "cs_6_0", {"-I."}, &shader))
+      if (graphics->CreateShader(core_->GetShadersVFS(), "software/build.slang", entry, "cs_6_0", {"-I."}, &shader))
         throw std::runtime_error(std::string("failed to compile software BVH kernel: ") + entry);
       builder_shaders_.push_back(std::move(shader));
     }
@@ -119,8 +119,12 @@ float Transmission(HitRecord hit, float3 direction) {
 #endif
 }
 }
+#ifdef SAMPLE_SHADOW_ANY_HIT
 #undef SAMPLE_SHADOW_ANY_HIT
+#endif
+#ifdef SAMPLE_SHADOW_NO_HITRECORD
 #undef SAMPLE_SHADOW_NO_HITRECORD
+#endif
 )";
   }
   if (has_graph) {
@@ -175,14 +179,14 @@ float Transmission(HitRecord hit, float3 direction) {
   }
 
   auto vfs = core_->GetShadersVFS();
-  vfs.WriteFile("software_materials.hlsli", source.str());
+  vfs.WriteFile("software_materials.slang", source.str());
   render_program_.reset();
   std::vector<std::string> args{"-I.", "-DSOFTWARE_DATA_BUFFER_COUNT=" + std::to_string(buffers)};
   if (ray_query_)
     args.push_back("-DSPARKIUM_RAY_QUERY");
   if (has_graph)
     args.push_back("-DSPARKIUM_SHADER_GRAPHS");
-  if (core_->GraphicsCore()->CreateShader(vfs, "software/render.hlsl", "Main", ray_query_ ? "cs_6_5" : "cs_6_0", args,
+  if (core_->GraphicsCore()->CreateShader(vfs, "software/render.slang", "Main", ray_query_ ? "cs_6_5" : "cs_6_0", args,
                                           &render_shader_))
     throw std::runtime_error("failed to compile compute ray tracing shader");
   core_->GraphicsCore()->CreateComputeProgram(render_shader_.get(), &render_program_);

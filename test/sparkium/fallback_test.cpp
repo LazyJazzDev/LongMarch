@@ -392,7 +392,7 @@ TEST_P(SoftwareBVHSizeTest, ComputeConstructionAndTraversalMatchDoublePrecisionO
   graphics->CreateBuffer(rays.size() * sizeof(Hit), graphics::BUFFER_TYPE_STATIC, &output);
 
   auto vfs = core->GetShadersVFS();
-  vfs.WriteFile("bvh_test.hlsl", R"(
+  vfs.WriteFile("bvh_test.slang", R"(
 #define SOFTWARE_EXTERNAL_BINDINGS
 #ifdef NATIVE_QUERY
 RaytracingAccelerationStructure query_scene : register(t0, space0);
@@ -404,9 +404,9 @@ ByteAddressBuffer data_buffers[] : register(t0, space2);
 ByteAddressBuffer rays : register(t0, space3);
 RWByteAddressBuffer results : register(u0, space4);
 #ifdef NATIVE_QUERY
-#include "ray_query/traversal.hlsli"
+#include "ray_query/traversal.slang"
 #else
-#include "software/traversal.hlsli"
+#include "software/traversal.slang"
 #endif
 [numthreads(64, 1, 1)] void Main(uint3 id : SV_DispatchThreadID) {
   if (id.x >= rays.Load(0)) return;
@@ -424,7 +424,7 @@ RWByteAddressBuffer results : register(u0, space4);
   std::vector<std::string> args{"-I."};
   if (ray_query)
     args.push_back("-DNATIVE_QUERY");
-  ASSERT_EQ(graphics->CreateShader(vfs, "bvh_test.hlsl", "Main", ray_query ? "cs_6_5" : "cs_6_0", args, &shader), 0);
+  ASSERT_EQ(graphics->CreateShader(vfs, "bvh_test.slang", "Main", ray_query ? "cs_6_5" : "cs_6_0", args, &shader), 0);
   std::unique_ptr<graphics::ComputeProgram> program;
   graphics->CreateComputeProgram(shader.get(), &program);
   for (int i = 0; i < 4; ++i)
@@ -570,9 +570,9 @@ TEST_P(ComputeTraversalTest, TransparentShadowLayers) {
   sparkium::raytracing::SoftwarePipeline pipeline(sparkium::raytracing::DedicatedCast(core.get()), ray_query);
   pipeline.AddInstance(&rt_geometry, &rt_material, glm::mat4x3(1), 0);
   auto vfs = core->GetShadersVFS();
-  vfs.WriteFile("shadow_test.hlsl", R"(
+  vfs.WriteFile("shadow_test.slang", R"(
 #define SOFTWARE_EXTERNAL_BINDINGS
-#include "common.hlsli"
+#include "common.slang"
 #ifdef NATIVE_QUERY
 RaytracingAccelerationStructure query_scene : register(t0, space0);
 #else
@@ -582,13 +582,13 @@ ByteAddressBuffer software_instances : register(t0, space1);
 ByteAddressBuffer data_buffers[] : register(t0, space2);
 RWByteAddressBuffer results : register(u0, space3);
 #ifdef NATIVE_QUERY
-#include "ray_query/traversal.hlsli"
+#include "ray_query/traversal.slang"
 #else
-#include "software/traversal.hlsli"
+#include "software/traversal.slang"
 #endif
 HitRecord SoftwareHitRecord(SoftwareHit hit, float3 direction) { return (HitRecord)0; }
 float SoftwareShadowTransmission(uint material, HitRecord hit, float3 direction) { return 0.5f; }
-#include "software/shadow.hlsli"
+#include "software/shadow.slang"
 [numthreads(1, 1, 1)] void Main() {
   float3 o = float3(0, 0, 4), d = float3(0, 0, -1);
   results.Store4(0, asuint(float4(ShadowRay(o, d, 10), ShadowRayNoAlpha(o, d, 10),
@@ -599,7 +599,8 @@ float SoftwareShadowTransmission(uint material, HitRecord hit, float3 direction)
   std::vector<std::string> args{"-I."};
   if (ray_query)
     args.push_back("-DNATIVE_QUERY");
-  ASSERT_EQ(graphics->CreateShader(vfs, "shadow_test.hlsl", "Main", ray_query ? "cs_6_5" : "cs_6_0", args, &shader), 0);
+  ASSERT_EQ(graphics->CreateShader(vfs, "shadow_test.slang", "Main", ray_query ? "cs_6_5" : "cs_6_0", args, &shader),
+            0);
   std::unique_ptr<graphics::ComputeProgram> program;
   graphics->CreateComputeProgram(shader.get(), &program);
   for (int i = 0; i < 3; ++i)
@@ -635,23 +636,26 @@ float SoftwareShadowTransmission(uint material, HitRecord hit, float3 direction)
 TEST_F(SoftwareBVHTest, SharedShadersCompileForNativeRayTracingAndCompute) {
   auto vfs = core->GetShadersVFS();
   for (bool spirv : {false, true}) {
-    std::vector<std::string> args{"-I."};
+    // DXIL's downstream compiler is a D3D12 dependency, not a Metal requirement.
+    if (!spirv && !graphics::SupportBackendAPI(graphics::BACKEND_API_D3D12))
+      continue;
+    std::vector<std::string> args{"-I.", "-warnings-as-errors", "all"};
     if (spirv)
-      args.insert(args.end(), {"-spirv", "-fspv-target-env=vulkan1.2", "-fvk-use-dx-layout"});
+      args.insert(args.end(), {"-target", "spirv", "-profile", "spirv_1_5", "-fvk-use-dx-layout"});
     auto compile = [&](const char *file, const char *entry, const char *target) {
       SCOPED_TRACE(testing::Message() << file << " / " << entry << ", SPIR-V=" << spirv);
       EXPECT_FALSE(graphics::CompileShader(vfs, file, entry, target, args).data.empty());
     };
     for (auto entry : {"Main", "MissMain", "ShadowMiss"})
-      compile("raygen.hlsl", entry, "lib_6_5");
-    compile("camera.hlsl", "CameraPinhole", "lib_6_5");
+      compile("raygen.slang", entry, "lib_6_5");
+    compile("camera.slang", "CameraPinhole", "lib_6_5");
     for (auto material : {"lambertian", "light", "principled", "specular"}) {
-      vfs.WriteFile("material_sampler.hlsli",
-                    sparkium::CodeLines(vfs, std::string("material/") + material + "/sampler.hlsl"));
-      compile("geometry/mesh/hit_group.hlsl", "RenderClosestHit", "lib_6_5");
-      compile("geometry/mesh/hit_group.hlsl", "ShadowClosestHit", "lib_6_5");
+      vfs.WriteFile("material_sampler.slang",
+                    sparkium::CodeLines(vfs, std::string("material/") + material + "/sampler.slang"));
+      compile("geometry/mesh/hit_group.slang", "RenderClosestHit", "lib_6_5");
+      compile("geometry/mesh/hit_group.slang", "ShadowClosestHit", "lib_6_5");
     }
-    sparkium::CodeLines graph(vfs, "material/shader_graph/sampler.hlsl");
+    sparkium::CodeLines graph(vfs, "material/shader_graph/sampler.slang");
     graph.InsertAfter(sparkium::CodeLines(R"(
 GraphSurface EvaluateShaderGraph(HitRecord hit, float3 direction, int bounce, uint ray_type,
                                  bool shadow, ByteAddressBuffer material) {
@@ -663,11 +667,15 @@ GraphSurface EvaluateShaderGraph(HitRecord hit, float3 direction, int bounce, ui
 }
 )"),
                       "// SHADER_GRAPH_IMPLEMENTATION");
-    vfs.WriteFile("material_sampler.hlsli", graph);
+    vfs.WriteFile("material_sampler.slang", graph);
     for (auto entry : {"RenderClosestHit", "ShadowClosestHit", "ShadowAnyHit"})
-      compile("geometry/mesh/hit_group.hlsl", entry, "lib_6_5");
+      compile("geometry/mesh/hit_group.slang", entry, "lib_6_5");
     for (auto entry : {"InitLeaves", "ReduceNodes", "MortonKeys", "BitonicSort", "SortLeaves"})
-      compile("software/build.hlsl", entry, "cs_6_0");
+      compile("software/build.slang", entry, "cs_6_0");
+    for (auto entry : {"BlellochUpSweep", "BlellochDownSweep"})
+      compile("blelloch_scan.slang", entry, "cs_6_0");
+    compile("film2img.slang", "Main", "cs_6_0");
+    compile("material/principled/pixel_shader.slang", "PSMain", "ps_6_0");
   }
 }
 

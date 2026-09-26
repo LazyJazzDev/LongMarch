@@ -96,8 +96,8 @@ int VulkanCore::CreateShader(const std::string &source_code,
                              const std::string &target,
                              double_ptr<Shader> pp_shader) {
   VirtualFileSystem vfs;
-  vfs.WriteFile("shader.hlsl", source_code);
-  return CreateShader(vfs, "shader.hlsl", entry_point, target, pp_shader);
+  vfs.WriteFile("shader.slang", source_code);
+  return CreateShader(vfs, "shader.slang", entry_point, target, pp_shader);
 }
 
 int VulkanCore::CreateShader(const VirtualFileSystem &vfs,
@@ -114,13 +114,8 @@ int VulkanCore::CreateShader(const VirtualFileSystem &vfs,
                              const std::string &target,
                              const std::vector<std::string> &args,
                              double_ptr<Shader> pp_shader) {
-  std::vector<std::string> compile_args = {"-spirv", "-fspv-target-env=vulkan1.2", "-fvk-use-dx-layout"};
-#if !defined(NDEBUG) && !defined(__APPLE__)
-  compile_args.push_back("-Qembed_debug");
-  if (!DebugEnabled()) {
-    compile_args.push_back("-fspv-debug=vulkan-with-source");
-  }
-#endif
+  std::vector<std::string> compile_args = {"-target", "spirv", "-profile", "spirv_1_5", "-fvk-use-dx-layout"};
+
   compile_args.insert(compile_args.end(), args.begin(), args.end());
   auto blob = CompileShader(vfs, source_file, entry_point, target, compile_args);
   if (blob.data.empty())

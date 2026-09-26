@@ -22,6 +22,7 @@ if (LONGMARCH_PYTHON_ENABLED)
 
 
     target_link_libraries(long_march PUBLIC LongMarchCommon)
+    LONGMARCH_DEPLOY_RUNTIME_DEPENDENCIES(long_march)
 
     # copy all related dll files to the destination too.
     install(TARGETS long_march
@@ -90,7 +91,7 @@ if (LONGMARCH_PYTHON_ENABLED)
             POST_EXCLUDE_REGEXES
             ${_post_excludes}
             DIRECTORIES "$<TARGET_FILE_DIR:long_march>"
-            "${DXC_DLL_DIR}"
+            "$<TARGET_FILE_DIR:slang::slang>"
             "${Python3_RUNTIME_LIBRARY_DIRS}"
             COMPONENT python_package
     )
@@ -102,5 +103,8 @@ if (LONGMARCH_PYTHON_ENABLED)
         )
     endif ()
 
-    message(STATUS "DXC_DLL_DIR: ${DXC_DLL_DIR}")
+    if(WIN32)
+        install(FILES ${LONGMARCH_SLANG_RUNTIME_DLLS}
+                DESTINATION ${Python3_SITEARCH} COMPONENT python_package)
+    endif()
 endif ()
