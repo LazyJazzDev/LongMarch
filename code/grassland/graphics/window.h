@@ -164,6 +164,9 @@ class Window {
   }
 
  private:
+  void NotifyResize();
+  glm::ivec2 resize_size_{};  // Last notified logical window size.
+
   struct HDRPresentation;
   std::unique_ptr<HDRPresentation> hdr_presentation_;
   DisplayBrightness display_brightness_{};

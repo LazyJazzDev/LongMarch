@@ -247,10 +247,12 @@ Window::Window(int width, int height, const std::string &title, bool fullscreen,
 #ifdef __APPLE__
   magnify_monitor_ = detail::InstallMagnifyEvents(this);
 #endif
+  resize_size_ = GetSize();
   glfwSetWindowUserPointer(window_, this);
   glfwSetFramebufferSizeCallback(window_, [](GLFWwindow *window, int width, int height) {
     auto *owner = static_cast<Window *>(glfwGetWindowUserPointer(window));
     owner->framebuffer_resize_event_.InvokeCallbacks(width, height);
+    owner->NotifyResize();
   });
   glfwSetCursorEnterCallback(window_, [](GLFWwindow *window, int entered) {
     auto *owner = static_cast<Window *>(glfwGetWindowUserPointer(window));
@@ -262,7 +264,7 @@ Window::Window(int width, int height, const std::string &title, bool fullscreen,
   });
   glfwSetWindowSizeCallback(window_, [](GLFWwindow *window, int width, int height) {
     Window *p_window = static_cast<Window *>(glfwGetWindowUserPointer(window));
-    p_window->resize_event_.InvokeCallbacks(width, height);
+    p_window->NotifyResize();
   });
   glfwSetMouseButtonCallback(window_, [](GLFWwindow *window, int button, int action, int mods) {
     Window *p_window = static_cast<Window *>(glfwGetWindowUserPointer(window));
@@ -419,8 +421,22 @@ std::string Window::GetTitle() const {
   return glfwGetWindowTitle(window_);
 }
 
+void Window::NotifyResize() {
+  if (!window_)
+    return;
+  const auto size = GetSize();
+  if (size == resize_size_)
+    return;
+  // Wayland programmatic resizing may omit the logical-size callback.
+  // Deduplicate both native callbacks and Resize() by logical size; pixel-only
+  // scaling remains exclusively a FramebufferResizeEvent.
+  resize_size_ = size;
+  resize_event_.InvokeCallbacks(size.x, size.y);
+}
+
 void Window::Resize(int new_width, int new_height) {
   glfwSetWindowSize(window_, new_width, new_height);
+  NotifyResize();
 }
 
 void Window::CloseWindow() {

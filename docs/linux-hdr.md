@@ -138,7 +138,7 @@ The scene-size regression is also opt-in:
 
 ```sh
 LONGMARCH_WINDOW_SYSTEM=wayland LONGMARCH_TEST_HDR=1 \
-  ./build-wayland/test/sparkium/sparkium_fallback_test --gtest_filter='VulkanWindowResizeTest.*'
+  ./build-wayland/test/sparkium/sparkium_fallback_test --gtest_filter='WindowResizeEventTest.*:VulkanWindowResizeTest.*'
 ```
 
 It loads Cornell Box → Texture → Cornell Box, renders one sample per scene,
@@ -149,8 +149,14 @@ unchanged when the window resizes. It checks
 framebuffer/swapchain dimensions in SDR and HDR, and reads back both lower corners
 of the HDR composition to detect stale targets or black borders. At 150% desktop
 scaling, the original Wayland code reproduced a 3072×1536 framebuffer with a stale
-1536×1536 swapchain. Vulkan now rebuilds on framebuffer-size notifications;
-GLFW's Wayland programmatic resize does not emit a logical-window-size callback.
+1536×1536 swapchain. `Window` now normalizes GLFW notifications into `ResizeEvent`:
+framebuffer-only
+callbacks also notify logical-size subscribers when the logical size changed.
+Matching logical sizes are deduplicated; pixel-only scaling does not synthesize
+a logical resize. Vulkan keeps its `FramebufferResizeEvent` subscription so
+presentation resources follow pixel sizes. A separate event regression suppresses
+the native logical-size callback, checks duplicate notifications, and injects a
+pixel-only callback to verify that the two public events remain distinct.
 The regression passes on native Wayland (SDR and PQ) and the default X11-only
 build (SDR, via XWayland). The edge readback uses a uniform test image with ImGui after scene rendering;
 it is not an image-quality comparison or physical display measurement.

@@ -225,6 +225,64 @@ class BrightnessProbeWindow : public graphics::Window {
   }
 };
 
+TEST(WindowResizeEventTest, FramebufferOnlyResizeNotifiesLogicalSubscribersOnce) {
+  if (!InteractiveHDRTests())
+    GTEST_SKIP();
+  BrightnessProbeWindow window;
+  glfwPollEvents();
+  std::vector<glm::ivec4> notifications;
+  window.ResizeEvent().RegisterCallback([&](int width, int height) {
+    EXPECT_EQ(glm::ivec2(width, height), window.GetSize());
+    const glm::ivec4 state(window.GetSize(), window.GetFramebufferSize());
+    if (!notifications.empty())
+      EXPECT_NE(state, notifications.back());
+    notifications.push_back(state);
+  });
+  int framebuffer_events = 0;
+  window.FramebufferResizeEvent().RegisterCallback([&](int, int) { ++framebuffer_events; });
+
+  // Suppress GLFW's logical-size callback even on X11. The framebuffer callback
+  // must keep the public ResizeEvent working without backend-specific patches.
+  auto native_resize = glfwSetWindowSizeCallback(window.GLFWWindow(), nullptr);
+  ASSERT_NE(native_resize, nullptr);
+  for (auto size : {glm::ivec2{192, 128}, glm::ivec2{256, 128}}) {
+    const auto before = notifications.size();
+    const auto framebuffer_before = framebuffer_events;
+    // Bypass Window::Resize to exercise the framebuffer callback itself.
+    glfwSetWindowSize(window.GLFWWindow(), size.x, size.y);
+    for (int i = 0; i < 50; ++i) {
+      glfwWaitEventsTimeout(0.01);
+      if (window.GetSize() == size && notifications.size() > before)
+        break;
+    }
+    EXPECT_EQ(window.GetSize(), size);
+    EXPECT_GT(framebuffer_events, framebuffer_before);
+    EXPECT_GT(notifications.size(), before);
+    if (!notifications.empty())
+      EXPECT_EQ(notifications.back(), glm::ivec4(size, window.GetFramebufferSize()));
+
+    // A delayed duplicate logical callback, or repeating the same size request,
+    // must not notify ResizeEvent again for the same dimensions.
+    const auto settled_count = notifications.size();
+    native_resize(window.GLFWWindow(), size.x, size.y);
+    window.Resize(size.x, size.y);
+    EXPECT_EQ(notifications.size(), settled_count);
+  }
+  glfwSetWindowSizeCallback(window.GLFWWindow(), native_resize);
+  // Exercise a pixel-only notification without changing logical coordinates.
+  // Framebuffer listeners still receive it; logical resize listeners do not.
+  auto native_framebuffer = glfwSetFramebufferSizeCallback(window.GLFWWindow(), nullptr);
+  glfwSetFramebufferSizeCallback(window.GLFWWindow(), native_framebuffer);
+  ASSERT_NE(native_framebuffer, nullptr);
+  const auto logical_count = notifications.size();
+  const auto framebuffer_count = framebuffer_events;
+  const auto pixels = window.GetFramebufferSize();
+  native_framebuffer(window.GLFWWindow(), pixels.x * 2, pixels.y * 2);
+  EXPECT_EQ(framebuffer_events, framebuffer_count + 1);
+  EXPECT_EQ(notifications.size(), logical_count);
+  window.CloseWindow();
+}
+
 TEST(HDRBrightnessTest, SetHDRReportsFailureWithoutThrowing) {
   if (!InteractiveHDRTests())
     GTEST_SKIP();
