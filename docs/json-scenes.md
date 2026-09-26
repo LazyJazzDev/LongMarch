@@ -107,7 +107,8 @@ The GUI shows the queried white and the applied multiplier.
 D3D12 and Vulkan compose the scene and ImGui into a floating-point intermediate,
 then apply the reference-white multiplier once to RGB, preserving alpha. ImGui
 vertex colors are decoded from sRGB for linear composition and restored after
-upload. Custom ImGui textures on the HDR path must supply linear RGB. Incoming
+upload. Disabling reference-white alignment changes only the brightness
+multiplier, not UI color conversion. Custom ImGui textures on the HDR path must supply linear RGB. Incoming
 HDR scene images must already be linear; SDR presentation remains unchanged.
 
 The window API exposes:

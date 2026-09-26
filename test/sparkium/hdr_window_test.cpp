@@ -14,6 +14,31 @@
 
 using namespace grassland;
 
+#if defined(LONGMARCH_VULKAN_ENABLED)
+class FailingSwapchainWindow : public graphics::backend::VulkanWindow {
+ public:
+  explicit FailingSwapchainWindow(graphics::backend::VulkanCore *core)
+      : VulkanWindow(core, 320, 240, "Swapchain recovery", false, false, false) {
+  }
+
+  int failures = 0;
+
+ protected:
+  VkResult CreatePresentationSwapchain(VkSurfaceFormatKHR format,
+                                       std::unique_ptr<vulkan::Swapchain> *result,
+                                       VkSwapchainKHR old) override {
+    const auto status = VulkanWindow::CreatePresentationSwapchain(format, result, old);
+    if (status == VK_SUCCESS && failures > 0) {
+      --failures;
+      // A real creation retires the old swapchain before simulating failure.
+      result->reset();
+      return VK_ERROR_INITIALIZATION_FAILED;
+    }
+    return status;
+  }
+};
+#endif
+
 namespace {
 bool InteractiveHDRTests() {
   return std::getenv("LONGMARCH_TEST_HDR") || std::getenv("LONGMARCH_TEST_HDR_WINDOWS");
@@ -59,6 +84,48 @@ glm::vec3 ExpectedOutput(graphics::Window *window, glm::vec3 linear) {
   return UsesPQSwapchain(window) ? ExpectedPQ(linear) : linear * window->HDRReferenceWhiteScale();
 }
 }  // namespace
+
+#if defined(LONGMARCH_VULKAN_ENABLED)
+TEST(VulkanHDRRecoveryTest, RetiredSwapchainIsRecreatedOrPresentationStops) {
+  if (!InteractiveHDRTests())
+    GTEST_SKIP();
+  std::unique_ptr<graphics::Core> core;
+  ASSERT_EQ(graphics::CreateCore(graphics::BACKEND_API_VULKAN, graphics::Core::Settings{2, true}, &core), 0);
+  ASSERT_EQ(core->InitializeLogicalDeviceAutoSelect(false), 0);
+  FailingSwapchainWindow window(static_cast<graphics::backend::VulkanCore *>(core.get()));
+  if (!HasHDRSurface(&window))
+    GTEST_SKIP();
+  window.InitImGui(nullptr, 18.0f);
+  ImGui::GetIO().IniFilename = nullptr;
+  std::unique_ptr<graphics::Image> image;
+  ASSERT_EQ(core->CreateImage(320, 240, graphics::IMAGE_FORMAT_R32G32B32A32_SFLOAT, &image), 0);
+  for (bool hdr : {false, true}) {
+    ASSERT_EQ(window.SetHDR(hdr), 0);
+    const auto format = window.SwapChain()->Format();
+    window.failures = 1;
+    EXPECT_NE(window.SetHDR(!hdr), 0);
+    EXPECT_EQ(window.IsHDR(), hdr);
+    EXPECT_EQ(window.SwapChain()->Format(), format);
+    for (int frame = 0; frame < 3; ++frame) {
+      window.BeginImGuiFrame();
+      ImGui::TextUnformatted("Recovered presentation");
+      window.EndImGuiFrame();
+      std::unique_ptr<graphics::CommandContext> commands;
+      ASSERT_EQ(core->CreateCommandContext(&commands), 0);
+      commands->CmdClearImage(image.get(), {{0.2f, 0.4f, 0.6f, 1.0f}});
+      commands->CmdPresent(&window, image.get());
+      ASSERT_EQ(core->SubmitCommandContext(commands.get()), 0);
+      core->WaitGPU();
+    }
+  }
+  window.failures = 2;
+  EXPECT_NE(window.SetHDR(false), 0);
+  EXPECT_THROW(window.AcquireNextImage(), std::runtime_error);
+  EXPECT_THROW(window.Present(), std::runtime_error);
+  EXPECT_NE(window.SetHDR(true), 0);
+  window.CloseWindow();
+}
+#endif
 
 #if defined(LONGMARCH_VULKAN_ENABLED)
 // Reproduce the GUI's Cornell Box (square) -> Texture (wide) resize on the
@@ -339,61 +406,64 @@ TEST_P(HDRWindowTest, PresentationAndImGuiSwitching) {
     std::unique_ptr<graphics::Image> image;
     ASSERT_EQ(core->CreateImage(320, 240, graphics::IMAGE_FORMAT_R32G32B32A32_SFLOAT, &image), 0);
     bool resized = false;
-    for (bool hdr : {true, true, false, true, false}) {
-      ASSERT_EQ(window->SetHDR(hdr), 0);
+    for (bool alignment : {true, false}) {
+      window->SetHDRBrightnessAlignment(alignment);
+      for (bool hdr : {true, true, false, true, false}) {
+        ASSERT_EQ(window->SetHDR(hdr), 0);
 #if defined(LONGMARCH_D3D12_ENABLED)
-      if (GetParam() == graphics::BACKEND_API_D3D12) {
-        auto native = dynamic_cast<graphics::backend::D3D12Window *>(window.get());
-        EXPECT_EQ(native->SwapChain()->BackBufferFormat(),
-                  hdr ? DXGI_FORMAT_R16G16B16A16_FLOAT : DXGI_FORMAT_R8G8B8A8_UNORM);
-      }
+        if (GetParam() == graphics::BACKEND_API_D3D12) {
+          auto native = dynamic_cast<graphics::backend::D3D12Window *>(window.get());
+          EXPECT_EQ(native->SwapChain()->BackBufferFormat(),
+                    hdr ? DXGI_FORMAT_R16G16B16A16_FLOAT : DXGI_FORMAT_R8G8B8A8_UNORM);
+        }
 #endif
 #if defined(LONGMARCH_VULKAN_ENABLED)
-      if (GetParam() == graphics::BACKEND_API_VULKAN) {
-        auto native = dynamic_cast<graphics::backend::VulkanWindow *>(window.get());
-        auto *swapchain = native->SwapChain();
-        const auto support = vulkan::Swapchain::QuerySwapChainSupport(swapchain->Device()->PhysicalDevice().Handle(),
-                                                                      swapchain->Surface()->Handle());
-        const auto expected_format =
-            hdr ? graphics::backend::VulkanWindow::ChooseHDRSurfaceFormat(support.formats)->format
-                : VK_FORMAT_R8G8B8A8_UNORM;
-        EXPECT_EQ(swapchain->Format(), expected_format);
-      }
+        if (GetParam() == graphics::BACKEND_API_VULKAN) {
+          auto native = dynamic_cast<graphics::backend::VulkanWindow *>(window.get());
+          auto *swapchain = native->SwapChain();
+          const auto support = vulkan::Swapchain::QuerySwapChainSupport(swapchain->Device()->PhysicalDevice().Handle(),
+                                                                        swapchain->Surface()->Handle());
+          const auto expected_format =
+              hdr ? graphics::backend::VulkanWindow::ChooseHDRSurfaceFormat(support.formats)->format
+                  : VK_FORMAT_R8G8B8A8_UNORM;
+          EXPECT_EQ(swapchain->Format(), expected_format);
+        }
 #endif
-      if (imgui) {
-        ImGui::GetIO().IniFilename = nullptr;
-        window->BeginImGuiFrame();
-        ImGui::TextUnformatted("HDR / SDR switching");
-        ImGui::GetForegroundDrawList()->AddRectFilled({100, 100}, {220, 200}, IM_COL32(128, 128, 128, 255));
-        window->EndImGuiFrame();
-      }
-      std::unique_ptr<graphics::CommandContext> commands;
-      ASSERT_EQ(core->CreateCommandContext(&commands), 0);
-      commands->CmdClearImage(image.get(), {{3.0f, 2.0f, 1.0f, 1.0f}});
-      commands->CmdPresent(window.get(), image.get());
-      ASSERT_EQ(core->SubmitCommandContext(commands.get()), 0);
-      core->WaitGPU();
-      if (hdr) {
-        std::unique_ptr<graphics::CommandContext> readback_commands;
-        core->CreateCommandContext(&readback_commands);
-        auto *aligned = window->AlignHDRComposition(readback_commands.get());
-        ASSERT_EQ(core->SubmitCommandContext(readback_commands.get()), 0);
+        if (imgui) {
+          ImGui::GetIO().IniFilename = nullptr;
+          window->BeginImGuiFrame();
+          ImGui::TextUnformatted("HDR / SDR switching");
+          ImGui::GetForegroundDrawList()->AddRectFilled({100, 100}, {220, 200}, IM_COL32(128, 128, 128, 255));
+          window->EndImGuiFrame();
+        }
+        std::unique_ptr<graphics::CommandContext> commands;
+        ASSERT_EQ(core->CreateCommandContext(&commands), 0);
+        commands->CmdClearImage(image.get(), {{3.0f, 2.0f, 1.0f, 1.0f}});
+        commands->CmdPresent(window.get(), image.get());
+        ASSERT_EQ(core->SubmitCommandContext(commands.get()), 0);
         core->WaitGPU();
-        std::vector<uint16_t> pixels(aligned->Extent().width * aligned->Extent().height * 4);
-        aligned->DownloadData(pixels.data());
-        const float scale = window->HDRReferenceWhiteScale();
-        const size_t center =
-            ((aligned->Extent().height / 2) * aligned->Extent().width + aligned->Extent().width / 2) * 4;
-        // ImGui's 128/255 gray is sRGB, decoded to about 0.216 linear.
-        const auto expected = ExpectedOutput(window.get(), imgui ? glm::vec3{0.216f} : glm::vec3{3, 2, 1});
-        for (int c = 0; c < 3; ++c)
-          EXPECT_NEAR(glm::unpackHalf1x16(pixels[center + c]), expected[c], 0.01f * scale);
+        if (hdr) {
+          std::unique_ptr<graphics::CommandContext> readback_commands;
+          core->CreateCommandContext(&readback_commands);
+          auto *aligned = window->AlignHDRComposition(readback_commands.get());
+          ASSERT_EQ(core->SubmitCommandContext(readback_commands.get()), 0);
+          core->WaitGPU();
+          std::vector<uint16_t> pixels(aligned->Extent().width * aligned->Extent().height * 4);
+          aligned->DownloadData(pixels.data());
+          const float scale = window->HDRReferenceWhiteScale();
+          const size_t center =
+              ((aligned->Extent().height / 2) * aligned->Extent().width + aligned->Extent().width / 2) * 4;
+          // UI must remain linear even with reference-white alignment disabled.
+          const auto expected = ExpectedOutput(window.get(), imgui ? glm::vec3{0.216f} : glm::vec3{3, 2, 1});
+          for (int c = 0; c < 3; ++c)
+            EXPECT_NEAR(glm::unpackHalf1x16(pixels[center + c]), expected[c], 0.01f * scale);
+        }
+        if (!resized) {
+          window->Resize(352, 256);
+          resized = true;
+        }
+        glfwPollEvents();
       }
-      if (!resized) {
-        window->Resize(352, 256);
-        resized = true;
-      }
-      glfwPollEvents();
     }
     window->CloseWindow();
   }
@@ -446,10 +516,7 @@ TEST_P(HDRWindowTest, ReferenceWhiteScalingPreservesSourceAndAlpha) {
   }
   window->SetHDRBrightnessAlignment(false);
   EXPECT_EQ(window->HDRReferenceWhiteScale(), 1.0f);
-  if (UsesPQSwapchain(window.get()))
-    EXPECT_NE(window->PrepareHDRComposition(core.get(), {13, 7}), nullptr);
-  else
-    EXPECT_EQ(window->PrepareHDRComposition(core.get(), {13, 7}), nullptr);
+  EXPECT_NE(window->PrepareHDRComposition(core.get(), {13, 7}), nullptr);
   window->SetHDRBrightnessAlignment(true);
   ASSERT_EQ(window->SetHDR(false), 0);
   EXPECT_EQ(window->HDRReferenceWhiteScale(), 1.0f);
@@ -540,7 +607,7 @@ TEST_P(HDRWindowTest, PQReadbackUsesAbsoluteNitsAndPreservesSource) {
     EXPECT_NEAR(glm::unpackHalf1x16(actual[4]), PQ(203.0), 0.001);
   }
   // Reuse the same pipeline with scRGB: the PQ white must not leak into the
-  // Windows-style scaling path, and disabling alignment still bypasses it.
+  // Windows-style scaling path; disabling alignment leaves a unity multiplier.
   window.pq_output = false;
   window.brightness = {240.0f, 3.0f, 0.0f, true, true};
   window.RefreshDisplayBrightness();
@@ -560,7 +627,8 @@ TEST_P(HDRWindowTest, PQReadbackUsesAbsoluteNitsAndPreservesSource) {
     EXPECT_EQ(actual[i * 4 + 3], source[i * 4 + 3]);
   }
   window.SetHDRBrightnessAlignment(false);
-  EXPECT_EQ(window.PrepareHDRComposition(core.get(), {uint32_t(samples.size()), 1}), nullptr);
+  EXPECT_NE(window.PrepareHDRComposition(core.get(), {uint32_t(samples.size()), 1}), nullptr);
+  EXPECT_EQ(window.HDRReferenceWhiteScale(), 1.0f);
   window.CloseWindow();
 }
 

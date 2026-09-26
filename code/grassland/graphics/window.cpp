@@ -147,7 +147,7 @@ float Window::HDRReferenceWhiteScale() {
 }
 
 Image *Window::PrepareHDRComposition(Core *core, Extent2D extent) {
-  if (!enable_hdr_ || (!align_hdr_brightness_ && !UsesPQOutput()))
+  if (!enable_hdr_)
     return nullptr;
   if (!hdr_presentation_) {
     auto pending = std::make_unique<HDRPresentation>();

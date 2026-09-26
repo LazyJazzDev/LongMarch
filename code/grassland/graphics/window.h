@@ -86,6 +86,10 @@ class Window {
   // Returns 0 on success, nonzero on failure; details are logged.
   virtual int SetHDR(bool enable_hdr);
 
+  bool IsHDR() const {
+    return enable_hdr_;
+  }
+
   // Main-thread query, refreshed at most every 500 ms, including monitor changes.
   DisplayBrightness GetDisplayBrightness();
   void RefreshDisplayBrightness();

@@ -411,7 +411,7 @@ void D3D12CmdPresent::CompileCommand(D3D12CommandContext *context, ID3D12Graphic
     auto binding_heap = imgui_assets.srv_heap->Handle();
     command_list->SetDescriptorHeaps(1, &binding_heap);
     ImGui::SetCurrentContext(imgui_assets.context);
-    ImGuiLinearColors linear_ui(target_ != nullptr);
+    ImGuiLinearColors linear_ui(window_->IsHDR());
     ImGui_ImplDX12_RenderDrawData(ImGui::GetDrawData(), command_list);
     context->Core()->BindDescriptorHeaps(command_list);
   }
