@@ -104,18 +104,10 @@ DisplayBrightness Window::QueryDisplayBrightness() const {
           continue;
         if (!std::isfinite(desc.MaxLuminance) || desc.MaxLuminance <= 0.0f)
           return result;
-        result.max_luminance_nits = desc.MaxLuminance;
-        result.reported_luminance_known = true;
-        if (std::isfinite(desc.MaxFullFrameLuminance) && desc.MaxFullFrameLuminance > 0.0f &&
-            desc.MaxFullFrameLuminance <= desc.MaxLuminance)
-          result.max_full_frame_luminance_nits = desc.MaxFullFrameLuminance;
-        if (std::isfinite(desc.MinLuminance) && desc.MinLuminance >= 0.0f && desc.MinLuminance <= desc.MaxLuminance)
-          result.min_luminance_nits = desc.MinLuminance;
         if (result.reference_white_known && result.sdr_white_nits > 0.0f) {
-          const float ratio = result.max_luminance_nits / result.sdr_white_nits;
+          const float ratio = desc.MaxLuminance / result.sdr_white_nits;
           if (std::isfinite(ratio)) {
             result.hdr_headroom = std::max(1.0f, ratio);
-            result.hdr_headroom_estimated = true;
           }
         }
         return result;
@@ -141,11 +133,7 @@ void Window::RefreshDisplayBrightness() {
   if (previous.sdr_white_nits != next.sdr_white_nits ||
       previous.hdr_reference_white_scale != next.hdr_reference_white_scale ||
       previous.hdr_headroom != next.hdr_headroom || previous.reference_white_known != next.reference_white_known ||
-      previous.hdr_enabled != next.hdr_enabled || previous.max_luminance_nits != next.max_luminance_nits ||
-      previous.max_full_frame_luminance_nits != next.max_full_frame_luminance_nits ||
-      previous.min_luminance_nits != next.min_luminance_nits ||
-      previous.reported_luminance_known != next.reported_luminance_known ||
-      previous.hdr_headroom_estimated != next.hdr_headroom_estimated)
+      previous.hdr_enabled != next.hdr_enabled)
     display_brightness_event_.InvokeCallbacks(display_brightness_);
 }
 
@@ -444,11 +432,6 @@ void Window::PybindClassRegistration(py::classh<Window> &c) {
     result["hdr_headroom"] = info.hdr_headroom;
     result["reference_white_known"] = info.reference_white_known;
     result["hdr_enabled"] = info.hdr_enabled;
-    result["max_luminance_nits"] = info.max_luminance_nits;
-    result["max_full_frame_luminance_nits"] = info.max_full_frame_luminance_nits;
-    result["min_luminance_nits"] = info.min_luminance_nits;
-    result["reported_luminance_known"] = info.reported_luminance_known;
-    result["hdr_headroom_estimated"] = info.hdr_headroom_estimated;
     return result;
   });
   c.def("__repr__", [](Window *window) {

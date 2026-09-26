@@ -114,12 +114,12 @@ The window API exposes:
 
 Windows queries the window's monitor through DisplayConfig. If unavailable it
 uses a 1x fallback with the reference marked unknown. Windows also matches the window's monitor across DXGI adapters and queries
-`IDXGIOutput6::GetDesc1` for reported peak, full-frame peak and minimum luminance.
+`IDXGIOutput6::GetDesc1` for reported peak luminance internally.
 When peak and SDR white are valid, estimated headroom is `max(1, peak / SDR white)`.
-These driver-reported capabilities are not real-time measurements. Invalid or
-unavailable peak data leaves headroom unknown. The GUI labels Windows headroom
-as estimated, unlike the current EDR headroom on Metal. Luminance metadata and
-its validity/estimate flags are exposed through the C++ and Python APIs. Metal uses a 1x white
+This driver-reported capability is not a real-time measurement. Invalid or
+unavailable peak data leaves headroom unknown. Only the resulting `hdr_headroom`
+is exposed through the C++ and Python APIs and displayed in the GUI.
+Metal uses a 1x white
 scale because its EDR surface already follows the system reference, and exposes
 the screen's current EDR headroom; that path was not run on this Windows machine.
 

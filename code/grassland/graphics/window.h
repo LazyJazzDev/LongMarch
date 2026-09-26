@@ -22,15 +22,10 @@ struct DisplayBrightness {
   // Zero means unknown. Scale is relative to the native linear HDR surface.
   float sdr_white_nits{0.0f};
   float hdr_reference_white_scale{1.0f};
+  // Windows estimates peak / SDR white; Metal reports current EDR headroom.
   float hdr_headroom{0.0f};
   bool reference_white_known{false};
   bool hdr_enabled{false};
-  // Driver-reported capabilities, not real-time luminance. Zero means unknown.
-  float max_luminance_nits{0.0f};
-  float max_full_frame_luminance_nits{0.0f};
-  float min_luminance_nits{0.0f};
-  bool reported_luminance_known{false};
-  bool hdr_headroom_estimated{false};
 };
 
 // ImGui vertex colors are sRGB values; floating-point HDR targets are linear.
