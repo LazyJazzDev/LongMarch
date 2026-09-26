@@ -3,18 +3,6 @@
   "version-string": "0.0.1",
   "description": "A C++ library for graphics study",
   "dependencies": [
-    "eigen3",
-    "glm",
-    "glfw3",
-    "fmt",
-    "freetype",
-    "vulkan-memory-allocator",
-    "gtest",
-    "stb",
-    "mikktspace",
-    "tinyobjloader",
-    "tinyfiledialogs",
-    "rapidjson",
     "assimp",
     {
       "name": "d3dx12",
@@ -23,16 +11,49 @@
     {
       "name": "directx-dxc",
       "platform": "windows"
-    }
+    },
+    "eigen3",
+    "fmt",
+    "freetype",
+    "glfw3",
+    "glm",
+    "gtest",
+    "mikktspace",
+    "rapidjson",
+    "stb",
+    "tinyfiledialogs",
+    "tinyobjloader",
+    "vulkan-memory-allocator"
   ],
-  "default-features": ["wayland"],
+  "default-features": [
+    "metal",
+    "slang",
+    "wayland"
+  ],
   "features": {
+    "metal": {
+      "description": "Use Apple metal-cpp headers packaged by vcpkg.",
+      "dependencies": [
+        {
+          "name": "metal-cpp",
+          "platform": "osx"
+        }
+      ]
+    },
+    "slang": {
+      "description": "Use the pinned vcpkg Slang SDK (disable when supplying an external SDK).",
+      "dependencies": [
+        "shader-slang"
+      ]
+    },
     "wayland": {
       "description": "Build native Wayland support alongside X11 on Linux",
       "dependencies": [
         {
           "name": "glfw3",
-          "features": ["wayland"],
+          "features": [
+            "wayland"
+          ],
           "platform": "linux"
         }
       ]
