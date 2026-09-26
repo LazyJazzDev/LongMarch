@@ -4,6 +4,12 @@ if (LONGMARCH_ENABLE_METAL AND APPLE)
     enable_language(OBJCXX)
     set(CMAKE_OBJCXX_STANDARD 17)
     set(LONGMARCH_METAL_ENABLED ON)
+    # Older builds cached an empty optional override. find_path treats that as
+    # an existing result and skips discovery, even when vcpkg installed headers.
+    if (DEFINED LONGMARCH_METAL_CPP_DIR AND "${LONGMARCH_METAL_CPP_DIR}" STREQUAL "")
+        unset(LONGMARCH_METAL_CPP_DIR CACHE)
+        unset(LONGMARCH_METAL_CPP_DIR)
+    endif ()
     find_path(LONGMARCH_METAL_CPP_DIR Metal/Metal.hpp
             PATH_SUFFIXES metal-cpp
             DOC "Directory containing Apple metal-cpp headers")
