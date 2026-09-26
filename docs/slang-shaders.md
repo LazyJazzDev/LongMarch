@@ -47,6 +47,10 @@ cmake -S . -B out/external-slang -G Ninja -DCMAKE_BUILD_TYPE=Release \
   -DVCPKG_MANIFEST_FEATURES=metal -Dslang_DIR=/sdk/lib/cmake/slang
 ```
 
+The default `metal` feature also supplies SPIRV-Cross independently of Vulkan SDK.
+If disabling that feature, provide its exported CMake packages through
+`CMAKE_PREFIX_PATH` as well as the metal-cpp headers.
+
 On Windows the official package directory is `/sdk/cmake`. `CMAKE_PREFIX_PATH`
 can also select an SDK. Use a fresh build directory when changing providers,
 or clear the cached `slang_DIR` and `SLANGC_EXECUTABLE` entries. The chosen package

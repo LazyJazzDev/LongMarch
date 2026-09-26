@@ -196,7 +196,7 @@ API selection, and the compute ray tracing path.
 
 - [vcpkg](https://github.com/microsoft/vcpkg): The C++ package manager. Clone the vcpkg repo to anywhere you like, we will refer tha vcpkg path as
   `<VCPKG_ROOT>` in the following instructions (the path ends in `vcpkg`, not its parent directory).
-- [Vulkan SDK](https://vulkan.lunarg.com/sdk/home): Vulkan is the latest cross-platform graphics API. Install the SDK [Caution: not the Runtime (RT)] via the official **SDK installer**. You should be able to run `vulkaninfo` command in a new terminal after installation. **No optional components are needed for this project**.
+- [[optional] Vulkan SDK](https://vulkan.lunarg.com/sdk/home): Required only for the Vulkan backend. Native Metal builds use vcpkg-provided metal-cpp and SPIRV-Cross and do not require Vulkan SDK.
 - [[optional] Python3](https://python.org): We provide python package with pybind11. Such functionality requires Python3 installation. You may install anywhere you like (System-wide, User-only, Conda, Homebrew, etc.). We will refer the python executable path as `<PYTHON_EXECUTABLE_PATH>` in the following instructions.
 
 CUDA is not available on macOS since Apple has deprecated NVIDIA GPU support.

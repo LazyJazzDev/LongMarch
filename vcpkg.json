@@ -32,10 +32,14 @@
   ],
   "features": {
     "metal": {
-      "description": "Use Apple metal-cpp headers packaged by vcpkg.",
+      "description": "Use Apple metal-cpp headers and SPIRV-Cross for the native Metal backend.",
       "dependencies": [
         {
           "name": "metal-cpp",
+          "platform": "osx"
+        },
+        {
+          "name": "spirv-cross",
           "platform": "osx"
         }
       ]

@@ -636,6 +636,9 @@ float SoftwareShadowTransmission(uint material, HitRecord hit, float3 direction)
 TEST_F(SoftwareBVHTest, SharedShadersCompileForNativeRayTracingAndCompute) {
   auto vfs = core->GetShadersVFS();
   for (bool spirv : {false, true}) {
+    // DXIL's downstream compiler is a D3D12 dependency, not a Metal requirement.
+    if (!spirv && !graphics::SupportBackendAPI(graphics::BACKEND_API_D3D12))
+      continue;
     std::vector<std::string> args{"-I.", "-warnings-as-errors", "all"};
     if (spirv)
       args.insert(args.end(), {"-target", "spirv", "-profile", "spirv_1_5", "-fvk-use-dx-layout"});

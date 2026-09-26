@@ -4,7 +4,7 @@
 #include <cstring>
 #include <filesystem>
 #include <fstream>
-#include <spirv_cross/spirv_msl.hpp>
+#include <spirv_msl.hpp>
 #include <stdexcept>
 
 #include "grassland/graphics/backend/metal/metal_core.h"
