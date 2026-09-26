@@ -237,8 +237,8 @@ void Core::PybindClassRegistration(py::classh<Core> &c) {
          const std::vector<std::string> &args) {
         std::shared_ptr<Shader> shader_;
         VirtualFileSystem vfs;
-        vfs.WriteFile("main.hlsl", source_code);
-        core->CreateShader(vfs, "main.hlsl", entry_point, target, args, &shader_);
+        vfs.WriteFile("main.slang", source_code);
+        core->CreateShader(vfs, "main.slang", entry_point, target, args, &shader_);
         return shader_;
       },
       py::arg("source_code"), py::arg("entry_point"), py::arg("target"), py::arg("args") = std::vector<std::string>{},

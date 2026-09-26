@@ -80,7 +80,7 @@ find_package(glfw3 CONFIG REQUIRED)
 set(GLFW3_LIB_NAME glfw)
 list(APPEND LIB_LIST ${GLFW3_LIB_NAME})
 
-find_package(Vulkan COMPONENTS dxc)
+find_package(Vulkan)
 if (Vulkan_FOUND AND NOT LONGMARCH_DISABLE_VULKAN)
     set(LONGMARCH_VULKAN_ENABLED ON)
     set(VULKAN_LIB_NAME ${Vulkan_LIBRARIES})
@@ -138,37 +138,8 @@ if (WIN32)
     list(APPEND INC_LIST ${D3DX12_INCLUDE_DIRS})
 endif ()
 
-if (LONGMARCH_VULKAN_ENABLED OR LONGMARCH_METAL_ENABLED)
-    set(ENABLE_SPIRV_CODEGEN ON)
-    set(DXC_LIB_NAME Vulkan::dxc_lib)
-    list(APPEND LIB_LIST ${DXC_LIB_NAME})
-
-    get_filename_component(VULKAN_DXC_DIR "${Vulkan_dxc_EXECUTABLE}" DIRECTORY)
-
-    if (WIN32)
-        set(DXC_DLL_DIR "${VULKAN_DXC_DIR}")
-    else ()
-        get_filename_component(DXC_DLL_DIR "${Vulkan_dxc_LIBRARY}" DIRECTORY)
-    endif ()
-elseif (LONGMARCH_D3D12_ENABLED)
-    set(DXC_LIB_NAME dxcompiler)
-    list(APPEND LIB_LIST ${DXC_LIB_NAME})
-
-    if (DEFINED ENV{WindowsSdkVerBinPath})
-        # e.g., C:\Program Files (x86)\Windows Kits\10\bin\10.0.22621.0\
-        set(_BASE "$ENV{WindowsSdkVerBinPath}")
-        if (CMAKE_SIZEOF_VOID_P EQUAL 8)
-            set(WINSDK_BIN_DIR "${_BASE}x64")
-        else ()
-            set(WINSDK_BIN_DIR "${_BASE}x86")
-        endif ()
-    endif ()
-
-    set(DXC_DLL_DIR "${WINSDK_BIN_DIR}")
-endif ()
-
-message(STATUS "DXC_LIB_NAME: ${DXC_LIB_NAME}")
-message(STATUS "DXC_DLL_DIR: ${DXC_DLL_DIR}")
+include(cmake/Slang.cmake)
+list(APPEND LIB_LIST slang::slang)
 
 # Deploy non-system runtime libraries beside an executable so build-tree
 # programs can be launched directly from their output directory.
@@ -177,27 +148,24 @@ function(LONGMARCH_DEPLOY_RUNTIME_DEPENDENCIES TARGET_NAME)
         return()
     endif ()
 
-    if (LONGMARCH_VULKAN_ENABLED OR LONGMARCH_METAL_ENABLED)
-        if (WIN32)
-            find_file(DXC_RUNTIME_LIBRARY
-                    NAMES dxcompiler.dll
-                    HINTS "${DXC_DLL_DIR}" "${VULKAN_DXC_DIR}")
-        else ()
-            set(DXC_RUNTIME_LIBRARY "${Vulkan_dxc_LIBRARY}")
-        endif ()
-
-        if (DXC_RUNTIME_LIBRARY AND EXISTS "${DXC_RUNTIME_LIBRARY}")
+    add_custom_command(TARGET ${TARGET_NAME} POST_BUILD
+            COMMAND ${CMAKE_COMMAND} -E copy_if_different
+            "$<TARGET_FILE:slang::slang>" "$<TARGET_FILE_DIR:${TARGET_NAME}>"
+            COMMENT "Deploying Slang compiler runtime for ${TARGET_NAME}")
+    # DXIL generation is performed by Slang's downstream DXC on Windows.
+    if(WIN32)
+        foreach(_dll IN LISTS LONGMARCH_SLANG_RUNTIME_DLLS)
             add_custom_command(TARGET ${TARGET_NAME} POST_BUILD
-                    COMMAND ${CMAKE_COMMAND} -E copy_if_different
-                    "${DXC_RUNTIME_LIBRARY}" "$<TARGET_FILE_DIR:${TARGET_NAME}>"
-                    COMMENT "Deploying DXC runtime for ${TARGET_NAME}")
-        endif ()
+                COMMAND ${CMAKE_COMMAND} -E copy_if_different "${_dll}" "$<TARGET_FILE_DIR:${TARGET_NAME}>")
+        endforeach()
+    endif()
 
+    if (LONGMARCH_VULKAN_ENABLED)
         if (WIN32)
             get_filename_component(VULKAN_LIBRARY_DIR "${Vulkan_LIBRARY}" DIRECTORY)
             find_file(VULKAN_RUNTIME_LIBRARY
                     NAMES vulkan-1.dll
-                    HINTS "${VULKAN_LIBRARY_DIR}/../bin" "${VULKAN_DXC_DIR}")
+                    HINTS "${VULKAN_LIBRARY_DIR}/../bin")
             if (VULKAN_RUNTIME_LIBRARY)
                 add_custom_command(TARGET ${TARGET_NAME} POST_BUILD
                         COMMAND ${CMAKE_COMMAND} -E copy_if_different

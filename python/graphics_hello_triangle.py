@@ -23,7 +23,7 @@ def main():
     print(f"Window Created: {window}")
 
     # Load shader file
-    shader_path = "./shaders/hello_triangle.hlsl"
+    shader_path = "./shaders/hello_triangle.slang"
     print(f"Loading shader from: {shader_path}")
     print(f"Shader file exists: {pathlib.Path(shader_path).exists()}")
 

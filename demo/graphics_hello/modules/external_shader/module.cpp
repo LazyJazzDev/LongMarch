@@ -50,12 +50,12 @@ void ModuleExternalShader::OnInit() {
 
   shader_vfs.Print();
 
-  core_->CreateShader(shader_vfs, "raygen.hlsl", "Main", "lib_6_3", &raygen_shader_);
-  core_->CreateShader(shader_vfs, "miss.hlsl", "Main", "lib_6_3", &miss_shader_);
-  core_->CreateShader(shader_vfs, "closest_hit.hlsl", "Main", "lib_6_3", &closest_hit_shader_);
-  core_->CreateShader(shader_vfs, "sphere_chit.hlsl", "Main", "lib_6_3", &sphere_closest_hit_shader_);
-  core_->CreateShader(shader_vfs, "sphere_int.hlsl", "Main", "lib_6_3", &sphere_intersection_shader_);
-  core_->CreateShader(shader_vfs, "callable.hlsl", "Main", "lib_6_3", &callable_shader_);
+  core_->CreateShader(shader_vfs, "raygen.slang", "Main", "lib_6_3", &raygen_shader_);
+  core_->CreateShader(shader_vfs, "miss.slang", "Main", "lib_6_3", &miss_shader_);
+  core_->CreateShader(shader_vfs, "closest_hit.slang", "Main", "lib_6_3", &closest_hit_shader_);
+  core_->CreateShader(shader_vfs, "sphere_chit.slang", "Main", "lib_6_3", &sphere_closest_hit_shader_);
+  core_->CreateShader(shader_vfs, "sphere_int.slang", "Main", "lib_6_3", &sphere_intersection_shader_);
+  core_->CreateShader(shader_vfs, "callable.slang", "Main", "lib_6_3", &callable_shader_);
   grassland::LogInfo("Shader compiled successfully");
 
   core_->CreateBottomLevelAccelerationStructure(vertex_buffer.get(), index_buffer.get(), sizeof(glm::vec3),

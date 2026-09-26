@@ -27,10 +27,6 @@ struct HitGroup {
   bool procedure{false};
 };
 
-ComPtr<ID3DBlob> CompileShaderLegacy(const std::string &source_code,
-                                     const std::string &entry_point,
-                                     const std::string &target);
-
 CompiledShaderBlob CompileShader(const std::string &source_code,
                                  const std::string &entry_point,
                                  const std::string &target);

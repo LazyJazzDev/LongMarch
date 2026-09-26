@@ -16,7 +16,7 @@ matching JSON references.
 Each shader graph supplies `GraphImpl()` separately from its full sampler. The
 compute shader dispatches graph evaluation by material ID to produce a
 `GraphSurface`, then calls one shared `SampleGraphSurface` implementation in
-`material/shader_graph/surface_sampler.hlsli`. Shadow opacity also uses the graph
+`material/shader_graph/surface_sampler.slang`. Shadow opacity also uses the graph
 parameters. Native RT hit shaders retain a wrapper around the same sampler.
 Scenes without graphs retain their original compact material dispatch.
 

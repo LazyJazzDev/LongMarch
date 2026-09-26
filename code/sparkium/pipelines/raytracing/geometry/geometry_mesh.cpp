@@ -8,8 +8,8 @@ GeometryMesh::GeometryMesh(sparkium::GeometryMesh &geometry)
     : geometry_(geometry),
       Geometry(DedicatedCast(geometry.GetCore())) {
   auto &vfs = core_->GetShadersVFS();
-  sampler_implementation_ = CodeLines(vfs, "geometry/mesh/geometry_sampler.hlsli");
-  closest_hit_shader_implementation_ = CodeLines(vfs, "geometry/mesh/hit_group.hlsl");
+  sampler_implementation_ = CodeLines(vfs, "geometry/mesh/geometry_sampler.slang");
+  closest_hit_shader_implementation_ = CodeLines(vfs, "geometry/mesh/hit_group.slang");
 }
 
 graphics::Buffer *GeometryMesh::Buffer() {

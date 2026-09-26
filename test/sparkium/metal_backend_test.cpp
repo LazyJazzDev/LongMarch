@@ -283,7 +283,7 @@ RWStructuredBuffer<uint> output : register(u0, space1);
 TEST_F(MetalBackendTest, LightSelectionPartialWorkgroupDoesNotOverwriteTail) {
   sparkium::Core renderer(core.get());
   std::unique_ptr<graphics::Shader> shader;
-  ASSERT_EQ(core->CreateShader(renderer.GetShadersVFS(), "gather_light_power.hlsl", "GatherLightPowerKernel", "cs_6_3",
+  ASSERT_EQ(core->CreateShader(renderer.GetShadersVFS(), "gather_light_power.slang", "GatherLightPowerKernel", "cs_6_3",
                                {"-I."}, &shader),
             0);
   std::unique_ptr<graphics::ComputeProgram> program;

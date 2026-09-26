@@ -1,0 +1,57 @@
+# Prefer a recent package (including vcpkg's shader-slang port). Older Vulkan SDK
+# copies are deliberately not accepted. The fallback is an immutable official SDK.
+set(LONGMARCH_SLANG_VERSION "2026.18.3")
+find_package(slang ${LONGMARCH_SLANG_VERSION} CONFIG QUIET)
+if(NOT slang_FOUND)
+    if(CMAKE_SYSTEM_PROCESSOR MATCHES "^(arm64|aarch64|ARM64)$")
+        set(_slang_arch aarch64)
+    elseif(CMAKE_SYSTEM_PROCESSOR MATCHES "^(x86_64|AMD64|amd64)$")
+        set(_slang_arch x86_64)
+    else()
+        message(FATAL_ERROR "No official Slang SDK for ${CMAKE_SYSTEM_PROCESSOR}")
+    endif()
+    if(WIN32)
+        set(_slang_os windows)
+    elseif(APPLE)
+        set(_slang_os macos)
+    elseif(CMAKE_SYSTEM_NAME STREQUAL "Linux")
+        set(_slang_os linux)
+    else()
+        message(FATAL_ERROR "Provide a Slang SDK for ${CMAKE_SYSTEM_NAME}")
+    endif()
+    set(_slang_hash_linux-aarch64 3fa8e91d5562b9151509dea1430b6bc4126d6f6d12571135a202d2fc65a11e25)
+    set(_slang_hash_linux-x86_64 516cbcb524f89a8e6185c12e59d4dcd203292e7d75d162325234ce6525f5f614)
+    set(_slang_hash_macos-aarch64 d06187a6f90aaee68a5ceef453cf973016e2d3adfc61ce51b1cd6a0d204cfca2)
+    set(_slang_hash_macos-x86_64 af1f4f51a472fc6a56541db2396eaacff1bdf7efe028928156b471798b3aa092)
+    set(_slang_hash_windows-aarch64 b2b8d9f9492698b4836c3a3326fa97666c25574f7e23b022aa2d551c300fa054)
+    set(_slang_hash_windows-x86_64 1339d7b3050ae680c11152b8ccff977173591ce8e9c1d2a5cff2eb904d52e50d)
+    include(FetchContent)
+    FetchContent_Declare(longmarch_slang_sdk
+        URL "https://github.com/shader-slang/slang/releases/download/v${LONGMARCH_SLANG_VERSION}/slang-${LONGMARCH_SLANG_VERSION}-${_slang_os}-${_slang_arch}.zip"
+        URL_HASH "SHA256=${_slang_hash_${_slang_os}-${_slang_arch}}"
+        DOWNLOAD_EXTRACT_TIMESTAMP TRUE)
+    FetchContent_MakeAvailable(longmarch_slang_sdk)
+    find_package(slang ${LONGMARCH_SLANG_VERSION} CONFIG REQUIRED
+        PATHS "${longmarch_slang_sdk_SOURCE_DIR}/lib/cmake/slang"
+              "${longmarch_slang_sdk_SOURCE_DIR}/cmake" NO_DEFAULT_PATH)
+endif()
+message(STATUS "Slang SDK: ${slang_DIR}")
+
+if(WIN32)
+    # Official Slang releases do not bundle the downstream DXIL compiler.
+    # vcpkg provides it as a runtime dependency; no DXC API is linked by LongMarch.
+    find_package(directx-dxc CONFIG REQUIRED)
+    get_filename_component(_dxc_bin "${DIRECTX_DXC_TOOL}" DIRECTORY)
+    get_target_property(_slang_location slang::slang IMPORTED_LOCATION_RELEASE)
+    if(NOT _slang_location)
+        get_target_property(_slang_location slang::slang IMPORTED_LOCATION)
+    endif()
+    get_filename_component(_slang_bin "${_slang_location}" DIRECTORY)
+    file(GLOB LONGMARCH_SLANG_RUNTIME_DLLS "${_slang_bin}/*.dll")
+    foreach(_name dxcompiler.dll dxil.dll)
+        if(NOT EXISTS "${_dxc_bin}/${_name}")
+            message(FATAL_ERROR "Slang DXIL target requires ${_dxc_bin}/${_name}")
+        endif()
+        list(APPEND LONGMARCH_SLANG_RUNTIME_DLLS "${_dxc_bin}/${_name}")
+    endforeach()
+endif()

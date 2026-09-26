@@ -251,7 +251,7 @@ void NBodyCS::OnClose() {
 }
 
 void NBodyCS::BuildRenderNode() {
-  core_->CreateShader(GetShaderCode("shaders/nbody.hlsl"), "CSMain", "cs_6_0", &nbody_compute_shader_);
+  core_->CreateShader(GetShaderCode("shaders/nbody.slang"), "CSMain", "cs_6_0", &nbody_compute_shader_);
   core_->CreateComputeProgram(nbody_compute_shader_.get(), &nbody_compute_program_);
   nbody_compute_program_->AddResourceBinding(graphics::RESOURCE_TYPE_STORAGE_BUFFER, 1);
   nbody_compute_program_->AddResourceBinding(graphics::RESOURCE_TYPE_WRITABLE_STORAGE_BUFFER, 1);
@@ -261,8 +261,8 @@ void NBodyCS::BuildRenderNode() {
   if (options_.mode == "compute")
     return;
 
-  core_->CreateShader(GetShaderVirtualFileSystem(), "shaders/particle.hlsl", "VSMain", "vs_6_0", &vertex_shader_);
-  core_->CreateShader(GetShaderVirtualFileSystem(), "shaders/particle.hlsl", "PSMain", "ps_6_0", &fragment_shader_);
+  core_->CreateShader(GetShaderVirtualFileSystem(), "shaders/particle.slang", "VSMain", "vs_6_0", &vertex_shader_);
+  core_->CreateShader(GetShaderVirtualFileSystem(), "shaders/particle.slang", "PSMain", "ps_6_0", &fragment_shader_);
   core_->CreateProgram({frame_image_->Format()}, graphics::IMAGE_FORMAT_UNDEFINED, &program_);
   program_->SetBlendState(0, graphics::BlendState(graphics::BLEND_FACTOR_ONE, graphics::BLEND_FACTOR_ONE,
                                                   graphics::BLEND_OP_ADD, graphics::BLEND_FACTOR_ONE,
@@ -274,8 +274,8 @@ void NBodyCS::BuildRenderNode() {
   program_->BindShader(fragment_shader_.get(), graphics::SHADER_TYPE_PIXEL);
   program_->Finalize();
 
-  core_->CreateShader(GetShaderVirtualFileSystem(), "shaders/hdr.hlsl", "VSMain", "vs_6_0", &hdr_vertex_shader_);
-  core_->CreateShader(GetShaderVirtualFileSystem(), "shaders/hdr.hlsl", "PSMain", "ps_6_0", &hdr_fragment_shader_);
+  core_->CreateShader(GetShaderVirtualFileSystem(), "shaders/hdr.slang", "VSMain", "vs_6_0", &hdr_vertex_shader_);
+  core_->CreateShader(GetShaderVirtualFileSystem(), "shaders/hdr.slang", "PSMain", "ps_6_0", &hdr_fragment_shader_);
   core_->CreateProgram({}, graphics::IMAGE_FORMAT_UNDEFINED, &hdr_program_);
   hdr_program_->AddResourceBinding(graphics::RESOURCE_TYPE_UNIFORM_BUFFER, 1);
   hdr_program_->AddResourceBinding(graphics::RESOURCE_TYPE_WRITABLE_IMAGE, 1);

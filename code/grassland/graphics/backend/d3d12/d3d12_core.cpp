@@ -22,9 +22,9 @@ namespace {
 
 void BlitPipeline::Initialize(d3d12::Device *device) {
   device_ = device;
-  device_->CreateShaderModule(d3d12::CompileShader(GetShaderCode("shaders/d3d12/blit.hlsl"), "VSMain", "vs_6_0"),
+  device_->CreateShaderModule(d3d12::CompileShader(GetShaderCode("shaders/d3d12/blit.slang"), "VSMain", "vs_6_0"),
                               &vertex_shader);
-  device_->CreateShaderModule(d3d12::CompileShader(GetShaderCode("shaders/d3d12/blit.hlsl"), "PSMain", "ps_6_0"),
+  device_->CreateShaderModule(d3d12::CompileShader(GetShaderCode("shaders/d3d12/blit.slang"), "PSMain", "ps_6_0"),
                               &pixel_shader);
 
   CD3DX12_DESCRIPTOR_RANGE1 range;
@@ -117,8 +117,8 @@ int D3D12Core::CreateShader(const std::string &source_code,
                             const std::string &target,
                             double_ptr<Shader> pp_shader) {
   VirtualFileSystem vfs;
-  vfs.WriteFile("shader.hlsl", source_code);
-  return CreateShader(vfs, "shader.hlsl", entry_point, target, pp_shader);
+  vfs.WriteFile("shader.slang", source_code);
+  return CreateShader(vfs, "shader.slang", entry_point, target, pp_shader);
 }
 
 int D3D12Core::CreateShader(const VirtualFileSystem &vfs,
