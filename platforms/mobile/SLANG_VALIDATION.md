@@ -23,7 +23,7 @@ its HDR presentation, game rendering fixes, and explicit-origin compute tiling.
 Apple Silicon, Ninja / Release:
 
 - iOS ARM64 device and simulator apps built. Final simulator app installed and
-  launched. No physical iPhone validation was performed in this update.
+  launched. Physical iPhone validation is recorded in the follow-up below.
 - Nine scenes prepared and replayed without a compiler: all replay PNGs exactly
   matched preparation at 128-pixel maximum edge, 2 spp. Cornell also passed at
   256 pixels / 32 spp. Missing and corrupt cache rejection passed.
@@ -59,3 +59,46 @@ and driver limitations are unchanged.
   under `out/mobile/slang/HarmonyResources-before-slang`.
 
 Generated outputs and local signing settings are not committed.
+
+## Physical iPhone follow-up — 2026-09-26
+
+Tested commit `eb61816` on iPhone 16 Plus, Apple A18 GPU, iOS 26.6.2.
+The Release device app was signed with the existing local development profile,
+verified with `codesign --verify --strict`, installed, and tested through its
+existing smoke-run entry points. No renderer changes were needed.
+
+All **20 cases passed**: 11 demos and 9 Sparkium scenes. Before each launch the
+previous result was replaced by a unique pending marker, so results cannot be
+mistaken for a previous run. Each demo reported completed GPU frames; each scene
+reported 2 spp, an empty error string, and a saved image of the expected size.
+
+Demos: 2048, GoL, Triangle, Texture, Blend, Cube, Resize, SDR Sample, HDR,
+Ray Query, and NBody. 2048/GoL reached their settled idle state. HDR reported
+`edr_enabled=true` with RGBA16Float drawable format; this verifies the EDR path,
+not a measurement of physical display brightness.
+
+| Sparkium scene | Device render resolution | Samples | Result |
+| --- | --- | --- | --- |
+| cornell_box | 1024 × 1024 | 2 spp | Passed |
+| texture | 2048 × 1024 | 2 spp | Passed |
+| area_light | 1024 × 1024 | 2 spp | Passed |
+| point_light | 1024 × 1024 | 2 spp | Passed |
+| principled | 1024 × 1024 | 2 spp | Passed |
+| specular | 1024 × 1024 | 2 spp | Passed |
+| blender_classroom | 1920 × 1080 | 2 spp | Passed |
+| blender_junkshop | 2000 × 1000 | 2 spp | Passed |
+| blender_monster | 1024 × 1024 | 2 spp | Passed |
+
+All nine saved images were checked for dimensions and nonuniform RGB output.
+Cornell Box, Texture, and the three Blender images were visually inspected:
+geometry/material content is visible, with the expected substantial noise at
+2 spp. This is a functional smoke check, not a converged image comparison,
+interactive gesture suite, prolonged memory test, or sustained performance test.
+No missing-cache errors, renderer-reported failures, or app termination occurred
+during these cases.
+
+The signed device app is `out/mobile/slang/iphone/LongMarch.app`. Raw results,
+rendered images, device screenshots, and the local runner are under
+`out/mobile/slang/iphone/` (including `report.json`). These generated diagnostics
+remain outside Git. The app is relaunched without smoke environment variables
+after testing, returning to its normal demo browser.
