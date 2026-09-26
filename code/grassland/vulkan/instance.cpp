@@ -2,7 +2,6 @@
 
 #include <utility>
 
-#include "grassland/util/glfw.h"
 #include "grassland/vulkan/device.h"
 #include "grassland/vulkan/physical_device.h"
 #include "grassland/vulkan/surface.h"
@@ -55,7 +54,7 @@ void InstanceCreateHint::ApplyGLFWSurfaceSupport() {
   if (!glfw_extensions) {
     int err = glfwGetError(nullptr);
     if (err == GLFW_NOT_INITIALIZED) {
-      if (InitializeGLFWWithPlatform()) {
+      if (glfwInit()) {
         glfw_extensions = glfwGetRequiredInstanceExtensions(&glfw_extension_count);
         local_init = true;
       }

@@ -97,7 +97,10 @@ TEST(VulkanWindowResizeTest, ProgrammaticSquareToWideUpdatesPresentation) {
       const auto samples = film->info.accumulated_samples;
       ASSERT_GT(samples, 0);
       std::unique_ptr<graphics::Image> source;
-      ASSERT_EQ(core->CreateImage(size.x, size.y, graphics::IMAGE_FORMAT_R32G32B32A32_SFLOAT, &source), 0);
+      ASSERT_EQ(core->CreateImage(
+                    size.x, size.y,
+                    hdr ? graphics::IMAGE_FORMAT_R32G32B32A32_SFLOAT : graphics::IMAGE_FORMAT_R8G8B8A8_UNORM, &source),
+                0);
       film->Develop(source.get(), hdr);
       window->Resize(size.x, size.y);
       // X11 acknowledges asynchronously. Present through several event cycles

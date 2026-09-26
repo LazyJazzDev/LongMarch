@@ -6,6 +6,10 @@
 
 namespace grassland::graphics {
 
+namespace backend {
+class VulkanCore;
+}
+
 enum class MagnifyPhase { kBegin, kUpdate, kEnd, kCancel };
 
 // Incremental scale (1.0 = unchanged), with a focus in GLFW window coordinates:
@@ -164,6 +168,10 @@ class Window {
   }
 
  private:
+  friend class backend::VulkanCore;
+  // Select GLFW before Vulkan queries platform-specific instance extensions.
+  static bool InitializeGLFW();
+
   struct HDRPresentation;
   std::unique_ptr<HDRPresentation> hdr_presentation_;
   DisplayBrightness display_brightness_{};

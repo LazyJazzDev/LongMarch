@@ -31,8 +31,10 @@ On Linux, `LONGMARCH_WINDOW_SYSTEM` accepts:
 | `x11` | Explicitly use X11, including XWayland in a Wayland session. |
 | `wayland` | Require native Wayland; report an error if it is unavailable or not compiled in. |
 
-Set the variable before starting the process. It controls both Vulkan's GLFW
-initialization and the subsequent windows. The automatic fallback concerns window
+Set the variable before starting the process. `Window` owns platform selection;
+the graphics Vulkan core initializes GLFW through that private implementation
+before gathering WSI extensions. The low-level Vulkan library keeps its native
+GLFW initialization path without depending on the graphics/window layer. The automatic fallback concerns window
 system initialization, not HDR support: a valid SDR-only Wayland session stays
 on Wayland. Older GLFW versions retain their native platform selection.
 
