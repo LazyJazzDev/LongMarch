@@ -730,7 +730,7 @@ std::unique_ptr<JsonScene> JsonScene::Load(Core *core, const std::filesystem::pa
     result->film_ = std::make_unique<Film>(core, width, height);
     result->film_->info.persistence = FloatMember(film, "persistence", 1.0f);
     result->film_->info.clamping = FloatMember(film, "clamping", 100.0f);
-    result->film_->info.max_exposure = FloatMember(film, "max_exposure", 1.0f);
+    result->film_->info.max_exposure = FloatMember(film, "max_exposure", result->film_->info.max_exposure);
     std::string view_transform = film.HasMember("view_transform") ? ReadString(film["view_transform"]) : "normalized";
     if (view_transform == "normalized")
       result->film_->info.view_transform = 0;

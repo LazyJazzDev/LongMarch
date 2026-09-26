@@ -166,6 +166,9 @@ exposure, bypasses the SDR view transform, and preserves values above 1 (up to
 65504, as in GUI HDR development). RGBE is lossy, stores no alpha or embedded
 color profile, and this export uses linear sRGB primaries by convention.
 Accumulation limits (`max_exposure`, `clamping`) still apply upstream.
+`max_exposure` defaults to 16.0 in Film and JSON loading; all bundled scenes use
+16.0 so HDR highlights above reference white survive accumulation. Explicit
+scene values still override this default.
 
 For HDR-capable browsers, convert that file to PQ AVIF using NumPy and FFmpeg
 with the `libsvtav1` encoder:
