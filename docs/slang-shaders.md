@@ -16,22 +16,42 @@ As checked on 2026-09-26:
 | Upstream vcpkg `shader-slang` | `2026.18.2` |
 | Official Slang release | `2026.18.3` |
 
-`cmake/Slang.cmake` first looks for a compatible Slang CMake package, version
-2026.18.3 or newer. This includes an appropriately updated vcpkg package. When
-none exists, CMake downloads the official **2026.18.3** SDK for the host platform,
-with a pinned SHA-256 for each supported macOS/Linux/Windows ARM64/x86-64 archive.
-It does not replace `/usr/local/bin/slangc` or select the Vulkan SDK's compiler.
+The default `slang` manifest feature installs **2026.18.3** through vcpkg.
+`vcpkg-configuration.json` selects the project overlay port, so an older vcpkg
+checkout does not silently substitute its registry version. The port packages
+the official SDK with pinned SHA-512 hashes for Windows, Linux and macOS,
+each on ARM64 and x86-64. This is the same compiler release used in the
+[NonUniform comparison](reports/nonuniform-compiler-comparison.md).
+The overlay can be retired once the registry provides the required release.
+
+`cmake/Slang.cmake` only finds an installed package (2026.18.3 or newer).
+It never downloads Slang and fails with setup instructions if none is found.
+vcpkg manages downloads, installation and binary caching; for offline builds,
+populate the vcpkg caches/install tree beforehand. The system `slangc` and the
+Vulkan SDK's compiler are not replaced.
+
+To supply an external SDK, disable the default features and explicitly keep
+any vcpkg features you still need. For example, on macOS with vcpkg metal-cpp:
+
+```sh
+cmake -S . -B out/external-slang -G Ninja -DCMAKE_BUILD_TYPE=Release \
+  -DVCPKG_PATH=/path/to/vcpkg -DVCPKG_MANIFEST_NO_DEFAULT_FEATURES=ON \
+  -DVCPKG_MANIFEST_FEATURES=metal -Dslang_DIR=/sdk/lib/cmake/slang
+```
+
+On Windows the official package directory is `/sdk/cmake`. `CMAKE_PREFIX_PATH`
+can also select an SDK. Use a fresh build directory when changing providers,
+or clear the cached `slang_DIR` and `SLANGC_EXECUTABLE` entries. The chosen package
+path is logged at configure time. To provide metal-cpp externally as well,
+omit the `metal` feature and set `LONGMARCH_METAL_CPP_DIR` to its header root.
+CMake does not download metal-cpp either.
 
 The official 2026.18.3 macOS ARM64 compiler dylib declares macOS **26.0** as
 its minimum OS (verified from LC_BUILD_VERSION). Older macOS hosts need a Slang
 SDK built for their deployment target; the Metal backend's own macOS 13 minimum
-does not override the compiler library requirement.
-
-An existing SDK can be selected with `-Dslang_DIR=/sdk/lib/cmake/slang`.
-The SDK choice is logged at configure time. vcpkg's port also packages official
-prebuilt releases; it is not a separate compiler implementation. Its current
-release lag is why an unconditional dependency on the registry package is not
-used in the manifest yet.
+does not override the compiler library requirement. These prebuilt SDKs cover
+desktop hosts, not native iOS/HarmonyOS compiler libraries; mobile offline shader
+packaging needs separate integration on its development branch.
 
 ## Targets and compatibility
 
@@ -84,8 +104,10 @@ Ninja / Release on Apple Silicon:
   succeeded. The paired PNG RGB outputs were identical at these settings.
   This is a small deterministic regression, not a full-resolution quality or
   performance benchmark.
-- Official SDK download, hash verification, CMake import and runtime loading
-  were exercised; the system Slang installation was not changed.
+- The vcpkg overlay installs the official SDK; package discovery and runtime
+  loading are validated on macOS ARM64. Its compiler dylib is byte-for-byte
+  identical to the previously tested official SDK. External SDK discovery and
+  the missing-package failure path were also checked. The system Slang is unchanged.
 
 D3D12 execution and Windows/Linux SDK deployment have not been exercised on this
 macOS machine. DXIL compilation alone is not a D3D12 rendering test.

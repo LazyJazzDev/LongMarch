@@ -44,9 +44,11 @@ SPIRV-Cross development libraries (available in the Vulkan SDK). CMake selects
 Slang independently of the Vulkan SDK; see [Slang setup](slang-shaders.md);
 the Vulkan runtime backend itself can be disabled.
 
-CMake fetches the hash-pinned official metal-cpp macOS 15/iOS 18 archive.
-For an offline build, set `LONGMARCH_METAL_CPP_DIR` to a local metal-cpp header
-root containing `Metal/Metal.hpp` and `Foundation/Foundation.hpp`.
+The default vcpkg `metal` feature supplies the hash-pinned Apple metal-cpp
+macOS 15/iOS 18 headers. CMake does not download dependencies. Alternatively,
+set `LONGMARCH_METAL_CPP_DIR` to a local header root containing `Metal/Metal.hpp`
+and `Foundation/Foundation.hpp`, and disable the manifest `metal` feature
+(see the external SDK instructions in [Slang setup](slang-shaders.md)).
 
 ```sh
 cmake -S . -B build-metal -G Ninja \

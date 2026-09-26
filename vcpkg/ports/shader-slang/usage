@@ -1,0 +1,6 @@
+shader-slang provides CMake targets:
+
+    find_package(slang 2026.18.3 CONFIG REQUIRED)
+    target_link_libraries(main PRIVATE slang::slang)
+
+The compiler tools are installed in tools/shader-slang.

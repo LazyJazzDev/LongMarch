@@ -1,18 +1,14 @@
-# Apple metal-cpp is header-only. Pin the official SDK archive for reproducible builds.
+# Apple metal-cpp headers are supplied by vcpkg or an external Apple SDK.
 option(LONGMARCH_ENABLE_METAL "Build the native metal-cpp backend on macOS" ${APPLE})
 if (LONGMARCH_ENABLE_METAL AND APPLE)
     enable_language(OBJCXX)
     set(CMAKE_OBJCXX_STANDARD 17)
     set(LONGMARCH_METAL_ENABLED ON)
-    set(LONGMARCH_METAL_CPP_DIR "" CACHE PATH "Optional existing metal-cpp header directory")
+    find_path(LONGMARCH_METAL_CPP_DIR Metal/Metal.hpp
+            PATH_SUFFIXES metal-cpp
+            DOC "Directory containing Apple metal-cpp headers")
     if (NOT LONGMARCH_METAL_CPP_DIR)
-        include(FetchContent)
-        FetchContent_Declare(metal_cpp
-                URL https://developer.apple.com/metal/cpp/files/metal-cpp_macOS15_iOS18.zip
-                URL_HASH SHA256=0433df1e0ab13c2b0becbd78665071e3fa28381e9714a3fce28a497892b8a184
-                DOWNLOAD_EXTRACT_TIMESTAMP TRUE)
-        FetchContent_MakeAvailable(metal_cpp)
-        set(LONGMARCH_METAL_CPP_DIR "${metal_cpp_SOURCE_DIR}")
+        message(FATAL_ERROR "Install the vcpkg metal feature or set LONGMARCH_METAL_CPP_DIR to Apple metal-cpp headers. CMake will not download them.")
     endif ()
     get_filename_component(_metal_sdk_lib "${Vulkan_LIBRARY}" DIRECTORY)
     find_path(SPIRV_CROSS_INCLUDE_DIR spirv_cross/spirv_msl.hpp
