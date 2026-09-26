@@ -44,11 +44,11 @@ EntityGeometryMaterial::EntityGeometryMaterial(sparkium::EntityGeometryMaterial 
 
   if (!hit_groups_.render_group.closest_hit_shader) {
     auto vfs = core_->GetShadersVFS();
-    vfs.WriteFile("material_sampler.hlsli", material_->SamplerImpl());
-    vfs.WriteFile("entity_chit.hlsl", geometry_->ClosestHitShaderImpl());
-    core_->GraphicsCore()->CreateShader(vfs, "entity_chit.hlsl", "RenderClosestHit", "lib_6_5", {"-I."},
+    vfs.WriteFile("material_sampler.slang", material_->SamplerImpl());
+    vfs.WriteFile("entity_chit.slang", geometry_->ClosestHitShaderImpl());
+    core_->GraphicsCore()->CreateShader(vfs, "entity_chit.slang", "RenderClosestHit", "lib_6_5", {"-I."},
                                         &closest_hit_shader_);
-    core_->GraphicsCore()->CreateShader(vfs, "entity_chit.hlsl", "ShadowClosestHit", "lib_6_5", {"-I."},
+    core_->GraphicsCore()->CreateShader(vfs, "entity_chit.slang", "ShadowClosestHit", "lib_6_5", {"-I."},
                                         &shadow_closest_hit_shader_);
     hit_groups_.render_group.closest_hit_shader = closest_hit_shader_.get();
     hit_groups_.shadow_group.closest_hit_shader = shadow_closest_hit_shader_.get();

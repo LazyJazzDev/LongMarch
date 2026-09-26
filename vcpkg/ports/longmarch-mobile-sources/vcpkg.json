@@ -1,0 +1,6 @@
+{
+  "name": "longmarch-mobile-sources",
+  "version-string": "1.0.0",
+  "description": "Portable MikkTSpace and FreeType sources compiled with the mobile target SDK",
+  "license": null
+}

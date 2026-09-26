@@ -6,7 +6,7 @@ multiple render targets, depth testing, blending, resource transfers, GLFW
 presentation through CAMetalLayer, and ImGui. Metal is the default API when this
 backend is enabled; `--backend vulkan` selects the existing Vulkan backend.
 
-HLSL shaders go through DXC → SPIR-V → SPIRV-Cross → MSL → Metal's runtime
+Slang shaders go through Slang → SPIR-V → SPIRV-Cross → MSL → Metal's runtime
 compiler. Metal shader compilation enables fast math by default, allowing floating-point
 reassociation and approximate math; results need not match strict floating-point compilation.
 GPU commands and resources use Metal directly, without MoltenVK.
@@ -37,14 +37,18 @@ implementation macros are defined once in `metal_util.cpp`.
 
 ## Build and run
 
-Requirements: Apple Silicon, macOS 13 or later (MSL 3.0), Xcode Command Line
-Tools, CMake/Ninja, existing vcpkg dependencies, and Vulkan SDK's DXC and
-SPIRV-Cross development libraries. The SDK supplies shader compilation tools;
+Requirements: Apple Silicon and MSL 3.0 (Metal backend: macOS 13+; bundled
+Slang 2026.18.3 ARM64 compiler: macOS 26+), Xcode Command Line
+Tools, CMake/Ninja, existing vcpkg dependencies, and Slang 2026.18.3+ and
+SPIRV-Cross development libraries (available in the Vulkan SDK). CMake selects
+Slang independently of the Vulkan SDK; see [Slang setup](slang-shaders.md);
 the Vulkan runtime backend itself can be disabled.
 
-CMake fetches the hash-pinned official metal-cpp macOS 15/iOS 18 archive.
-For an offline build, set `LONGMARCH_METAL_CPP_DIR` to a local metal-cpp header
-root containing `Metal/Metal.hpp` and `Foundation/Foundation.hpp`.
+The default vcpkg `metal` feature supplies the hash-pinned Apple metal-cpp
+macOS 15/iOS 18 headers. CMake does not download dependencies. Alternatively,
+set `LONGMARCH_METAL_CPP_DIR` to a local header root containing `Metal/Metal.hpp`
+and `Foundation/Foundation.hpp`, and disable the manifest `metal` feature
+(see the external SDK instructions in [Slang setup](slang-shaders.md)).
 
 ```sh
 cmake -S . -B build-metal -G Ninja \
@@ -110,7 +114,7 @@ and `scripts/profile_nbody.py`. The demo supports synchronized frame benchmarks,
 per-frame CPU/GPU timing CSVs, and deterministic particle-state readback.
 
 Set `LONGMARCH_METAL_SHADER_DUMP=/path/to/directory` to save generated MSL and
-an HLSL virtual-filesystem snapshot for debugging compiler failures. Native GPU
+a Slang virtual-filesystem snapshot for debugging compiler failures. Native GPU
 command errors are checked when waiting for completion.
 
 Frame profiling supports `--profile timings.csv --profile-cpu-only` on Metal.

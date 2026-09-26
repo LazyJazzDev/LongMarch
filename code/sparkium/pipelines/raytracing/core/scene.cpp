@@ -20,15 +20,15 @@ namespace sparkium::raytracing {
 Scene::Scene(sparkium::Scene &scene) : scene_(scene), settings(scene.settings) {
   core_ = DedicatedCast(scene_.GetCore());
   if (core_->GraphicsCore()->DeviceRayTracingSupport()) {
-    core_->GraphicsCore()->CreateShader(core_->GetShadersVFS(), "raygen.hlsl", "Main", "lib_6_5", &raygen_shader_);
-    core_->GraphicsCore()->CreateShader(core_->GetShadersVFS(), "raygen.hlsl", "MissMain", "lib_6_5",
+    core_->GraphicsCore()->CreateShader(core_->GetShadersVFS(), "raygen.slang", "Main", "lib_6_5", &raygen_shader_);
+    core_->GraphicsCore()->CreateShader(core_->GetShadersVFS(), "raygen.slang", "MissMain", "lib_6_5",
                                         &default_miss_shader_);
-    core_->GraphicsCore()->CreateShader(core_->GetShadersVFS(), "raygen.hlsl", "ShadowMiss", "lib_6_5",
+    core_->GraphicsCore()->CreateShader(core_->GetShadersVFS(), "raygen.slang", "ShadowMiss", "lib_6_5",
                                         &shadow_miss_shader_);
   }
   core_->GraphicsCore()->CreateBuffer(sizeof(Settings::RayTracing) + sizeof(sparkium::Film::Info),
                                       graphics::BUFFER_TYPE_STATIC, &scene_settings_buffer_);
-  core_->GraphicsCore()->CreateShader(core_->GetShadersVFS(), "gather_light_power.hlsl", "GatherLightPowerKernel",
+  core_->GraphicsCore()->CreateShader(core_->GetShadersVFS(), "gather_light_power.slang", "GatherLightPowerKernel",
                                       "cs_6_3", &gather_light_power_shader_);
   core_->GraphicsCore()->CreateSampler({graphics::FILTER_MODE_LINEAR}, &linear_sampler_);
   core_->GraphicsCore()->CreateSampler({graphics::FILTER_MODE_NEAREST}, &nearest_sampler_);

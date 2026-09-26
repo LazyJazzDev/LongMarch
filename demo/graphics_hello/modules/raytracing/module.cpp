@@ -38,9 +38,9 @@ void ModuleRayTracing::OnInit() {
   core_->CreateImage(window_->GetWidth(), window_->GetHeight(), grassland::graphics::IMAGE_FORMAT_R32G32B32A32_SFLOAT,
                      &color_image_);
 
-  core_->CreateShader(LoadShader("modules/raytracing/shaders/shader.hlsl"), "RayGenMain", "lib_6_3", &raygen_shader_);
-  core_->CreateShader(LoadShader("modules/raytracing/shaders/shader.hlsl"), "MissMain", "lib_6_3", &miss_shader_);
-  core_->CreateShader(LoadShader("modules/raytracing/shaders/shader.hlsl"), "ClosestHitMain", "lib_6_3",
+  core_->CreateShader(LoadShader("modules/raytracing/shaders/shader.slang"), "RayGenMain", "lib_6_3", &raygen_shader_);
+  core_->CreateShader(LoadShader("modules/raytracing/shaders/shader.slang"), "MissMain", "lib_6_3", &miss_shader_);
+  core_->CreateShader(LoadShader("modules/raytracing/shaders/shader.slang"), "ClosestHitMain", "lib_6_3",
                       &closest_hit_shader_);
   grassland::LogInfo("Shader compiled successfully");
 

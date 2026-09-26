@@ -21,7 +21,7 @@ MetalStage CompileMetalStage(MetalCore *core, MetalShader *shader, const std::ve
   MetalPool pool;
   if (bindings.size() > 16)
     throw std::runtime_error("Metal supports at most 16 resource sets");
-  std::vector<std::string> key_parts{"sparkium-msl-3.0-tier2-fastmath-v1",
+  std::vector<std::string> key_parts{"sparkium-msl-3.0-tier2-fastmath-basevertex-v2",
                                      GetShaderCacheSettings().ios ? "ios" : "macos", shader->EntryPoint(),
                                      std::string(shader->blob.data.begin(), shader->blob.data.end())};
   for (const auto &binding : bindings) {
@@ -64,6 +64,9 @@ MetalStage CompileMetalStage(MetalCore *core, MetalShader *shader, const std::ve
     if (GetShaderCacheSettings().ios && !GetShaderCacheSettings().directory.empty())
       options.platform = spirv_cross::CompilerMSL::Options::iOS;
     options.ios_use_simdgroup_functions = true;
+    // Slang uses BaseVertex/BaseInstance to preserve SV_VertexID/InstanceID
+    // semantics. These Metal attributes are supported by our iOS 18+ target.
+    options.ios_support_base_vertex_instance = true;
     options.argument_buffers = true;
     options.argument_buffers_tier = spirv_cross::CompilerMSL::Options::ArgumentBuffersTier::Tier2;
     compiler.set_msl_options(options);

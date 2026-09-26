@@ -31,6 +31,9 @@ Sparkium also has an experimental [compute ray tracing fallback](docs/rt-fallbac
 for GPUs without hardware ray tracing. It shares the path tracer's materials,
 lighting and JSON scenes and builds its acceleration structures with compute shaders.
 
+Shaders are compiled with Slang 2026.18.3 or newer. The default vcpkg feature supplies the pinned SDK;
+CMake can also use an external SDK and never downloads Slang itself; see [shader compilation and migration](docs/slang-shaders.md).
+
 ## How to Build
 
 We strongly recommend using [CLion](https://www.jetbrains.com/clion/) as the IDE for development. It has great CMake support for editing, building, and debugging.

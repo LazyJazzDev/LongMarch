@@ -9,6 +9,7 @@ struct ShaderCacheSettings {
   bool read_only{true};
   bool ios{true};
 };
+
 void ConfigureShaderCache(const ShaderCacheSettings &settings);
 const ShaderCacheSettings &GetShaderCacheSettings();
 std::string ShaderCacheKey(const std::vector<std::string> &parts);
