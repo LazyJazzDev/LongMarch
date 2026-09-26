@@ -1,20 +1,16 @@
-include(${CMAKE_CURRENT_LIST_DIR}/float_vertices.cmake)
 set(SOURCES "")
 list(APPEND SOURCES ${LONGMARCH_IMGUI_DIR}/backends/imgui_impl_glfw.cpp)
 
 if (LONGMARCH_VULKAN_ENABLED)
-    make_float_vertex_backend(vulkan cpp BACKEND_SOURCE)
-    list(APPEND SOURCES ${BACKEND_SOURCE})
+    list(APPEND SOURCES backends/imgui_impl_vulkan.cpp)
 endif ()
 
 if (LONGMARCH_D3D12_ENABLED)
-    make_float_vertex_backend(dx12 cpp BACKEND_SOURCE)
-    list(APPEND SOURCES ${BACKEND_SOURCE})
+    list(APPEND SOURCES backends/imgui_impl_dx12.cpp)
 endif ()
 
 if (LONGMARCH_METAL_ENABLED)
-    make_float_vertex_backend(metal mm BACKEND_SOURCE)
-    list(APPEND SOURCES ${BACKEND_SOURCE})
+    list(APPEND SOURCES backends/imgui_impl_metal.mm)
 endif ()
 add_library(${GRASSLAND_SUBLIB_NAME} ${SOURCES})
 if (LONGMARCH_METAL_ENABLED)
