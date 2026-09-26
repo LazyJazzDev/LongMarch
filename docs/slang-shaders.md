@@ -37,6 +37,7 @@ used in the manifest yet.
 
 - Vulkan: Slang directly emits SPIR-V 1.5; the runtime no longer applies the
   DXC-specific `RestoreStorageBufferNonUniform` repair to shader modules.
+  The obsolete repair header and its DXC regression test have been removed.
 - Metal: the same Slang SPIR-V passes through the existing SPIRV-Cross argument
   buffer mapping and Apple's MSL compiler. Native Metal RT paths remain intact.
 - D3D12: Slang emits DXIL. Slang may invoke downstream DXC for this target;
