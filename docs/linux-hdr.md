@@ -7,14 +7,18 @@ desktop HDR setting. An advertised format is not a physical brightness measureme
 
 ## Build and window-system compatibility
 
-The default vcpkg manifest keeps the existing GLFW configuration. Native Wayland
-is an optional manifest feature, and enabling it retains GLFW's X11 backend.
+The default vcpkg manifest enables native Wayland alongside GLFW's X11 backend
+on Linux. No feature flag or window-system environment variable is required.
+Windows and macOS retain their existing GLFW dependencies.
+For an X11-only build, configure with `-DVCPKG_MANIFEST_NO_DEFAULT_FEATURES=ON`
+and omit any explicit `VCPKG_MANIFEST_FEATURES=wayland` setting.
+
 On Ubuntu, install `libwayland-dev`, `libxkbcommon-dev`, and `extra-cmake-modules`
 alongside the existing X11 build dependencies. Then use a separate build directory:
 
 ```sh
 cmake -S . -B build-wayland -G Ninja -DCMAKE_BUILD_TYPE=Release \
-  -DVCPKG_PATH=/path/to/vcpkg -DVCPKG_MANIFEST_FEATURES=wayland \
+  -DVCPKG_PATH=/path/to/vcpkg \
   -DLONGMARCH_DISABLE_CUDA=ON -DLONGMARCH_DISABLE_PYTHON=ON
 cmake --build build-wayland --target demo_sparkium_gui sparkium_fallback_test
 ```
@@ -54,8 +58,7 @@ the primary output's work area is used only as a window-size hint.
 Enable HDR in the desktop's display settings, then run:
 
 ```sh
-LONGMARCH_WINDOW_SYSTEM=wayland \
-  ./build-wayland/demo/sparkium_gui/demo_sparkium_gui --backend vulkan --hdr
+./build-wayland/demo/sparkium_gui/demo_sparkium_gui --backend vulkan --hdr
 ```
 
 The GUI reports `HDR` without exposing the backend encoding. If the surface
@@ -159,7 +162,7 @@ callback. Framebuffer callbacks never synthesize `ResizeEvent`.
 The event regression checks programmatic resizing and duplicate suppression on
 both platforms, and verifies that framebuffer callbacks alone do not synthesize
 logical resize notifications.
-The regression passes on native Wayland (SDR and PQ) and the default X11-only
+The regression passes on native Wayland (SDR and PQ) and the explicit X11-only
 build (SDR, via XWayland). The edge readback uses a uniform test image with ImGui after scene rendering;
 it is not an image-quality comparison or physical display measurement.
 
@@ -214,7 +217,7 @@ Only this opt-in target requires Wayland development tools and
 
 ```sh
 cmake -S . -B build-wayland -G Ninja -DCMAKE_BUILD_TYPE=Release \
-  -DVCPKG_PATH=/path/to/vcpkg -DVCPKG_MANIFEST_FEATURES=wayland \
+  -DVCPKG_PATH=/path/to/vcpkg \
   -DLONGMARCH_ENABLE_WAYLAND_COLOR_PROBE=ON
 cmake --build build-wayland --target wayland_color_probe
 LONGMARCH_WINDOW_SYSTEM=wayland WAYLAND_DEBUG=client \

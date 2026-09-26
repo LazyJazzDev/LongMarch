@@ -21,14 +21,15 @@
       "platform": "windows"
     }
   ],
+  "default-features": ["wayland"],
   "features": {
     "wayland": {
       "description": "Build native Wayland support alongside X11 on Linux",
-      "supports": "linux",
       "dependencies": [
         {
           "name": "glfw3",
-          "features": ["wayland"]
+          "features": ["wayland"],
+          "platform": "linux"
         }
       ]
     }
