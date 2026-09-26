@@ -108,6 +108,7 @@ class DeviceCreateInfo DeviceFeatureRequirement::GenerateRecommendedDeviceCreate
   physical_device_descriptor_indexing_features.sType =
       VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_DESCRIPTOR_INDEXING_FEATURES_EXT;
   physical_device_descriptor_indexing_features.shaderSampledImageArrayNonUniformIndexing = VK_TRUE;
+  physical_device_descriptor_indexing_features.shaderStorageBufferArrayNonUniformIndexing = VK_TRUE;
   physical_device_descriptor_indexing_features.runtimeDescriptorArray = VK_TRUE;
   physical_device_descriptor_indexing_features.descriptorBindingVariableDescriptorCount = VK_TRUE;
   VkPhysicalDeviceDynamicRenderingFeaturesKHR physical_device_dynamic_rendering_features{};
