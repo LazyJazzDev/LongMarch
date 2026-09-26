@@ -10,9 +10,9 @@
 namespace sparkium::raster {
 
 Scene::Scene(sparkium::Scene &scene) : scene_(scene), core_(DedicatedCast(scene.GetCore())), settings(scene.settings) {
-  core_->GraphicsCore()->CreateShader(core_->GetShadersVFS(), "light/ambient/lighting.hlsl", "VSMain", "vs_6_0", {},
+  core_->GraphicsCore()->CreateShader(core_->GetShadersVFS(), "light/ambient/lighting.slang", "VSMain", "vs_6_0", {},
                                       &ambient_light_vs_);
-  core_->GraphicsCore()->CreateShader(core_->GetShadersVFS(), "light/ambient/lighting.hlsl", "PSMain", "ps_6_0", {},
+  core_->GraphicsCore()->CreateShader(core_->GetShadersVFS(), "light/ambient/lighting.slang", "PSMain", "ps_6_0", {},
                                       &ambient_light_ps_);
   core_->GraphicsCore()->CreateProgram({graphics::IMAGE_FORMAT_R32G32B32A32_SFLOAT}, graphics::IMAGE_FORMAT_UNDEFINED,
                                        &ambient_light_program_);

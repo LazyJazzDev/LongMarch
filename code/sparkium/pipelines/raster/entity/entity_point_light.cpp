@@ -11,9 +11,9 @@ EntityPointLight::EntityPointLight(sparkium::EntityPointLight &entity)
     : entity_(entity),
       Entity(DedicatedCast(entity.GetCore())) {
   core_->GraphicsCore()->CreateBuffer(sizeof(PointLightData), graphics::BUFFER_TYPE_DYNAMIC, &point_light_buffer_);
-  core_->GraphicsCore()->CreateShader(core_->GetShadersVFS(), "light/point/lighting.hlsl", "VSMain", "vs_6_0", {"-I."},
+  core_->GraphicsCore()->CreateShader(core_->GetShadersVFS(), "light/point/lighting.slang", "VSMain", "vs_6_0", {"-I."},
                                       &point_light_vs_);
-  core_->GraphicsCore()->CreateShader(core_->GetShadersVFS(), "light/point/lighting.hlsl", "PSMain", "ps_6_0", {"-I."},
+  core_->GraphicsCore()->CreateShader(core_->GetShadersVFS(), "light/point/lighting.slang", "PSMain", "ps_6_0", {"-I."},
                                       &point_light_ps_);
   core_->GraphicsCore()->CreateProgram({graphics::IMAGE_FORMAT_R32G32B32A32_SFLOAT}, graphics::IMAGE_FORMAT_UNDEFINED,
                                        &point_light_program_);

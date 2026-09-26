@@ -18,7 +18,7 @@ GeometryMesh::GeometryMesh(sparkium::GeometryMesh &geometry)
   if (header.tangent_offset) {
     args.push_back("-DHAS_TANGENT");
   }
-  core_->GraphicsCore()->CreateShader(core_->GetShadersVFS(), "geometry/mesh/vertex_shader.hlsl", "VSMain", "vs_6_0",
+  core_->GraphicsCore()->CreateShader(core_->GetShadersVFS(), "geometry/mesh/vertex_shader.slang", "VSMain", "vs_6_0",
                                       args, &vertex_shader_);
 }
 

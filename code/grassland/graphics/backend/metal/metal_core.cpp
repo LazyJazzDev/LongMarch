@@ -128,8 +128,8 @@ int MetalCore::CreateShader(const std::string &source_code,
                             const std::string &target,
                             double_ptr<Shader> pp_shader) {
   VirtualFileSystem vfs;
-  vfs.WriteFile("shader.hlsl", source_code);
-  return CreateShader(vfs, "shader.hlsl", entry_point, target, pp_shader);
+  vfs.WriteFile("shader.slang", source_code);
+  return CreateShader(vfs, "shader.slang", entry_point, target, pp_shader);
 }
 
 int MetalCore::CreateShader(const VirtualFileSystem &vfs,
@@ -146,10 +146,10 @@ int MetalCore::CreateShader(const VirtualFileSystem &vfs,
                             const std::string &target,
                             const std::vector<std::string> &args,
                             double_ptr<Shader> pp_shader) {
-  std::vector<std::string> compile_args = {"-spirv", "-fspv-target-env=vulkan1.2", "-fvk-use-dx-layout"};
+  std::vector<std::string> compile_args = {"-target", "spirv", "-profile", "spirv_1_5", "-fvk-use-dx-layout"};
   compile_args.insert(compile_args.end(), args.begin(), args.end());
   if (const char *directory = std::getenv("LONGMARCH_METAL_SHADER_DUMP"))
-    vfs.SaveToDirectory(std::filesystem::path(directory) / "hlsl");
+    vfs.SaveToDirectory(std::filesystem::path(directory) / "slang");
   auto blob = CompileShader(vfs, source_file, entry_point, target, compile_args);
   if (blob.data.empty())
     return -1;

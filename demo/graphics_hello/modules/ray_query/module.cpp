@@ -36,7 +36,7 @@ void ModuleRayQuery::OnInit() {
   core_->CreateImage(window_->GetWidth(), window_->GetHeight(), grassland::graphics::IMAGE_FORMAT_R32G32B32A32_SFLOAT,
                      &color_image_);
 
-  core_->CreateShader(LoadShader("modules/ray_query/shaders/shader.hlsl"), "CSMain", "cs_6_5", &compute_shader_);
+  core_->CreateShader(LoadShader("modules/ray_query/shaders/shader.slang"), "CSMain", "cs_6_5", &compute_shader_);
 
   core_->CreateBottomLevelAccelerationStructure(vertex_buffer_.get(), index_buffer_.get(), sizeof(glm::vec3),
                                                 &triangle_blas_);

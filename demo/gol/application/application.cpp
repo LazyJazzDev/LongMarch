@@ -112,7 +112,7 @@ void Application::OnFramebufferResize() {
 }
 
 void Application::OnInit() {
-  const auto shader_code = GetShaderCode("shaders/super.hlsl");
+  const auto shader_code = GetShaderCode("shaders/super.slang");
   core_->CreateShader(shader_code, "VSMain", "vs_6_0", &vertex_shader_);
   core_->CreateShader(shader_code, "PSMain", "ps_6_0", &pixel_shader_);
   core_->CreateProgram({graphics::IMAGE_FORMAT_R8G8B8A8_UNORM}, graphics::IMAGE_FORMAT_D32_SFLOAT, &program_);
@@ -128,7 +128,7 @@ void Application::OnInit() {
   program_->SetCullMode(graphics::CULL_MODE_NONE);
   program_->Finalize();
 
-  const auto resolve_code = GetShaderCode("shaders/resolve.hlsl");
+  const auto resolve_code = GetShaderCode("shaders/resolve.slang");
   core_->CreateShader(resolve_code, "VSMain", "vs_6_0", &resolve_vertex_shader_);
   core_->CreateShader(resolve_code, "PSMain", "ps_6_0", &resolve_pixel_shader_);
   core_->CreateProgram({graphics::IMAGE_FORMAT_R8G8B8A8_UNORM}, graphics::IMAGE_FORMAT_UNDEFINED, &resolve_program_);

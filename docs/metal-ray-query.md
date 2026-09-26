@@ -34,7 +34,7 @@ continues to describe pipeline RT/SBT support. Metal reports query support using
 (M1/M2 also support the API). Do not pass `--require-hardware-rt` for this path:
 that existing option checks pipeline RT and rejects Metal.
 
-- The shared render HLSL uses `cs_6_5` and `SPARKIUM_RAY_QUERY`. DXC emits SPIR-V,
+- The shared render Slang uses `cs_6_5` and `SPARKIUM_RAY_QUERY`. Slang directly emits SPIR-V,
   and the existing SPIRV-Cross backend translates `RayQuery` into MSL 3.0
   `intersection_query`. The current compiler chain works without a new compiler
   or postprocessing generated MSL.
@@ -154,7 +154,7 @@ refit, or compaction. Mesh geometry is assumed immutable, matching the current
 mesh API. This experiment covers triangle meshes, not custom AABB intersection
 functions, procedural geometry, pipeline RT/SBT, or Blender hair. Only M5 was
 tested; other Apple GPU generations need their own compatibility/performance
-checks. The linked DXC and SPIRV-Cross must support RayQuery translation.
+checks. The linked Slang and SPIRV-Cross must support RayQuery translation.
 
 Apple's [M3/A17 Pro GPU discussion](https://developer.apple.com/videos/play/tech-talks/111375/)
 explains that intersection queries add scratch traffic and disable ray reorder
@@ -180,7 +180,7 @@ cmake-build-metal-only/demo/graphics_hello/demo_graphics_hello --module ray_quer
 ```
 
 The demo pairs a triangle BLAS with an AABB BLAS. Bounding-box candidates are
-intersected with an analytic sphere in HLSL and committed through
+intersected with an analytic sphere in Slang and committed through
 `CommitProceduralPrimitiveHit`. The sphere instance uses nonuniform scaling to
 exercise object-space rays and inverse-transpose normals. This is inline query
 support; Metal still does not implement the RT pipeline/intersection-shader/SBT

@@ -42,8 +42,8 @@ void ModuleHDR::OnInit() {
 
   core_->CreateImage(1280, 720, grassland::graphics::IMAGE_FORMAT_R32G32B32A32_SFLOAT, &color_image_);
 
-  core_->CreateShader(LoadShader("modules/hdr/shaders/shader.hlsl"), "VSMain", "vs_6_0", &vertex_shader_);
-  core_->CreateShader(LoadShader("modules/hdr/shaders/shader.hlsl"), "PSMain", "ps_6_0", &fragment_shader_);
+  core_->CreateShader(LoadShader("modules/hdr/shaders/shader.slang"), "VSMain", "vs_6_0", &vertex_shader_);
+  core_->CreateShader(LoadShader("modules/hdr/shaders/shader.slang"), "PSMain", "ps_6_0", &fragment_shader_);
   grassland::LogInfo("Shader compiled successfully");
 
   core_->CreateProgram({grassland::graphics::IMAGE_FORMAT_R32G32B32A32_SFLOAT},

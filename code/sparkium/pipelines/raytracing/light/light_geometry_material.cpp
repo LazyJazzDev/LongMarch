@@ -21,13 +21,13 @@ LightGeometryMaterial::LightGeometryMaterial(Core *core,
       &direct_lighting_sampler_data_);
 
   auto vfs = core_->GetShadersVFS();
-  vfs.WriteFile("geometry_sampler.hlsli", geometry_->SamplerImpl());
-  vfs.WriteFile("material_evaluator.hlsli", material_->EvaluatorImpl());
+  vfs.WriteFile("geometry_sampler.slang", geometry_->SamplerImpl());
+  vfs.WriteFile("material_evaluator.slang", material_->EvaluatorImpl());
 
-  core_->GraphicsCore()->CreateShader(vfs, "light/geometry_material/gather_primitive_power.hlsl",
+  core_->GraphicsCore()->CreateShader(vfs, "light/geometry_material/gather_primitive_power.slang",
                                       "GatherPrimitivePowerKernel", "cs_6_3", {"-I."}, &gather_primitive_power_shader_);
   if (core_->GraphicsCore()->DeviceRayTracingSupport())
-    core_->GraphicsCore()->CreateShader(vfs, "light/geometry_material/direct_lighting_sampler.hlsl",
+    core_->GraphicsCore()->CreateShader(vfs, "light/geometry_material/direct_lighting_sampler.slang",
                                         "SampleDirectLightingCallable", "lib_6_5", {"-I."}, &direct_lighting_sampler_);
 
   uint32_t primitive_count = geometry_->PrimitiveCount();

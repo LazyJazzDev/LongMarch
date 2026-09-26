@@ -24,8 +24,8 @@ MaterialPrincipled::MaterialPrincipled(sparkium::MaterialPrincipled &material)
       Material(DedicatedCast(material.GetCore())) {
   core_->GraphicsCore()->CreateBuffer(sizeof(Info) + sizeof(RegisteredTextures), graphics::BUFFER_TYPE_STATIC,
                                       &material_buffer_);
-  sampler_implementation_ = CodeLines(core_->GetShadersVFS(), "material/principled/sampler.hlsl");
-  evaluator_implementation_ = CodeLines(core_->GetShadersVFS(), "material/principled/evaluator.hlsli");
+  sampler_implementation_ = CodeLines(core_->GetShadersVFS(), "material/principled/sampler.slang");
+  evaluator_implementation_ = CodeLines(core_->GetShadersVFS(), "material/principled/evaluator.slang");
 }
 
 graphics::Buffer *MaterialPrincipled::Buffer() {

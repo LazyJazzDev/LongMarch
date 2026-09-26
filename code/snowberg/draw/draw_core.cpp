@@ -12,8 +12,8 @@ namespace {
 }
 
 Core::Core(graphics::Core *core) : core_(core) {
-  core_->CreateShader(GetShaderCode("shaders/draw.hlsl"), "VSMain", "vs_6_0", &vertex_shader_);
-  core_->CreateShader(GetShaderCode("shaders/draw.hlsl"), "PSMain", "ps_6_0", &fragment_shader_);
+  core_->CreateShader(GetShaderCode("shaders/draw.slang"), "VSMain", "vs_6_0", &vertex_shader_);
+  core_->CreateShader(GetShaderCode("shaders/draw.slang"), "PSMain", "ps_6_0", &fragment_shader_);
 
   core_->CreateBuffer(sizeof(DrawMetadata), graphics::BUFFER_TYPE_DYNAMIC, &metadata_buffer_);
 
