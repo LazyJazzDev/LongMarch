@@ -74,3 +74,9 @@ Vulkan 同步验证未报告错误。非 coherent 内存、多个 queue family �
 出现 GPU reset/device lost；配合 Sparkium 分块调用后已出图。此前也验证了 2048/GoL、
 Cornell、HDR，以及低采样 Monster/Classroom。独立分支提取了相关通用库修复，没有复制
 应用呈现代码，也没有将这些集成验证夸大为所有 Vulkan 驱动、全部场景的覆盖。
+
+## DXC 后续核查
+
+[版本与触发条件调查](dxc-nonuniform-investigation.md) 对当前 DXC、最新稳定版和预览版
+进行了原始 SPIR-V 对比。两个已发布新版本仍复现；报告同时明确现有修补函数对部分
+`-Od` 局部变量和未内联函数传参的覆盖限制，不能将它视为通用 NonUniform 修复器。
