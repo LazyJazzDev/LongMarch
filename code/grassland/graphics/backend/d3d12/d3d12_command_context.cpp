@@ -9,22 +9,6 @@
 
 namespace grassland::graphics::backend {
 
-namespace {
-class UploadCommand : public D3D12Command {
- public:
-  explicit UploadCommand(std::function<void(D3D12CommandContext *, ID3D12GraphicsCommandList *)> encode)
-      : encode_(std::move(encode)) {
-  }
-
-  void CompileCommand(D3D12CommandContext *context, ID3D12GraphicsCommandList *list) override {
-    encode_(context, list);
-  }
-
- private:
-  std::function<void(D3D12CommandContext *, ID3D12GraphicsCommandList *)> encode_;
-};
-}  // namespace
-
 void D3D12CommandContext::CmdUploadBuffer(Buffer *buffer, const void *data, size_t size, size_t offset) {
   auto *dst = dynamic_cast<D3D12Buffer *>(buffer);
   if (!dst || buffer->Type() != BUFFER_TYPE_STATIC || offset > buffer->Size() || size > buffer->Size() - offset)
@@ -37,7 +21,7 @@ void D3D12CommandContext::CmdUploadBuffer(Buffer *buffer, const void *data, size
   std::memcpy(staging->Map(), data, size);
   staging->Unmap();
   PushPostExecutionCallback([staging] {});
-  commands_.push_back(std::make_unique<UploadCommand>([dst, staging, size, offset](auto *context, auto *list) {
+  commands_.push_back(std::make_unique<D3D12CmdUpload>([dst, staging, size, offset](auto *context, auto *list) {
     context->RequireResourceState(list, dst->Buffer()->Handle(), D3D12_RESOURCE_STATE_COPY_DEST);
     list->CopyBufferRegion(dst->Buffer()->Handle(), offset, staging->Handle(), 0, size);
   }));
@@ -63,18 +47,19 @@ void D3D12CommandContext::CmdUploadImage(Image *image,
     std::memcpy(mapped + y * pitch, static_cast<const uint8_t *>(data) + y * row, row);
   staging->Unmap();
   PushPostExecutionCallback([staging] {});
-  commands_.push_back(std::make_unique<UploadCommand>([dst, staging, extent, offset, pitch](auto *context, auto *list) {
-    auto *resource = dst->Image()->Handle();
-    context->RequireResourceState(list, resource, D3D12_RESOURCE_STATE_COPY_DEST);
-    D3D12_TEXTURE_COPY_LOCATION source{};
-    source.pResource = staging->Handle();
-    source.Type = D3D12_TEXTURE_COPY_TYPE_PLACED_FOOTPRINT;
-    source.PlacedFootprint.Footprint = {resource->GetDesc().Format, extent.width, extent.height, 1, UINT(pitch)};
-    D3D12_TEXTURE_COPY_LOCATION target{};
-    target.pResource = resource;
-    target.Type = D3D12_TEXTURE_COPY_TYPE_SUBRESOURCE_INDEX;
-    list->CopyTextureRegion(&target, offset.x, offset.y, 0, &source, nullptr);
-  }));
+  commands_.push_back(
+      std::make_unique<D3D12CmdUpload>([dst, staging, extent, offset, pitch](auto *context, auto *list) {
+        auto *resource = dst->Image()->Handle();
+        context->RequireResourceState(list, resource, D3D12_RESOURCE_STATE_COPY_DEST);
+        D3D12_TEXTURE_COPY_LOCATION source{};
+        source.pResource = staging->Handle();
+        source.Type = D3D12_TEXTURE_COPY_TYPE_PLACED_FOOTPRINT;
+        source.PlacedFootprint.Footprint = {resource->GetDesc().Format, extent.width, extent.height, 1, UINT(pitch)};
+        D3D12_TEXTURE_COPY_LOCATION target{};
+        target.pResource = resource;
+        target.Type = D3D12_TEXTURE_COPY_TYPE_SUBRESOURCE_INDEX;
+        list->CopyTextureRegion(&target, offset.x, offset.y, 0, &source, nullptr);
+      }));
 }
 
 D3D12CommandContext::D3D12CommandContext(D3D12Core *core) : core_(core) {

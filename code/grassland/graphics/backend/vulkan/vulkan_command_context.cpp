@@ -9,22 +9,6 @@
 
 namespace grassland::graphics::backend {
 
-namespace {
-class UploadCommand : public VulkanCommand {
- public:
-  explicit UploadCommand(std::function<void(VulkanCommandContext *, VkCommandBuffer)> encode)
-      : encode_(std::move(encode)) {
-  }
-
-  void CompileCommand(VulkanCommandContext *context, VkCommandBuffer commands) override {
-    encode_(context, commands);
-  }
-
- private:
-  std::function<void(VulkanCommandContext *, VkCommandBuffer)> encode_;
-};
-}  // namespace
-
 void VulkanCommandContext::CmdUploadBuffer(Buffer *buffer, const void *data, size_t size, size_t offset) {
   auto *dst = dynamic_cast<VulkanBuffer *>(buffer);
   if (!dst || buffer->Type() != BUFFER_TYPE_STATIC || offset > buffer->Size() || size > buffer->Size() - offset)
@@ -37,7 +21,7 @@ void VulkanCommandContext::CmdUploadBuffer(Buffer *buffer, const void *data, siz
   std::memcpy(staging->Map(), data, size);
   staging->Unmap();
   PushPostExecutionCallback([staging] {});
-  commands_.push_back(std::make_unique<UploadCommand>([dst, staging, size, offset](auto *, VkCommandBuffer commands) {
+  commands_.push_back(std::make_unique<VulkanCmdUpload>([dst, staging, size, offset](auto *, VkCommandBuffer commands) {
     VkBufferMemoryBarrier barrier{VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER};
     barrier.srcAccessMask = VK_ACCESS_MEMORY_READ_BIT | VK_ACCESS_MEMORY_WRITE_BIT;
     barrier.dstAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
@@ -74,7 +58,7 @@ void VulkanCommandContext::CmdUploadImage(Image *image,
   staging->Unmap();
   PushPostExecutionCallback([staging] {});
   commands_.push_back(
-      std::make_unique<UploadCommand>([dst, staging, offset, extent](auto *context, VkCommandBuffer commands) {
+      std::make_unique<VulkanCmdUpload>([dst, staging, offset, extent](auto *context, VkCommandBuffer commands) {
         auto aspect = IsDepthFormat(dst->Format()) ? VK_IMAGE_ASPECT_DEPTH_BIT : VK_IMAGE_ASPECT_COLOR_BIT;
         context->RequireImageState(commands, dst->Image()->Handle(), VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
                                    VK_PIPELINE_STAGE_TRANSFER_BIT, VK_ACCESS_TRANSFER_WRITE_BIT, aspect);
