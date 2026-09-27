@@ -56,6 +56,10 @@ class CommandContext {
                              uint64_t dst_offset = 0,
                              uint64_t src_offset = 0) = 0;
 
+  // Copy CPU data into owned staging storage now, execute the transfer on submission.
+  virtual void CmdUploadBuffer(Buffer *buffer, const void *data, size_t size, size_t offset = 0) = 0;
+  virtual void CmdUploadImage(Image *image, const void *data, const Offset2D &offset, const Extent2D &extent) = 0;
+
   void PushPostExecutionCallback(std::function<void()> callback);
   const std::vector<std::function<void()>> &GetPostExecutionCallbacks() const;
 
