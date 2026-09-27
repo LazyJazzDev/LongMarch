@@ -15,15 +15,6 @@ class Buffer {
   Buffer() = default;
   virtual ~Buffer() = default;
 
-  // Weak identity lets deferred owners detect destruction and address reuse.
-  std::weak_ptr<void> Lifetime() const {
-    return lifetime_;
-  }
-
- private:
-  std::shared_ptr<void> lifetime_ = std::make_shared<int>(0);
-
- public:
   virtual BufferType Type() const = 0;
 
   virtual size_t Size() const = 0;

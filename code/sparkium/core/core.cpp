@@ -15,17 +15,33 @@ Core::Core(graphics::Core *core) : core_(core), data_updates_(core) {
   LoadPublicImages();
 }
 
-int Core::CreateBuffer(size_t size, graphics::BufferType type, double_ptr<graphics::Buffer> buffer) {
-  int status = core_->CreateBuffer(size, type, buffer);
+int Core::CreateBuffer(size_t size, graphics::BufferType type, double_ptr<sparkium::Buffer> buffer) {
+  if (type != graphics::BUFFER_TYPE_STATIC)
+    throw std::invalid_argument("tracked buffers must use static GPU storage");
+  std::unique_ptr<graphics::Buffer> native;
+  int status = core_->CreateBuffer(size, type, &native);
   if (!status)
-    data_updates_.Register(buffer.operator->());
+    buffer.construct(data_updates_, std::move(native));
   return status;
 }
 
-int Core::CreateImage(int width, int height, graphics::ImageFormat format, double_ptr<graphics::Image> image) {
-  int status = core_->CreateImage(width, height, format, image);
+int Core::CreateImage(int width, int height, graphics::ImageFormat format, double_ptr<sparkium::Image> image) {
+  std::unique_ptr<graphics::Image> native;
+  int status = core_->CreateImage(width, height, format, &native);
   if (!status)
-    data_updates_.Register(image.operator->());
+    image.construct(data_updates_, std::move(native));
+  return status;
+}
+
+int Core::LoadImageFromFile(const std::string &path, double_ptr<sparkium::Image> image) {
+  std::unique_ptr<graphics::Image> native;
+  std::unique_ptr<sparkium::Image> loaded;
+  int status = graphics::LoadImageFromFile(core_, path, &native, [&](graphics::Image *, const void *data) {
+    loaded = std::make_unique<sparkium::Image>(data_updates_, std::move(native));
+    loaded->Update(data);
+  });
+  if (!status)
+    image = loaded.release();
   return status;
 }
 
@@ -89,11 +105,13 @@ graphics::ComputeProgram *Core::GetComputeProgram(const std::string &name) {
 }
 
 graphics::Buffer *Core::GetBuffer(const std::string &name) {
-  return buffers_[name].get();
+  auto it = buffers_.find(name);
+  return it == buffers_.end() || !it->second ? nullptr : it->second->Get();
 }
 
 graphics::Image *Core::GetImage(const std::string &name) {
-  return images_[name].get();
+  auto it = images_.find(name);
+  return it == images_.end() || !it->second ? nullptr : it->second->Get();
 }
 
 void Core::SetPublicResource(const std::string &name, std::unique_ptr<graphics::Shader> &&shader) {
@@ -104,11 +122,11 @@ void Core::SetPublicResource(const std::string &name, std::unique_ptr<graphics::
   compute_programs_[name] = std::move(program);
 }
 
-void Core::SetPublicResource(const std::string &name, std::unique_ptr<graphics::Buffer> &&buffer) {
+void Core::SetPublicResource(const std::string &name, std::unique_ptr<sparkium::Buffer> &&buffer) {
   buffers_[name] = std::move(buffer);
 }
 
-void Core::SetPublicResource(const std::string &name, std::unique_ptr<graphics::Image> &&image) {
+void Core::SetPublicResource(const std::string &name, std::unique_ptr<sparkium::Image> &&image) {
   images_[name] = std::move(image);
 }
 
@@ -136,9 +154,9 @@ void Core::LoadPublicShaders() {
 void Core::LoadPublicBuffers() {
   auto path = FindAssetFile("data/new-joe-kuo-7.21201");
   auto data = SobolTableGen(65536, 1024, path);
-  std::unique_ptr<graphics::Buffer> buffer;
+  std::unique_ptr<sparkium::Buffer> buffer;
   CreateBuffer(data.size() * sizeof(float), graphics::BUFFER_TYPE_STATIC, &buffer);
-  GetDataUpdateTracker().Update(buffer.get(), data.data(), data.size() * sizeof(float));
+  buffer->Update(data.data(), data.size() * sizeof(float));
   SetPublicResource("sobol", std::move(buffer));
 }
 
@@ -146,13 +164,13 @@ void Core::LoadPublicImages() {
   uint32_t pixel = 0xFFFFFFFF;
   float hdr_pixel[] = {1.0f, 1.0f, 1.0f, 1.0f};
 
-  std::unique_ptr<graphics::Image> image;
+  std::unique_ptr<sparkium::Image> image;
   CreateImage(1, 1, graphics::IMAGE_FORMAT_R8G8B8A8_UNORM, &image);
-  GetDataUpdateTracker().Update(image.get(), &pixel);
+  image->Update(&pixel);
   SetPublicResource("white", std::move(image));
 
   CreateImage(1, 1, graphics::IMAGE_FORMAT_R32G32B32A32_SFLOAT, &image);
-  GetDataUpdateTracker().Update(image.get(), hdr_pixel);
+  image->Update(hdr_pixel);
   SetPublicResource("white_hdr", std::move(image));
 
   pixel = 0;
@@ -162,16 +180,16 @@ void Core::LoadPublicImages() {
   hdr_pixel[3] = 1.0f;
 
   CreateImage(1, 1, graphics::IMAGE_FORMAT_R8G8B8A8_UNORM, &image);
-  GetDataUpdateTracker().Update(image.get(), &pixel);
+  image->Update(&pixel);
   SetPublicResource("black", std::move(image));
 
   CreateImage(1, 1, graphics::IMAGE_FORMAT_R32G32B32A32_SFLOAT, &image);
-  GetDataUpdateTracker().Update(image.get(), hdr_pixel);
+  image->Update(hdr_pixel);
   SetPublicResource("black_hdr", std::move(image));
 
   pixel = 0xFFFF8080;  // Normal map default value (0.5, 0.5, 1.0)
   CreateImage(1, 1, graphics::IMAGE_FORMAT_R8G8B8A8_UNORM, &image);
-  GetDataUpdateTracker().Update(image.get(), &pixel);
+  image->Update(&pixel);
   SetPublicResource("normal_default", std::move(image));
 }
 

@@ -16,8 +16,8 @@ Film::Film(Core *core, int width, int height)
 void Film::Reset() {
   std::unique_ptr<graphics::CommandContext> cmd_context;
   core_->GraphicsCore()->CreateCommandContext(&cmd_context);
-  cmd_context->CmdClearImage(raw_image_.get(), {0.0f, 0.0f, 0.0f, 1.0f});
-  core_->GetDataUpdateTracker().Invalidate(raw_image_.get());
+  cmd_context->CmdClearImage(raw_image_->Get(), {0.0f, 0.0f, 0.0f, 1.0f});
+  raw_image_->Invalidate();
   core_->GraphicsCore()->SubmitCommandContext(cmd_context.get());
 
   for (auto &callback : reset_callbacks_) {
@@ -44,19 +44,17 @@ int Film::GetHeight() const {
 void Film::Develop(graphics::Image *targ_image, bool linear_hdr) {
   if (linear_hdr && targ_image->Format() != graphics::IMAGE_FORMAT_R32G32B32A32_SFLOAT)
     throw std::invalid_argument("HDR film development requires an RGBA32Float image");
-  core_->GetDataUpdateTracker().Register(targ_image);
-  if (targ_image != raw_image_.get())
-    core_->GetDataUpdateTracker().Invalidate(targ_image);
+  if (targ_image != raw_image_->Get())
+    core_->GetDataUpdateTracker().InvalidateIfTracked(targ_image);
   graphics::CpuProfileScope develop_profile("develop");
   std::unique_ptr<graphics::CommandContext> cmd_context;
   core_->GraphicsCore()->CreateCommandContext(&cmd_context);
   graphics::GpuProfileScope tone_profile(cmd_context.get(), "tone_map");
   cmd_context->CmdBindComputeProgram(core_->GetComputeProgram(linear_hdr ? "tone_mapping_hdr" : "tone_mapping"));
-  cmd_context->CmdBindResources(0, {raw_image_.get()}, graphics::BIND_POINT_COMPUTE);
+  cmd_context->CmdBindResources(0, {raw_image_->Get()}, graphics::BIND_POINT_COMPUTE);
   cmd_context->CmdBindResources(1, {targ_image}, graphics::BIND_POINT_COMPUTE);
-  core_->GetDataUpdateTracker().Update(tone_mapping_buffer_.get(), &info.view_transform,
-                                       sizeof(int) + sizeof(float) * 3);
-  cmd_context->CmdBindResources(2, {tone_mapping_buffer_.get()}, graphics::BIND_POINT_COMPUTE);
+  tone_mapping_buffer_->Update(&info.view_transform, sizeof(int) + sizeof(float) * 3);
+  cmd_context->CmdBindResources(2, {tone_mapping_buffer_->Get()}, graphics::BIND_POINT_COMPUTE);
   cmd_context->CmdDispatch((targ_image->Extent().width + 7) / 8, (targ_image->Extent().height + 7) / 8, 1);
   tone_profile.End();
   graphics::CpuProfileScope submit_profile("develop_submit");
@@ -72,15 +70,15 @@ void Film::RegisterResetCallback(const std::function<void()> &callback) {
 }
 
 graphics::Image *Film::GetRawImage() const {
-  return raw_image_.get();
+  return raw_image_ ? raw_image_->Get() : nullptr;
 }
 
 graphics::Image *Film::GetDepthImage() const {
-  return depth_image_.get();
+  return depth_image_ ? depth_image_->Get() : nullptr;
 }
 
 graphics::Image *Film::GetStencilImage() const {
-  return stencil_image_.get();
+  return stencil_image_ ? stencil_image_->Get() : nullptr;
 }
 
 }  // namespace sparkium

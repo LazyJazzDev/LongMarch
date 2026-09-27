@@ -17,8 +17,8 @@ Film::Film(sparkium::Film &film) : film_(film) {
 void Film::Reset() {
   std::unique_ptr<graphics::CommandContext> cmd_context;
   core_->GraphicsCore()->CreateCommandContext(&cmd_context);
-  cmd_context->CmdClearImage(accumulated_color_.get(), {0.0f, 0.0f, 0.0f, 0.0f});
-  cmd_context->CmdClearImage(accumulated_samples_.get(), {});
+  cmd_context->CmdClearImage(accumulated_color_->Get(), {0.0f, 0.0f, 0.0f, 0.0f});
+  cmd_context->CmdClearImage(accumulated_samples_->Get(), {});
   core_->GraphicsCore()->SubmitCommandContext(cmd_context.get());
   film_.info.accumulated_samples = 0;
 }

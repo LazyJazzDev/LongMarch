@@ -73,7 +73,7 @@ class Scene : public Object {
   std::unique_ptr<graphics::Shader> shadow_miss_shader_;
   std::unique_ptr<graphics::RayTracingProgram> rt_program_;
   std::unique_ptr<graphics::AccelerationStructure> tlas_;
-  std::unique_ptr<graphics::Buffer> scene_settings_buffer_;
+  std::unique_ptr<sparkium::Buffer> scene_settings_buffer_;
   std::map<Entity *, EntityStatus> entities_;
 
   std::vector<int32_t> miss_shader_indices_;
@@ -103,15 +103,15 @@ class Scene : public Object {
   std::vector<graphics::RayTracingInstance> instances_;
 
   std::vector<InstanceMetadata> instance_metadatas_;
-  std::unique_ptr<graphics::Buffer> instance_metadata_buffer_;
+  std::unique_ptr<sparkium::Buffer> instance_metadata_buffer_;
 
-  std::unique_ptr<graphics::Buffer> light_selector_buffer_;
+  std::unique_ptr<sparkium::Buffer> light_selector_buffer_;
 
   std::vector<LightMetadata> light_metadatas_;
-  std::unique_ptr<graphics::Buffer> light_metadatas_buffer_;
+  std::unique_ptr<sparkium::Buffer> light_metadatas_buffer_;
 
   std::vector<BlellochScanMetadata> blelloch_metadatas_;
-  std::unique_ptr<graphics::Buffer> blelloch_metadata_buffer_;
+  std::unique_ptr<sparkium::Buffer> blelloch_metadata_buffer_;
 
   std::unique_ptr<graphics::Shader> gather_light_power_shader_;
   std::unique_ptr<graphics::ComputeProgram> gather_light_power_program_;

@@ -35,7 +35,7 @@ class Scene : public Object {
   std::unique_ptr<graphics::Shader> ambient_light_vs_;
   std::unique_ptr<graphics::Shader> ambient_light_ps_;
   std::unique_ptr<graphics::Program> ambient_light_program_;
-  std::unique_ptr<graphics::Buffer> ambient_light_buffer_;
+  std::unique_ptr<sparkium::Buffer> ambient_light_buffer_;
 };
 
 Scene *DedicatedCast(sparkium::Scene *scene);

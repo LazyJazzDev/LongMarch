@@ -15,8 +15,7 @@ MaterialShaderGraph::MaterialShaderGraph(sparkium::MaterialShaderGraph &material
   sampler_implementation_ = CodeLines(core_->GetShadersVFS(), "material/shader_graph/sampler.slang");
   sampler_implementation_.InsertAfter(material_.graph_code, "// SHADER_GRAPH_IMPLEMENTATION");
   evaluator_implementation_ = CodeLines(core_->GetShadersVFS(), "material/shader_graph/evaluator.slang");
-  core_->GetDataUpdateTracker().Update(material_buffer_.get(), &material_.emission_hint,
-                                       sizeof(material_.emission_hint));
+  material_buffer_->Update(&material_.emission_hint, sizeof(material_.emission_hint));
 }
 
 void MaterialShaderGraph::PrepareHitShaders() {
@@ -39,7 +38,7 @@ const CodeLines *MaterialShaderGraph::GraphImpl() const {
 }
 
 graphics::Buffer *MaterialShaderGraph::Buffer() {
-  return material_buffer_.get();
+  return material_buffer_ ? material_buffer_->Get() : nullptr;
 }
 
 const CodeLines &MaterialShaderGraph::SamplerImpl() const {
@@ -56,7 +55,7 @@ void MaterialShaderGraph::Update(Scene *scene) {
   for (auto *texture : material_.textures)
     indices.push_back(scene->RegisterImage(texture));
   if (!indices.empty())
-    core_->GetDataUpdateTracker().Update(material_buffer_.get(), indices.data(), indices.size() * sizeof(int), 12);
+    material_buffer_->Update(indices.data(), indices.size() * sizeof(int), 12);
 }
 
 }  // namespace sparkium::raytracing

@@ -33,14 +33,14 @@ EntityPointLight::EntityPointLight(sparkium::EntityPointLight &entity)
 void EntityPointLight::Update(Scene *scene) {
   point_light_data.position = entity_.position;
   point_light_data.emission = entity_.color * entity_.strength;
-  core_->GetDataUpdateTracker().Update(point_light_buffer_.get(), &point_light_data, sizeof(PointLightData));
+  point_light_buffer_->Update(&point_light_data, sizeof(PointLightData));
   scene->RegisterLightingCallback([this](graphics::CommandContext *cmd_ctx, Camera *camera, Film *film) {
     cmd_ctx->CmdBindProgram(point_light_program_.get());
     cmd_ctx->CmdBindResources(0, {film->GetAlbedoRoughnessBuffer()}, graphics::BIND_POINT_GRAPHICS);
     cmd_ctx->CmdBindResources(1, {film->GetPositionSpecularBuffer()}, graphics::BIND_POINT_GRAPHICS);
     cmd_ctx->CmdBindResources(2, {film->GetNormalMetallicBuffer()}, graphics::BIND_POINT_GRAPHICS);
     cmd_ctx->CmdBindResources(3, {camera->NearFieldBuffer()}, graphics::BIND_POINT_GRAPHICS);
-    cmd_ctx->CmdBindResources(4, {point_light_buffer_.get()}, graphics::BIND_POINT_GRAPHICS);
+    cmd_ctx->CmdBindResources(4, {point_light_buffer_->Get()}, graphics::BIND_POINT_GRAPHICS);
     cmd_ctx->CmdDraw(6, 1, 0, 0);
   });
 }

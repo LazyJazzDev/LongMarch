@@ -59,7 +59,7 @@ GeometryMesh::GeometryMesh(Core *core, const Mesh<float> &mesh) : Geometry(core)
   std::memcpy(data.data(), &header_, sizeof(header_));
 
   core_->CreateBuffer(data.size(), graphics::BUFFER_TYPE_STATIC, &geometry_buffer_);
-  core_->GetDataUpdateTracker().Update(geometry_buffer_.get(), data.data(), data.size());
+  geometry_buffer_->Update(data.data(), data.size());
   primitive_count_ = header_.num_indices / 3;
 }
 
@@ -68,7 +68,7 @@ int GeometryMesh::PrimitiveCount() {
 }
 
 graphics::Buffer *GeometryMesh::GetBuffer() const {
-  return geometry_buffer_.get();
+  return geometry_buffer_ ? geometry_buffer_->Get() : nullptr;
 }
 
 const GeometryMesh::Header &GeometryMesh::GetHeader() const {

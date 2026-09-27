@@ -38,10 +38,10 @@ class Film : public Object {
  private:
   Core *core_;
   graphics::Extent2D extent_;
-  std::unique_ptr<graphics::Image> raw_image_;
-  std::unique_ptr<graphics::Image> depth_image_;
-  std::unique_ptr<graphics::Image> stencil_image_;
-  std::unique_ptr<graphics::Buffer> tone_mapping_buffer_;
+  std::unique_ptr<sparkium::Image> raw_image_;
+  std::unique_ptr<sparkium::Image> depth_image_;
+  std::unique_ptr<sparkium::Image> stencil_image_;
+  std::unique_ptr<sparkium::Buffer> tone_mapping_buffer_;
 
   std::vector<std::function<void()>> reset_callbacks_;
 };

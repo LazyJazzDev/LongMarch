@@ -59,24 +59,24 @@ class SoftwareBVHTest : public testing::Test {
 TEST_F(SoftwareBVHTest, DataUpdatesBatchBuffersImagesAndOverlappingWrites) {
   auto &tracker = core->GetDataUpdateTracker();
   tracker.Flush();
-  std::unique_ptr<graphics::Buffer> first, second;
-  std::unique_ptr<graphics::Image> image, hdr;
+  std::unique_ptr<sparkium::Buffer> first, second;
+  std::unique_ptr<sparkium::Image> image, hdr;
   ASSERT_EQ(core->CreateBuffer(32, graphics::BUFFER_TYPE_STATIC, &first), 0);
   ASSERT_EQ(core->CreateBuffer(16, graphics::BUFFER_TYPE_STATIC, &second), 0);
   ASSERT_EQ(core->CreateImage(3, 2, graphics::IMAGE_FORMAT_R8G8B8A8_UNORM, &image), 0);
   ASSERT_EQ(core->CreateImage(2, 1, graphics::IMAGE_FORMAT_R32G32B32A32_SFLOAT, &hdr), 0);
   std::array<glm::vec4, 2> radiance{glm::vec4(10, 2, 3, 1), glm::vec4(4, 5, 6, 1)}, hdr_read{};
-  tracker.Update(hdr.get(), radiance.data());
+  tracker.Update(hdr->Get(), radiance.data());
   std::array<uint32_t, 8> original{1, 2, 3, 4, 5, 6, 7, 8}, actual{};
   std::array<uint32_t, 6> pixels{1, 2, 3, 4, 5, 6}, downloaded{};
-  tracker.Update(first.get(), original.data(), sizeof(original));
-  tracker.Update(second.get(), original.data(), 16);
-  tracker.Update(image.get(), pixels.data());
+  tracker.Update(first->Get(), original.data(), sizeof(original));
+  tracker.Update(second->Get(), original.data(), 16);
+  tracker.Update(image->Get(), pixels.data());
   uint32_t patch[]{100, 200};
-  tracker.Update(first.get(), patch, sizeof(patch), 4);
+  tracker.Update(first->Get(), patch, sizeof(patch), 4);
   patch[0] = 300;
-  tracker.Update(first.get(), patch, 4, 8);
-  tracker.Update(image.get(), patch, {1, 0}, {1, 2});
+  tracker.Update(first->Get(), patch, 4, 8);
+  tracker.Update(image->Get(), patch, {1, 0}, {1, 2});
   // Update owns its data; the caller may immediately reuse it.
   patch[0] = patch[1] = 0;
   graphics::FrameProfile profile(graphics.get(), false);
@@ -97,13 +97,13 @@ TEST_F(SoftwareBVHTest, DataUpdatesBatchBuffersImagesAndOverlappingWrites) {
   hdr->DownloadData(hdr_read.data());
   EXPECT_EQ(hdr_read, radiance);
   profile.Begin(false);
-  tracker.Update(first.get(), original.data(), sizeof(original));
-  tracker.Update(image.get(), pixels.data());
+  tracker.Update(first->Get(), original.data(), sizeof(original));
+  tracker.Update(image->Get(), pixels.data());
   tracker.Flush();
   profile.Finish();
   EXPECT_EQ(profile.counters["data_update_batches"], 0u);
   uint32_t corner = 123;
-  tracker.Update(image.get(), &corner, {2, 1}, {1, 1});
+  tracker.Update(image->Get(), &corner, {2, 1}, {1, 1});
   tracker.Flush();
   image->DownloadData(downloaded.data());
   pixels[5] = corner;
@@ -112,29 +112,29 @@ TEST_F(SoftwareBVHTest, DataUpdatesBatchBuffersImagesAndOverlappingWrites) {
   std::unique_ptr<graphics::CommandContext> commands;
   graphics->CreateCommandContext(&commands);
   uint32_t gpu_tail = 999;
-  commands->CmdUploadBuffer(first.get(), &gpu_tail, 4, 28);
+  commands->CmdUploadBuffer(first->Get(), &gpu_tail, 4, 28);
   graphics->SubmitCommandContext(commands.get());
   uint32_t prefix = 777;
-  tracker.Update(first.get(), &prefix, 4);
+  tracker.Update(first->Get(), &prefix, 4);
   tracker.Flush();
   first->DownloadData(actual.data(), sizeof(actual));
   EXPECT_EQ(actual[0], prefix);
   EXPECT_EQ(actual[7], gpu_tail);
-  EXPECT_THROW(tracker.Update(first.get(), &prefix, 4, 32), std::out_of_range);
+  EXPECT_THROW(tracker.Update(first->Get(), &prefix, 4, 32), std::out_of_range);
 }
 
 TEST_F(SoftwareBVHTest, DataUpdatesDiscardDestroyedResourcesAndHandleReplacement) {
   auto &tracker = core->GetDataUpdateTracker();
   tracker.Flush();
-  std::unique_ptr<graphics::Buffer> buffer;
-  std::unique_ptr<graphics::Image> image;
+  std::unique_ptr<sparkium::Buffer> buffer;
+  std::unique_ptr<sparkium::Image> image;
   core->CreateBuffer(16, graphics::BUFFER_TYPE_STATIC, &buffer);
   core->CreateImage(1, 1, graphics::IMAGE_FORMAT_R8G8B8A8_UNORM, &image);
   uint32_t value = 42;
-  tracker.Update(buffer.get(), &value, 4);
-  tracker.Update(image.get(), &value);
-  auto *expired_buffer = buffer.get();
-  auto *expired_image = image.get();
+  tracker.Update(buffer->Get(), &value, 4);
+  tracker.Update(image->Get(), &value);
+  auto *expired_buffer = buffer->Get();
+  auto *expired_image = image->Get();
   buffer.reset();
   image.reset();
   EXPECT_THROW(tracker.Update(expired_buffer, &value, 4), std::invalid_argument);
@@ -145,17 +145,60 @@ TEST_F(SoftwareBVHTest, DataUpdatesDiscardDestroyedResourcesAndHandleReplacement
   profile.Finish();
   EXPECT_EQ(profile.counters["data_update_batches"], 0u);
   core->CreateBuffer(32, graphics::BUFFER_TYPE_STATIC, &buffer);
-  tracker.Update(buffer.get(), &value, 4);
+  tracker.Update(buffer->Get(), &value, 4);
   tracker.Flush();
   uint32_t actual = 0;
   buffer->DownloadData(&actual, 4);
   EXPECT_EQ(actual, value);
   buffer->Resize(64);
-  tracker.Invalidate(buffer.get());
-  tracker.Update(buffer.get(), &value, 4);
+  // The wrapper invalidates its snapshot automatically when resized.
+  tracker.Update(buffer->Get(), &value, 4);
   tracker.Flush();
   buffer->DownloadData(&actual, 4);
   EXPECT_EQ(actual, value);
+}
+
+TEST_F(SoftwareBVHTest, DataUpdatesResourceOwnersSurviveTrackerDestruction) {
+  std::unique_ptr<sparkium::Buffer> buffer;
+  std::unique_ptr<sparkium::Image> image;
+  uint32_t value = 42;
+  {
+    sparkium::DataUpdateTracker tracker(graphics.get());
+    std::unique_ptr<graphics::Buffer> native_buffer;
+    std::unique_ptr<graphics::Image> native_image;
+    ASSERT_EQ(graphics->CreateBuffer(4, graphics::BUFFER_TYPE_STATIC, &native_buffer), 0);
+    ASSERT_EQ(graphics->CreateImage(1, 1, graphics::IMAGE_FORMAT_R8G8B8A8_UNORM, &native_image), 0);
+    buffer = std::make_unique<sparkium::Buffer>(tracker, std::move(native_buffer));
+    image = std::make_unique<sparkium::Image>(tracker, std::move(native_image));
+    buffer->Update(&value, sizeof(value));
+    image->Update(&value);
+    // Destruction detaches live owners without submitting their pending updates.
+  }
+  EXPECT_THROW(buffer->Update(&value, sizeof(value)), std::logic_error);
+  EXPECT_THROW(image->Update(&value), std::logic_error);
+  EXPECT_NO_THROW(buffer.reset());
+  EXPECT_NO_THROW(image.reset());
+}
+
+TEST_F(SoftwareBVHTest, DataUpdatesOwnershipTransferKeepsRegistrationAndRejectsUnownedResources) {
+  auto &tracker = core->GetDataUpdateTracker();
+  tracker.Flush();
+  std::unique_ptr<graphics::Buffer> native;
+  ASSERT_EQ(graphics->CreateBuffer(4, graphics::BUFFER_TYPE_STATIC, &native), 0);
+  uint32_t value = 42, actual = 0;
+  // Raw graphics resources cannot be accidentally left in the registry.
+  EXPECT_THROW(tracker.Update(native.get(), &value, 4), std::invalid_argument);
+  auto owner = std::make_unique<sparkium::Buffer>(tracker, std::move(native));
+  auto *address = owner->Get();
+  owner->Update(&value, 4);
+  auto moved_owner = std::move(owner);
+  tracker.Flush();
+  moved_owner->DownloadData(&actual, 4);
+  EXPECT_EQ(actual, value);
+  sparkium::DataUpdateTracker other_tracker(graphics.get());
+  EXPECT_THROW(other_tracker.Update(address, &value, 4), std::invalid_argument);
+  moved_owner.reset();
+  EXPECT_THROW(tracker.Update(address, &value, 4), std::invalid_argument);
 }
 
 TEST_F(SoftwareBVHTest, DataUpdatesRestoreImageAfterFilmReset) {

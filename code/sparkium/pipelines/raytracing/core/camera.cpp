@@ -16,7 +16,7 @@ Camera::Camera(sparkium::Camera &camera) : camera_(camera) {
   camera_data_.aperture_blades = camera_.aperture_blades;
   camera_data_.aperture_rotation = camera_.aperture_rotation;
   camera_data_.aperture_ratio = camera_.aperture_ratio;
-  core_->GetDataUpdateTracker().Update(camera_buffer_.get(), &camera_data_, sizeof(camera_data_));
+  camera_buffer_->Update(&camera_data_, sizeof(camera_data_));
 }
 
 graphics::Shader *Camera::Shader() {
@@ -36,8 +36,8 @@ graphics::Buffer *Camera::Buffer() {
   camera_data_.aperture_blades = camera_.aperture_blades;
   camera_data_.aperture_rotation = camera_.aperture_rotation;
   camera_data_.aperture_ratio = camera_.aperture_ratio;
-  core_->GetDataUpdateTracker().Update(camera_buffer_.get(), &camera_data_, sizeof(camera_data_));
-  return camera_buffer_.get();
+  camera_buffer_->Update(&camera_data_, sizeof(camera_data_));
+  return camera_buffer_ ? camera_buffer_->Get() : nullptr;
 }
 
 Camera *DedicatedCast(sparkium::Camera *camera) {

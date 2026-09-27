@@ -17,7 +17,7 @@ graphics::Shader *MaterialLight::PixelShader() {
 }
 
 void MaterialLight::Sync() {
-  core_->GetDataUpdateTracker().Update(material_buffer_.get(), &material_.emission, sizeof(material_.emission));
+  material_buffer_->Update(&material_.emission, sizeof(material_.emission));
 }
 
 glm::vec3 MaterialLight::Emission() const {
@@ -25,7 +25,7 @@ glm::vec3 MaterialLight::Emission() const {
 }
 
 void MaterialLight::BindMaterialResources(graphics::CommandContext *cmd_ctx) {
-  cmd_ctx->CmdBindResources(2, {material_buffer_.get()}, graphics::BIND_POINT_GRAPHICS);
+  cmd_ctx->CmdBindResources(2, {material_buffer_->Get()}, graphics::BIND_POINT_GRAPHICS);
 }
 
 }  // namespace sparkium::raster

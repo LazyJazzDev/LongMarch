@@ -11,8 +11,10 @@ class Core : public Object {
     return data_updates_;
   }
 
-  int CreateBuffer(size_t size, graphics::BufferType type, double_ptr<graphics::Buffer> buffer);
-  int CreateImage(int width, int height, graphics::ImageFormat format, double_ptr<graphics::Image> image);
+  int CreateBuffer(size_t size, graphics::BufferType type, double_ptr<sparkium::Buffer> buffer);
+  int CreateImage(int width, int height, graphics::ImageFormat format, double_ptr<sparkium::Image> image);
+
+  int LoadImageFromFile(const std::string &path, double_ptr<sparkium::Image> image);
 
   graphics::Core *GraphicsCore() const;
 
@@ -33,8 +35,8 @@ class Core : public Object {
 
   void SetPublicResource(const std::string &name, std::unique_ptr<graphics::Shader> &&shader);
   void SetPublicResource(const std::string &name, std::unique_ptr<graphics::ComputeProgram> &&program);
-  void SetPublicResource(const std::string &name, std::unique_ptr<graphics::Buffer> &&buffer);
-  void SetPublicResource(const std::string &name, std::unique_ptr<graphics::Image> &&image);
+  void SetPublicResource(const std::string &name, std::unique_ptr<sparkium::Buffer> &&buffer);
+  void SetPublicResource(const std::string &name, std::unique_ptr<sparkium::Image> &&image);
 
  private:
   void LoadPublicShaders();
@@ -48,7 +50,7 @@ class Core : public Object {
 
   std::map<std::string, std::unique_ptr<graphics::Shader>> shaders_;
   std::map<std::string, std::unique_ptr<graphics::ComputeProgram>> compute_programs_;
-  std::map<std::string, std::unique_ptr<graphics::Buffer>> buffers_;
-  std::map<std::string, std::unique_ptr<graphics::Image>> images_;
+  std::map<std::string, std::unique_ptr<sparkium::Buffer>> buffers_;
+  std::map<std::string, std::unique_ptr<sparkium::Image>> images_;
 };
 }  // namespace sparkium

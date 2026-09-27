@@ -1,6 +1,7 @@
 #pragma once
 #include "grassland/grassland.h"
 #include "sparkium/core/code_lines.h"
+#include "sparkium/core/data_resource.h"
 
 namespace sparkium {
 

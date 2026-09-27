@@ -16,7 +16,7 @@ MaterialLight::MaterialLight(sparkium::MaterialLight &material)
 
 graphics::Buffer *MaterialLight::Buffer() {
   SyncMaterialData();
-  return material_buffer_.get();
+  return material_buffer_ ? material_buffer_->Get() : nullptr;
 }
 
 const CodeLines &MaterialLight::SamplerImpl() const {
@@ -37,7 +37,7 @@ void MaterialLight::SyncMaterialData() {
               sizeof(material_.camera_visible));
   std::memcpy(data.data() + sizeof(material_.emission) + sizeof(int) * 3, &material_.falloff_distance,
               sizeof(material_.falloff_distance));
-  core_->GetDataUpdateTracker().Update(material_buffer_.get(), data.data(), data.size());
+  material_buffer_->Update(data.data(), data.size());
 }
 
 }  // namespace sparkium::raytracing

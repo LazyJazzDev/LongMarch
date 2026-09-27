@@ -17,11 +17,11 @@ graphics::Shader *MaterialSpecular::PixelShader() {
 }
 
 void MaterialSpecular::Sync() {
-  core_->GetDataUpdateTracker().Update(material_buffer_.get(), &material_.base_color, sizeof(material_.base_color));
+  material_buffer_->Update(&material_.base_color, sizeof(material_.base_color));
 }
 
 void MaterialSpecular::BindMaterialResources(graphics::CommandContext *cmd_ctx) {
-  cmd_ctx->CmdBindResources(2, {material_buffer_.get()}, graphics::BIND_POINT_GRAPHICS);
+  cmd_ctx->CmdBindResources(2, {material_buffer_->Get()}, graphics::BIND_POINT_GRAPHICS);
 }
 
 }  // namespace sparkium::raster

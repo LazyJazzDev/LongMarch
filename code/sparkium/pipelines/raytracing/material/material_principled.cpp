@@ -29,7 +29,7 @@ MaterialPrincipled::MaterialPrincipled(sparkium::MaterialPrincipled &material)
 
 graphics::Buffer *MaterialPrincipled::Buffer() {
   SyncMaterialData();
-  return material_buffer_.get();
+  return material_buffer_ ? material_buffer_->Get() : nullptr;
 }
 
 const CodeLines &MaterialPrincipled::SamplerImpl() const {
@@ -67,12 +67,11 @@ void MaterialPrincipled::Update(Scene *scene) {
   if (material_.textures.emission) {
     registered_textures.emission = scene->RegisterImage(material_.textures.emission);
   }
-  core_->GetDataUpdateTracker().Update(material_buffer_.get(), &registered_textures, sizeof(RegisteredTextures),
-                                       sizeof(material_.info));
+  material_buffer_->Update(&registered_textures, sizeof(RegisteredTextures), sizeof(material_.info));
 }
 
 void MaterialPrincipled::SyncMaterialData() {
-  core_->GetDataUpdateTracker().Update(material_buffer_.get(), &material_.info, sizeof(material_.info));
+  material_buffer_->Update(&material_.info, sizeof(material_.info));
 }
 
 }  // namespace sparkium::raytracing

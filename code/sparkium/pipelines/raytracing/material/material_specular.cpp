@@ -15,7 +15,7 @@ MaterialSpecular::MaterialSpecular(sparkium::MaterialSpecular &material)
 
 graphics::Buffer *MaterialSpecular::Buffer() {
   SyncMaterialData();
-  return material_buffer_.get();
+  return material_buffer_ ? material_buffer_->Get() : nullptr;
 }
 
 const CodeLines &MaterialSpecular::SamplerImpl() const {
@@ -29,7 +29,7 @@ const CodeLines &MaterialSpecular::EvaluatorImpl() const {
 void MaterialSpecular::SyncMaterialData() {
   std::vector<uint8_t> data(material_buffer_->Size());
   std::memcpy(data.data(), &material_.base_color, sizeof(material_.base_color));
-  core_->GetDataUpdateTracker().Update(material_buffer_.get(), data.data(), data.size());
+  material_buffer_->Update(data.data(), data.size());
 }
 
 }  // namespace sparkium::raytracing

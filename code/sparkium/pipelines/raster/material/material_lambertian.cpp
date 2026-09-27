@@ -24,7 +24,7 @@ void MaterialLambertian::Sync() {
   data[3] = material_.emission.r;
   data[4] = material_.emission.g;
   data[5] = material_.emission.b;
-  core_->GetDataUpdateTracker().Update(material_buffer_.get(), data, sizeof(data));
+  material_buffer_->Update(data, sizeof(data));
 }
 
 glm::vec3 MaterialLambertian::Emission() const {
@@ -32,7 +32,7 @@ glm::vec3 MaterialLambertian::Emission() const {
 }
 
 void MaterialLambertian::BindMaterialResources(graphics::CommandContext *cmd_ctx) {
-  cmd_ctx->CmdBindResources(2, {material_buffer_.get()}, graphics::BIND_POINT_GRAPHICS);
+  cmd_ctx->CmdBindResources(2, {material_buffer_->Get()}, graphics::BIND_POINT_GRAPHICS);
 }
 
 }  // namespace sparkium::raster

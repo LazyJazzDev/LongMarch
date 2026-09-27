@@ -16,23 +16,23 @@ Film::Film(sparkium::Film &film) : film_(film), core_(DedicatedCast(film.GetCore
   film_.RegisterResetCallback([this]() {
     std::unique_ptr<graphics::CommandContext> cmd_ctx;
     core_->GraphicsCore()->CreateCommandContext(&cmd_ctx);
-    cmd_ctx->CmdClearImage(albedo_roughness_buffer_.get(), {0.0f, 0.0f, 0.0f, 0.0f});
-    cmd_ctx->CmdClearImage(position_specular_buffer_.get(), {0.0f, 0.0f, 0.0f, 0.0f});
-    cmd_ctx->CmdClearImage(normal_metallic_buffer_.get(), {0.0f, 0.0f, 0.0f, 0.0f});
+    cmd_ctx->CmdClearImage(albedo_roughness_buffer_->Get(), {0.0f, 0.0f, 0.0f, 0.0f});
+    cmd_ctx->CmdClearImage(position_specular_buffer_->Get(), {0.0f, 0.0f, 0.0f, 0.0f});
+    cmd_ctx->CmdClearImage(normal_metallic_buffer_->Get(), {0.0f, 0.0f, 0.0f, 0.0f});
     core_->GraphicsCore()->SubmitCommandContext(cmd_ctx.get());
   });
 }
 
 graphics::Image *Film::GetAlbedoRoughnessBuffer() const {
-  return albedo_roughness_buffer_.get();
+  return albedo_roughness_buffer_ ? albedo_roughness_buffer_->Get() : nullptr;
 }
 
 graphics::Image *Film::GetPositionSpecularBuffer() const {
-  return position_specular_buffer_.get();
+  return position_specular_buffer_ ? position_specular_buffer_->Get() : nullptr;
 }
 
 graphics::Image *Film::GetNormalMetallicBuffer() const {
-  return normal_metallic_buffer_.get();
+  return normal_metallic_buffer_ ? normal_metallic_buffer_->Get() : nullptr;
 }
 
 Film *DedicatedCast(sparkium::Film *film) {

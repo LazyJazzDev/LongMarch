@@ -14,8 +14,11 @@ class DataUpdateTracker {
   explicit DataUpdateTracker(graphics::Core *core) : core_(core) {
   }
 
-  void Register(graphics::Buffer *buffer);
-  void Register(graphics::Image *image);
+  ~DataUpdateTracker();
+  DataUpdateTracker(const DataUpdateTracker &) = delete;
+  DataUpdateTracker &operator=(const DataUpdateTracker &) = delete;
+  // External graphics targets have no registration to invalidate.
+  void InvalidateIfTracked(graphics::Image *image);
   void Update(graphics::Buffer *buffer, const void *data, size_t size, size_t offset = 0);
   void Update(graphics::Image *image, const void *data);
   void Update(graphics::Image *image, const void *data, graphics::Offset2D offset, graphics::Extent2D extent);
@@ -28,20 +31,12 @@ class DataUpdateTracker {
   void FlushBeforeRead(graphics::Buffer *buffer);
 
  private:
-  struct Entry {
-    std::weak_ptr<void> lifetime;
-    graphics::Buffer *buffer{};
-    graphics::Image *image{};
-    size_t capacity{};
-    std::vector<uint8_t> bytes;
-    std::vector<bool> valid;
-    std::vector<std::pair<size_t, size_t>> dirty;
-  };
-
-  Entry &Find(const void *resource);
-  void Write(Entry &entry, const void *data, size_t size, size_t offset);
+  friend class DataResource;
+  void Register(DataResource *resource);
+  void Unregister(DataResource *resource);
+  DataResource &Find(const void *resource);
   graphics::Core *core_;
-  std::map<const void *, Entry> resources_;
+  std::map<const void *, DataResource *> resources_;
 };
 
 }  // namespace sparkium

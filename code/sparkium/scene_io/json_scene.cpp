@@ -767,14 +767,10 @@ std::unique_ptr<JsonScene> JsonScene::Load(Core *core, const std::filesystem::pa
       auto found = loaded_images.find(key);
       if (found != loaded_images.end())
         return found->second;
-      std::unique_ptr<graphics::Image> image;
-      if (graphics::LoadImageFromFile(core->GraphicsCore(), key.string(), &image,
-                                      [&](graphics::Image *texture, const void *data) {
-                                        core->GetDataUpdateTracker().Register(texture);
-                                        core->GetDataUpdateTracker().Update(texture, data);
-                                      }) != 0)
+      std::unique_ptr<sparkium::Image> image;
+      if (core->LoadImageFromFile(key.string(), &image) != 0)
         throw std::runtime_error("cannot load texture: " + asset.string());
-      auto *result_image = image.get();
+      auto *result_image = image->Get();
       result->images_.push_back(std::move(image));
       loaded_images.emplace(std::move(key), result_image);
       return result_image;

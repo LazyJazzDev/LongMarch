@@ -15,7 +15,7 @@ MaterialLambertian::MaterialLambertian(sparkium::MaterialLambertian &material)
 
 graphics::Buffer *MaterialLambertian::Buffer() {
   SyncMaterialData();
-  return material_buffer_.get();
+  return material_buffer_ ? material_buffer_->Get() : nullptr;
 }
 
 const CodeLines &MaterialLambertian::SamplerImpl() const {
@@ -30,7 +30,7 @@ void MaterialLambertian::SyncMaterialData() {
   std::vector<uint8_t> data(material_buffer_->Size());
   std::memcpy(data.data(), &material_.base_color, sizeof(material_.base_color));
   std::memcpy(data.data() + sizeof(material_.base_color), &material_.emission, sizeof(material_.emission));
-  core_->GetDataUpdateTracker().Update(material_buffer_.get(), data.data(), data.size());
+  material_buffer_->Update(data.data(), data.size());
 }
 
 }  // namespace sparkium::raytracing

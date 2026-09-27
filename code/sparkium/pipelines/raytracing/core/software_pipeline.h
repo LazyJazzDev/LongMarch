@@ -24,11 +24,11 @@ class SoftwarePipeline {
   }
 
   graphics::Buffer *Nodes() const {
-    return nodes_.get();
+    return nodes_ ? nodes_->Get() : nullptr;
   }
 
   graphics::Buffer *Instances() const {
-    return instances_buffer_.get();
+    return instances_buffer_ ? instances_buffer_->Get() : nullptr;
   }
 
  private:
@@ -83,7 +83,7 @@ class SoftwarePipeline {
   std::vector<MaterialCode> material_sources_;
   uint32_t buffer_count_{}, sdr_count_{}, hdr_count_{};
   uint32_t builder_buffer_count_{};
-  std::unique_ptr<graphics::Buffer> nodes_, keys_, instances_buffer_, parameters_buffer_;
+  std::unique_ptr<sparkium::Buffer> nodes_, keys_, instances_buffer_, parameters_buffer_;
   std::vector<std::unique_ptr<graphics::Shader>> builder_shaders_;
   std::vector<std::unique_ptr<graphics::ComputeProgram>> builders_;
   std::unique_ptr<graphics::Shader> render_shader_;

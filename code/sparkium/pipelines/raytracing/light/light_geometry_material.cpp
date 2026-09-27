@@ -35,12 +35,10 @@ LightGeometryMaterial::LightGeometryMaterial(Core *core,
   core_->CreateBuffer(std::max<size_t>(1, metadatas_.size()) * sizeof(BlellochScanMetadata),
                       graphics::BUFFER_TYPE_STATIC, &metadata_buffer_);
   if (!metadatas_.empty())
-    core_->GetDataUpdateTracker().Update(metadata_buffer_.get(), metadatas_.data(),
-                                         metadatas_.size() * sizeof(BlellochScanMetadata));
+    metadata_buffer_->Update(metadatas_.data(), metadatas_.size() * sizeof(BlellochScanMetadata));
 
-  core_->GetDataUpdateTracker().Update(direct_lighting_sampler_data_.get(), &transform, sizeof(glm::mat4x3), 0);
-  core_->GetDataUpdateTracker().Update(direct_lighting_sampler_data_.get(), &primitive_count, sizeof(uint32_t),
-                                       sizeof(glm::mat4x3));
+  direct_lighting_sampler_data_->Update(&transform, sizeof(glm::mat4x3), 0);
+  direct_lighting_sampler_data_->Update(&primitive_count, sizeof(uint32_t), sizeof(glm::mat4x3));
   blelloch_scan_up_program_ = core_->GetComputeProgram("blelloch_scan_up");
   blelloch_scan_down_program_ = core_->GetComputeProgram("blelloch_scan_down");
 }
@@ -74,8 +72,8 @@ int LightGeometryMaterial::SamplerShader(Scene *scene) {
 }
 
 graphics::Buffer *LightGeometryMaterial::SamplerData() {
-  core_->GetDataUpdateTracker().Update(direct_lighting_sampler_data_.get(), &transform, sizeof(transform));
-  return direct_lighting_sampler_data_.get();
+  direct_lighting_sampler_data_->Update(&transform, sizeof(transform));
+  return direct_lighting_sampler_data_ ? direct_lighting_sampler_data_->Get() : nullptr;
 }
 
 uint32_t LightGeometryMaterial::SamplerPreprocess(graphics::CommandContext *cmd_context) {
@@ -83,10 +81,10 @@ uint32_t LightGeometryMaterial::SamplerPreprocess(graphics::CommandContext *cmd_
   cmd_context->CmdBindComputeProgram(gather_primitive_power_program_);
   cmd_context->CmdBindResources(0, {geometry_->Buffer()}, graphics::BIND_POINT_COMPUTE);
   cmd_context->CmdBindResources(1, {material_->Buffer()}, graphics::BIND_POINT_COMPUTE);
-  cmd_context->CmdBindResources(2, {direct_lighting_sampler_data_.get()}, graphics::BIND_POINT_COMPUTE);
+  cmd_context->CmdBindResources(2, {direct_lighting_sampler_data_->Get()}, graphics::BIND_POINT_COMPUTE);
   cmd_context->CmdDispatch((geometry_->PrimitiveCount() + 63) / 64, 1, 1);
   cmd_context->CmdBindComputeProgram(blelloch_scan_up_program_);
-  cmd_context->CmdBindResources(0, {direct_lighting_sampler_data_.get()}, graphics::BIND_POINT_COMPUTE);
+  cmd_context->CmdBindResources(0, {direct_lighting_sampler_data_->Get()}, graphics::BIND_POINT_COMPUTE);
 
   for (size_t i = 1; i < metadatas_.size(); i++) {
     cmd_context->CmdBindResources(1, {metadata_buffer_->Range(sizeof(BlellochScanMetadata) * i)},

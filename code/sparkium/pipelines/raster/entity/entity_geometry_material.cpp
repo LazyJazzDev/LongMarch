@@ -57,13 +57,13 @@ void EntityGeometryMaterial::Update(Scene *scene) {
   instance_data.model[3] = {entity_.transform[3], 1.0f};
   instance_data.inv_model = glm::inverse(instance_data.model);
   instance_data.normal_matrix = glm::transpose(instance_data.inv_model);
-  core_->GetDataUpdateTracker().Update(instance_buffer_.get(), &instance_data, sizeof(InstanceData));
+  instance_buffer_->Update(&instance_data, sizeof(InstanceData));
   material_->Sync();
 
   scene->RegisterRenderCallback([this](graphics::CommandContext *cmd_ctx, graphics::Buffer *camera_buffer) {
     cmd_ctx->CmdBindProgram(render_program_.get());
     cmd_ctx->CmdBindResources(0, {camera_buffer}, graphics::BIND_POINT_GRAPHICS);
-    cmd_ctx->CmdBindResources(1, {instance_buffer_.get()}, graphics::BIND_POINT_GRAPHICS);
+    cmd_ctx->CmdBindResources(1, {instance_buffer_->Get()}, graphics::BIND_POINT_GRAPHICS);
     material_->BindMaterialResources(cmd_ctx);
     geometry_->DispatchDrawCalls(cmd_ctx);
   });
@@ -74,14 +74,14 @@ void EntityGeometryMaterial::Update(Scene *scene) {
       glm::vec4 centric_area = geometry_->CentricArea(entity_.transform);
       point_light_data.emission = emission * glm::max(0.0f, centric_area.w) * 4.0f * glm::pi<float>();
       point_light_data.position = {centric_area.x, centric_area.y, centric_area.z};
-      core_->GetDataUpdateTracker().Update(point_light_buffer_.get(), &point_light_data, sizeof(PointLightData));
+      point_light_buffer_->Update(&point_light_data, sizeof(PointLightData));
       scene->RegisterLightingCallback([this](graphics::CommandContext *cmd_ctx, Camera *camera, Film *film) {
         cmd_ctx->CmdBindProgram(point_light_program_.get());
         cmd_ctx->CmdBindResources(0, {film->GetAlbedoRoughnessBuffer()}, graphics::BIND_POINT_GRAPHICS);
         cmd_ctx->CmdBindResources(1, {film->GetPositionSpecularBuffer()}, graphics::BIND_POINT_GRAPHICS);
         cmd_ctx->CmdBindResources(2, {film->GetNormalMetallicBuffer()}, graphics::BIND_POINT_GRAPHICS);
         cmd_ctx->CmdBindResources(3, {camera->NearFieldBuffer()}, graphics::BIND_POINT_GRAPHICS);
-        cmd_ctx->CmdBindResources(4, {point_light_buffer_.get()}, graphics::BIND_POINT_GRAPHICS);
+        cmd_ctx->CmdBindResources(4, {point_light_buffer_->Get()}, graphics::BIND_POINT_GRAPHICS);
         cmd_ctx->CmdDraw(6, 1, 0, 0);
       });
     }

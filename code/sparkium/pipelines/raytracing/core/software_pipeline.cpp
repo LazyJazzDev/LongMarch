@@ -300,10 +300,9 @@ void SoftwarePipeline::Update(graphics::CommandContext *commands,
   if (!instances_buffer_ || instances_buffer_->Size() < instance_bytes)
     core_->CreateBuffer(instance_bytes, graphics::BUFFER_TYPE_STATIC, &instances_buffer_);
   std::array<uint32_t, 4> header{static_cast<uint32_t>(gpu_instances.size()), 0, 0, 0};
-  core_->GetDataUpdateTracker().Update(instances_buffer_.get(), header.data(), sizeof(header));
+  instances_buffer_->Update(header.data(), sizeof(header));
   if (!gpu_instances.empty())
-    core_->GetDataUpdateTracker().Update(instances_buffer_.get(), gpu_instances.data(),
-                                         gpu_instances.size() * sizeof(GPUInstance), 16);
+    instances_buffer_->Update(gpu_instances.data(), gpu_instances.size() * sizeof(GPUInstance), 16);
   if (ray_query_) {
     if (!native_tlas_) {
       if (graphics->CreateTopLevelAccelerationStructure(native_instances, &native_tlas_))
@@ -346,7 +345,7 @@ void SoftwarePipeline::Update(graphics::CommandContext *commands,
   size_t parameter_bytes = parameters.size() * sizeof(BuildParameters);
   if (!parameters_buffer_ || parameters_buffer_->Size() < parameter_bytes)
     core_->CreateBuffer(parameter_bytes, graphics::BUFFER_TYPE_STATIC, &parameters_buffer_);
-  core_->GetDataUpdateTracker().Update(parameters_buffer_.get(), parameters.data(), parameter_bytes);
+  parameters_buffer_->Update(parameters.data(), parameter_bytes);
   prepare_profile.End();
   if (graphics::FrameProfile::active) {
     graphics::FrameProfile::active->counters["bvh_dispatches"] = passes.size();
@@ -358,12 +357,12 @@ void SoftwarePipeline::Update(graphics::CommandContext *commands,
   graphics::GpuProfileScope build_profile(commands, "bvh_build");
   for (size_t i = 0; i < passes.size(); ++i) {
     commands->CmdBindComputeProgram(builders_[passes[i].kernel].get());
-    commands->CmdBindResources(0, {nodes_.get()}, graphics::BIND_POINT_COMPUTE);
+    commands->CmdBindResources(0, {nodes_->Get()}, graphics::BIND_POINT_COMPUTE);
     commands->CmdBindResources(1, buffers, graphics::BIND_POINT_COMPUTE);
     commands->CmdBindResources(2, {parameters_buffer_->Range(i * sizeof(BuildParameters), sizeof(BuildParameters))},
                                graphics::BIND_POINT_COMPUTE);
-    commands->CmdBindResources(3, {keys_.get()}, graphics::BIND_POINT_COMPUTE);
-    commands->CmdBindResources(4, {instances_buffer_.get()}, graphics::BIND_POINT_COMPUTE);
+    commands->CmdBindResources(3, {keys_->Get()}, graphics::BIND_POINT_COMPUTE);
+    commands->CmdBindResources(4, {instances_buffer_->Get()}, graphics::BIND_POINT_COMPUTE);
     commands->CmdDispatch((passes[i].count + 63) / 64, 1, 1);
   }
   geometries_ = std::move(geometries);

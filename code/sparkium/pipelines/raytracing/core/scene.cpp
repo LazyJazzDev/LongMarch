@@ -53,10 +53,8 @@ void Scene::Render(Camera *camera, Film *film, bool software, bool ray_query) {
   }
   if (software && !software_pipeline_)
     software_pipeline_ = std::make_unique<SoftwarePipeline>(core_, ray_query_);
-  core_->GetDataUpdateTracker().Update(scene_settings_buffer_.get(), &settings.raytracing,
-                                       sizeof(Settings::RayTracing));
-  core_->GetDataUpdateTracker().Update(scene_settings_buffer_.get(), &film->film_.info, sizeof(sparkium::Film::Info),
-                                       sizeof(Settings::RayTracing));
+  scene_settings_buffer_->Update(&settings.raytracing, sizeof(Settings::RayTracing));
+  scene_settings_buffer_->Update(&film->film_.info, sizeof(sparkium::Film::Info), sizeof(Settings::RayTracing));
   camera->Buffer();
   graphics::CpuProfileScope update_profile("scene_update");
   UpdatePipeline(camera);
@@ -72,8 +70,8 @@ void Scene::Render(Camera *camera, Film *film, bool software, bool ray_query) {
     cmd_context->CmdBindComputeProgram(software_pipeline_->Program());
   else
     cmd_context->CmdBindRayTracingProgram(rt_program_.get());
-  cmd_context->CmdBindResources(0, {film->accumulated_color_.get()}, bind_point);
-  cmd_context->CmdBindResources(1, {film->accumulated_samples_.get()}, bind_point);
+  cmd_context->CmdBindResources(0, {film->accumulated_color_->Get()}, bind_point);
+  cmd_context->CmdBindResources(1, {film->accumulated_samples_->Get()}, bind_point);
   if (software) {
     if (ray_query_)
       cmd_context->CmdBindResources(2, software_pipeline_->AccelerationStructure(), bind_point);
@@ -81,12 +79,12 @@ void Scene::Render(Camera *camera, Film *film, bool software, bool ray_query) {
       cmd_context->CmdBindResources(2, {software_pipeline_->Nodes()}, bind_point);
   } else
     cmd_context->CmdBindResources(2, tlas_.get(), bind_point);
-  cmd_context->CmdBindResources(3, {scene_settings_buffer_.get()}, bind_point);
+  cmd_context->CmdBindResources(3, {scene_settings_buffer_->Get()}, bind_point);
   if (software) {
     auto resources = buffers_;
     resources.insert(resources.end(),
-                     {core_->GetBuffer("sobol"), camera->Buffer(), instance_metadata_buffer_.get(),
-                      light_selector_buffer_.get(), light_metadatas_buffer_.get(), software_pipeline_->Instances()});
+                     {core_->GetBuffer("sobol"), camera->Buffer(), instance_metadata_buffer_->Get(),
+                      light_selector_buffer_->Get(), light_metadatas_buffer_->Get(), software_pipeline_->Instances()});
     cmd_context->CmdBindResources(4, resources, bind_point);
     cmd_context->CmdBindResources(5, sdr_images_, bind_point);
     cmd_context->CmdBindResources(6, hdr_images_, bind_point);
@@ -95,9 +93,9 @@ void Scene::Render(Camera *camera, Film *film, bool software, bool ray_query) {
     cmd_context->CmdBindResources(4, {core_->GetBuffer("sobol")}, bind_point);
     cmd_context->CmdBindResources(5, {camera->Buffer()}, bind_point);
     cmd_context->CmdBindResources(6, buffers_, bind_point);
-    cmd_context->CmdBindResources(7, {instance_metadata_buffer_.get()}, bind_point);
-    cmd_context->CmdBindResources(8, {light_selector_buffer_.get()}, bind_point);
-    cmd_context->CmdBindResources(9, {light_metadatas_buffer_.get()}, bind_point);
+    cmd_context->CmdBindResources(7, {instance_metadata_buffer_->Get()}, bind_point);
+    cmd_context->CmdBindResources(8, {light_selector_buffer_->Get()}, bind_point);
+    cmd_context->CmdBindResources(9, {light_metadatas_buffer_->Get()}, bind_point);
     cmd_context->CmdBindResources(10, sdr_images_, bind_point);
     cmd_context->CmdBindResources(11, hdr_images_, bind_point);
     cmd_context->CmdBindResources(12, std::vector{linear_sampler_.get(), nearest_sampler_.get()}, bind_point);
@@ -111,8 +109,8 @@ void Scene::Render(Camera *camera, Film *film, bool software, bool ray_query) {
   trace_profile.End();
   graphics::GpuProfileScope resolve_profile(cmd_context.get(), "film_resolve");
   cmd_context->CmdBindComputeProgram(core_->GetComputeProgram("film2img"));
-  cmd_context->CmdBindResources(0, {film->accumulated_color_.get()}, graphics::BIND_POINT_COMPUTE);
-  cmd_context->CmdBindResources(1, {film->accumulated_samples_.get()}, graphics::BIND_POINT_COMPUTE);
+  cmd_context->CmdBindResources(0, {film->accumulated_color_->Get()}, graphics::BIND_POINT_COMPUTE);
+  cmd_context->CmdBindResources(1, {film->accumulated_samples_->Get()}, graphics::BIND_POINT_COMPUTE);
   cmd_context->CmdBindResources(2, {film->film_.GetRawImage()}, graphics::BIND_POINT_COMPUTE);
   cmd_context->CmdDispatch((film->film_.GetRawImage()->Extent().width + 7) / 8,
                            (film->film_.GetRawImage()->Extent().height + 7) / 8, 1);
@@ -306,8 +304,8 @@ void Scene::UpdatePipeline(Camera *camera) {
                         graphics::BUFFER_TYPE_STATIC, &instance_metadata_buffer_);
   }
   if (!instance_metadatas_.empty())
-    core_->GetDataUpdateTracker().Update(instance_metadata_buffer_.get(), instance_metadatas_.data(),
-                                         sizeof(InstanceMetadata) * instance_metadatas_.size());
+    instance_metadata_buffer_->Update(instance_metadatas_.data(),
+                                      sizeof(InstanceMetadata) * instance_metadatas_.size());
 
   if (!light_selector_buffer_ ||
       sizeof(uint32_t) + sizeof(float) * light_metadatas_.size() > light_selector_buffer_->Size()) {
@@ -319,10 +317,9 @@ void Scene::UpdatePipeline(Camera *camera) {
                         graphics::BUFFER_TYPE_STATIC, &light_metadatas_buffer_);
   }
   if (!light_metadatas_.empty())
-    core_->GetDataUpdateTracker().Update(light_metadatas_buffer_.get(), light_metadatas_.data(),
-                                         sizeof(LightMetadata) * light_metadatas_.size());
+    light_metadatas_buffer_->Update(light_metadatas_.data(), sizeof(LightMetadata) * light_metadatas_.size());
   uint32_t light_count = static_cast<uint32_t>(light_metadatas_.size());
-  core_->GetDataUpdateTracker().Update(light_selector_buffer_.get(), &light_count, sizeof(uint32_t), 0);
+  light_selector_buffer_->Update(&light_count, sizeof(uint32_t), 0);
 
   if (buffers_.empty())
     RegisterBuffer(camera->Buffer());
@@ -398,8 +395,8 @@ void Scene::UpdatePipeline(Camera *camera) {
   graphics::CpuProfileScope light_record_profile("light_selection_record");
   graphics::GpuProfileScope light_selection_profile(preprocess_cmd_context_.get(), "light_selection");
   preprocess_cmd_context_->CmdBindComputeProgram(gather_light_power_program_.get());
-  preprocess_cmd_context_->CmdBindResources(0, {light_metadatas_buffer_.get()}, graphics::BIND_POINT_COMPUTE);
-  preprocess_cmd_context_->CmdBindResources(1, {light_selector_buffer_.get()}, graphics::BIND_POINT_COMPUTE);
+  preprocess_cmd_context_->CmdBindResources(0, {light_metadatas_buffer_->Get()}, graphics::BIND_POINT_COMPUTE);
+  preprocess_cmd_context_->CmdBindResources(1, {light_selector_buffer_->Get()}, graphics::BIND_POINT_COMPUTE);
   preprocess_cmd_context_->CmdBindResources(2, buffers_, graphics::BIND_POINT_COMPUTE);
   if (!light_metadatas_.empty())
     preprocess_cmd_context_->CmdDispatch((light_metadatas_.size() + 63) / 64, 1, 1);
@@ -420,10 +417,10 @@ void Scene::UpdatePipeline(Camera *camera) {
       core_->CreateBuffer(sizeof(BlellochScanMetadata) * blelloch_metadatas_.size(), graphics::BUFFER_TYPE_STATIC,
                           &blelloch_metadata_buffer_);
     }
-    core_->GetDataUpdateTracker().Update(blelloch_metadata_buffer_.get(), blelloch_metadatas_.data(),
-                                         sizeof(BlellochScanMetadata) * blelloch_metadatas_.size());
+    blelloch_metadata_buffer_->Update(blelloch_metadatas_.data(),
+                                      sizeof(BlellochScanMetadata) * blelloch_metadatas_.size());
     preprocess_cmd_context_->CmdBindComputeProgram(blelloch_scan_up_program);
-    preprocess_cmd_context_->CmdBindResources(0, {light_selector_buffer_.get()}, graphics::BIND_POINT_COMPUTE);
+    preprocess_cmd_context_->CmdBindResources(0, {light_selector_buffer_->Get()}, graphics::BIND_POINT_COMPUTE);
     for (size_t i = 1; i < blelloch_metadatas_.size(); i++) {
       preprocess_cmd_context_->CmdBindResources(1, {blelloch_metadata_buffer_->Range(sizeof(BlellochScanMetadata) * i)},
                                                 graphics::BIND_POINT_COMPUTE);

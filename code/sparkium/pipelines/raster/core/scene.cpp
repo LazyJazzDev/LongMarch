@@ -62,7 +62,7 @@ void Scene::Render(Camera *camera, Film *film) {
   shadow_map_callbacks_.clear();
   lighting_callbacks_.clear();
 
-  core_->GetDataUpdateTracker().Update(ambient_light_buffer_.get(), &settings.ambient_light, sizeof(glm::vec3));
+  ambient_light_buffer_->Update(&settings.ambient_light, sizeof(glm::vec3));
 
   for (auto *entity : ordered_entities) {
     if (entities_.at(entity).active) {
@@ -84,8 +84,8 @@ void Scene::Render(Camera *camera, Film *film) {
       {scene_.settings.ambient_light.r, scene_.settings.ambient_light.g, scene_.settings.ambient_light.b, 0.0f});
   cmd_context->CmdClearImage(film->film_.GetDepthImage(), {1.0f, 0.0f, 0.0f, 0.0f});
   cmd_context->CmdBeginRendering(
-      {film->film_.GetRawImage(), film->albedo_roughness_buffer_.get(), film->position_specular_buffer_.get(),
-       film->normal_metallic_buffer_.get(), film->film_.GetStencilImage()},
+      {film->film_.GetRawImage(), film->albedo_roughness_buffer_->Get(), film->position_specular_buffer_->Get(),
+       film->normal_metallic_buffer_->Get(), film->film_.GetStencilImage()},
       film->film_.GetDepthImage());
   cmd_context->CmdSetPrimitiveTopology(graphics::PRIMITIVE_TOPOLOGY_TRIANGLE_LIST);
   graphics::Scissor scissor;
@@ -107,8 +107,8 @@ void Scene::Render(Camera *camera, Film *film) {
   cmd_context->CmdClearImage(film->film_.GetDepthImage(),
                              {1.0f, 0.0f, 0.0f, 0.0f});  // Clear depth to 1.0 for the near field rendering
   cmd_context->CmdBeginRendering(
-      {film->film_.GetRawImage(), film->albedo_roughness_buffer_.get(), film->position_specular_buffer_.get(),
-       film->normal_metallic_buffer_.get(), film->film_.GetStencilImage()},
+      {film->film_.GetRawImage(), film->albedo_roughness_buffer_->Get(), film->position_specular_buffer_->Get(),
+       film->normal_metallic_buffer_->Get(), film->film_.GetStencilImage()},
       film->film_.GetDepthImage());
   cmd_context->CmdSetPrimitiveTopology(graphics::PRIMITIVE_TOPOLOGY_TRIANGLE_LIST);
   cmd_context->CmdSetScissor(scissor);
@@ -128,7 +128,7 @@ void Scene::Render(Camera *camera, Film *film) {
   cmd_context->CmdBindResources(1, {film->GetPositionSpecularBuffer()}, graphics::BIND_POINT_GRAPHICS);
   cmd_context->CmdBindResources(2, {film->GetNormalMetallicBuffer()}, graphics::BIND_POINT_GRAPHICS);
   cmd_context->CmdBindResources(3, {camera->NearFieldBuffer()}, graphics::BIND_POINT_GRAPHICS);
-  cmd_context->CmdBindResources(4, {ambient_light_buffer_.get()}, graphics::BIND_POINT_GRAPHICS);
+  cmd_context->CmdBindResources(4, {ambient_light_buffer_->Get()}, graphics::BIND_POINT_GRAPHICS);
   cmd_context->CmdDraw(6, 1, 0, 0);
 
   for (auto &callback : lighting_callbacks_) {
