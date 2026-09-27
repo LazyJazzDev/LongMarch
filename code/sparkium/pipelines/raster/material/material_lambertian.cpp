@@ -9,8 +9,7 @@ MaterialLambertian::MaterialLambertian(sparkium::MaterialLambertian &material)
       Material(DedicatedCast(material.GetCore())) {
   core_->GraphicsCore()->CreateShader(core_->GetShadersVFS(), "material/lambertian/pixel_shader.slang", "PSMain",
                                       "ps_6_0", &pixel_shader_);
-  core_->GraphicsCore()->CreateBuffer(sizeof(glm::vec3) + sizeof(glm::vec3), graphics::BUFFER_TYPE_STATIC,
-                                      &material_buffer_);
+  core_->CreateBuffer(sizeof(glm::vec3) + sizeof(glm::vec3), graphics::BUFFER_TYPE_STATIC, &material_buffer_);
 }
 
 graphics::Shader *MaterialLambertian::PixelShader() {
@@ -25,7 +24,7 @@ void MaterialLambertian::Sync() {
   data[3] = material_.emission.r;
   data[4] = material_.emission.g;
   data[5] = material_.emission.b;
-  material_buffer_->UploadData(data, sizeof(data));
+  core_->GetDataUpdateTracker().Update(material_buffer_.get(), data, sizeof(data));
 }
 
 glm::vec3 MaterialLambertian::Emission() const {

@@ -292,17 +292,18 @@ void SoftwarePipeline::Update(graphics::CommandContext *commands,
   for (size_t i = 0; !rebuild && i < geometries.size(); ++i)
     rebuild = geometries[i].geometry != geometries_[i].geometry || geometries[i].count != geometries_[i].count;
   if (rebuild && !ray_query_) {
-    graphics->CreateBuffer(node_count * 32, graphics::BUFFER_TYPE_STATIC, &nodes_);
-    graphics->CreateBuffer(uint64_t(max_leaves) * 8, graphics::BUFFER_TYPE_STATIC, &keys_);
+    core_->CreateBuffer(node_count * 32, graphics::BUFFER_TYPE_STATIC, &nodes_);
+    core_->CreateBuffer(uint64_t(max_leaves) * 8, graphics::BUFFER_TYPE_STATIC, &keys_);
   }
 
   size_t instance_bytes = 16 + gpu_instances.size() * sizeof(GPUInstance);
   if (!instances_buffer_ || instances_buffer_->Size() < instance_bytes)
-    graphics->CreateBuffer(instance_bytes, graphics::BUFFER_TYPE_STATIC, &instances_buffer_);
+    core_->CreateBuffer(instance_bytes, graphics::BUFFER_TYPE_STATIC, &instances_buffer_);
   std::array<uint32_t, 4> header{static_cast<uint32_t>(gpu_instances.size()), 0, 0, 0};
-  instances_buffer_->UploadData(header.data(), sizeof(header));
+  core_->GetDataUpdateTracker().Update(instances_buffer_.get(), header.data(), sizeof(header));
   if (!gpu_instances.empty())
-    instances_buffer_->UploadData(gpu_instances.data(), gpu_instances.size() * sizeof(GPUInstance), 16);
+    core_->GetDataUpdateTracker().Update(instances_buffer_.get(), gpu_instances.data(),
+                                         gpu_instances.size() * sizeof(GPUInstance), 16);
   if (ray_query_) {
     if (!native_tlas_) {
       if (graphics->CreateTopLevelAccelerationStructure(native_instances, &native_tlas_))
@@ -344,8 +345,8 @@ void SoftwarePipeline::Update(graphics::CommandContext *commands,
     parameters.push_back(pass.parameters);
   size_t parameter_bytes = parameters.size() * sizeof(BuildParameters);
   if (!parameters_buffer_ || parameters_buffer_->Size() < parameter_bytes)
-    graphics->CreateBuffer(parameter_bytes, graphics::BUFFER_TYPE_STATIC, &parameters_buffer_);
-  parameters_buffer_->UploadData(parameters.data(), parameter_bytes);
+    core_->CreateBuffer(parameter_bytes, graphics::BUFFER_TYPE_STATIC, &parameters_buffer_);
+  core_->GetDataUpdateTracker().Update(parameters_buffer_.get(), parameters.data(), parameter_bytes);
   prepare_profile.End();
   if (graphics::FrameProfile::active) {
     graphics::FrameProfile::active->counters["bvh_dispatches"] = passes.size();

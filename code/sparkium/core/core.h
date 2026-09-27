@@ -1,10 +1,18 @@
 #pragma once
 #include "sparkium/core/core_util.h"
+#include "sparkium/core/data_update_tracker.h"
 
 namespace sparkium {
 class Core : public Object {
  public:
   Core(graphics::Core *core);
+
+  DataUpdateTracker &GetDataUpdateTracker() {
+    return data_updates_;
+  }
+
+  int CreateBuffer(size_t size, graphics::BufferType type, double_ptr<graphics::Buffer> buffer);
+  int CreateImage(int width, int height, graphics::ImageFormat format, double_ptr<graphics::Image> image);
 
   graphics::Core *GraphicsCore() const;
 
@@ -34,6 +42,7 @@ class Core : public Object {
   void LoadPublicImages();
 
   graphics::Core *core_{nullptr};
+  DataUpdateTracker data_updates_;
 
   VirtualFileSystem shaders_vfs_;
 

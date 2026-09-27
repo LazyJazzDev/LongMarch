@@ -18,7 +18,7 @@ LightPoint::LightPoint(Core *core,
       radius(radius),
       soft_falloff(soft_falloff),
       sampling_weight(sampling_weight) {
-  core_->GraphicsCore()->CreateBuffer(sizeof(float) * 9, graphics::BUFFER_TYPE_STATIC, &direct_lighting_sampler_data_);
+  core_->CreateBuffer(sizeof(float) * 9, graphics::BUFFER_TYPE_STATIC, &direct_lighting_sampler_data_);
 }
 
 int LightPoint::SamplerShader(Scene *scene) {
@@ -38,7 +38,7 @@ uint32_t LightPoint::SamplerPreprocess(graphics::CommandContext *cmd_ctx) {
   data[6] = sampling_weight >= 0.0f ? sampling_weight : max_power;
   data[7] = std::max(radius, 0.0f);
   std::memcpy(data + 8, &soft_falloff, sizeof(int));
-  direct_lighting_sampler_data_->UploadData(data, sizeof(data), 0);
+  core_->GetDataUpdateTracker().Update(direct_lighting_sampler_data_.get(), data, sizeof(data), 0);
   return sizeof(glm::vec3) + sizeof(glm::vec3);
 }
 

@@ -13,7 +13,6 @@ class LightGeometryMaterial : public Light {
   const glm::mat4x3 &transform;
 
  private:
-  glm::mat4x3 uploaded_transform_;
   Geometry *geometry_;
   Material *material_;
   std::unique_ptr<graphics::Shader> direct_lighting_sampler_;

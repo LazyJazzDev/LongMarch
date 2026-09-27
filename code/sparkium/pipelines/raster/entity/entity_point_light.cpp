@@ -10,7 +10,7 @@ namespace sparkium::raster {
 EntityPointLight::EntityPointLight(sparkium::EntityPointLight &entity)
     : entity_(entity),
       Entity(DedicatedCast(entity.GetCore())) {
-  core_->GraphicsCore()->CreateBuffer(sizeof(PointLightData), graphics::BUFFER_TYPE_DYNAMIC, &point_light_buffer_);
+  core_->CreateBuffer(sizeof(PointLightData), graphics::BUFFER_TYPE_STATIC, &point_light_buffer_);
   core_->GraphicsCore()->CreateShader(core_->GetShadersVFS(), "light/point/lighting.slang", "VSMain", "vs_6_0", {"-I."},
                                       &point_light_vs_);
   core_->GraphicsCore()->CreateShader(core_->GetShadersVFS(), "light/point/lighting.slang", "PSMain", "ps_6_0", {"-I."},
@@ -33,7 +33,7 @@ EntityPointLight::EntityPointLight(sparkium::EntityPointLight &entity)
 void EntityPointLight::Update(Scene *scene) {
   point_light_data.position = entity_.position;
   point_light_data.emission = entity_.color * entity_.strength;
-  point_light_buffer_->UploadData(&point_light_data, sizeof(PointLightData));
+  core_->GetDataUpdateTracker().Update(point_light_buffer_.get(), &point_light_data, sizeof(PointLightData));
   scene->RegisterLightingCallback([this](graphics::CommandContext *cmd_ctx, Camera *camera, Film *film) {
     cmd_ctx->CmdBindProgram(point_light_program_.get());
     cmd_ctx->CmdBindResources(0, {film->GetAlbedoRoughnessBuffer()}, graphics::BIND_POINT_GRAPHICS);

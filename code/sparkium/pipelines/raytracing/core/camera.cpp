@@ -7,7 +7,7 @@ namespace sparkium::raytracing {
 
 Camera::Camera(sparkium::Camera &camera) : camera_(camera) {
   core_ = DedicatedCast(camera_.GetCore());
-  core_->GraphicsCore()->CreateBuffer(sizeof(CameraData), graphics::BUFFER_TYPE_STATIC, &camera_buffer_);
+  core_->CreateBuffer(sizeof(CameraData), graphics::BUFFER_TYPE_STATIC, &camera_buffer_);
   camera_data_.world_to_camera = camera_.view;
   camera_data_.camera_to_world = glm::inverse(camera_.view);
   camera_data_.scale = glm::vec2(camera_.aspect * tan(camera_.fovy * 0.5f), tan(camera_.fovy * 0.5f));
@@ -16,7 +16,7 @@ Camera::Camera(sparkium::Camera &camera) : camera_(camera) {
   camera_data_.aperture_blades = camera_.aperture_blades;
   camera_data_.aperture_rotation = camera_.aperture_rotation;
   camera_data_.aperture_ratio = camera_.aperture_ratio;
-  camera_buffer_->UploadData(&camera_data_, sizeof(camera_data_));
+  core_->GetDataUpdateTracker().Update(camera_buffer_.get(), &camera_data_, sizeof(camera_data_));
 }
 
 graphics::Shader *Camera::Shader() {
@@ -36,7 +36,7 @@ graphics::Buffer *Camera::Buffer() {
   camera_data_.aperture_blades = camera_.aperture_blades;
   camera_data_.aperture_rotation = camera_.aperture_rotation;
   camera_data_.aperture_ratio = camera_.aperture_ratio;
-  camera_buffer_->UploadData(&camera_data_, sizeof(camera_data_));
+  core_->GetDataUpdateTracker().Update(camera_buffer_.get(), &camera_data_, sizeof(camera_data_));
   return camera_buffer_.get();
 }
 

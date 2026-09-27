@@ -30,6 +30,7 @@ const CodeLines &GeometryMesh::SamplerImpl() const {
 
 graphics::AccelerationStructure *GeometryMesh::BLAS() {
   if (!blas_) {
+    core_->GetDataUpdateTracker().FlushBeforeRead(geometry_.GetBuffer());
     auto header = geometry_.GetHeader();
 
     core_->GraphicsCore()->CreateBottomLevelAccelerationStructure(

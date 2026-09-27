@@ -56,6 +56,121 @@ class SoftwareBVHTest : public testing::Test {
   std::unique_ptr<sparkium::Core> core;
 };
 
+TEST_F(SoftwareBVHTest, DataUpdatesBatchBuffersImagesAndOverlappingWrites) {
+  auto &tracker = core->GetDataUpdateTracker();
+  tracker.Flush();
+  std::unique_ptr<graphics::Buffer> first, second;
+  std::unique_ptr<graphics::Image> image, hdr;
+  ASSERT_EQ(core->CreateBuffer(32, graphics::BUFFER_TYPE_STATIC, &first), 0);
+  ASSERT_EQ(core->CreateBuffer(16, graphics::BUFFER_TYPE_STATIC, &second), 0);
+  ASSERT_EQ(core->CreateImage(3, 2, graphics::IMAGE_FORMAT_R8G8B8A8_UNORM, &image), 0);
+  ASSERT_EQ(core->CreateImage(2, 1, graphics::IMAGE_FORMAT_R32G32B32A32_SFLOAT, &hdr), 0);
+  std::array<glm::vec4, 2> radiance{glm::vec4(10, 2, 3, 1), glm::vec4(4, 5, 6, 1)}, hdr_read{};
+  tracker.Update(hdr.get(), radiance.data());
+  std::array<uint32_t, 8> original{1, 2, 3, 4, 5, 6, 7, 8}, actual{};
+  std::array<uint32_t, 6> pixels{1, 2, 3, 4, 5, 6}, downloaded{};
+  tracker.Update(first.get(), original.data(), sizeof(original));
+  tracker.Update(second.get(), original.data(), 16);
+  tracker.Update(image.get(), pixels.data());
+  uint32_t patch[]{100, 200};
+  tracker.Update(first.get(), patch, sizeof(patch), 4);
+  patch[0] = 300;
+  tracker.Update(first.get(), patch, 4, 8);
+  tracker.Update(image.get(), patch, {1, 0}, {1, 2});
+  // Update owns its data; the caller may immediately reuse it.
+  patch[0] = patch[1] = 0;
+  graphics::FrameProfile profile(graphics.get(), false);
+  profile.Begin(false);
+  tracker.Flush();
+  profile.Finish();
+  EXPECT_EQ(profile.counters["data_update_batches"], 1u);
+  EXPECT_EQ(profile.counters["data_update_copies"], 4u);
+  graphics->WaitGPU();
+  first->DownloadData(actual.data(), sizeof(actual));
+  original[1] = 100;
+  original[2] = 300;
+  EXPECT_EQ(actual, original);
+  image->DownloadData(downloaded.data());
+  pixels[1] = 300;
+  pixels[4] = 200;
+  EXPECT_EQ(downloaded, pixels);
+  hdr->DownloadData(hdr_read.data());
+  EXPECT_EQ(hdr_read, radiance);
+  profile.Begin(false);
+  tracker.Update(first.get(), original.data(), sizeof(original));
+  tracker.Update(image.get(), pixels.data());
+  tracker.Flush();
+  profile.Finish();
+  EXPECT_EQ(profile.counters["data_update_batches"], 0u);
+  uint32_t corner = 123;
+  tracker.Update(image.get(), &corner, {2, 1}, {1, 1});
+  tracker.Flush();
+  image->DownloadData(downloaded.data());
+  pixels[5] = corner;
+  EXPECT_EQ(downloaded, pixels);
+  // GPU-owned tail must survive a CPU update to the prefix.
+  std::unique_ptr<graphics::CommandContext> commands;
+  graphics->CreateCommandContext(&commands);
+  uint32_t gpu_tail = 999;
+  commands->CmdUploadBuffer(first.get(), &gpu_tail, 4, 28);
+  graphics->SubmitCommandContext(commands.get());
+  uint32_t prefix = 777;
+  tracker.Update(first.get(), &prefix, 4);
+  tracker.Flush();
+  first->DownloadData(actual.data(), sizeof(actual));
+  EXPECT_EQ(actual[0], prefix);
+  EXPECT_EQ(actual[7], gpu_tail);
+  EXPECT_THROW(tracker.Update(first.get(), &prefix, 4, 32), std::out_of_range);
+}
+
+TEST_F(SoftwareBVHTest, DataUpdatesDiscardDestroyedResourcesAndHandleReplacement) {
+  auto &tracker = core->GetDataUpdateTracker();
+  tracker.Flush();
+  std::unique_ptr<graphics::Buffer> buffer;
+  std::unique_ptr<graphics::Image> image;
+  core->CreateBuffer(16, graphics::BUFFER_TYPE_STATIC, &buffer);
+  core->CreateImage(1, 1, graphics::IMAGE_FORMAT_R8G8B8A8_UNORM, &image);
+  uint32_t value = 42;
+  tracker.Update(buffer.get(), &value, 4);
+  tracker.Update(image.get(), &value);
+  auto *expired_buffer = buffer.get();
+  auto *expired_image = image.get();
+  buffer.reset();
+  image.reset();
+  EXPECT_THROW(tracker.Update(expired_buffer, &value, 4), std::invalid_argument);
+  EXPECT_THROW(tracker.Update(expired_image, &value), std::invalid_argument);
+  graphics::FrameProfile profile(graphics.get(), false);
+  profile.Begin(false);
+  tracker.Flush();
+  profile.Finish();
+  EXPECT_EQ(profile.counters["data_update_batches"], 0u);
+  core->CreateBuffer(32, graphics::BUFFER_TYPE_STATIC, &buffer);
+  tracker.Update(buffer.get(), &value, 4);
+  tracker.Flush();
+  uint32_t actual = 0;
+  buffer->DownloadData(&actual, 4);
+  EXPECT_EQ(actual, value);
+  buffer->Resize(64);
+  tracker.Invalidate(buffer.get());
+  tracker.Update(buffer.get(), &value, 4);
+  tracker.Flush();
+  buffer->DownloadData(&actual, 4);
+  EXPECT_EQ(actual, value);
+}
+
+TEST_F(SoftwareBVHTest, DataUpdatesRestoreImageAfterFilmReset) {
+  sparkium::Film film(core.get(), 2, 2);
+  std::array<glm::vec4, 4> pixels{glm::vec4(2), glm::vec4(3), glm::vec4(4), glm::vec4(5)}, actual{};
+  auto &tracker = core->GetDataUpdateTracker();
+  tracker.Update(film.GetRawImage(), pixels.data());
+  tracker.Flush();
+  film.Reset();
+  tracker.Update(film.GetRawImage(), pixels.data());
+  tracker.Flush();
+  film.GetRawImage()->DownloadData(actual.data());
+  EXPECT_EQ(actual, pixels);
+}
+
 TEST_F(SoftwareBVHTest, LazyGraphHitShadersSurvivePipelineSwitches) {
   if (!graphics->DeviceRayTracingSupport() || !graphics->DeviceRayQuerySupport())
     GTEST_SKIP() << "requires native RT and ray query";
@@ -127,9 +242,10 @@ TEST_F(SoftwareBVHTest, MaterialUploadsPreservePublicEditsAndSceneTextureMapping
   sparkium::MaterialSpecular specular(core.get());
   sparkium::MaterialPrincipled principled(core.get());
   std::vector<sparkium::Material *> materials{&diffuse, &emission, &specular, &principled};
-  auto read = [](sparkium::raytracing::Material *material) {
+  auto read = [&](sparkium::raytracing::Material *material) {
     auto *buffer = material->Buffer();
     std::vector<uint8_t> bytes(buffer->Size());
+    core->GetDataUpdateTracker().Flush();
     buffer->DownloadData(bytes.data(), bytes.size());
     return bytes;
   };
@@ -141,9 +257,10 @@ TEST_F(SoftwareBVHTest, MaterialUploadsPreservePublicEditsAndSceneTextureMapping
   for (auto *material : materials)
     for (int i = 0; i < 3; ++i)
       sparkium::raytracing::DedicatedCast(material)->Buffer();
+  core->GetDataUpdateTracker().Flush();
   profile.Finish();
   // Vulkan reports upload counters; both backends verify the GPU bytes below.
-  EXPECT_EQ(profile.counters["static_upload_calls"], 0u);
+  EXPECT_EQ(profile.counters["data_update_batches"], 0u);
 
   diffuse.base_color = {0.2f, 0.4f, 0.6f};
   emission.emission = {2.0f, 3.0f, 4.0f};
@@ -197,6 +314,8 @@ GraphSurface EvaluateShaderGraph(HitRecord hit, float3 direction, int bounce, ui
     rt_graph->Update(scene);
     const int index = scene->RegisterImage(texture.get());
     int principled_index = -1, graph_index = -1;
+    rt_principled->Buffer();
+    core->GetDataUpdateTracker().Flush();
     rt_principled->Buffer()->DownloadData(&principled_index, sizeof(int), sizeof(principled.info) + 8);
     rt_graph->Buffer()->DownloadData(&graph_index, sizeof(int), 12);
     EXPECT_EQ(principled_index, index);
@@ -204,12 +323,15 @@ GraphSurface EvaluateShaderGraph(HitRecord hit, float3 direction, int bounce, ui
     profile.Begin(false);
     rt_principled->Update(scene);
     rt_graph->Update(scene);
+    core->GetDataUpdateTracker().Flush();
     profile.Finish();
-    EXPECT_EQ(profile.counters["static_upload_calls"], 0u);
+    EXPECT_EQ(profile.counters["data_update_batches"], 0u);
   }
   principled.textures.base_color = nullptr;
   rt_principled->Update(a);
   int removed_index = 0;
+  rt_principled->Buffer();
+  core->GetDataUpdateTracker().Flush();
   rt_principled->Buffer()->DownloadData(&removed_index, sizeof(int), sizeof(principled.info) + 8);
   EXPECT_EQ(removed_index, -1);
 }
@@ -228,6 +350,7 @@ TEST_F(SoftwareBVHTest, GeometryLightTransformUploadsTrackChangesAndReverts) {
     transform[0][0] = scale;
     transform[3][1] = scale - 1.0f;
     auto *buffer = light.SamplerData();
+    core->GetDataUpdateTracker().Flush();
     glm::mat4x3 actual;
     buffer->DownloadData(&actual, sizeof(actual));
     EXPECT_EQ(actual, transform);
@@ -238,8 +361,9 @@ TEST_F(SoftwareBVHTest, GeometryLightTransformUploadsTrackChangesAndReverts) {
     profile.Begin(false);
     light.SamplerData();
     light.SamplerData();
+    core->GetDataUpdateTracker().Flush();
     profile.Finish();
-    EXPECT_EQ(profile.counters["static_upload_calls"], 0u);
+    EXPECT_EQ(profile.counters["data_update_batches"], 0u);
   }
 }
 
@@ -247,7 +371,7 @@ TEST_F(SoftwareBVHTest, HDRFilmDevelopmentPreservesHighlightsAndAccumulation) {
   sparkium::Film film(core.get(), 9, 3);
   std::vector<glm::vec4> source(27, glm::vec4(4.0f, 0.25f, -1.0f, 1.0f));
   source.back() = glm::vec4(100000.0f, 1.0f, 0.0f, 1.0f);
-  film.GetRawImage()->UploadData(source.data());
+  core->GetDataUpdateTracker().Update(film.GetRawImage(), source.data());
   film.info.accumulated_samples = 17;
   film.info.exposure = 1.0f;
   film.info.gamma = 1.0f;
@@ -296,7 +420,7 @@ TEST_F(SoftwareBVHTest, HDRArtisticGradeMatchesSDRMidtonesAndPreservesHighlights
                                       {0.999f, 0.999f, 0.999f, 1.0f}, {1.0f, 1.0f, 1.0f, 1.0f},
                                       {1.001f, 1.001f, 1.001f, 1.0f}, {4.0f, 2.0f, 1.0f, 1.0f},
                                       {16.0f, 8.0f, 4.0f, 1.0f},      {100000.0f, 0.0f, -1.0f, 1.0f}};
-  film.GetRawImage()->UploadData(source.data());
+  core->GetDataUpdateTracker().Update(film.GetRawImage(), source.data());
   std::unique_ptr<graphics::Image> sdr, hdr;
   ASSERT_EQ(graphics->CreateImage(8, 1, graphics::IMAGE_FORMAT_R8G8B8A8_UNORM, &sdr), 0);
   ASSERT_EQ(graphics->CreateImage(8, 1, graphics::IMAGE_FORMAT_R32G32B32A32_SFLOAT, &hdr), 0);
@@ -640,6 +764,7 @@ RWByteAddressBuffer results : register(u0, space4);
       pipeline.AddInstance(&rt_geometry, &rt_material, transform, 0);
     std::unique_ptr<graphics::CommandContext> commands;
     graphics->CreateCommandContext(&commands);
+    core->GetDataUpdateTracker().Flush();
     pipeline.Update(commands.get(), buffers, 1, 1);
     commands->CmdBindComputeProgram(program.get());
     if (ray_query)
@@ -651,6 +776,7 @@ RWByteAddressBuffer results : register(u0, space4);
     commands->CmdBindResources(3, {ray_buffer.get()}, graphics::BIND_POINT_COMPUTE);
     commands->CmdBindResources(4, {output.get()}, graphics::BIND_POINT_COMPUTE);
     commands->CmdDispatch((rays.size() + 63) / 64, 1, 1);
+    core->GetDataUpdateTracker().Flush();
     graphics->SubmitCommandContext(commands.get());
     graphics->WaitGPU();
     std::vector<Hit> actual(rays.size());
@@ -803,6 +929,7 @@ float SoftwareShadowTransmission(uint material, HitRecord hit, float3 direction)
   graphics->CreateBuffer(16, graphics::BUFFER_TYPE_STATIC, &output);
   std::unique_ptr<graphics::CommandContext> commands;
   graphics->CreateCommandContext(&commands);
+  core->GetDataUpdateTracker().Flush();
   pipeline.Update(commands.get(), {rt_geometry.Buffer()}, 1, 1);
   commands->CmdBindComputeProgram(program.get());
   if (ray_query)
@@ -813,6 +940,7 @@ float SoftwareShadowTransmission(uint material, HitRecord hit, float3 direction)
   commands->CmdBindResources(2, {rt_geometry.Buffer()}, graphics::BIND_POINT_COMPUTE);
   commands->CmdBindResources(3, {output.get()}, graphics::BIND_POINT_COMPUTE);
   commands->CmdDispatch(1, 1, 1);
+  core->GetDataUpdateTracker().Flush();
   graphics->SubmitCommandContext(commands.get());
   graphics->WaitGPU();
   float actual[4];

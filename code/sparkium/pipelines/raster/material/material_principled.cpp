@@ -23,8 +23,7 @@ MaterialPrincipled::MaterialPrincipled(sparkium::MaterialPrincipled &material)
       Material(DedicatedCast(material.GetCore())) {
   core_->GraphicsCore()->CreateShader(core_->GetShadersVFS(), "material/principled/pixel_shader.slang", "PSMain",
                                       "ps_6_0", {"-I."}, &pixel_shader_);
-  core_->GraphicsCore()->CreateBuffer(sizeof(material_.info) + sizeof(TextureInfo), graphics::BUFFER_TYPE_STATIC,
-                                      &material_buffer_);
+  core_->CreateBuffer(sizeof(material_.info) + sizeof(TextureInfo), graphics::BUFFER_TYPE_STATIC, &material_buffer_);
   core_->GraphicsCore()->CreateSampler(graphics::SamplerInfo{}, &sampler_);
 }
 
@@ -41,8 +40,8 @@ void MaterialPrincipled::Sync() {
   info.use_metallic_texture = material_.textures.metallic ? 1 : 0;
   info.use_normal_texture = material_.textures.normal ? 1 : 0;
   info.use_emission_texture = material_.textures.emission ? 1 : 0;
-  material_buffer_->UploadData(&material_.info, sizeof(material_.info));
-  material_buffer_->UploadData(&info, sizeof(info), sizeof(material_.info));
+  core_->GetDataUpdateTracker().Update(material_buffer_.get(), &material_.info, sizeof(material_.info));
+  core_->GetDataUpdateTracker().Update(material_buffer_.get(), &info, sizeof(info), sizeof(material_.info));
 }
 
 glm::vec3 MaterialPrincipled::Emission() const {

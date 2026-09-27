@@ -1,5 +1,4 @@
 #pragma once
-#include <map>
 
 #include "sparkium/pipelines/raytracing/core/core_util.h"
 
@@ -21,15 +20,7 @@ class Material : public Object {
   }
 
  protected:
-  // Material buffers contain CPU-owned data in fixed, non-overlapping ranges.
-  // Compare the bytes last uploaded, so public-field edits and scene-specific
-  // texture index changes still reach the GPU without explicit dirty flags.
-  void UploadMaterialData(graphics::Buffer *buffer, const void *data, size_t size, size_t offset = 0);
-
   Core *core_;
-
- private:
-  std::map<size_t, std::vector<uint8_t>> uploaded_data_;
 };
 
 }  // namespace sparkium::raytracing

@@ -9,10 +9,24 @@
 #include "sparkium/pipelines/pipelines.h"
 
 namespace sparkium {
-Core::Core(graphics::Core *core) : core_(core) {
+Core::Core(graphics::Core *core) : core_(core), data_updates_(core) {
   LoadPublicShaders();
   LoadPublicBuffers();
   LoadPublicImages();
+}
+
+int Core::CreateBuffer(size_t size, graphics::BufferType type, double_ptr<graphics::Buffer> buffer) {
+  int status = core_->CreateBuffer(size, type, buffer);
+  if (!status)
+    data_updates_.Register(buffer.operator->());
+  return status;
+}
+
+int Core::CreateImage(int width, int height, graphics::ImageFormat format, double_ptr<graphics::Image> image) {
+  int status = core_->CreateImage(width, height, format, image);
+  if (!status)
+    data_updates_.Register(image.operator->());
+  return status;
 }
 
 graphics::Core *Core::GraphicsCore() const {
@@ -123,8 +137,8 @@ void Core::LoadPublicBuffers() {
   auto path = FindAssetFile("data/new-joe-kuo-7.21201");
   auto data = SobolTableGen(65536, 1024, path);
   std::unique_ptr<graphics::Buffer> buffer;
-  core_->CreateBuffer(data.size() * sizeof(float), graphics::BUFFER_TYPE_STATIC, &buffer);
-  buffer->UploadData(data.data(), data.size() * sizeof(float));
+  CreateBuffer(data.size() * sizeof(float), graphics::BUFFER_TYPE_STATIC, &buffer);
+  GetDataUpdateTracker().Update(buffer.get(), data.data(), data.size() * sizeof(float));
   SetPublicResource("sobol", std::move(buffer));
 }
 
@@ -133,12 +147,12 @@ void Core::LoadPublicImages() {
   float hdr_pixel[] = {1.0f, 1.0f, 1.0f, 1.0f};
 
   std::unique_ptr<graphics::Image> image;
-  core_->CreateImage(1, 1, graphics::IMAGE_FORMAT_R8G8B8A8_UNORM, &image);
-  image->UploadData(&pixel);
+  CreateImage(1, 1, graphics::IMAGE_FORMAT_R8G8B8A8_UNORM, &image);
+  GetDataUpdateTracker().Update(image.get(), &pixel);
   SetPublicResource("white", std::move(image));
 
-  core_->CreateImage(1, 1, graphics::IMAGE_FORMAT_R32G32B32A32_SFLOAT, &image);
-  image->UploadData(hdr_pixel);
+  CreateImage(1, 1, graphics::IMAGE_FORMAT_R32G32B32A32_SFLOAT, &image);
+  GetDataUpdateTracker().Update(image.get(), hdr_pixel);
   SetPublicResource("white_hdr", std::move(image));
 
   pixel = 0;
@@ -147,17 +161,17 @@ void Core::LoadPublicImages() {
   hdr_pixel[2] = 0.0f;
   hdr_pixel[3] = 1.0f;
 
-  core_->CreateImage(1, 1, graphics::IMAGE_FORMAT_R8G8B8A8_UNORM, &image);
-  image->UploadData(&pixel);
+  CreateImage(1, 1, graphics::IMAGE_FORMAT_R8G8B8A8_UNORM, &image);
+  GetDataUpdateTracker().Update(image.get(), &pixel);
   SetPublicResource("black", std::move(image));
 
-  core_->CreateImage(1, 1, graphics::IMAGE_FORMAT_R32G32B32A32_SFLOAT, &image);
-  image->UploadData(hdr_pixel);
+  CreateImage(1, 1, graphics::IMAGE_FORMAT_R32G32B32A32_SFLOAT, &image);
+  GetDataUpdateTracker().Update(image.get(), hdr_pixel);
   SetPublicResource("black_hdr", std::move(image));
 
   pixel = 0xFFFF8080;  // Normal map default value (0.5, 0.5, 1.0)
-  core_->CreateImage(1, 1, graphics::IMAGE_FORMAT_R8G8B8A8_UNORM, &image);
-  image->UploadData(&pixel);
+  CreateImage(1, 1, graphics::IMAGE_FORMAT_R8G8B8A8_UNORM, &image);
+  GetDataUpdateTracker().Update(image.get(), &pixel);
   SetPublicResource("normal_default", std::move(image));
 }
 

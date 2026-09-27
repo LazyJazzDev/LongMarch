@@ -28,7 +28,7 @@ Scene::Scene(sparkium::Scene &scene) : scene_(scene), core_(DedicatedCast(scene.
   ambient_light_program_->AddResourceBinding(graphics::RESOURCE_TYPE_UNIFORM_BUFFER, 1);  // Ambient Light Data
   ambient_light_program_->Finalize();
 
-  core_->GraphicsCore()->CreateBuffer(sizeof(glm::vec3), graphics::BUFFER_TYPE_DYNAMIC, &ambient_light_buffer_);
+  core_->CreateBuffer(sizeof(glm::vec3), graphics::BUFFER_TYPE_STATIC, &ambient_light_buffer_);
 }
 
 void Scene::Render(Camera *camera, Film *film) {
@@ -62,7 +62,7 @@ void Scene::Render(Camera *camera, Film *film) {
   shadow_map_callbacks_.clear();
   lighting_callbacks_.clear();
 
-  ambient_light_buffer_->UploadData(&settings.ambient_light, sizeof(glm::vec3));
+  core_->GetDataUpdateTracker().Update(ambient_light_buffer_.get(), &settings.ambient_light, sizeof(glm::vec3));
 
   for (auto *entity : ordered_entities) {
     if (entities_.at(entity).active) {
@@ -137,6 +137,7 @@ void Scene::Render(Camera *camera, Film *film) {
 
   cmd_context->CmdEndRendering();
 
+  core_->GetDataUpdateTracker().Flush();
   core_->GraphicsCore()->SubmitCommandContext(cmd_context.get());
   core_->GraphicsCore()->WaitGPU();
 }

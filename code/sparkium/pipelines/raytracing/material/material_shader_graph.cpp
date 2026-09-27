@@ -11,11 +11,12 @@ MaterialShaderGraph::MaterialShaderGraph(sparkium::MaterialShaderGraph &material
     : Material(DedicatedCast(material.GetCore())),
       material_(material) {
   const size_t size = std::max<size_t>(16, 12 + material_.textures.size() * sizeof(int));
-  core_->GraphicsCore()->CreateBuffer(size, graphics::BUFFER_TYPE_STATIC, &material_buffer_);
+  core_->CreateBuffer(size, graphics::BUFFER_TYPE_STATIC, &material_buffer_);
   sampler_implementation_ = CodeLines(core_->GetShadersVFS(), "material/shader_graph/sampler.slang");
   sampler_implementation_.InsertAfter(material_.graph_code, "// SHADER_GRAPH_IMPLEMENTATION");
   evaluator_implementation_ = CodeLines(core_->GetShadersVFS(), "material/shader_graph/evaluator.slang");
-  UploadMaterialData(material_buffer_.get(), &material_.emission_hint, sizeof(material_.emission_hint));
+  core_->GetDataUpdateTracker().Update(material_buffer_.get(), &material_.emission_hint,
+                                       sizeof(material_.emission_hint));
 }
 
 void MaterialShaderGraph::PrepareHitShaders() {
@@ -55,7 +56,7 @@ void MaterialShaderGraph::Update(Scene *scene) {
   for (auto *texture : material_.textures)
     indices.push_back(scene->RegisterImage(texture));
   if (!indices.empty())
-    UploadMaterialData(material_buffer_.get(), indices.data(), indices.size() * sizeof(int), 12);
+    core_->GetDataUpdateTracker().Update(material_buffer_.get(), indices.data(), indices.size() * sizeof(int), 12);
 }
 
 }  // namespace sparkium::raytracing

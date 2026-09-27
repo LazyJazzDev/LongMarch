@@ -15,13 +15,11 @@ LightGeometryMaterial::LightGeometryMaterial(Core *core,
                                              Material *material,
                                              const glm::mat4x3 &transform)
     : Light(core),
-      uploaded_transform_(transform),
       geometry_(geometry),
       material_(material),
       transform(transform) {
-  core_->GraphicsCore()->CreateBuffer(
-      sizeof(glm::mat4x3) + sizeof(uint32_t) + geometry->PrimitiveCount() * sizeof(float), graphics::BUFFER_TYPE_STATIC,
-      &direct_lighting_sampler_data_);
+  core_->CreateBuffer(sizeof(glm::mat4x3) + sizeof(uint32_t) + geometry->PrimitiveCount() * sizeof(float),
+                      graphics::BUFFER_TYPE_STATIC, &direct_lighting_sampler_data_);
 
   gather_primitive_power_program_ =
       core_->GetGeometryLightPowerProgram(geometry_->SamplerImpl(), material_->EvaluatorImpl());
@@ -34,13 +32,15 @@ LightGeometryMaterial::LightGeometryMaterial(Core *core,
     metadata = {metadata.offset + (group_size - 1) * metadata.stride, metadata.stride * group_size,
                 metadata.element_count / group_size};
   }
-  core_->GraphicsCore()->CreateBuffer(std::max<size_t>(1, metadatas_.size()) * sizeof(BlellochScanMetadata),
-                                      graphics::BUFFER_TYPE_STATIC, &metadata_buffer_);
+  core_->CreateBuffer(std::max<size_t>(1, metadatas_.size()) * sizeof(BlellochScanMetadata),
+                      graphics::BUFFER_TYPE_STATIC, &metadata_buffer_);
   if (!metadatas_.empty())
-    metadata_buffer_->UploadData(metadatas_.data(), metadatas_.size() * sizeof(BlellochScanMetadata));
+    core_->GetDataUpdateTracker().Update(metadata_buffer_.get(), metadatas_.data(),
+                                         metadatas_.size() * sizeof(BlellochScanMetadata));
 
-  direct_lighting_sampler_data_->UploadData(&transform, sizeof(glm::mat4x3), 0);
-  direct_lighting_sampler_data_->UploadData(&primitive_count, sizeof(uint32_t), sizeof(glm::mat4x3));
+  core_->GetDataUpdateTracker().Update(direct_lighting_sampler_data_.get(), &transform, sizeof(glm::mat4x3), 0);
+  core_->GetDataUpdateTracker().Update(direct_lighting_sampler_data_.get(), &primitive_count, sizeof(uint32_t),
+                                       sizeof(glm::mat4x3));
   blelloch_scan_up_program_ = core_->GetComputeProgram("blelloch_scan_up");
   blelloch_scan_down_program_ = core_->GetComputeProgram("blelloch_scan_down");
 }
@@ -74,10 +74,7 @@ int LightGeometryMaterial::SamplerShader(Scene *scene) {
 }
 
 graphics::Buffer *LightGeometryMaterial::SamplerData() {
-  if (std::memcmp(&transform, &uploaded_transform_, sizeof(transform)) != 0) {
-    direct_lighting_sampler_data_->UploadData(&transform, sizeof(glm::mat4x3), 0);
-    uploaded_transform_ = transform;
-  }
+  core_->GetDataUpdateTracker().Update(direct_lighting_sampler_data_.get(), &transform, sizeof(transform));
   return direct_lighting_sampler_data_.get();
 }
 
