@@ -22,6 +22,7 @@ void DataResource::MergeUpdates() {
 }
 
 void DataResource::Invalidate() {
+  ++revision_;
   bytes_.clear();
   valid_.clear();
   dirty_.clear();
@@ -47,6 +48,7 @@ void DataResource::Write(const void *data, size_t size, size_t offset) {
   std::memcpy(bytes_.data() + offset, data, size);
   std::fill(valid_.begin() + offset, valid_.begin() + end, true);
   dirty_.emplace_back(offset, end);
+  ++revision_;
 }
 
 Buffer::Buffer(DataUpdateTracker &tracker, std::unique_ptr<graphics::Buffer> buffer)

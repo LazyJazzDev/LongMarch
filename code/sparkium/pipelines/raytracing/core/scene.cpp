@@ -78,7 +78,7 @@ void Scene::Render(Camera *camera, Film *film, bool software, bool ray_query) {
     else
       cmd_context->CmdBindResources(2, {software_pipeline_->Nodes()}, bind_point);
   } else
-    cmd_context->CmdBindResources(2, tlas_.get(), bind_point);
+    cmd_context->CmdBindResources(2, tlas_->Get(), bind_point);
   cmd_context->CmdBindResources(3, {scene_settings_buffer_->Get()}, bind_point);
   if (software) {
     auto resources = buffers_;
@@ -135,7 +135,7 @@ int32_t Scene::RegisterLight(Light *light, int custom_index) {
   return light_reg_index;
 }
 
-int32_t Scene::RegisterInstance(graphics::AccelerationStructure *blas,
+int32_t Scene::RegisterInstance(BottomLevelAccelerationStructure *blas,
                                 const glm::mat4x3 &transformation,
                                 int32_t hit_group_index,
                                 int32_t geometry_data_index,
@@ -291,7 +291,7 @@ void Scene::UpdatePipeline(Camera *camera) {
   graphics::CpuProfileScope metadata_profile("scene_metadata");
   if (!software_tracing_) {
     if (!tlas_) {
-      core_->GraphicsCore()->CreateTopLevelAccelerationStructure(instances_, &tlas_);
+      core_->CreateTopLevelAccelerationStructure(instances_, &tlas_);
     } else {
       tlas_->UpdateInstances(instances_);
     }

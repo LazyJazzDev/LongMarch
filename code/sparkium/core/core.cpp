@@ -45,6 +45,23 @@ int Core::LoadImageFromFile(const std::string &path, double_ptr<sparkium::Image>
   return status;
 }
 
+int Core::CreateBottomLevelAccelerationStructure(graphics::BufferRange vertices,
+                                                 graphics::BufferRange indices,
+                                                 uint32_t vertex_count,
+                                                 uint32_t stride,
+                                                 uint32_t primitive_count,
+                                                 graphics::RayTracingGeometryFlag flags,
+                                                 double_ptr<BottomLevelAccelerationStructure> blas) {
+  blas.construct(data_updates_, vertices, indices, vertex_count, stride, primitive_count, flags);
+  return 0;
+}
+
+int Core::CreateTopLevelAccelerationStructure(const std::vector<AccelerationStructureInstance> &instances,
+                                              double_ptr<TopLevelAccelerationStructure> tlas) {
+  tlas.construct(data_updates_, instances);
+  return 0;
+}
+
 graphics::Core *Core::GraphicsCore() const {
   return core_;
 }

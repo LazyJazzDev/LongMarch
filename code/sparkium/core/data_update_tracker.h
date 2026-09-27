@@ -1,6 +1,7 @@
 #pragma once
 
 #include <map>
+#include <set>
 
 #include "sparkium/core/core_util.h"
 
@@ -27,12 +28,16 @@ class DataUpdateTracker {
   void Invalidate(graphics::Buffer *buffer);
   void Invalidate(graphics::Image *image);
   void Flush();
-  // Native AS builders submit immediately; drain the batch only if their input is pending.
-  void FlushBeforeRead(graphics::Buffer *buffer);
 
  private:
   friend class Buffer;
   friend class Image;
+  friend class BottomLevelAccelerationStructure;
+  friend class TopLevelAccelerationStructure;
+  void Register(BottomLevelAccelerationStructure *blas);
+  void Register(TopLevelAccelerationStructure *tlas);
+  void Unregister(BottomLevelAccelerationStructure *blas);
+  void Unregister(TopLevelAccelerationStructure *tlas);
   void Register(Buffer *buffer);
   void Register(Image *image);
   void Unregister(Buffer *buffer);
@@ -42,6 +47,8 @@ class DataUpdateTracker {
   graphics::Core *core_;
   std::map<graphics::Buffer *, Buffer *> buffers_;
   std::map<graphics::Image *, Image *> images_;
+  std::set<BottomLevelAccelerationStructure *> blases_;
+  std::set<TopLevelAccelerationStructure *> tlases_;
 };
 
 }  // namespace sparkium

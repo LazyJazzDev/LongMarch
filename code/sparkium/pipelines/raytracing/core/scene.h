@@ -21,7 +21,7 @@ class Scene : public Object {
 
   int32_t RegisterLight(Light *light, int custom_index = -1);
 
-  int32_t RegisterInstance(graphics::AccelerationStructure *blas,
+  int32_t RegisterInstance(BottomLevelAccelerationStructure *blas,
                            const glm::mat4x3 &transformation,
                            int32_t hit_group_index,
                            int32_t geometry_data_index,
@@ -72,7 +72,7 @@ class Scene : public Object {
   std::unique_ptr<graphics::Shader> default_miss_shader_;
   std::unique_ptr<graphics::Shader> shadow_miss_shader_;
   std::unique_ptr<graphics::RayTracingProgram> rt_program_;
-  std::unique_ptr<graphics::AccelerationStructure> tlas_;
+  std::unique_ptr<TopLevelAccelerationStructure> tlas_;
   std::unique_ptr<sparkium::Buffer> scene_settings_buffer_;
   std::map<Entity *, EntityStatus> entities_;
 
@@ -100,7 +100,7 @@ class Scene : public Object {
   int sdr_image_capacity_{0};
   int hdr_image_capacity_{0};
 
-  std::vector<graphics::RayTracingInstance> instances_;
+  std::vector<AccelerationStructureInstance> instances_;
 
   std::vector<InstanceMetadata> instance_metadatas_;
   std::unique_ptr<sparkium::Buffer> instance_metadata_buffer_;

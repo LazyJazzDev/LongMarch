@@ -20,7 +20,7 @@ class SoftwarePipeline {
   }
 
   graphics::AccelerationStructure *AccelerationStructure() const {
-    return native_tlas_.get();
+    return native_tlas_ ? native_tlas_->Get() : nullptr;
   }
 
   graphics::Buffer *Nodes() const {
@@ -76,7 +76,7 @@ class SoftwarePipeline {
 
   Core *core_;
   bool ray_query_;
-  std::unique_ptr<graphics::AccelerationStructure> native_tlas_;
+  std::unique_ptr<TopLevelAccelerationStructure> native_tlas_;
   std::vector<Instance> instances_;
   std::vector<GeometryLayout> geometries_;
   uint32_t tlas_leaves_{};

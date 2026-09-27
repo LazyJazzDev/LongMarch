@@ -16,6 +16,16 @@ class Core : public Object {
 
   int LoadImageFromFile(const std::string &path, double_ptr<sparkium::Image> image);
 
+  int CreateBottomLevelAccelerationStructure(graphics::BufferRange vertices,
+                                             graphics::BufferRange indices,
+                                             uint32_t vertex_count,
+                                             uint32_t stride,
+                                             uint32_t primitive_count,
+                                             graphics::RayTracingGeometryFlag flags,
+                                             double_ptr<BottomLevelAccelerationStructure> blas);
+  int CreateTopLevelAccelerationStructure(const std::vector<AccelerationStructureInstance> &instances,
+                                          double_ptr<TopLevelAccelerationStructure> tlas);
+
   graphics::Core *GraphicsCore() const;
 
   // Resolve automatic selection and supported fallbacks for rendering and UI display.

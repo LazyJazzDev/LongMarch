@@ -1,5 +1,6 @@
 #pragma once
 #include "grassland/grassland.h"
+#include "sparkium/core/acceleration_structure.h"
 #include "sparkium/core/code_lines.h"
 #include "sparkium/core/data_resource.h"
 

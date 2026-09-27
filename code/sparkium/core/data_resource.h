@@ -13,6 +13,10 @@ class DataResource {
   DataResource &operator=(const DataResource &) = delete;
   void Invalidate();
 
+  uint64_t Revision() const {
+    return revision_;
+  }
+
  protected:
   ~DataResource() = default;
   void Write(const void *data, size_t size, size_t offset);
@@ -25,6 +29,7 @@ class DataResource {
   void MergeUpdates();
   DataUpdateTracker *tracker_;
   size_t capacity_{};
+  uint64_t revision_{};
   std::vector<uint8_t> bytes_;
   std::vector<bool> valid_;
   std::vector<std::pair<size_t, size_t>> dirty_;

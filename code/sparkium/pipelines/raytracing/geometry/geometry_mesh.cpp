@@ -28,15 +28,14 @@ const CodeLines &GeometryMesh::SamplerImpl() const {
   return sampler_implementation_;
 }
 
-graphics::AccelerationStructure *GeometryMesh::BLAS() {
+BottomLevelAccelerationStructure *GeometryMesh::BLAS() {
   if (!blas_) {
-    core_->GetDataUpdateTracker().FlushBeforeRead(geometry_.GetBuffer());
     auto header = geometry_.GetHeader();
 
-    core_->GraphicsCore()->CreateBottomLevelAccelerationStructure(
-        geometry_.GetBuffer()->Range(header.position_offset), geometry_.GetBuffer()->Range(header.index_offset),
-        header.num_vertices, header.position_stride, header.num_indices / 3, graphics::RAYTRACING_GEOMETRY_FLAG_NONE,
-        &blas_);
+    core_->CreateBottomLevelAccelerationStructure(geometry_.GetBuffer()->Range(header.position_offset),
+                                                  geometry_.GetBuffer()->Range(header.index_offset),
+                                                  header.num_vertices, header.position_stride, header.num_indices / 3,
+                                                  graphics::RAYTRACING_GEOMETRY_FLAG_NONE, &blas_);
   }
   return blas_.get();
 }

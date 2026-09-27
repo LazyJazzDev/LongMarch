@@ -7,6 +7,10 @@
 namespace sparkium {
 
 DataUpdateTracker::~DataUpdateTracker() {
+  for (auto *blas : blases_)
+    blas->tracker_ = nullptr;
+  for (auto *tlas : tlases_)
+    tlas->tracker_ = nullptr;
   for (auto &[address, buffer] : buffers_)
     buffer->tracker_ = nullptr;
   for (auto &[address, image] : images_)
@@ -24,6 +28,12 @@ void DataUpdateTracker::Register(Image *image) {
 }
 
 void DataUpdateTracker::Unregister(Buffer *buffer) {
+  for (auto *blas : blases_) {
+    if (blas->vertices_.buffer == buffer->Get())
+      blas->vertices_.buffer = nullptr;
+    if (blas->indices_.buffer == buffer->Get())
+      blas->indices_.buffer = nullptr;
+  }
   buffers_.erase(buffer->Get());
 }
 
@@ -74,9 +84,26 @@ void DataUpdateTracker::InvalidateIfTracked(graphics::Image *image) {
     it->second->Invalidate();
 }
 
-void DataUpdateTracker::FlushBeforeRead(graphics::Buffer *buffer) {
-  if (!Find(buffer).dirty_.empty())
-    Flush();
+void DataUpdateTracker::Register(BottomLevelAccelerationStructure *blas) {
+  blases_.insert(blas);
+}
+
+void DataUpdateTracker::Register(TopLevelAccelerationStructure *tlas) {
+  tlases_.insert(tlas);
+}
+
+void DataUpdateTracker::Unregister(BottomLevelAccelerationStructure *blas) {
+  blases_.erase(blas);
+  for (auto *tlas : tlases_)
+    for (auto &instance : tlas->instances_)
+      if (instance.blas == blas) {
+        instance.blas = nullptr;
+        tlas->dirty_ = true;
+      }
+}
+
+void DataUpdateTracker::Unregister(TopLevelAccelerationStructure *tlas) {
+  tlases_.erase(tlas);
 }
 
 void DataUpdateTracker::Flush() {
@@ -118,20 +145,24 @@ void DataUpdateTracker::Flush() {
       }
     }
   }
-  if (!commands)
-    return;
-  if (core_->SubmitCommandContext(commands.get()) != 0)
-    throw std::runtime_error("failed to submit tracked data updates");
-  for (auto &[address, buffer] : buffers_)
-    buffer->dirty_.clear();
-  for (auto &[address, image] : images_)
-    image->dirty_.clear();
-  if (graphics::FrameProfile::active) {
-    auto &counts = graphics::FrameProfile::active->counters;
-    ++counts["data_update_batches"];
-    counts["data_update_copies"] += copies;
-    counts["data_update_bytes"] += bytes;
+  if (commands) {
+    if (core_->SubmitCommandContext(commands.get()) != 0)
+      throw std::runtime_error("failed to submit tracked data updates");
+    for (auto &[address, buffer] : buffers_)
+      buffer->dirty_.clear();
+    for (auto &[address, image] : images_)
+      image->dirty_.clear();
+    if (graphics::FrameProfile::active) {
+      auto &counts = graphics::FrameProfile::active->counters;
+      ++counts["data_update_batches"];
+      counts["data_update_copies"] += copies;
+      counts["data_update_bytes"] += bytes;
+    }
   }
+  for (auto *blas : blases_)
+    blas->Build();
+  for (auto *tlas : tlases_)
+    tlas->Build();
 }
 
 }  // namespace sparkium

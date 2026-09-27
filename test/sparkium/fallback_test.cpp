@@ -214,6 +214,108 @@ TEST_F(SoftwareBVHTest, DataUpdatesRestoreImageAfterFilmReset) {
   EXPECT_EQ(actual, pixels);
 }
 
+TEST_F(SoftwareBVHTest, DataUpdatesDeferAccelerationStructuresAndSkipUnchangedInstances) {
+  if (!graphics->DeviceRayQuerySupport() && !graphics->DeviceRayTracingSupport())
+    GTEST_SKIP() << "requires native acceleration structures";
+  auto &tracker = core->GetDataUpdateTracker();
+  tracker.Flush();
+  std::unique_ptr<sparkium::Buffer> vertices, indices;
+  std::array<glm::vec3, 3> positions{{{-1, -1, 0}, {1, -1, 0}, {0, 1, 0}}};
+  std::array<uint32_t, 3> triangles{0, 1, 2};
+  core->CreateBuffer(sizeof(positions), graphics::BUFFER_TYPE_STATIC, &vertices);
+  core->CreateBuffer(sizeof(triangles), graphics::BUFFER_TYPE_STATIC, &indices);
+  vertices->Update(positions.data(), sizeof(positions));
+  indices->Update(triangles.data(), sizeof(triangles));
+  std::unique_ptr<sparkium::BottomLevelAccelerationStructure> blas;
+  std::unique_ptr<sparkium::TopLevelAccelerationStructure> tlas;
+  core->CreateBottomLevelAccelerationStructure(vertices->Range(), indices->Range(), 3, sizeof(glm::vec3), 1,
+                                               graphics::RAYTRACING_GEOMETRY_FLAG_NONE, &blas);
+  std::vector<sparkium::AccelerationStructureInstance> instances{blas->MakeInstance(glm::mat4x3(1.0f))};
+  core->CreateTopLevelAccelerationStructure(instances, &tlas);
+  EXPECT_EQ(blas->Get(), nullptr);
+  EXPECT_EQ(tlas->Get(), nullptr);
+  graphics::FrameProfile profile(graphics.get(), false);
+  auto flush = [&] {
+    profile.Begin(false);
+    tracker.Flush();
+    profile.Finish();
+  };
+  flush();
+  ASSERT_NE(blas->Get(), nullptr);
+  ASSERT_NE(tlas->Get(), nullptr);
+  EXPECT_EQ(profile.counters["data_update_batches"], 1u);
+  EXPECT_EQ(profile.counters["data_update_blas_builds"], 1u);
+  EXPECT_EQ(profile.counters["data_update_tlas_builds"], 1u);
+  vertices->Update(positions.data(), sizeof(positions));
+  tlas->UpdateInstances(instances);
+  flush();
+  EXPECT_EQ(profile.counters["data_update_batches"], 0u);
+  EXPECT_EQ(profile.counters["data_update_blas_builds"], 0u);
+  EXPECT_EQ(profile.counters["data_update_tlas_updates"], 0u);
+  instances[0].transform[3][0] = 2.0f;
+  tlas->UpdateInstances(instances);
+  flush();
+  EXPECT_EQ(profile.counters["data_update_blas_builds"], 0u);
+  EXPECT_EQ(profile.counters["data_update_tlas_updates"], 1u);
+  positions[0].x = -2.0f;
+  vertices->Update(positions.data(), sizeof(positions));
+  flush();
+  EXPECT_EQ(profile.counters["data_update_blas_builds"], 1u);
+  EXPECT_EQ(profile.counters["data_update_tlas_updates"], 1u);
+  instances[0].instance_id = 17;
+  instances[0].instance_mask = 127;
+  instances[0].instance_hit_group_offset = 2;
+  instances[0].instance_flags = graphics::RAYTRACING_INSTANCE_FLAG_NONE;
+  tlas->UpdateInstances(instances);
+  flush();
+  EXPECT_EQ(profile.counters["data_update_tlas_updates"], 1u);
+  // Destruction invalidates dependents before any stale pointer can be read.
+  vertices.reset();
+  EXPECT_NO_THROW(tracker.Flush());
+  blas.reset();
+  EXPECT_THROW(tlas->Get(), std::logic_error);
+  EXPECT_NO_THROW(tracker.Flush());
+  tlas.reset();
+  EXPECT_NO_THROW(tracker.Flush());
+}
+
+TEST_F(SoftwareBVHTest, DataUpdatesAccelerationStructureOwnersDetachAndCancelPendingBuilds) {
+  if (!graphics->DeviceRayQuerySupport() && !graphics->DeviceRayTracingSupport())
+    GTEST_SKIP() << "requires native acceleration structures";
+  std::unique_ptr<sparkium::Buffer> vertices, indices;
+  core->CreateBuffer(36, graphics::BUFFER_TYPE_STATIC, &vertices);
+  core->CreateBuffer(12, graphics::BUFFER_TYPE_STATIC, &indices);
+  auto &tracker = core->GetDataUpdateTracker();
+  tracker.Flush();
+  std::unique_ptr<sparkium::BottomLevelAccelerationStructure> blas;
+  std::unique_ptr<sparkium::TopLevelAccelerationStructure> tlas;
+  core->CreateBottomLevelAccelerationStructure(vertices->Range(), indices->Range(), 3, 12, 1,
+                                               graphics::RAYTRACING_GEOMETRY_FLAG_NONE, &blas);
+  core->CreateTopLevelAccelerationStructure({blas->MakeInstance(glm::mat4x3(1.0f))}, &tlas);
+  sparkium::DataUpdateTracker other(graphics.get());
+  EXPECT_THROW((sparkium::TopLevelAccelerationStructure(other, {blas->MakeInstance(glm::mat4x3(1.0f))})),
+               std::invalid_argument);
+  tlas.reset();
+  blas.reset();
+  graphics::FrameProfile profile(graphics.get(), false);
+  profile.Begin(false);
+  tracker.Flush();
+  profile.Finish();
+  EXPECT_EQ(profile.counters["data_update_blas_builds"], 0u);
+  EXPECT_EQ(profile.counters["data_update_tlas_builds"], 0u);
+  core->CreateBottomLevelAccelerationStructure(vertices->Range(), indices->Range(), 3, 12, 1,
+                                               graphics::RAYTRACING_GEOMETRY_FLAG_NONE, &blas);
+  core->CreateTopLevelAccelerationStructure({blas->MakeInstance(glm::mat4x3(1.0f))}, &tlas);
+  // Public resource uploads are already submitted; finish them before destroying their Core.
+  graphics->WaitGPU();
+  core.reset();
+  EXPECT_THROW(tlas->UpdateInstances({}), std::logic_error);
+  EXPECT_NO_THROW(tlas.reset());
+  EXPECT_NO_THROW(blas.reset());
+  EXPECT_NO_THROW(vertices.reset());
+  EXPECT_NO_THROW(indices.reset());
+}
+
 TEST_F(SoftwareBVHTest, LazyGraphHitShadersSurvivePipelineSwitches) {
   if (!graphics->DeviceRayTracingSupport() || !graphics->DeviceRayQuerySupport())
     GTEST_SKIP() << "requires native RT and ray query";
@@ -807,8 +909,8 @@ RWByteAddressBuffer results : register(u0, space4);
       pipeline.AddInstance(&rt_geometry, &rt_material, transform, 0);
     std::unique_ptr<graphics::CommandContext> commands;
     graphics->CreateCommandContext(&commands);
-    core->GetDataUpdateTracker().Flush();
     pipeline.Update(commands.get(), buffers, 1, 1);
+    core->GetDataUpdateTracker().Flush();
     commands->CmdBindComputeProgram(program.get());
     if (ray_query)
       commands->CmdBindResources(0, pipeline.AccelerationStructure(), graphics::BIND_POINT_COMPUTE);
@@ -972,8 +1074,8 @@ float SoftwareShadowTransmission(uint material, HitRecord hit, float3 direction)
   graphics->CreateBuffer(16, graphics::BUFFER_TYPE_STATIC, &output);
   std::unique_ptr<graphics::CommandContext> commands;
   graphics->CreateCommandContext(&commands);
-  core->GetDataUpdateTracker().Flush();
   pipeline.Update(commands.get(), {rt_geometry.Buffer()}, 1, 1);
+  core->GetDataUpdateTracker().Flush();
   commands->CmdBindComputeProgram(program.get());
   if (ray_query)
     commands->CmdBindResources(0, pipeline.AccelerationStructure(), graphics::BIND_POINT_COMPUTE);

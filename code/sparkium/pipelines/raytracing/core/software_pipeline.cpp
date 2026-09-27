@@ -237,11 +237,10 @@ void SoftwarePipeline::Update(graphics::CommandContext *commands,
                               const std::vector<graphics::Buffer *> &buffers,
                               uint32_t sdr_count,
                               uint32_t hdr_count) {
-  auto graphics = core_->GraphicsCore();
   graphics::CpuProfileScope prepare_profile("software_prepare");
   std::vector<GeometryLayout> geometries;
   std::vector<GPUInstance> gpu_instances;
-  std::vector<graphics::RayTracingInstance> native_instances;
+  std::vector<AccelerationStructureInstance> native_instances;
   std::vector<MaterialCode> materials;
   // Shared materials need source normalization only once per update. Keep this
   // local so edits and component destruction cannot leave a stale source cache.
@@ -304,12 +303,10 @@ void SoftwarePipeline::Update(graphics::CommandContext *commands,
   if (!gpu_instances.empty())
     instances_buffer_->Update(gpu_instances.data(), gpu_instances.size() * sizeof(GPUInstance), 16);
   if (ray_query_) {
-    if (!native_tlas_) {
-      if (graphics->CreateTopLevelAccelerationStructure(native_instances, &native_tlas_))
-        throw std::runtime_error("failed to create native TLAS");
-    } else if (native_tlas_->UpdateInstances(native_instances)) {
-      throw std::runtime_error("failed to update native TLAS");
-    }
+    if (!native_tlas_)
+      core_->CreateTopLevelAccelerationStructure(native_instances, &native_tlas_);
+    else
+      native_tlas_->UpdateInstances(native_instances);
     if (!render_program_ || materials != material_sources_ || buffer_count_ != buffers.size() ||
         sdr_count_ != sdr_count || hdr_count_ != hdr_count)
       CompileRenderer(materials, buffers.size(), sdr_count, hdr_count);
