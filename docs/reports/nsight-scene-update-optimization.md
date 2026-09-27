@@ -162,6 +162,13 @@ Check warmup completion again before reusing this delay on another machine.
   before/after comparison, not a cross-backend image comparison.
 - Pre-commit checks pass. Metal is not tested on this Windows machine.
 
+## macOS follow-up
+
+[Apple M5 / Metal verification](nsight-scene-update-macos.md) measures three runs
+per condition against the merged baseline. Classroom improves by 1.09%; Junkshop
+and Monster show no consistent gain across runs. All nine before/after PNG pairs
+are byte-identical. This follow-up supplements the Windows results above.
+
 ## Reproduction and artifacts
 
 For each baseline/optimized executable and each scene/backend, run from the
