@@ -7,41 +7,57 @@
 namespace sparkium {
 
 DataUpdateTracker::~DataUpdateTracker() {
-  for (auto &[address, resource] : resources_)
-    resource->tracker_ = nullptr;
+  for (auto &[address, buffer] : buffers_)
+    buffer->tracker_ = nullptr;
+  for (auto &[address, image] : images_)
+    image->tracker_ = nullptr;
 }
 
-void DataUpdateTracker::Register(DataResource *resource) {
-  const void *address = resource->buffer_ ? static_cast<void *>(resource->buffer_) : resource->image_;
-  if (!resources_.emplace(address, resource).second)
-    throw std::invalid_argument("resource already registered with DataUpdateTracker");
+void DataUpdateTracker::Register(Buffer *buffer) {
+  if (!buffers_.emplace(buffer->Get(), buffer).second)
+    throw std::invalid_argument("buffer already registered with DataUpdateTracker");
 }
 
-void DataUpdateTracker::Unregister(DataResource *resource) {
-  const void *address = resource->buffer_ ? static_cast<void *>(resource->buffer_) : resource->image_;
-  resources_.erase(address);
+void DataUpdateTracker::Register(Image *image) {
+  if (!images_.emplace(image->Get(), image).second)
+    throw std::invalid_argument("image already registered with DataUpdateTracker");
 }
 
-DataResource &DataUpdateTracker::Find(const void *resource) {
-  auto it = resources_.find(resource);
-  if (it == resources_.end())
-    throw std::invalid_argument("resource is not registered with DataUpdateTracker");
+void DataUpdateTracker::Unregister(Buffer *buffer) {
+  buffers_.erase(buffer->Get());
+}
+
+void DataUpdateTracker::Unregister(Image *image) {
+  images_.erase(image->Get());
+}
+
+Buffer &DataUpdateTracker::Find(graphics::Buffer *buffer) {
+  auto it = buffers_.find(buffer);
+  if (it == buffers_.end())
+    throw std::invalid_argument("buffer is not registered with DataUpdateTracker");
+  return *it->second;
+}
+
+Image &DataUpdateTracker::Find(graphics::Image *image) {
+  auto it = images_.find(image);
+  if (it == images_.end())
+    throw std::invalid_argument("image is not registered with DataUpdateTracker");
   return *it->second;
 }
 
 void DataUpdateTracker::Update(graphics::Buffer *buffer, const void *data, size_t size, size_t offset) {
-  static_cast<Buffer &>(Find(buffer)).Update(data, size, offset);
+  Find(buffer).Update(data, size, offset);
 }
 
 void DataUpdateTracker::Update(graphics::Image *image, const void *data) {
-  static_cast<Image &>(Find(image)).Update(data);
+  Find(image).Update(data);
 }
 
 void DataUpdateTracker::Update(graphics::Image *image,
                                const void *data,
                                graphics::Offset2D offset,
                                graphics::Extent2D extent) {
-  static_cast<Image &>(Find(image)).Update(data, offset, extent);
+  Find(image).Update(data, offset, extent);
 }
 
 void DataUpdateTracker::Invalidate(graphics::Buffer *buffer) {
@@ -53,8 +69,8 @@ void DataUpdateTracker::Invalidate(graphics::Image *image) {
 }
 
 void DataUpdateTracker::InvalidateIfTracked(graphics::Image *image) {
-  auto it = resources_.find(image);
-  if (it != resources_.end())
+  auto it = images_.find(image);
+  if (it != images_.end())
     it->second->Invalidate();
 }
 
@@ -66,38 +82,39 @@ void DataUpdateTracker::FlushBeforeRead(graphics::Buffer *buffer) {
 void DataUpdateTracker::Flush() {
   std::unique_ptr<graphics::CommandContext> commands;
   size_t copies = 0, bytes = 0;
-  for (auto &[address, resource] : resources_) {
-    auto &entry = *resource;
-    if (entry.dirty_.empty())
-      continue;
+  auto prepare = [&](DataResource &resource) {
+    if (resource.dirty_.empty())
+      return false;
     if (!commands)
       core_->CreateCommandContext(&commands);
-    std::sort(entry.dirty_.begin(), entry.dirty_.end());
-    std::vector<std::pair<size_t, size_t>> ranges;
-    for (auto range : entry.dirty_) {
-      if (!ranges.empty() && range.first <= ranges.back().second)
-        ranges.back().second = std::max(ranges.back().second, range.second);
-      else
-        ranges.push_back(range);
-    }
-    for (auto [begin, end] : ranges) {
+    resource.MergeUpdates();
+    return true;
+  };
+  for (auto &[address, buffer] : buffers_) {
+    if (!prepare(*buffer))
+      continue;
+    for (auto [begin, end] : buffer->dirty_) {
+      commands->CmdUploadBuffer(address, buffer->bytes_.data() + begin, end - begin, begin);
       bytes += end - begin;
-      if (entry.buffer_) {
-        commands->CmdUploadBuffer(entry.buffer_, entry.bytes_.data() + begin, end - begin, begin);
+      ++copies;
+    }
+  }
+  for (auto &[address, image] : images_) {
+    if (!prepare(*image))
+      continue;
+    size_t pixel = graphics::PixelSize(image->Format());
+    size_t pitch = image->Extent().width * pixel;
+    for (auto [begin, end] : image->dirty_) {
+      bytes += end - begin;
+      // Full rows can share one copy; partial rows retain their exact bounds.
+      while (begin < end) {
+        size_t width = std::min(end - begin, pitch - begin % pitch);
+        size_t rows = begin % pitch == 0 && end - begin >= pitch ? (end - begin) / pitch : 1;
+        commands->CmdUploadImage(address, image->bytes_.data() + begin,
+                                 {int32_t(begin % pitch / pixel), int32_t(begin / pitch)},
+                                 {uint32_t(width / pixel), uint32_t(rows)});
+        begin += width * rows;
         ++copies;
-      } else {
-        size_t pixel = graphics::PixelSize(entry.image_->Format());
-        size_t pitch = entry.image_->Extent().width * pixel;
-        // Full rows can share one copy; partial rows retain their exact bounds.
-        while (begin < end) {
-          size_t width = std::min(end - begin, pitch - begin % pitch);
-          size_t rows = begin % pitch == 0 && end - begin >= pitch ? (end - begin) / pitch : 1;
-          commands->CmdUploadImage(entry.image_, entry.bytes_.data() + begin,
-                                   {int32_t(begin % pitch / pixel), int32_t(begin / pitch)},
-                                   {uint32_t(width / pixel), uint32_t(rows)});
-          begin += width * rows;
-          ++copies;
-        }
       }
     }
   }
@@ -105,8 +122,10 @@ void DataUpdateTracker::Flush() {
     return;
   if (core_->SubmitCommandContext(commands.get()) != 0)
     throw std::runtime_error("failed to submit tracked data updates");
-  for (auto &[address, resource] : resources_)
-    resource->dirty_.clear();
+  for (auto &[address, buffer] : buffers_)
+    buffer->dirty_.clear();
+  for (auto &[address, image] : images_)
+    image->dirty_.clear();
   if (graphics::FrameProfile::active) {
     auto &counts = graphics::FrameProfile::active->counters;
     ++counts["data_update_batches"];

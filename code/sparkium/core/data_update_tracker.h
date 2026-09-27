@@ -31,12 +31,17 @@ class DataUpdateTracker {
   void FlushBeforeRead(graphics::Buffer *buffer);
 
  private:
-  friend class DataResource;
-  void Register(DataResource *resource);
-  void Unregister(DataResource *resource);
-  DataResource &Find(const void *resource);
+  friend class Buffer;
+  friend class Image;
+  void Register(Buffer *buffer);
+  void Register(Image *image);
+  void Unregister(Buffer *buffer);
+  void Unregister(Image *image);
+  Buffer &Find(graphics::Buffer *buffer);
+  Image &Find(graphics::Image *image);
   graphics::Core *core_;
-  std::map<const void *, DataResource *> resources_;
+  std::map<graphics::Buffer *, Buffer *> buffers_;
+  std::map<graphics::Image *, Image *> images_;
 };
 
 }  // namespace sparkium

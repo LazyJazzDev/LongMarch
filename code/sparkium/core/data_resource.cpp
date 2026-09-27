@@ -6,41 +6,30 @@
 #include "sparkium/core/data_update_tracker.h"
 
 namespace sparkium {
-DataResource::DataResource(DataUpdateTracker &tracker, graphics::Buffer *buffer, graphics::Image *image)
-    : tracker_(&tracker),
-      buffer_(buffer),
-      image_(image) {
-  if ((!buffer && !image) || (buffer && buffer->Type() != graphics::BUFFER_TYPE_STATIC))
-    throw std::invalid_argument("tracked resources require an image or static buffer");
-  capacity_ = buffer ? buffer->Size()
-                     : size_t(image->Extent().width) * image->Extent().height * graphics::PixelSize(image->Format());
-  tracker.Register(this);
+DataResource::DataResource(DataUpdateTracker &tracker) : tracker_(&tracker) {
 }
 
-DataResource::~DataResource() {
-  Detach();
-}
-
-void DataResource::Detach() {
-  if (tracker_) {
-    tracker_->Unregister(this);
-    tracker_ = nullptr;
+void DataResource::MergeUpdates() {
+  std::sort(dirty_.begin(), dirty_.end());
+  size_t count = 0;
+  for (auto range : dirty_) {
+    if (count && range.first <= dirty_[count - 1].second)
+      dirty_[count - 1].second = std::max(dirty_[count - 1].second, range.second);
+    else
+      dirty_[count++] = range;
   }
+  dirty_.resize(count);
 }
 
 void DataResource::Invalidate() {
   bytes_.clear();
   valid_.clear();
   dirty_.clear();
-  if (buffer_)
-    capacity_ = buffer_->Size();
 }
 
 void DataResource::Write(const void *data, size_t size, size_t offset) {
   if (!tracker_)
     throw std::logic_error("resource's DataUpdateTracker has been destroyed");
-  if (buffer_ && capacity_ != buffer_->Size())
-    Invalidate();
   if (offset > capacity_ || size > capacity_ - offset)
     throw std::out_of_range("tracked update exceeds resource bounds");
   if (!size)
@@ -61,12 +50,17 @@ void DataResource::Write(const void *data, size_t size, size_t offset) {
 }
 
 Buffer::Buffer(DataUpdateTracker &tracker, std::unique_ptr<graphics::Buffer> buffer)
-    : DataResource(tracker, buffer.get(), nullptr),
+    : DataResource(tracker),
       buffer_(std::move(buffer)) {
+  if (!buffer_ || buffer_->Type() != graphics::BUFFER_TYPE_STATIC)
+    throw std::invalid_argument("tracked buffers require static GPU storage");
+  capacity_ = buffer_->Size();
+  tracker.Register(this);
 }
 
 Buffer::~Buffer() {
-  Detach();
+  if (tracker_)
+    tracker_->Unregister(this);
 }
 
 void Buffer::Resize(size_t size) {
@@ -74,17 +68,29 @@ void Buffer::Resize(size_t size) {
   Invalidate();
 }
 
+void Buffer::Invalidate() {
+  DataResource::Invalidate();
+  capacity_ = buffer_->Size();
+}
+
 void Buffer::Update(const void *data, size_t size, size_t offset) {
+  if (capacity_ != buffer_->Size())
+    Invalidate();
   Write(data, size, offset);
 }
 
 Image::Image(DataUpdateTracker &tracker, std::unique_ptr<graphics::Image> image)
-    : DataResource(tracker, nullptr, image.get()),
+    : DataResource(tracker),
       image_(std::move(image)) {
+  if (!image_)
+    throw std::invalid_argument("tracked images require a native image");
+  capacity_ = size_t(Extent().width) * Extent().height * graphics::PixelSize(Format());
+  tracker.Register(this);
 }
 
 Image::~Image() {
-  Detach();
+  if (tracker_)
+    tracker_->Unregister(this);
 }
 
 void Image::Update(const void *data) {

@@ -34,7 +34,13 @@ full updates and rectangular patches. Callers can immediately reuse their data.
 and records pixels before the decoder releases its CPU data. JSON scenes retain
 these wrappers. Graphics clients outside Sparkium keep immediate image loading.
 The tracker retains raw-address lookup for APIs exposing native resources, but
-registration/unregistration are private to the owning wrappers. A newly allocated
+registration/unregistration are private to the owning wrappers. The tracker keeps
+separate typed Buffer and Image registries and records their uploads in separate
+loops into the same command context. DataResource contains only common state:
+tracker association, byte capacity, snapshot, initialized-byte mask and dirty
+intervals. It has no native Buffer/Image pointers or resource-type checks; concrete
+wrappers handle registration, destruction and resource-specific invalidation.
+A newly allocated
 resource cannot inherit the previous owner's registration or CPU cache.
 
 ## Submission and ordering
@@ -99,11 +105,17 @@ validation is on Windows D3D12/Vulkan; Metal requires verification on macOS.
 On the RTX 3090 Ti / driver 596.49 machine used in the
 [startup report](blender-startup-optimization.md), Ninja Release CLI, GUI and
 fallback-test builds pass. Debug D3D12 and Vulkan synchronization-validation runs
-each pass 41 tests, with two unsupported-HDR cases skipped because the display
-supports HDR. All five tracker-focused cases pass on both backends, including both destruction
+each pass 39 tests, with four HDR-dependent cases skipped. D3D12 exposes HDR,
+so its SDR-only case skips; Vulkan exposes no HDR surface in this run, so its
+HDR recovery, presentation/ImGui and reference-white cases skip. Its SDR fallback
+case passes. The earlier owning-wrapper run passed 41 tests with two skips. All five tracker-focused cases pass on both backends, including both destruction
 orders and ownership transfer.
 There are no validation errors; the existing unused raster vertex-output warning
 and intentionally injected presentation recovery errors remain.
+
+The Windows builds and full regression suites above were repeated after splitting
+the Buffer/Image registries. The Blender measurements below belong to the
+owning-wrapper revision `ed0dcdd`; they were not repeated for the registry split.
 
 After the owning-wrapper migration, all six Blender scene/backend pairs run for two frames at the original scene
 resolution and eight samples per dispatch. Each PNG is pixel-identical to the
@@ -119,3 +131,4 @@ frames from each run. Reproduction uses the CLI scene command in the startup rep
 inspect `data_update_batches`, `data_update_copies` and `data_update_bytes` in the
 CPU-profile CSV. The PNG comparison artifacts and full validation logs remain
 locally under `out/blender-startup/resource-owners/` and `out/resource-owner-*`.
+The registry-split build and regression logs are under `out/typed-tracker-*`.

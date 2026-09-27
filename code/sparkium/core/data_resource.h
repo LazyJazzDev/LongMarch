@@ -14,19 +14,17 @@ class DataResource {
   void Invalidate();
 
  protected:
-  ~DataResource();
-  void Detach();
+  ~DataResource() = default;
   void Write(const void *data, size_t size, size_t offset);
 
  private:
   friend class DataUpdateTracker;
   friend class Buffer;
   friend class Image;
-  DataResource(DataUpdateTracker &tracker, graphics::Buffer *buffer, graphics::Image *image);
+  explicit DataResource(DataUpdateTracker &tracker);
+  void MergeUpdates();
   DataUpdateTracker *tracker_;
-  graphics::Buffer *buffer_;
-  graphics::Image *image_;
-  size_t capacity_;
+  size_t capacity_{};
   std::vector<uint8_t> bytes_;
   std::vector<bool> valid_;
   std::vector<std::pair<size_t, size_t>> dirty_;
@@ -51,6 +49,7 @@ class Buffer final : public DataResource {
   }
 
   void Resize(size_t size);
+  void Invalidate();
   void Update(const void *data, size_t size, size_t offset = 0);
 
   void DownloadData(void *data, size_t size, size_t offset = 0) const {
