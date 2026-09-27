@@ -19,7 +19,7 @@ class Core : public Object {
 
   graphics::ComputeProgram *GetComputeProgram(const std::string &name);
 
-  graphics::ComputeProgram *GeometryLightProgram(const CodeLines &geometry, const CodeLines &material);
+  graphics::ComputeProgram *GetGeometryLightPowerProgram(const CodeLines &geometry, const CodeLines &material);
 
   graphics::Image *GetImage(const std::string &name);
 

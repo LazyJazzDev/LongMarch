@@ -23,7 +23,8 @@ LightGeometryMaterial::LightGeometryMaterial(Core *core,
       sizeof(glm::mat4x3) + sizeof(uint32_t) + geometry->PrimitiveCount() * sizeof(float), graphics::BUFFER_TYPE_STATIC,
       &direct_lighting_sampler_data_);
 
-  gather_primitive_power_program_ = core_->GeometryLightProgram(geometry_->SamplerImpl(), material_->EvaluatorImpl());
+  gather_primitive_power_program_ =
+      core_->GetGeometryLightPowerProgram(geometry_->SamplerImpl(), material_->EvaluatorImpl());
   uint32_t primitive_count = geometry_->PrimitiveCount();
   uint32_t group_size = 64;
 

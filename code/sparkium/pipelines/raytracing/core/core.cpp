@@ -26,7 +26,7 @@ graphics::ComputeProgram *Core::GetComputeProgram(const std::string &name) {
   return core_.GetComputeProgram(name);
 }
 
-graphics::ComputeProgram *Core::GeometryLightProgram(const CodeLines &geometry, const CodeLines &material) {
+graphics::ComputeProgram *Core::GetGeometryLightPowerProgram(const CodeLines &geometry, const CodeLines &material) {
   // The VFS, backend, entry point, profile and binding layout are fixed for this Core.
   auto key = std::make_pair(std::string(geometry), std::string(material));
   auto found = geometry_light_programs_.find(key);

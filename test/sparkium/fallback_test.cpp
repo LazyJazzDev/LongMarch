@@ -115,10 +115,10 @@ TEST_F(SoftwareBVHTest, GeometryLightProgramsShareOnlyEquivalentSources) {
   sparkium::CodeLines geometry(vfs, "geometry/mesh/geometry_sampler.slang");
   sparkium::CodeLines diffuse(vfs, "material/lambertian/evaluator.slang");
   sparkium::CodeLines emission(vfs, "material/light/evaluator.slang");
-  auto *first = rt_core->GeometryLightProgram(geometry, diffuse);
+  auto *first = rt_core->GetGeometryLightPowerProgram(geometry, diffuse);
   ASSERT_NE(first, nullptr);
-  EXPECT_EQ(first, rt_core->GeometryLightProgram(geometry, diffuse));
-  EXPECT_NE(first, rt_core->GeometryLightProgram(geometry, emission));
+  EXPECT_EQ(first, rt_core->GetGeometryLightPowerProgram(geometry, diffuse));
+  EXPECT_NE(first, rt_core->GetGeometryLightPowerProgram(geometry, emission));
 }
 
 TEST_F(SoftwareBVHTest, MaterialUploadsPreservePublicEditsAndSceneTextureMappings) {
