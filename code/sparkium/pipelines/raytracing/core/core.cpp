@@ -90,7 +90,7 @@ void Core::LoadPublicShaders() {
   core_.SetPublicResource("blelloch_scan_down", std::move(compute_program));
 }
 
-void Core::PrepareNativeShaders() {
+void Core::PrepareBuiltinHitShaders() {
   if (native_shaders_ready_)
     return;
   std::unique_ptr<graphics::Shader> shader;

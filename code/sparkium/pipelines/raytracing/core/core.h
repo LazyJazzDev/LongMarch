@@ -9,7 +9,7 @@ class Core : public Object {
  public:
   Core(sparkium::Core &core);
 
-  void PrepareNativeShaders();
+  void PrepareBuiltinHitShaders();
 
   graphics::Core *GraphicsCore() const;
 

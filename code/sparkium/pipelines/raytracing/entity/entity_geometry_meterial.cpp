@@ -25,7 +25,7 @@ void EntityGeometryMaterial::PrepareHitGroups() {
   if (!core_->GraphicsCore()->DeviceRayTracingSupport())
     return;
 
-  core_->PrepareNativeShaders();
+  core_->PrepareBuiltinHitShaders();
   if (dynamic_cast<GeometryMesh *>(geometry_)) {
     if (dynamic_cast<MaterialLambertian *>(material_)) {
       hit_groups_.render_group.closest_hit_shader = core_->GetShader("mesh_lambertian_chit");
