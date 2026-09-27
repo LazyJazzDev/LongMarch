@@ -19,9 +19,6 @@ LightPoint::LightPoint(Core *core,
       soft_falloff(soft_falloff),
       sampling_weight(sampling_weight) {
   core_->GraphicsCore()->CreateBuffer(sizeof(float) * 9, graphics::BUFFER_TYPE_STATIC, &direct_lighting_sampler_data_);
-  if (core_->GraphicsCore()->DeviceRayTracingSupport())
-    core_->GraphicsCore()->CreateShader(core_->GetShadersVFS(), "light/point/direct_lighting_sampler.slang",
-                                        "SampleDirectLightingCallable", "lib_6_5", {"-I."}, &direct_lighting_sampler_);
 }
 
 int LightPoint::SamplerShader(Scene *scene) {

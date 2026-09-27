@@ -25,8 +25,7 @@ class LightGeometryMaterial : public Light {
   std::vector<BlellochScanMetadata> metadatas_;
   std::unique_ptr<graphics::Buffer> metadata_buffer_;
 
-  std::unique_ptr<graphics::Shader> gather_primitive_power_shader_;
-  std::unique_ptr<graphics::ComputeProgram> gather_primitive_power_program_;
+  graphics::ComputeProgram *gather_primitive_power_program_;
 
   // float3x4 transform
   // uint num_primitive
