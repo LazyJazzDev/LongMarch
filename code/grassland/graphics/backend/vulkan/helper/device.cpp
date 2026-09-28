@@ -8,7 +8,6 @@
 #include "grassland/graphics/backend/vulkan/helper/descriptor_pool.h"
 #include "grassland/graphics/backend/vulkan/helper/descriptor_set.h"
 #include "grassland/graphics/backend/vulkan/helper/descriptor_set_layout.h"
-#include "grassland/graphics/backend/vulkan/helper/fence.h"
 #include "grassland/graphics/backend/vulkan/helper/image.h"
 #include "grassland/graphics/backend/vulkan/helper/instance.h"
 #include "grassland/graphics/backend/vulkan/helper/instance_procedures.h"
@@ -16,7 +15,6 @@
 #include "grassland/graphics/backend/vulkan/helper/pipeline_layout.h"
 #include "grassland/graphics/backend/vulkan/helper/queue.h"
 #include "grassland/graphics/backend/vulkan/helper/raytracing/raytracing.h"
-#include "grassland/graphics/backend/vulkan/helper/semaphore.h"
 #include "grassland/graphics/backend/vulkan/helper/shader_module.h"
 #include "grassland/graphics/backend/vulkan/helper/swap_chain.h"
 
@@ -171,47 +169,6 @@ VkResult Device::GetQueue(uint32_t queue_family_index, int queue_index, double_p
   vkGetDeviceQueue(device_, queue_family_index, queue_index, &queue);
 
   pp_queue.construct(this, queue_family_index, queue);
-
-  return VK_SUCCESS;
-}
-
-VkResult Device::CreateSemaphore(double_ptr<Semaphore> pp_semaphore) const {
-  if (!pp_semaphore) {
-    SetErrorMessage("pp_semaphore is nullptr");
-    return VK_ERROR_INITIALIZATION_FAILED;
-  }
-
-  VkSemaphore semaphore;
-  VkSemaphoreCreateInfo semaphore_create_info{};
-
-  semaphore_create_info.sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO;
-  semaphore_create_info.pNext = nullptr;
-  semaphore_create_info.flags = 0;
-
-  RETURN_IF_FAILED_VK(vkCreateSemaphore(device_, &semaphore_create_info, nullptr, &semaphore),
-                      "failed to create semaphore!");
-
-  pp_semaphore.construct(this, semaphore);
-
-  return VK_SUCCESS;
-}
-
-VkResult Device::CreateFence(bool signaled, double_ptr<Fence> pp_fence) const {
-  if (!pp_fence) {
-    SetErrorMessage("pp_fence is nullptr");
-    return VK_ERROR_INITIALIZATION_FAILED;
-  }
-
-  VkFence fence;
-  VkFenceCreateInfo fence_create_info{};
-
-  fence_create_info.sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO;
-  fence_create_info.pNext = nullptr;
-  fence_create_info.flags = signaled ? VK_FENCE_CREATE_SIGNALED_BIT : 0;
-
-  RETURN_IF_FAILED_VK(vkCreateFence(device_, &fence_create_info, nullptr, &fence), "failed to create fence!");
-
-  pp_fence.construct(this, fence);
 
   return VK_SUCCESS;
 }

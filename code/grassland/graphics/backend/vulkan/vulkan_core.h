@@ -123,8 +123,8 @@ class VulkanCore : public Core {
     return command_buffers_[current_frame_].get();
   }
 
-  vulkan::Fence *InFlightFence() const {
-    return in_flight_fences_[current_frame_].get();
+  VkFence InFlightFence() const {
+    return in_flight_fences_[current_frame_];
   }
 
   uint32_t CurrentFrame() const override {
@@ -151,7 +151,7 @@ class VulkanCore : public Core {
   VkPhysicalDeviceMemoryProperties memory_properties_;
 
   uint32_t current_frame_{0};
-  std::vector<std::unique_ptr<vulkan::Fence>> in_flight_fences_;
+  std::vector<VkFence> in_flight_fences_;
 
   std::vector<std::unique_ptr<vulkan::DescriptorPool>> descriptor_pools_;
   std::vector<std::queue<vulkan::DescriptorSet *>> descriptor_sets_;

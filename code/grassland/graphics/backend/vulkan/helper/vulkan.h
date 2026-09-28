@@ -7,7 +7,6 @@
 #include "grassland/graphics/backend/vulkan/helper/descriptor_set.h"
 #include "grassland/graphics/backend/vulkan/helper/descriptor_set_layout.h"
 #include "grassland/graphics/backend/vulkan/helper/device.h"
-#include "grassland/graphics/backend/vulkan/helper/fence.h"
 #include "grassland/graphics/backend/vulkan/helper/image.h"
 #include "grassland/graphics/backend/vulkan/helper/instance.h"
 #include "grassland/graphics/backend/vulkan/helper/pipeline.h"

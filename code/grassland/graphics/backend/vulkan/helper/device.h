@@ -63,10 +63,6 @@ class Device {
 
   VkResult CreateSwapchain(const Surface *surface, double_ptr<Swapchain> pp_swapchain) const;
 
-  VkResult CreateSemaphore(double_ptr<Semaphore> pp_semaphore) const;
-
-  VkResult CreateFence(bool signaled, double_ptr<Fence> pp_fence) const;
-
   VkResult CreateCommandPool(uint32_t queue_family_index,
                              VkCommandPoolCreateFlags flags,
                              double_ptr<CommandPool> pp_command_pool) const;

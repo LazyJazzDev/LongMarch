@@ -5,13 +5,6 @@
 #endif
 
 namespace grassland::graphics::backend::vulkan {
-Semaphore::Semaphore(const struct Device *device, VkSemaphore semaphore) : device_(device), semaphore_(semaphore) {
-}
-
-Semaphore::~Semaphore() {
-  vkDestroySemaphore(device_->Handle(), semaphore_, nullptr);
-}
-
 #if defined(LONGMARCH_CUDA_RUNTIME)
 VkExternalSemaphoreHandleTypeFlagBits GetDefaultExternalSemaphoreHandleType() {
 #ifdef _WIN64

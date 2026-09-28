@@ -33,6 +33,9 @@ VulkanCore::~VulkanCore() {
     vkDestroySemaphore(device_->Handle(), cuda_synchronization_semaphore_, nullptr);
   }
 #endif
+  if (device_) {
+    vkDeviceWaitIdle(device_->Handle());
+  }
   upload_staging_buffer_.reset();
   download_staging_buffer_.reset();
 
@@ -43,6 +46,12 @@ VulkanCore::~VulkanCore() {
     }
   }
   descriptor_pools_.clear();
+  if (device_) {
+    for (VkFence fence : in_flight_fences_) {
+      vkDestroyFence(device_->Handle(), fence, nullptr);
+    }
+    in_flight_fences_.clear();
+  }
 }
 
 int VulkanCore::CreateBuffer(size_t size, BufferType type, double_ptr<Buffer> pp_buffer) {
@@ -323,12 +332,12 @@ int VulkanCore::SubmitCommandContext(CommandContext *p_command_context) {
 
   std::vector<VkPipelineStageFlags> wait_stages{};
   for (auto &window : command_context->windows_) {
-    wait_semaphores.push_back(window->ImageAvailableSemaphore()->Handle());
+    wait_semaphores.push_back(window->ImageAvailableSemaphore());
     wait_stages.push_back(VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT);
-    signal_semaphores.push_back(window->RenderFinishSemaphore()->Handle());
+    signal_semaphores.push_back(window->RenderFinishSemaphore());
   }
 
-  VkFence fence = in_flight_fences_[current_frame_]->Handle();
+  VkFence fence = in_flight_fences_[current_frame_];
   vkResetFences(device_->Handle(), 1, &fence);
 
   VkSubmitInfo submit_info{};
@@ -373,7 +382,7 @@ int VulkanCore::SubmitCommandContext(CommandContext *p_command_context) {
   post_execute_functions_[current_frame_] = p_command_context->GetPostExecutionCallbacks();
 
   current_frame_ = (current_frame_ + 1) % FramesInFlight();
-  fence = in_flight_fences_[current_frame_]->Handle();
+  fence = in_flight_fences_[current_frame_];
   vkWaitForFences(device_->Handle(), 1, &fence, VK_TRUE, std::numeric_limits<uint64_t>::max());
 
   vkQueueWaitIdle(transfer_queue_->Handle());
@@ -482,7 +491,10 @@ int VulkanCore::InitializeLogicalDevice(int device_index) {
   post_execute_functions_.resize(FramesInFlight());
 
   for (int i = 0; i < FramesInFlight(); i++) {
-    device_->CreateFence(true, &in_flight_fences_[i]);
+    VkFenceCreateInfo fence_info{VK_STRUCTURE_TYPE_FENCE_CREATE_INFO};
+    fence_info.flags = VK_FENCE_CREATE_SIGNALED_BIT;
+    vulkan::ThrowIfFailed(vkCreateFence(device_->Handle(), &fence_info, nullptr, &in_flight_fences_[i]),
+                          "Failed to create in-flight fence");
     graphics_command_pool_->AllocateCommandBuffer(VK_COMMAND_BUFFER_LEVEL_PRIMARY, &command_buffers_[i]);
 
     VkDescriptorPoolSize pool_sizes[] = {

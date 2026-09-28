@@ -18,8 +18,13 @@ VulkanWindow::VulkanWindow(VulkanCore *core,
   image_available_semaphores_.resize(swap_chain_->ImageCount());
   render_finish_semaphores_.resize(swap_chain_->ImageCount());
   for (size_t i = 0; i < image_available_semaphores_.size(); ++i) {
-    core_->Device()->CreateSemaphore(&image_available_semaphores_[i]);
-    core_->Device()->CreateSemaphore(&render_finish_semaphores_[i]);
+    VkSemaphoreCreateInfo semaphore_info{VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO};
+    vulkan::ThrowIfFailed(
+        vkCreateSemaphore(core_->Device()->Handle(), &semaphore_info, nullptr, &image_available_semaphores_[i]),
+        "Failed to create image available semaphore");
+    vulkan::ThrowIfFailed(
+        vkCreateSemaphore(core_->Device()->Handle(), &semaphore_info, nullptr, &render_finish_semaphores_[i]),
+        "Failed to create render finish semaphore");
   }
   vkGetDeviceQueue(core_->Device()->Handle(), core_->Device()->PhysicalDevice().PresentFamilyIndex(surface_.get()), 0,
                    &present_queue_);
@@ -37,7 +42,13 @@ void VulkanWindow::CloseWindow() {
   if (imgui_assets_.context) {
     TerminateImGui();
   }
+  for (VkSemaphore semaphore : image_available_semaphores_) {
+    vkDestroySemaphore(core_->Device()->Handle(), semaphore, nullptr);
+  }
   image_available_semaphores_.clear();
+  for (VkSemaphore semaphore : render_finish_semaphores_) {
+    vkDestroySemaphore(core_->Device()->Handle(), semaphore, nullptr);
+  }
   render_finish_semaphores_.clear();
   swap_chain_.reset();
   surface_.reset();
@@ -48,17 +59,16 @@ vulkan::Swapchain *VulkanWindow::SwapChain() const {
   return swap_chain_.get();
 }
 
-vulkan::Semaphore *VulkanWindow::RenderFinishSemaphore() const {
-  return render_finish_semaphores_[core_->CurrentFrame()].get();
+VkSemaphore VulkanWindow::RenderFinishSemaphore() const {
+  return render_finish_semaphores_[core_->CurrentFrame()];
 }
 
-vulkan::Semaphore *VulkanWindow::ImageAvailableSemaphore() const {
-  return image_available_semaphores_[core_->CurrentFrame()].get();
+VkSemaphore VulkanWindow::ImageAvailableSemaphore() const {
+  return image_available_semaphores_[core_->CurrentFrame()];
 }
 
 uint32_t VulkanWindow::AcquireNextImage() {
-  swap_chain_->AcquireNextImage(std::numeric_limits<uint64_t>::max(),
-                                image_available_semaphores_[core_->CurrentFrame()]->Handle(), VK_NULL_HANDLE,
+  swap_chain_->AcquireNextImage(std::numeric_limits<uint64_t>::max(), ImageAvailableSemaphore(), VK_NULL_HANDLE,
                                 &image_index_);
   return image_index_;
 }
@@ -88,7 +98,7 @@ void VulkanWindow::Rebuild() {
 }
 
 void VulkanWindow::Present() {
-  VkSemaphore render_finish_semaphore = render_finish_semaphores_[core_->CurrentFrame()]->Handle();
+  VkSemaphore render_finish_semaphore = RenderFinishSemaphore();
 
   VkSwapchainKHR swap_chain = swap_chain_->Handle();
 

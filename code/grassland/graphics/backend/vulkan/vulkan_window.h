@@ -20,9 +20,9 @@ class VulkanWindow : public Window {
 
   vulkan::Swapchain *SwapChain() const;
 
-  vulkan::Semaphore *RenderFinishSemaphore() const;
+  VkSemaphore RenderFinishSemaphore() const;
 
-  vulkan::Semaphore *ImageAvailableSemaphore() const;
+  VkSemaphore ImageAvailableSemaphore() const;
 
   uint32_t AcquireNextImage();
 
@@ -55,8 +55,8 @@ class VulkanWindow : public Window {
   VulkanCore *core_;
   std::unique_ptr<vulkan::Surface> surface_;
   std::unique_ptr<vulkan::Swapchain> swap_chain_;
-  std::vector<std::unique_ptr<vulkan::Semaphore>> render_finish_semaphores_;
-  std::vector<std::unique_ptr<vulkan::Semaphore>> image_available_semaphores_;
+  std::vector<VkSemaphore> render_finish_semaphores_;
+  std::vector<VkSemaphore> image_available_semaphores_;
   uint32_t image_index_;
 
   VulkanImGuiAssets imgui_assets_{};

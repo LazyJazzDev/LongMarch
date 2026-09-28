@@ -97,8 +97,6 @@ class PipelineLayout;
 class Pipeline;
 class ShaderModule;
 struct HitGroup;
-class Fence;
-class Semaphore;
 class Buffer;
 class Image;
 class AccelerationStructure;
