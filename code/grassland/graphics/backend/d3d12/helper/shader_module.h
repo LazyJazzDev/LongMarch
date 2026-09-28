@@ -3,27 +3,10 @@
 
 namespace grassland::graphics::backend::d3d12 {
 
-class ShaderModule {
- public:
-  ShaderModule(const CompiledShaderBlob &shader_blob);
-
-  D3D12_SHADER_BYTECODE Handle() const {
-    return {shader_code_.data(), shader_code_.size()};
-  }
-
-  const std::wstring &EntryPoint() const {
-    return entry_point_;
-  }
-
- private:
-  std::vector<uint8_t> shader_code_;
-  std::wstring entry_point_;
-};
-
 struct HitGroup {
-  ShaderModule *closest_hit_shader{nullptr};
-  ShaderModule *any_hit_shader{nullptr};
-  ShaderModule *intersection_shader{nullptr};
+  const CompiledShaderBlob *closest_hit_shader{nullptr};
+  const CompiledShaderBlob *any_hit_shader{nullptr};
+  const CompiledShaderBlob *intersection_shader{nullptr};
   bool procedure{false};
 };
 

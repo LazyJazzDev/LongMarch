@@ -98,10 +98,10 @@ class D3D12RayTracingProgram : public RayTracingProgram, public D3D12ProgramBase
   }
 
  private:
-  d3d12::ShaderModule *raygen_shader_;
-  std::vector<d3d12::ShaderModule *> miss_shaders_;
+  const CompiledShaderBlob *raygen_shader_;
+  std::vector<const CompiledShaderBlob *> miss_shaders_;
   std::vector<d3d12::HitGroup> hit_groups_;
-  std::vector<d3d12::ShaderModule *> callable_shaders_;
+  std::vector<const CompiledShaderBlob *> callable_shaders_;
   std::unique_ptr<d3d12::RayTracingPipeline> pipeline_;
   std::unique_ptr<d3d12::ShaderTable> shader_table_;
 };

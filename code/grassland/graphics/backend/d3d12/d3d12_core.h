@@ -5,8 +5,8 @@ namespace grassland::graphics::backend {
 
 struct BlitPipeline {
   d3d12::Device *device_;
-  std::unique_ptr<d3d12::ShaderModule> vertex_shader;
-  std::unique_ptr<d3d12::ShaderModule> pixel_shader;
+  CompiledShaderBlob vertex_shader;
+  CompiledShaderBlob pixel_shader;
   Microsoft::WRL::ComPtr<ID3D12RootSignature> root_signature;
   std::map<DXGI_FORMAT, Microsoft::WRL::ComPtr<ID3D12PipelineState>> pipeline_states;
   void Initialize(d3d12::Device *device);
@@ -148,11 +148,11 @@ class D3D12Core : public Core {
   CD3DX12_CPU_DESCRIPTOR_HANDLE RTVDescriptorHandle(uint32_t index) const;
   CD3DX12_CPU_DESCRIPTOR_HANDLE DSVDescriptorHandle(uint32_t index) const;
 
-  d3d12::Buffer *RequestUploadStagingBuffer(size_t size);
-  d3d12::Buffer *RequestDownloadStagingBuffer(size_t size);
+  ID3D12Resource *RequestUploadStagingBuffer(size_t size);
+  ID3D12Resource *RequestDownloadStagingBuffer(size_t size);
 
 #if defined(LONGMARCH_CUDA_RUNTIME)
-  void ImportCudaExternalMemory(cudaExternalMemory_t &cuda_memory, d3d12::Buffer *buffer);
+  void ImportCudaExternalMemory(cudaExternalMemory_t &cuda_memory, ID3D12Resource *buffer);
   void CUDABeginExecutionBarrier(cudaStream_t stream) override;
   void CUDAEndExecutionBarrier(cudaStream_t stream) override;
 #endif
@@ -192,8 +192,8 @@ class D3D12Core : public Core {
   cudaExternalSemaphore_t cuda_semaphore_{};
 #endif
 
-  std::unique_ptr<d3d12::Buffer> upload_staging_buffer_;
-  std::unique_ptr<d3d12::Buffer> download_staging_buffer_;
+  Microsoft::WRL::ComPtr<ID3D12Resource> upload_staging_buffer_;
+  Microsoft::WRL::ComPtr<ID3D12Resource> download_staging_buffer_;
 };
 
 }  // namespace grassland::graphics::backend

@@ -12,6 +12,26 @@ Microsoft::WRL::ComPtr<ID3D12DescriptorHeap> CreateNativeDescriptorHeap(ID3D12De
                                                                         D3D12_DESCRIPTOR_HEAP_TYPE type,
                                                                         uint32_t count);
 
+Microsoft::WRL::ComPtr<ID3D12Resource> CreateNativeBuffer(ID3D12Device *device,
+                                                          size_t size,
+                                                          D3D12_HEAP_TYPE heap_type,
+                                                          D3D12_HEAP_FLAGS heap_flags,
+                                                          D3D12_RESOURCE_STATES resource_state,
+                                                          D3D12_RESOURCE_FLAGS resource_flags);
+
+Microsoft::WRL::ComPtr<ID3D12Resource> CreateNativeBuffer(ID3D12Device *device, size_t size, D3D12_HEAP_TYPE heap_type);
+
+Microsoft::WRL::ComPtr<ID3D12Resource> CreateNativeImage(ID3D12Device *device,
+                                                         size_t width,
+                                                         size_t height,
+                                                         DXGI_FORMAT format);
+
+Microsoft::WRL::ComPtr<IDXGISwapChain3> CreateNativeSwapChain(IDXGIFactory4 *factory,
+                                                              ID3D12CommandQueue *queue,
+                                                              HWND hwnd,
+                                                              uint32_t buffer_count,
+                                                              DXGI_FORMAT format);
+
 DXGI_FORMAT ImageFormatToDXGIFormat(ImageFormat format);
 
 DXGI_FORMAT InputTypeToDXGIFormat(InputType type);

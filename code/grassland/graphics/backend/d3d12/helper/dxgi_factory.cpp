@@ -4,7 +4,6 @@
 #include "grassland/graphics/backend/d3d12/helper/command_queue.h"
 #include "grassland/graphics/backend/d3d12/helper/device.h"
 #include "grassland/graphics/backend/d3d12/helper/device_feature_requirement.h"
-#include "grassland/graphics/backend/d3d12/helper/swap_chain.h"
 
 namespace grassland::graphics::backend::d3d12 {
 
@@ -128,67 +127,6 @@ HRESULT DXGIFactory::CreateDevice(const DeviceFeatureRequirement &device_feature
 
   pp_device.construct(adapters[device_index], d3d_feature_level, device);
   return S_OK;
-}
-
-HRESULT DXGIFactory::CreateSwapChain(const CommandQueue &command_queue,
-                                     HWND hwnd,
-                                     const DXGI_SWAP_CHAIN_DESC1 &desc,
-                                     double_ptr<SwapChain> pp_swap_chain) {
-  ComPtr<IDXGISwapChain1> swap_chain;
-  RETURN_IF_FAILED_HR(
-      factory_->CreateSwapChainForHwnd(command_queue.Handle(), hwnd, &desc, nullptr, nullptr, &swap_chain),
-      "failed to create swap chain.");
-
-  ComPtr<IDXGISwapChain3> swap_chain3;
-  RETURN_IF_FAILED_HR(swap_chain.As(&swap_chain3), "failed to create swap chain 3.");
-
-  if (desc.Format == DXGI_FORMAT_R16G16B16A16_FLOAT) {
-    // Enable HDR.
-    DXGI_COLOR_SPACE_TYPE color_space = DXGI_COLOR_SPACE_RGB_FULL_G10_NONE_P709;
-    UINT color_space_support = 0;
-    if (SUCCEEDED(swap_chain3->CheckColorSpaceSupport(color_space, &color_space_support)) &&
-        ((color_space_support & DXGI_SWAP_CHAIN_COLOR_SPACE_SUPPORT_FLAG_PRESENT) ==
-         DXGI_SWAP_CHAIN_COLOR_SPACE_SUPPORT_FLAG_PRESENT)) {
-      RETURN_IF_FAILED_HR(swap_chain3->SetColorSpace1(color_space), "failed to set color space.");
-    }
-  }
-
-  pp_swap_chain.construct(swap_chain3);
-
-  return S_OK;
-}
-
-HRESULT DXGIFactory::CreateSwapChain(const CommandQueue &command_queue,
-                                     HWND hwnd,
-                                     UINT buffer_count,
-                                     DXGI_FORMAT format,
-                                     double_ptr<SwapChain> pp_swap_chain) {
-  // Get window size from hwnd.
-  RECT rect;
-  GetClientRect(hwnd, &rect);
-  UINT width = rect.right - rect.left;
-  UINT height = rect.bottom - rect.top;
-  DXGI_SWAP_CHAIN_DESC1 desc = {};
-  desc.BufferCount = buffer_count;
-  desc.Width = width;
-  desc.Height = height;
-  desc.Format = format;
-  desc.BufferUsage = DXGI_USAGE_RENDER_TARGET_OUTPUT;
-  desc.SwapEffect = DXGI_SWAP_EFFECT_FLIP_DISCARD;
-  desc.SampleDesc.Count = 1;
-
-#ifndef NDEBUG
-  LogInfo("Swap Chain: {}x{}", width, height);
-#endif
-
-  return CreateSwapChain(command_queue, hwnd, desc, pp_swap_chain);
-}
-
-HRESULT DXGIFactory::CreateSwapChain(const CommandQueue &command_queue,
-                                     HWND hwnd,
-                                     UINT buffer_count,
-                                     double_ptr<SwapChain> pp_swap_chain) {
-  return CreateSwapChain(command_queue, hwnd, buffer_count, DXGI_FORMAT_R8G8B8A8_UNORM, pp_swap_chain);
 }
 
 HRESULT CreateDXGIFactory(DXGIFactoryCreateHint hint, double_ptr<DXGIFactory> pp_factory) {

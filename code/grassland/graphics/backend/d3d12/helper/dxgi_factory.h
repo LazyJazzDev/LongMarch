@@ -23,22 +23,6 @@ class DXGIFactory {
                        int device_index,
                        double_ptr<Device> pp_device);
 
-  HRESULT CreateSwapChain(const CommandQueue &command_queue,
-                          HWND hwnd,
-                          const DXGI_SWAP_CHAIN_DESC1 &desc,
-                          double_ptr<SwapChain> pp_swap_chain);
-
-  HRESULT CreateSwapChain(const CommandQueue &command_queue,
-                          HWND hwnd,
-                          UINT buffer_count,
-                          DXGI_FORMAT format,
-                          double_ptr<SwapChain> pp_swap_chain);
-
-  HRESULT CreateSwapChain(const CommandQueue &command_queue,
-                          HWND hwnd,
-                          UINT buffer_count,
-                          double_ptr<SwapChain> pp_swap_chain);
-
  private:
   DXGIFactoryCreateHint hint_;
   ComPtr<IDXGIFactory4> factory_;

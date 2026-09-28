@@ -9,4 +9,3 @@
 #include "grassland/graphics/backend/d3d12/helper/image.h"
 #include "grassland/graphics/backend/d3d12/helper/raytracing/raytracing.h"
 #include "grassland/graphics/backend/d3d12/helper/shader_module.h"
-#include "grassland/graphics/backend/d3d12/helper/swap_chain.h"

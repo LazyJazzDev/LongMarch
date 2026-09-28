@@ -143,22 +143,6 @@ HRESULT Device::CreateImageU8(size_t width, size_t height, double_ptr<Image> pp_
   return CreateImage(width, height, DXGI_FORMAT_R8G8B8A8_UNORM, pp_image);
 }
 
-HRESULT Device::CreateShaderModule(const void *compiled_shader_data,
-                                   size_t size,
-                                   double_ptr<ShaderModule> pp_shader_module) {
-  CompiledShaderBlob shader_code;
-  shader_code.data.resize(size);
-  std::memcpy(shader_code.data.data(), compiled_shader_data, size);
-  shader_code.entry_point = "main";
-  return CreateShaderModule(shader_code, pp_shader_module);
-}
-
-HRESULT Device::CreateShaderModule(const CompiledShaderBlob &compiled_shader,
-                                   double_ptr<ShaderModule> pp_shader_module) {
-  pp_shader_module.construct(compiled_shader);
-  return S_OK;
-}
-
 HRESULT Device::CreateBottomLevelAccelerationStructure(D3D12_GPU_VIRTUAL_ADDRESS aabb_buffer,
                                                        uint32_t stride,
                                                        uint32_t num_aabb,
@@ -380,23 +364,24 @@ HRESULT Device::CreateTopLevelAccelerationStructure(
 }
 
 HRESULT Device::CreateRayTracingPipeline(ID3D12RootSignature *root_signature,
-                                         ShaderModule *ray_gen_shader,
-                                         const std::vector<ShaderModule *> &miss_shaders,
+                                         const CompiledShaderBlob *ray_gen_shader,
+                                         const std::vector<const CompiledShaderBlob *> &miss_shaders,
                                          const std::vector<HitGroup> &hit_groups,
-                                         const std::vector<ShaderModule *> &callable_shaders,
+                                         const std::vector<const CompiledShaderBlob *> &callable_shaders,
                                          double_ptr<RayTracingPipeline> pp_pipeline) {
   CD3DX12_STATE_OBJECT_DESC pipeline_desc(D3D12_STATE_OBJECT_TYPE_RAYTRACING_PIPELINE);
   auto lib_ray_gen = pipeline_desc.CreateSubobject<CD3DX12_DXIL_LIBRARY_SUBOBJECT>();
-  auto ray_gen_code = ray_gen_shader->Handle();
+  auto ray_gen_code = D3D12_SHADER_BYTECODE{ray_gen_shader->data.data(), ray_gen_shader->data.size()};
   lib_ray_gen->SetDXILLibrary(&ray_gen_code);
-  lib_ray_gen->DefineExport(L"RayGenMain", ray_gen_shader->EntryPoint().c_str());
+  lib_ray_gen->DefineExport(L"RayGenMain", StringToWString(ray_gen_shader->entry_point).c_str());
 
   for (size_t i = 0; i < miss_shaders.size(); i++) {
     auto &miss_shader = miss_shaders[i];
     auto lib_miss = pipeline_desc.CreateSubobject<CD3DX12_DXIL_LIBRARY_SUBOBJECT>();
-    auto miss_code = miss_shader->Handle();
+    auto miss_code = D3D12_SHADER_BYTECODE{miss_shader->data.data(), miss_shader->data.size()};
     lib_miss->SetDXILLibrary(&miss_code);
-    lib_miss->DefineExport((L"MissMain" + std::to_wstring(i)).c_str(), miss_shader->EntryPoint().c_str());
+    lib_miss->DefineExport((L"MissMain" + std::to_wstring(i)).c_str(),
+                           StringToWString(miss_shader->entry_point).c_str());
   }
 
   for (size_t i = 0; i < hit_groups.size(); i++) {
@@ -404,27 +389,30 @@ HRESULT Device::CreateRayTracingPipeline(ID3D12RootSignature *root_signature,
     auto obj_hit_group = pipeline_desc.CreateSubobject<CD3DX12_HIT_GROUP_SUBOBJECT>();
 
     auto lib_rchit = pipeline_desc.CreateSubobject<CD3DX12_DXIL_LIBRARY_SUBOBJECT>();
-    auto rchit_code = hit_group.closest_hit_shader->Handle();
+    auto rchit_code =
+        D3D12_SHADER_BYTECODE{hit_group.closest_hit_shader->data.data(), hit_group.closest_hit_shader->data.size()};
     lib_rchit->SetDXILLibrary(&rchit_code);
     lib_rchit->DefineExport((L"ClosestHitMain" + std::to_wstring(i)).c_str(),
-                            hit_group.closest_hit_shader->EntryPoint().c_str());
+                            StringToWString(hit_group.closest_hit_shader->entry_point).c_str());
     obj_hit_group->SetClosestHitShaderImport((L"ClosestHitMain" + std::to_wstring(i)).c_str());
 
     if (hit_group.intersection_shader) {
       auto lib_rint = pipeline_desc.CreateSubobject<CD3DX12_DXIL_LIBRARY_SUBOBJECT>();
-      auto rint_code = hit_group.intersection_shader->Handle();
+      auto rint_code =
+          D3D12_SHADER_BYTECODE{hit_group.intersection_shader->data.data(), hit_group.intersection_shader->data.size()};
       lib_rint->SetDXILLibrary(&rint_code);
       lib_rint->DefineExport((L"IntersectionMain" + std::to_wstring(i)).c_str(),
-                             hit_group.intersection_shader->EntryPoint().c_str());
+                             StringToWString(hit_group.intersection_shader->entry_point).c_str());
       obj_hit_group->SetIntersectionShaderImport((L"IntersectionMain" + std::to_wstring(i)).c_str());
     }
 
     if (hit_group.any_hit_shader) {
       auto lib_rahit = pipeline_desc.CreateSubobject<CD3DX12_DXIL_LIBRARY_SUBOBJECT>();
-      auto rahit_code = hit_group.any_hit_shader->Handle();
+      auto rahit_code =
+          D3D12_SHADER_BYTECODE{hit_group.any_hit_shader->data.data(), hit_group.any_hit_shader->data.size()};
       lib_rahit->SetDXILLibrary(&rahit_code);
       lib_rahit->DefineExport((L"AnyHitMain" + std::to_wstring(i)).c_str(),
-                              hit_group.any_hit_shader->EntryPoint().c_str());
+                              StringToWString(hit_group.any_hit_shader->entry_point).c_str());
       obj_hit_group->SetAnyHitShaderImport((L"AnyHitMain" + std::to_wstring(i)).c_str());
     }
 
@@ -436,9 +424,10 @@ HRESULT Device::CreateRayTracingPipeline(ID3D12RootSignature *root_signature,
   for (size_t i = 0; i < callable_shaders.size(); i++) {
     auto &callable_shader = callable_shaders[i];
     auto lib_callable = pipeline_desc.CreateSubobject<CD3DX12_DXIL_LIBRARY_SUBOBJECT>();
-    auto callable_code = callable_shader->Handle();
+    auto callable_code = D3D12_SHADER_BYTECODE{callable_shader->data.data(), callable_shader->data.size()};
     lib_callable->SetDXILLibrary(&callable_code);
-    lib_callable->DefineExport((L"CallableMain" + std::to_wstring(i)).c_str(), callable_shader->EntryPoint().c_str());
+    lib_callable->DefineExport((L"CallableMain" + std::to_wstring(i)).c_str(),
+                               StringToWString(callable_shader->entry_point).c_str());
   }
 
   auto shader_config = pipeline_desc.CreateSubobject<CD3DX12_RAYTRACING_SHADER_CONFIG_SUBOBJECT>();
@@ -460,9 +449,9 @@ HRESULT Device::CreateRayTracingPipeline(ID3D12RootSignature *root_signature,
 }
 
 HRESULT Device::CreateRayTracingPipeline(ID3D12RootSignature *root_signature,
-                                         ShaderModule *ray_gen_shader,
-                                         ShaderModule *miss_shader,
-                                         ShaderModule *closest_hit_shader,
+                                         const CompiledShaderBlob *ray_gen_shader,
+                                         const CompiledShaderBlob *miss_shader,
+                                         const CompiledShaderBlob *closest_hit_shader,
                                          double_ptr<RayTracingPipeline> pp_pipeline) {
   return CreateRayTracingPipeline(root_signature, ray_gen_shader, {miss_shader},
                                   {{closest_hit_shader, nullptr, nullptr, false}}, {}, pp_pipeline);

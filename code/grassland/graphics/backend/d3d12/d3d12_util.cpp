@@ -3,6 +3,83 @@
 #include "grassland/graphics/backend/d3d12/d3d12_acceleration_structure.h"
 
 namespace grassland::graphics::backend {
+Microsoft::WRL::ComPtr<ID3D12Resource> CreateNativeBuffer(ID3D12Device *device,
+                                                          size_t size,
+                                                          D3D12_HEAP_TYPE heap_type,
+                                                          D3D12_HEAP_FLAGS heap_flags,
+                                                          D3D12_RESOURCE_STATES resource_state,
+                                                          D3D12_RESOURCE_FLAGS resource_flags) {
+  Microsoft::WRL::ComPtr<ID3D12Resource> buffer;
+  d3d12::ThrowIfFailed(d3d12::CreateBuffer(device, size, heap_type, heap_flags, resource_state, resource_flags, buffer),
+                       "Failed to create buffer");
+  return buffer;
+}
+
+Microsoft::WRL::ComPtr<ID3D12Resource> CreateNativeBuffer(ID3D12Device *device,
+                                                          size_t size,
+                                                          D3D12_HEAP_TYPE heap_type) {
+  return CreateNativeBuffer(
+      device, size, heap_type, D3D12_HEAP_FLAG_NONE, d3d12::HeapTypeDefaultResourceState(heap_type),
+      heap_type == D3D12_HEAP_TYPE_DEFAULT ? D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS : D3D12_RESOURCE_FLAG_NONE);
+}
+
+Microsoft::WRL::ComPtr<ID3D12Resource> CreateNativeImage(ID3D12Device *device,
+                                                         size_t width,
+                                                         size_t height,
+                                                         DXGI_FORMAT format) {
+  const auto flags = d3d12::IsDepthFormat(format)
+                         ? D3D12_RESOURCE_FLAG_ALLOW_DEPTH_STENCIL
+                         : D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS | D3D12_RESOURCE_FLAG_ALLOW_RENDER_TARGET;
+  auto desc = CD3DX12_RESOURCE_DESC::Tex2D(format, width, height, 1, 1, 1, 0, flags);
+  D3D12_CLEAR_VALUE clear_value{};
+  clear_value.Format = format;
+  if (d3d12::IsDepthFormat(format)) {
+    clear_value.DepthStencil.Depth = 1.0f;
+  } else {
+    clear_value.Color[3] = 1.0f;
+  }
+  const CD3DX12_HEAP_PROPERTIES heap_properties(D3D12_HEAP_TYPE_DEFAULT);
+  Microsoft::WRL::ComPtr<ID3D12Resource> image;
+  d3d12::ThrowIfFailed(
+      device->CreateCommittedResource(&heap_properties, D3D12_HEAP_FLAG_NONE, &desc, D3D12_RESOURCE_STATE_GENERIC_READ,
+                                      &clear_value, IID_PPV_ARGS(image.GetAddressOf())),
+      "Failed to create image");
+  return image;
+}
+
+Microsoft::WRL::ComPtr<IDXGISwapChain3> CreateNativeSwapChain(IDXGIFactory4 *factory,
+                                                              ID3D12CommandQueue *queue,
+                                                              HWND hwnd,
+                                                              uint32_t buffer_count,
+                                                              DXGI_FORMAT format) {
+  RECT rect{};
+  GetClientRect(hwnd, &rect);
+  DXGI_SWAP_CHAIN_DESC1 desc{};
+  desc.BufferCount = buffer_count;
+  desc.Width = rect.right - rect.left;
+  desc.Height = rect.bottom - rect.top;
+  desc.Format = format;
+  desc.BufferUsage = DXGI_USAGE_RENDER_TARGET_OUTPUT;
+  desc.SwapEffect = DXGI_SWAP_EFFECT_FLIP_DISCARD;
+  desc.SampleDesc.Count = 1;
+
+  Microsoft::WRL::ComPtr<IDXGISwapChain1> swap_chain1;
+  d3d12::ThrowIfFailed(
+      factory->CreateSwapChainForHwnd(queue, hwnd, &desc, nullptr, nullptr, swap_chain1.GetAddressOf()),
+      "Failed to create swap chain");
+  Microsoft::WRL::ComPtr<IDXGISwapChain3> swap_chain;
+  d3d12::ThrowIfFailed(swap_chain1.As(&swap_chain), "Failed to query swap chain 3");
+  if (format == DXGI_FORMAT_R16G16B16A16_FLOAT) {
+    constexpr auto color_space = DXGI_COLOR_SPACE_RGB_FULL_G10_NONE_P709;
+    UINT support = 0;
+    if (SUCCEEDED(swap_chain->CheckColorSpaceSupport(color_space, &support)) &&
+        (support & DXGI_SWAP_CHAIN_COLOR_SPACE_SUPPORT_FLAG_PRESENT)) {
+      d3d12::ThrowIfFailed(swap_chain->SetColorSpace1(color_space), "Failed to set HDR color space");
+    }
+  }
+  return swap_chain;
+}
+
 Microsoft::WRL::ComPtr<ID3D12DescriptorHeap> CreateNativeDescriptorHeap(ID3D12Device *device,
                                                                         D3D12_DESCRIPTOR_HEAP_TYPE type,
                                                                         uint32_t count) {

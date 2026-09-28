@@ -18,7 +18,11 @@ class D3D12Window : public Window {
 
   virtual void CloseWindow() override;
 
-  d3d12::SwapChain *SwapChain() const;
+  IDXGISwapChain3 *SwapChain() const;
+
+  DXGI_FORMAT BackBufferFormat() const;
+
+  Extent2D BackBufferExtent() const;
 
   ID3D12Resource *CurrentBackBuffer() const;
 
@@ -32,8 +36,11 @@ class D3D12Window : public Window {
   void SetupImGuiContext();
 
  private:
+  void RecreateSwapChain();
+
   D3D12Core *core_;
-  std::unique_ptr<d3d12::SwapChain> swap_chain_;
+  Microsoft::WRL::ComPtr<IDXGISwapChain3> swap_chain_;
+  std::vector<Microsoft::WRL::ComPtr<ID3D12Resource>> back_buffers_;
   uint32_t swap_chain_recreate_event_id_;
   D3D12ImGuiAssets imgui_assets_{};
 };

@@ -32,10 +32,8 @@ void ResetCommandRecord(ID3D12CommandAllocator *allocator, ID3D12GraphicsCommand
 
 void BlitPipeline::Initialize(d3d12::Device *device) {
   device_ = device;
-  device_->CreateShaderModule(d3d12::CompileShader(GetShaderCode("shaders/d3d12/blit.hlsl"), "VSMain", "vs_6_0"),
-                              &vertex_shader);
-  device_->CreateShaderModule(d3d12::CompileShader(GetShaderCode("shaders/d3d12/blit.hlsl"), "PSMain", "ps_6_0"),
-                              &pixel_shader);
+  vertex_shader = d3d12::CompileShader(GetShaderCode("shaders/d3d12/blit.hlsl"), "VSMain", "vs_6_0");
+  pixel_shader = d3d12::CompileShader(GetShaderCode("shaders/d3d12/blit.hlsl"), "PSMain", "ps_6_0");
 
   CD3DX12_DESCRIPTOR_RANGE1 range;
   range.Init(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 1, 0, 0);
@@ -54,8 +52,8 @@ ID3D12PipelineState *BlitPipeline::GetPipelineState(DXGI_FORMAT format) {
   if (pipeline_states.count(format) == 0) {
     D3D12_GRAPHICS_PIPELINE_STATE_DESC pipeline_state_desc = {};
     pipeline_state_desc.pRootSignature = root_signature.Get();
-    pipeline_state_desc.VS = vertex_shader->Handle();
-    pipeline_state_desc.PS = pixel_shader->Handle();
+    pipeline_state_desc.VS = {vertex_shader.data.data(), vertex_shader.data.size()};
+    pipeline_state_desc.PS = {pixel_shader.data.data(), pixel_shader.data.size()};
     pipeline_state_desc.BlendState = CD3DX12_BLEND_DESC(D3D12_DEFAULT);
     pipeline_state_desc.SampleMask = UINT_MAX;
     pipeline_state_desc.RasterizerState = CD3DX12_RASTERIZER_DESC(D3D12_DEFAULT);
@@ -185,7 +183,7 @@ int D3D12Core::CreateBottomLevelAccelerationStructure(BufferRange aabb_buffer,
 
   std::unique_ptr<d3d12::AccelerationStructure> blas;
   device_->CreateBottomLevelAccelerationStructure(
-      d3d12_aabb_buffer->InstantBuffer()->Handle()->GetGPUVirtualAddress() + aabb_buffer.offset, stride, num_aabb,
+      d3d12_aabb_buffer->InstantBuffer()->GetGPUVirtualAddress() + aabb_buffer.offset, stride, num_aabb,
       static_cast<D3D12_RAYTRACING_GEOMETRY_FLAGS>(flags), command_queue_.get(), fence_.get(),
       single_time_allocator_.Get(), &blas);
 
@@ -209,8 +207,8 @@ int D3D12Core::CreateBottomLevelAccelerationStructure(BufferRange vertex_buffer,
 
   std::unique_ptr<d3d12::AccelerationStructure> blas;
   device_->CreateBottomLevelAccelerationStructure(
-      d3d12_vertex_buffer->InstantBuffer()->Handle()->GetGPUVirtualAddress() + vertex_buffer.offset,
-      d3d12_index_buffer->InstantBuffer()->Handle()->GetGPUVirtualAddress() + index_buffer.offset, num_vertex, stride,
+      d3d12_vertex_buffer->InstantBuffer()->GetGPUVirtualAddress() + vertex_buffer.offset,
+      d3d12_index_buffer->InstantBuffer()->GetGPUVirtualAddress() + index_buffer.offset, num_vertex, stride,
       num_primitive, static_cast<D3D12_RAYTRACING_GEOMETRY_FLAGS>(flags), command_queue_.get(), fence_.get(),
       single_time_allocator_.Get(), &blas);
 
@@ -358,7 +356,7 @@ int D3D12Core::SubmitCommandContext(CommandContext *p_command_context) {
   command_queue_->Handle()->ExecuteCommandLists(1, command_lists);
 
   for (auto window : command_context->windows_) {
-    window->SwapChain()->Handle()->Present(0, 0);
+    window->SwapChain()->Present(0, 0);
   }
 
   fence_->Signal(command_queue_.get());
@@ -510,33 +508,31 @@ void D3D12Core::SingleTimeCommand(std::function<void(ID3D12GraphicsCommandList *
   fence_->Wait();
 }
 
-d3d12::Buffer *D3D12Core::RequestUploadStagingBuffer(size_t size) {
-  if (!upload_staging_buffer_ || upload_staging_buffer_->Size() < size) {
-    upload_staging_buffer_.reset();
-    device_->CreateBuffer(size, D3D12_HEAP_TYPE_UPLOAD, &upload_staging_buffer_);
+ID3D12Resource *D3D12Core::RequestUploadStagingBuffer(size_t size) {
+  if (!upload_staging_buffer_ || upload_staging_buffer_->GetDesc().Width < size) {
+    upload_staging_buffer_ = CreateNativeBuffer(device_->Handle(), size, D3D12_HEAP_TYPE_UPLOAD);
   }
-  return upload_staging_buffer_.get();
+  return upload_staging_buffer_.Get();
 }
 
-d3d12::Buffer *D3D12Core::RequestDownloadStagingBuffer(size_t size) {
-  if (!download_staging_buffer_ || download_staging_buffer_->Size() < size) {
-    download_staging_buffer_.reset();
-    device_->CreateBuffer(size, D3D12_HEAP_TYPE_READBACK, &download_staging_buffer_);
+ID3D12Resource *D3D12Core::RequestDownloadStagingBuffer(size_t size) {
+  if (!download_staging_buffer_ || download_staging_buffer_->GetDesc().Width < size) {
+    download_staging_buffer_ = CreateNativeBuffer(device_->Handle(), size, D3D12_HEAP_TYPE_READBACK);
   }
-  return download_staging_buffer_.get();
+  return download_staging_buffer_.Get();
 }
 
 #if defined(LONGMARCH_CUDA_RUNTIME)
-void D3D12Core::ImportCudaExternalMemory(cudaExternalMemory_t &cuda_memory, d3d12::Buffer *buffer) {
+void D3D12Core::ImportCudaExternalMemory(cudaExternalMemory_t &cuda_memory, ID3D12Resource *buffer) {
   HANDLE sharedHandle;
   WindowsSecurityAttributes windowsSecurityAttributes;
   LPCWSTR name = NULL;
-  d3d12::ThrowIfFailed(device_->Handle()->CreateSharedHandle(buffer->Handle(), &windowsSecurityAttributes, GENERIC_ALL,
-                                                             name, &sharedHandle),
-                       "Failed to create shared handle for D3D12 resource");
+  d3d12::ThrowIfFailed(
+      device_->Handle()->CreateSharedHandle(buffer, &windowsSecurityAttributes, GENERIC_ALL, name, &sharedHandle),
+      "Failed to create shared handle for D3D12 resource");
 
   D3D12_RESOURCE_ALLOCATION_INFO d3d12ResourceAllocationInfo;
-  auto resource_desc = CD3DX12_RESOURCE_DESC::Buffer(buffer->Size());
+  auto resource_desc = CD3DX12_RESOURCE_DESC::Buffer(buffer->GetDesc().Width);
   d3d12ResourceAllocationInfo = device_->Handle()->GetResourceAllocationInfo(cuda_device_node_mask_, 1, &resource_desc);
   size_t actualSize = d3d12ResourceAllocationInfo.SizeInBytes;
   size_t alignment = d3d12ResourceAllocationInfo.Alignment;

@@ -70,10 +70,6 @@ class Device {
 
   HRESULT CreateImageU8(size_t width, size_t height, double_ptr<Image> pp_image);
 
-  HRESULT CreateShaderModule(const void *compiled_shader_data, size_t size, double_ptr<ShaderModule> pp_shader_module);
-
-  HRESULT CreateShaderModule(const CompiledShaderBlob &compiled_shader, double_ptr<ShaderModule> pp_shader_module);
-
   HRESULT CreateBottomLevelAccelerationStructure(D3D12_GPU_VIRTUAL_ADDRESS aabb_buffer,
                                                  uint32_t stride,
                                                  uint32_t num_aabb,
@@ -125,16 +121,16 @@ class Device {
                                               double_ptr<AccelerationStructure> pp_tlas);
 
   HRESULT CreateRayTracingPipeline(ID3D12RootSignature *root_signature,
-                                   ShaderModule *ray_gen_shader,
-                                   const std::vector<ShaderModule *> &miss_shaders,
+                                   const CompiledShaderBlob *ray_gen_shader,
+                                   const std::vector<const CompiledShaderBlob *> &miss_shaders,
                                    const std::vector<HitGroup> &hit_groups,
-                                   const std::vector<ShaderModule *> &callable_shaders,
+                                   const std::vector<const CompiledShaderBlob *> &callable_shaders,
                                    double_ptr<RayTracingPipeline> pp_pipeline);
 
   HRESULT CreateRayTracingPipeline(ID3D12RootSignature *root_signature,
-                                   ShaderModule *ray_gen_shader,
-                                   ShaderModule *miss_shader,
-                                   ShaderModule *closest_hit_shader,
+                                   const CompiledShaderBlob *ray_gen_shader,
+                                   const CompiledShaderBlob *miss_shader,
+                                   const CompiledShaderBlob *closest_hit_shader,
                                    double_ptr<RayTracingPipeline> pp_pipeline);
 
   HRESULT CreateShaderTable(RayTracingPipeline *ray_tracing_pipeline,

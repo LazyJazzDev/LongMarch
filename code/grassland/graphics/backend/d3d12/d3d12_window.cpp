@@ -13,18 +13,11 @@ D3D12Window::D3D12Window(D3D12Core *core,
                          bool enable_hdr)
     : Window(width, height, title, fullscreen, resizable, enable_hdr),
       core_(core) {
-  HWND hwnd = glfwGetWin32Window(GLFWWindow());
-  core_->DXGIFactory()->CreateSwapChain(
-      *core_->CommandQueue(), hwnd, std::max(std::min(core_->FramesInFlight(), DXGI_MAX_SWAP_CHAIN_BUFFERS), 2),
-      enable_hdr_ ? DXGI_FORMAT_R16G16B16A16_FLOAT : DXGI_FORMAT_R8G8B8A8_UNORM, &swap_chain_);
-  ResizeEvent().RegisterCallback([this](int width, int height) {
+  RecreateSwapChain();
+  swap_chain_recreate_event_id_ = ResizeEvent().RegisterCallback([this](int width, int height) {
     core_->WaitGPU();
-    swap_chain_.reset();
-    HWND hwnd = glfwGetWin32Window(GLFWWindow());
-    core_->DXGIFactory()->CreateSwapChain(
-        *core_->CommandQueue(), hwnd, std::max(std::min(core_->FramesInFlight(), DXGI_MAX_SWAP_CHAIN_BUFFERS), 2),
-        enable_hdr_ ? DXGI_FORMAT_R16G16B16A16_FLOAT : DXGI_FORMAT_R8G8B8A8_UNORM, &swap_chain_);
-    if (imgui_assets_.context && imgui_assets_.rtv_format != swap_chain_->BackBufferFormat()) {
+    RecreateSwapChain();
+    if (imgui_assets_.context && imgui_assets_.rtv_format != BackBufferFormat()) {
       ImGui_ImplDX12_Shutdown();
       ImGui_ImplGlfw_Shutdown();
 
@@ -48,17 +41,46 @@ void D3D12Window::CloseWindow() {
   if (imgui_assets_.context) {
     TerminateImGui();
   }
-  swap_chain_.reset();
+  back_buffers_.clear();
+  swap_chain_.Reset();
   Window::CloseWindow();
   ResizeEvent().UnregisterCallback(swap_chain_recreate_event_id_);
 }
 
-d3d12::SwapChain *D3D12Window::SwapChain() const {
-  return swap_chain_.get();
+void D3D12Window::RecreateSwapChain() {
+  back_buffers_.clear();
+  swap_chain_.Reset();
+  swap_chain_ = CreateNativeSwapChain(core_->DXGIFactory()->Handle(), core_->CommandQueue()->Handle(),
+                                      glfwGetWin32Window(GLFWWindow()),
+                                      std::max(std::min(core_->FramesInFlight(), DXGI_MAX_SWAP_CHAIN_BUFFERS), 2),
+                                      enable_hdr_ ? DXGI_FORMAT_R16G16B16A16_FLOAT : DXGI_FORMAT_R8G8B8A8_UNORM);
+  DXGI_SWAP_CHAIN_DESC desc{};
+  d3d12::ThrowIfFailed(swap_chain_->GetDesc(&desc), "Failed to query swap chain");
+  back_buffers_.resize(desc.BufferCount);
+  for (uint32_t index = 0; index < desc.BufferCount; ++index) {
+    d3d12::ThrowIfFailed(swap_chain_->GetBuffer(index, IID_PPV_ARGS(back_buffers_[index].GetAddressOf())),
+                         "Failed to get swap chain back buffer");
+  }
+}
+
+IDXGISwapChain3 *D3D12Window::SwapChain() const {
+  return swap_chain_.Get();
+}
+
+DXGI_FORMAT D3D12Window::BackBufferFormat() const {
+  DXGI_SWAP_CHAIN_DESC desc{};
+  swap_chain_->GetDesc(&desc);
+  return desc.BufferDesc.Format;
+}
+
+Extent2D D3D12Window::BackBufferExtent() const {
+  DXGI_SWAP_CHAIN_DESC desc{};
+  swap_chain_->GetDesc(&desc);
+  return {desc.BufferDesc.Width, desc.BufferDesc.Height};
 }
 
 ID3D12Resource *D3D12Window::CurrentBackBuffer() const {
-  return swap_chain_->BackBuffer(swap_chain_->Handle()->GetCurrentBackBufferIndex());
+  return back_buffers_[swap_chain_->GetCurrentBackBufferIndex()].Get();
 }
 
 void D3D12Window::InitImGui(const char *font_file_path, float font_size) {
@@ -128,7 +150,7 @@ void D3D12Window::SetupImGuiContext() {
   init_info.Device = core_->Device()->Handle();
   init_info.CommandQueue = core_->CommandQueue()->Handle();
   init_info.NumFramesInFlight = core_->FramesInFlight();
-  init_info.RTVFormat = swap_chain_->BackBufferFormat();
+  init_info.RTVFormat = BackBufferFormat();
   init_info.DSVFormat = DXGI_FORMAT_UNKNOWN;
   init_info.UserData = &imgui_assets_;
 
@@ -147,7 +169,7 @@ void D3D12Window::SetupImGuiContext() {
 
   ImGui_ImplDX12_Init(&init_info);
 
-  imgui_assets_.rtv_format = swap_chain_->BackBufferFormat();
+  imgui_assets_.rtv_format = BackBufferFormat();
 
   auto &io = ImGui::GetIO();
   if (!imgui_assets_.font_path.empty()) {
