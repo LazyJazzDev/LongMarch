@@ -15,7 +15,7 @@ namespace grassland::graphics::backend {
 using namespace vulkan;
 
 void VulkanCore::InitializeNativeDevice(uint32_t api_version,
-                                        const vulkan::PhysicalDevice &physical_device,
+                                        VkPhysicalDevice physical_device,
                                         vulkan::DeviceCreateInfo create_info,
                                         VmaAllocatorCreateFlags allocator_flags,
                                         VkDevice device) {
@@ -24,7 +24,7 @@ void VulkanCore::InitializeNativeDevice(uint32_t api_version,
   create_info_.emplace(std::move(create_info));
   device_ = device;
   VmaAllocatorCreateInfo allocator_info = {};
-  allocator_info.physicalDevice = physical_device_->Handle();
+  allocator_info.physicalDevice = physical_device_;
   allocator_info.device = device_;
   allocator_info.instance = instance_;
   allocator_info.vulkanApiVersion = api_version_;
@@ -53,7 +53,7 @@ void VulkanCore::InitializeNativeDevice(uint32_t api_version,
   VkPhysicalDeviceProperties2 properties2{};
   properties2.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_PROPERTIES_2;
   properties2.pNext = &subgroup_properties_;
-  vkGetPhysicalDeviceProperties2(physical_device_->Handle(), &properties2);
+  vkGetPhysicalDeviceProperties2(physical_device_, &properties2);
 }
 
 void VulkanCore::DestroyNativeDevice() {
@@ -553,7 +553,7 @@ VkResult VulkanCore::CreateShaderBindingTable(VkPipeline pipeline,
   auto aligned_size = [](uint32_t value, uint32_t alignment) { return (value + alignment - 1) & ~(alignment - 1); };
 
   VkPhysicalDeviceRayTracingPipelinePropertiesKHR ray_tracing_pipeline_properties =
-      physical_device_->GetPhysicalDeviceRayTracingPipelineProperties();
+      vulkan::GetPhysicalDeviceRayTracingPipelineProperties(physical_device_);
 
   const uint32_t handle_size = ray_tracing_pipeline_properties.shaderGroupHandleSize;
   const uint32_t handle_size_aligned = aligned_size(ray_tracing_pipeline_properties.shaderGroupHandleSize,

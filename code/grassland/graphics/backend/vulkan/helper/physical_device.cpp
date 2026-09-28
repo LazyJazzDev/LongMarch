@@ -1,38 +1,26 @@
 #include "grassland/graphics/backend/vulkan/helper/physical_device.h"
 
-#include "grassland/graphics/backend/vulkan/helper/native_types.h"
-
 namespace grassland::graphics::backend::vulkan {
-PhysicalDevice::PhysicalDevice(VkPhysicalDevice physical_device) {
-  physical_device_ = physical_device;
-}
-
-PhysicalDevice::~PhysicalDevice() = default;
-
-VkPhysicalDevice PhysicalDevice::Handle() const {
-  return physical_device_;
-}
-
-VkPhysicalDeviceFeatures PhysicalDevice::GetPhysicalDeviceFeatures() const {
+VkPhysicalDeviceFeatures GetPhysicalDeviceFeatures(VkPhysicalDevice physical_device) {
   VkPhysicalDeviceFeatures features{};
-  vkGetPhysicalDeviceFeatures(physical_device_, &features);
+  vkGetPhysicalDeviceFeatures(physical_device, &features);
   return features;
 }
 
-VkPhysicalDeviceProperties PhysicalDevice::GetPhysicalDeviceProperties() const {
+VkPhysicalDeviceProperties GetPhysicalDeviceProperties(VkPhysicalDevice physical_device) {
   VkPhysicalDeviceProperties properties{};
-  vkGetPhysicalDeviceProperties(physical_device_, &properties);
+  vkGetPhysicalDeviceProperties(physical_device, &properties);
   return properties;
 }
 
-VkPhysicalDeviceMemoryProperties PhysicalDevice::GetPhysicalDeviceMemoryProperties() const {
+VkPhysicalDeviceMemoryProperties GetPhysicalDeviceMemoryProperties(VkPhysicalDevice physical_device) {
   VkPhysicalDeviceMemoryProperties properties{};
-  vkGetPhysicalDeviceMemoryProperties(physical_device_, &properties);
+  vkGetPhysicalDeviceMemoryProperties(physical_device, &properties);
   return properties;
 }
 
-uint64_t PhysicalDevice::GetDeviceLocalMemorySize() const {
-  VkPhysicalDeviceMemoryProperties properties = GetPhysicalDeviceMemoryProperties();
+uint64_t GetDeviceLocalMemorySize(VkPhysicalDevice physical_device) {
+  VkPhysicalDeviceMemoryProperties properties = GetPhysicalDeviceMemoryProperties(physical_device);
   uint64_t device_local_memory_size = 0;
   for (uint32_t i = 0; i < properties.memoryHeapCount; i++) {
     if (properties.memoryHeaps[i].flags & VK_MEMORY_HEAP_DEVICE_LOCAL_BIT) {
@@ -42,34 +30,24 @@ uint64_t PhysicalDevice::GetDeviceLocalMemorySize() const {
   return device_local_memory_size;
 }
 
-std::vector<VkExtensionProperties> PhysicalDevice::GetDeviceExtensions() const {
+std::vector<VkExtensionProperties> GetDeviceExtensions(VkPhysicalDevice physical_device) {
   uint32_t extension_count = 0;
-  vkEnumerateDeviceExtensionProperties(physical_device_, nullptr, &extension_count, nullptr);
+  vkEnumerateDeviceExtensionProperties(physical_device, nullptr, &extension_count, nullptr);
   std::vector<VkExtensionProperties> extensions(extension_count);
-  vkEnumerateDeviceExtensionProperties(physical_device_, nullptr, &extension_count, extensions.data());
+  vkEnumerateDeviceExtensionProperties(physical_device, nullptr, &extension_count, extensions.data());
   return extensions;
 }
 
-std::vector<VkQueueFamilyProperties> PhysicalDevice::GetQueueFamilyProperties() const {
+std::vector<VkQueueFamilyProperties> GetQueueFamilyProperties(VkPhysicalDevice physical_device) {
   uint32_t queue_family_count = 0;
-  vkGetPhysicalDeviceQueueFamilyProperties(physical_device_, &queue_family_count, nullptr);
+  vkGetPhysicalDeviceQueueFamilyProperties(physical_device, &queue_family_count, nullptr);
   std::vector<VkQueueFamilyProperties> queue_families(queue_family_count);
-  vkGetPhysicalDeviceQueueFamilyProperties(physical_device_, &queue_family_count, queue_families.data());
+  vkGetPhysicalDeviceQueueFamilyProperties(physical_device, &queue_family_count, queue_families.data());
   return queue_families;
 }
 
-VkPhysicalDeviceRayTracingPipelinePropertiesKHR PhysicalDevice::GetRayTracingProperties() const {
-  VkPhysicalDeviceRayTracingPipelinePropertiesKHR ray_tracing_properties{};
-  VkPhysicalDeviceProperties2 properties2{};
-  properties2.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_PROPERTIES_2;
-  properties2.pNext = &ray_tracing_properties;
-  ray_tracing_properties.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_RAY_TRACING_PIPELINE_PROPERTIES_KHR;
-  vkGetPhysicalDeviceProperties2(physical_device_, &properties2);
-  return ray_tracing_properties;
-}
-
-bool PhysicalDevice::IsExtensionSupported(const char *extension_name) const {
-  std::vector<VkExtensionProperties> extensions = GetDeviceExtensions();
+bool IsExtensionSupported(VkPhysicalDevice physical_device, const char *extension_name) {
+  std::vector<VkExtensionProperties> extensions = GetDeviceExtensions(physical_device);
   for (const auto &extension : extensions) {
     if (strcmp(extension.extensionName, extension_name) == 0) {
       return true;
@@ -78,39 +56,41 @@ bool PhysicalDevice::IsExtensionSupported(const char *extension_name) const {
   return false;
 }
 
-[[maybe_unused]] bool PhysicalDevice::SupportGeometryShader() const {
+[[maybe_unused]] bool SupportGeometryShader(VkPhysicalDevice physical_device) {
   // Geometry shader is feature of Vulkan
-  VkPhysicalDeviceFeatures features = GetPhysicalDeviceFeatures();
+  VkPhysicalDeviceFeatures features = GetPhysicalDeviceFeatures(physical_device);
   return features.geometryShader;
 }
 
-VkPhysicalDeviceRayTracingPipelinePropertiesKHR PhysicalDevice::GetPhysicalDeviceRayTracingPipelineProperties() const {
+VkPhysicalDeviceRayTracingPipelinePropertiesKHR GetPhysicalDeviceRayTracingPipelineProperties(
+    VkPhysicalDevice physical_device) {
   VkPhysicalDeviceRayTracingPipelinePropertiesKHR properties{};
   properties.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_RAY_TRACING_PIPELINE_PROPERTIES_KHR;
   properties.pNext = nullptr;
   VkPhysicalDeviceProperties2 properties2{};
   properties2.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_PROPERTIES_2;
   properties2.pNext = &properties;
-  vkGetPhysicalDeviceProperties2(physical_device_, &properties2);
+  vkGetPhysicalDeviceProperties2(physical_device, &properties2);
   return properties;
 }
 
-VkPhysicalDeviceRayTracingPipelineFeaturesKHR PhysicalDevice::GetPhysicalDeviceRayTracingPipelineFeatures() const {
+VkPhysicalDeviceRayTracingPipelineFeaturesKHR GetPhysicalDeviceRayTracingPipelineFeatures(
+    VkPhysicalDevice physical_device) {
   VkPhysicalDeviceRayTracingPipelineFeaturesKHR features{};
   features.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_RAY_TRACING_PIPELINE_FEATURES_KHR;
   features.pNext = nullptr;
   VkPhysicalDeviceFeatures2 features2{};
   features2.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2;
   features2.pNext = &features;
-  vkGetPhysicalDeviceFeatures2(physical_device_, &features2);
+  vkGetPhysicalDeviceFeatures2(physical_device, &features2);
   return features;
 }
 
-bool PhysicalDevice::SupportRayQuery() const {
-  if (!IsExtensionSupported(VK_KHR_RAY_QUERY_EXTENSION_NAME) ||
-      !IsExtensionSupported(VK_KHR_ACCELERATION_STRUCTURE_EXTENSION_NAME) ||
-      !IsExtensionSupported(VK_KHR_DEFERRED_HOST_OPERATIONS_EXTENSION_NAME) ||
-      !IsExtensionSupported(VK_KHR_BUFFER_DEVICE_ADDRESS_EXTENSION_NAME))
+bool SupportRayQuery(VkPhysicalDevice physical_device) {
+  if (!IsExtensionSupported(physical_device, VK_KHR_RAY_QUERY_EXTENSION_NAME) ||
+      !IsExtensionSupported(physical_device, VK_KHR_ACCELERATION_STRUCTURE_EXTENSION_NAME) ||
+      !IsExtensionSupported(physical_device, VK_KHR_DEFERRED_HOST_OPERATIONS_EXTENSION_NAME) ||
+      !IsExtensionSupported(physical_device, VK_KHR_BUFFER_DEVICE_ADDRESS_EXTENSION_NAME))
     return false;
   VkPhysicalDeviceBufferDeviceAddressFeatures address{VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_BUFFER_DEVICE_ADDRESS_FEATURES};
   VkPhysicalDeviceAccelerationStructureFeaturesKHR acceleration{
@@ -120,23 +100,24 @@ bool PhysicalDevice::SupportRayQuery() const {
   features.pNext = &query;
   query.pNext = &acceleration;
   acceleration.pNext = &address;
-  vkGetPhysicalDeviceFeatures2(physical_device_, &features);
+  vkGetPhysicalDeviceFeatures2(physical_device, &features);
   return query.rayQuery && acceleration.accelerationStructure && address.bufferDeviceAddress;
 }
 
-bool PhysicalDevice::SupportRayTracing() const {
-  VkPhysicalDeviceRayTracingPipelineFeaturesKHR features = GetPhysicalDeviceRayTracingPipelineFeatures();
+bool SupportRayTracing(VkPhysicalDevice physical_device) {
+  VkPhysicalDeviceRayTracingPipelineFeaturesKHR features = GetPhysicalDeviceRayTracingPipelineFeatures(physical_device);
   return features.rayTracingPipeline;
 }
 
-uint64_t PhysicalDevice::Evaluate() const {
+uint64_t Evaluate(VkPhysicalDevice physical_device) {
   uint64_t score = 0;
-  VkPhysicalDeviceProperties properties = GetPhysicalDeviceProperties();
-  VkPhysicalDeviceFeatures features = GetPhysicalDeviceFeatures();
-  VkPhysicalDeviceMemoryProperties memory_properties = GetPhysicalDeviceMemoryProperties();
+  VkPhysicalDeviceProperties properties = GetPhysicalDeviceProperties(physical_device);
+  VkPhysicalDeviceFeatures features = GetPhysicalDeviceFeatures(physical_device);
+  VkPhysicalDeviceMemoryProperties memory_properties = GetPhysicalDeviceMemoryProperties(physical_device);
   VkPhysicalDeviceRayTracingPipelinePropertiesKHR ray_tracing_properties =
-      GetPhysicalDeviceRayTracingPipelineProperties();
-  VkPhysicalDeviceRayTracingPipelineFeaturesKHR ray_tracing_features = GetPhysicalDeviceRayTracingPipelineFeatures();
+      GetPhysicalDeviceRayTracingPipelineProperties(physical_device);
+  VkPhysicalDeviceRayTracingPipelineFeaturesKHR ray_tracing_features =
+      GetPhysicalDeviceRayTracingPipelineFeatures(physical_device);
   if (properties.deviceType == VK_PHYSICAL_DEVICE_TYPE_DISCRETE_GPU) {
     score += 1000000000;
   }
@@ -148,7 +129,7 @@ uint64_t PhysicalDevice::Evaluate() const {
     score += 100000000;
   }
   // Consider memory size, get from existed function
-  uint64_t device_local_memory_size = GetDeviceLocalMemorySize();
+  uint64_t device_local_memory_size = GetDeviceLocalMemorySize(physical_device);
 
   // Score for memory size
   score += device_local_memory_size / 1000000;
@@ -156,9 +137,9 @@ uint64_t PhysicalDevice::Evaluate() const {
   return score;
 }
 
-uint32_t PhysicalDevice::GraphicsFamilyIndex() const {
+uint32_t GraphicsFamilyIndex(VkPhysicalDevice physical_device) {
   uint32_t graphics_family_index = 0;
-  std::vector<VkQueueFamilyProperties> queue_families = GetQueueFamilyProperties();
+  std::vector<VkQueueFamilyProperties> queue_families = GetQueueFamilyProperties(physical_device);
   for (const auto &queue_family : queue_families) {
     if (queue_family.queueFlags & VK_QUEUE_GRAPHICS_BIT) {
       return graphics_family_index;
@@ -168,12 +149,12 @@ uint32_t PhysicalDevice::GraphicsFamilyIndex() const {
   return -1;
 }
 
-uint32_t PhysicalDevice::PresentFamilyIndex(VkSurfaceKHR surface) const {
+uint32_t PresentFamilyIndex(VkPhysicalDevice physical_device, VkSurfaceKHR surface) {
   uint32_t present_family_index = 0;
-  std::vector<VkQueueFamilyProperties> queue_families = GetQueueFamilyProperties();
+  std::vector<VkQueueFamilyProperties> queue_families = GetQueueFamilyProperties(physical_device);
   for (const auto &queue_family : queue_families) {
     VkBool32 present_support = false;
-    vkGetPhysicalDeviceSurfaceSupportKHR(physical_device_, present_family_index, surface, &present_support);
+    vkGetPhysicalDeviceSurfaceSupportKHR(physical_device, present_family_index, surface, &present_support);
     if (present_support) {
       return present_family_index;
     }
@@ -182,9 +163,9 @@ uint32_t PhysicalDevice::PresentFamilyIndex(VkSurfaceKHR surface) const {
   return -1;
 }
 
-uint32_t PhysicalDevice::ComputeFamilyIndex() const {
+uint32_t ComputeFamilyIndex(VkPhysicalDevice physical_device) {
   uint32_t compute_family_index = 0;
-  std::vector<VkQueueFamilyProperties> queue_families = GetQueueFamilyProperties();
+  std::vector<VkQueueFamilyProperties> queue_families = GetQueueFamilyProperties(physical_device);
   for (const auto &queue_family : queue_families) {
     if (queue_family.queueFlags & VK_QUEUE_COMPUTE_BIT) {
       return compute_family_index;
@@ -194,9 +175,9 @@ uint32_t PhysicalDevice::ComputeFamilyIndex() const {
   return -1;
 }
 
-uint32_t PhysicalDevice::TransferFamilyIndex() const {
+uint32_t TransferFamilyIndex(VkPhysicalDevice physical_device) {
   uint32_t transfer_family_index = 0;
-  std::vector<VkQueueFamilyProperties> queue_families = GetQueueFamilyProperties();
+  std::vector<VkQueueFamilyProperties> queue_families = GetQueueFamilyProperties(physical_device);
   for (const auto &queue_family : queue_families) {
     if (queue_family.queueFlags & VK_QUEUE_TRANSFER_BIT) {
       return transfer_family_index;
@@ -206,58 +187,8 @@ uint32_t PhysicalDevice::TransferFamilyIndex() const {
   return -1;
 }
 
-VkSampleCountFlagBits PhysicalDevice::GetMaxUsableSampleCount() const {
-  VkPhysicalDeviceProperties physical_device_properties = GetPhysicalDeviceProperties();
-
-  VkSampleCountFlags counts = physical_device_properties.limits.framebufferColorSampleCounts &
-                              physical_device_properties.limits.framebufferDepthSampleCounts;
-  if (counts & VK_SAMPLE_COUNT_64_BIT) {
-    return VK_SAMPLE_COUNT_64_BIT;
-  }
-  if (counts & VK_SAMPLE_COUNT_32_BIT) {
-    return VK_SAMPLE_COUNT_32_BIT;
-  }
-  if (counts & VK_SAMPLE_COUNT_16_BIT) {
-    return VK_SAMPLE_COUNT_16_BIT;
-  }
-  if (counts & VK_SAMPLE_COUNT_8_BIT) {
-    return VK_SAMPLE_COUNT_8_BIT;
-  }
-  if (counts & VK_SAMPLE_COUNT_4_BIT) {
-    return VK_SAMPLE_COUNT_4_BIT;
-  }
-  if (counts & VK_SAMPLE_COUNT_2_BIT) {
-    return VK_SAMPLE_COUNT_2_BIT;
-  }
-  return VK_SAMPLE_COUNT_1_BIT;
-}
-
-bool PhysicalDevice::CheckFeatureSupport(const DeviceFeatureRequirement &feature_requirement) const {
-  if (GraphicsFamilyIndex() == -1) {
-    return false;
-  }
-
-  if (ComputeFamilyIndex() == -1) {
-    return false;
-  }
-
-  if (TransferFamilyIndex() == -1) {
-    return false;
-  }
-
-  if (feature_requirement.enable_raytracing_extension) {
-    if (!SupportRayTracing()) {
-      return false;
-    }
-  }
-
-  if (feature_requirement.enable_rayquery_extension && !SupportRayQuery())
-    return false;
-  return true;
-}
-
 #if defined(LONGMARCH_CUDA_RUNTIME)
-int PhysicalDevice::GetCUDADeviceIndex() const {
+int GetCUDADeviceIndex(VkPhysicalDevice physical_device) {
   VkPhysicalDeviceIDProperties id_properties{};
   id_properties.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_ID_PROPERTIES;
   id_properties.pNext = nullptr;
@@ -265,7 +196,7 @@ int PhysicalDevice::GetCUDADeviceIndex() const {
   VkPhysicalDeviceProperties2 properties2{};
   properties2.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_PROPERTIES_2;
   properties2.pNext = &id_properties;
-  vkGetPhysicalDeviceProperties2(physical_device_, &properties2);
+  vkGetPhysicalDeviceProperties2(physical_device, &properties2);
 
   int cuda_device_count = 0;
   cudaGetDeviceCount(&cuda_device_count);
@@ -278,6 +209,6 @@ int PhysicalDevice::GetCUDADeviceIndex() const {
   }
   return -1;
 }
-#endif
 
+#endif
 }  // namespace grassland::graphics::backend::vulkan

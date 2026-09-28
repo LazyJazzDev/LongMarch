@@ -12,7 +12,7 @@ struct DeviceFeatureRequirement {
   bool enable_raytracing_extension{false};
   bool enable_rayquery_extension{false};
 
-  class DeviceCreateInfo GenerateRecommendedDeviceCreateInfo(const PhysicalDevice &physical_device) const;
+  class DeviceCreateInfo GenerateRecommendedDeviceCreateInfo(VkPhysicalDevice physical_device) const;
 
   VmaAllocatorCreateFlags GetVmaAllocatorCreateFlags() const;
 };
@@ -76,6 +76,6 @@ struct DeviceCreateInfo {
     queue_families[family_index] = priorities;
   }
 
-  VkDeviceCreateInfo CompileVkDeviceCreateInfo(bool enable_validation_layers, const PhysicalDevice &physical_device);
+  VkDeviceCreateInfo CompileVkDeviceCreateInfo(bool enable_validation_layers, VkPhysicalDevice physical_device);
 };
 }  // namespace grassland::graphics::backend::vulkan

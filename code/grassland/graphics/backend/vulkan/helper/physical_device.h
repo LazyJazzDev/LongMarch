@@ -1,64 +1,27 @@
 #pragma once
-
 #include "grassland/graphics/backend/vulkan/helper/instance.h"
 
 namespace grassland::graphics::backend::vulkan {
-
-// Physical Device
-class PhysicalDevice {
- public:
-  explicit PhysicalDevice(VkPhysicalDevice physical_device);
-
-  ~PhysicalDevice();
-
-  VkPhysicalDevice Handle() const;
-
-  // Functions that Return Key Features and Properties
-  VkPhysicalDeviceFeatures GetPhysicalDeviceFeatures() const;
-
-  VkPhysicalDeviceProperties GetPhysicalDeviceProperties() const;
-
-  VkPhysicalDeviceMemoryProperties GetPhysicalDeviceMemoryProperties() const;
-
-  VkPhysicalDeviceRayTracingPipelinePropertiesKHR GetPhysicalDeviceRayTracingPipelineProperties() const;
-
-  VkPhysicalDeviceRayTracingPipelineFeaturesKHR GetPhysicalDeviceRayTracingPipelineFeatures() const;
-
-  uint64_t GetDeviceLocalMemorySize() const;
-
-  std::vector<VkExtensionProperties> GetDeviceExtensions() const;
-
-  std::vector<VkQueueFamilyProperties> GetQueueFamilyProperties() const;
-
-  VkPhysicalDeviceRayTracingPipelinePropertiesKHR GetRayTracingProperties() const;
-
-  bool IsExtensionSupported(const char *extension_name) const;
-
-  bool SupportGeometryShader() const;
-
-  bool SupportRayTracing() const;
-  bool SupportRayQuery() const;
-
-  uint64_t Evaluate() const;
-
-  uint32_t GraphicsFamilyIndex() const;
-
-  uint32_t PresentFamilyIndex(VkSurfaceKHR surface) const;
-
-  uint32_t ComputeFamilyIndex() const;
-
-  uint32_t TransferFamilyIndex() const;
-
-  VkSampleCountFlagBits GetMaxUsableSampleCount() const;
-
-  bool CheckFeatureSupport(const struct DeviceFeatureRequirement &feature_requirement) const;
-
+VkPhysicalDeviceFeatures GetPhysicalDeviceFeatures(VkPhysicalDevice physical_device);
+VkPhysicalDeviceProperties GetPhysicalDeviceProperties(VkPhysicalDevice physical_device);
+VkPhysicalDeviceMemoryProperties GetPhysicalDeviceMemoryProperties(VkPhysicalDevice physical_device);
+uint64_t GetDeviceLocalMemorySize(VkPhysicalDevice physical_device);
+std::vector<VkExtensionProperties> GetDeviceExtensions(VkPhysicalDevice physical_device);
+std::vector<VkQueueFamilyProperties> GetQueueFamilyProperties(VkPhysicalDevice physical_device);
+bool IsExtensionSupported(VkPhysicalDevice physical_device, const char *extension_name);
+[[maybe_unused]] bool SupportGeometryShader(VkPhysicalDevice physical_device);
+VkPhysicalDeviceRayTracingPipelinePropertiesKHR GetPhysicalDeviceRayTracingPipelineProperties(
+    VkPhysicalDevice physical_device);
+VkPhysicalDeviceRayTracingPipelineFeaturesKHR GetPhysicalDeviceRayTracingPipelineFeatures(
+    VkPhysicalDevice physical_device);
+bool SupportRayQuery(VkPhysicalDevice physical_device);
+bool SupportRayTracing(VkPhysicalDevice physical_device);
+uint64_t Evaluate(VkPhysicalDevice physical_device);
+uint32_t GraphicsFamilyIndex(VkPhysicalDevice physical_device);
+uint32_t PresentFamilyIndex(VkPhysicalDevice physical_device, VkSurfaceKHR surface);
+uint32_t ComputeFamilyIndex(VkPhysicalDevice physical_device);
+uint32_t TransferFamilyIndex(VkPhysicalDevice physical_device);
 #if defined(LONGMARCH_CUDA_RUNTIME)
-  int GetCUDADeviceIndex() const;
+int GetCUDADeviceIndex(VkPhysicalDevice physical_device);
 #endif
-
- private:
-  VkPhysicalDevice physical_device_{};
-};
-
 }  // namespace grassland::graphics::backend::vulkan

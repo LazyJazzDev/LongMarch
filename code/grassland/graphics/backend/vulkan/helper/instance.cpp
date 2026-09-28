@@ -129,17 +129,12 @@ VkResult CreateNativeInstance(InstanceCreateHint &create_hint,
   return VK_SUCCESS;
 }
 
-std::vector<PhysicalDevice> EnumerateNativePhysicalDevices(VkInstance instance) {
+std::vector<VkPhysicalDevice> EnumerateNativePhysicalDevices(VkInstance instance) {
   uint32_t count = 0;
   vkEnumeratePhysicalDevices(instance, &count, nullptr);
   std::vector<VkPhysicalDevice> handles(count);
   vkEnumeratePhysicalDevices(instance, &count, handles.data());
-  std::vector<PhysicalDevice> devices;
-  devices.reserve(count);
-  for (auto handle : handles) {
-    devices.emplace_back(handle);
-  }
-  return devices;
+  return handles;
 }
 
 }  // namespace grassland::graphics::backend::vulkan

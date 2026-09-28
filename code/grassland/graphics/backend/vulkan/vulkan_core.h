@@ -11,7 +11,7 @@ class VulkanCore : public Core {
   ~VulkanCore() override;
 
   bool DeviceRayQuerySupport() const override {
-    return device_ && physical_device_ && physical_device_->SupportRayQuery();
+    return device_ && physical_device_ && vulkan::SupportRayQuery(physical_device_);
   }
 
   BackendAPI API() const override {
@@ -107,8 +107,8 @@ class VulkanCore : public Core {
     return device_;
   }
 
-  const vulkan::PhysicalDevice &PhysicalDevice() const {
-    return *physical_device_;
+  VkPhysicalDevice PhysicalDevice() const {
+    return physical_device_;
   }
 
   const vulkan::DeviceCreateInfo &CreateInfo() const {
@@ -272,13 +272,13 @@ class VulkanCore : public Core {
   vulkan::InstanceProcedures instance_procedures_{};
   VkDevice device_{VK_NULL_HANDLE};
   uint32_t api_version_{};
-  std::optional<vulkan::PhysicalDevice> physical_device_;
+  VkPhysicalDevice physical_device_{VK_NULL_HANDLE};
   std::optional<vulkan::DeviceCreateInfo> create_info_;
   VkPhysicalDeviceSubgroupProperties subgroup_properties_{};
   vulkan::DeviceProcedures procedures_{};
   VmaAllocator allocator_{VK_NULL_HANDLE};
   void InitializeNativeDevice(uint32_t api_version,
-                              const vulkan::PhysicalDevice &physical_device,
+                              VkPhysicalDevice physical_device,
                               vulkan::DeviceCreateInfo create_info,
                               VmaAllocatorCreateFlags allocator_flags,
                               VkDevice device);

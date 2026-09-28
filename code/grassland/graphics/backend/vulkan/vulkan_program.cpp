@@ -45,7 +45,7 @@ void VulkanProgramBase::AddResourceBindingImpl(ResourceType type, int count) {
 void VulkanProgramBase::FinalizePipelineLayout() {
   // Bindings currently use VK_SHADER_STAGE_ALL and ordinary descriptor sets.
   // Reject oversized scenes even when validation is disabled.
-  const auto limits = core_->PhysicalDevice().GetPhysicalDeviceProperties().limits;
+  const auto limits = vulkan::GetPhysicalDeviceProperties(core_->PhysicalDevice()).limits;
   uint64_t storage_buffers = 0, sampled_images = 0;
   for (const auto &binding : descriptor_bindings_) {
     if (binding.descriptorType == VK_DESCRIPTOR_TYPE_STORAGE_BUFFER)

@@ -87,7 +87,6 @@ std::string VkResultToString(VkResult result);
                                                                                           \
   } while (false)
 
-class PhysicalDevice;
 struct HitGroup;
 
 bool IsDepthFormat(VkFormat format);

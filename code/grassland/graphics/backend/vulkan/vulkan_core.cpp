@@ -439,12 +439,12 @@ int VulkanCore::GetPhysicalDeviceProperties(PhysicalDeviceProperties *p_physical
   for (int i = 0; i < physical_devices.size(); ++i) {
     auto physical_device = physical_devices[i];
     PhysicalDeviceProperties properties{};
-    properties.name = physical_device.GetPhysicalDeviceProperties().deviceName;
-    properties.score = physical_device.Evaluate();
-    properties.ray_tracing_support = physical_device.SupportRayTracing();
-    properties.geometry_shader_support = physical_device.SupportGeometryShader();
+    properties.name = vulkan::GetPhysicalDeviceProperties(physical_device).deviceName;
+    properties.score = vulkan::Evaluate(physical_device);
+    properties.ray_tracing_support = vulkan::SupportRayTracing(physical_device);
+    properties.geometry_shader_support = vulkan::SupportGeometryShader(physical_device);
 #if defined(LONGMARCH_CUDA_RUNTIME)
-    properties.cuda_device_index = physical_device.GetCUDADeviceIndex();
+    properties.cuda_device_index = vulkan::GetCUDADeviceIndex(physical_device);
 #endif
     if (p_physical_device_properties) {
       p_physical_device_properties[i] = properties;
@@ -456,7 +456,7 @@ int VulkanCore::GetPhysicalDeviceProperties(PhysicalDeviceProperties *p_physical
 }
 
 int VulkanCore::InitializeLogicalDevice(int device_index) {
-  std::vector<vulkan::PhysicalDevice> physical_devices = vulkan::EnumerateNativePhysicalDevices(instance_);
+  std::vector<VkPhysicalDevice> physical_devices = vulkan::EnumerateNativePhysicalDevices(instance_);
 
   if (device_index < 0 || device_index >= physical_devices.size()) {
     return -1;
@@ -465,15 +465,15 @@ int VulkanCore::InitializeLogicalDevice(int device_index) {
   auto physical_device = physical_devices[device_index];
 
 #if defined(LONGMARCH_CUDA_RUNTIME)
-  cuda_device_ = physical_device.GetCUDADeviceIndex();
+  cuda_device_ = vulkan::GetCUDADeviceIndex(physical_device);
 #endif
 
   grassland::graphics::backend::vulkan::DeviceFeatureRequirement device_feature_requirement{};
-  device_feature_requirement.enable_raytracing_extension = physical_device.SupportRayTracing();
-  device_feature_requirement.enable_rayquery_extension = physical_device.SupportRayQuery();
+  device_feature_requirement.enable_raytracing_extension = vulkan::SupportRayTracing(physical_device);
+  device_feature_requirement.enable_rayquery_extension = vulkan::SupportRayQuery(physical_device);
   auto create_info = device_feature_requirement.GenerateRecommendedDeviceCreateInfo(physical_device);
   if (instance_hint_.IsEnabledExtension(VK_KHR_SURFACE_EXTENSION_NAME) &&
-      physical_device.IsExtensionSupported(VK_KHR_SWAPCHAIN_EXTENSION_NAME)) {
+      vulkan::IsExtensionSupported(physical_device, VK_KHR_SWAPCHAIN_EXTENSION_NAME)) {
     create_info.AddExtension(VK_KHR_SWAPCHAIN_EXTENSION_NAME);
   }
 #if defined(LONGMARCH_CUDA_RUNTIME)
@@ -497,27 +497,27 @@ int VulkanCore::InitializeLogicalDevice(int device_index) {
   auto native_create_info =
       create_info.CompileVkDeviceCreateInfo(instance_hint_.enable_validation_layers, physical_device);
   VkDevice native_device = VK_NULL_HANDLE;
-  if (vkCreateDevice(physical_device.Handle(), &native_create_info, nullptr, &native_device) != VK_SUCCESS) {
+  if (vkCreateDevice(physical_device, &native_create_info, nullptr, &native_device) != VK_SUCCESS) {
     return -1;
   }
   InitializeNativeDevice(instance_hint_.app_info.apiVersion, physical_device, create_info,
                          device_feature_requirement.GetVmaAllocatorCreateFlags(), native_device);
-  memory_properties_ = physical_device.GetPhysicalDeviceMemoryProperties();
+  memory_properties_ = vulkan::GetPhysicalDeviceMemoryProperties(physical_device);
 
-  device_name_ = physical_device.GetPhysicalDeviceProperties().deviceName;
-  ray_tracing_support_ = physical_device.SupportRayTracing();
+  device_name_ = vulkan::GetPhysicalDeviceProperties(physical_device).deviceName;
+  ray_tracing_support_ = vulkan::SupportRayTracing(physical_device);
 
   VkCommandPoolCreateInfo pool_info{VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO};
   pool_info.flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT;
-  pool_info.queueFamilyIndex = physical_device.GraphicsFamilyIndex();
+  pool_info.queueFamilyIndex = vulkan::GraphicsFamilyIndex(physical_device);
   vulkan::ThrowIfFailed(vkCreateCommandPool(native_device, &pool_info, nullptr, &graphics_command_pool_),
                         "failed to create graphics command pool");
-  pool_info.queueFamilyIndex = physical_device.TransferFamilyIndex();
+  pool_info.queueFamilyIndex = vulkan::TransferFamilyIndex(physical_device);
   vulkan::ThrowIfFailed(vkCreateCommandPool(native_device, &pool_info, nullptr, &transfer_command_pool_),
                         "failed to create transfer command pool");
 
-  vkGetDeviceQueue(native_device, physical_device.GraphicsFamilyIndex(), 0, &graphics_queue_);
-  vkGetDeviceQueue(native_device, physical_device.TransferFamilyIndex(), 0, &transfer_queue_);
+  vkGetDeviceQueue(native_device, vulkan::GraphicsFamilyIndex(physical_device), 0, &graphics_queue_);
+  vkGetDeviceQueue(native_device, vulkan::TransferFamilyIndex(physical_device), 0, &transfer_queue_);
 
   in_flight_fences_.resize(FramesInFlight());
   command_buffers_.resize(FramesInFlight());

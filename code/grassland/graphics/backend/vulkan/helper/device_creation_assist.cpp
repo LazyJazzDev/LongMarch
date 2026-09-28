@@ -3,7 +3,7 @@
 namespace grassland::graphics::backend::vulkan {
 
 VkDeviceCreateInfo DeviceCreateInfo::CompileVkDeviceCreateInfo(bool enable_validation_layers,
-                                                               const PhysicalDevice &physical_device) {
+                                                               VkPhysicalDevice physical_device) {
   queue_create_infos_.clear();
   queue_create_infos_.reserve(queue_families.size());
   for (auto &[family_index, priorities] : queue_families) {
@@ -15,7 +15,7 @@ VkDeviceCreateInfo DeviceCreateInfo::CompileVkDeviceCreateInfo(bool enable_valid
     queue_create_infos_.push_back(queue_create_info);
   }
 
-  physical_device_features_ = physical_device.GetPhysicalDeviceFeatures();
+  physical_device_features_ = GetPhysicalDeviceFeatures(physical_device);
 
   void *pNext = nullptr;
   for (auto &feature : features) {
@@ -44,7 +44,7 @@ VkDeviceCreateInfo DeviceCreateInfo::CompileVkDeviceCreateInfo(bool enable_valid
 }
 
 class DeviceCreateInfo DeviceFeatureRequirement::GenerateRecommendedDeviceCreateInfo(
-    const PhysicalDevice &physical_device) const {
+    VkPhysicalDevice physical_device) const {
   DeviceCreateInfo create_info;
 
 #ifdef __APPLE__
@@ -116,7 +116,7 @@ class DeviceCreateInfo DeviceFeatureRequirement::GenerateRecommendedDeviceCreate
   create_info.AddFeature(physical_device_descriptor_indexing_features);
   create_info.AddFeature(physical_device_dynamic_rendering_features);
 
-  auto queue_family_properties = physical_device.GetQueueFamilyProperties();
+  auto queue_family_properties = GetQueueFamilyProperties(physical_device);
 
   for (int i = 0; i < queue_family_properties.size(); i++) {
     create_info.AddQueueFamily(i, std::vector<float>(queue_family_properties[i].queueCount, 1.0f));

@@ -59,7 +59,7 @@ VkResult BuildAccelerationStructure(const VulkanCore *core,
       VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_ACCELERATION_STRUCTURE_PROPERTIES_KHR};
   VkPhysicalDeviceProperties2 device_properties{VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_PROPERTIES_2};
   device_properties.pNext = &properties;
-  vkGetPhysicalDeviceProperties2(core->PhysicalDevice().Handle(), &device_properties);
+  vkGetPhysicalDeviceProperties2(core->PhysicalDevice(), &device_properties);
   VkDeviceSize alignment = properties.minAccelerationStructureScratchOffsetAlignment;
   VkBuffer scratch = VK_NULL_HANDLE;
   VmaAllocation scratch_allocation = VK_NULL_HANDLE;

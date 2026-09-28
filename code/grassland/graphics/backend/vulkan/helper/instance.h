@@ -28,6 +28,6 @@ VkResult CreateNativeInstance(InstanceCreateHint &hint,
                               VkInstance &instance,
                               VkDebugUtilsMessengerEXT &debug_messenger,
                               InstanceProcedures &procedures);
-std::vector<class PhysicalDevice> EnumerateNativePhysicalDevices(VkInstance instance);
+std::vector<VkPhysicalDevice> EnumerateNativePhysicalDevices(VkInstance instance);
 
 }  // namespace grassland::graphics::backend::vulkan

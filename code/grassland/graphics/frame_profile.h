@@ -26,11 +26,12 @@ class FrameProfile {
     if (!vk)
       throw std::runtime_error("frame GPU profiling currently requires Vulkan; use --profile-cpu-only for Metal");
     device_ = vk->Handle();
-    const auto properties = vk->PhysicalDevice().GetPhysicalDeviceProperties();
+    const auto properties = grassland::graphics::backend::vulkan::GetPhysicalDeviceProperties(vk->PhysicalDevice());
     device_name = properties.deviceName;
     period_ = properties.limits.timestampPeriod;
-    bits_ =
-        vk->PhysicalDevice().GetQueueFamilyProperties()[vk->PhysicalDevice().GraphicsFamilyIndex()].timestampValidBits;
+    bits_ = grassland::graphics::backend::vulkan::GetQueueFamilyProperties(
+                vk->PhysicalDevice())[grassland::graphics::backend::vulkan::GraphicsFamilyIndex(vk->PhysicalDevice())]
+                .timestampValidBits;
     if (!bits_ || period_ <= 0)
       throw std::runtime_error("GPU queue does not support timestamps");
     VkQueryPoolCreateInfo info{};

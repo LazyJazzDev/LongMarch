@@ -18,8 +18,8 @@ void VulkanWindow::DestroySwapChain() {
 
 void VulkanWindow::CreateSwapChain() {
   VkDevice device = core_->Handle();
-  auto &physical_device = core_->PhysicalDevice();
-  auto support = vulkan::QuerySwapChainSupport(physical_device.Handle(), surface_);
+  auto physical_device = core_->PhysicalDevice();
+  auto support = vulkan::QuerySwapChainSupport(physical_device, surface_);
   VkFormat requested_format = enable_hdr_ ? VK_FORMAT_R16G16B16A16_SFLOAT : VK_FORMAT_R8G8B8A8_UNORM;
   VkColorSpaceKHR requested_color_space =
       enable_hdr_ ? VK_COLOR_SPACE_EXTENDED_SRGB_LINEAR_EXT : VK_COLOR_SPACE_SRGB_NONLINEAR_KHR;
@@ -39,7 +39,8 @@ void VulkanWindow::CreateSwapChain() {
   create_info.imageExtent = swap_chain_extent_;
   create_info.imageArrayLayers = 1;
   create_info.imageUsage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT;
-  uint32_t families[] = {physical_device.GraphicsFamilyIndex(), physical_device.PresentFamilyIndex(surface_)};
+  uint32_t families[] = {vulkan::GraphicsFamilyIndex(physical_device),
+                         vulkan::PresentFamilyIndex(physical_device, surface_)};
   if (families[0] != families[1]) {
     create_info.imageSharingMode = VK_SHARING_MODE_CONCURRENT;
     create_info.queueFamilyIndexCount = 2;
@@ -93,7 +94,7 @@ VulkanWindow::VulkanWindow(VulkanCore *core,
     vulkan::ThrowIfFailed(vkCreateSemaphore(core_->Handle(), &semaphore_info, nullptr, &render_finish_semaphores_[i]),
                           "Failed to create render finish semaphore");
   }
-  vkGetDeviceQueue(core_->Handle(), core_->PhysicalDevice().PresentFamilyIndex(surface_), 0, &present_queue_);
+  vkGetDeviceQueue(core_->Handle(), vulkan::PresentFamilyIndex(core_->PhysicalDevice(), surface_), 0, &present_queue_);
   ResizeEvent().RegisterCallback([this](int width, int height) { Rebuild(); });
 }
 
@@ -262,9 +263,9 @@ void VulkanWindow::SetupImGuiContext() {
   ImGui_ImplVulkan_InitInfo init_info = {};
   init_info.ApiVersion = VK_API_VERSION_1_2;
   init_info.Instance = core_->Instance();
-  init_info.PhysicalDevice = core_->PhysicalDevice().Handle();
+  init_info.PhysicalDevice = core_->PhysicalDevice();
   init_info.Device = core_->Handle();
-  init_info.QueueFamily = core_->PhysicalDevice().GraphicsFamilyIndex();
+  init_info.QueueFamily = vulkan::GraphicsFamilyIndex(core_->PhysicalDevice());
   init_info.Queue = core_->GraphicsQueue();
   init_info.DescriptorPoolSize = 32;
   init_info.RenderPass = imgui_assets_.render_pass;

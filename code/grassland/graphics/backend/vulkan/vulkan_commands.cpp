@@ -82,8 +82,8 @@ void VulkanCmdBeginRendering::CompileCommand(VulkanCommandContext *context, VkCo
   std::vector<VkRenderingAttachmentInfo> color_attachment_infos;
   VkRenderingAttachmentInfo depth_attachment_info{};
   Extent2D extent;
-  extent.width = context->Core()->PhysicalDevice().GetPhysicalDeviceProperties().limits.maxFramebufferWidth;
-  extent.height = context->Core()->PhysicalDevice().GetPhysicalDeviceProperties().limits.maxFramebufferHeight;
+  extent.width = vulkan::GetPhysicalDeviceProperties(context->Core()->PhysicalDevice()).limits.maxFramebufferWidth;
+  extent.height = vulkan::GetPhysicalDeviceProperties(context->Core()->PhysicalDevice()).limits.maxFramebufferHeight;
   for (int i = 0; i < color_targets_.size(); i++) {
     auto &color_target = color_targets_[i];
     context->RequireImageState(command_buffer, color_target->Handle(), VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
@@ -491,7 +491,7 @@ VulkanCmdDispatchRays::VulkanCmdDispatchRays(VulkanRayTracingProgram *program,
 
 void VulkanCmdDispatchRays::CompileCommand(VulkanCommandContext *context, VkCommandBuffer command_buffer) {
   VkPhysicalDeviceRayTracingPipelinePropertiesKHR ray_tracing_pipeline_properties =
-      context->Core()->PhysicalDevice().GetPhysicalDeviceRayTracingPipelineProperties();
+      vulkan::GetPhysicalDeviceRayTracingPipelineProperties(context->Core()->PhysicalDevice());
 
   auto aligned_size = [](uint32_t value, uint32_t alignment) { return (value + alignment - 1) & ~(alignment - 1); };
   const uint32_t handle_size_aligned = aligned_size(ray_tracing_pipeline_properties.shaderGroupHandleSize,
