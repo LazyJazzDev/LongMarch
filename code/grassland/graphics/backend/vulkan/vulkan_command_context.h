@@ -58,7 +58,7 @@ class VulkanCommandContext : public CommandContext {
 
   void RecordDynamicBuffer(VulkanBuffer *buffer);
 
-  vulkan::DescriptorSet *AcquireDescriptorSet(VkDescriptorSetLayout set_layout) const;
+  VkDescriptorSet AcquireDescriptorSet(VkDescriptorSetLayout set_layout) const;
 
  private:
   friend VulkanCore;
@@ -86,10 +86,14 @@ class VulkanCommandContext : public CommandContext {
   int required_set_count_{0};
 };
 
-inline vulkan::DescriptorSet *VulkanCommandContext::AcquireDescriptorSet(VkDescriptorSetLayout set_layout) const {
-  vulkan::DescriptorSet *descriptor_set = nullptr;
-  core_->current_descriptor_pool_->AllocateDescriptorSet(set_layout, &descriptor_set);
-  core_->current_descriptor_set_queue_->push(descriptor_set);
+inline VkDescriptorSet VulkanCommandContext::AcquireDescriptorSet(VkDescriptorSetLayout set_layout) const {
+  VkDescriptorSetAllocateInfo info{VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO};
+  info.descriptorPool = core_->current_descriptor_pool_;
+  info.descriptorSetCount = 1;
+  info.pSetLayouts = &set_layout;
+  VkDescriptorSet descriptor_set = VK_NULL_HANDLE;
+  vulkan::ThrowIfFailed(vkAllocateDescriptorSets(core_->Handle(), &info, &descriptor_set),
+                        "Failed to allocate Vulkan descriptor set");
   return descriptor_set;
 }
 

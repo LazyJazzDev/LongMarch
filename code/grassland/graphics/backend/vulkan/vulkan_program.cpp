@@ -21,6 +21,9 @@ VulkanProgramBase::VulkanProgramBase(VulkanCore *core) : core_(core) {
 VulkanProgramBase::~VulkanProgramBase() {
   if (pipeline_layout_)
     vkDestroyPipelineLayout(core_->Handle(), pipeline_layout_, nullptr);
+  for (VkDescriptorSetLayout layout : descriptor_set_layouts_) {
+    vkDestroyDescriptorSetLayout(core_->Handle(), layout, nullptr);
+  }
 }
 
 void VulkanProgramBase::AddResourceBindingImpl(ResourceType type, int count) {
@@ -29,9 +32,14 @@ void VulkanProgramBase::AddResourceBindingImpl(ResourceType type, int count) {
   binding.descriptorType = ResourceTypeToVkDescriptorType(type);
   binding.descriptorCount = count;
   binding.stageFlags = VK_SHADER_STAGE_ALL;
-  std::unique_ptr<vulkan::DescriptorSetLayout> descriptor_set_layout;
-  core_->CreateDescriptorSetLayout({binding}, &descriptor_set_layout);
-  descriptor_set_layouts_.push_back(std::move(descriptor_set_layout));
+  VkDescriptorSetLayoutCreateInfo info{VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO};
+  info.bindingCount = 1;
+  info.pBindings = &binding;
+  VkDescriptorSetLayout layout = VK_NULL_HANDLE;
+  vulkan::ThrowIfFailed(vkCreateDescriptorSetLayout(core_->Handle(), &info, nullptr, &layout),
+                        "Failed to create Vulkan descriptor set layout");
+  descriptor_set_layouts_.push_back(layout);
+  descriptor_bindings_.push_back(binding);
 }
 
 void VulkanProgramBase::FinalizePipelineLayout() {
@@ -39,13 +47,11 @@ void VulkanProgramBase::FinalizePipelineLayout() {
   // Reject oversized scenes even when validation is disabled.
   const auto limits = core_->PhysicalDevice().GetPhysicalDeviceProperties().limits;
   uint64_t storage_buffers = 0, sampled_images = 0;
-  for (const auto &layout : descriptor_set_layouts_) {
-    for (const auto &binding : layout->Bindings()) {
-      if (binding.descriptorType == VK_DESCRIPTOR_TYPE_STORAGE_BUFFER)
-        storage_buffers += binding.descriptorCount;
-      if (binding.descriptorType == VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE)
-        sampled_images += binding.descriptorCount;
-    }
+  for (const auto &binding : descriptor_bindings_) {
+    if (binding.descriptorType == VK_DESCRIPTOR_TYPE_STORAGE_BUFFER)
+      storage_buffers += binding.descriptorCount;
+    if (binding.descriptorType == VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE)
+      sampled_images += binding.descriptorCount;
   }
   if (descriptor_set_layouts_.size() > limits.maxBoundDescriptorSets ||
       storage_buffers > limits.maxPerStageDescriptorStorageBuffers ||
@@ -58,9 +64,7 @@ void VulkanProgramBase::FinalizePipelineLayout() {
                              std::to_string(limits.maxBoundDescriptorSets) + ")");
   std::vector<VkDescriptorSetLayout> descriptor_set_layouts;
   descriptor_set_layouts.reserve(descriptor_set_layouts_.size());
-  for (auto &descriptor_set_layout : descriptor_set_layouts_) {
-    descriptor_set_layouts.push_back(descriptor_set_layout->Handle());
-  }
+  descriptor_set_layouts = descriptor_set_layouts_;
   VkPipelineLayoutCreateInfo layout_info{VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO};
   layout_info.setLayoutCount = static_cast<uint32_t>(descriptor_set_layouts.size());
   layout_info.pSetLayouts = descriptor_set_layouts.data();

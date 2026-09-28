@@ -88,9 +88,6 @@ std::string VkResultToString(VkResult result);
   } while (false)
 
 class PhysicalDevice;
-class DescriptorPool;
-class DescriptorSetLayout;
-class DescriptorSet;
 struct HitGroup;
 class Buffer;
 class Image;

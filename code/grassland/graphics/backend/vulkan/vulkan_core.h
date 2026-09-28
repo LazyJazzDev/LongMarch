@@ -137,10 +137,7 @@ class VulkanCore : public Core {
 
   VkResult CreateDescriptorPool(const std::vector<VkDescriptorPoolSize> &pool_sizes,
                                 uint32_t max_sets,
-                                double_ptr<vulkan::DescriptorPool> pp_descriptor_pool) const;
-
-  VkResult CreateDescriptorSetLayout(const std::vector<VkDescriptorSetLayoutBinding> &bindings,
-                                     double_ptr<vulkan::DescriptorSetLayout> pp_descriptor_set_layout) const;
+                                VkDescriptorPool *pool) const;
 
   VkResult CreateImage(VkFormat format,
                        VkExtent2D extent,
@@ -314,10 +311,10 @@ class VulkanCore : public Core {
   uint32_t current_frame_{0};
   std::vector<VkFence> in_flight_fences_;
 
-  std::vector<std::unique_ptr<vulkan::DescriptorPool>> descriptor_pools_;
-  std::vector<std::queue<vulkan::DescriptorSet *>> descriptor_sets_;
-  vulkan::DescriptorPool *current_descriptor_pool_{nullptr};
-  std::queue<vulkan::DescriptorSet *> *current_descriptor_set_queue_{nullptr};
+  std::vector<VkDescriptorPool> descriptor_pools_;
+  std::vector<vulkan::DescriptorPoolSize> descriptor_pool_sizes_;
+  std::vector<uint32_t> descriptor_pool_max_sets_;
+  VkDescriptorPool current_descriptor_pool_{VK_NULL_HANDLE};
 
   VkCommandPool graphics_command_pool_{VK_NULL_HANDLE};
   VkCommandPool transfer_command_pool_{VK_NULL_HANDLE};

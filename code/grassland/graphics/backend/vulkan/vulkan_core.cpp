@@ -41,10 +41,10 @@ VulkanCore::~VulkanCore() {
   upload_staging_buffer_.reset();
   download_staging_buffer_.reset();
 
-  for (auto &descriptor_set : descriptor_sets_) {
-    while (!descriptor_set.empty()) {
-      delete descriptor_set.front();
-      descriptor_set.pop();
+  if (device_) {
+    for (VkDescriptorPool pool : descriptor_pools_) {
+      if (pool)
+        vkDestroyDescriptorPool(device_, pool, nullptr);
     }
   }
   descriptor_pools_.clear();
@@ -238,16 +238,9 @@ int VulkanCore::CreateRayTracingProgram(double_ptr<RayTracingProgram> pp_program
 int VulkanCore::SubmitCommandContext(CommandContext *p_command_context) {
   VulkanCommandContext *command_context = dynamic_cast<VulkanCommandContext *>(p_command_context);
 
-  auto &set_queue = descriptor_sets_[current_frame_];
   auto &pool = descriptor_pools_[current_frame_];
-
-  while (!set_queue.empty()) {
-    delete set_queue.front();
-    set_queue.pop();
-  }
-
-  auto pool_size = pool->PoolSize();
-  auto max_sets = pool->MaxSets();
+  auto pool_size = descriptor_pool_sizes_[current_frame_];
+  auto max_sets = descriptor_pool_max_sets_[current_frame_];
   bool update_pool = false;
   for (auto &[type, count] : command_context->required_pool_size_.descriptor_type_count) {
     if (!pool_size.descriptor_type_count.count(type) || pool_size.descriptor_type_count[type] < count) {
@@ -267,11 +260,14 @@ int VulkanCore::SubmitCommandContext(CommandContext *p_command_context) {
     update_pool = true;
   }
   if (update_pool) {
-    pool.reset();
+    vkDestroyDescriptorPool(device_, pool, nullptr);
     this->CreateDescriptorPool(pool_size.ToVkDescriptorPoolSize(), max_sets, &pool);
+    descriptor_pool_sizes_[current_frame_] = pool_size;
+    descriptor_pool_max_sets_[current_frame_] = max_sets;
+  } else {
+    vkResetDescriptorPool(device_, pool, 0);
   }
-  current_descriptor_pool_ = pool.get();
-  current_descriptor_set_queue_ = &set_queue;
+  current_descriptor_pool_ = pool;
 
   for (auto &window : command_context->windows_) {
     window->AcquireNextImage();
@@ -507,7 +503,8 @@ int VulkanCore::InitializeLogicalDevice(int device_index) {
   command_buffers_.resize(FramesInFlight());
 
   descriptor_pools_.resize(FramesInFlight());
-  descriptor_sets_.resize(FramesInFlight());
+  descriptor_pool_sizes_.resize(FramesInFlight());
+  descriptor_pool_max_sets_.resize(FramesInFlight(), 1);
 
   post_execute_functions_.resize(FramesInFlight());
 
@@ -523,14 +520,8 @@ int VulkanCore::InitializeLogicalDevice(int device_index) {
     vulkan::ThrowIfFailed(vkAllocateCommandBuffers(native_device, &allocate_info, &command_buffers_[i]),
                           "failed to allocate graphics command buffer");
 
-    VkDescriptorPoolSize pool_sizes[] = {
-        {VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 100},
-        {VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 100},
-        {VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, 100},
-        {VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, 100},
-    };
-
     this->CreateDescriptorPool({{VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 1}}, 1, &descriptor_pools_[i]);
+    descriptor_pool_sizes_[i] = vulkan::DescriptorPoolSize(VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 1);
   }
   VkCommandBufferAllocateInfo transfer_allocate_info{VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO};
   transfer_allocate_info.commandPool = transfer_command_pool_;

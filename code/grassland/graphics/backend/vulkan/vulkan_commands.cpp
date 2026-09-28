@@ -155,13 +155,13 @@ void VulkanCmdBindResourceBuffers::CompileCommand(VulkanCommandContext *context,
     buffer_infos[i].range = buffers_[i].size;
   }
 
-  auto descriptor_set = context->AcquireDescriptorSet(program_base_->DescriptorSetLayout(slot_)->Handle());
+  auto descriptor_set = context->AcquireDescriptorSet(program_base_->DescriptorSetLayout(slot_));
 
-  auto binding = program_base_->DescriptorSetLayout(slot_)->Bindings()[0];
+  auto binding = program_base_->DescriptorBinding(slot_);
 
   VkWriteDescriptorSet write_descriptor_set{};
   write_descriptor_set.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-  write_descriptor_set.dstSet = descriptor_set->Handle();
+  write_descriptor_set.dstSet = descriptor_set;
   write_descriptor_set.dstBinding = binding.binding;
   write_descriptor_set.dstArrayElement = 0;
   write_descriptor_set.descriptorCount = binding.descriptorCount;
@@ -169,7 +169,7 @@ void VulkanCmdBindResourceBuffers::CompileCommand(VulkanCommandContext *context,
   write_descriptor_set.pBufferInfo = buffer_infos.data();
   vkUpdateDescriptorSets(context->Core()->Handle(), 1, &write_descriptor_set, 0, nullptr);
 
-  VkDescriptorSet descriptor_sets[] = {descriptor_set->Handle()};
+  VkDescriptorSet descriptor_sets[] = {descriptor_set};
 
   vkCmdBindDescriptorSets(command_buffer, BindPointToVkPipelineBindPoint(bind_point_), program_base_->PipelineLayout(),
                           slot_, 1, descriptor_sets, 0, nullptr);
@@ -200,12 +200,12 @@ void VulkanCmdBindResourceImages::CompileCommand(VulkanCommandContext *context, 
     }
   }
 
-  auto descriptor_set = context->AcquireDescriptorSet(program_base_->DescriptorSetLayout(slot_)->Handle());
-  VkDescriptorSet descriptor_sets[] = {descriptor_set->Handle()};
-  auto binding = program_base_->DescriptorSetLayout(slot_)->Bindings()[0];
+  auto descriptor_set = context->AcquireDescriptorSet(program_base_->DescriptorSetLayout(slot_));
+  VkDescriptorSet descriptor_sets[] = {descriptor_set};
+  auto binding = program_base_->DescriptorBinding(slot_);
   VkWriteDescriptorSet write_descriptor_set{};
   write_descriptor_set.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-  write_descriptor_set.dstSet = descriptor_set->Handle();
+  write_descriptor_set.dstSet = descriptor_set;
   write_descriptor_set.dstBinding = binding.binding;
   write_descriptor_set.dstArrayElement = 0;
   write_descriptor_set.descriptorCount = binding.descriptorCount;
@@ -235,12 +235,12 @@ void VulkanCmdBindResourceSamplers::CompileCommand(VulkanCommandContext *context
     sampler_infos[i].imageLayout = VK_IMAGE_LAYOUT_UNDEFINED;
   }
 
-  auto descriptor_set = context->AcquireDescriptorSet(program_base_->DescriptorSetLayout(slot_)->Handle());
-  VkDescriptorSet descriptor_sets[] = {descriptor_set->Handle()};
-  auto binding = program_base_->DescriptorSetLayout(slot_)->Bindings()[0];
+  auto descriptor_set = context->AcquireDescriptorSet(program_base_->DescriptorSetLayout(slot_));
+  VkDescriptorSet descriptor_sets[] = {descriptor_set};
+  auto binding = program_base_->DescriptorBinding(slot_);
   VkWriteDescriptorSet write_descriptor_set{};
   write_descriptor_set.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-  write_descriptor_set.dstSet = descriptor_set->Handle();
+  write_descriptor_set.dstSet = descriptor_set;
   write_descriptor_set.dstBinding = binding.binding;
   write_descriptor_set.dstArrayElement = 0;
   write_descriptor_set.descriptorCount = binding.descriptorCount;
@@ -265,12 +265,12 @@ VulkanCmdBindResourceAccelerationStructure::VulkanCmdBindResourceAccelerationStr
 
 void VulkanCmdBindResourceAccelerationStructure::CompileCommand(VulkanCommandContext *context,
                                                                 VkCommandBuffer command_buffer) {
-  auto descriptor_set = context->AcquireDescriptorSet(program_base_->DescriptorSetLayout(slot_)->Handle());
-  VkDescriptorSet descriptor_sets[] = {descriptor_set->Handle()};
-  auto binding = program_base_->DescriptorSetLayout(slot_)->Bindings()[0];
+  auto descriptor_set = context->AcquireDescriptorSet(program_base_->DescriptorSetLayout(slot_));
+  VkDescriptorSet descriptor_sets[] = {descriptor_set};
+  auto binding = program_base_->DescriptorBinding(slot_);
   VkWriteDescriptorSet write_descriptor_set{};
   write_descriptor_set.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-  write_descriptor_set.dstSet = descriptor_set->Handle();
+  write_descriptor_set.dstSet = descriptor_set;
   write_descriptor_set.dstBinding = binding.binding;
   write_descriptor_set.dstArrayElement = 0;
   write_descriptor_set.descriptorCount = binding.descriptorCount;

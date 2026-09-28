@@ -3,8 +3,6 @@
 
 #include "grassland/graphics/backend/vulkan/helper/buffer.h"
 #include "grassland/graphics/backend/vulkan/helper/descriptor_pool.h"
-#include "grassland/graphics/backend/vulkan/helper/descriptor_set.h"
-#include "grassland/graphics/backend/vulkan/helper/descriptor_set_layout.h"
 #include "grassland/graphics/backend/vulkan/helper/image.h"
 #include "grassland/graphics/backend/vulkan/helper/instance.h"
 #include "grassland/graphics/backend/vulkan/helper/instance_procedures.h"
@@ -65,52 +63,12 @@ void VulkanCore::DestroyNativeDevice() {
 
 VkResult VulkanCore::CreateDescriptorPool(const std::vector<VkDescriptorPoolSize> &pool_sizes,
                                           uint32_t max_sets,
-                                          double_ptr<vulkan::DescriptorPool> pp_descriptor_pool) const {
-  if (!pp_descriptor_pool) {
-    SetErrorMessage("pp_descriptor_pool is nullptr");
-    return VK_ERROR_INITIALIZATION_FAILED;
-  }
-
-  VkDescriptorPool descriptor_pool;
-  VkDescriptorPoolCreateInfo create_info = {};
-  create_info.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
-  create_info.poolSizeCount = pool_sizes.size();
-  create_info.pPoolSizes = pool_sizes.data();
-  create_info.flags = VK_DESCRIPTOR_POOL_CREATE_FREE_DESCRIPTOR_SET_BIT;
-  create_info.maxSets = max_sets;
-
-  RETURN_IF_FAILED_VK(vkCreateDescriptorPool(device_, &create_info, nullptr, &descriptor_pool),
-                      "failed to create descriptor pool!");
-
-  DescriptorPoolSize pool_size;
-  for (const auto &pool_size_info : pool_sizes) {
-    pool_size.descriptor_type_count[pool_size_info.type] = pool_size_info.descriptorCount;
-  }
-
-  pp_descriptor_pool.construct(this, descriptor_pool, pool_size, max_sets);
-
-  return VK_SUCCESS;
-}
-
-VkResult VulkanCore::CreateDescriptorSetLayout(const std::vector<VkDescriptorSetLayoutBinding> &bindings,
-                                               double_ptr<vulkan::DescriptorSetLayout> pp_descriptor_set_layout) const {
-  if (!pp_descriptor_set_layout) {
-    SetErrorMessage("pp_descriptor_set_layout is nullptr");
-    return VK_ERROR_INITIALIZATION_FAILED;
-  }
-
-  VkDescriptorSetLayout descriptor_set_layout;
-  VkDescriptorSetLayoutCreateInfo create_info = {};
-  create_info.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
-  create_info.bindingCount = bindings.size();
-  create_info.pBindings = bindings.data();
-
-  RETURN_IF_FAILED_VK(vkCreateDescriptorSetLayout(device_, &create_info, nullptr, &descriptor_set_layout),
-                      "failed to create descriptor set layout!");
-
-  pp_descriptor_set_layout.construct(this, descriptor_set_layout, bindings);
-
-  return VK_SUCCESS;
+                                          VkDescriptorPool *pool) const {
+  VkDescriptorPoolCreateInfo info{VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO};
+  info.poolSizeCount = static_cast<uint32_t>(pool_sizes.size());
+  info.pPoolSizes = pool_sizes.data();
+  info.maxSets = max_sets;
+  return vkCreateDescriptorPool(device_, &info, nullptr, pool);
 }
 
 VkResult VulkanCore::CreateImage(VkFormat format,

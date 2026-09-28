@@ -75,37 +75,4 @@ struct DescriptorPoolSize {
   }
 };
 
-class DescriptorPool {
- public:
-  DescriptorPool(const VulkanCore *device,
-                 VkDescriptorPool descriptor_pool,
-                 DescriptorPoolSize pool_size,
-                 uint32_t max_sets);
-
-  ~DescriptorPool();
-
-  const VulkanCore *Device() const {
-    return device_;
-  }
-
-  VkDescriptorPool Handle() const {
-    return descriptor_pool_;
-  }
-
-  VkResult AllocateDescriptorSet(VkDescriptorSetLayout layout, double_ptr<DescriptorSet> pp_descriptor_set) const;
-
-  const DescriptorPoolSize &PoolSize() const {
-    return pool_size_;
-  }
-
-  uint32_t MaxSets() const {
-    return max_sets_;
-  }
-
- private:
-  const VulkanCore *device_{};
-  VkDescriptorPool descriptor_pool_{};
-  DescriptorPoolSize pool_size_;
-  uint32_t max_sets_{};
-};
 }  // namespace grassland::graphics::backend::vulkan

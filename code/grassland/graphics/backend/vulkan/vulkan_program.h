@@ -14,8 +14,16 @@ class VulkanProgramBase {
     return pipeline_layout_;
   }
 
-  vulkan::DescriptorSetLayout *DescriptorSetLayout(int index) const {
-    return descriptor_set_layouts_[index].get();
+  VkDescriptorSetLayout DescriptorSetLayout(int index) const {
+    return descriptor_set_layouts_[index];
+  }
+
+  const VkDescriptorSetLayoutBinding &DescriptorBinding(int index) const {
+    return descriptor_bindings_[index];
+  }
+
+  vulkan::DescriptorPoolSize DescriptorPoolSize(int index) const {
+    return {descriptor_bindings_[index].descriptorType, descriptor_bindings_[index].descriptorCount};
   }
 
   VulkanCore *Core() const {
@@ -27,7 +35,8 @@ class VulkanProgramBase {
 
   void FinalizePipelineLayout();
   VulkanCore *core_;
-  std::vector<std::unique_ptr<vulkan::DescriptorSetLayout>> descriptor_set_layouts_;
+  std::vector<VkDescriptorSetLayout> descriptor_set_layouts_;
+  std::vector<VkDescriptorSetLayoutBinding> descriptor_bindings_;
   VkPipelineLayout pipeline_layout_{VK_NULL_HANDLE};
 };
 
