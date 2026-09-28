@@ -1,4 +1,4 @@
-#include "pybind/pybind.h"
+#include "pybind/grassland/graphics/graphics.h"
 
 namespace grassland::graphics::pybind {
 void RegisterBuffer(py::classh<Buffer> &c) {

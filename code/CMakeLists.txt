@@ -17,7 +17,7 @@ target_link_libraries(LongMarch INTERFACE LongMarchCommon)
 
 if (LONGMARCH_PYTHON_ENABLED)
     # Bindings live only in the extension module; the C++ libraries do not link Python.
-    file(GLOB LONGMARCH_PYBIND_SOURCES CONFIGURE_DEPENDS pybind/*.cpp pybind/*.h)
+    file(GLOB_RECURSE LONGMARCH_PYBIND_SOURCES CONFIGURE_DEPENDS pybind/*.cpp pybind/*.h)
     pybind11_add_module(long_march ${LONGMARCH_PYBIND_SOURCES})
     target_include_directories(long_march PRIVATE ${CMAKE_CURRENT_LIST_DIR})
     target_link_libraries(long_march PUBLIC LongMarchCommon)

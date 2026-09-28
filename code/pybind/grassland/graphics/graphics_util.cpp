@@ -1,7 +1,7 @@
-#include "pybind/pybind.h"
+#include "pybind/grassland/graphics/graphics.h"
 
 namespace grassland::graphics::pybind {
-void RegisterTypes(py::module_ &m) {
+void RegisterGraphicsUtil(py::module_ &m) {
   py::enum_<BackendAPI> backend_api(m, "BackendAPI");
   backend_api.value("BACKEND_API_METAL", BACKEND_API_METAL, "Backend API: Metal");
   backend_api.value("BACKEND_API_VULKAN", BACKEND_API_VULKAN, "Backend API: Vulkan");

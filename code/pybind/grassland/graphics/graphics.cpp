@@ -1,4 +1,4 @@
-#include "pybind/pybind.h"
+#include "pybind/grassland/graphics/graphics.h"
 
 namespace grassland::graphics::pybind {
 void RegisterGraphics(py::module_ &m) {
@@ -29,7 +29,7 @@ void RegisterGraphics(py::module_ &m) {
   py::classh<Window> c_window(m, "Window");
 
   // Register all classes
-  RegisterTypes(m);
+  RegisterGraphicsUtil(m);
 
   py::enum_<MagnifyPhase> magnify_phase(m, "MagnifyPhase");
   magnify_phase.value("MAGNIFY_PHASE_BEGIN", MagnifyPhase::kBegin, "Magnify Phase: Begin");

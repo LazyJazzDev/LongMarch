@@ -1,4 +1,4 @@
-#include "pybind/pybind.h"
+#include "pybind/grassland/graphics/graphics.h"
 
 namespace grassland::graphics::pybind {
 // A small immediate-mode subset for Python demos. Calls act on the current ImGui
