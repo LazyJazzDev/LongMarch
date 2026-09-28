@@ -4,7 +4,6 @@
 #include <utility>
 
 #include "grassland/graphics/backend/vulkan/helper/buffer.h"
-#include "grassland/graphics/backend/vulkan/helper/command_pool.h"
 #include "grassland/graphics/backend/vulkan/helper/descriptor_pool.h"
 #include "grassland/graphics/backend/vulkan/helper/descriptor_set.h"
 #include "grassland/graphics/backend/vulkan/helper/descriptor_set_layout.h"
@@ -13,7 +12,6 @@
 #include "grassland/graphics/backend/vulkan/helper/instance_procedures.h"
 #include "grassland/graphics/backend/vulkan/helper/pipeline.h"
 #include "grassland/graphics/backend/vulkan/helper/pipeline_layout.h"
-#include "grassland/graphics/backend/vulkan/helper/queue.h"
 #include "grassland/graphics/backend/vulkan/helper/raytracing/raytracing.h"
 #include "grassland/graphics/backend/vulkan/helper/shader_module.h"
 #include "grassland/graphics/backend/vulkan/helper/swap_chain.h"
@@ -146,62 +144,6 @@ VkResult Device::CreateSwapchain(const Surface *surface,
 
 VkResult Device::CreateSwapchain(const Surface *surface, double_ptr<Swapchain> pp_swapchain) const {
   return CreateSwapchain(surface, VK_FORMAT_R8G8B8A8_UNORM, VK_COLOR_SPACE_SRGB_NONLINEAR_KHR, pp_swapchain);
-}
-
-VkResult Device::GetQueue(uint32_t queue_family_index, int queue_index, double_ptr<Queue> pp_queue) const {
-  if (!pp_queue) {
-    SetErrorMessage("pp_queue is nullptr");
-    return VK_ERROR_INITIALIZATION_FAILED;
-  }
-
-  if (queue_index < 0) {
-    queue_index = create_info_.queue_families.at(int(queue_family_index)).size() + queue_index;
-    if (queue_index < 0) {
-      SetErrorMessage("queue_index is out of range.");
-      return VK_ERROR_INITIALIZATION_FAILED;
-    }
-  }
-
-  if (queue_index >= create_info_.queue_families.at(int(queue_family_index)).size()) {
-    Warning(
-        "queue_index exceeded the number of queues in the queue family, using "
-        "the last queue. this may degrade performance.");
-    queue_index = create_info_.queue_families.at(int(queue_family_index)).size() - 1;
-  }
-
-  VkQueue queue;
-  vkGetDeviceQueue(device_, queue_family_index, queue_index, &queue);
-
-  pp_queue.construct(this, queue_family_index, queue);
-
-  return VK_SUCCESS;
-}
-
-VkResult Device::CreateCommandPool(uint32_t queue_family_index,
-                                   VkCommandPoolCreateFlags flags,
-                                   double_ptr<CommandPool> pp_command_pool) const {
-  if (!pp_command_pool) {
-    SetErrorMessage("pp_command_pool is nullptr");
-    return VK_ERROR_INITIALIZATION_FAILED;
-  }
-
-  VkCommandPool command_pool;
-  VkCommandPoolCreateInfo command_pool_create_info = {};
-  command_pool_create_info.sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;
-  command_pool_create_info.queueFamilyIndex = queue_family_index;
-  command_pool_create_info.flags = flags;
-
-  RETURN_IF_FAILED_VK(vkCreateCommandPool(device_, &command_pool_create_info, nullptr, &command_pool),
-                      "failed to create command pool!");
-
-  pp_command_pool.construct(this, command_pool);
-
-  return VK_SUCCESS;
-}
-
-VkResult Device::CreateCommandPool(double_ptr<CommandPool> pp_command_pool) const {
-  return CreateCommandPool(physical_device_.GraphicsFamilyIndex(), VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT,
-                           pp_command_pool);
 }
 
 VkResult Device::CreateShaderModule(const CompiledShaderBlob &code, double_ptr<ShaderModule> pp_shader_module) const {
@@ -554,8 +496,8 @@ VkResult Device::CreateBottomLevelAccelerationStructure(VkDeviceAddress aabb_add
                                                         VkDeviceSize stride,
                                                         uint32_t num_aabb,
                                                         VkGeometryFlagsKHR flags,
-                                                        CommandPool *command_pool,
-                                                        Queue *queue,
+                                                        VkCommandPool command_pool,
+                                                        VkQueue queue,
                                                         double_ptr<AccelerationStructure> pp_blas) {
   const VkBufferUsageFlags buffer_usage_flags =
       VK_BUFFER_USAGE_ACCELERATION_STRUCTURE_BUILD_INPUT_READ_ONLY_BIT_KHR | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT;
@@ -611,8 +553,8 @@ VkResult Device::CreateBottomLevelAccelerationStructure(VkDeviceAddress vertex_b
                                                         VkDeviceSize stride,
                                                         uint32_t primitive_count,
                                                         VkGeometryFlagsKHR flags,
-                                                        CommandPool *command_pool,
-                                                        Queue *queue,
+                                                        VkCommandPool command_pool,
+                                                        VkQueue queue,
                                                         double_ptr<AccelerationStructure> pp_blas) {
   const VkBufferUsageFlags buffer_usage_flags =
       VK_BUFFER_USAGE_ACCELERATION_STRUCTURE_BUILD_INPUT_READ_ONLY_BIT_KHR | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT;
@@ -673,8 +615,8 @@ VkResult Device::CreateBottomLevelAccelerationStructure(VkDeviceAddress vertex_b
                                                         uint32_t num_vertex,
                                                         VkDeviceSize stride,
                                                         uint32_t primitive_count,
-                                                        CommandPool *command_pool,
-                                                        Queue *queue,
+                                                        VkCommandPool command_pool,
+                                                        VkQueue queue,
                                                         double_ptr<AccelerationStructure> pp_blas) {
   return CreateBottomLevelAccelerationStructure(vertex_buffer_address, index_buffer_address, num_vertex, stride,
                                                 primitive_count, VK_GEOMETRY_OPAQUE_BIT_KHR, command_pool, queue,
@@ -684,8 +626,8 @@ VkResult Device::CreateBottomLevelAccelerationStructure(VkDeviceAddress vertex_b
 VkResult Device::CreateBottomLevelAccelerationStructure(Buffer *vertex_buffer,
                                                         Buffer *index_buffer,
                                                         VkDeviceSize stride,
-                                                        CommandPool *command_pool,
-                                                        Queue *queue,
+                                                        VkCommandPool command_pool,
+                                                        VkQueue queue,
                                                         double_ptr<AccelerationStructure> pp_blas) {
   return CreateBottomLevelAccelerationStructure(
       vertex_buffer->GetDeviceAddress(), index_buffer->GetDeviceAddress(), vertex_buffer->Size() / stride, stride,
@@ -693,8 +635,8 @@ VkResult Device::CreateBottomLevelAccelerationStructure(Buffer *vertex_buffer,
 }
 
 VkResult Device::CreateTopLevelAccelerationStructure(const std::vector<VkAccelerationStructureInstanceKHR> &instances,
-                                                     CommandPool *command_pool,
-                                                     Queue *queue,
+                                                     VkCommandPool command_pool,
+                                                     VkQueue queue,
                                                      double_ptr<AccelerationStructure> pp_tlas) {
   std::unique_ptr<Buffer> instances_buffer;
   CreateBuffer(
@@ -741,8 +683,8 @@ VkResult Device::CreateTopLevelAccelerationStructure(const std::vector<VkAcceler
 
 VkResult Device::CreateTopLevelAccelerationStructure(
     const std::vector<std::pair<AccelerationStructure *, glm::mat4>> &objects,
-    CommandPool *command_pool,
-    Queue *queue,
+    VkCommandPool command_pool,
+    VkQueue queue,
     double_ptr<AccelerationStructure> pp_tlas) {
   std::vector<VkAccelerationStructureInstanceKHR> acceleration_structure_instances;
   acceleration_structure_instances.reserve(objects.size());

@@ -56,20 +56,12 @@ class Device {
     return subgroup_properties_.subgroupSize;
   }
 
-  VkResult GetQueue(uint32_t queue_family_index, int queue_index, double_ptr<Queue> pp_queue) const;
-
   VkResult CreateSwapchain(const Surface *surface,
                            VkFormat format,
                            VkColorSpaceKHR color_space,
                            double_ptr<Swapchain> pp_swapchain) const;
 
   VkResult CreateSwapchain(const Surface *surface, double_ptr<Swapchain> pp_swapchain) const;
-
-  VkResult CreateCommandPool(uint32_t queue_family_index,
-                             VkCommandPoolCreateFlags flags,
-                             double_ptr<CommandPool> pp_command_pool) const;
-
-  VkResult CreateCommandPool(double_ptr<CommandPool> pp_command_pool) const;
 
   VkResult CreateShaderModule(const CompiledShaderBlob &code, double_ptr<ShaderModule> pp_shader_module) const;
 
@@ -137,8 +129,8 @@ class Device {
                                                   VkDeviceSize stride,
                                                   uint32_t num_aabb,
                                                   VkGeometryFlagsKHR flags,
-                                                  CommandPool *command_pool,
-                                                  Queue *queue,
+                                                  VkCommandPool command_pool,
+                                                  VkQueue queue,
                                                   double_ptr<AccelerationStructure> pp_blas);
 
   VkResult CreateBottomLevelAccelerationStructure(VkDeviceAddress vertex_buffer_address,
@@ -147,8 +139,8 @@ class Device {
                                                   VkDeviceSize stride,
                                                   uint32_t primitive_count,
                                                   VkGeometryFlagsKHR flags,
-                                                  CommandPool *command_pool,
-                                                  Queue *queue,
+                                                  VkCommandPool command_pool,
+                                                  VkQueue queue,
                                                   double_ptr<AccelerationStructure> pp_blas);
 
   VkResult CreateBottomLevelAccelerationStructure(VkDeviceAddress vertex_buffer_address,
@@ -156,26 +148,26 @@ class Device {
                                                   uint32_t num_vertex,
                                                   VkDeviceSize stride,
                                                   uint32_t primitive_count,
-                                                  CommandPool *command_pool,
-                                                  Queue *queue,
+                                                  VkCommandPool command_pool,
+                                                  VkQueue queue,
                                                   double_ptr<AccelerationStructure> pp_blas);
 
   VkResult CreateBottomLevelAccelerationStructure(Buffer *vertex_buffer,
                                                   Buffer *index_buffer,
                                                   VkDeviceSize stride,
-                                                  CommandPool *command_pool,
-                                                  Queue *queue,
+                                                  VkCommandPool command_pool,
+                                                  VkQueue queue,
                                                   double_ptr<AccelerationStructure> pp_blas);
 
   VkResult CreateTopLevelAccelerationStructure(const std::vector<VkAccelerationStructureInstanceKHR> &instances,
-                                               CommandPool *command_pool,
-                                               Queue *queue,
+                                               VkCommandPool command_pool,
+                                               VkQueue queue,
                                                double_ptr<AccelerationStructure> pp_tlas);
 
   VkResult CreateTopLevelAccelerationStructure(
       const std::vector<std::pair<AccelerationStructure *, glm::mat4>> &objects,
-      CommandPool *command_pool,
-      Queue *queue,
+      VkCommandPool command_pool,
+      VkQueue queue,
       double_ptr<AccelerationStructure> pp_tlas);
 
   VkResult CreateRayTracingPipeline(PipelineLayout *pipeline_layout,

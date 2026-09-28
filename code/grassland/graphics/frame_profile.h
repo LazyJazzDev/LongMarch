@@ -31,7 +31,7 @@ class FrameProfile {
     period_ = properties.limits.timestampPeriod;
     bits_ = vk->Device()
                 ->PhysicalDevice()
-                .GetQueueFamilyProperties()[vk->GraphicsQueue()->QueueFamilyIndex()]
+                .GetQueueFamilyProperties()[vk->Device()->PhysicalDevice().GraphicsFamilyIndex()]
                 .timestampValidBits;
     if (!bits_ || period_ <= 0)
       throw std::runtime_error("GPU queue does not support timestamps");

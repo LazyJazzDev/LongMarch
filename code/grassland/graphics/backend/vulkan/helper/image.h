@@ -60,8 +60,8 @@ class Image {
 
   VkResult Resize(VkExtent2D extent);
 
-  void FetchPixelData(CommandPool *command_pool,
-                      Queue *queue,
+  void FetchPixelData(VkCommandPool command_pool,
+                      VkQueue queue,
                       VkRect2D rect,
                       void *data,
                       VkDeviceSize size,
@@ -89,7 +89,7 @@ void TransitImageLayout(VkCommandBuffer command_buffer,
                         VkAccessFlags dst_access_flags,
                         VkImageAspectFlags aspect = VK_IMAGE_ASPECT_COLOR_BIT);
 
-void UploadImage(Queue *queue, CommandPool *command_pool, Image *image, const void *data, VkDeviceSize size);
+void UploadImage(VkQueue queue, VkCommandPool command_pool, Image *image, const void *data, VkDeviceSize size);
 
 void BlitImage(VkCommandBuffer cmd_buffer,
                Image *src_image,

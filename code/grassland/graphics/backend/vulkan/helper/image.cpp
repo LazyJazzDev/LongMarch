@@ -61,15 +61,15 @@ VkResult Image::Resize(VkExtent2D extent) {
   return VK_SUCCESS;
 }
 
-void Image::FetchPixelData(CommandPool *command_pool,
-                           Queue *queue,
+void Image::FetchPixelData(VkCommandPool command_pool,
+                           VkQueue queue,
                            VkRect2D rect,
                            void *data,
                            VkDeviceSize size,
                            VkImageLayout image_layout) const {
   std::unique_ptr<vulkan::Buffer> staging_buffer;
   device_->CreateBuffer(size, VK_BUFFER_USAGE_TRANSFER_DST_BIT, VMA_MEMORY_USAGE_CPU_TO_GPU, &staging_buffer);
-  command_pool->SingleTimeCommands(queue, [&](VkCommandBuffer cmd_buffer) {
+  SingleTimeCommand(device_->Handle(), queue, command_pool, [&](VkCommandBuffer cmd_buffer) {
     if (image_layout != VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL) {
       vulkan::TransitImageLayout(cmd_buffer, image_, image_layout, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
                                  VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT, 0,
@@ -126,14 +126,14 @@ void TransitImageLayout(VkCommandBuffer command_buffer,
   vkCmdPipelineBarrier(command_buffer, src_stage_flags, dst_stage_flags, 0, 0, nullptr, 0, nullptr, 1, &barrier);
 }
 
-void UploadImage(Queue *queue, CommandPool *command_pool, Image *image, const void *data, VkDeviceSize size) {
+void UploadImage(VkQueue queue, VkCommandPool command_pool, Image *image, const void *data, VkDeviceSize size) {
   std::unique_ptr<Buffer> staging_buffer;
   image->Device()->CreateBuffer(size, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VMA_MEMORY_USAGE_CPU_TO_GPU, &staging_buffer);
   void *staging_data = staging_buffer->Map();
   std::memcpy(staging_data, data, size);
   staging_buffer->Unmap();
 
-  SingleTimeCommand(queue, command_pool, [&](VkCommandBuffer cmd_buffer) {
+  SingleTimeCommand(image->Device()->Handle(), queue, command_pool, [&](VkCommandBuffer cmd_buffer) {
     TransitImageLayout(cmd_buffer, image->Handle(), VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
                        VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT, 0,
                        VK_ACCESS_TRANSFER_WRITE_BIT, image->Aspect());

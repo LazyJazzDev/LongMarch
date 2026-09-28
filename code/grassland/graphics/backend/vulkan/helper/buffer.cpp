@@ -39,21 +39,21 @@ void CopyBuffer(VkCommandBuffer command_buffer,
   vkCmdCopyBuffer(command_buffer, src_buffer->Handle(), dst_buffer->Handle(), 1, &copy_region);
 }
 
-void UploadBuffer(Queue *queue, CommandPool *command_pool, Buffer *buffer, const void *data, VkDeviceSize size) {
+void UploadBuffer(VkQueue queue, VkCommandPool command_pool, Buffer *buffer, const void *data, VkDeviceSize size) {
   std::unique_ptr<Buffer> staging_buffer;
   buffer->Device()->CreateBuffer(size, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VMA_MEMORY_USAGE_CPU_ONLY, &staging_buffer);
   void *staging_data = staging_buffer->Map();
   std::memcpy(staging_data, data, size);
   staging_buffer->Unmap();
 
-  SingleTimeCommand(queue, command_pool,
+  SingleTimeCommand(buffer->Device()->Handle(), queue, command_pool,
                     [&](VkCommandBuffer cmd_buffer) { CopyBuffer(cmd_buffer, staging_buffer.get(), buffer, size); });
 }
 
-void DownloadBuffer(Queue *queue, CommandPool *command_pool, Buffer *buffer, void *data, VkDeviceSize size) {
+void DownloadBuffer(VkQueue queue, VkCommandPool command_pool, Buffer *buffer, void *data, VkDeviceSize size) {
   std::unique_ptr<Buffer> staging_buffer;
   buffer->Device()->CreateBuffer(size, VK_BUFFER_USAGE_TRANSFER_DST_BIT, VMA_MEMORY_USAGE_CPU_ONLY, &staging_buffer);
-  SingleTimeCommand(queue, command_pool,
+  SingleTimeCommand(buffer->Device()->Handle(), queue, command_pool,
                     [&](VkCommandBuffer cmd_buffer) { CopyBuffer(cmd_buffer, buffer, staging_buffer.get(), size); });
   void *staging_data = staging_buffer->Map();
   std::memcpy(data, staging_data, size);

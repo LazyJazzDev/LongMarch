@@ -54,12 +54,14 @@ VulkanCore::~VulkanCore() {
     }
     in_flight_fences_.clear();
   }
-  command_buffers_.clear();
-  transfer_command_buffer_.reset();
-  graphics_command_pool_.reset();
-  transfer_command_pool_.reset();
-  graphics_queue_.reset();
-  transfer_queue_.reset();
+  if (device_) {
+    if (graphics_command_pool_) {
+      vkDestroyCommandPool(device_->Handle(), graphics_command_pool_, nullptr);
+    }
+    if (transfer_command_pool_) {
+      vkDestroyCommandPool(device_->Handle(), transfer_command_pool_, nullptr);
+    }
+  }
   device_.reset();
   if (instance_hint_.enable_validation_layers && debug_messenger_) {
     instance_procedures_.vkDestroyDebugUtilsMessengerEXT(instance_, debug_messenger_, nullptr);
@@ -179,8 +181,7 @@ int VulkanCore::CreateBottomLevelAccelerationStructure(BufferRange aabb_buffer,
   assert(vk_aabb_buffer);
   std::unique_ptr<vulkan::AccelerationStructure> blas;
   device_->CreateBottomLevelAccelerationStructure(vk_aabb_buffer->DeviceAddress() + aabb_buffer.offset, stride,
-                                                  num_aabb, flags, graphics_command_pool_.get(), graphics_queue_.get(),
-                                                  &blas);
+                                                  num_aabb, flags, graphics_command_pool_, graphics_queue_, &blas);
   pp_blas.construct<VulkanAccelerationStructure>(this, std::move(blas));
   return 0;
 }
@@ -199,7 +200,7 @@ int VulkanCore::CreateBottomLevelAccelerationStructure(BufferRange vertex_buffer
   std::unique_ptr<vulkan::AccelerationStructure> blas;
   device_->CreateBottomLevelAccelerationStructure(
       vk_vertex_buffer->DeviceAddress() + vertex_buffer.offset, vk_index_buffer->DeviceAddress() + index_buffer.offset,
-      num_vertex, stride, num_primitive, flags, graphics_command_pool_.get(), graphics_queue_.get(), &blas);
+      num_vertex, stride, num_primitive, flags, graphics_command_pool_, graphics_queue_, &blas);
   pp_blas.construct<VulkanAccelerationStructure>(this, std::move(blas));
   return 0;
 }
@@ -222,8 +223,7 @@ int VulkanCore::CreateTopLevelAccelerationStructure(const std::vector<RayTracing
   }
 
   std::unique_ptr<vulkan::AccelerationStructure> tlas;
-  device_->CreateTopLevelAccelerationStructure(vk_instances, graphics_command_pool_.get(), graphics_queue_.get(),
-                                               &tlas);
+  device_->CreateTopLevelAccelerationStructure(vk_instances, graphics_command_pool_, graphics_queue_, &tlas);
   pp_tlas.construct<VulkanAccelerationStructure>(this, std::move(tlas));
   return 0;
 }
@@ -276,18 +276,18 @@ int VulkanCore::SubmitCommandContext(CommandContext *p_command_context) {
   }
 
   if (command_context->dynamic_buffers_.size()) {
-    vkResetCommandBuffer(transfer_command_buffer_->Handle(), 0);
+    vkResetCommandBuffer(transfer_command_buffer_, 0);
     VkCommandBufferBeginInfo begin_info = {};
     begin_info.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
     begin_info.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
 
-    vkBeginCommandBuffer(transfer_command_buffer_->Handle(), &begin_info);
+    vkBeginCommandBuffer(transfer_command_buffer_, &begin_info);
     for (auto &buffer : command_context->dynamic_buffers_) {
-      buffer->TransferData(transfer_command_buffer_->Handle());
+      buffer->TransferData(transfer_command_buffer_);
     }
-    vkEndCommandBuffer(transfer_command_buffer_->Handle());
+    vkEndCommandBuffer(transfer_command_buffer_);
 
-    VkCommandBuffer command_buffers[] = {transfer_command_buffer_->Handle()};
+    VkCommandBuffer command_buffers[] = {transfer_command_buffer_};
 
     VkSubmitInfo submit_info = {};
     submit_info.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
@@ -317,10 +317,10 @@ int VulkanCore::SubmitCommandContext(CommandContext *p_command_context) {
     }
 #endif
 
-    vkQueueSubmit(transfer_queue_->Handle(), 1, &submit_info, nullptr);
+    vkQueueSubmit(transfer_queue_, 1, &submit_info, nullptr);
   }
 
-  VkCommandBuffer command_buffer = command_buffers_[current_frame_]->Handle();
+  VkCommandBuffer command_buffer = command_buffers_[current_frame_];
   vkResetCommandBuffer(command_buffer, 0);
   VkCommandBufferBeginInfo begin_info{};
   begin_info.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
@@ -388,7 +388,7 @@ int VulkanCore::SubmitCommandContext(CommandContext *p_command_context) {
     submit_info.pSignalSemaphores = signal_semaphores.data();
   }
 
-  vkQueueSubmit(graphics_queue_->Handle(), 1, &submit_info, fence);
+  vkQueueSubmit(graphics_queue_, 1, &submit_info, fence);
 
   for (auto &window : command_context->windows_) {
     window->Present();
@@ -400,7 +400,7 @@ int VulkanCore::SubmitCommandContext(CommandContext *p_command_context) {
   fence = in_flight_fences_[current_frame_];
   vkWaitForFences(device_->Handle(), 1, &fence, VK_TRUE, std::numeric_limits<uint64_t>::max());
 
-  vkQueueWaitIdle(transfer_queue_->Handle());
+  vkQueueWaitIdle(transfer_queue_);
 
   for (auto &callback : post_execute_functions_[current_frame_]) {
     callback();
@@ -490,17 +490,17 @@ int VulkanCore::InitializeLogicalDevice(int device_index) {
   device_name_ = physical_device.GetPhysicalDeviceProperties().deviceName;
   ray_tracing_support_ = physical_device.SupportRayTracing();
 
-  vulkan::ThrowIfFailed(
-      device_->CreateCommandPool(device_->PhysicalDevice().GraphicsFamilyIndex(),
-                                 VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT, &graphics_command_pool_),
-      "failed to create graphics command pool");
-  vulkan::ThrowIfFailed(
-      device_->CreateCommandPool(device_->PhysicalDevice().TransferFamilyIndex(),
-                                 VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT, &transfer_command_pool_),
-      "failed to create transfer command pool");
+  VkCommandPoolCreateInfo pool_info{VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO};
+  pool_info.flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT;
+  pool_info.queueFamilyIndex = physical_device.GraphicsFamilyIndex();
+  vulkan::ThrowIfFailed(vkCreateCommandPool(native_device, &pool_info, nullptr, &graphics_command_pool_),
+                        "failed to create graphics command pool");
+  pool_info.queueFamilyIndex = physical_device.TransferFamilyIndex();
+  vulkan::ThrowIfFailed(vkCreateCommandPool(native_device, &pool_info, nullptr, &transfer_command_pool_),
+                        "failed to create transfer command pool");
 
-  device_->GetQueue(device_->PhysicalDevice().GraphicsFamilyIndex(), 0, &graphics_queue_);
-  device_->GetQueue(device_->PhysicalDevice().TransferFamilyIndex(), 0, &transfer_queue_);
+  vkGetDeviceQueue(native_device, physical_device.GraphicsFamilyIndex(), 0, &graphics_queue_);
+  vkGetDeviceQueue(native_device, physical_device.TransferFamilyIndex(), 0, &transfer_queue_);
 
   in_flight_fences_.resize(FramesInFlight());
   command_buffers_.resize(FramesInFlight());
@@ -515,7 +515,12 @@ int VulkanCore::InitializeLogicalDevice(int device_index) {
     fence_info.flags = VK_FENCE_CREATE_SIGNALED_BIT;
     vulkan::ThrowIfFailed(vkCreateFence(device_->Handle(), &fence_info, nullptr, &in_flight_fences_[i]),
                           "Failed to create in-flight fence");
-    graphics_command_pool_->AllocateCommandBuffer(VK_COMMAND_BUFFER_LEVEL_PRIMARY, &command_buffers_[i]);
+    VkCommandBufferAllocateInfo allocate_info{VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO};
+    allocate_info.commandPool = graphics_command_pool_;
+    allocate_info.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
+    allocate_info.commandBufferCount = 1;
+    vulkan::ThrowIfFailed(vkAllocateCommandBuffers(native_device, &allocate_info, &command_buffers_[i]),
+                          "failed to allocate graphics command buffer");
 
     VkDescriptorPoolSize pool_sizes[] = {
         {VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 100},
@@ -526,7 +531,12 @@ int VulkanCore::InitializeLogicalDevice(int device_index) {
 
     device_->CreateDescriptorPool({{VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 1}}, 1, &descriptor_pools_[i]);
   }
-  transfer_command_pool_->AllocateCommandBuffer(VK_COMMAND_BUFFER_LEVEL_PRIMARY, &transfer_command_buffer_);
+  VkCommandBufferAllocateInfo transfer_allocate_info{VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO};
+  transfer_allocate_info.commandPool = transfer_command_pool_;
+  transfer_allocate_info.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
+  transfer_allocate_info.commandBufferCount = 1;
+  vulkan::ThrowIfFailed(vkAllocateCommandBuffers(native_device, &transfer_allocate_info, &transfer_command_buffer_),
+                        "failed to allocate transfer command buffer");
 
 #if defined(LONGMARCH_CUDA_RUNTIME)
 
@@ -584,7 +594,7 @@ int VulkanCore::InitializeLogicalDevice(int device_index) {
 }
 
 void VulkanCore::WaitGPU() {
-  graphics_queue_->WaitIdle();
+  vkQueueWaitIdle(graphics_queue_);
   for (auto &post_execute : post_execute_functions_) {
     for (auto &callback : post_execute) {
       callback();
@@ -621,7 +631,7 @@ void VulkanCore::SingleTimeCommand(std::function<void(VkCommandBuffer)> command)
     submit_info.pWaitDstStageMask = wait_stages;
   }
 #endif
-  vulkan::SingleTimeCommand(graphics_queue_.get(), graphics_command_pool_.get(), command, submit_info);
+  vulkan::SingleTimeCommand(device_->Handle(), graphics_queue_, graphics_command_pool_, command, submit_info);
 }
 
 uint32_t VulkanCore::FindMemoryType(uint32_t type_filter, VkMemoryPropertyFlags properties) {

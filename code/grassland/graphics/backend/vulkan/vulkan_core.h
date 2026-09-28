@@ -107,24 +107,24 @@ class VulkanCore : public Core {
     return device_.get();
   }
 
-  vulkan::Queue *GraphicsQueue() const {
-    return graphics_queue_.get();
+  VkQueue GraphicsQueue() const {
+    return graphics_queue_;
   }
 
-  vulkan::Queue *TransferQueue() const {
-    return transfer_queue_.get();
+  VkQueue TransferQueue() const {
+    return transfer_queue_;
   }
 
-  vulkan::CommandPool *GraphicsCommandPool() const {
-    return graphics_command_pool_.get();
+  VkCommandPool GraphicsCommandPool() const {
+    return graphics_command_pool_;
   }
 
-  vulkan::CommandPool *TransferCommandPool() const {
-    return transfer_command_pool_.get();
+  VkCommandPool TransferCommandPool() const {
+    return transfer_command_pool_;
   }
 
-  vulkan::CommandBuffer *CommandBuffer() const {
-    return command_buffers_[current_frame_].get();
+  VkCommandBuffer CommandBuffer() const {
+    return command_buffers_[current_frame_];
   }
 
   VkFence InFlightFence() const {
@@ -165,13 +165,13 @@ class VulkanCore : public Core {
   vulkan::DescriptorPool *current_descriptor_pool_{nullptr};
   std::queue<vulkan::DescriptorSet *> *current_descriptor_set_queue_{nullptr};
 
-  std::unique_ptr<vulkan::CommandPool> graphics_command_pool_;
-  std::unique_ptr<vulkan::CommandPool> transfer_command_pool_;
-  std::vector<std::unique_ptr<vulkan::CommandBuffer>> command_buffers_;
-  std::unique_ptr<vulkan::CommandBuffer> transfer_command_buffer_;
+  VkCommandPool graphics_command_pool_{VK_NULL_HANDLE};
+  VkCommandPool transfer_command_pool_{VK_NULL_HANDLE};
+  std::vector<VkCommandBuffer> command_buffers_;
+  VkCommandBuffer transfer_command_buffer_{VK_NULL_HANDLE};
 
-  std::unique_ptr<vulkan::Queue> graphics_queue_;
-  std::unique_ptr<vulkan::Queue> transfer_queue_;
+  VkQueue graphics_queue_{VK_NULL_HANDLE};
+  VkQueue transfer_queue_{VK_NULL_HANDLE};
 
   std::vector<std::vector<std::function<void()>>> post_execute_functions_;
 

@@ -19,12 +19,12 @@ class AccelerationStructure {
   }
 
   VkResult UpdateInstances(const std::vector<VkAccelerationStructureInstanceKHR> &instances,
-                           CommandPool *command_pool,
-                           Queue *queue);
+                           VkCommandPool command_pool,
+                           VkQueue queue);
 
   VkResult UpdateInstances(const std::vector<std::pair<AccelerationStructure *, glm::mat4>> &objects,
-                           CommandPool *command_pool,
-                           Queue *queue);
+                           VkCommandPool command_pool,
+                           VkQueue queue);
 
  private:
   const class Device *device_{};
@@ -40,8 +40,8 @@ VkResult BuildAccelerationStructure(const Device *device,
                                     VkBuildAccelerationStructureFlagsKHR flags,
                                     VkBuildAccelerationStructureModeKHR mode,
                                     uint32_t primitive_count,
-                                    CommandPool *command_pool,
-                                    Queue *queue,
+                                    VkCommandPool command_pool,
+                                    VkQueue queue,
                                     VkAccelerationStructureKHR *ptr_acceleration_structure,
                                     double_ptr<Buffer> pp_buffer);
 

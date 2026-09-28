@@ -207,8 +207,8 @@ void VulkanWindow::SetupImGuiContext() {
   init_info.Instance = core_->Instance();
   init_info.PhysicalDevice = core_->Device()->PhysicalDevice().Handle();
   init_info.Device = core_->Device()->Handle();
-  init_info.QueueFamily = core_->GraphicsQueue()->QueueFamilyIndex();
-  init_info.Queue = core_->GraphicsQueue()->Handle();
+  init_info.QueueFamily = core_->Device()->PhysicalDevice().GraphicsFamilyIndex();
+  init_info.Queue = core_->GraphicsQueue();
   init_info.DescriptorPoolSize = 32;
   init_info.RenderPass = imgui_assets_.render_pass;
   init_info.MinImageCount = 2;

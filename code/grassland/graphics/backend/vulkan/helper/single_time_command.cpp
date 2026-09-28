@@ -1,47 +1,41 @@
 #include "grassland/graphics/backend/vulkan/helper/single_time_command.h"
 
-#include "grassland/graphics/backend/vulkan/helper/command_buffer.h"
-
 namespace grassland::graphics::backend::vulkan {
-VkResult SingleTimeCommand(const Queue *queue,
-                           const CommandPool *command_pool,
-                           std::function<void(VkCommandBuffer)> function) {
-  VkSubmitInfo submit_info = {};
-  submit_info.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
-  return SingleTimeCommand(queue, command_pool, function, submit_info);
+VkResult SingleTimeCommand(VkDevice device,
+                           VkQueue queue,
+                           VkCommandPool pool,
+                           const std::function<void(VkCommandBuffer)> &function) {
+  VkSubmitInfo submit_info{VK_STRUCTURE_TYPE_SUBMIT_INFO};
+  return SingleTimeCommand(device, queue, pool, function, submit_info);
 }
 
-VkResult SingleTimeCommand(const Queue *queue,
-                           const CommandPool *command_pool,
-                           std::function<void(VkCommandBuffer)> function,
+VkResult SingleTimeCommand(VkDevice device,
+                           VkQueue queue,
+                           VkCommandPool pool,
+                           const std::function<void(VkCommandBuffer)> &function,
                            VkSubmitInfo &submit_info) {
-  std::unique_ptr<CommandBuffer> command_buffer;
-  command_pool->AllocateCommandBuffer(&command_buffer);
-
-  VkCommandBufferBeginInfo begin_info = {};
-  begin_info.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
+  VkCommandBufferAllocateInfo allocate_info{VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO};
+  allocate_info.commandPool = pool;
+  allocate_info.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
+  allocate_info.commandBufferCount = 1;
+  VkCommandBuffer buffer = VK_NULL_HANDLE;
+  RETURN_IF_FAILED_VK(vkAllocateCommandBuffers(device, &allocate_info, &buffer), "Failed to allocate command buffer");
+  VkCommandBufferBeginInfo begin_info{VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO};
   begin_info.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
-
-  vkBeginCommandBuffer(command_buffer->Handle(), &begin_info);
-
-  function(command_buffer->Handle());
-
-  vkEndCommandBuffer(command_buffer->Handle());
-
-  VkCommandBuffer command_buffers[] = {command_buffer->Handle()};
-
-  submit_info.commandBufferCount = 1;
-  submit_info.pCommandBuffers = command_buffers;
-
-  VkResult result = vkQueueSubmit(queue->Handle(), 1, &submit_info, nullptr);
-
-  if (result != VK_SUCCESS) {
-    SetErrorMessage("Failed to submit command buffer");
-    return result;
+  VkResult result = vkBeginCommandBuffer(buffer, &begin_info);
+  if (result == VK_SUCCESS) {
+    function(buffer);
+    result = vkEndCommandBuffer(buffer);
   }
-
-  result = vkQueueWaitIdle(queue->Handle());
-
+  if (result == VK_SUCCESS) {
+    submit_info.commandBufferCount = 1;
+    submit_info.pCommandBuffers = &buffer;
+    result = vkQueueSubmit(queue, 1, &submit_info, VK_NULL_HANDLE);
+  }
+  if (result == VK_SUCCESS) {
+    result = vkQueueWaitIdle(queue);
+  }
+  vkFreeCommandBuffers(device, pool, 1, &buffer);
   return result;
 }
 }  // namespace grassland::graphics::backend::vulkan

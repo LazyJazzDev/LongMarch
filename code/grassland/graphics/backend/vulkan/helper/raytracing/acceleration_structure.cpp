@@ -1,8 +1,7 @@
 #include "grassland/graphics/backend/vulkan/helper/raytracing/acceleration_structure.h"
 
 #include "grassland/graphics/backend/vulkan/helper/buffer.h"
-#include "grassland/graphics/backend/vulkan/helper/command_pool.h"
-#include "grassland/graphics/backend/vulkan/helper/queue.h"
+#include "grassland/graphics/backend/vulkan/helper/single_time_command.h"
 
 namespace grassland::graphics::backend::vulkan {
 
@@ -31,8 +30,8 @@ VkDeviceAddress AccelerationStructure::DeviceAddress() const {
 }
 
 VkResult AccelerationStructure::UpdateInstances(const std::vector<VkAccelerationStructureInstanceKHR> &instances,
-                                                CommandPool *command_pool,
-                                                Queue *queue) {
+                                                VkCommandPool command_pool,
+                                                VkQueue queue) {
   std::unique_ptr<class Buffer> instances_buffer;
   RETURN_IF_FAILED_VK(
       device_->CreateBuffer(sizeof(VkAccelerationStructureInstanceKHR) * std::max(instances.size(), size_t(1)),
@@ -84,8 +83,8 @@ VkResult AccelerationStructure::UpdateInstances(const std::vector<VkAcceleration
 
 VkResult AccelerationStructure::UpdateInstances(
     const std::vector<std::pair<AccelerationStructure *, glm::mat4>> &objects,
-    CommandPool *command_pool,
-    Queue *queue) {
+    VkCommandPool command_pool,
+    VkQueue queue) {
   std::vector<VkAccelerationStructureInstanceKHR> acceleration_structure_instances;
   for (int i = 0; i < objects.size(); i++) {
     auto &object = objects[i];
@@ -111,8 +110,8 @@ VkResult BuildAccelerationStructure(const Device *device,
                                     VkBuildAccelerationStructureFlagsKHR flags,
                                     VkBuildAccelerationStructureModeKHR mode,
                                     uint32_t primitive_count,
-                                    CommandPool *command_pool,
-                                    Queue *queue,
+                                    VkCommandPool command_pool,
+                                    VkQueue queue,
                                     VkAccelerationStructureKHR *ptr_acceleration_structure,
                                     double_ptr<Buffer> pp_buffer) {
   VkAccelerationStructureBuildGeometryInfoKHR build_geometry_info{};
@@ -186,12 +185,12 @@ VkResult BuildAccelerationStructure(const Device *device,
   std::vector<VkAccelerationStructureBuildRangeInfoKHR *> acceleration_build_structure_range_infos = {
       &acceleration_structure_build_range_info};
 
-  RETURN_IF_FAILED_VK(command_pool->SingleTimeCommands(queue,
-                                                       [&](VkCommandBuffer command_buffer) {
-                                                         device->Procedures().vkCmdBuildAccelerationStructuresKHR(
-                                                             command_buffer, 1, &build_geometry_info,
-                                                             acceleration_build_structure_range_infos.data());
-                                                       }),
+  RETURN_IF_FAILED_VK(SingleTimeCommand(device->Handle(), queue, command_pool,
+                                        [&](VkCommandBuffer command_buffer) {
+                                          device->Procedures().vkCmdBuildAccelerationStructuresKHR(
+                                              command_buffer, 1, &build_geometry_info,
+                                              acceleration_build_structure_range_infos.data());
+                                        }),
                       "failed to build acceleration structure!");
 
   return VK_SUCCESS;
