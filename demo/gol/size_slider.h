@@ -24,6 +24,7 @@ class SizeSlider : public Listener {
   void OnMouseButton(int button, int action, int mods) override;
   void OnCursorPos(double x, double y) override;
   void OnCursorEnter(int entered) override;
+  void OnFocus(bool focused) override;
 
  private:
   glm::vec2 FramePosition(double x, double y) const;

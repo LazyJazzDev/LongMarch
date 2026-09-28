@@ -108,7 +108,7 @@ void Core::LoadPublicShaders() {
     std::vector<std::string> args;
     if (hdr)
       args.push_back("-DSPARKIUM_HDR_OUTPUT=1");
-    core_->CreateShader(shaders_vfs_, "tone_mapping.hlsl", "Main", "cs_6_0", args, &shader);
+    core_->CreateShader(shaders_vfs_, "tone_mapping.slang", "Main", "cs_6_0", args, &shader);
     SetPublicResource(name, std::move(shader));
     core_->CreateComputeProgram(GetShader(name), &compute_program);
     compute_program->AddResourceBinding(graphics::RESOURCE_TYPE_IMAGE, 1);

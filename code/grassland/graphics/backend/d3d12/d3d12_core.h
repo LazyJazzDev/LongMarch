@@ -190,6 +190,7 @@ class D3D12Core : public Core {
 
   CD3DX12_CPU_DESCRIPTOR_HANDLE RTVDescriptorHandle(uint32_t index) const;
   CD3DX12_CPU_DESCRIPTOR_HANDLE DSVDescriptorHandle(uint32_t index) const;
+  void BindDescriptorHeaps(ID3D12GraphicsCommandList *commands) const;
 
   ID3D12Resource *RequestUploadStagingBuffer(size_t size);
   ID3D12Resource *RequestDownloadStagingBuffer(size_t size);

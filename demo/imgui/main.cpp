@@ -13,7 +13,7 @@ int main() {
       app.OnRender();
     }
 
-    glfwPollEvents();
+    grassland::graphics::Window::PollEvents();
   }
 
   app.OnClose();

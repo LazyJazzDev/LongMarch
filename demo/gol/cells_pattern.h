@@ -97,3 +97,11 @@ inline std::vector<uint8_t> CenterCellsPattern(const CellsPattern &pattern, int 
       grid[(top + y) * width + left + x] = pattern.cells[y * pattern.width + x];
   return grid;
 }
+
+// File loading preserves larger current dimensions and expands smaller ones.
+inline CellsPattern FitCellsPattern(const CellsPattern &pattern, int current_width, int current_height) {
+  ValidateCellsPattern(pattern);
+  const int width = std::max(pattern.width, std::clamp(current_width, grid_size::kMin, grid_size::kMax));
+  const int height = std::max(pattern.height, std::clamp(current_height, grid_size::kMin, grid_size::kMax));
+  return {width, height, CenterCellsPattern(pattern, width, height)};
+}

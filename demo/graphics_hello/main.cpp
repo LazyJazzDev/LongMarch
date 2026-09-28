@@ -121,7 +121,7 @@ void RunModule(const ModuleInfo &info, BackendAPI api, int frames) {
   int fps_frames = 0;
   int rendered = 0;
   while (module->IsAlive() && (!frames || rendered < frames)) {
-    glfwPollEvents();
+    grassland::graphics::Window::PollEvents();
     module->OnUpdate();
     if (module->IsAlive()) {
       module->OnRender();

@@ -42,10 +42,9 @@ void SizeSlider::Resize(glm::vec4 bounds, bool vertical) {
 }
 
 glm::vec2 SizeSlider::FramePosition(double x, double y) const {
-  int w, h;
-  glfwGetWindowSize(application_->GLFWWindow(), &w, &h);
+  const auto size = application_->GetWindow()->GetSize();
   return glm::vec2{float(x), float(y)} * glm::vec2(application_->FramebufferSize()) /
-         glm::vec2{std::max(w, 1), std::max(h, 1)};
+         glm::vec2(glm::max(size, glm::ivec2{1}));
 }
 
 bool SizeSlider::Contains(glm::vec2 p) const {
@@ -55,9 +54,8 @@ bool SizeSlider::Contains(glm::vec2 p) const {
 void SizeSlider::OnMouseButton(int button, int action, int) {
   if (button != GLFW_MOUSE_BUTTON_LEFT)
     return;
-  double x, y;
-  glfwGetCursorPos(application_->GLFWWindow(), &x, &y);
-  const auto p = FramePosition(x, y);
+  const auto cursor = application_->GetWindow()->GetCursorPosition();
+  const auto p = FramePosition(cursor.x, cursor.y);
   if (action == GLFW_PRESS) {
     focused_ = Contains(p);
     dragging_ = focused_;
@@ -80,6 +78,14 @@ void SizeSlider::OnCursorPos(double x, double y) {
 void SizeSlider::OnCursorEnter(int entered) {
   if (!entered)
     hovered_ = false;
+}
+
+void SizeSlider::OnFocus(bool focused) {
+  if (!focused) {
+    dragging_ = false;
+    hovered_ = false;
+    focused_ = false;
+  }
 }
 
 void SizeSlider::DragTo(glm::vec2 p) {

@@ -25,7 +25,6 @@ class LightPoint : public Light {
   float &sampling_weight;
 
  private:
-  std::unique_ptr<graphics::Shader> direct_lighting_sampler_;
   std::unique_ptr<graphics::Buffer> direct_lighting_sampler_data_;
 };
 

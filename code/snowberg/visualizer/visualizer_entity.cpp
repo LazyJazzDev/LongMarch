@@ -31,11 +31,11 @@ EntityMeshObject::EntityMeshObject(const std::shared_ptr<Core> &core,
       mesh_(mesh) {
   program_ = core_->LoadProgram<ProgramWithGeometryShader>(PROGRAM_ID_NO_NORMAL, [&]() {
     std::shared_ptr<ProgramWithGeometryShader> program = std::make_shared<ProgramWithGeometryShader>();
-    core_->GraphicsCore()->CreateShader(GetShaderCode("shaders/entity.hlsl"), "VSMain", "vs_6_0",
+    core_->GraphicsCore()->CreateShader(GetShaderCode("shaders/entity.slang"), "VSMain", "vs_6_0",
                                         &program->vertex_shader_);
-    core_->GraphicsCore()->CreateShader(GetShaderCode("shaders/entity.hlsl"), "GSMain", "gs_6_0",
+    core_->GraphicsCore()->CreateShader(GetShaderCode("shaders/entity.slang"), "GSMain", "gs_6_0",
                                         &program->geometry_shader_);
-    core_->GraphicsCore()->CreateShader(GetShaderCode("shaders/entity.hlsl"), "PSMain", "ps_6_0",
+    core_->GraphicsCore()->CreateShader(GetShaderCode("shaders/entity.slang"), "PSMain", "ps_6_0",
                                         &program->fragment_shader_);
     core_->GraphicsCore()->CreateProgram(
         {FilmChannelImageFormat(FILM_CHANNEL_EXPOSURE), FilmChannelImageFormat(FILM_CHANNEL_ALBEDO),
@@ -98,9 +98,9 @@ EntityAmbientLight::EntityAmbientLight(const std::shared_ptr<Core> &core, const 
     : Entity(core) {
   program_ = core_->LoadProgram<ProgramCommonRaster>(PROGRAM_AMBIENT_LIGHTING_PASS, [&]() {
     std::shared_ptr<ProgramCommonRaster> program = std::make_shared<ProgramCommonRaster>();
-    core_->GraphicsCore()->CreateShader(GetShaderCode("shaders/ambient_light.hlsl"), "VSMain", "vs_6_0",
+    core_->GraphicsCore()->CreateShader(GetShaderCode("shaders/ambient_light.slang"), "VSMain", "vs_6_0",
                                         &program->vertex_shader_);
-    core_->GraphicsCore()->CreateShader(GetShaderCode("shaders/ambient_light.hlsl"), "PSMain", "ps_6_0",
+    core_->GraphicsCore()->CreateShader(GetShaderCode("shaders/ambient_light.slang"), "PSMain", "ps_6_0",
                                         &program->fragment_shader_);
     core_->GraphicsCore()->CreateProgram({FilmChannelImageFormat(FILM_CHANNEL_EXPOSURE)},
                                          graphics::IMAGE_FORMAT_UNDEFINED, &program->program_);
@@ -156,9 +156,9 @@ EntityDirectionalLight::EntityDirectionalLight(const std::shared_ptr<Core> &core
   SetIntensity(intensity);
   program_ = core_->LoadProgram<ProgramCommonRaster>(PROGRAM_DIRECTION_LIGHTING_PASS, [&]() {
     std::shared_ptr<ProgramCommonRaster> program = std::make_shared<ProgramCommonRaster>();
-    core_->GraphicsCore()->CreateShader(GetShaderCode("shaders/directional_light.hlsl"), "VSMain", "vs_6_0",
+    core_->GraphicsCore()->CreateShader(GetShaderCode("shaders/directional_light.slang"), "VSMain", "vs_6_0",
                                         &program->vertex_shader_);
-    core_->GraphicsCore()->CreateShader(GetShaderCode("shaders/directional_light.hlsl"), "PSMain", "ps_6_0",
+    core_->GraphicsCore()->CreateShader(GetShaderCode("shaders/directional_light.slang"), "PSMain", "ps_6_0",
                                         &program->fragment_shader_);
     core_->GraphicsCore()->CreateProgram({FilmChannelImageFormat(FILM_CHANNEL_EXPOSURE)},
                                          graphics::IMAGE_FORMAT_UNDEFINED, &program->program_);

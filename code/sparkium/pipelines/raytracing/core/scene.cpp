@@ -19,16 +19,9 @@ namespace sparkium::raytracing {
 
 Scene::Scene(sparkium::Scene &scene) : scene_(scene), settings(scene.settings) {
   core_ = DedicatedCast(scene_.GetCore());
-  if (core_->GraphicsCore()->DeviceRayTracingSupport()) {
-    core_->GraphicsCore()->CreateShader(core_->GetShadersVFS(), "raygen.hlsl", "Main", "lib_6_5", &raygen_shader_);
-    core_->GraphicsCore()->CreateShader(core_->GetShadersVFS(), "raygen.hlsl", "MissMain", "lib_6_5",
-                                        &default_miss_shader_);
-    core_->GraphicsCore()->CreateShader(core_->GetShadersVFS(), "raygen.hlsl", "ShadowMiss", "lib_6_5",
-                                        &shadow_miss_shader_);
-  }
   core_->GraphicsCore()->CreateBuffer(sizeof(Settings::RayTracing) + sizeof(sparkium::Film::Info),
                                       graphics::BUFFER_TYPE_STATIC, &scene_settings_buffer_);
-  core_->GraphicsCore()->CreateShader(core_->GetShadersVFS(), "gather_light_power.hlsl", "GatherLightPowerKernel",
+  core_->GraphicsCore()->CreateShader(core_->GetShadersVFS(), "gather_light_power.slang", "GatherLightPowerKernel",
                                       "cs_6_3", &gather_light_power_shader_);
   core_->GraphicsCore()->CreateSampler({graphics::FILTER_MODE_LINEAR}, &linear_sampler_);
   core_->GraphicsCore()->CreateSampler({graphics::FILTER_MODE_NEAREST}, &nearest_sampler_);
@@ -36,6 +29,14 @@ Scene::Scene(sparkium::Scene &scene) : scene_(scene), settings(scene.settings) {
 
 void Scene::Render(Camera *camera, Film *film, bool software, bool ray_query) {
   software = software || ray_query;
+  if (!software && !raygen_shader_) {
+    core_->GraphicsCore()->CreateShader(core_->GetShadersVFS(), "raygen.slang", "Main", "lib_6_5", &raygen_shader_);
+    core_->GraphicsCore()->CreateShader(core_->GetShadersVFS(), "raygen.slang", "MissMain", "lib_6_5",
+                                        &default_miss_shader_);
+    core_->GraphicsCore()->CreateShader(core_->GetShadersVFS(), "raygen.slang", "ShadowMiss", "lib_6_5",
+                                        &shadow_miss_shader_);
+  }
+
   if (ray_query != ray_query_) {
     ray_query_ = ray_query;
     software_pipeline_.reset();
@@ -216,6 +217,8 @@ int32_t Scene::RegisterHitGroup(const InstanceHitGroups &hit_group) {
 }
 
 void Scene::UpdatePipeline(Camera *camera) {
+  if (!software_tracing_ && (callable_shaders_.empty() || callable_shaders_[0] != camera->Shader()))
+    pipeline_dirty_ = true;
   graphics::CpuProfileScope registration_profile("scene_registration");
   for (auto &[entity, status] : entities_) {
     status.keep = false;
@@ -272,7 +275,8 @@ void Scene::UpdatePipeline(Camera *camera) {
     hit_group_map_.clear();
     callable_shaders_.clear();
     callable_shader_map_.clear();
-    RegisterCallableShader(camera->Shader());
+    if (!software_tracing_)
+      RegisterCallableShader(camera->Shader());
   }
 
   graphics::GpuProfileScope geometry_light_profile(preprocess_cmd_context_.get(), "light_geometry");
@@ -386,7 +390,7 @@ void Scene::UpdatePipeline(Camera *camera) {
 
   metadata_profile.End();
   if (software_tracing_)
-    software_pipeline_->Update(preprocess_cmd_context_.get(), buffers_, sdr_images_.size(), hdr_images_.size());
+    software_pipeline_->Update(preprocess_cmd_context_.get(), buffers_, sdr_images_.size(), hdr_images_.size(), camera);
 
   graphics::CpuProfileScope light_record_profile("light_selection_record");
   graphics::GpuProfileScope light_selection_profile(preprocess_cmd_context_.get(), "light_selection");

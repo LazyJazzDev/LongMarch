@@ -75,7 +75,7 @@ VulkanCmdBeginRendering::VulkanCmdBeginRendering(const std::vector<VulkanImage *
 void VulkanCmdBeginRendering::CompileCommand(VulkanCommandContext *context, VkCommandBuffer command_buffer) {
   for (auto &image : resource_images_) {
     context->RequireImageState(command_buffer, image->Handle(), VK_IMAGE_LAYOUT_GENERAL,
-                               VK_PIPELINE_STAGE_ALL_GRAPHICS_BIT,
+                               VK_PIPELINE_STAGE_ALL_COMMANDS_BIT,
                                VK_ACCESS_MEMORY_READ_BIT | VK_ACCESS_MEMORY_WRITE_BIT, image->Aspect());
   }
 
@@ -87,7 +87,8 @@ void VulkanCmdBeginRendering::CompileCommand(VulkanCommandContext *context, VkCo
   for (int i = 0; i < color_targets_.size(); i++) {
     auto &color_target = color_targets_[i];
     context->RequireImageState(command_buffer, color_target->Handle(), VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
-                               VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT,
+                               VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
+                               VK_ACCESS_COLOR_ATTACHMENT_READ_BIT | VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT,
                                color_target->Aspect());
 
     VkRenderingAttachmentInfo attachment_info{};
@@ -112,10 +113,11 @@ void VulkanCmdBeginRendering::CompileCommand(VulkanCommandContext *context, VkCo
   rendering_info.renderArea.offset = {0, 0};
   rendering_info.layerCount = 1;
   if (depth_target_) {
-    context->RequireImageState(command_buffer, depth_target_->Handle(),
-                               VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL,
-                               VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT, VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT,
-                               depth_target_->Aspect());
+    context->RequireImageState(
+        command_buffer, depth_target_->Handle(), VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL,
+        VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT | VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT,
+        VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_READ_BIT | VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT,
+        depth_target_->Aspect());
     depth_attachment_info.sType = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO;
     depth_attachment_info.pNext = nullptr;
     depth_attachment_info.imageView = depth_target_->ImageView();
@@ -195,7 +197,7 @@ void VulkanCmdBindResourceImages::CompileCommand(VulkanCommandContext *context, 
     image_infos[i].imageLayout = VK_IMAGE_LAYOUT_GENERAL;
     if (update_layout_) {
       context->RequireImageState(command_buffer, images_[i]->Handle(), VK_IMAGE_LAYOUT_GENERAL,
-                                 VK_PIPELINE_STAGE_ALL_GRAPHICS_BIT,
+                                 VK_PIPELINE_STAGE_ALL_COMMANDS_BIT,
                                  VK_ACCESS_MEMORY_READ_BIT | VK_ACCESS_MEMORY_WRITE_BIT, images_[i]->Aspect());
     }
   }
@@ -394,14 +396,23 @@ void VulkanCmdDrawIndexed::CompileCommand(VulkanCommandContext *context, VkComma
   vkCmdDrawIndexed(command_buffer, index_count_, instance_count_, first_index_, vertex_offset_, first_instance_);
 }
 
-VulkanCmdPresent::VulkanCmdPresent(VulkanWindow *window, VulkanImage *image) : image_(image), window_(window) {
+VulkanCmdPresent::VulkanCmdPresent(VulkanWindow *window, VulkanImage *image, VulkanImage *target, bool draw_ui)
+    : target_(target),
+      draw_ui_(draw_ui),
+      image_(image),
+      window_(window) {
 }
 
 void VulkanCmdPresent::CompileCommand(VulkanCommandContext *context, VkCommandBuffer command_buffer) {
-  vulkan::TransitImageLayout(command_buffer, window_->CurrentImage(), VK_IMAGE_LAYOUT_UNDEFINED,
-                             VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT,
-                             VK_PIPELINE_STAGE_TRANSFER_BIT, 0, VK_ACCESS_TRANSFER_WRITE_BIT,
-                             VK_IMAGE_ASPECT_COLOR_BIT);
+  const auto destination = target_ ? target_->Handle() : window_->CurrentImage();
+  if (target_)
+    context->RequireImageState(command_buffer, destination, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+                               VK_PIPELINE_STAGE_TRANSFER_BIT, VK_ACCESS_TRANSFER_WRITE_BIT, VK_IMAGE_ASPECT_COLOR_BIT);
+  else
+    vulkan::TransitImageLayout(command_buffer, destination, VK_IMAGE_LAYOUT_UNDEFINED,
+                               VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT,
+                               VK_PIPELINE_STAGE_TRANSFER_BIT, 0, VK_ACCESS_TRANSFER_WRITE_BIT,
+                               VK_IMAGE_ASPECT_COLOR_BIT);
 
   context->RequireImageState(command_buffer, image_->Handle(), VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
                              VK_PIPELINE_STAGE_TRANSFER_BIT, VK_ACCESS_TRANSFER_READ_BIT, image_->Aspect());
@@ -417,8 +428,13 @@ void VulkanCmdPresent::CompileCommand(VulkanCommandContext *context, VkCommandBu
   clear_range.levelCount = 1;
   clear_range.baseArrayLayer = 0;
   clear_range.layerCount = 1;
-  vkCmdClearColorImage(command_buffer, window_->CurrentImage(), VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, &clear_color, 1,
+  vkCmdClearColorImage(command_buffer, destination, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, &clear_color, 1,
                        &clear_range);
+  // Clearing the letterbox and blitting both write the swapchain image.
+  vulkan::TransitImageLayout(command_buffer, destination, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+                             VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_PIPELINE_STAGE_TRANSFER_BIT,
+                             VK_PIPELINE_STAGE_TRANSFER_BIT, VK_ACCESS_TRANSFER_WRITE_BIT, VK_ACCESS_TRANSFER_WRITE_BIT,
+                             VK_IMAGE_ASPECT_COLOR_BIT);
 
   const float scale = std::min(static_cast<float>(window_extent.width) / image_extent.width,
                                static_cast<float>(window_extent.height) / image_extent.height);
@@ -440,39 +456,46 @@ void VulkanCmdPresent::CompileCommand(VulkanCommandContext *context, VkCommandBu
   blit.dstSubresource.mipLevel = 0;
   blit.dstSubresource.baseArrayLayer = 0;
   blit.dstSubresource.layerCount = 1;
-  vkCmdBlitImage(command_buffer, image_->Handle(), VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, window_->CurrentImage(),
+  vkCmdBlitImage(command_buffer, image_->Handle(), VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, destination,
                  VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &blit, VK_FILTER_LINEAR);
 
   auto &imgui_assets = window_->ImGuiAssets();
-  if (imgui_assets.context && imgui_assets.draw_command) {
+  if (draw_ui_ && imgui_assets.context && imgui_assets.draw_command) {
     imgui_assets.draw_command = false;
-    vulkan::TransitImageLayout(command_buffer, window_->CurrentImage(), VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
-                               VK_IMAGE_LAYOUT_GENERAL, VK_PIPELINE_STAGE_TRANSFER_BIT,
-                               VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, VK_ACCESS_TRANSFER_WRITE_BIT,
-                               VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT, VK_IMAGE_ASPECT_COLOR_BIT);
+    if (target_)
+      context->RequireImageState(
+          command_buffer, destination, VK_IMAGE_LAYOUT_GENERAL, VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
+          VK_ACCESS_COLOR_ATTACHMENT_READ_BIT | VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT, VK_IMAGE_ASPECT_COLOR_BIT);
+    else
+      vulkan::TransitImageLayout(
+          command_buffer, destination, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_GENERAL,
+          VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, VK_ACCESS_TRANSFER_WRITE_BIT,
+          VK_ACCESS_COLOR_ATTACHMENT_READ_BIT | VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT, VK_IMAGE_ASPECT_COLOR_BIT);
 
     ImGui::SetCurrentContext(imgui_assets.context);
 
     VkRenderPassBeginInfo renderPassInfo{};
     renderPassInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
     renderPassInfo.renderPass = imgui_assets.render_pass;
-    renderPassInfo.framebuffer = imgui_assets.framebuffers[window_->CurrentImageIndex()];
+    renderPassInfo.framebuffer =
+        target_ ? window_->HDRFramebuffer(target_) : imgui_assets.framebuffers[window_->CurrentImageIndex()];
     renderPassInfo.renderArea.offset = {0, 0};
-    renderPassInfo.renderArea.extent = window_->SwapChainExtent();
+    renderPassInfo.renderArea.extent = window_extent;
     renderPassInfo.clearValueCount = 0;
     renderPassInfo.pClearValues = nullptr;
 
     vkCmdBeginRenderPass(command_buffer, &renderPassInfo, VK_SUBPASS_CONTENTS_INLINE);
+    ImGuiLinearColors linear_ui(window_->IsHDR());
     ImGui_ImplVulkan_RenderDrawData(ImGui::GetDrawData(), command_buffer);
     vkCmdEndRenderPass(command_buffer);
 
-    vulkan::TransitImageLayout(command_buffer, window_->CurrentImage(), VK_IMAGE_LAYOUT_GENERAL,
-                               VK_IMAGE_LAYOUT_PRESENT_SRC_KHR, VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
-                               VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT, VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT, 0,
-                               VK_IMAGE_ASPECT_COLOR_BIT);
+    if (!target_)
+      vulkan::TransitImageLayout(command_buffer, destination, VK_IMAGE_LAYOUT_GENERAL, VK_IMAGE_LAYOUT_PRESENT_SRC_KHR,
+                                 VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT,
+                                 VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT, 0, VK_IMAGE_ASPECT_COLOR_BIT);
 
-  } else {
-    vulkan::TransitImageLayout(command_buffer, window_->CurrentImage(), VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+  } else if (!target_) {
+    vulkan::TransitImageLayout(command_buffer, destination, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
                                VK_IMAGE_LAYOUT_PRESENT_SRC_KHR, VK_PIPELINE_STAGE_TRANSFER_BIT,
                                VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT, VK_ACCESS_TRANSFER_WRITE_BIT, 0,
                                VK_IMAGE_ASPECT_COLOR_BIT);

@@ -35,7 +35,7 @@ channel shows compiler commands and index progress.
 The current database covers files compiled by the active build, including Metal
 and Vulkan. D3D12 and disabled CUDA/Python source paths need a build database for
 their corresponding platform/options to obtain complete semantic navigation.
-HLSL is not indexed as C++ by clangd.
+Slang is not indexed as C++ by clangd.
 
 If another machine uses a different build directory, change both
 `cmake.buildDirectory` and clangd's `--compile-commands-dir` in workspace settings.

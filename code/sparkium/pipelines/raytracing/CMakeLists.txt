@@ -1,6 +1,6 @@
 add_library(sparkium_raytracing raytracing.cpp)
 
-file(GLOB subdirs RELATIVE ${CMAKE_CURRENT_SOURCE_DIR} *)
+file(GLOB subdirs CONFIGURE_DEPENDS RELATIVE ${CMAKE_CURRENT_SOURCE_DIR} *)
 
 foreach (subdir ${subdirs})
     # check whether ${CMAKE_CURRENT_SOURCE_DIR}/${subdir}/CMakeLists.txt exists

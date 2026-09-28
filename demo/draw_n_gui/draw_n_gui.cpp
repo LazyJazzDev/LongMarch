@@ -15,7 +15,7 @@ DrawNGUI::~DrawNGUI() {
 void DrawNGUI::Run() {
   OnInit();
   while (!window_->ShouldClose()) {
-    glfwPollEvents();
+    grassland::graphics::Window::PollEvents();
     OnUpdate();
     OnRender();
   }
@@ -25,8 +25,11 @@ void DrawNGUI::Run() {
 
 void DrawNGUI::OnInit() {
   core_->CreateWindowObject(1280, 720, "Draw & GUI", false, true, &window_);
-  core_->CreateImage(1280, 720, grassland::graphics::IMAGE_FORMAT_R32G32B32A32_SFLOAT, &color_image_);
-  window_->ResizeEvent().RegisterCallback([this](int width, int height) {
+  core_->CreateImage(window_->GetFramebufferSize().x, window_->GetFramebufferSize().y,
+                     grassland::graphics::IMAGE_FORMAT_R32G32B32A32_SFLOAT, &color_image_);
+  window_->FramebufferResizeEvent().RegisterCallback([this](int width, int height) {
+    if (width <= 0 || height <= 0)
+      return;
     core_->WaitGPU();
     color_image_.reset();
     core_->CreateImage(width, height, grassland::graphics::IMAGE_FORMAT_R32G32B32A32_SFLOAT, &color_image_);
@@ -74,8 +77,8 @@ void DrawNGUI::OnUpdate() {
   draw_core_->BeginDraw();
   auto extent = color_image_->Extent();
   draw_core_->CmdSetDrawRegion(0, 0, extent.width, extent.height);
-  float alpha = 0.5f + 0.5f * glm::sin(glfwGetTime() * 5.0f);
-  float theta = glfwGetTime();
+  float alpha = 0.5f + 0.5f * glm::sin(grassland::GetTimeSeconds() * 5.0f);
+  float theta = grassland::GetTimeSeconds();
   draw_core_->CmdDrawInstance(
       model_.get(), texture_.get(),
       glm::rotate(glm::scale(glm::translate(glm::rotate(glm::mat4{1.0f}, theta, glm::vec3{0.0f, 0.0f, 1.0f}),

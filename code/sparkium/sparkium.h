@@ -1,5 +1,5 @@
 #pragma once
-#include "sparkium/core/camera.h"
+#include "sparkium/camera/cameras.h"
 #include "sparkium/core/core.h"
 #include "sparkium/core/entity.h"
 #include "sparkium/core/film.h"

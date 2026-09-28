@@ -2,6 +2,7 @@
 #include "application/animation_var.h"
 #include "application/application.h"
 #include "application/model.h"
+#include "boundary_toggle_button.h"
 #include "cell_button.h"
 #include "file_button.h"
 #include "grid_size.h"
@@ -51,6 +52,7 @@ class GameOfLife : public Application {
   void LayoutCells();
   void ResizeGrid(int width, int height);
   glm::vec2 CursorPosition() const;
+  glm::vec2 FramePosition(glm::dvec2 position) const;
   bool CursorInGrid() const;
   void ZoomGrid(float factor);
   void ScrollGrid(double x, double y);
@@ -69,9 +71,15 @@ class GameOfLife : public Application {
   uint32_t magnify_callback_{};
   uint32_t scroll_callback_{};
   uint32_t key_callback_{};
+  uint32_t pan_button_callback_{};
+  uint32_t pan_move_callback_{};
+  uint32_t pan_focus_callback_{};
+  bool panning_{false};
+  glm::vec2 pan_cursor_{0.0f};
 
   std::unique_ptr<PausePlayButton> pause_play_button_;
   std::unique_ptr<SpeedToggleButton> speed_toggle_button_;
+  std::unique_ptr<BoundaryToggleButton> boundary_button_;
   std::unique_ptr<RefreshButton> refresh_button_;
   std::unique_ptr<RandomizeButton> randomize_button_;
   std::unique_ptr<FileButton> open_button_;
@@ -87,6 +95,7 @@ class GameOfLife : public Application {
   std::vector<uint8_t> initial_cells_;
   std::vector<std::unique_ptr<CellButton>> cell_button_grid_;
   float time_total{0.0};
+  double last_frame_time_{};
   float ui_scale_{1.0};
   float random_density_{0.0f};
   uint32_t random_seed_{0};

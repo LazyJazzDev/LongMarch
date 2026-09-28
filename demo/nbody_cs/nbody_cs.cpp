@@ -41,7 +41,7 @@ void NBodyCS::Run() {
     OnUpdate();
     OnRender();
     if (window_)
-      glfwPollEvents();
+      grassland::graphics::Window::PollEvents();
     double wall = std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - start).count();
     if (Benchmark() && frame >= 0) {
       wall_times.push_back(wall);
@@ -169,11 +169,13 @@ void NBodyCS::OnRender() {
 }
 
 void NBodyCS::OnInit() {
-  if (options_.mode != "compute")
-    core_->CreateImage(options_.width, options_.height, graphics::IMAGE_FORMAT_R32G32B32A32_SFLOAT, &frame_image_);
+  if (options_.mode != "compute") {
+    const auto size = window_ ? window_->GetFramebufferSize() : glm::ivec2{options_.width, options_.height};
+    core_->CreateImage(size.x, size.y, graphics::IMAGE_FORMAT_R32G32B32A32_SFLOAT, &frame_image_);
+  }
 
   if (window_)
-    window_->ResizeEvent().RegisterCallback([this](int width, int height) {
+    window_->FramebufferResizeEvent().RegisterCallback([this](int width, int height) {
       core_->WaitGPU();
       if (width <= 0 || height <= 0)
         return;
@@ -214,18 +216,19 @@ void NBodyCS::OnInit() {
     window_->MouseMoveEvent().RegisterCallback([this](double xpos, double ypos) {
       ImGui::SetCurrentContext(window_->GetImGuiContext());
 
-      static auto last_xpos = xpos;
-      static auto last_ypos = ypos;
-      if (glfwGetMouseButton(window_->GLFWWindow(), GLFW_MOUSE_BUTTON_LEFT) == GLFW_PRESS) {
-        auto diffx = xpos - last_xpos;
-        auto diffy = ypos - last_ypos;
+      if (!cursor_initialized_) {
+        last_cursor_ = {xpos, ypos};
+        cursor_initialized_ = true;
+      }
+      if (window_->IsMouseButtonDown(GLFW_MOUSE_BUTTON_LEFT)) {
+        auto diffx = xpos - last_cursor_.x;
+        auto diffy = ypos - last_cursor_.y;
         if (!ImGui::GetIO().WantCaptureMouse) {
           rotation = glm::rotate(glm::mat4{1.0f}, glm::radians(float(diffx)), glm::vec3{0.0f, 1.0f, 0.0f}) * rotation;
           rotation = glm::rotate(glm::mat4{1.0f}, glm::radians(float(diffy)), glm::vec3{1.0f, 0.0f, 0.0f}) * rotation;
         }
       }
-      last_xpos = xpos;
-      last_ypos = ypos;
+      last_cursor_ = {xpos, ypos};
     });
 }
 
@@ -248,7 +251,7 @@ void NBodyCS::OnClose() {
 }
 
 void NBodyCS::BuildRenderNode() {
-  core_->CreateShader(GetShaderCode("shaders/nbody.hlsl"), "CSMain", "cs_6_0", &nbody_compute_shader_);
+  core_->CreateShader(GetShaderCode("shaders/nbody.slang"), "CSMain", "cs_6_0", &nbody_compute_shader_);
   core_->CreateComputeProgram(nbody_compute_shader_.get(), &nbody_compute_program_);
   nbody_compute_program_->AddResourceBinding(graphics::RESOURCE_TYPE_STORAGE_BUFFER, 1);
   nbody_compute_program_->AddResourceBinding(graphics::RESOURCE_TYPE_WRITABLE_STORAGE_BUFFER, 1);
@@ -258,8 +261,8 @@ void NBodyCS::BuildRenderNode() {
   if (options_.mode == "compute")
     return;
 
-  core_->CreateShader(GetShaderVirtualFileSystem(), "shaders/particle.hlsl", "VSMain", "vs_6_0", &vertex_shader_);
-  core_->CreateShader(GetShaderVirtualFileSystem(), "shaders/particle.hlsl", "PSMain", "ps_6_0", &fragment_shader_);
+  core_->CreateShader(GetShaderVirtualFileSystem(), "shaders/particle.slang", "VSMain", "vs_6_0", &vertex_shader_);
+  core_->CreateShader(GetShaderVirtualFileSystem(), "shaders/particle.slang", "PSMain", "ps_6_0", &fragment_shader_);
   core_->CreateProgram({frame_image_->Format()}, graphics::IMAGE_FORMAT_UNDEFINED, &program_);
   program_->SetBlendState(0, graphics::BlendState(graphics::BLEND_FACTOR_ONE, graphics::BLEND_FACTOR_ONE,
                                                   graphics::BLEND_OP_ADD, graphics::BLEND_FACTOR_ONE,
@@ -271,8 +274,8 @@ void NBodyCS::BuildRenderNode() {
   program_->BindShader(fragment_shader_.get(), graphics::SHADER_TYPE_PIXEL);
   program_->Finalize();
 
-  core_->CreateShader(GetShaderVirtualFileSystem(), "shaders/hdr.hlsl", "VSMain", "vs_6_0", &hdr_vertex_shader_);
-  core_->CreateShader(GetShaderVirtualFileSystem(), "shaders/hdr.hlsl", "PSMain", "ps_6_0", &hdr_fragment_shader_);
+  core_->CreateShader(GetShaderVirtualFileSystem(), "shaders/hdr.slang", "VSMain", "vs_6_0", &hdr_vertex_shader_);
+  core_->CreateShader(GetShaderVirtualFileSystem(), "shaders/hdr.slang", "PSMain", "ps_6_0", &hdr_fragment_shader_);
   core_->CreateProgram({}, graphics::IMAGE_FORMAT_UNDEFINED, &hdr_program_);
   hdr_program_->AddResourceBinding(graphics::RESOURCE_TYPE_UNIFORM_BUFFER, 1);
   hdr_program_->AddResourceBinding(graphics::RESOURCE_TYPE_WRITABLE_IMAGE, 1);
@@ -416,7 +419,9 @@ void NBodyCS::UpdateImGui() {
   ImGui::End();
   window_->EndImGuiFrame();
   if (trigger_hdr_switch) {
-    hdr_ = !hdr_;
-    window_->SetHDR(hdr_);
+    if (window_->SetHDR(!hdr_) == 0)
+      hdr_ = !hdr_;
+    else
+      LogWarning("HDR mode change unavailable; keeping the current presentation mode.");
   }
 }

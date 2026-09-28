@@ -46,10 +46,6 @@ class Application {
     return window_.get();
   }
 
-  [[nodiscard]] GLFWwindow *GLFWWindow() const {
-    return window_->GLFWWindow();
-  }
-
   [[nodiscard]] std::string Name() const {
     return name_;
   }
@@ -144,6 +140,8 @@ class Application {
 
   uint32_t mouse_move_callback_{};
   uint32_t mouse_button_callback_{};
+  uint32_t cursor_enter_callback_{};
+  uint32_t focus_callback_{};
 
   int fps_frames_{0};
   double fps_start_time_{0.0};

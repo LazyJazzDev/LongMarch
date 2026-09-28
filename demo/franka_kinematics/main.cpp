@@ -210,7 +210,7 @@ int main() {
   scene.settings.samples_per_dispatch = 32;
   sparkium::Film film(&sparkium_core, 1024, 512);
   film.info.persistence = 0.98f;
-  sparkium::Camera camera(
+  sparkium::CameraPinhole camera(
       &sparkium_core, glm::lookAt(glm::vec3{2.0f, -1.0f, 0.3f}, glm::vec3{0.0f, 0.0f, 0.5f}, glm::vec3{0.0, 0.0, 1.0}),
       glm::radians(30.0f), static_cast<float>(film.GetWidth()) / film.GetHeight());
 
@@ -328,7 +328,7 @@ int main() {
     core_->CreateCommandContext(&cmd_context);
     cmd_context->CmdPresent(window.get(), srgb_image.get());
     core_->SubmitCommandContext(cmd_context.get());
-    glfwPollEvents();
+    grassland::graphics::Window::PollEvents();
     float fps = fps_counter.TickFPS();
     char fps_buf[16];
     sprintf(fps_buf, "%.2f", fps);

@@ -99,8 +99,8 @@ int VulkanCore::CreateImage(int width, int height, ImageFormat format, double_pt
   SingleTimeCommand([this, pp_image](VkCommandBuffer command_buffer) {
     VulkanImage *image = dynamic_cast<VulkanImage *>(*pp_image);
     vulkan::TransitImageLayout(command_buffer, image->Handle(), VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_GENERAL,
-                               VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, VK_PIPELINE_STAGE_ALL_GRAPHICS_BIT,
-                               VK_ACCESS_MEMORY_READ_BIT, 0, image->Aspect());
+                               VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, 0,
+                               VK_ACCESS_MEMORY_READ_BIT | VK_ACCESS_MEMORY_WRITE_BIT, image->Aspect());
   });
   return 0;
 }
@@ -125,8 +125,8 @@ int VulkanCore::CreateShader(const std::string &source_code,
                              const std::string &target,
                              double_ptr<Shader> pp_shader) {
   VirtualFileSystem vfs;
-  vfs.WriteFile("shader.hlsl", source_code);
-  return CreateShader(vfs, "shader.hlsl", entry_point, target, pp_shader);
+  vfs.WriteFile("shader.slang", source_code);
+  return CreateShader(vfs, "shader.slang", entry_point, target, pp_shader);
 }
 
 int VulkanCore::CreateShader(const VirtualFileSystem &vfs,
@@ -143,13 +143,8 @@ int VulkanCore::CreateShader(const VirtualFileSystem &vfs,
                              const std::string &target,
                              const std::vector<std::string> &args,
                              double_ptr<Shader> pp_shader) {
-  std::vector<std::string> compile_args = {"-spirv", "-fspv-target-env=vulkan1.2", "-fvk-use-dx-layout"};
-#if !defined(NDEBUG) && !defined(__APPLE__)
-  compile_args.push_back("-Qembed_debug");
-  if (!DebugEnabled()) {
-    compile_args.push_back("-fspv-debug=vulkan-with-source");
-  }
-#endif
+  std::vector<std::string> compile_args = {"-target", "spirv", "-profile", "spirv_1_5", "-fvk-use-dx-layout"};
+
   compile_args.insert(compile_args.end(), args.begin(), args.end());
   auto blob = CompileShader(vfs, source_file, entry_point, target, compile_args);
   if (blob.data.empty())
@@ -335,7 +330,7 @@ int VulkanCore::SubmitCommandContext(CommandContext *p_command_context) {
     }
 #endif
 
-    vkQueueSubmit(transfer_queue_, 1, &submit_info, nullptr);
+    vulkan::ThrowIfFailed(vkQueueSubmit(transfer_queue_, 1, &submit_info, nullptr), "Submit Vulkan uploads");
   }
 
   VkCommandBuffer command_buffer = command_buffers_[current_frame_];
@@ -347,13 +342,22 @@ int VulkanCore::SubmitCommandContext(CommandContext *p_command_context) {
     return -1;
   }
 
+  // Queue order alone does not make copied uniforms/instances visible to shaders.
+  // This also orders static uploads and previous dispatches before this context.
+  VkMemoryBarrier upload_barrier{};
+  upload_barrier.sType = VK_STRUCTURE_TYPE_MEMORY_BARRIER;
+  upload_barrier.srcAccessMask = VK_ACCESS_MEMORY_WRITE_BIT;
+  upload_barrier.dstAccessMask = VK_ACCESS_MEMORY_READ_BIT | VK_ACCESS_MEMORY_WRITE_BIT;
+  vkCmdPipelineBarrier(command_buffer, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, 0, 1,
+                       &upload_barrier, 0, nullptr, 0, nullptr);
+
   for (auto &command : command_context->commands_) {
     command->CompileCommand(command_context, command_buffer);
   }
 
   for (auto [image, state] : command_context->image_states_) {
     vulkan::TransitImageLayout(command_buffer, image, state.layout, VK_IMAGE_LAYOUT_GENERAL, state.stage,
-                               VK_PIPELINE_STAGE_ALL_GRAPHICS_BIT, state.access, VK_ACCESS_MEMORY_READ_BIT,
+                               VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, state.access, VK_ACCESS_MEMORY_READ_BIT,
                                state.aspect);
   }
   command_context->image_states_.clear();
@@ -406,7 +410,7 @@ int VulkanCore::SubmitCommandContext(CommandContext *p_command_context) {
     submit_info.pSignalSemaphores = signal_semaphores.data();
   }
 
-  vkQueueSubmit(graphics_queue_, 1, &submit_info, fence);
+  vulkan::ThrowIfFailed(vkQueueSubmit(graphics_queue_, 1, &submit_info, fence), "Submit Vulkan rendering");
 
   for (auto &window : command_context->windows_) {
     window->Present();
@@ -416,9 +420,10 @@ int VulkanCore::SubmitCommandContext(CommandContext *p_command_context) {
 
   current_frame_ = (current_frame_ + 1) % FramesInFlight();
   fence = in_flight_fences_[current_frame_];
-  vkWaitForFences(this->Handle(), 1, &fence, VK_TRUE, std::numeric_limits<uint64_t>::max());
+  vulkan::ThrowIfFailed(vkWaitForFences(this->Handle(), 1, &fence, VK_TRUE, std::numeric_limits<uint64_t>::max()),
+                        "Wait for Vulkan rendering");
 
-  vkQueueWaitIdle(transfer_queue_);
+  vulkan::ThrowIfFailed(vkQueueWaitIdle(transfer_queue_), "Wait for Vulkan uploads");
 
   for (auto &callback : post_execute_functions_[current_frame_]) {
     callback();
@@ -512,12 +517,13 @@ int VulkanCore::InitializeLogicalDevice(int device_index) {
   pool_info.queueFamilyIndex = vulkan::GraphicsFamilyIndex(physical_device);
   vulkan::ThrowIfFailed(vkCreateCommandPool(native_device, &pool_info, nullptr, &graphics_command_pool_),
                         "failed to create graphics command pool");
-  pool_info.queueFamilyIndex = vulkan::TransferFamilyIndex(physical_device);
+  // Upload buffers use exclusive sharing and are consumed by the graphics queue.
+  pool_info.queueFamilyIndex = vulkan::GraphicsFamilyIndex(physical_device);
   vulkan::ThrowIfFailed(vkCreateCommandPool(native_device, &pool_info, nullptr, &transfer_command_pool_),
                         "failed to create transfer command pool");
 
   vkGetDeviceQueue(native_device, vulkan::GraphicsFamilyIndex(physical_device), 0, &graphics_queue_);
-  vkGetDeviceQueue(native_device, vulkan::TransferFamilyIndex(physical_device), 0, &transfer_queue_);
+  vkGetDeviceQueue(native_device, vulkan::GraphicsFamilyIndex(physical_device), 0, &transfer_queue_);
 
   in_flight_fences_.resize(FramesInFlight());
   command_buffers_.resize(FramesInFlight());

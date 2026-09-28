@@ -14,6 +14,11 @@ set(GRASSLAND_LIBS ${GRASSLAND_LIBS} PARENT_SCOPE)
 
 target_include_directories(${GRASSLAND_SUBLIB_NAME} PUBLIC ${LONGMARCH_INCLUDE_DIR} ${STB_INC_DIR})
 
-target_link_libraries(${GRASSLAND_SUBLIB_NAME} PUBLIC grassland_imgui ${DXC_LIB_NAME})
+target_link_libraries(${GRASSLAND_SUBLIB_NAME} PUBLIC grassland_imgui slang::slang)
+
+if (WIN32)
+    # Display luminance queries are shared by every Windows rendering backend.
+    target_link_libraries(${GRASSLAND_SUBLIB_NAME} PRIVATE dxgi)
+endif ()
 
 PACK_SHADER_CODE(${GRASSLAND_SUBLIB_NAME})

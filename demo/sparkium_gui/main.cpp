@@ -26,34 +26,10 @@ const char *PipelineName(sparkium::RenderPipeline pipeline) {
 }
 
 void ResizeWindowForFilm(graphics::Window *window, sparkium::Film *film) {
-  int window_x = 0;
-  int window_y = 0;
-  int window_width = window->GetWidth();
-  int window_height = window->GetHeight();
-  glfwGetWindowPos(window->GLFWWindow(), &window_x, &window_y);
-
-  int monitor_count = 0;
-  GLFWmonitor **monitors = glfwGetMonitors(&monitor_count);
-  GLFWmonitor *monitor = glfwGetPrimaryMonitor();
-  int best_overlap = -1;
-  for (int i = 0; i < monitor_count; ++i) {
-    int monitor_x, monitor_y, monitor_width, monitor_height;
-    glfwGetMonitorWorkarea(monitors[i], &monitor_x, &monitor_y, &monitor_width, &monitor_height);
-    const int overlap_width =
-        std::max(0, std::min(window_x + window_width, monitor_x + monitor_width) - std::max(window_x, monitor_x));
-    const int overlap_height =
-        std::max(0, std::min(window_y + window_height, monitor_y + monitor_height) - std::max(window_y, monitor_y));
-    const int overlap = overlap_width * overlap_height;
-    if (overlap > best_overlap) {
-      best_overlap = overlap;
-      monitor = monitors[i];
-    }
-  }
-
-  int work_x, work_y, work_width, work_height;
-  glfwGetMonitorWorkarea(monitor, &work_x, &work_y, &work_width, &work_height);
-  int frame_left, frame_top, frame_right, frame_bottom;
-  glfwGetWindowFrameSize(window->GLFWWindow(), &frame_left, &frame_top, &frame_right, &frame_bottom);
+  const auto work = window->GetMonitorWorkArea();
+  const auto frame = window->GetFrameSize();
+  const int work_x = work.x, work_y = work.y, work_width = work.z, work_height = work.w;
+  const int frame_left = frame.x, frame_top = frame.y, frame_right = frame.z, frame_bottom = frame.w;
   const int available_width = std::max(1, work_width - frame_left - frame_right);
   const int available_height = std::max(1, work_height - frame_top - frame_bottom);
   const float scale = std::min({1.0f, static_cast<float>(available_width) / film->GetWidth(),
@@ -62,8 +38,8 @@ void ResizeWindowForFilm(graphics::Window *window, sparkium::Film *film) {
   const int target_height = std::max(1, static_cast<int>(std::floor(film->GetHeight() * scale)));
 
   window->Resize(target_width, target_height);
-  glfwSetWindowPos(window->GLFWWindow(), work_x + frame_left + (available_width - target_width) / 2,
-                   work_y + frame_top + (available_height - target_height) / 2);
+  window->SetPosition(work_x + frame_left + (available_width - target_width) / 2,
+                      work_y + frame_top + (available_height - target_height) / 2);
 }
 }  // namespace
 
@@ -108,10 +84,8 @@ int main(int argc, char **argv) {
       throw std::runtime_error("failed to create graphics core");
     if (graphics_core->InitializeLogicalDeviceAutoSelect(false) != 0)
       throw std::runtime_error("failed to initialize graphics device");
-    const bool hdr_available = graphics_core->API() == graphics::BACKEND_API_METAL;
-    if (hdr_requested && !hdr_available)
-      throw std::invalid_argument("HDR preview currently requires the Metal backend");
     bool hdr_active = false;
+    std::string hdr_error;
     sparkium::Core core(graphics_core.get());
 
     std::unique_ptr<sparkium::JsonScene> loaded;
@@ -146,7 +120,19 @@ int main(int argc, char **argv) {
                                       "Sparkium Scene Browser", false, true, &window);
     ResizeWindowForFilm(window.get(), loaded->GetFilm());
     resize_pending = false;
+    if (hdr_requested) {
+      if (window->SetHDR(true) == 0) {
+        hdr_active = true;
+        create_display_image();
+      } else {
+        hdr_error = "Requested HDR presentation mode is unavailable; see the application log.";
+        hdr_requested = false;
+        std::cerr << "HDR unavailable; continuing in SDR: " << hdr_error << '\n';
+      }
+    }
+
     window->InitImGui(nullptr, 18.0f);
+    std::cout << "Display: " << (hdr_active ? "HDR" : "SDR") << std::endl;
     FPSCounter fps_counter;
     bool show_browser = true;
 
@@ -154,10 +140,16 @@ int main(int argc, char **argv) {
     while (!window->ShouldClose() && (!frame_limit || rendered_frames++ < frame_limit)) {
       // Apply before BeginImGuiFrame so ImGui and presentation use the same format.
       if (hdr_requested != hdr_active) {
-        window->SetHDR(hdr_requested);
-        hdr_active = hdr_requested;
-        create_display_image();
+        if (window->SetHDR(hdr_requested) == 0) {
+          hdr_active = hdr_requested;
+          hdr_error.clear();
+          create_display_image();
+        } else {
+          hdr_error = "Could not change HDR presentation; see the application log.";
+          hdr_requested = hdr_active;
+        }
       }
+
       window->BeginImGuiFrame();
       ImGui::SetNextWindowPos({10, 10}, ImGuiCond_Once);
       ImGui::SetNextWindowBgAlpha(hdr_active ? 1.0f : 0.85f);
@@ -201,16 +193,27 @@ int main(int argc, char **argv) {
         }
         ImGui::EndCombo();
       }
-      ImGui::BeginDisabled(!hdr_available);
       ImGui::Checkbox("HDR preview", &hdr_requested);
-      ImGui::EndDisabled();
       if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled))
         ImGui::SetTooltip(
-            hdr_available
-                ? "Linear HDR with exposure; bypasses SDR view transform, gamma and contrast. Requires an HDR display."
-                : "HDR preview currently requires the Metal backend.");
+            "Linear HDR retains exposure, gamma, contrast and an extended Filmic look. Requires an HDR display "
+            "and HDR enabled in the operating system.");
+      if (!hdr_error.empty())
+        ImGui::TextWrapped("HDR unavailable: %s", hdr_error.c_str());
       ImGui::SliderFloat("Exposure (EV)", &loaded->GetFilm()->info.exposure, -8.0f, 8.0f, "%.2f");
-      ImGui::TextUnformatted(hdr_active ? "Display: HDR (linear)" : "Display: SDR (scene view transform)");
+      ImGui::TextUnformatted(hdr_active ? "Display: HDR" : "Display: SDR (scene view transform)");
+      if (hdr_active) {
+        const auto brightness = window->GetDisplayBrightness();
+        if (brightness.sdr_white_nits > 0.0f)
+          ImGui::Text("Reference white: %.0f nits (%.2fx)", brightness.sdr_white_nits,
+                      window->HDRReferenceWhiteScale());
+        else if (!brightness.reference_white_known)
+          ImGui::TextUnformatted("Reference white: unavailable");
+        if (brightness.hdr_headroom > 0.0f)
+          ImGui::Text("HDR headroom: %.2fx", brightness.hdr_headroom);
+        else
+          ImGui::TextUnformatted("HDR headroom: unknown");
+      }
       auto *film = loaded->GetFilm();
       auto &settings = loaded->GetScene()->settings;
       const bool raster = core.ResolveRenderPipeline(pipeline) == sparkium::RENDER_PIPELINE_RASTERIZATION;
@@ -245,14 +248,14 @@ int main(int argc, char **argv) {
         if (reset)
           film->Reset();
       }
-      if (ImGui::CollapsingHeader("SDR view settings")) {
-        ImGui::BeginDisabled(hdr_active);
+      if (ImGui::CollapsingHeader("View settings")) {
         ImGui::Combo("View transform", &film->info.view_transform, "Normalized\0Standard\0Filmic\0");
-        ImGui::BeginDisabled(film->info.view_transform != 2);
+        ImGui::BeginDisabled(!hdr_active && film->info.view_transform != 2);
         ImGui::SliderFloat("Gamma", &film->info.gamma, 0.1f, 4.0f, "%.2f", ImGuiSliderFlags_AlwaysClamp);
         ImGui::SliderFloat("Contrast", &film->info.contrast, 0.0f, 4.0f, "%.2f", ImGuiSliderFlags_AlwaysClamp);
         ImGui::EndDisabled();
-        ImGui::EndDisabled();
+        if (hdr_active && film->info.view_transform == 0)
+          ImGui::TextWrapped("HDR preserves brightness without SDR normalization.");
       }
       if (ImGui::Button("Reload"))
         load_selected();
@@ -261,6 +264,7 @@ int main(int argc, char **argv) {
         loaded->GetFilm()->Reset();
       ImGui::Text("%s", scene_files[selected].string().c_str());
       ImGui::Text("Backend: %s", graphics::BackendAPIString(graphics_core->API()));
+      ImGui::Text("Resolution: %d x %d", loaded->GetFilm()->GetWidth(), loaded->GetFilm()->GetHeight());
       const auto resolved_pipeline = core.ResolveRenderPipeline(pipeline);
       if (resolved_pipeline != pipeline)
         ImGui::Text("Pipeline: %s (%s)", PipelineName(pipeline), PipelineName(resolved_pipeline));
@@ -293,7 +297,7 @@ int main(int argc, char **argv) {
       graphics_core->CreateCommandContext(&command_context);
       command_context->CmdPresent(window.get(), image.get());
       graphics_core->SubmitCommandContext(command_context.get());
-      glfwPollEvents();
+      graphics::Window::PollEvents();
       if (resize_pending) {
         ResizeWindowForFilm(window.get(), loaded->GetFilm());
         resize_pending = false;

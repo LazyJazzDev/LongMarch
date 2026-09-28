@@ -222,10 +222,12 @@ class VulkanCmdDrawIndexed : public VulkanCommand {
 
 class VulkanCmdPresent : public VulkanCommand {
  public:
-  VulkanCmdPresent(VulkanWindow *window, VulkanImage *image);
+  VulkanCmdPresent(VulkanWindow *window, VulkanImage *image, VulkanImage *target = nullptr, bool draw_ui = true);
   void CompileCommand(VulkanCommandContext *context, VkCommandBuffer command_buffer) override;
 
  private:
+  VulkanImage *target_;
+  bool draw_ui_;
   VulkanImage *image_;
   VulkanWindow *window_;
 };

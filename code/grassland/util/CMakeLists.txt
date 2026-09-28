@@ -20,5 +20,6 @@ if (LONGMARCH_CUDA_RUNTIME)
 endif ()
 
 if (LONGMARCH_PYTHON_ENABLED)
+    target_link_libraries(${GRASSLAND_SUBLIB_NAME} PUBLIC Python3::Python)
     target_compile_definitions(${GRASSLAND_SUBLIB_NAME} PUBLIC LONGMARCH_PYTHON_ENABLED)
 endif ()

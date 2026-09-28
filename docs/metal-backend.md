@@ -6,7 +6,7 @@ multiple render targets, depth testing, blending, resource transfers, GLFW
 presentation through CAMetalLayer, and ImGui. Metal is the default API when this
 backend is enabled; `--backend vulkan` selects the existing Vulkan backend.
 
-HLSL shaders go through DXC → SPIR-V → SPIRV-Cross → MSL → Metal's runtime
+Slang shaders go through Slang → SPIR-V → SPIRV-Cross → MSL → Metal's runtime
 compiler. Metal shader compilation enables fast math by default, allowing floating-point
 reassociation and approximate math; results need not match strict floating-point compilation.
 GPU commands and resources use Metal directly, without MoltenVK.
@@ -37,14 +37,19 @@ implementation macros are defined once in `metal_util.cpp`.
 
 ## Build and run
 
-Requirements: Apple Silicon, macOS 13 or later (MSL 3.0), Xcode Command Line
-Tools, CMake/Ninja, existing vcpkg dependencies, and Vulkan SDK's DXC and
-SPIRV-Cross development libraries. The SDK supplies shader compilation tools;
-the Vulkan runtime backend itself can be disabled.
+Requirements: Apple Silicon and MSL 3.0 (Metal backend: macOS 13+; the
+prebuilt Slang SDK may require a newer macOS), Xcode Command Line Tools,
+CMake/Ninja, vcpkg dependencies, Slang 2026.18.1+ and SPIRV-Cross development
+libraries. **Vulkan SDK is not required for Metal.** See [Slang setup](slang-shaders.md).
 
-CMake fetches the hash-pinned official metal-cpp macOS 15/iOS 18 archive.
-For an offline build, set `LONGMARCH_METAL_CPP_DIR` to a local metal-cpp header
-root containing `Metal/Metal.hpp` and `Foundation/Foundation.hpp`.
+The default vcpkg `metal` feature supplies Apple metal-cpp macOS 15/iOS 18
+headers and the upstream `spirv-cross` package. CMake resolves the exported
+`spirv_cross_core`, `spirv_cross_glsl` and `spirv_cross_msl` packages and links
+their imported targets; it does not derive include/library paths from Vulkan.
+CMake does not download dependencies. To use external dependencies, set
+`LONGMARCH_METAL_CPP_DIR` to the header root containing `Metal/Metal.hpp`, and
+`CMAKE_PREFIX_PATH` to an installed SPIRV-Cross prefix exporting those packages.
+Then disable the manifest `metal` feature if desired (see [Slang setup](slang-shaders.md)).
 
 ```sh
 cmake -S . -B build-metal -G Ninja \
@@ -110,7 +115,7 @@ and `scripts/profile_nbody.py`. The demo supports synchronized frame benchmarks,
 per-frame CPU/GPU timing CSVs, and deterministic particle-state readback.
 
 Set `LONGMARCH_METAL_SHADER_DUMP=/path/to/directory` to save generated MSL and
-an HLSL virtual-filesystem snapshot for debugging compiler failures. Native GPU
+a Slang virtual-filesystem snapshot for debugging compiler failures. Native GPU
 command errors are checked when waiting for completion.
 
 Frame profiling supports `--profile timings.csv --profile-cpu-only` on Metal.
@@ -145,3 +150,81 @@ be 1.0 and increase after EDR content starts presenting. Physical brightness
 also depends on the screen, its brightness setting, and macOS power/thermal
 management. An SDR-only screen cannot show highlights above its white level;
 ordinary SDR screenshots cannot establish physical HDR brightness.
+
+## PR #61 reference-white validation on macOS (2026-09-26)
+
+Validated `fix/sparkium-hdr-auto` based on `84d8fed` on Apple M5 with the built-in
+3024 × 1964 Liquid Retina XDR display. Ninja / Release builds of Sparkium GUI,
+Graphics Hello and `sparkium_fallback_test` passed. An existing external metal-cpp
+installation was selected explicitly; CMake did not download that SDK.
+
+With Metal API and shader validation enabled, four selected tests passed:
+`MetalWindowTest.HDRPresentationAndImGuiSwitching`,
+`MetalBackendTest.WindowCloseAfterPresent`,
+`SoftwareBVHTest.HDRFilmDevelopmentPreservesHighlightsAndAccumulation`, and
+`HDRSurfaceFormatTest.PreferredFormatWinsRegardlessOfEnumerationOrder`.
+`HDRBrightnessTest.RefreshNotifiesAndUnknownReferenceFallsBack` passed separately.
+
+The Metal window regression now also checks the PR's display-brightness API:
+reference white is known, native EDR reference-white scale remains 1 with automatic
+alignment both on and off, absolute SDR nits remain unknown, and reported headroom
+and HDR capability match the window's actual `NSScreen`. Repeated HDR/SDR switching,
+with and without ImGui, verifies RGBA16Float / BGRA8Unorm, extended linear sRGB /
+sRGB, and the layer's extended-dynamic-range flag.
+
+The live HDR gradient demo and Sparkium GUI both ran with Metal validation. The
+GUI used a temporary Cornell scene: 768 × 768, Auto pipeline, 1 sample/frame,
+8 bounces, max exposure 100. The committed scene was not modified. GUI logs show
+repeated HDR/SDR transitions and an active screen headroom of **12.34×**, with
+potential headroom **16×**; initial headroom was 1× before EDR activation settled.
+No Metal validation errors were found in these test/application logs.
+
+This establishes the Metal HDR configuration, display query and rendering path;
+it is not a physical peak-luminance measurement or proof from an SDR screenshot.
+Automated visual interaction through Computer Use remained unavailable in this
+session (`CUA_REPL_ENABLED_SURFACES is required`), including after a retry.
+
+Local build and logs: `out/pr61-metal/build`, `/tmp/pr61-metal-tests.log`,
+`/tmp/pr61-brightness-test.log`, `/tmp/pr61-gradient.log`, `/tmp/pr61-gui.log`.
+
+### HDR artistic grading
+
+HDR film development now retains exposure, artistic gamma and contrast. The
+legacy Filmic approximation matches the SDR curve up to scene-linear input 1,
+then continues along its tangent (matching value and first derivative) rather
+than clipping the highlights. Both paths share the Filmic grading operation;
+HDR omits its upper clamp and decodes the graded look back to linear sRGB for
+presentation. This is an extension of Sparkium's existing approximation, not
+Blender's full OCIO Filmic transform or a display-headroom-adaptive tone mapper.
+Standard and Normalized HDR previews also allow gamma/contrast; Normalized does
+not perform the SDR brightness normalization. SDR behavior remains unchanged.
+
+The GUI exposes these controls under View settings in HDR mode. GPU readback
+coverage checks Monster's gamma 1.15 / contrast 1.2, each control independently,
+SDR/HDR Filmic midtone agreement, continuity at the extension point, extended
+highlights, finite output under extreme grading, alpha and unchanged accumulation.
+Physical display appearance still requires visual review; these checks do not
+measure display luminance or establish an exact match to Blender.
+
+### Metal dependencies without Vulkan SDK discovery
+
+Metal now resolves SPIRV-Cross through its exported CMake packages, supplied by
+vcpkg's macOS `metal` feature or an external `CMAKE_PREFIX_PATH`. Neither
+`Vulkan_LIBRARY`, `Vulkan_INCLUDE_DIRS` nor `VULKAN_SDK` is used for Metal
+dependency discovery. Disabling the Vulkan backend also skips Vulkan discovery.
+Shared-shader DXIL tests run only when the D3D12 backend is built; a Metal-only
+build does not require a downstream DXC installation merely to run its tests.
+
+Validated on Apple M5/macOS 26.6.2 with upstream Slang 2026.18.2 and vcpkg
+SPIRV-Cross 1.4.341.0. A fresh build with Vulkan explicitly disabled succeeded.
+Configuration/build also succeeded with `VULKAN_SDK` removed from the environment,
+`LONGMARCH_DISABLE_VULKAN=OFF` and `CMAKE_DISABLE_FIND_PACKAGE_Vulkan=ON`, exercising
+normal optional-backend selection when Vulkan discovery is unavailable.
+The installed Vulkan SDK was not physically removed from this machine.
+
+Sparkium CLI/GUI and regression targets built. Metal regression passed **25**
+tests with **6 conditional skips** (desktop opt-ins / standalone RT parity).
+A native-query Monster smoke render completed at 96×96, 2 spp, 4 bounces.
+SPIRV-Cross package paths resolve inside the vcpkg install tree; the generated
+build contains no Vulkan SDK path and `otool -L` shows no Vulkan library in the
+GUI executable. This verifies dependency separation, not GUI visual quality.

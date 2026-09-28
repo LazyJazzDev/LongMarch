@@ -11,6 +11,8 @@ Camera::Camera(Core *core, const glm::mat4 &view, float fovy, float aspect)
       aspect(aspect) {
 }
 
+Camera::~Camera() = default;
+
 Core *Camera::GetCore() const {
   return core_;
 }

@@ -54,7 +54,10 @@ void NBodyCUDA::Run() {
     UpdateRenderAssets();
     OnRender();
     std::vector<uint8_t> color_buffer_(frame_image_->Extent().width * frame_image_->Extent().height * 4);
-    frame_image_->DownloadData(color_buffer_.data());
+    std::vector<float> encoded(color_buffer_.size());
+    frame_image_->DownloadData(encoded.data());
+    for (size_t i = 0; i < encoded.size(); ++i)
+      color_buffer_[i] = static_cast<uint8_t>(glm::clamp(encoded[i], 0.0f, 1.0f) * 255.0f + 0.5f);
     stbi_write_jpg("final_frame.jpg", frame_image_->Extent().width, frame_image_->Extent().height, 4,
                    color_buffer_.data(), 100);
     LogInfo("Frames per second: {:.2f}", fps_counter.GetFPS());
@@ -63,10 +66,10 @@ void NBodyCUDA::Run() {
     OnClose();
   } else {
     OnInit();
-    while (!glfwWindowShouldClose(window_->GLFWWindow())) {
+    while (!window_->ShouldClose()) {
       OnUpdate();
       OnRender();
-      glfwPollEvents();
+      grassland::graphics::Window::PollEvents();
     }
     core_->WaitGPU();
     OnClose();
@@ -75,9 +78,12 @@ void NBodyCUDA::Run() {
 
 void NBodyCUDA::OnInit() {
   if (!headless_) {
-    core_->CreateImage(window_->GetWidth(), window_->GetHeight(), graphics::IMAGE_FORMAT_R32G32B32A32_SFLOAT,
-                       &frame_image_);
-    window_->ResizeEvent().RegisterCallback([this](int width, int height) {
+    core_->CreateImage(window_->GetFramebufferSize().x, window_->GetFramebufferSize().y,
+                       graphics::IMAGE_FORMAT_R32G32B32A32_SFLOAT, &frame_image_);
+    window_->FramebufferResizeEvent().RegisterCallback([this](int width, int height) {
+      if (width <= 0 || height <= 0)
+        return;
+      core_->WaitGPU();
       frame_image_.reset();
       core_->CreateImage(width, height, graphics::IMAGE_FORMAT_R32G32B32A32_SFLOAT, &frame_image_);
       core_->CreateProgram({frame_image_->Format()}, graphics::IMAGE_FORMAT_UNDEFINED, &program_);
@@ -97,21 +103,22 @@ void NBodyCUDA::OnInit() {
     window_->MouseMoveEvent().RegisterCallback([this](double xpos, double ypos) {
       ImGui::SetCurrentContext(window_->GetImGuiContext());
 
-      static auto last_xpos = xpos;
-      static auto last_ypos = ypos;
-      if (glfwGetMouseButton(window_->GLFWWindow(), GLFW_MOUSE_BUTTON_LEFT) == GLFW_PRESS) {
-        auto diffx = xpos - last_xpos;
-        auto diffy = ypos - last_ypos;
+      if (!cursor_initialized_) {
+        last_cursor_ = {xpos, ypos};
+        cursor_initialized_ = true;
+      }
+      if (window_->IsMouseButtonDown(GLFW_MOUSE_BUTTON_LEFT)) {
+        auto diffx = xpos - last_cursor_.x;
+        auto diffy = ypos - last_cursor_.y;
         if (!ImGui::GetIO().WantCaptureMouse) {
           rotation = glm::rotate(glm::mat4{1.0f}, glm::radians(float(diffx)), glm::vec3{0.0f, 1.0f, 0.0f}) * rotation;
           rotation = glm::rotate(glm::mat4{1.0f}, glm::radians(float(diffy)), glm::vec3{1.0f, 0.0f, 0.0f}) * rotation;
         }
       }
-      last_xpos = xpos;
-      last_ypos = ypos;
+      last_cursor_ = {xpos, ypos};
     });
   } else {
-    core_->CreateImage(960, 640, graphics::IMAGE_FORMAT_R8G8B8A8_UNORM, &frame_image_);
+    core_->CreateImage(960, 640, graphics::IMAGE_FORMAT_R32G32B32A32_SFLOAT, &frame_image_);
   }
 
   LogInfo("Simulating {} particles...", n_particles_);
@@ -149,8 +156,8 @@ void NBodyCUDA::OnUpdate() {
   UpdateParticles();
 
   if (!headless_) {
-    UpdateRenderAssets();
     UpdateImGui();
+    UpdateRenderAssets();
     static FPSCounter fps_counter;
     window_->SetTitle("NBody CUDA FPS: " + std::to_string(fps_counter.TickFPS()));
   }
@@ -171,21 +178,22 @@ void NBodyCUDA::OnRender() {
   ctx->CmdBindResources(0, {global_uniform_buffer_.get()});
   ctx->CmdDraw(6, n_particles_, 0, 0);
   ctx->CmdEndRendering();
-  if (!headless_) {
+  {
     ctx->CmdBeginRendering({}, nullptr);
     ctx->CmdBindProgram(hdr_program_.get());
     ctx->CmdBindResources(0, {global_uniform_buffer_.get()});
     ctx->CmdBindResources(1, {frame_image_.get()});
     ctx->CmdDraw(6, 1, 0, 0);
     ctx->CmdEndRendering();
-    ctx->CmdPresent(window_.get(), frame_image_.get());
+    if (!headless_)
+      ctx->CmdPresent(window_.get(), frame_image_.get());
   }
   core_->SubmitCommandContext(ctx.get());
 }
 
 void NBodyCUDA::BuildRenderNode() {
-  core_->CreateShader(GetShaderVirtualFileSystem(), "shaders/particle.hlsl", "VSMain", "vs_6_0", &vertex_shader_);
-  core_->CreateShader(GetShaderVirtualFileSystem(), "shaders/particle.hlsl", "PSMain", "ps_6_0", &fragment_shader_);
+  core_->CreateShader(GetShaderVirtualFileSystem(), "shaders/particle.slang", "VSMain", "vs_6_0", &vertex_shader_);
+  core_->CreateShader(GetShaderVirtualFileSystem(), "shaders/particle.slang", "PSMain", "ps_6_0", &fragment_shader_);
   core_->CreateProgram({frame_image_->Format()}, graphics::IMAGE_FORMAT_UNDEFINED, &program_);
   program_->SetBlendState(0, graphics::BlendState(graphics::BLEND_FACTOR_ONE, graphics::BLEND_FACTOR_ONE,
                                                   graphics::BLEND_OP_ADD, graphics::BLEND_FACTOR_ONE,
@@ -197,9 +205,9 @@ void NBodyCUDA::BuildRenderNode() {
   program_->BindShader(fragment_shader_.get(), graphics::SHADER_TYPE_PIXEL);
   program_->Finalize();
 
-  if (!headless_) {
-    core_->CreateShader(GetShaderVirtualFileSystem(), "shaders/hdr.hlsl", "VSMain", "vs_6_0", &hdr_vertex_shader_);
-    core_->CreateShader(GetShaderVirtualFileSystem(), "shaders/hdr.hlsl", "PSMain", "ps_6_0", &hdr_fragment_shader_);
+  {
+    core_->CreateShader(GetShaderVirtualFileSystem(), "shaders/hdr.slang", "VSMain", "vs_6_0", &hdr_vertex_shader_);
+    core_->CreateShader(GetShaderVirtualFileSystem(), "shaders/hdr.slang", "PSMain", "ps_6_0", &hdr_fragment_shader_);
     core_->CreateProgram({}, graphics::IMAGE_FORMAT_UNDEFINED, &hdr_program_);
     hdr_program_->AddResourceBinding(graphics::RESOURCE_TYPE_UNIFORM_BUFFER, 1);
     hdr_program_->AddResourceBinding(graphics::RESOURCE_TYPE_WRITABLE_IMAGE, 1);
@@ -366,7 +374,9 @@ void NBodyCUDA::UpdateImGui() {
   ImGui::End();
   window_->EndImGuiFrame();
   if (trigger_hdr_switch) {
-    hdr_ = !hdr_;
-    window_->SetHDR(hdr_);
+    if (window_->SetHDR(!hdr_) == 0)
+      hdr_ = !hdr_;
+    else
+      LogWarning("HDR mode change unavailable; keeping the current presentation mode.");
   }
 }

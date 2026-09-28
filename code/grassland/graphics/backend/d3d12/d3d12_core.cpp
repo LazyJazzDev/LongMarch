@@ -12,6 +12,12 @@
 
 namespace grassland::graphics::backend {
 
+void D3D12Core::BindDescriptorHeaps(ID3D12GraphicsCommandList *commands) const {
+  ID3D12DescriptorHeap *heaps[] = {resource_descriptor_heaps_[current_frame_].Get(),
+                                   sampler_descriptor_heaps_[current_frame_].Get()};
+  commands->SetDescriptorHeaps(2, heaps);
+}
+
 namespace {
 #include "built_in_shaders.inl"
 
@@ -34,8 +40,8 @@ void ResetCommandRecord(ID3D12CommandAllocator *allocator, ID3D12GraphicsCommand
 
 void BlitPipeline::Initialize(ID3D12Device *device) {
   device_ = device;
-  vertex_shader = d3d12::CompileShader(GetShaderCode("shaders/d3d12/blit.hlsl"), "VSMain", "vs_6_0");
-  pixel_shader = d3d12::CompileShader(GetShaderCode("shaders/d3d12/blit.hlsl"), "PSMain", "ps_6_0");
+  vertex_shader = d3d12::CompileShader(GetShaderCode("shaders/d3d12/blit.slang"), "VSMain", "vs_6_0");
+  pixel_shader = d3d12::CompileShader(GetShaderCode("shaders/d3d12/blit.slang"), "PSMain", "ps_6_0");
 
   CD3DX12_DESCRIPTOR_RANGE1 range;
   range.Init(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 1, 0, 0);
@@ -156,8 +162,8 @@ int D3D12Core::CreateShader(const std::string &source_code,
                             const std::string &target,
                             double_ptr<Shader> pp_shader) {
   VirtualFileSystem vfs;
-  vfs.WriteFile("shader.hlsl", source_code);
-  return CreateShader(vfs, "shader.hlsl", entry_point, target, pp_shader);
+  vfs.WriteFile("shader.slang", source_code);
+  return CreateShader(vfs, "shader.slang", entry_point, target, pp_shader);
 }
 
 int D3D12Core::CreateShader(const VirtualFileSystem &vfs,
@@ -174,12 +180,11 @@ int D3D12Core::CreateShader(const VirtualFileSystem &vfs,
                             const std::string &target,
                             const std::vector<std::string> &args,
                             double_ptr<Shader> pp_shader) {
-  std::vector<std::string> compile_args = {"-Wno-ignored-attributes"};
-#if !defined(NDEBUG)
-  compile_args.push_back("-Qembed_debug");
-#endif
-  compile_args.insert(compile_args.end(), args.begin(), args.end());
-  pp_shader.construct<D3D12Shader>(this, CompileShader(vfs, source_file, entry_point, target, compile_args));
+  // Shared Slang compilation selects DXIL and configures debug information.
+  auto blob = CompileShader(vfs, source_file, entry_point, target, args);
+  if (blob.data.empty())
+    return -1;
+  pp_shader.construct<D3D12Shader>(this, blob);
   return 0;
 }
 
@@ -357,9 +362,7 @@ int D3D12Core::SubmitCommandContext(CommandContext *p_command_context) {
     device_.Get()->CreateDepthStencilView(resource, nullptr, dsv_handle);
   }
 
-  ID3D12DescriptorHeap *resource_heaps[] = {resource_descriptor_heaps_[current_frame_].Get(),
-                                            sampler_descriptor_heaps_[current_frame_].Get()};
-  command_list->SetDescriptorHeaps(2, resource_heaps);
+  BindDescriptorHeaps(command_list);
 
   for (auto &command : command_context->commands_) {
     command->CompileCommand(command_context, command_list);

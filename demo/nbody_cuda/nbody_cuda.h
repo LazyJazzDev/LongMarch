@@ -66,6 +66,8 @@ class NBodyCUDA {
   int n_particles_;
   std::mt19937 random_device_{uint32_t(std::time(nullptr))};
   glm::mat4 rotation{1.0f};
+  glm::dvec2 last_cursor_{0.0};
+  bool cursor_initialized_{false};
   bool hdr_{false};
   bool step_{true};
   float delta_t_{DELTA_T};

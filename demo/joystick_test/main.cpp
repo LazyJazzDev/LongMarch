@@ -58,7 +58,7 @@ int main() {
     core->CreateCommandContext(&command_context);
     command_context->CmdPresent(window.get(), color_image.get());
     core->SubmitCommandContext(command_context.get());
-    glfwPollEvents();
+    grassland::graphics::Window::PollEvents();
   }
 
   return 0;

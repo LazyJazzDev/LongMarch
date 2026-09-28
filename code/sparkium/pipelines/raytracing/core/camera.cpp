@@ -1,46 +1,41 @@
 #include "sparkium/pipelines/raytracing/core/camera.h"
 
-#include "sparkium/core/camera.h"
+#include <stdexcept>
+
+#include "sparkium/camera/cameras.h"
+#include "sparkium/pipelines/raytracing/camera/camera_pinhole.h"
+#include "sparkium/pipelines/raytracing/camera/camera_thin_lens.h"
 #include "sparkium/pipelines/raytracing/core/core.h"
 
 namespace sparkium::raytracing {
 
-Camera::Camera(sparkium::Camera &camera) : camera_(camera) {
-  core_ = DedicatedCast(camera_.GetCore());
-  if (core_->GraphicsCore()->DeviceRayTracingSupport())
-    core_->GraphicsCore()->CreateShader(core_->GetShadersVFS(), "camera.hlsl", "CameraPinhole", "lib_6_5",
-                                        &camera_shader_);
-  core_->GraphicsCore()->CreateBuffer(sizeof(CameraData), graphics::BUFFER_TYPE_STATIC, &camera_buffer_);
-  camera_data_.world_to_camera = camera_.view;
-  camera_data_.camera_to_world = glm::inverse(camera_.view);
-  camera_data_.scale = glm::vec2(camera_.aspect * tan(camera_.fovy * 0.5f), tan(camera_.fovy * 0.5f));
-  camera_data_.aperture_radius = camera_.aperture_radius;
-  camera_data_.focus_distance = camera_.focus_distance;
-  camera_data_.aperture_blades = camera_.aperture_blades;
-  camera_data_.aperture_rotation = camera_.aperture_rotation;
-  camera_data_.aperture_ratio = camera_.aperture_ratio;
-  camera_buffer_->UploadData(&camera_data_, sizeof(camera_data_));
+Camera::Camera(Core *core, const std::string &shader_file, const std::string &entry_point)
+    : core_(core),
+      shader_file_(shader_file),
+      entry_point_(entry_point) {
 }
 
-graphics::Shader *Camera::Shader() const {
+graphics::Shader *Camera::Shader() {
+  if (!camera_shader_ && core_->GraphicsCore()->DeviceRayTracingSupport()) {
+    if (core_->GraphicsCore()->CreateShader(core_->GetShadersVFS(), shader_file_, entry_point_, "lib_6_5",
+                                            &camera_shader_))
+      throw std::runtime_error("failed to compile camera shader");
+  }
   return camera_shader_.get();
 }
 
-graphics::Buffer *Camera::Buffer() {
-  camera_data_.world_to_camera = camera_.view;
-  camera_data_.camera_to_world = glm::inverse(camera_.view);
-  camera_data_.scale = glm::vec2(camera_.aspect * tan(camera_.fovy * 0.5f), tan(camera_.fovy * 0.5f));
-  camera_data_.aperture_radius = camera_.aperture_radius;
-  camera_data_.focus_distance = camera_.focus_distance;
-  camera_data_.aperture_blades = camera_.aperture_blades;
-  camera_data_.aperture_rotation = camera_.aperture_rotation;
-  camera_data_.aperture_ratio = camera_.aperture_ratio;
-  camera_buffer_->UploadData(&camera_data_, sizeof(camera_data_));
-  return camera_buffer_.get();
+const std::string &Camera::ShaderFile() const {
+  return shader_file_;
+}
+
+const std::string &Camera::EntryPoint() const {
+  return entry_point_;
 }
 
 Camera *DedicatedCast(sparkium::Camera *camera) {
-  COMPONENT_CAST(camera, Camera);
+  DEDICATED_CAST(camera, sparkium::CameraPinhole, CameraPinhole);
+  DEDICATED_CAST(camera, sparkium::CameraThinLens, CameraThinLens);
+  throw std::invalid_argument("unsupported ray tracing camera model");
 }
 
 }  // namespace sparkium::raytracing

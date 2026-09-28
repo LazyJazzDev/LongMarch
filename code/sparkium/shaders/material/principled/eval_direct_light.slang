@@ -1,0 +1,9 @@
+#pragma once
+
+__generic<BufferType : IBufferReader> float3
+MaterialPrincipledEvaluateDirectLighting(BufferType material_data,
+                                         float3 position,
+                                         GeometryPrimitiveSample primitive_sample) {
+  float4 emission = LoadFloat4(material_data, 92);
+  return emission.xyz * emission.w;  // Scale by the emission intensity
+}

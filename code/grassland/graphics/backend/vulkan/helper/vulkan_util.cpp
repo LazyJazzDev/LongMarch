@@ -254,7 +254,7 @@ void ThrowError(const std::string &message) {
 
 void ThrowIfFailed(VkResult result, const std::string &message) {
   if (result != VK_SUCCESS) {
-    ThrowError(message);
+    ThrowError(message + " (VkResult " + std::to_string(result) + ")");
   }
 }
 

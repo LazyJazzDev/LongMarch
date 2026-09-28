@@ -18,6 +18,7 @@ D3D12Window::D3D12Window(D3D12Core *core,
     core_->WaitGPU();
     RecreateSwapChain();
     if (imgui_assets_.context && imgui_assets_.rtv_format != BackBufferFormat()) {
+      ImGui::SetCurrentContext(imgui_assets_.context);
       ImGui_ImplDX12_Shutdown();
       ImGui_ImplGlfw_Shutdown();
 

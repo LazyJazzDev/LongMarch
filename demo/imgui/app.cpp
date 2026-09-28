@@ -21,8 +21,8 @@ void Application::OnInit() {
       ((core_->API() == grassland::graphics::BACKEND_API_VULKAN) ? "[Vulkan]" : "[D3D12]") + std::string(" ImGui Demo"),
       false, true, &window_);
   window_->InitImGui();
-  core_->CreateImage(window_->GetWidth(), window_->GetHeight(), grassland::graphics::IMAGE_FORMAT_R8G8B8A8_UNORM,
-                     &frame_image_);
+  core_->CreateImage(window_->GetFramebufferSize().x, window_->GetFramebufferSize().y,
+                     grassland::graphics::IMAGE_FORMAT_R8G8B8A8_UNORM, &frame_image_);
 }
 
 void Application::OnClose() {
