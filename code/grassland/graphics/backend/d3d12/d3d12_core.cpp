@@ -76,11 +76,38 @@ ID3D12PipelineState *BlitPipeline::GetPipelineState(DXGI_FORMAT format) {
 }
 
 D3D12Core::D3D12Core(const Settings &settings) : Core(settings) {
-  d3d12::DXGIFactoryCreateHint hint{DebugEnabled()};
-  d3d12::CreateDXGIFactory(hint, &dxgi_factory_);
+  UINT flags = 0;
+  if (DebugEnabled()) {
+    Microsoft::WRL::ComPtr<ID3D12Debug> debug;
+    if (SUCCEEDED(D3D12GetDebugInterface(IID_PPV_ARGS(debug.GetAddressOf())))) {
+      debug->EnableDebugLayer();
+      flags = DXGI_CREATE_FACTORY_DEBUG;
+    }
+  }
+  d3d12::ThrowIfFailed(CreateDXGIFactory2(flags, IID_PPV_ARGS(dxgi_factory_.GetAddressOf())),
+                       "Failed to create DXGI factory");
 }
 
 D3D12Core::~D3D12Core() {
+  if (fence_event_) {
+    CloseHandle(fence_event_);
+  }
+}
+
+void D3D12Core::SignalFence(ID3D12CommandQueue *queue) {
+  ++fence_value_;
+  d3d12::ThrowIfFailed(queue->Signal(fence_.Get(), fence_value_), "Failed to signal fence");
+}
+
+void D3D12Core::QueueWaitFence(ID3D12CommandQueue *queue) {
+  d3d12::ThrowIfFailed(queue->Wait(fence_.Get(), fence_value_), "Failed to wait for fence on queue");
+}
+
+void D3D12Core::WaitForFence(uint64_t value) {
+  if (fence_->GetCompletedValue() < value) {
+    d3d12::ThrowIfFailed(fence_->SetEventOnCompletion(value, fence_event_), "Failed to set fence event");
+    WaitForSingleObject(fence_event_, INFINITE);
+  }
 }
 
 int D3D12Core::CreateBuffer(size_t size, BufferType type, double_ptr<Buffer> pp_buffer) {
@@ -184,8 +211,7 @@ int D3D12Core::CreateBottomLevelAccelerationStructure(BufferRange aabb_buffer,
   std::unique_ptr<d3d12::AccelerationStructure> blas;
   device_->CreateBottomLevelAccelerationStructure(
       d3d12_aabb_buffer->InstantBuffer()->GetGPUVirtualAddress() + aabb_buffer.offset, stride, num_aabb,
-      static_cast<D3D12_RAYTRACING_GEOMETRY_FLAGS>(flags), command_queue_.get(), fence_.get(),
-      single_time_allocator_.Get(), &blas);
+      static_cast<D3D12_RAYTRACING_GEOMETRY_FLAGS>(flags), command_queue_.Get(), single_time_allocator_.Get(), &blas);
 
   pp_blas.construct<D3D12AccelerationStructure>(this, std::move(blas));
 
@@ -209,7 +235,7 @@ int D3D12Core::CreateBottomLevelAccelerationStructure(BufferRange vertex_buffer,
   device_->CreateBottomLevelAccelerationStructure(
       d3d12_vertex_buffer->InstantBuffer()->GetGPUVirtualAddress() + vertex_buffer.offset,
       d3d12_index_buffer->InstantBuffer()->GetGPUVirtualAddress() + index_buffer.offset, num_vertex, stride,
-      num_primitive, static_cast<D3D12_RAYTRACING_GEOMETRY_FLAGS>(flags), command_queue_.get(), fence_.get(),
+      num_primitive, static_cast<D3D12_RAYTRACING_GEOMETRY_FLAGS>(flags), command_queue_.Get(),
       single_time_allocator_.Get(), &blas);
 
   pp_blas.construct<D3D12AccelerationStructure>(this, std::move(blas));
@@ -236,8 +262,8 @@ int D3D12Core::CreateTopLevelAccelerationStructure(const std::vector<RayTracingI
   }
 
   std::unique_ptr<d3d12::AccelerationStructure> tlas;
-  device_->CreateTopLevelAccelerationStructure(d3d12_instances, command_queue_.get(), fence_.get(),
-                                               single_time_allocator_.Get(), &tlas);
+  device_->CreateTopLevelAccelerationStructure(d3d12_instances, command_queue_.Get(), single_time_allocator_.Get(),
+                                               &tlas);
 
   pp_tlas.construct<D3D12AccelerationStructure>(this, std::move(tlas));
 
@@ -262,10 +288,10 @@ int D3D12Core::SubmitCommandContext(CommandContext *p_command_context) {
 
     ID3D12CommandList *command_lists[] = {transfer_command_list_.Get()};
 
-    fence_->Wait(transfer_command_queue_.get());
-    transfer_command_queue_->Handle()->ExecuteCommandLists(1, command_lists);
-    fence_->Signal(transfer_command_queue_.get());
-    transfer_wait_value = fence_->Value();
+    QueueWaitFence(transfer_command_queue_.Get());
+    transfer_command_queue_.Get()->ExecuteCommandLists(1, command_lists);
+    SignalFence(transfer_command_queue_.Get());
+    transfer_wait_value = fence_value_;
   }
 
   ResetCommandRecord(command_allocators_[current_frame_].Get(), command_lists_[current_frame_].Get());
@@ -352,20 +378,20 @@ int D3D12Core::SubmitCommandContext(CommandContext *p_command_context) {
   command_context->rtv_index_.clear();
 
   ID3D12CommandList *command_lists[] = {command_list};
-  fence_->Wait(command_queue_.get());
-  command_queue_->Handle()->ExecuteCommandLists(1, command_lists);
+  QueueWaitFence(command_queue_.Get());
+  command_queue_.Get()->ExecuteCommandLists(1, command_lists);
 
   for (auto window : command_context->windows_) {
     window->SwapChain()->Present(0, 0);
   }
 
-  fence_->Signal(command_queue_.get());
-  in_flight_values_[current_frame_] = fence_->Value();
+  SignalFence(command_queue_.Get());
+  in_flight_values_[current_frame_] = fence_value_;
 
   post_execute_functions_[current_frame_] = p_command_context->GetPostExecutionCallbacks();
 
   current_frame_ = (current_frame_ + 1) % FramesInFlight();
-  fence_->WaitFor(std::max(in_flight_values_[current_frame_], transfer_wait_value));
+  WaitForFence(std::max(in_flight_values_[current_frame_], transfer_wait_value));
 
   for (auto &function : post_execute_functions_[current_frame_]) {
     function();
@@ -376,21 +402,21 @@ int D3D12Core::SubmitCommandContext(CommandContext *p_command_context) {
 }
 
 int D3D12Core::GetPhysicalDeviceProperties(PhysicalDeviceProperties *p_physical_device_properties) {
-  auto adapters = dxgi_factory_->EnumerateAdapters();
+  auto adapters = EnumerateNativeAdapters(dxgi_factory_.Get());
   if (adapters.empty()) {
     return 0;
   }
 
   if (p_physical_device_properties) {
     for (int i = 0; i < adapters.size(); ++i) {
-      auto adapter = adapters[i];
+      auto adapter = adapters[i].Get();
       PhysicalDeviceProperties properties{};
-      properties.name = adapter.Name();
-      properties.score = adapter.Evaluate();
-      properties.ray_tracing_support = adapter.SupportRayTracing();
+      properties.name = NativeAdapterName(adapter);
+      properties.score = NativeAdapterScore(adapter);
+      properties.ray_tracing_support = NativeAdapterSupportsRayTracing(adapter);
       properties.geometry_shader_support = true;
 #if defined(LONGMARCH_CUDA_RUNTIME)
-      properties.cuda_device_index = adapter.CUDADeviceIndex();
+      properties.cuda_device_index = NativeAdapterCUDADeviceIndex(adapter);
 #endif
       p_physical_device_properties[i] = properties;
     }
@@ -400,19 +426,43 @@ int D3D12Core::GetPhysicalDeviceProperties(PhysicalDeviceProperties *p_physical_
 }
 
 int D3D12Core::InitializeLogicalDevice(int device_index) {
-  auto adapters = dxgi_factory_->EnumerateAdapters();
+  auto adapters = EnumerateNativeAdapters(dxgi_factory_.Get());
 
   if (device_index < 0 || device_index >= adapters.size()) {
     return -1;
   }
 
-  dxgi_factory_->CreateDevice(d3d12::DeviceFeatureRequirement{adapters[device_index].SupportRayTracing()}, device_index,
-                              &device_);
+  adapter_ = adapters[device_index];
+  Microsoft::WRL::ComPtr<ID3D12Device> native_device;
+  d3d12::ThrowIfFailed(
+      D3D12CreateDevice(adapter_.Get(), D3D_FEATURE_LEVEL_11_0, IID_PPV_ARGS(native_device.GetAddressOf())),
+      "Failed to create D3D12 device");
+  D3D12_FEATURE_DATA_FEATURE_LEVELS feature_levels{};
+  const D3D_FEATURE_LEVEL requested_levels[] = {D3D_FEATURE_LEVEL_12_1, D3D_FEATURE_LEVEL_12_0, D3D_FEATURE_LEVEL_11_1,
+                                                D3D_FEATURE_LEVEL_11_0};
+  feature_levels.NumFeatureLevels = _countof(requested_levels);
+  feature_levels.pFeatureLevelsRequested = requested_levels;
+  feature_levels.MaxSupportedFeatureLevel = D3D_FEATURE_LEVEL_11_0;
+  if (FAILED(
+          native_device->CheckFeatureSupport(D3D12_FEATURE_FEATURE_LEVELS, &feature_levels, sizeof(feature_levels)))) {
+    feature_levels.MaxSupportedFeatureLevel = D3D_FEATURE_LEVEL_11_0;
+  }
+  if (DebugEnabled()) {
+    Microsoft::WRL::ComPtr<ID3D12InfoQueue> info_queue;
+    if (SUCCEEDED(native_device.As(&info_queue))) {
+      info_queue->SetBreakOnSeverity(D3D12_MESSAGE_SEVERITY_CORRUPTION, true);
+      info_queue->SetBreakOnSeverity(D3D12_MESSAGE_SEVERITY_ERROR, true);
+    }
+  }
+  device_ = std::make_unique<d3d12::Device>(adapter_.Get(), feature_levels.MaxSupportedFeatureLevel, native_device);
 
-  device_name_ = adapters[device_index].Name();
-  ray_tracing_support_ = adapters[device_index].SupportRayTracing();
+  device_name_ = NativeAdapterName(adapter_.Get());
+  ray_tracing_support_ = NativeAdapterSupportsRayTracing(adapter_.Get());
 
-  device_->CreateCommandQueue(D3D12_COMMAND_LIST_TYPE_DIRECT, &command_queue_);
+  D3D12_COMMAND_QUEUE_DESC queue_desc{};
+  queue_desc.Type = D3D12_COMMAND_LIST_TYPE_DIRECT;
+  d3d12::ThrowIfFailed(device_->Handle()->CreateCommandQueue(&queue_desc, IID_PPV_ARGS(command_queue_.GetAddressOf())),
+                       "Failed to create graphics queue");
   command_allocators_.resize(FramesInFlight());
   command_lists_.resize(FramesInFlight());
   resource_descriptor_heaps_.resize(FramesInFlight());
@@ -432,26 +482,29 @@ int D3D12Core::InitializeLogicalDevice(int device_index) {
   CreateCommandRecord(device_->Handle(), D3D12_COMMAND_LIST_TYPE_DIRECT, single_time_allocator_,
                       single_time_command_list_);
 
-  device_->CreateCommandQueue(D3D12_COMMAND_LIST_TYPE_DIRECT, &transfer_command_queue_);
+  d3d12::ThrowIfFailed(
+      device_->Handle()->CreateCommandQueue(&queue_desc, IID_PPV_ARGS(transfer_command_queue_.GetAddressOf())),
+      "Failed to create transfer queue");
   CreateCommandRecord(device_->Handle(), D3D12_COMMAND_LIST_TYPE_DIRECT, transfer_allocator_, transfer_command_list_);
 
   blit_pipeline_.Initialize(device_.get());
 
 #if defined(LONGMARCH_CUDA_RUNTIME)
-  cuda_device_ = device_->Adapter().CUDADeviceIndex();
+  cuda_device_ = NativeAdapterCUDADeviceIndex(adapter_.Get());
   cudaDeviceProp device_prop{};
   cudaGetDeviceProperties(&device_prop, device_index);
   cuda_device_node_mask_ = device_prop.luidDeviceNodeMask;
 
   if (cuda_device_ >= 0) {
-    device_->CreateFence(D3D12_FENCE_FLAG_SHARED, &fence_);
+    d3d12::ThrowIfFailed(
+        device_->Handle()->CreateFence(1, D3D12_FENCE_FLAG_SHARED, IID_PPV_ARGS(fence_.GetAddressOf())),
+        "Failed to create shared fence");
     cudaExternalSemaphoreHandleDesc externalSemaphoreHandleDesc{};
     WindowsSecurityAttributes windowsSecurityAttributes;
     LPCWSTR name = nullptr;
     HANDLE sharedHandle;
     externalSemaphoreHandleDesc.type = cudaExternalSemaphoreHandleTypeD3D12Fence;
-    device_->Handle()->CreateSharedHandle(fence_->Handle(), &windowsSecurityAttributes, GENERIC_ALL, name,
-                                          &sharedHandle);
+    device_->Handle()->CreateSharedHandle(fence_.Get(), &windowsSecurityAttributes, GENERIC_ALL, name, &sharedHandle);
     externalSemaphoreHandleDesc.handle.win32.handle = (void *)sharedHandle;
     externalSemaphoreHandleDesc.flags = 0;
 
@@ -463,7 +516,12 @@ int D3D12Core::InitializeLogicalDevice(int device_index) {
   } else
 #endif
   {
-    device_->CreateFence(D3D12_FENCE_FLAG_NONE, &fence_);
+    d3d12::ThrowIfFailed(device_->Handle()->CreateFence(1, D3D12_FENCE_FLAG_NONE, IID_PPV_ARGS(fence_.GetAddressOf())),
+                         "Failed to create fence");
+  }
+  fence_event_ = CreateEvent(nullptr, FALSE, FALSE, nullptr);
+  if (!fence_event_) {
+    throw std::runtime_error("Failed to create fence event");
   }
   in_flight_values_.resize(FramesInFlight(), 0);
 
@@ -471,7 +529,7 @@ int D3D12Core::InitializeLogicalDevice(int device_index) {
 }
 
 void D3D12Core::WaitGPU() {
-  fence_->Wait();
+  WaitForFence(fence_value_);
   for (auto &post_execute : post_execute_functions_) {
     for (auto &callback : post_execute) {
       callback();
@@ -502,10 +560,10 @@ void D3D12Core::SingleTimeCommand(std::function<void(ID3D12GraphicsCommandList *
   single_time_command_list_->Close();
 
   ID3D12CommandList *command_lists[] = {single_time_command_list_.Get()};
-  fence_->Wait(command_queue_.get());
-  command_queue_->Handle()->ExecuteCommandLists(1, command_lists);
-  fence_->Signal(command_queue_.get());
-  fence_->Wait();
+  QueueWaitFence(command_queue_.Get());
+  command_queue_.Get()->ExecuteCommandLists(1, command_lists);
+  SignalFence(command_queue_.Get());
+  WaitForFence(fence_value_);
 }
 
 ID3D12Resource *D3D12Core::RequestUploadStagingBuffer(size_t size) {
@@ -560,7 +618,7 @@ void D3D12Core::CUDABeginExecutionBarrier(cudaStream_t stream) {
 
   cudaExternalSemaphoreWaitParams wait_params = {};
   wait_params.flags = 0;
-  wait_params.params.fence.value = fence_->Value();
+  wait_params.params.fence.value = fence_value_;
 
   cudaWaitExternalSemaphoresAsync(&cuda_semaphore_, &wait_params, 1, stream);
 }
@@ -570,13 +628,13 @@ void D3D12Core::CUDAEndExecutionBarrier(cudaStream_t stream) {
     throw std::runtime_error("Not CUDA device!");
   }
 
-  auto cuda_synchronization_value_ = fence_->Value();
+  auto cuda_synchronization_value_ = fence_value_;
   cuda_synchronization_value_++;
   cudaExternalSemaphoreSignalParams signal_params = {};
   signal_params.flags = 0;
   signal_params.params.fence.value = cuda_synchronization_value_;
   cudaSignalExternalSemaphoresAsync(&cuda_semaphore_, &signal_params, 1, stream);
-  fence_->ExternalSignalUpdateValue(cuda_synchronization_value_);
+  fence_value_ = cuda_synchronization_value_;
 }
 #endif
 

@@ -107,16 +107,16 @@ class D3D12Core : public Core {
 
   uint32_t WaveSize() const override;
 
-  d3d12::DXGIFactory *DXGIFactory() const {
-    return dxgi_factory_.get();
+  IDXGIFactory4 *DXGIFactory() const {
+    return dxgi_factory_.Get();
   }
 
   d3d12::Device *Device() const {
     return device_.get();
   }
 
-  d3d12::CommandQueue *CommandQueue() const {
-    return command_queue_.get();
+  ID3D12CommandQueue *CommandQueue() const {
+    return command_queue_.Get();
   }
 
   ID3D12GraphicsCommandList *CommandList() const {
@@ -127,8 +127,8 @@ class D3D12Core : public Core {
     return command_allocators_[current_frame_].Get();
   }
 
-  d3d12::Fence *Fence() const {
-    return fence_.get();
+  ID3D12Fence *Fence() const {
+    return fence_.Get();
   }
 
   ID3D12CommandAllocator *SingleTimeCommandAllocator() const {
@@ -158,17 +158,23 @@ class D3D12Core : public Core {
 #endif
 
  private:
-  std::unique_ptr<d3d12::DXGIFactory> dxgi_factory_;
+  Microsoft::WRL::ComPtr<IDXGIFactory4> dxgi_factory_;
+  Microsoft::WRL::ComPtr<IDXGIAdapter1> adapter_;
   std::unique_ptr<d3d12::Device> device_;
 
   struct BlitPipeline blit_pipeline_;
 
-  std::unique_ptr<d3d12::CommandQueue> command_queue_;
-  std::unique_ptr<d3d12::CommandQueue> transfer_command_queue_;
+  Microsoft::WRL::ComPtr<ID3D12CommandQueue> command_queue_;
+  Microsoft::WRL::ComPtr<ID3D12CommandQueue> transfer_command_queue_;
   std::vector<Microsoft::WRL::ComPtr<ID3D12CommandAllocator>> command_allocators_;
   std::vector<Microsoft::WRL::ComPtr<ID3D12GraphicsCommandList>> command_lists_;
 
-  std::unique_ptr<d3d12::Fence> fence_;
+  Microsoft::WRL::ComPtr<ID3D12Fence> fence_;
+  uint64_t fence_value_{1};
+  HANDLE fence_event_{nullptr};
+  void SignalFence(ID3D12CommandQueue *queue);
+  void QueueWaitFence(ID3D12CommandQueue *queue);
+  void WaitForFence(uint64_t value);
   std::vector<uint64_t> in_flight_values_;
 
   Microsoft::WRL::ComPtr<ID3D12CommandAllocator> single_time_allocator_;

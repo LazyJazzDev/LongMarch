@@ -11,8 +11,7 @@ AccelerationStructure::AccelerationStructure(Device *device, const ComPtr<ID3D12
 }
 
 HRESULT AccelerationStructure::UpdateInstances(const std::vector<D3D12_RAYTRACING_INSTANCE_DESC> &instances,
-                                               CommandQueue *queue,
-                                               Fence *fence,
+                                               ID3D12CommandQueue *queue,
                                                ID3D12CommandAllocator *allocator) {
   ID3D12Device5 *device = device_->DXRDevice();
   RETURN_IF_FAILED_HR(as_->GetDevice(IID_PPV_ARGS(&device)), "failed to get DXR device.");
@@ -61,7 +60,7 @@ HRESULT AccelerationStructure::UpdateInstances(const std::vector<D3D12_RAYTRACIN
     num_instance_ = instances.size();
   }
 
-  queue->SingleTimeCommand(fence, allocator, [&](ID3D12GraphicsCommandList *command_list) {
+  SingleTimeCommand(queue, allocator, [&](ID3D12GraphicsCommandList *command_list) {
     ComPtr<ID3D12GraphicsCommandList4> command_list4;
     if (SUCCEEDED(command_list->QueryInterface(IID_PPV_ARGS(&command_list4)))) {
       command_list4->BuildRaytracingAccelerationStructure(&as_desc, 0, nullptr);
@@ -73,8 +72,7 @@ HRESULT AccelerationStructure::UpdateInstances(const std::vector<D3D12_RAYTRACIN
 
 HRESULT AccelerationStructure::UpdateInstances(
     const std::vector<std::pair<AccelerationStructure *, glm::mat4>> &objects,
-    CommandQueue *queue,
-    Fence *fence,
+    ID3D12CommandQueue *queue,
     ID3D12CommandAllocator *allocator) {
   ID3D12Device5 *device = device_->DXRDevice();
   RETURN_IF_FAILED_HR(as_->GetDevice(IID_PPV_ARGS(&device)), "failed to get DXR device.");
@@ -104,7 +102,7 @@ HRESULT AccelerationStructure::UpdateInstances(
     instance_descs.push_back(instance_desc);
   }
 
-  return UpdateInstances(instance_descs, queue, fence, allocator);
+  return UpdateInstances(instance_descs, queue, allocator);
 }
 
 }  // namespace grassland::graphics::backend::d3d12

@@ -1,62 +1,33 @@
 #include "grassland/graphics/backend/d3d12/helper/command_queue.h"
 
-#include "grassland/graphics/backend/d3d12/helper/fence.h"
-
 namespace grassland::graphics::backend::d3d12 {
-
-CommandQueue::CommandQueue(const ComPtr<ID3D12CommandQueue> &command_queue) : command_queue_(command_queue) {
-}
-
-HRESULT CommandQueue::SingleTimeCommand(Fence *fence,
-                                        ID3D12CommandAllocator *command_allocator,
-                                        const std::function<void(ID3D12GraphicsCommandList *)> &function) {
+HRESULT SingleTimeCommand(ID3D12CommandQueue *queue,
+                          ID3D12CommandAllocator *allocator,
+                          const std::function<void(ID3D12GraphicsCommandList *)> &function) {
   ComPtr<ID3D12Device> device;
-  RETURN_IF_FAILED_HR(command_queue_->GetDevice(IID_PPV_ARGS(&device)), "failed to get device.");
-
-  RETURN_IF_FAILED_HR(command_allocator->Reset(), "failed to reset command allocator.");
-
-  ComPtr<ID3D12GraphicsCommandList> command_list;
-  RETURN_IF_FAILED_HR(device->CreateCommandList(0, D3D12_COMMAND_LIST_TYPE_DIRECT, command_allocator, nullptr,
-                                                IID_PPV_ARGS(&command_list)),
-                      "failed to create command list.");
-
-  function(command_list.Get());
-
-  command_list->Close();
-
-  ID3D12CommandList *command_lists[] = {command_list.Get()};
-
-  command_queue_->ExecuteCommandLists(1, command_lists);
-
-  RETURN_IF_FAILED_HR(fence->Signal(this), "failed to signal fence.");
-
-  fence->Wait();
-
-  return S_OK;
-}
-
-HRESULT CommandQueue::SingleTimeCommand(Fence *fence,
-                                        const std::function<void(ID3D12GraphicsCommandList *)> &function) {
-  ComPtr<ID3D12Device> device;
-  RETURN_IF_FAILED_HR(command_queue_->GetDevice(IID_PPV_ARGS(&device)), "failed to get device.");
-
-  ComPtr<ID3D12CommandAllocator> command_allocator;
-  RETURN_IF_FAILED_HR(device->CreateCommandAllocator(D3D12_COMMAND_LIST_TYPE_DIRECT, IID_PPV_ARGS(&command_allocator)),
-                      "failed to create command allocator.");
-
-  return SingleTimeCommand(fence, command_allocator.Get(), function);
-}
-
-HRESULT CommandQueue::SingleTimeCommand(const std::function<void(ID3D12GraphicsCommandList *)> &function) {
-  ComPtr<ID3D12Device> device;
-  RETURN_IF_FAILED_HR(command_queue_->GetDevice(IID_PPV_ARGS(&device)), "failed to get device.");
-
+  RETURN_IF_FAILED_HR(queue->GetDevice(IID_PPV_ARGS(device.GetAddressOf())), "Failed to get queue device");
+  RETURN_IF_FAILED_HR(allocator->Reset(), "Failed to reset command allocator");
+  ComPtr<ID3D12GraphicsCommandList> list;
+  RETURN_IF_FAILED_HR(device->CreateCommandList(0, D3D12_COMMAND_LIST_TYPE_DIRECT, allocator, nullptr,
+                                                IID_PPV_ARGS(list.GetAddressOf())),
+                      "Failed to create command list");
+  function(list.Get());
+  RETURN_IF_FAILED_HR(list->Close(), "Failed to close command list");
+  ID3D12CommandList *lists[] = {list.Get()};
+  queue->ExecuteCommandLists(1, lists);
   ComPtr<ID3D12Fence> fence;
-  RETURN_IF_FAILED_HR(device->CreateFence(0, D3D12_FENCE_FLAG_NONE, IID_PPV_ARGS(&fence)), "failed to create fence.");
-
-  Fence fence_wrapper(fence);
-
-  return SingleTimeCommand(&fence_wrapper, function);
+  RETURN_IF_FAILED_HR(device->CreateFence(0, D3D12_FENCE_FLAG_NONE, IID_PPV_ARGS(fence.GetAddressOf())),
+                      "Failed to create command fence");
+  RETURN_IF_FAILED_HR(queue->Signal(fence.Get(), 1), "Failed to signal command fence");
+  HANDLE event = CreateEvent(nullptr, FALSE, FALSE, nullptr);
+  if (!event) {
+    return HRESULT_FROM_WIN32(GetLastError());
+  }
+  HRESULT result = fence->SetEventOnCompletion(1, event);
+  if (SUCCEEDED(result)) {
+    WaitForSingleObject(event, INFINITE);
+  }
+  CloseHandle(event);
+  return result;
 }
-
 }  // namespace grassland::graphics::backend::d3d12

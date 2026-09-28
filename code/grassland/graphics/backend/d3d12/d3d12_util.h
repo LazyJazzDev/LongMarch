@@ -32,6 +32,14 @@ Microsoft::WRL::ComPtr<IDXGISwapChain3> CreateNativeSwapChain(IDXGIFactory4 *fac
                                                               uint32_t buffer_count,
                                                               DXGI_FORMAT format);
 
+std::vector<Microsoft::WRL::ComPtr<IDXGIAdapter1>> EnumerateNativeAdapters(IDXGIFactory4 *factory);
+std::string NativeAdapterName(IDXGIAdapter1 *adapter);
+bool NativeAdapterSupportsRayTracing(IDXGIAdapter1 *adapter);
+uint64_t NativeAdapterScore(IDXGIAdapter1 *adapter);
+#if defined(LONGMARCH_CUDA_RUNTIME)
+int NativeAdapterCUDADeviceIndex(IDXGIAdapter1 *adapter);
+#endif
+
 DXGI_FORMAT ImageFormatToDXGIFormat(ImageFormat format);
 
 DXGI_FORMAT InputTypeToDXGIFormat(InputType type);

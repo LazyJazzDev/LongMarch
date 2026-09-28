@@ -68,13 +68,9 @@ size_t SizeAlignTo(size_t size, size_t alignment);
 
 struct DeviceFeatureRequirement;
 
-class DXGIFactory;
-class Adapter;
 class Device;
-class CommandQueue;
 class Buffer;
 class Image;
-class Fence;
 class AccelerationStructure;
 class RayTracingPipeline;
 class ShaderTable;

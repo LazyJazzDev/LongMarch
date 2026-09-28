@@ -80,6 +80,65 @@ Microsoft::WRL::ComPtr<IDXGISwapChain3> CreateNativeSwapChain(IDXGIFactory4 *fac
   return swap_chain;
 }
 
+std::vector<Microsoft::WRL::ComPtr<IDXGIAdapter1>> EnumerateNativeAdapters(IDXGIFactory4 *factory) {
+  std::vector<Microsoft::WRL::ComPtr<IDXGIAdapter1>> adapters;
+  for (UINT index = 0;; ++index) {
+    Microsoft::WRL::ComPtr<IDXGIAdapter1> adapter;
+    if (factory->EnumAdapters1(index, adapter.GetAddressOf()) == DXGI_ERROR_NOT_FOUND) {
+      break;
+    }
+    DXGI_ADAPTER_DESC1 desc{};
+    adapter->GetDesc1(&desc);
+    if (!(desc.Flags & DXGI_ADAPTER_FLAG_SOFTWARE)) {
+      adapters.push_back(std::move(adapter));
+    }
+  }
+  return adapters;
+}
+
+std::string NativeAdapterName(IDXGIAdapter1 *adapter) {
+  DXGI_ADAPTER_DESC1 desc{};
+  adapter->GetDesc1(&desc);
+  return WStringToString(desc.Description);
+}
+
+bool NativeAdapterSupportsRayTracing(IDXGIAdapter1 *adapter) {
+  Microsoft::WRL::ComPtr<ID3D12Device5> device;
+  if (FAILED(D3D12CreateDevice(adapter, D3D_FEATURE_LEVEL_12_0, IID_PPV_ARGS(device.GetAddressOf())))) {
+    return false;
+  }
+  D3D12_FEATURE_DATA_D3D12_OPTIONS5 options{};
+  return SUCCEEDED(device->CheckFeatureSupport(D3D12_FEATURE_D3D12_OPTIONS5, &options, sizeof(options))) &&
+         options.RaytracingTier >= D3D12_RAYTRACING_TIER_1_1;
+}
+
+uint64_t NativeAdapterScore(IDXGIAdapter1 *adapter) {
+  DXGI_ADAPTER_DESC1 desc{};
+  adapter->GetDesc1(&desc);
+  uint64_t score = desc.DedicatedVideoMemory / 1024 / 1024;
+  if (NativeAdapterSupportsRayTracing(adapter)) {
+    score += 100000;
+  }
+  return score;
+}
+
+#if defined(LONGMARCH_CUDA_RUNTIME)
+int NativeAdapterCUDADeviceIndex(IDXGIAdapter1 *adapter) {
+  DXGI_ADAPTER_DESC1 desc{};
+  adapter->GetDesc1(&desc);
+  int count = 0;
+  cudaGetDeviceCount(&count);
+  for (int index = 0; index < count; ++index) {
+    cudaDeviceProp properties{};
+    cudaGetDeviceProperties(&properties, index);
+    if (std::memcmp(&properties.luid, &desc.AdapterLuid, sizeof(LUID)) == 0) {
+      return index;
+    }
+  }
+  return -1;
+}
+#endif
+
 Microsoft::WRL::ComPtr<ID3D12DescriptorHeap> CreateNativeDescriptorHeap(ID3D12Device *device,
                                                                         D3D12_DESCRIPTOR_HEAP_TYPE type,
                                                                         uint32_t count) {

@@ -2,6 +2,33 @@
 
 namespace grassland::graphics::backend::d3d12 {
 
+namespace {
+std::string error_message;
+}
+
+void ThrowError(const std::string &message) {
+  throw std::runtime_error(message);
+}
+
+void ThrowIfFailed(HRESULT hr, const std::string &message) {
+  if (FAILED(hr)) {
+    ThrowError(message);
+  }
+}
+
+void Warning(const std::string &message) {
+  LogWarning("[D3D12] " + message);
+}
+
+void SetErrorMessage(const std::string &message) {
+  LogError("[D3D12] " + message);
+  error_message = message;
+}
+
+std::string GetErrorMessage() {
+  return error_message;
+}
+
 std::string HRESULTToString(HRESULT hr) {
   char buffer[256] = {};
   sprintf(buffer, "HRESULT: 0x%08X", hr);

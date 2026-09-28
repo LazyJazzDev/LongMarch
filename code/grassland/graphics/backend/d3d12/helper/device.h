@@ -1,10 +1,10 @@
 #pragma once
-#include "grassland/graphics/backend/d3d12/helper/adapter.h"
+#include "grassland/graphics/backend/d3d12/helper/d3d12util.h"
 
 namespace grassland::graphics::backend::d3d12 {
 class Device {
  public:
-  Device(const Adapter &adapter, D3D_FEATURE_LEVEL feature_level, ComPtr<ID3D12Device> device);
+  Device(IDXGIAdapter1 *adapter, D3D_FEATURE_LEVEL feature_level, ComPtr<ID3D12Device> device);
 
   ID3D12Device *Handle() const {
     return device_.Get();
@@ -14,8 +14,8 @@ class Device {
     return dxr_device_.Get();
   }
 
-  const Adapter &Adapter() const {
-    return adapter_;
+  IDXGIAdapter1 *Adapter() const {
+    return adapter_.Get();
   }
 
   D3D_FEATURE_LEVEL FeatureLevel() const {
@@ -25,12 +25,6 @@ class Device {
   UINT WaveLaneCountMax() const {
     return d3d12_options1_.WaveLaneCountMax;
   }
-
-  HRESULT CreateCommandQueue(D3D12_COMMAND_LIST_TYPE type, double_ptr<CommandQueue> pp_command_queue);
-
-  HRESULT CreateFence(D3D12_FENCE_FLAGS fence_flags, double_ptr<Fence> pp_fence);
-
-  HRESULT CreateFence(double_ptr<Fence> pp_fence);
 
   HRESULT CreateBuffer(size_t size,
                        D3D12_HEAP_TYPE heap_type,
@@ -74,8 +68,7 @@ class Device {
                                                  uint32_t stride,
                                                  uint32_t num_aabb,
                                                  D3D12_RAYTRACING_GEOMETRY_FLAGS flags,
-                                                 CommandQueue *queue,
-                                                 Fence *fence,
+                                                 ID3D12CommandQueue *queue,
                                                  ID3D12CommandAllocator *allocator,
                                                  double_ptr<AccelerationStructure> pp_as);
 
@@ -85,8 +78,7 @@ class Device {
                                                  uint32_t stride,
                                                  uint32_t primitive_count,
                                                  D3D12_RAYTRACING_GEOMETRY_FLAGS flags,
-                                                 CommandQueue *queue,
-                                                 Fence *fence,
+                                                 ID3D12CommandQueue *queue,
                                                  ID3D12CommandAllocator *allocator,
                                                  double_ptr<AccelerationStructure> pp_as);
 
@@ -95,28 +87,24 @@ class Device {
                                                  uint32_t num_vertex,
                                                  uint32_t stride,
                                                  uint32_t primitive_count,
-                                                 CommandQueue *queue,
-                                                 Fence *fence,
+                                                 ID3D12CommandQueue *queue,
                                                  ID3D12CommandAllocator *allocator,
                                                  double_ptr<AccelerationStructure> pp_as);
 
   HRESULT CreateBottomLevelAccelerationStructure(Buffer *vertex_buffer,
                                                  Buffer *index_buffer,
                                                  uint32_t stride,
-                                                 CommandQueue *queue,
-                                                 Fence *fence,
+                                                 ID3D12CommandQueue *queue,
                                                  ID3D12CommandAllocator *allocator,
                                                  double_ptr<AccelerationStructure> pp_as);
 
   HRESULT CreateTopLevelAccelerationStructure(const std::vector<D3D12_RAYTRACING_INSTANCE_DESC> &instances,
-                                              CommandQueue *queue,
-                                              Fence *fence,
+                                              ID3D12CommandQueue *queue,
                                               ID3D12CommandAllocator *allocator,
                                               double_ptr<AccelerationStructure> pp_tlas);
 
   HRESULT CreateTopLevelAccelerationStructure(const std::vector<std::pair<AccelerationStructure *, glm::mat4>> &objects,
-                                              CommandQueue *queue,
-                                              Fence *fence,
+                                              ID3D12CommandQueue *queue,
                                               ID3D12CommandAllocator *allocator,
                                               double_ptr<AccelerationStructure> pp_tlas);
 
@@ -147,7 +135,7 @@ class Device {
   ID3D12Resource *RequestScratchBuffer(size_t size);
   ID3D12Resource *RequestInstanceBuffer(size_t size);
 
-  class Adapter adapter_;
+  ComPtr<IDXGIAdapter1> adapter_;
   ComPtr<ID3D12Device> device_;
   D3D_FEATURE_LEVEL feature_level_;
   D3D12_FEATURE_DATA_D3D12_OPTIONS1 d3d12_options1_;
