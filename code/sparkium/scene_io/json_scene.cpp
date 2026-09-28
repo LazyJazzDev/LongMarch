@@ -14,6 +14,7 @@
 #include "rapidjson/document.h"
 #include "rapidjson/error/en.h"
 #include "rapidjson/istreamwrapper.h"
+#include "sparkium/camera/cameras.h"
 #include "sparkium/core/core.h"
 
 namespace sparkium {
@@ -752,13 +753,24 @@ std::unique_ptr<JsonScene> JsonScene::Load(Core *core, const std::filesystem::pa
     if (!(fov > 0.0f && fov < 180.0f) || glm::length(target - eye) < 1e-6f ||
         glm::length(glm::cross(target - eye, up)) < 1e-6f)
       throw std::runtime_error("camera requires a valid field of view and nondegenerate look-at vectors");
-    result->camera_ = std::make_unique<Camera>(core, glm::lookAt(eye, target, up), glm::radians(fov),
-                                               static_cast<float>(width) / static_cast<float>(height));
-    result->camera_->aperture_radius = FloatMember(camera, "aperture_radius", 0.0f);
-    result->camera_->focus_distance = FloatMember(camera, "focus_distance", glm::length(target - eye));
-    result->camera_->aperture_blades = camera.HasMember("aperture_blades") ? ReadInt(camera["aperture_blades"]) : 0;
-    result->camera_->aperture_rotation = FloatMember(camera, "aperture_rotation", 0.0f);
-    result->camera_->aperture_ratio = FloatMember(camera, "aperture_ratio", 1.0f);
+    const float aperture_radius = FloatMember(camera, "aperture_radius", 0.0f);
+    const std::string camera_type =
+        camera.HasMember("type") ? ReadString(camera["type"]) : (aperture_radius > 0.0f ? "thin_lens" : "pinhole");
+    const auto view = glm::lookAt(eye, target, up);
+    const float aspect = float(width) / float(height);
+    if (camera_type == "pinhole") {
+      result->camera_ = std::make_unique<CameraPinhole>(core, view, glm::radians(fov), aspect);
+    } else if (camera_type == "thin_lens") {
+      auto lens = std::make_unique<CameraThinLens>(core, view, glm::radians(fov), aspect);
+      lens->aperture_radius = aperture_radius;
+      lens->focus_distance = FloatMember(camera, "focus_distance", glm::length(target - eye));
+      lens->aperture_blades = camera.HasMember("aperture_blades") ? ReadInt(camera["aperture_blades"]) : 0;
+      lens->aperture_rotation = FloatMember(camera, "aperture_rotation", 0.0f);
+      lens->aperture_ratio = FloatMember(camera, "aperture_ratio", 1.0f);
+      result->camera_ = std::move(lens);
+    } else {
+      throw std::runtime_error("unknown camera type: " + camera_type);
+    }
 
     const auto &materials = RequireObject(Member(document, "materials"));
     for (auto it = materials.MemberBegin(); it != materials.MemberEnd(); ++it) {

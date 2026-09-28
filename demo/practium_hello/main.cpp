@@ -135,7 +135,7 @@ int main() {
 
   sparkium::Film film(practium_core.GetRenderCore(), extent.width, extent.height);
   scene.GetRenderScene()->settings.raytracing.samples_per_dispatch = 32;
-  sparkium::Camera camera(
+  sparkium::CameraPinhole camera(
       practium_core.GetRenderCore(),
       glm::lookAt(glm::vec3{-5.0f, 0.3f, 7.0f}, glm::vec3{0.0f, 0.0f, 0.0f}, glm::vec3{0.0, 1.0, 0.0}),
       glm::radians(30.0f), static_cast<float>(film.GetWidth()) / film.GetHeight());

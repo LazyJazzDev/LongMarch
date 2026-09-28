@@ -17,6 +17,10 @@ struct CameraData {
 struct HitRecord {
   float t;
   float3 position;
+  float3 shadow_offset;
+  float3 shadow_transmission_offset;
+  float3 shadow_normal;
+  float shadow_geometry_cutoff;
   float3 object_position;
   float3 object_origin;
   float2 tex_coord;
@@ -38,6 +42,7 @@ struct RenderContext {
   float3 throughput;
   RandomDevice rd;
   float bsdf_pdf;
+  float3 shadow_origin;
   float3 shadow_eval;
   float3 shadow_dir;
   float shadow_length;

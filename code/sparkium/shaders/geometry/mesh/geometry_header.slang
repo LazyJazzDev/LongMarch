@@ -16,4 +16,5 @@ struct GeometryHeader {
   uint index_offset;
   uint color_offset;
   uint color_stride;
+  float shadow_terminator_geometry_offset;
 };
