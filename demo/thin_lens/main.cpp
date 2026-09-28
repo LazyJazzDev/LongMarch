@@ -61,7 +61,9 @@ int main(int argc, char **argv) {
     scene.settings.samples_per_dispatch = 8;
     scene.settings.max_bounces = 4;
     scene.settings.background_color = glm::vec3(0.015f, 0.022f, 0.04f);
-    sparkium::GeometryMesh sphere(&core, Mesh<>::Sphere(32, 16));
+    // Sphere supplies radial vertex normals; dense subject geometry also smooths silhouettes.
+    sparkium::GeometryMesh subject_sphere(&core, Mesh<>::Sphere(64, 128));
+    sparkium::GeometryMesh sphere(&core, Mesh<>::Sphere(24, 48));
     std::vector<std::unique_ptr<sparkium::Material>> materials;
     std::vector<std::unique_ptr<sparkium::EntityGeometryMaterial>> entities;
     auto diffuse = [&](glm::vec3 color) -> sparkium::Material * {
@@ -98,7 +100,7 @@ int main(int argc, char **argv) {
     const glm::vec3 colors[]{{0.9f, 0.16f, 0.055f}, {0.04f, 0.65f, 0.52f}, {0.08f, 0.3f, 0.9f}};
     auto *white = diffuse({0.9f, 0.9f, 0.9f});
     for (int i = 0; i < 3; ++i) {
-      add(&sphere, diffuse(colors[i]), positions[i], glm::vec3(0.65f));
+      add(&subject_sphere, diffuse(colors[i]), positions[i], glm::vec3(0.65f));
       // Fine contrasting dots make the focal plane easy to recognize.
       for (int j = -2; j <= 2; ++j)
         add(&sphere, white, positions[i] + glm::vec3(j * 0.15f, 0.1f, 0.60f - 0.04f * std::abs(j)), glm::vec3(0.045f));
