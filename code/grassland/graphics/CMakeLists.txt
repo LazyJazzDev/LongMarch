@@ -24,6 +24,9 @@ endif ()
 if (WIN32)
     # Display luminance queries are shared by every Windows rendering backend.
     target_link_libraries(${GRASSLAND_SUBLIB_NAME} PRIVATE dxgi)
+else ()
+    # dladdr locates the Slang library that ships its runtime plugins.
+    target_link_libraries(${GRASSLAND_SUBLIB_NAME} PRIVATE ${CMAKE_DL_LIBS})
 endif ()
 
 PACK_SHADER_CODE(${GRASSLAND_SUBLIB_NAME})
