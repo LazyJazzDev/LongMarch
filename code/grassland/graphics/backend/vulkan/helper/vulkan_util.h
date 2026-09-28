@@ -91,13 +91,10 @@ class PhysicalDevice;
 class DescriptorPool;
 class DescriptorSetLayout;
 class DescriptorSet;
-class PipelineLayout;
-class Pipeline;
 struct HitGroup;
 class Buffer;
 class Image;
 class AccelerationStructure;
-class RayTracingPipeline;
 class ShaderBindingTable;
 
 bool IsDepthFormat(VkFormat format);

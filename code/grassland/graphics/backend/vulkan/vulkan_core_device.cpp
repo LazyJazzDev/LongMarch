@@ -9,7 +9,6 @@
 #include "grassland/graphics/backend/vulkan/helper/instance.h"
 #include "grassland/graphics/backend/vulkan/helper/instance_procedures.h"
 #include "grassland/graphics/backend/vulkan/helper/pipeline.h"
-#include "grassland/graphics/backend/vulkan/helper/pipeline_layout.h"
 #include "grassland/graphics/backend/vulkan/helper/raytracing/raytracing.h"
 #include "grassland/graphics/backend/vulkan/vulkan_core.h"
 #include "grassland/graphics/backend/vulkan/vulkan_shader.h"
@@ -270,31 +269,7 @@ VkResult VulkanCore::CreateBuffer(VkDeviceSize size,
   return CreateBuffer(size, usage, memory_usage, flags, pp_buffer);
 }
 
-VkResult VulkanCore::CreatePipelineLayout(const std::vector<VkDescriptorSetLayout> &descriptor_set_layouts,
-                                          double_ptr<vulkan::PipelineLayout> pp_pipeline_layout) const {
-  if (!pp_pipeline_layout) {
-    SetErrorMessage("pp_pipeline_layout is nullptr");
-    return VK_ERROR_INITIALIZATION_FAILED;
-  }
-
-  VkPipelineLayout pipeline_layout;
-  VkPipelineLayoutCreateInfo pipeline_layout_info{};
-  pipeline_layout_info.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
-  pipeline_layout_info.setLayoutCount = descriptor_set_layouts.size();
-  pipeline_layout_info.pSetLayouts = descriptor_set_layouts.data();
-  pipeline_layout_info.pushConstantRangeCount = 0;
-  pipeline_layout_info.pPushConstantRanges = nullptr;
-
-  RETURN_IF_FAILED_VK(vkCreatePipelineLayout(device_, &pipeline_layout_info, nullptr, &pipeline_layout),
-                      "failed to create pipeline layout!");
-
-  pp_pipeline_layout.construct(this, pipeline_layout);
-
-  return VK_SUCCESS;
-}
-
-VkResult VulkanCore::CreatePipeline(const struct vulkan::PipelineSettings &settings,
-                                    double_ptr<vulkan::Pipeline> pp_pipeline) const {
+VkResult VulkanCore::CreatePipeline(const struct vulkan::PipelineSettings &settings, VkPipeline *pp_pipeline) const {
   if (!pp_pipeline) {
     SetErrorMessage("pp_pipeline is nullptr");
     return VK_ERROR_INITIALIZATION_FAILED;
@@ -361,7 +336,7 @@ VkResult VulkanCore::CreatePipeline(const struct vulkan::PipelineSettings &setti
   pipeline_create_info.pMultisampleState = &settings.multisample_state_create_info;
   pipeline_create_info.pColorBlendState = &color_blend_state;
   pipeline_create_info.pDynamicState = &dynamic_state;
-  pipeline_create_info.layout = settings.pipeline_layout->Handle();
+  pipeline_create_info.layout = settings.pipeline_layout;
   pipeline_create_info.renderPass = VK_NULL_HANDLE;
   pipeline_create_info.pDepthStencilState = settings.depth_stencil_state_create_info.has_value()
                                                 ? &settings.depth_stencil_state_create_info.value()
@@ -375,7 +350,7 @@ VkResult VulkanCore::CreatePipeline(const struct vulkan::PipelineSettings &setti
   RETURN_IF_FAILED_VK(vkCreateGraphicsPipelines(device_, VK_NULL_HANDLE, 1, &pipeline_create_info, nullptr, &pipeline),
                       "failed to create graphics pipeline!");
 
-  pp_pipeline.construct(this, pipeline);
+  *pp_pipeline = pipeline;
 
   return VK_SUCCESS;
 }
@@ -595,12 +570,12 @@ VkResult VulkanCore::CreateTopLevelAccelerationStructure(
   return CreateTopLevelAccelerationStructure(acceleration_structure_instances, command_pool, queue, pp_tlas);
 }
 
-VkResult VulkanCore::CreateRayTracingPipeline(vulkan::PipelineLayout *pipeline_layout,
+VkResult VulkanCore::CreateRayTracingPipeline(VkPipelineLayout pipeline_layout,
                                               VulkanShader *ray_gen_shader,
                                               const std::vector<VulkanShader *> &miss_shaders,
                                               const std::vector<vulkan::HitGroup> &hit_groups,
                                               const std::vector<VulkanShader *> &callable_shaders,
-                                              double_ptr<vulkan::RayTracingPipeline> pp_pipeline) const {
+                                              VkPipeline *pp_pipeline) const {
   std::vector<VkPipelineShaderStageCreateInfo> shader_stage_create_infos;
   std::vector<VkRayTracingShaderGroupCreateInfoKHR> shader_groups;
   // Ray generation group
@@ -729,7 +704,7 @@ VkResult VulkanCore::CreateRayTracingPipeline(vulkan::PipelineLayout *pipeline_l
   ray_tracing_pipeline_create_info.groupCount = shader_groups.size();
   ray_tracing_pipeline_create_info.pGroups = shader_groups.data();
   ray_tracing_pipeline_create_info.maxPipelineRayRecursionDepth = 1;
-  ray_tracing_pipeline_create_info.layout = pipeline_layout->Handle();
+  ray_tracing_pipeline_create_info.layout = pipeline_layout;
   ray_tracing_pipeline_create_info.basePipelineHandle = VK_NULL_HANDLE;
 
   VkPipeline pipeline;
@@ -737,21 +712,14 @@ VkResult VulkanCore::CreateRayTracingPipeline(vulkan::PipelineLayout *pipeline_l
                                                                  &ray_tracing_pipeline_create_info, nullptr, &pipeline),
                       "failed to create ray tracing pipeline!");
 
-  pp_pipeline.construct(this, pipeline, miss_shaders.size(), hit_groups.size(), callable_shaders.size());
+  *pp_pipeline = pipeline;
 
   return VK_SUCCESS;
 }
 
-VkResult VulkanCore::CreateRayTracingPipeline(vulkan::PipelineLayout *pipeline_layout,
-                                              VulkanShader *ray_gen_shader,
-                                              VulkanShader *miss_shader,
-                                              VulkanShader *closest_hit_shader,
-                                              double_ptr<vulkan::RayTracingPipeline> pp_pipeline) const {
-  return CreateRayTracingPipeline(pipeline_layout, ray_gen_shader, {miss_shader},
-                                  {{closest_hit_shader, nullptr, nullptr, false}}, {}, pp_pipeline);
-}
-
-VkResult VulkanCore::CreateShaderBindingTable(vulkan::RayTracingPipeline *ray_tracing_pipeline,
+VkResult VulkanCore::CreateShaderBindingTable(VkPipeline pipeline,
+                                              size_t miss_shader_count,
+                                              size_t hit_group_count,
                                               const std::vector<int32_t> &miss_shader_indices,
                                               const std::vector<int32_t> &hit_group_indices,
                                               const std::vector<int32_t> &callable_shader_indices,
@@ -791,8 +759,8 @@ VkResult VulkanCore::CreateShaderBindingTable(vulkan::RayTracingPipeline *ray_tr
 
   // Copy the pipeline's shader handles into a host buffer
   std::vector<uint8_t> shader_handle_storage(handle_size * group_count);
-  procedures_.vkGetRayTracingShaderGroupHandlesKHR(device_, ray_tracing_pipeline->Handle(), 0, group_count,
-                                                   handle_size * group_count, shader_handle_storage.data());
+  procedures_.vkGetRayTracingShaderGroupHandlesKHR(device_, pipeline, 0, group_count, handle_size * group_count,
+                                                   shader_handle_storage.data());
 
   // Copy the shader handles from the host buffer to the binding tables
   auto *data = static_cast<uint8_t *>(buffer->Map());
@@ -804,18 +772,15 @@ VkResult VulkanCore::CreateShaderBindingTable(vulkan::RayTracingPipeline *ray_tr
   }
   data_head = data + hit_group_offset;
   for (auto hit_group_index : hit_group_indices) {
-    std::memcpy(
-        data_head,
-        shader_handle_storage.data() + handle_size * (hit_group_index + ray_tracing_pipeline->MissShaderCount() + 1),
-        handle_size);
+    std::memcpy(data_head, shader_handle_storage.data() + handle_size * (hit_group_index + miss_shader_count + 1),
+                handle_size);
     data_head += handle_size_aligned;
   }
   data_head = data + callable_shader_offset;
   for (auto callable_shader_index : callable_shader_indices) {
     std::memcpy(
         data_head,
-        shader_handle_storage.data() + handle_size * (callable_shader_index + ray_tracing_pipeline->HitGroupCount() +
-                                                      ray_tracing_pipeline->MissShaderCount() + 1),
+        shader_handle_storage.data() + handle_size * (callable_shader_index + hit_group_count + miss_shader_count + 1),
         handle_size);
     data_head += handle_size_aligned;
   }
@@ -826,18 +791,6 @@ VkResult VulkanCore::CreateShaderBindingTable(vulkan::RayTracingPipeline *ray_tr
                    miss_shader_indices.size(), hit_group_indices.size(), callable_shader_indices.size());
 
   return VK_SUCCESS;
-}
-
-VkResult VulkanCore::CreateShaderBindingTable(vulkan::RayTracingPipeline *ray_tracing_pipeline,
-                                              double_ptr<vulkan::ShaderBindingTable> pp_sbt) const {
-  std::vector<int32_t> miss_shader_indices(ray_tracing_pipeline->MissShaderCount());
-  std::iota(miss_shader_indices.begin(), miss_shader_indices.end(), 0);
-  std::vector<int32_t> hit_group_indices(ray_tracing_pipeline->HitGroupCount());
-  std::iota(hit_group_indices.begin(), hit_group_indices.end(), 0);
-  std::vector<int32_t> callable_shader_indices(ray_tracing_pipeline->CallableShaderCount());
-  std::iota(callable_shader_indices.begin(), callable_shader_indices.end(), 0);
-  return CreateShaderBindingTable(ray_tracing_pipeline, miss_shader_indices, hit_group_indices, callable_shader_indices,
-                                  pp_sbt);
 }
 
 }  // namespace grassland::graphics::backend

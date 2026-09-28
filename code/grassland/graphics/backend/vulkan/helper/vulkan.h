@@ -8,7 +8,6 @@
 #include "grassland/graphics/backend/vulkan/helper/instance.h"
 #include "grassland/graphics/backend/vulkan/helper/native_types.h"
 #include "grassland/graphics/backend/vulkan/helper/pipeline.h"
-#include "grassland/graphics/backend/vulkan/helper/pipeline_layout.h"
 #include "grassland/graphics/backend/vulkan/helper/raytracing/raytracing.h"
 #include "grassland/graphics/backend/vulkan/helper/semaphore.h"
 #include "grassland/graphics/backend/vulkan/helper/shader_module.h"

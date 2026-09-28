@@ -18,6 +18,11 @@ std::vector<VkFormat> ConvertImageFormats(const std::vector<ImageFormat> &format
 VulkanProgramBase::VulkanProgramBase(VulkanCore *core) : core_(core) {
 }
 
+VulkanProgramBase::~VulkanProgramBase() {
+  if (pipeline_layout_)
+    vkDestroyPipelineLayout(core_->Handle(), pipeline_layout_, nullptr);
+}
+
 void VulkanProgramBase::AddResourceBindingImpl(ResourceType type, int count) {
   VkDescriptorSetLayoutBinding binding = {};
   binding.binding = 0;
@@ -56,7 +61,11 @@ void VulkanProgramBase::FinalizePipelineLayout() {
   for (auto &descriptor_set_layout : descriptor_set_layouts_) {
     descriptor_set_layouts.push_back(descriptor_set_layout->Handle());
   }
-  core_->CreatePipelineLayout(descriptor_set_layouts, &pipeline_layout_);
+  VkPipelineLayoutCreateInfo layout_info{VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO};
+  layout_info.setLayoutCount = static_cast<uint32_t>(descriptor_set_layouts.size());
+  layout_info.pSetLayouts = descriptor_set_layouts.data();
+  vulkan::ThrowIfFailed(vkCreatePipelineLayout(core_->Handle(), &layout_info, nullptr, &pipeline_layout_),
+                        "Failed to create Vulkan pipeline layout");
 }
 
 VulkanProgram::VulkanProgram(VulkanCore *core, const std::vector<ImageFormat> &color_formats, ImageFormat depth_format)
@@ -66,7 +75,8 @@ VulkanProgram::VulkanProgram(VulkanCore *core, const std::vector<ImageFormat> &c
 }
 
 VulkanProgram::~VulkanProgram() {
-  pipeline_.reset();
+  if (pipeline_)
+    vkDestroyPipeline(core_->Handle(), pipeline_, nullptr);
 }
 
 void VulkanProgram::AddInputAttribute(uint32_t binding, InputType type, uint32_t offset) {
@@ -103,7 +113,7 @@ void VulkanProgram::BindShader(Shader *shader, ShaderType type) {
 
 void VulkanProgram::Finalize() {
   FinalizePipelineLayout();
-  pipeline_settings_.pipeline_layout = pipeline_layout_.get();
+  pipeline_settings_.pipeline_layout = pipeline_layout_;
   core_->CreatePipeline(pipeline_settings_, &pipeline_);
 }
 
@@ -132,7 +142,7 @@ void VulkanComputeProgram::Finalize() {
   FinalizePipelineLayout();
   VkComputePipelineCreateInfo pipeline_create_info = {};
   pipeline_create_info.sType = VK_STRUCTURE_TYPE_COMPUTE_PIPELINE_CREATE_INFO;
-  pipeline_create_info.layout = pipeline_layout_->Handle();
+  pipeline_create_info.layout = pipeline_layout_;
   pipeline_create_info.stage.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
   pipeline_create_info.stage.stage = VK_SHADER_STAGE_COMPUTE_BIT;
   pipeline_create_info.stage.module = compute_shader_->ModuleHandle();
@@ -145,6 +155,11 @@ void VulkanComputeProgram::Finalize() {
 }
 
 VulkanRayTracingProgram::VulkanRayTracingProgram(VulkanCore *core) : VulkanProgramBase(core) {
+}
+
+VulkanRayTracingProgram::~VulkanRayTracingProgram() {
+  if (pipeline_)
+    vkDestroyPipeline(core_->Handle(), pipeline_, nullptr);
 }
 
 VulkanRayTracingProgram::VulkanRayTracingProgram(VulkanCore *core,
@@ -201,10 +216,10 @@ void VulkanRayTracingProgram::Finalize(const std::vector<int32_t> &miss_shader_i
                                        const std::vector<int32_t> &hit_group_indices,
                                        const std::vector<int32_t> &callable_shader_indices) {
   FinalizePipelineLayout();
-  core_->CreateRayTracingPipeline(pipeline_layout_.get(), raygen_shader_, miss_shaders_, hit_groups_, callable_shaders_,
+  core_->CreateRayTracingPipeline(pipeline_layout_, raygen_shader_, miss_shaders_, hit_groups_, callable_shaders_,
                                   &pipeline_);
-  core_->CreateShaderBindingTable(pipeline_.get(), miss_shader_indices, hit_group_indices, callable_shader_indices,
-                                  &shader_binding_table_);
+  core_->CreateShaderBindingTable(pipeline_, miss_shaders_.size(), hit_groups_.size(), miss_shader_indices,
+                                  hit_group_indices, callable_shader_indices, &shader_binding_table_);
 }
 
 void VulkanRayTracingProgram::Finalize() {

@@ -8,10 +8,10 @@ namespace grassland::graphics::backend {
 class VulkanProgramBase {
  public:
   VulkanProgramBase(VulkanCore *core);
-  virtual ~VulkanProgramBase() = default;
+  virtual ~VulkanProgramBase();
 
-  vulkan::PipelineLayout *PipelineLayout() const {
-    return pipeline_layout_.get();
+  VkPipelineLayout PipelineLayout() const {
+    return pipeline_layout_;
   }
 
   vulkan::DescriptorSetLayout *DescriptorSetLayout(int index) const {
@@ -28,7 +28,7 @@ class VulkanProgramBase {
   void FinalizePipelineLayout();
   VulkanCore *core_;
   std::vector<std::unique_ptr<vulkan::DescriptorSetLayout>> descriptor_set_layouts_;
-  std::unique_ptr<vulkan::PipelineLayout> pipeline_layout_;
+  VkPipelineLayout pipeline_layout_{VK_NULL_HANDLE};
 };
 
 class VulkanProgram : public Program, public VulkanProgramBase {
@@ -50,13 +50,13 @@ class VulkanProgram : public Program, public VulkanProgramBase {
   int NumInputBindings() const;
   const vulkan::PipelineSettings *PipelineSettings() const;
 
-  vulkan::Pipeline *Pipeline() const {
-    return pipeline_.get();
+  VkPipeline Pipeline() const {
+    return pipeline_;
   }
 
  private:
   vulkan::PipelineSettings pipeline_settings_;
-  std::unique_ptr<vulkan::Pipeline> pipeline_;
+  VkPipeline pipeline_{VK_NULL_HANDLE};
 };
 
 class VulkanComputeProgram : public ComputeProgram, public VulkanProgramBase {
@@ -84,7 +84,7 @@ class VulkanRayTracingProgram : public RayTracingProgram, public VulkanProgramBa
                           VulkanShader *raygen_shader,
                           VulkanShader *miss_shader,
                           VulkanShader *closest_hit_shader);
-  ~VulkanRayTracingProgram() override = default;
+  ~VulkanRayTracingProgram() override;
 
   void AddResourceBinding(ResourceType type, int count) override;
 
@@ -98,8 +98,8 @@ class VulkanRayTracingProgram : public RayTracingProgram, public VulkanProgramBa
                 const std::vector<int32_t> &callable_shader_indices) override;
   void Finalize() override;
 
-  vulkan::RayTracingPipeline *Pipeline() const {
-    return pipeline_.get();
+  VkPipeline Pipeline() const {
+    return pipeline_;
   }
 
   vulkan::ShaderBindingTable *ShaderBindingTable() const {
@@ -111,7 +111,7 @@ class VulkanRayTracingProgram : public RayTracingProgram, public VulkanProgramBa
   std::vector<VulkanShader *> miss_shaders_;
   std::vector<vulkan::HitGroup> hit_groups_;
   std::vector<VulkanShader *> callable_shaders_;
-  std::unique_ptr<vulkan::RayTracingPipeline> pipeline_;
+  VkPipeline pipeline_{VK_NULL_HANDLE};
   std::unique_ptr<vulkan::ShaderBindingTable> shader_binding_table_;
 };
 

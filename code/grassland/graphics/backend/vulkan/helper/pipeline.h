@@ -4,7 +4,7 @@
 
 namespace grassland::graphics::backend::vulkan {
 struct PipelineSettings {
-  explicit PipelineSettings(const PipelineLayout *pipeline_layout = nullptr,
+  explicit PipelineSettings(VkPipelineLayout pipeline_layout = VK_NULL_HANDLE,
                             const std::vector<VkFormat> &color_attachment_formats = {},
                             VkFormat depth_attachment_format = VK_FORMAT_UNDEFINED);
 
@@ -44,7 +44,7 @@ struct PipelineSettings {
   void EnableDynamicPrimitiveTopology();
 
   // Pipeline layout
-  const PipelineLayout *pipeline_layout;
+  VkPipelineLayout pipeline_layout;
 
   // Shader stages
   std::vector<VkPipelineShaderStageCreateInfo> shader_stage_create_infos;
@@ -77,53 +77,6 @@ struct PipelineSettings {
   // Dynamic rendering state
   std::vector<VkFormat> color_attachment_formats{};
   VkFormat depth_attachment_format{VK_FORMAT_UNDEFINED};
-};
-
-class Pipeline {
- public:
-  explicit Pipeline(const VulkanCore *device, VkPipeline pipeline);
-
-  virtual ~Pipeline();
-
-  VkPipeline Handle() const {
-    return pipeline_;
-  }
-
-  const VulkanCore *Device() const {
-    return device_;
-  }
-
- private:
-  const VulkanCore *device_{};
-  VkPipeline pipeline_{};
-};
-
-class RayTracingPipeline : public Pipeline {
- public:
-  explicit RayTracingPipeline(const VulkanCore *device,
-                              VkPipeline pipeline,
-                              size_t miss_shader_count,
-                              size_t hit_group_count,
-                              size_t callable_shader_count);
-
-  ~RayTracingPipeline() = default;
-
-  size_t MissShaderCount() const {
-    return miss_shader_count_;
-  }
-
-  size_t HitGroupCount() const {
-    return hit_group_count_;
-  }
-
-  size_t CallableShaderCount() const {
-    return callable_shader_count_;
-  }
-
- private:
-  size_t miss_shader_count_{};
-  size_t hit_group_count_{};
-  size_t callable_shader_count_{};
 };
 
 }  // namespace grassland::graphics::backend::vulkan

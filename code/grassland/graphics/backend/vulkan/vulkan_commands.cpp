@@ -17,7 +17,7 @@ VulkanCmdBindProgram::VulkanCmdBindProgram(VulkanProgram *program) : program_(pr
 }
 
 void VulkanCmdBindProgram::CompileCommand(VulkanCommandContext *context, VkCommandBuffer command_buffer) {
-  vkCmdBindPipeline(command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, program_->Pipeline()->Handle());
+  vkCmdBindPipeline(command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, program_->Pipeline());
 }
 
 VulkanCmdBindComputeProgram::VulkanCmdBindComputeProgram(VulkanComputeProgram *program) : program_(program) {
@@ -31,7 +31,7 @@ VulkanCmdBindRayTracingProgram::VulkanCmdBindRayTracingProgram(VulkanRayTracingP
 }
 
 void VulkanCmdBindRayTracingProgram::CompileCommand(VulkanCommandContext *context, VkCommandBuffer command_buffer) {
-  vkCmdBindPipeline(command_buffer, VK_PIPELINE_BIND_POINT_RAY_TRACING_KHR, program_->Pipeline()->Handle());
+  vkCmdBindPipeline(command_buffer, VK_PIPELINE_BIND_POINT_RAY_TRACING_KHR, program_->Pipeline());
 }
 
 VulkanCmdBindVertexBuffers::VulkanCmdBindVertexBuffers(uint32_t first_binding,
@@ -171,8 +171,8 @@ void VulkanCmdBindResourceBuffers::CompileCommand(VulkanCommandContext *context,
 
   VkDescriptorSet descriptor_sets[] = {descriptor_set->Handle()};
 
-  vkCmdBindDescriptorSets(command_buffer, BindPointToVkPipelineBindPoint(bind_point_),
-                          program_base_->PipelineLayout()->Handle(), slot_, 1, descriptor_sets, 0, nullptr);
+  vkCmdBindDescriptorSets(command_buffer, BindPointToVkPipelineBindPoint(bind_point_), program_base_->PipelineLayout(),
+                          slot_, 1, descriptor_sets, 0, nullptr);
 }
 
 VulkanCmdBindResourceImages::VulkanCmdBindResourceImages(int slot,
@@ -213,8 +213,8 @@ void VulkanCmdBindResourceImages::CompileCommand(VulkanCommandContext *context, 
   write_descriptor_set.pImageInfo = image_infos.data();
   vkUpdateDescriptorSets(context->Core()->Handle(), 1, &write_descriptor_set, 0, nullptr);
 
-  vkCmdBindDescriptorSets(command_buffer, BindPointToVkPipelineBindPoint(bind_point_),
-                          program_base_->PipelineLayout()->Handle(), slot_, 1, descriptor_sets, 0, nullptr);
+  vkCmdBindDescriptorSets(command_buffer, BindPointToVkPipelineBindPoint(bind_point_), program_base_->PipelineLayout(),
+                          slot_, 1, descriptor_sets, 0, nullptr);
 }
 
 VulkanCmdBindResourceSamplers::VulkanCmdBindResourceSamplers(int slot,
@@ -248,8 +248,8 @@ void VulkanCmdBindResourceSamplers::CompileCommand(VulkanCommandContext *context
   write_descriptor_set.pImageInfo = sampler_infos.data();
   vkUpdateDescriptorSets(context->Core()->Handle(), 1, &write_descriptor_set, 0, nullptr);
 
-  vkCmdBindDescriptorSets(command_buffer, BindPointToVkPipelineBindPoint(bind_point_),
-                          program_base_->PipelineLayout()->Handle(), slot_, 1, descriptor_sets, 0, nullptr);
+  vkCmdBindDescriptorSets(command_buffer, BindPointToVkPipelineBindPoint(bind_point_), program_base_->PipelineLayout(),
+                          slot_, 1, descriptor_sets, 0, nullptr);
 }
 
 VulkanCmdBindResourceAccelerationStructure::VulkanCmdBindResourceAccelerationStructure(
@@ -287,8 +287,8 @@ void VulkanCmdBindResourceAccelerationStructure::CompileCommand(VulkanCommandCon
 
   vkUpdateDescriptorSets(context->Core()->Handle(), 1, &write_descriptor_set, 0, nullptr);
 
-  vkCmdBindDescriptorSets(command_buffer, BindPointToVkPipelineBindPoint(bind_point_),
-                          program_base_->PipelineLayout()->Handle(), slot_, 1, descriptor_sets, 0, nullptr);
+  vkCmdBindDescriptorSets(command_buffer, BindPointToVkPipelineBindPoint(bind_point_), program_base_->PipelineLayout(),
+                          slot_, 1, descriptor_sets, 0, nullptr);
 }
 
 void VulkanCmdEndRendering::CompileCommand(VulkanCommandContext *context, VkCommandBuffer command_buffer) {

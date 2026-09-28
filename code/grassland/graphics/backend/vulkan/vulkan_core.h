@@ -188,11 +188,7 @@ class VulkanCore : public Core {
                         VmaMemoryUsage memory_usage,
                         double_ptr<vulkan::Buffer> pp_buffer) const;
 
-  VkResult CreatePipelineLayout(const std::vector<VkDescriptorSetLayout> &descriptor_set_layouts,
-                                double_ptr<vulkan::PipelineLayout> pp_pipeline_layout) const;
-
-  VkResult CreatePipeline(const struct vulkan::PipelineSettings &settings,
-                          double_ptr<vulkan::Pipeline> pp_pipeline) const;
+  VkResult CreatePipeline(const vulkan::PipelineSettings &settings, VkPipeline *pipeline) const;
 
   VkResult CreateBottomLevelAccelerationStructure(VkDeviceAddress aabb_address,
                                                   VkDeviceSize stride,
@@ -239,26 +235,18 @@ class VulkanCore : public Core {
       VkQueue queue,
       double_ptr<vulkan::AccelerationStructure> pp_tlas);
 
-  VkResult CreateRayTracingPipeline(vulkan::PipelineLayout *pipeline_layout,
+  VkResult CreateRayTracingPipeline(VkPipelineLayout pipeline_layout,
                                     VulkanShader *ray_gen_shader,
                                     const std::vector<VulkanShader *> &miss_shaders,
                                     const std::vector<vulkan::HitGroup> &hit_groups,
                                     const std::vector<VulkanShader *> &callable_shaders,
-                                    double_ptr<vulkan::RayTracingPipeline> pp_pipeline) const;
-
-  VkResult CreateRayTracingPipeline(vulkan::PipelineLayout *pipeline_layout,
-                                    VulkanShader *ray_gen_shader,
-                                    VulkanShader *miss_shader,
-                                    VulkanShader *closest_hit_shader,
-                                    double_ptr<vulkan::RayTracingPipeline> pp_pipeline) const;
-
-  VkResult CreateShaderBindingTable(vulkan::RayTracingPipeline *ray_tracing_pipeline,
+                                    VkPipeline *pipeline) const;
+  VkResult CreateShaderBindingTable(VkPipeline pipeline,
+                                    size_t miss_shader_count,
+                                    size_t hit_group_count,
                                     const std::vector<int32_t> &miss_shader_indices,
                                     const std::vector<int32_t> &hit_group_indices,
                                     const std::vector<int32_t> &callable_shader_indices,
-                                    double_ptr<vulkan::ShaderBindingTable> pp_sbt) const;
-
-  VkResult CreateShaderBindingTable(vulkan::RayTracingPipeline *ray_tracing_pipeline,
                                     double_ptr<vulkan::ShaderBindingTable> pp_sbt) const;
 
   VkQueue GraphicsQueue() const {
