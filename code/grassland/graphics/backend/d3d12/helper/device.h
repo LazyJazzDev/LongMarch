@@ -82,9 +82,6 @@ class Device {
 
   HRESULT CreateShaderModule(const CompiledShaderBlob &compiled_shader, double_ptr<ShaderModule> pp_shader_module);
 
-  HRESULT CreatePipelineState(const D3D12_GRAPHICS_PIPELINE_STATE_DESC &desc,
-                              double_ptr<PipelineState> pp_pipeline_state);
-
   HRESULT CreateBottomLevelAccelerationStructure(D3D12_GPU_VIRTUAL_ADDRESS aabb_buffer,
                                                  uint32_t stride,
                                                  uint32_t num_aabb,

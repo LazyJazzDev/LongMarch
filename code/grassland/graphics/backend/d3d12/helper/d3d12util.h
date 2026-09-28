@@ -80,7 +80,6 @@ class Buffer;
 class Image;
 class Fence;
 class ShaderModule;
-class PipelineState;
 class AccelerationStructure;
 class RayTracingPipeline;
 class ShaderTable;

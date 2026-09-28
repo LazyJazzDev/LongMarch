@@ -9,7 +9,6 @@
 #include "grassland/graphics/backend/d3d12/helper/descriptor_heap.h"
 #include "grassland/graphics/backend/d3d12/helper/fence.h"
 #include "grassland/graphics/backend/d3d12/helper/image.h"
-#include "grassland/graphics/backend/d3d12/helper/pipeline_state.h"
 #include "grassland/graphics/backend/d3d12/helper/raytracing/raytracing.h"
 #include "grassland/graphics/backend/d3d12/helper/shader_module.h"
 #include "grassland/math/math_aabb.h"
@@ -193,18 +192,6 @@ HRESULT Device::CreateShaderModule(const void *compiled_shader_data,
 HRESULT Device::CreateShaderModule(const CompiledShaderBlob &compiled_shader,
                                    double_ptr<ShaderModule> pp_shader_module) {
   pp_shader_module.construct(compiled_shader);
-  return S_OK;
-}
-
-HRESULT Device::CreatePipelineState(const D3D12_GRAPHICS_PIPELINE_STATE_DESC &desc,
-                                    double_ptr<PipelineState> pp_pipeline_state) {
-  ComPtr<ID3D12PipelineState> pipeline_state;
-
-  RETURN_IF_FAILED_HR(device_->CreateGraphicsPipelineState(&desc, IID_PPV_ARGS(&pipeline_state)),
-                      "failed to create pipeline state.");
-
-  pp_pipeline_state.construct(pipeline_state);
-
   return S_OK;
 }
 

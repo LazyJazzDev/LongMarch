@@ -34,7 +34,7 @@ void BlitPipeline::Initialize(d3d12::Device *device) {
   root_signature = CreateNativeRootSignature(device_->Handle(), root_signature_desc);
 }
 
-d3d12::PipelineState *BlitPipeline::GetPipelineState(DXGI_FORMAT format) {
+ID3D12PipelineState *BlitPipeline::GetPipelineState(DXGI_FORMAT format) {
   if (pipeline_states.count(format) == 0) {
     D3D12_GRAPHICS_PIPELINE_STATE_DESC pipeline_state_desc = {};
     pipeline_state_desc.pRootSignature = root_signature.Get();
@@ -54,9 +54,11 @@ d3d12::PipelineState *BlitPipeline::GetPipelineState(DXGI_FORMAT format) {
     pipeline_state_desc.DSVFormat = DXGI_FORMAT_UNKNOWN;
     pipeline_state_desc.SampleDesc.Count = 1;
     pipeline_state_desc.SampleDesc.Quality = 0;
-    device_->CreatePipelineState(pipeline_state_desc, &pipeline_states[format]);
+    d3d12::ThrowIfFailed(device_->Handle()->CreateGraphicsPipelineState(
+                             &pipeline_state_desc, IID_PPV_ARGS(pipeline_states[format].GetAddressOf())),
+                         "Failed to create blit pipeline state");
   }
-  return pipeline_states.at(format).get();
+  return pipeline_states.at(format).Get();
 }
 
 D3D12Core::D3D12Core(const Settings &settings) : Core(settings) {

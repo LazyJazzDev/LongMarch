@@ -106,7 +106,9 @@ void D3D12Program::Finalize() {
   pipeline_state_desc_.InputLayout.NumElements = static_cast<UINT>(input_attributes_.size());
   pipeline_state_desc_.pRootSignature = root_signature_.Get();
 
-  core_->Device()->CreatePipelineState(pipeline_state_desc_, &pipeline_state_);
+  d3d12::ThrowIfFailed(core_->Device()->Handle()->CreateGraphicsPipelineState(
+                           &pipeline_state_desc_, IID_PPV_ARGS(pipeline_state_.GetAddressOf())),
+                       "Failed to create graphics pipeline state");
 }
 
 int D3D12Program::NumInputBindings() const {

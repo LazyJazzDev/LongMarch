@@ -15,7 +15,7 @@ D3D12CmdBindProgram::D3D12CmdBindProgram(D3D12Program *program) : program_(progr
 
 void D3D12CmdBindProgram::CompileCommand(D3D12CommandContext *context, ID3D12GraphicsCommandList *command_list) {
   command_list->SetGraphicsRootSignature(program_->RootSignature());
-  command_list->SetPipelineState(program_->PipelineState()->Handle());
+  command_list->SetPipelineState(program_->PipelineState());
 }
 
 D3D12CmdBindRayTracingProgram::D3D12CmdBindRayTracingProgram(D3D12RayTracingProgram *program) : program_(program) {
@@ -382,7 +382,7 @@ void D3D12CmdPresent::CompileCommand(D3D12CommandContext *context, ID3D12Graphic
   const float target_height = image_extent.height * scale;
   const float target_x = (extent.width - target_width) * 0.5f;
   const float target_y = (extent.height - target_height) * 0.5f;
-  command_list->SetPipelineState(pso->Handle());
+  command_list->SetPipelineState(pso);
   command_list->SetGraphicsRootSignature(root_signature);
   command_list->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
 

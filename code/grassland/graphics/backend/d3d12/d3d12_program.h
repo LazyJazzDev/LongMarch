@@ -42,15 +42,15 @@ class D3D12Program : public Program, public D3D12ProgramBase {
   uint32_t InputBindingStride(uint32_t index) const;
   const D3D12_GRAPHICS_PIPELINE_STATE_DESC *PipelineStateDesc() const;
 
-  d3d12::PipelineState *PipelineState() const {
-    return pipeline_state_.get();
+  ID3D12PipelineState *PipelineState() const {
+    return pipeline_state_.Get();
   }
 
  private:
   std::vector<std::pair<uint32_t, bool>> input_bindings_;
   std::vector<D3D12_INPUT_ELEMENT_DESC> input_attributes_;
   D3D12_GRAPHICS_PIPELINE_STATE_DESC pipeline_state_desc_;
-  std::unique_ptr<d3d12::PipelineState> pipeline_state_;
+  Microsoft::WRL::ComPtr<ID3D12PipelineState> pipeline_state_;
 };
 
 class D3D12ComputeProgram : public ComputeProgram, public D3D12ProgramBase {
