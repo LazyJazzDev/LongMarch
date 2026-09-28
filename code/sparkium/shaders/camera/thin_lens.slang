@@ -6,7 +6,7 @@
 #endif
 
     void
-    CameraPinhole(inout RayGenPayload raygen_payload) {
+    CameraThinLens(inout RayGenPayload raygen_payload) {
       float4x4 camera_to_world;
       float2 scale;
       camera_to_world = LoadFloat4x4(camera_data, 64);

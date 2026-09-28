@@ -5,17 +5,15 @@ namespace sparkium {
 
 class Camera : public Object {
  public:
-  Camera(Core *core, const glm::mat4 &view, float fovy, float aspect);
+  virtual ~Camera() = 0;
   Core *GetCore() const;
 
   glm::mat4 view;
   float fovy;
   float aspect;
-  float aperture_radius{0.0f};
-  float focus_distance{1.0f};
-  int aperture_blades{0};
-  float aperture_rotation{0.0f};
-  float aperture_ratio{1.0f};
+
+ protected:
+  Camera(Core *core, const glm::mat4 &view, float fovy, float aspect);
 
  private:
   Core *core_;

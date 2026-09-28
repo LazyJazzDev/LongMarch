@@ -27,6 +27,46 @@ unknown references, and invalid camera/mesh settings through its error result.
 Compute ray tracing fallback and Blender-specific extensions follow in separate
 changes.
 
+## Camera models
+
+`Camera` is an abstract base for `CameraPinhole` and `CameraThinLens`, exposed
+through `sparkium/camera/cameras.h`. Both retain `view`, `fovy` and `aspect` on
+the base; aperture and focus parameters belong only to `CameraThinLens`.
+Code that previously constructed `Camera` should construct the appropriate
+concrete class instead. Scene/rendering APIs continue to accept `Camera *`.
+
+In JSON, `camera.type` selects `"pinhole"` or `"thin_lens"`. Unknown types are
+rejected. If the type is omitted, a positive `aperture_radius` selects a thin
+lens; otherwise the loader selects a pinhole, preserving existing scene output.
+An explicit pinhole ignores the thin-lens parameters.
+
+```json
+"camera": {
+  "type": "thin_lens",
+  "eye": [0, 0, 4],
+  "target": [0, 0, 0],
+  "fov_degrees": 45,
+  "aperture_radius": 0.05,
+  "focus_distance": 4,
+  "aperture_blades": 6,
+  "aperture_rotation": 0,
+  "aperture_ratio": 1
+}
+```
+
+A thin lens samples a circular aperture (`aperture_blades < 3`) or a regular
+polygon, optionally rotated in radians and stretched horizontally by
+`aperture_ratio`. `focus_distance` is the distance to the focus plane along the
+camera's forward axis, not the optical focal length. It defaults to the eye–target
+distance in JSON. A nonpositive aperture radius or focus distance retains pinhole
+ray generation. C++ defaults are zero aperture, focus distance 1, circular
+aperture, zero rotation and ratio 1.
+
+Native RT, Ray Query and software tracing use the concrete model's shader.
+Switching camera models on an existing scene refreshes the native callable or
+compute renderer. Raster camera behavior is unchanged; it does not implement
+thin-lens depth of field.
+
 ## Check the basic scenes
 
 ```sh

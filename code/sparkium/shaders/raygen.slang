@@ -23,7 +23,7 @@ void RenderPixel(uint2 pixel, uint2 extent) {
       payload.uv = uv;
       payload.lens_sample = float2(RandomFloat(context.rd), RandomFloat(context.rd));
 #ifdef SPARKIUM_SOFTWARE_RT
-      CameraPinhole(payload);
+      SPARKIUM_CAMERA_ENTRY(payload);
 #else
       CallShader(0, payload);
 #endif

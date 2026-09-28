@@ -2,9 +2,12 @@
 #include <long_march.h>
 
 #include <algorithm>
+#include <array>
 #include <cmath>
 #include <cstdlib>
 #include <cstring>
+#include <filesystem>
+#include <fstream>
 #include <glm/gtc/matrix_transform.hpp>
 #include <numeric>
 #include <random>
@@ -13,6 +16,7 @@
 #include "../../demo/sparkium_backend.h"
 #include "grassland/graphics/backend/backend.h"
 #include "grassland/graphics/frame_profile.h"
+#include "sparkium/pipelines/raytracing/core/camera.h"
 #include "sparkium/pipelines/raytracing/core/core.h"
 #include "sparkium/pipelines/raytracing/core/software_pipeline.h"
 #include "sparkium/pipelines/raytracing/entity/entities.h"
@@ -53,6 +57,163 @@ class SoftwareBVHTest : public testing::Test {
   std::unique_ptr<sparkium::Core> core;
 };
 
+TEST_F(SoftwareBVHTest, JsonCameraTypesPreserveLegacyScenes) {
+  const auto path = std::filesystem::temp_directory_path() /
+                    ("sparkium-camera-" + std::to_string(reinterpret_cast<uintptr_t>(core.get())) + ".json");
+
+  struct RemoveFile {
+    std::filesystem::path path;
+
+    ~RemoveFile() {
+      std::error_code error;
+      std::filesystem::remove(path, error);
+    }
+  } cleanup{path};
+
+  auto load = [&](const std::string &parameters, std::string *error) {
+    std::ofstream file(path);
+    file << R"({"format":"sparkium-scene","version":1,"renderer":{},
+"film":{"width":8,"height":8},"materials":{},"geometries":{},"entities":[],
+"camera":{"eye":[0,0,4],"target":[0,0,0])"
+         << parameters << "}}";
+    file.close();
+    return sparkium::JsonScene::Load(core.get(), path, error);
+  };
+  std::string error;
+  auto pinhole = load("", &error);
+  ASSERT_NE(pinhole, nullptr) << error;
+  EXPECT_NE(dynamic_cast<sparkium::CameraPinhole *>(pinhole->GetCamera()), nullptr);
+  auto legacy = load(R"(,"aperture_radius":0.2,"aperture_blades":6)", &error);
+  ASSERT_NE(legacy, nullptr) << error;
+  auto *lens = dynamic_cast<sparkium::CameraThinLens *>(legacy->GetCamera());
+  ASSERT_NE(lens, nullptr);
+  EXPECT_FLOAT_EQ(lens->aperture_radius, 0.2f);
+  EXPECT_FLOAT_EQ(lens->focus_distance, 4.0f);
+  EXPECT_EQ(lens->aperture_blades, 6);
+  auto explicit_lens = load(R"(,"type":"thin_lens","aperture_radius":0)", &error);
+  ASSERT_NE(explicit_lens, nullptr) << error;
+  EXPECT_NE(dynamic_cast<sparkium::CameraThinLens *>(explicit_lens->GetCamera()), nullptr);
+  auto explicit_pinhole = load(R"(,"type":"pinhole","aperture_radius":0.2)", &error);
+  ASSERT_NE(explicit_pinhole, nullptr) << error;
+  EXPECT_NE(dynamic_cast<sparkium::CameraPinhole *>(explicit_pinhole->GetCamera()), nullptr);
+  EXPECT_EQ(load(R"(,"type":"unknown")", &error), nullptr);
+  EXPECT_NE(error.find("unknown camera type"), std::string::npos);
+}
+
+TEST_F(SoftwareBVHTest, CameraModelsGeneratePinholeAndFocusedRays) {
+  sparkium::CameraPinhole pinhole(core.get(), glm::mat4(1), glm::radians(60.0f), 1.5f);
+  sparkium::CameraThinLens lens(core.get(), pinhole.view, pinhole.fovy, pinhole.aspect);
+  auto sample = [&](sparkium::Camera &camera) {
+    auto *adapter = sparkium::raytracing::DedicatedCast(&camera);
+    auto vfs = core->GetShadersVFS();
+    vfs.WriteFile("bindings.slang", R"(
+#pragma once
+#include "common.slang"
+#include "buffer_helper.slang"
+ByteAddressBuffer camera_data : register(t0, space0);
+)");
+    vfs.WriteFile("camera_test.slang", "#define SPARKIUM_SOFTWARE_RT\n#include \"" + adapter->ShaderFile() +
+                                           "\"\nRWByteAddressBuffer output : register(u0, space1);\n"
+                                           "[numthreads(1,1,1)] void Main(uint3 id : SV_DispatchThreadID) {\n"
+                                           "RayGenPayload p; p.uv = float2(0.3f, -0.2f); "
+                                           "p.lens_sample = float2(0.13f + 0.2f * id.x, 0.64f);\n" +
+                                           adapter->EntryPoint() +
+                                           "(p); output.Store4(id.x * 32, asuint(float4(p.origin, 1))); "
+                                           "output.Store4(id.x * 32 + 16, asuint(float4(p.direction, 0))); }\n");
+    std::unique_ptr<graphics::Shader> shader;
+    EXPECT_EQ(graphics->CreateShader(vfs, "camera_test.slang", "Main", "cs_6_0", {"-I."}, &shader), 0);
+    std::unique_ptr<graphics::ComputeProgram> program;
+    graphics->CreateComputeProgram(shader.get(), &program);
+    program->AddResourceBinding(graphics::RESOURCE_TYPE_STORAGE_BUFFER, 1);
+    program->AddResourceBinding(graphics::RESOURCE_TYPE_WRITABLE_STORAGE_BUFFER, 1);
+    program->Finalize();
+    std::unique_ptr<graphics::Buffer> output;
+    graphics->CreateBuffer(128, graphics::BUFFER_TYPE_STATIC, &output);
+    std::unique_ptr<graphics::CommandContext> commands;
+    graphics->CreateCommandContext(&commands);
+    commands->CmdBindComputeProgram(program.get());
+    commands->CmdBindResources(0, {adapter->Buffer()}, graphics::BIND_POINT_COMPUTE);
+    commands->CmdBindResources(1, {output.get()}, graphics::BIND_POINT_COMPUTE);
+    commands->CmdDispatch(4, 1, 1);
+    graphics->SubmitCommandContext(commands.get());
+    std::array<glm::vec4, 8> result{};
+    output->DownloadData(result.data(), sizeof(result));
+    return result;
+  };
+  const auto reference = sample(pinhole);
+  const auto zero_aperture = sample(lens);
+  const glm::vec3 expected =
+      glm::normalize(glm::vec3(0.3f * 1.5f * tan(glm::radians(30.0f)), -0.2f * tan(glm::radians(30.0f)), -1.0f));
+  for (size_t i = 0; i < reference.size(); ++i)
+    for (int c = 0; c < 3; ++c) {
+      EXPECT_NEAR(reference[i][c], zero_aperture[i][c], 1e-6f);
+      EXPECT_NEAR(reference[i][c], i % 2 ? expected[c] : 0.0f, 1e-6f);
+    }
+  lens.aperture_radius = 0.5f;
+  lens.focus_distance = 4.0f;
+  lens.aperture_ratio = 1.7f;
+  lens.aperture_rotation = 0.4f;
+  for (int blades : {0, 6}) {
+    lens.aperture_blades = blades;
+    const auto rays = sample(lens);
+    bool distinct_origin = false;
+    for (int i = 0; i < 4; ++i) {
+      const glm::vec3 origin(rays[i * 2]), direction(rays[i * 2 + 1]);
+      distinct_origin |= glm::length(origin) > 0.1f;
+      EXPECT_NEAR(origin.z, 0.0f, 1e-6f);
+      EXPECT_LE(glm::length(glm::vec2(origin.x / lens.aperture_ratio, origin.y)), lens.aperture_radius + 1e-6f);
+      const auto focus = origin + direction * (lens.focus_distance / -direction.z);
+      const auto expected_focus = expected * (lens.focus_distance / -expected.z);
+      for (int c = 0; c < 3; ++c)
+        EXPECT_NEAR(focus[c], expected_focus[c], 1e-5f);
+    }
+    EXPECT_TRUE(distinct_origin);
+  }
+  // Public pose/optics changes must update the GPU data on the next access.
+  pinhole.view = glm::translate(glm::mat4(1), glm::vec3(-2, -3, -4));
+  const auto moved = sample(pinhole);
+  for (int c = 0; c < 3; ++c)
+    EXPECT_NEAR(moved[0][c], float(c + 2), 1e-6f);
+}
+
+TEST_F(SoftwareBVHTest, CameraModelsSwitchWithoutStalePrograms) {
+  std::vector<Vector3<float>> positions{{-1, -1, 0}, {1, -1, 0}, {0, 1, 0}};
+  uint32_t indices[]{0, 1, 2};
+  Mesh<> mesh(3, 3, indices, positions.data());
+  sparkium::GeometryMesh geometry(core.get(), mesh);
+  sparkium::MaterialLambertian material(core.get(), glm::vec3(0), glm::vec3(0.3f, 0.5f, 0.7f));
+  sparkium::EntityGeometryMaterial entity(core.get(), &geometry, &material);
+  sparkium::Scene scene(core.get());
+  scene.AddEntity(&entity);
+  scene.settings.samples_per_dispatch = 16;
+  scene.settings.max_bounces = 1;
+  const auto view = glm::lookAt(glm::vec3(0, 0, 4), glm::vec3(0), glm::vec3(0, 1, 0));
+  sparkium::CameraPinhole pinhole(core.get(), view, glm::radians(45.0f), 1.0f);
+  sparkium::CameraThinLens lens(core.get(), view, pinhole.fovy, pinhole.aspect);
+  lens.focus_distance = 2.0f;
+  auto render = [&](sparkium::Camera *camera, sparkium::RenderPipeline pipeline) {
+    sparkium::Film film(core.get(), 16, 16);
+    core->Render(&scene, camera, &film, pipeline);
+    std::vector<glm::vec4> pixels(256);
+    film.GetRawImage()->DownloadData(pixels.data());
+    return pixels;
+  };
+  std::vector<sparkium::RenderPipeline> pipelines{sparkium::RENDER_PIPELINE_RT_FALLBACK};
+  if (graphics->DeviceRayQuerySupport())
+    pipelines.push_back(sparkium::RENDER_PIPELINE_RAY_QUERY);
+  if (graphics->DeviceRayTracingSupport())
+    pipelines.push_back(sparkium::RENDER_PIPELINE_RAY_TRACING);
+  for (auto pipeline : pipelines) {
+    SCOPED_TRACE(int(pipeline));
+    const auto reference = render(&pinhole, pipeline);
+    lens.aperture_radius = 0;
+    EXPECT_EQ(render(&lens, pipeline), reference);
+    lens.aperture_radius = 0.5f;
+    EXPECT_NE(render(&lens, pipeline), reference);
+    EXPECT_EQ(render(&pinhole, pipeline), reference);
+  }
+}
+
 TEST_F(SoftwareBVHTest, LazyGraphHitShadersSurvivePipelineSwitches) {
   if (!graphics->DeviceRayTracingSupport() || !graphics->DeviceRayQuerySupport())
     GTEST_SKIP() << "requires native RT and ray query";
@@ -81,8 +242,8 @@ GraphSurface EvaluateShaderGraph(HitRecord hit, float3 direction, int bounce, ui
   scene.AddEntity(&entity);
   scene.settings.samples_per_dispatch = 1;
   scene.settings.max_bounces = 1;
-  sparkium::Camera camera(core.get(), glm::lookAt(glm::vec3(0, 0, 4), glm::vec3(0), glm::vec3(0, 1, 0)),
-                          glm::radians(30.0f), 1.0f);
+  sparkium::CameraPinhole camera(core.get(), glm::lookAt(glm::vec3(0, 0, 4), glm::vec3(0), glm::vec3(0, 1, 0)),
+                                 glm::radians(30.0f), 1.0f);
   std::vector<glm::vec4> reference(256), pixels(256);
   bool first_frame = true;
   for (auto pipeline : {sparkium::RENDER_PIPELINE_RAY_QUERY, sparkium::RENDER_PIPELINE_RAY_TRACING,
@@ -265,8 +426,8 @@ TEST_F(SoftwareBVHTest, LightSamplingIsIndependentOfEntityAddresses) {
   first.AddEntity(lights[0].second);  // Duplicate adds must not register twice.
   first.SetEntityActive(lights[0].second, false);
   first.SetEntityActive(lights[0].second, true);
-  sparkium::Camera camera(core.get(), glm::lookAt(glm::vec3(0, 0, 4), glm::vec3(0), glm::vec3(0, 1, 0)),
-                          glm::radians(45.0f), 1.0f);
+  sparkium::CameraPinhole camera(core.get(), glm::lookAt(glm::vec3(0, 0, 4), glm::vec3(0), glm::vec3(0, 1, 0)),
+                                 glm::radians(45.0f), 1.0f);
   for (auto pipeline : {sparkium::RENDER_PIPELINE_RT_FALLBACK, sparkium::RENDER_PIPELINE_RAY_QUERY,
                         sparkium::RENDER_PIPELINE_RAY_TRACING, sparkium::RENDER_PIPELINE_RASTERIZATION}) {
     if (pipeline == sparkium::RENDER_PIPELINE_RAY_QUERY && !graphics->DeviceRayQuerySupport())
@@ -313,8 +474,8 @@ TEST_F(SoftwareBVHTest, NonblockingEmittersDoNotHideShadowOccluders) {
   scene.settings.samples_per_dispatch = 16;
   scene.settings.max_bounces = 1;
   scene.settings.alpha_shadow = true;
-  sparkium::Camera camera(core.get(), glm::lookAt(glm::vec3(0, 0, 4), glm::vec3(0), glm::vec3(0, 1, 0)),
-                          glm::radians(20.0f), 1.0f);
+  sparkium::CameraPinhole camera(core.get(), glm::lookAt(glm::vec3(0, 0, 4), glm::vec3(0), glm::vec3(0, 1, 0)),
+                                 glm::radians(20.0f), 1.0f);
   for (auto pipeline : {sparkium::RENDER_PIPELINE_RT_FALLBACK, sparkium::RENDER_PIPELINE_RAY_QUERY,
                         sparkium::RENDER_PIPELINE_RAY_TRACING}) {
     if (pipeline == sparkium::RENDER_PIPELINE_RAY_QUERY && !graphics->DeviceRayQuerySupport())
@@ -515,7 +676,8 @@ RWByteAddressBuffer results : register(u0, space4);
       pipeline.AddInstance(&rt_geometry, &rt_material, transform, 0);
     std::unique_ptr<graphics::CommandContext> commands;
     graphics->CreateCommandContext(&commands);
-    pipeline.Update(commands.get(), buffers, 1, 1);
+    sparkium::CameraPinhole camera(core.get(), glm::mat4(1), glm::radians(45.0f), 1.0f);
+    pipeline.Update(commands.get(), buffers, 1, 1, sparkium::raytracing::DedicatedCast(&camera));
     commands->CmdBindComputeProgram(program.get());
     if (ray_query)
       commands->CmdBindResources(0, pipeline.AccelerationStructure(), graphics::BIND_POINT_COMPUTE);
@@ -559,7 +721,7 @@ TEST_P(ComputeTraversalTest, EmptySceneBackgroundAccumulationAndReset) {
   sparkium::Scene scene(core.get());
   scene.settings.samples_per_dispatch = 3;
   scene.settings.background_color = glm::vec3(0.2f, 0.4f, 0.7f);
-  sparkium::Camera camera(core.get(), glm::mat4(1), glm::radians(45.0f), 17.0f / 13.0f);
+  sparkium::CameraPinhole camera(core.get(), glm::mat4(1), glm::radians(45.0f), 17.0f / 13.0f);
   sparkium::Film film(core.get(), 17, 13);
   auto check = [&](glm::vec3 expected) {
     std::vector<glm::vec4> pixels(17 * 13);
@@ -678,7 +840,8 @@ float SoftwareShadowTransmission(uint material, HitRecord hit, float3 direction)
   graphics->CreateBuffer(16, graphics::BUFFER_TYPE_STATIC, &output);
   std::unique_ptr<graphics::CommandContext> commands;
   graphics->CreateCommandContext(&commands);
-  pipeline.Update(commands.get(), {rt_geometry.Buffer()}, 1, 1);
+  sparkium::CameraPinhole camera(core.get(), glm::mat4(1), glm::radians(45.0f), 1.0f);
+  pipeline.Update(commands.get(), {rt_geometry.Buffer()}, 1, 1, sparkium::raytracing::DedicatedCast(&camera));
   commands->CmdBindComputeProgram(program.get());
   if (ray_query)
     commands->CmdBindResources(0, pipeline.AccelerationStructure(), graphics::BIND_POINT_COMPUTE);
@@ -713,7 +876,8 @@ TEST_F(SoftwareBVHTest, SharedShadersCompileForNativeRayTracingAndCompute) {
     };
     for (auto entry : {"Main", "MissMain", "ShadowMiss"})
       compile("raygen.slang", entry, "lib_6_5");
-    compile("camera.slang", "CameraPinhole", "lib_6_5");
+    compile("camera/pinhole.slang", "CameraPinhole", "lib_6_5");
+    compile("camera/thin_lens.slang", "CameraThinLens", "lib_6_5");
     for (auto material : {"lambertian", "light", "principled", "specular"}) {
       vfs.WriteFile("material_sampler.slang",
                     sparkium::CodeLines(vfs, std::string("material/") + material + "/sampler.slang"));
@@ -749,8 +913,8 @@ TEST_F(SoftwareBVHTest, RasterPointLightsLeaveEmptyBackgroundUnchanged) {
   scene.settings.ambient_light = glm::vec3(0.2f);
   sparkium::EntityPointLight light(core.get(), glm::vec3(0, 0, 1), glm::vec3(1), 100.0f);
   scene.AddEntity(&light);
-  sparkium::Camera camera(core.get(), glm::lookAt(glm::vec3(0, 0, 4), glm::vec3(0), glm::vec3(0, 1, 0)),
-                          glm::radians(45.0f), 17.0f / 13.0f);
+  sparkium::CameraPinhole camera(core.get(), glm::lookAt(glm::vec3(0, 0, 4), glm::vec3(0), glm::vec3(0, 1, 0)),
+                                 glm::radians(45.0f), 17.0f / 13.0f);
   sparkium::Film film(core.get(), 17, 13);
   core->Render(&scene, &camera, &film, sparkium::RENDER_PIPELINE_RASTERIZATION);
   std::vector<glm::vec4> pixels(17 * 13);
@@ -774,8 +938,8 @@ TEST_F(SoftwareBVHTest, HardwareImageParity) {
   scene.settings.samples_per_dispatch = 16;
   scene.settings.max_bounces = 4;
   scene.settings.background_color = glm::vec3(0.1f);
-  sparkium::Camera camera(core.get(), glm::lookAt(glm::vec3(0, 0, 4), glm::vec3(0), glm::vec3(0, 1, 0)),
-                          glm::radians(45.0f), 1.0f);
+  sparkium::CameraPinhole camera(core.get(), glm::lookAt(glm::vec3(0, 0, 4), glm::vec3(0), glm::vec3(0, 1, 0)),
+                                 glm::radians(45.0f), 1.0f);
   sparkium::Film software(core.get(), 32, 32), hardware(core.get(), 32, 32);
   core->Render(&scene, &camera, &software, sparkium::RENDER_PIPELINE_RT_FALLBACK);
   core->Render(&scene, &camera, &hardware, sparkium::RENDER_PIPELINE_RAY_TRACING);

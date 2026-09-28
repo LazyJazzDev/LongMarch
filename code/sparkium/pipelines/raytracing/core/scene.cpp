@@ -217,6 +217,8 @@ int32_t Scene::RegisterHitGroup(const InstanceHitGroups &hit_group) {
 }
 
 void Scene::UpdatePipeline(Camera *camera) {
+  if (!software_tracing_ && (callable_shaders_.empty() || callable_shaders_[0] != camera->Shader()))
+    pipeline_dirty_ = true;
   graphics::CpuProfileScope registration_profile("scene_registration");
   for (auto &[entity, status] : entities_) {
     status.keep = false;
@@ -388,7 +390,7 @@ void Scene::UpdatePipeline(Camera *camera) {
 
   metadata_profile.End();
   if (software_tracing_)
-    software_pipeline_->Update(preprocess_cmd_context_.get(), buffers_, sdr_images_.size(), hdr_images_.size());
+    software_pipeline_->Update(preprocess_cmd_context_.get(), buffers_, sdr_images_.size(), hdr_images_.size(), camera);
 
   graphics::CpuProfileScope light_record_profile("light_selection_record");
   graphics::GpuProfileScope light_selection_profile(preprocess_cmd_context_.get(), "light_selection");

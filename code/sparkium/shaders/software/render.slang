@@ -3,7 +3,7 @@
 #include "bsdf/lambertian.slang"
 #include "bsdf/principled_material.slang"
 #include "bsdf/specular.slang"
-#include "camera.slang"
+#include "software_camera.slang"
 #include "direct_lighting.slang"
 #include "geometry/mesh/hit_record.slang"
 #include "random.slang"
