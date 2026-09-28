@@ -141,31 +141,9 @@ class VulkanCore : public Core {
 
   VkResult CreateImage(VkFormat format,
                        VkExtent2D extent,
-                       VkImageUsageFlags usage,
-                       VkImageAspectFlags aspect,
-                       VkSampleCountFlagBits sample_count,
-                       VmaMemoryUsage mem_usage,
-                       double_ptr<vulkan::Image> pp_image) const;
-
-  VkResult CreateImage(VkFormat format,
-                       VkExtent2D extent,
-                       VkImageUsageFlags usage,
-                       VkImageAspectFlags aspect,
-                       VkSampleCountFlagBits sample_count,
-                       double_ptr<vulkan::Image> pp_image) const;
-
-  VkResult CreateImage(VkFormat format,
-                       VkExtent2D extent,
-                       VkImageUsageFlags usage,
-                       VkImageAspectFlags aspect,
-                       double_ptr<vulkan::Image> pp_image) const;
-
-  VkResult CreateImage(VkFormat format,
-                       VkExtent2D extent,
-                       VkImageUsageFlags usage,
-                       double_ptr<vulkan::Image> pp_image) const;
-
-  VkResult CreateImage(VkFormat format, VkExtent2D extent, double_ptr<vulkan::Image> pp_image) const;
+                       VkImage *image,
+                       VkImageView *view,
+                       VmaAllocation *allocation) const;
 
   VkResult CreateBuffer(VkDeviceSize size,
                         VkBufferUsageFlags usage,

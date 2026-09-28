@@ -73,15 +73,17 @@ VkResult VulkanCore::CreateDescriptorPool(const std::vector<VkDescriptorPoolSize
 
 VkResult VulkanCore::CreateImage(VkFormat format,
                                  VkExtent2D extent,
-                                 VkImageUsageFlags usage,
-                                 VkImageAspectFlags aspect,
-                                 VkSampleCountFlagBits sample_count,
-                                 VmaMemoryUsage mem_usage,
-                                 double_ptr<vulkan::Image> pp_image) const {
-  if (!pp_image) {
-    SetErrorMessage("pp_image is nullptr");
+                                 VkImage *out_image,
+                                 VkImageView *out_view,
+                                 VmaAllocation *out_allocation) const {
+  if (!out_image || !out_view || !out_allocation)
     return VK_ERROR_INITIALIZATION_FAILED;
-  }
+  VkImageAspectFlags aspect = IsDepthFormat(format) ? VK_IMAGE_ASPECT_DEPTH_BIT : VK_IMAGE_ASPECT_COLOR_BIT;
+  VkImageUsageFlags usage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT |
+                            VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_STORAGE_BIT;
+  if (IsDepthFormat(format))
+    usage = VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT |
+            VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_SAMPLED_BIT;
 
   VkImageCreateInfo image_create_info{};
   image_create_info.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
@@ -92,7 +94,7 @@ VkResult VulkanCore::CreateImage(VkFormat format,
   image_create_info.extent.depth = 1;
   image_create_info.mipLevels = 1;
   image_create_info.arrayLayers = 1;
-  image_create_info.samples = sample_count;
+  image_create_info.samples = VK_SAMPLE_COUNT_1_BIT;
   image_create_info.tiling = VK_IMAGE_TILING_OPTIMAL;
   image_create_info.usage = usage;
   image_create_info.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
@@ -101,7 +103,7 @@ VkResult VulkanCore::CreateImage(VkFormat format,
   // Create image from image create info by VMA library
 
   VmaAllocationCreateInfo allocation_info = {};
-  allocation_info.usage = mem_usage;
+  allocation_info.usage = VMA_MEMORY_USAGE_GPU_ONLY;
 
   VkImage image;
   VmaAllocation allocation;
@@ -126,51 +128,17 @@ VkResult VulkanCore::CreateImage(VkFormat format,
 
   VkImageView image_view;
 
-  RETURN_IF_FAILED_VK(vkCreateImageView(device_, &image_view_create_info, nullptr, &image_view),
-                      "failed to create image view!");
+  VkResult view_result = vkCreateImageView(device_, &image_view_create_info, nullptr, &image_view);
+  if (view_result != VK_SUCCESS) {
+    vmaDestroyImage(allocator_, image, allocation);
+    return view_result;
+  }
 
-  pp_image.construct(this, format, extent, usage, aspect, sample_count, image, image_view, allocation);
+  *out_image = image;
+  *out_view = image_view;
+  *out_allocation = allocation;
 
   return VK_SUCCESS;
-}
-
-VkResult VulkanCore::CreateImage(VkFormat format,
-                                 VkExtent2D extent,
-                                 VkImageUsageFlags usage,
-                                 VkImageAspectFlags aspect,
-                                 VkSampleCountFlagBits sample_count,
-                                 double_ptr<vulkan::Image> pp_image) const {
-  return CreateImage(format, extent, usage, aspect, sample_count, VMA_MEMORY_USAGE_GPU_ONLY, pp_image);
-}
-
-VkResult VulkanCore::CreateImage(VkFormat format,
-                                 VkExtent2D extent,
-                                 VkImageUsageFlags usage,
-                                 VkImageAspectFlags aspect,
-                                 double_ptr<vulkan::Image> pp_image) const {
-  return CreateImage(format, extent, usage, aspect, VK_SAMPLE_COUNT_1_BIT, pp_image);
-}
-
-VkResult VulkanCore::CreateImage(VkFormat format,
-                                 VkExtent2D extent,
-                                 VkImageUsageFlags usage,
-                                 double_ptr<vulkan::Image> pp_image) const {
-  VkImageAspectFlagBits aspect = VK_IMAGE_ASPECT_COLOR_BIT;
-  if (IsDepthFormat(format)) {
-    aspect = VK_IMAGE_ASPECT_DEPTH_BIT;
-  }
-  return CreateImage(format, extent, usage, aspect, pp_image);
-}
-
-VkResult VulkanCore::CreateImage(VkFormat format, VkExtent2D extent, double_ptr<vulkan::Image> pp_image) const {
-  VkImageUsageFlags usage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT |
-                            VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_STORAGE_BIT;
-  if (IsDepthFormat(format)) {
-    usage = VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT |
-            VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_SAMPLED_BIT;
-  }
-
-  return CreateImage(format, extent, usage, pp_image);
 }
 
 VkResult VulkanCore::CreateBuffer(VkDeviceSize size,

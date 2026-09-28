@@ -90,7 +90,6 @@ std::string VkResultToString(VkResult result);
 class PhysicalDevice;
 struct HitGroup;
 class Buffer;
-class Image;
 class AccelerationStructure;
 class ShaderBindingTable;
 

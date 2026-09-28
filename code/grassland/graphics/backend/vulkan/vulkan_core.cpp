@@ -96,10 +96,9 @@ int VulkanCore::CreateImage(int width, int height, ImageFormat format, double_pt
   pp_image.construct<VulkanImage>(this, width, height, format);
   SingleTimeCommand([this, pp_image](VkCommandBuffer command_buffer) {
     VulkanImage *image = dynamic_cast<VulkanImage *>(*pp_image);
-    vulkan::TransitImageLayout(command_buffer, image->Image()->Handle(), VK_IMAGE_LAYOUT_UNDEFINED,
-                               VK_IMAGE_LAYOUT_GENERAL, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT,
-                               VK_PIPELINE_STAGE_ALL_GRAPHICS_BIT, VK_ACCESS_MEMORY_READ_BIT, 0,
-                               image->Image()->Aspect());
+    vulkan::TransitImageLayout(command_buffer, image->Handle(), VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_GENERAL,
+                               VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, VK_PIPELINE_STAGE_ALL_GRAPHICS_BIT,
+                               VK_ACCESS_MEMORY_READ_BIT, 0, image->Aspect());
   });
   return 0;
 }
