@@ -28,8 +28,6 @@ class Device {
 
   HRESULT CreateCommandQueue(D3D12_COMMAND_LIST_TYPE type, double_ptr<CommandQueue> pp_command_queue);
 
-  HRESULT CreateCommandAllocator(D3D12_COMMAND_LIST_TYPE type, double_ptr<CommandAllocator> pp_command_allocator);
-
   HRESULT CreateDescriptorHeap(const D3D12_DESCRIPTOR_HEAP_DESC &desc, double_ptr<DescriptorHeap> pp_descriptor_heap);
 
   HRESULT CreateDescriptorHeap(D3D12_DESCRIPTOR_HEAP_TYPE type,
@@ -88,7 +86,7 @@ class Device {
                                                  D3D12_RAYTRACING_GEOMETRY_FLAGS flags,
                                                  CommandQueue *queue,
                                                  Fence *fence,
-                                                 CommandAllocator *allocator,
+                                                 ID3D12CommandAllocator *allocator,
                                                  double_ptr<AccelerationStructure> pp_as);
 
   HRESULT CreateBottomLevelAccelerationStructure(D3D12_GPU_VIRTUAL_ADDRESS vertex_buffer,
@@ -99,7 +97,7 @@ class Device {
                                                  D3D12_RAYTRACING_GEOMETRY_FLAGS flags,
                                                  CommandQueue *queue,
                                                  Fence *fence,
-                                                 CommandAllocator *allocator,
+                                                 ID3D12CommandAllocator *allocator,
                                                  double_ptr<AccelerationStructure> pp_as);
 
   HRESULT CreateBottomLevelAccelerationStructure(D3D12_GPU_VIRTUAL_ADDRESS vertex_buffer,
@@ -109,7 +107,7 @@ class Device {
                                                  uint32_t primitive_count,
                                                  CommandQueue *queue,
                                                  Fence *fence,
-                                                 CommandAllocator *allocator,
+                                                 ID3D12CommandAllocator *allocator,
                                                  double_ptr<AccelerationStructure> pp_as);
 
   HRESULT CreateBottomLevelAccelerationStructure(Buffer *vertex_buffer,
@@ -117,19 +115,19 @@ class Device {
                                                  uint32_t stride,
                                                  CommandQueue *queue,
                                                  Fence *fence,
-                                                 CommandAllocator *allocator,
+                                                 ID3D12CommandAllocator *allocator,
                                                  double_ptr<AccelerationStructure> pp_as);
 
   HRESULT CreateTopLevelAccelerationStructure(const std::vector<D3D12_RAYTRACING_INSTANCE_DESC> &instances,
                                               CommandQueue *queue,
                                               Fence *fence,
-                                              CommandAllocator *allocator,
+                                              ID3D12CommandAllocator *allocator,
                                               double_ptr<AccelerationStructure> pp_tlas);
 
   HRESULT CreateTopLevelAccelerationStructure(const std::vector<std::pair<AccelerationStructure *, glm::mat4>> &objects,
                                               CommandQueue *queue,
                                               Fence *fence,
-                                              CommandAllocator *allocator,
+                                              ID3D12CommandAllocator *allocator,
                                               double_ptr<AccelerationStructure> pp_tlas);
 
   HRESULT CreateRayTracingPipeline(ID3D12RootSignature *root_signature,

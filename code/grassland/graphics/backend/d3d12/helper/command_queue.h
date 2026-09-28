@@ -1,5 +1,4 @@
 #pragma once
-#include "grassland/graphics/backend/d3d12/helper/command_list.h"
 #include "grassland/graphics/backend/d3d12/helper/device.h"
 
 namespace grassland::graphics::backend::d3d12 {
@@ -13,7 +12,7 @@ class CommandQueue {
   }
 
   HRESULT SingleTimeCommand(Fence *fence,
-                            CommandAllocator *command_allocator,
+                            ID3D12CommandAllocator *command_allocator,
                             const std::function<void(ID3D12GraphicsCommandList *)> &function);
 
   HRESULT SingleTimeCommand(Fence *fence, const std::function<void(ID3D12GraphicsCommandList *)> &function);

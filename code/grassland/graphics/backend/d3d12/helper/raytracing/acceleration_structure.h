@@ -1,6 +1,6 @@
 #pragma once
-#include "grassland/graphics/backend/d3d12/helper/command_allocator.h"
 #include "grassland/graphics/backend/d3d12/helper/d3d12util.h"
+#include "grassland/graphics/backend/d3d12/helper/device.h"
 
 namespace grassland::graphics::backend::d3d12 {
 
@@ -15,12 +15,12 @@ class AccelerationStructure {
   HRESULT UpdateInstances(const std::vector<D3D12_RAYTRACING_INSTANCE_DESC> &instances,
                           CommandQueue *queue,
                           Fence *fence,
-                          CommandAllocator *allocator);
+                          ID3D12CommandAllocator *allocator);
 
   HRESULT UpdateInstances(const std::vector<std::pair<AccelerationStructure *, glm::mat4>> &objects,
                           CommandQueue *queue,
                           Fence *fence,
-                          CommandAllocator *allocator);
+                          ID3D12CommandAllocator *allocator);
 
  private:
   Device *device_;

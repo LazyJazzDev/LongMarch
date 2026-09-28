@@ -74,8 +74,6 @@ class Device;
 class SwapChain;
 class DescriptorHeap;
 class CommandQueue;
-class CommandAllocator;
-class CommandList;
 class Buffer;
 class Image;
 class Fence;

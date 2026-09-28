@@ -3,8 +3,6 @@
 #include <numeric>
 
 #include "grassland/graphics/backend/d3d12/helper/buffer.h"
-#include "grassland/graphics/backend/d3d12/helper/command_allocator.h"
-#include "grassland/graphics/backend/d3d12/helper/command_list.h"
 #include "grassland/graphics/backend/d3d12/helper/command_queue.h"
 #include "grassland/graphics/backend/d3d12/helper/descriptor_heap.h"
 #include "grassland/graphics/backend/d3d12/helper/fence.h"
@@ -33,16 +31,6 @@ HRESULT Device::CreateCommandQueue(D3D12_COMMAND_LIST_TYPE type, double_ptr<Comm
                       "failed to create command queue.");
 
   pp_command_queue.construct(command_queue);
-  return S_OK;
-}
-
-HRESULT Device::CreateCommandAllocator(D3D12_COMMAND_LIST_TYPE type,
-                                       double_ptr<CommandAllocator> pp_command_allocator) {
-  ComPtr<ID3D12CommandAllocator> command_allocator;
-  RETURN_IF_FAILED_HR(device_->CreateCommandAllocator(type, IID_PPV_ARGS(&command_allocator)),
-                      "failed to create command allocator.");
-
-  pp_command_allocator.construct(command_allocator);
   return S_OK;
 }
 
@@ -201,7 +189,7 @@ HRESULT Device::CreateBottomLevelAccelerationStructure(D3D12_GPU_VIRTUAL_ADDRESS
                                                        D3D12_RAYTRACING_GEOMETRY_FLAGS flags,
                                                        CommandQueue *queue,
                                                        Fence *fence,
-                                                       CommandAllocator *allocator,
+                                                       ID3D12CommandAllocator *allocator,
                                                        double_ptr<AccelerationStructure> pp_as) {
   D3D12_RAYTRACING_GEOMETRY_DESC geometry = {};
   geometry.Type = D3D12_RAYTRACING_GEOMETRY_TYPE_PROCEDURAL_PRIMITIVE_AABBS;
@@ -255,7 +243,7 @@ HRESULT Device::CreateBottomLevelAccelerationStructure(D3D12_GPU_VIRTUAL_ADDRESS
                                                        D3D12_RAYTRACING_GEOMETRY_FLAGS flags,
                                                        CommandQueue *queue,
                                                        Fence *fence,
-                                                       CommandAllocator *allocator,
+                                                       ID3D12CommandAllocator *allocator,
                                                        double_ptr<AccelerationStructure> pp_as) {
   D3D12_RAYTRACING_GEOMETRY_DESC geometry = {};
   geometry.Type = D3D12_RAYTRACING_GEOMETRY_TYPE_TRIANGLES;
@@ -313,7 +301,7 @@ HRESULT Device::CreateBottomLevelAccelerationStructure(D3D12_GPU_VIRTUAL_ADDRESS
                                                        uint32_t primitive_count,
                                                        CommandQueue *queue,
                                                        Fence *fence,
-                                                       CommandAllocator *allocator,
+                                                       ID3D12CommandAllocator *allocator,
                                                        double_ptr<AccelerationStructure> pp_as) {
   return CreateBottomLevelAccelerationStructure(vertex_buffer, index_buffer, num_vertex, stride, primitive_count,
                                                 D3D12_RAYTRACING_GEOMETRY_FLAG_NO_DUPLICATE_ANYHIT_INVOCATION, queue,
@@ -325,7 +313,7 @@ HRESULT Device::CreateBottomLevelAccelerationStructure(Buffer *vertex_buffer,
                                                        uint32_t stride,
                                                        CommandQueue *queue,
                                                        Fence *fence,
-                                                       CommandAllocator *allocator,
+                                                       ID3D12CommandAllocator *allocator,
                                                        double_ptr<AccelerationStructure> pp_as) {
   return CreateBottomLevelAccelerationStructure(
       vertex_buffer->Handle()->GetGPUVirtualAddress(), index_buffer->Handle()->GetGPUVirtualAddress(),
@@ -336,7 +324,7 @@ HRESULT Device::CreateBottomLevelAccelerationStructure(Buffer *vertex_buffer,
 HRESULT Device::CreateTopLevelAccelerationStructure(const std::vector<D3D12_RAYTRACING_INSTANCE_DESC> &instances,
                                                     CommandQueue *queue,
                                                     Fence *fence,
-                                                    CommandAllocator *allocator,
+                                                    ID3D12CommandAllocator *allocator,
                                                     double_ptr<AccelerationStructure> pp_tlas) {
   ID3D12Resource *instance_buffer = RequestInstanceBuffer(sizeof(D3D12_RAYTRACING_INSTANCE_DESC) * instances.size());
   void *instance_buffer_ptr{};
@@ -385,7 +373,7 @@ HRESULT Device::CreateTopLevelAccelerationStructure(
     const std::vector<std::pair<AccelerationStructure *, glm::mat4>> &objects,
     CommandQueue *queue,
     Fence *fence,
-    CommandAllocator *allocator,
+    ID3D12CommandAllocator *allocator,
     double_ptr<AccelerationStructure> pp_tlas) {
   std::vector<D3D12_RAYTRACING_INSTANCE_DESC> instance_descs;
   instance_descs.reserve(objects.size());

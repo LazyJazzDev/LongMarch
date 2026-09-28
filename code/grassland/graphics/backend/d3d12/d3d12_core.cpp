@@ -12,7 +12,23 @@ namespace grassland::graphics::backend {
 
 namespace {
 #include "built_in_shaders.inl"
+
+void CreateCommandRecord(ID3D12Device *device,
+                         D3D12_COMMAND_LIST_TYPE type,
+                         Microsoft::WRL::ComPtr<ID3D12CommandAllocator> &allocator,
+                         Microsoft::WRL::ComPtr<ID3D12GraphicsCommandList> &list) {
+  d3d12::ThrowIfFailed(device->CreateCommandAllocator(type, IID_PPV_ARGS(allocator.GetAddressOf())),
+                       "Failed to create command allocator");
+  d3d12::ThrowIfFailed(device->CreateCommandList(0, type, allocator.Get(), nullptr, IID_PPV_ARGS(list.GetAddressOf())),
+                       "Failed to create command list");
+  d3d12::ThrowIfFailed(list->Close(), "Failed to close command list");
 }
+
+void ResetCommandRecord(ID3D12CommandAllocator *allocator, ID3D12GraphicsCommandList *list) {
+  d3d12::ThrowIfFailed(allocator->Reset(), "Failed to reset command allocator");
+  d3d12::ThrowIfFailed(list->Reset(allocator, nullptr), "Failed to reset command list");
+}
+}  // namespace
 
 void BlitPipeline::Initialize(d3d12::Device *device) {
   device_ = device;
@@ -171,7 +187,7 @@ int D3D12Core::CreateBottomLevelAccelerationStructure(BufferRange aabb_buffer,
   device_->CreateBottomLevelAccelerationStructure(
       d3d12_aabb_buffer->InstantBuffer()->Handle()->GetGPUVirtualAddress() + aabb_buffer.offset, stride, num_aabb,
       static_cast<D3D12_RAYTRACING_GEOMETRY_FLAGS>(flags), command_queue_.get(), fence_.get(),
-      single_time_allocator_.get(), &blas);
+      single_time_allocator_.Get(), &blas);
 
   pp_blas.construct<D3D12AccelerationStructure>(this, std::move(blas));
 
@@ -196,7 +212,7 @@ int D3D12Core::CreateBottomLevelAccelerationStructure(BufferRange vertex_buffer,
       d3d12_vertex_buffer->InstantBuffer()->Handle()->GetGPUVirtualAddress() + vertex_buffer.offset,
       d3d12_index_buffer->InstantBuffer()->Handle()->GetGPUVirtualAddress() + index_buffer.offset, num_vertex, stride,
       num_primitive, static_cast<D3D12_RAYTRACING_GEOMETRY_FLAGS>(flags), command_queue_.get(), fence_.get(),
-      single_time_allocator_.get(), &blas);
+      single_time_allocator_.Get(), &blas);
 
   pp_blas.construct<D3D12AccelerationStructure>(this, std::move(blas));
 
@@ -223,7 +239,7 @@ int D3D12Core::CreateTopLevelAccelerationStructure(const std::vector<RayTracingI
 
   std::unique_ptr<d3d12::AccelerationStructure> tlas;
   device_->CreateTopLevelAccelerationStructure(d3d12_instances, command_queue_.get(), fence_.get(),
-                                               single_time_allocator_.get(), &tlas);
+                                               single_time_allocator_.Get(), &tlas);
 
   pp_tlas.construct<D3D12AccelerationStructure>(this, std::move(tlas));
 
@@ -240,13 +256,13 @@ int D3D12Core::SubmitCommandContext(CommandContext *p_command_context) {
 
   uint64_t transfer_wait_value = 0;
   if (command_context->dynamic_buffers_.size()) {
-    transfer_allocator_->ResetCommandRecord(transfer_command_list_.get());
+    ResetCommandRecord(transfer_allocator_.Get(), transfer_command_list_.Get());
     for (auto buffer : command_context->dynamic_buffers_) {
-      buffer->TransferData(transfer_command_list_->Handle());
+      buffer->TransferData(transfer_command_list_.Get());
     }
-    transfer_command_list_->Handle()->Close();
+    transfer_command_list_->Close();
 
-    ID3D12CommandList *command_lists[] = {transfer_command_list_->Handle()};
+    ID3D12CommandList *command_lists[] = {transfer_command_list_.Get()};
 
     fence_->Wait(transfer_command_queue_.get());
     transfer_command_queue_->Handle()->ExecuteCommandLists(1, command_lists);
@@ -254,9 +270,9 @@ int D3D12Core::SubmitCommandContext(CommandContext *p_command_context) {
     transfer_wait_value = fence_->Value();
   }
 
-  command_allocators_[current_frame_]->ResetCommandRecord(command_lists_[current_frame_].get());
+  ResetCommandRecord(command_allocators_[current_frame_].Get(), command_lists_[current_frame_].Get());
 
-  auto command_list = command_lists_[current_frame_]->Handle();
+  auto command_list = command_lists_[current_frame_].Get();
 
   for (auto window : command_context->windows_) {
     command_context->RecordRTVImage(window->CurrentBackBuffer());
@@ -406,16 +422,14 @@ int D3D12Core::InitializeLogicalDevice(int device_index) {
     device_->CreateDescriptorHeap(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV, 64, &resource_descriptor_heaps_[i]);
     device_->CreateDescriptorHeap(D3D12_DESCRIPTOR_HEAP_TYPE_SAMPLER, 64, &sampler_descriptor_heaps_[i]);
 
-    device_->CreateCommandAllocator(D3D12_COMMAND_LIST_TYPE_DIRECT, &command_allocators_[i]);
-    command_allocators_[i]->CreateCommandList(D3D12_COMMAND_LIST_TYPE_DIRECT, &command_lists_[i]);
+    CreateCommandRecord(device_->Handle(), D3D12_COMMAND_LIST_TYPE_DIRECT, command_allocators_[i], command_lists_[i]);
   }
 
-  device_->CreateCommandAllocator(D3D12_COMMAND_LIST_TYPE_DIRECT, &single_time_allocator_);
-  single_time_allocator_->CreateCommandList(D3D12_COMMAND_LIST_TYPE_DIRECT, &single_time_command_list_);
+  CreateCommandRecord(device_->Handle(), D3D12_COMMAND_LIST_TYPE_DIRECT, single_time_allocator_,
+                      single_time_command_list_);
 
   device_->CreateCommandQueue(D3D12_COMMAND_LIST_TYPE_DIRECT, &transfer_command_queue_);
-  device_->CreateCommandAllocator(D3D12_COMMAND_LIST_TYPE_DIRECT, &transfer_allocator_);
-  transfer_allocator_->CreateCommandList(D3D12_COMMAND_LIST_TYPE_DIRECT, &transfer_command_list_);
+  CreateCommandRecord(device_->Handle(), D3D12_COMMAND_LIST_TYPE_DIRECT, transfer_allocator_, transfer_command_list_);
 
   blit_pipeline_.Initialize(device_.get());
 
@@ -467,11 +481,11 @@ uint32_t D3D12Core::WaveSize() const {
 }
 
 void D3D12Core::SingleTimeCommand(std::function<void(ID3D12GraphicsCommandList *)> command) {
-  single_time_allocator_->ResetCommandRecord(single_time_command_list_.get());
-  command(single_time_command_list_->Handle());
-  single_time_command_list_->Handle()->Close();
+  ResetCommandRecord(single_time_allocator_.Get(), single_time_command_list_.Get());
+  command(single_time_command_list_.Get());
+  single_time_command_list_->Close();
 
-  ID3D12CommandList *command_lists[] = {single_time_command_list_->Handle()};
+  ID3D12CommandList *command_lists[] = {single_time_command_list_.Get()};
   fence_->Wait(command_queue_.get());
   command_queue_->Handle()->ExecuteCommandLists(1, command_lists);
   fence_->Signal(command_queue_.get());

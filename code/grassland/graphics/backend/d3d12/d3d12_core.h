@@ -119,20 +119,20 @@ class D3D12Core : public Core {
     return command_queue_.get();
   }
 
-  d3d12::CommandList *CommandList() const {
-    return command_lists_[current_frame_].get();
+  ID3D12GraphicsCommandList *CommandList() const {
+    return command_lists_[current_frame_].Get();
   }
 
-  d3d12::CommandAllocator *CommandAllocator() const {
-    return command_allocators_[current_frame_].get();
+  ID3D12CommandAllocator *CommandAllocator() const {
+    return command_allocators_[current_frame_].Get();
   }
 
   d3d12::Fence *Fence() const {
     return fence_.get();
   }
 
-  d3d12::CommandAllocator *SingleTimeCommandAllocator() const {
-    return single_time_allocator_.get();
+  ID3D12CommandAllocator *SingleTimeCommandAllocator() const {
+    return single_time_allocator_.Get();
   }
 
   uint32_t CurrentFrame() const override {
@@ -170,17 +170,17 @@ class D3D12Core : public Core {
 
   std::unique_ptr<d3d12::CommandQueue> command_queue_;
   std::unique_ptr<d3d12::CommandQueue> transfer_command_queue_;
-  std::vector<std::unique_ptr<d3d12::CommandAllocator>> command_allocators_;
-  std::vector<std::unique_ptr<d3d12::CommandList>> command_lists_;
+  std::vector<Microsoft::WRL::ComPtr<ID3D12CommandAllocator>> command_allocators_;
+  std::vector<Microsoft::WRL::ComPtr<ID3D12GraphicsCommandList>> command_lists_;
 
   std::unique_ptr<d3d12::Fence> fence_;
   std::vector<uint64_t> in_flight_values_;
 
-  std::unique_ptr<d3d12::CommandAllocator> single_time_allocator_;
-  std::unique_ptr<d3d12::CommandList> single_time_command_list_;
+  Microsoft::WRL::ComPtr<ID3D12CommandAllocator> single_time_allocator_;
+  Microsoft::WRL::ComPtr<ID3D12GraphicsCommandList> single_time_command_list_;
 
-  std::unique_ptr<d3d12::CommandAllocator> transfer_allocator_;
-  std::unique_ptr<d3d12::CommandList> transfer_command_list_;
+  Microsoft::WRL::ComPtr<ID3D12CommandAllocator> transfer_allocator_;
+  Microsoft::WRL::ComPtr<ID3D12GraphicsCommandList> transfer_command_list_;
 
   std::vector<std::unique_ptr<d3d12::DescriptorHeap>> resource_descriptor_heaps_;
   std::vector<std::unique_ptr<d3d12::DescriptorHeap>> sampler_descriptor_heaps_;

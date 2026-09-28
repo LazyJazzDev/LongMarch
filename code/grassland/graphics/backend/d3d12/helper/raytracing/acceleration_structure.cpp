@@ -13,7 +13,7 @@ AccelerationStructure::AccelerationStructure(Device *device, const ComPtr<ID3D12
 HRESULT AccelerationStructure::UpdateInstances(const std::vector<D3D12_RAYTRACING_INSTANCE_DESC> &instances,
                                                CommandQueue *queue,
                                                Fence *fence,
-                                               CommandAllocator *allocator) {
+                                               ID3D12CommandAllocator *allocator) {
   ID3D12Device5 *device = device_->DXRDevice();
   RETURN_IF_FAILED_HR(as_->GetDevice(IID_PPV_ARGS(&device)), "failed to get DXR device.");
 
@@ -75,7 +75,7 @@ HRESULT AccelerationStructure::UpdateInstances(
     const std::vector<std::pair<AccelerationStructure *, glm::mat4>> &objects,
     CommandQueue *queue,
     Fence *fence,
-    CommandAllocator *allocator) {
+    ID3D12CommandAllocator *allocator) {
   ID3D12Device5 *device = device_->DXRDevice();
   RETURN_IF_FAILED_HR(as_->GetDevice(IID_PPV_ARGS(&device)), "failed to get DXR device.");
 
