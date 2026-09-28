@@ -1,8 +1,8 @@
 # Thin Lens
 
 An interactive, procedural scene dedicated to `sparkium::CameraThinLens`.
-Orange, teal and blue subjects occupy three depths; fine white details and a
-checkerboard make focus easy to judge. Small background emitters show the
+Orange, teal and blue spheres occupy three depths, with a checkerboard floor
+to help judge focus. Small background emitters show the
 aperture's bokeh shape. No external models or textures are required.
 
 ```sh
@@ -15,7 +15,7 @@ backend selection on other platforms. Rendering uses native Ray Query when
 available, otherwise native RT or software tracing; it never selects raster.
 
 - **Near / orange**, **Mid / teal**, **Far / blue** focus on the subjects' front
-  details at distances 3.4, 5.4 and 8.4. Focus distance is measured along the
+  surfaces at distances 3.4, 5.4 and 8.4. Focus distance is measured along the
   camera's forward axis.
 - **Aperture radius** controls depth of field. Larger values increase blur;
   zero matches the pinhole camera.
