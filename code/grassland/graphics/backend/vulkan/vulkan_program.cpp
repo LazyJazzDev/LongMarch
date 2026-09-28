@@ -94,7 +94,8 @@ void VulkanProgram::SetBlendState(int target_id, const BlendState &state) {
 void VulkanProgram::BindShader(Shader *shader, ShaderType type) {
   VulkanShader *vulkan_shader = dynamic_cast<VulkanShader *>(shader);
   if (vulkan_shader) {
-    pipeline_settings_.AddShaderStage(vulkan_shader->ShaderModule(), ShaderTypeToVkShaderStageFlags(type));
+    pipeline_settings_.AddShaderStage(vulkan_shader->ModuleHandle(), vulkan_shader->EntryPointRef(),
+                                      ShaderTypeToVkShaderStageFlags(type));
   } else {
     throw std::runtime_error("Invalid shader object, expected VulkanShader");
   }
@@ -134,8 +135,8 @@ void VulkanComputeProgram::Finalize() {
   pipeline_create_info.layout = pipeline_layout_->Handle();
   pipeline_create_info.stage.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
   pipeline_create_info.stage.stage = VK_SHADER_STAGE_COMPUTE_BIT;
-  pipeline_create_info.stage.module = compute_shader_->ShaderModule()->Handle();
-  pipeline_create_info.stage.pName = compute_shader_->ShaderModule()->EntryPoint().c_str();
+  pipeline_create_info.stage.module = compute_shader_->ModuleHandle();
+  pipeline_create_info.stage.pName = compute_shader_->EntryPointRef().c_str();
   pipeline_create_info.stage.pSpecializationInfo = nullptr;
   const VkResult result =
       vkCreateComputePipelines(core_->Handle(), VK_NULL_HANDLE, 1, &pipeline_create_info, nullptr, &pipeline_);
@@ -163,28 +164,28 @@ void VulkanRayTracingProgram::AddResourceBinding(ResourceType type, int count) {
 void VulkanRayTracingProgram::AddRayGenShader(Shader *ray_gen_shader) {
   auto vk_raygen_shader = dynamic_cast<VulkanShader *>(ray_gen_shader);
   assert(vk_raygen_shader != nullptr);
-  raygen_shader_ = vk_raygen_shader->ShaderModule();
+  raygen_shader_ = vk_raygen_shader;
 }
 
 void VulkanRayTracingProgram::AddMissShader(Shader *miss_shader) {
   auto vk_miss_shader = dynamic_cast<VulkanShader *>(miss_shader);
   assert(vk_miss_shader != nullptr);
-  miss_shaders_.emplace_back(vk_miss_shader->ShaderModule());
+  miss_shaders_.emplace_back(vk_miss_shader);
 }
 
 void VulkanRayTracingProgram::AddHitGroup(HitGroup hit_group) {
   vulkan::HitGroup vk_hit_group;
   auto vk_closest_hit_shader = dynamic_cast<VulkanShader *>(hit_group.closest_hit_shader);
-  vk_hit_group.closest_hit_shader = vk_closest_hit_shader->ShaderModule();
+  vk_hit_group.closest_hit_shader = vk_closest_hit_shader;
   assert(vk_hit_group.closest_hit_shader != nullptr);
   auto vk_any_hit_shader = dynamic_cast<VulkanShader *>(hit_group.any_hit_shader);
   if (vk_any_hit_shader) {
-    vk_hit_group.any_hit_shader = vk_any_hit_shader->ShaderModule();
+    vk_hit_group.any_hit_shader = vk_any_hit_shader;
   }
 
   auto vk_intersection_shader = dynamic_cast<VulkanShader *>(hit_group.intersection_shader);
   if (vk_intersection_shader) {
-    vk_hit_group.intersection_shader = vk_intersection_shader->ShaderModule();
+    vk_hit_group.intersection_shader = vk_intersection_shader;
   }
   vk_hit_group.procedure = hit_group.procedure;
   hit_groups_.emplace_back(std::move(vk_hit_group));
@@ -193,7 +194,7 @@ void VulkanRayTracingProgram::AddHitGroup(HitGroup hit_group) {
 void VulkanRayTracingProgram::AddCallableShader(Shader *callable_shader) {
   auto vk_callable_shader = dynamic_cast<VulkanShader *>(callable_shader);
   assert(vk_callable_shader != nullptr);
-  callable_shaders_.emplace_back(vk_callable_shader->ShaderModule());
+  callable_shaders_.emplace_back(vk_callable_shader);
 }
 
 void VulkanRayTracingProgram::Finalize(const std::vector<int32_t> &miss_shader_indices,

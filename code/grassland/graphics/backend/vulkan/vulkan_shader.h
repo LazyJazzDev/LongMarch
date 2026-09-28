@@ -7,19 +7,24 @@ namespace grassland::graphics::backend {
 class VulkanShader : public Shader {
  public:
   VulkanShader(VulkanCore *core, const CompiledShaderBlob &shader_blob);
-  ~VulkanShader() override = default;
+  ~VulkanShader() override;
 
-  vulkan::ShaderModule *ShaderModule() const {
-    return shader_module_.get();
+  VkShaderModule ModuleHandle() const {
+    return shader_module_;
   }
 
   std::string EntryPoint() const override {
-    return shader_module_->EntryPoint();
+    return entry_point_;
+  }
+
+  const std::string &EntryPointRef() const {
+    return entry_point_;
   }
 
  private:
   VulkanCore *core_;
-  std::unique_ptr<vulkan::ShaderModule> shader_module_;
+  VkShaderModule shader_module_{VK_NULL_HANDLE};
+  std::string entry_point_;
 };
 
 }  // namespace grassland::graphics::backend

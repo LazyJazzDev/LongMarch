@@ -11,8 +11,8 @@
 #include "grassland/graphics/backend/vulkan/helper/pipeline.h"
 #include "grassland/graphics/backend/vulkan/helper/pipeline_layout.h"
 #include "grassland/graphics/backend/vulkan/helper/raytracing/raytracing.h"
-#include "grassland/graphics/backend/vulkan/helper/shader_module.h"
 #include "grassland/graphics/backend/vulkan/vulkan_core.h"
+#include "grassland/graphics/backend/vulkan/vulkan_shader.h"
 
 namespace grassland::graphics::backend {
 using namespace vulkan;
@@ -62,38 +62,6 @@ void VulkanCore::InitializeNativeDevice(uint32_t api_version,
 void VulkanCore::DestroyNativeDevice() {
   vmaDestroyAllocator(allocator_);
   vkDestroyDevice(device_, nullptr);
-}
-
-VkResult VulkanCore::CreateShaderModule(const CompiledShaderBlob &code,
-                                        double_ptr<vulkan::ShaderModule> pp_shader_module) const {
-  if (!pp_shader_module) {
-    SetErrorMessage("pp_shader_module is nullptr");
-    return VK_ERROR_INITIALIZATION_FAILED;
-  }
-
-  VkShaderModule shader_module;
-  VkShaderModuleCreateInfo create_info = {};
-  create_info.sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO;
-  create_info.codeSize = code.data.size();
-  create_info.pCode = reinterpret_cast<const uint32_t *>(code.data.data());
-
-  RETURN_IF_FAILED_VK(vkCreateShaderModule(device_, &create_info, nullptr, &shader_module),
-                      "failed to create shader module!");
-
-  pp_shader_module.construct(this, shader_module, code.entry_point);
-
-  return VK_SUCCESS;
-}
-
-VkResult VulkanCore::CreateShaderModule(const void *p_code,
-                                        size_t code_size,
-                                        const std::string &entry_point,
-                                        double_ptr<vulkan::ShaderModule> pp_shader_module) const {
-  CompiledShaderBlob code;
-  code.data.resize(code_size);
-  std::memcpy(code.data.data(), p_code, code_size);
-  code.entry_point = entry_point;
-  return CreateShaderModule(code, pp_shader_module);
 }
 
 VkResult VulkanCore::CreateDescriptorPool(const std::vector<VkDescriptorPoolSize> &pool_sizes,
@@ -628,10 +596,10 @@ VkResult VulkanCore::CreateTopLevelAccelerationStructure(
 }
 
 VkResult VulkanCore::CreateRayTracingPipeline(vulkan::PipelineLayout *pipeline_layout,
-                                              vulkan::ShaderModule *ray_gen_shader,
-                                              const std::vector<vulkan::ShaderModule *> &miss_shaders,
+                                              VulkanShader *ray_gen_shader,
+                                              const std::vector<VulkanShader *> &miss_shaders,
                                               const std::vector<vulkan::HitGroup> &hit_groups,
-                                              const std::vector<vulkan::ShaderModule *> &callable_shaders,
+                                              const std::vector<VulkanShader *> &callable_shaders,
                                               double_ptr<vulkan::RayTracingPipeline> pp_pipeline) const {
   std::vector<VkPipelineShaderStageCreateInfo> shader_stage_create_infos;
   std::vector<VkRayTracingShaderGroupCreateInfoKHR> shader_groups;
@@ -651,8 +619,8 @@ VkResult VulkanCore::CreateRayTracingPipeline(vulkan::PipelineLayout *pipeline_l
       nullptr,
       0,
       VK_SHADER_STAGE_RAYGEN_BIT_KHR,
-      ray_gen_shader->Handle(),
-      ray_gen_shader->EntryPoint().c_str(),
+      ray_gen_shader->ModuleHandle(),
+      ray_gen_shader->EntryPointRef().c_str(),
       nullptr,
   });
 
@@ -673,8 +641,8 @@ VkResult VulkanCore::CreateRayTracingPipeline(vulkan::PipelineLayout *pipeline_l
         nullptr,
         0,
         VK_SHADER_STAGE_MISS_BIT_KHR,
-        miss_shader->Handle(),
-        miss_shader->EntryPoint().c_str(),
+        miss_shader->ModuleHandle(),
+        miss_shader->EntryPointRef().c_str(),
         nullptr,
     });
   }
@@ -696,8 +664,8 @@ VkResult VulkanCore::CreateRayTracingPipeline(vulkan::PipelineLayout *pipeline_l
         nullptr,
         0,
         VK_SHADER_STAGE_CLOSEST_HIT_BIT_KHR,
-        hit_group.closest_hit_shader->Handle(),
-        hit_group.closest_hit_shader->EntryPoint().c_str(),
+        hit_group.closest_hit_shader->ModuleHandle(),
+        hit_group.closest_hit_shader->EntryPointRef().c_str(),
         nullptr,
     });
 
@@ -708,8 +676,8 @@ VkResult VulkanCore::CreateRayTracingPipeline(vulkan::PipelineLayout *pipeline_l
           nullptr,
           0,
           VK_SHADER_STAGE_ANY_HIT_BIT_KHR,
-          hit_group.any_hit_shader->Handle(),
-          hit_group.any_hit_shader->EntryPoint().c_str(),
+          hit_group.any_hit_shader->ModuleHandle(),
+          hit_group.any_hit_shader->EntryPointRef().c_str(),
           nullptr,
       });
     }
@@ -722,8 +690,8 @@ VkResult VulkanCore::CreateRayTracingPipeline(vulkan::PipelineLayout *pipeline_l
           nullptr,
           0,
           VK_SHADER_STAGE_INTERSECTION_BIT_KHR,
-          hit_group.intersection_shader->Handle(),
-          hit_group.intersection_shader->EntryPoint().c_str(),
+          hit_group.intersection_shader->ModuleHandle(),
+          hit_group.intersection_shader->EntryPointRef().c_str(),
           nullptr,
       });
     }
@@ -748,8 +716,8 @@ VkResult VulkanCore::CreateRayTracingPipeline(vulkan::PipelineLayout *pipeline_l
         nullptr,
         0,
         VK_SHADER_STAGE_CALLABLE_BIT_KHR,
-        callable_shader->Handle(),
-        callable_shader->EntryPoint().c_str(),
+        callable_shader->ModuleHandle(),
+        callable_shader->EntryPointRef().c_str(),
         nullptr,
     });
   }
@@ -775,9 +743,9 @@ VkResult VulkanCore::CreateRayTracingPipeline(vulkan::PipelineLayout *pipeline_l
 }
 
 VkResult VulkanCore::CreateRayTracingPipeline(vulkan::PipelineLayout *pipeline_layout,
-                                              vulkan::ShaderModule *ray_gen_shader,
-                                              vulkan::ShaderModule *miss_shader,
-                                              vulkan::ShaderModule *closest_hit_shader,
+                                              VulkanShader *ray_gen_shader,
+                                              VulkanShader *miss_shader,
+                                              VulkanShader *closest_hit_shader,
                                               double_ptr<vulkan::RayTracingPipeline> pp_pipeline) const {
   return CreateRayTracingPipeline(pipeline_layout, ray_gen_shader, {miss_shader},
                                   {{closest_hit_shader, nullptr, nullptr, false}}, {}, pp_pipeline);

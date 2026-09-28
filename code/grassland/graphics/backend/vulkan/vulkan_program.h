@@ -107,10 +107,10 @@ class VulkanRayTracingProgram : public RayTracingProgram, public VulkanProgramBa
   }
 
  private:
-  vulkan::ShaderModule *raygen_shader_;
-  std::vector<vulkan::ShaderModule *> miss_shaders_;
+  VulkanShader *raygen_shader_;
+  std::vector<VulkanShader *> miss_shaders_;
   std::vector<vulkan::HitGroup> hit_groups_;
-  std::vector<vulkan::ShaderModule *> callable_shaders_;
+  std::vector<VulkanShader *> callable_shaders_;
   std::unique_ptr<vulkan::RayTracingPipeline> pipeline_;
   std::unique_ptr<vulkan::ShaderBindingTable> shader_binding_table_;
 };

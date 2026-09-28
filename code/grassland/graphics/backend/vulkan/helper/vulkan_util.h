@@ -93,7 +93,6 @@ class DescriptorSetLayout;
 class DescriptorSet;
 class PipelineLayout;
 class Pipeline;
-class ShaderModule;
 struct HitGroup;
 class Buffer;
 class Image;

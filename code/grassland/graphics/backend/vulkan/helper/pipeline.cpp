@@ -87,14 +87,16 @@ void PipelineSettings::AddInputAttribute(uint32_t binding, uint32_t location, Vk
   });
 }
 
-void PipelineSettings::AddShaderStage(ShaderModule *shader_module, VkShaderStageFlagBits stage) {
+void PipelineSettings::AddShaderStage(VkShaderModule shader_module,
+                                      const std::string &entry_point,
+                                      VkShaderStageFlagBits stage) {
   shader_stage_create_infos.push_back(VkPipelineShaderStageCreateInfo{
       VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO,
       nullptr,
       0,
       stage,
-      shader_module->Handle(),
-      shader_module->EntryPoint().c_str(),
+      shader_module,
+      entry_point.c_str(),
       nullptr,
   });
 }

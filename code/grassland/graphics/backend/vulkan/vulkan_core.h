@@ -135,13 +135,6 @@ class VulkanCore : public Core {
     return subgroup_properties_.subgroupSize;
   }
 
-  VkResult CreateShaderModule(const CompiledShaderBlob &code, double_ptr<vulkan::ShaderModule> pp_shader_module) const;
-
-  VkResult CreateShaderModule(const void *p_code,
-                              size_t code_size,
-                              const std::string &entry_point,
-                              double_ptr<vulkan::ShaderModule> pp_shader_module) const;
-
   VkResult CreateDescriptorPool(const std::vector<VkDescriptorPoolSize> &pool_sizes,
                                 uint32_t max_sets,
                                 double_ptr<vulkan::DescriptorPool> pp_descriptor_pool) const;
@@ -247,16 +240,16 @@ class VulkanCore : public Core {
       double_ptr<vulkan::AccelerationStructure> pp_tlas);
 
   VkResult CreateRayTracingPipeline(vulkan::PipelineLayout *pipeline_layout,
-                                    vulkan::ShaderModule *ray_gen_shader,
-                                    const std::vector<vulkan::ShaderModule *> &miss_shaders,
+                                    VulkanShader *ray_gen_shader,
+                                    const std::vector<VulkanShader *> &miss_shaders,
                                     const std::vector<vulkan::HitGroup> &hit_groups,
-                                    const std::vector<vulkan::ShaderModule *> &callable_shaders,
+                                    const std::vector<VulkanShader *> &callable_shaders,
                                     double_ptr<vulkan::RayTracingPipeline> pp_pipeline) const;
 
   VkResult CreateRayTracingPipeline(vulkan::PipelineLayout *pipeline_layout,
-                                    vulkan::ShaderModule *ray_gen_shader,
-                                    vulkan::ShaderModule *miss_shader,
-                                    vulkan::ShaderModule *closest_hit_shader,
+                                    VulkanShader *ray_gen_shader,
+                                    VulkanShader *miss_shader,
+                                    VulkanShader *closest_hit_shader,
                                     double_ptr<vulkan::RayTracingPipeline> pp_pipeline) const;
 
   VkResult CreateShaderBindingTable(vulkan::RayTracingPipeline *ray_tracing_pipeline,
