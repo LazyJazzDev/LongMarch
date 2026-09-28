@@ -12,8 +12,9 @@ deferred builds after uploads.
 `Core::CreateBuffer` and `Core::CreateImage` return owning `sparkium::Buffer`
 and `sparkium::Image` wrappers. Pipeline-specific Core objects forward these
 factories to the owning Sparkium Core. The wrappers own the native graphics
-resource and its CPU update state: snapshot, initialized-byte mask, dirty intervals
-and tracker registration. They use composition; `Get()` supplies the unchanged
+resource and its CPU update state: snapshot, validity, dirty regions and tracker
+registration. Buffer validity and dirty regions are byte-based; Image uses 2D
+pixel rectangles. They use composition; `Get()` supplies the unchanged
 native backend object to graphics commands. `graphics::Buffer` and
 `graphics::Image` no longer contain `Lifetime()` or a shared lifetime token.
 
@@ -27,8 +28,8 @@ the GPU must still outlive execution.
 
 `buffer->Update(data, size, offset)` and `image->Update(data, ...)` compare bytes
 locally and copy changes into the wrapper's owned snapshot. Overlapping updates
-have last-write-wins semantics; adjacent/overlapping dirty intervals merge before
-submission. No comparison reads GPU memory. CPU ranges are copied exactly,
+have last-write-wins semantics. Buffer merges adjacent/overlapping byte intervals;
+Image merges rectangles only when their union is exactly rectangular. No comparison reads GPU memory. CPU ranges are copied exactly,
 preserving GPU-written CDFs and other disjoint resource regions. Images support
 full updates and rectangular patches. Callers can immediately reuse their data.
 
@@ -41,12 +42,34 @@ duplicates or detached resources. Unregistration detaches the owner, invalidates
 dependents and ignores resources belonging to another tracker. The tracker keeps
 separate typed Buffer and Image registries and records their uploads in separate
 loops into the same command context through resource-owned `RecordUploads`
-operations. DataResource contains common upload state and recording logic:
-tracker association, byte capacity, snapshot, initialized-byte mask and dirty
-intervals. It has no native Buffer/Image pointers or resource-type checks; concrete
-wrappers handle registration, destruction and resource-specific invalidation.
-A newly allocated
-resource cannot inherit the previous owner's registration or CPU cache.
+operations. Buffer and Image are independent classes in `buffer.h/.cpp` and
+`image.h/.cpp`; the DataResource base and its files have been removed. Each class
+owns registration, destruction, invalidation and its own update representation.
+A newly allocated resource cannot inherit the previous owner's registration or
+CPU cache.
+
+### Two-dimensional image updates
+
+An Image update records one pixel rectangle, regardless of its height, and advances
+its revision once. Known snapshot coverage is also stored as rectangles, with no
+per-byte validity mask or per-row dirty intervals. A containing known rectangle
+provides a fast coverage check; more complex coverage is resolved by rectangle
+subtraction. Comparisons still inspect the supplied pixels, and matching data is
+skipped even when its coverage was established by multiple earlier rectangles.
+
+Contained, adjacent and overlapping rectangles merge when the union contains no
+holes. L-shaped and disjoint regions remain separate so GPU-written pixels in
+between are never overwritten. Overlapping non-rectangular unions can produce
+redundant copies in the intersection; each copy reads the latest CPU snapshot,
+so later updates win regardless of upload order. Metadata work depends on the
+number of rectangles rather than the number of image rows or pixel bytes.
+
+Each dirty rectangle emits one `CmdUploadImage`. Full-width regions read the
+snapshot directly; narrower multi-row regions are packed once for the existing
+tightly packed graphics API. Pixel comparison, copying and packing still cost
+work proportional to the pixel data. The pixel snapshot is allocated lazily for
+the whole image on the first update; this change removes the byte validity mask
+and row-fragment metadata, not the CPU pixel snapshot.
 
 ## Encapsulation
 
@@ -56,7 +79,7 @@ queries expose only association, revisions, input validity and build generations
 The tracker no longer reads or writes resource fields, and TLAS no longer reads
 BLAS fields directly. No mutable snapshots, dirty ranges or registries are exposed.
 
-Nine narrowly scoped member-function friendships remain across DataResource,
+Ten narrowly scoped member-function friendships remain across Buffer, Image,
 BLAS and TLAS: only the relevant `Flush` and `Unregister` overloads can acknowledge
 successful uploads, invoke ordered builds, detach owners or invalidate dependents.
 These operations remain private because allowing arbitrary callers to acknowledge
@@ -126,8 +149,10 @@ entire frame, acceleration-structure construction and presentation use one submi
 - Immediate CPU readback outside rendering requires `Flush` first; graphics
   readback performs the necessary completion wait. Resources must remain alive
   until submitted commands finish, as for other graphics commands.
-- Snapshots consume host memory proportional to the initialized extent of CPU
-  data, plus an initialized-byte mask. GPU-only resources allocate no snapshot.
+- Buffer snapshots consume host memory proportional to the initialized extent of
+  CPU data, plus an initialized-byte mask. Image snapshots allocate full-image
+  pixel storage with rectangle metadata on the first update. GPU-only resources
+  allocate no snapshot.
   This is the cost of exact comparisons without relying on hash equality.
 
 ## Validation
@@ -147,18 +172,22 @@ validation is on Windows D3D12/Vulkan; Metal requires verification on macOS.
 On the RTX 3090 Ti / driver 596.49 machine used in the
 [startup report](blender-startup-optimization.md), Ninja Release CLI, GUI and
 fallback-test builds pass. Debug D3D12 and Vulkan synchronization-validation runs
-each pass 42 tests, with four HDR-dependent cases skipped. D3D12 exposes HDR,
+each pass 44 tests, with four HDR-dependent cases skipped. D3D12 exposes HDR,
 so its SDR-only case skips; Vulkan exposes no HDR surface in this run, so its
 HDR recovery, presentation/ImGui and reference-white cases skip. Its SDR fallback
 case passes. The earlier owning-wrapper run passed 41 tests with two skips.
-All eight tracker-focused cases cover upload ownership, both destruction orders,
+All ten tracker/image-focused cases cover upload ownership, both destruction orders,
 BLAS/TLAS deferred construction, unchanged-instance suppression, geometry changes,
-instance changes, dependency destruction and cross-tracker rejection. The final
-encapsulation refactor repeats both full suites and additionally verifies duplicate
+instance changes, dependency destruction and cross-tracker rejection. Both full suites were repeated after splitting Buffer and Image. Tests verify duplicate
 registration rejection, foreign-tracker unregistration, explicit detachment and
-rejection of detached resources. CLI, GUI and fallback-test builds pass again.
+rejection of detached resources. The 128-row narrow-image test coalesces adjacent
+and contained overlapping patches into one upload of 2,560 bytes (5 x 128 RGBA8
+pixels), instead of generating per-row commands. Image regressions also check
+L-shaped and disjoint regions, preservation of GPU-owned holes, last-write-wins
+pixels, source ownership, multi-rectangle snapshot coverage, zero-valued initial
+updates, bounds and invalidation. CLI, GUI and fallback-test builds pass again.
 The six Blender image comparisons below were performed on the earlier managed-AS
-version; they were not repeated for the encapsulation-only revision.
+version; they were not repeated for the independent Buffer/Image revision.
 There are no validation errors; the existing unused raster vertex-output warning
 and intentionally injected presentation recovery errors remain.
 

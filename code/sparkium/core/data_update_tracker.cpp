@@ -4,6 +4,7 @@
 
 #include "grassland/graphics/frame_profile.h"
 #include "sparkium/core/acceleration_structure.h"
+#include "sparkium/core/image.h"
 
 namespace sparkium {
 

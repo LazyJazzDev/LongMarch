@@ -1,6 +1,6 @@
 #pragma once
 
-#include "sparkium/core/data_resource.h"
+#include "sparkium/core/buffer.h"
 
 namespace sparkium {
 class BottomLevelAccelerationStructure;

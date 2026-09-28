@@ -123,6 +123,96 @@ TEST_F(SoftwareBVHTest, DataUpdatesBatchBuffersImagesAndOverlappingWrites) {
   EXPECT_THROW(tracker.Update(first->Get(), &prefix, 4, 32), std::out_of_range);
 }
 
+TEST_F(SoftwareBVHTest, ImageUpdatesKeepTallAdjacentAndOverlappingRegionsInOneCopy) {
+  auto &tracker = core->GetDataUpdateTracker();
+  tracker.Flush();
+  std::unique_ptr<sparkium::Image> image;
+  ASSERT_EQ(core->CreateImage(12, 256, graphics::IMAGE_FORMAT_R8G8B8A8_UNORM, &image), 0);
+  std::vector<uint32_t> expected(12 * 256, 0x12345678), actual(expected.size());
+  std::unique_ptr<graphics::CommandContext> commands;
+  ASSERT_EQ(graphics->CreateCommandContext(&commands), 0);
+  commands->CmdUploadImage(image->Get(), expected.data(), {0, 0}, {12, 256});
+  ASSERT_EQ(graphics->SubmitCommandContext(commands.get()), 0);
+  auto update = [&](uint32_t x, uint32_t y, uint32_t width, uint32_t height, uint32_t value) {
+    std::vector<uint32_t> patch(width * height, value);
+    auto revision = image->Revision();
+    image->Update(patch.data(), {int32_t(x), int32_t(y)}, {width, height});
+    EXPECT_EQ(image->Revision(), revision + 1);
+    for (uint32_t row = y; row < y + height; ++row)
+      std::fill_n(expected.begin() + row * 12 + x, width, value);
+    // The owner must retain the pixels after the source is reused or destroyed.
+    std::fill(patch.begin(), patch.end(), 0xdeadbeef);
+  };
+  update(3, 7, 2, 128, 0);  // Zero-valued pixels still need uploading on the first write.
+  update(5, 7, 3, 128, 42);
+  update(4, 50, 2, 3, 77);
+  graphics::FrameProfile profile(graphics.get(), false);
+  profile.Begin(false);
+  tracker.Flush();
+  profile.Finish();
+  EXPECT_EQ(profile.counters["data_update_copies"], 1u);
+  EXPECT_EQ(profile.counters["data_update_bytes"], 5u * 128u * sizeof(uint32_t));
+  image->DownloadData(actual.data());
+  EXPECT_EQ(actual, expected);  // All pixels outside the exact union retain GPU data.
+  std::vector<uint32_t> patch(5 * 128);
+  for (size_t y = 0; y < 128; ++y)
+    std::copy_n(expected.begin() + (y + 7) * 12 + 3, 5, patch.begin() + y * 5);
+  auto revision = image->Revision();
+  image->Update(patch.data(), {3, 7}, {5, 128});
+  EXPECT_EQ(image->Revision(), revision);
+  EXPECT_FALSE(image->HasUpdates());
+}
+
+TEST_F(SoftwareBVHTest, ImageUpdatesPreserveHolesAndRecognizeCoverageAcrossRectangles) {
+  auto &tracker = core->GetDataUpdateTracker();
+  tracker.Flush();
+  std::unique_ptr<sparkium::Image> image;
+  ASSERT_EQ(core->CreateImage(8, 8, graphics::IMAGE_FORMAT_R8G8B8A8_UNORM, &image), 0);
+  std::array<uint32_t, 64> expected, actual{};
+  expected.fill(0x12345678);
+  std::unique_ptr<graphics::CommandContext> commands;
+  ASSERT_EQ(graphics->CreateCommandContext(&commands), 0);
+  commands->CmdUploadImage(image->Get(), expected.data(), {0, 0}, {8, 8});
+  ASSERT_EQ(graphics->SubmitCommandContext(commands.get()), 0);
+  auto update = [&](uint32_t x, uint32_t y, uint32_t width, uint32_t height, uint32_t value) {
+    std::vector<uint32_t> patch(width * height, value);
+    image->Update(patch.data(), {int32_t(x), int32_t(y)}, {width, height});
+    for (uint32_t row = y; row < y + height; ++row)
+      std::fill_n(expected.begin() + row * 8 + x, width, value);
+  };
+  update(1, 1, 4, 1, 10);
+  update(1, 2, 1, 3, 20);
+  update(2, 1, 2, 2, 30);
+  update(6, 6, 1, 1, 40);  // A disjoint rectangle must not expand the L-shaped union.
+  graphics::FrameProfile profile(graphics.get(), false);
+  profile.Begin(false);
+  tracker.Flush();
+  profile.Finish();
+  EXPECT_EQ(profile.counters["data_update_copies"], 4u);
+  image->DownloadData(actual.data());
+  EXPECT_EQ(actual, expected);
+  std::array<uint32_t, 6> covered{};
+  for (size_t y = 0; y < 2; ++y)
+    std::copy_n(expected.begin() + (y + 1) * 8 + 1, 3, covered.begin() + y * 3);
+  auto revision = image->Revision();
+  image->Update(covered.data(), {1, 1}, {3, 2});
+  EXPECT_EQ(image->Revision(), revision);
+  EXPECT_FALSE(image->HasUpdates());
+  EXPECT_THROW(image->Update(covered.data(), {-1, 0}, {1, 1}), std::out_of_range);
+  EXPECT_THROW(image->Update(covered.data(), {7, 7}, {2, 1}), std::out_of_range);
+  EXPECT_THROW(image->Update(nullptr, {0, 0}, {1, 1}), std::invalid_argument);
+  EXPECT_NO_THROW(image->Update(nullptr, {8, 8}, {0, 0}));
+  image->Invalidate();
+  image->Update(covered.data(), {1, 1}, {3, 2});
+  EXPECT_TRUE(image->HasUpdates());
+  profile.Begin(false);
+  tracker.Flush();
+  profile.Finish();
+  EXPECT_EQ(profile.counters["data_update_copies"], 1u);
+  image->DownloadData(actual.data());
+  EXPECT_EQ(actual, expected);
+}
+
 TEST_F(SoftwareBVHTest, DataUpdatesDiscardDestroyedResourcesAndHandleReplacement) {
   auto &tracker = core->GetDataUpdateTracker();
   tracker.Flush();
