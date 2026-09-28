@@ -1,16 +1,14 @@
 #include "grassland/graphics/backend/vulkan/helper/surface.h"
 
-#include "grassland/graphics/backend/vulkan/helper/instance.h"
-
 namespace grassland::graphics::backend::vulkan {
-Surface::Surface(const class Instance *instance, GLFWwindow *window, VkSurfaceKHR surface)
+Surface::Surface(VkInstance instance, GLFWwindow *window, VkSurfaceKHR surface)
     : instance_(instance),
       window_(window),
       surface_(surface) {
 }
 
 Surface::~Surface() {
-  vkDestroySurfaceKHR(instance_->Handle(), surface_, nullptr);
+  vkDestroySurfaceKHR(instance_, surface_, nullptr);
 }
 
 VkSurfaceKHR Surface::Handle() const {
@@ -21,7 +19,7 @@ GLFWwindow *Surface::Window() const {
   return window_;
 }
 
-const Instance *Surface::Instance() const {
+VkInstance Surface::Instance() const {
   return instance_;
 }
 }  // namespace grassland::graphics::backend::vulkan

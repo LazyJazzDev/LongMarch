@@ -17,7 +17,9 @@ VulkanCore::VulkanCore(const Settings &settings) : Core(settings) {
   hint.AddExtension(VK_KHR_EXTERNAL_MEMORY_CAPABILITIES_EXTENSION_NAME);
   hint.AddExtension(VK_KHR_EXTERNAL_SEMAPHORE_CAPABILITIES_EXTENSION_NAME);
 #endif
-  vulkan::CreateInstance(hint, &instance_);
+  vulkan::ThrowIfFailed(vulkan::CreateNativeInstance(hint, instance_, debug_messenger_, instance_procedures_),
+                        "Failed to create Vulkan instance");
+  instance_hint_ = std::move(hint);
 }
 
 VulkanCore::~VulkanCore() {
@@ -51,6 +53,19 @@ VulkanCore::~VulkanCore() {
       vkDestroyFence(device_->Handle(), fence, nullptr);
     }
     in_flight_fences_.clear();
+  }
+  command_buffers_.clear();
+  transfer_command_buffer_.reset();
+  graphics_command_pool_.reset();
+  transfer_command_pool_.reset();
+  graphics_queue_.reset();
+  transfer_queue_.reset();
+  device_.reset();
+  if (instance_hint_.enable_validation_layers && debug_messenger_) {
+    instance_procedures_.vkDestroyDebugUtilsMessengerEXT(instance_, debug_messenger_, nullptr);
+  }
+  if (instance_) {
+    vkDestroyInstance(instance_, nullptr);
   }
 }
 
@@ -396,7 +411,7 @@ int VulkanCore::SubmitCommandContext(CommandContext *p_command_context) {
 }
 
 int VulkanCore::GetPhysicalDeviceProperties(PhysicalDeviceProperties *p_physical_device_properties) {
-  auto physical_devices = instance_->EnumeratePhysicalDevices();
+  auto physical_devices = vulkan::EnumerateNativePhysicalDevices(instance_);
   if (physical_devices.empty()) {
     return 0;
   }
@@ -423,7 +438,7 @@ int VulkanCore::GetPhysicalDeviceProperties(PhysicalDeviceProperties *p_physical
 }
 
 int VulkanCore::InitializeLogicalDevice(int device_index) {
-  std::vector<vulkan::PhysicalDevice> physical_devices = instance_->EnumeratePhysicalDevices();
+  std::vector<vulkan::PhysicalDevice> physical_devices = vulkan::EnumerateNativePhysicalDevices(instance_);
 
   if (device_index < 0 || device_index >= physical_devices.size()) {
     return -1;
@@ -439,7 +454,7 @@ int VulkanCore::InitializeLogicalDevice(int device_index) {
   device_feature_requirement.enable_raytracing_extension = physical_device.SupportRayTracing();
   device_feature_requirement.enable_rayquery_extension = physical_device.SupportRayQuery();
   auto create_info = device_feature_requirement.GenerateRecommendedDeviceCreateInfo(physical_device);
-  if (instance_->CreateHint().IsEnabledExtension(VK_KHR_SURFACE_EXTENSION_NAME) &&
+  if (instance_hint_.IsEnabledExtension(VK_KHR_SURFACE_EXTENSION_NAME) &&
       physical_device.IsExtensionSupported(VK_KHR_SWAPCHAIN_EXTENSION_NAME)) {
     create_info.AddExtension(VK_KHR_SWAPCHAIN_EXTENSION_NAME);
   }
@@ -461,10 +476,15 @@ int VulkanCore::InitializeLogicalDevice(int device_index) {
     create_info.AddFeature(physical_device_timeline_semaphore_features);
   }
 #endif
-  if (instance_->CreateDevice(physical_device, create_info, device_feature_requirement.GetVmaAllocatorCreateFlags(),
-                              &device_) != VK_SUCCESS) {
+  auto native_create_info =
+      create_info.CompileVkDeviceCreateInfo(instance_hint_.enable_validation_layers, physical_device);
+  VkDevice native_device = VK_NULL_HANDLE;
+  if (vkCreateDevice(physical_device.Handle(), &native_create_info, nullptr, &native_device) != VK_SUCCESS) {
     return -1;
   }
+  device_ = std::make_unique<vulkan::Device>(instance_, instance_hint_.app_info.apiVersion, instance_procedures_,
+                                             physical_device, create_info,
+                                             device_feature_requirement.GetVmaAllocatorCreateFlags(), native_device);
   memory_properties_ = physical_device.GetPhysicalDeviceMemoryProperties();
 
   device_name_ = physical_device.GetPhysicalDeviceProperties().deviceName;

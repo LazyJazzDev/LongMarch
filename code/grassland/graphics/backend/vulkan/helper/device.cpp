@@ -19,20 +19,24 @@
 #include "grassland/graphics/backend/vulkan/helper/swap_chain.h"
 
 namespace grassland::graphics::backend::vulkan {
-Device::Device(const class Instance *instance,
+Device::Device(VkInstance instance,
+               uint32_t api_version,
+               InstanceProcedures instance_procedures,
                const class PhysicalDevice &physical_device,
                DeviceCreateInfo create_info,
                VmaAllocatorCreateFlags allocator_flags,
                VkDevice device)
     : instance_(instance),
+      api_version_(api_version),
+      instance_procedures_(instance_procedures),
       physical_device_(physical_device),
       create_info_(std::move(create_info)),
       device_(device) {
   VmaAllocatorCreateInfo allocator_info = {};
   allocator_info.physicalDevice = physical_device_.Handle();
   allocator_info.device = device_;
-  allocator_info.instance = instance->Handle();
-  allocator_info.vulkanApiVersion = instance_->CreateHint().app_info.apiVersion;
+  allocator_info.instance = instance;
+  allocator_info.vulkanApiVersion = api_version_;
   allocator_info.flags = allocator_flags;
   vmaCreateAllocator(&allocator_info, &allocator_);
 
@@ -1007,7 +1011,7 @@ VkResult Device::CreateShaderBindingTable(RayTracingPipeline *ray_tracing_pipeli
 
 void Device::NameObject(VkImage image, const std::string &name) {
 #if !defined(NDEBUG)
-  if (instance_->Procedures().vkSetDebugUtilsObjectNameEXT == nullptr) {
+  if (instance_procedures_.vkSetDebugUtilsObjectNameEXT == nullptr) {
     return;
   }
 
@@ -1016,13 +1020,13 @@ void Device::NameObject(VkImage image, const std::string &name) {
   name_info.objectType = VK_OBJECT_TYPE_IMAGE;
   name_info.objectHandle = reinterpret_cast<uint64_t>(image);
   name_info.pObjectName = name.c_str();
-  instance_->Procedures().vkSetDebugUtilsObjectNameEXT(device_, &name_info);
+  instance_procedures_.vkSetDebugUtilsObjectNameEXT(device_, &name_info);
 #endif
 }
 
 void Device::NameObject(VkImageView image_view, const std::string &name) {
 #if !defined(NDEBUG)
-  if (instance_->Procedures().vkSetDebugUtilsObjectNameEXT == nullptr) {
+  if (instance_procedures_.vkSetDebugUtilsObjectNameEXT == nullptr) {
     return;
   }
 
@@ -1031,13 +1035,13 @@ void Device::NameObject(VkImageView image_view, const std::string &name) {
   name_info.objectType = VK_OBJECT_TYPE_IMAGE_VIEW;
   name_info.objectHandle = reinterpret_cast<uint64_t>(image_view);
   name_info.pObjectName = name.c_str();
-  instance_->Procedures().vkSetDebugUtilsObjectNameEXT(device_, &name_info);
+  instance_procedures_.vkSetDebugUtilsObjectNameEXT(device_, &name_info);
 #endif
 }
 
 void Device::NameObject(VkBuffer buffer, const std::string &name) {
 #if !defined(NDEBUG)
-  if (instance_->Procedures().vkSetDebugUtilsObjectNameEXT == nullptr) {
+  if (instance_procedures_.vkSetDebugUtilsObjectNameEXT == nullptr) {
     return;
   }
 
@@ -1046,13 +1050,13 @@ void Device::NameObject(VkBuffer buffer, const std::string &name) {
   name_info.objectType = VK_OBJECT_TYPE_BUFFER;
   name_info.objectHandle = reinterpret_cast<uint64_t>(buffer);
   name_info.pObjectName = name.c_str();
-  instance_->Procedures().vkSetDebugUtilsObjectNameEXT(device_, &name_info);
+  instance_procedures_.vkSetDebugUtilsObjectNameEXT(device_, &name_info);
 #endif
 }
 
 void Device::NameObject(VkDeviceMemory memory, const std::string &name) {
 #if !defined(NDEBUG)
-  if (instance_->Procedures().vkSetDebugUtilsObjectNameEXT == nullptr) {
+  if (instance_procedures_.vkSetDebugUtilsObjectNameEXT == nullptr) {
     return;
   }
 
@@ -1061,13 +1065,13 @@ void Device::NameObject(VkDeviceMemory memory, const std::string &name) {
   name_info.objectType = VK_OBJECT_TYPE_DEVICE_MEMORY;
   name_info.objectHandle = reinterpret_cast<uint64_t>(memory);
   name_info.pObjectName = name.c_str();
-  instance_->Procedures().vkSetDebugUtilsObjectNameEXT(device_, &name_info);
+  instance_procedures_.vkSetDebugUtilsObjectNameEXT(device_, &name_info);
 #endif
 }
 
 void Device::NameObject(VkDescriptorSet descriptor_set, const std::string &name) {
 #if !defined(NDEBUG)
-  if (instance_->Procedures().vkSetDebugUtilsObjectNameEXT == nullptr) {
+  if (instance_procedures_.vkSetDebugUtilsObjectNameEXT == nullptr) {
     return;
   }
 
@@ -1076,13 +1080,13 @@ void Device::NameObject(VkDescriptorSet descriptor_set, const std::string &name)
   name_info.objectType = VK_OBJECT_TYPE_DESCRIPTOR_SET;
   name_info.objectHandle = reinterpret_cast<uint64_t>(descriptor_set);
   name_info.pObjectName = name.c_str();
-  instance_->Procedures().vkSetDebugUtilsObjectNameEXT(device_, &name_info);
+  instance_procedures_.vkSetDebugUtilsObjectNameEXT(device_, &name_info);
 #endif
 }
 
 void Device::NameObject(VkDescriptorSetLayout descriptor_set_layout, const std::string &name) {
 #if !defined(NDEBUG)
-  if (instance_->Procedures().vkSetDebugUtilsObjectNameEXT == nullptr) {
+  if (instance_procedures_.vkSetDebugUtilsObjectNameEXT == nullptr) {
     return;
   }
 
@@ -1091,13 +1095,13 @@ void Device::NameObject(VkDescriptorSetLayout descriptor_set_layout, const std::
   name_info.objectType = VK_OBJECT_TYPE_DESCRIPTOR_SET_LAYOUT;
   name_info.objectHandle = reinterpret_cast<uint64_t>(descriptor_set_layout);
   name_info.pObjectName = name.c_str();
-  instance_->Procedures().vkSetDebugUtilsObjectNameEXT(device_, &name_info);
+  instance_procedures_.vkSetDebugUtilsObjectNameEXT(device_, &name_info);
 #endif
 }
 
 void Device::NameObject(VkPipeline pipeline, const std::string &name) {
 #if !defined(NDEBUG)
-  if (instance_->Procedures().vkSetDebugUtilsObjectNameEXT == nullptr) {
+  if (instance_procedures_.vkSetDebugUtilsObjectNameEXT == nullptr) {
     return;
   }
 
@@ -1106,13 +1110,13 @@ void Device::NameObject(VkPipeline pipeline, const std::string &name) {
   name_info.objectType = VK_OBJECT_TYPE_PIPELINE;
   name_info.objectHandle = reinterpret_cast<uint64_t>(pipeline);
   name_info.pObjectName = name.c_str();
-  instance_->Procedures().vkSetDebugUtilsObjectNameEXT(device_, &name_info);
+  instance_procedures_.vkSetDebugUtilsObjectNameEXT(device_, &name_info);
 #endif
 }
 
 void Device::NameObject(VkPipelineLayout pipeline_layout, const std::string &name) {
 #if !defined(NDEBUG)
-  if (instance_->Procedures().vkSetDebugUtilsObjectNameEXT == nullptr) {
+  if (instance_procedures_.vkSetDebugUtilsObjectNameEXT == nullptr) {
     return;
   }
 
@@ -1121,13 +1125,13 @@ void Device::NameObject(VkPipelineLayout pipeline_layout, const std::string &nam
   name_info.objectType = VK_OBJECT_TYPE_PIPELINE_LAYOUT;
   name_info.objectHandle = reinterpret_cast<uint64_t>(pipeline_layout);
   name_info.pObjectName = name.c_str();
-  instance_->Procedures().vkSetDebugUtilsObjectNameEXT(device_, &name_info);
+  instance_procedures_.vkSetDebugUtilsObjectNameEXT(device_, &name_info);
 #endif
 }
 
 void Device::NameObject(VkRenderPass render_pass, const std::string &name) {
 #if !defined(NDEBUG)
-  if (instance_->Procedures().vkSetDebugUtilsObjectNameEXT == nullptr) {
+  if (instance_procedures_.vkSetDebugUtilsObjectNameEXT == nullptr) {
     return;
   }
 
@@ -1136,13 +1140,13 @@ void Device::NameObject(VkRenderPass render_pass, const std::string &name) {
   name_info.objectType = VK_OBJECT_TYPE_RENDER_PASS;
   name_info.objectHandle = reinterpret_cast<uint64_t>(render_pass);
   name_info.pObjectName = name.c_str();
-  instance_->Procedures().vkSetDebugUtilsObjectNameEXT(device_, &name_info);
+  instance_procedures_.vkSetDebugUtilsObjectNameEXT(device_, &name_info);
 #endif
 }
 
 void Device::NameObject(VkSampler sampler, const std::string &name) {
 #if !defined(NDEBUG)
-  if (instance_->Procedures().vkSetDebugUtilsObjectNameEXT == nullptr) {
+  if (instance_procedures_.vkSetDebugUtilsObjectNameEXT == nullptr) {
     return;
   }
 
@@ -1151,13 +1155,13 @@ void Device::NameObject(VkSampler sampler, const std::string &name) {
   name_info.objectType = VK_OBJECT_TYPE_SAMPLER;
   name_info.objectHandle = reinterpret_cast<uint64_t>(sampler);
   name_info.pObjectName = name.c_str();
-  instance_->Procedures().vkSetDebugUtilsObjectNameEXT(device_, &name_info);
+  instance_procedures_.vkSetDebugUtilsObjectNameEXT(device_, &name_info);
 #endif
 }
 
 void Device::NameObject(VkCommandPool command_pool, const std::string &name) {
 #if !defined(NDEBUG)
-  if (instance_->Procedures().vkSetDebugUtilsObjectNameEXT == nullptr) {
+  if (instance_procedures_.vkSetDebugUtilsObjectNameEXT == nullptr) {
     return;
   }
 
@@ -1166,13 +1170,13 @@ void Device::NameObject(VkCommandPool command_pool, const std::string &name) {
   name_info.objectType = VK_OBJECT_TYPE_COMMAND_POOL;
   name_info.objectHandle = reinterpret_cast<uint64_t>(command_pool);
   name_info.pObjectName = name.c_str();
-  instance_->Procedures().vkSetDebugUtilsObjectNameEXT(device_, &name_info);
+  instance_procedures_.vkSetDebugUtilsObjectNameEXT(device_, &name_info);
 #endif
 }
 
 void Device::NameObject(VkCommandBuffer command_buffer, const std::string &name) {
 #if !defined(NDEBUG)
-  if (instance_->Procedures().vkSetDebugUtilsObjectNameEXT == nullptr) {
+  if (instance_procedures_.vkSetDebugUtilsObjectNameEXT == nullptr) {
     return;
   }
 
@@ -1181,13 +1185,13 @@ void Device::NameObject(VkCommandBuffer command_buffer, const std::string &name)
   name_info.objectType = VK_OBJECT_TYPE_COMMAND_BUFFER;
   name_info.objectHandle = reinterpret_cast<uint64_t>(command_buffer);
   name_info.pObjectName = name.c_str();
-  instance_->Procedures().vkSetDebugUtilsObjectNameEXT(device_, &name_info);
+  instance_procedures_.vkSetDebugUtilsObjectNameEXT(device_, &name_info);
 #endif
 }
 
 void Device::NameObject(VkFramebuffer framebuffer, const std::string &name) {
 #if !defined(NDEBUG)
-  if (instance_->Procedures().vkSetDebugUtilsObjectNameEXT == nullptr) {
+  if (instance_procedures_.vkSetDebugUtilsObjectNameEXT == nullptr) {
     return;
   }
 
@@ -1196,13 +1200,13 @@ void Device::NameObject(VkFramebuffer framebuffer, const std::string &name) {
   name_info.objectType = VK_OBJECT_TYPE_FRAMEBUFFER;
   name_info.objectHandle = reinterpret_cast<uint64_t>(framebuffer);
   name_info.pObjectName = name.c_str();
-  instance_->Procedures().vkSetDebugUtilsObjectNameEXT(device_, &name_info);
+  instance_procedures_.vkSetDebugUtilsObjectNameEXT(device_, &name_info);
 #endif
 }
 
 void Device::NameObject(VkDescriptorPool descriptor_pool, const std::string &name) {
 #if !defined(NDEBUG)
-  if (instance_->Procedures().vkSetDebugUtilsObjectNameEXT == nullptr) {
+  if (instance_procedures_.vkSetDebugUtilsObjectNameEXT == nullptr) {
     return;
   }
 
@@ -1211,13 +1215,13 @@ void Device::NameObject(VkDescriptorPool descriptor_pool, const std::string &nam
   name_info.objectType = VK_OBJECT_TYPE_DESCRIPTOR_POOL;
   name_info.objectHandle = reinterpret_cast<uint64_t>(descriptor_pool);
   name_info.pObjectName = name.c_str();
-  instance_->Procedures().vkSetDebugUtilsObjectNameEXT(device_, &name_info);
+  instance_procedures_.vkSetDebugUtilsObjectNameEXT(device_, &name_info);
 #endif
 }
 
 void Device::NameObject(VkShaderModule shader_module, const std::string &name) {
 #if !defined(NDEBUG)
-  if (instance_->Procedures().vkSetDebugUtilsObjectNameEXT == nullptr) {
+  if (instance_procedures_.vkSetDebugUtilsObjectNameEXT == nullptr) {
     return;
   }
 
@@ -1226,13 +1230,13 @@ void Device::NameObject(VkShaderModule shader_module, const std::string &name) {
   name_info.objectType = VK_OBJECT_TYPE_SHADER_MODULE;
   name_info.objectHandle = reinterpret_cast<uint64_t>(shader_module);
   name_info.pObjectName = name.c_str();
-  instance_->Procedures().vkSetDebugUtilsObjectNameEXT(device_, &name_info);
+  instance_procedures_.vkSetDebugUtilsObjectNameEXT(device_, &name_info);
 #endif
 }
 
 void Device::NameObject(VkAccelerationStructureKHR acceleration_structure, const std::string &name) {
 #if !defined(NDEBUG)
-  if (instance_->Procedures().vkSetDebugUtilsObjectNameEXT == nullptr) {
+  if (instance_procedures_.vkSetDebugUtilsObjectNameEXT == nullptr) {
     return;
   }
 
@@ -1241,7 +1245,7 @@ void Device::NameObject(VkAccelerationStructureKHR acceleration_structure, const
   name_info.objectType = VK_OBJECT_TYPE_ACCELERATION_STRUCTURE_KHR;
   name_info.objectHandle = reinterpret_cast<uint64_t>(acceleration_structure);
   name_info.pObjectName = name.c_str();
-  instance_->Procedures().vkSetDebugUtilsObjectNameEXT(device_, &name_info);
+  instance_procedures_.vkSetDebugUtilsObjectNameEXT(device_, &name_info);
 #endif
 }
 

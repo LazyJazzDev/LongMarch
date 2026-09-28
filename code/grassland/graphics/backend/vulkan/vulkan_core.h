@@ -95,8 +95,12 @@ class VulkanCore : public Core {
 
   uint32_t WaveSize() const override;
 
-  vulkan::Instance *Instance() const {
-    return instance_.get();
+  VkInstance Instance() const {
+    return instance_;
+  }
+
+  const vulkan::InstanceProcedures &InstanceProcedures() const {
+    return instance_procedures_;
   }
 
   vulkan::Device *Device() const {
@@ -146,7 +150,10 @@ class VulkanCore : public Core {
 
  private:
   friend class VulkanCommandContext;
-  std::unique_ptr<vulkan::Instance> instance_;
+  VkInstance instance_{VK_NULL_HANDLE};
+  VkDebugUtilsMessengerEXT debug_messenger_{VK_NULL_HANDLE};
+  vulkan::InstanceCreateHint instance_hint_{};
+  vulkan::InstanceProcedures instance_procedures_{};
   std::unique_ptr<vulkan::Device> device_;
   VkPhysicalDeviceMemoryProperties memory_properties_;
 

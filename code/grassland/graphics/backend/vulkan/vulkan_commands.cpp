@@ -130,7 +130,7 @@ void VulkanCmdBeginRendering::CompileCommand(VulkanCommandContext *context, VkCo
 
   rendering_info.renderArea.extent.width = extent.width;
   rendering_info.renderArea.extent.height = extent.height;
-  context->Core()->Instance()->Procedures().vkCmdBeginRenderingKHR(command_buffer, &rendering_info);
+  context->Core()->InstanceProcedures().vkCmdBeginRenderingKHR(command_buffer, &rendering_info);
 }
 
 void VulkanCmdBeginRendering::RecordResourceImages(VulkanImage *resource_image) {
@@ -292,7 +292,7 @@ void VulkanCmdBindResourceAccelerationStructure::CompileCommand(VulkanCommandCon
 }
 
 void VulkanCmdEndRendering::CompileCommand(VulkanCommandContext *context, VkCommandBuffer command_buffer) {
-  context->Core()->Instance()->Procedures().vkCmdEndRenderingKHR(command_buffer);
+  context->Core()->InstanceProcedures().vkCmdEndRenderingKHR(command_buffer);
 }
 
 VulkanCmdClearImage::VulkanCmdClearImage(VulkanImage *image, const ClearValue &clear_value)
@@ -360,8 +360,8 @@ VulkanCmdSetPrimitiveTopology::VulkanCmdSetPrimitiveTopology(PrimitiveTopology t
 }
 
 void VulkanCmdSetPrimitiveTopology::CompileCommand(VulkanCommandContext *context, VkCommandBuffer command_buffer) {
-  context->Core()->Instance()->Procedures().vkCmdSetPrimitiveTopologyEXT(
-      command_buffer, PrimitiveTopologyToVkPrimitiveTopology(topology_));
+  context->Core()->InstanceProcedures().vkCmdSetPrimitiveTopologyEXT(command_buffer,
+                                                                     PrimitiveTopologyToVkPrimitiveTopology(topology_));
 }
 
 VulkanCmdDraw::VulkanCmdDraw(uint32_t index_count,

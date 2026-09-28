@@ -10,7 +10,9 @@ namespace grassland::graphics::backend::vulkan {
 
 class Device {
  public:
-  Device(const class Instance *instance,
+  Device(VkInstance instance,
+         uint32_t api_version,
+         InstanceProcedures instance_procedures,
          const class PhysicalDevice &physical_device,
          DeviceCreateInfo create_info,
          VmaAllocatorCreateFlags allocator_flags,
@@ -22,7 +24,7 @@ class Device {
     return device_;
   }
 
-  const class Instance *Instance() const {
+  VkInstance Instance() const {
     return instance_;
   }
 
@@ -216,7 +218,9 @@ class Device {
   void NameObject(VkAccelerationStructureKHR acceleration_structure, const std::string &name);
 
  private:
-  const class Instance *instance_{};
+  VkInstance instance_{};
+  uint32_t api_version_{};
+  InstanceProcedures instance_procedures_{};
 
   class PhysicalDevice physical_device_;
 

@@ -82,7 +82,6 @@ std::string VkResultToString(VkResult result);
                                                                                           \
   } while (false)
 
-class Instance;
 class Surface;
 class PhysicalDevice;
 class Device;

@@ -11,7 +11,10 @@ VulkanWindow::VulkanWindow(VulkanCore *core,
                            bool enable_hdr)
     : Window(width, height, title, fullscreen, resizable, enable_hdr),
       core_(core) {
-  core_->Instance()->CreateSurfaceFromGLFWWindow(GLFWWindow(), &surface_);
+  VkSurfaceKHR surface = VK_NULL_HANDLE;
+  vulkan::ThrowIfFailed(glfwCreateWindowSurface(core_->Instance(), GLFWWindow(), nullptr, &surface),
+                        "Failed to create window surface");
+  surface_ = std::make_unique<vulkan::Surface>(core_->Instance(), GLFWWindow(), surface);
   core_->Device()->CreateSwapchain(
       surface_.get(), enable_hdr_ ? VK_FORMAT_R16G16B16A16_SFLOAT : VK_FORMAT_R8G8B8A8_UNORM,
       enable_hdr_ ? VK_COLOR_SPACE_EXTENDED_SRGB_LINEAR_EXT : VK_COLOR_SPACE_SRGB_NONLINEAR_KHR, &swap_chain_);
@@ -201,7 +204,7 @@ void VulkanWindow::SetupImGuiContext() {
 
   ImGui_ImplVulkan_InitInfo init_info = {};
   init_info.ApiVersion = VK_API_VERSION_1_2;
-  init_info.Instance = core_->Instance()->Handle();
+  init_info.Instance = core_->Instance();
   init_info.PhysicalDevice = core_->Device()->PhysicalDevice().Handle();
   init_info.Device = core_->Device()->Handle();
   init_info.QueueFamily = core_->GraphicsQueue()->QueueFamilyIndex();

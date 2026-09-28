@@ -5,7 +5,7 @@
 namespace grassland::graphics::backend::vulkan {
 class Surface {
  public:
-  Surface(const class Instance *instance, GLFWwindow *window, VkSurfaceKHR surface);
+  Surface(VkInstance instance, GLFWwindow *window, VkSurfaceKHR surface);
 
   ~Surface();
 
@@ -13,10 +13,10 @@ class Surface {
 
   GLFWwindow *Window() const;
 
-  const class Instance *Instance() const;
+  VkInstance Instance() const;
 
  private:
-  const class Instance *instance_{};
+  VkInstance instance_{};
   GLFWwindow *window_{};
   VkSurfaceKHR surface_{};
 };
