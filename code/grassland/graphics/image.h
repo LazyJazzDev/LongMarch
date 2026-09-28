@@ -6,6 +6,7 @@ namespace grassland::graphics {
 class Image {
  public:
   virtual ~Image() = default;
+
   virtual Extent2D Extent() const = 0;
   virtual ImageFormat Format() const = 0;
   virtual void UploadData(const void *data) const = 0;
@@ -20,6 +21,9 @@ class Image {
 #endif
 };
 
-int LoadImageFromFile(Core *core, const std::string &file_path, double_ptr<Image> pp_image);
+int LoadImageFromFile(Core *core,
+                      const std::string &file_path,
+                      double_ptr<Image> pp_image,
+                      const std::function<void(Image *, const void *)> &upload = {});
 
 }  // namespace grassland::graphics

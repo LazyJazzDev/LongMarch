@@ -16,7 +16,7 @@ class EntityPointLight : public Entity {
 
  private:
   sparkium::EntityPointLight &entity_;
-  std::unique_ptr<graphics::Buffer> point_light_buffer_;
+  std::unique_ptr<sparkium::Buffer> point_light_buffer_;
   std::unique_ptr<graphics::Shader> point_light_vs_;
   std::unique_ptr<graphics::Shader> point_light_ps_;
   std::unique_ptr<graphics::Program> point_light_program_;

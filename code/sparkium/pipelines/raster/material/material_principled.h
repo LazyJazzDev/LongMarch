@@ -20,7 +20,7 @@ class MaterialPrincipled : public Material {
  private:
   sparkium::MaterialPrincipled &material_;
   std::unique_ptr<graphics::Shader> pixel_shader_;
-  std::unique_ptr<graphics::Buffer> material_buffer_;
+  std::unique_ptr<sparkium::Buffer> material_buffer_;
   std::unique_ptr<graphics::Sampler> sampler_;
 };
 

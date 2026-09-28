@@ -10,6 +10,14 @@
 
 namespace grassland::graphics::backend {
 
+D3D12CmdUpload::D3D12CmdUpload(std::function<void(D3D12CommandContext *, ID3D12GraphicsCommandList *)> encode)
+    : encode_(std::move(encode)) {
+}
+
+void D3D12CmdUpload::CompileCommand(D3D12CommandContext *context, ID3D12GraphicsCommandList *commands) {
+  encode_(context, commands);
+}
+
 D3D12CmdBindProgram::D3D12CmdBindProgram(D3D12Program *program) : program_(program) {
 }
 

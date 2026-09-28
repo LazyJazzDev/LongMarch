@@ -21,6 +21,22 @@ Mesh<float> BuildHairMesh(const std::vector<Vector3<float>> &points,
   normals.reserve(points.size() * radial_segments);
   tex_coords.reserve(points.size() * radial_segments);
 
+  size_t segment_count = 0;
+  for (size_t strand = 0; strand + 1 < strand_offsets.size(); ++strand) {
+    const size_t begin = strand_offsets[strand];
+    const size_t end = strand_offsets[strand + 1];
+    if (end <= begin + 1 || end > points.size())
+      throw std::runtime_error("invalid hair strand offsets");
+    segment_count += end - begin - 1;
+  }
+  indices.reserve(segment_count * size_t(radial_segments) * 6);
+  std::vector<Vector2<float>> circle;
+  circle.reserve(radial_segments);
+  for (int j = 0; j < radial_segments; ++j) {
+    const float angle = 2.0f * grassland::PI<float>() * float(j) / float(radial_segments);
+    circle.push_back({std::cos(angle), std::sin(angle)});
+  }
+
   for (size_t strand = 0; strand + 1 < strand_offsets.size(); ++strand) {
     const uint32_t begin = strand_offsets[strand];
     const uint32_t end = strand_offsets[strand + 1];
@@ -42,8 +58,7 @@ Mesh<float> BuildHairMesh(const std::vector<Vector3<float>> &points,
       Vector3<float> up = side.cross(tangent).normalized();
       const float v = float(i - begin) / float(end - begin - 1);
       for (int j = 0; j < radial_segments; ++j) {
-        const float angle = 2.0f * grassland::PI<float>() * float(j) / float(radial_segments);
-        const Vector3<float> normal = std::cos(angle) * side + std::sin(angle) * up;
+        const Vector3<float> normal = circle[j].x() * side + circle[j].y() * up;
         positions.push_back(points[i] + normal * radii[i]);
         normals.push_back(normal);
         tex_coords.push_back({float(j) / float(radial_segments), v});

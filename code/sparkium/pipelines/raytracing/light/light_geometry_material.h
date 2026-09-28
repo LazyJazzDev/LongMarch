@@ -16,13 +16,13 @@ class LightGeometryMaterial : public Light {
   Geometry *geometry_;
   Material *material_;
   std::unique_ptr<graphics::Shader> direct_lighting_sampler_;
-  std::unique_ptr<graphics::Buffer> direct_lighting_sampler_data_;
+  std::unique_ptr<sparkium::Buffer> direct_lighting_sampler_data_;
 
   graphics::ComputeProgram *blelloch_scan_up_program_;
   graphics::ComputeProgram *blelloch_scan_down_program_;
 
   std::vector<BlellochScanMetadata> metadatas_;
-  std::unique_ptr<graphics::Buffer> metadata_buffer_;
+  std::unique_ptr<sparkium::Buffer> metadata_buffer_;
 
   graphics::ComputeProgram *gather_primitive_power_program_;
 

@@ -7,15 +7,15 @@ namespace sparkium::raytracing {
 MaterialLambertian::MaterialLambertian(sparkium::MaterialLambertian &material)
     : material_(material),
       Material(DedicatedCast(material.GetCore())) {
-  core_->GraphicsCore()->CreateBuffer(sizeof(material_.base_color) + sizeof(material_.emission),
-                                      graphics::BUFFER_TYPE_STATIC, &material_buffer_);
+  core_->CreateBuffer(sizeof(material_.base_color) + sizeof(material_.emission), graphics::BUFFER_TYPE_STATIC,
+                      &material_buffer_);
   sampler_implementation_ = CodeLines(core_->GetShadersVFS(), "material/lambertian/sampler.slang");
   evaluator_implementation_ = CodeLines(core_->GetShadersVFS(), "material/lambertian/evaluator.slang");
 }
 
 graphics::Buffer *MaterialLambertian::Buffer() {
   SyncMaterialData();
-  return material_buffer_.get();
+  return material_buffer_ ? material_buffer_->Get() : nullptr;
 }
 
 const CodeLines &MaterialLambertian::SamplerImpl() const {
@@ -30,7 +30,7 @@ void MaterialLambertian::SyncMaterialData() {
   std::vector<uint8_t> data(material_buffer_->Size());
   std::memcpy(data.data(), &material_.base_color, sizeof(material_.base_color));
   std::memcpy(data.data() + sizeof(material_.base_color), &material_.emission, sizeof(material_.emission));
-  material_buffer_->UploadData(data.data(), data.size());
+  material_buffer_->Update(data.data(), data.size());
 }
 
 }  // namespace sparkium::raytracing

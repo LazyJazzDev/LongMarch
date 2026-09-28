@@ -7,8 +7,8 @@ namespace sparkium::raytracing {
 MaterialLight::MaterialLight(sparkium::MaterialLight &material)
     : material_(material),
       Material(DedicatedCast(material.GetCore())) {
-  core_->GraphicsCore()->CreateBuffer(sizeof(material_.emission) + sizeof(int) * 3 + sizeof(float),
-                                      graphics::BUFFER_TYPE_STATIC, &material_buffer_);
+  core_->CreateBuffer(sizeof(material_.emission) + sizeof(int) * 3 + sizeof(float), graphics::BUFFER_TYPE_STATIC,
+                      &material_buffer_);
   sampler_implementation_ = CodeLines(core_->GetShadersVFS(), "material/light/sampler.slang");
   evaluator_implementation_ = CodeLines(core_->GetShadersVFS(), "material/light/evaluator.slang");
   SyncMaterialData();
@@ -16,7 +16,7 @@ MaterialLight::MaterialLight(sparkium::MaterialLight &material)
 
 graphics::Buffer *MaterialLight::Buffer() {
   SyncMaterialData();
-  return material_buffer_.get();
+  return material_buffer_ ? material_buffer_->Get() : nullptr;
 }
 
 const CodeLines &MaterialLight::SamplerImpl() const {
@@ -37,7 +37,7 @@ void MaterialLight::SyncMaterialData() {
               sizeof(material_.camera_visible));
   std::memcpy(data.data() + sizeof(material_.emission) + sizeof(int) * 3, &material_.falloff_distance,
               sizeof(material_.falloff_distance));
-  material_buffer_->UploadData(data.data(), data.size());
+  material_buffer_->Update(data.data(), data.size());
 }
 
 }  // namespace sparkium::raytracing

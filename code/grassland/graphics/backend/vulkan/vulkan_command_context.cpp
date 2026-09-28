@@ -9,6 +9,68 @@
 
 namespace grassland::graphics::backend {
 
+void VulkanCommandContext::CmdUploadBuffer(Buffer *buffer, const void *data, size_t size, size_t offset) {
+  auto *dst = dynamic_cast<VulkanBuffer *>(buffer);
+  if (!dst || buffer->Type() != BUFFER_TYPE_STATIC || offset > buffer->Size() || size > buffer->Size() - offset)
+    throw std::invalid_argument("invalid Vulkan buffer upload");
+  if (!size)
+    return;
+  std::unique_ptr<vulkan::Buffer> allocation;
+  core_->Device()->CreateBuffer(size, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VMA_MEMORY_USAGE_CPU_ONLY, &allocation);
+  std::shared_ptr<vulkan::Buffer> staging(std::move(allocation));
+  std::memcpy(staging->Map(), data, size);
+  staging->Unmap();
+  PushPostExecutionCallback([staging] {});
+  commands_.push_back(std::make_unique<VulkanCmdUpload>([dst, staging, size, offset](auto *, VkCommandBuffer commands) {
+    VkBufferMemoryBarrier barrier{VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER};
+    barrier.srcAccessMask = VK_ACCESS_MEMORY_READ_BIT | VK_ACCESS_MEMORY_WRITE_BIT;
+    barrier.dstAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
+    barrier.srcQueueFamilyIndex = barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+    barrier.buffer = dst->Buffer();
+    barrier.offset = offset;
+    barrier.size = size;
+    vkCmdPipelineBarrier(commands, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT, 0, 0, nullptr, 1,
+                         &barrier, 0, nullptr);
+    VkBufferCopy region{0, offset, size};
+    vkCmdCopyBuffer(commands, staging->Handle(), dst->Buffer(), 1, &region);
+    barrier.srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
+    barrier.dstAccessMask = VK_ACCESS_MEMORY_READ_BIT | VK_ACCESS_MEMORY_WRITE_BIT;
+    vkCmdPipelineBarrier(commands, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, 0, 0, nullptr, 1,
+                         &barrier, 0, nullptr);
+  }));
+}
+
+void VulkanCommandContext::CmdUploadImage(Image *image,
+                                          const void *data,
+                                          const Offset2D &offset,
+                                          const Extent2D &extent) {
+  auto *dst = dynamic_cast<VulkanImage *>(image);
+  if (!dst || offset.x < 0 || offset.y < 0 || uint64_t(offset.x) + extent.width > image->Extent().width ||
+      uint64_t(offset.y) + extent.height > image->Extent().height)
+    throw std::invalid_argument("invalid Vulkan image upload");
+  if (!extent.width || !extent.height)
+    return;
+  size_t size = size_t(extent.width) * extent.height * PixelSize(image->Format());
+  std::unique_ptr<vulkan::Buffer> allocation;
+  core_->Device()->CreateBuffer(size, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VMA_MEMORY_USAGE_CPU_ONLY, &allocation);
+  std::shared_ptr<vulkan::Buffer> staging(std::move(allocation));
+  std::memcpy(staging->Map(), data, size);
+  staging->Unmap();
+  PushPostExecutionCallback([staging] {});
+  commands_.push_back(
+      std::make_unique<VulkanCmdUpload>([dst, staging, offset, extent](auto *context, VkCommandBuffer commands) {
+        auto aspect = IsDepthFormat(dst->Format()) ? VK_IMAGE_ASPECT_DEPTH_BIT : VK_IMAGE_ASPECT_COLOR_BIT;
+        context->RequireImageState(commands, dst->Image()->Handle(), VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+                                   VK_PIPELINE_STAGE_TRANSFER_BIT, VK_ACCESS_TRANSFER_WRITE_BIT, aspect);
+        VkBufferImageCopy region{};
+        region.imageSubresource = {VkImageAspectFlags(aspect), 0, 0, 1};
+        region.imageOffset = {offset.x, offset.y, 0};
+        region.imageExtent = {extent.width, extent.height, 1};
+        vkCmdCopyBufferToImage(commands, staging->Handle(), dst->Image()->Handle(),
+                               VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &region);
+      }));
+}
+
 namespace {
 class TimestampCommand : public VulkanCommand {
  public:

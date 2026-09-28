@@ -26,7 +26,7 @@ class Camera : public Object {
   sparkium::Camera &camera_;
   Core *core_;
   std::unique_ptr<graphics::Shader> camera_shader_;
-  std::unique_ptr<graphics::Buffer> camera_buffer_;
+  std::unique_ptr<sparkium::Buffer> camera_buffer_;
   CameraData camera_data_;
 };
 

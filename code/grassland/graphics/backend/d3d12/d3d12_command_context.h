@@ -42,6 +42,8 @@ class D3D12CommandContext : public CommandContext {
                       int32_t vertex_offset,
                       uint32_t first_instance) override;
   void CmdClearImage(Image *image, const ClearValue &color) override;
+  void CmdUploadBuffer(Buffer *buffer, const void *data, size_t size, size_t offset = 0) override;
+  void CmdUploadImage(Image *image, const void *data, const Offset2D &offset, const Extent2D &extent) override;
   void CmdPresent(Window *window, Image *image) override;
   void CmdDispatchRays(uint32_t width, uint32_t height, uint32_t depth) override;
   void CmdDispatch(uint32_t group_count_x, uint32_t group_count_y, uint32_t group_count_z) override;

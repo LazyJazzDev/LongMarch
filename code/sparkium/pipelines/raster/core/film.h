@@ -17,9 +17,9 @@ class Film : public Object {
   sparkium::Film &film_;
   Core *core_;
 
-  std::unique_ptr<graphics::Image> albedo_roughness_buffer_;
-  std::unique_ptr<graphics::Image> position_specular_buffer_;
-  std::unique_ptr<graphics::Image> normal_metallic_buffer_;
+  std::unique_ptr<sparkium::Image> albedo_roughness_buffer_;
+  std::unique_ptr<sparkium::Image> position_specular_buffer_;
+  std::unique_ptr<sparkium::Image> normal_metallic_buffer_;
 };
 
 Film *DedicatedCast(sparkium::Film *film);

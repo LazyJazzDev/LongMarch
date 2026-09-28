@@ -11,6 +11,34 @@ class Core : public Object {
 
   void PrepareBuiltinHitShaders();
 
+  DataUpdateTracker &GetDataUpdateTracker() {
+    return core_.GetDataUpdateTracker();
+  }
+
+  int CreateBuffer(size_t size, graphics::BufferType type, double_ptr<sparkium::Buffer> buffer) {
+    return core_.CreateBuffer(size, type, buffer);
+  }
+
+  int CreateImage(int width, int height, graphics::ImageFormat format, double_ptr<sparkium::Image> image) {
+    return core_.CreateImage(width, height, format, image);
+  }
+
+  int CreateBottomLevelAccelerationStructure(graphics::BufferRange vertices,
+                                             graphics::BufferRange indices,
+                                             uint32_t vertex_count,
+                                             uint32_t stride,
+                                             uint32_t primitive_count,
+                                             graphics::RayTracingGeometryFlag flags,
+                                             double_ptr<BottomLevelAccelerationStructure> blas) {
+    return core_.CreateBottomLevelAccelerationStructure(vertices, indices, vertex_count, stride, primitive_count, flags,
+                                                        blas);
+  }
+
+  int CreateTopLevelAccelerationStructure(const std::vector<AccelerationStructureInstance> &instances,
+                                          double_ptr<TopLevelAccelerationStructure> tlas) {
+    return core_.CreateTopLevelAccelerationStructure(instances, tlas);
+  }
+
   graphics::Core *GraphicsCore() const;
 
   const VirtualFileSystem &GetShadersVFS() const;

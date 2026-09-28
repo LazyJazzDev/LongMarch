@@ -9,6 +9,15 @@ class D3D12Command {
   virtual void CompileCommand(D3D12CommandContext *context, ID3D12GraphicsCommandList *command_list) = 0;
 };
 
+class D3D12CmdUpload : public D3D12Command {
+ public:
+  explicit D3D12CmdUpload(std::function<void(D3D12CommandContext *, ID3D12GraphicsCommandList *)> encode);
+  void CompileCommand(D3D12CommandContext *context, ID3D12GraphicsCommandList *commands) override;
+
+ private:
+  std::function<void(D3D12CommandContext *, ID3D12GraphicsCommandList *)> encode_;
+};
+
 class D3D12CmdBindProgram : public D3D12Command {
  public:
   D3D12CmdBindProgram(D3D12Program *program);

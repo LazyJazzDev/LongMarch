@@ -760,6 +760,22 @@ std::unique_ptr<JsonScene> JsonScene::Load(Core *core, const std::filesystem::pa
     result->camera_->aperture_rotation = FloatMember(camera, "aperture_rotation", 0.0f);
     result->camera_->aperture_ratio = FloatMember(camera, "aperture_ratio", 1.0f);
 
+    // All scene textures use the same decoder settings. Keep ownership in JsonScene.
+    std::map<std::filesystem::path, graphics::Image *> loaded_images;
+    auto load_image = [&](const std::filesystem::path &asset) {
+      auto key = std::filesystem::weakly_canonical(asset);
+      auto found = loaded_images.find(key);
+      if (found != loaded_images.end())
+        return found->second;
+      std::unique_ptr<sparkium::Image> image;
+      if (core->LoadImageFromFile(key.string(), &image) != 0)
+        throw std::runtime_error("cannot load texture: " + asset.string());
+      auto *result_image = image->Get();
+      result->images_.push_back(std::move(image));
+      loaded_images.emplace(std::move(key), result_image);
+      return result_image;
+    };
+
     const auto &materials = RequireObject(Member(document, "materials"));
     for (auto it = materials.MemberBegin(); it != materials.MemberEnd(); ++it) {
       std::string id = ReadString(it->name);
@@ -812,12 +828,7 @@ std::unique_ptr<JsonScene> JsonScene::Load(Core *core, const std::filesystem::pa
           for (auto [slot, destination] : slots) {
             if (!textures.HasMember(slot))
               continue;
-            auto image = std::unique_ptr<graphics::Image>{};
-            auto asset = Resolve(path, ReadString(textures[slot]));
-            if (graphics::LoadImageFromFile(core->GraphicsCore(), asset.string(), &image) != 0)
-              throw std::runtime_error("cannot load texture: " + asset.string());
-            *destination = image.get();
-            result->images_.push_back(std::move(image));
+            *destination = load_image(Resolve(path, ReadString(textures[slot])));
           }
           principled->textures.normal_reverse_y = BoolMember(textures, "normal_reverse_y", false);
         }
@@ -832,12 +843,8 @@ std::unique_ptr<JsonScene> JsonScene::Load(Core *core, const std::filesystem::pa
               std::string(ReadString(node->value["type"])) != "image_texture")
             continue;
           auto asset = Resolve(path, ReadString(Member(node->value, "path")));
-          auto image = std::unique_ptr<graphics::Image>{};
-          if (graphics::LoadImageFromFile(core->GraphicsCore(), asset.string(), &image) != 0)
-            throw std::runtime_error("cannot load shader graph texture: " + asset.string());
           texture_slots[ReadString(node->name)] = static_cast<int>(textures.size());
-          textures.push_back(image.get());
-          result->images_.push_back(std::move(image));
+          textures.push_back(load_image(asset));
         }
         auto code = ShaderGraphCompiler(graph, texture_slots).Compile();
         material = std::make_unique<MaterialShaderGraph>(core, code, textures, Vec3Member(spec, "emission_hint"));
