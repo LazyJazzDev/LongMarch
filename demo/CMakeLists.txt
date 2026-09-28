@@ -1,5 +1,5 @@
 # Enumerate all subdirectories of current directory
-file(GLOB subdirs RELATIVE ${CMAKE_CURRENT_SOURCE_DIR} *)
+file(GLOB subdirs CONFIGURE_DEPENDS RELATIVE ${CMAKE_CURRENT_SOURCE_DIR} *)
 
 foreach (subdir ${subdirs})
     if (IS_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/${subdir})
