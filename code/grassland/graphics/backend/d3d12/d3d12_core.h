@@ -7,7 +7,7 @@ struct BlitPipeline {
   d3d12::Device *device_;
   std::unique_ptr<d3d12::ShaderModule> vertex_shader;
   std::unique_ptr<d3d12::ShaderModule> pixel_shader;
-  std::unique_ptr<d3d12::RootSignature> root_signature;
+  Microsoft::WRL::ComPtr<ID3D12RootSignature> root_signature;
   std::map<DXGI_FORMAT, std::unique_ptr<d3d12::PipelineState>> pipeline_states;
   void Initialize(d3d12::Device *device);
   d3d12::PipelineState *GetPipelineState(DXGI_FORMAT format);

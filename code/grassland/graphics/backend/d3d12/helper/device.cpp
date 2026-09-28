@@ -11,7 +11,6 @@
 #include "grassland/graphics/backend/d3d12/helper/image.h"
 #include "grassland/graphics/backend/d3d12/helper/pipeline_state.h"
 #include "grassland/graphics/backend/d3d12/helper/raytracing/raytracing.h"
-#include "grassland/graphics/backend/d3d12/helper/root_signature.h"
 #include "grassland/graphics/backend/d3d12/helper/shader_module.h"
 #include "grassland/math/math_aabb.h"
 
@@ -194,40 +193,6 @@ HRESULT Device::CreateShaderModule(const void *compiled_shader_data,
 HRESULT Device::CreateShaderModule(const CompiledShaderBlob &compiled_shader,
                                    double_ptr<ShaderModule> pp_shader_module) {
   pp_shader_module.construct(compiled_shader);
-  return S_OK;
-}
-
-HRESULT Device::CreateRootSignature(const CD3DX12_VERSIONED_ROOT_SIGNATURE_DESC &desc,
-                                    double_ptr<RootSignature> pp_root_signature) {
-  D3D12_FEATURE_DATA_ROOT_SIGNATURE featureData = {};
-
-  // This is the highest version the sample supports. If CheckFeatureSupport
-  // succeeds, the HighestVersion returned will not be greater than this.
-  featureData.HighestVersion = D3D_ROOT_SIGNATURE_VERSION_1_1;
-
-  if (FAILED(device_->CheckFeatureSupport(D3D12_FEATURE_ROOT_SIGNATURE, &featureData, sizeof(featureData)))) {
-    featureData.HighestVersion = D3D_ROOT_SIGNATURE_VERSION_1_0;
-  }
-
-  ComPtr<ID3DBlob> signature;
-  ComPtr<ID3DBlob> error;
-
-  auto hr = D3DX12SerializeVersionedRootSignature(&desc, featureData.HighestVersion, &signature, &error);
-  if (FAILED(hr)) {
-    if (error) {
-      LogError("failed to serialize root signature: {}", static_cast<const char *>(error->GetBufferPointer()));
-    }
-    return hr;
-  }
-
-  ComPtr<ID3D12RootSignature> root_signature;
-
-  RETURN_IF_FAILED_HR(device_->CreateRootSignature(0, signature->GetBufferPointer(), signature->GetBufferSize(),
-                                                   IID_PPV_ARGS(&root_signature)),
-                      "failed to create root signature.");
-
-  pp_root_signature.construct(root_signature);
-
   return S_OK;
 }
 
@@ -463,7 +428,7 @@ HRESULT Device::CreateTopLevelAccelerationStructure(
   return CreateTopLevelAccelerationStructure(instance_descs, queue, fence, allocator, pp_tlas);
 }
 
-HRESULT Device::CreateRayTracingPipeline(RootSignature *root_signature,
+HRESULT Device::CreateRayTracingPipeline(ID3D12RootSignature *root_signature,
                                          ShaderModule *ray_gen_shader,
                                          const std::vector<ShaderModule *> &miss_shaders,
                                          const std::vector<HitGroup> &hit_groups,
@@ -529,7 +494,7 @@ HRESULT Device::CreateRayTracingPipeline(RootSignature *root_signature,
   shader_config->Config(512 * sizeof(float), 4 * sizeof(float));
 
   auto global_root_signature = pipeline_desc.CreateSubobject<CD3DX12_GLOBAL_ROOT_SIGNATURE_SUBOBJECT>();
-  global_root_signature->SetRootSignature(root_signature->Handle());
+  global_root_signature->SetRootSignature(root_signature);
 
   auto pipeline_config = pipeline_desc.CreateSubobject<CD3DX12_RAYTRACING_PIPELINE_CONFIG_SUBOBJECT>();
   pipeline_config->Config(31);
@@ -543,7 +508,7 @@ HRESULT Device::CreateRayTracingPipeline(RootSignature *root_signature,
   return S_OK;
 }
 
-HRESULT Device::CreateRayTracingPipeline(RootSignature *root_signature,
+HRESULT Device::CreateRayTracingPipeline(ID3D12RootSignature *root_signature,
                                          ShaderModule *ray_gen_shader,
                                          ShaderModule *miss_shader,
                                          ShaderModule *closest_hit_shader,

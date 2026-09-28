@@ -3,6 +3,31 @@
 #include "grassland/graphics/backend/d3d12/d3d12_acceleration_structure.h"
 
 namespace grassland::graphics::backend {
+Microsoft::WRL::ComPtr<ID3D12RootSignature> CreateNativeRootSignature(
+    ID3D12Device *device,
+    const CD3DX12_VERSIONED_ROOT_SIGNATURE_DESC &desc) {
+  D3D12_FEATURE_DATA_ROOT_SIGNATURE feature_data{};
+  feature_data.HighestVersion = D3D_ROOT_SIGNATURE_VERSION_1_1;
+  if (FAILED(device->CheckFeatureSupport(D3D12_FEATURE_ROOT_SIGNATURE, &feature_data, sizeof(feature_data)))) {
+    feature_data.HighestVersion = D3D_ROOT_SIGNATURE_VERSION_1_0;
+  }
+
+  Microsoft::WRL::ComPtr<ID3DBlob> signature;
+  Microsoft::WRL::ComPtr<ID3DBlob> error;
+  HRESULT result = D3DX12SerializeVersionedRootSignature(&desc, feature_data.HighestVersion, &signature, &error);
+  if (FAILED(result) && error) {
+    d3d12::SetErrorMessage("Failed to serialize root signature: {}",
+                           static_cast<const char *>(error->GetBufferPointer()));
+  }
+  d3d12::ThrowIfFailed(result, "Failed to serialize root signature");
+
+  Microsoft::WRL::ComPtr<ID3D12RootSignature> root_signature;
+  d3d12::ThrowIfFailed(device->CreateRootSignature(0, signature->GetBufferPointer(), signature->GetBufferSize(),
+                                                   IID_PPV_ARGS(root_signature.GetAddressOf())),
+                       "Failed to create root signature");
+  return root_signature;
+}
+
 DXGI_FORMAT ImageFormatToDXGIFormat(ImageFormat format) {
   switch (format) {
     case IMAGE_FORMAT_B8G8R8A8_UNORM:

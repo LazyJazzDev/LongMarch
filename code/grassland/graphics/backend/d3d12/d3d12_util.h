@@ -4,6 +4,10 @@
 
 namespace grassland::graphics::backend {
 
+Microsoft::WRL::ComPtr<ID3D12RootSignature> CreateNativeRootSignature(
+    ID3D12Device *device,
+    const CD3DX12_VERSIONED_ROOT_SIGNATURE_DESC &desc);
+
 DXGI_FORMAT ImageFormatToDXGIFormat(ImageFormat format);
 
 DXGI_FORMAT InputTypeToDXGIFormat(InputType type);

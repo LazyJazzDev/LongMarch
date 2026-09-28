@@ -24,7 +24,7 @@ void D3D12ProgramBase::FinalizeRootSignature() {
                                root_parameters.empty() ? nullptr : root_parameters.data(), 0, nullptr,
                                D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT);
 
-  core_->Device()->CreateRootSignature(root_signature_desc, &root_signature_);
+  root_signature_ = CreateNativeRootSignature(core_->Device()->Handle(), root_signature_desc);
 }
 
 D3D12Program::D3D12Program(D3D12Core *core, const std::vector<ImageFormat> &color_formats, ImageFormat depth_format)
@@ -104,7 +104,7 @@ void D3D12Program::Finalize() {
 
   pipeline_state_desc_.InputLayout.pInputElementDescs = input_attributes_.data();
   pipeline_state_desc_.InputLayout.NumElements = static_cast<UINT>(input_attributes_.size());
-  pipeline_state_desc_.pRootSignature = root_signature_->Handle();
+  pipeline_state_desc_.pRootSignature = root_signature_.Get();
 
   core_->Device()->CreatePipelineState(pipeline_state_desc_, &pipeline_state_);
 }
@@ -134,7 +134,7 @@ void D3D12ComputeProgram::Finalize() {
   FinalizeRootSignature();
 
   D3D12_COMPUTE_PIPELINE_STATE_DESC pipeline_desc{};
-  pipeline_desc.pRootSignature = root_signature_->Handle();
+  pipeline_desc.pRootSignature = root_signature_.Get();
   pipeline_desc.CS = compute_shader_->ShaderModule().Handle();
 
   core_->Device()->Handle()->CreateComputePipelineState(&pipeline_desc, IID_PPV_ARGS(&pipeline_state_));
@@ -200,7 +200,7 @@ void D3D12RayTracingProgram::Finalize(const std::vector<int32_t> &miss_shader_in
                                       const std::vector<int32_t> &callable_shader_indices) {
   FinalizeRootSignature();
 
-  core_->Device()->CreateRayTracingPipeline(root_signature_.get(), raygen_shader_, miss_shaders_, hit_groups_,
+  core_->Device()->CreateRayTracingPipeline(root_signature_.Get(), raygen_shader_, miss_shaders_, hit_groups_,
                                             callable_shaders_, &pipeline_);
 
   core_->Device()->CreateShaderTable(pipeline_.get(), miss_shader_indices, hit_group_indices, callable_shader_indices,

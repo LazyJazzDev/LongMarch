@@ -82,9 +82,6 @@ class Device {
 
   HRESULT CreateShaderModule(const CompiledShaderBlob &compiled_shader, double_ptr<ShaderModule> pp_shader_module);
 
-  HRESULT CreateRootSignature(const CD3DX12_VERSIONED_ROOT_SIGNATURE_DESC &desc,
-                              double_ptr<RootSignature> pp_root_signature);
-
   HRESULT CreatePipelineState(const D3D12_GRAPHICS_PIPELINE_STATE_DESC &desc,
                               double_ptr<PipelineState> pp_pipeline_state);
 
@@ -138,14 +135,14 @@ class Device {
                                               CommandAllocator *allocator,
                                               double_ptr<AccelerationStructure> pp_tlas);
 
-  HRESULT CreateRayTracingPipeline(RootSignature *root_signature,
+  HRESULT CreateRayTracingPipeline(ID3D12RootSignature *root_signature,
                                    ShaderModule *ray_gen_shader,
                                    const std::vector<ShaderModule *> &miss_shaders,
                                    const std::vector<HitGroup> &hit_groups,
                                    const std::vector<ShaderModule *> &callable_shaders,
                                    double_ptr<RayTracingPipeline> pp_pipeline);
 
-  HRESULT CreateRayTracingPipeline(RootSignature *root_signature,
+  HRESULT CreateRayTracingPipeline(ID3D12RootSignature *root_signature,
                                    ShaderModule *ray_gen_shader,
                                    ShaderModule *miss_shader,
                                    ShaderModule *closest_hit_shader,

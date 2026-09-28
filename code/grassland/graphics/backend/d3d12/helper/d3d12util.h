@@ -73,7 +73,6 @@ class Adapter;
 class Device;
 class SwapChain;
 class DescriptorHeap;
-class RootSignature;
 class CommandQueue;
 class CommandAllocator;
 class CommandList;

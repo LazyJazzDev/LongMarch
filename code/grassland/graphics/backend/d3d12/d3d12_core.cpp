@@ -31,13 +31,13 @@ void BlitPipeline::Initialize(d3d12::Device *device) {
   CD3DX12_VERSIONED_ROOT_SIGNATURE_DESC root_signature_desc;
   root_signature_desc.Init_1_1(1, &root_parameter, 1, &sampler_desc,
                                D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT);
-  device_->CreateRootSignature(root_signature_desc, &root_signature);
+  root_signature = CreateNativeRootSignature(device_->Handle(), root_signature_desc);
 }
 
 d3d12::PipelineState *BlitPipeline::GetPipelineState(DXGI_FORMAT format) {
   if (pipeline_states.count(format) == 0) {
     D3D12_GRAPHICS_PIPELINE_STATE_DESC pipeline_state_desc = {};
-    pipeline_state_desc.pRootSignature = root_signature->Handle();
+    pipeline_state_desc.pRootSignature = root_signature.Get();
     pipeline_state_desc.VS = vertex_shader->Handle();
     pipeline_state_desc.PS = pixel_shader->Handle();
     pipeline_state_desc.BlendState = CD3DX12_BLEND_DESC(D3D12_DEFAULT);

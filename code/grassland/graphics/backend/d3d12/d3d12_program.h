@@ -13,8 +13,8 @@ class D3D12ProgramBase {
   void AddResourceBindingImpl(ResourceType type, int count);
   void FinalizeRootSignature();
 
-  d3d12::RootSignature *RootSignature() const {
-    return root_signature_.get();
+  ID3D12RootSignature *RootSignature() const {
+    return root_signature_.Get();
   }
 
   CD3DX12_DESCRIPTOR_RANGE1 *DescriptorRange(int index) {
@@ -24,7 +24,7 @@ class D3D12ProgramBase {
  protected:
   D3D12Core *core_;
   std::vector<CD3DX12_DESCRIPTOR_RANGE1> descriptor_ranges_;
-  std::unique_ptr<d3d12::RootSignature> root_signature_;
+  Microsoft::WRL::ComPtr<ID3D12RootSignature> root_signature_;
 };
 
 class D3D12Program : public Program, public D3D12ProgramBase {

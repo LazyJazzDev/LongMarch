@@ -14,7 +14,7 @@ D3D12CmdBindProgram::D3D12CmdBindProgram(D3D12Program *program) : program_(progr
 }
 
 void D3D12CmdBindProgram::CompileCommand(D3D12CommandContext *context, ID3D12GraphicsCommandList *command_list) {
-  command_list->SetGraphicsRootSignature(program_->RootSignature()->Handle());
+  command_list->SetGraphicsRootSignature(program_->RootSignature());
   command_list->SetPipelineState(program_->PipelineState()->Handle());
 }
 
@@ -23,7 +23,7 @@ D3D12CmdBindRayTracingProgram::D3D12CmdBindRayTracingProgram(D3D12RayTracingProg
 
 void D3D12CmdBindRayTracingProgram::CompileCommand(D3D12CommandContext *context,
                                                    ID3D12GraphicsCommandList *command_list) {
-  command_list->SetComputeRootSignature(program_->RootSignature()->Handle());
+  command_list->SetComputeRootSignature(program_->RootSignature());
   d3d12::ComPtr<ID3D12GraphicsCommandList4> command_list4;
   if (SUCCEEDED(command_list->QueryInterface(IID_PPV_ARGS(&command_list4)))) {
     command_list4->SetPipelineState1(program_->PipelineState()->Handle());
@@ -34,7 +34,7 @@ D3D12CmdBindComputeProgram::D3D12CmdBindComputeProgram(D3D12ComputeProgram *prog
 }
 
 void D3D12CmdBindComputeProgram::CompileCommand(D3D12CommandContext *context, ID3D12GraphicsCommandList *command_list) {
-  command_list->SetComputeRootSignature(program_->RootSignature()->Handle());
+  command_list->SetComputeRootSignature(program_->RootSignature());
   command_list->SetPipelineState(program_->PipelineState().Get());
 }
 
@@ -370,7 +370,7 @@ void D3D12CmdPresent::CompileCommand(D3D12CommandContext *context, ID3D12Graphic
 
   command_list->ResourceBarrier(1, &barrier);
 
-  auto root_signature = context->Core()->BlitPipeline()->root_signature->Handle();
+  auto root_signature = context->Core()->BlitPipeline()->root_signature.Get();
   auto pso = context->Core()->BlitPipeline()->GetPipelineState(window_->SwapChain()->BackBufferFormat());
   Extent2D extent;
   extent.width = window_->SwapChain()->Width();
