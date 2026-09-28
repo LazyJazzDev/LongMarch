@@ -27,8 +27,10 @@ class Image final {
   }
 
   bool HasUpdates() const {
-    return !dirty_.empty();
+    return !updates_.empty();
   }
+
+  size_t PendingUploadBytes() const;
 
   uint64_t Revision() const {
     return revision_;
@@ -51,25 +53,23 @@ class Image final {
 
   void DetachTracker() {
     tracker_ = nullptr;
+    AcknowledgeUploads();
   }
 
   void AcknowledgeUploads() {
-    dirty_.clear();
+    std::vector<UpdateTask>().swap(updates_);
   }
 
   DataUpdateTracker *tracker_;
   uint64_t revision_{};
-  std::vector<uint8_t> bytes_;
 
-  // Half-open pixel bounds, independent of image row pitch and pixel byte size.
-  struct Region {
-    uint32_t left, top, right, bottom;
+  struct UpdateTask {
+    graphics::Offset2D offset;
+    graphics::Extent2D extent;
+    std::vector<uint8_t> data;
   };
 
-  static void AddRegion(std::vector<Region> &regions, Region region);
-  bool HasSnapshot(Region region) const;
-  std::vector<Region> valid_;
-  std::vector<Region> dirty_;
+  std::vector<UpdateTask> updates_;
   std::unique_ptr<graphics::Image> image_;
 };
 }  // namespace sparkium

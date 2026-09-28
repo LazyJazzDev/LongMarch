@@ -27,8 +27,10 @@ class Buffer final {
   }
 
   bool HasUpdates() const {
-    return !dirty_.empty();
+    return !updates_.empty();
   }
+
+  size_t PendingUploadBytes() const;
 
   uint64_t Revision() const {
     return revision_;
@@ -51,19 +53,23 @@ class Buffer final {
 
   void DetachTracker() {
     tracker_ = nullptr;
+    AcknowledgeUploads();
   }
 
   void AcknowledgeUploads() {
-    dirty_.clear();
+    std::vector<UpdateTask>().swap(updates_);
   }
 
   DataUpdateTracker *tracker_;
   uint64_t revision_{};
-  std::vector<uint8_t> bytes_;
-  void MergeUpdates();
+
+  struct UpdateTask {
+    size_t offset;
+    std::vector<uint8_t> data;
+  };
+
+  std::vector<UpdateTask> updates_;
   size_t capacity_{};
-  std::vector<bool> valid_;
-  std::vector<std::pair<size_t, size_t>> dirty_;
   std::unique_ptr<graphics::Buffer> buffer_;
 };
 }  // namespace sparkium

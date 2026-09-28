@@ -1,6 +1,5 @@
 #include "sparkium/core/buffer.h"
 
-#include <cstring>
 #include <stdexcept>
 
 namespace sparkium {
@@ -23,31 +22,23 @@ void Buffer::Resize(size_t size) {
   Invalidate();
 }
 
-void Buffer::MergeUpdates() {
-  std::sort(dirty_.begin(), dirty_.end());
-  size_t count = 0;
-  for (auto range : dirty_) {
-    if (count && range.first <= dirty_[count - 1].second)
-      dirty_[count - 1].second = std::max(dirty_[count - 1].second, range.second);
-    else
-      dirty_[count++] = range;
-  }
-  dirty_.resize(count);
-}
-
 void Buffer::Invalidate() {
   capacity_ = buffer_->Size();
   ++revision_;
-  bytes_.clear();
-  valid_.clear();
-  dirty_.clear();
+  AcknowledgeUploads();
+}
+
+size_t Buffer::PendingUploadBytes() const {
+  size_t bytes = 0;
+  for (const auto &task : updates_)
+    bytes += task.data.size();
+  return bytes;
 }
 
 void Buffer::RecordUploads(graphics::CommandContext &commands, size_t &copies, size_t &bytes) {
-  MergeUpdates();
-  for (auto [begin, end] : dirty_) {
-    commands.CmdUploadBuffer(Get(), bytes_.data() + begin, end - begin, begin);
-    bytes += end - begin;
+  for (const auto &task : updates_) {
+    commands.CmdUploadBuffer(Get(), task.data.data(), task.data.size(), task.offset);
+    bytes += task.data.size();
     ++copies;
   }
 }
@@ -63,17 +54,8 @@ void Buffer::Update(const void *data, size_t size, size_t offset) {
     return;
   if (!data)
     throw std::invalid_argument("null update data");
-  const size_t end = offset + size;
-  if (bytes_.size() < end) {
-    bytes_.resize(end);
-    valid_.resize(end, false);
-  }
-  if (std::all_of(valid_.begin() + offset, valid_.begin() + end, [](bool value) { return value; }) &&
-      std::memcmp(bytes_.data() + offset, data, size) == 0)
-    return;
-  std::memcpy(bytes_.data() + offset, data, size);
-  std::fill(valid_.begin() + offset, valid_.begin() + end, true);
-  dirty_.emplace_back(offset, end);
+  const auto *source = static_cast<const uint8_t *>(data);
+  updates_.push_back({offset, std::vector<uint8_t>(source, source + size)});
   ++revision_;
 }
 

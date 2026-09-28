@@ -56,7 +56,7 @@ class SoftwareBVHTest : public testing::Test {
   std::unique_ptr<sparkium::Core> core;
 };
 
-TEST_F(SoftwareBVHTest, DataUpdatesBatchBuffersImagesAndOverlappingWrites) {
+TEST_F(SoftwareBVHTest, DataUpdatesBatchOwnedTasksAndOverlappingWrites) {
   auto &tracker = core->GetDataUpdateTracker();
   tracker.Flush();
   std::unique_ptr<sparkium::Buffer> first, second;
@@ -84,7 +84,7 @@ TEST_F(SoftwareBVHTest, DataUpdatesBatchBuffersImagesAndOverlappingWrites) {
   tracker.Flush();
   profile.Finish();
   EXPECT_EQ(profile.counters["data_update_batches"], 1u);
-  EXPECT_EQ(profile.counters["data_update_copies"], 4u);
+  EXPECT_EQ(profile.counters["data_update_copies"], 7u);
   graphics->WaitGPU();
   first->DownloadData(actual.data(), sizeof(actual));
   original[1] = 100;
@@ -101,7 +101,8 @@ TEST_F(SoftwareBVHTest, DataUpdatesBatchBuffersImagesAndOverlappingWrites) {
   tracker.Update(image->Get(), pixels.data());
   tracker.Flush();
   profile.Finish();
-  EXPECT_EQ(profile.counters["data_update_batches"], 0u);
+  EXPECT_EQ(profile.counters["data_update_batches"], 1u);
+  EXPECT_EQ(profile.counters["data_update_copies"], 2u);
   uint32_t corner = 123;
   tracker.Update(image->Get(), &corner, {2, 1}, {1, 1});
   tracker.Flush();
@@ -123,7 +124,7 @@ TEST_F(SoftwareBVHTest, DataUpdatesBatchBuffersImagesAndOverlappingWrites) {
   EXPECT_THROW(tracker.Update(first->Get(), &prefix, 4, 32), std::out_of_range);
 }
 
-TEST_F(SoftwareBVHTest, ImageUpdatesKeepTallAdjacentAndOverlappingRegionsInOneCopy) {
+TEST_F(SoftwareBVHTest, ImageUpdatesQueueRectanglesWithoutRowFragmentation) {
   auto &tracker = core->GetDataUpdateTracker();
   tracker.Flush();
   std::unique_ptr<sparkium::Image> image;
@@ -150,8 +151,9 @@ TEST_F(SoftwareBVHTest, ImageUpdatesKeepTallAdjacentAndOverlappingRegionsInOneCo
   profile.Begin(false);
   tracker.Flush();
   profile.Finish();
-  EXPECT_EQ(profile.counters["data_update_copies"], 1u);
-  EXPECT_EQ(profile.counters["data_update_bytes"], 5u * 128u * sizeof(uint32_t));
+  EXPECT_EQ(profile.counters["data_update_copies"], 3u);
+  EXPECT_EQ(profile.counters["data_update_bytes"], (5u * 128u + 2u * 3u) * sizeof(uint32_t));
+  EXPECT_EQ(image->PendingUploadBytes(), 0u);
   image->DownloadData(actual.data());
   EXPECT_EQ(actual, expected);  // All pixels outside the exact union retain GPU data.
   std::vector<uint32_t> patch(5 * 128);
@@ -159,11 +161,11 @@ TEST_F(SoftwareBVHTest, ImageUpdatesKeepTallAdjacentAndOverlappingRegionsInOneCo
     std::copy_n(expected.begin() + (y + 7) * 12 + 3, 5, patch.begin() + y * 5);
   auto revision = image->Revision();
   image->Update(patch.data(), {3, 7}, {5, 128});
-  EXPECT_EQ(image->Revision(), revision);
-  EXPECT_FALSE(image->HasUpdates());
+  EXPECT_EQ(image->Revision(), revision + 1);
+  EXPECT_TRUE(image->HasUpdates());
 }
 
-TEST_F(SoftwareBVHTest, ImageUpdatesPreserveHolesAndRecognizeCoverageAcrossRectangles) {
+TEST_F(SoftwareBVHTest, ImageUpdatesPreserveHolesAndReplayExplicitRequests) {
   auto &tracker = core->GetDataUpdateTracker();
   tracker.Flush();
   std::unique_ptr<sparkium::Image> image;
@@ -196,8 +198,8 @@ TEST_F(SoftwareBVHTest, ImageUpdatesPreserveHolesAndRecognizeCoverageAcrossRecta
     std::copy_n(expected.begin() + (y + 1) * 8 + 1, 3, covered.begin() + y * 3);
   auto revision = image->Revision();
   image->Update(covered.data(), {1, 1}, {3, 2});
-  EXPECT_EQ(image->Revision(), revision);
-  EXPECT_FALSE(image->HasUpdates());
+  EXPECT_EQ(image->Revision(), revision + 1);
+  EXPECT_TRUE(image->HasUpdates());
   EXPECT_THROW(image->Update(covered.data(), {-1, 0}, {1, 1}), std::out_of_range);
   EXPECT_THROW(image->Update(covered.data(), {7, 7}, {2, 1}), std::out_of_range);
   EXPECT_THROW(image->Update(nullptr, {0, 0}, {1, 1}), std::invalid_argument);
@@ -211,6 +213,45 @@ TEST_F(SoftwareBVHTest, ImageUpdatesPreserveHolesAndRecognizeCoverageAcrossRecta
   EXPECT_EQ(profile.counters["data_update_copies"], 1u);
   image->DownloadData(actual.data());
   EXPECT_EQ(actual, expected);
+}
+
+TEST_F(SoftwareBVHTest, UploadTasksOwnOnlyRequestedDataAndReleaseItAfterSubmissionOrCancellation) {
+  auto &tracker = core->GetDataUpdateTracker();
+  tracker.Flush();
+  std::unique_ptr<sparkium::Buffer> buffer;
+  std::unique_ptr<sparkium::Image> image;
+  ASSERT_EQ(core->CreateBuffer(1024 * 1024, graphics::BUFFER_TYPE_STATIC, &buffer), 0);
+  ASSERT_EQ(core->CreateImage(1024, 1024, graphics::IMAGE_FORMAT_R8G8B8A8_UNORM, &image), 0);
+  EXPECT_EQ(buffer->PendingUploadBytes(), 0u);
+  EXPECT_EQ(image->PendingUploadBytes(), 0u);
+  uint32_t value = 42, actual = 0;
+  buffer->Update(&value, sizeof(value), buffer->Size() - sizeof(value));
+  image->Update(&value, {1000, 1000}, {1, 1});
+  EXPECT_EQ(buffer->PendingUploadBytes(), sizeof(value));
+  EXPECT_EQ(image->PendingUploadBytes(), sizeof(value));
+  value = 7;
+  tracker.Flush();
+  EXPECT_EQ(buffer->PendingUploadBytes(), 0u);
+  EXPECT_EQ(image->PendingUploadBytes(), 0u);
+  buffer->DownloadData(&actual, sizeof(actual), buffer->Size() - sizeof(actual));
+  EXPECT_EQ(actual, 42u);
+  // A later identical request is still queued: there is no retained comparison data.
+  value = 42;
+  buffer->Update(&value, sizeof(value), buffer->Size() - sizeof(value));
+  image->Update(&value, {1000, 1000}, {1, 1});
+  EXPECT_EQ(buffer->PendingUploadBytes(), sizeof(value));
+  EXPECT_EQ(image->PendingUploadBytes(), sizeof(value));
+  buffer->Invalidate();
+  image->Invalidate();
+  EXPECT_EQ(buffer->PendingUploadBytes(), 0u);
+  EXPECT_EQ(image->PendingUploadBytes(), 0u);
+  buffer->Update(&value, sizeof(value));
+  image->Update(&value, {1000, 1000}, {1, 1});
+  tracker.Unregister(buffer.get());
+  tracker.Unregister(image.get());
+  EXPECT_EQ(buffer->PendingUploadBytes(), 0u);
+  EXPECT_EQ(image->PendingUploadBytes(), 0u);
+  graphics->WaitGPU();
 }
 
 TEST_F(SoftwareBVHTest, DataUpdatesDiscardDestroyedResourcesAndHandleReplacement) {
@@ -241,7 +282,7 @@ TEST_F(SoftwareBVHTest, DataUpdatesDiscardDestroyedResourcesAndHandleReplacement
   buffer->DownloadData(&actual, 4);
   EXPECT_EQ(actual, value);
   buffer->Resize(64);
-  // The wrapper invalidates its snapshot automatically when resized.
+  // Resizing cancels obsolete tasks and advances the geometry revision.
   tracker.Update(buffer->Get(), &value, 4);
   tracker.Flush();
   buffer->DownloadData(&actual, 4);
@@ -376,12 +417,17 @@ TEST_F(SoftwareBVHTest, DataUpdatesDeferAccelerationStructuresAndSkipUnchangedIn
   EXPECT_EQ(profile.counters["data_update_batches"], 1u);
   EXPECT_EQ(profile.counters["data_update_blas_builds"], 1u);
   EXPECT_EQ(profile.counters["data_update_tlas_builds"], 1u);
-  vertices->Update(positions.data(), sizeof(positions));
   tlas->UpdateInstances(instances);
   flush();
   EXPECT_EQ(profile.counters["data_update_batches"], 0u);
   EXPECT_EQ(profile.counters["data_update_blas_builds"], 0u);
   EXPECT_EQ(profile.counters["data_update_tlas_updates"], 0u);
+  // An explicit upload is a new geometry revision even when its bytes match.
+  vertices->Update(positions.data(), sizeof(positions));
+  flush();
+  EXPECT_EQ(profile.counters["data_update_batches"], 1u);
+  EXPECT_EQ(profile.counters["data_update_blas_builds"], 1u);
+  EXPECT_EQ(profile.counters["data_update_tlas_updates"], 1u);
   instances[0].transform[3][0] = 2.0f;
   tlas->UpdateInstances(instances);
   flush();
@@ -553,7 +599,7 @@ TEST_F(SoftwareBVHTest, MaterialUploadsPreservePublicEditsAndSceneTextureMapping
   core->GetDataUpdateTracker().Flush();
   profile.Finish();
   // Vulkan reports upload counters; both backends verify the GPU bytes below.
-  EXPECT_EQ(profile.counters["data_update_batches"], 0u);
+  EXPECT_EQ(profile.counters["data_update_batches"], 1u);
 
   diffuse.base_color = {0.2f, 0.4f, 0.6f};
   emission.emission = {2.0f, 3.0f, 4.0f};
@@ -618,7 +664,7 @@ GraphSurface EvaluateShaderGraph(HitRecord hit, float3 direction, int bounce, ui
     rt_graph->Update(scene);
     core->GetDataUpdateTracker().Flush();
     profile.Finish();
-    EXPECT_EQ(profile.counters["data_update_batches"], 0u);
+    EXPECT_EQ(profile.counters["data_update_batches"], 1u);
   }
   principled.textures.base_color = nullptr;
   rt_principled->Update(a);
@@ -656,7 +702,7 @@ TEST_F(SoftwareBVHTest, GeometryLightTransformUploadsTrackChangesAndReverts) {
     light.SamplerData();
     core->GetDataUpdateTracker().Flush();
     profile.Finish();
-    EXPECT_EQ(profile.counters["data_update_batches"], 0u);
+    EXPECT_EQ(profile.counters["data_update_batches"], 1u);
   }
 }
 

@@ -13,8 +13,8 @@ class BottomLevelAccelerationStructure;
 class TopLevelAccelerationStructure;
 
 // Used on the render thread, like the graphics Core.
-// CPU-owned ranges only: GPU-written portions of a resource are never mirrored
-// or overwritten. Resources must outlive submission, as with other GPU commands.
+// Owns queued upload scheduling, not a CPU mirror or content-deduplication cache.
+// Only explicitly queued ranges are uploaded; Resources must outlive submission, as with other GPU commands.
 class DataUpdateTracker {
  public:
   explicit DataUpdateTracker(graphics::Core *core) : core_(core) {
@@ -23,13 +23,13 @@ class DataUpdateTracker {
   ~DataUpdateTracker();
   DataUpdateTracker(const DataUpdateTracker &) = delete;
   DataUpdateTracker &operator=(const DataUpdateTracker &) = delete;
-  // External graphics targets have no registration to invalidate.
+  // Cancel pending writes to a tracked target before replacing its contents.
   void InvalidateIfTracked(graphics::Image *image);
   void Update(graphics::Buffer *buffer, const void *data, size_t size, size_t offset = 0);
   void Update(graphics::Image *image, const void *data);
   void Update(graphics::Image *image, const void *data, graphics::Offset2D offset, graphics::Extent2D extent);
-  // Explicit invalidation is required after resizing or writing tracked ranges
-  // outside this tracker. GPU writes to disjoint ranges need no invalidation.
+  // Cancel pending uploads. Buffer invalidation also marks external geometry
+  // changes for dependent AS builds. No cached content comparison is involved.
   void Invalidate(graphics::Buffer *buffer);
   void Invalidate(graphics::Image *image);
   void Flush();
