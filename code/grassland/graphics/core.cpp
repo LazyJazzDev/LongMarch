@@ -401,6 +401,25 @@ void Core::PybindClassRegistration(py::classh<Core> &c) {
 #if defined(LONGMARCH_CUDA_RUNTIME)
   c.def("init_cuda", &Core::InitializeLogicalDeviceByCUDADeviceID, py::arg("cuda_device_id"),
         "Initialize logical device by CUDA device index");
+  c.def("cuda_device_index", &Core::CUDADeviceIndex, "CUDA device of the logical device, or -1");
+  c.def(
+      "create_cuda_buffer",
+      [](Core *core, size_t size) {
+        std::shared_ptr<CUDABuffer> buffer_;
+        if (core->CreateCUDABuffer(size, &buffer_))
+          throw std::runtime_error("Failed to create CUDA buffer");
+        return buffer_;
+      },
+      py::arg("size"), "Create a static buffer that CUDA can access through cuda_ptr()", py::keep_alive<0, 1>{});
+  // Streams are raw cudaStream_t handles, e.g. warp.Stream.cuda_stream; 0 is the legacy default stream.
+  c.def(
+      "cuda_begin_execution_barrier",
+      [](Core *core, uintptr_t stream) { core->CUDABeginExecutionBarrier(reinterpret_cast<cudaStream_t>(stream)); },
+      py::arg("stream") = 0, "Make CUDA work on the stream wait for submitted graphics work");
+  c.def(
+      "cuda_end_execution_barrier",
+      [](Core *core, uintptr_t stream) { core->CUDAEndExecutionBarrier(reinterpret_cast<cudaStream_t>(stream)); },
+      py::arg("stream") = 0, "Make later graphics work wait for CUDA work on the stream");
 #endif
 }
 #endif
