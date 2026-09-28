@@ -29,6 +29,19 @@ class BottomLevelAccelerationStructure final {
   BottomLevelAccelerationStructure(const BottomLevelAccelerationStructure &) = delete;
   BottomLevelAccelerationStructure &operator=(const BottomLevelAccelerationStructure &) = delete;
   graphics::AccelerationStructure *Get() const;
+
+  bool IsTrackedBy(const DataUpdateTracker &tracker) const {
+    return tracker_ == &tracker;
+  }
+
+  bool HasValidInputs() const {
+    return tracker_ && vertices_.buffer && indices_.buffer;
+  }
+
+  uint64_t Generation() const {
+    return generation_;
+  }
+
   AccelerationStructureInstance MakeInstance(
       const glm::mat4x3 &transform,
       uint32_t instance_id = 0,
@@ -37,8 +50,17 @@ class BottomLevelAccelerationStructure final {
       graphics::RayTracingInstanceFlag flags = graphics::RAYTRACING_INSTANCE_FLAG_NONE);
 
  private:
-  friend class DataUpdateTracker;
-  friend class TopLevelAccelerationStructure;
+  // Only submission and lifecycle callbacks may mutate tracker-owned state.
+  friend void DataUpdateTracker::Flush();
+  friend void DataUpdateTracker::Unregister(Buffer *buffer);
+  friend void DataUpdateTracker::Unregister(BottomLevelAccelerationStructure *blas);
+
+  // Lifecycle and dependency notifications are restricted to the tracker.
+  void DetachTracker() {
+    tracker_ = nullptr;
+  }
+
+  void InvalidateBuffer(graphics::Buffer *buffer);
   void Build();
   DataUpdateTracker *tracker_;
   graphics::BufferRange vertices_, indices_;
@@ -56,10 +78,24 @@ class TopLevelAccelerationStructure final {
   TopLevelAccelerationStructure(const TopLevelAccelerationStructure &) = delete;
   TopLevelAccelerationStructure &operator=(const TopLevelAccelerationStructure &) = delete;
   graphics::AccelerationStructure *Get() const;
+
+  bool IsTrackedBy(const DataUpdateTracker &tracker) const {
+    return tracker_ == &tracker;
+  }
+
   void UpdateInstances(const std::vector<AccelerationStructureInstance> &instances);
 
  private:
-  friend class DataUpdateTracker;
+  // Only submission and lifecycle callbacks may mutate tracker-owned state.
+  friend void DataUpdateTracker::Flush();
+  friend void DataUpdateTracker::Unregister(BottomLevelAccelerationStructure *blas);
+  friend void DataUpdateTracker::Unregister(TopLevelAccelerationStructure *tlas);
+
+  void DetachTracker() {
+    tracker_ = nullptr;
+  }
+
+  void InvalidateBLAS(BottomLevelAccelerationStructure *blas);
   void Build();
   DataUpdateTracker *tracker_;
   bool dirty_{true};

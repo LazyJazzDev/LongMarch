@@ -7,6 +7,12 @@ description: Apply the user-confirmed build, commit-message, squash-merge, PR-hi
 
 这些是用户已确认的项目约定。适用于 LongMarch 及其 LongMarchAssetsLFS 素材库；不要套用到无关项目。当前用户明确提出的新要求优先于本文件。
 
+## 封装与访问权限
+
+- 优先通过职责明确的成员函数接口协作，尽量不用友元访问其他类的内部状态；能少开访问权限就少开。
+- 不以公开字段、可变内部引用或无约束的 setter 代替友元。由拥有状态的类维护不变量；查询只暴露必要信息，修改通过语义明确的操作完成。
+- 确需友元时，将授权缩到必要的成员函数，避免授予整个类访问权限，并说明保留原因。
+
 ## 构建
 
 - LongMarch 默认使用 CMake 的 `Ninja` 生成器（`-G Ninja`），除非用户明确指定其他方案。单配置 Release 构建使用 `-DCMAKE_BUILD_TYPE=Release`。

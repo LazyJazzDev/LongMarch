@@ -1,11 +1,8 @@
 #pragma once
 
-#include "grassland/grassland.h"
+#include "sparkium/core/data_update_tracker.h"
 
 namespace sparkium {
-namespace graphics = grassland::graphics;
-class DataUpdateTracker;
-
 // Owns the CPU update state. Registration never owns the resource.
 class DataResource {
  public:
@@ -13,19 +10,49 @@ class DataResource {
   DataResource &operator=(const DataResource &) = delete;
   void Invalidate();
 
+  bool IsTrackedBy(const DataUpdateTracker &tracker) const {
+    return tracker_ == &tracker;
+  }
+
+  bool HasUpdates() const {
+    return !dirty_.empty();
+  }
+
   uint64_t Revision() const {
     return revision_;
   }
 
  protected:
+  explicit DataResource(DataUpdateTracker &tracker);
   ~DataResource() = default;
+
+  DataUpdateTracker *Tracker() const {
+    return tracker_;
+  }
+
+  size_t Capacity() const {
+    return capacity_;
+  }
+
+  void ResetCapacity(size_t capacity);
+  void RecordUploads(graphics::CommandContext &commands, graphics::Buffer *buffer, size_t &copies, size_t &bytes);
+  void RecordUploads(graphics::CommandContext &commands, graphics::Image *image, size_t &copies, size_t &bytes);
   void Write(const void *data, size_t size, size_t offset);
 
  private:
-  friend class DataUpdateTracker;
-  friend class Buffer;
-  friend class Image;
-  explicit DataResource(DataUpdateTracker &tracker);
+  // Submission acknowledgement and lifetime detachment must remain tracker-controlled.
+  friend void DataUpdateTracker::Flush();
+  friend void DataUpdateTracker::Unregister(Buffer *buffer);
+  friend void DataUpdateTracker::Unregister(Image *image);
+
+  void DetachTracker() {
+    tracker_ = nullptr;
+  }
+
+  void AcknowledgeUploads() {
+    dirty_.clear();
+  }
+
   void MergeUpdates();
   DataUpdateTracker *tracker_;
   size_t capacity_{};
@@ -51,6 +78,10 @@ class Buffer final : public DataResource {
 
   graphics::BufferRange Range(size_t offset = 0, size_t size = ~0ull) const {
     return buffer_->Range(offset, size);
+  }
+
+  void RecordUploads(graphics::CommandContext &commands, size_t &copies, size_t &bytes) {
+    DataResource::RecordUploads(commands, Get(), copies, bytes);
   }
 
   void Resize(size_t size);
@@ -80,6 +111,10 @@ class Image final : public DataResource {
 
   graphics::ImageFormat Format() const {
     return image_->Format();
+  }
+
+  void RecordUploads(graphics::CommandContext &commands, size_t &copies, size_t &bytes) {
+    DataResource::RecordUploads(commands, Get(), copies, bytes);
   }
 
   void Update(const void *data);

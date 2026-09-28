@@ -3,41 +3,49 @@
 #include <stdexcept>
 
 #include "grassland/graphics/frame_profile.h"
+#include "sparkium/core/acceleration_structure.h"
 
 namespace sparkium {
 
 DataUpdateTracker::~DataUpdateTracker() {
-  for (auto *blas : blases_)
-    blas->tracker_ = nullptr;
-  for (auto *tlas : tlases_)
-    tlas->tracker_ = nullptr;
-  for (auto &[address, buffer] : buffers_)
-    buffer->tracker_ = nullptr;
-  for (auto &[address, image] : images_)
-    image->tracker_ = nullptr;
+  // Remove dependents first, using the same detachment path as explicit removal.
+  while (!tlases_.empty())
+    Unregister(*tlases_.begin());
+  while (!blases_.empty())
+    Unregister(*blases_.begin());
+  while (!buffers_.empty())
+    Unregister(buffers_.begin()->second);
+  while (!images_.empty())
+    Unregister(images_.begin()->second);
 }
 
 void DataUpdateTracker::Register(Buffer *buffer) {
+  if (!buffer || !buffer->IsTrackedBy(*this))
+    throw std::invalid_argument("resource belongs to a different or destroyed DataUpdateTracker");
   if (!buffers_.emplace(buffer->Get(), buffer).second)
     throw std::invalid_argument("buffer already registered with DataUpdateTracker");
 }
 
 void DataUpdateTracker::Register(Image *image) {
+  if (!image || !image->IsTrackedBy(*this))
+    throw std::invalid_argument("resource belongs to a different or destroyed DataUpdateTracker");
   if (!images_.emplace(image->Get(), image).second)
     throw std::invalid_argument("image already registered with DataUpdateTracker");
 }
 
 void DataUpdateTracker::Unregister(Buffer *buffer) {
-  for (auto *blas : blases_) {
-    if (blas->vertices_.buffer == buffer->Get())
-      blas->vertices_.buffer = nullptr;
-    if (blas->indices_.buffer == buffer->Get())
-      blas->indices_.buffer = nullptr;
-  }
+  if (!buffer || !buffer->IsTrackedBy(*this))
+    return;
+  for (auto *blas : blases_)
+    blas->InvalidateBuffer(buffer->Get());
+  buffer->DetachTracker();
   buffers_.erase(buffer->Get());
 }
 
 void DataUpdateTracker::Unregister(Image *image) {
+  if (!image || !image->IsTrackedBy(*this))
+    return;
+  image->DetachTracker();
   images_.erase(image->Get());
 }
 
@@ -85,73 +93,64 @@ void DataUpdateTracker::InvalidateIfTracked(graphics::Image *image) {
 }
 
 void DataUpdateTracker::Register(BottomLevelAccelerationStructure *blas) {
-  blases_.insert(blas);
+  if (!blas || !blas->IsTrackedBy(*this))
+    throw std::invalid_argument("resource belongs to a different or destroyed DataUpdateTracker");
+  if (!blases_.insert(blas).second)
+    throw std::invalid_argument("BLAS already registered with DataUpdateTracker");
 }
 
 void DataUpdateTracker::Register(TopLevelAccelerationStructure *tlas) {
-  tlases_.insert(tlas);
+  if (!tlas || !tlas->IsTrackedBy(*this))
+    throw std::invalid_argument("resource belongs to a different or destroyed DataUpdateTracker");
+  if (!tlases_.insert(tlas).second)
+    throw std::invalid_argument("TLAS already registered with DataUpdateTracker");
 }
 
 void DataUpdateTracker::Unregister(BottomLevelAccelerationStructure *blas) {
+  if (!blas || !blas->IsTrackedBy(*this))
+    return;
   blases_.erase(blas);
+  blas->DetachTracker();
   for (auto *tlas : tlases_)
-    for (auto &instance : tlas->instances_)
-      if (instance.blas == blas) {
-        instance.blas = nullptr;
-        tlas->dirty_ = true;
-      }
+    tlas->InvalidateBLAS(blas);
 }
 
 void DataUpdateTracker::Unregister(TopLevelAccelerationStructure *tlas) {
+  if (!tlas || !tlas->IsTrackedBy(*this))
+    return;
+  tlas->DetachTracker();
   tlases_.erase(tlas);
+}
+
+uint64_t DataUpdateTracker::Revision(graphics::Buffer *buffer) {
+  return Find(buffer).Revision();
+}
+
+bool DataUpdateTracker::Contains(BottomLevelAccelerationStructure *blas) const {
+  return blases_.count(blas) != 0;
 }
 
 void DataUpdateTracker::Flush() {
   std::unique_ptr<graphics::CommandContext> commands;
   size_t copies = 0, bytes = 0;
-  auto prepare = [&](DataResource &resource) {
-    if (resource.dirty_.empty())
-      return false;
-    if (!commands)
-      core_->CreateCommandContext(&commands);
-    resource.MergeUpdates();
-    return true;
+  auto record = [&](auto &resources) {
+    for (auto &[address, resource] : resources) {
+      if (!resource->HasUpdates())
+        continue;
+      if (!commands)
+        core_->CreateCommandContext(&commands);
+      resource->RecordUploads(*commands, copies, bytes);
+    }
   };
-  for (auto &[address, buffer] : buffers_) {
-    if (!prepare(*buffer))
-      continue;
-    for (auto [begin, end] : buffer->dirty_) {
-      commands->CmdUploadBuffer(address, buffer->bytes_.data() + begin, end - begin, begin);
-      bytes += end - begin;
-      ++copies;
-    }
-  }
-  for (auto &[address, image] : images_) {
-    if (!prepare(*image))
-      continue;
-    size_t pixel = graphics::PixelSize(image->Format());
-    size_t pitch = image->Extent().width * pixel;
-    for (auto [begin, end] : image->dirty_) {
-      bytes += end - begin;
-      // Full rows can share one copy; partial rows retain their exact bounds.
-      while (begin < end) {
-        size_t width = std::min(end - begin, pitch - begin % pitch);
-        size_t rows = begin % pitch == 0 && end - begin >= pitch ? (end - begin) / pitch : 1;
-        commands->CmdUploadImage(address, image->bytes_.data() + begin,
-                                 {int32_t(begin % pitch / pixel), int32_t(begin / pitch)},
-                                 {uint32_t(width / pixel), uint32_t(rows)});
-        begin += width * rows;
-        ++copies;
-      }
-    }
-  }
+  record(buffers_);
+  record(images_);
   if (commands) {
     if (core_->SubmitCommandContext(commands.get()) != 0)
       throw std::runtime_error("failed to submit tracked data updates");
     for (auto &[address, buffer] : buffers_)
-      buffer->dirty_.clear();
+      buffer->AcknowledgeUploads();
     for (auto &[address, image] : images_)
-      image->dirty_.clear();
+      image->AcknowledgeUploads();
     if (graphics::FrameProfile::active) {
       auto &counts = graphics::FrameProfile::active->counters;
       ++counts["data_update_batches"];

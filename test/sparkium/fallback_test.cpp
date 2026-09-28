@@ -201,6 +201,46 @@ TEST_F(SoftwareBVHTest, DataUpdatesOwnershipTransferKeepsRegistrationAndRejectsU
   EXPECT_THROW(tracker.Update(address, &value, 4), std::invalid_argument);
 }
 
+TEST_F(SoftwareBVHTest, DataUpdatesRegistrationPreservesOwnershipAndDetachesPendingUploads) {
+  auto &tracker = core->GetDataUpdateTracker();
+  tracker.Flush();
+  sparkium::DataUpdateTracker other(graphics.get());
+  std::unique_ptr<sparkium::Buffer> buffer;
+  std::unique_ptr<sparkium::Image> image;
+  ASSERT_EQ(core->CreateBuffer(4, graphics::BUFFER_TYPE_STATIC, &buffer), 0);
+  ASSERT_EQ(core->CreateImage(1, 1, graphics::IMAGE_FORMAT_R8G8B8A8_UNORM, &image), 0);
+  uint32_t value = 42;
+  buffer->Update(&value, sizeof(value));
+  image->Update(&value);
+  EXPECT_THROW(other.Register(buffer.get()), std::invalid_argument);
+  EXPECT_THROW(other.Register(image.get()), std::invalid_argument);
+  EXPECT_THROW(tracker.Register(buffer.get()), std::invalid_argument);
+  EXPECT_THROW(tracker.Register(image.get()), std::invalid_argument);
+  other.Unregister(buffer.get());
+  other.Unregister(image.get());
+  EXPECT_TRUE(buffer->IsTrackedBy(tracker));
+  EXPECT_TRUE(image->IsTrackedBy(tracker));
+  EXPECT_EQ(tracker.Revision(buffer->Get()), buffer->Revision());
+  tracker.Unregister(buffer.get());
+  tracker.Unregister(image.get());
+  EXPECT_FALSE(buffer->IsTrackedBy(tracker));
+  EXPECT_FALSE(image->IsTrackedBy(tracker));
+  EXPECT_THROW(tracker.Register(buffer.get()), std::invalid_argument);
+  EXPECT_THROW(tracker.Register(image.get()), std::invalid_argument);
+  EXPECT_THROW(buffer->Update(&value, sizeof(value)), std::logic_error);
+  EXPECT_THROW(image->Update(&value), std::logic_error);
+  EXPECT_THROW(tracker.Revision(buffer->Get()), std::invalid_argument);
+  graphics::FrameProfile profile(graphics.get(), false);
+  profile.Begin(false);
+  tracker.Flush();
+  profile.Finish();
+  EXPECT_EQ(profile.counters["data_update_batches"], 0u);
+  EXPECT_NO_THROW(tracker.Unregister(buffer.get()));
+  EXPECT_NO_THROW(tracker.Unregister(image.get()));
+  // The initial Core uploads still need to finish before fixture destruction.
+  graphics->WaitGPU();
+}
+
 TEST_F(SoftwareBVHTest, DataUpdatesRestoreImageAfterFilmReset) {
   sparkium::Film film(core.get(), 2, 2);
   std::array<glm::vec4, 4> pixels{glm::vec4(2), glm::vec4(3), glm::vec4(4), glm::vec4(5)}, actual{};
@@ -295,6 +335,24 @@ TEST_F(SoftwareBVHTest, DataUpdatesAccelerationStructureOwnersDetachAndCancelPen
   sparkium::DataUpdateTracker other(graphics.get());
   EXPECT_THROW((sparkium::TopLevelAccelerationStructure(other, {blas->MakeInstance(glm::mat4x3(1.0f))})),
                std::invalid_argument);
+  EXPECT_TRUE(tracker.Contains(blas.get()));
+  EXPECT_THROW(other.Register(blas.get()), std::invalid_argument);
+  EXPECT_THROW(other.Register(tlas.get()), std::invalid_argument);
+  EXPECT_THROW(tracker.Register(blas.get()), std::invalid_argument);
+  EXPECT_THROW(tracker.Register(tlas.get()), std::invalid_argument);
+  other.Unregister(blas.get());
+  other.Unregister(tlas.get());
+  EXPECT_TRUE(tracker.Contains(blas.get()));
+  EXPECT_TRUE(tlas->IsTrackedBy(tracker));
+  tracker.Unregister(blas.get());
+  EXPECT_FALSE(tracker.Contains(blas.get()));
+  EXPECT_THROW(blas->Get(), std::logic_error);
+  EXPECT_THROW(tlas->Get(), std::logic_error);
+  EXPECT_THROW(tracker.Register(blas.get()), std::invalid_argument);
+  EXPECT_NO_THROW(tracker.Flush());
+  tracker.Unregister(tlas.get());
+  EXPECT_THROW(tlas->UpdateInstances({}), std::logic_error);
+  EXPECT_THROW(tracker.Register(tlas.get()), std::invalid_argument);
   tlas.reset();
   blas.reset();
   graphics::FrameProfile profile(graphics.get(), false);

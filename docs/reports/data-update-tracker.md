@@ -36,14 +36,32 @@ full updates and rectangular patches. Callers can immediately reuse their data.
 and records pixels before the decoder releases its CPU data. JSON scenes retain
 these wrappers. Graphics clients outside Sparkium keep immediate image loading.
 The tracker retains raw-address lookup for APIs exposing native resources, but
-registration/unregistration are private to the owning wrappers. The tracker keeps
+registration validates that each wrapper belongs to this tracker and rejects
+duplicates or detached resources. Unregistration detaches the owner, invalidates
+dependents and ignores resources belonging to another tracker. The tracker keeps
 separate typed Buffer and Image registries and records their uploads in separate
-loops into the same command context. DataResource contains only common state:
+loops into the same command context through resource-owned `RecordUploads`
+operations. DataResource contains common upload state and recording logic:
 tracker association, byte capacity, snapshot, initialized-byte mask and dirty
 intervals. It has no native Buffer/Image pointers or resource-type checks; concrete
 wrappers handle registration, destruction and resource-specific invalidation.
 A newly allocated
 resource cannot inherit the previous owner's registration or CPU cache.
+
+## Encapsulation
+
+All ten class-wide friend declarations introduced by this PR have been removed.
+Resources own upload recording, capacity invalidation and dependency invalidation;
+queries expose only association, revisions, input validity and build generations.
+The tracker no longer reads or writes resource fields, and TLAS no longer reads
+BLAS fields directly. No mutable snapshots, dirty ranges or registries are exposed.
+
+Nine narrowly scoped member-function friendships remain across DataResource,
+BLAS and TLAS: only the relevant `Flush` and `Unregister` overloads can acknowledge
+successful uploads, invoke ordered builds, detach owners or invalidate dependents.
+These operations remain private because allowing arbitrary callers to acknowledge
+unsubmitted uploads or build before dependencies would break tracker ordering.
+Tracker destruction reuses unregistration, so it needs no additional friendship.
 
 ## Submission and ordering
 
@@ -129,13 +147,18 @@ validation is on Windows D3D12/Vulkan; Metal requires verification on macOS.
 On the RTX 3090 Ti / driver 596.49 machine used in the
 [startup report](blender-startup-optimization.md), Ninja Release CLI, GUI and
 fallback-test builds pass. Debug D3D12 and Vulkan synchronization-validation runs
-each pass 41 tests, with four HDR-dependent cases skipped. D3D12 exposes HDR,
+each pass 42 tests, with four HDR-dependent cases skipped. D3D12 exposes HDR,
 so its SDR-only case skips; Vulkan exposes no HDR surface in this run, so its
 HDR recovery, presentation/ImGui and reference-white cases skip. Its SDR fallback
 case passes. The earlier owning-wrapper run passed 41 tests with two skips.
-All seven tracker-focused cases cover upload ownership, both destruction orders,
+All eight tracker-focused cases cover upload ownership, both destruction orders,
 BLAS/TLAS deferred construction, unchanged-instance suppression, geometry changes,
-instance changes, dependency destruction and cross-tracker rejection.
+instance changes, dependency destruction and cross-tracker rejection. The final
+encapsulation refactor repeats both full suites and additionally verifies duplicate
+registration rejection, foreign-tracker unregistration, explicit detachment and
+rejection of detached resources. CLI, GUI and fallback-test builds pass again.
+The six Blender image comparisons below were performed on the earlier managed-AS
+version; they were not repeated for the encapsulation-only revision.
 There are no validation errors; the existing unused raster vertex-output warning
 and intentionally injected presentation recovery errors remain.
 

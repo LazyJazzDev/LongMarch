@@ -3,9 +3,14 @@
 #include <map>
 #include <set>
 
-#include "sparkium/core/core_util.h"
+#include "grassland/grassland.h"
 
 namespace sparkium {
+namespace graphics = grassland::graphics;
+class Buffer;
+class Image;
+class BottomLevelAccelerationStructure;
+class TopLevelAccelerationStructure;
 
 // Used on the render thread, like the graphics Core.
 // CPU-owned ranges only: GPU-written portions of a resource are never mirrored
@@ -29,11 +34,15 @@ class DataUpdateTracker {
   void Invalidate(graphics::Image *image);
   void Flush();
 
- private:
-  friend class Buffer;
-  friend class Image;
-  friend class BottomLevelAccelerationStructure;
-  friend class TopLevelAccelerationStructure;
+  uint64_t Revision(graphics::Buffer *buffer);
+  bool Contains(BottomLevelAccelerationStructure *blas) const;
+
+  graphics::Core *GetCore() const {
+    return core_;
+  }
+
+  // Registration accepts only resources created for this tracker. Unregistering
+  // detaches the resource and invalidates dependents; detached resources cannot rejoin.
   void Register(BottomLevelAccelerationStructure *blas);
   void Register(TopLevelAccelerationStructure *tlas);
   void Unregister(BottomLevelAccelerationStructure *blas);
@@ -42,6 +51,8 @@ class DataUpdateTracker {
   void Register(Image *image);
   void Unregister(Buffer *buffer);
   void Unregister(Image *image);
+
+ private:
   Buffer &Find(graphics::Buffer *buffer);
   Image &Find(graphics::Image *image);
   graphics::Core *core_;

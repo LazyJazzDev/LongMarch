@@ -26,8 +26,8 @@ BottomLevelAccelerationStructure::BottomLevelAccelerationStructure(DataUpdateTra
       stride_(stride),
       primitive_count_(primitive_count),
       flags_(flags) {
-  tracker.Find(vertices.buffer);
-  tracker.Find(indices.buffer);
+  tracker.Revision(vertices.buffer);
+  tracker.Revision(indices.buffer);
   tracker.Register(this);
 }
 
@@ -52,11 +52,18 @@ AccelerationStructureInstance BottomLevelAccelerationStructure::MakeInstance(con
   return {this, transform, instance_id, instance_mask, hit_group_offset, flags};
 }
 
+void BottomLevelAccelerationStructure::InvalidateBuffer(graphics::Buffer *buffer) {
+  if (vertices_.buffer == buffer)
+    vertices_.buffer = nullptr;
+  if (indices_.buffer == buffer)
+    indices_.buffer = nullptr;
+}
+
 void BottomLevelAccelerationStructure::Build() {
   if (!vertices_.buffer || !indices_.buffer)
     return;
-  auto vertex_revision = tracker_->Find(vertices_.buffer).Revision();
-  auto index_revision = tracker_->Find(indices_.buffer).Revision();
+  auto vertex_revision = tracker_->Revision(vertices_.buffer);
+  auto index_revision = tracker_->Revision(indices_.buffer);
   if (native_ && vertex_revision == vertex_revision_ && index_revision == index_revision_)
     return;
   auto valid_range = [](graphics::BufferRange range) {
@@ -67,8 +74,8 @@ void BottomLevelAccelerationStructure::Build() {
       uint64_t(primitive_count_) * 3 * sizeof(uint32_t) > indices_.size)
     throw std::out_of_range("tracked BLAS geometry exceeds its input buffers");
   std::unique_ptr<graphics::AccelerationStructure> replacement;
-  if (tracker_->core_->CreateBottomLevelAccelerationStructure(vertices_, indices_, vertex_count_, stride_,
-                                                              primitive_count_, flags_, &replacement))
+  if (tracker_->GetCore()->CreateBottomLevelAccelerationStructure(vertices_, indices_, vertex_count_, stride_,
+                                                                  primitive_count_, flags_, &replacement))
     throw std::runtime_error("failed to build tracked BLAS");
   native_ = std::move(replacement);
   vertex_revision_ = vertex_revision;
@@ -106,7 +113,7 @@ void TopLevelAccelerationStructure::UpdateInstances(const std::vector<Accelerati
   if (!tracker_)
     throw std::logic_error("acceleration structure's DataUpdateTracker has been destroyed");
   for (const auto &instance : instances)
-    if (!tracker_->blases_.count(instance.blas))
+    if (!tracker_->Contains(instance.blas))
       throw std::invalid_argument("TLAS requires BLAS resources from the same tracker");
   if (instances_ != instances) {
     instances_ = instances;
@@ -114,15 +121,23 @@ void TopLevelAccelerationStructure::UpdateInstances(const std::vector<Accelerati
   }
 }
 
+void TopLevelAccelerationStructure::InvalidateBLAS(BottomLevelAccelerationStructure *blas) {
+  for (auto &instance : instances_)
+    if (instance.blas == blas) {
+      instance.blas = nullptr;
+      dirty_ = true;
+    }
+}
+
 void TopLevelAccelerationStructure::Build() {
   bool changed = !native_ || dirty_ || generations_.size() != instances_.size();
   for (size_t i = 0; i < instances_.size(); ++i) {
     auto *blas = instances_[i].blas;
-    if (!blas || !blas->vertices_.buffer || !blas->indices_.buffer)
+    if (!blas || !blas->HasValidInputs())
       return;
     if (!blas->Get())
       throw std::logic_error("TLAS requires a built BLAS");
-    if (!changed && generations_[i] != blas->generation_)
+    if (!changed && generations_[i] != blas->Generation())
       changed = true;
   }
   if (!changed)
@@ -132,14 +147,14 @@ void TopLevelAccelerationStructure::Build() {
   generations.reserve(instances_.size());
   native_instances.reserve(instances_.size());
   for (const auto &instance : instances_) {
-    generations.push_back(instance.blas->generation_);
+    generations.push_back(instance.blas->Generation());
     native_instances.push_back(
         instance.blas->Get()->MakeInstance(instance.transform, instance.instance_id, instance.instance_mask,
                                            instance.instance_hit_group_offset, instance.instance_flags));
   }
   const bool updating = native_ != nullptr;
   int result = updating ? native_->UpdateInstances(native_instances)
-                        : tracker_->core_->CreateTopLevelAccelerationStructure(native_instances, &native_);
+                        : tracker_->GetCore()->CreateTopLevelAccelerationStructure(native_instances, &native_);
   if (result)
     throw std::runtime_error("failed to build tracked TLAS");
   generations_ = std::move(generations);

@@ -28,6 +28,44 @@ void DataResource::Invalidate() {
   dirty_.clear();
 }
 
+void DataResource::ResetCapacity(size_t capacity) {
+  Invalidate();
+  capacity_ = capacity;
+}
+
+void DataResource::RecordUploads(graphics::CommandContext &commands,
+                                 graphics::Buffer *buffer,
+                                 size_t &copies,
+                                 size_t &bytes) {
+  MergeUpdates();
+  for (auto [begin, end] : dirty_) {
+    commands.CmdUploadBuffer(buffer, bytes_.data() + begin, end - begin, begin);
+    bytes += end - begin;
+    ++copies;
+  }
+}
+
+void DataResource::RecordUploads(graphics::CommandContext &commands,
+                                 graphics::Image *image,
+                                 size_t &copies,
+                                 size_t &bytes) {
+  MergeUpdates();
+  size_t pixel = graphics::PixelSize(image->Format());
+  size_t pitch = image->Extent().width * pixel;
+  for (auto [begin, end] : dirty_) {
+    bytes += end - begin;
+    // Full rows share one copy; partial rows retain their exact bounds.
+    while (begin < end) {
+      size_t width = std::min(end - begin, pitch - begin % pitch);
+      size_t rows = begin % pitch == 0 && end - begin >= pitch ? (end - begin) / pitch : 1;
+      commands.CmdUploadImage(image, bytes_.data() + begin, {int32_t(begin % pitch / pixel), int32_t(begin / pitch)},
+                              {uint32_t(width / pixel), uint32_t(rows)});
+      begin += width * rows;
+      ++copies;
+    }
+  }
+}
+
 void DataResource::Write(const void *data, size_t size, size_t offset) {
   if (!tracker_)
     throw std::logic_error("resource's DataUpdateTracker has been destroyed");
@@ -56,13 +94,13 @@ Buffer::Buffer(DataUpdateTracker &tracker, std::unique_ptr<graphics::Buffer> buf
       buffer_(std::move(buffer)) {
   if (!buffer_ || buffer_->Type() != graphics::BUFFER_TYPE_STATIC)
     throw std::invalid_argument("tracked buffers require static GPU storage");
-  capacity_ = buffer_->Size();
+  ResetCapacity(buffer_->Size());
   tracker.Register(this);
 }
 
 Buffer::~Buffer() {
-  if (tracker_)
-    tracker_->Unregister(this);
+  if (Tracker())
+    Tracker()->Unregister(this);
 }
 
 void Buffer::Resize(size_t size) {
@@ -71,12 +109,11 @@ void Buffer::Resize(size_t size) {
 }
 
 void Buffer::Invalidate() {
-  DataResource::Invalidate();
-  capacity_ = buffer_->Size();
+  ResetCapacity(buffer_->Size());
 }
 
 void Buffer::Update(const void *data, size_t size, size_t offset) {
-  if (capacity_ != buffer_->Size())
+  if (Capacity() != buffer_->Size())
     Invalidate();
   Write(data, size, offset);
 }
@@ -86,13 +123,13 @@ Image::Image(DataUpdateTracker &tracker, std::unique_ptr<graphics::Image> image)
       image_(std::move(image)) {
   if (!image_)
     throw std::invalid_argument("tracked images require a native image");
-  capacity_ = size_t(Extent().width) * Extent().height * graphics::PixelSize(Format());
+  ResetCapacity(size_t(Extent().width) * Extent().height * graphics::PixelSize(Format()));
   tracker.Register(this);
 }
 
 Image::~Image() {
-  if (tracker_)
-    tracker_->Unregister(this);
+  if (Tracker())
+    Tracker()->Unregister(this);
 }
 
 void Image::Update(const void *data) {
