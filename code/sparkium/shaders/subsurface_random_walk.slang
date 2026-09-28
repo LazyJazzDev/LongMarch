@@ -90,7 +90,7 @@ bool ContinueSubsurfaceRandomWalk(inout RenderContext context, HitRecord hit_rec
     context.medium_object_index = -1;
     context.medium_sample_distance = INF;
     HitRecord exit_record = hit_record;
-    exit_record.shadow_offset = float3(0.0f);
+    exit_record.shadow_geometry_cutoff = 0.0f;
     exit_record.normal = exit_record.geom_normal = exit_normal;
     float3 light_eval, light_direction;
     float light_pdf;

@@ -4,7 +4,9 @@
 #include <array>
 #include <cstdlib>
 #include <cstring>
+#include <limits>
 #include <numeric>
+#include <stdexcept>
 
 #include "grassland/graphics/frame_profile.h"
 
@@ -287,12 +289,16 @@ TEST_F(MetalBackendTest, ShadowTerminatorOffsetPreservesPlanesAndScalesWithGeome
 #include "shadow_terminator.slang"
 RWStructuredBuffer<float4> output : register(u0, space0);
 [numthreads(1,1,1)] void Main(uint3 id : SV_DispatchThreadID) {
-  float3 p = float3(0,0,0), v = float3(1,0,0), n = normalize(float3(1,0,1));
-  output[0] = float4(ShadowTerminatorOffset(p, v, n), 0);
-  output[1] = float4(ShadowTerminatorOffset(p, v * 2, n), 0);
-  output[2] = float4(ShadowTerminatorOffset(p, v, float3(0,0,1)), 0);
-  output[3] = float4(ShadowTerminatorOffset(v, v, n), 0);
-  output[4] = float4(ShadowTerminatorOffset(v * 2, v, n), 0);
+  float3 V[3] = {float3(0,0,0), float3(1,0,0), float3(0,1,0)};
+  float3 N[3] = {float3(0,0,1), float3(0.6,0,0.8), float3(0,0.6,0.8)};
+  float3 bary = float3(1.0/3.0);
+  output[0] = float4(ShadowTerminatorSurfaceOffset(V, N, bary, false), ShadowTerminatorWeight(0.5, 0.2, 0.1));
+  output[1] = float4(ShadowTerminatorSurfaceOffset(V, N, bary, true), ShadowTerminatorWeight(0.2, 0.05, 0.1));
+  output[2] = float4(ShadowTerminatorSurfaceOffset(V, N, float3(1,0,0), false), ShadowTerminatorWeight(0.05, 0.05, 0.1));
+  for (int i = 0; i < 3; ++i) V[i] *= 2.0;
+  output[3] = float4(ShadowTerminatorSurfaceOffset(V, N, bary, false), ShadowTerminatorWeight(0, -0.1, 0));
+  for (int j = 0; j < 3; ++j) N[j] = float3(0,0,1);
+  output[4] = float4(ShadowTerminatorSurfaceOffset(V, N, bary, false), ShadowTerminatorWeight(0, -0.1, 0.1));
 })");
   std::unique_ptr<graphics::Shader> shader;
   ASSERT_EQ(core->CreateShader(vfs, "terminator_test.slang", "Main", "cs_6_3", {"-I."}, &shader), 0);
@@ -310,12 +316,37 @@ RWStructuredBuffer<float4> output : register(u0, space0);
   commands->CmdDispatch(1, 1, 1);
   ASSERT_EQ(core->SubmitCommandContext(commands.get()), 0);
   output->DownloadData(values.data(), sizeof(values));
-  const std::array<glm::vec3, 5> expected{{{0.5f, 0, 0.5f}, {1, 0, 1}, {0, 0, 0}, {0, 0, 0}, {0, 0, 0}}};
+  // Golden values from Cycles' parabolic height and local-envelope equations.
+  const std::array<glm::vec4, 5> expected{{{0.026666667f, 0.026666667f, 0.115555556f, 0},
+                                           {0, 0, 0, 0.5f},
+                                           {0, 0, 0, 1},
+                                           {0.053333333f, 0.053333333f, 0.231111111f, 0},
+                                           {0, 0, 0, 1}}};
   for (size_t i = 0; i < values.size(); ++i) {
     SCOPED_TRACE(i);
-    for (int axis = 0; axis < 3; ++axis)
+    for (int axis = 0; axis < 4; ++axis)
       EXPECT_NEAR(values[i][axis], expected[i][axis], 1e-6f);
   }
+}
+
+TEST_F(MetalBackendTest, GeometryOffsetSettingValidatesAndUpdatesExistingBuffer) {
+  sparkium::Core renderer(core.get());
+  sparkium::GeometryMesh mesh(&renderer, Mesh<>::Sphere(8, 8));
+  auto *buffer = mesh.GetBuffer();
+  EXPECT_FLOAT_EQ(mesh.GetShadowTerminatorGeometryOffset(), 0.1f);
+  for (float value : {0.0f, 0.5f, 1.0f}) {
+    mesh.SetShadowTerminatorGeometryOffset(value);
+    EXPECT_EQ(mesh.GetBuffer(), buffer);
+    EXPECT_FLOAT_EQ(mesh.GetShadowTerminatorGeometryOffset(), value);
+    sparkium::GeometryMesh::Header header;
+    buffer->DownloadData(&header, sizeof(header));
+    EXPECT_FLOAT_EQ(header.shadow_terminator_geometry_offset, value);
+  }
+  EXPECT_THROW(mesh.SetShadowTerminatorGeometryOffset(-0.1f), std::invalid_argument);
+  EXPECT_THROW(mesh.SetShadowTerminatorGeometryOffset(1.1f), std::invalid_argument);
+  EXPECT_THROW(mesh.SetShadowTerminatorGeometryOffset(std::numeric_limits<float>::quiet_NaN()), std::invalid_argument);
+  EXPECT_THROW(mesh.SetShadowTerminatorGeometryOffset(std::numeric_limits<float>::infinity()), std::invalid_argument);
+  EXPECT_FLOAT_EQ(mesh.GetShadowTerminatorGeometryOffset(), 1.0f);
 }
 
 TEST_F(MetalBackendTest, LightSelectionPartialWorkgroupDoesNotOverwriteTail) {

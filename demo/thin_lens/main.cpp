@@ -16,14 +16,15 @@ int main(int argc, char **argv) {
     auto backend = graphics::BACKEND_API_DEFAULT;
     bool headless = false, pinhole_mode = false;
     int frames = 0, blades = 6;
-    float aperture = 0.22f, focus = 5.4f;
+    float aperture = 0.22f, focus = 5.4f, geometry_offset = 0.1f;
     std::filesystem::path output;
     for (int i = 1; i < argc; ++i) {
       const std::string arg = argv[i];
       if (arg == "--help") {
         std::cout << "Thin Lens: interactive depth of field and bokeh\n"
                      "--backend auto|metal|vulkan|d3d12 --frames N --headless --output image.png\n"
-                     "--pinhole --focus distance --aperture radius --blades N (0 = circle)\n";
+                     "--pinhole --focus distance --aperture radius --blades N (0 = circle)\n"
+                     "--geometry-offset cutoff (0..1, default 0.1; 0 disables)\n";
         return 0;
       } else if (arg == "--backend" && i + 1 < argc)
         backend = ParseSparkiumBackend(argv[++i]);
@@ -41,6 +42,8 @@ int main(int argc, char **argv) {
         focus = std::stof(argv[++i]);
       else if (arg == "--aperture" && i + 1 < argc)
         aperture = std::stof(argv[++i]);
+      else if (arg == "--geometry-offset" && i + 1 < argc)
+        geometry_offset = std::stof(argv[++i]);
       else if (arg == "--blades" && i + 1 < argc)
         blades = std::stoi(argv[++i]);
       else
@@ -62,6 +65,7 @@ int main(int argc, char **argv) {
     scene.settings.max_bounces = 4;
     scene.settings.background_color = glm::vec3(0.015f, 0.022f, 0.04f);
     sparkium::GeometryMesh sphere(&core, Mesh<>::Sphere(32, 16));
+    sphere.SetShadowTerminatorGeometryOffset(geometry_offset);
     std::vector<std::unique_ptr<sparkium::Material>> materials;
     std::vector<std::unique_ptr<sparkium::EntityGeometryMaterial>> entities;
     auto diffuse = [&](glm::vec3 color) -> sparkium::Material * {
@@ -161,6 +165,10 @@ int main(int argc, char **argv) {
         changed |= ImGui::SliderAngle("Rotation", &lens.aperture_rotation, 0, 180);
         changed |= ImGui::SliderFloat("Horizontal ratio", &lens.aperture_ratio, 0.4f, 2.5f, "%.2f");
         ImGui::EndDisabled();
+        if (ImGui::SliderFloat("Geometry offset", &geometry_offset, 0.0f, 1.0f, "%.3f")) {
+          sphere.SetShadowTerminatorGeometryOffset(geometry_offset);
+          changed = true;
+        }
         if (ImGui::Button("Reset lens")) {
           pinhole_mode = false;
           lens.aperture_radius = 0.22f;

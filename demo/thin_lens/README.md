@@ -43,11 +43,28 @@ cmake-build-release/demo/thin_lens/demo_thin_lens --backend metal \
 `--focus`, `--aperture`, and `--blades` (0 or 3–8). `--output` saves the developed
 render without the UI; headless mode requires a positive frame count.
 
-The spheres retain the coarse `Sphere(32, 16)` mesh. Ray-traced direct-light
-visibility uses a shadow-terminator position correction derived from vertex
-normals: the shadow origin is interpolated toward the vertex tangent planes,
-while BSDF evaluation and light sampling keep the actual hit position. This
-reduces faceted self-shadow boundaries without adding geometry. It does not
-smooth silhouettes or change indirect reflection rays. Flat faces, back-face
-hits and transmission visibility retain their original shadow origins. Like
-other position-offset corrections, it can soften very close contact shadows.
+The spheres retain the coarse `Sphere(32, 16)` mesh. **Geometry offset** controls
+Cycles' shadow-terminator geometry correction (default `0.1`, range `[0, 1]`);
+zero disables it. This is a grazing-angle cutoff, not a world-space distance.
+The slider updates the mesh and resets accumulation. Use `--geometry-offset 0`
+or `--geometry-offset 0.1` for repeatable headless comparisons.
+
+The correction uses Cycles' parabolic height estimate and local linear envelope,
+with a smooth angular weight and separate reflection/transmission directions.
+Only shadow visibility rays move; BSDF evaluation, light PDFs, silhouette and
+indirect path origins stay unchanged. Meshes without vertex normals are unaffected.
+Large values may alter nearby contact shadows.
+
+For other scenes, configure each mesh through the public API:
+
+```cpp
+mesh.SetShadowTerminatorGeometryOffset(0.1f); // default, Cycles geometry cutoff
+mesh.SetShadowTerminatorGeometryOffset(0.0f); // disable
+float cutoff = mesh.GetShadowTerminatorGeometryOffset();
+film.Reset(); // reset accumulated rendering after changing the mesh setting
+```
+
+Values outside `[0, 1]`, NaN and infinity throw `std::invalid_argument`.
+The setting is shared by all instances of that mesh and does not rebuild its BLAS.
+This does not enable Cycles' separate Shading Offset or Bump Map Correction.
+Source and Apache-2.0 attribution: [Cycles adaptation](../../external/cycles/README.md).

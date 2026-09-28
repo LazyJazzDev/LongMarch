@@ -105,6 +105,8 @@ void Core::PrepareBuiltinHitShaders() {
   core_.SetPublicResource("mesh_lambertian_chit", std::move(shader));
   core_.GraphicsCore()->CreateShader(vfs, "entity_chit.slang", "ShadowClosestHit", "lib_6_5", {"-I."}, &shader);
   core_.SetPublicResource("mesh_lambertian_shadow_chit", std::move(shader));
+  core_.GraphicsCore()->CreateShader(vfs, "entity_chit.slang", "ShadowAnyHit", "lib_6_5", {"-I."}, &shader);
+  core_.SetPublicResource("mesh_lambertian_shadow_ahit", std::move(shader));
 
   vfs.WriteFile("material_sampler.slang", CodeLines{shaders_vfs, "material/light/sampler.slang"});
   core_.GraphicsCore()->CreateShader(vfs, "entity_chit.slang", "RenderClosestHit", "lib_6_5", {"-I."}, &shader);
@@ -119,12 +121,16 @@ void Core::PrepareBuiltinHitShaders() {
   core_.SetPublicResource("mesh_principled_chit", std::move(shader));
   core_.GraphicsCore()->CreateShader(vfs, "entity_chit.slang", "ShadowClosestHit", "lib_6_5", {"-I."}, &shader);
   core_.SetPublicResource("mesh_principled_shadow_chit", std::move(shader));
+  core_.GraphicsCore()->CreateShader(vfs, "entity_chit.slang", "ShadowAnyHit", "lib_6_5", {"-I."}, &shader);
+  core_.SetPublicResource("mesh_principled_shadow_ahit", std::move(shader));
 
   vfs.WriteFile("material_sampler.slang", CodeLines{shaders_vfs, "material/specular/sampler.slang"});
   core_.GraphicsCore()->CreateShader(vfs, "entity_chit.slang", "RenderClosestHit", "lib_6_5", {"-I."}, &shader);
   core_.SetPublicResource("mesh_specular_chit", std::move(shader));
   core_.GraphicsCore()->CreateShader(vfs, "entity_chit.slang", "ShadowClosestHit", "lib_6_5", {"-I."}, &shader);
   core_.SetPublicResource("mesh_specular_shadow_chit", std::move(shader));
+  core_.GraphicsCore()->CreateShader(vfs, "entity_chit.slang", "ShadowAnyHit", "lib_6_5", {"-I."}, &shader);
+  core_.SetPublicResource("mesh_specular_shadow_ahit", std::move(shader));
   native_shaders_ready_ = true;
 }
 

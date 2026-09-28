@@ -30,6 +30,7 @@ HitRecord MakeMeshHitRecord(uint geometry_index,
   header.index_offset = geometry_buffer.Load(48);
   header.color_offset = geometry_buffer.Load(52);
   header.color_stride = geometry_buffer.Load(56);
+  header.shadow_terminator_geometry_offset = asfloat(geometry_buffer.Load(60));
 
   uint3 vid;
   vid = geometry_buffer.Load3(header.index_offset + primitive_index * 3 * 4);
@@ -55,19 +56,10 @@ HitRecord MakeMeshHitRecord(uint geometry_index,
   // emitters (for example a unit quad scaled to a 30 x 30 area light).
   hit_record.pdf = 1.0f / (length(cross(world_pos[1] - world_pos[0], world_pos[2] - world_pos[0])) * 0.5f);
 
-  hit_record.shadow_offset = float3(0.0f);
+  float3 normals[3] = {float3(0.0f), float3(0.0f), float3(0.0f)};
   if (header.normal_offset != 0) {
-    float3 normals[3];
-    for (int i = 0; i < 3; ++i) {
+    for (int i = 0; i < 3; ++i)
       normals[i] = LoadFloat3(geometry_buffer, header.normal_offset + header.normal_stride * vid[i]);
-      float3 world_normal = mul(world_to_object, normals[i]).xyz;
-      float normal_length = length(world_normal);
-      if (normal_length > 1.0e-7f) {
-        world_normal /= normal_length;
-        hit_record.shadow_offset +=
-            barycentrics[i] * ShadowTerminatorOffset(hit_record.position, world_pos[i], world_normal);
-      }
-    }
     hit_record.normal = normalize(
         mul(world_to_object, normals[0] * barycentrics[0] + normals[1] * barycentrics[1] + normals[2] * barycentrics[2])
             .xyz);
@@ -119,11 +111,25 @@ HitRecord MakeMeshHitRecord(uint geometry_index,
 
   if (dot(ray_direction, hit_record.normal) > 0.0) {
     hit_record.front_facing = false;
-    hit_record.shadow_offset = float3(0.0f);
     hit_record.geom_normal = -hit_record.geom_normal;
     hit_record.normal = -hit_record.normal;
     hit_record.tangent = -hit_record.tangent;
     hit_record.signal = -hit_record.signal;
+  }
+
+  hit_record.shadow_normal = hit_record.normal;
+  hit_record.shadow_geometry_cutoff = header.normal_offset != 0 ? header.shadow_terminator_geometry_offset : 0.0f;
+  hit_record.shadow_offset = hit_record.shadow_transmission_offset = float3(0.0f);
+  if (hit_record.shadow_geometry_cutoff > 0.0f) {
+    float3 n =
+        mul(object_to_world,
+            float4(normals[0] * barycentrics[0] + normals[1] * barycentrics[1] + normals[2] * barycentrics[2], 0.0f))
+            .xyz;
+    bool flipped = dot(n, hit_record.geom_normal) <= 0.0f;
+    hit_record.shadow_offset =
+        mul(object_to_world, float4(ShadowTerminatorSurfaceOffset(pos, normals, barycentrics, flipped), 0.0f)).xyz;
+    hit_record.shadow_transmission_offset =
+        mul(object_to_world, float4(ShadowTerminatorSurfaceOffset(pos, normals, barycentrics, !flipped), 0.0f)).xyz;
   }
 
   hit_record.object_index = object_index;

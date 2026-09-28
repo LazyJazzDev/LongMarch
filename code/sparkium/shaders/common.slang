@@ -18,6 +18,9 @@ struct HitRecord {
   float t;
   float3 position;
   float3 shadow_offset;
+  float3 shadow_transmission_offset;
+  float3 shadow_normal;
+  float shadow_geometry_cutoff;
   float3 object_position;
   float3 object_origin;
   float2 tex_coord;
@@ -39,6 +42,7 @@ struct RenderContext {
   float3 throughput;
   RandomDevice rd;
   float bsdf_pdf;
+  int2 shadow_skip;
   float3 shadow_origin;
   float3 shadow_eval;
   float3 shadow_dir;
@@ -61,6 +65,7 @@ struct RenderContext {
 #define RAY_TYPE_VOLUME 3
 
 struct ShadowRayPayload {
+  int2 skip;
   float shadow;
 };
 

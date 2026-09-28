@@ -1,5 +1,6 @@
 #pragma once
 #include "bindings.slang"
+#include "shadow_terminator.slang"
 #include "shadow_ray.slang"
 #include "random.slang"
 #include "light/point/sampler.slang"
@@ -42,6 +43,7 @@ void SampleDirectLighting(inout RenderContext context,
   context.shadow_eval = context.shadow_dir = float3(0, 0, 0);
   context.shadow_length = 0.0f;
   context.shadow_origin = hit_record.position;
+  context.shadow_skip = int2(-1, -1);
   if (light_count == 0)
     return;
   BufferReference<ByteAddressBuffer> power_cdf = MakeBufferReference(light_selector_data, 4);
@@ -83,13 +85,22 @@ void SampleDirectLighting(inout RenderContext context,
   omega_in = asfloat(payload.high.xyz);
   pdf = asfloat(payload.high.w) * prob;
   context.shadow_eval = eval;
-  // Offset exterior reflection visibility only. Transmission and volume
-  // boundaries keep their physical origins. Preserve the sampled endpoint.
-  float3 offset = dot(hit_record.normal, omega_in) > 0.0f ? hit_record.shadow_offset : float3(0.0f);
-  context.shadow_origin = hit_record.position + offset;
-  float3 shadow_segment = omega_in * shadow_length - offset;
-  context.shadow_length = length(shadow_segment);
-  context.shadow_dir = shadow_segment / max(context.shadow_length, EPSILON);
+  float NL = dot(hit_record.shadow_normal, omega_in);
+  bool transmit = NL < 0.0f;
+  float NgL = dot(transmit ? -hit_record.geom_normal : hit_record.geom_normal, omega_in);
+  float amount = ShadowTerminatorWeight(abs(NL), NgL, hit_record.shadow_geometry_cutoff);
+  context.shadow_dir = omega_in;
+  context.shadow_length = shadow_length;
+  if (amount > 0.0f) {
+    float3 offset = (transmit ? hit_record.shadow_transmission_offset : hit_record.shadow_offset) * amount;
+    if (NgL > 0.0f)
+      context.shadow_skip = int2(hit_record.object_index, hit_record.primitive_index);
+    context.shadow_origin = hit_record.position + offset;
+    // Preserve the finite light endpoint after moving the shadow origin.
+    float3 shadow_segment = omega_in * shadow_length - offset;
+    context.shadow_length = length(shadow_segment);
+    context.shadow_dir = shadow_segment / max(context.shadow_length, EPSILON);
+  }
 }
 
 float DirectLightingProbability(uint light_index) {

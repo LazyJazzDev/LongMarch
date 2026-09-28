@@ -30,6 +30,7 @@ void EntityGeometryMaterial::PrepareHitGroups() {
     if (dynamic_cast<MaterialLambertian *>(material_)) {
       hit_groups_.render_group.closest_hit_shader = core_->GetShader("mesh_lambertian_chit");
       hit_groups_.shadow_group.closest_hit_shader = core_->GetShader("mesh_lambertian_shadow_chit");
+      hit_groups_.shadow_group.any_hit_shader = core_->GetShader("mesh_lambertian_shadow_ahit");
     } else if (dynamic_cast<MaterialLight *>(material_)) {
       hit_groups_.render_group.closest_hit_shader = core_->GetShader("mesh_light_chit");
       hit_groups_.shadow_group.closest_hit_shader = core_->GetShader("mesh_light_shadow_chit");
@@ -37,9 +38,11 @@ void EntityGeometryMaterial::PrepareHitGroups() {
     } else if (dynamic_cast<MaterialPrincipled *>(material_)) {
       hit_groups_.render_group.closest_hit_shader = core_->GetShader("mesh_principled_chit");
       hit_groups_.shadow_group.closest_hit_shader = core_->GetShader("mesh_principled_shadow_chit");
+      hit_groups_.shadow_group.any_hit_shader = core_->GetShader("mesh_principled_shadow_ahit");
     } else if (dynamic_cast<MaterialSpecular *>(material_)) {
       hit_groups_.render_group.closest_hit_shader = core_->GetShader("mesh_specular_chit");
       hit_groups_.shadow_group.closest_hit_shader = core_->GetShader("mesh_specular_shadow_chit");
+      hit_groups_.shadow_group.any_hit_shader = core_->GetShader("mesh_specular_shadow_ahit");
     } else if (auto graph = dynamic_cast<MaterialShaderGraph *>(material_)) {
       graph->PrepareHitShaders();
       hit_groups_.render_group.closest_hit_shader = graph->RenderClosestHitShader();
@@ -56,6 +59,9 @@ void EntityGeometryMaterial::PrepareHitGroups() {
                                         &closest_hit_shader_);
     core_->GraphicsCore()->CreateShader(vfs, "entity_chit.slang", "ShadowClosestHit", "lib_6_5", {"-I."},
                                         &shadow_closest_hit_shader_);
+    core_->GraphicsCore()->CreateShader(vfs, "entity_chit.slang", "ShadowAnyHit", "lib_6_5", {"-I."},
+                                        &shadow_any_hit_shader_);
+    hit_groups_.shadow_group.any_hit_shader = shadow_any_hit_shader_.get();
     hit_groups_.render_group.closest_hit_shader = closest_hit_shader_.get();
     hit_groups_.shadow_group.closest_hit_shader = shadow_closest_hit_shader_.get();
   }
