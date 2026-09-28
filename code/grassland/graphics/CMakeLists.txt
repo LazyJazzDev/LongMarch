@@ -16,6 +16,11 @@ target_include_directories(${GRASSLAND_SUBLIB_NAME} PUBLIC ${LONGMARCH_INCLUDE_D
 
 target_link_libraries(${GRASSLAND_SUBLIB_NAME} PUBLIC grassland_imgui slang::slang)
 
+if (LONGMARCH_CUDA_RUNTIME)
+    target_compile_definitions(${GRASSLAND_SUBLIB_NAME} PUBLIC LONGMARCH_CUDA_RUNTIME)
+    target_link_libraries(${GRASSLAND_SUBLIB_NAME} PUBLIC CUDA::cudart_static)
+endif ()
+
 if (WIN32)
     # Display luminance queries are shared by every Windows rendering backend.
     target_link_libraries(${GRASSLAND_SUBLIB_NAME} PRIVATE dxgi)
