@@ -28,7 +28,7 @@ ImageFormat D3D12Image::Format() const {
 void D3D12Image::UploadData(const void *data) const {
   auto pixel_size = PixelSize(format_);
   const UINT64 upload_buffer_size = GetRequiredIntermediateSize(image_.Get(), 0, 1);
-  Microsoft::WRL::ComPtr<ID3D12Resource> upload_buffer;
+  ComPtr<ID3D12Resource> upload_buffer;
   upload_buffer = CreateNativeBuffer(core_->Device(), upload_buffer_size, D3D12_HEAP_TYPE_UPLOAD);
   D3D12_SUBRESOURCE_DATA subresource_data{};
   subresource_data.pData = data;
@@ -49,7 +49,7 @@ void D3D12Image::UploadData(const void *data) const {
 void D3D12Image::DownloadData(void *data) const {
   auto pixel_size = PixelSize(format_);
   const UINT64 download_buffer_size = GetRequiredIntermediateSize(image_.Get(), 0, 1);
-  Microsoft::WRL::ComPtr<ID3D12Resource> download_buffer;
+  ComPtr<ID3D12Resource> download_buffer;
   download_buffer = CreateNativeBuffer(core_->Device(), download_buffer_size, D3D12_HEAP_TYPE_READBACK);
   D3D12_SUBRESOURCE_DATA subresource_data{};
   subresource_data.pData = data;
@@ -94,12 +94,12 @@ void D3D12Image::UploadData(const void *data, const Offset2D &offset, const Exte
   auto pixel_size = PixelSize(format_);
 
   // Create a staging image that matches the region size
-  Microsoft::WRL::ComPtr<ID3D12Resource> staging_image;
+  ComPtr<ID3D12Resource> staging_image;
   staging_image = CreateNativeImage(core_->Device(), extent.width, extent.height, ImageFormatToDXGIFormat(format_));
 
   // Create upload buffer sized for the staging image
   const UINT64 upload_buffer_size = GetRequiredIntermediateSize(staging_image.Get(), 0, 1);
-  Microsoft::WRL::ComPtr<ID3D12Resource> upload_buffer;
+  ComPtr<ID3D12Resource> upload_buffer;
   upload_buffer = CreateNativeBuffer(core_->Device(), upload_buffer_size, D3D12_HEAP_TYPE_UPLOAD);
 
   // Calculate source data layout
@@ -160,12 +160,12 @@ void D3D12Image::DownloadData(void *data, const Offset2D &offset, const Extent2D
   auto pixel_size = PixelSize(format_);
 
   // Create a staging image that matches the region size
-  Microsoft::WRL::ComPtr<ID3D12Resource> staging_image;
+  ComPtr<ID3D12Resource> staging_image;
   staging_image = CreateNativeImage(core_->Device(), extent.width, extent.height, ImageFormatToDXGIFormat(format_));
 
   // Create download buffer sized for the staging image
   const UINT64 download_buffer_size = GetRequiredIntermediateSize(staging_image.Get(), 0, 1);
-  Microsoft::WRL::ComPtr<ID3D12Resource> download_buffer;
+  ComPtr<ID3D12Resource> download_buffer;
   download_buffer = CreateNativeBuffer(core_->Device(), download_buffer_size, D3D12_HEAP_TYPE_READBACK);
 
   // Calculate destination data layout

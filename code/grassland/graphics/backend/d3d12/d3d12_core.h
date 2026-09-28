@@ -7,8 +7,8 @@ struct BlitPipeline {
   ID3D12Device *device_;
   CompiledShaderBlob vertex_shader;
   CompiledShaderBlob pixel_shader;
-  Microsoft::WRL::ComPtr<ID3D12RootSignature> root_signature;
-  std::map<DXGI_FORMAT, Microsoft::WRL::ComPtr<ID3D12PipelineState>> pipeline_states;
+  ComPtr<ID3D12RootSignature> root_signature;
+  std::map<DXGI_FORMAT, ComPtr<ID3D12PipelineState>> pipeline_states;
   void Initialize(ID3D12Device *device);
   ID3D12PipelineState *GetPipelineState(DXGI_FORMAT format);
 };
@@ -103,7 +103,7 @@ class D3D12Core : public Core {
                                                 D3D12_RAYTRACING_GEOMETRY_FLAGS flags,
                                                 ID3D12CommandQueue *queue,
                                                 ID3D12CommandAllocator *allocator,
-                                                Microsoft::WRL::ComPtr<ID3D12Resource> &result);
+                                                ComPtr<ID3D12Resource> &result);
 
   HRESULT BuildBottomLevelAccelerationStructure(D3D12_GPU_VIRTUAL_ADDRESS vertex_buffer,
                                                 D3D12_GPU_VIRTUAL_ADDRESS index_buffer,
@@ -113,25 +113,25 @@ class D3D12Core : public Core {
                                                 D3D12_RAYTRACING_GEOMETRY_FLAGS flags,
                                                 ID3D12CommandQueue *queue,
                                                 ID3D12CommandAllocator *allocator,
-                                                Microsoft::WRL::ComPtr<ID3D12Resource> &result);
+                                                ComPtr<ID3D12Resource> &result);
 
   HRESULT BuildTopLevelAccelerationStructure(const std::vector<D3D12_RAYTRACING_INSTANCE_DESC> &instances,
                                              ID3D12CommandQueue *queue,
                                              ID3D12CommandAllocator *allocator,
-                                             Microsoft::WRL::ComPtr<ID3D12Resource> &result);
+                                             ComPtr<ID3D12Resource> &result);
 
   HRESULT CreateRayTracingPipeline(ID3D12RootSignature *root_signature,
                                    const CompiledShaderBlob *ray_gen_shader,
                                    const std::vector<const CompiledShaderBlob *> &miss_shaders,
                                    const std::vector<d3d12::HitGroup> &hit_groups,
                                    const std::vector<const CompiledShaderBlob *> &callable_shaders,
-                                   Microsoft::WRL::ComPtr<ID3D12StateObject> &pipeline);
+                                   ComPtr<ID3D12StateObject> &pipeline);
 
   HRESULT CreateShaderTable(ID3D12StateObject *pipeline,
                             const std::vector<int32_t> &miss_shader_indices,
                             const std::vector<int32_t> &hit_group_indices,
                             const std::vector<int32_t> &callable_shader_indices,
-                            Microsoft::WRL::ComPtr<ID3D12Resource> &buffer,
+                            ComPtr<ID3D12Resource> &buffer,
                             D3D12_GPU_VIRTUAL_ADDRESS &miss_offset,
                             D3D12_GPU_VIRTUAL_ADDRESS &hit_group_offset,
                             D3D12_GPU_VIRTUAL_ADDRESS &callable_offset) const;
@@ -203,24 +203,24 @@ class D3D12Core : public Core {
 
  private:
   friend class D3D12AccelerationStructure;
-  Microsoft::WRL::ComPtr<IDXGIFactory4> dxgi_factory_;
-  Microsoft::WRL::ComPtr<IDXGIAdapter1> adapter_;
-  Microsoft::WRL::ComPtr<ID3D12Device> device_;
-  Microsoft::WRL::ComPtr<ID3D12Device5> dxr_device_;
+  ComPtr<IDXGIFactory4> dxgi_factory_;
+  ComPtr<IDXGIAdapter1> adapter_;
+  ComPtr<ID3D12Device> device_;
+  ComPtr<ID3D12Device5> dxr_device_;
   D3D12_FEATURE_DATA_D3D12_OPTIONS1 d3d12_options1_{};
-  Microsoft::WRL::ComPtr<ID3D12Resource> scratch_buffer_;
-  Microsoft::WRL::ComPtr<ID3D12Resource> instance_buffer_;
+  ComPtr<ID3D12Resource> scratch_buffer_;
+  ComPtr<ID3D12Resource> instance_buffer_;
   ID3D12Resource *RequestScratchBuffer(size_t size);
   ID3D12Resource *RequestInstanceBuffer(size_t size);
 
   struct BlitPipeline blit_pipeline_;
 
-  Microsoft::WRL::ComPtr<ID3D12CommandQueue> command_queue_;
-  Microsoft::WRL::ComPtr<ID3D12CommandQueue> transfer_command_queue_;
-  std::vector<Microsoft::WRL::ComPtr<ID3D12CommandAllocator>> command_allocators_;
-  std::vector<Microsoft::WRL::ComPtr<ID3D12GraphicsCommandList>> command_lists_;
+  ComPtr<ID3D12CommandQueue> command_queue_;
+  ComPtr<ID3D12CommandQueue> transfer_command_queue_;
+  std::vector<ComPtr<ID3D12CommandAllocator>> command_allocators_;
+  std::vector<ComPtr<ID3D12GraphicsCommandList>> command_lists_;
 
-  Microsoft::WRL::ComPtr<ID3D12Fence> fence_;
+  ComPtr<ID3D12Fence> fence_;
   uint64_t fence_value_{1};
   HANDLE fence_event_{nullptr};
   void SignalFence(ID3D12CommandQueue *queue);
@@ -228,17 +228,17 @@ class D3D12Core : public Core {
   void WaitForFence(uint64_t value);
   std::vector<uint64_t> in_flight_values_;
 
-  Microsoft::WRL::ComPtr<ID3D12CommandAllocator> single_time_allocator_;
-  Microsoft::WRL::ComPtr<ID3D12GraphicsCommandList> single_time_command_list_;
+  ComPtr<ID3D12CommandAllocator> single_time_allocator_;
+  ComPtr<ID3D12GraphicsCommandList> single_time_command_list_;
 
-  Microsoft::WRL::ComPtr<ID3D12CommandAllocator> transfer_allocator_;
-  Microsoft::WRL::ComPtr<ID3D12GraphicsCommandList> transfer_command_list_;
+  ComPtr<ID3D12CommandAllocator> transfer_allocator_;
+  ComPtr<ID3D12GraphicsCommandList> transfer_command_list_;
 
-  std::vector<Microsoft::WRL::ComPtr<ID3D12DescriptorHeap>> resource_descriptor_heaps_;
-  std::vector<Microsoft::WRL::ComPtr<ID3D12DescriptorHeap>> sampler_descriptor_heaps_;
+  std::vector<ComPtr<ID3D12DescriptorHeap>> resource_descriptor_heaps_;
+  std::vector<ComPtr<ID3D12DescriptorHeap>> sampler_descriptor_heaps_;
 
-  std::vector<Microsoft::WRL::ComPtr<ID3D12DescriptorHeap>> rtv_descriptor_heaps_;
-  std::vector<Microsoft::WRL::ComPtr<ID3D12DescriptorHeap>> dsv_descriptor_heaps_;
+  std::vector<ComPtr<ID3D12DescriptorHeap>> rtv_descriptor_heaps_;
+  std::vector<ComPtr<ID3D12DescriptorHeap>> dsv_descriptor_heaps_;
 
   uint32_t current_frame_{0};
 
@@ -249,8 +249,8 @@ class D3D12Core : public Core {
   cudaExternalSemaphore_t cuda_semaphore_{};
 #endif
 
-  Microsoft::WRL::ComPtr<ID3D12Resource> upload_staging_buffer_;
-  Microsoft::WRL::ComPtr<ID3D12Resource> download_staging_buffer_;
+  ComPtr<ID3D12Resource> upload_staging_buffer_;
+  ComPtr<ID3D12Resource> download_staging_buffer_;
 };
 
 }  // namespace grassland::graphics::backend

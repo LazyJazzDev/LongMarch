@@ -41,7 +41,7 @@ class D3D12StaticBuffer : public D3D12Buffer {
 
  private:
   D3D12Core *core_;
-  Microsoft::WRL::ComPtr<ID3D12Resource> buffer_;
+  ComPtr<ID3D12Resource> buffer_;
 };
 
 class D3D12DynamicBuffer : public D3D12Buffer {
@@ -67,8 +67,8 @@ class D3D12DynamicBuffer : public D3D12Buffer {
 
  private:
   D3D12Core *core_;
-  std::vector<Microsoft::WRL::ComPtr<ID3D12Resource>> buffers_;
-  Microsoft::WRL::ComPtr<ID3D12Resource> staging_buffer_;
+  std::vector<ComPtr<ID3D12Resource>> buffers_;
+  ComPtr<ID3D12Resource> staging_buffer_;
 };
 
 #if defined(LONGMARCH_CUDA_RUNTIME)
@@ -95,7 +95,7 @@ class D3D12CUDABuffer : public D3D12Buffer, public CUDABuffer {
 
  private:
   D3D12Core *core_;
-  Microsoft::WRL::ComPtr<ID3D12Resource> buffer_;
+  ComPtr<ID3D12Resource> buffer_;
   cudaExternalMemory_t cuda_memory_;
 };
 #endif

@@ -39,8 +39,8 @@ class D3D12Window : public Window {
   void RecreateSwapChain();
 
   D3D12Core *core_;
-  Microsoft::WRL::ComPtr<IDXGISwapChain3> swap_chain_;
-  std::vector<Microsoft::WRL::ComPtr<ID3D12Resource>> back_buffers_;
+  ComPtr<IDXGISwapChain3> swap_chain_;
+  std::vector<ComPtr<ID3D12Resource>> back_buffers_;
   uint32_t swap_chain_recreate_event_id_;
   D3D12ImGuiAssets imgui_assets_{};
 };

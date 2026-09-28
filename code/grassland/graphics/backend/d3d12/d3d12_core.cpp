@@ -23,8 +23,8 @@ namespace {
 
 void CreateCommandRecord(ID3D12Device *device,
                          D3D12_COMMAND_LIST_TYPE type,
-                         Microsoft::WRL::ComPtr<ID3D12CommandAllocator> &allocator,
-                         Microsoft::WRL::ComPtr<ID3D12GraphicsCommandList> &list) {
+                         ComPtr<ID3D12CommandAllocator> &allocator,
+                         ComPtr<ID3D12GraphicsCommandList> &list) {
   d3d12::ThrowIfFailed(device->CreateCommandAllocator(type, IID_PPV_ARGS(allocator.GetAddressOf())),
                        "Failed to create command allocator");
   d3d12::ThrowIfFailed(device->CreateCommandList(0, type, allocator.Get(), nullptr, IID_PPV_ARGS(list.GetAddressOf())),
@@ -86,7 +86,7 @@ ID3D12PipelineState *BlitPipeline::GetPipelineState(DXGI_FORMAT format) {
 D3D12Core::D3D12Core(const Settings &settings) : Core(settings) {
   UINT flags = 0;
   if (DebugEnabled()) {
-    Microsoft::WRL::ComPtr<ID3D12Debug> debug;
+    ComPtr<ID3D12Debug> debug;
     if (SUCCEEDED(D3D12GetDebugInterface(IID_PPV_ARGS(debug.GetAddressOf())))) {
       debug->EnableDebugLayer();
       flags = DXGI_CREATE_FACTORY_DEBUG;
@@ -215,7 +215,7 @@ int D3D12Core::CreateBottomLevelAccelerationStructure(BufferRange aabb_buffer,
 
   assert(d3d12_aabb_buffer != nullptr);
 
-  Microsoft::WRL::ComPtr<ID3D12Resource> blas;
+  ComPtr<ID3D12Resource> blas;
   BuildBottomLevelAccelerationStructure(d3d12_aabb_buffer->InstantBuffer()->GetGPUVirtualAddress() + aabb_buffer.offset,
                                         stride, num_aabb, static_cast<D3D12_RAYTRACING_GEOMETRY_FLAGS>(flags),
                                         command_queue_.Get(), single_time_allocator_.Get(), blas);
@@ -238,7 +238,7 @@ int D3D12Core::CreateBottomLevelAccelerationStructure(BufferRange vertex_buffer,
   assert(d3d12_vertex_buffer != nullptr);
   assert(d3d12_index_buffer != nullptr);
 
-  Microsoft::WRL::ComPtr<ID3D12Resource> blas;
+  ComPtr<ID3D12Resource> blas;
   BuildBottomLevelAccelerationStructure(
       d3d12_vertex_buffer->InstantBuffer()->GetGPUVirtualAddress() + vertex_buffer.offset,
       d3d12_index_buffer->InstantBuffer()->GetGPUVirtualAddress() + index_buffer.offset, num_vertex, stride,
@@ -268,7 +268,7 @@ int D3D12Core::CreateTopLevelAccelerationStructure(const std::vector<RayTracingI
     d3d12_instances.emplace_back(RayTracingInstanceToD3D12RayTracingInstanceDesc(instance));
   }
 
-  Microsoft::WRL::ComPtr<ID3D12Resource> tlas;
+  ComPtr<ID3D12Resource> tlas;
   BuildTopLevelAccelerationStructure(d3d12_instances, command_queue_.Get(), single_time_allocator_.Get(), tlas);
 
   pp_tlas.construct<D3D12AccelerationStructure>(this, std::move(tlas), instances.size());
@@ -437,7 +437,7 @@ int D3D12Core::InitializeLogicalDevice(int device_index) {
   }
 
   adapter_ = adapters[device_index];
-  Microsoft::WRL::ComPtr<ID3D12Device> native_device;
+  ComPtr<ID3D12Device> native_device;
   d3d12::ThrowIfFailed(
       D3D12CreateDevice(adapter_.Get(), D3D_FEATURE_LEVEL_11_0, IID_PPV_ARGS(native_device.GetAddressOf())),
       "Failed to create D3D12 device");
@@ -452,7 +452,7 @@ int D3D12Core::InitializeLogicalDevice(int device_index) {
     feature_levels.MaxSupportedFeatureLevel = D3D_FEATURE_LEVEL_11_0;
   }
   if (DebugEnabled()) {
-    Microsoft::WRL::ComPtr<ID3D12InfoQueue> info_queue;
+    ComPtr<ID3D12InfoQueue> info_queue;
     if (SUCCEEDED(native_device.As(&info_queue))) {
       info_queue->SetBreakOnSeverity(D3D12_MESSAGE_SEVERITY_CORRUPTION, true);
       info_queue->SetBreakOnSeverity(D3D12_MESSAGE_SEVERITY_ERROR, true);
@@ -647,7 +647,7 @@ HRESULT D3D12Core::BuildBottomLevelAccelerationStructure(D3D12_GPU_VIRTUAL_ADDRE
                                                          D3D12_RAYTRACING_GEOMETRY_FLAGS flags,
                                                          ID3D12CommandQueue *queue,
                                                          ID3D12CommandAllocator *allocator,
-                                                         Microsoft::WRL::ComPtr<ID3D12Resource> &result) {
+                                                         ComPtr<ID3D12Resource> &result) {
   D3D12_RAYTRACING_GEOMETRY_DESC geometry = {};
   geometry.Type = D3D12_RAYTRACING_GEOMETRY_TYPE_PROCEDURAL_PRIMITIVE_AABBS;
   geometry.AABBs.AABBs.StartAddress = aabb_buffer;
@@ -669,7 +669,7 @@ HRESULT D3D12Core::BuildBottomLevelAccelerationStructure(D3D12_GPU_VIRTUAL_ADDRE
 
   ID3D12Resource *scratch_buffer = RequestScratchBuffer(as_prebuild_info.ScratchDataSizeInBytes);
 
-  d3d12::ComPtr<ID3D12Resource> as;
+  ComPtr<ID3D12Resource> as;
   RETURN_IF_FAILED_HR(
       d3d12::CreateBuffer(device_.Get(), as_prebuild_info.ResultDataMaxSizeInBytes, D3D12_HEAP_TYPE_DEFAULT,
                           D3D12_RESOURCE_STATE_RAYTRACING_ACCELERATION_STRUCTURE,
@@ -683,7 +683,7 @@ HRESULT D3D12Core::BuildBottomLevelAccelerationStructure(D3D12_GPU_VIRTUAL_ADDRE
   as_desc.SourceAccelerationStructureData = 0;
 
   d3d12::SingleTimeCommand(queue, allocator, [&](ID3D12GraphicsCommandList *command_list) {
-    d3d12::ComPtr<ID3D12GraphicsCommandList4> command_list4;
+    ComPtr<ID3D12GraphicsCommandList4> command_list4;
     if (SUCCEEDED(command_list->QueryInterface(IID_PPV_ARGS(&command_list4)))) {
       command_list4->BuildRaytracingAccelerationStructure(&as_desc, 0, nullptr);
     }
@@ -701,7 +701,7 @@ HRESULT D3D12Core::BuildBottomLevelAccelerationStructure(D3D12_GPU_VIRTUAL_ADDRE
                                                          D3D12_RAYTRACING_GEOMETRY_FLAGS flags,
                                                          ID3D12CommandQueue *queue,
                                                          ID3D12CommandAllocator *allocator,
-                                                         Microsoft::WRL::ComPtr<ID3D12Resource> &result) {
+                                                         ComPtr<ID3D12Resource> &result) {
   D3D12_RAYTRACING_GEOMETRY_DESC geometry = {};
   geometry.Type = D3D12_RAYTRACING_GEOMETRY_TYPE_TRIANGLES;
   geometry.Triangles.VertexBuffer.StartAddress = vertex_buffer;
@@ -728,7 +728,7 @@ HRESULT D3D12Core::BuildBottomLevelAccelerationStructure(D3D12_GPU_VIRTUAL_ADDRE
 
   ID3D12Resource *scratch_buffer = RequestScratchBuffer(as_prebuild_info.ScratchDataSizeInBytes);
 
-  d3d12::ComPtr<ID3D12Resource> as;
+  ComPtr<ID3D12Resource> as;
   RETURN_IF_FAILED_HR(
       d3d12::CreateBuffer(device_.Get(), as_prebuild_info.ResultDataMaxSizeInBytes, D3D12_HEAP_TYPE_DEFAULT,
                           D3D12_RESOURCE_STATE_RAYTRACING_ACCELERATION_STRUCTURE,
@@ -742,7 +742,7 @@ HRESULT D3D12Core::BuildBottomLevelAccelerationStructure(D3D12_GPU_VIRTUAL_ADDRE
   as_desc.SourceAccelerationStructureData = 0;
 
   d3d12::SingleTimeCommand(queue, allocator, [&](ID3D12GraphicsCommandList *command_list) {
-    d3d12::ComPtr<ID3D12GraphicsCommandList4> command_list4;
+    ComPtr<ID3D12GraphicsCommandList4> command_list4;
     if (SUCCEEDED(command_list->QueryInterface(IID_PPV_ARGS(&command_list4)))) {
       command_list4->BuildRaytracingAccelerationStructure(&as_desc, 0, nullptr);
     }
@@ -755,7 +755,7 @@ HRESULT D3D12Core::BuildBottomLevelAccelerationStructure(D3D12_GPU_VIRTUAL_ADDRE
 HRESULT D3D12Core::BuildTopLevelAccelerationStructure(const std::vector<D3D12_RAYTRACING_INSTANCE_DESC> &instances,
                                                       ID3D12CommandQueue *queue,
                                                       ID3D12CommandAllocator *allocator,
-                                                      Microsoft::WRL::ComPtr<ID3D12Resource> &result) {
+                                                      ComPtr<ID3D12Resource> &result) {
   ID3D12Resource *instance_buffer = RequestInstanceBuffer(sizeof(D3D12_RAYTRACING_INSTANCE_DESC) * instances.size());
   void *instance_buffer_ptr{};
   RETURN_IF_FAILED_HR(instance_buffer->Map(0, nullptr, &instance_buffer_ptr), "failed to map instance buffer.");
@@ -776,7 +776,7 @@ HRESULT D3D12Core::BuildTopLevelAccelerationStructure(const std::vector<D3D12_RA
 
   ID3D12Resource *scratch_buffer = RequestScratchBuffer(as_prebuild_info.ScratchDataSizeInBytes);
 
-  d3d12::ComPtr<ID3D12Resource> as;
+  ComPtr<ID3D12Resource> as;
   RETURN_IF_FAILED_HR(
       d3d12::CreateBuffer(device_.Get(), as_prebuild_info.ResultDataMaxSizeInBytes, D3D12_HEAP_TYPE_DEFAULT,
                           D3D12_RESOURCE_STATE_RAYTRACING_ACCELERATION_STRUCTURE,
@@ -790,7 +790,7 @@ HRESULT D3D12Core::BuildTopLevelAccelerationStructure(const std::vector<D3D12_RA
   as_desc.SourceAccelerationStructureData = 0;
 
   d3d12::SingleTimeCommand(queue, allocator, [&](ID3D12GraphicsCommandList *command_list) {
-    d3d12::ComPtr<ID3D12GraphicsCommandList4> command_list4;
+    ComPtr<ID3D12GraphicsCommandList4> command_list4;
     if (SUCCEEDED(command_list->QueryInterface(IID_PPV_ARGS(&command_list4)))) {
       command_list4->BuildRaytracingAccelerationStructure(&as_desc, 0, nullptr);
     }
@@ -805,7 +805,7 @@ HRESULT D3D12Core::CreateRayTracingPipeline(ID3D12RootSignature *root_signature,
                                             const std::vector<const CompiledShaderBlob *> &miss_shaders,
                                             const std::vector<d3d12::HitGroup> &hit_groups,
                                             const std::vector<const CompiledShaderBlob *> &callable_shaders,
-                                            Microsoft::WRL::ComPtr<ID3D12StateObject> &result) {
+                                            ComPtr<ID3D12StateObject> &result) {
   CD3DX12_STATE_OBJECT_DESC pipeline_desc(D3D12_STATE_OBJECT_TYPE_RAYTRACING_PIPELINE);
   auto lib_ray_gen = pipeline_desc.CreateSubobject<CD3DX12_DXIL_LIBRARY_SUBOBJECT>();
   auto ray_gen_code = D3D12_SHADER_BYTECODE{ray_gen_shader->data.data(), ray_gen_shader->data.size()};
@@ -886,11 +886,11 @@ HRESULT D3D12Core::CreateShaderTable(ID3D12StateObject *pipeline,
                                      const std::vector<int32_t> &miss_shader_indices,
                                      const std::vector<int32_t> &hit_group_indices,
                                      const std::vector<int32_t> &callable_shader_indices,
-                                     Microsoft::WRL::ComPtr<ID3D12Resource> &result,
+                                     ComPtr<ID3D12Resource> &result,
                                      D3D12_GPU_VIRTUAL_ADDRESS &miss_shader_offset,
                                      D3D12_GPU_VIRTUAL_ADDRESS &hit_group_offset,
                                      D3D12_GPU_VIRTUAL_ADDRESS &callable_shader_offset) const {
-  d3d12::ComPtr<ID3D12StateObjectProperties> pipeline_properties;
+  ComPtr<ID3D12StateObjectProperties> pipeline_properties;
   RETURN_IF_FAILED_HR(pipeline->QueryInterface(IID_PPV_ARGS(&pipeline_properties)),
                       "failed to get pipeline properties.");
 
@@ -912,7 +912,7 @@ HRESULT D3D12Core::CreateShaderTable(ID3D12StateObject *pipeline,
   accum_offset =
       d3d12::SizeAlignTo(accum_offset + shader_record_size * callable_shader_indices.size(), shader_table_alignment);
 
-  d3d12::ComPtr<ID3D12Resource> buffer;
+  ComPtr<ID3D12Resource> buffer;
   RETURN_IF_FAILED_HR(d3d12::CreateBuffer(device_.Get(), accum_offset, D3D12_HEAP_TYPE_UPLOAD,
                                           D3D12_RESOURCE_STATE_GENERIC_READ, D3D12_RESOURCE_FLAG_NONE, buffer),
                       "failed to create shader binding table buffer.");

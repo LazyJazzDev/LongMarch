@@ -3,30 +3,25 @@
 #include "grassland/graphics/backend/d3d12/d3d12_acceleration_structure.h"
 
 namespace grassland::graphics::backend {
-Microsoft::WRL::ComPtr<ID3D12Resource> CreateNativeBuffer(ID3D12Device *device,
-                                                          size_t size,
-                                                          D3D12_HEAP_TYPE heap_type,
-                                                          D3D12_HEAP_FLAGS heap_flags,
-                                                          D3D12_RESOURCE_STATES resource_state,
-                                                          D3D12_RESOURCE_FLAGS resource_flags) {
-  Microsoft::WRL::ComPtr<ID3D12Resource> buffer;
+ComPtr<ID3D12Resource> CreateNativeBuffer(ID3D12Device *device,
+                                          size_t size,
+                                          D3D12_HEAP_TYPE heap_type,
+                                          D3D12_HEAP_FLAGS heap_flags,
+                                          D3D12_RESOURCE_STATES resource_state,
+                                          D3D12_RESOURCE_FLAGS resource_flags) {
+  ComPtr<ID3D12Resource> buffer;
   d3d12::ThrowIfFailed(d3d12::CreateBuffer(device, size, heap_type, heap_flags, resource_state, resource_flags, buffer),
                        "Failed to create buffer");
   return buffer;
 }
 
-Microsoft::WRL::ComPtr<ID3D12Resource> CreateNativeBuffer(ID3D12Device *device,
-                                                          size_t size,
-                                                          D3D12_HEAP_TYPE heap_type) {
+ComPtr<ID3D12Resource> CreateNativeBuffer(ID3D12Device *device, size_t size, D3D12_HEAP_TYPE heap_type) {
   return CreateNativeBuffer(
       device, size, heap_type, D3D12_HEAP_FLAG_NONE, d3d12::HeapTypeDefaultResourceState(heap_type),
       heap_type == D3D12_HEAP_TYPE_DEFAULT ? D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS : D3D12_RESOURCE_FLAG_NONE);
 }
 
-Microsoft::WRL::ComPtr<ID3D12Resource> CreateNativeImage(ID3D12Device *device,
-                                                         size_t width,
-                                                         size_t height,
-                                                         DXGI_FORMAT format) {
+ComPtr<ID3D12Resource> CreateNativeImage(ID3D12Device *device, size_t width, size_t height, DXGI_FORMAT format) {
   const auto flags = d3d12::IsDepthFormat(format)
                          ? D3D12_RESOURCE_FLAG_ALLOW_DEPTH_STENCIL
                          : D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS | D3D12_RESOURCE_FLAG_ALLOW_RENDER_TARGET;
@@ -39,7 +34,7 @@ Microsoft::WRL::ComPtr<ID3D12Resource> CreateNativeImage(ID3D12Device *device,
     clear_value.Color[3] = 1.0f;
   }
   const CD3DX12_HEAP_PROPERTIES heap_properties(D3D12_HEAP_TYPE_DEFAULT);
-  Microsoft::WRL::ComPtr<ID3D12Resource> image;
+  ComPtr<ID3D12Resource> image;
   d3d12::ThrowIfFailed(
       device->CreateCommittedResource(&heap_properties, D3D12_HEAP_FLAG_NONE, &desc, D3D12_RESOURCE_STATE_GENERIC_READ,
                                       &clear_value, IID_PPV_ARGS(image.GetAddressOf())),
@@ -47,11 +42,11 @@ Microsoft::WRL::ComPtr<ID3D12Resource> CreateNativeImage(ID3D12Device *device,
   return image;
 }
 
-Microsoft::WRL::ComPtr<IDXGISwapChain3> CreateNativeSwapChain(IDXGIFactory4 *factory,
-                                                              ID3D12CommandQueue *queue,
-                                                              HWND hwnd,
-                                                              uint32_t buffer_count,
-                                                              DXGI_FORMAT format) {
+ComPtr<IDXGISwapChain3> CreateNativeSwapChain(IDXGIFactory4 *factory,
+                                              ID3D12CommandQueue *queue,
+                                              HWND hwnd,
+                                              uint32_t buffer_count,
+                                              DXGI_FORMAT format) {
   RECT rect{};
   GetClientRect(hwnd, &rect);
   DXGI_SWAP_CHAIN_DESC1 desc{};
@@ -63,11 +58,11 @@ Microsoft::WRL::ComPtr<IDXGISwapChain3> CreateNativeSwapChain(IDXGIFactory4 *fac
   desc.SwapEffect = DXGI_SWAP_EFFECT_FLIP_DISCARD;
   desc.SampleDesc.Count = 1;
 
-  Microsoft::WRL::ComPtr<IDXGISwapChain1> swap_chain1;
+  ComPtr<IDXGISwapChain1> swap_chain1;
   d3d12::ThrowIfFailed(
       factory->CreateSwapChainForHwnd(queue, hwnd, &desc, nullptr, nullptr, swap_chain1.GetAddressOf()),
       "Failed to create swap chain");
-  Microsoft::WRL::ComPtr<IDXGISwapChain3> swap_chain;
+  ComPtr<IDXGISwapChain3> swap_chain;
   d3d12::ThrowIfFailed(swap_chain1.As(&swap_chain), "Failed to query swap chain 3");
   if (format == DXGI_FORMAT_R16G16B16A16_FLOAT) {
     constexpr auto color_space = DXGI_COLOR_SPACE_RGB_FULL_G10_NONE_P709;
@@ -80,10 +75,10 @@ Microsoft::WRL::ComPtr<IDXGISwapChain3> CreateNativeSwapChain(IDXGIFactory4 *fac
   return swap_chain;
 }
 
-std::vector<Microsoft::WRL::ComPtr<IDXGIAdapter1>> EnumerateNativeAdapters(IDXGIFactory4 *factory) {
-  std::vector<Microsoft::WRL::ComPtr<IDXGIAdapter1>> adapters;
+std::vector<ComPtr<IDXGIAdapter1>> EnumerateNativeAdapters(IDXGIFactory4 *factory) {
+  std::vector<ComPtr<IDXGIAdapter1>> adapters;
   for (UINT index = 0;; ++index) {
-    Microsoft::WRL::ComPtr<IDXGIAdapter1> adapter;
+    ComPtr<IDXGIAdapter1> adapter;
     if (factory->EnumAdapters1(index, adapter.GetAddressOf()) == DXGI_ERROR_NOT_FOUND) {
       break;
     }
@@ -103,7 +98,7 @@ std::string NativeAdapterName(IDXGIAdapter1 *adapter) {
 }
 
 bool NativeAdapterSupportsRayTracing(IDXGIAdapter1 *adapter) {
-  Microsoft::WRL::ComPtr<ID3D12Device5> device;
+  ComPtr<ID3D12Device5> device;
   if (FAILED(D3D12CreateDevice(adapter, D3D_FEATURE_LEVEL_12_0, IID_PPV_ARGS(device.GetAddressOf())))) {
     return false;
   }
@@ -139,32 +134,31 @@ int NativeAdapterCUDADeviceIndex(IDXGIAdapter1 *adapter) {
 }
 #endif
 
-Microsoft::WRL::ComPtr<ID3D12DescriptorHeap> CreateNativeDescriptorHeap(ID3D12Device *device,
-                                                                        D3D12_DESCRIPTOR_HEAP_TYPE type,
-                                                                        uint32_t count) {
+ComPtr<ID3D12DescriptorHeap> CreateNativeDescriptorHeap(ID3D12Device *device,
+                                                        D3D12_DESCRIPTOR_HEAP_TYPE type,
+                                                        uint32_t count) {
   D3D12_DESCRIPTOR_HEAP_DESC desc{};
   desc.Type = type;
   desc.NumDescriptors = std::max(count, 1u);
   if (type == D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV || type == D3D12_DESCRIPTOR_HEAP_TYPE_SAMPLER) {
     desc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE;
   }
-  Microsoft::WRL::ComPtr<ID3D12DescriptorHeap> heap;
+  ComPtr<ID3D12DescriptorHeap> heap;
   d3d12::ThrowIfFailed(device->CreateDescriptorHeap(&desc, IID_PPV_ARGS(heap.GetAddressOf())),
                        "Failed to create descriptor heap");
   return heap;
 }
 
-Microsoft::WRL::ComPtr<ID3D12RootSignature> CreateNativeRootSignature(
-    ID3D12Device *device,
-    const CD3DX12_VERSIONED_ROOT_SIGNATURE_DESC &desc) {
+ComPtr<ID3D12RootSignature> CreateNativeRootSignature(ID3D12Device *device,
+                                                      const CD3DX12_VERSIONED_ROOT_SIGNATURE_DESC &desc) {
   D3D12_FEATURE_DATA_ROOT_SIGNATURE feature_data{};
   feature_data.HighestVersion = D3D_ROOT_SIGNATURE_VERSION_1_1;
   if (FAILED(device->CheckFeatureSupport(D3D12_FEATURE_ROOT_SIGNATURE, &feature_data, sizeof(feature_data)))) {
     feature_data.HighestVersion = D3D_ROOT_SIGNATURE_VERSION_1_0;
   }
 
-  Microsoft::WRL::ComPtr<ID3DBlob> signature;
-  Microsoft::WRL::ComPtr<ID3DBlob> error;
+  ComPtr<ID3DBlob> signature;
+  ComPtr<ID3DBlob> error;
   HRESULT result = D3DX12SerializeVersionedRootSignature(&desc, feature_data.HighestVersion, &signature, &error);
   if (FAILED(result) && error) {
     d3d12::SetErrorMessage("Failed to serialize root signature: {}",
@@ -172,7 +166,7 @@ Microsoft::WRL::ComPtr<ID3D12RootSignature> CreateNativeRootSignature(
   }
   d3d12::ThrowIfFailed(result, "Failed to serialize root signature");
 
-  Microsoft::WRL::ComPtr<ID3D12RootSignature> root_signature;
+  ComPtr<ID3D12RootSignature> root_signature;
   d3d12::ThrowIfFailed(device->CreateRootSignature(0, signature->GetBufferPointer(), signature->GetBufferSize(),
                                                    IID_PPV_ARGS(root_signature.GetAddressOf())),
                        "Failed to create root signature");

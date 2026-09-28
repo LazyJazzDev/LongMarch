@@ -52,7 +52,7 @@ size_t D3D12StaticBuffer::Size() const {
 
 void D3D12StaticBuffer::Resize(size_t new_size) {
   core_->WaitGPU();
-  Microsoft::WRL::ComPtr<ID3D12Resource> new_buffer;
+  ComPtr<ID3D12Resource> new_buffer;
   new_buffer = CreateNativeBuffer(core_->Device(), new_size, D3D12_HEAP_TYPE_DEFAULT);
   core_->SingleTimeCommand([&](ID3D12GraphicsCommandList *command_list) {
     CopyNativeBuffer(command_list, buffer_.Get(), new_buffer.Get(), std::min(buffer_->GetDesc().Width, new_size));
@@ -112,7 +112,7 @@ size_t D3D12DynamicBuffer::Size() const {
 }
 
 void D3D12DynamicBuffer::Resize(size_t new_size) {
-  Microsoft::WRL::ComPtr<ID3D12Resource> new_buffer;
+  ComPtr<ID3D12Resource> new_buffer;
   new_buffer = CreateNativeBuffer(core_->Device(), new_size, D3D12_HEAP_TYPE_UPLOAD);
 
   std::memcpy(MapBuffer(new_buffer.Get()), MapBuffer(staging_buffer_.Get()), std::min(new_size, Size()));
@@ -173,7 +173,7 @@ size_t D3D12CUDABuffer::Size() const {
 
 void D3D12CUDABuffer::Resize(size_t new_size) {
   core_->WaitGPU();
-  Microsoft::WRL::ComPtr<ID3D12Resource> new_buffer;
+  ComPtr<ID3D12Resource> new_buffer;
   new_buffer = CreateNativeBuffer(core_->Device(), new_size, D3D12_HEAP_TYPE_DEFAULT, D3D12_HEAP_FLAG_SHARED,
                                   D3D12_RESOURCE_STATE_GENERIC_READ, D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS);
   core_->SingleTimeCommand([&](ID3D12GraphicsCommandList *command_list) {

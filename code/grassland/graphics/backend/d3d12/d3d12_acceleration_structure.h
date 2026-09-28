@@ -5,9 +5,7 @@ namespace grassland::graphics::backend {
 
 class D3D12AccelerationStructure : public AccelerationStructure {
  public:
-  D3D12AccelerationStructure(D3D12Core *core,
-                             Microsoft::WRL::ComPtr<ID3D12Resource> acceleration_structure,
-                             int instance_count);
+  D3D12AccelerationStructure(D3D12Core *core, ComPtr<ID3D12Resource> acceleration_structure, int instance_count);
 
   int UpdateInstances(const std::vector<RayTracingInstance> &instances) override;
 
@@ -17,7 +15,7 @@ class D3D12AccelerationStructure : public AccelerationStructure {
 
  private:
   D3D12Core *core_;
-  Microsoft::WRL::ComPtr<ID3D12Resource> acceleration_structure_;
+  ComPtr<ID3D12Resource> acceleration_structure_;
   int instance_count_{};
 };
 

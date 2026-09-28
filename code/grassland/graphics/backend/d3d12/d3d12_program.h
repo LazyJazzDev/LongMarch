@@ -24,7 +24,7 @@ class D3D12ProgramBase {
  protected:
   D3D12Core *core_;
   std::vector<CD3DX12_DESCRIPTOR_RANGE1> descriptor_ranges_;
-  Microsoft::WRL::ComPtr<ID3D12RootSignature> root_signature_;
+  ComPtr<ID3D12RootSignature> root_signature_;
 };
 
 class D3D12Program : public Program, public D3D12ProgramBase {
@@ -50,7 +50,7 @@ class D3D12Program : public Program, public D3D12ProgramBase {
   std::vector<std::pair<uint32_t, bool>> input_bindings_;
   std::vector<D3D12_INPUT_ELEMENT_DESC> input_attributes_;
   D3D12_GRAPHICS_PIPELINE_STATE_DESC pipeline_state_desc_;
-  Microsoft::WRL::ComPtr<ID3D12PipelineState> pipeline_state_;
+  ComPtr<ID3D12PipelineState> pipeline_state_;
 };
 
 class D3D12ComputeProgram : public ComputeProgram, public D3D12ProgramBase {
@@ -60,13 +60,13 @@ class D3D12ComputeProgram : public ComputeProgram, public D3D12ProgramBase {
   void AddResourceBinding(ResourceType type, int count) override;
   void Finalize() override;
 
-  d3d12::ComPtr<ID3D12PipelineState> PipelineState() const {
+  ComPtr<ID3D12PipelineState> PipelineState() const {
     return pipeline_state_;
   }
 
  private:
   D3D12Shader *compute_shader_;
-  d3d12::ComPtr<ID3D12PipelineState> pipeline_state_;
+  ComPtr<ID3D12PipelineState> pipeline_state_;
 };
 
 class D3D12RayTracingProgram : public RayTracingProgram, public D3D12ProgramBase {
@@ -126,8 +126,8 @@ class D3D12RayTracingProgram : public RayTracingProgram, public D3D12ProgramBase
   std::vector<const CompiledShaderBlob *> miss_shaders_;
   std::vector<d3d12::HitGroup> hit_groups_;
   std::vector<const CompiledShaderBlob *> callable_shaders_;
-  Microsoft::WRL::ComPtr<ID3D12StateObject> pipeline_;
-  Microsoft::WRL::ComPtr<ID3D12Resource> shader_table_;
+  ComPtr<ID3D12StateObject> pipeline_;
+  ComPtr<ID3D12Resource> shader_table_;
   D3D12_GPU_VIRTUAL_ADDRESS miss_offset_{};
   D3D12_GPU_VIRTUAL_ADDRESS hit_group_offset_{};
   D3D12_GPU_VIRTUAL_ADDRESS callable_offset_{};

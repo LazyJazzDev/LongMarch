@@ -4,35 +4,31 @@
 
 namespace grassland::graphics::backend {
 
-Microsoft::WRL::ComPtr<ID3D12RootSignature> CreateNativeRootSignature(
-    ID3D12Device *device,
-    const CD3DX12_VERSIONED_ROOT_SIGNATURE_DESC &desc);
+ComPtr<ID3D12RootSignature> CreateNativeRootSignature(ID3D12Device *device,
+                                                      const CD3DX12_VERSIONED_ROOT_SIGNATURE_DESC &desc);
 
-Microsoft::WRL::ComPtr<ID3D12DescriptorHeap> CreateNativeDescriptorHeap(ID3D12Device *device,
-                                                                        D3D12_DESCRIPTOR_HEAP_TYPE type,
-                                                                        uint32_t count);
+ComPtr<ID3D12DescriptorHeap> CreateNativeDescriptorHeap(ID3D12Device *device,
+                                                        D3D12_DESCRIPTOR_HEAP_TYPE type,
+                                                        uint32_t count);
 
-Microsoft::WRL::ComPtr<ID3D12Resource> CreateNativeBuffer(ID3D12Device *device,
-                                                          size_t size,
-                                                          D3D12_HEAP_TYPE heap_type,
-                                                          D3D12_HEAP_FLAGS heap_flags,
-                                                          D3D12_RESOURCE_STATES resource_state,
-                                                          D3D12_RESOURCE_FLAGS resource_flags);
+ComPtr<ID3D12Resource> CreateNativeBuffer(ID3D12Device *device,
+                                          size_t size,
+                                          D3D12_HEAP_TYPE heap_type,
+                                          D3D12_HEAP_FLAGS heap_flags,
+                                          D3D12_RESOURCE_STATES resource_state,
+                                          D3D12_RESOURCE_FLAGS resource_flags);
 
-Microsoft::WRL::ComPtr<ID3D12Resource> CreateNativeBuffer(ID3D12Device *device, size_t size, D3D12_HEAP_TYPE heap_type);
+ComPtr<ID3D12Resource> CreateNativeBuffer(ID3D12Device *device, size_t size, D3D12_HEAP_TYPE heap_type);
 
-Microsoft::WRL::ComPtr<ID3D12Resource> CreateNativeImage(ID3D12Device *device,
-                                                         size_t width,
-                                                         size_t height,
-                                                         DXGI_FORMAT format);
+ComPtr<ID3D12Resource> CreateNativeImage(ID3D12Device *device, size_t width, size_t height, DXGI_FORMAT format);
 
-Microsoft::WRL::ComPtr<IDXGISwapChain3> CreateNativeSwapChain(IDXGIFactory4 *factory,
-                                                              ID3D12CommandQueue *queue,
-                                                              HWND hwnd,
-                                                              uint32_t buffer_count,
-                                                              DXGI_FORMAT format);
+ComPtr<IDXGISwapChain3> CreateNativeSwapChain(IDXGIFactory4 *factory,
+                                              ID3D12CommandQueue *queue,
+                                              HWND hwnd,
+                                              uint32_t buffer_count,
+                                              DXGI_FORMAT format);
 
-std::vector<Microsoft::WRL::ComPtr<IDXGIAdapter1>> EnumerateNativeAdapters(IDXGIFactory4 *factory);
+std::vector<ComPtr<IDXGIAdapter1>> EnumerateNativeAdapters(IDXGIFactory4 *factory);
 std::string NativeAdapterName(IDXGIAdapter1 *adapter);
 bool NativeAdapterSupportsRayTracing(IDXGIAdapter1 *adapter);
 uint64_t NativeAdapterScore(IDXGIAdapter1 *adapter);

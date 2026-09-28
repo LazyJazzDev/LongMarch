@@ -5,7 +5,7 @@
 namespace grassland::graphics::backend {
 
 D3D12AccelerationStructure::D3D12AccelerationStructure(D3D12Core *core,
-                                                       Microsoft::WRL::ComPtr<ID3D12Resource> acceleration_structure,
+                                                       ComPtr<ID3D12Resource> acceleration_structure,
                                                        int instance_count)
     : core_(core),
       acceleration_structure_(std::move(acceleration_structure)),
@@ -57,7 +57,7 @@ int D3D12AccelerationStructure::UpdateInstances(const std::vector<RayTracingInst
   build.SourceAccelerationStructureData = rebuild ? 0 : acceleration_structure_->GetGPUVirtualAddress();
   d3d12::ThrowIfFailed(d3d12::SingleTimeCommand(core_->CommandQueue(), core_->SingleTimeCommandAllocator(),
                                                 [&](ID3D12GraphicsCommandList *list) {
-                                                  Microsoft::WRL::ComPtr<ID3D12GraphicsCommandList4> rt_list;
+                                                  ComPtr<ID3D12GraphicsCommandList4> rt_list;
                                                   d3d12::ThrowIfFailed(list->QueryInterface(IID_PPV_ARGS(&rt_list)),
                                                                        "Failed to query DXR command list");
                                                   rt_list->BuildRaytracingAccelerationStructure(&build, 0, nullptr);

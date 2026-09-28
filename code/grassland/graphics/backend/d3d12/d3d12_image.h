@@ -18,7 +18,7 @@ class D3D12Image : public Image {
 
  private:
   D3D12Core *core_;
-  Microsoft::WRL::ComPtr<ID3D12Resource> image_;
+  ComPtr<ID3D12Resource> image_;
   ImageFormat format_;
 };
 

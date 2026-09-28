@@ -24,7 +24,7 @@ D3D12CmdBindRayTracingProgram::D3D12CmdBindRayTracingProgram(D3D12RayTracingProg
 void D3D12CmdBindRayTracingProgram::CompileCommand(D3D12CommandContext *context,
                                                    ID3D12GraphicsCommandList *command_list) {
   command_list->SetComputeRootSignature(program_->RootSignature());
-  d3d12::ComPtr<ID3D12GraphicsCommandList4> command_list4;
+  ComPtr<ID3D12GraphicsCommandList4> command_list4;
   if (SUCCEEDED(command_list->QueryInterface(IID_PPV_ARGS(&command_list4)))) {
     command_list4->SetPipelineState1(program_->PipelineState());
   }
@@ -429,7 +429,7 @@ D3D12CmdDispatchRays::D3D12CmdDispatchRays(D3D12RayTracingProgram *program,
 }
 
 void D3D12CmdDispatchRays::CompileCommand(D3D12CommandContext *context, ID3D12GraphicsCommandList *command_list) {
-  d3d12::ComPtr<ID3D12GraphicsCommandList4> dxr_command_list;
+  ComPtr<ID3D12GraphicsCommandList4> dxr_command_list;
   if (SUCCEEDED(command_list->QueryInterface(IID_PPV_ARGS(&dxr_command_list)))) {
     auto shader_table = program_->ShaderTable();
     UINT shader_record_size =

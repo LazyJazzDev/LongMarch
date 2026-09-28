@@ -14,9 +14,13 @@
 #include "grassland/graphics/graphics_util.h"
 #include "grassland/util/util.h"
 
-namespace grassland::graphics::backend::d3d12 {
+namespace grassland::graphics::backend {
 
 using Microsoft::WRL::ComPtr;
+
+}  // namespace grassland::graphics::backend
+
+namespace grassland::graphics::backend::d3d12 {
 
 void ThrowError(const std::string &message);
 
