@@ -66,11 +66,6 @@ size_t SizeAlignTo(size_t size, size_t alignment);
                                                                                        \
   } while (false)
 
-struct DeviceFeatureRequirement;
-
-class AccelerationStructure;
-class RayTracingPipeline;
-class ShaderTable;
 struct HitGroup;
 
 #ifdef NDEBUG

@@ -203,10 +203,12 @@ void D3D12RayTracingProgram::Finalize(const std::vector<int32_t> &miss_shader_in
   FinalizeRootSignature();
 
   core_->CreateRayTracingPipeline(root_signature_.Get(), raygen_shader_, miss_shaders_, hit_groups_, callable_shaders_,
-                                  &pipeline_);
-
-  core_->CreateShaderTable(pipeline_.get(), miss_shader_indices, hit_group_indices, callable_shader_indices,
-                           &shader_table_);
+                                  pipeline_);
+  core_->CreateShaderTable(pipeline_.Get(), miss_shader_indices, hit_group_indices, callable_shader_indices,
+                           shader_table_, miss_offset_, hit_group_offset_, callable_offset_);
+  miss_count_ = miss_shader_indices.size();
+  hit_group_count_ = hit_group_indices.size();
+  callable_count_ = callable_shader_indices.size();
 }
 
 void D3D12RayTracingProgram::Finalize() {

@@ -89,12 +89,36 @@ class D3D12RayTracingProgram : public RayTracingProgram, public D3D12ProgramBase
                 const std::vector<int32_t> &callable_shader_indices) override;
   void Finalize() override;
 
-  d3d12::RayTracingPipeline *PipelineState() const {
-    return pipeline_.get();
+  ID3D12StateObject *PipelineState() const {
+    return pipeline_.Get();
   }
 
-  d3d12::ShaderTable *ShaderTable() const {
-    return shader_table_.get();
+  ID3D12Resource *ShaderTable() const {
+    return shader_table_.Get();
+  }
+
+  D3D12_GPU_VIRTUAL_ADDRESS MissShaderAddress() const {
+    return shader_table_->GetGPUVirtualAddress() + miss_offset_;
+  }
+
+  D3D12_GPU_VIRTUAL_ADDRESS HitGroupAddress() const {
+    return shader_table_->GetGPUVirtualAddress() + hit_group_offset_;
+  }
+
+  D3D12_GPU_VIRTUAL_ADDRESS CallableShaderAddress() const {
+    return shader_table_->GetGPUVirtualAddress() + callable_offset_;
+  }
+
+  size_t MissShaderCount() const {
+    return miss_count_;
+  }
+
+  size_t HitGroupCount() const {
+    return hit_group_count_;
+  }
+
+  size_t CallableShaderCount() const {
+    return callable_count_;
   }
 
  private:
@@ -102,8 +126,14 @@ class D3D12RayTracingProgram : public RayTracingProgram, public D3D12ProgramBase
   std::vector<const CompiledShaderBlob *> miss_shaders_;
   std::vector<d3d12::HitGroup> hit_groups_;
   std::vector<const CompiledShaderBlob *> callable_shaders_;
-  std::unique_ptr<d3d12::RayTracingPipeline> pipeline_;
-  std::unique_ptr<d3d12::ShaderTable> shader_table_;
+  Microsoft::WRL::ComPtr<ID3D12StateObject> pipeline_;
+  Microsoft::WRL::ComPtr<ID3D12Resource> shader_table_;
+  D3D12_GPU_VIRTUAL_ADDRESS miss_offset_{};
+  D3D12_GPU_VIRTUAL_ADDRESS hit_group_offset_{};
+  D3D12_GPU_VIRTUAL_ADDRESS callable_offset_{};
+  size_t miss_count_{};
+  size_t hit_group_count_{};
+  size_t callable_count_{};
 };
 
 }  // namespace grassland::graphics::backend

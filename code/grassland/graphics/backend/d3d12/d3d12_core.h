@@ -97,65 +97,44 @@ class D3D12Core : public Core {
 
   int CreateRayTracingProgram(double_ptr<RayTracingProgram> pp_program) override;
 
-  HRESULT CreateBottomLevelAccelerationStructure(D3D12_GPU_VIRTUAL_ADDRESS aabb_buffer,
-                                                 uint32_t stride,
-                                                 uint32_t num_aabb,
-                                                 D3D12_RAYTRACING_GEOMETRY_FLAGS flags,
-                                                 ID3D12CommandQueue *queue,
-                                                 ID3D12CommandAllocator *allocator,
-                                                 double_ptr<d3d12::AccelerationStructure> pp_as);
+  HRESULT BuildBottomLevelAccelerationStructure(D3D12_GPU_VIRTUAL_ADDRESS aabb_buffer,
+                                                uint32_t stride,
+                                                uint32_t num_aabb,
+                                                D3D12_RAYTRACING_GEOMETRY_FLAGS flags,
+                                                ID3D12CommandQueue *queue,
+                                                ID3D12CommandAllocator *allocator,
+                                                Microsoft::WRL::ComPtr<ID3D12Resource> &result);
 
-  HRESULT CreateBottomLevelAccelerationStructure(D3D12_GPU_VIRTUAL_ADDRESS vertex_buffer,
-                                                 D3D12_GPU_VIRTUAL_ADDRESS index_buffer,
-                                                 uint32_t num_vertex,
-                                                 uint32_t stride,
-                                                 uint32_t primitive_count,
-                                                 D3D12_RAYTRACING_GEOMETRY_FLAGS flags,
-                                                 ID3D12CommandQueue *queue,
-                                                 ID3D12CommandAllocator *allocator,
-                                                 double_ptr<d3d12::AccelerationStructure> pp_as);
+  HRESULT BuildBottomLevelAccelerationStructure(D3D12_GPU_VIRTUAL_ADDRESS vertex_buffer,
+                                                D3D12_GPU_VIRTUAL_ADDRESS index_buffer,
+                                                uint32_t num_vertex,
+                                                uint32_t stride,
+                                                uint32_t primitive_count,
+                                                D3D12_RAYTRACING_GEOMETRY_FLAGS flags,
+                                                ID3D12CommandQueue *queue,
+                                                ID3D12CommandAllocator *allocator,
+                                                Microsoft::WRL::ComPtr<ID3D12Resource> &result);
 
-  HRESULT CreateBottomLevelAccelerationStructure(D3D12_GPU_VIRTUAL_ADDRESS vertex_buffer,
-                                                 D3D12_GPU_VIRTUAL_ADDRESS index_buffer,
-                                                 uint32_t num_vertex,
-                                                 uint32_t stride,
-                                                 uint32_t primitive_count,
-                                                 ID3D12CommandQueue *queue,
-                                                 ID3D12CommandAllocator *allocator,
-                                                 double_ptr<d3d12::AccelerationStructure> pp_as);
-
-  HRESULT CreateTopLevelAccelerationStructure(const std::vector<D3D12_RAYTRACING_INSTANCE_DESC> &instances,
-                                              ID3D12CommandQueue *queue,
-                                              ID3D12CommandAllocator *allocator,
-                                              double_ptr<d3d12::AccelerationStructure> pp_tlas);
-
-  HRESULT CreateTopLevelAccelerationStructure(
-      const std::vector<std::pair<d3d12::AccelerationStructure *, glm::mat4>> &objects,
-      ID3D12CommandQueue *queue,
-      ID3D12CommandAllocator *allocator,
-      double_ptr<d3d12::AccelerationStructure> pp_tlas);
+  HRESULT BuildTopLevelAccelerationStructure(const std::vector<D3D12_RAYTRACING_INSTANCE_DESC> &instances,
+                                             ID3D12CommandQueue *queue,
+                                             ID3D12CommandAllocator *allocator,
+                                             Microsoft::WRL::ComPtr<ID3D12Resource> &result);
 
   HRESULT CreateRayTracingPipeline(ID3D12RootSignature *root_signature,
                                    const CompiledShaderBlob *ray_gen_shader,
                                    const std::vector<const CompiledShaderBlob *> &miss_shaders,
                                    const std::vector<d3d12::HitGroup> &hit_groups,
                                    const std::vector<const CompiledShaderBlob *> &callable_shaders,
-                                   double_ptr<d3d12::RayTracingPipeline> pp_pipeline);
+                                   Microsoft::WRL::ComPtr<ID3D12StateObject> &pipeline);
 
-  HRESULT CreateRayTracingPipeline(ID3D12RootSignature *root_signature,
-                                   const CompiledShaderBlob *ray_gen_shader,
-                                   const CompiledShaderBlob *miss_shader,
-                                   const CompiledShaderBlob *closest_hit_shader,
-                                   double_ptr<d3d12::RayTracingPipeline> pp_pipeline);
-
-  HRESULT CreateShaderTable(d3d12::RayTracingPipeline *ray_tracing_pipeline,
+  HRESULT CreateShaderTable(ID3D12StateObject *pipeline,
                             const std::vector<int32_t> &miss_shader_indices,
                             const std::vector<int32_t> &hit_group_indices,
                             const std::vector<int32_t> &callable_shader_indices,
-                            double_ptr<d3d12::ShaderTable> pp_shader_table) const;
-
-  HRESULT CreateShaderTable(d3d12::RayTracingPipeline *ray_tracing_pipeline,
-                            double_ptr<d3d12::ShaderTable> pp_shader_table) const;
+                            Microsoft::WRL::ComPtr<ID3D12Resource> &buffer,
+                            D3D12_GPU_VIRTUAL_ADDRESS &miss_offset,
+                            D3D12_GPU_VIRTUAL_ADDRESS &hit_group_offset,
+                            D3D12_GPU_VIRTUAL_ADDRESS &callable_offset) const;
 
   int SubmitCommandContext(CommandContext *p_command_context) override;
 
@@ -222,7 +201,7 @@ class D3D12Core : public Core {
 #endif
 
  private:
-  friend class d3d12::AccelerationStructure;
+  friend class D3D12AccelerationStructure;
   Microsoft::WRL::ComPtr<IDXGIFactory4> dxgi_factory_;
   Microsoft::WRL::ComPtr<IDXGIAdapter1> adapter_;
   Microsoft::WRL::ComPtr<ID3D12Device> device_;

@@ -26,7 +26,7 @@ void D3D12CmdBindRayTracingProgram::CompileCommand(D3D12CommandContext *context,
   command_list->SetComputeRootSignature(program_->RootSignature());
   d3d12::ComPtr<ID3D12GraphicsCommandList4> command_list4;
   if (SUCCEEDED(command_list->QueryInterface(IID_PPV_ARGS(&command_list4)))) {
-    command_list4->SetPipelineState1(program_->PipelineState()->Handle());
+    command_list4->SetPipelineState1(program_->PipelineState());
   }
 }
 
@@ -422,16 +422,16 @@ void D3D12CmdDispatchRays::CompileCommand(D3D12CommandContext *context, ID3D12Gr
     UINT shader_record_size =
         d3d12::SizeAlignTo(D3D12_SHADER_IDENTIFIER_SIZE_IN_BYTES, D3D12_RAYTRACING_SHADER_RECORD_BYTE_ALIGNMENT);
     D3D12_DISPATCH_RAYS_DESC dispatch_desc = {};
-    dispatch_desc.HitGroupTable.StartAddress = shader_table->GetHitGroupDeviceAddress();
-    dispatch_desc.HitGroupTable.SizeInBytes = shader_record_size * shader_table->HitGroupShaderCount();
+    dispatch_desc.HitGroupTable.StartAddress = program_->HitGroupAddress();
+    dispatch_desc.HitGroupTable.SizeInBytes = shader_record_size * program_->HitGroupCount();
     dispatch_desc.HitGroupTable.StrideInBytes = shader_record_size;
-    dispatch_desc.MissShaderTable.StartAddress = shader_table->GetMissDeviceAddress();
-    dispatch_desc.MissShaderTable.SizeInBytes = shader_record_size * shader_table->MissShaderCount();
+    dispatch_desc.MissShaderTable.StartAddress = program_->MissShaderAddress();
+    dispatch_desc.MissShaderTable.SizeInBytes = shader_record_size * program_->MissShaderCount();
     dispatch_desc.MissShaderTable.StrideInBytes = shader_record_size;
-    dispatch_desc.RayGenerationShaderRecord.StartAddress = shader_table->GetRayGenDeviceAddress();
+    dispatch_desc.RayGenerationShaderRecord.StartAddress = shader_table->GetGPUVirtualAddress();
     dispatch_desc.RayGenerationShaderRecord.SizeInBytes = shader_record_size;
-    dispatch_desc.CallableShaderTable.StartAddress = shader_table->GetCallableDeviceAddress();
-    dispatch_desc.CallableShaderTable.SizeInBytes = shader_record_size * shader_table->CallableShaderCount();
+    dispatch_desc.CallableShaderTable.StartAddress = program_->CallableShaderAddress();
+    dispatch_desc.CallableShaderTable.SizeInBytes = shader_record_size * program_->CallableShaderCount();
     dispatch_desc.CallableShaderTable.StrideInBytes = shader_record_size;
     dispatch_desc.Width = width_;
     dispatch_desc.Height = height_;

@@ -210,12 +210,12 @@ int D3D12Core::CreateBottomLevelAccelerationStructure(BufferRange aabb_buffer,
 
   assert(d3d12_aabb_buffer != nullptr);
 
-  std::unique_ptr<d3d12::AccelerationStructure> blas;
-  CreateBottomLevelAccelerationStructure(
-      d3d12_aabb_buffer->InstantBuffer()->GetGPUVirtualAddress() + aabb_buffer.offset, stride, num_aabb,
-      static_cast<D3D12_RAYTRACING_GEOMETRY_FLAGS>(flags), command_queue_.Get(), single_time_allocator_.Get(), &blas);
+  Microsoft::WRL::ComPtr<ID3D12Resource> blas;
+  BuildBottomLevelAccelerationStructure(d3d12_aabb_buffer->InstantBuffer()->GetGPUVirtualAddress() + aabb_buffer.offset,
+                                        stride, num_aabb, static_cast<D3D12_RAYTRACING_GEOMETRY_FLAGS>(flags),
+                                        command_queue_.Get(), single_time_allocator_.Get(), blas);
 
-  pp_blas.construct<D3D12AccelerationStructure>(this, std::move(blas));
+  pp_blas.construct<D3D12AccelerationStructure>(this, std::move(blas), num_aabb);
 
   return 0;
 }
@@ -233,14 +233,14 @@ int D3D12Core::CreateBottomLevelAccelerationStructure(BufferRange vertex_buffer,
   assert(d3d12_vertex_buffer != nullptr);
   assert(d3d12_index_buffer != nullptr);
 
-  std::unique_ptr<d3d12::AccelerationStructure> blas;
-  CreateBottomLevelAccelerationStructure(
+  Microsoft::WRL::ComPtr<ID3D12Resource> blas;
+  BuildBottomLevelAccelerationStructure(
       d3d12_vertex_buffer->InstantBuffer()->GetGPUVirtualAddress() + vertex_buffer.offset,
       d3d12_index_buffer->InstantBuffer()->GetGPUVirtualAddress() + index_buffer.offset, num_vertex, stride,
       num_primitive, static_cast<D3D12_RAYTRACING_GEOMETRY_FLAGS>(flags), command_queue_.Get(),
-      single_time_allocator_.Get(), &blas);
+      single_time_allocator_.Get(), blas);
 
-  pp_blas.construct<D3D12AccelerationStructure>(this, std::move(blas));
+  pp_blas.construct<D3D12AccelerationStructure>(this, std::move(blas), num_primitive);
 
   return 0;
 }
@@ -263,10 +263,10 @@ int D3D12Core::CreateTopLevelAccelerationStructure(const std::vector<RayTracingI
     d3d12_instances.emplace_back(RayTracingInstanceToD3D12RayTracingInstanceDesc(instance));
   }
 
-  std::unique_ptr<d3d12::AccelerationStructure> tlas;
-  CreateTopLevelAccelerationStructure(d3d12_instances, command_queue_.Get(), single_time_allocator_.Get(), &tlas);
+  Microsoft::WRL::ComPtr<ID3D12Resource> tlas;
+  BuildTopLevelAccelerationStructure(d3d12_instances, command_queue_.Get(), single_time_allocator_.Get(), tlas);
 
-  pp_tlas.construct<D3D12AccelerationStructure>(this, std::move(tlas));
+  pp_tlas.construct<D3D12AccelerationStructure>(this, std::move(tlas), instances.size());
 
   return 0;
 }
@@ -638,13 +638,13 @@ void D3D12Core::CUDAEndExecutionBarrier(cudaStream_t stream) {
 }
 #endif
 
-HRESULT D3D12Core::CreateBottomLevelAccelerationStructure(D3D12_GPU_VIRTUAL_ADDRESS aabb_buffer,
-                                                          uint32_t stride,
-                                                          uint32_t num_aabb,
-                                                          D3D12_RAYTRACING_GEOMETRY_FLAGS flags,
-                                                          ID3D12CommandQueue *queue,
-                                                          ID3D12CommandAllocator *allocator,
-                                                          double_ptr<d3d12::AccelerationStructure> pp_as) {
+HRESULT D3D12Core::BuildBottomLevelAccelerationStructure(D3D12_GPU_VIRTUAL_ADDRESS aabb_buffer,
+                                                         uint32_t stride,
+                                                         uint32_t num_aabb,
+                                                         D3D12_RAYTRACING_GEOMETRY_FLAGS flags,
+                                                         ID3D12CommandQueue *queue,
+                                                         ID3D12CommandAllocator *allocator,
+                                                         Microsoft::WRL::ComPtr<ID3D12Resource> &result) {
   D3D12_RAYTRACING_GEOMETRY_DESC geometry = {};
   geometry.Type = D3D12_RAYTRACING_GEOMETRY_TYPE_PROCEDURAL_PRIMITIVE_AABBS;
   geometry.AABBs.AABBs.StartAddress = aabb_buffer;
@@ -686,19 +686,19 @@ HRESULT D3D12Core::CreateBottomLevelAccelerationStructure(D3D12_GPU_VIRTUAL_ADDR
     }
   });
 
-  pp_as.construct(this, as, num_aabb);
+  result = std::move(as);
   return S_OK;
 }
 
-HRESULT D3D12Core::CreateBottomLevelAccelerationStructure(D3D12_GPU_VIRTUAL_ADDRESS vertex_buffer,
-                                                          D3D12_GPU_VIRTUAL_ADDRESS index_buffer,
-                                                          uint32_t num_vertex,
-                                                          uint32_t stride,
-                                                          uint32_t primitive_count,
-                                                          D3D12_RAYTRACING_GEOMETRY_FLAGS flags,
-                                                          ID3D12CommandQueue *queue,
-                                                          ID3D12CommandAllocator *allocator,
-                                                          double_ptr<d3d12::AccelerationStructure> pp_as) {
+HRESULT D3D12Core::BuildBottomLevelAccelerationStructure(D3D12_GPU_VIRTUAL_ADDRESS vertex_buffer,
+                                                         D3D12_GPU_VIRTUAL_ADDRESS index_buffer,
+                                                         uint32_t num_vertex,
+                                                         uint32_t stride,
+                                                         uint32_t primitive_count,
+                                                         D3D12_RAYTRACING_GEOMETRY_FLAGS flags,
+                                                         ID3D12CommandQueue *queue,
+                                                         ID3D12CommandAllocator *allocator,
+                                                         Microsoft::WRL::ComPtr<ID3D12Resource> &result) {
   D3D12_RAYTRACING_GEOMETRY_DESC geometry = {};
   geometry.Type = D3D12_RAYTRACING_GEOMETRY_TYPE_TRIANGLES;
   geometry.Triangles.VertexBuffer.StartAddress = vertex_buffer;
@@ -745,27 +745,14 @@ HRESULT D3D12Core::CreateBottomLevelAccelerationStructure(D3D12_GPU_VIRTUAL_ADDR
     }
   });
 
-  pp_as.construct(this, as, primitive_count);
+  result = std::move(as);
   return S_OK;
 }
 
-HRESULT D3D12Core::CreateBottomLevelAccelerationStructure(D3D12_GPU_VIRTUAL_ADDRESS vertex_buffer,
-                                                          D3D12_GPU_VIRTUAL_ADDRESS index_buffer,
-                                                          uint32_t num_vertex,
-                                                          uint32_t stride,
-                                                          uint32_t primitive_count,
-                                                          ID3D12CommandQueue *queue,
-                                                          ID3D12CommandAllocator *allocator,
-                                                          double_ptr<d3d12::AccelerationStructure> pp_as) {
-  return CreateBottomLevelAccelerationStructure(vertex_buffer, index_buffer, num_vertex, stride, primitive_count,
-                                                D3D12_RAYTRACING_GEOMETRY_FLAG_NO_DUPLICATE_ANYHIT_INVOCATION, queue,
-                                                allocator, pp_as);
-}
-
-HRESULT D3D12Core::CreateTopLevelAccelerationStructure(const std::vector<D3D12_RAYTRACING_INSTANCE_DESC> &instances,
-                                                       ID3D12CommandQueue *queue,
-                                                       ID3D12CommandAllocator *allocator,
-                                                       double_ptr<d3d12::AccelerationStructure> pp_tlas) {
+HRESULT D3D12Core::BuildTopLevelAccelerationStructure(const std::vector<D3D12_RAYTRACING_INSTANCE_DESC> &instances,
+                                                      ID3D12CommandQueue *queue,
+                                                      ID3D12CommandAllocator *allocator,
+                                                      Microsoft::WRL::ComPtr<ID3D12Resource> &result) {
   ID3D12Resource *instance_buffer = RequestInstanceBuffer(sizeof(D3D12_RAYTRACING_INSTANCE_DESC) * instances.size());
   void *instance_buffer_ptr{};
   RETURN_IF_FAILED_HR(instance_buffer->Map(0, nullptr, &instance_buffer_ptr), "failed to map instance buffer.");
@@ -806,41 +793,8 @@ HRESULT D3D12Core::CreateTopLevelAccelerationStructure(const std::vector<D3D12_R
     }
   });
 
-  pp_tlas.construct(this, as, instances.size());
+  result = std::move(as);
   return S_OK;
-}
-
-HRESULT D3D12Core::CreateTopLevelAccelerationStructure(
-    const std::vector<std::pair<d3d12::AccelerationStructure *, glm::mat4>> &objects,
-    ID3D12CommandQueue *queue,
-    ID3D12CommandAllocator *allocator,
-    double_ptr<d3d12::AccelerationStructure> pp_tlas) {
-  std::vector<D3D12_RAYTRACING_INSTANCE_DESC> instance_descs;
-  instance_descs.reserve(objects.size());
-  for (int i = 0; i < objects.size(); i++) {
-    auto &object = objects[i];
-    D3D12_RAYTRACING_INSTANCE_DESC instance_desc = {};
-    instance_desc.Transform[0][0] = object.second[0][0];
-    instance_desc.Transform[0][1] = object.second[1][0];
-    instance_desc.Transform[0][2] = object.second[2][0];
-    instance_desc.Transform[0][3] = object.second[3][0];
-    instance_desc.Transform[1][0] = object.second[0][1];
-    instance_desc.Transform[1][1] = object.second[1][1];
-    instance_desc.Transform[1][2] = object.second[2][1];
-    instance_desc.Transform[1][3] = object.second[3][1];
-    instance_desc.Transform[2][0] = object.second[0][2];
-    instance_desc.Transform[2][1] = object.second[1][2];
-    instance_desc.Transform[2][2] = object.second[2][2];
-    instance_desc.Transform[2][3] = object.second[3][2];
-    instance_desc.InstanceID = i;
-    instance_desc.InstanceMask = 0xFF;
-    instance_desc.InstanceContributionToHitGroupIndex = 0;
-    instance_desc.Flags = D3D12_RAYTRACING_INSTANCE_FLAG_TRIANGLE_CULL_DISABLE;
-    instance_desc.AccelerationStructure = objects[i].first->Handle()->GetGPUVirtualAddress();
-    instance_descs.push_back(instance_desc);
-  }
-
-  return CreateTopLevelAccelerationStructure(instance_descs, queue, allocator, pp_tlas);
 }
 
 HRESULT D3D12Core::CreateRayTracingPipeline(ID3D12RootSignature *root_signature,
@@ -848,7 +802,7 @@ HRESULT D3D12Core::CreateRayTracingPipeline(ID3D12RootSignature *root_signature,
                                             const std::vector<const CompiledShaderBlob *> &miss_shaders,
                                             const std::vector<d3d12::HitGroup> &hit_groups,
                                             const std::vector<const CompiledShaderBlob *> &callable_shaders,
-                                            double_ptr<d3d12::RayTracingPipeline> pp_pipeline) {
+                                            Microsoft::WRL::ComPtr<ID3D12StateObject> &result) {
   CD3DX12_STATE_OBJECT_DESC pipeline_desc(D3D12_STATE_OBJECT_TYPE_RAYTRACING_PIPELINE);
   auto lib_ray_gen = pipeline_desc.CreateSubobject<CD3DX12_DXIL_LIBRARY_SUBOBJECT>();
   auto ray_gen_code = D3D12_SHADER_BYTECODE{ray_gen_shader->data.data(), ray_gen_shader->data.size()};
@@ -919,31 +873,22 @@ HRESULT D3D12Core::CreateRayTracingPipeline(ID3D12RootSignature *root_signature,
   auto pipeline_config = pipeline_desc.CreateSubobject<CD3DX12_RAYTRACING_PIPELINE_CONFIG_SUBOBJECT>();
   pipeline_config->Config(31);
 
-  d3d12::ComPtr<ID3D12StateObject> pipeline;
-
-  RETURN_IF_FAILED_HR(dxr_device_->CreateStateObject(pipeline_desc, IID_PPV_ARGS(&pipeline)),
+  RETURN_IF_FAILED_HR(dxr_device_->CreateStateObject(pipeline_desc, IID_PPV_ARGS(result.GetAddressOf())),
                       "failed to create ray tracing pipeline.");
 
-  pp_pipeline.construct(pipeline, miss_shaders.size(), hit_groups.size(), callable_shaders.size());
   return S_OK;
 }
 
-HRESULT D3D12Core::CreateRayTracingPipeline(ID3D12RootSignature *root_signature,
-                                            const CompiledShaderBlob *ray_gen_shader,
-                                            const CompiledShaderBlob *miss_shader,
-                                            const CompiledShaderBlob *closest_hit_shader,
-                                            double_ptr<d3d12::RayTracingPipeline> pp_pipeline) {
-  return CreateRayTracingPipeline(root_signature, ray_gen_shader, {miss_shader},
-                                  {{closest_hit_shader, nullptr, nullptr, false}}, {}, pp_pipeline);
-}
-
-HRESULT D3D12Core::CreateShaderTable(d3d12::RayTracingPipeline *ray_tracing_pipeline,
+HRESULT D3D12Core::CreateShaderTable(ID3D12StateObject *pipeline,
                                      const std::vector<int32_t> &miss_shader_indices,
                                      const std::vector<int32_t> &hit_group_indices,
                                      const std::vector<int32_t> &callable_shader_indices,
-                                     double_ptr<d3d12::ShaderTable> pp_shader_table) const {
+                                     Microsoft::WRL::ComPtr<ID3D12Resource> &result,
+                                     D3D12_GPU_VIRTUAL_ADDRESS &miss_shader_offset,
+                                     D3D12_GPU_VIRTUAL_ADDRESS &hit_group_offset,
+                                     D3D12_GPU_VIRTUAL_ADDRESS &callable_shader_offset) const {
   d3d12::ComPtr<ID3D12StateObjectProperties> pipeline_properties;
-  RETURN_IF_FAILED_HR(ray_tracing_pipeline->Handle()->QueryInterface(IID_PPV_ARGS(&pipeline_properties)),
+  RETURN_IF_FAILED_HR(pipeline->QueryInterface(IID_PPV_ARGS(&pipeline_properties)),
                       "failed to get pipeline properties.");
 
   const UINT shader_idenfitier_size = D3D12_SHADER_IDENTIFIER_SIZE_IN_BYTES;
@@ -952,11 +897,6 @@ HRESULT D3D12Core::CreateShaderTable(d3d12::RayTracingPipeline *ray_tracing_pipe
   const UINT shader_table_alignment = D3D12_RAYTRACING_SHADER_TABLE_BYTE_ALIGNMENT;
 
   D3D12_GPU_VIRTUAL_ADDRESS accum_offset = 0;
-
-  D3D12_GPU_VIRTUAL_ADDRESS ray_gen_shader_offset = 0;
-  D3D12_GPU_VIRTUAL_ADDRESS miss_shader_offset = 0;
-  D3D12_GPU_VIRTUAL_ADDRESS hit_group_offset = 0;
-  D3D12_GPU_VIRTUAL_ADDRESS callable_shader_offset = 0;
 
   miss_shader_offset = accum_offset = d3d12::SizeAlignTo(accum_offset + shader_record_size * 1, shader_table_alignment);
 
@@ -1001,22 +941,9 @@ HRESULT D3D12Core::CreateShaderTable(d3d12::RayTracingPipeline *ray_tracing_pipe
 
   buffer->Unmap(0, nullptr);
 
-  pp_shader_table.construct(buffer, ray_gen_shader_offset, miss_shader_offset, hit_group_offset, callable_shader_offset,
-                            miss_shader_indices.size(), hit_group_indices.size(), callable_shader_indices.size());
+  result = std::move(buffer);
 
   return S_OK;
-}
-
-HRESULT D3D12Core::CreateShaderTable(d3d12::RayTracingPipeline *ray_tracing_pipeline,
-                                     double_ptr<d3d12::ShaderTable> pp_shader_table) const {
-  std::vector<int32_t> miss_shader_indices(ray_tracing_pipeline->MissShaderCount());
-  std::iota(miss_shader_indices.begin(), miss_shader_indices.end(), 0);
-  std::vector<int32_t> hit_group_indices(ray_tracing_pipeline->HitGroupCount());
-  std::iota(hit_group_indices.begin(), hit_group_indices.end(), 0);
-  std::vector<int32_t> callable_shader_indices(ray_tracing_pipeline->CallableShaderCount());
-  std::iota(callable_shader_indices.begin(), callable_shader_indices.end(), 0);
-  return CreateShaderTable(ray_tracing_pipeline, miss_shader_indices, hit_group_indices, callable_shader_indices,
-                           pp_shader_table);
 }
 
 ID3D12Resource *D3D12Core::RequestScratchBuffer(size_t size) {

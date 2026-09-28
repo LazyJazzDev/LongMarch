@@ -393,10 +393,8 @@ D3D12_RAYTRACING_INSTANCE_DESC RayTracingInstanceToD3D12RayTracingInstanceDesc(c
   desc.InstanceMask = instance.instance_mask;
   desc.InstanceContributionToHitGroupIndex = instance.instance_hit_group_offset;
   desc.Flags = instance.instance_flags;
-  desc.AccelerationStructure = dynamic_cast<D3D12AccelerationStructure *>(instance.acceleration_structure)
-                                   ->Handle()
-                                   ->Handle()
-                                   ->GetGPUVirtualAddress();
+  desc.AccelerationStructure =
+      dynamic_cast<D3D12AccelerationStructure *>(instance.acceleration_structure)->Handle()->GetGPUVirtualAddress();
   return desc;
 }
 
