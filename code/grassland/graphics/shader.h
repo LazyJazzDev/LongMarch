@@ -7,10 +7,6 @@ class Shader {
  public:
   virtual ~Shader() = default;
   virtual std::string EntryPoint() const = 0;
-
-#if defined(LONGMARCH_PYTHON_ENABLED)
-  static void PybindClassRegistration(py::classh<Shader> &c);
-#endif
 };
 
 CompiledShaderBlob CompileShader(const std::string &source_code,

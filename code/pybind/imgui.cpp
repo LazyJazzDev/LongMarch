@@ -1,13 +1,10 @@
-#include "grassland/graphics/imgui_pybind.h"
+#include "pybind/pybind.h"
 
-#include "grassland/graphics/window.h"
-
-namespace grassland::graphics {
-#if defined(LONGMARCH_PYTHON_ENABLED)
+namespace grassland::graphics::pybind {
 // A small immediate-mode subset for Python demos. Calls act on the current ImGui
 // context, which Window.begin_imgui_frame selects; widgets belong between
 // begin_imgui_frame and end_imgui_frame. Text is never used as a format string.
-void PybindImGuiRegistration(py::module_ &m) {
+void RegisterImGui(py::module_ &m) {
   m.doc() = "Dear ImGui widgets for the window created by long_march.graphics";
 
   m.attr("COND_ALWAYS") = int(ImGuiCond_Always);
@@ -92,5 +89,4 @@ void PybindImGuiRegistration(py::module_ &m) {
       py::arg("label"), py::arg("values"), py::arg("scale_min") = FLT_MAX, py::arg("scale_max") = FLT_MAX,
       py::arg("graph_width") = 0.0f, py::arg("graph_height") = 0.0f);
 }
-#endif
-}  // namespace grassland::graphics
+}  // namespace grassland::graphics::pybind
