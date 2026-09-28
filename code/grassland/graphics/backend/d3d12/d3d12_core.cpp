@@ -279,57 +279,61 @@ int D3D12Core::SubmitCommandContext(CommandContext *p_command_context) {
   }
 
   if (!resource_descriptor_heaps_[current_frame_] ||
-      resource_descriptor_heaps_[current_frame_]->NumDescriptors() < command_context->resource_descriptor_count_) {
-    resource_descriptor_heaps_[current_frame_].reset();
-    device_->CreateDescriptorHeap(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV, command_context->resource_descriptor_count_,
-                                  &resource_descriptor_heaps_[current_frame_]);
+      resource_descriptor_heaps_[current_frame_]->GetDesc().NumDescriptors <
+          command_context->resource_descriptor_count_) {
+    resource_descriptor_heaps_[current_frame_] = CreateNativeDescriptorHeap(
+        device_->Handle(), D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV, command_context->resource_descriptor_count_);
   }
 
   if (!sampler_descriptor_heaps_[current_frame_] ||
-      sampler_descriptor_heaps_[current_frame_]->NumDescriptors() < command_context->sampler_descriptor_count_) {
-    sampler_descriptor_heaps_[current_frame_].reset();
-    device_->CreateDescriptorHeap(D3D12_DESCRIPTOR_HEAP_TYPE_SAMPLER, command_context->sampler_descriptor_count_,
-                                  &sampler_descriptor_heaps_[current_frame_]);
+      sampler_descriptor_heaps_[current_frame_]->GetDesc().NumDescriptors <
+          command_context->sampler_descriptor_count_) {
+    sampler_descriptor_heaps_[current_frame_] = CreateNativeDescriptorHeap(
+        device_->Handle(), D3D12_DESCRIPTOR_HEAP_TYPE_SAMPLER, command_context->sampler_descriptor_count_);
   }
 
   if (command_context->resource_descriptor_count_) {
-    command_context->resource_descriptor_size_ = resource_descriptor_heaps_[current_frame_]->DescriptorSize();
-    command_context->resource_descriptor_base_ = resource_descriptor_heaps_[current_frame_]->CPUHandle(0);
-    command_context->resource_descriptor_gpu_base_ = resource_descriptor_heaps_[current_frame_]->GPUHandle(0);
+    command_context->resource_descriptor_size_ =
+        device_->Handle()->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
+    command_context->resource_descriptor_base_ =
+        resource_descriptor_heaps_[current_frame_]->GetCPUDescriptorHandleForHeapStart();
+    command_context->resource_descriptor_gpu_base_ =
+        resource_descriptor_heaps_[current_frame_]->GetGPUDescriptorHandleForHeapStart();
   }
 
   if (command_context->sampler_descriptor_count_) {
-    command_context->sampler_descriptor_size_ = sampler_descriptor_heaps_[current_frame_]->DescriptorSize();
-    command_context->sampler_descriptor_base_ = sampler_descriptor_heaps_[current_frame_]->CPUHandle(0);
-    command_context->sampler_descriptor_gpu_base_ = sampler_descriptor_heaps_[current_frame_]->GPUHandle(0);
+    command_context->sampler_descriptor_size_ =
+        device_->Handle()->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_SAMPLER);
+    command_context->sampler_descriptor_base_ =
+        sampler_descriptor_heaps_[current_frame_]->GetCPUDescriptorHandleForHeapStart();
+    command_context->sampler_descriptor_gpu_base_ =
+        sampler_descriptor_heaps_[current_frame_]->GetGPUDescriptorHandleForHeapStart();
   }
 
   if (!rtv_descriptor_heaps_[current_frame_] ||
-      rtv_descriptor_heaps_[current_frame_]->NumDescriptors() < command_context->rtv_index_.size()) {
-    rtv_descriptor_heaps_[current_frame_].reset();
-    device_->CreateDescriptorHeap(D3D12_DESCRIPTOR_HEAP_TYPE_RTV, command_context->rtv_index_.size(),
-                                  &rtv_descriptor_heaps_[current_frame_]);
+      rtv_descriptor_heaps_[current_frame_]->GetDesc().NumDescriptors < command_context->rtv_index_.size()) {
+    rtv_descriptor_heaps_[current_frame_] = CreateNativeDescriptorHeap(
+        device_->Handle(), D3D12_DESCRIPTOR_HEAP_TYPE_RTV, command_context->rtv_index_.size());
   }
 
   if (!dsv_descriptor_heaps_[current_frame_] ||
-      dsv_descriptor_heaps_[current_frame_]->NumDescriptors() < command_context->dsv_index_.size()) {
-    dsv_descriptor_heaps_[current_frame_].reset();
-    device_->CreateDescriptorHeap(D3D12_DESCRIPTOR_HEAP_TYPE_DSV, command_context->dsv_index_.size(),
-                                  &dsv_descriptor_heaps_[current_frame_]);
+      dsv_descriptor_heaps_[current_frame_]->GetDesc().NumDescriptors < command_context->dsv_index_.size()) {
+    dsv_descriptor_heaps_[current_frame_] = CreateNativeDescriptorHeap(
+        device_->Handle(), D3D12_DESCRIPTOR_HEAP_TYPE_DSV, command_context->dsv_index_.size());
   }
 
   for (auto &[resource, index] : command_context->rtv_index_) {
-    auto rtv_handle = rtv_descriptor_heaps_[current_frame_]->CPUHandle(index);
+    auto rtv_handle = RTVDescriptorHandle(index);
     device_->Handle()->CreateRenderTargetView(resource, nullptr, rtv_handle);
   }
 
   for (auto &[resource, index] : command_context->dsv_index_) {
-    auto dsv_handle = dsv_descriptor_heaps_[current_frame_]->CPUHandle(index);
+    auto dsv_handle = DSVDescriptorHandle(index);
     device_->Handle()->CreateDepthStencilView(resource, nullptr, dsv_handle);
   }
 
-  ID3D12DescriptorHeap *resource_heaps[] = {resource_descriptor_heaps_[current_frame_]->Handle(),
-                                            sampler_descriptor_heaps_[current_frame_]->Handle()};
+  ID3D12DescriptorHeap *resource_heaps[] = {resource_descriptor_heaps_[current_frame_].Get(),
+                                            sampler_descriptor_heaps_[current_frame_].Get()};
   command_list->SetDescriptorHeaps(2, resource_heaps);
 
   for (auto &command : command_context->commands_) {
@@ -419,8 +423,10 @@ int D3D12Core::InitializeLogicalDevice(int device_index) {
   dsv_descriptor_heaps_.resize(FramesInFlight());
   post_execute_functions_.resize(FramesInFlight());
   for (int i = 0; i < FramesInFlight(); i++) {
-    device_->CreateDescriptorHeap(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV, 64, &resource_descriptor_heaps_[i]);
-    device_->CreateDescriptorHeap(D3D12_DESCRIPTOR_HEAP_TYPE_SAMPLER, 64, &sampler_descriptor_heaps_[i]);
+    resource_descriptor_heaps_[i] =
+        CreateNativeDescriptorHeap(device_->Handle(), D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV, 64);
+    sampler_descriptor_heaps_[i] =
+        CreateNativeDescriptorHeap(device_->Handle(), D3D12_DESCRIPTOR_HEAP_TYPE_SAMPLER, 64);
 
     CreateCommandRecord(device_->Handle(), D3D12_COMMAND_LIST_TYPE_DIRECT, command_allocators_[i], command_lists_[i]);
   }
@@ -474,6 +480,18 @@ void D3D12Core::WaitGPU() {
     }
     post_execute.clear();
   }
+}
+
+CD3DX12_CPU_DESCRIPTOR_HANDLE D3D12Core::RTVDescriptorHandle(uint32_t index) const {
+  return CD3DX12_CPU_DESCRIPTOR_HANDLE(
+      rtv_descriptor_heaps_[current_frame_]->GetCPUDescriptorHandleForHeapStart(), index,
+      device_->Handle()->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_RTV));
+}
+
+CD3DX12_CPU_DESCRIPTOR_HANDLE D3D12Core::DSVDescriptorHandle(uint32_t index) const {
+  return CD3DX12_CPU_DESCRIPTOR_HANDLE(
+      dsv_descriptor_heaps_[current_frame_]->GetCPUDescriptorHandleForHeapStart(), index,
+      device_->Handle()->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_DSV));
 }
 
 uint32_t D3D12Core::WaveSize() const {

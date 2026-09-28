@@ -3,6 +3,21 @@
 #include "grassland/graphics/backend/d3d12/d3d12_acceleration_structure.h"
 
 namespace grassland::graphics::backend {
+Microsoft::WRL::ComPtr<ID3D12DescriptorHeap> CreateNativeDescriptorHeap(ID3D12Device *device,
+                                                                        D3D12_DESCRIPTOR_HEAP_TYPE type,
+                                                                        uint32_t count) {
+  D3D12_DESCRIPTOR_HEAP_DESC desc{};
+  desc.Type = type;
+  desc.NumDescriptors = std::max(count, 1u);
+  if (type == D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV || type == D3D12_DESCRIPTOR_HEAP_TYPE_SAMPLER) {
+    desc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE;
+  }
+  Microsoft::WRL::ComPtr<ID3D12DescriptorHeap> heap;
+  d3d12::ThrowIfFailed(device->CreateDescriptorHeap(&desc, IID_PPV_ARGS(heap.GetAddressOf())),
+                       "Failed to create descriptor heap");
+  return heap;
+}
+
 Microsoft::WRL::ComPtr<ID3D12RootSignature> CreateNativeRootSignature(
     ID3D12Device *device,
     const CD3DX12_VERSIONED_ROOT_SIGNATURE_DESC &desc) {

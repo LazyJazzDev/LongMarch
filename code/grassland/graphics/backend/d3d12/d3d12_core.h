@@ -145,13 +145,8 @@ class D3D12Core : public Core {
     return &blit_pipeline_;
   }
 
-  d3d12::DescriptorHeap *RTVDescriptorHeap() const {
-    return rtv_descriptor_heaps_[current_frame_].get();
-  }
-
-  d3d12::DescriptorHeap *DSVDescriptorHeap() const {
-    return dsv_descriptor_heaps_[current_frame_].get();
-  }
+  CD3DX12_CPU_DESCRIPTOR_HANDLE RTVDescriptorHandle(uint32_t index) const;
+  CD3DX12_CPU_DESCRIPTOR_HANDLE DSVDescriptorHandle(uint32_t index) const;
 
   d3d12::Buffer *RequestUploadStagingBuffer(size_t size);
   d3d12::Buffer *RequestDownloadStagingBuffer(size_t size);
@@ -182,11 +177,11 @@ class D3D12Core : public Core {
   Microsoft::WRL::ComPtr<ID3D12CommandAllocator> transfer_allocator_;
   Microsoft::WRL::ComPtr<ID3D12GraphicsCommandList> transfer_command_list_;
 
-  std::vector<std::unique_ptr<d3d12::DescriptorHeap>> resource_descriptor_heaps_;
-  std::vector<std::unique_ptr<d3d12::DescriptorHeap>> sampler_descriptor_heaps_;
+  std::vector<Microsoft::WRL::ComPtr<ID3D12DescriptorHeap>> resource_descriptor_heaps_;
+  std::vector<Microsoft::WRL::ComPtr<ID3D12DescriptorHeap>> sampler_descriptor_heaps_;
 
-  std::vector<std::unique_ptr<d3d12::DescriptorHeap>> rtv_descriptor_heaps_;
-  std::vector<std::unique_ptr<d3d12::DescriptorHeap>> dsv_descriptor_heaps_;
+  std::vector<Microsoft::WRL::ComPtr<ID3D12DescriptorHeap>> rtv_descriptor_heaps_;
+  std::vector<Microsoft::WRL::ComPtr<ID3D12DescriptorHeap>> dsv_descriptor_heaps_;
 
   uint32_t current_frame_{0};
 

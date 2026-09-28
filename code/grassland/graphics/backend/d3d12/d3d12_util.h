@@ -8,6 +8,10 @@ Microsoft::WRL::ComPtr<ID3D12RootSignature> CreateNativeRootSignature(
     ID3D12Device *device,
     const CD3DX12_VERSIONED_ROOT_SIGNATURE_DESC &desc);
 
+Microsoft::WRL::ComPtr<ID3D12DescriptorHeap> CreateNativeDescriptorHeap(ID3D12Device *device,
+                                                                        D3D12_DESCRIPTOR_HEAP_TYPE type,
+                                                                        uint32_t count);
+
 DXGI_FORMAT ImageFormatToDXGIFormat(ImageFormat format);
 
 DXGI_FORMAT InputTypeToDXGIFormat(InputType type);

@@ -72,7 +72,6 @@ class DXGIFactory;
 class Adapter;
 class Device;
 class SwapChain;
-class DescriptorHeap;
 class CommandQueue;
 class Buffer;
 class Image;

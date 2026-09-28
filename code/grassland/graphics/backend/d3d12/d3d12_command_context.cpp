@@ -246,11 +246,11 @@ void D3D12CommandContext::RequireResourceState(ID3D12GraphicsCommandList *comman
 }
 
 CD3DX12_CPU_DESCRIPTOR_HANDLE D3D12CommandContext::RTVHandle(ID3D12Resource *resource) const {
-  return core_->RTVDescriptorHeap()->CPUHandle(rtv_index_.at(resource));
+  return core_->RTVDescriptorHandle(rtv_index_.at(resource));
 }
 
 CD3DX12_CPU_DESCRIPTOR_HANDLE D3D12CommandContext::DSVHandle(ID3D12Resource *resource) const {
-  return core_->DSVDescriptorHeap()->CPUHandle(dsv_index_.at(resource));
+  return core_->DSVDescriptorHandle(dsv_index_.at(resource));
 }
 
 CD3DX12_GPU_DESCRIPTOR_HANDLE D3D12CommandContext::WriteUAVDescriptor(D3D12Image *image) {

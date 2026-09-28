@@ -28,12 +28,6 @@ class Device {
 
   HRESULT CreateCommandQueue(D3D12_COMMAND_LIST_TYPE type, double_ptr<CommandQueue> pp_command_queue);
 
-  HRESULT CreateDescriptorHeap(const D3D12_DESCRIPTOR_HEAP_DESC &desc, double_ptr<DescriptorHeap> pp_descriptor_heap);
-
-  HRESULT CreateDescriptorHeap(D3D12_DESCRIPTOR_HEAP_TYPE type,
-                               uint32_t num_descriptors,
-                               double_ptr<DescriptorHeap> pp_descriptor_heap);
-
   HRESULT CreateFence(D3D12_FENCE_FLAGS fence_flags, double_ptr<Fence> pp_fence);
 
   HRESULT CreateFence(double_ptr<Fence> pp_fence);

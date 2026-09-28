@@ -4,7 +4,6 @@
 
 #include "grassland/graphics/backend/d3d12/helper/buffer.h"
 #include "grassland/graphics/backend/d3d12/helper/command_queue.h"
-#include "grassland/graphics/backend/d3d12/helper/descriptor_heap.h"
 #include "grassland/graphics/backend/d3d12/helper/fence.h"
 #include "grassland/graphics/backend/d3d12/helper/image.h"
 #include "grassland/graphics/backend/d3d12/helper/raytracing/raytracing.h"
@@ -32,29 +31,6 @@ HRESULT Device::CreateCommandQueue(D3D12_COMMAND_LIST_TYPE type, double_ptr<Comm
 
   pp_command_queue.construct(command_queue);
   return S_OK;
-}
-
-HRESULT Device::CreateDescriptorHeap(const D3D12_DESCRIPTOR_HEAP_DESC &desc,
-                                     double_ptr<DescriptorHeap> pp_descriptor_heap) {
-  ComPtr<ID3D12DescriptorHeap> descriptor_heap;
-  RETURN_IF_FAILED_HR(device_->CreateDescriptorHeap(&desc, IID_PPV_ARGS(&descriptor_heap)),
-                      "failed to create descriptor heap.");
-  pp_descriptor_heap.construct(descriptor_heap);
-  return S_OK;
-}
-
-HRESULT Device::CreateDescriptorHeap(D3D12_DESCRIPTOR_HEAP_TYPE type,
-                                     uint32_t num_descriptors,
-                                     double_ptr<DescriptorHeap> pp_descriptor_heap) {
-  D3D12_DESCRIPTOR_HEAP_DESC desc = {};
-  desc.Type = type;
-  desc.NumDescriptors = num_descriptors;
-  desc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_NONE;
-  if (type == D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV || type == D3D12_DESCRIPTOR_HEAP_TYPE_SAMPLER) {
-    desc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE;
-  }
-
-  return CreateDescriptorHeap(desc, pp_descriptor_heap);
 }
 
 HRESULT Device::CreateFence(D3D12_FENCE_FLAGS fence_flags, double_ptr<Fence> pp_fence) {
