@@ -1,5 +1,6 @@
 #pragma once
 #include "bindings.slang"
+#include "shadow_terminator.slang"
 #include "geometry/mesh/geometry_header.slang"
 
 HitRecord MakeMeshHitRecord(uint geometry_index,
@@ -54,12 +55,22 @@ HitRecord MakeMeshHitRecord(uint geometry_index,
   // emitters (for example a unit quad scaled to a 30 x 30 area light).
   hit_record.pdf = 1.0f / (length(cross(world_pos[1] - world_pos[0], world_pos[2] - world_pos[0])) * 0.5f);
 
+  hit_record.shadow_offset = float3(0.0f);
   if (header.normal_offset != 0) {
-    hit_record.normal =
-        LoadFloat3(geometry_buffer, header.normal_offset + header.normal_stride * vid[0]) * barycentrics[0] +
-        LoadFloat3(geometry_buffer, header.normal_offset + header.normal_stride * vid[1]) * barycentrics[1] +
-        LoadFloat3(geometry_buffer, header.normal_offset + header.normal_stride * vid[2]) * barycentrics[2];
-    hit_record.normal = normalize(mul(world_to_object, hit_record.normal).xyz);
+    float3 normals[3];
+    for (int i = 0; i < 3; ++i) {
+      normals[i] = LoadFloat3(geometry_buffer, header.normal_offset + header.normal_stride * vid[i]);
+      float3 world_normal = mul(world_to_object, normals[i]).xyz;
+      float normal_length = length(world_normal);
+      if (normal_length > 1.0e-7f) {
+        world_normal /= normal_length;
+        hit_record.shadow_offset +=
+            barycentrics[i] * ShadowTerminatorOffset(hit_record.position, world_pos[i], world_normal);
+      }
+    }
+    hit_record.normal = normalize(
+        mul(world_to_object, normals[0] * barycentrics[0] + normals[1] * barycentrics[1] + normals[2] * barycentrics[2])
+            .xyz);
   } else {
     hit_record.normal = hit_record.geom_normal;
   }
@@ -108,6 +119,7 @@ HitRecord MakeMeshHitRecord(uint geometry_index,
 
   if (dot(ray_direction, hit_record.normal) > 0.0) {
     hit_record.front_facing = false;
+    hit_record.shadow_offset = float3(0.0f);
     hit_record.geom_normal = -hit_record.geom_normal;
     hit_record.normal = -hit_record.normal;
     hit_record.tangent = -hit_record.tangent;

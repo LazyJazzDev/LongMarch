@@ -42,3 +42,12 @@ cmake-build-release/demo/thin_lens/demo_thin_lens --backend metal \
 `--frames N` also bounds interactive smoke tests. CLI optical options are
 `--focus`, `--aperture`, and `--blades` (0 or 3–8). `--output` saves the developed
 render without the UI; headless mode requires a positive frame count.
+
+The spheres retain the coarse `Sphere(32, 16)` mesh. Ray-traced direct-light
+visibility uses a shadow-terminator position correction derived from vertex
+normals: the shadow origin is interpolated toward the vertex tangent planes,
+while BSDF evaluation and light sampling keep the actual hit position. This
+reduces faceted self-shadow boundaries without adding geometry. It does not
+smooth silhouettes or change indirect reflection rays. Flat faces, back-face
+hits and transmission visibility retain their original shadow origins. Like
+other position-offset corrections, it can soften very close contact shadows.

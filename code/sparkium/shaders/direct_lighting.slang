@@ -41,6 +41,7 @@ void SampleDirectLighting(inout RenderContext context,
   pdf = 0.0f;
   context.shadow_eval = context.shadow_dir = float3(0, 0, 0);
   context.shadow_length = 0.0f;
+  context.shadow_origin = hit_record.position;
   if (light_count == 0)
     return;
   BufferReference<ByteAddressBuffer> power_cdf = MakeBufferReference(light_selector_data, 4);
@@ -82,8 +83,13 @@ void SampleDirectLighting(inout RenderContext context,
   omega_in = asfloat(payload.high.xyz);
   pdf = asfloat(payload.high.w) * prob;
   context.shadow_eval = eval;
-  context.shadow_dir = omega_in;
-  context.shadow_length = shadow_length;
+  // Offset exterior reflection visibility only. Transmission and volume
+  // boundaries keep their physical origins. Preserve the sampled endpoint.
+  float3 offset = dot(hit_record.normal, omega_in) > 0.0f ? hit_record.shadow_offset : float3(0.0f);
+  context.shadow_origin = hit_record.position + offset;
+  float3 shadow_segment = omega_in * shadow_length - offset;
+  context.shadow_length = length(shadow_segment);
+  context.shadow_dir = shadow_segment / max(context.shadow_length, EPSILON);
 }
 
 float DirectLightingProbability(uint light_index) {

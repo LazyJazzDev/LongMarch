@@ -280,6 +280,44 @@ RWStructuredBuffer<uint> output : register(u0, space1);
     EXPECT_EQ(actual[i], count - i);
 }
 
+TEST_F(MetalBackendTest, ShadowTerminatorOffsetPreservesPlanesAndScalesWithGeometry) {
+  sparkium::Core renderer(core.get());
+  auto vfs = renderer.GetShadersVFS();
+  vfs.WriteFile("terminator_test.slang", R"(
+#include "shadow_terminator.slang"
+RWStructuredBuffer<float4> output : register(u0, space0);
+[numthreads(1,1,1)] void Main(uint3 id : SV_DispatchThreadID) {
+  float3 p = float3(0,0,0), v = float3(1,0,0), n = normalize(float3(1,0,1));
+  output[0] = float4(ShadowTerminatorOffset(p, v, n), 0);
+  output[1] = float4(ShadowTerminatorOffset(p, v * 2, n), 0);
+  output[2] = float4(ShadowTerminatorOffset(p, v, float3(0,0,1)), 0);
+  output[3] = float4(ShadowTerminatorOffset(v, v, n), 0);
+  output[4] = float4(ShadowTerminatorOffset(v * 2, v, n), 0);
+})");
+  std::unique_ptr<graphics::Shader> shader;
+  ASSERT_EQ(core->CreateShader(vfs, "terminator_test.slang", "Main", "cs_6_3", {"-I."}, &shader), 0);
+  std::unique_ptr<graphics::ComputeProgram> program;
+  ASSERT_EQ(core->CreateComputeProgram(shader.get(), &program), 0);
+  program->AddResourceBinding(graphics::RESOURCE_TYPE_WRITABLE_STORAGE_BUFFER, 1);
+  program->Finalize();
+  std::array<glm::vec4, 5> values;
+  std::unique_ptr<graphics::Buffer> output;
+  core->CreateBuffer(sizeof(values), graphics::BUFFER_TYPE_STATIC, &output);
+  std::unique_ptr<graphics::CommandContext> commands;
+  core->CreateCommandContext(&commands);
+  commands->CmdBindComputeProgram(program.get());
+  commands->CmdBindResources(0, {output.get()}, graphics::BIND_POINT_COMPUTE);
+  commands->CmdDispatch(1, 1, 1);
+  ASSERT_EQ(core->SubmitCommandContext(commands.get()), 0);
+  output->DownloadData(values.data(), sizeof(values));
+  const std::array<glm::vec3, 5> expected{{{0.5f, 0, 0.5f}, {1, 0, 1}, {0, 0, 0}, {0, 0, 0}, {0, 0, 0}}};
+  for (size_t i = 0; i < values.size(); ++i) {
+    SCOPED_TRACE(i);
+    for (int axis = 0; axis < 3; ++axis)
+      EXPECT_NEAR(values[i][axis], expected[i][axis], 1e-6f);
+  }
+}
+
 TEST_F(MetalBackendTest, LightSelectionPartialWorkgroupDoesNotOverwriteTail) {
   sparkium::Core renderer(core.get());
   std::unique_ptr<graphics::Shader> shader;
