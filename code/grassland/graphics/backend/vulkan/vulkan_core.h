@@ -150,6 +150,28 @@ class VulkanCore : public Core {
                         VmaMemoryUsage memory_usage,
                         VmaAllocationCreateFlags flags,
                         VkDeviceSize alignment,
+                        VkBuffer *buffer,
+                        VmaAllocation *allocation) const;
+
+  VkResult CreateBuffer(VkDeviceSize size,
+                        VkBufferUsageFlags usage,
+                        VmaMemoryUsage memory_usage,
+                        VkBuffer *buffer,
+                        VmaAllocation *allocation) const {
+    return CreateBuffer(size, usage, memory_usage, 0, 0, buffer, allocation);
+  }
+
+  VkDeviceAddress BufferAddress(VkBuffer buffer) const {
+    VkBufferDeviceAddressInfo info{VK_STRUCTURE_TYPE_BUFFER_DEVICE_ADDRESS_INFO};
+    info.buffer = buffer;
+    return vkGetBufferDeviceAddress(device_, &info);
+  }
+
+  VkResult CreateBuffer(VkDeviceSize size,
+                        VkBufferUsageFlags usage,
+                        VmaMemoryUsage memory_usage,
+                        VmaAllocationCreateFlags flags,
+                        VkDeviceSize alignment,
                         double_ptr<vulkan::Buffer> pp_buffer) const;
 
   VkResult CreateBuffer(VkDeviceSize size,
@@ -256,8 +278,16 @@ class VulkanCore : public Core {
 
   uint32_t FindMemoryType(uint32_t type_filter, VkMemoryPropertyFlags properties);
 
-  vulkan::Buffer *RequestUploadStagingBuffer(size_t size);
-  vulkan::Buffer *RequestDownloadStagingBuffer(size_t size);
+  VkBuffer RequestUploadStagingBuffer(size_t size);
+  VkBuffer RequestDownloadStagingBuffer(size_t size);
+
+  VmaAllocation UploadStagingAllocation() const {
+    return upload_staging_allocation_;
+  }
+
+  VmaAllocation DownloadStagingAllocation() const {
+    return download_staging_allocation_;
+  }
 
 #if defined(LONGMARCH_CUDA_RUNTIME)
   void ImportCudaExternalMemory(cudaExternalMemory_t &cuda_memory, VkDeviceMemory &vulkan_memory, VkDeviceSize size);
@@ -313,8 +343,12 @@ class VulkanCore : public Core {
   void *GetSemaphoreHandle(VkSemaphore semaphore);
 #endif
 
-  std::unique_ptr<vulkan::Buffer> upload_staging_buffer_;
-  std::unique_ptr<vulkan::Buffer> download_staging_buffer_;
+  VkBuffer upload_staging_buffer_{VK_NULL_HANDLE};
+  VmaAllocation upload_staging_allocation_{VK_NULL_HANDLE};
+  size_t upload_staging_size_{};
+  VkBuffer download_staging_buffer_{VK_NULL_HANDLE};
+  VmaAllocation download_staging_allocation_{VK_NULL_HANDLE};
+  size_t download_staging_size_{};
 };
 
 }  // namespace grassland::graphics::backend

@@ -146,6 +146,46 @@ VkResult VulkanCore::CreateBuffer(VkDeviceSize size,
                                   VmaMemoryUsage memory_usage,
                                   VmaAllocationCreateFlags flags,
                                   VkDeviceSize alignment,
+                                  VkBuffer *out_buffer,
+                                  VmaAllocation *out_allocation) const {
+  if (!out_buffer || !out_allocation) {
+    SetErrorMessage("buffer output is nullptr");
+    return VK_ERROR_INITIALIZATION_FAILED;
+  }
+
+  VkBufferCreateInfo buffer_info{};
+  buffer_info.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
+  buffer_info.size = size;
+  buffer_info.usage = usage;
+  buffer_info.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+
+  VmaAllocationCreateInfo alloc_info{};
+  alloc_info.usage = memory_usage;
+  alloc_info.flags = flags;
+
+  VkBuffer buffer;
+  VmaAllocation allocation;
+
+  if (alignment) {
+    RETURN_IF_FAILED_VK(
+        vmaCreateBufferWithAlignment(allocator_, &buffer_info, &alloc_info, alignment, &buffer, &allocation, nullptr),
+        "failed to create buffer!");
+  } else {
+    RETURN_IF_FAILED_VK(vmaCreateBuffer(allocator_, &buffer_info, &alloc_info, &buffer, &allocation, nullptr),
+                        "failed to create buffer!");
+  }
+
+  *out_buffer = buffer;
+  *out_allocation = allocation;
+
+  return VK_SUCCESS;
+}
+
+VkResult VulkanCore::CreateBuffer(VkDeviceSize size,
+                                  VkBufferUsageFlags usage,
+                                  VmaMemoryUsage memory_usage,
+                                  VmaAllocationCreateFlags flags,
+                                  VkDeviceSize alignment,
                                   double_ptr<vulkan::Buffer> pp_buffer) const {
   if (!pp_buffer) {
     SetErrorMessage("pp_buffer is nullptr");

@@ -38,8 +38,10 @@ VulkanCore::~VulkanCore() {
   if (device_) {
     vkDeviceWaitIdle(this->Handle());
   }
-  upload_staging_buffer_.reset();
-  download_staging_buffer_.reset();
+  if (upload_staging_buffer_)
+    vmaDestroyBuffer(allocator_, upload_staging_buffer_, upload_staging_allocation_);
+  if (download_staging_buffer_)
+    vmaDestroyBuffer(allocator_, download_staging_buffer_, download_staging_allocation_);
 
   if (device_) {
     for (VkDescriptorPool pool : descriptor_pools_) {
@@ -634,20 +636,28 @@ uint32_t VulkanCore::FindMemoryType(uint32_t type_filter, VkMemoryPropertyFlags 
   return ~0;
 }
 
-vulkan::Buffer *VulkanCore::RequestUploadStagingBuffer(size_t size) {
-  if (!upload_staging_buffer_ || upload_staging_buffer_->Size() < size) {
-    upload_staging_buffer_.reset();
-    this->CreateBuffer(size, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VMA_MEMORY_USAGE_CPU_ONLY, &upload_staging_buffer_);
+VkBuffer VulkanCore::RequestUploadStagingBuffer(size_t size) {
+  if (!upload_staging_buffer_ || upload_staging_size_ < size) {
+    if (upload_staging_buffer_)
+      vmaDestroyBuffer(allocator_, upload_staging_buffer_, upload_staging_allocation_);
+    vulkan::ThrowIfFailed(CreateBuffer(size, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VMA_MEMORY_USAGE_CPU_ONLY,
+                                       &upload_staging_buffer_, &upload_staging_allocation_),
+                          "Failed to create Vulkan upload staging buffer");
+    upload_staging_size_ = size;
   }
-  return upload_staging_buffer_.get();
+  return upload_staging_buffer_;
 }
 
-vulkan::Buffer *VulkanCore::RequestDownloadStagingBuffer(size_t size) {
-  if (!download_staging_buffer_ || download_staging_buffer_->Size() < size) {
-    download_staging_buffer_.reset();
-    this->CreateBuffer(size, VK_BUFFER_USAGE_TRANSFER_DST_BIT, VMA_MEMORY_USAGE_CPU_ONLY, &download_staging_buffer_);
+VkBuffer VulkanCore::RequestDownloadStagingBuffer(size_t size) {
+  if (!download_staging_buffer_ || download_staging_size_ < size) {
+    if (download_staging_buffer_)
+      vmaDestroyBuffer(allocator_, download_staging_buffer_, download_staging_allocation_);
+    vulkan::ThrowIfFailed(CreateBuffer(size, VK_BUFFER_USAGE_TRANSFER_DST_BIT, VMA_MEMORY_USAGE_CPU_ONLY,
+                                       &download_staging_buffer_, &download_staging_allocation_),
+                          "Failed to create Vulkan download staging buffer");
+    download_staging_size_ = size;
   }
-  return download_staging_buffer_.get();
+  return download_staging_buffer_;
 }
 
 #if defined(LONGMARCH_CUDA_RUNTIME)
