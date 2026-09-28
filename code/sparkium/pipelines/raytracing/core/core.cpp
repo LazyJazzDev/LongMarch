@@ -26,6 +26,29 @@ graphics::ComputeProgram *Core::GetComputeProgram(const std::string &name) {
   return core_.GetComputeProgram(name);
 }
 
+graphics::ComputeProgram *Core::GetGeometryLightPowerProgram(const CodeLines &geometry, const CodeLines &material) {
+  // The VFS, backend, entry point, profile and binding layout are fixed for this Core.
+  auto key = std::make_pair(std::string(geometry), std::string(material));
+  auto found = geometry_light_programs_.find(key);
+  if (found != geometry_light_programs_.end())
+    return found->second.program.get();
+  GeometryLightResources resources;
+  auto vfs = GetShadersVFS();
+  vfs.WriteFile("geometry_sampler.slang", geometry);
+  vfs.WriteFile("material_evaluator.slang", material);
+  if (GraphicsCore()->CreateShader(vfs, "light/geometry_material/gather_primitive_power.slang",
+                                   "GatherPrimitivePowerKernel", "cs_6_3", {"-I."}, &resources.shader) != 0)
+    throw std::runtime_error("failed to compile geometry light power shader");
+  GraphicsCore()->CreateComputeProgram(resources.shader.get(), &resources.program);
+  resources.program->AddResourceBinding(graphics::RESOURCE_TYPE_STORAGE_BUFFER, 1);
+  resources.program->AddResourceBinding(graphics::RESOURCE_TYPE_STORAGE_BUFFER, 1);
+  resources.program->AddResourceBinding(graphics::RESOURCE_TYPE_WRITABLE_STORAGE_BUFFER, 1);
+  resources.program->Finalize();
+  auto *program = resources.program.get();
+  geometry_light_programs_.emplace(std::move(key), std::move(resources));
+  return program;
+}
+
 graphics::Image *Core::GetImage(const std::string &name) {
   return core_.GetImage(name);
 }
@@ -65,7 +88,13 @@ void Core::LoadPublicShaders() {
   compute_program->AddResourceBinding(graphics::RESOURCE_TYPE_UNIFORM_BUFFER, 1);
   compute_program->Finalize();
   core_.SetPublicResource("blelloch_scan_down", std::move(compute_program));
+}
 
+void Core::PrepareBuiltinHitShaders() {
+  if (native_shaders_ready_)
+    return;
+  std::unique_ptr<graphics::Shader> shader;
+  auto &shaders_vfs = core_.GetShadersVFS();
   if (!core_.GraphicsCore()->DeviceRayTracingSupport())
     return;
 
@@ -96,6 +125,7 @@ void Core::LoadPublicShaders() {
   core_.SetPublicResource("mesh_specular_chit", std::move(shader));
   core_.GraphicsCore()->CreateShader(vfs, "entity_chit.slang", "ShadowClosestHit", "lib_6_5", {"-I."}, &shader);
   core_.SetPublicResource("mesh_specular_shadow_chit", std::move(shader));
+  native_shaders_ready_ = true;
 }
 
 Core *DedicatedCast(sparkium::Core *core) {

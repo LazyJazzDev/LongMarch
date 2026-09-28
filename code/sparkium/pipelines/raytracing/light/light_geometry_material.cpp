@@ -20,24 +20,10 @@ LightGeometryMaterial::LightGeometryMaterial(Core *core,
       sizeof(glm::mat4x3) + sizeof(uint32_t) + geometry->PrimitiveCount() * sizeof(float), graphics::BUFFER_TYPE_STATIC,
       &direct_lighting_sampler_data_);
 
-  auto vfs = core_->GetShadersVFS();
-  vfs.WriteFile("geometry_sampler.slang", geometry_->SamplerImpl());
-  vfs.WriteFile("material_evaluator.slang", material_->EvaluatorImpl());
-
-  core_->GraphicsCore()->CreateShader(vfs, "light/geometry_material/gather_primitive_power.slang",
-                                      "GatherPrimitivePowerKernel", "cs_6_3", {"-I."}, &gather_primitive_power_shader_);
-  if (core_->GraphicsCore()->DeviceRayTracingSupport())
-    core_->GraphicsCore()->CreateShader(vfs, "light/geometry_material/direct_lighting_sampler.slang",
-                                        "SampleDirectLightingCallable", "lib_6_5", {"-I."}, &direct_lighting_sampler_);
-
+  gather_primitive_power_program_ =
+      core_->GetGeometryLightPowerProgram(geometry_->SamplerImpl(), material_->EvaluatorImpl());
   uint32_t primitive_count = geometry_->PrimitiveCount();
   uint32_t group_size = 64;
-
-  core_->GraphicsCore()->CreateComputeProgram(gather_primitive_power_shader_.get(), &gather_primitive_power_program_);
-  gather_primitive_power_program_->AddResourceBinding(graphics::RESOURCE_TYPE_STORAGE_BUFFER, 1);
-  gather_primitive_power_program_->AddResourceBinding(graphics::RESOURCE_TYPE_STORAGE_BUFFER, 1);
-  gather_primitive_power_program_->AddResourceBinding(graphics::RESOURCE_TYPE_WRITABLE_STORAGE_BUFFER, 1);
-  gather_primitive_power_program_->Finalize();
 
   BlellochScanMetadata metadata{52, 4, primitive_count};
   while (metadata.element_count > 1) {
@@ -72,6 +58,15 @@ int LightGeometryMaterial::SamplerShader(Scene *scene) {
     if (dynamic_cast<MaterialSpecular *>(material_))
       return 0x1000005;
   }
+  if (!direct_lighting_sampler_ && !scene->SoftwareTracing()) {
+    auto vfs = core_->GetShadersVFS();
+    vfs.WriteFile("geometry_sampler.slang", geometry_->SamplerImpl());
+    vfs.WriteFile("material_evaluator.slang", material_->EvaluatorImpl());
+    if (core_->GraphicsCore()->CreateShader(vfs, "light/geometry_material/direct_lighting_sampler.slang",
+                                            "SampleDirectLightingCallable", "lib_6_5", {"-I."},
+                                            &direct_lighting_sampler_) != 0)
+      throw std::runtime_error("failed to compile geometry light callable");
+  }
   return scene->RegisterCallableShader(direct_lighting_sampler_.get());
 }
 
@@ -82,7 +77,7 @@ graphics::Buffer *LightGeometryMaterial::SamplerData() {
 
 uint32_t LightGeometryMaterial::SamplerPreprocess(graphics::CommandContext *cmd_context) {
   uint32_t group_size = 64;
-  cmd_context->CmdBindComputeProgram(gather_primitive_power_program_.get());
+  cmd_context->CmdBindComputeProgram(gather_primitive_power_program_);
   cmd_context->CmdBindResources(0, {geometry_->Buffer()}, graphics::BIND_POINT_COMPUTE);
   cmd_context->CmdBindResources(1, {material_->Buffer()}, graphics::BIND_POINT_COMPUTE);
   cmd_context->CmdBindResources(2, {direct_lighting_sampler_data_.get()}, graphics::BIND_POINT_COMPUTE);

@@ -10,6 +10,8 @@ class EntityGeometryMaterial : public Entity {
   void Update(Scene *scene) override;
 
  private:
+  void PrepareHitGroups();
+
   sparkium::EntityGeometryMaterial &entity_;
   Geometry *geometry_{nullptr};
   Material *material_{nullptr};

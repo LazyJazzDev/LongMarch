@@ -17,7 +17,7 @@
 #include "sparkium/pipelines/raytracing/core/software_pipeline.h"
 #include "sparkium/pipelines/raytracing/entity/entities.h"
 #include "sparkium/pipelines/raytracing/geometry/geometry_mesh.h"
-#include "sparkium/pipelines/raytracing/material/material_lambertian.h"
+#include "sparkium/pipelines/raytracing/material/materials.h"
 
 using namespace grassland;
 
@@ -52,6 +52,71 @@ class SoftwareBVHTest : public testing::Test {
   std::unique_ptr<graphics::Core> graphics;
   std::unique_ptr<sparkium::Core> core;
 };
+
+TEST_F(SoftwareBVHTest, LazyGraphHitShadersSurvivePipelineSwitches) {
+  if (!graphics->DeviceRayTracingSupport() || !graphics->DeviceRayQuerySupport())
+    GTEST_SKIP() << "requires native RT and ray query";
+  sparkium::CodeLines code(R"(
+GraphSurface EvaluateShaderGraph(HitRecord hit, float3 direction, int bounce, uint ray_type,
+                                 bool shadow, ByteAddressBuffer material) {
+  GraphSurface surface = (GraphSurface)0;
+  surface.normal = hit.normal;
+  surface.opacity = 1.0f; surface.shadow_opacity = -1.0f;
+  surface.ior = 1.45f; surface.roughness = 0.5f;
+  surface.emission = float3(0.2f, 0.4f, 0.6f);
+  return surface;
+}
+)");
+  sparkium::MaterialShaderGraph material(core.get(), code, {});
+  auto *graph =
+      dynamic_cast<sparkium::raytracing::MaterialShaderGraph *>(sparkium::raytracing::DedicatedCast(&material));
+  ASSERT_NE(graph, nullptr);
+  EXPECT_EQ(graph->RenderClosestHitShader(), nullptr);
+  uint32_t indices[]{0, 1, 2};
+  std::vector<Vector3<float>> positions{{-2, -2, 0}, {2, -2, 0}, {0, 2, 0}};
+  Mesh<> mesh(3, 3, indices, positions.data());
+  sparkium::GeometryMesh geometry(core.get(), mesh);
+  sparkium::EntityGeometryMaterial entity(core.get(), &geometry, &material);
+  sparkium::Scene scene(core.get());
+  scene.AddEntity(&entity);
+  scene.settings.samples_per_dispatch = 1;
+  scene.settings.max_bounces = 1;
+  sparkium::Camera camera(core.get(), glm::lookAt(glm::vec3(0, 0, 4), glm::vec3(0), glm::vec3(0, 1, 0)),
+                          glm::radians(30.0f), 1.0f);
+  std::vector<glm::vec4> reference(256), pixels(256);
+  bool first_frame = true;
+  for (auto pipeline : {sparkium::RENDER_PIPELINE_RAY_QUERY, sparkium::RENDER_PIPELINE_RAY_TRACING,
+                        sparkium::RENDER_PIPELINE_RAY_QUERY, sparkium::RENDER_PIPELINE_RAY_TRACING}) {
+    sparkium::Film film(core.get(), 16, 16);
+    core->Render(&scene, &camera, &film, pipeline);
+    film.GetRawImage()->DownloadData(pixels.data());
+    if (first_frame) {
+      first_frame = false;
+      reference = pixels;
+      EXPECT_EQ(graph->RenderClosestHitShader(), nullptr);
+    } else {
+      EXPECT_NE(graph->RenderClosestHitShader(), nullptr);
+      EXPECT_NE(graph->ShadowClosestHitShader(), nullptr);
+      EXPECT_NE(graph->ShadowAnyHitShader(), nullptr);
+      for (size_t i = 0; i < pixels.size(); ++i)
+        for (int c = 0; c < 3; ++c)
+          EXPECT_NEAR(pixels[i][c], reference[i][c], 1e-6f);
+    }
+  }
+  EXPECT_GT(reference[136].z, 0.0f);
+}
+
+TEST_F(SoftwareBVHTest, GeometryLightProgramsShareOnlyEquivalentSources) {
+  auto *rt_core = sparkium::raytracing::DedicatedCast(core.get());
+  auto vfs = rt_core->GetShadersVFS();
+  sparkium::CodeLines geometry(vfs, "geometry/mesh/geometry_sampler.slang");
+  sparkium::CodeLines diffuse(vfs, "material/lambertian/evaluator.slang");
+  sparkium::CodeLines emission(vfs, "material/light/evaluator.slang");
+  auto *first = rt_core->GetGeometryLightPowerProgram(geometry, diffuse);
+  ASSERT_NE(first, nullptr);
+  EXPECT_EQ(first, rt_core->GetGeometryLightPowerProgram(geometry, diffuse));
+  EXPECT_NE(first, rt_core->GetGeometryLightPowerProgram(geometry, emission));
+}
 
 TEST_F(SoftwareBVHTest, HDRFilmDevelopmentPreservesHighlightsAndAccumulation) {
   sparkium::Film film(core.get(), 9, 3);

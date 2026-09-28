@@ -7,6 +7,7 @@ namespace sparkium::raytracing {
 class MaterialShaderGraph : public Material {
  public:
   explicit MaterialShaderGraph(sparkium::MaterialShaderGraph &material);
+  void PrepareHitShaders();
   graphics::Buffer *Buffer() override;
   const CodeLines &SamplerImpl() const override;
   const CodeLines &EvaluatorImpl() const override;
