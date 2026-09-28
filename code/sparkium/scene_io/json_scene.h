@@ -55,7 +55,7 @@ class JsonScene {
   std::unique_ptr<Camera> camera_;
   std::map<std::string, std::unique_ptr<Material>> materials_;
   std::map<std::string, std::unique_ptr<Geometry>> geometries_;
-  std::vector<std::unique_ptr<sparkium::Image>> images_;
+  std::vector<std::unique_ptr<graphics::Image>> images_;
   std::vector<std::unique_ptr<Entity>> entities_;
 };
 

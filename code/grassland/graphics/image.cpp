@@ -66,20 +66,14 @@ void Image::PybindClassRegistration(py::classh<Image> &c) {
 }
 #endif
 
-int LoadImageFromFile(Core *core,
-                      const std::string &file_path,
-                      double_ptr<Image> pp_image,
-                      const std::function<void(Image *, const void *)> &upload) {
+int LoadImageFromFile(Core *core, const std::string &file_path, double_ptr<Image> pp_image) {
   int w, h, c;
   {
     auto data = stbi_load(file_path.c_str(), &w, &h, &c, 4);
     if (data) {
       core->CreateImage(w, h, IMAGE_FORMAT_R8G8B8A8_UNORM, pp_image);
-      std::unique_ptr<void, decltype(&stbi_image_free)> owned(data, &stbi_image_free);
-      if (upload)
-        upload(pp_image.operator->(), data);
-      else
-        pp_image->UploadData(data);
+      pp_image->UploadData(data);
+      stbi_image_free(data);
       return 0;
     }
   }
@@ -87,11 +81,8 @@ int LoadImageFromFile(Core *core,
     auto data = stbi_loadf(file_path.c_str(), &w, &h, &c, 4);
     if (data) {
       core->CreateImage(w, h, IMAGE_FORMAT_R32G32B32A32_SFLOAT, pp_image);
-      std::unique_ptr<void, decltype(&stbi_image_free)> owned(data, &stbi_image_free);
-      if (upload)
-        upload(pp_image.operator->(), data);
-      else
-        pp_image->UploadData(data);
+      pp_image->UploadData(data);
+      stbi_image_free(data);
       return 0;
     }
   }

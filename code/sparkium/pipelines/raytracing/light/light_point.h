@@ -25,7 +25,7 @@ class LightPoint : public Light {
   float &sampling_weight;
 
  private:
-  std::unique_ptr<sparkium::Buffer> direct_lighting_sampler_data_;
+  std::unique_ptr<graphics::Buffer> direct_lighting_sampler_data_;
 };
 
 }  // namespace sparkium::raytracing

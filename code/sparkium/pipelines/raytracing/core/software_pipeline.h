@@ -20,15 +20,15 @@ class SoftwarePipeline {
   }
 
   graphics::AccelerationStructure *AccelerationStructure() const {
-    return native_tlas_ ? native_tlas_->Get() : nullptr;
+    return native_tlas_.get();
   }
 
   graphics::Buffer *Nodes() const {
-    return nodes_ ? nodes_->Get() : nullptr;
+    return nodes_.get();
   }
 
   graphics::Buffer *Instances() const {
-    return instances_buffer_ ? instances_buffer_->Get() : nullptr;
+    return instances_buffer_.get();
   }
 
  private:
@@ -76,14 +76,14 @@ class SoftwarePipeline {
 
   Core *core_;
   bool ray_query_;
-  std::unique_ptr<TopLevelAccelerationStructure> native_tlas_;
+  std::unique_ptr<graphics::AccelerationStructure> native_tlas_;
   std::vector<Instance> instances_;
   std::vector<GeometryLayout> geometries_;
   uint32_t tlas_leaves_{};
   std::vector<MaterialCode> material_sources_;
   uint32_t buffer_count_{}, sdr_count_{}, hdr_count_{};
   uint32_t builder_buffer_count_{};
-  std::unique_ptr<sparkium::Buffer> nodes_, keys_, instances_buffer_, parameters_buffer_;
+  std::unique_ptr<graphics::Buffer> nodes_, keys_, instances_buffer_, parameters_buffer_;
   std::vector<std::unique_ptr<graphics::Shader>> builder_shaders_;
   std::vector<std::unique_ptr<graphics::ComputeProgram>> builders_;
   std::unique_ptr<graphics::Shader> render_shader_;

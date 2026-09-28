@@ -13,14 +13,6 @@
 
 namespace grassland::graphics::backend {
 
-VulkanCmdUpload::VulkanCmdUpload(std::function<void(VulkanCommandContext *, VkCommandBuffer)> encode)
-    : encode_(std::move(encode)) {
-}
-
-void VulkanCmdUpload::CompileCommand(VulkanCommandContext *context, VkCommandBuffer commands) {
-  encode_(context, commands);
-}
-
 VulkanCmdBindProgram::VulkanCmdBindProgram(VulkanProgram *program) : program_(program) {
 }
 

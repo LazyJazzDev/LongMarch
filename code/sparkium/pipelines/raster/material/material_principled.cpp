@@ -23,7 +23,8 @@ MaterialPrincipled::MaterialPrincipled(sparkium::MaterialPrincipled &material)
       Material(DedicatedCast(material.GetCore())) {
   core_->GraphicsCore()->CreateShader(core_->GetShadersVFS(), "material/principled/pixel_shader.slang", "PSMain",
                                       "ps_6_0", {"-I."}, &pixel_shader_);
-  core_->CreateBuffer(sizeof(material_.info) + sizeof(TextureInfo), graphics::BUFFER_TYPE_STATIC, &material_buffer_);
+  core_->GraphicsCore()->CreateBuffer(sizeof(material_.info) + sizeof(TextureInfo), graphics::BUFFER_TYPE_STATIC,
+                                      &material_buffer_);
   core_->GraphicsCore()->CreateSampler(graphics::SamplerInfo{}, &sampler_);
 }
 
@@ -40,8 +41,8 @@ void MaterialPrincipled::Sync() {
   info.use_metallic_texture = material_.textures.metallic ? 1 : 0;
   info.use_normal_texture = material_.textures.normal ? 1 : 0;
   info.use_emission_texture = material_.textures.emission ? 1 : 0;
-  material_buffer_->Update(&material_.info, sizeof(material_.info));
-  material_buffer_->Update(&info, sizeof(info), sizeof(material_.info));
+  material_buffer_->UploadData(&material_.info, sizeof(material_.info));
+  material_buffer_->UploadData(&info, sizeof(info), sizeof(material_.info));
 }
 
 glm::vec3 MaterialPrincipled::Emission() const {
@@ -54,7 +55,7 @@ void MaterialPrincipled::SetupProgram(graphics::Program *program) {
 }
 
 void MaterialPrincipled::BindMaterialResources(graphics::CommandContext *cmd_ctx) {
-  cmd_ctx->CmdBindResources(2, {material_buffer_->Get()}, graphics::BIND_POINT_GRAPHICS);
+  cmd_ctx->CmdBindResources(2, {material_buffer_.get()}, graphics::BIND_POINT_GRAPHICS);
   std::vector<graphics::Image *> textures(6);
   textures[0] = material_.textures.base_color;
   if (!textures[0])

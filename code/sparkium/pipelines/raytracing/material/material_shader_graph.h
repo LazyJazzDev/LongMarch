@@ -28,7 +28,7 @@ class MaterialShaderGraph : public Material {
 
  private:
   sparkium::MaterialShaderGraph &material_;
-  std::unique_ptr<sparkium::Buffer> material_buffer_;
+  std::unique_ptr<graphics::Buffer> material_buffer_;
   CodeLines sampler_implementation_;
   CodeLines evaluator_implementation_;
   std::unique_ptr<graphics::Shader> closest_hit_shader_;

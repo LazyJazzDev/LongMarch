@@ -20,7 +20,7 @@ class Film;
 
 struct GeometryRegistration {
   int32_t data_index;
-  BottomLevelAccelerationStructure *blas;
+  graphics::AccelerationStructure *blas;
 };
 
 struct InstanceRegistration {

@@ -5,7 +5,6 @@
 #include <limits>
 #include <sstream>
 #include <stdexcept>
-#include <unordered_map>
 
 #include "grassland/graphics/frame_profile.h"
 #include "sparkium/pipelines/raytracing/core/core.h"
@@ -237,14 +236,12 @@ void SoftwarePipeline::Update(graphics::CommandContext *commands,
                               const std::vector<graphics::Buffer *> &buffers,
                               uint32_t sdr_count,
                               uint32_t hdr_count) {
+  auto graphics = core_->GraphicsCore();
   graphics::CpuProfileScope prepare_profile("software_prepare");
   std::vector<GeometryLayout> geometries;
   std::vector<GPUInstance> gpu_instances;
-  std::vector<AccelerationStructureInstance> native_instances;
+  std::vector<graphics::RayTracingInstance> native_instances;
   std::vector<MaterialCode> materials;
-  // Shared materials need source normalization only once per update. Keep this
-  // local so edits and component destruction cannot leave a stale source cache.
-  std::unordered_map<Material *, uint32_t> material_indices;
   if (16ull + instances_.size() * sizeof(GPUInstance) > std::numeric_limits<uint32_t>::max())
     throw std::runtime_error("software instance byte address overflow");
   const uint32_t tlas_leaves = ray_query_ ? 1 : LeafCount(instances_.size());
@@ -263,16 +260,12 @@ void SoftwarePipeline::Update(graphics::CommandContext *commands,
       node_count += uint64_t(leaves) * 2 - 1;
       max_leaves = std::max(max_leaves, leaves);
     }
-    auto [cached_material, inserted] = material_indices.try_emplace(instance.material, 0);
-    if (inserted) {
-      const auto *graph = instance.material->GraphImpl();
-      MaterialCode source{graph != nullptr, MaterialSource(graph ? *graph : instance.material->SamplerImpl())};
-      auto material = std::find(materials.begin(), materials.end(), source);
-      cached_material->second = static_cast<uint32_t>(std::distance(materials.begin(), material));
-      if (material == materials.end())
-        materials.push_back(std::move(source));
-    }
-    const uint32_t material_index = cached_material->second;
+    const auto *graph = instance.material->GraphImpl();
+    MaterialCode source{graph != nullptr, MaterialSource(graph ? *graph : instance.material->SamplerImpl())};
+    auto material = std::find(materials.begin(), materials.end(), source);
+    uint32_t material_index = std::distance(materials.begin(), material);
+    if (material == materials.end())
+      materials.push_back(std::move(source));
     glm::mat4 object_to_world(instance.transform);
     if (std::abs(glm::determinant(object_to_world)) < 1.0e-20f)
       throw std::runtime_error("software ray tracing requires invertible instance transforms");
@@ -291,22 +284,24 @@ void SoftwarePipeline::Update(graphics::CommandContext *commands,
   for (size_t i = 0; !rebuild && i < geometries.size(); ++i)
     rebuild = geometries[i].geometry != geometries_[i].geometry || geometries[i].count != geometries_[i].count;
   if (rebuild && !ray_query_) {
-    core_->CreateBuffer(node_count * 32, graphics::BUFFER_TYPE_STATIC, &nodes_);
-    core_->CreateBuffer(uint64_t(max_leaves) * 8, graphics::BUFFER_TYPE_STATIC, &keys_);
+    graphics->CreateBuffer(node_count * 32, graphics::BUFFER_TYPE_STATIC, &nodes_);
+    graphics->CreateBuffer(uint64_t(max_leaves) * 8, graphics::BUFFER_TYPE_STATIC, &keys_);
   }
 
   size_t instance_bytes = 16 + gpu_instances.size() * sizeof(GPUInstance);
   if (!instances_buffer_ || instances_buffer_->Size() < instance_bytes)
-    core_->CreateBuffer(instance_bytes, graphics::BUFFER_TYPE_STATIC, &instances_buffer_);
+    graphics->CreateBuffer(instance_bytes, graphics::BUFFER_TYPE_STATIC, &instances_buffer_);
   std::array<uint32_t, 4> header{static_cast<uint32_t>(gpu_instances.size()), 0, 0, 0};
-  instances_buffer_->Update(header.data(), sizeof(header));
+  instances_buffer_->UploadData(header.data(), sizeof(header));
   if (!gpu_instances.empty())
-    instances_buffer_->Update(gpu_instances.data(), gpu_instances.size() * sizeof(GPUInstance), 16);
+    instances_buffer_->UploadData(gpu_instances.data(), gpu_instances.size() * sizeof(GPUInstance), 16);
   if (ray_query_) {
-    if (!native_tlas_)
-      core_->CreateTopLevelAccelerationStructure(native_instances, &native_tlas_);
-    else
-      native_tlas_->UpdateInstances(native_instances);
+    if (!native_tlas_) {
+      if (graphics->CreateTopLevelAccelerationStructure(native_instances, &native_tlas_))
+        throw std::runtime_error("failed to create native TLAS");
+    } else if (native_tlas_->UpdateInstances(native_instances)) {
+      throw std::runtime_error("failed to update native TLAS");
+    }
     if (!render_program_ || materials != material_sources_ || buffer_count_ != buffers.size() ||
         sdr_count_ != sdr_count || hdr_count_ != hdr_count)
       CompileRenderer(materials, buffers.size(), sdr_count, hdr_count);
@@ -341,8 +336,8 @@ void SoftwarePipeline::Update(graphics::CommandContext *commands,
     parameters.push_back(pass.parameters);
   size_t parameter_bytes = parameters.size() * sizeof(BuildParameters);
   if (!parameters_buffer_ || parameters_buffer_->Size() < parameter_bytes)
-    core_->CreateBuffer(parameter_bytes, graphics::BUFFER_TYPE_STATIC, &parameters_buffer_);
-  parameters_buffer_->Update(parameters.data(), parameter_bytes);
+    graphics->CreateBuffer(parameter_bytes, graphics::BUFFER_TYPE_STATIC, &parameters_buffer_);
+  parameters_buffer_->UploadData(parameters.data(), parameter_bytes);
   prepare_profile.End();
   if (graphics::FrameProfile::active) {
     graphics::FrameProfile::active->counters["bvh_dispatches"] = passes.size();
@@ -354,12 +349,12 @@ void SoftwarePipeline::Update(graphics::CommandContext *commands,
   graphics::GpuProfileScope build_profile(commands, "bvh_build");
   for (size_t i = 0; i < passes.size(); ++i) {
     commands->CmdBindComputeProgram(builders_[passes[i].kernel].get());
-    commands->CmdBindResources(0, {nodes_->Get()}, graphics::BIND_POINT_COMPUTE);
+    commands->CmdBindResources(0, {nodes_.get()}, graphics::BIND_POINT_COMPUTE);
     commands->CmdBindResources(1, buffers, graphics::BIND_POINT_COMPUTE);
     commands->CmdBindResources(2, {parameters_buffer_->Range(i * sizeof(BuildParameters), sizeof(BuildParameters))},
                                graphics::BIND_POINT_COMPUTE);
-    commands->CmdBindResources(3, {keys_->Get()}, graphics::BIND_POINT_COMPUTE);
-    commands->CmdBindResources(4, {instances_buffer_->Get()}, graphics::BIND_POINT_COMPUTE);
+    commands->CmdBindResources(3, {keys_.get()}, graphics::BIND_POINT_COMPUTE);
+    commands->CmdBindResources(4, {instances_buffer_.get()}, graphics::BIND_POINT_COMPUTE);
     commands->CmdDispatch((passes[i].count + 63) / 64, 1, 1);
   }
   geometries_ = std::move(geometries);

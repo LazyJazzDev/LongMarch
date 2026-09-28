@@ -15,7 +15,7 @@ class MaterialLambertian : public Material {
 
  private:
   sparkium::MaterialLambertian &material_;
-  std::unique_ptr<sparkium::Buffer> material_buffer_;
+  std::unique_ptr<graphics::Buffer> material_buffer_;
   CodeLines sampler_implementation_;
   CodeLines evaluator_implementation_;
 };

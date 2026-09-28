@@ -8,15 +8,6 @@ class VulkanCommand {
   virtual void CompileCommand(VulkanCommandContext *context, VkCommandBuffer command_buffer) = 0;
 };
 
-class VulkanCmdUpload : public VulkanCommand {
- public:
-  explicit VulkanCmdUpload(std::function<void(VulkanCommandContext *, VkCommandBuffer)> encode);
-  void CompileCommand(VulkanCommandContext *context, VkCommandBuffer commands) override;
-
- private:
-  std::function<void(VulkanCommandContext *, VkCommandBuffer)> encode_;
-};
-
 class VulkanCmdBindProgram : public VulkanCommand {
  public:
   VulkanCmdBindProgram(VulkanProgram *program);

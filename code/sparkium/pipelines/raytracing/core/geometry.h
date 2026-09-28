@@ -9,7 +9,7 @@ class Geometry : public Object {
   virtual ~Geometry() = default;
 
   virtual graphics::Buffer *Buffer() = 0;
-  virtual BottomLevelAccelerationStructure *BLAS() = 0;
+  virtual graphics::AccelerationStructure *BLAS() = 0;
   virtual const CodeLines &ClosestHitShaderImpl() const = 0;
   virtual int PrimitiveCount() = 0;
   virtual const CodeLines &SamplerImpl() const = 0;

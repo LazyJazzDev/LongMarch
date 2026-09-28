@@ -1,6 +1,5 @@
 #include "grassland/graphics/backend/metal/metal_command_context.h"
 
-#include <cstring>
 #include <stdexcept>
 
 #include "grassland/graphics/backend/metal/metal_acceleration_structure.h"
@@ -337,59 +336,6 @@ void MetalCommandContext::CmdCopyBuffer(Buffer *dst,
   blit->copyFromBuffer(dynamic_cast<MetalBuffer *>(src)->Handle(), src_offset,
                        dynamic_cast<MetalBuffer *>(dst)->Handle(), dst_offset, size);
   blit->endEncoding();
-}
-
-void MetalCommandContext::CmdUploadBuffer(Buffer *buffer, const void *data, size_t size, size_t offset) {
-  auto *dst = dynamic_cast<MetalBuffer *>(buffer);
-  if (render_pass_ || !dst || offset > buffer->Size() || size > buffer->Size() - offset)
-    throw std::invalid_argument("invalid Metal buffer upload");
-  if (!size)
-    return;
-  EndEncoder();
-  MetalPool pool;
-  auto staging = NS::TransferPtr(core_->Device()->newBuffer(data, size, MTL::ResourceStorageModeShared));
-  MetalCheck(staging.get(), nullptr, "buffer upload staging");
-  auto blit = command_->blitCommandEncoder();
-  blit->copyFromBuffer(staging.get(), 0, dst->Handle(), offset, size);
-  blit->endEncoding();
-  PushPostExecutionCallback([staging] {});
-}
-
-void MetalCommandContext::CmdUploadImage(Image *image,
-                                         const void *data,
-                                         const Offset2D &offset,
-                                         const Extent2D &extent) {
-  auto *dst = dynamic_cast<MetalImage *>(image);
-  if (render_pass_ || !dst || offset.x < 0 || offset.y < 0 ||
-      uint64_t(offset.x) + extent.width > image->Extent().width ||
-      uint64_t(offset.y) + extent.height > image->Extent().height)
-    throw std::invalid_argument("invalid Metal image upload");
-  if (!extent.width || !extent.height)
-    return;
-  EndEncoder();
-  MetalPool pool;
-  const bool rgb = image->Format() == IMAGE_FORMAT_R32G32B32_SFLOAT;
-  size_t pixel = rgb ? 16 : PixelSize(image->Format());
-  size_t pitch = (extent.width * pixel + 255) & ~size_t(255);
-  auto staging = NS::TransferPtr(core_->Device()->newBuffer(pitch * extent.height, MTL::ResourceStorageModeShared));
-  MetalCheck(staging.get(), nullptr, "image upload staging");
-  for (size_t y = 0; y < extent.height; ++y) {
-    auto *target = static_cast<uint8_t *>(staging->contents()) + y * pitch;
-    auto *source = static_cast<const uint8_t *>(data) + y * extent.width * PixelSize(image->Format());
-    if (rgb) {
-      for (size_t x = 0; x < extent.width; ++x) {
-        std::memcpy(target + x * 16, source + x * 12, 12);
-        float alpha = 1;
-        std::memcpy(target + x * 16 + 12, &alpha, 4);
-      }
-    } else
-      std::memcpy(target, source, extent.width * pixel);
-  }
-  auto blit = command_->blitCommandEncoder();
-  blit->copyFromBuffer(staging.get(), 0, pitch, pitch * extent.height, MTL::Size(extent.width, extent.height, 1),
-                       dst->Handle(), 0, 0, MTL::Origin(offset.x, offset.y, 0));
-  blit->endEncoding();
-  PushPostExecutionCallback([staging] {});
 }
 
 void MetalCommandContext::CmdPresent(Window *window, Image *image) {
