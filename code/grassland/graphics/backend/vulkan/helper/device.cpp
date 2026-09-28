@@ -16,7 +16,6 @@
 #include "grassland/graphics/backend/vulkan/helper/pipeline_layout.h"
 #include "grassland/graphics/backend/vulkan/helper/queue.h"
 #include "grassland/graphics/backend/vulkan/helper/raytracing/raytracing.h"
-#include "grassland/graphics/backend/vulkan/helper/render_pass.h"
 #include "grassland/graphics/backend/vulkan/helper/semaphore.h"
 #include "grassland/graphics/backend/vulkan/helper/shader_module.h"
 #include "grassland/graphics/backend/vulkan/helper/swap_chain.h"
@@ -325,70 +324,6 @@ VkResult Device::CreateDescriptorSetLayout(const std::vector<VkDescriptorSetLayo
   return VK_SUCCESS;
 }
 
-VkResult Device::CreateRenderPass(
-    const std::vector<VkAttachmentDescription> &attachment_descriptions,
-    const std::vector<struct SubpassSettings> &subpass_settings,
-    const std::vector<VkSubpassDependency> &dependencies,
-    grassland::double_ptr<grassland::graphics::backend::vulkan::RenderPass> pp_render_pass) const {
-  if (!pp_render_pass) {
-    SetErrorMessage("pp_render_pass is nullptr");
-    return VK_ERROR_INITIALIZATION_FAILED;
-  }
-
-  std::vector<VkSubpassDescription> subpass_descriptions{};
-
-  for (const auto &subpass_setting : subpass_settings) {
-    subpass_descriptions.push_back(subpass_setting.Description());
-  }
-
-  // Build RenderPass here
-  VkRenderPassCreateInfo render_pass_create_info{};
-  render_pass_create_info.sType = VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO;
-  render_pass_create_info.attachmentCount = attachment_descriptions.size();
-  render_pass_create_info.pAttachments = attachment_descriptions.data();
-  render_pass_create_info.subpassCount = subpass_descriptions.size();
-  render_pass_create_info.pSubpasses = subpass_descriptions.data();
-  render_pass_create_info.dependencyCount = dependencies.size();
-  render_pass_create_info.pDependencies = dependencies.data();
-
-  VkRenderPass render_pass;
-  RETURN_IF_FAILED_VK(vkCreateRenderPass(device_, &render_pass_create_info, nullptr, &render_pass),
-                      "failed to create render pass!");
-
-  pp_render_pass.construct(this, attachment_descriptions, subpass_settings, render_pass);
-
-  return VK_SUCCESS;
-}
-
-VkResult Device::CreateRenderPass(const std::vector<VkAttachmentDescription> &attachment_descriptions,
-                                  const std::vector<VkAttachmentReference> &color_attachment_references,
-                                  const std::optional<VkAttachmentReference> &depth_attachment_reference,
-                                  const std::vector<VkAttachmentReference> &resolve_attachment_references,
-                                  double_ptr<RenderPass> pp_render_pass) const {
-  return CreateRenderPass(
-      attachment_descriptions,
-      std::vector<struct SubpassSettings>{
-          {color_attachment_references, depth_attachment_reference, resolve_attachment_references}},
-      std::vector<VkSubpassDependency>{{VK_SUBPASS_EXTERNAL, 0, VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
-                                        VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, 0,
-                                        VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT, 0}},
-      pp_render_pass);
-}
-
-VkResult Device::CreateRenderPass(const std::vector<VkAttachmentDescription> &attachment_descriptions,
-                                  const std::vector<VkAttachmentReference> &color_attachment_references,
-                                  const std::optional<VkAttachmentReference> &depth_attachment_reference,
-                                  double_ptr<RenderPass> pp_render_pass) const {
-  return CreateRenderPass(attachment_descriptions, color_attachment_references, depth_attachment_reference,
-                          std::vector<VkAttachmentReference>{}, pp_render_pass);
-}
-
-VkResult Device::CreateRenderPass(const std::vector<VkAttachmentDescription> &attachment_descriptions,
-                                  const std::vector<VkAttachmentReference> &color_attachment_references,
-                                  double_ptr<RenderPass> pp_render_pass) const {
-  return CreateRenderPass(attachment_descriptions, color_attachment_references, std::nullopt, pp_render_pass);
-}
-
 VkResult Device::CreateImage(VkFormat format,
                              VkExtent2D extent,
                              VkImageUsageFlags usage,
@@ -620,13 +555,11 @@ VkResult Device::CreatePipeline(const struct PipelineSettings &settings, double_
   pipeline_create_info.sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO;
 
   VkPipelineRenderingCreateInfoKHR rendering_create_info{};
-  if (!settings.render_pass) {
-    rendering_create_info.sType = VK_STRUCTURE_TYPE_PIPELINE_RENDERING_CREATE_INFO_KHR;
-    rendering_create_info.colorAttachmentCount = settings.color_attachment_formats.size();
-    rendering_create_info.pColorAttachmentFormats = settings.color_attachment_formats.data();
-    rendering_create_info.depthAttachmentFormat = settings.depth_attachment_format;
-    pipeline_create_info.pNext = &rendering_create_info;
-  }
+  rendering_create_info.sType = VK_STRUCTURE_TYPE_PIPELINE_RENDERING_CREATE_INFO_KHR;
+  rendering_create_info.colorAttachmentCount = settings.color_attachment_formats.size();
+  rendering_create_info.pColorAttachmentFormats = settings.color_attachment_formats.data();
+  rendering_create_info.depthAttachmentFormat = settings.depth_attachment_format;
+  pipeline_create_info.pNext = &rendering_create_info;
 
   pipeline_create_info.stageCount = settings.shader_stage_create_infos.size();
   pipeline_create_info.pStages = settings.shader_stage_create_infos.data();
@@ -638,7 +571,7 @@ VkResult Device::CreatePipeline(const struct PipelineSettings &settings, double_
   pipeline_create_info.pColorBlendState = &color_blend_state;
   pipeline_create_info.pDynamicState = &dynamic_state;
   pipeline_create_info.layout = settings.pipeline_layout->Handle();
-  pipeline_create_info.renderPass = settings.render_pass ? settings.render_pass->Handle() : VK_NULL_HANDLE;
+  pipeline_create_info.renderPass = VK_NULL_HANDLE;
   pipeline_create_info.pDepthStencilState = settings.depth_stencil_state_create_info.has_value()
                                                 ? &settings.depth_stencil_state_create_info.value()
                                                 : nullptr;

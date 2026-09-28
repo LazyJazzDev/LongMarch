@@ -87,26 +87,6 @@ class Device {
   VkResult CreateDescriptorSetLayout(const std::vector<VkDescriptorSetLayoutBinding> &bindings,
                                      double_ptr<DescriptorSetLayout> pp_descriptor_set_layout) const;
 
-  VkResult CreateRenderPass(const std::vector<VkAttachmentDescription> &attachment_descriptions,
-                            const std::vector<struct SubpassSettings> &subpass_settings,
-                            const std::vector<VkSubpassDependency> &dependencies,
-                            double_ptr<RenderPass> pp_render_pass) const;
-
-  VkResult CreateRenderPass(const std::vector<VkAttachmentDescription> &attachment_descriptions,
-                            const std::vector<VkAttachmentReference> &color_attachment_references,
-                            const std::optional<VkAttachmentReference> &depth_attachment_reference,
-                            const std::vector<VkAttachmentReference> &resolve_attachment_references,
-                            double_ptr<RenderPass> pp_render_pass) const;
-
-  VkResult CreateRenderPass(const std::vector<VkAttachmentDescription> &attachment_descriptions,
-                            const std::vector<VkAttachmentReference> &color_attachment_references,
-                            const std::optional<VkAttachmentReference> &depth_attachment_reference,
-                            double_ptr<RenderPass> pp_render_pass) const;
-
-  VkResult CreateRenderPass(const std::vector<VkAttachmentDescription> &attachment_descriptions,
-                            const std::vector<VkAttachmentReference> &color_attachment_references,
-                            double_ptr<RenderPass> pp_render_pass) const;
-
   VkResult CreateImage(VkFormat format,
                        VkExtent2D extent,
                        VkImageUsageFlags usage,

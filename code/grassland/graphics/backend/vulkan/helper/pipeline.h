@@ -1,14 +1,9 @@
 #pragma once
 #include "grassland/graphics/backend/vulkan/helper/device.h"
-#include "grassland/graphics/backend/vulkan/helper/render_pass.h"
 #include "grassland/graphics/backend/vulkan/helper/shader_module.h"
 
 namespace grassland::graphics::backend::vulkan {
 struct PipelineSettings {
-  explicit PipelineSettings(const RenderPass *render_pass = nullptr,
-                            const PipelineLayout *pipeline_layout = nullptr,
-                            int subpass = 0);
-
   explicit PipelineSettings(const PipelineLayout *pipeline_layout = nullptr,
                             const std::vector<VkFormat> &color_attachment_formats = {},
                             VkFormat depth_attachment_format = VK_FORMAT_UNDEFINED);
@@ -47,9 +42,6 @@ struct PipelineSettings {
   void SetTessellationState(uint32_t patch_control_points);
 
   void EnableDynamicPrimitiveTopology();
-
-  // Render pass
-  const RenderPass *render_pass;
 
   // Pipeline layout
   const PipelineLayout *pipeline_layout;

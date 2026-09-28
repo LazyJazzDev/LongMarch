@@ -4,59 +4,10 @@
 
 namespace grassland::graphics::backend::vulkan {
 
-PipelineSettings::PipelineSettings(const RenderPass *render_pass, const PipelineLayout *pipeline_layout, int subpass)
-    : render_pass(render_pass),
-      pipeline_layout(pipeline_layout),
-      subpass(subpass) {
-  PipelineSettingsCommon();
-
-  auto &subpass_settings = render_pass->SubpassSettings()[subpass];
-
-  if (render_pass) {
-    if (subpass_settings.DepthAttachmentReference().has_value()) {
-      depth_stencil_state_create_info = VkPipelineDepthStencilStateCreateInfo{
-          VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO,
-          nullptr,
-          0,
-          VK_TRUE,
-          VK_TRUE,
-          VK_COMPARE_OP_LESS,
-          VK_FALSE,
-          VK_FALSE,
-          VkStencilOpState{},
-          VkStencilOpState{},
-          0.0f,
-          1.0f,
-      };
-    }
-
-    if (!subpass_settings.ColorAttachmentReferences().empty()) {
-      pipeline_color_blend_attachment_states.resize(subpass_settings.ColorAttachmentReferences().size());
-      for (size_t i = 0; i < subpass_settings.ColorAttachmentReferences().size(); i++) {
-        pipeline_color_blend_attachment_states[i].blendEnable = VK_FALSE;
-        pipeline_color_blend_attachment_states[i].srcColorBlendFactor = VK_BLEND_FACTOR_ONE;
-        pipeline_color_blend_attachment_states[i].dstColorBlendFactor = VK_BLEND_FACTOR_ZERO;
-        pipeline_color_blend_attachment_states[i].colorBlendOp = VK_BLEND_OP_ADD;
-        pipeline_color_blend_attachment_states[i].srcAlphaBlendFactor = VK_BLEND_FACTOR_ONE;
-        pipeline_color_blend_attachment_states[i].dstAlphaBlendFactor = VK_BLEND_FACTOR_ZERO;
-        pipeline_color_blend_attachment_states[i].alphaBlendOp = VK_BLEND_OP_ADD;
-        pipeline_color_blend_attachment_states[i].colorWriteMask =
-            VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT | VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT;
-      }
-    }
-
-    if (!subpass_settings.ResolveAttachmentReferences().empty()) {
-      multisample_state_create_info.alphaToCoverageEnable = VK_TRUE;
-      multisample_state_create_info.alphaToOneEnable = VK_TRUE;
-    }
-  }
-}
-
 PipelineSettings::PipelineSettings(const PipelineLayout *pipeline_layout,
                                    const std::vector<VkFormat> &color_attachment_formats,
                                    VkFormat depth_attachment_format)
-    : render_pass(nullptr),
-      pipeline_layout(pipeline_layout),
+    : pipeline_layout(pipeline_layout),
       color_attachment_formats(color_attachment_formats),
       depth_attachment_format(depth_attachment_format),
       subpass(0) {

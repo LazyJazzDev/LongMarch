@@ -95,8 +95,6 @@ class DescriptorSetLayout;
 class DescriptorSet;
 class PipelineLayout;
 class Pipeline;
-class RenderPass;
-class Framebuffer;
 class ShaderModule;
 struct HitGroup;
 class Fence;
