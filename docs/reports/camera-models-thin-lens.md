@@ -8,7 +8,7 @@
 - 光圈、焦距平面距离、叶片数、旋转与横向比例只属于 `CameraThinLens`；软件追踪、Ray Query 和原生 RT 按具体模型选择着色器，切换模型时刷新相应程序。
 - JSON 支持 `camera.type: "pinhole" | "thin_lens"`。未指定类型时，以正的 `aperture_radius` 选择薄镜，否则选择针孔；保持旧场景的选择语义。C++ 中直接构造 `Camera` 的调用需改为具体类型。
 - 新增 `demo_thin_lens`：近、中、远三个彩色球、棋盘地面与背景发光点；支持焦点预设、光圈形状、实际针孔相机对比及无窗口输出。球体保持 `Sphere(32,16)`，无表面装饰小点。
-- 移植 Cycles Geometry Offset 的抛物线高度近似、局部线性包络、掠射角权重和反射／透射方向处理；阴影射线按实例及三角形过滤来源自相交，仍保留其他遮挡面。保留 Apache-2.0 许可和固定上游来源。
+- 移植 Cycles Geometry Offset 的抛物线高度近似、局部线性包络、掠射角权重和反射／透射方向处理；阴影射线保留原有遍历与 `TMin` 处理，不额外引入来源三角形过滤。保留 Apache-2.0 许可和固定上游来源。
 
 ```cpp
 sparkium::CameraThinLens camera(&core, view, fovy, aspect);
@@ -57,9 +57,10 @@ cmake-build-release/demo/thin_lens/demo_thin_lens --backend metal
 
 - Camera 拆分阶段：Release GUI／CLI／示例及 Debug GUI 构建通过；Cornell 与 Junkshop 输出与拆分前逐字节一致；零光圈 ThinLens 与 Pinhole 的 demo 输出逐字节一致。
 - 最终 Geometry Offset 实现：Release `demo_thin_lens`、`sparkium_fallback_test` 和 Debug `demo_thin_lens` 构建通过，Metal GUI 三帧运行测试通过。
-- 最终相关回归测试 **23 通过、2 跳过**：包含相机生成／切换、JSON 兼容、共享 shader 编译、BVH 遍历、透明阴影、自相交过滤、Cycles 高度／角度公式与参数校验／缓冲更新。
+- 最终相关回归测试 **23 通过、2 跳过**：包含相机生成／切换、JSON 兼容、共享 shader 编译、BVH 遍历、透明阴影、Cycles 高度／角度公式与参数校验／缓冲更新。
 - 本机不支持原生 RT 管线，因此原生 RT 管线切换及图像一致性两项跳过。共享原生 RT 着色器完成 SPIR-V 编译检查；未在本机完成 Vulkan／D3D12 原生 RT 实际渲染验证。
-- 本 PR 的渲染图使用代码提交 `1d8cece`，512 spp；报告与素材引用不改变渲染实现。pre-commit 检查通过。
+- 本 PR 的渲染图使用代码提交 `1d8cece`，512 spp；移除阴影 `skip` 后重新渲染薄镜、针孔及关闭 Geometry Offset 三组结果，均与已发布图片逐字节一致。
+- 阴影 `skip` 参数及为其新增的 Any-Hit 着色器已移除，不透明阴影恢复任意命中提前结束；原有透明阴影处理保持不变。移除后 Release 构建及上述 23 项回归测试通过，2 项仍因设备能力跳过。pre-commit 检查通过。
 
 ## 范围与限制
 

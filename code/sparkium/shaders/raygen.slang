@@ -53,7 +53,6 @@ void RenderPixel(uint2 pixel, uint2 extent) {
       context.shadow_dir = float3(0.0, 0.0, 0.0);
       context.shadow_length = 0.0;
       context.shadow_origin = context.origin;
-      context.shadow_skip = int2(-1, -1);
 
 #ifdef SPARKIUM_SOFTWARE_RT
       SoftwareTracePath(ray, context);
@@ -63,11 +62,11 @@ void RenderPixel(uint2 pixel, uint2 extent) {
 
       if (context.shadow_eval.x > 0.0 || context.shadow_eval.y > 0.0 || context.shadow_eval.z > 0.0) {
         if (render_settings.alpha_shadow) {
-          context.radiance += context.shadow_eval * ShadowRay(context.shadow_origin, context.shadow_dir,
-                                                              context.shadow_length, context.shadow_skip);
+          context.radiance +=
+              context.shadow_eval * ShadowRay(context.shadow_origin, context.shadow_dir, context.shadow_length);
         } else {
-          context.radiance += context.shadow_eval * ShadowRayNoAlpha(context.shadow_origin, context.shadow_dir,
-                                                                     context.shadow_length, context.shadow_skip);
+          context.radiance +=
+              context.shadow_eval * ShadowRayNoAlpha(context.shadow_origin, context.shadow_dir, context.shadow_length);
         }
       }
 

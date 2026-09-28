@@ -43,7 +43,6 @@ void SampleDirectLighting(inout RenderContext context,
   context.shadow_eval = context.shadow_dir = float3(0, 0, 0);
   context.shadow_length = 0.0f;
   context.shadow_origin = hit_record.position;
-  context.shadow_skip = int2(-1, -1);
   if (light_count == 0)
     return;
   BufferReference<ByteAddressBuffer> power_cdf = MakeBufferReference(light_selector_data, 4);
@@ -93,8 +92,6 @@ void SampleDirectLighting(inout RenderContext context,
   context.shadow_length = shadow_length;
   if (amount > 0.0f) {
     float3 offset = (transmit ? hit_record.shadow_transmission_offset : hit_record.shadow_offset) * amount;
-    if (NgL > 0.0f)
-      context.shadow_skip = int2(hit_record.object_index, hit_record.primitive_index);
     context.shadow_origin = hit_record.position + offset;
     // Preserve the finite light endpoint after moving the shadow origin.
     float3 shadow_segment = omega_in * shadow_length - offset;

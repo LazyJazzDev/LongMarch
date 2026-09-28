@@ -29,17 +29,13 @@ HitRecord MakeHitRecord(in BuiltInTriangleIntersectionAttributes attr) {
 #endif
 }
 
-[shader("anyhit")] void ShadowAnyHit(inout ShadowRayPayload payload, in BuiltInTriangleIntersectionAttributes attr) {
-  if (all(int2(InstanceIndex(), PrimitiveIndex()) == payload.skip)) {
-    IgnoreHit();
-    return;
-  }
 #if defined(SAMPLE_SHADOW_ANY_HIT)
+[shader("anyhit")] void ShadowAnyHit(inout ShadowRayPayload payload, in BuiltInTriangleIntersectionAttributes attr) {
   float opacity = saturate(SampleShadowOpacity(MakeHitRecord(attr), WorldRayDirection()));
   payload.shadow *= 1.0f - opacity;
   if (payload.shadow > 1.0e-4f)
     IgnoreHit();
   else
     AcceptHitAndEndSearch();
-#endif
 }
+#endif

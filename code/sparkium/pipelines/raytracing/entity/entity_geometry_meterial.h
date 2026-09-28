@@ -18,7 +18,6 @@ class EntityGeometryMaterial : public Entity {
   std::unique_ptr<LightGeometryMaterial> light_geom_mat_;
   std::unique_ptr<graphics::Shader> closest_hit_shader_;
   std::unique_ptr<graphics::Shader> shadow_closest_hit_shader_;
-  std::unique_ptr<graphics::Shader> shadow_any_hit_shader_;
   InstanceHitGroups hit_groups_;
 };
 

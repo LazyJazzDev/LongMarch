@@ -42,7 +42,6 @@ struct RenderContext {
   float3 throughput;
   RandomDevice rd;
   float bsdf_pdf;
-  int2 shadow_skip;
   float3 shadow_origin;
   float3 shadow_eval;
   float3 shadow_dir;
@@ -65,7 +64,6 @@ struct RenderContext {
 #define RAY_TYPE_VOLUME 3
 
 struct ShadowRayPayload {
-  int2 skip;
   float shadow;
 };
 

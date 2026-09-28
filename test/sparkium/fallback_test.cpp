@@ -818,10 +818,8 @@ float SoftwareShadowTransmission(uint material, HitRecord hit, float3 direction)
 #include "software/shadow.slang"
 [numthreads(1, 1, 1)] void Main() {
   float3 o = float3(0, 0, 4), d = float3(0, 0, -1);
-  results.Store4(0, asuint(float4(ShadowRay(o, d, 10, int2(-1,-1)), ShadowRayNoAlpha(o, d, 10, int2(-1,-1)),
-                                  ShadowRay(o, d, 4.5f, int2(-1,-1)), ShadowRay(o, d, 3.0f, int2(-1,-1)))));
-  results.Store4(16, asuint(float4(ShadowRay(o, d, 10, int2(0,0)), ShadowRayNoAlpha(o, d, 10, int2(0,0)),
-      ShadowRayNoAlpha(o, d, 4.5f, int2(0,0)), ShadowRay(o, d, 4.5f, int2(1,0)))));
+  results.Store4(0, asuint(float4(ShadowRay(o, d, 10), ShadowRayNoAlpha(o, d, 10),
+                                  ShadowRay(o, d, 4.5f), ShadowRay(o, d, 3.0f))));
 }
 )");
   std::unique_ptr<graphics::Shader> shader;
@@ -839,7 +837,7 @@ float SoftwareShadowTransmission(uint material, HitRecord hit, float3 direction)
   program->AddResourceBinding(graphics::RESOURCE_TYPE_WRITABLE_STORAGE_BUFFER, 1);
   program->Finalize();
   std::unique_ptr<graphics::Buffer> output;
-  graphics->CreateBuffer(32, graphics::BUFFER_TYPE_STATIC, &output);
+  graphics->CreateBuffer(16, graphics::BUFFER_TYPE_STATIC, &output);
   std::unique_ptr<graphics::CommandContext> commands;
   graphics->CreateCommandContext(&commands);
   sparkium::CameraPinhole camera(core.get(), glm::mat4(1), glm::radians(45.0f), 1.0f);
@@ -855,16 +853,12 @@ float SoftwareShadowTransmission(uint material, HitRecord hit, float3 direction)
   commands->CmdDispatch(1, 1, 1);
   graphics->SubmitCommandContext(commands.get());
   graphics->WaitGPU();
-  float actual[8];
+  float actual[4];
   output->DownloadData(actual, sizeof(actual));
   EXPECT_FLOAT_EQ(actual[0], 0.25f);
   EXPECT_FLOAT_EQ(actual[1], 0.0f);
   EXPECT_FLOAT_EQ(actual[2], 0.5f);
   EXPECT_FLOAT_EQ(actual[3], 1.0f);
-  EXPECT_FLOAT_EQ(actual[4], 0.5f);  // Skip only the source primitive, not the next layer.
-  EXPECT_FLOAT_EQ(actual[5], 0.0f);
-  EXPECT_FLOAT_EQ(actual[6], 1.0f);
-  EXPECT_FLOAT_EQ(actual[7], 0.5f);  // Same primitive index in another object must not be skipped.
 }
 
 TEST_F(SoftwareBVHTest, SharedShadersCompileForNativeRayTracingAndCompute) {
@@ -889,7 +883,6 @@ TEST_F(SoftwareBVHTest, SharedShadersCompileForNativeRayTracingAndCompute) {
                     sparkium::CodeLines(vfs, std::string("material/") + material + "/sampler.slang"));
       compile("geometry/mesh/hit_group.slang", "RenderClosestHit", "lib_6_5");
       compile("geometry/mesh/hit_group.slang", "ShadowClosestHit", "lib_6_5");
-      compile("geometry/mesh/hit_group.slang", "ShadowAnyHit", "lib_6_5");
     }
     sparkium::CodeLines graph(vfs, "material/shader_graph/sampler.slang");
     graph.InsertAfter(sparkium::CodeLines(R"(

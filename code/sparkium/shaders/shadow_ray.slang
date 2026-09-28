@@ -2,10 +2,10 @@
 #include "bindings.slang"
 
 #ifdef SPARKIUM_SOFTWARE_RT
-float ShadowRayNoAlpha(float3 origin, float3 direction, float dist, int2 skip = int2(-1, -1));
-float ShadowRay(float3 origin, float3 direction, float dist, int2 skip = int2(-1, -1));
+float ShadowRayNoAlpha(float3 origin, float3 direction, float dist);
+float ShadowRay(float3 origin, float3 direction, float dist);
 #else
-float ShadowRayNoAlpha(float3 origin, float3 direction, float dist, int2 skip = int2(-1, -1)) {
+float ShadowRayNoAlpha(float3 origin, float3 direction, float dist) {
   RayDesc ray;
   ray.Origin = origin;
   ray.Direction = direction;
@@ -14,7 +14,6 @@ float ShadowRayNoAlpha(float3 origin, float3 direction, float dist, int2 skip = 
 #if defined(__spirv__) && defined(DEBUG_SHADER)
   ShadowRayPayload payload;
   payload.shadow = 1.0;
-  payload.skip = skip;
   TraceRay(as, RAY_FLAG_NONE, 0xFF, 1, 0, 1, ray, payload);
   return payload.shadow;
 #else
@@ -24,8 +23,6 @@ float ShadowRayNoAlpha(float3 origin, float3 direction, float dist, int2 skip = 
                     ray);
   while (rq.Proceed()) {
     if (rq.CandidateType() == CANDIDATE_NON_OPAQUE_TRIANGLE) {
-      if (all(int2(rq.CandidateInstanceIndex(), rq.CandidatePrimitiveIndex()) == skip))
-        continue;
       rq.Abort();
       return 0.0f;
     }
@@ -34,7 +31,7 @@ float ShadowRayNoAlpha(float3 origin, float3 direction, float dist, int2 skip = 
   return 1.0;
 }
 
-float ShadowRay(float3 origin, float3 direction, float dist, int2 skip = int2(-1, -1)) {
+float ShadowRay(float3 origin, float3 direction, float dist) {
   RayDesc ray;
   ray.Origin = origin;
   ray.Direction = direction;
@@ -42,7 +39,6 @@ float ShadowRay(float3 origin, float3 direction, float dist, int2 skip = int2(-1
   ray.TMax = dist;
   ShadowRayPayload payload;
   payload.shadow = 1.0;
-  payload.skip = skip;
   TraceRay(as, RAY_FLAG_NONE, 0xFF, 1, 0, 1, ray, payload);
   return payload.shadow;
 }
