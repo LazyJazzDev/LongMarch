@@ -1,54 +1,7 @@
 #include "grassland/graphics/backend/vulkan/helper/swap_chain.h"
 
 namespace grassland::graphics::backend::vulkan {
-Swapchain::Swapchain(const class grassland::graphics::backend::vulkan::Device *device,
-                     const class grassland::graphics::backend::vulkan::Surface *surface,
-                     VkSwapchainKHR swapchain,
-                     VkFormat format,
-                     VkExtent2D extent)
-    : device_(device),
-      surface_(surface),
-      swapchain_(swapchain),
-      format_(format),
-      extent_(extent) {
-  CreateImageViews();
-}
-
-Swapchain::~Swapchain() {
-  for (auto imageView : image_views_) {
-    vkDestroyImageView(device_->Handle(), imageView, nullptr);
-  }
-  vkDestroySwapchainKHR(device_->Handle(), swapchain_, nullptr);
-}
-
-void Swapchain::CreateImageViews() {
-  vkGetSwapchainImagesKHR(device_->Handle(), swapchain_, &image_count_, nullptr);
-  images_.resize(image_count_);
-  vkGetSwapchainImagesKHR(device_->Handle(), swapchain_, &image_count_, images_.data());
-  image_views_.resize(image_count_);
-
-  for (size_t i = 0; i < image_count_; i++) {
-    VkImageViewCreateInfo createInfo{};
-    createInfo.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
-    createInfo.image = images_[i];
-    createInfo.viewType = VK_IMAGE_VIEW_TYPE_2D;
-    createInfo.format = format_;
-    createInfo.components.r = VK_COMPONENT_SWIZZLE_IDENTITY;
-    createInfo.components.g = VK_COMPONENT_SWIZZLE_IDENTITY;
-    createInfo.components.b = VK_COMPONENT_SWIZZLE_IDENTITY;
-    createInfo.components.a = VK_COMPONENT_SWIZZLE_IDENTITY;
-    createInfo.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-    createInfo.subresourceRange.baseMipLevel = 0;
-    createInfo.subresourceRange.levelCount = 1;
-    createInfo.subresourceRange.baseArrayLayer = 0;
-    createInfo.subresourceRange.layerCount = 1;
-    if (vkCreateImageView(device_->Handle(), &createInfo, nullptr, &image_views_[i]) != VK_SUCCESS) {
-      ThrowError("failed to create image views!");
-    }
-  }
-}
-
-SwapChainSupportDetails Swapchain::QuerySwapChainSupport(VkPhysicalDevice device, VkSurfaceKHR surface) {
+SwapChainSupportDetails QuerySwapChainSupport(VkPhysicalDevice device, VkSurfaceKHR surface) {
   SwapChainSupportDetails details;
   vkGetPhysicalDeviceSurfaceCapabilitiesKHR(device, surface, &details.capabilities);
   uint32_t formatCount;
@@ -69,9 +22,9 @@ SwapChainSupportDetails Swapchain::QuerySwapChainSupport(VkPhysicalDevice device
   return details;
 }
 
-VkSurfaceFormatKHR Swapchain::ChooseSwapSurfaceFormat(const std::vector<VkSurfaceFormatKHR> &availableFormats,
-                                                      VkFormat preferred_format,
-                                                      VkColorSpaceKHR preferred_color_space) {
+VkSurfaceFormatKHR ChooseSwapSurfaceFormat(const std::vector<VkSurfaceFormatKHR> &availableFormats,
+                                           VkFormat preferred_format,
+                                           VkColorSpaceKHR preferred_color_space) {
   VkSurfaceFormatKHR result = availableFormats[0];
 
   for (const auto &availableFormat : availableFormats) {
@@ -92,7 +45,7 @@ VkSurfaceFormatKHR Swapchain::ChooseSwapSurfaceFormat(const std::vector<VkSurfac
   return result;
 }
 
-VkPresentModeKHR Swapchain::ChooseSwapPresentMode(const std::vector<VkPresentModeKHR> &availablePresentModes) {
+VkPresentModeKHR ChooseSwapPresentMode(const std::vector<VkPresentModeKHR> &availablePresentModes) {
   for (const auto &availablePresentMode : availablePresentModes) {
     if (availablePresentMode == VK_PRESENT_MODE_IMMEDIATE_KHR) {
       return availablePresentMode;
@@ -103,7 +56,7 @@ VkPresentModeKHR Swapchain::ChooseSwapPresentMode(const std::vector<VkPresentMod
   return VK_PRESENT_MODE_FIFO_KHR;
 }
 
-VkExtent2D Swapchain::ChooseSwapExtent(const VkSurfaceCapabilitiesKHR &capabilities, GLFWwindow *window) {
+VkExtent2D ChooseSwapExtent(const VkSurfaceCapabilitiesKHR &capabilities, GLFWwindow *window) {
   if (capabilities.currentExtent.width != std::numeric_limits<uint32_t>::max()) {
     return capabilities.currentExtent;
   } else {
@@ -121,10 +74,4 @@ VkExtent2D Swapchain::ChooseSwapExtent(const VkSurfaceCapabilitiesKHR &capabilit
   }
 }
 
-VkResult Swapchain::AcquireNextImage(uint64_t timeout,
-                                     VkSemaphore semaphore,
-                                     VkFence fence,
-                                     uint32_t *image_index) const {
-  return vkAcquireNextImageKHR(device_->Handle(), swapchain_, timeout, semaphore, fence, image_index);
-}
 }  // namespace grassland::graphics::backend::vulkan

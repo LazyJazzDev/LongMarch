@@ -43,7 +43,7 @@ class PhysicalDevice {
 
   uint32_t GraphicsFamilyIndex() const;
 
-  uint32_t PresentFamilyIndex(const Surface *surface) const;
+  uint32_t PresentFamilyIndex(VkSurfaceKHR surface) const;
 
   uint32_t ComputeFamilyIndex() const;
 

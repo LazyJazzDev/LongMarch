@@ -407,7 +407,7 @@ void VulkanCmdPresent::CompileCommand(VulkanCommandContext *context, VkCommandBu
                              VK_PIPELINE_STAGE_TRANSFER_BIT, VK_ACCESS_TRANSFER_READ_BIT, image_->Image()->Aspect());
 
   auto image_extent = image_->Extent();
-  auto window_extent = window_->SwapChain()->Extent();
+  auto window_extent = window_->SwapChainExtent();
 
   VkClearColorValue clear_color{};
   clear_color.float32[3] = 1.0f;
@@ -458,7 +458,7 @@ void VulkanCmdPresent::CompileCommand(VulkanCommandContext *context, VkCommandBu
     renderPassInfo.renderPass = imgui_assets.render_pass;
     renderPassInfo.framebuffer = imgui_assets.framebuffers[window_->CurrentImageIndex()];
     renderPassInfo.renderArea.offset = {0, 0};
-    renderPassInfo.renderArea.extent = window_->SwapChain()->Extent();
+    renderPassInfo.renderArea.extent = window_->SwapChainExtent();
     renderPassInfo.clearValueCount = 0;
     renderPassInfo.pClearValues = nullptr;
 

@@ -3,7 +3,6 @@
 #include <utility>
 
 #include "grassland/graphics/backend/vulkan/helper/physical_device.h"
-#include "grassland/graphics/backend/vulkan/helper/surface.h"
 #include "grassland/graphics/backend/vulkan/helper/validation_layer.h"
 
 namespace grassland::graphics::backend::vulkan {

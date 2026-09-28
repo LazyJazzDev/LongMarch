@@ -1,7 +1,6 @@
 #include "grassland/graphics/backend/vulkan/helper/physical_device.h"
 
 #include "grassland/graphics/backend/vulkan/helper/device.h"
-#include "grassland/graphics/backend/vulkan/helper/surface.h"
 
 namespace grassland::graphics::backend::vulkan {
 PhysicalDevice::PhysicalDevice(VkPhysicalDevice physical_device) {
@@ -169,12 +168,12 @@ uint32_t PhysicalDevice::GraphicsFamilyIndex() const {
   return -1;
 }
 
-uint32_t PhysicalDevice::PresentFamilyIndex(const Surface *surface) const {
+uint32_t PhysicalDevice::PresentFamilyIndex(VkSurfaceKHR surface) const {
   uint32_t present_family_index = 0;
   std::vector<VkQueueFamilyProperties> queue_families = GetQueueFamilyProperties();
   for (const auto &queue_family : queue_families) {
     VkBool32 present_support = false;
-    vkGetPhysicalDeviceSurfaceSupportKHR(physical_device_, present_family_index, surface->Handle(), &present_support);
+    vkGetPhysicalDeviceSurfaceSupportKHR(physical_device_, present_family_index, surface, &present_support);
     if (present_support) {
       return present_family_index;
     }

@@ -18,7 +18,9 @@ class VulkanWindow : public Window {
 
   virtual void CloseWindow() override;
 
-  vulkan::Swapchain *SwapChain() const;
+  VkExtent2D SwapChainExtent() const {
+    return swap_chain_extent_;
+  }
 
   VkSemaphore RenderFinishSemaphore() const;
 
@@ -35,7 +37,7 @@ class VulkanWindow : public Window {
   }
 
   VkImage CurrentImage() const {
-    return swap_chain_->Image(image_index_);
+    return swap_chain_images_[image_index_];
   }
 
   void InitImGui(const char *font_file_path, float font_size) override;
@@ -53,8 +55,14 @@ class VulkanWindow : public Window {
  private:
   VkQueue present_queue_;
   VulkanCore *core_;
-  std::unique_ptr<vulkan::Surface> surface_;
-  std::unique_ptr<vulkan::Swapchain> swap_chain_;
+  VkSurfaceKHR surface_{VK_NULL_HANDLE};
+  VkSwapchainKHR swap_chain_{VK_NULL_HANDLE};
+  VkFormat swap_chain_format_{VK_FORMAT_UNDEFINED};
+  VkExtent2D swap_chain_extent_{};
+  std::vector<VkImage> swap_chain_images_;
+  std::vector<VkImageView> swap_chain_image_views_;
+  void CreateSwapChain();
+  void DestroySwapChain();
   std::vector<VkSemaphore> render_finish_semaphores_;
   std::vector<VkSemaphore> image_available_semaphores_;
   uint32_t image_index_;

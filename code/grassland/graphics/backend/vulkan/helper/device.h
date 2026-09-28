@@ -56,13 +56,6 @@ class Device {
     return subgroup_properties_.subgroupSize;
   }
 
-  VkResult CreateSwapchain(const Surface *surface,
-                           VkFormat format,
-                           VkColorSpaceKHR color_space,
-                           double_ptr<Swapchain> pp_swapchain) const;
-
-  VkResult CreateSwapchain(const Surface *surface, double_ptr<Swapchain> pp_swapchain) const;
-
   VkResult CreateShaderModule(const CompiledShaderBlob &code, double_ptr<ShaderModule> pp_shader_module) const;
 
   VkResult CreateShaderModule(const void *p_code,

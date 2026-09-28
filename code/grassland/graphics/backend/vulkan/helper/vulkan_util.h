@@ -82,10 +82,8 @@ std::string VkResultToString(VkResult result);
                                                                                           \
   } while (false)
 
-class Surface;
 class PhysicalDevice;
 class Device;
-class Swapchain;
 class DescriptorPool;
 class DescriptorSetLayout;
 class DescriptorSet;

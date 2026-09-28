@@ -13,5 +13,4 @@
 #include "grassland/graphics/backend/vulkan/helper/semaphore.h"
 #include "grassland/graphics/backend/vulkan/helper/shader_module.h"
 #include "grassland/graphics/backend/vulkan/helper/single_time_command.h"
-#include "grassland/graphics/backend/vulkan/helper/surface.h"
 #include "grassland/graphics/backend/vulkan/helper/swap_chain.h"
