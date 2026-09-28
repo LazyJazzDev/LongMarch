@@ -4,12 +4,12 @@
 namespace grassland::graphics::backend {
 
 struct BlitPipeline {
-  d3d12::Device *device_;
+  ID3D12Device *device_;
   CompiledShaderBlob vertex_shader;
   CompiledShaderBlob pixel_shader;
   Microsoft::WRL::ComPtr<ID3D12RootSignature> root_signature;
   std::map<DXGI_FORMAT, Microsoft::WRL::ComPtr<ID3D12PipelineState>> pipeline_states;
-  void Initialize(d3d12::Device *device);
+  void Initialize(ID3D12Device *device);
   ID3D12PipelineState *GetPipelineState(DXGI_FORMAT format);
 };
 
@@ -22,7 +22,7 @@ class D3D12Core : public Core {
     if (!device_)
       return false;
     D3D12_FEATURE_DATA_D3D12_OPTIONS5 options{};
-    return SUCCEEDED(device_->Handle()->CheckFeatureSupport(D3D12_FEATURE_D3D12_OPTIONS5, &options, sizeof(options))) &&
+    return SUCCEEDED(device_.Get()->CheckFeatureSupport(D3D12_FEATURE_D3D12_OPTIONS5, &options, sizeof(options))) &&
            options.RaytracingTier >= D3D12_RAYTRACING_TIER_1_1;
   }
 
@@ -97,6 +97,66 @@ class D3D12Core : public Core {
 
   int CreateRayTracingProgram(double_ptr<RayTracingProgram> pp_program) override;
 
+  HRESULT CreateBottomLevelAccelerationStructure(D3D12_GPU_VIRTUAL_ADDRESS aabb_buffer,
+                                                 uint32_t stride,
+                                                 uint32_t num_aabb,
+                                                 D3D12_RAYTRACING_GEOMETRY_FLAGS flags,
+                                                 ID3D12CommandQueue *queue,
+                                                 ID3D12CommandAllocator *allocator,
+                                                 double_ptr<d3d12::AccelerationStructure> pp_as);
+
+  HRESULT CreateBottomLevelAccelerationStructure(D3D12_GPU_VIRTUAL_ADDRESS vertex_buffer,
+                                                 D3D12_GPU_VIRTUAL_ADDRESS index_buffer,
+                                                 uint32_t num_vertex,
+                                                 uint32_t stride,
+                                                 uint32_t primitive_count,
+                                                 D3D12_RAYTRACING_GEOMETRY_FLAGS flags,
+                                                 ID3D12CommandQueue *queue,
+                                                 ID3D12CommandAllocator *allocator,
+                                                 double_ptr<d3d12::AccelerationStructure> pp_as);
+
+  HRESULT CreateBottomLevelAccelerationStructure(D3D12_GPU_VIRTUAL_ADDRESS vertex_buffer,
+                                                 D3D12_GPU_VIRTUAL_ADDRESS index_buffer,
+                                                 uint32_t num_vertex,
+                                                 uint32_t stride,
+                                                 uint32_t primitive_count,
+                                                 ID3D12CommandQueue *queue,
+                                                 ID3D12CommandAllocator *allocator,
+                                                 double_ptr<d3d12::AccelerationStructure> pp_as);
+
+  HRESULT CreateTopLevelAccelerationStructure(const std::vector<D3D12_RAYTRACING_INSTANCE_DESC> &instances,
+                                              ID3D12CommandQueue *queue,
+                                              ID3D12CommandAllocator *allocator,
+                                              double_ptr<d3d12::AccelerationStructure> pp_tlas);
+
+  HRESULT CreateTopLevelAccelerationStructure(
+      const std::vector<std::pair<d3d12::AccelerationStructure *, glm::mat4>> &objects,
+      ID3D12CommandQueue *queue,
+      ID3D12CommandAllocator *allocator,
+      double_ptr<d3d12::AccelerationStructure> pp_tlas);
+
+  HRESULT CreateRayTracingPipeline(ID3D12RootSignature *root_signature,
+                                   const CompiledShaderBlob *ray_gen_shader,
+                                   const std::vector<const CompiledShaderBlob *> &miss_shaders,
+                                   const std::vector<d3d12::HitGroup> &hit_groups,
+                                   const std::vector<const CompiledShaderBlob *> &callable_shaders,
+                                   double_ptr<d3d12::RayTracingPipeline> pp_pipeline);
+
+  HRESULT CreateRayTracingPipeline(ID3D12RootSignature *root_signature,
+                                   const CompiledShaderBlob *ray_gen_shader,
+                                   const CompiledShaderBlob *miss_shader,
+                                   const CompiledShaderBlob *closest_hit_shader,
+                                   double_ptr<d3d12::RayTracingPipeline> pp_pipeline);
+
+  HRESULT CreateShaderTable(d3d12::RayTracingPipeline *ray_tracing_pipeline,
+                            const std::vector<int32_t> &miss_shader_indices,
+                            const std::vector<int32_t> &hit_group_indices,
+                            const std::vector<int32_t> &callable_shader_indices,
+                            double_ptr<d3d12::ShaderTable> pp_shader_table) const;
+
+  HRESULT CreateShaderTable(d3d12::RayTracingPipeline *ray_tracing_pipeline,
+                            double_ptr<d3d12::ShaderTable> pp_shader_table) const;
+
   int SubmitCommandContext(CommandContext *p_command_context) override;
 
   int GetPhysicalDeviceProperties(PhysicalDeviceProperties *p_physical_device_properties = nullptr) override;
@@ -111,8 +171,12 @@ class D3D12Core : public Core {
     return dxgi_factory_.Get();
   }
 
-  d3d12::Device *Device() const {
-    return device_.get();
+  ID3D12Device *Device() const {
+    return device_.Get();
+  }
+
+  ID3D12Device5 *DXRDevice() const {
+    return dxr_device_.Get();
   }
 
   ID3D12CommandQueue *CommandQueue() const {
@@ -158,9 +222,16 @@ class D3D12Core : public Core {
 #endif
 
  private:
+  friend class d3d12::AccelerationStructure;
   Microsoft::WRL::ComPtr<IDXGIFactory4> dxgi_factory_;
   Microsoft::WRL::ComPtr<IDXGIAdapter1> adapter_;
-  std::unique_ptr<d3d12::Device> device_;
+  Microsoft::WRL::ComPtr<ID3D12Device> device_;
+  Microsoft::WRL::ComPtr<ID3D12Device5> dxr_device_;
+  D3D12_FEATURE_DATA_D3D12_OPTIONS1 d3d12_options1_{};
+  Microsoft::WRL::ComPtr<ID3D12Resource> scratch_buffer_;
+  Microsoft::WRL::ComPtr<ID3D12Resource> instance_buffer_;
+  ID3D12Resource *RequestScratchBuffer(size_t size);
+  ID3D12Resource *RequestInstanceBuffer(size_t size);
 
   struct BlitPipeline blit_pipeline_;
 

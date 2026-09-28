@@ -68,9 +68,6 @@ size_t SizeAlignTo(size_t size, size_t alignment);
 
 struct DeviceFeatureRequirement;
 
-class Device;
-class Buffer;
-class Image;
 class AccelerationStructure;
 class RayTracingPipeline;
 class ShaderTable;

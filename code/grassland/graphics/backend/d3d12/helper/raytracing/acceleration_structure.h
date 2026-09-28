@@ -1,12 +1,15 @@
 #pragma once
 #include "grassland/graphics/backend/d3d12/helper/d3d12util.h"
-#include "grassland/graphics/backend/d3d12/helper/device.h"
+
+namespace grassland::graphics::backend {
+class D3D12Core;
+}
 
 namespace grassland::graphics::backend::d3d12 {
 
 class AccelerationStructure {
  public:
-  AccelerationStructure(Device *device, const ComPtr<ID3D12Resource> &as, int num_instance);
+  AccelerationStructure(D3D12Core *core, const ComPtr<ID3D12Resource> &as, int num_instance);
 
   ID3D12Resource *Handle() const {
     return as_.Get();
@@ -21,7 +24,7 @@ class AccelerationStructure {
                           ID3D12CommandAllocator *allocator);
 
  private:
-  Device *device_;
+  D3D12Core *core_;
   ComPtr<ID3D12Resource> as_;
   int num_instance_;
 };

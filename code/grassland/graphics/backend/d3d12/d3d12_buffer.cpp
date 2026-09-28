@@ -35,7 +35,7 @@ D3D12BufferRange::D3D12BufferRange(const BufferRange &range)
 }
 
 D3D12StaticBuffer::D3D12StaticBuffer(D3D12Core *core, size_t size) : core_(core) {
-  buffer_ = CreateNativeBuffer(core_->Device()->Handle(), size, D3D12_HEAP_TYPE_DEFAULT);
+  buffer_ = CreateNativeBuffer(core_->Device(), size, D3D12_HEAP_TYPE_DEFAULT);
 }
 
 D3D12StaticBuffer::~D3D12StaticBuffer() {
@@ -53,7 +53,7 @@ size_t D3D12StaticBuffer::Size() const {
 void D3D12StaticBuffer::Resize(size_t new_size) {
   core_->WaitGPU();
   Microsoft::WRL::ComPtr<ID3D12Resource> new_buffer;
-  new_buffer = CreateNativeBuffer(core_->Device()->Handle(), new_size, D3D12_HEAP_TYPE_DEFAULT);
+  new_buffer = CreateNativeBuffer(core_->Device(), new_size, D3D12_HEAP_TYPE_DEFAULT);
   core_->SingleTimeCommand([&](ID3D12GraphicsCommandList *command_list) {
     CopyNativeBuffer(command_list, buffer_.Get(), new_buffer.Get(), std::min(buffer_->GetDesc().Width, new_size));
   });
@@ -93,9 +93,9 @@ ID3D12Resource *D3D12StaticBuffer::InstantBuffer() const {
 D3D12DynamicBuffer::D3D12DynamicBuffer(D3D12Core *core, size_t size) : core_(core) {
   buffers_.resize(core_->FramesInFlight());
   for (size_t i = 0; i < buffers_.size(); ++i) {
-    buffers_[i] = CreateNativeBuffer(core_->Device()->Handle(), size, D3D12_HEAP_TYPE_DEFAULT);
+    buffers_[i] = CreateNativeBuffer(core_->Device(), size, D3D12_HEAP_TYPE_DEFAULT);
   }
-  staging_buffer_ = CreateNativeBuffer(core_->Device()->Handle(), size, D3D12_HEAP_TYPE_UPLOAD);
+  staging_buffer_ = CreateNativeBuffer(core_->Device(), size, D3D12_HEAP_TYPE_UPLOAD);
 }
 
 D3D12DynamicBuffer::~D3D12DynamicBuffer() {
@@ -113,7 +113,7 @@ size_t D3D12DynamicBuffer::Size() const {
 
 void D3D12DynamicBuffer::Resize(size_t new_size) {
   Microsoft::WRL::ComPtr<ID3D12Resource> new_buffer;
-  new_buffer = CreateNativeBuffer(core_->Device()->Handle(), new_size, D3D12_HEAP_TYPE_UPLOAD);
+  new_buffer = CreateNativeBuffer(core_->Device(), new_size, D3D12_HEAP_TYPE_UPLOAD);
 
   std::memcpy(MapBuffer(new_buffer.Get()), MapBuffer(staging_buffer_.Get()), std::min(new_size, Size()));
   new_buffer->Unmap(0, nullptr);
@@ -145,7 +145,7 @@ void D3D12DynamicBuffer::TransferData(ID3D12GraphicsCommandList *command_list) {
   if (buffers_[core_->CurrentFrame()]->GetDesc().Width != staging_buffer_->GetDesc().Width) {
     buffers_[core_->CurrentFrame()].Reset();
     buffers_[core_->CurrentFrame()] =
-        CreateNativeBuffer(core_->Device()->Handle(), staging_buffer_->GetDesc().Width, D3D12_HEAP_TYPE_DEFAULT);
+        CreateNativeBuffer(core_->Device(), staging_buffer_->GetDesc().Width, D3D12_HEAP_TYPE_DEFAULT);
   }
   CopyNativeBuffer(command_list, staging_buffer_.Get(), buffers_[core_->CurrentFrame()].Get(),
                    staging_buffer_->GetDesc().Width, 0, 0);
@@ -153,7 +153,7 @@ void D3D12DynamicBuffer::TransferData(ID3D12GraphicsCommandList *command_list) {
 
 #if defined(LONGMARCH_CUDA_RUNTIME)
 D3D12CUDABuffer::D3D12CUDABuffer(D3D12Core *core, size_t size) : core_(core) {
-  buffer_ = CreateNativeBuffer(core_->Device()->Handle(), size, D3D12_HEAP_TYPE_DEFAULT, D3D12_HEAP_FLAG_SHARED,
+  buffer_ = CreateNativeBuffer(core_->Device(), size, D3D12_HEAP_TYPE_DEFAULT, D3D12_HEAP_FLAG_SHARED,
                                D3D12_RESOURCE_STATE_GENERIC_READ, D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS);
   core_->ImportCudaExternalMemory(cuda_memory_, buffer_.Get());
 }
@@ -174,7 +174,7 @@ size_t D3D12CUDABuffer::Size() const {
 void D3D12CUDABuffer::Resize(size_t new_size) {
   core_->WaitGPU();
   Microsoft::WRL::ComPtr<ID3D12Resource> new_buffer;
-  new_buffer = CreateNativeBuffer(core_->Device()->Handle(), new_size, D3D12_HEAP_TYPE_DEFAULT, D3D12_HEAP_FLAG_SHARED,
+  new_buffer = CreateNativeBuffer(core_->Device(), new_size, D3D12_HEAP_TYPE_DEFAULT, D3D12_HEAP_FLAG_SHARED,
                                   D3D12_RESOURCE_STATE_GENERIC_READ, D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS);
   core_->SingleTimeCommand([&](ID3D12GraphicsCommandList *command_list) {
     CopyNativeBuffer(command_list, buffer_.Get(), new_buffer.Get(), std::min(buffer_->GetDesc().Width, new_size));

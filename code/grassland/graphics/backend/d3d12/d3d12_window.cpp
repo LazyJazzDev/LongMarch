@@ -140,13 +140,13 @@ void D3D12Window::SetupImGuiContext() {
   srv_heap_desc.NodeMask = 0;
   srv_heap_desc.NumDescriptors = 64;
   srv_heap_desc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV;
-  d3d12::ThrowIfFailed(core_->Device()->Handle()->CreateDescriptorHeap(
-                           &srv_heap_desc, IID_PPV_ARGS(imgui_assets_.srv_heap.GetAddressOf())),
-                       "Failed to create ImGui descriptor heap");
-  imgui_assets_.descriptor_alloc.Create(core_->Device()->Handle(), imgui_assets_.srv_heap.Get());
+  d3d12::ThrowIfFailed(
+      core_->Device()->CreateDescriptorHeap(&srv_heap_desc, IID_PPV_ARGS(imgui_assets_.srv_heap.GetAddressOf())),
+      "Failed to create ImGui descriptor heap");
+  imgui_assets_.descriptor_alloc.Create(core_->Device(), imgui_assets_.srv_heap.Get());
 
   ImGui_ImplDX12_InitInfo init_info = {};
-  init_info.Device = core_->Device()->Handle();
+  init_info.Device = core_->Device();
   init_info.CommandQueue = core_->CommandQueue();
   init_info.NumFramesInFlight = core_->FramesInFlight();
   init_info.RTVFormat = BackBufferFormat();

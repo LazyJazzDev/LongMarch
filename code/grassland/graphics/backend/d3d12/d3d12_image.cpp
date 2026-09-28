@@ -11,7 +11,7 @@ void *MapBuffer(ID3D12Resource *buffer) {
 }  // namespace
 
 D3D12Image::D3D12Image(D3D12Core *core, int width, int height, ImageFormat format) : core_(core), format_(format) {
-  image_ = CreateNativeImage(core_->Device()->Handle(), width, height, ImageFormatToDXGIFormat(format));
+  image_ = CreateNativeImage(core_->Device(), width, height, ImageFormatToDXGIFormat(format));
 }
 
 Extent2D D3D12Image::Extent() const {
@@ -29,7 +29,7 @@ void D3D12Image::UploadData(const void *data) const {
   auto pixel_size = PixelSize(format_);
   const UINT64 upload_buffer_size = GetRequiredIntermediateSize(image_.Get(), 0, 1);
   Microsoft::WRL::ComPtr<ID3D12Resource> upload_buffer;
-  upload_buffer = CreateNativeBuffer(core_->Device()->Handle(), upload_buffer_size, D3D12_HEAP_TYPE_UPLOAD);
+  upload_buffer = CreateNativeBuffer(core_->Device(), upload_buffer_size, D3D12_HEAP_TYPE_UPLOAD);
   D3D12_SUBRESOURCE_DATA subresource_data{};
   subresource_data.pData = data;
   subresource_data.RowPitch = image_->GetDesc().Width * pixel_size;
@@ -50,7 +50,7 @@ void D3D12Image::DownloadData(void *data) const {
   auto pixel_size = PixelSize(format_);
   const UINT64 download_buffer_size = GetRequiredIntermediateSize(image_.Get(), 0, 1);
   Microsoft::WRL::ComPtr<ID3D12Resource> download_buffer;
-  download_buffer = CreateNativeBuffer(core_->Device()->Handle(), download_buffer_size, D3D12_HEAP_TYPE_READBACK);
+  download_buffer = CreateNativeBuffer(core_->Device(), download_buffer_size, D3D12_HEAP_TYPE_READBACK);
   D3D12_SUBRESOURCE_DATA subresource_data{};
   subresource_data.pData = data;
   subresource_data.RowPitch = image_->GetDesc().Width * pixel_size;
@@ -67,7 +67,7 @@ void D3D12Image::DownloadData(void *data) const {
 
   D3D12_PLACED_SUBRESOURCE_FOOTPRINT layout{};
   auto desc = image_.Get()->GetDesc();
-  core_->Device()->Handle()->GetCopyableFootprints(&desc, 0, 1, 0, &layout, nullptr, nullptr, nullptr);
+  core_->Device()->GetCopyableFootprints(&desc, 0, 1, 0, &layout, nullptr, nullptr, nullptr);
   dst_location.PlacedFootprint = layout;
 
   core_->SingleTimeCommand([&](ID3D12GraphicsCommandList *command_list) {
@@ -95,13 +95,12 @@ void D3D12Image::UploadData(const void *data, const Offset2D &offset, const Exte
 
   // Create a staging image that matches the region size
   Microsoft::WRL::ComPtr<ID3D12Resource> staging_image;
-  staging_image =
-      CreateNativeImage(core_->Device()->Handle(), extent.width, extent.height, ImageFormatToDXGIFormat(format_));
+  staging_image = CreateNativeImage(core_->Device(), extent.width, extent.height, ImageFormatToDXGIFormat(format_));
 
   // Create upload buffer sized for the staging image
   const UINT64 upload_buffer_size = GetRequiredIntermediateSize(staging_image.Get(), 0, 1);
   Microsoft::WRL::ComPtr<ID3D12Resource> upload_buffer;
-  upload_buffer = CreateNativeBuffer(core_->Device()->Handle(), upload_buffer_size, D3D12_HEAP_TYPE_UPLOAD);
+  upload_buffer = CreateNativeBuffer(core_->Device(), upload_buffer_size, D3D12_HEAP_TYPE_UPLOAD);
 
   // Calculate source data layout
   D3D12_SUBRESOURCE_DATA subresource_data{};
@@ -162,13 +161,12 @@ void D3D12Image::DownloadData(void *data, const Offset2D &offset, const Extent2D
 
   // Create a staging image that matches the region size
   Microsoft::WRL::ComPtr<ID3D12Resource> staging_image;
-  staging_image =
-      CreateNativeImage(core_->Device()->Handle(), extent.width, extent.height, ImageFormatToDXGIFormat(format_));
+  staging_image = CreateNativeImage(core_->Device(), extent.width, extent.height, ImageFormatToDXGIFormat(format_));
 
   // Create download buffer sized for the staging image
   const UINT64 download_buffer_size = GetRequiredIntermediateSize(staging_image.Get(), 0, 1);
   Microsoft::WRL::ComPtr<ID3D12Resource> download_buffer;
-  download_buffer = CreateNativeBuffer(core_->Device()->Handle(), download_buffer_size, D3D12_HEAP_TYPE_READBACK);
+  download_buffer = CreateNativeBuffer(core_->Device(), download_buffer_size, D3D12_HEAP_TYPE_READBACK);
 
   // Calculate destination data layout
   D3D12_SUBRESOURCE_DATA subresource_data{};
@@ -198,7 +196,7 @@ void D3D12Image::DownloadData(void *data, const Offset2D &offset, const Extent2D
 
   D3D12_PLACED_SUBRESOURCE_FOOTPRINT layout{};
   auto staging_desc = staging_image.Get()->GetDesc();
-  core_->Device()->Handle()->GetCopyableFootprints(&staging_desc, 0, 1, 0, &layout, nullptr, nullptr, nullptr);
+  core_->Device()->GetCopyableFootprints(&staging_desc, 0, 1, 0, &layout, nullptr, nullptr, nullptr);
   buffer_dst_location.PlacedFootprint = layout;
 
   core_->SingleTimeCommand([&](ID3D12GraphicsCommandList *command_list) {

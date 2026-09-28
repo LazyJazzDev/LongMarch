@@ -24,7 +24,7 @@ void D3D12ProgramBase::FinalizeRootSignature() {
                                root_parameters.empty() ? nullptr : root_parameters.data(), 0, nullptr,
                                D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT);
 
-  root_signature_ = CreateNativeRootSignature(core_->Device()->Handle(), root_signature_desc);
+  root_signature_ = CreateNativeRootSignature(core_->Device(), root_signature_desc);
 }
 
 D3D12Program::D3D12Program(D3D12Core *core, const std::vector<ImageFormat> &color_formats, ImageFormat depth_format)
@@ -106,9 +106,9 @@ void D3D12Program::Finalize() {
   pipeline_state_desc_.InputLayout.NumElements = static_cast<UINT>(input_attributes_.size());
   pipeline_state_desc_.pRootSignature = root_signature_.Get();
 
-  d3d12::ThrowIfFailed(core_->Device()->Handle()->CreateGraphicsPipelineState(
-                           &pipeline_state_desc_, IID_PPV_ARGS(pipeline_state_.GetAddressOf())),
-                       "Failed to create graphics pipeline state");
+  d3d12::ThrowIfFailed(
+      core_->Device()->CreateGraphicsPipelineState(&pipeline_state_desc_, IID_PPV_ARGS(pipeline_state_.GetAddressOf())),
+      "Failed to create graphics pipeline state");
 }
 
 int D3D12Program::NumInputBindings() const {
@@ -139,7 +139,7 @@ void D3D12ComputeProgram::Finalize() {
   pipeline_desc.pRootSignature = root_signature_.Get();
   pipeline_desc.CS = compute_shader_->Bytecode();
 
-  core_->Device()->Handle()->CreateComputePipelineState(&pipeline_desc, IID_PPV_ARGS(&pipeline_state_));
+  core_->Device()->CreateComputePipelineState(&pipeline_desc, IID_PPV_ARGS(&pipeline_state_));
 }
 
 D3D12RayTracingProgram::D3D12RayTracingProgram(D3D12Core *core,
@@ -202,11 +202,11 @@ void D3D12RayTracingProgram::Finalize(const std::vector<int32_t> &miss_shader_in
                                       const std::vector<int32_t> &callable_shader_indices) {
   FinalizeRootSignature();
 
-  core_->Device()->CreateRayTracingPipeline(root_signature_.Get(), raygen_shader_, miss_shaders_, hit_groups_,
-                                            callable_shaders_, &pipeline_);
+  core_->CreateRayTracingPipeline(root_signature_.Get(), raygen_shader_, miss_shaders_, hit_groups_, callable_shaders_,
+                                  &pipeline_);
 
-  core_->Device()->CreateShaderTable(pipeline_.get(), miss_shader_indices, hit_group_indices, callable_shader_indices,
-                                     &shader_table_);
+  core_->CreateShaderTable(pipeline_.get(), miss_shader_indices, hit_group_indices, callable_shader_indices,
+                           &shader_table_);
 }
 
 void D3D12RayTracingProgram::Finalize() {

@@ -1,11 +1,12 @@
 #include "grassland/graphics/backend/d3d12/helper/raytracing/acceleration_structure.h"
 
+#include "grassland/graphics/backend/d3d12/d3d12_core.h"
 #include "grassland/graphics/backend/d3d12/helper/command_queue.h"
 
 namespace grassland::graphics::backend::d3d12 {
 
-AccelerationStructure::AccelerationStructure(Device *device, const ComPtr<ID3D12Resource> &as, int num_instance)
-    : device_(device),
+AccelerationStructure::AccelerationStructure(D3D12Core *core, const ComPtr<ID3D12Resource> &as, int num_instance)
+    : core_(core),
       as_(as),
       num_instance_(num_instance) {
 }
@@ -13,11 +14,11 @@ AccelerationStructure::AccelerationStructure(Device *device, const ComPtr<ID3D12
 HRESULT AccelerationStructure::UpdateInstances(const std::vector<D3D12_RAYTRACING_INSTANCE_DESC> &instances,
                                                ID3D12CommandQueue *queue,
                                                ID3D12CommandAllocator *allocator) {
-  ID3D12Device5 *device = device_->DXRDevice();
+  ID3D12Device5 *device = core_->DXRDevice();
   RETURN_IF_FAILED_HR(as_->GetDevice(IID_PPV_ARGS(&device)), "failed to get DXR device.");
 
   ID3D12Resource *instance_buffer =
-      device_->RequestInstanceBuffer(sizeof(D3D12_RAYTRACING_INSTANCE_DESC) * instances.size());
+      core_->RequestInstanceBuffer(sizeof(D3D12_RAYTRACING_INSTANCE_DESC) * instances.size());
   void *instance_buffer_ptr{};
   RETURN_IF_FAILED_HR(instance_buffer->Map(0, nullptr, &instance_buffer_ptr), "failed to map instance buffer.");
   if (!instances.empty())
@@ -38,7 +39,7 @@ HRESULT AccelerationStructure::UpdateInstances(const std::vector<D3D12_RAYTRACIN
 
   if (!as_ || as_->GetDesc().Width < as_prebuild_info.ResultDataMaxSizeInBytes) {
     RETURN_IF_FAILED_HR(
-        d3d12::CreateBuffer(device_->Handle(), as_prebuild_info.ResultDataMaxSizeInBytes, D3D12_HEAP_TYPE_DEFAULT,
+        d3d12::CreateBuffer(core_->Device(), as_prebuild_info.ResultDataMaxSizeInBytes, D3D12_HEAP_TYPE_DEFAULT,
                             D3D12_RESOURCE_STATE_RAYTRACING_ACCELERATION_STRUCTURE,
                             D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS, as_),
         "failed to create acceleration structure buffer.");
@@ -46,7 +47,7 @@ HRESULT AccelerationStructure::UpdateInstances(const std::vector<D3D12_RAYTRACIN
                       D3D12_RAYTRACING_ACCELERATION_STRUCTURE_BUILD_FLAG_ALLOW_UPDATE;
   }
 
-  ID3D12Resource *scratch_buffer = device_->RequestScratchBuffer(as_prebuild_info.ScratchDataSizeInBytes);
+  ID3D12Resource *scratch_buffer = core_->RequestScratchBuffer(as_prebuild_info.ScratchDataSizeInBytes);
   D3D12_BUILD_RAYTRACING_ACCELERATION_STRUCTURE_DESC as_desc = {};
   as_desc.Inputs = as_inputs;
   as_desc.ScratchAccelerationStructureData = scratch_buffer->GetGPUVirtualAddress();
@@ -74,7 +75,7 @@ HRESULT AccelerationStructure::UpdateInstances(
     const std::vector<std::pair<AccelerationStructure *, glm::mat4>> &objects,
     ID3D12CommandQueue *queue,
     ID3D12CommandAllocator *allocator) {
-  ID3D12Device5 *device = device_->DXRDevice();
+  ID3D12Device5 *device = core_->DXRDevice();
   RETURN_IF_FAILED_HR(as_->GetDevice(IID_PPV_ARGS(&device)), "failed to get DXR device.");
 
   std::vector<D3D12_RAYTRACING_INSTANCE_DESC> instance_descs;
