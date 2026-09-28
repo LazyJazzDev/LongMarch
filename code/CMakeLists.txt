@@ -27,8 +27,19 @@ if (LONGMARCH_PYTHON_ENABLED)
     # copy all related dll files to the destination too.
     install(TARGETS long_march
             RUNTIME_DEPENDENCY_SET long_march_deps
-            LIBRARY DESTINATION ${Python3_SITEARCH}
-            COMPONENT python_package)
+            LIBRARY DESTINATION ${Python3_SITEARCH} COMPONENT python_package
+            RUNTIME DESTINATION ${Python3_SITEARCH} COMPONENT python_package)
+
+    # Slang loads its SPIR-V optimizer through dlopen, so it is invisible to
+    # RUNTIME_DEPENDENCY_SET when scanning the Python extension's link table.
+    # Install the plugin explicitly and include its own linked dependencies.
+    if (NOT TARGET slang::slang-glslang)
+        message(FATAL_ERROR "Slang SDK must provide slang::slang-glslang for the Python package")
+    endif ()
+    install(IMPORTED_RUNTIME_ARTIFACTS slang::slang-glslang
+            RUNTIME_DEPENDENCY_SET long_march_deps
+            LIBRARY DESTINATION ${Python3_SITEARCH} COMPONENT python_package
+            RUNTIME DESTINATION ${Python3_SITEARCH} COMPONENT python_package)
 
 
     # Construct platform-specific exclude regexes
@@ -83,6 +94,15 @@ if (LONGMARCH_PYTHON_ENABLED)
         list(APPEND _pre_excludes ${_linux_excludes})
     endif()
 
+    set(_runtime_search_directories
+            "$<TARGET_FILE_DIR:long_march>"
+            "$<TARGET_FILE_DIR:slang::slang>"
+            "${Python3_RUNTIME_LIBRARY_DIRS}")
+    if (LONGMARCH_VULKAN_ENABLED AND Vulkan_LIBRARY)
+        get_filename_component(_vulkan_runtime_dir "${Vulkan_LIBRARY}" DIRECTORY)
+        list(APPEND _runtime_search_directories "${_vulkan_runtime_dir}")
+    endif ()
+
     install(
             RUNTIME_DEPENDENCY_SET long_march_deps
             DESTINATION ${Python3_SITEARCH}
@@ -90,16 +110,13 @@ if (LONGMARCH_PYTHON_ENABLED)
             ${_pre_excludes}
             POST_EXCLUDE_REGEXES
             ${_post_excludes}
-            DIRECTORIES "$<TARGET_FILE_DIR:long_march>"
-            "$<TARGET_FILE_DIR:slang::slang>"
-            "${Python3_RUNTIME_LIBRARY_DIRS}"
+            DIRECTORIES ${_runtime_search_directories}
             COMPONENT python_package
     )
 
     if (APPLE)
         set_target_properties(long_march PROPERTIES
-                INSTALL_RPATH "@loader_path;${Python3_SITEARCH}"
-                BUILD_WITH_INSTALL_RPATH TRUE
+                INSTALL_RPATH "@loader_path"
         )
     endif ()
 
