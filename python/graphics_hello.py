@@ -13,6 +13,8 @@ import time
 import numpy as np
 from long_march import graphics
 
+from glm_math import as_bytes, look_at, perspective, rotate_y, scale, translate  # noqa: F401 (re-exported)
+
 REPO_ROOT = pathlib.Path(__file__).resolve().parent.parent
 MODULE_ROOT = REPO_ROOT / "demo" / "graphics_hello"
 
@@ -69,56 +71,6 @@ def initialize_graphics_hello(api, require_ray_tracing=False):
     log_info(f"- Ray Tracing Support: {core.ray_tracing_support()}")
     log_info(f"- Ray Query Support: {core.ray_query_support()}")
     return core
-
-
-# Matrix helpers matching GLM (right-handed). Matrices are row-major numpy arrays that
-# act on column vectors; upload them with as_bytes() to get GLM's column-major layout.
-def rotate_y(angle):
-    c, s = math.cos(angle), math.sin(angle)
-    return np.array([[c, 0, s, 0], [0, 1, 0, 0], [-s, 0, c, 0], [0, 0, 0, 1]], np.float32)
-
-
-def translate(x, y, z):
-    m = np.identity(4, np.float32)
-    m[:3, 3] = (x, y, z)
-    return m
-
-
-def scale(x, y, z):
-    return np.diag(np.array([x, y, z, 1], np.float32))
-
-
-def look_at(eye, center, up):
-    eye, center, up = (np.asarray(v, np.float32) for v in (eye, center, up))
-    f = center - eye
-    f /= np.linalg.norm(f)
-    s = np.cross(f, up)
-    s /= np.linalg.norm(s)
-    u = np.cross(s, f)
-    m = np.identity(4, np.float32)
-    m[0, :3], m[1, :3], m[2, :3] = s, u, -f
-    m[:3, 3] = (-s @ eye, -u @ eye, f @ eye)
-    return m
-
-
-def perspective(fovy, aspect, near, far, zero_to_one=False):
-    """glm::perspective (depth -1..1), or glm::perspectiveZO with zero_to_one."""
-    t = math.tan(fovy / 2)
-    m = np.zeros((4, 4), np.float32)
-    m[0, 0] = 1 / (aspect * t)
-    m[1, 1] = 1 / t
-    m[3, 2] = -1
-    if zero_to_one:
-        m[2, 2] = far / (near - far)
-        m[2, 3] = -(far * near) / (far - near)
-    else:
-        m[2, 2] = -(far + near) / (far - near)
-        m[2, 3] = -(2 * far * near) / (far - near)
-    return m
-
-
-def as_bytes(*matrices):
-    return b"".join(np.ascontiguousarray(m.T, np.float32).tobytes() for m in matrices)
 
 
 def instance_transform(m):
