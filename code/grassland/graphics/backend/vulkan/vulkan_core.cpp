@@ -426,7 +426,7 @@ int VulkanCore::InitializeLogicalDevice(int device_index) {
   cuda_device_ = physical_device.GetCUDADeviceIndex();
 #endif
 
-  grassland::vulkan::DeviceFeatureRequirement device_feature_requirement{};
+  grassland::graphics::backend::vulkan::DeviceFeatureRequirement device_feature_requirement{};
   device_feature_requirement.enable_raytracing_extension = physical_device.SupportRayTracing();
   device_feature_requirement.enable_rayquery_extension = physical_device.SupportRayQuery();
   auto create_info = device_feature_requirement.GenerateRecommendedDeviceCreateInfo(physical_device);

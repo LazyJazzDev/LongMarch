@@ -1,0 +1,34 @@
+#pragma once
+#include "grassland/graphics/backend/d3d12/helper/device.h"
+
+namespace grassland::graphics::backend::d3d12 {
+
+class Buffer {
+ public:
+  Buffer(const ComPtr<ID3D12Resource> &buffer, size_t allocated_size);
+
+  size_t Size() const {
+    return allocated_size_;
+  }
+
+  ID3D12Resource *Handle() const {
+    return buffer_.Get();
+  }
+
+  void *Map() const;
+  void Unmap() const;
+
+ private:
+  ComPtr<ID3D12Resource> buffer_;
+  size_t allocated_size_;
+};
+
+void CopyBuffer(ID3D12GraphicsCommandList *command_list,
+                Buffer *src_buffer,
+                Buffer *dst_buffer,
+                size_t size,
+                size_t src_offset = 0,
+                size_t dst_offset = 0,
+                D3D12_RESOURCE_STATES dst_original_state = D3D12_RESOURCE_STATE_GENERIC_READ);
+
+}  // namespace grassland::graphics::backend::d3d12

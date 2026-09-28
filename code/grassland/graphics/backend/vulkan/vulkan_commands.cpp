@@ -230,7 +230,7 @@ VulkanCmdBindResourceSamplers::VulkanCmdBindResourceSamplers(int slot,
 void VulkanCmdBindResourceSamplers::CompileCommand(VulkanCommandContext *context, VkCommandBuffer command_buffer) {
   std::vector<VkDescriptorImageInfo> sampler_infos(samplers_.size());
   for (size_t i = 0; i < samplers_.size(); ++i) {
-    sampler_infos[i].sampler = samplers_[i]->Sampler()->Handle();
+    sampler_infos[i].sampler = samplers_[i]->Handle();
     sampler_infos[i].imageView = VK_NULL_HANDLE;
     sampler_infos[i].imageLayout = VK_IMAGE_LAYOUT_UNDEFINED;
   }

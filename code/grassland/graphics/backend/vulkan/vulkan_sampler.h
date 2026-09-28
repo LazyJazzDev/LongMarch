@@ -7,14 +7,15 @@ namespace grassland::graphics::backend {
 class VulkanSampler : public Sampler {
  public:
   VulkanSampler(VulkanCore *core, const SamplerInfo &info);
+  ~VulkanSampler() override;
 
-  vulkan::Sampler *Sampler() const {
-    return sampler_.get();
+  VkSampler Handle() const {
+    return sampler_;
   }
 
  private:
   VulkanCore *core_;
-  std::unique_ptr<vulkan::Sampler> sampler_;
+  VkSampler sampler_{VK_NULL_HANDLE};
 };
 
 }  // namespace grassland::graphics::backend

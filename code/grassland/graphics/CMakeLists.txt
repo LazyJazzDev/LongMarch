@@ -16,12 +16,4 @@ target_include_directories(${GRASSLAND_SUBLIB_NAME} PUBLIC ${LONGMARCH_INCLUDE_D
 
 target_link_libraries(${GRASSLAND_SUBLIB_NAME} PUBLIC grassland_imgui ${DXC_LIB_NAME})
 
-if (LONGMARCH_VULKAN_ENABLED)
-    target_link_libraries(${GRASSLAND_SUBLIB_NAME} PUBLIC grassland_vulkan)
-endif ()
-
-if (LONGMARCH_D3D12_ENABLED)
-    target_link_libraries(${GRASSLAND_SUBLIB_NAME} PUBLIC grassland_d3d12)
-endif ()
-
 PACK_SHADER_CODE(${GRASSLAND_SUBLIB_NAME})
