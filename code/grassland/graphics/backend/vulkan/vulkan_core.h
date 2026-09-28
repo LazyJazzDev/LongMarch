@@ -11,7 +11,7 @@ class VulkanCore : public Core {
   ~VulkanCore() override;
 
   bool DeviceRayQuerySupport() const override {
-    return device_ && device_->PhysicalDevice().SupportRayQuery();
+    return device_ && physical_device_ && vulkan::SupportRayQuery(physical_device_);
   }
 
   BackendAPI API() const override {
@@ -95,36 +95,148 @@ class VulkanCore : public Core {
 
   uint32_t WaveSize() const override;
 
-  vulkan::Instance *Instance() const {
-    return instance_.get();
+  VkInstance Instance() const {
+    return instance_;
   }
 
-  vulkan::Device *Device() const {
-    return device_.get();
+  const vulkan::InstanceProcedures &InstanceProcedures() const {
+    return instance_procedures_;
   }
 
-  vulkan::Queue *GraphicsQueue() const {
-    return graphics_queue_.get();
+  VkDevice Handle() const {
+    return device_;
   }
 
-  vulkan::Queue *TransferQueue() const {
-    return transfer_queue_.get();
+  VkPhysicalDevice PhysicalDevice() const {
+    return physical_device_;
   }
 
-  vulkan::CommandPool *GraphicsCommandPool() const {
-    return graphics_command_pool_.get();
+  const vulkan::DeviceCreateInfo &CreateInfo() const {
+    return *create_info_;
   }
 
-  vulkan::CommandPool *TransferCommandPool() const {
-    return transfer_command_pool_.get();
+  vulkan::DeviceProcedures &Procedures() {
+    return procedures_;
   }
 
-  vulkan::CommandBuffer *CommandBuffer() const {
-    return command_buffers_[current_frame_].get();
+  const vulkan::DeviceProcedures &Procedures() const {
+    return procedures_;
   }
 
-  vulkan::Fence *InFlightFence() const {
-    return in_flight_fences_[current_frame_].get();
+  VmaAllocator Allocator() const {
+    return allocator_;
+  }
+
+  VkResult WaitIdle() const {
+    return vkDeviceWaitIdle(device_);
+  }
+
+  uint32_t SubGroupSize() const {
+    return subgroup_properties_.subgroupSize;
+  }
+
+  VkResult CreateDescriptorPool(const std::vector<VkDescriptorPoolSize> &pool_sizes,
+                                uint32_t max_sets,
+                                VkDescriptorPool *pool) const;
+
+  VkResult CreateImage(VkFormat format,
+                       VkExtent2D extent,
+                       VkImage *image,
+                       VkImageView *view,
+                       VmaAllocation *allocation) const;
+
+  VkResult CreateBuffer(VkDeviceSize size,
+                        VkBufferUsageFlags usage,
+                        VmaMemoryUsage memory_usage,
+                        VmaAllocationCreateFlags flags,
+                        VkDeviceSize alignment,
+                        VkBuffer *buffer,
+                        VmaAllocation *allocation) const;
+
+  VkResult CreateBuffer(VkDeviceSize size,
+                        VkBufferUsageFlags usage,
+                        VmaMemoryUsage memory_usage,
+                        VkBuffer *buffer,
+                        VmaAllocation *allocation) const {
+    return CreateBuffer(size, usage, memory_usage, 0, 0, buffer, allocation);
+  }
+
+  VkDeviceAddress BufferAddress(VkBuffer buffer) const {
+    VkBufferDeviceAddressInfo info{VK_STRUCTURE_TYPE_BUFFER_DEVICE_ADDRESS_INFO};
+    info.buffer = buffer;
+    return vkGetBufferDeviceAddress(device_, &info);
+  }
+
+  VkResult CreatePipeline(const vulkan::PipelineSettings &settings, VkPipeline *pipeline) const;
+
+  VkResult CreateNativeAABBAccelerationStructure(VkDeviceAddress aabb_address,
+                                                 VkDeviceSize stride,
+                                                 uint32_t count,
+                                                 VkGeometryFlagsKHR flags,
+                                                 VkAccelerationStructureKHR *as,
+                                                 VkBuffer *buffer,
+                                                 VmaAllocation *allocation,
+                                                 VkDeviceSize *buffer_size,
+                                                 VkDeviceAddress *address);
+  VkResult CreateNativeTriangleAccelerationStructure(VkDeviceAddress vertex_address,
+                                                     VkDeviceAddress index_address,
+                                                     uint32_t num_vertex,
+                                                     VkDeviceSize stride,
+                                                     uint32_t primitive_count,
+                                                     VkGeometryFlagsKHR flags,
+                                                     VkAccelerationStructureKHR *as,
+                                                     VkBuffer *buffer,
+                                                     VmaAllocation *allocation,
+                                                     VkDeviceSize *buffer_size,
+                                                     VkDeviceAddress *address);
+  VkResult CreateNativeTopLevelAccelerationStructure(const std::vector<VkAccelerationStructureInstanceKHR> &instances,
+                                                     VkAccelerationStructureKHR *as,
+                                                     VkBuffer *buffer,
+                                                     VmaAllocation *allocation,
+                                                     VkDeviceSize *buffer_size,
+                                                     VkDeviceAddress *address);
+
+  VkResult CreateRayTracingPipeline(VkPipelineLayout pipeline_layout,
+                                    VulkanShader *ray_gen_shader,
+                                    const std::vector<VulkanShader *> &miss_shaders,
+                                    const std::vector<vulkan::HitGroup> &hit_groups,
+                                    const std::vector<VulkanShader *> &callable_shaders,
+                                    VkPipeline *pipeline) const;
+  VkResult CreateShaderBindingTable(VkPipeline pipeline,
+                                    size_t miss_shader_count,
+                                    size_t hit_group_count,
+                                    const std::vector<int32_t> &miss_shader_indices,
+                                    const std::vector<int32_t> &hit_group_indices,
+                                    const std::vector<int32_t> &callable_shader_indices,
+                                    VkBuffer *buffer,
+                                    VmaAllocation *allocation,
+                                    VkDeviceAddress *raygen_address,
+                                    VkDeviceAddress *miss_address,
+                                    VkDeviceAddress *hit_address,
+                                    VkDeviceAddress *callable_address) const;
+
+  VkQueue GraphicsQueue() const {
+    return graphics_queue_;
+  }
+
+  VkQueue TransferQueue() const {
+    return transfer_queue_;
+  }
+
+  VkCommandPool GraphicsCommandPool() const {
+    return graphics_command_pool_;
+  }
+
+  VkCommandPool TransferCommandPool() const {
+    return transfer_command_pool_;
+  }
+
+  VkCommandBuffer CommandBuffer() const {
+    return command_buffers_[current_frame_];
+  }
+
+  VkFence InFlightFence() const {
+    return in_flight_fences_[current_frame_];
   }
 
   uint32_t CurrentFrame() const override {
@@ -135,8 +247,16 @@ class VulkanCore : public Core {
 
   uint32_t FindMemoryType(uint32_t type_filter, VkMemoryPropertyFlags properties);
 
-  vulkan::Buffer *RequestUploadStagingBuffer(size_t size);
-  vulkan::Buffer *RequestDownloadStagingBuffer(size_t size);
+  VkBuffer RequestUploadStagingBuffer(size_t size);
+  VkBuffer RequestDownloadStagingBuffer(size_t size);
+
+  VmaAllocation UploadStagingAllocation() const {
+    return upload_staging_allocation_;
+  }
+
+  VmaAllocation DownloadStagingAllocation() const {
+    return download_staging_allocation_;
+  }
 
 #if defined(LONGMARCH_CUDA_RUNTIME)
   void ImportCudaExternalMemory(cudaExternalMemory_t &cuda_memory, VkDeviceMemory &vulkan_memory, VkDeviceSize size);
@@ -146,25 +266,40 @@ class VulkanCore : public Core {
 
  private:
   friend class VulkanCommandContext;
-  std::unique_ptr<vulkan::Instance> instance_;
-  std::unique_ptr<vulkan::Device> device_;
+  VkInstance instance_{VK_NULL_HANDLE};
+  VkDebugUtilsMessengerEXT debug_messenger_{VK_NULL_HANDLE};
+  vulkan::InstanceCreateHint instance_hint_{};
+  vulkan::InstanceProcedures instance_procedures_{};
+  VkDevice device_{VK_NULL_HANDLE};
+  uint32_t api_version_{};
+  VkPhysicalDevice physical_device_{VK_NULL_HANDLE};
+  std::optional<vulkan::DeviceCreateInfo> create_info_;
+  VkPhysicalDeviceSubgroupProperties subgroup_properties_{};
+  vulkan::DeviceProcedures procedures_{};
+  VmaAllocator allocator_{VK_NULL_HANDLE};
+  void InitializeNativeDevice(uint32_t api_version,
+                              VkPhysicalDevice physical_device,
+                              vulkan::DeviceCreateInfo create_info,
+                              VmaAllocatorCreateFlags allocator_flags,
+                              VkDevice device);
+  void DestroyNativeDevice();
   VkPhysicalDeviceMemoryProperties memory_properties_;
 
   uint32_t current_frame_{0};
-  std::vector<std::unique_ptr<vulkan::Fence>> in_flight_fences_;
+  std::vector<VkFence> in_flight_fences_;
 
-  std::vector<std::unique_ptr<vulkan::DescriptorPool>> descriptor_pools_;
-  std::vector<std::queue<vulkan::DescriptorSet *>> descriptor_sets_;
-  vulkan::DescriptorPool *current_descriptor_pool_{nullptr};
-  std::queue<vulkan::DescriptorSet *> *current_descriptor_set_queue_{nullptr};
+  std::vector<VkDescriptorPool> descriptor_pools_;
+  std::vector<vulkan::DescriptorPoolSize> descriptor_pool_sizes_;
+  std::vector<uint32_t> descriptor_pool_max_sets_;
+  VkDescriptorPool current_descriptor_pool_{VK_NULL_HANDLE};
 
-  std::unique_ptr<vulkan::CommandPool> graphics_command_pool_;
-  std::unique_ptr<vulkan::CommandPool> transfer_command_pool_;
-  std::vector<std::unique_ptr<vulkan::CommandBuffer>> command_buffers_;
-  std::unique_ptr<vulkan::CommandBuffer> transfer_command_buffer_;
+  VkCommandPool graphics_command_pool_{VK_NULL_HANDLE};
+  VkCommandPool transfer_command_pool_{VK_NULL_HANDLE};
+  std::vector<VkCommandBuffer> command_buffers_;
+  VkCommandBuffer transfer_command_buffer_{VK_NULL_HANDLE};
 
-  std::unique_ptr<vulkan::Queue> graphics_queue_;
-  std::unique_ptr<vulkan::Queue> transfer_queue_;
+  VkQueue graphics_queue_{VK_NULL_HANDLE};
+  VkQueue transfer_queue_{VK_NULL_HANDLE};
 
   std::vector<std::vector<std::function<void()>>> post_execute_functions_;
 
@@ -177,8 +312,12 @@ class VulkanCore : public Core {
   void *GetSemaphoreHandle(VkSemaphore semaphore);
 #endif
 
-  std::unique_ptr<vulkan::Buffer> upload_staging_buffer_;
-  std::unique_ptr<vulkan::Buffer> download_staging_buffer_;
+  VkBuffer upload_staging_buffer_{VK_NULL_HANDLE};
+  VmaAllocation upload_staging_allocation_{VK_NULL_HANDLE};
+  size_t upload_staging_size_{};
+  VkBuffer download_staging_buffer_{VK_NULL_HANDLE};
+  VmaAllocation download_staging_allocation_{VK_NULL_HANDLE};
+  size_t download_staging_size_{};
 };
 
 }  // namespace grassland::graphics::backend

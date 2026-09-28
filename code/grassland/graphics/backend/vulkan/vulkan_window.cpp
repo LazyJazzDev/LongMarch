@@ -1,8 +1,91 @@
 #include "grassland/graphics/backend/vulkan/vulkan_window.h"
 
+#include "grassland/graphics/backend/vulkan/helper/swap_chain.h"
 #include "grassland/graphics/backend/vulkan/vulkan_image.h"
 
 namespace grassland::graphics::backend {
+
+void VulkanWindow::DestroySwapChain() {
+  for (VkImageView view : swap_chain_image_views_) {
+    vkDestroyImageView(core_->Handle(), view, nullptr);
+  }
+  swap_chain_image_views_.clear();
+  swap_chain_images_.clear();
+  if (swap_chain_) {
+    vkDestroySwapchainKHR(core_->Handle(), swap_chain_, nullptr);
+    swap_chain_ = VK_NULL_HANDLE;
+  }
+}
+
+VkResult VulkanWindow::CreatePresentationSwapchain(VkSurfaceFormatKHR surface_format,
+                                                   VkSwapchainKHR *result,
+                                                   VkSwapchainKHR old_swapchain) {
+  VkDevice device = core_->Handle();
+  auto physical_device = core_->PhysicalDevice();
+  auto support = vulkan::QuerySwapChainSupport(physical_device, surface_);
+  auto present_mode = vulkan::ChooseSwapPresentMode(support.presentModes);
+  swap_chain_extent_ = vulkan::ChooseSwapExtent(support.capabilities, GLFWWindow());
+  uint32_t image_count = support.capabilities.minImageCount + 1;
+  if (support.capabilities.maxImageCount && image_count > support.capabilities.maxImageCount) {
+    image_count = support.capabilities.maxImageCount;
+  }
+  VkSwapchainCreateInfoKHR create_info{VK_STRUCTURE_TYPE_SWAPCHAIN_CREATE_INFO_KHR};
+  create_info.surface = surface_;
+  create_info.minImageCount = image_count;
+  create_info.imageFormat = surface_format.format;
+  create_info.imageColorSpace = surface_format.colorSpace;
+  create_info.imageExtent = swap_chain_extent_;
+  create_info.imageArrayLayers = 1;
+  create_info.imageUsage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT;
+  uint32_t families[] = {vulkan::GraphicsFamilyIndex(physical_device),
+                         vulkan::PresentFamilyIndex(physical_device, surface_)};
+  if (families[0] != families[1]) {
+    create_info.imageSharingMode = VK_SHARING_MODE_CONCURRENT;
+    create_info.queueFamilyIndexCount = 2;
+    create_info.pQueueFamilyIndices = families;
+  } else {
+    create_info.imageSharingMode = VK_SHARING_MODE_EXCLUSIVE;
+  }
+  create_info.preTransform = support.capabilities.currentTransform;
+  create_info.compositeAlpha = VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR;
+  create_info.presentMode = present_mode;
+  create_info.clipped = VK_TRUE;
+  create_info.oldSwapchain = old_swapchain;
+  return vkCreateSwapchainKHR(device, &create_info, nullptr, result);
+}
+
+void VulkanWindow::LoadSwapChainImages() {
+  VkDevice device = core_->Handle();
+  uint32_t image_count = 0;
+  vulkan::ThrowIfFailed(vkGetSwapchainImagesKHR(device, swap_chain_, &image_count, nullptr),
+                        "Failed to query Vulkan swap chain images");
+  swap_chain_images_.resize(image_count);
+  vulkan::ThrowIfFailed(vkGetSwapchainImagesKHR(device, swap_chain_, &image_count, swap_chain_images_.data()),
+                        "Failed to get Vulkan swap chain images");
+  swap_chain_image_views_.resize(image_count);
+  for (size_t i = 0; i < image_count; ++i) {
+    VkImageViewCreateInfo view_info{VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO};
+    view_info.image = swap_chain_images_[i];
+    view_info.viewType = VK_IMAGE_VIEW_TYPE_2D;
+    view_info.format = swap_chain_format_;
+    view_info.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+    view_info.subresourceRange.levelCount = 1;
+    view_info.subresourceRange.layerCount = 1;
+    vulkan::ThrowIfFailed(vkCreateImageView(device, &view_info, nullptr, &swap_chain_image_views_[i]),
+                          "Failed to create Vulkan swap chain image view");
+  }
+}
+
+void VulkanWindow::CreateSwapChain() {
+  const auto format = SelectSurfaceFormat(enable_hdr_);
+  if (!format)
+    throw std::runtime_error("No supported Vulkan presentation format");
+  vulkan::ThrowIfFailed(CreatePresentationSwapchain(*format, &swap_chain_, VK_NULL_HANDLE),
+                        "Failed to create Vulkan swap chain");
+  surface_format_ = *format;
+  swap_chain_format_ = format->format;
+  LoadSwapChainImages();
+}
 
 VulkanWindow::VulkanWindow(VulkanCore *core,
                            int width,
@@ -13,25 +96,19 @@ VulkanWindow::VulkanWindow(VulkanCore *core,
                            bool enable_hdr)
     : Window(width, height, title, fullscreen, resizable, enable_hdr),
       core_(core) {
-  core_->Instance()->CreateSurfaceFromGLFWWindow(GLFWWindow(), &surface_);
-  const auto format = SelectSurfaceFormat(enable_hdr_);
-  if (!format)
-    throw std::runtime_error("No supported Vulkan presentation format");
-  surface_format_ = *format;
-  if (core_->Device()->CreateSwapchain(surface_.get(), surface_format_.format, surface_format_.colorSpace,
-                                       &swap_chain_) != VK_SUCCESS)
-    throw std::runtime_error("Failed to create Vulkan swapchain");
-  image_available_semaphores_.resize(swap_chain_->ImageCount());
-  render_finish_semaphores_.resize(swap_chain_->ImageCount());
+  vulkan::ThrowIfFailed(glfwCreateWindowSurface(core_->Instance(), GLFWWindow(), nullptr, &surface_),
+                        "Failed to create window surface");
+  CreateSwapChain();
+  image_available_semaphores_.resize(swap_chain_images_.size());
+  render_finish_semaphores_.resize(swap_chain_images_.size());
   for (size_t i = 0; i < image_available_semaphores_.size(); ++i) {
-    core_->Device()->CreateSemaphore(&image_available_semaphores_[i]);
-    core_->Device()->CreateSemaphore(&render_finish_semaphores_[i]);
+    VkSemaphoreCreateInfo semaphore_info{VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO};
+    vulkan::ThrowIfFailed(vkCreateSemaphore(core_->Handle(), &semaphore_info, nullptr, &image_available_semaphores_[i]),
+                          "Failed to create image available semaphore");
+    vulkan::ThrowIfFailed(vkCreateSemaphore(core_->Handle(), &semaphore_info, nullptr, &render_finish_semaphores_[i]),
+                          "Failed to create render finish semaphore");
   }
-  vkGetDeviceQueue(core_->Device()->Handle(), core_->Device()->PhysicalDevice().PresentFamilyIndex(surface_.get()), 0,
-                   &present_queue_);
-  // Swapchains follow pixels, not logical window coordinates. In particular,
-  // GLFW on Wayland emits only a framebuffer callback for programmatic resizes
-  // and for fractional-scale changes without a logical size change.
+  vkGetDeviceQueue(core_->Handle(), vulkan::PresentFamilyIndex(core_->PhysicalDevice(), surface_), 0, &present_queue_);
   FramebufferResizeEvent().RegisterCallback([this](int width, int height) {
     if (width > 0 && height > 0 && Rebuild() != 0)
       LogError("Failed to resize Vulkan presentation");
@@ -46,33 +123,39 @@ VulkanWindow::~VulkanWindow() {
 
 void VulkanWindow::CloseWindow() {
   core_->WaitGPU();
-  hdr_framebuffer_.reset();
+  if (hdr_framebuffer_ != VK_NULL_HANDLE) {
+    vkDestroyFramebuffer(core_->Handle(), hdr_framebuffer_, nullptr);
+    hdr_framebuffer_ = VK_NULL_HANDLE;
+  }
   if (imgui_assets_.context) {
     TerminateImGui();
   }
+  for (VkSemaphore semaphore : image_available_semaphores_) {
+    vkDestroySemaphore(core_->Handle(), semaphore, nullptr);
+  }
   image_available_semaphores_.clear();
+  for (VkSemaphore semaphore : render_finish_semaphores_) {
+    vkDestroySemaphore(core_->Handle(), semaphore, nullptr);
+  }
   render_finish_semaphores_.clear();
-  swap_chain_.reset();
-  surface_.reset();
+  DestroySwapChain();
+  vkDestroySurfaceKHR(core_->Instance(), surface_, nullptr);
+  surface_ = VK_NULL_HANDLE;
   Window::CloseWindow();
 }
 
 int VulkanWindow::SetHDR(bool enable_hdr) {
-  if (!GLFWWindow())
-    return -1;
-  if (presentation_failed_)
+  if (!GLFWWindow() || presentation_failed_)
     return -1;
   if (enable_hdr == enable_hdr_)
     return 0;
+  if (!SelectSurfaceFormat(enable_hdr)) {
+    LogWarning("Requested Vulkan HDR/SDR presentation mode is unavailable");
+    return -1;
+  }
   const bool previous = enable_hdr_;
+  enable_hdr_ = enable_hdr;
   try {
-    // Reject unsupported requests before changing state or retiring a swapchain.
-    if (!SelectSurfaceFormat(enable_hdr)) {
-      LogWarning("Requested Vulkan HDR/SDR presentation mode is unavailable");
-      return -1;
-    }
-    enable_hdr_ = enable_hdr;
-    // A format change needs a rebuild even when the framebuffer size is fixed.
     if (Rebuild() != 0) {
       enable_hdr_ = previous;
       return -1;
@@ -99,17 +182,16 @@ std::optional<VkSurfaceFormatKHR> VulkanWindow::ChooseHDRSurfaceFormat(const std
 }
 
 std::optional<VkSurfaceFormatKHR> VulkanWindow::SelectSurfaceFormat(bool hdr) const {
-  const auto support =
-      vulkan::Swapchain::QuerySwapChainSupport(core_->Device()->PhysicalDevice().Handle(), surface_->Handle());
+  const auto support = vulkan::QuerySwapChainSupport(core_->PhysicalDevice(), surface_);
   if (support.formats.empty())
     return std::nullopt;
   auto format = hdr ? ChooseHDRSurfaceFormat(support.formats)
-                    : vulkan::Swapchain::ChooseSwapSurfaceFormat(support.formats, VK_FORMAT_R8G8B8A8_UNORM,
-                                                                 VK_COLOR_SPACE_SRGB_NONLINEAR_KHR);
-  if (!format)
+                    : std::optional<VkSurfaceFormatKHR>(vulkan::ChooseSwapSurfaceFormat(
+                          support.formats, VK_FORMAT_R8G8B8A8_UNORM, VK_COLOR_SPACE_SRGB_NONLINEAR_KHR));
+  if (!format || (!hdr && format->colorSpace != VK_COLOR_SPACE_SRGB_NONLINEAR_KHR))
     return std::nullopt;
   VkFormatProperties properties{};
-  vkGetPhysicalDeviceFormatProperties(core_->Device()->PhysicalDevice().Handle(), format->format, &properties);
+  vkGetPhysicalDeviceFormatProperties(core_->PhysicalDevice(), format->format, &properties);
   if (!(properties.optimalTilingFeatures & VK_FORMAT_FEATURE_BLIT_DST_BIT))
     return std::nullopt;
   return format;
@@ -120,36 +202,24 @@ bool VulkanWindow::UsesPQOutput() const {
 }
 
 VkFormat VulkanWindow::ImGuiFormat() const {
-  return UsesPQOutput() ? VK_FORMAT_R16G16B16A16_SFLOAT : swap_chain_->Format();
+  return UsesPQOutput() ? VK_FORMAT_R16G16B16A16_SFLOAT : swap_chain_format_;
 }
 
-vulkan::Swapchain *VulkanWindow::SwapChain() const {
-  if (presentation_failed_)
-    throw std::runtime_error("Vulkan presentation unavailable after swapchain recovery failed");
-  return swap_chain_.get();
+VkSemaphore VulkanWindow::RenderFinishSemaphore() const {
+  return render_finish_semaphores_[core_->CurrentFrame()];
 }
 
-vulkan::Semaphore *VulkanWindow::RenderFinishSemaphore() const {
-  return render_finish_semaphores_[core_->CurrentFrame()].get();
-}
-
-vulkan::Semaphore *VulkanWindow::ImageAvailableSemaphore() const {
-  return image_available_semaphores_[core_->CurrentFrame()].get();
+VkSemaphore VulkanWindow::ImageAvailableSemaphore() const {
+  return image_available_semaphores_[core_->CurrentFrame()];
 }
 
 uint32_t VulkanWindow::AcquireNextImage() {
   if (presentation_failed_)
     throw std::runtime_error("Vulkan presentation unavailable after swapchain recovery failed");
-  swap_chain_->AcquireNextImage(std::numeric_limits<uint64_t>::max(),
-                                image_available_semaphores_[core_->CurrentFrame()]->Handle(), VK_NULL_HANDLE,
-                                &image_index_);
+  vulkan::ThrowIfFailed(vkAcquireNextImageKHR(core_->Handle(), swap_chain_, std::numeric_limits<uint64_t>::max(),
+                                              ImageAvailableSemaphore(), VK_NULL_HANDLE, &image_index_),
+                        "Failed to acquire Vulkan swapchain image");
   return image_index_;
-}
-
-VkResult VulkanWindow::CreatePresentationSwapchain(VkSurfaceFormatKHR format,
-                                                   std::unique_ptr<vulkan::Swapchain> *result,
-                                                   VkSwapchainKHR old_swapchain) {
-  return core_->Device()->CreateSwapchain(surface_.get(), format.format, format.colorSpace, result, old_swapchain);
 }
 
 int VulkanWindow::Rebuild() {
@@ -161,43 +231,40 @@ int VulkanWindow::Rebuild() {
     return -1;
   const auto previous_format = surface_format_;
   const bool previous_hdr = previous_format.colorSpace != VK_COLOR_SPACE_SRGB_NONLINEAR_KHR;
+  VkSwapchainKHR next = VK_NULL_HANDLE;
+  const auto status = CreatePresentationSwapchain(*format, &next, swap_chain_);
+  if (hdr_framebuffer_ != VK_NULL_HANDLE) {
+    vkDestroyFramebuffer(core_->Handle(), hdr_framebuffer_, nullptr);
+    hdr_framebuffer_ = VK_NULL_HANDLE;
+  }
+  if (imgui_assets_.context) {
+    DestroyImGuiFramebuffers();
+  }
+  DestroySwapChain();
   bool recovered = false;
-  std::unique_ptr<vulkan::Swapchain> next;
-  auto create = [&](VkSurfaceFormatKHR requested, VkSwapchainKHR old) {
-    try {
-      return CreatePresentationSwapchain(requested, &next, old);
-    } catch (const std::exception &error) {
-      LogError("Vulkan swapchain creation failed: {}", error.what());
-      return VK_ERROR_INITIALIZATION_FAILED;
-    }
-  };
-  const auto status = create(*format, swap_chain_->Handle());
-  // vkCreateSwapchainKHR can retire oldSwapchain even when creation fails.
-  // Drop attachments before destroying it; never acquire from it again.
-  hdr_framebuffer_.reset();
-  imgui_assets_.framebuffers.clear();
-  swap_chain_.reset();
   if (status != VK_SUCCESS) {
-    next.reset();
+    if (next != VK_NULL_HANDLE)
+      vkDestroySwapchainKHR(core_->Handle(), next, nullptr);
     enable_hdr_ = previous_hdr;
-    if (create(previous_format, VK_NULL_HANDLE) != VK_SUCCESS) {
+    if (CreatePresentationSwapchain(previous_format, &next, VK_NULL_HANDLE) != VK_SUCCESS) {
       presentation_failed_ = true;
       LogError("Vulkan presentation disabled: could not recreate the previous swapchain mode");
       return -1;
     }
     recovered = true;
   }
-  swap_chain_ = std::move(next);
+  swap_chain_ = next;
   surface_format_ = recovered ? previous_format : *format;
+  swap_chain_format_ = surface_format_.format;
+  LoadSwapChainImages();
   if (imgui_assets_.context) {
     ImGui::SetCurrentContext(imgui_assets_.context);
-    imgui_assets_.framebuffers.clear();
-    if (imgui_assets_.render_pass->AttachmentDescriptions()[0].format != ImGuiFormat()) {
+    if (imgui_assets_.render_pass_format != ImGuiFormat()) {
       ImGui_ImplVulkan_Shutdown();
       ImGui_ImplGlfw_Shutdown();
 
       ImGui::DestroyContext(imgui_assets_.context);
-      imgui_assets_.render_pass.reset();
+      DestroyImGuiRenderPass();
       SetupImGuiContext();
     }
 
@@ -209,9 +276,9 @@ int VulkanWindow::Rebuild() {
 void VulkanWindow::Present() {
   if (presentation_failed_)
     throw std::runtime_error("Vulkan presentation unavailable after swapchain recovery failed");
-  VkSemaphore render_finish_semaphore = render_finish_semaphores_[core_->CurrentFrame()]->Handle();
+  VkSemaphore render_finish_semaphore = RenderFinishSemaphore();
 
-  VkSwapchainKHR swap_chain = swap_chain_->Handle();
+  VkSwapchainKHR swap_chain = swap_chain_;
 
   VkPresentInfoKHR presentInfo{};
   presentInfo.sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR;
@@ -241,6 +308,7 @@ void VulkanWindow::InitImGui(const char *font_file_path, float font_size) {
 }
 
 void VulkanWindow::TerminateImGui() {
+  core_->WaitGPU();
   if (imgui_assets_.context) {
     ImGui::SetCurrentContext(imgui_assets_.context);
     ImGui_ImplVulkan_Shutdown();
@@ -248,6 +316,8 @@ void VulkanWindow::TerminateImGui() {
     ImGui::DestroyContext(imgui_assets_.context);
     imgui_assets_.context = nullptr;
   }
+  DestroyImGuiFramebuffers();
+  DestroyImGuiRenderPass();
 }
 
 void VulkanWindow::BeginImGuiFrame() {
@@ -294,19 +364,30 @@ void VulkanWindow::SetupImGuiContext() {
   VkAttachmentReference attachment_ref{};
   attachment_ref.attachment = 0;
   attachment_ref.layout = VK_IMAGE_LAYOUT_GENERAL;
-  core_->Device()->CreateRenderPass({attachment_desc}, {attachment_ref}, &imgui_assets_.render_pass);
+  VkSubpassDescription subpass{};
+  subpass.pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS;
+  subpass.colorAttachmentCount = 1;
+  subpass.pColorAttachments = &attachment_ref;
+  VkRenderPassCreateInfo render_pass_info{VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO};
+  render_pass_info.attachmentCount = 1;
+  render_pass_info.pAttachments = &attachment_desc;
+  render_pass_info.subpassCount = 1;
+  render_pass_info.pSubpasses = &subpass;
+  vulkan::ThrowIfFailed(vkCreateRenderPass(core_->Handle(), &render_pass_info, nullptr, &imgui_assets_.render_pass),
+                        "Failed to create ImGui render pass");
+  imgui_assets_.render_pass_format = attachment_desc.format;
 
   ImGui_ImplVulkan_InitInfo init_info = {};
   init_info.ApiVersion = VK_API_VERSION_1_2;
-  init_info.Instance = core_->Instance()->Handle();
-  init_info.PhysicalDevice = core_->Device()->PhysicalDevice().Handle();
-  init_info.Device = core_->Device()->Handle();
-  init_info.QueueFamily = core_->GraphicsQueue()->QueueFamilyIndex();
-  init_info.Queue = core_->GraphicsQueue()->Handle();
+  init_info.Instance = core_->Instance();
+  init_info.PhysicalDevice = core_->PhysicalDevice();
+  init_info.Device = core_->Handle();
+  init_info.QueueFamily = vulkan::GraphicsFamilyIndex(core_->PhysicalDevice());
+  init_info.Queue = core_->GraphicsQueue();
   init_info.DescriptorPoolSize = 32;
-  init_info.RenderPass = imgui_assets_.render_pass->Handle();
+  init_info.RenderPass = imgui_assets_.render_pass;
   init_info.MinImageCount = 2;
-  init_info.ImageCount = swap_chain_->ImageCount();
+  init_info.ImageCount = static_cast<uint32_t>(swap_chain_images_.size());
   init_info.MSAASamples = VK_SAMPLE_COUNT_1_BIT;
   ImGui_ImplVulkan_Init(&init_info);
 
@@ -326,21 +407,54 @@ void VulkanWindow::SetupImGuiContext() {
 }
 
 void VulkanWindow::BuildImGuiFramebuffers() {
-  // PQ is encoded only after scene/UI blending in the floating-point target.
   if (UsesPQOutput())
     return;
-  imgui_assets_.framebuffers.resize(swap_chain_->ImageCount());
-  for (int i = 0; i < swap_chain_->ImageCount(); i++) {
-    imgui_assets_.render_pass->CreateFramebuffer({swap_chain_->ImageViews()[i]}, swap_chain_->Extent(),
-                                                 &imgui_assets_.framebuffers[i]);
+  imgui_assets_.framebuffers.resize(swap_chain_images_.size());
+  for (int i = 0; i < swap_chain_images_.size(); i++) {
+    VkImageView image_view = swap_chain_image_views_[i];
+    VkFramebufferCreateInfo framebuffer_info{VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO};
+    framebuffer_info.renderPass = imgui_assets_.render_pass;
+    framebuffer_info.attachmentCount = 1;
+    framebuffer_info.pAttachments = &image_view;
+    framebuffer_info.width = swap_chain_extent_.width;
+    framebuffer_info.height = swap_chain_extent_.height;
+    framebuffer_info.layers = 1;
+    vulkan::ThrowIfFailed(
+        vkCreateFramebuffer(core_->Handle(), &framebuffer_info, nullptr, &imgui_assets_.framebuffers[i]),
+        "Failed to create ImGui framebuffer");
   }
 }
 
-vulkan::Framebuffer *VulkanWindow::HDRFramebuffer(VulkanImage *image) {
-  if (!hdr_framebuffer_)
-    imgui_assets_.render_pass->CreateFramebuffer({image->Image()->ImageView()}, image->Image()->Extent(),
-                                                 &hdr_framebuffer_);
-  return hdr_framebuffer_.get();
+void VulkanWindow::DestroyImGuiFramebuffers() {
+  for (VkFramebuffer framebuffer : imgui_assets_.framebuffers) {
+    vkDestroyFramebuffer(core_->Handle(), framebuffer, nullptr);
+  }
+  imgui_assets_.framebuffers.clear();
+}
+
+void VulkanWindow::DestroyImGuiRenderPass() {
+  if (imgui_assets_.render_pass != VK_NULL_HANDLE) {
+    vkDestroyRenderPass(core_->Handle(), imgui_assets_.render_pass, nullptr);
+    imgui_assets_.render_pass = VK_NULL_HANDLE;
+    imgui_assets_.render_pass_format = VK_FORMAT_UNDEFINED;
+  }
+}
+
+VkFramebuffer VulkanWindow::HDRFramebuffer(VulkanImage *image) {
+  if (hdr_framebuffer_ == VK_NULL_HANDLE) {
+    VkImageView image_view = image->ImageView();
+    const auto extent = image->Extent();
+    VkFramebufferCreateInfo info{VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO};
+    info.renderPass = imgui_assets_.render_pass;
+    info.attachmentCount = 1;
+    info.pAttachments = &image_view;
+    info.width = extent.width;
+    info.height = extent.height;
+    info.layers = 1;
+    vulkan::ThrowIfFailed(vkCreateFramebuffer(core_->Handle(), &info, nullptr, &hdr_framebuffer_),
+                          "Failed to create HDR ImGui framebuffer");
+  }
+  return hdr_framebuffer_;
 }
 
 }  // namespace grassland::graphics::backend

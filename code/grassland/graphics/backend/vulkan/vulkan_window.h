@@ -24,11 +24,25 @@ class VulkanWindow : public Window {
   // An HDR request must never silently select an SDR format.
   static std::optional<VkSurfaceFormatKHR> ChooseHDRSurfaceFormat(const std::vector<VkSurfaceFormatKHR> &formats);
 
-  vulkan::Swapchain *SwapChain() const;
+  VkExtent2D SwapChainExtent() const {
+    return swap_chain_extent_;
+  }
 
-  vulkan::Semaphore *RenderFinishSemaphore() const;
+  VkFormat SwapChainFormat() const {
+    return swap_chain_format_;
+  }
 
-  vulkan::Semaphore *ImageAvailableSemaphore() const;
+  VkSurfaceKHR Surface() const {
+    return surface_;
+  }
+
+  VkPhysicalDevice PhysicalDevice() const {
+    return core_->PhysicalDevice();
+  }
+
+  VkSemaphore RenderFinishSemaphore() const;
+
+  VkSemaphore ImageAvailableSemaphore() const;
 
   uint32_t AcquireNextImage();
 
@@ -41,7 +55,7 @@ class VulkanWindow : public Window {
   }
 
   VkImage CurrentImage() const {
-    return swap_chain_->Image(image_index_);
+    return swap_chain_images_[image_index_];
   }
 
   void InitImGui(const char *font_file_path, float font_size) override;
@@ -53,11 +67,13 @@ class VulkanWindow : public Window {
   VulkanImGuiAssets &ImGuiAssets();
   void SetupImGuiContext();
   void BuildImGuiFramebuffers();
-  vulkan::Framebuffer *HDRFramebuffer(VulkanImage *image);
+  void DestroyImGuiFramebuffers();
+  void DestroyImGuiRenderPass();
+  VkFramebuffer HDRFramebuffer(VulkanImage *image);
 
  protected:
   virtual VkResult CreatePresentationSwapchain(VkSurfaceFormatKHR format,
-                                               std::unique_ptr<vulkan::Swapchain> *result,
+                                               VkSwapchainKHR *result,
                                                VkSwapchainKHR old_swapchain);
 
  private:
@@ -68,14 +84,21 @@ class VulkanWindow : public Window {
   VkSurfaceFormatKHR surface_format_{};
   VkQueue present_queue_;
   VulkanCore *core_;
-  std::unique_ptr<vulkan::Surface> surface_;
-  std::unique_ptr<vulkan::Swapchain> swap_chain_;
-  std::vector<std::unique_ptr<vulkan::Semaphore>> render_finish_semaphores_;
-  std::vector<std::unique_ptr<vulkan::Semaphore>> image_available_semaphores_;
+  VkSurfaceKHR surface_{VK_NULL_HANDLE};
+  VkSwapchainKHR swap_chain_{VK_NULL_HANDLE};
+  VkFormat swap_chain_format_{VK_FORMAT_UNDEFINED};
+  VkExtent2D swap_chain_extent_{};
+  std::vector<VkImage> swap_chain_images_;
+  std::vector<VkImageView> swap_chain_image_views_;
+  void CreateSwapChain();
+  void LoadSwapChainImages();
+  void DestroySwapChain();
+  std::vector<VkSemaphore> render_finish_semaphores_;
+  std::vector<VkSemaphore> image_available_semaphores_;
   uint32_t image_index_;
 
   VulkanImGuiAssets imgui_assets_{};
-  std::unique_ptr<vulkan::Framebuffer> hdr_framebuffer_;
+  VkFramebuffer hdr_framebuffer_{VK_NULL_HANDLE};
 };
 
 }  // namespace grassland::graphics::backend

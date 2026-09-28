@@ -9,6 +9,7 @@
 #include "grassland/graphics/backend/d3d12/d3d12_window.h"
 #endif
 #if defined(LONGMARCH_VULKAN_ENABLED)
+#include "grassland/graphics/backend/vulkan/helper/swap_chain.h"
 #include "grassland/graphics/backend/vulkan/vulkan_window.h"
 #endif
 
@@ -18,24 +19,27 @@ using namespace grassland;
 class FailingSwapchainWindow : public graphics::backend::VulkanWindow {
  public:
   explicit FailingSwapchainWindow(graphics::backend::VulkanCore *core)
-      : VulkanWindow(core, 320, 240, "Swapchain recovery", false, false, false) {
+      : VulkanWindow(core, 320, 240, "Swapchain recovery", false, false, false),
+        core_(core) {
   }
 
   int failures = 0;
 
  protected:
-  VkResult CreatePresentationSwapchain(VkSurfaceFormatKHR format,
-                                       std::unique_ptr<vulkan::Swapchain> *result,
-                                       VkSwapchainKHR old) override {
+  VkResult CreatePresentationSwapchain(VkSurfaceFormatKHR format, VkSwapchainKHR *result, VkSwapchainKHR old) override {
     const auto status = VulkanWindow::CreatePresentationSwapchain(format, result, old);
     if (status == VK_SUCCESS && failures > 0) {
       --failures;
       // A real creation retires the old swapchain before simulating failure.
-      result->reset();
+      vkDestroySwapchainKHR(core_->Handle(), *result, nullptr);
+      *result = VK_NULL_HANDLE;
       return VK_ERROR_INITIALIZATION_FAILED;
     }
     return status;
   }
+
+ private:
+  graphics::backend::VulkanCore *core_;
 };
 #endif
 
@@ -47,9 +51,7 @@ bool InteractiveHDRTests() {
 bool HasHDRSurface(graphics::Window *window) {
 #if defined(LONGMARCH_VULKAN_ENABLED)
   if (auto native = dynamic_cast<graphics::backend::VulkanWindow *>(window)) {
-    auto swapchain = native->SwapChain();
-    const auto support = vulkan::Swapchain::QuerySwapChainSupport(swapchain->Device()->PhysicalDevice().Handle(),
-                                                                  swapchain->Surface()->Handle());
+    const auto support = graphics::backend::vulkan::QuerySwapChainSupport(native->PhysicalDevice(), native->Surface());
     return graphics::backend::VulkanWindow::ChooseHDRSurfaceFormat(support.formats).has_value();
   }
 #endif
@@ -65,7 +67,7 @@ bool UsesPQSwapchain(graphics::Window *window) {
 #if defined(LONGMARCH_VULKAN_ENABLED)
   if (auto *native = dynamic_cast<graphics::backend::VulkanWindow *>(window)) {
     // Inspect the actual backend target, without a public encoding query.
-    auto format = native->SwapChain()->Format();
+    auto format = native->SwapChainFormat();
     return format == VK_FORMAT_A2B10G10R10_UNORM_PACK32 || format == VK_FORMAT_A2R10G10B10_UNORM_PACK32;
   }
 #endif
@@ -101,11 +103,11 @@ TEST(VulkanHDRRecoveryTest, RetiredSwapchainIsRecreatedOrPresentationStops) {
   ASSERT_EQ(core->CreateImage(320, 240, graphics::IMAGE_FORMAT_R32G32B32A32_SFLOAT, &image), 0);
   for (bool hdr : {false, true}) {
     ASSERT_EQ(window.SetHDR(hdr), 0);
-    const auto format = window.SwapChain()->Format();
+    const auto format = window.SwapChainFormat();
     window.failures = 1;
     EXPECT_NE(window.SetHDR(!hdr), 0);
     EXPECT_EQ(window.IsHDR(), hdr);
-    EXPECT_EQ(window.SwapChain()->Format(), format);
+    EXPECT_EQ(window.SwapChainFormat(), format);
     for (int frame = 0; frame < 3; ++frame) {
       window.BeginImGuiFrame();
       ImGui::TextUnformatted("Recovered presentation");
@@ -180,7 +182,7 @@ TEST(VulkanWindowResizeTest, ProgrammaticSquareToWideUpdatesPresentation) {
           window->Resize(size.x, size.y);
         glfwWaitEventsTimeout(0.02);
         auto fb = window->GetFramebufferSize();
-        auto extent = native->SwapChain()->Extent();
+        auto extent = native->SwapChainExtent();
         SCOPED_TRACE(testing::Message() << "hdr=" << hdr << " requested=" << size.x << "x" << size.y
                                         << " framebuffer=" << fb.x << "x" << fb.y << " frame=" << frame);
         ASSERT_EQ(extent.width, fb.x);
@@ -231,14 +233,14 @@ TEST(HDRSurfaceFormatTest, PreferredFormatWinsRegardlessOfEnumerationOrder) {
   const VkSurfaceFormatKHR hdr{VK_FORMAT_R16G16B16A16_SFLOAT, VK_COLOR_SPACE_EXTENDED_SRGB_LINEAR_EXT};
   const VkSurfaceFormatKHR sdr{VK_FORMAT_R8G8B8A8_UNORM, VK_COLOR_SPACE_SRGB_NONLINEAR_KHR};
   for (const auto &formats : {std::vector<VkSurfaceFormatKHR>{hdr, sdr}, std::vector<VkSurfaceFormatKHR>{sdr, hdr}}) {
-    auto selected = vulkan::Swapchain::ChooseSwapSurfaceFormat(formats, hdr.format, hdr.colorSpace);
+    auto selected = graphics::backend::vulkan::ChooseSwapSurfaceFormat(formats, hdr.format, hdr.colorSpace);
     EXPECT_EQ(selected.format, hdr.format);
     EXPECT_EQ(selected.colorSpace, hdr.colorSpace);
-    selected = vulkan::Swapchain::ChooseSwapSurfaceFormat(formats, sdr.format, sdr.colorSpace);
+    selected = graphics::backend::vulkan::ChooseSwapSurfaceFormat(formats, sdr.format, sdr.colorSpace);
     EXPECT_EQ(selected.format, sdr.format);
     EXPECT_EQ(selected.colorSpace, sdr.colorSpace);
   }
-  EXPECT_THROW(vulkan::Swapchain::ChooseSwapSurfaceFormat({}, hdr.format, hdr.colorSpace), std::runtime_error);
+  EXPECT_THROW(graphics::backend::vulkan::ChooseSwapSurfaceFormat({}, hdr.format, hdr.colorSpace), std::runtime_error);
 }
 
 TEST(HDRSurfaceFormatTest, HDRNegotiationPreservesScRGBAndSupportsBothPQLayouts) {
@@ -413,20 +415,18 @@ TEST_P(HDRWindowTest, PresentationAndImGuiSwitching) {
 #if defined(LONGMARCH_D3D12_ENABLED)
         if (GetParam() == graphics::BACKEND_API_D3D12) {
           auto native = dynamic_cast<graphics::backend::D3D12Window *>(window.get());
-          EXPECT_EQ(native->SwapChain()->BackBufferFormat(),
-                    hdr ? DXGI_FORMAT_R16G16B16A16_FLOAT : DXGI_FORMAT_R8G8B8A8_UNORM);
+          EXPECT_EQ(native->BackBufferFormat(), hdr ? DXGI_FORMAT_R16G16B16A16_FLOAT : DXGI_FORMAT_R8G8B8A8_UNORM);
         }
 #endif
 #if defined(LONGMARCH_VULKAN_ENABLED)
         if (GetParam() == graphics::BACKEND_API_VULKAN) {
           auto native = dynamic_cast<graphics::backend::VulkanWindow *>(window.get());
-          auto *swapchain = native->SwapChain();
-          const auto support = vulkan::Swapchain::QuerySwapChainSupport(swapchain->Device()->PhysicalDevice().Handle(),
-                                                                        swapchain->Surface()->Handle());
+          const auto support =
+              graphics::backend::vulkan::QuerySwapChainSupport(native->PhysicalDevice(), native->Surface());
           const auto expected_format =
               hdr ? graphics::backend::VulkanWindow::ChooseHDRSurfaceFormat(support.formats)->format
                   : VK_FORMAT_R8G8B8A8_UNORM;
-          EXPECT_EQ(swapchain->Format(), expected_format);
+          EXPECT_EQ(native->SwapChainFormat(), expected_format);
         }
 #endif
         if (imgui) {

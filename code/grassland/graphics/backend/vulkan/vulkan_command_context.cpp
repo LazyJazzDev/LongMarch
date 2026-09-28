@@ -118,7 +118,7 @@ void VulkanCommandContext::CmdBindResources(int slot, const std::vector<BufferRa
   }
   commands_.push_back(
       std::make_unique<VulkanCmdBindResourceBuffers>(slot, vk_buffers, program_bases_[bind_point], bind_point));
-  required_pool_size_ += program_bases_[bind_point]->DescriptorSetLayout(slot)->GetPoolSize();
+  required_pool_size_ += program_bases_[bind_point]->DescriptorPoolSize(slot);
   required_set_count_++;
 }
 
@@ -140,7 +140,7 @@ void VulkanCommandContext::CmdBindResources(int slot, const std::vector<Image *>
   }
   commands_.push_back(std::make_unique<VulkanCmdBindResourceImages>(slot, vk_images, program_bases_[bind_point],
                                                                     bind_point, update_layout));
-  required_pool_size_ += program_bases_[bind_point]->DescriptorSetLayout(slot)->GetPoolSize();
+  required_pool_size_ += program_bases_[bind_point]->DescriptorPoolSize(slot);
   required_set_count_++;
 }
 
@@ -156,7 +156,7 @@ void VulkanCommandContext::CmdBindResources(int slot, const std::vector<Sampler 
   }
   commands_.push_back(
       std::make_unique<VulkanCmdBindResourceSamplers>(slot, vk_samplers, program_bases_[bind_point], bind_point));
-  required_pool_size_ += program_bases_[bind_point]->DescriptorSetLayout(slot)->GetPoolSize();
+  required_pool_size_ += program_bases_[bind_point]->DescriptorPoolSize(slot);
   required_set_count_++;
 }
 
@@ -171,7 +171,7 @@ void VulkanCommandContext::CmdBindResources(int slot,
   auto vk_acceleration_structure = dynamic_cast<VulkanAccelerationStructure *>(acceleration_structure);
   commands_.push_back(std::make_unique<VulkanCmdBindResourceAccelerationStructure>(
       slot, vk_acceleration_structure, program_bases_[bind_point], bind_point));
-  required_pool_size_ += program_bases_[bind_point]->DescriptorSetLayout(slot)->GetPoolSize();
+  required_pool_size_ += program_bases_[bind_point]->DescriptorPoolSize(slot);
   required_set_count_++;
 }
 
@@ -215,7 +215,7 @@ void VulkanCommandContext::CmdClearImage(Image *image, const ClearValue &color) 
 void VulkanCommandContext::CmdPresent(Window *window, Image *image) {
   auto native_window = dynamic_cast<VulkanWindow *>(window);
   auto native_image = dynamic_cast<VulkanImage *>(image);
-  auto extent = native_window->SwapChain()->Extent();
+  auto extent = native_window->SwapChainExtent();
   auto composition = dynamic_cast<VulkanImage *>(window->PrepareHDRComposition(core_, {extent.width, extent.height}));
   if (composition) {
     commands_.push_back(std::make_unique<VulkanCmdPresent>(native_window, native_image, composition));

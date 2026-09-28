@@ -41,7 +41,9 @@ class VulkanStaticBuffer : public VulkanBuffer {
 
  private:
   VulkanCore *core_;
-  std::unique_ptr<vulkan::Buffer> buffer_;
+  VkBuffer buffer_{VK_NULL_HANDLE};
+  VmaAllocation allocation_{VK_NULL_HANDLE};
+  size_t size_{};
 };
 
 class VulkanDynamicBuffer : public VulkanBuffer {
@@ -67,8 +69,12 @@ class VulkanDynamicBuffer : public VulkanBuffer {
 
  private:
   VulkanCore *core_;
-  std::vector<std::unique_ptr<vulkan::Buffer>> buffers_;
-  std::unique_ptr<vulkan::Buffer> staging_buffer_;
+  std::vector<VkBuffer> buffers_;
+  std::vector<VmaAllocation> allocations_;
+  std::vector<size_t> buffer_sizes_;
+  VkBuffer staging_buffer_{VK_NULL_HANDLE};
+  VmaAllocation staging_allocation_{VK_NULL_HANDLE};
+  size_t size_{};
 };
 
 #if defined(LONGMARCH_CUDA_RUNTIME)

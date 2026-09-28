@@ -24,6 +24,7 @@
 #include "sparkium/pipelines/raytracing/material/materials.h"
 
 using namespace grassland;
+namespace vulkan = grassland::graphics::backend::vulkan;
 
 namespace {
 struct Ray {
@@ -507,9 +508,9 @@ TEST_F(SoftwareBVHTest, NonblockingEmittersDoNotHideShadowOccluders) {
 TEST_F(SoftwareBVHTest, RayQueryCapabilityMatchesDevice) {
 #if defined(LONGMARCH_VULKAN_ENABLED)
   if (auto *vk = dynamic_cast<graphics::backend::VulkanCore *>(graphics.get())) {
-    const auto &physical = vk->Device()->PhysicalDevice();
-    EXPECT_EQ(graphics->DeviceRayQuerySupport(), physical.SupportRayQuery());
-    if (physical.SupportRayQuery()) {
+    const auto physical = vk->PhysicalDevice();
+    EXPECT_EQ(graphics->DeviceRayQuerySupport(), vulkan::SupportRayQuery(physical));
+    if (vulkan::SupportRayQuery(physical)) {
       vulkan::DeviceFeatureRequirement requirement{};
       requirement.enable_rayquery_extension = true;
       auto info = requirement.GenerateRecommendedDeviceCreateInfo(physical);
@@ -521,19 +522,19 @@ TEST_F(SoftwareBVHTest, RayQueryCapabilityMatchesDevice) {
       EXPECT_TRUE(has_extension(VK_KHR_ACCELERATION_STRUCTURE_EXTENSION_NAME));
       EXPECT_FALSE(has_extension(VK_KHR_RAY_TRACING_PIPELINE_EXTENSION_NAME));
       EXPECT_NE(requirement.GetVmaAllocatorCreateFlags() & VMA_ALLOCATOR_CREATE_BUFFER_DEVICE_ADDRESS_BIT, 0);
-      std::unique_ptr<vulkan::Device> query_device;
-      ASSERT_EQ(vk->Instance()->CreateDevice(physical, info, requirement.GetVmaAllocatorCreateFlags(), &query_device),
-                VK_SUCCESS);
-      EXPECT_NE(query_device->Procedures().vkCmdBuildAccelerationStructuresKHR, nullptr);
-      EXPECT_EQ(query_device->Procedures().vkCmdTraceRaysKHR, nullptr);
+      VkDevice query_device = VK_NULL_HANDLE;
+      auto create_info = info.CompileVkDeviceCreateInfo(false, physical);
+      ASSERT_EQ(vkCreateDevice(physical, &create_info, nullptr, &query_device), VK_SUCCESS);
+      EXPECT_NE(vkGetDeviceProcAddr(query_device, "vkCmdBuildAccelerationStructuresKHR"), nullptr);
+      EXPECT_EQ(vkGetDeviceProcAddr(query_device, "vkCmdTraceRaysKHR"), nullptr);
+      vkDestroyDevice(query_device, nullptr);
     }
   }
 #endif
 #if defined(LONGMARCH_D3D12_ENABLED)
   if (auto *dx = dynamic_cast<graphics::backend::D3D12Core *>(graphics.get())) {
     D3D12_FEATURE_DATA_D3D12_OPTIONS5 options{};
-    const auto result =
-        dx->Device()->Handle()->CheckFeatureSupport(D3D12_FEATURE_D3D12_OPTIONS5, &options, sizeof(options));
+    const auto result = dx->Device()->CheckFeatureSupport(D3D12_FEATURE_D3D12_OPTIONS5, &options, sizeof(options));
     EXPECT_EQ(graphics->DeviceRayQuerySupport(),
               SUCCEEDED(result) && options.RaytracingTier >= D3D12_RAYTRACING_TIER_1_1);
   }

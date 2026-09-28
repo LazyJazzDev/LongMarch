@@ -185,8 +185,7 @@ void D3D12CommandContext::CmdClearImage(Image *image, const ClearValue &color) {
 void D3D12CommandContext::CmdPresent(Window *window, Image *image) {
   auto native_window = dynamic_cast<D3D12Window *>(window);
   auto native_image = dynamic_cast<D3D12Image *>(image);
-  auto extent = native_window->SwapChain()->Width();
-  Extent2D window_extent{extent, native_window->SwapChain()->Height()};
+  Extent2D window_extent = native_window->BackBufferExtent();
   auto composition = dynamic_cast<D3D12Image *>(window->PrepareHDRComposition(core_, window_extent));
   if (composition) {
     RecordRTVImage(composition);
@@ -220,11 +219,11 @@ void D3D12CommandContext::CmdCopyBuffer(Buffer *dst_buffer,
 }
 
 void D3D12CommandContext::RecordRTVImage(const D3D12Image *image) {
-  RecordRTVImage(image->Image()->Handle());
+  RecordRTVImage(image->Image());
 }
 
 void D3D12CommandContext::RecordDSVImage(const D3D12Image *image) {
-  RecordDSVImage(image->Image()->Handle());
+  RecordDSVImage(image->Image());
 }
 
 void D3D12CommandContext::RecordRTVImage(ID3D12Resource *resource) {
@@ -257,11 +256,11 @@ void D3D12CommandContext::RequireResourceState(ID3D12GraphicsCommandList *comman
 }
 
 CD3DX12_CPU_DESCRIPTOR_HANDLE D3D12CommandContext::RTVHandle(ID3D12Resource *resource) const {
-  return core_->RTVDescriptorHeap()->CPUHandle(rtv_index_.at(resource));
+  return core_->RTVDescriptorHandle(rtv_index_.at(resource));
 }
 
 CD3DX12_CPU_DESCRIPTOR_HANDLE D3D12CommandContext::DSVHandle(ID3D12Resource *resource) const {
-  return core_->DSVDescriptorHeap()->CPUHandle(dsv_index_.at(resource));
+  return core_->DSVDescriptorHandle(dsv_index_.at(resource));
 }
 
 CD3DX12_GPU_DESCRIPTOR_HANDLE D3D12CommandContext::WriteUAVDescriptor(D3D12Image *image) {
@@ -271,8 +270,7 @@ CD3DX12_GPU_DESCRIPTOR_HANDLE D3D12CommandContext::WriteUAVDescriptor(D3D12Image
   desc.Texture2D.MipSlice = 0;
   desc.Texture2D.PlaneSlice = 0;
 
-  core_->Device()->Handle()->CreateUnorderedAccessView(image->Image()->Handle(), nullptr, &desc,
-                                                       resource_descriptor_base_);
+  core_->Device()->CreateUnorderedAccessView(image->Image(), nullptr, &desc, resource_descriptor_base_);
   resource_descriptor_base_.Offset(resource_descriptor_size_);
   auto result = resource_descriptor_gpu_base_;
   resource_descriptor_gpu_base_.Offset(resource_descriptor_size_);
@@ -292,7 +290,7 @@ CD3DX12_GPU_DESCRIPTOR_HANDLE D3D12CommandContext::WriteSRVDescriptor(D3D12Image
   desc.Texture2D.PlaneSlice = 0;
   desc.Texture2D.ResourceMinLODClamp = 0.0f;
 
-  core_->Device()->Handle()->CreateShaderResourceView(image->Image()->Handle(), &desc, resource_descriptor_base_);
+  core_->Device()->CreateShaderResourceView(image->Image(), &desc, resource_descriptor_base_);
 
   resource_descriptor_base_.Offset(resource_descriptor_size_);
   auto result = resource_descriptor_gpu_base_;
@@ -310,8 +308,7 @@ CD3DX12_GPU_DESCRIPTOR_HANDLE D3D12CommandContext::WriteSRVDescriptor(D3D12Buffe
   desc.Buffer.NumElements = static_cast<UINT>(buffer.size) >> 2;
   desc.Buffer.StructureByteStride = 0;
 
-  core_->Device()->Handle()->CreateShaderResourceView(buffer.buffer->Buffer()->Handle(), &desc,
-                                                      resource_descriptor_base_);
+  core_->Device()->CreateShaderResourceView(buffer.buffer->Buffer(), &desc, resource_descriptor_base_);
 
   resource_descriptor_base_.Offset(resource_descriptor_size_);
   auto result = resource_descriptor_gpu_base_;
@@ -324,9 +321,9 @@ CD3DX12_GPU_DESCRIPTOR_HANDLE D3D12CommandContext::WriteSRVDescriptor(
   D3D12_SHADER_RESOURCE_VIEW_DESC desc = {};
   desc.ViewDimension = D3D12_SRV_DIMENSION_RAYTRACING_ACCELERATION_STRUCTURE;
   desc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
-  desc.RaytracingAccelerationStructure.Location = acceleration_structure->Handle()->Handle()->GetGPUVirtualAddress();
+  desc.RaytracingAccelerationStructure.Location = acceleration_structure->Handle()->GetGPUVirtualAddress();
 
-  core_->Device()->Handle()->CreateShaderResourceView(nullptr, &desc, resource_descriptor_base_);
+  core_->Device()->CreateShaderResourceView(nullptr, &desc, resource_descriptor_base_);
 
   resource_descriptor_base_.Offset(resource_descriptor_size_);
   auto result = resource_descriptor_gpu_base_;
@@ -336,10 +333,10 @@ CD3DX12_GPU_DESCRIPTOR_HANDLE D3D12CommandContext::WriteSRVDescriptor(
 
 CD3DX12_GPU_DESCRIPTOR_HANDLE D3D12CommandContext::WriteCBVDescriptor(D3D12BufferRange buffer) {
   D3D12_CONSTANT_BUFFER_VIEW_DESC desc = {};
-  desc.BufferLocation = buffer.buffer->Buffer()->Handle()->GetGPUVirtualAddress() + buffer.offset;
+  desc.BufferLocation = buffer.buffer->Buffer()->GetGPUVirtualAddress() + buffer.offset;
   desc.SizeInBytes = static_cast<UINT>(d3d12::SizeAlignTo(buffer.size, 256));
 
-  core_->Device()->Handle()->CreateConstantBufferView(&desc, resource_descriptor_base_);
+  core_->Device()->CreateConstantBufferView(&desc, resource_descriptor_base_);
 
   resource_descriptor_base_.Offset(resource_descriptor_size_);
   auto result = resource_descriptor_gpu_base_;
@@ -357,8 +354,7 @@ CD3DX12_GPU_DESCRIPTOR_HANDLE D3D12CommandContext::WriteUAVDescriptor(D3D12Buffe
   desc.Buffer.StructureByteStride = 0;
   desc.Buffer.CounterOffsetInBytes = 0;
 
-  core_->Device()->Handle()->CreateUnorderedAccessView(buffer.buffer->Buffer()->Handle(), nullptr, &desc,
-                                                       resource_descriptor_base_);
+  core_->Device()->CreateUnorderedAccessView(buffer.buffer->Buffer(), nullptr, &desc, resource_descriptor_base_);
 
   resource_descriptor_base_.Offset(resource_descriptor_size_);
   auto result = resource_descriptor_gpu_base_;
@@ -368,7 +364,7 @@ CD3DX12_GPU_DESCRIPTOR_HANDLE D3D12CommandContext::WriteUAVDescriptor(D3D12Buffe
 
 CD3DX12_GPU_DESCRIPTOR_HANDLE
 D3D12CommandContext::WriteSamplerDescriptor(const D3D12_SAMPLER_DESC &desc) {
-  core_->Device()->Handle()->CreateSampler(&desc, sampler_descriptor_base_);
+  core_->Device()->CreateSampler(&desc, sampler_descriptor_base_);
 
   sampler_descriptor_base_.Offset(sampler_descriptor_size_);
   auto result = sampler_descriptor_gpu_base_;

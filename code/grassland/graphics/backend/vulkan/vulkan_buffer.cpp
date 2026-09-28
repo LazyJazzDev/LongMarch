@@ -10,23 +10,37 @@ VulkanBufferRange::VulkanBufferRange(const BufferRange &range)
       size(range.size) {
 }
 
-VulkanStaticBuffer::VulkanStaticBuffer(VulkanCore *core, size_t size) : core_(core) {
-  auto usage = VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_TRANSFER_SRC_BIT |
-               VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT | VK_BUFFER_USAGE_STORAGE_BUFFER_BIT |
-               VK_BUFFER_USAGE_INDEX_BUFFER_BIT | VK_BUFFER_USAGE_VERTEX_BUFFER_BIT;
-  if (core_->DeviceRayTracingSupport() || core_->DeviceRayQuerySupport()) {
+namespace {
+VkBufferUsageFlags StaticUsage(VulkanCore *core) {
+  VkBufferUsageFlags usage = VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_TRANSFER_SRC_BIT |
+                             VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT | VK_BUFFER_USAGE_STORAGE_BUFFER_BIT |
+                             VK_BUFFER_USAGE_INDEX_BUFFER_BIT | VK_BUFFER_USAGE_VERTEX_BUFFER_BIT;
+  if (core->DeviceRayTracingSupport() || core->DeviceRayQuerySupport())
     usage |= VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
              VK_BUFFER_USAGE_ACCELERATION_STRUCTURE_BUILD_INPUT_READ_ONLY_BIT_KHR;
-  }
-  core_->Device()->CreateBuffer(size, usage, VMA_MEMORY_USAGE_GPU_ONLY, &buffer_);
+  return usage;
+}
+
+VkBufferUsageFlags DynamicStagingUsage(VulkanCore *core) {
+  VkBufferUsageFlags usage = VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_TRANSFER_SRC_BIT;
+  if (core->DeviceRayTracingSupport() || core->DeviceRayQuerySupport())
+    usage |= VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
+             VK_BUFFER_USAGE_ACCELERATION_STRUCTURE_BUILD_INPUT_READ_ONLY_BIT_KHR;
+  return usage;
+}
+}  // namespace
+
+VulkanStaticBuffer::VulkanStaticBuffer(VulkanCore *core, size_t size) : core_(core), size_(size) {
+  vulkan::ThrowIfFailed(core_->CreateBuffer(size, StaticUsage(core), VMA_MEMORY_USAGE_GPU_ONLY, &buffer_, &allocation_),
+                        "Failed to create Vulkan static buffer");
 }
 
 VulkanStaticBuffer::~VulkanStaticBuffer() {
-  buffer_.reset();
+  vmaDestroyBuffer(core_->Allocator(), buffer_, allocation_);
 }
 
 size_t VulkanStaticBuffer::Size() const {
-  return buffer_->Size();
+  return size_;
 }
 
 BufferType VulkanStaticBuffer::Type() const {
@@ -35,22 +49,20 @@ BufferType VulkanStaticBuffer::Type() const {
 
 void VulkanStaticBuffer::Resize(size_t new_size) {
   core_->WaitGPU();
-  std::unique_ptr<vulkan::Buffer> new_buffer;
-  auto usage = VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_TRANSFER_SRC_BIT |
-               VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT | VK_BUFFER_USAGE_STORAGE_BUFFER_BIT |
-               VK_BUFFER_USAGE_INDEX_BUFFER_BIT | VK_BUFFER_USAGE_VERTEX_BUFFER_BIT;
-  if (core_->DeviceRayTracingSupport() || core_->DeviceRayQuerySupport()) {
-    usage |= VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
-             VK_BUFFER_USAGE_ACCELERATION_STRUCTURE_BUILD_INPUT_READ_ONLY_BIT_KHR;
-  }
-  core_->Device()->CreateBuffer(new_size, usage, VMA_MEMORY_USAGE_GPU_ONLY, &new_buffer);
+  VkBuffer new_buffer = VK_NULL_HANDLE;
+  VmaAllocation new_allocation = VK_NULL_HANDLE;
+  vulkan::ThrowIfFailed(
+      core_->CreateBuffer(new_size, StaticUsage(core_), VMA_MEMORY_USAGE_GPU_ONLY, &new_buffer, &new_allocation),
+      "Failed to resize Vulkan static buffer");
   core_->SingleTimeCommand([&](VkCommandBuffer command_buffer) {
     VkBufferCopy copy_region{};
-    copy_region.size = std::min(static_cast<size_t>(buffer_->Size()), new_size);
-    vkCmdCopyBuffer(command_buffer, buffer_->Handle(), new_buffer->Handle(), 1, &copy_region);
+    copy_region.size = std::min(size_, new_size);
+    vkCmdCopyBuffer(command_buffer, buffer_, new_buffer, 1, &copy_region);
   });
-  buffer_.reset();
-  buffer_ = std::move(new_buffer);
+  vmaDestroyBuffer(core_->Allocator(), buffer_, allocation_);
+  buffer_ = new_buffer;
+  allocation_ = new_allocation;
+  size_ = new_size;
 }
 
 void VulkanStaticBuffer::UploadData(const void *data, size_t size, size_t offset) {
@@ -61,13 +73,15 @@ void VulkanStaticBuffer::UploadData(const void *data, size_t size, size_t offset
   }
   core_->WaitGPU();
   auto staging_buffer = core_->RequestUploadStagingBuffer(size);
-  std::memcpy(staging_buffer->Map(), data, size);
-  staging_buffer->Unmap();
+  void *mapped = nullptr;
+  vmaMapMemory(core_->Allocator(), core_->UploadStagingAllocation(), &mapped);
+  std::memcpy(mapped, data, size);
+  vmaUnmapMemory(core_->Allocator(), core_->UploadStagingAllocation());
   core_->SingleTimeCommand([&](VkCommandBuffer command_buffer) {
     VkBufferCopy copy_region{};
     copy_region.size = size;
     copy_region.dstOffset = offset;
-    vkCmdCopyBuffer(command_buffer, staging_buffer->Handle(), buffer_->Handle(), 1, &copy_region);
+    vkCmdCopyBuffer(command_buffer, staging_buffer, buffer_, 1, &copy_region);
   });
 }
 
@@ -78,45 +92,44 @@ void VulkanStaticBuffer::DownloadData(void *data, size_t size, size_t offset) {
     VkBufferCopy copy_region{};
     copy_region.size = size;
     copy_region.srcOffset = offset;
-    vkCmdCopyBuffer(command_buffer, buffer_->Handle(), staging_buffer->Handle(), 1, &copy_region);
+    vkCmdCopyBuffer(command_buffer, buffer_, staging_buffer, 1, &copy_region);
   });
-  std::memcpy(data, staging_buffer->Map(), size);
-  staging_buffer->Unmap();
+  void *mapped = nullptr;
+  vmaMapMemory(core_->Allocator(), core_->DownloadStagingAllocation(), &mapped);
+  std::memcpy(data, mapped, size);
+  vmaUnmapMemory(core_->Allocator(), core_->DownloadStagingAllocation());
 }
 
 VkBuffer VulkanStaticBuffer::Buffer() const {
-  return buffer_->Handle();
+  return buffer_;
 }
 
 VkDeviceAddress VulkanStaticBuffer::DeviceAddress() const {
-  return buffer_->GetDeviceAddress();
+  return core_->BufferAddress(buffer_);
 }
 
-VulkanDynamicBuffer::VulkanDynamicBuffer(VulkanCore *core, size_t size) : core_(core) {
-  auto usage = VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_TRANSFER_SRC_BIT;
-  if (core_->DeviceRayTracingSupport() || core_->DeviceRayQuerySupport()) {
-    usage |= VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
-             VK_BUFFER_USAGE_ACCELERATION_STRUCTURE_BUILD_INPUT_READ_ONLY_BIT_KHR;
-  }
-  core_->Device()->CreateBuffer(size, usage, VMA_MEMORY_USAGE_CPU_TO_GPU, &staging_buffer_);
-
-  usage = VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_TRANSFER_SRC_BIT | VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT |
-          VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_INDEX_BUFFER_BIT | VK_BUFFER_USAGE_VERTEX_BUFFER_BIT;
-
-  buffers_.resize(core_->FramesInFlight());
-
+VulkanDynamicBuffer::VulkanDynamicBuffer(VulkanCore *core, size_t size) : core_(core), size_(size) {
+  vulkan::ThrowIfFailed(core_->CreateBuffer(size, DynamicStagingUsage(core), VMA_MEMORY_USAGE_CPU_TO_GPU,
+                                            &staging_buffer_, &staging_allocation_),
+                        "Failed to create Vulkan dynamic staging buffer");
+  buffers_.resize(core_->FramesInFlight(), VK_NULL_HANDLE);
+  allocations_.resize(core_->FramesInFlight(), VK_NULL_HANDLE);
+  buffer_sizes_.resize(core_->FramesInFlight(), size);
   for (size_t i = 0; i < buffers_.size(); ++i) {
-    core_->Device()->CreateBuffer(size, usage, VMA_MEMORY_USAGE_GPU_ONLY, &buffers_[i]);
+    vulkan::ThrowIfFailed(
+        core_->CreateBuffer(size, StaticUsage(core), VMA_MEMORY_USAGE_GPU_ONLY, &buffers_[i], &allocations_[i]),
+        "Failed to create Vulkan dynamic device buffer");
   }
 }
 
 VulkanDynamicBuffer::~VulkanDynamicBuffer() {
-  buffers_.clear();
-  staging_buffer_.reset();
+  for (size_t i = 0; i < buffers_.size(); ++i)
+    vmaDestroyBuffer(core_->Allocator(), buffers_[i], allocations_[i]);
+  vmaDestroyBuffer(core_->Allocator(), staging_buffer_, staging_allocation_);
 }
 
 size_t VulkanDynamicBuffer::Size() const {
-  return staging_buffer_->Size();
+  return size_;
 }
 
 BufferType VulkanDynamicBuffer::Type() const {
@@ -124,53 +137,58 @@ BufferType VulkanDynamicBuffer::Type() const {
 }
 
 void VulkanDynamicBuffer::Resize(size_t new_size) {
-  std::unique_ptr<vulkan::Buffer> new_buffer;
-  auto usage = VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_TRANSFER_SRC_BIT;
-  if (core_->DeviceRayTracingSupport() || core_->DeviceRayQuerySupport()) {
-    usage |= VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
-             VK_BUFFER_USAGE_ACCELERATION_STRUCTURE_BUILD_INPUT_READ_ONLY_BIT_KHR;
-  }
-  core_->Device()->CreateBuffer(new_size, usage, VMA_MEMORY_USAGE_CPU_TO_GPU, &new_buffer);
-  std::memcpy(new_buffer->Map(), staging_buffer_->Map(),
-              std::min(new_size, static_cast<size_t>(staging_buffer_->Size())));
-  new_buffer->Unmap();
-  staging_buffer_->Unmap();
-  staging_buffer_.reset();
-  staging_buffer_ = std::move(new_buffer);
+  VkBuffer new_buffer = VK_NULL_HANDLE;
+  VmaAllocation new_allocation = VK_NULL_HANDLE;
+  vulkan::ThrowIfFailed(core_->CreateBuffer(new_size, DynamicStagingUsage(core_), VMA_MEMORY_USAGE_CPU_TO_GPU,
+                                            &new_buffer, &new_allocation),
+                        "Failed to resize Vulkan dynamic staging buffer");
+  void *new_data = nullptr;
+  void *old_data = nullptr;
+  vmaMapMemory(core_->Allocator(), new_allocation, &new_data);
+  vmaMapMemory(core_->Allocator(), staging_allocation_, &old_data);
+  std::memcpy(new_data, old_data, std::min(new_size, size_));
+  vmaUnmapMemory(core_->Allocator(), staging_allocation_);
+  vmaUnmapMemory(core_->Allocator(), new_allocation);
+  vmaDestroyBuffer(core_->Allocator(), staging_buffer_, staging_allocation_);
+  staging_buffer_ = new_buffer;
+  staging_allocation_ = new_allocation;
+  size_ = new_size;
 }
 
 void VulkanDynamicBuffer::UploadData(const void *data, size_t size, size_t offset) {
-  std::memcpy(static_cast<uint8_t *>(staging_buffer_->Map()) + offset, data, size);
-  staging_buffer_->Unmap();
+  void *mapped = nullptr;
+  vmaMapMemory(core_->Allocator(), staging_allocation_, &mapped);
+  std::memcpy(static_cast<uint8_t *>(mapped) + offset, data, size);
+  vmaUnmapMemory(core_->Allocator(), staging_allocation_);
 }
 
 void VulkanDynamicBuffer::DownloadData(void *data, size_t size, size_t offset) {
-  std::memcpy(data, static_cast<uint8_t *>(staging_buffer_->Map()) + offset, size);
-  staging_buffer_->Unmap();
+  void *mapped = nullptr;
+  vmaMapMemory(core_->Allocator(), staging_allocation_, &mapped);
+  std::memcpy(data, static_cast<uint8_t *>(mapped) + offset, size);
+  vmaUnmapMemory(core_->Allocator(), staging_allocation_);
 }
 
 VkBuffer VulkanDynamicBuffer::Buffer() const {
-  return buffers_[core_->CurrentFrame()]->Handle();
+  return buffers_[core_->CurrentFrame()];
 }
 
 VkDeviceAddress VulkanDynamicBuffer::DeviceAddress() const {
-  return staging_buffer_->GetDeviceAddress();
+  return core_->BufferAddress(staging_buffer_);
 }
 
 void VulkanDynamicBuffer::TransferData(VkCommandBuffer cmd_buffer) {
-  if (buffers_[core_->CurrentFrame()]->Size() != staging_buffer_->Size()) {
-    buffers_[core_->CurrentFrame()].reset();
-    auto usage = VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_TRANSFER_SRC_BIT |
-                 VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT | VK_BUFFER_USAGE_STORAGE_BUFFER_BIT |
-                 VK_BUFFER_USAGE_INDEX_BUFFER_BIT | VK_BUFFER_USAGE_VERTEX_BUFFER_BIT;
-    core_->Device()->CreateBuffer(staging_buffer_->Size(), usage, VMA_MEMORY_USAGE_GPU_ONLY,
-                                  &buffers_[core_->CurrentFrame()]);
+  size_t frame = core_->CurrentFrame();
+  if (buffer_sizes_[frame] != size_) {
+    vmaDestroyBuffer(core_->Allocator(), buffers_[frame], allocations_[frame]);
+    vulkan::ThrowIfFailed(core_->CreateBuffer(size_, StaticUsage(core_), VMA_MEMORY_USAGE_GPU_ONLY, &buffers_[frame],
+                                              &allocations_[frame]),
+                          "Failed to resize Vulkan dynamic device buffer");
+    buffer_sizes_[frame] = size_;
   }
-
   VkBufferCopy copy_region{};
-  copy_region.size = staging_buffer_->Size();
-
-  vkCmdCopyBuffer(cmd_buffer, staging_buffer_->Handle(), buffers_[core_->CurrentFrame()]->Handle(), 1, &copy_region);
+  copy_region.size = size_;
+  vkCmdCopyBuffer(cmd_buffer, staging_buffer_, buffers_[frame], 1, &copy_region);
 }
 
 #if defined(LONGMARCH_CUDA_RUNTIME)
@@ -183,7 +201,7 @@ VulkanCUDABuffer::VulkanCUDABuffer(VulkanCore *core, size_t size) : core_(core),
              VK_BUFFER_USAGE_ACCELERATION_STRUCTURE_BUILD_INPUT_READ_ONLY_BIT_KHR;
   }
   vulkan::CreateExternalBuffer(
-      core_->Device()->Handle(),
+      core_->Handle(),
       [core_ = this->core_](uint32_t type_filter, VkMemoryPropertyFlags properties) {
         return core_->FindMemoryType(type_filter, properties);
       },
@@ -192,8 +210,7 @@ VulkanCUDABuffer::VulkanCUDABuffer(VulkanCore *core, size_t size) : core_(core),
   VkBufferDeviceAddressInfo buffer_device_address_info{};
   buffer_device_address_info.sType = VK_STRUCTURE_TYPE_BUFFER_DEVICE_ADDRESS_INFO;
   buffer_device_address_info.buffer = buffer_;
-  address_ =
-      core_->Device()->Procedures().vkGetBufferDeviceAddressKHR(core_->Device()->Handle(), &buffer_device_address_info);
+  address_ = core_->Procedures().vkGetBufferDeviceAddressKHR(core_->Handle(), &buffer_device_address_info);
 }
 
 VulkanCUDABuffer::~VulkanCUDABuffer() {
@@ -203,11 +220,11 @@ VulkanCUDABuffer::~VulkanCUDABuffer() {
 void VulkanCUDABuffer::Reset() {
   cudaDestroyExternalMemory(cuda_memory_);
   if (memory_) {
-    vkFreeMemory(core_->Device()->Handle(), memory_, nullptr);
+    vkFreeMemory(core_->Handle(), memory_, nullptr);
     memory_ = VK_NULL_HANDLE;
   }
   if (buffer_) {
-    vkDestroyBuffer(core_->Device()->Handle(), buffer_, nullptr);
+    vkDestroyBuffer(core_->Handle(), buffer_, nullptr);
     buffer_ = VK_NULL_HANDLE;
   }
 }
@@ -233,7 +250,7 @@ void VulkanCUDABuffer::Resize(size_t new_size) {
   VkBuffer new_buffer;
   VkDeviceMemory new_memory;
   vulkan::CreateExternalBuffer(
-      core_->Device()->Handle(),
+      core_->Handle(),
       [core_ = this->core_](uint32_t type_filter, VkMemoryPropertyFlags properties) {
         return core_->FindMemoryType(type_filter, properties);
       },
@@ -251,20 +268,21 @@ void VulkanCUDABuffer::Resize(size_t new_size) {
   VkBufferDeviceAddressInfo buffer_device_address_info{};
   buffer_device_address_info.sType = VK_STRUCTURE_TYPE_BUFFER_DEVICE_ADDRESS_INFO;
   buffer_device_address_info.buffer = buffer_;
-  address_ =
-      core_->Device()->Procedures().vkGetBufferDeviceAddressKHR(core_->Device()->Handle(), &buffer_device_address_info);
+  address_ = core_->Procedures().vkGetBufferDeviceAddressKHR(core_->Handle(), &buffer_device_address_info);
 }
 
 void VulkanCUDABuffer::UploadData(const void *data, size_t size, size_t offset) {
   core_->WaitGPU();
   auto staging_buffer = core_->RequestUploadStagingBuffer(size);
-  std::memcpy(staging_buffer->Map(), data, size);
-  staging_buffer->Unmap();
+  void *mapped = nullptr;
+  vmaMapMemory(core_->Allocator(), core_->UploadStagingAllocation(), &mapped);
+  std::memcpy(mapped, data, size);
+  vmaUnmapMemory(core_->Allocator(), core_->UploadStagingAllocation());
   core_->SingleTimeCommand([&](VkCommandBuffer command_buffer) {
     VkBufferCopy copy_region{};
     copy_region.size = size;
     copy_region.dstOffset = offset;
-    vkCmdCopyBuffer(command_buffer, staging_buffer->Handle(), buffer_, 1, &copy_region);
+    vkCmdCopyBuffer(command_buffer, staging_buffer, buffer_, 1, &copy_region);
   });
 }
 
@@ -275,10 +293,12 @@ void VulkanCUDABuffer::DownloadData(void *data, size_t size, size_t offset) {
     VkBufferCopy copy_region{};
     copy_region.size = size;
     copy_region.srcOffset = offset;
-    vkCmdCopyBuffer(command_buffer, buffer_, staging_buffer->Handle(), 1, &copy_region);
+    vkCmdCopyBuffer(command_buffer, buffer_, staging_buffer, 1, &copy_region);
   });
-  std::memcpy(data, staging_buffer->Map(), size);
-  staging_buffer->Unmap();
+  void *mapped = nullptr;
+  vmaMapMemory(core_->Allocator(), core_->DownloadStagingAllocation(), &mapped);
+  std::memcpy(data, mapped, size);
+  vmaUnmapMemory(core_->Allocator(), core_->DownloadStagingAllocation());
 }
 
 VkBuffer VulkanCUDABuffer::Buffer() const {

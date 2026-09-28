@@ -14,8 +14,8 @@ D3D12CmdBindProgram::D3D12CmdBindProgram(D3D12Program *program) : program_(progr
 }
 
 void D3D12CmdBindProgram::CompileCommand(D3D12CommandContext *context, ID3D12GraphicsCommandList *command_list) {
-  command_list->SetGraphicsRootSignature(program_->RootSignature()->Handle());
-  command_list->SetPipelineState(program_->PipelineState()->Handle());
+  command_list->SetGraphicsRootSignature(program_->RootSignature());
+  command_list->SetPipelineState(program_->PipelineState());
 }
 
 D3D12CmdBindRayTracingProgram::D3D12CmdBindRayTracingProgram(D3D12RayTracingProgram *program) : program_(program) {
@@ -23,10 +23,10 @@ D3D12CmdBindRayTracingProgram::D3D12CmdBindRayTracingProgram(D3D12RayTracingProg
 
 void D3D12CmdBindRayTracingProgram::CompileCommand(D3D12CommandContext *context,
                                                    ID3D12GraphicsCommandList *command_list) {
-  command_list->SetComputeRootSignature(program_->RootSignature()->Handle());
-  d3d12::ComPtr<ID3D12GraphicsCommandList4> command_list4;
+  command_list->SetComputeRootSignature(program_->RootSignature());
+  ComPtr<ID3D12GraphicsCommandList4> command_list4;
   if (SUCCEEDED(command_list->QueryInterface(IID_PPV_ARGS(&command_list4)))) {
-    command_list4->SetPipelineState1(program_->PipelineState()->Handle());
+    command_list4->SetPipelineState1(program_->PipelineState());
   }
 }
 
@@ -34,7 +34,7 @@ D3D12CmdBindComputeProgram::D3D12CmdBindComputeProgram(D3D12ComputeProgram *prog
 }
 
 void D3D12CmdBindComputeProgram::CompileCommand(D3D12CommandContext *context, ID3D12GraphicsCommandList *command_list) {
-  command_list->SetComputeRootSignature(program_->RootSignature()->Handle());
+  command_list->SetComputeRootSignature(program_->RootSignature());
   command_list->SetPipelineState(program_->PipelineState().Get());
 }
 
@@ -58,11 +58,11 @@ D3D12CmdBindVertexBuffers::D3D12CmdBindVertexBuffers(uint32_t first_binding,
 void D3D12CmdBindVertexBuffers::CompileCommand(D3D12CommandContext *context, ID3D12GraphicsCommandList *command_list) {
   std::vector<D3D12_VERTEX_BUFFER_VIEW> vertex_buffer_views(buffers_.size());
   for (size_t i = 0; i < buffers_.size(); ++i) {
-    vertex_buffer_views[i].BufferLocation = buffers_[i]->Buffer()->Handle()->GetGPUVirtualAddress() + offsets_[i];
+    vertex_buffer_views[i].BufferLocation = buffers_[i]->Buffer()->GetGPUVirtualAddress() + offsets_[i];
     vertex_buffer_views[i].StrideInBytes = program_->InputBindingStride(first_binding_ + i);
     vertex_buffer_views[i].SizeInBytes = buffers_[i]->Size() - offsets_[i];
 
-    context->RequireResourceState(command_list, buffers_[i]->Buffer()->Handle(),
+    context->RequireResourceState(command_list, buffers_[i]->Buffer(),
                                   D3D12_RESOURCE_STATE_VERTEX_AND_CONSTANT_BUFFER | D3D12_RESOURCE_STATE_INDEX_BUFFER);
   }
   command_list->IASetVertexBuffers(first_binding_, buffers_.size(), vertex_buffer_views.data());
@@ -75,11 +75,11 @@ D3D12CmdBindIndexBuffer::D3D12CmdBindIndexBuffer(D3D12Buffer *buffer, uint64_t o
 
 void D3D12CmdBindIndexBuffer::CompileCommand(D3D12CommandContext *context, ID3D12GraphicsCommandList *command_list) {
   D3D12_INDEX_BUFFER_VIEW index_buffer_view;
-  index_buffer_view.BufferLocation = buffer_->Buffer()->Handle()->GetGPUVirtualAddress() + offset_;
+  index_buffer_view.BufferLocation = buffer_->Buffer()->GetGPUVirtualAddress() + offset_;
   index_buffer_view.SizeInBytes = buffer_->Size() - offset_;
   index_buffer_view.Format = DXGI_FORMAT_R32_UINT;
 
-  context->RequireResourceState(command_list, buffer_->Buffer()->Handle(),
+  context->RequireResourceState(command_list, buffer_->Buffer(),
                                 D3D12_RESOURCE_STATE_VERTEX_AND_CONSTANT_BUFFER | D3D12_RESOURCE_STATE_INDEX_BUFFER);
   command_list->IASetIndexBuffer(&index_buffer_view);
 }
@@ -106,8 +106,7 @@ void D3D12CmdBindResourceBuffers::CompileCommand(D3D12CommandContext *context,
         if (i == 0) {
           first_descriptor = desc;
         }
-        context->RequireResourceState(command_list, buffers_[i].buffer->Buffer()->Handle(),
-                                      D3D12_RESOURCE_STATE_GENERIC_READ);
+        context->RequireResourceState(command_list, buffers_[i].buffer->Buffer(), D3D12_RESOURCE_STATE_GENERIC_READ);
       }
       break;
     case D3D12_DESCRIPTOR_RANGE_TYPE_SRV:
@@ -116,8 +115,7 @@ void D3D12CmdBindResourceBuffers::CompileCommand(D3D12CommandContext *context,
         if (i == 0) {
           first_descriptor = desc;
         }
-        context->RequireResourceState(command_list, buffers_[i].buffer->Buffer()->Handle(),
-                                      D3D12_RESOURCE_STATE_GENERIC_READ);
+        context->RequireResourceState(command_list, buffers_[i].buffer->Buffer(), D3D12_RESOURCE_STATE_GENERIC_READ);
       }
       break;
     case D3D12_DESCRIPTOR_RANGE_TYPE_UAV:
@@ -126,7 +124,7 @@ void D3D12CmdBindResourceBuffers::CompileCommand(D3D12CommandContext *context,
         if (i == 0) {
           first_descriptor = desc;
         }
-        context->RequireResourceState(command_list, buffers_[i].buffer->Buffer()->Handle(),
+        context->RequireResourceState(command_list, buffers_[i].buffer->Buffer(),
                                       D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
       }
       break;
@@ -163,7 +161,7 @@ void D3D12CmdBindResourceImages::CompileCommand(D3D12CommandContext *context, ID
         if (i == 0) {
           first_descriptor = desc;
         }
-        context->RequireResourceState(command_list, images_[i]->Image()->Handle(), D3D12_RESOURCE_STATE_GENERIC_READ);
+        context->RequireResourceState(command_list, images_[i]->Image(), D3D12_RESOURCE_STATE_GENERIC_READ);
       }
       break;
     case D3D12_DESCRIPTOR_RANGE_TYPE_UAV:
@@ -172,8 +170,7 @@ void D3D12CmdBindResourceImages::CompileCommand(D3D12CommandContext *context, ID
         if (i == 0) {
           first_descriptor = desc;
         }
-        context->RequireResourceState(command_list, images_[i]->Image()->Handle(),
-                                      D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
+        context->RequireResourceState(command_list, images_[i]->Image(), D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
       }
       break;
   }
@@ -254,13 +251,12 @@ void D3D12CmdBeginRendering::CompileCommand(D3D12CommandContext *context, ID3D12
   CD3DX12_CPU_DESCRIPTOR_HANDLE rtv_handles[8]{};
   CD3DX12_CPU_DESCRIPTOR_HANDLE dsv_handle{};
   for (size_t i = 0; i < color_targets_.size(); ++i) {
-    context->RequireResourceState(command_list, color_targets_[i]->Image()->Handle(),
-                                  D3D12_RESOURCE_STATE_RENDER_TARGET);
-    rtv_handles[i] = context->RTVHandle(color_targets_[i]->Image()->Handle());
+    context->RequireResourceState(command_list, color_targets_[i]->Image(), D3D12_RESOURCE_STATE_RENDER_TARGET);
+    rtv_handles[i] = context->RTVHandle(color_targets_[i]->Image());
   }
   if (depth_target_) {
-    context->RequireResourceState(command_list, depth_target_->Image()->Handle(), D3D12_RESOURCE_STATE_DEPTH_WRITE);
-    dsv_handle = context->DSVHandle(depth_target_->Image()->Handle());
+    context->RequireResourceState(command_list, depth_target_->Image(), D3D12_RESOURCE_STATE_DEPTH_WRITE);
+    dsv_handle = context->DSVHandle(depth_target_->Image());
     command_list->OMSetRenderTargets(color_targets_.size(), rtv_handles, FALSE, &dsv_handle);
   } else {
     command_list->OMSetRenderTargets(color_targets_.size(), rtv_handles, FALSE, nullptr);
@@ -274,22 +270,22 @@ D3D12CmdClearImage::D3D12CmdClearImage(D3D12Image *image, const ClearValue &clea
 
 void D3D12CmdClearImage::CompileCommand(D3D12CommandContext *context, ID3D12GraphicsCommandList *command_list) {
   if (IsDepthFormat(image_->Format())) {
-    context->RequireResourceState(command_list, image_->Image()->Handle(), D3D12_RESOURCE_STATE_DEPTH_WRITE);
+    context->RequireResourceState(command_list, image_->Image(), D3D12_RESOURCE_STATE_DEPTH_WRITE);
     D3D12_CLEAR_VALUE clear_value;
     clear_value.Format = ImageFormatToDXGIFormat(image_->Format());
     clear_value.DepthStencil.Depth = clear_value_.depth.depth;
     clear_value.DepthStencil.Stencil = 0;
-    command_list->ClearDepthStencilView(context->DSVHandle(image_->Image()->Handle()), D3D12_CLEAR_FLAG_DEPTH,
+    command_list->ClearDepthStencilView(context->DSVHandle(image_->Image()), D3D12_CLEAR_FLAG_DEPTH,
                                         clear_value.DepthStencil.Depth, clear_value.DepthStencil.Stencil, 0, nullptr);
   } else {
-    context->RequireResourceState(command_list, image_->Image()->Handle(), D3D12_RESOURCE_STATE_RENDER_TARGET);
+    context->RequireResourceState(command_list, image_->Image(), D3D12_RESOURCE_STATE_RENDER_TARGET);
     D3D12_CLEAR_VALUE clear_value;
     clear_value.Format = ImageFormatToDXGIFormat(image_->Format());
     clear_value.Color[0] = clear_value_.color.r;
     clear_value.Color[1] = clear_value_.color.g;
     clear_value.Color[2] = clear_value_.color.b;
     clear_value.Color[3] = clear_value_.color.a;
-    command_list->ClearRenderTargetView(context->RTVHandle(image_->Image()->Handle()), clear_value.Color, 0, nullptr);
+    command_list->ClearRenderTargetView(context->RTVHandle(image_->Image()), clear_value.Color, 0, nullptr);
   }
 }
 
@@ -367,9 +363,9 @@ D3D12CmdPresent::D3D12CmdPresent(D3D12Window *window, D3D12Image *image, D3D12Im
 void D3D12CmdPresent::CompileCommand(D3D12CommandContext *context, ID3D12GraphicsCommandList *command_list) {
   auto gpu_descriptor = context->WriteSRVDescriptor(image_);
 
-  context->RequireResourceState(command_list, image_->Image()->Handle(), D3D12_RESOURCE_STATE_GENERIC_READ);
+  context->RequireResourceState(command_list, image_->Image(), D3D12_RESOURCE_STATE_GENERIC_READ);
 
-  auto destination = target_ ? target_->Image()->Handle() : window_->CurrentBackBuffer();
+  auto destination = target_ ? target_->Image() : window_->CurrentBackBuffer();
   CD3DX12_RESOURCE_BARRIER barrier = CD3DX12_RESOURCE_BARRIER::Transition(destination, D3D12_RESOURCE_STATE_PRESENT,
                                                                           D3D12_RESOURCE_STATE_RENDER_TARGET);
 
@@ -378,11 +374,10 @@ void D3D12CmdPresent::CompileCommand(D3D12CommandContext *context, ID3D12Graphic
   else
     command_list->ResourceBarrier(1, &barrier);
 
-  auto root_signature = context->Core()->BlitPipeline()->root_signature->Handle();
-  auto pso = context->Core()->BlitPipeline()->GetPipelineState(window_->SwapChain()->BackBufferFormat());
+  auto root_signature = context->Core()->BlitPipeline()->root_signature.Get();
+  auto pso = context->Core()->BlitPipeline()->GetPipelineState(window_->BackBufferFormat());
   Extent2D extent;
-  extent.width = window_->SwapChain()->Width();
-  extent.height = window_->SwapChain()->Height();
+  extent = window_->BackBufferExtent();
   auto image_extent = image_->Extent();
   const float scale = std::min(static_cast<float>(extent.width) / image_extent.width,
                                static_cast<float>(extent.height) / image_extent.height);
@@ -390,7 +385,7 @@ void D3D12CmdPresent::CompileCommand(D3D12CommandContext *context, ID3D12Graphic
   const float target_height = image_extent.height * scale;
   const float target_x = (extent.width - target_width) * 0.5f;
   const float target_y = (extent.height - target_height) * 0.5f;
-  command_list->SetPipelineState(pso->Handle());
+  command_list->SetPipelineState(pso);
   command_list->SetGraphicsRootSignature(root_signature);
   command_list->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
 
@@ -408,7 +403,7 @@ void D3D12CmdPresent::CompileCommand(D3D12CommandContext *context, ID3D12Graphic
   auto &imgui_assets = window_->ImGuiAssets();
   if (draw_ui_ && imgui_assets.context && imgui_assets.draw_command) {
     imgui_assets.draw_command = false;
-    auto binding_heap = imgui_assets.srv_heap->Handle();
+    auto binding_heap = imgui_assets.srv_heap.Get();
     command_list->SetDescriptorHeaps(1, &binding_heap);
     ImGui::SetCurrentContext(imgui_assets.context);
     ImGuiLinearColors linear_ui(window_->IsHDR());
@@ -434,22 +429,22 @@ D3D12CmdDispatchRays::D3D12CmdDispatchRays(D3D12RayTracingProgram *program,
 }
 
 void D3D12CmdDispatchRays::CompileCommand(D3D12CommandContext *context, ID3D12GraphicsCommandList *command_list) {
-  d3d12::ComPtr<ID3D12GraphicsCommandList4> dxr_command_list;
+  ComPtr<ID3D12GraphicsCommandList4> dxr_command_list;
   if (SUCCEEDED(command_list->QueryInterface(IID_PPV_ARGS(&dxr_command_list)))) {
     auto shader_table = program_->ShaderTable();
     UINT shader_record_size =
         d3d12::SizeAlignTo(D3D12_SHADER_IDENTIFIER_SIZE_IN_BYTES, D3D12_RAYTRACING_SHADER_RECORD_BYTE_ALIGNMENT);
     D3D12_DISPATCH_RAYS_DESC dispatch_desc = {};
-    dispatch_desc.HitGroupTable.StartAddress = shader_table->GetHitGroupDeviceAddress();
-    dispatch_desc.HitGroupTable.SizeInBytes = shader_record_size * shader_table->HitGroupShaderCount();
+    dispatch_desc.HitGroupTable.StartAddress = program_->HitGroupAddress();
+    dispatch_desc.HitGroupTable.SizeInBytes = shader_record_size * program_->HitGroupCount();
     dispatch_desc.HitGroupTable.StrideInBytes = shader_record_size;
-    dispatch_desc.MissShaderTable.StartAddress = shader_table->GetMissDeviceAddress();
-    dispatch_desc.MissShaderTable.SizeInBytes = shader_record_size * shader_table->MissShaderCount();
+    dispatch_desc.MissShaderTable.StartAddress = program_->MissShaderAddress();
+    dispatch_desc.MissShaderTable.SizeInBytes = shader_record_size * program_->MissShaderCount();
     dispatch_desc.MissShaderTable.StrideInBytes = shader_record_size;
-    dispatch_desc.RayGenerationShaderRecord.StartAddress = shader_table->GetRayGenDeviceAddress();
+    dispatch_desc.RayGenerationShaderRecord.StartAddress = shader_table->GetGPUVirtualAddress();
     dispatch_desc.RayGenerationShaderRecord.SizeInBytes = shader_record_size;
-    dispatch_desc.CallableShaderTable.StartAddress = shader_table->GetCallableDeviceAddress();
-    dispatch_desc.CallableShaderTable.SizeInBytes = shader_record_size * shader_table->CallableShaderCount();
+    dispatch_desc.CallableShaderTable.StartAddress = program_->CallableShaderAddress();
+    dispatch_desc.CallableShaderTable.SizeInBytes = shader_record_size * program_->CallableShaderCount();
     dispatch_desc.CallableShaderTable.StrideInBytes = shader_record_size;
     dispatch_desc.Width = width_;
     dispatch_desc.Height = height_;
@@ -493,10 +488,9 @@ D3D12CmdCopyBuffer::D3D12CmdCopyBuffer(D3D12Buffer *dst_buffer,
 }
 
 void D3D12CmdCopyBuffer::CompileCommand(D3D12CommandContext *context, ID3D12GraphicsCommandList *command_list) {
-  context->RequireResourceState(command_list, dst_buffer_->Buffer()->Handle(), D3D12_RESOURCE_STATE_COPY_DEST);
-  context->RequireResourceState(command_list, src_buffer_->Buffer()->Handle(), D3D12_RESOURCE_STATE_COPY_SOURCE);
-  command_list->CopyBufferRegion(dst_buffer_->Buffer()->Handle(), dst_offset_, src_buffer_->Buffer()->Handle(),
-                                 src_offset_, size_);
+  context->RequireResourceState(command_list, dst_buffer_->Buffer(), D3D12_RESOURCE_STATE_COPY_DEST);
+  context->RequireResourceState(command_list, src_buffer_->Buffer(), D3D12_RESOURCE_STATE_COPY_SOURCE);
+  command_list->CopyBufferRegion(dst_buffer_->Buffer(), dst_offset_, src_buffer_->Buffer(), src_offset_, size_);
 }
 
 }  // namespace grassland::graphics::backend

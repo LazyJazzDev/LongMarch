@@ -8,14 +8,22 @@ namespace grassland::graphics::backend {
 class VulkanProgramBase {
  public:
   VulkanProgramBase(VulkanCore *core);
-  virtual ~VulkanProgramBase() = default;
+  virtual ~VulkanProgramBase();
 
-  vulkan::PipelineLayout *PipelineLayout() const {
-    return pipeline_layout_.get();
+  VkPipelineLayout PipelineLayout() const {
+    return pipeline_layout_;
   }
 
-  vulkan::DescriptorSetLayout *DescriptorSetLayout(int index) const {
-    return descriptor_set_layouts_[index].get();
+  VkDescriptorSetLayout DescriptorSetLayout(int index) const {
+    return descriptor_set_layouts_[index];
+  }
+
+  const VkDescriptorSetLayoutBinding &DescriptorBinding(int index) const {
+    return descriptor_bindings_[index];
+  }
+
+  vulkan::DescriptorPoolSize DescriptorPoolSize(int index) const {
+    return {descriptor_bindings_[index].descriptorType, descriptor_bindings_[index].descriptorCount};
   }
 
   VulkanCore *Core() const {
@@ -27,8 +35,9 @@ class VulkanProgramBase {
 
   void FinalizePipelineLayout();
   VulkanCore *core_;
-  std::vector<std::unique_ptr<vulkan::DescriptorSetLayout>> descriptor_set_layouts_;
-  std::unique_ptr<vulkan::PipelineLayout> pipeline_layout_;
+  std::vector<VkDescriptorSetLayout> descriptor_set_layouts_;
+  std::vector<VkDescriptorSetLayoutBinding> descriptor_bindings_;
+  VkPipelineLayout pipeline_layout_{VK_NULL_HANDLE};
 };
 
 class VulkanProgram : public Program, public VulkanProgramBase {
@@ -50,13 +59,13 @@ class VulkanProgram : public Program, public VulkanProgramBase {
   int NumInputBindings() const;
   const vulkan::PipelineSettings *PipelineSettings() const;
 
-  vulkan::Pipeline *Pipeline() const {
-    return pipeline_.get();
+  VkPipeline Pipeline() const {
+    return pipeline_;
   }
 
  private:
   vulkan::PipelineSettings pipeline_settings_;
-  std::unique_ptr<vulkan::Pipeline> pipeline_;
+  VkPipeline pipeline_{VK_NULL_HANDLE};
 };
 
 class VulkanComputeProgram : public ComputeProgram, public VulkanProgramBase {
@@ -84,7 +93,7 @@ class VulkanRayTracingProgram : public RayTracingProgram, public VulkanProgramBa
                           VulkanShader *raygen_shader,
                           VulkanShader *miss_shader,
                           VulkanShader *closest_hit_shader);
-  ~VulkanRayTracingProgram() override = default;
+  ~VulkanRayTracingProgram() override;
 
   void AddResourceBinding(ResourceType type, int count) override;
 
@@ -98,21 +107,53 @@ class VulkanRayTracingProgram : public RayTracingProgram, public VulkanProgramBa
                 const std::vector<int32_t> &callable_shader_indices) override;
   void Finalize() override;
 
-  vulkan::RayTracingPipeline *Pipeline() const {
-    return pipeline_.get();
+  VkPipeline Pipeline() const {
+    return pipeline_;
   }
 
-  vulkan::ShaderBindingTable *ShaderBindingTable() const {
-    return shader_binding_table_.get();
+  VkDeviceAddress GetRayGenDeviceAddress() const {
+    return raygen_address_;
+  }
+
+  VkDeviceAddress GetMissDeviceAddress() const {
+    return miss_address_;
+  }
+
+  VkDeviceAddress GetHitGroupDeviceAddress() const {
+    return hit_address_;
+  }
+
+  VkDeviceAddress GetCallableDeviceAddress() const {
+    return callable_address_;
+  }
+
+  size_t MissShaderCount() const {
+    return miss_shader_count_;
+  }
+
+  size_t HitGroupCount() const {
+    return hit_group_count_;
+  }
+
+  size_t CallableShaderCount() const {
+    return callable_shader_count_;
   }
 
  private:
-  vulkan::ShaderModule *raygen_shader_;
-  std::vector<vulkan::ShaderModule *> miss_shaders_;
+  VulkanShader *raygen_shader_;
+  std::vector<VulkanShader *> miss_shaders_;
   std::vector<vulkan::HitGroup> hit_groups_;
-  std::vector<vulkan::ShaderModule *> callable_shaders_;
-  std::unique_ptr<vulkan::RayTracingPipeline> pipeline_;
-  std::unique_ptr<vulkan::ShaderBindingTable> shader_binding_table_;
+  std::vector<VulkanShader *> callable_shaders_;
+  VkPipeline pipeline_{VK_NULL_HANDLE};
+  VkBuffer sbt_buffer_{VK_NULL_HANDLE};
+  VmaAllocation sbt_allocation_{VK_NULL_HANDLE};
+  VkDeviceAddress raygen_address_{};
+  VkDeviceAddress miss_address_{};
+  VkDeviceAddress hit_address_{};
+  VkDeviceAddress callable_address_{};
+  size_t miss_shader_count_{};
+  size_t hit_group_count_{};
+  size_t callable_shader_count_{};
 };
 
 }  // namespace grassland::graphics::backend
