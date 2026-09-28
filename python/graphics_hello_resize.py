@@ -1,28 +1,9 @@
-import math
 import sys
 
-import numpy as np
 from long_march import graphics
 
 import graphics_hello as gh
-
-CUBE_VERTICES = np.array([
-    [-1.0, -1.0, 1.0, 0.0, 0.0, 0.0], [1.0, -1.0, 1.0, 1.0, 0.0, 0.0],
-    [-1.0, 1.0, 1.0, 0.0, 1.0, 0.0], [1.0, 1.0, 1.0, 1.0, 1.0, 0.0],
-    [-1.0, -1.0, -1.0, 0.0, 0.0, 1.0], [1.0, -1.0, -1.0, 1.0, 0.0, 1.0],
-    [-1.0, 1.0, -1.0, 0.0, 1.0, 1.0], [1.0, 1.0, -1.0, 1.0, 1.0, 1.0],
-], np.float32)
-
-CUBE_INDICES = np.array([0, 1, 2, 2, 1, 3, 2, 3, 6, 6, 3, 7, 6, 7, 4, 4, 7, 5,
-                         4, 5, 0, 0, 5, 1, 1, 5, 3, 3, 5, 7, 0, 2, 4, 4, 2, 6], np.uint32)
-
-
-def cube_uniforms(angle, aspect):
-    """GlobalUniformBuffer {model, view, proj} shared by the cube and resize modules."""
-    model = gh.rotate_y(angle)
-    view = gh.look_at((0.0, 0.0, 5.0), (0.0, 0.0, 0.0), (0.0, 1.0, 0.0))
-    proj = gh.perspective(math.radians(45.0), aspect, 3.5, 6.5, zero_to_one=True)
-    return gh.as_bytes(model, view, proj)
+from graphics_hello_cube import CUBE_INDICES, CUBE_VERTICES, cube_uniforms
 
 
 class Module(gh.Module):
@@ -30,10 +11,21 @@ class Module(gh.Module):
         super().__init__()
         self.core = gh.initialize_graphics_hello(api)
 
+    def create_targets(self, width, height):
+        self.color_image = self.core.create_image(width, height, graphics.IMAGE_FORMAT_R32G32B32A32_SFLOAT)
+        self.depth_image = self.core.create_image(width, height, graphics.IMAGE_FORMAT_D32_SFLOAT)
+
+    def on_framebuffer_resize(self, width, height):
+        if width <= 0 or height <= 0:
+            return
+        self.core.wait_gpu()
+        self.color_image = self.depth_image = None
+        self.create_targets(width, height)
+
     def on_init(self):
         self.alive = True
         self.window = self.core.create_window(1280, 720, gh.graphics_hello_title(self.core.api()) +
-                                              " Graphics Hello Cube")
+                                              " Graphics Hello Resize", False, True)
 
         self.vertex_buffer = self.core.create_buffer(CUBE_VERTICES.nbytes, graphics.BUFFER_TYPE_STATIC)
         self.index_buffer = self.core.create_buffer(CUBE_INDICES.nbytes, graphics.BUFFER_TYPE_STATIC)
@@ -42,10 +34,10 @@ class Module(gh.Module):
 
         self.uniform_buffer = self.core.create_buffer(3 * 64, graphics.BUFFER_TYPE_DYNAMIC)
 
-        self.color_image = self.core.create_image(1280, 720, graphics.IMAGE_FORMAT_R32G32B32A32_SFLOAT)
-        self.depth_image = self.core.create_image(1280, 720, graphics.IMAGE_FORMAT_D32_SFLOAT)
+        self.create_targets(*self.window.get_framebuffer_size())
+        self.window.register_framebuffer_resize_event(self.on_framebuffer_resize)
 
-        shader = gh.load_shader("modules/cube/shaders/shader.slang")
+        shader = gh.load_shader("modules/resize/shaders/shader.slang")
         self.vertex_shader = self.core.create_shader(shader, "VSMain", "vs_6_0")
         self.fragment_shader = self.core.create_shader(shader, "PSMain", "ps_6_0")
         gh.log_info("Shader compiled successfully")
@@ -68,7 +60,8 @@ class Module(gh.Module):
 
     def on_update(self):
         if self.update_alive():
-            self.uniform_buffer.upload_data(cube_uniforms(self.rotation_angle(), 1280.0 / 720.0))
+            extent = self.color_image.extent()
+            self.uniform_buffer.upload_data(cube_uniforms(self.rotation_angle(), extent.width / extent.height))
 
     def on_render(self):
         command_context = self.core.create_command_context()
@@ -79,8 +72,10 @@ class Module(gh.Module):
         command_context.cmd_bind_vertex_buffers(0, [self.vertex_buffer], [0])
         command_context.cmd_bind_index_buffer(self.index_buffer, 0)
         command_context.cmd_bind_resources(0, [self.uniform_buffer])
-        command_context.cmd_set_viewport(0, 0, 1280, 720, 0.0, 1.0)
-        command_context.cmd_set_scissor(0, 0, 1280, 720)
+
+        extent = self.color_image.extent()
+        command_context.cmd_set_viewport(0, 0, extent.width, extent.height, 0.0, 1.0)
+        command_context.cmd_set_scissor(0, 0, extent.width, extent.height)
         command_context.cmd_set_primitive_topology(graphics.PRIMITIVE_TOPOLOGY_TRIANGLE_LIST)
         command_context.cmd_draw_indexed(36, 1, 0, 0, 0)
         command_context.cmd_end_rendering()
@@ -89,4 +84,4 @@ class Module(gh.Module):
 
 
 if __name__ == "__main__":
-    sys.exit(gh.main(module="cube"))
+    sys.exit(gh.main(module="resize"))

@@ -223,6 +223,17 @@ void Core::PybindClassRegistration(py::classh<Core> &c) {
       "Create an image", py::keep_alive<0, 1>{});
 
   c.def(
+      "load_image_from_file",
+      [](Core *core, const std::string &file_path) {
+        std::shared_ptr<Image> image_;
+        if (LoadImageFromFile(core, file_path, &image_)) {
+          throw std::runtime_error("Failed to load image: " + file_path);
+        }
+        return image_;
+      },
+      py::arg("file_path"), "Load an LDR (RGBA8) or HDR (RGBA32F) image from a file", py::keep_alive<0, 1>{});
+
+  c.def(
       "create_sampler",
       [](Core *core, const SamplerInfo &info) {
         std::shared_ptr<Sampler> sampler_;
@@ -243,6 +254,20 @@ void Core::PybindClassRegistration(py::classh<Core> &c) {
       },
       py::arg("source_code"), py::arg("entry_point"), py::arg("target"), py::arg("args") = std::vector<std::string>{},
       "Create shader from source code", py::keep_alive<0, 1>{});
+
+  c.def(
+      "create_shader_from_directory",
+      [](Core *core, const std::string &directory, const std::string &source_file, const std::string &entry_point,
+         const std::string &target, const std::vector<std::string> &args) {
+        std::shared_ptr<Shader> shader_;
+        core->CreateShader(VirtualFileSystem::LoadDirectory(directory), source_file, entry_point, target, args,
+                           &shader_);
+        return shader_;
+      },
+      py::arg("directory"), py::arg("source_file"), py::arg("entry_point"), py::arg("target"),
+      py::arg("args") = std::vector<std::string>{},
+      "Create shader from a file in a directory; includes resolve against the loaded directory",
+      py::keep_alive<0, 1>{});
 
   c.def(
       "create_program",
@@ -337,19 +362,19 @@ void Core::PybindClassRegistration(py::classh<Core> &c) {
             throw std::runtime_error("Each object must be a pair of (AccelerationStructure, transform)");
           }
           AccelerationStructure *as = pair[0].cast<AccelerationStructure *>();
-          py::list transform_list = pair[1].cast<py::list>();
+          py::sequence transform_list = pair[1].cast<py::sequence>();
 
           if (transform_list.size() != 4) {
             throw std::runtime_error("Transform matrix must have 4 rows");
           }
           glm::mat4 transform;
           for (int i = 0; i < 4; i++) {
-            py::list row = transform_list[i].cast<py::list>();
+            py::sequence row = transform_list[i].cast<py::sequence>();
             if (row.size() != 4) {
               throw std::runtime_error("Transform matrix rows must have 4 columns");
             }
             for (int j = 0; j < 4; j++) {
-              transform[i][j] = row[j].cast<float>();
+              transform[j][i] = row[j].cast<float>();  // Rows are given row-major.
             }
           }
           objects.emplace_back(as, transform);
@@ -376,6 +401,25 @@ void Core::PybindClassRegistration(py::classh<Core> &c) {
 #if defined(LONGMARCH_CUDA_RUNTIME)
   c.def("init_cuda", &Core::InitializeLogicalDeviceByCUDADeviceID, py::arg("cuda_device_id"),
         "Initialize logical device by CUDA device index");
+  c.def("cuda_device_index", &Core::CUDADeviceIndex, "CUDA device of the logical device, or -1");
+  c.def(
+      "create_cuda_buffer",
+      [](Core *core, size_t size) {
+        std::shared_ptr<CUDABuffer> buffer_;
+        if (core->CreateCUDABuffer(size, &buffer_))
+          throw std::runtime_error("Failed to create CUDA buffer");
+        return buffer_;
+      },
+      py::arg("size"), "Create a static buffer that CUDA can access through cuda_ptr()", py::keep_alive<0, 1>{});
+  // Streams are raw cudaStream_t handles, e.g. warp.Stream.cuda_stream; 0 is the legacy default stream.
+  c.def(
+      "cuda_begin_execution_barrier",
+      [](Core *core, uintptr_t stream) { core->CUDABeginExecutionBarrier(reinterpret_cast<cudaStream_t>(stream)); },
+      py::arg("stream") = 0, "Make CUDA work on the stream wait for submitted graphics work");
+  c.def(
+      "cuda_end_execution_barrier",
+      [](Core *core, uintptr_t stream) { core->CUDAEndExecutionBarrier(reinterpret_cast<cudaStream_t>(stream)); },
+      py::arg("stream") = 0, "Make later graphics work wait for CUDA work on the stream");
 #endif
 }
 #endif

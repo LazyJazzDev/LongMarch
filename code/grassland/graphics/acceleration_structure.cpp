@@ -47,19 +47,19 @@ void AccelerationStructure::PybindClassRegistration(py::classh<AccelerationStruc
             throw std::runtime_error("Each instance must be a pair of (AccelerationStructure, transform)");
           }
           AccelerationStructure *as = pair[0].cast<AccelerationStructure *>();
-          py::list transform_list = pair[1].cast<py::list>();
+          py::sequence transform_list = pair[1].cast<py::sequence>();
 
           if (transform_list.size() != 3) {
             throw std::runtime_error("Transform matrix must have 3 rows");
           }
           glm::mat4x3 transform;
           for (int i = 0; i < 3; i++) {
-            py::list row = transform_list[i].cast<py::list>();
+            py::sequence row = transform_list[i].cast<py::sequence>();
             if (row.size() != 4) {
               throw std::runtime_error("Transform matrix rows must have 4 columns");
             }
             for (int j = 0; j < 4; j++) {
-              transform[i][j] = row[j].cast<float>();
+              transform[j][i] = row[j].cast<float>();  // Rows are given row-major.
             }
           }
           instances.emplace_back(as, transform);
@@ -71,19 +71,19 @@ void AccelerationStructure::PybindClassRegistration(py::classh<AccelerationStruc
   // Wrap make_instance to handle glm::mat4x3 properly
   c.def(
       "make_instance",
-      [](AccelerationStructure *self, py::list transform_list, uint32_t instance_id, uint32_t instance_mask,
+      [](AccelerationStructure *self, py::sequence transform_list, uint32_t instance_id, uint32_t instance_mask,
          uint32_t instance_hit_group_offset, RayTracingInstanceFlag instance_flags) {
         if (transform_list.size() != 3) {
           throw std::runtime_error("Transform matrix must have 3 rows");
         }
         glm::mat4x3 transform;
         for (int i = 0; i < 3; i++) {
-          py::list row = transform_list[i].cast<py::list>();
+          py::sequence row = transform_list[i].cast<py::sequence>();
           if (row.size() != 4) {
             throw std::runtime_error("Transform matrix rows must have 4 columns");
           }
           for (int j = 0; j < 4; j++) {
-            transform[i][j] = row[j].cast<float>();
+            transform[j][i] = row[j].cast<float>();  // Rows are given row-major.
           }
         }
         return self->MakeInstance(transform, instance_id, instance_mask, instance_hit_group_offset, instance_flags);
