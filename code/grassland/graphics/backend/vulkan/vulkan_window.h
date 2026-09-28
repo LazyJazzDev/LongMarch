@@ -47,6 +47,8 @@ class VulkanWindow : public Window {
   VulkanImGuiAssets &ImGuiAssets();
   void SetupImGuiContext();
   void BuildImGuiFramebuffers();
+  void DestroyImGuiFramebuffers();
+  void DestroyImGuiRenderPass();
 
  private:
   VkQueue present_queue_;

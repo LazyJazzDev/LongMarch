@@ -400,7 +400,7 @@ void D3D12CmdPresent::CompileCommand(D3D12CommandContext *context, ID3D12Graphic
   auto &imgui_assets = window_->ImGuiAssets();
   if (imgui_assets.context && imgui_assets.draw_command) {
     imgui_assets.draw_command = false;
-    auto binding_heap = imgui_assets.srv_heap->Handle();
+    auto binding_heap = imgui_assets.srv_heap.Get();
     command_list->SetDescriptorHeaps(1, &binding_heap);
     ImGui_ImplDX12_RenderDrawData(ImGui::GetDrawData(), command_list);
   }

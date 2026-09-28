@@ -455,10 +455,10 @@ void VulkanCmdPresent::CompileCommand(VulkanCommandContext *context, VkCommandBu
 
     VkRenderPassBeginInfo renderPassInfo{};
     renderPassInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
-    renderPassInfo.renderPass = imgui_assets.render_pass->Handle();
-    renderPassInfo.framebuffer = imgui_assets.framebuffers[window_->CurrentImageIndex()]->Handle();
+    renderPassInfo.renderPass = imgui_assets.render_pass;
+    renderPassInfo.framebuffer = imgui_assets.framebuffers[window_->CurrentImageIndex()];
     renderPassInfo.renderArea.offset = {0, 0};
-    renderPassInfo.renderArea.extent = imgui_assets.framebuffers[window_->CurrentImageIndex()]->Extent();
+    renderPassInfo.renderArea.extent = window_->SwapChain()->Extent();
     renderPassInfo.clearValueCount = 0;
     renderPassInfo.pClearValues = nullptr;
 

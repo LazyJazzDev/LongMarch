@@ -50,7 +50,7 @@ struct ExampleDescriptorHeapAllocator {
 struct D3D12ImGuiAssets {
   ImGuiContext *context;
 
-  std::unique_ptr<d3d12::DescriptorHeap> srv_heap;
+  Microsoft::WRL::ComPtr<ID3D12DescriptorHeap> srv_heap;
   ExampleDescriptorHeapAllocator descriptor_alloc;
 
   DXGI_FORMAT rtv_format;

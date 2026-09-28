@@ -7,8 +7,9 @@
 namespace grassland::graphics::backend {
 struct VulkanImGuiAssets {
   ImGuiContext *context;
-  std::unique_ptr<vulkan::RenderPass> render_pass;
-  std::vector<std::unique_ptr<vulkan::Framebuffer>> framebuffers;
+  VkRenderPass render_pass{VK_NULL_HANDLE};
+  VkFormat render_pass_format{VK_FORMAT_UNDEFINED};
+  std::vector<VkFramebuffer> framebuffers;
   std::string font_path;
   float font_size;
   bool draw_command;

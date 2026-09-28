@@ -65,19 +65,21 @@ uint32_t VulkanWindow::AcquireNextImage() {
 
 void VulkanWindow::Rebuild() {
   core_->WaitGPU();
+  if (imgui_assets_.context) {
+    DestroyImGuiFramebuffers();
+  }
   swap_chain_.reset();
   core_->Device()->CreateSwapchain(
       surface_.get(), enable_hdr_ ? VK_FORMAT_R16G16B16A16_SFLOAT : VK_FORMAT_R8G8B8A8_UNORM,
       enable_hdr_ ? VK_COLOR_SPACE_EXTENDED_SRGB_LINEAR_EXT : VK_COLOR_SPACE_SRGB_NONLINEAR_KHR, &swap_chain_);
   if (imgui_assets_.context) {
     ImGui::SetCurrentContext(imgui_assets_.context);
-    imgui_assets_.framebuffers.clear();
-    if (imgui_assets_.render_pass->AttachmentDescriptions()[0].format != swap_chain_->Format()) {
+    if (imgui_assets_.render_pass_format != swap_chain_->Format()) {
       ImGui_ImplVulkan_Shutdown();
       ImGui_ImplGlfw_Shutdown();
 
       ImGui::DestroyContext(imgui_assets_.context);
-      imgui_assets_.render_pass.reset();
+      DestroyImGuiRenderPass();
       SetupImGuiContext();
     }
 
@@ -117,6 +119,7 @@ void VulkanWindow::InitImGui(const char *font_file_path, float font_size) {
 }
 
 void VulkanWindow::TerminateImGui() {
+  core_->WaitGPU();
   if (imgui_assets_.context) {
     ImGui::SetCurrentContext(imgui_assets_.context);
     ImGui_ImplVulkan_Shutdown();
@@ -124,6 +127,8 @@ void VulkanWindow::TerminateImGui() {
     ImGui::DestroyContext(imgui_assets_.context);
     imgui_assets_.context = nullptr;
   }
+  DestroyImGuiFramebuffers();
+  DestroyImGuiRenderPass();
 }
 
 void VulkanWindow::BeginImGuiFrame() {
@@ -170,7 +175,19 @@ void VulkanWindow::SetupImGuiContext() {
   VkAttachmentReference attachment_ref{};
   attachment_ref.attachment = 0;
   attachment_ref.layout = VK_IMAGE_LAYOUT_GENERAL;
-  core_->Device()->CreateRenderPass({attachment_desc}, {attachment_ref}, &imgui_assets_.render_pass);
+  VkSubpassDescription subpass{};
+  subpass.pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS;
+  subpass.colorAttachmentCount = 1;
+  subpass.pColorAttachments = &attachment_ref;
+  VkRenderPassCreateInfo render_pass_info{VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO};
+  render_pass_info.attachmentCount = 1;
+  render_pass_info.pAttachments = &attachment_desc;
+  render_pass_info.subpassCount = 1;
+  render_pass_info.pSubpasses = &subpass;
+  vulkan::ThrowIfFailed(
+      vkCreateRenderPass(core_->Device()->Handle(), &render_pass_info, nullptr, &imgui_assets_.render_pass),
+      "Failed to create ImGui render pass");
+  imgui_assets_.render_pass_format = attachment_desc.format;
 
   ImGui_ImplVulkan_InitInfo init_info = {};
   init_info.ApiVersion = VK_API_VERSION_1_2;
@@ -180,7 +197,7 @@ void VulkanWindow::SetupImGuiContext() {
   init_info.QueueFamily = core_->GraphicsQueue()->QueueFamilyIndex();
   init_info.Queue = core_->GraphicsQueue()->Handle();
   init_info.DescriptorPoolSize = 32;
-  init_info.RenderPass = imgui_assets_.render_pass->Handle();
+  init_info.RenderPass = imgui_assets_.render_pass;
   init_info.MinImageCount = 2;
   init_info.ImageCount = 3;
   init_info.MSAASamples = VK_SAMPLE_COUNT_1_BIT;
@@ -204,8 +221,32 @@ void VulkanWindow::SetupImGuiContext() {
 void VulkanWindow::BuildImGuiFramebuffers() {
   imgui_assets_.framebuffers.resize(swap_chain_->ImageCount());
   for (int i = 0; i < swap_chain_->ImageCount(); i++) {
-    imgui_assets_.render_pass->CreateFramebuffer({swap_chain_->ImageViews()[i]}, swap_chain_->Extent(),
-                                                 &imgui_assets_.framebuffers[i]);
+    VkImageView image_view = swap_chain_->ImageViews()[i];
+    VkFramebufferCreateInfo framebuffer_info{VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO};
+    framebuffer_info.renderPass = imgui_assets_.render_pass;
+    framebuffer_info.attachmentCount = 1;
+    framebuffer_info.pAttachments = &image_view;
+    framebuffer_info.width = swap_chain_->Extent().width;
+    framebuffer_info.height = swap_chain_->Extent().height;
+    framebuffer_info.layers = 1;
+    vulkan::ThrowIfFailed(
+        vkCreateFramebuffer(core_->Device()->Handle(), &framebuffer_info, nullptr, &imgui_assets_.framebuffers[i]),
+        "Failed to create ImGui framebuffer");
+  }
+}
+
+void VulkanWindow::DestroyImGuiFramebuffers() {
+  for (VkFramebuffer framebuffer : imgui_assets_.framebuffers) {
+    vkDestroyFramebuffer(core_->Device()->Handle(), framebuffer, nullptr);
+  }
+  imgui_assets_.framebuffers.clear();
+}
+
+void VulkanWindow::DestroyImGuiRenderPass() {
+  if (imgui_assets_.render_pass != VK_NULL_HANDLE) {
+    vkDestroyRenderPass(core_->Device()->Handle(), imgui_assets_.render_pass, nullptr);
+    imgui_assets_.render_pass = VK_NULL_HANDLE;
+    imgui_assets_.render_pass_format = VK_FORMAT_UNDEFINED;
   }
 }
 

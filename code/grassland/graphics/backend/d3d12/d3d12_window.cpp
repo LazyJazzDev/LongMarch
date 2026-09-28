@@ -30,6 +30,7 @@ D3D12Window::D3D12Window(D3D12Core *core,
 
       ImGui::DestroyContext(imgui_assets_.context);
       imgui_assets_.descriptor_alloc.Destroy();
+      imgui_assets_.srv_heap.Reset();
 
       SetupImGuiContext();
     }
@@ -70,6 +71,7 @@ void D3D12Window::InitImGui(const char *font_file_path, float font_size) {
 }
 
 void D3D12Window::TerminateImGui() {
+  core_->WaitGPU();
   if (imgui_assets_.context) {
     ImGui::SetCurrentContext(imgui_assets_.context);
     ImGui_ImplDX12_Shutdown();
@@ -77,6 +79,8 @@ void D3D12Window::TerminateImGui() {
     ImGui::DestroyContext(imgui_assets_.context);
     imgui_assets_.context = nullptr;
   }
+  imgui_assets_.descriptor_alloc.Destroy();
+  imgui_assets_.srv_heap.Reset();
 }
 
 void D3D12Window::BeginImGuiFrame() {
@@ -115,8 +119,10 @@ void D3D12Window::SetupImGuiContext() {
   srv_heap_desc.NodeMask = 0;
   srv_heap_desc.NumDescriptors = 64;
   srv_heap_desc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV;
-  core_->Device()->CreateDescriptorHeap(srv_heap_desc, &imgui_assets_.srv_heap);
-  imgui_assets_.descriptor_alloc.Create(core_->Device()->Handle(), imgui_assets_.srv_heap->Handle());
+  d3d12::ThrowIfFailed(core_->Device()->Handle()->CreateDescriptorHeap(
+                           &srv_heap_desc, IID_PPV_ARGS(imgui_assets_.srv_heap.GetAddressOf())),
+                       "Failed to create ImGui descriptor heap");
+  imgui_assets_.descriptor_alloc.Create(core_->Device()->Handle(), imgui_assets_.srv_heap.Get());
 
   ImGui_ImplDX12_InitInfo init_info = {};
   init_info.Device = core_->Device()->Handle();
@@ -126,7 +132,7 @@ void D3D12Window::SetupImGuiContext() {
   init_info.DSVFormat = DXGI_FORMAT_UNKNOWN;
   init_info.UserData = &imgui_assets_;
 
-  init_info.SrvDescriptorHeap = imgui_assets_.srv_heap->Handle();
+  init_info.SrvDescriptorHeap = imgui_assets_.srv_heap.Get();
   init_info.SrvDescriptorAllocFn = [](ImGui_ImplDX12_InitInfo *info, D3D12_CPU_DESCRIPTOR_HANDLE *out_cpu_desc_handle,
                                       D3D12_GPU_DESCRIPTOR_HANDLE *out_gpu_desc_handle) {
     auto assets = static_cast<D3D12ImGuiAssets *>(info->UserData);
