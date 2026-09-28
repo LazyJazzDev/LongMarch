@@ -91,7 +91,6 @@ class PhysicalDevice;
 struct HitGroup;
 class Buffer;
 class AccelerationStructure;
-class ShaderBindingTable;
 
 bool IsDepthFormat(VkFormat format);
 

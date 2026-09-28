@@ -244,7 +244,12 @@ class VulkanCore : public Core {
                                     const std::vector<int32_t> &miss_shader_indices,
                                     const std::vector<int32_t> &hit_group_indices,
                                     const std::vector<int32_t> &callable_shader_indices,
-                                    double_ptr<vulkan::ShaderBindingTable> pp_sbt) const;
+                                    VkBuffer *buffer,
+                                    VmaAllocation *allocation,
+                                    VkDeviceAddress *raygen_address,
+                                    VkDeviceAddress *miss_address,
+                                    VkDeviceAddress *hit_address,
+                                    VkDeviceAddress *callable_address) const;
 
   VkQueue GraphicsQueue() const {
     return graphics_queue_;

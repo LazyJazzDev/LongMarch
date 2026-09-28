@@ -497,7 +497,7 @@ void VulkanCmdDispatchRays::CompileCommand(VulkanCommandContext *context, VkComm
   const uint32_t handle_size_aligned = aligned_size(ray_tracing_pipeline_properties.shaderGroupHandleSize,
                                                     ray_tracing_pipeline_properties.shaderGroupHandleAlignment);
 
-  auto shader_binding_table = program_->ShaderBindingTable();
+  auto shader_binding_table = program_;
   VkStridedDeviceAddressRegionKHR ray_gen_shader_sbt_entry{};
   ray_gen_shader_sbt_entry.deviceAddress = shader_binding_table->GetRayGenDeviceAddress();
   ray_gen_shader_sbt_entry.stride = handle_size_aligned;

@@ -162,6 +162,8 @@ VulkanRayTracingProgram::VulkanRayTracingProgram(VulkanCore *core) : VulkanProgr
 }
 
 VulkanRayTracingProgram::~VulkanRayTracingProgram() {
+  if (sbt_buffer_)
+    vmaDestroyBuffer(core_->Allocator(), sbt_buffer_, sbt_allocation_);
   if (pipeline_)
     vkDestroyPipeline(core_->Handle(), pipeline_, nullptr);
 }
@@ -222,8 +224,14 @@ void VulkanRayTracingProgram::Finalize(const std::vector<int32_t> &miss_shader_i
   FinalizePipelineLayout();
   core_->CreateRayTracingPipeline(pipeline_layout_, raygen_shader_, miss_shaders_, hit_groups_, callable_shaders_,
                                   &pipeline_);
-  core_->CreateShaderBindingTable(pipeline_, miss_shaders_.size(), hit_groups_.size(), miss_shader_indices,
-                                  hit_group_indices, callable_shader_indices, &shader_binding_table_);
+  vulkan::ThrowIfFailed(
+      core_->CreateShaderBindingTable(pipeline_, miss_shaders_.size(), hit_groups_.size(), miss_shader_indices,
+                                      hit_group_indices, callable_shader_indices, &sbt_buffer_, &sbt_allocation_,
+                                      &raygen_address_, &miss_address_, &hit_address_, &callable_address_),
+      "Failed to create Vulkan shader binding table");
+  miss_shader_count_ = miss_shader_indices.size();
+  hit_group_count_ = hit_group_indices.size();
+  callable_shader_count_ = callable_shader_indices.size();
 }
 
 void VulkanRayTracingProgram::Finalize() {

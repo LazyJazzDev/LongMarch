@@ -7,7 +7,7 @@
 #include "grassland/graphics/backend/vulkan/helper/instance.h"
 #include "grassland/graphics/backend/vulkan/helper/instance_procedures.h"
 #include "grassland/graphics/backend/vulkan/helper/pipeline.h"
-#include "grassland/graphics/backend/vulkan/helper/raytracing/raytracing.h"
+#include "grassland/graphics/backend/vulkan/helper/raytracing/acceleration_structure.h"
 #include "grassland/graphics/backend/vulkan/vulkan_core.h"
 #include "grassland/graphics/backend/vulkan/vulkan_shader.h"
 
@@ -689,7 +689,12 @@ VkResult VulkanCore::CreateShaderBindingTable(VkPipeline pipeline,
                                               const std::vector<int32_t> &miss_shader_indices,
                                               const std::vector<int32_t> &hit_group_indices,
                                               const std::vector<int32_t> &callable_shader_indices,
-                                              double_ptr<vulkan::ShaderBindingTable> pp_sbt) const {
+                                              VkBuffer *out_buffer,
+                                              VmaAllocation *out_allocation,
+                                              VkDeviceAddress *raygen_address,
+                                              VkDeviceAddress *miss_address,
+                                              VkDeviceAddress *hit_address,
+                                              VkDeviceAddress *callable_address) const {
   auto aligned_size = [](uint32_t value, uint32_t alignment) { return (value + alignment - 1) & ~(alignment - 1); };
 
   VkPhysicalDeviceRayTracingPipelinePropertiesKHR ray_tracing_pipeline_properties =
@@ -718,10 +723,12 @@ VkResult VulkanCore::CreateShaderBindingTable(VkPipeline pipeline,
 
   // Ray_gen
   // Create binding table buffers for each shader type
-  std::unique_ptr<vulkan::Buffer> buffer;
-  CreateBuffer(sbt_size, sbt_buffer_usage_flags, VMA_MEMORY_USAGE_CPU_TO_GPU, 0, base_alignment, &buffer);
-
-  VkDeviceAddress buffer_address = buffer->GetDeviceAddress();
+  VkBuffer buffer = VK_NULL_HANDLE;
+  VmaAllocation allocation = VK_NULL_HANDLE;
+  RETURN_IF_FAILED_VK(CreateBuffer(sbt_size, sbt_buffer_usage_flags, VMA_MEMORY_USAGE_CPU_TO_GPU, 0, base_alignment,
+                                   &buffer, &allocation),
+                      "Failed to allocate shader binding table");
+  VkDeviceAddress buffer_address = BufferAddress(buffer);
 
   // Copy the pipeline's shader handles into a host buffer
   std::vector<uint8_t> shader_handle_storage(handle_size * group_count);
@@ -729,7 +736,9 @@ VkResult VulkanCore::CreateShaderBindingTable(VkPipeline pipeline,
                                                    shader_handle_storage.data());
 
   // Copy the shader handles from the host buffer to the binding tables
-  auto *data = static_cast<uint8_t *>(buffer->Map());
+  void *mapped = nullptr;
+  RETURN_IF_FAILED_VK(vmaMapMemory(allocator_, allocation, &mapped), "Failed to map shader binding table");
+  auto *data = static_cast<uint8_t *>(mapped);
   std::memcpy(data + raygen_shader_offset, shader_handle_storage.data(), handle_size_aligned);
   auto data_head = data + miss_shader_offset;
   for (auto miss_shader_index : miss_shader_indices) {
@@ -750,11 +759,14 @@ VkResult VulkanCore::CreateShaderBindingTable(VkPipeline pipeline,
         handle_size);
     data_head += handle_size_aligned;
   }
-  buffer->Unmap();
+  vmaUnmapMemory(allocator_, allocation);
 
-  pp_sbt.construct(std::move(buffer), buffer_address + raygen_shader_offset, buffer_address + miss_shader_offset,
-                   buffer_address + hit_group_offset, buffer_address + callable_shader_offset,
-                   miss_shader_indices.size(), hit_group_indices.size(), callable_shader_indices.size());
+  *out_buffer = buffer;
+  *out_allocation = allocation;
+  *raygen_address = buffer_address + raygen_shader_offset;
+  *miss_address = buffer_address + miss_shader_offset;
+  *hit_address = buffer_address + hit_group_offset;
+  *callable_address = buffer_address + callable_shader_offset;
 
   return VK_SUCCESS;
 }

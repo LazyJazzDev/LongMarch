@@ -111,8 +111,32 @@ class VulkanRayTracingProgram : public RayTracingProgram, public VulkanProgramBa
     return pipeline_;
   }
 
-  vulkan::ShaderBindingTable *ShaderBindingTable() const {
-    return shader_binding_table_.get();
+  VkDeviceAddress GetRayGenDeviceAddress() const {
+    return raygen_address_;
+  }
+
+  VkDeviceAddress GetMissDeviceAddress() const {
+    return miss_address_;
+  }
+
+  VkDeviceAddress GetHitGroupDeviceAddress() const {
+    return hit_address_;
+  }
+
+  VkDeviceAddress GetCallableDeviceAddress() const {
+    return callable_address_;
+  }
+
+  size_t MissShaderCount() const {
+    return miss_shader_count_;
+  }
+
+  size_t HitGroupCount() const {
+    return hit_group_count_;
+  }
+
+  size_t CallableShaderCount() const {
+    return callable_shader_count_;
   }
 
  private:
@@ -121,7 +145,15 @@ class VulkanRayTracingProgram : public RayTracingProgram, public VulkanProgramBa
   std::vector<vulkan::HitGroup> hit_groups_;
   std::vector<VulkanShader *> callable_shaders_;
   VkPipeline pipeline_{VK_NULL_HANDLE};
-  std::unique_ptr<vulkan::ShaderBindingTable> shader_binding_table_;
+  VkBuffer sbt_buffer_{VK_NULL_HANDLE};
+  VmaAllocation sbt_allocation_{VK_NULL_HANDLE};
+  VkDeviceAddress raygen_address_{};
+  VkDeviceAddress miss_address_{};
+  VkDeviceAddress hit_address_{};
+  VkDeviceAddress callable_address_{};
+  size_t miss_shader_count_{};
+  size_t hit_group_count_{};
+  size_t callable_shader_count_{};
 };
 
 }  // namespace grassland::graphics::backend
