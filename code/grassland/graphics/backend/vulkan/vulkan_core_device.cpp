@@ -43,9 +43,9 @@ void VulkanCore::InitializeNativeDevice(uint32_t api_version,
   }
 
   if (ray_tracing_enabled) {
-    procedures_.GetRayTracingProcedures(device_);
+    vulkan::LoadRayTracingProcedures(device_, procedures_);
   } else if (acceleration_structure_enabled) {
-    procedures_.GetAccelerationStructureProcedures(device_);
+    vulkan::LoadAccelerationStructureProcedures(device_, procedures_);
   }
 
   subgroup_properties_ = {};

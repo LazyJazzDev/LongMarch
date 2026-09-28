@@ -118,7 +118,7 @@ VkResult CreateNativeInstance(InstanceCreateHint &create_hint,
 
   RETURN_IF_FAILED_VK(vkCreateInstance(&instance_create_info, nullptr, &instance), "failed to create instance.");
 
-  instance_procedures.Initialize(instance, create_hint.enable_validation_layers);
+  LoadInstanceProcedures(instance, create_hint.enable_validation_layers, instance_procedures);
 
   if (create_hint.enable_validation_layers) {
     RETURN_IF_FAILED_VK(

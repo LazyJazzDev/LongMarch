@@ -2,12 +2,7 @@
 #include "grassland/graphics/backend/vulkan/helper/vulkan_util.h"
 
 namespace grassland::graphics::backend::vulkan {
-class DeviceProcedures {
- public:
-  explicit DeviceProcedures();
-  void GetRayTracingProcedures(VkDevice device);
-  void GetAccelerationStructureProcedures(VkDevice device);
-
+struct DeviceProcedures {
   /** Ray Tracing Procedures */
   GRASSLAND_VULKAN_PROCEDURE_VAR(vkCmdBuildAccelerationStructuresKHR);
   GRASSLAND_VULKAN_PROCEDURE_VAR(vkCreateAccelerationStructureKHR);
@@ -19,4 +14,7 @@ class DeviceProcedures {
   GRASSLAND_VULKAN_PROCEDURE_VAR(vkGetRayTracingShaderGroupHandlesKHR);
   GRASSLAND_VULKAN_PROCEDURE_VAR(vkCmdTraceRaysKHR);
 };
+
+void LoadRayTracingProcedures(VkDevice device, DeviceProcedures &out);
+void LoadAccelerationStructureProcedures(VkDevice device, DeviceProcedures &out);
 }  // namespace grassland::graphics::backend::vulkan

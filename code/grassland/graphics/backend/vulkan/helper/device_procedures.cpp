@@ -14,11 +14,9 @@ FuncTy GetProcedure(VkDevice device, const char *function_name) {
 }  // namespace
 
 #define GET_PROCEDURE(device, function_name) \
-  function_name = grassland::graphics::backend::vulkan::GetProcedure<PFN_##function_name>(device, #function_name)
+  out.function_name = grassland::graphics::backend::vulkan::GetProcedure<PFN_##function_name>(device, #function_name)
 
-DeviceProcedures::DeviceProcedures() = default;
-
-void DeviceProcedures::GetAccelerationStructureProcedures(VkDevice device) {
+void LoadAccelerationStructureProcedures(VkDevice device, DeviceProcedures &out) {
   GET_PROCEDURE(device, vkGetBufferDeviceAddressKHR);
   GET_PROCEDURE(device, vkGetAccelerationStructureBuildSizesKHR);
   GET_PROCEDURE(device, vkCreateAccelerationStructureKHR);
@@ -27,8 +25,8 @@ void DeviceProcedures::GetAccelerationStructureProcedures(VkDevice device) {
   GET_PROCEDURE(device, vkGetAccelerationStructureDeviceAddressKHR);
 }
 
-void DeviceProcedures::GetRayTracingProcedures(VkDevice device) {
-  GetAccelerationStructureProcedures(device);
+void LoadRayTracingProcedures(VkDevice device, DeviceProcedures &out) {
+  LoadAccelerationStructureProcedures(device, out);
   GET_PROCEDURE(device, vkCreateRayTracingPipelinesKHR);
   GET_PROCEDURE(device, vkGetRayTracingShaderGroupHandlesKHR);
   GET_PROCEDURE(device, vkCmdTraceRaysKHR);
