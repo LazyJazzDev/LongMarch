@@ -175,6 +175,8 @@ void util::PybindModuleRegistration(py::module_ &m) {
   backend_api.value("BACKEND_API_D3D12", BACKEND_API_D3D12, "Backend API: Direct3D 12");
   backend_api.export_values();
   m.attr("BACKEND_API_DEFAULT") = py::cast(BACKEND_API_DEFAULT);
+  m.def("support_backend_api", &SupportBackendAPI, py::arg("api"), "Check whether a backend is compiled in");
+  m.def("backend_api_string", &BackendAPIString, py::arg("api"), "Backend name, such as D3D12 or Vulkan");
 
   py::enum_<ImageFormat> image_format(m, "ImageFormat");
   image_format.value("IMAGE_FORMAT_UNDEFINED", IMAGE_FORMAT_UNDEFINED, "Image Format: Undefined");
@@ -534,7 +536,8 @@ void util::PybindModuleRegistration(py::module_ &m) {
   py::class_<BufferRange> buffer_range(m, "BufferRange");
   buffer_range.def(
       py::init([](Buffer *buffer, uint64_t offset, uint64_t size) { return BufferRange(buffer, offset, size); }),
-      py::arg("buffer"), py::arg("offset") = 0, py::arg("size") = 0, "Create a buffer range");
+      py::arg("buffer"), py::arg("offset") = 0, py::arg("size") = ~0ull,
+      "Create a buffer range; the default size spans to the buffer end", py::keep_alive<1, 2>());
   buffer_range.def_readwrite("buffer", &BufferRange::buffer, "Buffer object");
   buffer_range.def_readwrite("offset", &BufferRange::offset, "Offset in bytes");
   buffer_range.def_readwrite("size", &BufferRange::size, "Size in bytes");

@@ -256,6 +256,20 @@ void Core::PybindClassRegistration(py::classh<Core> &c) {
       "Create shader from source code", py::keep_alive<0, 1>{});
 
   c.def(
+      "create_shader_from_directory",
+      [](Core *core, const std::string &directory, const std::string &source_file, const std::string &entry_point,
+         const std::string &target, const std::vector<std::string> &args) {
+        std::shared_ptr<Shader> shader_;
+        core->CreateShader(VirtualFileSystem::LoadDirectory(directory), source_file, entry_point, target, args,
+                           &shader_);
+        return shader_;
+      },
+      py::arg("directory"), py::arg("source_file"), py::arg("entry_point"), py::arg("target"),
+      py::arg("args") = std::vector<std::string>{},
+      "Create shader from a file in a directory; includes resolve against the loaded directory",
+      py::keep_alive<0, 1>{});
+
+  c.def(
       "create_program",
       [](Core *core, const std::vector<ImageFormat> &color_formats, ImageFormat depth_format) {
         std::shared_ptr<Program> program_;
@@ -348,19 +362,19 @@ void Core::PybindClassRegistration(py::classh<Core> &c) {
             throw std::runtime_error("Each object must be a pair of (AccelerationStructure, transform)");
           }
           AccelerationStructure *as = pair[0].cast<AccelerationStructure *>();
-          py::list transform_list = pair[1].cast<py::list>();
+          py::sequence transform_list = pair[1].cast<py::sequence>();
 
           if (transform_list.size() != 4) {
             throw std::runtime_error("Transform matrix must have 4 rows");
           }
           glm::mat4 transform;
           for (int i = 0; i < 4; i++) {
-            py::list row = transform_list[i].cast<py::list>();
+            py::sequence row = transform_list[i].cast<py::sequence>();
             if (row.size() != 4) {
               throw std::runtime_error("Transform matrix rows must have 4 columns");
             }
             for (int j = 0; j < 4; j++) {
-              transform[i][j] = row[j].cast<float>();
+              transform[j][i] = row[j].cast<float>();  // Rows are given row-major.
             }
           }
           objects.emplace_back(as, transform);
