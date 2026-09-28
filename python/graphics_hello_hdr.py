@@ -1,110 +1,87 @@
-import pathlib
-
-from long_march import graphics
-import numpy as np
 import sys
 
-def main():
-    print("=== LongMarch Graphics Hello HDR Demo ===")
-    print("Initializing graphics core...")
+import numpy as np
+from long_march import graphics
 
-    core_settings = graphics.CoreSettings()
-    print(f"Core Settings: {core_settings}")
+import graphics_hello as gh
 
-    core = graphics.Core()
-    print(f"Core Created: {core}")
 
-    print("Initializing graphics device...")
-    core.init_auto()
-    print(f"Core Initialized: {core}")
-    print(f"Device Name: {core.device_name()}")
-    print(f"Ray Tracing Support: {core.ray_tracing_support()}")
+class Module(gh.Module):
+    def __init__(self, api=graphics.BACKEND_API_DEFAULT):
+        super().__init__()
+        self.core = gh.initialize_graphics_hello(api)
+        self.hdr_enabled = True
 
-    print("Creating HDR window...")
-    window = core.create_window(1280, 720, "[Python] Graphics Hello HDR", resizable=True)
-    window.set_hdr(True)  # Enable HDR
-    print(f"Window Created: {window}")
+    def on_key(self, key, scancode, action, mods):
+        if key == gh.GLFW_KEY_H and action == gh.GLFW_PRESS:
+            self.hdr_enabled = not self.hdr_enabled
+            self.window.set_hdr(self.hdr_enabled)
+            gh.log_info(f"HDR demo presentation: {'HDR' if self.hdr_enabled else 'SDR'}")
 
-    # Load shader file
-    shader_path = "./shaders/hdr_shader.slang"
-    print(f"Loading shader from: {shader_path}")
-    print(f"Shader file exists: {pathlib.Path(shader_path).exists()}")
+    def on_init(self):
+        self.alive = True
+        self.window = self.core.create_window(1280, 720, gh.graphics_hello_title(self.core.api()) +
+                                              " Graphics Hello HDR [H: toggle HDR/SDR]")
+        self.window.set_hdr(True)
+        self.window.register_key_event(self.on_key)
 
-    with open(shader_path, "r") as f:
-        shader_code = f.read()
+        vertices = np.array([
+            [-0.5, 0.05, 0.0, 0.0, 0.0, 0.0],
+            [0.5, 0.05, 0.0, 3.0, 3.0, 3.0],
+            [0.5, 0.25, 0.0, 3.0, 3.0, 3.0],
+            [-0.5, 0.25, 0.0, 0.0, 0.0, 0.0],
+            # SDR reference white below the HDR gradient.
+            [-0.5, -0.25, 0.0, 1.0, 1.0, 1.0],
+            [0.5, -0.25, 0.0, 1.0, 1.0, 1.0],
+            [0.5, -0.05, 0.0, 1.0, 1.0, 1.0],
+            [-0.5, -0.05, 0.0, 1.0, 1.0, 1.0],
+        ], np.float32)
+        indices = np.array([0, 1, 2, 0, 2, 3, 4, 5, 6, 4, 6, 7], np.uint32)
 
-    print("Compiling shaders...")
-    vertex_shader = core.create_shader(shader_code, "VSMain", "vs_6_0")
-    pixel_shader = core.create_shader(shader_code, "PSMain", "ps_6_0")
-    print(f"Vertex Shader: {vertex_shader}")
-    print(f"Pixel Shader: {pixel_shader}")
+        self.vertex_buffer = self.core.create_buffer(vertices.nbytes, graphics.BUFFER_TYPE_DYNAMIC)
+        self.index_buffer = self.core.create_buffer(indices.nbytes, graphics.BUFFER_TYPE_DYNAMIC)
+        self.vertex_buffer.upload_data(vertices.tobytes())
+        self.index_buffer.upload_data(indices.tobytes())
 
-    print("Creating graphics program...")
-    program = core.create_program([graphics.IMAGE_FORMAT_R32G32B32A32_SFLOAT], graphics.IMAGE_FORMAT_UNDEFINED)
-    program.add_input_binding(24)  # sizeof(Vertex) = 6 floats * 4 bytes = 24 bytes
-    program.add_input_attribute(0, graphics.INPUT_TYPE_FLOAT3, 0)  # position
-    program.add_input_attribute(0, graphics.INPUT_TYPE_FLOAT3, 12)  # color
-    program.bind_shader(vertex_shader, graphics.SHADER_TYPE_VERTEX)
-    program.bind_shader(pixel_shader, graphics.SHADER_TYPE_PIXEL)
-    program.finalize()
-    print(f"Program Created: {program}")
+        self.color_image = self.core.create_image(1280, 720, graphics.IMAGE_FORMAT_R32G32B32A32_SFLOAT)
 
-    print("Preparing HDR geometry...")
-    # Rectangle with HDR colors (values > 1.0)
-    vertices = np.array([
-        [-0.5, -0.1, 0.0, 0.0, 0.0, 0.0],  # Bottom left (black)
-        [0.5, -0.1, 0.0, 3.0, 3.0, 3.0],   # Bottom right (bright white)
-        [0.5, 0.1, 0.0, 3.0, 3.0, 3.0],    # Top right (bright white)
-        [-0.5, 0.1, 0.0, 0.0, 0.0, 0.0],   # Top left (black)
-    ], dtype=np.float32)
+        shader = gh.load_shader("modules/hdr/shaders/shader.slang")
+        self.vertex_shader = self.core.create_shader(shader, "VSMain", "vs_6_0")
+        self.fragment_shader = self.core.create_shader(shader, "PSMain", "ps_6_0")
+        gh.log_info("Shader compiled successfully")
 
-    indices = np.array([0, 1, 2, 0, 2, 3], dtype=np.uint32)
-    vertices_bytes = vertices.tobytes()
-    indices_bytes = indices.tobytes()
+        self.program = self.core.create_program([graphics.IMAGE_FORMAT_R32G32B32A32_SFLOAT],
+                                                graphics.IMAGE_FORMAT_UNDEFINED)
+        self.program.add_input_binding(24, False)
+        self.program.add_input_attribute(0, graphics.INPUT_TYPE_FLOAT3, 0)
+        self.program.add_input_attribute(0, graphics.INPUT_TYPE_FLOAT3, 12)
+        self.program.bind_shader(self.vertex_shader, graphics.SHADER_TYPE_VERTEX)
+        self.program.bind_shader(self.fragment_shader, graphics.SHADER_TYPE_PIXEL)
+        self.program.finalize()
 
-    print(f"Vertex data: {len(vertices_bytes)} bytes ({len(vertices)} vertices)")
-    print(f"Index data: {len(indices_bytes)} bytes ({len(indices)} indices)")
+    def on_close(self):
+        self.core.wait_gpu()
+        del self.program, self.vertex_shader, self.fragment_shader, self.color_image
+        del self.index_buffer, self.vertex_buffer
 
-    print("Creating buffers...")
-    vertex_buffer = core.create_buffer(len(vertices_bytes), graphics.BUFFER_TYPE_DYNAMIC)
-    vertex_buffer.upload_data(vertices_bytes)
-    index_buffer = core.create_buffer(len(indices_bytes), graphics.BUFFER_TYPE_DYNAMIC)
-    index_buffer.upload_data(indices_bytes)
-    print(f"Vertex Buffer: {vertex_buffer}")
-    print(f"Index Buffer: {index_buffer}")
+    def on_update(self):
+        self.update_alive()
 
-    print("Creating HDR frame buffer...")
-    color_image = core.create_image(window.get_width(), window.get_height(), graphics.IMAGE_FORMAT_R32G32B32A32_SFLOAT)
-    print(f"Color Image: {color_image}")
+    def on_render(self):
+        command_context = self.core.create_command_context()
+        command_context.cmd_clear_image(self.color_image, [0.0, 0.0, 0.0, 1.0])
+        command_context.cmd_begin_rendering([self.color_image], None)
+        command_context.cmd_bind_program(self.program)
+        command_context.cmd_bind_vertex_buffers(0, [self.vertex_buffer], [0])
+        command_context.cmd_bind_index_buffer(self.index_buffer, 0)
+        command_context.cmd_set_viewport(0, 0, 1280, 720, 0.0, 1.0)
+        command_context.cmd_set_scissor(0, 0, 1280, 720)
+        command_context.cmd_set_primitive_topology(graphics.PRIMITIVE_TOPOLOGY_TRIANGLE_LIST)
+        command_context.cmd_draw_indexed(12, 1, 0, 0, 0)
+        command_context.cmd_end_rendering()
+        command_context.cmd_present(self.window, self.color_image)
+        self.core.submit_command_context(command_context)
 
-    def on_resize(width, height):
-        print(f"Window resized to {width}x{height} - Recreating frame buffer")
-        nonlocal color_image
-        color_image = core.create_image(window.get_width(), window.get_height(), graphics.IMAGE_FORMAT_R32G32B32A32_SFLOAT)
-        print(f"New Color Image: {color_image}")
 
-    window.register_resize_event(on_resize)
-
-    print("\n=== Starting HDR Render Loop ===")
-
-    while not window.should_close():
-        # Render frame
-        cmd_ctx = core.create_command_context()
-        cmd_ctx.cmd_clear_image(color_image, [0.0, 0.0, 0.0, 1.0])  # Black background
-        cmd_ctx.cmd_begin_rendering([color_image], None)  # No depth buffer
-        cmd_ctx.cmd_bind_program(program)
-        cmd_ctx.cmd_bind_vertex_buffers(0, [vertex_buffer], [0])
-        cmd_ctx.cmd_bind_index_buffer(index_buffer, 0)
-        cmd_ctx.cmd_set_viewport(0, 0, window.get_width(), window.get_height(), 0.0, 1.0)
-        cmd_ctx.cmd_set_scissor(0, 0, window.get_width(), window.get_height())
-        cmd_ctx.cmd_set_primitive_topology(graphics.PRIMITIVE_TOPOLOGY_TRIANGLE_LIST)
-        cmd_ctx.cmd_draw_indexed(6, 1, 0, 0, 0)  # 2 triangles = 6 indices
-        cmd_ctx.cmd_end_rendering()
-        cmd_ctx.cmd_present(window, color_image)
-        core.submit_command_context(cmd_ctx)
-        window.poll_events()
-
-    print(f"\n=== HDR Demo Complete ===")
-
-if __name__ == '__main__':
-    main()
+if __name__ == "__main__":
+    sys.exit(gh.main(module="hdr"))
