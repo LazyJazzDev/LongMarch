@@ -472,20 +472,34 @@ int Window::SetHDR(bool enable_hdr) {
 }
 
 #if defined(LONGMARCH_PYTHON_ENABLED)
+namespace {
+py::dict DisplayBrightnessDict(const DisplayBrightness &info) {
+  py::dict result;
+  result["sdr_white_nits"] = info.sdr_white_nits;
+  result["hdr_reference_white_scale"] = info.hdr_reference_white_scale;
+  result["hdr_headroom"] = info.hdr_headroom;
+  result["reference_white_known"] = info.reference_white_known;
+  result["hdr_enabled"] = info.hdr_enabled;
+  return result;
+}
+}  // namespace
+
 void Window::PybindClassRegistration(py::classh<Window> &c) {
   c.def("set_hdr_brightness_alignment", &Window::SetHDRBrightnessAlignment);
+  c.def("hdr_brightness_alignment", &Window::HDRBrightnessAlignment);
   c.def("hdr_reference_white_scale", &Window::HDRReferenceWhiteScale);
   c.def("refresh_display_brightness", &Window::RefreshDisplayBrightness);
-  c.def("display_brightness", [](Window &window) {
-    const auto info = window.GetDisplayBrightness();
-    py::dict result;
-    result["sdr_white_nits"] = info.sdr_white_nits;
-    result["hdr_reference_white_scale"] = info.hdr_reference_white_scale;
-    result["hdr_headroom"] = info.hdr_headroom;
-    result["reference_white_known"] = info.reference_white_known;
-    result["hdr_enabled"] = info.hdr_enabled;
-    return result;
-  });
+  c.def("display_brightness", [](Window &window) { return DisplayBrightnessDict(window.GetDisplayBrightness()); });
+  c.def(
+      "register_display_brightness_event",
+      [](Window &w, py::function callback) {
+        return w.DisplayBrightnessEvent().RegisterCallback(
+            [callback](const DisplayBrightness &info) { callback(DisplayBrightnessDict(info)); });
+      },
+      py::arg("callback"));
+  c.def("unregister_display_brightness_event",
+        [](Window &w, uint32_t id) { w.DisplayBrightnessEvent().UnregisterCallback(id); });
+  c.def("is_hdr", &Window::IsHDR);
   c.def("__repr__", [](Window *window) {
     return py::str("Window(width={}, height={}, title='{}', hdr={})")
         .format(window->GetWidth(), window->GetHeight(), window->GetTitle(), window->enable_hdr_);
@@ -607,6 +621,23 @@ void Window::PybindClassRegistration(py::classh<Window> &c) {
       },
       py::arg("callback"));
   c.def("unregister_focus_event", [](Window &w, uint32_t id) { w.FocusEvent().UnregisterCallback(id); });
+  c.def("unregister_resize_event", [](Window &w, uint32_t id) { w.ResizeEvent().UnregisterCallback(id); });
+  c.def("unregister_mouse_move_event", [](Window &w, uint32_t id) { w.MouseMoveEvent().UnregisterCallback(id); });
+  c.def("unregister_mouse_button_event", [](Window &w, uint32_t id) { w.MouseButtonEvent().UnregisterCallback(id); });
+  c.def("unregister_scroll_event", [](Window &w, uint32_t id) { w.ScrollEvent().UnregisterCallback(id); });
+  c.def("unregister_key_event", [](Window &w, uint32_t id) { w.KeyEvent().UnregisterCallback(id); });
+  c.def("unregister_char_event", [](Window &w, uint32_t id) { w.CharEvent().UnregisterCallback(id); });
+  c.def("unregister_drop_event", [](Window &w, uint32_t id) { w.DropEvent().UnregisterCallback(id); });
+  c.def("supports_magnify_gestures", &Window::SupportsMagnifyGestures);
+  c.def(
+      "register_magnify_event",
+      [](Window &w, py::function callback) {
+        return w.MagnifyEvent().RegisterCallback([callback](const MagnifyGesture &gesture) {
+          callback(gesture.scale, gesture.x, gesture.y, gesture.phase);
+        });
+      },
+      py::arg("callback"), "Add a callback(scale, x, y, phase) for native magnify gestures");
+  c.def("unregister_magnify_event", [](Window &w, uint32_t id) { w.MagnifyEvent().UnregisterCallback(id); });
   c.def_static("poll_events", &Window::PollEvents);
 }
 #endif

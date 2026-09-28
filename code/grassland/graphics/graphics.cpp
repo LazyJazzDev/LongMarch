@@ -27,6 +27,14 @@ void PybindModuleRegistration(py::module_ &m) {
 
   // Register all classes
   util::PybindModuleRegistration(m);
+
+  py::enum_<MagnifyPhase> magnify_phase(m, "MagnifyPhase");
+  magnify_phase.value("MAGNIFY_PHASE_BEGIN", MagnifyPhase::kBegin, "Magnify Phase: Begin");
+  magnify_phase.value("MAGNIFY_PHASE_UPDATE", MagnifyPhase::kUpdate, "Magnify Phase: Update");
+  magnify_phase.value("MAGNIFY_PHASE_END", MagnifyPhase::kEnd, "Magnify Phase: End");
+  magnify_phase.value("MAGNIFY_PHASE_CANCEL", MagnifyPhase::kCancel, "Magnify Phase: Cancel");
+  magnify_phase.export_values();
+
   Core::Settings::PybindClassRegistration(c_core_settings);
   Core::PybindClassRegistration(c_core);
   Shader::PybindClassRegistration(c_shader);

@@ -223,6 +223,17 @@ void Core::PybindClassRegistration(py::classh<Core> &c) {
       "Create an image", py::keep_alive<0, 1>{});
 
   c.def(
+      "load_image_from_file",
+      [](Core *core, const std::string &file_path) {
+        std::shared_ptr<Image> image_;
+        if (LoadImageFromFile(core, file_path, &image_)) {
+          throw std::runtime_error("Failed to load image: " + file_path);
+        }
+        return image_;
+      },
+      py::arg("file_path"), "Load an LDR (RGBA8) or HDR (RGBA32F) image from a file", py::keep_alive<0, 1>{});
+
+  c.def(
       "create_sampler",
       [](Core *core, const SamplerInfo &info) {
         std::shared_ptr<Sampler> sampler_;

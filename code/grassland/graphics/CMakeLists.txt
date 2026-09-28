@@ -14,7 +14,7 @@ set(GRASSLAND_LIBS ${GRASSLAND_LIBS} PARENT_SCOPE)
 
 target_include_directories(${GRASSLAND_SUBLIB_NAME} PUBLIC ${LONGMARCH_INCLUDE_DIR} ${STB_INC_DIR})
 
-target_link_libraries(${GRASSLAND_SUBLIB_NAME} PUBLIC grassland_imgui slang::slang)
+target_link_libraries(${GRASSLAND_SUBLIB_NAME} PUBLIC grassland_util grassland_imgui slang::slang)
 
 if (LONGMARCH_CUDA_RUNTIME)
     target_compile_definitions(${GRASSLAND_SUBLIB_NAME} PUBLIC LONGMARCH_CUDA_RUNTIME)
