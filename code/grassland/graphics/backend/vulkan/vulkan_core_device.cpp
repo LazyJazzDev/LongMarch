@@ -594,7 +594,7 @@ VkResult VulkanCore::CreateShaderBindingTable(VkPipeline pipeline,
   void *mapped = nullptr;
   RETURN_IF_FAILED_VK(vmaMapMemory(allocator_, allocation, &mapped), "Failed to map shader binding table");
   auto *data = static_cast<uint8_t *>(mapped);
-  std::memcpy(data + raygen_shader_offset, shader_handle_storage.data(), handle_size_aligned);
+  std::memcpy(data + raygen_shader_offset, shader_handle_storage.data(), handle_size);
   auto data_head = data + miss_shader_offset;
   for (auto miss_shader_index : miss_shader_indices) {
     std::memcpy(data_head, shader_handle_storage.data() + handle_size * (miss_shader_index + 1), handle_size);
