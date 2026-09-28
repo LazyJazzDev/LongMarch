@@ -2,9 +2,10 @@
 
 #include "grassland/graphics/backend/vulkan/helper/buffer.h"
 #include "grassland/graphics/backend/vulkan/helper/single_time_command.h"
+#include "grassland/graphics/backend/vulkan/vulkan_core.h"
 
 namespace grassland::graphics::backend::vulkan {
-Image::Image(const class Device *device,
+Image::Image(const VulkanCore *device,
              VkFormat format,
              VkExtent2D extent,
              VkImageUsageFlags usage,

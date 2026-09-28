@@ -1,11 +1,11 @@
 #pragma once
 #include "grassland/graphics/backend/vulkan/helper/descriptor_pool.h"
-#include "grassland/graphics/backend/vulkan/helper/device.h"
+#include "grassland/graphics/backend/vulkan/helper/native_types.h"
 
 namespace grassland::graphics::backend::vulkan {
 class DescriptorSetLayout {
  public:
-  DescriptorSetLayout(const class Device *device,
+  DescriptorSetLayout(const VulkanCore *device,
                       VkDescriptorSetLayout layout,
                       const std::vector<VkDescriptorSetLayoutBinding> &bindings);
 
@@ -17,7 +17,7 @@ class DescriptorSetLayout {
     return layout_;
   }
 
-  const class Device *Device() const {
+  const VulkanCore *Device() const {
     return device_;
   }
 
@@ -26,7 +26,7 @@ class DescriptorSetLayout {
   }
 
  private:
-  const class Device *device_{};
+  const VulkanCore *device_{};
 
   VkDescriptorSetLayout layout_{};
 

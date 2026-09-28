@@ -2,10 +2,11 @@
 
 #include "grassland/graphics/backend/vulkan/helper/buffer.h"
 #include "grassland/graphics/backend/vulkan/helper/single_time_command.h"
+#include "grassland/graphics/backend/vulkan/vulkan_core.h"
 
 namespace grassland::graphics::backend::vulkan {
 
-AccelerationStructure::AccelerationStructure(const class Device *device,
+AccelerationStructure::AccelerationStructure(const VulkanCore *device,
                                              std::unique_ptr<class Buffer> buffer,
                                              VkDeviceAddress device_address,
                                              VkAccelerationStructureKHR as,
@@ -104,7 +105,7 @@ VkResult AccelerationStructure::UpdateInstances(
   return UpdateInstances(acceleration_structure_instances, command_pool, queue);
 }
 
-VkResult BuildAccelerationStructure(const Device *device,
+VkResult BuildAccelerationStructure(const VulkanCore *device,
                                     VkAccelerationStructureGeometryKHR geometry,
                                     VkAccelerationStructureTypeKHR type,
                                     VkBuildAccelerationStructureFlagsKHR flags,

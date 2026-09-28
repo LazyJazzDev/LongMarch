@@ -23,7 +23,12 @@
 #include "grassland/graphics/graphics_util.h"
 #include "grassland/util/util.h"
 
+namespace grassland::graphics::backend {
+class VulkanCore;
+}
+
 namespace grassland::graphics::backend::vulkan {
+using ::grassland::graphics::backend::VulkanCore;
 #define GRASSLAND_VULKAN_PROCEDURE_VAR(function_name) PFN_##function_name function_name{};
 
 #ifdef NDEBUG
@@ -83,7 +88,6 @@ std::string VkResultToString(VkResult result);
   } while (false)
 
 class PhysicalDevice;
-class Device;
 class DescriptorPool;
 class DescriptorSetLayout;
 class DescriptorSet;

@@ -25,14 +25,14 @@ void VulkanProgramBase::AddResourceBindingImpl(ResourceType type, int count) {
   binding.descriptorCount = count;
   binding.stageFlags = VK_SHADER_STAGE_ALL;
   std::unique_ptr<vulkan::DescriptorSetLayout> descriptor_set_layout;
-  core_->Device()->CreateDescriptorSetLayout({binding}, &descriptor_set_layout);
+  core_->CreateDescriptorSetLayout({binding}, &descriptor_set_layout);
   descriptor_set_layouts_.push_back(std::move(descriptor_set_layout));
 }
 
 void VulkanProgramBase::FinalizePipelineLayout() {
   // Bindings currently use VK_SHADER_STAGE_ALL and ordinary descriptor sets.
   // Reject oversized scenes even when validation is disabled.
-  const auto limits = core_->Device()->PhysicalDevice().GetPhysicalDeviceProperties().limits;
+  const auto limits = core_->PhysicalDevice().GetPhysicalDeviceProperties().limits;
   uint64_t storage_buffers = 0, sampled_images = 0;
   for (const auto &layout : descriptor_set_layouts_) {
     for (const auto &binding : layout->Bindings()) {
@@ -56,7 +56,7 @@ void VulkanProgramBase::FinalizePipelineLayout() {
   for (auto &descriptor_set_layout : descriptor_set_layouts_) {
     descriptor_set_layouts.push_back(descriptor_set_layout->Handle());
   }
-  core_->Device()->CreatePipelineLayout(descriptor_set_layouts, &pipeline_layout_);
+  core_->CreatePipelineLayout(descriptor_set_layouts, &pipeline_layout_);
 }
 
 VulkanProgram::VulkanProgram(VulkanCore *core, const std::vector<ImageFormat> &color_formats, ImageFormat depth_format)
@@ -103,7 +103,7 @@ void VulkanProgram::BindShader(Shader *shader, ShaderType type) {
 void VulkanProgram::Finalize() {
   FinalizePipelineLayout();
   pipeline_settings_.pipeline_layout = pipeline_layout_.get();
-  core_->Device()->CreatePipeline(pipeline_settings_, &pipeline_);
+  core_->CreatePipeline(pipeline_settings_, &pipeline_);
 }
 
 int VulkanProgram::NumInputBindings() const {
@@ -120,7 +120,7 @@ VulkanComputeProgram::VulkanComputeProgram(VulkanCore *core, VulkanShader *compu
 }
 
 VulkanComputeProgram::~VulkanComputeProgram() {
-  vkDestroyPipeline(core_->Device()->Handle(), pipeline_, nullptr);
+  vkDestroyPipeline(core_->Handle(), pipeline_, nullptr);
 }
 
 void VulkanComputeProgram::AddResourceBinding(ResourceType type, int count) {
@@ -137,8 +137,8 @@ void VulkanComputeProgram::Finalize() {
   pipeline_create_info.stage.module = compute_shader_->ShaderModule()->Handle();
   pipeline_create_info.stage.pName = compute_shader_->ShaderModule()->EntryPoint().c_str();
   pipeline_create_info.stage.pSpecializationInfo = nullptr;
-  const VkResult result = vkCreateComputePipelines(core_->Device()->Handle(), VK_NULL_HANDLE, 1, &pipeline_create_info,
-                                                   nullptr, &pipeline_);
+  const VkResult result =
+      vkCreateComputePipelines(core_->Handle(), VK_NULL_HANDLE, 1, &pipeline_create_info, nullptr, &pipeline_);
   if (result != VK_SUCCESS)
     throw std::runtime_error("failed to create Vulkan compute pipeline: " + std::to_string(result));
 }
@@ -200,10 +200,10 @@ void VulkanRayTracingProgram::Finalize(const std::vector<int32_t> &miss_shader_i
                                        const std::vector<int32_t> &hit_group_indices,
                                        const std::vector<int32_t> &callable_shader_indices) {
   FinalizePipelineLayout();
-  core_->Device()->CreateRayTracingPipeline(pipeline_layout_.get(), raygen_shader_, miss_shaders_, hit_groups_,
-                                            callable_shaders_, &pipeline_);
-  core_->Device()->CreateShaderBindingTable(pipeline_.get(), miss_shader_indices, hit_group_indices,
-                                            callable_shader_indices, &shader_binding_table_);
+  core_->CreateRayTracingPipeline(pipeline_layout_.get(), raygen_shader_, miss_shaders_, hit_groups_, callable_shaders_,
+                                  &pipeline_);
+  core_->CreateShaderBindingTable(pipeline_.get(), miss_shader_indices, hit_group_indices, callable_shader_indices,
+                                  &shader_binding_table_);
 }
 
 void VulkanRayTracingProgram::Finalize() {

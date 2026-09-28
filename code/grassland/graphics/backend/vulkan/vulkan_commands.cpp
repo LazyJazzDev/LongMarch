@@ -82,8 +82,8 @@ void VulkanCmdBeginRendering::CompileCommand(VulkanCommandContext *context, VkCo
   std::vector<VkRenderingAttachmentInfo> color_attachment_infos;
   VkRenderingAttachmentInfo depth_attachment_info{};
   Extent2D extent;
-  extent.width = context->Core()->Device()->PhysicalDevice().GetPhysicalDeviceProperties().limits.maxFramebufferWidth;
-  extent.height = context->Core()->Device()->PhysicalDevice().GetPhysicalDeviceProperties().limits.maxFramebufferHeight;
+  extent.width = context->Core()->PhysicalDevice().GetPhysicalDeviceProperties().limits.maxFramebufferWidth;
+  extent.height = context->Core()->PhysicalDevice().GetPhysicalDeviceProperties().limits.maxFramebufferHeight;
   for (int i = 0; i < color_targets_.size(); i++) {
     auto &color_target = color_targets_[i];
     context->RequireImageState(command_buffer, color_target->Image()->Handle(),
@@ -167,7 +167,7 @@ void VulkanCmdBindResourceBuffers::CompileCommand(VulkanCommandContext *context,
   write_descriptor_set.descriptorCount = binding.descriptorCount;
   write_descriptor_set.descriptorType = binding.descriptorType;
   write_descriptor_set.pBufferInfo = buffer_infos.data();
-  vkUpdateDescriptorSets(context->Core()->Device()->Handle(), 1, &write_descriptor_set, 0, nullptr);
+  vkUpdateDescriptorSets(context->Core()->Handle(), 1, &write_descriptor_set, 0, nullptr);
 
   VkDescriptorSet descriptor_sets[] = {descriptor_set->Handle()};
 
@@ -211,7 +211,7 @@ void VulkanCmdBindResourceImages::CompileCommand(VulkanCommandContext *context, 
   write_descriptor_set.descriptorCount = binding.descriptorCount;
   write_descriptor_set.descriptorType = binding.descriptorType;
   write_descriptor_set.pImageInfo = image_infos.data();
-  vkUpdateDescriptorSets(context->Core()->Device()->Handle(), 1, &write_descriptor_set, 0, nullptr);
+  vkUpdateDescriptorSets(context->Core()->Handle(), 1, &write_descriptor_set, 0, nullptr);
 
   vkCmdBindDescriptorSets(command_buffer, BindPointToVkPipelineBindPoint(bind_point_),
                           program_base_->PipelineLayout()->Handle(), slot_, 1, descriptor_sets, 0, nullptr);
@@ -246,7 +246,7 @@ void VulkanCmdBindResourceSamplers::CompileCommand(VulkanCommandContext *context
   write_descriptor_set.descriptorCount = binding.descriptorCount;
   write_descriptor_set.descriptorType = binding.descriptorType;
   write_descriptor_set.pImageInfo = sampler_infos.data();
-  vkUpdateDescriptorSets(context->Core()->Device()->Handle(), 1, &write_descriptor_set, 0, nullptr);
+  vkUpdateDescriptorSets(context->Core()->Handle(), 1, &write_descriptor_set, 0, nullptr);
 
   vkCmdBindDescriptorSets(command_buffer, BindPointToVkPipelineBindPoint(bind_point_),
                           program_base_->PipelineLayout()->Handle(), slot_, 1, descriptor_sets, 0, nullptr);
@@ -285,7 +285,7 @@ void VulkanCmdBindResourceAccelerationStructure::CompileCommand(VulkanCommandCon
   acceleration_structure_info.pAccelerationStructures = &acceleration_structure;
   write_descriptor_set.pNext = &acceleration_structure_info;
 
-  vkUpdateDescriptorSets(context->Core()->Device()->Handle(), 1, &write_descriptor_set, 0, nullptr);
+  vkUpdateDescriptorSets(context->Core()->Handle(), 1, &write_descriptor_set, 0, nullptr);
 
   vkCmdBindDescriptorSets(command_buffer, BindPointToVkPipelineBindPoint(bind_point_),
                           program_base_->PipelineLayout()->Handle(), slot_, 1, descriptor_sets, 0, nullptr);
@@ -491,7 +491,7 @@ VulkanCmdDispatchRays::VulkanCmdDispatchRays(VulkanRayTracingProgram *program,
 
 void VulkanCmdDispatchRays::CompileCommand(VulkanCommandContext *context, VkCommandBuffer command_buffer) {
   VkPhysicalDeviceRayTracingPipelinePropertiesKHR ray_tracing_pipeline_properties =
-      context->Core()->Device()->PhysicalDevice().GetPhysicalDeviceRayTracingPipelineProperties();
+      context->Core()->PhysicalDevice().GetPhysicalDeviceRayTracingPipelineProperties();
 
   auto aligned_size = [](uint32_t value, uint32_t alignment) { return (value + alignment - 1) & ~(alignment - 1); };
   const uint32_t handle_size_aligned = aligned_size(ray_tracing_pipeline_properties.shaderGroupHandleSize,
@@ -518,9 +518,9 @@ void VulkanCmdDispatchRays::CompileCommand(VulkanCommandContext *context, VkComm
   callable_shader_sbt_entry.stride = handle_size_aligned;
   callable_shader_sbt_entry.size = handle_size_aligned * shader_binding_table->CallableShaderCount();
 
-  program_->Core()->Device()->Procedures().vkCmdTraceRaysKHR(command_buffer, &ray_gen_shader_sbt_entry,
-                                                             &miss_shader_sbt_entry, &hit_shader_sbt_entry,
-                                                             &callable_shader_sbt_entry, width_, height_, depth_);
+  program_->Core()->Procedures().vkCmdTraceRaysKHR(command_buffer, &ray_gen_shader_sbt_entry, &miss_shader_sbt_entry,
+                                                   &hit_shader_sbt_entry, &callable_shader_sbt_entry, width_, height_,
+                                                   depth_);
 
   VkMemoryBarrier memory_barrier = {};
   memory_barrier.sType = VK_STRUCTURE_TYPE_MEMORY_BARRIER;

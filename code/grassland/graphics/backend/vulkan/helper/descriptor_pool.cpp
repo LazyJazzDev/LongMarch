@@ -3,9 +3,10 @@
 #include <utility>
 
 #include "grassland/graphics/backend/vulkan/helper/descriptor_set.h"
+#include "grassland/graphics/backend/vulkan/vulkan_core.h"
 
 namespace grassland::graphics::backend::vulkan {
-DescriptorPool::DescriptorPool(const struct Device *device,
+DescriptorPool::DescriptorPool(const VulkanCore *device,
                                VkDescriptorPool descriptor_pool,
                                DescriptorPoolSize pool_size,
                                uint32_t max_sets)

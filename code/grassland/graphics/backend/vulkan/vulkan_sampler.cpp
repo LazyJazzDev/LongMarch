@@ -13,12 +13,12 @@ VulkanSampler::VulkanSampler(VulkanCore *core, const SamplerInfo &info) : core_(
   create_info.borderColor = VK_BORDER_COLOR_FLOAT_TRANSPARENT_BLACK;
   create_info.compareOp = VK_COMPARE_OP_ALWAYS;
   create_info.mipmapMode = FilterModeToVkSamplerMipmapMode(info.mip_filter);
-  vulkan::ThrowIfFailed(vkCreateSampler(core_->Device()->Handle(), &create_info, nullptr, &sampler_),
+  vulkan::ThrowIfFailed(vkCreateSampler(core_->Handle(), &create_info, nullptr, &sampler_),
                         "Failed to create Vulkan sampler");
 }
 
 VulkanSampler::~VulkanSampler() {
-  vkDestroySampler(core_->Device()->Handle(), sampler_, nullptr);
+  vkDestroySampler(core_->Handle(), sampler_, nullptr);
 }
 
 }  // namespace grassland::graphics::backend

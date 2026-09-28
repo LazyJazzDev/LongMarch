@@ -1,11 +1,11 @@
 #pragma once
 #include "grassland/graphics/backend/vulkan/helper/buffer.h"
-#include "grassland/graphics/backend/vulkan/helper/device.h"
+#include "grassland/graphics/backend/vulkan/helper/native_types.h"
 
 namespace grassland::graphics::backend::vulkan {
 class AccelerationStructure {
  public:
-  AccelerationStructure(const class Device *device,
+  AccelerationStructure(const VulkanCore *device,
                         std::unique_ptr<class Buffer> buffer,
                         VkDeviceAddress device_address,
                         VkAccelerationStructureKHR as,
@@ -27,14 +27,14 @@ class AccelerationStructure {
                            VkQueue queue);
 
  private:
-  const class Device *device_{};
+  const VulkanCore *device_{};
   std::unique_ptr<class Buffer> buffer_;
   VkDeviceAddress device_address_{};
   VkAccelerationStructureKHR as_{};
   int num_instance_;
 };
 
-VkResult BuildAccelerationStructure(const Device *device,
+VkResult BuildAccelerationStructure(const VulkanCore *device,
                                     VkAccelerationStructureGeometryKHR geometry,
                                     VkAccelerationStructureTypeKHR type,
                                     VkBuildAccelerationStructureFlagsKHR flags,

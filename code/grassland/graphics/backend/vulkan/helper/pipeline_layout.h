@@ -1,14 +1,14 @@
 #pragma once
-#include "grassland/graphics/backend/vulkan/helper/device.h"
+#include "grassland/graphics/backend/vulkan/helper/native_types.h"
 
 namespace grassland::graphics::backend::vulkan {
 class PipelineLayout {
  public:
-  PipelineLayout(const class Device *device, VkPipelineLayout pipeline_layout);
+  PipelineLayout(const VulkanCore *device, VkPipelineLayout pipeline_layout);
 
   ~PipelineLayout();
 
-  const class Device *Device() const {
+  const VulkanCore *Device() const {
     return device_;
   }
 
@@ -17,7 +17,7 @@ class PipelineLayout {
   }
 
  private:
-  const class Device *device_{};
+  const VulkanCore *device_{};
   VkPipelineLayout pipeline_layout_{};
 };
 }  // namespace grassland::graphics::backend::vulkan

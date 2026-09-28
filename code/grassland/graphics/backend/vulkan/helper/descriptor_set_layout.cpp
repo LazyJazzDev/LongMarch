@@ -1,8 +1,10 @@
 #include "grassland/graphics/backend/vulkan/helper/descriptor_set_layout.h"
 
+#include "grassland/graphics/backend/vulkan/vulkan_core.h"
+
 namespace grassland::graphics::backend::vulkan {
 
-DescriptorSetLayout::DescriptorSetLayout(const struct Device *device,
+DescriptorSetLayout::DescriptorSetLayout(const VulkanCore *device,
                                          VkDescriptorSetLayout layout,
                                          const std::vector<VkDescriptorSetLayoutBinding> &bindings)
     : device_(device),

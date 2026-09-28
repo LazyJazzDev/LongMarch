@@ -11,7 +11,7 @@ class VulkanCore : public Core {
   ~VulkanCore() override;
 
   bool DeviceRayQuerySupport() const override {
-    return device_ && device_->PhysicalDevice().SupportRayQuery();
+    return device_ && physical_device_ && physical_device_->SupportRayQuery();
   }
 
   BackendAPI API() const override {
@@ -103,9 +103,170 @@ class VulkanCore : public Core {
     return instance_procedures_;
   }
 
-  vulkan::Device *Device() const {
-    return device_.get();
+  VkDevice Handle() const {
+    return device_;
   }
+
+  const vulkan::PhysicalDevice &PhysicalDevice() const {
+    return *physical_device_;
+  }
+
+  const vulkan::DeviceCreateInfo &CreateInfo() const {
+    return *create_info_;
+  }
+
+  vulkan::DeviceProcedures &Procedures() {
+    return procedures_;
+  }
+
+  const vulkan::DeviceProcedures &Procedures() const {
+    return procedures_;
+  }
+
+  VmaAllocator Allocator() const {
+    return allocator_;
+  }
+
+  VkResult WaitIdle() const {
+    return vkDeviceWaitIdle(device_);
+  }
+
+  uint32_t SubGroupSize() const {
+    return subgroup_properties_.subgroupSize;
+  }
+
+  VkResult CreateShaderModule(const CompiledShaderBlob &code, double_ptr<vulkan::ShaderModule> pp_shader_module) const;
+
+  VkResult CreateShaderModule(const void *p_code,
+                              size_t code_size,
+                              const std::string &entry_point,
+                              double_ptr<vulkan::ShaderModule> pp_shader_module) const;
+
+  VkResult CreateDescriptorPool(const std::vector<VkDescriptorPoolSize> &pool_sizes,
+                                uint32_t max_sets,
+                                double_ptr<vulkan::DescriptorPool> pp_descriptor_pool) const;
+
+  VkResult CreateDescriptorSetLayout(const std::vector<VkDescriptorSetLayoutBinding> &bindings,
+                                     double_ptr<vulkan::DescriptorSetLayout> pp_descriptor_set_layout) const;
+
+  VkResult CreateImage(VkFormat format,
+                       VkExtent2D extent,
+                       VkImageUsageFlags usage,
+                       VkImageAspectFlags aspect,
+                       VkSampleCountFlagBits sample_count,
+                       VmaMemoryUsage mem_usage,
+                       double_ptr<vulkan::Image> pp_image) const;
+
+  VkResult CreateImage(VkFormat format,
+                       VkExtent2D extent,
+                       VkImageUsageFlags usage,
+                       VkImageAspectFlags aspect,
+                       VkSampleCountFlagBits sample_count,
+                       double_ptr<vulkan::Image> pp_image) const;
+
+  VkResult CreateImage(VkFormat format,
+                       VkExtent2D extent,
+                       VkImageUsageFlags usage,
+                       VkImageAspectFlags aspect,
+                       double_ptr<vulkan::Image> pp_image) const;
+
+  VkResult CreateImage(VkFormat format,
+                       VkExtent2D extent,
+                       VkImageUsageFlags usage,
+                       double_ptr<vulkan::Image> pp_image) const;
+
+  VkResult CreateImage(VkFormat format, VkExtent2D extent, double_ptr<vulkan::Image> pp_image) const;
+
+  VkResult CreateBuffer(VkDeviceSize size,
+                        VkBufferUsageFlags usage,
+                        VmaMemoryUsage memory_usage,
+                        VmaAllocationCreateFlags flags,
+                        VkDeviceSize alignment,
+                        double_ptr<vulkan::Buffer> pp_buffer) const;
+
+  VkResult CreateBuffer(VkDeviceSize size,
+                        VkBufferUsageFlags usage,
+                        VmaMemoryUsage memory_usage,
+                        VmaAllocationCreateFlags flags,
+                        double_ptr<vulkan::Buffer> pp_buffer) const;
+
+  VkResult CreateBuffer(VkDeviceSize size,
+                        VkBufferUsageFlags usage,
+                        VmaMemoryUsage memory_usage,
+                        double_ptr<vulkan::Buffer> pp_buffer) const;
+
+  VkResult CreatePipelineLayout(const std::vector<VkDescriptorSetLayout> &descriptor_set_layouts,
+                                double_ptr<vulkan::PipelineLayout> pp_pipeline_layout) const;
+
+  VkResult CreatePipeline(const struct vulkan::PipelineSettings &settings,
+                          double_ptr<vulkan::Pipeline> pp_pipeline) const;
+
+  VkResult CreateBottomLevelAccelerationStructure(VkDeviceAddress aabb_address,
+                                                  VkDeviceSize stride,
+                                                  uint32_t num_aabb,
+                                                  VkGeometryFlagsKHR flags,
+                                                  VkCommandPool command_pool,
+                                                  VkQueue queue,
+                                                  double_ptr<vulkan::AccelerationStructure> pp_blas);
+
+  VkResult CreateBottomLevelAccelerationStructure(VkDeviceAddress vertex_buffer_address,
+                                                  VkDeviceAddress index_buffer_address,
+                                                  uint32_t num_vertex,
+                                                  VkDeviceSize stride,
+                                                  uint32_t primitive_count,
+                                                  VkGeometryFlagsKHR flags,
+                                                  VkCommandPool command_pool,
+                                                  VkQueue queue,
+                                                  double_ptr<vulkan::AccelerationStructure> pp_blas);
+
+  VkResult CreateBottomLevelAccelerationStructure(VkDeviceAddress vertex_buffer_address,
+                                                  VkDeviceAddress index_buffer_address,
+                                                  uint32_t num_vertex,
+                                                  VkDeviceSize stride,
+                                                  uint32_t primitive_count,
+                                                  VkCommandPool command_pool,
+                                                  VkQueue queue,
+                                                  double_ptr<vulkan::AccelerationStructure> pp_blas);
+
+  VkResult CreateBottomLevelAccelerationStructure(vulkan::Buffer *vertex_buffer,
+                                                  vulkan::Buffer *index_buffer,
+                                                  VkDeviceSize stride,
+                                                  VkCommandPool command_pool,
+                                                  VkQueue queue,
+                                                  double_ptr<vulkan::AccelerationStructure> pp_blas);
+
+  VkResult CreateTopLevelAccelerationStructure(const std::vector<VkAccelerationStructureInstanceKHR> &instances,
+                                               VkCommandPool command_pool,
+                                               VkQueue queue,
+                                               double_ptr<vulkan::AccelerationStructure> pp_tlas);
+
+  VkResult CreateTopLevelAccelerationStructure(
+      const std::vector<std::pair<vulkan::AccelerationStructure *, glm::mat4>> &objects,
+      VkCommandPool command_pool,
+      VkQueue queue,
+      double_ptr<vulkan::AccelerationStructure> pp_tlas);
+
+  VkResult CreateRayTracingPipeline(vulkan::PipelineLayout *pipeline_layout,
+                                    vulkan::ShaderModule *ray_gen_shader,
+                                    const std::vector<vulkan::ShaderModule *> &miss_shaders,
+                                    const std::vector<vulkan::HitGroup> &hit_groups,
+                                    const std::vector<vulkan::ShaderModule *> &callable_shaders,
+                                    double_ptr<vulkan::RayTracingPipeline> pp_pipeline) const;
+
+  VkResult CreateRayTracingPipeline(vulkan::PipelineLayout *pipeline_layout,
+                                    vulkan::ShaderModule *ray_gen_shader,
+                                    vulkan::ShaderModule *miss_shader,
+                                    vulkan::ShaderModule *closest_hit_shader,
+                                    double_ptr<vulkan::RayTracingPipeline> pp_pipeline) const;
+
+  VkResult CreateShaderBindingTable(vulkan::RayTracingPipeline *ray_tracing_pipeline,
+                                    const std::vector<int32_t> &miss_shader_indices,
+                                    const std::vector<int32_t> &hit_group_indices,
+                                    const std::vector<int32_t> &callable_shader_indices,
+                                    double_ptr<vulkan::ShaderBindingTable> pp_sbt) const;
+
+  VkResult CreateShaderBindingTable(vulkan::RayTracingPipeline *ray_tracing_pipeline,
+                                    double_ptr<vulkan::ShaderBindingTable> pp_sbt) const;
 
   VkQueue GraphicsQueue() const {
     return graphics_queue_;
@@ -154,7 +315,19 @@ class VulkanCore : public Core {
   VkDebugUtilsMessengerEXT debug_messenger_{VK_NULL_HANDLE};
   vulkan::InstanceCreateHint instance_hint_{};
   vulkan::InstanceProcedures instance_procedures_{};
-  std::unique_ptr<vulkan::Device> device_;
+  VkDevice device_{VK_NULL_HANDLE};
+  uint32_t api_version_{};
+  std::optional<vulkan::PhysicalDevice> physical_device_;
+  std::optional<vulkan::DeviceCreateInfo> create_info_;
+  VkPhysicalDeviceSubgroupProperties subgroup_properties_{};
+  vulkan::DeviceProcedures procedures_{};
+  VmaAllocator allocator_{VK_NULL_HANDLE};
+  void InitializeNativeDevice(uint32_t api_version,
+                              const vulkan::PhysicalDevice &physical_device,
+                              vulkan::DeviceCreateInfo create_info,
+                              VmaAllocatorCreateFlags allocator_flags,
+                              VkDevice device);
+  void DestroyNativeDevice();
   VkPhysicalDeviceMemoryProperties memory_properties_;
 
   uint32_t current_frame_{0};

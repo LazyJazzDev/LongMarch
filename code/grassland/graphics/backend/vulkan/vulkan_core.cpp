@@ -30,13 +30,13 @@ VulkanCore::~VulkanCore() {
     semaphore_wait_info.pSemaphores = &cuda_synchronization_semaphore_;
     semaphore_wait_info.pValues = &cuda_synchronization_value_;
     semaphore_wait_info.semaphoreCount = 1;
-    vkWaitSemaphores(device_->Handle(), &semaphore_wait_info, std::numeric_limits<uint64_t>::max());
+    vkWaitSemaphores(this->Handle(), &semaphore_wait_info, std::numeric_limits<uint64_t>::max());
     cudaDestroyExternalSemaphore(cuda_external_semaphore_);
-    vkDestroySemaphore(device_->Handle(), cuda_synchronization_semaphore_, nullptr);
+    vkDestroySemaphore(this->Handle(), cuda_synchronization_semaphore_, nullptr);
   }
 #endif
   if (device_) {
-    vkDeviceWaitIdle(device_->Handle());
+    vkDeviceWaitIdle(this->Handle());
   }
   upload_staging_buffer_.reset();
   download_staging_buffer_.reset();
@@ -50,19 +50,21 @@ VulkanCore::~VulkanCore() {
   descriptor_pools_.clear();
   if (device_) {
     for (VkFence fence : in_flight_fences_) {
-      vkDestroyFence(device_->Handle(), fence, nullptr);
+      vkDestroyFence(this->Handle(), fence, nullptr);
     }
     in_flight_fences_.clear();
   }
   if (device_) {
     if (graphics_command_pool_) {
-      vkDestroyCommandPool(device_->Handle(), graphics_command_pool_, nullptr);
+      vkDestroyCommandPool(this->Handle(), graphics_command_pool_, nullptr);
     }
     if (transfer_command_pool_) {
-      vkDestroyCommandPool(device_->Handle(), transfer_command_pool_, nullptr);
+      vkDestroyCommandPool(this->Handle(), transfer_command_pool_, nullptr);
     }
   }
-  device_.reset();
+  if (device_) {
+    DestroyNativeDevice();
+  }
   if (instance_hint_.enable_validation_layers && debug_messenger_) {
     instance_procedures_.vkDestroyDebugUtilsMessengerEXT(instance_, debug_messenger_, nullptr);
   }
@@ -180,8 +182,8 @@ int VulkanCore::CreateBottomLevelAccelerationStructure(BufferRange aabb_buffer,
   VulkanBuffer *vk_aabb_buffer = dynamic_cast<VulkanBuffer *>(aabb_buffer.buffer);
   assert(vk_aabb_buffer);
   std::unique_ptr<vulkan::AccelerationStructure> blas;
-  device_->CreateBottomLevelAccelerationStructure(vk_aabb_buffer->DeviceAddress() + aabb_buffer.offset, stride,
-                                                  num_aabb, flags, graphics_command_pool_, graphics_queue_, &blas);
+  this->CreateBottomLevelAccelerationStructure(vk_aabb_buffer->DeviceAddress() + aabb_buffer.offset, stride, num_aabb,
+                                               flags, graphics_command_pool_, graphics_queue_, &blas);
   pp_blas.construct<VulkanAccelerationStructure>(this, std::move(blas));
   return 0;
 }
@@ -198,7 +200,7 @@ int VulkanCore::CreateBottomLevelAccelerationStructure(BufferRange vertex_buffer
   assert(vk_vertex_buffer != nullptr);
   assert(vk_index_buffer != nullptr);
   std::unique_ptr<vulkan::AccelerationStructure> blas;
-  device_->CreateBottomLevelAccelerationStructure(
+  this->CreateBottomLevelAccelerationStructure(
       vk_vertex_buffer->DeviceAddress() + vertex_buffer.offset, vk_index_buffer->DeviceAddress() + index_buffer.offset,
       num_vertex, stride, num_primitive, flags, graphics_command_pool_, graphics_queue_, &blas);
   pp_blas.construct<VulkanAccelerationStructure>(this, std::move(blas));
@@ -223,7 +225,7 @@ int VulkanCore::CreateTopLevelAccelerationStructure(const std::vector<RayTracing
   }
 
   std::unique_ptr<vulkan::AccelerationStructure> tlas;
-  device_->CreateTopLevelAccelerationStructure(vk_instances, graphics_command_pool_, graphics_queue_, &tlas);
+  this->CreateTopLevelAccelerationStructure(vk_instances, graphics_command_pool_, graphics_queue_, &tlas);
   pp_tlas.construct<VulkanAccelerationStructure>(this, std::move(tlas));
   return 0;
 }
@@ -266,7 +268,7 @@ int VulkanCore::SubmitCommandContext(CommandContext *p_command_context) {
   }
   if (update_pool) {
     pool.reset();
-    device_->CreateDescriptorPool(pool_size.ToVkDescriptorPoolSize(), max_sets, &pool);
+    this->CreateDescriptorPool(pool_size.ToVkDescriptorPoolSize(), max_sets, &pool);
   }
   current_descriptor_pool_ = pool.get();
   current_descriptor_set_queue_ = &set_queue;
@@ -353,7 +355,7 @@ int VulkanCore::SubmitCommandContext(CommandContext *p_command_context) {
   }
 
   VkFence fence = in_flight_fences_[current_frame_];
-  vkResetFences(device_->Handle(), 1, &fence);
+  vkResetFences(this->Handle(), 1, &fence);
 
   VkSubmitInfo submit_info{};
   submit_info.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
@@ -398,7 +400,7 @@ int VulkanCore::SubmitCommandContext(CommandContext *p_command_context) {
 
   current_frame_ = (current_frame_ + 1) % FramesInFlight();
   fence = in_flight_fences_[current_frame_];
-  vkWaitForFences(device_->Handle(), 1, &fence, VK_TRUE, std::numeric_limits<uint64_t>::max());
+  vkWaitForFences(this->Handle(), 1, &fence, VK_TRUE, std::numeric_limits<uint64_t>::max());
 
   vkQueueWaitIdle(transfer_queue_);
 
@@ -482,9 +484,8 @@ int VulkanCore::InitializeLogicalDevice(int device_index) {
   if (vkCreateDevice(physical_device.Handle(), &native_create_info, nullptr, &native_device) != VK_SUCCESS) {
     return -1;
   }
-  device_ = std::make_unique<vulkan::Device>(instance_, instance_hint_.app_info.apiVersion, instance_procedures_,
-                                             physical_device, create_info,
-                                             device_feature_requirement.GetVmaAllocatorCreateFlags(), native_device);
+  InitializeNativeDevice(instance_hint_.app_info.apiVersion, physical_device, create_info,
+                         device_feature_requirement.GetVmaAllocatorCreateFlags(), native_device);
   memory_properties_ = physical_device.GetPhysicalDeviceMemoryProperties();
 
   device_name_ = physical_device.GetPhysicalDeviceProperties().deviceName;
@@ -513,7 +514,7 @@ int VulkanCore::InitializeLogicalDevice(int device_index) {
   for (int i = 0; i < FramesInFlight(); i++) {
     VkFenceCreateInfo fence_info{VK_STRUCTURE_TYPE_FENCE_CREATE_INFO};
     fence_info.flags = VK_FENCE_CREATE_SIGNALED_BIT;
-    vulkan::ThrowIfFailed(vkCreateFence(device_->Handle(), &fence_info, nullptr, &in_flight_fences_[i]),
+    vulkan::ThrowIfFailed(vkCreateFence(this->Handle(), &fence_info, nullptr, &in_flight_fences_[i]),
                           "Failed to create in-flight fence");
     VkCommandBufferAllocateInfo allocate_info{VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO};
     allocate_info.commandPool = graphics_command_pool_;
@@ -529,7 +530,7 @@ int VulkanCore::InitializeLogicalDevice(int device_index) {
         {VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, 100},
     };
 
-    device_->CreateDescriptorPool({{VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 1}}, 1, &descriptor_pools_[i]);
+    this->CreateDescriptorPool({{VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 1}}, 1, &descriptor_pools_[i]);
   }
   VkCommandBufferAllocateInfo transfer_allocate_info{VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO};
   transfer_allocate_info.commandPool = transfer_command_pool_;
@@ -557,7 +558,7 @@ int VulkanCore::InitializeLogicalDevice(int device_index) {
 
     semaphore_create_info.pNext = &export_semaphore_create_info;
     vulkan::ThrowIfFailed(
-        vkCreateSemaphore(device_->Handle(), &semaphore_create_info, nullptr, &cuda_synchronization_semaphore_),
+        vkCreateSemaphore(this->Handle(), &semaphore_create_info, nullptr, &cuda_synchronization_semaphore_),
         "Failed to create CUDA synchronization semaphore");
 
     cudaExternalSemaphoreHandleDesc external_semaphore_handle_desc = {};
@@ -604,7 +605,7 @@ void VulkanCore::WaitGPU() {
 }
 
 uint32_t VulkanCore::WaveSize() const {
-  return device_->SubGroupSize();
+  return this->SubGroupSize();
 }
 
 void VulkanCore::SingleTimeCommand(std::function<void(VkCommandBuffer)> command) {
@@ -631,7 +632,7 @@ void VulkanCore::SingleTimeCommand(std::function<void(VkCommandBuffer)> command)
     submit_info.pWaitDstStageMask = wait_stages;
   }
 #endif
-  vulkan::SingleTimeCommand(device_->Handle(), graphics_queue_, graphics_command_pool_, command, submit_info);
+  vulkan::SingleTimeCommand(this->Handle(), graphics_queue_, graphics_command_pool_, command, submit_info);
 }
 
 uint32_t VulkanCore::FindMemoryType(uint32_t type_filter, VkMemoryPropertyFlags properties) {
@@ -646,7 +647,7 @@ uint32_t VulkanCore::FindMemoryType(uint32_t type_filter, VkMemoryPropertyFlags 
 vulkan::Buffer *VulkanCore::RequestUploadStagingBuffer(size_t size) {
   if (!upload_staging_buffer_ || upload_staging_buffer_->Size() < size) {
     upload_staging_buffer_.reset();
-    device_->CreateBuffer(size, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VMA_MEMORY_USAGE_CPU_ONLY, &upload_staging_buffer_);
+    this->CreateBuffer(size, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VMA_MEMORY_USAGE_CPU_ONLY, &upload_staging_buffer_);
   }
   return upload_staging_buffer_.get();
 }
@@ -654,7 +655,7 @@ vulkan::Buffer *VulkanCore::RequestUploadStagingBuffer(size_t size) {
 vulkan::Buffer *VulkanCore::RequestDownloadStagingBuffer(size_t size) {
   if (!download_staging_buffer_ || download_staging_buffer_->Size() < size) {
     download_staging_buffer_.reset();
-    device_->CreateBuffer(size, VK_BUFFER_USAGE_TRANSFER_DST_BIT, VMA_MEMORY_USAGE_CPU_ONLY, &download_staging_buffer_);
+    this->CreateBuffer(size, VK_BUFFER_USAGE_TRANSFER_DST_BIT, VMA_MEMORY_USAGE_CPU_ONLY, &download_staging_buffer_);
   }
   return download_staging_buffer_.get();
 }
@@ -731,11 +732,11 @@ void *VulkanCore::GetMemoryHandle(VkDeviceMemory memory) {
 
   PFN_vkGetMemoryWin32HandleKHR fpGetMemoryWin32HandleKHR;
   fpGetMemoryWin32HandleKHR =
-      (PFN_vkGetMemoryWin32HandleKHR)vkGetDeviceProcAddr(device_->Handle(), "vkGetMemoryWin32HandleKHR");
+      (PFN_vkGetMemoryWin32HandleKHR)vkGetDeviceProcAddr(this->Handle(), "vkGetMemoryWin32HandleKHR");
   if (!fpGetMemoryWin32HandleKHR) {
     throw std::runtime_error("Failed to retrieve vkGetMemoryWin32HandleKHR!");
   }
-  if (fpGetMemoryWin32HandleKHR(device_->Handle(), &vk_memory_get_win32_handle_info_khr, &handle) != VK_SUCCESS) {
+  if (fpGetMemoryWin32HandleKHR(this->Handle(), &vk_memory_get_win32_handle_info_khr, &handle) != VK_SUCCESS) {
     throw std::runtime_error("Failed to retrieve handle for buffer!");
   }
   return (void *)handle;
@@ -749,11 +750,11 @@ void *VulkanCore::GetMemoryHandle(VkDeviceMemory memory) {
   vk_memory_get_fd_info_khr.handleType = handle_type;
 
   PFN_vkGetMemoryFdKHR fpGetMemoryFdKHR;
-  fpGetMemoryFdKHR = (PFN_vkGetMemoryFdKHR)vkGetDeviceProcAddr(device_->Handle(), "vkGetMemoryFdKHR");
+  fpGetMemoryFdKHR = (PFN_vkGetMemoryFdKHR)vkGetDeviceProcAddr(this->Handle(), "vkGetMemoryFdKHR");
   if (!fpGetMemoryFdKHR) {
     throw std::runtime_error("Failed to retrieve vkGetMemoryWin32HandleKHR!");
   }
-  if (fpGetMemoryFdKHR(device_->Handle(), &vk_memory_get_fd_info_khr, &fd) != VK_SUCCESS) {
+  if (fpGetMemoryFdKHR(this->Handle(), &vk_memory_get_fd_info_khr, &fd) != VK_SUCCESS) {
     throw std::runtime_error("Failed to retrieve handle for buffer!");
   }
   return (void *)(uintptr_t)fd;
@@ -773,11 +774,11 @@ void *VulkanCore::GetSemaphoreHandle(VkSemaphore semaphore) {
 
   PFN_vkGetSemaphoreWin32HandleKHR fpGetSemaphoreWin32HandleKHR;
   fpGetSemaphoreWin32HandleKHR =
-      (PFN_vkGetSemaphoreWin32HandleKHR)vkGetDeviceProcAddr(device_->Handle(), "vkGetSemaphoreWin32HandleKHR");
+      (PFN_vkGetSemaphoreWin32HandleKHR)vkGetDeviceProcAddr(this->Handle(), "vkGetSemaphoreWin32HandleKHR");
   if (!fpGetSemaphoreWin32HandleKHR) {
     throw std::runtime_error("Failed to retrieve vkGetMemoryWin32HandleKHR!");
   }
-  if (fpGetSemaphoreWin32HandleKHR(device_->Handle(), &semaphore_get_win32_handle_info_khr, &handle) != VK_SUCCESS) {
+  if (fpGetSemaphoreWin32HandleKHR(this->Handle(), &semaphore_get_win32_handle_info_khr, &handle) != VK_SUCCESS) {
     throw std::runtime_error("Failed to retrieve handle for buffer!");
   }
 
@@ -792,11 +793,11 @@ void *VulkanCore::GetSemaphoreHandle(VkSemaphore semaphore) {
   semaphore_get_fd_info_khr.handleType = handle_type;
 
   PFN_vkGetSemaphoreFdKHR fpGetSemaphoreFdKHR;
-  fpGetSemaphoreFdKHR = (PFN_vkGetSemaphoreFdKHR)vkGetDeviceProcAddr(device_->Handle(), "vkGetSemaphoreFdKHR");
+  fpGetSemaphoreFdKHR = (PFN_vkGetSemaphoreFdKHR)vkGetDeviceProcAddr(this->Handle(), "vkGetSemaphoreFdKHR");
   if (!fpGetSemaphoreFdKHR) {
     throw std::runtime_error("Failed to retrieve vkGetMemoryWin32HandleKHR!");
   }
-  if (fpGetSemaphoreFdKHR(device_->Handle(), &semaphore_get_fd_info_khr, &fd) != VK_SUCCESS) {
+  if (fpGetSemaphoreFdKHR(this->Handle(), &semaphore_get_fd_info_khr, &fd) != VK_SUCCESS) {
     throw std::runtime_error("Failed to retrieve handle for buffer!");
   }
 

@@ -1,6 +1,6 @@
 #include "grassland/graphics/backend/vulkan/helper/physical_device.h"
 
-#include "grassland/graphics/backend/vulkan/helper/device.h"
+#include "grassland/graphics/backend/vulkan/helper/native_types.h"
 
 namespace grassland::graphics::backend::vulkan {
 PhysicalDevice::PhysicalDevice(VkPhysicalDevice physical_device) {

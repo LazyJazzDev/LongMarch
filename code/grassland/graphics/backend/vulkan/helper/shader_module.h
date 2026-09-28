@@ -1,11 +1,11 @@
 #pragma once
 
-#include "grassland/graphics/backend/vulkan/helper/device.h"
+#include "grassland/graphics/backend/vulkan/helper/native_types.h"
 
 namespace grassland::graphics::backend::vulkan {
 class ShaderModule {
  public:
-  ShaderModule(const class Device *device, VkShaderModule shader_module, const std::string &entry_point);
+  ShaderModule(const VulkanCore *device, VkShaderModule shader_module, const std::string &entry_point);
 
   ~ShaderModule();
 
@@ -13,7 +13,7 @@ class ShaderModule {
     return shader_module_;
   }
 
-  const class Device *Device() const {
+  const VulkanCore *Device() const {
     return device_;
   }
 
@@ -22,7 +22,7 @@ class ShaderModule {
   }
 
  private:
-  const class Device *device_{};
+  const VulkanCore *device_{};
   VkShaderModule shader_module_{};
   std::string entry_point_;
 };

@@ -1,14 +1,14 @@
 #pragma once
-#include "grassland/graphics/backend/vulkan/helper/device.h"
+#include "grassland/graphics/backend/vulkan/helper/native_types.h"
 
 namespace grassland::graphics::backend::vulkan {
 class Buffer {
  public:
-  Buffer(const class Device *device, VkDeviceSize size, VkBuffer buffer, VmaAllocation allocation);
+  Buffer(const VulkanCore *device, VkDeviceSize size, VkBuffer buffer, VmaAllocation allocation);
 
   ~Buffer();
 
-  const class Device *Device() const {
+  const VulkanCore *Device() const {
     return device_;
   }
 
@@ -24,20 +24,13 @@ class Buffer {
     return size_;
   }
 
-  void *Map() const {
-    void *data;
-    vmaMapMemory(device_->Allocator(), allocation_, &data);
-    return data;
-  }
-
-  void Unmap() const {
-    vmaUnmapMemory(device_->Allocator(), allocation_);
-  }
+  void *Map() const;
+  void Unmap() const;
 
   VkDeviceAddress GetDeviceAddress() const;
 
  private:
-  const class Device *device_{};
+  const VulkanCore *device_{};
   VkDeviceSize size_{};
   VkBuffer buffer_{};
   VmaAllocation allocation_{};

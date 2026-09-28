@@ -3,6 +3,7 @@
 #include "grassland/graphics/backend/vulkan/helper/buffer.h"
 #include "grassland/graphics/backend/vulkan/helper/image.h"
 #include "grassland/graphics/backend/vulkan/helper/raytracing/acceleration_structure.h"
+#include "grassland/graphics/backend/vulkan/vulkan_core.h"
 
 namespace grassland::graphics::backend::vulkan {
 DescriptorSet::DescriptorSet(const struct DescriptorPool *descriptor_pool, VkDescriptorSet set)

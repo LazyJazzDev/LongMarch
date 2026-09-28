@@ -6,19 +6,19 @@ namespace grassland::graphics::backend {
 
 void VulkanWindow::DestroySwapChain() {
   for (VkImageView view : swap_chain_image_views_) {
-    vkDestroyImageView(core_->Device()->Handle(), view, nullptr);
+    vkDestroyImageView(core_->Handle(), view, nullptr);
   }
   swap_chain_image_views_.clear();
   swap_chain_images_.clear();
   if (swap_chain_) {
-    vkDestroySwapchainKHR(core_->Device()->Handle(), swap_chain_, nullptr);
+    vkDestroySwapchainKHR(core_->Handle(), swap_chain_, nullptr);
     swap_chain_ = VK_NULL_HANDLE;
   }
 }
 
 void VulkanWindow::CreateSwapChain() {
-  VkDevice device = core_->Device()->Handle();
-  auto &physical_device = core_->Device()->PhysicalDevice();
+  VkDevice device = core_->Handle();
+  auto &physical_device = core_->PhysicalDevice();
   auto support = vulkan::QuerySwapChainSupport(physical_device.Handle(), surface_);
   VkFormat requested_format = enable_hdr_ ? VK_FORMAT_R16G16B16A16_SFLOAT : VK_FORMAT_R8G8B8A8_UNORM;
   VkColorSpaceKHR requested_color_space =
@@ -88,15 +88,12 @@ VulkanWindow::VulkanWindow(VulkanCore *core,
   render_finish_semaphores_.resize(swap_chain_images_.size());
   for (size_t i = 0; i < image_available_semaphores_.size(); ++i) {
     VkSemaphoreCreateInfo semaphore_info{VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO};
-    vulkan::ThrowIfFailed(
-        vkCreateSemaphore(core_->Device()->Handle(), &semaphore_info, nullptr, &image_available_semaphores_[i]),
-        "Failed to create image available semaphore");
-    vulkan::ThrowIfFailed(
-        vkCreateSemaphore(core_->Device()->Handle(), &semaphore_info, nullptr, &render_finish_semaphores_[i]),
-        "Failed to create render finish semaphore");
+    vulkan::ThrowIfFailed(vkCreateSemaphore(core_->Handle(), &semaphore_info, nullptr, &image_available_semaphores_[i]),
+                          "Failed to create image available semaphore");
+    vulkan::ThrowIfFailed(vkCreateSemaphore(core_->Handle(), &semaphore_info, nullptr, &render_finish_semaphores_[i]),
+                          "Failed to create render finish semaphore");
   }
-  vkGetDeviceQueue(core_->Device()->Handle(), core_->Device()->PhysicalDevice().PresentFamilyIndex(surface_), 0,
-                   &present_queue_);
+  vkGetDeviceQueue(core_->Handle(), core_->PhysicalDevice().PresentFamilyIndex(surface_), 0, &present_queue_);
   ResizeEvent().RegisterCallback([this](int width, int height) { Rebuild(); });
 }
 
@@ -112,11 +109,11 @@ void VulkanWindow::CloseWindow() {
     TerminateImGui();
   }
   for (VkSemaphore semaphore : image_available_semaphores_) {
-    vkDestroySemaphore(core_->Device()->Handle(), semaphore, nullptr);
+    vkDestroySemaphore(core_->Handle(), semaphore, nullptr);
   }
   image_available_semaphores_.clear();
   for (VkSemaphore semaphore : render_finish_semaphores_) {
-    vkDestroySemaphore(core_->Device()->Handle(), semaphore, nullptr);
+    vkDestroySemaphore(core_->Handle(), semaphore, nullptr);
   }
   render_finish_semaphores_.clear();
   DestroySwapChain();
@@ -134,8 +131,8 @@ VkSemaphore VulkanWindow::ImageAvailableSemaphore() const {
 }
 
 uint32_t VulkanWindow::AcquireNextImage() {
-  vkAcquireNextImageKHR(core_->Device()->Handle(), swap_chain_, std::numeric_limits<uint64_t>::max(),
-                        ImageAvailableSemaphore(), VK_NULL_HANDLE, &image_index_);
+  vkAcquireNextImageKHR(core_->Handle(), swap_chain_, std::numeric_limits<uint64_t>::max(), ImageAvailableSemaphore(),
+                        VK_NULL_HANDLE, &image_index_);
   return image_index_;
 }
 
@@ -258,17 +255,16 @@ void VulkanWindow::SetupImGuiContext() {
   render_pass_info.pAttachments = &attachment_desc;
   render_pass_info.subpassCount = 1;
   render_pass_info.pSubpasses = &subpass;
-  vulkan::ThrowIfFailed(
-      vkCreateRenderPass(core_->Device()->Handle(), &render_pass_info, nullptr, &imgui_assets_.render_pass),
-      "Failed to create ImGui render pass");
+  vulkan::ThrowIfFailed(vkCreateRenderPass(core_->Handle(), &render_pass_info, nullptr, &imgui_assets_.render_pass),
+                        "Failed to create ImGui render pass");
   imgui_assets_.render_pass_format = attachment_desc.format;
 
   ImGui_ImplVulkan_InitInfo init_info = {};
   init_info.ApiVersion = VK_API_VERSION_1_2;
   init_info.Instance = core_->Instance();
-  init_info.PhysicalDevice = core_->Device()->PhysicalDevice().Handle();
-  init_info.Device = core_->Device()->Handle();
-  init_info.QueueFamily = core_->Device()->PhysicalDevice().GraphicsFamilyIndex();
+  init_info.PhysicalDevice = core_->PhysicalDevice().Handle();
+  init_info.Device = core_->Handle();
+  init_info.QueueFamily = core_->PhysicalDevice().GraphicsFamilyIndex();
   init_info.Queue = core_->GraphicsQueue();
   init_info.DescriptorPoolSize = 32;
   init_info.RenderPass = imgui_assets_.render_pass;
@@ -304,21 +300,21 @@ void VulkanWindow::BuildImGuiFramebuffers() {
     framebuffer_info.height = swap_chain_extent_.height;
     framebuffer_info.layers = 1;
     vulkan::ThrowIfFailed(
-        vkCreateFramebuffer(core_->Device()->Handle(), &framebuffer_info, nullptr, &imgui_assets_.framebuffers[i]),
+        vkCreateFramebuffer(core_->Handle(), &framebuffer_info, nullptr, &imgui_assets_.framebuffers[i]),
         "Failed to create ImGui framebuffer");
   }
 }
 
 void VulkanWindow::DestroyImGuiFramebuffers() {
   for (VkFramebuffer framebuffer : imgui_assets_.framebuffers) {
-    vkDestroyFramebuffer(core_->Device()->Handle(), framebuffer, nullptr);
+    vkDestroyFramebuffer(core_->Handle(), framebuffer, nullptr);
   }
   imgui_assets_.framebuffers.clear();
 }
 
 void VulkanWindow::DestroyImGuiRenderPass() {
   if (imgui_assets_.render_pass != VK_NULL_HANDLE) {
-    vkDestroyRenderPass(core_->Device()->Handle(), imgui_assets_.render_pass, nullptr);
+    vkDestroyRenderPass(core_->Handle(), imgui_assets_.render_pass, nullptr);
     imgui_assets_.render_pass = VK_NULL_HANDLE;
     imgui_assets_.render_pass_format = VK_FORMAT_UNDEFINED;
   }

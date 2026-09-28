@@ -1,11 +1,11 @@
 #pragma once
 
-#include "grassland/graphics/backend/vulkan/helper/device.h"
+#include "grassland/graphics/backend/vulkan/helper/native_types.h"
 
 namespace grassland::graphics::backend::vulkan {
 class Image {
  public:
-  Image(const class Device *device,
+  Image(const VulkanCore *device,
         VkFormat format,
         VkExtent2D extent,
         VkImageUsageFlags usage,
@@ -16,7 +16,7 @@ class Image {
         VmaAllocation allocation);
   ~Image();
 
-  const class Device *Device() const {
+  const VulkanCore *Device() const {
     return device_;
   }
 
@@ -68,7 +68,7 @@ class Image {
                       VkImageLayout image_layout = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL) const;
 
  private:
-  const class Device *device_{};
+  const VulkanCore *device_{};
   VkFormat format_{};
   VkExtent2D extent_{};
   VkImageUsageFlags usage_{};

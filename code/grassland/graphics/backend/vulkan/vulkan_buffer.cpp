@@ -18,7 +18,7 @@ VulkanStaticBuffer::VulkanStaticBuffer(VulkanCore *core, size_t size) : core_(co
     usage |= VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
              VK_BUFFER_USAGE_ACCELERATION_STRUCTURE_BUILD_INPUT_READ_ONLY_BIT_KHR;
   }
-  core_->Device()->CreateBuffer(size, usage, VMA_MEMORY_USAGE_GPU_ONLY, &buffer_);
+  core_->CreateBuffer(size, usage, VMA_MEMORY_USAGE_GPU_ONLY, &buffer_);
 }
 
 VulkanStaticBuffer::~VulkanStaticBuffer() {
@@ -43,7 +43,7 @@ void VulkanStaticBuffer::Resize(size_t new_size) {
     usage |= VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
              VK_BUFFER_USAGE_ACCELERATION_STRUCTURE_BUILD_INPUT_READ_ONLY_BIT_KHR;
   }
-  core_->Device()->CreateBuffer(new_size, usage, VMA_MEMORY_USAGE_GPU_ONLY, &new_buffer);
+  core_->CreateBuffer(new_size, usage, VMA_MEMORY_USAGE_GPU_ONLY, &new_buffer);
   core_->SingleTimeCommand([&](VkCommandBuffer command_buffer) {
     VkBufferCopy copy_region{};
     copy_region.size = std::min(static_cast<size_t>(buffer_->Size()), new_size);
@@ -98,7 +98,7 @@ VulkanDynamicBuffer::VulkanDynamicBuffer(VulkanCore *core, size_t size) : core_(
     usage |= VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
              VK_BUFFER_USAGE_ACCELERATION_STRUCTURE_BUILD_INPUT_READ_ONLY_BIT_KHR;
   }
-  core_->Device()->CreateBuffer(size, usage, VMA_MEMORY_USAGE_CPU_TO_GPU, &staging_buffer_);
+  core_->CreateBuffer(size, usage, VMA_MEMORY_USAGE_CPU_TO_GPU, &staging_buffer_);
 
   usage = VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_TRANSFER_SRC_BIT | VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT |
           VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_INDEX_BUFFER_BIT | VK_BUFFER_USAGE_VERTEX_BUFFER_BIT;
@@ -106,7 +106,7 @@ VulkanDynamicBuffer::VulkanDynamicBuffer(VulkanCore *core, size_t size) : core_(
   buffers_.resize(core_->FramesInFlight());
 
   for (size_t i = 0; i < buffers_.size(); ++i) {
-    core_->Device()->CreateBuffer(size, usage, VMA_MEMORY_USAGE_GPU_ONLY, &buffers_[i]);
+    core_->CreateBuffer(size, usage, VMA_MEMORY_USAGE_GPU_ONLY, &buffers_[i]);
   }
 }
 
@@ -130,7 +130,7 @@ void VulkanDynamicBuffer::Resize(size_t new_size) {
     usage |= VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
              VK_BUFFER_USAGE_ACCELERATION_STRUCTURE_BUILD_INPUT_READ_ONLY_BIT_KHR;
   }
-  core_->Device()->CreateBuffer(new_size, usage, VMA_MEMORY_USAGE_CPU_TO_GPU, &new_buffer);
+  core_->CreateBuffer(new_size, usage, VMA_MEMORY_USAGE_CPU_TO_GPU, &new_buffer);
   std::memcpy(new_buffer->Map(), staging_buffer_->Map(),
               std::min(new_size, static_cast<size_t>(staging_buffer_->Size())));
   new_buffer->Unmap();
@@ -163,8 +163,7 @@ void VulkanDynamicBuffer::TransferData(VkCommandBuffer cmd_buffer) {
     auto usage = VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_TRANSFER_SRC_BIT |
                  VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT | VK_BUFFER_USAGE_STORAGE_BUFFER_BIT |
                  VK_BUFFER_USAGE_INDEX_BUFFER_BIT | VK_BUFFER_USAGE_VERTEX_BUFFER_BIT;
-    core_->Device()->CreateBuffer(staging_buffer_->Size(), usage, VMA_MEMORY_USAGE_GPU_ONLY,
-                                  &buffers_[core_->CurrentFrame()]);
+    core_->CreateBuffer(staging_buffer_->Size(), usage, VMA_MEMORY_USAGE_GPU_ONLY, &buffers_[core_->CurrentFrame()]);
   }
 
   VkBufferCopy copy_region{};
@@ -183,7 +182,7 @@ VulkanCUDABuffer::VulkanCUDABuffer(VulkanCore *core, size_t size) : core_(core),
              VK_BUFFER_USAGE_ACCELERATION_STRUCTURE_BUILD_INPUT_READ_ONLY_BIT_KHR;
   }
   vulkan::CreateExternalBuffer(
-      core_->Device()->Handle(),
+      core_->Handle(),
       [core_ = this->core_](uint32_t type_filter, VkMemoryPropertyFlags properties) {
         return core_->FindMemoryType(type_filter, properties);
       },
@@ -192,8 +191,7 @@ VulkanCUDABuffer::VulkanCUDABuffer(VulkanCore *core, size_t size) : core_(core),
   VkBufferDeviceAddressInfo buffer_device_address_info{};
   buffer_device_address_info.sType = VK_STRUCTURE_TYPE_BUFFER_DEVICE_ADDRESS_INFO;
   buffer_device_address_info.buffer = buffer_;
-  address_ =
-      core_->Device()->Procedures().vkGetBufferDeviceAddressKHR(core_->Device()->Handle(), &buffer_device_address_info);
+  address_ = core_->Procedures().vkGetBufferDeviceAddressKHR(core_->Handle(), &buffer_device_address_info);
 }
 
 VulkanCUDABuffer::~VulkanCUDABuffer() {
@@ -203,11 +201,11 @@ VulkanCUDABuffer::~VulkanCUDABuffer() {
 void VulkanCUDABuffer::Reset() {
   cudaDestroyExternalMemory(cuda_memory_);
   if (memory_) {
-    vkFreeMemory(core_->Device()->Handle(), memory_, nullptr);
+    vkFreeMemory(core_->Handle(), memory_, nullptr);
     memory_ = VK_NULL_HANDLE;
   }
   if (buffer_) {
-    vkDestroyBuffer(core_->Device()->Handle(), buffer_, nullptr);
+    vkDestroyBuffer(core_->Handle(), buffer_, nullptr);
     buffer_ = VK_NULL_HANDLE;
   }
 }
@@ -233,7 +231,7 @@ void VulkanCUDABuffer::Resize(size_t new_size) {
   VkBuffer new_buffer;
   VkDeviceMemory new_memory;
   vulkan::CreateExternalBuffer(
-      core_->Device()->Handle(),
+      core_->Handle(),
       [core_ = this->core_](uint32_t type_filter, VkMemoryPropertyFlags properties) {
         return core_->FindMemoryType(type_filter, properties);
       },
@@ -251,8 +249,7 @@ void VulkanCUDABuffer::Resize(size_t new_size) {
   VkBufferDeviceAddressInfo buffer_device_address_info{};
   buffer_device_address_info.sType = VK_STRUCTURE_TYPE_BUFFER_DEVICE_ADDRESS_INFO;
   buffer_device_address_info.buffer = buffer_;
-  address_ =
-      core_->Device()->Procedures().vkGetBufferDeviceAddressKHR(core_->Device()->Handle(), &buffer_device_address_info);
+  address_ = core_->Procedures().vkGetBufferDeviceAddressKHR(core_->Handle(), &buffer_device_address_info);
 }
 
 void VulkanCUDABuffer::UploadData(const void *data, size_t size, size_t offset) {

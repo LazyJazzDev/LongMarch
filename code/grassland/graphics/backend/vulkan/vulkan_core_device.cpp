@@ -1,5 +1,3 @@
-#include "grassland/graphics/backend/vulkan/helper/device.h"
-
 #include <numeric>
 #include <utility>
 
@@ -14,25 +12,24 @@
 #include "grassland/graphics/backend/vulkan/helper/pipeline_layout.h"
 #include "grassland/graphics/backend/vulkan/helper/raytracing/raytracing.h"
 #include "grassland/graphics/backend/vulkan/helper/shader_module.h"
+#include "grassland/graphics/backend/vulkan/vulkan_core.h"
 
-namespace grassland::graphics::backend::vulkan {
-Device::Device(VkInstance instance,
-               uint32_t api_version,
-               InstanceProcedures instance_procedures,
-               const class PhysicalDevice &physical_device,
-               DeviceCreateInfo create_info,
-               VmaAllocatorCreateFlags allocator_flags,
-               VkDevice device)
-    : instance_(instance),
-      api_version_(api_version),
-      instance_procedures_(instance_procedures),
-      physical_device_(physical_device),
-      create_info_(std::move(create_info)),
-      device_(device) {
+namespace grassland::graphics::backend {
+using namespace vulkan;
+
+void VulkanCore::InitializeNativeDevice(uint32_t api_version,
+                                        const vulkan::PhysicalDevice &physical_device,
+                                        vulkan::DeviceCreateInfo create_info,
+                                        VmaAllocatorCreateFlags allocator_flags,
+                                        VkDevice device) {
+  api_version_ = api_version;
+  physical_device_ = physical_device;
+  create_info_.emplace(std::move(create_info));
+  device_ = device;
   VmaAllocatorCreateInfo allocator_info = {};
-  allocator_info.physicalDevice = physical_device_.Handle();
+  allocator_info.physicalDevice = physical_device_->Handle();
   allocator_info.device = device_;
-  allocator_info.instance = instance;
+  allocator_info.instance = instance_;
   allocator_info.vulkanApiVersion = api_version_;
   allocator_info.flags = allocator_flags;
   vmaCreateAllocator(&allocator_info, &allocator_);
@@ -40,7 +37,7 @@ Device::Device(VkInstance instance,
   bool ray_tracing_enabled = false;
   bool acceleration_structure_enabled = false;
 
-  for (auto extension : create_info_.extensions) {
+  for (auto extension : create_info_->extensions) {
     if (strcmp(extension, VK_KHR_RAY_TRACING_PIPELINE_EXTENSION_NAME) == 0) {
       ray_tracing_enabled = true;
     }
@@ -59,15 +56,16 @@ Device::Device(VkInstance instance,
   VkPhysicalDeviceProperties2 properties2{};
   properties2.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_PROPERTIES_2;
   properties2.pNext = &subgroup_properties_;
-  vkGetPhysicalDeviceProperties2(physical_device_.Handle(), &properties2);
+  vkGetPhysicalDeviceProperties2(physical_device_->Handle(), &properties2);
 }
 
-Device::~Device() {
+void VulkanCore::DestroyNativeDevice() {
   vmaDestroyAllocator(allocator_);
   vkDestroyDevice(device_, nullptr);
 }
 
-VkResult Device::CreateShaderModule(const CompiledShaderBlob &code, double_ptr<ShaderModule> pp_shader_module) const {
+VkResult VulkanCore::CreateShaderModule(const CompiledShaderBlob &code,
+                                        double_ptr<vulkan::ShaderModule> pp_shader_module) const {
   if (!pp_shader_module) {
     SetErrorMessage("pp_shader_module is nullptr");
     return VK_ERROR_INITIALIZATION_FAILED;
@@ -87,10 +85,10 @@ VkResult Device::CreateShaderModule(const CompiledShaderBlob &code, double_ptr<S
   return VK_SUCCESS;
 }
 
-VkResult Device::CreateShaderModule(const void *p_code,
-                                    size_t code_size,
-                                    const std::string &entry_point,
-                                    double_ptr<ShaderModule> pp_shader_module) const {
+VkResult VulkanCore::CreateShaderModule(const void *p_code,
+                                        size_t code_size,
+                                        const std::string &entry_point,
+                                        double_ptr<vulkan::ShaderModule> pp_shader_module) const {
   CompiledShaderBlob code;
   code.data.resize(code_size);
   std::memcpy(code.data.data(), p_code, code_size);
@@ -98,9 +96,9 @@ VkResult Device::CreateShaderModule(const void *p_code,
   return CreateShaderModule(code, pp_shader_module);
 }
 
-VkResult Device::CreateDescriptorPool(const std::vector<VkDescriptorPoolSize> &pool_sizes,
-                                      uint32_t max_sets,
-                                      double_ptr<DescriptorPool> pp_descriptor_pool) const {
+VkResult VulkanCore::CreateDescriptorPool(const std::vector<VkDescriptorPoolSize> &pool_sizes,
+                                          uint32_t max_sets,
+                                          double_ptr<vulkan::DescriptorPool> pp_descriptor_pool) const {
   if (!pp_descriptor_pool) {
     SetErrorMessage("pp_descriptor_pool is nullptr");
     return VK_ERROR_INITIALIZATION_FAILED;
@@ -127,8 +125,8 @@ VkResult Device::CreateDescriptorPool(const std::vector<VkDescriptorPoolSize> &p
   return VK_SUCCESS;
 }
 
-VkResult Device::CreateDescriptorSetLayout(const std::vector<VkDescriptorSetLayoutBinding> &bindings,
-                                           double_ptr<DescriptorSetLayout> pp_descriptor_set_layout) const {
+VkResult VulkanCore::CreateDescriptorSetLayout(const std::vector<VkDescriptorSetLayoutBinding> &bindings,
+                                               double_ptr<vulkan::DescriptorSetLayout> pp_descriptor_set_layout) const {
   if (!pp_descriptor_set_layout) {
     SetErrorMessage("pp_descriptor_set_layout is nullptr");
     return VK_ERROR_INITIALIZATION_FAILED;
@@ -148,13 +146,13 @@ VkResult Device::CreateDescriptorSetLayout(const std::vector<VkDescriptorSetLayo
   return VK_SUCCESS;
 }
 
-VkResult Device::CreateImage(VkFormat format,
-                             VkExtent2D extent,
-                             VkImageUsageFlags usage,
-                             VkImageAspectFlags aspect,
-                             VkSampleCountFlagBits sample_count,
-                             VmaMemoryUsage mem_usage,
-                             double_ptr<Image> pp_image) const {
+VkResult VulkanCore::CreateImage(VkFormat format,
+                                 VkExtent2D extent,
+                                 VkImageUsageFlags usage,
+                                 VkImageAspectFlags aspect,
+                                 VkSampleCountFlagBits sample_count,
+                                 VmaMemoryUsage mem_usage,
+                                 double_ptr<vulkan::Image> pp_image) const {
   if (!pp_image) {
     SetErrorMessage("pp_image is nullptr");
     return VK_ERROR_INITIALIZATION_FAILED;
@@ -211,27 +209,27 @@ VkResult Device::CreateImage(VkFormat format,
   return VK_SUCCESS;
 }
 
-VkResult Device::CreateImage(VkFormat format,
-                             VkExtent2D extent,
-                             VkImageUsageFlags usage,
-                             VkImageAspectFlags aspect,
-                             VkSampleCountFlagBits sample_count,
-                             double_ptr<Image> pp_image) const {
+VkResult VulkanCore::CreateImage(VkFormat format,
+                                 VkExtent2D extent,
+                                 VkImageUsageFlags usage,
+                                 VkImageAspectFlags aspect,
+                                 VkSampleCountFlagBits sample_count,
+                                 double_ptr<vulkan::Image> pp_image) const {
   return CreateImage(format, extent, usage, aspect, sample_count, VMA_MEMORY_USAGE_GPU_ONLY, pp_image);
 }
 
-VkResult Device::CreateImage(VkFormat format,
-                             VkExtent2D extent,
-                             VkImageUsageFlags usage,
-                             VkImageAspectFlags aspect,
-                             double_ptr<Image> pp_image) const {
+VkResult VulkanCore::CreateImage(VkFormat format,
+                                 VkExtent2D extent,
+                                 VkImageUsageFlags usage,
+                                 VkImageAspectFlags aspect,
+                                 double_ptr<vulkan::Image> pp_image) const {
   return CreateImage(format, extent, usage, aspect, VK_SAMPLE_COUNT_1_BIT, pp_image);
 }
 
-VkResult Device::CreateImage(VkFormat format,
-                             VkExtent2D extent,
-                             VkImageUsageFlags usage,
-                             double_ptr<Image> pp_image) const {
+VkResult VulkanCore::CreateImage(VkFormat format,
+                                 VkExtent2D extent,
+                                 VkImageUsageFlags usage,
+                                 double_ptr<vulkan::Image> pp_image) const {
   VkImageAspectFlagBits aspect = VK_IMAGE_ASPECT_COLOR_BIT;
   if (IsDepthFormat(format)) {
     aspect = VK_IMAGE_ASPECT_DEPTH_BIT;
@@ -239,7 +237,7 @@ VkResult Device::CreateImage(VkFormat format,
   return CreateImage(format, extent, usage, aspect, pp_image);
 }
 
-VkResult Device::CreateImage(VkFormat format, VkExtent2D extent, double_ptr<Image> pp_image) const {
+VkResult VulkanCore::CreateImage(VkFormat format, VkExtent2D extent, double_ptr<vulkan::Image> pp_image) const {
   VkImageUsageFlags usage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT |
                             VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_STORAGE_BIT;
   if (IsDepthFormat(format)) {
@@ -250,12 +248,12 @@ VkResult Device::CreateImage(VkFormat format, VkExtent2D extent, double_ptr<Imag
   return CreateImage(format, extent, usage, pp_image);
 }
 
-VkResult Device::CreateBuffer(VkDeviceSize size,
-                              VkBufferUsageFlags usage,
-                              VmaMemoryUsage memory_usage,
-                              VmaAllocationCreateFlags flags,
-                              VkDeviceSize alignment,
-                              double_ptr<Buffer> pp_buffer) const {
+VkResult VulkanCore::CreateBuffer(VkDeviceSize size,
+                                  VkBufferUsageFlags usage,
+                                  VmaMemoryUsage memory_usage,
+                                  VmaAllocationCreateFlags flags,
+                                  VkDeviceSize alignment,
+                                  double_ptr<vulkan::Buffer> pp_buffer) const {
   if (!pp_buffer) {
     SetErrorMessage("pp_buffer is nullptr");
     return VK_ERROR_INITIALIZATION_FAILED;
@@ -288,24 +286,24 @@ VkResult Device::CreateBuffer(VkDeviceSize size,
   return VK_SUCCESS;
 }
 
-VkResult Device::CreateBuffer(VkDeviceSize size,
-                              VkBufferUsageFlags usage,
-                              VmaMemoryUsage memory_usage,
-                              VmaAllocationCreateFlags flags,
-                              double_ptr<Buffer> pp_buffer) const {
+VkResult VulkanCore::CreateBuffer(VkDeviceSize size,
+                                  VkBufferUsageFlags usage,
+                                  VmaMemoryUsage memory_usage,
+                                  VmaAllocationCreateFlags flags,
+                                  double_ptr<vulkan::Buffer> pp_buffer) const {
   return CreateBuffer(size, usage, memory_usage, flags, 0, pp_buffer);
 }
 
-VkResult Device::CreateBuffer(VkDeviceSize size,
-                              VkBufferUsageFlags usage,
-                              VmaMemoryUsage memory_usage,
-                              double_ptr<Buffer> pp_buffer) const {
+VkResult VulkanCore::CreateBuffer(VkDeviceSize size,
+                                  VkBufferUsageFlags usage,
+                                  VmaMemoryUsage memory_usage,
+                                  double_ptr<vulkan::Buffer> pp_buffer) const {
   VmaAllocationCreateFlags flags = 0;
   return CreateBuffer(size, usage, memory_usage, flags, pp_buffer);
 }
 
-VkResult Device::CreatePipelineLayout(const std::vector<VkDescriptorSetLayout> &descriptor_set_layouts,
-                                      double_ptr<PipelineLayout> pp_pipeline_layout) const {
+VkResult VulkanCore::CreatePipelineLayout(const std::vector<VkDescriptorSetLayout> &descriptor_set_layouts,
+                                          double_ptr<vulkan::PipelineLayout> pp_pipeline_layout) const {
   if (!pp_pipeline_layout) {
     SetErrorMessage("pp_pipeline_layout is nullptr");
     return VK_ERROR_INITIALIZATION_FAILED;
@@ -327,7 +325,8 @@ VkResult Device::CreatePipelineLayout(const std::vector<VkDescriptorSetLayout> &
   return VK_SUCCESS;
 }
 
-VkResult Device::CreatePipeline(const struct PipelineSettings &settings, double_ptr<Pipeline> pp_pipeline) const {
+VkResult VulkanCore::CreatePipeline(const struct vulkan::PipelineSettings &settings,
+                                    double_ptr<vulkan::Pipeline> pp_pipeline) const {
   if (!pp_pipeline) {
     SetErrorMessage("pp_pipeline is nullptr");
     return VK_ERROR_INITIALIZATION_FAILED;
@@ -413,20 +412,20 @@ VkResult Device::CreatePipeline(const struct PipelineSettings &settings, double_
   return VK_SUCCESS;
 }
 
-VkResult Device::CreateBottomLevelAccelerationStructure(VkDeviceAddress aabb_address,
-                                                        VkDeviceSize stride,
-                                                        uint32_t num_aabb,
-                                                        VkGeometryFlagsKHR flags,
-                                                        VkCommandPool command_pool,
-                                                        VkQueue queue,
-                                                        double_ptr<AccelerationStructure> pp_blas) {
+VkResult VulkanCore::CreateBottomLevelAccelerationStructure(VkDeviceAddress aabb_address,
+                                                            VkDeviceSize stride,
+                                                            uint32_t num_aabb,
+                                                            VkGeometryFlagsKHR flags,
+                                                            VkCommandPool command_pool,
+                                                            VkQueue queue,
+                                                            double_ptr<vulkan::AccelerationStructure> pp_blas) {
   const VkBufferUsageFlags buffer_usage_flags =
       VK_BUFFER_USAGE_ACCELERATION_STRUCTURE_BUILD_INPUT_READ_ONLY_BIT_KHR | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT;
 
   // Setup a single transformation matrix that can be used to transform the
   // whole geometry for a single bottom level acceleration structure
   VkTransformMatrixKHR transform_matrix = {1.0f, 0.0f, 0.0f, 0.0f, 0.0f, 1.0f, 0.0f, 0.0f, 0.0f, 0.0f, 1.0f, 0.0f};
-  std::unique_ptr<Buffer> transform_matrix_buffer;
+  std::unique_ptr<vulkan::Buffer> transform_matrix_buffer;
   RETURN_IF_FAILED_VK(
       CreateBuffer(sizeof(transform_matrix), buffer_usage_flags, VMA_MEMORY_USAGE_CPU_TO_GPU, &transform_matrix_buffer),
       "failed to create transform matrix buffer!");
@@ -451,7 +450,7 @@ VkResult Device::CreateBottomLevelAccelerationStructure(VkDeviceAddress aabb_add
   acceleration_structure_geometry.geometry.aabbs.stride = stride;
   acceleration_structure_geometry.geometry.aabbs.data = aabb_data_device_address;
 
-  std::unique_ptr<Buffer> buffer;
+  std::unique_ptr<vulkan::Buffer> buffer;
   VkAccelerationStructureKHR acceleration_structure;
 
   BuildAccelerationStructure(this, acceleration_structure_geometry, VK_ACCELERATION_STRUCTURE_TYPE_BOTTOM_LEVEL_KHR,
@@ -468,22 +467,22 @@ VkResult Device::CreateBottomLevelAccelerationStructure(VkDeviceAddress aabb_add
   return VK_SUCCESS;
 }
 
-VkResult Device::CreateBottomLevelAccelerationStructure(VkDeviceAddress vertex_buffer_address,
-                                                        VkDeviceAddress index_buffer_address,
-                                                        uint32_t num_vertex,
-                                                        VkDeviceSize stride,
-                                                        uint32_t primitive_count,
-                                                        VkGeometryFlagsKHR flags,
-                                                        VkCommandPool command_pool,
-                                                        VkQueue queue,
-                                                        double_ptr<AccelerationStructure> pp_blas) {
+VkResult VulkanCore::CreateBottomLevelAccelerationStructure(VkDeviceAddress vertex_buffer_address,
+                                                            VkDeviceAddress index_buffer_address,
+                                                            uint32_t num_vertex,
+                                                            VkDeviceSize stride,
+                                                            uint32_t primitive_count,
+                                                            VkGeometryFlagsKHR flags,
+                                                            VkCommandPool command_pool,
+                                                            VkQueue queue,
+                                                            double_ptr<vulkan::AccelerationStructure> pp_blas) {
   const VkBufferUsageFlags buffer_usage_flags =
       VK_BUFFER_USAGE_ACCELERATION_STRUCTURE_BUILD_INPUT_READ_ONLY_BIT_KHR | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT;
 
   // Setup a single transformation matrix that can be used to transform the
   // whole geometry for a single bottom level acceleration structure
   VkTransformMatrixKHR transform_matrix = {1.0f, 0.0f, 0.0f, 0.0f, 0.0f, 1.0f, 0.0f, 0.0f, 0.0f, 0.0f, 1.0f, 0.0f};
-  std::unique_ptr<Buffer> transform_matrix_buffer;
+  std::unique_ptr<vulkan::Buffer> transform_matrix_buffer;
   RETURN_IF_FAILED_VK(CreateBuffer(sizeof(transform_matrix), buffer_usage_flags, VMA_MEMORY_USAGE_CPU_TO_GPU, 0, 16,
                                    &transform_matrix_buffer),
                       "failed to create transform matrix buffer!");
@@ -514,7 +513,7 @@ VkResult Device::CreateBottomLevelAccelerationStructure(VkDeviceAddress vertex_b
   acceleration_structure_geometry.geometry.triangles.indexData = index_data_device_address;
   acceleration_structure_geometry.geometry.triangles.transformData = transform_matrix_device_address;
 
-  std::unique_ptr<Buffer> buffer;
+  std::unique_ptr<vulkan::Buffer> buffer;
   VkAccelerationStructureKHR acceleration_structure;
 
   BuildAccelerationStructure(this, acceleration_structure_geometry, VK_ACCELERATION_STRUCTURE_TYPE_BOTTOM_LEVEL_KHR,
@@ -531,35 +530,36 @@ VkResult Device::CreateBottomLevelAccelerationStructure(VkDeviceAddress vertex_b
   return VK_SUCCESS;
 }
 
-VkResult Device::CreateBottomLevelAccelerationStructure(VkDeviceAddress vertex_buffer_address,
-                                                        VkDeviceAddress index_buffer_address,
-                                                        uint32_t num_vertex,
-                                                        VkDeviceSize stride,
-                                                        uint32_t primitive_count,
-                                                        VkCommandPool command_pool,
-                                                        VkQueue queue,
-                                                        double_ptr<AccelerationStructure> pp_blas) {
+VkResult VulkanCore::CreateBottomLevelAccelerationStructure(VkDeviceAddress vertex_buffer_address,
+                                                            VkDeviceAddress index_buffer_address,
+                                                            uint32_t num_vertex,
+                                                            VkDeviceSize stride,
+                                                            uint32_t primitive_count,
+                                                            VkCommandPool command_pool,
+                                                            VkQueue queue,
+                                                            double_ptr<vulkan::AccelerationStructure> pp_blas) {
   return CreateBottomLevelAccelerationStructure(vertex_buffer_address, index_buffer_address, num_vertex, stride,
                                                 primitive_count, VK_GEOMETRY_OPAQUE_BIT_KHR, command_pool, queue,
                                                 pp_blas);
 }
 
-VkResult Device::CreateBottomLevelAccelerationStructure(Buffer *vertex_buffer,
-                                                        Buffer *index_buffer,
-                                                        VkDeviceSize stride,
-                                                        VkCommandPool command_pool,
-                                                        VkQueue queue,
-                                                        double_ptr<AccelerationStructure> pp_blas) {
+VkResult VulkanCore::CreateBottomLevelAccelerationStructure(vulkan::Buffer *vertex_buffer,
+                                                            vulkan::Buffer *index_buffer,
+                                                            VkDeviceSize stride,
+                                                            VkCommandPool command_pool,
+                                                            VkQueue queue,
+                                                            double_ptr<vulkan::AccelerationStructure> pp_blas) {
   return CreateBottomLevelAccelerationStructure(
       vertex_buffer->GetDeviceAddress(), index_buffer->GetDeviceAddress(), vertex_buffer->Size() / stride, stride,
       index_buffer->Size() / (sizeof(uint32_t) * 3), command_pool, queue, pp_blas);
 }
 
-VkResult Device::CreateTopLevelAccelerationStructure(const std::vector<VkAccelerationStructureInstanceKHR> &instances,
-                                                     VkCommandPool command_pool,
-                                                     VkQueue queue,
-                                                     double_ptr<AccelerationStructure> pp_tlas) {
-  std::unique_ptr<Buffer> instances_buffer;
+VkResult VulkanCore::CreateTopLevelAccelerationStructure(
+    const std::vector<VkAccelerationStructureInstanceKHR> &instances,
+    VkCommandPool command_pool,
+    VkQueue queue,
+    double_ptr<vulkan::AccelerationStructure> pp_tlas) {
+  std::unique_ptr<vulkan::Buffer> instances_buffer;
   CreateBuffer(
       sizeof(VkAccelerationStructureInstanceKHR) * std::max(instances.size(), static_cast<size_t>(1)),
       VK_BUFFER_USAGE_ACCELERATION_STRUCTURE_BUILD_INPUT_READ_ONLY_BIT_KHR | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
@@ -583,7 +583,7 @@ VkResult Device::CreateTopLevelAccelerationStructure(const std::vector<VkAcceler
 
   VkAccelerationStructureKHR acceleration_structure;
 
-  std::unique_ptr<Buffer> buffer;
+  std::unique_ptr<vulkan::Buffer> buffer;
 
   BuildAccelerationStructure(
       this, acceleration_structure_geometry, VK_ACCELERATION_STRUCTURE_TYPE_TOP_LEVEL_KHR,
@@ -602,11 +602,11 @@ VkResult Device::CreateTopLevelAccelerationStructure(const std::vector<VkAcceler
   return VK_SUCCESS;
 }
 
-VkResult Device::CreateTopLevelAccelerationStructure(
-    const std::vector<std::pair<AccelerationStructure *, glm::mat4>> &objects,
+VkResult VulkanCore::CreateTopLevelAccelerationStructure(
+    const std::vector<std::pair<vulkan::AccelerationStructure *, glm::mat4>> &objects,
     VkCommandPool command_pool,
     VkQueue queue,
-    double_ptr<AccelerationStructure> pp_tlas) {
+    double_ptr<vulkan::AccelerationStructure> pp_tlas) {
   std::vector<VkAccelerationStructureInstanceKHR> acceleration_structure_instances;
   acceleration_structure_instances.reserve(objects.size());
   for (int i = 0; i < objects.size(); i++) {
@@ -627,12 +627,12 @@ VkResult Device::CreateTopLevelAccelerationStructure(
   return CreateTopLevelAccelerationStructure(acceleration_structure_instances, command_pool, queue, pp_tlas);
 }
 
-VkResult Device::CreateRayTracingPipeline(PipelineLayout *pipeline_layout,
-                                          ShaderModule *ray_gen_shader,
-                                          const std::vector<ShaderModule *> &miss_shaders,
-                                          const std::vector<HitGroup> &hit_groups,
-                                          const std::vector<ShaderModule *> &callable_shaders,
-                                          double_ptr<RayTracingPipeline> pp_pipeline) const {
+VkResult VulkanCore::CreateRayTracingPipeline(vulkan::PipelineLayout *pipeline_layout,
+                                              vulkan::ShaderModule *ray_gen_shader,
+                                              const std::vector<vulkan::ShaderModule *> &miss_shaders,
+                                              const std::vector<vulkan::HitGroup> &hit_groups,
+                                              const std::vector<vulkan::ShaderModule *> &callable_shaders,
+                                              double_ptr<vulkan::RayTracingPipeline> pp_pipeline) const {
   std::vector<VkPipelineShaderStageCreateInfo> shader_stage_create_infos;
   std::vector<VkRayTracingShaderGroupCreateInfoKHR> shader_groups;
   // Ray generation group
@@ -774,24 +774,24 @@ VkResult Device::CreateRayTracingPipeline(PipelineLayout *pipeline_layout,
   return VK_SUCCESS;
 }
 
-VkResult Device::CreateRayTracingPipeline(PipelineLayout *pipeline_layout,
-                                          ShaderModule *ray_gen_shader,
-                                          ShaderModule *miss_shader,
-                                          ShaderModule *closest_hit_shader,
-                                          double_ptr<RayTracingPipeline> pp_pipeline) const {
+VkResult VulkanCore::CreateRayTracingPipeline(vulkan::PipelineLayout *pipeline_layout,
+                                              vulkan::ShaderModule *ray_gen_shader,
+                                              vulkan::ShaderModule *miss_shader,
+                                              vulkan::ShaderModule *closest_hit_shader,
+                                              double_ptr<vulkan::RayTracingPipeline> pp_pipeline) const {
   return CreateRayTracingPipeline(pipeline_layout, ray_gen_shader, {miss_shader},
                                   {{closest_hit_shader, nullptr, nullptr, false}}, {}, pp_pipeline);
 }
 
-VkResult Device::CreateShaderBindingTable(RayTracingPipeline *ray_tracing_pipeline,
-                                          const std::vector<int32_t> &miss_shader_indices,
-                                          const std::vector<int32_t> &hit_group_indices,
-                                          const std::vector<int32_t> &callable_shader_indices,
-                                          double_ptr<ShaderBindingTable> pp_sbt) const {
+VkResult VulkanCore::CreateShaderBindingTable(vulkan::RayTracingPipeline *ray_tracing_pipeline,
+                                              const std::vector<int32_t> &miss_shader_indices,
+                                              const std::vector<int32_t> &hit_group_indices,
+                                              const std::vector<int32_t> &callable_shader_indices,
+                                              double_ptr<vulkan::ShaderBindingTable> pp_sbt) const {
   auto aligned_size = [](uint32_t value, uint32_t alignment) { return (value + alignment - 1) & ~(alignment - 1); };
 
   VkPhysicalDeviceRayTracingPipelinePropertiesKHR ray_tracing_pipeline_properties =
-      physical_device_.GetPhysicalDeviceRayTracingPipelineProperties();
+      physical_device_->GetPhysicalDeviceRayTracingPipelineProperties();
 
   const uint32_t handle_size = ray_tracing_pipeline_properties.shaderGroupHandleSize;
   const uint32_t handle_size_aligned = aligned_size(ray_tracing_pipeline_properties.shaderGroupHandleSize,
@@ -816,7 +816,7 @@ VkResult Device::CreateShaderBindingTable(RayTracingPipeline *ray_tracing_pipeli
 
   // Ray_gen
   // Create binding table buffers for each shader type
-  std::unique_ptr<Buffer> buffer;
+  std::unique_ptr<vulkan::Buffer> buffer;
   CreateBuffer(sbt_size, sbt_buffer_usage_flags, VMA_MEMORY_USAGE_CPU_TO_GPU, 0, base_alignment, &buffer);
 
   VkDeviceAddress buffer_address = buffer->GetDeviceAddress();
@@ -860,8 +860,8 @@ VkResult Device::CreateShaderBindingTable(RayTracingPipeline *ray_tracing_pipeli
   return VK_SUCCESS;
 }
 
-VkResult Device::CreateShaderBindingTable(RayTracingPipeline *ray_tracing_pipeline,
-                                          double_ptr<ShaderBindingTable> pp_sbt) const {
+VkResult VulkanCore::CreateShaderBindingTable(vulkan::RayTracingPipeline *ray_tracing_pipeline,
+                                              double_ptr<vulkan::ShaderBindingTable> pp_sbt) const {
   std::vector<int32_t> miss_shader_indices(ray_tracing_pipeline->MissShaderCount());
   std::iota(miss_shader_indices.begin(), miss_shader_indices.end(), 0);
   std::vector<int32_t> hit_group_indices(ray_tracing_pipeline->HitGroupCount());
@@ -872,244 +872,4 @@ VkResult Device::CreateShaderBindingTable(RayTracingPipeline *ray_tracing_pipeli
                                   pp_sbt);
 }
 
-void Device::NameObject(VkImage image, const std::string &name) {
-#if !defined(NDEBUG)
-  if (instance_procedures_.vkSetDebugUtilsObjectNameEXT == nullptr) {
-    return;
-  }
-
-  VkDebugUtilsObjectNameInfoEXT name_info{};
-  name_info.sType = VK_STRUCTURE_TYPE_DEBUG_UTILS_OBJECT_NAME_INFO_EXT;
-  name_info.objectType = VK_OBJECT_TYPE_IMAGE;
-  name_info.objectHandle = reinterpret_cast<uint64_t>(image);
-  name_info.pObjectName = name.c_str();
-  instance_procedures_.vkSetDebugUtilsObjectNameEXT(device_, &name_info);
-#endif
-}
-
-void Device::NameObject(VkImageView image_view, const std::string &name) {
-#if !defined(NDEBUG)
-  if (instance_procedures_.vkSetDebugUtilsObjectNameEXT == nullptr) {
-    return;
-  }
-
-  VkDebugUtilsObjectNameInfoEXT name_info{};
-  name_info.sType = VK_STRUCTURE_TYPE_DEBUG_UTILS_OBJECT_NAME_INFO_EXT;
-  name_info.objectType = VK_OBJECT_TYPE_IMAGE_VIEW;
-  name_info.objectHandle = reinterpret_cast<uint64_t>(image_view);
-  name_info.pObjectName = name.c_str();
-  instance_procedures_.vkSetDebugUtilsObjectNameEXT(device_, &name_info);
-#endif
-}
-
-void Device::NameObject(VkBuffer buffer, const std::string &name) {
-#if !defined(NDEBUG)
-  if (instance_procedures_.vkSetDebugUtilsObjectNameEXT == nullptr) {
-    return;
-  }
-
-  VkDebugUtilsObjectNameInfoEXT name_info{};
-  name_info.sType = VK_STRUCTURE_TYPE_DEBUG_UTILS_OBJECT_NAME_INFO_EXT;
-  name_info.objectType = VK_OBJECT_TYPE_BUFFER;
-  name_info.objectHandle = reinterpret_cast<uint64_t>(buffer);
-  name_info.pObjectName = name.c_str();
-  instance_procedures_.vkSetDebugUtilsObjectNameEXT(device_, &name_info);
-#endif
-}
-
-void Device::NameObject(VkDeviceMemory memory, const std::string &name) {
-#if !defined(NDEBUG)
-  if (instance_procedures_.vkSetDebugUtilsObjectNameEXT == nullptr) {
-    return;
-  }
-
-  VkDebugUtilsObjectNameInfoEXT name_info{};
-  name_info.sType = VK_STRUCTURE_TYPE_DEBUG_UTILS_OBJECT_NAME_INFO_EXT;
-  name_info.objectType = VK_OBJECT_TYPE_DEVICE_MEMORY;
-  name_info.objectHandle = reinterpret_cast<uint64_t>(memory);
-  name_info.pObjectName = name.c_str();
-  instance_procedures_.vkSetDebugUtilsObjectNameEXT(device_, &name_info);
-#endif
-}
-
-void Device::NameObject(VkDescriptorSet descriptor_set, const std::string &name) {
-#if !defined(NDEBUG)
-  if (instance_procedures_.vkSetDebugUtilsObjectNameEXT == nullptr) {
-    return;
-  }
-
-  VkDebugUtilsObjectNameInfoEXT name_info{};
-  name_info.sType = VK_STRUCTURE_TYPE_DEBUG_UTILS_OBJECT_NAME_INFO_EXT;
-  name_info.objectType = VK_OBJECT_TYPE_DESCRIPTOR_SET;
-  name_info.objectHandle = reinterpret_cast<uint64_t>(descriptor_set);
-  name_info.pObjectName = name.c_str();
-  instance_procedures_.vkSetDebugUtilsObjectNameEXT(device_, &name_info);
-#endif
-}
-
-void Device::NameObject(VkDescriptorSetLayout descriptor_set_layout, const std::string &name) {
-#if !defined(NDEBUG)
-  if (instance_procedures_.vkSetDebugUtilsObjectNameEXT == nullptr) {
-    return;
-  }
-
-  VkDebugUtilsObjectNameInfoEXT name_info{};
-  name_info.sType = VK_STRUCTURE_TYPE_DEBUG_UTILS_OBJECT_NAME_INFO_EXT;
-  name_info.objectType = VK_OBJECT_TYPE_DESCRIPTOR_SET_LAYOUT;
-  name_info.objectHandle = reinterpret_cast<uint64_t>(descriptor_set_layout);
-  name_info.pObjectName = name.c_str();
-  instance_procedures_.vkSetDebugUtilsObjectNameEXT(device_, &name_info);
-#endif
-}
-
-void Device::NameObject(VkPipeline pipeline, const std::string &name) {
-#if !defined(NDEBUG)
-  if (instance_procedures_.vkSetDebugUtilsObjectNameEXT == nullptr) {
-    return;
-  }
-
-  VkDebugUtilsObjectNameInfoEXT name_info{};
-  name_info.sType = VK_STRUCTURE_TYPE_DEBUG_UTILS_OBJECT_NAME_INFO_EXT;
-  name_info.objectType = VK_OBJECT_TYPE_PIPELINE;
-  name_info.objectHandle = reinterpret_cast<uint64_t>(pipeline);
-  name_info.pObjectName = name.c_str();
-  instance_procedures_.vkSetDebugUtilsObjectNameEXT(device_, &name_info);
-#endif
-}
-
-void Device::NameObject(VkPipelineLayout pipeline_layout, const std::string &name) {
-#if !defined(NDEBUG)
-  if (instance_procedures_.vkSetDebugUtilsObjectNameEXT == nullptr) {
-    return;
-  }
-
-  VkDebugUtilsObjectNameInfoEXT name_info{};
-  name_info.sType = VK_STRUCTURE_TYPE_DEBUG_UTILS_OBJECT_NAME_INFO_EXT;
-  name_info.objectType = VK_OBJECT_TYPE_PIPELINE_LAYOUT;
-  name_info.objectHandle = reinterpret_cast<uint64_t>(pipeline_layout);
-  name_info.pObjectName = name.c_str();
-  instance_procedures_.vkSetDebugUtilsObjectNameEXT(device_, &name_info);
-#endif
-}
-
-void Device::NameObject(VkRenderPass render_pass, const std::string &name) {
-#if !defined(NDEBUG)
-  if (instance_procedures_.vkSetDebugUtilsObjectNameEXT == nullptr) {
-    return;
-  }
-
-  VkDebugUtilsObjectNameInfoEXT name_info{};
-  name_info.sType = VK_STRUCTURE_TYPE_DEBUG_UTILS_OBJECT_NAME_INFO_EXT;
-  name_info.objectType = VK_OBJECT_TYPE_RENDER_PASS;
-  name_info.objectHandle = reinterpret_cast<uint64_t>(render_pass);
-  name_info.pObjectName = name.c_str();
-  instance_procedures_.vkSetDebugUtilsObjectNameEXT(device_, &name_info);
-#endif
-}
-
-void Device::NameObject(VkSampler sampler, const std::string &name) {
-#if !defined(NDEBUG)
-  if (instance_procedures_.vkSetDebugUtilsObjectNameEXT == nullptr) {
-    return;
-  }
-
-  VkDebugUtilsObjectNameInfoEXT name_info{};
-  name_info.sType = VK_STRUCTURE_TYPE_DEBUG_UTILS_OBJECT_NAME_INFO_EXT;
-  name_info.objectType = VK_OBJECT_TYPE_SAMPLER;
-  name_info.objectHandle = reinterpret_cast<uint64_t>(sampler);
-  name_info.pObjectName = name.c_str();
-  instance_procedures_.vkSetDebugUtilsObjectNameEXT(device_, &name_info);
-#endif
-}
-
-void Device::NameObject(VkCommandPool command_pool, const std::string &name) {
-#if !defined(NDEBUG)
-  if (instance_procedures_.vkSetDebugUtilsObjectNameEXT == nullptr) {
-    return;
-  }
-
-  VkDebugUtilsObjectNameInfoEXT name_info{};
-  name_info.sType = VK_STRUCTURE_TYPE_DEBUG_UTILS_OBJECT_NAME_INFO_EXT;
-  name_info.objectType = VK_OBJECT_TYPE_COMMAND_POOL;
-  name_info.objectHandle = reinterpret_cast<uint64_t>(command_pool);
-  name_info.pObjectName = name.c_str();
-  instance_procedures_.vkSetDebugUtilsObjectNameEXT(device_, &name_info);
-#endif
-}
-
-void Device::NameObject(VkCommandBuffer command_buffer, const std::string &name) {
-#if !defined(NDEBUG)
-  if (instance_procedures_.vkSetDebugUtilsObjectNameEXT == nullptr) {
-    return;
-  }
-
-  VkDebugUtilsObjectNameInfoEXT name_info{};
-  name_info.sType = VK_STRUCTURE_TYPE_DEBUG_UTILS_OBJECT_NAME_INFO_EXT;
-  name_info.objectType = VK_OBJECT_TYPE_COMMAND_BUFFER;
-  name_info.objectHandle = reinterpret_cast<uint64_t>(command_buffer);
-  name_info.pObjectName = name.c_str();
-  instance_procedures_.vkSetDebugUtilsObjectNameEXT(device_, &name_info);
-#endif
-}
-
-void Device::NameObject(VkFramebuffer framebuffer, const std::string &name) {
-#if !defined(NDEBUG)
-  if (instance_procedures_.vkSetDebugUtilsObjectNameEXT == nullptr) {
-    return;
-  }
-
-  VkDebugUtilsObjectNameInfoEXT name_info{};
-  name_info.sType = VK_STRUCTURE_TYPE_DEBUG_UTILS_OBJECT_NAME_INFO_EXT;
-  name_info.objectType = VK_OBJECT_TYPE_FRAMEBUFFER;
-  name_info.objectHandle = reinterpret_cast<uint64_t>(framebuffer);
-  name_info.pObjectName = name.c_str();
-  instance_procedures_.vkSetDebugUtilsObjectNameEXT(device_, &name_info);
-#endif
-}
-
-void Device::NameObject(VkDescriptorPool descriptor_pool, const std::string &name) {
-#if !defined(NDEBUG)
-  if (instance_procedures_.vkSetDebugUtilsObjectNameEXT == nullptr) {
-    return;
-  }
-
-  VkDebugUtilsObjectNameInfoEXT name_info{};
-  name_info.sType = VK_STRUCTURE_TYPE_DEBUG_UTILS_OBJECT_NAME_INFO_EXT;
-  name_info.objectType = VK_OBJECT_TYPE_DESCRIPTOR_POOL;
-  name_info.objectHandle = reinterpret_cast<uint64_t>(descriptor_pool);
-  name_info.pObjectName = name.c_str();
-  instance_procedures_.vkSetDebugUtilsObjectNameEXT(device_, &name_info);
-#endif
-}
-
-void Device::NameObject(VkShaderModule shader_module, const std::string &name) {
-#if !defined(NDEBUG)
-  if (instance_procedures_.vkSetDebugUtilsObjectNameEXT == nullptr) {
-    return;
-  }
-
-  VkDebugUtilsObjectNameInfoEXT name_info{};
-  name_info.sType = VK_STRUCTURE_TYPE_DEBUG_UTILS_OBJECT_NAME_INFO_EXT;
-  name_info.objectType = VK_OBJECT_TYPE_SHADER_MODULE;
-  name_info.objectHandle = reinterpret_cast<uint64_t>(shader_module);
-  name_info.pObjectName = name.c_str();
-  instance_procedures_.vkSetDebugUtilsObjectNameEXT(device_, &name_info);
-#endif
-}
-
-void Device::NameObject(VkAccelerationStructureKHR acceleration_structure, const std::string &name) {
-#if !defined(NDEBUG)
-  if (instance_procedures_.vkSetDebugUtilsObjectNameEXT == nullptr) {
-    return;
-  }
-
-  VkDebugUtilsObjectNameInfoEXT name_info{};
-  name_info.sType = VK_STRUCTURE_TYPE_DEBUG_UTILS_OBJECT_NAME_INFO_EXT;
-  name_info.objectType = VK_OBJECT_TYPE_ACCELERATION_STRUCTURE_KHR;
-  name_info.objectHandle = reinterpret_cast<uint64_t>(acceleration_structure);
-  name_info.pObjectName = name.c_str();
-  instance_procedures_.vkSetDebugUtilsObjectNameEXT(device_, &name_info);
-#endif
-}
-
-}  // namespace grassland::graphics::backend::vulkan
+}  // namespace grassland::graphics::backend

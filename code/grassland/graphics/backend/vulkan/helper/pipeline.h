@@ -1,5 +1,5 @@
 #pragma once
-#include "grassland/graphics/backend/vulkan/helper/device.h"
+#include "grassland/graphics/backend/vulkan/helper/native_types.h"
 #include "grassland/graphics/backend/vulkan/helper/shader_module.h"
 
 namespace grassland::graphics::backend::vulkan {
@@ -81,7 +81,7 @@ struct PipelineSettings {
 
 class Pipeline {
  public:
-  explicit Pipeline(const class Device *device, VkPipeline pipeline);
+  explicit Pipeline(const VulkanCore *device, VkPipeline pipeline);
 
   virtual ~Pipeline();
 
@@ -89,18 +89,18 @@ class Pipeline {
     return pipeline_;
   }
 
-  const class Device *Device() const {
+  const VulkanCore *Device() const {
     return device_;
   }
 
  private:
-  const class Device *device_{};
+  const VulkanCore *device_{};
   VkPipeline pipeline_{};
 };
 
 class RayTracingPipeline : public Pipeline {
  public:
-  explicit RayTracingPipeline(const class Device *device,
+  explicit RayTracingPipeline(const VulkanCore *device,
                               VkPipeline pipeline,
                               size_t miss_shader_count,
                               size_t hit_group_count,

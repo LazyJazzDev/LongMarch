@@ -2,6 +2,8 @@
 
 #include <utility>
 
+#include "grassland/graphics/backend/vulkan/vulkan_core.h"
+
 namespace grassland::graphics::backend::vulkan {
 
 PipelineSettings::PipelineSettings(const PipelineLayout *pipeline_layout,
@@ -135,14 +137,14 @@ void PipelineSettings::EnableDynamicPrimitiveTopology() {
   dynamic_primitive_topology = true;
 }
 
-Pipeline::Pipeline(const class vulkan::Device *device, VkPipeline pipeline) : device_(device), pipeline_(pipeline) {
+Pipeline::Pipeline(const VulkanCore *device, VkPipeline pipeline) : device_(device), pipeline_(pipeline) {
 }
 
 Pipeline::~Pipeline() {
   vkDestroyPipeline(device_->Handle(), pipeline_, nullptr);
 }
 
-RayTracingPipeline::RayTracingPipeline(const class vulkan::Device *device,
+RayTracingPipeline::RayTracingPipeline(const VulkanCore *device,
                                        VkPipeline pipeline,
                                        size_t miss_shader_count,
                                        size_t hit_group_count,

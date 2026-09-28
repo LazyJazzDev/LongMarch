@@ -25,14 +25,12 @@ class FrameProfile {
     auto vk = dynamic_cast<graphics::backend::VulkanCore *>(core);
     if (!vk)
       throw std::runtime_error("frame GPU profiling currently requires Vulkan; use --profile-cpu-only for Metal");
-    device_ = vk->Device()->Handle();
-    const auto properties = vk->Device()->PhysicalDevice().GetPhysicalDeviceProperties();
+    device_ = vk->Handle();
+    const auto properties = vk->PhysicalDevice().GetPhysicalDeviceProperties();
     device_name = properties.deviceName;
     period_ = properties.limits.timestampPeriod;
-    bits_ = vk->Device()
-                ->PhysicalDevice()
-                .GetQueueFamilyProperties()[vk->Device()->PhysicalDevice().GraphicsFamilyIndex()]
-                .timestampValidBits;
+    bits_ =
+        vk->PhysicalDevice().GetQueueFamilyProperties()[vk->PhysicalDevice().GraphicsFamilyIndex()].timestampValidBits;
     if (!bits_ || period_ <= 0)
       throw std::runtime_error("GPU queue does not support timestamps");
     VkQueryPoolCreateInfo info{};

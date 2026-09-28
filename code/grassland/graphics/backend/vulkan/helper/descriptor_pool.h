@@ -1,6 +1,6 @@
 #pragma once
 
-#include "grassland/graphics/backend/vulkan/helper/device.h"
+#include "grassland/graphics/backend/vulkan/helper/native_types.h"
 
 namespace grassland::graphics::backend::vulkan {
 
@@ -77,14 +77,14 @@ struct DescriptorPoolSize {
 
 class DescriptorPool {
  public:
-  DescriptorPool(const class Device *device,
+  DescriptorPool(const VulkanCore *device,
                  VkDescriptorPool descriptor_pool,
                  DescriptorPoolSize pool_size,
                  uint32_t max_sets);
 
   ~DescriptorPool();
 
-  const class Device *Device() const {
+  const VulkanCore *Device() const {
     return device_;
   }
 
@@ -103,7 +103,7 @@ class DescriptorPool {
   }
 
  private:
-  const class Device *device_{};
+  const VulkanCore *device_{};
   VkDescriptorPool descriptor_pool_{};
   DescriptorPoolSize pool_size_;
   uint32_t max_sets_{};

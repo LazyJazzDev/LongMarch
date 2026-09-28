@@ -1,6 +1,7 @@
 #include "grassland/graphics/backend/vulkan/helper/buffer.h"
 
 #include "grassland/graphics/backend/vulkan/helper/single_time_command.h"
+#include "grassland/graphics/backend/vulkan/vulkan_core.h"
 
 #ifdef _WIN64
 #include <VersionHelpers.h>
@@ -8,11 +9,21 @@
 #endif
 
 namespace grassland::graphics::backend::vulkan {
-Buffer::Buffer(const class Device *device, VkDeviceSize size, VkBuffer buffer, VmaAllocation allocation)
+Buffer::Buffer(const VulkanCore *device, VkDeviceSize size, VkBuffer buffer, VmaAllocation allocation)
     : device_(device),
       size_(size),
       buffer_(buffer),
       allocation_(allocation) {
+}
+
+void *Buffer::Map() const {
+  void *data = nullptr;
+  vmaMapMemory(device_->Allocator(), allocation_, &data);
+  return data;
+}
+
+void Buffer::Unmap() const {
+  vmaUnmapMemory(device_->Allocator(), allocation_);
 }
 
 Buffer::~Buffer() {

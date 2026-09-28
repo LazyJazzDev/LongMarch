@@ -6,7 +6,7 @@ VulkanImage::VulkanImage(VulkanCore *core, int width, int height, ImageFormat fo
   VkExtent2D extent;
   extent.width = width;
   extent.height = height;
-  core_->Device()->CreateImage(ImageFormatToVkFormat(format), extent, &image_);
+  core_->CreateImage(ImageFormatToVkFormat(format), extent, &image_);
 }
 
 Extent2D VulkanImage::Extent() const {
@@ -22,8 +22,8 @@ void VulkanImage::UploadData(const void *data) const {
   auto extent = image_->Extent();
   auto pixel_size = static_cast<size_t>(PixelSize(format_));
   std::unique_ptr<vulkan::Buffer> staging_buffer;
-  core_->Device()->CreateBuffer(pixel_size * extent.width * extent.height, VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
-                                VMA_MEMORY_USAGE_CPU_ONLY, &staging_buffer);
+  core_->CreateBuffer(pixel_size * extent.width * extent.height, VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
+                      VMA_MEMORY_USAGE_CPU_ONLY, &staging_buffer);
   std::memcpy(staging_buffer->Map(), data, pixel_size * extent.width * extent.height);
   staging_buffer->Unmap();
   core_->SingleTimeCommand([&](VkCommandBuffer command_buffer) {
@@ -55,8 +55,8 @@ void VulkanImage::DownloadData(void *data) const {
   auto extent = image_->Extent();
   auto pixel_size = static_cast<size_t>(PixelSize(format_));
   std::unique_ptr<vulkan::Buffer> staging_buffer;
-  core_->Device()->CreateBuffer(pixel_size * extent.width * extent.height, VK_BUFFER_USAGE_TRANSFER_DST_BIT,
-                                VMA_MEMORY_USAGE_CPU_ONLY, &staging_buffer);
+  core_->CreateBuffer(pixel_size * extent.width * extent.height, VK_BUFFER_USAGE_TRANSFER_DST_BIT,
+                      VMA_MEMORY_USAGE_CPU_ONLY, &staging_buffer);
   core_->SingleTimeCommand([&](VkCommandBuffer command_buffer) {
     VkImageAspectFlagBits aspect = IsDepthFormat(format_) ? VK_IMAGE_ASPECT_DEPTH_BIT : VK_IMAGE_ASPECT_COLOR_BIT;
     vulkan::TransitImageLayout(command_buffer, image_->Handle(), VK_IMAGE_LAYOUT_GENERAL,
@@ -88,8 +88,8 @@ void VulkanImage::DownloadData(void *data) const {
 void VulkanImage::UploadData(const void *data, const Offset2D &offset, const Extent2D &extent) const {
   auto pixel_size = static_cast<size_t>(PixelSize(format_));
   std::unique_ptr<vulkan::Buffer> staging_buffer;
-  core_->Device()->CreateBuffer(pixel_size * extent.width * extent.height, VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
-                                VMA_MEMORY_USAGE_CPU_ONLY, &staging_buffer);
+  core_->CreateBuffer(pixel_size * extent.width * extent.height, VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
+                      VMA_MEMORY_USAGE_CPU_ONLY, &staging_buffer);
   std::memcpy(staging_buffer->Map(), data, pixel_size * extent.width * extent.height);
   staging_buffer->Unmap();
   core_->SingleTimeCommand([&](VkCommandBuffer command_buffer) {
@@ -120,8 +120,8 @@ void VulkanImage::UploadData(const void *data, const Offset2D &offset, const Ext
 void VulkanImage::DownloadData(void *data, const Offset2D &offset, const Extent2D &extent) const {
   auto pixel_size = static_cast<size_t>(PixelSize(format_));
   std::unique_ptr<vulkan::Buffer> staging_buffer;
-  core_->Device()->CreateBuffer(pixel_size * extent.width * extent.height, VK_BUFFER_USAGE_TRANSFER_DST_BIT,
-                                VMA_MEMORY_USAGE_CPU_ONLY, &staging_buffer);
+  core_->CreateBuffer(pixel_size * extent.width * extent.height, VK_BUFFER_USAGE_TRANSFER_DST_BIT,
+                      VMA_MEMORY_USAGE_CPU_ONLY, &staging_buffer);
   core_->SingleTimeCommand([&](VkCommandBuffer command_buffer) {
     VkImageAspectFlagBits aspect = IsDepthFormat(format_) ? VK_IMAGE_ASPECT_DEPTH_BIT : VK_IMAGE_ASPECT_COLOR_BIT;
     vulkan::TransitImageLayout(command_buffer, image_->Handle(), VK_IMAGE_LAYOUT_GENERAL,
