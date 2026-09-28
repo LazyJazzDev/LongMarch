@@ -175,13 +175,6 @@ SlangStage ShaderStage(const std::string &profile) {
 }
 }  // namespace
 
-#if defined(LONGMARCH_PYTHON_ENABLED)
-void Shader::PybindClassRegistration(py::classh<Shader> &c) {
-  c.def("entry_point", &Shader::EntryPoint, "Get the shader entry point");
-  c.def("__repr__", [](Shader *shader) { return py::str("Shader(entry_point='{}')").format(shader->EntryPoint()); });
-}
-#endif
-
 CompiledShaderBlob CompileShader(const std::string &source_code,
                                  const std::string &entry_point,
                                  const std::string &target,

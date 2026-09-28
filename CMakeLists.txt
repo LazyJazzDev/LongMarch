@@ -215,9 +215,8 @@ if (NOT LONGMARCH_DISABLE_PYTHON)
         message(STATUS "Python3_VERSION: ${Python3_VERSION}")
         message(STATUS "Python3_SITEARCH: ${Python3_SITEARCH}")
 
+        # Only the long_march extension module (code/pybind) uses pybind11.
         add_subdirectory(external/pybind11)
-        set(PYBIND11_LIB_NAME pybind11::headers)
-        list(APPEND LIB_LIST ${PYBIND11_LIB_NAME})
 
         set(LONGMARCH_PYTHON_ENABLED ON)
     endif ()

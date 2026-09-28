@@ -1,11 +1,7 @@
-#include "grassland/graphics/graphics.h"
+#include "pybind/grassland/graphics/graphics.h"
 
-#include "grassland/graphics/frame_profile.h"
-#include "grassland/graphics/imgui_pybind.h"
-
-namespace grassland::graphics {
-#if defined(LONGMARCH_PYTHON_ENABLED)
-void PybindModuleRegistration(py::module_ &m) {
+namespace grassland::graphics::pybind {
+void RegisterGraphics(py::module_ &m) {
   // Core classes
   py::classh<Core> c_core(m, "Core");
   py::classh<Core::Settings> c_core_settings(m, "CoreSettings");
@@ -33,7 +29,7 @@ void PybindModuleRegistration(py::module_ &m) {
   py::classh<Window> c_window(m, "Window");
 
   // Register all classes
-  util::PybindModuleRegistration(m);
+  RegisterGraphicsUtil(m);
 
   py::enum_<MagnifyPhase> magnify_phase(m, "MagnifyPhase");
   magnify_phase.value("MAGNIFY_PHASE_BEGIN", MagnifyPhase::kBegin, "Magnify Phase: Begin");
@@ -42,18 +38,18 @@ void PybindModuleRegistration(py::module_ &m) {
   magnify_phase.value("MAGNIFY_PHASE_CANCEL", MagnifyPhase::kCancel, "Magnify Phase: Cancel");
   magnify_phase.export_values();
 
-  Core::Settings::PybindClassRegistration(c_core_settings);
-  Core::PybindClassRegistration(c_core);
-  Shader::PybindClassRegistration(c_shader);
-  Program::PybindClassRegistration(c_program);
-  ComputeProgram::PybindClassRegistration(c_compute_program);
-  RayTracingProgram::PybindClassRegistration(c_raytracing_program);
-  CommandContext::PybindClassRegistration(c_command_context);
-  Buffer::PybindClassRegistration(c_buffer);
-  Image::PybindClassRegistration(c_image);
-  AccelerationStructure::PybindClassRegistration(c_acceleration_structure);
-  Sampler::PybindClassRegistration(c_sampler);
-  Window::PybindClassRegistration(c_window);
+  RegisterCoreSettings(c_core_settings);
+  RegisterCore(c_core);
+  RegisterShader(c_shader);
+  RegisterProgram(c_program);
+  RegisterComputeProgram(c_compute_program);
+  RegisterRayTracingProgram(c_raytracing_program);
+  RegisterCommandContext(c_command_context);
+  RegisterBuffer(c_buffer);
+  RegisterImage(c_image);
+  RegisterAccelerationStructure(c_acceleration_structure);
+  RegisterSampler(c_sampler);
+  RegisterWindow(c_window);
 
 #if defined(LONGMARCH_CUDA_RUNTIME)
   c_cuda_buffer.doc() = "Device buffer shared with CUDA; cuda_ptr() is a device pointer in the core's CUDA device";
@@ -76,7 +72,6 @@ void PybindModuleRegistration(py::module_ &m) {
   c_frame_profile.def_readonly("cpu_ms", &FrameProfile::cpu_ms);
 
   auto m_imgui = m.def_submodule("imgui", "Dear ImGui widgets for graphics windows");
-  PybindImGuiRegistration(m_imgui);
+  RegisterImGui(m_imgui);
 }
-#endif
-}  // namespace grassland::graphics
+}  // namespace grassland::graphics::pybind
