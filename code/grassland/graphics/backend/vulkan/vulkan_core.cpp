@@ -182,10 +182,16 @@ int VulkanCore::CreateBottomLevelAccelerationStructure(BufferRange aabb_buffer,
                                                        double_ptr<AccelerationStructure> pp_blas) {
   VulkanBuffer *vk_aabb_buffer = dynamic_cast<VulkanBuffer *>(aabb_buffer.buffer);
   assert(vk_aabb_buffer);
-  std::unique_ptr<vulkan::AccelerationStructure> blas;
-  this->CreateBottomLevelAccelerationStructure(vk_aabb_buffer->DeviceAddress() + aabb_buffer.offset, stride, num_aabb,
-                                               flags, graphics_command_pool_, graphics_queue_, &blas);
-  pp_blas.construct<VulkanAccelerationStructure>(this, std::move(blas));
+  VkAccelerationStructureKHR as = VK_NULL_HANDLE;
+  VkBuffer buffer = VK_NULL_HANDLE;
+  VmaAllocation allocation = VK_NULL_HANDLE;
+  VkDeviceSize buffer_size = 0;
+  VkDeviceAddress address = 0;
+  vulkan::ThrowIfFailed(
+      CreateNativeAABBAccelerationStructure(vk_aabb_buffer->DeviceAddress() + aabb_buffer.offset, stride, num_aabb,
+                                            flags, &as, &buffer, &allocation, &buffer_size, &address),
+      "Failed to create Vulkan AABB acceleration structure");
+  pp_blas.construct<VulkanAccelerationStructure>(this, as, buffer, allocation, buffer_size, address, num_aabb);
   return 0;
 }
 
@@ -200,11 +206,17 @@ int VulkanCore::CreateBottomLevelAccelerationStructure(BufferRange vertex_buffer
   VulkanBuffer *vk_index_buffer = dynamic_cast<VulkanBuffer *>(index_buffer.buffer);
   assert(vk_vertex_buffer != nullptr);
   assert(vk_index_buffer != nullptr);
-  std::unique_ptr<vulkan::AccelerationStructure> blas;
-  this->CreateBottomLevelAccelerationStructure(
-      vk_vertex_buffer->DeviceAddress() + vertex_buffer.offset, vk_index_buffer->DeviceAddress() + index_buffer.offset,
-      num_vertex, stride, num_primitive, flags, graphics_command_pool_, graphics_queue_, &blas);
-  pp_blas.construct<VulkanAccelerationStructure>(this, std::move(blas));
+  VkAccelerationStructureKHR as = VK_NULL_HANDLE;
+  VkBuffer buffer = VK_NULL_HANDLE;
+  VmaAllocation allocation = VK_NULL_HANDLE;
+  VkDeviceSize buffer_size = 0;
+  VkDeviceAddress address = 0;
+  vulkan::ThrowIfFailed(CreateNativeTriangleAccelerationStructure(
+                            vk_vertex_buffer->DeviceAddress() + vertex_buffer.offset,
+                            vk_index_buffer->DeviceAddress() + index_buffer.offset, num_vertex, stride, num_primitive,
+                            flags, &as, &buffer, &allocation, &buffer_size, &address),
+                        "Failed to create Vulkan triangle acceleration structure");
+  pp_blas.construct<VulkanAccelerationStructure>(this, as, buffer, allocation, buffer_size, address, num_primitive);
   return 0;
 }
 
@@ -225,9 +237,16 @@ int VulkanCore::CreateTopLevelAccelerationStructure(const std::vector<RayTracing
     vk_instances.emplace_back(RayTracingInstanceToVkAccelerationStructureInstanceKHR(instance));
   }
 
-  std::unique_ptr<vulkan::AccelerationStructure> tlas;
-  this->CreateTopLevelAccelerationStructure(vk_instances, graphics_command_pool_, graphics_queue_, &tlas);
-  pp_tlas.construct<VulkanAccelerationStructure>(this, std::move(tlas));
+  VkAccelerationStructureKHR as = VK_NULL_HANDLE;
+  VkBuffer buffer = VK_NULL_HANDLE;
+  VmaAllocation allocation = VK_NULL_HANDLE;
+  VkDeviceSize buffer_size = 0;
+  VkDeviceAddress address = 0;
+  vulkan::ThrowIfFailed(
+      CreateNativeTopLevelAccelerationStructure(vk_instances, &as, &buffer, &allocation, &buffer_size, &address),
+      "Failed to create Vulkan top-level acceleration structure");
+  pp_tlas.construct<VulkanAccelerationStructure>(this, as, buffer, allocation, buffer_size, address,
+                                                 static_cast<int>(instances.size()));
   return 0;
 }
 

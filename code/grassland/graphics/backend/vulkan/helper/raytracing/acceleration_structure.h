@@ -1,48 +1,17 @@
 #pragma once
-#include "grassland/graphics/backend/vulkan/helper/buffer.h"
-#include "grassland/graphics/backend/vulkan/helper/native_types.h"
+#include "grassland/graphics/backend/vulkan/helper/vulkan_util.h"
 
 namespace grassland::graphics::backend::vulkan {
-class AccelerationStructure {
- public:
-  AccelerationStructure(const VulkanCore *device,
-                        std::unique_ptr<class Buffer> buffer,
-                        VkDeviceAddress device_address,
-                        VkAccelerationStructureKHR as,
-                        int num_instance);
-  ~AccelerationStructure();
-  class Buffer *Buffer() const;
-  VkDeviceAddress DeviceAddress() const;
-
-  VkAccelerationStructureKHR Handle() const {
-    return as_;
-  }
-
-  VkResult UpdateInstances(const std::vector<VkAccelerationStructureInstanceKHR> &instances,
-                           VkCommandPool command_pool,
-                           VkQueue queue);
-
-  VkResult UpdateInstances(const std::vector<std::pair<AccelerationStructure *, glm::mat4>> &objects,
-                           VkCommandPool command_pool,
-                           VkQueue queue);
-
- private:
-  const VulkanCore *device_{};
-  std::unique_ptr<class Buffer> buffer_;
-  VkDeviceAddress device_address_{};
-  VkAccelerationStructureKHR as_{};
-  int num_instance_;
-};
-
-VkResult BuildAccelerationStructure(const VulkanCore *device,
-                                    VkAccelerationStructureGeometryKHR geometry,
+VkResult BuildAccelerationStructure(const VulkanCore *core,
+                                    const VkAccelerationStructureGeometryKHR &geometry,
                                     VkAccelerationStructureTypeKHR type,
                                     VkBuildAccelerationStructureFlagsKHR flags,
                                     VkBuildAccelerationStructureModeKHR mode,
                                     uint32_t primitive_count,
                                     VkCommandPool command_pool,
                                     VkQueue queue,
-                                    VkAccelerationStructureKHR *ptr_acceleration_structure,
-                                    double_ptr<Buffer> pp_buffer);
-
+                                    VkAccelerationStructureKHR *as,
+                                    VkBuffer *buffer,
+                                    VmaAllocation *allocation,
+                                    VkDeviceSize *buffer_size);
 }  // namespace grassland::graphics::backend::vulkan

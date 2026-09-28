@@ -181,60 +181,6 @@ VkResult VulkanCore::CreateBuffer(VkDeviceSize size,
   return VK_SUCCESS;
 }
 
-VkResult VulkanCore::CreateBuffer(VkDeviceSize size,
-                                  VkBufferUsageFlags usage,
-                                  VmaMemoryUsage memory_usage,
-                                  VmaAllocationCreateFlags flags,
-                                  VkDeviceSize alignment,
-                                  double_ptr<vulkan::Buffer> pp_buffer) const {
-  if (!pp_buffer) {
-    SetErrorMessage("pp_buffer is nullptr");
-    return VK_ERROR_INITIALIZATION_FAILED;
-  }
-
-  VkBufferCreateInfo buffer_info{};
-  buffer_info.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
-  buffer_info.size = size;
-  buffer_info.usage = usage;
-  buffer_info.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
-
-  VmaAllocationCreateInfo alloc_info{};
-  alloc_info.usage = memory_usage;
-  alloc_info.flags = flags;
-
-  VkBuffer buffer;
-  VmaAllocation allocation;
-
-  if (alignment) {
-    RETURN_IF_FAILED_VK(
-        vmaCreateBufferWithAlignment(allocator_, &buffer_info, &alloc_info, alignment, &buffer, &allocation, nullptr),
-        "failed to create buffer!");
-  } else {
-    RETURN_IF_FAILED_VK(vmaCreateBuffer(allocator_, &buffer_info, &alloc_info, &buffer, &allocation, nullptr),
-                        "failed to create buffer!");
-  }
-
-  pp_buffer.construct(this, size, buffer, allocation);
-
-  return VK_SUCCESS;
-}
-
-VkResult VulkanCore::CreateBuffer(VkDeviceSize size,
-                                  VkBufferUsageFlags usage,
-                                  VmaMemoryUsage memory_usage,
-                                  VmaAllocationCreateFlags flags,
-                                  double_ptr<vulkan::Buffer> pp_buffer) const {
-  return CreateBuffer(size, usage, memory_usage, flags, 0, pp_buffer);
-}
-
-VkResult VulkanCore::CreateBuffer(VkDeviceSize size,
-                                  VkBufferUsageFlags usage,
-                                  VmaMemoryUsage memory_usage,
-                                  double_ptr<vulkan::Buffer> pp_buffer) const {
-  VmaAllocationCreateFlags flags = 0;
-  return CreateBuffer(size, usage, memory_usage, flags, pp_buffer);
-}
-
 VkResult VulkanCore::CreatePipeline(const struct vulkan::PipelineSettings &settings, VkPipeline *pp_pipeline) const {
   if (!pp_pipeline) {
     SetErrorMessage("pp_pipeline is nullptr");
@@ -321,219 +267,128 @@ VkResult VulkanCore::CreatePipeline(const struct vulkan::PipelineSettings &setti
   return VK_SUCCESS;
 }
 
-VkResult VulkanCore::CreateBottomLevelAccelerationStructure(VkDeviceAddress aabb_address,
-                                                            VkDeviceSize stride,
-                                                            uint32_t num_aabb,
-                                                            VkGeometryFlagsKHR flags,
-                                                            VkCommandPool command_pool,
-                                                            VkQueue queue,
-                                                            double_ptr<vulkan::AccelerationStructure> pp_blas) {
-  const VkBufferUsageFlags buffer_usage_flags =
-      VK_BUFFER_USAGE_ACCELERATION_STRUCTURE_BUILD_INPUT_READ_ONLY_BIT_KHR | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT;
-
-  // Setup a single transformation matrix that can be used to transform the
-  // whole geometry for a single bottom level acceleration structure
-  VkTransformMatrixKHR transform_matrix = {1.0f, 0.0f, 0.0f, 0.0f, 0.0f, 1.0f, 0.0f, 0.0f, 0.0f, 0.0f, 1.0f, 0.0f};
-  std::unique_ptr<vulkan::Buffer> transform_matrix_buffer;
-  RETURN_IF_FAILED_VK(
-      CreateBuffer(sizeof(transform_matrix), buffer_usage_flags, VMA_MEMORY_USAGE_CPU_TO_GPU, &transform_matrix_buffer),
-      "failed to create transform matrix buffer!");
-  std::memcpy(transform_matrix_buffer->Map(), &transform_matrix, sizeof(transform_matrix));
-  transform_matrix_buffer->Unmap();
-
-  VkDeviceOrHostAddressConstKHR aabb_data_device_address{};
-  VkDeviceOrHostAddressConstKHR transform_matrix_device_address{};
-
-  aabb_data_device_address.deviceAddress = aabb_address;
-  transform_matrix_device_address.deviceAddress = transform_matrix_buffer->GetDeviceAddress();
-
-  // The bottom level acceleration structure contains one set of triangles as
-  // the input geometry
-  VkAccelerationStructureGeometryKHR acceleration_structure_geometry{};
-  acceleration_structure_geometry.sType = VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_GEOMETRY_KHR;
-  acceleration_structure_geometry.geometryType = VK_GEOMETRY_TYPE_AABBS_KHR;
-  acceleration_structure_geometry.flags = flags;
-  acceleration_structure_geometry.geometry.aabbs.sType =
-      VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_GEOMETRY_AABBS_DATA_KHR;
-  acceleration_structure_geometry.geometry.aabbs.pNext = nullptr;
-  acceleration_structure_geometry.geometry.aabbs.stride = stride;
-  acceleration_structure_geometry.geometry.aabbs.data = aabb_data_device_address;
-
-  std::unique_ptr<vulkan::Buffer> buffer;
-  VkAccelerationStructureKHR acceleration_structure;
-
-  BuildAccelerationStructure(this, acceleration_structure_geometry, VK_ACCELERATION_STRUCTURE_TYPE_BOTTOM_LEVEL_KHR,
-                             VK_BUILD_ACCELERATION_STRUCTURE_PREFER_FAST_TRACE_BIT_KHR,
-                             VK_BUILD_ACCELERATION_STRUCTURE_MODE_BUILD_KHR, num_aabb, command_pool, queue,
-                             &acceleration_structure, &buffer);
-
-  VkAccelerationStructureDeviceAddressInfoKHR acceleration_device_address_info{};
-  acceleration_device_address_info.sType = VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_DEVICE_ADDRESS_INFO_KHR;
-  acceleration_device_address_info.accelerationStructure = acceleration_structure;
-  VkDeviceAddress device_address =
-      procedures_.vkGetAccelerationStructureDeviceAddressKHR(device_, &acceleration_device_address_info);
-  pp_blas.construct(this, std::move(buffer), device_address, acceleration_structure, num_aabb);
+VkResult VulkanCore::CreateNativeAABBAccelerationStructure(VkDeviceAddress aabb_address,
+                                                           VkDeviceSize stride,
+                                                           uint32_t count,
+                                                           VkGeometryFlagsKHR flags,
+                                                           VkAccelerationStructureKHR *as,
+                                                           VkBuffer *buffer,
+                                                           VmaAllocation *allocation,
+                                                           VkDeviceSize *buffer_size,
+                                                           VkDeviceAddress *address) {
+  VkAccelerationStructureGeometryKHR geometry{VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_GEOMETRY_KHR};
+  geometry.geometryType = VK_GEOMETRY_TYPE_AABBS_KHR;
+  geometry.flags = flags;
+  geometry.geometry.aabbs.sType = VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_GEOMETRY_AABBS_DATA_KHR;
+  geometry.geometry.aabbs.stride = stride;
+  geometry.geometry.aabbs.data.deviceAddress = aabb_address;
+  VkResult result = vulkan::BuildAccelerationStructure(
+      this, geometry, VK_ACCELERATION_STRUCTURE_TYPE_BOTTOM_LEVEL_KHR,
+      VK_BUILD_ACCELERATION_STRUCTURE_PREFER_FAST_TRACE_BIT_KHR, VK_BUILD_ACCELERATION_STRUCTURE_MODE_BUILD_KHR, count,
+      graphics_command_pool_, graphics_queue_, as, buffer, allocation, buffer_size);
+  if (result != VK_SUCCESS)
+    return result;
+  VkAccelerationStructureDeviceAddressInfoKHR info{VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_DEVICE_ADDRESS_INFO_KHR};
+  info.accelerationStructure = *as;
+  *address = procedures_.vkGetAccelerationStructureDeviceAddressKHR(device_, &info);
   return VK_SUCCESS;
 }
 
-VkResult VulkanCore::CreateBottomLevelAccelerationStructure(VkDeviceAddress vertex_buffer_address,
-                                                            VkDeviceAddress index_buffer_address,
-                                                            uint32_t num_vertex,
-                                                            VkDeviceSize stride,
-                                                            uint32_t primitive_count,
-                                                            VkGeometryFlagsKHR flags,
-                                                            VkCommandPool command_pool,
-                                                            VkQueue queue,
-                                                            double_ptr<vulkan::AccelerationStructure> pp_blas) {
-  const VkBufferUsageFlags buffer_usage_flags =
-      VK_BUFFER_USAGE_ACCELERATION_STRUCTURE_BUILD_INPUT_READ_ONLY_BIT_KHR | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT;
-
-  // Setup a single transformation matrix that can be used to transform the
-  // whole geometry for a single bottom level acceleration structure
-  VkTransformMatrixKHR transform_matrix = {1.0f, 0.0f, 0.0f, 0.0f, 0.0f, 1.0f, 0.0f, 0.0f, 0.0f, 0.0f, 1.0f, 0.0f};
-  std::unique_ptr<vulkan::Buffer> transform_matrix_buffer;
-  RETURN_IF_FAILED_VK(CreateBuffer(sizeof(transform_matrix), buffer_usage_flags, VMA_MEMORY_USAGE_CPU_TO_GPU, 0, 16,
-                                   &transform_matrix_buffer),
-                      "failed to create transform matrix buffer!");
-  std::memcpy(transform_matrix_buffer->Map(), &transform_matrix, sizeof(transform_matrix));
-  transform_matrix_buffer->Unmap();
-
-  VkDeviceOrHostAddressConstKHR vertex_data_device_address{};
-  VkDeviceOrHostAddressConstKHR index_data_device_address{};
-  VkDeviceOrHostAddressConstKHR transform_matrix_device_address{};
-
-  vertex_data_device_address.deviceAddress = vertex_buffer_address;
-  index_data_device_address.deviceAddress = index_buffer_address;
-  transform_matrix_device_address.deviceAddress = transform_matrix_buffer->GetDeviceAddress();
-
-  // The bottom level acceleration structure contains one set of triangles as
-  // the input geometry
-  VkAccelerationStructureGeometryKHR acceleration_structure_geometry{};
-  acceleration_structure_geometry.sType = VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_GEOMETRY_KHR;
-  acceleration_structure_geometry.geometryType = VK_GEOMETRY_TYPE_TRIANGLES_KHR;
-  acceleration_structure_geometry.flags = flags;
-  acceleration_structure_geometry.geometry.triangles.sType =
-      VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_GEOMETRY_TRIANGLES_DATA_KHR;
-  acceleration_structure_geometry.geometry.triangles.vertexFormat = VK_FORMAT_R32G32B32_SFLOAT;
-  acceleration_structure_geometry.geometry.triangles.vertexData = vertex_data_device_address;
-  acceleration_structure_geometry.geometry.triangles.maxVertex = num_vertex;
-  acceleration_structure_geometry.geometry.triangles.vertexStride = stride;
-  acceleration_structure_geometry.geometry.triangles.indexType = VK_INDEX_TYPE_UINT32;
-  acceleration_structure_geometry.geometry.triangles.indexData = index_data_device_address;
-  acceleration_structure_geometry.geometry.triangles.transformData = transform_matrix_device_address;
-
-  std::unique_ptr<vulkan::Buffer> buffer;
-  VkAccelerationStructureKHR acceleration_structure;
-
-  BuildAccelerationStructure(this, acceleration_structure_geometry, VK_ACCELERATION_STRUCTURE_TYPE_BOTTOM_LEVEL_KHR,
-                             VK_BUILD_ACCELERATION_STRUCTURE_PREFER_FAST_TRACE_BIT_KHR,
-                             VK_BUILD_ACCELERATION_STRUCTURE_MODE_BUILD_KHR, primitive_count, command_pool, queue,
-                             &acceleration_structure, &buffer);
-
-  VkAccelerationStructureDeviceAddressInfoKHR acceleration_device_address_info{};
-  acceleration_device_address_info.sType = VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_DEVICE_ADDRESS_INFO_KHR;
-  acceleration_device_address_info.accelerationStructure = acceleration_structure;
-  VkDeviceAddress device_address =
-      procedures_.vkGetAccelerationStructureDeviceAddressKHR(device_, &acceleration_device_address_info);
-  pp_blas.construct(this, std::move(buffer), device_address, acceleration_structure, primitive_count);
-  return VK_SUCCESS;
-}
-
-VkResult VulkanCore::CreateBottomLevelAccelerationStructure(VkDeviceAddress vertex_buffer_address,
-                                                            VkDeviceAddress index_buffer_address,
-                                                            uint32_t num_vertex,
-                                                            VkDeviceSize stride,
-                                                            uint32_t primitive_count,
-                                                            VkCommandPool command_pool,
-                                                            VkQueue queue,
-                                                            double_ptr<vulkan::AccelerationStructure> pp_blas) {
-  return CreateBottomLevelAccelerationStructure(vertex_buffer_address, index_buffer_address, num_vertex, stride,
-                                                primitive_count, VK_GEOMETRY_OPAQUE_BIT_KHR, command_pool, queue,
-                                                pp_blas);
-}
-
-VkResult VulkanCore::CreateBottomLevelAccelerationStructure(vulkan::Buffer *vertex_buffer,
-                                                            vulkan::Buffer *index_buffer,
-                                                            VkDeviceSize stride,
-                                                            VkCommandPool command_pool,
-                                                            VkQueue queue,
-                                                            double_ptr<vulkan::AccelerationStructure> pp_blas) {
-  return CreateBottomLevelAccelerationStructure(
-      vertex_buffer->GetDeviceAddress(), index_buffer->GetDeviceAddress(), vertex_buffer->Size() / stride, stride,
-      index_buffer->Size() / (sizeof(uint32_t) * 3), command_pool, queue, pp_blas);
-}
-
-VkResult VulkanCore::CreateTopLevelAccelerationStructure(
-    const std::vector<VkAccelerationStructureInstanceKHR> &instances,
-    VkCommandPool command_pool,
-    VkQueue queue,
-    double_ptr<vulkan::AccelerationStructure> pp_tlas) {
-  std::unique_ptr<vulkan::Buffer> instances_buffer;
-  CreateBuffer(
-      sizeof(VkAccelerationStructureInstanceKHR) * std::max(instances.size(), static_cast<size_t>(1)),
+VkResult VulkanCore::CreateNativeTriangleAccelerationStructure(VkDeviceAddress vertex_address,
+                                                               VkDeviceAddress index_address,
+                                                               uint32_t num_vertex,
+                                                               VkDeviceSize stride,
+                                                               uint32_t primitive_count,
+                                                               VkGeometryFlagsKHR flags,
+                                                               VkAccelerationStructureKHR *as,
+                                                               VkBuffer *buffer,
+                                                               VmaAllocation *allocation,
+                                                               VkDeviceSize *buffer_size,
+                                                               VkDeviceAddress *address) {
+  VkTransformMatrixKHR transform = {1.0f, 0.0f, 0.0f, 0.0f, 0.0f, 1.0f, 0.0f, 0.0f, 0.0f, 0.0f, 1.0f, 0.0f};
+  VkBuffer transform_buffer = VK_NULL_HANDLE;
+  VmaAllocation transform_allocation = VK_NULL_HANDLE;
+  VkResult result = CreateBuffer(
+      sizeof(transform),
       VK_BUFFER_USAGE_ACCELERATION_STRUCTURE_BUILD_INPUT_READ_ONLY_BIT_KHR | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
-      VMA_MEMORY_USAGE_CPU_TO_GPU, 0, 16, &instances_buffer);
-  std::memcpy(instances_buffer->Map(), instances.data(), instances.size() * sizeof(VkAccelerationStructureInstanceKHR));
-  instances_buffer->Unmap();
-
-  VkDeviceOrHostAddressConstKHR instance_data_device_address{};
-  instance_data_device_address.deviceAddress = instances_buffer->GetDeviceAddress();
-
-  // The top level acceleration structure contains (bottom level) instance as
-  // the input geometry
-  VkAccelerationStructureGeometryKHR acceleration_structure_geometry{};
-  acceleration_structure_geometry.sType = VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_GEOMETRY_KHR;
-  acceleration_structure_geometry.geometryType = VK_GEOMETRY_TYPE_INSTANCES_KHR;
-  acceleration_structure_geometry.flags = VK_GEOMETRY_OPAQUE_BIT_KHR;
-  acceleration_structure_geometry.geometry.instances.sType =
-      VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_GEOMETRY_INSTANCES_DATA_KHR;
-  acceleration_structure_geometry.geometry.instances.arrayOfPointers = VK_FALSE;
-  acceleration_structure_geometry.geometry.instances.data = instance_data_device_address;
-
-  VkAccelerationStructureKHR acceleration_structure;
-
-  std::unique_ptr<vulkan::Buffer> buffer;
-
-  BuildAccelerationStructure(
-      this, acceleration_structure_geometry, VK_ACCELERATION_STRUCTURE_TYPE_TOP_LEVEL_KHR,
-      VK_BUILD_ACCELERATION_STRUCTURE_PREFER_FAST_TRACE_BIT_KHR | VK_BUILD_ACCELERATION_STRUCTURE_ALLOW_UPDATE_BIT_KHR,
-      VK_BUILD_ACCELERATION_STRUCTURE_MODE_BUILD_KHR, instances.size(), command_pool, queue, &acceleration_structure,
-      &buffer);
-
-  // Get the top acceleration structure's handle, which will be used to setup
-  // it's descriptor
-  VkAccelerationStructureDeviceAddressInfoKHR acceleration_device_address_info{};
-  acceleration_device_address_info.sType = VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_DEVICE_ADDRESS_INFO_KHR;
-  acceleration_device_address_info.accelerationStructure = acceleration_structure;
-  VkDeviceAddress device_address =
-      procedures_.vkGetAccelerationStructureDeviceAddressKHR(device_, &acceleration_device_address_info);
-  pp_tlas.construct(this, std::move(buffer), device_address, acceleration_structure, instances.size());
+      VMA_MEMORY_USAGE_CPU_TO_GPU, 0, 16, &transform_buffer, &transform_allocation);
+  if (result != VK_SUCCESS)
+    return result;
+  void *mapped = nullptr;
+  result = vmaMapMemory(allocator_, transform_allocation, &mapped);
+  if (result != VK_SUCCESS) {
+    vmaDestroyBuffer(allocator_, transform_buffer, transform_allocation);
+    return result;
+  }
+  std::memcpy(mapped, &transform, sizeof(transform));
+  vmaUnmapMemory(allocator_, transform_allocation);
+  VkAccelerationStructureGeometryKHR geometry{VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_GEOMETRY_KHR};
+  geometry.geometryType = VK_GEOMETRY_TYPE_TRIANGLES_KHR;
+  geometry.flags = flags;
+  geometry.geometry.triangles.sType = VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_GEOMETRY_TRIANGLES_DATA_KHR;
+  geometry.geometry.triangles.vertexFormat = VK_FORMAT_R32G32B32_SFLOAT;
+  geometry.geometry.triangles.vertexData.deviceAddress = vertex_address;
+  geometry.geometry.triangles.maxVertex = num_vertex;
+  geometry.geometry.triangles.vertexStride = stride;
+  geometry.geometry.triangles.indexType = VK_INDEX_TYPE_UINT32;
+  geometry.geometry.triangles.indexData.deviceAddress = index_address;
+  geometry.geometry.triangles.transformData.deviceAddress = BufferAddress(transform_buffer);
+  result = vulkan::BuildAccelerationStructure(
+      this, geometry, VK_ACCELERATION_STRUCTURE_TYPE_BOTTOM_LEVEL_KHR,
+      VK_BUILD_ACCELERATION_STRUCTURE_PREFER_FAST_TRACE_BIT_KHR, VK_BUILD_ACCELERATION_STRUCTURE_MODE_BUILD_KHR,
+      primitive_count, graphics_command_pool_, graphics_queue_, as, buffer, allocation, buffer_size);
+  vmaDestroyBuffer(allocator_, transform_buffer, transform_allocation);
+  if (result != VK_SUCCESS)
+    return result;
+  VkAccelerationStructureDeviceAddressInfoKHR info{VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_DEVICE_ADDRESS_INFO_KHR};
+  info.accelerationStructure = *as;
+  *address = procedures_.vkGetAccelerationStructureDeviceAddressKHR(device_, &info);
   return VK_SUCCESS;
 }
 
-VkResult VulkanCore::CreateTopLevelAccelerationStructure(
-    const std::vector<std::pair<vulkan::AccelerationStructure *, glm::mat4>> &objects,
-    VkCommandPool command_pool,
-    VkQueue queue,
-    double_ptr<vulkan::AccelerationStructure> pp_tlas) {
-  std::vector<VkAccelerationStructureInstanceKHR> acceleration_structure_instances;
-  acceleration_structure_instances.reserve(objects.size());
-  for (int i = 0; i < objects.size(); i++) {
-    auto &object = objects[i];
-    VkAccelerationStructureInstanceKHR acceleration_structure_instance{};
-    acceleration_structure_instance.transform = {object.second[0][0], object.second[1][0], object.second[2][0],
-                                                 object.second[3][0], object.second[0][1], object.second[1][1],
-                                                 object.second[2][1], object.second[3][1], object.second[0][2],
-                                                 object.second[1][2], object.second[2][2], object.second[3][2]};
-    acceleration_structure_instance.instanceCustomIndex = i;
-    acceleration_structure_instance.mask = 0xFF;
-    acceleration_structure_instance.instanceShaderBindingTableRecordOffset = 0;
-    acceleration_structure_instance.flags = VK_GEOMETRY_INSTANCE_TRIANGLE_FACING_CULL_DISABLE_BIT_KHR;
-    acceleration_structure_instance.accelerationStructureReference = object.first->DeviceAddress();
-    acceleration_structure_instances.push_back(acceleration_structure_instance);
+VkResult VulkanCore::CreateNativeTopLevelAccelerationStructure(
+    const std::vector<VkAccelerationStructureInstanceKHR> &instances,
+    VkAccelerationStructureKHR *as,
+    VkBuffer *buffer,
+    VmaAllocation *allocation,
+    VkDeviceSize *buffer_size,
+    VkDeviceAddress *address) {
+  VkBuffer instance_buffer = VK_NULL_HANDLE;
+  VmaAllocation instance_allocation = VK_NULL_HANDLE;
+  VkDeviceSize size = sizeof(VkAccelerationStructureInstanceKHR) * std::max(size_t(1), instances.size());
+  VkResult result = CreateBuffer(
+      size,
+      VK_BUFFER_USAGE_ACCELERATION_STRUCTURE_BUILD_INPUT_READ_ONLY_BIT_KHR | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
+      VMA_MEMORY_USAGE_CPU_TO_GPU, 0, 16, &instance_buffer, &instance_allocation);
+  if (result != VK_SUCCESS)
+    return result;
+  void *mapped = nullptr;
+  result = vmaMapMemory(allocator_, instance_allocation, &mapped);
+  if (result != VK_SUCCESS) {
+    vmaDestroyBuffer(allocator_, instance_buffer, instance_allocation);
+    return result;
   }
-
-  return CreateTopLevelAccelerationStructure(acceleration_structure_instances, command_pool, queue, pp_tlas);
+  if (!instances.empty())
+    std::memcpy(mapped, instances.data(), instances.size() * sizeof(instances[0]));
+  vmaUnmapMemory(allocator_, instance_allocation);
+  VkAccelerationStructureGeometryKHR geometry{VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_GEOMETRY_KHR};
+  geometry.geometryType = VK_GEOMETRY_TYPE_INSTANCES_KHR;
+  geometry.flags = VK_GEOMETRY_OPAQUE_BIT_KHR;
+  geometry.geometry.instances.sType = VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_GEOMETRY_INSTANCES_DATA_KHR;
+  geometry.geometry.instances.arrayOfPointers = VK_FALSE;
+  geometry.geometry.instances.data.deviceAddress = BufferAddress(instance_buffer);
+  result = vulkan::BuildAccelerationStructure(
+      this, geometry, VK_ACCELERATION_STRUCTURE_TYPE_TOP_LEVEL_KHR,
+      VK_BUILD_ACCELERATION_STRUCTURE_PREFER_FAST_TRACE_BIT_KHR | VK_BUILD_ACCELERATION_STRUCTURE_ALLOW_UPDATE_BIT_KHR,
+      VK_BUILD_ACCELERATION_STRUCTURE_MODE_BUILD_KHR, static_cast<uint32_t>(instances.size()), graphics_command_pool_,
+      graphics_queue_, as, buffer, allocation, buffer_size);
+  vmaDestroyBuffer(allocator_, instance_buffer, instance_allocation);
+  if (result != VK_SUCCESS)
+    return result;
+  VkAccelerationStructureDeviceAddressInfoKHR info{VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_DEVICE_ADDRESS_INFO_KHR};
+  info.accelerationStructure = *as;
+  *address = procedures_.vkGetAccelerationStructureDeviceAddressKHR(device_, &info);
+  return VK_SUCCESS;
 }
 
 VkResult VulkanCore::CreateRayTracingPipeline(VkPipelineLayout pipeline_layout,

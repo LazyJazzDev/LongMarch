@@ -89,8 +89,6 @@ std::string VkResultToString(VkResult result);
 
 class PhysicalDevice;
 struct HitGroup;
-class Buffer;
-class AccelerationStructure;
 
 bool IsDepthFormat(VkFormat format);
 

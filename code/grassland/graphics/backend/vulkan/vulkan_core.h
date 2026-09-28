@@ -167,70 +167,34 @@ class VulkanCore : public Core {
     return vkGetBufferDeviceAddress(device_, &info);
   }
 
-  VkResult CreateBuffer(VkDeviceSize size,
-                        VkBufferUsageFlags usage,
-                        VmaMemoryUsage memory_usage,
-                        VmaAllocationCreateFlags flags,
-                        VkDeviceSize alignment,
-                        double_ptr<vulkan::Buffer> pp_buffer) const;
-
-  VkResult CreateBuffer(VkDeviceSize size,
-                        VkBufferUsageFlags usage,
-                        VmaMemoryUsage memory_usage,
-                        VmaAllocationCreateFlags flags,
-                        double_ptr<vulkan::Buffer> pp_buffer) const;
-
-  VkResult CreateBuffer(VkDeviceSize size,
-                        VkBufferUsageFlags usage,
-                        VmaMemoryUsage memory_usage,
-                        double_ptr<vulkan::Buffer> pp_buffer) const;
-
   VkResult CreatePipeline(const vulkan::PipelineSettings &settings, VkPipeline *pipeline) const;
 
-  VkResult CreateBottomLevelAccelerationStructure(VkDeviceAddress aabb_address,
-                                                  VkDeviceSize stride,
-                                                  uint32_t num_aabb,
-                                                  VkGeometryFlagsKHR flags,
-                                                  VkCommandPool command_pool,
-                                                  VkQueue queue,
-                                                  double_ptr<vulkan::AccelerationStructure> pp_blas);
-
-  VkResult CreateBottomLevelAccelerationStructure(VkDeviceAddress vertex_buffer_address,
-                                                  VkDeviceAddress index_buffer_address,
-                                                  uint32_t num_vertex,
-                                                  VkDeviceSize stride,
-                                                  uint32_t primitive_count,
-                                                  VkGeometryFlagsKHR flags,
-                                                  VkCommandPool command_pool,
-                                                  VkQueue queue,
-                                                  double_ptr<vulkan::AccelerationStructure> pp_blas);
-
-  VkResult CreateBottomLevelAccelerationStructure(VkDeviceAddress vertex_buffer_address,
-                                                  VkDeviceAddress index_buffer_address,
-                                                  uint32_t num_vertex,
-                                                  VkDeviceSize stride,
-                                                  uint32_t primitive_count,
-                                                  VkCommandPool command_pool,
-                                                  VkQueue queue,
-                                                  double_ptr<vulkan::AccelerationStructure> pp_blas);
-
-  VkResult CreateBottomLevelAccelerationStructure(vulkan::Buffer *vertex_buffer,
-                                                  vulkan::Buffer *index_buffer,
-                                                  VkDeviceSize stride,
-                                                  VkCommandPool command_pool,
-                                                  VkQueue queue,
-                                                  double_ptr<vulkan::AccelerationStructure> pp_blas);
-
-  VkResult CreateTopLevelAccelerationStructure(const std::vector<VkAccelerationStructureInstanceKHR> &instances,
-                                               VkCommandPool command_pool,
-                                               VkQueue queue,
-                                               double_ptr<vulkan::AccelerationStructure> pp_tlas);
-
-  VkResult CreateTopLevelAccelerationStructure(
-      const std::vector<std::pair<vulkan::AccelerationStructure *, glm::mat4>> &objects,
-      VkCommandPool command_pool,
-      VkQueue queue,
-      double_ptr<vulkan::AccelerationStructure> pp_tlas);
+  VkResult CreateNativeAABBAccelerationStructure(VkDeviceAddress aabb_address,
+                                                 VkDeviceSize stride,
+                                                 uint32_t count,
+                                                 VkGeometryFlagsKHR flags,
+                                                 VkAccelerationStructureKHR *as,
+                                                 VkBuffer *buffer,
+                                                 VmaAllocation *allocation,
+                                                 VkDeviceSize *buffer_size,
+                                                 VkDeviceAddress *address);
+  VkResult CreateNativeTriangleAccelerationStructure(VkDeviceAddress vertex_address,
+                                                     VkDeviceAddress index_address,
+                                                     uint32_t num_vertex,
+                                                     VkDeviceSize stride,
+                                                     uint32_t primitive_count,
+                                                     VkGeometryFlagsKHR flags,
+                                                     VkAccelerationStructureKHR *as,
+                                                     VkBuffer *buffer,
+                                                     VmaAllocation *allocation,
+                                                     VkDeviceSize *buffer_size,
+                                                     VkDeviceAddress *address);
+  VkResult CreateNativeTopLevelAccelerationStructure(const std::vector<VkAccelerationStructureInstanceKHR> &instances,
+                                                     VkAccelerationStructureKHR *as,
+                                                     VkBuffer *buffer,
+                                                     VmaAllocation *allocation,
+                                                     VkDeviceSize *buffer_size,
+                                                     VkDeviceAddress *address);
 
   VkResult CreateRayTracingPipeline(VkPipelineLayout pipeline_layout,
                                     VulkanShader *ray_gen_shader,

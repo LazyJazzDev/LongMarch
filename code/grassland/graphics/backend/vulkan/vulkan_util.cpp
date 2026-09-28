@@ -235,7 +235,7 @@ VkAccelerationStructureInstanceKHR RayTracingInstanceToVkAccelerationStructureIn
   vk_instance.instanceShaderBindingTableRecordOffset = instance.instance_hit_group_offset;
   vk_instance.flags = instance.instance_flags;
   vk_instance.accelerationStructureReference =
-      dynamic_cast<VulkanAccelerationStructure *>(instance.acceleration_structure)->Handle()->DeviceAddress();
+      dynamic_cast<VulkanAccelerationStructure *>(instance.acceleration_structure)->DeviceAddress();
   return vk_instance;
 }
 

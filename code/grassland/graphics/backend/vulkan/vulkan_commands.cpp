@@ -276,7 +276,7 @@ void VulkanCmdBindResourceAccelerationStructure::CompileCommand(VulkanCommandCon
   write_descriptor_set.descriptorCount = binding.descriptorCount;
   write_descriptor_set.descriptorType = binding.descriptorType;
 
-  VkAccelerationStructureKHR acceleration_structure = acceleration_structure_->Handle()->Handle();
+  VkAccelerationStructureKHR acceleration_structure = acceleration_structure_->Handle();
 
   VkWriteDescriptorSetAccelerationStructureKHR acceleration_structure_info{};
   acceleration_structure_info.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET_ACCELERATION_STRUCTURE_KHR;
