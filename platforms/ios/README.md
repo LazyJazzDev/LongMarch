@@ -111,7 +111,7 @@ unchanged. Large scenes can still exceed a device's memory budget.
 - Full Xcode with iOS SDK, macOS on Apple Silicon for resource preparation.
 - iOS 18+ and a Metal device supporting tier-2 argument buffers and unified memory.
   Sparkium additionally requires ray queries; graphics/NBody do not. The simulator supports the raster/compute game path; ray-query support is checked separately.
-- CMake 3.25+, Ninja, Python 3, the existing project Slang and SPIRV-Cross installation.
+- CMake 3.25+, Ninja, Python 3, and the shared mobile Slang and SPIRV-Cross packages below.
   Slang and SPIRV-Cross are used **only on the Mac**, and are not linked into the app.
 - Pillow for resizing textures during packaging: `python3 -m pip install -r platforms/ios/requirements.txt`.
 - Material edits or shader edits require regenerating the resource bundle.
@@ -119,7 +119,7 @@ unchanged. Large scenes can still exceed a device's memory budget.
 ## Build
 
 Run from the repository root. Initialize `assets` and fetch its LFS objects first.
-Install the shared host dependencies once (Slang 2026.18.3, metal-cpp,
+Install the shared host dependencies once (Slang, SPIRV-Cross, metal-cpp,
 portable headers, and FreeType/MikkTSpace sources):
 
 ```sh
@@ -132,8 +132,8 @@ SDKs or third-party sources. FreeType and MikkTSpace are compiled with the targe
 SDK; no macOS library is linked into an iOS/HarmonyOS app. `LONGMARCH_MOBILE_DEPS`
 can select a nondefault installation; normal builds need no dependency path flags.
 The Slang library requires macOS 26+ on Apple Silicon. An external Slang SDK can be
-selected with `slang_DIR`; mobile preparation requires exactly 2026.18.3 so offline
-cache identities stay consistent.
+selected with `slang_DIR`; it must meet the desktop minimum version. Regenerate the
+bundle after changing the Slang compiler.
 
 ```sh
 cmake -S platforms/ios -B build-ios-prepare -G Ninja \
