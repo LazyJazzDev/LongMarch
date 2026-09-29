@@ -212,9 +212,9 @@ void GameOfLife::CustomOnUpdate() {
              glm::vec4{0.1, 0.1, 0.1, 1.0}, glm::uvec4{0}});
   // Match the opposite action rail to the main toolbar background.
   const auto framebuffer = glm::vec2(FramebufferSize());
-  const glm::vec2 action_position = sidebar_ ? glm::vec2{playground_right_, 0} : glm::vec2{0, playground_bottom_};
+  const glm::vec2 action_position = sidebar_ ? glm::vec2{playground_right_, 0} : glm::vec2{0, 0};
   const glm::vec2 action_size = sidebar_ ? glm::vec2{framebuffer.x - playground_right_, framebuffer.y}
-                                         : glm::vec2{framebuffer.x, framebuffer.y - playground_bottom_};
+                                         : glm::vec2{framebuffer.x, playground_top_};
   DrawModel(&white_rect_model.value(),
             {GetModelMatrix(action_position, action_size, 0.8f), glm::vec4{0.1, 0.1, 0.1, 1.0}, glm::uvec4{0}});
   DrawModel(
@@ -268,11 +268,10 @@ void GameOfLife::OnWindowSize() {
   panel_top_ = 0;
   panel_bottom_ = window_height;
 
-  const bool prefer_sidebar =
-      std::min(window_height / cell_grid_height_, (window_width - panel_size * 2.0f) / cell_grid_width_) >
-      std::min((window_height - panel_size * 2.0f) / cell_grid_height_, window_width / cell_grid_width_);
-  if (!width_slider_->IsDragging() && !height_slider_->IsDragging())
-    sidebar_ = prefer_sidebar;
+  // The controls stay on the window's short edges whatever the grid's aspect, so
+  // changing the grid dimensions never moves them: sidebars in landscape
+  // windows, top and bottom panels in portrait ones.
+  sidebar_ = window_width >= window_height;
   auto place = [icon_size](Button *button, float x, float y) { button->Resize(x, y, x + icon_size, y + icon_size); };
   if (sidebar_) {
     playground_left = panel_size;
@@ -290,17 +289,18 @@ void GameOfLife::OnWindowSize() {
     width_slider_->Resize({margin, top, margin + slider_thickness, bottom}, true);
     height_slider_->Resize({margin + slider_thickness + slider_gap, top, margin + icon_size, bottom}, true);
   } else {
+    // The dense controls anchor the bottom edge; reset and randomize sit on top.
     playground_top = panel_size;
     playground_bottom = window_height - panel_size;
-    panel_bottom_ = playground_top;
-    const float top = margin;
+    panel_top_ = playground_bottom;
+    const float top = window_height - margin - icon_size;
     place(open_button_.get(), margin, top);
     place(save_button_.get(), margin + step, top);
     place(boundary_button_.get(), window_width - margin - icon_size - step * 2.0f, top);
     place(speed_toggle_button_.get(), window_width - margin - icon_size - step, top);
     place(pause_play_button_.get(), window_width - margin - icon_size, top);
-    place(refresh_button_.get(), margin, window_height - margin - icon_size);
-    place(randomize_button_.get(), window_width - margin - icon_size, window_height - margin - icon_size);
+    place(refresh_button_.get(), margin, margin);
+    place(randomize_button_.get(), window_width - margin - icon_size, margin);
     const float left = margin + step * 2.0f;
     const float right = window_width - left - step;
     width_slider_->Resize({left, top, right, top + slider_thickness}, false);

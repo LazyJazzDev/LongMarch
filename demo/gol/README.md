@@ -59,7 +59,9 @@ and errors show an explanatory dialog followed by a red pulse and a gentle shake
 
 The toolbar groups file actions above board actions in a two-column block.
 Dimension sliders occupy the flexible middle space and playback controls sit at
-the opposite end. The same groups rearrange into a bottom panel for wide grids.
+the opposite end. In portrait windows the same groups form a panel along the bottom
+edge, with reset and randomize along the top. The controls always sit on the window's short edges, so changing the grid
+dimensions never moves them.
 
 The rounded `W` and `H` sliders between randomize and speed adjust the number of
 columns and rows from 2 to 256. They fill the space between the buttons: two
