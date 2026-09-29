@@ -330,6 +330,242 @@ private struct GridDimensionPicker: View {
   }
 }
 
+private struct PatternFile: Identifiable {
+  let url: URL
+  let modified: Date
+  var id: URL { url }
+  var name: String { url.deletingPathExtension().lastPathComponent }
+}
+
+// A named pattern from the built-in Life Lexicon library (demo/gol/patterns/library.json).
+private struct BuiltinPattern: Decodable, Identifiable {
+  let name: String
+  let category: String
+  let width: Int
+  let height: Int
+  let period: Int?
+  let speed: String?
+  let rle: String
+  var id: String { category + ":" + name }
+
+  static let categories: [(id: String, title: String)] = [
+    ("still", "静物"), ("oscillator", "振荡器"), ("spaceship", "飞船"), ("gun", "枪"),
+    ("puffer", "繁殖器与耙"), ("methuselah", "长寿图案"), ("other", "其他结构"),
+  ]
+
+  static let all: [BuiltinPattern] = {
+    struct Document: Decodable { let patterns: [BuiltinPattern] }
+    guard
+      let url = Bundle.main.resourceURL?.appendingPathComponent(
+        "SparkiumResources/Patterns/library.json"),
+      let data = try? Data(contentsOf: url),
+      let document = try? JSONDecoder().decode(Document.self, from: data)
+    else { return [] }
+    return document.patterns
+  }()
+
+  var detail: String {
+    var parts: [String] = []
+    if let speed {
+      parts.append(
+        speed.replacingOccurrences(of: " diagonal", with: " 对角")
+          .replacingOccurrences(of: " orthogonal", with: " 正交")
+          .replacingOccurrences(of: " oblique", with: " 斜向"))
+    }
+    if let period, period > 1 { parts.append("p\(period)") }
+    parts.append("\(width)×\(height)")
+    return parts.joined(separator: " · ")
+  }
+
+  // Life .cells text for the run-length encoded cells.
+  var cells: String {
+    var rows: [String] = []
+    var row = ""
+    var count = ""
+    for c in rle {
+      if c.isNumber {
+        count.append(c)
+        continue
+      }
+      let n = Int(count) ?? 1
+      count = ""
+      switch c {
+      case "b": row += String(repeating: ".", count: n)
+      case "o": row += String(repeating: "O", count: n)
+      case "$", "!":
+        rows.append(row)
+        if c == "$" { rows.append(contentsOf: Array(repeating: "", count: n - 1)) }
+        row = ""
+      default: break
+      }
+      if c == "!" { break }
+    }
+    let lines = rows.map { $0.padding(toLength: width, withPad: ".", startingAt: 0) }
+    return "!Name: \(name)\n!Life Lexicon, CC BY-SA 3.0\n" + lines.joined(separator: "\n") + "\n"
+  }
+}
+
+// Life patterns saved inside the app, listed before the system document picker.
+private enum PatternLibrary {
+  static var directory: URL {
+    let directory = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
+      .appendingPathComponent("Patterns", isDirectory: true)
+    try? FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+    return directory
+  }
+
+  static func files() -> [PatternFile] {
+    let urls =
+      (try? FileManager.default.contentsOfDirectory(
+        at: directory, includingPropertiesForKeys: [.contentModificationDateKey])) ?? []
+    return urls.filter { $0.pathExtension.lowercased() == "cells" }.map { url in
+      let modified =
+        (try? url.resourceValues(forKeys: [.contentModificationDateKey]).contentModificationDate)
+        ?? .distantPast
+      return PatternFile(url: url, modified: modified)
+    }.sorted { $0.modified > $1.modified }
+  }
+
+  // A file in the library, without directories or reserved characters.
+  static func url(named name: String) -> URL? {
+    var base = name.trimmingCharacters(in: .whitespacesAndNewlines)
+    if base.lowercased().hasSuffix(".cells") { base.removeLast(6) }
+    base = base.components(separatedBy: CharacterSet(charactersIn: "/\\:*?\"<>|")).joined(separator: "_")
+      .trimmingCharacters(in: .whitespacesAndNewlines)
+    return base.isEmpty ? nil : directory.appendingPathComponent(base).appendingPathExtension("cells")
+  }
+}
+
+private struct PatternLibraryView: View {
+  let saving: Bool
+  let choose: (URL) -> Void
+  let system: () -> Void
+  let cancel: () -> Void
+  @State private var files = PatternLibrary.files()
+  @State private var name = "Life " + Date().formatted(
+    .verbatim("\(year: .defaultDigits)-\(month: .twoDigits)-\(day: .twoDigits) \(hour: .twoDigits(clock: .twentyFourHour, hourCycle: .zeroBased)).\(minute: .twoDigits).\(second: .twoDigits)",
+      timeZone: .current, calendar: .current))
+  @State private var replacing: URL?
+  @State private var query = ""
+
+  private func matches(_ name: String) -> Bool {
+    query.isEmpty || name.localizedCaseInsensitiveContains(query)
+  }
+
+  var body: some View {
+    NavigationStack {
+      list
+        .navigationTitle(saving ? "保存图案" : "打开图案")
+    }
+    .preferredColorScheme(.dark)
+  }
+
+  @ViewBuilder private var list: some View {
+    if saving {
+      content
+    } else {
+      content.searchable(
+        text: $query, placement: .navigationBarDrawer(displayMode: .always), prompt: "搜索图案")
+    }
+  }
+
+  private var content: some View {
+    let saved = files.filter { matches($0.name) }
+    return List {
+        if saving {
+          Section {
+            TextField("文件名", text: $name).submitLabel(.done).onSubmit(save)
+          }
+        }
+        Section(saving ? "" : "我的图案 · \(saved.count)") {
+          if saved.isEmpty && query.isEmpty {
+            Text("还没有保存的图案").foregroundStyle(.secondary)
+          }
+          ForEach(saved) { file in
+            Button {
+              if saving { replacing = file.url } else { choose(file.url) }
+            } label: {
+              HStack(spacing: 12) {
+                Image(systemName: "doc.text").foregroundStyle(.tint)
+                VStack(alignment: .leading, spacing: 2) {
+                  Text(file.name).foregroundStyle(Color(uiColor: .label)).lineLimit(1)
+                  Text(file.modified, format: .dateTime.year().month().day().hour().minute())
+                    .font(.footnote).foregroundStyle(Color(uiColor: .secondaryLabel))
+                }
+              }
+            }
+          }
+          .onDelete { offsets in
+            for index in offsets { try? FileManager.default.removeItem(at: saved[index].url) }
+            files = PatternLibrary.files()
+          }
+        }
+        if !saving {
+          ForEach(BuiltinPattern.categories, id: \.id) { category in
+            let items = BuiltinPattern.all.filter { $0.category == category.id && matches($0.name) }
+            if !items.isEmpty {
+              Section("\(category.title) · \(items.count)") {
+                ForEach(items) { pattern in
+                  Button {
+                    openBuiltin(pattern)
+                  } label: {
+                    HStack(spacing: 12) {
+                      Image(systemName: "square.grid.3x3.fill").foregroundStyle(.tint)
+                      VStack(alignment: .leading, spacing: 2) {
+                        Text(pattern.name).foregroundStyle(Color(uiColor: .label)).lineLimit(1)
+                        Text(pattern.detail).font(.footnote).foregroundStyle(Color(uiColor: .secondaryLabel))
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+        Section {
+          Button(saving ? "保存到系统文件…" : "从系统文件读取…", action: system)
+        } footer: {
+          if !saving { Text("内置图案来自 Life Lexicon（Stephen A. Silver 等，CC BY-SA 3.0）") }
+        }
+      }
+      .navigationBarTitleDisplayMode(.inline)
+      .toolbar {
+        ToolbarItem(placement: .cancellationAction) { Button("取消", action: cancel) }
+        if saving {
+          ToolbarItem(placement: .confirmationAction) {
+            Button("保存", action: save).disabled(PatternLibrary.url(named: name) == nil)
+          }
+        }
+      }
+      .alert(
+        "替换图案？", isPresented: Binding(get: { replacing != nil }, set: { if !$0 { replacing = nil } })
+      ) {
+        Button("取消", role: .cancel) { replacing = nil }
+        Button("替换", role: .destructive) {
+          if let url = replacing { choose(url) }
+          replacing = nil
+        }
+      } message: {
+        Text("“\(replacing?.deletingPathExtension().lastPathComponent ?? "")”已存在，要替换它吗？")
+      }
+  }
+
+  private func openBuiltin(_ pattern: BuiltinPattern) {
+    let url = FileManager.default.temporaryDirectory.appendingPathComponent("Builtin.cells")
+    do {
+      try pattern.cells.write(to: url, atomically: true, encoding: .utf8)
+      choose(url)
+    } catch {
+      cancel()
+    }
+  }
+
+  private func save() {
+    guard let url = PatternLibrary.url(named: name) else { return }
+    if FileManager.default.fileExists(atPath: url.path) { replacing = url } else { choose(url) }
+  }
+}
+
 private struct DesktopGameView: UIViewRepresentable {
   let life: Bool
   let active: Bool
@@ -342,6 +578,8 @@ private struct DesktopGameView: UIViewRepresentable {
     private var exporting = false
     private var temporary: URL?
     private weak var sizePopover: UIViewController?
+    private weak var library: UIViewController?
+    private var libraryHandled = false
 
     func requestSize(_ axis: Int, value: Int) {
       guard let view, let root = view.window?.rootViewController,
@@ -372,9 +610,48 @@ private struct DesktopGameView: UIViewRepresentable {
     func adaptivePresentationStyle(
       for controller: UIPresentationController,
       traitCollection: UITraitCollection
-    ) -> UIModalPresentationStyle { .none }
+    ) -> UIModalPresentationStyle { controller.presentedViewController === library ? .automatic : .none }
 
+    // Open and save start in the in-app pattern library; the system document
+    // picker is one link away. Dismissing the library cancels the request.
     func request(_ action: Int) {
+      guard let view, let root = view.window?.rootViewController, root.presentedViewController == nil
+      else {
+        cancel()
+        return
+      }
+      libraryHandled = false
+      let content = PatternLibraryView(
+        saving: action == 2,
+        choose: { [weak self] url in self?.finishLibrary { self?.complete(url) } },
+        system: { [weak self] in self?.finishLibrary { self?.systemRequest(action) } },
+        cancel: { [weak self] in self?.finishLibrary { self?.cancel() } })
+      let controller = UIHostingController(rootView: content)
+      if let sheet = controller.sheetPresentationController {
+        sheet.detents = [.medium(), .large()]
+        sheet.prefersGrabberVisible = true
+      }
+      controller.presentationController?.delegate = self
+      library = controller
+      root.present(controller, animated: true)
+    }
+
+    private func finishLibrary(_ next: @escaping () -> Void) {
+      libraryHandled = true
+      if let library { library.dismiss(animated: true, completion: next) } else { next() }
+    }
+
+    func presentationControllerDidDismiss(_ controller: UIPresentationController) {
+      guard controller.presentedViewController === library, !libraryHandled else { return }
+      libraryHandled = true
+      cancel()
+    }
+
+    private func complete(_ url: URL) {
+      view?.renderer.completeFile(url.path) { [weak self] message in self?.error(message) }
+    }
+
+    private func systemRequest(_ action: Int) {
       guard let view, let root = view.window?.rootViewController else { return }
       if action == 2 {
         let url = FileManager.default.temporaryDirectory.appendingPathComponent("Life.cells")
@@ -441,7 +718,13 @@ private struct DesktopGameView: UIViewRepresentable {
     view.renderer.start(view: view, resources: resources, demo: life ? "gol" : "2048") {
       _, _, fps, _, _, _, _, error in status(fps, error)
     }
-    if let axis = ProcessInfo.processInfo.environment["LONGMARCH_SMOKE_SIZE_PICKER"] {
+    if let file = ProcessInfo.processInfo.environment["LONGMARCH_SMOKE_FILE"] {
+      // Opens the pattern library the way the open/save buttons do, for screenshots.
+      DispatchQueue.main.asyncAfter(deadline: .now() + 1) { [weak coordinator = context.coordinator] in
+        coordinator?.request(file == "save" ? 2 : 1)
+      }
+    }
+        if let axis = ProcessInfo.processInfo.environment["LONGMARCH_SMOKE_SIZE_PICKER"] {
       DispatchQueue.main.asyncAfter(deadline: .now() + 1) { [weak view] in
         view?.smokeSizeTap(axis == "height" ? 2 : 1)
       }
