@@ -1,6 +1,7 @@
 #include "application.h"
 
 #include <algorithm>
+#include <cstring>
 #include <map>
 
 #ifndef LONGMARCH_HOSTED_GAMES
@@ -101,9 +102,22 @@ void Application::DrawModel(DeviceModel *device_model, const InstanceInfo &insta
   main_frame_.instances.emplace_back(device_model, instance_info);
 }
 
+void Application::DrawModelWithData(DeviceModel *device_model,
+                                    InstanceInfo instance_info,
+                                    const std::vector<uint32_t> &data) {
+  instance_info.extra.y = uint32_t(main_frame_.data.size() * sizeof(uint32_t));
+  main_frame_.data_instances.push_back(main_frame_.instances.size());
+  main_frame_.data.insert(main_frame_.data.end(), data.begin(), data.end());
+  main_frame_.instances.emplace_back(device_model, instance_info);
+}
+
 void Application::CaptureSecondFrame(float alpha) {
   second_frame_.instances = std::move(main_frame_.instances);
+  second_frame_.data = std::move(main_frame_.data);
+  second_frame_.data_instances = std::move(main_frame_.data_instances);
   main_frame_.instances.clear();
+  main_frame_.data.clear();
+  main_frame_.data_instances.clear();
   second_frame_alpha_ = alpha;
 }
 
@@ -180,8 +194,11 @@ void Application::OnUpdate() {
     OnFramebufferResize();
   }
 
-  main_frame_.instances.clear();
-  second_frame_.instances.clear();
+  for (auto *target : {&main_frame_, &second_frame_}) {
+    target->instances.clear();
+    target->data.clear();
+    target->data_instances.clear();
+  }
   second_frame_alpha_ = 0.0f;
 
   CustomOnUpdate();
@@ -268,17 +285,24 @@ void Application::RenderFrameTarget(graphics::CommandContext *context, FrameTarg
                    [](const auto &a, const auto &b) { return std::less<DeviceModel *>{}(a.model, b.model); });
 
   if (!instances.empty()) {
-    auto &instance_infos = target.upload_instances;
-    instance_infos.clear();
-    instance_infos.reserve(instances.size());
-    for (auto &instance : instances) {
-      instance_infos.push_back(instance.second);
+    // One upload: instance records, then the data words they reference.
+    const size_t records_size = instances.size() * sizeof(InstanceInfo);
+    const size_t data_size = target.data.size() * sizeof(uint32_t);
+    auto &upload = target.upload;
+    upload.resize(records_size + data_size);
+    auto *records = reinterpret_cast<InstanceInfo *>(upload.data());
+    for (size_t i = 0; i < instances.size(); i++) {
+      records[i] = instances[i].second;
     }
-    const size_t data_size = instance_infos.size() * sizeof(InstanceInfo);
-    if (data_size > target.instance_buffer->Size()) {
-      target.instance_buffer->Resize(data_size);
+    for (size_t index : target.data_instances) {
+      records[index].extra.y += uint32_t(records_size);
     }
-    target.instance_buffer->UploadData(instance_infos.data(), data_size);
+    if (data_size)
+      std::memcpy(upload.data() + records_size, target.data.data(), data_size);
+    if (upload.size() > target.instance_buffer->Size()) {
+      target.instance_buffer->Resize(upload.size());
+    }
+    target.instance_buffer->UploadData(upload.data(), upload.size());
   }
 
   const auto extent = target.color_image->Extent();

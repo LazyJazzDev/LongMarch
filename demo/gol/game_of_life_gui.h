@@ -79,6 +79,7 @@ class GameOfLife : public Application {
 
   void InitCells(int width, int height);
   void LayoutCells();
+  void DrawCellGrid();
   void ResizeGrid(int width, int height);
   glm::vec2 CursorPosition() const;
   glm::vec2 FramePosition(glm::dvec2 position) const;
@@ -128,6 +129,13 @@ class GameOfLife : public Application {
   std::vector<uint8_t> cell_grid_;
   std::vector<uint8_t> initial_cells_;
   std::vector<std::unique_ptr<CellButton>> cell_button_grid_;
+  // Top-left corner of cell (0, 0) and the cell pitch, in framebuffer pixels.
+  glm::vec2 cell_grid_origin_{};
+  float cell_unit_{};
+  // Contiguous per-cell animation state and the packed shader data it produces.
+  std::vector<CellVisual> cell_visuals_;
+  std::vector<uint32_t> cell_appearance_;
+  bool cells_animating_{false};
   float time_total{0.0};
   double last_frame_time_{};
   double last_simulation_time_{};

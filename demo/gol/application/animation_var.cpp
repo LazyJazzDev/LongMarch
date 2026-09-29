@@ -32,10 +32,6 @@ void AnimationVar::UpdateTarget(float new_target) {
   target_ = new_target;
 }
 
-bool AnimationVar::IsFinished() const {
-  return alpha_ == 1.0;
-}
-
 void AnimationVar::AddTarget(float delta) {
   UpdateTarget(target_ + delta);
 }

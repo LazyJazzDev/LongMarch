@@ -6,37 +6,40 @@
 
 namespace life_demo {
 
-class CellButton : public Button {
- public:
-  CellButton(Application *app,
-             float left,
-             float top,
-             float right,
-             float bottom,
-             uint8_t *cell,
-             DeviceModel *device_model);
-  void Rebind(uint8_t *cell);
-  void Update(float t, bool animate_state);
-  void Draw();
+// Animated appearance of one cell. The grid stores these contiguously so the
+// per-frame pass streams through memory instead of visiting every button.
+struct CellVisual {
+  AnimationVar background{0.0f, AnimationStyle::kPower5};
+  AnimationVar light{0.0f, AnimationStyle::kPower5};
+  bool dirty{true};
 
-  bool IsAnimating() const {
-    return !background_animation_var_.IsFinished() || !light_animation_var_.IsFinished();
+  void Reset(bool alive);
+
+  // Advances toward the cell state and refreshes `packed` when it changes:
+  // dead and live brightness for the hover/press state, and the live-cell
+  // light, as three 10-bit unorm fields read by the cell grid shader.
+  // Returns whether an animation is still running.
+  bool Update(bool alive, float t, bool animate_state, uint32_t &packed) {
+    // Most cells are settled and already packed; skip them without any calls.
+    if (!dirty && background.IsFinished() && light.IsFinished() && light.Target() == (alive ? 1.0f : 0.0f))
+      return false;
+    return Animate(alive, t, animate_state, packed);
   }
 
  private:
-  void OnResize() override;
+  bool Animate(bool alive, float t, bool animate_state, uint32_t &packed);
+};
+
+class CellButton : public Button {
+ public:
+  CellButton(Application *app, float left, float top, float right, float bottom, uint8_t *cell, CellVisual *visual);
+  void Rebind(uint8_t *cell, CellVisual *visual);
+
+ private:
   void OnClick() override;
   void OnStateChange(int state) override;
-  void ResizeModel();
-  MixValue<float> background_brightness_[2];
-  DeviceModel *device_model_{};
-  glm::mat4 model_matrix_{1.0f};
-  glm::uvec4 appearance_{2, 0, 0, 0};
-  bool appearance_dirty_{true};
-  AnimationVar background_animation_var_;
-  AnimationVar light_animation_var_;
-  int32_t click_cnt_{0};
   uint8_t *cell_{nullptr};
+  CellVisual *visual_{nullptr};
 };
 
 }  // namespace life_demo

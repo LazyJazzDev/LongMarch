@@ -87,6 +87,10 @@ class Application {
 
   void DrawModel(DeviceModel *device_model, const InstanceInfo &instance_info);
 
+  // Draws one instance together with per-instance data words that its shader
+  // reads from the instance buffer. extra.y receives the data's byte offset.
+  void DrawModelWithData(DeviceModel *device_model, InstanceInfo instance_info, const std::vector<uint32_t> &data);
+
   float IconRotation() const {
     return icon_rotation_;
   }
@@ -122,7 +126,11 @@ class Application {
     std::unique_ptr<graphics::Image> color_image;
     std::unique_ptr<graphics::Buffer> instance_buffer;
     std::vector<std::pair<DeviceModel *, InstanceInfo>> instances;
-    std::vector<InstanceInfo> upload_instances;
+    // Data words stored after the instance records, and the instances whose
+    // extra.y holds an offset into them, relative to the end of the records.
+    std::vector<uint32_t> data;
+    std::vector<size_t> data_instances;
+    std::vector<uint8_t> upload;
   };
 
   void OnInit();

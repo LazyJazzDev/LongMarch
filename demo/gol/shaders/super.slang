@@ -67,20 +67,30 @@ float4 IconTheme(PSInput input) {
   return float4(input.color.rgb * scale, 1.0);
 }
 
-float4 CellTheme(PSInput input) {
+// One quad covers the visible grid: color.xy is the top-left corner of cell (0, 0),
+// color.z the cell pitch in framebuffer pixels, extra.zw the grid dimensions and
+// extra.y the byte offset of one packed appearance word per cell.
+float4 CellGridTheme(PSInput input) {
+  float2 grid = (input.screen_position - input.color.xy) / input.color.z;
+  int2 cell = int2(floor(grid));
+  int2 size = int2(input.extra.zw);
+  clip(float2(cell));
+  clip(float2(size - 1 - cell));
+  // Each cell fills the middle 80% of its pitch, mapped to [-1, 1] as before.
+  float2 local_position = (grid - float2(cell) - 0.5) / 0.4;
   // The original 120-triangle silhouette samples |x|^8 + |y|^8 = 1.
-  // Evaluate that same contour on a quad: four vertices per cell, preserving
-  // the existing lighting and supersampled edge coverage at every zoom level.
-  float2 p = input.local_position * input.local_position;
+  float2 p = local_position * local_position;
   p *= p;
   p *= p;
   clip(1.0 - p.x - p.y);
-  float scale = 1.0 + length(input.local_position - float2(-1.0, -1.0)) * 0.15;
-  float4 background_color = float4(input.color.rgb * scale * asfloat(input.extra.y), 1.0);
+  uint packed = instance_infos.Load(input.extra.y + 4 * uint(cell.y * size.x + cell.x));
+  float3 appearance = float3(packed & 1023u, (packed >> 10) & 1023u, (packed >> 20) & 1023u) / 1023.0;
 
-  scale = 2.0 - length(input.local_position - float2(-1.0, -1.0)) * 0.3;
-  float4 foreground_color = float4(input.color.rgb * scale * asfloat(input.extra.z), 1.0) * asfloat(input.extra.w);
-  return float4(background_color.rgb * (1.0 - foreground_color.a) + foreground_color.rgb * foreground_color.a, 1.0);
+  float scale = 1.0 + length(local_position - float2(-1.0, -1.0)) * 0.15;
+  float3 background_color = scale * appearance.x;
+  scale = 2.0 - length(local_position - float2(-1.0, -1.0)) * 0.3;
+  float4 foreground_color = float4(float3(scale * appearance.y), 1.0) * appearance.z;
+  return float4(background_color * (1.0 - foreground_color.a) + foreground_color.rgb * foreground_color.a, 1.0);
 }
 
 // A rounded plate with real cutouts. Discard exposes the button background through
@@ -173,7 +183,7 @@ float4 PSMain(PSInput input) : SV_TARGET {
       color = SliderTheme(input);
       break;
     case 2:
-      color = CellTheme(input);
+      color = CellGridTheme(input);
       break;
     default:
       color = float4(1.0, 1.0, 1.0, 1.0);
