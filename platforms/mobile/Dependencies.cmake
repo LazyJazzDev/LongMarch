@@ -29,7 +29,12 @@ function(longmarch_mobile_compiler target)
     message(FATAL_ERROR "Shader preparation requires a host build, not a mobile target SDK")
   endif()
   # A host SDK only: device/replay targets never include or link Slang.
-  find_package(slang 2026.18.3 EXACT CONFIG REQUIRED HINTS ${_mobile_prefixes})
+  # Same minimum as desktop builds (cmake/SlangVersion.cmake).
+  include("${ROOT}/cmake/SlangVersion.cmake")
+  find_package(slang CONFIG REQUIRED HINTS ${_mobile_prefixes})
+  if(slang_VERSION VERSION_LESS LONGMARCH_MIN_SLANG_VERSION)
+    message(FATAL_ERROR "Mobile shader preparation requires Slang ${LONGMARCH_MIN_SLANG_VERSION}+, found ${slang_VERSION}")
+  endif()
   message(STATUS "Mobile Slang SDK: ${slang_DIR}")
   target_link_libraries(${target} PUBLIC slang::slang)
 endfunction()

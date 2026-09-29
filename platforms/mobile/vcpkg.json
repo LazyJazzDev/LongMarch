@@ -12,6 +12,10 @@
       "platform": "osx"
     },
     "rapidjson",
+    {
+      "name": "spirv-cross",
+      "platform": "osx"
+    },
     "stb",
     "tinyobjloader",
     "vulkan-memory-allocator"

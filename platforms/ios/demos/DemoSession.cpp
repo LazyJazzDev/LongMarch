@@ -28,7 +28,7 @@ struct DemoGPUTimer {
     core = dynamic_cast<grassland::graphics::backend::VulkanCore *>(graphics);
     if (!core)
       return;
-    auto physical = core->Device()->PhysicalDevice().Handle();
+    auto physical = core->PhysicalDevice();
     VkPhysicalDeviceProperties properties{};
     vkGetPhysicalDeviceProperties(physical, &properties);
     period = properties.limits.timestampPeriod;
@@ -36,14 +36,15 @@ struct DemoGPUTimer {
     vkGetPhysicalDeviceQueueFamilyProperties(physical, &count, nullptr);
     std::vector<VkQueueFamilyProperties> families(count);
     vkGetPhysicalDeviceQueueFamilyProperties(physical, &count, families.data());
-    valid_bits = families.at(core->GraphicsQueue()->QueueFamilyIndex()).timestampValidBits;
+    valid_bits = families.at(grassland::graphics::backend::vulkan::GraphicsFamilyIndex(core->PhysicalDevice()))
+                     .timestampValidBits;
     if (!valid_bits || !properties.limits.timestampComputeAndGraphics)
       return;
     VkQueryPoolCreateInfo info{};
     info.sType = VK_STRUCTURE_TYPE_QUERY_POOL_CREATE_INFO;
     info.queryType = VK_QUERY_TYPE_TIMESTAMP;
     info.queryCount = 2;
-    if (vkCreateQueryPool(core->Device()->Handle(), &info, nullptr, &pool) != VK_SUCCESS)
+    if (vkCreateQueryPool(core->Handle(), &info, nullptr, &pool) != VK_SUCCESS)
       pool = VK_NULL_HANDLE;
 #endif
   }
@@ -51,7 +52,7 @@ struct DemoGPUTimer {
   ~DemoGPUTimer() {
 #ifdef LONGMARCH_VULKAN_ENABLED
     if (pool)
-      vkDestroyQueryPool(core->Device()->Handle(), pool, nullptr);
+      vkDestroyQueryPool(core->Handle(), pool, nullptr);
 #endif
   }
 
@@ -67,7 +68,7 @@ struct DemoGPUTimer {
 #ifdef LONGMARCH_VULKAN_ENABLED
     if (pool) {
       uint64_t ticks[2]{};
-      if (vkGetQueryPoolResults(core->Device()->Handle(), pool, 0, 2, sizeof(ticks), ticks, sizeof(uint64_t),
+      if (vkGetQueryPoolResults(core->Handle(), pool, 0, 2, sizeof(ticks), ticks, sizeof(uint64_t),
                                 VK_QUERY_RESULT_64_BIT) == VK_SUCCESS) {
         uint64_t mask = valid_bits == 64 ? UINT64_MAX : (uint64_t(1) << valid_bits) - 1;
         return double((ticks[1] - ticks[0]) & mask) * period / 1e6;

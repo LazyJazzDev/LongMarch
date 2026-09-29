@@ -32,6 +32,8 @@ class RenderSession {
   int Height() const;
   int Samples() const;
   int MaxBounces() const;
+  // HDR development is linear only without Filmic or artistic grading.
+  bool LinearHDRLook() const;
   void ResetFilm();
   std::string Device() const;
 

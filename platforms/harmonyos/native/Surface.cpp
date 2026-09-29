@@ -9,6 +9,7 @@
 #include "XEngineCapabilities.h"
 
 using namespace grassland;
+namespace vulkan = grassland::graphics::backend::vulkan;
 
 namespace longmarch::harmony {
 Surface::Surface(graphics::Core *core, OHNativeWindow *window)
@@ -16,25 +17,25 @@ Surface::Surface(graphics::Core *core, OHNativeWindow *window)
       window_(window) {
   if (!core_ || !window)
     throw std::runtime_error("Missing Vulkan core or native window");
-  auto create = reinterpret_cast<PFN_vkCreateSurfaceOHOS>(
-      vkGetInstanceProcAddr(core_->Instance()->Handle(), "vkCreateSurfaceOHOS"));
+  auto create =
+      reinterpret_cast<PFN_vkCreateSurfaceOHOS>(vkGetInstanceProcAddr(core_->Instance(), "vkCreateSurfaceOHOS"));
   if (!create)
     throw std::runtime_error("VK_OHOS_surface is unavailable");
-  const auto &physical_device = core_->Device()->PhysicalDevice();
-  const auto properties = physical_device.GetPhysicalDeviceProperties();
+  const auto physical_device = core_->PhysicalDevice();
+  const auto properties = vulkan::GetPhysicalDeviceProperties(physical_device);
   OH_LOG_Print(
       LOG_APP, LOG_INFO, 0, "LongMarchGPU",
       "GPU=%{public}s API=%{public}u.%{public}u RTpipeline=%{public}u RayQuery=%{public}u storageBuffers=%{public}u sampledImages=%{public}u",
       properties.deviceName, VK_VERSION_MAJOR(properties.apiVersion), VK_VERSION_MINOR(properties.apiVersion),
-      physical_device.SupportRayTracing(), physical_device.SupportRayQuery(),
+      vulkan::SupportRayTracing(physical_device), vulkan::SupportRayQuery(physical_device),
       properties.limits.maxPerStageDescriptorStorageBuffers, properties.limits.maxPerStageDescriptorSampledImages);
   OH_LOG_Print(
       LOG_APP, LOG_INFO, 0, "LongMarchGPU",
       "RT pipeline extension=%{public}u ray query extension=%{public}u acceleration structure extension=%{public}u",
-      physical_device.IsExtensionSupported(VK_KHR_RAY_TRACING_PIPELINE_EXTENSION_NAME),
-      physical_device.IsExtensionSupported(VK_KHR_RAY_QUERY_EXTENSION_NAME),
-      physical_device.IsExtensionSupported(VK_KHR_ACCELERATION_STRUCTURE_EXTENSION_NAME));
-  LogXEngineCapabilities(physical_device.Handle());
+      vulkan::IsExtensionSupported(physical_device, VK_KHR_RAY_TRACING_PIPELINE_EXTENSION_NAME),
+      vulkan::IsExtensionSupported(physical_device, VK_KHR_RAY_QUERY_EXTENSION_NAME),
+      vulkan::IsExtensionSupported(physical_device, VK_KHR_ACCELERATION_STRUCTURE_EXTENSION_NAME));
+  LogXEngineCapabilities(physical_device);
   uint32_t layer_count = 0;
   if (vkEnumerateInstanceLayerProperties(&layer_count, nullptr) == VK_SUCCESS) {
     std::vector<VkLayerProperties> layers(layer_count);
@@ -45,29 +46,29 @@ Surface::Surface(graphics::Core *core, OHNativeWindow *window)
   VkSurfaceCreateInfoOHOS info{};
   info.sType = VK_STRUCTURE_TYPE_SURFACE_CREATE_INFO_OHOS;
   info.window = window;
-  vulkan::ThrowIfFailed(create(core_->Instance()->Handle(), &info, nullptr, &surface_), "Create OHOS surface");
+  vulkan::ThrowIfFailed(create(core_->Instance(), &info, nullptr, &surface_), "Create OHOS surface");
   VkBool32 supported = VK_FALSE;
   VkResult result = vkGetPhysicalDeviceSurfaceSupportKHR(
-      core_->Device()->PhysicalDevice().Handle(), core_->GraphicsQueue()->QueueFamilyIndex(), surface_, &supported);
+      core_->PhysicalDevice(), vulkan::GraphicsFamilyIndex(core_->PhysicalDevice()), surface_, &supported);
   if (result != VK_SUCCESS || !supported) {
-    vkDestroySurfaceKHR(core_->Instance()->Handle(), surface_, nullptr);
+    vkDestroySurfaceKHR(core_->Instance(), surface_, nullptr);
     surface_ = VK_NULL_HANDLE;
     throw std::runtime_error("Graphics queue cannot present to this display");
   }
 }
 
 Surface::~Surface() {
-  vkDeviceWaitIdle(core_->Device()->Handle());
+  vkDeviceWaitIdle(core_->Handle());
   ReleaseSwapchain();
   if (surface_)
-    vkDestroySurfaceKHR(core_->Instance()->Handle(), surface_, nullptr);
+    vkDestroySurfaceKHR(core_->Instance(), surface_, nullptr);
 }
 
 void Surface::ReleaseSwapchain() {
   if (acquire_fence_)
-    vkDestroyFence(core_->Device()->Handle(), acquire_fence_, nullptr);
+    vkDestroyFence(core_->Handle(), acquire_fence_, nullptr);
   if (swapchain_)
-    vkDestroySwapchainKHR(core_->Device()->Handle(), swapchain_, nullptr);
+    vkDestroySwapchainKHR(core_->Handle(), swapchain_, nullptr);
   acquire_fence_ = VK_NULL_HANDLE;
   swapchain_ = VK_NULL_HANDLE;
   images_.clear();
@@ -83,8 +84,8 @@ void Surface::Resize(uint32_t width, uint32_t height, bool hdr) {
   requested_width_ = width;
   requested_height_ = height;
   requested_hdr_ = hdr;
-  auto device = core_->Device()->Handle();
-  auto physical = core_->Device()->PhysicalDevice().Handle();
+  auto device = core_->Handle();
+  auto physical = core_->PhysicalDevice();
   VkSurfaceCapabilitiesKHR caps{};
   vulkan::ThrowIfFailed(vkGetPhysicalDeviceSurfaceCapabilitiesKHR(physical, surface_, &caps), "Surface capabilities");
   if (!(caps.supportedUsageFlags & VK_IMAGE_USAGE_TRANSFER_DST_BIT))
@@ -201,7 +202,7 @@ bool Surface::Present(graphics::Image *source,
   auto *image = dynamic_cast<graphics::backend::VulkanImage *>(source);
   if (!image)
     throw std::runtime_error("Presentation requires a Vulkan image");
-  auto device = core_->Device()->Handle();
+  auto device = core_->Handle();
   uint32_t index = 0;
   VkResult acquire = vkAcquireNextImageKHR(device, swapchain_, UINT64_MAX, VK_NULL_HANDLE, acquire_fence_, &index);
   if (acquire == VK_ERROR_OUT_OF_DATE_KHR) {
@@ -243,15 +244,15 @@ bool Surface::Present(graphics::Image *source,
     vkCmdClearColorImage(cmd, images_[index], VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, &black, 1, &range);
     transit(images_[index], VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
             VK_ACCESS_TRANSFER_WRITE_BIT, VK_ACCESS_TRANSFER_WRITE_BIT);
-    transit(image->Image()->Handle(), VK_IMAGE_LAYOUT_GENERAL, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
-            VK_ACCESS_MEMORY_WRITE_BIT, VK_ACCESS_TRANSFER_READ_BIT);
+    transit(image->Handle(), VK_IMAGE_LAYOUT_GENERAL, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, VK_ACCESS_MEMORY_WRITE_BIT,
+            VK_ACCESS_TRANSFER_READ_BIT);
     if (blit.dstOffsets[1].x > blit.dstOffsets[0].x && blit.dstOffsets[1].y > blit.dstOffsets[0].y &&
         blit.srcOffsets[1].x > blit.srcOffsets[0].x && blit.srcOffsets[1].y > blit.srcOffsets[0].y) {
-      vkCmdBlitImage(cmd, image->Image()->Handle(), VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, images_[index],
+      vkCmdBlitImage(cmd, image->Handle(), VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, images_[index],
                      VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &blit, VK_FILTER_NEAREST);
     }
-    transit(image->Image()->Handle(), VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, VK_IMAGE_LAYOUT_GENERAL,
-            VK_ACCESS_TRANSFER_READ_BIT, VK_ACCESS_MEMORY_READ_BIT | VK_ACCESS_MEMORY_WRITE_BIT);
+    transit(image->Handle(), VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, VK_IMAGE_LAYOUT_GENERAL, VK_ACCESS_TRANSFER_READ_BIT,
+            VK_ACCESS_MEMORY_READ_BIT | VK_ACCESS_MEMORY_WRITE_BIT);
     transit(images_[index], VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_PRESENT_SRC_KHR,
             VK_ACCESS_TRANSFER_WRITE_BIT, 0);
   });
@@ -262,7 +263,7 @@ bool Surface::Present(graphics::Image *source,
   info.swapchainCount = 1;
   info.pSwapchains = &swapchain_;
   info.pImageIndices = &index;
-  VkResult result = vkQueuePresentKHR(core_->GraphicsQueue()->Handle(), &info);
+  VkResult result = vkQueuePresentKHR(core_->GraphicsQueue(), &info);
   if (result == VK_ERROR_OUT_OF_DATE_KHR || result == VK_SUBOPTIMAL_KHR) {
     core_->WaitGPU();
     ReleaseSwapchain();

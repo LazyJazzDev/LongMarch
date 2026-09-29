@@ -80,6 +80,11 @@ int RenderSession::Samples() const {
   return scene_->GetFilm()->info.accumulated_samples;
 }
 
+bool RenderSession::LinearHDRLook() const {
+  const auto &info = scene_->GetFilm()->info;
+  return info.view_transform != 2 && info.contrast == 1.0f && info.gamma == 1.0f;
+}
+
 int RenderSession::MaxBounces() const {
   return scene_->GetScene()->settings.max_bounces;
 }

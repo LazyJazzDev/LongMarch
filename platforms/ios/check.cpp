@@ -38,7 +38,10 @@ int main(int argc, char **argv) {
       first += a;
       second += b;
     }
-    if (samples != session.Samples() || std::abs(second - 2 * first) > std::max(0.01f, first * 0.001f))
+    // +1 EV doubles a linear look exactly; graded looks must still brighten.
+    const bool exposure_ok =
+        session.LinearHDRLook() ? std::abs(second - 2 * first) <= std::max(0.01f, first * 0.001f) : second > first;
+    if (samples != session.Samples() || !exposure_ok)
       throw std::runtime_error("Display controls changed film or exposure is incorrect");
     std::cout << "HDR peak " << peak << " (linear sRGB)\n";
     if (!stbi_write_png(argv[3], session.Width(), session.Height(), 4, pixels.data(), session.Width() * 4))
