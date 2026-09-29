@@ -447,107 +447,166 @@ private struct PatternLibraryView: View {
       timeZone: .current, calendar: .current))
   @State private var replacing: URL?
   @State private var query = ""
+  @State private var folderQuery = ""
+  // Smoke runs can open a folder directly with LONGMARCH_SMOKE_FOLDER.
+  @State private var path = ProcessInfo.processInfo.environment["LONGMARCH_SMOKE_FOLDER"].map { [$0] } ?? []
 
-  private func matches(_ name: String) -> Bool {
+  // The folder of the patterns the user saved; the others are built-in categories.
+  private static let mine = "mine"
+
+  private static func matches(_ name: String, _ query: String) -> Bool {
     query.isEmpty || name.localizedCaseInsensitiveContains(query)
   }
 
   var body: some View {
-    NavigationStack {
-      list
+    NavigationStack(path: $path) {
+      root
         .navigationTitle(saving ? "保存图案" : "打开图案")
+        .navigationBarTitleDisplayMode(.inline)
+        .toolbar {
+          ToolbarItem(placement: .cancellationAction) { Button("取消", action: cancel) }
+          if saving {
+            ToolbarItem(placement: .confirmationAction) {
+              Button("保存", action: save).disabled(PatternLibrary.url(named: name) == nil)
+            }
+          }
+        }
+        .navigationDestination(for: String.self) { folder($0) }
     }
     .preferredColorScheme(.dark)
-  }
-
-  @ViewBuilder private var list: some View {
-    if saving {
-      content
-    } else {
-      content.searchable(
-        text: $query, placement: .navigationBarDrawer(displayMode: .always), prompt: "搜索图案")
+    .alert(
+      "替换图案？", isPresented: Binding(get: { replacing != nil }, set: { if !$0 { replacing = nil } })
+    ) {
+      Button("取消", role: .cancel) { replacing = nil }
+      Button("替换", role: .destructive) {
+        if let url = replacing { choose(url) }
+        replacing = nil
+      }
+    } message: {
+      Text("“\(replacing?.deletingPathExtension().lastPathComponent ?? "")”已存在，要替换它吗？")
     }
   }
 
-  private var content: some View {
-    let saved = files.filter { matches($0.name) }
-    return List {
-        if saving {
-          Section {
-            TextField("文件名", text: $name).submitLabel(.done).onSubmit(save)
-          }
-        }
-        Section(saving ? "" : "我的图案 · \(saved.count)") {
-          if saved.isEmpty && query.isEmpty {
-            Text("还没有保存的图案").foregroundStyle(.secondary)
-          }
-          ForEach(saved) { file in
-            Button {
-              if saving { replacing = file.url } else { choose(file.url) }
-            } label: {
-              HStack(spacing: 12) {
-                Image(systemName: "doc.text").foregroundStyle(.tint)
-                VStack(alignment: .leading, spacing: 2) {
-                  Text(file.name).foregroundStyle(Color(uiColor: .label)).lineLimit(1)
-                  Text(file.modified, format: .dateTime.year().month().day().hour().minute())
-                    .font(.footnote).foregroundStyle(Color(uiColor: .secondaryLabel))
-                }
-              }
-            }
-          }
-          .onDelete { offsets in
-            for index in offsets { try? FileManager.default.removeItem(at: saved[index].url) }
-            files = PatternLibrary.files()
-          }
-        }
-        if !saving {
-          ForEach(BuiltinPattern.categories, id: \.id) { category in
-            let items = BuiltinPattern.all.filter { $0.category == category.id && matches($0.name) }
-            if !items.isEmpty {
-              Section("\(category.title) · \(items.count)") {
-                ForEach(items) { pattern in
-                  Button {
-                    openBuiltin(pattern)
-                  } label: {
-                    HStack(spacing: 12) {
-                      Image(systemName: "square.grid.3x3.fill").foregroundStyle(.tint)
-                      VStack(alignment: .leading, spacing: 2) {
-                        Text(pattern.name).foregroundStyle(Color(uiColor: .label)).lineLimit(1)
-                        Text(pattern.detail).font(.footnote).foregroundStyle(Color(uiColor: .secondaryLabel))
-                      }
-                    }
-                  }
-                }
-              }
-            }
-          }
-        }
+  @ViewBuilder private var root: some View {
+    if saving {
+      List {
         Section {
-          Button(saving ? "保存到系统文件…" : "从系统文件读取…", action: system)
-        } footer: {
-          if !saving { Text("内置图案来自 Life Lexicon（Stephen A. Silver 等，CC BY-SA 3.0）") }
+          TextField("文件名", text: $name).submitLabel(.done).onSubmit(save)
         }
+        savedSection(files, header: "我的图案")
+        systemSection
       }
-      .navigationBarTitleDisplayMode(.inline)
-      .toolbar {
-        ToolbarItem(placement: .cancellationAction) { Button("取消", action: cancel) }
-        if saving {
-          ToolbarItem(placement: .confirmationAction) {
-            Button("保存", action: save).disabled(PatternLibrary.url(named: name) == nil)
+    } else {
+      List {
+        if query.isEmpty {
+          Section {
+            folderLink(Self.mine, title: "我的图案", count: files.count, symbol: "folder.fill.badge.person.crop")
+            ForEach(BuiltinPattern.categories, id: \.id) { category in
+              folderLink(
+                category.id, title: category.title,
+                count: BuiltinPattern.all.filter { $0.category == category.id }.count, symbol: "folder.fill")
+            }
+          }
+        } else {
+          let saved = files.filter { Self.matches($0.name, query) }
+          if !saved.isEmpty { savedSection(saved, header: "我的图案 · \(saved.count)") }
+          ForEach(BuiltinPattern.categories, id: \.id) { category in
+            let items = builtins(category.id, query)
+            if !items.isEmpty {
+              Section("\(category.title) · \(items.count)") { ForEach(items) { builtinRow($0) } }
+            }
+          }
+        }
+        systemSection
+      }
+      .searchable(text: $query, placement: .navigationBarDrawer(displayMode: .always), prompt: "搜索图案")
+    }
+  }
+
+  // One folder of the open sheet: the saved patterns or a built-in category.
+  private func folder(_ id: String) -> some View {
+    let title = id == Self.mine ? "我的图案" : BuiltinPattern.categories.first { $0.id == id }?.title ?? id
+    return List {
+      if id == Self.mine {
+        let saved = files.filter { Self.matches($0.name, folderQuery) }
+        if saved.isEmpty && folderQuery.isEmpty {
+          Text("还没有保存的图案").foregroundStyle(.secondary)
+        }
+        savedRows(saved)
+      } else {
+        ForEach(builtins(id, folderQuery)) { builtinRow($0) }
+      }
+    }
+    .navigationTitle(title)
+    .searchable(text: $folderQuery, placement: .navigationBarDrawer(displayMode: .always), prompt: "搜索图案")
+    .onAppear { folderQuery = "" }
+  }
+
+  private func builtins(_ category: String, _ query: String) -> [BuiltinPattern] {
+    BuiltinPattern.all.filter { $0.category == category && Self.matches($0.name, query) }
+  }
+
+  private func folderLink(_ id: String, title: String, count: Int, symbol: String) -> some View {
+    NavigationLink(value: id) {
+      HStack(spacing: 12) {
+        Image(systemName: symbol).foregroundStyle(.tint)
+        Text(title).foregroundStyle(Color(uiColor: .label))
+        Spacer()
+        Text("\(count)").foregroundStyle(Color(uiColor: .secondaryLabel)).monospacedDigit()
+      }
+    }
+  }
+
+  private func savedSection(_ saved: [PatternFile], header: String) -> some View {
+    Section(header) {
+      if saved.isEmpty {
+        Text("还没有保存的图案").foregroundStyle(.secondary)
+      }
+      savedRows(saved)
+    }
+  }
+
+  private func savedRows(_ saved: [PatternFile]) -> some View {
+    ForEach(saved) { file in
+      Button {
+        if saving { replacing = file.url } else { choose(file.url) }
+      } label: {
+        HStack(spacing: 12) {
+          Image(systemName: "doc.text").foregroundStyle(.tint)
+          VStack(alignment: .leading, spacing: 2) {
+            Text(file.name).foregroundStyle(Color(uiColor: .label)).lineLimit(1)
+            Text(file.modified, format: .dateTime.year().month().day().hour().minute())
+              .font(.footnote).foregroundStyle(Color(uiColor: .secondaryLabel))
           }
         }
       }
-      .alert(
-        "替换图案？", isPresented: Binding(get: { replacing != nil }, set: { if !$0 { replacing = nil } })
-      ) {
-        Button("取消", role: .cancel) { replacing = nil }
-        Button("替换", role: .destructive) {
-          if let url = replacing { choose(url) }
-          replacing = nil
+    }
+    .onDelete { offsets in
+      for index in offsets { try? FileManager.default.removeItem(at: saved[index].url) }
+      files = PatternLibrary.files()
+    }
+  }
+
+  private func builtinRow(_ pattern: BuiltinPattern) -> some View {
+    Button {
+      openBuiltin(pattern)
+    } label: {
+      HStack(spacing: 12) {
+        Image(systemName: "square.grid.3x3.fill").foregroundStyle(.tint)
+        VStack(alignment: .leading, spacing: 2) {
+          Text(pattern.name).foregroundStyle(Color(uiColor: .label)).lineLimit(1)
+          Text(pattern.detail).font(.footnote).foregroundStyle(Color(uiColor: .secondaryLabel))
         }
-      } message: {
-        Text("“\(replacing?.deletingPathExtension().lastPathComponent ?? "")”已存在，要替换它吗？")
       }
+    }
+  }
+
+  private var systemSection: some View {
+    Section {
+      Button(saving ? "保存到系统文件…" : "从系统文件读取…", action: system)
+    } footer: {
+      if !saving { Text("内置图案来自 Life Lexicon（Stephen A. Silver 等，CC BY-SA 3.0）") }
+    }
   }
 
   private func openBuiltin(_ pattern: BuiltinPattern) {
