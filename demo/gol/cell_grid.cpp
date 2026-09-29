@@ -107,6 +107,15 @@ void CellGrid::SetState(int index, int state) {
     active_state_ = state;
 }
 
+void CellGrid::SetSuspended(bool suspended) {
+  suspended_ = suspended;
+  if (suspended && active_ >= 0) {
+    SetState(active_, 0);
+    active_ = -1;
+    active_state_ = 0;
+  }
+}
+
 void CellGrid::OnCursorEnter(int enter) {
   if (!enter && active_ >= 0) {
     SetState(active_, 0);
@@ -115,6 +124,8 @@ void CellGrid::OnCursorEnter(int enter) {
 }
 
 void CellGrid::OnCursorPos(double xpos, double ypos) {
+  if (suspended_)
+    return;
   const int index = CellAt({xpos, ypos});
   if (index == active_)
     return;
@@ -125,7 +136,7 @@ void CellGrid::OnCursorPos(double xpos, double ypos) {
 }
 
 void CellGrid::OnMouseButton(int mouse_button, int state, int mods) {
-  if (mouse_button != GLFW_MOUSE_BUTTON_LEFT)
+  if (mouse_button != GLFW_MOUSE_BUTTON_LEFT || suspended_)
     return;
   const int index = CellAt(application_->GetWindow()->GetCursorPosition());
   if (index != active_) {

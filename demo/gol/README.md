@@ -75,6 +75,8 @@ Grid navigation:
 
 - Two-finger scrolling pans the enlarged grid horizontally and vertically.
 - Hold the right mouse button and drag from inside the grid viewport to pan.
+- Once enlarged, the grid also pans with a left-button drag (one finger on touch
+  screens); a tap or click without moving still toggles the cell.
   Enlarged grid edges can be pulled inward with 5% viewport padding on each side.
 - Ctrl + two-finger scrolling or mouse wheel zooms around the pointer (1x–12x).
 - Ctrl + `+` / `-` zooms in/out.

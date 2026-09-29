@@ -86,6 +86,8 @@ class GameOfLife : public Application {
   bool CursorInGrid() const;
   void ZoomGrid(float factor);
   void ScrollGrid(double x, double y);
+  // Ends a left-drag pan and resumes cell input.
+  void EndDragPan();
   enum class FileAction { kNone, kOpen, kSave };
   void RequestFileAction(FileAction action);
   void ProcessFileAction();
@@ -111,6 +113,10 @@ class GameOfLife : public Application {
   uint32_t pan_focus_callback_{};
   bool panning_{false};
   glm::vec2 pan_cursor_{0.0f};
+  // A left press on an enlarged grid, which becomes a pan once it moves.
+  bool drag_pending_{false};
+  bool drag_panning_{false};
+  glm::vec2 drag_start_{0.0f};
 
   std::unique_ptr<PausePlayButton> pause_play_button_;
   std::unique_ptr<SpeedToggleButton> speed_toggle_button_;

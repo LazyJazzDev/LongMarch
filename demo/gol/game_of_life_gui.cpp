@@ -114,23 +114,41 @@ void GameOfLife::CustomOnInit() {
   scroll_callback_ = GetWindow()->ScrollEvent().RegisterCallback([this](double x, double y) { ScrollGrid(x, y); });
   pan_button_callback_ =
       GetWindow()->MouseButtonEvent().RegisterCallback([this](int button, int action, int, double x, double y) {
-        if (button != GLFW_MOUSE_BUTTON_RIGHT)
-          return;
-        pan_cursor_ = FramePosition({x, y});
-        panning_ = action == GLFW_PRESS && pan_cursor_.x >= playground_left_ && pan_cursor_.x < playground_right_ &&
-                   pan_cursor_.y >= playground_top_ && pan_cursor_.y < playground_bottom_;
+        const auto cursor = FramePosition({x, y});
+        const bool in_grid = cursor.x >= playground_left_ && cursor.x < playground_right_ &&
+                             cursor.y >= playground_top_ && cursor.y < playground_bottom_;
+        if (button == GLFW_MOUSE_BUTTON_RIGHT) {
+          pan_cursor_ = cursor;
+          panning_ = action == GLFW_PRESS && in_grid;
+        } else if (button == GLFW_MOUSE_BUTTON_LEFT) {
+          // A left drag (one finger on touch screens) pans an enlarged grid; a
+          // tap still toggles the cell. The drag becomes a pan once it moves.
+          drag_start_ = cursor;
+          drag_pending_ = action == GLFW_PRESS && in_grid && grid_view_.zoom > 1.0f;
+          if (action != GLFW_PRESS)
+            EndDragPan();
+        }
       });
   pan_move_callback_ = GetWindow()->MouseMoveEvent().RegisterCallback([this](double x, double y) {
+    const auto cursor = FramePosition({x, y});
+    const glm::vec2 scale = glm::vec2(FramebufferSize()) / glm::vec2(glm::max(GetWindow()->GetSize(), glm::ivec2{1}));
+    if (drag_pending_ && glm::length(cursor - drag_start_) > 8.0f * scale.x) {
+      drag_pending_ = false;
+      drag_panning_ = panning_ = true;
+      pan_cursor_ = drag_start_;
+      cell_input_->SetSuspended(true);
+    }
     if (!panning_)
       return;
-    const auto cursor = FramePosition({x, y});
     grid_view_.pan += cursor - pan_cursor_;
     pan_cursor_ = cursor;
     LayoutCells();
   });
   pan_focus_callback_ = GetWindow()->FocusEvent().RegisterCallback([this](bool focused) {
-    if (!focused)
+    if (!focused) {
       panning_ = false;
+      EndDragPan();
+    }
   });
   key_callback_ = GetWindow()->KeyEvent().RegisterCallback([this](int key, int, int action, int mods) {
     if (action != GLFW_PRESS && action != GLFW_REPEAT)
@@ -258,8 +276,17 @@ void GameOfLife::CustomOnClose() {
   white_icon_model.reset();
 }
 
+void GameOfLife::EndDragPan() {
+  drag_pending_ = false;
+  if (!drag_panning_)
+    return;
+  drag_panning_ = panning_ = false;
+  cell_input_->SetSuspended(false);
+}
+
 void GameOfLife::OnWindowSize() {
   panning_ = false;
+  EndDragPan();
   auto window_width = float(FramebufferSize().x);
   auto window_height = float(FramebufferSize().y);
   auto ui_unit = std::min(window_width, window_height) * 0.01f * ui_scale_;
