@@ -14,7 +14,10 @@ interface BuiltinPattern {
 }
 interface PatternDocument { patterns: BuiltinPattern[]; }
 // One row of the library list: a section header, a saved pattern or a built-in one.
-interface LibraryRow { key: string; header?: string; saved?: PatternFile; builtin?: BuiltinPattern; }
+interface LibraryRow {
+  key: string; header?: string; folder?: string; title?: string; count?: number;
+  saved?: PatternFile; builtin?: BuiltinPattern;
+}
 
 const CATEGORY_NAMES: Record<string, string> = {
   'still': '静物', 'oscillator': '振荡器', 'spaceship': '飞船', 'gun': '枪',
@@ -220,6 +223,8 @@ struct Index {
   @State private patterns: PatternFile[] = [];
   @State private saveName: string = '';
   @State private librarySearch: string = '';
+  // '' is the folder list; 'saved' or a category id is an opened folder.
+  @State private libraryFolder: string = '';
   private libraryHandled: boolean = false;
   private libraryRows: LibraryRows = new LibraryRows();
   private builtins?: BuiltinPattern[];
@@ -523,25 +528,46 @@ struct Index {
     return this.builtins;
   }
   // Saved patterns first, then the built-in library by category, filtered by the search text.
+  private folderTitle(folder: string): string {
+    return folder === 'saved' ? '我的图案' : CATEGORY_NAMES[folder];
+  }
+  // The library opens on a folder list: saved patterns in "我的图案", then one
+  // folder per built-in category. Searching the list spans every folder;
+  // searching an opened folder filters only that folder.
   private rebuildRows(): void {
     const query = this.librarySearch.trim().toLowerCase();
     const matches = (name: string): boolean => query.length === 0 || name.toLowerCase().includes(query);
     const rows: LibraryRow[] = [];
-    const saved = this.patterns.filter((pattern: PatternFile) => matches(pattern.name));
-    if (saved.length > 0 || (this.librarySave && query.length === 0)) {
-      rows.push({ key: 'h:saved', header: `我的图案 · ${saved.length}` });
+    const folder = this.librarySave ? 'saved' : this.libraryFolder;
+    const builtins = this.librarySave ? [] : this.loadBuiltins();
+    if (folder === '' && query.length === 0) {
+      rows.push({ key: 'f:saved', folder: 'saved', title: this.folderTitle('saved'), count: this.patterns.length });
+      for (const category of CATEGORY_ORDER) {
+        const count = builtins.filter((pattern: BuiltinPattern) => pattern.category === category).length;
+        rows.push({ key: `f:${category}`, folder: category, title: this.folderTitle(category), count: count });
+      }
+      this.libraryRows.set(rows);
+      return;
+    }
+    const grouped = folder === '';
+    if (folder === '' || folder === 'saved') {
+      const saved = this.patterns.filter((pattern: PatternFile) => matches(pattern.name));
+      if (grouped && saved.length > 0) rows.push({ key: 'h:saved', header: `${this.folderTitle('saved')} · ${saved.length}` });
       saved.forEach((pattern: PatternFile) => rows.push({ key: `s:${pattern.name}`, saved: pattern }));
     }
-    if (!this.librarySave) {
-      const builtins = this.loadBuiltins();
-      for (const category of CATEGORY_ORDER) {
-        const items = builtins.filter((pattern: BuiltinPattern) => pattern.category === category && matches(pattern.name));
-        if (items.length === 0) continue;
-        rows.push({ key: `h:${category}`, header: `${CATEGORY_NAMES[category]} · ${items.length}` });
-        items.forEach((pattern: BuiltinPattern) => rows.push({ key: `b:${category}:${pattern.name}`, builtin: pattern }));
-      }
+    for (const category of CATEGORY_ORDER) {
+      if (folder !== '' && folder !== category) continue;
+      const items = builtins.filter((pattern: BuiltinPattern) => pattern.category === category && matches(pattern.name));
+      if (items.length === 0) continue;
+      if (grouped) rows.push({ key: `h:${category}`, header: `${this.folderTitle(category)} · ${items.length}` });
+      items.forEach((pattern: BuiltinPattern) => rows.push({ key: `b:${category}:${pattern.name}`, builtin: pattern }));
     }
     this.libraryRows.set(rows);
+  }
+  private openFolder(folder: string): void {
+    this.libraryFolder = folder;
+    this.librarySearch = '';
+    this.rebuildRows();
   }
   // Opening or saving starts in the app's own pattern library; the system
   // document picker is one link away.
@@ -550,6 +576,7 @@ struct Index {
     this.libraryHandled = false;
     this.librarySave = action !== 1;
     this.librarySearch = '';
+    this.libraryFolder = '';
     try {
       this.refreshPatterns();
     } catch (e) {
@@ -1017,7 +1044,17 @@ struct Index {
 
   @Builder
   private libraryRow(row: LibraryRow) {
-    if (row.header !== undefined) {
+    if (row.folder !== undefined) {
+      Row({ space: 12 }) {
+        SymbolGlyph(row.folder === 'saved' ? $r('sys.symbol.folder_fill') : $r('sys.symbol.folder'))
+          .fontSize(22).fontColor([TINT])
+        Text(row.title).fontSize(17).fontColor(LABEL).layoutWeight(1)
+        Text(`${row.count}`).fontSize(17).fontColor(SECONDARY)
+        SymbolGlyph($r('sys.symbol.chevron_right')).fontSize(16).fontColor([SECONDARY])
+      }
+      .width('100%').padding({ left: 16, right: 16, top: 12, bottom: 12 }).backgroundColor(SHEET_ROW)
+      .border({ width: { bottom: 0.5 }, color: SEPARATOR })
+    } else if (row.header !== undefined) {
       Text(row.header).fontSize(15).fontWeight(600).fontColor(HEADER)
         .width('100%').padding({ left: 16, right: 16, top: 18, bottom: 8 })
     } else {
@@ -1049,7 +1086,18 @@ struct Index {
           Text('保存').fontSize(17).fontWeight(600).fontColor(TINT).onClick(() => this.savePattern(this.saveName))
         }.width('100%').padding({ left: 16, right: 16, bottom: 4 })
       } else {
-        Search({ value: this.librarySearch, placeholder: '搜索图案' })
+        if (this.libraryFolder.length > 0) {
+          Row({ space: 4 }) {
+            SymbolGlyph($r('sys.symbol.chevron_left')).fontSize(18).fontColor([TINT])
+            Text('全部分类').fontSize(17).fontColor(TINT)
+            Blank()
+            Text(this.folderTitle(this.libraryFolder)).fontSize(17).fontWeight(600).fontColor(LABEL)
+          }
+          .width('100%').padding({ left: 16, right: 16, bottom: 10 })
+          .onClick(() => this.openFolder(''))
+        }
+        Search({ value: this.librarySearch,
+          placeholder: this.libraryFolder.length > 0 ? `在“${this.folderTitle(this.libraryFolder)}”中搜索` : '搜索全部图案' })
           .height(40).margin({ left: 16, right: 16 }).backgroundColor(FILL).fontColor(LABEL)
           .placeholderColor(SECONDARY).textFont({ size: 17 })
           .onChange((value: string) => { this.librarySearch = value; this.rebuildRows(); })
@@ -1059,7 +1107,8 @@ struct Index {
           ListItem() { this.libraryRow(row) }
           .swipeAction(row.saved ? { end: this.patternDelete(row.saved) } : {})
           .onClick(() => {
-            if (row.saved) { if (this.librarySave) this.savePattern(row.saved.name); else this.openPattern(row.saved); }
+            if (row.folder !== undefined) this.openFolder(row.folder);
+            else if (row.saved) { if (this.librarySave) this.savePattern(row.saved.name); else this.openPattern(row.saved); }
             else if (row.builtin) this.openBuiltin(row.builtin);
           })
         }, (row: LibraryRow) => row.key)
