@@ -7,6 +7,7 @@ import native from 'liblongmarch.so';
 interface SceneInfo { id: string; name: string; width: number; height: number; }
 interface DemoInfo { id: string; name: string; detail: string; symbol: Resource; reason?: string; }
 interface DemoSection { title: string; demos: DemoInfo[]; }
+interface PatternFile { name: string; modified: number; }
 // A single object-literal @Builder argument is passed by reference, so the
 // builder refreshes when the state it reads changes; plain arguments do not.
 interface CaptionArgs { text: string; color: string; }
@@ -48,6 +49,9 @@ class NativeStatus {
 const BACKGROUND = '#000000';
 const GROUPED_ROW = '#1C1C1E';
 const ROW_PRESSED = '#2C2C2E';
+// Grouped rows on a sheet, one level above the sheet background.
+const SHEET = '#1C1C1E';
+const SHEET_ROW = '#2C2C2E';
 const SEPARATOR = '#38383A';
 const LABEL = '#FFFFFF';
 const SECONDARY = '#99EBEBF5';
@@ -101,6 +105,21 @@ function grouped(value: number): string {
   return Math.round(value).toString().replace(/\B(?=(\d{3})+(?!\d))/g, ',');
 }
 
+function pad(value: number): string {
+  return value < 10 ? `0${value}` : `${value}`;
+}
+
+function patternDate(seconds: number): string {
+  const d = new Date(seconds * 1000);
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
+
+// A file name for the in-app pattern library, without directories or reserved characters.
+function patternName(name: string): string {
+  const base = name.trim().replace(/\.cells$/i, '').replace(/[\\/:*?"<>|]/g, '_').trim();
+  return base.length > 0 ? base : '';
+}
+
 function rectEnd(start: number, size: number): number {
   return size > 0 ? start + size : 0;
 }
@@ -137,6 +156,12 @@ struct Index {
   @State private scrolled: boolean = false;
   private timer: number = -1;
   private fileBusy: boolean = false;
+  // In-app pattern library shown by the GoL open/save buttons.
+  @State private libraryVisible: boolean = false;
+  @State private librarySave: boolean = false;
+  @State private patterns: PatternFile[] = [];
+  @State private saveName: string = '';
+  private libraryHandled: boolean = false;
   private request: number = 0;
   private areaWidth: number = 1;
   private areaHeight: number = 1;
@@ -413,12 +438,78 @@ struct Index {
     }
     throw new Error('File operation timed out');
   }
-  private async fileAction(action: number): Promise<void> {
+  private patternDirectory(): string {
+    const directory = `${this.context().filesDir}/patterns`;
+    if (!fs.accessSync(directory)) fs.mkdirSync(directory);
+    return directory;
+  }
+  private refreshPatterns(): void {
+    const directory = this.patternDirectory();
+    this.patterns = fs.listFileSync(directory)
+      .filter((file: string) => file.toLowerCase().endsWith('.cells'))
+      .map((file: string): PatternFile => ({ name: file.slice(0, -6), modified: fs.statSync(`${directory}/${file}`).mtime }))
+      .sort((a: PatternFile, b: PatternFile) => b.modified - a.modified);
+  }
+  // Opening or saving starts in the app's own pattern library; the system
+  // document picker is one link away.
+  private fileAction(action: number): void {
     this.fileBusy = true;
-    const temp = `${this.context().cacheDir}/Life.cells`;
+    this.libraryHandled = false;
+    this.librarySave = action !== 1;
     try {
+      this.refreshPatterns();
+    } catch (e) {
+      this.patterns = [];
+    }
+    const now = new Date();
+    this.saveName = `Life ${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())} ` +
+      `${pad(now.getHours())}.${pad(now.getMinutes())}.${pad(now.getSeconds())}`;
+    this.libraryVisible = true;
+  }
+  // Runs one choice from the library after closing it; cancelling reaches the
+  // game as an empty path, exactly like a dismissed system picker.
+  private async finishFile(work: () => Promise<void>): Promise<void> {
+    this.libraryHandled = true;
+    this.libraryVisible = false;
+    try {
+      await work();
+    } catch (e) {
+      this.alert('Game error', `Files: ${e}`);
+      try { await this.completeFile(''); } catch (cancelError) { /* Keep the original error visible. */ }
+    }
+    finally { this.fileBusy = false; }
+  }
+  private libraryDismissed(): void {
+    if (this.libraryHandled) return;
+    this.libraryHandled = true;
+    this.finishFile(() => this.completeFile(''));
+  }
+  private openPattern(pattern: PatternFile): void {
+    this.finishFile(() => this.completeFile(`${this.patternDirectory()}/${pattern.name}.cells`));
+  }
+  private savePattern(name: string): void {
+    const base = patternName(name);
+    if (base.length === 0) { this.alert('保存图案', '请输入文件名。'); return; }
+    const save = () => this.finishFile(() => this.completeFile(`${this.patternDirectory()}/${base}.cells`));
+    if (!this.patterns.some((pattern: PatternFile) => pattern.name === base)) { save(); return; }
+    this.getUIContext().showAlertDialog({
+      title: '替换图案？', message: `“${base}”已存在，要替换它吗？`, autoCancel: true,
+      primaryButton: { value: '取消', action: () => {} },
+      secondaryButton: { value: '替换', fontColor: DESTRUCTIVE, action: () => save() }
+    });
+  }
+  private deletePattern(pattern: PatternFile): void {
+    try {
+      fs.unlinkSync(`${this.patternDirectory()}/${pattern.name}.cells`);
+      this.refreshPatterns();
+    } catch (e) { this.alert('Game error', `Files: ${e}`); }
+  }
+  private systemFile(): void {
+    const save = this.librarySave;
+    this.finishFile(async () => {
+      const temp = `${this.context().cacheDir}/Life.cells`;
       const dialog = new picker.DocumentViewPicker(this.context());
-      if (action === 1) {
+      if (!save) {
         const options = new picker.DocumentSelectOptions(); options.maxSelectNumber = 1;
         const uris = await dialog.select(options);
         if (uris.length === 0) { await this.completeFile(''); return; }
@@ -434,11 +525,7 @@ struct Index {
           try { await fs.copyFile(temp, file.fd); } finally { fs.closeSync(file); }
         }
       }
-    } catch (e) {
-      this.alert('Game error', `Files: ${e}`);
-      try { await this.completeFile(''); } catch (cancelError) { /* Keep the original error visible. */ }
-    }
-    finally { this.fileBusy = false; }
+    });
   }
 
   private sceneItems(): MenuElement[] {
@@ -815,6 +902,62 @@ struct Index {
       .position({ x: this.rootWidth - this.safeRight - 12, y: this.safeTop + 12 }).markAnchor({ x: '100%', y: 0 })
   }
 
+  // ---- GoL pattern library (open/save start here, not in the system picker) ----
+
+  @Builder
+  private patternDelete(pattern: PatternFile) {
+    Row() { Text('删除').fontSize(17).fontColor(LABEL) }
+    .width(80).height('100%').justifyContent(FlexAlign.Center).backgroundColor(DESTRUCTIVE)
+    .onClick(() => this.deletePattern(pattern))
+  }
+
+  @Builder
+  private patternLibrary() {
+    Column() {
+      if (this.librarySave) {
+        Row({ space: 12 }) {
+          TextInput({ text: this.saveName, placeholder: '文件名' })
+            .layoutWeight(1).height(40).fontSize(17).fontColor(LABEL).placeholderColor(SECONDARY)
+            .backgroundColor(FILL).borderRadius(10).caretColor(TINT)
+            .onChange((value: string) => { this.saveName = value; })
+            .onSubmit(() => this.savePattern(this.saveName))
+          Text('保存').fontSize(17).fontWeight(600).fontColor(TINT).onClick(() => this.savePattern(this.saveName))
+        }.width('100%').padding({ left: 16, right: 16, bottom: 12 })
+      }
+      if (this.patterns.length === 0) {
+        Column() {
+          Text(this.librarySave ? '还没有保存的图案' : '还没有保存的图案，可以从系统文件读取').fontSize(15).fontColor(SECONDARY)
+        }.layoutWeight(1).justifyContent(FlexAlign.Center)
+      } else {
+        Column() {
+        List() {
+          ForEach(this.patterns, (pattern: PatternFile) => {
+            ListItem() {
+              Row({ space: 12 }) {
+                SymbolGlyph($r('sys.symbol.doc_text')).fontSize(20).fontColor([TINT])
+                Column({ space: 2 }) {
+                  Text(pattern.name).fontSize(17).fontColor(LABEL).maxLines(1).textOverflow({ overflow: TextOverflow.Ellipsis })
+                  Text(patternDate(pattern.modified)).fontSize(13).fontColor(SECONDARY)
+                }.alignItems(HorizontalAlign.Start).layoutWeight(1)
+              }.width('100%').padding({ left: 16, right: 16, top: 10, bottom: 10 }).backgroundColor(SHEET_ROW)
+            }
+            .swipeAction({ end: this.patternDelete(pattern) })
+            .onClick(() => { if (this.librarySave) this.savePattern(pattern.name); else this.openPattern(pattern); })
+            .accessibilityText(pattern.name)
+          }, (pattern: PatternFile) => pattern.name)
+        }
+        .divider({ strokeWidth: 0.5, color: SEPARATOR, startMargin: 48 })
+        .backgroundColor(SHEET_ROW).borderRadius(12).clip(true)
+        .edgeEffect(EdgeEffect.Spring).scrollBar(BarState.Off)
+        .constraintSize({ maxHeight: '100%' }).height('auto')
+        }.layoutWeight(1).padding({ left: 16, right: 16 }).justifyContent(FlexAlign.Start)
+      }
+      Text(this.librarySave ? '保存到系统文件…' : '从系统文件读取…')
+        .fontSize(17).fontColor(TINT).padding({ top: 14, bottom: 14 + this.safeBottom })
+        .onClick(() => this.systemFile())
+    }.width('100%').height('100%')
+  }
+
   // ---- Game pages (iOS GamesView) ----
 
   @Builder
@@ -871,6 +1014,11 @@ struct Index {
     .width('100%').height('100%').backgroundColor(BACKGROUND)
     .onAreaChange((oldArea: Area, area: Area) => {
       this.rootWidth = Number(area.width); this.rootHeight = Number(area.height);
+    })
+    .bindSheet($$this.libraryVisible, this.patternLibrary(), {
+      height: SheetSize.MEDIUM, dragBar: true, backgroundColor: SHEET,
+      title: { title: this.librarySave ? '保存图案' : '打开图案' },
+      onDisappear: () => this.libraryDismissed()
     })
   }
 }
