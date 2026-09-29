@@ -462,8 +462,11 @@ struct Index {
       return;
     }
     const ending = event.type === TouchType.Up;
+    // Every change of the finger count keeps the pointer where the game last saw
+    // it: a jump while a drag is active would move the grid by the difference.
     if (points.length === 0 || (ending && points.length <= 1)) {
-      if (event.changedTouches.length > 0) {
+      // A two-finger gesture ends at its last midpoint, a single touch where it lifted.
+      if (!this.multi && event.changedTouches.length > 0) {
         this.lastX = event.changedTouches[0].x; this.lastY = event.changedTouches[0].y;
       }
       if (this.button >= 0) this.pointer(2, this.lastX, this.lastY, this.button);
@@ -489,9 +492,15 @@ struct Index {
       const onCanvas = this.selected !== '2048' || y <= this.canvasSpan();
       if (this.isGame() && onCanvas) { this.button = 0; this.pointer(1, x, y); }
     } else if (points.length >= 2 && !this.multi) {
-      if (this.button >= 0) { this.pointer(5, x, y, 0); this.pointer(5, x, y, 1); }
+      // Cancel the one-finger press where that finger was, then start the
+      // two-finger pan at the midpoint.
+      if (this.button >= 0) { this.pointer(5, this.lastX, this.lastY, 0); this.pointer(5, this.lastX, this.lastY, 1); }
       this.multi = true; this.button = -1;
       if (this.selected === 'gol') { this.button = 1; this.pointer(1, x, y, 1); }
+    } else if (event.type === TouchType.Move && this.multi && points.length < 2) {
+      // One finger of a two-finger gesture lifted: end it at the last midpoint.
+      if (this.button >= 0) { this.pointer(2, this.lastX, this.lastY, this.button); this.button = -1; }
+      return;
     } else if (event.type === TouchType.Move) {
       if (this.selected === 'sparkium') {
         const factor = this.distance > 0 && distance > 0 ? distance / this.distance : 1;
@@ -510,7 +519,10 @@ struct Index {
         if (this.selected === 'gol' && this.distance > 0 && distance > 0) this.pointer(6, x, y, distance / this.distance);
       }
     }
-    if (ending && this.button >= 0) { this.pointer(2, x, y, this.button); this.button = -1; }
+    if (ending && this.button >= 0) {
+      this.pointer(2, this.multi ? this.lastX : x, this.multi ? this.lastY : y, this.button);
+      this.button = -1;
+    }
     this.lastX = x; this.lastY = y; this.distance = distance;
   }
   private async completeFile(path: string): Promise<void> {
