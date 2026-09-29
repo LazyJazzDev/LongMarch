@@ -19,10 +19,6 @@ interface LibraryRow {
   saved?: PatternFile; builtin?: BuiltinPattern;
 }
 
-const CATEGORY_NAMES: Record<string, string> = {
-  'still': '静物', 'oscillator': '振荡器', 'spaceship': '飞船', 'gun': '枪',
-  'puffer': '繁殖器与耙', 'methuselah': '长寿图案', 'other': '其他结构'
-};
 const CATEGORY_ORDER: string[] = ['still', 'oscillator', 'spaceship', 'gun', 'puffer', 'methuselah', 'other'];
 
 class LibraryRows implements IDataSource {
@@ -40,9 +36,13 @@ class LibraryRows implements IDataSource {
   }
 }
 
-function patternDetail(pattern: BuiltinPattern): string {
+// Category names are the string resources category_<id>; speed directions are direction_<name>.
+function patternDetail(pattern: BuiltinPattern, text: (name: string) => string): string {
   const parts: string[] = [];
-  if (pattern.speed) parts.push(pattern.speed.replace(' diagonal', ' 对角').replace(' orthogonal', ' 正交').replace(' oblique', ' 斜向'));
+  if (pattern.speed) {
+    parts.push(pattern.speed.replace(/ (diagonal|orthogonal|oblique)$/,
+      (match: string, direction: string): string => ` ${text(`direction_${direction}`)}`));
+  }
   if (pattern.period && pattern.period > 1) parts.push(`p${pattern.period}`);
   parts.push(`${pattern.width}×${pattern.height}`);
   return parts.join(' · ');
@@ -249,6 +249,10 @@ struct Index {
   private win?: window.Window;
   private listScroller: Scroller = new Scroller();
   private context(): common.UIAbilityContext { return this.getUIContext().getHostContext() as common.UIAbilityContext; }
+  // A localized string resource, with %s/%d arguments.
+  private text(name: string, ...args: (string | number)[]): string {
+    return this.context().resourceManager.getStringByNameSync(name, ...args);
+  }
   private send(c: NativeCommand): void { native.command(JSON.stringify(c)); }
   private isGame(): boolean { return this.selected === '2048' || this.selected === 'gol'; }
 
@@ -341,14 +345,14 @@ struct Index {
   private alert(title: string, message: string): void {
     this.getUIContext().showAlertDialog({
       title: title, message: message, autoCancel: false,
-      confirm: { value: 'OK', action: () => {} }
+      confirm: { value: $r('app.string.ok'), action: () => {} }
     });
   }
   // Games report errors in an alert; renderers show them in their control panel.
   private showNativeError(error: string): void {
     if (error.length === 0 || error === this.shownError) return;
     this.shownError = error;
-    if (this.selected.length === 0 || this.isGame()) this.alert(this.isGame() ? 'Game error' : 'LongMarch', error);
+    if (this.selected.length === 0 || this.isGame()) this.alert(this.isGame() ? this.text('game_error') : 'LongMarch', error);
     else this.controls = true;
   }
 
@@ -529,9 +533,9 @@ struct Index {
   }
   // Saved patterns first, then the built-in library by category, filtered by the search text.
   private folderTitle(folder: string): string {
-    return folder === 'saved' ? '我的图案' : CATEGORY_NAMES[folder];
+    return this.text(folder === 'saved' ? 'my_patterns' : `category_${folder}`);
   }
-  // The library opens on a folder list: saved patterns in "我的图案", then one
+  // The library opens on a folder list: saved patterns in "My Patterns", then one
   // folder per built-in category. Searching the list spans every folder;
   // searching an opened folder filters only that folder.
   private rebuildRows(): void {
@@ -596,7 +600,7 @@ struct Index {
     try {
       await work();
     } catch (e) {
-      this.alert('Game error', `Files: ${e}`);
+      this.alert(this.text('game_error'), `Files: ${e}`);
       try { await this.completeFile(''); } catch (cancelError) { /* Keep the original error visible. */ }
     }
     finally { this.fileBusy = false; }
@@ -619,13 +623,13 @@ struct Index {
   }
   private savePattern(name: string): void {
     const base = patternName(name);
-    if (base.length === 0) { this.alert('保存图案', '请输入文件名。'); return; }
+    if (base.length === 0) { this.alert(this.text('save_pattern'), this.text('enter_file_name')); return; }
     const save = () => this.finishFile(() => this.completeFile(`${this.patternDirectory()}/${base}.cells`));
     if (!this.patterns.some((pattern: PatternFile) => pattern.name === base)) { save(); return; }
     this.getUIContext().showAlertDialog({
-      title: '替换图案？', message: `“${base}”已存在，要替换它吗？`, autoCancel: true,
-      primaryButton: { value: '取消', action: () => {} },
-      secondaryButton: { value: '替换', fontColor: DESTRUCTIVE, action: () => save() }
+      title: $r('app.string.replace_pattern'), message: this.text('replace_exists', base), autoCancel: true,
+      primaryButton: { value: $r('app.string.cancel'), action: () => {} },
+      secondaryButton: { value: $r('app.string.replace'), fontColor: DESTRUCTIVE, action: () => save() }
     });
   }
   private deletePattern(pattern: PatternFile): void {
@@ -633,7 +637,7 @@ struct Index {
       fs.unlinkSync(`${this.patternDirectory()}/${pattern.name}.cells`);
       this.refreshPatterns();
       this.rebuildRows();
-    } catch (e) { this.alert('Game error', `Files: ${e}`); }
+    } catch (e) { this.alert(this.text('game_error'), `Files: ${e}`); }
   }
   private systemFile(): void {
     const save = this.librarySave;
@@ -976,9 +980,9 @@ struct Index {
   private sizePicker() {
     Column({ space: 16 }) {
       Row() {
-        Text(this.sizeAxis === 1 ? '网格宽度' : '网格高度').fontSize(17).fontWeight(600).fontColor(LABEL)
+        Text(this.sizeAxis === 1 ? $r('app.string.grid_width') : $r('app.string.grid_height')).fontSize(17).fontWeight(600).fontColor(LABEL)
         Blank()
-        Text('完成').fontSize(17).fontColor(TINT).onClick(() => { this.applySize(this.sizeValue); this.closeSize(); })
+        Text($r('app.string.done')).fontSize(17).fontColor(TINT).onClick(() => { this.applySize(this.sizeValue); this.closeSize(); })
       }.width('100%')
       Row() {
         Text(`${this.sizeValue}`).fontSize(22).fontColor(LABEL).fontFeature('"tnum" on')
@@ -992,7 +996,7 @@ struct Index {
           this.sizeValue = Math.round(value);
           if (mode === SliderChangeMode.End || mode === SliderChangeMode.Click) this.applySize(value);
         })
-        .accessibilityText(this.sizeAxis === 1 ? '网格宽度' : '网格高度')
+        .accessibilityText(this.text(this.sizeAxis === 1 ? 'grid_width' : 'grid_height'))
       Row() {
         Text('2').fontSize(12).fontColor(SECONDARY)
         Blank()
@@ -1037,7 +1041,7 @@ struct Index {
 
   @Builder
   private patternDelete(pattern: PatternFile) {
-    Row() { Text('删除').fontSize(17).fontColor(LABEL) }
+    Row() { Text($r('app.string.delete')).fontSize(17).fontColor(LABEL) }
     .width(80).height('100%').justifyContent(FlexAlign.Center).backgroundColor(DESTRUCTIVE)
     .onClick(() => this.deletePattern(pattern))
   }
@@ -1064,7 +1068,7 @@ struct Index {
         Column({ space: 2 }) {
           Text(row.saved ? row.saved.name : row.builtin!.name).fontSize(17).fontColor(LABEL)
             .maxLines(1).textOverflow({ overflow: TextOverflow.Ellipsis })
-          Text(row.saved ? patternDate(row.saved.modified) : patternDetail(row.builtin!))
+          Text(row.saved ? patternDate(row.saved.modified) : patternDetail(row.builtin!, (name: string): string => this.text(name)))
             .fontSize(13).fontColor(SECONDARY)
         }.alignItems(HorizontalAlign.Start).layoutWeight(1)
       }
@@ -1078,18 +1082,18 @@ struct Index {
     Column() {
       if (this.librarySave) {
         Row({ space: 12 }) {
-          TextInput({ text: this.saveName, placeholder: '文件名' })
+          TextInput({ text: this.saveName, placeholder: $r('app.string.file_name') })
             .layoutWeight(1).height(40).fontSize(17).fontColor(LABEL).placeholderColor(SECONDARY)
             .backgroundColor(FILL).borderRadius(10).caretColor(TINT)
             .onChange((value: string) => { this.saveName = value; })
             .onSubmit(() => this.savePattern(this.saveName))
-          Text('保存').fontSize(17).fontWeight(600).fontColor(TINT).onClick(() => this.savePattern(this.saveName))
+          Text($r('app.string.save')).fontSize(17).fontWeight(600).fontColor(TINT).onClick(() => this.savePattern(this.saveName))
         }.width('100%').padding({ left: 16, right: 16, bottom: 4 })
       } else {
         if (this.libraryFolder.length > 0) {
           Row({ space: 4 }) {
             SymbolGlyph($r('sys.symbol.chevron_left')).fontSize(18).fontColor([TINT])
-            Text('全部分类').fontSize(17).fontColor(TINT)
+            Text($r('app.string.all_folders')).fontSize(17).fontColor(TINT)
             Blank()
             Text(this.folderTitle(this.libraryFolder)).fontSize(17).fontWeight(600).fontColor(LABEL)
           }
@@ -1097,7 +1101,8 @@ struct Index {
           .onClick(() => this.openFolder(''))
         }
         Search({ value: this.librarySearch,
-          placeholder: this.libraryFolder.length > 0 ? `在“${this.folderTitle(this.libraryFolder)}”中搜索` : '搜索全部图案' })
+          placeholder: this.libraryFolder.length > 0 ?
+            this.text('search_in_folder', this.folderTitle(this.libraryFolder)) : this.text('search_all') })
           .height(40).margin({ left: 16, right: 16 }).backgroundColor(FILL).fontColor(LABEL)
           .placeholderColor(SECONDARY).textFont({ size: 17 })
           .onChange((value: string) => { this.librarySearch = value; this.rebuildRows(); })
@@ -1113,12 +1118,12 @@ struct Index {
           })
         }, (row: LibraryRow) => row.key)
         ListItem() {
-          Text(this.librarySave ? '' : '内置图案来自 Life Lexicon（Stephen A. Silver 等，CC BY-SA 3.0）')
+          Text(this.librarySave ? '' : this.text('lexicon_credit'))
             .fontSize(12).fontColor(SECONDARY).padding({ left: 16, right: 16, top: 12, bottom: 12 })
         }
       }
       .cachedCount(8).scrollBar(BarState.Auto).edgeEffect(EdgeEffect.Spring).layoutWeight(1).width('100%')
-      Text(this.librarySave ? '保存到系统文件…' : '从系统文件读取…')
+      Text(this.librarySave ? $r('app.string.save_to_files') : $r('app.string.open_from_files'))
         .fontSize(17).fontColor(TINT).padding({ top: 14, bottom: 14 + this.safeBottom })
         .onClick(() => this.systemFile())
     }.width('100%').height('100%')
@@ -1183,7 +1188,7 @@ struct Index {
     })
     .bindSheet($$this.libraryVisible, this.patternLibrary(), {
       detents: [SheetSize.MEDIUM, SheetSize.LARGE], dragBar: true, backgroundColor: SHEET,
-      title: { title: this.librarySave ? '保存图案' : '打开图案' },
+      title: { title: this.librarySave ? $r('app.string.save_pattern') : $r('app.string.open_pattern') },
       onDisappear: () => this.libraryDismissed()
     })
   }
