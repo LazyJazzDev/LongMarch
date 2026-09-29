@@ -110,8 +110,12 @@ if(SPARKIUM_APP)
   add_executable(LongMarch MACOSX_BUNDLE SparkiumApp.swift DemosApp.swift demos/DemoView.swift
     games/GamesView.swift
     demos/DemoBridge.mm demos/DemoBridge.h SparkiumBridge.mm SparkiumBridge.h RenderQueue.h
-    "${bundle_resources}" Assets.xcassets)
+    "${bundle_resources}" Assets.xcassets en.lproj/Localizable.strings zh-Hans.lproj/Localizable.strings)
   set_source_files_properties("${bundle_resources}" Assets.xcassets PROPERTIES MACOSX_PACKAGE_LOCATION Resources)
+  foreach(language en zh-Hans)
+    set_source_files_properties(${language}.lproj/Localizable.strings PROPERTIES
+      MACOSX_PACKAGE_LOCATION Resources/${language}.lproj)
+  endforeach()
   # Folder resources otherwise copy only at configure time; shader preparation can
   # add nested cache files without changing the folder timestamp seen by Ninja.
   add_custom_target(ios_app_resources

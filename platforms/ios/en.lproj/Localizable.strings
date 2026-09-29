@@ -1,0 +1,32 @@
+/* Game of Life interface strings. Keys are the English text in GamesView.swift. */
+
+"Grid width" = "Grid width";
+"Grid height" = "Grid height";
+"Done" = "Done";
+"Adjust by one cell" = "Adjust by one cell";
+"Still lifes" = "Still lifes";
+"Oscillators" = "Oscillators";
+"Spaceships" = "Spaceships";
+"Guns" = "Guns";
+"Puffers and rakes" = "Puffers and rakes";
+"Methuselahs" = "Methuselahs";
+"Other structures" = "Other structures";
+"diagonal" = "diagonal";
+"orthogonal" = "orthogonal";
+"oblique" = "oblique";
+"Save Pattern" = "Save Pattern";
+"Open Pattern" = "Open Pattern";
+"Cancel" = "Cancel";
+"Save" = "Save";
+"Replace Pattern?" = "Replace Pattern?";
+"Replace" = "Replace";
+"“%@” already exists. Do you want to replace it?" = "“%@” already exists. Do you want to replace it?";
+"File name" = "File name";
+"My Patterns" = "My Patterns";
+"Search patterns" = "Search patterns";
+"No saved patterns yet" = "No saved patterns yet";
+"Save to Files…" = "Save to Files…";
+"Open from Files…" = "Open from Files…";
+"Built-in patterns come from the Life Lexicon (Stephen A. Silver et al., CC BY-SA 3.0)." = "Built-in patterns come from the Life Lexicon (Stephen A. Silver et al., CC BY-SA 3.0).";
+"Game error" = "Game error";
+"OK" = "OK";

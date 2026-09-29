@@ -293,9 +293,9 @@ private struct GridDimensionPicker: View {
   var body: some View {
     VStack(spacing: 16) {
       HStack {
-        Text(axis == 1 ? "网格宽度" : "网格高度").font(.headline)
+        Text(axis == 1 ? LocalizedStringKey("Grid width") : "Grid height").font(.headline)
         Spacer()
-        Button("完成") {
+        Button("Done") {
           apply(Int(value))
           close()
         }
@@ -304,7 +304,7 @@ private struct GridDimensionPicker: View {
         Text("\(Int(value))").font(.title2.monospacedDigit())
         Spacer()
         Stepper(
-          "逐格微调",
+          "Adjust by one cell",
           value: Binding(
             get: { Int(value) },
             set: {
@@ -319,7 +319,7 @@ private struct GridDimensionPicker: View {
         // finishes scrubbing instead of rebuilding thousands of cells per move.
         if !editing { apply(Int(value)) }
       }
-      .accessibilityLabel(axis == 1 ? "网格宽度" : "网格高度")
+      .accessibilityLabel(axis == 1 ? LocalizedStringKey("Grid width") : "Grid height")
       .accessibilityValue("\(Int(value))")
       HStack {
         Text("2")
@@ -349,8 +349,10 @@ private struct BuiltinPattern: Decodable, Identifiable {
   var id: String { category + ":" + name }
 
   static let categories: [(id: String, title: String)] = [
-    ("still", "静物"), ("oscillator", "振荡器"), ("spaceship", "飞船"), ("gun", "枪"),
-    ("puffer", "繁殖器与耙"), ("methuselah", "长寿图案"), ("other", "其他结构"),
+    ("still", String(localized: "Still lifes")), ("oscillator", String(localized: "Oscillators")),
+    ("spaceship", String(localized: "Spaceships")), ("gun", String(localized: "Guns")),
+    ("puffer", String(localized: "Puffers and rakes")), ("methuselah", String(localized: "Methuselahs")),
+    ("other", String(localized: "Other structures")),
   ]
 
   static let all: [BuiltinPattern] = {
@@ -368,9 +370,9 @@ private struct BuiltinPattern: Decodable, Identifiable {
     var parts: [String] = []
     if let speed {
       parts.append(
-        speed.replacingOccurrences(of: " diagonal", with: " 对角")
-          .replacingOccurrences(of: " orthogonal", with: " 正交")
-          .replacingOccurrences(of: " oblique", with: " 斜向"))
+        speed.replacingOccurrences(of: " diagonal", with: " " + String(localized: "diagonal"))
+          .replacingOccurrences(of: " orthogonal", with: " " + String(localized: "orthogonal"))
+          .replacingOccurrences(of: " oblique", with: " " + String(localized: "oblique")))
     }
     if let period, period > 1 { parts.append("p\(period)") }
     parts.append("\(width)×\(height)")
@@ -461,13 +463,13 @@ private struct PatternLibraryView: View {
   var body: some View {
     NavigationStack(path: $path) {
       root
-        .navigationTitle(saving ? "保存图案" : "打开图案")
+        .navigationTitle(saving ? LocalizedStringKey("Save Pattern") : "Open Pattern")
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
-          ToolbarItem(placement: .cancellationAction) { Button("取消", action: cancel) }
+          ToolbarItem(placement: .cancellationAction) { Button("Cancel", action: cancel) }
           if saving {
             ToolbarItem(placement: .confirmationAction) {
-              Button("保存", action: save).disabled(PatternLibrary.url(named: name) == nil)
+              Button("Save", action: save).disabled(PatternLibrary.url(named: name) == nil)
             }
           }
         }
@@ -475,15 +477,15 @@ private struct PatternLibraryView: View {
     }
     .preferredColorScheme(.dark)
     .alert(
-      "替换图案？", isPresented: Binding(get: { replacing != nil }, set: { if !$0 { replacing = nil } })
+      "Replace Pattern?", isPresented: Binding(get: { replacing != nil }, set: { if !$0 { replacing = nil } })
     ) {
-      Button("取消", role: .cancel) { replacing = nil }
-      Button("替换", role: .destructive) {
+      Button("Cancel", role: .cancel) { replacing = nil }
+      Button("Replace", role: .destructive) {
         if let url = replacing { choose(url) }
         replacing = nil
       }
     } message: {
-      Text("“\(replacing?.deletingPathExtension().lastPathComponent ?? "")”已存在，要替换它吗？")
+      Text("“\(replacing?.deletingPathExtension().lastPathComponent ?? "")” already exists. Do you want to replace it?")
     }
   }
 
@@ -491,16 +493,16 @@ private struct PatternLibraryView: View {
     if saving {
       List {
         Section {
-          TextField("文件名", text: $name).submitLabel(.done).onSubmit(save)
+          TextField("File name", text: $name).submitLabel(.done).onSubmit(save)
         }
-        savedSection(files, header: "我的图案")
+        savedSection(files, header: String(localized: "My Patterns"))
         systemSection
       }
     } else {
       List {
         if query.isEmpty {
           Section {
-            folderLink(Self.mine, title: "我的图案", count: files.count, symbol: "folder.fill.badge.person.crop")
+            folderLink(Self.mine, title: String(localized: "My Patterns"), count: files.count, symbol: "folder.fill.badge.person.crop")
             ForEach(BuiltinPattern.categories, id: \.id) { category in
               folderLink(
                 category.id, title: category.title,
@@ -509,7 +511,7 @@ private struct PatternLibraryView: View {
           }
         } else {
           let saved = files.filter { Self.matches($0.name, query) }
-          if !saved.isEmpty { savedSection(saved, header: "我的图案 · \(saved.count)") }
+          if !saved.isEmpty { savedSection(saved, header: String(localized: "My Patterns") + " · \(saved.count)") }
           ForEach(BuiltinPattern.categories, id: \.id) { category in
             let items = builtins(category.id, query)
             if !items.isEmpty {
@@ -519,18 +521,18 @@ private struct PatternLibraryView: View {
         }
         systemSection
       }
-      .searchable(text: $query, placement: .navigationBarDrawer(displayMode: .always), prompt: "搜索图案")
+      .searchable(text: $query, placement: .navigationBarDrawer(displayMode: .always), prompt: "Search patterns")
     }
   }
 
   // One folder of the open sheet: the saved patterns or a built-in category.
   private func folder(_ id: String) -> some View {
-    let title = id == Self.mine ? "我的图案" : BuiltinPattern.categories.first { $0.id == id }?.title ?? id
+    let title = id == Self.mine ? String(localized: "My Patterns") : BuiltinPattern.categories.first { $0.id == id }?.title ?? id
     return List {
       if id == Self.mine {
         let saved = files.filter { Self.matches($0.name, folderQuery) }
         if saved.isEmpty && folderQuery.isEmpty {
-          Text("还没有保存的图案").foregroundStyle(.secondary)
+          Text("No saved patterns yet").foregroundStyle(.secondary)
         }
         savedRows(saved)
       } else {
@@ -538,7 +540,7 @@ private struct PatternLibraryView: View {
       }
     }
     .navigationTitle(title)
-    .searchable(text: $folderQuery, placement: .navigationBarDrawer(displayMode: .always), prompt: "搜索图案")
+    .searchable(text: $folderQuery, placement: .navigationBarDrawer(displayMode: .always), prompt: "Search patterns")
     .onAppear { folderQuery = "" }
   }
 
@@ -560,7 +562,7 @@ private struct PatternLibraryView: View {
   private func savedSection(_ saved: [PatternFile], header: String) -> some View {
     Section(header) {
       if saved.isEmpty {
-        Text("还没有保存的图案").foregroundStyle(.secondary)
+        Text("No saved patterns yet").foregroundStyle(.secondary)
       }
       savedRows(saved)
     }
@@ -603,9 +605,9 @@ private struct PatternLibraryView: View {
 
   private var systemSection: some View {
     Section {
-      Button(saving ? "保存到系统文件…" : "从系统文件读取…", action: system)
+      Button(saving ? LocalizedStringKey("Save to Files…") : "Open from Files…", action: system)
     } footer: {
-      if !saving { Text("内置图案来自 Life Lexicon（Stephen A. Silver 等，CC BY-SA 3.0）") }
+      if !saving { Text("Built-in patterns come from the Life Lexicon (Stephen A. Silver et al., CC BY-SA 3.0).") }
     }
   }
 
