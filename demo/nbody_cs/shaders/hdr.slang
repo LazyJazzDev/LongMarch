@@ -29,7 +29,7 @@ void PSMain(PSInput input) {
   float highlight = 1.0 - rcp(max(peak, 1.0));
   float luminance = dot(color.rgb, float3(0.2126, 0.7152, 0.0722));
   color.rgb = lerp(color.rgb, luminance.xxx, highlight);
-  if (!ubo.hdr) {
+  if (ubo.hdr == 0) {
     // Particles accumulate linear radiance. Only SDR needs sRGB encoding;
     // HDR stays linear, including highlights above reference white.
     float3 radiance = saturate(color.rgb);

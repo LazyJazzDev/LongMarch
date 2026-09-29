@@ -62,6 +62,17 @@ PSInput VSMain(VSInput input) {
   return output;
 }
 
+// HLSL Clip(): Slang has no WGSL lowering for it, so discard explicitly on every backend.
+void Clip(float value) {
+  if (value < 0.0)
+    discard;
+}
+
+void Clip(float2 value) {
+  if (any(value < 0.0))
+    discard;
+}
+
 float4 IconTheme(PSInput input) {
   float scale = 2.0 - length(input.local_position - float2(-1.0, -1.0)) * 0.3;
   return float4(input.color.rgb * scale, 1.0);
@@ -75,8 +86,8 @@ float4 CellGridTheme(PSInput input, float sample_size) {
   float2 grid = (input.screen_position - input.color.xy) / input.color.z;
   int2 cell = int2(floor(grid));
   int2 size = int2(input.extra.zw);
-  clip(float2(cell));
-  clip(float2(size - 1 - cell));
+  Clip(float2(cell));
+  Clip(float2(size - 1 - cell));
   // Each cell fills the middle 80% of its pitch, mapped to [-1, 1] as before.
   float2 local_position = (grid - float2(cell) - 0.5) / 0.4;
   // The original 120-triangle silhouette samples |x|^8 + |y|^8 = 1. The L8
@@ -88,7 +99,7 @@ float4 CellGridTheme(PSInput input, float sample_size) {
   p *= p;
   float samples_per_unit = 0.4 * input.color.z / max(sample_size, 1.0e-6);
   float coverage = saturate(0.5 - (pow(p.x + p.y, 0.125) - 1.0) * samples_per_unit);
-  clip(coverage - 1.0 / 512.0);
+  Clip(coverage - 1.0 / 512.0);
   uint packed = instance_infos.Load(input.extra.y + 4 * uint(cell.y * size.x + cell.x));
   float3 appearance = float3(packed & 1023u, (packed >> 10) & 1023u, (packed >> 20) & 1023u) / 1023.0;
 
@@ -106,7 +117,7 @@ float4 DiceFaceTheme(PSInput input) {
   float2 p = input.local_position;
   float2 q = abs(p) - 0.74;
   float rounded_rect = length(max(q, 0.0)) + min(max(q.x, q.y), 0.0) - 0.26;
-  clip(-rounded_rect);
+  Clip(-rounded_rect);
   uint value = input.extra.y;
   float hole = 10.0;
   if ((value & 1) != 0)
@@ -117,7 +128,7 @@ float4 DiceFaceTheme(PSInput input) {
     hole = min(hole, min(length(p - float2(-0.50, 0.50)), length(p - float2(0.50, -0.50))));
   if (value == 6)
     hole = min(hole, min(length(p - float2(-0.50, 0.0)), length(p - float2(0.50, 0.0))));
-  clip(hole - 0.20);
+  Clip(hole - 0.20);
   float2 projected = input.projected_die_position;
   float shade = 1.0 - 0.16 * (projected.x + projected.y);
   return float4(input.color.rgb * shade, 1.0);
@@ -128,7 +139,7 @@ float4 SliderTheme(PSInput input) {
   float radius = asfloat(input.extra.w);
   float2 q = abs(input.local_position) * half_size - half_size + radius;
   float distance = length(max(q, 0.0)) + min(max(q.x, q.y), 0.0) - radius;
-  clip(-distance);
+  Clip(-distance);
   // Shape the cross-section in framebuffer pixels, not stretched square UVs.
   // The short side sets the rounding width on every edge, including the ends.
   float2 position = input.local_position * half_size;
@@ -169,8 +180,8 @@ float4 PSMain(PSInput input) : SV_TARGET {
   // Framebuffer pixels per rendered sample (below 1 when supersampled), taken
   // before any clip from a linear input so it is valid across the pixel quad.
   float sample_size = max(abs(ddx(input.screen_position.x)), abs(ddy(input.screen_position.y)));
-  clip(input.screen_position - input.clip_rect.xy);
-  clip(input.clip_rect.zw - input.screen_position);
+  Clip(input.screen_position - input.clip_rect.xy);
+  Clip(input.clip_rect.zw - input.screen_position);
   // Init rng_state with the fragment position, one dimension at a time.
   uint rng_state = uint(input.position.x);
   rng_state = RandPCG(rng_state);
