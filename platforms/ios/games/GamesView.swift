@@ -8,6 +8,8 @@ private final class GameMetalView: MTKView {
   private var start = CGPoint.zero
   private(set) var lastPointerPosition = CGPoint.zero
   private var pointerDown = false
+  // Last two-finger pan position forwarded to the game.
+  private var panPoint = CGPoint.zero
   override init(frame: CGRect, device: MTLDevice?) {
     super.init(frame: frame, device: device)
     isMultipleTouchEnabled = true
@@ -75,6 +77,9 @@ private final class GameMetalView: MTKView {
   @objc private func magnify(_ gesture: UIPinchGestureRecognizer) {
     guard life else { return }
     cancelPointer()
+    // Ending touches report the remaining finger, not the midpoint; moving the
+    // pointer there would pan the grid by the difference.
+    guard gesture.state == .began || gesture.state == .changed else { return }
     send(6, gesture.location(in: self), gesture.scale)
     gesture.scale = 1
   }
@@ -83,11 +88,14 @@ private final class GameMetalView: MTKView {
     cancelPointer()
     let point = gesture.location(in: self)
     if gesture.state == .began {
+      panPoint = point
       send(1, point, 1)
     } else if gesture.state == .changed {
+      panPoint = point
       send(0, point)
     } else {
-      send(2, point, 1)
+      // Release where the pan last was, for the same reason as the pinch.
+      send(2, panPoint, 1)
     }
   }
 }
