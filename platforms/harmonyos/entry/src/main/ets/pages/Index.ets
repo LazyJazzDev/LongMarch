@@ -8,6 +8,64 @@ interface SceneInfo { id: string; name: string; width: number; height: number; }
 interface DemoInfo { id: string; name: string; detail: string; symbol: Resource; reason?: string; }
 interface DemoSection { title: string; demos: DemoInfo[]; }
 interface PatternFile { name: string; modified: number; }
+// A named pattern from the built-in Life Lexicon library (demo/gol/patterns/library.json).
+interface BuiltinPattern {
+  name: string; category: string; width: number; height: number; period?: number; speed?: string; rle: string;
+}
+interface PatternDocument { patterns: BuiltinPattern[]; }
+// One row of the library list: a section header, a saved pattern or a built-in one.
+interface LibraryRow { key: string; header?: string; saved?: PatternFile; builtin?: BuiltinPattern; }
+
+const CATEGORY_NAMES: Record<string, string> = {
+  'still': '静物', 'oscillator': '振荡器', 'spaceship': '飞船', 'gun': '枪',
+  'puffer': '繁殖器与耙', 'methuselah': '长寿图案', 'other': '其他结构'
+};
+const CATEGORY_ORDER: string[] = ['still', 'oscillator', 'spaceship', 'gun', 'puffer', 'methuselah', 'other'];
+
+class LibraryRows implements IDataSource {
+  private rows: LibraryRow[] = [];
+  private listeners: DataChangeListener[] = [];
+  set(rows: LibraryRow[]): void {
+    this.rows = rows;
+    this.listeners.forEach((listener: DataChangeListener) => listener.onDataReloaded());
+  }
+  totalCount(): number { return this.rows.length; }
+  getData(index: number): LibraryRow { return this.rows[index]; }
+  registerDataChangeListener(listener: DataChangeListener): void { this.listeners.push(listener); }
+  unregisterDataChangeListener(listener: DataChangeListener): void {
+    this.listeners = this.listeners.filter((item: DataChangeListener) => item !== listener);
+  }
+}
+
+function patternDetail(pattern: BuiltinPattern): string {
+  const parts: string[] = [];
+  if (pattern.speed) parts.push(pattern.speed.replace(' diagonal', ' 对角').replace(' orthogonal', ' 正交').replace(' oblique', ' 斜向'));
+  if (pattern.period && pattern.period > 1) parts.push(`p${pattern.period}`);
+  parts.push(`${pattern.width}×${pattern.height}`);
+  return parts.join(' · ');
+}
+
+// Life .cells text for a run-length encoded pattern.
+function patternCells(pattern: BuiltinPattern): string {
+  const rows: string[] = [];
+  let row = '';
+  let count = '';
+  for (const c of pattern.rle) {
+    if (c >= '0' && c <= '9') { count += c; continue; }
+    const n = count.length > 0 ? Number(count) : 1;
+    count = '';
+    if (c === 'b') row += '.'.repeat(n);
+    else if (c === 'o') row += 'O'.repeat(n);
+    else if (c === '$' || c === '!') {
+      rows.push(row);
+      for (let i = 1; i < n && c === '$'; i++) rows.push('');
+      row = '';
+      if (c === '!') break;
+    }
+  }
+  const lines = rows.map((line: string) => line.padEnd(pattern.width, '.'));
+  return `!Name: ${pattern.name}\n!Life Lexicon, CC BY-SA 3.0\n${lines.join('\n')}\n`;
+}
 // A single object-literal @Builder argument is passed by reference, so the
 // builder refreshes when the state it reads changes; plain arguments do not.
 interface CaptionArgs { text: string; color: string; }
@@ -161,7 +219,10 @@ struct Index {
   @State private librarySave: boolean = false;
   @State private patterns: PatternFile[] = [];
   @State private saveName: string = '';
+  @State private librarySearch: string = '';
   private libraryHandled: boolean = false;
+  private libraryRows: LibraryRows = new LibraryRows();
+  private builtins?: BuiltinPattern[];
   private request: number = 0;
   private areaWidth: number = 1;
   private areaHeight: number = 1;
@@ -450,17 +511,51 @@ struct Index {
       .map((file: string): PatternFile => ({ name: file.slice(0, -6), modified: fs.statSync(`${directory}/${file}`).mtime }))
       .sort((a: PatternFile, b: PatternFile) => b.modified - a.modified);
   }
+  private loadBuiltins(): BuiltinPattern[] {
+    if (this.builtins === undefined) {
+      try {
+        const text = fs.readTextSync(`${this.stats.resources}/Patterns/library.json`);
+        this.builtins = (JSON.parse(text) as PatternDocument).patterns;
+      } catch (e) {
+        this.builtins = [];
+      }
+    }
+    return this.builtins;
+  }
+  // Saved patterns first, then the built-in library by category, filtered by the search text.
+  private rebuildRows(): void {
+    const query = this.librarySearch.trim().toLowerCase();
+    const matches = (name: string): boolean => query.length === 0 || name.toLowerCase().includes(query);
+    const rows: LibraryRow[] = [];
+    const saved = this.patterns.filter((pattern: PatternFile) => matches(pattern.name));
+    if (saved.length > 0 || (this.librarySave && query.length === 0)) {
+      rows.push({ key: 'h:saved', header: `我的图案 · ${saved.length}` });
+      saved.forEach((pattern: PatternFile) => rows.push({ key: `s:${pattern.name}`, saved: pattern }));
+    }
+    if (!this.librarySave) {
+      const builtins = this.loadBuiltins();
+      for (const category of CATEGORY_ORDER) {
+        const items = builtins.filter((pattern: BuiltinPattern) => pattern.category === category && matches(pattern.name));
+        if (items.length === 0) continue;
+        rows.push({ key: `h:${category}`, header: `${CATEGORY_NAMES[category]} · ${items.length}` });
+        items.forEach((pattern: BuiltinPattern) => rows.push({ key: `b:${category}:${pattern.name}`, builtin: pattern }));
+      }
+    }
+    this.libraryRows.set(rows);
+  }
   // Opening or saving starts in the app's own pattern library; the system
   // document picker is one link away.
   private fileAction(action: number): void {
     this.fileBusy = true;
     this.libraryHandled = false;
     this.librarySave = action !== 1;
+    this.librarySearch = '';
     try {
       this.refreshPatterns();
     } catch (e) {
       this.patterns = [];
     }
+    this.rebuildRows();
     const now = new Date();
     this.saveName = `Life ${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())} ` +
       `${pad(now.getHours())}.${pad(now.getMinutes())}.${pad(now.getSeconds())}`;
@@ -487,6 +582,14 @@ struct Index {
   private openPattern(pattern: PatternFile): void {
     this.finishFile(() => this.completeFile(`${this.patternDirectory()}/${pattern.name}.cells`));
   }
+  private openBuiltin(pattern: BuiltinPattern): void {
+    this.finishFile(async () => {
+      const path = `${this.context().cacheDir}/Builtin.cells`;
+      const file = fs.openSync(path, fs.OpenMode.CREATE | fs.OpenMode.WRITE_ONLY | fs.OpenMode.TRUNC);
+      try { fs.writeSync(file.fd, patternCells(pattern)); } finally { fs.closeSync(file); }
+      await this.completeFile(path);
+    });
+  }
   private savePattern(name: string): void {
     const base = patternName(name);
     if (base.length === 0) { this.alert('保存图案', '请输入文件名。'); return; }
@@ -502,6 +605,7 @@ struct Index {
     try {
       fs.unlinkSync(`${this.patternDirectory()}/${pattern.name}.cells`);
       this.refreshPatterns();
+      this.rebuildRows();
     } catch (e) { this.alert('Game error', `Files: ${e}`); }
   }
   private systemFile(): void {
@@ -912,6 +1016,27 @@ struct Index {
   }
 
   @Builder
+  private libraryRow(row: LibraryRow) {
+    if (row.header !== undefined) {
+      Text(row.header).fontSize(15).fontWeight(600).fontColor(HEADER)
+        .width('100%').padding({ left: 16, right: 16, top: 18, bottom: 8 })
+    } else {
+      Row({ space: 12 }) {
+        SymbolGlyph(row.saved ? $r('sys.symbol.doc_text') : $r('sys.symbol.square_grid_2x2'))
+          .fontSize(20).fontColor([TINT])
+        Column({ space: 2 }) {
+          Text(row.saved ? row.saved.name : row.builtin!.name).fontSize(17).fontColor(LABEL)
+            .maxLines(1).textOverflow({ overflow: TextOverflow.Ellipsis })
+          Text(row.saved ? patternDate(row.saved.modified) : patternDetail(row.builtin!))
+            .fontSize(13).fontColor(SECONDARY)
+        }.alignItems(HorizontalAlign.Start).layoutWeight(1)
+      }
+      .width('100%').padding({ left: 16, right: 16, top: 10, bottom: 10 }).backgroundColor(SHEET_ROW)
+      .border({ width: { bottom: 0.5 }, color: SEPARATOR })
+    }
+  }
+
+  @Builder
   private patternLibrary() {
     Column() {
       if (this.librarySave) {
@@ -922,36 +1047,28 @@ struct Index {
             .onChange((value: string) => { this.saveName = value; })
             .onSubmit(() => this.savePattern(this.saveName))
           Text('保存').fontSize(17).fontWeight(600).fontColor(TINT).onClick(() => this.savePattern(this.saveName))
-        }.width('100%').padding({ left: 16, right: 16, bottom: 12 })
-      }
-      if (this.patterns.length === 0) {
-        Column() {
-          Text(this.librarySave ? '还没有保存的图案' : '还没有保存的图案，可以从系统文件读取').fontSize(15).fontColor(SECONDARY)
-        }.layoutWeight(1).justifyContent(FlexAlign.Center)
+        }.width('100%').padding({ left: 16, right: 16, bottom: 4 })
       } else {
-        Column() {
-        List() {
-          ForEach(this.patterns, (pattern: PatternFile) => {
-            ListItem() {
-              Row({ space: 12 }) {
-                SymbolGlyph($r('sys.symbol.doc_text')).fontSize(20).fontColor([TINT])
-                Column({ space: 2 }) {
-                  Text(pattern.name).fontSize(17).fontColor(LABEL).maxLines(1).textOverflow({ overflow: TextOverflow.Ellipsis })
-                  Text(patternDate(pattern.modified)).fontSize(13).fontColor(SECONDARY)
-                }.alignItems(HorizontalAlign.Start).layoutWeight(1)
-              }.width('100%').padding({ left: 16, right: 16, top: 10, bottom: 10 }).backgroundColor(SHEET_ROW)
-            }
-            .swipeAction({ end: this.patternDelete(pattern) })
-            .onClick(() => { if (this.librarySave) this.savePattern(pattern.name); else this.openPattern(pattern); })
-            .accessibilityText(pattern.name)
-          }, (pattern: PatternFile) => pattern.name)
-        }
-        .divider({ strokeWidth: 0.5, color: SEPARATOR, startMargin: 48 })
-        .backgroundColor(SHEET_ROW).borderRadius(12).clip(true)
-        .edgeEffect(EdgeEffect.Spring).scrollBar(BarState.Off)
-        .constraintSize({ maxHeight: '100%' }).height('auto')
-        }.layoutWeight(1).padding({ left: 16, right: 16 }).justifyContent(FlexAlign.Start)
+        Search({ value: this.librarySearch, placeholder: '搜索图案' })
+          .height(40).margin({ left: 16, right: 16 }).backgroundColor(FILL).fontColor(LABEL)
+          .placeholderColor(SECONDARY).textFont({ size: 17 })
+          .onChange((value: string) => { this.librarySearch = value; this.rebuildRows(); })
       }
+      List() {
+        LazyForEach(this.libraryRows, (row: LibraryRow) => {
+          ListItem() { this.libraryRow(row) }
+          .swipeAction(row.saved ? { end: this.patternDelete(row.saved) } : {})
+          .onClick(() => {
+            if (row.saved) { if (this.librarySave) this.savePattern(row.saved.name); else this.openPattern(row.saved); }
+            else if (row.builtin) this.openBuiltin(row.builtin);
+          })
+        }, (row: LibraryRow) => row.key)
+        ListItem() {
+          Text(this.librarySave ? '' : '内置图案来自 Life Lexicon（Stephen A. Silver 等，CC BY-SA 3.0）')
+            .fontSize(12).fontColor(SECONDARY).padding({ left: 16, right: 16, top: 12, bottom: 12 })
+        }
+      }
+      .cachedCount(8).scrollBar(BarState.Auto).edgeEffect(EdgeEffect.Spring).layoutWeight(1).width('100%')
       Text(this.librarySave ? '保存到系统文件…' : '从系统文件读取…')
         .fontSize(17).fontColor(TINT).padding({ top: 14, bottom: 14 + this.safeBottom })
         .onClick(() => this.systemFile())
@@ -1016,7 +1133,7 @@ struct Index {
       this.rootWidth = Number(area.width); this.rootHeight = Number(area.height);
     })
     .bindSheet($$this.libraryVisible, this.patternLibrary(), {
-      height: SheetSize.MEDIUM, dragBar: true, backgroundColor: SHEET,
+      detents: [SheetSize.MEDIUM, SheetSize.LARGE], dragBar: true, backgroundColor: SHEET,
       title: { title: this.librarySave ? '保存图案' : '打开图案' },
       onDisappear: () => this.libraryDismissed()
     })
