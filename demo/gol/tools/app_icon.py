@@ -8,13 +8,16 @@ app writes to the framebuffer unconverted: color * (2 - 0.3 * |p - (-1, -1)|) fo
 button-local p in [-1, 1], y downward.
 
 Outputs full-bleed squares without rounded corners; each system applies its mask.
-  <output>/ios.png         opaque 1024 x 1024 App Store and home screen icon
+  <output>/AppIcon.icon    Icon Composer icon for iOS: the plate gradient as the
+                           fill and the glider as a Liquid Glass layer
+  <output>/ios.png         opaque 1024 x 1024 flat rendering
   <output>/background.png  opaque HarmonyOS layered-icon background
   <output>/foreground.png  transparent HarmonyOS layered-icon foreground
 
 Usage: app_icon.py <output-dir>
 """
 
+import json
 import sys
 from pathlib import Path
 
@@ -53,6 +56,69 @@ def render():
     return to_bytes(composite), to_bytes(plate), to_bytes(foreground)
 
 
+def srgb(color):
+    return 'srgb:' + ','.join(f'{v:.5f}' for v in (*color, 1.0))
+
+
+def glider_outline():
+    """SVG path of the live cells' union: cell edges not shared by two live cells, chained into loops."""
+    live = {(bit % 4, bit // 4) for bit in range(16) if GLIDER >> bit & 1}
+    edges = {}
+    for x, y in live:
+        # Clockwise on screen (y downward), so shared edges cancel.
+        for a, b, neighbor in (((x, y), (x + 1, y), (x, y - 1)), ((x + 1, y), (x + 1, y + 1), (x + 1, y)),
+                               ((x + 1, y + 1), (x, y + 1), (x, y + 1)), ((x, y + 1), (x, y), (x - 1, y))):
+            if neighbor not in live:
+                edges.setdefault(a, []).append(b)
+    point = lambda v: tuple(((c - 2) * PITCH + 1.0) * SIZE / 2 for c in v)
+    path = []
+    while edges:
+        start = next(iter(edges))
+        loop, current = [start], start
+        while True:
+            following = edges[current].pop()
+            if not edges[current]:
+                del edges[current]
+            if following == start:
+                break
+            loop.append(following)
+            current = following
+        # Keep only corners.
+        corners = [v for i, v in enumerate(loop)
+                   if (loop[i - 1][0] - v[0]) * (loop[(i + 1) % len(loop)][1] - v[1]) !=
+                   (loop[i - 1][1] - v[1]) * (loop[(i + 1) % len(loop)][0] - v[0])]
+        path.append('M' + ' L'.join('{:.2f} {:.2f}'.format(*point(v)) for v in corners) + ' Z')
+    return ' '.join(path)
+
+
+def glider_svg():
+    # IconTheme's scale runs from 2.0 at the top-left corner to 1.15 at the
+    # bottom-right; the glass layer keeps that diagonal ramp.
+    stops = ''.join(f'<stop offset="{offset}" stop-color="#{"".join(f"{round(min(v * scale, 1.0) * 255):02x}" for v in NEUTRAL)}"/>'
+                    for offset, scale in ((0, 2.0), (1, 2.0 - 2.0 * np.sqrt(2.0) * 0.3)))
+    return (f'<svg xmlns="http://www.w3.org/2000/svg" width="{SIZE}" height="{SIZE}" viewBox="0 0 {SIZE} {SIZE}">\n'
+            f'<defs><linearGradient id="shade" gradientUnits="userSpaceOnUse" x1="0" y1="0" x2="{SIZE}" y2="{SIZE}">'
+            f'{stops}</linearGradient></defs>\n<path fill="url(#shade)" d="{glider_outline()}"/>\n</svg>\n')
+
+
+def write_icon_composer(path):
+    (path / 'Assets').mkdir(parents=True, exist_ok=True)
+    (path / 'Assets/glider.svg').write_text(glider_svg())
+    low = 2.0 - 2.0 * np.sqrt(2.0) * 0.3
+    document = {
+        'fill': {'linear-gradient': [srgb(PLATE * 2.0), srgb(PLATE * low)],
+                 'orientation': {'start': {'x': 0, 'y': 0}, 'stop': {'x': 1, 'y': 1}}},
+        'groups': [{
+            'layers': [{'image-name': 'glider.svg', 'name': 'glider', 'glass': True}],
+            'shadow': {'kind': 'neutral', 'opacity': 0.5},
+            'specular': True,
+            'translucency': {'enabled': True, 'value': 0.4},
+        }],
+        'supported-platforms': {'squares': ['iOS']},
+    }
+    (path / 'icon.json').write_text(json.dumps(document, indent=2) + '\n')
+
+
 def main():
     output = Path(sys.argv[1])
     output.mkdir(parents=True, exist_ok=True)
@@ -60,6 +126,7 @@ def main():
     Image.fromarray(composite, 'RGB').save(output / 'ios.png')
     Image.fromarray(background, 'RGB').save(output / 'background.png')
     Image.fromarray(foreground, 'RGBA').save(output / 'foreground.png')
+    write_icon_composer(output / 'AppIcon.icon')
 
 
 if __name__ == '__main__':
