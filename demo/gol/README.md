@@ -107,6 +107,20 @@ starts with 36 live cells and emits one glider every 30 generations. Load it
 on the 200 x 200 grid with `--play` to watch the stream. Gliders wrap around
 the grid edges and can eventually interact with the gun or other gliders.
 
+`patterns/library.json` is the built-in pattern library of the iOS and
+HarmonyOS apps: 736 named patterns from the [Life Lexicon](https://github.com/dvgrn/life-lexicon)
+(Stephen A. Silver, Dave Greene and David Bell; CC BY-SA 3.0) that fit the
+256 x 256 grid. `tools/lexicon_patterns.py` builds it from the plaintext
+Lexicon and classifies each pattern by simulating it: still lifes and
+oscillators (with their period) return to their cells, spaceships (with their
+speed) return shifted, and small patterns that settle only after 50 or more
+generations are methuselahs. Guns, puffers and other patterns fall back to
+keywords in their definitions. Regenerate it with:
+
+```sh
+python3 demo/gol/tools/lexicon_patterns.py life-lexicon-nowrap-plaintext.txt demo/gol/patterns/library.json
+```
+
 `game_of_life_lib/` holds `update_step`, the part students implement in the
 assignment; this demo defaults to periodic boundaries, with a button to restore the
 assignment's fixed/dead boundaries. Left/right and top/bottom edges connect, including diagonal
