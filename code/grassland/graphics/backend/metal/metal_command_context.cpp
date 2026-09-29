@@ -33,7 +33,12 @@ Core *MetalCommandContext::GetCore() const {
   return core_;
 }
 
-void MetalCommandContext::EndEncoder() {
+void MetalCommandContext::EndEncoder(bool flush_clears) {
+  // A clear folded into a pass must execute even when the pass has no draws.
+  if (render_pass_ && !render_ && !attachmentless_) {
+    MetalPool pool;
+    render_ = NS::RetainPtr(command_->renderCommandEncoder(render_pass_.get()));
+  }
   render_pass_.reset();
   if (compute_) {
     compute_->endEncoding();
@@ -43,6 +48,8 @@ void MetalCommandContext::EndEncoder() {
     render_->endEncoding();
     render_.reset();
   }
+  if (flush_clears)
+    FlushClears();
 }
 
 void MetalCommandContext::CmdBindProgram(Program *program) {
@@ -167,6 +174,7 @@ void MetalCommandContext::CmdDispatch(uint32_t x, uint32_t y, uint32_t z) {
     throw std::runtime_error("no compute program bound");
   if (render_pass_)
     throw std::runtime_error("compute dispatch inside render pass");
+  FlushClears();
   MetalPool pool;
   if (!compute_)
     compute_ = NS::RetainPtr(command_->computeCommandEncoder());
@@ -180,20 +188,36 @@ void MetalCommandContext::CmdDispatch(uint32_t x, uint32_t y, uint32_t z) {
 void MetalCommandContext::CmdBeginRendering(const std::vector<Image *> &colors, Image *depth) {
   if (render_pass_)
     throw std::runtime_error("nested Metal render pass");
-  EndEncoder();
+  EndEncoder(false);
   MetalPool pool;
   auto pass = MTL::RenderPassDescriptor::renderPassDescriptor();
   for (size_t i = 0; i < colors.size(); ++i) {
     auto attachment = pass->colorAttachments()->object(i);
-    attachment->setTexture(dynamic_cast<MetalImage *>(colors[i])->Handle());
-    attachment->setLoadAction(MTL::LoadActionLoad);
+    auto texture = dynamic_cast<MetalImage *>(colors[i])->Handle();
+    attachment->setTexture(texture);
+    auto clear = pending_clears_.find(texture);
+    attachment->setLoadAction(clear == pending_clears_.end() ? MTL::LoadActionLoad : MTL::LoadActionClear);
     attachment->setStoreAction(MTL::StoreActionStore);
+    if (clear != pending_clears_.end()) {
+      const auto c = clear->second.value.color;
+      attachment->setClearColor(MTL::ClearColor(c.r, c.g, c.b, c.a));
+      pending_clears_.erase(clear);
+    }
   }
   if (depth) {
-    pass->depthAttachment()->setTexture(dynamic_cast<MetalImage *>(depth)->Handle());
-    pass->depthAttachment()->setLoadAction(MTL::LoadActionLoad);
-    pass->depthAttachment()->setStoreAction(MTL::StoreActionStore);
+    auto attachment = pass->depthAttachment();
+    auto texture = dynamic_cast<MetalImage *>(depth)->Handle();
+    attachment->setTexture(texture);
+    auto clear = pending_clears_.find(texture);
+    attachment->setLoadAction(clear == pending_clears_.end() ? MTL::LoadActionLoad : MTL::LoadActionClear);
+    attachment->setStoreAction(MTL::StoreActionStore);
+    if (clear != pending_clears_.end()) {
+      attachment->setClearDepth(clear->second.value.depth.depth);
+      pending_clears_.erase(clear);
+    }
   }
+  // Other cleared textures may be sampled by this pass. Materialize them first.
+  FlushClears();
   render_pass_ = NS::RetainPtr(pass);
   attachmentless_ = colors.empty() && !depth;
 }
@@ -300,24 +324,37 @@ void MetalCommandContext::CmdDrawIndexed(uint32_t count,
 void MetalCommandContext::CmdClearImage(Image *image, const ClearValue &value) {
   if (render_pass_)
     throw std::runtime_error("clear inside render pass");
-  EndEncoder();
+  EndEncoder(false);
+  auto texture = dynamic_cast<MetalImage *>(image)->Handle();
+  // Consecutive clears can be consumed by the next attachment load instead of
+  // storing and reloading a full image on tile-based GPUs. Retain the exact
+  // texture generation until it has been encoded.
+  pending_clears_.insert_or_assign(texture,
+                                   PendingClear{NS::RetainPtr(texture), value, IsDepthFormat(image->Format())});
+}
+
+void MetalCommandContext::FlushClears() {
+  if (pending_clears_.empty())
+    return;
   MetalPool pool;
-  auto metal = dynamic_cast<MetalImage *>(image);
-  auto pass = MTL::RenderPassDescriptor::renderPassDescriptor();
-  if (IsDepthFormat(image->Format())) {
-    pass->depthAttachment()->setTexture(metal->Handle());
-    pass->depthAttachment()->setClearDepth(value.depth.depth);
-    pass->depthAttachment()->setLoadAction(MTL::LoadActionClear);
-    pass->depthAttachment()->setStoreAction(MTL::StoreActionStore);
-  } else {
-    auto attachment = pass->colorAttachments()->object(0);
-    attachment->setTexture(metal->Handle());
-    auto c = value.color;
-    attachment->setClearColor(MTL::ClearColor(c.r, c.g, c.b, c.a));
-    attachment->setLoadAction(MTL::LoadActionClear);
-    attachment->setStoreAction(MTL::StoreActionStore);
+  for (const auto &[texture, clear] : pending_clears_) {
+    auto pass = MTL::RenderPassDescriptor::renderPassDescriptor();
+    if (clear.depth) {
+      pass->depthAttachment()->setTexture(texture);
+      pass->depthAttachment()->setClearDepth(clear.value.depth.depth);
+      pass->depthAttachment()->setLoadAction(MTL::LoadActionClear);
+      pass->depthAttachment()->setStoreAction(MTL::StoreActionStore);
+    } else {
+      auto attachment = pass->colorAttachments()->object(0);
+      attachment->setTexture(texture);
+      const auto c = clear.value.color;
+      attachment->setClearColor(MTL::ClearColor(c.r, c.g, c.b, c.a));
+      attachment->setLoadAction(MTL::LoadActionClear);
+      attachment->setStoreAction(MTL::StoreActionStore);
+    }
+    command_->renderCommandEncoder(pass)->endEncoding();
   }
-  command_->renderCommandEncoder(pass)->endEncoding();
+  pending_clears_.clear();
 }
 
 void MetalCommandContext::CmdCopyBuffer(Buffer *dst,

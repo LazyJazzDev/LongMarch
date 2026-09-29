@@ -1,4 +1,6 @@
 #pragma once
+#include <map>
+
 #include "grassland/graphics/backend/vulkan/vulkan_core.h"
 
 namespace grassland::graphics::backend {
@@ -71,10 +73,19 @@ class VulkanCmdBeginRendering : public VulkanCommand {
 
   void RecordResourceImages(VulkanImage *resource_image);
 
+  // Whether image is an attachment covering the whole render area, so a clear
+  // immediately before rendering can become its load operation.
+  bool CanFoldClear(VulkanImage *image) const;
+
+  // Clears the attachment with its load operation instead of a transfer
+  // command, which tile-based GPUs apply without reading or writing memory.
+  void FoldClear(VulkanImage *image, const ClearValue &clear_value);
+
  private:
   std::vector<VulkanImage *> color_targets_;
   VulkanImage *depth_target_;
   std::set<VulkanImage *> resource_images_;
+  std::map<VulkanImage *, ClearValue> load_clears_;
 };
 
 class VulkanCmdBindResourceBuffers : public VulkanCommand {
@@ -153,6 +164,14 @@ class VulkanCmdClearImage : public VulkanCommand {
   VulkanCmdClearImage(VulkanImage *image, const ClearValue &clear_value);
 
   void CompileCommand(VulkanCommandContext *context, VkCommandBuffer command_buffer) override;
+
+  VulkanImage *Image() const {
+    return image_;
+  }
+
+  const ClearValue &Value() const {
+    return clear_value_;
+  }
 
  private:
   VulkanImage *image_;

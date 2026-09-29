@@ -84,6 +84,54 @@ TEST(MetalCompatibility, TiledComputeUsesExplicitPixelOrigins) {
 }
 #endif
 
+// Clears right before a pass become its load operation: the last clear of an
+// attachment wins, a pass without draws still clears, and an attachment larger
+// than the render area (which a load clear would not cover) is cleared completely.
+void CheckClearsFoldIntoRenderPasses(BackendAPI backend) {
+  std::unique_ptr<Core> core;
+  ASSERT_EQ(CreateCore(backend, Core::Settings{1, true}, &core), 0);
+  ASSERT_EQ(core->InitializeLogicalDeviceAutoSelect(false), 0);
+  std::unique_ptr<Image> color, depth, large_depth;
+  ASSERT_EQ(core->CreateImage(4, 4, IMAGE_FORMAT_R32G32B32A32_SFLOAT, &color), 0);
+  ASSERT_EQ(core->CreateImage(4, 4, IMAGE_FORMAT_D32_SFLOAT, &depth), 0);
+  ASSERT_EQ(core->CreateImage(8, 8, IMAGE_FORMAT_D32_SFLOAT, &large_depth), 0);
+  std::unique_ptr<CommandContext> commands;
+  ASSERT_EQ(core->CreateCommandContext(&commands), 0);
+  commands->CmdClearImage(color.get(), {{1, 0, 0, 1}});
+  commands->CmdClearImage(color.get(), {{0, 1, 0, 1}});
+  commands->CmdClearImage(depth.get(), {{0.375f}});
+  commands->CmdBeginRendering({color.get()}, depth.get());
+  commands->CmdEndRendering();
+  commands->CmdClearImage(color.get(), {{0, 0, 1, 1}});
+  commands->CmdClearImage(large_depth.get(), {{0.625f}});
+  commands->CmdBeginRendering({color.get()}, large_depth.get());
+  commands->CmdEndRendering();
+  ASSERT_EQ(core->SubmitCommandContext(commands.get()), 0);
+  core->WaitGPU();
+  std::vector<std::array<float, 4>> pixels(16);
+  color->DownloadData(pixels.data());
+  for (const auto &pixel : pixels)
+    EXPECT_EQ(pixel, (std::array<float, 4>{0, 0, 1, 1}));
+  std::vector<float> depths(16);
+  depth->DownloadData(depths.data());
+  for (float value : depths)
+    EXPECT_EQ(value, 0.375f);
+  depths.resize(64);
+  large_depth->DownloadData(depths.data());
+  for (float value : depths)
+    EXPECT_EQ(value, 0.625f);
+}
+
+TEST(VulkanCompatibility, ClearsFoldIntoRenderPasses) {
+  CheckClearsFoldIntoRenderPasses(BACKEND_API_VULKAN);
+}
+
+#ifdef LONGMARCH_METAL_ENABLED
+TEST(MetalCompatibility, ClearsFoldIntoRenderPasses) {
+  CheckClearsFoldIntoRenderPasses(BACKEND_API_METAL);
+}
+#endif
+
 TEST(VulkanCompatibility, DivergentStorageBuffersThroughHelperProduceCorrectValues) {
   std::unique_ptr<Core> core;
   ASSERT_EQ(CreateCore(BACKEND_API_VULKAN, Core::Settings{1, true}, &core), 0);
