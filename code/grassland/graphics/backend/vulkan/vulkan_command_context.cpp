@@ -100,6 +100,16 @@ void VulkanCommandContext::CmdBeginRendering(const std::vector<Image *> &color_t
 
   auto cmd = std::make_unique<VulkanCmdBeginRendering>(vk_color_targets, vk_depth_target);
 
+  // Attachment clears recorded right before rendering become load operations.
+  // Scanning backwards, a later clear of the same image replaces the earlier one.
+  while (!commands_.empty()) {
+    auto *clear = dynamic_cast<VulkanCmdClearImage *>(commands_.back().get());
+    if (!clear || !cmd->CanFoldClear(clear->Image()))
+      break;
+    cmd->FoldClear(clear->Image(), clear->Value());
+    commands_.pop_back();
+  }
+
   active_rendering_cmd_ = cmd.get();
 
   commands_.push_back(std::move(cmd));
