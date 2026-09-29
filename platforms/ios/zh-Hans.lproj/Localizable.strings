@@ -27,6 +27,6 @@
 "No saved patterns yet" = "还没有保存的图案";
 "Save to Files…" = "保存到系统文件…";
 "Open from Files…" = "从系统文件读取…";
-"Built-in patterns come from the Life Lexicon (Stephen A. Silver et al., CC BY-SA 3.0)." = "内置图案来自 Life Lexicon（Stephen A. Silver 等，CC BY-SA 3.0）。";
+"Built-in patterns are adapted from the Life Lexicon by Stephen A. Silver et al. and licensed under [CC BY-SA 3.0](https://creativecommons.org/licenses/by-sa/3.0/)." = "内置图案改编自 Stephen A. Silver 等编写的 Life Lexicon，以 [CC BY-SA 3.0](https://creativecommons.org/licenses/by-sa/3.0/) 授权。";
 "Game error" = "游戏出错";
 "OK" = "好";

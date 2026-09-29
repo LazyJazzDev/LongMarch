@@ -421,7 +421,7 @@ private struct BuiltinPattern: Decodable, Identifiable {
       if c == "!" { break }
     }
     let lines = rows.map { $0.padding(toLength: width, withPad: ".", startingAt: 0) }
-    return "!Name: \(name)\n!Life Lexicon, CC BY-SA 3.0\n" + lines.joined(separator: "\n") + "\n"
+    return "!Name: \(name)\n!Life Lexicon (Stephen A. Silver et al.), adapted under CC BY-SA 3.0: https://creativecommons.org/licenses/by-sa/3.0/\n" + lines.joined(separator: "\n") + "\n"
   }
 }
 
@@ -625,7 +625,7 @@ private struct PatternLibraryView: View {
     Section {
       Button(saving ? LocalizedStringKey("Save to Files…") : "Open from Files…", action: system)
     } footer: {
-      if !saving { Text("Built-in patterns come from the Life Lexicon (Stephen A. Silver et al., CC BY-SA 3.0).") }
+      if !saving { Text("Built-in patterns are adapted from the Life Lexicon by Stephen A. Silver et al. and licensed under [CC BY-SA 3.0](https://creativecommons.org/licenses/by-sa/3.0/).") }
     }
   }
 
