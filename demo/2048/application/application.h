@@ -142,6 +142,6 @@ class Application {
   uint32_t cursor_enter_callback_{};
   uint32_t focus_callback_{};
 
-  int fps_frames_{0};
-  double fps_start_time_{0.0};
+  grassland::FPSCounter fps_counter_;
+  double title_time_{0.0};
 };
