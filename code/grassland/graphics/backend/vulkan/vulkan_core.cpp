@@ -71,6 +71,10 @@ VulkanCore::~VulkanCore() {
       vkDestroyFence(this->Handle(), fence, nullptr);
     }
     in_flight_fences_.clear();
+    if (upload_fence_)
+      vkDestroyFence(this->Handle(), upload_fence_, nullptr);
+    upload_fence_ = VK_NULL_HANDLE;
+    upload_pending_ = false;
   }
   if (device_) {
     if (graphics_command_pool_) {
@@ -311,6 +315,7 @@ int VulkanCore::SubmitCommandContext(CommandContext *p_command_context) {
 #endif
 
   if (command_context->dynamic_buffers_.size()) {
+    WaitUploads();
     vkResetCommandBuffer(transfer_command_buffer_, 0);
     VkCommandBufferBeginInfo begin_info = {};
     begin_info.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
@@ -352,7 +357,8 @@ int VulkanCore::SubmitCommandContext(CommandContext *p_command_context) {
     }
 #endif
 
-    vulkan::ThrowIfFailed(vkQueueSubmit(transfer_queue_, 1, &submit_info, nullptr), "Submit Vulkan uploads");
+    vulkan::ThrowIfFailed(vkQueueSubmit(transfer_queue_, 1, &submit_info, upload_fence_), "Submit Vulkan uploads");
+    upload_pending_ = true;
   }
 
   VkCommandBuffer command_buffer = command_buffers_[current_frame_];
@@ -448,8 +454,6 @@ int VulkanCore::SubmitCommandContext(CommandContext *p_command_context) {
   fence = in_flight_fences_[current_frame_];
   vulkan::ThrowIfFailed(vkWaitForFences(this->Handle(), 1, &fence, VK_TRUE, std::numeric_limits<uint64_t>::max()),
                         "Wait for Vulkan rendering");
-
-  vulkan::ThrowIfFailed(vkQueueWaitIdle(transfer_queue_), "Wait for Vulkan uploads");
 
   for (auto &callback : post_execute_functions_[current_frame_]) {
     callback();
@@ -581,6 +585,9 @@ int VulkanCore::InitializeLogicalDevice(int device_index) {
   transfer_allocate_info.commandBufferCount = 1;
   vulkan::ThrowIfFailed(vkAllocateCommandBuffers(native_device, &transfer_allocate_info, &transfer_command_buffer_),
                         "failed to allocate transfer command buffer");
+  VkFenceCreateInfo upload_fence_info{VK_STRUCTURE_TYPE_FENCE_CREATE_INFO};
+  vulkan::ThrowIfFailed(vkCreateFence(native_device, &upload_fence_info, nullptr, &upload_fence_),
+                        "failed to create upload fence");
 
 #if defined(LONGMARCH_CUDA_RUNTIME)
 
@@ -637,8 +644,22 @@ int VulkanCore::InitializeLogicalDevice(int device_index) {
   return 0;
 }
 
+void VulkanCore::WaitUploads() {
+  if (!upload_pending_)
+    return;
+  vulkan::ThrowIfFailed(vkWaitForFences(device_, 1, &upload_fence_, VK_TRUE, std::numeric_limits<uint64_t>::max()),
+                        "Wait for Vulkan uploads");
+  vkResetFences(device_, 1, &upload_fence_);
+  upload_pending_ = false;
+}
+
 void VulkanCore::WaitGPU() {
   vkQueueWaitIdle(graphics_queue_);
+  vkQueueWaitIdle(transfer_queue_);
+  if (upload_pending_) {
+    vkResetFences(device_, 1, &upload_fence_);
+    upload_pending_ = false;
+  }
   for (auto &post_execute : post_execute_functions_) {
     for (auto &callback : post_execute) {
       callback();

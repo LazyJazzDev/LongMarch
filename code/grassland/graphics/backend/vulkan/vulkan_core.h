@@ -223,6 +223,11 @@ class VulkanCore : public Core {
     return transfer_queue_;
   }
 
+  // Waits for the last dynamic-buffer upload, which reads the shared staging
+  // memory. Uploads follow earlier rendering on the queue, so this lets the CPU
+  // prepare one frame while the GPU renders the previous one.
+  void WaitUploads();
+
   VkCommandPool GraphicsCommandPool() const {
     return graphics_command_pool_;
   }
@@ -297,6 +302,8 @@ class VulkanCore : public Core {
   VkCommandPool transfer_command_pool_{VK_NULL_HANDLE};
   std::vector<VkCommandBuffer> command_buffers_;
   VkCommandBuffer transfer_command_buffer_{VK_NULL_HANDLE};
+  VkFence upload_fence_{VK_NULL_HANDLE};
+  bool upload_pending_{false};
 
   VkQueue graphics_queue_{VK_NULL_HANDLE};
   VkQueue transfer_queue_{VK_NULL_HANDLE};

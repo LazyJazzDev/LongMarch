@@ -123,6 +123,7 @@ VulkanDynamicBuffer::VulkanDynamicBuffer(VulkanCore *core, size_t size) : core_(
 }
 
 VulkanDynamicBuffer::~VulkanDynamicBuffer() {
+  core_->WaitUploads();
   for (size_t i = 0; i < buffers_.size(); ++i)
     vmaDestroyBuffer(core_->Allocator(), buffers_[i], allocations_[i]);
   vmaDestroyBuffer(core_->Allocator(), staging_buffer_, staging_allocation_);
@@ -137,6 +138,7 @@ BufferType VulkanDynamicBuffer::Type() const {
 }
 
 void VulkanDynamicBuffer::Resize(size_t new_size) {
+  core_->WaitUploads();
   VkBuffer new_buffer = VK_NULL_HANDLE;
   VmaAllocation new_allocation = VK_NULL_HANDLE;
   vulkan::ThrowIfFailed(core_->CreateBuffer(new_size, DynamicStagingUsage(core_), VMA_MEMORY_USAGE_CPU_TO_GPU,
@@ -156,6 +158,8 @@ void VulkanDynamicBuffer::Resize(size_t new_size) {
 }
 
 void VulkanDynamicBuffer::UploadData(const void *data, size_t size, size_t offset) {
+  // The staging memory is also the source of the last submitted upload.
+  core_->WaitUploads();
   void *mapped = nullptr;
   vmaMapMemory(core_->Allocator(), staging_allocation_, &mapped);
   std::memcpy(static_cast<uint8_t *>(mapped) + offset, data, size);
