@@ -20,6 +20,7 @@ interface LibraryRow {
   saved?: PatternFile; builtin?: BuiltinPattern;
 }
 
+const LEXICON_LICENSE: string = 'https://creativecommons.org/licenses/by-sa/3.0/';
 const CATEGORY_ORDER: string[] = ['still', 'oscillator', 'spaceship', 'gun', 'puffer', 'methuselah', 'other'];
 
 class LibraryRows implements IDataSource {
@@ -68,7 +69,7 @@ function patternCells(pattern: BuiltinPattern): string {
     }
   }
   const lines = rows.map((line: string) => line.padEnd(pattern.width, '.'));
-  return `!Name: ${pattern.name}\n!Life Lexicon, CC BY-SA 3.0\n${lines.join('\n')}\n`;
+  return `!Name: ${pattern.name}\n!Life Lexicon (Stephen A. Silver et al.), adapted under CC BY-SA 3.0: https://creativecommons.org/licenses/by-sa/3.0/\n${lines.join('\n')}\n`;
 }
 // A single object-literal @Builder argument is passed by reference, so the
 // builder refreshes when the state it reads changes; plain arguments do not.
@@ -609,6 +610,10 @@ struct Index {
     }
     finally { this.fileBusy = false; }
   }
+  // The built-in patterns' license (CC BY-SA 3.0), from the library footer.
+  private openLicense(): void {
+    this.context().openLink(LEXICON_LICENSE).catch(() => { /* The address stays readable in the footer. */ });
+  }
   private libraryDismissed(): void {
     if (this.libraryHandled) return;
     this.libraryHandled = true;
@@ -1124,6 +1129,7 @@ struct Index {
         ListItem() {
           Text(this.librarySave ? '' : this.text('lexicon_credit'))
             .fontSize(12).fontColor(SECONDARY).padding({ left: 16, right: 16, top: 12, bottom: 12 })
+            .onClick(() => { if (!this.librarySave) this.openLicense(); })
         }
       }
       .cachedCount(8).scrollBar(BarState.Auto).edgeEffect(EdgeEffect.Spring).layoutWeight(1).width('100%')
