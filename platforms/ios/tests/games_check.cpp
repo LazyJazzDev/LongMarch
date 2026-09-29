@@ -112,6 +112,34 @@ int main(int argc, char **argv) {
             grassland::graphics::MagnifyGesture{1.5, 320, 400, grassland::graphics::MagnifyPhase::kUpdate});
         Settle(game);
         Check(Pixels(game) != edited, "Desktop grid magnification did not update rendering");
+        // One finger (the left button) pans the enlarged grid; returning the same
+        // distance restores the view exactly, so neither end cell toggled.
+        auto leave = [&] {
+          window->CursorEnterEvent().InvokeCallbacks(false);
+          Settle(game);
+        };
+        auto drag = [&](double x0, double y0, double x1, double y1) {
+          window->CursorEnterEvent().InvokeCallbacks(true);
+          window->SendPointer(x0, y0);
+          window->SendMouseButton(GLFW_MOUSE_BUTTON_LEFT, GLFW_PRESS);
+          for (int i = 1; i <= 6; ++i)
+            window->SendPointer(x0 + (x1 - x0) * i / 6, y0 + (y1 - y0) * i / 6);
+          window->SendMouseButton(GLFW_MOUSE_BUTTON_LEFT, GLFW_RELEASE);
+          leave();
+        };
+        leave();
+        const auto zoomed = Pixels(game);
+        drag(320, 400, 380, 440);
+        Check(Pixels(game) != zoomed, "One-finger drag did not pan the enlarged grid");
+        drag(380, 440, 320, 400);
+        Check(Pixels(game) == zoomed, "One-finger pan toggled a cell or did not return exactly");
+        window->CursorEnterEvent().InvokeCallbacks(true);
+        window->SendPointer(320, 400);
+        window->SendMouseButton(GLFW_MOUSE_BUTTON_LEFT, GLFW_PRESS);
+        window->SendMouseButton(GLFW_MOUSE_BUTTON_LEFT, GLFW_RELEASE);
+        leave();
+        Check(Pixels(game) != zoomed, "A tap on the enlarged grid no longer toggles its cell");
+        window->CursorEnterEvent().InvokeCallbacks(true);
         window->SendKey(GLFW_KEY_O, GLFW_PRESS, GLFW_MOD_CONTROL);
         window->SendKey(GLFW_KEY_O, GLFW_RELEASE, GLFW_MOD_CONTROL);
         Settle(game);
