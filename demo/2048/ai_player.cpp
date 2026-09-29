@@ -482,7 +482,9 @@ std::optional<Direction> AiPlayer::SearchBestMove(const Board &board, float budg
 }
 
 AiPlayer::AiPlayer() {
+#ifndef __EMSCRIPTEN__
   worker_ = std::thread([this] { WorkerLoop(); });
+#endif
 }
 
 AiPlayer::~AiPlayer() {
@@ -513,6 +515,17 @@ void AiPlayer::RequestMove(const Board &board, uint64_t revision, float budget_m
 
 std::optional<Direction> AiPlayer::TakeMove(uint64_t revision) {
   std::lock_guard<std::mutex> lock(mutex_);
+#ifdef __EMSCRIPTEN__
+  // Browser pages have no threads without cross-origin isolation, which static
+  // hosting cannot enable: search on this thread, with a budget that keeps
+  // frames flowing.
+  if (!result_.has_value() && pending_.has_value() && pending_->revision == revision) {
+    const Request request = *pending_;
+    pending_.reset();
+    if (const auto move = SearchBestMove(request.board, std::min(request.budget_ms, 50.0f)))
+      result_ = std::make_pair(request.revision, *move);
+  }
+#endif
   if (!result_.has_value() || result_->first != revision) {
     return std::nullopt;
   }
