@@ -7,7 +7,7 @@ wrapper; this version runs on every LongMarch backend (Vulkan, D3D12, Metal).
 
 ```sh
 cmake --build build --target demo_gol
-build/demo/gol/demo_gol                      # 40 x 30 grid
+build/demo/gol/demo_gol                      # 64 x 64 grid
 build/demo/gol/demo_gol 60 40 --random 0.3   # random 60 x 40 grid
 build/demo/gol/demo_gol 200 200 --pattern demo/gol/patterns/295P5H1V1.cells
 build/demo/gol/demo_gol 200 200 --pattern demo/gol/patterns/gosper-glider-gun.cells --play
@@ -45,7 +45,7 @@ live cells, and empty borders, including completely empty grids. A `.cells`
 extension is added when omitted, with confirmation before replacing a file.
 Files are plain text: `O` for alive, `.` for dead, one complete row per line;
 lines starting with `!` are comments. Rows must have equal lengths and fit in
-200 x 200 cells; files larger than 1 MiB are rejected.
+256 x 256 cells; files larger than 1 MiB are rejected.
 
 Opening keeps each current grid dimension when it is larger than the file, and
 expands dimensions that are too small. The file is centered independently on both
@@ -63,7 +63,7 @@ Dimension sliders occupy the flexible middle space and playback controls sit at
 the opposite end. The same groups rearrange into a bottom panel for wide grids.
 
 The rounded `W` and `H` sliders between randomize and speed adjust the number of
-columns and rows from 2 to 200. They fill the space between the buttons: two
+columns and rows from 2 to 256. They fill the space between the buttons: two
 vertical bars in the sidebar, two horizontal bars in the bottom panel. A straight
 color boundary marks each value (increasing upward or rightward); centered pixel
 labels rotate with the bars. Drag or click anywhere on a bar; after selecting a slider,
@@ -88,7 +88,7 @@ Grid navigation:
 
 Options:
 
-- `WIDTH HEIGHT`: cell grid size, each in [2, 200].
+- `WIDTH HEIGHT`: cell grid size, each in [2, 256], defaulting to 64 × 64.
 - `--random DENSITY`: start with random live cells, e.g. `0.3`.
 - `--pattern FILE`: center a Life `.cells` pattern on the grid, initially paused.
 - `--play`: start the simulation immediately.
