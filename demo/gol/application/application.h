@@ -57,6 +57,10 @@ class Application {
 
   void DrawModel(DeviceModel *device_model, const InstanceInfo &instance_info);
 
+  // Draws one instance together with per-instance data words that its shader
+  // reads from the instance buffer. extra.y receives the data's byte offset.
+  void DrawModelWithData(DeviceModel *device_model, InstanceInfo instance_info, const std::vector<uint32_t> &data);
+
   // Moves every model drawn so far this frame into a second frame, which is
   // blended over the main frame with the given opacity.
   void CaptureSecondFrame(float alpha);
@@ -82,6 +86,11 @@ class Application {
     std::unique_ptr<graphics::Image> color_image;
     std::unique_ptr<graphics::Buffer> instance_buffer;
     std::vector<std::pair<DeviceModel *, InstanceInfo>> instances;
+    // Data words stored after the instance records, and the instances whose
+    // extra.y holds an offset into them, relative to the end of the records.
+    std::vector<uint32_t> data;
+    std::vector<size_t> data_instances;
+    std::vector<uint8_t> upload;
   };
 
   void OnInit();
@@ -101,9 +110,10 @@ class Application {
   template <class Func, class... Args>
   void NotifyListeners(Func func, Args... args) {
     // Listeners may register or unregister themselves while handling events.
-    auto listeners = listeners_;
+    const auto revision = listener_revision_;
+    const std::vector<Listener *> listeners(listeners_.begin(), listeners_.end());
     for (auto listener : listeners) {
-      if (listeners_.count(listener)) {
+      if (revision == listener_revision_ || listeners_.count(listener)) {
         (listener->*func)(args...);
       }
     }
@@ -137,6 +147,7 @@ class Application {
   int supersample_scale_{1};
 
   std::set<Listener *> listeners_{};
+  uint64_t listener_revision_{};
 
   uint32_t mouse_move_callback_{};
   uint32_t mouse_button_callback_{};

@@ -3,7 +3,7 @@
 #include "application/application.h"
 #include "application/model.h"
 #include "boundary_toggle_button.h"
-#include "cell_button.h"
+#include "cell_grid.h"
 #include "file_button.h"
 #include "grid_size.h"
 #include "grid_view.h"
@@ -50,6 +50,7 @@ class GameOfLife : public Application {
 
   void InitCells(int width, int height);
   void LayoutCells();
+  void DrawCellGrid();
   void ResizeGrid(int width, int height);
   glm::vec2 CursorPosition() const;
   glm::vec2 FramePosition(glm::dvec2 position) const;
@@ -93,7 +94,7 @@ class GameOfLife : public Application {
 
   std::vector<uint8_t> cell_grid_;
   std::vector<uint8_t> initial_cells_;
-  std::vector<std::unique_ptr<CellButton>> cell_button_grid_;
+  std::unique_ptr<CellGrid> cell_input_;
   float time_total{0.0};
   double last_frame_time_{};
   float ui_scale_{1.0};

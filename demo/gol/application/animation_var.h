@@ -18,7 +18,14 @@ class AnimationVar {
 
   [[nodiscard]] float Value() const;
 
-  [[nodiscard]] bool IsFinished() const;
+  [[nodiscard]] bool IsFinished() const {
+    return alpha_ == 1.0f;
+  }
+
+  // The value once finished; Value() equals it whenever IsFinished().
+  [[nodiscard]] float Target() const {
+    return target_;
+  }
 
   explicit operator float() const;
 
