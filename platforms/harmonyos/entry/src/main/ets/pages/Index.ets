@@ -387,23 +387,38 @@ struct Index {
     this.button = -1; this.multi = false;
     this.send({ type: 'open', demo: demo.id, scene: this.scene });
     this.orientation(demo.id);
-    if (demo.id === 'gol') {
-      try {
-        sensor.on(sensor.SensorId.GRAVITY, (data: sensor.GravityResponse) => {
-          if (Math.abs(data.x) + Math.abs(data.y) > 3) {
-            const angle = Math.round(Math.atan2(-data.x, data.y) / (Math.PI / 2)) * Math.PI / 2;
-            this.send({ type: 'icons', angle: this.entryAngle - angle });
-          }
-        }, { interval: 200000000 });
-        this.sensorActive = true;
-      } catch (e) { /* Direction icons remain upright if no gravity sensor is available. */ }
-    }
+    if (demo.id === 'gol') this.startGravity();
   }
   private leave(): void {
     this.send({ type: 'stop' });
     this.selected = ''; this.sizeAxis = 0; this.sizeVisible = false; this.shownError = '';
-    if (this.sensorActive) { sensor.off(sensor.SensorId.GRAVITY); this.sensorActive = false; }
+    this.stopGravity();
     this.orientation('');
+  }
+  // GoL turns its direction icons with the device. The sensor is used only while
+  // the page is visible: apps must not read sensors in the background.
+  private startGravity(): void {
+    if (this.sensorActive) return;
+    try {
+      sensor.on(sensor.SensorId.GRAVITY, (data: sensor.GravityResponse) => {
+        if (Math.abs(data.x) + Math.abs(data.y) > 3) {
+          const angle = Math.round(Math.atan2(-data.x, data.y) / (Math.PI / 2)) * Math.PI / 2;
+          this.send({ type: 'icons', angle: this.entryAngle - angle });
+        }
+      }, { interval: 200000000 });
+      this.sensorActive = true;
+    } catch (e) { /* Direction icons remain upright if no gravity sensor is available. */ }
+  }
+  private stopGravity(): void {
+    if (!this.sensorActive) return;
+    try { sensor.off(sensor.SensorId.GRAVITY); } catch (e) { /* Already unsubscribed. */ }
+    this.sensorActive = false;
+  }
+  onPageShow(): void {
+    if (this.selected === 'gol') this.startGravity();
+  }
+  onPageHide(): void {
+    this.stopGravity();
   }
   private selectScene(index: number): void {
     this.scene = this.stats.scenes[index].id;
