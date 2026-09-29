@@ -186,7 +186,7 @@ void Host::Resize() {
   if (demo_ && width_ && height_) {
     if (Game()) {
       demo_->Resize(width_, height_);
-      Game()->SetBottomControlInset(24.f / std::max(1u, height_));
+      Game()->SetBottomControlInset(bottom_inset_);
     } else if (selection_ == "nbody_cs" || selection_ == "graphics_hello_resize") {
       demo_->Resize(std::max(1, int(width_ * render_scale_)), std::max(1, int(height_ * render_scale_)));
     }
@@ -274,6 +274,10 @@ void Host::Execute(const std::string &json) {
   } else if (type == "size" && Game()) {
     Game()->SetGridDimension(int(Number(c, "axis")), int(std::clamp(Number(c, "value", 64), 2.0, 256.0)));
     size_value_ = int(std::clamp(Number(c, "value", 64), 2.0, 256.0));
+    dirty_ = true;
+  } else if (type == "bottomInset") {
+    bottom_inset_ = float(std::clamp(Number(c, "value"), 0.0, 0.25));
+    Resize();
     dirty_ = true;
   } else if (type == "dismissSize") {
     size_axis_ = 0;
