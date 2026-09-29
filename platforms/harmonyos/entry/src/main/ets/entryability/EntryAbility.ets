@@ -1,11 +1,15 @@
 import { UIAbility, Want, ConfigurationConstant } from '@kit.AbilityKit';
 import { window } from '@kit.ArkUI';
 import native from 'liblongmarch.so';
+import BuildProfile from 'BuildProfile';
 
 export default class EntryAbility extends UIAbility {
   onCreate(want: Want): void {
     this.context.getApplicationContext().setColorMode(ConfigurationConstant.ColorMode.COLOR_MODE_DARK);
-    AppStorage.setOrCreate('longmarchSmokeDemo', String(want.parameters?.demo ?? ''));
+    // A standalone game product always opens its game; LongMarch Demos opens
+    // the requested demo of a smoke launch, if any.
+    const standalone: string = BuildProfile.STANDALONE_GAME;
+    AppStorage.setOrCreate('longmarchSmokeDemo', standalone.length > 0 ? standalone : String(want.parameters?.demo ?? ''));
     AppStorage.setOrCreate('longmarchSmokeScene', String(want.parameters?.scene ?? ''));
     AppStorage.setOrCreate('longmarchSmokeSamples', Number(want.parameters?.samples ?? 32));
   }

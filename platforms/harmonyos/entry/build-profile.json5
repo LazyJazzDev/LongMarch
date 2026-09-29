@@ -8,5 +8,10 @@
       "abiFilters": ["arm64-v8a"]
     }
   },
-  "targets": [{ "name": "default" }]
+  // LongMarch Demos bundles every scene; the standalone Game of Life bundles
+  // only the game's shaders and patterns (see README.md).
+  "targets": [
+    { "name": "default", "resource": { "directories": ["./src/main/resources", "./src/demos/resources"] } },
+    { "name": "gameoflife", "resource": { "directories": ["./src/main/resources", "./src/gol/resources"] } }
+  ]
 }
