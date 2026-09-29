@@ -316,8 +316,10 @@ void Application::BuildScreenFrameObjects() {
   const int width = size.x, height = size.y;
   framebuffer_size_ = {std::max(width, 1), std::max(height, 1)};
   supersample_scale_ = ChooseSupersampleScale(framebuffer_size_);
+  // Phone displays are dense enough without supersampling; hosted surfaces
+  // render at native resolution straight into the presented image.
   if (window_->IsHosted())
-    supersample_scale_ = std::min(supersample_scale_, 2);
+    supersample_scale_ = 1;
   const auto sample_size = framebuffer_size_ * supersample_scale_;
 
   core_->WaitGPU();
