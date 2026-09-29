@@ -1,10 +1,5 @@
 #pragma once
 
-#define CLOSURE_BSDF_MICROFACET_GGX_FRESNEL_ID 0
-#define CLOSURE_BSDF_MICROFACET_GGX_CLEARCOAT_ID 1
-#define CLOSURE_BSDF_MICROFACET_GGX_REFRACTION_ID 2
-#define CLOSURE_BSDF_MICROFACET_GGX_GLASS_ID 3
-
 struct ClearcoatBsdf {
   Spectrum weight;
   float sample_weight;

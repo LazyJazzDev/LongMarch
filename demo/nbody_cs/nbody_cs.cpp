@@ -419,7 +419,9 @@ void NBodyCS::UpdateImGui() {
   ImGui::End();
   window_->EndImGuiFrame();
   if (trigger_hdr_switch) {
-    hdr_ = !hdr_;
-    window_->SetHDR(hdr_);
+    if (window_->SetHDR(!hdr_) == 0)
+      hdr_ = !hdr_;
+    else
+      LogWarning("HDR mode change unavailable; keeping the current presentation mode.");
   }
 }

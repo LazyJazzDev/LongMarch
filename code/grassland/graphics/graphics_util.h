@@ -310,10 +310,6 @@ uint32_t PixelSize(ImageFormat format);
 class CUDABuffer;
 #endif
 
-namespace util {
-#if defined(LONGMARCH_PYTHON_ENABLED)
-void PybindModuleRegistration(py::module_ &m);
-#endif
-}  // namespace util
+namespace util {}  // namespace util
 
 }  // namespace grassland::graphics

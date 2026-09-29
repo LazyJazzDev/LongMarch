@@ -7,6 +7,7 @@
 #include <stdexcept>
 
 #include "grassland/graphics/frame_profile.h"
+#include "sparkium/pipelines/raytracing/core/camera.h"
 #include "sparkium/pipelines/raytracing/core/core.h"
 #include "sparkium/pipelines/raytracing/core/geometry.h"
 #include "sparkium/pipelines/raytracing/core/material.h"
@@ -106,7 +107,9 @@ void SoftwarePipeline::CompileBuilders(uint32_t buffer_count) {
 void SoftwarePipeline::CompileRenderer(const std::vector<MaterialCode> &materials,
                                        uint32_t buffers,
                                        uint32_t sdr_count,
-                                       uint32_t hdr_count) {
+                                       uint32_t hdr_count,
+                                       const std::string &camera_file,
+                                       const std::string &camera_entry) {
   graphics::CpuProfileScope compile_profile("compile_renderer");
   const bool has_graph = std::any_of(materials.begin(), materials.end(),
                                      [](const MaterialCode &material) { return material.shader_graph; });
@@ -135,8 +138,12 @@ float Transmission(HitRecord hit, float3 direction) {
 #endif
 }
 }
+#ifdef SAMPLE_SHADOW_ANY_HIT
 #undef SAMPLE_SHADOW_ANY_HIT
+#endif
+#ifdef SAMPLE_SHADOW_NO_HITRECORD
 #undef SAMPLE_SHADOW_NO_HITRECORD
+#endif
 )";
   }
   if (has_graph) {
@@ -193,8 +200,10 @@ float Transmission(HitRecord hit, float3 direction) {
 
   auto vfs = core_->GetShadersVFS();
   vfs.WriteFile("software_materials.slang", source.str());
+  vfs.WriteFile("software_camera.slang", "#include \"" + camera_file + "\"\n");
   render_program_.reset();
   std::vector<std::string> args{"-I.", "-DSOFTWARE_DATA_BUFFER_COUNT=" + std::to_string(buffers)};
+  args.push_back("-DSPARKIUM_CAMERA_ENTRY=" + camera_entry);
   if (ray_query_)
     args.push_back("-DSPARKIUM_RAY_QUERY");
   if (has_graph)
@@ -214,6 +223,8 @@ float Transmission(HitRecord hit, float3 direction) {
            {graphics::RESOURCE_TYPE_SAMPLER, 2}})
     render_program_->AddResourceBinding(binding.first, binding.second);
   render_program_->Finalize();
+  camera_file_ = camera_file;
+  camera_entry_ = camera_entry;
   material_sources_ = materials;
   buffer_count_ = buffers;
   sdr_count_ = sdr_count;
@@ -248,9 +259,12 @@ void SoftwarePipeline::AppendBuild(std::vector<BuildPass> &passes, BuildParamete
 void SoftwarePipeline::Update(graphics::CommandContext *commands,
                               const std::vector<graphics::Buffer *> &buffers,
                               uint32_t sdr_count,
-                              uint32_t hdr_count) {
+                              uint32_t hdr_count,
+                              Camera *camera) {
   auto graphics = core_->GraphicsCore();
   graphics::CpuProfileScope prepare_profile("software_prepare");
+  const std::string camera_file = camera->ShaderFile();
+  const std::string camera_entry = camera->EntryPoint();
   std::vector<GeometryLayout> geometries;
   std::vector<GPUInstance> gpu_instances;
   std::vector<graphics::RayTracingInstance> native_instances;
@@ -316,9 +330,10 @@ void SoftwarePipeline::Update(graphics::CommandContext *commands,
     } else if (native_tlas_->UpdateInstances(native_instances)) {
       throw std::runtime_error("failed to update native TLAS");
     }
-    if (!render_program_ || materials != material_sources_ || buffer_count_ != buffers.size() ||
-        sdr_count_ != sdr_count || hdr_count_ != hdr_count)
-      CompileRenderer(materials, buffers.size(), sdr_count, hdr_count);
+    if (!render_program_ || camera_file_ != camera_file || camera_entry_ != camera_entry ||
+        materials != material_sources_ || buffer_count_ != buffers.size() || sdr_count_ != sdr_count ||
+        hdr_count_ != hdr_count)
+      CompileRenderer(materials, buffers.size(), sdr_count, hdr_count, camera_file, camera_entry);
     if (graphics::FrameProfile::active) {
       graphics::FrameProfile::active->counters["native_ray_query"] = 1;
       graphics::FrameProfile::active->counters["instances"] = instances_.size();
@@ -327,9 +342,10 @@ void SoftwarePipeline::Update(graphics::CommandContext *commands,
   }
   if (builders_.empty() || builder_buffer_count_ != buffers.size())
     CompileBuilders(buffers.size());
-  if (!render_program_ || materials != material_sources_ || buffer_count_ != buffers.size() ||
-      sdr_count_ != sdr_count || hdr_count_ != hdr_count)
-    CompileRenderer(materials, buffers.size(), sdr_count, hdr_count);
+  if (!render_program_ || camera_file_ != camera_file || camera_entry_ != camera_entry ||
+      materials != material_sources_ || buffer_count_ != buffers.size() || sdr_count_ != sdr_count ||
+      hdr_count_ != hdr_count)
+    CompileRenderer(materials, buffers.size(), sdr_count, hdr_count, camera_file, camera_entry);
   std::vector<BuildPass> passes;
   if (rebuild)
     for (const auto &geometry : geometries) {

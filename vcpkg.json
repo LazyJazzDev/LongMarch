@@ -8,10 +8,6 @@
       "name": "d3dx12",
       "platform": "windows"
     },
-    {
-      "name": "directx-dxc",
-      "platform": "windows"
-    },
     "eigen3",
     "fmt",
     "freetype",
@@ -27,22 +23,39 @@
   ],
   "default-features": [
     "metal",
-    "slang"
+    "slang",
+    "wayland"
   ],
   "features": {
     "metal": {
-      "description": "Use Apple metal-cpp headers packaged by vcpkg.",
+      "description": "Use Apple metal-cpp headers and SPIRV-Cross for the native Metal backend.",
       "dependencies": [
         {
           "name": "metal-cpp",
+          "platform": "osx"
+        },
+        {
+          "name": "spirv-cross",
           "platform": "osx"
         }
       ]
     },
     "slang": {
-      "description": "Use the pinned vcpkg Slang SDK (disable when supplying an external SDK).",
+      "description": "Use the upstream vcpkg Slang SDK (disable when supplying an external SDK).",
       "dependencies": [
         "shader-slang"
+      ]
+    },
+    "wayland": {
+      "description": "Build native Wayland support alongside X11 on Linux",
+      "dependencies": [
+        {
+          "name": "glfw3",
+          "features": [
+            "wayland"
+          ],
+          "platform": "linux"
+        }
       ]
     }
   }

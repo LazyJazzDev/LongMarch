@@ -21,9 +21,15 @@ class GeometryMesh : public Geometry {
     uint32_t index_offset;
     uint32_t color_offset;
     uint32_t color_stride;
+    float shadow_terminator_geometry_offset = 0.1f;
   };
 
   GeometryMesh(Core *core, const Mesh<float> &mesh);
+
+  // Cycles grazing-angle cutoff in [0, 1]; zero disables geometry offset.
+  // Reset accumulated films after changing this setting.
+  void SetShadowTerminatorGeometryOffset(float cutoff);
+  float GetShadowTerminatorGeometryOffset() const;
 
   int PrimitiveCount() override;
   graphics::Buffer *GetBuffer() const;

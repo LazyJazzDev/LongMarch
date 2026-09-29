@@ -11,17 +11,17 @@ class D3D12Shader : public Shader {
 
   std::string EntryPoint() const override;
 
-  d3d12::ShaderModule &ShaderModule() {
-    return shader_module_;
+  D3D12_SHADER_BYTECODE Bytecode() const {
+    return {shader_blob_.data.data(), shader_blob_.data.size()};
   }
 
-  const d3d12::ShaderModule &ShaderModule() const {
-    return shader_module_;
+  const CompiledShaderBlob &CompiledBlob() const {
+    return shader_blob_;
   }
 
  private:
   D3D12Core *core_;
-  d3d12::ShaderModule shader_module_;
+  CompiledShaderBlob shader_blob_;
 };
 
 }  // namespace grassland::graphics::backend

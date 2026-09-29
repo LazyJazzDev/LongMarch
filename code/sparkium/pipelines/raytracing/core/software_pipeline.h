@@ -13,7 +13,8 @@ class SoftwarePipeline {
   void Update(graphics::CommandContext *commands,
               const std::vector<graphics::Buffer *> &buffers,
               uint32_t sdr_count,
-              uint32_t hdr_count);
+              uint32_t hdr_count,
+              Camera *camera);
 
   graphics::ComputeProgram *Program() const {
     return render_program_.get();
@@ -71,11 +72,14 @@ class SoftwarePipeline {
   void CompileRenderer(const std::vector<MaterialCode> &materials,
                        uint32_t buffers,
                        uint32_t sdr_count,
-                       uint32_t hdr_count);
+                       uint32_t hdr_count,
+                       const std::string &camera_file,
+                       const std::string &camera_entry);
   void AppendBuild(std::vector<BuildPass> &passes, BuildParameters parameters);
 
   Core *core_;
   bool ray_query_;
+  std::string camera_file_, camera_entry_;
   std::unique_ptr<graphics::AccelerationStructure> native_tlas_;
   std::vector<Instance> instances_;
   std::vector<GeometryLayout> geometries_;

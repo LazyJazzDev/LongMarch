@@ -40,7 +40,7 @@ groupshared float group_element[GROUP_SIZE];
     [numthreads(GROUP_SIZE, 1, 1)] void BlellochDownSweep(uint3 DTID
                                                           : SV_DispatchThreadID) {
   uint index = DTID.x;
-  if (index / GROUP_SIZE) {
+  if (index / GROUP_SIZE != 0) {
     float element = 0.0f;
     if (index < metadata.element_count) {
       element = asfloat(buffer.Load(metadata.offset + index * metadata.stride));

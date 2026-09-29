@@ -16,15 +16,23 @@ As checked on 2026-09-26:
 | Upstream vcpkg `shader-slang` | `2026.18.2` |
 | Official Slang release | `2026.18.3` |
 
-The default `slang` manifest feature installs **2026.18.3** through vcpkg.
-`vcpkg-configuration.json` selects the project overlay port, so an older vcpkg
-checkout does not silently substitute its registry version. The port packages
-the official SDK with pinned SHA-512 hashes for Windows, Linux and macOS,
-each on ARM64 and x86-64. This is the same compiler release used in the
-[NonUniform comparison](reports/nonuniform-compiler-comparison.md).
-The overlay can be retired once the registry provides the required release.
+The default `slang` manifest feature uses the upstream vcpkg `shader-slang`
+port, currently **2026.18.2** at the registry baseline. The project-specific
+2026.18.3 overlay is removed. `vcpkg-configuration.json` selects a reproducible
+upstream registry revision shared by Slang and the other ports (updated on
+2026-09-27, including FreeType 2.14.3). This snapshot selects a default package; it is not an exact SDK requirement.
+Windows, Linux and macOS ARM64/x86-64 remain supplied by the same upstream port.
 
-`cmake/Slang.cmake` only finds an installed package (2026.18.3 or newer).
+The minimum supported compiler is **2026.18.1**, established by
+[boundary-version NonUniform tests](reports/slang-minimum-version.md).
+2026.11 fixes resource-operand propagation, but integer arithmetic after the
+annotation needs 2026.18.1. Caller-only integer annotations across user function
+boundaries still require rewriting at the actual resource access.
+
+`cmake/Slang.cmake` finds an installed package (2026.18.1 or newer).
+The minimum is checked exclusively at CMake configure time using the discovered
+SDK package version. There is no C++ version parser or runtime version check.
+Newer calendar-year versions are allowed by an explicit lower-bound comparison.
 It never downloads Slang and fails with setup instructions if none is found.
 vcpkg manages downloads, installation and binary caching; for offline builds,
 populate the vcpkg caches/install tree beforehand. The system `slangc` and the
@@ -38,6 +46,10 @@ cmake -S . -B out/external-slang -G Ninja -DCMAKE_BUILD_TYPE=Release \
   -DVCPKG_PATH=/path/to/vcpkg -DVCPKG_MANIFEST_NO_DEFAULT_FEATURES=ON \
   -DVCPKG_MANIFEST_FEATURES=metal -Dslang_DIR=/sdk/lib/cmake/slang
 ```
+
+The default `metal` feature also supplies SPIRV-Cross independently of Vulkan SDK.
+If disabling that feature, provide its exported CMake packages through
+`CMAKE_PREFIX_PATH` as well as the metal-cpp headers.
 
 On Windows the official package directory is `/sdk/cmake`. `CMAKE_PREFIX_PATH`
 can also select an SDK. Use a fresh build directory when changing providers,
@@ -63,8 +75,12 @@ packaging needs separate integration on its development branch.
 - D3D12: Slang emits DXIL. Slang may invoke downstream DXC for this target;
   removing direct DXC API integration does not remove that downstream tool.
   The official Windows Slang archive does not bundle DXC (verified from the
-  2026.18.3 x86-64 archive). The Windows-only vcpkg `directx-dxc` dependency
-  supplies dxcompiler.dll and dxil.dll; deployment copies these next to Slang.
+  2026.18.3 x86-64 archive). The Windows SDK supplies dxcompiler.dll and dxil.dll;
+  deployment copies this matching pair next to Slang. CMake prefers the selected
+  Windows SDK, then the newest installed SDK containing both DLLs for the target
+  architecture. Set `LONGMARCH_DXC_RUNTIME_DIR` to an SDK `bin/<version>/<arch>`
+  directory to select it explicitly. Install a recent Windows SDK if neither DLL
+  pair is available; DXC is no longer supplied by vcpkg.
   LongMarch does not link the DXC API.
 
 Column-major matrix layout, DirectX-compatible buffer layout, entry point names,
@@ -109,8 +125,85 @@ Ninja / Release on Apple Silicon:
   identical to the previously tested official SDK. External SDK discovery and
   the missing-package failure path were also checked. The system Slang is unchanged.
 
-D3D12 execution and Windows/Linux SDK deployment have not been exercised on this
-macOS machine. DXIL compilation alone is not a D3D12 rendering test.
+Windows x64 / MSVC 19.44 / Ninja Release was also validated on an RTX 3090 Ti
+(driver 596.49), using the vcpkg Slang 2026.18.3 package:
+
+- The nine targets listed above build with Python enabled, including the graphics
+  tests that link Grassland directly. Python linkage propagates with its headers.
+- D3D12 and Vulkan each pass all 18 Sparkium regression tests, including hardware
+  image parity. Both runs enable backend debugging; Vulkan also enables
+  synchronization validation with `VK_LAYER_VALIDATE_SYNC=1`.
+- The default D3D12 CLI passes all 31 JSON scene/raster and invalid-input checks
+  at the script's 96x96 resolution.
+- All three Slang tests and both Vulkan compatibility tests pass. The native
+  backend compiler test requires a GPU and checks valid and invalid shader input
+  through the D3D12/Vulkan API on each compiled backend.
+- D3D12 no longer forwards DXC-only warning/debug options to Slang and rejects
+  empty compilation results. Vulkan queries and enables supported
+  `shaderDrawParameters`, required by Slang's vertex/instance ID lowering.
+
+### Windows validation after rebasing onto main
+
+Rebased onto `12c859d` (including the HDR presentation fixes) and repeated
+validation on the Windows / RTX 3090 Ti configuration above:
+
+- Built all 20 current demo targets and `test/all`, plus the explicitly excluded
+  Slang compiler, Vulkan compatibility and window-input tests, with Ninja Release.
+- All 47 automated demo runs exited successfully: all 11 graphics_hello modules,
+  2048, GoL, Sparkium CLI and Sparkium GUI SDR/HDR on both D3D12 and Vulkan;
+  NBody CS compute/offscreen/window on both backends; eight console/CUDA demos;
+  and CUDA NBody headless mode.
+- Opened ImGui, DrawNGUI, joystick_test, Practium, Franka and CUDA NBody windows,
+  inspected their rendered content and closed them normally (exit code zero).
+  No joystick was connected, so physical controller input was not checked.
+- Slang compiler tests (3), Vulkan compatibility tests (2), window-input tests (2)
+  and GoL tests (31) passed.
+- Sparkium regression runs with each of `SPARKIUM_TEST_BACKEND=d3d12` and
+  `vulkan` passed 32 tests and skipped two unsupported-HDR cases because this
+  desktop supports HDR. Backend debugging, Vulkan synchronization validation
+  and HDR window tests were enabled. No Vulkan validation errors were reported.
+- External ray tracing shaders use assets commit `f5d2bcd`, rebased onto the
+  assets main branch; both native backends ran the external_shader demo.
+
+These are short smoke runs (generally six frames; CLI two frames), not exhaustive
+interaction, long-running stability or calibrated HDR luminance measurements.
+This initial rebase run still emitted implicit-conversion, macro and
+possible-uninitialized-variable warnings; the cleanup below addresses them.
+Linux deployment and Metal were not rerun during this Windows rebase
+validation; the Apple Silicon results above describe the earlier revision.
+
+### Shader diagnostic cleanup
+
+Shared includes and generated material programs are compiled for multiple entry
+points and targets, so a small set of source issues produced thousands of repeated
+Slang diagnostics. The cleanup fixes the sources without suppressing diagnostics:
+
+- Test integer flags and bit masks explicitly, and convert channel selections to
+  explicit floating-point weights. Buffer layouts and nonzero flag semantics stay
+  unchanged.
+- Keep Film sample counts as floats, matching their R32F texture storage.
+- Initialize mesh-light emission to zero for unrecognized material shader IDs.
+- Remove unused, repeated microfacet closure macros and only undefine generated
+  shadow macros when they are defined.
+
+The standalone shader corpus and shared renderer compiler tests treat warnings
+as errors. Shared renderer tests compile DXIL and SPIR-V and additionally cover
+Film development, both prefix-scan kernels and the Principled raster pixel shader.
+Production compilation keeps its normal diagnostic policy.
+
+On Windows with Slang 2026.18.3, the standalone/compiler suite passed all three
+tests and each D3D12/Vulkan Sparkium regression run passed 32 tests (two
+unsupported-HDR cases skipped). These runs emitted no Slang warnings, including
+the generated material and software-tracing programs compiled at runtime.
+All 31 JSON checks, 24 basic-scene CLI runs (six scenes, raster and hardware ray
+tracing on both backends), and four GUI SDR/HDR smoke runs also passed without
+Slang warnings. With identical settings, the two-frame 96x96 Cornell PNG outputs
+matched the pre-cleanup images pixel-for-pixel on each backend. This is limited
+smoke/parity coverage; Metal was not rerun.
+
+The [Blender throughput comparison](reports/slang-blender-performance.md) records
+two full-resolution runs per scene/backend against the previous HLSL measurements,
+including the separate initialization costs and historical-baseline limitations.
 
 ```sh
 cmake -S . -B out/slang-build -G Ninja -DCMAKE_BUILD_TYPE=Release \

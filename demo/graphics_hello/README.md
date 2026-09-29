@@ -95,6 +95,19 @@ MTL_DEBUG_LAYER=1 MTL_SHADER_VALIDATION=1 \
   build/demo/graphics_hello/demo_graphics_hello --module ray_query --backend metal --frames 10
 ```
 
+## Python
+
+`python/graphics_hello.py` is the Python counterpart, built on the installed
+`long_march` module. It has the same eleven modules, options, menu, window
+titles, FPS display and animation timing, and compiles the shaders in
+`modules/NAME/shaders/`. Each module is also a standalone script,
+`python/graphics_hello_NAME.py`, which accepts `--backend` and `--frames`.
+
+```sh
+python3 python/graphics_hello.py --module ray_query --backend vulkan
+python3 python/graphics_hello_cube.py --backend d3d12 --frames 60
+```
+
 The previous `demo_graphics_hello_*` targets are replaced by
 `demo_graphics_hello --module NAME`. Module sources and shaders now live in
 `modules/NAME/`; built-in shaders are embedded once through `shaders.cpp`.

@@ -15,6 +15,12 @@ MaterialShaderGraph::MaterialShaderGraph(sparkium::MaterialShaderGraph &material
   sampler_implementation_ = CodeLines(core_->GetShadersVFS(), "material/shader_graph/sampler.slang");
   sampler_implementation_.InsertAfter(material_.graph_code, "// SHADER_GRAPH_IMPLEMENTATION");
   evaluator_implementation_ = CodeLines(core_->GetShadersVFS(), "material/shader_graph/evaluator.slang");
+  material_buffer_->UploadData(&material_.emission_hint, sizeof(material_.emission_hint));
+}
+
+void MaterialShaderGraph::PrepareHitShaders() {
+  if (closest_hit_shader_ && shadow_closest_hit_shader_ && shadow_any_hit_shader_)
+    return;
   auto vfs = core_->GetShadersVFS();
   vfs.WriteFile("material_sampler.slang", sampler_implementation_);
   if (core_->GraphicsCore()->DeviceRayTracingSupport() &&
@@ -25,7 +31,6 @@ MaterialShaderGraph::MaterialShaderGraph(sparkium::MaterialShaderGraph &material
        core_->GraphicsCore()->CreateShader(vfs, "geometry/mesh/hit_group.slang", "ShadowAnyHit", "lib_6_5", {"-I."},
                                            &shadow_any_hit_shader_) != 0))
     throw std::runtime_error("failed to compile shader graph material");
-  material_buffer_->UploadData(&material_.emission_hint, sizeof(material_.emission_hint));
 }
 
 const CodeLines *MaterialShaderGraph::GraphImpl() const {

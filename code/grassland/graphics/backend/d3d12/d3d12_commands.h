@@ -201,10 +201,12 @@ class D3D12CmdDrawIndexed : public D3D12Command {
 
 class D3D12CmdPresent : public D3D12Command {
  public:
-  D3D12CmdPresent(D3D12Window *window, D3D12Image *image);
+  D3D12CmdPresent(D3D12Window *window, D3D12Image *image, D3D12Image *target = nullptr, bool draw_ui = true);
   void CompileCommand(D3D12CommandContext *context, ID3D12GraphicsCommandList *command_list) override;
 
  private:
+  D3D12Image *target_;
+  bool draw_ui_;
   D3D12Image *image_;
   D3D12Window *window_;
 };

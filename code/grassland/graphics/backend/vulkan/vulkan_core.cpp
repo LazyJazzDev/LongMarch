@@ -33,7 +33,9 @@ VulkanCore::VulkanCore(const Settings &settings) : Core(settings) {
   hint.AddExtension(VK_KHR_EXTERNAL_MEMORY_CAPABILITIES_EXTENSION_NAME);
   hint.AddExtension(VK_KHR_EXTERNAL_SEMAPHORE_CAPABILITIES_EXTENSION_NAME);
 #endif
-  vulkan::ThrowIfFailed(vulkan::CreateInstance(hint, &instance_), "Cannot initialize Vulkan instance");
+  vulkan::ThrowIfFailed(vulkan::CreateNativeInstance(hint, instance_, debug_messenger_, instance_procedures_),
+                        "Failed to create Vulkan instance");
+  instance_hint_ = std::move(hint);
 }
 
 VulkanCore::~VulkanCore() {
@@ -44,21 +46,49 @@ VulkanCore::~VulkanCore() {
     semaphore_wait_info.pSemaphores = &cuda_synchronization_semaphore_;
     semaphore_wait_info.pValues = &cuda_synchronization_value_;
     semaphore_wait_info.semaphoreCount = 1;
-    vkWaitSemaphores(device_->Handle(), &semaphore_wait_info, std::numeric_limits<uint64_t>::max());
+    vkWaitSemaphores(this->Handle(), &semaphore_wait_info, std::numeric_limits<uint64_t>::max());
     cudaDestroyExternalSemaphore(cuda_external_semaphore_);
-    vkDestroySemaphore(device_->Handle(), cuda_synchronization_semaphore_, nullptr);
+    vkDestroySemaphore(this->Handle(), cuda_synchronization_semaphore_, nullptr);
   }
 #endif
-  upload_staging_buffer_.reset();
-  download_staging_buffer_.reset();
+  if (device_) {
+    vkDeviceWaitIdle(this->Handle());
+  }
+  if (upload_staging_buffer_)
+    vmaDestroyBuffer(allocator_, upload_staging_buffer_, upload_staging_allocation_);
+  if (download_staging_buffer_)
+    vmaDestroyBuffer(allocator_, download_staging_buffer_, download_staging_allocation_);
 
-  for (auto &descriptor_set : descriptor_sets_) {
-    while (!descriptor_set.empty()) {
-      delete descriptor_set.front();
-      descriptor_set.pop();
+  if (device_) {
+    for (VkDescriptorPool pool : descriptor_pools_) {
+      if (pool)
+        vkDestroyDescriptorPool(device_, pool, nullptr);
     }
   }
   descriptor_pools_.clear();
+  if (device_) {
+    for (VkFence fence : in_flight_fences_) {
+      vkDestroyFence(this->Handle(), fence, nullptr);
+    }
+    in_flight_fences_.clear();
+  }
+  if (device_) {
+    if (graphics_command_pool_) {
+      vkDestroyCommandPool(this->Handle(), graphics_command_pool_, nullptr);
+    }
+    if (transfer_command_pool_) {
+      vkDestroyCommandPool(this->Handle(), transfer_command_pool_, nullptr);
+    }
+  }
+  if (device_) {
+    DestroyNativeDevice();
+  }
+  if (instance_hint_.enable_validation_layers && debug_messenger_) {
+    instance_procedures_.vkDestroyDebugUtilsMessengerEXT(instance_, debug_messenger_, nullptr);
+  }
+  if (instance_) {
+    vkDestroyInstance(instance_, nullptr);
+  }
 }
 
 int VulkanCore::CreateBuffer(size_t size, BufferType type, double_ptr<Buffer> pp_buffer) {
@@ -84,10 +114,9 @@ int VulkanCore::CreateImage(int width, int height, ImageFormat format, double_pt
   pp_image.construct<VulkanImage>(this, width, height, format);
   SingleTimeCommand([this, pp_image](VkCommandBuffer command_buffer) {
     VulkanImage *image = dynamic_cast<VulkanImage *>(*pp_image);
-    vulkan::TransitImageLayout(command_buffer, image->Image()->Handle(), VK_IMAGE_LAYOUT_UNDEFINED,
-                               VK_IMAGE_LAYOUT_GENERAL, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT,
-                               VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, 0,
-                               VK_ACCESS_MEMORY_READ_BIT | VK_ACCESS_MEMORY_WRITE_BIT, image->Image()->Aspect());
+    vulkan::TransitImageLayout(command_buffer, image->Handle(), VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_GENERAL,
+                               VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, 0,
+                               VK_ACCESS_MEMORY_READ_BIT | VK_ACCESS_MEMORY_WRITE_BIT, image->Aspect());
   });
   return 0;
 }
@@ -168,11 +197,16 @@ int VulkanCore::CreateBottomLevelAccelerationStructure(BufferRange aabb_buffer,
                                                        double_ptr<AccelerationStructure> pp_blas) {
   VulkanBuffer *vk_aabb_buffer = dynamic_cast<VulkanBuffer *>(aabb_buffer.buffer);
   assert(vk_aabb_buffer);
-  std::unique_ptr<vulkan::AccelerationStructure> blas;
-  device_->CreateBottomLevelAccelerationStructure(vk_aabb_buffer->DeviceAddress() + aabb_buffer.offset, stride,
-                                                  num_aabb, flags, graphics_command_pool_.get(), graphics_queue_.get(),
-                                                  &blas);
-  pp_blas.construct<VulkanAccelerationStructure>(this, std::move(blas));
+  VkAccelerationStructureKHR as = VK_NULL_HANDLE;
+  VkBuffer buffer = VK_NULL_HANDLE;
+  VmaAllocation allocation = VK_NULL_HANDLE;
+  VkDeviceSize buffer_size = 0;
+  VkDeviceAddress address = 0;
+  vulkan::ThrowIfFailed(
+      CreateNativeAABBAccelerationStructure(vk_aabb_buffer->DeviceAddress() + aabb_buffer.offset, stride, num_aabb,
+                                            flags, &as, &buffer, &allocation, &buffer_size, &address),
+      "Failed to create Vulkan AABB acceleration structure");
+  pp_blas.construct<VulkanAccelerationStructure>(this, as, buffer, allocation, buffer_size, address, num_aabb);
   return 0;
 }
 
@@ -187,11 +221,17 @@ int VulkanCore::CreateBottomLevelAccelerationStructure(BufferRange vertex_buffer
   VulkanBuffer *vk_index_buffer = dynamic_cast<VulkanBuffer *>(index_buffer.buffer);
   assert(vk_vertex_buffer != nullptr);
   assert(vk_index_buffer != nullptr);
-  std::unique_ptr<vulkan::AccelerationStructure> blas;
-  device_->CreateBottomLevelAccelerationStructure(
-      vk_vertex_buffer->DeviceAddress() + vertex_buffer.offset, vk_index_buffer->DeviceAddress() + index_buffer.offset,
-      num_vertex, stride, num_primitive, flags, graphics_command_pool_.get(), graphics_queue_.get(), &blas);
-  pp_blas.construct<VulkanAccelerationStructure>(this, std::move(blas));
+  VkAccelerationStructureKHR as = VK_NULL_HANDLE;
+  VkBuffer buffer = VK_NULL_HANDLE;
+  VmaAllocation allocation = VK_NULL_HANDLE;
+  VkDeviceSize buffer_size = 0;
+  VkDeviceAddress address = 0;
+  vulkan::ThrowIfFailed(CreateNativeTriangleAccelerationStructure(
+                            vk_vertex_buffer->DeviceAddress() + vertex_buffer.offset,
+                            vk_index_buffer->DeviceAddress() + index_buffer.offset, num_vertex, stride, num_primitive,
+                            flags, &as, &buffer, &allocation, &buffer_size, &address),
+                        "Failed to create Vulkan triangle acceleration structure");
+  pp_blas.construct<VulkanAccelerationStructure>(this, as, buffer, allocation, buffer_size, address, num_primitive);
   return 0;
 }
 
@@ -212,10 +252,16 @@ int VulkanCore::CreateTopLevelAccelerationStructure(const std::vector<RayTracing
     vk_instances.emplace_back(RayTracingInstanceToVkAccelerationStructureInstanceKHR(instance));
   }
 
-  std::unique_ptr<vulkan::AccelerationStructure> tlas;
-  device_->CreateTopLevelAccelerationStructure(vk_instances, graphics_command_pool_.get(), graphics_queue_.get(),
-                                               &tlas);
-  pp_tlas.construct<VulkanAccelerationStructure>(this, std::move(tlas));
+  VkAccelerationStructureKHR as = VK_NULL_HANDLE;
+  VkBuffer buffer = VK_NULL_HANDLE;
+  VmaAllocation allocation = VK_NULL_HANDLE;
+  VkDeviceSize buffer_size = 0;
+  VkDeviceAddress address = 0;
+  vulkan::ThrowIfFailed(
+      CreateNativeTopLevelAccelerationStructure(vk_instances, &as, &buffer, &allocation, &buffer_size, &address),
+      "Failed to create Vulkan top-level acceleration structure");
+  pp_tlas.construct<VulkanAccelerationStructure>(this, as, buffer, allocation, buffer_size, address,
+                                                 static_cast<int>(instances.size()));
   return 0;
 }
 
@@ -227,16 +273,9 @@ int VulkanCore::CreateRayTracingProgram(double_ptr<RayTracingProgram> pp_program
 int VulkanCore::SubmitCommandContext(CommandContext *p_command_context) {
   VulkanCommandContext *command_context = dynamic_cast<VulkanCommandContext *>(p_command_context);
 
-  auto &set_queue = descriptor_sets_[current_frame_];
   auto &pool = descriptor_pools_[current_frame_];
-
-  while (!set_queue.empty()) {
-    delete set_queue.front();
-    set_queue.pop();
-  }
-
-  auto pool_size = pool->PoolSize();
-  auto max_sets = pool->MaxSets();
+  auto pool_size = descriptor_pool_sizes_[current_frame_];
+  auto max_sets = descriptor_pool_max_sets_[current_frame_];
   bool update_pool = false;
   for (auto &[type, count] : command_context->required_pool_size_.descriptor_type_count) {
     if (!pool_size.descriptor_type_count.count(type) || pool_size.descriptor_type_count[type] < count) {
@@ -256,11 +295,14 @@ int VulkanCore::SubmitCommandContext(CommandContext *p_command_context) {
     update_pool = true;
   }
   if (update_pool) {
-    pool.reset();
-    device_->CreateDescriptorPool(pool_size.ToVkDescriptorPoolSize(), max_sets, &pool);
+    vkDestroyDescriptorPool(device_, pool, nullptr);
+    this->CreateDescriptorPool(pool_size.ToVkDescriptorPoolSize(), max_sets, &pool);
+    descriptor_pool_sizes_[current_frame_] = pool_size;
+    descriptor_pool_max_sets_[current_frame_] = max_sets;
+  } else {
+    vkResetDescriptorPool(device_, pool, 0);
   }
-  current_descriptor_pool_ = pool.get();
-  current_descriptor_set_queue_ = &set_queue;
+  current_descriptor_pool_ = pool;
 
 #ifndef LONGMARCH_HEADLESS
   for (auto &window : command_context->windows_) {
@@ -269,18 +311,18 @@ int VulkanCore::SubmitCommandContext(CommandContext *p_command_context) {
 #endif
 
   if (command_context->dynamic_buffers_.size()) {
-    vkResetCommandBuffer(transfer_command_buffer_->Handle(), 0);
+    vkResetCommandBuffer(transfer_command_buffer_, 0);
     VkCommandBufferBeginInfo begin_info = {};
     begin_info.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
     begin_info.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
 
-    vkBeginCommandBuffer(transfer_command_buffer_->Handle(), &begin_info);
+    vkBeginCommandBuffer(transfer_command_buffer_, &begin_info);
     for (auto &buffer : command_context->dynamic_buffers_) {
-      buffer->TransferData(transfer_command_buffer_->Handle());
+      buffer->TransferData(transfer_command_buffer_);
     }
-    vkEndCommandBuffer(transfer_command_buffer_->Handle());
+    vkEndCommandBuffer(transfer_command_buffer_);
 
-    VkCommandBuffer command_buffers[] = {transfer_command_buffer_->Handle()};
+    VkCommandBuffer command_buffers[] = {transfer_command_buffer_};
 
     VkSubmitInfo submit_info = {};
     submit_info.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
@@ -310,10 +352,10 @@ int VulkanCore::SubmitCommandContext(CommandContext *p_command_context) {
     }
 #endif
 
-    vulkan::ThrowIfFailed(vkQueueSubmit(transfer_queue_->Handle(), 1, &submit_info, nullptr), "Submit Vulkan uploads");
+    vulkan::ThrowIfFailed(vkQueueSubmit(transfer_queue_, 1, &submit_info, nullptr), "Submit Vulkan uploads");
   }
 
-  VkCommandBuffer command_buffer = command_buffers_[current_frame_]->Handle();
+  VkCommandBuffer command_buffer = command_buffers_[current_frame_];
   vkResetCommandBuffer(command_buffer, 0);
   VkCommandBufferBeginInfo begin_info{};
   begin_info.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
@@ -350,14 +392,14 @@ int VulkanCore::SubmitCommandContext(CommandContext *p_command_context) {
   std::vector<VkPipelineStageFlags> wait_stages{};
 #ifndef LONGMARCH_HEADLESS
   for (auto &window : command_context->windows_) {
-    wait_semaphores.push_back(window->ImageAvailableSemaphore()->Handle());
+    wait_semaphores.push_back(window->ImageAvailableSemaphore());
     wait_stages.push_back(VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT);
-    signal_semaphores.push_back(window->RenderFinishSemaphore()->Handle());
+    signal_semaphores.push_back(window->RenderFinishSemaphore());
   }
 #endif
 
-  VkFence fence = in_flight_fences_[current_frame_]->Handle();
-  vkResetFences(device_->Handle(), 1, &fence);
+  VkFence fence = in_flight_fences_[current_frame_];
+  vkResetFences(this->Handle(), 1, &fence);
 
   VkSubmitInfo submit_info{};
   submit_info.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
@@ -392,7 +434,7 @@ int VulkanCore::SubmitCommandContext(CommandContext *p_command_context) {
     submit_info.pSignalSemaphores = signal_semaphores.data();
   }
 
-  vulkan::ThrowIfFailed(vkQueueSubmit(graphics_queue_->Handle(), 1, &submit_info, fence), "Submit Vulkan rendering");
+  vulkan::ThrowIfFailed(vkQueueSubmit(graphics_queue_, 1, &submit_info, fence), "Submit Vulkan rendering");
 
 #ifndef LONGMARCH_HEADLESS
   for (auto &window : command_context->windows_) {
@@ -403,11 +445,11 @@ int VulkanCore::SubmitCommandContext(CommandContext *p_command_context) {
   post_execute_functions_[current_frame_] = p_command_context->GetPostExecutionCallbacks();
 
   current_frame_ = (current_frame_ + 1) % FramesInFlight();
-  fence = in_flight_fences_[current_frame_]->Handle();
-  vulkan::ThrowIfFailed(vkWaitForFences(device_->Handle(), 1, &fence, VK_TRUE, std::numeric_limits<uint64_t>::max()),
+  fence = in_flight_fences_[current_frame_];
+  vulkan::ThrowIfFailed(vkWaitForFences(this->Handle(), 1, &fence, VK_TRUE, std::numeric_limits<uint64_t>::max()),
                         "Wait for Vulkan rendering");
 
-  vulkan::ThrowIfFailed(vkQueueWaitIdle(transfer_queue_->Handle()), "Wait for Vulkan uploads");
+  vulkan::ThrowIfFailed(vkQueueWaitIdle(transfer_queue_), "Wait for Vulkan uploads");
 
   for (auto &callback : post_execute_functions_[current_frame_]) {
     callback();
@@ -418,7 +460,7 @@ int VulkanCore::SubmitCommandContext(CommandContext *p_command_context) {
 }
 
 int VulkanCore::GetPhysicalDeviceProperties(PhysicalDeviceProperties *p_physical_device_properties) {
-  auto physical_devices = instance_->EnumeratePhysicalDevices();
+  auto physical_devices = vulkan::EnumerateNativePhysicalDevices(instance_);
   if (physical_devices.empty()) {
     return 0;
   }
@@ -428,12 +470,12 @@ int VulkanCore::GetPhysicalDeviceProperties(PhysicalDeviceProperties *p_physical
   for (int i = 0; i < physical_devices.size(); ++i) {
     auto physical_device = physical_devices[i];
     PhysicalDeviceProperties properties{};
-    properties.name = physical_device.GetPhysicalDeviceProperties().deviceName;
-    properties.score = physical_device.Evaluate();
-    properties.ray_tracing_support = physical_device.SupportRayTracing();
-    properties.geometry_shader_support = physical_device.SupportGeometryShader();
+    properties.name = vulkan::GetPhysicalDeviceProperties(physical_device).deviceName;
+    properties.score = vulkan::Evaluate(physical_device);
+    properties.ray_tracing_support = vulkan::SupportRayTracing(physical_device);
+    properties.geometry_shader_support = vulkan::SupportGeometryShader(physical_device);
 #if defined(LONGMARCH_CUDA_RUNTIME)
-    properties.cuda_device_index = physical_device.GetCUDADeviceIndex();
+    properties.cuda_device_index = vulkan::GetCUDADeviceIndex(physical_device);
 #endif
     if (p_physical_device_properties) {
       p_physical_device_properties[i] = properties;
@@ -445,7 +487,7 @@ int VulkanCore::GetPhysicalDeviceProperties(PhysicalDeviceProperties *p_physical
 }
 
 int VulkanCore::InitializeLogicalDevice(int device_index) {
-  std::vector<vulkan::PhysicalDevice> physical_devices = instance_->EnumeratePhysicalDevices();
+  std::vector<VkPhysicalDevice> physical_devices = vulkan::EnumerateNativePhysicalDevices(instance_);
 
   if (device_index < 0 || device_index >= physical_devices.size()) {
     return -1;
@@ -454,15 +496,15 @@ int VulkanCore::InitializeLogicalDevice(int device_index) {
   auto physical_device = physical_devices[device_index];
 
 #if defined(LONGMARCH_CUDA_RUNTIME)
-  cuda_device_ = physical_device.GetCUDADeviceIndex();
+  cuda_device_ = vulkan::GetCUDADeviceIndex(physical_device);
 #endif
 
-  grassland::vulkan::DeviceFeatureRequirement device_feature_requirement{};
-  device_feature_requirement.enable_raytracing_extension = physical_device.SupportRayTracing();
-  device_feature_requirement.enable_rayquery_extension = physical_device.SupportRayQuery();
+  grassland::graphics::backend::vulkan::DeviceFeatureRequirement device_feature_requirement{};
+  device_feature_requirement.enable_raytracing_extension = vulkan::SupportRayTracing(physical_device);
+  device_feature_requirement.enable_rayquery_extension = vulkan::SupportRayQuery(physical_device);
   auto create_info = device_feature_requirement.GenerateRecommendedDeviceCreateInfo(physical_device);
-  if (instance_->CreateHint().IsEnabledExtension(VK_KHR_SURFACE_EXTENSION_NAME) &&
-      physical_device.IsExtensionSupported(VK_KHR_SWAPCHAIN_EXTENSION_NAME)) {
+  if (instance_hint_.IsEnabledExtension(VK_KHR_SURFACE_EXTENSION_NAME) &&
+      vulkan::IsExtensionSupported(physical_device, VK_KHR_SWAPCHAIN_EXTENSION_NAME)) {
     create_info.AddExtension(VK_KHR_SWAPCHAIN_EXTENSION_NAME);
   }
 #if defined(LONGMARCH_CUDA_RUNTIME)
@@ -483,51 +525,62 @@ int VulkanCore::InitializeLogicalDevice(int device_index) {
     create_info.AddFeature(physical_device_timeline_semaphore_features);
   }
 #endif
-  if (instance_->CreateDevice(physical_device, create_info, device_feature_requirement.GetVmaAllocatorCreateFlags(),
-                              &device_) != VK_SUCCESS) {
+  auto native_create_info =
+      create_info.CompileVkDeviceCreateInfo(instance_hint_.enable_validation_layers, physical_device);
+  VkDevice native_device = VK_NULL_HANDLE;
+  if (vkCreateDevice(physical_device, &native_create_info, nullptr, &native_device) != VK_SUCCESS) {
     return -1;
   }
-  memory_properties_ = physical_device.GetPhysicalDeviceMemoryProperties();
+  InitializeNativeDevice(instance_hint_.app_info.apiVersion, physical_device, create_info,
+                         device_feature_requirement.GetVmaAllocatorCreateFlags(), native_device);
+  memory_properties_ = vulkan::GetPhysicalDeviceMemoryProperties(physical_device);
 
-  device_name_ = physical_device.GetPhysicalDeviceProperties().deviceName;
-  ray_tracing_support_ = physical_device.SupportRayTracing();
+  device_name_ = vulkan::GetPhysicalDeviceProperties(physical_device).deviceName;
+  ray_tracing_support_ = vulkan::SupportRayTracing(physical_device);
 
-  vulkan::ThrowIfFailed(
-      device_->CreateCommandPool(device_->PhysicalDevice().GraphicsFamilyIndex(),
-                                 VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT, &graphics_command_pool_),
-      "failed to create graphics command pool");
-  vulkan::ThrowIfFailed(
-      device_->CreateCommandPool(device_->PhysicalDevice().GraphicsFamilyIndex(),
-                                 VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT, &transfer_command_pool_),
-      "failed to create transfer command pool");
+  VkCommandPoolCreateInfo pool_info{VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO};
+  pool_info.flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT;
+  pool_info.queueFamilyIndex = vulkan::GraphicsFamilyIndex(physical_device);
+  vulkan::ThrowIfFailed(vkCreateCommandPool(native_device, &pool_info, nullptr, &graphics_command_pool_),
+                        "failed to create graphics command pool");
+  // Upload buffers use exclusive sharing and are consumed by the graphics queue.
+  pool_info.queueFamilyIndex = vulkan::GraphicsFamilyIndex(physical_device);
+  vulkan::ThrowIfFailed(vkCreateCommandPool(native_device, &pool_info, nullptr, &transfer_command_pool_),
+                        "failed to create transfer command pool");
 
-  device_->GetQueue(device_->PhysicalDevice().GraphicsFamilyIndex(), 0, &graphics_queue_);
-  // Buffers use exclusive sharing. Upload and consume them on the same family;
-  // a dedicated transfer queue would require explicit ownership transfers.
-  device_->GetQueue(device_->PhysicalDevice().GraphicsFamilyIndex(), 0, &transfer_queue_);
+  vkGetDeviceQueue(native_device, vulkan::GraphicsFamilyIndex(physical_device), 0, &graphics_queue_);
+  vkGetDeviceQueue(native_device, vulkan::GraphicsFamilyIndex(physical_device), 0, &transfer_queue_);
 
   in_flight_fences_.resize(FramesInFlight());
   command_buffers_.resize(FramesInFlight());
 
   descriptor_pools_.resize(FramesInFlight());
-  descriptor_sets_.resize(FramesInFlight());
+  descriptor_pool_sizes_.resize(FramesInFlight());
+  descriptor_pool_max_sets_.resize(FramesInFlight(), 1);
 
   post_execute_functions_.resize(FramesInFlight());
 
   for (int i = 0; i < FramesInFlight(); i++) {
-    device_->CreateFence(true, &in_flight_fences_[i]);
-    graphics_command_pool_->AllocateCommandBuffer(VK_COMMAND_BUFFER_LEVEL_PRIMARY, &command_buffers_[i]);
+    VkFenceCreateInfo fence_info{VK_STRUCTURE_TYPE_FENCE_CREATE_INFO};
+    fence_info.flags = VK_FENCE_CREATE_SIGNALED_BIT;
+    vulkan::ThrowIfFailed(vkCreateFence(this->Handle(), &fence_info, nullptr, &in_flight_fences_[i]),
+                          "Failed to create in-flight fence");
+    VkCommandBufferAllocateInfo allocate_info{VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO};
+    allocate_info.commandPool = graphics_command_pool_;
+    allocate_info.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
+    allocate_info.commandBufferCount = 1;
+    vulkan::ThrowIfFailed(vkAllocateCommandBuffers(native_device, &allocate_info, &command_buffers_[i]),
+                          "failed to allocate graphics command buffer");
 
-    VkDescriptorPoolSize pool_sizes[] = {
-        {VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 100},
-        {VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 100},
-        {VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, 100},
-        {VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, 100},
-    };
-
-    device_->CreateDescriptorPool({{VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 1}}, 1, &descriptor_pools_[i]);
+    this->CreateDescriptorPool({{VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 1}}, 1, &descriptor_pools_[i]);
+    descriptor_pool_sizes_[i] = vulkan::DescriptorPoolSize(VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 1);
   }
-  transfer_command_pool_->AllocateCommandBuffer(VK_COMMAND_BUFFER_LEVEL_PRIMARY, &transfer_command_buffer_);
+  VkCommandBufferAllocateInfo transfer_allocate_info{VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO};
+  transfer_allocate_info.commandPool = transfer_command_pool_;
+  transfer_allocate_info.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
+  transfer_allocate_info.commandBufferCount = 1;
+  vulkan::ThrowIfFailed(vkAllocateCommandBuffers(native_device, &transfer_allocate_info, &transfer_command_buffer_),
+                        "failed to allocate transfer command buffer");
 
 #if defined(LONGMARCH_CUDA_RUNTIME)
 
@@ -548,7 +601,7 @@ int VulkanCore::InitializeLogicalDevice(int device_index) {
 
     semaphore_create_info.pNext = &export_semaphore_create_info;
     vulkan::ThrowIfFailed(
-        vkCreateSemaphore(device_->Handle(), &semaphore_create_info, nullptr, &cuda_synchronization_semaphore_),
+        vkCreateSemaphore(this->Handle(), &semaphore_create_info, nullptr, &cuda_synchronization_semaphore_),
         "Failed to create CUDA synchronization semaphore");
 
     cudaExternalSemaphoreHandleDesc external_semaphore_handle_desc = {};
@@ -585,7 +638,7 @@ int VulkanCore::InitializeLogicalDevice(int device_index) {
 }
 
 void VulkanCore::WaitGPU() {
-  graphics_queue_->WaitIdle();
+  vkQueueWaitIdle(graphics_queue_);
   for (auto &post_execute : post_execute_functions_) {
     for (auto &callback : post_execute) {
       callback();
@@ -595,7 +648,7 @@ void VulkanCore::WaitGPU() {
 }
 
 uint32_t VulkanCore::WaveSize() const {
-  return device_->SubGroupSize();
+  return this->SubGroupSize();
 }
 
 void VulkanCore::SingleTimeCommand(std::function<void(VkCommandBuffer)> command) {
@@ -622,9 +675,7 @@ void VulkanCore::SingleTimeCommand(std::function<void(VkCommandBuffer)> command)
     submit_info.pWaitDstStageMask = wait_stages;
   }
 #endif
-  vulkan::ThrowIfFailed(
-      vulkan::SingleTimeCommand(graphics_queue_.get(), graphics_command_pool_.get(), command, submit_info),
-      "Execute Vulkan transfer");
+  vulkan::SingleTimeCommand(this->Handle(), graphics_queue_, graphics_command_pool_, command, submit_info);
 }
 
 uint32_t VulkanCore::FindMemoryType(uint32_t type_filter, VkMemoryPropertyFlags properties) {
@@ -636,20 +687,28 @@ uint32_t VulkanCore::FindMemoryType(uint32_t type_filter, VkMemoryPropertyFlags 
   return ~0;
 }
 
-vulkan::Buffer *VulkanCore::RequestUploadStagingBuffer(size_t size) {
-  if (!upload_staging_buffer_ || upload_staging_buffer_->Size() < size) {
-    upload_staging_buffer_.reset();
-    device_->CreateBuffer(size, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VMA_MEMORY_USAGE_CPU_ONLY, &upload_staging_buffer_);
+VkBuffer VulkanCore::RequestUploadStagingBuffer(size_t size) {
+  if (!upload_staging_buffer_ || upload_staging_size_ < size) {
+    if (upload_staging_buffer_)
+      vmaDestroyBuffer(allocator_, upload_staging_buffer_, upload_staging_allocation_);
+    vulkan::ThrowIfFailed(CreateBuffer(size, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VMA_MEMORY_USAGE_CPU_ONLY,
+                                       &upload_staging_buffer_, &upload_staging_allocation_),
+                          "Failed to create Vulkan upload staging buffer");
+    upload_staging_size_ = size;
   }
-  return upload_staging_buffer_.get();
+  return upload_staging_buffer_;
 }
 
-vulkan::Buffer *VulkanCore::RequestDownloadStagingBuffer(size_t size) {
-  if (!download_staging_buffer_ || download_staging_buffer_->Size() < size) {
-    download_staging_buffer_.reset();
-    device_->CreateBuffer(size, VK_BUFFER_USAGE_TRANSFER_DST_BIT, VMA_MEMORY_USAGE_CPU_ONLY, &download_staging_buffer_);
+VkBuffer VulkanCore::RequestDownloadStagingBuffer(size_t size) {
+  if (!download_staging_buffer_ || download_staging_size_ < size) {
+    if (download_staging_buffer_)
+      vmaDestroyBuffer(allocator_, download_staging_buffer_, download_staging_allocation_);
+    vulkan::ThrowIfFailed(CreateBuffer(size, VK_BUFFER_USAGE_TRANSFER_DST_BIT, VMA_MEMORY_USAGE_CPU_ONLY,
+                                       &download_staging_buffer_, &download_staging_allocation_),
+                          "Failed to create Vulkan download staging buffer");
+    download_staging_size_ = size;
   }
-  return download_staging_buffer_.get();
+  return download_staging_buffer_;
 }
 
 #if defined(LONGMARCH_CUDA_RUNTIME)
@@ -724,11 +783,11 @@ void *VulkanCore::GetMemoryHandle(VkDeviceMemory memory) {
 
   PFN_vkGetMemoryWin32HandleKHR fpGetMemoryWin32HandleKHR;
   fpGetMemoryWin32HandleKHR =
-      (PFN_vkGetMemoryWin32HandleKHR)vkGetDeviceProcAddr(device_->Handle(), "vkGetMemoryWin32HandleKHR");
+      (PFN_vkGetMemoryWin32HandleKHR)vkGetDeviceProcAddr(this->Handle(), "vkGetMemoryWin32HandleKHR");
   if (!fpGetMemoryWin32HandleKHR) {
     throw std::runtime_error("Failed to retrieve vkGetMemoryWin32HandleKHR!");
   }
-  if (fpGetMemoryWin32HandleKHR(device_->Handle(), &vk_memory_get_win32_handle_info_khr, &handle) != VK_SUCCESS) {
+  if (fpGetMemoryWin32HandleKHR(this->Handle(), &vk_memory_get_win32_handle_info_khr, &handle) != VK_SUCCESS) {
     throw std::runtime_error("Failed to retrieve handle for buffer!");
   }
   return (void *)handle;
@@ -742,11 +801,11 @@ void *VulkanCore::GetMemoryHandle(VkDeviceMemory memory) {
   vk_memory_get_fd_info_khr.handleType = handle_type;
 
   PFN_vkGetMemoryFdKHR fpGetMemoryFdKHR;
-  fpGetMemoryFdKHR = (PFN_vkGetMemoryFdKHR)vkGetDeviceProcAddr(device_->Handle(), "vkGetMemoryFdKHR");
+  fpGetMemoryFdKHR = (PFN_vkGetMemoryFdKHR)vkGetDeviceProcAddr(this->Handle(), "vkGetMemoryFdKHR");
   if (!fpGetMemoryFdKHR) {
     throw std::runtime_error("Failed to retrieve vkGetMemoryWin32HandleKHR!");
   }
-  if (fpGetMemoryFdKHR(device_->Handle(), &vk_memory_get_fd_info_khr, &fd) != VK_SUCCESS) {
+  if (fpGetMemoryFdKHR(this->Handle(), &vk_memory_get_fd_info_khr, &fd) != VK_SUCCESS) {
     throw std::runtime_error("Failed to retrieve handle for buffer!");
   }
   return (void *)(uintptr_t)fd;
@@ -766,11 +825,11 @@ void *VulkanCore::GetSemaphoreHandle(VkSemaphore semaphore) {
 
   PFN_vkGetSemaphoreWin32HandleKHR fpGetSemaphoreWin32HandleKHR;
   fpGetSemaphoreWin32HandleKHR =
-      (PFN_vkGetSemaphoreWin32HandleKHR)vkGetDeviceProcAddr(device_->Handle(), "vkGetSemaphoreWin32HandleKHR");
+      (PFN_vkGetSemaphoreWin32HandleKHR)vkGetDeviceProcAddr(this->Handle(), "vkGetSemaphoreWin32HandleKHR");
   if (!fpGetSemaphoreWin32HandleKHR) {
     throw std::runtime_error("Failed to retrieve vkGetMemoryWin32HandleKHR!");
   }
-  if (fpGetSemaphoreWin32HandleKHR(device_->Handle(), &semaphore_get_win32_handle_info_khr, &handle) != VK_SUCCESS) {
+  if (fpGetSemaphoreWin32HandleKHR(this->Handle(), &semaphore_get_win32_handle_info_khr, &handle) != VK_SUCCESS) {
     throw std::runtime_error("Failed to retrieve handle for buffer!");
   }
 
@@ -785,11 +844,11 @@ void *VulkanCore::GetSemaphoreHandle(VkSemaphore semaphore) {
   semaphore_get_fd_info_khr.handleType = handle_type;
 
   PFN_vkGetSemaphoreFdKHR fpGetSemaphoreFdKHR;
-  fpGetSemaphoreFdKHR = (PFN_vkGetSemaphoreFdKHR)vkGetDeviceProcAddr(device_->Handle(), "vkGetSemaphoreFdKHR");
+  fpGetSemaphoreFdKHR = (PFN_vkGetSemaphoreFdKHR)vkGetDeviceProcAddr(this->Handle(), "vkGetSemaphoreFdKHR");
   if (!fpGetSemaphoreFdKHR) {
     throw std::runtime_error("Failed to retrieve vkGetMemoryWin32HandleKHR!");
   }
-  if (fpGetSemaphoreFdKHR(device_->Handle(), &semaphore_get_fd_info_khr, &fd) != VK_SUCCESS) {
+  if (fpGetSemaphoreFdKHR(this->Handle(), &semaphore_get_fd_info_khr, &fd) != VK_SUCCESS) {
     throw std::runtime_error("Failed to retrieve handle for buffer!");
   }
 

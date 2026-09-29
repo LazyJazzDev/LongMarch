@@ -24,7 +24,7 @@ void D3D12ProgramBase::FinalizeRootSignature() {
                                root_parameters.empty() ? nullptr : root_parameters.data(), 0, nullptr,
                                D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT);
 
-  core_->Device()->CreateRootSignature(root_signature_desc, &root_signature_);
+  root_signature_ = CreateNativeRootSignature(core_->Device(), root_signature_desc);
 }
 
 D3D12Program::D3D12Program(D3D12Core *core, const std::vector<ImageFormat> &color_formats, ImageFormat depth_format)
@@ -85,13 +85,13 @@ void D3D12Program::BindShader(Shader *shader, ShaderType type) {
   if (d3d12_shader) {
     switch (type) {
       case SHADER_TYPE_VERTEX:
-        pipeline_state_desc_.VS = d3d12_shader->ShaderModule().Handle();
+        pipeline_state_desc_.VS = d3d12_shader->Bytecode();
         break;
       case SHADER_TYPE_PIXEL:
-        pipeline_state_desc_.PS = d3d12_shader->ShaderModule().Handle();
+        pipeline_state_desc_.PS = d3d12_shader->Bytecode();
         break;
       case SHADER_TYPE_GEOMETRY:
-        pipeline_state_desc_.GS = d3d12_shader->ShaderModule().Handle();
+        pipeline_state_desc_.GS = d3d12_shader->Bytecode();
         break;
     }
   } else {
@@ -104,9 +104,11 @@ void D3D12Program::Finalize() {
 
   pipeline_state_desc_.InputLayout.pInputElementDescs = input_attributes_.data();
   pipeline_state_desc_.InputLayout.NumElements = static_cast<UINT>(input_attributes_.size());
-  pipeline_state_desc_.pRootSignature = root_signature_->Handle();
+  pipeline_state_desc_.pRootSignature = root_signature_.Get();
 
-  core_->Device()->CreatePipelineState(pipeline_state_desc_, &pipeline_state_);
+  d3d12::ThrowIfFailed(
+      core_->Device()->CreateGraphicsPipelineState(&pipeline_state_desc_, IID_PPV_ARGS(pipeline_state_.GetAddressOf())),
+      "Failed to create graphics pipeline state");
 }
 
 int D3D12Program::NumInputBindings() const {
@@ -134,10 +136,10 @@ void D3D12ComputeProgram::Finalize() {
   FinalizeRootSignature();
 
   D3D12_COMPUTE_PIPELINE_STATE_DESC pipeline_desc{};
-  pipeline_desc.pRootSignature = root_signature_->Handle();
-  pipeline_desc.CS = compute_shader_->ShaderModule().Handle();
+  pipeline_desc.pRootSignature = root_signature_.Get();
+  pipeline_desc.CS = compute_shader_->Bytecode();
 
-  core_->Device()->Handle()->CreateComputePipelineState(&pipeline_desc, IID_PPV_ARGS(&pipeline_state_));
+  core_->Device()->CreateComputePipelineState(&pipeline_desc, IID_PPV_ARGS(&pipeline_state_));
 }
 
 D3D12RayTracingProgram::D3D12RayTracingProgram(D3D12Core *core,
@@ -162,28 +164,28 @@ void D3D12RayTracingProgram::AddRayGenShader(Shader *ray_gen_shader) {
 
   assert(shader != nullptr);
 
-  raygen_shader_ = &shader->ShaderModule();
+  raygen_shader_ = &shader->CompiledBlob();
 }
 
 void D3D12RayTracingProgram::AddMissShader(Shader *miss_shader) {
   D3D12Shader *shader = dynamic_cast<D3D12Shader *>(miss_shader);
   assert(shader != nullptr);
-  miss_shaders_.emplace_back(&shader->ShaderModule());
+  miss_shaders_.emplace_back(&shader->CompiledBlob());
 }
 
 void D3D12RayTracingProgram::AddHitGroup(HitGroup hit_group) {
   d3d12::HitGroup d3d_hit_group;
   D3D12Shader *d3d12_closest_hit_shader = dynamic_cast<D3D12Shader *>(hit_group.closest_hit_shader);
   assert(d3d12_closest_hit_shader != nullptr);
-  d3d_hit_group.closest_hit_shader = &d3d12_closest_hit_shader->ShaderModule();
+  d3d_hit_group.closest_hit_shader = &d3d12_closest_hit_shader->CompiledBlob();
   D3D12Shader *d3d12_any_hit_shader = dynamic_cast<D3D12Shader *>(hit_group.any_hit_shader);
   if (d3d12_any_hit_shader) {
-    d3d_hit_group.any_hit_shader = &d3d12_any_hit_shader->ShaderModule();
+    d3d_hit_group.any_hit_shader = &d3d12_any_hit_shader->CompiledBlob();
   }
 
   D3D12Shader *d3d12_intersection_shader = dynamic_cast<D3D12Shader *>(hit_group.intersection_shader);
   if (d3d12_intersection_shader) {
-    d3d_hit_group.intersection_shader = &d3d12_intersection_shader->ShaderModule();
+    d3d_hit_group.intersection_shader = &d3d12_intersection_shader->CompiledBlob();
   }
   d3d_hit_group.procedure = hit_group.procedure;
   hit_groups_.emplace_back(d3d_hit_group);
@@ -192,7 +194,7 @@ void D3D12RayTracingProgram::AddHitGroup(HitGroup hit_group) {
 void D3D12RayTracingProgram::AddCallableShader(Shader *callable_shader) {
   D3D12Shader *shader = dynamic_cast<D3D12Shader *>(callable_shader);
   assert(shader != nullptr);
-  callable_shaders_.emplace_back(&shader->ShaderModule());
+  callable_shaders_.emplace_back(&shader->CompiledBlob());
 }
 
 void D3D12RayTracingProgram::Finalize(const std::vector<int32_t> &miss_shader_indices,
@@ -200,11 +202,13 @@ void D3D12RayTracingProgram::Finalize(const std::vector<int32_t> &miss_shader_in
                                       const std::vector<int32_t> &callable_shader_indices) {
   FinalizeRootSignature();
 
-  core_->Device()->CreateRayTracingPipeline(root_signature_.get(), raygen_shader_, miss_shaders_, hit_groups_,
-                                            callable_shaders_, &pipeline_);
-
-  core_->Device()->CreateShaderTable(pipeline_.get(), miss_shader_indices, hit_group_indices, callable_shader_indices,
-                                     &shader_table_);
+  core_->CreateRayTracingPipeline(root_signature_.Get(), raygen_shader_, miss_shaders_, hit_groups_, callable_shaders_,
+                                  pipeline_);
+  core_->CreateShaderTable(pipeline_.Get(), miss_shader_indices, hit_group_indices, callable_shader_indices,
+                           shader_table_, miss_offset_, hit_group_offset_, callable_offset_);
+  miss_count_ = miss_shader_indices.size();
+  hit_group_count_ = hit_group_indices.size();
+  callable_count_ = callable_shader_indices.size();
 }
 
 void D3D12RayTracingProgram::Finalize() {

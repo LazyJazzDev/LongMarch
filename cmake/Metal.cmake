@@ -16,11 +16,9 @@ if (LONGMARCH_ENABLE_METAL AND APPLE)
     if (NOT LONGMARCH_METAL_CPP_DIR)
         message(FATAL_ERROR "Install the vcpkg metal feature or set LONGMARCH_METAL_CPP_DIR to Apple metal-cpp headers. CMake will not download them.")
     endif ()
-    get_filename_component(_metal_sdk_lib "${Vulkan_LIBRARY}" DIRECTORY)
-    find_path(SPIRV_CROSS_INCLUDE_DIR spirv_cross/spirv_msl.hpp
-            HINTS ${Vulkan_INCLUDE_DIRS} "$ENV{VULKAN_SDK}/include" REQUIRED)
-    foreach (_part msl glsl core)
-        find_library(SPIRV_CROSS_${_part}_LIBRARY NAMES spirv-cross-${_part}
-                HINTS "${_metal_sdk_lib}" "$ENV{VULKAN_SDK}/lib" REQUIRED)
+    # Metal uses SPIRV-Cross as a shader translator, independently of Vulkan.
+    # Resolve exported targets from vcpkg or an external CMAKE_PREFIX_PATH.
+    foreach (_part core glsl msl)
+        find_package(spirv_cross_${_part} CONFIG REQUIRED)
     endforeach ()
 endif ()

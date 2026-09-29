@@ -2,14 +2,22 @@
 
 namespace grassland::graphics::backend {
 
+namespace {
+void *MapBuffer(ID3D12Resource *buffer) {
+  void *data = nullptr;
+  d3d12::ThrowIfFailed(buffer->Map(0, nullptr, &data), "Failed to map image staging buffer");
+  return data;
+}
+}  // namespace
+
 D3D12Image::D3D12Image(D3D12Core *core, int width, int height, ImageFormat format) : core_(core), format_(format) {
-  core_->Device()->CreateImage(width, height, ImageFormatToDXGIFormat(format), &image_);
+  image_ = CreateNativeImage(core_->Device(), width, height, ImageFormatToDXGIFormat(format));
 }
 
 Extent2D D3D12Image::Extent() const {
   Extent2D extent;
-  extent.width = image_->Width();
-  extent.height = image_->Height();
+  extent.width = image_->GetDesc().Width;
+  extent.height = image_->GetDesc().Height;
   return extent;
 }
 
@@ -19,20 +27,20 @@ ImageFormat D3D12Image::Format() const {
 
 void D3D12Image::UploadData(const void *data) const {
   auto pixel_size = PixelSize(format_);
-  const UINT64 upload_buffer_size = GetRequiredIntermediateSize(image_->Handle(), 0, 1);
-  std::unique_ptr<d3d12::Buffer> upload_buffer;
-  core_->Device()->CreateBuffer(upload_buffer_size, D3D12_HEAP_TYPE_UPLOAD, &upload_buffer);
+  const UINT64 upload_buffer_size = GetRequiredIntermediateSize(image_.Get(), 0, 1);
+  ComPtr<ID3D12Resource> upload_buffer;
+  upload_buffer = CreateNativeBuffer(core_->Device(), upload_buffer_size, D3D12_HEAP_TYPE_UPLOAD);
   D3D12_SUBRESOURCE_DATA subresource_data{};
   subresource_data.pData = data;
-  subresource_data.RowPitch = image_->Width() * pixel_size;
-  subresource_data.SlicePitch = subresource_data.RowPitch * image_->Height();
+  subresource_data.RowPitch = image_->GetDesc().Width * pixel_size;
+  subresource_data.SlicePitch = subresource_data.RowPitch * image_->GetDesc().Height;
 
   core_->SingleTimeCommand([&](ID3D12GraphicsCommandList *command_list) {
     CD3DX12_RESOURCE_BARRIER barrier = CD3DX12_RESOURCE_BARRIER::Transition(
-        image_->Handle(), D3D12_RESOURCE_STATE_GENERIC_READ, D3D12_RESOURCE_STATE_COPY_DEST);
+        image_.Get(), D3D12_RESOURCE_STATE_GENERIC_READ, D3D12_RESOURCE_STATE_COPY_DEST);
     command_list->ResourceBarrier(1, &barrier);
-    UpdateSubresources(command_list, image_->Handle(), upload_buffer->Handle(), 0, 0, 1, &subresource_data);
-    barrier = CD3DX12_RESOURCE_BARRIER::Transition(image_->Handle(), D3D12_RESOURCE_STATE_COPY_DEST,
+    UpdateSubresources(command_list, image_.Get(), upload_buffer.Get(), 0, 0, 1, &subresource_data);
+    barrier = CD3DX12_RESOURCE_BARRIER::Transition(image_.Get(), D3D12_RESOURCE_STATE_COPY_DEST,
                                                    D3D12_RESOURCE_STATE_GENERIC_READ);
     command_list->ResourceBarrier(1, &barrier);
   });
@@ -40,59 +48,59 @@ void D3D12Image::UploadData(const void *data) const {
 
 void D3D12Image::DownloadData(void *data) const {
   auto pixel_size = PixelSize(format_);
-  const UINT64 download_buffer_size = GetRequiredIntermediateSize(image_->Handle(), 0, 1);
-  std::unique_ptr<d3d12::Buffer> download_buffer;
-  core_->Device()->CreateBuffer(download_buffer_size, D3D12_HEAP_TYPE_READBACK, &download_buffer);
+  const UINT64 download_buffer_size = GetRequiredIntermediateSize(image_.Get(), 0, 1);
+  ComPtr<ID3D12Resource> download_buffer;
+  download_buffer = CreateNativeBuffer(core_->Device(), download_buffer_size, D3D12_HEAP_TYPE_READBACK);
   D3D12_SUBRESOURCE_DATA subresource_data{};
   subresource_data.pData = data;
-  subresource_data.RowPitch = image_->Width() * pixel_size;
-  subresource_data.SlicePitch = subresource_data.RowPitch * image_->Height();
+  subresource_data.RowPitch = image_->GetDesc().Width * pixel_size;
+  subresource_data.SlicePitch = subresource_data.RowPitch * image_->GetDesc().Height;
 
   D3D12_TEXTURE_COPY_LOCATION src_location{};
-  src_location.pResource = image_->Handle();
+  src_location.pResource = image_.Get();
   src_location.Type = D3D12_TEXTURE_COPY_TYPE_SUBRESOURCE_INDEX;
   src_location.SubresourceIndex = 0;
 
   D3D12_TEXTURE_COPY_LOCATION dst_location{};
-  dst_location.pResource = download_buffer->Handle();
+  dst_location.pResource = download_buffer.Get();
   dst_location.Type = D3D12_TEXTURE_COPY_TYPE_PLACED_FOOTPRINT;
 
   D3D12_PLACED_SUBRESOURCE_FOOTPRINT layout{};
-  auto desc = image_->Handle()->GetDesc();
-  core_->Device()->Handle()->GetCopyableFootprints(&desc, 0, 1, 0, &layout, nullptr, nullptr, nullptr);
+  auto desc = image_.Get()->GetDesc();
+  core_->Device()->GetCopyableFootprints(&desc, 0, 1, 0, &layout, nullptr, nullptr, nullptr);
   dst_location.PlacedFootprint = layout;
 
   core_->SingleTimeCommand([&](ID3D12GraphicsCommandList *command_list) {
     CD3DX12_RESOURCE_BARRIER barrier = CD3DX12_RESOURCE_BARRIER::Transition(
-        image_->Handle(), D3D12_RESOURCE_STATE_GENERIC_READ, D3D12_RESOURCE_STATE_COPY_SOURCE);
+        image_.Get(), D3D12_RESOURCE_STATE_GENERIC_READ, D3D12_RESOURCE_STATE_COPY_SOURCE);
     command_list->ResourceBarrier(1, &barrier);
 
     command_list->CopyTextureRegion(&dst_location, 0, 0, 0, &src_location, nullptr);
 
-    barrier = CD3DX12_RESOURCE_BARRIER::Transition(image_->Handle(), D3D12_RESOURCE_STATE_COPY_SOURCE,
+    barrier = CD3DX12_RESOURCE_BARRIER::Transition(image_.Get(), D3D12_RESOURCE_STATE_COPY_SOURCE,
                                                    D3D12_RESOURCE_STATE_GENERIC_READ);
     command_list->ResourceBarrier(1, &barrier);
   });
 
-  uint8_t *mapped_data = static_cast<uint8_t *>(download_buffer->Map());
-  for (UINT row = 0; row < image_->Height(); row++) {
+  uint8_t *mapped_data = static_cast<uint8_t *>(MapBuffer(download_buffer.Get()));
+  for (UINT row = 0; row < image_->GetDesc().Height; row++) {
     memcpy(static_cast<uint8_t *>(data) + row * subresource_data.RowPitch,
            mapped_data + layout.Offset + row * layout.Footprint.RowPitch, subresource_data.RowPitch);
   }
-  download_buffer->Unmap();
+  download_buffer->Unmap(0, nullptr);
 }
 
 void D3D12Image::UploadData(const void *data, const Offset2D &offset, const Extent2D &extent) const {
   auto pixel_size = PixelSize(format_);
 
   // Create a staging image that matches the region size
-  std::unique_ptr<d3d12::Image> staging_image;
-  core_->Device()->CreateImage(extent.width, extent.height, ImageFormatToDXGIFormat(format_), &staging_image);
+  ComPtr<ID3D12Resource> staging_image;
+  staging_image = CreateNativeImage(core_->Device(), extent.width, extent.height, ImageFormatToDXGIFormat(format_));
 
   // Create upload buffer sized for the staging image
-  const UINT64 upload_buffer_size = GetRequiredIntermediateSize(staging_image->Handle(), 0, 1);
-  std::unique_ptr<d3d12::Buffer> upload_buffer;
-  core_->Device()->CreateBuffer(upload_buffer_size, D3D12_HEAP_TYPE_UPLOAD, &upload_buffer);
+  const UINT64 upload_buffer_size = GetRequiredIntermediateSize(staging_image.Get(), 0, 1);
+  ComPtr<ID3D12Resource> upload_buffer;
+  upload_buffer = CreateNativeBuffer(core_->Device(), upload_buffer_size, D3D12_HEAP_TYPE_UPLOAD);
 
   // Calculate source data layout
   D3D12_SUBRESOURCE_DATA subresource_data{};
@@ -103,30 +111,30 @@ void D3D12Image::UploadData(const void *data, const Offset2D &offset, const Exte
   core_->SingleTimeCommand([&](ID3D12GraphicsCommandList *command_list) {
     // Transition staging image to copy destination for upload
     CD3DX12_RESOURCE_BARRIER staging_barrier = CD3DX12_RESOURCE_BARRIER::Transition(
-        staging_image->Handle(), D3D12_RESOURCE_STATE_GENERIC_READ, D3D12_RESOURCE_STATE_COPY_DEST);
+        staging_image.Get(), D3D12_RESOURCE_STATE_GENERIC_READ, D3D12_RESOURCE_STATE_COPY_DEST);
     command_list->ResourceBarrier(1, &staging_barrier);
 
     // Upload data to staging image
-    UpdateSubresources(command_list, staging_image->Handle(), upload_buffer->Handle(), 0, 0, 1, &subresource_data);
+    UpdateSubresources(command_list, staging_image.Get(), upload_buffer.Get(), 0, 0, 1, &subresource_data);
 
     // Transition staging image to copy source
-    staging_barrier = CD3DX12_RESOURCE_BARRIER::Transition(staging_image->Handle(), D3D12_RESOURCE_STATE_COPY_DEST,
+    staging_barrier = CD3DX12_RESOURCE_BARRIER::Transition(staging_image.Get(), D3D12_RESOURCE_STATE_COPY_DEST,
                                                            D3D12_RESOURCE_STATE_COPY_SOURCE);
     command_list->ResourceBarrier(1, &staging_barrier);
 
     // Transition main image to copy destination
     CD3DX12_RESOURCE_BARRIER main_barrier = CD3DX12_RESOURCE_BARRIER::Transition(
-        image_->Handle(), D3D12_RESOURCE_STATE_GENERIC_READ, D3D12_RESOURCE_STATE_COPY_DEST);
+        image_.Get(), D3D12_RESOURCE_STATE_GENERIC_READ, D3D12_RESOURCE_STATE_COPY_DEST);
     command_list->ResourceBarrier(1, &main_barrier);
 
     // Copy from staging image to main image at specified offset
     D3D12_TEXTURE_COPY_LOCATION src_location{};
-    src_location.pResource = staging_image->Handle();
+    src_location.pResource = staging_image.Get();
     src_location.Type = D3D12_TEXTURE_COPY_TYPE_SUBRESOURCE_INDEX;
     src_location.SubresourceIndex = 0;
 
     D3D12_TEXTURE_COPY_LOCATION dst_location{};
-    dst_location.pResource = image_->Handle();
+    dst_location.pResource = image_.Get();
     dst_location.Type = D3D12_TEXTURE_COPY_TYPE_SUBRESOURCE_INDEX;
     dst_location.SubresourceIndex = 0;
 
@@ -142,7 +150,7 @@ void D3D12Image::UploadData(const void *data, const Offset2D &offset, const Exte
     command_list->CopyTextureRegion(&dst_location, offset.x, offset.y, 0, &src_location, &src_box);
 
     // Transition main image back to generic read
-    main_barrier = CD3DX12_RESOURCE_BARRIER::Transition(image_->Handle(), D3D12_RESOURCE_STATE_COPY_DEST,
+    main_barrier = CD3DX12_RESOURCE_BARRIER::Transition(image_.Get(), D3D12_RESOURCE_STATE_COPY_DEST,
                                                         D3D12_RESOURCE_STATE_GENERIC_READ);
     command_list->ResourceBarrier(1, &main_barrier);
   });
@@ -152,13 +160,13 @@ void D3D12Image::DownloadData(void *data, const Offset2D &offset, const Extent2D
   auto pixel_size = PixelSize(format_);
 
   // Create a staging image that matches the region size
-  std::unique_ptr<d3d12::Image> staging_image;
-  core_->Device()->CreateImage(extent.width, extent.height, ImageFormatToDXGIFormat(format_), &staging_image);
+  ComPtr<ID3D12Resource> staging_image;
+  staging_image = CreateNativeImage(core_->Device(), extent.width, extent.height, ImageFormatToDXGIFormat(format_));
 
   // Create download buffer sized for the staging image
-  const UINT64 download_buffer_size = GetRequiredIntermediateSize(staging_image->Handle(), 0, 1);
-  std::unique_ptr<d3d12::Buffer> download_buffer;
-  core_->Device()->CreateBuffer(download_buffer_size, D3D12_HEAP_TYPE_READBACK, &download_buffer);
+  const UINT64 download_buffer_size = GetRequiredIntermediateSize(staging_image.Get(), 0, 1);
+  ComPtr<ID3D12Resource> download_buffer;
+  download_buffer = CreateNativeBuffer(core_->Device(), download_buffer_size, D3D12_HEAP_TYPE_READBACK);
 
   // Calculate destination data layout
   D3D12_SUBRESOURCE_DATA subresource_data{};
@@ -167,39 +175,39 @@ void D3D12Image::DownloadData(void *data, const Offset2D &offset, const Extent2D
   subresource_data.SlicePitch = subresource_data.RowPitch * extent.height;
 
   D3D12_TEXTURE_COPY_LOCATION src_location{};
-  src_location.pResource = image_->Handle();
+  src_location.pResource = image_.Get();
   src_location.Type = D3D12_TEXTURE_COPY_TYPE_SUBRESOURCE_INDEX;
   src_location.SubresourceIndex = 0;
 
   D3D12_TEXTURE_COPY_LOCATION dst_location{};
-  dst_location.pResource = staging_image->Handle();
+  dst_location.pResource = staging_image.Get();
   dst_location.Type = D3D12_TEXTURE_COPY_TYPE_SUBRESOURCE_INDEX;
   dst_location.SubresourceIndex = 0;
 
   // Copy from staging image to download buffer
   D3D12_TEXTURE_COPY_LOCATION staging_src_location{};
-  staging_src_location.pResource = staging_image->Handle();
+  staging_src_location.pResource = staging_image.Get();
   staging_src_location.Type = D3D12_TEXTURE_COPY_TYPE_SUBRESOURCE_INDEX;
   staging_src_location.SubresourceIndex = 0;
 
   D3D12_TEXTURE_COPY_LOCATION buffer_dst_location{};
-  buffer_dst_location.pResource = download_buffer->Handle();
+  buffer_dst_location.pResource = download_buffer.Get();
   buffer_dst_location.Type = D3D12_TEXTURE_COPY_TYPE_PLACED_FOOTPRINT;
 
   D3D12_PLACED_SUBRESOURCE_FOOTPRINT layout{};
-  auto staging_desc = staging_image->Handle()->GetDesc();
-  core_->Device()->Handle()->GetCopyableFootprints(&staging_desc, 0, 1, 0, &layout, nullptr, nullptr, nullptr);
+  auto staging_desc = staging_image.Get()->GetDesc();
+  core_->Device()->GetCopyableFootprints(&staging_desc, 0, 1, 0, &layout, nullptr, nullptr, nullptr);
   buffer_dst_location.PlacedFootprint = layout;
 
   core_->SingleTimeCommand([&](ID3D12GraphicsCommandList *command_list) {
     // Transition staging image to copy destination
     CD3DX12_RESOURCE_BARRIER staging_barrier = CD3DX12_RESOURCE_BARRIER::Transition(
-        staging_image->Handle(), D3D12_RESOURCE_STATE_GENERIC_READ, D3D12_RESOURCE_STATE_COPY_DEST);
+        staging_image.Get(), D3D12_RESOURCE_STATE_GENERIC_READ, D3D12_RESOURCE_STATE_COPY_DEST);
     command_list->ResourceBarrier(1, &staging_barrier);
 
     // Transition main image to copy source
     CD3DX12_RESOURCE_BARRIER main_barrier = CD3DX12_RESOURCE_BARRIER::Transition(
-        image_->Handle(), D3D12_RESOURCE_STATE_GENERIC_READ, D3D12_RESOURCE_STATE_COPY_SOURCE);
+        image_.Get(), D3D12_RESOURCE_STATE_GENERIC_READ, D3D12_RESOURCE_STATE_COPY_SOURCE);
     command_list->ResourceBarrier(1, &main_barrier);
 
     // Copy from main image to staging image at specified offset
@@ -214,7 +222,7 @@ void D3D12Image::DownloadData(void *data, const Offset2D &offset, const Extent2D
     command_list->CopyTextureRegion(&dst_location, 0, 0, 0, &src_location, &src_box);
 
     // Transition staging image to copy source
-    staging_barrier = CD3DX12_RESOURCE_BARRIER::Transition(staging_image->Handle(), D3D12_RESOURCE_STATE_COPY_DEST,
+    staging_barrier = CD3DX12_RESOURCE_BARRIER::Transition(staging_image.Get(), D3D12_RESOURCE_STATE_COPY_DEST,
                                                            D3D12_RESOURCE_STATE_COPY_SOURCE);
     command_list->ResourceBarrier(1, &staging_barrier);
 
@@ -230,22 +238,22 @@ void D3D12Image::DownloadData(void *data, const Offset2D &offset, const Extent2D
     command_list->CopyTextureRegion(&buffer_dst_location, 0, 0, 0, &staging_src_location, &staging_box);
 
     // Transition main image back to generic read after all operations are finished
-    main_barrier = CD3DX12_RESOURCE_BARRIER::Transition(image_->Handle(), D3D12_RESOURCE_STATE_COPY_SOURCE,
+    main_barrier = CD3DX12_RESOURCE_BARRIER::Transition(image_.Get(), D3D12_RESOURCE_STATE_COPY_SOURCE,
                                                         D3D12_RESOURCE_STATE_GENERIC_READ);
     command_list->ResourceBarrier(1, &main_barrier);
   });
 
   // Copy data from download buffer to user buffer
-  uint8_t *mapped_data = static_cast<uint8_t *>(download_buffer->Map());
+  uint8_t *mapped_data = static_cast<uint8_t *>(MapBuffer(download_buffer.Get()));
   for (UINT row = 0; row < extent.height; row++) {
     memcpy(static_cast<uint8_t *>(data) + row * subresource_data.RowPitch,
            mapped_data + layout.Offset + row * layout.Footprint.RowPitch, subresource_data.RowPitch);
   }
-  download_buffer->Unmap();
+  download_buffer->Unmap(0, nullptr);
 }
 
-d3d12::Image *D3D12Image::Image() const {
-  return image_.get();
+ID3D12Resource *D3D12Image::Image() const {
+  return image_.Get();
 }
 
 }  // namespace grassland::graphics::backend

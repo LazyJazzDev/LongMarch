@@ -14,14 +14,19 @@ set(GRASSLAND_LIBS ${GRASSLAND_LIBS} PARENT_SCOPE)
 
 target_include_directories(${GRASSLAND_SUBLIB_NAME} PUBLIC ${LONGMARCH_INCLUDE_DIR} ${STB_INC_DIR})
 
-target_link_libraries(${GRASSLAND_SUBLIB_NAME} PUBLIC grassland_imgui slang::slang)
+target_link_libraries(${GRASSLAND_SUBLIB_NAME} PUBLIC grassland_util grassland_imgui slang::slang)
 
-if (LONGMARCH_VULKAN_ENABLED)
-    target_link_libraries(${GRASSLAND_SUBLIB_NAME} PUBLIC grassland_vulkan)
+if (LONGMARCH_CUDA_RUNTIME)
+    target_compile_definitions(${GRASSLAND_SUBLIB_NAME} PUBLIC LONGMARCH_CUDA_RUNTIME)
+    target_link_libraries(${GRASSLAND_SUBLIB_NAME} PUBLIC CUDA::cudart_static)
 endif ()
 
-if (LONGMARCH_D3D12_ENABLED)
-    target_link_libraries(${GRASSLAND_SUBLIB_NAME} PUBLIC grassland_d3d12)
+if (WIN32)
+    # Display luminance queries are shared by every Windows rendering backend.
+    target_link_libraries(${GRASSLAND_SUBLIB_NAME} PRIVATE dxgi)
+else ()
+    # dladdr locates the Slang library that ships its runtime plugins.
+    target_link_libraries(${GRASSLAND_SUBLIB_NAME} PRIVATE ${CMAKE_DL_LIBS})
 endif ()
 
 PACK_SHADER_CODE(${GRASSLAND_SUBLIB_NAME})

@@ -28,7 +28,8 @@ void MeshLightSampler(int shader_index, inout SampleDirectLightingPayload payloa
   float3 omega_in = primitive_sample.position - position;
   float shadow_length = length(omega_in);
 
-  float3 eval;
+  // Unknown material types contribute no emitted light.
+  float3 eval = float3(0.0f, 0.0f, 0.0f);
   switch (shader_index) {
     case 0x1000001:
       eval = MaterialLightEvaluateDirectLighting(material_data, position, primitive_sample);

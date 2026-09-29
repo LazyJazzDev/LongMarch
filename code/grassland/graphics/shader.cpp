@@ -7,6 +7,16 @@
 #include <slang.h>
 
 #include <atomic>
+#include <filesystem>
+
+#if defined(_WIN32)
+#ifndef NOMINMAX
+#define NOMINMAX
+#endif
+#include <windows.h>
+#else
+#include <dlfcn.h>
+#endif
 #endif
 
 namespace grassland::graphics {
@@ -14,6 +24,40 @@ namespace {
 #include "built_in_shaders.inl"
 
 #ifndef LONGMARCH_OFFLINE_SHADERS
+// Directory of the loaded Slang library. Slang loads slang-glslang (glslang and
+// spirv-opt) by name at run time, which searches PATH rather than Slang's own
+// directory; installs such as the Python package ship it next to Slang.
+std::string SlangLibraryDirectory() {
+  const auto symbol = reinterpret_cast<const void *>(&slang_createGlobalSession);
+#if defined(_WIN32)
+  HMODULE module = nullptr;
+  if (!GetModuleHandleExW(GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS | GET_MODULE_HANDLE_EX_FLAG_UNCHANGED_REFCOUNT,
+                          static_cast<LPCWSTR>(symbol), &module))
+    return {};
+  std::wstring path(MAX_PATH, L'\0');
+  DWORD length;
+  while ((length = GetModuleFileNameW(module, path.data(), static_cast<DWORD>(path.size()))) == path.size())
+    path.resize(path.size() * 2);
+  if (!length)
+    return {};
+  path.resize(length);
+  return std::filesystem::path(path).parent_path().u8string();
+#else
+  Dl_info info{};
+  if (!dladdr(symbol, &info) || !info.dli_fname)
+    return {};
+  return std::filesystem::path(info.dli_fname).parent_path().u8string();
+#endif
+}
+
+void UseBundledSlangPlugins(slang::IGlobalSession *global) {
+  const auto directory = SlangLibraryDirectory();
+  if (directory.empty())
+    return;
+  for (auto pass_through : {SLANG_PASS_THROUGH_GLSLANG, SLANG_PASS_THROUGH_SPIRV_OPT})
+    global->setDownstreamCompilerPath(pass_through, directory.c_str());
+}
+
 bool SameUUID(const SlangUUID &a, const SlangUUID &b) {
   return std::memcmp(&a, &b, sizeof(a)) == 0;
 }
@@ -137,13 +181,6 @@ SlangStage ShaderStage(const std::string &profile) {
 #endif
 }  // namespace
 
-#if defined(LONGMARCH_PYTHON_ENABLED)
-void Shader::PybindClassRegistration(py::classh<Shader> &c) {
-  c.def("entry_point", &Shader::EntryPoint, "Get the shader entry point");
-  c.def("__repr__", [](Shader *shader) { return py::str("Shader(entry_point='{}')").format(shader->EntryPoint()); });
-}
-#endif
-
 CompiledShaderBlob CompileShader(const std::string &source_code,
                                  const std::string &entry_point,
                                  const std::string &target,
@@ -172,8 +209,11 @@ CompiledShaderBlob CompileShader(const VirtualFileSystem &vfs,
   // Global sessions cache Slang's standard library. Separate sessions per thread
   // avoid concurrent access to the compiler's mutable state.
   thread_local Slang::ComPtr<slang::IGlobalSession> global;
-  if (!global && SLANG_FAILED(slang::createGlobalSession(global.writeRef())))
-    throw std::runtime_error("Cannot initialize Slang compiler");
+  if (!global) {
+    if (SLANG_FAILED(slang::createGlobalSession(global.writeRef())))
+      throw std::runtime_error("Cannot initialize Slang compiler");
+    UseBundledSlangPlugins(global);
+  }
   const auto stage = ShaderStage(target);
   const auto suffix = target.find('_');
   std::vector<std::string> options{"-profile", "sm" + target.substr(suffix), "-matrix-layout-column-major", "-O3",

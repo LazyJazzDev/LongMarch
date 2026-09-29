@@ -19,7 +19,7 @@ VulkanCmdBindProgram::VulkanCmdBindProgram(VulkanProgram *program) : program_(pr
 }
 
 void VulkanCmdBindProgram::CompileCommand(VulkanCommandContext *context, VkCommandBuffer command_buffer) {
-  vkCmdBindPipeline(command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, program_->Pipeline()->Handle());
+  vkCmdBindPipeline(command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, program_->Pipeline());
 }
 
 VulkanCmdBindComputeProgram::VulkanCmdBindComputeProgram(VulkanComputeProgram *program) : program_(program) {
@@ -33,7 +33,7 @@ VulkanCmdBindRayTracingProgram::VulkanCmdBindRayTracingProgram(VulkanRayTracingP
 }
 
 void VulkanCmdBindRayTracingProgram::CompileCommand(VulkanCommandContext *context, VkCommandBuffer command_buffer) {
-  vkCmdBindPipeline(command_buffer, VK_PIPELINE_BIND_POINT_RAY_TRACING_KHR, program_->Pipeline()->Handle());
+  vkCmdBindPipeline(command_buffer, VK_PIPELINE_BIND_POINT_RAY_TRACING_KHR, program_->Pipeline());
 }
 
 VulkanCmdBindVertexBuffers::VulkanCmdBindVertexBuffers(uint32_t first_binding,
@@ -76,27 +76,27 @@ VulkanCmdBeginRendering::VulkanCmdBeginRendering(const std::vector<VulkanImage *
 
 void VulkanCmdBeginRendering::CompileCommand(VulkanCommandContext *context, VkCommandBuffer command_buffer) {
   for (auto &image : resource_images_) {
-    context->RequireImageState(command_buffer, image->Image()->Handle(), VK_IMAGE_LAYOUT_GENERAL,
+    context->RequireImageState(command_buffer, image->Handle(), VK_IMAGE_LAYOUT_GENERAL,
                                VK_PIPELINE_STAGE_ALL_COMMANDS_BIT,
-                               VK_ACCESS_MEMORY_READ_BIT | VK_ACCESS_MEMORY_WRITE_BIT, image->Image()->Aspect());
+                               VK_ACCESS_MEMORY_READ_BIT | VK_ACCESS_MEMORY_WRITE_BIT, image->Aspect());
   }
 
   std::vector<VkRenderingAttachmentInfo> color_attachment_infos;
   VkRenderingAttachmentInfo depth_attachment_info{};
   Extent2D extent;
-  extent.width = context->Core()->Device()->PhysicalDevice().GetPhysicalDeviceProperties().limits.maxFramebufferWidth;
-  extent.height = context->Core()->Device()->PhysicalDevice().GetPhysicalDeviceProperties().limits.maxFramebufferHeight;
+  extent.width = vulkan::GetPhysicalDeviceProperties(context->Core()->PhysicalDevice()).limits.maxFramebufferWidth;
+  extent.height = vulkan::GetPhysicalDeviceProperties(context->Core()->PhysicalDevice()).limits.maxFramebufferHeight;
   for (int i = 0; i < color_targets_.size(); i++) {
     auto &color_target = color_targets_[i];
-    context->RequireImageState(command_buffer, color_target->Image()->Handle(),
-                               VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
+    context->RequireImageState(command_buffer, color_target->Handle(), VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
+                               VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
                                VK_ACCESS_COLOR_ATTACHMENT_READ_BIT | VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT,
-                               color_target->Image()->Aspect());
+                               color_target->Aspect());
 
     VkRenderingAttachmentInfo attachment_info{};
     attachment_info.sType = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO;
     attachment_info.pNext = nullptr;
-    attachment_info.imageView = color_target->Image()->ImageView();
+    attachment_info.imageView = color_target->ImageView();
     attachment_info.imageLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
     attachment_info.loadOp = VK_ATTACHMENT_LOAD_OP_LOAD;
     attachment_info.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
@@ -116,13 +116,13 @@ void VulkanCmdBeginRendering::CompileCommand(VulkanCommandContext *context, VkCo
   rendering_info.layerCount = 1;
   if (depth_target_) {
     context->RequireImageState(
-        command_buffer, depth_target_->Image()->Handle(), VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL,
+        command_buffer, depth_target_->Handle(), VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL,
         VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT | VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT,
         VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_READ_BIT | VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT,
-        depth_target_->Image()->Aspect());
+        depth_target_->Aspect());
     depth_attachment_info.sType = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO;
     depth_attachment_info.pNext = nullptr;
-    depth_attachment_info.imageView = depth_target_->Image()->ImageView();
+    depth_attachment_info.imageView = depth_target_->ImageView();
     depth_attachment_info.imageLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
     depth_attachment_info.loadOp = VK_ATTACHMENT_LOAD_OP_LOAD;
     depth_attachment_info.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
@@ -134,7 +134,7 @@ void VulkanCmdBeginRendering::CompileCommand(VulkanCommandContext *context, VkCo
 
   rendering_info.renderArea.extent.width = extent.width;
   rendering_info.renderArea.extent.height = extent.height;
-  context->Core()->Instance()->Procedures().vkCmdBeginRenderingKHR(command_buffer, &rendering_info);
+  context->Core()->InstanceProcedures().vkCmdBeginRenderingKHR(command_buffer, &rendering_info);
 }
 
 void VulkanCmdBeginRendering::RecordResourceImages(VulkanImage *resource_image) {
@@ -159,24 +159,24 @@ void VulkanCmdBindResourceBuffers::CompileCommand(VulkanCommandContext *context,
     buffer_infos[i].range = buffers_[i].size;
   }
 
-  auto descriptor_set = context->AcquireDescriptorSet(program_base_->DescriptorSetLayout(slot_)->Handle());
+  auto descriptor_set = context->AcquireDescriptorSet(program_base_->DescriptorSetLayout(slot_));
 
-  auto binding = program_base_->DescriptorSetLayout(slot_)->Bindings()[0];
+  auto binding = program_base_->DescriptorBinding(slot_);
 
   VkWriteDescriptorSet write_descriptor_set{};
   write_descriptor_set.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-  write_descriptor_set.dstSet = descriptor_set->Handle();
+  write_descriptor_set.dstSet = descriptor_set;
   write_descriptor_set.dstBinding = binding.binding;
   write_descriptor_set.dstArrayElement = 0;
   write_descriptor_set.descriptorCount = binding.descriptorCount;
   write_descriptor_set.descriptorType = binding.descriptorType;
   write_descriptor_set.pBufferInfo = buffer_infos.data();
-  vkUpdateDescriptorSets(context->Core()->Device()->Handle(), 1, &write_descriptor_set, 0, nullptr);
+  vkUpdateDescriptorSets(context->Core()->Handle(), 1, &write_descriptor_set, 0, nullptr);
 
-  VkDescriptorSet descriptor_sets[] = {descriptor_set->Handle()};
+  VkDescriptorSet descriptor_sets[] = {descriptor_set};
 
-  vkCmdBindDescriptorSets(command_buffer, BindPointToVkPipelineBindPoint(bind_point_),
-                          program_base_->PipelineLayout()->Handle(), slot_, 1, descriptor_sets, 0, nullptr);
+  vkCmdBindDescriptorSets(command_buffer, BindPointToVkPipelineBindPoint(bind_point_), program_base_->PipelineLayout(),
+                          slot_, 1, descriptor_sets, 0, nullptr);
 }
 
 VulkanCmdBindResourceImages::VulkanCmdBindResourceImages(int slot,
@@ -195,30 +195,30 @@ void VulkanCmdBindResourceImages::CompileCommand(VulkanCommandContext *context, 
   std::vector<VkDescriptorImageInfo> image_infos(images_.size());
   for (size_t i = 0; i < images_.size(); ++i) {
     image_infos[i].sampler = VK_NULL_HANDLE;
-    image_infos[i].imageView = images_[i]->Image()->ImageView();
+    image_infos[i].imageView = images_[i]->ImageView();
     image_infos[i].imageLayout = VK_IMAGE_LAYOUT_GENERAL;
     if (update_layout_) {
-      context->RequireImageState(command_buffer, images_[i]->Image()->Handle(), VK_IMAGE_LAYOUT_GENERAL,
+      context->RequireImageState(command_buffer, images_[i]->Handle(), VK_IMAGE_LAYOUT_GENERAL,
                                  VK_PIPELINE_STAGE_ALL_COMMANDS_BIT,
-                                 VK_ACCESS_MEMORY_READ_BIT | VK_ACCESS_MEMORY_WRITE_BIT, images_[i]->Image()->Aspect());
+                                 VK_ACCESS_MEMORY_READ_BIT | VK_ACCESS_MEMORY_WRITE_BIT, images_[i]->Aspect());
     }
   }
 
-  auto descriptor_set = context->AcquireDescriptorSet(program_base_->DescriptorSetLayout(slot_)->Handle());
-  VkDescriptorSet descriptor_sets[] = {descriptor_set->Handle()};
-  auto binding = program_base_->DescriptorSetLayout(slot_)->Bindings()[0];
+  auto descriptor_set = context->AcquireDescriptorSet(program_base_->DescriptorSetLayout(slot_));
+  VkDescriptorSet descriptor_sets[] = {descriptor_set};
+  auto binding = program_base_->DescriptorBinding(slot_);
   VkWriteDescriptorSet write_descriptor_set{};
   write_descriptor_set.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-  write_descriptor_set.dstSet = descriptor_set->Handle();
+  write_descriptor_set.dstSet = descriptor_set;
   write_descriptor_set.dstBinding = binding.binding;
   write_descriptor_set.dstArrayElement = 0;
   write_descriptor_set.descriptorCount = binding.descriptorCount;
   write_descriptor_set.descriptorType = binding.descriptorType;
   write_descriptor_set.pImageInfo = image_infos.data();
-  vkUpdateDescriptorSets(context->Core()->Device()->Handle(), 1, &write_descriptor_set, 0, nullptr);
+  vkUpdateDescriptorSets(context->Core()->Handle(), 1, &write_descriptor_set, 0, nullptr);
 
-  vkCmdBindDescriptorSets(command_buffer, BindPointToVkPipelineBindPoint(bind_point_),
-                          program_base_->PipelineLayout()->Handle(), slot_, 1, descriptor_sets, 0, nullptr);
+  vkCmdBindDescriptorSets(command_buffer, BindPointToVkPipelineBindPoint(bind_point_), program_base_->PipelineLayout(),
+                          slot_, 1, descriptor_sets, 0, nullptr);
 }
 
 VulkanCmdBindResourceSamplers::VulkanCmdBindResourceSamplers(int slot,
@@ -234,26 +234,26 @@ VulkanCmdBindResourceSamplers::VulkanCmdBindResourceSamplers(int slot,
 void VulkanCmdBindResourceSamplers::CompileCommand(VulkanCommandContext *context, VkCommandBuffer command_buffer) {
   std::vector<VkDescriptorImageInfo> sampler_infos(samplers_.size());
   for (size_t i = 0; i < samplers_.size(); ++i) {
-    sampler_infos[i].sampler = samplers_[i]->Sampler()->Handle();
+    sampler_infos[i].sampler = samplers_[i]->Handle();
     sampler_infos[i].imageView = VK_NULL_HANDLE;
     sampler_infos[i].imageLayout = VK_IMAGE_LAYOUT_UNDEFINED;
   }
 
-  auto descriptor_set = context->AcquireDescriptorSet(program_base_->DescriptorSetLayout(slot_)->Handle());
-  VkDescriptorSet descriptor_sets[] = {descriptor_set->Handle()};
-  auto binding = program_base_->DescriptorSetLayout(slot_)->Bindings()[0];
+  auto descriptor_set = context->AcquireDescriptorSet(program_base_->DescriptorSetLayout(slot_));
+  VkDescriptorSet descriptor_sets[] = {descriptor_set};
+  auto binding = program_base_->DescriptorBinding(slot_);
   VkWriteDescriptorSet write_descriptor_set{};
   write_descriptor_set.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-  write_descriptor_set.dstSet = descriptor_set->Handle();
+  write_descriptor_set.dstSet = descriptor_set;
   write_descriptor_set.dstBinding = binding.binding;
   write_descriptor_set.dstArrayElement = 0;
   write_descriptor_set.descriptorCount = binding.descriptorCount;
   write_descriptor_set.descriptorType = binding.descriptorType;
   write_descriptor_set.pImageInfo = sampler_infos.data();
-  vkUpdateDescriptorSets(context->Core()->Device()->Handle(), 1, &write_descriptor_set, 0, nullptr);
+  vkUpdateDescriptorSets(context->Core()->Handle(), 1, &write_descriptor_set, 0, nullptr);
 
-  vkCmdBindDescriptorSets(command_buffer, BindPointToVkPipelineBindPoint(bind_point_),
-                          program_base_->PipelineLayout()->Handle(), slot_, 1, descriptor_sets, 0, nullptr);
+  vkCmdBindDescriptorSets(command_buffer, BindPointToVkPipelineBindPoint(bind_point_), program_base_->PipelineLayout(),
+                          slot_, 1, descriptor_sets, 0, nullptr);
 }
 
 VulkanCmdBindResourceAccelerationStructure::VulkanCmdBindResourceAccelerationStructure(
@@ -269,18 +269,18 @@ VulkanCmdBindResourceAccelerationStructure::VulkanCmdBindResourceAccelerationStr
 
 void VulkanCmdBindResourceAccelerationStructure::CompileCommand(VulkanCommandContext *context,
                                                                 VkCommandBuffer command_buffer) {
-  auto descriptor_set = context->AcquireDescriptorSet(program_base_->DescriptorSetLayout(slot_)->Handle());
-  VkDescriptorSet descriptor_sets[] = {descriptor_set->Handle()};
-  auto binding = program_base_->DescriptorSetLayout(slot_)->Bindings()[0];
+  auto descriptor_set = context->AcquireDescriptorSet(program_base_->DescriptorSetLayout(slot_));
+  VkDescriptorSet descriptor_sets[] = {descriptor_set};
+  auto binding = program_base_->DescriptorBinding(slot_);
   VkWriteDescriptorSet write_descriptor_set{};
   write_descriptor_set.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-  write_descriptor_set.dstSet = descriptor_set->Handle();
+  write_descriptor_set.dstSet = descriptor_set;
   write_descriptor_set.dstBinding = binding.binding;
   write_descriptor_set.dstArrayElement = 0;
   write_descriptor_set.descriptorCount = binding.descriptorCount;
   write_descriptor_set.descriptorType = binding.descriptorType;
 
-  VkAccelerationStructureKHR acceleration_structure = acceleration_structure_->Handle()->Handle();
+  VkAccelerationStructureKHR acceleration_structure = acceleration_structure_->Handle();
 
   VkWriteDescriptorSetAccelerationStructureKHR acceleration_structure_info{};
   acceleration_structure_info.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET_ACCELERATION_STRUCTURE_KHR;
@@ -289,14 +289,14 @@ void VulkanCmdBindResourceAccelerationStructure::CompileCommand(VulkanCommandCon
   acceleration_structure_info.pAccelerationStructures = &acceleration_structure;
   write_descriptor_set.pNext = &acceleration_structure_info;
 
-  vkUpdateDescriptorSets(context->Core()->Device()->Handle(), 1, &write_descriptor_set, 0, nullptr);
+  vkUpdateDescriptorSets(context->Core()->Handle(), 1, &write_descriptor_set, 0, nullptr);
 
-  vkCmdBindDescriptorSets(command_buffer, BindPointToVkPipelineBindPoint(bind_point_),
-                          program_base_->PipelineLayout()->Handle(), slot_, 1, descriptor_sets, 0, nullptr);
+  vkCmdBindDescriptorSets(command_buffer, BindPointToVkPipelineBindPoint(bind_point_), program_base_->PipelineLayout(),
+                          slot_, 1, descriptor_sets, 0, nullptr);
 }
 
 void VulkanCmdEndRendering::CompileCommand(VulkanCommandContext *context, VkCommandBuffer command_buffer) {
-  context->Core()->Instance()->Procedures().vkCmdEndRenderingKHR(command_buffer);
+  context->Core()->InstanceProcedures().vkCmdEndRenderingKHR(command_buffer);
 }
 
 VulkanCmdClearImage::VulkanCmdClearImage(VulkanImage *image, const ClearValue &clear_value)
@@ -305,9 +305,9 @@ VulkanCmdClearImage::VulkanCmdClearImage(VulkanImage *image, const ClearValue &c
 }
 
 void VulkanCmdClearImage::CompileCommand(VulkanCommandContext *context, VkCommandBuffer command_buffer) {
-  context->RequireImageState(command_buffer, image_->Image()->Handle(), VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
-                             VK_PIPELINE_STAGE_TRANSFER_BIT, VK_ACCESS_TRANSFER_WRITE_BIT, image_->Image()->Aspect());
-  if (!vulkan::IsDepthFormat(image_->Image()->Format())) {
+  context->RequireImageState(command_buffer, image_->Handle(), VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+                             VK_PIPELINE_STAGE_TRANSFER_BIT, VK_ACCESS_TRANSFER_WRITE_BIT, image_->Aspect());
+  if (!vulkan::IsDepthFormat(image_->NativeFormat())) {
     VkClearColorValue clear_value;
     clear_value.float32[0] = clear_value_.color.r;
     clear_value.float32[1] = clear_value_.color.g;
@@ -319,8 +319,8 @@ void VulkanCmdClearImage::CompileCommand(VulkanCommandContext *context, VkComman
     subresource_range.levelCount = 1;
     subresource_range.baseArrayLayer = 0;
     subresource_range.layerCount = 1;
-    vkCmdClearColorImage(command_buffer, image_->Image()->Handle(), VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, &clear_value,
-                         1, &subresource_range);
+    vkCmdClearColorImage(command_buffer, image_->Handle(), VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, &clear_value, 1,
+                         &subresource_range);
   } else {
     VkClearDepthStencilValue clear_value;
     clear_value.depth = clear_value_.depth.depth;
@@ -331,8 +331,8 @@ void VulkanCmdClearImage::CompileCommand(VulkanCommandContext *context, VkComman
     subresource_range.levelCount = 1;
     subresource_range.baseArrayLayer = 0;
     subresource_range.layerCount = 1;
-    vkCmdClearDepthStencilImage(command_buffer, image_->Image()->Handle(), VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
-                                &clear_value, 1, &subresource_range);
+    vkCmdClearDepthStencilImage(command_buffer, image_->Handle(), VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, &clear_value, 1,
+                                &subresource_range);
   }
 }
 
@@ -364,8 +364,8 @@ VulkanCmdSetPrimitiveTopology::VulkanCmdSetPrimitiveTopology(PrimitiveTopology t
 }
 
 void VulkanCmdSetPrimitiveTopology::CompileCommand(VulkanCommandContext *context, VkCommandBuffer command_buffer) {
-  context->Core()->Instance()->Procedures().vkCmdSetPrimitiveTopologyEXT(
-      command_buffer, PrimitiveTopologyToVkPrimitiveTopology(topology_));
+  context->Core()->InstanceProcedures().vkCmdSetPrimitiveTopologyEXT(command_buffer,
+                                                                     PrimitiveTopologyToVkPrimitiveTopology(topology_));
 }
 
 VulkanCmdDraw::VulkanCmdDraw(uint32_t index_count,
@@ -399,20 +399,29 @@ void VulkanCmdDrawIndexed::CompileCommand(VulkanCommandContext *context, VkComma
 }
 
 #ifndef LONGMARCH_HEADLESS
-VulkanCmdPresent::VulkanCmdPresent(VulkanWindow *window, VulkanImage *image) : image_(image), window_(window) {
+VulkanCmdPresent::VulkanCmdPresent(VulkanWindow *window, VulkanImage *image, VulkanImage *target, bool draw_ui)
+    : target_(target),
+      draw_ui_(draw_ui),
+      image_(image),
+      window_(window) {
 }
 
 void VulkanCmdPresent::CompileCommand(VulkanCommandContext *context, VkCommandBuffer command_buffer) {
-  vulkan::TransitImageLayout(command_buffer, window_->CurrentImage(), VK_IMAGE_LAYOUT_UNDEFINED,
-                             VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT,
-                             VK_PIPELINE_STAGE_TRANSFER_BIT, 0, VK_ACCESS_TRANSFER_WRITE_BIT,
-                             VK_IMAGE_ASPECT_COLOR_BIT);
+  const auto destination = target_ ? target_->Handle() : window_->CurrentImage();
+  if (target_)
+    context->RequireImageState(command_buffer, destination, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+                               VK_PIPELINE_STAGE_TRANSFER_BIT, VK_ACCESS_TRANSFER_WRITE_BIT, VK_IMAGE_ASPECT_COLOR_BIT);
+  else
+    vulkan::TransitImageLayout(command_buffer, destination, VK_IMAGE_LAYOUT_UNDEFINED,
+                               VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT,
+                               VK_PIPELINE_STAGE_TRANSFER_BIT, 0, VK_ACCESS_TRANSFER_WRITE_BIT,
+                               VK_IMAGE_ASPECT_COLOR_BIT);
 
-  context->RequireImageState(command_buffer, image_->Image()->Handle(), VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
-                             VK_PIPELINE_STAGE_TRANSFER_BIT, VK_ACCESS_TRANSFER_READ_BIT, image_->Image()->Aspect());
+  context->RequireImageState(command_buffer, image_->Handle(), VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
+                             VK_PIPELINE_STAGE_TRANSFER_BIT, VK_ACCESS_TRANSFER_READ_BIT, image_->Aspect());
 
   auto image_extent = image_->Extent();
-  auto window_extent = window_->SwapChain()->Extent();
+  auto window_extent = window_->SwapChainExtent();
 
   VkClearColorValue clear_color{};
   clear_color.float32[3] = 1.0f;
@@ -422,8 +431,13 @@ void VulkanCmdPresent::CompileCommand(VulkanCommandContext *context, VkCommandBu
   clear_range.levelCount = 1;
   clear_range.baseArrayLayer = 0;
   clear_range.layerCount = 1;
-  vkCmdClearColorImage(command_buffer, window_->CurrentImage(), VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, &clear_color, 1,
+  vkCmdClearColorImage(command_buffer, destination, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, &clear_color, 1,
                        &clear_range);
+  // Clearing the letterbox and blitting both write the swapchain image.
+  vulkan::TransitImageLayout(command_buffer, destination, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+                             VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_PIPELINE_STAGE_TRANSFER_BIT,
+                             VK_PIPELINE_STAGE_TRANSFER_BIT, VK_ACCESS_TRANSFER_WRITE_BIT, VK_ACCESS_TRANSFER_WRITE_BIT,
+                             VK_IMAGE_ASPECT_COLOR_BIT);
 
   const float scale = std::min(static_cast<float>(window_extent.width) / image_extent.width,
                                static_cast<float>(window_extent.height) / image_extent.height);
@@ -445,39 +459,46 @@ void VulkanCmdPresent::CompileCommand(VulkanCommandContext *context, VkCommandBu
   blit.dstSubresource.mipLevel = 0;
   blit.dstSubresource.baseArrayLayer = 0;
   blit.dstSubresource.layerCount = 1;
-  vkCmdBlitImage(command_buffer, image_->Image()->Handle(), VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
-                 window_->CurrentImage(), VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &blit, VK_FILTER_LINEAR);
+  vkCmdBlitImage(command_buffer, image_->Handle(), VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, destination,
+                 VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &blit, VK_FILTER_LINEAR);
 
   auto &imgui_assets = window_->ImGuiAssets();
-  if (imgui_assets.context && imgui_assets.draw_command) {
+  if (draw_ui_ && imgui_assets.context && imgui_assets.draw_command) {
     imgui_assets.draw_command = false;
-    vulkan::TransitImageLayout(command_buffer, window_->CurrentImage(), VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
-                               VK_IMAGE_LAYOUT_GENERAL, VK_PIPELINE_STAGE_TRANSFER_BIT,
-                               VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, VK_ACCESS_TRANSFER_WRITE_BIT,
-                               VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT, VK_IMAGE_ASPECT_COLOR_BIT);
+    if (target_)
+      context->RequireImageState(
+          command_buffer, destination, VK_IMAGE_LAYOUT_GENERAL, VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
+          VK_ACCESS_COLOR_ATTACHMENT_READ_BIT | VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT, VK_IMAGE_ASPECT_COLOR_BIT);
+    else
+      vulkan::TransitImageLayout(
+          command_buffer, destination, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_GENERAL,
+          VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, VK_ACCESS_TRANSFER_WRITE_BIT,
+          VK_ACCESS_COLOR_ATTACHMENT_READ_BIT | VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT, VK_IMAGE_ASPECT_COLOR_BIT);
 
     ImGui::SetCurrentContext(imgui_assets.context);
 
     VkRenderPassBeginInfo renderPassInfo{};
     renderPassInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
-    renderPassInfo.renderPass = imgui_assets.render_pass->Handle();
-    renderPassInfo.framebuffer = imgui_assets.framebuffers[window_->CurrentImageIndex()]->Handle();
+    renderPassInfo.renderPass = imgui_assets.render_pass;
+    renderPassInfo.framebuffer =
+        target_ ? window_->HDRFramebuffer(target_) : imgui_assets.framebuffers[window_->CurrentImageIndex()];
     renderPassInfo.renderArea.offset = {0, 0};
-    renderPassInfo.renderArea.extent = imgui_assets.framebuffers[window_->CurrentImageIndex()]->Extent();
+    renderPassInfo.renderArea.extent = window_extent;
     renderPassInfo.clearValueCount = 0;
     renderPassInfo.pClearValues = nullptr;
 
     vkCmdBeginRenderPass(command_buffer, &renderPassInfo, VK_SUBPASS_CONTENTS_INLINE);
+    ImGuiLinearColors linear_ui(window_->IsHDR());
     ImGui_ImplVulkan_RenderDrawData(ImGui::GetDrawData(), command_buffer);
     vkCmdEndRenderPass(command_buffer);
 
-    vulkan::TransitImageLayout(command_buffer, window_->CurrentImage(), VK_IMAGE_LAYOUT_GENERAL,
-                               VK_IMAGE_LAYOUT_PRESENT_SRC_KHR, VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
-                               VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT, VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT, 0,
-                               VK_IMAGE_ASPECT_COLOR_BIT);
+    if (!target_)
+      vulkan::TransitImageLayout(command_buffer, destination, VK_IMAGE_LAYOUT_GENERAL, VK_IMAGE_LAYOUT_PRESENT_SRC_KHR,
+                                 VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT,
+                                 VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT, 0, VK_IMAGE_ASPECT_COLOR_BIT);
 
-  } else {
-    vulkan::TransitImageLayout(command_buffer, window_->CurrentImage(), VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+  } else if (!target_) {
+    vulkan::TransitImageLayout(command_buffer, destination, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
                                VK_IMAGE_LAYOUT_PRESENT_SRC_KHR, VK_PIPELINE_STAGE_TRANSFER_BIT,
                                VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT, VK_ACCESS_TRANSFER_WRITE_BIT, 0,
                                VK_IMAGE_ASPECT_COLOR_BIT);
@@ -498,13 +519,13 @@ VulkanCmdDispatchRays::VulkanCmdDispatchRays(VulkanRayTracingProgram *program,
 
 void VulkanCmdDispatchRays::CompileCommand(VulkanCommandContext *context, VkCommandBuffer command_buffer) {
   VkPhysicalDeviceRayTracingPipelinePropertiesKHR ray_tracing_pipeline_properties =
-      context->Core()->Device()->PhysicalDevice().GetPhysicalDeviceRayTracingPipelineProperties();
+      vulkan::GetPhysicalDeviceRayTracingPipelineProperties(context->Core()->PhysicalDevice());
 
   auto aligned_size = [](uint32_t value, uint32_t alignment) { return (value + alignment - 1) & ~(alignment - 1); };
   const uint32_t handle_size_aligned = aligned_size(ray_tracing_pipeline_properties.shaderGroupHandleSize,
                                                     ray_tracing_pipeline_properties.shaderGroupHandleAlignment);
 
-  auto shader_binding_table = program_->ShaderBindingTable();
+  auto shader_binding_table = program_;
   VkStridedDeviceAddressRegionKHR ray_gen_shader_sbt_entry{};
   ray_gen_shader_sbt_entry.deviceAddress = shader_binding_table->GetRayGenDeviceAddress();
   ray_gen_shader_sbt_entry.stride = handle_size_aligned;
@@ -525,9 +546,9 @@ void VulkanCmdDispatchRays::CompileCommand(VulkanCommandContext *context, VkComm
   callable_shader_sbt_entry.stride = handle_size_aligned;
   callable_shader_sbt_entry.size = handle_size_aligned * shader_binding_table->CallableShaderCount();
 
-  program_->Core()->Device()->Procedures().vkCmdTraceRaysKHR(command_buffer, &ray_gen_shader_sbt_entry,
-                                                             &miss_shader_sbt_entry, &hit_shader_sbt_entry,
-                                                             &callable_shader_sbt_entry, width_, height_, depth_);
+  program_->Core()->Procedures().vkCmdTraceRaysKHR(command_buffer, &ray_gen_shader_sbt_entry, &miss_shader_sbt_entry,
+                                                   &hit_shader_sbt_entry, &callable_shader_sbt_entry, width_, height_,
+                                                   depth_);
 
   VkMemoryBarrier memory_barrier = {};
   memory_barrier.sType = VK_STRUCTURE_TYPE_MEMORY_BARRIER;

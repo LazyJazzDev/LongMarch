@@ -14,11 +14,11 @@ class D3D12Image : public Image {
   void UploadData(const void *data, const Offset2D &offset, const Extent2D &extent) const override;
   void DownloadData(void *data, const Offset2D &offset, const Extent2D &extent) const override;
 
-  d3d12::Image *Image() const;
+  ID3D12Resource *Image() const;
 
  private:
   D3D12Core *core_;
-  std::unique_ptr<d3d12::Image> image_;
+  ComPtr<ID3D12Resource> image_;
   ImageFormat format_;
 };
 

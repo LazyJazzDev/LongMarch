@@ -5,7 +5,7 @@
 #include <filesystem>
 #include <fstream>
 #ifndef LONGMARCH_OFFLINE_SHADERS
-#include <spirv_cross/spirv_msl.hpp>
+#include <spirv_msl.hpp>
 #endif
 #include <sstream>
 #include <stdexcept>

@@ -1,8 +1,15 @@
 #include "sparkium/geometry/geometry_mesh.h"
 
+#include <cmath>
+#include <cstddef>
+#include <stdexcept>
+
 #include "sparkium/core/core.h"
 
 namespace sparkium {
+
+static_assert(offsetof(GeometryMesh::Header, shadow_terminator_geometry_offset) == 60);
+static_assert(sizeof(GeometryMesh::Header) == 64);
 
 GeometryMesh::GeometryMesh(Core *core, const Mesh<float> &mesh) : Geometry(core) {
   std::vector<uint8_t> data;
@@ -61,6 +68,19 @@ GeometryMesh::GeometryMesh(Core *core, const Mesh<float> &mesh) : Geometry(core)
   core_->GraphicsCore()->CreateBuffer(data.size(), graphics::BUFFER_TYPE_STATIC, &geometry_buffer_);
   geometry_buffer_->UploadData(data.data(), data.size());
   primitive_count_ = header_.num_indices / 3;
+}
+
+void GeometryMesh::SetShadowTerminatorGeometryOffset(float cutoff) {
+  if (!std::isfinite(cutoff) || cutoff < 0.0f || cutoff > 1.0f)
+    throw std::invalid_argument("Shadow terminator geometry offset must be finite and in [0, 1]");
+  if (cutoff == header_.shadow_terminator_geometry_offset)
+    return;
+  header_.shadow_terminator_geometry_offset = cutoff;
+  geometry_buffer_->UploadData(&cutoff, sizeof(cutoff), offsetof(Header, shadow_terminator_geometry_offset));
+}
+
+float GeometryMesh::GetShadowTerminatorGeometryOffset() const {
+  return header_.shadow_terminator_geometry_offset;
 }
 
 int GeometryMesh::PrimitiveCount() {

@@ -4,13 +4,13 @@
 namespace grassland::graphics::backend {
 
 struct BlitPipeline {
-  d3d12::Device *device_;
-  std::unique_ptr<d3d12::ShaderModule> vertex_shader;
-  std::unique_ptr<d3d12::ShaderModule> pixel_shader;
-  std::unique_ptr<d3d12::RootSignature> root_signature;
-  std::map<DXGI_FORMAT, std::unique_ptr<d3d12::PipelineState>> pipeline_states;
-  void Initialize(d3d12::Device *device);
-  d3d12::PipelineState *GetPipelineState(DXGI_FORMAT format);
+  ID3D12Device *device_;
+  CompiledShaderBlob vertex_shader;
+  CompiledShaderBlob pixel_shader;
+  ComPtr<ID3D12RootSignature> root_signature;
+  std::map<DXGI_FORMAT, ComPtr<ID3D12PipelineState>> pipeline_states;
+  void Initialize(ID3D12Device *device);
+  ID3D12PipelineState *GetPipelineState(DXGI_FORMAT format);
 };
 
 class D3D12Core : public Core {
@@ -22,7 +22,7 @@ class D3D12Core : public Core {
     if (!device_)
       return false;
     D3D12_FEATURE_DATA_D3D12_OPTIONS5 options{};
-    return SUCCEEDED(device_->Handle()->CheckFeatureSupport(D3D12_FEATURE_D3D12_OPTIONS5, &options, sizeof(options))) &&
+    return SUCCEEDED(device_.Get()->CheckFeatureSupport(D3D12_FEATURE_D3D12_OPTIONS5, &options, sizeof(options))) &&
            options.RaytracingTier >= D3D12_RAYTRACING_TIER_1_1;
   }
 
@@ -97,6 +97,45 @@ class D3D12Core : public Core {
 
   int CreateRayTracingProgram(double_ptr<RayTracingProgram> pp_program) override;
 
+  HRESULT BuildBottomLevelAccelerationStructure(D3D12_GPU_VIRTUAL_ADDRESS aabb_buffer,
+                                                uint32_t stride,
+                                                uint32_t num_aabb,
+                                                D3D12_RAYTRACING_GEOMETRY_FLAGS flags,
+                                                ID3D12CommandQueue *queue,
+                                                ID3D12CommandAllocator *allocator,
+                                                ComPtr<ID3D12Resource> &result);
+
+  HRESULT BuildBottomLevelAccelerationStructure(D3D12_GPU_VIRTUAL_ADDRESS vertex_buffer,
+                                                D3D12_GPU_VIRTUAL_ADDRESS index_buffer,
+                                                uint32_t num_vertex,
+                                                uint32_t stride,
+                                                uint32_t primitive_count,
+                                                D3D12_RAYTRACING_GEOMETRY_FLAGS flags,
+                                                ID3D12CommandQueue *queue,
+                                                ID3D12CommandAllocator *allocator,
+                                                ComPtr<ID3D12Resource> &result);
+
+  HRESULT BuildTopLevelAccelerationStructure(const std::vector<D3D12_RAYTRACING_INSTANCE_DESC> &instances,
+                                             ID3D12CommandQueue *queue,
+                                             ID3D12CommandAllocator *allocator,
+                                             ComPtr<ID3D12Resource> &result);
+
+  HRESULT CreateRayTracingPipeline(ID3D12RootSignature *root_signature,
+                                   const CompiledShaderBlob *ray_gen_shader,
+                                   const std::vector<const CompiledShaderBlob *> &miss_shaders,
+                                   const std::vector<d3d12::HitGroup> &hit_groups,
+                                   const std::vector<const CompiledShaderBlob *> &callable_shaders,
+                                   ComPtr<ID3D12StateObject> &pipeline);
+
+  HRESULT CreateShaderTable(ID3D12StateObject *pipeline,
+                            const std::vector<int32_t> &miss_shader_indices,
+                            const std::vector<int32_t> &hit_group_indices,
+                            const std::vector<int32_t> &callable_shader_indices,
+                            ComPtr<ID3D12Resource> &buffer,
+                            D3D12_GPU_VIRTUAL_ADDRESS &miss_offset,
+                            D3D12_GPU_VIRTUAL_ADDRESS &hit_group_offset,
+                            D3D12_GPU_VIRTUAL_ADDRESS &callable_offset) const;
+
   int SubmitCommandContext(CommandContext *p_command_context) override;
 
   int GetPhysicalDeviceProperties(PhysicalDeviceProperties *p_physical_device_properties = nullptr) override;
@@ -107,32 +146,36 @@ class D3D12Core : public Core {
 
   uint32_t WaveSize() const override;
 
-  d3d12::DXGIFactory *DXGIFactory() const {
-    return dxgi_factory_.get();
+  IDXGIFactory4 *DXGIFactory() const {
+    return dxgi_factory_.Get();
   }
 
-  d3d12::Device *Device() const {
-    return device_.get();
+  ID3D12Device *Device() const {
+    return device_.Get();
   }
 
-  d3d12::CommandQueue *CommandQueue() const {
-    return command_queue_.get();
+  ID3D12Device5 *DXRDevice() const {
+    return dxr_device_.Get();
   }
 
-  d3d12::CommandList *CommandList() const {
-    return command_lists_[current_frame_].get();
+  ID3D12CommandQueue *CommandQueue() const {
+    return command_queue_.Get();
   }
 
-  d3d12::CommandAllocator *CommandAllocator() const {
-    return command_allocators_[current_frame_].get();
+  ID3D12GraphicsCommandList *CommandList() const {
+    return command_lists_[current_frame_].Get();
   }
 
-  d3d12::Fence *Fence() const {
-    return fence_.get();
+  ID3D12CommandAllocator *CommandAllocator() const {
+    return command_allocators_[current_frame_].Get();
   }
 
-  d3d12::CommandAllocator *SingleTimeCommandAllocator() const {
-    return single_time_allocator_.get();
+  ID3D12Fence *Fence() const {
+    return fence_.Get();
+  }
+
+  ID3D12CommandAllocator *SingleTimeCommandAllocator() const {
+    return single_time_allocator_.Get();
   }
 
   uint32_t CurrentFrame() const override {
@@ -145,48 +188,57 @@ class D3D12Core : public Core {
     return &blit_pipeline_;
   }
 
-  d3d12::DescriptorHeap *RTVDescriptorHeap() const {
-    return rtv_descriptor_heaps_[current_frame_].get();
-  }
+  CD3DX12_CPU_DESCRIPTOR_HANDLE RTVDescriptorHandle(uint32_t index) const;
+  CD3DX12_CPU_DESCRIPTOR_HANDLE DSVDescriptorHandle(uint32_t index) const;
+  void BindDescriptorHeaps(ID3D12GraphicsCommandList *commands) const;
 
-  d3d12::DescriptorHeap *DSVDescriptorHeap() const {
-    return dsv_descriptor_heaps_[current_frame_].get();
-  }
-
-  d3d12::Buffer *RequestUploadStagingBuffer(size_t size);
-  d3d12::Buffer *RequestDownloadStagingBuffer(size_t size);
+  ID3D12Resource *RequestUploadStagingBuffer(size_t size);
+  ID3D12Resource *RequestDownloadStagingBuffer(size_t size);
 
 #if defined(LONGMARCH_CUDA_RUNTIME)
-  void ImportCudaExternalMemory(cudaExternalMemory_t &cuda_memory, d3d12::Buffer *buffer);
+  void ImportCudaExternalMemory(cudaExternalMemory_t &cuda_memory, ID3D12Resource *buffer);
   void CUDABeginExecutionBarrier(cudaStream_t stream) override;
   void CUDAEndExecutionBarrier(cudaStream_t stream) override;
 #endif
 
  private:
-  std::unique_ptr<d3d12::DXGIFactory> dxgi_factory_;
-  std::unique_ptr<d3d12::Device> device_;
+  friend class D3D12AccelerationStructure;
+  ComPtr<IDXGIFactory4> dxgi_factory_;
+  ComPtr<IDXGIAdapter1> adapter_;
+  ComPtr<ID3D12Device> device_;
+  ComPtr<ID3D12Device5> dxr_device_;
+  D3D12_FEATURE_DATA_D3D12_OPTIONS1 d3d12_options1_{};
+  ComPtr<ID3D12Resource> scratch_buffer_;
+  ComPtr<ID3D12Resource> instance_buffer_;
+  ID3D12Resource *RequestScratchBuffer(size_t size);
+  ID3D12Resource *RequestInstanceBuffer(size_t size);
 
   struct BlitPipeline blit_pipeline_;
 
-  std::unique_ptr<d3d12::CommandQueue> command_queue_;
-  std::unique_ptr<d3d12::CommandQueue> transfer_command_queue_;
-  std::vector<std::unique_ptr<d3d12::CommandAllocator>> command_allocators_;
-  std::vector<std::unique_ptr<d3d12::CommandList>> command_lists_;
+  ComPtr<ID3D12CommandQueue> command_queue_;
+  ComPtr<ID3D12CommandQueue> transfer_command_queue_;
+  std::vector<ComPtr<ID3D12CommandAllocator>> command_allocators_;
+  std::vector<ComPtr<ID3D12GraphicsCommandList>> command_lists_;
 
-  std::unique_ptr<d3d12::Fence> fence_;
+  ComPtr<ID3D12Fence> fence_;
+  uint64_t fence_value_{1};
+  HANDLE fence_event_{nullptr};
+  void SignalFence(ID3D12CommandQueue *queue);
+  void QueueWaitFence(ID3D12CommandQueue *queue);
+  void WaitForFence(uint64_t value);
   std::vector<uint64_t> in_flight_values_;
 
-  std::unique_ptr<d3d12::CommandAllocator> single_time_allocator_;
-  std::unique_ptr<d3d12::CommandList> single_time_command_list_;
+  ComPtr<ID3D12CommandAllocator> single_time_allocator_;
+  ComPtr<ID3D12GraphicsCommandList> single_time_command_list_;
 
-  std::unique_ptr<d3d12::CommandAllocator> transfer_allocator_;
-  std::unique_ptr<d3d12::CommandList> transfer_command_list_;
+  ComPtr<ID3D12CommandAllocator> transfer_allocator_;
+  ComPtr<ID3D12GraphicsCommandList> transfer_command_list_;
 
-  std::vector<std::unique_ptr<d3d12::DescriptorHeap>> resource_descriptor_heaps_;
-  std::vector<std::unique_ptr<d3d12::DescriptorHeap>> sampler_descriptor_heaps_;
+  std::vector<ComPtr<ID3D12DescriptorHeap>> resource_descriptor_heaps_;
+  std::vector<ComPtr<ID3D12DescriptorHeap>> sampler_descriptor_heaps_;
 
-  std::vector<std::unique_ptr<d3d12::DescriptorHeap>> rtv_descriptor_heaps_;
-  std::vector<std::unique_ptr<d3d12::DescriptorHeap>> dsv_descriptor_heaps_;
+  std::vector<ComPtr<ID3D12DescriptorHeap>> rtv_descriptor_heaps_;
+  std::vector<ComPtr<ID3D12DescriptorHeap>> dsv_descriptor_heaps_;
 
   uint32_t current_frame_{0};
 
@@ -197,8 +249,8 @@ class D3D12Core : public Core {
   cudaExternalSemaphore_t cuda_semaphore_{};
 #endif
 
-  std::unique_ptr<d3d12::Buffer> upload_staging_buffer_;
-  std::unique_ptr<d3d12::Buffer> download_staging_buffer_;
+  ComPtr<ID3D12Resource> upload_staging_buffer_;
+  ComPtr<ID3D12Resource> download_staging_buffer_;
 };
 
 }  // namespace grassland::graphics::backend

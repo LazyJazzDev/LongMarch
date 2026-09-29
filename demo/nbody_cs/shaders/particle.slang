@@ -23,5 +23,9 @@ PSInput VSMain([[vk::location(0)]] float3 pos
 
 float4 PSMain(PSInput input) : SV_TARGET {
   float scale = max(1.0 - length(input.frag_v), 0.0);
-  return float4(float3(0.2, 0.4, 1.0) * scale * scale * scale, 0.0);
+  // Decode the original sRGB particle tint before linear accumulation.
+  const float3 linear_tint = float3(0.03310477, 0.13286832, 1.0);
+  // A compact, bright stellar core: half the radius and eight times the peak.
+  const float peak_radiance = 8.0;
+  return float4(linear_tint * peak_radiance * scale * scale * scale, 0.0);
 }

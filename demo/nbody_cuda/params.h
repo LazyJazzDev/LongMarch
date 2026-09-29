@@ -5,4 +5,4 @@
 #define GRAVITY_COE (1e2f / float(NUM_PARTICLE))
 #define INITIAL_SPEED 2.0f
 #define INITIAL_RADIUS 10.0f
-#define PARTICLE_SIZE 0.14f
+#define PARTICLE_SIZE 0.07f

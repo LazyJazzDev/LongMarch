@@ -71,7 +71,7 @@ std::string ShaderRequestKey(const VirtualFileSystem &vfs,
                              const std::string &entry,
                              const std::string &target,
                              const std::vector<std::string> &args) {
-  std::vector<std::string> parts{"sparkium-slang-2026.18.3-release-v1", file, entry, target};
+  std::vector<std::string> parts{"sparkium-slang-release-v2", file, entry, target};
   parts.push_back(std::to_string(args.size()));
   parts.insert(parts.end(), args.begin(), args.end());
   for (const auto &path : vfs.ListFiles()) {

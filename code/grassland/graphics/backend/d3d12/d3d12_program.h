@@ -13,8 +13,8 @@ class D3D12ProgramBase {
   void AddResourceBindingImpl(ResourceType type, int count);
   void FinalizeRootSignature();
 
-  d3d12::RootSignature *RootSignature() const {
-    return root_signature_.get();
+  ID3D12RootSignature *RootSignature() const {
+    return root_signature_.Get();
   }
 
   CD3DX12_DESCRIPTOR_RANGE1 *DescriptorRange(int index) {
@@ -24,7 +24,7 @@ class D3D12ProgramBase {
  protected:
   D3D12Core *core_;
   std::vector<CD3DX12_DESCRIPTOR_RANGE1> descriptor_ranges_;
-  std::unique_ptr<d3d12::RootSignature> root_signature_;
+  ComPtr<ID3D12RootSignature> root_signature_;
 };
 
 class D3D12Program : public Program, public D3D12ProgramBase {
@@ -42,15 +42,15 @@ class D3D12Program : public Program, public D3D12ProgramBase {
   uint32_t InputBindingStride(uint32_t index) const;
   const D3D12_GRAPHICS_PIPELINE_STATE_DESC *PipelineStateDesc() const;
 
-  d3d12::PipelineState *PipelineState() const {
-    return pipeline_state_.get();
+  ID3D12PipelineState *PipelineState() const {
+    return pipeline_state_.Get();
   }
 
  private:
   std::vector<std::pair<uint32_t, bool>> input_bindings_;
   std::vector<D3D12_INPUT_ELEMENT_DESC> input_attributes_;
   D3D12_GRAPHICS_PIPELINE_STATE_DESC pipeline_state_desc_;
-  std::unique_ptr<d3d12::PipelineState> pipeline_state_;
+  ComPtr<ID3D12PipelineState> pipeline_state_;
 };
 
 class D3D12ComputeProgram : public ComputeProgram, public D3D12ProgramBase {
@@ -60,13 +60,13 @@ class D3D12ComputeProgram : public ComputeProgram, public D3D12ProgramBase {
   void AddResourceBinding(ResourceType type, int count) override;
   void Finalize() override;
 
-  d3d12::ComPtr<ID3D12PipelineState> PipelineState() const {
+  ComPtr<ID3D12PipelineState> PipelineState() const {
     return pipeline_state_;
   }
 
  private:
   D3D12Shader *compute_shader_;
-  d3d12::ComPtr<ID3D12PipelineState> pipeline_state_;
+  ComPtr<ID3D12PipelineState> pipeline_state_;
 };
 
 class D3D12RayTracingProgram : public RayTracingProgram, public D3D12ProgramBase {
@@ -89,21 +89,51 @@ class D3D12RayTracingProgram : public RayTracingProgram, public D3D12ProgramBase
                 const std::vector<int32_t> &callable_shader_indices) override;
   void Finalize() override;
 
-  d3d12::RayTracingPipeline *PipelineState() const {
-    return pipeline_.get();
+  ID3D12StateObject *PipelineState() const {
+    return pipeline_.Get();
   }
 
-  d3d12::ShaderTable *ShaderTable() const {
-    return shader_table_.get();
+  ID3D12Resource *ShaderTable() const {
+    return shader_table_.Get();
+  }
+
+  D3D12_GPU_VIRTUAL_ADDRESS MissShaderAddress() const {
+    return shader_table_->GetGPUVirtualAddress() + miss_offset_;
+  }
+
+  D3D12_GPU_VIRTUAL_ADDRESS HitGroupAddress() const {
+    return shader_table_->GetGPUVirtualAddress() + hit_group_offset_;
+  }
+
+  D3D12_GPU_VIRTUAL_ADDRESS CallableShaderAddress() const {
+    return shader_table_->GetGPUVirtualAddress() + callable_offset_;
+  }
+
+  size_t MissShaderCount() const {
+    return miss_count_;
+  }
+
+  size_t HitGroupCount() const {
+    return hit_group_count_;
+  }
+
+  size_t CallableShaderCount() const {
+    return callable_count_;
   }
 
  private:
-  d3d12::ShaderModule *raygen_shader_;
-  std::vector<d3d12::ShaderModule *> miss_shaders_;
+  const CompiledShaderBlob *raygen_shader_;
+  std::vector<const CompiledShaderBlob *> miss_shaders_;
   std::vector<d3d12::HitGroup> hit_groups_;
-  std::vector<d3d12::ShaderModule *> callable_shaders_;
-  std::unique_ptr<d3d12::RayTracingPipeline> pipeline_;
-  std::unique_ptr<d3d12::ShaderTable> shader_table_;
+  std::vector<const CompiledShaderBlob *> callable_shaders_;
+  ComPtr<ID3D12StateObject> pipeline_;
+  ComPtr<ID3D12Resource> shader_table_;
+  D3D12_GPU_VIRTUAL_ADDRESS miss_offset_{};
+  D3D12_GPU_VIRTUAL_ADDRESS hit_group_offset_{};
+  D3D12_GPU_VIRTUAL_ADDRESS callable_offset_{};
+  size_t miss_count_{};
+  size_t hit_group_count_{};
+  size_t callable_count_{};
 };
 
 }  // namespace grassland::graphics::backend

@@ -34,8 +34,8 @@ void WriteLeaf(uint slot, uint primitive) {
       SoftwareNode local = LoadSoftwareNode(nodes, instance.root);
       if (all(local.lo <= local.hi)) {
         for (uint corner = 0; corner < 8; ++corner) {
-          float3 p = float3((corner & 1) ? local.hi.x : local.lo.x, (corner & 2) ? local.hi.y : local.lo.y,
-                            (corner & 4) ? local.hi.z : local.lo.z);
+          float3 p = float3((corner & 1) != 0 ? local.hi.x : local.lo.x, (corner & 2) != 0 ? local.hi.y : local.lo.y,
+                            (corner & 4) != 0 ? local.hi.z : local.lo.z);
           p = mul(instance.object_to_world, float4(p, 1));
           n.lo = min(n.lo, p);
           n.hi = max(n.hi, p);

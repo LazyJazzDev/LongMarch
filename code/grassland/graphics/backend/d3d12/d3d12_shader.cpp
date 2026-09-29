@@ -4,11 +4,11 @@
 
 namespace grassland::graphics::backend {
 
-D3D12Shader::D3D12Shader(D3D12Core *core, const CompiledShaderBlob &blob) : core_(core), shader_module_(blob) {
+D3D12Shader::D3D12Shader(D3D12Core *core, const CompiledShaderBlob &blob) : core_(core), shader_blob_(blob) {
 }
 
 std::string D3D12Shader::EntryPoint() const {
-  return WStringToString(shader_module_.EntryPoint());
+  return shader_blob_.entry_point;
 }
 
 }  // namespace grassland::graphics::backend

@@ -80,7 +80,9 @@ find_package(glfw3 CONFIG REQUIRED)
 set(GLFW3_LIB_NAME glfw)
 list(APPEND LIB_LIST ${GLFW3_LIB_NAME})
 
-find_package(Vulkan)
+if (NOT LONGMARCH_DISABLE_VULKAN)
+    find_package(Vulkan)
+endif ()
 if (Vulkan_FOUND AND NOT LONGMARCH_DISABLE_VULKAN)
     set(LONGMARCH_VULKAN_ENABLED ON)
     set(VULKAN_LIB_NAME ${Vulkan_LIBRARIES})
@@ -152,6 +154,12 @@ function(LONGMARCH_DEPLOY_RUNTIME_DEPENDENCIES TARGET_NAME)
             COMMAND ${CMAKE_COMMAND} -E copy_if_different
             "$<TARGET_FILE:slang::slang>" "$<TARGET_FILE_DIR:${TARGET_NAME}>"
             COMMENT "Deploying Slang compiler runtime for ${TARGET_NAME}")
+    if (TARGET slang::slang-glslang)
+        add_custom_command(TARGET ${TARGET_NAME} POST_BUILD
+                COMMAND ${CMAKE_COMMAND} -E copy_if_different
+                "$<TARGET_FILE:slang::slang-glslang>" "$<TARGET_FILE_DIR:${TARGET_NAME}>"
+                COMMENT "Deploying Slang SPIR-V optimizer for ${TARGET_NAME}")
+    endif ()
     # DXIL generation is performed by Slang's downstream DXC on Windows.
     if(WIN32)
         foreach(_dll IN LISTS LONGMARCH_SLANG_RUNTIME_DLLS)
@@ -207,9 +215,8 @@ if (NOT LONGMARCH_DISABLE_PYTHON)
         message(STATUS "Python3_VERSION: ${Python3_VERSION}")
         message(STATUS "Python3_SITEARCH: ${Python3_SITEARCH}")
 
+        # Only the long_march extension module (code/pybind) uses pybind11.
         add_subdirectory(external/pybind11)
-        set(PYBIND11_LIB_NAME pybind11::headers)
-        list(APPEND LIB_LIST ${PYBIND11_LIB_NAME})
 
         set(LONGMARCH_PYTHON_ENABLED ON)
     endif ()
