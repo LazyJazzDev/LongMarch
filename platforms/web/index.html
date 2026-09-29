@@ -5,66 +5,345 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>LongMarch Web</title>
 <style>
-  :root { --bg: #141414; --bar: rgba(30, 32, 36, 0.72); --text: #e8eaed; --muted: #9aa1ac; --accent: #4f8fe6; }
+  :root { --bg: #141414; --bar: rgba(30, 32, 36, 0.72); --sheet: #1c1c1e; --row: #2c2c2e; --separator: #38383a;
+    --text: #f2f2f7; --muted: #98989f; --accent: #0a84ff; --danger: #ff453a; }
   * { box-sizing: border-box; }
+  [hidden] { display: none !important; }
   html, body { margin: 0; height: 100%; background: var(--bg); color: var(--text); overflow: hidden;
-    font: 14px/1.4 -apple-system, BlinkMacSystemFont, "PingFang SC", "Segoe UI", sans-serif; }
+    font: 15px/1.4 -apple-system, BlinkMacSystemFont, "PingFang SC", "Segoe UI", sans-serif; }
   canvas { position: fixed; inset: 0; width: 100%; height: 100%; display: block; touch-action: none; outline: none; }
   nav { position: fixed; top: max(12px, env(safe-area-inset-top)); left: 50%; transform: translateX(-50%); z-index: 1;
     display: flex; gap: 4px; padding: 4px; border-radius: 999px; background: var(--bar);
     backdrop-filter: blur(20px) saturate(1.4); -webkit-backdrop-filter: blur(20px) saturate(1.4);
     box-shadow: 0 4px 16px rgba(0, 0, 0, 0.35), inset 0 0 0 0.5px rgba(255, 255, 255, 0.12); }
-  nav a { color: var(--muted); text-decoration: none; padding: 6px 14px; border-radius: 999px; white-space: nowrap; }
+  nav a { color: var(--muted); text-decoration: none; padding: 6px 14px; border-radius: 999px; white-space: nowrap;
+    font-size: 14px; }
   nav a[aria-current] { color: var(--text); background: rgba(255, 255, 255, 0.14); }
   #status { position: fixed; inset: 0; display: grid; place-items: center; padding: 16px; text-align: center; color: var(--muted); }
   #status[hidden] { display: none; }
   #status p { max-width: 420px; margin: 0; }
+
+  /* Pattern library: a bottom sheet like the mobile apps. */
+  #library { position: fixed; inset: 0; z-index: 2; display: flex; align-items: flex-end; justify-content: center;
+    background: rgba(0, 0, 0, 0.35); }
+  #library[hidden] { display: none; }
+  .sheet { width: min(560px, 100%); height: min(78vh, 720px); display: flex; flex-direction: column; background: var(--sheet);
+    border-radius: 16px 16px 0 0; box-shadow: 0 -8px 32px rgba(0, 0, 0, 0.45); padding-bottom: env(safe-area-inset-bottom); }
+  .header { display: flex; align-items: center; gap: 8px; padding: 14px 16px 8px; }
+  .header h2 { flex: 1; margin: 0; font-size: 17px; font-weight: 600; text-align: center; }
+  .header button, .link { background: none; border: 0; color: var(--accent); font: inherit; padding: 4px; cursor: pointer; }
+  .header .spacer { width: 44px; }
+  .field { display: flex; gap: 8px; padding: 4px 16px 8px; }
+  .field input { flex: 1; min-width: 0; height: 36px; border: 0; border-radius: 10px; padding: 0 12px; font: inherit;
+    color: var(--text); background: #2c2c2e; outline: none; }
+  .field input:focus { box-shadow: 0 0 0 2px rgba(10, 132, 255, 0.6); }
+  .field button { border: 0; border-radius: 10px; padding: 0 16px; font: inherit; font-weight: 600; color: #fff;
+    background: var(--accent); cursor: pointer; }
+  .field button:disabled { opacity: 0.4; cursor: default; }
+  .back { display: flex; align-items: center; justify-content: space-between; padding: 0 16px 6px; }
+  .back strong { font-weight: 600; }
+  .list { flex: 1; overflow-y: auto; padding: 4px 16px 8px; -webkit-overflow-scrolling: touch; }
+  .group { margin: 12px 4px 6px; color: var(--muted); font-size: 13px; }
+  .rows { border-radius: 12px; overflow: hidden; background: var(--row); }
+  .row { display: flex; align-items: center; gap: 12px; width: 100%; padding: 11px 14px; border: 0; background: none;
+    color: var(--text); font: inherit; text-align: left; cursor: pointer; }
+  .row + .row { box-shadow: inset 0 0.5px 0 var(--separator); }
+  .row:hover { background: rgba(255, 255, 255, 0.05); }
+  .row .icon { width: 22px; flex: none; color: var(--accent); text-align: center; }
+  .row .main { flex: 1; min-width: 0; }
+  .row .name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .row .detail { color: var(--muted); font-size: 13px; }
+  .row .count, .row .chevron { color: var(--muted); }
+  .row .delete { color: var(--danger); background: none; border: 0; font: inherit; padding: 4px 6px; cursor: pointer; }
+  .empty { padding: 14px; color: var(--muted); }
+  .footer { padding: 8px 16px 14px; text-align: center; }
+  .credit { margin: 10px 4px 4px; color: var(--muted); font-size: 12px; }
+  .credit a { color: var(--muted); }
 </style>
 </head>
 <body>
 <nav id="apps"></nav>
 <canvas id="canvas" tabindex="0"></canvas>
 <div id="status"><p id="message"></p></div>
+<div id="library" hidden>
+  <div class="sheet" role="dialog" aria-modal="true" aria-labelledby="library-title">
+    <div class="header">
+      <span class="spacer"></span>
+      <h2 id="library-title"></h2>
+      <button id="library-close" type="button"></button>
+    </div>
+    <div class="field" id="save-field"><input id="save-name" autocomplete="off"><button id="save-button" type="button"></button></div>
+    <div class="back" id="back"><button class="link" id="back-button" type="button"></button><strong id="folder-title"></strong></div>
+    <div class="field" id="search-field"><input id="search" type="search" autocomplete="off"></div>
+    <div class="list" id="list"></div>
+    <div class="footer"><button class="link" id="system" type="button"></button></div>
+  </div>
+</div>
+<input id="file" type="file" accept=".cells,.txt,text/plain" hidden>
 <script>
+(() => {
+  // A function scope keeps these names out of the globals of longmarch.js (Emscripten's runtime).
   const zh = navigator.language.toLowerCase().startsWith('zh');
-  const text = zh
-    ? { gol: '生命游戏', '2048': '2048', nbody: 'N 体模拟', loading: '正在加载…',
-        unsupported: '这个浏览器不支持 WebGPU。请使用最新版的 Chrome、Edge 或 Safari 26。', failed: '运行出错：' }
-    : { gol: 'Game of Life', '2048': '2048', nbody: 'N-body', loading: 'Loading…',
-        unsupported: 'This browser does not support WebGPU. Use a current Chrome, Edge or Safari 26.', failed: 'Error: ' };
+  const text = zh ? {
+    gol: '生命游戏', '2048': '2048', nbody: 'N 体模拟', loading: '正在加载…',
+    unsupported: '这个浏览器不支持 WebGPU。请使用最新版的 Chrome、Edge 或 Safari 26。', failed: '运行出错：',
+    open: '打开图案', save: '保存图案', cancel: '取消', saveButton: '保存', name: '文件名', mine: '我的图案',
+    allFolders: '全部分类', searchAll: '搜索全部图案', searchIn: (f) => `在“${f}”中搜索`, noSaved: '还没有保存的图案',
+    openSystem: '从系统文件读取…', saveSystem: '保存到系统文件…', remove: '删除',
+    replace: (n) => `“${n}”已存在，要替换它吗？`, removeConfirm: (n) => `删除“${n}”？`,
+    credit: '内置图案改编自 Stephen A. Silver 等编写的 Life Lexicon，以 {link} 授权。',
+    categories: { still: '静物', oscillator: '振荡器', spaceship: '飞船', gun: '枪', puffer: '繁殖器与耙',
+      methuselah: '长寿图案', other: '其他结构' },
+    directions: { diagonal: '对角', orthogonal: '正交', oblique: '斜向' },
+  } : {
+    gol: 'Game of Life', '2048': '2048', nbody: 'N-body', loading: 'Loading…',
+    unsupported: 'This browser does not support WebGPU. Use a current Chrome, Edge or Safari 26.', failed: 'Error: ',
+    open: 'Open Pattern', save: 'Save Pattern', cancel: 'Cancel', saveButton: 'Save', name: 'File name', mine: 'My Patterns',
+    allFolders: 'All Folders', searchAll: 'Search all patterns', searchIn: (f) => `Search in “${f}”`,
+    noSaved: 'No saved patterns yet', openSystem: 'Open from Files…', saveSystem: 'Save to Files…', remove: 'Delete',
+    replace: (n) => `“${n}” already exists. Do you want to replace it?`, removeConfirm: (n) => `Delete “${n}”?`,
+    credit: 'Built-in patterns are adapted from the Life Lexicon by Stephen A. Silver et al. and licensed under {link}.',
+    categories: { still: 'Still lifes', oscillator: 'Oscillators', spaceship: 'Spaceships', gun: 'Guns',
+      puffer: 'Puffers and rakes', methuselah: 'Methuselahs', other: 'Other structures' },
+    directions: { diagonal: 'diagonal', orthogonal: 'orthogonal', oblique: 'oblique' },
+  };
+  const CATEGORIES = ['still', 'oscillator', 'spaceship', 'gun', 'puffer', 'methuselah', 'other'];
+  const LICENSE = 'https://creativecommons.org/licenses/by-sa/3.0/';
   const apps = ['gol', '2048', 'nbody'];
-  const app = apps.includes(new URLSearchParams(location.search).get('app')) ?
-    new URLSearchParams(location.search).get('app') : 'gol';
+  const requested = new URLSearchParams(location.search).get('app');
+  const app = apps.includes(requested) ? requested : 'gol';
+  const $ = (id) => document.getElementById(id);
   document.documentElement.lang = zh ? 'zh-CN' : 'en';
   document.title = text[app] + ' · LongMarch';
-  const nav = document.getElementById('apps');
   for (const id of apps) {
     const link = document.createElement('a');
     link.href = '?app=' + id;
     link.textContent = text[id];
     if (id === app) link.setAttribute('aria-current', 'page');
-    nav.appendChild(link);
+    $('apps').appendChild(link);
   }
-  const status = document.getElementById('status');
-  const message = document.getElementById('message');
-  const show = (value) => { message.textContent = value; status.hidden = false; };
+  const show = (value) => { $('message').textContent = value; $('status').hidden = false; };
   show(text.loading);
-  const canvas = document.getElementById('canvas');
+  const canvas = $('canvas');
   canvas.addEventListener('contextmenu', (event) => event.preventDefault());
+
+  // ---- Saved patterns: this browser's storage, like the apps' own library folder. ----
+  const STORE = 'longmarch.gol.patterns';
+  const readStore = () => { try { return JSON.parse(localStorage.getItem(STORE)) || {}; } catch { return {}; } };
+  const writeStore = (patterns) => { try { localStorage.setItem(STORE, JSON.stringify(patterns)); } catch {} };
+  const saved = () => Object.entries(readStore()).map(([name, value]) => ({ name, ...value }))
+    .sort((a, b) => b.modified - a.modified);
+  const fileName = (name) => name.trim().replace(/\.cells$/i, '').replace(/[\\/:*?"<>|]/g, '_').trim();
+
+  // ---- Built-in patterns (demo/gol/patterns/library.json, CC BY-SA 3.0). ----
+  let builtins = null;
+  const loadBuiltins = () => {
+    if (!builtins) {
+      try { builtins = JSON.parse(Module.FS.readFile('/res/Patterns/library.json', { encoding: 'utf8' })).patterns; }
+      catch { builtins = []; }
+    }
+    return builtins;
+  };
+  const detail = (p) => {
+    const parts = [];
+    if (p.speed) parts.push(p.speed.replace(/ (diagonal|orthogonal|oblique)$/, (m, d) => ' ' + text.directions[d]));
+    if (p.period && p.period > 1) parts.push('p' + p.period);
+    parts.push(`${p.width}×${p.height}`);
+    return parts.join(' · ');
+  };
+  // Life .cells text for a run-length encoded pattern.
+  const cells = (p) => {
+    const rows = [];
+    let row = '', count = '';
+    for (const c of p.rle) {
+      if (c >= '0' && c <= '9') { count += c; continue; }
+      const n = count ? Number(count) : 1;
+      count = '';
+      if (c === 'b') row += '.'.repeat(n);
+      else if (c === 'o') row += 'O'.repeat(n);
+      else if (c === '$' || c === '!') {
+        rows.push(row);
+        for (let i = 1; i < n && c === '$'; i++) rows.push('');
+        row = '';
+        if (c === '!') break;
+      }
+    }
+    return `!Name: ${p.name}\n!Life Lexicon (Stephen A. Silver et al.), adapted under CC BY-SA 3.0: ${LICENSE}\n` +
+      rows.map((line) => line.padEnd(p.width, '.')).join('\n') + '\n';
+  };
+
+  // ---- The sheet, opened by the game's open (1) and save (2) buttons. ----
+  let action = 0, folder = '';
+  const PATH = '/tmp/pattern.cells';
+  const finish = (path) => {
+    $('library').hidden = true;
+    action = 0;
+    const error = Module.ccall('lm_complete_file', 'string', ['string'], [path]);
+    if (error) alert(error);
+    canvas.focus();
+  };
+  const openText = (value) => { Module.FS.writeFile(PATH, value); finish(PATH); };
+  const saveTo = (name) => {
+    const store = readStore();
+    if (store[name] && !confirm(text.replace(name))) return;
+    finish(PATH);
+    try {
+      store[name] = { cells: Module.FS.readFile(PATH, { encoding: 'utf8' }), modified: Date.now() };
+      writeStore(store);
+    } catch {}
+  };
+  const element = (tag, className, content) => {
+    const node = document.createElement(tag);
+    if (className) node.className = className;
+    if (content !== undefined) node.textContent = content;
+    return node;
+  };
+  const row = (icon, name, sub, onClick, trailing) => {
+    const button = element('button', 'row');
+    button.type = 'button';
+    button.appendChild(element('span', 'icon', icon));
+    const main = element('span', 'main');
+    main.appendChild(element('div', 'name', name));
+    if (sub) main.appendChild(element('div', 'detail', sub));
+    button.appendChild(main);
+    if (trailing) for (const node of trailing) button.appendChild(node);
+    button.addEventListener('click', onClick);
+    return button;
+  };
+  const group = (title, rows) => {
+    const list = $('list');
+    if (title) list.appendChild(element('div', 'group', title));
+    const container = element('div', 'rows');
+    for (const node of rows) container.appendChild(node);
+    list.appendChild(container);
+  };
+  const savedRow = (p) => {
+    const remove = element('span', 'delete', text.remove);
+    remove.setAttribute('role', 'button');
+    remove.addEventListener('click', (event) => {
+      event.stopPropagation();
+      if (!confirm(text.removeConfirm(p.name))) return;
+      const store = readStore();
+      delete store[p.name];
+      writeStore(store);
+      render();
+    });
+    return row('📄', p.name, new Date(p.modified).toLocaleString(), () => {
+      if (action === 2) saveTo(p.name);
+      else openText(p.cells);
+    }, [remove]);
+  };
+  const builtinRow = (p) => row('▦', p.name, detail(p), () => openText(cells(p)));
+  const folderRow = (id, title, count) => {
+    const trailing = [element('span', 'count', String(count)), element('span', 'chevron', '›')];
+    return row(id === 'mine' ? '📂' : '📁', title, '', () => { folder = id; $('search').value = ''; render(); }, trailing);
+  };
+  const folderTitle = (id) => id === 'mine' ? text.mine : text.categories[id];
+  const render = () => {
+    const list = $('list');
+    list.textContent = '';
+    const query = $('search').value.trim().toLowerCase();
+    const match = (name) => !query || name.toLowerCase().includes(query);
+    const mine = saved();
+    const saving = action === 2;
+    $('save-field').hidden = !saving;
+    $('search-field').hidden = saving;
+    $('back').hidden = saving || !folder;
+    $('folder-title').textContent = folder ? folderTitle(folder) : '';
+    $('search').placeholder = folder ? text.searchIn(folderTitle(folder)) : text.searchAll;
+    if (saving) {
+      group(text.mine, mine.length ? mine.map(savedRow) : [element('div', 'empty', text.noSaved)]);
+      return;
+    }
+    const patterns = loadBuiltins();
+    if (!folder && !query) {
+      group('', [folderRow('mine', text.mine, mine.length),
+        ...CATEGORIES.map((id) => folderRow(id, text.categories[id], patterns.filter((p) => p.category === id).length))]);
+    } else {
+      if (!folder || folder === 'mine') {
+        const items = mine.filter((p) => match(p.name));
+        if (items.length || folder) group(folder ? '' : `${text.mine} · ${items.length}`,
+          items.length ? items.map(savedRow) : [element('div', 'empty', text.noSaved)]);
+      }
+      for (const id of CATEGORIES) {
+        if (folder && folder !== id) continue;
+        const items = patterns.filter((p) => p.category === id && match(p.name));
+        if (items.length) group(folder ? '' : `${text.categories[id]} · ${items.length}`, items.map(builtinRow));
+      }
+    }
+    const credit = element('p', 'credit');
+    const [before, after] = text.credit.split('{link}');
+    const link = element('a', '', 'CC BY-SA 3.0');
+    link.href = LICENSE;
+    link.target = '_blank';
+    link.rel = 'noopener';
+    credit.append(before, link, after);
+    list.appendChild(credit);
+  };
+  const pad = (n) => String(n).padStart(2, '0');
+  const openLibrary = (request) => {
+    action = request;
+    folder = '';
+    $('search').value = '';
+    const now = new Date();
+    $('save-name').value = `Life ${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())} ` +
+      `${pad(now.getHours())}.${pad(now.getMinutes())}.${pad(now.getSeconds())}`;
+    $('library-title').textContent = request === 2 ? text.save : text.open;
+    $('system').textContent = request === 2 ? text.saveSystem : text.openSystem;
+    $('library').hidden = false;
+    render();
+    (request === 2 ? $('save-name') : $('search')).focus();
+  };
+  $('library-close').textContent = text.cancel;
+  $('save-button').textContent = text.saveButton;
+  $('save-name').placeholder = text.name;
+  $('back-button').textContent = '‹ ' + text.allFolders;
+  $('library-close').addEventListener('click', () => finish(''));
+  $('library').addEventListener('click', (event) => { if (event.target === $('library')) finish(''); });
+  document.addEventListener('keydown', (event) => { if (event.key === 'Escape' && action) finish(''); });
+  $('back-button').addEventListener('click', () => { folder = ''; $('search').value = ''; render(); });
+  $('search').addEventListener('input', render);
+  const saveName = () => fileName($('save-name').value);
+  $('save-name').addEventListener('input', () => { $('save-button').disabled = !saveName(); });
+  $('save-name').addEventListener('keydown', (event) => { if (event.key === 'Enter' && saveName()) saveTo(saveName()); });
+  $('save-button').addEventListener('click', () => { if (saveName()) saveTo(saveName()); });
+  $('system').addEventListener('click', () => {
+    if (action === 2) {
+      finish(PATH);
+      try {
+        const blob = new Blob([Module.FS.readFile(PATH)], { type: 'text/plain' });
+        const link = element('a');
+        link.href = URL.createObjectURL(blob);
+        link.download = (saveName() || 'Life') + '.cells';
+        link.click();
+        setTimeout(() => URL.revokeObjectURL(link.href), 1000);
+      } catch {}
+    } else {
+      $('file').value = '';
+      $('file').click();
+    }
+  });
+  $('file').addEventListener('change', async () => {
+    const file = $('file').files[0];
+    if (file) openText(await file.text());
+  });
+
   if (!navigator.gpu) {
     show(text.unsupported);
   } else {
     window.Module = {
       arguments: [app],
       canvas,
-      onLongMarchReady: () => { status.hidden = true; canvas.focus(); },
+      onLongMarchReady: () => { $('status').hidden = true; canvas.focus(); },
       onLongMarchError: (error) => show(text.failed + error),
+      onLongMarchFile: openLibrary,
       printErr: (line) => console.error(line),
     };
     const script = document.createElement('script');
     script.src = 'longmarch.js';
     document.body.appendChild(script);
   }
+})();
 </script>
 </body>
 </html>

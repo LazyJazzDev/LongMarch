@@ -72,9 +72,11 @@ target_include_directories(longmarch PRIVATE "${MOBILE}" "${CMAKE_CURRENT_BINARY
   "${ROOT}/demo/2048" "${ROOT}/demo/gol")
 target_link_libraries(longmarch PRIVATE web_gol web_2048)
 target_link_options(longmarch PRIVATE -sENVIRONMENT=web -sALLOW_MEMORY_GROWTH=1 -sEXIT_RUNTIME=0
+  -sEXPORTED_FUNCTIONS=_main,_lm_complete_file -sEXPORTED_RUNTIME_METHODS=FS,ccall
   "--preload-file=${WEB_RESOURCES}@/res")
 set_target_properties(longmarch PROPERTIES LINK_DEPENDS "${WEB_RESOURCES}/shaders")
 # The page (index.html) loads longmarch.js next to it.
-add_custom_command(TARGET longmarch POST_BUILD
-  COMMAND "${CMAKE_COMMAND}" -E copy "${CMAKE_CURRENT_SOURCE_DIR}/index.html" "$<TARGET_FILE_DIR:longmarch>/index.html"
-  VERBATIM)
+add_custom_command(OUTPUT "${CMAKE_CURRENT_BINARY_DIR}/index.html"
+  COMMAND "${CMAKE_COMMAND}" -E copy "${CMAKE_CURRENT_SOURCE_DIR}/index.html" "${CMAKE_CURRENT_BINARY_DIR}/index.html"
+  DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/index.html" VERBATIM)
+add_custom_target(web_page ALL DEPENDS "${CMAKE_CURRENT_BINARY_DIR}/index.html")

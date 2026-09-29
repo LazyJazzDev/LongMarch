@@ -63,6 +63,10 @@ struct Host {
   float yaw = 0, pitch = 0;
   bool dragging = false;
   double drag_x = 0, drag_y = 0;
+  // A Game of Life open/save request shown in the page's pattern library.
+  bool file_pending = false;
+  // Releases reach the game only after a press on the canvas, not from the page's sheet.
+  bool pressed = false;
 };
 
 Host host;
@@ -188,9 +192,12 @@ void Frame() {
     if (Nbody())
       host.session->Configure(4096, 10, 0.03f, true, host.yaw, host.pitch, 0);
     if (auto game = host.session->Game()) {
-      // The pattern library and native file dialogs are not in the web app yet.
-      if (game->FileRequest() > 0)
-        game->CompleteFile("");
+      // The page shows its pattern library, then answers with lm_complete_file.
+      const int request = game->FileRequest();
+      if (request > 0 && !host.file_pending) {
+        host.file_pending = true;
+        EM_ASM({ Module.onLongMarchFile($0); }, request);
+      }
     }
     host.session->Render();
     Present(host.session->Image());
@@ -216,8 +223,9 @@ void Button(int button, bool press, double x, double y) {
     return;
   }
   auto window = GameWindow();
-  if (!window)
+  if (!window || (!press && !host.pressed))
     return;
+  host.pressed = press;
   Pointer(x, y);
   if (press)
     window->CursorEnterEvent().InvokeCallbacks(true);
@@ -310,6 +318,12 @@ int Key(const EmscriptenKeyboardEvent *event) {
 }
 
 EM_BOOL OnKey(int type, const EmscriptenKeyboardEvent *event, void *) {
+  // Typing in the page's pattern library stays in its text fields.
+  if (EM_ASM_INT({
+        const e = document.activeElement;
+        return e && (e.tagName == 'INPUT' || e.tagName == 'TEXTAREA');
+      }))
+    return EM_FALSE;
   auto window = GameWindow();
   const int key = Key(event);
   if (!window || key == GLFW_KEY_UNKNOWN)
@@ -372,6 +386,21 @@ void RequestDevice() {
 }
 
 }  // namespace
+
+// Completes the pending Game of Life file request: the game loads or saves the
+// .cells file at path in the Emscripten file system, or cancels for "". Returns
+// an error message, empty on success.
+extern "C" EMSCRIPTEN_KEEPALIVE const char *lm_complete_file(const char *path) {
+  static std::string error;
+  host.file_pending = false;
+  auto game = host.session ? host.session->Game() : nullptr;
+  try {
+    error = game ? game->CompleteFile(path) : "No game is running";
+  } catch (const std::exception &e) {
+    error = e.what();
+  }
+  return error.c_str();
+}
 
 int main(int argc, char **argv) {
   const std::string app = argc > 1 ? argv[1] : "gol";

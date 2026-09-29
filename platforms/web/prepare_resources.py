@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
-"""Stage the browser apps' resources: the WGSL shader cache and 2048's font.
+"""Stage the browser apps' resources: the WGSL shader cache, 2048's font and the
+Game of Life pattern library.
 
 web_shader_prepare (a SPARKIUM_PREPARE build of platforms/ios) compiles the
 apps' Slang requests to WGSL with the same cache keys the WebGPU backend reads.
@@ -29,5 +30,9 @@ with tempfile.TemporaryDirectory(prefix='web-resources-', dir=output.parent) as 
     subprocess.run([str(args.shader_tool.resolve()), str(staging / 'shaders')], check=True)
     (staging / 'assets/fonts').mkdir(parents=True)
     shutil.copy2(font, staging / 'assets/fonts')
+    # Game of Life's built-in library, read by the page (CC BY-SA 3.0, see LICENSE.md there).
+    (staging / 'Patterns').mkdir()
+    for name in ['library.json', 'LICENSE.md']:
+        shutil.copy2(ROOT / 'demo/gol/patterns' / name, staging / 'Patterns')
     staging.rename(output)
 print(f'Prepared {len(list((output / "shaders").iterdir()))} WGSL shaders in {output}')

@@ -33,7 +33,8 @@ python3 -m http.server --directory build-web 8765
 ```
 
 Open http://localhost:8765/. `build-web` holds the site: `index.html`,
-`longmarch.js`, `longmarch.wasm` and `longmarch.data` (the prepared resources).
+`longmarch.js`, `longmarch.wasm` and `longmarch.data` (the prepared resources,
+including the CC BY-SA 3.0 pattern library of `demo/gol/patterns`).
 
 ## Browser support
 
@@ -50,7 +51,10 @@ The page reports when it is unavailable.
   worker thread.
 - N-body renders to a half-float target: WebGPU blends 32-bit float targets only
   with an optional feature.
-- Game of Life's pattern library and file dialogs are not available yet; its
-  open and save buttons do nothing.
+- Game of Life's open and save buttons show the page's pattern library, like the
+  apps: the built-in Life Lexicon folders, search, and My Patterns, which this
+  browser keeps in local storage. "Open from Files…" reads a `.cells` file the
+  user picks; "Save to Files…" downloads one. The page passes `.cells` text to
+  the game through the Emscripten file system and `lm_complete_file`.
 - Input: mouse and one-finger touch act as the pointer, the wheel scrolls, a
   trackpad pinch zooms, and the keyboard works as on the desktop.
