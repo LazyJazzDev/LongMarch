@@ -212,9 +212,9 @@ void GameOfLife::CustomOnUpdate() {
              glm::vec4{0.1, 0.1, 0.1, 1.0}, glm::uvec4{0}});
   // Match the opposite action rail to the main toolbar background.
   const auto framebuffer = glm::vec2(FramebufferSize());
-  const glm::vec2 action_position = sidebar_ ? glm::vec2{playground_right_, 0} : glm::vec2{0, playground_bottom_};
+  const glm::vec2 action_position = sidebar_ ? glm::vec2{playground_right_, 0} : glm::vec2{0, 0};
   const glm::vec2 action_size = sidebar_ ? glm::vec2{framebuffer.x - playground_right_, framebuffer.y}
-                                         : glm::vec2{framebuffer.x, framebuffer.y - playground_bottom_};
+                                         : glm::vec2{framebuffer.x, playground_top_};
   DrawModel(&white_rect_model.value(),
             {GetModelMatrix(action_position, action_size, 0.8f), glm::vec4{0.1, 0.1, 0.1, 1.0}, glm::uvec4{0}});
   DrawModel(
@@ -268,11 +268,9 @@ void GameOfLife::OnWindowSize() {
   panel_top_ = 0;
   panel_bottom_ = window_height;
 
-  const bool prefer_sidebar =
-      std::min(window_height / cell_grid_height_, (window_width - panel_size * 2.0f) / cell_grid_width_) >
-      std::min((window_height - panel_size * 2.0f) / cell_grid_height_, window_width / cell_grid_width_);
-  if (!width_slider_->IsDragging() && !height_slider_->IsDragging())
-    sidebar_ = prefer_sidebar;
+  // Control bars follow the window's short edges, independent of the grid
+  // aspect: sidebars in landscape windows, top and bottom bars in portrait ones.
+  sidebar_ = window_width >= window_height;
   auto place = [icon_size](Button *button, float x, float y) { button->Resize(x, y, x + icon_size, y + icon_size); };
   if (sidebar_) {
     playground_left = panel_size;
@@ -290,17 +288,21 @@ void GameOfLife::OnWindowSize() {
     width_slider_->Resize({margin, top, margin + slider_thickness, bottom}, true);
     height_slider_->Resize({margin + slider_thickness + slider_gap, top, margin + icon_size, bottom}, true);
   } else {
-    playground_top = panel_size;
+    // Give the sparse top actions more breathing room against rounded corners.
+    const float action_top_margin = margin * 2.0f;
+    playground_top = panel_size + action_top_margin - margin;
     playground_bottom = window_height - panel_size;
-    panel_bottom_ = playground_top;
-    const float top = margin;
+    panel_top_ = playground_bottom;
+    const float top = window_height - margin - icon_size;
     place(open_button_.get(), margin, top);
     place(save_button_.get(), margin + step, top);
     place(boundary_button_.get(), window_width - margin - icon_size - step * 2.0f, top);
     place(speed_toggle_button_.get(), window_width - margin - icon_size - step, top);
     place(pause_play_button_.get(), window_width - margin - icon_size, top);
-    place(refresh_button_.get(), margin, window_height - margin - icon_size);
-    place(randomize_button_.get(), window_width - margin - icon_size, window_height - margin - icon_size);
+    // The sparse action rail sits along the top edge, and the dense controls
+    // along the opposite short edge.
+    place(refresh_button_.get(), margin, action_top_margin);
+    place(randomize_button_.get(), window_width - margin - icon_size, action_top_margin);
     const float left = margin + step * 2.0f;
     const float right = window_width - left - step;
     width_slider_->Resize({left, top, right, top + slider_thickness}, false);
