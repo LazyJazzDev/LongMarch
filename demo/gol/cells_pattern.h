@@ -25,7 +25,7 @@ inline CellsPattern ParseCellsPattern(std::istream &input) {
     if (line.empty() || line.front() == '!')
       continue;
     if (line.size() > grid_size::kMax || pattern.height >= grid_size::kMax)
-      throw std::invalid_argument("Pattern must fit within a 200 x 200 grid");
+      throw std::invalid_argument("Pattern must fit within a 256 x 256 grid");
     if (pattern.width == 0)
       pattern.width = static_cast<int>(line.size());
     if (static_cast<int>(line.size()) != pattern.width)

@@ -455,7 +455,7 @@ void GameOfLife::ProcessFileAction() {
     const char *message =
         action == FileAction::kSave
             ? "Could not save the grid. Check that the folder exists, is writable, and has free disk space."
-            : "Could not read the grid. Choose a readable .cells file under 1 MiB, with equal-length rows of O and . and at most 200 rows and columns.";
+            : "Could not read the grid. Choose a readable .cells file under 1 MiB, with equal-length rows of O and . and at most 256 rows and columns.";
     tinyfd_messageBox(action == FileAction::kSave ? "Could not save grid" : "Could not open grid", message, "ok",
                       "error", 1);
     button->Feedback(false);

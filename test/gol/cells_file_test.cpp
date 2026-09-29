@@ -17,12 +17,12 @@ TEST(CellsFile, RoundTripPreservesDimensionsBordersAndEveryCell) {
 }
 
 TEST(CellsFile, RoundTripPreservesAnEmptyMaximumGrid) {
-  CellsPattern original{200, 200, std::vector<uint8_t>(40000, 0)};
+  CellsPattern original{256, 256, std::vector<uint8_t>(65536, 0)};
   std::stringstream file;
   WriteCellsPattern(file, original);
   const auto restored = ParseCellsPattern(file);
-  EXPECT_EQ(restored.width, 200);
-  EXPECT_EQ(restored.height, 200);
+  EXPECT_EQ(restored.width, 256);
+  EXPECT_EQ(restored.height, 256);
   EXPECT_EQ(restored.cells, original.cells);
 }
 
@@ -36,12 +36,12 @@ TEST(CellsFile, AcceptsCommentsCRLFAndSingleCellPatterns) {
 
 TEST(CellsFile, RejectsMalformedAndOversizedPatterns) {
   for (const auto &data :
-       {std::string("! empty\n"), std::string("OO\n.\n"), std::string("OX\n"), std::string(201, 'O')}) {
+       {std::string("! empty\n"), std::string("OO\n.\n"), std::string("OX\n"), std::string(257, 'O')}) {
     std::istringstream file(data);
     EXPECT_THROW(ParseCellsPattern(file), std::invalid_argument);
   }
   std::string tall;
-  for (int i = 0; i < 201; ++i)
+  for (int i = 0; i < 257; ++i)
     tall += "O\n";
   std::istringstream file(tall);
   EXPECT_THROW(ParseCellsPattern(file), std::invalid_argument);
