@@ -25,12 +25,26 @@ class Surface {
 
  private:
   void ReleaseSwapchain();
+
+  // Presentation work in flight. The blit waits for the acquired image and
+  // signals presentation on the GPU, so the render thread never blocks on it.
+  struct Frame {
+    VkCommandBuffer commands = VK_NULL_HANDLE;
+    VkSemaphore acquired = VK_NULL_HANDLE;
+    VkSemaphore blitted = VK_NULL_HANDLE;
+    VkFence done = VK_NULL_HANDLE;
+  };
+
+  static constexpr size_t kFramesInFlight = 2;
+
   grassland::graphics::backend::VulkanCore *core_;
   OHNativeWindow *window_;
   std::unique_ptr<HdrPresentation> presentation_;
   VkSurfaceKHR surface_ = VK_NULL_HANDLE;
   VkSwapchainKHR swapchain_ = VK_NULL_HANDLE;
-  VkFence acquire_fence_ = VK_NULL_HANDLE;
+  VkCommandPool command_pool_ = VK_NULL_HANDLE;
+  Frame frames_[kFramesInFlight];
+  size_t frame_ = 0;
   std::vector<VkImage> images_;
   VkExtent2D extent_{};
   bool hdr_ = false;

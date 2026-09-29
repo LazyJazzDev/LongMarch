@@ -55,21 +55,46 @@ Surface::Surface(graphics::Core *core, OHNativeWindow *window)
     surface_ = VK_NULL_HANDLE;
     throw std::runtime_error("Graphics queue cannot present to this display");
   }
+  auto device = core_->Handle();
+  VkCommandPoolCreateInfo pool{VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO};
+  pool.flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT;
+  pool.queueFamilyIndex = vulkan::GraphicsFamilyIndex(core_->PhysicalDevice());
+  vulkan::ThrowIfFailed(vkCreateCommandPool(device, &pool, nullptr, &command_pool_), "Presentation command pool");
+  for (auto &frame : frames_) {
+    VkCommandBufferAllocateInfo allocate{VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO};
+    allocate.commandPool = command_pool_;
+    allocate.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
+    allocate.commandBufferCount = 1;
+    vulkan::ThrowIfFailed(vkAllocateCommandBuffers(device, &allocate, &frame.commands), "Presentation commands");
+    VkSemaphoreCreateInfo semaphore{VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO};
+    vulkan::ThrowIfFailed(vkCreateSemaphore(device, &semaphore, nullptr, &frame.acquired), "Acquire semaphore");
+    vulkan::ThrowIfFailed(vkCreateSemaphore(device, &semaphore, nullptr, &frame.blitted), "Blit semaphore");
+    VkFenceCreateInfo fence{VK_STRUCTURE_TYPE_FENCE_CREATE_INFO};
+    fence.flags = VK_FENCE_CREATE_SIGNALED_BIT;
+    vulkan::ThrowIfFailed(vkCreateFence(device, &fence, nullptr, &frame.done), "Presentation fence");
+  }
 }
 
 Surface::~Surface() {
   vkDeviceWaitIdle(core_->Handle());
   ReleaseSwapchain();
+  for (auto &frame : frames_) {
+    if (frame.done)
+      vkDestroyFence(core_->Handle(), frame.done, nullptr);
+    if (frame.acquired)
+      vkDestroySemaphore(core_->Handle(), frame.acquired, nullptr);
+    if (frame.blitted)
+      vkDestroySemaphore(core_->Handle(), frame.blitted, nullptr);
+  }
+  if (command_pool_)
+    vkDestroyCommandPool(core_->Handle(), command_pool_, nullptr);
   if (surface_)
     vkDestroySurfaceKHR(core_->Instance(), surface_, nullptr);
 }
 
 void Surface::ReleaseSwapchain() {
-  if (acquire_fence_)
-    vkDestroyFence(core_->Handle(), acquire_fence_, nullptr);
   if (swapchain_)
     vkDestroySwapchainKHR(core_->Handle(), swapchain_, nullptr);
-  acquire_fence_ = VK_NULL_HANDLE;
   swapchain_ = VK_NULL_HANDLE;
   images_.clear();
 }
@@ -181,9 +206,6 @@ void Surface::Resize(uint32_t width, uint32_t height, bool hdr) {
   vulkan::ThrowIfFailed(vkGetSwapchainImagesKHR(device, swapchain_, &count, nullptr), "Swapchain images");
   images_.resize(count);
   vulkan::ThrowIfFailed(vkGetSwapchainImagesKHR(device, swapchain_, &count, images_.data()), "Swapchain images");
-  VkFenceCreateInfo fence{};
-  fence.sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO;
-  vulkan::ThrowIfFailed(vkCreateFence(device, &fence, nullptr, &acquire_fence_), "Acquire fence");
 }
 
 bool Surface::Present(graphics::Image *source,
@@ -203,8 +225,11 @@ bool Surface::Present(graphics::Image *source,
   if (!image)
     throw std::runtime_error("Presentation requires a Vulkan image");
   auto device = core_->Handle();
+  auto &frame = frames_[frame_];
+  // Reuse this slot only after its previous blit, which bounds work in flight.
+  vulkan::ThrowIfFailed(vkWaitForFences(device, 1, &frame.done, VK_TRUE, UINT64_MAX), "Wait presentation");
   uint32_t index = 0;
-  VkResult acquire = vkAcquireNextImageKHR(device, swapchain_, UINT64_MAX, VK_NULL_HANDLE, acquire_fence_, &index);
+  VkResult acquire = vkAcquireNextImageKHR(device, swapchain_, UINT64_MAX, frame.acquired, VK_NULL_HANDLE, &index);
   if (acquire == VK_ERROR_OUT_OF_DATE_KHR) {
     core_->WaitGPU();
     ReleaseSwapchain();
@@ -213,8 +238,8 @@ bool Surface::Present(graphics::Image *source,
   }
   if (acquire != VK_SUBOPTIMAL_KHR)
     vulkan::ThrowIfFailed(acquire, "Acquire display image");
-  vulkan::ThrowIfFailed(vkWaitForFences(device, 1, &acquire_fence_, VK_TRUE, UINT64_MAX), "Wait display image");
-  vulkan::ThrowIfFailed(vkResetFences(device, 1, &acquire_fence_), "Reset acquire fence");
+  vulkan::ThrowIfFailed(vkResetFences(device, 1, &frame.done), "Reset presentation fence");
+  frame_ = (frame_ + 1) % kFramesInFlight;
   auto size = image->Extent();
   const double scale = std::min(double(extent_.width) / size.width, double(extent_.height) / size.height) * zoom;
   const double left = (extent_.width - size.width * scale) / 2 + pan_x;
@@ -230,7 +255,12 @@ bool Surface::Present(graphics::Image *source,
                         clip((blit.dstOffsets[0].y - top) / scale, size.height), 0};
   blit.srcOffsets[1] = {clip((blit.dstOffsets[1].x - left) / scale, size.width),
                         clip((blit.dstOffsets[1].y - top) / scale, size.height), 1};
-  core_->SingleTimeCommand([&](VkCommandBuffer cmd) {
+  {
+    VkCommandBuffer cmd = frame.commands;
+    vkResetCommandBuffer(cmd, 0);
+    VkCommandBufferBeginInfo begin{VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO};
+    begin.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
+    vulkan::ThrowIfFailed(vkBeginCommandBuffer(cmd, &begin), "Begin presentation commands");
     auto transit = [&](VkImage target, VkImageLayout before, VkImageLayout after, VkAccessFlags src,
                        VkAccessFlags dst) {
       vulkan::TransitImageLayout(cmd, target, before, after, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT,
@@ -255,11 +285,22 @@ bool Surface::Present(graphics::Image *source,
             VK_ACCESS_MEMORY_READ_BIT | VK_ACCESS_MEMORY_WRITE_BIT);
     transit(images_[index], VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_PRESENT_SRC_KHR,
             VK_ACCESS_TRANSFER_WRITE_BIT, 0);
-  });
-  // SingleTimeCommand completes on the GPU before presentation, so there is no
-  // outstanding image write requiring a presentation wait semaphore.
+    vulkan::ThrowIfFailed(vkEndCommandBuffer(cmd), "End presentation commands");
+    VkPipelineStageFlags wait_stage = VK_PIPELINE_STAGE_ALL_COMMANDS_BIT;
+    VkSubmitInfo submit{VK_STRUCTURE_TYPE_SUBMIT_INFO};
+    submit.waitSemaphoreCount = 1;
+    submit.pWaitSemaphores = &frame.acquired;
+    submit.pWaitDstStageMask = &wait_stage;
+    submit.commandBufferCount = 1;
+    submit.pCommandBuffers = &cmd;
+    submit.signalSemaphoreCount = 1;
+    submit.pSignalSemaphores = &frame.blitted;
+    vulkan::ThrowIfFailed(vkQueueSubmit(core_->GraphicsQueue(), 1, &submit, frame.done), "Submit presentation");
+  }
   VkPresentInfoKHR info{};
   info.sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR;
+  info.waitSemaphoreCount = 1;
+  info.pWaitSemaphores = &frame.blitted;
   info.swapchainCount = 1;
   info.pSwapchains = &swapchain_;
   info.pImageIndices = &index;
