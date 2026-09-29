@@ -1,6 +1,7 @@
 #include "application.h"
 
 #include <algorithm>
+#include <cstring>
 #include <map>
 
 #define STB_IMAGE_WRITE_IMPLEMENTATION
@@ -85,18 +86,33 @@ void Application::DrawModel(DeviceModel *device_model, const InstanceInfo &insta
   main_frame_.instances.emplace_back(device_model, instance_info);
 }
 
+void Application::DrawModelWithData(DeviceModel *device_model,
+                                    InstanceInfo instance_info,
+                                    const std::vector<uint32_t> &data) {
+  instance_info.extra.y = uint32_t(main_frame_.data.size() * sizeof(uint32_t));
+  main_frame_.data_instances.push_back(main_frame_.instances.size());
+  main_frame_.data.insert(main_frame_.data.end(), data.begin(), data.end());
+  main_frame_.instances.emplace_back(device_model, instance_info);
+}
+
 void Application::CaptureSecondFrame(float alpha) {
   second_frame_.instances = std::move(main_frame_.instances);
+  second_frame_.data = std::move(main_frame_.data);
+  second_frame_.data_instances = std::move(main_frame_.data_instances);
   main_frame_.instances.clear();
+  main_frame_.data.clear();
+  main_frame_.data_instances.clear();
   second_frame_alpha_ = alpha;
 }
 
 void Application::RegisterListener(Listener *listener) {
-  listeners_.insert(listener);
+  if (listeners_.insert(listener).second)
+    ++listener_revision_;
 }
 
 void Application::UnregisterListener(Listener *listener) {
-  listeners_.erase(listener);
+  if (listeners_.erase(listener))
+    ++listener_revision_;
 }
 
 void Application::CustomOnUpdate() {
@@ -162,8 +178,11 @@ void Application::OnUpdate() {
     OnFramebufferResize();
   }
 
-  main_frame_.instances.clear();
-  second_frame_.instances.clear();
+  for (auto *target : {&main_frame_, &second_frame_}) {
+    target->instances.clear();
+    target->data.clear();
+    target->data_instances.clear();
+  }
   second_frame_alpha_ = 0.0f;
 
   CustomOnUpdate();
@@ -220,21 +239,44 @@ void Application::OnRender() {
 
 void Application::RenderFrameTarget(graphics::CommandContext *context, FrameTarget &target) {
   auto &instances = target.instances;
-  // Group instances of the same model into a single draw call. The stable sort
-  // keeps submission order within a model; the depth buffer resolves layering.
-  std::stable_sort(instances.begin(), instances.end(), [](const auto &a, const auto &b) { return a.first < b.first; });
+
+  // Group instances of the same model into a single draw call without sorting
+  // or moving the large InstanceInfo records: sort the short list of runs of
+  // consecutive instances instead. The stable sort keeps submission order within
+  // a model; the depth buffer resolves layering.
+  struct Batch {
+    DeviceModel *model;
+    size_t head, count;
+  };
+
+  std::vector<Batch> batches;
+  for (size_t head = 0, tail = 0; head < instances.size(); head = tail) {
+    while (tail < instances.size() && instances[head].first == instances[tail].first)
+      ++tail;
+    batches.push_back({instances[head].first, head, tail - head});
+  }
+  std::stable_sort(batches.begin(), batches.end(),
+                   [](const auto &a, const auto &b) { return std::less<DeviceModel *>{}(a.model, b.model); });
 
   if (!instances.empty()) {
-    std::vector<InstanceInfo> instance_infos;
-    instance_infos.reserve(instances.size());
-    for (auto &instance : instances) {
-      instance_infos.push_back(instance.second);
+    // One upload: instance records, then the data words they reference.
+    const size_t records_size = instances.size() * sizeof(InstanceInfo);
+    const size_t data_size = target.data.size() * sizeof(uint32_t);
+    auto &upload = target.upload;
+    upload.resize(records_size + data_size);
+    auto *records = reinterpret_cast<InstanceInfo *>(upload.data());
+    for (size_t i = 0; i < instances.size(); i++) {
+      records[i] = instances[i].second;
     }
-    const size_t data_size = instance_infos.size() * sizeof(InstanceInfo);
-    if (data_size > target.instance_buffer->Size()) {
-      target.instance_buffer->Resize(data_size);
+    for (size_t index : target.data_instances) {
+      records[index].extra.y += uint32_t(records_size);
     }
-    target.instance_buffer->UploadData(instance_infos.data(), data_size);
+    if (data_size)
+      std::memcpy(upload.data() + records_size, target.data.data(), data_size);
+    if (upload.size() > target.instance_buffer->Size()) {
+      target.instance_buffer->Resize(upload.size());
+    }
+    target.instance_buffer->UploadData(upload.data(), upload.size());
   }
 
   const auto extent = target.color_image->Extent();
@@ -249,17 +291,13 @@ void Application::RenderFrameTarget(graphics::CommandContext *context, FrameTarg
   context->CmdSetScissor({{0, 0}, extent});
   context->CmdSetPrimitiveTopology(graphics::PRIMITIVE_TOPOLOGY_TRIANGLE_LIST);
 
-  for (size_t head = 0, tail = 0; head < instances.size(); head = tail) {
-    while (tail < instances.size() && instances[head].first == instances[tail].first) {
-      tail++;
-    }
-    auto *device_model = instances[head].first;
-    if (!device_model->IndexCount()) {
+  for (const auto &batch : batches) {
+    auto *device_model = batch.model;
+    if (!device_model->IndexCount())
       continue;
-    }
     context->CmdBindVertexBuffers(0, {device_model->VertexBuffer()}, {0});
     context->CmdBindIndexBuffer(device_model->IndexBuffer(), 0);
-    context->CmdDrawIndexed(device_model->IndexCount(), uint32_t(tail - head), 0, 0, uint32_t(head));
+    context->CmdDrawIndexed(device_model->IndexCount(), uint32_t(batch.count), 0, 0, uint32_t(batch.head));
   }
   context->CmdEndRendering();
 }
