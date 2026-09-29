@@ -163,7 +163,7 @@ private final class GameCanvasView: UIView {
       entryOrientation = scene.interfaceOrientation
       if entryOrientation == .unknown { entryOrientation = .portrait }
       lockedScene = scene
-      DemoAppDelegate.orientationMask = mask(for: entryOrientation)
+      GameAppDelegate.orientationMask = mask(for: entryOrientation)
       scene.windows.first(where: { $0.isKeyWindow })?.rootViewController?
         .setNeedsUpdateOfSupportedInterfaceOrientations()
       UIDevice.current.beginGeneratingDeviceOrientationNotifications()
@@ -186,7 +186,7 @@ private final class GameCanvasView: UIView {
     UIDevice.current.endGeneratingDeviceOrientationNotifications()
     lockedScene = nil
     iconAngle = nil
-    DemoAppDelegate.orientationMask = .allButUpsideDown
+    GameAppDelegate.orientationMask = .allButUpsideDown
     scene.windows.first(where: { $0.isKeyWindow })?.rootViewController?
       .setNeedsUpdateOfSupportedInterfaceOrientations()
   }
@@ -337,6 +337,26 @@ private struct PatternFile: Identifiable {
   var name: String { url.deletingPathExtension().lastPathComponent }
 }
 
+// GoL freezes the interface orientation for the lifetime of its page. Device
+// orientation remains available to its icons without rotating the UIWindow.
+@MainActor
+final class GameAppDelegate: NSObject, UIApplicationDelegate {
+  static var orientationMask: UIInterfaceOrientationMask = .allButUpsideDown
+
+  func application(
+    _ application: UIApplication, supportedInterfaceOrientationsFor window: UIWindow?
+  ) -> UIInterfaceOrientationMask {
+    Self.orientationMask
+  }
+}
+
+// The prepared resource folder: every scene in LongMarch Demos, only the game's
+// shaders and patterns in a standalone game (Info.plist LongMarchGameResources).
+enum GameResources {
+  static let url = Bundle.main.resourceURL!.appendingPathComponent(
+    Bundle.main.object(forInfoDictionaryKey: "LongMarchGameResources") as? String ?? "SparkiumResources")
+}
+
 // A named pattern from the built-in Life Lexicon library (demo/gol/patterns/library.json).
 private struct BuiltinPattern: Decodable, Identifiable {
   let name: String
@@ -358,9 +378,7 @@ private struct BuiltinPattern: Decodable, Identifiable {
   static let all: [BuiltinPattern] = {
     struct Document: Decodable { let patterns: [BuiltinPattern] }
     guard
-      let url = Bundle.main.resourceURL?.appendingPathComponent(
-        "SparkiumResources/Patterns/library.json"),
-      let data = try? Data(contentsOf: url),
+      let data = try? Data(contentsOf: GameResources.url.appendingPathComponent("Patterns/library.json")),
       let document = try? JSONDecoder().decode(Document.self, from: data)
     else { return [] }
     return document.patterns
@@ -775,8 +793,7 @@ private struct DesktopGameView: UIViewRepresentable {
     view.renderer.sizeRequest = { [weak coordinator = context.coordinator] axis, value in
       coordinator?.requestSize(axis, value: value)
     }
-    let resources = Bundle.main.resourceURL!.appendingPathComponent("SparkiumResources")
-    view.renderer.start(view: view, resources: resources, demo: life ? "gol" : "2048") {
+    view.renderer.start(view: view, resources: GameResources.url, demo: life ? "gol" : "2048") {
       _, _, fps, _, _, _, _, error in status(fps, error)
     }
     if let file = ProcessInfo.processInfo.environment["LONGMARCH_SMOKE_FILE"] {
@@ -803,7 +820,8 @@ private struct DesktopGameView: UIViewRepresentable {
 }
 struct GamesView: View {
   let life: Bool
-  let onExit: () -> Void
+  // Nil in a standalone game, which shows no status header.
+  let onExit: (() -> Void)?
   @Environment(\.scenePhase) private var phase
   @State private var fps = 0.0
   @State private var error: String?
@@ -820,14 +838,16 @@ struct GamesView: View {
           game.ignoresSafeArea()
           // Only this small overlay uses the safe area. The Metal canvas fills
           // the display, with reset/random beside the island and controls below.
-          HStack(spacing: 12) {
-            Text("[Metal] GoL FPS: \(fps, specifier: "%.1f")")
-              .font(.caption2.monospaced())
-            Button("Demos", action: onExit).font(.caption)
+          if let onExit {
+            HStack(spacing: 12) {
+              Text("[Metal] GoL FPS: \(fps, specifier: "%.1f")")
+                .font(.caption2.monospaced())
+              Button("Demos", action: onExit).font(.caption)
+            }
+            .padding(.horizontal, 12).padding(.vertical, 6)
+            .statusCapsule()
+            .padding(.top, 4)
           }
-          .padding(.horizontal, 12).padding(.vertical, 6)
-          .background(.black.opacity(0.45), in: Capsule())
-          .padding(.top, 4)
         }
         .defersSystemGestures(on: .bottom)
       } else {
@@ -840,7 +860,7 @@ struct GamesView: View {
               Text("[Metal] 2048 FPS: \(fps, specifier: "%.1f")")
                 .font(.caption2.monospaced())
                 .foregroundStyle(Color(red: 0.47, green: 0.44, blue: 0.40))
-              Button("Demos", action: onExit).font(.caption)
+              if let onExit { Button("Demos", action: onExit).font(.caption) }
             }
             .padding(.horizontal, 12).padding(.vertical, 6)
             .background(.black.opacity(0.05), in: Capsule())
@@ -859,5 +879,16 @@ struct GamesView: View {
       } message: {
         Text(error ?? "")
       }
+  }
+}
+
+extension View {
+  // The system's Liquid Glass on iOS 26 and later, a dark capsule before it.
+  @ViewBuilder fileprivate func statusCapsule() -> some View {
+    if #available(iOS 26.0, *) {
+      glassEffect(.regular, in: Capsule())
+    } else {
+      background(.black.opacity(0.45), in: Capsule())
+    }
   }
 }

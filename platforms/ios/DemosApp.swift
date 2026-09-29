@@ -132,21 +132,8 @@ private struct DemoBrowser: View {
   }
 }
 
-// GoL freezes the interface orientation for the lifetime of its page. Device
-// orientation remains available to its icons without rotating the UIWindow.
-@MainActor
-final class DemoAppDelegate: NSObject, UIApplicationDelegate {
-  static var orientationMask: UIInterfaceOrientationMask = .allButUpsideDown
-
-  func application(
-    _ application: UIApplication, supportedInterfaceOrientationsFor window: UIWindow?
-  ) -> UIInterfaceOrientationMask {
-    Self.orientationMask
-  }
-}
-
 @main
 struct LongMarchDemosApp: App {
-  @UIApplicationDelegateAdaptor(DemoAppDelegate.self) private var appDelegate
+  @UIApplicationDelegateAdaptor(GameAppDelegate.self) private var appDelegate
   var body: some Scene { WindowGroup { DemoBrowser() } }
 }

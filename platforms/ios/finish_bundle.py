@@ -7,5 +7,6 @@ bundle = Path(sys.argv[1])
 path = bundle / 'Info.plist'
 info = plistlib.loads(path.read_bytes())
 info.update(plistlib.loads(Path(sys.argv[2]).read_bytes()))
-info.update(CFBundleExecutable='LongMarch', CFBundleIdentifier='dev.lazyjazz.longmarch', MinimumOSVersion='18.0')
+# Executable name and bundle identifier.
+info.update(CFBundleExecutable=sys.argv[3], CFBundleIdentifier=sys.argv[4], MinimumOSVersion='18.0')
 path.write_bytes(plistlib.dumps(info))

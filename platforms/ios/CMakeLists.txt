@@ -90,6 +90,63 @@ if(NOT CMAKE_SYSTEM_NAME STREQUAL "iOS")
   add_executable(mobile_demo_check demos/check.cpp)
   target_link_libraries(mobile_demo_check PRIVATE mobile_demos)
 endif()
+set(GAME_OF_LIFE_RESOURCES "${CMAKE_CURRENT_SOURCE_DIR}/../../out/ios/GameOfLifeResources" CACHE PATH
+  "Prepared resources of the standalone Game of Life app (prepare_game_resources.py)")
+
+# One SwiftUI app bundle. RESOURCES is a prepared folder copied into the bundle
+# as FOLDER; STRINGS are <language>.lproj/<name>.strings files.
+function(longmarch_ios_app target bundle_id info_plist assets resources folder)
+  cmake_parse_arguments(PARSE_ARGV 6 app "" "" "SOURCES;STRINGS")
+  # A root folder literally named Resources makes CFBundle interpret an iOS app
+  # as a legacy macOS bundle and overlook its root Info.plist.
+  set(bundle_resources "${CMAKE_CURRENT_BINARY_DIR}/${target}-bundle/${folder}")
+  file(MAKE_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/${target}-bundle")
+  file(CREATE_LINK "${resources}" "${bundle_resources}" SYMBOLIC)
+  add_executable(${target} MACOSX_BUNDLE ${app_SOURCES}
+    demos/DemoBridge.mm demos/DemoBridge.h SparkiumBridge.mm SparkiumBridge.h RenderQueue.h
+    "${bundle_resources}" ${assets} ${app_STRINGS})
+  set_source_files_properties("${bundle_resources}" ${assets} PROPERTIES MACOSX_PACKAGE_LOCATION Resources)
+  foreach(strings ${app_STRINGS})
+    get_filename_component(language "${strings}" DIRECTORY)
+    get_filename_component(language "${language}" NAME)
+    set_source_files_properties(${strings} PROPERTIES MACOSX_PACKAGE_LOCATION Resources/${language})
+  endforeach()
+  # Folder resources otherwise copy only at configure time; shader preparation can
+  # add nested cache files without changing the folder timestamp seen by Ninja.
+  add_custom_target(${target}_resources
+    COMMAND "${CMAKE_COMMAND}" -E copy_directory "${resources}" "$<TARGET_BUNDLE_DIR:${target}>/${folder}"
+    VERBATIM)
+  add_dependencies(${target} ${target}_resources)
+  target_link_libraries(${target} PRIVATE mobile_demos "-framework SwiftUI" "-framework CoreGraphics" "-framework MetalKit")
+  target_compile_options(${target} PRIVATE "$<$<COMPILE_LANGUAGE:OBJCXX>:-fobjc-arc>")
+  set_target_properties(${target} PROPERTIES
+    MACOSX_BUNDLE_INFO_PLIST "${info_plist}"
+    XCODE_ATTRIBUTE_PRODUCT_BUNDLE_IDENTIFIER "${bundle_id}"
+    XCODE_ATTRIBUTE_ASSETCATALOG_COMPILER_APPICON_NAME "AppIcon"
+    XCODE_ATTRIBUTE_SWIFT_OBJC_BRIDGING_HEADER "${CMAKE_CURRENT_SOURCE_DIR}/SparkiumBridge.h"
+    XCODE_ATTRIBUTE_SWIFT_VERSION "5.0"
+    XCODE_ATTRIBUTE_TARGETED_DEVICE_FAMILY "1,2"
+    XCODE_ATTRIBUTE_CODE_SIGN_STYLE Automatic
+    XCODE_ATTRIBUTE_ENABLE_USER_SCRIPT_SANDBOXING NO)
+  if(CMAKE_GENERATOR STREQUAL "Ninja")
+    target_compile_options(${target} PRIVATE "$<$<COMPILE_LANGUAGE:Swift>:-import-objc-header;${CMAKE_CURRENT_SOURCE_DIR}/SparkiumBridge.h>")
+    target_link_options(${target} PRIVATE -sdk "${CMAKE_OSX_SYSROOT}")
+    set_target_properties(${target} PROPERTIES MACOSX_BUNDLE_GUI_IDENTIFIER "${bundle_id}")
+    set(ios_platform iphoneos)
+    if(ios_sysroot_lower MATCHES "simulator")
+      set(ios_platform iphonesimulator)
+    endif()
+    add_custom_command(TARGET ${target} POST_BUILD
+      COMMAND xcrun actool "${assets}" --compile "$<TARGET_BUNDLE_DIR:${target}>"
+        --platform ${ios_platform} --minimum-deployment-target ${CMAKE_OSX_DEPLOYMENT_TARGET}
+        --app-icon AppIcon --target-device iphone --target-device ipad
+        --output-partial-info-plist "${CMAKE_CURRENT_BINARY_DIR}/${target}-bundle/AppIcon.plist"
+      COMMAND "${Python3_EXECUTABLE}" "${CMAKE_CURRENT_SOURCE_DIR}/finish_bundle.py"
+        "$<TARGET_BUNDLE_DIR:${target}>" "${CMAKE_CURRENT_BINARY_DIR}/${target}-bundle/AppIcon.plist" ${target} ${bundle_id}
+      VERBATIM)
+  endif()
+endfunction()
+
 if(SPARKIUM_APP)
   if(CMAKE_GENERATOR STREQUAL "Ninja" AND CMAKE_SYSTEM_NAME STREQUAL "iOS")
     set(swift_target "arm64-apple-ios${CMAKE_OSX_DEPLOYMENT_TARGET}")
@@ -103,54 +160,19 @@ if(SPARKIUM_APP)
   if(NOT EXISTS "${SPARKIUM_RESOURCES}/catalog.json")
     message(FATAL_ERROR "Prepare resources first; see README.md")
   endif()
-  # A root folder literally named Resources makes CFBundle interpret an iOS app
-  # as a legacy macOS bundle and overlook its root Info.plist.
-  set(bundle_resources "${CMAKE_CURRENT_BINARY_DIR}/SparkiumResources")
-  file(CREATE_LINK "${SPARKIUM_RESOURCES}" "${bundle_resources}" SYMBOLIC)
-  add_executable(LongMarch MACOSX_BUNDLE SparkiumApp.swift DemosApp.swift demos/DemoView.swift
-    games/GamesView.swift
-    demos/DemoBridge.mm demos/DemoBridge.h SparkiumBridge.mm SparkiumBridge.h RenderQueue.h
-    "${bundle_resources}" Assets.xcassets en.lproj/Localizable.strings zh-Hans.lproj/Localizable.strings)
-  set_source_files_properties("${bundle_resources}" Assets.xcassets PROPERTIES MACOSX_PACKAGE_LOCATION Resources)
-  foreach(language en zh-Hans)
-    set_source_files_properties(${language}.lproj/Localizable.strings PROPERTIES
-      MACOSX_PACKAGE_LOCATION Resources/${language}.lproj)
-  endforeach()
-  # Folder resources otherwise copy only at configure time; shader preparation can
-  # add nested cache files without changing the folder timestamp seen by Ninja.
-  add_custom_target(ios_app_resources
-    COMMAND "${CMAKE_COMMAND}" -E copy_directory "${SPARKIUM_RESOURCES}" "$<TARGET_BUNDLE_DIR:LongMarch>/SparkiumResources"
-    VERBATIM)
-  add_dependencies(LongMarch ios_app_resources)
-  target_link_libraries(LongMarch PRIVATE mobile_demos "-framework SwiftUI" "-framework CoreGraphics" "-framework MetalKit")
-  target_compile_options(LongMarch PRIVATE "$<$<COMPILE_LANGUAGE:OBJCXX>:-fobjc-arc>")
-  set_target_properties(LongMarch PROPERTIES
-    MACOSX_BUNDLE_INFO_PLIST "${CMAKE_CURRENT_SOURCE_DIR}/Info.plist"
-    XCODE_ATTRIBUTE_PRODUCT_BUNDLE_IDENTIFIER "dev.lazyjazz.longmarch"
-    XCODE_ATTRIBUTE_ASSETCATALOG_COMPILER_APPICON_NAME "AppIcon"
-    XCODE_ATTRIBUTE_SWIFT_OBJC_BRIDGING_HEADER "${CMAKE_CURRENT_SOURCE_DIR}/SparkiumBridge.h"
-    XCODE_ATTRIBUTE_SWIFT_VERSION "5.0"
-    XCODE_ATTRIBUTE_TARGETED_DEVICE_FAMILY "1,2"
-    XCODE_ATTRIBUTE_CODE_SIGN_STYLE Automatic
-    XCODE_ATTRIBUTE_ENABLE_USER_SCRIPT_SANDBOXING NO)
-endif()
-
-if(SPARKIUM_APP AND CMAKE_GENERATOR STREQUAL "Ninja")
-  target_compile_options(LongMarch PRIVATE "$<$<COMPILE_LANGUAGE:Swift>:-import-objc-header;${CMAKE_CURRENT_SOURCE_DIR}/SparkiumBridge.h>")
-  target_link_options(LongMarch PRIVATE -sdk "${CMAKE_OSX_SYSROOT}")
-  set_target_properties(LongMarch PROPERTIES MACOSX_BUNDLE_GUI_IDENTIFIER "dev.lazyjazz.longmarch")
-  set(ios_platform iphoneos)
-  if(ios_sysroot_lower MATCHES "simulator")
-    set(ios_platform iphonesimulator)
+  set(game_strings en.lproj/Localizable.strings zh-Hans.lproj/Localizable.strings)
+  longmarch_ios_app(LongMarch dev.lazyjazz.longmarch "${CMAKE_CURRENT_SOURCE_DIR}/Info.plist"
+    "${CMAKE_CURRENT_SOURCE_DIR}/Assets.xcassets" "${SPARKIUM_RESOURCES}" SparkiumResources
+    SOURCES SparkiumApp.swift DemosApp.swift demos/DemoView.swift games/GamesView.swift
+    STRINGS ${game_strings})
+  if(EXISTS "${GAME_OF_LIFE_RESOURCES}/Patterns/library.json")
+    longmarch_ios_app(GameOfLife dev.lazyjazz.gameoflife "${CMAKE_CURRENT_SOURCE_DIR}/gol/Info.plist"
+      "${CMAKE_CURRENT_SOURCE_DIR}/gol/Assets.xcassets" "${GAME_OF_LIFE_RESOURCES}" GameResources
+      SOURCES gol/GameOfLifeApp.swift games/GamesView.swift
+      STRINGS ${game_strings} gol/en.lproj/InfoPlist.strings gol/zh-Hans.lproj/InfoPlist.strings)
+  else()
+    message(STATUS "Game of Life app skipped: prepare GAME_OF_LIFE_RESOURCES first; see README.md")
   endif()
-  add_custom_command(TARGET LongMarch POST_BUILD
-    COMMAND xcrun actool "${CMAKE_CURRENT_SOURCE_DIR}/Assets.xcassets" --compile "$<TARGET_BUNDLE_DIR:LongMarch>"
-      --platform ${ios_platform} --minimum-deployment-target ${CMAKE_OSX_DEPLOYMENT_TARGET}
-      --app-icon AppIcon --target-device iphone --target-device ipad
-      --output-partial-info-plist "${CMAKE_CURRENT_BINARY_DIR}/AppIcon.plist"
-    COMMAND "${Python3_EXECUTABLE}" "${CMAKE_CURRENT_SOURCE_DIR}/finish_bundle.py"
-      "$<TARGET_BUNDLE_DIR:LongMarch>" "${CMAKE_CURRENT_BINARY_DIR}/AppIcon.plist"
-    VERBATIM)
 endif()
 
 # Compile the actual desktop UI, geometry, animation and Slang for native hosts.
