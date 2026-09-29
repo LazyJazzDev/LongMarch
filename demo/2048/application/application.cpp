@@ -150,7 +150,7 @@ void Application::OnInit() {
 
   BuildScreenFrameObjects();
 
-  fps_start_time_ = grassland::GetTimeSeconds();
+  title_time_ = grassland::GetTimeSeconds();
   CustomOnInit();
 }
 
@@ -311,13 +311,14 @@ void Application::BuildScreenFrameObjects() {
 }
 
 void Application::UpdateTitle() {
-  fps_frames_++;
+  // FPSCounter averages over the frames of the last second; the title shows it
+  // four times a second.
+  fps_counter_.TickFrame();
   const double now = grassland::GetTimeSeconds();
-  if (now - fps_start_time_ >= 1.0) {
-    window_->SetTitle(fmt::format("[{}] {} FPS: {:.1f}", graphics::BackendAPIString(core_->API()), name_,
-                                  fps_frames_ / (now - fps_start_time_)));
-    fps_frames_ = 0;
-    fps_start_time_ = now;
+  if (now - title_time_ >= 0.25) {
+    window_->SetTitle(
+        fmt::format("[{}] {} FPS: {:.1f}", graphics::BackendAPIString(core_->API()), name_, fps_counter_.GetFPS()));
+    title_time_ = now;
   }
 }
 
