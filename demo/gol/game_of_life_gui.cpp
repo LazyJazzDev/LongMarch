@@ -18,6 +18,11 @@
 
 namespace life_demo {
 
+namespace {
+// Playground background, also the color seen through the gaps between cells.
+constexpr float kPlaygroundBrightness = 0.08f;
+}  // namespace
+
 GameOfLife::GameOfLife(const char *title,
                        int width,
                        int height,
@@ -195,12 +200,7 @@ void GameOfLife::CustomOnUpdate() {
   // Synchronize after stepping so the new generation is visible in this frame.
   // One pass over the cells: animate, collect the shader data and remember
   // whether another frame is needed, instead of revisiting 65536 objects.
-  const bool animate_cells = !pause_play_button_->IsPlaying();
-  cell_appearance_.resize(cell_visuals_.size());
-  bool cells_animating = false;
-  for (size_t i = 0; i < cell_visuals_.size(); ++i)
-    cells_animating |= cell_visuals_[i].Update(cell_grid_[i] != 0, delta_time, animate_cells, cell_appearance_[i]);
-  cells_animating_ = cells_animating;
+  cells_animating_ = cell_input_->Update(delta_time, !pause_play_button_->IsPlaying());
 
   // Draw pause_play_button_
   pause_play_button_->Draw();
@@ -232,7 +232,7 @@ void GameOfLife::CustomOnUpdate() {
       &white_rect_model.value(),
       {GetModelMatrix(glm::vec2{playground_left_, playground_top_},
                       glm::vec2{playground_right_ - playground_left_, playground_bottom_ - playground_top_}, 0.8f),
-       {0.08, 0.08, 0.08, 1.0},
+       {kPlaygroundBrightness, kPlaygroundBrightness, kPlaygroundBrightness, 1.0},
        glm::uvec4{0}});
 }
 
@@ -246,7 +246,7 @@ void GameOfLife::CustomOnClose() {
   // Release all resources
   width_slider_.reset();
   height_slider_.reset();
-  cell_button_grid_.clear();
+  cell_input_.reset();
   pause_play_button_.reset();
   speed_toggle_button_.reset();
   boundary_button_.reset();
@@ -335,39 +335,30 @@ void GameOfLife::LayoutCells() {
   const float fitted_unit = std::min(viewport.y / cell_grid_height_, viewport.x / cell_grid_width_) * 0.95f;
   grid_view_.Clamp(viewport, glm::vec2{cell_grid_width_, cell_grid_height_} * fitted_unit);
   const float cell_unit = fitted_unit * grid_view_.zoom;
-  float cell_size = cell_unit * 0.8f;
-  float cell_gap = (cell_unit - cell_size) * 0.5f;
-  cell_unit_ = cell_unit;
-  cell_grid_origin_ = glm::vec2{float(playground_left_ + playground_right_) * 0.5f,
-                                float(playground_bottom_ + playground_top_) * 0.5f} -
-                      glm::vec2{float(cell_grid_width_), float(cell_grid_height_)} * cell_unit * 0.5f + grid_view_.pan;
-
-  for (int x = 0; x < cell_grid_width_; x++) {
-    for (int y = 0; y < cell_grid_height_; y++) {
-      int index = y * cell_grid_width_ + x;
-      const glm::vec2 origin = cell_grid_origin_ + glm::vec2{float(x), float(y)} * cell_unit;
-      cell_button_grid_[index]->SetClipBounds(
-          {playground_left_, playground_top_, playground_right_, playground_bottom_});
-      cell_button_grid_[index]->Resize(origin.x + cell_gap, origin.y + cell_gap, origin.x + cell_gap + cell_size,
-                                       origin.y + cell_gap + cell_size);
-    }
-  }
+  const glm::vec2 origin = glm::vec2{float(playground_left_ + playground_right_) * 0.5f,
+                                     float(playground_bottom_ + playground_top_) * 0.5f} -
+                           glm::vec2{float(cell_grid_width_), float(cell_grid_height_)} * cell_unit * 0.5f +
+                           grid_view_.pan;
+  cell_input_->Layout(origin, cell_unit, {playground_left_, playground_top_, playground_right_, playground_bottom_});
 }
 
 void GameOfLife::DrawCellGrid() {
   // One quad covers the visible part of the grid; the pixel shader finds the
-  // cell under each fragment. Cells keep their own input and animation state.
+  // cell under each fragment.
+  const glm::vec2 grid_origin = cell_input_->Origin();
   const glm::vec2 grid_end =
-      cell_grid_origin_ + glm::vec2{float(cell_grid_width_), float(cell_grid_height_)} * cell_unit_;
-  const glm::vec2 low = glm::max(cell_grid_origin_, glm::vec2{playground_left_, playground_top_});
+      grid_origin + glm::vec2{float(cell_grid_width_), float(cell_grid_height_)} * cell_input_->Unit();
+  const glm::vec2 low = glm::max(grid_origin, glm::vec2{playground_left_, playground_top_});
   const glm::vec2 high = glm::min(grid_end, glm::vec2{playground_right_, playground_bottom_});
   if (high.x <= low.x || high.y <= low.y)
     return;
-  // color carries the grid origin and pitch; extra.zw carries its dimensions.
-  DrawModelWithData(&white_rect_model.value(),
-                    {GetModelMatrix(low, high - low, 0.4f), glm::vec4{cell_grid_origin_, cell_unit_, 0.0f},
-                     glm::uvec4{2u, 0u, uint32_t(cell_grid_width_), uint32_t(cell_grid_height_)}},
-                    cell_appearance_);
+  // color carries the grid origin, pitch and gap brightness (the playground
+  // background below); extra.zw carries its dimensions.
+  DrawModelWithData(
+      &white_rect_model.value(),
+      {GetModelMatrix(low, high - low, 0.4f), glm::vec4{grid_origin, cell_input_->Unit(), kPlaygroundBrightness},
+       glm::uvec4{2u, 0u, uint32_t(cell_grid_width_), uint32_t(cell_grid_height_)}},
+      cell_input_->Appearance());
 }
 
 glm::vec2 GameOfLife::CursorPosition() const {
@@ -412,17 +403,8 @@ void GameOfLife::ResizeGrid(int width, int height) {
   cell_grid_ = std::move(resized);
   cell_grid_width_ = width;
   cell_grid_height_ = height;
-  // Reuse existing buttons, then rebind every pointer after vector reallocation.
-  cell_visuals_.resize(cell_grid_.size());
-  cell_appearance_.assign(cell_grid_.size(), 0);
-  if (cell_button_grid_.size() > cell_grid_.size())
-    cell_button_grid_.resize(cell_grid_.size());
-  for (size_t i = 0; i < cell_grid_.size(); ++i) {
-    if (i == cell_button_grid_.size())
-      cell_button_grid_.push_back(
-          std::make_unique<CellButton>(this, 0, 0, 100, 100, &cell_grid_[i], &cell_visuals_[i]));
-    cell_button_grid_[i]->Rebind(&cell_grid_[i], &cell_visuals_[i]);
-  }
+  // Rebind after vector reallocation.
+  cell_input_->Reset(cell_grid_.data(), cell_grid_width_, cell_grid_height_);
   grid_view_ = {};
   OnWindowSize();
 }
@@ -560,15 +542,8 @@ void GameOfLife::InitCells(int width, int height) {
   } else if (random_density_ > 0.0f) {
     RandomizeCells(random_density_, random_seed_);
   }
-  cell_visuals_.resize(cell_grid_.size());
-  cell_appearance_.assign(cell_grid_.size(), 0);
-  for (int y = 0; y < cell_grid_height_; y++) {
-    for (int x = 0; x < cell_grid_width_; x++) {
-      int index = y * cell_grid_width_ + x;
-      cell_button_grid_.push_back(
-          std::make_unique<CellButton>(this, 0, 0, 100, 100, &cell_grid_[index], &cell_visuals_[index]));
-    }
-  }
+  cell_input_ = std::make_unique<CellGrid>(this);
+  cell_input_->Reset(cell_grid_.data(), cell_grid_width_, cell_grid_height_);
 }
 
 void GameOfLife::EnableNativeSizeControls() {

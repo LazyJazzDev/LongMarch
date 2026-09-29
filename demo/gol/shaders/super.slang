@@ -68,9 +68,10 @@ float4 IconTheme(PSInput input) {
 }
 
 // One quad covers the visible grid: color.xy is the top-left corner of cell (0, 0),
-// color.z the cell pitch in framebuffer pixels, extra.zw the grid dimensions and
-// extra.y the byte offset of one packed appearance word per cell.
-float4 CellGridTheme(PSInput input) {
+// color.z the cell pitch in framebuffer pixels, color.w the brightness of the gaps,
+// extra.zw the grid dimensions and extra.y the byte offset of one packed
+// appearance word per cell.
+float4 CellGridTheme(PSInput input, float sample_size) {
   float2 grid = (input.screen_position - input.color.xy) / input.color.z;
   int2 cell = int2(floor(grid));
   int2 size = int2(input.extra.zw);
@@ -78,11 +79,16 @@ float4 CellGridTheme(PSInput input) {
   clip(float2(size - 1 - cell));
   // Each cell fills the middle 80% of its pitch, mapped to [-1, 1] as before.
   float2 local_position = (grid - float2(cell) - 0.5) / 0.4;
-  // The original 120-triangle silhouette samples |x|^8 + |y|^8 = 1.
+  // The original 120-triangle silhouette samples |x|^8 + |y|^8 = 1. The L8
+  // norm minus one is a distance to that edge in cell units (exact along the
+  // axes); in rendered samples it antialiases cells a few pixels wide without
+  // supersampling.
   float2 p = local_position * local_position;
   p *= p;
   p *= p;
-  clip(1.0 - p.x - p.y);
+  float samples_per_unit = 0.4 * input.color.z / max(sample_size, 1.0e-6);
+  float coverage = saturate(0.5 - (pow(p.x + p.y, 0.125) - 1.0) * samples_per_unit);
+  clip(coverage - 1.0 / 512.0);
   uint packed = instance_infos.Load(input.extra.y + 4 * uint(cell.y * size.x + cell.x));
   float3 appearance = float3(packed & 1023u, (packed >> 10) & 1023u, (packed >> 20) & 1023u) / 1023.0;
 
@@ -90,7 +96,8 @@ float4 CellGridTheme(PSInput input) {
   float3 background_color = scale * appearance.x;
   scale = 2.0 - length(local_position - float2(-1.0, -1.0)) * 0.3;
   float4 foreground_color = float4(float3(scale * appearance.y), 1.0) * appearance.z;
-  return float4(background_color * (1.0 - foreground_color.a) + foreground_color.rgb * foreground_color.a, 1.0);
+  float3 cell_color = background_color * (1.0 - foreground_color.a) + foreground_color.rgb * foreground_color.a;
+  return float4(lerp(float3(input.color.w), cell_color, coverage), 1.0);
 }
 
 // A rounded plate with real cutouts. Discard exposes the button background through
@@ -159,6 +166,9 @@ float4 ShakeColor(inout uint rng_state, float4 color, float shake) {
 }
 
 float4 PSMain(PSInput input) : SV_TARGET {
+  // Framebuffer pixels per rendered sample (below 1 when supersampled), taken
+  // before any clip from a linear input so it is valid across the pixel quad.
+  float sample_size = max(abs(ddx(input.screen_position.x)), abs(ddy(input.screen_position.y)));
   clip(input.screen_position - input.clip_rect.xy);
   clip(input.clip_rect.zw - input.screen_position);
   // Init rng_state with the fragment position, one dimension at a time.
@@ -183,7 +193,7 @@ float4 PSMain(PSInput input) : SV_TARGET {
       color = SliderTheme(input);
       break;
     case 2:
-      color = CellGridTheme(input);
+      color = CellGridTheme(input, sample_size);
       break;
     default:
       color = float4(1.0, 1.0, 1.0, 1.0);
