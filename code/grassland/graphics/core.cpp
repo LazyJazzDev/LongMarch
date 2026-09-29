@@ -149,7 +149,9 @@ int Core::InitializeLogicalDeviceByCUDADeviceID(int cuda_device_id) {
 }
 #endif
 
-#if defined(LONGMARCH_METAL_ENABLED)
+#if defined(LONGMARCH_WEBGPU_ENABLED)
+#define DEFAULT_API 3
+#elif defined(LONGMARCH_METAL_ENABLED)
 #define DEFAULT_API 2
 #elif defined(LONGMARCH_D3D12_ENABLED)
 #define DEFAULT_API 0
@@ -161,6 +163,15 @@ int CreateCore(BackendAPI api, const Core::Settings &settings, double_ptr<Core> 
   if (!SupportBackendAPI(api))
     return -1;
   switch (api) {
+#ifdef LONGMARCH_WEBGPU_ENABLED
+    case BACKEND_API_WEBGPU:
+      pp_core.construct<backend::WebGPUCore>(settings);
+      break;
+#if DEFAULT_API == 3
+    default:
+      return -1;
+#endif
+#endif
 #ifdef LONGMARCH_METAL_ENABLED
     case BACKEND_API_METAL:
       pp_core.construct<backend::MetalCore>(settings);

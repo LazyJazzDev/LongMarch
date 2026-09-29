@@ -12,3 +12,7 @@ namespace grassland::graphics::backend {}
 #if defined(LONGMARCH_METAL_ENABLED)
 #include "grassland/graphics/backend/metal/metal_backend.h"
 #endif
+
+#if defined(LONGMARCH_WEBGPU_ENABLED)
+#include "grassland/graphics/backend/webgpu/webgpu_backend.h"
+#endif

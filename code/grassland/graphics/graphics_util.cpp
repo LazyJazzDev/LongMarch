@@ -14,6 +14,8 @@ const char *BackendAPIString(BackendAPI api) {
       return "Vulkan";
     case BACKEND_API_D3D12:
       return "D3D12";
+    case BACKEND_API_WEBGPU:
+      return "WebGPU";
     default:
       return "Unknown";
   }
@@ -21,6 +23,10 @@ const char *BackendAPIString(BackendAPI api) {
 
 bool SupportBackendAPI(BackendAPI api) {
   switch (api) {
+#if defined(LONGMARCH_WEBGPU_ENABLED)
+    case BACKEND_API_WEBGPU:
+      return true;
+#endif
 #if defined(LONGMARCH_METAL_ENABLED)
     case BACKEND_API_METAL:
       return true;
