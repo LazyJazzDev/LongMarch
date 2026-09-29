@@ -82,6 +82,13 @@ struct DemoGPUTimer {
 namespace {
 #include "demo_shaders.inl"
 
+// WebGPU blends 32-bit float targets only with an optional feature; half floats
+// hold the demos' HDR range and always blend.
+grassland::graphics::ImageFormat ColorFormat(grassland::graphics::BackendAPI backend) {
+  return backend == grassland::graphics::BACKEND_API_WEBGPU ? grassland::graphics::IMAGE_FORMAT_R16G16B16A16_SFLOAT
+                                                            : grassland::graphics::IMAGE_FORMAT_R32G32B32A32_SFLOAT;
+}
+
 struct ColorVertex {
   glm::vec3 position, color;
 };
@@ -147,7 +154,7 @@ DemoSession::DemoSession(const std::filesystem::path &resources,
   if (CreateCore(backend, Core::Settings{1, false}, &core_) || core_->InitializeLogicalDeviceAutoSelect(false))
     throw std::runtime_error("Cannot initialize requested graphics backend");
   timer_ = std::make_unique<DemoGPUTimer>(core_.get());
-  core_->CreateImage(width_, height_, IMAGE_FORMAT_R32G32B32A32_SFLOAT, &color_);
+  core_->CreateImage(width_, height_, ColorFormat(backend_), &color_);
   if (demo_ == "nbody_cs")
     InitializeNBody();
   else if (demo_ == "graphics_hello_ray_query")
@@ -334,7 +341,7 @@ void DemoSession::Resize(int width, int height) {
   core_->WaitGPU();
   width_ = width;
   height_ = height;
-  core_->CreateImage(width, height, IMAGE_FORMAT_R32G32B32A32_SFLOAT, &color_);
+  core_->CreateImage(width, height, ColorFormat(backend_), &color_);
   if (depth_)
     core_->CreateImage(width, height, IMAGE_FORMAT_D32_SFLOAT, &depth_);
 }
