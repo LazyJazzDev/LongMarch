@@ -23,7 +23,7 @@ Game of Life preserves the original shaded cells, pixel icons, concave/convex
 size sliders, rotating blue die, red reset, pause/play spring and boundary-glider
 animation. Tap or draw to edit, use two fingers to pan, and pinch to zoom. Its
 width/height (2–256, initially 64×64), 1×/2×/5×/lightning speed, periodic/fixed edges and file buttons
-are the same desktop controls. Lightning advances once per rendered frame.
+are the same desktop controls. Lightning advances 60 generations per second.
 Sidebars follow the window's short edges rather than the grid aspect ratio. On
 iPhone, GoL fills the display, with reset/random at the two upper corners in
 portrait, dense controls below, and a compact status/exit overlay beneath the
@@ -267,7 +267,7 @@ MTKView display loop while a board is still, wakes on input/resize/focus/file
 completion, and schedules normal Life generations at their simulation deadlines.
 Animations and lightning mode use the native 60 Hz display link;
 only slower simulation deadlines use one-shot timers; lightning advances
-one generation per rendered frame. Hosted surfaces render at native resolution without
+60 generations per second, one per 60 Hz frame. Hosted surfaces render at native resolution without
 supersampling, since phone displays are dense enough, and allocate the second full-screen
 color target only when an overlay transition uses it. Frames without overlays bypass the
 resolve pass; the presentation command uses the same ordered Metal

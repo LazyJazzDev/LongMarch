@@ -72,8 +72,9 @@ int main(int argc, char **argv) {
     clock.Advance(.3, true, 0, [&] { ++steps; });
     Check(steps == 1 && clock.NextStepDelay(0) == .5, "Timed Life wake missed a generation");
     clock.Advance(10, true, SimulationClock::kLightning, [&] { ++steps; });
-    Check(steps == 2 && clock.NextStepDelay(SimulationClock::kLightning) == 0,
-          "Lightning mode must advance only once per rendered frame");
+    const double lightning_delay = clock.NextStepDelay(SimulationClock::kLightning);
+    Check(steps == 2 && lightning_delay > 0 && lightning_delay <= SimulationClock::kLightningPeriod,
+          "Lightning mode must advance once per frame at 60 generations per second");
     for (auto name : {"gol", "2048"}) {
       DemoSession game(argv[1], name);
       game.Resize(640, 800);
