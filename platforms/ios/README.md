@@ -267,9 +267,10 @@ MTKView display loop while a board is still, wakes on input/resize/focus/file
 completion, and schedules normal Life generations at their simulation deadlines.
 Animations and lightning mode use the native 60 Hz display link;
 only slower simulation deadlines use one-shot timers; lightning advances
-one generation per rendered frame. Hosted surfaces cap supersampling at 2x per axis to preserve rounded edges,
-and allocate the second full-screen color target only when an overlay transition
-uses it. At 1x sampling, frames without overlays bypass the resolve pass; the presentation command uses the same ordered Metal
+one generation per rendered frame. Hosted surfaces render at native resolution without
+supersampling, since phone displays are dense enough, and allocate the second full-screen
+color target only when an overlay transition uses it. Frames without overlays bypass the
+resolve pass; the presentation command uses the same ordered Metal
 queue without a redundant wait between game rendering and presentation.
 Presentation completion is asynchronous with at most two game frames in flight;
 Metal queue ordering protects shared textures and completion handlers report errors.
