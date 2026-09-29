@@ -7,6 +7,13 @@ import native from 'liblongmarch.so';
 interface SceneInfo { id: string; name: string; width: number; height: number; }
 interface DemoInfo { id: string; name: string; detail: string; symbol: Resource; reason?: string; }
 interface DemoSection { title: string; demos: DemoInfo[]; }
+// A single object-literal @Builder argument is passed by reference, so the
+// builder refreshes when the state it reads changes; plain arguments do not.
+interface CaptionArgs { text: string; color: string; }
+interface MenuArgs { label: string; value: string; items: MenuElement[]; }
+interface ToggleArgs { label: string; isOn: boolean; target: string; }
+interface ButtonArgs { label: string; enabled: boolean; action: string; }
+interface HeaderArgs { title: string; closeColor: string; }
 interface NativeCommand {
   type: string; demo?: string; scene?: string; value?: number | boolean;
   hdr?: boolean; exposure?: number; particles?: number; galaxies?: number; step?: number;
@@ -476,15 +483,15 @@ struct Index {
       Row({ space: 16 }) {
         Row() { SymbolGlyph(demo.symbol).fontSize(22).fontColor([TINT]) }.width(32).justifyContent(FlexAlign.Center)
         Column({ space: 4 }) {
-          Text(demo.name).fontSize(17).fontWeight(FontWeight.Medium).fontColor(LABEL)
+          Text(demo.name).fontSize(17).fontWeight(600).fontColor(LABEL)
           Text(demo.reason ?? demo.detail).fontSize(15).fontColor(SECONDARY)
         }.alignItems(HorizontalAlign.Start).layoutWeight(1)
         SymbolGlyph(demo.reason === undefined ? $r('sys.symbol.chevron_right') : $r('sys.symbol.ohos_lock'))
-          .fontSize(17).fontColor([SECONDARY])
+          .fontSize(18).fontWeight(FontWeight.Medium).fontColor([SECONDARY])
       }.padding({ left: 16, right: 16, top: 17, bottom: 17 }).width('100%')
+      .opacity(demo.reason === undefined ? 1 : 0.45)
       if (!last) { Divider().strokeWidth(0.5).color(SEPARATOR).margin({ left: 64, right: 16 }) }
     }
-    .opacity(demo.reason === undefined ? 1 : 0.45)
     .enabled(demo.reason === undefined)
     .stateStyles({ normal: { .backgroundColor(GROUPED_ROW) }, pressed: { .backgroundColor(ROW_PRESSED) },
       disabled: { .backgroundColor(GROUPED_ROW) } })
@@ -505,7 +512,7 @@ struct Index {
           }
           ForEach(SECTIONS, (section: DemoSection) => {
             Column() {
-              Text(section.title).fontSize(17).fontWeight(FontWeight.Medium).fontColor(HEADER)
+              Text(section.title).fontSize(17).fontWeight(600).fontColor(HEADER)
                 .padding({ left: 16, bottom: 10 })
               Column() {
                 ForEach(section.demos, (demo: DemoInfo, index: number) => {
@@ -522,7 +529,7 @@ struct Index {
       .onDidScroll(() => { this.scrolled = this.listScroller.currentOffset().yOffset > 1; })
       // Inline title bar: transparent at the top edge, material once content scrolls under it.
       Column() {
-        Text('LongMarch Demos').fontSize(17).fontWeight(FontWeight.Medium).fontColor(LABEL).height(44)
+        Text('LongMarch Demos').fontSize(17).fontWeight(600).fontColor(LABEL).height(44)
       }
       .padding({ top: this.safeTop }).width('100%').alignItems(HorizontalAlign.Center)
       .backgroundColor(this.scrolled ? '#B3000000' : '#00000000')
@@ -535,28 +542,28 @@ struct Index {
   // ---- Shared iOS-style controls ----
 
   @Builder
-  private menuRow(label: string, value: string, items: MenuElement[]) {
+  private menuRow(args: MenuArgs) {
     Row() {
-      Text(label).fontSize(17).fontColor(LABEL)
+      Text(args.label).fontSize(17).fontColor(LABEL)
       Blank()
       Row({ space: 5 }) {
-        Text(value).fontSize(17).fontColor(TINT).textAlign(TextAlign.End).maxLines(2)
+        Text(args.value).fontSize(17).fontColor(TINT).textAlign(TextAlign.End).maxLines(2)
         Column() {
           SymbolGlyph($r('sys.symbol.chevron_up')).fontSize(9).fontColor([TINT])
           SymbolGlyph($r('sys.symbol.chevron_down')).fontSize(9).fontColor([TINT]).margin({ top: -3 })
         }
-      }.constraintSize({ maxWidth: '62%' }).bindMenu(items)
+      }.constraintSize({ maxWidth: '62%' }).bindMenu(args.items)
     }.width('100%').constraintSize({ minHeight: 38 })
   }
 
   @Builder
-  private toggleRow(label: string, isOn: boolean, target: string) {
+  private toggleRow(args: ToggleArgs) {
     Row() {
-      Text(label).fontSize(17).fontColor(LABEL)
+      Text(args.label).fontSize(17).fontColor(LABEL)
       Blank()
-      Toggle({ type: ToggleType.Switch, isOn: isOn }).selectedColor(SWITCH_ON).switchPointColor('#FFFFFF')
+      Toggle({ type: ToggleType.Switch, isOn: args.isOn }).selectedColor(SWITCH_ON).switchPointColor('#FFFFFF')
         .onChange((value: boolean) => {
-          if (target === 'hdr') { this.hdr = value; this.display(); } else this.setSimulate(value);
+          if (args.target === 'hdr') { this.hdr = value; this.display(); } else this.setSimulate(value);
         })
     }.width('100%')
   }
@@ -579,26 +586,26 @@ struct Index {
   }
 
   @Builder
-  private borderedButton(label: string, enabled: boolean, action: string) {
-    Text(label).fontSize(17).fontColor(enabled ? TINT : '#4DEBEBF5')
+  private borderedButton(args: ButtonArgs) {
+    Text(args.label).fontSize(17).fontColor(args.enabled ? TINT : '#4DEBEBF5')
       .padding({ left: 14, right: 14, top: 7, bottom: 7 }).backgroundColor(FILL).borderRadius(100)
       .onClick(() => {
-        if (!enabled) return;
-        if (action === 'reload') this.reload(); else this.send({ type: 'resetFilm' });
+        if (!args.enabled) return;
+        if (args.action === 'reload') this.reload(); else this.send({ type: 'resetFilm' });
       })
   }
 
   @Builder
-  private caption(text: string, color: string) {
-    Text(text).fontSize(12).fontColor(color).fontFeature('"tnum" on')
+  private caption(args: CaptionArgs) {
+    Text(args.text).fontSize(12).fontColor(args.color).fontFeature('"tnum" on')
   }
 
   @Builder
-  private panelHeader(title: string, closeColor: string) {
+  private panelHeader(args: HeaderArgs) {
     Row() {
-      Text(title).fontSize(17).fontWeight(FontWeight.Medium).fontColor(LABEL)
+      Text(args.title).fontSize(17).fontWeight(600).fontColor(LABEL)
       Blank()
-      Row() { SymbolGlyph($r('sys.symbol.xmark')).fontSize(20).fontColor([closeColor]) }
+      Row() { SymbolGlyph($r('sys.symbol.xmark')).fontSize(20).fontColor([args.closeColor]) }
         .width(44).height(44).justifyContent(FlexAlign.Center).onClick(() => this.controls = false)
         .accessibilityText('Hide controls')
     }.width('100%').padding({ left: 14, right: 2 })
@@ -609,16 +616,16 @@ struct Index {
   @Builder
   private graphicsPanel() {
     Column() {
-      this.panelHeader(this.title, TINT)
+      this.panelHeader({ title: this.title, closeColor: TINT })
       Divider().strokeWidth(0.5).color(SEPARATOR)
       Scroll() {
         Column({ space: 12 }) {
           Text(this.subtitle).fontSize(15).fontColor(SECONDARY)
           if (this.selected === 'graphics_hello_hdr' || this.selected === 'nbody_cs') {
-            this.toggleRow('HDR display', this.hdr, 'hdr')
+            this.toggleRow({ label: 'HDR display', isOn: this.hdr, target: 'hdr' })
           }
           if (this.selected === 'nbody_cs') {
-            this.menuRow('Particles', grouped(this.particles), this.particleItems())
+            this.menuRow({ label: 'Particles', value: grouped(this.particles), items: this.particleItems() })
             Row() {
               Text(`Galaxies: ${this.galaxies}`).fontSize(17).fontColor(LABEL)
               Blank()
@@ -632,23 +639,23 @@ struct Index {
             Text('Drag the image to rotate the camera.').fontSize(12).fontColor(SECONDARY)
           }
           if (this.selected === 'nbody_cs' || this.selected === 'graphics_hello_resize') {
-            this.toggleRow(this.selected === 'nbody_cs' ? 'Simulate' : 'Animate', !this.paused, 'simulate')
-            this.menuRow('Render scale', `${this.renderScale * 100}%`, this.scaleItems())
+            this.toggleRow({ label: this.selected === 'nbody_cs' ? 'Simulate' : 'Animate', isOn: !this.paused, target: 'simulate' })
+            this.menuRow({ label: 'Render scale', value: `${this.renderScale * 100}%`, items: this.scaleItems() })
           }
           Divider().strokeWidth(0.5).color(SEPARATOR)
           Column({ space: 6 }) {
-            this.caption(this.stats.frames === 0 ? 'Preparing Vulkan…' : `Frame: ${grouped(this.stats.frames)}`, LABEL)
-            this.caption(`FPS: ${this.stats.fps.toFixed(1)} · Frame: ${this.stats.fps > 0 ? (1000 / this.stats.fps).toFixed(2) : '—'} ms`, LABEL)
-            this.caption(`GPU: ${this.stats.gpuMs > 0 ? this.stats.gpuMs.toFixed(2) + ' ms' : 'unavailable'}`, LABEL)
+            this.caption({ text: this.stats.frames === 0 ? 'Preparing Vulkan…' : `Frame: ${grouped(this.stats.frames)}`, color: LABEL })
+            this.caption({ text: `FPS: ${this.stats.fps.toFixed(1)} · Frame: ${this.stats.fps > 0 ? (1000 / this.stats.fps).toFixed(2) : '—'} ms`, color: LABEL })
+            this.caption({ text: `GPU: ${this.stats.gpuMs > 0 ? this.stats.gpuMs.toFixed(2) + ' ms' : 'unavailable'}`, color: LABEL })
             if (this.selected === 'nbody_cs' && !this.paused) {
-              this.caption(`Estimated: ${(this.particles * this.particles * 20 * this.stats.fps / 1e9).toFixed(1)} GFLOP/s`, LABEL)
+              this.caption({ text: `Estimated: ${(this.particles * this.particles * 20 * this.stats.fps / 1e9).toFixed(1)} GFLOP/s`, color: LABEL })
             }
-            this.caption(`Resolution: ${grouped(this.stats.width)} × ${grouped(this.stats.height)}`, LABEL)
-            this.caption('Backend: Vulkan', LABEL)
-            this.caption(`Device: ${this.stats.device || '—'}`, LABEL)
-            this.caption(`Pipeline: ${this.selected === 'nbody_cs' ? 'Compute + Rasterization' :
-              this.selected === 'graphics_hello_ray_query' ? 'Compute + Ray Query' : 'Rasterization'}`, LABEL)
-            if (this.selected === 'graphics_hello_hdr' || this.selected === 'nbody_cs') this.caption(this.hdrCaption(), SECONDARY)
+            this.caption({ text: `Resolution: ${grouped(this.stats.width)} × ${grouped(this.stats.height)}`, color: LABEL })
+            this.caption({ text: 'Backend: Vulkan', color: LABEL })
+            this.caption({ text: `Device: ${this.stats.device || '—'}`, color: LABEL })
+            this.caption({ text: `Pipeline: ${this.selected === 'nbody_cs' ? 'Compute + Rasterization' :
+              this.selected === 'graphics_hello_ray_query' ? 'Compute + Ray Query' : 'Rasterization'}`, color: LABEL })
+            if (this.selected === 'graphics_hello_hdr' || this.selected === 'nbody_cs') this.caption({ text: this.hdrCaption(), color: SECONDARY })
             if (this.stats.error.length > 0) {
               Text(this.stats.error).fontSize(12).fontColor(DESTRUCTIVE).copyOption(CopyOptions.LocalDevice)
             }
@@ -666,41 +673,41 @@ struct Index {
   @Builder
   private sparkiumPanel() {
     Column() {
-      this.panelHeader('Sparkium scenes', LABEL)
+      this.panelHeader({ title: 'Sparkium scenes', closeColor: LABEL })
       Divider().strokeWidth(0.5).color(SEPARATOR)
       Scroll() {
         Column({ space: 10 }) {
-          this.menuRow('Scene', this.sceneName(), this.sceneItems())
-          this.menuRow('SPP limit', this.limit.toString(), this.limitItems())
-          this.toggleRow('HDR display', this.hdr, 'hdr')
+          this.menuRow({ label: 'Scene', value: this.sceneName(), items: this.sceneItems() })
+          this.menuRow({ label: 'SPP limit', value: this.limit.toString(), items: this.limitItems() })
+          this.toggleRow({ label: 'HDR display', isOn: this.hdr, target: 'hdr' })
           Text(`Exposure: ${this.exposure.toFixed(1)} EV`).fontSize(12).fontColor(LABEL)
           Slider({ value: this.exposure, min: -5, max: 5, step: .1 })
             .selectedColor(TINT).trackColor('#3A3A3C').blockColor('#FFFFFF').trackThickness(4)
             .onChange((value: number) => { this.exposure = value; this.display(); })
           Text(this.hdrCaption()).fontSize(12).fontColor(SECONDARY)
           Row({ space: 8 }) {
-            this.borderedButton('Reload', true, 'reload')
-            this.borderedButton('Reset film', this.stats.frames > 0 && this.stats.error.length === 0, 'reset')
+            this.borderedButton({ label: 'Reload', enabled: true, action: 'reload' })
+            this.borderedButton({ label: 'Reset film', enabled: this.stats.frames > 0 && this.stats.error.length === 0, action: 'reset' })
           }
           Divider().strokeWidth(0.5).color(SEPARATOR)
           Column({ space: 6 }) {
             Row() {
-              this.caption(`Ray/s: ${(this.stats.width * this.stats.height * this.stats.fps / 1e6).toFixed(2)} M`, LABEL)
+              this.caption({ text: `Ray/s: ${(this.stats.width * this.stats.height * this.stats.fps / 1e6).toFixed(2)} M`, color: LABEL })
               Blank()
-              this.caption(`FPS: ${this.stats.fps.toFixed(1)}`, LABEL)
+              this.caption({ text: `FPS: ${this.stats.fps.toFixed(1)}`, color: LABEL })
             }.width('100%')
-            this.caption(`Accumulated spp: ${this.stats.spp}`, LABEL)
+            this.caption({ text: `Accumulated spp: ${this.stats.spp}`, color: LABEL })
             Progress({ value: Math.min(this.stats.spp, this.limit), total: this.limit, type: ProgressType.Linear })
               .color(TINT).backgroundColor('#3A3A3C').style({ strokeWidth: 4 }).width('100%')
-            this.caption(this.sparkiumStatus(), SECONDARY)
-            this.caption(`Render time: ${this.stats.seconds.toFixed(1)} s`, LABEL)
-            this.caption('Backend: Vulkan', LABEL)
-            this.caption(`Device: ${this.stats.device || '—'}`, LABEL)
-            this.caption(`Pipeline: ${this.stats.pipeline || '—'}`, LABEL)
-            this.caption(this.stats.width > 0 ? `Resolution: ${grouped(this.stats.width)} × ${grouped(this.stats.height)}` : 'Resolution: loading…', LABEL)
-            this.caption(`Samples / frame: 1 · Max bounces: ${this.stats.bounces}`, LABEL)
-            this.caption('Ray/s and FPS describe the last rendered frame.', SECONDARY)
-            this.caption(`scenes/${this.scene}/scene.json`, SECONDARY)
+            this.caption({ text: this.sparkiumStatus(), color: SECONDARY })
+            this.caption({ text: `Render time: ${this.stats.seconds.toFixed(1)} s`, color: LABEL })
+            this.caption({ text: 'Backend: Vulkan', color: LABEL })
+            this.caption({ text: `Device: ${this.stats.device || '—'}`, color: LABEL })
+            this.caption({ text: `Pipeline: ${this.stats.pipeline || '—'}`, color: LABEL })
+            this.caption({ text: this.stats.width > 0 ? `Resolution: ${grouped(this.stats.width)} × ${grouped(this.stats.height)}` : 'Resolution: loading…', color: LABEL })
+            this.caption({ text: `Samples / frame: 1 · Max bounces: ${this.stats.bounces}`, color: LABEL })
+            this.caption({ text: 'Ray/s and FPS describe the last rendered frame.', color: SECONDARY })
+            this.caption({ text: `scenes/${this.scene}/scene.json`, color: SECONDARY })
             if (this.stats.error.length > 0) {
               Text(this.stats.error).fontSize(12).fontColor(DESTRUCTIVE).copyOption(CopyOptions.LocalDevice)
             }
@@ -751,7 +758,7 @@ struct Index {
   private sizePicker() {
     Column({ space: 16 }) {
       Row() {
-        Text(this.sizeAxis === 1 ? '网格宽度' : '网格高度').fontSize(17).fontWeight(FontWeight.Medium).fontColor(LABEL)
+        Text(this.sizeAxis === 1 ? '网格宽度' : '网格高度').fontSize(17).fontWeight(600).fontColor(LABEL)
         Blank()
         Text('完成').fontSize(17).fontColor(TINT).onClick(() => { this.applySize(this.sizeValue); this.closeSize(); })
       }.width('100%')

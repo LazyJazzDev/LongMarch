@@ -148,6 +148,28 @@ be measured; host success on Metal does not establish large-scene Vulkan support
   checks supported 10-bit buffer formats and PQ/HLG transfer functions; selecting
   a floating-point format alone does not establish HDR output.
 
+## iOS-aligned interface on PLU-AL10
+
+Checked on 2026-09-29 with a signed debug HAP built from the `mobile-app` branch
+(Maleoon 920, 1316 × 2832, Vulkan 1.3), against iOS 27 simulator screenshots of
+the same screens:
+
+- The demo browser shows the inline title, the five iOS sections and order, and
+  disabled RT pipeline rows with a lock. The title bar gains material and a
+  hairline once content scrolls under it; landscape rows keep symmetric insets.
+- Hello Cube and NBody show the left control panel below the top safe area and
+  the Demos button at the top right. NBody statistics update live (for example
+  38.5 FPS, 4.51 ms GPU, 1316 × 2832, Maleoon 920) with HDR10 PQ output.
+- Sparkium runs in landscape with the panel clear of the camera cutout and
+  accumulates Cornell Box samples.
+- 2048 fills the display with its cream background below the status capsule.
+  GoL fills the display with the capsule between its corner buttons. Tapping
+  the width readout opens the anchored size popover; + and Done changed the
+  grid from 64 to 65 columns.
+- Found and fixed on device: values passed to parameterized ArkUI builders were
+  captured once, which froze panel statistics and picker values. The builders
+  now take one object literal, which ArkUI passes by reference.
+
 ## Pending
 
 - Extended XComponent lifecycle stress, repeated navigation and surface
