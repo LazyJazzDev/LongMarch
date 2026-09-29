@@ -100,6 +100,11 @@ void VulkanCmdBeginRendering::CompileCommand(VulkanCommandContext *context, VkCo
     attachment_info.imageLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
     attachment_info.loadOp = VK_ATTACHMENT_LOAD_OP_LOAD;
     attachment_info.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
+    if (auto clear = load_clears_.find(color_target); clear != load_clears_.end()) {
+      attachment_info.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
+      const auto &color = clear->second.color;
+      attachment_info.clearValue.color = {{color.r, color.g, color.b, color.a}};
+    }
     color_attachment_infos.push_back(attachment_info);
 
     auto target_extent = color_target->Extent();
@@ -126,6 +131,10 @@ void VulkanCmdBeginRendering::CompileCommand(VulkanCommandContext *context, VkCo
     depth_attachment_info.imageLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
     depth_attachment_info.loadOp = VK_ATTACHMENT_LOAD_OP_LOAD;
     depth_attachment_info.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
+    if (auto clear = load_clears_.find(depth_target_); clear != load_clears_.end()) {
+      depth_attachment_info.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
+      depth_attachment_info.clearValue.depthStencil = {clear->second.depth.depth, 0};
+    }
     rendering_info.pDepthAttachment = &depth_attachment_info;
     auto target_extent = depth_target_->Extent();
     extent.width = std::min(extent.width, target_extent.width);
@@ -139,6 +148,24 @@ void VulkanCmdBeginRendering::CompileCommand(VulkanCommandContext *context, VkCo
 
 void VulkanCmdBeginRendering::RecordResourceImages(VulkanImage *resource_image) {
   resource_images_.insert(resource_image);
+}
+
+bool VulkanCmdBeginRendering::CanFoldClear(VulkanImage *image) const {
+  std::vector<VulkanImage *> attachments = color_targets_;
+  if (depth_target_)
+    attachments.push_back(depth_target_);
+  if (std::find(attachments.begin(), attachments.end(), image) == attachments.end())
+    return false;
+  // Load clears cover only the render area, the intersection of all attachments.
+  for (auto *attachment : attachments) {
+    if (attachment->Extent().width != image->Extent().width || attachment->Extent().height != image->Extent().height)
+      return false;
+  }
+  return true;
+}
+
+void VulkanCmdBeginRendering::FoldClear(VulkanImage *image, const ClearValue &clear_value) {
+  load_clears_.emplace(image, clear_value);
 }
 
 VulkanCmdBindResourceBuffers::VulkanCmdBindResourceBuffers(int slot,
