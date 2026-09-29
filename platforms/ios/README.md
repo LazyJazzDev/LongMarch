@@ -192,8 +192,12 @@ xcrun devicectl device install app --device <device> \
   build-ios-xcode/Release-iphoneos/GameOfLife.app
 ```
 
-`demo/gol/tools/app_icon.py` renders its icon (`gol/Assets.xcassets`) from the
-boundary-mode button: the plate and an enlarged glider with the button's shading.
+`demo/gol/tools/app_icon.py` generates its Icon Composer icon (`gol/AppIcon.icon`)
+from the boundary-mode button: the plate gradient as the fill and an enlarged glider
+as a Liquid Glass layer. actool renders the flat icons of earlier iOS versions from
+it. Preview a rendition with Icon Composer's `ictool`, for example
+`ictool gol/AppIcon.icon --export-image --output-file icon.png --platform iOS
+--rendition Dark --width 1024 --height 1024 --scale 1`.
 
 Resource preparation refuses to overwrite an existing output. Use `--output` to
 prepare another bundle and `-DSPARKIUM_RESOURCES` to select it. Generated resources,

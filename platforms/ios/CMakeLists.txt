@@ -106,6 +106,10 @@ function(longmarch_ios_app target bundle_id info_plist assets resources folder)
     demos/DemoBridge.mm demos/DemoBridge.h SparkiumBridge.mm SparkiumBridge.h RenderQueue.h
     "${bundle_resources}" ${assets} ${app_STRINGS})
   set_source_files_properties("${bundle_resources}" ${assets} PROPERTIES MACOSX_PACKAGE_LOCATION Resources)
+  if(assets MATCHES "\\.icon$")
+    # An Icon Composer icon: layered Liquid Glass on iOS 26, flat renderings before.
+    set_source_files_properties(${assets} PROPERTIES XCODE_EXPLICIT_FILE_TYPE folder.iconcomposer.icon)
+  endif()
   foreach(strings ${app_STRINGS})
     get_filename_component(language "${strings}" DIRECTORY)
     get_filename_component(language "${language}" NAME)
@@ -167,7 +171,7 @@ if(SPARKIUM_APP)
     STRINGS ${game_strings})
   if(EXISTS "${GAME_OF_LIFE_RESOURCES}/Patterns/library.json")
     longmarch_ios_app(GameOfLife dev.lazyjazz.gameoflife "${CMAKE_CURRENT_SOURCE_DIR}/gol/Info.plist"
-      "${CMAKE_CURRENT_SOURCE_DIR}/gol/Assets.xcassets" "${GAME_OF_LIFE_RESOURCES}" GameResources
+      "${CMAKE_CURRENT_SOURCE_DIR}/gol/AppIcon.icon" "${GAME_OF_LIFE_RESOURCES}" GameResources
       SOURCES gol/GameOfLifeApp.swift games/GamesView.swift
       STRINGS ${game_strings} gol/en.lproj/InfoPlist.strings gol/zh-Hans.lproj/InfoPlist.strings)
   else()

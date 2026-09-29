@@ -1,0 +1,4 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024">
+<defs><linearGradient id="shade" gradientUnits="userSpaceOnUse" x1="0" y1="0" x2="1024" y2="1024"><stop offset="0" stop-color="#f0faff"/><stop offset="1" stop-color="#8a9099"/></linearGradient></defs>
+<path fill="url(#shade)" d="M184.32 348.16 L675.84 348.16 L675.84 675.84 L512.00 675.84 L512.00 839.68 L348.16 839.68 L348.16 675.84 L512.00 675.84 L512.00 512.00 L184.32 512.00 Z"/>
+</svg>
