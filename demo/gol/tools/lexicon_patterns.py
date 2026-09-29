@@ -192,8 +192,9 @@ def main():
     catalog.sort(key=lambda e: (CATEGORIES.index(e['category']), e['name'].lower()))
     document = {
         'source': 'Life Lexicon, https://github.com/dvgrn/life-lexicon (plaintext release of 2019-10-29)',
-        'license': 'CC BY-SA 3.0; the Life Lexicon is copyright Stephen A. Silver, 1997-2018, '
-                   'updated by Dave Greene and David Bell',
+        'license': 'CC BY-SA 3.0 (https://creativecommons.org/licenses/by-sa/3.0/). Adapted from the Life Lexicon, copyright Stephen A. Silver, '
+                   '1997-2018, updated by Dave Greene and David Bell: patterns extracted, limited to '
+                   '256 x 256 and classified by simulation',
         'patterns': catalog,
     }
     with open(output, 'w', encoding='utf-8') as file:

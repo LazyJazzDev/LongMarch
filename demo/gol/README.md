@@ -108,9 +108,11 @@ on the 200 x 200 grid with `--play` to watch the stream. Gliders wrap around
 the grid edges and can eventually interact with the gun or other gliders.
 
 `patterns/library.json` is the built-in pattern library of the iOS and
-HarmonyOS apps: 736 named patterns from the [Life Lexicon](https://github.com/dvgrn/life-lexicon)
-(Stephen A. Silver, Dave Greene and David Bell; CC BY-SA 3.0) that fit the
-256 x 256 grid. `tools/lexicon_patterns.py` builds it from the plaintext
+HarmonyOS apps: 736 named patterns adapted from the [Life Lexicon](https://github.com/dvgrn/life-lexicon)
+(Stephen A. Silver, Dave Greene and David Bell) that fit the 256 x 256 grid.
+Unlike the rest of the repository, the patterns are licensed under
+[CC BY-SA 3.0](https://creativecommons.org/licenses/by-sa/3.0/); see
+[`patterns/LICENSE.md`](patterns/LICENSE.md). `tools/lexicon_patterns.py` builds it from the plaintext
 Lexicon and classifies each pattern by simulating it: still lifes and
 oscillators (with their period) return to their cells, spaceships (with their
 speed) return shifted, and small patterns that settle only after 50 or more
