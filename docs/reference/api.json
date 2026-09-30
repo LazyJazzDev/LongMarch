@@ -6070,5 +6070,929 @@
   "snowberg::visualizer::Vertex": {
     "contract": "当前几何 shader 将法线替换为平面法线，UV 尚未用于材质纹理。",
     "description": "位置、法线、UV、颜色的三维顶点布局。"
+  },
+  "sparkium::(anonymous)::BinaryHair": {
+    "contract": "精确校验长度与首尾 offset；逐束有效性由 GeometryHair 构造继续检查。",
+    "description": "读取 SPKHAIR1：16 字节头后依次 offsets、float3 points、float radii。"
+  },
+  "sparkium::(anonymous)::BinaryHairData": {
+    "contract": "offsets 长度为 strand_count+1。",
+    "description": "临时拥有毛发 points、radii、offsets 数组。"
+  },
+  "sparkium::(anonymous)::BinaryMesh": {
+    "contract": "flags 仅允许低三位；验证总长度，不检查索引范围、数值有限性或跨端序转换。",
+    "description": "读取 SPKMESH1 原生数值布局：20 字节头、uint32 索引、float3 顶点、可选法线/UV/颜色。"
+  },
+  "sparkium::(anonymous)::BoolMember": {
+    "contract": "缺失采用 fallback。",
+    "description": "读取可选布尔字段。"
+  },
+  "sparkium::(anonymous)::BuildHairMesh": {
+    "contract": "非法数量/偏移/径向分段抛 runtime_error；不封端，不验证半径或零切线。",
+    "description": "为每个点按切线生成径向顶点/法线/UV，并用两三角连接相邻环。"
+  },
+  "sparkium::(anonymous)::FloatMember": {
+    "contract": "缺失采用 fallback，不额外检查业务范围。",
+    "description": "读取可选有限浮点字段。"
+  },
+  "sparkium::(anonymous)::InlineMesh": {
+    "contract": "要求非空三角列表、合法索引；UV 数量匹配，法线由后续选项生成。",
+    "description": "从 positions/indices 及可选 tex_coords 创建 CPU Mesh。"
+  },
+  "sparkium::(anonymous)::Member": {
+    "contract": "非对象或缺字段抛异常。",
+    "description": "读取必需对象成员。"
+  },
+  "sparkium::(anonymous)::ReadBool": {
+    "contract": "数字不作隐式布尔转换。",
+    "description": "读取严格布尔值。"
+  },
+  "sparkium::(anonymous)::ReadInt": {
+    "contract": "不接受仅可表示为 double 或超出 IsInt 范围的值。",
+    "description": "读取有符号 32 位 JSON 整数。"
+  },
+  "sparkium::(anonymous)::ReadNumber": {
+    "contract": "NaN、无穷与转换溢出拒绝。",
+    "description": "读数值为 float 并验证有限性。"
+  },
+  "sparkium::(anonymous)::ReadString": {
+    "contract": "指针由 JSON 文档拥有；后续按 C 字符串使用。",
+    "description": "验证字符串并返回 GetString 指针。"
+  },
+  "sparkium::(anonymous)::RequireArray": {
+    "contract": "类型不匹配抛 runtime_error。",
+    "description": "验证 JSON 值为数组并返回引用。"
+  },
+  "sparkium::(anonymous)::RequireObject": {
+    "contract": "类型不匹配抛 runtime_error。",
+    "description": "验证 JSON 值为对象并返回引用。"
+  },
+  "sparkium::(anonymous)::Resolve": {
+    "contract": "允许绝对路径和 ..，不保证文件存在。",
+    "description": "将相对资源路径相对文档父目录解析并 weakly_canonical。"
+  },
+  "sparkium::(anonymous)::ShaderGraphCompiler": {
+    "contract": "借用 graph 与纹理槽映射，按节点 ID 和输出名缓存，拒绝递归环。",
+    "description": "把 JSON 图编译为 GraphSurface 求值函数及辅助 Slang 函数。"
+  },
+  "sparkium::(anonymous)::ShaderGraphCompiler::Compile": {
+    "contract": "按一次性使用设计；重复调用不清空流或缓存。未指定输出保留默认值，shadow_opacity 默认 -1。",
+    "description": "输出噪声、色彩与旋转辅助函数，设置 GraphSurface 默认值并展开 surface 输出。"
+  },
+  "sparkium::(anonymous)::ShaderGraphCompiler::Expression": {
+    "contract": "引用缺少 output 时使用 value；非支持字面量抛异常。",
+    "description": "将含 node 的对象解析为节点引用，其余值解析为字面量。"
+  },
+  "sparkium::(anonymous)::ShaderGraphCompiler::Input": {
+    "contract": "缺失采用源码表达式 fallback；存在则递归 Expression。",
+    "description": "读取节点 inputs 的可选命名输入。"
+  },
+  "sparkium::(anonymous)::ShaderGraphCompiler::Literal": {
+    "contract": "标量复制四份；数组重复末分量补齐前三项，缺失第四项补 1。",
+    "description": "把数字或 1–4 元数值数组变为 float4。"
+  },
+  "sparkium::(anonymous)::ShaderGraphCompiler::Node": {
+    "contract": "检查未知节点与循环；只支持文件说明列出的子集。图像纹理索引位于 material_data 字节 12+slot*4，srgb 标记执行 RGB 解码。",
+    "description": "按节点类型生成 float4 表达式与中间变量，缓存每个 id:output。"
+  },
+  "sparkium::(anonymous)::ShaderGraphCompiler::Number": {
+    "contract": "无小数点或指数时补 .0。",
+    "description": "以 9 位精度生成带 f 后缀的 Slang 浮点字面量。"
+  },
+  "sparkium::(anonymous)::ShaderGraphCompiler::ShaderGraphCompiler": {
+    "contract": "引用须覆盖编译器使用期。",
+    "description": "保存图与纹理槽引用并验证 nodes 对象。"
+  },
+  "sparkium::(anonymous)::Transform": {
+    "contract": "matrix 优先；TRS 按 T*Rx*Ry*Rz*S，缺项为单位变换。",
+    "description": "读取列主序 16 元矩阵或平移、角度制 XYZ 旋转、缩放。"
+  },
+  "sparkium::(anonymous)::Value": {
+    "contract": "不拥有文档外的数据。",
+    "description": "RapidJSON Value 的本地别名。"
+  },
+  "sparkium::(anonymous)::Vec3": {
+    "contract": "null 返回 fallback，其余形状错误抛异常。",
+    "description": "将恰好三个数的数组转为 glm::vec3。"
+  },
+  "sparkium::(anonymous)::Vec3Member": {
+    "contract": "缺失采用 fallback。",
+    "description": "读取可选三维向量字段。"
+  },
+  "sparkium::COMPONENT_CAST": {
+    "contract": "obj 非空，宏不是普通表达式，必须用于返回类型匹配的函数。",
+    "description": "适配宏：查找 cast_type 组件；没有则以 *obj 构造并追加，再从所在函数 return。"
+  },
+  "sparkium::Camera": {
+    "contract": "fovy 为弧度，参数本身没有验证。",
+    "description": "抽象相机描述，保存 view/fovy/aspect 并可挂载管线组件。"
+  },
+  "sparkium::Camera::Camera": {
+    "contract": "受保护构造供具体相机使用。",
+    "description": "保存借用 Core 与视图/FOV/宽高比。"
+  },
+  "sparkium::Camera::GetCore": {
+    "contract": "不延长 Core 寿命，调用方不能删除它。",
+    "description": "返回借用的 sparkium Core 指针。"
+  },
+  "sparkium::Camera::~Camera": {
+    "contract": "确保 Camera 抽象且派生对象能正常析构。",
+    "description": "纯虚析构的默认实现。"
+  },
+  "sparkium::CameraPinhole": {
+    "contract": "不附加透镜参数，管线根据动态类型适配。",
+    "description": "针孔相机具体类型，使用基类 view/fovy/aspect。"
+  },
+  "sparkium::CameraPinhole::CameraPinhole": {
+    "contract": "不立即创建管线或重置 Film。",
+    "description": "原样把 Core、view、fovy、aspect 传给 Camera。"
+  },
+  "sparkium::CameraThinLens": {
+    "contract": "孔径半径和焦距使用场景长度单位，旋转为弧度；具体采样限制见相机 shader。",
+    "description": "薄透镜相机前端，默认零孔径、焦距 1、叶片数 0、旋转 0、孔径比 1。"
+  },
+  "sparkium::CameraThinLens::CameraThinLens": {
+    "contract": "参数修改不会自动重置累积。",
+    "description": "初始化基类投影参数，透镜字段使用声明初值。"
+  },
+  "sparkium::CodeLines": {
+    "contract": "空行会被丢弃，不能当作字节保真编辑器。",
+    "description": "源码行片段容器，用于模板 shader 插入与带行号诊断。"
+  },
+  "sparkium::CodeLines::CodeLines": {
+    "contract": "C 字符串非空指针；内嵌 NUL 截断，VFS 读取失败没有错误返回。",
+    "description": "支持默认空、C 字符串、std::string、字节数组及 VFS 文件构造，统一按 CR/LF 拆非空行。"
+  },
+  "sparkium::CodeLines::InsertAfter": {
+    "contract": "匹配含空白的整行，插入复制数据；不实施语法验证。",
+    "description": "在第一条完全匹配 after_line 后插入其他片段，找不到则追加末尾。"
+  },
+  "sparkium::CodeLines::InsertIndent": {
+    "contract": "num_spaces 应非负，否则转无符号长度可能导致巨大分配。",
+    "description": "在每行前插入 num_spaces 个空格。"
+  },
+  "sparkium::CodeLines::operator bool": {
+    "contract": "不能判断代码是否合法或能否编译。",
+    "description": "返回是否至少有一条保存的非空行。"
+  },
+  "sparkium::CodeLines::operator std::string": {
+    "contract": "原文件空行和 CRLF 形式不保留。",
+    "description": "串接所有行，每行追加一个换行符。"
+  },
+  "sparkium::Core": {
+    "contract": "构造会读取 shader 目录与 Sobol 素材并分配较大表，设备必须已初始化。",
+    "description": "借用 graphics Core，拥有 shader VFS 与按名称缓存的公共 GPU 资源。"
+  },
+  "sparkium::Core::Core": {
+    "contract": "core 非空；资源创建返回状态未逐项检查。",
+    "description": "依次载入公共色调 shader、Sobol 缓冲和默认图像。"
+  },
+  "sparkium::Core::GetBuffer": {
+    "contract": "使用 map[]；缺失会插入空条目并返回 nullptr，替换或销毁缓存后旧指针失效。",
+    "description": "在对应命名缓存查找并返回 Buffer 裸指针。"
+  },
+  "sparkium::Core::GetComputeProgram": {
+    "contract": "使用 map[]；缺失会插入空条目并返回 nullptr，替换或销毁缓存后旧指针失效。",
+    "description": "在对应命名缓存查找并返回 ComputeProgram 裸指针。"
+  },
+  "sparkium::Core::GetImage": {
+    "contract": "使用 map[]；缺失会插入空条目并返回 nullptr，替换或销毁缓存后旧指针失效。",
+    "description": "在对应命名缓存查找并返回 Image 裸指针。"
+  },
+  "sparkium::Core::GetShader": {
+    "contract": "使用 map[]；缺失会插入空条目并返回 nullptr，替换或销毁缓存后旧指针失效。",
+    "description": "在对应命名缓存查找并返回 Shader 裸指针。"
+  },
+  "sparkium::Core::GetShadersVFS": {
+    "contract": "用于生成/编译管线 shader，不转移所有权。",
+    "description": "返回所拥有 shader 虚拟文件系统的 const 引用。"
+  },
+  "sparkium::Core::GraphicsCore": {
+    "contract": "调用者负责其寿命。",
+    "description": "返回借用的底层 graphics Core。"
+  },
+  "sparkium::Core::LoadPublicBuffers": {
+    "contract": "表约 256 MiB；素材缺失会经 SobolTableGen 抛异常。",
+    "description": "由 Joe–Kuo 素材生成 65536×1024 Sobol 表并上传静态缓冲，命名为 sobol。"
+  },
+  "sparkium::Core::LoadPublicImages": {
+    "contract": "SDR black 为全零含 alpha=0，HDR black 的 alpha=1；默认法线编码约 (0.5,0.5,1)。",
+    "description": "创建 1×1 white/black RGBA8 与 white_hdr/black_hdr RGBA32F、normal_default。"
+  },
+  "sparkium::Core::LoadPublicShaders": {
+    "contract": "HDR 变体定义 SPARKIUM_HDR_OUTPUT=1；依赖部署时目录仍可访问。",
+    "description": "从编译时 shader 目录构建 VFS，编译 SDR/HDR tone_mapping 并建立三个资源槽的计算程序。"
+  },
+  "sparkium::Core::Render": {
+    "contract": "显式 ray_query 不支持抛 runtime_error；未知枚举仅 LogError。输入场景/相机/Film 应同 Core。",
+    "description": "解析请求后分派 raster 或 raytracing 适配层，软件/查询路径通过不同标志调用。"
+  },
+  "sparkium::Core::ResolveRenderPipeline": {
+    "contract": "显式 ray_query 原样返回，真正可用性在 Render 检查；显式光栅不作能力验证。",
+    "description": "AUTO 在 D3D12/Vulkan 优先 ray query，再按完整 RT、ray query、软件 BVH 选择；不支持完整 RT 请求会回退。"
+  },
+  "sparkium::Core::SetPublicResource": {
+    "contract": "同名替换立即释放旧对象，需保证旧借用指针和在途 GPU 使用已结束。",
+    "description": "Shader/ComputeProgram/Buffer/Image 重载把 unique_ptr 移入对应命名缓存。"
+  },
+  "sparkium::DEDICATED_CAST": {
+    "contract": "类型不匹配则继续所在函数，通常用于一串专用适配分支。",
+    "description": "先把 obj dynamic_cast 为 is_type，匹配后查找/追加 cast_type 并 return。"
+  },
+  "sparkium::Entity": {
+    "contract": "Scene 不拥有 Entity，外部须保持其存活。",
+    "description": "场景可注册对象的父类。"
+  },
+  "sparkium::Entity::Entity": {
+    "contract": "不自动加入 Scene。",
+    "description": "保存借用 Core。"
+  },
+  "sparkium::Entity::GetCore": {
+    "contract": "不延长 Core 寿命，调用方不能删除它。",
+    "description": "返回借用的 sparkium Core 指针。"
+  },
+  "sparkium::Entity::operator bool": {
+    "contract": "不验证资源、活动状态或渲染可用性。",
+    "description": "返回 core_ 是否非空。"
+  },
+  "sparkium::Entity::~Entity": {
+    "contract": "不会自动从 Scene 删除裸指针注册。",
+    "description": "默认虚析构。"
+  },
+  "sparkium::EntityGeometryMaterial": {
+    "contract": "模型矩阵为 GLM 4 列×3 行；依赖对象必须比渲染使用活得久。",
+    "description": "借用 Geometry/Material 的仿射变换实例，并保存 raster_light 开关。"
+  },
+  "sparkium::EntityGeometryMaterial::EntityGeometryMaterial": {
+    "contract": "不验证非空、类型组合或同设备，不自动注册 Scene。",
+    "description": "保存 Core、几何/材质裸指针和变换，默认单位仿射矩阵。"
+  },
+  "sparkium::EntityGeometryMaterial::GetGeometry": {
+    "contract": "无所有权转移。",
+    "description": "返回借用的 Geometry 指针。"
+  },
+  "sparkium::EntityGeometryMaterial::GetMaterial": {
+    "contract": "无所有权转移。",
+    "description": "返回借用的 Material 指针。"
+  },
+  "sparkium::EntityGeometryMaterial::GetTransformation": {
+    "contract": "与公开 transform 相同。",
+    "description": "按值返回当前仿射矩阵。"
+  },
+  "sparkium::EntityGeometryMaterial::SetTransformation": {
+    "contract": "不直接上传 GPU 或 Reset Film。",
+    "description": "替换 CPU 变换矩阵。"
+  },
+  "sparkium::EntityPointLight": {
+    "contract": "默认强度与半径为 0，采样权重为 −1；实际采样规则由管线解释。",
+    "description": "位置/颜色/强度/半径/软衰减/采样权重的点光源实体。"
+  },
+  "sparkium::EntityPointLight::EntityPointLight": {
+    "contract": "不检查负半径或强度，不自动加入 Scene。",
+    "description": "原样保存参数，soft_falloff bool 转为 int。"
+  },
+  "sparkium::Film": {
+    "contract": "继承 Object 以持有管线特定累积资源。",
+    "description": "固定尺寸的线性原始颜色、深度、模板及开发参数容器。"
+  },
+  "sparkium::Film::Develop": {
+    "contract": "linear_hdr 要求 RGBA32F 否则 invalid_argument；targ_image 非空，目标尺寸/源访问需与 shader 协议匹配。",
+    "description": "绑定 SDR/HDR 色调计算程序、上传显示参数、以 8×8 组映射到目标，提交后 WaitGPU。"
+  },
+  "sparkium::Film::Film": {
+    "contract": "width/height 应正数；负值转无符号没有保护。",
+    "description": "创建 RGBA32F、D32F、R32_SINT 图像和色调参数缓冲。"
+  },
+  "sparkium::Film::GetCore": {
+    "contract": "不延长 Core 寿命，调用方不能删除它。",
+    "description": "返回借用的 sparkium Core 指针。"
+  },
+  "sparkium::Film::GetDepthImage": {
+    "contract": "具体使用由渲染路径决定。",
+    "description": "返回 D32F 深度图的借用指针。"
+  },
+  "sparkium::Film::GetExtent": {
+    "contract": "不反映外部窗口尺寸变化。",
+    "description": "按值返回固定像素 extent。"
+  },
+  "sparkium::Film::GetHeight": {
+    "contract": "创建后不改变。",
+    "description": "返回固定像素高度。"
+  },
+  "sparkium::Film::GetRawImage": {
+    "contract": "由管线写入，开发前不等于最终显示颜色。",
+    "description": "返回 RGBA32F 线性渲染图像的借用指针。"
+  },
+  "sparkium::Film::GetStencilImage": {
+    "contract": "是独立整数图，不是深度模板复合格式。",
+    "description": "返回 R32_SINT 模板/标记图的借用指针。"
+  },
+  "sparkium::Film::GetWidth": {
+    "contract": "创建后不改变。",
+    "description": "返回固定像素宽度。"
+  },
+  "sparkium::Film::Info": {
+    "contract": "默认值见声明；后四字段连续上传到 tone mapping，前四由各渲染路径使用。",
+    "description": "累积样本、persistence/clamping/max_exposure 与显示 view_transform/exposure/gamma/contrast 参数。"
+  },
+  "sparkium::Film::RegisterResetCallback": {
+    "contract": "无注销接口；回调捕获引用必须持续有效，遍历中修改列表不安全。",
+    "description": "复制回调并追加到 Reset 通知列表。"
+  },
+  "sparkium::Film::Reset": {
+    "contract": "本函数不直接重置 accumulated_samples，也不清 depth/stencil；无 WaitGPU。",
+    "description": "提交清 raw 为 (0,0,0,1) 的命令，然后按注册顺序调用回调。"
+  },
+  "sparkium::FindJsonScenes": {
+    "contract": "目录不存在返回空；权限、遍历等文件系统错误可抛出，不由 Load 的错误处理包裹。",
+    "description": "递归查找文件名精确等于 scene.json 的常规文件并排序。"
+  },
+  "sparkium::Geometry": {
+    "contract": "不直接拥有统一顶点缓冲，具体几何与管线适配层负责。",
+    "description": "持有借用 Core 与图元计数抽象接口的几何父类。"
+  },
+  "sparkium::Geometry::Geometry": {
+    "contract": "不验证设备或几何数据。",
+    "description": "保存 Core 指针。"
+  },
+  "sparkium::Geometry::GetCore": {
+    "contract": "不延长 Core 寿命，调用方不能删除它。",
+    "description": "返回借用的 sparkium Core 指针。"
+  },
+  "sparkium::Geometry::PrimitiveCount": {
+    "contract": "图元含义由子类定义，例如网格三角形或毛发段。",
+    "description": "返回具体几何可相交/绘制的图元数量的纯虚接口。"
+  },
+  "sparkium::Geometry::~Geometry": {
+    "contract": "Object 组件链随后被释放。",
+    "description": "默认虚析构。"
+  },
+  "sparkium::GeometryHair": {
+    "contract": "不是原生曲线几何；默认每截面 3 边。",
+    "description": "把曲线 strand 转为渐变半径多边形管的 GeometryMesh 子类。"
+  },
+  "sparkium::GeometryHair::GeometryHair": {
+    "contract": "points/radii 等长，每 strand 至少两个不同位置点，offset 覆盖全部点。",
+    "description": "调用 BuildHairMesh 构建管网格，再按普通网格上传。"
+  },
+  "sparkium::GeometryMesh": {
+    "contract": "借用 Core，拥有缓冲；输入网格后续改变不影响已上传数据。",
+    "description": "将 grassland::Mesh<float> 打包到单个静态 GPU 缓冲的几何实现。"
+  },
+  "sparkium::GeometryMesh::GeometryMesh": {
+    "contract": "输入须有效；GenerateTangents 返回码未检查，不检查索引越界。切线生成可能改变顶点数。",
+    "description": "必要时复制并生成切线，顺序打包各属性，更新 Header 后上传缓冲。"
+  },
+  "sparkium::GeometryMesh::GetBuffer": {
+    "contract": "使用偏移访问，不是单独的位置缓冲。",
+    "description": "返回包含 Header 和全部几何数据的借用缓冲指针。"
+  },
+  "sparkium::GeometryMesh::GetHeader": {
+    "contract": "依附 GeometryMesh；与 GPU 布局匹配。",
+    "description": "返回 CPU Header 的 const 引用。"
+  },
+  "sparkium::GeometryMesh::GetShadowTerminatorGeometryOffset": {
+    "contract": "默认 0.1。",
+    "description": "返回当前 CPU 头部的阴影终止截止参数。"
+  },
+  "sparkium::GeometryMesh::Header": {
+    "contract": "不存在的可选属性字段为零；索引固定 uint32，位置/法线/切线/颜色为 float3，UV 为 float2，手性 float。",
+    "description": "64 字节布局，记录数量、索引/属性字节偏移与步长，以及阴影终止偏移截止参数。"
+  },
+  "sparkium::GeometryMesh::PrimitiveCount": {
+    "contract": "尾部不完整三角形不会计入，但构造不拒绝该输入。",
+    "description": "返回最终索引数/3 的三角形数量。"
+  },
+  "sparkium::GeometryMesh::SetShadowTerminatorGeometryOffset": {
+    "contract": "无效抛 invalid_argument，相同值不上传；0 禁用偏移，应用需 Reset 已累积 Film。",
+    "description": "验证 cutoff 有限且在 [0,1]，修改头部并仅上传对应 float。"
+  },
+  "sparkium::JsonScene": {
+    "contract": "保持本对象和 Core 存活期间才可使用 Get* 返回的借用指针。",
+    "description": "拥有场景文件及其全部装配资源的聚合对象。"
+  },
+  "sparkium::JsonScene::GetCamera": {
+    "contract": "不得独立删除；JsonScene 销毁后失效。",
+    "description": "返回本对象拥有的相机的借用指针。"
+  },
+  "sparkium::JsonScene::GetFilm": {
+    "contract": "不得独立删除；JsonScene 销毁后失效。",
+    "description": "返回本对象拥有的成像与曝光设置对象的借用指针。"
+  },
+  "sparkium::JsonScene::GetName": {
+    "contract": "",
+    "description": "返回显式场景名或文件 stem 的常量引用。"
+  },
+  "sparkium::JsonScene::GetPath": {
+    "contract": "",
+    "description": "返回 absolute(input).lexically_normal() 后的文档路径引用。"
+  },
+  "sparkium::JsonScene::GetRenderPipeline": {
+    "contract": "AUTO 尚未解析为实际可用的硬件管线。",
+    "description": "返回文档请求的管线枚举。"
+  },
+  "sparkium::JsonScene::GetScene": {
+    "contract": "不得独立删除；JsonScene 销毁后失效。",
+    "description": "返回本对象拥有的实体已注册的 Scene的借用指针。"
+  },
+  "sparkium::JsonScene::Load": {
+    "contract": "失败返回 nullptr 并按需写入 exception.what()；成功不清除 error。所有 GPU 创建依赖调用方提供的有效 Core。",
+    "description": "读取 JSON、校验字段、加载资源并构建可渲染场景。"
+  },
+  "sparkium::Material": {
+    "contract": "仅保存 Core，不能据基类直接推断 BSDF。",
+    "description": "各类材质参数与管线组件的公共父类。"
+  },
+  "sparkium::Material::GetCore": {
+    "contract": "不延长 Core 寿命，调用方不能删除它。",
+    "description": "返回借用的 sparkium Core 指针。"
+  },
+  "sparkium::Material::Material": {
+    "contract": "不创建纹理或 shader。",
+    "description": "保存借用 Core。"
+  },
+  "sparkium::Material::~Material": {
+    "contract": "派生材质与组件拥有的资源依其成员释放。",
+    "description": "默认虚析构。"
+  },
+  "sparkium::MaterialLambertian": {
+    "contract": "数值按线性颜色使用时应由调用者完成色彩空间转换。",
+    "description": "保存漫反射基础色与自发光 RGB 的材质前端。"
+  },
+  "sparkium::MaterialLambertian::MaterialLambertian": {
+    "contract": "默认 0.8 灰、零发光；不验证分量范围。",
+    "description": "复制 base_color/emission 并保存 Core。"
+  },
+  "sparkium::MaterialLight": {
+    "contract": "布尔值以 int 存储以便与 GPU 记录对应，应用负责几何的关联。",
+    "description": "保存 emission、双面、遮挡、相机可见与衰减距离的发光材质。"
+  },
+  "sparkium::MaterialLight::MaterialLight": {
+    "contract": "无输入验证；构造不自动注册场景灯光或创建发光几何。",
+    "description": "复制发光参数，将三个布尔标志转为 int。"
+  },
+  "sparkium::MaterialPrincipled": {
+    "contract": "各层的实际支持与采样方式见管线/BSDF；参数变更不自动清累积。",
+    "description": "分离数值 Info、纹理 TextureInfo 的多层材质前端，公开引用字段别名映射到 info。"
+  },
+  "sparkium::MaterialPrincipled::Info": {
+    "contract": "字段顺序用于管线打包；没有自动范围钳制，不能通过 struct 名称假定与外部渲染器完全等价。",
+    "description": "BSDF 参数块：基础/次表面颜色和半径、权重、金属/镜面/粗糙度、各向异性、sheen/coat、IOR/透射、发光色与强度。"
+  },
+  "sparkium::MaterialPrincipled::MaterialPrincipled": {
+    "contract": "默认 metallic/transmission/subsurface/emission_strength 为 0，roughness=0.5，ior=1.45。",
+    "description": "保存 Core，以传入 base_color 初始化 Info，其余字段保留声明默认值。"
+  },
+  "sparkium::MaterialPrincipled::TextureInfo": {
+    "contract": "nullptr 由管线选择默认值；normal_reverse_y 仅是标志，不在这里修改纹理内容。",
+    "description": "法线、基础色、金属、镜面、粗糙度、各向异性/旋转和发光的可选借用图像。"
+  },
+  "sparkium::MaterialShaderGraph": {
+    "contract": "纹理不归材质所有；graph_code 需符合节点材质适配器预期入口和类型。",
+    "description": "保存生成式 Slang 片段、纹理列表和 emission_hint 的材质。"
+  },
+  "sparkium::MaterialShaderGraph::MaterialShaderGraph": {
+    "contract": "不在构造时编译或验证生成代码，失败可能延后到管线创建。",
+    "description": "复制源码片段、图像指针列表与发光估计。"
+  },
+  "sparkium::MaterialSpecular": {
+    "contract": "具体 delta BSDF 行为由对应管线实现。",
+    "description": "保存镜面反射 tint 的材质前端。"
+  },
+  "sparkium::MaterialSpecular::MaterialSpecular": {
+    "contract": "默认 0.8 灰，不创建纹理。",
+    "description": "复制基础色并保存 Core。"
+  },
+  "sparkium::Object": {
+    "contract": "next 公开并独占后续对象，外部替换会释放整条后链。",
+    "description": "多态对象与 unique_ptr 单链组件的公共父类。"
+  },
+  "sparkium::Object::AddComponent": {
+    "contract": "不检查是否已有同类型，调用者需要去重时先 GetComponent。",
+    "description": "完美转发构造 T 并追加链尾，返回其借用指针。"
+  },
+  "sparkium::Object::FindTail": {
+    "contract": "私有辅助，链长决定递归深度。",
+    "description": "递归找到最后一个空 unique_ptr 槽并返回可变引用。"
+  },
+  "sparkium::Object::GetComponent": {
+    "contract": "找不到返回 nullptr；不延长对象寿命。",
+    "description": "先 dynamic_cast 当前对象，再递归 next，返回首个匹配 T 的借用指针。"
+  },
+  "sparkium::Object::~Object": {
+    "contract": "组件可能持有指向宿主的借用引用，需注意派生析构与 GPU 在途使用。",
+    "description": "默认虚析构，随后递归释放 next 组件链。"
+  },
+  "sparkium::RenderPipeline": {
+    "contract": "AUTO 需 ResolveRenderPipeline 得到实际路径；显式值不是设备支持保证。",
+    "description": "光栅、完整光追、自动、计算 BVH 回退、原生 ray query 五种请求。"
+  },
+  "sparkium::Scene": {
+    "contract": "不销毁实体，删除前必须显式取消注册。",
+    "description": "非拥有实体注册表、稳定顺序与渲染设置。"
+  },
+  "sparkium::Scene::AddEntity": {
+    "contract": "不延长寿命，不检查 nullptr/同 Core。",
+    "description": "首次注册实体指针并追加稳定顺序；重复指针不重复加入。"
+  },
+  "sparkium::Scene::DeleteEntity": {
+    "contract": "不销毁实体；不存在时无操作。",
+    "description": "从 map 与稳定顺序 vector 移除实体指针。"
+  },
+  "sparkium::Scene::EntityStatus": {
+    "contract": "状态独立于 Entity::operator bool。",
+    "description": "注册实体 active 标志，默认 true。"
+  },
+  "sparkium::Scene::GetCore": {
+    "contract": "不延长 Core 寿命，调用方不能删除它。",
+    "description": "返回借用的 sparkium Core 指针。"
+  },
+  "sparkium::Scene::GetEntities": {
+    "contract": "引用依附 Scene，不应以指针排序作为跨进程稳定实例顺序。",
+    "description": "返回包含活动状态的 const map 引用。"
+  },
+  "sparkium::Scene::GetEntityOrder": {
+    "contract": "用于稳定实例 ID/灯光抽样，新增删除可能使引用元素迭代器失效。",
+    "description": "返回首次注册顺序的 const vector 引用。"
+  },
+  "sparkium::Scene::Scene": {
+    "contract": "默认 Settings 来自字段初值。",
+    "description": "保存借用 Core 并创建空注册表。"
+  },
+  "sparkium::Scene::SetEntityActive": {
+    "contract": "未注册指针经 map.at 抛 out_of_range。",
+    "description": "修改已注册实体的 active 字段。"
+  },
+  "sparkium::Scene::Settings": {
+    "contract": "默认复制会复制引用绑定，不能把副本当作所有别名都指向自身的独立值对象。",
+    "description": "光追/光栅设置及兼容性的引用别名。"
+  },
+  "sparkium::Scene::Settings::Rasterization": {
+    "contract": "不等于光追环境贴图。",
+    "description": "光栅环境 RGB 强度，默认每通道 0.1。"
+  },
+  "sparkium::Scene::Settings::RayTracing": {
+    "contract": "默认 128 样本/32 反弹/不透明阴影/黑背景，范围验证由使用路径决定。",
+    "description": "每 dispatch 样本、最大反弹、alpha_shadow、填充和背景 RGB。"
+  },
+  "sparkium::operator<<": {
+    "contract": "用于诊断，不是原始 shader 源码序列化。",
+    "description": "将 CodeLines 按 1 起始、宽度 4 的行号写出，返回 ostream。"
+  },
+  "sparkium::raster::(anonymous)::TextureInfo": {
+    "contract": "紧跟前端 Info 数据，顺序必须与 shader 的 Load 偏移相同。",
+    "description": "Principled 光栅纹理布局：Y 方向符号和六个纹理启用 int。"
+  },
+  "sparkium::raster::Camera": {
+    "contract": "继承 Object；借用前端/Core，专用 GPU 资源由组件拥有。",
+    "description": "双视锥 GPU 相机组件。"
+  },
+  "sparkium::raster::Camera::Camera": {
+    "contract": "输入前端与 Core 必须存活；资源创建结果按实现直接使用，未形成独立错误返回协议。",
+    "description": "构造Camera组件并建立本文件声明的 GPU 资源/前端引用。"
+  },
+  "sparkium::raster::Camera::FarFieldBuffer": {
+    "contract": "",
+    "description": "返回远场 [100,10000] CameraData 缓冲的借用指针。"
+  },
+  "sparkium::raster::Camera::NearFieldBuffer": {
+    "contract": "",
+    "description": "返回近场 [0.1,100] CameraData 缓冲的借用指针。"
+  },
+  "sparkium::raster::Camera::Update": {
+    "contract": "fovy 为弧度，aspect>0，view 可逆；不检查参数退化。",
+    "description": "重算并上传近场与远场透视矩阵及逆矩阵。"
+  },
+  "sparkium::raster::CameraData": {
+    "contract": "字段顺序须与 raster_common.slang 相机常量协议一致。",
+    "description": "六个 mat4 的 GPU 常量布局：view/proj/view_proj 与各自逆矩阵。"
+  },
+  "sparkium::raster::Core": {
+    "contract": "继承 Object；借用前端/Core，专用 GPU 资源由组件拥有。",
+    "description": "前端 Core 的借用转发组件。"
+  },
+  "sparkium::raster::Core::Core": {
+    "contract": "输入前端与 Core 必须存活；资源创建结果按实现直接使用，未形成独立错误返回协议。",
+    "description": "构造Core组件并建立本文件声明的 GPU 资源/前端引用。"
+  },
+  "sparkium::raster::Core::GetBuffer": {
+    "contract": "返回值由前端持有；命名 GPU 资源查询可能在缺失时插入空槽。",
+    "description": "向借用的前端 Core 转发 GetBuffer 查询。"
+  },
+  "sparkium::raster::Core::GetComputeProgram": {
+    "contract": "返回值由前端持有；命名 GPU 资源查询可能在缺失时插入空槽。",
+    "description": "向借用的前端 Core 转发 GetComputeProgram 查询。"
+  },
+  "sparkium::raster::Core::GetImage": {
+    "contract": "返回值由前端持有；命名 GPU 资源查询可能在缺失时插入空槽。",
+    "description": "向借用的前端 Core 转发 GetImage 查询。"
+  },
+  "sparkium::raster::Core::GetShader": {
+    "contract": "返回值由前端持有；命名 GPU 资源查询可能在缺失时插入空槽。",
+    "description": "向借用的前端 Core 转发 GetShader 查询。"
+  },
+  "sparkium::raster::Core::GetShadersVFS": {
+    "contract": "返回值由前端持有；命名 GPU 资源查询可能在缺失时插入空槽。",
+    "description": "向借用的前端 Core 转发 GetShadersVFS 查询。"
+  },
+  "sparkium::raster::Core::GraphicsCore": {
+    "contract": "返回值由前端持有；命名 GPU 资源查询可能在缺失时插入空槽。",
+    "description": "向借用的前端 Core 转发 GraphicsCore 查询。"
+  },
+  "sparkium::raster::DedicatedCast": {
+    "contract": "Core/Scene/Camera/Film 直接走 COMPONENT_CAST；Entity/Geometry/Material 按已支持派生类型分派，未知类型返回 nullptr。不转移前端所有权。",
+    "description": "获取或按需附加与输入前端类型相应的 Raster 组件。"
+  },
+  "sparkium::raster::Entity": {
+    "contract": "继承 Object；借用前端/Core，专用 GPU 资源由组件拥有。",
+    "description": "逐帧回调注册的抽象实体。"
+  },
+  "sparkium::raster::Entity::Entity": {
+    "contract": "输入前端与 Core 必须存活；资源创建结果按实现直接使用，未形成独立错误返回协议。",
+    "description": "构造Entity组件并建立本文件声明的 GPU 资源/前端引用。"
+  },
+  "sparkium::raster::Entity::Update": {
+    "contract": "Scene 在每次渲染开始清空旧回调；只对 active 实体调用。",
+    "description": "由具体实体同步资源并向 Scene 注册当帧回调。"
+  },
+  "sparkium::raster::Entity::operator bool": {
+    "contract": "不检查所有 GPU 创建或材质转换是否成功。",
+    "description": "检查 core_ 是否非空。"
+  },
+  "sparkium::raster::Entity::~Entity": {
+    "contract": "",
+    "description": "虚析构接口，允许经基类释放派生组件。"
+  },
+  "sparkium::raster::EntityGeometryMaterial": {
+    "contract": "继承 Object；借用前端/Core，专用 GPU 资源由组件拥有。",
+    "description": "组合网格、材质及近似发光的实体组件。"
+  },
+  "sparkium::raster::EntityGeometryMaterial::EntityGeometryMaterial": {
+    "contract": "输入前端与 Core 必须存活；资源创建结果按实现直接使用，未形成独立错误返回协议。",
+    "description": "构造EntityGeometryMaterial组件并建立本文件声明的 GPU 资源/前端引用。"
+  },
+  "sparkium::raster::EntityGeometryMaterial::InstanceData": {
+    "contract": "Update 从前端 mat4x3 补齐仿射最后行，要求可逆。",
+    "description": "模型、逆模型、逆转置法线矩阵的三个 mat4 布局。"
+  },
+  "sparkium::raster::EntityGeometryMaterial::PointLightData": {
+    "contract": "没有半径和采样权重字段，须与 point/lighting.slang 读取偏移匹配。",
+    "description": "连续 emission RGB 与 position XYZ 的点光存储缓冲布局。"
+  },
+  "sparkium::raster::EntityGeometryMaterial::Update": {
+    "contract": "每帧发光估算会下载网格数据；geometry_/material_ 是构造时缓存的组件。",
+    "description": "上传模型及法线矩阵、同步材质并注册几何绘制；必要时注册面积中心点光。"
+  },
+  "sparkium::raster::EntityPointLight": {
+    "contract": "继承 Object；借用前端/Core，专用 GPU 资源由组件拥有。",
+    "description": "点光全屏照明组件。"
+  },
+  "sparkium::raster::EntityPointLight::EntityPointLight": {
+    "contract": "输入前端与 Core 必须存活；资源创建结果按实现直接使用，未形成独立错误返回协议。",
+    "description": "构造EntityPointLight组件并建立本文件声明的 GPU 资源/前端引用。"
+  },
+  "sparkium::raster::EntityPointLight::PointLightData": {
+    "contract": "没有半径和采样权重字段，须与 point/lighting.slang 读取偏移匹配。",
+    "description": "连续 emission RGB 与 position XYZ 的点光存储缓冲布局。"
+  },
+  "sparkium::raster::EntityPointLight::Update": {
+    "contract": "不根据零强度跳过回调，也不使用半径和 soft_falloff。",
+    "description": "上传 color*strength 和 position 并注册全屏点光叠加。"
+  },
+  "sparkium::raster::Film": {
+    "contract": "继承 Object；借用前端/Core，专用 GPU 资源由组件拥有。",
+    "description": "拥有三张 G-buffer 的 Film 组件。"
+  },
+  "sparkium::raster::Film::Film": {
+    "contract": "输入前端与 Core 必须存活；资源创建结果按实现直接使用，未形成独立错误返回协议。",
+    "description": "构造Film组件并建立本文件声明的 GPU 资源/前端引用。"
+  },
+  "sparkium::raster::Film::GetAlbedoRoughnessBuffer": {
+    "contract": "分辨率固定为组件创建时的前端 Film 尺寸。",
+    "description": "返回 AlbedoRoughness RGBA32F 图像的借用指针。"
+  },
+  "sparkium::raster::Film::GetNormalMetallicBuffer": {
+    "contract": "分辨率固定为组件创建时的前端 Film 尺寸。",
+    "description": "返回 NormalMetallic RGBA32F 图像的借用指针。"
+  },
+  "sparkium::raster::Film::GetPositionSpecularBuffer": {
+    "contract": "分辨率固定为组件创建时的前端 Film 尺寸。",
+    "description": "返回 PositionSpecular RGBA32F 图像的借用指针。"
+  },
+  "sparkium::raster::Geometry": {
+    "contract": "继承 Object；借用前端/Core，专用 GPU 资源由组件拥有。",
+    "description": "几何 shader、顶点布局与绘制协议。"
+  },
+  "sparkium::raster::Geometry::CentricArea": {
+    "contract": "",
+    "description": "返回给定仿射变换后面积加权中心 xyz 与总面积 w。"
+  },
+  "sparkium::raster::Geometry::DispatchDrawCalls": {
+    "contract": "",
+    "description": "绑定几何缓冲并发出绘制命令；基类为空实现。"
+  },
+  "sparkium::raster::Geometry::Geometry": {
+    "contract": "输入前端与 Core 必须存活；资源创建结果按实现直接使用，未形成独立错误返回协议。",
+    "description": "构造Geometry组件并建立本文件声明的 GPU 资源/前端引用。"
+  },
+  "sparkium::raster::Geometry::SetupProgram": {
+    "contract": "",
+    "description": "扩展程序的顶点输入布局；基类为空实现。"
+  },
+  "sparkium::raster::Geometry::VertexShader": {
+    "contract": "",
+    "description": "返回派生几何的顶点着色器。"
+  },
+  "sparkium::raster::Geometry::~Geometry": {
+    "contract": "",
+    "description": "虚析构接口，允许经基类释放派生组件。"
+  },
+  "sparkium::raster::GeometryMesh": {
+    "contract": "继承 Object；借用前端/Core，专用 GPU 资源由组件拥有。",
+    "description": "前端打包网格的光栅适配。"
+  },
+  "sparkium::raster::GeometryMesh::CentricArea": {
+    "contract": "返回 vec4(center,total_area)；零总面积导致除零，非廉价查询。",
+    "description": "下载网格位置/索引，变换后计算三角面积及面积加权中心。"
+  },
+  "sparkium::raster::GeometryMesh::DispatchDrawCalls": {
+    "contract": "调用方已绑定相容程序并开启渲染。",
+    "description": "按 Header 偏移绑定同一 Buffer 的多段流与索引，绘制 PrimitiveCount()*3 索引。"
+  },
+  "sparkium::raster::GeometryMesh::GeometryMesh": {
+    "contract": "输入前端与 Core 必须存活；资源创建结果按实现直接使用，未形成独立错误返回协议。",
+    "description": "构造GeometryMesh组件并建立本文件声明的 GPU 资源/前端引用。"
+  },
+  "sparkium::raster::GeometryMesh::SetupProgram": {
+    "contract": "程序须尚未 Finalize；与 Header 和 shader defines 保持一致。",
+    "description": "按位置、可选法线、UV、切线和符号添加顶点流与属性。"
+  },
+  "sparkium::raster::GeometryMesh::VertexShader": {
+    "contract": "借用，不转移所有权。",
+    "description": "返回构造时按 HAS_NORMAL/HAS_TEXCOORD/HAS_TANGENT 编译的顶点 shader。"
+  },
+  "sparkium::raster::Material": {
+    "contract": "继承 Object；借用前端/Core，专用 GPU 资源由组件拥有。",
+    "description": "材质 shader、同步与绑定协议。"
+  },
+  "sparkium::raster::Material::BindMaterialResources": {
+    "contract": "",
+    "description": "绑定材质资源；基类为空实现。"
+  },
+  "sparkium::raster::Material::Emission": {
+    "contract": "",
+    "description": "返回发光近似值；基类为 vec3(0)。"
+  },
+  "sparkium::raster::Material::Material": {
+    "contract": "输入前端与 Core 必须存活；资源创建结果按实现直接使用，未形成独立错误返回协议。",
+    "description": "构造Material组件并建立本文件声明的 GPU 资源/前端引用。"
+  },
+  "sparkium::raster::Material::PixelShader": {
+    "contract": "",
+    "description": "返回派生材质像素着色器。"
+  },
+  "sparkium::raster::Material::SetupProgram": {
+    "contract": "",
+    "description": "扩展材质资源布局；基类为空实现。"
+  },
+  "sparkium::raster::Material::Sync": {
+    "contract": "",
+    "description": "同步前端参数到 GPU 缓冲。"
+  },
+  "sparkium::raster::Material::~Material": {
+    "contract": "",
+    "description": "虚析构接口，允许经基类释放派生组件。"
+  },
+  "sparkium::raster::MaterialLambertian": {
+    "contract": "继承 Object；借用前端/Core，专用 GPU 资源由组件拥有。",
+    "description": "漫反射与发光常量的光栅适配。"
+  },
+  "sparkium::raster::MaterialLambertian::BindMaterialResources": {
+    "contract": "调用方应已绑定采用同一资源布局的程序。",
+    "description": "绑定材质存储缓冲到 graphics 槽 2。"
+  },
+  "sparkium::raster::MaterialLambertian::Emission": {
+    "contract": "不对发光纹理积分。",
+    "description": "返回前端 emission作为发光几何的点光估算。"
+  },
+  "sparkium::raster::MaterialLambertian::MaterialLambertian": {
+    "contract": "输入前端与 Core 必须存活；资源创建结果按实现直接使用，未形成独立错误返回协议。",
+    "description": "构造MaterialLambertian组件并建立本文件声明的 GPU 资源/前端引用。"
+  },
+  "sparkium::raster::MaterialLambertian::PixelShader": {
+    "contract": "",
+    "description": "返回对应固定材质 G-buffer 像素 shader 的借用指针。"
+  },
+  "sparkium::raster::MaterialLambertian::Sync": {
+    "contract": "不会自动重建程序；由实体 Update 每帧调用。",
+    "description": "从前端上传 六个 float：base_color 和 emission。"
+  },
+  "sparkium::raster::MaterialLight": {
+    "contract": "继承 Object；借用前端/Core，专用 GPU 资源由组件拥有。",
+    "description": "发光常量的光栅适配。"
+  },
+  "sparkium::raster::MaterialLight::BindMaterialResources": {
+    "contract": "调用方应已绑定采用同一资源布局的程序。",
+    "description": "绑定材质存储缓冲到 graphics 槽 2。"
+  },
+  "sparkium::raster::MaterialLight::Emission": {
+    "contract": "不对发光纹理积分。",
+    "description": "返回前端 emission作为发光几何的点光估算。"
+  },
+  "sparkium::raster::MaterialLight::MaterialLight": {
+    "contract": "输入前端与 Core 必须存活；资源创建结果按实现直接使用，未形成独立错误返回协议。",
+    "description": "构造MaterialLight组件并建立本文件声明的 GPU 资源/前端引用。"
+  },
+  "sparkium::raster::MaterialLight::PixelShader": {
+    "contract": "",
+    "description": "返回对应固定材质 G-buffer 像素 shader 的借用指针。"
+  },
+  "sparkium::raster::MaterialLight::Sync": {
+    "contract": "不会自动重建程序；由实体 Update 每帧调用。",
+    "description": "从前端上传 emission RGB。"
+  },
+  "sparkium::raster::MaterialPrincipled": {
+    "contract": "继承 Object；借用前端/Core，专用 GPU 资源由组件拥有。",
+    "description": "Principled 参数及六类纹理的光栅适配。"
+  },
+  "sparkium::raster::MaterialPrincipled::BindMaterialResources": {
+    "contract": "调用方应已绑定采用同一资源布局的程序。",
+    "description": "绑定材质存储缓冲到 graphics 槽 2。同时在槽 3 绑定六图、槽 4 绑定采样器，缺失图使用 Core 默认图。"
+  },
+  "sparkium::raster::MaterialPrincipled::Emission": {
+    "contract": "不对发光纹理积分。",
+    "description": "返回前端 emission_color*emission_strength作为发光几何的点光估算。"
+  },
+  "sparkium::raster::MaterialPrincipled::MaterialPrincipled": {
+    "contract": "输入前端与 Core 必须存活；资源创建结果按实现直接使用，未形成独立错误返回协议。",
+    "description": "构造MaterialPrincipled组件并建立本文件声明的 GPU 资源/前端引用。"
+  },
+  "sparkium::raster::MaterialPrincipled::PixelShader": {
+    "contract": "",
+    "description": "返回对应固定材质 G-buffer 像素 shader 的借用指针。"
+  },
+  "sparkium::raster::MaterialPrincipled::SetupProgram": {
+    "contract": "必须在 Finalize 前调用；纹理顺序参见文件说明。",
+    "description": "在已存在的相机/实例/材质三个槽之后追加六图及一个 sampler 槽。"
+  },
+  "sparkium::raster::MaterialPrincipled::Sync": {
+    "contract": "不会自动重建程序；由实体 Update 每帧调用。",
+    "description": "从前端上传 完整 Info 后接 TextureInfo。"
+  },
+  "sparkium::raster::MaterialSpecular": {
+    "contract": "继承 Object；借用前端/Core，专用 GPU 资源由组件拥有。",
+    "description": "镜面材质参数的 G-buffer 适配。"
+  },
+  "sparkium::raster::MaterialSpecular::BindMaterialResources": {
+    "contract": "调用方应已绑定采用同一资源布局的程序。",
+    "description": "绑定材质存储缓冲到 graphics 槽 2。"
+  },
+  "sparkium::raster::MaterialSpecular::MaterialSpecular": {
+    "contract": "输入前端与 Core 必须存活；资源创建结果按实现直接使用，未形成独立错误返回协议。",
+    "description": "构造MaterialSpecular组件并建立本文件声明的 GPU 资源/前端引用。"
+  },
+  "sparkium::raster::MaterialSpecular::PixelShader": {
+    "contract": "",
+    "description": "返回对应固定材质 G-buffer 像素 shader 的借用指针。"
+  },
+  "sparkium::raster::MaterialSpecular::Sync": {
+    "contract": "不会自动重建程序；由实体 Update 每帧调用。",
+    "description": "从前端上传 base_color RGB。"
+  },
+  "sparkium::raster::Render": {
+    "contract": "输入须来自相容 Core；函数不另行处理空转换结果。",
+    "description": "将四个前端对象转换为 Raster 组件并调用 Scene::Render。"
+  },
+  "sparkium::raster::Scene": {
+    "contract": "继承 Object；借用前端/Core，专用 GPU 资源由组件拥有。",
+    "description": "双区间延迟渲染调度组件。"
+  },
+  "sparkium::raster::Scene::EntityStatus": {
+    "contract": "",
+    "description": "实体追踪标记：active 决定本帧更新，keep 决定是否仍在前端场景内。"
+  },
+  "sparkium::raster::Scene::RegisterLightingCallback": {
+    "contract": "在 raw image 渲染 pass 内执行，通常采用加法混合。",
+    "description": "追加光照回调，参数含 Camera/Film。"
+  },
+  "sparkium::raster::Scene::RegisterRenderCallback": {
+    "contract": "一帧被远场/近场分别调用，必须遵守已开启 G-buffer pass 的约定。",
+    "description": "追加几何绘制回调，参数为命令上下文及本轮相机缓冲。"
+  },
+  "sparkium::raster::Scene::RegisterShadowMapCallback": {
+    "contract": "当前 Render 不执行该列表，下一帧还会清空。",
+    "description": "追加阴影回调。"
+  },
+  "sparkium::raster::Scene::Render": {
+    "contract": "最终 WaitGPU；背景用 ambient_light，阴影回调未执行，近场覆盖前清深度。",
+    "description": "重建实体回调，重置 Film，绘制远/近场并叠加环境和点光照明。"
+  },
+  "sparkium::raster::Scene::Scene": {
+    "contract": "输入前端与 Core 必须存活；资源创建结果按实现直接使用，未形成独立错误返回协议。",
+    "description": "构造Scene组件并建立本文件声明的 GPU 资源/前端引用。"
+  },
+  "sparkium::raster::Scene::Settings": {
+    "contract": "settings 为常量借用引用，实际值由前端控制。",
+    "description": "前端 sparkium::Scene::Settings 的别名。"
   }
 }

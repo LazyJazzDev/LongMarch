@@ -386,5 +386,174 @@
     ],
     "summary": "公共 Core/Scene/Camera/Film/Geometry/Material/Entity 描述场景；raster 和 raytracing 子系统缓存各自的管线表示，Slang 着色器执行采样与着色。",
     "title": "Sparkium · 多管线渲染"
+  },
+  "code/sparkium/camera": {
+    "contracts": [
+      "fovy 按 GLM/着色器约定使用弧度，aspect 为宽高比。",
+      "相机参数为公开值，构造不验证；修改后是否需要重置累积由应用负责。",
+      "薄透镜参数不意味着每条光栅管线都实现相同景深效果，应对照对应适配层。"
+    ],
+    "flow": [
+      "Camera 保存 view、fovy、aspect；CameraPinhole 仅标记针孔模型。",
+      "CameraThinLens 追加孔径半径、焦距、叶片数、旋转与宽高比，供路径追踪采样。"
+    ],
+    "summary": "针孔和薄透镜相机的前端参数类型；真正投影/射线生成由各渲染管线的适配组件和 shader 负责。",
+    "title": "相机描述"
+  },
+  "code/sparkium/core": {
+    "contracts": [
+      "Core 借用 graphics Core，其余对象借用 sparkium Core；所有资源必须保持调用与在途 GPU 操作所需寿命。",
+      "Scene 不拥有 Entity，EntityGeometryMaterial 不拥有 Geometry/Material；销毁前需从 Scene 删除并处理在途渲染。",
+      "Object.next 独占后续组件，GetComponent 动态查找，AddComponent 追加；不是并发安全 ECS，也不自动去重。",
+      "自动管线优先级受后端能力决定；显式不支持的 ray_query 会抛异常，旧 RT 请求可回退。",
+      "场景或相机更改后的累积重置需应用按用途调用 Film::Reset，不能假定所有公开字段修改都会自动使缓存失效。"
+    ],
+    "flow": [
+      "应用创建渲染对象并在 Scene 注册非拥有 Entity 指针；稳定注册顺序用于实例编号和灯光采样。",
+      "Core 解析自动管线，选择光栅、完整 RT、原生 ray query 或计算 BVH 路径。",
+      "具体管线从 Object 获取/创建适配组件；Film 持有线性颜色、深度、模板图像并通过 Develop 色调映射输出。"
+    ],
+    "summary": "定义渲染器共用的 Core、Scene、Film、Camera、Geometry、Material、Entity，并通过 Object 组件链惰性附加各管线适配对象。",
+    "title": "渲染对象与管线入口"
+  },
+  "code/sparkium/entity": {
+    "contracts": [
+      "实体不会自动注册 Scene；Geometry/Material/Core 生命周期必须覆盖实体渲染。",
+      "参数存储与渲染解释分离，本目录的 setter 只修改 CPU 值，不直接上传 GPU 或重置 Film。"
+    ],
+    "flow": [
+      "EntityGeometryMaterial 借用几何/材质，保存 3×4 仿射模型矩阵。",
+      "EntityPointLight 保存位置、RGB、强度、半径、衰减开关与采样权重。",
+      "应用显式把实体加入 Scene，管线根据动态类型选择适配器。"
+    ],
+    "summary": "提供几何+材质实例与点光源两种场景实体，继承 Object 以便惰性挂载管线组件。",
+    "title": "场景实体描述"
+  },
+  "code/sparkium/geometry": {
+    "contracts": [
+      "Header 所有 offset/stride 均以字节计；可选属性 offset=0 表示不存在。",
+      "PrimitiveCount 是三角形数；GeometryHair 当前不使用原生曲线图元或解析圆柱求交。",
+      "几何数据构造后没有整体更新接口，仅允许更新阴影终止几何偏移参数；更改该参数后应用应重置累积 Film。"
+    ],
+    "flow": [
+      "GeometryMesh 在 64 字节 Header 后顺序打包索引、位置及可选法线/UV/切线/手性/颜色。",
+      "有法线与 UV 但缺切线时复制网格生成切线；最终头部记录可能改变后的顶点数。",
+      "GeometryHair 按各 strand 的点与半径生成截面环和连接三角形，再调用 GeometryMesh。"
+    ],
+    "summary": "以统一二进制网格缓冲供光栅与路径追踪共享；毛发曲线在导入后转为多边形管，再复用网格管线。",
+    "title": "网格与毛发几何"
+  },
+  "code/sparkium/material": {
+    "contracts": [
+      "纹理都是 graphics::Image 裸指针，材质不持有其所有权；拥有者必须覆盖全部渲染使用。",
+      "构造与字段赋值不验证物理参数范围，不直接上传 GPU、不自动 Reset Film。",
+      "公开参数不代表所有渲染路径支持一致效果，须结合管线适配器和 shader 对照。"
+    ],
+    "flow": [
+      "Material 子类保存 CPU 参数，Object 链按所选管线创建实现组件。",
+      "Principled 将数值 Info 和借用纹理 TextureInfo 分开，公开引用字段提供兼容访问。",
+      "ShaderGraph 保存 CodeLines 与纹理指针序列，Scene 更新时分配 GPU 纹理索引。"
+    ],
+    "summary": "提供 Lambertian、镜面、发光、Principled 与生成式 shader graph 前端；具体求值由 raster/raytracing 材质适配器和 BSDF shader 完成。",
+    "title": "材质参数与节点图描述"
+  },
+  "code/sparkium/pipelines": {
+    "contracts": [
+      "组件借用前端对象；前端与 graphics::Core 必须活过渲染工作。",
+      "Raster 支持固定 G-buffer 材质子集；Raytracing 通过动态生成着色器组合材料与几何。",
+      "新类型需同时实现转换分派、数据布局和对应着色器，不是仅添加一个前端类。"
+    ],
+    "flow": [
+      "Core 解析请求的 RenderPipeline。",
+      "DedicatedCast 查询或创建对象专用组件。",
+      "专用 Scene 收集实体、同步资源、录制命令并更新 Film。"
+    ],
+    "summary": "在统一 Sparkium 前端对象的 Object 组件链上附加光栅或光追实现；前端场景和资源描述可复用，后端渲染算法并不具有完全相同的材质能力。",
+    "title": "渲染管线组件"
+  },
+  "code/sparkium/pipelines/raster": {
+    "contracts": [
+      "每次 Render 调用 Film::Reset，不做路径追踪式跨帧累计。",
+      "阴影回调目前没有调用点；不宣称具备阴影贴图。",
+      "raster_light 发光网格被近似成面积加权中心的点光源，材质图尚无 Raster DedicatedCast。"
+    ],
+    "flow": [
+      "同步实体与相机。",
+      "先绘制 100–10000 远场，清深度，再绘制 0.1–100 近场。",
+      "向 raw image 叠加环境与实体光照，提交并 WaitGPU。"
+    ],
+    "summary": "把可见几何写入三张 RGBA32F G-buffer 与前端 Film，再执行环境及点光源全屏叠加。",
+    "title": "光栅延迟渲染"
+  },
+  "code/sparkium/pipelines/raster/core": {
+    "contracts": [
+      "Geometry 提供 VS、顶点布局与 Draw；Material 提供 PS、数据同步与资源绑定。",
+      "几何程序槽 0 为相机、1 为实例、2 为材质；Principled 再用 3/4 绑定贴图/采样器。",
+      "回调捕获组件 this，依赖所属前端资源存活；Render 结束等待 GPU。"
+    ],
+    "flow": [
+      "DedicatedCast 附加组件。",
+      "Entity::Update 注册当帧渲染和照明回调。",
+      "Scene 按前端插入顺序同步并执行。"
+    ],
+    "summary": "Core 转发共享资源，Camera 维护双视锥常量，Film 持有 G-buffer，Scene 通过逐帧回调组织几何与照明。",
+    "title": "光栅核心协议"
+  },
+  "code/sparkium/pipelines/raster/entity": {
+    "contracts": [
+      "构造后不会重新选择几何/材质程序。",
+      "实例变换必须可逆，否则 normal_matrix 无有效结果。",
+      "点光源光栅数据只有 emission 和 position；半径、soft_falloff、sampling_weight 不进入这个布局。"
+    ],
+    "flow": [
+      "构造时固化 Geometry/Material 专用组件及程序。",
+      "Update 上传变换和材质并注册绘制。",
+      "启用 raster_light 的正发光几何附加近似点光。"
+    ],
+    "summary": "几何材质实体组装 G-buffer 程序；点光源实体注册全屏加法照明。",
+    "title": "光栅实体"
+  },
+  "code/sparkium/pipelines/raster/geometry": {
+    "contracts": [
+      "Header 与构造时 shader defines 必须保持一致。",
+      "CentricArea 每次从 GPU 下载完整位置和索引，在给定世界仿射变换后计算面积及中心；不是缓存查询。",
+      "零总面积时中心除零；调用方需提供有效非退化三角网格。"
+    ],
+    "flow": [
+      "由可选法线/UV/切线偏移生成 shader defines。",
+      "SetupProgram 建立对应输入布局。",
+      "DispatchDrawCalls 按同一 Header 顺序绑定并索引绘制。"
+    ],
+    "summary": "将 GeometryMesh 共用的大缓冲按 Header 偏移绑定成独立顶点流和 uint32 索引流。",
+    "title": "光栅网格适配"
+  },
+  "code/sparkium/pipelines/raster/material": {
+    "contracts": [
+      "Principled 光栅支持 base_color/roughness/specular/metallic/normal/emission 六类图；前端 anisotropic 图不在本适配器绑定。",
+      "无贴图时绑定 Core 的 white/black/normal_default 并用显式标志控制采样。",
+      "几何发光估算使用 Emission 常量，不积分纹理发光。"
+    ],
+    "flow": [
+      "构造 PS 和专用材质缓冲。",
+      "每帧 Sync 上传参数。",
+      "BindMaterialResources 绑定槽 2，Principled 再绑定六张图及采样器。"
+    ],
+    "summary": "Lambertian、Light、Specular 和 Principled 把前端参数同步到固定像素着色器。",
+    "title": "光栅材质适配"
+  },
+  "code/sparkium/scene_io": {
+    "contracts": [
+      "JsonScene 独占 Scene、Film、Camera、材质、几何、图像和实体；Core 为借用，必须活得更久。",
+      "Load 捕获 std::exception 返回空并可写错误字符串；成功时不清空已有 error。FindJsonScenes 的文件系统异常直接传播。",
+      "JSON 允许注释和尾逗号；路径可绝对或相对文档，不限制在某个资源根目录。",
+      "shader_graph 是项目支持的节点子集，不等同 Blender 节点求值器；bump 当前仅透传法线。"
+    ],
+    "flow": [
+      "校验根格式、渲染设置、Film 和 Camera。",
+      "先创建材质与贴图，再读取几何，最后按 ID 关联实体并注册到 Scene。",
+      "图节点递归生成有缓存的 float4 中间表达式，汇入 GraphSurface。"
+    ],
+    "summary": "把 sparkium-scene v1 文档及相对路径资源装配成拥有完整生命周期的 JsonScene；材质图转换为 Slang 源码交给渲染组件编译。",
+    "title": "JSON 场景与材质图编译"
   }
 }

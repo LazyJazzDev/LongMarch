@@ -328,6 +328,11 @@
     "sha256": "9e4169cfb161dd4d0ed9d0f9b0bbd10605839ee7bba363a6a8463d718a31690a",
     "summary": "二维图像抽象与 STB 文件导入；本文件定义类型与调用接口。"
   },
+  "code/grassland/graphics/interface.cpp": {
+    "details": [],
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "summary": "空编译单元，没有接口定义或运行时代码。"
+  },
   "code/grassland/graphics/interface.h": {
     "details": [
       "包含资源、Core、命令与窗口的公共声明，不暴露具体后端头。"
@@ -426,6 +431,13 @@
     ],
     "sha256": "10aec831a6897062af401cf3b2a07143b6cfadd7f5eee5003c8f3063f83f31bd",
     "summary": "包含聚合头的编译单元，无额外运行时接口。"
+  },
+  "code/grassland/grassland.cu": {
+    "details": [
+      "此文件自身没有 CUDA kernel。"
+    ],
+    "sha256": "3fe261fe8078c23ee5b49d92627a3dcb15c45dc8c3d6d7fed1a55ae3b8ec0920",
+    "summary": "CUDA 编译入口，仅包含 grassland 聚合头。"
   },
   "code/grassland/grassland.h": {
     "details": [
@@ -2059,6 +2071,724 @@
     ],
     "sha256": "891d626da126602b4da3c989cf9f776ebe67a64d788f217e1bcbcaa510338eb3",
     "summary": "定义 code/sparkium 的构建目标、子模块接入和传递依赖。"
+  },
+  "code/sparkium/camera/CMakeLists.txt": {
+    "details": [
+      "源文件集合、目标链接和父作用域导出以本页列出的 CMake 原文为准；PUBLIC 依赖会传递给使用此目标的调用方。"
+    ],
+    "sha256": "633a1dda215b8f26dda4db7985eb2e02942984fe251743060b6390a5c717edfc",
+    "summary": "定义 camera 的 CMake 构建边界与传递依赖。"
+  },
+  "code/sparkium/camera/camera_pinhole.cpp": {
+    "details": [
+      "构造仅委托 Camera 保存 view/fovy/aspect，不创建图像或管线。"
+    ],
+    "sha256": "d8d2df5192353c9f76c6a4b196c77e3eddb64ab2ff1e024af8c7482d8b4aca49",
+    "summary": "只含基类参数的针孔相机前端；本文件实现接口行为。"
+  },
+  "code/sparkium/camera/camera_pinhole.h": {
+    "details": [
+      "构造仅委托 Camera 保存 view/fovy/aspect，不创建图像或管线。"
+    ],
+    "sha256": "8cead1a7562a635cc193aae43fa1968974909f666409991722dda84ce4870851",
+    "summary": "只含基类参数的针孔相机前端；本文件定义类型与调用接口。"
+  },
+  "code/sparkium/camera/camera_thin_lens.cpp": {
+    "details": [
+      "构造仅委托 Camera 保存 view/fovy/aspect，不创建图像或管线。"
+    ],
+    "sha256": "852dfa26fcf16c2d5a26fc4340da78ea550b5fb76f1e6888c610b667006b6ae2",
+    "summary": "附加薄透镜与孔径形状参数的相机前端；本文件实现接口行为。"
+  },
+  "code/sparkium/camera/camera_thin_lens.h": {
+    "details": [
+      "构造仅委托 Camera 保存 view/fovy/aspect，不创建图像或管线。"
+    ],
+    "sha256": "812218e4502776de1cd15daf8ac564d3a34cc9c03605a6c4f1616e3947a49a0d",
+    "summary": "附加薄透镜与孔径形状参数的相机前端；本文件定义类型与调用接口。"
+  },
+  "code/sparkium/camera/cameras.h": {
+    "details": [
+      "#include \"sparkium/camera/camera_pinhole.h\"",
+      "#include \"sparkium/camera/camera_thin_lens.h\""
+    ],
+    "sha256": "782acb4bcc35172ef329a84aea40d278bd25b34ec30213706d632a5dbd9b7458",
+    "summary": "聚合头：将相关声明从一个入口暴露给调用方。"
+  },
+  "code/sparkium/core/CMakeLists.txt": {
+    "details": [
+      "源文件集合、目标链接和父作用域导出以本页列出的 CMake 原文为准；PUBLIC 依赖会传递给使用此目标的调用方。"
+    ],
+    "sha256": "b17298239ced0ec4b54b450080ccdd7643a5c7995bedabb3fef9f1a93c9e0ae6",
+    "summary": "定义 core 的 CMake 构建边界与传递依赖。"
+  },
+  "code/sparkium/core/camera.cpp": {
+    "details": [
+      "纯虚析构在 cpp 中有默认定义；view/fovy/aspect 直接保存，不做输入验证。"
+    ],
+    "sha256": "1d8bb084620344c5ae24f8f1530453b844bdaa7dffb325a537ea564e97042ea6",
+    "summary": "可扩展相机抽象基类；本文件实现接口行为。"
+  },
+  "code/sparkium/core/camera.h": {
+    "details": [
+      "纯虚析构在 cpp 中有默认定义；view/fovy/aspect 直接保存，不做输入验证。"
+    ],
+    "sha256": "44b2c4e1e4077b342d89ce99cc94810153ddce858eab781f79c2abedb4c7aa6a",
+    "summary": "可扩展相机抽象基类；本文件定义类型与调用接口。"
+  },
+  "code/sparkium/core/code_lines.cpp": {
+    "details": [
+      "以 CR/LF 分割并丢弃空行，不是保真源码编辑器；InsertAfter 找不到标记时追加末尾。",
+      "VFS 读取失败没有错误传播，形成空片段；转换 string 每行附加换行，输出流另加行号。"
+    ],
+    "sha256": "037ebee1596edead0867a0b3031514e8e30aa853e2b934ede304cad949be544d",
+    "summary": "生成式 shader 源码的行片段工具；本文件实现接口行为。"
+  },
+  "code/sparkium/core/code_lines.h": {
+    "details": [
+      "以 CR/LF 分割并丢弃空行，不是保真源码编辑器；InsertAfter 找不到标记时追加末尾。",
+      "VFS 读取失败没有错误传播，形成空片段；转换 string 每行附加换行，输出流另加行号。"
+    ],
+    "sha256": "4602b414c0cd695fc4fab8f53a05811697eaf07d32dfa360c3bff0f5380115ae",
+    "summary": "生成式 shader 源码的行片段工具；本文件定义类型与调用接口。"
+  },
+  "code/sparkium/core/core.cpp": {
+    "details": [
+      "AUTO 在 D3D12/Vulkan 优先 ray query，其次完整 RT，再其次可用 ray query，否则 software BVH。",
+      "公共资源包括 SDR/HDR 色调映射程序、Sobol 表和白/黑/默认法线纹理。",
+      "Get* 使用 map[]，未知名称会插入空条目并返回 nullptr；SetPublicResource 移入所有权并替换旧资源。"
+    ],
+    "sha256": "641724764ee4e883d2a022f435b5119bcd69ce62a19c2d7e86b19f8bcc7f809b",
+    "summary": "管线选择及命名公共资源缓存；本文件实现接口行为。"
+  },
+  "code/sparkium/core/core.h": {
+    "details": [
+      "AUTO 在 D3D12/Vulkan 优先 ray query，其次完整 RT，再其次可用 ray query，否则 software BVH。",
+      "公共资源包括 SDR/HDR 色调映射程序、Sobol 表和白/黑/默认法线纹理。",
+      "Get* 使用 map[]，未知名称会插入空条目并返回 nullptr；SetPublicResource 移入所有权并替换旧资源。"
+    ],
+    "sha256": "f0e9c800f020265f93efe108614dffaac53dd8e1d6a6f4b53e80628c45147811",
+    "summary": "管线选择及命名公共资源缓存；本文件定义类型与调用接口。"
+  },
+  "code/sparkium/core/core_util.cpp": {
+    "details": [
+      "COMPONENT_CAST 查找或追加通用组件；DEDICATED_CAST 先检查前端动态类型再追加专用组件。",
+      "链尾查找递归，组件没有自动移除/替换接口。"
+    ],
+    "sha256": "abc54a93469cf98416e440e9adad6c4d28a3bc56be3debc3156f1c44947464ee",
+    "summary": "Object 组件链、适配宏与渲染管线枚举；本文件实现接口行为。"
+  },
+  "code/sparkium/core/core_util.h": {
+    "details": [
+      "COMPONENT_CAST 查找或追加通用组件；DEDICATED_CAST 先检查前端动态类型再追加专用组件。",
+      "链尾查找递归，组件没有自动移除/替换接口。"
+    ],
+    "sha256": "ee0e41c107272c49e8a74e5b059adc2993fadb41a2f25056f9eedaf38af0de54",
+    "summary": "Object 组件链、适配宏与渲染管线枚举；本文件定义类型与调用接口。"
+  },
+  "code/sparkium/core/entity.cpp": {
+    "details": [
+      "bool 转换仅检查 core_ 非空，不能证明几何、材质或 Scene 注册有效。"
+    ],
+    "sha256": "d82df54e6188234bfe85fab1c57bea6489e13446644769a1434af629d11dd050",
+    "summary": "实体基类；本文件实现接口行为。"
+  },
+  "code/sparkium/core/entity.h": {
+    "details": [
+      "bool 转换仅检查 core_ 非空，不能证明几何、材质或 Scene 注册有效。"
+    ],
+    "sha256": "f2db70c3d0d350d3d4d8f45ed8501478154a8f9f4914edc1508a7ba64280e1aa",
+    "summary": "实体基类；本文件定义类型与调用接口。"
+  },
+  "code/sparkium/core/film.cpp": {
+    "details": [
+      "构造创建 RGBA32F raw、D32F depth、R32_SINT stencil 和 16 字节色调常量。",
+      "Reset 只直接清 raw 图，再运行回调；info.accumulated_samples 是否重置取决于注册的管线回调。",
+      "Develop 创建/提交计算命令并 WaitGPU，linear_hdr 输出要求 RGBA32F；上传 view_transform/exposure/gamma/contrast 连续字段。"
+    ],
+    "sha256": "dcb6deca7d168ee8b29f83d872397934a159bdaaadd37592bb9e27fe506de258",
+    "summary": "线性渲染图像、累积重置与色调映射；本文件实现接口行为。"
+  },
+  "code/sparkium/core/film.h": {
+    "details": [
+      "构造创建 RGBA32F raw、D32F depth、R32_SINT stencil 和 16 字节色调常量。",
+      "Reset 只直接清 raw 图，再运行回调；info.accumulated_samples 是否重置取决于注册的管线回调。",
+      "Develop 创建/提交计算命令并 WaitGPU，linear_hdr 输出要求 RGBA32F；上传 view_transform/exposure/gamma/contrast 连续字段。"
+    ],
+    "sha256": "5dbe5af0acbc60cef1326440ddb298e8027f7aea84c8d570bd706326225ae751",
+    "summary": "线性渲染图像、累积重置与色调映射；本文件定义类型与调用接口。"
+  },
+  "code/sparkium/core/geometry.cpp": {
+    "details": [
+      "PrimitiveCount 纯虚，由网格/毛发等具体几何提供图元数量。"
+    ],
+    "sha256": "46b36cc2560f345533ab23b2f790886da7191955912b253680aa17f80f3d5c35",
+    "summary": "几何抽象基类；本文件实现接口行为。"
+  },
+  "code/sparkium/core/geometry.h": {
+    "details": [
+      "PrimitiveCount 纯虚，由网格/毛发等具体几何提供图元数量。"
+    ],
+    "sha256": "134993f185a25e584ee8d2bf18a4f9911d7acb9919777ca61153c64a794b263b",
+    "summary": "几何抽象基类；本文件定义类型与调用接口。"
+  },
+  "code/sparkium/core/material.cpp": {
+    "details": [
+      "这里只保留借用 Core 与虚析构，具体 BSDF/纹理参数位于 material 子目录。"
+    ],
+    "sha256": "2938217c8f565b8e0acee6f2e0691ec90729eb5ee436eb49cdd0ebb7f47e65f0",
+    "summary": "材质抽象父类与组件入口；本文件实现接口行为。"
+  },
+  "code/sparkium/core/material.h": {
+    "details": [
+      "这里只保留借用 Core 与虚析构，具体 BSDF/纹理参数位于 material 子目录。"
+    ],
+    "sha256": "2d31700ac2129212c268dd89006b47bc4e942256b2d23816cb7e915200ffb7c4",
+    "summary": "材质抽象父类与组件入口；本文件定义类型与调用接口。"
+  },
+  "code/sparkium/core/scene.cpp": {
+    "details": [
+      "map 保存激活状态，vector 保存首次注册顺序；重复 Add 不增加顺序条目。",
+      "SetEntityActive 对未注册对象抛 out_of_range；Settings 内含对嵌套字段的引用别名，默认复制语义需谨慎。"
+    ],
+    "sha256": "b9dafcfd0d5136a950cb5d0c78779bca0d9bc9429e8b28dfac286b4f4e896ba4",
+    "summary": "场景实体注册与稳定顺序；本文件实现接口行为。"
+  },
+  "code/sparkium/core/scene.h": {
+    "details": [
+      "map 保存激活状态，vector 保存首次注册顺序；重复 Add 不增加顺序条目。",
+      "SetEntityActive 对未注册对象抛 out_of_range；Settings 内含对嵌套字段的引用别名，默认复制语义需谨慎。"
+    ],
+    "sha256": "5fcb954054c2f7094aaedd7bfce99a517519ac88d01fff3cd53c8b64ebdbda7d",
+    "summary": "场景实体注册与稳定顺序；本文件定义类型与调用接口。"
+  },
+  "code/sparkium/entity/CMakeLists.txt": {
+    "details": [
+      "源文件集合、目标链接和父作用域导出以本页列出的 CMake 原文为准；PUBLIC 依赖会传递给使用此目标的调用方。"
+    ],
+    "sha256": "633a1dda215b8f26dda4db7985eb2e02942984fe251743060b6390a5c717edfc",
+    "summary": "定义 entity 的 CMake 构建边界与传递依赖。"
+  },
+  "code/sparkium/entity/entities.h": {
+    "details": [
+      "#include \"sparkium/entity/entity_geometry_material.h\"",
+      "#include \"sparkium/entity/entity_point_light.h\""
+    ],
+    "sha256": "804d7e7c3923167c324262c781cd12a4bfca0d4ebbc445a6ebddb57bb799dc65",
+    "summary": "聚合头：将相关声明从一个入口暴露给调用方。"
+  },
+  "code/sparkium/entity/entity_geometry_material.cpp": {
+    "details": [
+      "transform 为 GLM mat4x3，即 4 列、3 行的仿射矩阵；raster_light 默认为 true。"
+    ],
+    "sha256": "daaf618a0a88e517d16e11750c8ad983790b11cb9ffc03b8e520e42f1383bb76",
+    "summary": "借用几何与材质的变换实例；本文件实现接口行为。"
+  },
+  "code/sparkium/entity/entity_geometry_material.h": {
+    "details": [
+      "transform 为 GLM mat4x3，即 4 列、3 行的仿射矩阵；raster_light 默认为 true。"
+    ],
+    "sha256": "e8f76e05cefc16255e8c7e78ea00503302c6b14499b06c27e338bd7c56dc5732",
+    "summary": "借用几何与材质的变换实例；本文件定义类型与调用接口。"
+  },
+  "code/sparkium/entity/entity_point_light.cpp": {
+    "details": [
+      "构造复制所有字段，将 bool soft_falloff 保存为 int；不钳制半径、强度或采样权重。"
+    ],
+    "sha256": "996263e79549180c47ca7480629c3afdfda0d7d94ffe4f382ee993b8b1f16fc6",
+    "summary": "点光源参数记录；本文件实现接口行为。"
+  },
+  "code/sparkium/entity/entity_point_light.h": {
+    "details": [
+      "构造复制所有字段，将 bool soft_falloff 保存为 int；不钳制半径、强度或采样权重。"
+    ],
+    "sha256": "04827b8a609338d64b159f5ad88fced5335153cc72ed5d61ef966b3ce1c80ccf",
+    "summary": "点光源参数记录；本文件定义类型与调用接口。"
+  },
+  "code/sparkium/geometry/CMakeLists.txt": {
+    "details": [
+      "源文件集合、目标链接和父作用域导出以本页列出的 CMake 原文为准；PUBLIC 依赖会传递给使用此目标的调用方。"
+    ],
+    "sha256": "633a1dda215b8f26dda4db7985eb2e02942984fe251743060b6390a5c717edfc",
+    "summary": "定义 geometry 的 CMake 构建边界与传递依赖。"
+  },
+  "code/sparkium/geometry/geometries.h": {
+    "details": [
+      "#include \"sparkium/geometry/geometry_hair.h\"",
+      "#include \"sparkium/geometry/geometry_mesh.h\""
+    ],
+    "sha256": "a2bf8d4c24f018a7174fbf98e520573204a4959083bc1f7e78f81dcb3b0c777e",
+    "summary": "聚合头：将相关声明从一个入口暴露给调用方。"
+  },
+  "code/sparkium/geometry/geometry_hair.cpp": {
+    "details": [
+      "检查点/半径数量、strand_offsets 起止与每段至少两点、radial_segments≥3。",
+      "每环用局部切线与参考轴重建坐标系，未做 parallel transport；急转或参考轴切换处可能扭转。",
+      "管端没有封口；重合点导致零切线，半径非负/有限也没有验证。"
+    ],
+    "sha256": "439398e8c81f02e44e7d23b74d657ce0e33e35a17c46c30135c2388d5452f85b",
+    "summary": "曲线点列到渐变半径三角管的转换；本文件实现接口行为。"
+  },
+  "code/sparkium/geometry/geometry_hair.h": {
+    "details": [
+      "检查点/半径数量、strand_offsets 起止与每段至少两点、radial_segments≥3。",
+      "每环用局部切线与参考轴重建坐标系，未做 parallel transport；急转或参考轴切换处可能扭转。",
+      "管端没有封口；重合点导致零切线，半径非负/有限也没有验证。"
+    ],
+    "sha256": "a24b702f252c445eef27a2d021432b3e5aaa9a1c01ca9a7101ac744c0551cf26",
+    "summary": "曲线点列到渐变半径三角管的转换；本文件定义类型与调用接口。"
+  },
+  "code/sparkium/geometry/geometry_mesh.cpp": {
+    "details": [
+      "Header 用 static_assert 固定 64 字节，shadow_terminator_geometry_offset 位于字节 60。",
+      "可选切线生成可能拆并顶点；写回 Header 后一次上传静态缓冲。"
+    ],
+    "sha256": "c89e27466634773f56100df549df20d98b8f710bd5cb4ca28c9a1dc06858c6f7",
+    "summary": "带显式字节头部的统一网格资源；本文件实现接口行为。"
+  },
+  "code/sparkium/geometry/geometry_mesh.h": {
+    "details": [
+      "Header 用 static_assert 固定 64 字节，shadow_terminator_geometry_offset 位于字节 60。",
+      "可选切线生成可能拆并顶点；写回 Header 后一次上传静态缓冲。"
+    ],
+    "sha256": "485331551ed0451f196cd2fce15947e3552ce0ceb6f8587e3580121e55a2c6cb",
+    "summary": "带显式字节头部的统一网格资源；本文件定义类型与调用接口。"
+  },
+  "code/sparkium/material/CMakeLists.txt": {
+    "details": [
+      "源文件集合、目标链接和父作用域导出以本页列出的 CMake 原文为准；PUBLIC 依赖会传递给使用此目标的调用方。"
+    ],
+    "sha256": "633a1dda215b8f26dda4db7985eb2e02942984fe251743060b6390a5c717edfc",
+    "summary": "定义 material 的 CMake 构建边界与传递依赖。"
+  },
+  "code/sparkium/material/material_lambertian.cpp": {
+    "details": [
+      "默认 base_color=0.8、emission=0；此目录不求值 BRDF。"
+    ],
+    "sha256": "a0033bb6d088ba675735b3fe4339f5b79aa0f5a4bc95b79e102159c6ec0a0d13",
+    "summary": "漫反射与自发光参数；本文件实现接口行为。"
+  },
+  "code/sparkium/material/material_lambertian.h": {
+    "details": [
+      "默认 base_color=0.8、emission=0；此目录不求值 BRDF。"
+    ],
+    "sha256": "d5367c56d950422ed38f3b5436adf51a982ce8b46f673c4b46b7ca657b8161c6",
+    "summary": "漫反射与自发光参数；本文件定义类型与调用接口。"
+  },
+  "code/sparkium/material/material_light.cpp": {
+    "details": [
+      "默认 emission=0、two_sided=false、block_ray=false、camera_visible=true、falloff_distance=0。"
+    ],
+    "sha256": "30a3788cb82ed8313fda275bca40a8559f795b192d113feb5f16fb3476110e2d",
+    "summary": "可控制双面、遮挡和相机可见性的发光材质；本文件实现接口行为。"
+  },
+  "code/sparkium/material/material_light.h": {
+    "details": [
+      "默认 emission=0、two_sided=false、block_ray=false、camera_visible=true、falloff_distance=0。"
+    ],
+    "sha256": "5f9fa31553c7acc5396f2fde1be6d7d55afcbdc315f9aa717b61ceb7564d86d2",
+    "summary": "可控制双面、遮挡和相机可见性的发光材质；本文件定义类型与调用接口。"
+  },
+  "code/sparkium/material/material_principled.cpp": {
+    "details": [
+      "Info 保存基础色、次表面、金属/镜面/粗糙度、各向异性、sheen、clearcoat、折射/透射和发光。",
+      "TextureInfo 的各 Image 指针均非拥有；normal_reverse_y 标识法线贴图 Y 方向翻转。",
+      "公开引用别名指向 info 字段；类型因 Object 独占组件链不可按普通可复制材质值处理。"
+    ],
+    "sha256": "cf56d8c2ddbbffd10b43d64a6da837ce3df45727c79ba1fdce6cf65284bc9f5f",
+    "summary": "多层 BSDF 数值与纹理参数；本文件实现接口行为。"
+  },
+  "code/sparkium/material/material_principled.h": {
+    "details": [
+      "Info 保存基础色、次表面、金属/镜面/粗糙度、各向异性、sheen、clearcoat、折射/透射和发光。",
+      "TextureInfo 的各 Image 指针均非拥有；normal_reverse_y 标识法线贴图 Y 方向翻转。",
+      "公开引用别名指向 info 字段；类型因 Object 独占组件链不可按普通可复制材质值处理。"
+    ],
+    "sha256": "7773870a50a70d07de892db3287bcf88d38d88b24b269bd6c9905c79e1caae52",
+    "summary": "多层 BSDF 数值与纹理参数；本文件定义类型与调用接口。"
+  },
+  "code/sparkium/material/material_shader_graph.cpp": {
+    "details": [
+      "保存 graph_code 的副本、纹理借用指针和 emission_hint；实际节点图编译由 scene_io 执行。"
+    ],
+    "sha256": "e460e8dc1fac8c8dd208bade91f3a34e69fe8b65ef0d116b2f9594d47a91b71b",
+    "summary": "生成式 Slang 材质片段；本文件实现接口行为。"
+  },
+  "code/sparkium/material/material_shader_graph.h": {
+    "details": [
+      "保存 graph_code 的副本、纹理借用指针和 emission_hint；实际节点图编译由 scene_io 执行。"
+    ],
+    "sha256": "4f7c38b24c65f0804c5ef8f796a3043271840ce3cf02999f9ecbc521f66ffb0c",
+    "summary": "生成式 Slang 材质片段；本文件定义类型与调用接口。"
+  },
+  "code/sparkium/material/material_specular.cpp": {
+    "details": [
+      "默认 base_color=0.8；实际反射方向和权重见 specular shader。"
+    ],
+    "sha256": "a2c85d8010e427d27d2239f1ed12471eae677eb1a99e1cd304d0d8f4ad4f089d",
+    "summary": "理想镜面颜色参数；本文件实现接口行为。"
+  },
+  "code/sparkium/material/material_specular.h": {
+    "details": [
+      "默认 base_color=0.8；实际反射方向和权重见 specular shader。"
+    ],
+    "sha256": "94cb92b1c0bab1e0a4d802741e4e2811e539674285f78e37a9165dfa323256fa",
+    "summary": "理想镜面颜色参数；本文件定义类型与调用接口。"
+  },
+  "code/sparkium/material/materials.h": {
+    "details": [
+      "#include \"sparkium/material/material_lambertian.h\"",
+      "#include \"sparkium/material/material_light.h\"",
+      "#include \"sparkium/material/material_principled.h\"",
+      "#include \"sparkium/material/material_shader_graph.h\"",
+      "#include \"sparkium/material/material_specular.h\""
+    ],
+    "sha256": "c88c3731ec42b8734365c5007b09b23ac5412aeab362c157149b35f3ed510a5a",
+    "summary": "聚合头：将相关声明从一个入口暴露给调用方。"
+  },
+  "code/sparkium/pipelines/CMakeLists.txt": {
+    "details": [],
+    "sha256": "1d22e21134265009aa45f3231b7956784a8cdeaca616a1fe6a4412c81d2982da",
+    "summary": "构建两个管线子目录并公开链接 sparkium_raster、sparkium_raytracing、Grassland 和 Snowberg，将管线目标导出至 SPARKIUM_LIBS。"
+  },
+  "code/sparkium/pipelines/pipelines.cpp": {
+    "details": [],
+    "sha256": "c4e002af954b758e185cc493f220326350988e69e214a4aa818fc1e4bf7d10d0",
+    "summary": "聚合 raster 与 raytracing 的公共入口。"
+  },
+  "code/sparkium/pipelines/pipelines.h": {
+    "details": [],
+    "sha256": "3d99dba84f1e816e9e19e3eafbd6abcd3a482f3440a49d828dbe1ede0a460989",
+    "summary": "聚合 raster 与 raytracing 的公共入口。"
+  },
+  "code/sparkium/pipelines/raster/CMakeLists.txt": {
+    "details": [
+      "源文件集合、目标链接和父作用域导出以本页列出的 CMake 原文为准；PUBLIC 依赖会传递给使用此目标的调用方。"
+    ],
+    "sha256": "4e3ee1c356d19fdeb53f0df3a6ee879589692f0787d8a5e4b43cb9a9c9647dcd",
+    "summary": "定义 raster 的 CMake 构建边界与传递依赖。"
+  },
+  "code/sparkium/pipelines/raster/core/CMakeLists.txt": {
+    "details": [
+      "源文件集合、目标链接和父作用域导出以本页列出的 CMake 原文为准；PUBLIC 依赖会传递给使用此目标的调用方。"
+    ],
+    "sha256": "d4a98b3d6ef3a667eeef7607e732b4a451c7f27867708f6dff08d95c6a702927",
+    "summary": "定义 core 的 CMake 构建边界与传递依赖。"
+  },
+  "code/sparkium/pipelines/raster/core/camera.cpp": {
+    "details": [
+      "CameraData 为 view/proj/view_proj 及三个逆矩阵；使用 perspectiveZO，近场 0.1–100，远场 100–10000。薄透镜光圈不参与光栅投影。"
+    ],
+    "sha256": "b971d64d7978bb571eedb1a74314841b320be093a7fbbee9c6b0119aaa661fcd",
+    "summary": "双深度区间相机常量上传。；本文件实现接口行为。"
+  },
+  "code/sparkium/pipelines/raster/core/camera.h": {
+    "details": [
+      "CameraData 为 view/proj/view_proj 及三个逆矩阵；使用 perspectiveZO，近场 0.1–100，远场 100–10000。薄透镜光圈不参与光栅投影。"
+    ],
+    "sha256": "42fb68bffae0c57006d6f36f88d6330c774fea86cefa170fda302396ee7e9b76",
+    "summary": "双深度区间相机常量上传。；本文件定义类型与调用接口。"
+  },
+  "code/sparkium/pipelines/raster/core/core.cpp": {
+    "details": [
+      "GetShader/GetComputeProgram/GetBuffer/GetImage 返回前端 Core 拥有的指针；查询缺失键沿用前端 map[] 行为。"
+    ],
+    "sha256": "0aef56d79313abfbb4d1abea05820c9431538c16cb67be95cc5a6696a03d4d3c",
+    "summary": "共享资源转发与光栅 Render 入口。；本文件实现接口行为。"
+  },
+  "code/sparkium/pipelines/raster/core/core.h": {
+    "details": [
+      "GetShader/GetComputeProgram/GetBuffer/GetImage 返回前端 Core 拥有的指针；查询缺失键沿用前端 map[] 行为。"
+    ],
+    "sha256": "1a5305c29039d2d66de8c9346ff1b375e80c7212c5b0511c88dc773e59c3199e",
+    "summary": "共享资源转发与光栅 Render 入口。；本文件定义类型与调用接口。"
+  },
+  "code/sparkium/pipelines/raster/core/core_util.cpp": {
+    "details": [],
+    "sha256": "77c7d5b6054803a9ec0fa5cbb7043dd8517d0f90451d38a20cb149a6d7d9a929",
+    "summary": "定义专用组件前置声明及所需前端类型依赖。；本文件实现接口行为。"
+  },
+  "code/sparkium/pipelines/raster/core/core_util.h": {
+    "details": [],
+    "sha256": "a80c66464a7d7568b140b55673a7cd520e48e09745cb1452a66c24f05109f401",
+    "summary": "定义专用组件前置声明及所需前端类型依赖。；本文件定义类型与调用接口。"
+  },
+  "code/sparkium/pipelines/raster/core/entity.cpp": {
+    "details": [
+      "operator bool 仅检查 core_ 非空，不代表全部资源或材质转换成功。"
+    ],
+    "sha256": "252cee976a3d9d4bc85a7b52583288ba5cdf86ca51f74e2905d7a032b4e03491",
+    "summary": "光栅 Entity 抽象 Update 协议。；本文件实现接口行为。"
+  },
+  "code/sparkium/pipelines/raster/core/entity.h": {
+    "details": [
+      "operator bool 仅检查 core_ 非空，不代表全部资源或材质转换成功。"
+    ],
+    "sha256": "487ff991ad9501e0ff5eac9c9f31fcb303e27d5be69043d0e5ad724ec9038ca9",
+    "summary": "光栅 Entity 抽象 Update 协议。；本文件定义类型与调用接口。"
+  },
+  "code/sparkium/pipelines/raster/core/film.cpp": {
+    "details": [
+      "构造时按前端 Film 尺寸分配，不自动监听尺寸变化；Reset 回调清三张图并提交，无独立 WaitGPU。"
+    ],
+    "sha256": "fb88d135385a7a83da1c2b4978233993504db788dbee63c6253ce3c07c775356",
+    "summary": "持有 AlbedoRoughness、PositionSpecular、NormalMetallic 三张 RGBA32F 图像。；本文件实现接口行为。"
+  },
+  "code/sparkium/pipelines/raster/core/film.h": {
+    "details": [
+      "构造时按前端 Film 尺寸分配，不自动监听尺寸变化；Reset 回调清三张图并提交，无独立 WaitGPU。"
+    ],
+    "sha256": "5f64de5fc74b021044b8b1844a08101a7004c4215b29979aa8a5fc432a74aa9c",
+    "summary": "持有 AlbedoRoughness、PositionSpecular、NormalMetallic 三张 RGBA32F 图像。；本文件定义类型与调用接口。"
+  },
+  "code/sparkium/pipelines/raster/core/geometry.cpp": {
+    "details": [
+      "基类 SetupProgram/DispatchDrawCalls 为空；VertexShader/CentricArea 必须实现。"
+    ],
+    "sha256": "c0b77b714c855686c4d2edc6e850355ad9389d92be82d97eee40ebacfba26643",
+    "summary": "Geometry 的着色器、布局、绘制与面积中心协议。；本文件实现接口行为。"
+  },
+  "code/sparkium/pipelines/raster/core/geometry.h": {
+    "details": [
+      "基类 SetupProgram/DispatchDrawCalls 为空；VertexShader/CentricArea 必须实现。"
+    ],
+    "sha256": "068302f940799ebf72fa5600885cebd3368c39b79800b489ebc8f4a2b4f1a2d8",
+    "summary": "Geometry 的着色器、布局、绘制与面积中心协议。；本文件定义类型与调用接口。"
+  },
+  "code/sparkium/pipelines/raster/core/material.cpp": {
+    "details": [
+      "基类 SetupProgram/BindMaterialResources 为空，Emission 返回零；PixelShader/Sync 必须实现。"
+    ],
+    "sha256": "f0b06fd407ac48d646a349ce09ee9dc00d3330009f8fea560bb85b1e79287708",
+    "summary": "Material 的 PS、Sync、绑定和发光协议。；本文件实现接口行为。"
+  },
+  "code/sparkium/pipelines/raster/core/material.h": {
+    "details": [
+      "基类 SetupProgram/BindMaterialResources 为空，Emission 返回零；PixelShader/Sync 必须实现。"
+    ],
+    "sha256": "a744ecb09afba3022f0671ba8a2aa4c4cd4600358120882341a4541eb186434d",
+    "summary": "Material 的 PS、Sync、绑定和发光协议。；本文件定义类型与调用接口。"
+  },
+  "code/sparkium/pipelines/raster/core/scene.cpp": {
+    "details": [
+      "每帧清空所有回调，并按前端 GetEntityOrder 更新 active 实体；失去 keep 标记的组件从映射移除。",
+      "远场后只清深度再画近场；Raw 背景使用 ambient_light，而不是独立 background_color。",
+      "RegisterShadowMapCallback 保存的回调没有执行循环；最终 Submit 后 WaitGPU。"
+    ],
+    "sha256": "f61b7d82e41c5f44871fb013f637a8c1601f377d0d8d27255938ebc47812adba",
+    "summary": "双视锥 G-buffer 加延迟照明的调度实现。；本文件实现接口行为。"
+  },
+  "code/sparkium/pipelines/raster/core/scene.h": {
+    "details": [
+      "每帧清空所有回调，并按前端 GetEntityOrder 更新 active 实体；失去 keep 标记的组件从映射移除。",
+      "远场后只清深度再画近场；Raw 背景使用 ambient_light，而不是独立 background_color。",
+      "RegisterShadowMapCallback 保存的回调没有执行循环；最终 Submit 后 WaitGPU。"
+    ],
+    "sha256": "0d22a66be07e14f827cf2e3af87363183a27a4ae53ac4a2b485c1137ed570576",
+    "summary": "双视锥 G-buffer 加延迟照明的调度实现。；本文件定义类型与调用接口。"
+  },
+  "code/sparkium/pipelines/raster/entity/CMakeLists.txt": {
+    "details": [
+      "源文件集合、目标链接和父作用域导出以本页列出的 CMake 原文为准；PUBLIC 依赖会传递给使用此目标的调用方。"
+    ],
+    "sha256": "56b328e0f1a66bd474ab5ce2e486141848e2fa6647aaba02551ef6d542814b8b",
+    "summary": "定义 entity 的 CMake 构建边界与传递依赖。"
+  },
+  "code/sparkium/pipelines/raster/entity/entities.cpp": {
+    "details": [],
+    "sha256": "4d44191a3b54637163f3e538f2b9935692d912a17aef2e97b922cd6929def8ef",
+    "summary": "将前端几何材质实体或点光实体转换为光栅组件；未知类型返回 nullptr。；本文件实现接口行为。"
+  },
+  "code/sparkium/pipelines/raster/entity/entities.h": {
+    "details": [],
+    "sha256": "2a2f8d9900b14c032705d322394a3584f90acba2cb5e30a5429cf6a16fe961fa",
+    "summary": "将前端几何材质实体或点光实体转换为光栅组件；未知类型返回 nullptr。；本文件定义类型与调用接口。"
+  },
+  "code/sparkium/pipelines/raster/entity/entity_geometry_material.cpp": {
+    "details": [
+      "InstanceData 存 model/inv_model/normal_matrix；Update 每帧上传并同步 Material。",
+      "正发光且 raster_light=true 时调用 CentricArea；点光 emission=材质发光×max(area,0)×4π，位置为面积加权中心。",
+      "构造使用 DedicatedCast 结果未检查空值；不支持的几何或材质不可直接传入。"
+    ],
+    "sha256": "d3998fd76a907a09d414e405c47c4ac58fb87151b8be0f1edecc02a1ffe0d9e7",
+    "summary": "组合几何/材质程序并为发光网格注册近似点光源。；本文件实现接口行为。"
+  },
+  "code/sparkium/pipelines/raster/entity/entity_geometry_material.h": {
+    "details": [
+      "InstanceData 存 model/inv_model/normal_matrix；Update 每帧上传并同步 Material。",
+      "正发光且 raster_light=true 时调用 CentricArea；点光 emission=材质发光×max(area,0)×4π，位置为面积加权中心。",
+      "构造使用 DedicatedCast 结果未检查空值；不支持的几何或材质不可直接传入。"
+    ],
+    "sha256": "4045f993fc51c2c3a4b4b45a0528112798a165dc9c31639e1fdc3637e1eebd6c",
+    "summary": "组合几何/材质程序并为发光网格注册近似点光源。；本文件定义类型与调用接口。"
+  },
+  "code/sparkium/pipelines/raster/entity/entity_point_light.cpp": {
+    "details": [
+      "不读取点光 radius、soft_falloff、sampling_weight。"
+    ],
+    "sha256": "8f049b6c445f848d31c5b19c432c4eafd557127781bf4894bf8032a47913d6ed",
+    "summary": "将前端 color*strength 与 position 上传，注册六顶点全屏加法光照。；本文件实现接口行为。"
+  },
+  "code/sparkium/pipelines/raster/entity/entity_point_light.h": {
+    "details": [
+      "不读取点光 radius、soft_falloff、sampling_weight。"
+    ],
+    "sha256": "dda7d30109255af1e072a1626037fe758aba86962609560ea011d1a1ead70b68",
+    "summary": "将前端 color*strength 与 position 上传，注册六顶点全屏加法光照。；本文件定义类型与调用接口。"
+  },
+  "code/sparkium/pipelines/raster/geometry/CMakeLists.txt": {
+    "details": [
+      "源文件集合、目标链接和父作用域导出以本页列出的 CMake 原文为准；PUBLIC 依赖会传递给使用此目标的调用方。"
+    ],
+    "sha256": "56b328e0f1a66bd474ab5ce2e486141848e2fa6647aaba02551ef6d542814b8b",
+    "summary": "定义 geometry 的 CMake 构建边界与传递依赖。"
+  },
+  "code/sparkium/pipelines/raster/geometry/geoemtry_mesh.cpp": {
+    "details": [
+      "文件名保留源码拼写 geoemtry_mesh；索引缓冲、位置、法线、UV、切线及符号流均由 Header 偏移定位。"
+    ],
+    "sha256": "ca78c7df9d8cdbdeb7f6c15b292772ea12dbf3ee5d1c38630c9f18cd2e089413",
+    "summary": "绑定共享网格缓冲、绘制索引三角并估算世界空间面积中心。；本文件实现接口行为。"
+  },
+  "code/sparkium/pipelines/raster/geometry/geoemtry_mesh.h": {
+    "details": [
+      "文件名保留源码拼写 geoemtry_mesh；索引缓冲、位置、法线、UV、切线及符号流均由 Header 偏移定位。"
+    ],
+    "sha256": "0def6e36b9f792f2a578acb53d6a6f4c1ee2189d8445d647b83568078abb3d9c",
+    "summary": "绑定共享网格缓冲、绘制索引三角并估算世界空间面积中心。；本文件定义类型与调用接口。"
+  },
+  "code/sparkium/pipelines/raster/geometry/geometries.cpp": {
+    "details": [],
+    "sha256": "98e26ad111e4c34add5872000c2f2b620f9daf33be4f0c3956eb2223cbd0edeb",
+    "summary": "GeometryMesh 的组件分派；其他 Geometry 返回 nullptr。；本文件实现接口行为。"
+  },
+  "code/sparkium/pipelines/raster/geometry/geometries.h": {
+    "details": [],
+    "sha256": "6e41598bda8379971d18249c74cd6520f5efce5ec35a9aa2085c67a7c99c6c03",
+    "summary": "GeometryMesh 的组件分派；其他 Geometry 返回 nullptr。；本文件定义类型与调用接口。"
+  },
+  "code/sparkium/pipelines/raster/material/CMakeLists.txt": {
+    "details": [
+      "源文件集合、目标链接和父作用域导出以本页列出的 CMake 原文为准；PUBLIC 依赖会传递给使用此目标的调用方。"
+    ],
+    "sha256": "56b328e0f1a66bd474ab5ce2e486141848e2fa6647aaba02551ef6d542814b8b",
+    "summary": "定义 material 的 CMake 构建边界与传递依赖。"
+  },
+  "code/sparkium/pipelines/raster/material/material_lambertian.cpp": {
+    "details": [],
+    "sha256": "07f0acc21897d63bcfe0f4b0f794403e4ce3de2dd4ded29be30a79ea45050ae3",
+    "summary": "上传连续六个 float：base_color RGB 后接 emission RGB，绑定材质槽 2。；本文件实现接口行为。"
+  },
+  "code/sparkium/pipelines/raster/material/material_lambertian.h": {
+    "details": [],
+    "sha256": "55ea9c020b1e86b8455ccc367c583c237aad69bcf096040d43cb9865ea2706f9",
+    "summary": "上传连续六个 float：base_color RGB 后接 emission RGB，绑定材质槽 2。；本文件定义类型与调用接口。"
+  },
+  "code/sparkium/pipelines/raster/material/material_light.cpp": {
+    "details": [
+      "不上传 two_sided/block_ray/camera_visible/falloff。"
+    ],
+    "sha256": "0fee558b9f747c8b0ee888ab52aa74cb88d81a5bd3808aeeb4a10a8aefff7f28",
+    "summary": "上传 emission RGB，供发光像素着色器和几何点光估算使用。；本文件实现接口行为。"
+  },
+  "code/sparkium/pipelines/raster/material/material_light.h": {
+    "details": [
+      "不上传 two_sided/block_ray/camera_visible/falloff。"
+    ],
+    "sha256": "558d1f4f000f860282e5c422c3ae847d43909f0c1817804039fa11c95d662fe9",
+    "summary": "上传 emission RGB，供发光像素着色器和几何点光估算使用。；本文件定义类型与调用接口。"
+  },
+  "code/sparkium/pipelines/raster/material/material_principled.cpp": {
+    "details": [
+      "TextureInfo 为 y_signal 和六个 int；法线 Y 翻转用 -1，否则 +1。槽 3 图顺序：base_color、roughness、specular、metallic、normal、emission。"
+    ],
+    "sha256": "c583b4d18dcd9e40d79099eac6a803b23ee58951fd1fc58a387b1eeb3c1ff225",
+    "summary": "上传前端 Info 后追加纹理启用标记，绑定六张图与默认采样器。；本文件实现接口行为。"
+  },
+  "code/sparkium/pipelines/raster/material/material_principled.h": {
+    "details": [
+      "TextureInfo 为 y_signal 和六个 int；法线 Y 翻转用 -1，否则 +1。槽 3 图顺序：base_color、roughness、specular、metallic、normal、emission。"
+    ],
+    "sha256": "740867f911c49ce2ce0535b2c50ec47f8a22c140bc2fdf137000f56ec9fa0033",
+    "summary": "上传前端 Info 后追加纹理启用标记，绑定六张图与默认采样器。；本文件定义类型与调用接口。"
+  },
+  "code/sparkium/pipelines/raster/material/material_specular.cpp": {
+    "details": [
+      "光栅模式不执行理想镜面的二次射线。"
+    ],
+    "sha256": "22784a6023906c86e99f889f325bbdc3e26c10136bd49078b9dc49d5cc2db697",
+    "summary": "上传 base_color RGB 到固定 Specular G-buffer 着色器。；本文件实现接口行为。"
+  },
+  "code/sparkium/pipelines/raster/material/material_specular.h": {
+    "details": [
+      "光栅模式不执行理想镜面的二次射线。"
+    ],
+    "sha256": "e7d29f8d7c2d68c2dccfe43917c730e32b8874b49b362aba81def74b80014c08",
+    "summary": "上传 base_color RGB 到固定 Specular G-buffer 着色器。；本文件定义类型与调用接口。"
+  },
+  "code/sparkium/pipelines/raster/material/materials.cpp": {
+    "details": [
+      "支持 Lambertian/Light/Principled/Specular；ShaderGraph 不支持。"
+    ],
+    "sha256": "811df2cc8fa759854b19792ede1884b32a581ca56d9d893a50a8bbe0f5cbc431",
+    "summary": "四种前端材质到 Raster 组件的分派。；本文件实现接口行为。"
+  },
+  "code/sparkium/pipelines/raster/material/materials.h": {
+    "details": [
+      "支持 Lambertian/Light/Principled/Specular；ShaderGraph 不支持。"
+    ],
+    "sha256": "6f4cdd9bfce06865e302e1e4f138c2671c4b69796cc03e5003a47b3da155e245",
+    "summary": "四种前端材质到 Raster 组件的分派。；本文件定义类型与调用接口。"
+  },
+  "code/sparkium/pipelines/raster/raster.cpp": {
+    "details": [
+      "#include \"sparkium/pipelines/raster/raster.h\""
+    ],
+    "sha256": "c982d59fe73e16784a45f48d5fa63a93d96e57dd418319267a7f3250438cf863",
+    "summary": "模块编译单元：包含对应头文件并保留命名空间边界，无额外运行时算法。"
+  },
+  "code/sparkium/pipelines/raster/raster.h": {
+    "details": [
+      "#include \"sparkium/pipelines/raster/core/core.h\"",
+      "#include \"sparkium/pipelines/raster/entity/entities.h\"",
+      "#include \"sparkium/pipelines/raster/geometry/geometries.h\"",
+      "#include \"sparkium/pipelines/raster/material/materials.h\""
+    ],
+    "sha256": "36d05ad99564570a4175d29ebb69fa8b73ade96cfa36761d4b41a24475a2e546",
+    "summary": "聚合头：将相关声明从一个入口暴露给调用方。"
+  },
+  "code/sparkium/scene_io/CMakeLists.txt": {
+    "details": [],
+    "sha256": "2d3c3323b52897743dfb7b45982fb90d33596aba704decd5ad0688b83fe18a3d",
+    "summary": "构建 sparkium_scene_io，并公开链接 Grassland、Snowberg、core/entity/geometry/material 和 RapidJSON；将目标加入父作用域 SPARKIUM_LIBS。"
+  },
+  "code/sparkium/scene_io/json_scene.cpp": {
+    "details": [
+      "根必须包含 format=\"sparkium-scene\"、version=1，以及 renderer、film、camera、materials、geometries、entities。renderer 支持 auto/rasterization/ray_tracing/ray_query/rt_fallback；samples 默认 32、max_bounces 默认 32，均须大于零。",
+      "film 宽高为正整数；persistence 默认 1、clamping 默认 100，view_transform 为 normalized/standard/filmic。相机 fov_degrees 默认 60 且在 (0,180)；eye/target/up 必须形成有效视图。薄透镜在 aperture_radius>0 时可自动选择；focus_distance 默认视点距离，叶片旋转按原值传入。",
+      "材质支持 lambertian、specular、light、principled、shader_graph；Principled 加载 normal/base_color/metallic/specular/roughness/anisotropic/anisotropic_rotation/emission 八类贴图并支持 normal_reverse_y。图材质预加载所有 image_texture 节点，包括未连接节点。",
+      "几何支持 sphere、OBJ mesh、binary_mesh、inline_mesh、hair；内嵌网格校验三角索引范围，二进制网格只校验长度与标志，不校验索引范围。可显式重算法线/切线；毛发经 GeometryHair 转为三角网格。",
+      "实体支持 mesh 和 point_light。mesh 通过几何/材质 ID 查找；transform 的 matrix 为列主序且优先于 TRS，TRS 使用 T*Rx*Ry*Rz*S。look_at 会覆盖 transform；实体 look_at 未重复执行相机的退化校验。",
+      "材质图输出包括 base_color、metallic、specular、roughness、anisotropic、anisotropic_rotation、sheen、clearcoat、clearcoat_roughness、ior、transmission、transmission_roughness、emission、normal、opacity、shadow_opacity、thin_walled、subsurface、subsurface_scale、subsurface_radius、subsurface_method。未列出的输出被忽略。",
+      "图支持常量、纹理坐标、图像、mapping、noise/voronoi/gradient/wave/sky/brick、顶点与对象信息、geometry_info/light_path、mix/math、color_ramp/rgb_curves、HSV/gamma/bright_contrast、layer_weight、normal_map、bump、combine/separate/passthrough/invert_y。noise 为值噪声，sky 为近似梯度，bump 不使用高度；light_path 的 glossy/diffuse/singular 都按反射标记判断。",
+      "color_ramp 按输入顺序线性混合，不排序；rgb_curves 是每通道均匀采样的分段线性插值。math 的 DIVIDE 使用 max(abs(b),1e-8)，不保留负除数符号；未知 math 操作按 ADD，未知节点类型抛异常。"
+    ],
+    "sha256": "1f315e6a8bc067f7b9a241a09c6a4dab751b4d2d10d5973c6802d2de067b50d0",
+    "summary": "JSON v1 场景装配、二进制网格/毛发读取与材质图源码生成。；本文件实现接口行为。"
+  },
+  "code/sparkium/scene_io/json_scene.h": {
+    "details": [
+      "根必须包含 format=\"sparkium-scene\"、version=1，以及 renderer、film、camera、materials、geometries、entities。renderer 支持 auto/rasterization/ray_tracing/ray_query/rt_fallback；samples 默认 32、max_bounces 默认 32，均须大于零。",
+      "film 宽高为正整数；persistence 默认 1、clamping 默认 100，view_transform 为 normalized/standard/filmic。相机 fov_degrees 默认 60 且在 (0,180)；eye/target/up 必须形成有效视图。薄透镜在 aperture_radius>0 时可自动选择；focus_distance 默认视点距离，叶片旋转按原值传入。",
+      "材质支持 lambertian、specular、light、principled、shader_graph；Principled 加载 normal/base_color/metallic/specular/roughness/anisotropic/anisotropic_rotation/emission 八类贴图并支持 normal_reverse_y。图材质预加载所有 image_texture 节点，包括未连接节点。",
+      "几何支持 sphere、OBJ mesh、binary_mesh、inline_mesh、hair；内嵌网格校验三角索引范围，二进制网格只校验长度与标志，不校验索引范围。可显式重算法线/切线；毛发经 GeometryHair 转为三角网格。",
+      "实体支持 mesh 和 point_light。mesh 通过几何/材质 ID 查找；transform 的 matrix 为列主序且优先于 TRS，TRS 使用 T*Rx*Ry*Rz*S。look_at 会覆盖 transform；实体 look_at 未重复执行相机的退化校验。",
+      "材质图输出包括 base_color、metallic、specular、roughness、anisotropic、anisotropic_rotation、sheen、clearcoat、clearcoat_roughness、ior、transmission、transmission_roughness、emission、normal、opacity、shadow_opacity、thin_walled、subsurface、subsurface_scale、subsurface_radius、subsurface_method。未列出的输出被忽略。",
+      "图支持常量、纹理坐标、图像、mapping、noise/voronoi/gradient/wave/sky/brick、顶点与对象信息、geometry_info/light_path、mix/math、color_ramp/rgb_curves、HSV/gamma/bright_contrast、layer_weight、normal_map、bump、combine/separate/passthrough/invert_y。noise 为值噪声，sky 为近似梯度，bump 不使用高度；light_path 的 glossy/diffuse/singular 都按反射标记判断。",
+      "color_ramp 按输入顺序线性混合，不排序；rgb_curves 是每通道均匀采样的分段线性插值。math 的 DIVIDE 使用 max(abs(b),1e-8)，不保留负除数符号；未知 math 操作按 ADD，未知节点类型抛异常。"
+    ],
+    "sha256": "47f384af3a88c5f977dbd17c2a0c956cdeee173a55ffffebf9008fe2e7ac8cab",
+    "summary": "JSON v1 场景装配、二进制网格/毛发读取与材质图源码生成。；本文件定义类型与调用接口。"
   },
   "code/sparkium/sparkium.cpp": {
     "details": [
