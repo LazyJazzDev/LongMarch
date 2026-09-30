@@ -47,6 +47,12 @@ def object_id(obj):
     return 'api-' + hashlib.sha256((obj['qualified'] + obj['signature']).encode()).hexdigest()[:14]
 
 
+def api_note(api, path, obj):
+    # Shader entry points and file-local helpers may share a spelling without
+    # sharing semantics. A file-scoped record always takes precedence.
+    return api.get(path + '#' + obj['qualified']) or api.get(obj['qualified'])
+
+
 def build(strict=False):
     records = [extract(path, ROOT) for path in tracked_files(ROOT)]
     files = read_json('files.json')
@@ -56,7 +62,7 @@ def build(strict=False):
     directories = sorted({str(parent) for path in paths for parent in Path(path).parents if str(parent) != '.'})
     revision = subprocess.check_output(['git', 'rev-parse', 'HEAD'], cwd=ROOT, text=True).strip()
     pending = [r['path'] for r in records if r['path'] not in files or files[r['path']].get('sha256') != r['sha256']]
-    undocumented = sorted({o['qualified'] for r in records for o in r['objects'] if o['qualified'] not in api})
+    undocumented = sorted({r['path'] + '#' + o['qualified'] for r in records for o in r['objects'] if not api_note(api, r['path'], o)})
     missing_modules = sorted(set(directories) - set(modules))
     coverage = {'source_revision': revision, 'files': len(records), 'reviewed_files': len(records) - len(pending),
                 'objects': sum(len(r['objects']) for r in records), 'documented_object_names': len(api),
@@ -160,7 +166,7 @@ def build(strict=False):
         if record['objects']:
             body += '<h2>对象与接口</h2><p class="hint">同名重载分别列出；私有成员用于解释实现边界，不构成对外接口。</p>'
         for obj in record['objects']:
-            description = api.get(obj['qualified'])
+            description = api_note(api, record['path'], obj)
             body += f'<article class="api-object" id="{object_id(obj)}"><p class="api-kind">{esc(obj["kind"])} · {esc(obj["access"])} · L{obj["line"]}–{obj["end_line"]}</p><h3>{esc(obj["qualified"])}</h3>'
             body += '<pre><code>' + esc(obj['signature']) + '</code></pre>'
             if description:

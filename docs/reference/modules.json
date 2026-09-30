@@ -255,6 +255,78 @@
     "summary": "组织 draw、gui、solver、visualizer 四类应用设施；新的 GUI 与保留原外观的 surface 基础设施同属此模块。",
     "title": "Snowberg · 应用基础组件"
   },
+  "code/snowberg/draw": {
+    "contracts": [
+      "先 CmdSetDrawRegion 再提交文字，建立像素到 NDC 变换；通用网格的 Transform 直接输出裁剪坐标。",
+      "队列只保存模型/纹理裸指针，资源必须活到命令执行和 GPU 使用结束。",
+      "BeginDraw/EndDraw 当前为空；真正清空元数据与命令发生在 Render。",
+      "文字按码点依次绘制，未提供 shaping、kerning、多行换行或自动字体回退。FreeType 失败未检查，调用者应传有效字体。"
+    ],
+    "flow": [
+      "Core 收集 region、instance 和 text 命令，Render 上传元数据并按提交顺序执行。",
+      "Model/Texture 拥有 GPU 数据并借用 draw Core；FontCore 按字体/字号/码点缓存字形纹理。",
+      "绘制程序按输出颜色格式缓存，启用 alpha 混合且无深度附件；纹理和顶点色乘实例色。"
+    ],
+    "summary": "面向已存在 graphics 图像的轻量命令队列；以二维网格、纹理、逐实例变换/颜色和 FreeType 字形组成 GUI 绘制基础。",
+    "title": "二维绘制与字体"
+  },
+  "code/snowberg/draw/shaders": {
+    "contracts": [
+      "槽 0 为存储元数据，槽 1 为纹理，槽 2 为采样器；实例索引来自独立 per-instance 顶点流。",
+      "C++ Transform 对应着色器 4×4 矩阵，DrawMetadata 后跟 vec4 色；布局必须一致。"
+    ],
+    "flow": [
+      "顶点阶段读取 instance_id 对应 DrawMetadata，变换位置并调制顶点颜色。",
+      "片元阶段采样纹理并乘插值颜色，混合由 graphics 管线完成。"
+    ],
+    "summary": "以逐实例矩阵和颜色驱动纹理化三角网格，Slang 是当前 draw Core 实际加载路径；GLSL 文件保留相同基础渲染协议。",
+    "title": "二维网格着色器"
+  },
+  "code/snowberg/gui": {
+    "contracts": [
+      "声明式坐标使用窗口逻辑像素；surface 绘制使用帧缓冲像素；WorldPanel 使用自己的离屏像素尺寸。",
+      "Context 每帧 BeginFrame→BeginPanel/控件/EndPanel→EndFrame。面板不能嵌套，行列数固定。",
+      "控件标识由 panel id、类型、label/id 组合；同类型同标签不可在同一面板内重复或在拖动时改变。",
+      "当前控件仅支持单指针；无键盘焦点、文本输入、滚动容器或声明式裁剪。Custom 绘制也不自动裁剪。",
+      "背景模糊是两遍全分辨率九抽头采样加圆角遮罩合成，最多 16 面板参与遮罩；未实现物理折射或 iOS 系统材质。"
+    ],
+    "flow": [
+      "声明式 Context 每帧收集面板/控件并完成命中处理，EndFrame 先模糊合成背景，再由 snowberg_draw 绘制控件。",
+      "WorldPanel 在离屏纹理上复用 Context，再把纹理绘制到三维四边形；应用负责选择最近射线命中并分发输入。",
+      "surface::Application 负责定制游戏界面的窗口、实例化渲染、事件与动画基础，2048/GoL 保留原来视觉。"
+    ],
+    "summary": "在 graphics 上提供声明式玻璃控件、自定义二维 surface 与世界空间面板；界面状态由应用持有，渲染资源由各上下文管理。",
+    "title": "统一 GUI"
+  },
+  "code/snowberg/gui/shaders": {
+    "contracts": [
+      "Slang register space 与 graphics AddResourceBinding 的位置逐项对应；常量结构与 C++ 字节布局必须一致。",
+      "Blur/Composite 线程组为 8×8×1；CPU 以向上取整的组数调度，越界线程提前返回。",
+      "输出图像格式需支持相应采样、存储写入或颜色附件用法；当前代码没有逐次检查资源创建状态。"
+    ],
+    "flow": [
+      "Context 以 Blur 横向→纵向→Composite→draw 控件完成屏幕界面。",
+      "surface resolve 通过无顶点缓冲的全屏三角形平均超采样并混合第二帧。",
+      "world_panel 顶点变换局部单位矩形，片元采样离屏 UI。"
+    ],
+    "summary": "提供背景模糊、玻璃遮罩、surface 抗锯齿 resolve 与世界面板纹理映射。",
+    "title": "GUI 着色器协议"
+  },
+  "code/snowberg/gui/surface": {
+    "contracts": [
+      "InstanceInfo 的矩阵、颜色、extra 和 clip_rect 必须与自定义 shader 布局一致；extra.y 是字节偏移。",
+      "DeviceModel 和 Listener 借用 Application，必须在 Application 销毁前释放；渲染队列中的模型要活到 GPU 使用结束。",
+      "Button 的布局和 clip 使用帧缓冲像素，命中边界转换到窗口逻辑像素；布局/DPI 改变后需 Resize 重新计算。",
+      "输入通过监听器快照分发，允许回调期间增删监听器；没有消费标志、层级冒泡或自动互斥焦点。"
+    ],
+    "flow": [
+      "Application 创建 graphics Core/Window，初始化用户 VSMain/PSMain 和内建超采样 resolve。",
+      "每帧应用回调提交模型实例及可选数据，按模型分批并通过深度处理图层。",
+      "可将当前提交捕获为第二帧，resolve 平均超采样像素并按 alpha 混合，随后 ComposeUI 可追加控件。"
+    ],
+    "summary": "为保持原有游戏视觉的界面提供实例绘制、可定制着色器、事件监听、按钮和动画值。",
+    "title": "自定义视觉 surface"
+  },
   "code/sparkium": {
     "contracts": [
       "公共对象和管线适配对象分层；不要把同名 raytracing::Scene 与 sparkium::Scene 混为一个所有权对象。",

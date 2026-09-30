@@ -1318,6 +1318,386 @@
     "sha256": "01fc4d4a4163c15598875ec8992ce61dc8d4b2eb5733ee05e9c42119c999d74e",
     "summary": "定义 code/snowberg 的构建目标、子模块接入和传递依赖。"
   },
+  "code/snowberg/draw/CMakeLists.txt": {
+    "details": [
+      "源文件集合、目标链接和父作用域导出以本页列出的 CMake 原文为准；PUBLIC 依赖会传递给使用此目标的调用方。"
+    ],
+    "sha256": "e1fea571bfb5f0ca8fc74c0e0c930d4a8b1a6c9925121965626b3910755454f3",
+    "summary": "定义 draw 的 CMake 构建边界与传递依赖。"
+  },
+  "code/snowberg/draw/draw.cpp": {
+    "details": [
+      "#include \"snowberg/draw/draw.h\""
+    ],
+    "sha256": "c681c3e61ff155bb20a35bc980d983cf2718fe4f6dae21053b5c3f6d5a6d6bde",
+    "summary": "模块编译单元：包含对应头文件并保留命名空间边界，无额外运行时算法。"
+  },
+  "code/snowberg/draw/draw.h": {
+    "details": [
+      "#include \"snowberg/draw/draw_commands.h\"",
+      "#include \"snowberg/draw/draw_core.h\"",
+      "#include \"snowberg/draw/draw_model.h\"",
+      "#include \"snowberg/draw/draw_texture.h\"",
+      "#include \"snowberg/draw/draw_util.h\""
+    ],
+    "sha256": "7d3e365f7d99c8a3e92409eb361dd98010245d167743520298fcbf02e38706d9",
+    "summary": "聚合头：将相关声明从一个入口暴露给调用方。"
+  },
+  "code/snowberg/draw/draw_commands.cpp": {
+    "details": [
+      "命令对象拥有参数值，模型与纹理为借用指针；Execute 只向 graphics CommandContext 录制。"
+    ],
+    "sha256": "f9542c0ea587fd19941ddf57ae6e71c92bca380cb68ca6d2266c24e3fe778d18",
+    "summary": "延迟录制的设置区域和绘制实例命令；本文件实现接口行为。"
+  },
+  "code/snowberg/draw/draw_commands.h": {
+    "details": [
+      "命令对象拥有参数值，模型与纹理为借用指针；Execute 只向 graphics CommandContext 录制。"
+    ],
+    "sha256": "062770e3027bf1f49f1789c25f299c4240caf906d78c3ac3d42e76dcb4eb7eba",
+    "summary": "延迟录制的设置区域和绘制实例命令；本文件定义类型与调用接口。"
+  },
+  "code/snowberg/draw/draw_core.cpp": {
+    "details": [
+      "Render 按输出格式取得程序，上传元数据并执行所有命令；执行后队列清空。",
+      "默认白色纹理使无纹理模型可使用同一 shader；文字每字形提交一个纹理四边形。"
+    ],
+    "sha256": "98133b686bb0babbb5b1b29c7637ffe9fb1ad5bb2ea83fd52350edd845e29b0f",
+    "summary": "绘制资源管理、逐帧命令队列及文本展开；本文件实现接口行为。"
+  },
+  "code/snowberg/draw/draw_core.h": {
+    "details": [
+      "Render 按输出格式取得程序，上传元数据并执行所有命令；执行后队列清空。",
+      "默认白色纹理使无纹理模型可使用同一 shader；文字每字形提交一个纹理四边形。"
+    ],
+    "sha256": "50fe3cbd68b5ec4c0bd838783a71680d04a5aa9b184fb1f6960653175ca78e72",
+    "summary": "绘制资源管理、逐帧命令队列及文本展开；本文件定义类型与调用接口。"
+  },
+  "code/snowberg/draw/draw_font.cpp": {
+    "details": [
+      "每个字形使用独立 RGBA8 图像，白色 RGB 与灰度 alpha；空白字符可没有纹理但保留 advance。",
+      "以位图 width 索引 bitmap.buffer，未处理通用 pitch/彩色字形格式。",
+      "FontCore 析构删除所有缓存纹理并释放 face/library；GPU 同步由调用者负责。"
+    ],
+    "sha256": "51b5d55ca5502ec849145d8bdbfa879538f9890567256f72487ad42d94737bed",
+    "summary": "FreeType 字形载入、度量和 GPU 缓存；本文件实现接口行为。"
+  },
+  "code/snowberg/draw/draw_font.h": {
+    "details": [
+      "每个字形使用独立 RGBA8 图像，白色 RGB 与灰度 alpha；空白字符可没有纹理但保留 advance。",
+      "以位图 width 索引 bitmap.buffer，未处理通用 pitch/彩色字形格式。",
+      "FontCore 析构删除所有缓存纹理并释放 face/library；GPU 同步由调用者负责。"
+    ],
+    "sha256": "ce4587620fd1ec4e7e52d7a66b0f76fbceed4ee3444648c920e54261ba5bc412",
+    "summary": "FreeType 字形载入、度量和 GPU 缓存；本文件定义类型与调用接口。"
+  },
+  "code/snowberg/draw/draw_model.cpp": {
+    "details": [
+      "SetModelData 必要时扩容并上传全部数据，更新索引数；不验证输入索引有效性。"
+    ],
+    "sha256": "98466eac057787eefb12b31fe10ad2e4dcbffa9d03877d65792cb7ba363bcb6d",
+    "summary": "二维网格动态缓冲；本文件实现接口行为。"
+  },
+  "code/snowberg/draw/draw_model.h": {
+    "details": [
+      "SetModelData 必要时扩容并上传全部数据，更新索引数；不验证输入索引有效性。"
+    ],
+    "sha256": "b0ef0b8c25d77d12c3bc9df2004521902081353323c47f8a55d9a84f2ec00278",
+    "summary": "二维网格动态缓冲；本文件定义类型与调用接口。"
+  },
+  "code/snowberg/draw/draw_texture.cpp": {
+    "details": [
+      "构造固定宽高/格式，上传委托 graphics Image；无图集分配或自动 mipmap。"
+    ],
+    "sha256": "7766e51205db1b757073e203d60aa318be7763f0040af40465bbb9ffab67b9bc",
+    "summary": "RGBA8 二维纹理包装；本文件实现接口行为。"
+  },
+  "code/snowberg/draw/draw_texture.h": {
+    "details": [
+      "构造固定宽高/格式，上传委托 graphics Image；无图集分配或自动 mipmap。"
+    ],
+    "sha256": "3f28e095cab37874176b6ca55a7b07be8534b7dd82d43644772cc9b541d6e4bc",
+    "summary": "RGBA8 二维纹理包装；本文件定义类型与调用接口。"
+  },
+  "code/snowberg/draw/draw_util.cpp": {
+    "details": [
+      "PixelCoordToNDC 把左上原点、Y 向下的局部区域像素映射到 NDC；width/height 必须非零。"
+    ],
+    "sha256": "952cc0dd8cf9167ee04df14cf6e55264c73de257e54ae21ea5081cf6af76c474",
+    "summary": "二维顶点、实例元数据与像素坐标转换；本文件实现接口行为。"
+  },
+  "code/snowberg/draw/draw_util.h": {
+    "details": [
+      "PixelCoordToNDC 把左上原点、Y 向下的局部区域像素映射到 NDC；width/height 必须非零。"
+    ],
+    "sha256": "2110e6a8fe7614fd33fb0bdc0512d3c50c0ff2d07a33c3ecd4c9de66be0bc672",
+    "summary": "二维顶点、实例元数据与像素坐标转换；本文件定义类型与调用接口。"
+  },
+  "code/snowberg/draw/shaders/draw.frag": {
+    "details": [
+      "当前 draw_core.cpp 只加载 draw.slang；GLSL 文件不构成另一套正在运行的后端实现。"
+    ],
+    "sha256": "fa4e7e26cd25c4f688af0287d00a8199f638c6ff9b17abf6cee5e963a46c8211",
+    "summary": "保留的 GLSL 片元程序，采样分离纹理/采样器并调制颜色。"
+  },
+  "code/snowberg/draw/shaders/draw.slang": {
+    "details": [
+      "当前 draw_core.cpp 只加载 draw.slang；GLSL 文件不构成另一套正在运行的后端实现。"
+    ],
+    "sha256": "86baba2729bbbfddbb83c5f392a856a4edcfb8585abbecc7f7f1fad4c9ab1b8e",
+    "summary": "当前 Core 使用的跨后端 Slang 顶点/片元程序。"
+  },
+  "code/snowberg/draw/shaders/draw.vert": {
+    "details": [
+      "当前 draw_core.cpp 只加载 draw.slang；GLSL 文件不构成另一套正在运行的后端实现。"
+    ],
+    "sha256": "5843d53d1026036b89d4ab91d711398bd23cea7324e04012df25cdf8dc086331",
+    "summary": "保留的 GLSL 顶点程序，以存储缓冲实例矩阵变换二维顶点。"
+  },
+  "code/snowberg/gui/CMakeLists.txt": {
+    "details": [
+      "源文件集合、目标链接和父作用域导出以本页列出的 CMake 原文为准；PUBLIC 依赖会传递给使用此目标的调用方。"
+    ],
+    "sha256": "aa5aef61ba85993f82f060faaa577c0a6059ca577b8ac283127411c5c22acf75",
+    "summary": "定义 gui 的 CMake 构建边界与传递依赖。"
+  },
+  "code/snowberg/gui/README.md": {
+    "details": [
+      "示例演示声明式面板收集和将 EndFrame 返回图像呈现；surface 单独用于保留游戏原有视觉。"
+    ],
+    "sha256": "620f2bc396d6651a9643bed0d3783cabeb32117f2b9e4a150de5ed222e8380c0",
+    "summary": "GUI 两条使用路径的入门示例与当前能力边界"
+  },
+  "code/snowberg/gui/gui.cpp": {
+    "details": [
+      "输入在 BeginFrame 读取，Activate 在按下时捕获 ID、同控件内释放时触发点击；捕获只保留字符串。",
+      "面板宽度由调用者指定，高度根据子控件累计；普通边距 18、纵向间隔 7、行间横向间距 8。",
+      "圆角网格按物理宽/高/半径缓存；无淘汰策略，动态尺寸可能持续增大缓存。",
+      "EndFrame 借用返回的 scene 或自身 output_，应用负责提交命令及资源存活；尺寸/格式改变会 WaitGPU 后重建。"
+    ],
+    "sha256": "5c6385c1806088684a725b9897b9ab42bcf08a286a7f5ea523e8bb4804d3c2fa",
+    "summary": "声明式控件收集、指针状态机和玻璃绘制；本文件实现接口行为。"
+  },
+  "code/snowberg/gui/gui.h": {
+    "details": [
+      "输入在 BeginFrame 读取，Activate 在按下时捕获 ID、同控件内释放时触发点击；捕获只保留字符串。",
+      "面板宽度由调用者指定，高度根据子控件累计；普通边距 18、纵向间隔 7、行间横向间距 8。",
+      "圆角网格按物理宽/高/半径缓存；无淘汰策略，动态尺寸可能持续增大缓存。",
+      "EndFrame 借用返回的 scene 或自身 output_，应用负责提交命令及资源存活；尺寸/格式改变会 WaitGPU 后重建。"
+    ],
+    "sha256": "e0e6f0c4ad52fc5deda0e915a1703bb60bd113cb291e225833429ccd6e25ad95",
+    "summary": "声明式控件收集、指针状态机和玻璃绘制；本文件定义类型与调用接口。"
+  },
+  "code/snowberg/gui/gui_button.cpp": {
+    "details": [],
+    "sha256": "fc449b134a3f602f2d3939661fc19744bef969d0ddd872fb3c099ff4b4aa6744",
+    "summary": "包含历史空头文件的编译单元，没有运行时代码。"
+  },
+  "code/snowberg/gui/gui_button.h": {
+    "details": [
+      "当前实现位于 gui.h、world_panel.h 和 surface；不要将此文件名视为已实现能力。"
+    ],
+    "sha256": "0bbdbd79e3b4a3df7b29b995a53b9b59208d33b14ea1df3afc5bb8efe5b3da07",
+    "summary": "历史空头文件，仅保留 include guard，没有可用控件类型。"
+  },
+  "code/snowberg/gui/gui_input_bar.cpp": {
+    "details": [],
+    "sha256": "51607c62533641c6c1deb1ff08bc6c0f7486bc8849ff2b7e8bf0188ae9599e77",
+    "summary": "包含历史空头文件的编译单元，没有运行时代码。"
+  },
+  "code/snowberg/gui/gui_input_bar.h": {
+    "details": [
+      "当前实现位于 gui.h、world_panel.h 和 surface；不要将此文件名视为已实现能力。"
+    ],
+    "sha256": "aaaaed6e1816e7e19846709e4d1f231d168c44473fa040e6b601bcf60fc83f73",
+    "summary": "历史空头文件，仅保留 include guard，没有可用控件类型。"
+  },
+  "code/snowberg/gui/gui_module.cpp": {
+    "details": [],
+    "sha256": "efe0b3b605849af3dd5bd56d6764084d3fac83b8f12600e0923da7001cb837fd",
+    "summary": "包含历史空头文件的编译单元，没有运行时代码。"
+  },
+  "code/snowberg/gui/gui_module.h": {
+    "details": [
+      "当前实现位于 gui.h、world_panel.h 和 surface；不要将此文件名视为已实现能力。"
+    ],
+    "sha256": "31d3aeb23f6ec3d60222c31c2c433c960d636fd3924c4dec9c803e5b8c26479f",
+    "summary": "历史空头文件，仅保留 include guard，没有可用控件类型。"
+  },
+  "code/snowberg/gui/gui_util.cpp": {
+    "details": [],
+    "sha256": "59976b2305522cd564db0bd8cde1deae57b59c0f510ad1ff38428a989c919926",
+    "summary": "包含历史空头文件的编译单元，没有运行时代码。"
+  },
+  "code/snowberg/gui/gui_util.h": {
+    "details": [
+      "当前实现位于 gui.h、world_panel.h 和 surface；不要将此文件名视为已实现能力。"
+    ],
+    "sha256": "27a7c5fea6c1d41a73efb541d4ca3d7763ec64c5cab4dd014706361be784b327",
+    "summary": "历史空头文件，仅保留 include guard，没有可用控件类型。"
+  },
+  "code/snowberg/gui/gui_window.cpp": {
+    "details": [],
+    "sha256": "989b045c145acf37b33a2e2c054d2f2c008cae8cb0bb2b9f3084604e4f90102d",
+    "summary": "包含历史空头文件的编译单元，没有运行时代码。"
+  },
+  "code/snowberg/gui/gui_window.h": {
+    "details": [
+      "当前实现位于 gui.h、world_panel.h 和 surface；不要将此文件名视为已实现能力。"
+    ],
+    "sha256": "479db1d683e3a488e43c620a22fb0124c8e0da0030999fa612f048015d3d104c",
+    "summary": "历史空头文件，仅保留 include guard，没有可用控件类型。"
+  },
+  "code/snowberg/gui/shaders/blur.slang": {
+    "details": [
+      "权重中心 0.227027，两侧四对，边缘坐标钳制；direction 指定像素步长，CPU 当前取 (2,0)/(0,2)。"
+    ],
+    "sha256": "2e3a45b87f905360cbf9c0445269e038124a636fce9e1aed6c66bdea6f958c40",
+    "summary": "单方向九抽头高斯近似模糊"
+  },
+  "code/snowberg/gui/shaders/composite.slang": {
+    "details": [
+      "最多 16 个矩形，圆角最多 16 物理像素；多个面板取最大遮罩，模糊混合强度固定 0.72。"
+    ],
+    "sha256": "55310df0b35af95f6e63986c8b6c1cbe5522a702ffd0c7d718bd45b062cbc3a2",
+    "summary": "圆角面板遮罩内混合原图与模糊图"
+  },
+  "code/snowberg/gui/shaders/surface_resolve.slang": {
+    "details": [
+      "每个输出像素平均 scale² 个输入像素；两个 RGB 按 second_frame_alpha 混合，输出 alpha 恒 1。"
+    ],
+    "sha256": "48c6d090cd48fcb5954158ac57a92f39520796213f7d55b882fdcacdd1e6fa84",
+    "summary": "整数超采样降采样与双帧颜色混合"
+  },
+  "code/snowberg/gui/shaders/world_panel.slang": {
+    "details": [
+      "VSMain 使用 local_to_clip；PSMain 返回线性采样纹理，没有光照、色彩空间转换或透明像素 discard。"
+    ],
+    "sha256": "945426b3411bc9fa1377b58380b132fc4d8b89ab68d24252b45d06eca298e07e",
+    "summary": "世界面板四边形的变换与纹理采样"
+  },
+  "code/snowberg/gui/surface/animation_var.cpp": {
+    "details": [
+      "Update 接收归一化进度增量，不直接接收秒或持续时间；调用者负责换算。",
+      "重定向以当前插值值为起点，完成时精确返回 target，避免小数误差尾差。"
+    ],
+    "sha256": "1bac07d845c7a539c0e7d1818e96f49476329bc272df44142f71701ecaf4268e",
+    "summary": "一维可重定向插值动画；本文件实现接口行为。"
+  },
+  "code/snowberg/gui/surface/animation_var.h": {
+    "details": [
+      "Update 接收归一化进度增量，不直接接收秒或持续时间；调用者负责换算。",
+      "重定向以当前插值值为起点，完成时精确返回 target，避免小数误差尾差。"
+    ],
+    "sha256": "a38488ce2afa8046cfb290afd1356f4cd69423d9d5b2149ffa16dc1118174c51",
+    "summary": "一维可重定向插值动画；本文件定义类型与调用接口。"
+  },
+  "code/snowberg/gui/surface/application.cpp": {
+    "details": [
+      "Run 初始化→事件/更新/渲染循环→可选截图→GPU 等待与清理。",
+      "帧缓冲最大边≤2048 时 3×超采样，≤4096 时 2×，更大时 1×；绘制坐标仍是原始帧缓冲像素。",
+      "实例记录后拼接 uint32 数据，extra.y 在上传时增加实例记录区字节数。",
+      "RenderFrameTarget 稳定排序连续模型批次；深度负责图层，同深度跨模型提交顺序不保证。"
+    ],
+    "sha256": "a903ee9e6df483f39746857f076ad422e1deff6da20b64fef40e07176034060f",
+    "summary": "surface 窗口生命周期与双帧实例化渲染；本文件实现接口行为。"
+  },
+  "code/snowberg/gui/surface/application.h": {
+    "details": [
+      "Run 初始化→事件/更新/渲染循环→可选截图→GPU 等待与清理。",
+      "帧缓冲最大边≤2048 时 3×超采样，≤4096 时 2×，更大时 1×；绘制坐标仍是原始帧缓冲像素。",
+      "实例记录后拼接 uint32 数据，extra.y 在上传时增加实例记录区字节数。",
+      "RenderFrameTarget 稳定排序连续模型批次；深度负责图层，同深度跨模型提交顺序不保证。"
+    ],
+    "sha256": "d65b0a189e946d5e931d026abcf871750c26cd4bbb0198e84170138d8995889e",
+    "summary": "surface 窗口生命周期与双帧实例化渲染；本文件定义类型与调用接口。"
+  },
+  "code/snowberg/gui/surface/button.cpp": {
+    "details": [
+      "状态 0=普通、1=悬停、2=按下；按钮自身不绘制，派生类实现视觉和 OnClick。",
+      "指针移出会清除按下态，返回后释放不会点击；这不同于声明式 Context 的持续捕获。",
+      "Deactivate 仅注销，不重置 state；应用应在需要时同步视觉。"
+    ],
+    "sha256": "46df2cae4c674515b19e9436955d2664021d6d61e2e3fb005e31a63ca1a131a7",
+    "summary": "自定义按钮的状态与逻辑像素命中；本文件实现接口行为。"
+  },
+  "code/snowberg/gui/surface/button.h": {
+    "details": [
+      "状态 0=普通、1=悬停、2=按下；按钮自身不绘制，派生类实现视觉和 OnClick。",
+      "指针移出会清除按下态，返回后释放不会点击；这不同于声明式 Context 的持续捕获。",
+      "Deactivate 仅注销，不重置 state；应用应在需要时同步视觉。"
+    ],
+    "sha256": "7288d9f8d534ae49cd42c1df65c2a44c8d3ea8a6726a9b3e526619a2bddb2593",
+    "summary": "自定义按钮的状态与逻辑像素命中；本文件定义类型与调用接口。"
+  },
+  "code/snowberg/gui/surface/interpolation.cpp": {
+    "details": [
+      "Mix 不钳制 alpha；PowerInterpolation 是对称分段幂次缓动。",
+      "CosineInterpolation 从 x=0 的 1 递减到 x=1 的 0；不是从 0 到 1 的通常 ease-in-out。"
+    ],
+    "sha256": "ca9fed5d60906950ccf9ed8c369461715fb366961b67b2b32ead17cdec0e9e1b",
+    "summary": "值序列及缓动插值；本文件实现接口行为。"
+  },
+  "code/snowberg/gui/surface/interpolation.h": {
+    "details": [
+      "Mix 不钳制 alpha；PowerInterpolation 是对称分段幂次缓动。",
+      "CosineInterpolation 从 x=0 的 1 递减到 x=1 的 0；不是从 0 到 1 的通常 ease-in-out。"
+    ],
+    "sha256": "5d4ab455219773d938f1d1280b2651ffe04d56c505d8a828f3ca631e231c3a4a",
+    "summary": "值序列及缓动插值；本文件定义类型与调用接口。"
+  },
+  "code/snowberg/gui/surface/listener.cpp": {
+    "details": [
+      "构造注册，析构注销，Application 必须比监听器活得久。",
+      "失焦默认转为 OnCursorEnter(0)；OnWindowSize 是空钩子，当前 Application 未注册大小事件来调用它。"
+    ],
+    "sha256": "24a59e3d4eda586f336f799075c29be03f001982d8314f2b2744341395485d41",
+    "summary": "非拥有式窗口事件监听器；本文件实现接口行为。"
+  },
+  "code/snowberg/gui/surface/listener.h": {
+    "details": [
+      "构造注册，析构注销，Application 必须比监听器活得久。",
+      "失焦默认转为 OnCursorEnter(0)；OnWindowSize 是空钩子，当前 Application 未注册大小事件来调用它。"
+    ],
+    "sha256": "759db6a9daac76073d64d11948fc226702769cba015aff696742f383e57f9c21",
+    "summary": "非拥有式窗口事件监听器；本文件定义类型与调用接口。"
+  },
+  "code/snowberg/gui/surface/model.cpp": {
+    "details": [
+      "DeviceModel 以动态缓冲上传，容量不足才扩容；索引数由最后一次 UploadIndices 决定。",
+      "MixModel 要求非空关键帧和相同顶点数，按 alpha 整数部分循环选段、小数部分插值；负 alpha 不安全。",
+      "GetModelMatrix 使用 [-1,1] 模型域；GetModelMatrixZO 保留旧界面的半像素与中心变换语义。"
+    ],
+    "sha256": "77ea513cd05837417051d63ed9ed8632626436ed2469a6e2c638fc23328cf037",
+    "summary": "CPU/GPU 网格、变形插值及模型变换；本文件实现接口行为。"
+  },
+  "code/snowberg/gui/surface/model.h": {
+    "details": [
+      "DeviceModel 以动态缓冲上传，容量不足才扩容；索引数由最后一次 UploadIndices 决定。",
+      "MixModel 要求非空关键帧和相同顶点数，按 alpha 整数部分循环选段、小数部分插值；负 alpha 不安全。",
+      "GetModelMatrix 使用 [-1,1] 模型域；GetModelMatrixZO 保留旧界面的半像素与中心变换语义。"
+    ],
+    "sha256": "3c282cc51446e8d94fc1a49884fb18c6613f47cd78f0e935a7208c76e41c49d6",
+    "summary": "CPU/GPU 网格、变形插值及模型变换；本文件定义类型与调用接口。"
+  },
+  "code/snowberg/gui/world_panel.cpp": {
+    "details": [
+      "局部矩形为 x/y∈[0,1)、z=0，SetTransform 定义大小/位置/方向；RayHit 不检查场景物体遮挡。",
+      "默认禁用背景模糊，离屏纹理 RGBA8；透明背景经混合绘到场景，使用传入深度附件。",
+      "多个面板最近命中、屏幕 UI 优先级与透明排序均由应用管理。"
+    ],
+    "sha256": "fc8b9176fc0dcb67aa093ac988478b67badb498a93d6a779f4272d93b2d9366b",
+    "summary": "离屏控件到世界空间四边形的适配；本文件实现接口行为。"
+  },
+  "code/snowberg/gui/world_panel.h": {
+    "details": [
+      "局部矩形为 x/y∈[0,1)、z=0，SetTransform 定义大小/位置/方向；RayHit 不检查场景物体遮挡。",
+      "默认禁用背景模糊，离屏纹理 RGBA8；透明背景经混合绘到场景，使用传入深度附件。",
+      "多个面板最近命中、屏幕 UI 优先级与透明排序均由应用管理。"
+    ],
+    "sha256": "389092541ddec386becff53d002c0e70b2d6f5f11833f18ef567a2f9251546d2",
+    "summary": "离屏控件到世界空间四边形的适配；本文件定义类型与调用接口。"
+  },
   "code/snowberg/snowberg.cpp": {
     "details": [
       "#include \"snowberg/snowberg.h\""

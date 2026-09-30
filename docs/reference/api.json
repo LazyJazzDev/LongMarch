@@ -7,6 +7,26 @@
     "contract": "",
     "description": "使 GLFW native 头暴露 Win32 window handle 接口。"
   },
+  "GUI_BUTTON_H": {
+    "contract": "不是 GUI 类型或功能开关。",
+    "description": "阻止历史空头文件重复包含的预处理标记。"
+  },
+  "GUI_INPUT_BAR_H": {
+    "contract": "不是 GUI 类型或功能开关。",
+    "description": "阻止历史空头文件重复包含的预处理标记。"
+  },
+  "GUI_MODULE_H": {
+    "contract": "不是 GUI 类型或功能开关。",
+    "description": "阻止历史空头文件重复包含的预处理标记。"
+  },
+  "GUI_UTIL_H": {
+    "contract": "不是 GUI 类型或功能开关。",
+    "description": "阻止历史空头文件重复包含的预处理标记。"
+  },
+  "GUI_WINDOW_H": {
+    "contract": "不是 GUI 类型或功能开关。",
+    "description": "阻止历史空头文件重复包含的预处理标记。"
+  },
   "NOMINMAX": {
     "contract": "",
     "description": "阻止 Windows 头定义 min/max 宏，避免干扰 C++ 算法名称。"
@@ -26,6 +46,210 @@
   "WIN32_LEAN_AND_MEAN": {
     "contract": "",
     "description": "在 _WIN64 分支缩减 Windows 头包含范围。"
+  },
+  "code/snowberg/draw/shaders/draw.frag#frag_color": {
+    "contract": "由管线后续混合到颜色附件。",
+    "description": "location 0 片元 RGBA 输出。"
+  },
+  "code/snowberg/draw/shaders/draw.frag#in_color": {
+    "contract": "包含顶点与实例颜色。",
+    "description": "location 1 插值 RGBA。"
+  },
+  "code/snowberg/draw/shaders/draw.frag#in_tex_coord": {
+    "contract": "来自 draw.vert 的同位置输出。",
+    "description": "location 0 插值 UV。"
+  },
+  "code/snowberg/draw/shaders/draw.frag#main": {
+    "contract": "是 GLSL 片元入口，与其他文件 main 名字相同但职责不同。",
+    "description": "采样纹理并乘输入颜色，写 frag_color。"
+  },
+  "code/snowberg/draw/shaders/draw.frag#samp": {
+    "contract": "与 tex 组成 sampler2D。",
+    "description": "set 2/binding 0 分离 sampler。"
+  },
+  "code/snowberg/draw/shaders/draw.frag#tex": {
+    "contract": "须与采样器组合才能调用 texture。",
+    "description": "set 1/binding 0 分离 texture2D。"
+  },
+  "code/snowberg/draw/shaders/draw.slang#DrawMetadata": {
+    "contract": "与 C++ DrawMetadata 的 transform/color 顺序一致。",
+    "description": "4×4 model 与 float4 color 的实例布局。"
+  },
+  "code/snowberg/draw/shaders/draw.slang#PSInput": {
+    "contract": "颜色已包含实例颜色乘数。",
+    "description": "裁剪空间 position 与供片元插值的 UV/颜色。"
+  },
+  "code/snowberg/draw/shaders/draw.slang#PSMain": {
+    "contract": "没有光照、alpha discard 或色彩空间转换。",
+    "description": "将采样纹理色乘插值颜色，返回 RGBA。"
+  },
+  "code/snowberg/draw/shaders/draw.slang#VSInput": {
+    "contract": "location 0..3 对应 Core 输入属性；instance_id 来自 per-instance 顶点流。",
+    "description": "position/tex_coord/color 与实例索引输入结构。"
+  },
+  "code/snowberg/draw/shaders/draw.slang#VSMain": {
+    "contract": "输出不进行额外像素坐标转换，CPU 矩阵须已包含投影。",
+    "description": "读取实例记录，变换二维位置并将顶点色乘实例色。"
+  },
+  "code/snowberg/draw/shaders/draw.slang#draw_metadata": {
+    "contract": "地址为 sizeof(DrawMetadata)×instance_id。",
+    "description": "槽 0 ByteAddressBuffer，保存连续实例记录。"
+  },
+  "code/snowberg/draw/shaders/draw.slang#samp": {
+    "contract": "Core 使用线性过滤与边缘钳制。",
+    "description": "槽 2 采样器。"
+  },
+  "code/snowberg/draw/shaders/draw.slang#texture": {
+    "contract": "白纹理用于无纹理几何，字形纹理携带 alpha。",
+    "description": "槽 1 采样纹理。"
+  },
+  "code/snowberg/draw/shaders/draw.vert#DrawMetadata": {
+    "contract": "存储缓冲采用 std430。",
+    "description": "GLSL mat4 model/vec4 color 实例记录。"
+  },
+  "code/snowberg/draw/shaders/draw.vert#draw_metadata": {
+    "contract": "set 0/binding 0，索引必须有效。",
+    "description": "DrawMetadataBuffer 中的运行时长度实例数组。"
+  },
+  "code/snowberg/draw/shaders/draw.vert#in_color": {
+    "contract": "乘实例颜色后传出。",
+    "description": "location 2 顶点 RGBA。"
+  },
+  "code/snowberg/draw/shaders/draw.vert#in_instance_index": {
+    "contract": "输入实例流须与 draw_metadata 数组对应。",
+    "description": "location 3 实例记录索引。"
+  },
+  "code/snowberg/draw/shaders/draw.vert#in_position": {
+    "contract": "GLSL 保留路径，当前 Core 实际使用 Slang。",
+    "description": "location 0 二维顶点位置。"
+  },
+  "code/snowberg/draw/shaders/draw.vert#in_tex_coord": {
+    "contract": "顶点阶段原样传出。",
+    "description": "location 1 二维纹理坐标。"
+  },
+  "code/snowberg/draw/shaders/draw.vert#main": {
+    "contract": "是 GLSL 顶点入口，当前 draw_core 不加载该文件。",
+    "description": "用实例矩阵写 gl_Position，输出 UV 和顶点色×实例色。"
+  },
+  "code/snowberg/draw/shaders/draw.vert#out_color": {
+    "contract": "与片元 in_color 对应。",
+    "description": "location 1 输出调制颜色。"
+  },
+  "code/snowberg/draw/shaders/draw.vert#out_tex_coord": {
+    "contract": "与片元 in_tex_coord 接口对应。",
+    "description": "location 0 输出 UV。"
+  },
+  "code/snowberg/gui/gui.h#snowberg::draw::Core": {
+    "contract": "完整定义见 snowberg/draw；此头只声明类型以减少直接包含。",
+    "description": "声明式 GUI 所用二维绘制资源与命令管理器的前置声明。"
+  },
+  "code/snowberg/gui/gui.h#snowberg::draw::Model": {
+    "contract": "完整定义见 snowberg/draw；此头只声明类型以减少直接包含。",
+    "description": "圆角矩形缓存持有的二维网格对象前置声明。"
+  },
+  "code/snowberg/gui/shaders/blur.slang#Blur": {
+    "contract": "每对偏移是 i×direction，边缘钳制到有效像素；CPU 需要分开录制横/纵两遍。",
+    "description": "8×8 线程组执行中心加四对邻域权重求和，越界返回。"
+  },
+  "code/snowberg/gui/shaders/blur.slang#BlurSettings": {
+    "contract": "与 C++ BlurSettings 对齐，总计四个 int。",
+    "description": "模糊常量布局：int2 direction 与 int2 extent。"
+  },
+  "code/snowberg/gui/shaders/blur.slang#blur_settings": {
+    "contract": "direction 以物理像素为单位，extent 是输出边界。",
+    "description": "绑定槽 2 的方向与尺寸常量。"
+  },
+  "code/snowberg/gui/shaders/blur.slang#blur_source": {
+    "contract": "输入图至少覆盖 extent，使用 Load 不经过采样器。",
+    "description": "只读输入 Texture2D<float4>，绑定槽 0。"
+  },
+  "code/snowberg/gui/shaders/blur.slang#blur_target": {
+    "contract": "不能与本次读取源以不安全方式别名。",
+    "description": "可写输出图像，绑定槽 1。"
+  },
+  "code/snowberg/gui/shaders/composite.slang#Composite": {
+    "contract": "8×8 线程组；没有折射、背景层独立抓取或按面板顺序的递归模糊。",
+    "description": "以圆角矩形 SDF 构造抗锯齿遮罩，取各面板最大值，以 0.72×遮罩混合原图和模糊图。"
+  },
+  "code/snowberg/gui/shaders/composite.slang#GlassSettings": {
+    "contract": "count≤16，坐标是物理像素。",
+    "description": "输出尺寸、面板数量、填充和 16 个 xyxy 矩形。"
+  },
+  "code/snowberg/gui/shaders/composite.slang#blurred_source": {
+    "contract": "与原图尺寸和颜色含义相同。",
+    "description": "槽 1 两遍模糊后的场景图。"
+  },
+  "code/snowberg/gui/shaders/composite.slang#glass_settings": {
+    "contract": "CPU GlassSettings 与 shader 布局必须相同。",
+    "description": "槽 3 玻璃遮罩参数常量。"
+  },
+  "code/snowberg/gui/shaders/composite.slang#glass_target": {
+    "contract": "外部面板区域保留原图。",
+    "description": "槽 2 可写合成图。"
+  },
+  "code/snowberg/gui/shaders/composite.slang#scene_source": {
+    "contract": "像素尺寸与 extent 一致。",
+    "description": "槽 0 原场景图。"
+  },
+  "code/snowberg/gui/shaders/surface_resolve.slang#PSMain": {
+    "contract": "目标尺寸需与输入及 scale 匹配；这里不是源 alpha 混合。",
+    "description": "平均两个输入各 scale² 个像素，将 RGB 按比例混合后输出 alpha=1。"
+  },
+  "code/snowberg/gui/shaders/surface_resolve.slang#ResolveParams": {
+    "contract": "CPU ResolveParams 同布局；scale 必须≥1。",
+    "description": "float 混合比例、uint 超采样倍率和 uint2 填充。"
+  },
+  "code/snowberg/gui/shaders/surface_resolve.slang#VSMain": {
+    "contract": "以 3 顶点、无顶点缓冲方式调用。",
+    "description": "从 SV_VertexID 生成覆盖视口的全屏三角形。"
+  },
+  "code/snowberg/gui/shaders/surface_resolve.slang#main_frame": {
+    "contract": "尺寸为输出尺寸×scale。",
+    "description": "槽 1 超采样主颜色图。"
+  },
+  "code/snowberg/gui/shaders/surface_resolve.slang#params": {
+    "contract": "第二帧比例建议 [0,1]，shader 不钳制。",
+    "description": "槽 0 resolve 常量缓冲。"
+  },
+  "code/snowberg/gui/shaders/surface_resolve.slang#second_frame": {
+    "contract": "没有第二帧时 CPU 绑定主图并设 alpha=0。",
+    "description": "槽 2 超采样第二颜色图。"
+  },
+  "code/snowberg/gui/shaders/world_panel.slang#PSMain": {
+    "contract": "不执行光照或 alpha discard；混合和深度行为由管线决定。",
+    "description": "按插值 UV 采样 panel_image 并直接返回 RGBA。"
+  },
+  "code/snowberg/gui/shaders/world_panel.slang#PanelUniform": {
+    "contract": "CPU 上传 view_projection×local_to_world。",
+    "description": "单个 float4x4 local_to_clip 矩阵。"
+  },
+  "code/snowberg/gui/shaders/world_panel.slang#PixelInput": {
+    "contract": "UV 随透视插值。",
+    "description": "齐次裁剪坐标与插值 UV 的顶点到片元记录。"
+  },
+  "code/snowberg/gui/shaders/world_panel.slang#VSMain": {
+    "contract": "世界矩形大小和姿态完全由矩阵决定。",
+    "description": "将局部二维位置扩展到 z=0,w=1 并变换到裁剪空间，同时传递 UV。"
+  },
+  "code/snowberg/gui/shaders/world_panel.slang#VertexInput": {
+    "contract": "匹配 WorldPanel::Vertex。",
+    "description": "二维 position 与 UV 输入记录，location 0/1。"
+  },
+  "code/snowberg/gui/shaders/world_panel.slang#panel_image": {
+    "contract": "默认由内部 Context 绘制到 RGBA8。",
+    "description": "槽 1 离屏 UI 纹理。"
+  },
+  "code/snowberg/gui/shaders/world_panel.slang#panel_sampler": {
+    "contract": "CPU 建立线性过滤、边缘钳制。",
+    "description": "槽 2 采样器。"
+  },
+  "code/snowberg/gui/shaders/world_panel.slang#panel_uniform": {
+    "contract": "使用 mul(matrix,vector) 进行顶点变换。",
+    "description": "槽 0 面板变换常量。"
+  },
+  "code/snowberg/gui/surface/application.cpp#STB_IMAGE_WRITE_IMPLEMENTATION": {
+    "contract": "供 Application::SaveScreenshot 使用；与其他同名宏实例按各自链接目标审视，避免重复定义。",
+    "description": "在本编译单元启用 stb_image_write 的 PNG 写出实现。"
   },
   "contradium::(anonymous)::PBDStepHelper": {
     "contract": "",
@@ -4274,5 +4498,861 @@
   "practium::Scene::SyncRenderState": {
     "contract": "",
     "description": "依次调用所有已注册 Entity 的同步方法，要求每个指针仍有效。"
+  },
+  "snowberg::draw::CharModel": {
+    "contract": "char_tex_ 由 FontCore 所有，空白字形可为空；返回副本不转移纹理所有权。",
+    "description": "字形纹理与 advance、bearing、位图宽高的缓存值。"
+  },
+  "snowberg::draw::Core": {
+    "contract": "借用 graphics Core；无内建线程同步。",
+    "description": "拥有二维绘制程序、元数据缓冲、字体和命令队列的绘制器。"
+  },
+  "snowberg::draw::Core::BeginDraw": {
+    "contract": "不会开始 graphics render pass 或清空旧命令。",
+    "description": "当前为空方法。"
+  },
+  "snowberg::draw::Core::CmdDrawInstance": {
+    "contract": "仅颜色重载用单位变换；Model/Texture/Image 均借用并须存活到执行。Transform 应已映射到裁剪坐标。",
+    "description": "排队一个带变换/颜色的模型实例；纹理重载使用给定纹理，其余使用白纹理。"
+  },
+  "snowberg::draw::Core::CmdDrawText": {
+    "contract": "origin.y 为基线；先设置有效字体与 draw region。无 kerning、换行布局或复杂文字 shaping。",
+    "description": "将字符串转换为宽字符，按字形 bearing 放置四边形并以 advance_x 推进。"
+  },
+  "snowberg::draw::Core::CmdSetDrawRegion": {
+    "contract": "宽高必须正数，文本坐标相对该 viewport；区域原点由 viewport 偏移应用。",
+    "description": "排队设置 viewport/scissor，并立即更新后续文字使用的像素变换。"
+  },
+  "snowberg::draw::Core::Core": {
+    "contract": "core 必须有效；创建错误没有逐项返回给调用者。",
+    "description": "编译 Slang 程序，建立白纹理/线性采样器、索引流、FontCore 和字形四边形。"
+  },
+  "snowberg::draw::Core::CreateModel": {
+    "contract": "输出槽非空，Model 借用当前 Core。",
+    "description": "通过 double_ptr 输出新建 Model。"
+  },
+  "snowberg::draw::Core::CreateTexture": {
+    "contract": "宽高有效且输出槽非空；对象借用 Core。",
+    "description": "通过 double_ptr 输出固定宽高的 RGBA8 Texture。"
+  },
+  "snowberg::draw::Core::EndDraw": {
+    "contract": "实际执行与清队列需调用 Render。",
+    "description": "当前为空方法。"
+  },
+  "snowberg::draw::Core::GetFontCore": {
+    "contract": "可配置字体，不能自行删除。",
+    "description": "返回内部 FontCore 的借用指针。"
+  },
+  "snowberg::draw::Core::GetProgram": {
+    "contract": "启用混合、关闭剔除、不使用深度附件；返回借用指针。",
+    "description": "按颜色附件格式惰性建立并缓存光栅管线。"
+  },
+  "snowberg::draw::Core::GetTextWidth": {
+    "contract": "可能触发字形纹理创建；不是字形墨迹包围盒宽度。",
+    "description": "求字符串各码点的 advance_x 总和。"
+  },
+  "snowberg::draw::Core::GraphicsCore": {
+    "contract": "不转移所有权。",
+    "description": "返回借用的底层 graphics Core。"
+  },
+  "snowberg::draw::Core::Render": {
+    "contract": "context/image 同设备且非空；不清空目标颜色，不提交 GPU 命令。",
+    "description": "扩容/上传元数据与实例索引流，开始颜色渲染、执行队列、结束渲染并清空命令。"
+  },
+  "snowberg::draw::Core::SetASCIIFontTypeFile": {
+    "contract": "先设主字体；这是 ASCII 分流而非通用缺字回退。",
+    "description": "选择专供码点<128 的字体覆盖。"
+  },
+  "snowberg::draw::Core::SetFontSize": {
+    "contract": "需先设主字体；字号影响后续字形和文字宽度。",
+    "description": "设置 FreeType 像素字号。"
+  },
+  "snowberg::draw::Core::SetFontTypeFile": {
+    "contract": "需有效路径，底层 FT_New_Face 返回状态未检查。",
+    "description": "委托 FontCore 载入并选择主字体。"
+  },
+  "snowberg::draw::CreateCore": {
+    "contract": "无独立错误码，底层 Core 必须存活更久。",
+    "description": "在指定 graphics Core 上构造 draw Core 并写入 double_ptr。"
+  },
+  "snowberg::draw::DrawCmdDrawInstance": {
+    "contract": "实例参数索引 Core 上传的元数据。",
+    "description": "保存借用模型/纹理以及实例起点和数量的绘制命令。"
+  },
+  "snowberg::draw::DrawCmdDrawInstance::DrawCmdDrawInstance": {
+    "contract": "不复制 GPU 资源或延长对象寿命。",
+    "description": "保存 model/texture 和 instance_base/count。"
+  },
+  "snowberg::draw::DrawCmdDrawInstance::Execute": {
+    "contract": "Core 已绑定程序、元数据和 per-instance 索引流。",
+    "description": "绑定纹理、顶点/索引缓冲，以模型索引数执行 CmdDrawIndexed。"
+  },
+  "snowberg::draw::DrawCmdSetDrawRegion": {
+    "contract": "不持有图像，执行时应用于当前目标。",
+    "description": "保存 x/y/width/height 的区域命令。"
+  },
+  "snowberg::draw::DrawCmdSetDrawRegion::DrawCmdSetDrawRegion": {
+    "contract": "不验证负尺寸或目标边界。",
+    "description": "复制区域参数。"
+  },
+  "snowberg::draw::DrawCmdSetDrawRegion::Execute": {
+    "contract": "width/height 转为 scissor 无符号尺寸，调用者避免负数。",
+    "description": "录制对应 viewport 和 scissor，深度范围 [0,1]。"
+  },
+  "snowberg::draw::DrawCommand": {
+    "contract": "Execute 纯虚，析构虚函数。",
+    "description": "可多态执行的延迟绘制命令基类。"
+  },
+  "snowberg::draw::DrawCommand::Execute": {
+    "contract": "上下文须处于适合该操作的录制阶段。",
+    "description": "派生类将自己的操作录制到给定 graphics 命令上下文。"
+  },
+  "snowberg::draw::DrawCommand::~DrawCommand": {
+    "contract": "不拥有命令引用的模型/纹理。",
+    "description": "默认虚析构，允许通过基类释放命令。"
+  },
+  "snowberg::draw::DrawMetadata": {
+    "contract": "与着色器 DrawMetadata 的 model/color 内存布局对应。",
+    "description": "每实例 4×4 transform 与 RGBA color。"
+  },
+  "snowberg::draw::FontCore": {
+    "contract": "借用 draw Core；无缓存淘汰、并发保护或可靠错误恢复。",
+    "description": "拥有 FreeType 库、字体 face 及按字号/码点分层的 GPU 字形缓存。"
+  },
+  "snowberg::draw::FontCore::CharMap": {
+    "contract": "纹理指针由 FontCore 统一释放。",
+    "description": "码点到 CharModel 的有序映射。"
+  },
+  "snowberg::draw::FontCore::FaceMap": {
+    "contract": "face 身份是缓存第一层键。",
+    "description": "FT_Face 到 SizeMap 的映射。"
+  },
+  "snowberg::draw::FontCore::FontCore": {
+    "contract": "主 active_face_ 尚未初始化；必须先 SetFontTypeFile，再查询字形或设字号。",
+    "description": "初始化 FreeType 并将默认字号设为 16。"
+  },
+  "snowberg::draw::FontCore::GetCharModel": {
+    "contract": "码点<128 可用 ASCII face；未处理位图 pitch 或载入错误，返回结构中的纹理仍归 FontCore。",
+    "description": "查找字体/字号/码点缓存，缺失时 FT_LOAD_RENDER 生成白 RGB/灰度 alpha 纹理并缓存度量。"
+  },
+  "snowberg::draw::FontCore::GetFontSize": {
+    "contract": "不查询实际字形高度。",
+    "description": "返回当前像素字号。"
+  },
+  "snowberg::draw::FontCore::SetASCIIFontTypeFile": {
+    "contract": "主字体仍需先设置，非 ASCII 继续使用主 face。",
+    "description": "缓存/选择 ASCII 专用 face 并更新字号。"
+  },
+  "snowberg::draw::FontCore::SetFontSize": {
+    "contract": "字号单位为像素；新字号使用独立缓存。",
+    "description": "更新 active_size_ 并对当前主/ASCII face 调用 FT_Set_Pixel_Sizes。"
+  },
+  "snowberg::draw::FontCore::SetFontTypeFile": {
+    "contract": "FT_New_Face 失败未检查；必须传有效字体文件。",
+    "description": "按路径缓存/载入 face 并选择主字体，更新像素字号。"
+  },
+  "snowberg::draw::FontCore::SizeMap": {
+    "contract": "同一码点在不同字号下拥有独立纹理。",
+    "description": "像素字号到 CharMap 的映射。"
+  },
+  "snowberg::draw::FontCore::UpdateActiveCharMap": {
+    "contract": "函数名虽含 map，实际不主动填充字形缓存。",
+    "description": "将当前字号设置到主字体及可选 ASCII face。"
+  },
+  "snowberg::draw::FontCore::~FontCore": {
+    "contract": "调用者保证 GPU 不再读取字形图像。",
+    "description": "删除全部字形纹理，释放所有 face，最后关闭 FreeType。"
+  },
+  "snowberg::draw::Model": {
+    "contract": "借用 draw Core，缓冲容量不等于有效索引数。",
+    "description": "拥有动态二维顶点与 uint32 索引缓冲。"
+  },
+  "snowberg::draw::Model::DrawCore": {
+    "contract": "不得通过该指针删除它。",
+    "description": "返回借用的 draw Core。"
+  },
+  "snowberg::draw::Model::IndexBuffer": {
+    "contract": "元素为 uint32。",
+    "description": "返回拥有的索引缓冲借用指针。"
+  },
+  "snowberg::draw::Model::IndexCount": {
+    "contract": "不返回缓冲容量。",
+    "description": "返回最后上传的有效索引数量。"
+  },
+  "snowberg::draw::Model::Model": {
+    "contract": "core 非空且存活更久。",
+    "description": "创建至少一个 Vertex 和一个 uint32 的动态缓冲，索引数为 0。"
+  },
+  "snowberg::draw::Model::SetModelData": {
+    "contract": "输入索引应有效，拓扑按三角形列表解释；调用者保证更新与 GPU 使用同步。",
+    "description": "按需扩容并全量上传顶点/索引，设置有效索引数。"
+  },
+  "snowberg::draw::Model::VertexBuffer": {
+    "contract": "格式为 draw::Vertex。",
+    "description": "返回拥有的顶点缓冲借用指针。"
+  },
+  "snowberg::draw::PixelCoordToNDC": {
+    "contract": "width/height 不可为零；z/w 保持单位矩阵行为。",
+    "description": "将 [0,width]×[0,height] 的左上原点像素映射为 NDC 的 [−1,1]×[1,−1]。"
+  },
+  "snowberg::draw::Texture": {
+    "contract": "借用 draw Core，拥有 graphics Image。",
+    "description": "固定尺寸 RGBA8 图像包装。"
+  },
+  "snowberg::draw::Texture::DrawCore": {
+    "contract": "不转移所有权。",
+    "description": "返回借用的 draw Core。"
+  },
+  "snowberg::draw::Texture::Image": {
+    "contract": "提交期间必须保持 Texture 存活。",
+    "description": "返回拥有图像的借用指针。"
+  },
+  "snowberg::draw::Texture::Texture": {
+    "contract": "尺寸应为正，创建返回码未检查。",
+    "description": "通过底层 Core 创建指定宽高 RGBA8 图像。"
+  },
+  "snowberg::draw::Texture::UploadData": {
+    "contract": "data 至少包含 width×height×4 字节，格式为 RGBA8。",
+    "description": "委托 Image 上传整幅像素。"
+  },
+  "snowberg::draw::Transform": {
+    "contract": "通用绘制实例直接用于模型到裁剪空间变换。",
+    "description": "glm::mat4 的类型别名。"
+  },
+  "snowberg::draw::Vertex": {
+    "contract": "匹配 Slang 四个输入流属性中的前三个。",
+    "description": "二维 position、二维 tex_coord 和 RGBA color 顶点记录。"
+  },
+  "snowberg::gui::(anonymous)::Alpha": {
+    "contract": "供 GUI 内部使用。",
+    "description": "复制颜色并将 alpha 乘给定系数。"
+  },
+  "snowberg::gui::(anonymous)::BlurSettings": {
+    "contract": "内部绘制协议；不得让 CPU/着色器布局发生不一致。",
+    "description": "与 blur.slang 匹配的方向/输出尺寸常量记录。"
+  },
+  "snowberg::gui::(anonymous)::GlassSettings": {
+    "contract": "内部绘制协议；不得让 CPU/着色器布局发生不一致。",
+    "description": "与 composite.slang 匹配的尺寸、数量、填充及最多 16 个矩形记录。"
+  },
+  "snowberg::gui::(anonymous)::ValueLabel": {
+    "contract": "供 GUI 内部使用。",
+    "description": "格式化滑块标签与数值，范围小于 0.5/10 时分别取 3/2 位小数，否则 1 位。"
+  },
+  "snowberg::gui::(anonymous)::Vec": {
+    "contract": "供 GUI 内部使用。",
+    "description": "将 Color 四分量原样转为 glm::vec4。"
+  },
+  "snowberg::gui::Canvas": {
+    "contract": "不得在回调后保存引用使用；绘制不裁剪到画布边界。",
+    "description": "Custom 回调期间有效的绘制适配器，持有上下文与局部原点/尺寸。"
+  },
+  "snowberg::gui::Canvas::Canvas": {
+    "contract": "私有构造，借用 Context，不创建独立 GPU 资源。",
+    "description": "由 Context 建立局部坐标绘制视图。"
+  },
+  "snowberg::gui::Canvas::Circle": {
+    "contract": "半径为逻辑像素；圆弧每角 8 段，非解析抗锯齿圆。",
+    "description": "以局部 x/y 为中心，使用全圆角方形网格近似圆。"
+  },
+  "snowberg::gui::Canvas::Height": {
+    "contract": "等于 Custom 提交的高度。",
+    "description": "返回当前自定义区域的逻辑高度。"
+  },
+  "snowberg::gui::Canvas::Label": {
+    "contract": "baseline 是字体基线而非文本顶边，size 默认 15。",
+    "description": "在局部 x 和 baseline 位置绘制文字。"
+  },
+  "snowberg::gui::Canvas::ParticleField": {
+    "contract": "不是持久粒子模拟；count 次 CPU 绘制，time 通常非负以避免 fmod 负坐标。",
+    "description": "根据序号和 time 直接计算周期漂移的圆形粒子装饰。"
+  },
+  "snowberg::gui::Canvas::Rectangle": {
+    "contract": "单位为逻辑像素；默认圆角 8，非正宽高不绘制。",
+    "description": "在画布局部 x/y 绘制填色圆角矩形。"
+  },
+  "snowberg::gui::Canvas::Width": {
+    "contract": "只提供布局尺寸，不表示裁剪已启用。",
+    "description": "返回当前自定义区域的逻辑宽度。"
+  },
+  "snowberg::gui::CanvasResponse": {
+    "contract": "pointer 在未悬停时也有坐标；没有单独的持续按住字段。",
+    "description": "包含画布局部 pointer、hovered、按下边沿 pressed 和释放触发 clicked。"
+  },
+  "snowberg::gui::Color": {
+    "contract": "不钳制分量，也不自动进行色彩空间转换。",
+    "description": "浮点 RGBA 颜色，RGB 默认 0，alpha 默认 1。"
+  },
+  "snowberg::gui::Context": {
+    "contract": "借用 graphics Core/Window，二者必须活得更久；不可复制。",
+    "description": "拥有绘制器、程序、模糊图像与缓存的逐帧声明式 GUI 上下文。"
+  },
+  "snowberg::gui::Context::Activate": {
+    "contract": "重叠控件按提交顺序可能覆盖捕获；没有统一 z 序命中管理。",
+    "description": "维护字符串指针捕获与释放点击，同时累计 WantsPointer。"
+  },
+  "snowberg::gui::Context::BeginFrame": {
+    "contract": "持久 active_id 保留；控件要在每帧重新提交。",
+    "description": "清空本帧面板，读取输入并计算按下/释放边沿，重置 WantsPointer。"
+  },
+  "snowberg::gui::Context::BeginPanel": {
+    "contract": "禁止嵌套，违反抛 logic_error；ID 应稳定且唯一，尺寸由调用者保证有效。",
+    "description": "创建指定 ID、位置、宽度的面板，按标题是否存在设置内容起点。"
+  },
+  "snowberg::gui::Context::BeginRow": {
+    "contract": "必须在面板内、不能行嵌套且 columns≥1，否则抛 logic_error。",
+    "description": "开始固定列数的等宽一行，后续控件依次占一列。"
+  },
+  "snowberg::gui::Context::Button": {
+    "contract": "ID 使用面板 ID 与 label，同类标签须唯一且交互期间稳定。",
+    "description": "提交 36 高按钮，在捕获后于按钮内释放时返回 true。"
+  },
+  "snowberg::gui::Context::Checkbox": {
+    "contract": "value 必须非空；整行命中区域可点击。",
+    "description": "提交 31 高复选项，点击时翻转 *value 并返回 true。"
+  },
+  "snowberg::gui::Context::Choice": {
+    "contract": "空列表直接 false 且不占布局；index 非空。仅显示索引被 clamp，未点击时不会修正调用者的无效索引。",
+    "description": "提交可点击循环选择项，点击将索引加一并按条目数取模。"
+  },
+  "snowberg::gui::Context::ClearPointerInput": {
+    "contract": "不会立即重置历史按住态，下一帧按状态差生成边沿。",
+    "description": "取消指针覆盖，后续 BeginFrame 使用窗口光标与左键。"
+  },
+  "snowberg::gui::Context::Context": {
+    "contract": "无效参数抛 invalid_argument；后续 GPU/字体创建结果未逐项检查。",
+    "description": "验证非空 core/window/字体路径，创建绘制器、两条计算程序及常量缓冲；复制构造被删除。"
+  },
+  "snowberg::gui::Context::Custom": {
+    "contract": "回调在 EndFrame 才执行，捕获的引用需活到那时；paint 必须可调用，区域不自动裁剪。",
+    "description": "占用指定高度，保存绘制回调并立即返回本帧局部指针响应。"
+  },
+  "snowberg::gui::Context::DrawRect": {
+    "contract": "非正尺寸跳过；缓存没有逐帧清空或上限。",
+    "description": "按物理尺寸/圆角缓存三角扇网格，再以像素到 NDC 变换提交颜色实例。"
+  },
+  "snowberg::gui::Context::DrawText": {
+    "contract": "坐标第二维是基线；字号最小为 1。",
+    "description": "按输出与逻辑尺寸之比设置字体像素大小并提交文字。"
+  },
+  "snowberg::gui::Context::EndFrame": {
+    "contract": "commands/scene 非空且同一设备；未结束面板抛 logic_error。可能返回原图并直接修改它；内部输出借用到重建/析构，提交完成前不得销毁。",
+    "description": "录制两遍背景模糊与面板遮罩合成，再绘制控件，返回待呈现图像。"
+  },
+  "snowberg::gui::Context::EndPanel": {
+    "contract": "没有活动面板时抛 logic_error。",
+    "description": "自动结束未闭合行，按内容计算面板高度并将面板范围纳入指针占用。"
+  },
+  "snowberg::gui::Context::EndRow": {
+    "contract": "没有活动行时抛 logic_error；允许不足列数提前结束。",
+    "description": "以该行最高控件的高度推进面板纵向位置。"
+  },
+  "snowberg::gui::Context::Frame": {
+    "contract": "height 用于推进游标，未存于此返回记录。",
+    "description": "内部布局结果 x/y/width。"
+  },
+  "snowberg::gui::Context::Heading": {
+    "contract": "需位于面板内；不建立新的容器层级。",
+    "description": "提交 29 高的标题项，绘制使用 text 色和字号 18。"
+  },
+  "snowberg::gui::Context::Hit": {
+    "contract": "不检查遮挡顺序或其他面板覆盖。",
+    "description": "用左上闭、右下开的矩形判断当前逻辑光标。"
+  },
+  "snowberg::gui::Context::Item": {
+    "contract": "是帧内快照，不拥有业务变量。",
+    "description": "本帧控件绘制记录，保存类型、标签、布局、状态、图表样本或回调。"
+  },
+  "snowberg::gui::Context::Item::Kind": {
+    "contract": "供 PaintItem 分派绘制。",
+    "description": "区分文本、标题、分隔线、按钮、复选、滑块、选择、图表、自定义画布。"
+  },
+  "snowberg::gui::Context::NextFrame": {
+    "contract": "面板外调用或行内项目超过列数均抛 logic_error。",
+    "description": "计算下一个纵向项或当前行等宽列的位置，并推进布局状态。"
+  },
+  "snowberg::gui::Context::NextY": {
+    "contract": "仍消费完整布局项/行列位置。",
+    "description": "执行 NextFrame 布局并只返回 y。"
+  },
+  "snowberg::gui::Context::PaintItem": {
+    "contract": "只负责绘制，业务值与点击已在提交控件时处理。",
+    "description": "按 Item 类型选择主题色、基础几何和文本，或执行 Custom 回调。"
+  },
+  "snowberg::gui::Context::Panel": {
+    "contract": "BeginFrame 清空，禁止跨帧保留引用。",
+    "description": "面板记录，包含 ID/标题、边界、控件集合与行布局游标。"
+  },
+  "snowberg::gui::Context::Plot": {
+    "contract": "max≤min 时全部按零高度；没有交互、时间轴或采样聚合。",
+    "description": "复制样本并归一化到 [0,1]，绘制 88 高的柱状图。"
+  },
+  "snowberg::gui::Context::Separator": {
+    "contract": "颜色固定半透明白，不取 Theme 的独立分隔符字段。",
+    "description": "占用 3 高的布局项，并绘制 1 像素横线。"
+  },
+  "snowberg::gui::Context::SetLogicalSize": {
+    "contract": "两维都大于零时启用，否则 EndFrame 回退窗口逻辑尺寸。",
+    "description": "设置布局与输出图像缩放所用逻辑尺寸。"
+  },
+  "snowberg::gui::Context::SetPointerInput": {
+    "contract": "覆盖持续有效直到 ClearPointerInput；应在 BeginFrame 前更新。",
+    "description": "设置逻辑坐标与左键状态覆盖，供离屏/世界空间等输入来源使用。"
+  },
+  "snowberg::gui::Context::Slider": {
+    "contract": "value 非空且范围有效。float 在 max≤min 时不更新；int 经 float 计算四舍五入并 clamp，要求 min≤max。",
+    "description": "提交 51 高滑块，捕获按住时把横向位置映射到范围；返回数值是否变化。"
+  },
+  "snowberg::gui::Context::Spacer": {
+    "contract": "在行中也会消费一列；不产生可见绘制项。",
+    "description": "占用指定高度及常规 7 像素后间距，默认高度 8。"
+  },
+  "snowberg::gui::Context::Style": {
+    "contract": "样式在绘制时读取；引用依附 Context，使用者负责字段一致性。",
+    "description": "返回可变 Theme 引用。"
+  },
+  "snowberg::gui::Context::Text": {
+    "contract": "需位于面板内；文本不自动折行或截断。",
+    "description": "提交 21 逻辑像素高的普通文本项，绘制使用 muted 色和字号 15。"
+  },
+  "snowberg::gui::Context::WantsPointer": {
+    "contract": "应在本帧界面构建后查询，以决定是否把事件交给场景；不是全局输入路由器。",
+    "description": "查询本帧控件或面板是否悬停/捕获指针。"
+  },
+  "snowberg::gui::Context::operator=": {
+    "contract": "每个 Context 独立持有 GPU 资源和输入状态。",
+    "description": "禁止复制赋值。"
+  },
+  "snowberg::gui::Context::~Context": {
+    "contract": "析构本身不 WaitGPU，调用者保证相关提交已完成。",
+    "description": "释放上下文拥有的缓存、绘制器和 GPU 资源。"
+  },
+  "snowberg::gui::DefaultFont": {
+    "contract": "返回文件路径，不预先验证字体加载成功；资源搜索可能返回空。",
+    "description": "macOS 优先选存在的 SFNS.ttf，否则通过资源搜索寻找 ClearSans WOFF。"
+  },
+  "snowberg::gui::Theme": {
+    "contract": "默认浅色半透明样式；dark 只影响阴影和滑块拇指等分支，调用者仍需设置整套深色配色。",
+    "description": "共享面板、控件、强调、文字与弱化颜色及 backdrop_blur/dark 标志。"
+  },
+  "snowberg::gui::WorldPanel": {
+    "contract": "借用 Core/Window，尺寸构造后固定；不提供完整场景树或全局事件管理。",
+    "description": "拥有离屏 Context 和纹理四边形的三维 GUI 适配对象。"
+  },
+  "snowberg::gui::WorldPanel::BeginFrame": {
+    "contract": "应用每帧调用，只有选中的面板应接收有效命中。",
+    "description": "把命中像素或未命中的 (−1,−1) 与按键状态传给内部 Context，再开始帧。"
+  },
+  "snowberg::gui::WorldPanel::Controls": {
+    "contract": "配合 WorldPanel::BeginFrame 与 Render 使用。",
+    "description": "返回内部 Context 引用，供声明本帧面板/控件。"
+  },
+  "snowberg::gui::WorldPanel::GetProgram": {
+    "contract": "管线启用混合、关闭面剔除，绑定矩阵、UI 图像和采样器。",
+    "description": "按场景颜色/深度格式缓存已完成的光栅管线。"
+  },
+  "snowberg::gui::WorldPanel::Hit": {
+    "contract": "由应用在多个面板命中间选择最近者；本记录不表达场景物体遮挡。",
+    "description": "射线命中结果：pixel 是面板像素坐标，distance 是世界空间欧氏距离。"
+  },
+  "snowberg::gui::WorldPanel::RayHit": {
+    "contract": "平行、负参数或越界返回 nullopt；双面可命中，不检测深度遮挡。",
+    "description": "把射线变换到局部，求 z=0 交点并检查 [0,1) 方形，返回像素坐标和世界距离。"
+  },
+  "snowberg::gui::WorldPanel::Render": {
+    "contract": "commands/scene 非空，depth 可空；透明像素未 discard，深度测试/写入采用 graphics Program 默认状态。",
+    "description": "清空离屏纹理、结束内部 UI 帧，再以 view_projection×local_to_world 绘制世界四边形。"
+  },
+  "snowberg::gui::WorldPanel::SetTransform": {
+    "contract": "射线求交要求可逆仿射变换；输入没有验证。",
+    "description": "保存局部单位矩形到世界的矩阵。"
+  },
+  "snowberg::gui::WorldPanel::Vertex": {
+    "contract": "顶点位置与 UV 都在单位方形，z 在着色器中设为 0。",
+    "description": "内部四边形顶点布局：二维位置加二维 UV。"
+  },
+  "snowberg::gui::WorldPanel::WorldPanel": {
+    "contract": "width/height 必须正数，否则 invalid_argument；控件默认关闭背景模糊。",
+    "description": "建立指定分辨率离屏控件、RGBA8 纹理、单位四边形与采样程序；复制构造被删除。"
+  },
+  "snowberg::gui::WorldPanel::operator=": {
+    "contract": "资源及控件输入状态属于当前实例。",
+    "description": "禁止复制赋值。"
+  },
+  "snowberg::gui::WorldPanel::~WorldPanel": {
+    "contract": "不自动等待 GPU，需在提交完成后析构。",
+    "description": "释放离屏控件和所有拥有的 GPU 资源。"
+  },
+  "snowberg::gui::surface::(anonymous)::ChooseSupersampleScale": {
+    "contract": "阈值按帧缓冲像素，不是窗口逻辑像素。",
+    "description": "最大边≤2048 返回 3，≤4096 返回 2，更大返回 1。"
+  },
+  "snowberg::gui::surface::(anonymous)::ResolveParams": {
+    "contract": "必须与 surface_resolve.slang 的常量结构一致。",
+    "description": "CPU 侧第二帧 alpha、超采样倍率与对齐填充记录。"
+  },
+  "snowberg::gui::surface::AnimationStyle": {
+    "contract": "枚举只选择时间曲线，不设置持续时间。",
+    "description": "线性、二次和五次对称缓动样式。"
+  },
+  "snowberg::gui::surface::AnimationVar": {
+    "contract": "默认已完成，外部驱动 Update；不读取系统时钟。",
+    "description": "保存 origin、target、归一化进度 alpha 的可重定向标量动画。"
+  },
+  "snowberg::gui::surface::AnimationVar::AddTarget": {
+    "contract": "增量加到 target 而非当前插值值。",
+    "description": "将增量加到已有目标，再从当前值重启动画。"
+  },
+  "snowberg::gui::surface::AnimationVar::AnimationVar": {
+    "contract": "默认 val=0、线性曲线。",
+    "description": "以 val 同时初始化起点与终点、alpha=1，并保存样式。"
+  },
+  "snowberg::gui::surface::AnimationVar::IsFinished": {
+    "contract": "由 Update 完成路径确保精确置 1。",
+    "description": "判断 alpha 是否恰为 1。"
+  },
+  "snowberg::gui::surface::AnimationVar::Target": {
+    "contract": "动画进行中通常不同于 Value。",
+    "description": "返回最终目标值。"
+  },
+  "snowberg::gui::surface::AnimationVar::TryUpdateTarget": {
+    "contract": "比较不是容差判断，也不与当前 Value 比较。",
+    "description": "仅当新目标与旧 target 浮点不相等时重启动画。"
+  },
+  "snowberg::gui::surface::AnimationVar::Update": {
+    "contract": "t 为进度增量，通常非负；完成的那次更新仍返回 true。负 t 不作下界钳制。",
+    "description": "进度增加 t，达到 1 时设为精确完成；若调用前已完成返回 false，否则 true。"
+  },
+  "snowberg::gui::surface::AnimationVar::UpdateTarget": {
+    "contract": "即使目标相同也重启动画。",
+    "description": "先取当前 Value 作为新起点，再设目标并把 alpha 归零。"
+  },
+  "snowberg::gui::surface::AnimationVar::Value": {
+    "contract": "只读取，不推进动画。",
+    "description": "按 alpha 和所选缓动混合起终值，alpha 恰为 0/1 时直接返回端点。"
+  },
+  "snowberg::gui::surface::AnimationVar::operator float": {
+    "contract": "不会更新进度。",
+    "description": "显式转换为当前 Value。"
+  },
+  "snowberg::gui::surface::Application": {
+    "contract": "派生类通过生命周期钩子提交自定义模型；输入监听器和 DeviceModel 都借用应用。",
+    "description": "拥有 graphics 设备、窗口和渲染循环的可派生 surface 应用。"
+  },
+  "snowberg::gui::surface::Application::Application": {
+    "contract": "后端或设备不可用抛 runtime_error；width/height 和 surface_shader 由调用者提供，其他创建失败未逐项处理。",
+    "description": "检查指定后端并自动选择无需光追的设备，创建窗口和光标/按键/焦点回调。"
+  },
+  "snowberg::gui::surface::Application::BuildScreenFrameObjects": {
+    "contract": "左上为原点、Y 向下；此操作会阻塞 GPU。",
+    "description": "以有效帧缓冲尺寸选超采样倍率，WaitGPU 后重建颜色/深度/呈现图像和像素投影矩阵。"
+  },
+  "snowberg::gui::surface::Application::CaptureSecondFrame": {
+    "contract": "多次调用覆盖上次第二帧；仅 alpha>0 时渲染第二帧，推荐 [0,1]，接口不钳制。",
+    "description": "把当前主队列与数据移到第二帧，清空主队列并设混合 alpha。"
+  },
+  "snowberg::gui::surface::Application::ComposeUI": {
+    "contract": "可录制声明式 GUI 或其他合成；返回图像须非空并存活至提交完成。",
+    "description": "在 surface resolve 后、呈现前的虚函数，默认直接返回 scene。"
+  },
+  "snowberg::gui::surface::Application::Core": {
+    "contract": "不得删除，生命周期依附 Application。",
+    "description": "返回所拥有 graphics Core 的借用指针。"
+  },
+  "snowberg::gui::surface::Application::CustomOnClose": {
+    "contract": "适合释放依赖 graphics Core 的派生资源。",
+    "description": "GPU 等待完成后、内建资源释放前调用的空虚函数。"
+  },
+  "snowberg::gui::surface::Application::CustomOnInit": {
+    "contract": "派生类在此创建绘制模型、事件和业务资源。",
+    "description": "渲染管线和尺寸资源建立后调用的空虚函数钩子。"
+  },
+  "snowberg::gui::surface::Application::CustomOnUpdate": {
+    "contract": "派生类在此更新业务并提交本帧 DrawModel。",
+    "description": "每帧清空提交队列并处理尺寸变化后调用的空虚函数。"
+  },
+  "snowberg::gui::surface::Application::DrawModel": {
+    "contract": "模型非空且需存活至 GPU 使用完毕；每帧更新前队列被清空。",
+    "description": "将 DeviceModel 指针和 InstanceInfo 副本加入本帧主队列。"
+  },
+  "snowberg::gui::surface::Application::DrawModelWithData": {
+    "contract": "上传时再加实例记录区长度；覆盖传入 extra.y，shader 按同协议读取。",
+    "description": "追加实例及 uint32 附加数据，把 extra.y 设置为数据段相对字节偏移。"
+  },
+  "snowberg::gui::surface::Application::FrameTarget": {
+    "contract": "main/second 各持一份；depth_image 在录制两帧时重复清空使用。",
+    "description": "内部颜色图、实例缓冲、CPU 实例/附加数据/偏移索引及上传暂存。"
+  },
+  "snowberg::gui::surface::Application::FramebufferSize": {
+    "contract": "初始化前为零；最小化后保留最后有效绘制尺寸。",
+    "description": "返回当前绘制用帧缓冲像素尺寸。"
+  },
+  "snowberg::gui::surface::Application::GetWindow": {
+    "contract": "可查询原始输入，但不得删除窗口。",
+    "description": "返回所拥有窗口的借用指针。"
+  },
+  "snowberg::gui::surface::Application::Name": {
+    "contract": "名称用于窗口标题，不是窗口对象 ID。",
+    "description": "按值返回应用名称。"
+  },
+  "snowberg::gui::surface::Application::NotifyListeners": {
+    "contract": "新注册者不在当前快照；单线程事件设计，不提供并发锁或事件消费。",
+    "description": "快照监听器集合，依次调用成员回调；注册表变化后跳过已被注销的指针。"
+  },
+  "snowberg::gui::surface::Application::OnClose": {
+    "contract": "窗口/Core 随 Application 后续析构；不是窗口关闭事件回调。",
+    "description": "WaitGPU 后调用业务清理，释放帧图像、缓冲及着色器程序。"
+  },
+  "snowberg::gui::surface::Application::OnFramebufferResize": {
+    "contract": "派生类重新布局，必要时 Resize 按钮；初始化建图不调用此钩子。",
+    "description": "有效帧缓冲尺寸改变并重建后调用的空虚函数。"
+  },
+  "snowberg::gui::surface::Application::OnInit": {
+    "contract": "用户 shader 必须匹配 Vertex、InstanceInfo 及绑定槽；最后调用 CustomOnInit。",
+    "description": "编译用户 VSMain/PSMain 和内建 resolve，建立顶点/资源协议与动态缓冲。"
+  },
+  "snowberg::gui::surface::Application::OnRender": {
+    "contract": "零窗口尺寸直接跳过；没有每帧显式 WaitGPU，动态资源同步由 graphics 后端承担。",
+    "description": "准备实例索引流，录制可选第二帧/主帧、resolve、ComposeUI、Present，然后提交。"
+  },
+  "snowberg::gui::surface::Application::OnUpdate": {
+    "contract": "最小化不重建零尺寸图像。",
+    "description": "必要时重建帧缓冲资源，然后清空两帧队列、归零第二帧 alpha、调用业务更新并刷新标题。"
+  },
+  "snowberg::gui::surface::Application::RegisterListener": {
+    "contract": "同一指针重复注册无效；不要传 nullptr。",
+    "description": "将非拥有监听器指针加入集合，新增时递增版本号。"
+  },
+  "snowberg::gui::surface::Application::RenderFrameTarget": {
+    "contract": "模型深度应定义明确的图层；同模型内部保留提交顺序，跨模型排序会改变原顺序。",
+    "description": "把实例记录与尾随数据一次上传，按模型排序连续批次并以 instance stream 偏移绘制。"
+  },
+  "snowberg::gui::surface::Application::Run": {
+    "contract": "max_frames>0 时达到次数退出，否则运行到窗口关闭；异常没有统一清理包装。",
+    "description": "执行初始化、事件/更新/渲染循环、可选截图与关闭清理。"
+  },
+  "snowberg::gui::surface::Application::SaveScreenshot": {
+    "contract": "需有有效 last_presented_image；自定义 ComposeUI 返回其他格式会不匹配固定四字节下载存储。",
+    "description": "WaitGPU 后下载最后呈现图像的 RGBA8 数据并调用 stbi_write_png。"
+  },
+  "snowberg::gui::surface::Application::SetScreenshotPath": {
+    "contract": "是帧缓冲截图，不包含系统窗口；需至少成功呈现一帧。",
+    "description": "记录退出时保存最后呈现图像的 PNG 路径。"
+  },
+  "snowberg::gui::surface::Application::UnregisterListener": {
+    "contract": "不存在时无操作，不负责销毁监听器。",
+    "description": "从监听器集合移除指针，成功移除时递增版本。"
+  },
+  "snowberg::gui::surface::Application::UpdateTitle": {
+    "contract": "FPSCounter 使用约最近一秒样本，最小化更新也会计入 Tick。",
+    "description": "更新 FPSCounter，并最多每 0.25 秒刷新带后端和 FPS 的窗口标题。"
+  },
+  "snowberg::gui::surface::Application::~Application": {
+    "contract": "正常运行资源清理由 Run 尾部 OnClose 执行；派生监听器必须先销毁。",
+    "description": "从窗口注销四类已注册回调。"
+  },
+  "snowberg::gui::surface::Button": {
+    "contract": "不绘制控件；local_to_world_ 字段当前不参与命中转换。",
+    "description": "借助 Listener 实现矩形命中和普通/悬停/按下状态的可派生按钮。"
+  },
+  "snowberg::gui::surface::Button::Activate": {
+    "contract": "重复调用不增加重复监听。",
+    "description": "将按钮重新注册到应用事件集合。"
+  },
+  "snowberg::gui::surface::Button::Button": {
+    "contract": "上下边可反向并会交换，左右边不会自动交换。",
+    "description": "注册监听器，保存帧缓冲像素边界并计算逻辑坐标命中范围。"
+  },
+  "snowberg::gui::surface::Button::CalculateListenerBounds": {
+    "contract": "分母至少 1；交集为空时边界反向，正常命中为 false。",
+    "description": "以按钮与 clip 的交集乘窗口尺寸/帧缓冲尺寸，得到逻辑像素边界。"
+  },
+  "snowberg::gui::surface::Button::Deactivate": {
+    "contract": "不销毁、隐藏或重置按钮状态；绘制由应用另行控制。",
+    "description": "注销事件监听。"
+  },
+  "snowberg::gui::surface::Button::IsInsideListenerBounds": {
+    "contract": "与 Context 右下开区间规则不同。",
+    "description": "用四边闭区间检查逻辑坐标是否命中。"
+  },
+  "snowberg::gui::surface::Button::OnClick": {
+    "contract": "业务行为由派生类实现。",
+    "description": "成功点击钩子，默认无操作。"
+  },
+  "snowberg::gui::surface::Button::OnCursorEnter": {
+    "contract": "final，派生类通过 OnStateChange 接收结果。",
+    "description": "离开窗口时把非零状态清为 0。"
+  },
+  "snowberg::gui::surface::Button::OnCursorPos": {
+    "contract": "移出会丢失按下态；再进入释放不会触发 OnClick。",
+    "description": "进入时把普通态设为悬停，离开时清为普通。"
+  },
+  "snowberg::gui::surface::Button::OnMouseButton": {
+    "contract": "范围外释放本身不重置状态，通常依赖移动/离窗事件先清理。",
+    "description": "仅处理左键：范围内按下设状态 2，范围内释放且原状态 2 时点击，再设状态 1。"
+  },
+  "snowberg::gui::surface::Button::OnResize": {
+    "contract": "可更新派生几何，不会由仅设置裁剪触发。",
+    "description": "Resize 后的空虚钩子。"
+  },
+  "snowberg::gui::surface::Button::OnStateChange": {
+    "contract": "可能收到与之前相同的状态值。",
+    "description": "状态更新通知，默认空实现，供派生类调整视觉或动画。"
+  },
+  "snowberg::gui::surface::Button::OnWindowSize": {
+    "contract": "不会重算命中边界，应用要在布局变化时调用 Resize。",
+    "description": "只调用 Listener 的空尺寸钩子。"
+  },
+  "snowberg::gui::surface::Button::Resize": {
+    "contract": "参数为帧缓冲像素，不检查左右顺序。",
+    "description": "替换边界，交换反向上下边，重算命中范围并调用 OnResize。"
+  },
+  "snowberg::gui::surface::Button::SetClipBounds": {
+    "contract": "只处理输入边界，不自动修改渲染 InstanceInfo.clip_rect。",
+    "description": "保存帧缓冲裁剪矩形，与按钮范围求交并重算命中，最后重置状态。"
+  },
+  "snowberg::gui::surface::Button::SetState": {
+    "contract": "约定 0/1/2，函数本身不验证范围或去重。",
+    "description": "保存状态值并调用 OnStateChange。"
+  },
+  "snowberg::gui::surface::Button::~Button": {
+    "contract": "集合删除幂等，重复注销无害；app 必须存活。",
+    "description": "注销按钮监听器，随后基类析构再次注销。"
+  },
+  "snowberg::gui::surface::ComposeVertices": {
+    "contract": "保持输入顺序。",
+    "description": "为每个二维位置附加相同颜色并返回新顶点 vector。"
+  },
+  "snowberg::gui::surface::CosineInterpolation": {
+    "contract": "x 从 0 到 1 时结果从 1 降到 0，方向与 Mix 的进度相反。",
+    "description": "返回 (cos(πx)+1)/2。"
+  },
+  "snowberg::gui::surface::DeviceModel": {
+    "contract": "GPU 数据独立于 CPU Model，后续 CPU 修改需显式上传。",
+    "description": "借用 Application 并拥有动态顶点/索引缓冲。"
+  },
+  "snowberg::gui::surface::DeviceModel::DeviceModel": {
+    "contract": "app 非空且比对象活得久，数量不是已上传元素的保证。",
+    "description": "数量重载只分配至少一元素容量且索引计数为零；Model 重载再上传顶点/索引。"
+  },
+  "snowberg::gui::surface::DeviceModel::IndexBuffer": {
+    "contract": "绘制使用 uint32 索引。",
+    "description": "返回拥有的索引缓冲借用指针。"
+  },
+  "snowberg::gui::surface::DeviceModel::IndexCount": {
+    "contract": "初始数量构造后仍为零，因此未上传不会绘制。",
+    "description": "返回最后 UploadIndices 的索引数量。"
+  },
+  "snowberg::gui::surface::DeviceModel::UploadIndices": {
+    "contract": "不会自动验证顶点范围。",
+    "description": "容量不足则扩容，上传并更新索引计数。"
+  },
+  "snowberg::gui::surface::DeviceModel::UploadVertices": {
+    "contract": "不修改索引计数，不检查索引是否仍有效。",
+    "description": "容量不足则扩容，再上传全部输入顶点。"
+  },
+  "snowberg::gui::surface::DeviceModel::VertexBuffer": {
+    "contract": "不得删除；Resize 后底层设备存储可能变化。",
+    "description": "返回拥有的顶点缓冲借用指针。"
+  },
+  "snowberg::gui::surface::GetModelMatrix": {
+    "contract": "position 是目标左上位置；默认 depth=0.5。",
+    "description": "把 [-1,1] 局部模型缩放到 scale 并平移到 position+scale/2，设置 z=depth。"
+  },
+  "snowberg::gui::surface::GetModelMatrixZO": {
+    "contract": "结果 x/y 为 position+0.5+scale×(local−0.5)，保留旧界面中心/半像素语义。",
+    "description": "执行 T(position+0.5) S(scale) T(−0.5,−0.5,depth)。"
+  },
+  "snowberg::gui::surface::InstanceInfo": {
+    "contract": "clip_rect 默认为极大范围；自定义 shader 必须主动使用此字段才产生裁剪。矩阵和 extra 没有统一默认语义。",
+    "description": "每实例 GPU 记录：model 变换、color、extra 与 clip_rect。"
+  },
+  "snowberg::gui::surface::Listener": {
+    "contract": "借用 Application，必须先于它析构。",
+    "description": "自动注册/注销的窗口事件基类，默认回调为空。"
+  },
+  "snowberg::gui::surface::Listener::Listener": {
+    "contract": "application 非空；注册不转移所有权。",
+    "description": "保存应用指针并立即注册 this。"
+  },
+  "snowberg::gui::surface::Listener::OnCursorEnter": {
+    "contract": "enter 为 0/1；失焦也会触发虚调用 OnCursorEnter(0)。",
+    "description": "光标进入/离开钩子，默认无操作。"
+  },
+  "snowberg::gui::surface::Listener::OnCursorPos": {
+    "contract": "坐标不是帧缓冲像素；高 DPI 需换算。",
+    "description": "光标逻辑坐标变化钩子，默认无操作。"
+  },
+  "snowberg::gui::surface::Listener::OnFocus": {
+    "contract": "派生类覆盖时可保留此行为以清理悬停/按下状态。",
+    "description": "失焦时转发 OnCursorEnter(0)，获得焦点时无操作。"
+  },
+  "snowberg::gui::surface::Listener::OnMouseButton": {
+    "contract": "可从应用窗口查询当前光标；回调没有消费返回值。",
+    "description": "鼠标键、GLFW 动作和修饰键钩子，默认无操作。"
+  },
+  "snowberg::gui::surface::Listener::OnWindowSize": {
+    "contract": "当前 Application 不自动分发此钩子；不可依赖它刷新按钮布局。",
+    "description": "窗口尺寸钩子，默认无操作。"
+  },
+  "snowberg::gui::surface::Listener::~Listener": {
+    "contract": "应用此时必须仍存活。",
+    "description": "从应用注销 this。"
+  },
+  "snowberg::gui::surface::Mix": {
+    "contract": "Ty 需支持这些运算；alpha 不钳制，超范围为外插。",
+    "description": "计算 v0×(1−alpha)+v1×alpha 的通用线性混合。"
+  },
+  "snowberg::gui::surface::MixModel": {
+    "contract": "关键帧非空，各帧顶点一一对应并共享索引拓扑。",
+    "description": "持有多套等长顶点关键帧和一个复用的混合 Model。"
+  },
+  "snowberg::gui::surface::MixModel::GetModel": {
+    "contract": "要求 alpha≥0；下一次调用覆盖该引用中的顶点。角度采用 atan2(x,y) 并把终角调整为不小于起角。",
+    "description": "alpha 整数部分循环选段，小数部分插值相邻关键帧并返回复用 Model 引用。"
+  },
+  "snowberg::gui::surface::MixModel::MixModel": {
+    "contract": "等长仅用 assert 检查；空关键帧会访问越界。",
+    "description": "复制关键帧，并以第一帧和给定索引初始化混合结果。"
+  },
+  "snowberg::gui::surface::MixStyle": {
+    "contract": "仅影响位置；颜色始终线性混合。",
+    "description": "关键帧顶点插值方式：线性或按极坐标顺时针角度插值。"
+  },
+  "snowberg::gui::surface::MixValue": {
+    "contract": "默认空构造允许，但空序列不能调用 GetValue。",
+    "description": "保存一组值并在循环相邻关键值之间插值。"
+  },
+  "snowberg::gui::surface::MixValue::GetValue": {
+    "contract": "要求非空且 alpha≥0；没有越界或负进度校验。",
+    "description": "alpha 整数部分对序列长度取模选段，小数部分线性混合该项与下一项。"
+  },
+  "snowberg::gui::surface::MixValue::MixValue": {
+    "contract": "序列类型需可复制，使用 GetValue 前必须非空。",
+    "description": "复制输入关键值序列。"
+  },
+  "snowberg::gui::surface::Model": {
+    "contract": "不拥有 GPU 资源；顶点允许直接修改，索引仅只读暴露。",
+    "description": "持有 CPU 顶点和 uint32 索引数组。"
+  },
+  "snowberg::gui::surface::Model::Indices": {
+    "contract": "引用依附 Model，无所有权转移。",
+    "description": "返回索引 vector 的 const 引用。"
+  },
+  "snowberg::gui::surface::Model::Model": {
+    "contract": "不验证索引范围或拓扑。",
+    "description": "复制传入顶点和索引数组。"
+  },
+  "snowberg::gui::surface::Model::Vertices": {
+    "contract": "可修改 CPU 顶点，但不会自动上传到 DeviceModel。",
+    "description": "返回顶点 vector 引用，提供 const/可变重载。"
+  },
+  "snowberg::gui::surface::PowerInterpolation": {
+    "contract": "通常 x∈[0,1]、index>0；没有输入范围防护。",
+    "description": "前半段返回 (2x)^index/2，后半段返回 1−(2−2x)^index/2。"
+  },
+  "snowberg::gui::surface::Vertex": {
+    "contract": "布局与 Application 输入属性及用户着色器一致。",
+    "description": "surface 顶点记录，包含二维 position 与 RGBA color。"
   }
 }
