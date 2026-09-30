@@ -48,10 +48,19 @@ void ModuleCube::OnInit() {
   program_->BindShader(vertex_shader_.get(), grassland::graphics::SHADER_TYPE_VERTEX);
   program_->BindShader(fragment_shader_.get(), grassland::graphics::SHADER_TYPE_PIXEL);
   program_->Finalize();
+
+  overlay_ = std::make_unique<snowberg::gui::Context>(core_.get(), window_.get(), snowberg::gui::DefaultFont());
+  world_panel_ =
+      std::make_unique<snowberg::gui::WorldPanel>(core_.get(), window_.get(), 320, 260, snowberg::gui::DefaultFont());
+  auto transform = glm::translate(glm::mat4(1.0f), glm::vec3{1.15f, 0.75f, 0.1f});
+  transform = glm::scale(transform, glm::vec3{1.7f, -1.35f, 1.0f});
+  world_panel_->SetTransform(transform);
 }
 
 void ModuleCube::OnClose() {
   core_->WaitGPU();
+  world_panel_.reset();
+  overlay_.reset();
   program_.reset();
   vertex_shader_.reset();
   fragment_shader_.reset();
@@ -68,12 +77,37 @@ void ModuleCube::OnUpdate() {
     alive_ = false;
   }
   if (alive_) {
-    const float x = RotationAngle();
+    overlay_->BeginFrame();
+    overlay_->BeginPanel("help", 16, 16, 260, "Graphics Hello");
+    overlay_->Text("2D overlay and 3D controls");
+    overlay_->Text("The panel on the right lives in 3D.");
+    overlay_->EndPanel();
+
+    const auto cursor = window_->GetCursorPosition();
+    const auto size = window_->GetSize();
+    const glm::vec2 ndc{float(2.0 * cursor.x / size.x - 1.0), float(1.0 - 2.0 * cursor.y / size.y)};
+    const auto inverse = glm::inverse(view_projection_);
+    glm::vec4 near_point = inverse * glm::vec4{ndc, 0.0f, 1.0f};
+    glm::vec4 far_point = inverse * glm::vec4{ndc, 1.0f, 1.0f};
+    near_point /= near_point.w;
+    far_point /= far_point.w;
+    const auto hit = world_panel_->RayHit(glm::vec3(near_point), glm::normalize(glm::vec3(far_point - near_point)));
+    world_panel_->BeginFrame(overlay_->WantsPointer() ? std::nullopt : hit,
+                             window_->IsMouseButtonDown(GLFW_MOUSE_BUTTON_LEFT));
+    auto &controls = world_panel_->Controls();
+    controls.BeginPanel("world", 0, 0, 320, "World controls");
+    controls.Checkbox("Rotate cube", &rotate_);
+    controls.Text("Click or drag this 3D panel.");
+    controls.EndPanel();
+
+    if (rotate_)
+      rotation_ = RotationAngle();
 
     GlobalUniformBuffer ubo = {};
-    ubo.model = glm::rotate(glm::mat4{1.0f}, x, glm::vec3{0.0f, 1.0f, 0.0f});
+    ubo.model = glm::rotate(glm::mat4{1.0f}, rotation_, glm::vec3{0.0f, 1.0f, 0.0f});
     ubo.view = glm::lookAt(glm::vec3{0.0f, 0.0f, 5.0f}, glm::vec3{0.0f, 0.0f, 0.0f}, glm::vec3{0.0f, 1.0f, 0.0f});
     ubo.proj = glm::perspectiveZO(glm::radians(45.0f), 1280.0f / 720.0f, 3.5f, 6.5f);
+    view_projection_ = ubo.proj * ubo.view;
     uniform_buffer_->UploadData(&ubo, sizeof(GlobalUniformBuffer));
   }
 }
@@ -93,7 +127,9 @@ void ModuleCube::OnRender() {
   command_context->CmdSetPrimitiveTopology(grassland::graphics::PRIMITIVE_TOPOLOGY_TRIANGLE_LIST);
   command_context->CmdDrawIndexed(36, 1, 0, 0, 0);
   command_context->CmdEndRendering();
-  command_context->CmdPresent(window_.get(), color_image_.get());
+  world_panel_->Render(command_context.get(), color_image_.get(), depth_image_.get(), view_projection_);
+  auto *display = overlay_->EndFrame(command_context.get(), color_image_.get());
+  command_context->CmdPresent(window_.get(), display);
   core_->SubmitCommandContext(command_context.get());
 }
 

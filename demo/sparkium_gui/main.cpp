@@ -6,6 +6,7 @@
 #include <iostream>
 
 #include "../sparkium_backend.h"
+#include "snowberg/gui/gui.h"
 
 using namespace long_march;
 
@@ -131,14 +132,14 @@ int main(int argc, char **argv) {
       }
     }
 
-    window->InitImGui(nullptr, 18.0f);
+    snowberg::gui::Context ui(graphics_core.get(), window.get(), snowberg::gui::DefaultFont());
     std::cout << "Display: " << (hdr_active ? "HDR" : "SDR") << std::endl;
     FPSCounter fps_counter;
-    bool show_browser = true;
+    int ui_page = 0;
 
     int rendered_frames = 0;
     while (!window->ShouldClose() && (!frame_limit || rendered_frames++ < frame_limit)) {
-      // Apply before BeginImGuiFrame so ImGui and presentation use the same format.
+      // Apply before building the UI so the scene and overlay use the same format.
       if (hdr_requested != hdr_active) {
         if (window->SetHDR(hdr_requested) == 0) {
           hdr_active = hdr_requested;
@@ -150,152 +151,124 @@ int main(int argc, char **argv) {
         }
       }
 
-      window->BeginImGuiFrame();
-      ImGui::SetNextWindowPos({10, 10}, ImGuiCond_Once);
-      ImGui::SetNextWindowBgAlpha(hdr_active ? 1.0f : 0.85f);
-      ImGui::Begin("Sparkium scenes", &show_browser, ImGuiWindowFlags_AlwaysAutoResize);
-      if (ImGui::BeginCombo("Scene", loaded->GetName().c_str())) {
-        for (size_t i = 0; i < scene_files.size(); ++i) {
-          bool current = i == selected;
-          if (ImGui::Selectable(scene_files[i].parent_path().filename().string().c_str(), current)) {
-            auto previous = selected;
-            selected = i;
-            if (!load_selected())
-              selected = previous;
-          }
-          if (current)
-            ImGui::SetItemDefaultFocus();
+      ui.BeginFrame();
+      ui.BeginPanel("sparkium", 12, 12, 370, "Sparkium");
+      ui.Choice("Page", &ui_page, {"Scene", "Sampling", "Environment", "Display", "Stats"});
+      ui.Separator();
+      auto *film = loaded->GetFilm();
+      auto &settings = loaded->GetScene()->settings;
+      if (ui_page == 0) {
+        std::vector<std::string> scene_names;
+        for (const auto &file : scene_files)
+          scene_names.push_back(file.parent_path().filename().string());
+        int scene_index = static_cast<int>(selected);
+        if (ui.Choice("Scene", &scene_index, scene_names)) {
+          const auto previous = selected;
+          selected = static_cast<size_t>(scene_index);
+          if (!load_selected())
+            selected = previous;
+          film = loaded->GetFilm();
         }
-        ImGui::EndCombo();
-      }
-      const std::string auto_label =
-          std::string("Auto (") + PipelineName(core.ResolveRenderPipeline(sparkium::RENDER_PIPELINE_AUTO)) + ")";
-      const auto selected_pipeline =
-          pipeline == sparkium::RENDER_PIPELINE_AUTO ? pipeline : core.ResolveRenderPipeline(pipeline);
-      const char *pipeline_label =
-          selected_pipeline == sparkium::RENDER_PIPELINE_AUTO ? auto_label.c_str() : PipelineName(selected_pipeline);
-      if (ImGui::BeginCombo("Pipeline", pipeline_label)) {
-        for (auto option : {sparkium::RENDER_PIPELINE_AUTO, sparkium::RENDER_PIPELINE_RASTERIZATION,
-                            sparkium::RENDER_PIPELINE_RAY_TRACING, sparkium::RENDER_PIPELINE_RT_FALLBACK,
-                            sparkium::RENDER_PIPELINE_RAY_QUERY}) {
+        const std::vector<sparkium::RenderPipeline> pipeline_options = {
+            sparkium::RENDER_PIPELINE_AUTO, sparkium::RENDER_PIPELINE_RASTERIZATION,
+            sparkium::RENDER_PIPELINE_RAY_TRACING, sparkium::RENDER_PIPELINE_RT_FALLBACK,
+            sparkium::RENDER_PIPELINE_RAY_QUERY};
+        std::vector<std::string> pipeline_names;
+        std::vector<sparkium::RenderPipeline> available_pipelines;
+        for (auto option : pipeline_options) {
           if (option == sparkium::RENDER_PIPELINE_RAY_TRACING && !graphics_core->DeviceRayTracingSupport())
             continue;
           if (option == sparkium::RENDER_PIPELINE_RAY_QUERY && !graphics_core->DeviceRayQuerySupport())
             continue;
-          const bool current = option == selected_pipeline;
-          const char *label = option == sparkium::RENDER_PIPELINE_AUTO ? auto_label.c_str() : PipelineName(option);
-          if (ImGui::Selectable(label, current) && pipeline != option) {
-            pipeline = option;
-            loaded->GetFilm()->Reset();
-          }
-          if (current)
-            ImGui::SetItemDefaultFocus();
+          available_pipelines.push_back(option);
+          pipeline_names.emplace_back(PipelineName(option));
         }
-        ImGui::EndCombo();
-      }
-      ImGui::Checkbox("HDR preview", &hdr_requested);
-      if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled))
-        ImGui::SetTooltip(
-            "Linear HDR retains exposure, gamma, contrast and an extended Filmic look. Requires an HDR display "
-            "and HDR enabled in the operating system.");
-      if (!hdr_error.empty())
-        ImGui::TextWrapped("HDR unavailable: %s", hdr_error.c_str());
-      ImGui::SliderFloat("Exposure (EV)", &loaded->GetFilm()->info.exposure, -8.0f, 8.0f, "%.2f");
-      ImGui::TextUnformatted(hdr_active ? "Display: HDR" : "Display: SDR (scene view transform)");
-      if (hdr_active) {
-        const auto brightness = window->GetDisplayBrightness();
-        if (brightness.sdr_white_nits > 0.0f)
-          ImGui::Text("Reference white: %.0f nits (%.2fx)", brightness.sdr_white_nits,
-                      window->HDRReferenceWhiteScale());
-        else if (!brightness.reference_white_known)
-          ImGui::TextUnformatted("Reference white: unavailable");
-        if (brightness.hdr_headroom > 0.0f)
-          ImGui::Text("HDR headroom: %.2fx", brightness.hdr_headroom);
-        else
-          ImGui::TextUnformatted("HDR headroom: unknown");
-      }
-      auto *film = loaded->GetFilm();
-      auto &settings = loaded->GetScene()->settings;
-      const bool raster = core.ResolveRenderPipeline(pipeline) == sparkium::RENDER_PIPELINE_RASTERIZATION;
-      if (ImGui::CollapsingHeader("Render settings", ImGuiTreeNodeFlags_DefaultOpen)) {
+        int pipeline_index = 0;
+        for (size_t i = 0; i < available_pipelines.size(); ++i)
+          if (available_pipelines[i] == pipeline)
+            pipeline_index = static_cast<int>(i);
+        if (ui.Choice("Pipeline", &pipeline_index, pipeline_names)) {
+          pipeline = available_pipelines[static_cast<size_t>(pipeline_index)];
+          film->Reset();
+        }
+        if (ui.Button("Reload"))
+          load_selected();
+        if (ui.Button("Reset film"))
+          film->Reset();
+        ui.Text("Backend: " + std::string(graphics::BackendAPIString(graphics_core->API())));
+        ui.Text("Resolution: " + std::to_string(film->GetWidth()) + " x " + std::to_string(film->GetHeight()));
+      } else if (ui_page == 1) {
+        const bool raster = core.ResolveRenderPipeline(pipeline) == sparkium::RENDER_PIPELINE_RASTERIZATION;
         bool reset = false;
         if (raster) {
-          reset |= ImGui::ColorEdit3("Ambient light", &settings.ambient_light.x, ImGuiColorEditFlags_Float);
+          ui.Text("Rasterization uses one sample per frame.");
         } else {
-          reset |= ImGui::SliderInt("Samples / frame", &settings.samples_per_dispatch, 1, 256, "%d",
-                                    ImGuiSliderFlags_AlwaysClamp);
-          reset |= ImGui::SliderInt("Max bounces", &settings.max_bounces, 1, 128, "%d", ImGuiSliderFlags_AlwaysClamp);
+          reset |= ui.Slider("Samples / frame", &settings.samples_per_dispatch, 1, 256);
+          reset |= ui.Slider("Max bounces", &settings.max_bounces, 1, 128);
           bool alpha_shadow = settings.alpha_shadow != 0;
-          if (ImGui::Checkbox("Alpha shadows", &alpha_shadow)) {
+          if (ui.Checkbox("Alpha shadows", &alpha_shadow)) {
             settings.alpha_shadow = alpha_shadow;
             reset = true;
           }
-          reset |= ImGui::ColorEdit3("Background", &settings.background_color.x, ImGuiColorEditFlags_Float);
-          reset |= ImGui::SliderFloat("Persistence", &film->info.persistence, 0.0f, 1.0f, "%.3f",
-                                      ImGuiSliderFlags_AlwaysClamp);
-          reset |= ImGui::SliderFloat("Sample clamp", &film->info.clamping, 0.01f, 10000.0f, "%.2f",
-                                      ImGuiSliderFlags_Logarithmic | ImGuiSliderFlags_AlwaysClamp);
-          if (ImGui::IsItemHovered())
-            ImGui::SetTooltip("Limits each sample's peak radiance before accumulation; reduces fireflies.");
-          reset |= ImGui::SliderFloat("Max exposure", &film->info.max_exposure, 0.01f, 10000.0f, "%.2f",
-                                      ImGuiSliderFlags_Logarithmic | ImGuiSliderFlags_AlwaysClamp);
-          if (ImGui::IsItemHovered())
-            ImGui::SetTooltip("Linear accumulated brightness limit, not EV. Use 30 or more for Cornell Box HDR.");
-          if (hdr_requested && film->info.max_exposure <= 1.0f)
-            ImGui::TextWrapped(
-                "Max exposure <= 1 clips scene highlights before HDR display. Raise it to preserve HDR.");
+          reset |= ui.Slider("Persistence", &film->info.persistence, 0.0f, 1.0f);
         }
         if (reset)
           film->Reset();
-      }
-      if (ImGui::CollapsingHeader("View settings")) {
-        ImGui::Combo("View transform", &film->info.view_transform, "Normalized\0Standard\0Filmic\0");
-        ImGui::BeginDisabled(!hdr_active && film->info.view_transform != 2);
-        ImGui::SliderFloat("Gamma", &film->info.gamma, 0.1f, 4.0f, "%.2f", ImGuiSliderFlags_AlwaysClamp);
-        ImGui::SliderFloat("Contrast", &film->info.contrast, 0.0f, 4.0f, "%.2f", ImGuiSliderFlags_AlwaysClamp);
-        ImGui::EndDisabled();
-        if (hdr_active && film->info.view_transform == 0)
-          ImGui::TextWrapped("HDR preserves brightness without SDR normalization.");
-      }
-      if (ImGui::Button("Reload"))
-        load_selected();
-      ImGui::SameLine();
-      if (ImGui::Button("Reset film"))
-        loaded->GetFilm()->Reset();
-      ImGui::Text("%s", scene_files[selected].string().c_str());
-      ImGui::Text("Backend: %s", graphics::BackendAPIString(graphics_core->API()));
-      ImGui::Text("Resolution: %d x %d", loaded->GetFilm()->GetWidth(), loaded->GetFilm()->GetHeight());
-      const auto resolved_pipeline = core.ResolveRenderPipeline(pipeline);
-      if (resolved_pipeline != pipeline)
-        ImGui::Text("Pipeline: %s (%s)", PipelineName(pipeline), PipelineName(resolved_pipeline));
-      else
-        ImGui::Text("Pipeline: %s", PipelineName(pipeline));
-      const float fps = fps_counter.TickFPS();
-      if (resolved_pipeline == sparkium::RENDER_PIPELINE_RASTERIZATION) {
-        ImGui::TextUnformatted("Ray/s: N/A");
-        ImGui::TextUnformatted("Accumulated spp: N/A");
+      } else if (ui_page == 2) {
+        const bool raster = core.ResolveRenderPipeline(pipeline) == sparkium::RENDER_PIPELINE_RASTERIZATION;
+        bool reset = false;
+        if (raster) {
+          reset |= ui.Slider("Ambient red", &settings.ambient_light.x, 0.0f, 2.0f);
+          reset |= ui.Slider("Ambient green", &settings.ambient_light.y, 0.0f, 2.0f);
+          reset |= ui.Slider("Ambient blue", &settings.ambient_light.z, 0.0f, 2.0f);
+        } else {
+          reset |= ui.Slider("Background red", &settings.background_color.x, 0.0f, 2.0f);
+          reset |= ui.Slider("Background green", &settings.background_color.y, 0.0f, 2.0f);
+          reset |= ui.Slider("Background blue", &settings.background_color.z, 0.0f, 2.0f);
+          reset |= ui.Slider("Sample clamp", &film->info.clamping, 0.01f, 10000.0f);
+          reset |= ui.Slider("Max exposure", &film->info.max_exposure, 0.01f, 10000.0f);
+        }
+        if (reset)
+          film->Reset();
+      } else if (ui_page == 3) {
+        ui.Checkbox("HDR preview", &hdr_requested);
+        if (!hdr_error.empty())
+          ui.Text(hdr_error);
+        ui.Slider("Exposure (EV)", &film->info.exposure, -8.0f, 8.0f);
+        ui.Choice("View transform", &film->info.view_transform, {"Normalized", "Standard", "Filmic"});
+        ui.Slider("Gamma", &film->info.gamma, 0.1f, 4.0f);
+        ui.Slider("Contrast", &film->info.contrast, 0.0f, 4.0f);
+        ui.Text(hdr_active ? "Display: HDR" : "Display: SDR");
+        if (hdr_active) {
+          const auto brightness = window->GetDisplayBrightness();
+          if (brightness.sdr_white_nits > 0.0f)
+            ui.Text("Reference white: " + std::to_string(int(brightness.sdr_white_nits)) + " nits");
+          if (brightness.hdr_headroom > 0.0f)
+            ui.Text("HDR headroom: " + std::to_string(brightness.hdr_headroom));
+        }
       } else {
-        const auto *film = loaded->GetFilm();
-        const double camera_rays_per_second = film->info.accumulated_samples > 0
-                                                  ? static_cast<double>(film->GetWidth()) * film->GetHeight() *
-                                                        loaded->GetScene()->settings.samples_per_dispatch * fps
-                                                  : 0.0;
-        ImGui::Text("Ray/s: %.2f M", camera_rays_per_second / 1e6);
-        if (ImGui::IsItemHovered())
-          ImGui::SetTooltip("Camera rays: width x height x samples per frame x FPS.");
-        ImGui::Text("Accumulated spp: %d", film->info.accumulated_samples);
+        const float fps = fps_counter.TickFPS();
+        const auto resolved = core.ResolveRenderPipeline(pipeline);
+        ui.Text("Pipeline: " + std::string(PipelineName(resolved)));
+        ui.Text("FPS: " + std::to_string(fps));
+        if (resolved != sparkium::RENDER_PIPELINE_RASTERIZATION) {
+          const double rays = double(film->GetWidth()) * film->GetHeight() * settings.samples_per_dispatch * fps / 1e6;
+          ui.Text("Camera ray/s: " + std::to_string(rays) + " M");
+          ui.Text("Accumulated spp: " + std::to_string(film->info.accumulated_samples));
+        }
+        ui.Text(scene_files[selected].string());
+        if (!load_error.empty())
+          ui.Text(load_error);
       }
-      if (!load_error.empty())
-        ImGui::TextColored({1, .3f, .3f, 1}, "%s", load_error.c_str());
-      ImGui::Text("%.1f FPS", fps);
-      ImGui::End();
-      window->EndImGuiFrame();
+      ui.EndPanel();
 
       core.Render(loaded->GetScene(), loaded->GetCamera(), loaded->GetFilm(), pipeline);
       loaded->GetFilm()->Develop(image.get(), hdr_active);
       std::unique_ptr<graphics::CommandContext> command_context;
       graphics_core->CreateCommandContext(&command_context);
-      command_context->CmdPresent(window.get(), image.get());
+      auto *gui_image = ui.EndFrame(command_context.get(), image.get());
+
+      command_context->CmdPresent(window.get(), gui_image);
       graphics_core->SubmitCommandContext(command_context.get());
       graphics::Window::PollEvents();
       if (resize_pending) {
@@ -303,7 +276,6 @@ int main(int argc, char **argv) {
         resize_pending = false;
       }
     }
-    window->TerminateImGui();
     return 0;
   } catch (const std::exception &exception) {
     std::cerr << "sparkium_gui: " << exception.what() << '\n';

@@ -79,6 +79,10 @@ class Application {
   // Called after the framebuffer size changes, before the next update.
   virtual void OnFramebufferResize();
 
+  virtual graphics::Image *ComposeUI(graphics::CommandContext *commands, graphics::Image *scene) {
+    return scene;
+  }
+
   glm::vec4 clear_color_{0.0f, 0.0f, 0.0f, 1.0f};
 
  private:
@@ -125,6 +129,7 @@ class Application {
   std::string screenshot_path_;
   std::unique_ptr<graphics::Core> core_;
   std::unique_ptr<graphics::Window> window_;
+  graphics::Image *last_presented_image_{};
 
   std::unique_ptr<graphics::Shader> vertex_shader_;
   std::unique_ptr<graphics::Shader> pixel_shader_;

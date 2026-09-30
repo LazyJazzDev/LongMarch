@@ -1,5 +1,6 @@
 #pragma once
 #include "long_march.h"
+#include "snowberg/gui/gui.h"
 
 struct Vertex {
   glm::vec3 pos;
@@ -31,5 +32,9 @@ class Application {
   std::shared_ptr<grassland::graphics::Core> core_;
   std::unique_ptr<grassland::graphics::Window> window_;
   std::unique_ptr<grassland::graphics::Image> frame_image_;
+  std::unique_ptr<snowberg::gui::Context> ui_;
+  bool animated_{true};
+  bool particles_{true};
+  float intensity_{0.5f};
   bool alive_{false};
 };

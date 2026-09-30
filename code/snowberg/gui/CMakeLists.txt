@@ -7,4 +7,6 @@ set(SNOWBERG_LIBS ${SNOWBERG_LIBS} PARENT_SCOPE)
 
 target_include_directories(${SNOWBERG_SUBLIB_NAME} PUBLIC ${LONGMARCH_INCLUDE_DIR})
 
-target_link_libraries(${SNOWBERG_SUBLIB_NAME} PUBLIC Grassland)
+target_link_libraries(${SNOWBERG_SUBLIB_NAME} PUBLIC Grassland snowberg_draw)
+
+PACK_SHADER_CODE(${SNOWBERG_SUBLIB_NAME})

@@ -7,6 +7,7 @@
 #include "assimp/postprocess.h"
 #include "assimp/scene.h"
 #include "glm/gtc/matrix_transform.hpp"
+#include "snowberg/gui/gui.h"
 #include "stb_image_write.h"
 
 using namespace long_march;
@@ -261,27 +262,22 @@ int main() {
                         {-3.0159f, 3.01599f, 0.0f},     {0.0f, 0.04f, 0.0f}};
 
   bool ray_tracing = true;
-  window->InitImGui(nullptr, 20.0f);
+  snowberg::gui::Context ui(core_.get(), window.get(), snowberg::gui::DefaultFont());
   while (!window->ShouldClose()) {
-    window->BeginImGuiFrame();
-    if (ImGui::Begin("Franka Joint Control", nullptr, ImGuiWindowFlags_AlwaysAutoResize)) {
-      ImGui::Checkbox("Ray Tracing", &ray_tracing);
-      if (ray_tracing && !core_->DeviceRayTracingSupport()) {
-        ImGui::Text("Ray Tracing not supported on this device!");
-      }
-      ImGui::Separator();
-      if (ImGui::Button("Center")) {
-        for (auto &j : joints) {
-          j.value = (j.upper_bound + j.lower_bound) * 0.5f;
-        }
-      }
-      for (int i = 0; i < 8; i++) {
-        ImGui::SliderFloat(("Joint " + std::to_string(i + 1)).c_str(), &joints[i].value, joints[i].lower_bound,
-                           joints[i].upper_bound);
+    ui.BeginFrame();
+    ui.BeginPanel("joints", 16, 16, 300, "Franka joints");
+    ui.Checkbox("Ray tracing", &ray_tracing);
+    if (ray_tracing && !core_->DeviceRayTracingSupport())
+      ui.Text("Ray tracing unavailable");
+    ui.Separator();
+    if (ui.Button("Center")) {
+      for (auto &j : joints) {
+        j.value = (j.upper_bound + j.lower_bound) * 0.5f;
       }
     }
-    ImGui::End();
-    window->EndImGuiFrame();
+    for (int i = 0; i < 8; i++)
+      ui.Slider("Joint " + std::to_string(i + 1), &joints[i].value, joints[i].lower_bound, joints[i].upper_bound);
+    ui.EndPanel();
     glm::mat4 combined_mat = glm::mat4(1.0f);
     combined_mesh[1].SetTransformation(combined_mat);
     combined_mat *= xyz_rpy_trans({0.0f, 0.0f, 0.333f}, {});
@@ -326,7 +322,9 @@ int main() {
     film.Develop(srgb_image.get());
     std::unique_ptr<graphics::CommandContext> cmd_context;
     core_->CreateCommandContext(&cmd_context);
-    cmd_context->CmdPresent(window.get(), srgb_image.get());
+    auto *gui_image = ui.EndFrame(cmd_context.get(), srgb_image.get());
+
+    cmd_context->CmdPresent(window.get(), gui_image);
     core_->SubmitCommandContext(cmd_context.get());
     grassland::graphics::Window::PollEvents();
     float fps = fps_counter.TickFPS();

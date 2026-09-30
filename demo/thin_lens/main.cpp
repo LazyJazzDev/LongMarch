@@ -6,6 +6,7 @@
 #include <iostream>
 
 #include "../sparkium_backend.h"
+#include "snowberg/gui/gui.h"
 #define STB_IMAGE_WRITE_IMPLEMENTATION
 #include "stb_image_write.h"
 
@@ -121,10 +122,10 @@ int main(int argc, char **argv) {
     std::unique_ptr<graphics::Image> image;
     graphics->CreateImage(width, height, graphics::IMAGE_FORMAT_R8G8B8A8_UNORM, &image);
     std::unique_ptr<graphics::Window> window;
+    std::unique_ptr<snowberg::gui::Context> ui;
     if (!headless) {
       graphics->CreateWindowObject(width, height, "Sparkium - Thin Lens", &window);
-      window->InitImGui(nullptr, 18.0f);
-      ImGui::GetIO().IniFilename = nullptr;
+      ui = std::make_unique<snowberg::gui::Context>(graphics.get(), window.get(), snowberg::gui::DefaultFont());
     }
     const auto pipeline = graphics->DeviceRayQuerySupport()     ? sparkium::RENDER_PIPELINE_RAY_QUERY
                           : graphics->DeviceRayTracingSupport() ? sparkium::RENDER_PIPELINE_RAY_TRACING
@@ -132,44 +133,40 @@ int main(int argc, char **argv) {
     std::cout << "Device: " << graphics->DeviceName() << ", pipeline: " << int(pipeline) << std::endl;
     int rendered = 0;
     while ((!window || !window->ShouldClose()) && (!frames || rendered < frames)) {
-      if (window) {
-        window->BeginImGuiFrame();
-        ImGui::SetNextWindowPos({16, 16}, ImGuiCond_Always);
-        ImGui::SetNextWindowSize({330, 0}, ImGuiCond_Always);
-        ImGui::SetNextWindowBgAlpha(0.92f);
-        ImGui::Begin("Thin Lens", nullptr, ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoMove);
-        ImGui::TextWrapped("Focus one subject. Watch the background lights change into aperture-shaped bokeh.");
-        ImGui::PushItemWidth(160.0f);
-        bool changed = ImGui::Checkbox("Pinhole comparison", &pinhole_mode);
-        ImGui::BeginDisabled(pinhole_mode);
-        changed |= ImGui::SliderFloat("Focus", &lens.focus_distance, 2.5f, 13.0f, "%.2f");
-        if (ImGui::Button("Near / orange")) {
-          lens.focus_distance = 3.4f;
-          changed = true;
+      if (ui) {
+        ui->BeginFrame();
+        ui->BeginPanel("lens", 16, 16, 340, "Thin lens");
+        ui->Text("Focus a subject and shape the background bokeh.");
+        bool changed = ui->Checkbox("Pinhole comparison", &pinhole_mode);
+        if (!pinhole_mode) {
+          changed |= ui->Slider("Focus", &lens.focus_distance, 2.5f, 13.0f);
+          if (ui->Button("Focus near / orange")) {
+            lens.focus_distance = 3.4f;
+            changed = true;
+          }
+          if (ui->Button("Focus mid / teal")) {
+            lens.focus_distance = 5.4f;
+            changed = true;
+          }
+          if (ui->Button("Focus far / blue")) {
+            lens.focus_distance = 8.4f;
+            changed = true;
+          }
+          changed |= ui->Slider("Aperture radius", &lens.aperture_radius, 0.0f, 0.45f);
+          int shape = lens.aperture_blades == 0 ? 0 : lens.aperture_blades - 2;
+          if (ui->Choice("Shape", &shape,
+                         {"Circle", "Triangle", "Square", "Pentagon", "Hexagon", "Heptagon", "Octagon"})) {
+            lens.aperture_blades = shape == 0 ? 0 : shape + 2;
+            changed = true;
+          }
+          changed |= ui->Slider("Rotation", &lens.aperture_rotation, 0.0f, glm::pi<float>());
+          changed |= ui->Slider("Horizontal ratio", &lens.aperture_ratio, 0.4f, 2.5f);
         }
-        ImGui::SameLine();
-        if (ImGui::Button("Mid / teal")) {
-          lens.focus_distance = 5.4f;
-          changed = true;
-        }
-        if (ImGui::Button("Far / blue")) {
-          lens.focus_distance = 8.4f;
-          changed = true;
-        }
-        changed |= ImGui::SliderFloat("Aperture radius", &lens.aperture_radius, 0.0f, 0.45f, "%.3f");
-        int shape = lens.aperture_blades == 0 ? 0 : lens.aperture_blades - 2;
-        if (ImGui::Combo("Shape", &shape, "Circle\0Triangle\0Square\0Pentagon\0Hexagon\0Heptagon\0Octagon\0")) {
-          lens.aperture_blades = shape == 0 ? 0 : shape + 2;
-          changed = true;
-        }
-        changed |= ImGui::SliderAngle("Rotation", &lens.aperture_rotation, 0, 180);
-        changed |= ImGui::SliderFloat("Horizontal ratio", &lens.aperture_ratio, 0.4f, 2.5f, "%.2f");
-        ImGui::EndDisabled();
-        if (ImGui::SliderFloat("Geometry offset", &geometry_offset, 0.0f, 1.0f, "%.3f")) {
+        if (ui->Slider("Geometry offset", &geometry_offset, 0.0f, 1.0f)) {
           sphere.SetShadowTerminatorGeometryOffset(geometry_offset);
           changed = true;
         }
-        if (ImGui::Button("Reset lens")) {
+        if (ui->Button("Reset lens")) {
           pinhole_mode = false;
           lens.aperture_radius = 0.22f;
           lens.focus_distance = 5.4f;
@@ -180,18 +177,17 @@ int main(int argc, char **argv) {
         }
         if (changed)
           film.Reset();
-        ImGui::Text("Samples: %d", film.info.accumulated_samples);
-        ImGui::TextWrapped("Larger aperture = shallower depth of field. Zero aperture matches a pinhole.");
-        ImGui::PopItemWidth();
-        ImGui::End();
-        window->EndImGuiFrame();
+        ui->Text("Samples: " + std::to_string(film.info.accumulated_samples));
+        ui->EndPanel();
       }
       core.Render(&scene, pinhole_mode ? static_cast<sparkium::Camera *>(&pinhole) : &lens, &film, pipeline);
       film.Develop(image.get());
       if (window) {
         std::unique_ptr<graphics::CommandContext> commands;
         graphics->CreateCommandContext(&commands);
-        commands->CmdPresent(window.get(), image.get());
+        auto *gui_image = ui->EndFrame(commands.get(), image.get());
+
+        commands->CmdPresent(window.get(), gui_image);
         graphics->SubmitCommandContext(commands.get());
         graphics::Window::PollEvents();
       }
@@ -201,13 +197,12 @@ int main(int argc, char **argv) {
     if (!output.empty()) {
       if (output.has_parent_path())
         std::filesystem::create_directories(output.parent_path());
+      film.Develop(image.get());
       std::vector<uint8_t> pixels(width * height * 4);
       image->DownloadData(pixels.data());
       if (!stbi_write_png(output.string().c_str(), width, height, 4, pixels.data(), width * 4))
         throw std::runtime_error("cannot save output image");
     }
-    if (window)
-      window->TerminateImGui();
     return 0;
   } catch (const std::exception &error) {
     std::cerr << "thin_lens: " << error.what() << '\n';

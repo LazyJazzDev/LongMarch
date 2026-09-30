@@ -2,28 +2,10 @@
 
 #include <algorithm>
 
+#include "rounded_rectangle.h"
+
 namespace {
-
-// The score board in its normal state, and the same board while the autoplay
-// owns the game. The autoplay palette is a muted brick red of about the same
-// lightness as the warm grey it replaces, with a tinted title, so the board
-// reads as the same object in a different mood instead of a warning banner.
-const glm::vec3 kScoreBoardColor{184.0f / 255.0f, 173.0f / 255.0f, 161.0f / 255.0f};
-const glm::vec3 kScoreBoardTitleColor{236.0f / 255.0f, 228.0f / 255.0f, 214.0f / 255.0f};
-const glm::vec3 kAiScoreBoardColor{174.0f / 255.0f, 70.0f / 255.0f, 56.0f / 255.0f};
-const glm::vec3 kAiScoreBoardTitleColor{240.0f / 255.0f, 196.0f / 255.0f, 178.0f / 255.0f};
-
-// How long the score board takes to fade between the two palettes, and how
-// long one autoplay move may think. The search runs on its own thread, so the
-// budget only decides how deep it looks, not how smoothly the board moves.
-constexpr float kAiThemeSeconds = 0.45f;
 constexpr float kAiSearchBudgetMs = 150.0f;
-
-// The clicks that start the autoplay have to be consecutive: a pause longer
-// than this window starts the count over.
-constexpr float kScoreBoardClickWindow = 1.2f;
-constexpr int kScoreBoardClicksToStartAi = 5;
-
 }  // namespace
 
 TwentyFourEight::TwentyFourEight(const std::string &title, int width, int height, graphics::BackendAPI api)
@@ -33,7 +15,7 @@ TwentyFourEight::TwentyFourEight(const std::string &title, int width, int height
       return;
     }
     // The autoplay takes the game over completely while it runs, so the arrow
-    // keys stop answering until the score board turns it off again.
+    // keys stop answering until the GUI control turns it off again.
     if (ai_enabled_) {
       return;
     }
@@ -73,69 +55,10 @@ void TwentyFourEight::CustomOnInit() {
 
   font_factory_ = std::make_unique<font::Factory>(FindAssetFile("fonts/ClearSans-Bold-webfont.woff"));
   block_renderer_ = std::make_unique<BlockRenderer>(this, font_factory_.get());
-  score_board_ = std::make_unique<NoticeBoard>(this, font_factory_.get(), kScoreBoardTitleColor, glm::vec3{1.0f},
-                                               kScoreBoardColor, L"SCORE", L"0");
-  score_board_gesture_ = std::make_unique<ScoreBoardGesture>(this, this);
-  game_over_bar_ = std::make_unique<TextBar>(this, font_factory_.get(), L"Game Over!", 1.0f,
-                                             glm::vec3{117.0f, 110.0f, 102.0f} / 255.0f, glm::vec2{0.0f, 0.0f},
-                                             TextBar::AlignMode::kMid);
-  game_over_score_board_ =
-      std::make_unique<NoticeBoard>(this, font_factory_.get(), glm::vec3{236.0f, 228.0f, 214.0f} / 255.0f,
-                                    glm::vec3{1.0f}, glm::vec3{184.0f, 173.0f, 161.0f} / 255.0f, L"SCORE", L"0");
-  game_over_button_ = std::make_unique<TextButton>(
-      this, font_factory_.get(), glm::vec3{1.0f}, glm::vec3{184.0f, 173.0f, 161.0f} / 255.0f, L"TRY AGAIN",
-      [](Application *app) {
-        auto app_instance = dynamic_cast<TwentyFourEight *>(app);
-        if (app_instance) {
-          app_instance->ResetGame();
-        } else {
-          LogError("The app is not a 2048 instance");
-        }
-      },
-      0.5f);
-  menu_bar_ =
-      std::make_unique<TextBar>(this, font_factory_.get(), L"Menu", 1.0f, glm::vec3{117.0f, 110.0f, 102.0f} / 255.0f,
-                                glm::vec2{0.0f, 0.0f}, TextBar::AlignMode::kMid);
-  menu_keep_going_button_ = std::make_unique<TextButton>(
-      this, font_factory_.get(), glm::vec3{1.0f}, glm::vec3{184.0f, 173.0f, 161.0f} / 255.0f, L"KEEP GOING",
-      [](Application *app) {
-        auto app_instance = dynamic_cast<TwentyFourEight *>(app);
-        if (app_instance) {
-          app_instance->TransitStage(GameStage::kGameGoing);
-        } else {
-          LogError("The app is not a 2048 instance");
-        }
-      },
-      0.5f);
-  menu_new_game_button_ = std::make_unique<TextButton>(
-      this, font_factory_.get(), glm::vec3{1.0f}, glm::vec3{184.0f, 173.0f, 161.0f} / 255.0f, L"NEW GAME",
-      [](Application *app) {
-        auto app_instance = dynamic_cast<TwentyFourEight *>(app);
-        if (app_instance) {
-          app_instance->ResetGame();
-        } else {
-          LogError("The app is not a 2048 instance");
-        }
-      },
-      0.5f);
-
-  menu_button_ = std::make_unique<TextButton>(
-      this, font_factory_.get(), glm::vec3{1.0f}, glm::vec3{225.0f, 156.0f, 102.0f} / 255.0f, L"MENU",
-      [](Application *app) {
-        auto app_instance = dynamic_cast<TwentyFourEight *>(app);
-        if (app_instance) {
-          app_instance->TransitStage(GameStage::kMenu);
-        } else {
-          LogError("The app is not a 2048 instance");
-        }
-      },
-      0.618f);
+  ui_ = std::make_unique<snowberg::gui::Context>(Core(), GetWindow(), snowberg::gui::DefaultFont());
   OnWindowSize();
   ResetGame();
   SetAiEnabled(initial_ai_enabled_);
-  // A run started with `--ai` shows the theme it would have faded into.
-  ai_theme_mix_ = ai_enabled_ ? 1.0f : 0.0f;
-  UpdateScoreBoardTheme();
 }
 
 void TwentyFourEight::CustomOnUpdate() {
@@ -152,16 +75,7 @@ void TwentyFourEight::CustomOnUpdate() {
 void TwentyFourEight::CustomOnClose() {
   // Release resources in reverse order of creation.
   ai_player_.Reset();
-  score_board_gesture_.reset();
-  menu_button_.reset();
-  menu_new_game_button_.reset();
-  menu_keep_going_button_.reset();
-  menu_bar_.reset();
-  game_over_button_.reset();
-  game_over_score_board_.reset();
-  game_over_bar_.reset();
-  score_board_.reset();
-
+  ui_.reset();
   background_model_.reset();
   slot_model_.reset();
   number_blocks_.clear();
@@ -180,32 +94,7 @@ void TwentyFourEight::SetAiEnabled(bool enabled) {
   board_revision_++;
   ai_player_.Reset();
   operation_buffer_.reset();
-  score_board_clicks_ = 0;
-  score_board_click_timer_ = 0.0f;
-  score_board_->UpdateTitleText(ai_enabled_ ? L"AI" : L"SCORE");
   LogInfo("2048 autoplay {}", ai_enabled_ ? "started" : "stopped");
-}
-
-void TwentyFourEight::OnScoreBoardClick() {
-  if (ai_enabled_) {
-    SetAiEnabled(false);
-    return;
-  }
-
-  score_board_clicks_++;
-  score_board_click_timer_ = kScoreBoardClickWindow;
-  if (score_board_clicks_ >= kScoreBoardClicksToStartAi) {
-    SetAiEnabled(true);
-  }
-}
-
-// The score board fades between the two palettes instead of switching, so the
-// autoplay taking over reads as the board itself changing.
-void TwentyFourEight::UpdateScoreBoardTheme() {
-  const glm::vec3 title_color = glm::mix(kScoreBoardTitleColor, kAiScoreBoardTitleColor, ai_theme_mix_);
-  const glm::vec3 background_color = glm::mix(kScoreBoardColor, kAiScoreBoardColor, ai_theme_mix_);
-  score_board_->UpdateTitleColor(title_color);
-  score_board_->UpdateBackgroundColor(background_color);
 }
 
 AiPlayer::Board TwentyFourEight::SnapshotBoard() const {
@@ -229,8 +118,6 @@ void TwentyFourEight::OnWindowSize() {
   float title_scale = 1.0f / 4.0f;
   float ui_unit = std::min(window_width, window_height / (1.0f + title_scale)) * 1e-2f;
   float block_size = ui_unit * 20.0f;
-  float left = window_width * 0.5f - ui_unit * 50.0f;
-  float top = window_height * 0.5f - ui_unit * (1.0f + title_scale) * 50.0f;
 
   board_to_world_ = glm::mat4{block_size,
                               0.0f,
@@ -248,89 +135,15 @@ void TwentyFourEight::OnWindowSize() {
                               window_height * 0.5f + 50.0f * title_scale * ui_unit + block_size * 2.0f,
                               0.0f,
                               1.0f};
-  logo_to_world_ = glm::mat4{block_size,
-                             0.0f,
-                             0.0f,
-                             0.0f,
-                             0.0f,
-                             -block_size,
-                             0.0f,
-                             0.0f,
-                             0.0f,
-                             0.0f,
-                             1.0f,
-                             0.0f,
-                             window_width * 0.5f - block_size * 2.125f,
-                             top + 50.0f * title_scale * ui_unit + block_size * 0.5f,
-                             0.0f,
-                             1.0f};
-  score_board_->Resize(window_width * 0.5f + ui_unit * 50.0f - ui_unit * 38.75f,
-                       top + 50.0f * title_scale * ui_unit + block_size * 0.5f - block_size * (1.0f - 1.0f / 16.0f),
-                       window_width * 0.5f + ui_unit * 50.0f - ui_unit * 8.75f,
-                       top + 50.0f * title_scale * ui_unit + block_size * 0.5f - block_size * (5.0f / 16.0f),
-                       block_size / 32.0f);
-  menu_button_->Resize(window_width * 0.5f + ui_unit * 50.0f - ui_unit * 38.75f,
-                       top + 50.0f * title_scale * ui_unit + block_size * 0.5f - block_size * (4.0f / 16.0f),
-                       window_width * 0.5f + ui_unit * 50.0f - ui_unit * 8.75f,
-                       top + 50.0f * title_scale * ui_unit + block_size * 0.5f - block_size * (1.0f / 16.0f),
-                       block_size / 32.0f);
-  // The click target of the score board gesture is the score board itself.
-  score_board_gesture_->Resize(
-      window_width * 0.5f + ui_unit * 50.0f - ui_unit * 38.75f,
-      top + 50.0f * title_scale * ui_unit + block_size * 0.5f - block_size * (1.0f - 1.0f / 16.0f),
-      window_width * 0.5f + ui_unit * 50.0f - ui_unit * 8.75f,
-      top + 50.0f * title_scale * ui_unit + block_size * 0.5f - block_size * (5.0f / 16.0f));
-
-  game_over_bar_->Resize(ui_unit * 7.0f, glm::vec2{window_width * 0.5f, window_height * 0.5f - ui_unit * 30.0f});
-  game_over_score_board_->Resize(window_width * 0.5f - ui_unit * 15.0f, window_height * 0.5f - ui_unit * 25.0f,
-                                 window_width * 0.5f + ui_unit * 15.0f, window_height * 0.5f - ui_unit * 5.0f,
-                                 block_size / 32.0f);
-  game_over_button_->Resize(window_width * 0.5f - ui_unit * 15.0f, window_height * 0.5f - ui_unit * 3.0f,
-                            window_width * 0.5f + ui_unit * 15.0f, window_height * 0.5f + ui_unit * 5.0f,
-                            block_size / 32.0f);
-  menu_new_game_button_->Resize(window_width * 0.5f - ui_unit * 15.0f, window_height * 0.5f - ui_unit * 0.0f,
-                                window_width * 0.5f + ui_unit * 15.0f, window_height * 0.5f + ui_unit * 8.0f,
-                                block_size / 32.0f);
-  menu_keep_going_button_->Resize(window_width * 0.5f - ui_unit * 15.0f, window_height * 0.5f - ui_unit * 13.0f,
-                                  window_width * 0.5f + ui_unit * 15.0f, window_height * 0.5f - ui_unit * 5.0f,
-                                  block_size / 32.0f);
-  menu_bar_->Resize(ui_unit * 7.0f, glm::vec2{window_width * 0.5f, window_height * 0.5f - ui_unit * 30.0f});
+  if (window_width < window_height) {
+    const float board_top = board_to_world_[3].y - block_size * 4.0f;
+    board_to_world_[3].y += std::max(0.0f, 238.0f * window_width / 720.0f - board_top);
+  }
 }
 
 void TwentyFourEight::OnTransitStage() {
   alpha_ = 0.0f;
   game_stage_ = target_game_stage_;
-  switch (game_stage_) {
-    case GameStage::kGameGoing:
-      menu_button_->Activate();
-      score_board_gesture_->Activate();
-      game_over_button_->Deactivate();
-      menu_keep_going_button_->Deactivate();
-      menu_new_game_button_->Deactivate();
-      break;
-    case GameStage::kMenu:
-      menu_button_->Deactivate();
-      score_board_gesture_->Deactivate();
-      game_over_button_->Deactivate();
-      menu_keep_going_button_->Activate();
-      menu_new_game_button_->Activate();
-      break;
-    case GameStage::kGameOver:
-      [&]() {
-        auto number_str = std::to_string(score_);
-        std::wstring number_str32;
-        for (auto c : number_str) {
-          number_str32 += char32_t(c);
-        }
-        game_over_score_board_->UpdateContentText(number_str32);
-      }();
-      menu_button_->Deactivate();
-      score_board_gesture_->Deactivate();
-      game_over_button_->Activate();
-      menu_keep_going_button_->Deactivate();
-      menu_new_game_button_->Deactivate();
-      break;
-  }
 }
 
 void TwentyFourEight::TransitStage(GameStage stage) {
@@ -346,7 +159,6 @@ void TwentyFourEight::ResetGame() {
   GenRandomBlock();
   score_ = 0;
   alpha_ = 0.0f;
-  UpdateScoreBoard();
   TransitStage(GameStage::kGameGoing);
   operation_buffer_.reset();
 }
@@ -410,7 +222,6 @@ void TwentyFourEight::OnMove(Direction direction) {
     GenRandomBlock();
     board_revision_++;
   }
-  UpdateScoreBoard();
 }
 
 void TwentyFourEight::AddBlock(int x, int y, int number) {
@@ -430,15 +241,6 @@ void TwentyFourEight::GenRandomBlock() {
   if (cell.has_value()) {
     AddBlock(cell->first, cell->second, number);
   }
-}
-
-void TwentyFourEight::UpdateScoreBoard() {
-  auto number_str = std::to_string(score_);
-  std::wstring number_str32;
-  for (auto c : number_str) {
-    number_str32 += char32_t(c);
-  }
-  score_board_->UpdateContentText(number_str32);
 }
 
 bool TwentyFourEight::IsGameOver() {
@@ -477,23 +279,6 @@ bool TwentyFourEight::IsGameOver() {
 }
 
 void TwentyFourEight::OnUpdate(float t) {
-  // The gesture window and the theme fade run on the frame clock; the board
-  // animation below runs on its own faster one.
-  if (score_board_click_timer_ > 0.0f) {
-    score_board_click_timer_ -= t;
-    if (score_board_click_timer_ <= 0.0f) {
-      score_board_click_timer_ = 0.0f;
-      score_board_clicks_ = 0;
-    }
-  }
-  const float theme_target = ai_enabled_ ? 1.0f : 0.0f;
-  if (ai_theme_mix_ != theme_target) {
-    const float step = t / kAiThemeSeconds;
-    ai_theme_mix_ = theme_target > ai_theme_mix_ ? std::min(theme_target, ai_theme_mix_ + step)
-                                                 : std::max(theme_target, ai_theme_mix_ - step);
-    UpdateScoreBoardTheme();
-  }
-
   if (target_game_stage_ != game_stage_) {
     OnTransitStage();
   }
@@ -595,34 +380,6 @@ void TwentyFourEight::OnUpdate(float t) {
 }
 
 void TwentyFourEight::OnDraw() {
-  if (game_stage_ == GameStage::kGameOver) {
-    game_over_bar_->Draw();
-    game_over_score_board_->Draw();
-    game_over_button_->Draw();
-
-    float alpha = std::max((alpha_ - 0.5f) * 2.0f, 0.0f);
-
-    if (alpha == 1.0f) {
-      return;
-    } else {
-      // Fade the overlay in over the game board.
-      CaptureSecondFrame(alpha);
-    }
-  }
-
-  if (game_stage_ == GameStage::kMenu) {
-    menu_bar_->Draw();
-    menu_keep_going_button_->Draw();
-    menu_new_game_button_->Draw();
-
-    if (alpha_ == 1.0f) {
-      return;
-    } else {
-      // Fade the overlay in over the game board.
-      CaptureSecondFrame(alpha_);
-    }
-  }
-
   DrawModel(background_model_.get(), InstanceInfo{
                                          glm::translate(board_to_world_, glm::vec3{0.0f, 0.0f, 0.8f}),
                                          glm::vec4{1.0f},
@@ -639,15 +396,12 @@ void TwentyFourEight::OnDraw() {
                                    });
     }
   }
-  score_board_->Draw();
 
   std::sort(number_blocks_.begin(), number_blocks_.end(),
             [](const NumberBlock &num_block0, const NumberBlock &num_block1) {
               return num_block0.number < num_block1.number;
             });
 
-  block_renderer_->SetBoardToWorld(logo_to_world_);
-  block_renderer_->Render(2048, 0.0f, 0.0f, 1.0f, 1.0f, 0.2f);
   block_renderer_->SetBoardToWorld(board_to_world_);
 
   float depth_offset = 0.2f + 0.2f / 16.0f;
@@ -655,6 +409,45 @@ void TwentyFourEight::OnDraw() {
     number_block.Render(block_renderer_.get(), alpha_, depth_offset);
     depth_offset -= 0.2f / 16.0f;
   }
+}
 
-  menu_button_->Draw();
+graphics::Image *TwentyFourEight::ComposeUI(graphics::CommandContext *commands, graphics::Image *scene) {
+  ui_->BeginFrame();
+  const auto size = GetWindow()->GetSize();
+  const float margin = 24.0f;
+  const bool portrait = size.x < size.y;
+  const float width =
+      portrait ? std::min(float(size.x) - 2.0f * margin, 600.0f) : std::min(280.0f, std::max(220.0f, size.x * 0.24f));
+  ui_->BeginPanel("game", portrait ? (size.x - width) * 0.5f : margin, margin, width, "2048");
+  ui_->Heading("Score  " + std::to_string(score_));
+  ui_->Text(ai_enabled_ ? "Autoplay is running" : "Use arrow keys to move tiles");
+  if (portrait)
+    ui_->BeginRow(3);
+  if (ui_->Button(ai_enabled_ ? "Stop autoplay" : "Autoplay"))
+    SetAiEnabled(!ai_enabled_);
+  if (ui_->Button("New game"))
+    ResetGame();
+  if (ui_->Button("Menu"))
+    TransitStage(GameStage::kMenu);
+  if (portrait)
+    ui_->EndRow();
+  ui_->EndPanel();
+
+  if (game_stage_ == GameStage::kMenu) {
+    ui_->BeginPanel("menu", std::max(margin, size.x * 0.5f - 160.0f), std::max(margin, size.y * 0.5f - 100.0f), 320.0f,
+                    "Game menu");
+    if (ui_->Button("Keep going"))
+      TransitStage(GameStage::kGameGoing);
+    if (ui_->Button("Start again"))
+      ResetGame();
+    ui_->EndPanel();
+  } else if (game_stage_ == GameStage::kGameOver) {
+    ui_->BeginPanel("game_over", std::max(margin, size.x * 0.5f - 160.0f), std::max(margin, size.y * 0.5f - 100.0f),
+                    320.0f, "Game over");
+    ui_->Text("Score  " + std::to_string(score_));
+    if (ui_->Button("Try again"))
+      ResetGame();
+    ui_->EndPanel();
+  }
+  return ui_->EndFrame(commands, scene);
 }

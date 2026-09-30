@@ -214,7 +214,8 @@ void Application::OnRender() {
   context->CmdDraw(3, 1, 0, 0);
   context->CmdEndRendering();
 
-  context->CmdPresent(window_.get(), present_image_.get());
+  last_presented_image_ = ComposeUI(context.get(), present_image_.get());
+  context->CmdPresent(window_.get(), last_presented_image_);
   core_->SubmitCommandContext(context.get());
 }
 
@@ -324,9 +325,9 @@ void Application::UpdateTitle() {
 
 void Application::SaveScreenshot() {
   core_->WaitGPU();
-  const auto extent = present_image_->Extent();
+  const auto extent = last_presented_image_->Extent();
   std::vector<uint8_t> pixels(size_t(extent.width) * extent.height * 4);
-  present_image_->DownloadData(pixels.data());
+  last_presented_image_->DownloadData(pixels.data());
   if (stbi_write_png(screenshot_path_.c_str(), int(extent.width), int(extent.height), 4, pixels.data(),
                      int(extent.width) * 4)) {
     LogInfo("Screenshot saved to {}", screenshot_path_);

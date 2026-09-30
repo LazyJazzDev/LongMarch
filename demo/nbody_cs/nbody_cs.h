@@ -1,10 +1,10 @@
 #pragma once
 #include "glm/gtc/matrix_transform.hpp"
 #include "grassland/graphics/frame_profile.h"
-#include "imgui.h"
 #include "long_march.h"
 #include "params.h"
 #include "random"
+#include "snowberg/gui/gui.h"
 
 using namespace long_march;
 
@@ -43,7 +43,7 @@ class NBodyCS {
 
   void BuildRenderNode();
 
-  void UpdateImGui();
+  void UpdateGui();
 
   float RandomFloat();
   glm::vec3 RandomOnSphere();
@@ -53,6 +53,7 @@ class NBodyCS {
 
   std::unique_ptr<graphics::Core> core_;
   std::unique_ptr<graphics::Window> window_;
+  std::unique_ptr<snowberg::gui::Context> ui_;
   std::unique_ptr<graphics::Buffer> global_uniform_buffer_;
 
   std::unique_ptr<graphics::Buffer> particles_pos_;
