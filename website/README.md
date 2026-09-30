@@ -23,13 +23,8 @@ branch or those directories. The same workflow is installed on `gh-pages` so
 reviewed website snapshots can be published before the source PR reaches
 `main`. Keep the workflow copies synchronized.
 
-The four sections are `#home`, `#install`, `#architecture`, and `#examples`.
-Keep commands consistent with CMake targets and platform support. Screenshot
-URLs point to pinned commits in LongMarchAssetsLFS. The home illustration is
-CSS concept art, not a renderer output.
-
-Architecture uses nested, collapsible navigation. Component heading IDs such as
-`#arch-graphics` and `#arch-camera` are stable deep links: opening or refreshing
-them selects the architecture tab, expands the relevant group and scrolls to
-the component. The reading position updates the active directory item. On
-small screens the directory becomes a bounded panel above the content.
+The home, installation and samples sections use `#home`, `#install` and
+`#examples`. Architecture lives in independent static documents under
+`reference/`. Legacy `#architecture` and `#arch-*` links redirect to the
+corresponding documentation page. See `docs/reference/README.md` for the
+source review process and document build command.

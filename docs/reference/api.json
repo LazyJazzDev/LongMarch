@@ -1,0 +1,622 @@
+{
+  "NOMINMAX": {
+    "contract": "",
+    "description": "阻止 Windows 头定义 min/max 宏，避免干扰 C++ 算法名称。"
+  },
+  "WIN32_LEAN_AND_MEAN": {
+    "contract": "",
+    "description": "在 _WIN64 分支缩减 Windows 头包含范围。"
+  },
+  "contradium::(anonymous)::PBDStepHelper": {
+    "contract": "",
+    "description": "Step 内部临时记录，保留实体引用、预测 x/q、修正增量与接触计数。"
+  },
+  "contradium::(anonymous)::PBDStepHelper::PBDStepHelper": {
+    "contract": "",
+    "description": "从实体复制当前位姿，清零增量，保留非拥有引用。"
+  },
+  "contradium::Core": {
+    "contract": "传入的 graphics::Core 生命周期必须覆盖此对象。",
+    "description": "保存借用图形 Core 的物理模块入口。"
+  },
+  "contradium::Core::Core": {
+    "contract": "",
+    "description": "将参数 core 存入 core_；不创建其他资源。"
+  },
+  "contradium::IPCSolver": {
+    "contract": "不能实例化不完整类型，也不能据此宣称该求解器已经实现。",
+    "description": "仅前向声明：用于预留类型名称，当前目录没有对应完整类定义或可调用实现。"
+  },
+  "contradium::MPMSolver": {
+    "contract": "不能实例化不完整类型，也不能据此宣称该求解器已经实现。",
+    "description": "仅前向声明：用于预留类型名称，当前目录没有对应完整类定义或可调用实现。"
+  },
+  "contradium::PBDSolver": {
+    "contract": "对象内部不加锁；调用方串行更新。",
+    "description": "拥有刚体 map 与递增 ID，提供状态修改和一次物理步进。"
+  },
+  "contradium::PBDSolver::AddEntity": {
+    "contract": "网格需满足 MeshSDF 输入假设；不校验负质量、无效四元数或退化网格。",
+    "description": "拷贝网格，基于位置/索引创建 SDF；设置位姿和质量/惯量，速度初始化为零，返回新 ID。"
+  },
+  "contradium::PBDSolver::GetEntity": {
+    "contract": "返回值依赖求解器存活；无效 ID 抛异常。",
+    "description": "按 ID 查询刚体的只读引用，不复制网格或 SDF。"
+  },
+  "contradium::PBDSolver::RigidEntity": {
+    "contract": "正常通过 AddEntity 构造，再用求解器接口维护质量与逆量一致性。",
+    "description": "单个刚体的拥有数据：网格和 SDF；质量/惯量与逆量；x_、q_、v_、w_ 表示位姿和速度。"
+  },
+  "contradium::PBDSolver::SetAngularVelocity": {
+    "contract": "ID 必须存在，否则 map.at 抛出异常；修改不自动同步到渲染实体。",
+    "description": "替换角速度 w_。"
+  },
+  "contradium::PBDSolver::SetInertia": {
+    "contract": "ID 必须存在，否则 map.at 抛出异常；修改不自动同步到渲染实体。",
+    "description": "替换标量 inertia_ 并重算逆量；零惯量对应零逆惯量。"
+  },
+  "contradium::PBDSolver::SetMass": {
+    "contract": "ID 必须存在，否则 map.at 抛出异常；修改不自动同步到渲染实体。",
+    "description": "替换 mass_ 并重算 inv_mass_；零质量对应零逆质量。"
+  },
+  "contradium::PBDSolver::SetOrientation": {
+    "contract": "ID 必须存在，否则 map.at 抛出异常；修改不自动同步到渲染实体。",
+    "description": "替换实体朝向 q_，不在此处归一化。"
+  },
+  "contradium::PBDSolver::SetPosition": {
+    "contract": "ID 必须存在，否则 map.at 抛出异常；修改不自动同步到渲染实体。",
+    "description": "替换实体世界位置 x_。"
+  },
+  "contradium::PBDSolver::SetVelocity": {
+    "contract": "ID 必须存在，否则 map.at 抛出异常；修改不自动同步到渲染实体。",
+    "description": "替换线速度 v_。"
+  },
+  "contradium::PBDSolver::Step": {
+    "contract": "dt>0；接触修正分母必须非零。没有收敛阈值、摩擦和恢复系数参数。",
+    "description": "按重力预测、20 次 SDF 接触投影、速度重建三个阶段原地更新全部实体。"
+  },
+  "contradium::RigidSolver": {
+    "contract": "不能实例化不完整类型，也不能据此宣称该求解器已经实现。",
+    "description": "仅前向声明：用于预留类型名称，当前目录没有对应完整类定义或可调用实现。"
+  },
+  "contradium::StableFluidSolver": {
+    "contract": "不能实例化不完整类型，也不能据此宣称该求解器已经实现。",
+    "description": "仅前向声明：用于预留类型名称，当前目录没有对应完整类定义或可调用实现。"
+  },
+  "contradium::VBDSolver": {
+    "contract": "不能实例化不完整类型，也不能据此宣称该求解器已经实现。",
+    "description": "仅前向声明：用于预留类型名称，当前目录没有对应完整类定义或可调用实现。"
+  },
+  "fmt::format": {
+    "contract": "不具备非 CUDA fmt::format 的实际格式化语义。",
+    "description": "__CUDACC__ 分支中的占位模板，忽略参数并返回空字符串。"
+  },
+  "grassland::(anonymous)::CudaCreateAndRecordEvent": {
+    "contract": "调用方负责销毁；此助手不检查 CUDA 错误。",
+    "description": "创建默认 CUDA event 并立即记录到默认流，将 event handle 返回给拥有者。"
+  },
+  "grassland::BinarySearch": {
+    "contract": "num_key>0，keys 至少包含 num_key 个元素；依赖 < 定义严格顺序，不做长度检查。",
+    "description": "对已升序排列的 keys 精确查找 key，返回首个匹配位置或 -1。"
+  },
+  "grassland::CUDAThrowIfFailed": {
+    "contract": "仅启用 CUDA runtime 时存在。",
+    "description": "cudaSuccess 时无操作，否则记录错误数值并抛 runtime_error。"
+  },
+  "grassland::DeferredProcess": {
+    "contract": "复制/移动构造与赋值都已删除，避免同一回调重复执行。",
+    "description": "保存一个在析构时执行的回调，用于作用域资源收尾。"
+  },
+  "grassland::DeferredProcess::DeferredProcess": {
+    "contract": "不要把可抛异常的清理逻辑交给析构执行。",
+    "description": "函数重载复制 std::function；复制/移动构造重载被显式删除。"
+  },
+  "grassland::DeferredProcess::operator=": {
+    "contract": "",
+    "description": "复制与移动赋值均删除，不能重新绑定已有作用域守卫。"
+  },
+  "grassland::DeferredProcess::~DeferredProcess": {
+    "contract": "析构异常会遵循 C++ 析构 noexcept 规则，通常导致终止。",
+    "description": "若 func_ 非空则调用一次保存的回调。"
+  },
+  "grassland::DeviceClock": {
+    "contract": "仅 LONGMARCH_CUDA_RUNTIME；事件记在默认流。",
+    "description": "拥有起点、终点与中间 CUDA event 的单次设备计时器。"
+  },
+  "grassland::DeviceClock::DeviceClock": {
+    "contract": "会阻塞调用线程；未逐个检查 CUDA 返回码。",
+    "description": "调用 cudaDeviceSynchronize，再创建并记录起点 event。"
+  },
+  "grassland::DeviceClock::Finish": {
+    "contract": "按单次测量调用；重复 Finish 会覆盖旧 stop_，不应作为可重置计时器使用。",
+    "description": "记录和同步终点，输出总毫秒数及各段时间/比例，销毁并移除中间事件。"
+  },
+  "grassland::DeviceClock::Record": {
+    "contract": "事件名称默认 Event；不接受显式 stream。",
+    "description": "创建并记录 CUDA event，将事件和可读名称分别压入队列。"
+  },
+  "grassland::DeviceClock::~DeviceClock": {
+    "contract": "不拥有 CUDA context。",
+    "description": "销毁存在的起止事件与未消费的中间事件。"
+  },
+  "grassland::DeviceType": {
+    "contract": "枚举项存在不等于当前构建包含 CUDA runtime。",
+    "description": "CPU=0、CUDA=1 的设备类别枚举。"
+  },
+  "grassland::EventManager": {
+    "contract": "无内部锁；回调执行期间不应修改正在迭代的注册集合。",
+    "description": "持有回调表与优先级到 ID 集合的索引。"
+  },
+  "grassland::EventManager::InvokeCallbacks": {
+    "contract": "同一个右值实参可能被前面的回调移走；异常会中断后续调用。",
+    "description": "按优先级降序、ID 升序遍历回调，并逐次 perfect-forward 参数。"
+  },
+  "grassland::EventManager::RegisterCallback": {
+    "contract": "较大 priority 先执行；同优先级按 ID 升序执行。",
+    "description": "保存回调和整数优先级，分配递增 uint32 ID 并加入优先级索引，返回注销用 ID。"
+  },
+  "grassland::EventManager::UnregisterCallback": {
+    "contract": "不提供回调执行期间迭代器稳定性的保证。",
+    "description": "查到 ID 后同时移除优先级集合和回调表记录；未知 ID 无操作。"
+  },
+  "grassland::FPSCounter": {
+    "contract": "无 GPU 同步，计量的是调用 TickFrame 的频率。",
+    "description": "保存帧时刻队列，估算最近一段时间的平均帧率。"
+  },
+  "grassland::FPSCounter::GetFPS": {
+    "contract": "跨度为零未防护，可能产生非有限结果。",
+    "description": "少于两个记录返回 0；否则返回 (n-1)/首尾时间跨度（秒）。"
+  },
+  "grassland::FPSCounter::Reset": {
+    "contract": "下次 GetFPS 在两次记录前均为 0。",
+    "description": "清空全部历史时刻。"
+  },
+  "grassland::FPSCounter::TickFPS": {
+    "contract": "",
+    "description": "先 TickFrame 再返回 GetFPS。"
+  },
+  "grassland::FPSCounter::TickFrame": {
+    "contract": "停顿后仍以实际两帧间隔计算。",
+    "description": "追加当前高精度时刻，淘汰早于一秒的记录但保留至少两项。"
+  },
+  "grassland::FileProbe": {
+    "contract": "前缀和文件名直接字符串相加。",
+    "description": "拥有按添加顺序排列的搜索前缀，查找磁盘文件或路径。"
+  },
+  "grassland::FileProbe::AddSearchPath": {
+    "contract": "若需要目录分隔符，应包含在 path 中。",
+    "description": "向列表尾部添加搜索前缀。"
+  },
+  "grassland::FileProbe::FileProbe": {
+    "contract": "",
+    "description": "创建空搜索列表；默认前缀仅由 GetInstance 初始化。"
+  },
+  "grassland::FileProbe::FindFile": {
+    "contract": "filesystem 查询可能抛异常；不自动 canonicalize。",
+    "description": "依序检查 prefix+filename，返回首个存在且为普通文件的路径，失败返回空字符串。"
+  },
+  "grassland::FileProbe::FindPath": {
+    "contract": "与 FindFile 的区别是没有 is_regular_file 限制。",
+    "description": "依序返回首个存在的路径，可为目录或其他条目；失败返回空字符串。"
+  },
+  "grassland::FileProbe::GetInstance": {
+    "contract": "自定义初始化 bool 未加锁，不应依赖并发首次调用安全。",
+    "description": "返回静态单例，首次访问填入素材及相对目录前缀。"
+  },
+  "grassland::FileProbe::~FileProbe": {
+    "contract": "",
+    "description": "默认清理搜索路径向量，无额外资源释放。"
+  },
+  "grassland::FindAssetFile": {
+    "contract": "失败返回空字符串，调用方必须处理。",
+    "description": "调用全局 FileProbe::FindFile 查找普通素材文件。"
+  },
+  "grassland::FindAssetPath": {
+    "contract": "可返回目录。",
+    "description": "调用全局 FileProbe::FindPath 查找存在的素材路径。"
+  },
+  "grassland::GetTimeSeconds": {
+    "contract": "不依赖窗口系统；时钟单调，返回 double。",
+    "description": "返回从首次调用起累计的 steady_clock 秒数。"
+  },
+  "grassland::GetTimestamp": {
+    "contract": "用于日志，不是单调计时；Windows 使用 localtime_s，其他平台 localtime_r。",
+    "description": "读取本地系统时间，格式化到毫秒并返回带方括号的字符串。"
+  },
+  "grassland::LM_DEVICE_FUNC": {
+    "contract": "宏在预处理阶段工作，不是运行时函数。",
+    "description": "NVCC 下同时标注主机与设备函数；普通编译器下展开为空。"
+  },
+  "grassland::LogError": {
+    "contract": "需要错误传播时调用方必须显式 return/throw。",
+    "description": "输出 ERROR 标记的消息；不会自动抛异常或结束程序。"
+  },
+  "grassland::LogInfo": {
+    "contract": "不抛业务错误；__CUDACC__ 下 format 占位返回空字符串。",
+    "description": "输出 INFO 标记、时间戳和消息到 std::cout；变参重载先用 fmt::format 格式化。"
+  },
+  "grassland::LogWarning": {
+    "contract": "不改变控制流。",
+    "description": "输出 WARNING 标记的消息，模板重载转交格式化后的单字符串重载。"
+  },
+  "grassland::Metronome": {
+    "contract": "Tick 会阻塞当前线程，不是异步定时器。",
+    "description": "用 steady_clock 记录上一 Tick 结束时刻的节拍器。"
+  },
+  "grassland::Metronome::Metronome": {
+    "contract": "",
+    "description": "将起点设为当前 steady_clock 时刻。"
+  },
+  "grassland::Metronome::Tick": {
+    "contract": "若工作已超时不额外睡眠；长周期误差不会用绝对时间补偿。",
+    "description": "从目标 duration 减去已用时间，剩余为正时 sleep_for，随后以实际当前时刻重设起点。"
+  },
+  "grassland::PCIVendorIDToName": {
+    "contract": "不查设备型号。",
+    "description": "把已知 PCI 厂商 ID 映射为名称，未知值格式化为 Unknown vendor id 与四位十六进制数。"
+  },
+  "grassland::SobolTableGen": {
+    "contract": "N,D>0；文件须包含所需维度；打不开文件抛 runtime_error，后续格式错误没有完整检查。",
+    "description": "读取方向数并生成样本主序的 N×D Sobol uint32 表；逐维计算方向向量，逐样本用 XOR 递推。"
+  },
+  "grassland::StringToWString": {
+    "contract": "不验证非法续字节、截断输入或码点范围；不是安全 Unicode 解码库。",
+    "description": "按 UTF-8 前导字节和后续字节拼接 wchar_t 并写入输出。"
+  },
+  "grassland::VertexBufferView": {
+    "contract": "不拥有内存、不保存元素数量；调用方保证有效期、对齐与边界。",
+    "description": "借用交错顶点数据的首地址和字节步长，按类型与偏移解释元素。"
+  },
+  "grassland::VertexBufferView::At": {
+    "contract": "底层内存必须原本可写；否则修改会产生未定义行为。",
+    "description": "移除 data 的 const 性并返回目标位置的可写 T&。"
+  },
+  "grassland::VertexBufferView::Get": {
+    "contract": "解释类型必须匹配实际布局；不检查范围或 alignment。",
+    "description": "返回 data+stride*index+offset 位置上的 const T&。"
+  },
+  "grassland::VertexBufferView::VertexBufferView": {
+    "contract": "所有 offset 都是字节偏移，不是元素编号。",
+    "description": "默认构造为空；原始重载接受 stride 和字节 offset；模板重载以 sizeof(T) 为 stride。"
+  },
+  "grassland::VirtualFileSystem": {
+    "contract": "",
+    "description": "拥有根目录的内存文件树；复制采用深拷贝，移动转移根所有权。"
+  },
+  "grassland::VirtualFileSystem::AccessFile": {
+    "contract": "借用条目地址只在树未销毁/替换时有效；文件系统操作可能抛异常。",
+    "description": "将路径拆成各段，处理根分隔符和 ./..，最后通过 open 获取文件；可根据参数创建缺失目录。"
+  },
+  "grassland::VirtualFileSystem::LoadDirectory": {
+    "contract": "借用条目地址只在树未销毁/替换时有效；文件系统操作可能抛异常。",
+    "description": "递归枚举磁盘普通文件，把能打开的文件按相对路径读入新的 VFS。"
+  },
+  "grassland::VirtualFileSystem::Print": {
+    "contract": "",
+    "description": "递归输出虚拟路径与文件字节数到 stdout，不输出文件内容。"
+  },
+  "grassland::VirtualFileSystem::ReadFile": {
+    "contract": "",
+    "description": "只读查找并将文件字节复制到输出 vector，返回 0；查找失败返回 -1 并不填入新数据。"
+  },
+  "grassland::VirtualFileSystem::SaveToDirectory": {
+    "contract": "借用条目地址只在树未销毁/替换时有效；文件系统操作可能抛异常。",
+    "description": "委托根条目递归输出整棵目录树到磁盘路径。"
+  },
+  "grassland::VirtualFileSystem::VirtualFileSystem": {
+    "contract": "",
+    "description": "默认创建空根；复制重载递归复制根；移动重载直接移走 root_。"
+  },
+  "grassland::VirtualFileSystem::WriteFile": {
+    "contract": "",
+    "description": "解析/创建父目录和目标文件后复制数据，成功返回 0，路径类型冲突返回 -1；字符串和字节指针重载委托到字节向量版本。"
+  },
+  "grassland::VirtualFileSystem::operator=": {
+    "contract": "",
+    "description": "复制赋值深拷贝对方根；移动赋值转移 root_；返回 *this。"
+  },
+  "grassland::VirtualFileSystemDirectory": {
+    "contract": "",
+    "description": "内存目录，按名称用 unique_ptr 拥有目录/文件子条目。"
+  },
+  "grassland::VirtualFileSystemDirectory::SaveToPath": {
+    "contract": "借用条目地址只在树未销毁/替换时有效；文件系统操作可能抛异常。",
+    "description": "创建磁盘目录并递归保存每个子项。"
+  },
+  "grassland::VirtualFileSystemDirectory::VirtualFileSystemDirectory": {
+    "contract": "",
+    "description": "构造空子项表并保存父指针。"
+  },
+  "grassland::VirtualFileSystemDirectory::deep_copy": {
+    "contract": "",
+    "description": "递归复制每个子项，并让各复制项指向新目录作为父节点。"
+  },
+  "grassland::VirtualFileSystemDirectory::enter": {
+    "contract": "",
+    "description": "处理 . 和 ..，查找或按需创建目录；目标是文件、父目录不存在或不允许创建时返回 nullptr。"
+  },
+  "grassland::VirtualFileSystemDirectory::open": {
+    "contract": "",
+    "description": "拒绝 . / .. 文件名，查找或按需创建文件条目；目录/文件类型冲突返回 nullptr。"
+  },
+  "grassland::VirtualFileSystemEntry": {
+    "contract": "",
+    "description": "所有内存条目的多态基类，保存借用 parent_，约定深复制和磁盘保存接口。"
+  },
+  "grassland::VirtualFileSystemEntry::SaveToPath": {
+    "contract": "借用条目地址只在树未销毁/替换时有效；文件系统操作可能抛异常。",
+    "description": "纯虚磁盘输出协议，由目录或文件条目实现。"
+  },
+  "grassland::VirtualFileSystemEntry::VirtualFileSystemEntry": {
+    "contract": "",
+    "description": "记录父条目指针；根的 parent 为 nullptr。"
+  },
+  "grassland::VirtualFileSystemEntry::deep_copy": {
+    "contract": "",
+    "description": "纯虚复制协议：返回拥有的独立条目，并将新条目的父指针绑定到参数 parent。"
+  },
+  "grassland::VirtualFileSystemEntry::~VirtualFileSystemEntry": {
+    "contract": "",
+    "description": "默认虚析构，允许通过基类 unique_ptr 释放派生条目。"
+  },
+  "grassland::VirtualFileSystemFile": {
+    "contract": "",
+    "description": "内存文件，拥有 vector<uint8_t> data；父目录只是借用指针。"
+  },
+  "grassland::VirtualFileSystemFile::SaveToPath": {
+    "contract": "借用条目地址只在树未销毁/替换时有效；文件系统操作可能抛异常。",
+    "description": "以 binary 模式打开目标并写入全部 data；此实现不显式检查写入结果。"
+  },
+  "grassland::VirtualFileSystemFile::VirtualFileSystemFile": {
+    "contract": "",
+    "description": "创建空文件数据并保存父目录。"
+  },
+  "grassland::VirtualFileSystemFile::deep_copy": {
+    "contract": "",
+    "description": "复制字节向量到新文件条目，重新设置父指针。"
+  },
+  "grassland::WStringToString": {
+    "contract": "未处理 UTF-16 代理对组合和无效码点；Windows 非 BMP 字符需特别注意。",
+    "description": "把每个 wchar_t 值按 1–4 字节 UTF-8 编码到 std::string。"
+  },
+  "grassland::WindowsSecurityAttributes": {
+    "contract": "仅 _WIN64；对象未显式禁用复制，使用时应避免复制导致重复释放。",
+    "description": "拥有安全描述符及关联 SID/ACL，供 Windows 可继承共享句柄使用。"
+  },
+  "grassland::WindowsSecurityAttributes::WindowsSecurityAttributes": {
+    "contract": "calloc 失败抛异常；其他 Win32 调用返回值没有完整逐项检查。",
+    "description": "分配描述符，为 World SID 配置访问 ACL，填入可继承 SECURITY_ATTRIBUTES。"
+  },
+  "grassland::WindowsSecurityAttributes::operator&": {
+    "contract": "调用方不能释放返回地址；其有效期依赖包装对象。",
+    "description": "返回内部 win_security_attributes_ 地址供 Win32 调用。"
+  },
+  "grassland::WindowsSecurityAttributes::~WindowsSecurityAttributes": {
+    "contract": "不负责关闭使用这些属性创建的句柄。",
+    "description": "依次 FreeSid、LocalFree ACL，再 free 描述符分配。"
+  },
+  "grassland::double_ptr": {
+    "contract": "适配器本身不拥有输出槽；输出槽必须覆盖适配器使用期。",
+    "description": "对外部输出槽的临时视图，兼容裸二级指针及智能指针地址。"
+  },
+  "grassland::double_ptr::(anonymous)": {
+    "contract": "仅访问标签对应的指针类型。",
+    "description": "匿名联合体保存三种输出槽指针之一，由 type 标签区分当前分支。"
+  },
+  "grassland::double_ptr::construct": {
+    "contract": "输出槽非空；构造异常直接传播；智能槽替换会释放旧对象。",
+    "description": "按槽类型用 new/make_shared/make_unique 创建对象；显式 ChildType 重载允许构造派生对象。"
+  },
+  "grassland::double_ptr::double_ptr": {
+    "contract": "必须传入可写且类型正确的地址。",
+    "description": "根据传入指针类型保存对应输出槽并设置类型标记；nullptr 重载构造空槽。"
+  },
+  "grassland::double_ptr::operator ContentType *": {
+    "contract": "空槽不可读取。",
+    "description": "读取当前输出槽中的对象指针，智能槽使用 get()，不转移所有权。"
+  },
+  "grassland::double_ptr::operator bool": {
+    "contract": "不是检查槽内 ContentType* 是否为空。",
+    "description": "检查保存的输出槽地址是否为空。"
+  },
+  "grassland::double_ptr::operator*": {
+    "contract": "这与通常智能指针的解引用语义不同。",
+    "description": "返回 ContentType* 本身，而不是 ContentType&。"
+  },
+  "grassland::double_ptr::operator->": {
+    "contract": "调用方保证槽与对象非空。",
+    "description": "通过指针转换读取外部槽当前对象，提供成员访问。"
+  },
+  "grassland::double_ptr::operator=": {
+    "contract": "传入指针的所有权按槽类型转交；不能把同一裸对象重复包装成不共享控制块的智能指针。",
+    "description": "将新对象写入裸槽，或用新 shared_ptr/unique_ptr 接管后替换智能槽；返回该对象指针。"
+  },
+  "grassland::double_ptr_type": {
+    "contract": "决定赋值和构造时采用哪一种所有权包装。",
+    "description": "标识输出槽类型：raw、shared 或 unique。"
+  },
+  "grassland::operator<<": {
+    "contract": "这是自由函数，通过友元读取私有 search_paths_。",
+    "description": "把 FileProbe 的搜索前缀逐行输出到给定 ostream，返回该流。"
+  },
+  "practium::Core": {
+    "contract": "",
+    "description": "应用入口，拥有 Sparkium/Contradium Core，借用 graphics Core。"
+  },
+  "practium::Core::Core": {
+    "contract": "",
+    "description": "以同一 graphics Core 创建并拥有 sparkium::Core 与 contradium::Core。"
+  },
+  "practium::Core::GetPhysicsCore": {
+    "contract": "",
+    "description": "返回 physics_core_.get() 的借用指针。"
+  },
+  "practium::Core::GetRenderCore": {
+    "contract": "",
+    "description": "返回 render_core_.get() 的借用指针，不能由调用方释放。"
+  },
+  "practium::Entity": {
+    "contract": "",
+    "description": "构造时自动注册场景的多态接口，派生类负责同步可见状态。"
+  },
+  "practium::Entity::Entity": {
+    "contract": "",
+    "description": "保存 scene_ 并立即注册 this；要求 Scene 非空且比实体更早创建。"
+  },
+  "practium::Entity::GetScene": {
+    "contract": "",
+    "description": "返回借用 Scene 指针。"
+  },
+  "practium::Entity::SyncRenderState": {
+    "contract": "",
+    "description": "纯虚同步协议：派生类将物理或应用状态更新到关联的可见对象。"
+  },
+  "practium::Entity::~Entity": {
+    "contract": "在清理实体后不要继续遍历保存其裸指针的场景。",
+    "description": "默认虚析构，释放自身成员；没有向 Scene 注销实体的额外步骤。"
+  },
+  "practium::EntityPBDRigid": {
+    "contract": "",
+    "description": "持有 PBD ID 与渲染对象，用于双向状态桥接。"
+  },
+  "practium::EntityPBDRigid::EntityPBDRigid": {
+    "contract": "",
+    "description": "创建视觉 GeometryMesh 与 EntityGeometryMaterial，向渲染场景注册，再以碰撞网格和物理参数添加 PBD 刚体，保存 ID。"
+  },
+  "practium::EntityPBDRigid::SetAngularVelocity": {
+    "contract": "PBD 实体 ID 必须仍然有效；参数约束与对应求解器接口相同。",
+    "description": "用内部 pbd_rigid_id_ 将参数转发给 PBDSolver::SetAngularVelocity；不自动同步图形变换。"
+  },
+  "practium::EntityPBDRigid::SetInertia": {
+    "contract": "PBD 实体 ID 必须仍然有效；参数约束与对应求解器接口相同。",
+    "description": "用内部 pbd_rigid_id_ 将参数转发给 PBDSolver::SetInertia；不自动同步图形变换。"
+  },
+  "practium::EntityPBDRigid::SetMass": {
+    "contract": "PBD 实体 ID 必须仍然有效；参数约束与对应求解器接口相同。",
+    "description": "用内部 pbd_rigid_id_ 将参数转发给 PBDSolver::SetMass；不自动同步图形变换。"
+  },
+  "practium::EntityPBDRigid::SetOrientation": {
+    "contract": "PBD 实体 ID 必须仍然有效；参数约束与对应求解器接口相同。",
+    "description": "用内部 pbd_rigid_id_ 将参数转发给 PBDSolver::SetOrientation；不自动同步图形变换。"
+  },
+  "practium::EntityPBDRigid::SetPosition": {
+    "contract": "PBD 实体 ID 必须仍然有效；参数约束与对应求解器接口相同。",
+    "description": "用内部 pbd_rigid_id_ 将参数转发给 PBDSolver::SetPosition；不自动同步图形变换。"
+  },
+  "practium::EntityPBDRigid::SetVelocity": {
+    "contract": "PBD 实体 ID 必须仍然有效；参数约束与对应求解器接口相同。",
+    "description": "用内部 pbd_rigid_id_ 将参数转发给 PBDSolver::SetVelocity；不自动同步图形变换。"
+  },
+  "practium::EntityPBDRigid::SyncRenderState": {
+    "contract": "",
+    "description": "读取求解器中刚体的 q_/x_，构造旋转和平移矩阵，再写入渲染实体 transform。"
+  },
+  "practium::EntityPBDRigid::~EntityPBDRigid": {
+    "contract": "在清理实体后不要继续遍历保存其裸指针的场景。",
+    "description": "默认虚析构，释放自身成员；没有向 Scene 注销实体的额外步骤。"
+  },
+  "practium::Material": {
+    "contract": "",
+    "description": "物理材质的多态基类，只保存借用 Core 指针。"
+  },
+  "practium::Material::Material": {
+    "contract": "",
+    "description": "保存借用 Core 指针，未配置实际求解参数。"
+  },
+  "practium::Material::~Material": {
+    "contract": "不会释放借用的 Core。",
+    "description": "默认虚析构，释放自身成员；没有向 Scene 注销实体的额外步骤。"
+  },
+  "practium::MaterialPBDRigid": {
+    "contract": "",
+    "description": "创建刚体时的质量和标量惯量参数对象。"
+  },
+  "practium::MaterialPBDRigid::MaterialPBDRigid": {
+    "contract": "",
+    "description": "复制质量/惯量；fixed=true 时将二者置零。"
+  },
+  "practium::Model": {
+    "contract": "",
+    "description": "视觉网格、碰撞网格与视觉材质的抽象提供者。"
+  },
+  "practium::Model::CollisionMesh": {
+    "contract": "",
+    "description": "纯虚接口，按值返回用于碰撞求解的 Mesh。"
+  },
+  "practium::Model::Model": {
+    "contract": "",
+    "description": "保存借用 Core 指针，模型数据由派生类持有。"
+  },
+  "practium::Model::VisualMaterial": {
+    "contract": "",
+    "description": "纯虚接口，返回由模型或外部资源管理者保证存活的 Sparkium 材质指针。"
+  },
+  "practium::Model::VisualMesh": {
+    "contract": "",
+    "description": "纯虚接口，按值返回用于显示的 Mesh。"
+  },
+  "practium::Model::~Model": {
+    "contract": "不会释放借用的 Core。",
+    "description": "默认虚析构，释放自身成员；没有向 Scene 注销实体的额外步骤。"
+  },
+  "practium::ModelMesh": {
+    "contract": "",
+    "description": "提供可独立指定的视觉/碰撞网格和借用视觉材质。"
+  },
+  "practium::ModelMesh::CollisionMesh": {
+    "contract": "",
+    "description": "按值返回 collision_mesh_。"
+  },
+  "practium::ModelMesh::ModelMesh": {
+    "contract": "",
+    "description": "两参数网格重载委托到双网格重载；深拷贝网格并规范碰撞网格，借用材质指针。"
+  },
+  "practium::ModelMesh::VisualMaterial": {
+    "contract": "",
+    "description": "返回 material_ 借用指针，不复制或转移材质。"
+  },
+  "practium::ModelMesh::VisualMesh": {
+    "contract": "",
+    "description": "按值返回 mesh_，调用方获得独立 Mesh。"
+  },
+  "practium::Scene": {
+    "contract": "",
+    "description": "拥有渲染场景与可选 PBD，借用注册的实体。"
+  },
+  "practium::Scene::AddEntity": {
+    "contract": "",
+    "description": "dynamic_cast 检查物理材质；PBD 材质创建 EntityPBDRigid 并转移 unique_ptr 给调用方；其他类型返回空。"
+  },
+  "practium::Scene::GetCore": {
+    "contract": "",
+    "description": "返回构造时保存的 Core 借用指针。"
+  },
+  "practium::Scene::GetPBDSolver": {
+    "contract": "",
+    "description": "首次调用创建 PBDSolver，以后返回同一求解器的借用指针。"
+  },
+  "practium::Scene::GetRenderScene": {
+    "contract": "",
+    "description": "返回拥有的 Sparkium Scene 的借用指针。"
+  },
+  "practium::Scene::RegisterEntity": {
+    "contract": "",
+    "description": "把裸指针追加到 entities_；不去重、不接管所有权、不提供注销。"
+  },
+  "practium::Scene::Scene": {
+    "contract": "",
+    "description": "保存 Core 借用指针并创建 Sparkium Scene；PBD 此时尚未创建。"
+  },
+  "practium::Scene::Settings": {
+    "contract": "",
+    "description": "声明 dt 默认值 0.003；Scene 尚未持有或使用这一 Settings 对象。"
+  },
+  "practium::Scene::Step": {
+    "contract": "",
+    "description": "若求解器已存在则以 0.01 秒推进一次，否则无操作；不读取 Settings::dt。"
+  },
+  "practium::Scene::SyncRenderState": {
+    "contract": "",
+    "description": "依次调用所有已注册 Entity 的同步方法，要求每个指针仍有效。"
+  }
+}

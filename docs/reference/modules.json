@@ -1,0 +1,126 @@
+{
+  "code/contradium": {
+    "contracts": [
+      "graphics::Core 是借用指针，拥有者必须活得更久。",
+      "RigidSolver、VBDSolver、IPCSolver、MPMSolver、StableFluidSolver 在 core_util.h 中仅前向声明，不构成已实现功能。",
+      "PBDSolver 不提供实体移除、多线程同步、参数合法性检查或完整关节系统。"
+    ],
+    "flow": [
+      "应用创建 PBDSolver，AddEntity 建立网格和 SDF。",
+      "每步预测位姿、迭代接触约束、回写位姿和速度。"
+    ],
+    "summary": "当前可执行求解路径集中在 PBDSolver；Core 只保存图形 Core 引用，其他求解器名多为前向声明。",
+    "title": "Contradium · 物理框架"
+  },
+  "code/contradium/core": {
+    "contracts": [
+      "不可从此 Core 推断具备 GPU 求解能力。",
+      "Core 不拥有传入的图形设备。"
+    ],
+    "flow": [
+      "构造 Core 后只保存后端引用，不创建求解器。"
+    ],
+    "summary": "Core 保存借用的 graphics::Core 指针；core_util 建立类型依赖和求解器声明。",
+    "title": "Contradium 核心入口"
+  },
+  "code/contradium/pbd": {
+    "contracts": [
+      "dt 必须大于 0；实现末尾除以 dt，未校验零步长。",
+      "质量/惯量为零时对应逆量置零。固定物体仍可因调用方设置非零速度而移动。",
+      "接触双方逆质量/惯量同时为零可能产生零分母；调用方不能依赖内部防护。",
+      "位置、线速度、角速度与 SDF 网格采用一致坐标和单位；四元数应有效且归一化。",
+      "map.at 对无效实体 ID 抛出 out_of_range；GetEntity 返回借用 const 引用。"
+    ],
+    "flow": [
+      "AddEntity 深拷贝网格，建立 MeshSDF，分配递增 ID。",
+      "Step 用重力与当前速度预测平移和旋转。",
+      "20 轮迭代中对刚体对的顶点做 SDF 接触检测，累积平移/旋转修正。",
+      "按接触数平均修正；最终用位姿差重建速度。"
+    ],
+    "summary": "以网格 SDF 为接触查询，使用预测位姿与位置修正实现小规模刚体仿真。",
+    "title": "刚体位置约束求解"
+  },
+  "code/grassland/util": {
+    "contracts": [
+      "本模块多数容器与计时器不加锁，应在调用方同步。",
+      "名称中含 LogError 不表示抛异常；CUDAThrowIfFailed 则明确会抛 runtime_error。",
+      "原始指针视图不拥有内存，不自动检查大小、对齐和有效期。",
+      "CUDA / Windows 对象受宏条件控制，不在其他平台提供同名实现。"
+    ],
+    "flow": [
+      "调用方选择独立工具，不需要初始化窗口；GetTimeSeconds 使用 steady_clock。",
+      "FileProbe 查找磁盘资源，VirtualFileSystem 将资源复制进内存树，着色器编译可借此脱离工作目录。",
+      "double_ptr 让工厂函数接收 raw/shared/unique 三种输出位置，并按调用方选定的方式交付所有权。"
+    ],
+    "summary": "提供跨模块使用的事件、资源路径、虚拟文件系统、计时、采样、输出指针和平台辅助。",
+    "title": "通用工具与基础约定"
+  },
+  "code/practium": {
+    "contracts": [
+      "Scene 不拥有 entities_ 中的 Entity；调用方需保留返回的 unique_ptr。",
+      "没有实体注销接口；销毁 Entity 后继续调用 Scene::SyncRenderState 会留下悬空指针。",
+      "创建顺序建议：graphics Core → Practium Core → 模型/材质与 Scene → Entity；反向销毁并停止访问相关场景。",
+      "物理材质与视觉材质分离，不应把 MaterialPBDRigid 当作 BSDF。"
+    ],
+    "flow": [
+      "Core 拥有渲染 Core 和物理 Core；Scene 拥有渲染场景并懒创建 PBD 求解器。",
+      "Model 提供视觉网格、碰撞网格和视觉材质；MaterialPBDRigid 提供物理参数。",
+      "AddEntity 返回拥有实体的 unique_ptr；实体向 Scene 注册借用指针。",
+      "每帧 Step 后 SyncRenderState，再由 Sparkium 渲染。"
+    ],
+    "summary": "组合 Sparkium 场景与 Contradium 刚体求解，把模型、物理材质和实体组织为渲染/物理双表示。",
+    "title": "Practium · 仿真应用层"
+  },
+  "code/practium/core": {
+    "contracts": [
+      "Model 网格接口按值返回；VisualMaterial 返回借用指针。",
+      "Scene::AddEntity 当前仅识别 MaterialPBDRigid，否则返回 nullptr。",
+      "Scene::Settings::dt=0.003 只是声明；Step 实际调用固定 0.01 秒步长。"
+    ],
+    "flow": [
+      "Core 构造渲染/物理子 Core。",
+      "Scene 将注册实体保持为裸指针；实际所有权留给调用方。",
+      "派生 Entity 实现 SyncRenderState，把仿真结果映射到渲染对象。"
+    ],
+    "summary": "Core、Scene、Model、Material、Entity 定义渲染与物理组合的基本协议。",
+    "title": "仿真对象协议"
+  },
+  "code/practium/entity": {
+    "contracts": [
+      "视觉材质来自 Model，作为借用指针保留。",
+      "设置物理参数不会即时更新渲染变换，需要显式 SyncRenderState。",
+      "当前析构没有从 Practium 或 Sparkium 场景注销对象，应统一管理场景与实体生命周期。"
+    ],
+    "flow": [
+      "构造时获取 Model 的两个网格，创建视觉几何与渲染实体，再添加碰撞刚体。",
+      "Set 系列转发到 PBDSolver；SyncRenderState 从 PBD 位姿构建变换矩阵。"
+    ],
+    "summary": "EntityPBDRigid 同时持有 Sparkium 几何/实体对象与 PBD 刚体 ID，桥接两边的状态。",
+    "title": "仿真实体适配"
+  },
+  "code/practium/material": {
+    "contracts": [
+      "材质是创建时参数；后续修改 mass/inertia 字段不会自动推送到已有刚体。",
+      "修改已存在刚体请使用 EntityPBDRigid 的 SetMass/SetInertia。"
+    ],
+    "flow": [
+      "创建物理材质后传给 Scene::AddEntity / EntityPBDRigid。",
+      "fixed=true 时把质量和惯量同时设为零，创建刚体时再计算逆量。"
+    ],
+    "summary": "Material 是带 Core 引用的多态基类；MaterialPBDRigid 保存刚体质量与标量惯量。",
+    "title": "物理材质"
+  },
+  "code/practium/model": {
+    "contracts": [
+      "简单构造重载以同一个输入作为视觉与碰撞网格。",
+      "material_ 不被 ModelMesh 拥有；使用实体之前必须保证材质存活。",
+      "成员当前公开，外部修改后需理解已创建实体使用的是构造时网格副本。"
+    ],
+    "flow": [
+      "构造复制输入网格，碰撞网格执行 MakeCollisionMesh。",
+      "VisualMesh / CollisionMesh 按值返回各自数据；VisualMaterial 返回借用指针。"
+    ],
+    "summary": "Model 的两个网格接口允许降低碰撞复杂度而保留高质量视觉网格。ModelMesh 是当前具体实现。",
+    "title": "视觉/碰撞模型"
+  }
+}

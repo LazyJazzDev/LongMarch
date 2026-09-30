@@ -1,0 +1,635 @@
+{
+  "code/contradium/CMakeLists.txt": {
+    "details": [
+      "源文件集合、目标链接和父作用域导出以本页列出的 CMake 原文为准；PUBLIC 依赖会传递给使用此目标的调用方。"
+    ],
+    "sha256": "1a62ec0a158e4fb41e77dd72d00843dffc656cc50aa66948e0dd3377e9212972",
+    "summary": "定义 contradium 的 CMake 构建边界与传递依赖。"
+  },
+  "code/contradium/contradium.cpp": {
+    "details": [
+      "#include \"contradium/contradium.h\""
+    ],
+    "sha256": "979c2b80d3851b728cd46a3da9aa89044fdc47dcc628f8f1a95104e40bd6f45e",
+    "summary": "模块编译单元：包含对应头文件并保留命名空间边界，无额外运行时算法。"
+  },
+  "code/contradium/contradium.h": {
+    "details": [
+      "#include \"contradium/core/core.h\"",
+      "#include \"contradium/pbd/pbd.h\""
+    ],
+    "sha256": "0ce7ef89439dcd8a52ae40060683771004ce81282aeeb4790fec16859f286a22",
+    "summary": "聚合头：将相关声明从一个入口暴露给调用方。"
+  },
+  "code/contradium/core/CMakeLists.txt": {
+    "details": [
+      "源文件集合、目标链接和父作用域导出以本页列出的 CMake 原文为准；PUBLIC 依赖会传递给使用此目标的调用方。"
+    ],
+    "sha256": "2dd7a288f88c4794641c7bc29c8f6b1f4de24e6a1f7d52d12c1f44b998ceda79",
+    "summary": "定义 core 的 CMake 构建边界与传递依赖。"
+  },
+  "code/contradium/core/core.cpp": {
+    "details": [
+      "构造仅存储 graphics::Core*，没有初始化 PBD 或设备计算资源。"
+    ],
+    "sha256": "b4b1e04bce29a7799c8035b500d2c839188cd61902de728a331cc8a5b8014288",
+    "summary": "物理 Core 的最小包装；本文件实现接口行为。"
+  },
+  "code/contradium/core/core.h": {
+    "details": [
+      "构造仅存储 graphics::Core*，没有初始化 PBD 或设备计算资源。"
+    ],
+    "sha256": "a8c4c3756885f9e82d18952c0341878a808991aa6e2ea2cb1f7cc9892806ebc4",
+    "summary": "物理 Core 的最小包装；本文件定义类型与调用接口。"
+  },
+  "code/contradium/core/core_util.cpp": {
+    "details": [
+      "#include \"contradium/core/core_util.h\""
+    ],
+    "sha256": "c8465ed21b786e699625d63f46647c88b7241328641f278f50c0f1521c38dcde",
+    "summary": "模块编译单元：包含对应头文件并保留命名空间边界，无额外运行时算法。"
+  },
+  "code/contradium/core/core_util.h": {
+    "details": [
+      "这些声明避免头文件依赖环；只有 PBDSolver 在本模块具有具体实现。"
+    ],
+    "sha256": "702019e2163d7176012538ebe784121c90fd4f128c52a181ed3ee95b62c088b0",
+    "summary": "导入 Grassland 并前向声明六类求解器。"
+  },
+  "code/contradium/pbd/CMakeLists.txt": {
+    "details": [
+      "源文件集合、目标链接和父作用域导出以本页列出的 CMake 原文为准；PUBLIC 依赖会传递给使用此目标的调用方。"
+    ],
+    "sha256": "2dd7a288f88c4794641c7bc29c8f6b1f4de24e6a1f7d52d12c1f44b998ceda79",
+    "summary": "定义 pbd 的 CMake 构建边界与传递依赖。"
+  },
+  "code/contradium/pbd/pbd.cpp": {
+    "details": [
+      "#include \"contradium/pbd/pbd.h\""
+    ],
+    "sha256": "8d58871ab5fef8e6bc2f90987e0f4949b24e1456871d08c886273a763d5bca6c",
+    "summary": "模块编译单元：包含对应头文件并保留命名空间边界，无额外运行时算法。"
+  },
+  "code/contradium/pbd/pbd.h": {
+    "details": [
+      "#include \"contradium/pbd/pbd_solver.h\""
+    ],
+    "sha256": "47e4b2a913e228d6885aa5bbc689cecfc4b5a41921ba7107806e4fc1146e9a22",
+    "summary": "聚合头：将相关声明从一个入口暴露给调用方。"
+  },
+  "code/contradium/pbd/pbd_solver.cpp": {
+    "details": [
+      "RigidEntity 保存 mesh/mesh_sdf、质量与逆量、位置/四元数及线/角速度。",
+      "PBDStepHelper 是单次 Step 的临时工作记录，引用实体并保存预测值与修正累加器。",
+      "实体插入后只能通过 ID 操作，当前没有移除接口。"
+    ],
+    "sha256": "c798b109c89ab49a475f0e9d3fed08e15332db1165e3b3dc150ac695e7a3def4",
+    "summary": "刚体状态表与 SDF 接触求解；本文件实现接口行为。"
+  },
+  "code/contradium/pbd/pbd_solver.h": {
+    "details": [
+      "RigidEntity 保存 mesh/mesh_sdf、质量与逆量、位置/四元数及线/角速度。",
+      "PBDStepHelper 是单次 Step 的临时工作记录，引用实体并保存预测值与修正累加器。",
+      "实体插入后只能通过 ID 操作，当前没有移除接口。"
+    ],
+    "sha256": "02d8caebc9110cd9c05f8d19d3e2711d5a6e4be3e05c108e00d72e16c383c595",
+    "summary": "刚体状态表与 SDF 接触求解；本文件定义类型与调用接口。"
+  },
+  "code/contradium/pbd/pbd_util.cpp": {
+    "details": [
+      "#include \"contradium/pbd/pbd_util.h\""
+    ],
+    "sha256": "efa52495887de0276e98e5a0e05856750e6506d399f170a6499c350a39bd3964",
+    "summary": "模块编译单元：包含对应头文件并保留命名空间边界，无额外运行时算法。"
+  },
+  "code/contradium/pbd/pbd_util.h": {
+    "details": [
+      "#include \"contradium/core/core.h\""
+    ],
+    "sha256": "202dabb49b67c19aae79ac85dc65057eec85f6306ab0c7aecfd6188e9663f165",
+    "summary": "聚合头：将相关声明从一个入口暴露给调用方。"
+  },
+  "code/grassland/util/CMakeLists.txt": {
+    "details": [
+      "源文件集合、目标链接和父作用域导出以本页列出的 CMake 原文为准；PUBLIC 依赖会传递给使用此目标的调用方。"
+    ],
+    "sha256": "15ca3eec6e9efcd060cee099dcf69da5eb66be8caa5a0b6a7e09a81532b5f335",
+    "summary": "定义 util 的 CMake 构建边界与传递依赖。"
+  },
+  "code/grassland/util/binary_search.h": {
+    "details": [
+      "以 lower-bound 风格折半查找，找不到返回 -1；num_key 必须>0，空输入会访问 keys[0]。"
+    ],
+    "sha256": "aac2f1a80465ce6a663bc5611ca168d1f9859885d5def351ffa2322953610abd",
+    "summary": "有序数组精确查找模板"
+  },
+  "code/grassland/util/deferred_process.cpp": {
+    "details": [
+      "对象不可复制或移动，析构调用保存的 std::function；回调不应抛出异常。"
+    ],
+    "sha256": "ea281e3125624bac175fb646719c19b5db7b803b8cdb23a26b837255202f0cdf",
+    "summary": "作用域退出回调；本文件实现接口行为。"
+  },
+  "code/grassland/util/deferred_process.h": {
+    "details": [
+      "对象不可复制或移动，析构调用保存的 std::function；回调不应抛出异常。"
+    ],
+    "sha256": "f16080a5785d858aa973a83c4e9d58c33a4fb7fa9b08bdaec61d3b86fc9b12ed",
+    "summary": "作用域退出回调；本文件定义类型与调用接口。"
+  },
+  "code/grassland/util/device_clock.cpp": {
+    "details": [
+      "构造先同步设备再记录起点；Record 将默认流事件排队；Finish 同步终点并打印毫秒统计。",
+      "Finish 消耗记录队列；重复 Finish 会覆盖 stop_，应按一次测量使用。"
+    ],
+    "sha256": "bfba1402a8def2e350b1ba47b1714b5ed4235833a5a563f5814527d3f9bd3c03",
+    "summary": "CUDA 事件时间记录器；本文件实现接口行为。"
+  },
+  "code/grassland/util/device_clock.h": {
+    "details": [
+      "构造先同步设备再记录起点；Record 将默认流事件排队；Finish 同步终点并打印毫秒统计。",
+      "Finish 消耗记录队列；重复 Finish 会覆盖 stop_，应按一次测量使用。"
+    ],
+    "sha256": "4182f06de3c3e0badfb7f10d980f88070b8780198714944f979602f3c53d152c",
+    "summary": "CUDA 事件时间记录器；本文件定义类型与调用接口。"
+  },
+  "code/grassland/util/double_ptr.cpp": {
+    "details": [
+      "适配 ContentType**、shared_ptr*、unique_ptr*；赋值或 construct 改变外部输出槽。",
+      "nullptr 构造仅可用于判空，不能执行赋值/construct/解引用；raw 输出的释放责任在调用方。",
+      "operator bool 检查输出槽地址，不检查输出槽当前指向的对象。"
+    ],
+    "sha256": "965ee1bc561c4d010de43775cdd9839e5d77c04efffcb1bd6f0b60e7516852c1",
+    "summary": "统一工厂输出参数适配器；本文件实现接口行为。"
+  },
+  "code/grassland/util/double_ptr.h": {
+    "details": [
+      "适配 ContentType**、shared_ptr*、unique_ptr*；赋值或 construct 改变外部输出槽。",
+      "nullptr 构造仅可用于判空，不能执行赋值/construct/解引用；raw 输出的释放责任在调用方。",
+      "operator bool 检查输出槽地址，不检查输出槽当前指向的对象。"
+    ],
+    "sha256": "62ee7e57efb4ae8b12a28fd2d9b59f6c2108503508fecb86461e01229787d4e9",
+    "summary": "统一工厂输出参数适配器；本文件定义类型与调用接口。"
+  },
+  "code/grassland/util/event_manager.h": {
+    "details": [
+      "优先级按 std::greater 降序调用，同优先级按递增注册 ID 调用。",
+      "InvokeCallbacks 直接遍历容器，不支持依赖安全性的回调中增删或并发修改。"
+    ],
+    "sha256": "dd8b2e3c2deb02a164ea8edaa035e7e61d655b6168385a2c231be052f93d7680",
+    "summary": "按优先级组织的回调容器"
+  },
+  "code/grassland/util/file_probe.cpp": {
+    "details": [
+      "路径通过字符串 path+filename 拼接，不会自动补分隔符。",
+      "默认顺序为空前缀、构建时素材目录、./、../、../../；文件查找失败返回空字符串。"
+    ],
+    "sha256": "6aac0920755e01da7ee33a998b7a9cc2100c5cbcdf5c1b6f03fec930a741d40c",
+    "summary": "磁盘路径搜索和全局素材查找；本文件实现接口行为。"
+  },
+  "code/grassland/util/file_probe.h": {
+    "details": [
+      "路径通过字符串 path+filename 拼接，不会自动补分隔符。",
+      "默认顺序为空前缀、构建时素材目录、./、../、../../；文件查找失败返回空字符串。"
+    ],
+    "sha256": "90a9b8c18a8435fe89f06309bd4728b5efd57767c2cf87156e30a2578fea56a8",
+    "summary": "磁盘路径搜索和全局素材查找；本文件定义类型与调用接口。"
+  },
+  "code/grassland/util/fps_counter.cpp": {
+    "details": [
+      "TickFrame 删除过期记录但至少保留两项；GetFPS=(帧数-1)/时间跨度。",
+      "少于两项返回 0；相同时间戳导致零时间跨度时无额外防护。"
+    ],
+    "sha256": "d6e4f381ded647c61e5ac7daef8c1fa5646d50922f9f8a71fb23300bf7b095ac",
+    "summary": "最近约一秒帧时间队列；本文件实现接口行为。"
+  },
+  "code/grassland/util/fps_counter.h": {
+    "details": [
+      "TickFrame 删除过期记录但至少保留两项；GetFPS=(帧数-1)/时间跨度。",
+      "少于两项返回 0；相同时间戳导致零时间跨度时无额外防护。"
+    ],
+    "sha256": "f6b2857dba170173dd3d2c8c9c541ad9afb4880cd3bb40b914e5dcba6d434449",
+    "summary": "最近约一秒帧时间队列；本文件定义类型与调用接口。"
+  },
+  "code/grassland/util/log.cpp": {
+    "details": [
+      "Info/Warning/Error 都写 std::cout 并 flush，不改变控制流。",
+      "非 CUDA 模板使用 fmt::format；__CUDACC__ 分支的 format 是返回空字符串的占位实现。"
+    ],
+    "sha256": "5fc06c4bbaa75e98f14eaea3192773d25ee9b45dcf65b2a312aa66e3e6cec9f8",
+    "summary": "时间戳与分级日志输出；本文件实现接口行为。"
+  },
+  "code/grassland/util/log.h": {
+    "details": [
+      "Info/Warning/Error 都写 std::cout 并 flush，不改变控制流。",
+      "非 CUDA 模板使用 fmt::format；__CUDACC__ 分支的 format 是返回空字符串的占位实现。"
+    ],
+    "sha256": "b055bafb22ca61fdbe2e247b990146066a495aaacdfc9cc3e538191e0dd312e9",
+    "summary": "时间戳与分级日志输出；本文件定义类型与调用接口。"
+  },
+  "code/grassland/util/metronome.cpp": {
+    "details": [
+      "Tick 从上次完成时刻计算剩余时间，正值才 sleep；完成后重设起点，因此不是固定绝对时刻调度。"
+    ],
+    "sha256": "ed234cc6dd75b15af810a6a053582a95b057a70959df15e7ff8a60237c110448",
+    "summary": "基于 steady_clock 的线程节拍器；本文件实现接口行为。"
+  },
+  "code/grassland/util/metronome.h": {
+    "details": [
+      "Tick 从上次完成时刻计算剩余时间，正值才 sleep；完成后重设起点，因此不是固定绝对时刻调度。"
+    ],
+    "sha256": "75586e06b117ce25b7aedd0ffbfb01ce02ff95f634875bd4b8a3df5be536ce84",
+    "summary": "基于 steady_clock 的线程节拍器；本文件定义类型与调用接口。"
+  },
+  "code/grassland/util/sobol.cpp": {
+    "details": [
+      "输出 N×D 个 uint32，按样本主序 table[i*D+j] 排布，相当于缩放到 2^32 的采样值。",
+      "N、D 均需>0，方向数文件需覆盖要求的维度；只检查文件打开，不完整验证内容和尺寸。"
+    ],
+    "sha256": "42a115d43ed1a5b0eaadf8317de16e70ab6a35af0a3d85e5b8caf77faa86220a",
+    "summary": "基于方向数文件生成 uint32 Sobol 表；本文件实现接口行为。"
+  },
+  "code/grassland/util/sobol.h": {
+    "details": [
+      "输出 N×D 个 uint32，按样本主序 table[i*D+j] 排布，相当于缩放到 2^32 的采样值。",
+      "N、D 均需>0，方向数文件需覆盖要求的维度；只检查文件打开，不完整验证内容和尺寸。"
+    ],
+    "sha256": "441ac61dead6f4e5b9764b56cc3c6918f8bf53f7a8411bd6d1bf2c0dfbe2293a",
+    "summary": "基于方向数文件生成 uint32 Sobol 表；本文件定义类型与调用接口。"
+  },
+  "code/grassland/util/string_convert.cpp": {
+    "details": [
+      "按码点位段编码/解码，未完整验证无效 UTF-8。",
+      "Windows 的 16 位 wchar_t 与非 BMP 码点/代理对不被完整处理，不应作为通用 Unicode 校验器。"
+    ],
+    "sha256": "00155c6dca2b61f387b35e3eacf23001111bb8c20b4d2503b356ecccbd89480f",
+    "summary": "UTF-8 与 wstring 的手工转换；本文件实现接口行为。"
+  },
+  "code/grassland/util/string_convert.h": {
+    "details": [
+      "按码点位段编码/解码，未完整验证无效 UTF-8。",
+      "Windows 的 16 位 wchar_t 与非 BMP 码点/代理对不被完整处理，不应作为通用 Unicode 校验器。"
+    ],
+    "sha256": "6c5458ca717fce1a602d9c72c8c28d28cc712077e6a3d038cf0ec73acc0287dc",
+    "summary": "UTF-8 与 wstring 的手工转换；本文件定义类型与调用接口。"
+  },
+  "code/grassland/util/time.h": {
+    "details": [
+      "以首次调用的 steady_clock 时刻为零点；可用于无窗口任务。"
+    ],
+    "sha256": "1d6e7f119bd15bdd9a636d637afd78ca65ad1e1faa196f12540c6c3c5d316ab9",
+    "summary": "无需 GLFW 的单调秒计时"
+  },
+  "code/grassland/util/util.cpp": {
+    "details": [
+      "#include \"grassland/util/util.h\""
+    ],
+    "sha256": "f8d5179128efaaf7355cbd45f833e1a88bea0a0c9ef21c1f9360ed2bef798803",
+    "summary": "模块编译单元：包含对应头文件并保留命名空间边界，无额外运行时算法。"
+  },
+  "code/grassland/util/util.h": {
+    "details": [
+      "具体能力、条件编译和生命周期见对应文件页面。"
+    ],
+    "sha256": "c8ae5cd403d23b02ac1f7d882e8addcc1e661122abbcab32310c6090a0bcd1eb",
+    "summary": "通用工具聚合头；集中暴露计时、采样、事件、文件与平台工具。"
+  },
+  "code/grassland/util/util_util.cpp": {
+    "details": [
+      "LM_DEVICE_FUNC 在 NVCC 下展开为 __device__ __host__，普通 C++ 下为空。",
+      "VertexBufferView 保存非拥有 data 和字节 stride；Get/At 的 offset 同样以字节计，均不校验边界或对齐。"
+    ],
+    "sha256": "d83c8a9f8fce6506d656b2610b8c81932d5c5d264a502d8f19b7f5f6579d46b9",
+    "summary": "平台宏、CUDA 错误转换和交错顶点视图；本文件实现接口行为。"
+  },
+  "code/grassland/util/util_util.h": {
+    "details": [
+      "LM_DEVICE_FUNC 在 NVCC 下展开为 __device__ __host__，普通 C++ 下为空。",
+      "VertexBufferView 保存非拥有 data 和字节 stride；Get/At 的 offset 同样以字节计，均不校验边界或对齐。"
+    ],
+    "sha256": "d6d14bca356d0c42fc6b4d141769734cc45551d5884f312dc3eece3d8b59cd59",
+    "summary": "平台宏、CUDA 错误转换和交错顶点视图；本文件定义类型与调用接口。"
+  },
+  "code/grassland/util/vendor_id.cpp": {
+    "details": [
+      "识别 AMD/ATI、NVIDIA、Intel、Apple、Qualcomm、HUAWEI 和 ARM；未知值保留十六进制编号。"
+    ],
+    "sha256": "cb6e1c819511153c48af57d32d71e8335824b38ed5e9afa588af8522a8280528",
+    "summary": "PCI 厂商编号的可读标签；本文件实现接口行为。"
+  },
+  "code/grassland/util/vendor_id.h": {
+    "details": [
+      "识别 AMD/ATI、NVIDIA、Intel、Apple、Qualcomm、HUAWEI 和 ARM；未知值保留十六进制编号。"
+    ],
+    "sha256": "ca605c3230fbc72e382f81fabc642f038e0b1c54ebbe4ab16754815cdee6cddc",
+    "summary": "PCI 厂商编号的可读标签；本文件定义类型与调用接口。"
+  },
+  "code/grassland/util/virtual_file_system.cpp": {
+    "details": [
+      "目录通过 unique_ptr 拥有子项，条目保留借用 parent_；文件拥有字节向量。",
+      "Read/Write 返回 0 成功、-1 路径类型冲突或无效；Read 复制数据，不返回内部缓冲。",
+      "LoadDirectory / SaveToDirectory 与真实文件系统交互，可能抛 filesystem 异常；不是隔离沙箱。"
+    ],
+    "sha256": "3a66671c95704b1fc5aa2cc742c6a15dbc0d0da1ad9fbe502dead1d76aa2cc30",
+    "summary": "可深拷贝的内存目录树；本文件实现接口行为。"
+  },
+  "code/grassland/util/virtual_file_system.h": {
+    "details": [
+      "目录通过 unique_ptr 拥有子项，条目保留借用 parent_；文件拥有字节向量。",
+      "Read/Write 返回 0 成功、-1 路径类型冲突或无效；Read 复制数据，不返回内部缓冲。",
+      "LoadDirectory / SaveToDirectory 与真实文件系统交互，可能抛 filesystem 异常；不是隔离沙箱。"
+    ],
+    "sha256": "8632c4ded6e12515b47445594688f62663ba0aa5d655a57a6433c2669b98311b",
+    "summary": "可深拷贝的内存目录树；本文件定义类型与调用接口。"
+  },
+  "code/grassland/util/windows_security_attributes.cpp": {
+    "details": [
+      "分配 security descriptor、World SID 与 ACL，设置可继承句柄。",
+      "operator& 返回内部 SECURITY_ATTRIBUTES*，有效期受包装对象限制；仅 _WIN64 编译。"
+    ],
+    "sha256": "f63d7277c28fe91b1fcbafc3c8fad42f3c6112af67bd2bf73408ecb5a1cfced1",
+    "summary": "Windows 共享句柄安全属性的 RAII 包装；本文件实现接口行为。"
+  },
+  "code/grassland/util/windows_security_attributes.h": {
+    "details": [
+      "分配 security descriptor、World SID 与 ACL，设置可继承句柄。",
+      "operator& 返回内部 SECURITY_ATTRIBUTES*，有效期受包装对象限制；仅 _WIN64 编译。"
+    ],
+    "sha256": "248974a440aa68df47758c10bc62419a7e1e5fa0a5f3364662a1feb8b081cd66",
+    "summary": "Windows 共享句柄安全属性的 RAII 包装；本文件定义类型与调用接口。"
+  },
+  "code/practium/CMakeLists.txt": {
+    "details": [
+      "源文件集合、目标链接和父作用域导出以本页列出的 CMake 原文为准；PUBLIC 依赖会传递给使用此目标的调用方。"
+    ],
+    "sha256": "4f206673638395754b7e274e1fb8e4fdf83f3d1a30beb450e4555efff364e7c8",
+    "summary": "定义 practium 的 CMake 构建边界与传递依赖。"
+  },
+  "code/practium/core/CMakeLists.txt": {
+    "details": [
+      "源文件集合、目标链接和父作用域导出以本页列出的 CMake 原文为准；PUBLIC 依赖会传递给使用此目标的调用方。"
+    ],
+    "sha256": "b8f6f28d5b0a4907635a0ecf1237f77789d9e56e6137feefe626c176710c5b7a",
+    "summary": "定义 core 的 CMake 构建边界与传递依赖。"
+  },
+  "code/practium/core/core.cpp": {
+    "details": [
+      "core_ 借用图形设备，render_core_ / physics_core_ 由 unique_ptr 拥有。"
+    ],
+    "sha256": "f40f418825ff866412797ad5b238e0e409412af75cdce46306a8b87fe674aae9",
+    "summary": "管理 Sparkium / Contradium 子 Core 的应用入口；本文件实现接口行为。"
+  },
+  "code/practium/core/core.h": {
+    "details": [
+      "core_ 借用图形设备，render_core_ / physics_core_ 由 unique_ptr 拥有。"
+    ],
+    "sha256": "e7a9d2b87a2c5248f344813dee712278a6327c34aee509f0db40a1afe8002c56",
+    "summary": "管理 Sparkium / Contradium 子 Core 的应用入口；本文件定义类型与调用接口。"
+  },
+  "code/practium/core/core_util.cpp": {
+    "details": [
+      "#include \"practium/core/core_util.h\""
+    ],
+    "sha256": "10ae3da559770316b3f182139f233e6f5e96514e91197698e32c926c3da03887",
+    "summary": "模块编译单元：包含对应头文件并保留命名空间边界，无额外运行时算法。"
+  },
+  "code/practium/core/core_util.h": {
+    "details": [
+      "#include \"contradium/contradium.h\"",
+      "#include \"grassland/grassland.h\"",
+      "#include \"snowberg/snowberg.h\"",
+      "#include \"sparkium/sparkium.h\""
+    ],
+    "sha256": "09f922992033866365bf0aab80d53ed8f2703b0013d70ca7cee4a4830dc0bb15",
+    "summary": "聚合头：将相关声明从一个入口暴露给调用方。"
+  },
+  "code/practium/core/entity.cpp": {
+    "details": [
+      "基类构造自动调用 Scene::RegisterEntity(this)。",
+      "SyncRenderState 为 const 纯虚接口；const 指实体接口本身，不表示不会改变关联的渲染对象。"
+    ],
+    "sha256": "246acb046984753360bf113cb96ab848438da167b5e273655f4b466800feec3e",
+    "summary": "可同步仿真状态的抽象实体；本文件实现接口行为。"
+  },
+  "code/practium/core/entity.h": {
+    "details": [
+      "基类构造自动调用 Scene::RegisterEntity(this)。",
+      "SyncRenderState 为 const 纯虚接口；const 指实体接口本身，不表示不会改变关联的渲染对象。"
+    ],
+    "sha256": "d9ce5904a59ced9ee2b2573c6f829fe990a8b1685d1ab0bb5dfd875fdd861fae",
+    "summary": "可同步仿真状态的抽象实体；本文件定义类型与调用接口。"
+  },
+  "code/practium/core/material.cpp": {
+    "details": [
+      "只保存 core_，具体物理参数由派生材质定义。"
+    ],
+    "sha256": "83dd7b08c3c2c52ee6e1247e22ba86872b853b385bda06bdf33171170384f8c9",
+    "summary": "带 Core 引用和虚析构的物理材质基类；本文件实现接口行为。"
+  },
+  "code/practium/core/material.h": {
+    "details": [
+      "只保存 core_，具体物理参数由派生材质定义。"
+    ],
+    "sha256": "1a19fd45cbdd2ee20d1f6db23a2f375291ffa733e87af69ae3ab7454b8994066",
+    "summary": "带 Core 引用和虚析构的物理材质基类；本文件定义类型与调用接口。"
+  },
+  "code/practium/core/model.cpp": {
+    "details": [
+      "网格按值返回；材质借用；派生类必须实现三个虚接口。"
+    ],
+    "sha256": "6522c9fe4192edf989f2ee5e5d6a9f75430949110ef71a14693181587a6ab80c",
+    "summary": "为实体提供视觉/碰撞形状及视觉材质的抽象模型；本文件实现接口行为。"
+  },
+  "code/practium/core/model.h": {
+    "details": [
+      "网格按值返回；材质借用；派生类必须实现三个虚接口。"
+    ],
+    "sha256": "1864941d66db52faa75aa6fc38a044835a9080d30c738e4b4fc7afa5ee736c77",
+    "summary": "为实体提供视觉/碰撞形状及视觉材质的抽象模型；本文件定义类型与调用接口。"
+  },
+  "code/practium/core/scene.cpp": {
+    "details": [
+      "AddEntity 按物理材质动态类型选择实体，目前仅支持刚体。",
+      "实体裸指针表不清理，调用方必须避免先销毁实体后再次同步。"
+    ],
+    "sha256": "65a57e824d6fa5fe0f3678f724cf78cd3fc251b09c0eed8b063e488640fc7b46",
+    "summary": "管理渲染场景、可选 PBD 求解器与实体注册表；本文件实现接口行为。"
+  },
+  "code/practium/core/scene.h": {
+    "details": [
+      "AddEntity 按物理材质动态类型选择实体，目前仅支持刚体。",
+      "实体裸指针表不清理，调用方必须避免先销毁实体后再次同步。"
+    ],
+    "sha256": "e07fa35d2f3f9591fc0e203666c32388d5a8ddf14afa8596db1b9c2a6a7ce3b8",
+    "summary": "管理渲染场景、可选 PBD 求解器与实体注册表；本文件定义类型与调用接口。"
+  },
+  "code/practium/entity/CMakeLists.txt": {
+    "details": [
+      "源文件集合、目标链接和父作用域导出以本页列出的 CMake 原文为准；PUBLIC 依赖会传递给使用此目标的调用方。"
+    ],
+    "sha256": "70635dcb59a515ab7bb2404e26bfd56fb1301d2d5811b0eed6c9ce4e18d2952c",
+    "summary": "定义 entity 的 CMake 构建边界与传递依赖。"
+  },
+  "code/practium/entity/entities.cpp": {
+    "details": [
+      "#include \"practium/entity/entities.h\""
+    ],
+    "sha256": "8543a957968898e96b581f2a841eba73c2b139e60233c173d843f39e79e21eb1",
+    "summary": "模块编译单元：包含对应头文件并保留命名空间边界，无额外运行时算法。"
+  },
+  "code/practium/entity/entities.h": {
+    "details": [
+      "#include \"practium/entity/entity_pbd_rigid.h\""
+    ],
+    "sha256": "3cb7b1380512af5f3f80dcedd841906541fc567a87b28429cf62c704fb64403f",
+    "summary": "聚合头：将相关声明从一个入口暴露给调用方。"
+  },
+  "code/practium/entity/entity_pbd_rigid.cpp": {
+    "details": [
+      "拥有视觉几何和渲染实体；借用视觉材质。",
+      "位置和四元数转换为 Eigen 3×4 刚体变换后通过 EigenToGLM 写入渲染实体。"
+    ],
+    "sha256": "2d86fe07419eb2c957b49809b33adbd777a58548df39c30c440c8b26c47a51a5",
+    "summary": "PBD 刚体与 Sparkium 网格实体之间的桥接；本文件实现接口行为。"
+  },
+  "code/practium/entity/entity_pbd_rigid.h": {
+    "details": [
+      "拥有视觉几何和渲染实体；借用视觉材质。",
+      "位置和四元数转换为 Eigen 3×4 刚体变换后通过 EigenToGLM 写入渲染实体。"
+    ],
+    "sha256": "8f3a6ee5351d69860d47eaf4f63baca95b5282072c28f307b8ed3c4aa83addef",
+    "summary": "PBD 刚体与 Sparkium 网格实体之间的桥接；本文件定义类型与调用接口。"
+  },
+  "code/practium/entity/entity_util.cpp": {
+    "details": [
+      "#include \"practium/entity/entity_util.h\""
+    ],
+    "sha256": "19750045a20ded82b6646e3b8171689be9497103b17e9c57ce548c0dad092a0f",
+    "summary": "模块编译单元：包含对应头文件并保留命名空间边界，无额外运行时算法。"
+  },
+  "code/practium/entity/entity_util.h": {
+    "details": [
+      "#include \"practium/core/entity.h\"",
+      "#include \"practium/material/materials.h\"",
+      "#include \"practium/model/models.h\""
+    ],
+    "sha256": "12653d992faa987feaeca61f5c13ae9510ae98eacb5f4a03ea151592dec78a5d",
+    "summary": "聚合头：将相关声明从一个入口暴露给调用方。"
+  },
+  "code/practium/material/CMakeLists.txt": {
+    "details": [
+      "源文件集合、目标链接和父作用域导出以本页列出的 CMake 原文为准；PUBLIC 依赖会传递给使用此目标的调用方。"
+    ],
+    "sha256": "70635dcb59a515ab7bb2404e26bfd56fb1301d2d5811b0eed6c9ce4e18d2952c",
+    "summary": "定义 material 的 CMake 构建边界与传递依赖。"
+  },
+  "code/practium/material/material_pbd_rigid.cpp": {
+    "details": [
+      "默认质量和惯量均为 1；fixed 参数覆盖二者为 0。"
+    ],
+    "sha256": "8c65b0a7b78d587773151c56faf7386cb1e3d300b784d24ef305fc0746ce19fd",
+    "summary": "刚体质量/惯量的创建参数；本文件实现接口行为。"
+  },
+  "code/practium/material/material_pbd_rigid.h": {
+    "details": [
+      "默认质量和惯量均为 1；fixed 参数覆盖二者为 0。"
+    ],
+    "sha256": "096e16867bed825bcf25b9b0cab191c49e805a45fb859fdf656d8213c961b4a9",
+    "summary": "刚体质量/惯量的创建参数；本文件定义类型与调用接口。"
+  },
+  "code/practium/material/material_util.cpp": {
+    "details": [
+      "#include \"practium/material/material_util.h\""
+    ],
+    "sha256": "85f396e94f5ad975d536a4e878eba245710674b399127acd3b4041d1f2a2570d",
+    "summary": "模块编译单元：包含对应头文件并保留命名空间边界，无额外运行时算法。"
+  },
+  "code/practium/material/material_util.h": {
+    "details": [
+      "#include \"practium/core/material.h\""
+    ],
+    "sha256": "6c666247ad1d2264a79beca54c5146eb113a8ec3b4d6c393f6d01fd0d3483bd1",
+    "summary": "聚合头：将相关声明从一个入口暴露给调用方。"
+  },
+  "code/practium/material/materials.cpp": {
+    "details": [
+      "#include \"practium/material/materials.h\""
+    ],
+    "sha256": "bbecdfc7a774c7434b8c1eb616be8278c4fd90aba2f39d1b8479e28b1365ec83",
+    "summary": "模块编译单元：包含对应头文件并保留命名空间边界，无额外运行时算法。"
+  },
+  "code/practium/material/materials.h": {
+    "details": [
+      "#include \"practium/material/material_pbd_rigid.h\""
+    ],
+    "sha256": "c41dfa14f67fa6a729cc32c98091baee5c78867329bfcdde6ea39c0e6b0786e5",
+    "summary": "聚合头：将相关声明从一个入口暴露给调用方。"
+  },
+  "code/practium/model/CMakeLists.txt": {
+    "details": [
+      "源文件集合、目标链接和父作用域导出以本页列出的 CMake 原文为准；PUBLIC 依赖会传递给使用此目标的调用方。"
+    ],
+    "sha256": "70635dcb59a515ab7bb2404e26bfd56fb1301d2d5811b0eed6c9ce4e18d2952c",
+    "summary": "定义 model 的 CMake 构建边界与传递依赖。"
+  },
+  "code/practium/model/model_mesh.cpp": {
+    "details": [
+      "碰撞网格构造后执行 MakeCollisionMesh；返回网格会发生值复制。"
+    ],
+    "sha256": "8c38e32cec76ebff543890357f99e90b46ba961655991432d4f245d1294bf55b",
+    "summary": "拥有视觉网格与碰撞网格副本的具体 Model；本文件实现接口行为。"
+  },
+  "code/practium/model/model_mesh.h": {
+    "details": [
+      "碰撞网格构造后执行 MakeCollisionMesh；返回网格会发生值复制。"
+    ],
+    "sha256": "171fabb93c7617c37fb00d9d47cc810e1314ebf53c5124f4e8cbda28f8e2a54b",
+    "summary": "拥有视觉网格与碰撞网格副本的具体 Model；本文件定义类型与调用接口。"
+  },
+  "code/practium/model/model_util.cpp": {
+    "details": [
+      "#include \"practium/model/model_util.h\""
+    ],
+    "sha256": "6720e2a309ffc502307bda54c3582afb0b16ebca198acede49e104329119ee55",
+    "summary": "模块编译单元：包含对应头文件并保留命名空间边界，无额外运行时算法。"
+  },
+  "code/practium/model/model_util.h": {
+    "details": [
+      "#include \"practium/core/model.h\""
+    ],
+    "sha256": "9aade0281e1ef77affc21f3f8198ab295fb5cc0e65768ed6b8afcdc573ffa8a2",
+    "summary": "聚合头：将相关声明从一个入口暴露给调用方。"
+  },
+  "code/practium/model/models.cpp": {
+    "details": [
+      "#include \"practium/model/models.h\""
+    ],
+    "sha256": "be3286d4693091b068ad48aef3133e35c7c74a17f3e9de10986894b05a592455",
+    "summary": "模块编译单元：包含对应头文件并保留命名空间边界，无额外运行时算法。"
+  },
+  "code/practium/model/models.h": {
+    "details": [
+      "#include \"practium/model/model_mesh.h\""
+    ],
+    "sha256": "12e9be9bb904dd7c08ee43611e27ae7a1b912e79d94fb8501541d6dd2239dcbb",
+    "summary": "聚合头：将相关声明从一个入口暴露给调用方。"
+  },
+  "code/practium/practium.cpp": {
+    "details": [
+      "#include \"practium/practium.h\""
+    ],
+    "sha256": "d887176411062c1c32672c9a962a8930f9eaa855354cddc6dadcda329aa74a6c",
+    "summary": "模块编译单元：包含对应头文件并保留命名空间边界，无额外运行时算法。"
+  },
+  "code/practium/practium.h": {
+    "details": [
+      "#include \"practium/core/core.h\"",
+      "#include \"practium/core/scene.h\"",
+      "#include \"practium/entity/entities.h\"",
+      "#include \"practium/material/materials.h\"",
+      "#include \"practium/model/models.h\""
+    ],
+    "sha256": "6dcce9871f566d9393a329bfa1370ee7a143c14593c5bf8b68696546d5f3b634",
+    "summary": "聚合头：将相关声明从一个入口暴露给调用方。"
+  }
+}
