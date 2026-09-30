@@ -103,6 +103,36 @@
     "summary": "Core 提供设备与资源工厂，Program 描述可执行管线，CommandContext 记录命令，Window 处理窗口输入与呈现。三类后端通过派生对象实现同一协议。",
     "title": "统一图形接口"
   },
+  "code/grassland/graphics/backend": {
+    "contracts": [
+      "不能跨Core或跨后端混用资源；各实现的检查覆盖不同。",
+      "接口存在不代表全部后端支持：例如Metal支持原生Ray Query但不支持SBT光追程序或geometry shader。",
+      "后端原生Handle均为借用句柄，生命周期随包装对象。"
+    ],
+    "flow": [
+      "CMake按LONGMARCH_*_ENABLED纳入实现。",
+      "Core枚举/选择设备，创建专用资源。",
+      "专用命令上下文按平台资源绑定和同步语义提交。"
+    ],
+    "summary": "将统一Core/Buffer/Image/Program/CommandContext/Window接口映射到按构建选项启用的Metal、Vulkan或D3D12。",
+    "title": "RHI后端适配"
+  },
+  "code/grassland/graphics/backend/metal": {
+    "contracts": [
+      "初始化要求hasUnifiedMemory及Tier2，WaveSize固定32；DeviceRayTracingSupport为false，DeviceRayQuerySupport另查supportsRaytracing。",
+      "最多16个resource set、15个vertex binding（槽16–30）、31个顶点attribute和8个颜色附件。",
+      "每次Buffer上传/下载和resize都WaitGPU；AS构建同步，当前无refit/compaction。",
+      "HDR用RGBA16Float+ExtendedLinearSRGB/EDR，输入须线性RGB；SDR用BGRA8Unorm+sRGB色彩空间。"
+    ],
+    "flow": [
+      "Core选择设备并建立串行命令队列。",
+      "Buffer用shared存储，Image用private texture加staging。",
+      "Program Finalize按绑定布局生成MSL/argument encoder。",
+      "CommandContext录制encoder，Core控制提交窗口与完成回调，CAMetalLayer呈现。"
+    ],
+    "summary": "面向统一内存和Tier2 argument buffers的Metal实现；Slang先编SPIR-V，再SPIRV-Cross生成MSL3.0。",
+    "title": "Metal后端"
+  },
   "code/grassland/imgui": {
     "contracts": [
       "本目录不包含自有控件实现，也不是 Snowberg 新 GUI。",
@@ -239,6 +269,45 @@
     ],
     "summary": "Model 的两个网格接口允许降低碰撞复杂度而保留高质量视觉网格。ModelMesh 是当前具体实现。",
     "title": "视觉/碰撞模型"
+  },
+  "code/pybind": {
+    "contracts": [
+      "只有扩展目标依赖Python；C++库和可执行程序不依赖Python。",
+      "Python接口以snake_case为主，不等于所有C++API的完整镜像。",
+      "大部分工厂未把非零C++返回码转换为异常；返回对象及设备能力必须检查。"
+    ],
+    "flow": [
+      "PYBIND11_MODULE建立long_march和graphics子模块。",
+      "先注册枚举/结构再绑定资源、程序、窗口与命令。",
+      "Python调用Core工厂创建对象，录制后提交并按需等待。"
+    ],
+    "summary": "pybind11的long_march扩展，主要暴露graphics RHI，使用smart holder管理GPU对象与Python引用。",
+    "title": "Python扩展入口"
+  },
+  "code/pybind/grassland": {
+    "contracts": [
+      "没有把Grassland所有math/physics/CUDA求解类都自动导出。"
+    ],
+    "flow": [
+      "通过graphics子模块访问RHI。"
+    ],
+    "summary": "把跨后端graphics接口映射到Python；该目录当前只有graphics绑定。",
+    "title": "Grassland Python桥接"
+  },
+  "code/pybind/grassland/graphics": {
+    "contracts": [
+      "keep_alive索引0为返回值、1为self；部分资源列表绑定当前误把slot/first_binding参数作为被保留对象，不能假定它们可靠持有GPU资源。调用方应保留资源至GPU完成。",
+      "Window事件从调用PollEvents的线程执行Python回调，封装未另行gil_scoped_acquire；按Python主线程事件循环使用。",
+      "CUDA流以uintptr整数传递，0为legacy默认流；不替Python创建或销毁流。",
+      "保留的imgui子模块是兼容绑定，不是Snowberg GUI的Python绑定。"
+    ],
+    "flow": [
+      "Core构造后init/init_auto。",
+      "创建Shader/Program/Buffer/Image，配置finalize。",
+      "录制CommandContext、submit，再present或wait_gpu。"
+    ],
+    "summary": "Core工厂返回shared资源，程序绑定用keep_alive保留shader，窗口回调持有Python callable；字节传输使用py::bytes。",
+    "title": "Python RHI接口与生命周期"
   },
   "code/snowberg": {
     "contracts": [
@@ -664,6 +733,21 @@
     "summary": "由 C++ VFS 加载并按管线组合的 Slang 库，包含路径状态、采样/BSDF、几何命中、照明、软件求交及成像。",
     "title": "Sparkium 着色器库"
   },
+  "code/sparkium/shaders/bsdf": {
+    "contracts": [
+      "这里eval通常为BSDF×入射cos，不是单独BRDF；sample_weight用于重要性选择，weight用于能量着色。",
+      "principled_*实现文件多数被包含在PrincipledMaterial结构体内部，函数/结构实际为成员；独立源码页面保留片段中的声明名。",
+      "输入方向/法线需要归一化，切线要能形成有效基；低层sample函数有提前分支不写全部输出，调用方须先把eval/方向/pdf初始化为零。",
+      "roughness平方形成alpha，各向异性使用不同alpha_x/y；pdf=1e6用于delta的工程约定，并非连续分布的真实有限密度。"
+    ],
+    "flow": [
+      "CalculateClosureWeight按前端参数配置闭包及采样权重。",
+      "Eval求所有闭包贡献与混合PDF。",
+      "Sample按权重CDF选闭包、重映射随机数，再补评估其他闭包形成一致混合结果。"
+    ],
+    "summary": "Lambertian和理想镜面提供独立函数，Principled把diffuse、普通微表面、玻璃反射、玻璃折射、clearcoat、sheen六闭包混合。",
+    "title": "BSDF闭包与采样"
+  },
   "code/sparkium/shaders/camera": {
     "contracts": [
       "uv 已由 raygen 映射至 [-1,1]，不是像素坐标。",
@@ -752,6 +836,75 @@
     ],
     "summary": "光栅按逆平方衰减求Principled；光追支持delta、面向接收点圆盘和球光立体角采样。",
     "title": "点光与有限半径点光"
+  },
+  "code/sparkium/shaders/material": {
+    "contracts": [
+      "路径eval通常已含cos项，更新throughput使用eval/pdf；理想镜面函数另采用delta约定。",
+      "同名SampleMaterial/MaterialEvaluator通过VFS注入或命名空间隔离，不应同时原样包含多个实现。",
+      "阴影NO_HITRECORD和ANY_HIT宏决定hit-group编译接口。"
+    ],
+    "flow": [
+      "读取实例元数据定位材质Buffer。",
+      "评估直接光、发光与BSDF延续路径。",
+      "功率预处理独立调用PrimitivePower。"
+    ],
+    "summary": "每类材质提供路径SampleMaterial、阴影接口和几何光MaterialEvaluator，部分还提供光栅PSMain。",
+    "title": "材质着色器协议"
+  },
+  "code/sparkium/shaders/material/lambertian": {
+    "contracts": [
+      "阴影始终不透明。"
+    ],
+    "flow": [
+      "获取材质参数。",
+      "执行采样/阴影或发光求值接口。"
+    ],
+    "summary": "常量漫反射和双面发光。",
+    "title": "Lambertian"
+  },
+  "code/sparkium/shaders/material/light": {
+    "contracts": [
+      "相机不可见保留camera ray_type穿过不阻挡发光层；不改变射线方向。"
+    ],
+    "flow": [
+      "获取材质参数。",
+      "执行采样/阴影或发光求值接口。"
+    ],
+    "summary": "可控制双面、阻挡、相机可见和距离衰减的发光面。",
+    "title": "纯发光"
+  },
+  "code/sparkium/shaders/material/principled": {
+    "contracts": [
+      "光栅只保留G-buffer能表达的子集；发光CDF与直接光采样用常量发光，未积分贴图。"
+    ],
+    "flow": [
+      "获取材质参数。",
+      "执行采样/阴影或发光求值接口。"
+    ],
+    "summary": "常量与八类贴图驱动六闭包BSDF。",
+    "title": "Principled"
+  },
+  "code/sparkium/shaders/material/shader_graph": {
+    "contracts": [
+      "图形求值由C++注入；emission_hint只用于几何光采样，可能与逐点图发光不同。"
+    ],
+    "flow": [
+      "获取材质参数。",
+      "执行采样/阴影或发光求值接口。"
+    ],
+    "summary": "把图输出GraphSurface交给共享Principled/薄壁/次表面/透明路径采样。",
+    "title": "材质图表面"
+  },
+  "code/sparkium/shaders/material/specular": {
+    "contracts": [
+      "光栅只能写metallic=1、roughness=0的G-buffer近似。"
+    ],
+    "flow": [
+      "获取材质参数。",
+      "执行采样/阴影或发光求值接口。"
+    ],
+    "summary": "只产生镜面反射，不发光、不进行显式直接光采样。",
+    "title": "理想镜面"
   },
   "code/sparkium/shaders/ray_query": {
     "contracts": [

@@ -222,6 +222,214 @@
     "sha256": "6a643f6b9cb6b4d88a4e3bd4dc0dd4c605087767c6cdd52b74121df63828f906",
     "summary": "加速结构实例化与更新协议；本文件定义类型与调用接口。"
   },
+  "code/grassland/graphics/backend/CMakeLists.txt": {
+    "details": [],
+    "sha256": "a39af242c5620518d3c91b126ff65aec946b5f6e4e67e877ce02bb89d0b47e55",
+    "summary": "按三个后端启用变量选择子目录，并把共同源码加入grassland_graphics。"
+  },
+  "code/grassland/graphics/backend/backend.cpp": {
+    "details": [],
+    "sha256": "5d01462443dfa2d04aa77cd43ed1f191abf8376dc4ba1d5a3d9a4a04d04b085c",
+    "summary": "后端聚合编译单元，无运行时算法。"
+  },
+  "code/grassland/graphics/backend/backend.h": {
+    "details": [],
+    "sha256": "b3ab4fa30096716e47434279ed2d133fa54c267c64343695f9d4cd8f00948b7e",
+    "summary": "按编译宏聚合各后端公共入口。"
+  },
+  "code/grassland/graphics/backend/metal/CMakeLists.txt": {
+    "details": [],
+    "sha256": "824fcf48f22eed4d96e5981fda2ccb381910a48760034c96cce7f698e0567296",
+    "summary": "收集cpp/h/mm到grassland_graphics，公开Metal-cpp头目录与启用宏，链接Metal/Foundation/QuartzCore/Cocoa及SPIRV-Cross。"
+  },
+  "code/grassland/graphics/backend/metal/metal_acceleration_structure.cpp": {
+    "details": [
+      "BLAS校验同类buffer、非零count、4字节对齐、stride及Range长度，但未扫描索引值是否越界。",
+      "TLAS要求同Core非TLAS子结构，有限可逆变换，拒绝同时opaque/nonopaque。按原生BLAS句柄去重并retain children。",
+      "Update逐字节比较清零初始化的instance descriptors及子句柄，无变化跳过；有变化全量同步重建，不refit。"
+    ],
+    "sha256": "c8d1ff057d1662d82d9f56623060783fd16f5a6cb3c3ff009fa7b774d078c30d",
+    "summary": "原生AABB/三角BLAS及UserID实例TLAS，供inline Ray Query。；本文件实现接口行为。"
+  },
+  "code/grassland/graphics/backend/metal/metal_acceleration_structure.h": {
+    "details": [
+      "BLAS校验同类buffer、非零count、4字节对齐、stride及Range长度，但未扫描索引值是否越界。",
+      "TLAS要求同Core非TLAS子结构，有限可逆变换，拒绝同时opaque/nonopaque。按原生BLAS句柄去重并retain children。",
+      "Update逐字节比较清零初始化的instance descriptors及子句柄，无变化跳过；有变化全量同步重建，不refit。"
+    ],
+    "sha256": "cf00a77663c416233fcbed2b3b17c241c81cb20bbb99311b5453088f6e294496",
+    "summary": "原生AABB/三角BLAS及UserID实例TLAS，供inline Ray Query。；本文件定义类型与调用接口。"
+  },
+  "code/grassland/graphics/backend/metal/metal_backend.cpp": {
+    "details": [],
+    "sha256": "60c01118bdde079b0ef72370a9c3401142ff9ad1ca4b34897e78d6a7e3384bb7",
+    "summary": "聚合MetalCore、AS、窗口和公共工具入口，无附加运行时逻辑。"
+  },
+  "code/grassland/graphics/backend/metal/metal_backend.h": {
+    "details": [],
+    "sha256": "04a6505c2316cc865cb5235fef4b25b4d10ff9b1141164ce55905b04244ba824",
+    "summary": "聚合MetalCore、AS、窗口和公共工具入口，无附加运行时逻辑。"
+  },
+  "code/grassland/graphics/backend/metal/metal_buffer.cpp": {
+    "details": [
+      "实际分配至少4字节但Size保留请求长度；resize等尺寸无操作，否则等待并复制min(old,new)字节。",
+      "上传/下载防溢出范围检查并WaitGPU；type不改变分配策略。"
+    ],
+    "sha256": "2692d63d605eae9c3caec08ab4a486378f32d240677a501ba00841f70ebc982d",
+    "summary": "统一shared-memory MTLBuffer实现三种逻辑BufferType。；本文件实现接口行为。"
+  },
+  "code/grassland/graphics/backend/metal/metal_buffer.h": {
+    "details": [
+      "实际分配至少4字节但Size保留请求长度；resize等尺寸无操作，否则等待并复制min(old,new)字节。",
+      "上传/下载防溢出范围检查并WaitGPU；type不改变分配策略。"
+    ],
+    "sha256": "f83cc18645562fda3fc14bf341a88db6bc9b3bf957f8314ca0710a2b67d6c895",
+    "summary": "统一shared-memory MTLBuffer实现三种逻辑BufferType。；本文件定义类型与调用接口。"
+  },
+  "code/grassland/graphics/backend/metal/metal_command_context.cpp": {
+    "details": [
+      "资源按graphics/compute各自map暂存，实际Draw/Dispatch才验证已使用set及数量并分配argument buffer；BufferRange校验边界，未约束shader只读范围。",
+      "原生AS只接受compute bind point，显式useResource TLAS/BLAS并捕获具体代资源到完成回调；sampler也通过回调保留。",
+      "Draw要求render pass和program，attachmentless pass必须有正viewport；viewport/scissor在同context跨pass保留。",
+      "compute dispatch后插入Buffer|Texture屏障；render pass内部禁止dispatch/copy/clear。索引固定uint32；CmdPresent结束当前encoder并录制呈现。",
+      "部分dynamic_cast直接解引用而未检空，跨后端输入不安全；提交后进一步录制没有逐方法保护，应视context为一次性。"
+    ],
+    "sha256": "7fcc923ae4f3432fcb6a5c9e088e26b23cd273f15d43ba5b6dea160e5646de01",
+    "summary": "Metal encoder录制、延迟render encoder创建与argument-buffer绑定。；本文件实现接口行为。"
+  },
+  "code/grassland/graphics/backend/metal/metal_command_context.h": {
+    "details": [
+      "资源按graphics/compute各自map暂存，实际Draw/Dispatch才验证已使用set及数量并分配argument buffer；BufferRange校验边界，未约束shader只读范围。",
+      "原生AS只接受compute bind point，显式useResource TLAS/BLAS并捕获具体代资源到完成回调；sampler也通过回调保留。",
+      "Draw要求render pass和program，attachmentless pass必须有正viewport；viewport/scissor在同context跨pass保留。",
+      "compute dispatch后插入Buffer|Texture屏障；render pass内部禁止dispatch/copy/clear。索引固定uint32；CmdPresent结束当前encoder并录制呈现。",
+      "部分dynamic_cast直接解引用而未检空，跨后端输入不安全；提交后进一步录制没有逐方法保护，应视context为一次性。"
+    ],
+    "sha256": "ce7e34c0a294d632c390d0974ac845962d2e796edf1d4b76ab3dbb2ee2774593",
+    "summary": "Metal encoder录制、延迟render encoder创建与argument-buffer绑定。；本文件定义类型与调用接口。"
+  },
+  "code/grassland/graphics/backend/metal/metal_core.cpp": {
+    "details": [
+      "GetPhysicalDeviceProperties的memory字段用统一内存1000/其他100作选择分值，不是真实显存；两个能力布尔填false。",
+      "Commit回收完成提交，达到max(1,frames_in_flight)时等待最早提交；CurrentFrame按每次提交轮转，不只按present。",
+      "Submit拒绝不同Core、不同类型或重复提交的context；Reap在GPU错误时先移除提交再抛异常，该提交回调不会继续执行。",
+      "CreateShader先编SPIR-V（spirv_1_5/dx-layout），真正MSL和pipeline编译在Finalize；CreateRayTracingProgram返回-1。"
+    ],
+    "sha256": "3f4c6bf23401a48f6dcc622c7ca614bb456d8d1eec946d8710afd59c9c67ee04",
+    "summary": "设备与队列生命周期、资源工厂、提交限流与完成回调。；本文件实现接口行为。"
+  },
+  "code/grassland/graphics/backend/metal/metal_core.h": {
+    "details": [
+      "GetPhysicalDeviceProperties的memory字段用统一内存1000/其他100作选择分值，不是真实显存；两个能力布尔填false。",
+      "Commit回收完成提交，达到max(1,frames_in_flight)时等待最早提交；CurrentFrame按每次提交轮转，不只按present。",
+      "Submit拒绝不同Core、不同类型或重复提交的context；Reap在GPU错误时先移除提交再抛异常，该提交回调不会继续执行。",
+      "CreateShader先编SPIR-V（spirv_1_5/dx-layout），真正MSL和pipeline编译在Finalize；CreateRayTracingProgram返回-1。"
+    ],
+    "sha256": "398f2e7cfcd44bf5abc9410213ed4cb14f768d1538754835f5b6512d7908e2a0",
+    "summary": "设备与队列生命周期、资源工厂、提交限流与完成回调。；本文件定义类型与调用接口。"
+  },
+  "code/grassland/graphics/backend/metal/metal_image.cpp": {
+    "details": [
+      "正宽高必需；usage包含ShaderRead/RenderTarget，非深度另加ShaderWrite；无mipmap。",
+      "每行staging pitch按256对齐，CPU输入输出仍紧密；RGB32F上传补alpha1、下载去alpha。",
+      "空区域返回，其他区域验证坐标与范围；提交blit并WaitGPU，源/目标host内存长度仍由调用方保证。"
+    ],
+    "sha256": "bdef63795571c15daf81326ad4c3e853b411efa17dc1d3ef3e50973ec2286f33",
+    "summary": "private二维纹理与同步staging传输。；本文件实现接口行为。"
+  },
+  "code/grassland/graphics/backend/metal/metal_image.h": {
+    "details": [
+      "正宽高必需；usage包含ShaderRead/RenderTarget，非深度另加ShaderWrite；无mipmap。",
+      "每行staging pitch按256对齐，CPU输入输出仍紧密；RGB32F上传补alpha1、下载去alpha。",
+      "空区域返回，其他区域验证坐标与范围；提交blit并WaitGPU，源/目标host内存长度仍由调用方保证。"
+    ],
+    "sha256": "ff1efbe314b6162cd0fb9d3e5fecc92701b3bdfc229f3d0a5d9f2678d8eb225e",
+    "summary": "private二维纹理与同步staging传输。；本文件定义类型与调用接口。"
+  },
+  "code/grassland/graphics/backend/metal/metal_program.cpp": {
+    "details": [
+      "资源count必须>0，AS仅允许count1；最终stage最多16set。",
+      "默认CullBack；有深度格式时Less且write=true，无深度Always且不写；不支持geometry shader。",
+      "顶点流映射16+binding，属性依输入顺序location递增；BlendState枚举直接索引/转换，非法枚举未全检查。"
+    ],
+    "sha256": "023c448a646648f183f2209f9282a6de4f50c6224b72a692cd1a4f6273b407e6",
+    "summary": "计算/图形状态、资源布局和Metal pipeline编译。；本文件实现接口行为。"
+  },
+  "code/grassland/graphics/backend/metal/metal_program.h": {
+    "details": [
+      "资源count必须>0，AS仅允许count1；最终stage最多16set。",
+      "默认CullBack；有深度格式时Less且write=true，无深度Always且不写；不支持geometry shader。",
+      "顶点流映射16+binding，属性依输入顺序location递增；BlendState枚举直接索引/转换，非法枚举未全检查。"
+    ],
+    "sha256": "9063009ca368db47df89950deaaca570d83b6bdb48df1936846188c9bb3198ba",
+    "summary": "计算/图形状态、资源布局和Metal pipeline编译。；本文件定义类型与调用接口。"
+  },
+  "code/grassland/graphics/backend/metal/metal_sampler.cpp": {
+    "details": [
+      "未知地址模式默认ClampToEdge；过滤非LINEAR默认Nearest。"
+    ],
+    "sha256": "1db511bce1eec04a73102ad0356210fea68d9a70731505c8e9cadbeed0dc4e6b",
+    "summary": "SamplerInfo到Metal sampler状态转换，启用argument-buffer支持。；本文件实现接口行为。"
+  },
+  "code/grassland/graphics/backend/metal/metal_sampler.h": {
+    "details": [
+      "未知地址模式默认ClampToEdge；过滤非LINEAR默认Nearest。"
+    ],
+    "sha256": "4bef3db93717f2fcbc70d97509e0ca79b4ac2243d06b3a10e820d00ef2454ac1",
+    "summary": "SamplerInfo到Metal sampler状态转换，启用argument-buffer支持。；本文件定义类型与调用接口。"
+  },
+  "code/grassland/graphics/backend/metal/metal_shader.cpp": {
+    "details": [
+      "选择SPIR-V第一入口，MSL3.0/Tier2，开启fastMath；每set binding0映射到对应argument buffer槽。",
+      "LONGMARCH_METAL_SHADER_DUMP启用后保存MSL及Core保存的Slang VFS；它是可选诊断输出，不参与正常资源生命周期。"
+    ],
+    "sha256": "5923fdb79d4d36d11c3a9b96a31680b7b55862aefe7cce34f8a4a32ddcf430a8",
+    "summary": "SPIR-V blob包装与按Program资源布局编译MSL stage。；本文件实现接口行为。"
+  },
+  "code/grassland/graphics/backend/metal/metal_shader.h": {
+    "details": [
+      "选择SPIR-V第一入口，MSL3.0/Tier2，开启fastMath；每set binding0映射到对应argument buffer槽。",
+      "LONGMARCH_METAL_SHADER_DUMP启用后保存MSL及Core保存的Slang VFS；它是可选诊断输出，不参与正常资源生命周期。"
+    ],
+    "sha256": "8de64ff28afb62c76108716f43efba657d20e47f6a4b1b84690dd037b2a2abc8",
+    "summary": "SPIR-V blob包装与按Program资源布局编译MSL stage。；本文件定义类型与调用接口。"
+  },
+  "code/grassland/graphics/backend/metal/metal_util.cpp": {
+    "details": [
+      "MetalPool局部autorelease pool在析构release；MetalCheck仅在对象为空时抛runtime_error。",
+      "RGB32F映射RGBA32Float，Image传输负责3↔4通道转换；未知格式抛异常。"
+    ],
+    "sha256": "0873b01c440fc5f0db69ad57510ba4aa103229c222b3f5adb84721ab3f99f822",
+    "summary": "原生所有权池、错误转换、格式映射与资源布局元数据。；本文件实现接口行为。"
+  },
+  "code/grassland/graphics/backend/metal/metal_util.h": {
+    "details": [
+      "MetalPool局部autorelease pool在析构release；MetalCheck仅在对象为空时抛runtime_error。",
+      "RGB32F映射RGBA32Float，Image传输负责3↔4通道转换；未知格式抛异常。"
+    ],
+    "sha256": "d2e15787029dadbc7a5f20a04295e92f75ef5dbed0b98e59b3c9cdd22c07b395",
+    "summary": "原生所有权池、错误转换、格式映射与资源布局元数据。；本文件定义类型与调用接口。"
+  },
+  "code/grassland/graphics/backend/metal/metal_window.h": {
+    "details": [
+      "ConfigurePresentation构建内嵌全屏三角MSL，采样输入纹理；SDR/HDR转换由上层准备，本呈现shader不做tone map。",
+      "SetHDR失败返回-1；Window::SetHDR失败时尝试恢复旧presentation；捕获异常路径只报告错误。",
+      "Present按framebuffer尺寸设置drawable，最小化或nextDrawable空时跳过；先图像后ImGui叠加，HDR下ImGuiLinearColors临时转换颜色。",
+      "CloseWindow先WaitGPU、关闭ImGui、从NSView解除layer，再释放原生window。"
+    ],
+    "sha256": "eddd065b840d3191b4e5227b829c20643beae6a12959995b56dab7113e364581",
+    "summary": "Cocoa CAMetalLayer、SDR/EDR呈现和兼容ImGui。；本文件定义类型与调用接口。"
+  },
+  "code/grassland/graphics/backend/metal/metal_window.mm": {
+    "details": [
+      "ConfigurePresentation构建内嵌全屏三角MSL，采样输入纹理；SDR/HDR转换由上层准备，本呈现shader不做tone map。",
+      "SetHDR失败返回-1；Window::SetHDR失败时尝试恢复旧presentation；捕获异常路径只报告错误。",
+      "Present按framebuffer尺寸设置drawable，最小化或nextDrawable空时跳过；先图像后ImGui叠加，HDR下ImGuiLinearColors临时转换颜色。",
+      "CloseWindow先WaitGPU、关闭ImGui、从NSView解除layer，再释放原生window。"
+    ],
+    "sha256": "9e57bd06aa5a804471c232d58a7a0599fd66c8dac0067232145b63fc5ab64e29",
+    "summary": "Cocoa CAMetalLayer、SDR/EDR呈现和兼容ImGui。；Objective-C++实现。"
+  },
   "code/grassland/graphics/buffer.cpp": {
     "details": [
       "Type/Size/Resize/Upload/Download 的具体内存与同步行为由后端定义。",
@@ -1322,6 +1530,123 @@
     ],
     "sha256": "6dcce9871f566d9393a329bfa1370ee7a143c14593c5bf8b68696546d5f3b634",
     "summary": "聚合头：将相关声明从一个入口暴露给调用方。"
+  },
+  "code/pybind/grassland/graphics/acceleration_structure.cpp": {
+    "details": [
+      "update_instances支持RayTracingInstance列表或(AS,3×4矩阵)列表；make_instance也接受3×4行主序并转存GLM列主序。",
+      "make_instance的keep_alive<0,1>让返回实例保留AS；update_instances列表未声明相同保活，外部应持有BLAS。"
+    ],
+    "sha256": "5fe0bee7a60fd39d67962a319fd26af7be082a2c68ff30c7c8826737ec046135",
+    "summary": "AS实例更新与make_instance行主序矩阵转换。"
+  },
+  "code/pybind/grassland/graphics/buffer.cpp": {
+    "details": [
+      "upload_data默认size为bytes长度，但显式size未验证<=bytes长度；只检查size+offset<=Buffer::Size。调用方不得指定超过源bytes长度。",
+      "download_data默认size=Size-offset；offset越界和size加法溢出未完备检查。返回新py::bytes拷贝，不是零拷贝view。"
+    ],
+    "sha256": "8a5895be3f2326c2d55ef8a86f077606eb3e88caa48885604903b68e294f5bfe",
+    "summary": "DeviceBuffer字节上传/下载、尺寸/类型查询与resize。"
+  },
+  "code/pybind/grassland/graphics/command_context.cpp": {
+    "details": [
+      "cmd_bind_resources的keep_alive<1,2>保留的是slot整数，cmd_bind_vertex_buffers保留的是first_binding；不保证实际列表资源存活。",
+      "cmd_begin_rendering无目标保活；cmd_present只保留window，未保留image。所有引用资源需外部保留至提交完成。",
+      "cmd_draw虽然参数名index_count、docstring写indexed，实际调用非索引CmdDraw。cmd_dispatch宽高为工作组数；cmd_dispatch_rays为射线维度。",
+      "cmd_clear_image可传四float颜色（校验长度）或单float深度；viewport/scissor用独立坐标参数组装。"
+    ],
+    "sha256": "1d96907fcc8c8dd09bd76fd392d730790f8deb3026875019f016fe2d72587dd5",
+    "summary": "命令录制桥接，含资源重载与Python列表/标量到原生结构的转换。"
+  },
+  "code/pybind/grassland/graphics/core.cpp": {
+    "details": [
+      "CoreSettings可改frames_in_flight/enable_debug，但构造Core后修改该设置对象不自动更新Core。",
+      "资源工厂用keep_alive<0,1>让返回对象保留Core；compute program额外保留shader，RT三shader重载保留三者。",
+      "create_shader把字符串写入临时VFS main.slang；create_shader_from_directory加载目录解决include。load_image_from_file与create_cuda_buffer检查错误码并抛异常，许多其他工厂未检查。",
+      "create_tlas的(pair)重载接受4×4行主序列表，create_blas的BufferRange重载未额外保留range对象；调用方需维持依赖资源。"
+    ],
+    "sha256": "c49ddfdfe5ccf29282cc3a7b8582e6ac9211e8e7169bc72e3441d2e4fa95806b",
+    "summary": "Core设置、设备初始化、资源工厂、提交与CUDA屏障绑定。"
+  },
+  "code/pybind/grassland/graphics/graphics.cpp": {
+    "details": [
+      "DeviceBuffer是C++Buffer的Python名；CUDABuffer通过py::multiple_inheritance处理虚基类指针调整。cuda_ptr返回设备指针整数，不是host可读内存。",
+      "FrameProfile构造keep_alive保留Core；begin/begin_gpu/end_gpu/finish配套使用，gpu_ms须WaitGPU后读取；cpu_ms/gpu_ms只读属性。"
+    ],
+    "sha256": "934ab5e9f71477358c0b9281fa50f93589852ef28a15bf2b9945c072a0203197",
+    "summary": "创建RHI smart-holder类、手势枚举、可选CUDA buffer、FrameProfile及imgui子模块。"
+  },
+  "code/pybind/grassland/graphics/graphics.h": {
+    "details": [],
+    "sha256": "4dddcca06b50cac22b43627bd2706571fc3d37f2f5d8c2fbc17e7dffddeea001",
+    "summary": "声明各Register*注册函数，供扩展统一按依赖顺序绑定。"
+  },
+  "code/pybind/grassland/graphics/graphics_util.cpp": {
+    "details": [
+      "BackendAPI含Metal/Vulkan/D3D12；默认API为模块常量，SHADER_TYPE_FRAGMENT别名PIXEL。enum export_values使枚举值也出现在模块级。",
+      "SamplerInfo四种构造重载，BlendState默认/enable/六项混合重载；字段直接def_readwrite，无状态校验。",
+      "BufferRange构造保留原Buffer，但公开buffer setter未建立新的保活关系。RayTracingInstance.acceleration_structure setter只存裸指针，调用方须保留对象。",
+      "RayTracingInstance.transform是3×4行主序；ID和hit_group_offset为24bit、mask/flags为8bit，setter无显式范围检查，赋入位域可能截断。",
+      "两类RT flags提供|/&/^/~和bool；__str__若未知值使用0x前缀加十进制to_string，不能视作可靠十六进制序列化。"
+    ],
+    "sha256": "f2db117bdfd720570c9e00749f6e1c77cbf305ff4b33b007f7b4972d1e0b81c4",
+    "summary": "导出RHI枚举、位标志运算与可修改参数结构。"
+  },
+  "code/pybind/grassland/graphics/image.cpp": {
+    "details": [
+      "上传未校验bytes长度；必须至少匹配像素尺寸×区域宽高，offset/extent也需有效。",
+      "下载按PixelSize分配紧密字节数组并复制为bytes，颜色空间与行方向不转换。"
+    ],
+    "sha256": "8e979491d960bacb6c88096c434629b1df0723e942279265db3f474b3adb8f32",
+    "summary": "Image全图/子矩形py::bytes读写与extent/format查询。"
+  },
+  "code/pybind/grassland/graphics/imgui.cpp": {
+    "details": [
+      "在window.begin_imgui_frame与end_imgui_frame之间使用；begin即使返回False也要end。text使用TextUnformatted，文本不当格式串。",
+      "checkbox/slider返回(changed,value)，不会修改Python不可变参数本身；slider格式字符串直接传ImGui，需要匹配数值类型。",
+      "set_ini_filename使用全局静态string储存，多个context切换文件名会共享这一个储存位置；None禁用保存。"
+    ],
+    "sha256": "988147e62a90566a1a14c4fc48841e424ba2c1c058e57ed387451cee475ec0e5",
+    "summary": "保留的Python ImGui即时控件子集。"
+  },
+  "code/pybind/grassland/graphics/program.cpp": {
+    "details": [
+      "图形bind_shader保留shader；RT add_ray_gen/miss/callable及hit组保留所传shader。",
+      "RT finalize可自动生成索引或显式三组索引；不把Finalize错误码统一转换为异常。"
+    ],
+    "sha256": "7e129e583e9b7810fce09fe1bab77f52ed6187373dd01b64e92b4c6696af9c3e",
+    "summary": "图形/计算/光追程序配置、shader引用保活与Finalize绑定。"
+  },
+  "code/pybind/grassland/graphics/sampler.cpp": {
+    "details": [],
+    "sha256": "bb6e3985569eec5dc314aec4b971e2a3e31bca17f64abe1161556a003435b220",
+    "summary": "Sampler只暴露__repr__，配置通过Core.create_sampler(SamplerInfo)指定。"
+  },
+  "code/pybind/grassland/graphics/shader.cpp": {
+    "details": [],
+    "sha256": "d7ce109106d66cb7eea40c67e9cbb133326a28de3a1adc2f951ef45de57bb4e1",
+    "summary": "Shader暴露entry_point与包含入口名的__repr__。"
+  },
+  "code/pybind/grassland/graphics/window.cpp": {
+    "details": [
+      "get_size/get_framebuffer_size分别逻辑窗口尺寸与像素尺寸，GLM向量转tuple；frame_size/work_area为四元素tuple。",
+      "register_*返回回调ID，各unregister_*用相同ID移除；窗口保存Python callable，回调闭包反向持窗可能形成引用环。",
+      "drop回调只传路径列表；magnify传scale,x,y,phase；display_brightness传包含五项亮度信息的dict。",
+      "poll_events是静态方法；本绑定未主动释放GIL来运行GPU等待或额外获取GIL执行C++线程事件。"
+    ],
+    "sha256": "7c0cd352cf775542b005d1202cf2e3ac9b127334e781fa1e25d85ead86314666",
+    "summary": "Window尺寸/焦点/HDR、输入事件、手势和兼容ImGui帧接口绑定。"
+  },
+  "code/pybind/long_march.cpp": {
+    "details": [
+      "graphics的旧docstring只写Vulkan/D3D12；实际BackendAPI绑定还包括Metal。"
+    ],
+    "sha256": "3192dc2c4074488e1da94433495bfc9ccd3d0164324af8272ed050906261371a",
+    "summary": "long_march模块初始化：hello打印问候，建立graphics并调用RegisterGraphics。"
+  },
+  "code/pybind/pybind.h": {
+    "details": [],
+    "sha256": "2dc758f4094c9ee095ee9f7c1b75f27d482234571ffbea4d77524d7bf0c1fdb5",
+    "summary": "集中引入pybind11及chrono/Eigen/function/NumPy/STL转换支持，并定义namespace py别名。"
   },
   "code/snowberg/CMakeLists.txt": {
     "details": [
@@ -3240,6 +3565,72 @@
     "sha256": "1c6b697b13bf5364476a2376c898fa5cc105dc94ad1fa053af05630191130f8f",
     "summary": "分层inclusive扫描的上下扫内核。"
   },
+  "code/sparkium/shaders/bsdf/lambertian.slang": {
+    "details": [],
+    "sha256": "1b02a4b86fda4d4207fdae119452e1db4ec666625c53c76d0eb4d6f0193e5ba3",
+    "summary": "余弦加权Lambertian求值与采样。"
+  },
+  "code/sparkium/shaders/bsdf/principled_bsdf.slang": {
+    "details": [
+      "背面用局部interface_ior=1/ior，不改变原材质ior，因此重复Eval/Sample不会来回翻转IOR。",
+      "漫反射权重=(1-metallic)*(1-transmission)*(1-subsurface)；本文件不自行实现次表面传播，图材质在外层处理随机游走。",
+      "anisotropic_rotation以整圈为单位乘2π；clearcoat固定IOR1.5，alpha=clearcoat_roughness²。",
+      "SamplePrincipledBSDF归一化CDF前未检查total_cdf=0；无有效闭包时CDF可为NaN，外围应以零pdf终止。"
+    ],
+    "sha256": "1e12df6a00e6c8184d92aa0c5d85193eb9d4a09210456701f740f778a5af7b8c",
+    "summary": "配置六闭包、混合求值和按权重采样。"
+  },
+  "code/sparkium/shaders/bsdf/principled_diffuse.slang": {
+    "details": [],
+    "sha256": "35834a03c38798138a5ea7be3923b4e3443f4993c3759dfde3d63c4f9d5233e8",
+    "summary": "含粗糙度逆向反射项的Principled漫反射闭包。"
+  },
+  "code/sparkium/shaders/bsdf/principled_material.slang": {
+    "details": [
+      "struct内部include将各片段作为成员；hit_record/omega_v须先赋值，Eval/Sample会重算闭包。"
+    ],
+    "sha256": "e3279186c168baca97bfb3e20aaf0a90f0b20ef74bf04b51f5227c9770a98370",
+    "summary": "六闭包聚合、材质字段及成员实现的包含入口。"
+  },
+  "code/sparkium/shaders/bsdf/principled_microfacet.slang": {
+    "details": [
+      "这些底层函数假设有效入射方向和不触及奇异端点的随机数；randu=0/1可触发log或除零，未全面钳制。"
+    ],
+    "sha256": "a323535b5dc1e3b8ad7f1e026853ca2a6a0ca6eaa6b02896219b1a2b4627661a",
+    "summary": "可见法线斜率采样及各向异性拉伸。"
+  },
+  "code/sparkium/shaders/bsdf/principled_microfacet_clearcoat.slang": {
+    "details": [],
+    "sha256": "ab4a72544433a2ac7cac062604ab40f09cc3daf8e090acafd9bb8566b5082677",
+    "summary": "GTR1清漆层求值与采样。"
+  },
+  "code/sparkium/shaders/bsdf/principled_microfacet_fresnel.slang": {
+    "details": [],
+    "sha256": "6536d74417416ab59638c7783b6914d727fbfd2876f1ab19622b7bc1e43c3582",
+    "summary": "彩色Fresnel各向异性GGX求值与采样。"
+  },
+  "code/sparkium/shaders/bsdf/principled_microfacet_refraction.slang": {
+    "details": [
+      "IOR在外层已按正反面选择；此文件用折射half-vector及η²Jacobian。低层sample的Ng参数未参与几何法线过滤。"
+    ],
+    "sha256": "5a6d111459e95174090904f010001352a2d2d90a0c5b4a45ae0061d9845c933d",
+    "summary": "各向同性GGX折射求值与可见法线采样。"
+  },
+  "code/sparkium/shaders/bsdf/principled_sheen.slang": {
+    "details": [],
+    "sha256": "1788ced71bc2054686575c620daa5d114aff68b4d455ead6959cba0159914c43",
+    "summary": "掠射Sheen闭包及余弦采样。"
+  },
+  "code/sparkium/shaders/bsdf/principled_util.slang": {
+    "details": [],
+    "sha256": "737ce0f99a41a137d5d2593901ad5d78cf6731046faf462350cec5b8231a8c46",
+    "summary": "Fresnel、坐标基、误差函数及闭包权重兼容工具。"
+  },
+  "code/sparkium/shaders/bsdf/specular.slang": {
+    "details": [],
+    "sha256": "cb75da6f271bbc7bde101c5b6e7b0953c6c99106a836c7d5533113fc31cac58d",
+    "summary": "理想镜面反射的delta采样约定。"
+  },
   "code/sparkium/shaders/buffer_helper.slang": {
     "details": [
       "所有offset为字节，无越界保护。矩阵按CPU紧密列主序读入，显式transpose为Slang数学矩阵。"
@@ -3384,6 +3775,121 @@
     ],
     "sha256": "36214afe770ec3daf55f679f9648353d25d4fcbcf9a46a0a4cb06f1978905ded",
     "summary": "delta、圆盘soft-falloff和球形点光的方向采样。"
+  },
+  "code/sparkium/shaders/material/lambertian/eval_direct_light.slang": {
+    "details": [],
+    "sha256": "b069f4ca0b549e7f93d9add38a75f42ccaaa8cb202e41b759358655a62112d58",
+    "summary": "lambertian几何光直接发光求值。"
+  },
+  "code/sparkium/shaders/material/lambertian/evaluator.slang": {
+    "details": [
+      "PrimitivePower 使用最大颜色通道近似功率，不是光谱/亮度积分。"
+    ],
+    "sha256": "e8accfd804a96300ed50128359d7416a6596ef1d2d866650a4dd11b630d7afaa",
+    "summary": "为几何光提供lambertian材质的功率估算与发光求值。"
+  },
+  "code/sparkium/shaders/material/lambertian/pixel_shader.slang": {
+    "details": [],
+    "sha256": "8cc488e0a0d958f0d3df38def4d83dc97ef9ef34f3b31625a2e9e2a79b0da7c0",
+    "summary": "lambertian光栅G-buffer像素实现。"
+  },
+  "code/sparkium/shaders/material/lambertian/sampler.slang": {
+    "details": [],
+    "sha256": "1b751519b3f288eba4fcfd237b22cabcbd370cf030935ad227f036e33d8c3a7c",
+    "summary": "漫反射直接光MIS、发光命中MIS与余弦延续采样。"
+  },
+  "code/sparkium/shaders/material/light/eval_direct_light.slang": {
+    "details": [],
+    "sha256": "ce54815631c2736ed117e994f3fad490829547b03ac1453b0ef44e574f2349c1",
+    "summary": "light几何光直接发光求值。"
+  },
+  "code/sparkium/shaders/material/light/evaluator.slang": {
+    "details": [
+      "PrimitivePower 使用最大颜色通道近似功率，不是光谱/亮度积分。"
+    ],
+    "sha256": "82248f331ed469375143b0bffd52039a4fd3bbf44142c57f3b840d4d7b4115c4",
+    "summary": "为几何光提供light材质的功率估算与发光求值。"
+  },
+  "code/sparkium/shaders/material/light/pixel_shader.slang": {
+    "details": [],
+    "sha256": "b91f3b5c6fd81ac810913ac5c9c46a7edc666172af83f510566eb465ff3437d6",
+    "summary": "light光栅G-buffer像素实现。"
+  },
+  "code/sparkium/shaders/material/light/sampler.slang": {
+    "details": [
+      "falloff按当前射线段hit.t线性衰减；非阻挡路径只移动origin，保留direction与ray_type。"
+    ],
+    "sha256": "d519a5a8a59387fb1150e1a91fd51d823c9c44a42f43edde5be886ab453a3496",
+    "summary": "发光面可见性、MIS以及是否透过该面。"
+  },
+  "code/sparkium/shaders/material/principled/eval_direct_light.slang": {
+    "details": [],
+    "sha256": "7cbc29a43163d62744df81f37860dac05ca6e3c1b5bbc7faef9db0f0fb9ff738",
+    "summary": "principled几何光直接发光求值。"
+  },
+  "code/sparkium/shaders/material/principled/evaluator.slang": {
+    "details": [
+      "PrimitivePower 使用最大颜色通道近似功率，不是光谱/亮度积分。"
+    ],
+    "sha256": "6d19cb1b0eb2f6b392cca57be35e96cc51dfc6e7dc7c62d8a275c8b190d9b2a5",
+    "summary": "为几何光提供principled材质的功率估算与发光求值。"
+  },
+  "code/sparkium/shaders/material/principled/pixel_shader.slang": {
+    "details": [
+      "Principled先读取完整Info但只将G-buffer子集写出；UV翻Y，贴图覆盖标量，发光贴图乘常量。有效切线/副切线才应用法线贴图。"
+    ],
+    "sha256": "b30797fdfc1792c2d032a6820baac6034720d0a4d0628623da7efd9202108eea",
+    "summary": "principled光栅G-buffer像素实现。"
+  },
+  "code/sparkium/shaders/material/principled/sampler.slang": {
+    "details": [
+      "normal贴图只在abs(signal)>.5启用；实现TBN的B使用cross(normal,tangent)*y_signal，未再乘signal正负值。",
+      "读取八图索引，base_color等贴图覆盖参数，emission贴图乘常量发光；未隐式做sRGB解码。",
+      "Principled即使有transmission参数，其快速阴影实现仍为完全不透明。"
+    ],
+    "sha256": "5b7e04542d229cbae50395f6e97d61ba5b11099251a0fcde9b527b5d4a803dcd",
+    "summary": "从Info和纹理索引构造Principled并执行直接光/发光MIS与路径采样。"
+  },
+  "code/sparkium/shaders/material/shader_graph/evaluator.slang": {
+    "details": [
+      "PrimitivePower 使用最大颜色通道近似功率，不是光谱/亮度积分。"
+    ],
+    "sha256": "5f9a9cb353bdf14605528a834aefb430efb5fb9bfd49839fa51996f692abfbe3",
+    "summary": "为几何光提供shader_graph材质的功率估算与发光求值。"
+  },
+  "code/sparkium/shaders/material/shader_graph/sampler.slang": {
+    "details": [
+      "EvaluateShaderGraph在// SHADER_GRAPH_IMPLEMENTATION之后由C++插入。阴影求图使用bounce=1、ray_type=REFLECTION、is_shadow_ray=true。"
+    ],
+    "sha256": "a300a030e6de611f25feda23f28bec0d863844903f94f8297a50f4ba0f4360e8",
+    "summary": "注入图源码与共享表面采样的原生材质入口。"
+  },
+  "code/sparkium/shaders/material/shader_graph/surface_sampler.slang": {
+    "details": [
+      "opacity作为是否选择表面分支的随机概率，透明事件只移动origin并把bsdf_pdf设INF。",
+      "thin_walled>1.5：粗糙Fresnel反射+保持入射方向的着色透射；>0.5：不透明Principled与薄玻璃空间混合。",
+      "subsurface_method>.5且subsurface>0且radius*scale最大分量>=1e-4才用随机游走；正面进入时在表面反射与介质之间选择，method>1.5采用skin入射混合。",
+      "一般分支直接加graph.emission，没有普通Lambertian/Principled的发光命中MIS；薄壁与随机游走提前返回的分支不执行这段发光。"
+    ],
+    "sha256": "bc1db05dd2e10a7f402cf4cf2d2a0a5f150dd2f9c31c70c690e385c54f8edd53",
+    "summary": "材质图表面的透明、薄壁玻璃、次表面和一般Principled采样。"
+  },
+  "code/sparkium/shaders/material/specular/evaluator.slang": {
+    "details": [
+      "PrimitivePower 使用最大颜色通道近似功率，不是光谱/亮度积分。"
+    ],
+    "sha256": "9c369b9504398a2b7789caab591beab1a75ef373360be8720081cb0a27977622",
+    "summary": "为几何光提供specular材质的功率估算与发光求值。"
+  },
+  "code/sparkium/shaders/material/specular/pixel_shader.slang": {
+    "details": [],
+    "sha256": "974c7ac5bf6cdcf40efbfc0e3ba7d168b1d9cedec595b31aeb1a9735eada7bd9",
+    "summary": "specular光栅G-buffer像素实现。"
+  },
+  "code/sparkium/shaders/material/specular/sampler.slang": {
+    "details": [],
+    "sha256": "070acbe858b362d481c36bf010113d4f419fe2cda62f7d2e34740d57b241f609",
+    "summary": "理想镜面路径延续与不透明阴影。"
   },
   "code/sparkium/shaders/random.slang": {
     "details": [

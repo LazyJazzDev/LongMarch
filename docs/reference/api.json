@@ -1,4 +1,8 @@
 {
+  "CA_PRIVATE_IMPLEMENTATION": {
+    "contract": "宏定义只应由一个编译单元承担。",
+    "description": "在本编译单元实例化Metal-cpp对应框架的私有实现符号。"
+  },
   "DEFAULT_DISPATCH_SIZE": {
     "contract": "线程数为零时产生零 blocks，调用点没有统一避免此情形。",
     "description": "使用每块 256 线程展开 CUDA launch 尺寸。"
@@ -9,7 +13,7 @@
   },
   "GLFW_EXPOSE_NATIVE_COCOA": {
     "contract": "",
-    "description": "使 GLFW native 头暴露 Cocoa window handle 接口。"
+    "description": "启用GLFW Cocoa原生窗口访问声明。"
   },
   "GLFW_EXPOSE_NATIVE_WIN32": {
     "contract": "",
@@ -35,6 +39,14 @@
     "contract": "不是 GUI 类型或功能开关。",
     "description": "阻止历史空头文件重复包含的预处理标记。"
   },
+  "IMGUI_IMPL_METAL_CPP": {
+    "contract": "",
+    "description": "选择ImGui Metal-cpp桥接后端声明。"
+  },
+  "MTL_PRIVATE_IMPLEMENTATION": {
+    "contract": "宏定义只应由一个编译单元承担。",
+    "description": "在本编译单元实例化Metal-cpp对应框架的私有实现符号。"
+  },
   "NOMINMAX": {
     "contract": "",
     "description": "阻止 Windows 头定义 min/max 宏，避免干扰 C++ 算法名称。"
@@ -42,6 +54,14 @@
   "NSEvent": {
     "contract": "",
     "description": "Objective-C 的原生事件类型前向声明，本项目不定义或拥有该类。"
+  },
+  "NS_PRIVATE_IMPLEMENTATION": {
+    "contract": "宏定义只应由一个编译单元承担。",
+    "description": "在本编译单元实例化Metal-cpp对应框架的私有实现符号。"
+  },
+  "PYBIND11_MODULE": {
+    "contract": "Python导入时执行；不是供C++直接调用的普通业务函数。",
+    "description": "定义long_march扩展初始化函数，绑定hello及graphics子模块。"
   },
   "STB_IMAGE_IMPLEMENTATION": {
     "contract": "",
@@ -502,6 +522,290 @@
   "code/sparkium/shaders/blelloch_scan.slang#metadata": {
     "contract": "",
     "description": "space1当前扫描层常量。"
+  },
+  "code/sparkium/shaders/bsdf/lambertian.slang#EvalLambertianBSDF": {
+    "contract": "",
+    "description": "返回base_color*max(N·L,0)/π，并将同一cos/π写pdf。"
+  },
+  "code/sparkium/shaders/bsdf/lambertian.slang#SampleLambertianBSDF": {
+    "contract": "拒绝几何背侧时仍保留采样pdf，通量由零eval终止。",
+    "description": "在着色法线半球采样，若方向位于几何法线正侧则eval=pdf*base_color，否则eval=0。"
+  },
+  "code/sparkium/shaders/bsdf/principled_bsdf.slang#CalculateClosureWeight": {
+    "contract": "[mutating]改变闭包缓存；普通specular映射IOR与各向异性参数假设物理合理输入。",
+    "description": "清所有闭包并按材质、Fresnel与颜色计算weight/sample_weight和几何参数。"
+  },
+  "code/sparkium/shaders/bsdf/principled_bsdf.slang#EvalPrincipledBSDF": {
+    "contract": "",
+    "description": "先重算闭包，再求所有闭包的eval和混合PDF。"
+  },
+  "code/sparkium/shaders/bsdf/principled_bsdf.slang#EvalPrincipledBSDFKernel": {
+    "contract": "eval/accum_weight为按值累积输入，pdf为inout；采样时传入已选闭包结果避免重复。",
+    "description": "累加除exclude以外的有效闭包eval及加权pdf，最终pdf除总采样权重。"
+  },
+  "code/sparkium/shaders/bsdf/principled_bsdf.slang#PrincipledThinReflectionProbability": {
+    "contract": "",
+    "description": "重算闭包，返回玻璃反射sample_weight/(反射+折射权重)，分母下界CUTOFF。"
+  },
+  "code/sparkium/shaders/bsdf/principled_bsdf.slang#SamplePrincipledBSDF": {
+    "contract": "eval/方向/pdf先清零；r1/r2应为单位区间随机数。",
+    "description": "按六闭包sample_weight CDF选择并重映射r1，调用具体sample后补评估其余闭包。"
+  },
+  "code/sparkium/shaders/bsdf/principled_bsdf.slang#SamplePrincipledThinReflection": {
+    "contract": "输入r1已在反射事件内归一化；不会采透射delta事件。",
+    "description": "仅采样玻璃粗糙反射，eval乘闭包weight，pdf再乘它在薄玻璃混合中的选择概率。"
+  },
+  "code/sparkium/shaders/bsdf/principled_diffuse.slang#PrincipledDiffuseBsdf": {
+    "contract": "",
+    "description": "能量weight、选择sample_weight、法线N、roughness。"
+  },
+  "code/sparkium/shaders/bsdf/principled_diffuse.slang#bsdf_principled_diffuse_compute_brdf": {
+    "contract": "pdf参数实际上未修改，需由外层eval/sample赋值；NdotL<=0返回0。",
+    "description": "计算Disney漫反射及retro-reflection项乘NdotL/π。"
+  },
+  "code/sparkium/shaders/bsdf/principled_diffuse.slang#bsdf_principled_diffuse_eval": {
+    "contract": "",
+    "description": "正半球设pdf=NdotL/π并计算漫反射，负侧pdf/eval均0。"
+  },
+  "code/sparkium/shaders/bsdf/principled_diffuse.slang#bsdf_principled_diffuse_sample": {
+    "contract": "",
+    "description": "余弦半球采样，几何法线背侧把eval/pdf均设0。"
+  },
+  "code/sparkium/shaders/bsdf/principled_material.slang#CLOSURE_COUNT": {
+    "contract": "",
+    "description": "固定六个闭包，与混合CDF索引0..5对应。"
+  },
+  "code/sparkium/shaders/bsdf/principled_material.slang#PrincipledMaterial": {
+    "contract": "",
+    "description": "聚合命中、出射方向、六种闭包缓存和颜色/粗糙度/折射/薄层等参数。"
+  },
+  "code/sparkium/shaders/bsdf/principled_microfacet.slang#microfacet_beckmann_sample_slopes": {
+    "contract": "",
+    "description": "正入射使用高斯斜率；其他角度用erf逆函数近似和最多两步Newton求可见Beckmann斜率，同时返回G1i。"
+  },
+  "code/sparkium/shaders/bsdf/principled_microfacet.slang#microfacet_ggx_sample_slopes": {
+    "contract": "",
+    "description": "正入射用sqrt(u/(1-u))，其他角度求GGX可见斜率并返回Smith遮蔽G1i。"
+  },
+  "code/sparkium/shaders/bsdf/principled_microfacet.slang#microfacet_sample_stretched": {
+    "contract": "",
+    "description": "拉伸入射方向→采Beckmann/GGX斜率→旋转→按alpha_x/y解拉伸→归一化微法线。"
+  },
+  "code/sparkium/shaders/bsdf/principled_microfacet_clearcoat.slang#ClearcoatBsdf": {
+    "contract": "",
+    "description": "各向同性clearcoat闭包：weight、sample_weight、N、alpha、cspec0、ior、fresnel_color、clearcoat。"
+  },
+  "code/sparkium/shaders/bsdf/principled_microfacet_clearcoat.slang#bsdf_microfacet_fresnel_color": {
+    "contract": "需在PrincipledMaterial内部使用，依赖外层omega_v。",
+    "description": "按omega_v与N求Fresnel颜色，并乘其平均值到sample_weight。颜色额外乘.25*clearcoat。"
+  },
+  "code/sparkium/shaders/bsdf/principled_microfacet_clearcoat.slang#bsdf_microfacet_ggx_clearcoat_setup": {
+    "contract": "",
+    "description": "钳制cspec0与alpha，再更新Fresnel颜色及采样权重。"
+  },
+  "code/sparkium/shaders/bsdf/principled_microfacet_clearcoat.slang#bsdf_microfacet_ggx_eval_clearcoat": {
+    "contract": "",
+    "description": "在反射半球且alpha乘积>1e-7时求连续反射项；否则pdf/eval为0。"
+  },
+  "code/sparkium/shaders/bsdf/principled_microfacet_clearcoat.slang#bsdf_microfacet_ggx_eval_reflect_clearcoat": {
+    "contract": "出入方向须在正半球，否则eval/pdf置零。",
+    "description": "计算微表面反射eval=BRDF*cos与可见法线PDF。D用GTR1，Smith G固定alpha=.25。"
+  },
+  "code/sparkium/shaders/bsdf/principled_microfacet_clearcoat.slang#bsdf_microfacet_ggx_sample_clearcoat": {
+    "contract": "部分无效入射分支不写全部inout输出；调用方先初始化为零，函数返回REFLECT|GLOSSY或SINGULAR标签。",
+    "description": "采可见微法线再反射，几何背面拒绝；极光滑时用pdf=1e6的delta约定。最终eval额外乘.25*clearcoat。"
+  },
+  "code/sparkium/shaders/bsdf/principled_microfacet_clearcoat.slang#reflection_color": {
+    "contract": "",
+    "description": "由L/H、IOR和cspec0返回彩色Fresnel反射率。"
+  },
+  "code/sparkium/shaders/bsdf/principled_microfacet_fresnel.slang#FresnelBsdf": {
+    "contract": "",
+    "description": "各向异性微表面闭包：weight/sample_weight、N/T、alpha_x/y、color、ior、cspec0/fresnel_color。"
+  },
+  "code/sparkium/shaders/bsdf/principled_microfacet_fresnel.slang#bsdf_microfacet_fresnel_color": {
+    "contract": "需在PrincipledMaterial内部使用，依赖外层omega_v。",
+    "description": "按omega_v与N求Fresnel颜色，并乘其平均值到sample_weight。"
+  },
+  "code/sparkium/shaders/bsdf/principled_microfacet_fresnel.slang#bsdf_microfacet_ggx_eval_fresnel": {
+    "contract": "",
+    "description": "在反射半球且alpha乘积>1e-7时求连续反射项；否则pdf/eval为0。"
+  },
+  "code/sparkium/shaders/bsdf/principled_microfacet_fresnel.slang#bsdf_microfacet_ggx_eval_reflect_fresnel": {
+    "contract": "出入方向须在正半球，否则eval/pdf置零。",
+    "description": "计算微表面反射eval=BRDF*cos与可见法线PDF。支持各向同性和按T方向的各向异性GGX。"
+  },
+  "code/sparkium/shaders/bsdf/principled_microfacet_fresnel.slang#bsdf_microfacet_ggx_fresnel_setup": {
+    "contract": "",
+    "description": "钳制cspec0与alpha，再更新Fresnel颜色及采样权重。"
+  },
+  "code/sparkium/shaders/bsdf/principled_microfacet_fresnel.slang#bsdf_microfacet_ggx_sample_fresnel": {
+    "contract": "部分无效入射分支不写全部inout输出；调用方先初始化为零，函数返回REFLECT|GLOSSY或SINGULAR标签。",
+    "description": "采可见微法线再反射，几何背面拒绝；极光滑时用pdf=1e6的delta约定。"
+  },
+  "code/sparkium/shaders/bsdf/principled_microfacet_fresnel.slang#reflection_color": {
+    "contract": "",
+    "description": "由L/H、IOR和cspec0返回彩色Fresnel反射率。"
+  },
+  "code/sparkium/shaders/bsdf/principled_microfacet_refraction.slang#RefractionBsdf": {
+    "contract": "",
+    "description": "weight/sample_weight、N、alpha、ior的折射闭包。"
+  },
+  "code/sparkium/shaders/bsdf/principled_microfacet_refraction.slang#bsdf_microfacet_ggx_eval_refraction": {
+    "contract": "",
+    "description": "连续折射包装，非负入射侧或alpha²<=1e-7返回零。"
+  },
+  "code/sparkium/shaders/bsdf/principled_microfacet_refraction.slang#bsdf_microfacet_ggx_eval_transmit_refraction": {
+    "contract": "",
+    "description": "要求出射正侧、入射负侧，计算折射D/G/Jacobian及pdf；同侧返回零。"
+  },
+  "code/sparkium/shaders/bsdf/principled_microfacet_refraction.slang#bsdf_microfacet_ggx_sample_refraction": {
+    "contract": "调用方先清inout输出；返回TRANSMIT|GLOSSY或SINGULAR标签，不能把返回标签等同有效非零样本。",
+    "description": "采微法线并调用fresnel_dielectric得到T；全反射或inside拒绝；极光滑/IOR≈1采用eval=pdf=1e6。"
+  },
+  "code/sparkium/shaders/bsdf/principled_sheen.slang#PrincipledSheenBsdf": {
+    "contract": "",
+    "description": "weight/sample_weight/N与估计平均avg_value。"
+  },
+  "code/sparkium/shaders/bsdf/principled_sheen.slang#bsdf_principled_sheen_eval": {
+    "contract": "",
+    "description": "正半球求Sheen值并提供余弦PDF，否则零。"
+  },
+  "code/sparkium/shaders/bsdf/principled_sheen.slang#bsdf_principled_sheen_sample": {
+    "contract": "",
+    "description": "余弦采样，几何背侧拒绝，返回REFLECT|DIFFUSE标签。"
+  },
+  "code/sparkium/shaders/bsdf/principled_sheen.slang#bsdf_principled_sheen_setup": {
+    "contract": "",
+    "description": "计算avg_value并乘入sample_weight，借用聚合材质omega_v。"
+  },
+  "code/sparkium/shaders/bsdf/principled_sheen.slang#calculate_avg_principled_sheen_brdf": {
+    "contract": "",
+    "description": "以H=N近似平均值，返回Schlick(N·I)*(N·I)。"
+  },
+  "code/sparkium/shaders/bsdf/principled_sheen.slang#calculate_principled_sheen_brdf": {
+    "contract": "",
+    "description": "返回Schlick(L·H)*N·L，入出任一在负半球则eval/pdf清零。"
+  },
+  "code/sparkium/shaders/bsdf/principled_util.slang#CLOSURE_WEIGHT_CUTOFF": {
+    "contract": "",
+    "description": "低于1e-5的闭包采样权重视作无效。"
+  },
+  "code/sparkium/shaders/bsdf/principled_util.slang#D_GTR1": {
+    "contract": "alpha=0使log(alpha²)无效，delta分支通常避开连续求值。",
+    "description": "返回clearcoat的GTR1分布，alpha>=1返回1/π。"
+  },
+  "code/sparkium/shaders/bsdf/principled_util.slang#LABEL_DIFFUSE": {
+    "contract": "",
+    "description": "散射事件位标记 4，可按位组合。"
+  },
+  "code/sparkium/shaders/bsdf/principled_util.slang#LABEL_GLOSSY": {
+    "contract": "",
+    "description": "散射事件位标记 8，可按位组合。"
+  },
+  "code/sparkium/shaders/bsdf/principled_util.slang#LABEL_NONE": {
+    "contract": "",
+    "description": "散射事件位标记 0，可按位组合。"
+  },
+  "code/sparkium/shaders/bsdf/principled_util.slang#LABEL_REFLECT": {
+    "contract": "",
+    "description": "散射事件位标记 2，可按位组合。"
+  },
+  "code/sparkium/shaders/bsdf/principled_util.slang#LABEL_SINGULAR": {
+    "contract": "",
+    "description": "散射事件位标记 16，可按位组合。"
+  },
+  "code/sparkium/shaders/bsdf/principled_util.slang#LABEL_SUBSURFACE_SCATTER": {
+    "contract": "",
+    "description": "散射事件位标记 256，可按位组合。"
+  },
+  "code/sparkium/shaders/bsdf/principled_util.slang#LABEL_TRANSMIT": {
+    "contract": "",
+    "description": "散射事件位标记 1，可按位组合。"
+  },
+  "code/sparkium/shaders/bsdf/principled_util.slang#LABEL_TRANSMIT_TRANSPARENT": {
+    "contract": "",
+    "description": "散射事件位标记 128，可按位组合。"
+  },
+  "code/sparkium/shaders/bsdf/principled_util.slang#LABEL_TRANSPARENT": {
+    "contract": "",
+    "description": "散射事件位标记 32，可按位组合。"
+  },
+  "code/sparkium/shaders/bsdf/principled_util.slang#LABEL_VOLUME_SCATTER": {
+    "contract": "",
+    "description": "散射事件位标记 64，可按位组合。"
+  },
+  "code/sparkium/shaders/bsdf/principled_util.slang#PREPARE_BSDF": {
+    "contract": "多语句宏，会声明局部变量；调用点需使用独立块作用域。",
+    "description": "把输入权重逐通道钳为非负，以RGB平均绝对值生成sample_weight，低于阈值置零。"
+  },
+  "code/sparkium/shaders/bsdf/principled_util.slang#Spectrum": {
+    "contract": "",
+    "description": "将Spectrum定义为float3的RGB约定。"
+  },
+  "code/sparkium/shaders/bsdf/principled_util.slang#average": {
+    "contract": "",
+    "description": "RGB三个分量算术平均，不是亮度权重。"
+  },
+  "code/sparkium/shaders/bsdf/principled_util.slang#copysignf": {
+    "contract": "不是完整IEEE copysign：零和符号位特殊情形不同。",
+    "description": "当x*y<0时翻转x，否则保持x。"
+  },
+  "code/sparkium/shaders/bsdf/principled_util.slang#fast_erff": {
+    "contract": "",
+    "description": "Abramowitz-Stegun多项式erf近似，|x|>=12.3返回带符号1。"
+  },
+  "code/sparkium/shaders/bsdf/principled_util.slang#fast_ierff": {
+    "contract": "",
+    "description": "Mike Giles逆erf分段多项式近似，内部绝对值最多.99999994。"
+  },
+  "code/sparkium/shaders/bsdf/principled_util.slang#fresnel_dielectric": {
+    "contract": "全反射返回1且T=0；eta必须为有效正比率。",
+    "description": "按N·I判断入/出介质，写反射R/透射T/is_inside并返回非偏振Fresnel反射率。"
+  },
+  "code/sparkium/shaders/bsdf/principled_util.slang#fresnel_dielectric_cos": {
+    "contract": "",
+    "description": "按绝对余弦与eta算介电Fresnel，折射根号域不正时返回1。"
+  },
+  "code/sparkium/shaders/bsdf/principled_util.slang#interpolate_fresnel_color": {
+    "contract": "F0=1会使分母零，调用方需有效IOR。",
+    "description": "将介电Fresnel从F0归一化到[基色cspec0,白色]之间。"
+  },
+  "code/sparkium/shaders/bsdf/principled_util.slang#madd": {
+    "contract": "",
+    "description": "返回a*b+c，不保证硬件fused multiply-add。"
+  },
+  "code/sparkium/shaders/bsdf/principled_util.slang#make_float3": {
+    "contract": "",
+    "description": "把单标量广播或三个分量构造float3的兼容重载。"
+  },
+  "code/sparkium/shaders/bsdf/principled_util.slang#make_orthonormals_tangent": {
+    "contract": "N应单位化，T不可平行N或为零。",
+    "description": "b=normalize(cross(N,T))，a=cross(b,N)。"
+  },
+  "code/sparkium/shaders/bsdf/principled_util.slang#rotate_around_axis": {
+    "contract": "axis须单位化，angle为弧度。",
+    "description": "Rodrigues形式绕axis旋转向量p。"
+  },
+  "code/sparkium/shaders/bsdf/principled_util.slang#safe_sqrtf": {
+    "contract": "",
+    "description": "sqrt(max(f,0))，保护负舍入误差。"
+  },
+  "code/sparkium/shaders/bsdf/principled_util.slang#saturate": {
+    "contract": "",
+    "description": "覆盖同名宏为clamp(x,0,1)。"
+  },
+  "code/sparkium/shaders/bsdf/principled_util.slang#saturatef": {
+    "contract": "",
+    "description": "以clamp(x,0,1)钳制。"
+  },
+  "code/sparkium/shaders/bsdf/principled_util.slang#schlick_fresnel": {
+    "contract": "",
+    "description": "返回saturate(1-u)^5。"
+  },
+  "code/sparkium/shaders/bsdf/specular.slang#SampleSpecularBSDF": {
+    "contract": "调用方直接把eval作为反射权重，不除pdf；与微表面delta输出eval=1e6的协议不同。",
+    "description": "reflect(direction,normal)，pdf=1e6；几何法线正侧eval=base_color，否则零。"
   },
   "code/sparkium/shaders/buffer_helper.slang#BufferReference": {
     "contract": "",
@@ -1078,6 +1382,242 @@
   "code/sparkium/shaders/light/point/sampler.slang#PointLightSampler": {
     "contract": "输入payload.low.xyz为接收位置，low.w为数据索引；输出low.xyz为eval、low.w为长度、high.xyz方向、high.w密度。",
     "description": "读取36字节点光数据，消费payload的二维随机数和表面法线，输出方向、阴影长度、发光和PDF。"
+  },
+  "code/sparkium/shaders/material/lambertian/eval_direct_light.slang#MaterialLambertianEvaluateDirectLighting": {
+    "contract": "",
+    "description": "读取偏移12的emission，不区分方向。"
+  },
+  "code/sparkium/shaders/material/lambertian/evaluator.slang#MaterialEvaluator": {
+    "contract": "",
+    "description": "借用material_data的泛型发光求值器。"
+  },
+  "code/sparkium/shaders/material/lambertian/evaluator.slang#MaterialEvaluator::EvaluateDirectLighting": {
+    "contract": "",
+    "description": "返回偏移12的emission，供直接光采样使用。"
+  },
+  "code/sparkium/shaders/material/lambertian/evaluator.slang#MaterialEvaluator::PrimitivePower": {
+    "contract": "",
+    "description": "返回max(emission)*世界面积*2π。"
+  },
+  "code/sparkium/shaders/material/lambertian/pixel_shader.slang#MaterialLambertian": {
+    "contract": "",
+    "description": "紧密材质数据：base_color和emission两个float3。"
+  },
+  "code/sparkium/shaders/material/lambertian/pixel_shader.slang#PSInput": {
+    "contract": "",
+    "description": "世界位置/法线/UV的插值输入。"
+  },
+  "code/sparkium/shaders/material/lambertian/pixel_shader.slang#PSMain": {
+    "contract": "normal编码为N*.5+.5，stencil固定0；不处理透明混合。",
+    "description": "无有效顶点法线时用cross(ddy(position),ddx(position))生成几何法线；radiance=emission alpha0，albedo=base_color、roughness1、specular0、metallic0。"
+  },
+  "code/sparkium/shaders/material/lambertian/pixel_shader.slang#PSOutput": {
+    "contract": "",
+    "description": "五MRT：radiance、albedo_roughness、position_specular、normal_metallic、int stencil。"
+  },
+  "code/sparkium/shaders/material/lambertian/pixel_shader.slang#material_data": {
+    "contract": "",
+    "description": "space2材质字节Buffer，与专用C++适配布局匹配。"
+  },
+  "code/sparkium/shaders/material/lambertian/sampler.slang#SAMPLE_SHADOW_NO_HITRECORD": {
+    "contract": "",
+    "description": "声明阴影只需payload，无命中记录。"
+  },
+  "code/sparkium/shaders/material/lambertian/sampler.slang#SampleMaterial": {
+    "contract": "BSDF pdf<EPSILON时终止；shadow_eval供raygen后续可见性求值。",
+    "description": "读取base_color/emission，准备直接光贡献；发光按命中面积PDF与光CDF计算MIS，再采样漫反射更新通量。"
+  },
+  "code/sparkium/shaders/material/lambertian/sampler.slang#SampleShadow": {
+    "contract": "",
+    "description": "将阴影透过值设0，Lambertian完全遮挡。"
+  },
+  "code/sparkium/shaders/material/light/eval_direct_light.slang#MaterialLightEvaluateDirectLighting": {
+    "contract": "",
+    "description": "读取emission与two_sided，背面单面光返回0；falloff_distance>0时乘saturate(1-distance/falloff)。"
+  },
+  "code/sparkium/shaders/material/light/evaluator.slang#MaterialEvaluator": {
+    "contract": "",
+    "description": "借用material_data的泛型发光求值器。"
+  },
+  "code/sparkium/shaders/material/light/evaluator.slang#MaterialEvaluator::EvaluateDirectLighting": {
+    "contract": "",
+    "description": "返回偏移0的emission，按two_sided/朝向及falloff_distance裁减，供直接光采样使用。"
+  },
+  "code/sparkium/shaders/material/light/evaluator.slang#MaterialEvaluator::PrimitivePower": {
+    "contract": "",
+    "description": "返回max(emission)*世界面积*π，two_sided时再乘2。"
+  },
+  "code/sparkium/shaders/material/light/pixel_shader.slang#MaterialLight": {
+    "contract": "",
+    "description": "紧密材质数据：emission float3。"
+  },
+  "code/sparkium/shaders/material/light/pixel_shader.slang#PSInput": {
+    "contract": "",
+    "description": "世界位置/法线/UV的插值输入。"
+  },
+  "code/sparkium/shaders/material/light/pixel_shader.slang#PSMain": {
+    "contract": "normal编码为N*.5+.5，stencil固定0；不处理透明混合。",
+    "description": "无有效顶点法线时用cross(ddy(position),ddx(position))生成几何法线；radiance=emission alpha0，albedo0、roughness1、specular0、metallic0。"
+  },
+  "code/sparkium/shaders/material/light/pixel_shader.slang#PSOutput": {
+    "contract": "",
+    "description": "五MRT：radiance、albedo_roughness、position_specular、normal_metallic、int stencil。"
+  },
+  "code/sparkium/shaders/material/light/pixel_shader.slang#material_data": {
+    "contract": "",
+    "description": "space2材质字节Buffer，与专用C++适配布局匹配。"
+  },
+  "code/sparkium/shaders/material/light/sampler.slang#SAMPLE_SHADOW_ANY_HIT": {
+    "contract": "",
+    "description": "启用阴影any-hit接口，让非阻挡面IgnoreHit。"
+  },
+  "code/sparkium/shaders/material/light/sampler.slang#SampleMaterial": {
+    "contract": "非阻挡不改变ray_type，连续穿过共面发光三角仍维持相机隐藏语义。",
+    "description": "相机可见或非camera路径、且符合双面/正面条件时积累发光MIS；block_ray则清通量。"
+  },
+  "code/sparkium/shaders/material/light/sampler.slang#SampleShadow": {
+    "contract": "",
+    "description": "closest-hit意味着阻挡面，设payload.shadow=0。"
+  },
+  "code/sparkium/shaders/material/light/sampler.slang#SampleShadowOpacity": {
+    "contract": "",
+    "description": "返回材质block_ray标志对应的0或1；方向未使用。"
+  },
+  "code/sparkium/shaders/material/principled/eval_direct_light.slang#MaterialPrincipledEvaluateDirectLighting": {
+    "contract": "",
+    "description": "读取偏移92的emission.xyz*strength，不采样发光纹理。"
+  },
+  "code/sparkium/shaders/material/principled/evaluator.slang#MaterialEvaluator": {
+    "contract": "",
+    "description": "借用material_data的泛型发光求值器。"
+  },
+  "code/sparkium/shaders/material/principled/evaluator.slang#MaterialEvaluator::EvaluateDirectLighting": {
+    "contract": "",
+    "description": "返回偏移92的float4 emission.xyz*strength，供直接光采样使用。"
+  },
+  "code/sparkium/shaders/material/principled/evaluator.slang#MaterialEvaluator::PrimitivePower": {
+    "contract": "",
+    "description": "返回max(emissionRGB)*strength*世界面积*2π。"
+  },
+  "code/sparkium/shaders/material/principled/pixel_shader.slang#PSInput": {
+    "contract": "",
+    "description": "世界位置/法线/UV的插值输入。另含切线和signal。"
+  },
+  "code/sparkium/shaders/material/principled/pixel_shader.slang#PSMain": {
+    "contract": "normal编码为N*.5+.5，stencil固定0；不处理透明混合。",
+    "description": "无有效顶点法线时用cross(ddy(position),ddx(position))生成几何法线；按贴图/常量输出emission*strength alpha0、base_color/roughness、position/specular与编码法线/metallic。"
+  },
+  "code/sparkium/shaders/material/principled/pixel_shader.slang#PSOutput": {
+    "contract": "",
+    "description": "五MRT：radiance、albedo_roughness、position_specular、normal_metallic、int stencil。"
+  },
+  "code/sparkium/shaders/material/principled/pixel_shader.slang#S": {
+    "contract": "",
+    "description": "space4材质sampler。"
+  },
+  "code/sparkium/shaders/material/principled/pixel_shader.slang#material_data": {
+    "contract": "",
+    "description": "space2材质字节Buffer，与专用C++适配布局匹配。"
+  },
+  "code/sparkium/shaders/material/principled/pixel_shader.slang#textures": {
+    "contract": "",
+    "description": "space3六图数组：base_color/roughness/specular/metallic/normal/emission。"
+  },
+  "code/sparkium/shaders/material/principled/sampler.slang#SAMPLE_SHADOW_NO_HITRECORD": {
+    "contract": "",
+    "description": "采用无HitRecord的固定不透明阴影接口。"
+  },
+  "code/sparkium/shaders/material/principled/sampler.slang#SampleMaterial": {
+    "contract": "采样pdf<1e-5终止；发光MIS在掠射NdotL<EPSILON时设0。",
+    "description": "逐项读取材质、评估直接光MIS和发光命中MIS，采样六闭包更新通量及reflection/transmission ray_type。"
+  },
+  "code/sparkium/shaders/material/principled/sampler.slang#SampleShadow": {
+    "contract": "",
+    "description": "设payload.shadow=0，不根据透射参数算透明阴影。"
+  },
+  "code/sparkium/shaders/material/shader_graph/evaluator.slang#MaterialEvaluator": {
+    "contract": "",
+    "description": "借用material_data的泛型发光求值器。"
+  },
+  "code/sparkium/shaders/material/shader_graph/evaluator.slang#MaterialEvaluator::EvaluateDirectLighting": {
+    "contract": "",
+    "description": "返回偏移0的emission_hint，供直接光采样使用。"
+  },
+  "code/sparkium/shaders/material/shader_graph/evaluator.slang#MaterialEvaluator::PrimitivePower": {
+    "contract": "",
+    "description": "返回max(emission_hint)*世界面积*2π。"
+  },
+  "code/sparkium/shaders/material/shader_graph/sampler.slang#SAMPLE_SHADOW_ANY_HIT": {
+    "contract": "",
+    "description": "启用图不透明度的阴影any-hit。"
+  },
+  "code/sparkium/shaders/material/shader_graph/sampler.slang#SampleMaterial": {
+    "contract": "",
+    "description": "查询材质数据，求GraphSurface并调用SampleGraphSurface。"
+  },
+  "code/sparkium/shaders/material/shader_graph/sampler.slang#SampleShadow": {
+    "contract": "",
+    "description": "closest-hit阶段将透过值置0；透明度已在any-hit累计。"
+  },
+  "code/sparkium/shaders/material/shader_graph/sampler.slang#SampleShadowOpacity": {
+    "contract": "",
+    "description": "求阴影条件下的GraphSurface，再返回GraphShadowOpacity。"
+  },
+  "code/sparkium/shaders/material/shader_graph/surface_sampler.slang#GraphShadowOpacity": {
+    "contract": "本函数不自行saturate最后结果，由any-hit或计算分派钳制。",
+    "description": "显式shadow_opacity>=0时优先，否则用opacity；再乘1-随机游走subsurface权重。"
+  },
+  "code/sparkium/shaders/material/shader_graph/surface_sampler.slang#GraphSurface": {
+    "contract": "",
+    "description": "图求值输出：颜色与Principled参数、发光/法线、opacity/shadow_opacity、thin_walled以及次表面参数。"
+  },
+  "code/sparkium/shaders/material/shader_graph/surface_sampler.slang#SampleGraphSurface": {
+    "contract": "不是完整Blender闭包图执行器，具体阈值与路径限制见文件说明。",
+    "description": "按透明、两类薄壁、次表面及一般材质顺序分派，并更新RenderContext延续路径和阴影贡献。"
+  },
+  "code/sparkium/shaders/material/specular/evaluator.slang#MaterialEvaluator": {
+    "contract": "",
+    "description": "借用material_data的泛型发光求值器。"
+  },
+  "code/sparkium/shaders/material/specular/evaluator.slang#MaterialEvaluator::EvaluateDirectLighting": {
+    "contract": "",
+    "description": "返回恒为vec3(0)，供直接光采样使用。"
+  },
+  "code/sparkium/shaders/material/specular/evaluator.slang#MaterialEvaluator::PrimitivePower": {
+    "contract": "",
+    "description": "返回恒为0。"
+  },
+  "code/sparkium/shaders/material/specular/pixel_shader.slang#MaterialSpecular": {
+    "contract": "",
+    "description": "紧密材质数据：base_color float3。"
+  },
+  "code/sparkium/shaders/material/specular/pixel_shader.slang#PSInput": {
+    "contract": "",
+    "description": "世界位置/法线/UV的插值输入。"
+  },
+  "code/sparkium/shaders/material/specular/pixel_shader.slang#PSMain": {
+    "contract": "normal编码为N*.5+.5，stencil固定0；不处理透明混合。",
+    "description": "无有效顶点法线时用cross(ddy(position),ddx(position))生成几何法线；radiance=0 alpha1，albedo=base_color、roughness0、specular0、metallic1。"
+  },
+  "code/sparkium/shaders/material/specular/pixel_shader.slang#PSOutput": {
+    "contract": "",
+    "description": "五MRT：radiance、albedo_roughness、position_specular、normal_metallic、int stencil。"
+  },
+  "code/sparkium/shaders/material/specular/pixel_shader.slang#material_data": {
+    "contract": "",
+    "description": "space2材质字节Buffer，与专用C++适配布局匹配。"
+  },
+  "code/sparkium/shaders/material/specular/sampler.slang#SAMPLE_SHADOW_NO_HITRECORD": {
+    "contract": "",
+    "description": "声明无HitRecord的阴影接口。"
+  },
+  "code/sparkium/shaders/material/specular/sampler.slang#SampleMaterial": {
+    "contract": "此delta函数eval已是反射权重，不再除1e6的约定PDF。",
+    "description": "调用SampleSpecularBSDF，通量直接乘eval，更新反射方向与pdf。"
+  },
+  "code/sparkium/shaders/material/specular/sampler.slang#SampleShadow": {
+    "contract": "",
+    "description": "把payload.shadow设0，镜面挡住直接阴影。"
   },
   "code/sparkium/shaders/random.slang#InitRandomSeed": {
     "contract": "",
@@ -5431,6 +5971,470 @@
     "contract": "主线程调用；不要跨窗口混用回调与原生句柄。",
     "description": "调用 CloseWindow 释放通用窗口资源，后端派生类另负责其 swapchain/ImGui 资源。"
   },
+  "grassland::graphics::backend::(anonymous)::AddBinding": {
+    "contract": "总set数限制在CompileMetalStage检查。",
+    "description": "检查count>0且AS count=1后追加MetalBinding。"
+  },
+  "grassland::graphics::backend::(anonymous)::CheckPoint": {
+    "contract": "",
+    "description": "只允许GRAPHICS/COMPUTE，其他bind point抛异常。"
+  },
+  "grassland::graphics::backend::(anonymous)::CheckRegion": {
+    "contract": "零extent允许，由传输函数直接返回。",
+    "description": "检查非负区域起点与64位相加后的终点不越界。"
+  },
+  "grassland::graphics::backend::CompileMetalStage": {
+    "contract": "shader须非空blob；最多16set；fastMath开启，原生编译错误抛异常。",
+    "description": "SPIRV-Cross生成MSL3.0 argument-buffer代码并编译MTL::Function，收集实际使用set的encoder及compute线程组尺寸。"
+  },
+  "grassland::graphics::backend::MetalAccelerationStructure": {
+    "contract": "原生对象通过NS::SharedPtr持有，返回Handle借用；Core及依赖资源须满足本页生命周期说明。",
+    "description": "Query用原生BLAS/TLAS。"
+  },
+  "grassland::graphics::backend::MetalAccelerationStructure::Build": {
+    "contract": "要求native Query支持；错误抛异常，不refit或compact。",
+    "description": "WaitGPU后按descriptor分配AS/scratch，同步构建并替换structure。"
+  },
+  "grassland::graphics::backend::MetalAccelerationStructure::Children": {
+    "contract": "供argument-buffer的间接资源声明和提交保活。",
+    "description": "返回TLAS持有的原生BLAS引用数组。"
+  },
+  "grassland::graphics::backend::MetalAccelerationStructure::Handle": {
+    "contract": "TLAS更新可能替换。",
+    "description": "返回当前代原生AS借用句柄。"
+  },
+  "grassland::graphics::backend::MetalAccelerationStructure::MetalAccelerationStructure": {
+    "contract": "AS有AABB/三角/TLAS三种重载，Shader仅保存blob，Core尚需InitializeLogicalDevice；具体校验/同步见文件说明。",
+    "description": "按本文件定义构造MetalAccelerationStructure及所需资源。"
+  },
+  "grassland::graphics::backend::MetalAccelerationStructure::UpdateInstances": {
+    "contract": "只TLAS可调用；跨Core/嵌套TLAS、非有限或不可逆变换、冲突opacity标记均抛异常。",
+    "description": "校验并转换TLAS实例、去重retain子BLAS，无变化跳过，否则同步全量重建。"
+  },
+  "grassland::graphics::backend::MetalBinding": {
+    "contract": "原生对象通过NS::SharedPtr持有，返回Handle借用；Core及依赖资源须满足本页生命周期说明。",
+    "description": "resource type及count布局条目。"
+  },
+  "grassland::graphics::backend::MetalBuffer": {
+    "contract": "原生对象通过NS::SharedPtr持有，返回Handle借用；Core及依赖资源须满足本页生命周期说明。",
+    "description": "统一shared存储Buffer。"
+  },
+  "grassland::graphics::backend::MetalBuffer::DownloadData": {
+    "contract": "不会返回零拷贝指针。",
+    "description": "检查范围并WaitGPU后memcpy到host。"
+  },
+  "grassland::graphics::backend::MetalBuffer::Handle": {
+    "contract": "Resize可更换句柄。",
+    "description": "返回借用MTL::Buffer。"
+  },
+  "grassland::graphics::backend::MetalBuffer::MetalBuffer": {
+    "contract": "AS有AABB/三角/TLAS三种重载，Shader仅保存blob，Core尚需InitializeLogicalDevice；具体校验/同步见文件说明。",
+    "description": "按本文件定义构造MetalBuffer及所需资源。"
+  },
+  "grassland::graphics::backend::MetalBuffer::Resize": {
+    "contract": "等尺寸且已有Buffer直接返回；旧Handle失效。",
+    "description": "等待GPU，分配shared替代Buffer并保留min(old,new)前缀。"
+  },
+  "grassland::graphics::backend::MetalBuffer::Size": {
+    "contract": "原生至少分配4字节。",
+    "description": "返回逻辑请求字节数。"
+  },
+  "grassland::graphics::backend::MetalBuffer::Type": {
+    "contract": "Metal三种类型均用shared存储。",
+    "description": "返回请求的逻辑BufferType。"
+  },
+  "grassland::graphics::backend::MetalBuffer::UploadData": {
+    "contract": "调用方host源指针至少有size字节。",
+    "description": "检查offset/size范围，WaitGPU后memcpy到shared地址。"
+  },
+  "grassland::graphics::backend::MetalCheck": {
+    "contract": "非空对象不因error非空而抛异常。",
+    "description": "对象为空时把operation和NS::Error描述转为runtime_error。"
+  },
+  "grassland::graphics::backend::MetalCommandContext": {
+    "contract": "原生对象通过NS::SharedPtr持有，返回Handle借用；Core及依赖资源须满足本页生命周期说明。",
+    "description": "一次性Metal command buffer及encoder状态。"
+  },
+  "grassland::graphics::backend::MetalCommandContext::BindStage": {
+    "contract": "必须提供精确count；AS与sampler通过完成回调保留，BufferRange size只用于检查而非shader边界保护。",
+    "description": "为实际使用set分配argument buffer，逐资源填引用、声明useResource并绑定至stage。"
+  },
+  "grassland::graphics::backend::MetalCommandContext::CmdBeginRendering": {
+    "contract": "拒绝嵌套；附件必须为MetalImage，部分cast未检查。",
+    "description": "结束旧encoder并保存Load/Store附件的render pass，延迟创建encoder。"
+  },
+  "grassland::graphics::backend::MetalCommandContext::CmdBindComputeProgram": {
+    "contract": "需Finalize后Dispatch。",
+    "description": "验证并保存MetalComputeProgram借用指针。"
+  },
+  "grassland::graphics::backend::MetalCommandContext::CmdBindIndexBuffer": {
+    "contract": "绘制固定uint32索引。",
+    "description": "保存索引BufferRange。"
+  },
+  "grassland::graphics::backend::MetalCommandContext::CmdBindProgram": {
+    "contract": "实际pipeline在PrepareDraw设置。",
+    "description": "验证并保存MetalProgram借用指针。"
+  },
+  "grassland::graphics::backend::MetalCommandContext::CmdBindRayTracingProgram": {
+    "contract": "",
+    "description": "抛异常：不支持原生RT program。"
+  },
+  "grassland::graphics::backend::MetalCommandContext::CmdBindResources": {
+    "contract": "仅graphics/compute；AS只compute。数量与范围到BindStage才检查，不立即编码。",
+    "description": "按bind point和slot缓存单种资源列表或AS。"
+  },
+  "grassland::graphics::backend::MetalCommandContext::CmdBindVertexBuffers": {
+    "contract": "本重载要求offsets数量精确等于buffers；不立即验证原生类型。",
+    "description": "保存从first开始的BufferRange列表。"
+  },
+  "grassland::graphics::backend::MetalCommandContext::CmdClearImage": {
+    "contract": "不支持在当前pass中清图。",
+    "description": "在pass外录制仅Clear/Store的颜色或深度render pass。"
+  },
+  "grassland::graphics::backend::MetalCommandContext::CmdCopyBuffer": {
+    "contract": "禁止在render pass内调用；输入须同后端。",
+    "description": "检查源/目标范围，结束encoder并录制blit拷贝。"
+  },
+  "grassland::graphics::backend::MetalCommandContext::CmdDispatch": {
+    "contract": "线程组尺寸来自SPIR-V；dispatch后插Buffer/Texture屏障。",
+    "description": "确保compute program且不在render pass，创建encoder、绑定stage并派发工作组。"
+  },
+  "grassland::graphics::backend::MetalCommandContext::CmdDispatchRays": {
+    "contract": "",
+    "description": "抛异常：不支持原生DispatchRays。"
+  },
+  "grassland::graphics::backend::MetalCommandContext::CmdDraw": {
+    "contract": "first是顶点起点；负值转UInteger不受额外检查。",
+    "description": "PrepareDraw后录制非索引drawPrimitives。"
+  },
+  "grassland::graphics::backend::MetalCommandContext::CmdDrawIndexed": {
+    "contract": "缺索引Buffer抛异常。",
+    "description": "PrepareDraw后按uint32索引、offset+first*4录制绘制。"
+  },
+  "grassland::graphics::backend::MetalCommandContext::CmdEndRendering": {
+    "contract": "",
+    "description": "结束当前encoder并清render pass。"
+  },
+  "grassland::graphics::backend::MetalCommandContext::CmdPresent": {
+    "contract": "需有效MetalWindow/MetalImage；不是立即提交。",
+    "description": "结束encoder后调用MetalWindow::Present录制呈现。"
+  },
+  "grassland::graphics::backend::MetalCommandContext::CmdSetPrimitiveTopology": {
+    "contract": "",
+    "description": "映射五种统一拓扑到Metal，越界抛异常。"
+  },
+  "grassland::graphics::backend::MetalCommandContext::CmdSetScissor": {
+    "contract": "extent是否超附件由调用方保证。",
+    "description": "要求render pass和非负起点，保存并按需设置scissor。"
+  },
+  "grassland::graphics::backend::MetalCommandContext::CmdSetViewport": {
+    "contract": "attachmentless pass需正尺寸；缓存跨pass保留。",
+    "description": "在render pass内设置viewport缓存，已建encoder则立即设置。"
+  },
+  "grassland::graphics::backend::MetalCommandContext::EndEncoder": {
+    "contract": "不清绑定资源、viewport/scissor缓存。",
+    "description": "清render_pass并end/reset compute和render encoder。"
+  },
+  "grassland::graphics::backend::MetalCommandContext::GetCore": {
+    "contract": "",
+    "description": "返回借用Core。"
+  },
+  "grassland::graphics::backend::MetalCommandContext::Handle": {
+    "contract": "用于Core提交和窗口呈现。",
+    "description": "返回借用MTL::CommandBuffer。"
+  },
+  "grassland::graphics::backend::MetalCommandContext::MetalCommandContext": {
+    "contract": "AS有AABB/三角/TLAS三种重载，Shader仅保存blob，Core尚需InitializeLogicalDevice；具体校验/同步见文件说明。",
+    "description": "按本文件定义构造MetalCommandContext及所需资源。"
+  },
+  "grassland::graphics::backend::MetalCommandContext::PrepareDraw": {
+    "contract": "attachmentless由viewport确定renderTarget尺寸；viewport/scissor会重放。",
+    "description": "验证pass/program，按需建encoder并设置pipeline/深度/剔除/CCW/顶点流及两stage资源。"
+  },
+  "grassland::graphics::backend::MetalCommandContext::Resources": {
+    "contract": "CmdBindResources整体替换set，引用由调用方维护至编码/执行完成。",
+    "description": "一个set的四选一资源容器：BufferRange、Image、Sampler列表或一个AS。"
+  },
+  "grassland::graphics::backend::MetalCommandContext::~MetalCommandContext": {
+    "contract": "不隐式提交命令。",
+    "description": "结束仍开启的encoder。"
+  },
+  "grassland::graphics::backend::MetalComputeProgram": {
+    "contract": "原生对象通过NS::SharedPtr持有，返回Handle借用；Core及依赖资源须满足本页生命周期说明。",
+    "description": "计算stage与pipeline状态。"
+  },
+  "grassland::graphics::backend::MetalComputeProgram::AddResourceBinding": {
+    "contract": "count必须正，AS仅count1；Finalize前配置。",
+    "description": "按调用顺序追加type/count资源set。"
+  },
+  "grassland::graphics::backend::MetalComputeProgram::Finalize": {
+    "contract": "",
+    "description": "编译stage并创建计算pipeline，验证shader线程组总线程数不超过设备pipeline上限。"
+  },
+  "grassland::graphics::backend::MetalComputeProgram::MetalComputeProgram": {
+    "contract": "AS有AABB/三角/TLAS三种重载，Shader仅保存blob，Core尚需InitializeLogicalDevice；具体校验/同步见文件说明。",
+    "description": "按本文件定义构造MetalComputeProgram及所需资源。"
+  },
+  "grassland::graphics::backend::MetalCore": {
+    "contract": "原生对象通过NS::SharedPtr持有，返回Handle借用；Core及依赖资源须满足本页生命周期说明。",
+    "description": "Metal设备、队列与提交所有者。"
+  },
+  "grassland::graphics::backend::MetalCore::API": {
+    "contract": "",
+    "description": "返回BACKEND_API_METAL。"
+  },
+  "grassland::graphics::backend::MetalCore::Commit": {
+    "contract": "只登记本函数提交的命令；AS Build采用独立同步提交。",
+    "description": "回收完成提交并按frames_in_flight限流，retain命令和回调后commit并轮转帧槽。"
+  },
+  "grassland::graphics::backend::MetalCore::CreateBottomLevelAccelerationStructure": {
+    "contract": "简写检查非空、stride>=12和uint32数量上限，完整Range校验由AS构造执行。",
+    "description": "按AABB或三角BufferRange构造同步BLAS；Buffer简写根据size/stride推数量。"
+  },
+  "grassland::graphics::backend::MetalCore::CreateBuffer": {
+    "contract": "构造校验失败抛异常；Core必须已初始化。ComputeShader须来自此后端，Finalize完成实际编译。",
+    "description": "通过double_ptr构造MetalBuffer，成功返回0。"
+  },
+  "grassland::graphics::backend::MetalCore::CreateCommandContext": {
+    "contract": "构造校验失败抛异常；Core必须已初始化。ComputeShader须来自此后端，Finalize完成实际编译。",
+    "description": "通过double_ptr构造MetalCommandContext，成功返回0。"
+  },
+  "grassland::graphics::backend::MetalCore::CreateComputeProgram": {
+    "contract": "构造校验失败抛异常；Core必须已初始化。ComputeShader须来自此后端，Finalize完成实际编译。",
+    "description": "通过double_ptr构造MetalComputeProgram，成功返回0。"
+  },
+  "grassland::graphics::backend::MetalCore::CreateImage": {
+    "contract": "构造校验失败抛异常；Core必须已初始化。ComputeShader须来自此后端，Finalize完成实际编译。",
+    "description": "通过double_ptr构造MetalImage，成功返回0。"
+  },
+  "grassland::graphics::backend::MetalCore::CreateProgram": {
+    "contract": "构造校验失败抛异常；Core必须已初始化。ComputeShader须来自此后端，Finalize完成实际编译。",
+    "description": "通过double_ptr构造MetalProgram，成功返回0。"
+  },
+  "grassland::graphics::backend::MetalCore::CreateRayTracingProgram": {
+    "contract": "可使用计算Shader里的Ray Query。",
+    "description": "返回-1表示不支持原生SBT/RT程序。"
+  },
+  "grassland::graphics::backend::MetalCore::CreateSampler": {
+    "contract": "构造校验失败抛异常；Core必须已初始化。ComputeShader须来自此后端，Finalize完成实际编译。",
+    "description": "通过double_ptr构造MetalSampler，成功返回0。"
+  },
+  "grassland::graphics::backend::MetalCore::CreateShader": {
+    "contract": "固定spirv_1_5/dx-layout参数，额外args追加；空blob返回-1。尚未执行MSL编译。",
+    "description": "字符串/VFS重载最终调用Slang编译SPIR-V并保存MetalShader。"
+  },
+  "grassland::graphics::backend::MetalCore::CreateTopLevelAccelerationStructure": {
+    "contract": "构造校验失败抛异常；Core必须已初始化。ComputeShader须来自此后端，Finalize完成实际编译。",
+    "description": "通过double_ptr构造MetalAccelerationStructure TLAS，成功返回0。"
+  },
+  "grassland::graphics::backend::MetalCore::CreateWindowObject": {
+    "contract": "构造校验失败抛异常；Core必须已初始化。ComputeShader须来自此后端，Finalize完成实际编译。",
+    "description": "通过double_ptr构造MetalWindow，成功返回0。"
+  },
+  "grassland::graphics::backend::MetalCore::CurrentFrame": {
+    "contract": "上传/内部提交也能使槽变化。",
+    "description": "返回按Commit轮转的帧槽。"
+  },
+  "grassland::graphics::backend::MetalCore::Device": {
+    "contract": "初始化前为空。",
+    "description": "返回选定MTL::Device借用指针。"
+  },
+  "grassland::graphics::backend::MetalCore::DeviceRayQuerySupport": {
+    "contract": "与原生SBT光追支持不同。",
+    "description": "检查已选设备supportsRaytracing。"
+  },
+  "grassland::graphics::backend::MetalCore::GetPhysicalDeviceProperties": {
+    "contract": "输出数组由调用方分配足够长度；内存数值为简化选择评分。",
+    "description": "枚举MTL::CopyAllDevices并按需填数组，返回数量。"
+  },
+  "grassland::graphics::backend::MetalCore::InitializeLogicalDevice": {
+    "contract": "索引越界返回-1；能力不符或原生创建失败抛异常。",
+    "description": "选择设备并创建CommandQueue，要求统一内存和Tier2。"
+  },
+  "grassland::graphics::backend::MetalCore::MetalCore": {
+    "contract": "AS有AABB/三角/TLAS三种重载，Shader仅保存blob，Core尚需InitializeLogicalDevice；具体校验/同步见文件说明。",
+    "description": "按本文件定义构造MetalCore及所需资源。"
+  },
+  "grassland::graphics::backend::MetalCore::Queue": {
+    "contract": "初始化前为空。",
+    "description": "返回MTL::CommandQueue借用指针。"
+  },
+  "grassland::graphics::backend::MetalCore::Reap": {
+    "contract": "错误提交先移除再抛，其回调不执行；正常提交调用所有回调。",
+    "description": "按队列顺序回收完成提交，可选择waitUntilCompleted。"
+  },
+  "grassland::graphics::backend::MetalCore::Submission": {
+    "contract": "",
+    "description": "持有待完成MTL::CommandBuffer和对应完成回调列表。"
+  },
+  "grassland::graphics::backend::MetalCore::SubmitCommandContext": {
+    "contract": "无效返回-1；有效提交后submitted=true。",
+    "description": "验证Metal类型/所属Core/未提交，结束encoder并Commit。"
+  },
+  "grassland::graphics::backend::MetalCore::WaitGPU": {
+    "contract": "执行post callbacks；GPU错误抛异常。",
+    "description": "以Reap(true)等待并回收全部已登记提交。"
+  },
+  "grassland::graphics::backend::MetalCore::WaveSize": {
+    "contract": "当前实现假设目标Apple GPU SIMD宽度。",
+    "description": "返回固定32。"
+  },
+  "grassland::graphics::backend::MetalCore::~MetalCore": {
+    "contract": "不向析构外传播std::exception。",
+    "description": "等待所有提交完成，析构中异常降为日志。"
+  },
+  "grassland::graphics::backend::MetalFormat": {
+    "contract": "RGB32F与RGBA32F均映射RGBA32Float；UNDEFINED为Invalid，未知格式抛异常。",
+    "description": "转换统一ImageFormat到MTL::PixelFormat。"
+  },
+  "grassland::graphics::backend::MetalImage": {
+    "contract": "原生对象通过NS::SharedPtr持有，返回Handle借用；Core及依赖资源须满足本页生命周期说明。",
+    "description": "private二维纹理。"
+  },
+  "grassland::graphics::backend::MetalImage::DownloadData": {
+    "contract": "全图重载转发区域重载；范围校验、256字节staging行对齐、空区域无操作，提交后WaitGPU。",
+    "description": "同步从private texture下载为紧密host像素；RGB去掉原生alpha。"
+  },
+  "grassland::graphics::backend::MetalImage::Extent": {
+    "contract": "",
+    "description": "返回创建尺寸。"
+  },
+  "grassland::graphics::backend::MetalImage::Format": {
+    "contract": "",
+    "description": "返回抽象图像格式，RGB32F仍报告RGB而底层RGBA。"
+  },
+  "grassland::graphics::backend::MetalImage::Handle": {
+    "contract": "",
+    "description": "返回借用MTL::Texture。"
+  },
+  "grassland::graphics::backend::MetalImage::MetalImage": {
+    "contract": "AS有AABB/三角/TLAS三种重载，Shader仅保存blob，Core尚需InitializeLogicalDevice；具体校验/同步见文件说明。",
+    "description": "按本文件定义构造MetalImage及所需资源。"
+  },
+  "grassland::graphics::backend::MetalImage::UploadData": {
+    "contract": "全图重载转发区域重载；范围校验、256字节staging行对齐、空区域无操作，提交后WaitGPU。",
+    "description": "同步拷贝紧密host像素到private texture；RGB扩为RGBA，alpha1。"
+  },
+  "grassland::graphics::backend::MetalPool": {
+    "contract": "原生对象通过NS::SharedPtr持有，返回Handle借用；Core及依赖资源须满足本页生命周期说明。",
+    "description": "autorelease pool的作用域拥有者。"
+  },
+  "grassland::graphics::backend::MetalPool::~MetalPool": {
+    "contract": "不要复制导致同一pool重复release。",
+    "description": "释放本作用域autorelease pool。"
+  },
+  "grassland::graphics::backend::MetalProgram": {
+    "contract": "原生对象通过NS::SharedPtr持有，返回Handle借用；Core及依赖资源须满足本页生命周期说明。",
+    "description": "图形VS/PS、顶点/资源布局与深度混合状态。"
+  },
+  "grassland::graphics::backend::MetalProgram::AddInputAttribute": {
+    "contract": "最多31属性，binding须已添加，类型范围受检。",
+    "description": "按递增location设置InputType格式、offset和16+binding。"
+  },
+  "grassland::graphics::backend::MetalProgram::AddInputBinding": {
+    "contract": "最多15流，stepRate=1。",
+    "description": "创建16+binding的顶点流布局，设置stride及逐顶点/逐实例步进。"
+  },
+  "grassland::graphics::backend::MetalProgram::AddResourceBinding": {
+    "contract": "count必须正，AS仅count1；Finalize前配置。",
+    "description": "按调用顺序追加type/count资源set。"
+  },
+  "grassland::graphics::backend::MetalProgram::BindShader": {
+    "contract": "geometry stage抛不支持；未匹配MetalShader抛invalid_argument。",
+    "description": "保存MetalShader的vertex或pixel借用指针。"
+  },
+  "grassland::graphics::backend::MetalProgram::Finalize": {
+    "contract": "vertex必需；深度状态已由构造固定。",
+    "description": "编译vertex与可选fragment stage，创建RenderPipelineState。"
+  },
+  "grassland::graphics::backend::MetalProgram::MetalProgram": {
+    "contract": "AS有AABB/三角/TLAS三种重载，Shader仅保存blob，Core尚需InitializeLogicalDevice；具体校验/同步见文件说明。",
+    "description": "按本文件定义构造MetalProgram及所需资源。"
+  },
+  "grassland::graphics::backend::MetalProgram::SetBlendState": {
+    "contract": "target须0..7；因子枚举数组索引没有额外校验。",
+    "description": "设置指定颜色附件的RGB/alpha blend因子和操作。"
+  },
+  "grassland::graphics::backend::MetalProgram::SetCullMode": {
+    "contract": "默认BACK，接口自身不验证枚举值。",
+    "description": "保存CullMode供每次Draw设置。"
+  },
+  "grassland::graphics::backend::MetalSampler": {
+    "contract": "原生对象通过NS::SharedPtr持有，返回Handle借用；Core及依赖资源须满足本页生命周期说明。",
+    "description": "支持argument buffer的sampler状态。"
+  },
+  "grassland::graphics::backend::MetalSampler::MetalSampler": {
+    "contract": "AS有AABB/三角/TLAS三种重载，Shader仅保存blob，Core尚需InitializeLogicalDevice；具体校验/同步见文件说明。",
+    "description": "按本文件定义构造MetalSampler及所需资源。"
+  },
+  "grassland::graphics::backend::MetalShader": {
+    "contract": "原生对象通过NS::SharedPtr持有，返回Handle借用；Core及依赖资源须满足本页生命周期说明。",
+    "description": "编译后的SPIR-V blob与入口名。"
+  },
+  "grassland::graphics::backend::MetalShader::EntryPoint": {
+    "contract": "",
+    "description": "返回保存的CompiledShaderBlob入口名。"
+  },
+  "grassland::graphics::backend::MetalShader::MetalShader": {
+    "contract": "AS有AABB/三角/TLAS三种重载，Shader仅保存blob，Core尚需InitializeLogicalDevice；具体校验/同步见文件说明。",
+    "description": "按本文件定义构造MetalShader及所需资源。"
+  },
+  "grassland::graphics::backend::MetalStage": {
+    "contract": "原生对象通过NS::SharedPtr持有，返回Handle借用；Core及依赖资源须满足本页生命周期说明。",
+    "description": "MSL函数、按set索引的argument encoder和线程组尺寸。"
+  },
+  "grassland::graphics::backend::MetalWindow": {
+    "contract": "原生对象通过NS::SharedPtr持有，返回Handle借用；Core及依赖资源须满足本页生命周期说明。",
+    "description": "GLFW Cocoa窗口和CAMetalLayer呈现。"
+  },
+  "grassland::graphics::backend::MetalWindow::BeginImGuiFrame": {
+    "contract": "必须先InitImGui；真实drawable在Present获得。",
+    "description": "选择context，以1×1临时纹理提供附件格式，再启动ImGui帧。"
+  },
+  "grassland::graphics::backend::MetalWindow::CloseWindow": {
+    "contract": "窗口已关闭时直接返回。",
+    "description": "等待GPU，销毁ImGui，解除NSView layer并关闭GLFW窗口。"
+  },
+  "grassland::graphics::backend::MetalWindow::ConfigurePresentation": {
+    "contract": "等待GPU再更换；HDR线性RGBA16F，SDR BGRA8Unorm。",
+    "description": "编译内嵌全屏三角及采样PS，设置layer格式、colorspace和EDR属性。"
+  },
+  "grassland::graphics::backend::MetalWindow::EndImGuiFrame": {
+    "contract": "需Begin配对。",
+    "description": "选择context并ImGui::Render。"
+  },
+  "grassland::graphics::backend::MetalWindow::GetImGuiContext": {
+    "contract": "未初始化/已终止时为空。",
+    "description": "返回借用ImGuiContext。"
+  },
+  "grassland::graphics::backend::MetalWindow::InitImGui": {
+    "contract": "已有context时无操作。",
+    "description": "创建ImGui context并初始化GLFW/Metal后端，默认Dark风格，可加载字体。"
+  },
+  "grassland::graphics::backend::MetalWindow::MetalWindow": {
+    "contract": "AS有AABB/三角/TLAS三种重载，Shader仅保存blob，Core尚需InitializeLogicalDevice；具体校验/同步见文件说明。",
+    "description": "按本文件定义构造MetalWindow及所需资源。"
+  },
+  "grassland::graphics::backend::MetalWindow::Present": {
+    "contract": "最小化或drawable空时跳过；仅录制到传入command，不commit。",
+    "description": "获取drawable，线性采样输入图像全屏绘制，再叠加ImGui并presentDrawable。"
+  },
+  "grassland::graphics::backend::MetalWindow::QueryDisplayBrightness": {
+    "contract": "报告系统参考白已知，但未查询物理sdr_white_nits。",
+    "description": "读取NSScreen当前/潜在EDR headroom，reference scale=1。"
+  },
+  "grassland::graphics::backend::MetalWindow::SetHDR": {
+    "contract": "相同状态直接0，父类失败时尝试恢复；无HDR headroom不拒绝启用。",
+    "description": "重新配置呈现并调用Window::SetHDR；失败返回-1并记录日志。"
+  },
+  "grassland::graphics::backend::MetalWindow::TerminateImGui": {
+    "contract": "无context时无操作。",
+    "description": "WaitGPU并关闭两个ImGui后端、销毁context。"
+  },
+  "grassland::graphics::backend::MetalWindow::~MetalWindow": {
+    "contract": "",
+    "description": "调用CloseWindow完成GPU等待及原生窗口拆卸。"
+  },
   "grassland::graphics::detail::DispatchMagnifyEvent": {
     "contract": "取消只发 scale=1；原事件仍返回给系统继续处理。",
     "description": "过滤非 magnify 和其他 NSWindow 事件，换算 Cocoa 点为左上原点逻辑坐标，把阶段和增量尺度发送给 MagnifyEvent。"
@@ -5446,6 +6450,70 @@
   "grassland::graphics::kEnableDebug": {
     "contract": "",
     "description": "NDEBUG 未定义时为 true，Release 常见构建中为 false；作为 Core::Settings 调试选项默认值。"
+  },
+  "grassland::graphics::pybind::(anonymous)::DisplayBrightnessDict": {
+    "contract": "五键：sdr_white_nits、hdr_reference_white_scale、hdr_headroom、reference_white_known、hdr_enabled。",
+    "description": "把DisplayBrightness复制成Python字典。"
+  },
+  "grassland::graphics::pybind::RegisterAccelerationStructure": {
+    "contract": "Python可见名、默认参数、重载和keep_alive策略以本页逐项绑定声明为准；特定边界条件见文件说明。",
+    "description": "绑定实例列表更新与3×4行主序make_instance。"
+  },
+  "grassland::graphics::pybind::RegisterBuffer": {
+    "contract": "Python可见名、默认参数、重载和keep_alive策略以本页逐项绑定声明为准；特定边界条件见文件说明。",
+    "description": "绑定DeviceBuffer字节读写、resize、size/type。"
+  },
+  "grassland::graphics::pybind::RegisterCommandContext": {
+    "contract": "Python可见名、默认参数、重载和keep_alive策略以本页逐项绑定声明为准；特定边界条件见文件说明。",
+    "description": "绑定命令录制及资源数组重载，必要时把Python值转为原生结构。"
+  },
+  "grassland::graphics::pybind::RegisterComputeProgram": {
+    "contract": "Python可见名、默认参数、重载和keep_alive策略以本页逐项绑定声明为准；特定边界条件见文件说明。",
+    "description": "绑定计算资源布局与finalize。"
+  },
+  "grassland::graphics::pybind::RegisterCore": {
+    "contract": "Python可见名、默认参数、重载和keep_alive策略以本页逐项绑定声明为准；特定边界条件见文件说明。",
+    "description": "绑定设备选择、资源创建与GPU/CUDA提交同步。"
+  },
+  "grassland::graphics::pybind::RegisterCoreSettings": {
+    "contract": "Python可见名、默认参数、重载和keep_alive策略以本页逐项绑定声明为准；特定边界条件见文件说明。",
+    "description": "绑定CoreSettings构造与可写frames_in_flight/enable_debug。"
+  },
+  "grassland::graphics::pybind::RegisterGraphics": {
+    "contract": "Python可见名、默认参数、重载和keep_alive策略以本页逐项绑定声明为准；特定边界条件见文件说明。",
+    "description": "建立类型并按依赖顺序调用各注册函数，附加CUDA/FrameProfile/ImGui。"
+  },
+  "grassland::graphics::pybind::RegisterGraphicsUtil": {
+    "contract": "Python可见名、默认参数、重载和keep_alive策略以本页逐项绑定声明为准；特定边界条件见文件说明。",
+    "description": "导出枚举、参数结构和位标志运算。"
+  },
+  "grassland::graphics::pybind::RegisterImGui": {
+    "contract": "Python可见名、默认参数、重载和keep_alive策略以本页逐项绑定声明为准；特定边界条件见文件说明。",
+    "description": "为graphics.imgui绑定常用即时控件和当前context查询。"
+  },
+  "grassland::graphics::pybind::RegisterImage": {
+    "contract": "Python可见名、默认参数、重载和keep_alive策略以本页逐项绑定声明为准；特定边界条件见文件说明。",
+    "description": "绑定Image的bytes全图/部分读写和format/extent。"
+  },
+  "grassland::graphics::pybind::RegisterProgram": {
+    "contract": "Python可见名、默认参数、重载和keep_alive策略以本页逐项绑定声明为准；特定边界条件见文件说明。",
+    "description": "绑定图形输入/资源布局、状态、shader与finalize。"
+  },
+  "grassland::graphics::pybind::RegisterRayTracingProgram": {
+    "contract": "Python可见名、默认参数、重载和keep_alive策略以本页逐项绑定声明为准；特定边界条件见文件说明。",
+    "description": "绑定RT shader组及自动/显式索引finalize。"
+  },
+  "grassland::graphics::pybind::RegisterSampler": {
+    "contract": "Python可见名、默认参数、重载和keep_alive策略以本页逐项绑定声明为准；特定边界条件见文件说明。",
+    "description": "为Sampler提供__repr__。"
+  },
+  "grassland::graphics::pybind::RegisterShader": {
+    "contract": "Python可见名、默认参数、重载和keep_alive策略以本页逐项绑定声明为准；特定边界条件见文件说明。",
+    "description": "为Shader提供entry_point和__repr__。"
+  },
+  "grassland::graphics::pybind::RegisterWindow": {
+    "contract": "Python可见名、默认参数、重载和keep_alive策略以本页逐项绑定声明为准；特定边界条件见文件说明。",
+    "description": "绑定窗口/HDR/事件及兼容ImGui生命周期接口。"
   },
   "grassland::operator*": {
     "contract": "张量乘法维度需在编译期匹配；流输出是诊断文本。",
@@ -5634,6 +6702,10 @@
   "practium::Scene::SyncRenderState": {
     "contract": "",
     "description": "依次调用所有已注册 Entity 的同步方法，要求每个指针仍有效。"
+  },
+  "py": {
+    "contract": "",
+    "description": "pybind11命名空间短别名，仅用于扩展编译。"
   },
   "snowberg::draw::CharModel": {
     "contract": "char_tex_ 由 FontCore 所有，空白字形可为空；返回副本不转移纹理所有权。",
