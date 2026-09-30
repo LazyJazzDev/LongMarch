@@ -30,6 +30,7 @@ jobs:
         run: |
           python -m pip install -r tools/reference/requirements.txt
           python tools/reference/build.py --strict
+          python tools/reference/validate.py
       - name: Preserve existing web applications
         uses: actions/checkout@v4
         with:

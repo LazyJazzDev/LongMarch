@@ -66,22 +66,30 @@ def extract(path: Path, root: Path) -> dict:
     # Ignore calling-convention annotations for parsing, retaining exact offsets
     # and the unmodified source for displayed signatures and line evidence.
     parse_data = re.sub(rb"(?m)^(?![ \t]*#)([^\n]*)$",
-                        lambda m: re.sub(rb"\b(?:LM_DEVICE_FUNC|__host__|__device__|__global__|__forceinline__)\b",
+                        lambda m: re.sub(rb"\b(?:LM_DEVICE_FUNC|__host__|__device__|__global__|__forceinline__|VKAPI_ATTR|VKAPI_CALL)\b",
                                          lambda token: b" " * len(token.group()), m.group()), data)
     prefixes = []
+    # Shader storage blocks and GLSL qualifiers need a structural C++ surrogate.
+    if path.suffix in {'.slang', '.vert', '.frag'}:
+        parse_data = re.sub(rb'\bcbuffer\b', lambda m: b'struct ', parse_data)
+        parse_data = re.sub(rb'\bprecise\b|\bgroupshared\b', lambda m: b' ' * len(m.group()), parse_data)
+    if path.suffix in {'.vert', '.frag'}:
+        parse_data = re.sub(rb'layout\([^)]*\)', lambda m: b' ' * len(m.group()), parse_data)
+        parse_data = re.sub(rb'\bbuffer(?=\s+\w+\s*\{)', lambda m: b'struct', parse_data)
+        parse_data = re.sub(rb'\b(?:in|out|uniform)\b', lambda m: b' ' * len(m.group()), parse_data)
     if path.suffix == '.slang':
         # Adapt declaration-only Slang syntax, keeping byte offsets and original
         # text. Without this, C++ recovery mislabels function locals as globals.
         def blank_prefix(match):
             prefixes.append((match.start(), match.end()))
             return re.sub(rb'[^\n]', b' ', match.group())
-        parse_data = re.sub(rb'__generic\s*<[^>]+>|\[(?:mutating|shader\([^\]]*\)|numthreads\([^\]]*\))\]',
+        parse_data = re.sub(rb'__generic\s*<[^>]+>|\[(?:mutating|unroll|maxvertexcount\([^\]]*\)|shader\([^\]]*\)|numthreads\([^\]]*\))\]',
                             blank_prefix, parse_data)
         parse_data = re.sub(rb'\binterface\b',
                             lambda m: b'struct' + b' ' * (len(m.group()) - 6), parse_data)
         parse_data = re.sub(rb'\bextension(\s+\w+)\s*:\s*\w+',
                             lambda m: b'namespace' + m.group(1) + b' ' * (len(m.group()) - 9 - len(m.group(1))), parse_data)
-        parse_data = re.sub(rb'\b(?:inout|out|SP_MUTATING)\b',
+        parse_data = re.sub(rb'\b(?:inout|out|in|triangle|SP_MUTATING)\b',
                             lambda m: b' ' * len(m.group()), parse_data)
         # Slang register bindings and semantics are not C++ base classes or
         # function declarators. Blank only their annotation bytes so original
@@ -90,6 +98,7 @@ def extract(path: Path, root: Path) -> dict:
                             lambda m: re.sub(rb'[^\n]', b' ', m.group()), parse_data)
         parse_data = re.sub(rb':\s*(?:SV_[A-Za-z0-9_]+|TEXCOORD[0-9]*|POSITION[0-9]*|COLOR[0-9]*)(?![A-Za-z0-9_])',
                             lambda m: re.sub(rb'[^\n]', b' ', m.group()), parse_data)
+    parse_data = re.sub(rb'=\s*\{[^{}]*\}', lambda m: b'=' + re.sub(rb'[^\n]', b' ', m.group()[1:-1]) + b'0', parse_data)
     tree = PARSER.parse(parse_data)
     record['parse_errors'] = sorted(set(n.start_point.row + 1 for n in walk(tree.root_node) if n.type == 'ERROR' or n.is_missing))
 
@@ -127,13 +136,15 @@ def extract(path: Path, root: Path) -> dict:
                 function = next((n for n in walk(declarator) if n.type in {'function_declarator', 'operator_cast'}), None)
             # Parameters are not top-level callable declarations.
         is_variable = kind == 'declaration' and not function and node.child_by_field_name('declarator') is not None
-        if is_type or function or is_variable or kind in {'alias_declaration', 'type_definition', 'preproc_def', 'preproc_function_def'}:
+        if is_type or function or is_variable or kind in {'alias_declaration', 'using_declaration', 'type_definition', 'preproc_def', 'preproc_function_def'}:
             name = (text(node.child_by_field_name('name'), data) if is_type else
                     declarator_name(function.child_by_field_name('declarator'), data) if function else
                     text(node.child_by_field_name('name'), data) or declarator_name(node.child_by_field_name('declarator'), data))
             if function and function.type == 'operator_cast':
                 cast = text(node.child_by_field_name('declarator'), data)
                 name = cast.split('(')[0].strip()
+            if kind == 'using_declaration':
+                name = re.sub(r'^using\s+(?:namespace\s+)?|;$', '', text(node, data)).strip()
             name = name or '(anonymous)'
             body = node.child_by_field_name('body')
             signature_start = node.start_byte
@@ -165,7 +176,13 @@ def extract(path: Path, root: Path) -> dict:
                     obj['throws'] = [text(n, data) for n in walk(body) if n.type == 'throw_statement']
             if is_type and body:
                 member_access = 'private' if kind == 'class_specifier' else 'public'
-                for child in body.named_children:
+                def fields(children):
+                    for child in children:
+                        if child.type.startswith('preproc_if') or child.type in {'preproc_else', 'preproc_elif'}:
+                            yield from fields(child.named_children)
+                        else:
+                            yield child
+                for child in fields(body.named_children):
                     if child.type == 'access_specifier':
                         member_access = text(child, data)
                     elif child.type in {'field_declaration', 'enumerator'}:
@@ -182,10 +199,18 @@ def extract(path: Path, root: Path) -> dict:
                         visit(child, scope + name + '::', member_access, conditions)
                 return
             record['objects'].append(obj)
+            if is_variable:
+                # A declaration can introduce several independent objects.
+                for extra in node.children_by_field_name('declarator')[1:]:
+                    extra_name = declarator_name(extra, data)
+                    record['objects'].append({**obj, 'name': extra_name, 'qualified': scope + extra_name})
             # A function's local variables/lambdas are implementation details, not additional public objects.
             return
         for child in node.named_children:
             visit(child, scope, access, conditions)
 
     visit(tree.root_node)
+    # Preserve bindings and embedded-language objects as their own evidence records.
+    from supplements import supplement
+    supplement(record, tree, data, root)
     return record

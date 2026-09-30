@@ -1,0 +1,159 @@
+{
+  "code/grassland/graphics/backend/d3d12/d3d12_core.cpp": {
+    "lines": [
+      519
+    ],
+    "review": "CUDA条件编译把else与后续普通fence分支分开，C++解析器报告孤立else。已核对InitializeLogicalDevice完整函数范围及CUDA/非CUDA两条路径，原文全部保留。",
+    "sha256": "95ec196d41a708feacd307abb5e0c01c603d56cfe1c77c7aadf8c6bf2f8fc1ae"
+  },
+  "code/grassland/graphics/backend/metal/metal_window.mm": {
+    "lines": [
+      24,
+      28,
+      29,
+      37,
+      102,
+      130,
+      146,
+      168,
+      201,
+      202
+    ],
+    "review": "诊断均为Objective-C消息发送和__bridge cast；已核对构造、亮度查询、HDR、关闭、ImGui与Present方法均被提取，内嵌MSL另外逐对象登记。没有独立Objective-C类定义被遗漏。",
+    "sha256": "9e57bd06aa5a804471c232d58a7a0599fd66c8dac0067232145b63fc5ab64e29"
+  },
+  "code/grassland/graphics/graphics_util.h": {
+    "lines": [
+      28
+    ],
+    "review": "BACKEND_API_DEFAULT的枚举初始化由条件编译选择Metal/Vulkan/D3D12；已核对BackendAPI原始枚举与对应架构说明，条件分支保留在完整源码。",
+    "sha256": "48db21f4a06979749b68371a5018c029bb826370ed5295e147ea098961c43262"
+  },
+  "code/grassland/graphics/window_gestures.h": {
+    "lines": [
+      4
+    ],
+    "review": "@class NSEvent为Objective-C前向声明，已保留NSEvent对象记录；不是缺失的C++实现。",
+    "sha256": "f39122ede8b983b4ad445fc97df9e84bc502b3c81fca7bfe84289b223219a934"
+  },
+  "code/grassland/graphics/window_gestures.mm": {
+    "lines": [
+      20,
+      36,
+      37,
+      40,
+      41,
+      46,
+      47
+    ],
+    "review": "诊断为Cocoa消息及block语法；已核对DispatchMagnifyEvent、InstallMagnifyEvents、RemoveMagnifyEvents完整范围、monitor retain/release和增量缩放约定。",
+    "sha256": "392960b6178762102f34259a9d991cb96d38aa3f04002e683e13f4e7c28c95f2"
+  },
+  "code/grassland/math/math_mesh.cxx": {
+    "lines": [
+      593,
+      594
+    ],
+    "review": "诊断均为template class显式实例化。已核对每条float/double实例化均有独立对象记录，算法说明位于对应模板类和方法；不是新算法或缺失实现。",
+    "sha256": "6894a7b360d3195299d72069a3325fc0a19ad9c0a07c658f20ead66905be9d25"
+  },
+  "code/grassland/physics/diff_kernel/dk_dihedral_angle.cpp": {
+    "lines": [
+      68,
+      69,
+      105,
+      106,
+      150,
+      151,
+      184,
+      185,
+      483,
+      484
+    ],
+    "review": "诊断均为template class显式实例化。已核对每条float/double实例化均有独立对象记录，算法说明位于对应模板类和方法；不是新算法或缺失实现。",
+    "sha256": "8d28863df383d876f39310a0fdfeeb35cfd4cb014fc0b916b5a887776845b397"
+  },
+  "code/grassland/physics/diff_kernel/dk_elastic_models.cpp": {
+    "lines": [
+      39,
+      40,
+      86,
+      87,
+      136,
+      137,
+      180,
+      181,
+      248,
+      249,
+      317,
+      318,
+      349,
+      350,
+      381,
+      382
+    ],
+    "review": "诊断均为template class显式实例化。已核对每条float/double实例化均有独立对象记录，算法说明位于对应模板类和方法；不是新算法或缺失实现。",
+    "sha256": "12a8343a10af5239818e08c4e10aeff377651a4bec417bd619a0c8455b0a93c6"
+  },
+  "code/grassland/physics/diff_kernel/dk_geometry_sdf.cpp": {
+    "lines": [
+      30,
+      31,
+      56,
+      57,
+      98,
+      99,
+      139,
+      140,
+      215,
+      216,
+      239,
+      240,
+      268,
+      269
+    ],
+    "review": "诊断均为template class显式实例化。已核对每条float/double实例化均有独立对象记录，算法说明位于对应模板类和方法；不是新算法或缺失实现。",
+    "sha256": "f6ff6a00aa19ec0209d2b378c6d002a04fa490944f350d9e14737303c890fc77"
+  },
+  "code/grassland/util/double_ptr.h": {
+    "lines": [
+      60,
+      76,
+      92,
+      96
+    ],
+    "review": "解析器不接受显式调用转换运算符的表达式。construct、operator->、operator*及转换运算符记录均在，已核对拥有权和转换行为。",
+    "sha256": "62ee7e57efb4ae8b12a28fd2d9b59f6c2108503508fecb86461e01229787d4e9"
+  },
+  "code/snowberg/gui/surface/animation_var.cpp": {
+    "lines": [
+      30
+    ],
+    "review": "UpdateTarget中的显式operator float()调用造成诊断；UpdateTarget完整实现和重定目标前采样当前值的行为已说明。",
+    "sha256": "1bac07d845c7a539c0e7d1818e96f49476329bc272df44142f71701ecaf4268e"
+  },
+  "code/snowberg/gui/surface/application.h": {
+    "lines": [
+      127
+    ],
+    "review": "成员函数指针调用(listener->*func)(args...)造成诊断；NotifyListeners完整模板已提取并说明监听器派发。",
+    "sha256": "d65b0a189e946d5e931d026abcf871750c26cd4bbb0198e84170138d8995889e"
+  },
+  "code/snowberg/solver/solver_scene_update.cpp": {
+    "lines": [
+      369,
+      376,
+      383,
+      386,
+      389,
+      428,
+      453,
+      474,
+      482,
+      487,
+      492
+    ],
+    "review": "CUDA三尖括号kernel launch不属于C++语法。已逐项核对Update与UpdateBatch中的InitializeSolver、SolveVBDParticlePosition、CopyParticleIndices、速度及塑性kernel调用，所有kernel自身另有对象说明；调用原文保留。",
+    "sha256": "5404bd9f5c094f09bea3d151deaf48c9db2d7c1ecca6c80d356eca5341e9eccd"
+  }
+}

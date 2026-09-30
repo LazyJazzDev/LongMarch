@@ -87,6 +87,34 @@
     "contract": "",
     "description": "在 _WIN64 分支缩减 Windows 头包含范围。"
   },
+  "code/contradium/core/core_util.h#contradium::grassland": {
+    "contract": "把已有类型/重载或命名空间成员引入当前作用域，不新建对象或改变原类型语义。",
+    "description": "名称导入：using namespace grassland;"
+  },
+  "code/grassland/graphics/backend/d3d12/helper/d3d12util.h#grassland::graphics::backend::Microsoft::WRL::ComPtr": {
+    "contract": "把已有类型/重载或命名空间成员引入当前作用域，不新建对象或改变原类型语义。",
+    "description": "名称导入：using Microsoft::WRL::ComPtr;"
+  },
+  "code/grassland/graphics/backend/d3d12/helper/d3d12util.h#grassland::graphics::backend::d3d12::graphics::CompiledShaderBlob": {
+    "contract": "把已有类型/重载或命名空间成员引入当前作用域，不新建对象或改变原类型语义。",
+    "description": "名称导入：using graphics::CompiledShaderBlob;"
+  },
+  "code/grassland/graphics/backend/metal/metal_command_context.h#grassland::graphics::backend::MetalCommandContext::CommandContext::CmdBindResources": {
+    "contract": "把已有类型/重载或命名空间成员引入当前作用域，不新建对象或改变原类型语义。",
+    "description": "名称导入：using CommandContext::CmdBindResources;"
+  },
+  "code/grassland/graphics/backend/metal/metal_window.mm#embedded::Vertex": {
+    "contract": "position带Metal内建标记。",
+    "description": "MSL顶点输出：position为裁剪坐标，uv为采样坐标。"
+  },
+  "code/grassland/graphics/backend/metal/metal_window.mm#embedded::present_fragment": {
+    "contract": "不进行gamma或tone mapping。",
+    "description": "以normalized/clamp_to_edge/linear sampler采样texture0并原样返回RGBA。"
+  },
+  "code/grassland/graphics/backend/metal/metal_window.mm#embedded::present_vertex": {
+    "contract": "CPU绘制3顶点，无vertex buffer。",
+    "description": "用vertex_id位运算生成覆盖屏幕的三角形，翻转Y并输出UV。"
+  },
   "code/grassland/graphics/backend/vulkan/helper/device_procedures.cpp#grassland::graphics::backend::vulkan::(anonymous)::GetProcedure": {
     "contract": "",
     "description": "用vkGetDeviceProcAddr取得函数，缺失抛异常。"
@@ -95,6 +123,42 @@
     "contract": "",
     "description": "按PFN类型将device函数写入out成员。"
   },
+  "code/grassland/graphics/backend/vulkan/helper/device_procedures.h#grassland::graphics::backend::vulkan::DeviceProcedures::vkCmdBuildAccelerationStructuresKHR": {
+    "contract": "由对应LoadInstanceProcedures/LoadAccelerationStructureProcedures/LoadRayTracingProcedures加载；调用前要求设备扩展及函数有效，语义遵循同名Vulkan API。",
+    "description": "原生函数指针 vkCmdBuildAccelerationStructuresKHR，类型 PFN_vkCmdBuildAccelerationStructuresKHR，初始为空。"
+  },
+  "code/grassland/graphics/backend/vulkan/helper/device_procedures.h#grassland::graphics::backend::vulkan::DeviceProcedures::vkCmdTraceRaysKHR": {
+    "contract": "由对应LoadInstanceProcedures/LoadAccelerationStructureProcedures/LoadRayTracingProcedures加载；调用前要求设备扩展及函数有效，语义遵循同名Vulkan API。",
+    "description": "原生函数指针 vkCmdTraceRaysKHR，类型 PFN_vkCmdTraceRaysKHR，初始为空。"
+  },
+  "code/grassland/graphics/backend/vulkan/helper/device_procedures.h#grassland::graphics::backend::vulkan::DeviceProcedures::vkCreateAccelerationStructureKHR": {
+    "contract": "由对应LoadInstanceProcedures/LoadAccelerationStructureProcedures/LoadRayTracingProcedures加载；调用前要求设备扩展及函数有效，语义遵循同名Vulkan API。",
+    "description": "原生函数指针 vkCreateAccelerationStructureKHR，类型 PFN_vkCreateAccelerationStructureKHR，初始为空。"
+  },
+  "code/grassland/graphics/backend/vulkan/helper/device_procedures.h#grassland::graphics::backend::vulkan::DeviceProcedures::vkCreateRayTracingPipelinesKHR": {
+    "contract": "由对应LoadInstanceProcedures/LoadAccelerationStructureProcedures/LoadRayTracingProcedures加载；调用前要求设备扩展及函数有效，语义遵循同名Vulkan API。",
+    "description": "原生函数指针 vkCreateRayTracingPipelinesKHR，类型 PFN_vkCreateRayTracingPipelinesKHR，初始为空。"
+  },
+  "code/grassland/graphics/backend/vulkan/helper/device_procedures.h#grassland::graphics::backend::vulkan::DeviceProcedures::vkDestroyAccelerationStructureKHR": {
+    "contract": "由对应LoadInstanceProcedures/LoadAccelerationStructureProcedures/LoadRayTracingProcedures加载；调用前要求设备扩展及函数有效，语义遵循同名Vulkan API。",
+    "description": "原生函数指针 vkDestroyAccelerationStructureKHR，类型 PFN_vkDestroyAccelerationStructureKHR，初始为空。"
+  },
+  "code/grassland/graphics/backend/vulkan/helper/device_procedures.h#grassland::graphics::backend::vulkan::DeviceProcedures::vkGetAccelerationStructureBuildSizesKHR": {
+    "contract": "由对应LoadInstanceProcedures/LoadAccelerationStructureProcedures/LoadRayTracingProcedures加载；调用前要求设备扩展及函数有效，语义遵循同名Vulkan API。",
+    "description": "原生函数指针 vkGetAccelerationStructureBuildSizesKHR，类型 PFN_vkGetAccelerationStructureBuildSizesKHR，初始为空。"
+  },
+  "code/grassland/graphics/backend/vulkan/helper/device_procedures.h#grassland::graphics::backend::vulkan::DeviceProcedures::vkGetAccelerationStructureDeviceAddressKHR": {
+    "contract": "由对应LoadInstanceProcedures/LoadAccelerationStructureProcedures/LoadRayTracingProcedures加载；调用前要求设备扩展及函数有效，语义遵循同名Vulkan API。",
+    "description": "原生函数指针 vkGetAccelerationStructureDeviceAddressKHR，类型 PFN_vkGetAccelerationStructureDeviceAddressKHR，初始为空。"
+  },
+  "code/grassland/graphics/backend/vulkan/helper/device_procedures.h#grassland::graphics::backend::vulkan::DeviceProcedures::vkGetBufferDeviceAddressKHR": {
+    "contract": "由对应LoadInstanceProcedures/LoadAccelerationStructureProcedures/LoadRayTracingProcedures加载；调用前要求设备扩展及函数有效，语义遵循同名Vulkan API。",
+    "description": "原生函数指针 vkGetBufferDeviceAddressKHR，类型 PFN_vkGetBufferDeviceAddressKHR，初始为空。"
+  },
+  "code/grassland/graphics/backend/vulkan/helper/device_procedures.h#grassland::graphics::backend::vulkan::DeviceProcedures::vkGetRayTracingShaderGroupHandlesKHR": {
+    "contract": "由对应LoadInstanceProcedures/LoadAccelerationStructureProcedures/LoadRayTracingProcedures加载；调用前要求设备扩展及函数有效，语义遵循同名Vulkan API。",
+    "description": "原生函数指针 vkGetRayTracingShaderGroupHandlesKHR，类型 PFN_vkGetRayTracingShaderGroupHandlesKHR，初始为空。"
+  },
   "code/grassland/graphics/backend/vulkan/helper/instance_procedures.cpp#grassland::graphics::backend::vulkan::(anonymous)::GetProcedure": {
     "contract": "",
     "description": "用vkGetInstanceProcAddr取得函数，缺失只警告。"
@@ -102,6 +166,46 @@
   "code/grassland/graphics/backend/vulkan/helper/instance_procedures.cpp#grassland::graphics::backend::vulkan::GET_PROCEDURE": {
     "contract": "",
     "description": "按PFN类型将instance函数写入out成员。"
+  },
+  "code/grassland/graphics/backend/vulkan/helper/instance_procedures.h#grassland::graphics::backend::vulkan::InstanceProcedures::vkCmdBeginRenderingKHR": {
+    "contract": "由对应LoadInstanceProcedures/LoadAccelerationStructureProcedures/LoadRayTracingProcedures加载；调用前要求设备扩展及函数有效，语义遵循同名Vulkan API。",
+    "description": "原生函数指针 vkCmdBeginRenderingKHR，类型 PFN_vkCmdBeginRenderingKHR，初始为空。"
+  },
+  "code/grassland/graphics/backend/vulkan/helper/instance_procedures.h#grassland::graphics::backend::vulkan::InstanceProcedures::vkCmdEndRenderingKHR": {
+    "contract": "由对应LoadInstanceProcedures/LoadAccelerationStructureProcedures/LoadRayTracingProcedures加载；调用前要求设备扩展及函数有效，语义遵循同名Vulkan API。",
+    "description": "原生函数指针 vkCmdEndRenderingKHR，类型 PFN_vkCmdEndRenderingKHR，初始为空。"
+  },
+  "code/grassland/graphics/backend/vulkan/helper/instance_procedures.h#grassland::graphics::backend::vulkan::InstanceProcedures::vkCmdSetPrimitiveTopologyEXT": {
+    "contract": "由对应LoadInstanceProcedures/LoadAccelerationStructureProcedures/LoadRayTracingProcedures加载；调用前要求设备扩展及函数有效，语义遵循同名Vulkan API。",
+    "description": "原生函数指针 vkCmdSetPrimitiveTopologyEXT，类型 PFN_vkCmdSetPrimitiveTopologyEXT，初始为空。"
+  },
+  "code/grassland/graphics/backend/vulkan/helper/instance_procedures.h#grassland::graphics::backend::vulkan::InstanceProcedures::vkCreateDebugUtilsMessengerEXT": {
+    "contract": "由对应LoadInstanceProcedures/LoadAccelerationStructureProcedures/LoadRayTracingProcedures加载；调用前要求设备扩展及函数有效，语义遵循同名Vulkan API。",
+    "description": "原生函数指针 vkCreateDebugUtilsMessengerEXT，类型 PFN_vkCreateDebugUtilsMessengerEXT，初始为空。"
+  },
+  "code/grassland/graphics/backend/vulkan/helper/instance_procedures.h#grassland::graphics::backend::vulkan::InstanceProcedures::vkDestroyDebugUtilsMessengerEXT": {
+    "contract": "由对应LoadInstanceProcedures/LoadAccelerationStructureProcedures/LoadRayTracingProcedures加载；调用前要求设备扩展及函数有效，语义遵循同名Vulkan API。",
+    "description": "原生函数指针 vkDestroyDebugUtilsMessengerEXT，类型 PFN_vkDestroyDebugUtilsMessengerEXT，初始为空。"
+  },
+  "code/grassland/graphics/backend/vulkan/helper/instance_procedures.h#grassland::graphics::backend::vulkan::InstanceProcedures::vkSetDebugUtilsObjectNameEXT": {
+    "contract": "由对应LoadInstanceProcedures/LoadAccelerationStructureProcedures/LoadRayTracingProcedures加载；调用前要求设备扩展及函数有效，语义遵循同名Vulkan API。",
+    "description": "原生函数指针 vkSetDebugUtilsObjectNameEXT，类型 PFN_vkSetDebugUtilsObjectNameEXT，初始为空。"
+  },
+  "code/grassland/graphics/backend/vulkan/helper/vulkan_util.h#grassland::graphics::backend::vulkan::::grassland::graphics::backend::VulkanCore": {
+    "contract": "把已有类型/重载或命名空间成员引入当前作用域，不新建对象或改变原类型语义。",
+    "description": "名称导入：using ::grassland::graphics::backend::VulkanCore;"
+  },
+  "code/grassland/graphics/backend/vulkan/helper/vulkan_util.h#grassland::graphics::backend::vulkan::function_name": {
+    "contract": "由对应LoadInstanceProcedures/LoadAccelerationStructureProcedures/LoadRayTracingProcedures加载；调用前要求设备扩展及函数有效，语义遵循同名Vulkan API。",
+    "description": "原生函数指针 function_name，类型 PFN_function_name，初始为空。"
+  },
+  "code/grassland/graphics/backend/vulkan/helper/vulkan_util.h#grassland::graphics::backend::vulkan::graphics::CompiledShaderBlob": {
+    "contract": "把已有类型/重载或命名空间成员引入当前作用域，不新建对象或改变原类型语义。",
+    "description": "名称导入：using graphics::CompiledShaderBlob;"
+  },
+  "code/grassland/graphics/backend/vulkan/vulkan_core_device.cpp#grassland::graphics::backend::vulkan": {
+    "contract": "把已有类型/重载或命名空间成员引入当前作用域，不新建对象或改变原类型语义。",
+    "description": "名称导入：using namespace vulkan;"
   },
   "code/grassland/graphics/shaders/d3d12/blit.slang#PSInput": {
     "contract": "",
@@ -122,6 +226,1650 @@
   "code/grassland/graphics/shaders/d3d12/blit.slang#src_texture": {
     "contract": "",
     "description": "t0输入图像。"
+  },
+  "code/grassland/graphics/window.cpp#embedded::EncodePQ": {
+    "contract": "输入非负，10000nits以上钳到1。",
+    "description": "将绝对亮度nits/10000饱和后按ST2084常数编码到PQ。"
+  },
+  "code/grassland/graphics/window.cpp#embedded::Main": {
+    "contract": "保留alpha；越界线程返回。",
+    "description": "读取像素，RGB钳非负；PQ分支BT709→BT2020后乘white_nits编码，线性分支乘white_scale钳65504。"
+  },
+  "code/grassland/graphics/window.cpp#embedded::Settings": {
+    "contract": "CPU布局与Window::AlignHDRComposition一致。",
+    "description": "space2/b0的16字节亮度参数块：white_scale、pq_output、white_nits、padding。"
+  },
+  "code/grassland/graphics/window.cpp#embedded::output_image": {
+    "contract": "按输出尺寸做8×8工作组边界检查。",
+    "description": "space1/u0 rgba16f输出storage纹理。"
+  },
+  "code/grassland/graphics/window.cpp#embedded::source_image": {
+    "contract": "尺寸须覆盖输出像素。",
+    "description": "space0/t0线性HDR输入纹理。"
+  },
+  "code/grassland/math/math_util.h#grassland::Eigen::Matrix": {
+    "contract": "把已有类型/重载或命名空间成员引入当前作用域，不新建对象或改变原类型语义。",
+    "description": "名称导入：using Eigen::Matrix;"
+  },
+  "code/grassland/math/math_util.h#grassland::Eigen::Matrix2": {
+    "contract": "把已有类型/重载或命名空间成员引入当前作用域，不新建对象或改变原类型语义。",
+    "description": "名称导入：using Eigen::Matrix2;"
+  },
+  "code/grassland/math/math_util.h#grassland::Eigen::Matrix3": {
+    "contract": "把已有类型/重载或命名空间成员引入当前作用域，不新建对象或改变原类型语义。",
+    "description": "名称导入：using Eigen::Matrix3;"
+  },
+  "code/grassland/math/math_util.h#grassland::Eigen::Matrix4": {
+    "contract": "把已有类型/重载或命名空间成员引入当前作用域，不新建对象或改变原类型语义。",
+    "description": "名称导入：using Eigen::Matrix4;"
+  },
+  "code/grassland/math/math_util.h#grassland::Eigen::Quaternion": {
+    "contract": "把已有类型/重载或命名空间成员引入当前作用域，不新建对象或改变原类型语义。",
+    "description": "名称导入：using Eigen::Quaternion;"
+  },
+  "code/grassland/math/math_util.h#grassland::Eigen::RowVector2": {
+    "contract": "把已有类型/重载或命名空间成员引入当前作用域，不新建对象或改变原类型语义。",
+    "description": "名称导入：using Eigen::RowVector2;"
+  },
+  "code/grassland/math/math_util.h#grassland::Eigen::RowVector3": {
+    "contract": "把已有类型/重载或命名空间成员引入当前作用域，不新建对象或改变原类型语义。",
+    "description": "名称导入：using Eigen::RowVector3;"
+  },
+  "code/grassland/math/math_util.h#grassland::Eigen::RowVector4": {
+    "contract": "把已有类型/重载或命名空间成员引入当前作用域，不新建对象或改变原类型语义。",
+    "description": "名称导入：using Eigen::RowVector4;"
+  },
+  "code/grassland/math/math_util.h#grassland::Eigen::Vector": {
+    "contract": "把已有类型/重载或命名空间成员引入当前作用域，不新建对象或改变原类型语义。",
+    "description": "名称导入：using Eigen::Vector;"
+  },
+  "code/grassland/math/math_util.h#grassland::Eigen::Vector2": {
+    "contract": "把已有类型/重载或命名空间成员引入当前作用域，不新建对象或改变原类型语义。",
+    "description": "名称导入：using Eigen::Vector2;"
+  },
+  "code/grassland/math/math_util.h#grassland::Eigen::Vector3": {
+    "contract": "把已有类型/重载或命名空间成员引入当前作用域，不新建对象或改变原类型语义。",
+    "description": "名称导入：using Eigen::Vector3;"
+  },
+  "code/grassland/math/math_util.h#grassland::Eigen::Vector4": {
+    "contract": "把已有类型/重载或命名空间成员引入当前作用域，不新建对象或改变原类型语义。",
+    "description": "名称导入：using Eigen::Vector4;"
+  },
+  "code/long_march.h#long_march::grassland": {
+    "contract": "把已有类型/重载或命名空间成员引入当前作用域，不新建对象或改变原类型语义。",
+    "description": "名称导入：using namespace grassland;"
+  },
+  "code/long_march.h#long_march::snowberg": {
+    "contract": "把已有类型/重载或命名空间成员引入当前作用域，不新建对象或改变原类型语义。",
+    "description": "名称导入：using namespace snowberg;"
+  },
+  "code/practium/core/core_util.h#practium::grassland": {
+    "contract": "把已有类型/重载或命名空间成员引入当前作用域，不新建对象或改变原类型语义。",
+    "description": "名称导入：using namespace grassland;"
+  },
+  "code/pybind/grassland/graphics/acceleration_structure.cpp#long_march.graphics.AccelerationStructure.__repr__": {
+    "contract": "用于诊断，不是序列化协议，也不创建GPU资源。",
+    "description": "生成该对象的Python可读表示；格式字符串和读取字段见注册表达式。"
+  },
+  "code/pybind/grassland/graphics/acceleration_structure.cpp#long_march.graphics.AccelerationStructure.make_instance": {
+    "contract": "维度不符抛异常；返回对象keep_alive保留self。",
+    "description": "从3行4列、行主序sequence建立实例；默认id0、mask255、hitoffset0、flags NONE。"
+  },
+  "code/pybind/grassland/graphics/acceleration_structure.cpp#long_march.graphics.AccelerationStructure.update_instances": {
+    "contract": "二元组长度/矩阵维度受检；不会为列表内AS新增keep_alive，调用方保活。",
+    "description": "接受RayTracingInstance列表，或(AS,3×4行主序变换)二元组列表，转发原生TLAS更新并返回状态码。"
+  },
+  "code/pybind/grassland/graphics/buffer.cpp#long_march.graphics.DeviceBuffer.__repr__": {
+    "contract": "用于诊断，不是序列化协议，也不创建GPU资源。",
+    "description": "生成该对象的Python可读表示；格式字符串和读取字段见注册表达式。"
+  },
+  "code/pybind/grassland/graphics/buffer.cpp#long_march.graphics.DeviceBuffer.download_data": {
+    "contract": "offset须不超过Size，否则默认减法可能下溢；Dynamic后端可能只读CPU staging。",
+    "description": "默认读取offset到buffer末尾，分配临时vector并返回bytes副本。"
+  },
+  "code/pybind/grassland/graphics/buffer.cpp#long_march.graphics.DeviceBuffer.resize": {
+    "contract": " Python参数名、默认值和keep_alive策略以本页注册表达式为准；数值与枚举按pybind11转换。",
+    "description": "请求新字节容量，是否保留旧数据及同步方式见具体后端。 Python 名称为 long_march.graphics.DeviceBuffer.resize，转发 Buffer::Resize。"
+  },
+  "code/pybind/grassland/graphics/buffer.cpp#long_march.graphics.DeviceBuffer.size": {
+    "contract": " Python参数名、默认值和keep_alive策略以本页注册表达式为准；数值与枚举按pybind11转换。",
+    "description": "查询字节容量。 Python 名称为 long_march.graphics.DeviceBuffer.size，转发 Buffer::Size。"
+  },
+  "code/pybind/grassland/graphics/buffer.cpp#long_march.graphics.DeviceBuffer.type": {
+    "contract": " Python参数名、默认值和keep_alive策略以本页注册表达式为准；数值与枚举按pybind11转换。",
+    "description": "查询创建时缓冲用途类型。 Python 名称为 long_march.graphics.DeviceBuffer.type，转发 Buffer::Type。"
+  },
+  "code/pybind/grassland/graphics/buffer.cpp#long_march.graphics.DeviceBuffer.upload_data": {
+    "contract": "只检查size+offset与Buffer大小，未检查显式size不超过bytes长度，且加法未防溢出。",
+    "description": "接受bytes；size默认全部bytes，offset默认0，然后调用Buffer::UploadData。"
+  },
+  "code/pybind/grassland/graphics/command_context.cpp#long_march.graphics.CommandContext.__repr__": {
+    "contract": "用于诊断，不是序列化协议，也不创建GPU资源。",
+    "description": "生成该对象的Python可读表示；格式字符串和读取字段见注册表达式。"
+  },
+  "code/pybind/grassland/graphics/command_context.cpp#long_march.graphics.CommandContext.cmd_begin_rendering": {
+    "contract": "资源/程序/附件布局及使用顺序必须匹配；裸指针不表达所有权转移。 Python参数名、默认值和keep_alive策略以本页注册表达式为准；数值与枚举按pybind11转换。 未设置附件keep_alive。 调用方须明确保存资源至GPU完成。",
+    "description": "开始以 color_targets 和可选 depth_target 为附件的渲染区间。 Python 名称为 long_march.graphics.CommandContext.cmd_begin_rendering，转发 CommandContext::CmdBeginRendering。"
+  },
+  "code/pybind/grassland/graphics/command_context.cpp#long_march.graphics.CommandContext.cmd_bind_compute_program": {
+    "contract": "资源/程序/附件布局及使用顺序必须匹配；裸指针不表达所有权转移。 Python参数名、默认值和keep_alive策略以本页注册表达式为准；数值与枚举按pybind11转换。",
+    "description": "绑定已 Finalize 的计算程序。 Python 名称为 long_march.graphics.CommandContext.cmd_bind_compute_program，转发 CommandContext::CmdBindComputeProgram。"
+  },
+  "code/pybind/grassland/graphics/command_context.cpp#long_march.graphics.CommandContext.cmd_bind_index_buffer": {
+    "contract": "资源/程序/附件布局及使用顺序必须匹配；裸指针不表达所有权转移。 Python参数名、默认值和keep_alive策略以本页注册表达式为准；数值与枚举按pybind11转换。",
+    "description": "绑定索引缓冲及字节偏移。 Python 名称为 long_march.graphics.CommandContext.cmd_bind_index_buffer，转发 CommandContext::CmdBindIndexBuffer。"
+  },
+  "code/pybind/grassland/graphics/command_context.cpp#long_march.graphics.CommandContext.cmd_bind_program": {
+    "contract": "资源/程序/附件布局及使用顺序必须匹配；裸指针不表达所有权转移。 Python参数名、默认值和keep_alive策略以本页注册表达式为准；数值与枚举按pybind11转换。",
+    "description": "绑定已 Finalize 的光栅程序。 Python 名称为 long_march.graphics.CommandContext.cmd_bind_program，转发 CommandContext::CmdBindProgram。"
+  },
+  "code/pybind/grassland/graphics/command_context.cpp#long_march.graphics.CommandContext.cmd_bind_raytracing_program": {
+    "contract": "资源/程序/附件布局及使用顺序必须匹配；裸指针不表达所有权转移。 Python参数名、默认值和keep_alive策略以本页注册表达式为准；数值与枚举按pybind11转换。",
+    "description": "绑定已 Finalize 的 RT 程序及其 SBT。 Python 名称为 long_march.graphics.CommandContext.cmd_bind_raytracing_program，转发 CommandContext::CmdBindRayTracingProgram。"
+  },
+  "code/pybind/grassland/graphics/command_context.cpp#long_march.graphics.CommandContext.cmd_bind_resources": {
+    "contract": "资源/程序/附件布局及使用顺序必须匹配；裸指针不表达所有权转移。 Python参数名、默认值和keep_alive策略以本页注册表达式为准；数值与枚举按pybind11转换。 keep_alive<1,2>对应slot整数，不能保活第三参数资源数组/AS。 调用方须明确保存资源至GPU完成。",
+    "description": "按 slot 和 BindPoint 绑定缓冲区间、图像、采样器或 AS；Buffer* 重载转为全区间再委托。 Python 名称为 long_march.graphics.CommandContext.cmd_bind_resources，转发 CommandContext::CmdBindResources。"
+  },
+  "code/pybind/grassland/graphics/command_context.cpp#long_march.graphics.CommandContext.cmd_bind_vertex_buffers": {
+    "contract": "资源/程序/附件布局及使用顺序必须匹配；裸指针不表达所有权转移。 Python参数名、默认值和keep_alive策略以本页注册表达式为准；数值与枚举按pybind11转换。 keep_alive<1,2>对应first_binding整数，不能保活buffers。 调用方须明确保存资源至GPU完成。",
+    "description": "从 first_binding 开始绑定若干顶点流，offsets 为各缓冲的字节偏移。 Python 名称为 long_march.graphics.CommandContext.cmd_bind_vertex_buffers，转发 CommandContext::CmdBindVertexBuffers。"
+  },
+  "code/pybind/grassland/graphics/command_context.cpp#long_march.graphics.CommandContext.cmd_clear_image": {
+    "contract": "图像等资源由调用方保活至GPU完成；不做跨后端验证。",
+    "description": "接受4分量颜色vector或一个深度float，构造ClearValue；颜色长度不为4抛异常。"
+  },
+  "code/pybind/grassland/graphics/command_context.cpp#long_march.graphics.CommandContext.cmd_copy_buffer": {
+    "contract": "资源/程序/附件布局及使用顺序必须匹配；裸指针不表达所有权转移。 Python参数名、默认值和keep_alive策略以本页注册表达式为准；数值与枚举按pybind11转换。",
+    "description": "从 src_offset 向 dst_offset 复制 size 字节，注意参数顺序为目标在前。 Python 名称为 long_march.graphics.CommandContext.cmd_copy_buffer，转发 CommandContext::CmdCopyBuffer。"
+  },
+  "code/pybind/grassland/graphics/command_context.cpp#long_march.graphics.CommandContext.cmd_dispatch": {
+    "contract": "资源/程序/附件布局及使用顺序必须匹配；裸指针不表达所有权转移。 Python参数名、默认值和keep_alive策略以本页注册表达式为准；数值与枚举按pybind11转换。",
+    "description": "记录 group_count_x/y/z 个线程组，实际线程数还乘 shader 的 numthreads。 Python 名称为 long_march.graphics.CommandContext.cmd_dispatch，转发 CommandContext::CmdDispatch。"
+  },
+  "code/pybind/grassland/graphics/command_context.cpp#long_march.graphics.CommandContext.cmd_dispatch_rays": {
+    "contract": "资源/程序/附件布局及使用顺序必须匹配；裸指针不表达所有权转移。 Python参数名、默认值和keep_alive策略以本页注册表达式为准；数值与枚举按pybind11转换。",
+    "description": "记录 width×height×depth 的射线 dispatch。 Python 名称为 long_march.graphics.CommandContext.cmd_dispatch_rays，转发 CommandContext::CmdDispatchRays。"
+  },
+  "code/pybind/grassland/graphics/command_context.cpp#long_march.graphics.CommandContext.cmd_draw": {
+    "contract": "instance_count默认1，其余偏移默认0。",
+    "description": "非索引绘制；index_count参数名及绑定docstring中的indexed有误，实际是vertex count。"
+  },
+  "code/pybind/grassland/graphics/command_context.cpp#long_march.graphics.CommandContext.cmd_draw_indexed": {
+    "contract": "资源/程序/附件布局及使用顺序必须匹配；裸指针不表达所有权转移。 Python参数名、默认值和keep_alive策略以本页注册表达式为准；数值与枚举按pybind11转换。",
+    "description": "记录索引实例化绘制，包含首索引、顶点基址和首实例。 Python 名称为 long_march.graphics.CommandContext.cmd_draw_indexed，转发 CommandContext::CmdDrawIndexed。"
+  },
+  "code/pybind/grassland/graphics/command_context.cpp#long_march.graphics.CommandContext.cmd_end_rendering": {
+    "contract": "资源/程序/附件布局及使用顺序必须匹配；裸指针不表达所有权转移。 Python参数名、默认值和keep_alive策略以本页注册表达式为准；数值与枚举按pybind11转换。",
+    "description": "结束当前渲染区间。 Python 名称为 long_march.graphics.CommandContext.cmd_end_rendering，转发 CommandContext::CmdEndRendering。"
+  },
+  "code/pybind/grassland/graphics/command_context.cpp#long_march.graphics.CommandContext.cmd_present": {
+    "contract": "资源/程序/附件布局及使用顺序必须匹配；裸指针不表达所有权转移。 Python参数名、默认值和keep_alive策略以本页注册表达式为准；数值与枚举按pybind11转换。 只keep_alive window，未保活image。 调用方须明确保存资源至GPU完成。",
+    "description": "将指定 Image 送到 Window 的后端呈现路径，可包含格式/HDR 转换。 Python 名称为 long_march.graphics.CommandContext.cmd_present，转发 CommandContext::CmdPresent。"
+  },
+  "code/pybind/grassland/graphics/command_context.cpp#long_march.graphics.CommandContext.cmd_set_primitive_topology": {
+    "contract": "资源/程序/附件布局及使用顺序必须匹配；裸指针不表达所有权转移。 Python参数名、默认值和keep_alive策略以本页注册表达式为准；数值与枚举按pybind11转换。",
+    "description": "设置顶点/索引解释为三角形、线或点的拓扑。 Python 名称为 long_march.graphics.CommandContext.cmd_set_primitive_topology，转发 CommandContext::CmdSetPrimitiveTopology。"
+  },
+  "code/pybind/grassland/graphics/command_context.cpp#long_march.graphics.CommandContext.cmd_set_scissor": {
+    "contract": "图像等资源由调用方保活至GPU完成；不做跨后端验证。",
+    "description": "由x/y/width/height构造Scissor，width/height为uint32。"
+  },
+  "code/pybind/grassland/graphics/command_context.cpp#long_march.graphics.CommandContext.cmd_set_viewport": {
+    "contract": "图像等资源由调用方保活至GPU完成；不做跨后端验证。",
+    "description": "由六个数值构造Viewport，min/max depth默认0/1。"
+  },
+  "code/pybind/grassland/graphics/core.cpp#long_march.graphics.Core.__init__": {
+    "contract": "尚需init/init_auto；工厂返回码未检查，不支持的后端可能得到空结果。",
+    "description": "使用BackendAPI和CoreSettings调用CreateCore，返回shared_ptr包装。"
+  },
+  "code/pybind/grassland/graphics/core.cpp#long_march.graphics.Core.__repr__": {
+    "contract": "用于诊断，不是序列化协议，也不创建GPU资源。",
+    "description": "生成该对象的Python可读表示；格式字符串和读取字段见注册表达式。"
+  },
+  "code/pybind/grassland/graphics/core.cpp#long_march.graphics.Core.api": {
+    "contract": " Python参数名、默认值和keep_alive策略以本页注册表达式为准；数值与枚举按pybind11转换。",
+    "description": "返回实际后端 BackendAPI，不是自动选择请求值。 Python 名称为 long_march.graphics.Core.api，转发 Core::API。"
+  },
+  "code/pybind/grassland/graphics/core.cpp#long_march.graphics.Core.create_blas": {
+    "contract": "返回资源通过keep_alive保留Core；多数工厂返回码未检查，失败可能返回None或抛底层异常。BLAS Range/TLAS列表不额外保活其中借用对象，调用方保存依赖。",
+    "description": "支持AABB Range+stride/count/flags、三角Range+显式数量、Buffer简写三种重载。"
+  },
+  "code/pybind/grassland/graphics/core.cpp#long_march.graphics.Core.create_buffer": {
+    "contract": "返回资源通过keep_alive保留Core；多数工厂返回码未检查，失败可能返回None或抛底层异常。BLAS Range/TLAS列表不额外保活其中借用对象，调用方保存依赖。",
+    "description": "按字节size创建DeviceBuffer，默认STATIC。"
+  },
+  "code/pybind/grassland/graphics/core.cpp#long_march.graphics.Core.create_command_context": {
+    "contract": "返回资源通过keep_alive保留Core；多数工厂返回码未检查，失败可能返回None或抛底层异常。BLAS Range/TLAS列表不额外保活其中借用对象，调用方保存依赖。",
+    "description": "创建当前后端的一次性命令上下文。"
+  },
+  "code/pybind/grassland/graphics/core.cpp#long_march.graphics.Core.create_compute_program": {
+    "contract": "返回资源通过keep_alive保留Core；多数工厂返回码未检查，失败可能返回None或抛底层异常。BLAS Range/TLAS列表不额外保活其中借用对象，调用方保存依赖。",
+    "description": "从compute_shader创建Program，返回对象保活Core及shader。"
+  },
+  "code/pybind/grassland/graphics/core.cpp#long_march.graphics.Core.create_cuda_buffer": {
+    "contract": "仅CUDA构建导出；非0返回码转异常。",
+    "description": "创建可CUDA共享的静态Buffer并保活Core。"
+  },
+  "code/pybind/grassland/graphics/core.cpp#long_march.graphics.Core.create_image": {
+    "contract": "返回资源通过keep_alive保留Core；多数工厂返回码未检查，失败可能返回None或抛底层异常。BLAS Range/TLAS列表不额外保活其中借用对象，调用方保存依赖。",
+    "description": "按宽高创建Image，默认RGBA8_UNORM。"
+  },
+  "code/pybind/grassland/graphics/core.cpp#long_march.graphics.Core.create_program": {
+    "contract": "返回资源通过keep_alive保留Core；多数工厂返回码未检查，失败可能返回None或抛底层异常。BLAS Range/TLAS列表不额外保活其中借用对象，调用方保存依赖。",
+    "description": "创建图形Program，depth_format默认UNDEFINED。"
+  },
+  "code/pybind/grassland/graphics/core.cpp#long_march.graphics.Core.create_raytracing_program": {
+    "contract": "返回资源通过keep_alive保留Core；多数工厂返回码未检查，失败可能返回None或抛底层异常。BLAS Range/TLAS列表不额外保活其中借用对象，调用方保存依赖。",
+    "description": "创建空RT Program，或同时加入raygen/miss/closest-hit；带shader重载保活三shader。"
+  },
+  "code/pybind/grassland/graphics/core.cpp#long_march.graphics.Core.create_sampler": {
+    "contract": "返回资源通过keep_alive保留Core；多数工厂返回码未检查，失败可能返回None或抛底层异常。BLAS Range/TLAS列表不额外保活其中借用对象，调用方保存依赖。",
+    "description": "按SamplerInfo创建Sampler，默认SamplerInfo()。"
+  },
+  "code/pybind/grassland/graphics/core.cpp#long_march.graphics.Core.create_shader": {
+    "contract": "返回资源通过keep_alive保留Core；多数工厂返回码未检查，失败可能返回None或抛底层异常。BLAS Range/TLAS列表不额外保活其中借用对象，调用方保存依赖。",
+    "description": "将source_code保存到VFS的main.slang并编译entry_point/target，args默认空。"
+  },
+  "code/pybind/grassland/graphics/core.cpp#long_march.graphics.Core.create_shader_from_directory": {
+    "contract": "返回资源通过keep_alive保留Core；多数工厂返回码未检查，失败可能返回None或抛底层异常。BLAS Range/TLAS列表不额外保活其中借用对象，调用方保存依赖。",
+    "description": "递归载入directory到VFS后编译source_file，includes相对载入目录解析。"
+  },
+  "code/pybind/grassland/graphics/core.cpp#long_march.graphics.Core.create_tlas": {
+    "contract": "返回资源通过keep_alive保留Core；多数工厂返回码未检查，失败可能返回None或抛底层异常。BLAS Range/TLAS列表不额外保活其中借用对象，调用方保存依赖。",
+    "description": "接受RayTracingInstance列表，或(AS,4×4行主序矩阵)列表；二元组及每行维度严格检查。"
+  },
+  "code/pybind/grassland/graphics/core.cpp#long_march.graphics.Core.create_window": {
+    "contract": "返回资源通过keep_alive保留Core；多数工厂返回码未检查，失败可能返回None或抛底层异常。BLAS Range/TLAS列表不额外保活其中借用对象，调用方保存依赖。",
+    "description": "按宽高标题创建窗口，fullscreen/resizable默认false。"
+  },
+  "code/pybind/grassland/graphics/core.cpp#long_march.graphics.Core.cuda_begin_execution_barrier": {
+    "contract": "stream为原始cudaStream_t整数，默认0；必须属于Core匹配的CUDA设备。",
+    "description": "令CUDA stream等待已提交图形工作。"
+  },
+  "code/pybind/grassland/graphics/core.cpp#long_march.graphics.Core.cuda_device_index": {
+    "contract": " Python参数名、默认值和keep_alive策略以本页注册表达式为准；数值与枚举按pybind11转换。",
+    "description": "返回匹配的 CUDA 设备索引，默认 -1 表示未匹配。 Python 名称为 long_march.graphics.Core.cuda_device_index，转发 Core::CUDADeviceIndex。"
+  },
+  "code/pybind/grassland/graphics/core.cpp#long_march.graphics.Core.cuda_end_execution_barrier": {
+    "contract": "stream为原始cudaStream_t整数，默认0；必须属于Core匹配的CUDA设备。",
+    "description": "令后续图形提交等待CUDA stream此前工作。"
+  },
+  "code/pybind/grassland/graphics/core.cpp#long_march.graphics.Core.current_frame": {
+    "contract": " Python参数名、默认值和keep_alive策略以本页注册表达式为准；数值与枚举按pybind11转换。",
+    "description": "由后端返回当前在途帧槽索引。 Python 名称为 long_march.graphics.Core.current_frame，转发 Core::CurrentFrame。"
+  },
+  "code/pybind/grassland/graphics/core.cpp#long_march.graphics.Core.debug_enabled": {
+    "contract": " Python参数名、默认值和keep_alive策略以本页注册表达式为准；数值与枚举按pybind11转换。",
+    "description": "返回设置中的调试开关。 Python 名称为 long_march.graphics.Core.debug_enabled，转发 Core::DebugEnabled。"
+  },
+  "code/pybind/grassland/graphics/core.cpp#long_march.graphics.Core.device_name": {
+    "contract": " Python参数名、默认值和keep_alive策略以本页注册表达式为准；数值与枚举按pybind11转换。",
+    "description": "返回逻辑设备初始化后保存的名称。 Python 名称为 long_march.graphics.Core.device_name，转发 Core::DeviceName。"
+  },
+  "code/pybind/grassland/graphics/core.cpp#long_march.graphics.Core.frames_in_flight": {
+    "contract": " Python参数名、默认值和keep_alive策略以本页注册表达式为准；数值与枚举按pybind11转换。",
+    "description": "返回配置中的在途帧数量。 Python 名称为 long_march.graphics.Core.frames_in_flight，转发 Core::FramesInFlight。"
+  },
+  "code/pybind/grassland/graphics/core.cpp#long_march.graphics.Core.init": {
+    "contract": "检查返回码；无效索引由后端处理。 Python参数名、默认值和keep_alive策略以本页注册表达式为准；数值与枚举按pybind11转换。",
+    "description": "用物理设备枚举索引初始化逻辑设备和相关队列。 Python 名称为 long_march.graphics.Core.init，转发 Core::InitializeLogicalDevice。"
+  },
+  "code/pybind/grassland/graphics/core.cpp#long_march.graphics.Core.init_auto": {
+    "contract": "无候选时记录日志并传 -1 给 InitializeLogicalDevice；该条件不代表 ray query。 Python参数名、默认值和keep_alive策略以本页注册表达式为准；数值与枚举按pybind11转换。",
+    "description": "枚举设备，按 score 选择最高分；require_ray_tracing=true 时跳过无完整 RT 支持设备。 Python 名称为 long_march.graphics.Core.init_auto，转发 Core::InitializeLogicalDeviceAutoSelect。"
+  },
+  "code/pybind/grassland/graphics/core.cpp#long_march.graphics.Core.init_cuda": {
+    "contract": "无匹配时同样传 -1；仅 CUDA runtime 构建。 Python参数名、默认值和keep_alive策略以本页注册表达式为准；数值与枚举按pybind11转换。",
+    "description": "寻找属性中 cuda_device_index 与参数匹配的物理设备，再初始化对应逻辑设备。 Python 名称为 long_march.graphics.Core.init_cuda，转发 Core::InitializeLogicalDeviceByCUDADeviceID。"
+  },
+  "code/pybind/grassland/graphics/core.cpp#long_march.graphics.Core.load_image_from_file": {
+    "contract": "LoadImageFromFile非0抛runtime_error并包含路径。",
+    "description": "从文件加载LDR为RGBA8、HDR为RGBA32F，返回Image并保活Core。"
+  },
+  "code/pybind/grassland/graphics/core.cpp#long_march.graphics.Core.ray_query_support": {
+    "contract": " Python参数名、默认值和keep_alive策略以本页注册表达式为准；数值与枚举按pybind11转换。",
+    "description": "查询 inline ray query；基类默认 false，后端可覆盖。 Python 名称为 long_march.graphics.Core.ray_query_support，转发 Core::DeviceRayQuerySupport。"
+  },
+  "code/pybind/grassland/graphics/core.cpp#long_march.graphics.Core.ray_tracing_support": {
+    "contract": " Python参数名、默认值和keep_alive策略以本页注册表达式为准；数值与枚举按pybind11转换。",
+    "description": "返回完整 RT pipeline 支持状态。 Python 名称为 long_march.graphics.Core.ray_tracing_support，转发 Core::DeviceRayTracingSupport。"
+  },
+  "code/pybind/grassland/graphics/core.cpp#long_march.graphics.Core.submit_command_context": {
+    "contract": "提交与 GPU 完成是不同阶段；不要立即释放在用资源。 Python参数名、默认值和keep_alive策略以本页注册表达式为准；数值与枚举按pybind11转换。",
+    "description": "提交由同一 Core 创建并完成记录的命令上下文。 Python 名称为 long_march.graphics.Core.submit_command_context，转发 Core::SubmitCommandContext。"
+  },
+  "code/pybind/grassland/graphics/core.cpp#long_march.graphics.Core.wait_gpu": {
+    "contract": " Python参数名、默认值和keep_alive策略以本页注册表达式为准；数值与枚举按pybind11转换。",
+    "description": "阻塞等待后端 GPU 工作完成，用于回读、销毁或重分配前同步。 Python 名称为 long_march.graphics.Core.wait_gpu，转发 Core::WaitGPU。"
+  },
+  "code/pybind/grassland/graphics/core.cpp#long_march.graphics.Core.wave_size": {
+    "contract": "不要假定所有 GPU 固定为 32。 Python参数名、默认值和keep_alive策略以本页注册表达式为准；数值与枚举按pybind11转换。",
+    "description": "返回后端设备的 wave/subgroup 大小信息。 Python 名称为 long_march.graphics.Core.wave_size，转发 Core::WaveSize。"
+  },
+  "code/pybind/grassland/graphics/core.cpp#long_march.graphics.CoreSettings.__init__": {
+    "contract": "字段可写；帧数应为正且满足后端限制。",
+    "description": "构造Core设置，frames_in_flight默认2，enable_debug默认编译期kEnableDebug。"
+  },
+  "code/pybind/grassland/graphics/core.cpp#long_march.graphics.CoreSettings.__repr__": {
+    "contract": "用于诊断，不是序列化协议，也不创建GPU资源。",
+    "description": "生成该对象的Python可读表示；格式字符串和读取字段见注册表达式。"
+  },
+  "code/pybind/grassland/graphics/core.cpp#long_march.graphics.CoreSettings.enable_debug": {
+    "contract": "默认取决于构建配置；开启可能要求系统validation组件。",
+    "description": "可读写的后端调试/validation开关。"
+  },
+  "code/pybind/grassland/graphics/core.cpp#long_march.graphics.CoreSettings.frames_in_flight": {
+    "contract": "构建设备前设置；修改设置对象不会重新配置已有Core。",
+    "description": "可读写的在途帧槽数量。"
+  },
+  "code/pybind/grassland/graphics/graphics.cpp#long_march.graphics.AccelerationStructure": {
+    "contract": "py::classh使用smart_holder；只有本页或对应注册文件中的__init__明确提供构造时才能直接实例化。不是所有对象或后端都支持 UpdateInstances。",
+    "description": "Python 类型，映射 C++ AccelerationStructure。BLAS/TLAS 的统一多态资源；提供实例描述生成和 TLAS 实例更新。"
+  },
+  "code/pybind/grassland/graphics/graphics.cpp#long_march.graphics.CUDABuffer": {
+    "contract": "py::classh使用smart_holder；只有本页或对应注册文件中的__init__明确提供构造时才能直接实例化。只在启用 CUDA runtime 时声明。",
+    "description": "Python 类型，映射 C++ CUDABuffer, Buffer。虚继承 Buffer 的共享设备内存接口，防止多重继承产生两份 Buffer 基类。"
+  },
+  "code/pybind/grassland/graphics/graphics.cpp#long_march.graphics.CUDABuffer.cuda_ptr": {
+    "contract": "不是CPU可解引用地址；资源Resize/销毁后失效，访问前后使用跨API执行屏障。",
+    "description": "返回共享内存的CUDA device pointer整数。"
+  },
+  "code/pybind/grassland/graphics/graphics.cpp#long_march.graphics.CommandContext": {
+    "contract": "py::classh使用smart_holder；只有本页或对应注册文件中的__init__明确提供构造时才能直接实例化。资源须由同一 Core 创建，录制/提交/完成阶段分开。",
+    "description": "Python 类型，映射 C++ CommandContext。一批 GPU 命令和提交后回调的抽象记录器。"
+  },
+  "code/pybind/grassland/graphics/graphics.cpp#long_march.graphics.ComputeProgram": {
+    "contract": "py::classh使用smart_holder；只有本页或对应注册文件中的__init__明确提供构造时才能直接实例化。配置在 Finalize 前完成；绑定与执行由 CommandContext 进行。",
+    "description": "Python 类型，映射 C++ ComputeProgram。可配置资源布局的计算管线接口。"
+  },
+  "code/pybind/grassland/graphics/graphics.cpp#long_march.graphics.Core": {
+    "contract": "py::classh使用smart_holder；只有本页或对应注册文件中的__init__明确提供构造时才能直接实例化。Core 必须比其创建的设备资源存活更久。",
+    "description": "Python 类型，映射 C++ Core。图形设备抽象和资源工厂，保存通用设置，由具体后端实现设备对象与提交。"
+  },
+  "code/pybind/grassland/graphics/graphics.cpp#long_march.graphics.CoreSettings": {
+    "contract": "py::classh使用smart_holder；只有本页或对应注册文件中的__init__明确提供构造时才能直接实例化。在途帧配置应为正，基类不统一校验。",
+    "description": "Python 类型，映射 C++ Core::Settings。初始化配置：frames_in_flight 默认 2，enable_debug 默认由 NDEBUG 决定。"
+  },
+  "code/pybind/grassland/graphics/graphics.cpp#long_march.graphics.DeviceBuffer": {
+    "contract": "py::classh使用smart_holder；只有本页或对应注册文件中的__init__明确提供构造时才能直接实例化。",
+    "description": "Python 类型，映射 C++ Buffer。GPU 缓冲多态接口，具体存储、在途帧版本和传输机制由后端决定。"
+  },
+  "code/pybind/grassland/graphics/graphics.cpp#long_march.graphics.FrameProfile": {
+    "contract": "py::classh使用smart_holder；只有本页或对应注册文件中的__init__明确提供构造时才能直接实例化。scope 生命周期不能超过 profile/context；名称指针必须在 CPU scope 结束前有效；GPU 结果在 WaitGPU 后 Finish。",
+    "description": "Python 类型，映射 C++ FrameProfile。单线程可选帧分析器，CPU 名称累计毫秒、GPU 时间戳和 counters 由各 scope 写入。"
+  },
+  "code/pybind/grassland/graphics/graphics.cpp#long_march.graphics.FrameProfile.__init__": {
+    "contract": "GPU时间戳当前仅Vulkan，结果应wait_gpu后读取。",
+    "description": "用Core和gpu_timestamps开关构造profile，默认true并保活Core。"
+  },
+  "code/pybind/grassland/graphics/graphics.cpp#long_march.graphics.FrameProfile.begin": {
+    "contract": "scope 生命周期不能超过 profile/context；名称指针必须在 CPU scope 结束前有效；GPU 结果在 WaitGPU 后 Finish。 Python参数名、默认值和keep_alive策略以本页注册表达式为准；数值与枚举按pybind11转换。",
+    "description": "拒绝任何已有 active profile，清空统计与名称，设置开关，并把 thread_local active 指向 this。 Python 名称为 long_march.graphics.FrameProfile.begin，转发 FrameProfile::Begin。"
+  },
+  "code/pybind/grassland/graphics/graphics.cpp#long_march.graphics.FrameProfile.begin_gpu": {
+    "contract": "scope 生命周期不能超过 profile/context；名称指针必须在 CPU scope 结束前有效；GPU 结果在 WaitGPU 后 Finish。 Python参数名、默认值和keep_alive策略以本页注册表达式为准；数值与枚举按pybind11转换。",
+    "description": "已启用查询时分配两个槽、记录开始时间戳并返回槽索引；关闭时返回 -1；超过 64 槽或非 Vulkan context 抛异常。 Python 名称为 long_march.graphics.FrameProfile.begin_gpu，转发 FrameProfile::BeginGpu。"
+  },
+  "code/pybind/grassland/graphics/graphics.cpp#long_march.graphics.FrameProfile.cpu_ms": {
+    "contract": "pybind11 STL转换为Python容器；GPU结果须完成后读取。",
+    "description": "只读暴露按名称汇总的CPU耗时map，单位毫秒。"
+  },
+  "code/pybind/grassland/graphics/graphics.cpp#long_march.graphics.FrameProfile.end_gpu": {
+    "contract": "scope 生命周期不能超过 profile/context；名称指针必须在 CPU scope 结束前有效；GPU 结果在 WaitGPU 后 Finish。 Python参数名、默认值和keep_alive策略以本页注册表达式为准；数值与枚举按pybind11转换。",
+    "description": "索引非负时向 index+1 记录结束时间戳；负索引无操作。 Python 名称为 long_march.graphics.FrameProfile.end_gpu，转发 FrameProfile::EndGpu。"
+  },
+  "code/pybind/grassland/graphics/graphics.cpp#long_march.graphics.FrameProfile.finish": {
+    "contract": "scope 生命周期不能超过 profile/context；名称指针必须在 CPU scope 结束前有效；GPU 结果在 WaitGPU 后 Finish。 Python参数名、默认值和keep_alive策略以本页注册表达式为准；数值与枚举按pybind11转换。",
+    "description": "清空 active，读取成对 GPU 查询值，按 valid bits 处理回绕并乘 timestampPeriod 转为毫秒，按名称累计。 Python 名称为 long_march.graphics.FrameProfile.finish，转发 FrameProfile::Finish。"
+  },
+  "code/pybind/grassland/graphics/graphics.cpp#long_march.graphics.FrameProfile.gpu_ms": {
+    "contract": "pybind11 STL转换为Python容器；GPU结果须完成后读取。",
+    "description": "只读暴露按名称汇总的GPU耗时map，单位毫秒。"
+  },
+  "code/pybind/grassland/graphics/graphics.cpp#long_march.graphics.Image": {
+    "contract": "py::classh使用smart_holder；只有本页或对应注册文件中的__init__明确提供构造时才能直接实例化。",
+    "description": "Python 类型，映射 C++ Image。固定格式和尺寸的二维图像接口，支持完整或局部数据传输。"
+  },
+  "code/pybind/grassland/graphics/graphics.cpp#long_march.graphics.MagnifyPhase": {
+    "contract": "py::classh使用smart_holder；只有本页或对应注册文件中的__init__明确提供构造时才能直接实例化。",
+    "description": "Python 类型，映射 C++ MagnifyPhase。原生缩放手势阶段：Begin、Update、End、Cancel。"
+  },
+  "code/pybind/grassland/graphics/graphics.cpp#long_march.graphics.MagnifyPhase.MAGNIFY_PHASE_BEGIN": {
+    "contract": "数值由C++枚举定义；export_values同时在所属模块导出同名值。",
+    "description": "枚举成员，原生值为 MagnifyPhase::kBegin。Magnify Phase: Begin"
+  },
+  "code/pybind/grassland/graphics/graphics.cpp#long_march.graphics.MagnifyPhase.MAGNIFY_PHASE_CANCEL": {
+    "contract": "数值由C++枚举定义；export_values同时在所属模块导出同名值。",
+    "description": "枚举成员，原生值为 MagnifyPhase::kCancel。Magnify Phase: Cancel"
+  },
+  "code/pybind/grassland/graphics/graphics.cpp#long_march.graphics.MagnifyPhase.MAGNIFY_PHASE_END": {
+    "contract": "数值由C++枚举定义；export_values同时在所属模块导出同名值。",
+    "description": "枚举成员，原生值为 MagnifyPhase::kEnd。Magnify Phase: End"
+  },
+  "code/pybind/grassland/graphics/graphics.cpp#long_march.graphics.MagnifyPhase.MAGNIFY_PHASE_UPDATE": {
+    "contract": "数值由C++枚举定义；export_values同时在所属模块导出同名值。",
+    "description": "枚举成员，原生值为 MagnifyPhase::kUpdate。Magnify Phase: Update"
+  },
+  "code/pybind/grassland/graphics/graphics.cpp#long_march.graphics.Program": {
+    "contract": "py::classh使用smart_holder；只有本页或对应注册文件中的__init__明确提供构造时才能直接实例化。配置在 Finalize 前完成；绑定与执行由 CommandContext 进行。",
+    "description": "Python 类型，映射 C++ Program。可配置顶点输入、资源布局和光栅状态的管线接口。"
+  },
+  "code/pybind/grassland/graphics/graphics.cpp#long_march.graphics.RayTracingProgram": {
+    "contract": "py::classh使用smart_holder；只有本页或对应注册文件中的__init__明确提供构造时才能直接实例化。配置在 Finalize 前完成；绑定与执行由 CommandContext 进行。",
+    "description": "Python 类型，映射 C++ RayTracingProgram。管理 raygen/miss/hit/callable shader 和 SBT 排列的 RT 管线接口。"
+  },
+  "code/pybind/grassland/graphics/graphics.cpp#long_march.graphics.Sampler": {
+    "contract": "py::classh使用smart_holder；只有本页或对应注册文件中的__init__明确提供构造时才能直接实例化。",
+    "description": "Python 类型，映射 C++ Sampler。只含虚析构的采样器基类；采样配置通过 SamplerInfo 在工厂创建时给定。"
+  },
+  "code/pybind/grassland/graphics/graphics.cpp#long_march.graphics.Shader": {
+    "contract": "py::classh使用smart_holder；只有本页或对应注册文件中的__init__明确提供构造时才能直接实例化。",
+    "description": "Python 类型，映射 C++ Shader。后端着色器资源接口，公开其入口点名称。"
+  },
+  "code/pybind/grassland/graphics/graphics.cpp#long_march.graphics.Window": {
+    "contract": "py::classh使用smart_holder；只有本页或对应注册文件中的__init__明确提供构造时才能直接实例化。窗口操作和事件轮询在主线程；窗口关闭后不能继续调用需要 GLFWwindow 的查询接口。",
+    "description": "Python 类型，映射 C++ Window。拥有 GLFWwindow、输入事件分发器与可选 HDR 呈现中间资源的多态窗口。"
+  },
+  "code/pybind/grassland/graphics/graphics.cpp#long_march.graphics.imgui": {
+    "contract": "具体导出对象在对应Register函数文件中逐项列出。",
+    "description": "创建Python子模块 long_march.graphics.imgui。"
+  },
+  "code/pybind/grassland/graphics/graphics_util.cpp#long_march.graphics.AddressMode": {
+    "contract": "py::classh使用smart_holder；只有本页或对应注册文件中的__init__明确提供构造时才能直接实例化。",
+    "description": "Python 类型，映射 C++ AddressMode。纹理越界寻址：重复、镜像重复、边缘钳制或边界钳制。"
+  },
+  "code/pybind/grassland/graphics/graphics_util.cpp#long_march.graphics.AddressMode.ADDRESS_MODE_CLAMP_TO_BORDER": {
+    "contract": "数值由C++枚举定义；export_values同时在所属模块导出同名值。",
+    "description": "枚举成员，原生值为 ADDRESS_MODE_CLAMP_TO_BORDER。Address Mode: Clamp to Border"
+  },
+  "code/pybind/grassland/graphics/graphics_util.cpp#long_march.graphics.AddressMode.ADDRESS_MODE_CLAMP_TO_EDGE": {
+    "contract": "数值由C++枚举定义；export_values同时在所属模块导出同名值。",
+    "description": "枚举成员，原生值为 ADDRESS_MODE_CLAMP_TO_EDGE。Address Mode: Clamp to Edge"
+  },
+  "code/pybind/grassland/graphics/graphics_util.cpp#long_march.graphics.AddressMode.ADDRESS_MODE_MIRRORED_REPEAT": {
+    "contract": "数值由C++枚举定义；export_values同时在所属模块导出同名值。",
+    "description": "枚举成员，原生值为 ADDRESS_MODE_MIRRORED_REPEAT。Address Mode: Mirrored Repeat"
+  },
+  "code/pybind/grassland/graphics/graphics_util.cpp#long_march.graphics.AddressMode.ADDRESS_MODE_REPEAT": {
+    "contract": "数值由C++枚举定义；export_values同时在所属模块导出同名值。",
+    "description": "枚举成员，原生值为 ADDRESS_MODE_REPEAT。Address Mode: Repeat"
+  },
+  "code/pybind/grassland/graphics/graphics_util.cpp#long_march.graphics.BACKEND_API_DEFAULT": {
+    "contract": "值由当前构建的C++配置决定。",
+    "description": "Python模块常量/别名，绑定表达式为 py::cast(BACKEND_API_DEFAULT)。"
+  },
+  "code/pybind/grassland/graphics/graphics_util.cpp#long_march.graphics.BIND_POINT_COMPUTE": {
+    "contract": "值由当前构建的C++配置决定。",
+    "description": "Python模块常量/别名，绑定表达式为 py::cast(BIND_POINT_COMPUTE)。"
+  },
+  "code/pybind/grassland/graphics/graphics_util.cpp#long_march.graphics.BIND_POINT_GRAPHICS": {
+    "contract": "值由当前构建的C++配置决定。",
+    "description": "Python模块常量/别名，绑定表达式为 py::cast(BIND_POINT_GRAPHICS)。"
+  },
+  "code/pybind/grassland/graphics/graphics_util.cpp#long_march.graphics.BIND_POINT_RAYTRACING": {
+    "contract": "值由当前构建的C++配置决定。",
+    "description": "Python模块常量/别名，绑定表达式为 py::cast(BIND_POINT_RAYTRACING)。"
+  },
+  "code/pybind/grassland/graphics/graphics_util.cpp#long_march.graphics.BackendAPI": {
+    "contract": "py::classh使用smart_holder；只有本页或对应注册文件中的__init__明确提供构造时才能直接实例化。",
+    "description": "Python 类型，映射 C++ BackendAPI。后端枚举 Vulkan=0、D3D12=1、Metal=2；DEFAULT 按编译宏选择，不能将枚举存在当作已构建支持。"
+  },
+  "code/pybind/grassland/graphics/graphics_util.cpp#long_march.graphics.BackendAPI.BACKEND_API_D3D12": {
+    "contract": "数值由C++枚举定义；export_values同时在所属模块导出同名值。",
+    "description": "枚举成员，原生值为 BACKEND_API_D3D12。Backend API: Direct3D 12"
+  },
+  "code/pybind/grassland/graphics/graphics_util.cpp#long_march.graphics.BackendAPI.BACKEND_API_METAL": {
+    "contract": "数值由C++枚举定义；export_values同时在所属模块导出同名值。",
+    "description": "枚举成员，原生值为 BACKEND_API_METAL。Backend API: Metal"
+  },
+  "code/pybind/grassland/graphics/graphics_util.cpp#long_march.graphics.BackendAPI.BACKEND_API_VULKAN": {
+    "contract": "数值由C++枚举定义；export_values同时在所属模块导出同名值。",
+    "description": "枚举成员，原生值为 BACKEND_API_VULKAN。Backend API: Vulkan"
+  },
+  "code/pybind/grassland/graphics/graphics_util.cpp#long_march.graphics.BindPoint": {
+    "contract": "py::classh使用smart_holder；只有本页或对应注册文件中的__init__明确提供构造时才能直接实例化。",
+    "description": "Python 类型，映射 C++ BindPoint。资源绑定的程序域：GRAPHICS、COMPUTE、RAYTRACING；COUNT 用于内部数组大小。"
+  },
+  "code/pybind/grassland/graphics/graphics_util.cpp#long_march.graphics.BindPoint.BIND_POINT_COMPUTE": {
+    "contract": "数值由C++枚举定义；export_values同时在所属模块导出同名值。",
+    "description": "枚举成员，原生值为 BIND_POINT_COMPUTE。Bind Point: Compute Pipeline"
+  },
+  "code/pybind/grassland/graphics/graphics_util.cpp#long_march.graphics.BindPoint.BIND_POINT_GRAPHICS": {
+    "contract": "数值由C++枚举定义；export_values同时在所属模块导出同名值。",
+    "description": "枚举成员，原生值为 BIND_POINT_GRAPHICS。Bind Point: Graphics Pipeline"
+  },
+  "code/pybind/grassland/graphics/graphics_util.cpp#long_march.graphics.BindPoint.BIND_POINT_RAYTRACING": {
+    "contract": "数值由C++枚举定义；export_values同时在所属模块导出同名值。",
+    "description": "枚举成员，原生值为 BIND_POINT_RAYTRACING。Bind Point: Ray Tracing Pipeline"
+  },
+  "code/pybind/grassland/graphics/graphics_util.cpp#long_march.graphics.BlendFactor": {
+    "contract": "py::classh使用smart_holder；只有本页或对应注册文件中的__init__明确提供构造时才能直接实例化。",
+    "description": "Python 类型，映射 C++ BlendFactor。源/目标颜色或 alpha 及其补值、0 和 1，用于颜色与 alpha 混合。"
+  },
+  "code/pybind/grassland/graphics/graphics_util.cpp#long_march.graphics.BlendFactor.BLEND_FACTOR_DST_ALPHA": {
+    "contract": "数值由C++枚举定义；export_values同时在所属模块导出同名值。",
+    "description": "枚举成员，原生值为 BLEND_FACTOR_DST_ALPHA。Blend Factor: Destination Alpha"
+  },
+  "code/pybind/grassland/graphics/graphics_util.cpp#long_march.graphics.BlendFactor.BLEND_FACTOR_DST_COLOR": {
+    "contract": "数值由C++枚举定义；export_values同时在所属模块导出同名值。",
+    "description": "枚举成员，原生值为 BLEND_FACTOR_DST_COLOR。Blend Factor: Destination Color"
+  },
+  "code/pybind/grassland/graphics/graphics_util.cpp#long_march.graphics.BlendFactor.BLEND_FACTOR_ONE": {
+    "contract": "数值由C++枚举定义；export_values同时在所属模块导出同名值。",
+    "description": "枚举成员，原生值为 BLEND_FACTOR_ONE。Blend Factor: One"
+  },
+  "code/pybind/grassland/graphics/graphics_util.cpp#long_march.graphics.BlendFactor.BLEND_FACTOR_ONE_MINUS_DST_ALPHA": {
+    "contract": "数值由C++枚举定义；export_values同时在所属模块导出同名值。",
+    "description": "枚举成员，原生值为 BLEND_FACTOR_ONE_MINUS_DST_ALPHA。Blend Factor: One Minus Destination Alpha"
+  },
+  "code/pybind/grassland/graphics/graphics_util.cpp#long_march.graphics.BlendFactor.BLEND_FACTOR_ONE_MINUS_DST_COLOR": {
+    "contract": "数值由C++枚举定义；export_values同时在所属模块导出同名值。",
+    "description": "枚举成员，原生值为 BLEND_FACTOR_ONE_MINUS_DST_COLOR。Blend Factor: One Minus Destination Color"
+  },
+  "code/pybind/grassland/graphics/graphics_util.cpp#long_march.graphics.BlendFactor.BLEND_FACTOR_ONE_MINUS_SRC_ALPHA": {
+    "contract": "数值由C++枚举定义；export_values同时在所属模块导出同名值。",
+    "description": "枚举成员，原生值为 BLEND_FACTOR_ONE_MINUS_SRC_ALPHA。Blend Factor: One Minus Source Alpha"
+  },
+  "code/pybind/grassland/graphics/graphics_util.cpp#long_march.graphics.BlendFactor.BLEND_FACTOR_ONE_MINUS_SRC_COLOR": {
+    "contract": "数值由C++枚举定义；export_values同时在所属模块导出同名值。",
+    "description": "枚举成员，原生值为 BLEND_FACTOR_ONE_MINUS_SRC_COLOR。Blend Factor: One Minus Source Color"
+  },
+  "code/pybind/grassland/graphics/graphics_util.cpp#long_march.graphics.BlendFactor.BLEND_FACTOR_SRC_ALPHA": {
+    "contract": "数值由C++枚举定义；export_values同时在所属模块导出同名值。",
+    "description": "枚举成员，原生值为 BLEND_FACTOR_SRC_ALPHA。Blend Factor: Source Alpha"
+  },
+  "code/pybind/grassland/graphics/graphics_util.cpp#long_march.graphics.BlendFactor.BLEND_FACTOR_SRC_COLOR": {
+    "contract": "数值由C++枚举定义；export_values同时在所属模块导出同名值。",
+    "description": "枚举成员，原生值为 BLEND_FACTOR_SRC_COLOR。Blend Factor: Source Color"
+  },
+  "code/pybind/grassland/graphics/graphics_util.cpp#long_march.graphics.BlendFactor.BLEND_FACTOR_ZERO": {
+    "contract": "数值由C++枚举定义；export_values同时在所属模块导出同名值。",
+    "description": "枚举成员，原生值为 BLEND_FACTOR_ZERO。Blend Factor: Zero"
+  },
+  "code/pybind/grassland/graphics/graphics_util.cpp#long_march.graphics.BlendOp": {
+    "contract": "py::classh使用smart_holder；只有本页或对应注册文件中的__init__明确提供构造时才能直接实例化。",
+    "description": "Python 类型，映射 C++ BlendOp。ADD、SUBTRACT、REVERSE_SUBTRACT、MIN、MAX 混合运算。"
+  },
+  "code/pybind/grassland/graphics/graphics_util.cpp#long_march.graphics.BlendOp.BLEND_OP_ADD": {
+    "contract": "数值由C++枚举定义；export_values同时在所属模块导出同名值。",
+    "description": "枚举成员，原生值为 BLEND_OP_ADD。Blend Operation: Add"
+  },
+  "code/pybind/grassland/graphics/graphics_util.cpp#long_march.graphics.BlendOp.BLEND_OP_MAX": {
+    "contract": "数值由C++枚举定义；export_values同时在所属模块导出同名值。",
+    "description": "枚举成员，原生值为 BLEND_OP_MAX。Blend Operation: Max"
+  },
+  "code/pybind/grassland/graphics/graphics_util.cpp#long_march.graphics.BlendOp.BLEND_OP_MIN": {
+    "contract": "数值由C++枚举定义；export_values同时在所属模块导出同名值。",
+    "description": "枚举成员，原生值为 BLEND_OP_MIN。Blend Operation: Min"
+  },
+  "code/pybind/grassland/graphics/graphics_util.cpp#long_march.graphics.BlendOp.BLEND_OP_REVERSE_SUBTRACT": {
+    "contract": "数值由C++枚举定义；export_values同时在所属模块导出同名值。",
+    "description": "枚举成员，原生值为 BLEND_OP_REVERSE_SUBTRACT。Blend Operation: Reverse Subtract"
+  },
+  "code/pybind/grassland/graphics/graphics_util.cpp#long_march.graphics.BlendOp.BLEND_OP_SUBTRACT": {
+    "contract": "数值由C++枚举定义；export_values同时在所属模块导出同名值。",
+    "description": "枚举成员，原生值为 BLEND_OP_SUBTRACT。Blend Operation: Subtract"
+  },
+  "code/pybind/grassland/graphics/graphics_util.cpp#long_march.graphics.BlendState": {
+    "contract": "py::classh使用smart_holder；只有本页或对应注册文件中的__init__明确提供构造时才能直接实例化。",
+    "description": "Python 类型，映射 C++ BlendState。单颜色附件混合开关及独立颜色/alpha 的源因子、目标因子、运算。"
+  },
+  "code/pybind/grassland/graphics/graphics_util.cpp#long_march.graphics.BlendState.__init__": {
+    "contract": "数值和矩阵有效性仍需调用方保证；这些值对象本身不创建GPU资源。",
+    "description": "无参/enable开关/完整RGB与alpha因子操作重载；默认无参不混合，详细默认因子见签名。"
+  },
+  "code/pybind/grassland/graphics/graphics_util.cpp#long_march.graphics.BlendState.__repr__": {
+    "contract": "用于诊断，不是序列化协议，也不创建GPU资源。",
+    "description": "生成该对象的Python可读表示；格式字符串和读取字段见注册表达式。"
+  },
+  "code/pybind/grassland/graphics/graphics_util.cpp#long_march.graphics.BlendState.alpha_op": {
+    "contract": "直接改C++值，不自动重新创建已有GPU资源或验证组合合法性。",
+    "description": "可读写字段：alpha组合操作。"
+  },
+  "code/pybind/grassland/graphics/graphics_util.cpp#long_march.graphics.BlendState.blend_enable": {
+    "contract": "直接改C++值，不自动重新创建已有GPU资源或验证组合合法性。",
+    "description": "可读写字段：混合开关。"
+  },
+  "code/pybind/grassland/graphics/graphics_util.cpp#long_march.graphics.BlendState.color_op": {
+    "contract": "直接改C++值，不自动重新创建已有GPU资源或验证组合合法性。",
+    "description": "可读写字段：RGB组合操作。"
+  },
+  "code/pybind/grassland/graphics/graphics_util.cpp#long_march.graphics.BlendState.dst_alpha": {
+    "contract": "直接改C++值，不自动重新创建已有GPU资源或验证组合合法性。",
+    "description": "可读写字段：alpha目标因子。"
+  },
+  "code/pybind/grassland/graphics/graphics_util.cpp#long_march.graphics.BlendState.dst_color": {
+    "contract": "直接改C++值，不自动重新创建已有GPU资源或验证组合合法性。",
+    "description": "可读写字段：RGB目标因子。"
+  },
+  "code/pybind/grassland/graphics/graphics_util.cpp#long_march.graphics.BlendState.src_alpha": {
+    "contract": "直接改C++值，不自动重新创建已有GPU资源或验证组合合法性。",
+    "description": "可读写字段：alpha源因子。"
+  },
+  "code/pybind/grassland/graphics/graphics_util.cpp#long_march.graphics.BlendState.src_color": {
+    "contract": "直接改C++值，不自动重新创建已有GPU资源或验证组合合法性。",
+    "description": "可读写字段：RGB源因子。"
+  },
+  "code/pybind/grassland/graphics/graphics_util.cpp#long_march.graphics.BufferRange": {
+    "contract": "py::classh使用smart_holder；只有本页或对应注册文件中的__init__明确提供构造时才能直接实例化。不持有资源所有权；offset 必须<=Buffer::Size。",
+    "description": "Python 类型，映射 C++ BufferRange。借用 buffer 加 offset/size 的字节区间描述。"
+  },
+  "code/pybind/grassland/graphics/graphics_util.cpp#long_march.graphics.BufferRange.__init__": {
+    "contract": "数值和矩阵有效性仍需调用方保证；这些值对象本身不创建GPU资源。",
+    "description": "从Buffer及offset/size构造，size默认~0ull表示到末尾，构造keep_alive保留Buffer。"
+  },
+  "code/pybind/grassland/graphics/graphics_util.cpp#long_march.graphics.BufferRange.__repr__": {
+    "contract": "用于诊断，不是序列化协议，也不创建GPU资源。",
+    "description": "生成该对象的Python可读表示；格式字符串和读取字段见注册表达式。"
+  },
+  "code/pybind/grassland/graphics/graphics_util.cpp#long_march.graphics.BufferRange.buffer": {
+    "contract": "直接改C++值，不自动重新创建已有GPU资源或验证组合合法性。",
+    "description": "可读写字段：借用Buffer指针；重新赋值不会更新构造时的keep_alive。"
+  },
+  "code/pybind/grassland/graphics/graphics_util.cpp#long_march.graphics.BufferRange.offset": {
+    "contract": "直接改C++值，不自动重新创建已有GPU资源或验证组合合法性。",
+    "description": "可读写字段：字节起始偏移。"
+  },
+  "code/pybind/grassland/graphics/graphics_util.cpp#long_march.graphics.BufferRange.size": {
+    "contract": "直接改C++值，不自动重新创建已有GPU资源或验证组合合法性。",
+    "description": "可读写字段：字节范围长度。"
+  },
+  "code/pybind/grassland/graphics/graphics_util.cpp#long_march.graphics.BufferType": {
+    "contract": "py::classh使用smart_holder；只有本页或对应注册文件中的__init__明确提供构造时才能直接实例化。",
+    "description": "Python 类型，映射 C++ BufferType。STATIC、DYNAMIC、ONETIME 的资源更新用途分类；具体设备内存和帧复制策略由后端决定。"
+  },
+  "code/pybind/grassland/graphics/graphics_util.cpp#long_march.graphics.BufferType.BUFFER_TYPE_DYNAMIC": {
+    "contract": "数值由C++枚举定义；export_values同时在所属模块导出同名值。",
+    "description": "枚举成员，原生值为 BUFFER_TYPE_DYNAMIC。Buffer Type: Dynamic"
+  },
+  "code/pybind/grassland/graphics/graphics_util.cpp#long_march.graphics.BufferType.BUFFER_TYPE_ONETIME": {
+    "contract": "数值由C++枚举定义；export_values同时在所属模块导出同名值。",
+    "description": "枚举成员，原生值为 BUFFER_TYPE_ONETIME。Buffer Type: One-Time"
+  },
+  "code/pybind/grassland/graphics/graphics_util.cpp#long_march.graphics.BufferType.BUFFER_TYPE_STATIC": {
+    "contract": "数值由C++枚举定义；export_values同时在所属模块导出同名值。",
+    "description": "枚举成员，原生值为 BUFFER_TYPE_STATIC。Buffer Type: Static"
+  },
+  "code/pybind/grassland/graphics/graphics_util.cpp#long_march.graphics.CullMode": {
+    "contract": "py::classh使用smart_holder；只有本页或对应注册文件中的__init__明确提供构造时才能直接实例化。",
+    "description": "Python 类型，映射 C++ CullMode。三角形不剔除、剔除正面、剔除背面。具体正反面方向由后端光栅约定决定。"
+  },
+  "code/pybind/grassland/graphics/graphics_util.cpp#long_march.graphics.CullMode.CULL_MODE_BACK": {
+    "contract": "数值由C++枚举定义；export_values同时在所属模块导出同名值。",
+    "description": "枚举成员，原生值为 CULL_MODE_BACK。Cull Mode: Back Face"
+  },
+  "code/pybind/grassland/graphics/graphics_util.cpp#long_march.graphics.CullMode.CULL_MODE_FRONT": {
+    "contract": "数值由C++枚举定义；export_values同时在所属模块导出同名值。",
+    "description": "枚举成员，原生值为 CULL_MODE_FRONT。Cull Mode: Front Face"
+  },
+  "code/pybind/grassland/graphics/graphics_util.cpp#long_march.graphics.CullMode.CULL_MODE_NONE": {
+    "contract": "数值由C++枚举定义；export_values同时在所属模块导出同名值。",
+    "description": "枚举成员，原生值为 CULL_MODE_NONE。Cull Mode: None"
+  },
+  "code/pybind/grassland/graphics/graphics_util.cpp#long_march.graphics.Extent2D": {
+    "contract": "py::classh使用smart_holder；只有本页或对应注册文件中的__init__明确提供构造时才能直接实例化。",
+    "description": "Python 类型，映射 C++ Extent2D。无符号物理像素宽/高；使用范围由具体资源接口决定。"
+  },
+  "code/pybind/grassland/graphics/graphics_util.cpp#long_march.graphics.Extent2D.__init__": {
+    "contract": "数值和矩阵有效性仍需调用方保证；这些值对象本身不创建GPU资源。",
+    "description": "从uint32 width/height构造像素尺寸。"
+  },
+  "code/pybind/grassland/graphics/graphics_util.cpp#long_march.graphics.Extent2D.__repr__": {
+    "contract": "用于诊断，不是序列化协议，也不创建GPU资源。",
+    "description": "生成该对象的Python可读表示；格式字符串和读取字段见注册表达式。"
+  },
+  "code/pybind/grassland/graphics/graphics_util.cpp#long_march.graphics.Extent2D.height": {
+    "contract": "直接改C++值，不自动重新创建已有GPU资源或验证组合合法性。",
+    "description": "可读写字段：uint32像素高度。"
+  },
+  "code/pybind/grassland/graphics/graphics_util.cpp#long_march.graphics.Extent2D.width": {
+    "contract": "直接改C++值，不自动重新创建已有GPU资源或验证组合合法性。",
+    "description": "可读写字段：uint32像素宽度。"
+  },
+  "code/pybind/grassland/graphics/graphics_util.cpp#long_march.graphics.FilterMode": {
+    "contract": "py::classh使用smart_holder；只有本页或对应注册文件中的__init__明确提供构造时才能直接实例化。",
+    "description": "Python 类型，映射 C++ FilterMode。纹理最近邻或线性过滤。"
+  },
+  "code/pybind/grassland/graphics/graphics_util.cpp#long_march.graphics.FilterMode.FILTER_MODE_LINEAR": {
+    "contract": "数值由C++枚举定义；export_values同时在所属模块导出同名值。",
+    "description": "枚举成员，原生值为 FILTER_MODE_LINEAR。Filter Mode: Linear"
+  },
+  "code/pybind/grassland/graphics/graphics_util.cpp#long_march.graphics.FilterMode.FILTER_MODE_NEAREST": {
+    "contract": "数值由C++枚举定义；export_values同时在所属模块导出同名值。",
+    "description": "枚举成员，原生值为 FILTER_MODE_NEAREST。Filter Mode: Nearest"
+  },
+  "code/pybind/grassland/graphics/graphics_util.cpp#long_march.graphics.ImageFormat": {
+    "contract": "py::classh使用smart_holder；只有本页或对应注册文件中的__init__明确提供构造时才能直接实例化。",
+    "description": "Python 类型，映射 C++ ImageFormat。跨后端图像格式编号，覆盖 UNORM、浮点、整数与 D32 深度；UNDEFINED=0 表示未指定。"
+  },
+  "code/pybind/grassland/graphics/graphics_util.cpp#long_march.graphics.ImageFormat.IMAGE_FORMAT_B8G8R8A8_UNORM": {
+    "contract": "数值由C++枚举定义；export_values同时在所属模块导出同名值。",
+    "description": "枚举成员，原生值为 IMAGE_FORMAT_B8G8R8A8_UNORM。Image Format: B8G8R8A8 Unorm"
+  },
+  "code/pybind/grassland/graphics/graphics_util.cpp#long_march.graphics.ImageFormat.IMAGE_FORMAT_D32_SFLOAT": {
+    "contract": "数值由C++枚举定义；export_values同时在所属模块导出同名值。",
+    "description": "枚举成员，原生值为 IMAGE_FORMAT_D32_SFLOAT。Image Format: D32 Float"
+  },
+  "code/pybind/grassland/graphics/graphics_util.cpp#long_march.graphics.ImageFormat.IMAGE_FORMAT_R16G16B16A16_SFLOAT": {
+    "contract": "数值由C++枚举定义；export_values同时在所属模块导出同名值。",
+    "description": "枚举成员，原生值为 IMAGE_FORMAT_R16G16B16A16_SFLOAT。Image Format: R16G16B16A16 Float"
+  },
+  "code/pybind/grassland/graphics/graphics_util.cpp#long_march.graphics.ImageFormat.IMAGE_FORMAT_R32G32B32A32_SFLOAT": {
+    "contract": "数值由C++枚举定义；export_values同时在所属模块导出同名值。",
+    "description": "枚举成员，原生值为 IMAGE_FORMAT_R32G32B32A32_SFLOAT。Image Format: R32G32B32A32 Float"
+  },
+  "code/pybind/grassland/graphics/graphics_util.cpp#long_march.graphics.ImageFormat.IMAGE_FORMAT_R32G32B32_SFLOAT": {
+    "contract": "数值由C++枚举定义；export_values同时在所属模块导出同名值。",
+    "description": "枚举成员，原生值为 IMAGE_FORMAT_R32G32B32_SFLOAT。Image Format: R32G32B32 Float"
+  },
+  "code/pybind/grassland/graphics/graphics_util.cpp#long_march.graphics.ImageFormat.IMAGE_FORMAT_R32G32_SFLOAT": {
+    "contract": "数值由C++枚举定义；export_values同时在所属模块导出同名值。",
+    "description": "枚举成员，原生值为 IMAGE_FORMAT_R32G32_SFLOAT。Image Format: R32G32 Float"
+  },
+  "code/pybind/grassland/graphics/graphics_util.cpp#long_march.graphics.ImageFormat.IMAGE_FORMAT_R32_SFLOAT": {
+    "contract": "数值由C++枚举定义；export_values同时在所属模块导出同名值。",
+    "description": "枚举成员，原生值为 IMAGE_FORMAT_R32_SFLOAT。Image Format: R32 Float"
+  },
+  "code/pybind/grassland/graphics/graphics_util.cpp#long_march.graphics.ImageFormat.IMAGE_FORMAT_R32_SINT": {
+    "contract": "数值由C++枚举定义；export_values同时在所属模块导出同名值。",
+    "description": "枚举成员，原生值为 IMAGE_FORMAT_R32_SINT。Image Format: R32 Sint"
+  },
+  "code/pybind/grassland/graphics/graphics_util.cpp#long_march.graphics.ImageFormat.IMAGE_FORMAT_R32_UINT": {
+    "contract": "数值由C++枚举定义；export_values同时在所属模块导出同名值。",
+    "description": "枚举成员，原生值为 IMAGE_FORMAT_R32_UINT。Image Format: R32 Uint"
+  },
+  "code/pybind/grassland/graphics/graphics_util.cpp#long_march.graphics.ImageFormat.IMAGE_FORMAT_R8G8B8A8_UNORM": {
+    "contract": "数值由C++枚举定义；export_values同时在所属模块导出同名值。",
+    "description": "枚举成员，原生值为 IMAGE_FORMAT_R8G8B8A8_UNORM。Image Format: R8G8B8A8 Unorm"
+  },
+  "code/pybind/grassland/graphics/graphics_util.cpp#long_march.graphics.ImageFormat.IMAGE_FORMAT_UNDEFINED": {
+    "contract": "数值由C++枚举定义；export_values同时在所属模块导出同名值。",
+    "description": "枚举成员，原生值为 IMAGE_FORMAT_UNDEFINED。Image Format: Undefined"
+  },
+  "code/pybind/grassland/graphics/graphics_util.cpp#long_march.graphics.InputType": {
+    "contract": "py::classh使用smart_holder；只有本页或对应注册文件中的__init__明确提供构造时才能直接实例化。",
+    "description": "Python 类型，映射 C++ InputType。顶点属性的标量类别与 1–4 分量组合，均以 32 位 int/uint/float 表示。"
+  },
+  "code/pybind/grassland/graphics/graphics_util.cpp#long_march.graphics.InputType.INPUT_TYPE_FLOAT": {
+    "contract": "数值由C++枚举定义；export_values同时在所属模块导出同名值。",
+    "description": "枚举成员，原生值为 INPUT_TYPE_FLOAT。Input Type: float"
+  },
+  "code/pybind/grassland/graphics/graphics_util.cpp#long_march.graphics.InputType.INPUT_TYPE_FLOAT2": {
+    "contract": "数值由C++枚举定义；export_values同时在所属模块导出同名值。",
+    "description": "枚举成员，原生值为 INPUT_TYPE_FLOAT2。Input Type: float2"
+  },
+  "code/pybind/grassland/graphics/graphics_util.cpp#long_march.graphics.InputType.INPUT_TYPE_FLOAT3": {
+    "contract": "数值由C++枚举定义；export_values同时在所属模块导出同名值。",
+    "description": "枚举成员，原生值为 INPUT_TYPE_FLOAT3。Input Type: float3"
+  },
+  "code/pybind/grassland/graphics/graphics_util.cpp#long_march.graphics.InputType.INPUT_TYPE_FLOAT4": {
+    "contract": "数值由C++枚举定义；export_values同时在所属模块导出同名值。",
+    "description": "枚举成员，原生值为 INPUT_TYPE_FLOAT4。Input Type: float4"
+  },
+  "code/pybind/grassland/graphics/graphics_util.cpp#long_march.graphics.InputType.INPUT_TYPE_INT": {
+    "contract": "数值由C++枚举定义；export_values同时在所属模块导出同名值。",
+    "description": "枚举成员，原生值为 INPUT_TYPE_INT。Input Type: int"
+  },
+  "code/pybind/grassland/graphics/graphics_util.cpp#long_march.graphics.InputType.INPUT_TYPE_INT2": {
+    "contract": "数值由C++枚举定义；export_values同时在所属模块导出同名值。",
+    "description": "枚举成员，原生值为 INPUT_TYPE_INT2。Input Type: int2"
+  },
+  "code/pybind/grassland/graphics/graphics_util.cpp#long_march.graphics.InputType.INPUT_TYPE_INT3": {
+    "contract": "数值由C++枚举定义；export_values同时在所属模块导出同名值。",
+    "description": "枚举成员，原生值为 INPUT_TYPE_INT3。Input Type: int3"
+  },
+  "code/pybind/grassland/graphics/graphics_util.cpp#long_march.graphics.InputType.INPUT_TYPE_INT4": {
+    "contract": "数值由C++枚举定义；export_values同时在所属模块导出同名值。",
+    "description": "枚举成员，原生值为 INPUT_TYPE_INT4。Input Type: int4"
+  },
+  "code/pybind/grassland/graphics/graphics_util.cpp#long_march.graphics.InputType.INPUT_TYPE_UINT": {
+    "contract": "数值由C++枚举定义；export_values同时在所属模块导出同名值。",
+    "description": "枚举成员，原生值为 INPUT_TYPE_UINT。Input Type: uint"
+  },
+  "code/pybind/grassland/graphics/graphics_util.cpp#long_march.graphics.InputType.INPUT_TYPE_UINT2": {
+    "contract": "数值由C++枚举定义；export_values同时在所属模块导出同名值。",
+    "description": "枚举成员，原生值为 INPUT_TYPE_UINT2。Input Type: uint2"
+  },
+  "code/pybind/grassland/graphics/graphics_util.cpp#long_march.graphics.InputType.INPUT_TYPE_UINT3": {
+    "contract": "数值由C++枚举定义；export_values同时在所属模块导出同名值。",
+    "description": "枚举成员，原生值为 INPUT_TYPE_UINT3。Input Type: uint3"
+  },
+  "code/pybind/grassland/graphics/graphics_util.cpp#long_march.graphics.InputType.INPUT_TYPE_UINT4": {
+    "contract": "数值由C++枚举定义；export_values同时在所属模块导出同名值。",
+    "description": "枚举成员，原生值为 INPUT_TYPE_UINT4。Input Type: uint4"
+  },
+  "code/pybind/grassland/graphics/graphics_util.cpp#long_march.graphics.Offset2D": {
+    "contract": "py::classh使用smart_holder；只有本页或对应注册文件中的__init__明确提供构造时才能直接实例化。",
+    "description": "Python 类型，映射 C++ Offset2D。整数二维偏移 x/y。"
+  },
+  "code/pybind/grassland/graphics/graphics_util.cpp#long_march.graphics.Offset2D.__init__": {
+    "contract": "数值和矩阵有效性仍需调用方保证；这些值对象本身不创建GPU资源。",
+    "description": "从有符号x/y构造像素偏移。"
+  },
+  "code/pybind/grassland/graphics/graphics_util.cpp#long_march.graphics.Offset2D.__repr__": {
+    "contract": "用于诊断，不是序列化协议，也不创建GPU资源。",
+    "description": "生成该对象的Python可读表示；格式字符串和读取字段见注册表达式。"
+  },
+  "code/pybind/grassland/graphics/graphics_util.cpp#long_march.graphics.Offset2D.x": {
+    "contract": "直接改C++值，不自动重新创建已有GPU资源或验证组合合法性。",
+    "description": "可读写字段：有符号水平像素偏移。"
+  },
+  "code/pybind/grassland/graphics/graphics_util.cpp#long_march.graphics.Offset2D.y": {
+    "contract": "直接改C++值，不自动重新创建已有GPU资源或验证组合合法性。",
+    "description": "可读写字段：有符号垂直像素偏移。"
+  },
+  "code/pybind/grassland/graphics/graphics_util.cpp#long_march.graphics.PrimitiveTopology": {
+    "contract": "py::classh使用smart_holder；只有本页或对应注册文件中的__init__明确提供构造时才能直接实例化。",
+    "description": "Python 类型，映射 C++ PrimitiveTopology。三角形列表/条带、线列表/条带、点列表的顶点连接方式。"
+  },
+  "code/pybind/grassland/graphics/graphics_util.cpp#long_march.graphics.PrimitiveTopology.PRIMITIVE_TOPOLOGY_LINE_LIST": {
+    "contract": "数值由C++枚举定义；export_values同时在所属模块导出同名值。",
+    "description": "枚举成员，原生值为 PRIMITIVE_TOPOLOGY_LINE_LIST。Primitive Topology: Line List"
+  },
+  "code/pybind/grassland/graphics/graphics_util.cpp#long_march.graphics.PrimitiveTopology.PRIMITIVE_TOPOLOGY_LINE_STRIP": {
+    "contract": "数值由C++枚举定义；export_values同时在所属模块导出同名值。",
+    "description": "枚举成员，原生值为 PRIMITIVE_TOPOLOGY_LINE_STRIP。Primitive Topology: Line Strip"
+  },
+  "code/pybind/grassland/graphics/graphics_util.cpp#long_march.graphics.PrimitiveTopology.PRIMITIVE_TOPOLOGY_POINT_LIST": {
+    "contract": "数值由C++枚举定义；export_values同时在所属模块导出同名值。",
+    "description": "枚举成员，原生值为 PRIMITIVE_TOPOLOGY_POINT_LIST。Primitive Topology: Point List"
+  },
+  "code/pybind/grassland/graphics/graphics_util.cpp#long_march.graphics.PrimitiveTopology.PRIMITIVE_TOPOLOGY_TRIANGLE_LIST": {
+    "contract": "数值由C++枚举定义；export_values同时在所属模块导出同名值。",
+    "description": "枚举成员，原生值为 PRIMITIVE_TOPOLOGY_TRIANGLE_LIST。Primitive Topology: Triangle List"
+  },
+  "code/pybind/grassland/graphics/graphics_util.cpp#long_march.graphics.PrimitiveTopology.PRIMITIVE_TOPOLOGY_TRIANGLE_STRIP": {
+    "contract": "数值由C++枚举定义；export_values同时在所属模块导出同名值。",
+    "description": "枚举成员，原生值为 PRIMITIVE_TOPOLOGY_TRIANGLE_STRIP。Primitive Topology: Triangle Strip"
+  },
+  "code/pybind/grassland/graphics/graphics_util.cpp#long_march.graphics.RAYTRACING_INSTANCE_FLAG_NONE": {
+    "contract": "值由当前构建的C++配置决定。",
+    "description": "Python模块常量/别名，绑定表达式为 py::cast(RAYTRACING_INSTANCE_FLAG_NONE)。"
+  },
+  "code/pybind/grassland/graphics/graphics_util.cpp#long_march.graphics.RAYTRACING_INSTANCE_FLAG_NO_OPAQUE": {
+    "contract": "值由当前构建的C++配置决定。",
+    "description": "Python模块常量/别名，绑定表达式为 py::cast(RAYTRACING_INSTANCE_FLAG_NO_OPAQUE)。"
+  },
+  "code/pybind/grassland/graphics/graphics_util.cpp#long_march.graphics.RAYTRACING_INSTANCE_FLAG_OPAQUE": {
+    "contract": "值由当前构建的C++配置决定。",
+    "description": "Python模块常量/别名，绑定表达式为 py::cast(RAYTRACING_INSTANCE_FLAG_OPAQUE)。"
+  },
+  "code/pybind/grassland/graphics/graphics_util.cpp#long_march.graphics.RAYTRACING_INSTANCE_FLAG_TRIANGLE_FACING_CULL_DISABLE": {
+    "contract": "值由当前构建的C++配置决定。",
+    "description": "Python模块常量/别名，绑定表达式为 py::cast(RAYTRACING_INSTANCE_FLAG_TRIANGLE_FACING_CULL_DISABLE)。"
+  },
+  "code/pybind/grassland/graphics/graphics_util.cpp#long_march.graphics.RAYTRACING_INSTANCE_FLAG_TRIANGLE_FLIP_FACING": {
+    "contract": "值由当前构建的C++配置决定。",
+    "description": "Python模块常量/别名，绑定表达式为 py::cast(RAYTRACING_INSTANCE_FLAG_TRIANGLE_FLIP_FACING)。"
+  },
+  "code/pybind/grassland/graphics/graphics_util.cpp#long_march.graphics.RayTracingAABB": {
+    "contract": "py::classh使用smart_holder；只有本页或对应注册文件中的__init__明确提供构造时才能直接实例化。",
+    "description": "Python 类型，映射 C++ RayTracingAABB。程序化几何包围盒的最小/最大三轴浮点坐标。"
+  },
+  "code/pybind/grassland/graphics/graphics_util.cpp#long_march.graphics.RayTracingAABB.__init__": {
+    "contract": "数值和矩阵有效性仍需调用方保证；这些值对象本身不创建GPU资源。",
+    "description": "从min/max三轴六个float构造包围盒。"
+  },
+  "code/pybind/grassland/graphics/graphics_util.cpp#long_march.graphics.RayTracingAABB.__repr__": {
+    "contract": "用于诊断，不是序列化协议，也不创建GPU资源。",
+    "description": "生成该对象的Python可读表示；格式字符串和读取字段见注册表达式。"
+  },
+  "code/pybind/grassland/graphics/graphics_util.cpp#long_march.graphics.RayTracingAABB.max_x": {
+    "contract": "直接改C++值，不自动重新创建已有GPU资源或验证组合合法性。",
+    "description": "可读写字段：最大x坐标。"
+  },
+  "code/pybind/grassland/graphics/graphics_util.cpp#long_march.graphics.RayTracingAABB.max_y": {
+    "contract": "直接改C++值，不自动重新创建已有GPU资源或验证组合合法性。",
+    "description": "可读写字段：最大y坐标。"
+  },
+  "code/pybind/grassland/graphics/graphics_util.cpp#long_march.graphics.RayTracingAABB.max_z": {
+    "contract": "直接改C++值，不自动重新创建已有GPU资源或验证组合合法性。",
+    "description": "可读写字段：最大z坐标。"
+  },
+  "code/pybind/grassland/graphics/graphics_util.cpp#long_march.graphics.RayTracingAABB.min_x": {
+    "contract": "直接改C++值，不自动重新创建已有GPU资源或验证组合合法性。",
+    "description": "可读写字段：最小x坐标。"
+  },
+  "code/pybind/grassland/graphics/graphics_util.cpp#long_march.graphics.RayTracingAABB.min_y": {
+    "contract": "直接改C++值，不自动重新创建已有GPU资源或验证组合合法性。",
+    "description": "可读写字段：最小y坐标。"
+  },
+  "code/pybind/grassland/graphics/graphics_util.cpp#long_march.graphics.RayTracingAABB.min_z": {
+    "contract": "直接改C++值，不自动重新创建已有GPU资源或验证组合合法性。",
+    "description": "可读写字段：最小z坐标。"
+  },
+  "code/pybind/grassland/graphics/graphics_util.cpp#long_march.graphics.RayTracingGeometryFlag": {
+    "contract": "py::classh使用smart_holder；只有本页或对应注册文件中的__init__明确提供构造时才能直接实例化。",
+    "description": "Python 类型，映射 C++ RayTracingGeometryFlag。BLAS 几何位标志：不透明及禁止重复 any-hit 调用。"
+  },
+  "code/pybind/grassland/graphics/graphics_util.cpp#long_march.graphics.RayTracingGeometryFlag.RAYTRACING_GEOMETRY_FLAG_NONE": {
+    "contract": "数值由C++枚举定义；export_values同时在所属模块导出同名值。",
+    "description": "枚举成员，原生值为 RAYTRACING_GEOMETRY_FLAG_NONE。Ray Tracing Geometry Flag: None"
+  },
+  "code/pybind/grassland/graphics/graphics_util.cpp#long_march.graphics.RayTracingGeometryFlag.RAYTRACING_GEOMETRY_FLAG_NO_DUPLICATE_ANYHIT_INVOCATION": {
+    "contract": "数值由C++枚举定义；export_values同时在所属模块导出同名值。",
+    "description": "枚举成员，原生值为 RAYTRACING_GEOMETRY_FLAG_NO_DUPLICATE_ANYHIT_INVOCATION。Ray Tracing Geometry Flag: No Duplicate Any Hit Invocation"
+  },
+  "code/pybind/grassland/graphics/graphics_util.cpp#long_march.graphics.RayTracingGeometryFlag.RAYTRACING_GEOMETRY_FLAG_OPAQUE": {
+    "contract": "数值由C++枚举定义；export_values同时在所属模块导出同名值。",
+    "description": "枚举成员，原生值为 RAYTRACING_GEOMETRY_FLAG_OPAQUE。Ray Tracing Geometry Flag: Opaque"
+  },
+  "code/pybind/grassland/graphics/graphics_util.cpp#long_march.graphics.RayTracingGeometryFlag.__and__": {
+    "contract": "位运算不限制在已定义mask；__str__并非可靠数值序列化。",
+    "description": "uint32位与。"
+  },
+  "code/pybind/grassland/graphics/graphics_util.cpp#long_march.graphics.RayTracingGeometryFlag.__bool__": {
+    "contract": "位运算不限制在已定义mask；__str__并非可靠数值序列化。",
+    "description": "底层uint32非0为true。"
+  },
+  "code/pybind/grassland/graphics/graphics_util.cpp#long_march.graphics.RayTracingGeometryFlag.__invert__": {
+    "contract": "位运算不限制在已定义mask；__str__并非可靠数值序列化。",
+    "description": "uint32全部32位取反。"
+  },
+  "code/pybind/grassland/graphics/graphics_util.cpp#long_march.graphics.RayTracingGeometryFlag.__or__": {
+    "contract": "位运算不限制在已定义mask；__str__并非可靠数值序列化。",
+    "description": "uint32位或。"
+  },
+  "code/pybind/grassland/graphics/graphics_util.cpp#long_march.graphics.RayTracingGeometryFlag.__str__": {
+    "contract": "位运算不限制在已定义mask；__str__并非可靠数值序列化。",
+    "description": "按已知位拼接名称，0返回NONE；纯未知位以0x前缀加十进制to_string表示。"
+  },
+  "code/pybind/grassland/graphics/graphics_util.cpp#long_march.graphics.RayTracingGeometryFlag.__xor__": {
+    "contract": "位运算不限制在已定义mask；__str__并非可靠数值序列化。",
+    "description": "uint32异或。"
+  },
+  "code/pybind/grassland/graphics/graphics_util.cpp#long_march.graphics.RayTracingInstance": {
+    "contract": "py::classh使用smart_holder；只有本页或对应注册文件中的__init__明确提供构造时才能直接实例化。",
+    "description": "Python 类型，映射 C++ RayTracingInstance。3×4 变换、24 位 ID、8 位 mask、24 位 hit-group offset、8 位 flags 和借用 AS 指针。"
+  },
+  "code/pybind/grassland/graphics/graphics_util.cpp#long_march.graphics.RayTracingInstance.__init__": {
+    "contract": "数值和矩阵有效性仍需调用方保证；这些值对象本身不创建GPU资源。",
+    "description": "默认构造实例记录，后续设置transform/AS及位字段。"
+  },
+  "code/pybind/grassland/graphics/graphics_util.cpp#long_march.graphics.RayTracingInstance.__repr__": {
+    "contract": "用于诊断，不是序列化协议，也不创建GPU资源。",
+    "description": "生成该对象的Python可读表示；格式字符串和读取字段见注册表达式。"
+  },
+  "code/pybind/grassland/graphics/graphics_util.cpp#long_march.graphics.RayTracingInstance.acceleration_structure": {
+    "contract": "setter只cast并赋值，没有keep_alive；调用方保存AS Python引用。",
+    "description": "取得或设置实例借用的AS指针。"
+  },
+  "code/pybind/grassland/graphics/graphics_util.cpp#long_march.graphics.RayTracingInstance.instance_flags": {
+    "contract": "赋值直接写位字段，没有显式范围校验，超过位宽会截断。",
+    "description": "可读写8位字段：实例标志。"
+  },
+  "code/pybind/grassland/graphics/graphics_util.cpp#long_march.graphics.RayTracingInstance.instance_hit_group_offset": {
+    "contract": "赋值直接写位字段，没有显式范围校验，超过位宽会截断。",
+    "description": "可读写24位字段：SBT hit group偏移。"
+  },
+  "code/pybind/grassland/graphics/graphics_util.cpp#long_march.graphics.RayTracingInstance.instance_id": {
+    "contract": "赋值直接写位字段，没有显式范围校验，超过位宽会截断。",
+    "description": "可读写24位字段：自定义实例ID。"
+  },
+  "code/pybind/grassland/graphics/graphics_util.cpp#long_march.graphics.RayTracingInstance.instance_mask": {
+    "contract": "赋值直接写位字段，没有显式范围校验，超过位宽会截断。",
+    "description": "可读写8位字段：射线可见性mask。"
+  },
+  "code/pybind/grassland/graphics/graphics_util.cpp#long_march.graphics.RayTracingInstance.transform": {
+    "contract": "修改返回的list不会回写；需给整个属性赋值。维度或转换失败抛异常，逐元素赋值途中失败可能已部分修改。",
+    "description": "读取为3×4行主序list；写入要求3行、每行4元素list，并逐值转float。"
+  },
+  "code/pybind/grassland/graphics/graphics_util.cpp#long_march.graphics.RayTracingInstanceFlag": {
+    "contract": "py::classh使用smart_holder；只有本页或对应注册文件中的__init__明确提供构造时才能直接实例化。",
+    "description": "Python 类型，映射 C++ RayTracingInstanceFlag。实例位标志控制朝向剔除、朝向翻转和强制不透明/非不透明。"
+  },
+  "code/pybind/grassland/graphics/graphics_util.cpp#long_march.graphics.RayTracingInstanceFlag.RAYTRACING_INSTANCE_FLAG_NONE": {
+    "contract": "数值由C++枚举定义；export_values同时在所属模块导出同名值。",
+    "description": "枚举成员，原生值为 RAYTRACING_INSTANCE_FLAG_NONE。Ray Tracing Instance Flag: None"
+  },
+  "code/pybind/grassland/graphics/graphics_util.cpp#long_march.graphics.RayTracingInstanceFlag.RAYTRACING_INSTANCE_FLAG_NO_OPAQUE": {
+    "contract": "数值由C++枚举定义；export_values同时在所属模块导出同名值。",
+    "description": "枚举成员，原生值为 RAYTRACING_INSTANCE_FLAG_NO_OPAQUE。Ray Tracing Instance Flag: Force Non-Opaque"
+  },
+  "code/pybind/grassland/graphics/graphics_util.cpp#long_march.graphics.RayTracingInstanceFlag.RAYTRACING_INSTANCE_FLAG_OPAQUE": {
+    "contract": "数值由C++枚举定义；export_values同时在所属模块导出同名值。",
+    "description": "枚举成员，原生值为 RAYTRACING_INSTANCE_FLAG_OPAQUE。Ray Tracing Instance Flag: Force Opaque"
+  },
+  "code/pybind/grassland/graphics/graphics_util.cpp#long_march.graphics.RayTracingInstanceFlag.RAYTRACING_INSTANCE_FLAG_TRIANGLE_FACING_CULL_DISABLE": {
+    "contract": "数值由C++枚举定义；export_values同时在所属模块导出同名值。",
+    "description": "枚举成员，原生值为 RAYTRACING_INSTANCE_FLAG_TRIANGLE_FACING_CULL_DISABLE。Ray Tracing Instance Flag: Triangle Cull Disable"
+  },
+  "code/pybind/grassland/graphics/graphics_util.cpp#long_march.graphics.RayTracingInstanceFlag.RAYTRACING_INSTANCE_FLAG_TRIANGLE_FLIP_FACING": {
+    "contract": "数值由C++枚举定义；export_values同时在所属模块导出同名值。",
+    "description": "枚举成员，原生值为 RAYTRACING_INSTANCE_FLAG_TRIANGLE_FLIP_FACING。Ray Tracing Instance Flag: Triangle Front Counterclockwise"
+  },
+  "code/pybind/grassland/graphics/graphics_util.cpp#long_march.graphics.RayTracingInstanceFlag.__and__": {
+    "contract": "位运算不限制在已定义mask；__str__并非可靠数值序列化。",
+    "description": "uint32位与。"
+  },
+  "code/pybind/grassland/graphics/graphics_util.cpp#long_march.graphics.RayTracingInstanceFlag.__bool__": {
+    "contract": "位运算不限制在已定义mask；__str__并非可靠数值序列化。",
+    "description": "底层uint32非0为true。"
+  },
+  "code/pybind/grassland/graphics/graphics_util.cpp#long_march.graphics.RayTracingInstanceFlag.__invert__": {
+    "contract": "位运算不限制在已定义mask；__str__并非可靠数值序列化。",
+    "description": "uint32全部32位取反。"
+  },
+  "code/pybind/grassland/graphics/graphics_util.cpp#long_march.graphics.RayTracingInstanceFlag.__or__": {
+    "contract": "位运算不限制在已定义mask；__str__并非可靠数值序列化。",
+    "description": "uint32位或。"
+  },
+  "code/pybind/grassland/graphics/graphics_util.cpp#long_march.graphics.RayTracingInstanceFlag.__str__": {
+    "contract": "位运算不限制在已定义mask；__str__并非可靠数值序列化。",
+    "description": "按已知位拼接名称，0返回NONE；纯未知位以0x前缀加十进制to_string表示。"
+  },
+  "code/pybind/grassland/graphics/graphics_util.cpp#long_march.graphics.RayTracingInstanceFlag.__xor__": {
+    "contract": "位运算不限制在已定义mask；__str__并非可靠数值序列化。",
+    "description": "uint32异或。"
+  },
+  "code/pybind/grassland/graphics/graphics_util.cpp#long_march.graphics.ResourceType": {
+    "contract": "py::classh使用smart_holder；只有本页或对应注册文件中的__init__明确提供构造时才能直接实例化。",
+    "description": "Python 类型，映射 C++ ResourceType。程序资源槽类别，区分 uniform/storage/read-write buffer、只读/可写 image、sampler 和 acceleration structure。"
+  },
+  "code/pybind/grassland/graphics/graphics_util.cpp#long_march.graphics.ResourceType.RESOURCE_TYPE_ACCELERATION_STRUCTURE": {
+    "contract": "数值由C++枚举定义；export_values同时在所属模块导出同名值。",
+    "description": "枚举成员，原生值为 RESOURCE_TYPE_ACCELERATION_STRUCTURE。Resource Type: Acceleration Structure"
+  },
+  "code/pybind/grassland/graphics/graphics_util.cpp#long_march.graphics.ResourceType.RESOURCE_TYPE_IMAGE": {
+    "contract": "数值由C++枚举定义；export_values同时在所属模块导出同名值。",
+    "description": "枚举成员，原生值为 RESOURCE_TYPE_IMAGE。Resource Type: Image (read-only)"
+  },
+  "code/pybind/grassland/graphics/graphics_util.cpp#long_march.graphics.ResourceType.RESOURCE_TYPE_SAMPLER": {
+    "contract": "数值由C++枚举定义；export_values同时在所属模块导出同名值。",
+    "description": "枚举成员，原生值为 RESOURCE_TYPE_SAMPLER。Resource Type: Sampler"
+  },
+  "code/pybind/grassland/graphics/graphics_util.cpp#long_march.graphics.ResourceType.RESOURCE_TYPE_STORAGE_BUFFER": {
+    "contract": "数值由C++枚举定义；export_values同时在所属模块导出同名值。",
+    "description": "枚举成员，原生值为 RESOURCE_TYPE_STORAGE_BUFFER。Resource Type: Storage Buffer"
+  },
+  "code/pybind/grassland/graphics/graphics_util.cpp#long_march.graphics.ResourceType.RESOURCE_TYPE_UNIFORM_BUFFER": {
+    "contract": "数值由C++枚举定义；export_values同时在所属模块导出同名值。",
+    "description": "枚举成员，原生值为 RESOURCE_TYPE_UNIFORM_BUFFER。Resource Type: Uniform Buffer"
+  },
+  "code/pybind/grassland/graphics/graphics_util.cpp#long_march.graphics.ResourceType.RESOURCE_TYPE_WRITABLE_IMAGE": {
+    "contract": "数值由C++枚举定义；export_values同时在所属模块导出同名值。",
+    "description": "枚举成员，原生值为 RESOURCE_TYPE_WRITABLE_IMAGE。Resource Type: Writable Image"
+  },
+  "code/pybind/grassland/graphics/graphics_util.cpp#long_march.graphics.ResourceType.RESOURCE_TYPE_WRITABLE_STORAGE_BUFFER": {
+    "contract": "数值由C++枚举定义；export_values同时在所属模块导出同名值。",
+    "description": "枚举成员，原生值为 RESOURCE_TYPE_WRITABLE_STORAGE_BUFFER。Resource Type: Writable Storage Buffer"
+  },
+  "code/pybind/grassland/graphics/graphics_util.cpp#long_march.graphics.SHADER_TYPE_FRAGMENT": {
+    "contract": "值由当前构建的C++配置决定。",
+    "description": "Python模块常量/别名，绑定表达式为 py::cast(SHADER_TYPE_PIXEL)。"
+  },
+  "code/pybind/grassland/graphics/graphics_util.cpp#long_march.graphics.SamplerInfo": {
+    "contract": "py::classh使用smart_holder；只有本页或对应注册文件中的__init__明确提供构造时才能直接实例化。",
+    "description": "Python 类型，映射 C++ SamplerInfo。分别描述 min/mag/mip 过滤和 U/V/W 寻址模式。"
+  },
+  "code/pybind/grassland/graphics/graphics_util.cpp#long_march.graphics.SamplerInfo.__init__": {
+    "contract": "数值和矩阵有效性仍需调用方保证；这些值对象本身不创建GPU资源。",
+    "description": "四种重载：统一filter、统一address、filter+address或完整六字段；默认LINEAR/REPEAT。"
+  },
+  "code/pybind/grassland/graphics/graphics_util.cpp#long_march.graphics.SamplerInfo.__repr__": {
+    "contract": "用于诊断，不是序列化协议，也不创建GPU资源。",
+    "description": "生成该对象的Python可读表示；格式字符串和读取字段见注册表达式。"
+  },
+  "code/pybind/grassland/graphics/graphics_util.cpp#long_march.graphics.SamplerInfo.address_mode_u": {
+    "contract": "直接改C++值，不自动重新创建已有GPU资源或验证组合合法性。",
+    "description": "可读写字段：U轴寻址。"
+  },
+  "code/pybind/grassland/graphics/graphics_util.cpp#long_march.graphics.SamplerInfo.address_mode_v": {
+    "contract": "直接改C++值，不自动重新创建已有GPU资源或验证组合合法性。",
+    "description": "可读写字段：V轴寻址。"
+  },
+  "code/pybind/grassland/graphics/graphics_util.cpp#long_march.graphics.SamplerInfo.address_mode_w": {
+    "contract": "直接改C++值，不自动重新创建已有GPU资源或验证组合合法性。",
+    "description": "可读写字段：W轴寻址。"
+  },
+  "code/pybind/grassland/graphics/graphics_util.cpp#long_march.graphics.SamplerInfo.mag_filter": {
+    "contract": "直接改C++值，不自动重新创建已有GPU资源或验证组合合法性。",
+    "description": "可读写字段：放大过滤。"
+  },
+  "code/pybind/grassland/graphics/graphics_util.cpp#long_march.graphics.SamplerInfo.min_filter": {
+    "contract": "直接改C++值，不自动重新创建已有GPU资源或验证组合合法性。",
+    "description": "可读写字段：缩小过滤。"
+  },
+  "code/pybind/grassland/graphics/graphics_util.cpp#long_march.graphics.SamplerInfo.mip_filter": {
+    "contract": "直接改C++值，不自动重新创建已有GPU资源或验证组合合法性。",
+    "description": "可读写字段：mip级间过滤。"
+  },
+  "code/pybind/grassland/graphics/graphics_util.cpp#long_march.graphics.Scissor": {
+    "contract": "py::classh使用smart_holder；只有本页或对应注册文件中的__init__明确提供构造时才能直接实例化。",
+    "description": "Python 类型，映射 C++ Scissor。由 offset 和 extent 构成的整数裁剪矩形。"
+  },
+  "code/pybind/grassland/graphics/graphics_util.cpp#long_march.graphics.Scissor.__init__": {
+    "contract": "数值和矩阵有效性仍需调用方保证；这些值对象本身不创建GPU资源。",
+    "description": "从Offset2D和Extent2D构造裁剪矩形。"
+  },
+  "code/pybind/grassland/graphics/graphics_util.cpp#long_march.graphics.Scissor.__repr__": {
+    "contract": "用于诊断，不是序列化协议，也不创建GPU资源。",
+    "description": "生成该对象的Python可读表示；格式字符串和读取字段见注册表达式。"
+  },
+  "code/pybind/grassland/graphics/graphics_util.cpp#long_march.graphics.Scissor.extent": {
+    "contract": "直接改C++值，不自动重新创建已有GPU资源或验证组合合法性。",
+    "description": "可读写字段：裁剪尺寸Extent2D。"
+  },
+  "code/pybind/grassland/graphics/graphics_util.cpp#long_march.graphics.Scissor.offset": {
+    "contract": "直接改C++值，不自动重新创建已有GPU资源或验证组合合法性。",
+    "description": "可读写字段：裁剪起点Offset2D。"
+  },
+  "code/pybind/grassland/graphics/graphics_util.cpp#long_march.graphics.ShaderType": {
+    "contract": "py::classh使用smart_holder；只有本页或对应注册文件中的__init__明确提供构造时才能直接实例化。",
+    "description": "Python 类型，映射 C++ ShaderType。图形阶段枚举；PIXEL 和 FRAGMENT 同值，另有 VERTEX 与 GEOMETRY。计算与 RT 走专用程序接口。"
+  },
+  "code/pybind/grassland/graphics/graphics_util.cpp#long_march.graphics.ShaderType.SHADER_TYPE_GEOMETRY": {
+    "contract": "数值由C++枚举定义；export_values同时在所属模块导出同名值。",
+    "description": "枚举成员，原生值为 SHADER_TYPE_GEOMETRY。Shader Type: Geometry Shader"
+  },
+  "code/pybind/grassland/graphics/graphics_util.cpp#long_march.graphics.ShaderType.SHADER_TYPE_PIXEL": {
+    "contract": "数值由C++枚举定义；export_values同时在所属模块导出同名值。",
+    "description": "枚举成员，原生值为 SHADER_TYPE_PIXEL。Shader Type: Pixel Shader"
+  },
+  "code/pybind/grassland/graphics/graphics_util.cpp#long_march.graphics.ShaderType.SHADER_TYPE_VERTEX": {
+    "contract": "数值由C++枚举定义；export_values同时在所属模块导出同名值。",
+    "description": "枚举成员，原生值为 SHADER_TYPE_VERTEX。Shader Type: Vertex Shader"
+  },
+  "code/pybind/grassland/graphics/graphics_util.cpp#long_march.graphics.Viewport": {
+    "contract": "py::classh使用smart_holder；只有本页或对应注册文件中的__init__明确提供构造时才能直接实例化。",
+    "description": "Python 类型，映射 C++ Viewport。浮点 x/y/width/height 以及 min_depth/max_depth，用于光栅视口变换。"
+  },
+  "code/pybind/grassland/graphics/graphics_util.cpp#long_march.graphics.Viewport.__init__": {
+    "contract": "数值和矩阵有效性仍需调用方保证；这些值对象本身不创建GPU资源。",
+    "description": "从x/y/width/height及depth范围构造，深度默认0..1。"
+  },
+  "code/pybind/grassland/graphics/graphics_util.cpp#long_march.graphics.Viewport.__repr__": {
+    "contract": "用于诊断，不是序列化协议，也不创建GPU资源。",
+    "description": "生成该对象的Python可读表示；格式字符串和读取字段见注册表达式。"
+  },
+  "code/pybind/grassland/graphics/graphics_util.cpp#long_march.graphics.Viewport.height": {
+    "contract": "直接改C++值，不自动重新创建已有GPU资源或验证组合合法性。",
+    "description": "可读写字段：视口高度。"
+  },
+  "code/pybind/grassland/graphics/graphics_util.cpp#long_march.graphics.Viewport.max_depth": {
+    "contract": "直接改C++值，不自动重新创建已有GPU资源或验证组合合法性。",
+    "description": "可读写字段：深度映射上界。"
+  },
+  "code/pybind/grassland/graphics/graphics_util.cpp#long_march.graphics.Viewport.min_depth": {
+    "contract": "直接改C++值，不自动重新创建已有GPU资源或验证组合合法性。",
+    "description": "可读写字段：深度映射下界。"
+  },
+  "code/pybind/grassland/graphics/graphics_util.cpp#long_march.graphics.Viewport.width": {
+    "contract": "直接改C++值，不自动重新创建已有GPU资源或验证组合合法性。",
+    "description": "可读写字段：视口宽度。"
+  },
+  "code/pybind/grassland/graphics/graphics_util.cpp#long_march.graphics.Viewport.x": {
+    "contract": "直接改C++值，不自动重新创建已有GPU资源或验证组合合法性。",
+    "description": "可读写字段：视口水平起点。"
+  },
+  "code/pybind/grassland/graphics/graphics_util.cpp#long_march.graphics.Viewport.y": {
+    "contract": "直接改C++值，不自动重新创建已有GPU资源或验证组合合法性。",
+    "description": "可读写字段：视口垂直起点。"
+  },
+  "code/pybind/grassland/graphics/graphics_util.cpp#long_march.graphics.backend_api_string": {
+    "contract": " Python参数名、默认值和keep_alive策略以本页注册表达式为准；数值与枚举按pybind11转换。",
+    "description": "返回 Metal/Vulkan/D3D12 的静态名称字符串，未知枚举返回 Unknown。 Python 名称为 long_march.graphics.backend_api_string，转发 BackendAPIString。"
+  },
+  "code/pybind/grassland/graphics/graphics_util.cpp#long_march.graphics.support_backend_api": {
+    "contract": " Python参数名、默认值和keep_alive策略以本页注册表达式为准；数值与枚举按pybind11转换。",
+    "description": "根据编译宏报告该后端是否包含在此构建中，不执行设备或驱动探测。 Python 名称为 long_march.graphics.support_backend_api，转发 SupportBackendAPI。"
+  },
+  "code/pybind/grassland/graphics/image.cpp#long_march.graphics.Image.__repr__": {
+    "contract": "用于诊断，不是序列化协议，也不创建GPU资源。",
+    "description": "生成该对象的Python可读表示；格式字符串和读取字段见注册表达式。"
+  },
+  "code/pybind/grassland/graphics/image.cpp#long_march.graphics.Image.download_data": {
+    "contract": "返回紧密像素数据；范围与乘法溢出未在绑定统一校验。",
+    "description": "按全图或区域width*height*PixelSize分配临时vector，读回后返回bytes。"
+  },
+  "code/pybind/grassland/graphics/image.cpp#long_march.graphics.Image.extent": {
+    "contract": " Python参数名、默认值和keep_alive策略以本页注册表达式为准；数值与枚举按pybind11转换。",
+    "description": "返回物理像素尺寸 Extent2D。 Python 名称为 long_march.graphics.Image.extent，转发 Image::Extent。"
+  },
+  "code/pybind/grassland/graphics/image.cpp#long_march.graphics.Image.format": {
+    "contract": " Python参数名、默认值和keep_alive策略以本页注册表达式为准；数值与枚举按pybind11转换。",
+    "description": "返回图像创建格式。 Python 名称为 long_march.graphics.Image.format，转发 Image::Format。"
+  },
+  "code/pybind/grassland/graphics/image.cpp#long_march.graphics.Image.upload_data": {
+    "contract": "绑定层不检查bytes长度或区域合法性；必须与格式PixelSize匹配。",
+    "description": "接受bytes紧密像素数据；全图重载或offset/extent区域重载转发Image。"
+  },
+  "code/pybind/grassland/graphics/imgui.cpp#long_march.graphics.imgui.COND_ALWAYS": {
+    "contract": "值由当前构建的C++配置决定。",
+    "description": "Python模块常量/别名，绑定表达式为 int(ImGuiCond_Always)。"
+  },
+  "code/pybind/grassland/graphics/imgui.cpp#long_march.graphics.imgui.COND_FIRST_USE_EVER": {
+    "contract": "值由当前构建的C++配置决定。",
+    "description": "Python模块常量/别名，绑定表达式为 int(ImGuiCond_FirstUseEver)。"
+  },
+  "code/pybind/grassland/graphics/imgui.cpp#long_march.graphics.imgui.COND_ONCE": {
+    "contract": "值由当前构建的C++配置决定。",
+    "description": "Python模块常量/别名，绑定表达式为 int(ImGuiCond_Once)。"
+  },
+  "code/pybind/grassland/graphics/imgui.cpp#long_march.graphics.imgui.SLIDER_FLAGS_ALWAYS_CLAMP": {
+    "contract": "值由当前构建的C++配置决定。",
+    "description": "Python模块常量/别名，绑定表达式为 int(ImGuiSliderFlags_AlwaysClamp)。"
+  },
+  "code/pybind/grassland/graphics/imgui.cpp#long_march.graphics.imgui.SLIDER_FLAGS_LOGARITHMIC": {
+    "contract": "值由当前构建的C++配置决定。",
+    "description": "Python模块常量/别名，绑定表达式为 int(ImGuiSliderFlags_Logarithmic)。"
+  },
+  "code/pybind/grassland/graphics/imgui.cpp#long_march.graphics.imgui.SLIDER_FLAGS_NONE": {
+    "contract": "值由当前构建的C++配置决定。",
+    "description": "Python模块常量/别名，绑定表达式为 int(ImGuiSliderFlags_None)。"
+  },
+  "code/pybind/grassland/graphics/imgui.cpp#long_march.graphics.imgui.TREE_NODE_FLAGS_DEFAULT_OPEN": {
+    "contract": "值由当前构建的C++配置决定。",
+    "description": "Python模块常量/别名，绑定表达式为 int(ImGuiTreeNodeFlags_DefaultOpen)。"
+  },
+  "code/pybind/grassland/graphics/imgui.cpp#long_march.graphics.imgui.WINDOW_FLAGS_ALWAYS_AUTO_RESIZE": {
+    "contract": "值由当前构建的C++配置决定。",
+    "description": "Python模块常量/别名，绑定表达式为 int(ImGuiWindowFlags_AlwaysAutoResize)。"
+  },
+  "code/pybind/grassland/graphics/imgui.cpp#long_march.graphics.imgui.WINDOW_FLAGS_NONE": {
+    "contract": "值由当前构建的C++配置决定。",
+    "description": "Python模块常量/别名，绑定表达式为 int(ImGuiWindowFlags_None)。"
+  },
+  "code/pybind/grassland/graphics/imgui.cpp#long_march.graphics.imgui.WINDOW_FLAGS_NO_MOVE": {
+    "contract": "值由当前构建的C++配置决定。",
+    "description": "Python模块常量/别名，绑定表达式为 int(ImGuiWindowFlags_NoMove)。"
+  },
+  "code/pybind/grassland/graphics/imgui.cpp#long_march.graphics.imgui.WINDOW_FLAGS_NO_RESIZE": {
+    "contract": "值由当前构建的C++配置决定。",
+    "description": "Python模块常量/别名，绑定表达式为 int(ImGuiWindowFlags_NoResize)。"
+  },
+  "code/pybind/grassland/graphics/imgui.cpp#long_march.graphics.imgui.begin": {
+    "contract": "作用于当前ImGui上下文，控件在begin_imgui_frame/end_imgui_frame之间调用；slider format直接交给ImGui，须与数值类型相容。",
+    "description": "开始指定name/flags的ImGui窗口，返回内容是否可见。无论true/false都必须end。"
+  },
+  "code/pybind/grassland/graphics/imgui.cpp#long_march.graphics.imgui.button": {
+    "contract": "作用于当前ImGui上下文，控件在begin_imgui_frame/end_imgui_frame之间调用；slider format直接交给ImGui，须与数值类型相容。",
+    "description": "绘制按钮，返回本帧点击状态。"
+  },
+  "code/pybind/grassland/graphics/imgui.cpp#long_march.graphics.imgui.checkbox": {
+    "contract": "作用于当前ImGui上下文，控件在begin_imgui_frame/end_imgui_frame之间调用；slider format直接交给ImGui，须与数值类型相容。",
+    "description": "接受bool值副本，返回(changed,new_value)，调用方回写新值。"
+  },
+  "code/pybind/grassland/graphics/imgui.cpp#long_march.graphics.imgui.collapsing_header": {
+    "contract": "作用于当前ImGui上下文，控件在begin_imgui_frame/end_imgui_frame之间调用；slider format直接交给ImGui，须与数值类型相容。",
+    "description": "绘制折叠标题并返回展开状态。"
+  },
+  "code/pybind/grassland/graphics/imgui.cpp#long_march.graphics.imgui.end": {
+    "contract": "作用于当前ImGui上下文，控件在begin_imgui_frame/end_imgui_frame之间调用；slider format直接交给ImGui，须与数值类型相容。",
+    "description": "结束对应begin窗口。"
+  },
+  "code/pybind/grassland/graphics/imgui.cpp#long_march.graphics.imgui.new_line": {
+    "contract": "作用于当前ImGui上下文，控件在begin_imgui_frame/end_imgui_frame之间调用；slider format直接交给ImGui，须与数值类型相容。",
+    "description": "开始新行。"
+  },
+  "code/pybind/grassland/graphics/imgui.cpp#long_march.graphics.imgui.plot_lines": {
+    "contract": "作用于当前ImGui上下文，控件在begin_imgui_frame/end_imgui_frame之间调用；slider format直接交给ImGui，须与数值类型相容。",
+    "description": "从float列表绘制折线，scale_min/max默认FLT_MAX表示自动范围，尺寸默认0。"
+  },
+  "code/pybind/grassland/graphics/imgui.cpp#long_march.graphics.imgui.same_line": {
+    "contract": "作用于当前ImGui上下文，控件在begin_imgui_frame/end_imgui_frame之间调用；slider format直接交给ImGui，须与数值类型相容。",
+    "description": "将后续项放同一行，offset默认0、spacing默认-1。"
+  },
+  "code/pybind/grassland/graphics/imgui.cpp#long_march.graphics.imgui.separator": {
+    "contract": "作用于当前ImGui上下文，控件在begin_imgui_frame/end_imgui_frame之间调用；slider format直接交给ImGui，须与数值类型相容。",
+    "description": "插入分隔线。"
+  },
+  "code/pybind/grassland/graphics/imgui.cpp#long_march.graphics.imgui.set_current_context": {
+    "contract": "作用于当前ImGui上下文，控件在begin_imgui_frame/end_imgui_frame之间调用；slider format直接交给ImGui，须与数值类型相容。",
+    "description": "选择已init_imgui窗口的ImGui context。"
+  },
+  "code/pybind/grassland/graphics/imgui.cpp#long_march.graphics.imgui.set_ini_filename": {
+    "contract": "作用于当前ImGui上下文，控件在begin_imgui_frame/end_imgui_frame之间调用；slider format直接交给ImGui，须与数值类型相容。",
+    "description": "设置布局文件名，None禁用；static string在所有context间共享，后次赋值可使旧context指针失效。"
+  },
+  "code/pybind/grassland/graphics/imgui.cpp#long_march.graphics.imgui.set_next_window_bg_alpha": {
+    "contract": "作用于当前ImGui上下文，控件在begin_imgui_frame/end_imgui_frame之间调用；slider format直接交给ImGui，须与数值类型相容。",
+    "description": "设置下一个窗口背景alpha。"
+  },
+  "code/pybind/grassland/graphics/imgui.cpp#long_march.graphics.imgui.set_next_window_pos": {
+    "contract": "作用于当前ImGui上下文，控件在begin_imgui_frame/end_imgui_frame之间调用；slider format直接交给ImGui，须与数值类型相容。",
+    "description": "设置下一个ImGui窗口位置及条件，cond默认0。"
+  },
+  "code/pybind/grassland/graphics/imgui.cpp#long_march.graphics.imgui.slider_float": {
+    "contract": "作用于当前ImGui上下文，控件在begin_imgui_frame/end_imgui_frame之间调用；slider format直接交给ImGui，须与数值类型相容。",
+    "description": "float滑块返回(changed,new_value)，默认format %.3f。"
+  },
+  "code/pybind/grassland/graphics/imgui.cpp#long_march.graphics.imgui.slider_int": {
+    "contract": "作用于当前ImGui上下文，控件在begin_imgui_frame/end_imgui_frame之间调用；slider format直接交给ImGui，须与数值类型相容。",
+    "description": "int滑块返回(changed,new_value)，默认format %d。"
+  },
+  "code/pybind/grassland/graphics/imgui.cpp#long_march.graphics.imgui.text": {
+    "contract": "作用于当前ImGui上下文，控件在begin_imgui_frame/end_imgui_frame之间调用；slider format直接交给ImGui，须与数值类型相容。",
+    "description": "通过TextUnformatted绘制整个字符串，不将文本作格式串。"
+  },
+  "code/pybind/grassland/graphics/imgui.cpp#long_march.graphics.imgui.want_capture_keyboard": {
+    "contract": "作用于当前ImGui上下文，控件在begin_imgui_frame/end_imgui_frame之间调用；slider format直接交给ImGui，须与数值类型相容。",
+    "description": "读取WantCaptureKeyboard。"
+  },
+  "code/pybind/grassland/graphics/imgui.cpp#long_march.graphics.imgui.want_capture_mouse": {
+    "contract": "作用于当前ImGui上下文，控件在begin_imgui_frame/end_imgui_frame之间调用；slider format直接交给ImGui，须与数值类型相容。",
+    "description": "读取当前ImGui IO的WantCaptureMouse。"
+  },
+  "code/pybind/grassland/graphics/program.cpp#long_march.graphics.ComputeProgram.__repr__": {
+    "contract": "用于诊断，不是序列化协议，也不创建GPU资源。",
+    "description": "生成该对象的Python可读表示；格式字符串和读取字段见注册表达式。"
+  },
+  "code/pybind/grassland/graphics/program.cpp#long_march.graphics.ComputeProgram.add_resource_binding": {
+    "contract": "着色器 register/space、CmdBindResources slot 及 count 必须与此布局一致。 Python参数名、默认值和keep_alive策略以本页注册表达式为准；数值与枚举按pybind11转换。",
+    "description": "按调用顺序添加资源槽，指定 ResourceType 与数组 count。 Python 名称为 long_march.graphics.ComputeProgram.add_resource_binding，转发 ComputeProgram::AddResourceBinding。"
+  },
+  "code/pybind/grassland/graphics/program.cpp#long_march.graphics.ComputeProgram.finalize": {
+    "contract": "具体编译或设备错误由后端返回/抛出；不要在使用中的程序上重新配置。 Python参数名、默认值和keep_alive策略以本页注册表达式为准；数值与枚举按pybind11转换。",
+    "description": "完成布局和管线创建，使程序可用于录制；RT 还可指定 miss/hit/callable 的索引列表。 Python 名称为 long_march.graphics.ComputeProgram.finalize，转发 ComputeProgram::Finalize。"
+  },
+  "code/pybind/grassland/graphics/program.cpp#long_march.graphics.Program.__repr__": {
+    "contract": "用于诊断，不是序列化协议，也不创建GPU资源。",
+    "description": "生成该对象的Python可读表示；格式字符串和读取字段见注册表达式。"
+  },
+  "code/pybind/grassland/graphics/program.cpp#long_march.graphics.Program.add_input_attribute": {
+    "contract": "在 Finalize 前调用，并与目标格式和顶点数据布局一致。 Python参数名、默认值和keep_alive策略以本页注册表达式为准；数值与枚举按pybind11转换。",
+    "description": "为指定流 binding 追加类型及字节 offset 的顶点属性，位置由添加顺序决定。 Python 名称为 long_march.graphics.Program.add_input_attribute，转发 Program::AddInputAttribute。"
+  },
+  "code/pybind/grassland/graphics/program.cpp#long_march.graphics.Program.add_input_binding": {
+    "contract": "在 Finalize 前调用，并与目标格式和顶点数据布局一致。 Python参数名、默认值和keep_alive策略以本页注册表达式为准；数值与枚举按pybind11转换。",
+    "description": "追加顶点流字节 stride，input_per_instance 决定按顶点还是实例推进。 Python 名称为 long_march.graphics.Program.add_input_binding，转发 Program::AddInputBinding。"
+  },
+  "code/pybind/grassland/graphics/program.cpp#long_march.graphics.Program.add_resource_binding": {
+    "contract": "着色器 register/space、CmdBindResources slot 及 count 必须与此布局一致。 Python参数名、默认值和keep_alive策略以本页注册表达式为准；数值与枚举按pybind11转换。",
+    "description": "按调用顺序添加资源槽，指定 ResourceType 与数组 count。 Python 名称为 long_march.graphics.Program.add_resource_binding，转发 Program::AddResourceBinding。"
+  },
+  "code/pybind/grassland/graphics/program.cpp#long_march.graphics.Program.bind_shader": {
+    "contract": "在 Finalize 前调用，并与目标格式和顶点数据布局一致。 Python参数名、默认值和keep_alive策略以本页注册表达式为准；数值与枚举按pybind11转换。",
+    "description": "把已编译 shader 关联到指定图形阶段。 Python 名称为 long_march.graphics.Program.bind_shader，转发 Program::BindShader。"
+  },
+  "code/pybind/grassland/graphics/program.cpp#long_march.graphics.Program.finalize": {
+    "contract": "具体编译或设备错误由后端返回/抛出；不要在使用中的程序上重新配置。 Python参数名、默认值和keep_alive策略以本页注册表达式为准；数值与枚举按pybind11转换。",
+    "description": "完成布局和管线创建，使程序可用于录制；RT 还可指定 miss/hit/callable 的索引列表。 Python 名称为 long_march.graphics.Program.finalize，转发 Program::Finalize。"
+  },
+  "code/pybind/grassland/graphics/program.cpp#long_march.graphics.Program.set_blend_state": {
+    "contract": "在 Finalize 前调用，并与目标格式和顶点数据布局一致。 Python参数名、默认值和keep_alive策略以本页注册表达式为准；数值与枚举按pybind11转换。",
+    "description": "设置指定颜色附件 target_id 的混合因子和运算。 Python 名称为 long_march.graphics.Program.set_blend_state，转发 Program::SetBlendState。"
+  },
+  "code/pybind/grassland/graphics/program.cpp#long_march.graphics.Program.set_cull_mode": {
+    "contract": "在 Finalize 前调用，并与目标格式和顶点数据布局一致。 Python参数名、默认值和keep_alive策略以本页注册表达式为准；数值与枚举按pybind11转换。",
+    "description": "设置三角形剔除模式。 Python 名称为 long_march.graphics.Program.set_cull_mode，转发 Program::SetCullMode。"
+  },
+  "code/pybind/grassland/graphics/program.cpp#long_march.graphics.RayTracingProgram.__repr__": {
+    "contract": "用于诊断，不是序列化协议，也不创建GPU资源。",
+    "description": "生成该对象的Python可读表示；格式字符串和读取字段见注册表达式。"
+  },
+  "code/pybind/grassland/graphics/program.cpp#long_march.graphics.RayTracingProgram.add_callable_shader": {
+    "contract": "shader 需属于兼容后端且支持对应阶段；SBT/实例偏移必须引用有效组。 Python参数名、默认值和keep_alive策略以本页注册表达式为准；数值与枚举按pybind11转换。",
+    "description": "按顺序添加 callable shader。 Python 名称为 long_march.graphics.RayTracingProgram.add_callable_shader，转发 RayTracingProgram::AddCallableShader。"
+  },
+  "code/pybind/grassland/graphics/program.cpp#long_march.graphics.RayTracingProgram.add_hit_group": {
+    "contract": "shader 需属于兼容后端且支持对应阶段；SBT/实例偏移必须引用有效组。 Python参数名、默认值和keep_alive策略以本页注册表达式为准；数值与枚举按pybind11转换。",
+    "description": "描述符重载添加 HitGroup；指针重载组装 closest/any/intersection/procedure 后委托。 Python 名称为 long_march.graphics.RayTracingProgram.add_hit_group，转发 RayTracingProgram::AddHitGroup。"
+  },
+  "code/pybind/grassland/graphics/program.cpp#long_march.graphics.RayTracingProgram.add_miss_shader": {
+    "contract": "shader 需属于兼容后端且支持对应阶段；SBT/实例偏移必须引用有效组。 Python参数名、默认值和keep_alive策略以本页注册表达式为准；数值与枚举按pybind11转换。",
+    "description": "按顺序添加 miss shader。 Python 名称为 long_march.graphics.RayTracingProgram.add_miss_shader，转发 RayTracingProgram::AddMissShader。"
+  },
+  "code/pybind/grassland/graphics/program.cpp#long_march.graphics.RayTracingProgram.add_ray_gen_shader": {
+    "contract": "shader 需属于兼容后端且支持对应阶段；SBT/实例偏移必须引用有效组。 Python参数名、默认值和keep_alive策略以本页注册表达式为准；数值与枚举按pybind11转换。",
+    "description": "添加 raygen shader。 Python 名称为 long_march.graphics.RayTracingProgram.add_ray_gen_shader，转发 RayTracingProgram::AddRayGenShader。"
+  },
+  "code/pybind/grassland/graphics/program.cpp#long_march.graphics.RayTracingProgram.add_resource_binding": {
+    "contract": "着色器 register/space、CmdBindResources slot 及 count 必须与此布局一致。 Python参数名、默认值和keep_alive策略以本页注册表达式为准；数值与枚举按pybind11转换。",
+    "description": "按调用顺序添加资源槽，指定 ResourceType 与数组 count。 Python 名称为 long_march.graphics.RayTracingProgram.add_resource_binding，转发 RayTracingProgram::AddResourceBinding。"
+  },
+  "code/pybind/grassland/graphics/program.cpp#long_march.graphics.RayTracingProgram.finalize": {
+    "contract": "具体编译或设备错误由后端返回/抛出；不要在使用中的程序上重新配置。 Python参数名、默认值和keep_alive策略以本页注册表达式为准；数值与枚举按pybind11转换。",
+    "description": "完成布局和管线创建，使程序可用于录制；RT 还可指定 miss/hit/callable 的索引列表。 Python 名称为 long_march.graphics.RayTracingProgram.finalize，转发 RayTracingProgram::Finalize。"
+  },
+  "code/pybind/grassland/graphics/sampler.cpp#long_march.graphics.Sampler.__repr__": {
+    "contract": "用于诊断，不是序列化协议，也不创建GPU资源。",
+    "description": "生成该对象的Python可读表示；格式字符串和读取字段见注册表达式。"
+  },
+  "code/pybind/grassland/graphics/shader.cpp#long_march.graphics.Shader.__repr__": {
+    "contract": "用于诊断，不是序列化协议，也不创建GPU资源。",
+    "description": "生成该对象的Python可读表示；格式字符串和读取字段见注册表达式。"
+  },
+  "code/pybind/grassland/graphics/shader.cpp#long_march.graphics.Shader.entry_point": {
+    "contract": " Python参数名、默认值和keep_alive策略以本页注册表达式为准；数值与枚举按pybind11转换。",
+    "description": "返回用于此 shader 的入口函数名。 Python 名称为 long_march.graphics.Shader.entry_point，转发 Shader::EntryPoint。"
+  },
+  "code/pybind/grassland/graphics/window.cpp#long_march.graphics.Window.__repr__": {
+    "contract": "用于诊断，不是序列化协议，也不创建GPU资源。",
+    "description": "生成该对象的Python可读表示；格式字符串和读取字段见注册表达式。"
+  },
+  "code/pybind/grassland/graphics/window.cpp#long_march.graphics.Window.begin_imgui_frame": {
+    "contract": "主线程调用；不要跨窗口混用回调与原生句柄。 Python参数名、默认值和keep_alive策略以本页注册表达式为准；数值与枚举按pybind11转换。",
+    "description": "在此窗口 ImGui 上下文开始一帧，应用随后构建控件。 Python 名称为 long_march.graphics.Window.begin_imgui_frame，转发 Window::BeginImGuiFrame。"
+  },
+  "code/pybind/grassland/graphics/window.cpp#long_march.graphics.Window.display_brightness": {
+    "contract": "这是亮度能力/状态快照，未知物理亮度不应当实测值使用。",
+    "description": "返回dict：sdr_white_nits、hdr_reference_white_scale、hdr_headroom、reference_white_known、hdr_enabled。"
+  },
+  "code/pybind/grassland/graphics/window.cpp#long_march.graphics.Window.end_imgui_frame": {
+    "contract": "主线程调用；不要跨窗口混用回调与原生句柄。 Python参数名、默认值和keep_alive策略以本页注册表达式为准；数值与枚举按pybind11转换。",
+    "description": "结束本帧 ImGui 控件构建；实际提交/合成细节由后端提供。 Python 名称为 long_march.graphics.Window.end_imgui_frame，转发 Window::EndImGuiFrame。"
+  },
+  "code/pybind/grassland/graphics/window.cpp#long_march.graphics.Window.focus": {
+    "contract": "主线程调用；不要跨窗口混用回调与原生句柄。 Python参数名、默认值和keep_alive策略以本页注册表达式为准；数值与枚举按pybind11转换。",
+    "description": "请求 GLFW 将此窗口取得焦点，最终行为由窗口系统决定。 Python 名称为 long_march.graphics.Window.focus，转发 Window::Focus。"
+  },
+  "code/pybind/grassland/graphics/window.cpp#long_march.graphics.Window.get_cursor_position": {
+    "contract": "具体平台单位/失败回退继承Window实现。",
+    "description": "返回tuple：(x,y)逻辑窗口光标坐标。"
+  },
+  "code/pybind/grassland/graphics/window.cpp#long_march.graphics.Window.get_frame_size": {
+    "contract": "具体平台单位/失败回退继承Window实现。",
+    "description": "返回tuple：(left,top,right,bottom)窗口装饰宽度。"
+  },
+  "code/pybind/grassland/graphics/window.cpp#long_march.graphics.Window.get_framebuffer_size": {
+    "contract": "具体平台单位/失败回退继承Window实现。",
+    "description": "返回tuple：(width,height)像素尺寸。"
+  },
+  "code/pybind/grassland/graphics/window.cpp#long_march.graphics.Window.get_height": {
+    "contract": "主线程调用；不要跨窗口混用回调与原生句柄。 Python参数名、默认值和keep_alive策略以本页注册表达式为准；数值与枚举按pybind11转换。",
+    "description": "调用 GLFW 查询逻辑内容区高度。 Python 名称为 long_march.graphics.Window.get_height，转发 Window::GetHeight。"
+  },
+  "code/pybind/grassland/graphics/window.cpp#long_march.graphics.Window.get_monitor_work_area": {
+    "contract": "具体平台单位/失败回退继承Window实现。",
+    "description": "返回tuple：(x,y,width,height)显示器可用区域。"
+  },
+  "code/pybind/grassland/graphics/window.cpp#long_march.graphics.Window.get_position": {
+    "contract": "具体平台单位/失败回退继承Window实现。",
+    "description": "返回tuple：(x,y)桌面窗口坐标。"
+  },
+  "code/pybind/grassland/graphics/window.cpp#long_march.graphics.Window.get_size": {
+    "contract": "具体平台单位/失败回退继承Window实现。",
+    "description": "返回tuple：(width,height)逻辑窗口尺寸。"
+  },
+  "code/pybind/grassland/graphics/window.cpp#long_march.graphics.Window.get_title": {
+    "contract": "主线程调用；不要跨窗口混用回调与原生句柄。 Python参数名、默认值和keep_alive策略以本页注册表达式为准；数值与枚举按pybind11转换。",
+    "description": "复制并返回 GLFW 当前标题。 Python 名称为 long_march.graphics.Window.get_title，转发 Window::GetTitle。"
+  },
+  "code/pybind/grassland/graphics/window.cpp#long_march.graphics.Window.get_width": {
+    "contract": "主线程调用；不要跨窗口混用回调与原生句柄。 Python参数名、默认值和keep_alive策略以本页注册表达式为准；数值与枚举按pybind11转换。",
+    "description": "调用 GLFW 查询逻辑内容区宽度。 Python 名称为 long_march.graphics.Window.get_width，转发 Window::GetWidth。"
+  },
+  "code/pybind/grassland/graphics/window.cpp#long_march.graphics.Window.hdr_brightness_alignment": {
+    "contract": "主线程调用；不要跨窗口混用回调与原生句柄。 Python参数名、默认值和keep_alive策略以本页注册表达式为准；数值与枚举按pybind11转换。",
+    "description": "返回当前对齐策略开关。 Python 名称为 long_march.graphics.Window.hdr_brightness_alignment，转发 Window::HDRBrightnessAlignment。"
+  },
+  "code/pybind/grassland/graphics/window.cpp#long_march.graphics.Window.hdr_reference_white_scale": {
+    "contract": "主线程调用；不要跨窗口混用回调与原生句柄。 Python参数名、默认值和keep_alive策略以本页注册表达式为准；数值与枚举按pybind11转换。",
+    "description": "同时启用 HDR 和亮度对齐时返回查询的参考白点尺度，否则返回 1。 Python 名称为 long_march.graphics.Window.hdr_reference_white_scale，转发 Window::HDRReferenceWhiteScale。"
+  },
+  "code/pybind/grassland/graphics/window.cpp#long_march.graphics.Window.init_imgui": {
+    "contract": "主线程调用；不要跨窗口混用回调与原生句柄。 Python参数名、默认值和keep_alive策略以本页注册表达式为准；数值与枚举按pybind11转换。",
+    "description": "由后端创建并初始化窗口自己的 ImGui 上下文、字体与渲染资源。 Python 名称为 long_march.graphics.Window.init_imgui，转发 Window::InitImGui。"
+  },
+  "code/pybind/grassland/graphics/window.cpp#long_march.graphics.Window.is_focused": {
+    "contract": "主线程调用；不要跨窗口混用回调与原生句柄。 Python参数名、默认值和keep_alive策略以本页注册表达式为准；数值与枚举按pybind11转换。",
+    "description": "查询 GLFW_FOCUSED 属性。 Python 名称为 long_march.graphics.Window.is_focused，转发 Window::IsFocused。"
+  },
+  "code/pybind/grassland/graphics/window.cpp#long_march.graphics.Window.is_hdr": {
+    "contract": "主线程调用；不要跨窗口混用回调与原生句柄。 Python参数名、默认值和keep_alive策略以本页注册表达式为准；数值与枚举按pybind11转换。",
+    "description": "返回应用请求/生效的 enable_hdr_，不等于系统桌面的 HDR 设置。 Python 名称为 long_march.graphics.Window.is_hdr，转发 Window::IsHDR。"
+  },
+  "code/pybind/grassland/graphics/window.cpp#long_march.graphics.Window.is_key_down": {
+    "contract": "主线程调用；不要跨窗口混用回调与原生句柄。 Python参数名、默认值和keep_alive策略以本页注册表达式为准；数值与枚举按pybind11转换。",
+    "description": "查询 GLFW key 是否处于 PRESS 状态；不是字符输入事件。 Python 名称为 long_march.graphics.Window.is_key_down，转发 Window::IsKeyDown。"
+  },
+  "code/pybind/grassland/graphics/window.cpp#long_march.graphics.Window.is_mouse_button_down": {
+    "contract": "主线程调用；不要跨窗口混用回调与原生句柄。 Python参数名、默认值和keep_alive策略以本页注册表达式为准；数值与枚举按pybind11转换。",
+    "description": "查询指定 GLFW 鼠标按钮的 PRESS 状态。 Python 名称为 long_march.graphics.Window.is_mouse_button_down，转发 Window::IsMouseButtonDown。"
+  },
+  "code/pybind/grassland/graphics/window.cpp#long_march.graphics.Window.poll_events": {
+    "contract": "主线程调用；不要跨窗口混用回调与原生句柄。 Python参数名、默认值和keep_alive策略以本页注册表达式为准；数值与枚举按pybind11转换。",
+    "description": "调用 glfwPollEvents 为所有窗口处理事件，回调在该事件线程中执行。 Python 名称为 long_march.graphics.Window.poll_events，转发 Window::PollEvents。"
+  },
+  "code/pybind/grassland/graphics/window.cpp#long_march.graphics.Window.refresh_display_brightness": {
+    "contract": "主线程调用；不要跨窗口混用回调与原生句柄。 Python参数名、默认值和keep_alive策略以本页注册表达式为准；数值与枚举按pybind11转换。",
+    "description": "调用虚 QueryDisplayBrightness 更新缓存和时间戳，只有字段发生变化才发送显示亮度事件。 Python 名称为 long_march.graphics.Window.refresh_display_brightness，转发 Window::RefreshDisplayBrightness。"
+  },
+  "code/pybind/grassland/graphics/window.cpp#long_march.graphics.Window.register_char_event": {
+    "contract": "回调被C++闭包持有直到注销/窗口销毁；未显式获取GIL，应在持有GIL的Python线程PollEvents。",
+    "description": "保存Python callback，事件发生时以 Unicode codepoint整数 调用，返回uint32注册ID。"
+  },
+  "code/pybind/grassland/graphics/window.cpp#long_march.graphics.Window.register_cursor_enter_event": {
+    "contract": "回调被C++闭包持有直到注销/窗口销毁；未显式获取GIL，应在持有GIL的Python线程PollEvents。",
+    "description": "保存Python callback，事件发生时以 entered bool 调用，返回uint32注册ID。"
+  },
+  "code/pybind/grassland/graphics/window.cpp#long_march.graphics.Window.register_display_brightness_event": {
+    "contract": "回调被C++闭包持有直到注销/窗口销毁；未显式获取GIL，应在持有GIL的Python线程PollEvents。",
+    "description": "保存Python callback，事件发生时以 包含五个亮度状态字段的dict 调用，返回uint32注册ID。"
+  },
+  "code/pybind/grassland/graphics/window.cpp#long_march.graphics.Window.register_drop_event": {
+    "contract": "回调被C++闭包持有直到注销/窗口销毁；未显式获取GIL，应在持有GIL的Python线程PollEvents。",
+    "description": "保存Python callback，事件发生时以 路径字符串list 调用，返回uint32注册ID。"
+  },
+  "code/pybind/grassland/graphics/window.cpp#long_march.graphics.Window.register_focus_event": {
+    "contract": "回调被C++闭包持有直到注销/窗口销毁；未显式获取GIL，应在持有GIL的Python线程PollEvents。",
+    "description": "保存Python callback，事件发生时以 focused bool 调用，返回uint32注册ID。"
+  },
+  "code/pybind/grassland/graphics/window.cpp#long_march.graphics.Window.register_framebuffer_resize_event": {
+    "contract": "回调被C++闭包持有直到注销/窗口销毁；未显式获取GIL，应在持有GIL的Python线程PollEvents。",
+    "description": "保存Python callback，事件发生时以 width,height（像素尺寸） 调用，返回uint32注册ID。"
+  },
+  "code/pybind/grassland/graphics/window.cpp#long_march.graphics.Window.register_key_event": {
+    "contract": "回调被C++闭包持有直到注销/窗口销毁；未显式获取GIL，应在持有GIL的Python线程PollEvents。",
+    "description": "保存Python callback，事件发生时以 key,scancode,action,mods 调用，返回uint32注册ID。"
+  },
+  "code/pybind/grassland/graphics/window.cpp#long_march.graphics.Window.register_magnify_event": {
+    "contract": "回调被C++闭包持有直到注销/窗口销毁；未显式获取GIL，应在持有GIL的Python线程PollEvents。",
+    "description": "保存Python callback，事件发生时以 scale,x,y,phase（增量缩放，不是累计倍率） 调用，返回uint32注册ID。"
+  },
+  "code/pybind/grassland/graphics/window.cpp#long_march.graphics.Window.register_mouse_button_event": {
+    "contract": "回调被C++闭包持有直到注销/窗口销毁；未显式获取GIL，应在持有GIL的Python线程PollEvents。",
+    "description": "保存Python callback，事件发生时以 button,action,mods,x,y 调用，返回uint32注册ID。"
+  },
+  "code/pybind/grassland/graphics/window.cpp#long_march.graphics.Window.register_mouse_move_event": {
+    "contract": "回调被C++闭包持有直到注销/窗口销毁；未显式获取GIL，应在持有GIL的Python线程PollEvents。",
+    "description": "保存Python callback，事件发生时以 x,y 调用，返回uint32注册ID。"
+  },
+  "code/pybind/grassland/graphics/window.cpp#long_march.graphics.Window.register_resize_event": {
+    "contract": "回调被C++闭包持有直到注销/窗口销毁；未显式获取GIL，应在持有GIL的Python线程PollEvents。",
+    "description": "保存Python callback，事件发生时以 width,height（逻辑尺寸） 调用，返回uint32注册ID。"
+  },
+  "code/pybind/grassland/graphics/window.cpp#long_march.graphics.Window.register_scroll_event": {
+    "contract": "回调被C++闭包持有直到注销/窗口销毁；未显式获取GIL，应在持有GIL的Python线程PollEvents。",
+    "description": "保存Python callback，事件发生时以 xoffset,yoffset 调用，返回uint32注册ID。"
+  },
+  "code/pybind/grassland/graphics/window.cpp#long_march.graphics.Window.request_close": {
+    "contract": "主线程调用；不要跨窗口混用回调与原生句柄。 Python参数名、默认值和keep_alive策略以本页注册表达式为准；数值与枚举按pybind11转换。",
+    "description": "只设置 should-close 标志，不立即销毁窗口。 Python 名称为 long_march.graphics.Window.request_close，转发 Window::RequestClose。"
+  },
+  "code/pybind/grassland/graphics/window.cpp#long_march.graphics.Window.resize": {
+    "contract": "主线程调用；不要跨窗口混用回调与原生句柄。 Python参数名、默认值和keep_alive策略以本页注册表达式为准；数值与枚举按pybind11转换。",
+    "description": "请求 GLFW 改变逻辑尺寸；Wayland 再调用 NotifyResize 补偿缺失的原生通知。 Python 名称为 long_march.graphics.Window.resize，转发 Window::Resize。"
+  },
+  "code/pybind/grassland/graphics/window.cpp#long_march.graphics.Window.set_hdr": {
+    "contract": "主线程调用；不要跨窗口混用回调与原生句柄。 Python参数名、默认值和keep_alive策略以本页注册表达式为准；数值与枚举按pybind11转换。",
+    "description": "通用实现设置应用呈现开关，刷新显示亮度并发送 resize 事件；捕获异常时恢复原开关并返回 -1。后端可能覆盖。 Python 名称为 long_march.graphics.Window.set_hdr，转发 Window::SetHDR。"
+  },
+  "code/pybind/grassland/graphics/window.cpp#long_march.graphics.Window.set_hdr_brightness_alignment": {
+    "contract": "主线程调用；不要跨窗口混用回调与原生句柄。 Python参数名、默认值和keep_alive策略以本页注册表达式为准；数值与枚举按pybind11转换。",
+    "description": "设置是否让 HDR 参考白点与系统亮度对齐；不修改系统设置。 Python 名称为 long_march.graphics.Window.set_hdr_brightness_alignment，转发 Window::SetHDRBrightnessAlignment。"
+  },
+  "code/pybind/grassland/graphics/window.cpp#long_march.graphics.Window.set_position": {
+    "contract": "主线程调用；不要跨窗口混用回调与原生句柄。 Python参数名、默认值和keep_alive策略以本页注册表达式为准；数值与枚举按pybind11转换。",
+    "description": "设置屏幕逻辑位置；Wayland 分支无操作。 Python 名称为 long_march.graphics.Window.set_position，转发 Window::SetPosition。"
+  },
+  "code/pybind/grassland/graphics/window.cpp#long_march.graphics.Window.set_title": {
+    "contract": "主线程调用；不要跨窗口混用回调与原生句柄。 Python参数名、默认值和keep_alive策略以本页注册表达式为准；数值与枚举按pybind11转换。",
+    "description": "把 UTF-8 标题传给 GLFW。 Python 名称为 long_march.graphics.Window.set_title，转发 Window::SetTitle。"
+  },
+  "code/pybind/grassland/graphics/window.cpp#long_march.graphics.Window.should_close": {
+    "contract": "主线程调用；不要跨窗口混用回调与原生句柄。 Python参数名、默认值和keep_alive策略以本页注册表达式为准；数值与枚举按pybind11转换。",
+    "description": "查询 GLFW should-close 标志，调用前要求窗口仍存在。 Python 名称为 long_march.graphics.Window.should_close，转发 Window::ShouldClose。"
+  },
+  "code/pybind/grassland/graphics/window.cpp#long_march.graphics.Window.supports_magnify_gestures": {
+    "contract": "主线程调用；不要跨窗口混用回调与原生句柄。 Python参数名、默认值和keep_alive策略以本页注册表达式为准；数值与枚举按pybind11转换。",
+    "description": "通过是否安装原生监视器报告平台手势接口支持；不判断用户是否连接了触控板。 Python 名称为 long_march.graphics.Window.supports_magnify_gestures，转发 Window::SupportsMagnifyGestures。"
+  },
+  "code/pybind/grassland/graphics/window.cpp#long_march.graphics.Window.terminate_imgui": {
+    "contract": "主线程调用；不要跨窗口混用回调与原生句柄。 Python参数名、默认值和keep_alive策略以本页注册表达式为准；数值与枚举按pybind11转换。",
+    "description": "由后端结束并释放窗口的 ImGui 资源。 Python 名称为 long_march.graphics.Window.terminate_imgui，转发 Window::TerminateImGui。"
+  },
+  "code/pybind/grassland/graphics/window.cpp#long_march.graphics.Window.unregister_char_event": {
+    "contract": "ID只属于对应窗口/事件，不要混用。",
+    "description": "用对应register返回的ID注销该事件回调。"
+  },
+  "code/pybind/grassland/graphics/window.cpp#long_march.graphics.Window.unregister_cursor_enter_event": {
+    "contract": "ID只属于对应窗口/事件，不要混用。",
+    "description": "用对应register返回的ID注销该事件回调。"
+  },
+  "code/pybind/grassland/graphics/window.cpp#long_march.graphics.Window.unregister_display_brightness_event": {
+    "contract": "ID只属于对应窗口/事件，不要混用。",
+    "description": "用对应register返回的ID注销该事件回调。"
+  },
+  "code/pybind/grassland/graphics/window.cpp#long_march.graphics.Window.unregister_drop_event": {
+    "contract": "ID只属于对应窗口/事件，不要混用。",
+    "description": "用对应register返回的ID注销该事件回调。"
+  },
+  "code/pybind/grassland/graphics/window.cpp#long_march.graphics.Window.unregister_focus_event": {
+    "contract": "ID只属于对应窗口/事件，不要混用。",
+    "description": "用对应register返回的ID注销该事件回调。"
+  },
+  "code/pybind/grassland/graphics/window.cpp#long_march.graphics.Window.unregister_framebuffer_resize_event": {
+    "contract": "ID只属于对应窗口/事件，不要混用。",
+    "description": "用对应register返回的ID注销该事件回调。"
+  },
+  "code/pybind/grassland/graphics/window.cpp#long_march.graphics.Window.unregister_key_event": {
+    "contract": "ID只属于对应窗口/事件，不要混用。",
+    "description": "用对应register返回的ID注销该事件回调。"
+  },
+  "code/pybind/grassland/graphics/window.cpp#long_march.graphics.Window.unregister_magnify_event": {
+    "contract": "ID只属于对应窗口/事件，不要混用。",
+    "description": "用对应register返回的ID注销该事件回调。"
+  },
+  "code/pybind/grassland/graphics/window.cpp#long_march.graphics.Window.unregister_mouse_button_event": {
+    "contract": "ID只属于对应窗口/事件，不要混用。",
+    "description": "用对应register返回的ID注销该事件回调。"
+  },
+  "code/pybind/grassland/graphics/window.cpp#long_march.graphics.Window.unregister_mouse_move_event": {
+    "contract": "ID只属于对应窗口/事件，不要混用。",
+    "description": "用对应register返回的ID注销该事件回调。"
+  },
+  "code/pybind/grassland/graphics/window.cpp#long_march.graphics.Window.unregister_resize_event": {
+    "contract": "ID只属于对应窗口/事件，不要混用。",
+    "description": "用对应register返回的ID注销该事件回调。"
+  },
+  "code/pybind/grassland/graphics/window.cpp#long_march.graphics.Window.unregister_scroll_event": {
+    "contract": "ID只属于对应窗口/事件，不要混用。",
+    "description": "用对应register返回的ID注销该事件回调。"
+  },
+  "code/pybind/long_march.cpp#long_march.graphics": {
+    "contract": "具体导出对象在对应Register函数文件中逐项列出。",
+    "description": "创建Python子模块 long_march.graphics。"
+  },
+  "code/pybind/long_march.cpp#long_march.hello": {
+    "contract": "无参数、无GPU初始化。",
+    "description": "通过py::print输出Hello from LongMarch!。"
+  },
+  "code/snowberg/draw/draw_util.h#snowberg::draw::grassland": {
+    "contract": "把已有类型/重载或命名空间成员引入当前作用域，不新建对象或改变原类型语义。",
+    "description": "名称导入：using namespace grassland;"
   },
   "code/snowberg/draw/shaders/draw.frag#frag_color": {
     "contract": "由管线后续混合到颜色附件。",
@@ -182,6 +1930,10 @@
   "code/snowberg/draw/shaders/draw.vert#DrawMetadata": {
     "contract": "存储缓冲采用 std430。",
     "description": "GLSL mat4 model/vec4 color 实例记录。"
+  },
+  "code/snowberg/draw/shaders/draw.vert#DrawMetadataBuffer": {
+    "contract": "实例索引选择model/color，CPU数据排列须符合std430。",
+    "description": "set0/binding0、std430布局的DrawMetadata数组存储块。"
   },
   "code/snowberg/draw/shaders/draw.vert#draw_metadata": {
     "contract": "set 0/binding 0，索引必须有效。",
@@ -327,6 +2079,14 @@
     "contract": "供 Application::SaveScreenshot 使用；与其他同名宏实例按各自链接目标审视，避免重复定义。",
     "description": "在本编译单元启用 stb_image_write 的 PNG 写出实现。"
   },
+  "code/snowberg/gui/surface/application.h#snowberg::gui::surface::grassland": {
+    "contract": "把已有类型/重载或命名空间成员引入当前作用域，不新建对象或改变原类型语义。",
+    "description": "名称导入：using namespace grassland;"
+  },
+  "code/snowberg/solver/solver_util.h#snowberg::solver::grassland": {
+    "contract": "把已有类型/重载或命名空间成员引入当前作用域，不新建对象或改变原类型语义。",
+    "description": "名称导入：using namespace grassland;"
+  },
   "code/snowberg/visualizer/shaders/ambient_light.slang#LightInfo": {
     "contract": "CPU 侧动态缓冲与着色器常量布局一致。",
     "description": "光源常量：RGB 环境强度。"
@@ -470,6 +2230,62 @@
   "code/snowberg/visualizer/shaders/inverse.slang#spvDet3x3": {
     "contract": "参数按 a/b/c 三组输入，与 inverse 的调用布局一致。",
     "description": "通过三个 2×2 子行列式展开 3×3 行列式。"
+  },
+  "code/snowberg/visualizer/visualizer_util.h#snowberg::visualizer::grassland": {
+    "contract": "把已有类型/重载或命名空间成员引入当前作用域，不新建对象或改变原类型语义。",
+    "description": "名称导入：using namespace grassland;"
+  },
+  "code/sparkium/core/core_util.h#sparkium::grassland": {
+    "contract": "把已有类型/重载或命名空间成员引入当前作用域，不新建对象或改变原类型语义。",
+    "description": "名称导入：using namespace grassland;"
+  },
+  "code/sparkium/pipelines/raytracing/core/software_pipeline.cpp#embedded::SoftwareMaterialData": {
+    "contract": "仅有graph材质的生成路径添加该函数。",
+    "description": "用hit.object_index读取InstanceMetadata并按material_data_index取非一致索引Buffer。"
+  },
+  "code/sparkium/pipelines/raytracing/core/software_pipeline.cpp#embedded::SoftwareSampleMaterial": {
+    "contract": "无graph时生成简化switch；未知material把throughput置零。",
+    "description": "按material索引分派Graph Evaluate+SampleGraphSurface或普通SampleMaterial。"
+  },
+  "code/sparkium/pipelines/raytracing/core/software_pipeline.cpp#embedded::SoftwareShadowTransmission": {
+    "contract": "graph固定bounce1、REFLECTION、shadow=true；未知material返回0。",
+    "description": "按材质分派graph shadow opacity或普通Transmission。"
+  },
+  "code/sparkium/pipelines/raytracing/core/software_pipeline.cpp#embedded::Transmission": {
+    "contract": "NO_HITRECORD宏控制是否传HitRecord；每个SoftwareMaterialN命名空间独立生成。",
+    "description": "普通材质阴影适配：ANY_HIT时1-saturate(opacity)，否则以shadow=1初始化payload并调用SampleShadow。"
+  },
+  "code/sparkium/scene_io/json_scene.cpp#embedded::EvaluateShaderGraph": {
+    "contract": "输入HitRecord/view/bounce/ray_type/shadow/material buffer；具体节点依赖、循环检测与近似规则见GraphCompiler。",
+    "description": "由GraphCompiler生成：先初始化21个GraphSurface输出，再按JSON节点表达式覆盖存在的surface字段并返回。"
+  },
+  "code/sparkium/scene_io/json_scene.cpp#embedded::GraphHash": {
+    "contract": "非密码hash，供程序纹理使用。",
+    "description": "对float3坐标做frac乘加混合得到确定性标量hash。"
+  },
+  "code/sparkium/scene_io/json_scene.cpp#embedded::GraphHsvToRgb": {
+    "contract": "色相使用frac，饱和度/值不另限幅。",
+    "description": "将HSV按周期色相转换RGB。"
+  },
+  "code/sparkium/scene_io/json_scene.cpp#embedded::GraphNoise": {
+    "contract": "近似值噪声，不是Blender噪声的逐位实现。",
+    "description": "采样格点八角hash，平滑f*f*(3-2*f)后做三线性插值。"
+  },
+  "code/sparkium/scene_io/json_scene.cpp#embedded::GraphRgbToHsv": {
+    "contract": "epsilon1e-10用于退化色差/亮度。",
+    "description": "用分量交换和epsilon将RGB转HSV。"
+  },
+  "code/sparkium/scene_io/json_scene.cpp#embedded::GraphRotateXYZ": {
+    "contract": "r为弧度，与JSON实体Euler角度入口区分。",
+    "description": "依次执行X、Y、Z轴旋转。"
+  },
+  "code/sparkium/scene_io/json_scene.cpp#embedded::GraphSrgbToLinear": {
+    "contract": "未预先钳输入，pow分支仍会计算。",
+    "description": "逐通道按0.04045阈值执行标准sRGB解码。"
+  },
+  "code/sparkium/scene_io/json_scene.cpp#embedded::GraphVoronoi": {
+    "contract": "三个轴由同一hash乘固定向量，属于简化Voronoi。",
+    "description": "搜索邻近3×3×3格子中hash扰动点的最近距离。"
   },
   "code/sparkium/shaders/bindings.slang#SOBOL_TABLE": {
     "contract": "",
@@ -1758,6 +3574,10 @@
   "code/sparkium/shaders/software/build.slang#BitonicSort": {
     "contract": "",
     "description": "对i与i XOR sort_stride做互斥compare-swap，用sort_stage选择方向。"
+  },
+  "code/sparkium/shaders/software/build.slang#BuildParameters": {
+    "contract": "各字段控制节点偏移、primitive/instance数量、归约层和排序stage；CPU按SoftwarePipeline的256字节参数布局上传。",
+    "description": "space2/b0软件BVH构建参数常量块。"
   },
   "code/sparkium/shaders/software/build.slang#EmptyNode": {
     "contract": "",
@@ -6031,6 +7851,10 @@
     "contract": "零extent允许，由传输函数直接返回。",
     "description": "检查非负区域起点与64位相加后的终点不越界。"
   },
+  "grassland::graphics::backend::(anonymous)::ConvertImageFormats": {
+    "contract": "",
+    "description": "逐元素将统一ImageFormat转换VkFormat。"
+  },
   "grassland::graphics::backend::(anonymous)::CopyNativeBuffer": {
     "contract": "",
     "description": "仅将目标从声明original state转COPY_DEST，复制后恢复；源状态由调用方保证。"
@@ -6038,6 +7862,10 @@
   "grassland::graphics::backend::(anonymous)::CreateCommandRecord": {
     "contract": "",
     "description": "创建allocator/list并立即Close初始list；失败抛异常。"
+  },
+  "grassland::graphics::backend::(anonymous)::DynamicStagingUsage": {
+    "contract": "",
+    "description": "transfer src/dst；有RT/Query时加address与AS输入。"
   },
   "grassland::graphics::backend::(anonymous)::MapBuffer": {
     "contract": "",
@@ -6047,21 +7875,57 @@
     "contract": "",
     "description": "依次Reset allocator与list；调用方确保此前GPU使用结束。"
   },
+  "grassland::graphics::backend::(anonymous)::StaticUsage": {
+    "contract": "",
+    "description": "transfer/uniform/storage/index/vertex usage；有RT/Query时加address和AS输入。"
+  },
+  "grassland::graphics::backend::(anonymous)::TimestampCommand": {
+    "contract": "",
+    "description": "借用query pool并记录timestamp索引和重置数量。"
+  },
+  "grassland::graphics::backend::(anonymous)::TimestampCommand::CompileCommand": {
+    "contract": "pool必须有效且支持timestamp。",
+    "description": "reset_count非0则重置从0起的查询，再写BOTTOM_OF_PIPE timestamp。"
+  },
+  "grassland::graphics::backend::(anonymous)::TimestampCommand::TimestampCommand": {
+    "contract": "",
+    "description": "保存pool/index/reset_count。"
+  },
   "grassland::graphics::backend::AddressModeToD3D12AddressMode": {
     "contract": "未知WRAP。",
     "description": "映射repeat/mirror/edge/border。"
+  },
+  "grassland::graphics::backend::AddressModeToVkSamplerAddressMode": {
+    "contract": "未知REPEAT。",
+    "description": "映射repeat/mirror/edge/border。"
+  },
+  "grassland::graphics::backend::BindPointToVkPipelineBindPoint": {
+    "contract": "未知抛异常。",
+    "description": "映射graphics/compute/raytracing。"
   },
   "grassland::graphics::backend::BlendFactorToD3D12Blend": {
     "contract": "未知ZERO。",
     "description": "映射统一混合因子。"
   },
+  "grassland::graphics::backend::BlendFactorToVkBlendFactor": {
+    "contract": "未知ZERO。",
+    "description": "映射混合因子。"
+  },
   "grassland::graphics::backend::BlendOpToD3D12BlendOp": {
     "contract": "未知ADD。",
     "description": "映射五种混合操作。"
   },
+  "grassland::graphics::backend::BlendOpToVkBlendOp": {
+    "contract": "未知ADD。",
+    "description": "映射五种blend操作。"
+  },
   "grassland::graphics::backend::BlendStateToD3D12RenderTargetBlendDesc": {
     "contract": "非法枚举走转换默认值。",
     "description": "转换RGB/alpha混合，RGBA全写，LogicOp关闭。"
+  },
+  "grassland::graphics::backend::BlendStateToVkPipelineColorBlendAttachmentState": {
+    "contract": "",
+    "description": "转换RGB/alpha blend并开启RGBA全写。"
   },
   "grassland::graphics::backend::BlitPipeline": {
     "contract": "成员字段及具体操作见本页；借用对象须保持有效。",
@@ -6102,6 +7966,10 @@
   "grassland::graphics::backend::CullModeToD3D12CullMode": {
     "contract": "未知NONE。",
     "description": "映射NONE/BACK/FRONT。"
+  },
+  "grassland::graphics::backend::CullModeToVkCullMode": {
+    "contract": "未知NONE。",
+    "description": "映射NONE/FRONT/BACK。"
   },
   "grassland::graphics::backend::D3D12AccelerationStructure": {
     "contract": "成员字段及具体操作见本页；借用对象须保持有效。",
@@ -7191,13 +9059,29 @@
     "contract": "未知回全POINT。",
     "description": "组合min/mag/mip的八种POINT/LINEAR过滤。"
   },
+  "grassland::graphics::backend::FilterModeToVkFilter": {
+    "contract": "未知NEAREST。",
+    "description": "映射NEAREST/LINEAR。"
+  },
+  "grassland::graphics::backend::FilterModeToVkSamplerMipmapMode": {
+    "contract": "未知NEAREST。",
+    "description": "映射mipmap过滤。"
+  },
   "grassland::graphics::backend::ImageFormatToDXGIFormat": {
     "contract": "未知/UNDEFINED为UNKNOWN。",
+    "description": "映射统一像素格式。"
+  },
+  "grassland::graphics::backend::ImageFormatToVkFormat": {
+    "contract": "未知UNDEFINED。",
     "description": "映射统一像素格式。"
   },
   "grassland::graphics::backend::InputTypeToDXGIFormat": {
     "contract": "未知UNKNOWN。",
     "description": "映射int/uint/float的1..4分量格式。"
+  },
+  "grassland::graphics::backend::InputTypeToVkFormat": {
+    "contract": "未知UNDEFINED。",
+    "description": "映射int/uint/float1..4分量格式。"
   },
   "grassland::graphics::backend::MetalAccelerationStructure": {
     "contract": "原生对象通过NS::SharedPtr持有，返回Handle借用；Core及依赖资源须满足本页生命周期说明。",
@@ -7667,13 +9551,1237 @@
     "contract": "未知TRIANGLELIST。",
     "description": "映射五种统一拓扑。"
   },
+  "grassland::graphics::backend::PrimitiveTopologyToVkPrimitiveTopology": {
+    "contract": "未知TRIANGLE_LIST。",
+    "description": "映射五种拓扑。"
+  },
   "grassland::graphics::backend::RayTracingInstanceToD3D12RayTracingInstanceDesc": {
     "contract": "AS类型cast未检空。",
     "description": "复制3×4行主序transform及id/mask/hitoffset/flags和BLAS地址。"
   },
+  "grassland::graphics::backend::RayTracingInstanceToVkAccelerationStructureInstanceKHR": {
+    "contract": "AS类型cast未检查。",
+    "description": "复制3×4行主序transform、id/mask/hitoffset/flags与BLAS地址。"
+  },
   "grassland::graphics::backend::ResourceTypeToD3D12DescriptorRangeType": {
     "contract": "默认SRV。",
     "description": "uniform→CBV，只读→SRV，可写→UAV，sampler→SAMPLER。"
+  },
+  "grassland::graphics::backend::ResourceTypeToVkDescriptorType": {
+    "contract": "未知MAX_ENUM。",
+    "description": "映射资源到descriptor类型，只读/可写storage buffer均为STORAGE_BUFFER。"
+  },
+  "grassland::graphics::backend::ShaderTypeToVkShaderStageFlags": {
+    "contract": "未知ALL。",
+    "description": "映射vertex/pixel/geometry到Vulkan stage。"
+  },
+  "grassland::graphics::backend::VulkanAccelerationStructure": {
+    "contract": "资源须与Core同后端；生命周期及字段用途见本页操作说明。",
+    "description": "原生AS及其存储所有者。"
+  },
+  "grassland::graphics::backend::VulkanAccelerationStructure::DeviceAddress": {
+    "contract": "更新后刷新。",
+    "description": "返回当前AS地址。"
+  },
+  "grassland::graphics::backend::VulkanAccelerationStructure::Handle": {
+    "contract": "更新扩容可能替换。",
+    "description": "返回当前AS handle。"
+  },
+  "grassland::graphics::backend::VulkanAccelerationStructure::UpdateInstances": {
+    "contract": "仅对TLAS调用；失败-1，成功0；替换旧资源前需同步。",
+    "description": "上传16字节对齐实例数组，数量相同update、变化build并刷新地址。"
+  },
+  "grassland::graphics::backend::VulkanAccelerationStructure::VulkanAccelerationStructure": {
+    "contract": "Core仍需InitializeLogicalDevice，Program仍需Finalize；特殊重载/限制见文件说明。",
+    "description": "初始化VulkanAccelerationStructure的本页状态和资源。"
+  },
+  "grassland::graphics::backend::VulkanAccelerationStructure::~VulkanAccelerationStructure": {
+    "contract": "GPU须已完成。",
+    "description": "销毁AS后释放VMA Buffer。"
+  },
+  "grassland::graphics::backend::VulkanBuffer": {
+    "contract": "资源须与Core同后端；生命周期及字段用途见本页操作说明。",
+    "description": "GPU句柄与设备地址抽象接口。"
+  },
+  "grassland::graphics::backend::VulkanBuffer::Buffer": {
+    "contract": "借用。",
+    "description": "获取GPU句柄纯虚接口。"
+  },
+  "grassland::graphics::backend::VulkanBuffer::DeviceAddress": {
+    "contract": "不保证等于Buffer地址，Dynamic为staging。",
+    "description": "获取用于原生AS构建的地址纯虚接口。"
+  },
+  "grassland::graphics::backend::VulkanBuffer::~VulkanBuffer": {
+    "contract": "",
+    "description": "默认虚析构，允许通过基类释放派生对象。"
+  },
+  "grassland::graphics::backend::VulkanBufferRange": {
+    "contract": "资源须与Core同后端；生命周期及字段用途见本页操作说明。",
+    "description": "借用buffer及字节offset/size。"
+  },
+  "grassland::graphics::backend::VulkanBufferRange::VulkanBufferRange": {
+    "contract": "Core仍需InitializeLogicalDevice，Program仍需Finalize；特殊重载/限制见文件说明。",
+    "description": "初始化VulkanBufferRange的本页状态和资源。"
+  },
+  "grassland::graphics::backend::VulkanCUDABuffer": {
+    "contract": "资源须与Core同后端；生命周期及字段用途见本页操作说明。",
+    "description": "外部内存共享缓冲。"
+  },
+  "grassland::graphics::backend::VulkanCUDABuffer::Buffer": {
+    "contract": "Dynamic随帧槽轮换。",
+    "description": "返回当前GPU VkBuffer。"
+  },
+  "grassland::graphics::backend::VulkanCUDABuffer::DeviceAddress": {
+    "contract": "Dynamic为CPU staging地址；CUDA缓存地址；须启用address能力。",
+    "description": "返回设备地址。"
+  },
+  "grassland::graphics::backend::VulkanCUDABuffer::DownloadData": {
+    "contract": "Dynamic读staging，不读取GPU写入；其余同步读回。",
+    "description": "复制缓冲指定范围到host。"
+  },
+  "grassland::graphics::backend::VulkanCUDABuffer::GetCUDAMemoryPointer": {
+    "contract": "CUDA返回码未检查，裸地址非host指针。",
+    "description": "映射外部内存0..size的CUDA device pointer。"
+  },
+  "grassland::graphics::backend::VulkanCUDABuffer::Reset": {
+    "contract": "cuda_memory_未清零，勿重复调用；GPU需已同步。",
+    "description": "销毁CUDA映射、释放VkDeviceMemory并销毁Buffer。"
+  },
+  "grassland::graphics::backend::VulkanCUDABuffer::Resize": {
+    "contract": "Static/CUDA先WaitGPU并GPUcopy；Dynamic只Map复制staging，提交时更新GPU副本。",
+    "description": "新建并保留min(old,new)前缀。"
+  },
+  "grassland::graphics::backend::VulkanCUDABuffer::Size": {
+    "contract": "",
+    "description": "返回逻辑请求字节数。"
+  },
+  "grassland::graphics::backend::VulkanCUDABuffer::Type": {
+    "contract": "",
+    "description": "Dynamic返回DYNAMIC，Static/CUDA返回STATIC。"
+  },
+  "grassland::graphics::backend::VulkanCUDABuffer::UploadData": {
+    "contract": "Dynamic只写staging，Static/CUDA同步上传；无范围校验。",
+    "description": "复制host指定范围到缓冲。"
+  },
+  "grassland::graphics::backend::VulkanCUDABuffer::VulkanCUDABuffer": {
+    "contract": "Core仍需InitializeLogicalDevice，Program仍需Finalize；特殊重载/限制见文件说明。",
+    "description": "初始化VulkanCUDABuffer的本页状态和资源。"
+  },
+  "grassland::graphics::backend::VulkanCUDABuffer::~VulkanCUDABuffer": {
+    "contract": "不隐式等待GPU。",
+    "description": "释放Buffer及对应allocation，CUDA转调Reset。"
+  },
+  "grassland::graphics::backend::VulkanCmdBeginRendering": {
+    "contract": "延迟命令借用资源，保持到GPU完成。",
+    "description": "先转换本pass资源图像GENERAL，再转换附件并开启LOAD/STORE dynamic rendering，render area取附件最小尺寸。"
+  },
+  "grassland::graphics::backend::VulkanCmdBeginRendering::CompileCommand": {
+    "contract": "资源数组数量须精确匹配Program声明；范围和调用顺序由调用方保证。",
+    "description": "先转换本pass资源图像GENERAL，再转换附件并开启LOAD/STORE dynamic rendering，render area取附件最小尺寸。"
+  },
+  "grassland::graphics::backend::VulkanCmdBeginRendering::RecordResourceImages": {
+    "contract": "Compile在BeginRendering之前统一转GENERAL。",
+    "description": "将pass内使用的图像加入去重集合。"
+  },
+  "grassland::graphics::backend::VulkanCmdBeginRendering::VulkanCmdBeginRendering": {
+    "contract": "不立即执行GPU操作。",
+    "description": "保存值参数及借用资源供提交时编译。"
+  },
+  "grassland::graphics::backend::VulkanCmdBindComputeProgram": {
+    "contract": "延迟命令借用资源，保持到GPU完成。",
+    "description": "绑定COMPUTE pipeline。"
+  },
+  "grassland::graphics::backend::VulkanCmdBindComputeProgram::CompileCommand": {
+    "contract": "资源数组数量须精确匹配Program声明；范围和调用顺序由调用方保证。",
+    "description": "绑定COMPUTE pipeline。"
+  },
+  "grassland::graphics::backend::VulkanCmdBindComputeProgram::VulkanCmdBindComputeProgram": {
+    "contract": "不立即执行GPU操作。",
+    "description": "保存值参数及借用资源供提交时编译。"
+  },
+  "grassland::graphics::backend::VulkanCmdBindIndexBuffer": {
+    "contract": "延迟命令借用资源，保持到GPU完成。",
+    "description": "以UINT32格式绑定索引Buffer。"
+  },
+  "grassland::graphics::backend::VulkanCmdBindIndexBuffer::CompileCommand": {
+    "contract": "资源数组数量须精确匹配Program声明；范围和调用顺序由调用方保证。",
+    "description": "以UINT32格式绑定索引Buffer。"
+  },
+  "grassland::graphics::backend::VulkanCmdBindIndexBuffer::VulkanCmdBindIndexBuffer": {
+    "contract": "不立即执行GPU操作。",
+    "description": "保存值参数及借用资源供提交时编译。"
+  },
+  "grassland::graphics::backend::VulkanCmdBindProgram": {
+    "contract": "延迟命令借用资源，保持到GPU完成。",
+    "description": "绑定GRAPHICS pipeline。"
+  },
+  "grassland::graphics::backend::VulkanCmdBindProgram::CompileCommand": {
+    "contract": "资源数组数量须精确匹配Program声明；范围和调用顺序由调用方保证。",
+    "description": "绑定GRAPHICS pipeline。"
+  },
+  "grassland::graphics::backend::VulkanCmdBindProgram::VulkanCmdBindProgram": {
+    "contract": "不立即执行GPU操作。",
+    "description": "保存值参数及借用资源供提交时编译。"
+  },
+  "grassland::graphics::backend::VulkanCmdBindRayTracingProgram": {
+    "contract": "延迟命令借用资源，保持到GPU完成。",
+    "description": "绑定RAY_TRACING pipeline。"
+  },
+  "grassland::graphics::backend::VulkanCmdBindRayTracingProgram::CompileCommand": {
+    "contract": "资源数组数量须精确匹配Program声明；范围和调用顺序由调用方保证。",
+    "description": "绑定RAY_TRACING pipeline。"
+  },
+  "grassland::graphics::backend::VulkanCmdBindRayTracingProgram::VulkanCmdBindRayTracingProgram": {
+    "contract": "不立即执行GPU操作。",
+    "description": "保存值参数及借用资源供提交时编译。"
+  },
+  "grassland::graphics::backend::VulkanCmdBindResourceAccelerationStructure": {
+    "contract": "延迟命令借用资源，保持到GPU完成。",
+    "description": "通过pNext写单AS描述并绑定set，布局count必须1。"
+  },
+  "grassland::graphics::backend::VulkanCmdBindResourceAccelerationStructure::CompileCommand": {
+    "contract": "资源数组数量须精确匹配Program声明；范围和调用顺序由调用方保证。",
+    "description": "通过pNext写单AS描述并绑定set，布局count必须1。"
+  },
+  "grassland::graphics::backend::VulkanCmdBindResourceAccelerationStructure::VulkanCmdBindResourceAccelerationStructure": {
+    "contract": "不立即执行GPU操作。",
+    "description": "保存值参数及借用资源供提交时编译。"
+  },
+  "grassland::graphics::backend::VulkanCmdBindResourceBuffers": {
+    "contract": "延迟命令借用资源，保持到GPU完成。",
+    "description": "分配slot set，以offset/range写buffer infos，再绑定set。"
+  },
+  "grassland::graphics::backend::VulkanCmdBindResourceBuffers::CompileCommand": {
+    "contract": "资源数组数量须精确匹配Program声明；范围和调用顺序由调用方保证。",
+    "description": "分配slot set，以offset/range写buffer infos，再绑定set。"
+  },
+  "grassland::graphics::backend::VulkanCmdBindResourceBuffers::VulkanCmdBindResourceBuffers": {
+    "contract": "不立即执行GPU操作。",
+    "description": "保存值参数及借用资源供提交时编译。"
+  },
+  "grassland::graphics::backend::VulkanCmdBindResourceImages": {
+    "contract": "延迟命令借用资源，保持到GPU完成。",
+    "description": "按需转GENERAL，写image view描述，再绑定set。"
+  },
+  "grassland::graphics::backend::VulkanCmdBindResourceImages::CompileCommand": {
+    "contract": "资源数组数量须精确匹配Program声明；范围和调用顺序由调用方保证。",
+    "description": "按需转GENERAL，写image view描述，再绑定set。"
+  },
+  "grassland::graphics::backend::VulkanCmdBindResourceImages::VulkanCmdBindResourceImages": {
+    "contract": "不立即执行GPU操作。",
+    "description": "保存值参数及借用资源供提交时编译。"
+  },
+  "grassland::graphics::backend::VulkanCmdBindResourceSamplers": {
+    "contract": "延迟命令借用资源，保持到GPU完成。",
+    "description": "写sampler描述并绑定set。"
+  },
+  "grassland::graphics::backend::VulkanCmdBindResourceSamplers::CompileCommand": {
+    "contract": "资源数组数量须精确匹配Program声明；范围和调用顺序由调用方保证。",
+    "description": "写sampler描述并绑定set。"
+  },
+  "grassland::graphics::backend::VulkanCmdBindResourceSamplers::VulkanCmdBindResourceSamplers": {
+    "contract": "不立即执行GPU操作。",
+    "description": "保存值参数及借用资源供提交时编译。"
+  },
+  "grassland::graphics::backend::VulkanCmdBindVertexBuffers": {
+    "contract": "延迟命令借用资源，保持到GPU完成。",
+    "description": "绑定当前帧Buffer，缺省offset补0。"
+  },
+  "grassland::graphics::backend::VulkanCmdBindVertexBuffers::CompileCommand": {
+    "contract": "资源数组数量须精确匹配Program声明；范围和调用顺序由调用方保证。",
+    "description": "绑定当前帧Buffer，缺省offset补0。"
+  },
+  "grassland::graphics::backend::VulkanCmdBindVertexBuffers::VulkanCmdBindVertexBuffers": {
+    "contract": "不立即执行GPU操作。",
+    "description": "保存值参数及借用资源供提交时编译。"
+  },
+  "grassland::graphics::backend::VulkanCmdClearImage": {
+    "contract": "延迟命令借用资源，保持到GPU完成。",
+    "description": "转TRANSFER_DST后清颜色float32值或仅深度；stencil不清。"
+  },
+  "grassland::graphics::backend::VulkanCmdClearImage::CompileCommand": {
+    "contract": "资源数组数量须精确匹配Program声明；范围和调用顺序由调用方保证。",
+    "description": "转TRANSFER_DST后清颜色float32值或仅深度；stencil不清。"
+  },
+  "grassland::graphics::backend::VulkanCmdClearImage::VulkanCmdClearImage": {
+    "contract": "不立即执行GPU操作。",
+    "description": "保存值参数及借用资源供提交时编译。"
+  },
+  "grassland::graphics::backend::VulkanCmdCopyBuffer": {
+    "contract": "延迟命令借用资源，保持到GPU完成。",
+    "description": "按dst在前参数录制vkCmdCopyBuffer，不额外插内存屏障。"
+  },
+  "grassland::graphics::backend::VulkanCmdCopyBuffer::CompileCommand": {
+    "contract": "资源数组数量须精确匹配Program声明；范围和调用顺序由调用方保证。",
+    "description": "按dst在前参数录制vkCmdCopyBuffer，不额外插内存屏障。"
+  },
+  "grassland::graphics::backend::VulkanCmdCopyBuffer::VulkanCmdCopyBuffer": {
+    "contract": "不立即执行GPU操作。",
+    "description": "保存值参数及借用资源供提交时编译。"
+  },
+  "grassland::graphics::backend::VulkanCmdDispatch": {
+    "contract": "延迟命令借用资源，保持到GPU完成。",
+    "description": "派发工作组后ALL_COMMANDS写→读屏障。"
+  },
+  "grassland::graphics::backend::VulkanCmdDispatch::CompileCommand": {
+    "contract": "资源数组数量须精确匹配Program声明；范围和调用顺序由调用方保证。",
+    "description": "派发工作组后ALL_COMMANDS写→读屏障。"
+  },
+  "grassland::graphics::backend::VulkanCmdDispatch::VulkanCmdDispatch": {
+    "contract": "不立即执行GPU操作。",
+    "description": "保存值参数及借用资源供提交时编译。"
+  },
+  "grassland::graphics::backend::VulkanCmdDispatchRays": {
+    "contract": "延迟命令借用资源，保持到GPU完成。",
+    "description": "按handle alignment构造四段SBT地址范围并TraceRays，之后ALL_COMMANDS写→读屏障。"
+  },
+  "grassland::graphics::backend::VulkanCmdDispatchRays::CompileCommand": {
+    "contract": "资源数组数量须精确匹配Program声明；范围和调用顺序由调用方保证。",
+    "description": "按handle alignment构造四段SBT地址范围并TraceRays，之后ALL_COMMANDS写→读屏障。"
+  },
+  "grassland::graphics::backend::VulkanCmdDispatchRays::VulkanCmdDispatchRays": {
+    "contract": "不立即执行GPU操作。",
+    "description": "保存值参数及借用资源供提交时编译。"
+  },
+  "grassland::graphics::backend::VulkanCmdDraw": {
+    "contract": "延迟命令借用资源，保持到GPU完成。",
+    "description": "vkCmdDraw非索引绘制，index_count参数实际为vertex count。"
+  },
+  "grassland::graphics::backend::VulkanCmdDraw::CompileCommand": {
+    "contract": "资源数组数量须精确匹配Program声明；范围和调用顺序由调用方保证。",
+    "description": "vkCmdDraw非索引绘制，index_count参数实际为vertex count。"
+  },
+  "grassland::graphics::backend::VulkanCmdDraw::VulkanCmdDraw": {
+    "contract": "不立即执行GPU操作。",
+    "description": "保存值参数及借用资源供提交时编译。"
+  },
+  "grassland::graphics::backend::VulkanCmdDrawIndexed": {
+    "contract": "延迟命令借用资源，保持到GPU完成。",
+    "description": "vkCmdDrawIndexed支持first index、base vertex及first instance。"
+  },
+  "grassland::graphics::backend::VulkanCmdDrawIndexed::CompileCommand": {
+    "contract": "资源数组数量须精确匹配Program声明；范围和调用顺序由调用方保证。",
+    "description": "vkCmdDrawIndexed支持first index、base vertex及first instance。"
+  },
+  "grassland::graphics::backend::VulkanCmdDrawIndexed::VulkanCmdDrawIndexed": {
+    "contract": "不立即执行GPU操作。",
+    "description": "保存值参数及借用资源供提交时编译。"
+  },
+  "grassland::graphics::backend::VulkanCmdEndRendering": {
+    "contract": "延迟命令借用资源，保持到GPU完成。",
+    "description": "调用vkCmdEndRenderingKHR。"
+  },
+  "grassland::graphics::backend::VulkanCmdEndRendering::CompileCommand": {
+    "contract": "资源数组数量须精确匹配Program声明；范围和调用顺序由调用方保证。",
+    "description": "调用vkCmdEndRenderingKHR。"
+  },
+  "grassland::graphics::backend::VulkanCmdPresent": {
+    "contract": "延迟命令借用资源，保持到GPU完成。",
+    "description": "transfer clear黑边、线性blit居中保持比例，可叠加兼容ImGui，最终转PRESENT。"
+  },
+  "grassland::graphics::backend::VulkanCmdPresent::CompileCommand": {
+    "contract": "资源数组数量须精确匹配Program声明；范围和调用顺序由调用方保证。",
+    "description": "transfer clear黑边、线性blit居中保持比例，可叠加兼容ImGui，最终转PRESENT。"
+  },
+  "grassland::graphics::backend::VulkanCmdPresent::VulkanCmdPresent": {
+    "contract": "不立即执行GPU操作。",
+    "description": "保存值参数及借用资源供提交时编译。"
+  },
+  "grassland::graphics::backend::VulkanCmdSetPrimitiveTopology": {
+    "contract": "延迟命令借用资源，保持到GPU完成。",
+    "description": "通过扩展函数设置动态拓扑。"
+  },
+  "grassland::graphics::backend::VulkanCmdSetPrimitiveTopology::CompileCommand": {
+    "contract": "资源数组数量须精确匹配Program声明；范围和调用顺序由调用方保证。",
+    "description": "通过扩展函数设置动态拓扑。"
+  },
+  "grassland::graphics::backend::VulkanCmdSetPrimitiveTopology::VulkanCmdSetPrimitiveTopology": {
+    "contract": "不立即执行GPU操作。",
+    "description": "保存值参数及借用资源供提交时编译。"
+  },
+  "grassland::graphics::backend::VulkanCmdSetScissor": {
+    "contract": "延迟命令借用资源，保持到GPU完成。",
+    "description": "设置offset/extent原值。"
+  },
+  "grassland::graphics::backend::VulkanCmdSetScissor::CompileCommand": {
+    "contract": "资源数组数量须精确匹配Program声明；范围和调用顺序由调用方保证。",
+    "description": "设置offset/extent原值。"
+  },
+  "grassland::graphics::backend::VulkanCmdSetScissor::VulkanCmdSetScissor": {
+    "contract": "不立即执行GPU操作。",
+    "description": "保存值参数及借用资源供提交时编译。"
+  },
+  "grassland::graphics::backend::VulkanCmdSetViewport": {
+    "contract": "延迟命令借用资源，保持到GPU完成。",
+    "description": "设置x、y+height、width、负height及depth范围以翻转Y。"
+  },
+  "grassland::graphics::backend::VulkanCmdSetViewport::CompileCommand": {
+    "contract": "资源数组数量须精确匹配Program声明；范围和调用顺序由调用方保证。",
+    "description": "设置x、y+height、width、负height及depth范围以翻转Y。"
+  },
+  "grassland::graphics::backend::VulkanCmdSetViewport::VulkanCmdSetViewport": {
+    "contract": "不立即执行GPU操作。",
+    "description": "保存值参数及借用资源供提交时编译。"
+  },
+  "grassland::graphics::backend::VulkanCommand": {
+    "contract": "资源须与Core同后端；生命周期及字段用途见本页操作说明。",
+    "description": "原生命令编译多态接口。"
+  },
+  "grassland::graphics::backend::VulkanCommand::CompileCommand": {
+    "contract": "Core按录制顺序调用。",
+    "description": "将本对象写入原生command buffer的纯虚接口。"
+  },
+  "grassland::graphics::backend::VulkanCommand::~VulkanCommand": {
+    "contract": "",
+    "description": "默认虚析构，允许通过基类释放派生对象。"
+  },
+  "grassland::graphics::backend::VulkanCommandContext": {
+    "contract": "资源须与Core同后端；生命周期及字段用途见本页操作说明。",
+    "description": "延迟命令、资源与同步状态容器。"
+  },
+  "grassland::graphics::backend::VulkanCommandContext::AcquireDescriptorSet": {
+    "contract": "提交编译阶段调用，失败抛异常。",
+    "description": "从Core当前帧池分配一个layout对应set。"
+  },
+  "grassland::graphics::backend::VulkanCommandContext::CmdBeginRendering": {
+    "contract": "Present可插入HDR中间合成并收集窗口；CmdBegin/EndRendering需要配对。",
+    "description": "录制命令：先转换本pass资源图像GENERAL，再转换附件并开启LOAD/STORE dynamic rendering，render area取附件最小尺寸。"
+  },
+  "grassland::graphics::backend::VulkanCommandContext::CmdBindComputeProgram": {
+    "contract": "Present可插入HDR中间合成并收集窗口；CmdBegin/EndRendering需要配对。",
+    "description": "录制命令：绑定COMPUTE pipeline。"
+  },
+  "grassland::graphics::backend::VulkanCommandContext::CmdBindIndexBuffer": {
+    "contract": "Present可插入HDR中间合成并收集窗口；CmdBegin/EndRendering需要配对。",
+    "description": "录制命令：以UINT32格式绑定索引Buffer。"
+  },
+  "grassland::graphics::backend::VulkanCommandContext::CmdBindProgram": {
+    "contract": "Present可插入HDR中间合成并收集窗口；CmdBegin/EndRendering需要配对。",
+    "description": "录制命令：绑定GRAPHICS pipeline。"
+  },
+  "grassland::graphics::backend::VulkanCommandContext::CmdBindRayTracingProgram": {
+    "contract": "Present可插入HDR中间合成并收集窗口；CmdBegin/EndRendering需要配对。",
+    "description": "录制命令：绑定RAY_TRACING pipeline。"
+  },
+  "grassland::graphics::backend::VulkanCommandContext::CmdBindResources": {
+    "contract": "须先绑定对应program；图形pass内图像屏障前移至BeginRendering。",
+    "description": "记录资源并累计descriptor type/count及set预算。"
+  },
+  "grassland::graphics::backend::VulkanCommandContext::CmdBindVertexBuffers": {
+    "contract": "Present可插入HDR中间合成并收集窗口；CmdBegin/EndRendering需要配对。",
+    "description": "录制命令：绑定当前帧Buffer，缺省offset补0。"
+  },
+  "grassland::graphics::backend::VulkanCommandContext::CmdClearImage": {
+    "contract": "Present可插入HDR中间合成并收集窗口；CmdBegin/EndRendering需要配对。",
+    "description": "录制命令：转TRANSFER_DST后清颜色float32值或仅深度；stencil不清。"
+  },
+  "grassland::graphics::backend::VulkanCommandContext::CmdCopyBuffer": {
+    "contract": "Present可插入HDR中间合成并收集窗口；CmdBegin/EndRendering需要配对。",
+    "description": "录制命令：按dst在前参数录制vkCmdCopyBuffer，不额外插内存屏障。"
+  },
+  "grassland::graphics::backend::VulkanCommandContext::CmdDispatch": {
+    "contract": "Present可插入HDR中间合成并收集窗口；CmdBegin/EndRendering需要配对。",
+    "description": "录制命令：派发工作组后ALL_COMMANDS写→读屏障。"
+  },
+  "grassland::graphics::backend::VulkanCommandContext::CmdDispatchRays": {
+    "contract": "Present可插入HDR中间合成并收集窗口；CmdBegin/EndRendering需要配对。",
+    "description": "录制命令：按handle alignment构造四段SBT地址范围并TraceRays，之后ALL_COMMANDS写→读屏障。"
+  },
+  "grassland::graphics::backend::VulkanCommandContext::CmdDraw": {
+    "contract": "Present可插入HDR中间合成并收集窗口；CmdBegin/EndRendering需要配对。",
+    "description": "录制命令：vkCmdDraw非索引绘制，index_count参数实际为vertex count。"
+  },
+  "grassland::graphics::backend::VulkanCommandContext::CmdDrawIndexed": {
+    "contract": "Present可插入HDR中间合成并收集窗口；CmdBegin/EndRendering需要配对。",
+    "description": "录制命令：vkCmdDrawIndexed支持first index、base vertex及first instance。"
+  },
+  "grassland::graphics::backend::VulkanCommandContext::CmdEndRendering": {
+    "contract": "Present可插入HDR中间合成并收集窗口；CmdBegin/EndRendering需要配对。",
+    "description": "录制命令：调用vkCmdEndRenderingKHR。"
+  },
+  "grassland::graphics::backend::VulkanCommandContext::CmdPresent": {
+    "contract": "Present可插入HDR中间合成并收集窗口；CmdBegin/EndRendering需要配对。",
+    "description": "录制命令：transfer clear黑边、线性blit居中保持比例，可叠加兼容ImGui，最终转PRESENT。"
+  },
+  "grassland::graphics::backend::VulkanCommandContext::CmdSetPrimitiveTopology": {
+    "contract": "Present可插入HDR中间合成并收集窗口；CmdBegin/EndRendering需要配对。",
+    "description": "录制命令：通过扩展函数设置动态拓扑。"
+  },
+  "grassland::graphics::backend::VulkanCommandContext::CmdSetScissor": {
+    "contract": "Present可插入HDR中间合成并收集窗口；CmdBegin/EndRendering需要配对。",
+    "description": "录制命令：设置offset/extent原值。"
+  },
+  "grassland::graphics::backend::VulkanCommandContext::CmdSetViewport": {
+    "contract": "Present可插入HDR中间合成并收集窗口；CmdBegin/EndRendering需要配对。",
+    "description": "录制命令：设置x、y+height、width、负height及depth范围以翻转Y。"
+  },
+  "grassland::graphics::backend::VulkanCommandContext::CmdTimestamp": {
+    "contract": "pool由调用方保活，索引无检查。",
+    "description": "录制可选reset查询池前reset_count项，再写BOTTOM_OF_PIPE timestamp到index。"
+  },
+  "grassland::graphics::backend::VulkanCommandContext::Core": {
+    "contract": "",
+    "description": "返回VulkanCore借用指针。"
+  },
+  "grassland::graphics::backend::VulkanCommandContext::GetCore": {
+    "contract": "",
+    "description": "返回统一Core借用指针。"
+  },
+  "grassland::graphics::backend::VulkanCommandContext::ImageState": {
+    "contract": "",
+    "description": "记录图像当前layout、stage、access和aspect，用于下一次barrier和提交末尾恢复。"
+  },
+  "grassland::graphics::backend::VulkanCommandContext::RecordDynamicBuffer": {
+    "contract": "",
+    "description": "将动态buffer加入去重上传集合。"
+  },
+  "grassland::graphics::backend::VulkanCommandContext::RequireImageState": {
+    "contract": "首次假定GENERAL/TOP_OF_PIPE/无access，默认aspect参数为DEPTH，颜色调用须显式传COLOR。",
+    "description": "每次按缓存旧状态发image barrier并保存layout/stage/access/aspect。"
+  },
+  "grassland::graphics::backend::VulkanCommandContext::VulkanCommandContext": {
+    "contract": "Core仍需InitializeLogicalDevice，Program仍需Finalize；特殊重载/限制见文件说明。",
+    "description": "初始化VulkanCommandContext的本页状态和资源。"
+  },
+  "grassland::graphics::backend::VulkanComputeProgram": {
+    "contract": "资源须与Core同后端；生命周期及字段用途见本页操作说明。",
+    "description": "借用compute shader并拥有pipeline。"
+  },
+  "grassland::graphics::backend::VulkanComputeProgram::AddResourceBinding": {
+    "contract": "调用顺序决定set索引。",
+    "description": "追加按slot排列的set layout。"
+  },
+  "grassland::graphics::backend::VulkanComputeProgram::Finalize": {
+    "contract": "shader须非空且存活，失败抛runtime_error。",
+    "description": "创建layout及compute pipeline。"
+  },
+  "grassland::graphics::backend::VulkanComputeProgram::Pipeline": {
+    "contract": "Finalize成功后有效。",
+    "description": "返回借用VkPipeline。"
+  },
+  "grassland::graphics::backend::VulkanComputeProgram::VulkanComputeProgram": {
+    "contract": "Core仍需InitializeLogicalDevice，Program仍需Finalize；特殊重载/限制见文件说明。",
+    "description": "初始化VulkanComputeProgram的本页状态和资源。"
+  },
+  "grassland::graphics::backend::VulkanComputeProgram::~VulkanComputeProgram": {
+    "contract": "GPU须已完成，基类再销毁layout。",
+    "description": "销毁pipeline，RT另释放SBT。"
+  },
+  "grassland::graphics::backend::VulkanCore": {
+    "contract": "资源须与Core同后端；生命周期及字段用途见本页操作说明。",
+    "description": "instance/device/VMA/队列与帧资源所有者。"
+  },
+  "grassland::graphics::backend::VulkanCore::API": {
+    "contract": "",
+    "description": "返回BACKEND_API_VULKAN。"
+  },
+  "grassland::graphics::backend::VulkanCore::Allocator": {
+    "contract": "原生对象/引用借用，须在初始化后使用；缓存扩容可改变allocation。",
+    "description": "返回VMA allocator。"
+  },
+  "grassland::graphics::backend::VulkanCore::BufferAddress": {
+    "contract": "buffer须以device-address usage创建且feature启用。",
+    "description": "调用core vkGetBufferDeviceAddress查询。"
+  },
+  "grassland::graphics::backend::VulkanCore::CUDABeginExecutionBarrier": {
+    "contract": "无CUDA设备抛异常，CUDA失败通过CUDAThrowIfFailed传播。",
+    "description": "CUDA stream等待当前timeline值。"
+  },
+  "grassland::graphics::backend::VulkanCore::CUDAEndExecutionBarrier": {
+    "contract": "后续Vulkan提交等待此值。",
+    "description": "递增timeline值并在CUDA stream signal。"
+  },
+  "grassland::graphics::backend::VulkanCore::CommandBuffer": {
+    "contract": "原生对象/引用借用，须在初始化后使用；缓存扩容可改变allocation。",
+    "description": "返回当前帧command buffer。"
+  },
+  "grassland::graphics::backend::VulkanCore::CreateBottomLevelAccelerationStructure": {
+    "contract": "简写以size/stride推数量并默认OPAQUE；stride非0、范围和类型由调用方保证。",
+    "description": "按AABB或float3/uint32三角Range设备地址同步构建BLAS。"
+  },
+  "grassland::graphics::backend::VulkanCore::CreateBuffer": {
+    "contract": "原生输出null返回INITIALIZATION_FAILED，成功才写输出；统一成功0。",
+    "description": "统一重载按type构造Static/Dynamic；原生重载以VMA创建指定usage/内存/可选alignment的Buffer。"
+  },
+  "grassland::graphics::backend::VulkanCore::CreateCUDABuffer": {
+    "contract": "Core须初始化；构造可能抛异常；compute cast未检空。",
+    "description": "通过double_ptr构造CUDA外部内存Buffer，成功0。"
+  },
+  "grassland::graphics::backend::VulkanCore::CreateCommandContext": {
+    "contract": "Core须初始化；构造可能抛异常；compute cast未检空。",
+    "description": "通过double_ptr构造VulkanCommandContext，成功0。"
+  },
+  "grassland::graphics::backend::VulkanCore::CreateComputeProgram": {
+    "contract": "Core须初始化；构造可能抛异常；compute cast未检空。",
+    "description": "通过double_ptr构造借用compute shader的VulkanComputeProgram，成功0。"
+  },
+  "grassland::graphics::backend::VulkanCore::CreateDescriptorPool": {
+    "contract": "无FREE_DESCRIPTOR_SET flag，按整池reset回收。",
+    "description": "创建普通descriptor pool。"
+  },
+  "grassland::graphics::backend::VulkanCore::CreateImage": {
+    "contract": "原生view失败清理image；直接原生调用不转换layout。",
+    "description": "统一重载构造Image并同步UNDEFINED→GENERAL；原生重载创建单mip optimal GPU_ONLY image/view。"
+  },
+  "grassland::graphics::backend::VulkanCore::CreateInfo": {
+    "contract": "原生对象/引用借用，须在初始化后使用；缓存扩容可改变allocation。",
+    "description": "返回保存的设备配置const引用。"
+  },
+  "grassland::graphics::backend::VulkanCore::CreateNativeAABBAccelerationStructure": {
+    "contract": "PREFER_FAST_TRACE，无ALLOW_UPDATE。",
+    "description": "以AABB地址/stride/count调用单geometry BLAS helper并查询地址。"
+  },
+  "grassland::graphics::backend::VulkanCore::CreateNativeTopLevelAccelerationStructure": {
+    "contract": "至少分配一条实例空间以支持空列表；数量按实际数组。",
+    "description": "16字节对齐实例upload，构建PREFER_FAST_TRACE|ALLOW_UPDATE TLAS。"
+  },
+  "grassland::graphics::backend::VulkanCore::CreateNativeTriangleAccelerationStructure": {
+    "contract": "maxVertex当前赋num_vertex；未扫描索引。",
+    "description": "分配identity transform，构建float3/uint32三角BLAS并返回地址。"
+  },
+  "grassland::graphics::backend::VulkanCore::CreatePipeline": {
+    "contract": "viewport/scissor动态，topology按开关动态；输出null返回错误。",
+    "description": "以dynamic rendering和可选depth/tessellation配置创建Graphics pipeline。"
+  },
+  "grassland::graphics::backend::VulkanCore::CreateProgram": {
+    "contract": "Core须初始化；构造可能抛异常；compute cast未检空。",
+    "description": "通过double_ptr构造VulkanProgram，成功0。"
+  },
+  "grassland::graphics::backend::VulkanCore::CreateRayTracingPipeline": {
+    "contract": "递归深度1，closest-hit必需，返回VkResult。",
+    "description": "按raygen→miss→hit groups→callable顺序建shader groups。"
+  },
+  "grassland::graphics::backend::VulkanCore::CreateRayTracingProgram": {
+    "contract": "Core须初始化；构造可能抛异常；compute cast未检空。",
+    "description": "通过double_ptr构造待配置VulkanRayTracingProgram，成功0。"
+  },
+  "grassland::graphics::backend::VulkanCore::CreateSampler": {
+    "contract": "Core须初始化；构造可能抛异常；compute cast未检空。",
+    "description": "通过double_ptr构造VulkanSampler，成功0。"
+  },
+  "grassland::graphics::backend::VulkanCore::CreateShader": {
+    "contract": "附加args追加，空blob返回-1。",
+    "description": "Slang编SPIR-V1.5、dx-layout并创建VulkanShader。"
+  },
+  "grassland::graphics::backend::VulkanCore::CreateShaderBindingTable": {
+    "contract": "group_count来自索引数组长度，任意重复/子集有计数风险；索引和GetHandles结果未检查。",
+    "description": "按handle/base alignment分配CPU_TO_GPU SBT并按索引复制group handles。"
+  },
+  "grassland::graphics::backend::VulkanCore::CreateTopLevelAccelerationStructure": {
+    "contract": "原生失败抛异常。",
+    "description": "转换实例并同步创建允许update的TLAS。"
+  },
+  "grassland::graphics::backend::VulkanCore::CreateWindowObject": {
+    "contract": "Core须初始化；构造可能抛异常；compute cast未检空。",
+    "description": "通过double_ptr构造初始HDR=false的VulkanWindow，成功0。"
+  },
+  "grassland::graphics::backend::VulkanCore::CurrentFrame": {
+    "contract": "原生对象/引用借用，须在初始化后使用；缓存扩容可改变allocation。",
+    "description": "返回当前帧槽索引。"
+  },
+  "grassland::graphics::backend::VulkanCore::DestroyNativeDevice": {
+    "contract": "调用方先销毁子资源并等待。",
+    "description": "销毁VMA allocator和device。"
+  },
+  "grassland::graphics::backend::VulkanCore::DeviceRayQuerySupport": {
+    "contract": "未初始化false。",
+    "description": "已初始化时重新查询physical device的query能力。"
+  },
+  "grassland::graphics::backend::VulkanCore::DownloadStagingAllocation": {
+    "contract": "原生对象/引用借用，须在初始化后使用；缓存扩容可改变allocation。",
+    "description": "返回当前下载缓存allocation。"
+  },
+  "grassland::graphics::backend::VulkanCore::FindMemoryType": {
+    "contract": "失败uint32(~0)。",
+    "description": "从type_filter候选中找包含全部properties的首项。"
+  },
+  "grassland::graphics::backend::VulkanCore::GetMemoryHandle": {
+    "contract": "缺函数/导出失败抛异常；FD经uintptr_t编码为void*。",
+    "description": "动态取得Win32/FD导出函数并导出memory handle。"
+  },
+  "grassland::graphics::backend::VulkanCore::GetPhysicalDeviceProperties": {
+    "contract": "输出数组由调用方分配。",
+    "description": "枚举物理设备并按需填name/score/RT/geometry/CUDA属性。"
+  },
+  "grassland::graphics::backend::VulkanCore::GetSemaphoreHandle": {
+    "contract": "缺函数/导出失败抛异常。",
+    "description": "动态取得Win32/FD导出函数并导出semaphore handle。"
+  },
+  "grassland::graphics::backend::VulkanCore::GraphicsCommandPool": {
+    "contract": "原生对象/引用借用，须在初始化后使用；缓存扩容可改变allocation。",
+    "description": "返回graphics pool。"
+  },
+  "grassland::graphics::backend::VulkanCore::GraphicsQueue": {
+    "contract": "原生对象/引用借用，须在初始化后使用；缓存扩容可改变allocation。",
+    "description": "返回graphics queue。"
+  },
+  "grassland::graphics::backend::VulkanCore::Handle": {
+    "contract": "原生对象/引用借用，须在初始化后使用；缓存扩容可改变allocation。",
+    "description": "返回device。"
+  },
+  "grassland::graphics::backend::VulkanCore::ImportCudaExternalMemory": {
+    "contract": "CUDA错误未检查；size由调用方提供，Win32 handle未显式关闭。",
+    "description": "导出平台handle并临时切CUDA设备导入外部内存。"
+  },
+  "grassland::graphics::backend::VulkanCore::InFlightFence": {
+    "contract": "原生对象/引用借用，须在初始化后使用；缓存扩容可改变allocation。",
+    "description": "返回当前帧fence。"
+  },
+  "grassland::graphics::backend::VulkanCore::InitializeLogicalDevice": {
+    "contract": "无效索引或vkCreateDevice失败-1，其余部分失败抛异常；不保证所有推荐feature受支持。",
+    "description": "选择设备、推荐features、创建device/VMA/queues/pools/fences及可选CUDA timeline。"
+  },
+  "grassland::graphics::backend::VulkanCore::InitializeNativeDevice": {
+    "contract": "vmaCreateAllocator结果未检查。",
+    "description": "接管device与配置、创建VMA并按扩展加载AS/RT函数，查询subgroup。"
+  },
+  "grassland::graphics::backend::VulkanCore::Instance": {
+    "contract": "原生对象/引用借用，须在初始化后使用；缓存扩容可改变allocation。",
+    "description": "返回instance。"
+  },
+  "grassland::graphics::backend::VulkanCore::InstanceProcedures": {
+    "contract": "原生对象/引用借用，须在初始化后使用；缓存扩容可改变allocation。",
+    "description": "返回instance函数表const引用。"
+  },
+  "grassland::graphics::backend::VulkanCore::PhysicalDevice": {
+    "contract": "原生对象/引用借用，须在初始化后使用；缓存扩容可改变allocation。",
+    "description": "返回physical device。"
+  },
+  "grassland::graphics::backend::VulkanCore::Procedures": {
+    "contract": "原生对象/引用借用，须在初始化后使用；缓存扩容可改变allocation。",
+    "description": "返回device函数表引用（含可变/const重载）。"
+  },
+  "grassland::graphics::backend::VulkanCore::RequestDownloadStagingBuffer": {
+    "contract": "同上。",
+    "description": "复用/扩容CPU_ONLY transfer-destination缓存。"
+  },
+  "grassland::graphics::backend::VulkanCore::RequestUploadStagingBuffer": {
+    "contract": "扩容先销毁旧Buffer，调用方先同步。",
+    "description": "复用/扩容CPU_ONLY transfer-source缓存。"
+  },
+  "grassland::graphics::backend::VulkanCore::SingleTimeCommand": {
+    "contract": "helper返回VkResult被忽略，回调异常传播。",
+    "description": "构造可选CUDA timeline等待/signal后调用helper同步一次性提交。"
+  },
+  "grassland::graphics::backend::VulkanCore::SubGroupSize": {
+    "contract": "不保证所有shader实际固定此宽度。",
+    "description": "返回物理设备subgroupSize。"
+  },
+  "grassland::graphics::backend::VulkanCore::SubmitCommandContext": {
+    "contract": "同graphics/transfer queue，末尾queue idle串行等待；context和资源必须有效。",
+    "description": "扩容/重置当前descriptor pool、acquire窗口、上传动态Buffer、编译命令、恢复GENERAL、提交present并轮转回收。"
+  },
+  "grassland::graphics::backend::VulkanCore::TransferCommandPool": {
+    "contract": "原生对象/引用借用，须在初始化后使用；缓存扩容可改变allocation。",
+    "description": "返回upload pool。"
+  },
+  "grassland::graphics::backend::VulkanCore::TransferQueue": {
+    "contract": "原生对象/引用借用，须在初始化后使用；缓存扩容可改变allocation。",
+    "description": "返回同一graphics family第0队列。"
+  },
+  "grassland::graphics::backend::VulkanCore::UploadStagingAllocation": {
+    "contract": "原生对象/引用借用，须在初始化后使用；缓存扩容可改变allocation。",
+    "description": "返回当前上传缓存allocation。"
+  },
+  "grassland::graphics::backend::VulkanCore::VulkanCore": {
+    "contract": "Core仍需InitializeLogicalDevice，Program仍需Finalize；特殊重载/限制见文件说明。",
+    "description": "初始化VulkanCore的本页状态和资源。"
+  },
+  "grassland::graphics::backend::VulkanCore::WaitGPU": {
+    "contract": "idle结果未检查；独立CUDA尚未提交的工作不由此保证完成。",
+    "description": "等待graphics queue idle并调用/清空全部post callbacks。"
+  },
+  "grassland::graphics::backend::VulkanCore::WaitIdle": {
+    "contract": "不执行post callbacks。",
+    "description": "调用vkDeviceWaitIdle并返回VkResult。"
+  },
+  "grassland::graphics::backend::VulkanCore::WaveSize": {
+    "contract": "",
+    "description": "返回SubGroupSize。"
+  },
+  "grassland::graphics::backend::VulkanCore::~VulkanCore": {
+    "contract": "不执行待处理post callbacks；资源包装应先销毁。",
+    "description": "等待CUDA timeline及device idle，销毁staging/帧池/fence/命令池/VMA/device/debug/instance。"
+  },
+  "grassland::graphics::backend::VulkanDynamicBuffer": {
+    "contract": "资源须与Core同后端；生命周期及字段用途见本页操作说明。",
+    "description": "CPU staging和逐帧GPU副本。"
+  },
+  "grassland::graphics::backend::VulkanDynamicBuffer::Buffer": {
+    "contract": "Dynamic随帧槽轮换。",
+    "description": "返回当前GPU VkBuffer。"
+  },
+  "grassland::graphics::backend::VulkanDynamicBuffer::DeviceAddress": {
+    "contract": "Dynamic为CPU staging地址；CUDA缓存地址；须启用address能力。",
+    "description": "返回设备地址。"
+  },
+  "grassland::graphics::backend::VulkanDynamicBuffer::DownloadData": {
+    "contract": "Dynamic读staging，不读取GPU写入；其余同步读回。",
+    "description": "复制缓冲指定范围到host。"
+  },
+  "grassland::graphics::backend::VulkanDynamicBuffer::Resize": {
+    "contract": "Static/CUDA先WaitGPU并GPUcopy；Dynamic只Map复制staging，提交时更新GPU副本。",
+    "description": "新建并保留min(old,new)前缀。"
+  },
+  "grassland::graphics::backend::VulkanDynamicBuffer::Size": {
+    "contract": "",
+    "description": "返回逻辑请求字节数。"
+  },
+  "grassland::graphics::backend::VulkanDynamicBuffer::TransferData": {
+    "contract": "Core保证旧副本可复用，未主动flush staging。",
+    "description": "按size重建当前帧GPU副本并录制全量vkCmdCopyBuffer。"
+  },
+  "grassland::graphics::backend::VulkanDynamicBuffer::Type": {
+    "contract": "",
+    "description": "Dynamic返回DYNAMIC，Static/CUDA返回STATIC。"
+  },
+  "grassland::graphics::backend::VulkanDynamicBuffer::UploadData": {
+    "contract": "Dynamic只写staging，Static/CUDA同步上传；无范围校验。",
+    "description": "复制host指定范围到缓冲。"
+  },
+  "grassland::graphics::backend::VulkanDynamicBuffer::VulkanDynamicBuffer": {
+    "contract": "Core仍需InitializeLogicalDevice，Program仍需Finalize；特殊重载/限制见文件说明。",
+    "description": "初始化VulkanDynamicBuffer的本页状态和资源。"
+  },
+  "grassland::graphics::backend::VulkanDynamicBuffer::~VulkanDynamicBuffer": {
+    "contract": "不隐式等待GPU。",
+    "description": "释放Buffer及对应allocation，CUDA转调Reset。"
+  },
+  "grassland::graphics::backend::VulkanImGuiAssets": {
+    "contract": "资源须与Core同后端；生命周期及字段用途见本页操作说明。",
+    "description": "兼容ImGui窗口状态。"
+  },
+  "grassland::graphics::backend::VulkanImage": {
+    "contract": "资源须与Core同后端；生命周期及字段用途见本页操作说明。",
+    "description": "二维图像/view/allocation所有者。"
+  },
+  "grassland::graphics::backend::VulkanImage::Aspect": {
+    "contract": "不包含stencil。",
+    "description": "返回DEPTH或COLOR。"
+  },
+  "grassland::graphics::backend::VulkanImage::DownloadData": {
+    "contract": "GENERAL→TRANSFER_SRC→GENERAL；输出须足够大。",
+    "description": "全图或区域经staging同步读回紧密像素。"
+  },
+  "grassland::graphics::backend::VulkanImage::Extent": {
+    "contract": "",
+    "description": "返回创建的像素宽高。"
+  },
+  "grassland::graphics::backend::VulkanImage::Format": {
+    "contract": "",
+    "description": "返回统一格式。"
+  },
+  "grassland::graphics::backend::VulkanImage::Handle": {
+    "contract": "",
+    "description": "返回借用VkImage。"
+  },
+  "grassland::graphics::backend::VulkanImage::ImageView": {
+    "contract": "",
+    "description": "返回借用单mip view。"
+  },
+  "grassland::graphics::backend::VulkanImage::NativeFormat": {
+    "contract": "",
+    "description": "转换统一格式为VkFormat。"
+  },
+  "grassland::graphics::backend::VulkanImage::UploadData": {
+    "contract": "GENERAL→TRANSFER_DST→GENERAL；无范围/host长度校验。",
+    "description": "紧密全图或区域像素经新建staging同步copy到图像。"
+  },
+  "grassland::graphics::backend::VulkanImage::VulkanImage": {
+    "contract": "Core仍需InitializeLogicalDevice，Program仍需Finalize；特殊重载/限制见文件说明。",
+    "description": "初始化VulkanImage的本页状态和资源。"
+  },
+  "grassland::graphics::backend::VulkanImage::~VulkanImage": {
+    "contract": "GPU须已完成。",
+    "description": "先销毁view再VMA image。"
+  },
+  "grassland::graphics::backend::VulkanProgram": {
+    "contract": "资源须与Core同后端；生命周期及字段用途见本页操作说明。",
+    "description": "图形配置和pipeline。"
+  },
+  "grassland::graphics::backend::VulkanProgram::AddInputAttribute": {
+    "contract": "binding须对应已配置流。",
+    "description": "按递增location追加格式、binding和offset。"
+  },
+  "grassland::graphics::backend::VulkanProgram::AddInputBinding": {
+    "contract": "",
+    "description": "按递增binding追加stride与vertex/instance rate。"
+  },
+  "grassland::graphics::backend::VulkanProgram::AddResourceBinding": {
+    "contract": "调用顺序决定set索引。",
+    "description": "追加按slot排列的set layout。"
+  },
+  "grassland::graphics::backend::VulkanProgram::BindShader": {
+    "contract": "类型不匹配抛异常，重复同stage不会替换。",
+    "description": "追加VulkanShader stage并借用入口字符串。"
+  },
+  "grassland::graphics::backend::VulkanProgram::Finalize": {
+    "contract": "当前忽略工厂VkResult。",
+    "description": "创建layout并调用Core图形pipeline工厂。"
+  },
+  "grassland::graphics::backend::VulkanProgram::NumInputBindings": {
+    "contract": "",
+    "description": "返回顶点流数量。"
+  },
+  "grassland::graphics::backend::VulkanProgram::Pipeline": {
+    "contract": "Finalize成功后有效。",
+    "description": "返回借用VkPipeline。"
+  },
+  "grassland::graphics::backend::VulkanProgram::PipelineSettings": {
+    "contract": "",
+    "description": "返回内部设置const借用指针。"
+  },
+  "grassland::graphics::backend::VulkanProgram::SetBlendState": {
+    "contract": "索引无检查。",
+    "description": "转换并替换指定颜色附件blend。"
+  },
+  "grassland::graphics::backend::VulkanProgram::SetCullMode": {
+    "contract": "Finalize前。",
+    "description": "转换并设置剔除模式。"
+  },
+  "grassland::graphics::backend::VulkanProgram::VulkanProgram": {
+    "contract": "Core仍需InitializeLogicalDevice，Program仍需Finalize；特殊重载/限制见文件说明。",
+    "description": "初始化VulkanProgram的本页状态和资源。"
+  },
+  "grassland::graphics::backend::VulkanProgram::~VulkanProgram": {
+    "contract": "GPU须已完成，基类再销毁layout。",
+    "description": "销毁pipeline，RT另释放SBT。"
+  },
+  "grassland::graphics::backend::VulkanProgramBase": {
+    "contract": "资源须与Core同后端；生命周期及字段用途见本页操作说明。",
+    "description": "descriptor set layouts及pipeline layout所有者。"
+  },
+  "grassland::graphics::backend::VulkanProgramBase::AddResourceBindingImpl": {
+    "contract": "count须正、type有效；无额外校验。",
+    "description": "立即创建单binding0、stage ALL的set layout并记录。"
+  },
+  "grassland::graphics::backend::VulkanProgramBase::Core": {
+    "contract": "",
+    "description": "返回借用Core。"
+  },
+  "grassland::graphics::backend::VulkanProgramBase::DescriptorBinding": {
+    "contract": "索引无检查。",
+    "description": "返回slot的binding0描述引用。"
+  },
+  "grassland::graphics::backend::VulkanProgramBase::DescriptorPoolSize": {
+    "contract": "",
+    "description": "返回slot type/count所需池容量。"
+  },
+  "grassland::graphics::backend::VulkanProgramBase::DescriptorSetLayout": {
+    "contract": "索引无检查。",
+    "description": "返回slot对应set layout。"
+  },
+  "grassland::graphics::backend::VulkanProgramBase::FinalizePipelineLayout": {
+    "contract": "其他descriptor限制依赖原生API；重复Finalize未销毁旧layout。",
+    "description": "检查set/storage-buffer/sampled-image数量上限并创建layout。"
+  },
+  "grassland::graphics::backend::VulkanProgramBase::PipelineLayout": {
+    "contract": "Finalize后有效。",
+    "description": "返回借用layout。"
+  },
+  "grassland::graphics::backend::VulkanProgramBase::VulkanProgramBase": {
+    "contract": "Core仍需InitializeLogicalDevice，Program仍需Finalize；特殊重载/限制见文件说明。",
+    "description": "初始化VulkanProgramBase的本页状态和资源。"
+  },
+  "grassland::graphics::backend::VulkanProgramBase::~VulkanProgramBase": {
+    "contract": "GPU须已完成。",
+    "description": "销毁pipeline layout及所有set layouts。"
+  },
+  "grassland::graphics::backend::VulkanRayTracingProgram": {
+    "contract": "资源须与Core同后端；生命周期及字段用途见本页操作说明。",
+    "description": "借用光追shader并拥有pipeline和SBT。"
+  },
+  "grassland::graphics::backend::VulkanRayTracingProgram::AddCallableShader": {
+    "contract": "",
+    "description": "追加callable借用指针。"
+  },
+  "grassland::graphics::backend::VulkanRayTracingProgram::AddHitGroup": {
+    "contract": "closest-hit只assert；shader须活到Finalize。",
+    "description": "追加closest-hit必需及可选any-hit/intersection、procedure。"
+  },
+  "grassland::graphics::backend::VulkanRayTracingProgram::AddMissShader": {
+    "contract": "",
+    "description": "追加miss借用指针。"
+  },
+  "grassland::graphics::backend::VulkanRayTracingProgram::AddRayGenShader": {
+    "contract": "后次覆盖，仅assert类型正确。",
+    "description": "设置唯一raygen借用指针。"
+  },
+  "grassland::graphics::backend::VulkanRayTracingProgram::AddResourceBinding": {
+    "contract": "调用顺序决定set索引。",
+    "description": "追加按slot排列的set layout。"
+  },
+  "grassland::graphics::backend::VulkanRayTracingProgram::CallableShaderCount": {
+    "contract": "",
+    "description": "返回Finalize传入的对应索引数组长度。"
+  },
+  "grassland::graphics::backend::VulkanRayTracingProgram::Finalize": {
+    "contract": "自定义索引受SBT计数实现限制，见文件说明；pipeline结果未检查。",
+    "description": "创建RT pipeline和SBT；无参使用全部0..N-1索引。"
+  },
+  "grassland::graphics::backend::VulkanRayTracingProgram::GetCallableDeviceAddress": {
+    "contract": "Finalize后有效。",
+    "description": "返回SBT中对应段设备地址。"
+  },
+  "grassland::graphics::backend::VulkanRayTracingProgram::GetHitGroupDeviceAddress": {
+    "contract": "Finalize后有效。",
+    "description": "返回SBT中对应段设备地址。"
+  },
+  "grassland::graphics::backend::VulkanRayTracingProgram::GetMissDeviceAddress": {
+    "contract": "Finalize后有效。",
+    "description": "返回SBT中对应段设备地址。"
+  },
+  "grassland::graphics::backend::VulkanRayTracingProgram::GetRayGenDeviceAddress": {
+    "contract": "Finalize后有效。",
+    "description": "返回SBT中对应段设备地址。"
+  },
+  "grassland::graphics::backend::VulkanRayTracingProgram::HitGroupCount": {
+    "contract": "",
+    "description": "返回Finalize传入的对应索引数组长度。"
+  },
+  "grassland::graphics::backend::VulkanRayTracingProgram::MissShaderCount": {
+    "contract": "",
+    "description": "返回Finalize传入的对应索引数组长度。"
+  },
+  "grassland::graphics::backend::VulkanRayTracingProgram::Pipeline": {
+    "contract": "Finalize成功后有效。",
+    "description": "返回借用VkPipeline。"
+  },
+  "grassland::graphics::backend::VulkanRayTracingProgram::VulkanRayTracingProgram": {
+    "contract": "Core仍需InitializeLogicalDevice，Program仍需Finalize；特殊重载/限制见文件说明。",
+    "description": "初始化VulkanRayTracingProgram的本页状态和资源。"
+  },
+  "grassland::graphics::backend::VulkanRayTracingProgram::~VulkanRayTracingProgram": {
+    "contract": "GPU须已完成，基类再销毁layout。",
+    "description": "销毁pipeline，RT另释放SBT。"
+  },
+  "grassland::graphics::backend::VulkanResourceBinding": {
+    "contract": "资源须与Core同后端；生命周期及字段用途见本页操作说明。",
+    "description": "Buffer/Image二选一借用记录。"
+  },
+  "grassland::graphics::backend::VulkanResourceBinding::VulkanResourceBinding": {
+    "contract": "Core仍需InitializeLogicalDevice，Program仍需Finalize；特殊重载/限制见文件说明。",
+    "description": "初始化VulkanResourceBinding的本页状态和资源。"
+  },
+  "grassland::graphics::backend::VulkanSampler": {
+    "contract": "资源须与Core同后端；生命周期及字段用途见本页操作说明。",
+    "description": "VkSampler所有者。"
+  },
+  "grassland::graphics::backend::VulkanSampler::Handle": {
+    "contract": "",
+    "description": "返回借用VkSampler。"
+  },
+  "grassland::graphics::backend::VulkanSampler::VulkanSampler": {
+    "contract": "Core仍需InitializeLogicalDevice，Program仍需Finalize；特殊重载/限制见文件说明。",
+    "description": "初始化VulkanSampler的本页状态和资源。"
+  },
+  "grassland::graphics::backend::VulkanSampler::~VulkanSampler": {
+    "contract": "GPU须已完成。",
+    "description": "销毁VkSampler。"
+  },
+  "grassland::graphics::backend::VulkanShader": {
+    "contract": "资源须与Core同后端；生命周期及字段用途见本页操作说明。",
+    "description": "VkShaderModule和入口字符串所有者。"
+  },
+  "grassland::graphics::backend::VulkanShader::EntryPoint": {
+    "contract": "",
+    "description": "返回入口名副本。"
+  },
+  "grassland::graphics::backend::VulkanShader::EntryPointRef": {
+    "contract": "为PipelineSettings保持c_str稳定。",
+    "description": "返回入口名const引用。"
+  },
+  "grassland::graphics::backend::VulkanShader::ModuleHandle": {
+    "contract": "",
+    "description": "返回借用VkShaderModule。"
+  },
+  "grassland::graphics::backend::VulkanShader::VulkanShader": {
+    "contract": "Core仍需InitializeLogicalDevice，Program仍需Finalize；特殊重载/限制见文件说明。",
+    "description": "初始化VulkanShader的本页状态和资源。"
+  },
+  "grassland::graphics::backend::VulkanShader::~VulkanShader": {
+    "contract": "创建依赖pipeline后可释放，但Program保存的entry引用仍不可再用。",
+    "description": "销毁VkShaderModule。"
+  },
+  "grassland::graphics::backend::VulkanStaticBuffer": {
+    "contract": "资源须与Core同后端；生命周期及字段用途见本页操作说明。",
+    "description": "单份GPU_ONLY缓冲。"
+  },
+  "grassland::graphics::backend::VulkanStaticBuffer::Buffer": {
+    "contract": "Dynamic随帧槽轮换。",
+    "description": "返回当前GPU VkBuffer。"
+  },
+  "grassland::graphics::backend::VulkanStaticBuffer::DeviceAddress": {
+    "contract": "Dynamic为CPU staging地址；CUDA缓存地址；须启用address能力。",
+    "description": "返回设备地址。"
+  },
+  "grassland::graphics::backend::VulkanStaticBuffer::DownloadData": {
+    "contract": "Dynamic读staging，不读取GPU写入；其余同步读回。",
+    "description": "复制缓冲指定范围到host。"
+  },
+  "grassland::graphics::backend::VulkanStaticBuffer::Resize": {
+    "contract": "Static/CUDA先WaitGPU并GPUcopy；Dynamic只Map复制staging，提交时更新GPU副本。",
+    "description": "新建并保留min(old,new)前缀。"
+  },
+  "grassland::graphics::backend::VulkanStaticBuffer::Size": {
+    "contract": "",
+    "description": "返回逻辑请求字节数。"
+  },
+  "grassland::graphics::backend::VulkanStaticBuffer::Type": {
+    "contract": "",
+    "description": "Dynamic返回DYNAMIC，Static/CUDA返回STATIC。"
+  },
+  "grassland::graphics::backend::VulkanStaticBuffer::UploadData": {
+    "contract": "Dynamic只写staging，Static/CUDA同步上传；无范围校验。",
+    "description": "复制host指定范围到缓冲。"
+  },
+  "grassland::graphics::backend::VulkanStaticBuffer::VulkanStaticBuffer": {
+    "contract": "Core仍需InitializeLogicalDevice，Program仍需Finalize；特殊重载/限制见文件说明。",
+    "description": "初始化VulkanStaticBuffer的本页状态和资源。"
+  },
+  "grassland::graphics::backend::VulkanStaticBuffer::~VulkanStaticBuffer": {
+    "contract": "不隐式等待GPU。",
+    "description": "释放Buffer及对应allocation，CUDA转调Reset。"
+  },
+  "grassland::graphics::backend::VulkanWindow": {
+    "contract": "资源须与Core同后端；生命周期及字段用途见本页操作说明。",
+    "description": "交换链、surface及呈现同步对象。"
+  },
+  "grassland::graphics::backend::VulkanWindow::AcquireNextImage": {
+    "contract": "非SUCCESS均抛异常，包括SUBOPTIMAL/OUT_OF_DATE。",
+    "description": "无限超时acquire到当前image_index并signal可用信号量。"
+  },
+  "grassland::graphics::backend::VulkanWindow::BeginImGuiFrame": {
+    "contract": "无context跳过。",
+    "description": "选择context并开始Vulkan/GLFW/ImGui新帧。"
+  },
+  "grassland::graphics::backend::VulkanWindow::BuildImGuiFramebuffers": {
+    "contract": "PQ直接返回，由HDRFramebuffer负责。",
+    "description": "非PQ时为每个swapchain view创建framebuffer。"
+  },
+  "grassland::graphics::backend::VulkanWindow::ChooseHDRSurfaceFormat": {
+    "contract": "无精确匹配返回nullopt，不选SDR。",
+    "description": "优先RGBA16F+extended linear sRGB，其次A2B10/A2R10+PQ。"
+  },
+  "grassland::graphics::backend::VulkanWindow::CloseWindow": {
+    "contract": "resize callback随窗口生命周期，不单独注销。",
+    "description": "WaitGPU后释放HDR/ImGui framebuffer、semaphore、交换链、surface及GLFW窗口。"
+  },
+  "grassland::graphics::backend::VulkanWindow::CreatePresentationSwapchain": {
+    "contract": "graphics/present families不同时CONCURRENT；返回VkResult并更新extent。",
+    "description": "查询能力和extent，以minImageCount+1（受max限制）创建swapchain。"
+  },
+  "grassland::graphics::backend::VulkanWindow::CreateSwapChain": {
+    "contract": "失败抛异常。",
+    "description": "选格式并创建初始交换链，加载images/views。"
+  },
+  "grassland::graphics::backend::VulkanWindow::CurrentImage": {
+    "contract": "原生handle为借用；CurrentImage须先Acquire。",
+    "description": "返回已acquire的VkImage。"
+  },
+  "grassland::graphics::backend::VulkanWindow::CurrentImageIndex": {
+    "contract": "原生handle为借用；CurrentImage须先Acquire。",
+    "description": "返回已acquire的image索引。"
+  },
+  "grassland::graphics::backend::VulkanWindow::DestroyImGuiFramebuffers": {
+    "contract": "GPU须已完成。",
+    "description": "销毁并清空framebuffer数组。"
+  },
+  "grassland::graphics::backend::VulkanWindow::DestroyImGuiRenderPass": {
+    "contract": "",
+    "description": "销毁render pass并清handle/format。"
+  },
+  "grassland::graphics::backend::VulkanWindow::DestroySwapChain": {
+    "contract": "调用方先同步GPU。",
+    "description": "销毁views并清images，销毁swapchain置null。"
+  },
+  "grassland::graphics::backend::VulkanWindow::EndImGuiFrame": {
+    "contract": "Present消费。",
+    "description": "ImGui::Render并设置draw_command。"
+  },
+  "grassland::graphics::backend::VulkanWindow::GetImGuiContext": {
+    "contract": "",
+    "description": "返回借用context，可为空。"
+  },
+  "grassland::graphics::backend::VulkanWindow::HDRFramebuffer": {
+    "contract": "未验证以后传入image相同；Rebuild负责失效。",
+    "description": "首次为传入图像创建合成framebuffer，以后返回缓存。"
+  },
+  "grassland::graphics::backend::VulkanWindow::ImGuiAssets": {
+    "contract": "不要破坏原生资源生命周期。",
+    "description": "返回内部兼容状态可变引用。"
+  },
+  "grassland::graphics::backend::VulkanWindow::ImGuiFormat": {
+    "contract": "",
+    "description": "PQ时返回RGBA16F合成格式，其余交换链格式。"
+  },
+  "grassland::graphics::backend::VulkanWindow::ImageAvailableSemaphore": {
+    "contract": "FramesInFlight不得越界。",
+    "description": "返回CurrentFrame索引的acquire信号量。"
+  },
+  "grassland::graphics::backend::VulkanWindow::InitImGui": {
+    "contract": "重复初始化无防重入。",
+    "description": "保存字体，建立Classic context/render pass及framebuffers。"
+  },
+  "grassland::graphics::backend::VulkanWindow::LoadSwapChainImages": {
+    "contract": "中途失败抛异常。",
+    "description": "查询交换链images并逐个创建2D color view。"
+  },
+  "grassland::graphics::backend::VulkanWindow::PhysicalDevice": {
+    "contract": "原生handle为借用；CurrentImage须先Acquire。",
+    "description": "返回Core物理设备。"
+  },
+  "grassland::graphics::backend::VulkanWindow::Present": {
+    "contract": "OUT_OF_DATE/SUBOPTIMAL触发Rebuild，其余失败抛异常。",
+    "description": "等待render-finish semaphore提交present。"
+  },
+  "grassland::graphics::backend::VulkanWindow::Rebuild": {
+    "contract": "恢复成功仍返回-1表示请求失败；恢复失败永久标记presentation_failed。",
+    "description": "WaitGPU，尝试新交换链，失败恢复旧模式，必要时重建ImGui资源。"
+  },
+  "grassland::graphics::backend::VulkanWindow::RenderFinishSemaphore": {
+    "contract": "数组按初始swapchain image数分配。",
+    "description": "返回CurrentFrame索引的完成信号量。"
+  },
+  "grassland::graphics::backend::VulkanWindow::SelectSurfaceFormat": {
+    "contract": "无合适格式nullopt。",
+    "description": "选择HDR或sRGB SDR并验证BLIT_DST格式能力。"
+  },
+  "grassland::graphics::backend::VulkanWindow::SetHDR": {
+    "contract": "失败-1且恢复旧标志；presentation_failed时拒绝。",
+    "description": "预检查格式，切换标志并Rebuild，再更新Window状态。"
+  },
+  "grassland::graphics::backend::VulkanWindow::SetupImGuiContext": {
+    "contract": "PQ用线性RGBA16F中间附件。",
+    "description": "初始化GLFW/Vulkan兼容后端、32容量descriptor pool、字体及GENERAL-layout render pass。"
+  },
+  "grassland::graphics::backend::VulkanWindow::Surface": {
+    "contract": "原生handle为借用；CurrentImage须先Acquire。",
+    "description": "返回VkSurfaceKHR。"
+  },
+  "grassland::graphics::backend::VulkanWindow::SwapChainExtent": {
+    "contract": "原生handle为借用；CurrentImage须先Acquire。",
+    "description": "返回交换链像素尺寸。"
+  },
+  "grassland::graphics::backend::VulkanWindow::SwapChainFormat": {
+    "contract": "原生handle为借用；CurrentImage须先Acquire。",
+    "description": "返回交换链VkFormat。"
+  },
+  "grassland::graphics::backend::VulkanWindow::TerminateImGui": {
+    "contract": "",
+    "description": "WaitGPU后关闭后端/context，销毁framebuffers/render pass。"
+  },
+  "grassland::graphics::backend::VulkanWindow::UsesPQOutput": {
+    "contract": "",
+    "description": "检查HDR且surface colorspace为ST2084。"
+  },
+  "grassland::graphics::backend::VulkanWindow::VulkanWindow": {
+    "contract": "Core仍需InitializeLogicalDevice，Program仍需Finalize；特殊重载/限制见文件说明。",
+    "description": "初始化VulkanWindow的本页状态和资源。"
+  },
+  "grassland::graphics::backend::VulkanWindow::~VulkanWindow": {
+    "contract": "",
+    "description": "若GLFW窗口仍存则CloseWindow。"
   },
   "grassland::graphics::backend::d3d12::(anonymous)::error_message": {
     "contract": "无同步，不适合并发错误归属判断。",
@@ -7887,6 +10995,10 @@
     "contract": "具体成员声明与操作在本页逐项列出。",
     "description": "AS与RT pipeline函数指针表，初始空。"
   },
+  "grassland::graphics::backend::vulkan::DeviceProcedures::GRASSLAND_VULKAN_PROCEDURE_VAR": {
+    "contract": "每条宏调用对应一个独立函数指针；由相应Load*Procedures填充。",
+    "description": "声明并零初始化指定Vulkan扩展PFN函数成员。"
+  },
   "grassland::graphics::backend::vulkan::EnumerateNativePhysicalDevices": {
     "contract": "返回码未检查，handle由instance管理。",
     "description": "两次vkEnumeratePhysicalDevices查询返回handle列表。"
@@ -7986,6 +11098,10 @@
   "grassland::graphics::backend::vulkan::InstanceProcedures": {
     "contract": "具体成员声明与操作在本页逐项列出。",
     "description": "debug/rendering/topology函数表，初始空。"
+  },
+  "grassland::graphics::backend::vulkan::InstanceProcedures::GRASSLAND_VULKAN_PROCEDURE_VAR": {
+    "contract": "每条宏调用对应一个独立函数指针；由相应Load*Procedures填充。",
+    "description": "声明并零初始化指定Vulkan扩展PFN函数成员。"
   },
   "grassland::graphics::backend::vulkan::IsDepthFormat": {
     "contract": "其余false。",

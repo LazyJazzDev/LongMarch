@@ -7,6 +7,7 @@ import hashlib
 import html
 import json
 import os
+import re
 from pathlib import Path
 import shutil
 import subprocess
@@ -44,7 +45,7 @@ def module_url(path):
 
 
 def object_id(obj):
-    return 'api-' + hashlib.sha256((obj['qualified'] + obj['signature']).encode()).hexdigest()[:14]
+    return 'api-' + hashlib.sha256((obj['qualified'] + obj['signature'] + str(obj['line'])).encode()).hexdigest()[:14]
 
 
 def api_note(api, path, obj):
@@ -63,14 +64,30 @@ def build(strict=False):
     revision = subprocess.check_output(['git', 'rev-parse', 'HEAD'], cwd=ROOT, text=True).strip()
     pending = [r['path'] for r in records if r['path'] not in files or files[r['path']].get('sha256') != r['sha256']]
     undocumented = sorted({r['path'] + '#' + o['qualified'] for r in records for o in r['objects'] if not api_note(api, r['path'], o)})
+    audits = read_json('diagnostics.json')
+    supplemental = read_json('supplemental.json')
+    audit_failures = []
+    for record in records:
+        if record['parse_errors']:
+            audit = audits.get(record['path'], {})
+            if audit.get('sha256') != record['sha256'] or audit.get('lines') != record['parse_errors'] or not audit.get('review'):
+                audit_failures.append(record['path'] + ': parser diagnostics need review')
+        raw_starts = [record['source'].count('\n', 0, m.start()) + 1 for m in re.finditer(r'R"[^\s(]*\(', record['source'])]
+        if raw_starts and supplemental.get(record['path'], {}).get('raw_string_starts') != raw_starts:
+            audit_failures.append(record['path'] + ': embedded source inventory changed')
+        if record['path'].startswith('code/pybind/'):
+            expected = len(re.findall(r'\.(?:def|def_static|def_readwrite|def_readonly|def_property|def_property_readonly|value|attr|def_submodule)\s*\(', record['source']))
+            found = sum(o['kind'].startswith('python_') and o['kind'] != 'python_type' for o in record['objects'])
+            if expected != found:
+                audit_failures.append(record['path'] + ': Python registration coverage mismatch')
     missing_modules = sorted(set(directories) - set(modules))
     coverage = {'source_revision': revision, 'files': len(records), 'reviewed_files': len(records) - len(pending),
                 'objects': sum(len(r['objects']) for r in records), 'documented_object_names': len(api),
-                'pending_files': pending, 'undocumented_objects': undocumented, 'missing_modules': missing_modules,
+                'audit_failures': audit_failures, 'pending_files': pending, 'undocumented_objects': undocumented, 'missing_modules': missing_modules,
                 'parser_diagnostics': {r['path']: r['parse_errors'] for r in records if r['parse_errors']}}
     (SOURCE / 'coverage.json').write_text(json.dumps(coverage, ensure_ascii=False, indent=2) + '\n')
-    if strict and (pending or undocumented or missing_modules):
-        raise SystemExit(f'Reference incomplete: {len(pending)} files, {len(undocumented)} objects, {len(missing_modules)} modules')
+    if strict and (pending or undocumented or missing_modules or audit_failures):
+        raise SystemExit(f'Reference incomplete: {len(pending)} files, {len(undocumented)} objects, {len(missing_modules)} modules, {len(audit_failures)} source audits')
     if OUTPUT.exists():
         shutil.rmtree(OUTPUT)
     OUTPUT.mkdir(parents=True)
@@ -86,17 +103,24 @@ def build(strict=False):
     def link(current, dest, label, attrs=''):
         return f'<a href="{esc(relative(current, dest))}" {attrs}>{esc(label)}</a>'
 
+    directory_children = {d: [] for d in directories}
+    directory_files = {d: [] for d in directories}
+    for d in directories:
+        parent = str(Path(d).parent)
+        if parent in directory_children:
+            directory_children[parent].append(d)
+    for p in sorted(paths):
+        directory_files[str(Path(p).parent)].append(p)
+
     def navigation(current, current_module):
         def directory(path):
             selected = current_module == path or current_module.startswith(path + '/')
-            children = [d for d in directories if str(Path(d).parent) == path]
+            children = directory_children[path]
             title = modules.get(path, {}).get('title', Path(path).name)
             row = '<details' + (' open' if selected else '') + '><summary>' + esc(title) + '</summary><ul><li>'
             row += link(current, module_url(path), '架构设计与接口约定', 'aria-current="page"' if current == module_url(path) else '') + '</li>'
-            if selected:
-                for p in sorted(paths):
-                    if str(Path(p).parent) == path:
-                        row += '<li>' + link(current, file_url(p), Path(p).name, 'aria-current="page"' if current == file_url(p) else '') + '</li>'
+            for p in directory_files[path]:
+                row += '<li>' + link(current, file_url(p), Path(p).name, 'aria-current="page"' if current == file_url(p) else '') + '</li>'
             for child in children:
                 row += '<li>' + directory(child) + '</li>'
             return row + '</ul></details>'
@@ -121,7 +145,7 @@ def build(strict=False):
 
     intro = '<p class="lead">模块设计、逐文件说明与对象接口参考。目录中的每个条目打开独立文档页面。</p>'
     intro += f'<div class="stats"><span>{len(records)} 个源码文件</span><span>{len(directories)} 个目录模块</span><span>{sum(len(r["objects"]) for r in records)} 个声明 / 定义记录</span></div>'
-    if pending or undocumented or missing_modules:
+    if pending or undocumented or missing_modules or audit_failures:
         intro += f'<aside class="notice">编写中：已逐文件核对 {len(records)-len(pending)} / {len(records)}；尚有 {len(undocumented)} 个对象名和 {len(missing_modules)} 个模块待补充。源码提取不计作人工审阅。</aside>'
     intro += '<h2>阅读路径</h2><div class="module-cards">'
     for directory in directories:
@@ -156,6 +180,9 @@ def build(strict=False):
             body += '<h2>职责与设计</h2>' + paragraphs([note['summary']]) + bullet_list(note.get('details',[]))
         else:
             body += '<aside class="notice">本文件尚未完成当前版本的逐项说明，以下签名是源码证据。</aside>'
+        audit = audits.get(path)
+        if record['parse_errors'] and audit:
+            body += '<details class="evidence"><summary>扩展语法核对记录</summary>' + paragraphs([audit['review']]) + '</details>'
         if record['includes']:
             body += '<h2>直接依赖</h2><ul>'
             for include in record['includes']:

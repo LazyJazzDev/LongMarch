@@ -163,6 +163,22 @@
     "summary": "面向统一内存和Tier2 argument buffers的Metal实现；Slang先编SPIR-V，再SPIRV-Cross生成MSL3.0。",
     "title": "Metal后端"
   },
+  "code/grassland/graphics/backend/vulkan": {
+    "contracts": [
+      "资源与Core同后端且有效至GPU完成，context按一次性使用；多数cast只assert或直接解引用。",
+      "每个slot是独立descriptor set，唯一binding0；传入资源数量必须与Program声明一致。",
+      "transfer_queue实际等于graphics_queue的第0队列，提交末尾queue idle会串行等待，并非异步专用上传队列。",
+      "本文依据源码逐文件核对；当前文档任务没有在Vulkan设备上重新运行渲染。"
+    ],
+    "flow": [
+      "Core建立instance/device/VMA、同一graphics queue上的两套命令池和逐帧fence。",
+      "资源工厂建立GPU Buffer/Image，动态数据保存在CPU staging。",
+      "Context延迟收集命令、图像状态和descriptor预算；Submit上传、编码、呈现并回收帧槽。",
+      "Window按surface能力协商SDR/scRGB/PQ格式，HDR通过上层中间合成转换。"
+    ],
+    "summary": "基于Vulkan1.2、VMA、dynamic rendering与逐帧descriptor pool实现统一RHI；可分别启用SBT光追和Ray Query。",
+    "title": "Vulkan 后端"
+  },
   "code/grassland/graphics/backend/vulkan/helper": {
     "contracts": [
       "原生handle通常借用；创建函数输出资源由上层销毁。",

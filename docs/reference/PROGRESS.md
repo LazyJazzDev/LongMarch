@@ -1,39 +1,23 @@
-# Reference implementation progress
+# Reference coverage checkpoint
 
-Current task: replace the single architecture page with independent documents,
-review every tracked file in `code/`, and provide module design/interface
-standards plus object/API analysis. Do not call extracted signatures reviewed
-or publish the draft as a completed reference.
+- Reviewed source inventory: **629 / 629 tracked files under `code/`**.
+- Architecture and interface conventions: **75 / 75 directory modules**.
+- Object coverage: **5,204 declaration, definition, binding and embedded-source
+  records**, including overloads and repeated declarations/implementations.
+- All five component families (Contradium, Practium, Grassland, Snowberg and
+  Sparkium), Python bindings, shaders and build/configuration files are covered.
+- File reviews carry source hashes. Remaining extended-syntax diagnostics have
+  explicit hash- and line-checked review records. Python export extraction is
+  checked against every registration expression. Embedded shader objects have
+  separately reviewed source manifests.
+- Module and file navigation opens independent HTML pages. Generated output is
+  not committed to the development branch; Pages receives a static snapshot.
 
-- Inventory: 629 tracked files, 75 directories. Count source with `git ls-files`.
-- Extraction: pinned tree-sitter 0.25.2 + tree-sitter-cpp 0.23.4. Version 0.26.0
-  crashed on this machine, so keep the working pin. Parser diagnostics must be
-  reviewed; C++ extensions and shaders require manual coverage checks.
-- Reviewed and authored: 601 / 629 files. Contradium, Practium, Grassland util,
-  BVH, math and physics are complete at the file/API-note level. Graphics public
-  interfaces, window/input/HDR/profiling and root build/umbrella files are also
-  covered. All Snowberg modules (GUI/surface, draw, visualizer and CUDA solver)
-  are covered. Sparkium frontend resources, JSON scene loading and the complete raster pipeline
-  are covered. Ray tracing C++ and shared geometry/light/traversal shaders are covered.
-  All Sparkium shader files, Python registration files and the Metal backend
-  have file notes. D3D12 and Vulkan helpers are covered; the Vulkan RHI remains. Python exported objects, embedded shader
-  functions and parser diagnostics still require explicit completeness review.
-- `files.json` records each file's SHA-256 and authored responsibilities.
-- `api.json` records semantic descriptions by qualified name. Overloads share a
-  description only when it explicitly accounts for their different behavior.
-- `modules.json` records architecture, flow and interface contracts.
-- `coverage.json` is generated; strict builds reject missing/stale file notes,
-  missing objects or missing module designs.
-- Static reference scaffold is implemented. Pages are generated under ignored
-  `website/reference/`; this output is copied into the Pages publication branch
-  when complete. The main workflow builds strictly and copies the reference;
-  gh-pages publication copies the generated snapshot.
-- Home navigation now links to independent reference documents; legacy fragment
-  links redirect. Do not publish until strict checks and browser QA pass.
+`coverage.json` records the exact build checkpoint and remaining issues (none at
+this checkpoint). Its source revision precedes documentation-only commits when
+no source files changed. Publication regenerates links at the published source
+commit. Authoring helpers in temporary directories are not required to rebuild.
 
-Authoring helpers used during this session are in /private/tmp:
-`add_reference_notes.py`, `document-simulation.py`, `document-util.py`.
-They write the tracked JSON sources; their presence is not required for builds.
-`longmarch-extracted.json` contains a convenient full source/AST snapshot for
-review. Refresh it after changing extraction. The virtualenv is
-`/private/tmp/longmarch-doc-tools`.
+The pinned parser versions are tree-sitter 0.25.2 and tree-sitter-cpp 0.23.4;
+0.26.0 crashed in the original Python 3.14 environment. See README.md for the
+reproducible build and validation commands.
