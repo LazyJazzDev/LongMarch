@@ -541,6 +541,100 @@
     "summary": "Lambertian、Light、Specular 和 Principled 把前端参数同步到固定像素着色器。",
     "title": "光栅材质适配"
   },
+  "code/sparkium/pipelines/raytracing": {
+    "contracts": [
+      "software_tracing_ 包含 Ray Query 路径；它并非只表示软件求交。",
+      "改变场景、相机或材质通常需要调用方 Reset 累积；内部仅在追踪模式切换且曾渲染时自动 Reset。",
+      "组件借用前端与 Core；CPU 注册表按帧重建，索引不可跨帧保存。"
+    ],
+    "flow": [
+      "Scene 重建当帧资源索引与实例元数据。",
+      "光源预处理生成图元功率和光源选择 CDF。",
+      "更新 TLAS/BVH 与程序，追踪写入累积颜色/样本，再 film2img 解析至前端 Film。"
+    ],
+    "summary": "统一实体、材质、几何和光源注册协议，支持原生 RT shader table、计算着色器原生 Ray Query，以及 GPU 软件 BVH 三种追踪方式。",
+    "title": "光追与计算路径追踪"
+  },
+  "code/sparkium/pipelines/raytracing/camera": {
+    "contracts": [
+      "fovy 为弧度；view 必须可逆，Buffer 每次查询都上传。",
+      "Pinhole 与 ThinLens 具有不同数据长度，不可混用入口。"
+    ],
+    "flow": [
+      "Buffer() 重算视图逆矩阵及投影 scale。",
+      "原生 RT 惰性编译 callable；计算路径按 ShaderFile/EntryPoint 引入。"
+    ],
+    "summary": "将前端相机同步为 callable 或计算 shader 共用的字节布局。",
+    "title": "光追相机适配"
+  },
+  "code/sparkium/pipelines/raytracing/core": {
+    "contracts": [
+      "原生 RT 槽 0–12 与计算路径槽 0–7 不同；绑定布局必须和对应 shader 文件匹配。",
+      "纹理只接受 RGBA8 UNORM 或 RGBA32F，HDR 索引用 0x1000000 标记。",
+      "几何 BLAS 和软件 BLAS 采用静态内容缓存；相同指针/三角数的顶点原地修改不自动触发软件 BLAS 重建。"
+    ],
+    "flow": [
+      "按前端稳定实体顺序 Update。",
+      "注册缓冲、图像、实例、命中组和光源，执行 CDF 预处理。",
+      "编译容量匹配的资源布局并提交路径追踪与 Film resolve，最终 WaitGPU。"
+    ],
+    "summary": "Core 缓存公共 shader 与几何光预处理程序，Scene 组织资源表和着色器分派，SoftwarePipeline 管理计算路径。",
+    "title": "光追注册与执行协议"
+  },
+  "code/sparkium/pipelines/raytracing/entity": {
+    "contracts": [
+      "空三角几何跳过；不支持的几何或材质构造抛异常。",
+      "每个有效几何实体均注册几何光，功率预处理决定其采样权重。"
+    ],
+    "flow": [
+      "构造缓存专用几何/材质组件。",
+      "Update 材质纹理注册后创建 light 与 instance 的双向 custom_index。",
+      "原生路径选择命中组，计算路径追加 SoftwarePipeline 实例。"
+    ],
+    "summary": "把几何材质实体注册为实例兼几何光，把点光实体注册为显式光源。",
+    "title": "光追实体适配"
+  },
+  "code/sparkium/pipelines/raytracing/geometry": {
+    "contracts": [
+      "BLAS 缓存后没有更新方法，动态网格需重新管理组件。",
+      "geometry flags NONE 保留 any-hit 的非不透明语义。"
+    ],
+    "flow": [
+      "构造读取 hit_group 和 geometry_sampler。",
+      "首次 BLAS 创建底层加速结构。",
+      "Buffer/PrimitiveCount 转发前端。"
+    ],
+    "summary": "共享前端 Mesh 缓冲与几何采样源码，按需建立非 opaque 三角 BLAS。",
+    "title": "光追网格适配"
+  },
+  "code/sparkium/pipelines/raytracing/light": {
+    "contracts": [
+      "内建采样器编号从 0x1000000 起；较小编号用于 callable 表。",
+      "LightGeometryMaterial 的变换是借用引用，LightPoint 各参数也是引用。",
+      "图元数和材质布局在构造时确定，预处理不是任意拓扑更新接口。"
+    ],
+    "flow": [
+      "注册采样器编号和数据缓冲。",
+      "预处理更新数据与 CDF，返回功率字节偏移。",
+      "Scene 汇总每光源功率并扫描。"
+    ],
+    "summary": "统一 SamplerShader、SamplerData、SamplerPreprocess 三接口，让 Scene 能构造按功率采样的光源列表。",
+    "title": "光源采样与功率预处理"
+  },
+  "code/sparkium/pipelines/raytracing/material": {
+    "contracts": [
+      "纹理索引每帧有效；Principled 必须先 Update 再依赖尾部纹理索引。",
+      "ShaderGraph 缓冲和采样源码在构造时定形，后续增添纹理或改 graph_code 不会自动调整所有缓存。",
+      "EvaluatorImpl 是发光功率计算协议，不等同完整 BSDF 求值。"
+    ],
+    "flow": [
+      "Update 向当前 Scene 注册贴图。",
+      "Buffer 上传常量或返回已有材质数据。",
+      "SamplerImpl/EvaluatorImpl/GraphImpl 驱动程序组合。"
+    ],
+    "summary": "把前端参数、纹理索引和采样/发光求值源码提供给原生及计算追踪。",
+    "title": "光追材质适配"
+  },
   "code/sparkium/scene_io": {
     "contracts": [
       "JsonScene 独占 Scene、Film、Camera、材质、几何、图像和实体；Core 为借用，必须活得更久。",
@@ -555,5 +649,136 @@
     ],
     "summary": "把 sparkium-scene v1 文档及相对路径资源装配成拥有完整生命周期的 JsonScene；材质图转换为 Slang 源码交给渲染组件编译。",
     "title": "JSON 场景与材质图编译"
+  },
+  "code/sparkium/shaders": {
+    "contracts": [
+      "字节偏移、resource space 与 CPU Program::AddResourceBinding 顺序共同构成接口。",
+      "通用源码中同名 MaterialEvaluator/SampleMaterial 属于可替换实现，接口说明按文件区分。",
+      "shader 入口的 numthreads 与 CPU Dispatch 的组数需要匹配；输入图像格式和色彩域不可混用。"
+    ],
+    "flow": [
+      "前端固定字节布局上传到 Buffer/Image。",
+      "管线注入 geometry/material/camera 实现并编译入口。",
+      "路径追踪积累线性颜色，film2img 平均，tone_mapping 开发为显示图像。"
+    ],
+    "summary": "由 C++ VFS 加载并按管线组合的 Slang 库，包含路径状态、采样/BSDF、几何命中、照明、软件求交及成像。",
+    "title": "Sparkium 着色器库"
+  },
+  "code/sparkium/shaders/camera": {
+    "contracts": [
+      "uv 已由 raygen 映射至 [-1,1]，不是像素坐标。",
+      "lens_sample 来自单位方形；薄透镜只有半径/焦距都为正才生效。",
+      "原生管线标记 callable；SPARKIUM_SOFTWARE_RT 下作为普通函数调用。"
+    ],
+    "flow": [
+      "读取字节64的 camera_to_world 和128的 scale。",
+      "局部相机朝 -Z；薄透镜根据焦平面调整原点和方向。",
+      "变换到世界并归一化方向。"
+    ],
+    "summary": "针孔和薄透镜共享 RayGenPayload，把归一化屏幕 uv 与镜头样本转换成世界射线。",
+    "title": "相机射线生成"
+  },
+  "code/sparkium/shaders/geometry": {
+    "contracts": [
+      "图元采样PDF是世界面积密度，直接光路径再转换为立体角密度。",
+      "法线、UV、切线与颜色偏移为0时走缺省分支。"
+    ],
+    "flow": [
+      "由Header定位缓冲各属性。",
+      "插值和变换到世界空间。",
+      "将统一HitRecord交给材质采样。"
+    ],
+    "summary": "提供网格头布局、几何采样、命中记录与光栅顶点处理。",
+    "title": "几何着色器"
+  },
+  "code/sparkium/shaders/geometry/mesh": {
+    "contracts": [
+      "法线缺失使用几何法线；颜色缺失白色；UV缺失零；切线信号缺失0使切线法线贴图保持原法线。",
+      "退化三角面积为0会使法线/PDF无效；shader不校验索引范围。",
+      "光栅输入宏会改变location，CPU GeometryMesh::SetupProgram必须同序。"
+    ],
+    "flow": [
+      "加载64字节GeometryHeader。",
+      "索引三角并按重心插值，变换法线与切线。",
+      "生成阴影terminator偏移或光源表面样本。"
+    ],
+    "summary": "对同一GeometryMesh字节布局实现光栅、硬件RT、Ray Query和软件求交后的统一命中处理。",
+    "title": "三角网格着色器"
+  },
+  "code/sparkium/shaders/light": {
+    "contracts": [
+      "SampleDirectLighting仅准备阴影段，不在此函数立即追踪可见性。",
+      "光栅路径是全屏加法，不使用路径追踪光源CDF。"
+    ],
+    "flow": [
+      "CPU预处理构造按功率CDF。",
+      "选择光源及图元，再生成方向/辐射/立体角PDF。",
+      "BSDF按MIS权重贡献，阴影透射在后续路径阶段求值。"
+    ],
+    "summary": "支持光栅环境/点光，以及路径追踪的点光和网格直接采样。",
+    "title": "光照着色器"
+  },
+  "code/sparkium/shaders/light/ambient": {
+    "contracts": [
+      "没有环境贴图/IBL方向积分，也没有AO。"
+    ],
+    "flow": [
+      "准备输入资源。",
+      "执行本目录采样或照明入口。"
+    ],
+    "summary": "从光栅G-buffer提取albedo并乘固定ambient_light。",
+    "title": "环境光"
+  },
+  "code/sparkium/shaders/light/geometry_material": {
+    "contracts": [
+      "数据头为transform48字节+count4字节，CDF从52起。",
+      "ShaderGraph内建直接光使用emission_hint，未逐点执行任意图发光。"
+    ],
+    "flow": [
+      "准备输入资源。",
+      "执行本目录采样或照明入口。"
+    ],
+    "summary": "通过几何采样器和材质发光求值器建立图元CDF，抽样表面后转换面积PDF。",
+    "title": "几何面积光"
+  },
+  "code/sparkium/shaders/light/point": {
+    "contracts": [
+      "显式点光不在加速结构内，eval/pdf同时放大1e6以让直接光MIS近似1。",
+      "光栅不读取半径和soft_falloff。"
+    ],
+    "flow": [
+      "准备输入资源。",
+      "执行本目录采样或照明入口。"
+    ],
+    "summary": "光栅按逆平方衰减求Principled；光追支持delta、面向接收点圆盘和球光立体角采样。",
+    "title": "点光与有限半径点光"
+  },
+  "code/sparkium/shaders/ray_query": {
+    "contracts": [
+      "强制opaque只控制几何求交；材质透明度在共享阴影循环中另行处理。",
+      "跳过procedural primitives；只支持三角形。",
+      "CommittedInstanceID必须对应CPU注册的软件实例索引。"
+    ],
+    "flow": [
+      "TraceRayInline强制三角面opaque求交。",
+      "根据any_hit选择首次命中或最近命中。",
+      "把Committed属性映射为SoftwareHit。"
+    ],
+    "summary": "保持SoftwareHit ABI，用设备加速结构替换软件树遍历，着色与透明层处理仍走计算管线。",
+    "title": "原生内联Ray Query"
+  },
+  "code/sparkium/shaders/software": {
+    "contracts": [
+      "树深度受CPU每树2^21叶上限约束；栈无动态扩容。",
+      "对象空间射线方向不能归一化，才能在缩放变换下保留世界射线参数t。",
+      "透明阴影逐最近命中累乘，TMin推进一个正float可表示值，保留紧邻薄层。"
+    ],
+    "flow": [
+      "按2次幂叶容量建立BLAS/TLAS。",
+      "32项局部栈遍历AABB和watertight三角求交。",
+      "将命中转为HitRecord，交给生成的材质分派，再执行共享RenderPixel。"
+    ],
+    "summary": "平衡二叉树节点和Morton排序支持GPU构建、两级遍历与共享路径着色；也可用Ray Query替换InlineIntersect。",
+    "title": "计算路径与软件BVH"
   }
 }

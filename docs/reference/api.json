@@ -403,6 +403,990 @@
     "contract": "参数按 a/b/c 三组输入，与 inverse 的调用布局一致。",
     "description": "通过三个 2×2 子行列式展开 3×3 行列式。"
   },
+  "code/sparkium/shaders/bindings.slang#SOBOL_TABLE": {
+    "contract": "",
+    "description": "标记当前绑定包含Sobol表。"
+  },
+  "code/sparkium/shaders/bindings.slang#SampleTexture": {
+    "contract": "索引必须有效，-1不能传入；不自动做sRGB解码。",
+    "description": "按0x1000000位选择HDR/SDR图数组，线性采样LOD0并将v改为1-v。"
+  },
+  "code/sparkium/shaders/bindings.slang#accumulated_color": {
+    "contract": "原生与计算路径space不同；计算路径六个特殊Buffer为data_buffers尾部宏别名，详见原始声明及Scene::Render。",
+    "description": "可写RGBA累积颜色绑定。"
+  },
+  "code/sparkium/shaders/bindings.slang#accumulated_samples": {
+    "contract": "原生与计算路径space不同；计算路径六个特殊Buffer为data_buffers尾部宏别名，详见原始声明及Scene::Render。",
+    "description": "可写float累积样本绑定。"
+  },
+  "code/sparkium/shaders/bindings.slang#as": {
+    "contract": "原生与计算路径space不同；计算路径六个特殊Buffer为data_buffers尾部宏别名，详见原始声明及Scene::Render。",
+    "description": "原生RT场景加速结构绑定。"
+  },
+  "code/sparkium/shaders/bindings.slang#camera_data": {
+    "contract": "原生与计算路径space不同；计算路径六个特殊Buffer为data_buffers尾部宏别名，详见原始声明及Scene::Render。",
+    "description": "相机字节数据绑定。"
+  },
+  "code/sparkium/shaders/bindings.slang#data_buffers": {
+    "contract": "原生与计算路径space不同；计算路径六个特殊Buffer为data_buffers尾部宏别名，详见原始声明及Scene::Render。",
+    "description": "按Scene注册索引访问的数据缓冲数组绑定。"
+  },
+  "code/sparkium/shaders/bindings.slang#hdr_textures": {
+    "contract": "原生与计算路径space不同；计算路径六个特殊Buffer为data_buffers尾部宏别名，详见原始声明及Scene::Render。",
+    "description": "HDR纹理数组绑定。"
+  },
+  "code/sparkium/shaders/bindings.slang#instance_metadatas": {
+    "contract": "原生与计算路径space不同；计算路径六个特殊Buffer为data_buffers尾部宏别名，详见原始声明及Scene::Render。",
+    "description": "实例元数据绑定。"
+  },
+  "code/sparkium/shaders/bindings.slang#light_metadatas": {
+    "contract": "原生与计算路径space不同；计算路径六个特殊Buffer为data_buffers尾部宏别名，详见原始声明及Scene::Render。",
+    "description": "光源元数据绑定。"
+  },
+  "code/sparkium/shaders/bindings.slang#light_selector_data": {
+    "contract": "原生与计算路径space不同；计算路径六个特殊Buffer为data_buffers尾部宏别名，详见原始声明及Scene::Render。",
+    "description": "光源选择CDF绑定。"
+  },
+  "code/sparkium/shaders/bindings.slang#query_scene": {
+    "contract": "原生与计算路径space不同；计算路径六个特殊Buffer为data_buffers尾部宏别名，详见原始声明及Scene::Render。",
+    "description": "Ray Query硬件场景绑定。"
+  },
+  "code/sparkium/shaders/bindings.slang#render_settings": {
+    "contract": "原生与计算路径space不同；计算路径六个特殊Buffer为data_buffers尾部宏别名，详见原始声明及Scene::Render。",
+    "description": "RenderSettings常量绑定。"
+  },
+  "code/sparkium/shaders/bindings.slang#samplers": {
+    "contract": "原生与计算路径space不同；计算路径六个特殊Buffer为data_buffers尾部宏别名，详见原始声明及Scene::Render。",
+    "description": "线性/最近邻两个sampler绑定。"
+  },
+  "code/sparkium/shaders/bindings.slang#sdr_textures": {
+    "contract": "原生与计算路径space不同；计算路径六个特殊Buffer为data_buffers尾部宏别名，详见原始声明及Scene::Render。",
+    "description": "SDR纹理数组绑定。"
+  },
+  "code/sparkium/shaders/bindings.slang#sobol_table": {
+    "contract": "原生与计算路径space不同；计算路径六个特殊Buffer为data_buffers尾部宏别名，详见原始声明及Scene::Render。",
+    "description": "Sobol表绑定。"
+  },
+  "code/sparkium/shaders/bindings.slang#software_instances": {
+    "contract": "原生与计算路径space不同；计算路径六个特殊Buffer为data_buffers尾部宏别名，详见原始声明及Scene::Render。",
+    "description": "软件/Query实例表绑定。"
+  },
+  "code/sparkium/shaders/bindings.slang#software_nodes": {
+    "contract": "原生与计算路径space不同；计算路径六个特殊Buffer为data_buffers尾部宏别名，详见原始声明及Scene::Render。",
+    "description": "软件BVH字节节点绑定。"
+  },
+  "code/sparkium/shaders/blelloch_scan.slang#BlellochDownSweep": {
+    "contract": "",
+    "description": "为非首组加前一组末尾已扫描总和；跳过组末元素以避免重复累加。"
+  },
+  "code/sparkium/shaders/blelloch_scan.slang#BlellochUpSweep": {
+    "contract": "",
+    "description": "读元素，WavePrefixSum加自身，再跨wave合并64线程组内inclusive和。"
+  },
+  "code/sparkium/shaders/blelloch_scan.slang#GROUP_SIZE": {
+    "contract": "",
+    "description": "每工作组64线程。"
+  },
+  "code/sparkium/shaders/blelloch_scan.slang#Metadata": {
+    "contract": "",
+    "description": "扫描起始字节、元素字节步长和元素数。"
+  },
+  "code/sparkium/shaders/blelloch_scan.slang#buffer": {
+    "contract": "",
+    "description": "space0原地可写字节缓冲。"
+  },
+  "code/sparkium/shaders/blelloch_scan.slang#group_element": {
+    "contract": "",
+    "description": "64个groupshared float，用于跨wave合并组内inclusive前缀和。"
+  },
+  "code/sparkium/shaders/blelloch_scan.slang#metadata": {
+    "contract": "",
+    "description": "space1当前扫描层常量。"
+  },
+  "code/sparkium/shaders/buffer_helper.slang#BufferReference": {
+    "contract": "",
+    "description": "借用缓冲与固定基址，所有访问在偏移上叠加m_offset。"
+  },
+  "code/sparkium/shaders/buffer_helper.slang#BufferReference::Load": {
+    "contract": "offset为字节；引用实现叠加m_offset，无边界检查。",
+    "description": "读取1个连续uint字。"
+  },
+  "code/sparkium/shaders/buffer_helper.slang#BufferReference::Load2": {
+    "contract": "offset为字节；引用实现叠加m_offset，无边界检查。",
+    "description": "读取2个连续uint字。"
+  },
+  "code/sparkium/shaders/buffer_helper.slang#BufferReference::Load3": {
+    "contract": "offset为字节；引用实现叠加m_offset，无边界检查。",
+    "description": "读取3个连续uint字。"
+  },
+  "code/sparkium/shaders/buffer_helper.slang#BufferReference::Load4": {
+    "contract": "offset为字节；引用实现叠加m_offset，无边界检查。",
+    "description": "读取4个连续uint字。"
+  },
+  "code/sparkium/shaders/buffer_helper.slang#ByteAddressBuffer": {
+    "contract": "",
+    "description": "为原生只读字节缓冲声明IBufferReader扩展。"
+  },
+  "code/sparkium/shaders/buffer_helper.slang#IBufferReader": {
+    "contract": "",
+    "description": "统一uint/uint2/uint3/uint4字节读取协议。"
+  },
+  "code/sparkium/shaders/buffer_helper.slang#IBufferReader::Load": {
+    "contract": "offset为字节；引用实现叠加m_offset，无边界检查。",
+    "description": "读取1个连续uint字。"
+  },
+  "code/sparkium/shaders/buffer_helper.slang#IBufferReader::Load2": {
+    "contract": "offset为字节；引用实现叠加m_offset，无边界检查。",
+    "description": "读取2个连续uint字。"
+  },
+  "code/sparkium/shaders/buffer_helper.slang#IBufferReader::Load3": {
+    "contract": "offset为字节；引用实现叠加m_offset，无边界检查。",
+    "description": "读取3个连续uint字。"
+  },
+  "code/sparkium/shaders/buffer_helper.slang#IBufferReader::Load4": {
+    "contract": "offset为字节；引用实现叠加m_offset，无边界检查。",
+    "description": "读取4个连续uint字。"
+  },
+  "code/sparkium/shaders/buffer_helper.slang#LoadFloat": {
+    "contract": "实际读取4字节；源码部分注释把float2/3误写成16字节，应以Load2/3行为为准。",
+    "description": "按位把1个uint解释成float分量。"
+  },
+  "code/sparkium/shaders/buffer_helper.slang#LoadFloat2": {
+    "contract": "实际读取8字节；源码部分注释把float2/3误写成16字节，应以Load2/3行为为准。",
+    "description": "按位把2个uint解释成float分量。"
+  },
+  "code/sparkium/shaders/buffer_helper.slang#LoadFloat3": {
+    "contract": "实际读取12字节；源码部分注释把float2/3误写成16字节，应以Load2/3行为为准。",
+    "description": "按位把3个uint解释成float分量。"
+  },
+  "code/sparkium/shaders/buffer_helper.slang#LoadFloat3x3": {
+    "contract": "与CPU列主序紧密矩阵布局配对，不使用常量缓冲的隐式float3填充。",
+    "description": "读取3段、段距12字节，转置后返回float3x3。"
+  },
+  "code/sparkium/shaders/buffer_helper.slang#LoadFloat3x4": {
+    "contract": "与CPU列主序紧密矩阵布局配对，不使用常量缓冲的隐式float3填充。",
+    "description": "读取4段、段距12字节，转置后返回float3x4。"
+  },
+  "code/sparkium/shaders/buffer_helper.slang#LoadFloat4": {
+    "contract": "实际读取16字节；源码部分注释把float2/3误写成16字节，应以Load2/3行为为准。",
+    "description": "按位把4个uint解释成float分量。"
+  },
+  "code/sparkium/shaders/buffer_helper.slang#LoadFloat4x2": {
+    "contract": "与CPU列主序紧密矩阵布局配对，不使用常量缓冲的隐式float3填充。",
+    "description": "读取2段、段距16字节，转置后返回float4x2。"
+  },
+  "code/sparkium/shaders/buffer_helper.slang#LoadFloat4x3": {
+    "contract": "与CPU列主序紧密矩阵布局配对，不使用常量缓冲的隐式float3填充。",
+    "description": "读取3段、段距16字节，转置后返回float4x3。"
+  },
+  "code/sparkium/shaders/buffer_helper.slang#LoadFloat4x4": {
+    "contract": "与CPU列主序紧密矩阵布局配对，不使用常量缓冲的隐式float3填充。",
+    "description": "读取4段、段距16字节，转置后返回float4x4。"
+  },
+  "code/sparkium/shaders/buffer_helper.slang#MakeBufferReference": {
+    "contract": "不分配、不复制数据、不校验范围。",
+    "description": "构造固定基址引用；可写缓冲重载返回RWBufferReference。"
+  },
+  "code/sparkium/shaders/buffer_helper.slang#MakeStreamedBufferReference": {
+    "contract": "",
+    "description": "构造以offset为初始游标的顺序读取器。"
+  },
+  "code/sparkium/shaders/buffer_helper.slang#RWBufferReference": {
+    "contract": "",
+    "description": "带固定基址的可读写字节缓冲引用。"
+  },
+  "code/sparkium/shaders/buffer_helper.slang#RWBufferReference::Load": {
+    "contract": "offset为字节；引用实现叠加m_offset，无边界检查。",
+    "description": "读取1个连续uint字。"
+  },
+  "code/sparkium/shaders/buffer_helper.slang#RWBufferReference::Load2": {
+    "contract": "offset为字节；引用实现叠加m_offset，无边界检查。",
+    "description": "读取2个连续uint字。"
+  },
+  "code/sparkium/shaders/buffer_helper.slang#RWBufferReference::Load3": {
+    "contract": "offset为字节；引用实现叠加m_offset，无边界检查。",
+    "description": "读取3个连续uint字。"
+  },
+  "code/sparkium/shaders/buffer_helper.slang#RWBufferReference::Load4": {
+    "contract": "offset为字节；引用实现叠加m_offset，无边界检查。",
+    "description": "读取4个连续uint字。"
+  },
+  "code/sparkium/shaders/buffer_helper.slang#RWBufferReference::Store": {
+    "contract": "写入不推进基址；调用方保证资源可写及范围有效。",
+    "description": "在m_offset+offset存储1个uint字。"
+  },
+  "code/sparkium/shaders/buffer_helper.slang#RWBufferReference::Store2": {
+    "contract": "写入不推进基址；调用方保证资源可写及范围有效。",
+    "description": "在m_offset+offset存储2个uint字。"
+  },
+  "code/sparkium/shaders/buffer_helper.slang#RWBufferReference::Store3": {
+    "contract": "写入不推进基址；调用方保证资源可写及范围有效。",
+    "description": "在m_offset+offset存储3个uint字。"
+  },
+  "code/sparkium/shaders/buffer_helper.slang#RWBufferReference::Store4": {
+    "contract": "写入不推进基址；调用方保证资源可写及范围有效。",
+    "description": "在m_offset+offset存储4个uint字。"
+  },
+  "code/sparkium/shaders/buffer_helper.slang#RWByteAddressBuffer": {
+    "contract": "",
+    "description": "为原生可写字节缓冲声明IBufferReader扩展。"
+  },
+  "code/sparkium/shaders/buffer_helper.slang#StreamedBufferReference": {
+    "contract": "",
+    "description": "带可变游标的顺序读取器，每次Load推进相应字节数。"
+  },
+  "code/sparkium/shaders/buffer_helper.slang#StreamedBufferReference::LoadFloat": {
+    "contract": "[mutating]修改自身m_offset，无边界检查。",
+    "description": "从当前游标读取1个Float分量，然后推进4字节。"
+  },
+  "code/sparkium/shaders/buffer_helper.slang#StreamedBufferReference::LoadFloat2": {
+    "contract": "[mutating]修改自身m_offset，无边界检查。",
+    "description": "从当前游标读取2个Float分量，然后推进8字节。"
+  },
+  "code/sparkium/shaders/buffer_helper.slang#StreamedBufferReference::LoadFloat3": {
+    "contract": "[mutating]修改自身m_offset，无边界检查。",
+    "description": "从当前游标读取3个Float分量，然后推进12字节。"
+  },
+  "code/sparkium/shaders/buffer_helper.slang#StreamedBufferReference::LoadFloat4": {
+    "contract": "[mutating]修改自身m_offset，无边界检查。",
+    "description": "从当前游标读取4个Float分量，然后推进16字节。"
+  },
+  "code/sparkium/shaders/buffer_helper.slang#StreamedBufferReference::LoadInt": {
+    "contract": "[mutating]修改自身m_offset，无边界检查。",
+    "description": "从当前游标读取1个Int分量，然后推进4字节。"
+  },
+  "code/sparkium/shaders/buffer_helper.slang#StreamedBufferReference::LoadInt2": {
+    "contract": "[mutating]修改自身m_offset，无边界检查。",
+    "description": "从当前游标读取2个Int分量，然后推进8字节。"
+  },
+  "code/sparkium/shaders/buffer_helper.slang#StreamedBufferReference::LoadInt3": {
+    "contract": "[mutating]修改自身m_offset，无边界检查。",
+    "description": "从当前游标读取3个Int分量，然后推进12字节。"
+  },
+  "code/sparkium/shaders/buffer_helper.slang#StreamedBufferReference::LoadInt4": {
+    "contract": "[mutating]修改自身m_offset，无边界检查。",
+    "description": "从当前游标读取4个Int分量，然后推进16字节。"
+  },
+  "code/sparkium/shaders/buffer_helper.slang#StreamedBufferReference::LoadUint": {
+    "contract": "[mutating]修改自身m_offset，无边界检查。",
+    "description": "从当前游标读取1个Uint分量，然后推进4字节。"
+  },
+  "code/sparkium/shaders/buffer_helper.slang#StreamedBufferReference::LoadUint2": {
+    "contract": "[mutating]修改自身m_offset，无边界检查。",
+    "description": "从当前游标读取2个Uint分量，然后推进8字节。"
+  },
+  "code/sparkium/shaders/buffer_helper.slang#StreamedBufferReference::LoadUint3": {
+    "contract": "[mutating]修改自身m_offset，无边界检查。",
+    "description": "从当前游标读取3个Uint分量，然后推进12字节。"
+  },
+  "code/sparkium/shaders/buffer_helper.slang#StreamedBufferReference::LoadUint4": {
+    "contract": "[mutating]修改自身m_offset，无边界检查。",
+    "description": "从当前游标读取4个Uint分量，然后推进16字节。"
+  },
+  "code/sparkium/shaders/camera/pinhole.slang#CameraPinhole": {
+    "contract": "camera_data偏移64为逆视图矩阵，128为scale；输出方向归一化。",
+    "description": "以uv*scale和局部-Z构造射线，将原点与方向变换至世界。"
+  },
+  "code/sparkium/shaders/camera/thin_lens.slang#CameraThinLens": {
+    "contract": "只有aperture_radius与focus_distance均>0启用景深；否则为针孔行为。",
+    "description": "在镜头平面采样原点，让射线穿过距离focus_distance的焦平面。"
+  },
+  "code/sparkium/shaders/common.slang#CameraData": {
+    "contract": "",
+    "description": "两个4×4相机矩阵及二维scale的公共相机布局。"
+  },
+  "code/sparkium/shaders/common.slang#GeometryPrimitiveSample": {
+    "contract": "",
+    "description": "采样位置、法线、UV与概率密度。"
+  },
+  "code/sparkium/shaders/common.slang#HitRecord": {
+    "contract": "",
+    "description": "命中距离、世界/对象位置、阴影偏移、几何/着色法线、UV/颜色/切线、pdf与实例/图元索引。"
+  },
+  "code/sparkium/shaders/common.slang#IGeometrySampler": {
+    "contract": "",
+    "description": "几何采样接口，提供图元面积及给定样本的表面采样。"
+  },
+  "code/sparkium/shaders/common.slang#IGeometrySampler::PrimitiveArea": {
+    "contract": "",
+    "description": "返回指定图元面积，实际坐标域由实现的transform决定。"
+  },
+  "code/sparkium/shaders/common.slang#IGeometrySampler::SamplePrimitive": {
+    "contract": "",
+    "description": "使用float2样本返回图元表面位置、法线、UV和密度。"
+  },
+  "code/sparkium/shaders/common.slang#InstanceMetadata": {
+    "contract": "",
+    "description": "三int：geometry_data_index、material_data_index、custom_index。"
+  },
+  "code/sparkium/shaders/common.slang#LightMetadata": {
+    "contract": "",
+    "description": "三个索引加power_offset字节偏移，匹配C++16字节布局。"
+  },
+  "code/sparkium/shaders/common.slang#MakeOrthonormals": {
+    "contract": "N应为有效单位向量；零向量会归一化失败。",
+    "description": "围绕N构造正交切向量a/b。"
+  },
+  "code/sparkium/shaders/common.slang#RAY_TYPE_CAMERA": {
+    "contract": "",
+    "description": "路径类别编码 0：相机"
+  },
+  "code/sparkium/shaders/common.slang#RAY_TYPE_REFLECTION": {
+    "contract": "",
+    "description": "路径类别编码 1：反射"
+  },
+  "code/sparkium/shaders/common.slang#RAY_TYPE_TRANSMISSION": {
+    "contract": "",
+    "description": "路径类别编码 2：透射"
+  },
+  "code/sparkium/shaders/common.slang#RAY_TYPE_VOLUME": {
+    "contract": "",
+    "description": "路径类别编码 3：体积散射"
+  },
+  "code/sparkium/shaders/common.slang#RandomDevice": {
+    "contract": "",
+    "description": "Sobol 样本号/维度与哈希种子状态：offset、samp、seed、dim。"
+  },
+  "code/sparkium/shaders/common.slang#RayGenPayload": {
+    "contract": "",
+    "description": "屏幕uv、镜头样本以及输出origin/direction。"
+  },
+  "code/sparkium/shaders/common.slang#RenderContext": {
+    "contract": "",
+    "description": "一条路径的辐射、通量、随机数、BSDF PDF、待测阴影以及介质追踪状态。"
+  },
+  "code/sparkium/shaders/common.slang#RenderSettings": {
+    "contract": "",
+    "description": "Scene::Settings::RayTracing 后接 Film::Info 的GPU对应布局。"
+  },
+  "code/sparkium/shaders/common.slang#SampleDirectLightingPayload": {
+    "contract": "",
+    "description": "low/high/extra三个uint4组成48字节可调用载荷。"
+  },
+  "code/sparkium/shaders/common.slang#ShadowRayPayload": {
+    "contract": "",
+    "description": "单float shadow透过值，沿阴影射线更新。"
+  },
+  "code/sparkium/shaders/common.slang#sample_cos_hemisphere": {
+    "contract": "N应单位化；输入不钳制。",
+    "description": "用两个[0,1]样本在N半球做余弦采样，输出方向及cosθ/π密度。"
+  },
+  "code/sparkium/shaders/constants.slang#EPSILON": {
+    "contract": "",
+    "description": "一般数值阈值0.0001，具体使用由调用点决定。"
+  },
+  "code/sparkium/shaders/constants.slang#INF": {
+    "contract": "",
+    "description": "有限的大数1e8，不是IEEE无穷。"
+  },
+  "code/sparkium/shaders/constants.slang#INV_PI": {
+    "contract": "",
+    "description": "1/π近似常量。"
+  },
+  "code/sparkium/shaders/constants.slang#PI": {
+    "contract": "",
+    "description": "π近似常量。"
+  },
+  "code/sparkium/shaders/constants.slang#T_MAX": {
+    "contract": "",
+    "description": "最大射线距离1e9。"
+  },
+  "code/sparkium/shaders/constants.slang#T_MIN": {
+    "contract": "",
+    "description": "射线近距离阈值0.001。"
+  },
+  "code/sparkium/shaders/direct_lighting.slang#DirectLightingProbability": {
+    "contract": "",
+    "description": "查询光CDF相邻差归一化概率；越界或总功率<=0返回0。"
+  },
+  "code/sparkium/shaders/direct_lighting.slang#LightSampler": {
+    "contract": "新增自定义光需同时考虑两条路径的分派。",
+    "description": "分派0x1000000点光和1..5网格光；其他编号原生CallShader，软件路径输出零。"
+  },
+  "code/sparkium/shaders/direct_lighting.slang#PowerHeuristic": {
+    "contract": "ref<EPSILON时直接1，输入应为非负密度。",
+    "description": "返回base²/(base²+ref²)的MIS权重。"
+  },
+  "code/sparkium/shaders/direct_lighting.slang#SampleDirectLighting": {
+    "contract": "本函数不实际追踪阴影；调用方后续求可见性和BSDF贡献。",
+    "description": "按光CDF二分选择并重映射随机数，调用采样器，填eval/omega_in/pdf及context阴影段。"
+  },
+  "code/sparkium/shaders/film2img.slang#Main": {
+    "contract": "输出尺寸需至少覆盖输入；CPU以输入宽高向上取整Dispatch。",
+    "description": "执行颜色平均，未进行曝光或色调映射。"
+  },
+  "code/sparkium/shaders/film2img.slang#accumulated_color": {
+    "contract": "",
+    "description": "space0只读累计RGBA图。"
+  },
+  "code/sparkium/shaders/film2img.slang#accumulated_samples": {
+    "contract": "",
+    "description": "space1只读样本float图。"
+  },
+  "code/sparkium/shaders/film2img.slang#output": {
+    "contract": "",
+    "description": "space2可写raw RGBA图。"
+  },
+  "code/sparkium/shaders/gather_light_power.slang#GROUP_SIZE": {
+    "contract": "",
+    "description": "每工作组64线程。"
+  },
+  "code/sparkium/shaders/gather_light_power.slang#GatherLightPowerKernel": {
+    "contract": "",
+    "description": "按sampler_data_index和power_offset读每光功率，并对64线程组做inclusive和。"
+  },
+  "code/sparkium/shaders/gather_light_power.slang#data_buffers": {
+    "contract": "",
+    "description": "space2采样数据Buffer数组。"
+  },
+  "code/sparkium/shaders/gather_light_power.slang#group_element": {
+    "contract": "",
+    "description": "64个groupshared float，用于跨wave合并组内inclusive前缀和。"
+  },
+  "code/sparkium/shaders/gather_light_power.slang#light_metadatas": {
+    "contract": "",
+    "description": "space0读取LightMetadata。"
+  },
+  "code/sparkium/shaders/gather_light_power.slang#light_selector_data": {
+    "contract": "",
+    "description": "space1可写选择表，uint count后接floatCDF。"
+  },
+  "code/sparkium/shaders/geometry/mesh/geometry_header.slang#GeometryHeader": {
+    "contract": "",
+    "description": "15个uint记录数量/属性偏移与步长，末尾float为shadow_terminator_geometry_offset。"
+  },
+  "code/sparkium/shaders/geometry/mesh/geometry_sampler.slang#GeometrySampler": {
+    "contract": "",
+    "description": "借用geometry_data与float3x4 transform的IGeometrySampler实现。"
+  },
+  "code/sparkium/shaders/geometry/mesh/geometry_sampler.slang#GeometrySampler::PrimitiveArea": {
+    "contract": "primitive_id应有效，结果是变换后的面积。",
+    "description": "按索引读取并变换三个顶点，返回叉积长度的一半。"
+  },
+  "code/sparkium/shaders/geometry/mesh/geometry_sampler.slang#GeometrySampler::SamplePrimitive": {
+    "contract": "",
+    "description": "委托MeshSamplePrimitive，返回世界表面位置及面积PDF。"
+  },
+  "code/sparkium/shaders/geometry/mesh/geometry_sampler.slang#GeometrySampler::SetTransform": {
+    "contract": "",
+    "description": "修改采样器仿射变换。"
+  },
+  "code/sparkium/shaders/geometry/mesh/hit_group.slang#MakeHitRecord": {
+    "contract": "",
+    "description": "把InstanceID/InstanceIndex/PrimitiveIndex及硬件重心/矩阵传给MakeMeshHitRecord。"
+  },
+  "code/sparkium/shaders/geometry/mesh/hit_group.slang#RenderClosestHit": {
+    "contract": "",
+    "description": "先尝试继续次表面随机游走；未消费命中时调用SampleMaterial。"
+  },
+  "code/sparkium/shaders/geometry/mesh/hit_group.slang#ShadowAnyHit": {
+    "contract": "仅定义SAMPLE_SHADOW_ANY_HIT时编译；BLAS须允许any-hit。",
+    "description": "用saturate(SampleShadowOpacity)更新payload.shadow，仍>1e-4则IgnoreHit，否则终止搜索。"
+  },
+  "code/sparkium/shaders/geometry/mesh/hit_group.slang#ShadowClosestHit": {
+    "contract": "",
+    "description": "按材质宏选择有/无HitRecord的SampleShadow接口。"
+  },
+  "code/sparkium/shaders/geometry/mesh/hit_record.slang#MakeMeshHitRecord": {
+    "contract": "几何buffer/indices必须有效；world_to_object形状float4x3用作逆转置法线变换。缺属性回退见模块协议。",
+    "description": "按几何缓冲索引、对象/图元索引、重心、距离与正逆变换读取全部命中属性。"
+  },
+  "code/sparkium/shaders/geometry/mesh/sample_primitive.slang#MeshSamplePrimitive": {
+    "contract": "样本应在[0,1]²，三角非退化；不插值顶点法线。",
+    "description": "若x+y>1则sample=1-sample，再用重心插值位置与UV；几何法线由世界三角叉积，pdf=1/世界面积。"
+  },
+  "code/sparkium/shaders/geometry/mesh/vertex_shader.slang#CameraData": {
+    "contract": "",
+    "description": "六mat4光栅相机布局，与光追CameraData不同。"
+  },
+  "code/sparkium/shaders/geometry/mesh/vertex_shader.slang#GeometryData": {
+    "contract": "",
+    "description": "model/inv_model/normal_matrix三个mat4实例布局。"
+  },
+  "code/sparkium/shaders/geometry/mesh/vertex_shader.slang#VSInput": {
+    "contract": "",
+    "description": "位置必需，法线/UV/切线/符号按宏加入，location与CPU输入绑定匹配。"
+  },
+  "code/sparkium/shaders/geometry/mesh/vertex_shader.slang#VSMain": {
+    "contract": "",
+    "description": "变换位置、法线及切线，再以view_proj输出裁剪坐标。"
+  },
+  "code/sparkium/shaders/geometry/mesh/vertex_shader.slang#VSOutput": {
+    "contract": "",
+    "description": "裁剪位置及世界位置、法线、UV、切线、signal插值输出。"
+  },
+  "code/sparkium/shaders/geometry/mesh/vertex_shader.slang#camera_data": {
+    "contract": "",
+    "description": "space0相机常量。"
+  },
+  "code/sparkium/shaders/geometry/mesh/vertex_shader.slang#geometry_data": {
+    "contract": "",
+    "description": "space1实例常量。"
+  },
+  "code/sparkium/shaders/geometry_primitive_sampler.slang#EvaluatePrimitiveProbability": {
+    "contract": "",
+    "description": "用相邻CDF差除末尾总功率得到指定图元的离散概率。"
+  },
+  "code/sparkium/shaders/geometry_primitive_sampler.slang#SamplePrimitivePower": {
+    "contract": "r为inout；零区间概率会除零。",
+    "description": "二分找到r对应图元，返回区间概率并将r重映射到所选区间[0,1]。"
+  },
+  "code/sparkium/shaders/inverse.slang#inverse": {
+    "contract": "仅det!=0判断，无近奇异阈值；det==0返回输入。",
+    "description": "通过余子式与行列式求逆，按尺寸重载。"
+  },
+  "code/sparkium/shaders/inverse.slang#spvDet2x2": {
+    "contract": "",
+    "description": "计算a1*b2-b1*a2的2×2行列式。"
+  },
+  "code/sparkium/shaders/inverse.slang#spvDet3x3": {
+    "contract": "",
+    "description": "按第一列展开3×3行列式。"
+  },
+  "code/sparkium/shaders/light/ambient/lighting.slang#CameraInfo": {
+    "contract": "",
+    "description": "六个mat4的光栅相机布局。"
+  },
+  "code/sparkium/shaders/light/ambient/lighting.slang#PSInput": {
+    "contract": "",
+    "description": "像素SV_POSITION，用xy直接定位G-buffer。"
+  },
+  "code/sparkium/shaders/light/ambient/lighting.slang#PSMain": {
+    "contract": "不使用IBL/AO；读出的normal/position未参与最终结果。",
+    "description": "返回albedo*ambient_light。"
+  },
+  "code/sparkium/shaders/light/ambient/lighting.slang#PSOutput": {
+    "contract": "",
+    "description": "单路RGBA辐射输出，alpha=0供加法叠加。"
+  },
+  "code/sparkium/shaders/light/ambient/lighting.slang#SceneSettings": {
+    "contract": "",
+    "description": "ambient_light RGB常量布局。"
+  },
+  "code/sparkium/shaders/light/ambient/lighting.slang#VSMain": {
+    "contract": "调用方Draw(6)，无需顶点缓冲。",
+    "description": "用vertex_id索引六顶点数组生成覆盖屏幕的两个三角形。"
+  },
+  "code/sparkium/shaders/light/ambient/lighting.slang#VSOutput": {
+    "contract": "",
+    "description": "全屏顶点裁剪位置输出。"
+  },
+  "code/sparkium/shaders/light/ambient/lighting.slang#albedo_roughness": {
+    "contract": "",
+    "description": "space0 G-buffer，RGB为albedo。"
+  },
+  "code/sparkium/shaders/light/ambient/lighting.slang#camera_data": {
+    "contract": "",
+    "description": "space3相机常量，点光从inv_view提取相机位置。"
+  },
+  "code/sparkium/shaders/light/ambient/lighting.slang#normal_metallic": {
+    "contract": "",
+    "description": "space2 G-buffer，当前ambient公式不使用。"
+  },
+  "code/sparkium/shaders/light/ambient/lighting.slang#position_specular": {
+    "contract": "",
+    "description": "space1 G-buffer，当前ambient公式不使用。"
+  },
+  "code/sparkium/shaders/light/ambient/lighting.slang#scene_settings": {
+    "contract": "",
+    "description": "space4环境光常量。"
+  },
+  "code/sparkium/shaders/light/geometry_material/direct_lighting_sampler.slang#SampleDirectLightingCallable": {
+    "contract": "面积PDF乘距离²和图元概率，再除abs(N·L)；没有掠射除零保护。",
+    "description": "从payload读取接收位置/数据索引/实例索引/随机样本，按功率抽图元，评估发光并输出立体角PDF。"
+  },
+  "code/sparkium/shaders/light/geometry_material/gather_primitive_power.slang#GROUP_SIZE": {
+    "contract": "",
+    "description": "每工作组64线程。"
+  },
+  "code/sparkium/shaders/light/geometry_material/gather_primitive_power.slang#GatherPrimitivePowerKernel": {
+    "contract": "",
+    "description": "每图元求PrimitivePower后构建64线程inclusive前缀和，写入偏移52起的CDF。"
+  },
+  "code/sparkium/shaders/light/geometry_material/gather_primitive_power.slang#direct_lighting_sampler_data": {
+    "contract": "",
+    "description": "space2包含变换、count及CDF的可写采样Buffer。"
+  },
+  "code/sparkium/shaders/light/geometry_material/gather_primitive_power.slang#geometry_data": {
+    "contract": "",
+    "description": "space0几何Buffer。"
+  },
+  "code/sparkium/shaders/light/geometry_material/gather_primitive_power.slang#group_element": {
+    "contract": "",
+    "description": "64个groupshared float，用于跨wave合并组内inclusive前缀和。"
+  },
+  "code/sparkium/shaders/light/geometry_material/gather_primitive_power.slang#material_data": {
+    "contract": "",
+    "description": "space1材质Buffer。"
+  },
+  "code/sparkium/shaders/light/geometry_material/sampler.slang#MeshLightSampler": {
+    "contract": "几何光CDF必须有效；不会查询图材质的逐点图输出。",
+    "description": "按shader_index分派发光求值，输出光方向、距离、辐射和面积转立体角的PDF。"
+  },
+  "code/sparkium/shaders/light/point/direct_lighting_sampler.slang#SampleDirectLightingCallable": {
+    "contract": "",
+    "description": "将payload原样交给PointLightSampler。"
+  },
+  "code/sparkium/shaders/light/point/lighting.slang#CameraInfo": {
+    "contract": "",
+    "description": "六个mat4的光栅相机布局。"
+  },
+  "code/sparkium/shaders/light/point/lighting.slang#PSInput": {
+    "contract": "",
+    "description": "像素SV_POSITION，用xy直接定位G-buffer。"
+  },
+  "code/sparkium/shaders/light/point/lighting.slang#PSMain": {
+    "contract": "点光roughness下界0.08；未做阴影测试。",
+    "description": "构造无透射/无各向异性Principled并评估点光方向，乘emission/(4πdistance²)。"
+  },
+  "code/sparkium/shaders/light/point/lighting.slang#PSOutput": {
+    "contract": "",
+    "description": "单路RGBA辐射输出，alpha=0供加法叠加。"
+  },
+  "code/sparkium/shaders/light/point/lighting.slang#PointLightSettings": {
+    "contract": "",
+    "description": "emission RGB后接light_position XYZ的紧密存储布局。"
+  },
+  "code/sparkium/shaders/light/point/lighting.slang#VSMain": {
+    "contract": "调用方Draw(6)，无需顶点缓冲。",
+    "description": "用vertex_id索引六顶点数组生成覆盖屏幕的两个三角形。"
+  },
+  "code/sparkium/shaders/light/point/lighting.slang#VSOutput": {
+    "contract": "",
+    "description": "全屏顶点裁剪位置输出。"
+  },
+  "code/sparkium/shaders/light/point/lighting.slang#albedo_roughness_buffer": {
+    "contract": "",
+    "description": "space0 RGB albedo / A roughness。"
+  },
+  "code/sparkium/shaders/light/point/lighting.slang#camera_data": {
+    "contract": "",
+    "description": "space3相机常量，点光从inv_view提取相机位置。"
+  },
+  "code/sparkium/shaders/light/point/lighting.slang#normal_metallic_buffer": {
+    "contract": "",
+    "description": "space2 编码法线 RGB / A metallic，解码normal=rgb*2-1。"
+  },
+  "code/sparkium/shaders/light/point/lighting.slang#position_specular_buffer": {
+    "contract": "",
+    "description": "space1 RGB position / A specular。"
+  },
+  "code/sparkium/shaders/light/point/lighting.slang#settings": {
+    "contract": "",
+    "description": "space4点光存储Buffer。"
+  },
+  "code/sparkium/shaders/light/point/sampler.slang#PointLightSampler": {
+    "contract": "输入payload.low.xyz为接收位置，low.w为数据索引；输出low.xyz为eval、low.w为长度、high.xyz方向、high.w密度。",
+    "description": "读取36字节点光数据，消费payload的二维随机数和表面法线，输出方向、阴影长度、发光和PDF。"
+  },
+  "code/sparkium/shaders/random.slang#InitRandomSeed": {
+    "contract": "",
+    "description": "由像素x/y及样本s建立offset/seed，dim=0，samp=s。"
+  },
+  "code/sparkium/shaders/random.slang#RandomFloat": {
+    "contract": "",
+    "description": "将随机uint转换为float除以2^32。"
+  },
+  "code/sparkium/shaders/random.slang#RandomInCircle": {
+    "contract": "",
+    "description": "单位圆方向乘sqrt(u)，在圆盘面积上均匀采样。"
+  },
+  "code/sparkium/shaders/random.slang#RandomInSphere": {
+    "contract": "",
+    "description": "单位球面方向乘u^(1/3)，均匀采样球体积。"
+  },
+  "code/sparkium/shaders/random.slang#RandomOnCircle": {
+    "contract": "",
+    "description": "返回单位圆上的角度均匀随机二维向量。"
+  },
+  "code/sparkium/shaders/random.slang#RandomOnSphere": {
+    "contract": "",
+    "description": "z均匀[-1,1]加圆周方向，采样单位球面。"
+  },
+  "code/sparkium/shaders/random.slang#RandomUint": {
+    "contract": "",
+    "description": "在Sobol范围内调用SobolUint，否则更新seed做WangHash。"
+  },
+  "code/sparkium/shaders/random.slang#SampleCosHemisphere": {
+    "contract": "",
+    "description": "消费两个随机数并调用公共余弦半球采样。"
+  },
+  "code/sparkium/shaders/random.slang#SobolUint": {
+    "contract": "本函数自身不检查表边界，使用RandomUint进行范围分派。",
+    "description": "读取(samp*1024+dim)*4的Sobol字，异或更新后的offset哈希并dim++。"
+  },
+  "code/sparkium/shaders/random.slang#WangHash": {
+    "contract": "非密码学随机。",
+    "description": "更新inout seed并返回32位Wang哈希。"
+  },
+  "code/sparkium/shaders/random.slang#WangHashS": {
+    "contract": "",
+    "description": "相同Wang混合但参数按值，不修改调用方。"
+  },
+  "code/sparkium/shaders/ray_query/traversal.slang#InlineIntersect": {
+    "contract": "any_hit额外启用ACCEPT_FIRST_HIT_AND_END_SEARCH；false时输出零初始化但不表示有效命中。",
+    "description": "以mask0xff、FORCE_OPAQUE和SKIP_PROCEDURAL追踪，映射已提交三角命中。"
+  },
+  "code/sparkium/shaders/ray_query/traversal.slang#SoftwareHit": {
+    "contract": "",
+    "description": "与软件树相同的距离/重心/实例/图元结果结构。"
+  },
+  "code/sparkium/shaders/raygen.slang#ApplyPathMiss": {
+    "contract": "",
+    "description": "介质内miss直接清通量；介质外按background_color增加辐射再清通量。"
+  },
+  "code/sparkium/shaders/raygen.slang#Main": {
+    "contract": "",
+    "description": "原生raygeneration入口，用DispatchRays索引/尺寸调用RenderPixel。"
+  },
+  "code/sparkium/shaders/raygen.slang#MissMain": {
+    "contract": "",
+    "description": "原生miss入口，转发ApplyPathMiss。"
+  },
+  "code/sparkium/shaders/raygen.slang#RenderPixel": {
+    "contract": "相机callable固定索引0；计算路径直接调用生成入口。原点尺度决定TMin，可影响极大/极小场景。",
+    "description": "对samples_per_dispatch个样本执行最多max_bounces次路径循环，更新累计颜色与计数。"
+  },
+  "code/sparkium/shaders/raygen.slang#ShadowMiss": {
+    "contract": "",
+    "description": "保持已有payload.shadow，不重置已累计透明层透射。"
+  },
+  "code/sparkium/shaders/shadow_ray.slang#ShadowRay": {
+    "contract": "",
+    "description": "初始化payload.shadow=1并TraceRay到shadow组，返回各材质处理后的透射；计算路径实现位于software/shadow。"
+  },
+  "code/sparkium/shaders/shadow_ray.slang#ShadowRayNoAlpha": {
+    "contract": "实现依赖非opaque三角候选，不能泛化为任意BLAS flags的遮挡查询。",
+    "description": "原生默认inline query快速遮挡，debug SPIR-V用shadow TraceRay；计算路径这里只声明。"
+  },
+  "code/sparkium/shaders/shadow_terminator.slang#ShadowTerminatorSurfaceOffset": {
+    "contract": "传入同一坐标域的顶点与法线。",
+    "description": "按三顶点/法线及重心，以抛物近似和局部线性包络计算对象空间位移，flipped选择内外侧。"
+  },
+  "code/sparkium/shaders/shadow_terminator.slang#ShadowTerminatorWeight": {
+    "contract": "cutoff控制角度区域，不是世界距离。",
+    "description": "由NL、NgL和cutoff给出0..1的掠射偏移权重，cutoff<=0返回0。"
+  },
+  "code/sparkium/shaders/software/build.slang#BitonicSort": {
+    "contract": "",
+    "description": "对i与i XOR sort_stride做互斥compare-swap，用sort_stage选择方向。"
+  },
+  "code/sparkium/shaders/software/build.slang#EmptyNode": {
+    "contract": "",
+    "description": "返回倒置边界及无效索引的空节点。"
+  },
+  "code/sparkium/shaders/software/build.slang#InitLeaves": {
+    "contract": "",
+    "description": "按原始顺序初始化全部补齐叶。"
+  },
+  "code/sparkium/shaders/software/build.slang#MortonKeys": {
+    "contract": "",
+    "description": "为实际叶生成30bitMorton码，补齐叶使用INVALID使其排序至末尾。"
+  },
+  "code/sparkium/shaders/software/build.slang#ReduceNodes": {
+    "contract": "",
+    "description": "合并同层每节点的两个子边界并写入绝对子节点索引。"
+  },
+  "code/sparkium/shaders/software/build.slang#SortLeaves": {
+    "contract": "",
+    "description": "按排好序的keys.y重新调用WriteLeaf写叶。"
+  },
+  "code/sparkium/shaders/software/build.slang#SpreadBits": {
+    "contract": "",
+    "description": "把10bit输入展开到每三位一个bit，供三轴Morton交织。"
+  },
+  "code/sparkium/shaders/software/build.slang#WriteLeaf": {
+    "contract": "三角取三顶点边界；实例变换BLAS根AABB的八角；超出实际count写空叶。",
+    "description": "把指定图元/实例边界写入root+leaf_count-1+slot。"
+  },
+  "code/sparkium/shaders/software/build.slang#geometries": {
+    "contract": "",
+    "description": "space1场景几何Buffer数组。"
+  },
+  "code/sparkium/shaders/software/build.slang#geometry_index": {
+    "contract": "",
+    "description": "BLAS使用的几何Buffer数组索引。"
+  },
+  "code/sparkium/shaders/software/build.slang#instance_tree": {
+    "contract": "",
+    "description": "非0为TLAS叶，0为BLAS三角叶。"
+  },
+  "code/sparkium/shaders/software/build.slang#instances": {
+    "contract": "",
+    "description": "space4实例记录表。"
+  },
+  "code/sparkium/shaders/software/build.slang#keys": {
+    "contract": "",
+    "description": "space3可写uint2 Morton键/原始索引数组。"
+  },
+  "code/sparkium/shaders/software/build.slang#leaf_count": {
+    "contract": "",
+    "description": "补齐到2次幂的叶容量。"
+  },
+  "code/sparkium/shaders/software/build.slang#level_count": {
+    "contract": "",
+    "description": "当前归约层元素数量。"
+  },
+  "code/sparkium/shaders/software/build.slang#level_first": {
+    "contract": "",
+    "description": "当前归约层相对根的首节点。"
+  },
+  "code/sparkium/shaders/software/build.slang#nodes": {
+    "contract": "",
+    "description": "space0可写BVH节点Buffer。"
+  },
+  "code/sparkium/shaders/software/build.slang#primitive_count": {
+    "contract": "",
+    "description": "实际图元/实例数量。"
+  },
+  "code/sparkium/shaders/software/build.slang#root": {
+    "contract": "",
+    "description": "当前树的绝对根节点索引。"
+  },
+  "code/sparkium/shaders/software/build.slang#sort_stage": {
+    "contract": "",
+    "description": "Bitonic外层阶段。"
+  },
+  "code/sparkium/shaders/software/build.slang#sort_stride": {
+    "contract": "",
+    "description": "Bitonic XOR比较距离。"
+  },
+  "code/sparkium/shaders/software/layout.slang#LoadSoftwareInstance": {
+    "contract": "",
+    "description": "从16字节header后读取指定实例矩阵及四个索引字段。"
+  },
+  "code/sparkium/shaders/software/layout.slang#LoadSoftwareNode": {
+    "contract": "",
+    "description": "按index*32读取两个uint4并把xyz位解释为float边界。"
+  },
+  "code/sparkium/shaders/software/layout.slang#SOFTWARE_INSTANCE_BYTES": {
+    "contract": "",
+    "description": "实例记录字节数112。"
+  },
+  "code/sparkium/shaders/software/layout.slang#SOFTWARE_INVALID": {
+    "contract": "",
+    "description": "0xffffffff无效索引/叶节点标记。"
+  },
+  "code/sparkium/shaders/software/layout.slang#SOFTWARE_NODE_BYTES": {
+    "contract": "",
+    "description": "节点字节数32。"
+  },
+  "code/sparkium/shaders/software/layout.slang#SoftwareInstance": {
+    "contract": "",
+    "description": "正逆仿射各48字节，后接root/geometry/material/primitive_count四uint。"
+  },
+  "code/sparkium/shaders/software/layout.slang#SoftwareNode": {
+    "contract": "",
+    "description": "lo.xyz/first/hi.xyz/second，两个uint4连续存储。"
+  },
+  "code/sparkium/shaders/software/render.slang#ApplyPathMiss": {
+    "contract": "",
+    "description": "共享raygen实现的前置声明：无介质时加背景并终止通量。"
+  },
+  "code/sparkium/shaders/software/render.slang#Main": {
+    "contract": "",
+    "description": "8×8计算入口，按累积图尺寸做边界检查后调用RenderPixel。"
+  },
+  "code/sparkium/shaders/software/render.slang#SPARKIUM_SOFTWARE_RT": {
+    "contract": "",
+    "description": "选择共用绑定和射线生成中的计算分支。"
+  },
+  "code/sparkium/shaders/software/render.slang#SoftwareHitRecord": {
+    "contract": "",
+    "description": "读取实例并调用MakeMeshHitRecord；world_to_object显式转置为法线变换形状。"
+  },
+  "code/sparkium/shaders/software/render.slang#SoftwareTracePath": {
+    "contract": "",
+    "description": "InlineIntersect未命中走miss，命中先继续介质随机游走，否则按实例material编号采样材质。"
+  },
+  "code/sparkium/shaders/software/shadow.slang#ShadowRay": {
+    "contract": "射线参数应为正；返回剩余透过值，不做层数上限。",
+    "description": "反复最近命中并乘SoftwareShadowTransmission，透过<=1e-4停止；每层TMin推进一个正float ULP。"
+  },
+  "code/sparkium/shaders/software/shadow.slang#ShadowRayNoAlpha": {
+    "contract": "TMin=.001*max(length(origin),1)，TMax=dist。",
+    "description": "InlineIntersect(any_hit=true)有命中返回0，否则1。"
+  },
+  "code/sparkium/shaders/software/traversal.slang#InlineIntersect": {
+    "contract": "空实例表直接false，输出初始distance=TMax、索引INVALID。",
+    "description": "从TLAS根0遍历实例再遍历各BLAS，返回首个或最近命中。"
+  },
+  "code/sparkium/shaders/software/traversal.slang#SoftwareBoxHit": {
+    "contract": "t区间闭合测试，调用者用最近命中距离缩短上界。",
+    "description": "逐轴slab测试，零方向时只检查原点是否在该轴区间，空AABB拒绝。"
+  },
+  "code/sparkium/shaders/software/traversal.slang#SoftwareHit": {
+    "contract": "",
+    "description": "距离、二维重心、实例索引、图元索引的公共求交结果。"
+  },
+  "code/sparkium/shaders/software/traversal.slang#SoftwareTraceMesh": {
+    "contract": "",
+    "description": "把世界射线转对象空间，用32项栈遍历一个BLAS并更新所属实例索引。"
+  },
+  "code/sparkium/shaders/software/traversal.slang#SoftwareTriangleHit": {
+    "contract": "距离必须>=t_min且严格小于hit.distance；退化行列式拒绝，不剔除背面。",
+    "description": "最大方向轴置换+剪切边函数求交，更新更近命中的距离/重心/图元。"
+  },
+  "code/sparkium/shaders/subsurface_random_walk.slang#ContinueSubsurfaceRandomWalk": {
+    "contract": "无介质或命中其他对象交回普通表面着色；该算法不是异质介质或嵌套介质栈。",
+    "description": "若自由程先于表面则散射；否则处理同对象Fresnel边界和退出漫射；返回是否消费本次命中。"
+  },
+  "code/sparkium/shaders/subsurface_random_walk.slang#RandomWalkDistance": {
+    "contract": "",
+    "description": "以当前英雄通道sigma_t采指数距离，sigma下界1e-6，log输入下界1e-6。"
+  },
+  "code/sparkium/shaders/subsurface_random_walk.slang#RandomWalkSingleScatteringAlbedo": {
+    "contract": "",
+    "description": "以Van de Hulst/Cycles拟合把目标表面反射率反推单散射albedo，输入/结果钳制至[0,.999999]。"
+  },
+  "code/sparkium/shaders/subsurface_random_walk.slang#SampleUniformSphere": {
+    "contract": "",
+    "description": "消费两个随机数采各向同性单位球方向。"
+  },
+  "code/sparkium/shaders/subsurface_random_walk.slang#StartSubsurfaceRandomWalk": {
+    "contract": "radius*scale是平均自由程；最小1e-4。入射方向已由调用方的表面层采样。",
+    "description": "设置对象/通道/消光/反照率/IOR，自由程和体积ray_type，并把通量限制至所选通道乘3。"
+  },
+  "code/sparkium/shaders/tone_mapping.slang#ApplyArtisticGrade": {
+    "contract": "",
+    "description": "围绕.18调整contrast，SDR钳制，再按1/max(gamma,1e-4)幂变换并限制溢出。"
+  },
+  "code/sparkium/shaders/tone_mapping.slang#FilmicCurve": {
+    "contract": "",
+    "description": "非负颜色经过有肩部/趾部的有理式，再saturate到[0,1]。"
+  },
+  "code/sparkium/shaders/tone_mapping.slang#FilmicHDRCurve": {
+    "contract": "",
+    "description": "在色值1以内用FilmicCurve，以上按该点斜率线性延长。"
+  },
+  "code/sparkium/shaders/tone_mapping.slang#Main": {
+    "contract": "HDR返回线性RGB供EDR，SDR返回显示域值；两种输出不可混用。",
+    "description": "8×8计算入口：曝光乘2^exposure，选择显示变换并保留原alpha。"
+  },
+  "code/sparkium/shaders/tone_mapping.slang#ToneMappingSettings": {
+    "contract": "",
+    "description": "view_transform/exposure/gamma/contrast共四个32位字段。"
+  },
+  "code/sparkium/shaders/tone_mapping.slang#accumulated_color": {
+    "contract": "",
+    "description": "space0输入raw线性颜色，变量名沿用accumulated_color但此阶段已平均。"
+  },
+  "code/sparkium/shaders/tone_mapping.slang#output": {
+    "contract": "",
+    "description": "space1输出，宏选择RGBA32F HDR或RGBA8 SDR。"
+  },
+  "code/sparkium/shaders/tone_mapping.slang#settings": {
+    "contract": "",
+    "description": "space2色调设置常量。"
+  },
+  "code/sparkium/shaders/tone_mapping_functions.slang#Linear2sRGB": {
+    "contract": "",
+    "description": "以0.0031308为阈值：低段12.92c，高段1.055c^(1/2.4)-.055。"
+  },
+  "code/sparkium/shaders/tone_mapping_functions.slang#sRGB2Linear": {
+    "contract": "",
+    "description": "以0.04045为阈值：低段/12.92，高段((c+.055)/1.055)^2.4。"
+  },
   "contradium::(anonymous)::PBDStepHelper": {
     "contract": "",
     "description": "Step 内部临时记录，保留实体引用、预测 x/q、修正增量与接触计数。"
@@ -6994,5 +7978,689 @@
   "sparkium::raster::Scene::Settings": {
     "contract": "settings 为常量借用引用，实际值由前端控制。",
     "description": "前端 sparkium::Scene::Settings 的别名。"
+  },
+  "sparkium::raytracing::(anonymous)::GPUInstance": {
+    "contract": "与Slang实例Load偏移严格匹配。",
+    "description": "112字节：object_to_world/world_to_object两个mat4x3及root/geometry/material/primitive_count四uint。"
+  },
+  "sparkium::raytracing::(anonymous)::LeafCount": {
+    "contract": "超过2097152抛异常。",
+    "description": "把实际叶数补齐到至少1的2次幂。"
+  },
+  "sparkium::raytracing::(anonymous)::MaterialSource": {
+    "contract": "不处理任意预处理依赖；当前内建shader依赖由外围统一引入。",
+    "description": "移除去前导空白后以 #include/#pragma 开头的源码行。"
+  },
+  "sparkium::raytracing::(anonymous)::RegisteredTextures": {
+    "contract": "各int缺省-1；索引编码由 Scene::RegisterImage 决定。",
+    "description": "normal/y_signal及其余七类图像索引的GPU尾部布局。"
+  },
+  "sparkium::raytracing::BlellochScanMetadata": {
+    "contract": "共享数据的字段顺序必须与 Slang 读取布局一致。",
+    "description": "扫描 offset/stride/element_count 加 61 uint padding，共256字节。"
+  },
+  "sparkium::raytracing::Camera": {
+    "contract": "专用组件借用前端/Core；返回的 GPU 指针不转移所有权。具体布局、生命周期及限制见本页文件说明。",
+    "description": "相机代码/数据抽象协议。"
+  },
+  "sparkium::raytracing::Camera::Buffer": {
+    "contract": "查询有上传副作用，不是纯 getter。",
+    "description": "由派生相机同步参数并返回 GPU 常量数据。"
+  },
+  "sparkium::raytracing::Camera::Camera": {
+    "contract": "引用所指对象必须覆盖组件使用期；该构造不是自动跟踪前端结构变化的订阅接口。",
+    "description": "构造相机代码/数据抽象协议，建立本文件实现列出的资源与引用。"
+  },
+  "sparkium::raytracing::Camera::EntryPoint": {
+    "contract": "供 SoftwarePipeline 的编译键和代码生成使用。",
+    "description": "返回相机函数入口名的常量引用。"
+  },
+  "sparkium::raytracing::Camera::Shader": {
+    "contract": "编译失败抛异常；设备不支持原生RT返回 nullptr，Query/软件路径使用源码入口。",
+    "description": "在设备支持原生RT时惰性编译相机 callable。"
+  },
+  "sparkium::raytracing::Camera::ShaderFile": {
+    "contract": "供 SoftwarePipeline 的编译键和代码生成使用。",
+    "description": "返回相机虚拟源码路径的常量引用。"
+  },
+  "sparkium::raytracing::CameraPinhole": {
+    "contract": "专用组件借用前端/Core；返回的 GPU 指针不转移所有权。具体布局、生命周期及限制见本页文件说明。",
+    "description": "针孔相机GPU适配。"
+  },
+  "sparkium::raytracing::CameraPinhole::Buffer": {
+    "contract": "view 必须可逆，前端 fovy/aspect 合理；返回本组件拥有的 Buffer。",
+    "description": "重算 view 逆矩阵和 tan(fovy/2) 尺度并上传针孔数据。"
+  },
+  "sparkium::raytracing::CameraPinhole::CameraPinhole": {
+    "contract": "引用所指对象必须覆盖组件使用期；该构造不是自动跟踪前端结构变化的订阅接口。",
+    "description": "构造针孔相机GPU适配，建立本文件实现列出的资源与引用。"
+  },
+  "sparkium::raytracing::CameraPinholeData": {
+    "contract": "共享数据的字段顺序必须与 Slang 读取布局一致。",
+    "description": "视图及其逆矩阵，后接二维透视 scale。"
+  },
+  "sparkium::raytracing::CameraThinLens": {
+    "contract": "专用组件借用前端/Core；返回的 GPU 指针不转移所有权。具体布局、生命周期及限制见本页文件说明。",
+    "description": "薄透镜相机GPU适配。"
+  },
+  "sparkium::raytracing::CameraThinLens::Buffer": {
+    "contract": "view 必须可逆，前端 fovy/aspect 合理；返回本组件拥有的 Buffer。",
+    "description": "重算 view 逆矩阵和 tan(fovy/2) 尺度并上传薄透镜全部参数。"
+  },
+  "sparkium::raytracing::CameraThinLens::CameraThinLens": {
+    "contract": "引用所指对象必须覆盖组件使用期；该构造不是自动跟踪前端结构变化的订阅接口。",
+    "description": "构造薄透镜相机GPU适配，建立本文件实现列出的资源与引用。"
+  },
+  "sparkium::raytracing::CameraThinLensData": {
+    "contract": "共享数据的字段顺序必须与 Slang 读取布局一致。",
+    "description": "针孔字段后追加半径、焦距、叶片数、旋转和比例。"
+  },
+  "sparkium::raytracing::Core": {
+    "contract": "专用组件借用前端/Core；返回的 GPU 指针不转移所有权。具体布局、生命周期及限制见本页文件说明。",
+    "description": "共享资源和光源预处理程序缓存。"
+  },
+  "sparkium::raytracing::Core::Core": {
+    "contract": "引用所指对象必须覆盖组件使用期；该构造不是自动跟踪前端结构变化的订阅接口。",
+    "description": "构造共享资源和光源预处理程序缓存，建立本文件实现列出的资源与引用。"
+  },
+  "sparkium::raytracing::Core::GeometryLightResources": {
+    "contract": "",
+    "description": "缓存一对几何光功率 compute shader 与 program 的所有权。"
+  },
+  "sparkium::raytracing::Core::GetBuffer": {
+    "contract": "返回前端拥有的借用资源；命名查询缺失行为与前端相同。",
+    "description": "转发前端 Core 的 GetBuffer 查询。"
+  },
+  "sparkium::raytracing::Core::GetComputeProgram": {
+    "contract": "返回前端拥有的借用资源；命名查询缺失行为与前端相同。",
+    "description": "转发前端 Core 的 GetComputeProgram 查询。"
+  },
+  "sparkium::raytracing::Core::GetGeometryLightPowerProgram": {
+    "contract": "槽0几何存储缓冲、1材质存储缓冲、2可写采样缓冲；shader编译失败抛异常。",
+    "description": "按几何采样/材质求值源码对缓存 GatherPrimitivePowerKernel 程序。"
+  },
+  "sparkium::raytracing::Core::GetImage": {
+    "contract": "返回前端拥有的借用资源；命名查询缺失行为与前端相同。",
+    "description": "转发前端 Core 的 GetImage 查询。"
+  },
+  "sparkium::raytracing::Core::GetShader": {
+    "contract": "返回前端拥有的借用资源；命名查询缺失行为与前端相同。",
+    "description": "转发前端 Core 的 GetShader 查询。"
+  },
+  "sparkium::raytracing::Core::GetShadersVFS": {
+    "contract": "返回前端拥有的借用资源；命名查询缺失行为与前端相同。",
+    "description": "转发前端 Core 的 GetShadersVFS 查询。"
+  },
+  "sparkium::raytracing::Core::GraphicsCore": {
+    "contract": "返回前端拥有的借用资源；命名查询缺失行为与前端相同。",
+    "description": "转发前端 Core 的 GraphicsCore 查询。"
+  },
+  "sparkium::raytracing::Core::LoadPublicShaders": {
+    "contract": "私有初始化步骤；同名资源覆盖会替换所有权。",
+    "description": "构建 film2img 及 Blelloch 上下扫 shader/program，存入前端公共资源表。"
+  },
+  "sparkium::raytracing::Core::PrepareBuiltinHitShaders": {
+    "contract": "Light 额外加载 ShadowAnyHit；ready 后不重编译，CreateShader 返回值未逐一检查。",
+    "description": "有原生 RT 能力时惰性加载 Mesh 的四类内建材质命中组 shader。"
+  },
+  "sparkium::raytracing::DedicatedCast": {
+    "contract": "Core/Scene/Film 直接附加；Geometry/Material/Entity 未支持类型返回空；Camera 未支持类型抛 invalid_argument。",
+    "description": "查询或惰性附加与前端类型匹配的光追组件。"
+  },
+  "sparkium::raytracing::Entity": {
+    "contract": "专用组件借用前端/Core；返回的 GPU 指针不转移所有权。具体布局、生命周期及限制见本页文件说明。",
+    "description": "每帧场景注册抽象协议。"
+  },
+  "sparkium::raytracing::Entity::Entity": {
+    "contract": "引用所指对象必须覆盖组件使用期；该构造不是自动跟踪前端结构变化的订阅接口。",
+    "description": "构造每帧场景注册抽象协议，建立本文件实现列出的资源与引用。"
+  },
+  "sparkium::raytracing::Entity::Update": {
+    "contract": "必须在 Scene 已建立 preprocess context 的更新阶段调用。",
+    "description": "由派生实体向当前 Scene 注册本帧资源、实例及光源。"
+  },
+  "sparkium::raytracing::Entity::operator bool": {
+    "contract": "不验证其他资源是否创建成功。",
+    "description": "只检查 core_ 非空。"
+  },
+  "sparkium::raytracing::Entity::~Entity": {
+    "contract": "",
+    "description": "虚析构接口，支持经基类释放派生组件。"
+  },
+  "sparkium::raytracing::EntityGeometryMaterial": {
+    "contract": "专用组件借用前端/Core；返回的 GPU 指针不转移所有权。具体布局、生命周期及限制见本页文件说明。",
+    "description": "几何材质实例与几何光组件。"
+  },
+  "sparkium::raytracing::EntityGeometryMaterial::EntityGeometryMaterial": {
+    "contract": "引用所指对象必须覆盖组件使用期；该构造不是自动跟踪前端结构变化的订阅接口。",
+    "description": "构造几何材质实例与几何光组件，建立本文件实现列出的资源与引用。"
+  },
+  "sparkium::raytracing::EntityGeometryMaterial::PrepareHitGroups": {
+    "contract": "无原生RT能力直接返回；有render closest-hit后不再重建。",
+    "description": "优先复用内建Mesh材质hit组，图材质使用自身缓存，其余组合源码编译。"
+  },
+  "sparkium::raytracing::EntityGeometryMaterial::Update": {
+    "contract": "零图元跳过；软件/Query只支持GeometryMesh，原生路径准备命中组和BLAS。",
+    "description": "同步材质，注册几何光和实例，并设置两者custom_index关联。"
+  },
+  "sparkium::raytracing::EntityPointLight": {
+    "contract": "专用组件借用前端/Core；返回的 GPU 指针不转移所有权。具体布局、生命周期及限制见本页文件说明。",
+    "description": "显式点光实体组件。"
+  },
+  "sparkium::raytracing::EntityPointLight::EntityPointLight": {
+    "contract": "引用所指对象必须覆盖组件使用期；该构造不是自动跟踪前端结构变化的订阅接口。",
+    "description": "构造显式点光实体组件，建立本文件实现列出的资源与引用。"
+  },
+  "sparkium::raytracing::EntityPointLight::Update": {
+    "contract": "参数通过引用反映前端当前值，由 RegisterLight 内预处理上传。",
+    "description": "注册持有的 LightPoint。"
+  },
+  "sparkium::raytracing::Film": {
+    "contract": "专用组件借用前端/Core；返回的 GPU 指针不转移所有权。具体布局、生命周期及限制见本页文件说明。",
+    "description": "累积颜色与样本图像组件。"
+  },
+  "sparkium::raytracing::Film::Film": {
+    "contract": "引用所指对象必须覆盖组件使用期；该构造不是自动跟踪前端结构变化的订阅接口。",
+    "description": "构造累积颜色与样本图像组件，建立本文件实现列出的资源与引用。"
+  },
+  "sparkium::raytracing::Film::GetHeight": {
+    "contract": "专用图像本身未实现自动 resize。",
+    "description": "转发前端 Film 尺寸查询。"
+  },
+  "sparkium::raytracing::Film::GetWidth": {
+    "contract": "专用图像本身未实现自动 resize。",
+    "description": "转发前端 Film 尺寸查询。"
+  },
+  "sparkium::raytracing::Film::Reset": {
+    "contract": "提交命令，不独立 WaitGPU；通过前端 Film Reset 回调触发。",
+    "description": "清累积颜色/样本图，并把前端 info.accumulated_samples 设零。"
+  },
+  "sparkium::raytracing::Geometry": {
+    "contract": "专用组件借用前端/Core；返回的 GPU 指针不转移所有权。具体布局、生命周期及限制见本页文件说明。",
+    "description": "几何数据和采样/求交代码协议。"
+  },
+  "sparkium::raytracing::Geometry::BLAS": {
+    "contract": "派生类必须实现；所有返回引用/指针均借用。",
+    "description": "返回或创建底层加速结构。"
+  },
+  "sparkium::raytracing::Geometry::Buffer": {
+    "contract": "派生类必须实现；所有返回引用/指针均借用。",
+    "description": "返回几何打包缓冲。"
+  },
+  "sparkium::raytracing::Geometry::ClosestHitShaderImpl": {
+    "contract": "派生类必须实现；所有返回引用/指针均借用。",
+    "description": "返回几何原生 hit-group 源码。"
+  },
+  "sparkium::raytracing::Geometry::Geometry": {
+    "contract": "引用所指对象必须覆盖组件使用期；该构造不是自动跟踪前端结构变化的订阅接口。",
+    "description": "构造几何数据和采样/求交代码协议，建立本文件实现列出的资源与引用。"
+  },
+  "sparkium::raytracing::Geometry::PrimitiveCount": {
+    "contract": "派生类必须实现；所有返回引用/指针均借用。",
+    "description": "返回几何图元数量。"
+  },
+  "sparkium::raytracing::Geometry::SamplerImpl": {
+    "contract": "派生类必须实现；所有返回引用/指针均借用。",
+    "description": "返回几何表面采样源码。"
+  },
+  "sparkium::raytracing::Geometry::~Geometry": {
+    "contract": "",
+    "description": "虚析构接口，支持经基类释放派生组件。"
+  },
+  "sparkium::raytracing::GeometryMesh": {
+    "contract": "专用组件借用前端/Core；返回的 GPU 指针不转移所有权。具体布局、生命周期及限制见本页文件说明。",
+    "description": "三角网格缓冲及BLAS适配。"
+  },
+  "sparkium::raytracing::GeometryMesh::BLAS": {
+    "contract": "数据/源码引用借用；BLAS 不自动重建或更新。",
+    "description": "首次使用按 Header 的位置和索引范围创建 flags NONE 的三角BLAS，后续返回缓存。"
+  },
+  "sparkium::raytracing::GeometryMesh::Buffer": {
+    "contract": "数据/源码引用借用；BLAS 不自动重建或更新。",
+    "description": "返回前端共享打包Buffer。"
+  },
+  "sparkium::raytracing::GeometryMesh::ClosestHitShaderImpl": {
+    "contract": "数据/源码引用借用；BLAS 不自动重建或更新。",
+    "description": "返回构造加载的 mesh/hit_group.slang 源码。"
+  },
+  "sparkium::raytracing::GeometryMesh::GeometryMesh": {
+    "contract": "引用所指对象必须覆盖组件使用期；该构造不是自动跟踪前端结构变化的订阅接口。",
+    "description": "构造三角网格缓冲及BLAS适配，建立本文件实现列出的资源与引用。"
+  },
+  "sparkium::raytracing::GeometryMesh::Header": {
+    "contract": "",
+    "description": "前端 GeometryMesh::Header 的别名。"
+  },
+  "sparkium::raytracing::GeometryMesh::PrimitiveCount": {
+    "contract": "数据/源码引用借用；BLAS 不自动重建或更新。",
+    "description": "转发前端三角图元数。"
+  },
+  "sparkium::raytracing::GeometryMesh::SamplerImpl": {
+    "contract": "数据/源码引用借用；BLAS 不自动重建或更新。",
+    "description": "返回构造加载的 mesh/geometry_sampler.slang 源码。"
+  },
+  "sparkium::raytracing::GeometryRegistration": {
+    "contract": "共享数据的字段顺序必须与 Slang 读取布局一致。",
+    "description": "几何数据索引和借用 BLAS 指针；当前作为协议结构声明。"
+  },
+  "sparkium::raytracing::InstanceHitGroups": {
+    "contract": "共享数据的字段顺序必须与 Slang 读取布局一致。",
+    "description": "每实例一组 render 和一组 shadow 的 HitGroup。"
+  },
+  "sparkium::raytracing::InstanceMetadata": {
+    "contract": "共享数据的字段顺序必须与 Slang 读取布局一致。",
+    "description": "几何数据索引、材质数据索引、自定义索引，默认均 -1。"
+  },
+  "sparkium::raytracing::InstanceRegistration": {
+    "contract": "共享数据的字段顺序必须与 Slang 读取布局一致。",
+    "description": "实例索引包装结构。"
+  },
+  "sparkium::raytracing::Light": {
+    "contract": "专用组件借用前端/Core；返回的 GPU 指针不转移所有权。具体布局、生命周期及限制见本页文件说明。",
+    "description": "光源采样与功率预处理协议。"
+  },
+  "sparkium::raytracing::Light::Light": {
+    "contract": "引用所指对象必须覆盖组件使用期；该构造不是自动跟踪前端结构变化的订阅接口。",
+    "description": "构造光源采样与功率预处理协议，建立本文件实现列出的资源与引用。"
+  },
+  "sparkium::raytracing::Light::SamplerData": {
+    "contract": "供 Scene::RegisterLight 顺序调用；偏移不是光源索引。",
+    "description": "返回采样器数据缓冲，可在此同步变换。"
+  },
+  "sparkium::raytracing::Light::SamplerPreprocess": {
+    "contract": "供 Scene::RegisterLight 顺序调用；偏移不是光源索引。",
+    "description": "向命令上下文记录预处理或上传参数，返回功率 float 在采样数据中的字节偏移。"
+  },
+  "sparkium::raytracing::Light::SamplerShader": {
+    "contract": "供 Scene::RegisterLight 顺序调用；偏移不是光源索引。",
+    "description": "为当前 Scene 返回内建编号或注册 callable 的索引。"
+  },
+  "sparkium::raytracing::Light::operator bool": {
+    "contract": "不验证其他资源是否创建成功。",
+    "description": "只检查 core_ 非空。"
+  },
+  "sparkium::raytracing::Light::~Light": {
+    "contract": "",
+    "description": "虚析构接口，支持经基类释放派生组件。"
+  },
+  "sparkium::raytracing::LightGeometryMaterial": {
+    "contract": "专用组件借用前端/Core；返回的 GPU 指针不转移所有权。具体布局、生命周期及限制见本页文件说明。",
+    "description": "几何面积光采样组件。"
+  },
+  "sparkium::raytracing::LightGeometryMaterial::LightGeometryMaterial": {
+    "contract": "引用所指对象必须覆盖组件使用期；该构造不是自动跟踪前端结构变化的订阅接口。",
+    "description": "构造几何面积光采样组件，建立本文件实现列出的资源与引用。"
+  },
+  "sparkium::raytracing::LightGeometryMaterial::SamplerData": {
+    "contract": "只上传变换，不调整图元数量或缓冲长度。",
+    "description": "更新借用transform到数据头并返回采样缓冲。"
+  },
+  "sparkium::raytracing::LightGeometryMaterial::SamplerPreprocess": {
+    "contract": "图元数应大于0；需caller提交命令。",
+    "description": "记录图元功率收集与分层前缀和，返回CDF最后float的字节偏移。"
+  },
+  "sparkium::raytracing::LightGeometryMaterial::SamplerShader": {
+    "contract": "软件路径自定义组合无callable可用，可能返回-1；支持范围应遵守实体协议。",
+    "description": "返回Mesh五类内建材质的0x1000001..5编号，否则注册直接光callable。"
+  },
+  "sparkium::raytracing::LightMetadata": {
+    "contract": "共享数据的字段顺序必须与 Slang 读取布局一致。",
+    "description": "采样器编号、数据索引、自定义索引、功率字节偏移。"
+  },
+  "sparkium::raytracing::LightPoint": {
+    "contract": "专用组件借用前端/Core；返回的 GPU 指针不转移所有权。具体布局、生命周期及限制见本页文件说明。",
+    "description": "点光参数与采样组件。"
+  },
+  "sparkium::raytracing::LightPoint::LightPoint": {
+    "contract": "引用所指对象必须覆盖组件使用期；该构造不是自动跟踪前端结构变化的订阅接口。",
+    "description": "构造点光参数与采样组件，建立本文件实现列出的资源与引用。"
+  },
+  "sparkium::raytracing::LightPoint::SamplerData": {
+    "contract": "参数更新在 SamplerPreprocess 进行。",
+    "description": "返回36字节数据缓冲。"
+  },
+  "sparkium::raytracing::LightPoint::SamplerPreprocess": {
+    "contract": "返回功率权重偏移24；显式非负sampling_weight优先，否则用RGB最大值。cmd_ctx未使用。",
+    "description": "上传位置、RGB功率、采样权重、非负半径与soft_falloff int。"
+  },
+  "sparkium::raytracing::LightPoint::SamplerShader": {
+    "contract": "",
+    "description": "返回内建点光采样器编号 0x1000000。"
+  },
+  "sparkium::raytracing::Material": {
+    "contract": "专用组件借用前端/Core；返回的 GPU 指针不转移所有权。具体布局、生命周期及限制见本页文件说明。",
+    "description": "材质数据与采样/发光代码协议。"
+  },
+  "sparkium::raytracing::Material::Buffer": {
+    "contract": "",
+    "description": "返回材质参数缓冲，派生类可在此同步常量。"
+  },
+  "sparkium::raytracing::Material::EvaluatorImpl": {
+    "contract": "",
+    "description": "返回材质发光求值源码；基类返回静态空 CodeLines。"
+  },
+  "sparkium::raytracing::Material::GraphImpl": {
+    "contract": "",
+    "description": "返回独立材质图参数求值源码；基类为空指针。"
+  },
+  "sparkium::raytracing::Material::Material": {
+    "contract": "引用所指对象必须覆盖组件使用期；该构造不是自动跟踪前端结构变化的订阅接口。",
+    "description": "构造材质数据与采样/发光代码协议，建立本文件实现列出的资源与引用。"
+  },
+  "sparkium::raytracing::Material::SamplerImpl": {
+    "contract": "",
+    "description": "返回材质路径采样源码，派生类必须实现。"
+  },
+  "sparkium::raytracing::Material::Update": {
+    "contract": "",
+    "description": "可选的逐帧纹理注册阶段；基类为空。"
+  },
+  "sparkium::raytracing::Material::~Material": {
+    "contract": "",
+    "description": "虚析构接口，支持经基类释放派生组件。"
+  },
+  "sparkium::raytracing::MaterialLambertian": {
+    "contract": "专用组件借用前端/Core；返回的 GPU 指针不转移所有权。具体布局、生命周期及限制见本页文件说明。",
+    "description": "漫反射材质适配。"
+  },
+  "sparkium::raytracing::MaterialLambertian::Buffer": {
+    "contract": "借用指针；Principled尾部纹理索引需另由Update上传。",
+    "description": "先 SyncMaterialData 上传base_color后接emission两个vec3，再返回材质Buffer。"
+  },
+  "sparkium::raytracing::MaterialLambertian::EvaluatorImpl": {
+    "contract": "用于几何光图元功率预处理。",
+    "description": "返回本材质的发光求值源码常量引用。"
+  },
+  "sparkium::raytracing::MaterialLambertian::MaterialLambertian": {
+    "contract": "引用所指对象必须覆盖组件使用期；该构造不是自动跟踪前端结构变化的订阅接口。",
+    "description": "构造漫反射材质适配，建立本文件实现列出的资源与引用。"
+  },
+  "sparkium::raytracing::MaterialLambertian::SamplerImpl": {
+    "contract": "用于hit-group或计算材质分派组合。",
+    "description": "返回本材质的路径采样源码常量引用。"
+  },
+  "sparkium::raytracing::MaterialLambertian::SyncMaterialData": {
+    "contract": "不隐式注册贴图。",
+    "description": "将base_color后接emission两个vec3按固定字节布局上传。"
+  },
+  "sparkium::raytracing::MaterialLight": {
+    "contract": "专用组件借用前端/Core；返回的 GPU 指针不转移所有权。具体布局、生命周期及限制见本页文件说明。",
+    "description": "纯发光材质适配。"
+  },
+  "sparkium::raytracing::MaterialLight::Buffer": {
+    "contract": "借用指针；Principled尾部纹理索引需另由Update上传。",
+    "description": "先 SyncMaterialData 上传emission后接three flags及falloff_distance，再返回材质Buffer。"
+  },
+  "sparkium::raytracing::MaterialLight::EvaluatorImpl": {
+    "contract": "用于几何光图元功率预处理。",
+    "description": "返回本材质的发光求值源码常量引用。"
+  },
+  "sparkium::raytracing::MaterialLight::MaterialLight": {
+    "contract": "引用所指对象必须覆盖组件使用期；该构造不是自动跟踪前端结构变化的订阅接口。",
+    "description": "构造纯发光材质适配，建立本文件实现列出的资源与引用。"
+  },
+  "sparkium::raytracing::MaterialLight::SamplerImpl": {
+    "contract": "用于hit-group或计算材质分派组合。",
+    "description": "返回本材质的路径采样源码常量引用。"
+  },
+  "sparkium::raytracing::MaterialLight::SyncMaterialData": {
+    "contract": "不隐式注册贴图。",
+    "description": "将emission后接three flags及falloff_distance按固定字节布局上传。"
+  },
+  "sparkium::raytracing::MaterialPrincipled": {
+    "contract": "专用组件借用前端/Core；返回的 GPU 指针不转移所有权。具体布局、生命周期及限制见本页文件说明。",
+    "description": "Principled材质及纹理适配。"
+  },
+  "sparkium::raytracing::MaterialPrincipled::Buffer": {
+    "contract": "借用指针；Principled尾部纹理索引需另由Update上传。",
+    "description": "先 SyncMaterialData 上传前端Info主体，再返回材质Buffer。"
+  },
+  "sparkium::raytracing::MaterialPrincipled::EvaluatorImpl": {
+    "contract": "用于几何光图元功率预处理。",
+    "description": "返回本材质的发光求值源码常量引用。"
+  },
+  "sparkium::raytracing::MaterialPrincipled::Info": {
+    "contract": "实际GPU尾部使用 RegisteredTextures，不能直接复制 TextureInfo 指针。",
+    "description": "前端Principled标量/颜色参数布局的别名。"
+  },
+  "sparkium::raytracing::MaterialPrincipled::MaterialPrincipled": {
+    "contract": "引用所指对象必须覆盖组件使用期；该构造不是自动跟踪前端结构变化的订阅接口。",
+    "description": "构造Principled材质及纹理适配，建立本文件实现列出的资源与引用。"
+  },
+  "sparkium::raytracing::MaterialPrincipled::SamplerImpl": {
+    "contract": "用于hit-group或计算材质分派组合。",
+    "description": "返回本材质的路径采样源码常量引用。"
+  },
+  "sparkium::raytracing::MaterialPrincipled::SyncMaterialData": {
+    "contract": "不隐式注册贴图。",
+    "description": "将前端Info主体按固定字节布局上传。"
+  },
+  "sparkium::raytracing::MaterialPrincipled::TextureInfo": {
+    "contract": "实际GPU尾部使用 RegisteredTextures，不能直接复制 TextureInfo 指针。",
+    "description": "前端Principled的图像指针集合类型的别名。"
+  },
+  "sparkium::raytracing::MaterialPrincipled::Update": {
+    "contract": "每帧在当前Scene注册期调用；无图索引-1。",
+    "description": "逐项注册八类贴图并上传RegisteredTextures，法线Y按normal_reverse_y设置。"
+  },
+  "sparkium::raytracing::MaterialRegistration": {
+    "contract": "共享数据的字段顺序必须与 Slang 读取布局一致。",
+    "description": "材质数据索引，默认 -1。"
+  },
+  "sparkium::raytracing::MaterialShaderGraph": {
+    "contract": "专用组件借用前端/Core；返回的 GPU 指针不转移所有权。具体布局、生命周期及限制见本页文件说明。",
+    "description": "材质图代码与纹理适配。"
+  },
+  "sparkium::raytracing::MaterialShaderGraph::Buffer": {
+    "contract": "emission_hint只在构造上传。",
+    "description": "返回已有材质缓冲，不同步emission_hint。"
+  },
+  "sparkium::raytracing::MaterialShaderGraph::EvaluatorImpl": {
+    "contract": "用于几何光图元功率预处理。",
+    "description": "返回本材质的发光求值源码常量引用。"
+  },
+  "sparkium::raytracing::MaterialShaderGraph::GraphImpl": {
+    "contract": "计算路径按独立图源码分派；与构造时SamplerImpl快照不是同一缓存。",
+    "description": "返回前端graph_code的地址。"
+  },
+  "sparkium::raytracing::MaterialShaderGraph::MaterialShaderGraph": {
+    "contract": "引用所指对象必须覆盖组件使用期；该构造不是自动跟踪前端结构变化的订阅接口。",
+    "description": "构造材质图代码与纹理适配，建立本文件实现列出的资源与引用。"
+  },
+  "sparkium::raytracing::MaterialShaderGraph::PrepareHitShaders": {
+    "contract": "仅原生RT设备执行；任一步编译失败抛异常，三者均存在时直接返回。",
+    "description": "按插入图源码的sampler惰性编译render closest-hit、shadow closest-hit和shadow any-hit。"
+  },
+  "sparkium::raytracing::MaterialShaderGraph::RenderClosestHitShader": {
+    "contract": "PrepareHitShaders成功后才非空。",
+    "description": "返回对应原生命中shader的借用指针。"
+  },
+  "sparkium::raytracing::MaterialShaderGraph::SamplerImpl": {
+    "contract": "用于hit-group或计算材质分派组合。",
+    "description": "返回本材质的路径采样源码常量引用。"
+  },
+  "sparkium::raytracing::MaterialShaderGraph::ShadowAnyHitShader": {
+    "contract": "PrepareHitShaders成功后才非空。",
+    "description": "返回对应原生命中shader的借用指针。"
+  },
+  "sparkium::raytracing::MaterialShaderGraph::ShadowClosestHitShader": {
+    "contract": "PrepareHitShaders成功后才非空。",
+    "description": "返回对应原生命中shader的借用指针。"
+  },
+  "sparkium::raytracing::MaterialShaderGraph::Update": {
+    "contract": "纹理数组大小须与构造时分配相容；空图指针不被RegisterImage接受。",
+    "description": "注册textures并从字节12起上传图像索引数组。"
+  },
+  "sparkium::raytracing::MaterialSpecular": {
+    "contract": "专用组件借用前端/Core；返回的 GPU 指针不转移所有权。具体布局、生命周期及限制见本页文件说明。",
+    "description": "理想镜面材质适配。"
+  },
+  "sparkium::raytracing::MaterialSpecular::Buffer": {
+    "contract": "借用指针；Principled尾部纹理索引需另由Update上传。",
+    "description": "先 SyncMaterialData 上传base_color vec3，再返回材质Buffer。"
+  },
+  "sparkium::raytracing::MaterialSpecular::EvaluatorImpl": {
+    "contract": "用于几何光图元功率预处理。",
+    "description": "返回本材质的发光求值源码常量引用。"
+  },
+  "sparkium::raytracing::MaterialSpecular::MaterialSpecular": {
+    "contract": "引用所指对象必须覆盖组件使用期；该构造不是自动跟踪前端结构变化的订阅接口。",
+    "description": "构造理想镜面材质适配，建立本文件实现列出的资源与引用。"
+  },
+  "sparkium::raytracing::MaterialSpecular::SamplerImpl": {
+    "contract": "用于hit-group或计算材质分派组合。",
+    "description": "返回本材质的路径采样源码常量引用。"
+  },
+  "sparkium::raytracing::MaterialSpecular::SyncMaterialData": {
+    "contract": "不隐式注册贴图。",
+    "description": "将base_color vec3按固定字节布局上传。"
+  },
+  "sparkium::raytracing::Render": {
+    "contract": "Ray Query 在 Scene 中也使用 software 计算路径。",
+    "description": "转换 Core/Scene/Camera/Film 后转发 Scene::Render 的 software/ray_query 标记。"
+  },
+  "sparkium::raytracing::Scene": {
+    "contract": "专用组件借用前端/Core；返回的 GPU 指针不转移所有权。具体布局、生命周期及限制见本页文件说明。",
+    "description": "三路径追踪的注册与提交调度。"
+  },
+  "sparkium::raytracing::Scene::EntityStatus": {
+    "contract": "",
+    "description": "active/keep 用于逐帧实体追踪；shader_version 字段默认0，当前流程未用于版本判断。"
+  },
+  "sparkium::raytracing::Scene::HitGroupComparator": {
+    "contract": "",
+    "description": "对 render/shadow 两组 shader 指针和 procedure 做字典序比较，用于 map 去重。"
+  },
+  "sparkium::raytracing::Scene::HitGroupComparator::operator()": {
+    "contract": "判断的是同一组指针/标记，不比较 shader 源码等价性。",
+    "description": "比较两个命中组元组的严格顺序。"
+  },
+  "sparkium::raytracing::Scene::InstanceCustomIndex": {
+    "contract": "无边界检查；通常用于实例与光关联。",
+    "description": "返回指定实例元数据 custom_index 的可变引用。"
+  },
+  "sparkium::raytracing::Scene::LightCustomIndex": {
+    "contract": "无边界检查，引用会在向量扩容/下一帧清空后失效。",
+    "description": "返回指定光元数据 custom_index 的可变引用。"
+  },
+  "sparkium::raytracing::Scene::RegisterBuffer": {
+    "contract": "空指针返回 -1；返回索引只对当前注册表有效。",
+    "description": "按指针去重本帧数据缓冲。"
+  },
+  "sparkium::raytracing::Scene::RegisterCallableShader": {
+    "contract": "空指针返回 -1；不转移所有权。",
+    "description": "按指针去重 callable 并在新增时标记 pipeline dirty。"
+  },
+  "sparkium::raytracing::Scene::RegisterHitGroup": {
+    "contract": "返回逻辑组索引，实际 shader table 每组有两个 hit group。",
+    "description": "按 render/shadow shader及procedure元组去重，新增时标记管线脏。"
+  },
+  "sparkium::raytracing::Scene::RegisterImage": {
+    "contract": "HDR索引加0x1000000，其他格式返回-1；不检查空指针。",
+    "description": "将 RGBA8 图注册到 SDR 表，RGBA32F 图注册到 HDR 表。"
+  },
+  "sparkium::raytracing::Scene::RegisterInstance": {
+    "contract": "mask=255，SBT偏移=hit_group_index*2；硬件custom index使用geometry_data_index。",
+    "description": "构造硬件实例与元数据，返回当帧索引。"
+  },
+  "sparkium::raytracing::Scene::RegisterLight": {
+    "contract": "返回当帧光索引；light/context 必须有效。",
+    "description": "依次注册采样数据/代码并执行预处理，追加 LightMetadata。"
+  },
+  "sparkium::raytracing::Scene::RegisterSoftwareInstance": {
+    "contract": "仅在计算路径和 UpdatePipeline 注册期调用；custom_index 通常为光索引。",
+    "description": "追加 InstanceMetadata 与 SoftwarePipeline 实例，返回本帧实例索引。"
+  },
+  "sparkium::raytracing::Scene::Render": {
+    "contract": "模式切换可清累积；相机/材料的一般变化需调用方 Reset。",
+    "description": "更新资源管线并执行追踪、累积解析和 GPU 等待。"
+  },
+  "sparkium::raytracing::Scene::Scene": {
+    "contract": "引用所指对象必须覆盖组件使用期；该构造不是自动跟踪前端结构变化的订阅接口。",
+    "description": "构造三路径追踪的注册与提交调度，建立本文件实现列出的资源与引用。"
+  },
+  "sparkium::raytracing::Scene::Settings": {
+    "contract": "",
+    "description": "前端 Scene::Settings 别名，settings 为可变引用。"
+  },
+  "sparkium::raytracing::Scene::SoftwareTracing": {
+    "contract": "Ray Query 也返回 true。",
+    "description": "返回是否采用计算追踪路径。"
+  },
+  "sparkium::raytracing::Scene::UpdatePipeline": {
+    "contract": "内部前处理 context 在本函数创建并提交；对 active 实体按前端插入顺序 Update。",
+    "description": "同步实体，重建资源索引、实例与光CDF，更新加速结构和必要的资源容量布局。"
+  },
+  "sparkium::raytracing::SoftwarePipeline": {
+    "contract": "专用组件借用前端/Core；返回的 GPU 指针不转移所有权。具体布局、生命周期及限制见本页文件说明。",
+    "description": "软件BVH/原生Query的计算渲染组织器。"
+  },
+  "sparkium::raytracing::SoftwarePipeline::AccelerationStructure": {
+    "contract": "软件BVH模式通常为空。",
+    "description": "返回Query模式的硬件TLAS。"
+  },
+  "sparkium::raytracing::SoftwarePipeline::AddInstance": {
+    "contract": "这里不验证矩阵或创建 BLAS。",
+    "description": "追加借用几何/材质、变换副本及几何数据索引。"
+  },
+  "sparkium::raytracing::SoftwarePipeline::AppendBuild": {
+    "contract": "leaves应为非零2次幂；只生成CPU pass列表。",
+    "description": "追加叶初始化、归约、Morton/Bitonic排序、重排与再次归约各pass。"
+  },
+  "sparkium::raytracing::SoftwarePipeline::BuildParameters": {
+    "contract": "",
+    "description": "root/leaves/count/geometry/first/level_count/stage/stride/instance_tree与padding，共256字节。"
+  },
+  "sparkium::raytracing::SoftwarePipeline::BuildPass": {
+    "contract": "",
+    "description": "kernel索引、参数副本和待处理元素count。"
+  },
+  "sparkium::raytracing::SoftwarePipeline::ClearInstances": {
+    "contract": "不销毁程序和已缓存的GPU树。",
+    "description": "清空本帧 CPU 实例列表。"
+  },
+  "sparkium::raytracing::SoftwarePipeline::CompileBuilders": {
+    "contract": "shader仅首次编译，程序按资源数组大小重建；失败抛异常。",
+    "description": "按buffer_count构建五个BVH计算程序。"
+  },
+  "sparkium::raytracing::SoftwarePipeline::CompileRenderer": {
+    "contract": "Query profile cs_6_5，软件 cs_6_0；图材质共享BSDF，资源槽见文件说明。",
+    "description": "组合材质命名空间与分派函数、相机入口，编译计算追踪器。"
+  },
+  "sparkium::raytracing::SoftwarePipeline::GeometryLayout": {
+    "contract": "",
+    "description": "每个共享几何的根节点、补齐叶数、图元数和缓冲索引。"
+  },
+  "sparkium::raytracing::SoftwarePipeline::Instance": {
+    "contract": "",
+    "description": "借用几何/材质、变换副本和几何缓冲索引。"
+  },
+  "sparkium::raytracing::SoftwarePipeline::Instances": {
+    "contract": "由Update上传。",
+    "description": "返回16字节表头+112字节实例记录的缓冲。"
+  },
+  "sparkium::raytracing::SoftwarePipeline::MaterialCode": {
+    "contract": "",
+    "description": "shader_graph标记和处理后的源码；共同作为材质去重键。"
+  },
+  "sparkium::raytracing::SoftwarePipeline::MaterialCode::operator==": {
+    "contract": "",
+    "description": "同时比较图材质标记与完整源码文本。"
+  },
+  "sparkium::raytracing::SoftwarePipeline::Nodes": {
+    "contract": "Query模式不分配。",
+    "description": "返回软件BVH节点缓冲。"
+  },
+  "sparkium::raytracing::SoftwarePipeline::Program": {
+    "contract": "Update成功编译后有效。",
+    "description": "返回当前计算追踪程序。"
+  },
+  "sparkium::raytracing::SoftwarePipeline::SoftwarePipeline": {
+    "contract": "引用所指对象必须覆盖组件使用期；该构造不是自动跟踪前端结构变化的订阅接口。",
+    "description": "构造软件BVH/原生Query的计算渲染组织器，建立本文件实现列出的资源与引用。"
+  },
+  "sparkium::raytracing::SoftwarePipeline::Update": {
+    "contract": "软件静态BLAS缓存只看几何指针/数量；caller提交commands后方可追踪。",
+    "description": "构造GPU实例、校验地址与矩阵、按需编译 renderer，并更新硬件TLAS或记录软件BVH构建。"
   }
 }

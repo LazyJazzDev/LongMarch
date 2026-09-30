@@ -68,7 +68,21 @@ def extract(path: Path, root: Path) -> dict:
     parse_data = re.sub(rb"(?m)^(?![ \t]*#)([^\n]*)$",
                         lambda m: re.sub(rb"\b(?:LM_DEVICE_FUNC|__host__|__device__|__global__|__forceinline__)\b",
                                          lambda token: b" " * len(token.group()), m.group()), data)
+    prefixes = []
     if path.suffix == '.slang':
+        # Adapt declaration-only Slang syntax, keeping byte offsets and original
+        # text. Without this, C++ recovery mislabels function locals as globals.
+        def blank_prefix(match):
+            prefixes.append((match.start(), match.end()))
+            return re.sub(rb'[^\n]', b' ', match.group())
+        parse_data = re.sub(rb'__generic\s*<[^>]+>|\[(?:mutating|shader\([^\]]*\)|numthreads\([^\]]*\))\]',
+                            blank_prefix, parse_data)
+        parse_data = re.sub(rb'\binterface\b',
+                            lambda m: b'struct' + b' ' * (len(m.group()) - 6), parse_data)
+        parse_data = re.sub(rb'\bextension(\s+\w+)\s*:\s*\w+',
+                            lambda m: b'namespace' + m.group(1) + b' ' * (len(m.group()) - 9 - len(m.group(1))), parse_data)
+        parse_data = re.sub(rb'\b(?:inout|out|SP_MUTATING)\b',
+                            lambda m: b' ' * len(m.group()), parse_data)
         # Slang register bindings and semantics are not C++ base classes or
         # function declarators. Blank only their annotation bytes so original
         # signatures and source locations remain intact.
@@ -83,6 +97,16 @@ def extract(path: Path, root: Path) -> dict:
         kind = node.type
         if kind == 'namespace_definition':
             name = text(node.child_by_field_name('name'), data) or '(anonymous)'
+            if text(node, data).startswith('extension'):
+                body = node.child_by_field_name('body')
+                record['objects'].append({
+                    'name': name, 'qualified': scope + name, 'kind': 'slang_extension',
+                    'line': node.start_point.row + 1, 'end_line': node.end_point.row + 1,
+                    'signature': data[node.start_byte:body.start_byte].decode().strip(),
+                    'access': access, 'conditions': list(conditions),
+                    'comment': preceding_comment(node, data), 'members': [], 'parameters': [],
+                    'calls': [], 'returns': [], 'throws': [],
+                })
             visit(node.child_by_field_name('body'), f'{scope}{name}::', 'public', conditions)
             return
         if kind.startswith('preproc_if') or kind == 'preproc_else':
@@ -112,7 +136,13 @@ def extract(path: Path, root: Path) -> dict:
                 name = cast.split('(')[0].strip()
             name = name or '(anonymous)'
             body = node.child_by_field_name('body')
-            signature = data[node.start_byte:(body.start_byte if body else node.end_byte)].decode(errors='replace').strip()
+            signature_start = node.start_byte
+            if node.parent and node.parent.type == 'template_declaration':
+                signature_start = node.parent.start_byte
+            for prefix_start, prefix_end in reversed(prefixes):
+                if prefix_end <= signature_start and not parse_data[prefix_end:signature_start].strip():
+                    signature_start = prefix_start
+            signature = data[signature_start:(body.start_byte if body else node.end_byte)].decode(errors='replace').strip()
             # Function definitions include their exact body separately, not in the signature.
             obj = {
                 'name': name, 'qualified': scope + name, 'kind': kind,
