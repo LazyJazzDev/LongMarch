@@ -1,5 +1,7 @@
 #include "button.h"
 
+namespace snowberg::gui::surface {
+
 Button::Button(Application *app, float left, float top, float right, float bottom)
     : Listener(app),
       app_(app),
@@ -90,6 +92,12 @@ void Button::OnWindowSize(int width, int height) {
   Listener::OnWindowSize(width, height);
 }
 
+void Button::SetClipBounds(glm::vec4 bounds) {
+  clip_bounds_ = bounds;
+  CalculateListenerBounds();
+  SetState(0);
+}
+
 void Button::Activate() {
   app_->RegisterListener(this);
 }
@@ -110,12 +118,14 @@ void Button::CalculateListenerBounds() {
   float scale_y = float(window.y) / float(std::max(framebuffer.y, 1));
 
   // Calculate listener bounds
-  listener_left_ = left_ * scale_x;
-  listener_top_ = top_ * scale_y;
-  listener_right_ = right_ * scale_x;
-  listener_bottom_ = bottom_ * scale_y;
+  listener_left_ = std::max(left_, clip_bounds_.x) * scale_x;
+  listener_top_ = std::max(top_, clip_bounds_.y) * scale_y;
+  listener_right_ = std::min(right_, clip_bounds_.z) * scale_x;
+  listener_bottom_ = std::min(bottom_, clip_bounds_.w) * scale_y;
 }
 
 bool Button::IsInsideListenerBounds(float x, float y) const {
   return (listener_left_ <= x) && (x <= listener_right_) && (listener_top_ <= y) && (y <= listener_bottom_);
 }
+
+}  // namespace snowberg::gui::surface

@@ -5,6 +5,10 @@ The 2048 puzzle game, ported from the GUI of
 to `grassland::graphics`. The original targeted the legacy grassland Vulkan
 wrapper; this version runs on every LongMarch backend (Vulkan, D3D12, Metal).
 
+The original visual style and interactions use the shared
+`snowberg::gui::surface` renderer, input routing and animation primitives.
+Demo-local application headers only provide compatibility aliases.
+
 ```sh
 cmake --build build --target demo_2048
 build/demo/2048/demo_2048

@@ -27,7 +27,7 @@ constexpr int kScoreBoardClicksToStartAi = 5;
 }  // namespace
 
 TwentyFourEight::TwentyFourEight(const std::string &title, int width, int height, graphics::BackendAPI api)
-    : Application(title, width, height, api) {
+    : Application(title, width, height, api, DemoSurfaceShader()) {
   GetWindow()->KeyEvent().RegisterCallback([this](int key, int scancode, int action, int mods) {
     if (action != GLFW_PRESS) {
       return;

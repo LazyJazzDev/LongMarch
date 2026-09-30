@@ -1,0 +1,118 @@
+{
+  "source_revision": "a15741a4a20bed8d53ea5bff4b8282111ad0a423",
+  "files": 629,
+  "reviewed_files": 629,
+  "objects": 5204,
+  "documented_object_names": 3641,
+  "audit_failures": [],
+  "pending_files": [],
+  "undocumented_objects": [],
+  "missing_modules": [],
+  "parser_diagnostics": {
+    "code/grassland/graphics/backend/d3d12/d3d12_core.cpp": [
+      519
+    ],
+    "code/grassland/graphics/backend/metal/metal_window.mm": [
+      24,
+      28,
+      29,
+      37,
+      102,
+      130,
+      146,
+      168,
+      201,
+      202
+    ],
+    "code/grassland/graphics/graphics_util.h": [
+      28
+    ],
+    "code/grassland/graphics/window_gestures.h": [
+      4
+    ],
+    "code/grassland/graphics/window_gestures.mm": [
+      20,
+      36,
+      37,
+      40,
+      41,
+      46,
+      47
+    ],
+    "code/grassland/math/math_mesh.cxx": [
+      593,
+      594
+    ],
+    "code/grassland/physics/diff_kernel/dk_dihedral_angle.cpp": [
+      68,
+      69,
+      105,
+      106,
+      150,
+      151,
+      184,
+      185,
+      483,
+      484
+    ],
+    "code/grassland/physics/diff_kernel/dk_elastic_models.cpp": [
+      39,
+      40,
+      86,
+      87,
+      136,
+      137,
+      180,
+      181,
+      248,
+      249,
+      317,
+      318,
+      349,
+      350,
+      381,
+      382
+    ],
+    "code/grassland/physics/diff_kernel/dk_geometry_sdf.cpp": [
+      30,
+      31,
+      56,
+      57,
+      98,
+      99,
+      139,
+      140,
+      215,
+      216,
+      239,
+      240,
+      268,
+      269
+    ],
+    "code/grassland/util/double_ptr.h": [
+      60,
+      76,
+      92,
+      96
+    ],
+    "code/snowberg/gui/surface/animation_var.cpp": [
+      30
+    ],
+    "code/snowberg/gui/surface/application.h": [
+      127
+    ],
+    "code/snowberg/solver/solver_scene_update.cpp": [
+      369,
+      376,
+      383,
+      386,
+      389,
+      428,
+      453,
+      474,
+      482,
+      487,
+      492
+    ]
+  }
+}

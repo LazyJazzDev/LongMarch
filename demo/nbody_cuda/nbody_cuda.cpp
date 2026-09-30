@@ -99,10 +99,8 @@ void NBodyCUDA::OnInit() {
       program_->Finalize();
     });
 
-    window_->InitImGui(FileProbe::GetInstance().FindFile("fonts/simhei.ttf").c_str(), 20.0f);
+    ui_ = std::make_unique<snowberg::gui::Context>(core_.get(), window_.get(), snowberg::gui::DefaultFont());
     window_->MouseMoveEvent().RegisterCallback([this](double xpos, double ypos) {
-      ImGui::SetCurrentContext(window_->GetImGuiContext());
-
       if (!cursor_initialized_) {
         last_cursor_ = {xpos, ypos};
         cursor_initialized_ = true;
@@ -110,7 +108,7 @@ void NBodyCUDA::OnInit() {
       if (window_->IsMouseButtonDown(GLFW_MOUSE_BUTTON_LEFT)) {
         auto diffx = xpos - last_cursor_.x;
         auto diffy = ypos - last_cursor_.y;
-        if (!ImGui::GetIO().WantCaptureMouse) {
+        if (!ui_->WantsPointer()) {
           rotation = glm::rotate(glm::mat4{1.0f}, glm::radians(float(diffx)), glm::vec3{0.0f, 1.0f, 0.0f}) * rotation;
           rotation = glm::rotate(glm::mat4{1.0f}, glm::radians(float(diffy)), glm::vec3{1.0f, 0.0f, 0.0f}) * rotation;
         }
@@ -156,7 +154,7 @@ void NBodyCUDA::OnUpdate() {
   UpdateParticles();
 
   if (!headless_) {
-    UpdateImGui();
+    UpdateGui();
     UpdateRenderAssets();
     static FPSCounter fps_counter;
     window_->SetTitle("NBody CUDA FPS: " + std::to_string(fps_counter.TickFPS()));
@@ -185,8 +183,11 @@ void NBodyCUDA::OnRender() {
     ctx->CmdBindResources(1, {frame_image_.get()});
     ctx->CmdDraw(6, 1, 0, 0);
     ctx->CmdEndRendering();
-    if (!headless_)
-      ctx->CmdPresent(window_.get(), frame_image_.get());
+    if (!headless_) {
+      auto *gui_image = ui_->EndFrame(ctx.get(), frame_image_.get());
+
+      ctx->CmdPresent(window_.get(), gui_image);
+    }
   }
   core_->SubmitCommandContext(ctx.get());
 }
@@ -292,91 +293,32 @@ void NBodyCUDA::UpdateRenderAssets() {
   global_uniform_buffer_->UploadData(&ubo, sizeof(ubo));
 }
 
-void NBodyCUDA::UpdateImGui() {
-  window_->BeginImGuiFrame();
-  ImGui::SetNextWindowPos(ImVec2{0.0f, 0.0f}, ImGuiCond_Once);
-  ImGui::SetNextWindowBgAlpha(0.3f);
-  bool trigger_hdr_switch = false;
-  if (ImGui::Begin("NBody CUDA", nullptr, ImGuiWindowFlags_NoMove)) {
-    ImGui::Text("Statistics");
-    ImGui::Separator();
-    auto current_tp = std::chrono::steady_clock::now();
-    static auto last_frame_tp = current_tp;
-    auto duration = current_tp - last_frame_tp;
-    auto duration_ms = float(duration / std::chrono::microseconds(1)) * 1e-3f;
-    ImGui::Text("Frame Duration: %.3f ms", duration_ms);
-    if (step_) {
-      constexpr float num_flops_per_intersection = 20.0f;  // From NVIDIA's official CUDA N-body example
-      float intersection_per_second = float(n_particles_) * float(n_particles_) / (duration_ms * 1e-3f);
-      float ops = intersection_per_second * num_flops_per_intersection;
-      if (ops < 8e2f) {
-        ImGui::Text("%.2f FLOP/s", ops);
-      } else if (ops < 8e5f) {
-        ImGui::Text("%.2f KFLOP/s", ops * 1e-3f);
-      } else if (ops < 8e8f) {
-        ImGui::Text("%.2f MFLOP/s", ops * 1e-6f);
-      } else {
-        ImGui::Text("%.2f GFLOP/s", ops * 1e-9f);
-      }
-    }
-
-    if (ImGui::CollapsingHeader("Speed Distribution")) {
-      std::vector<glm::vec3> velocities(n_particles_);
-      core_->CUDABeginExecutionBarrier();
-      cudaMemcpy(velocities.data(), velocities_, sizeof(glm::vec3) * n_particles_, cudaMemcpyDeviceToHost);
-      core_->CUDAEndExecutionBarrier();
-      std::vector<float> speeds(n_particles_);
-      for (int i = 0; i < n_particles_; i++) {
-        speeds[i] = glm::length(velocities[i]);
-      }
-      std::sort(speeds.begin(), speeds.end());
-      float max_speed = speeds[n_particles_ - 1];
-      constexpr int num_samples = 100;
-      int samples[num_samples]{};
-      for (int i = 0; i < n_particles_; i++) {
-        samples[std::max(std::min(int(speeds[i] / max_speed * num_samples), num_samples - 1), 0)]++;
-      }
-      int max_sample = 0;
-      for (int i = 0; i < num_samples; i++) {
-        max_sample = std::max(max_sample, samples[i]);
-      }
-      float normalized_samples[num_samples]{};
-      for (int i = 0; i < num_samples; i++) {
-        normalized_samples[i] = float(samples[i]) / float(max_sample);
-      }
-      ImGui::PlotLines("##1", normalized_samples, num_samples, 0, nullptr, 0.0f, 1.0f);
-    }
-
-    ImGui::NewLine();
-
-    ImGui::Text("Control");
-    ImGui::Separator();
-    if (ImGui::Button("Reset")) {
-      ResetParticles();
-    }
-    ImGui::SameLine();
-    if (ImGui::Button(step_ ? "Pause" : "Resume")) {
-      step_ = !step_;
-    }
-    // Make slider logarithmic
-    ImGui::SliderFloat("Delta Time", &delta_t_, 0.001f, 0.1f, "%.3f", ImGuiSliderFlags_Logarithmic);
-    ImGui::SliderInt("Galaxy Number", &galaxy_number_, 1, 20, "%d");
-    ImGui::NewLine();
-
-    ImGui::Text("Visualizer");
-    ImGui::Separator();
-    if (ImGui::Button(("HDR: " + std::string(hdr_ ? "ON" : "OFF")).c_str())) {
-      trigger_hdr_switch = true;
-    }
-    last_frame_tp = current_tp;
+void NBodyCUDA::UpdateGui() {
+  ui_->BeginFrame();
+  ui_->BeginPanel("nbody", 12, 12, 320, "NBody CUDA");
+  ui_->Heading("Statistics");
+  const auto now = std::chrono::steady_clock::now();
+  static auto last = now;
+  const float duration_ms = std::chrono::duration<float, std::milli>(now - last).count();
+  last = now;
+  ui_->Text("Frame: " + std::to_string(duration_ms) + " ms");
+  if (step_ && duration_ms > 0) {
+    const float ops = float(n_particles_) * float(n_particles_) * 20.0f / (duration_ms * 1e-3f);
+    ui_->Text("Compute: " + std::to_string(ops * 1e-9f) + " GFLOP/s");
   }
-
-  ImGui::End();
-  window_->EndImGuiFrame();
-  if (trigger_hdr_switch) {
+  ui_->Separator();
+  ui_->Heading("Controls");
+  if (ui_->Button("Reset"))
+    ResetParticles();
+  if (ui_->Button(step_ ? "Pause" : "Resume"))
+    step_ = !step_;
+  ui_->Slider("Delta time", &delta_t_, 0.001f, 0.1f);
+  ui_->Slider("Galaxy number", &galaxy_number_, 1, 20);
+  if (ui_->Button(hdr_ ? "HDR: on" : "HDR: off")) {
     if (window_->SetHDR(!hdr_) == 0)
       hdr_ = !hdr_;
     else
       LogWarning("HDR mode change unavailable; keeping the current presentation mode.");
   }
+  ui_->EndPanel();
 }

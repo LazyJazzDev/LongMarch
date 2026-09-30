@@ -1,0 +1,1032 @@
+{
+  "code": {
+    "contracts": [
+      "C++ 标准为 17；通过 CMake target 传递 includes 和依赖，避免手工猜测链接顺序。",
+      "long_march.h 导入 grassland/snowberg 名称并保留其他模块别名；新增公共符号应避免跨模块重名歧义。",
+      "所有权不是统一一种形式：graphics 工厂用 double_ptr，Sparkium 多为借用关系+调用方拥有，visualizer 使用 shared_ptr/weak_ptr，具体以对象页为准。",
+      "可选 CUDA、Python 和各图形后端受构建宏控制；文档列出某声明不保证当前构建启用。",
+      "本参考范围覆盖 code/ 的每个受管文件，示例和测试通过相应对象/文件页关联。"
+    ],
+    "flow": [
+      "底层 Grassland 提供图形资源、数学/物理计算核和工具。",
+      "Snowberg 的绘制、GUI、可视化与求解组件复用基础能力；Sparkium 组织场景和渲染管线。",
+      "Contradium 提供当前 PBD 求解路径；Practium 组合其仿真状态与 Sparkium 可见实体。",
+      "应用可包含 long_march.h 使用聚合入口，也可只包含需要的子模块头。"
+    ],
+    "summary": "LongMarchCommon 聚合 Grassland、Snowberg、Sparkium、Contradium 和 Practium；LongMarch 是向应用暴露的 INTERFACE CMake 目标。Python 扩展单独链接该聚合库。",
+    "title": "LongMarch · 总体架构"
+  },
+  "code/contradium": {
+    "contracts": [
+      "graphics::Core 是借用指针，拥有者必须活得更久。",
+      "RigidSolver、VBDSolver、IPCSolver、MPMSolver、StableFluidSolver 在 core_util.h 中仅前向声明，不构成已实现功能。",
+      "PBDSolver 不提供实体移除、多线程同步、参数合法性检查或完整关节系统。"
+    ],
+    "flow": [
+      "应用创建 PBDSolver，AddEntity 建立网格和 SDF。",
+      "每步预测位姿、迭代接触约束、回写位姿和速度。"
+    ],
+    "summary": "当前可执行求解路径集中在 PBDSolver；Core 只保存图形 Core 引用，其他求解器名多为前向声明。",
+    "title": "Contradium · 物理框架"
+  },
+  "code/contradium/core": {
+    "contracts": [
+      "不可从此 Core 推断具备 GPU 求解能力。",
+      "Core 不拥有传入的图形设备。"
+    ],
+    "flow": [
+      "构造 Core 后只保存后端引用，不创建求解器。"
+    ],
+    "summary": "Core 保存借用的 graphics::Core 指针；core_util 建立类型依赖和求解器声明。",
+    "title": "Contradium 核心入口"
+  },
+  "code/contradium/pbd": {
+    "contracts": [
+      "dt 必须大于 0；实现末尾除以 dt，未校验零步长。",
+      "质量/惯量为零时对应逆量置零。固定物体仍可因调用方设置非零速度而移动。",
+      "接触双方逆质量/惯量同时为零可能产生零分母；调用方不能依赖内部防护。",
+      "位置、线速度、角速度与 SDF 网格采用一致坐标和单位；四元数应有效且归一化。",
+      "map.at 对无效实体 ID 抛出 out_of_range；GetEntity 返回借用 const 引用。"
+    ],
+    "flow": [
+      "AddEntity 深拷贝网格，建立 MeshSDF，分配递增 ID。",
+      "Step 用重力与当前速度预测平移和旋转。",
+      "20 轮迭代中对刚体对的顶点做 SDF 接触检测，累积平移/旋转修正。",
+      "按接触数平均修正；最终用位姿差重建速度。"
+    ],
+    "summary": "以网格 SDF 为接触查询，使用预测位姿与位置修正实现小规模刚体仿真。",
+    "title": "刚体位置约束求解"
+  },
+  "code/grassland": {
+    "contracts": [
+      "可直接使用子模块类型；聚合 grassland.h 会引入较多依赖。",
+      "__CUDACC__ 控制 host/device 函数标记，LONGMARCH_CUDA_RUNTIME 控制主机侧 CUDA 互操作声明，二者含义不同。",
+      "几何/数值 API 对输入维度、有效网格与奇异点的约束见各文件，不假定统一异常检查。"
+    ],
+    "flow": [
+      "util 提供平台/内存/事件基础；math 和 physics 提供通用计算。",
+      "bvh 管理空间层次树；graphics 将抽象资源分派到 Metal/Vulkan/D3D12。",
+      "上层模块依赖公共声明，后端 helper 处理原生 API 细节。"
+    ],
+    "summary": "提供 graphics、math、physics、bvh、util，以及 ImGui 后端构建适配；Grassland 目标 PUBLIC 链接各子库。",
+    "title": "Grassland · 基础层"
+  },
+  "code/grassland/bvh": {
+    "contracts": [
+      "输入实例数必须至少为 1；空树没有可调用的遍历入口。",
+      "BVHRef 不拥有节点；宿主或设备存储必须存活且不能在查询期间重建。",
+      "查询几何、命中结果和提前裁剪语义由回调定义，结构本身不假定射线查询。"
+    ],
+    "flow": [
+      "BVHHost 从 AABB 与实例编号构建二叉树，按循环坐标轴排序并平分。",
+      "内部节点合并子节点包围盒，失败链接编码跳过子树的路径。",
+      "BVHRef 借用节点数组，以调用方的包围盒与实例回调执行查询。"
+    ],
+    "summary": "以 CPU 构建、连续节点数组和无栈遍历组成的通用 BVH；CUDA 包装只负责把构建结果复制到设备。",
+    "title": "包围体层次结构"
+  },
+  "code/grassland/graphics": {
+    "contracts": [
+      "输出工厂通常以 0 表示成功，非零表示失败；编译/设备错误也可能抛 C++ 异常，不能只检查一种通道。",
+      "double_ptr 接管新建对象的方式由调用方槽类型决定；传给命令的裸指针通常是借用，同一批命令的资源必须属于同一 Core。",
+      "Program 的资源声明顺序与 CmdBindResources slot、着色器寄存器/space 必须一致；资源种类和数组长度必须匹配。",
+      "命令提交不等价于 GPU 完成；不要在完成之前销毁或覆盖 GPU 正在读取的资源。",
+      "Window、GLFW 事件和显示亮度查询在主线程调用；一般资源和 EventManager 没有全局并发保护。",
+      "RT pipeline 和 ray query 独立查询；显式硬件功能须检查支持，不将后端存在视为全部特性可用。"
+    ],
+    "flow": [
+      "CreateCore 选择已编译后端；枚举物理设备后 InitializeLogicalDevice。",
+      "通过 double_ptr 输出缓冲、图像、着色器、程序及窗口。先声明 Program 输入/资源布局、绑定 shader，再 Finalize。",
+      "创建 CommandContext，记录渲染/计算/复制命令并 SubmitCommandContext；需要读取结果或释放在用资源时 WaitGPU。",
+      "窗口事件在主线程 PollEvents 中处理，逻辑尺寸和像素尺寸分别通知。"
+    ],
+    "summary": "Core 提供设备与资源工厂，Program 描述可执行管线，CommandContext 记录命令，Window 处理窗口输入与呈现。三类后端通过派生对象实现同一协议。",
+    "title": "统一图形接口"
+  },
+  "code/grassland/graphics/backend": {
+    "contracts": [
+      "不能跨Core或跨后端混用资源；各实现的检查覆盖不同。",
+      "接口存在不代表全部后端支持：例如Metal支持原生Ray Query但不支持SBT光追程序或geometry shader。",
+      "后端原生Handle均为借用句柄，生命周期随包装对象。"
+    ],
+    "flow": [
+      "CMake按LONGMARCH_*_ENABLED纳入实现。",
+      "Core枚举/选择设备，创建专用资源。",
+      "专用命令上下文按平台资源绑定和同步语义提交。"
+    ],
+    "summary": "将统一Core/Buffer/Image/Program/CommandContext/Window接口映射到按构建选项启用的Metal、Vulkan或D3D12。",
+    "title": "RHI后端适配"
+  },
+  "code/grassland/graphics/backend/d3d12": {
+    "contracts": [
+      "Core 与借用资源必须活到 GPU 完成；资源析构不普遍隐式 WaitGPU。",
+      "Descriptor slot 对应 register space，起始寄存器为0；传入数量必须匹配声明，无统一边界检查。",
+      "光追能力按 Tier1.1 检测；原生 SBT 与 inline Ray Query 均需设备支持。",
+      "本后端未在当前 macOS 文档任务中运行验证；本文说明源码行为及可见限制。"
+    ],
+    "flow": [
+      "Core 创建设备、图形/传输队列和逐帧 allocator、descriptor heap。",
+      "动态 Buffer 的 CPU 暂存副本在提交前复制到当前帧 GPU 资源。",
+      "CommandContext 收集命令及资源状态，提交结束恢复 GENERIC_READ。",
+      "fence 控制帧槽复用与完成回调，Present 通过 blit 管线显示图像。"
+    ],
+    "summary": "将统一接口映射到 DXGI、D3D12 descriptor heap、Direct command list 和 DXR；命令先保存为对象，提交时集中分配描述符并编译。",
+    "title": "D3D12 后端"
+  },
+  "code/grassland/graphics/backend/d3d12/helper": {
+    "contracts": [
+      "SingleTimeCommand会Reset传入allocator；调用方必须确保它不仍被GPU使用，且不与别的录制并发。",
+      "全局error_message不是线程局部，后一次错误会覆盖前一次。",
+      "ComPtr管理COM引用；辅助HitGroup只借用CompiledShaderBlob指针。"
+    ],
+    "flow": [
+      "宏把失败HRESULT写入日志并返回。",
+      "CreateBuffer按256字节对齐创建committed resource。",
+      "SingleTimeCommand复用allocator录制回调，提交后用临时fence/event阻塞完成。"
+    ],
+    "summary": "提供HRESULT错误传播、COM公共类型、对齐Buffer创建和一次性同步命令。",
+    "title": "D3D12底层辅助"
+  },
+  "code/grassland/graphics/backend/metal": {
+    "contracts": [
+      "初始化要求hasUnifiedMemory及Tier2，WaveSize固定32；DeviceRayTracingSupport为false，DeviceRayQuerySupport另查supportsRaytracing。",
+      "最多16个resource set、15个vertex binding（槽16–30）、31个顶点attribute和8个颜色附件。",
+      "每次Buffer上传/下载和resize都WaitGPU；AS构建同步，当前无refit/compaction。",
+      "HDR用RGBA16Float+ExtendedLinearSRGB/EDR，输入须线性RGB；SDR用BGRA8Unorm+sRGB色彩空间。"
+    ],
+    "flow": [
+      "Core选择设备并建立串行命令队列。",
+      "Buffer用shared存储，Image用private texture加staging。",
+      "Program Finalize按绑定布局生成MSL/argument encoder。",
+      "CommandContext录制encoder，Core控制提交窗口与完成回调，CAMetalLayer呈现。"
+    ],
+    "summary": "面向统一内存和Tier2 argument buffers的Metal实现；Slang先编SPIR-V，再SPIRV-Cross生成MSL3.0。",
+    "title": "Metal后端"
+  },
+  "code/grassland/graphics/backend/vulkan": {
+    "contracts": [
+      "资源与Core同后端且有效至GPU完成，context按一次性使用；多数cast只assert或直接解引用。",
+      "每个slot是独立descriptor set，唯一binding0；传入资源数量必须与Program声明一致。",
+      "transfer_queue实际等于graphics_queue的第0队列，提交末尾queue idle会串行等待，并非异步专用上传队列。",
+      "本文依据源码逐文件核对；当前文档任务没有在Vulkan设备上重新运行渲染。"
+    ],
+    "flow": [
+      "Core建立instance/device/VMA、同一graphics queue上的两套命令池和逐帧fence。",
+      "资源工厂建立GPU Buffer/Image，动态数据保存在CPU staging。",
+      "Context延迟收集命令、图像状态和descriptor预算；Submit上传、编码、呈现并回收帧槽。",
+      "Window按surface能力协商SDR/scRGB/PQ格式，HDR通过上层中间合成转换。"
+    ],
+    "summary": "基于Vulkan1.2、VMA、dynamic rendering与逐帧descriptor pool实现统一RHI；可分别启用SBT光追和Ray Query。",
+    "title": "Vulkan 后端"
+  },
+  "code/grassland/graphics/backend/vulkan/helper": {
+    "contracts": [
+      "原生handle通常借用；创建函数输出资源由上层销毁。",
+      "VkResult路径和抛异常路径并存；部分枚举/查询未检查返回码。",
+      "共享error_message无锁且非thread_local；不能用于并发错误归属。"
+    ],
+    "flow": [
+      "InstanceCreateHint收集GLFW和调试扩展。",
+      "DeviceFeatureRequirement建立可复制的feature链和队列配置。",
+      "Core使用配置创建原生对象，helper提供同步单次命令及AS构建。"
+    ],
+    "summary": "为RHI适配层提供instance/device配置、能力查询、同步提交、管线参数及原生资源辅助。",
+    "title": "Vulkan 原生辅助"
+  },
+  "code/grassland/graphics/backend/vulkan/helper/raytracing": {
+    "contracts": [
+      "调用方保证旧AS已不在GPU使用，传入的handle/size输出指针均有效。",
+      "scratch采用buildScratchSize，即使update也未单独选择updateScratchSize。"
+    ],
+    "flow": [
+      "查询build sizes。",
+      "容量不足时销毁旧AS/Buffer并创建新资源，将update降为build。",
+      "分配对齐scratch、单次提交并等待queue idle后释放scratch。"
+    ],
+    "summary": "统一单geometry BLAS/TLAS的空间查询、资源扩容、scratch对齐和同步构建。",
+    "title": "Vulkan AS 构建辅助"
+  },
+  "code/grassland/graphics/shaders": {
+    "contracts": [
+      "呈现只采样输入，色彩映射由上层完成。"
+    ],
+    "flow": [
+      "CMake生成built_in_shaders.inl。",
+      "D3D12 BlitPipeline按虚拟路径读取并编译。"
+    ],
+    "summary": "随图形库打包的后端呈现着色器。",
+    "title": "Graphics 内置着色器"
+  },
+  "code/grassland/graphics/shaders/d3d12": {
+    "contracts": [
+      "无vertex buffer；CPU须绘制6顶点，输出格式由PSO决定。"
+    ],
+    "flow": [
+      "VSMain生成6顶点并翻转UV的y。",
+      "PSMain采样t0/s0。"
+    ],
+    "summary": "通过SV_VertexID生成全屏四边形，以线性采样呈现输入图像。",
+    "title": "D3D12 呈现着色器"
+  },
+  "code/grassland/imgui": {
+    "contracts": [
+      "本目录不包含自有控件实现，也不是 Snowberg 新 GUI。",
+      "保留库层 ImGui 支持供 Window 和 Python 兼容接口使用；仅 demo 的 UI 迁移不删除外部依赖。"
+    ],
+    "flow": [
+      "始终加入 imgui_impl_glfw.cpp。",
+      "按构建选项加入 Vulkan、DX12 或 Metal 实现；Metal 使用 IMGUI_IMPL_METAL_CPP 并链接系统框架。"
+    ],
+    "summary": "该目录只有 CMakeLists.txt，组合外部 ImGui 的 GLFW 与启用图形后端的适配源码。",
+    "title": "ImGui 后端构建适配"
+  },
+  "code/grassland/math": {
+    "contracts": [
+      "数学模板以 float/double 为主要支持类型；若定义在 cpp 中，仅显式实例化的类型可直接链接。",
+      "距离返回欧氏距离，射线命中返回参数 t；方向未归一化时 t 不是世界长度。",
+      "退化几何、零分母、索引有效性多数由调用者保证；不能将这些算法当作任意坏输入的鲁棒几何库。",
+      "CUDA 开关把本目录 cpp 作为 CUDA 编译；OBJ 的 cxx 保持 C++。"
+    ],
+    "flow": [
+      "轻量几何与多项式函数供 BVH、物理微分核和渲染数据准备复用。",
+      "Mesh 拥有分离属性数组；OBJ、法线、切线和碰撞网格处理会重建这些数组。",
+      "MeshSDF 预计算边和顶点符号，再以穷举最近特征提供距离及导数；它没有使用 BVH 加速。"
+    ],
+    "summary": "以 Eigen 定长矩阵为核心，提供几何值类型、距离和相交查询、连续碰撞、网格处理及网格 SDF。",
+    "title": "几何与数值基础"
+  },
+  "code/grassland/physics": {
+    "contracts": [
+      "输入矩阵按 Eigen 列主序展开为导数坐标；一个顶点的 xyz 连续排列。",
+      "调用方负责有效输入、材料参数与静止形态矩阵，并自行乘积分体积/面积、装配全局系统。"
+    ],
+    "flow": [
+      "physics_util 提供叉乘矩阵，diff_kernel 用一致的值/一阶/二阶接口组合局部函数。",
+      "FEM 将顶点位置转换为形变梯度，弹性模型计算能量密度，再用链式法则回传顶点导数。"
+    ],
+    "summary": "汇总可微几何、有限元形变梯度、弹性能和二面角；本层提供局部数学核，不负责场景管理或时间积分。",
+    "title": "物理数学基础"
+  },
+  "code/grassland/physics/diff_kernel": {
+    "contracts": [
+      "每个核定义 Scalar/InputType/OutputType、ValidInput、operator()、Jacobian、Hessian；标量输出仍是 1×1 矩阵。",
+      "ValidInput 不是自动执行的防护；部分实现始终返回 true，即便公式存在退化奇点。",
+      "HessianTensor.m[i] 为第 i 个输出关于所有输入坐标的二阶矩阵；H*A 表示 AᵀHᵢA。",
+      "cpp 中的模板提供 float/double 显式实例化，CUDA 开关使这些 cpp 以 CUDA 编译。"
+    ],
+    "flow": [
+      "基础核提供行列式、范数、归一化、叉积、点积与 atan2。",
+      "几何 SDF、FEM 和二面角复用基础核，也提供直接解析实现与局部 Hessian 接口。",
+      "Neo-Hookean 模型覆盖体与膜、对数与简化能量，并组合顶点到形变梯度的线性映射。"
+    ],
+    "summary": "使用定长函数对象表达值、Jacobian 和按输出分量存储的 Hessian；Compose 显式实现二阶链式法则。",
+    "title": "可微物理核"
+  },
+  "code/grassland/util": {
+    "contracts": [
+      "本模块多数容器与计时器不加锁，应在调用方同步。",
+      "名称中含 LogError 不表示抛异常；CUDAThrowIfFailed 则明确会抛 runtime_error。",
+      "原始指针视图不拥有内存，不自动检查大小、对齐和有效期。",
+      "CUDA / Windows 对象受宏条件控制，不在其他平台提供同名实现。"
+    ],
+    "flow": [
+      "调用方选择独立工具，不需要初始化窗口；GetTimeSeconds 使用 steady_clock。",
+      "FileProbe 查找磁盘资源，VirtualFileSystem 将资源复制进内存树，着色器编译可借此脱离工作目录。",
+      "double_ptr 让工厂函数接收 raw/shared/unique 三种输出位置，并按调用方选定的方式交付所有权。"
+    ],
+    "summary": "提供跨模块使用的事件、资源路径、虚拟文件系统、计时、采样、输出指针和平台辅助。",
+    "title": "通用工具与基础约定"
+  },
+  "code/practium": {
+    "contracts": [
+      "Scene 不拥有 entities_ 中的 Entity；调用方需保留返回的 unique_ptr。",
+      "没有实体注销接口；销毁 Entity 后继续调用 Scene::SyncRenderState 会留下悬空指针。",
+      "创建顺序建议：graphics Core → Practium Core → 模型/材质与 Scene → Entity；反向销毁并停止访问相关场景。",
+      "物理材质与视觉材质分离，不应把 MaterialPBDRigid 当作 BSDF。"
+    ],
+    "flow": [
+      "Core 拥有渲染 Core 和物理 Core；Scene 拥有渲染场景并懒创建 PBD 求解器。",
+      "Model 提供视觉网格、碰撞网格和视觉材质；MaterialPBDRigid 提供物理参数。",
+      "AddEntity 返回拥有实体的 unique_ptr；实体向 Scene 注册借用指针。",
+      "每帧 Step 后 SyncRenderState，再由 Sparkium 渲染。"
+    ],
+    "summary": "组合 Sparkium 场景与 Contradium 刚体求解，把模型、物理材质和实体组织为渲染/物理双表示。",
+    "title": "Practium · 仿真应用层"
+  },
+  "code/practium/core": {
+    "contracts": [
+      "Model 网格接口按值返回；VisualMaterial 返回借用指针。",
+      "Scene::AddEntity 当前仅识别 MaterialPBDRigid，否则返回 nullptr。",
+      "Scene::Settings::dt=0.003 只是声明；Step 实际调用固定 0.01 秒步长。"
+    ],
+    "flow": [
+      "Core 构造渲染/物理子 Core。",
+      "Scene 将注册实体保持为裸指针；实际所有权留给调用方。",
+      "派生 Entity 实现 SyncRenderState，把仿真结果映射到渲染对象。"
+    ],
+    "summary": "Core、Scene、Model、Material、Entity 定义渲染与物理组合的基本协议。",
+    "title": "仿真对象协议"
+  },
+  "code/practium/entity": {
+    "contracts": [
+      "视觉材质来自 Model，作为借用指针保留。",
+      "设置物理参数不会即时更新渲染变换，需要显式 SyncRenderState。",
+      "当前析构没有从 Practium 或 Sparkium 场景注销对象，应统一管理场景与实体生命周期。"
+    ],
+    "flow": [
+      "构造时获取 Model 的两个网格，创建视觉几何与渲染实体，再添加碰撞刚体。",
+      "Set 系列转发到 PBDSolver；SyncRenderState 从 PBD 位姿构建变换矩阵。"
+    ],
+    "summary": "EntityPBDRigid 同时持有 Sparkium 几何/实体对象与 PBD 刚体 ID，桥接两边的状态。",
+    "title": "仿真实体适配"
+  },
+  "code/practium/material": {
+    "contracts": [
+      "材质是创建时参数；后续修改 mass/inertia 字段不会自动推送到已有刚体。",
+      "修改已存在刚体请使用 EntityPBDRigid 的 SetMass/SetInertia。"
+    ],
+    "flow": [
+      "创建物理材质后传给 Scene::AddEntity / EntityPBDRigid。",
+      "fixed=true 时把质量和惯量同时设为零，创建刚体时再计算逆量。"
+    ],
+    "summary": "Material 是带 Core 引用的多态基类；MaterialPBDRigid 保存刚体质量与标量惯量。",
+    "title": "物理材质"
+  },
+  "code/practium/model": {
+    "contracts": [
+      "简单构造重载以同一个输入作为视觉与碰撞网格。",
+      "material_ 不被 ModelMesh 拥有；使用实体之前必须保证材质存活。",
+      "成员当前公开，外部修改后需理解已创建实体使用的是构造时网格副本。"
+    ],
+    "flow": [
+      "构造复制输入网格，碰撞网格执行 MakeCollisionMesh。",
+      "VisualMesh / CollisionMesh 按值返回各自数据；VisualMaterial 返回借用指针。"
+    ],
+    "summary": "Model 的两个网格接口允许降低碰撞复杂度而保留高质量视觉网格。ModelMesh 是当前具体实现。",
+    "title": "视觉/碰撞模型"
+  },
+  "code/pybind": {
+    "contracts": [
+      "只有扩展目标依赖Python；C++库和可执行程序不依赖Python。",
+      "Python接口以snake_case为主，不等于所有C++API的完整镜像。",
+      "大部分工厂未把非零C++返回码转换为异常；返回对象及设备能力必须检查。"
+    ],
+    "flow": [
+      "PYBIND11_MODULE建立long_march和graphics子模块。",
+      "先注册枚举/结构再绑定资源、程序、窗口与命令。",
+      "Python调用Core工厂创建对象，录制后提交并按需等待。"
+    ],
+    "summary": "pybind11的long_march扩展，主要暴露graphics RHI，使用smart holder管理GPU对象与Python引用。",
+    "title": "Python扩展入口"
+  },
+  "code/pybind/grassland": {
+    "contracts": [
+      "没有把Grassland所有math/physics/CUDA求解类都自动导出。"
+    ],
+    "flow": [
+      "通过graphics子模块访问RHI。"
+    ],
+    "summary": "把跨后端graphics接口映射到Python；该目录当前只有graphics绑定。",
+    "title": "Grassland Python桥接"
+  },
+  "code/pybind/grassland/graphics": {
+    "contracts": [
+      "keep_alive索引0为返回值、1为self；部分资源列表绑定当前误把slot/first_binding参数作为被保留对象，不能假定它们可靠持有GPU资源。调用方应保留资源至GPU完成。",
+      "Window事件从调用PollEvents的线程执行Python回调，封装未另行gil_scoped_acquire；按Python主线程事件循环使用。",
+      "CUDA流以uintptr整数传递，0为legacy默认流；不替Python创建或销毁流。",
+      "保留的imgui子模块是兼容绑定，不是Snowberg GUI的Python绑定。"
+    ],
+    "flow": [
+      "Core构造后init/init_auto。",
+      "创建Shader/Program/Buffer/Image，配置finalize。",
+      "录制CommandContext、submit，再present或wait_gpu。"
+    ],
+    "summary": "Core工厂返回shared资源，程序绑定用keep_alive保留shader，窗口回调持有Python callable；字节传输使用py::bytes。",
+    "title": "Python RHI接口与生命周期"
+  },
+  "code/snowberg": {
+    "contracts": [
+      "模块内几种 Core/Scene 分别属于 draw、visualizer、solver 命名空间，不要混用。",
+      "GUI 的 Begin/End 帧与面板需配对，合成输出依赖图像和命令的使用期。",
+      "当前有些旧 GUI 源文件已不在新公共 gui.h 中聚合；文件文档会明确构建/公开范围。",
+      "CUDA 求解并没有同名 Metal 实现，按条件编译使用。"
+    ],
+    "flow": [
+      "draw 负责模型/文字绘制，gui::Context 组织控件并进行玻璃合成。",
+      "gui::WorldPanel 将控件图像放入世界空间；surface 为 2048/GoL 保留自定义绘制和交互。",
+      "visualizer 为可扩展可视化提供场景与多通道渲染阶段；solver 在 CUDA 路径管理粒子和约束。"
+    ],
+    "summary": "组织 draw、gui、solver、visualizer 四类应用设施；新的 GUI 与保留原外观的 surface 基础设施同属此模块。",
+    "title": "Snowberg · 应用基础组件"
+  },
+  "code/snowberg/draw": {
+    "contracts": [
+      "先 CmdSetDrawRegion 再提交文字，建立像素到 NDC 变换；通用网格的 Transform 直接输出裁剪坐标。",
+      "队列只保存模型/纹理裸指针，资源必须活到命令执行和 GPU 使用结束。",
+      "BeginDraw/EndDraw 当前为空；真正清空元数据与命令发生在 Render。",
+      "文字按码点依次绘制，未提供 shaping、kerning、多行换行或自动字体回退。FreeType 失败未检查，调用者应传有效字体。"
+    ],
+    "flow": [
+      "Core 收集 region、instance 和 text 命令，Render 上传元数据并按提交顺序执行。",
+      "Model/Texture 拥有 GPU 数据并借用 draw Core；FontCore 按字体/字号/码点缓存字形纹理。",
+      "绘制程序按输出颜色格式缓存，启用 alpha 混合且无深度附件；纹理和顶点色乘实例色。"
+    ],
+    "summary": "面向已存在 graphics 图像的轻量命令队列；以二维网格、纹理、逐实例变换/颜色和 FreeType 字形组成 GUI 绘制基础。",
+    "title": "二维绘制与字体"
+  },
+  "code/snowberg/draw/shaders": {
+    "contracts": [
+      "槽 0 为存储元数据，槽 1 为纹理，槽 2 为采样器；实例索引来自独立 per-instance 顶点流。",
+      "C++ Transform 对应着色器 4×4 矩阵，DrawMetadata 后跟 vec4 色；布局必须一致。"
+    ],
+    "flow": [
+      "顶点阶段读取 instance_id 对应 DrawMetadata，变换位置并调制顶点颜色。",
+      "片元阶段采样纹理并乘插值颜色，混合由 graphics 管线完成。"
+    ],
+    "summary": "以逐实例矩阵和颜色驱动纹理化三角网格，Slang 是当前 draw Core 实际加载路径；GLSL 文件保留相同基础渲染协议。",
+    "title": "二维网格着色器"
+  },
+  "code/snowberg/gui": {
+    "contracts": [
+      "声明式坐标使用窗口逻辑像素；surface 绘制使用帧缓冲像素；WorldPanel 使用自己的离屏像素尺寸。",
+      "Context 每帧 BeginFrame→BeginPanel/控件/EndPanel→EndFrame。面板不能嵌套，行列数固定。",
+      "控件标识由 panel id、类型、label/id 组合；同类型同标签不可在同一面板内重复或在拖动时改变。",
+      "当前控件仅支持单指针；无键盘焦点、文本输入、滚动容器或声明式裁剪。Custom 绘制也不自动裁剪。",
+      "背景模糊是两遍全分辨率九抽头采样加圆角遮罩合成，最多 16 面板参与遮罩；未实现物理折射或 iOS 系统材质。"
+    ],
+    "flow": [
+      "声明式 Context 每帧收集面板/控件并完成命中处理，EndFrame 先模糊合成背景，再由 snowberg_draw 绘制控件。",
+      "WorldPanel 在离屏纹理上复用 Context，再把纹理绘制到三维四边形；应用负责选择最近射线命中并分发输入。",
+      "surface::Application 负责定制游戏界面的窗口、实例化渲染、事件与动画基础，2048/GoL 保留原来视觉。"
+    ],
+    "summary": "在 graphics 上提供声明式玻璃控件、自定义二维 surface 与世界空间面板；界面状态由应用持有，渲染资源由各上下文管理。",
+    "title": "统一 GUI"
+  },
+  "code/snowberg/gui/shaders": {
+    "contracts": [
+      "Slang register space 与 graphics AddResourceBinding 的位置逐项对应；常量结构与 C++ 字节布局必须一致。",
+      "Blur/Composite 线程组为 8×8×1；CPU 以向上取整的组数调度，越界线程提前返回。",
+      "输出图像格式需支持相应采样、存储写入或颜色附件用法；当前代码没有逐次检查资源创建状态。"
+    ],
+    "flow": [
+      "Context 以 Blur 横向→纵向→Composite→draw 控件完成屏幕界面。",
+      "surface resolve 通过无顶点缓冲的全屏三角形平均超采样并混合第二帧。",
+      "world_panel 顶点变换局部单位矩形，片元采样离屏 UI。"
+    ],
+    "summary": "提供背景模糊、玻璃遮罩、surface 抗锯齿 resolve 与世界面板纹理映射。",
+    "title": "GUI 着色器协议"
+  },
+  "code/snowberg/gui/surface": {
+    "contracts": [
+      "InstanceInfo 的矩阵、颜色、extra 和 clip_rect 必须与自定义 shader 布局一致；extra.y 是字节偏移。",
+      "DeviceModel 和 Listener 借用 Application，必须在 Application 销毁前释放；渲染队列中的模型要活到 GPU 使用结束。",
+      "Button 的布局和 clip 使用帧缓冲像素，命中边界转换到窗口逻辑像素；布局/DPI 改变后需 Resize 重新计算。",
+      "输入通过监听器快照分发，允许回调期间增删监听器；没有消费标志、层级冒泡或自动互斥焦点。"
+    ],
+    "flow": [
+      "Application 创建 graphics Core/Window，初始化用户 VSMain/PSMain 和内建超采样 resolve。",
+      "每帧应用回调提交模型实例及可选数据，按模型分批并通过深度处理图层。",
+      "可将当前提交捕获为第二帧，resolve 平均超采样像素并按 alpha 混合，随后 ComposeUI 可追加控件。"
+    ],
+    "summary": "为保持原有游戏视觉的界面提供实例绘制、可定制着色器、事件监听、按钮和动画值。",
+    "title": "自定义视觉 surface"
+  },
+  "code/snowberg/solver": {
+    "contracts": [
+      "时间推进只在 __CUDACC__ 路径实现；非 CUDA 构建只有主机数据准备与查询。",
+      "当前 ID 从零连续追加，部分 CUDA 核直接把 ID 当数组索引；不能自行引入稀疏 ID 或删除重排。",
+      "dt>0、非退化静止几何、有效材料参数和可逆局部 Hessian 由调用者保证；无固定粒子掩码、全局线搜索或自动 SPD 投影。",
+      "单场景固定 40 轮，批量固定 20 轮且摩擦实现不同；批量索引实现存在跨场景取错粒子风险，不能宣称与单场景等价。",
+      "刚体在本步只作为给定运动状态的 SDF 障碍物，没有接触反力反馈或自动刚体积分；也未实现布料自碰撞。"
+    ],
+    "flow": [
+      "ObjectPack 从三角网格或规则网格建立静止形态、质量和材料单元；Scene 分配递增 ID 并合并。",
+      "SceneDevice 建立粒子到单元的目录，贪心着色使同色粒子不共享拉伸/弯曲单元。",
+      "更新执行重力预测、按颜色迭代局部 3×3 系统、速度回算、拉伸和弯曲塑性更新。"
+    ],
+    "summary": "主机 Scene 装配粒子/拉伸/弯曲单元和网格 SDF 碰撞体，SceneDevice 复制到 CUDA 并按图着色进行顶点块下降求解。",
+    "title": "CUDA 布料与刚体接触求解"
+  },
+  "code/snowberg/visualizer": {
+    "contracts": [
+      "graphics Core 是借用指针，visualizer 对象通过 shared_ptr 持有 visualizer Core；底层设备须最后销毁。",
+      "Render 仅录制命令，调用者负责提交；帧槽 holder 通过后执行回调 Clear，Core 本身也须活到回调完成。",
+      "当前是环境光与无阴影方向光，不包含纹理材质、PBR、透明排序或光追。",
+      "网格程序依赖 geometry shader；应核对所用 graphics 后端能力，不能据统一接口假定 Metal 支持此管线。"
+    ],
+    "flow": [
+      "Core::Render 清理并写入曝光、反照率、位置、法线和深度，再遍历同一实体集合执行加法光照。",
+      "Scene 仅弱引用 Entity，网格实体弱引用 Mesh；应用持有对象，录制时 OwnershipHolder 延长在途资源寿命。",
+      "Program 以 uint64 ID 缓存，网格使用几何着色器重建平面法线，光源绘制全屏六顶点。"
+    ],
+    "summary": "以 Camera、Mesh、Film、Scene 与分阶段 Entity 组成的小型延迟光栅渲染器，面向几何调试和基础光照展示。",
+    "title": "延迟光栅可视化"
+  },
+  "code/snowberg/visualizer/shaders": {
+    "contracts": [
+      "光照槽 0..3 分别为反照率、位置、法线、深度，槽 4 是光源常量，实际两种光源只读取部分 G-buffer。",
+      "曝光光照输出 alpha=0，几何覆盖区域曝光 alpha=1；加法混合保留覆盖标志。",
+      "方向约定是表面指向光的方向；没有遮挡测试和阴影。"
+    ],
+    "flow": [
+      "entity VS 变换顶点，GS 用世界空间三角形叉积覆盖法线，PS 在背面翻转法线。",
+      "ambient 取 albedo×intensity，directional 再乘 max(N·L,0)。"
+    ],
+    "summary": "几何程序输出多目标 G-buffer，两个光照程序以全屏加法叠加曝光；inverse 提供矩阵求逆辅助。",
+    "title": "可视化 G-buffer 与光照"
+  },
+  "code/sparkium": {
+    "contracts": [
+      "公共对象和管线适配对象分层；不要把同名 raytracing::Scene 与 sparkium::Scene 混为一个所有权对象。",
+      "Scene、Entity 之间多为裸指针注册，必须按具体对象协议保留资源。",
+      "Shader Graph、Principled 等效果在不同管线的支持范围由实现决定。",
+      "变更场景或采样设置后需要使累积和管线缓存保持一致，具体失效/重置接口见对象说明。"
+    ],
+    "flow": [
+      "应用创建公共对象并注册进 Scene，传 Camera 和 Film 给 Core::Render。",
+      "Core 解析显式或 auto 管线，分派到 raster 或 raytracing；后者支持完整 RT、ray query 或 compute 软件 BVH。",
+      "管线构建/更新几何、材质、灯光与 GPU 资源，渲染结果写入 Film。",
+      "Film::Develop 应用曝光/显示变换到目标图像，Window 再完成实际呈现。"
+    ],
+    "summary": "公共 Core/Scene/Camera/Film/Geometry/Material/Entity 描述场景；raster 和 raytracing 子系统缓存各自的管线表示，Slang 着色器执行采样与着色。",
+    "title": "Sparkium · 多管线渲染"
+  },
+  "code/sparkium/camera": {
+    "contracts": [
+      "fovy 按 GLM/着色器约定使用弧度，aspect 为宽高比。",
+      "相机参数为公开值，构造不验证；修改后是否需要重置累积由应用负责。",
+      "薄透镜参数不意味着每条光栅管线都实现相同景深效果，应对照对应适配层。"
+    ],
+    "flow": [
+      "Camera 保存 view、fovy、aspect；CameraPinhole 仅标记针孔模型。",
+      "CameraThinLens 追加孔径半径、焦距、叶片数、旋转与宽高比，供路径追踪采样。"
+    ],
+    "summary": "针孔和薄透镜相机的前端参数类型；真正投影/射线生成由各渲染管线的适配组件和 shader 负责。",
+    "title": "相机描述"
+  },
+  "code/sparkium/core": {
+    "contracts": [
+      "Core 借用 graphics Core，其余对象借用 sparkium Core；所有资源必须保持调用与在途 GPU 操作所需寿命。",
+      "Scene 不拥有 Entity，EntityGeometryMaterial 不拥有 Geometry/Material；销毁前需从 Scene 删除并处理在途渲染。",
+      "Object.next 独占后续组件，GetComponent 动态查找，AddComponent 追加；不是并发安全 ECS，也不自动去重。",
+      "自动管线优先级受后端能力决定；显式不支持的 ray_query 会抛异常，旧 RT 请求可回退。",
+      "场景或相机更改后的累积重置需应用按用途调用 Film::Reset，不能假定所有公开字段修改都会自动使缓存失效。"
+    ],
+    "flow": [
+      "应用创建渲染对象并在 Scene 注册非拥有 Entity 指针；稳定注册顺序用于实例编号和灯光采样。",
+      "Core 解析自动管线，选择光栅、完整 RT、原生 ray query 或计算 BVH 路径。",
+      "具体管线从 Object 获取/创建适配组件；Film 持有线性颜色、深度、模板图像并通过 Develop 色调映射输出。"
+    ],
+    "summary": "定义渲染器共用的 Core、Scene、Film、Camera、Geometry、Material、Entity，并通过 Object 组件链惰性附加各管线适配对象。",
+    "title": "渲染对象与管线入口"
+  },
+  "code/sparkium/entity": {
+    "contracts": [
+      "实体不会自动注册 Scene；Geometry/Material/Core 生命周期必须覆盖实体渲染。",
+      "参数存储与渲染解释分离，本目录的 setter 只修改 CPU 值，不直接上传 GPU 或重置 Film。"
+    ],
+    "flow": [
+      "EntityGeometryMaterial 借用几何/材质，保存 3×4 仿射模型矩阵。",
+      "EntityPointLight 保存位置、RGB、强度、半径、衰减开关与采样权重。",
+      "应用显式把实体加入 Scene，管线根据动态类型选择适配器。"
+    ],
+    "summary": "提供几何+材质实例与点光源两种场景实体，继承 Object 以便惰性挂载管线组件。",
+    "title": "场景实体描述"
+  },
+  "code/sparkium/geometry": {
+    "contracts": [
+      "Header 所有 offset/stride 均以字节计；可选属性 offset=0 表示不存在。",
+      "PrimitiveCount 是三角形数；GeometryHair 当前不使用原生曲线图元或解析圆柱求交。",
+      "几何数据构造后没有整体更新接口，仅允许更新阴影终止几何偏移参数；更改该参数后应用应重置累积 Film。"
+    ],
+    "flow": [
+      "GeometryMesh 在 64 字节 Header 后顺序打包索引、位置及可选法线/UV/切线/手性/颜色。",
+      "有法线与 UV 但缺切线时复制网格生成切线；最终头部记录可能改变后的顶点数。",
+      "GeometryHair 按各 strand 的点与半径生成截面环和连接三角形，再调用 GeometryMesh。"
+    ],
+    "summary": "以统一二进制网格缓冲供光栅与路径追踪共享；毛发曲线在导入后转为多边形管，再复用网格管线。",
+    "title": "网格与毛发几何"
+  },
+  "code/sparkium/material": {
+    "contracts": [
+      "纹理都是 graphics::Image 裸指针，材质不持有其所有权；拥有者必须覆盖全部渲染使用。",
+      "构造与字段赋值不验证物理参数范围，不直接上传 GPU、不自动 Reset Film。",
+      "公开参数不代表所有渲染路径支持一致效果，须结合管线适配器和 shader 对照。"
+    ],
+    "flow": [
+      "Material 子类保存 CPU 参数，Object 链按所选管线创建实现组件。",
+      "Principled 将数值 Info 和借用纹理 TextureInfo 分开，公开引用字段提供兼容访问。",
+      "ShaderGraph 保存 CodeLines 与纹理指针序列，Scene 更新时分配 GPU 纹理索引。"
+    ],
+    "summary": "提供 Lambertian、镜面、发光、Principled 与生成式 shader graph 前端；具体求值由 raster/raytracing 材质适配器和 BSDF shader 完成。",
+    "title": "材质参数与节点图描述"
+  },
+  "code/sparkium/pipelines": {
+    "contracts": [
+      "组件借用前端对象；前端与 graphics::Core 必须活过渲染工作。",
+      "Raster 支持固定 G-buffer 材质子集；Raytracing 通过动态生成着色器组合材料与几何。",
+      "新类型需同时实现转换分派、数据布局和对应着色器，不是仅添加一个前端类。"
+    ],
+    "flow": [
+      "Core 解析请求的 RenderPipeline。",
+      "DedicatedCast 查询或创建对象专用组件。",
+      "专用 Scene 收集实体、同步资源、录制命令并更新 Film。"
+    ],
+    "summary": "在统一 Sparkium 前端对象的 Object 组件链上附加光栅或光追实现；前端场景和资源描述可复用，后端渲染算法并不具有完全相同的材质能力。",
+    "title": "渲染管线组件"
+  },
+  "code/sparkium/pipelines/raster": {
+    "contracts": [
+      "每次 Render 调用 Film::Reset，不做路径追踪式跨帧累计。",
+      "阴影回调目前没有调用点；不宣称具备阴影贴图。",
+      "raster_light 发光网格被近似成面积加权中心的点光源，材质图尚无 Raster DedicatedCast。"
+    ],
+    "flow": [
+      "同步实体与相机。",
+      "先绘制 100–10000 远场，清深度，再绘制 0.1–100 近场。",
+      "向 raw image 叠加环境与实体光照，提交并 WaitGPU。"
+    ],
+    "summary": "把可见几何写入三张 RGBA32F G-buffer 与前端 Film，再执行环境及点光源全屏叠加。",
+    "title": "光栅延迟渲染"
+  },
+  "code/sparkium/pipelines/raster/core": {
+    "contracts": [
+      "Geometry 提供 VS、顶点布局与 Draw；Material 提供 PS、数据同步与资源绑定。",
+      "几何程序槽 0 为相机、1 为实例、2 为材质；Principled 再用 3/4 绑定贴图/采样器。",
+      "回调捕获组件 this，依赖所属前端资源存活；Render 结束等待 GPU。"
+    ],
+    "flow": [
+      "DedicatedCast 附加组件。",
+      "Entity::Update 注册当帧渲染和照明回调。",
+      "Scene 按前端插入顺序同步并执行。"
+    ],
+    "summary": "Core 转发共享资源，Camera 维护双视锥常量，Film 持有 G-buffer，Scene 通过逐帧回调组织几何与照明。",
+    "title": "光栅核心协议"
+  },
+  "code/sparkium/pipelines/raster/entity": {
+    "contracts": [
+      "构造后不会重新选择几何/材质程序。",
+      "实例变换必须可逆，否则 normal_matrix 无有效结果。",
+      "点光源光栅数据只有 emission 和 position；半径、soft_falloff、sampling_weight 不进入这个布局。"
+    ],
+    "flow": [
+      "构造时固化 Geometry/Material 专用组件及程序。",
+      "Update 上传变换和材质并注册绘制。",
+      "启用 raster_light 的正发光几何附加近似点光。"
+    ],
+    "summary": "几何材质实体组装 G-buffer 程序；点光源实体注册全屏加法照明。",
+    "title": "光栅实体"
+  },
+  "code/sparkium/pipelines/raster/geometry": {
+    "contracts": [
+      "Header 与构造时 shader defines 必须保持一致。",
+      "CentricArea 每次从 GPU 下载完整位置和索引，在给定世界仿射变换后计算面积及中心；不是缓存查询。",
+      "零总面积时中心除零；调用方需提供有效非退化三角网格。"
+    ],
+    "flow": [
+      "由可选法线/UV/切线偏移生成 shader defines。",
+      "SetupProgram 建立对应输入布局。",
+      "DispatchDrawCalls 按同一 Header 顺序绑定并索引绘制。"
+    ],
+    "summary": "将 GeometryMesh 共用的大缓冲按 Header 偏移绑定成独立顶点流和 uint32 索引流。",
+    "title": "光栅网格适配"
+  },
+  "code/sparkium/pipelines/raster/material": {
+    "contracts": [
+      "Principled 光栅支持 base_color/roughness/specular/metallic/normal/emission 六类图；前端 anisotropic 图不在本适配器绑定。",
+      "无贴图时绑定 Core 的 white/black/normal_default 并用显式标志控制采样。",
+      "几何发光估算使用 Emission 常量，不积分纹理发光。"
+    ],
+    "flow": [
+      "构造 PS 和专用材质缓冲。",
+      "每帧 Sync 上传参数。",
+      "BindMaterialResources 绑定槽 2，Principled 再绑定六张图及采样器。"
+    ],
+    "summary": "Lambertian、Light、Specular 和 Principled 把前端参数同步到固定像素着色器。",
+    "title": "光栅材质适配"
+  },
+  "code/sparkium/pipelines/raytracing": {
+    "contracts": [
+      "software_tracing_ 包含 Ray Query 路径；它并非只表示软件求交。",
+      "改变场景、相机或材质通常需要调用方 Reset 累积；内部仅在追踪模式切换且曾渲染时自动 Reset。",
+      "组件借用前端与 Core；CPU 注册表按帧重建，索引不可跨帧保存。"
+    ],
+    "flow": [
+      "Scene 重建当帧资源索引与实例元数据。",
+      "光源预处理生成图元功率和光源选择 CDF。",
+      "更新 TLAS/BVH 与程序，追踪写入累积颜色/样本，再 film2img 解析至前端 Film。"
+    ],
+    "summary": "统一实体、材质、几何和光源注册协议，支持原生 RT shader table、计算着色器原生 Ray Query，以及 GPU 软件 BVH 三种追踪方式。",
+    "title": "光追与计算路径追踪"
+  },
+  "code/sparkium/pipelines/raytracing/camera": {
+    "contracts": [
+      "fovy 为弧度；view 必须可逆，Buffer 每次查询都上传。",
+      "Pinhole 与 ThinLens 具有不同数据长度，不可混用入口。"
+    ],
+    "flow": [
+      "Buffer() 重算视图逆矩阵及投影 scale。",
+      "原生 RT 惰性编译 callable；计算路径按 ShaderFile/EntryPoint 引入。"
+    ],
+    "summary": "将前端相机同步为 callable 或计算 shader 共用的字节布局。",
+    "title": "光追相机适配"
+  },
+  "code/sparkium/pipelines/raytracing/core": {
+    "contracts": [
+      "原生 RT 槽 0–12 与计算路径槽 0–7 不同；绑定布局必须和对应 shader 文件匹配。",
+      "纹理只接受 RGBA8 UNORM 或 RGBA32F，HDR 索引用 0x1000000 标记。",
+      "几何 BLAS 和软件 BLAS 采用静态内容缓存；相同指针/三角数的顶点原地修改不自动触发软件 BLAS 重建。"
+    ],
+    "flow": [
+      "按前端稳定实体顺序 Update。",
+      "注册缓冲、图像、实例、命中组和光源，执行 CDF 预处理。",
+      "编译容量匹配的资源布局并提交路径追踪与 Film resolve，最终 WaitGPU。"
+    ],
+    "summary": "Core 缓存公共 shader 与几何光预处理程序，Scene 组织资源表和着色器分派，SoftwarePipeline 管理计算路径。",
+    "title": "光追注册与执行协议"
+  },
+  "code/sparkium/pipelines/raytracing/entity": {
+    "contracts": [
+      "空三角几何跳过；不支持的几何或材质构造抛异常。",
+      "每个有效几何实体均注册几何光，功率预处理决定其采样权重。"
+    ],
+    "flow": [
+      "构造缓存专用几何/材质组件。",
+      "Update 材质纹理注册后创建 light 与 instance 的双向 custom_index。",
+      "原生路径选择命中组，计算路径追加 SoftwarePipeline 实例。"
+    ],
+    "summary": "把几何材质实体注册为实例兼几何光，把点光实体注册为显式光源。",
+    "title": "光追实体适配"
+  },
+  "code/sparkium/pipelines/raytracing/geometry": {
+    "contracts": [
+      "BLAS 缓存后没有更新方法，动态网格需重新管理组件。",
+      "geometry flags NONE 保留 any-hit 的非不透明语义。"
+    ],
+    "flow": [
+      "构造读取 hit_group 和 geometry_sampler。",
+      "首次 BLAS 创建底层加速结构。",
+      "Buffer/PrimitiveCount 转发前端。"
+    ],
+    "summary": "共享前端 Mesh 缓冲与几何采样源码，按需建立非 opaque 三角 BLAS。",
+    "title": "光追网格适配"
+  },
+  "code/sparkium/pipelines/raytracing/light": {
+    "contracts": [
+      "内建采样器编号从 0x1000000 起；较小编号用于 callable 表。",
+      "LightGeometryMaterial 的变换是借用引用，LightPoint 各参数也是引用。",
+      "图元数和材质布局在构造时确定，预处理不是任意拓扑更新接口。"
+    ],
+    "flow": [
+      "注册采样器编号和数据缓冲。",
+      "预处理更新数据与 CDF，返回功率字节偏移。",
+      "Scene 汇总每光源功率并扫描。"
+    ],
+    "summary": "统一 SamplerShader、SamplerData、SamplerPreprocess 三接口，让 Scene 能构造按功率采样的光源列表。",
+    "title": "光源采样与功率预处理"
+  },
+  "code/sparkium/pipelines/raytracing/material": {
+    "contracts": [
+      "纹理索引每帧有效；Principled 必须先 Update 再依赖尾部纹理索引。",
+      "ShaderGraph 缓冲和采样源码在构造时定形，后续增添纹理或改 graph_code 不会自动调整所有缓存。",
+      "EvaluatorImpl 是发光功率计算协议，不等同完整 BSDF 求值。"
+    ],
+    "flow": [
+      "Update 向当前 Scene 注册贴图。",
+      "Buffer 上传常量或返回已有材质数据。",
+      "SamplerImpl/EvaluatorImpl/GraphImpl 驱动程序组合。"
+    ],
+    "summary": "把前端参数、纹理索引和采样/发光求值源码提供给原生及计算追踪。",
+    "title": "光追材质适配"
+  },
+  "code/sparkium/scene_io": {
+    "contracts": [
+      "JsonScene 独占 Scene、Film、Camera、材质、几何、图像和实体；Core 为借用，必须活得更久。",
+      "Load 捕获 std::exception 返回空并可写错误字符串；成功时不清空已有 error。FindJsonScenes 的文件系统异常直接传播。",
+      "JSON 允许注释和尾逗号；路径可绝对或相对文档，不限制在某个资源根目录。",
+      "shader_graph 是项目支持的节点子集，不等同 Blender 节点求值器；bump 当前仅透传法线。"
+    ],
+    "flow": [
+      "校验根格式、渲染设置、Film 和 Camera。",
+      "先创建材质与贴图，再读取几何，最后按 ID 关联实体并注册到 Scene。",
+      "图节点递归生成有缓存的 float4 中间表达式，汇入 GraphSurface。"
+    ],
+    "summary": "把 sparkium-scene v1 文档及相对路径资源装配成拥有完整生命周期的 JsonScene；材质图转换为 Slang 源码交给渲染组件编译。",
+    "title": "JSON 场景与材质图编译"
+  },
+  "code/sparkium/shaders": {
+    "contracts": [
+      "字节偏移、resource space 与 CPU Program::AddResourceBinding 顺序共同构成接口。",
+      "通用源码中同名 MaterialEvaluator/SampleMaterial 属于可替换实现，接口说明按文件区分。",
+      "shader 入口的 numthreads 与 CPU Dispatch 的组数需要匹配；输入图像格式和色彩域不可混用。"
+    ],
+    "flow": [
+      "前端固定字节布局上传到 Buffer/Image。",
+      "管线注入 geometry/material/camera 实现并编译入口。",
+      "路径追踪积累线性颜色，film2img 平均，tone_mapping 开发为显示图像。"
+    ],
+    "summary": "由 C++ VFS 加载并按管线组合的 Slang 库，包含路径状态、采样/BSDF、几何命中、照明、软件求交及成像。",
+    "title": "Sparkium 着色器库"
+  },
+  "code/sparkium/shaders/bsdf": {
+    "contracts": [
+      "这里eval通常为BSDF×入射cos，不是单独BRDF；sample_weight用于重要性选择，weight用于能量着色。",
+      "principled_*实现文件多数被包含在PrincipledMaterial结构体内部，函数/结构实际为成员；独立源码页面保留片段中的声明名。",
+      "输入方向/法线需要归一化，切线要能形成有效基；低层sample函数有提前分支不写全部输出，调用方须先把eval/方向/pdf初始化为零。",
+      "roughness平方形成alpha，各向异性使用不同alpha_x/y；pdf=1e6用于delta的工程约定，并非连续分布的真实有限密度。"
+    ],
+    "flow": [
+      "CalculateClosureWeight按前端参数配置闭包及采样权重。",
+      "Eval求所有闭包贡献与混合PDF。",
+      "Sample按权重CDF选闭包、重映射随机数，再补评估其他闭包形成一致混合结果。"
+    ],
+    "summary": "Lambertian和理想镜面提供独立函数，Principled把diffuse、普通微表面、玻璃反射、玻璃折射、clearcoat、sheen六闭包混合。",
+    "title": "BSDF闭包与采样"
+  },
+  "code/sparkium/shaders/camera": {
+    "contracts": [
+      "uv 已由 raygen 映射至 [-1,1]，不是像素坐标。",
+      "lens_sample 来自单位方形；薄透镜只有半径/焦距都为正才生效。",
+      "原生管线标记 callable；SPARKIUM_SOFTWARE_RT 下作为普通函数调用。"
+    ],
+    "flow": [
+      "读取字节64的 camera_to_world 和128的 scale。",
+      "局部相机朝 -Z；薄透镜根据焦平面调整原点和方向。",
+      "变换到世界并归一化方向。"
+    ],
+    "summary": "针孔和薄透镜共享 RayGenPayload，把归一化屏幕 uv 与镜头样本转换成世界射线。",
+    "title": "相机射线生成"
+  },
+  "code/sparkium/shaders/geometry": {
+    "contracts": [
+      "图元采样PDF是世界面积密度，直接光路径再转换为立体角密度。",
+      "法线、UV、切线与颜色偏移为0时走缺省分支。"
+    ],
+    "flow": [
+      "由Header定位缓冲各属性。",
+      "插值和变换到世界空间。",
+      "将统一HitRecord交给材质采样。"
+    ],
+    "summary": "提供网格头布局、几何采样、命中记录与光栅顶点处理。",
+    "title": "几何着色器"
+  },
+  "code/sparkium/shaders/geometry/mesh": {
+    "contracts": [
+      "法线缺失使用几何法线；颜色缺失白色；UV缺失零；切线信号缺失0使切线法线贴图保持原法线。",
+      "退化三角面积为0会使法线/PDF无效；shader不校验索引范围。",
+      "光栅输入宏会改变location，CPU GeometryMesh::SetupProgram必须同序。"
+    ],
+    "flow": [
+      "加载64字节GeometryHeader。",
+      "索引三角并按重心插值，变换法线与切线。",
+      "生成阴影terminator偏移或光源表面样本。"
+    ],
+    "summary": "对同一GeometryMesh字节布局实现光栅、硬件RT、Ray Query和软件求交后的统一命中处理。",
+    "title": "三角网格着色器"
+  },
+  "code/sparkium/shaders/light": {
+    "contracts": [
+      "SampleDirectLighting仅准备阴影段，不在此函数立即追踪可见性。",
+      "光栅路径是全屏加法，不使用路径追踪光源CDF。"
+    ],
+    "flow": [
+      "CPU预处理构造按功率CDF。",
+      "选择光源及图元，再生成方向/辐射/立体角PDF。",
+      "BSDF按MIS权重贡献，阴影透射在后续路径阶段求值。"
+    ],
+    "summary": "支持光栅环境/点光，以及路径追踪的点光和网格直接采样。",
+    "title": "光照着色器"
+  },
+  "code/sparkium/shaders/light/ambient": {
+    "contracts": [
+      "没有环境贴图/IBL方向积分，也没有AO。"
+    ],
+    "flow": [
+      "准备输入资源。",
+      "执行本目录采样或照明入口。"
+    ],
+    "summary": "从光栅G-buffer提取albedo并乘固定ambient_light。",
+    "title": "环境光"
+  },
+  "code/sparkium/shaders/light/geometry_material": {
+    "contracts": [
+      "数据头为transform48字节+count4字节，CDF从52起。",
+      "ShaderGraph内建直接光使用emission_hint，未逐点执行任意图发光。"
+    ],
+    "flow": [
+      "准备输入资源。",
+      "执行本目录采样或照明入口。"
+    ],
+    "summary": "通过几何采样器和材质发光求值器建立图元CDF，抽样表面后转换面积PDF。",
+    "title": "几何面积光"
+  },
+  "code/sparkium/shaders/light/point": {
+    "contracts": [
+      "显式点光不在加速结构内，eval/pdf同时放大1e6以让直接光MIS近似1。",
+      "光栅不读取半径和soft_falloff。"
+    ],
+    "flow": [
+      "准备输入资源。",
+      "执行本目录采样或照明入口。"
+    ],
+    "summary": "光栅按逆平方衰减求Principled；光追支持delta、面向接收点圆盘和球光立体角采样。",
+    "title": "点光与有限半径点光"
+  },
+  "code/sparkium/shaders/material": {
+    "contracts": [
+      "路径eval通常已含cos项，更新throughput使用eval/pdf；理想镜面函数另采用delta约定。",
+      "同名SampleMaterial/MaterialEvaluator通过VFS注入或命名空间隔离，不应同时原样包含多个实现。",
+      "阴影NO_HITRECORD和ANY_HIT宏决定hit-group编译接口。"
+    ],
+    "flow": [
+      "读取实例元数据定位材质Buffer。",
+      "评估直接光、发光与BSDF延续路径。",
+      "功率预处理独立调用PrimitivePower。"
+    ],
+    "summary": "每类材质提供路径SampleMaterial、阴影接口和几何光MaterialEvaluator，部分还提供光栅PSMain。",
+    "title": "材质着色器协议"
+  },
+  "code/sparkium/shaders/material/lambertian": {
+    "contracts": [
+      "阴影始终不透明。"
+    ],
+    "flow": [
+      "获取材质参数。",
+      "执行采样/阴影或发光求值接口。"
+    ],
+    "summary": "常量漫反射和双面发光。",
+    "title": "Lambertian"
+  },
+  "code/sparkium/shaders/material/light": {
+    "contracts": [
+      "相机不可见保留camera ray_type穿过不阻挡发光层；不改变射线方向。"
+    ],
+    "flow": [
+      "获取材质参数。",
+      "执行采样/阴影或发光求值接口。"
+    ],
+    "summary": "可控制双面、阻挡、相机可见和距离衰减的发光面。",
+    "title": "纯发光"
+  },
+  "code/sparkium/shaders/material/principled": {
+    "contracts": [
+      "光栅只保留G-buffer能表达的子集；发光CDF与直接光采样用常量发光，未积分贴图。"
+    ],
+    "flow": [
+      "获取材质参数。",
+      "执行采样/阴影或发光求值接口。"
+    ],
+    "summary": "常量与八类贴图驱动六闭包BSDF。",
+    "title": "Principled"
+  },
+  "code/sparkium/shaders/material/shader_graph": {
+    "contracts": [
+      "图形求值由C++注入；emission_hint只用于几何光采样，可能与逐点图发光不同。"
+    ],
+    "flow": [
+      "获取材质参数。",
+      "执行采样/阴影或发光求值接口。"
+    ],
+    "summary": "把图输出GraphSurface交给共享Principled/薄壁/次表面/透明路径采样。",
+    "title": "材质图表面"
+  },
+  "code/sparkium/shaders/material/specular": {
+    "contracts": [
+      "光栅只能写metallic=1、roughness=0的G-buffer近似。"
+    ],
+    "flow": [
+      "获取材质参数。",
+      "执行采样/阴影或发光求值接口。"
+    ],
+    "summary": "只产生镜面反射，不发光、不进行显式直接光采样。",
+    "title": "理想镜面"
+  },
+  "code/sparkium/shaders/ray_query": {
+    "contracts": [
+      "强制opaque只控制几何求交；材质透明度在共享阴影循环中另行处理。",
+      "跳过procedural primitives；只支持三角形。",
+      "CommittedInstanceID必须对应CPU注册的软件实例索引。"
+    ],
+    "flow": [
+      "TraceRayInline强制三角面opaque求交。",
+      "根据any_hit选择首次命中或最近命中。",
+      "把Committed属性映射为SoftwareHit。"
+    ],
+    "summary": "保持SoftwareHit ABI，用设备加速结构替换软件树遍历，着色与透明层处理仍走计算管线。",
+    "title": "原生内联Ray Query"
+  },
+  "code/sparkium/shaders/software": {
+    "contracts": [
+      "树深度受CPU每树2^21叶上限约束；栈无动态扩容。",
+      "对象空间射线方向不能归一化，才能在缩放变换下保留世界射线参数t。",
+      "透明阴影逐最近命中累乘，TMin推进一个正float可表示值，保留紧邻薄层。"
+    ],
+    "flow": [
+      "按2次幂叶容量建立BLAS/TLAS。",
+      "32项局部栈遍历AABB和watertight三角求交。",
+      "将命中转为HitRecord，交给生成的材质分派，再执行共享RenderPixel。"
+    ],
+    "summary": "平衡二叉树节点和Morton排序支持GPU构建、两级遍历与共享路径着色；也可用Ray Query替换InlineIntersect。",
+    "title": "计算路径与软件BVH"
+  }
+}

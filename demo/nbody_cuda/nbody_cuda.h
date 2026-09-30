@@ -3,6 +3,7 @@
 #include "long_march.h"
 #include "params.h"
 #include "random"
+#include "snowberg/gui/gui.h"
 
 void UpdateStep(glm::vec3 *positions, glm::vec3 *velocities, glm::vec3 *positions_new, int n_particles, float delta_t);
 
@@ -38,7 +39,7 @@ class NBodyCUDA {
 
   void UpdateParticles();
   void UpdateRenderAssets();
-  void UpdateImGui();
+  void UpdateGui();
 
   float RandomFloat();
   glm::vec3 RandomOnSphere();
@@ -48,6 +49,7 @@ class NBodyCUDA {
 
   std::unique_ptr<graphics::Core> core_;
   std::unique_ptr<graphics::Window> window_;
+  std::unique_ptr<snowberg::gui::Context> ui_;
   std::unique_ptr<graphics::Buffer> global_uniform_buffer_;
   std::unique_ptr<graphics::CUDABuffer> particles_pos_;
   std::unique_ptr<graphics::Image> frame_image_;

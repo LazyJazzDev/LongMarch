@@ -3,6 +3,7 @@
 #include <random>
 
 #include "glm/gtc/matrix_transform.hpp"
+#include "snowberg/gui/gui.h"
 
 using namespace long_march;
 
@@ -154,7 +155,7 @@ int main() {
   bool ray_tracing = false;
   bool pause = true;
   bool day_light = true;
-  window->InitImGui(nullptr, 20.0f);
+  snowberg::gui::Context ui(core_.get(), window.get(), snowberg::gui::DefaultFont());
 
   while (!window->ShouldClose()) {
     if (!pause) {
@@ -164,19 +165,17 @@ int main() {
       film.info.persistence = 1.0f;
     }
 
-    window->BeginImGuiFrame();
-    ImGui::SetNextWindowPos({0, 0}, ImGuiCond_Once);
-    ImGui::SetNextWindowBgAlpha(0.3);
-    ImGui::Begin("Settings", nullptr, ImGuiWindowFlags_AlwaysAutoResize);
-    if (ImGui::Checkbox("Day Light", &day_light)) {
+    ui.BeginFrame();
+    ui.BeginPanel("settings", 12, 12, 270, "Settings");
+    if (ui.Checkbox("Day light", &day_light)) {
       scene.GetRenderScene()->SetEntityActive(area_light, day_light);
     }
-    ImGui::Checkbox("Pause", &pause);
-    ImGui::Checkbox("Ray Tracing", &ray_tracing);
+    ui.Checkbox("Pause", &pause);
+    ui.Checkbox("Ray tracing", &ray_tracing);
     if (ray_tracing && !core_->DeviceRayTracingSupport()) {
-      ImGui::Text("Ray Tracing not supported on this device!");
+      ui.Text("Ray tracing unavailable");
     }
-    if (ImGui::Button("Reset")) {
+    if (ui.Button("Reset")) {
       for (int i = 0; i < num_spheres; i++) {
         Vector3<float> position{std::uniform_real_distribution<float>(-0.5f, 0.5f)(rng), i * 0.4f + 0.3f,
                                 std::uniform_real_distribution<float>(-0.5f, 0.5f)(rng)};
@@ -186,8 +185,7 @@ int main() {
         sphere_pbd_entity->SetAngularVelocity({0.0f, 0.0f, 0.0f});
       }
     }
-    ImGui::End();
-    window->EndImGuiFrame();
+    ui.EndPanel();
 
     scene.SyncRenderState();
     practium_core.GetRenderCore()->Render(
@@ -197,7 +195,9 @@ int main() {
 
     std::unique_ptr<graphics::CommandContext> cmd_ctx;
     core_->CreateCommandContext(&cmd_ctx);
-    cmd_ctx->CmdPresent(window.get(), srgb_image.get());
+    auto *gui_image = ui.EndFrame(cmd_ctx.get(), srgb_image.get());
+
+    cmd_ctx->CmdPresent(window.get(), gui_image);
     core_->SubmitCommandContext(cmd_ctx.get());
 
     grassland::graphics::Window::PollEvents();

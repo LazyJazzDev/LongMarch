@@ -23,7 +23,7 @@ GameOfLife::GameOfLife(const char *title,
                        int cell_grid_width,
                        int cell_grid_height,
                        graphics::BackendAPI api)
-    : Application(title, width, height, api),
+    : Application(title, width, height, api, DemoSurfaceShader()),
       cell_grid_width_(cell_grid_width),
       cell_grid_height_(cell_grid_height) {
 }

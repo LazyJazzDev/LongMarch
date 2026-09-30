@@ -27,3 +27,6 @@ __pycache__/
 htmlcov/
 
 **/build*/
+
+# Generated architecture/API reference (built from docs/reference and code).
+/website/reference/
