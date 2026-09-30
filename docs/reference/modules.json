@@ -327,6 +327,50 @@
     "summary": "为保持原有游戏视觉的界面提供实例绘制、可定制着色器、事件监听、按钮和动画值。",
     "title": "自定义视觉 surface"
   },
+  "code/snowberg/solver": {
+    "contracts": [
+      "时间推进只在 __CUDACC__ 路径实现；非 CUDA 构建只有主机数据准备与查询。",
+      "当前 ID 从零连续追加，部分 CUDA 核直接把 ID 当数组索引；不能自行引入稀疏 ID 或删除重排。",
+      "dt>0、非退化静止几何、有效材料参数和可逆局部 Hessian 由调用者保证；无固定粒子掩码、全局线搜索或自动 SPD 投影。",
+      "单场景固定 40 轮，批量固定 20 轮且摩擦实现不同；批量索引实现存在跨场景取错粒子风险，不能宣称与单场景等价。",
+      "刚体在本步只作为给定运动状态的 SDF 障碍物，没有接触反力反馈或自动刚体积分；也未实现布料自碰撞。"
+    ],
+    "flow": [
+      "ObjectPack 从三角网格或规则网格建立静止形态、质量和材料单元；Scene 分配递增 ID 并合并。",
+      "SceneDevice 建立粒子到单元的目录，贪心着色使同色粒子不共享拉伸/弯曲单元。",
+      "更新执行重力预测、按颜色迭代局部 3×3 系统、速度回算、拉伸和弯曲塑性更新。"
+    ],
+    "summary": "主机 Scene 装配粒子/拉伸/弯曲单元和网格 SDF 碰撞体，SceneDevice 复制到 CUDA 并按图着色进行顶点块下降求解。",
+    "title": "CUDA 布料与刚体接触求解"
+  },
+  "code/snowberg/visualizer": {
+    "contracts": [
+      "graphics Core 是借用指针，visualizer 对象通过 shared_ptr 持有 visualizer Core；底层设备须最后销毁。",
+      "Render 仅录制命令，调用者负责提交；帧槽 holder 通过后执行回调 Clear，Core 本身也须活到回调完成。",
+      "当前是环境光与无阴影方向光，不包含纹理材质、PBR、透明排序或光追。",
+      "网格程序依赖 geometry shader；应核对所用 graphics 后端能力，不能据统一接口假定 Metal 支持此管线。"
+    ],
+    "flow": [
+      "Core::Render 清理并写入曝光、反照率、位置、法线和深度，再遍历同一实体集合执行加法光照。",
+      "Scene 仅弱引用 Entity，网格实体弱引用 Mesh；应用持有对象，录制时 OwnershipHolder 延长在途资源寿命。",
+      "Program 以 uint64 ID 缓存，网格使用几何着色器重建平面法线，光源绘制全屏六顶点。"
+    ],
+    "summary": "以 Camera、Mesh、Film、Scene 与分阶段 Entity 组成的小型延迟光栅渲染器，面向几何调试和基础光照展示。",
+    "title": "延迟光栅可视化"
+  },
+  "code/snowberg/visualizer/shaders": {
+    "contracts": [
+      "光照槽 0..3 分别为反照率、位置、法线、深度，槽 4 是光源常量，实际两种光源只读取部分 G-buffer。",
+      "曝光光照输出 alpha=0，几何覆盖区域曝光 alpha=1；加法混合保留覆盖标志。",
+      "方向约定是表面指向光的方向；没有遮挡测试和阴影。"
+    ],
+    "flow": [
+      "entity VS 变换顶点，GS 用世界空间三角形叉积覆盖法线，PS 在背面翻转法线。",
+      "ambient 取 albedo×intensity，directional 再乘 max(N·L,0)。"
+    ],
+    "summary": "几何程序输出多目标 G-buffer，两个光照程序以全屏加法叠加曝光；inverse 提供矩阵求逆辅助。",
+    "title": "可视化 G-buffer 与光照"
+  },
   "code/sparkium": {
     "contracts": [
       "公共对象和管线适配对象分层；不要把同名 raytracing::Scene 与 sparkium::Scene 混为一个所有权对象。",

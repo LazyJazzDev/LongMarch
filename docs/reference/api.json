@@ -1,4 +1,12 @@
 {
+  "DEFAULT_DISPATCH_SIZE": {
+    "contract": "线程数为零时产生零 blocks，调用点没有统一避免此情形。",
+    "description": "使用每块 256 线程展开 CUDA launch 尺寸。"
+  },
+  "DISPATCH_SIZE": {
+    "contract": "线程数为零时产生零 blocks，调用点没有统一避免此情形。",
+    "description": "展开为向上取整的 block 数和给定 block_size 两个 launch 参数。"
+  },
   "GLFW_EXPOSE_NATIVE_COCOA": {
     "contract": "",
     "description": "使 GLFW native 头暴露 Cocoa window handle 接口。"
@@ -250,6 +258,150 @@
   "code/snowberg/gui/surface/application.cpp#STB_IMAGE_WRITE_IMPLEMENTATION": {
     "contract": "供 Application::SaveScreenshot 使用；与其他同名宏实例按各自链接目标审视，避免重复定义。",
     "description": "在本编译单元启用 stb_image_write 的 PNG 写出实现。"
+  },
+  "code/snowberg/visualizer/shaders/ambient_light.slang#LightInfo": {
+    "contract": "CPU 侧动态缓冲与着色器常量布局一致。",
+    "description": "光源常量：RGB 环境强度。"
+  },
+  "code/snowberg/visualizer/shaders/ambient_light.slang#PSInput": {
+    "contract": "片元按 position.xy 整数坐标读取 G-buffer。",
+    "description": "仅包含 SV_POSITION 的全屏光照插值记录。"
+  },
+  "code/snowberg/visualizer/shaders/ambient_light.slang#PSMain": {
+    "contract": "没有色调映射、阴影或逐像素可见性测试；背景 albedo 清零自然无贡献。",
+    "description": "输出 albedo.rgb×intensity。"
+  },
+  "code/snowberg/visualizer/shaders/ambient_light.slang#PSOutput": {
+    "contract": "alpha 固定为 0，配合 ONE+ONE 加法混合。",
+    "description": "单一曝光颜色附件输出。"
+  },
+  "code/snowberg/visualizer/shaders/ambient_light.slang#VSMain": {
+    "contract": "调用 CmdDraw(6,1,0,0)，不需要顶点缓冲。",
+    "description": "用 SV_VertexID 索引六个角点生成全屏两三角形。"
+  },
+  "code/snowberg/visualizer/shaders/ambient_light.slang#g_albedo_texture": {
+    "contract": "此 shader 实际读取该图。",
+    "description": "槽 0 的RGBA 反照率 G-buffer 输入。"
+  },
+  "code/snowberg/visualizer/shaders/ambient_light.slang#g_depth_texture": {
+    "contract": "当前 shader 声明并绑定但未读取。",
+    "description": "槽 3 的深度 G-buffer 输入。"
+  },
+  "code/snowberg/visualizer/shaders/ambient_light.slang#g_normal_texture": {
+    "contract": "当前 shader 声明并绑定但未读取。",
+    "description": "槽 2 的世界法线 G-buffer 输入。"
+  },
+  "code/snowberg/visualizer/shaders/ambient_light.slang#g_position_texture": {
+    "contract": "当前 shader 声明并绑定但未读取。",
+    "description": "槽 1 的世界位置 G-buffer 输入。"
+  },
+  "code/snowberg/visualizer/shaders/ambient_light.slang#light_info": {
+    "contract": "不是相机参数，尽管 C++ 绑定处有旧注释。",
+    "description": "槽 4 的光源常量缓冲。"
+  },
+  "code/snowberg/visualizer/shaders/directional_light.slang#LightInfo": {
+    "contract": "CPU 侧动态缓冲与着色器常量布局一致。",
+    "description": "光源常量：方向与 RGB 强度。"
+  },
+  "code/snowberg/visualizer/shaders/directional_light.slang#PSInput": {
+    "contract": "片元按 position.xy 整数坐标读取 G-buffer。",
+    "description": "仅包含 SV_POSITION 的全屏光照插值记录。"
+  },
+  "code/snowberg/visualizer/shaders/directional_light.slang#PSMain": {
+    "contract": "没有色调映射、阴影或逐像素可见性测试；背景 albedo 清零自然无贡献。",
+    "description": "输出 albedo.rgb×intensity×max(dot(normal,direction),0)。"
+  },
+  "code/snowberg/visualizer/shaders/directional_light.slang#PSOutput": {
+    "contract": "alpha 固定为 0，配合 ONE+ONE 加法混合。",
+    "description": "单一曝光颜色附件输出。"
+  },
+  "code/snowberg/visualizer/shaders/directional_light.slang#VSMain": {
+    "contract": "调用 CmdDraw(6,1,0,0)，不需要顶点缓冲。",
+    "description": "用 SV_VertexID 索引六个角点生成全屏两三角形。"
+  },
+  "code/snowberg/visualizer/shaders/directional_light.slang#g_albedo_texture": {
+    "contract": "此 shader 实际读取该图。",
+    "description": "槽 0 的RGBA 反照率 G-buffer 输入。"
+  },
+  "code/snowberg/visualizer/shaders/directional_light.slang#g_depth_texture": {
+    "contract": "当前 shader 声明并绑定但未读取。",
+    "description": "槽 3 的深度 G-buffer 输入。"
+  },
+  "code/snowberg/visualizer/shaders/directional_light.slang#g_normal_texture": {
+    "contract": "此 shader 实际读取该图。",
+    "description": "槽 2 的世界法线 G-buffer 输入。"
+  },
+  "code/snowberg/visualizer/shaders/directional_light.slang#g_position_texture": {
+    "contract": "当前 shader 声明并绑定但未读取。",
+    "description": "槽 1 的世界位置 G-buffer 输入。"
+  },
+  "code/snowberg/visualizer/shaders/directional_light.slang#light_info": {
+    "contract": "不是相机参数，尽管 C++ 绑定处有旧注释。",
+    "description": "槽 4 的光源常量缓冲。"
+  },
+  "code/snowberg/visualizer/shaders/entity.slang#CameraInfo": {
+    "contract": "匹配 C++ CameraInfo。",
+    "description": "投影与视图两个矩阵。"
+  },
+  "code/snowberg/visualizer/shaders/entity.slang#EntityInfo": {
+    "contract": "与 CPU EntityInfo 对齐。",
+    "description": "材质加 model 矩阵。"
+  },
+  "code/snowberg/visualizer/shaders/entity.slang#GSInput": {
+    "contract": "结构相同，无额外转换。",
+    "description": "PSInput 的别名，用于 VS 到 GS 的传递。"
+  },
+  "code/snowberg/visualizer/shaders/entity.slang#GSMain": {
+    "contract": "依赖几何着色器支持；退化三角形归一化无保护。",
+    "description": "从世界空间三角形边叉积计算统一单位法线，输出原三顶点属性及新法线。"
+  },
+  "code/snowberg/visualizer/shaders/entity.slang#Material": {
+    "contract": "与 CPU Material 对齐。",
+    "description": "RGBA albedo 材质。"
+  },
+  "code/snowberg/visualizer/shaders/entity.slang#PSInput": {
+    "contract": "GS 会重写法线为面法线。",
+    "description": "裁剪位置、世界位置、法线、UV 和颜色的阶段间记录。"
+  },
+  "code/snowberg/visualizer/shaders/entity.slang#PSMain": {
+    "contract": "filter_color 局部变量未用于输出；没有实际前后面红蓝染色。",
+    "description": "归一化法线并在背面翻转，写 G-buffer；曝光 RGB=0、alpha=1。"
+  },
+  "code/snowberg/visualizer/shaders/entity.slang#PSOutput": {
+    "contract": "分别映射 SV_TARGET0..3，另由光栅管线写深度。",
+    "description": "曝光、反照率、位置、法线四个颜色目标。"
+  },
+  "code/snowberg/visualizer/shaders/entity.slang#VSInput": {
+    "contract": "位置 0..3 对应 visualizer::Vertex。",
+    "description": "position/normal/texcoord/color 输入结构。"
+  },
+  "code/snowberg/visualizer/shaders/entity.slang#VSMain": {
+    "contract": "model 应是可逆仿射矩阵；后续 GS 覆盖这里的顶点法线。",
+    "description": "按 model/view/proj 变换位置，求世界位置和逆转置法线，调制材质/顶点色。"
+  },
+  "code/snowberg/visualizer/shaders/entity.slang#camera_info": {
+    "contract": "由 Core 上传当前 Camera。",
+    "description": "space0/b0 相机常量。"
+  },
+  "code/snowberg/visualizer/shaders/entity.slang#entity_info": {
+    "contract": "每网格实体独立上传。",
+    "description": "space1/b0 实体常量。"
+  },
+  "code/snowberg/visualizer/shaders/inverse.slang#INVERSE_SLANG": {
+    "contract": "只影响当前 shader 编译。",
+    "description": "防止矩阵辅助函数重复包含的宏。"
+  },
+  "code/snowberg/visualizer/shaders/inverse.slang#inverse": {
+    "contract": "输入按值传入；det 精确为 0 时返回原矩阵，非错误码，近奇异矩阵不稳定化。",
+    "description": "2×2、3×3、4×4 重载用伴随矩阵除行列式求逆。"
+  },
+  "code/snowberg/visualizer/shaders/inverse.slang#spvDet2x2": {
+    "contract": "供高阶余子式展开使用。",
+    "description": "由四个标量计算 a1*b2−b1*a2。"
+  },
+  "code/snowberg/visualizer/shaders/inverse.slang#spvDet3x3": {
+    "contract": "参数按 a/b/c 三组输入，与 inverse 的调用布局一致。",
+    "description": "通过三个 2×2 子行列式展开 3×3 行列式。"
   },
   "contradium::(anonymous)::PBDStepHelper": {
     "contract": "",
@@ -5354,5 +5506,569 @@
   "snowberg::gui::surface::Vertex": {
     "contract": "布局与 Application 输入属性及用户着色器一致。",
     "description": "surface 顶点记录，包含二维 position 与 RGBA color。"
+  },
+  "snowberg::solver::(anonymous)::SearchAndCopyOp": {
+    "contract": "ID 必须存在且 num_particle>0；没有错误通道。",
+    "description": "Thrust 映射器，将粒子 ID 二分查找后返回位置。"
+  },
+  "snowberg::solver::(anonymous)::SearchAndCopyOp::operator()": {
+    "contract": "未命中下标为 −1，调用者必须预先保证有效 ID。",
+    "description": "返回 x[BinarySearch(particle_ids,num_particle,id)]。"
+  },
+  "snowberg::solver::CopyParticleIndices": {
+    "contract": "依赖 prefix offsets 与各桶计数一致；无效颜色或空发射需调用者避免。",
+    "description": "按颜色和场景偏移把各场景颜色桶位置合并到连续设备数组。"
+  },
+  "snowberg::solver::Core": {
+    "contract": "当前目录没有该类型的完整实现或工厂，不应作为可用能力列出。",
+    "description": "仅有前置声明的 solver Core 类型。"
+  },
+  "snowberg::solver::Directory": {
+    "contract": "bucket ID 必须在 [0,num_bucket)，没有范围检查。",
+    "description": "CPU 连续分桶目录，按桶保存原 contents 索引。"
+  },
+  "snowberg::solver::Directory::Directory": {
+    "contract": "contents 按桶编号取值，不是任意稀疏标签。",
+    "description": "默认空构造，或计数、前缀和、填入原位置构造稳定分桶。"
+  },
+  "snowberg::solver::Directory::operator DirectoryRef": {
+    "contract": "原存储重分配或销毁后视图失效。",
+    "description": "返回主机三个 vector 的裸指针视图。"
+  },
+  "snowberg::solver::DirectoryDevice": {
+    "contract": "仅 CUDA 可用，Ref 指向设备地址。",
+    "description": "Directory 的 CUDA device_vector 副本。"
+  },
+  "snowberg::solver::DirectoryDevice::DirectoryDevice": {
+    "contract": "后续主机改动不自动同步。",
+    "description": "默认空构造，或将主机目录三数组复制到设备。"
+  },
+  "snowberg::solver::DirectoryDevice::operator DirectoryRef": {
+    "contract": "设备容器必须活到核执行结束。",
+    "description": "返回三数组的设备原始指针。"
+  },
+  "snowberg::solver::DirectoryRef": {
+    "contract": "无桶数/长度元数据，使用方保证范围与存储寿命。",
+    "description": "借用桶起点 first、计数 count 与原数组位置 positions 的三个指针。"
+  },
+  "snowberg::solver::ElementBending": {
+    "contract": "theta_rest/elastic_limit 为弧度；elastic_limit<π 才更新静止角。",
+    "description": "四顶点二面角弯曲单元的刚度、阻尼、静止角与塑性界限。"
+  },
+  "snowberg::solver::ElementStretching": {
+    "contract": "默认 lambda=0 不适合直接计算简化 Neo-Hookean；通常由 ObjectPack 工厂填充。",
+    "description": "三角拉伸单元参数：mu/lambda/area/damping/Dm/sigma_lb/sigma_ub。"
+  },
+  "snowberg::solver::InitializeSolver": {
+    "contract": "不检查质量或固定标志，所有粒子都会预测。",
+    "description": "逐粒子 v+=gravity*dt，再从 x_prev 按速度预测新 x。"
+  },
+  "snowberg::solver::ObjectPack": {
+    "contract": "各粒子数组等长；拉伸每单元三个索引，弯曲每单元四个索引。",
+    "description": "一组 CPU 粒子 x/v/m 与拉伸/弯曲单元及局部索引。"
+  },
+  "snowberg::solver::ObjectPack::CreateFromMesh": {
+    "contract": "要求非空位置、有效三角索引及非退化面；Poisson 不能使 (1+ν)(1−2ν) 为零。尾部不足三个索引被忽略。",
+    "description": "变换输入位置并平均分配质量，以三角面构建拉伸、内部共享边构建弯曲。"
+  },
+  "snowberg::solver::ObjectPack::CreateGridCloth": {
+    "contract": "pos_grid 至少 n_row*n_col 项且维度通常≥2；每格四拉伸的 mu/lambda 乘 0.25，弯曲按布局乘 0.5/0.25。",
+    "description": "由列主 n_col×n_row 位置网格创建粒子与多方向膜/弯曲单元。"
+  },
+  "snowberg::solver::ObjectPack::PushBending": {
+    "contract": "四顶点按二面角协议排序；共享边与高度非零。",
+    "description": "取当前二面角为静止角，并按共享边长×6/两侧高度和缩放弯曲刚度。"
+  },
+  "snowberg::solver::ObjectPack::PushStretching": {
+    "contract": "第一条边非零、三角形非共线，否则除零/奇异 Dm；平方根舍入无钳制。",
+    "description": "在三角形局部正交平面中计算上三角 Dm、面积及材料参数并追加索引。"
+  },
+  "snowberg::solver::ObjectPackView": {
+    "contract": "拥有 ID 列表，不拥有 Scene 数据，也不提供自动删除。",
+    "description": "记录 ObjectPack 加入 Scene 后的粒子、拉伸、弯曲全局 ID。"
+  },
+  "snowberg::solver::RigidObject": {
+    "contract": "状态和参数需显式初始化。",
+    "description": "拥有主机 MeshSDF 以及接触/刚体状态的输入对象。"
+  },
+  "snowberg::solver::RigidObject::operator RigidObjectRef": {
+    "contract": "后续状态变化不会自动更新已创建 Ref 的值字段。",
+    "description": "借用主机 SDF 数组并复制 state/stiffness/friction。"
+  },
+  "snowberg::solver::RigidObjectDevice": {
+    "contract": "仅 CUDA 下定义。",
+    "description": "拥有设备 MeshSDF 及按值保存的刚体状态/接触参数。"
+  },
+  "snowberg::solver::RigidObjectDevice::operator RigidObjectRef": {
+    "contract": "设备 SDF 存活覆盖使用期。",
+    "description": "生成包含设备 SDF 指针的接触参数副本。"
+  },
+  "snowberg::solver::RigidObjectRef": {
+    "contract": "SDF 需在所执行 CPU/GPU 位置可访问。",
+    "description": "SDF 借用视图加刚体状态、接触刚度和摩擦系数的核参数记录。"
+  },
+  "snowberg::solver::RigidObjectState": {
+    "contract": "无默认数值初始化，调用者填入有效正交旋转和惯量。",
+    "description": "旋转 R、平移 t、线/角速度、质量和本体惯量的刚体状态值。"
+  },
+  "snowberg::solver::RigidObjectState::NextState": {
+    "contract": "要求可逆惯量；零角速度归一化没有专门分支，公式不包含外力或重力。",
+    "description": "返回平移加 v*dt、旋转左乘角轴增量后的副本，并保持原世界角动量重算 omega。"
+  },
+  "snowberg::solver::Scene": {
+    "contract": "无 CPU Update，也没有对象删除接口。",
+    "description": "CPU 场景装配容器，持有粒子、单元、SDF 与连续全局 ID。"
+  },
+  "snowberg::solver::Scene::AddObject": {
+    "contract": "ObjectPack 数组长度/索引必须一致；返回 ObjectPackView 用于查询。",
+    "description": "复制各粒子/单元数组，分配连续 ID 并将局部连接转为全局粒子 ID。"
+  },
+  "snowberg::solver::Scene::AddRigidBody": {
+    "contract": "原 RigidObject 后续修改不自动同步到 Scene。",
+    "description": "深复制 SDF、复制刚体记录并将 Ref 指向场景拥有的 SDF，返回递增 ID。"
+  },
+  "snowberg::solver::Scene::BendingIndex": {
+    "contract": "数组需非空、有序；调用者不能未经检查使用返回下标。",
+    "description": "在对应递增 ID 数组中二分查询并返回存储下标，未命中为 −1。"
+  },
+  "snowberg::solver::Scene::GetPositions": {
+    "contract": "ID 必须存在；未命中返回 −1 会被直接用作数组下标。",
+    "description": "按输入 ID 顺序在主机查询并复制位置。"
+  },
+  "snowberg::solver::Scene::ParticleIndex": {
+    "contract": "数组需非空、有序；调用者不能未经检查使用返回下标。",
+    "description": "在对应递增 ID 数组中二分查询并返回存储下标，未命中为 −1。"
+  },
+  "snowberg::solver::Scene::RigidObjectIndex": {
+    "contract": "数组需非空、有序；调用者不能未经检查使用返回下标。",
+    "description": "在对应递增 ID 数组中二分查询并返回存储下标，未命中为 −1。"
+  },
+  "snowberg::solver::Scene::StretchingIndex": {
+    "contract": "数组需非空、有序；调用者不能未经检查使用返回下标。",
+    "description": "在对应递增 ID 数组中二分查询并返回存储下标，未命中为 −1。"
+  },
+  "snowberg::solver::SceneDevice": {
+    "contract": "由完整 CPU Scene 一次构造，不自动跟踪主机拓扑更改。",
+    "description": "CUDA 求解场景，拥有设备数组、SDF、颜色/邻接目录与一个 CUDA stream。"
+  },
+  "snowberg::solver::SceneDevice::GetPositions": {
+    "contract": "包含分配与传输成本；无效 ID 未检查，不能视为廉价引用查询。",
+    "description": "把待查询 ID 上传，用 Thrust transform 查找设备位置，再复制回 CPU。"
+  },
+  "snowberg::solver::SceneDevice::GetRigidObjectFriction": {
+    "contract": "ID 必须存在；访问含设备到主机传输，未处理无效 ID。",
+    "description": "先在主机 ID 表查找，再从设备 RigidObjectRef 读取摩擦系数并返回。"
+  },
+  "snowberg::solver::SceneDevice::GetRigidObjectState": {
+    "contract": "ID 必须存在；访问含设备到主机传输，未处理无效 ID。",
+    "description": "先在主机 ID 表查找，再从设备 RigidObjectRef 读取完整刚体状态并返回。"
+  },
+  "snowberg::solver::SceneDevice::GetRigidObjectStiffness": {
+    "contract": "ID 必须存在；访问含设备到主机传输，未处理无效 ID。",
+    "description": "先在主机 ID 表查找，再从设备 RigidObjectRef 读取接触刚度并返回。"
+  },
+  "snowberg::solver::SceneDevice::SceneDevice": {
+    "contract": "单元连接须使用从零连续 ID；数据退化和 CUDA 创建失败没有统一检查。",
+    "description": "复制全部数据并修复设备 SDF 指针，构建邻接目录和贪心粒子着色，创建 stream。"
+  },
+  "snowberg::solver::SceneDevice::SetRigidObjectFriction": {
+    "contract": "ID 必须存在，未校验数值；调用者处理与并发求解的同步。",
+    "description": "读取设备记录、替换摩擦系数再写回设备。"
+  },
+  "snowberg::solver::SceneDevice::SetRigidObjectState": {
+    "contract": "ID 必须存在，未校验数值；调用者处理与并发求解的同步。",
+    "description": "读取设备记录、替换完整刚体状态再写回设备。"
+  },
+  "snowberg::solver::SceneDevice::SetRigidObjectStiffness": {
+    "contract": "ID 必须存在，未校验数值；调用者处理与并发求解的同步。",
+    "description": "读取设备记录、替换接触刚度再写回设备。"
+  },
+  "snowberg::solver::SceneDevice::Update": {
+    "contract": "dt>0；包含 DeviceClock 输出和粒子统计打印，部分核使用默认流。零元素 launch 未特判。",
+    "description": "一次重力预测、40 轮分色局部求解、速度回算及塑性更新。"
+  },
+  "snowberg::solver::SceneDevice::UpdateBatch": {
+    "contract": "当前局部/全局索引混用且摩擦固定 5，不能作为 Update 的等价加速版；需修复验证后使用。",
+    "description": "为多个场景合并每颜色的粒子列表，执行 20 轮批量核并分别更新速度/塑性。"
+  },
+  "snowberg::solver::SceneDevice::operator SceneRef": {
+    "contract": "视图不拥有存储；设备数组重分配或析构后失效。",
+    "description": "组装所有设备裸指针、计数与目录为 SceneRef。"
+  },
+  "snowberg::solver::SceneDevice::~SceneDevice": {
+    "contract": "使用方不可让其他流仍持有该场景裸指针。",
+    "description": "销毁 stream，成员设备数组随后释放。"
+  },
+  "snowberg::solver::SceneRef": {
+    "contract": "部分内核直接将连续 ID 用作下标；不能任意修改 ID/数组排列。",
+    "description": "借用整个设备求解场景的数组、计数和邻接目录。"
+  },
+  "snowberg::solver::SceneRef::BendingIndex": {
+    "contract": "数组需非空、有序；调用者不能未经检查使用返回下标。",
+    "description": "在对应递增 ID 数组中二分查询并返回存储下标，未命中为 −1。"
+  },
+  "snowberg::solver::SceneRef::ParticleIndex": {
+    "contract": "数组需非空、有序；调用者不能未经检查使用返回下标。",
+    "description": "在对应递增 ID 数组中二分查询并返回存储下标，未命中为 −1。"
+  },
+  "snowberg::solver::SceneRef::RigidObjectIndex": {
+    "contract": "数组需非空、有序；调用者不能未经检查使用返回下标。",
+    "description": "在对应递增 ID 数组中二分查询并返回存储下标，未命中为 −1。"
+  },
+  "snowberg::solver::SceneRef::StretchingIndex": {
+    "contract": "数组需非空、有序；调用者不能未经检查使用返回下标。",
+    "description": "在对应递增 ID 数组中二分查询并返回存储下标，未命中为 −1。"
+  },
+  "snowberg::solver::SolveVBDParticlePosition": {
+    "contract": "dt>0、质量/几何有效、H 可逆；接触厚度固定 0.018，摩擦使用每刚体 friction。",
+    "description": "对同色独立粒子累加惯性、拉伸、弯曲、SDF 接触与摩擦，解 3×3 位移并原地更新。"
+  },
+  "snowberg::solver::SolveVBDParticlePositionBatched": {
+    "contract": "当前把全局合并索引数组按局部 tid 读取，后续场景有错位风险；摩擦系数硬编码 5。",
+    "description": "按场景 offset 分派粒子并执行批量局部 VBD 更新。"
+  },
+  "snowberg::solver::StretchingEnergy": {
+    "contract": "self_index=0/1/2；lambda 非零、Dm 可逆、叉积范数非零。",
+    "description": "计算指定三角顶点的简化 Neo-Hookean 膜能梯度与 3×3 Hessian，并乘静止面积。"
+  },
+  "snowberg::solver::UpdateBendingPlasticity": {
+    "contract": "界限应非负，单位弧度；大于等于 π 时保持静止角。",
+    "description": "elastic_limit<π 时将当前/静止角差折返并截断，再更新 theta_rest。"
+  },
+  "snowberg::solver::UpdateStretchingPlasticity": {
+    "contract": "不直接改当前位置，也不更新记录的 area；秩亏 SVD 没有稳定化。",
+    "description": "对形变梯度 SVD，将奇异值按正 sigma 下/上界截断，再反算新的静止 Dm。"
+  },
+  "snowberg::solver::UpdateVelocity": {
+    "contract": "dt 必须非零。",
+    "description": "逐粒子 v=(x−x_prev)/dt。"
+  },
+  "snowberg::solver::VecLengthHessian": {
+    "contract": "v 非零，未做容差保护。",
+    "description": "设备端返回向量范数 Hessian (I−nnᵀ)/||v||。"
+  },
+  "snowberg::visualizer::Camera": {
+    "contract": "由 Core 创建；矩阵编辑在下一次 Render 上传。",
+    "description": "公开 proj/view 矩阵与私有动态相机缓冲。"
+  },
+  "snowberg::visualizer::Camera::Camera": {
+    "contract": "构造私有，Core 作为工厂调用。",
+    "description": "初始化单位矩阵并创建 CameraInfo 缓冲。"
+  },
+  "snowberg::visualizer::Camera::GetCore": {
+    "contract": "返回值会延长 visualizer Core 的寿命，底层 graphics Core 仍为借用。",
+    "description": "按值返回持有的 shared_ptr<Core>。"
+  },
+  "snowberg::visualizer::Camera::GetInfo": {
+    "contract": "不读取 GPU 缓冲。",
+    "description": "按值返回当前 proj/view。"
+  },
+  "snowberg::visualizer::Camera::LookAt": {
+    "contract": "eye≠center 且 up 不应与视向共线。",
+    "description": "以 GLM lookAt 计算视图矩阵并返回 Eigen 形式。"
+  },
+  "snowberg::visualizer::Camera::Perspective": {
+    "contract": "fovy 为弧度，aspect>0，近平面/远平面有效；深度约定受 GLM 配置影响。",
+    "description": "以 GLM perspective 生成投影并转为 Eigen。"
+  },
+  "snowberg::visualizer::Camera::SetInfo": {
+    "contract": "不会立即上传，Render 时同步。",
+    "description": "复制相机记录到 CPU 矩阵字段。"
+  },
+  "snowberg::visualizer::CameraInfo": {
+    "contract": "与 entity.slang 字段顺序一致。",
+    "description": "proj/view 两个 GLM 4×4 矩阵的 GPU 常量记录。"
+  },
+  "snowberg::visualizer::Core": {
+    "contract": "借用 graphics Core，工厂用 shared_ptr 建立对象。",
+    "description": "共享所有权的可视化资源工厂与阶段渲染器。"
+  },
+  "snowberg::visualizer::Core::Core": {
+    "contract": "私有构造，设备帧槽数量应稳定。",
+    "description": "保存设备并按 FramesInFlight 分配资源 holder。"
+  },
+  "snowberg::visualizer::Core::CreateCamera": {
+    "contract": "矩阵按元素复制，调用者选择正确裁剪空间约定。",
+    "description": "创建 Camera 并将 Eigen 投影/视图转为 GLM 字段。"
+  },
+  "snowberg::visualizer::Core::CreateCore": {
+    "contract": "graphics_core 非空且生命周期覆盖所有资源。",
+    "description": "调用私有构造并返回共享 Core。"
+  },
+  "snowberg::visualizer::Core::CreateEntity": {
+    "contract": "返回共享实体，但不自动 AddEntity 到 Scene。",
+    "description": "将当前 Core 与完美转发参数传给 EntityType 构造。"
+  },
+  "snowberg::visualizer::Core::CreateFilm": {
+    "contract": "宽高有效；无后续 Resize，换尺寸需创建新 Film。",
+    "description": "创建指定固定分辨率 Film。"
+  },
+  "snowberg::visualizer::Core::CreateMesh": {
+    "contract": "返回共享对象，初始有效顶点/索引数均为 0。",
+    "description": "创建空 GPU 网格。"
+  },
+  "snowberg::visualizer::Core::CreateScene": {
+    "contract": "Scene 持有当前 Core。",
+    "description": "创建空弱引用实体集合。"
+  },
+  "snowberg::visualizer::Core::GraphicsCore": {
+    "contract": "不转移所有权。",
+    "description": "返回底层 graphics Core 的借用指针。"
+  },
+  "snowberg::visualizer::Core::LoadProgram": {
+    "contract": "同一 ID 必须始终对应同一 ProgramType；static_pointer_cast 不作运行时类型检查，非线程安全。",
+    "description": "按 ID 返回缓存程序，不存在时调用 loader 并缓存。"
+  },
+  "snowberg::visualizer::Core::Render": {
+    "contract": "返回 0；context/scene/camera/film 同设备且非空，调用者提交。当前实现没有统一错误传播。",
+    "description": "上传相机、清空五通道，执行几何与光照阶段，登记延迟资源释放并清理无效实体。"
+  },
+  "snowberg::visualizer::CreateCore": {
+    "contract": "返回 shared_ptr，底层设备仍由调用者所有。",
+    "description": "委托 Core::CreateCore 的命名空间工厂。"
+  },
+  "snowberg::visualizer::Entity": {
+    "contract": "默认 ExecuteStage 不录制任何命令。",
+    "description": "可参与渲染阶段的多态基类，持有共享 Core。"
+  },
+  "snowberg::visualizer::Entity::Entity": {
+    "contract": "受保护构造，供派生实体调用。",
+    "description": "保存共享 Core。"
+  },
+  "snowberg::visualizer::Entity::ExecuteStage": {
+    "contract": "几何阶段非零返回值被 Core 解释为从场景移除该实体。",
+    "description": "默认返回 0，不执行渲染。"
+  },
+  "snowberg::visualizer::Entity::GetCore": {
+    "contract": "返回值会延长 visualizer Core 的寿命，底层 graphics Core 仍为借用。",
+    "description": "按值返回持有的 shared_ptr<Core>。"
+  },
+  "snowberg::visualizer::Entity::~Entity": {
+    "contract": "派生资源随共享实体引用释放。",
+    "description": "默认虚析构。"
+  },
+  "snowberg::visualizer::EntityAmbientLight": {
+    "contract": "不模拟遮挡或环境贴图。",
+    "description": "全屏反照率调制环境光实体。"
+  },
+  "snowberg::visualizer::EntityAmbientLight::EntityAmbientLight": {
+    "contract": "程序按固定 ID 缓存，场景加入需另调 AddEntity。",
+    "description": "载入加法光照程序并创建 RGB intensity 动态缓冲。"
+  },
+  "snowberg::visualizer::EntityAmbientLight::ExecuteStage": {
+    "contract": "返回 0；光照累加到曝光图。",
+    "description": "仅 lighting stage 上传强度、绑定 G-buffer 并绘制全屏 6 顶点。"
+  },
+  "snowberg::visualizer::EntityAmbientLight::SetIntensity": {
+    "contract": "不钳制，不进行色温/曝光转换。",
+    "description": "保存 RGB 环境强度。"
+  },
+  "snowberg::visualizer::EntityDirectionalLight": {
+    "contract": "方向为表面指向光的向量。",
+    "description": "沿统一方向的无阴影 Lambert 光实体。"
+  },
+  "snowberg::visualizer::EntityDirectionalLight::EntityDirectionalLight": {
+    "contract": "方向不能为零。",
+    "description": "归一化方向，保存强度，加载缓存加法程序并创建常量缓冲。"
+  },
+  "snowberg::visualizer::EntityDirectionalLight::ExecuteStage": {
+    "contract": "无阴影或距离衰减；返回 0。",
+    "description": "仅光照阶段上传方向/强度，读取 albedo/normal 后全屏累加 N·L 光照。"
+  },
+  "snowberg::visualizer::EntityDirectionalLight::LightInfo": {
+    "contract": "padding 使 intensity 从 16 字节边界开始，与常量缓冲协议对应。",
+    "description": "CPU 方向 float3、padding 与强度 float3 布局。"
+  },
+  "snowberg::visualizer::EntityDirectionalLight::SetDirection": {
+    "contract": "零向量没有专门处理，应避免。",
+    "description": "将方向归一化后保存。"
+  },
+  "snowberg::visualizer::EntityDirectionalLight::SetIntensity": {
+    "contract": "下一次 lighting stage 上传，不钳制。",
+    "description": "保存 RGB 光强。"
+  },
+  "snowberg::visualizer::EntityInfo": {
+    "contract": "与 entity.slang 对齐一致。",
+    "description": "Material 后跟 model 矩阵的 GPU 常量记录。"
+  },
+  "snowberg::visualizer::EntityMeshObject": {
+    "contract": "外部须保持 Mesh 存活，否则 ExecuteStage 返回 −1。",
+    "description": "材质/模型矩阵实例，弱引用 Mesh 并持有共享几何程序。"
+  },
+  "snowberg::visualizer::EntityMeshObject::EntityMeshObject": {
+    "contract": "要求 graphics 后端支持几何着色器，创建失败未检查。",
+    "description": "载入缓存的 VS/GS/PS 程序，保存网格弱引用和材质/矩阵并创建常量缓冲。"
+  },
+  "snowberg::visualizer::EntityMeshObject::ExecuteStage": {
+    "contract": "Mesh 过期返回 −1；其他有效阶段返回 0 而不绘制。",
+    "description": "锁定 Mesh，几何阶段保留其寿命、上传 EntityInfo 并绘制索引三角形。"
+  },
+  "snowberg::visualizer::EntityMeshObject::SetMaterial": {
+    "contract": "下一次几何阶段上传；当前材质只含 albedo。",
+    "description": "复制材质到 CPU EntityInfo。"
+  },
+  "snowberg::visualizer::EntityMeshObject::SetMesh": {
+    "contract": "不会持续持有传入 shared_ptr。",
+    "description": "替换网格弱引用。"
+  },
+  "snowberg::visualizer::EntityMeshObject::SetTransform": {
+    "contract": "下一次几何阶段上传。",
+    "description": "将 Eigen 4×4 模型矩阵转 GLM 存入 EntityInfo。"
+  },
+  "snowberg::visualizer::Film": {
+    "contract": "曝光立即创建，其他通道惰性创建。",
+    "description": "固定分辨率的五通道图像集合。"
+  },
+  "snowberg::visualizer::Film::Extent": {
+    "contract": "要求图像创建成功。",
+    "description": "返回曝光图像尺寸作为全部通道统一尺寸。"
+  },
+  "snowberg::visualizer::Film::Film": {
+    "contract": "由 Core 工厂调用，尺寸应正数。",
+    "description": "创建 RGBA32F 曝光图像并保存共享 Core。"
+  },
+  "snowberg::visualizer::Film::GetCore": {
+    "contract": "返回值会延长 visualizer Core 的寿命，底层 graphics Core 仍为借用。",
+    "description": "按值返回持有的 shared_ptr<Core>。"
+  },
+  "snowberg::visualizer::Film::GetImage": {
+    "contract": "film_channel 必须是 [0,FILM_CHANNEL_COUNT)，无数组越界检查。",
+    "description": "返回指定通道，尚未创建时按曝光尺寸分配。"
+  },
+  "snowberg::visualizer::FilmChannel": {
+    "contract": "COUNT 不能传给 Film::GetImage。",
+    "description": "曝光、反照率、位置、法线、深度以及数量哨兵。"
+  },
+  "snowberg::visualizer::FilmChannelImageFormat": {
+    "contract": "未知通道抛 runtime_error。",
+    "description": "四种颜色通道→RGBA32F，深度→D32F。"
+  },
+  "snowberg::visualizer::Material": {
+    "contract": "不包含粗糙度、金属度或纹理。",
+    "description": "当前仅包含 RGBA albedo 的材质记录。"
+  },
+  "snowberg::visualizer::Mesh": {
+    "contract": "独立于 grassland::Mesh；需按 visualizer::Vertex 格式上传。",
+    "description": "持有可更新 GPU Vertex/uint32 索引数据与有效数量。"
+  },
+  "snowberg::visualizer::Mesh::GetCore": {
+    "contract": "返回值会延长 visualizer Core 的寿命，底层 graphics Core 仍为借用。",
+    "description": "按值返回持有的 shared_ptr<Core>。"
+  },
+  "snowberg::visualizer::Mesh::GetIndexBuffer": {
+    "contract": "资源生命周期依附 Mesh。",
+    "description": "返回所拥有索引缓冲的借用指针。"
+  },
+  "snowberg::visualizer::Mesh::GetVertexBuffer": {
+    "contract": "资源生命周期依附 Mesh。",
+    "description": "返回所拥有顶点缓冲的借用指针。"
+  },
+  "snowberg::visualizer::Mesh::IndexCount": {
+    "contract": "用于 CmdDrawIndexed。",
+    "description": "返回有效索引数量。"
+  },
+  "snowberg::visualizer::Mesh::Mesh": {
+    "contract": "通过 Core 工厂调用。",
+    "description": "建立各 4096 字节的静态缓冲，初始化数量为 0。"
+  },
+  "snowberg::visualizer::Mesh::SetIndices": {
+    "contract": "索引为 uint32 且须落在顶点范围，三角形数量由 /3 得到。",
+    "description": "带数量重载按需扩容并上传；无数量重载覆盖当前 num_indices_ 个索引。"
+  },
+  "snowberg::visualizer::Mesh::SetVertices": {
+    "contract": "数量非负，输入至少包含相应 Vertex 元素；不验证指针或索引。",
+    "description": "带数量重载按需扩容并上传；无数量重载覆盖当前 num_vertices_ 个顶点。"
+  },
+  "snowberg::visualizer::Mesh::VertexCount": {
+    "contract": "不是缓冲容量。",
+    "description": "返回有效顶点数量。"
+  },
+  "snowberg::visualizer::OwnershipHolder": {
+    "contract": "Core 每帧槽有一个；Clear 的时机依赖 graphics 后执行回调。",
+    "description": "按类型保存共享 Film/Camera/Mesh/Entity 引用，延长在途资源寿命。"
+  },
+  "snowberg::visualizer::OwnershipHolder::AddCamera": {
+    "contract": "不去重，也允许空指针；Clear 时统一释放。",
+    "description": "追加并持有传入 Camera 的 shared_ptr。"
+  },
+  "snowberg::visualizer::OwnershipHolder::AddEntity": {
+    "contract": "不去重，也允许空指针；Clear 时统一释放。",
+    "description": "追加并持有传入 Entity 的 shared_ptr。"
+  },
+  "snowberg::visualizer::OwnershipHolder::AddFilm": {
+    "contract": "不去重，也允许空指针；Clear 时统一释放。",
+    "description": "追加并持有传入 Film 的 shared_ptr。"
+  },
+  "snowberg::visualizer::OwnershipHolder::AddMesh": {
+    "contract": "不去重，也允许空指针；Clear 时统一释放。",
+    "description": "追加并持有传入 Mesh 的 shared_ptr。"
+  },
+  "snowberg::visualizer::OwnershipHolder::Clear": {
+    "contract": "应只在 GPU 已结束对应使用后调用。",
+    "description": "清空四类共享引用集合。"
+  },
+  "snowberg::visualizer::Program": {
+    "contract": "只有默认虚析构，无执行接口。",
+    "description": "可多态保存不同着色程序资源包的基类。"
+  },
+  "snowberg::visualizer::Program::~Program": {
+    "contract": "允许共享基类指针正确释放派生资源包。",
+    "description": "默认虚析构。"
+  },
+  "snowberg::visualizer::ProgramCommonRaster": {
+    "contract": "由实体加载器初始化。",
+    "description": "拥有 vertex_shader_、fragment_shader_ 与 graphics program_ 的普通光栅资源包。"
+  },
+  "snowberg::visualizer::ProgramCommonRaster::~ProgramCommonRaster": {
+    "contract": "需避免 GPU 仍在使用时释放。",
+    "description": "默认析构并释放拥有的着色器与程序。"
+  },
+  "snowberg::visualizer::ProgramID": {
+    "contract": "ID 对应资源包类型须一致，LoadProgram 不做动态类型验证。",
+    "description": "网格几何、环境光与方向光缓存 ID。"
+  },
+  "snowberg::visualizer::ProgramWithGeometryShader": {
+    "contract": "当前用于 MeshObject 平面法线生成。",
+    "description": "拥有 VS、GS、PS 与 graphics Program 的几何着色资源包。"
+  },
+  "snowberg::visualizer::ProgramWithGeometryShader::~ProgramWithGeometryShader": {
+    "contract": "需要满足在途 GPU 寿命约束。",
+    "description": "默认析构释放完整几何光栅资源。"
+  },
+  "snowberg::visualizer::RenderContext": {
+    "contract": "实体不要把该栈上上下文引用保留到 Render 之外。",
+    "description": "一次阶段执行使用的命令上下文、Film、相机缓冲和 OwnershipHolder 借用集合。"
+  },
+  "snowberg::visualizer::RenderStage": {
+    "contract": "Core 依此次序执行实体。",
+    "description": "几何光栅阶段与光照光栅阶段。"
+  },
+  "snowberg::visualizer::Scene": {
+    "contract": "应用必须保留实体 shared_ptr 才能持续渲染。",
+    "description": "保存实体 ID 到 weak_ptr 的场景容器。"
+  },
+  "snowberg::visualizer::Scene::AddEntity": {
+    "contract": "返回 ID 从 0 开始；不验证同 Core，也不拒绝重复/空对象。",
+    "description": "为实体分配递增 ID 并保存弱引用。"
+  },
+  "snowberg::visualizer::Scene::GetCore": {
+    "contract": "返回值会延长 visualizer Core 的寿命，底层 graphics Core 仍为借用。",
+    "description": "按值返回持有的 shared_ptr<Core>。"
+  },
+  "snowberg::visualizer::Scene::Scene": {
+    "contract": "由 Core 工厂调用。",
+    "description": "保存共享 Core 并初始化空场景。"
+  },
+  "snowberg::visualizer::TextureType": {
+    "contract": "属于工具转换，不表示 Film 每通道的实际类型。",
+    "description": "SDR/HDR 两种图像格式分类枚举。"
+  },
+  "snowberg::visualizer::TextureTypeToImageFormat": {
+    "contract": "未知枚举值回退 RGBA8。",
+    "description": "HDR→RGBA32F，SDR→RGBA8 UNORM。"
+  },
+  "snowberg::visualizer::Vertex": {
+    "contract": "当前几何 shader 将法线替换为平面法线，UV 尚未用于材质纹理。",
+    "description": "位置、法线、UV、颜色的三维顶点布局。"
   }
 }

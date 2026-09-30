@@ -68,6 +68,14 @@ def extract(path: Path, root: Path) -> dict:
     parse_data = re.sub(rb"(?m)^(?![ \t]*#)([^\n]*)$",
                         lambda m: re.sub(rb"\b(?:LM_DEVICE_FUNC|__host__|__device__|__global__|__forceinline__)\b",
                                          lambda token: b" " * len(token.group()), m.group()), data)
+    if path.suffix == '.slang':
+        # Slang register bindings and semantics are not C++ base classes or
+        # function declarators. Blank only their annotation bytes so original
+        # signatures and source locations remain intact.
+        parse_data = re.sub(rb':\s*register\s*\([^)]*\)',
+                            lambda m: re.sub(rb'[^\n]', b' ', m.group()), parse_data)
+        parse_data = re.sub(rb':\s*(?:SV_[A-Za-z0-9_]+|TEXCOORD[0-9]*|POSITION[0-9]*|COLOR[0-9]*)(?![A-Za-z0-9_])',
+                            lambda m: re.sub(rb'[^\n]', b' ', m.group()), parse_data)
     tree = PARSER.parse(parse_data)
     record['parse_errors'] = sorted(set(n.start_point.row + 1 for n in walk(tree.root_node) if n.type == 'ERROR' or n.is_missing))
 

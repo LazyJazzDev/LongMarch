@@ -1716,6 +1716,343 @@
     "sha256": "360a41464e11fe7e6d48c8cfe24f8a0b149d4479ecc99d5e1408b291488a0f08",
     "summary": "聚合头：将本模块公共类型汇集为统一包含入口。"
   },
+  "code/snowberg/solver/CMakeLists.txt": {
+    "details": [
+      "源文件集合、目标链接和父作用域导出以本页列出的 CMake 原文为准；PUBLIC 依赖会传递给使用此目标的调用方。"
+    ],
+    "sha256": "3aefe21ffe0f063ad61be109d64466c082c936da268c9e5535753172c91f1dbc",
+    "summary": "定义 solver 的 CMake 构建边界与传递依赖。"
+  },
+  "code/snowberg/solver/solver.cpp": {
+    "details": [
+      "#include \"snowberg/solver/solver.h\""
+    ],
+    "sha256": "112b5d2df28edf456111e29a1284cfcbc1e82e1f0c19d8716ab3575e6d46fd83",
+    "summary": "模块编译单元：包含对应头文件并保留命名空间边界，无额外运行时算法。"
+  },
+  "code/snowberg/solver/solver.h": {
+    "details": [
+      "#include \"snowberg/solver/solver_element.h\"",
+      "#include \"snowberg/solver/solver_object_pack.h\"",
+      "#include \"snowberg/solver/solver_rigid_object.h\"",
+      "#include \"snowberg/solver/solver_scene.h\"",
+      "#include \"snowberg/solver/solver_util.h\""
+    ],
+    "sha256": "1390d8e21ac97124bb6721ba563bac57d80e8287f8fa3d1944073b534f870a9b",
+    "summary": "聚合头：将相关声明从一个入口暴露给调用方。"
+  },
+  "code/snowberg/solver/solver_element.cpp": {
+    "details": [
+      "拉伸保存 Lamé 参数、面积、阻尼、Dm 和奇异值塑性阈值；负阈值禁用对应边界。",
+      "弯曲保存刚度、阻尼、静止弧度和 elastic_limit；默认 4>π，禁用弯曲塑性。"
+    ],
+    "sha256": "d266a1674e328d000edff89cafb65b11757b2cfdcd0d6b7f3f4ff2be980fad75",
+    "summary": "拉伸与弯曲单元参数；本文件实现接口行为。"
+  },
+  "code/snowberg/solver/solver_element.h": {
+    "details": [
+      "拉伸保存 Lamé 参数、面积、阻尼、Dm 和奇异值塑性阈值；负阈值禁用对应边界。",
+      "弯曲保存刚度、阻尼、静止弧度和 elastic_limit；默认 4>π，禁用弯曲塑性。"
+    ],
+    "sha256": "ed157eb9aa0da552d537ce98425d57e6d80b13e683ca484d0b4c8d240ad88f07",
+    "summary": "拉伸与弯曲单元参数；本文件定义类型与调用接口。"
+  },
+  "code/snowberg/solver/solver_object_pack.cpp": {
+    "details": [
+      "质量平均分配到所有顶点，不按三角形面积分配。",
+      "普通网格按每三索引建立拉伸，仅对有双向邻接的内部边建立弯曲。",
+      "GridCloth 采用列主索引 i*n_row+j；每格四个拉伸单元和多组弯曲单元，系数分别缩放。"
+    ],
+    "sha256": "cedc1284ff49e8a008c7aadedb74e8b670896aa72d4002b07017eb1c752145b0",
+    "summary": "网格到求解粒子与单元的装配；本文件实现接口行为。"
+  },
+  "code/snowberg/solver/solver_object_pack.h": {
+    "details": [
+      "质量平均分配到所有顶点，不按三角形面积分配。",
+      "普通网格按每三索引建立拉伸，仅对有双向邻接的内部边建立弯曲。",
+      "GridCloth 采用列主索引 i*n_row+j；每格四个拉伸单元和多组弯曲单元，系数分别缩放。"
+    ],
+    "sha256": "bc7bdaada25a072cb60b3c3d4b2c5c4deca90155bb3e77983b6ac48b2312374d",
+    "summary": "网格到求解粒子与单元的装配；本文件定义类型与调用接口。"
+  },
+  "code/snowberg/solver/solver_rigid_object.cpp": {
+    "details": [
+      "主机/设备版本持有各自 MeshSDF 存储；转 Ref 借用 SDF 数组并复制状态/刚度/摩擦值。"
+    ],
+    "sha256": "900df77f2f943c1445167106b05238911d22311920880adcba6fb15662b8096f",
+    "summary": "刚体 SDF 数据所有者与轻量查询记录；本文件实现接口行为。"
+  },
+  "code/snowberg/solver/solver_rigid_object.h": {
+    "details": [
+      "主机/设备版本持有各自 MeshSDF 存储；转 Ref 借用 SDF 数组并复制状态/刚度/摩擦值。"
+    ],
+    "sha256": "f8ff8aaaab7293d8f781f0cddd1e8b01bf4455c3ccb77abb748caf6650b5df62",
+    "summary": "刚体 SDF 数据所有者与轻量查询记录；本文件定义类型与调用接口。"
+  },
+  "code/snowberg/solver/solver_scene.cpp": {
+    "details": [
+      "CPU Scene 只追加数据，不支持删除或同步设备后新增拓扑。",
+      "SceneDevice 深复制数组和 SDF、预建单元邻接及颜色桶；设备查询以 Thrust 临时数组回读。",
+      "ID 查询返回 −1 未命中，但上层 getter/setter 未验证结果；空数组的 BinarySearch 也没有安全处理。"
+    ],
+    "sha256": "72365b34942e6b1bce2c3b001e94cfda906e7b8cdb50880a20ecd6a6111614b8",
+    "summary": "主机对象合并、GPU 数据上传与图着色；本文件实现接口行为。"
+  },
+  "code/snowberg/solver/solver_scene.h": {
+    "details": [
+      "CPU Scene 只追加数据，不支持删除或同步设备后新增拓扑。",
+      "SceneDevice 深复制数组和 SDF、预建单元邻接及颜色桶；设备查询以 Thrust 临时数组回读。",
+      "ID 查询返回 −1 未命中，但上层 getter/setter 未验证结果；空数组的 BinarySearch 也没有安全处理。"
+    ],
+    "sha256": "4c2890eda55728ed89b01cc052804996340d3ffb558089cce0fe642c548487ee",
+    "summary": "主机对象合并、GPU 数据上传与图着色；本文件定义类型与调用接口。"
+  },
+  "code/snowberg/solver/solver_scene_update.cpp": {
+    "details": [
+      "单场景更新重力 (0,−9.8,0)，40 次按颜色迭代；碰撞壳层厚度硬编码 0.018。",
+      "每粒子累加惯性、拉伸、弯曲与接触的力/Hessian，然后直接 H.inverse()*f；无阻尼线搜索或数值失败恢复。",
+      "UpdateBatch 20 次迭代，碰撞摩擦硬编码 5，忽略 rigid_object.friction。",
+      "批量求解将 tid 减去场景偏移后，用局部 tid 读取全局合并 particle_indices；第二个及后续场景可能读到前面场景的粒子 ID。此实现需要修正与 CUDA 验证后才能依赖。",
+      "部分核在 scene.stream_，其余使用默认流，排序依赖默认流同步语义；不能作为无同步多流执行保证。"
+    ],
+    "sha256": "5404bd9f5c094f09bea3d151deaf48c9db2d7c1ecca6c80d356eca5341e9eccd",
+    "summary": "CUDA 顶点块下降、SDF 接触与塑性推进"
+  },
+  "code/snowberg/solver/solver_util.cpp": {
+    "details": [
+      "RigidObjectState::NextState 用角轴更新旋转并通过世界惯量保持角动量；不施加力或重力。",
+      "Directory 按 bucket ID 生成 first/count/positions；contents 中每项必须在桶范围内。"
+    ],
+    "sha256": "1e5b3e1f48d022689a4f7a8fe26c5d90df8cd3c20cbfeab236e43fe0875c4fc6",
+    "summary": "刚体状态外推和按桶分组目录；本文件实现接口行为。"
+  },
+  "code/snowberg/solver/solver_util.h": {
+    "details": [
+      "RigidObjectState::NextState 用角轴更新旋转并通过世界惯量保持角动量；不施加力或重力。",
+      "Directory 按 bucket ID 生成 first/count/positions；contents 中每项必须在桶范围内。"
+    ],
+    "sha256": "71485fd9ae9fb4b3229c9de8c54bfd8271d5ca5d4c28601a682c46f790ba8ad3",
+    "summary": "刚体状态外推和按桶分组目录；本文件定义类型与调用接口。"
+  },
+  "code/snowberg/visualizer/CMakeLists.txt": {
+    "details": [
+      "源文件集合、目标链接和父作用域导出以本页列出的 CMake 原文为准；PUBLIC 依赖会传递给使用此目标的调用方。"
+    ],
+    "sha256": "f147c1b3d4464e5dfb9b06965c786977b66dad3a4cf54294d9846cd48132fd18",
+    "summary": "定义 visualizer 的 CMake 构建边界与传递依赖。"
+  },
+  "code/snowberg/visualizer/shaders/ambient_light.slang": {
+    "details": [
+      "只使用 albedo 与 intensity；位置、法线、深度虽声明但不读取。"
+    ],
+    "sha256": "6b28bdd0d80fcd372ce522cdfa533898dfc254c5e8ed27e5b172eb8911b20f46",
+    "summary": "全屏环境光加法程序"
+  },
+  "code/snowberg/visualizer/shaders/directional_light.slang": {
+    "details": [
+      "读取 albedo/normal，乘 max(dot(normal,direction),0)；不检查阴影。"
+    ],
+    "sha256": "0515020b931558281e59da15c04607b7447f9086f5d67deb14e689b6cbf39ca4",
+    "summary": "全屏 Lambert 方向光程序"
+  },
+  "code/snowberg/visualizer/shaders/entity.slang": {
+    "details": [
+      "槽 0 CameraInfo，槽 1 EntityInfo；GS 每输入三角形输出三顶点平面法线。"
+    ],
+    "sha256": "a4a052646fa1ac6ba9c3d591dddd10cc374b6ec6511e96d88da21a21ca5a0096",
+    "summary": "顶点/几何/片元的 G-buffer 输出程序"
+  },
+  "code/snowberg/visualizer/shaders/inverse.slang": {
+    "details": [
+      "精确 det=0 时返回原矩阵，不报告失败；近奇异矩阵不做稳定化。"
+    ],
+    "sha256": "34e4950273061ad3dc0252fd2703d3b3290434fa36c699fac3501557b1e17a06",
+    "summary": "2×2/3×3/4×4 矩阵伴随求逆"
+  },
+  "code/snowberg/visualizer/visualizer.cpp": {
+    "details": [
+      "#include \"snowberg/visualizer/visualizer.h\"",
+      "#include \"snowberg/visualizer/visualizer_camera.h\"",
+      "#include \"snowberg/visualizer/visualizer_core.h\"",
+      "#include \"snowberg/visualizer/visualizer_entity.h\"",
+      "#include \"snowberg/visualizer/visualizer_film.h\"",
+      "#include \"snowberg/visualizer/visualizer_mesh.h\"",
+      "#include \"snowberg/visualizer/visualizer_scene.h\""
+    ],
+    "sha256": "d86585a96ef660a1b4dcdaf465247f1a70ee19ea77efdef2b2f5ef2ed7a89cdc",
+    "summary": "模块编译单元：包含对应头文件并保留命名空间边界，无额外运行时算法。"
+  },
+  "code/snowberg/visualizer/visualizer.h": {
+    "details": [
+      "#include \"snowberg/visualizer/visualizer_camera.h\"",
+      "#include \"snowberg/visualizer/visualizer_core.h\"",
+      "#include \"snowberg/visualizer/visualizer_entity.h\"",
+      "#include \"snowberg/visualizer/visualizer_film.h\"",
+      "#include \"snowberg/visualizer/visualizer_mesh.h\"",
+      "#include \"snowberg/visualizer/visualizer_program.h\"",
+      "#include \"snowberg/visualizer/visualizer_render_context.h\"",
+      "#include \"snowberg/visualizer/visualizer_scene.h\"",
+      "#include \"snowberg/visualizer/visualizer_util.h\""
+    ],
+    "sha256": "9ccb6ff7e025460276f19dbd2d6bae59914c5a98f9b4080263d435fced04bbea",
+    "summary": "聚合头：将相关声明从一个入口暴露给调用方。"
+  },
+  "code/snowberg/visualizer/visualizer_camera.cpp": {
+    "details": [
+      "默认单位投影/视图；Core 渲染时将当前矩阵上传。",
+      "LookAt/Perspective 委托 GLM 再转 Eigen；投影深度约定受 GLM 编译配置影响。"
+    ],
+    "sha256": "7b00444c2917a1a491166bb2b4b9a08763b3eebe5ceb89c3622714fa0abca29c",
+    "summary": "相机矩阵与动态常量缓冲；本文件实现接口行为。"
+  },
+  "code/snowberg/visualizer/visualizer_camera.h": {
+    "details": [
+      "默认单位投影/视图；Core 渲染时将当前矩阵上传。",
+      "LookAt/Perspective 委托 GLM 再转 Eigen；投影深度约定受 GLM 编译配置影响。"
+    ],
+    "sha256": "f2bffa665b5883796d71593d5ff3826a302c535af69fe5c6c898a48efe7bb2bf",
+    "summary": "相机矩阵与动态常量缓冲；本文件定义类型与调用接口。"
+  },
+  "code/snowberg/visualizer/visualizer_core.cpp": {
+    "details": [
+      "Core 必须通过 shared_ptr 工厂创建，子对象工厂依赖 shared_from_this。",
+      "几何阶段返回非零的实体及已过期弱引用会从 Scene 移除；当帧已锁定的实体仍参加后续光照遍历。"
+    ],
+    "sha256": "f403c03ce05683d4794296d8d82026fb154f154cd5608e2285af2bd5fc1ed3a6",
+    "summary": "资源工厂、程序缓存与两遍渲染调度；本文件实现接口行为。"
+  },
+  "code/snowberg/visualizer/visualizer_core.h": {
+    "details": [
+      "Core 必须通过 shared_ptr 工厂创建，子对象工厂依赖 shared_from_this。",
+      "几何阶段返回非零的实体及已过期弱引用会从 Scene 移除；当帧已锁定的实体仍参加后续光照遍历。"
+    ],
+    "sha256": "bbd1408720f5aad29ee5bbea40886276945fb1445f153c40da28b938832e5245",
+    "summary": "资源工厂、程序缓存与两遍渲染调度；本文件定义类型与调用接口。"
+  },
+  "code/snowberg/visualizer/visualizer_entity.cpp": {
+    "details": [
+      "MeshObject 上传材质 albedo 与模型矩阵；GS 生成平面法线，传入顶点法线最终会被覆盖。",
+      "环境光与方向光只在 lighting stage 绘制；程序采用 ONE+ONE 加法混合。"
+    ],
+    "sha256": "8c27479304cd31cfc75a771c0108b324e5c3d094f1290bce75fde22c7ef97325",
+    "summary": "网格实例、环境光与方向光实体；本文件实现接口行为。"
+  },
+  "code/snowberg/visualizer/visualizer_entity.h": {
+    "details": [
+      "MeshObject 上传材质 albedo 与模型矩阵；GS 生成平面法线，传入顶点法线最终会被覆盖。",
+      "环境光与方向光只在 lighting stage 绘制；程序采用 ONE+ONE 加法混合。"
+    ],
+    "sha256": "54b53d60c783edf8d403f9c25a01062fae864562bea262776bd641177f5fbd73",
+    "summary": "网格实例、环境光与方向光实体；本文件定义类型与调用接口。"
+  },
+  "code/snowberg/visualizer/visualizer_film.cpp": {
+    "details": [
+      "构造仅创建 RGBA32F 曝光图；其他 G-buffer 在首次 GetImage 时分配，深度为 D32F。",
+      "GetImage 先数组索引再检查内容，没有保护无效 FilmChannel。"
+    ],
+    "sha256": "72e84f55cc9f062ec6a3551cfdbf0174fb0f9d9b065e16af323c3b859d6fa952",
+    "summary": "按通道惰性分配的固定尺寸渲染图像；本文件实现接口行为。"
+  },
+  "code/snowberg/visualizer/visualizer_film.h": {
+    "details": [
+      "构造仅创建 RGBA32F 曝光图；其他 G-buffer 在首次 GetImage 时分配，深度为 D32F。",
+      "GetImage 先数组索引再检查内容，没有保护无效 FilmChannel。"
+    ],
+    "sha256": "2a529c9c9812b12d759f82738f3460455ca0a201d80d555cc8bdfec049c94857",
+    "summary": "按通道惰性分配的固定尺寸渲染图像；本文件定义类型与调用接口。"
+  },
+  "code/snowberg/visualizer/visualizer_mesh.cpp": {
+    "details": [
+      "初始顶点/索引缓冲各 4096 字节，必要时扩容；数量分别维护。",
+      "不带数量的 SetVertices/SetIndices 使用当前数量，而非从输入推断长度。"
+    ],
+    "sha256": "131f5e6114ca9a1e7856b1982a393ec688bfc201ca8ab42b1e937be14f5f0e84",
+    "summary": "可更新的 GPU 可视化网格；本文件实现接口行为。"
+  },
+  "code/snowberg/visualizer/visualizer_mesh.h": {
+    "details": [
+      "初始顶点/索引缓冲各 4096 字节，必要时扩容；数量分别维护。",
+      "不带数量的 SetVertices/SetIndices 使用当前数量，而非从输入推断长度。"
+    ],
+    "sha256": "1c87afc9e6afacc21338b427b0221d1a5900f4a4cd24f50d270464b69b25cecf",
+    "summary": "可更新的 GPU 可视化网格；本文件定义类型与调用接口。"
+  },
+  "code/snowberg/visualizer/visualizer_ownership_holder.cpp": {
+    "details": [
+      "Add 方法保留 shared_ptr；Clear 一次清空四类集合。",
+      "用于在命令后执行回调中释放，不是 GPU fence 的替代。"
+    ],
+    "sha256": "9a90ff7255bd942f3fae2d1c493c763a54fb603e9ac39a01f4c50597e797351a",
+    "summary": "在途帧资源的共享所有权集合；本文件实现接口行为。"
+  },
+  "code/snowberg/visualizer/visualizer_ownership_holder.h": {
+    "details": [
+      "Add 方法保留 shared_ptr；Clear 一次清空四类集合。",
+      "用于在命令后执行回调中释放，不是 GPU fence 的替代。"
+    ],
+    "sha256": "b026d8d72e3413f0a9860503076319437db00fc420afd7d6c217c09787e85c95",
+    "summary": "在途帧资源的共享所有权集合；本文件定义类型与调用接口。"
+  },
+  "code/snowberg/visualizer/visualizer_program.cpp": {
+    "details": [
+      "Program 为虚析构基类；CommonRaster 持有 VS/PS，WithGeometryShader 另含 GS。",
+      "public unique_ptr 字段由加载器配置，Program 本身不实施状态机。"
+    ],
+    "sha256": "197cc0a767d01495400eb1d8448f58073ac5d4acd697e416fb5609912f8bcf49",
+    "summary": "两类着色程序资源包；本文件实现接口行为。"
+  },
+  "code/snowberg/visualizer/visualizer_program.h": {
+    "details": [
+      "Program 为虚析构基类；CommonRaster 持有 VS/PS，WithGeometryShader 另含 GS。",
+      "public unique_ptr 字段由加载器配置，Program 本身不实施状态机。"
+    ],
+    "sha256": "2ed49c73bb9821473e3068902fe144a1f5f3e612f579b33a6fa6a60f8dc0a4b5",
+    "summary": "两类着色程序资源包；本文件定义类型与调用接口。"
+  },
+  "code/snowberg/visualizer/visualizer_render_context.cpp": {
+    "details": [
+      "包含命令上下文、Film、相机缓冲和资源 holder；仅在本次 Render 调用中有效。"
+    ],
+    "sha256": "e8b9fda71778510888256298a5119cacb84b5fd98be0b2894a5b9cff47ddbd5d",
+    "summary": "实体执行阶段所需的非拥有参数集合；本文件实现接口行为。"
+  },
+  "code/snowberg/visualizer/visualizer_render_context.h": {
+    "details": [
+      "包含命令上下文、Film、相机缓冲和资源 holder；仅在本次 Render 调用中有效。"
+    ],
+    "sha256": "3d73fde67ad1eef4ebdba25364b0ba81ee384eac018050bbcfef1b223e561660",
+    "summary": "实体执行阶段所需的非拥有参数集合；本文件定义类型与调用接口。"
+  },
+  "code/snowberg/visualizer/visualizer_scene.cpp": {
+    "details": [
+      "AddEntity 不延长实体寿命；释放应用 shared_ptr 后，后续 Render 会清理过期条目。",
+      "没有显式 RemoveEntity 接口，添加相同实体多次会生成多个 ID 并重复执行。"
+    ],
+    "sha256": "27613db41302a85205c5c7c7fae36dea7cb42d43d23e3419cd398de37d8edc68",
+    "summary": "以递增 ID 管理实体弱引用的场景；本文件实现接口行为。"
+  },
+  "code/snowberg/visualizer/visualizer_scene.h": {
+    "details": [
+      "AddEntity 不延长实体寿命；释放应用 shared_ptr 后，后续 Render 会清理过期条目。",
+      "没有显式 RemoveEntity 接口，添加相同实体多次会生成多个 ID 并重复执行。"
+    ],
+    "sha256": "e05c5c79311b35326b9e8f61bf99501fbe38cecaa9f92909e1b949a3f18fa7d4",
+    "summary": "以递增 ID 管理实体弱引用的场景；本文件定义类型与调用接口。"
+  },
+  "code/snowberg/visualizer/visualizer_util.cpp": {
+    "details": [
+      "四个颜色通道均为 RGBA32F，深度为 D32F；未知 FilmChannelImageFormat 抛 runtime_error。"
+    ],
+    "sha256": "b5a7bd0444f1cc111827d8d5037da2fb787500d111b9a87df4f9363755d4377e",
+    "summary": "顶点/材质/常量布局与通道、阶段、程序编号；本文件实现接口行为。"
+  },
+  "code/snowberg/visualizer/visualizer_util.h": {
+    "details": [
+      "四个颜色通道均为 RGBA32F，深度为 D32F；未知 FilmChannelImageFormat 抛 runtime_error。"
+    ],
+    "sha256": "345fad563ce00ac7ffcd80cf62b9d6298f9d5fe1b7d5131f04128fa6f22f7ab6",
+    "summary": "顶点/材质/常量布局与通道、阶段、程序编号；本文件定义类型与调用接口。"
+  },
   "code/sparkium/CMakeLists.txt": {
     "details": [
       "按当前 CMake 条件选择源文件与平台库；详细参数和 PUBLIC/PRIVATE 边界见本文件原文。"
