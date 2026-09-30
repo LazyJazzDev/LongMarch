@@ -15,10 +15,11 @@ WebAssembly games and are not included in this local source-only preview.
 
 The Pages workflow runs after website changes reach `main` (or manually on
 `main`). It assembles the website with `play/` and `gameoflife/` from `gh-pages`,
-then publishes via GitHub Pages Actions. The first deployment enables the
-Actions publishing mode; repository administration permissions may be needed
-if GitHub prevents that transition. Existing web applications remain sourced
-from `gh-pages`. Do not delete that branch or those directories.
+then publishes via GitHub Pages Actions. Repository Settings → Pages must use
+GitHub Actions as the build source (configured during initial publication).
+Existing web applications remain sourced from `gh-pages`. Do not delete that
+branch or those directories. After updating those applications, manually run
+this workflow on `main` to republish the combined site.
 
 The four sections are `#home`, `#install`, `#architecture`, and `#examples`.
 Keep commands consistent with CMake targets and platform support. Screenshot
