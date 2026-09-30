@@ -1,5 +1,7 @@
 #include "listener.h"
 
+namespace snowberg::gui::surface {
+
 Listener::Listener(Application *application) : application_(application) {
   application_->RegisterListener(this);
 }
@@ -24,3 +26,5 @@ void Listener::OnWindowSize(int width, int height) {
 Listener::~Listener() {
   application_->UnregisterListener(this);
 }
+
+}  // namespace snowberg::gui::surface

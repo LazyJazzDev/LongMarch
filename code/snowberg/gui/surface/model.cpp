@@ -1,5 +1,7 @@
 #include "model.h"
 
+namespace snowberg::gui::surface {
+
 Model::Model(const std::vector<Vertex> &vertices, const std::vector<uint32_t> &indices) {
   vertices_ = vertices;
   indices_ = indices;
@@ -49,6 +51,28 @@ glm::mat4 GetModelMatrix(const glm::vec2 &position, const glm::vec2 &scale, floa
          glm::scale(glm::mat4{1.0f}, glm::vec3{scale * 0.5f, 1.0f});
 }
 
+glm::mat4 GetModelMatrixZO(const glm::vec2 &position, const glm::vec2 &scale, float depth) {
+  return glm::mat4{1.0f,
+                   0.0f,
+                   0.0f,
+                   0.0f,
+                   0.0f,
+                   1.0f,
+                   0.0f,
+                   0.0f,
+                   0.0f,
+                   0.0f,
+                   1.0f,
+                   0.0f,
+                   0.5f + position.x,
+                   0.5f + position.y,
+                   0.0f,
+                   1.0f} *
+         glm::mat4(scale.x, 0.0f, 0.0f, 0.0f, 0.0f, scale.y, 0.0f, 0.0f, 0.0f, 0.0f, 1.0f, 0.0f, 0.0f, 0.0f, 0.0f,
+                   1.0f) *
+         glm::mat4{1.0f, 0.0f, 0.0f, 0.0f, 0.0f, 1.0f, 0.0f, 0.0f, 0.0f, 0.0f, 1.0f, 0.0f, -0.5f, -0.5f, depth, 1.0f};
+}
+
 MixModel::MixModel(const std::vector<std::vector<Vertex>> &vertices, const std::vector<uint32_t> &indices) {
   for (size_t i = 1; i < vertices.size(); i++) {
     assert(vertices[0].size() == vertices[i].size());
@@ -89,3 +113,5 @@ Model &MixModel::GetModel(float alpha, MixStyle mix_style) {
   }
   return mixed_model_.value();
 }
+
+}  // namespace snowberg::gui::surface

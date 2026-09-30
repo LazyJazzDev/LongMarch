@@ -2,6 +2,8 @@
 
 #include "interpolation.h"
 
+namespace snowberg::gui::surface {
+
 AnimationVar::AnimationVar(float val, AnimationStyle ani_style)
     : target_(val),
       origin_(val),
@@ -30,10 +32,6 @@ void AnimationVar::UpdateTarget(float new_target) {
   target_ = new_target;
 }
 
-bool AnimationVar::IsFinished() const {
-  return alpha_ == 1.0;
-}
-
 void AnimationVar::AddTarget(float delta) {
   UpdateTarget(target_ + delta);
 }
@@ -45,6 +43,10 @@ void AnimationVar::TryUpdateTarget(float new_target) {
 }
 
 float AnimationVar::Value() const {
+  if (alpha_ == 1.0f)
+    return target_;
+  if (alpha_ == 0.0f)
+    return origin_;
   switch (animation_style_) {
     case AnimationStyle::kPower2:
       return Mix(origin_, target_, PowerInterpolation(alpha_, 2.0f));
@@ -54,3 +56,5 @@ float AnimationVar::Value() const {
       return Mix(origin_, target_, alpha_);
   }
 }
+
+}  // namespace snowberg::gui::surface

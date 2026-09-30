@@ -1,7 +1,6 @@
 #pragma once
 #include "../../module.h"
 #include "long_march.h"
-#include "snowberg/gui/world_panel.h"
 
 namespace graphics_hello::cube {
 
@@ -46,11 +45,6 @@ class ModuleCube final : public Module {
   std::unique_ptr<grassland::graphics::Image> color_image_;
   std::unique_ptr<grassland::graphics::Image> depth_image_;
   std::unique_ptr<grassland::graphics::Program> program_;
-  std::unique_ptr<snowberg::gui::Context> overlay_;
-  std::unique_ptr<snowberg::gui::WorldPanel> world_panel_;
-  glm::mat4 view_projection_{1.0f};
-  bool rotate_{true};
-  float rotation_{0.0f};
   bool alive_{false};
 };
 

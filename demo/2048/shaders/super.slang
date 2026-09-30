@@ -2,6 +2,7 @@ struct InstanceInfo {
   float4x4 model;
   float4 color;
   uint4 extra;
+  float4 clip_rect;
 };
 
 struct GlobalUniformObject {

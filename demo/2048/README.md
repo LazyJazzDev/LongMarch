@@ -5,15 +5,23 @@ The 2048 puzzle game, ported from the GUI of
 to `grassland::graphics`. The original targeted the legacy grassland Vulkan
 wrapper; this version runs on every LongMarch backend (Vulkan, D3D12, Metal).
 
+The original visual style and interactions use the shared
+`snowberg::gui::surface` renderer, input routing and animation primitives.
+Demo-local application headers only provide compatibility aliases.
+
 ```sh
 cmake --build build --target demo_2048
 build/demo/2048/demo_2048
 ```
 
-Use the arrow keys to move the blocks. The Snowberg GUI panel shows the score,
-autoplay control, new game and menu. The menu offers **Keep going** and
-**Start again**; a game-over panel offers **Try again**. Click **Autoplay** to
-start the strategy and **Stop autoplay** to return to arrow-key control.
+Use the arrow keys to move the blocks. **MENU** opens the menu with
+**KEEP GOING** and **NEW GAME**; a game-over screen offers **TRY AGAIN**.
+
+Clicking the **SCORE** board five times in a row hands the game to the autoplay:
+the score-board label becomes **AI**, the score board fades to red, and the arrow keys
+stop answering until the board is clicked once more. The clicks have to be
+consecutive; a pause longer than about a second starts the count over, so the
+gesture stays out of the way of ordinary play.
 
 Options:
 

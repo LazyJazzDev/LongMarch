@@ -2,12 +2,17 @@
 #include "application/animation_var.h"
 #include "application/application.h"
 #include "application/model.h"
+#include "boundary_toggle_button.h"
 #include "cell_grid.h"
-#include "game_of_life_lib/game_of_life_lib.h"
+#include "file_button.h"
 #include "grid_size.h"
 #include "grid_view.h"
+#include "pause_play_button.h"
+#include "randomize_button.h"
+#include "refresh_button.h"
 #include "simulation_clock.h"
-#include "snowberg/gui/gui.h"
+#include "size_slider.h"
+#include "speed_toggle_button.h"
 
 class GameOfLife : public Application {
  public:
@@ -40,7 +45,6 @@ class GameOfLife : public Application {
   void CustomOnUpdate() override;
   void CustomOnClose() override;
   void OnFramebufferResize() override;
-  graphics::Image *ComposeUI(graphics::CommandContext *commands, graphics::Image *scene) override;
 
   void OnWindowSize();
 
@@ -59,12 +63,12 @@ class GameOfLife : public Application {
 
   SimulationClock simulation_clock_;
   GridView grid_view_;
-  std::unique_ptr<snowberg::gui::Context> ui_;
+  std::unique_ptr<SizeSlider> width_slider_;
+  std::unique_ptr<SizeSlider> height_slider_;
   int requested_width_{};
   int requested_height_{};
-  bool playing_{false};
-  int speed_level_{0};
-  BoundaryMode boundary_mode_{BoundaryMode::kPeriodic};
+  bool sidebar_{true};
+  bool sliders_were_dragging_{false};
   uint32_t magnify_callback_{};
   uint32_t scroll_callback_{};
   uint32_t key_callback_{};
@@ -74,10 +78,18 @@ class GameOfLife : public Application {
   bool panning_{false};
   glm::vec2 pan_cursor_{0.0f};
 
+  std::unique_ptr<PausePlayButton> pause_play_button_;
+  std::unique_ptr<SpeedToggleButton> speed_toggle_button_;
+  std::unique_ptr<BoundaryToggleButton> boundary_button_;
+  std::unique_ptr<RefreshButton> refresh_button_;
+  std::unique_ptr<RandomizeButton> randomize_button_;
+  std::unique_ptr<FileButton> open_button_;
+  std::unique_ptr<FileButton> save_button_;
   FileAction file_action_{FileAction::kNone};
   float file_action_delay_{0.0f};
   std::string file_path_{"life.cells"};
 
+  std::optional<DeviceModel> white_icon_model;
   std::optional<DeviceModel> white_rect_model;
 
   std::vector<uint8_t> cell_grid_;
@@ -85,11 +97,17 @@ class GameOfLife : public Application {
   std::unique_ptr<CellGrid> cell_input_;
   float time_total{0.0};
   double last_frame_time_{};
+  float ui_scale_{1.0};
   float random_density_{0.0f};
   uint32_t random_seed_{0};
   bool initial_playing_{false};
   int cell_grid_width_{};
   int cell_grid_height_{};
+
+  float panel_left_{};
+  float panel_right_{};
+  float panel_top_{};
+  float panel_bottom_{};
 
   float playground_left_{};
   float playground_right_{};

@@ -36,10 +36,25 @@ For 3D controls, create a `WorldPanel`, set its local to world transform and
 ray test the pointer against it. Feed the nearest hit to `BeginFrame`, build
 controls through `Controls()`, then call `Render` with the scene color and depth
 images. The panel is rendered into an offscreen image and drawn as a depth
-tested world quad. See `demo/graphics_hello/modules/cube` for a mixed 2D and
+tested world quad. See `demo/gui` for a mixed 2D and
 3D example.
 
 Current scope: mouse driven panels, rows, text, buttons, checkboxes, choices,
 sliders, plots and custom drawing. Keyboard focus, text fields, clipping and
 scrollable layout are future extensions. The API deliberately keeps scene
 state, simulation and file dialogs in the application.
+
+## Custom visual surfaces
+
+The GUI framework also provides `snowberg::gui::surface` for interfaces with
+application-defined meshes and shaders. It owns the shared window/frame lifecycle,
+input listener routing, button hit testing, animation interpolation, dynamic mesh
+buffers, instanced rendering, clipping records, supersampling and transition resolve.
+Pass the style's shader source to `surface::Application`; build custom controls from
+`surface::Button`, `surface::Model` and `surface::AnimationVar`.
+
+2048 and Game of Life use this path to retain their original layouts, colors,
+fonts, icons, transitions and interactions. Their local `application` headers are
+compatibility aliases; renderer and input implementations live in this library.
+The stock glass theme is used by demos previously based on ImGui. Choosing the
+shared framework does not require choosing that theme.
