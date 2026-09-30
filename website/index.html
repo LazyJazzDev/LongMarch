@@ -1,0 +1,75 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="LongMarch 长征：面向图形渲染、物理与仿真的 C++ 开发框架。了解架构、安装方法与交互样例。">
+  <meta name="theme-color" content="#f5f3ed">
+  <title>LongMarch · 长征</title>
+  <link rel="stylesheet" href="style.css">
+  <script src="site.js" defer></script>
+</head>
+<body>
+<a class="skip" href="#content">跳至正文</a>
+<header class="header">
+  <a class="brand" href="#home"><span class="mark" aria-hidden="true">L<span>↗</span></span> LongMarch <small>长征</small></a>
+  <a class="repo" href="https://github.com/LazyJazzDev/LongMarch">GitHub ↗</a>
+</header>
+<nav class="navigation" aria-label="项目说明">
+  <a href="#home" id="tab-home">主页</a><a href="#install" id="tab-install">安装和使用</a><a href="#architecture" id="tab-architecture">架构说明</a><a href="#examples" id="tab-examples">样例说明</a>
+</nav>
+<main id="content" tabindex="-1">
+<section id="home" aria-labelledby="home-title">
+  <div class="hero"><div><p class="eyebrow">GRAPHICS · PHYSICS · SIMULATION</p><h1 id="home-title">从一个像素，<br>到一个世界<span class="dot">。</span></h1><p class="lead">LongMarch 长征，将跨平台图形接口、渲染与仿真工具放进同一套 C++ 框架。从交互小游戏到光线追踪，逐步构建你的实验。</p><div class="actions"><a class="button" href="#install">开始构建 <span>↗</span></a><a class="text-link" href="#examples">探索样例 →</a></div><div class="tags"><span>C++17</span><span>Metal</span><span>Vulkan</span><span>Direct3D 12</span></div></div>
+  <figure class="hero-art"><div class="orbit orbit-one"></div><div class="orbit orbit-two"></div><div class="sphere"></div><span class="art-label">01 / LIGHT &amp; GEOMETRY</span><figcaption>几何与光 · CSS 概念示意</figcaption></figure></div>
+  <div class="section-heading"><p class="eyebrow">ONE PROJECT, MANY SCALES</p><h2>让底层能力，连接上层体验。</h2></div>
+  <div class="grid three"><article class="card"><span class="number">01</span><h3>跨平台图形</h3><p>通过 Grassland 的统一资源、命令与设备接口，面向 Metal、Vulkan 和 Direct3D 12 开发。后端能力按硬件与平台选择。</p><a href="#architecture">查看后端能力 →</a></article><article class="card"><span class="number">02</span><h3>从实时到路径追踪</h3><p>Sparkium 提供多条渲染路径；同一工程里探索光栅化、原生光线追踪、ray query 与软件回退。</p><a href="#examples">查看渲染样例 →</a></article><article class="card"><span class="number">03</span><h3>交互与仿真</h3><p>Snowberg 承载绘制和 GUI。统一底层既能保留游戏自己的视觉语言，也能提供磨砂玻璃控制面板与世界空间界面。</p><a href="#architecture">了解模块分工 →</a></article></div>
+  <aside class="note">项目持续开发中。不同模块成熟度不同；安装要求、后端限制和可运行样例见对应选项卡。</aside>
+</section>
+<section id="install" aria-labelledby="install-title">
+  <p class="eyebrow">GET STARTED</p><h1 id="install-title">安装和使用<span class="dot">。</span></h1><p class="lead">CMake + Ninja + vcpkg。先准备工具链，再获取带 LFS 素材的完整源码。</p>
+  <div class="requirements"><span>CMake ≥ 3.25</span><span>C++17 编译器</span><span>Ninja</span><span>Git LFS</span><span>vcpkg</span><span>Slang ≥ 2026.18.1</span></div>
+  <article class="step"><span class="number">01</span><div><h2>准备平台工具</h2><div class="grid three"><div><h3>macOS / Apple Silicon</h3><p>安装 Xcode Command Line Tools，以及 CMake、Ninja、Git LFS。原生 Metal 后端需要 macOS 13+；Slang 预编译包可能要求更高版本。</p><pre><code>xcode-select --install
+brew install cmake ninja git-lfs</code></pre></div><div><h3>Windows</h3><p>安装 Visual Studio 2022 的“使用 C++ 的桌面开发”、Windows SDK、CMake、Ninja 和 Git LFS。在 x64 Native Tools 命令行中构建。Vulkan 后端另需 Vulkan SDK。</p></div><div><h3>Linux</h3><p>准备 GCC 或 Clang、CMake、Ninja、Git LFS 和 Vulkan SDK。按发行版安装 GLFW 所需的 X11 / Wayland 开发依赖；确保显卡驱动支持 Vulkan。</p></div></div><p>依赖由 <a href="https://github.com/microsoft/vcpkg#quick-start-windows">vcpkg</a> 清单管理。先安装并 bootstrap vcpkg；Slang 默认通过清单特性提供。</p></div></article>
+  <article class="step"><span class="number">02</span><div><h2>获取源码和素材</h2><pre><code>git lfs install
+git clone --recurse-submodules https://github.com/LazyJazzDev/LongMarch.git
+cd LongMarch
+git -C assets lfs pull</code></pre><p>已有工作副本：执行 <code>git submodule update --init --recursive</code> 和 <code>git -C assets lfs pull</code>。素材使用仓库固定的子模块版本，不使用 <code>--remote</code> 更新。</p></div></article>
+  <article class="step"><span class="number">03</span><div><h2>配置 Release 构建</h2><label for="platform">构建平台</label> <select id="platform"><option value="mac">macOS · 原生 Metal</option><option value="linux">Linux · Vulkan</option><option value="windows">Windows · D3D12 / Vulkan</option></select><pre><code id="configure">cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release -DVCPKG_PATH=/path/to/vcpkg -DLONGMARCH_DISABLE_PYTHON=ON -DLONGMARCH_ENABLE_METAL=ON -DLONGMARCH_DISABLE_VULKAN=ON</code></pre><p>将 vcpkg 路径替换为本机路径。示例关闭可选 Python 绑定；CUDA 由工具链检测，可用 <code>-DLONGMARCH_DISABLE_CUDA=ON</code> 关闭。更换生成器或工具链时使用新的构建目录。</p></div></article>
+  <article class="step"><span class="number">04</span><div><h2>编译并运行第一个样例</h2><pre><code>cmake --build build --target demo_graphics_hello
+./build/demo/graphics_hello/demo_graphics_hello --module triangle</code></pre><p>Windows 下运行对应的 <code>.exe</code>。Ninja 默认构建不包含样例与测试，需显式指定目标。用 <code>--list</code> 查看 Graphics Hello 的模块。</p><div class="actions"><a class="button" href="#examples">选择下一个样例 →</a><a href="https://github.com/LazyJazzDev/LongMarch/blob/main/docs/vscode.md">VS Code 配置 ↗</a></div></div></article>
+</section>
+<section id="architecture" aria-labelledby="architecture-title">
+  <p class="eyebrow">UNDER THE SURFACE</p><h1 id="architecture-title">架构说明<span class="dot">。</span></h1><p class="lead">以 Grassland 为基础，让渲染、交互与仿真各自保持清晰的职责。</p>
+  <div class="architecture" aria-label="概念分层：应用与样例；渲染、界面、物理和仿真模块；Grassland 基础设施；原生图形后端"><div class="layer top">应用与样例 <small>2048 / GoL / Graphics Hello / NBody / 场景渲染</small></div><div class="module-row"><div>Sparkium<small>渲染</small></div><div>Snowberg<small>绘制与 GUI</small></div><div>Contradium<small>物理 · 开发中</small></div><div>Practium<small>仿真应用</small></div></div><div class="layer foundation">Grassland <small>graphics · 数学 · 几何 · 工具</small></div><div class="backend-row"><span>Metal</span><span>Vulkan</span><span>Direct3D 12</span></div></div><p class="caption">概念分层示意，并非完整的 CMake 依赖图。<code>LongMarch</code> 聚合目标与 <code>long_march.h</code> 提供统一接入点。</p>
+  <div class="grid two"><article class="card"><h2>Grassland · 草地</h2><p>基础数学、几何与图形设施。graphics 抽象设备、缓冲、图像、着色器和命令执行，并由各平台后端实现。</p><a href="https://github.com/LazyJazzDev/LongMarch/tree/main/code/grassland">源码 ↗</a></article><article class="card"><h2>Snowberg · 雪山</h2><p>draw、gui、solver 与 visualizer。GUI 控件面板、自定义 Canvas、世界空间面板和共享 surface 支撑不同视觉风格。2048 / GoL 保留原有 UI；工具型面板采用 Apple 风格。</p><p class="caption">当前 GUI 仍以鼠标交互为主，通用文本输入、键盘焦点和滚动裁剪尚不完整。</p></article><article class="card"><h2>Sparkium · 星火</h2><p>组织场景、材质、相机与渲染管线。结合硬件能力，在原生 RT、ray query 和软件回退之间选择；支持 JSON 场景与 CLI / GUI 入口。</p><a href="https://github.com/LazyJazzDev/LongMarch/blob/main/docs/json-scenes.md">场景格式 ↗</a></article><article class="card"><h2>Contradium / Practium</h2><p>Contradium 面向物理系统，仍在开发；Practium 提供仿真应用层的 core、entity、material 与 model。请以具体样例和源码支持范围为准。</p><a href="https://github.com/LazyJazzDev/LongMarch/tree/main/code/practium">仿真应用源码 ↗</a></article></div>
+  <h2 class="section-heading">图形后端与着色器</h2><div class="table-wrap"><table><thead><tr><th>后端</th><th>平台</th><th>使用说明</th></tr></thead><tbody><tr><td>Metal</td><td>macOS / Apple Silicon</td><td>原生 metal-cpp；支持光栅、计算和 ray query。无 RT pipeline / SBT 与 geometry shader。</td></tr><tr><td>Vulkan</td><td>Linux / Windows 等</td><td>需要 Vulkan SDK 与驱动；RT / ray query 取决于设备扩展。</td></tr><tr><td>Direct3D 12</td><td>Windows</td><td>基于 Windows SDK；光线追踪能力取决于 DXR 硬件和驱动。</td></tr></tbody></table></div><p>Slang 提供统一着色器入口。Metal 路径为 Slang → SPIR-V → SPIRV-Cross → MSL → 运行时编译。<code>auto</code> 的具体选择依照应用、平台和设备能力，不能保证所有机器具有相同功能。</p><div class="link-row"><a href="https://github.com/LazyJazzDev/LongMarch/blob/main/docs/slang-shaders.md">Slang 着色器 ↗</a><a href="https://github.com/LazyJazzDev/LongMarch/blob/main/docs/metal-backend.md">Metal 后端 ↗</a><a href="https://github.com/LazyJazzDev/LongMarch/blob/main/docs/rt-fallback.md">RT 回退 ↗</a></div>
+</section>
+<section id="examples" aria-labelledby="examples-title">
+  <p class="eyebrow">LEARN BY RUNNING</p><h1 id="examples-title">样例说明<span class="dot">。</span></h1><p class="lead">从一块游戏棋盘，到 GPU 上的粒子与光线。每个样例都是一个独立的实验入口。</p>
+  <div class="sample-feature"><img loading="lazy" src="https://media.githubusercontent.com/media/LazyJazzDev/LongMarchAssetsLFS/55a11b189b931ad12ad425717cb220cc94d8760c/reports/snowberg-gui/sparkium-window.png" alt="Sparkium 的彩色发光环场景与磨砂玻璃控制面板，macOS 实际窗口截图"><div><p class="eyebrow">FEATURED / SPARKIUM</p><h2>看见光的路径。</h2><p>用 GUI 实时调整场景与渲染参数，或用 CLI 输出离线图像。薄透镜样例进一步展示景深、焦平面与光圈。</p><p class="caption">实际运行截图：area_light 场景，Metal，1024 × 1024 SDR，每次分派 8 samples；累计采样数未记录。</p><a href="https://github.com/LazyJazzDev/LongMarch/tree/main/demo/sparkium_gui">阅读源码 ↗</a></div></div>
+  <aside class="note">统一 GUI 更新随 <a href="https://github.com/LazyJazzDev/LongMarch/pull/79">PR #79</a> 提供；合并前如需体验，请检出 <code>feat/snowberg-gui</code> 分支。其余样例以当前仓库为准。</aside>
+  <div class="grid two samples">
+  <article class="card"><span class="pill">交互游戏</span><h2>2048</h2><p>保留经典棋盘、配色、菜单与动画，用方向键移动。共享 GUI surface 负责底层渲染与事件。连续点击 SCORE 五次启动 AI，再点一次停止。</p><pre><code>cmake --build build --target demo_2048
+./build/demo/2048/demo_2048</code></pre><a href="play/">打开网页版游戏 ↗</a></article>
+  <article class="card"><span class="pill">元胞自动机</span><h2>Game of Life</h2><p>编辑细胞、播放与暂停、调节速度，探索不同图案的演化。保留原有网格、工具栏与交互，默认棋盘为 64 × 64。</p><pre><code>cmake --build build --target demo_gol
+./build/demo/gol/demo_gol</code></pre><a href="play/">打开网页版游戏 ↗</a></article>
+  <article class="card"><span class="pill">图形基础</span><h2>Graphics Hello</h2><p>三角形、混合、立方体、纹理、窗口缩放、HDR 与光线追踪模块。RT 模块是否可运行取决于后端能力。</p><pre><code>cmake --build build --target demo_graphics_hello
+./build/demo/graphics_hello/demo_graphics_hello --list</code></pre></article>
+  <article class="card"><span class="pill">GPU 计算</span><h2>NBody</h2><p>用计算着色器模拟多体粒子运动。交互模式包含参数面板；独立的 CUDA 版本需要 CUDA 工具链和对应硬件。</p><pre><code>cmake --build build --target demo_nbody_cs
+./build/demo/nbody_cs/demo_nbody_cs --mode interactive</code></pre></article>
+  <article class="card"><span class="pill">渲染工具</span><h2>Sparkium GUI</h2><p>浏览素材场景、选择渲染路径并调整画面参数。可传入 JSON 场景或目录；默认读取 assets/scenes。</p><pre><code>cmake --build build --target demo_sparkium_gui
+./build/demo/sparkium_gui/demo_sparkium_gui</code></pre></article>
+  <article class="card"><span class="pill">相机模型</span><h2>Thin Lens</h2><p>交互调整焦距、光圈与焦平面，观察不同深度物体的景深变化。自动选择可用的追踪路径。</p><pre><code>cmake --build build --target demo_thin_lens
+./build/demo/thin_lens/demo_thin_lens</code></pre></article>
+  <article class="card"><span class="pill">界面与自定义绘制</span><h2>GUI Showcase</h2><p>屏幕空间面板、粒子 Canvas 与带深度测试的世界空间面板，展示同一 GUI 框架的 2D / 3D 混合使用。</p><pre><code>cmake --build build --target demo_gui
+./build/demo/gui/demo_gui</code></pre></article>
+  <article class="card"><span class="pill">离线渲染</span><h2>Sparkium CLI</h2><p>从 JSON 场景渲染输出图片，适合脚本、对比实验和无窗口运行。下面使用 Metal 软件回退管线。</p><pre><code>cmake --build build --target demo_sparkium_cli
+./build/demo/sparkium_cli/demo_sparkium_cli assets/scenes/cornell_box/scene.json --backend metal --pipeline rt_fallback -o cornell.png</code></pre></article>
+  </div><aside class="note">从仓库根目录运行上述命令；Windows 使用对应的 .exe。网页版为单独发布的 Web 构建，功能与原生样例可能不同。更多样例见 <a href="https://github.com/LazyJazzDev/LongMarch/tree/main/demo">demo 目录</a>。</aside>
+</section>
+</main>
+<footer><a class="brand" href="#home">LongMarch <small>长征</small></a><p>探索图形、交互与仿真。</p><a href="https://github.com/LazyJazzDev/LongMarch/issues">问题与反馈 ↗</a></footer>
+<div id="announcement" class="sr-only" aria-live="polite"></div>
+</body>
+</html>

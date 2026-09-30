@@ -1,3 +1,5 @@
+> 项目说明网站：[LongMarch · 长征](https://lazyjazzdev.github.io/LongMarch/) — 主页、安装和使用、架构说明、样例说明。
+
 # Long March
 
 <!-- TOC -->
