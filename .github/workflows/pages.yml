@@ -1,0 +1,44 @@
+name: Publish project website
+on:
+  push:
+    branches: [main, gh-pages]
+    paths: ['website/**', '.github/workflows/pages.yml', 'index.html', 'style.css', 'site.js', 'play/**', 'gameoflife/**']
+  workflow_dispatch:
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+concurrency:
+  group: github-pages
+  cancel-in-progress: false
+jobs:
+  deploy:
+    if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/gh-pages'
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Preserve existing web applications
+        uses: actions/checkout@v4
+        with:
+          ref: gh-pages
+          path: legacy-pages
+      - name: Assemble website
+        run: |
+          mkdir -p _site
+          cp -R legacy-pages/play legacy-pages/gameoflife _site/
+          if [ "$GITHUB_REF_NAME" = "gh-pages" ]; then
+            cp index.html style.css site.js _site/
+          else
+            cp website/index.html website/style.css website/site.js _site/
+          fi
+          touch _site/.nojekyll
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: _site
+      - name: Deploy
+        id: deployment
+        uses: actions/deploy-pages@v4
