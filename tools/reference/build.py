@@ -141,7 +141,7 @@ def build(strict=False):
 <body><a class="skip" href="#document">跳至正文</a><header class="doc-header"><a class="brand" href="{home}">LongMarch <small>长征 / 文档</small></a><nav aria-label="项目导航"><a href="{home}#home">主页</a><a href="{home}#install">安装和使用</a>{link(current,'index.html','架构说明','aria-current="page"')}<a href="{home}#examples">样例说明</a></nav></header>
 <div class="doc-layout"><aside class="doc-sidebar"><label for="filter">筛选目录</label><input id="filter" type="search" placeholder="模块或文件名" autocomplete="off">{navigation(current,module)}</aside>
 <main id="document" tabindex="-1"><div class="breadcrumbs">{' / '.join(crumbs)}</div><h1>{esc(title)}</h1>{content}<footer>源码版本 <a href="https://github.com/LazyJazzDev/LongMarch/tree/{revision}">{revision[:10]}</a> · 接口和行为以该版本为准。</footer></main></div></body></html>'''
-        path.write_text(document)
+        path.write_text(document + '\n')
 
     intro = '<p class="lead">模块设计、逐文件说明与对象接口参考。目录中的每个条目打开独立文档页面。</p>'
     intro += f'<div class="stats"><span>{len(records)} 个源码文件</span><span>{len(directories)} 个目录模块</span><span>{sum(len(r["objects"]) for r in records)} 个声明 / 定义记录</span></div>'
