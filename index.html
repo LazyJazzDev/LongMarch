@@ -16,14 +16,14 @@
   <a class="repo" href="https://github.com/LazyJazzDev/LongMarch">GitHub ↗</a>
 </header>
 <nav class="navigation" aria-label="项目说明">
-  <a href="#home" id="tab-home">主页</a><a href="#install" id="tab-install">安装和使用</a><a href="#architecture" id="tab-architecture">架构说明</a><a href="#examples" id="tab-examples">样例说明</a>
+  <a href="#home" id="tab-home">主页</a><a href="#install" id="tab-install">安装和使用</a><a href="reference/index.html" id="tab-architecture">架构说明</a><a href="#examples" id="tab-examples">样例说明</a>
 </nav>
 <main id="content" tabindex="-1">
 <section id="home" aria-labelledby="home-title">
   <div class="hero"><div><p class="eyebrow">GRAPHICS · PHYSICS · SIMULATION</p><h1 id="home-title">从一个像素，<br>到一个世界<span class="dot">。</span></h1><p class="lead">LongMarch 长征，将跨平台图形接口、渲染与仿真工具放进同一套 C++ 框架。从交互小游戏到光线追踪，逐步构建你的实验。</p><div class="actions"><a class="button" href="#install">开始构建 <span>↗</span></a><a class="text-link" href="#examples">探索样例 →</a></div><div class="tags"><span>C++17</span><span>Metal</span><span>Vulkan</span><span>Direct3D 12</span></div></div>
   <figure class="hero-art"><div class="orbit orbit-one"></div><div class="orbit orbit-two"></div><div class="sphere"></div><span class="art-label">01 / LIGHT &amp; GEOMETRY</span><figcaption>几何与光 · CSS 概念示意</figcaption></figure></div>
   <div class="section-heading"><p class="eyebrow">ONE PROJECT, MANY SCALES</p><h2>让底层能力，连接上层体验。</h2></div>
-  <div class="grid three"><article class="card"><span class="number">01</span><h3>跨平台图形</h3><p>通过 Grassland 的统一资源、命令与设备接口，面向 Metal、Vulkan 和 Direct3D 12 开发。后端能力按硬件与平台选择。</p><a href="#architecture">查看后端能力 →</a></article><article class="card"><span class="number">02</span><h3>从实时到路径追踪</h3><p>Sparkium 提供多条渲染路径；同一工程里探索光栅化、原生光线追踪、ray query 与软件回退。</p><a href="#examples">查看渲染样例 →</a></article><article class="card"><span class="number">03</span><h3>交互与仿真</h3><p>Snowberg 承载绘制和 GUI。统一底层既能保留游戏自己的视觉语言，也能提供磨砂玻璃控制面板与世界空间界面。</p><a href="#architecture">了解模块分工 →</a></article></div>
+  <div class="grid three"><article class="card"><span class="number">01</span><h3>跨平台图形</h3><p>通过 Grassland 的统一资源、命令与设备接口，面向 Metal、Vulkan 和 Direct3D 12 开发。后端能力按硬件与平台选择。</p><a href="reference/index.html">查看后端能力 →</a></article><article class="card"><span class="number">02</span><h3>从实时到路径追踪</h3><p>Sparkium 提供多条渲染路径；同一工程里探索光栅化、原生光线追踪、ray query 与软件回退。</p><a href="#examples">查看渲染样例 →</a></article><article class="card"><span class="number">03</span><h3>交互与仿真</h3><p>Snowberg 承载绘制和 GUI。统一底层既能保留游戏自己的视觉语言，也能提供磨砂玻璃控制面板与世界空间界面。</p><a href="reference/index.html">了解模块分工 →</a></article></div>
   <aside class="note">项目持续开发中。不同模块成熟度不同；安装要求、后端限制和可运行样例见对应选项卡。</aside>
 </section>
 <section id="install" aria-labelledby="install-title">
@@ -38,177 +38,6 @@ git -C assets lfs pull</code></pre><p>已有工作副本：执行 <code>git subm
   <article class="step"><span class="number">03</span><div><h2>配置 Release 构建</h2><label for="platform">构建平台</label> <select id="platform"><option value="mac">macOS · 原生 Metal</option><option value="linux">Linux · Vulkan</option><option value="windows">Windows · D3D12 / Vulkan</option></select><pre><code id="configure">cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release -DVCPKG_PATH=/path/to/vcpkg -DLONGMARCH_DISABLE_PYTHON=ON -DLONGMARCH_ENABLE_METAL=ON -DLONGMARCH_DISABLE_VULKAN=ON</code></pre><p>将 vcpkg 路径替换为本机路径。示例关闭可选 Python 绑定；CUDA 由工具链检测，可用 <code>-DLONGMARCH_DISABLE_CUDA=ON</code> 关闭。更换生成器或工具链时使用新的构建目录。</p></div></article>
   <article class="step"><span class="number">04</span><div><h2>编译并运行第一个样例</h2><pre><code>cmake --build build --target demo_graphics_hello
 ./build/demo/graphics_hello/demo_graphics_hello --module triangle</code></pre><p>Windows 下运行对应的 <code>.exe</code>。Ninja 默认构建不包含样例与测试，需显式指定目标。用 <code>--list</code> 查看 Graphics Hello 的模块。</p><div class="actions"><a class="button" href="#examples">选择下一个样例 →</a><a href="https://github.com/LazyJazzDev/LongMarch/blob/main/docs/vscode.md">VS Code 配置 ↗</a></div></div></article>
-</section>
-<section id="architecture" aria-labelledby="architecture-title">
-<div class="architecture-layout">
-<aside class="architecture-sidebar"><nav aria-label="架构分级目录"><p class="eyebrow">COMPONENT INDEX</p><a class="toc-overview" href="#architecture">架构总览</a>
-<details open><summary>Grassland · 基础设施</summary><ol><li><a href="#arch-grassland">模块概览</a></li>
-<li><a href="#arch-graphics">设备、资源与命令</a></li>
-<li><a href="#arch-backends">Metal / Vulkan / D3D12</a></li>
-<li><a href="#arch-shaders">着色器编译与资源打包</a></li>
-<li><a href="#arch-window">窗口、输入与 HDR</a></li>
-<li><a href="#arch-math">数学、网格与碰撞</a></li>
-<li><a href="#arch-bvh">空间加速结构</a></li>
-<li><a href="#arch-diff">可微物理计算核</a></li>
-<li><a href="#arch-util">采样、事件与诊断</a></li>
-</ol></details>
-<details open><summary>Sparkium · 渲染系统</summary><ol><li><a href="#arch-sparkium">模块概览</a></li>
-<li><a href="#arch-scene">场景与对象组织</a></li>
-<li><a href="#arch-pipelines">光栅与三种追踪路径</a></li>
-<li><a href="#arch-geometry">网格与发丝几何</a></li>
-<li><a href="#arch-materials">材质、灯光与 Shader Graph</a></li>
-<li><a href="#arch-camera">相机与景深</a></li>
-<li><a href="#arch-film">累积、色调映射与输出</a></li>
-<li><a href="#arch-scene-io">JSON 场景与工具链</a></li>
-</ol></details>
-<details open><summary>Snowberg · 绘制与交互</summary><ol><li><a href="#arch-snowberg">模块概览</a></li>
-<li><a href="#arch-draw">二维绘制与字体</a></li>
-<li><a href="#arch-gui">面板、控件与玻璃合成</a></li>
-<li><a href="#arch-world-ui">世界空间界面</a></li>
-<li><a href="#arch-surface">保留自定义风格的游戏表面</a></li>
-<li><a href="#arch-visualizer">场景可视化</a></li>
-<li><a href="#arch-solver">粒子、形变与刚体求解</a></li>
-</ol></details>
-<details open><summary>仿真组合与语言接口</summary><ol><li><a href="#arch-simulation">模块概览</a></li>
-<li><a href="#arch-pbd">Contradium · 刚体 PBD</a></li>
-<li><a href="#arch-practium">Practium · 仿真与渲染联动</a></li>
-<li><a href="#arch-python">Python 与 CUDA 互操作</a></li>
-</ol></details>
-</nav></aside>
-<div class="architecture-content"><header id="arch-overview"><p class="eyebrow">UNDER THE SURFACE</p><h1 id="architecture-title">架构说明<span class="dot">。</span></h1><p class="lead">从底层接口到场景应用，按组件了解职责、数据流、接入方式和当前边界。</p><p>以下内容根据当前源码、样例和已有测试整理。每项均附源码与进一步阅读入口；“已实现”表示有具体实现，不代表所有平台完成同等验证。</p></header>
-  <div class="architecture" aria-label="概念分层：应用与样例；渲染、界面、物理和仿真模块；Grassland 基础设施；原生图形后端"><div class="layer top">应用与样例 <small>2048 / GoL / Graphics Hello / NBody / 场景渲染</small></div><div class="module-row"><div>Sparkium<small>渲染</small></div><div>Snowberg<small>绘制与 GUI</small></div><div>Contradium<small>物理 · 开发中</small></div><div>Practium<small>仿真应用</small></div></div><div class="layer foundation">Grassland <small>graphics · 数学 · 几何 · 工具</small></div><div class="backend-row"><span>Metal</span><span>Vulkan</span><span>Direct3D 12</span></div></div><p class="caption">概念分层示意，并非完整的 CMake 依赖图。<code>LongMarch</code> 聚合目标与 <code>long_march.h</code> 提供统一接入点。</p>
-
-<div class="architecture-reading"><strong>选择接入层</strong><p>自己写渲染器：Grassland graphics。加载场景并出图：Sparkium。画工具界面或游戏 UI：Snowberg。组合简单刚体仿真与渲染：Practium。只需几何或导数计算：直接使用 math、bvh、diff_kernel。</p></div>
-<section class="component-group" aria-labelledby="arch-grassland"><h2 id="arch-grassland" class="anchor-heading">Grassland · 基础设施</h2><p class="group-intro">跨平台资源与命令接口，以及可独立使用的数学、几何和物理计算工具。</p>
-<article class="component" aria-labelledby="arch-graphics"><p class="component-api">graphics::Core / CommandContext</p><h3 id="arch-graphics" class="anchor-heading">设备、资源与命令</h3><p>图形层将设备选择、资源创建与命令提交收敛到统一接口。上层绘制、渲染器和计算样例共享同一组抽象。</p><ul>
-<li>Core 创建 Buffer、Image、Sampler、Shader、Program 和 CommandContext，管理在途帧并查询设备能力。BufferRange 用于描述缓冲区中的资源区间。</li>
-<li>Program、ComputeProgram、RayTracingProgram 分别承载光栅、计算与 RT 程序；CommandContext 记录资源操作、绘制、计算和追踪命令，再交给 Core 提交。</li>
-<li>加速结构接口覆盖底层几何 BLAS 和顶层实例 TLAS；完整 RT pipeline 与 inline ray query 是分别查询的能力，不能互相替代。</li>
-</ul><p class="component-use">适合：自定义渲染器、计算着色器、离屏渲染。资源需保持存活到 GPU 使用完成。</p><div class="component-links"><a href="https://github.com/LazyJazzDev/LongMarch/tree/main/code/grassland/graphics/interface.h">源码接口 ↗</a><a href="https://github.com/LazyJazzDev/LongMarch/tree/main/demo/graphics_hello">样例 / 进一步阅读 ↗</a><a href="#architecture">返回总览 ↑</a></div></article>
-<article class="component" aria-labelledby="arch-backends"><p class="component-api">graphics::backend</p><h3 id="arch-backends" class="anchor-heading">Metal / Vulkan / D3D12</h3><p>三个后端实现相同图形接口，并在设备初始化阶段暴露实际支持的能力。</p><ul>
-<li>Metal 使用原生 metal-cpp，支持光栅、计算、MRT、深度、混合、数据传输和支持设备上的 ray query；没有 RT pipeline / SBT 或 geometry shader。</li>
-<li>Vulkan 提供跨平台实现，窗口与扩展随平台选择。D3D12 面向 Windows；二者的 RT 和 ray query 都依赖具体硬件、驱动与扩展。</li>
-<li>CUDA 互操作接口包含共享缓冲和执行屏障，只有启用 CUDA 并有相应后端支持时可用；不能据此推断 Metal 支持 CUDA。</li>
-</ul><p class="component-use">适合：同一应用的多后端部署。请先查询能力，再选择功能。</p><div class="component-links"><a href="https://github.com/LazyJazzDev/LongMarch/tree/main/code/grassland/graphics/backend">源码接口 ↗</a><a href="https://github.com/LazyJazzDev/LongMarch/tree/main/docs/metal-backend.md">样例 / 进一步阅读 ↗</a><a href="#architecture">返回总览 ↑</a></div></article>
-<article class="component" aria-labelledby="arch-shaders"><p class="component-api">Shader / VirtualFileSystem</p><h3 id="arch-shaders" class="anchor-heading">着色器编译与资源打包</h3><p>统一着色器入口以 Slang 为基础，并允许从字符串或虚拟文件系统编译带指定入口点和参数的程序。</p><ul>
-<li>Slang 最低版本为 2026.18.1。着色器源文件可打包进 VirtualFileSystem，避免运行时完全依赖工作目录中的散落文件。</li>
-<li>Metal 使用 Slang → SPIR-V → SPIRV-Cross → MSL → 运行时编译的路径；其他后端选择对应的目标表示。</li>
-<li>PACK_SHADER_CODE 将工程中的着色器资源接入构建。外部着色器、ray query 和非一致资源索引都有对应示例或检查。</li>
-</ul><p class="component-use">适合：共享着色器逻辑、嵌入式资源和自定义着色器实验。编译成功仍需满足设备功能要求。</p><div class="component-links"><a href="https://github.com/LazyJazzDev/LongMarch/tree/main/code/grassland/graphics/shader.h">源码接口 ↗</a><a href="https://github.com/LazyJazzDev/LongMarch/tree/main/docs/slang-shaders.md">样例 / 进一步阅读 ↗</a><a href="#architecture">返回总览 ↑</a></div></article>
-<article class="component" aria-labelledby="arch-window"><p class="component-api">Window / window_gestures</p><h3 id="arch-window" class="anchor-heading">窗口、输入与 HDR</h3><p>窗口层连接平台窗口、图形呈现和输入事件，为原生交互样例提供统一入口。</p><ul>
-<li>窗口接口与事件机制承接按键、指针、滚动、尺寸变化等输入；macOS 另有触控板缩放手势及其阶段信息。</li>
-<li>高 DPI 下区分逻辑窗口尺寸与实际帧缓冲像素，GUI 和游戏据此映射绘制与指针坐标。</li>
-<li>HDR 输出依赖显示器、窗口系统和后端；Metal 使用 EDR，Linux 有独立的 HDR / Wayland 文档和探测程序。</li>
-</ul><p class="component-use">适合：交互应用、HDR 预览。HDR 请求不等于显示链路一定具备 HDR 能力。</p><div class="component-links"><a href="https://github.com/LazyJazzDev/LongMarch/tree/main/code/grassland/graphics/window.h">源码接口 ↗</a><a href="https://github.com/LazyJazzDev/LongMarch/tree/main/docs/graphics-window-input.md">样例 / 进一步阅读 ↗</a><a href="#architecture">返回总览 ↑</a></div></article>
-<article class="component" aria-labelledby="arch-math"><p class="component-api">grassland::Mesh / math</p><h3 id="arch-math" class="anchor-heading">数学、网格与碰撞</h3><p>数学模块包含线性代数辅助、几何基元、网格处理、距离计算与碰撞检测，是渲染和求解器共用的基础。</p><ul>
-<li>提供 AABB、射线、三角形、多项式求根、SVD 与正定投影等工具；静态碰撞和连续碰撞检测（CCD）有独立实现与测试。</li>
-<li>Mesh 保存位置、法线、UV、切线、颜色和索引，支持 OBJ 读写、顶点拆分/合并、法线和切线生成、球体生成与变换。</li>
-<li>MeshSDF 提供网格有符号距离查询，并可查询导数；包含主机数据和启用 CUDA 时的设备数据表示。</li>
-</ul><p class="component-use">适合：几何预处理、碰撞实验和可微几何。输入网格质量与具体算法假设仍需由调用方保证。</p><div class="component-links"><a href="https://github.com/LazyJazzDev/LongMarch/tree/main/code/grassland/math/math.h">源码接口 ↗</a><a href="https://github.com/LazyJazzDev/LongMarch/tree/main/test/math">样例 / 进一步阅读 ↗</a><a href="#architecture">返回总览 ↑</a></div></article>
-<article class="component" aria-labelledby="arch-bvh"><p class="component-api">BVHHost / BVHCuda / BVHRef</p><h3 id="arch-bvh" class="anchor-heading">空间加速结构</h3><p>BVH 将包围盒组织成层次结构，为几何查询减少需要访问的候选对象。</p><ul>
-<li>BVHHost 接收 AABB 和实例索引构建节点，支持更新实例数据，并提供轻量 BVHRef 供遍历代码访问。</li>
-<li>BVHCuda 将主机 BVH 的节点存入设备容器，向 CUDA 计算提供相同的引用表示；当前这一路径从主机构建结果创建设备树。</li>
-<li>它是通用软件空间结构。graphics 的硬件 BLAS / TLAS 和 Sparkium 的计算追踪路径各有自己的资源与执行实现。</li>
-</ul><p class="component-use">适合：主机 / CUDA 几何查询。CUDA 版本需相应工具链与设备。</p><div class="component-links"><a href="https://github.com/LazyJazzDev/LongMarch/tree/main/code/grassland/bvh/bvh.h">源码接口 ↗</a><a href="https://github.com/LazyJazzDev/LongMarch/tree/main/test/bvh">样例 / 进一步阅读 ↗</a><a href="#architecture">返回总览 ↑</a></div></article>
-<article class="component" aria-labelledby="arch-diff"><p class="component-api">grassland / physics/diff_kernel</p><h3 id="arch-diff" class="anchor-heading">可微物理计算核</h3><p>一组能计算函数值、Jacobian 和 Hessian 的几何与弹性能量核，便于组装数值优化和物理求解器。</p><ul>
-<li>基础函数覆盖行列式、向量长度、归一化、点积、叉积、Atan2 与函数组合；HessianTensor 表达高阶导数数据。</li>
-<li>几何核包含点、球、线段、胶囊、立方体、平面等 SDF，以及二面角和二面角能量。</li>
-<li>有限元工具提供三角形、四面体的形变梯度和 Neo-Hookean 系列弹性能量。测试目录包含基础函数、组合函数、SDF、FEM 和弹性模型的导数验证。</li>
-</ul><p class="component-use">适合：可微仿真、能量最小化与求解器原型。这些是计算核，时间积分和全局求解需另行组织。</p><div class="component-links"><a href="https://github.com/LazyJazzDev/LongMarch/tree/main/code/grassland/physics/diff_kernel/diff_kernel.h">源码接口 ↗</a><a href="https://github.com/LazyJazzDev/LongMarch/tree/main/test/physics">样例 / 进一步阅读 ↗</a><a href="#architecture">返回总览 ↑</a></div></article>
-<article class="component" aria-labelledby="arch-util"><p class="component-api">util / FrameProfile</p><h3 id="arch-util" class="anchor-heading">采样、事件与诊断</h3><p>通用工具为样例和底层系统提供采样、时间、事件、资源与日志支持。</p><ul>
-<li>Sobol 低差异采样使用方向数素材，并有对应单元测试；素材缺失会报告错误，因此首次克隆必须拉取 LFS 资源。</li>
-<li>EventManager、延迟处理、计时器、节拍器和 FPSCounter 用于事件连接、生命周期处理和交互循环；另有日志、文件探测与字符串转换工具。</li>
-<li>FrameProfile 提供选择性开启的 CPU / GPU 帧分析。GPU 时间戳目前只支持 Vulkan，并须等待 GPU 完成后读取；CPU 计时可用于其他后端。</li>
-</ul><p class="component-use">适合：采样器、应用循环和性能诊断。嵌套计时的包含关系需要在分析时考虑。</p><div class="component-links"><a href="https://github.com/LazyJazzDev/LongMarch/tree/main/code/grassland/util/util.h">源码接口 ↗</a><a href="https://github.com/LazyJazzDev/LongMarch/tree/main/docs/rt-fallback-profile.md">样例 / 进一步阅读 ↗</a><a href="#architecture">返回总览 ↑</a></div></article>
-</section>
-<section class="component-group" aria-labelledby="arch-sparkium"><h2 id="arch-sparkium" class="anchor-heading">Sparkium · 渲染系统</h2><p class="group-intro">从场景描述到图像输出，组织几何、材质、相机、灯光和不同渲染路径。</p>
-<article class="component" aria-labelledby="arch-scene"><p class="component-api">Core / Scene / Entity</p><h3 id="arch-scene" class="anchor-heading">场景与对象组织</h3><p>Core 持有渲染公共资源，Scene 注册实体和渲染设置，Entity 将场景对象接入具体管线。</p><ul>
-<li>Core::Render 接收 Scene、Camera、Film 和渲染路径；ResolveRenderPipeline 返回自动选择或回退后的实际路径，供渲染和界面一致使用。</li>
-<li>Scene 可添加、删除和启停实体，并维护稳定的注册顺序，用于实例 ID 和灯光采样。</li>
-<li>Geometry 与 Material 分离：EntityGeometryMaterial 组合二者；EntityPointLight 提供点光源。公共着色器、缓冲和图像由 Core 统一提供。</li>
-</ul><p class="component-use">适合：程序化场景、交互渲染器与多管线实验。</p><div class="component-links"><a href="https://github.com/LazyJazzDev/LongMarch/tree/main/code/sparkium/core">源码接口 ↗</a><a href="https://github.com/LazyJazzDev/LongMarch/tree/main/demo/sparkium_gui">样例 / 进一步阅读 ↗</a><a href="#architecture">返回总览 ↑</a></div></article>
-<article class="component" aria-labelledby="arch-pipelines"><p class="component-api">raster / raytracing</p><h3 id="arch-pipelines" class="anchor-heading">光栅与三种追踪路径</h3><p>渲染路径包括显式光栅化、原生 RT pipeline、基于 ray query 的计算路径追踪，以及软件 BVH 计算回退。</p><ul>
-<li>光栅管线拥有独立的场景、材质与几何实现。追踪路径共享 raytracing 系统中的相机、材质、灯光及采样逻辑。</li>
-<li>auto 在 Vulkan / D3D12 支持 ray query 时优先使用它，否则依次考虑原生 RT、ray query 和软件回退；Metal 通常进入 ray query 或软件回退。auto 不自动选择光栅。</li>
-<li>显式请求原生 RT 但设备不支持时，可回退到 ray query 或软件；显式请求不可用的 ray_query 会报错。软件回退在 GPU 计算着色器中执行，不是 CPU 离线渲染器。</li>
-</ul><p class="component-use">适合：不同 GPU 能力下的统一场景渲染。各管线支持的材质效果不保证完全相同。</p><div class="component-links"><a href="https://github.com/LazyJazzDev/LongMarch/tree/main/code/sparkium/core/core.cpp">源码接口 ↗</a><a href="https://github.com/LazyJazzDev/LongMarch/tree/main/docs/rt-fallback.md">样例 / 进一步阅读 ↗</a><a href="#architecture">返回总览 ↑</a></div></article>
-<article class="component" aria-labelledby="arch-geometry"><p class="component-api">GeometryMesh / GeometryHair</p><h3 id="arch-geometry" class="anchor-heading">网格与发丝几何</h3><p>几何对象将主机网格接入渲染系统，并由管线生成其需要的 GPU 表示。</p><ul>
-<li>GeometryMesh 承载三角网格，配合变换与材质构成可渲染实体；网格数据可来自程序生成或场景导入。</li>
-<li>GeometryHair 接收控制点、半径和发束偏移，将各条发丝生成带法线和 UV 的管状三角网格；径向细分数决定网格精度。</li>
-<li>当前发丝通过网格表示参与渲染，不是硬件原生曲线 primitive，也不意味着已实现完整毛发散射模型。</li>
-</ul><p class="component-use">适合：通用网格、程序几何与发丝形状预览。</p><div class="component-links"><a href="https://github.com/LazyJazzDev/LongMarch/tree/main/code/sparkium/geometry">源码接口 ↗</a><a href="https://github.com/LazyJazzDev/LongMarch/tree/main/docs/json-scenes.md">样例 / 进一步阅读 ↗</a><a href="#architecture">返回总览 ↑</a></div></article>
-<article class="component" aria-labelledby="arch-materials"><p class="component-api">Material / MaterialShaderGraph</p><h3 id="arch-materials" class="anchor-heading">材质、灯光与 Shader Graph</h3><p>材质层包含 Lambertian、Specular、Principled 与发光材质，并支持由 JSON 节点图生成 Slang 表面参数计算。</p><ul>
-<li>基础材质表达漫反射、镜面与发光行为；Principled 提供更丰富的表面参数。点光源实体与发光几何分别由对应灯光实现接入追踪系统。</li>
-<li>MaterialShaderGraph 保存生成的代码、纹理引用和 emission hint；场景更新时安排纹理索引。具体可用节点由 JSON 导入和着色器生成代码决定。</li>
-<li>光栅与追踪分别实现材质适配。复杂节点图不应被理解为对外部 DCC 全部节点与渲染结果的无差别兼容。</li>
-</ul><p class="component-use">适合：材质实验、纹理场景与 Blender 场景转换后的验证。</p><div class="component-links"><a href="https://github.com/LazyJazzDev/LongMarch/tree/main/code/sparkium/material">源码接口 ↗</a><a href="https://github.com/LazyJazzDev/LongMarch/tree/main/docs/blender-align.md">样例 / 进一步阅读 ↗</a><a href="#architecture">返回总览 ↑</a></div></article>
-<article class="component" aria-labelledby="arch-camera"><p class="component-api">CameraPinhole / CameraThinLens</p><h3 id="arch-camera" class="anchor-heading">相机与景深</h3><p>相机层提供针孔与薄透镜模型，前者用于清晰投影，后者在追踪路径中模拟有限光圈带来的景深。</p><ul>
-<li>CameraPinhole 提供基本透视相机；CameraThinLens 扩展焦平面和光圈相关参数，通过镜头采样形成离焦模糊。</li>
-<li>相机基础接口与各管线中的实现分开，渲染调用仍使用统一 Camera 对象。</li>
-<li>Thin Lens 样例构建不同深度的物体，并提供交互参数和无窗口输出入口，可用于观察对焦与光圈变化。</li>
-</ul><p class="component-use">适合：透视场景、摄影相机实验。薄透镜并不是完整多镜片光学系统。</p><div class="component-links"><a href="https://github.com/LazyJazzDev/LongMarch/tree/main/code/sparkium/camera">源码接口 ↗</a><a href="https://github.com/LazyJazzDev/LongMarch/tree/main/demo/thin_lens">样例 / 进一步阅读 ↗</a><a href="#architecture">返回总览 ↑</a></div></article>
-<article class="component" aria-labelledby="arch-film"><p class="component-api">Film</p><h3 id="arch-film" class="anchor-heading">累积、色调映射与输出</h3><p>Film 将渲染中的线性图像与最终显示分开，负责累积状态、重置与显示变换。</p><ul>
-<li>保存原始图像、深度和 stencil 资源，并记录 accumulated_samples、persistence 和 clamping 等设置。</li>
-<li>Develop 将图像转换到目标图像，包含曝光、gamma、contrast 与 view transform；线性 HDR 输出采用 linear sRGB 和扩展的 Filmic 外观。</li>
-<li>Reset 及重置回调使场景或参数改变后可以清除累积。最终是否以 HDR 呈现还取决于 graphics 窗口和显示链路。</li>
-</ul><p class="component-use">适合：渐进渲染、结果预览和 SDR / HDR 输出。</p><div class="component-links"><a href="https://github.com/LazyJazzDev/LongMarch/tree/main/code/sparkium/core/film.h">源码接口 ↗</a><a href="https://github.com/LazyJazzDev/LongMarch/tree/main/docs/linux-hdr.md">样例 / 进一步阅读 ↗</a><a href="#architecture">返回总览 ↑</a></div></article>
-<article class="component" aria-labelledby="arch-scene-io"><p class="component-api">scene_io / Sparkium CLI &amp; GUI</p><h3 id="arch-scene-io" class="anchor-heading">JSON 场景与工具链</h3><p>JSON 场景入口把场景资源、模型、相机和渲染设置连接起来，CLI 与 GUI 复用渲染系统。</p><ul>
-<li>场景格式与导入器在 scene_io 中维护；使用仓库的示例场景和格式文档作为字段、资源路径及支持类型的依据。</li>
-<li>GUI 用于浏览场景、交互调参与图像观察；CLI 用于批量或无窗口渲染。Blender 对齐文档说明转换后的效果验证范围。</li>
-<li>模型、贴图、场景与报告图片集中存放在 assets LFS 子模块，主仓库固定其提交版本，便于复现实验。</li>
-</ul><p class="component-use">适合：场景交换、自动渲染与回归对比。外部格式支持以导入器实际处理的字段为准。</p><div class="component-links"><a href="https://github.com/LazyJazzDev/LongMarch/tree/main/code/sparkium/scene_io">源码接口 ↗</a><a href="https://github.com/LazyJazzDev/LongMarch/tree/main/docs/json-scenes.md">样例 / 进一步阅读 ↗</a><a href="#architecture">返回总览 ↑</a></div></article>
-</section>
-<section class="component-group" aria-labelledby="arch-snowberg"><h2 id="arch-snowberg" class="anchor-heading">Snowberg · 绘制与交互</h2><p class="group-intro">面向应用的绘制、界面、可视化与求解组件；它们各有明确的数据和使用入口。</p>
-<article class="component" aria-labelledby="arch-draw"><p class="component-api">draw::Core / Model / Texture</p><h3 id="arch-draw" class="anchor-heading">二维绘制与字体</h3><p>draw 提供命令式的模型、纹理和文本绘制，GUI 面板使用它绘制基础形状与文字。</p><ul>
-<li>BeginDraw / EndDraw 收集命令，Render 将其提交到指定图像。CmdDrawInstance 携带变换、颜色和可选纹理；CmdSetDrawRegion 设置绘制区域。</li>
-<li>FontCore 管理字体数据；Core 支持字体文件、ASCII 字体、字号设置、文本宽度测量及文本绘制。</li>
-<li>绘制程序按目标 ImageFormat 缓存，模型与纹理通过底层 graphics 资源执行。它适合直接绘图，不负责通用应用布局。</li>
-</ul><p class="component-use">适合：2D 覆盖层、文字、游戏自定义图形。</p><div class="component-links"><a href="https://github.com/LazyJazzDev/LongMarch/tree/feat/snowberg-gui/code/snowberg/draw">源码接口 ↗</a><a href="https://github.com/LazyJazzDev/LongMarch/tree/feat/snowberg-gui/demo/draw_n_gui">样例 / 进一步阅读 ↗</a><a href="#architecture">返回总览 ↑</a></div></article>
-<article class="component" aria-labelledby="arch-gui"><p class="component-api">gui::Context / Theme / Canvas</p><h3 id="arch-gui" class="anchor-heading">面板、控件与玻璃合成</h3><p>Context 每帧声明可见控件，并保留稳定 ID 对应的指针捕获状态。Theme 与自定义 Canvas 提供统一的外观和绘制入口。</p><ul>
-<li>面板与行布局包含 Text、Heading、Button、Checkbox、整数/浮点 Slider、Choice、Plot、Spacer 和 Separator。Custom 返回指针响应并调用 Canvas 绘制回调。</li>
-<li>Canvas 提供矩形、圆、文字与粒子场。EndFrame 接收场景图像，通过两遍背景模糊与合成得到玻璃面板效果；Theme 控制颜色、暗色风格和背景模糊。</li>
-<li>WantsPointer 帮助应用协调界面与场景输入。当前通用键盘焦点、文本编辑和滚动裁剪仍不完整；粒子场是绘制能力，不是独立粒子模拟系统。</li>
-</ul><p class="component-use">适合：渲染工具和调参面板。当前统一 GUI 实现随 PR #79 提供。</p><div class="component-links"><a href="https://github.com/LazyJazzDev/LongMarch/tree/feat/snowberg-gui/code/snowberg/gui/gui.h">源码接口 ↗</a><a href="https://github.com/LazyJazzDev/LongMarch/tree/feat/snowberg-gui/demo/gui">样例 / 进一步阅读 ↗</a><a href="#architecture">返回总览 ↑</a></div></article>
-<article class="component" aria-labelledby="arch-world-ui"><p class="component-api">gui::WorldPanel</p><h3 id="arch-world-ui" class="anchor-heading">世界空间界面</h3><p>WorldPanel 将同一个 GUI Context 用于 3D 场景中的平面面板。</p><ul>
-<li>界面先绘制到离屏纹理，再作为场景中的四边形绘制，并参与深度测试，使它与 3D 物体具有遮挡关系。</li>
-<li>通过射线与面板相交计算局部坐标，再转为 Context 的指针输入；屏幕空间与世界空间面板可以在同一个样例中使用。</li>
-<li>它提供平面世界 UI 的渲染与命中能力。跨多个面板的输入优先级、相机射线和场景对象交互仍由应用组织。</li>
-</ul><p class="component-use">适合：游戏内仪表、3D 控制面板。示例与接口见 PR #79。</p><div class="component-links"><a href="https://github.com/LazyJazzDev/LongMarch/tree/feat/snowberg-gui/code/snowberg/gui/world_panel.h">源码接口 ↗</a><a href="https://github.com/LazyJazzDev/LongMarch/tree/feat/snowberg-gui/demo/gui">样例 / 进一步阅读 ↗</a><a href="#architecture">返回总览 ↑</a></div></article>
-<article class="component" aria-labelledby="arch-surface"><p class="component-api">gui::surface</p><h3 id="arch-surface" class="anchor-heading">保留自定义风格的游戏表面</h3><p>surface 将 2048 和 GoL 原先重复的应用、输入、模型绘制、按钮及动画基础设施整合到共享模块。</p><ul>
-<li>Application 管理图形应用循环与窗口输入，DeviceModel 提供游戏网格数据的绘制基础，Listener / Button 承接事件和按钮交互。</li>
-<li>AnimationVar 与插值工具维护动画状态；游戏可以继续提供自己的网格、着色器、字体和视觉逻辑。</li>
-<li>2048 与 GoL 保留原有布局、配色、图标、动画和操作。统一基础设施与 GUI 面板共处于 snowberg/gui，应用可选择合适的绘制入口。</li>
-</ul><p class="component-use">适合：已有游戏 UI 迁移及高度自定义界面。新 surface 随 PR #79 提供。</p><div class="component-links"><a href="https://github.com/LazyJazzDev/LongMarch/tree/feat/snowberg-gui/code/snowberg/gui/surface">源码接口 ↗</a><a href="https://github.com/LazyJazzDev/LongMarch/tree/feat/snowberg-gui/demo/2048">样例 / 进一步阅读 ↗</a><a href="#architecture">返回总览 ↑</a></div></article>
-<article class="component" aria-labelledby="arch-visualizer"><p class="component-api">visualizer::Core / Scene / Film</p><h3 id="arch-visualizer" class="anchor-heading">场景可视化</h3><p>visualizer 提供可扩展的场景可视化渲染组织，拥有独立的相机、网格、实体、程序与图像资源。</p><ul>
-<li>Core 创建 Camera、Mesh、Scene 和 Film；Scene 注册 Entity，由实体在不同渲染阶段执行自己的逻辑。</li>
-<li>几何阶段写入 exposure、albedo、position、normal 与 depth 等通道，再执行光照阶段；相机数据通过缓冲传给着色器。</li>
-<li>OwnershipHolder 按在途帧保留资源，并在命令执行完成后清理，避免渲染中的资源被提前释放。</li>
-</ul><p class="component-use">适合：自定义实体和多通道可视化。现有管线骨架与资源管理已实现，具体可视化内容需实现 Entity。</p><div class="component-links"><a href="https://github.com/LazyJazzDev/LongMarch/tree/feat/snowberg-gui/code/snowberg/visualizer">源码接口 ↗</a><a href="https://github.com/LazyJazzDev/LongMarch/tree/feat/snowberg-gui/code/snowberg/visualizer/visualizer_core.cpp">样例 / 进一步阅读 ↗</a><a href="#architecture">返回总览 ↑</a></div></article>
-<article class="component" aria-labelledby="arch-solver"><p class="component-api">solver::Scene / SceneDevice</p><h3 id="arch-solver" class="anchor-heading">粒子、形变与刚体求解</h3><p>solver 管理粒子、拉伸/弯曲元素与刚体对象，并提供 CUDA 设备侧求解和状态查询入口。</p><ul>
-<li>ObjectPack 将粒子和约束成组加入主机场景；稳定 ID 通过目录结构映射到内部索引，刚体使用网格 SDF 数据。</li>
-<li>SceneDevice 保存设备位置、速度、质量、约束和刚体状态，提供 Update / UpdateBatch，以及位置查询和刚体刚度、摩擦相关接口。</li>
-<li>设备实现受 __CUDACC__ 条件控制，主机数据接口的存在不代表 Metal 上拥有等价求解后端。</li>
-</ul><p class="component-use">适合：CUDA 物理实验和批量场景更新。此处为源码能力说明，本轮文档更新未执行 CUDA 验证。</p><div class="component-links"><a href="https://github.com/LazyJazzDev/LongMarch/tree/feat/snowberg-gui/code/snowberg/solver">源码接口 ↗</a><a href="https://github.com/LazyJazzDev/LongMarch/tree/feat/snowberg-gui/code/snowberg/solver/solver_scene.h">样例 / 进一步阅读 ↗</a><a href="#architecture">返回总览 ↑</a></div></article>
-</section>
-<section class="component-group" aria-labelledby="arch-simulation"><h2 id="arch-simulation" class="anchor-heading">仿真组合与语言接口</h2><p class="group-intro">已具备可运行的组成路径，同时保留实验性模块的边界。</p>
-<article class="component" aria-labelledby="arch-pbd"><p class="component-api">contradium::PBDSolver</p><h3 id="arch-pbd" class="anchor-heading">Contradium · 刚体 PBD</h3><p>当前具体实现是刚体 PBD 求解器：维护网格、SDF、位姿、质量、惯量与线/角速度。</p><ul>
-<li>AddEntity 创建刚体及其网格 SDF。Step 施加重力、预测位姿，通过顶点与对方网格 SDF 检测接触，再迭代修正位置和旋转。</li>
-<li>状态接口可设置位置、朝向、质量、惯量和速度。求解完成后由修正位姿更新线速度和角速度。</li>
-<li>现有算法使用成对对象和顶点检查、固定迭代次数与标量惯量，适合小规模实验；完整关节、通用动力学体系和大规模性能并未由此得到保证。</li>
-</ul><p class="component-use">适合：简单刚体接触与 PBD 研究。应视为实验性求解器。</p><div class="component-links"><a href="https://github.com/LazyJazzDev/LongMarch/tree/main/code/contradium/pbd/pbd_solver.cpp">源码接口 ↗</a><a href="https://github.com/LazyJazzDev/LongMarch/tree/main/demo/practium_hello">样例 / 进一步阅读 ↗</a><a href="#architecture">返回总览 ↑</a></div></article>
-<article class="component" aria-labelledby="arch-practium"><p class="component-api">practium::Core / Scene / Entity</p><h3 id="arch-practium" class="anchor-heading">Practium · 仿真与渲染联动</h3><p>Practium 将 Sparkium 渲染场景和 Contradium 求解器组织到同一个应用场景，连接物理状态与可见对象。</p><ul>
-<li>ModelMesh、MaterialPBDRigid 与 EntityPBDRigid 组成当前明确实现的网格刚体路径。Scene 按需要创建 PBDSolver，并注册实体。</li>
-<li>Step 推进物理；SyncRenderState 将实体状态同步到 Sparkium。当前 Step 使用固定 0.01 秒步长，不应将声明中的 Settings 理解为已生效的通用调度器。</li>
-<li>现有 AddEntity 实现识别 PBD 刚体材质。更多实体类型、机器人控制和完整仿真框架还需继续扩展。</li>
-</ul><p class="component-use">适合：简单物理场景的渲染联动，参考 practium_hello。</p><div class="component-links"><a href="https://github.com/LazyJazzDev/LongMarch/tree/main/code/practium/core/scene.cpp">源码接口 ↗</a><a href="https://github.com/LazyJazzDev/LongMarch/tree/main/demo/practium_hello">样例 / 进一步阅读 ↗</a><a href="#architecture">返回总览 ↑</a></div></article>
-<article class="component" aria-labelledby="arch-python"><p class="component-api">pybind11 / long_march</p><h3 id="arch-python" class="anchor-heading">Python 与 CUDA 互操作</h3><p>可选的 Python 绑定主要覆盖 Grassland graphics，让脚本使用核心图形对象与窗口接口。</p><ul>
-<li>绑定包括 Core、设备缓冲、图像、采样器、着色器、光栅/计算/RT 程序、加速结构、命令上下文与 Window。</li>
-<li>python 目录提供 Graphics Hello 系列、计算 NBody 和 Warp 相关样例。启用 CUDA 时可提供共享缓冲设备指针；依赖配置与硬件要求仍需满足。</li>
-<li>还保留 graphics.imgui 兼容接口和 FrameProfile 绑定。原生 demo 的 GUI 迁移不代表引擎与 Python 的 ImGui 支持已移除，也不代表五大模块已全部绑定到 Python。</li>
-</ul><p class="component-use">适合：图形脚本、计算实验与 Python / GPU 协作。CMake 中不要禁用 Python 绑定。</p><div class="component-links"><a href="https://github.com/LazyJazzDev/LongMarch/tree/main/code/pybind/grassland/graphics">源码接口 ↗</a><a href="https://github.com/LazyJazzDev/LongMarch/tree/main/python">样例 / 进一步阅读 ↗</a><a href="#architecture">返回总览 ↑</a></div></article>
-</section>
-</div>
-</div>
 </section>
 <section id="examples" aria-labelledby="examples-title">
   <p class="eyebrow">LEARN BY RUNNING</p><h1 id="examples-title">样例说明<span class="dot">。</span></h1><p class="lead">从一块游戏棋盘，到 GPU 上的粒子与光线。每个样例都是一个独立的实验入口。</p>
