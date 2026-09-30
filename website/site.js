@@ -11,23 +11,61 @@ pages.forEach((page) => {
   page.setAttribute('aria-labelledby', `tab-${page.id}`);
   page.tabIndex = 0;
 });
+const tocLinks = [...document.querySelectorAll('.architecture-sidebar a')];
+const architecture = document.querySelector('#architecture');
+const headings = [...architecture.querySelectorAll('.anchor-heading')];
+function highlightSection(id) {
+  tocLinks.forEach((link) => {
+    if (link.hash === `#${id}`) link.setAttribute('aria-current', 'location');
+    else link.removeAttribute('aria-current');
+  });
+}
 function showPage() {
-  const id = location.hash.slice(1);
-  const active = pages.some((page) => page.id === id) ? id : 'home';
-  pages.forEach((page) => { page.hidden = page.id !== active; });
+  const target = document.getElementById(location.hash.slice(1));
+  // The skip link moves focus to the current page without changing its tab.
+  if (target?.id === 'content') return;
+  const page = target?.closest('main > section') || pages[0];
+  const deepLink = target && target !== page && page.contains(target);
+  pages.forEach((item) => { item.hidden = item !== page; });
   tabs.forEach((tab) => {
-    const selected = tab.hash === `#${active}`;
+    const selected = tab.hash === `#${page.id}`;
     tab.setAttribute('aria-selected', String(selected));
     tab.tabIndex = selected ? 0 : -1;
   });
-  document.title = `${tabs.find((tab) => tab.hash === `#${active}`).textContent} · LongMarch 长征`;
+  document.title = `${tabs.find((tab) => tab.hash === `#${page.id}`).textContent} · LongMarch 长征`;
+  if (deepLink) {
+    const link = tocLinks.find((item) => item.hash === location.hash);
+    const group = link?.closest('details');
+    if (group) group.open = true;
+    target.tabIndex = -1;
+    target.focus({ preventScroll: true });
+    target.scrollIntoView({ block: 'start' });
+    highlightSection(target.id);
+  } else {
+    window.scrollTo({ top: 0, behavior: 'instant' });
+    highlightSection('architecture');
+    // Links inside a panel must not leave focus in a newly hidden panel.
+    if (document.activeElement?.closest('section[hidden]')) page.focus({ preventScroll: true });
+  }
 }
 showPage();
-window.addEventListener('hashchange', () => {
-  if (!pages.some((page) => `#${page.id}` === location.hash)) return;
-  showPage();
-  window.scrollTo({ top: 0, behavior: 'instant' });
-});
+window.addEventListener('hashchange', showPage);
+// Restore fragment positioning after the browser restores an old scroll offset.
+window.addEventListener('pageshow', () => requestAnimationFrame(showPage));
+let scrollScheduled = false;
+window.addEventListener('scroll', () => {
+  if (architecture.hidden || scrollScheduled) return;
+  scrollScheduled = true;
+  requestAnimationFrame(() => {
+    scrollScheduled = false;
+    let active = 'architecture';
+    for (const heading of headings) {
+      if (heading.getBoundingClientRect().top > 100) break;
+      active = heading.id;
+    }
+    highlightSection(active);
+  });
+}, { passive: true });
 navigation.addEventListener('keydown', (event) => {
   const index = tabs.indexOf(document.activeElement);
   if (index < 0) return;

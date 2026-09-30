@@ -1,8 +1,8 @@
 name: Publish project website
 on:
   push:
-    branches: [main]
-    paths: ['website/**', '.github/workflows/pages.yml']
+    branches: [main, gh-pages]
+    paths: ['website/**', '.github/workflows/pages.yml', 'index.html', 'style.css', 'site.js', 'play/**', 'gameoflife/**']
   workflow_dispatch:
 permissions:
   contents: read
@@ -13,7 +13,7 @@ concurrency:
   cancel-in-progress: false
 jobs:
   deploy:
-    if: github.ref == 'refs/heads/main'
+    if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/gh-pages'
     runs-on: ubuntu-latest
     environment:
       name: github-pages
@@ -29,7 +29,11 @@ jobs:
         run: |
           mkdir -p _site
           cp -R legacy-pages/play legacy-pages/gameoflife _site/
-          cp -R website/. _site/
+          if [ "$GITHUB_REF_NAME" = "gh-pages" ]; then
+            cp index.html style.css site.js _site/
+          else
+            cp website/index.html website/style.css website/site.js _site/
+          fi
           touch _site/.nojekyll
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
