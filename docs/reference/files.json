@@ -1,4 +1,11 @@
 {
+  "code/CMakeLists.txt": {
+    "details": [
+      "LongMarch Python 扩展额外部署 Slang 的动态插件；系统库通过平台排除规则保留为运行环境依赖。"
+    ],
+    "sha256": "844ec4464fe61382099ed15d4792bdf9ed23d6cab8d1503f741491d5c15b813a",
+    "summary": "定义 code 的构建目标、子模块接入和传递依赖。"
+  },
   "code/contradium/CMakeLists.txt": {
     "details": [
       "源文件集合、目标链接和父作用域导出以本页列出的 CMake 原文为准；PUBLIC 依赖会传递给使用此目标的调用方。"
@@ -108,6 +115,660 @@
     ],
     "sha256": "202dabb49b67c19aae79ac85dc65057eec85f6306ab0c7aecfd6188e9663f165",
     "summary": "聚合头：将相关声明从一个入口暴露给调用方。"
+  },
+  "code/grassland/CMakeLists.txt": {
+    "details": [
+      "按当前 CMake 条件选择源文件与平台库；详细参数和 PUBLIC/PRIVATE 边界见本文件原文。"
+    ],
+    "sha256": "a1e66d2950f97f56fe977e22efa08ce3f72d3ce4176162a148a89737da79fa1e",
+    "summary": "定义 code/grassland 的构建目标、子模块接入和传递依赖。"
+  },
+  "code/grassland/bvh/CMakeLists.txt": {
+    "details": [
+      "源文件集合、目标链接和父作用域导出以本页列出的 CMake 原文为准；PUBLIC 依赖会传递给使用此目标的调用方。"
+    ],
+    "sha256": "f1a22391cb035c7d3cbf20526dd184574810c41865214ef32fc64ec43af3a715",
+    "summary": "定义 bvh 的 CMake 构建边界与传递依赖。"
+  },
+  "code/grassland/bvh/bvh.cpp": {
+    "details": [
+      "#include \"grassland/bvh/bvh.h\""
+    ],
+    "sha256": "f96fe8041231c62218c70f9a49c5e0c619da4f84c6f74737f49b25e9cb43d882",
+    "summary": "模块编译单元：包含对应头文件并保留命名空间边界，无额外运行时算法。"
+  },
+  "code/grassland/bvh/bvh.h": {
+    "details": [
+      "#include \"grassland/bvh/bvh_host.h\"",
+      "#include \"grassland/bvh/bvh_cuda.cuh\""
+    ],
+    "sha256": "fb0444cb309a4cbe740fede91a0cc3727c89695ab66fab83edfd32a1a548feb8",
+    "summary": "聚合头：将相关声明从一个入口暴露给调用方。"
+  },
+  "code/grassland/bvh/bvh_cuda.cu": {
+    "details": [
+      "从 BVHHost 的节点数组复制到 thrust::device_vector；此处不在 GPU 上构建树。",
+      "GetRef 暴露设备节点指针，必须在兼容的设备执行上下文使用。"
+    ],
+    "sha256": "d67b1c25ab79ae1a0b43fbf3b29deb6df8974a122bd8a1d0155b0078b5af12d5",
+    "summary": "CUDA 设备端 BVH 存储适配"
+  },
+  "code/grassland/bvh/bvh_cuda.cuh": {
+    "details": [
+      "从 BVHHost 的节点数组复制到 thrust::device_vector；此处不在 GPU 上构建树。",
+      "GetRef 暴露设备节点指针，必须在兼容的设备执行上下文使用。"
+    ],
+    "sha256": "686dd8ffbb33902cc1d7c029b7b284bf764ee2baf18a5dce3365f54cd82f1c74",
+    "summary": "CUDA 设备端 BVH 存储适配"
+  },
+  "code/grassland/bvh/bvh_host.cpp": {
+    "details": [
+      "UpdateInstances 将节点数组调整到 2N−1；没有处理 N=0 的分支。",
+      "构建按 AABB 下界在当前轴排序，轴按 x/y/z 循环；不是 SAH 构建，也不是增量 refit。",
+      "先构造右子树，再构造左子树；左子树失败链接指向右子树，右子树继承父级失败链接。"
+    ],
+    "sha256": "8d66db7eb317c239de1868862298ccdc7430df631d18f288fc2e587262a8550c",
+    "summary": "CPU BVH 存储、全量构建和调试输出；本文件实现接口行为。"
+  },
+  "code/grassland/bvh/bvh_host.h": {
+    "details": [
+      "UpdateInstances 将节点数组调整到 2N−1；没有处理 N=0 的分支。",
+      "构建按 AABB 下界在当前轴排序，轴按 x/y/z 循环；不是 SAH 构建，也不是增量 refit。",
+      "先构造右子树，再构造左子树；左子树失败链接指向右子树，右子树继承父级失败链接。"
+    ],
+    "sha256": "4d79cf50eee4be23daec629560cc7bff2cbb64ec9b15612cbd6f370c2f6867b3",
+    "summary": "CPU BVH 存储、全量构建和调试输出；本文件定义类型与调用接口。"
+  },
+  "code/grassland/bvh/bvh_util.cpp": {
+    "details": [
+      "叶子保存实例编号；内部节点保存左右孩子。next_node_on_failure 为 −1 时结束。",
+      "Traversal 从节点 0 开始；包围盒不命中便沿失败链接跳转，命中内部节点则进入左孩子。",
+      "实例回调返回值累计为最终命中标志，不会因首次命中自动终止。"
+    ],
+    "sha256": "a7f3fda1146e70742ab7114a6a87706b00a85bc3def5713b59097efd0b6bc88f",
+    "summary": "CPU/CUDA 共用的节点布局、AABB 合并和无栈遍历；本文件实现接口行为。"
+  },
+  "code/grassland/bvh/bvh_util.h": {
+    "details": [
+      "叶子保存实例编号；内部节点保存左右孩子。next_node_on_failure 为 −1 时结束。",
+      "Traversal 从节点 0 开始；包围盒不命中便沿失败链接跳转，命中内部节点则进入左孩子。",
+      "实例回调返回值累计为最终命中标志，不会因首次命中自动终止。"
+    ],
+    "sha256": "8528e01dc0a94d3c2e9fdad1926d3eda59b583b94cc8b641f62e9a03cbfcc6fe",
+    "summary": "CPU/CUDA 共用的节点布局、AABB 合并和无栈遍历；本文件定义类型与调用接口。"
+  },
+  "code/grassland/graphics/CMakeLists.txt": {
+    "details": [
+      "按当前 CMake 条件选择源文件与平台库；详细参数和 PUBLIC/PRIVATE 边界见本文件原文。"
+    ],
+    "sha256": "197355035f4cbb2de55d26e9c6bf27908508a4565935b578c7a7a4e3c63ee95f",
+    "summary": "定义 code/grassland/graphics 的构建目标、子模块接入和传递依赖。"
+  },
+  "code/grassland/graphics/acceleration_structure.cpp": {
+    "details": [
+      "MakeInstance 将 GLM 列主序矩阵写为 instance.transform[行][列]。",
+      "简化实例列表重载按输入顺序生成 instance_id，再调用后端实现。",
+      "实例保存借用 BLAS 指针，TLAS 使用期间须保留相关结构及依赖资源。"
+    ],
+    "sha256": "1505ea0d50093adcab9a24b351e5955ce8a39a30b74f958c70072d8fe92e858e",
+    "summary": "加速结构实例化与更新协议；本文件实现接口行为。"
+  },
+  "code/grassland/graphics/acceleration_structure.h": {
+    "details": [
+      "MakeInstance 将 GLM 列主序矩阵写为 instance.transform[行][列]。",
+      "简化实例列表重载按输入顺序生成 instance_id，再调用后端实现。",
+      "实例保存借用 BLAS 指针，TLAS 使用期间须保留相关结构及依赖资源。"
+    ],
+    "sha256": "6a643f6b9cb6b4d88a4e3bd4dc0dd4c605087767c6cdd52b74121df63828f906",
+    "summary": "加速结构实例化与更新协议；本文件定义类型与调用接口。"
+  },
+  "code/grassland/graphics/buffer.cpp": {
+    "details": [
+      "Type/Size/Resize/Upload/Download 的具体内存与同步行为由后端定义。",
+      "BufferRange 默认 size=~0ull 表示剩余区间，通过 min 限制大小；offset>Size 会发生无符号下溢，不能作为合法输入。",
+      "CUDABuffer 仅 CUDA runtime 构建存在，指针用于设备访问而非 CPU 解引用。"
+    ],
+    "sha256": "3247cc870261837790b5088ad06fa8bca8000f440d7befbee1cc64737c85d9d9",
+    "summary": "缓冲资源抽象及非拥有子区间；本文件实现接口行为。"
+  },
+  "code/grassland/graphics/buffer.h": {
+    "details": [
+      "Type/Size/Resize/Upload/Download 的具体内存与同步行为由后端定义。",
+      "BufferRange 默认 size=~0ull 表示剩余区间，通过 min 限制大小；offset>Size 会发生无符号下溢，不能作为合法输入。",
+      "CUDABuffer 仅 CUDA runtime 构建存在，指针用于设备访问而非 CPU 解引用。"
+    ],
+    "sha256": "496504b78dbbefcdbb18fe15b701875866d11049f1d73b122e4a282e7104efad",
+    "summary": "缓冲资源抽象及非拥有子区间；本文件定义类型与调用接口。"
+  },
+  "code/grassland/graphics/command_context.cpp": {
+    "details": [
+      "资源绑定覆盖 BufferRange、全 Buffer、Image、Sampler 和加速结构；默认 BindPoint 对普通资源为 graphics，对 AS 为 raytracing。",
+      "CmdDispatch 参数是线程组数，不是线程数；CmdDispatchRays 参数是射线网格尺寸。",
+      "完成回调由后端在执行完成流程中消费，注册动作本身不会立刻执行。"
+    ],
+    "sha256": "482e2e3425bc27c6bae8d9b35395497d3ce70f286185daa881d7cf25ae053d37",
+    "summary": "GPU 命令记录与执行后回调；本文件实现接口行为。"
+  },
+  "code/grassland/graphics/command_context.h": {
+    "details": [
+      "资源绑定覆盖 BufferRange、全 Buffer、Image、Sampler 和加速结构；默认 BindPoint 对普通资源为 graphics，对 AS 为 raytracing。",
+      "CmdDispatch 参数是线程组数，不是线程数；CmdDispatchRays 参数是射线网格尺寸。",
+      "完成回调由后端在执行完成流程中消费，注册动作本身不会立刻执行。"
+    ],
+    "sha256": "d84a3362874c7d76cfe628e660b0eef1ba800d0c601616a07c88cc9aaddca786",
+    "summary": "GPU 命令记录与执行后回调；本文件定义类型与调用接口。"
+  },
+  "code/grassland/graphics/core.cpp": {
+    "details": [
+      "Core 保存 frames_in_flight/debug 设置，构造尝试 GLFW 初始化但不因无窗口环境立即拒绝离屏运行。",
+      "自动选设备根据 score 排序，可要求完整 RT 支持；ray query 不通过这一布尔选项筛选。",
+      "无符合设备时仍把 -1 交给具体后端处理；调用方检查初始化结果。"
+    ],
+    "sha256": "189f2de961d20904477070ecbc27747ba2bcecf431d5eb90d1fee655a5c74a31",
+    "summary": "图形设备工厂、后端选择与公共创建助手；本文件实现接口行为。"
+  },
+  "code/grassland/graphics/core.h": {
+    "details": [
+      "Core 保存 frames_in_flight/debug 设置，构造尝试 GLFW 初始化但不因无窗口环境立即拒绝离屏运行。",
+      "自动选设备根据 score 排序，可要求完整 RT 支持；ray query 不通过这一布尔选项筛选。",
+      "无符合设备时仍把 -1 交给具体后端处理；调用方检查初始化结果。"
+    ],
+    "sha256": "c6ce4815a377aedf49fca021293f3bca45b9bd344b4a563b9b24cfad7a9f42ae",
+    "summary": "图形设备工厂、后端选择与公共创建助手；本文件定义类型与调用接口。"
+  },
+  "code/grassland/graphics/frame_profile.h": {
+    "details": [
+      "FrameProfile::active 为 thread_local，嵌套 Begin 不允许；每帧先 Begin，录制 scope，WaitGPU 后 Finish。",
+      "GPU 查询只实现 Vulkan，固定 64 个时间戳槽即最多 32 个区间；CPU-only 可用于其他后端。",
+      "CPU/GPU scope 是含子区间的累计值，不可把嵌套值相加作为总耗时。"
+    ],
+    "sha256": "905c1f69b85e08ffac871fc0259d5440fc73ef3795f9f835e54225276d218368",
+    "summary": "可选 CPU/GPU 帧性能记录与 RAII scope。"
+  },
+  "code/grassland/graphics/graphics.h": {
+    "details": [
+      "#include \"grassland/graphics/interface.h\""
+    ],
+    "sha256": "014573e95633f20553999a855d8a2b2c9c637a510f0c855e6bfa6e1f690524c4",
+    "summary": "聚合头：将本模块公共类型汇集为统一包含入口。"
+  },
+  "code/grassland/graphics/graphics_util.cpp": {
+    "details": [
+      "包含图像格式、缓冲类型、着色器资源、顶点输入、混合与 RT 实例描述。",
+      "BackendAPI 默认值按编译宏优先 Metal、再 D3D12、否则 Vulkan；SupportBackendAPI 仅判断编译支持。",
+      "ClearValue 是无标签 union，必须与目标图像颜色/深度格式匹配。"
+    ],
+    "sha256": "a84d3d47ca50b37134d1c78e65c080f87bd7b4f513fd654d2cf9765c853bc75f",
+    "summary": "跨后端枚举、POD 描述符与颜色/格式工具；本文件实现接口行为。"
+  },
+  "code/grassland/graphics/graphics_util.h": {
+    "details": [
+      "包含图像格式、缓冲类型、着色器资源、顶点输入、混合与 RT 实例描述。",
+      "BackendAPI 默认值按编译宏优先 Metal、再 D3D12、否则 Vulkan；SupportBackendAPI 仅判断编译支持。",
+      "ClearValue 是无标签 union，必须与目标图像颜色/深度格式匹配。"
+    ],
+    "sha256": "48db21f4a06979749b68371a5018c029bb826370ed5295e147ea098961c43262",
+    "summary": "跨后端枚举、POD 描述符与颜色/格式工具；本文件定义类型与调用接口。"
+  },
+  "code/grassland/graphics/image.cpp": {
+    "details": [
+      "区域与全图上传/下载要求调用方提供足够的紧密像素数据，接口没有字节长度参数。",
+      "LoadImageFromFile 先尝试 8 位 RGBA，再尝试浮点 RGBA；不能据此保证 HDR 文件一定走浮点路径。",
+      "导入没有检查 CreateImage 返回码后再解引用输出，应用应确保 Core 可正常分配目标格式。"
+    ],
+    "sha256": "02d319fc1ef18ed93cf9dca7670353a21f78af05534507dd19a7c54676864625",
+    "summary": "二维图像抽象与 STB 文件导入；本文件实现接口行为。"
+  },
+  "code/grassland/graphics/image.h": {
+    "details": [
+      "区域与全图上传/下载要求调用方提供足够的紧密像素数据，接口没有字节长度参数。",
+      "LoadImageFromFile 先尝试 8 位 RGBA，再尝试浮点 RGBA；不能据此保证 HDR 文件一定走浮点路径。",
+      "导入没有检查 CreateImage 返回码后再解引用输出，应用应确保 Core 可正常分配目标格式。"
+    ],
+    "sha256": "9e4169cfb161dd4d0ed9d0f9b0bbd10605839ee7bba363a6a8463d718a31690a",
+    "summary": "二维图像抽象与 STB 文件导入；本文件定义类型与调用接口。"
+  },
+  "code/grassland/graphics/interface.h": {
+    "details": [
+      "包含资源、Core、命令与窗口的公共声明，不暴露具体后端头。"
+    ],
+    "sha256": "e3f6ae741107e3b812ab0c1029453ff9adc1db723dac7a95886892793d57762c",
+    "summary": "面向上层的 graphics 接口聚合头。"
+  },
+  "code/grassland/graphics/program.cpp": {
+    "details": [
+      "创建程序后先添加资源布局再 Finalize，执行时由 CommandContext 绑定。",
+      "RayTracingProgram 的 shader 与 HitGroup 顺序参与 SBT 索引；数组版 Finalize 显式选择 miss/hit/callable 顺序。"
+    ],
+    "sha256": "71aa1c3a37dfcf19ccaa797f2b9ee19132ee7431f344eff1cb01615862e6db0a",
+    "summary": "光栅、计算和 RT 管线描述协议；本文件实现接口行为。"
+  },
+  "code/grassland/graphics/program.h": {
+    "details": [
+      "创建程序后先添加资源布局再 Finalize，执行时由 CommandContext 绑定。",
+      "RayTracingProgram 的 shader 与 HitGroup 顺序参与 SBT 索引；数组版 Finalize 显式选择 miss/hit/callable 顺序。"
+    ],
+    "sha256": "5775fd73d396d3e8dc04732e509d1dfc991d4a5163c190d49d43c7acf2f887d2",
+    "summary": "光栅、计算和 RT 管线描述协议；本文件定义类型与调用接口。"
+  },
+  "code/grassland/graphics/sampler.cpp": {
+    "details": [
+      "采样规则由 Core::CreateSampler 的 SamplerInfo 决定；该基类只提供虚析构，不暴露修改接口。"
+    ],
+    "sha256": "5489dfdc4b38c3a62ab2c0ffe504a6f575b3ccc496dc695ab7e468be8ee33575",
+    "summary": "纹理采样器的多态资源接口；本文件实现接口行为。"
+  },
+  "code/grassland/graphics/sampler.h": {
+    "details": [
+      "采样规则由 Core::CreateSampler 的 SamplerInfo 决定；该基类只提供虚析构，不暴露修改接口。"
+    ],
+    "sha256": "45e76d99a5a06950216c82bf9632ad8cb7ad2a25fb211e200969f535bb46e11b",
+    "summary": "纹理采样器的多态资源接口；本文件定义类型与调用接口。"
+  },
+  "code/grassland/graphics/shader.cpp": {
+    "details": [
+      "CompileShader 的字符串重载写入临时 VFS，再委托统一编译路径。",
+      "每线程缓存独立 Slang global session；使用自定义只读 VFS 解析 includes，保持重复 include 语义由 Slang 处理。",
+      "默认目标 DXIL；后端可通过 args 指定 SPIR-V 等目标。矩阵列主序、优化 O3、register/space 零偏移属于公共绑定约定。",
+      "多数编译阶段失败返回 data 为空的 CompiledShaderBlob，创建全局编译器失败或不支持的 profile 则抛异常。"
+    ],
+    "sha256": "324cb5612993459e01a257158a357184891d9d88f2cc9a643218f7260a961d49",
+    "summary": "着色器资源与 Slang 编译器接入；本文件实现接口行为。"
+  },
+  "code/grassland/graphics/shader.h": {
+    "details": [
+      "CompileShader 的字符串重载写入临时 VFS，再委托统一编译路径。",
+      "每线程缓存独立 Slang global session；使用自定义只读 VFS 解析 includes，保持重复 include 语义由 Slang 处理。",
+      "默认目标 DXIL；后端可通过 args 指定 SPIR-V 等目标。矩阵列主序、优化 O3、register/space 零偏移属于公共绑定约定。",
+      "多数编译阶段失败返回 data 为空的 CompiledShaderBlob，创建全局编译器失败或不支持的 profile 则抛异常。"
+    ],
+    "sha256": "bd3dedb8229a13e2fadb7de699a81ade9b91a0f8a6d6fdd702223d80fcbdbc5b",
+    "summary": "着色器资源与 Slang 编译器接入；本文件定义类型与调用接口。"
+  },
+  "code/grassland/graphics/window.cpp": {
+    "details": [
+      "构造创建 GLFW_NO_API 窗口并连接各 EventManager；Mac 安装本地缩放手势监视器。",
+      "GetSize/GetCursorPosition 使用内容区左上角为原点的逻辑坐标；GetFramebufferSize 返回物理像素，最小化可为零。",
+      "HDR 合成使用窗口拥有的两张 RGBA16F 图像；白点缩放或线性 BT.709→BT.2020/PQ 变换都不修改调用者场景图像。",
+      "ImGui 兼容接口仍在底层存在；原生 demo 的 GUI 迁移没有删除这些接口。"
+    ],
+    "sha256": "31703ad78ab00bfee896be0cc0134f5a68dfde9a399e4fb12f88d1abf9ce9b83",
+    "summary": "GLFW 逻辑窗口、输入分发与 HDR 合成公共层；本文件实现接口行为。"
+  },
+  "code/grassland/graphics/window.h": {
+    "details": [
+      "构造创建 GLFW_NO_API 窗口并连接各 EventManager；Mac 安装本地缩放手势监视器。",
+      "GetSize/GetCursorPosition 使用内容区左上角为原点的逻辑坐标；GetFramebufferSize 返回物理像素，最小化可为零。",
+      "HDR 合成使用窗口拥有的两张 RGBA16F 图像；白点缩放或线性 BT.709→BT.2020/PQ 变换都不修改调用者场景图像。",
+      "ImGui 兼容接口仍在底层存在；原生 demo 的 GUI 迁移没有删除这些接口。"
+    ],
+    "sha256": "d26a8ccd1f8b7f11bc19c2e6c77406008fbf68bb2188f9d4b389c86f83363915",
+    "summary": "GLFW 逻辑窗口、输入分发与 HDR 合成公共层；本文件定义类型与调用接口。"
+  },
+  "code/grassland/graphics/window_gestures.h": {
+    "details": [
+      "Install 返回由 Window 拥有的不透明监视器；Remove 必须在 GLFW window 销毁前执行；NSEvent 分发仅在 Objective-C 编译环境声明。"
+    ],
+    "sha256": "f39122ede8b983b4ad445fc97df9e84bc502b3c81fca7bfe84289b223219a934",
+    "summary": "声明 macOS 原生缩放手势桥接。"
+  },
+  "code/grassland/graphics/window_gestures.mm": {
+    "details": [
+      "只处理对应 NSWindow 的 magnify 事件，保留原事件继续分发。",
+      "将 Cocoa 坐标转换到内容区左上角；scale 为增量 1+magnification，最小 0.001，取消事件 scale=1。"
+    ],
+    "sha256": "392960b6178762102f34259a9d991cb96d38aa3f04002e683e13f4e7c28c95f2",
+    "summary": "把 Cocoa NSEventMagnify 转换为统一 MagnifyGesture。"
+  },
+  "code/grassland/grassland.cpp": {
+    "details": [
+      "#include \"grassland/grassland.h\""
+    ],
+    "sha256": "10aec831a6897062af401cf3b2a07143b6cfadd7f5eee5003c8f3063f83f31bd",
+    "summary": "包含聚合头的编译单元，无额外运行时接口。"
+  },
+  "code/grassland/grassland.h": {
+    "details": [
+      "#include \"grassland/bvh/bvh.h\"",
+      "#include \"grassland/graphics/graphics.h\"",
+      "#include \"grassland/math/math.h\"",
+      "#include \"grassland/physics/physics.h\"",
+      "#include \"grassland/util/util.h\""
+    ],
+    "sha256": "e958bf0d08d85a1fd61d08af956cb5110ace349104dfbd90232215a3b70c41d9",
+    "summary": "聚合头：将本模块公共类型汇集为统一包含入口。"
+  },
+  "code/grassland/imgui/CMakeLists.txt": {
+    "details": [
+      "按当前 CMake 条件选择源文件与平台库；详细参数和 PUBLIC/PRIVATE 边界见本文件原文。"
+    ],
+    "sha256": "ad4b08b34bbdc6277d054a1c1d0e5629bf69046fbc8e79acff0995d07319c2c2",
+    "summary": "定义 code/grassland/imgui 的构建目标、子模块接入和传递依赖。"
+  },
+  "code/grassland/math/CMakeLists.txt": {
+    "details": [
+      "源文件集合、目标链接和父作用域导出以本页列出的 CMake 原文为准；PUBLIC 依赖会传递给使用此目标的调用方。"
+    ],
+    "sha256": "aab05df0563564d5ab6d39d3dee57b8bdc8342b042cde5a659ce15ec301a7cb8",
+    "summary": "定义 math 的 CMake 构建边界与传递依赖。"
+  },
+  "code/grassland/math/math.cpp": {
+    "details": [
+      "#include \"grassland/math/math.h\""
+    ],
+    "sha256": "076cc82ac47a8030638db504603f1b42c81f1c1b62edb6aaa03dfc2ee7ae0e90",
+    "summary": "模块编译单元：包含对应头文件并保留命名空间边界，无额外运行时算法。"
+  },
+  "code/grassland/math/math.h": {
+    "details": [
+      "#include \"grassland/math/math_aabb.h\"",
+      "#include \"grassland/math/math_basics.h\"",
+      "#include \"grassland/math/math_ccd.h\"",
+      "#include \"grassland/math/math_mesh.h\"",
+      "#include \"grassland/math/math_mesh_sdf.h\"",
+      "#include \"grassland/math/math_polynomial.h\"",
+      "#include \"grassland/math/math_ray.h\"",
+      "#include \"grassland/math/math_spd_projection.h\"",
+      "#include \"grassland/math/math_static_collision.h\"",
+      "#include \"grassland/math/math_svd.h\"",
+      "#include \"grassland/math/math_triangle.h\"",
+      "#include \"grassland/math/math_util.h\""
+    ],
+    "sha256": "4d47ed7ab0ee078a16b3c6a6d496e83a4bf6ba86a0b41902c31c8e6005509496",
+    "summary": "聚合头：将相关声明从一个入口暴露给调用方。"
+  },
+  "code/grassland/math/math_aabb.h": {
+    "details": [
+      "默认上下界是极大值/极小值，用于逐点扩展空盒；空盒的 Center/Size 没有几何意义。",
+      "三维版提供闭区间 Contain；二维版没有该方法。"
+    ],
+    "sha256": "1d942b077ffc3965cf4ecf8db18812041a02cc44d48e99efec1e9cfe777d23b9",
+    "summary": "二维与三维轴对齐包围盒及别名"
+  },
+  "code/grassland/math/math_basics.h": {
+    "details": [
+      "PolygonArea 与 TetrahedronVolume 保留输入绕序产生的符号。",
+      "SolidAngle 使用 atan 的商表达式，没有 atan2 的完整象限处理；退化向量没有保护。"
+    ],
+    "sha256": "15aff181e069793b00161136c0f2eb7dcf5111a409549c91a07b71ecb083da17",
+    "summary": "有向面积、体积和立体角"
+  },
+  "code/grassland/math/math_ccd.h": {
+    "details": [
+      "先构造共面条件的三次多项式，再在 [0,1] 根中测试几何交点。",
+      "持续共面使多项式恒零时没有专门处理；平行边、退化面会被拒绝。"
+    ],
+    "sha256": "7796b261b951aeb8bdb191b82ea69dcc1dd64dab26a6b2105297813f60d51ea6",
+    "summary": "线性运动边边与点面连续碰撞"
+  },
+  "code/grassland/math/math_mesh.cxx": {
+    "details": [
+      "MergeVertices 按所有存在的属性精确比较，重新编号并去掉重复索引的三角形。",
+      "LoadObjFile 不读取材质或顶点色，且没有清空已有 colors_；复用带颜色网格读取不同顶点数文件有属性长度风险。",
+      "GenerateNormals 按面角加权；任意两相邻面法线点积小于阈值便把该顶点按面拆开。退化面和孤立点不保证有效法线。",
+      "Sphere 生成单位球；Transformed 复制网格，位置作仿射变换、法线作逆转置、切线作线性变换。"
+    ],
+    "sha256": "6894a7b360d3195299d72069a3325fc0a19ad9c0a07c658f20ead66905be9d25",
+    "summary": "OBJ 读写、顶点重建、法线与 MikkTSpace 切线生成"
+  },
+  "code/grassland/math/math_mesh.h": {
+    "details": [
+      "positions/indices 为主数组，法线、切线、UV、颜色可缺省；切线手性 signals 始终是 float。",
+      "访问器返回借用指针，重建与销毁使其失效；可变访问器不验证写入内容。"
+    ],
+    "sha256": "5905bf49c8984a058f66eb17d8f4952be075dc5fe65e193cfdd1cadb8e51ea5b",
+    "summary": "网格所有权、属性访问与处理接口"
+  },
+  "code/grassland/math/math_mesh_sdf.cpp": {
+    "details": [
+      "构造时复制 float 顶点与三角形索引，按有向边邻接计算内凹边和顶点符号；应提供一致绕序的闭合流形网格。",
+      "查询逐个检查面投影、边内部和顶点，选绝对距离最小的特征；面用绕序法线定符号，边/点用预计算标记。",
+      "sdf 输出必须非空，jacobian/hessian 可空；空网格返回 float 最大值与零导数。"
+    ],
+    "sha256": "1d562d788969add1d866432a3a5f69c32fbe929519983af605374fb09e210733",
+    "summary": "网格有符号距离及 CPU/CUDA 存储；本文件实现接口行为。"
+  },
+  "code/grassland/math/math_mesh_sdf.h": {
+    "details": [
+      "构造时复制 float 顶点与三角形索引，按有向边邻接计算内凹边和顶点符号；应提供一致绕序的闭合流形网格。",
+      "查询逐个检查面投影、边内部和顶点，选绝对距离最小的特征；面用绕序法线定符号，边/点用预计算标记。",
+      "sdf 输出必须非空，jacobian/hessian 可空；空网格返回 float 最大值与零导数。"
+    ],
+    "sha256": "b328544ccfd6baed8432b366abf6177c0f2a0f8767a1ef6a0f5e7e53d2c21fa0",
+    "summary": "网格有符号距离及 CPU/CUDA 存储；本文件定义类型与调用接口。"
+  },
+  "code/grassland/math/math_polynomial.h": {
+    "details": [
+      "默认搜索闭区间 [0,1]；通过导数根分割单调区间，再二分到 Eps×1e−2。",
+      "区间边界上的重根可能重复返回；三次二分后牛顿一步没有导数为零保护，也没有重新钳制范围。"
+    ],
+    "sha256": "55cb1bdfabc866d62b7c696eecf845cc40bab81b1bb2ba1459a73d0654caf73d",
+    "summary": "区间内一至三次实根求解"
+  },
+  "code/grassland/math/math_ray.h": {
+    "details": [
+      "支持二维和三维；不携带参数区间，也不会自动归一化方向。"
+    ],
+    "sha256": "138b1d30041210cdb3a9bb0947e5fb61e3088aad2da0ba12ef3465c329cf5b3f",
+    "summary": "只含原点与方向的射线值类型"
+  },
+  "code/grassland/math/math_spd_projection.h": {
+    "details": [
+      "负特征值截为零，因此输出保证的目标是半正定，而非严格正定；未检查特征分解成功状态。"
+    ],
+    "sha256": "3bc136cbb9da957a6d0d1df194f31fc269addecb505eba5eadf4dc2be6026176",
+    "summary": "以特征值截断投影对称矩阵"
+  },
+  "code/grassland/math/math_static_collision.cpp": {
+    "details": [
+      "实现显式实例化 float 和 double。带输出参数重载返回最近点参数，不带参数重载仅保留距离。",
+      "零长度边和退化面没有统一处理；近平行直线退回点线距离，近平行射线/三角形返回未命中。"
+    ],
+    "sha256": "c3b3c266efffa1ad9eec8cd44bd3ae1d4155849ba4e98caa9fd29fbe8c765a6f",
+    "summary": "静态距离、线段相交和射线命中；本文件实现接口行为。"
+  },
+  "code/grassland/math/math_static_collision.h": {
+    "details": [
+      "实现显式实例化 float 和 double。带输出参数重载返回最近点参数，不带参数重载仅保留距离。",
+      "零长度边和退化面没有统一处理；近平行直线退回点线距离，近平行射线/三角形返回未命中。"
+    ],
+    "sha256": "8e7f097ef00d8ae789e60fb3d15e54e44bac8771b3fdfab3412b5d076834583a",
+    "summary": "静态距离、线段相交和射线命中；本文件定义类型与调用接口。"
+  },
+  "code/grassland/math/math_svd.cpp": {
+    "details": [
+      "通过 AᵀA 的特征分解计算奇异值和左奇异向量；没有奇异值排序或零奇异值的补全处理。"
+    ],
+    "sha256": "bce6da6c97c5070e175aca236fa7de06235eaa4434d9607de1900a55058757e7",
+    "summary": "2×2 特征分解与 2×2、3×2 SVD；本文件实现接口行为。"
+  },
+  "code/grassland/math/math_svd.h": {
+    "details": [
+      "通过 AᵀA 的特征分解计算奇异值和左奇异向量；没有奇异值排序或零奇异值的补全处理。"
+    ],
+    "sha256": "8fcc44b4e35a3b2547ada61a918d8e008b30290b0684ea80130427374aed6787",
+    "summary": "2×2 特征分解与 2×2、3×2 SVD；本文件定义类型与调用接口。"
+  },
+  "code/grassland/math/math_triangle.h": {
+    "details": [
+      "operator[] 返回 Eigen 列表达式；三维 normal 按顶点绕序取归一化叉积。"
+    ],
+    "sha256": "1bc26433f4ca53130fa99d18ef2dc688d7a2202ae3e71e35bf5f4bb240b354da",
+    "summary": "以矩阵列存放三个顶点的三角形"
+  },
+  "code/grassland/math/math_util.h": {
+    "details": [
+      "Eps<float>=1e−4，Eps<double>=1e−8；这不是机器 epsilon。",
+      "矩阵转换逐列逐行复制，保持数学元素而非对对象进行内存重解释。"
+    ],
+    "sha256": "f6ed1990c3bc327072842985c44f0bd204602b56b3d98fa39159a9f91148b566",
+    "summary": "Eigen/GLM 类型桥接与数值常量"
+  },
+  "code/grassland/physics/CMakeLists.txt": {
+    "details": [
+      "源文件集合、目标链接和父作用域导出以本页列出的 CMake 原文为准；PUBLIC 依赖会传递给使用此目标的调用方。"
+    ],
+    "sha256": "debab10a8f950d3dbb875bb1af5e68f142fffff37ef0c4abeb248af93e24e702",
+    "summary": "定义 physics 的 CMake 构建边界与传递依赖。"
+  },
+  "code/grassland/physics/diff_kernel/CMakeLists.txt": {
+    "details": [
+      "源文件集合、目标链接和父作用域导出以本页列出的 CMake 原文为准；PUBLIC 依赖会传递给使用此目标的调用方。"
+    ],
+    "sha256": "b2c41271d0799aaed94b9c2f4e78d401c5e04f92a2a3a9b3b11f2ffeff96e461",
+    "summary": "定义 diff_kernel 的 CMake 构建边界与传递依赖。"
+  },
+  "code/grassland/physics/diff_kernel/diff_kernel.cpp": {
+    "details": [
+      "#include \"grassland/physics/diff_kernel/diff_kernel.h\""
+    ],
+    "sha256": "a8387c350781fdd9bbdb71dd0b205c4daa7a015a748229d27ec5e333aa591013",
+    "summary": "模块编译单元：包含对应头文件并保留命名空间边界，无额外运行时算法。"
+  },
+  "code/grassland/physics/diff_kernel/diff_kernel.h": {
+    "details": [
+      "#include \"grassland/physics/diff_kernel/dk_basics.h\"",
+      "#include \"grassland/physics/diff_kernel/dk_dihedral_angle.h\"",
+      "#include \"grassland/physics/diff_kernel/dk_elastic_models.h\"",
+      "#include \"grassland/physics/diff_kernel/dk_fem_elements.h\"",
+      "#include \"grassland/physics/diff_kernel/dk_geometry_sdf.h\""
+    ],
+    "sha256": "0f308bedef6d0cc5f23c7183fe20b076909f595897335f591066a63415d6a516",
+    "summary": "聚合头：将相关声明从一个入口暴露给调用方。"
+  },
+  "code/grassland/physics/diff_kernel/dk_basics.cpp": {
+    "details": [
+      "所有导数遵循列主序展开，组合方向为 f2(f1(x))。",
+      "归一化、范数、atan2 的 ValidInput 使用 100×Eps，行列式的对数要求 det>0。",
+      "MultiplyConstant 与 PlusConstant 继承内核输入约束，RightMultiplyMatrix 逐输出列组合导数。"
+    ],
+    "sha256": "e25447c02fc1394587373da0eb119d66b1dfda4347dbb87e1a983b62a93b3364",
+    "summary": "基础可微函数与组合器；本文件实现接口行为。"
+  },
+  "code/grassland/physics/diff_kernel/dk_basics.h": {
+    "details": [
+      "所有导数遵循列主序展开，组合方向为 f2(f1(x))。",
+      "归一化、范数、atan2 的 ValidInput 使用 100×Eps，行列式的对数要求 det>0。",
+      "MultiplyConstant 与 PlusConstant 继承内核输入约束，RightMultiplyMatrix 逐输出列组合导数。"
+    ],
+    "sha256": "ac876ab0b50108bcdeccab9c136c5d64e99b6fb1ff3d54f3c955991245f4146c",
+    "summary": "基础可微函数与组合器；本文件定义类型与调用接口。"
+  },
+  "code/grassland/physics/diff_kernel/dk_dihedral_angle.cpp": {
+    "details": [
+      "V 的四列是 v0/v1/v2/v3，共享边为 v1→v2；角度为弧度。",
+      "组合式与直接式并存；DihedralEnergy=(angle−rest_angle)²，差值不作周期折返。",
+      "保留的大段注释实现不参与编译；活动宏用于 Hessian 分块和局部快速路径。"
+    ],
+    "sha256": "8d28863df383d876f39310a0fdfeeb35cfd4cb014fc0b916b5a887776845b397",
+    "summary": "二面角、弯曲能量及局部导数；本文件实现接口行为。"
+  },
+  "code/grassland/physics/diff_kernel/dk_dihedral_angle.h": {
+    "details": [
+      "V 的四列是 v0/v1/v2/v3，共享边为 v1→v2；角度为弧度。",
+      "组合式与直接式并存；DihedralEnergy=(angle−rest_angle)²，差值不作周期折返。",
+      "保留的大段注释实现不参与编译；活动宏用于 Hessian 分块和局部快速路径。"
+    ],
+    "sha256": "00aa4e80bf5abb485d9c0f737008b161e35ec49bab70afb433fbd1c7d495b36d",
+    "summary": "二面角、弯曲能量及局部导数；本文件定义类型与调用接口。"
+  },
+  "code/grassland/physics/diff_kernel/dk_elastic_models.cpp": {
+    "details": [
+      "对数模型使用 ln J；简化模型使用 (J−1−mu/lambda)²，lambda 不能为零。",
+      "三角形膜以叉积范数作为面积比 J，四面体以 det F 为体积比。",
+      "返回能量密度，未乘静止体积、面积或厚度；Hessian 未做正定投影。"
+    ],
+    "sha256": "12a8343a10af5239818e08c4e10aeff377651a4bec417bd619a0c8455b0a93c6",
+    "summary": "体与膜的 Neo-Hookean 能量及顶点导数；本文件实现接口行为。"
+  },
+  "code/grassland/physics/diff_kernel/dk_elastic_models.h": {
+    "details": [
+      "对数模型使用 ln J；简化模型使用 (J−1−mu/lambda)²，lambda 不能为零。",
+      "三角形膜以叉积范数作为面积比 J，四面体以 det F 为体积比。",
+      "返回能量密度，未乘静止体积、面积或厚度；Hessian 未做正定投影。"
+    ],
+    "sha256": "f9b42f83f6040fdddd00ca652002c8c3499c0f38932f5deb6d71034614fb45a0",
+    "summary": "体与膜的 Neo-Hookean 能量及顶点导数；本文件定义类型与调用接口。"
+  },
+  "code/grassland/physics/diff_kernel/dk_fem_elements.cpp": {
+    "details": [
+      "四面体 F=[v1−v0,v2−v0,v3−v0]Dm⁻¹，三角形使用两条边和 2×2 Dm。",
+      "Dm 由调用者赋值且必须可逆；ValidInput 始终 true，不验证此条件。",
+      "3×2 到 3×3 的第三列是前两列叉积，没有单位化。"
+    ],
+    "sha256": "048a38ea254b9053995343d468b5ad3f5d539f27575345d4e5b5d1c3a7ebb5a2",
+    "summary": "四面体与三角形的形变梯度映射；本文件实现接口行为。"
+  },
+  "code/grassland/physics/diff_kernel/dk_fem_elements.h": {
+    "details": [
+      "四面体 F=[v1−v0,v2−v0,v3−v0]Dm⁻¹，三角形使用两条边和 2×2 Dm。",
+      "Dm 由调用者赋值且必须可逆；ValidInput 始终 true，不验证此条件。",
+      "3×2 到 3×3 的第三列是前两列叉积，没有单位化。"
+    ],
+    "sha256": "919f854adf8914f3d278455a4b34ae2f8cf815520375d7ab818f43394bfd832d",
+    "summary": "四面体与三角形的形变梯度映射；本文件定义类型与调用接口。"
+  },
+  "code/grassland/physics/diff_kernel/dk_geometry_sdf.cpp": {
+    "details": [
+      "点、线、线段返回无符号距离；球、胶囊、立方体、平面带符号。",
+      "CubeSDF.size 是半边长；PlaneSDF.normal 和 LineSDF.direction 要求单位向量才能具有距离语义。",
+      "ValidInput 并非都检查奇点；线核始终 true，但查询点在线上时导数有除零。"
+    ],
+    "sha256": "f6ff6a00aa19ec0209d2b378c6d002a04fa490944f350d9e14737303c890fc77",
+    "summary": "七种解析距离核与导数；本文件实现接口行为。"
+  },
+  "code/grassland/physics/diff_kernel/dk_geometry_sdf.h": {
+    "details": [
+      "点、线、线段返回无符号距离；球、胶囊、立方体、平面带符号。",
+      "CubeSDF.size 是半边长；PlaneSDF.normal 和 LineSDF.direction 要求单位向量才能具有距离语义。",
+      "ValidInput 并非都检查奇点；线核始终 true，但查询点在线上时导数有除零。"
+    ],
+    "sha256": "ad62c5a1b2e60747db25313ab6c695133ce8cfbabbda1f84cdc42a5ed513be08",
+    "summary": "七种解析距离核与导数；本文件定义类型与调用接口。"
+  },
+  "code/grassland/physics/diff_kernel/dk_hessian_tensor.cpp": {
+    "details": [
+      "默认清零；左右矩阵乘的语义不同：左乘组合输出，右乘对每片作合同变换。",
+      "索引 i/j/k 分别是输出与两个输入坐标，不作边界检查。"
+    ],
+    "sha256": "c61acbfd87576f8dcb163c4fe27929a56cfb63e0afac251c099a60dd638d643c",
+    "summary": "按输出分量分片的二阶张量；本文件实现接口行为。"
+  },
+  "code/grassland/physics/diff_kernel/dk_hessian_tensor.h": {
+    "details": [
+      "默认清零；左右矩阵乘的语义不同：左乘组合输出，右乘对每片作合同变换。",
+      "索引 i/j/k 分别是输出与两个输入坐标，不作边界检查。"
+    ],
+    "sha256": "d9d2c79cc12bc106093333716f8dc20880ba10dbf0febfb482718ea4b84c3356",
+    "summary": "按输出分量分片的二阶张量；本文件定义类型与调用接口。"
+  },
+  "code/grassland/physics/physics.cpp": {
+    "details": [
+      "#include \"grassland/physics/physics.h\""
+    ],
+    "sha256": "b9f4ab416d334911fe6cd88092c7733a769d1423c379f769c88411227b3af22e",
+    "summary": "模块编译单元：包含对应头文件并保留命名空间边界，无额外运行时算法。"
+  },
+  "code/grassland/physics/physics.h": {
+    "details": [
+      "#include \"grassland/physics/diff_kernel/diff_kernel.h\""
+    ],
+    "sha256": "39d5974879d56c8852a8680ac58ad6f14b7eca27cf26ea912d5d472d0cf1d177",
+    "summary": "聚合头：将相关声明从一个入口暴露给调用方。"
+  },
+  "code/grassland/physics/physics_util.cpp": {
+    "details": [
+      "Skew3(v)*w 等价于 v.cross(w)。"
+    ],
+    "sha256": "8f7a48a4baf99e89551de88a50ea8dabc34efb12c6d90491ac80247490bd425d",
+    "summary": "物理核共用的三维叉乘矩阵；本文件实现接口行为。"
+  },
+  "code/grassland/physics/physics_util.h": {
+    "details": [
+      "Skew3(v)*w 等价于 v.cross(w)。"
+    ],
+    "sha256": "1ba235cd4bd0db45dd5d756f8e9454b379f8cf69f9f4ebbbf3ef9c8de78e3069",
+    "summary": "物理核共用的三维叉乘矩阵；本文件定义类型与调用接口。"
   },
   "code/grassland/util/CMakeLists.txt": {
     "details": [
@@ -357,6 +1018,24 @@
     ],
     "sha256": "248974a440aa68df47758c10bc62419a7e1e5fa0a5f3364662a1feb8b081cd66",
     "summary": "Windows 共享句柄安全属性的 RAII 包装；本文件定义类型与调用接口。"
+  },
+  "code/long_march.cpp": {
+    "details": [
+      "#include \"long_march.h\""
+    ],
+    "sha256": "8b38ada2a7ebd284add14fe55a83653503ea8e155ef1ac4e96bcc965e46eb74d",
+    "summary": "包含聚合头的编译单元，无额外运行时接口。"
+  },
+  "code/long_march.h": {
+    "details": [
+      "#include \"contradium/contradium.h\"",
+      "#include \"grassland/grassland.h\"",
+      "#include \"practium/practium.h\"",
+      "#include \"snowberg/snowberg.h\"",
+      "#include \"sparkium/sparkium.h\""
+    ],
+    "sha256": "01f9c87f9ea9e2ad14ad17e778000c08082149ec1e7ba7fa7e40cd7910194737",
+    "summary": "聚合头：将本模块公共类型汇集为统一包含入口。"
   },
   "code/practium/CMakeLists.txt": {
     "details": [
@@ -631,5 +1310,61 @@
     ],
     "sha256": "6dcce9871f566d9393a329bfa1370ee7a143c14593c5bf8b68696546d5f3b634",
     "summary": "聚合头：将相关声明从一个入口暴露给调用方。"
+  },
+  "code/snowberg/CMakeLists.txt": {
+    "details": [
+      "按当前 CMake 条件选择源文件与平台库；详细参数和 PUBLIC/PRIVATE 边界见本文件原文。"
+    ],
+    "sha256": "01fc4d4a4163c15598875ec8992ce61dc8d4b2eb5733ee05e9c42119c999d74e",
+    "summary": "定义 code/snowberg 的构建目标、子模块接入和传递依赖。"
+  },
+  "code/snowberg/snowberg.cpp": {
+    "details": [
+      "#include \"snowberg/snowberg.h\""
+    ],
+    "sha256": "431d2422dfab66e4760590ffe3b115633de494df4c0efdf38446d28778474e04",
+    "summary": "包含聚合头的编译单元，无额外运行时接口。"
+  },
+  "code/snowberg/snowberg.h": {
+    "details": [
+      "#include \"snowberg/draw/draw.h\"",
+      "#include \"snowberg/gui/gui.h\"",
+      "#include \"snowberg/gui/world_panel.h\"",
+      "#include \"snowberg/solver/solver.h\"",
+      "#include \"snowberg/visualizer/visualizer.h\""
+    ],
+    "sha256": "360a41464e11fe7e6d48c8cfe24f8a0b149d4479ecc99d5e1408b291488a0f08",
+    "summary": "聚合头：将本模块公共类型汇集为统一包含入口。"
+  },
+  "code/sparkium/CMakeLists.txt": {
+    "details": [
+      "按当前 CMake 条件选择源文件与平台库；详细参数和 PUBLIC/PRIVATE 边界见本文件原文。"
+    ],
+    "sha256": "891d626da126602b4da3c989cf9f776ebe67a64d788f217e1bcbcaa510338eb3",
+    "summary": "定义 code/sparkium 的构建目标、子模块接入和传递依赖。"
+  },
+  "code/sparkium/sparkium.cpp": {
+    "details": [
+      "#include \"sparkium/sparkium.h\""
+    ],
+    "sha256": "408cc0c57ae6164512644134e53ef14f20b9d3c835cf36c89423a9f5d525ce7b",
+    "summary": "包含聚合头的编译单元，无额外运行时接口。"
+  },
+  "code/sparkium/sparkium.h": {
+    "details": [
+      "#include \"sparkium/camera/cameras.h\"",
+      "#include \"sparkium/core/core.h\"",
+      "#include \"sparkium/core/entity.h\"",
+      "#include \"sparkium/core/film.h\"",
+      "#include \"sparkium/core/geometry.h\"",
+      "#include \"sparkium/core/material.h\"",
+      "#include \"sparkium/core/scene.h\"",
+      "#include \"sparkium/entity/entities.h\"",
+      "#include \"sparkium/geometry/geometries.h\"",
+      "#include \"sparkium/material/materials.h\"",
+      "#include \"sparkium/scene_io/json_scene.h\""
+    ],
+    "sha256": "a633bcbce7b234feafed5795169747f77002564e8071394aa35528b893ed8056",
+    "summary": "聚合头：将本模块公共类型汇集为统一包含入口。"
   }
 }

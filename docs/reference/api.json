@@ -1,7 +1,27 @@
 {
+  "GLFW_EXPOSE_NATIVE_COCOA": {
+    "contract": "",
+    "description": "使 GLFW native 头暴露 Cocoa window handle 接口。"
+  },
+  "GLFW_EXPOSE_NATIVE_WIN32": {
+    "contract": "",
+    "description": "使 GLFW native 头暴露 Win32 window handle 接口。"
+  },
   "NOMINMAX": {
     "contract": "",
     "description": "阻止 Windows 头定义 min/max 宏，避免干扰 C++ 算法名称。"
+  },
+  "NSEvent": {
+    "contract": "",
+    "description": "Objective-C 的原生事件类型前向声明，本项目不定义或拥有该类。"
+  },
+  "STB_IMAGE_IMPLEMENTATION": {
+    "contract": "",
+    "description": "在图像加载翻译单元中生成 STB 实现。"
+  },
+  "TINYOBJLOADER_IMPLEMENTATION": {
+    "contract": "应只在预期实现单元定义，避免重复定义链接错误。",
+    "description": "在本编译单元启用 TinyObjLoader 的实现。"
   },
   "WIN32_LEAN_AND_MEAN": {
     "contract": "",
@@ -95,13 +115,485 @@
     "contract": "调用方负责销毁；此助手不检查 CUDA 错误。",
     "description": "创建默认 CUDA event 并立即记录到默认流，将 event handle 返回给拥有者。"
   },
+  "grassland::(anonymous)::PrivateSort": {
+    "contract": "数组至少有 n 个可写元素，复杂度 O(n²)。",
+    "description": "以两层比较交换对短根数组升序排序。"
+  },
+  "grassland::AABB": {
+    "contract": "等价于 AxisAlignedBoundingBox3f。",
+    "description": "三维 float 包围盒的简写。"
+  },
+  "grassland::AnyHitRayAABB": {
+    "contract": "重载可传上下界或 AABB；默认 t 区间 [Eps,1/Eps]，方向不要求单位长度。",
+    "description": "用 slab 区间相交求射线与盒子的最小有效参数，失败返回 −1。"
+  },
+  "grassland::AnyHitRayTriangle": {
+    "contract": "双面检测；默认 [Eps,1/Eps]，近平行或退化时失败。",
+    "description": "解射线参数和三角形重心坐标，命中返回 t，失败返回 −1。"
+  },
+  "grassland::Atan2": {
+    "contract": "负 x 轴分支处角度不连续，ValidInput 没有排除此分支。",
+    "description": "二维输入映射为有符号弧度角。"
+  },
+  "grassland::Atan2::Hessian": {
+    "contract": "负 x 轴分支处角度不连续，ValidInput 没有排除此分支。",
+    "description": "以 ||v||⁴ 为分母计算 2×2 二阶矩阵。"
+  },
+  "grassland::Atan2::InputType": {
+    "contract": "维度见本页精确 typedef 声明，与 Jacobian/Hessian 尺寸一致。",
+    "description": "函数输入的定长 Eigen 类型；矩阵按列展开作为导数输入。"
+  },
+  "grassland::Atan2::Jacobian": {
+    "contract": "负 x 轴分支处角度不连续，ValidInput 没有排除此分支。",
+    "description": "返回 [v1,−v0]/||v||²。"
+  },
+  "grassland::Atan2::OutputType": {
+    "contract": "维度见本页精确 typedef 声明，与 Jacobian/Hessian 尺寸一致。",
+    "description": "函数输出的定长 Eigen 类型；标量也以 1×1 矩阵表示。"
+  },
+  "grassland::Atan2::Scalar": {
+    "contract": "维度见本页精确 typedef 声明，与 Jacobian/Hessian 尺寸一致。",
+    "description": "计算标量类型，由 Real 或内核 Scalar 指定。"
+  },
+  "grassland::Atan2::ValidInput": {
+    "contract": "负 x 轴分支处角度不连续，ValidInput 没有排除此分支。",
+    "description": "要求输入范数大于 100×Eps。"
+  },
+  "grassland::Atan2::operator()": {
+    "contract": "负 x 轴分支处角度不连续，ValidInput 没有排除此分支。",
+    "description": "返回 atan2(v[0],v[1])，第一个分量是 y。"
+  },
+  "grassland::Atan2<Real>::Hessian": {
+    "contract": "负 x 轴分支处角度不连续，ValidInput 没有排除此分支。",
+    "description": "以 ||v||⁴ 为分母计算 2×2 二阶矩阵。"
+  },
+  "grassland::Atan2<Real>::Jacobian": {
+    "contract": "负 x 轴分支处角度不连续，ValidInput 没有排除此分支。",
+    "description": "返回 [v1,−v0]/||v||²。"
+  },
+  "grassland::Atan2<Real>::ValidInput": {
+    "contract": "负 x 轴分支处角度不连续，ValidInput 没有排除此分支。",
+    "description": "要求输入范数大于 100×Eps。"
+  },
+  "grassland::Atan2<Real>::operator()": {
+    "contract": "负 x 轴分支处角度不连续，ValidInput 没有排除此分支。",
+    "description": "返回 atan2(v[0],v[1])，第一个分量是 y。"
+  },
+  "grassland::AxisAlignedBoundingBox": {
+    "contract": "本文件只实现 dim=2、dim=3。",
+    "description": "按标量类型和维度声明的包围盒模板。"
+  },
+  "grassland::AxisAlignedBoundingBox2": {
+    "contract": "与目标类型完全相同，没有额外存储或校验。",
+    "description": "AxisAlignedBoundingBox 的 2 维、调用者指定标量 类型别名。"
+  },
+  "grassland::AxisAlignedBoundingBox2d": {
+    "contract": "与目标类型完全相同，没有额外存储或校验。",
+    "description": "AxisAlignedBoundingBox 的 2 维、double 类型别名。"
+  },
+  "grassland::AxisAlignedBoundingBox2f": {
+    "contract": "与目标类型完全相同，没有额外存储或校验。",
+    "description": "AxisAlignedBoundingBox 的 2 维、float 类型别名。"
+  },
+  "grassland::AxisAlignedBoundingBox3": {
+    "contract": "与目标类型完全相同，没有额外存储或校验。",
+    "description": "AxisAlignedBoundingBox 的 3 维、调用者指定标量 类型别名。"
+  },
+  "grassland::AxisAlignedBoundingBox3d": {
+    "contract": "与目标类型完全相同，没有额外存储或校验。",
+    "description": "AxisAlignedBoundingBox 的 3 维、double 类型别名。"
+  },
+  "grassland::AxisAlignedBoundingBox3f": {
+    "contract": "与目标类型完全相同，没有额外存储或校验。",
+    "description": "AxisAlignedBoundingBox 的 3 维、float 类型别名。"
+  },
+  "grassland::AxisAlignedBoundingBox<Scalar, 2>": {
+    "contract": "默认状态为空盒哨兵；先 Expand 再查询大小与中心。",
+    "description": "2 维上下界记录；逐坐标描述闭合区间。"
+  },
+  "grassland::AxisAlignedBoundingBox<Scalar, 2>::AxisAlignedBoundingBox": {
+    "contract": "单点盒允许零尺寸。",
+    "description": "默认构造空盒，或以单点同时初始化上下界。"
+  },
+  "grassland::AxisAlignedBoundingBox<Scalar, 2>::Center": {
+    "contract": "应在盒子已包含有效点后调用。",
+    "description": "返回 (lower_bound+upper_bound)/2。"
+  },
+  "grassland::AxisAlignedBoundingBox<Scalar, 2>::Expand": {
+    "contract": "不收缩已有范围；不验证 NaN 或反向上下界。",
+    "description": "用一个点或另一包围盒逐分量扩大当前上下界。"
+  },
+  "grassland::AxisAlignedBoundingBox<Scalar, 2>::Size": {
+    "contract": "空盒不会返回零尺寸。",
+    "description": "返回 upper_bound−lower_bound 的各轴长度。"
+  },
+  "grassland::AxisAlignedBoundingBox<Scalar, 3>": {
+    "contract": "默认状态为空盒哨兵；先 Expand 再查询大小与中心。",
+    "description": "3 维上下界记录；逐坐标描述闭合区间。"
+  },
+  "grassland::AxisAlignedBoundingBox<Scalar, 3>::AxisAlignedBoundingBox": {
+    "contract": "单点盒允许零尺寸。",
+    "description": "默认构造空盒，或以单点同时初始化上下界。"
+  },
+  "grassland::AxisAlignedBoundingBox<Scalar, 3>::Center": {
+    "contract": "应在盒子已包含有效点后调用。",
+    "description": "返回 (lower_bound+upper_bound)/2。"
+  },
+  "grassland::AxisAlignedBoundingBox<Scalar, 3>::Contain": {
+    "contract": "仅三维特化提供此方法。",
+    "description": "逐轴判断点是否位于上下界之间，边界也算包含。"
+  },
+  "grassland::AxisAlignedBoundingBox<Scalar, 3>::Expand": {
+    "contract": "不收缩已有范围；不验证 NaN 或反向上下界。",
+    "description": "用一个点或另一包围盒逐分量扩大当前上下界。"
+  },
+  "grassland::AxisAlignedBoundingBox<Scalar, 3>::Size": {
+    "contract": "空盒不会返回零尺寸。",
+    "description": "返回 upper_bound−lower_bound 的各轴长度。"
+  },
+  "grassland::BVHCuda": {
+    "contract": "不提供 GPU 构建或自动同步主机后续修改。",
+    "description": "以 thrust::device_vector 拥有 CPU 构建结果的设备副本。"
+  },
+  "grassland::BVHCuda::BVHCuda": {
+    "contract": "复制后的设备树与主机树独立；默认空对象不能遍历。",
+    "description": "默认创建空设备容器，或复制 BVHHost 的全部节点。"
+  },
+  "grassland::BVHCuda::GetRef": {
+    "contract": "返回的是设备地址；设备树销毁或存储重分配后失效。",
+    "description": "取得引用设备 vector 数据的 BVHRef。"
+  },
+  "grassland::BVHCuda::operator BVHRef": {
+    "contract": "不会将节点传回 CPU。",
+    "description": "委托 GetRef 返回设备查询视图。"
+  },
+  "grassland::BVHHost": {
+    "contract": "默认构造为空；必须提供至少一个实例后才能遍历。",
+    "description": "持有连续 BVHNode 数组的 CPU 树。"
+  },
+  "grassland::BVHHost::BVHHost": {
+    "contract": "两输入数组都至少包含 num_instance 个元素；num_instance 必须大于零。",
+    "description": "默认构造空树，或以 AABB/实例编号数组立即构建树。"
+  },
+  "grassland::BVHHost::GetRef": {
+    "contract": "不转移所有权，不检查空树。",
+    "description": "返回借用当前 CPU 节点数组的轻量遍历视图。"
+  },
+  "grassland::BVHHost::Nodes": {
+    "contract": "引用生命周期依附当前 BVHHost；调用者不能据此延长节点存活时间。",
+    "description": "返回节点 vector 的 const 引用，供设备复制或检查。"
+  },
+  "grassland::BVHHost::Print": {
+    "contract": "这是诊断输出，不是可反序列化的持久化格式。",
+    "description": "输出节点包围盒、实例编号、孩子和失败链接，帮助检查构建结果。"
+  },
+  "grassland::BVHHost::UpdateInstances": {
+    "contract": "重建会使先前取得的引用或裸指针失效；不支持与遍历并发。",
+    "description": "复制实例 AABB 和编号，重新排序并全量重建节点数组。"
+  },
+  "grassland::BVHHost::operator BVHRef": {
+    "contract": "转换不复制节点，生命周期与 GetRef 相同。",
+    "description": "以 GetRef 进行隐式视图转换。"
+  },
+  "grassland::BVHHostBuilder": {
+    "contract": "存储容量由调用方保证为 2N−1；只在构建过程中使用。",
+    "description": "递归构建的临时状态：nodes 指向预分配数组，num_nodes 记录已分配节点数。"
+  },
+  "grassland::BVHHostBuilder::Build": {
+    "contract": "会原地重排输入内容；返回根节点索引，并设置失败跳转链接。",
+    "description": "分配一个节点；单实例生成叶子，多实例排序平分并递归生成左右子树。"
+  },
+  "grassland::BVHNode": {
+    "contract": "aabb 用于裁剪，instance_index 用于叶子回调，lch/rch 为孩子索引，失败链接 −1 表示遍历结束。",
+    "description": "同时表示内部节点或叶子的紧凑记录。"
+  },
+  "grassland::BVHNode::BVHNode": {
+    "contract": "默认实例编号为 0；构建器为内部节点另设 −1。",
+    "description": "初始化包围盒与实例编号，并将孩子及失败链接置为 −1。"
+  },
+  "grassland::BVHRef": {
+    "contract": "没有节点数量、空值检查或所有权；使用方保证数据完整与存活。",
+    "description": "只包含 const BVHNode 指针的主机/设备兼容查询视图。"
+  },
+  "grassland::BVHRef::Traversal": {
+    "contract": "result、attached 及回调需对本次执行位置有效；回调可利用已有结果缩小后续查询，但返回 true 本身不会终止遍历。",
+    "description": "以 any_hit 裁剪包围盒，以 instance_hit 更新结果并累计命中状态。"
+  },
   "grassland::BinarySearch": {
     "contract": "num_key>0，keys 至少包含 num_key 个元素；依赖 < 定义严格顺序，不做长度检查。",
     "description": "对已升序排列的 keys 精确查找 key，返回首个匹配位置或 -1。"
   },
+  "grassland::BinarySearchRoot": {
+    "contract": "同号返回 false 且不写 root；调用者保证有序区间和非空输出，内部非单调时不能保证找到所有根。",
+    "description": "二次/三次重载在端点异号或含零的区间二分求根；三次随后进行一次牛顿修正。"
+  },
   "grassland::CUDAThrowIfFailed": {
     "contract": "仅启用 CUDA runtime 时存在。",
     "description": "cudaSuccess 时无操作，否则记录错误数值并抛 runtime_error。"
+  },
+  "grassland::CapsuleSDF": {
+    "contract": "要求 A≠B、radius 非负；半径只平移函数值，不改变空间导数。",
+    "description": "沿 A/B 线段、半径 radius 的胶囊 SDF，默认半径 1。"
+  },
+  "grassland::CapsuleSDF::Hessian": {
+    "contract": "要求 A≠B、radius 非负；半径只平移函数值，不改变空间导数。",
+    "description": "返回 与中心线段距离相同的分区 Hessian。"
+  },
+  "grassland::CapsuleSDF::InputType": {
+    "contract": "要求 A≠B、radius 非负；半径只平移函数值，不改变空间导数。",
+    "description": "三维查询点向量。"
+  },
+  "grassland::CapsuleSDF::Jacobian": {
+    "contract": "要求 A≠B、radius 非负；半径只平移函数值，不改变空间导数。",
+    "description": "返回 与中心线段距离相同的梯度，接口类型为 1×3。"
+  },
+  "grassland::CapsuleSDF::OutputType": {
+    "contract": "要求 A≠B、radius 非负；半径只平移函数值，不改变空间导数。",
+    "description": "包含距离值的 1×1 Eigen 矩阵。"
+  },
+  "grassland::CapsuleSDF::Scalar": {
+    "contract": "要求 A≠B、radius 非负；半径只平移函数值，不改变空间导数。",
+    "description": "Real 标量类型。"
+  },
+  "grassland::CapsuleSDF::ValidInput": {
+    "contract": "要求 A≠B、radius 非负；半径只平移函数值，不改变空间导数。",
+    "description": "点到中心线段距离大于 100×Eps。"
+  },
+  "grassland::CapsuleSDF::operator()": {
+    "contract": "要求 A≠B、radius 非负；半径只平移函数值，不改变空间导数。",
+    "description": "返回 线段距离−radius。"
+  },
+  "grassland::CapsuleSDF<Real>::Hessian": {
+    "contract": "要求 A≠B、radius 非负；半径只平移函数值，不改变空间导数。",
+    "description": "返回 与中心线段距离相同的分区 Hessian。"
+  },
+  "grassland::CapsuleSDF<Real>::Jacobian": {
+    "contract": "要求 A≠B、radius 非负；半径只平移函数值，不改变空间导数。",
+    "description": "返回 与中心线段距离相同的梯度，接口类型为 1×3。"
+  },
+  "grassland::CapsuleSDF<Real>::ValidInput": {
+    "contract": "要求 A≠B、radius 非负；半径只平移函数值，不改变空间导数。",
+    "description": "点到中心线段距离大于 100×Eps。"
+  },
+  "grassland::CapsuleSDF<Real>::operator()": {
+    "contract": "要求 A≠B、radius 非负；半径只平移函数值，不改变空间导数。",
+    "description": "返回 线段距离−radius。"
+  },
+  "grassland::CapsuleSDF<double>": {
+    "contract": "使 cpp 内定义的值与导数方法可由其他编译单元链接；算法约束与模板类型一致。",
+    "description": "为 double 标量生成该微分核的显式模板实例。"
+  },
+  "grassland::CapsuleSDF<float>": {
+    "contract": "使 cpp 内定义的值与导数方法可由其他编译单元链接；算法约束与模板类型一致。",
+    "description": "为 float 标量生成该微分核的显式模板实例。"
+  },
+  "grassland::Compose": {
+    "contract": "两个核中间类型和标量必须兼容。",
+    "description": "复合函数 f2(f1(x))，值成员 f1/f2 保存两个核。"
+  },
+  "grassland::Compose::Hessian": {
+    "contract": "两个核中间类型和标量必须兼容。",
+    "description": "返回每片 J1ᵀH2ᵢJ1，加上 J2 对 H1 各片的线性组合。"
+  },
+  "grassland::Compose::InputType": {
+    "contract": "维度见本页精确 typedef 声明，与 Jacobian/Hessian 尺寸一致。",
+    "description": "函数输入的定长 Eigen 类型；矩阵按列展开作为导数输入。"
+  },
+  "grassland::Compose::Jacobian": {
+    "contract": "两个核中间类型和标量必须兼容。",
+    "description": "返回 J2 J1。"
+  },
+  "grassland::Compose::OutputType": {
+    "contract": "维度见本页精确 typedef 声明，与 Jacobian/Hessian 尺寸一致。",
+    "description": "函数输出的定长 Eigen 类型；标量也以 1×1 矩阵表示。"
+  },
+  "grassland::Compose::Scalar": {
+    "contract": "维度见本页精确 typedef 声明，与 Jacobian/Hessian 尺寸一致。",
+    "description": "计算标量类型，由 Real 或内核 Scalar 指定。"
+  },
+  "grassland::Compose::ValidInput": {
+    "contract": "两个核中间类型和标量必须兼容。",
+    "description": "先验证 f1，再验证 f2(f1(x))，短路执行。"
+  },
+  "grassland::Compose::operator()": {
+    "contract": "两个核中间类型和标量必须兼容。",
+    "description": "返回 f2(f1(x))。"
+  },
+  "grassland::Compose<Real>::Hessian": {
+    "contract": "两个核中间类型和标量必须兼容。",
+    "description": "返回每片 J1ᵀH2ᵢJ1，加上 J2 对 H1 各片的线性组合。"
+  },
+  "grassland::Compose<Real>::Jacobian": {
+    "contract": "两个核中间类型和标量必须兼容。",
+    "description": "返回 J2 J1。"
+  },
+  "grassland::Compose<Real>::ValidInput": {
+    "contract": "两个核中间类型和标量必须兼容。",
+    "description": "先验证 f1，再验证 f2(f1(x))，短路执行。"
+  },
+  "grassland::Compose<Real>::operator()": {
+    "contract": "两个核中间类型和标量必须兼容。",
+    "description": "返回 f2(f1(x))。"
+  },
+  "grassland::Cross3": {
+    "contract": "输出三维，Jacobian 是 3×6。",
+    "description": "两个三维向量的叉积核，矩阵输入按列保存两个向量。"
+  },
+  "grassland::Cross3::Hessian": {
+    "contract": "输出三维，Jacobian 是 3×6。",
+    "description": "返回与输入无关的叉积混合导数，非零项为 ±1。"
+  },
+  "grassland::Cross3::InputType": {
+    "contract": "维度见本页精确 typedef 声明，与 Jacobian/Hessian 尺寸一致。",
+    "description": "函数输入的定长 Eigen 类型；矩阵按列展开作为导数输入。"
+  },
+  "grassland::Cross3::Jacobian": {
+    "contract": "输出三维，Jacobian 是 3×6。",
+    "description": "返回 [−Skew3(v),Skew3(u)]。"
+  },
+  "grassland::Cross3::OutputType": {
+    "contract": "维度见本页精确 typedef 声明，与 Jacobian/Hessian 尺寸一致。",
+    "description": "函数输出的定长 Eigen 类型；标量也以 1×1 矩阵表示。"
+  },
+  "grassland::Cross3::Scalar": {
+    "contract": "维度见本页精确 typedef 声明，与 Jacobian/Hessian 尺寸一致。",
+    "description": "计算标量类型，由 Real 或内核 Scalar 指定。"
+  },
+  "grassland::Cross3::ValidInput": {
+    "contract": "输出三维，Jacobian 是 3×6。",
+    "description": "始终 true。"
+  },
+  "grassland::Cross3::operator()": {
+    "contract": "输出三维，Jacobian 是 3×6。",
+    "description": "返回 u×v；既支持两个向量，也支持 3×2 矩阵。"
+  },
+  "grassland::Cross3<Real>::Hessian": {
+    "contract": "输出三维，Jacobian 是 3×6。",
+    "description": "返回与输入无关的叉积混合导数，非零项为 ±1。"
+  },
+  "grassland::Cross3<Real>::Jacobian": {
+    "contract": "输出三维，Jacobian 是 3×6。",
+    "description": "返回 [−Skew3(v),Skew3(u)]。"
+  },
+  "grassland::Cross3<Real>::ValidInput": {
+    "contract": "输出三维，Jacobian 是 3×6。",
+    "description": "始终 true。"
+  },
+  "grassland::Cross3<Real>::operator()": {
+    "contract": "输出三维，Jacobian 是 3×6。",
+    "description": "返回 u×v；既支持两个向量，也支持 3×2 矩阵。"
+  },
+  "grassland::CrossNorm": {
+    "contract": "共线输入处导数没有定义。",
+    "description": "两列叉积的长度，即平行四边形面积。"
+  },
+  "grassland::CrossNorm::Hessian": {
+    "contract": "共线输入处导数没有定义。",
+    "description": "将范数 Hessian 经叉积 Jacobian 拉回，并加入叉积自身混合二阶项。"
+  },
+  "grassland::CrossNorm::InputType": {
+    "contract": "维度见本页精确 typedef 声明，与 Jacobian/Hessian 尺寸一致。",
+    "description": "函数输入的定长 Eigen 类型；矩阵按列展开作为导数输入。"
+  },
+  "grassland::CrossNorm::Jacobian": {
+    "contract": "共线输入处导数没有定义。",
+    "description": "将单位法线乘两个叉积导数块。"
+  },
+  "grassland::CrossNorm::OutputType": {
+    "contract": "维度见本页精确 typedef 声明，与 Jacobian/Hessian 尺寸一致。",
+    "description": "函数输出的定长 Eigen 类型；标量也以 1×1 矩阵表示。"
+  },
+  "grassland::CrossNorm::Scalar": {
+    "contract": "维度见本页精确 typedef 声明，与 Jacobian/Hessian 尺寸一致。",
+    "description": "计算标量类型，由 Real 或内核 Scalar 指定。"
+  },
+  "grassland::CrossNorm::ValidInput": {
+    "contract": "共线输入处导数没有定义。",
+    "description": "要求叉积范数大于 100×Eps。"
+  },
+  "grassland::CrossNorm::operator()": {
+    "contract": "共线输入处导数没有定义。",
+    "description": "返回 ||F0×F1||。"
+  },
+  "grassland::CrossNorm<Real>::Hessian": {
+    "contract": "共线输入处导数没有定义。",
+    "description": "将范数 Hessian 经叉积 Jacobian 拉回，并加入叉积自身混合二阶项。"
+  },
+  "grassland::CrossNorm<Real>::Jacobian": {
+    "contract": "共线输入处导数没有定义。",
+    "description": "将单位法线乘两个叉积导数块。"
+  },
+  "grassland::CrossNorm<Real>::ValidInput": {
+    "contract": "共线输入处导数没有定义。",
+    "description": "要求叉积范数大于 100×Eps。"
+  },
+  "grassland::CrossNorm<Real>::operator()": {
+    "contract": "共线输入处导数没有定义。",
+    "description": "返回 ||F0×F1||。"
+  },
+  "grassland::CrossNormalized": {
+    "contract": "输入两列向量，输出单位叉积；两列共线时无有效归一化结果。",
+    "description": "Cross3 后接 VecNormalized 的组合核别名。"
+  },
+  "grassland::CubeSDF": {
+    "contract": "要求 size 非负；棱角和内部等距面不可微，代码选择其中一个分支。",
+    "description": "轴对齐立方体，center 默认原点，size 默认 1 且表示半边长。"
+  },
+  "grassland::CubeSDF::Hessian": {
+    "contract": "要求 size 非负；棱角和内部等距面不可微，代码选择其中一个分支。",
+    "description": "返回 外部按活跃坐标投影与单位外向向量计算；距离不大于 Eps 返回零。"
+  },
+  "grassland::CubeSDF::InputType": {
+    "contract": "要求 size 非负；棱角和内部等距面不可微，代码选择其中一个分支。",
+    "description": "三维查询点向量。"
+  },
+  "grassland::CubeSDF::Jacobian": {
+    "contract": "要求 size 非负；棱角和内部等距面不可微，代码选择其中一个分支。",
+    "description": "返回 外部返回有符号的最近点径向向量，内部选择最近面法线，接口类型为 1×3。"
+  },
+  "grassland::CubeSDF::OutputType": {
+    "contract": "要求 size 非负；棱角和内部等距面不可微，代码选择其中一个分支。",
+    "description": "包含距离值的 1×1 Eigen 矩阵。"
+  },
+  "grassland::CubeSDF::Scalar": {
+    "contract": "要求 size 非负；棱角和内部等距面不可微，代码选择其中一个分支。",
+    "description": "Real 标量类型。"
+  },
+  "grassland::CubeSDF::ValidInput": {
+    "contract": "要求 size 非负；棱角和内部等距面不可微，代码选择其中一个分支。",
+    "description": "始终 true。"
+  },
+  "grassland::CubeSDF::operator()": {
+    "contract": "要求 size 非负；棱角和内部等距面不可微，代码选择其中一个分支。",
+    "description": "返回 外部取超出各轴范围分量的范数，内部取最大带符号轴距离。"
+  },
+  "grassland::CubeSDF<Real>::Hessian": {
+    "contract": "要求 size 非负；棱角和内部等距面不可微，代码选择其中一个分支。",
+    "description": "返回 外部按活跃坐标投影与单位外向向量计算；距离不大于 Eps 返回零。"
+  },
+  "grassland::CubeSDF<Real>::Jacobian": {
+    "contract": "要求 size 非负；棱角和内部等距面不可微，代码选择其中一个分支。",
+    "description": "返回 外部返回有符号的最近点径向向量，内部选择最近面法线，接口类型为 1×3。"
+  },
+  "grassland::CubeSDF<Real>::ValidInput": {
+    "contract": "要求 size 非负；棱角和内部等距面不可微，代码选择其中一个分支。",
+    "description": "始终 true。"
+  },
+  "grassland::CubeSDF<Real>::operator()": {
+    "contract": "要求 size 非负；棱角和内部等距面不可微，代码选择其中一个分支。",
+    "description": "返回 外部取超出各轴范围分量的范数，内部取最大带符号轴距离。"
+  },
+  "grassland::CubeSDF<double>": {
+    "contract": "使 cpp 内定义的值与导数方法可由其他编译单元链接；算法约束与模板类型一致。",
+    "description": "为 double 标量生成该微分核的显式模板实例。"
+  },
+  "grassland::CubeSDF<float>": {
+    "contract": "使 cpp 内定义的值与导数方法可由其他编译单元链接；算法约束与模板类型一致。",
+    "description": "为 float 标量生成该微分核的显式模板实例。"
+  },
+  "grassland::CubicPolynomialNewtonIteration": {
+    "contract": "没有导数为零判断与区间约束。",
+    "description": "以 *root 为初值执行一次 x−f(x)/f′(x) 并写回。"
   },
   "grassland::DeferredProcess": {
     "contract": "复制/移动构造与赋值都已删除，避免同一回调重复执行。",
@@ -118,6 +610,54 @@
   "grassland::DeferredProcess::~DeferredProcess": {
     "contract": "析构异常会遵循 C++ 析构 noexcept 规则，通常导致终止。",
     "description": "若 func_ 非空则调用一次保存的回调。"
+  },
+  "grassland::Determinant3": {
+    "contract": "输入按列展开；无需可逆矩阵。",
+    "description": "3×3 矩阵行列式核。"
+  },
+  "grassland::Determinant3::Hessian": {
+    "contract": "输入按列展开；无需可逆矩阵。",
+    "description": "以列向量的 Skew3 构造 9×9 混合二阶块，同行列分块为零。"
+  },
+  "grassland::Determinant3::InputType": {
+    "contract": "维度见本页精确 typedef 声明，与 Jacobian/Hessian 尺寸一致。",
+    "description": "函数输入的定长 Eigen 类型；矩阵按列展开作为导数输入。"
+  },
+  "grassland::Determinant3::Jacobian": {
+    "contract": "输入按列展开；无需可逆矩阵。",
+    "description": "用三列的循环叉积组成 1×9 余子式行。"
+  },
+  "grassland::Determinant3::OutputType": {
+    "contract": "维度见本页精确 typedef 声明，与 Jacobian/Hessian 尺寸一致。",
+    "description": "函数输出的定长 Eigen 类型；标量也以 1×1 矩阵表示。"
+  },
+  "grassland::Determinant3::Scalar": {
+    "contract": "维度见本页精确 typedef 声明，与 Jacobian/Hessian 尺寸一致。",
+    "description": "计算标量类型，由 Real 或内核 Scalar 指定。"
+  },
+  "grassland::Determinant3::ValidInput": {
+    "contract": "输入按列展开；无需可逆矩阵。",
+    "description": "始终 true，包括奇异矩阵。"
+  },
+  "grassland::Determinant3::operator()": {
+    "contract": "输入按列展开；无需可逆矩阵。",
+    "description": "返回 det A。"
+  },
+  "grassland::Determinant3<Real>::Hessian": {
+    "contract": "输入按列展开；无需可逆矩阵。",
+    "description": "以列向量的 Skew3 构造 9×9 混合二阶块，同行列分块为零。"
+  },
+  "grassland::Determinant3<Real>::Jacobian": {
+    "contract": "输入按列展开；无需可逆矩阵。",
+    "description": "用三列的循环叉积组成 1×9 余子式行。"
+  },
+  "grassland::Determinant3<Real>::ValidInput": {
+    "contract": "输入按列展开；无需可逆矩阵。",
+    "description": "始终 true，包括奇异矩阵。"
+  },
+  "grassland::Determinant3<Real>::operator()": {
+    "contract": "输入按列展开；无需可逆矩阵。",
+    "description": "返回 det A。"
   },
   "grassland::DeviceClock": {
     "contract": "仅 LONGMARCH_CUDA_RUNTIME；事件记在默认流。",
@@ -143,6 +683,910 @@
     "contract": "枚举项存在不等于当前构建包含 CUDA runtime。",
     "description": "CPU=0、CUDA=1 的设备类别枚举。"
   },
+  "grassland::DihedralAngle": {
+    "contract": "要求共享边及两面非退化；弧度角的分支切换处不光滑。",
+    "description": "围绕 v1→v2 共享边的有符号二面角直接解析实现。"
+  },
+  "grassland::DihedralAngle::Hessian": {
+    "contract": "要求共享边及两面非退化；弧度角的分支切换处不光滑。",
+    "description": "以法线/高度/边长构造对称 12×12 分块 Hessian。"
+  },
+  "grassland::DihedralAngle::InputType": {
+    "contract": "维度见本页精确 typedef 声明，与 Jacobian/Hessian 尺寸一致。",
+    "description": "函数输入的定长 Eigen 类型；矩阵按列展开作为导数输入。"
+  },
+  "grassland::DihedralAngle::Jacobian": {
+    "contract": "要求共享边及两面非退化；弧度角的分支切换处不光滑。",
+    "description": "以两侧三角形高度、角余弦和法线组装 1×12 导数。"
+  },
+  "grassland::DihedralAngle::OutputType": {
+    "contract": "维度见本页精确 typedef 声明，与 Jacobian/Hessian 尺寸一致。",
+    "description": "函数输出的定长 Eigen 类型；标量也以 1×1 矩阵表示。"
+  },
+  "grassland::DihedralAngle::Scalar": {
+    "contract": "维度见本页精确 typedef 声明，与 Jacobian/Hessian 尺寸一致。",
+    "description": "计算标量类型，由 Real 或内核 Scalar 指定。"
+  },
+  "grassland::DihedralAngle::SubHessian": {
+    "contract": "subdim 为 0..3；其他值返回零矩阵，不返回交叉顶点块。",
+    "description": "计算指定顶点的 3×3 Hessian 对角块。"
+  },
+  "grassland::DihedralAngle::ValidInput": {
+    "contract": "要求共享边及两面非退化；弧度角的分支切换处不光滑。",
+    "description": "始终 true，不检查退化面。"
+  },
+  "grassland::DihedralAngle::operator()": {
+    "contract": "要求共享边及两面非退化；弧度角的分支切换处不光滑。",
+    "description": "由两侧单位法线及共享轴计算 atan2(sinθ,cosθ)。"
+  },
+  "grassland::DihedralAngle<Real>::Hessian": {
+    "contract": "要求共享边及两面非退化；弧度角的分支切换处不光滑。",
+    "description": "以法线/高度/边长构造对称 12×12 分块 Hessian。"
+  },
+  "grassland::DihedralAngle<Real>::Jacobian": {
+    "contract": "要求共享边及两面非退化；弧度角的分支切换处不光滑。",
+    "description": "以两侧三角形高度、角余弦和法线组装 1×12 导数。"
+  },
+  "grassland::DihedralAngle<Real>::SubHessian": {
+    "contract": "subdim 为 0..3；其他值返回零矩阵，不返回交叉顶点块。",
+    "description": "计算指定顶点的 3×3 Hessian 对角块。"
+  },
+  "grassland::DihedralAngle<Real>::ValidInput": {
+    "contract": "要求共享边及两面非退化；弧度角的分支切换处不光滑。",
+    "description": "始终 true，不检查退化面。"
+  },
+  "grassland::DihedralAngle<Real>::operator()": {
+    "contract": "要求共享边及两面非退化；弧度角的分支切换处不光滑。",
+    "description": "由两侧单位法线及共享轴计算 atan2(sinθ,cosθ)。"
+  },
+  "grassland::DihedralAngle<double>": {
+    "contract": "使 cpp 内定义的值与导数方法可由其他编译单元链接；算法约束与模板类型一致。",
+    "description": "为 double 标量生成该微分核的显式模板实例。"
+  },
+  "grassland::DihedralAngle<float>": {
+    "contract": "使 cpp 内定义的值与导数方法可由其他编译单元链接；算法约束与模板类型一致。",
+    "description": "为 float 标量生成该微分核的显式模板实例。"
+  },
+  "grassland::DihedralAngleAssistEdgesToNormalsAxis": {
+    "contract": "两个三角形必须非退化。",
+    "description": "将连续边转换为两个定向单位法线和单位共享轴。"
+  },
+  "grassland::DihedralAngleAssistEdgesToNormalsAxis::Hessian": {
+    "contract": "两个三角形必须非退化。",
+    "description": "以同样输入块索引装配三个基础核的二阶分片。"
+  },
+  "grassland::DihedralAngleAssistEdgesToNormalsAxis::InputType": {
+    "contract": "维度见本页精确 typedef 声明，与 Jacobian/Hessian 尺寸一致。",
+    "description": "函数输入的定长 Eigen 类型；矩阵按列展开作为导数输入。"
+  },
+  "grassland::DihedralAngleAssistEdgesToNormalsAxis::Jacobian": {
+    "contract": "两个三角形必须非退化。",
+    "description": "把两个归一化叉积和轴归一化的导数填入相应 9×9 块。"
+  },
+  "grassland::DihedralAngleAssistEdgesToNormalsAxis::OutputType": {
+    "contract": "维度见本页精确 typedef 声明，与 Jacobian/Hessian 尺寸一致。",
+    "description": "函数输出的定长 Eigen 类型；标量也以 1×1 矩阵表示。"
+  },
+  "grassland::DihedralAngleAssistEdgesToNormalsAxis::Scalar": {
+    "contract": "维度见本页精确 typedef 声明，与 Jacobian/Hessian 尺寸一致。",
+    "description": "计算标量类型，由 Real 或内核 Scalar 指定。"
+  },
+  "grassland::DihedralAngleAssistEdgesToNormalsAxis::ValidInput": {
+    "contract": "两个三角形必须非退化。",
+    "description": "要求 E0×E1 与 E1×E2 的长度均大于 100×Eps。"
+  },
+  "grassland::DihedralAngleAssistEdgesToNormalsAxis::operator()": {
+    "contract": "两个三角形必须非退化。",
+    "description": "返回 [normalize(E0×E1),−normalize(E1×E2),normalize(E1)]。"
+  },
+  "grassland::DihedralAngleAssistEdgesToNormalsAxis<Real>::Hessian": {
+    "contract": "两个三角形必须非退化。",
+    "description": "以同样输入块索引装配三个基础核的二阶分片。"
+  },
+  "grassland::DihedralAngleAssistEdgesToNormalsAxis<Real>::Jacobian": {
+    "contract": "两个三角形必须非退化。",
+    "description": "把两个归一化叉积和轴归一化的导数填入相应 9×9 块。"
+  },
+  "grassland::DihedralAngleAssistEdgesToNormalsAxis<Real>::ValidInput": {
+    "contract": "两个三角形必须非退化。",
+    "description": "要求 E0×E1 与 E1×E2 的长度均大于 100×Eps。"
+  },
+  "grassland::DihedralAngleAssistEdgesToNormalsAxis<Real>::operator()": {
+    "contract": "两个三角形必须非退化。",
+    "description": "返回 [normalize(E0×E1),−normalize(E1×E2),normalize(E1)]。"
+  },
+  "grassland::DihedralAngleAssistEdgesToNormalsAxis<double>": {
+    "contract": "使 cpp 内定义的值与导数方法可由其他编译单元链接；算法约束与模板类型一致。",
+    "description": "为 double 标量生成该微分核的显式模板实例。"
+  },
+  "grassland::DihedralAngleAssistEdgesToNormalsAxis<float>": {
+    "contract": "使 cpp 内定义的值与导数方法可由其他编译单元链接；算法约束与模板类型一致。",
+    "description": "为 float 标量生成该微分核的显式模板实例。"
+  },
+  "grassland::DihedralAngleAssistNormalsAxisToSinCosTheta": {
+    "contract": "依赖前级提供两个单位法线和共同单位轴。",
+    "description": "单位法线与轴映射为 [sinθ,cosθ]。"
+  },
+  "grassland::DihedralAngleAssistNormalsAxisToSinCosTheta::Hessian": {
+    "contract": "依赖前级提供两个单位法线和共同单位轴。",
+    "description": "第一个分片是行列式 Hessian，第二个在前 6×6 块填点积 Hessian。"
+  },
+  "grassland::DihedralAngleAssistNormalsAxisToSinCosTheta::InputType": {
+    "contract": "维度见本页精确 typedef 声明，与 Jacobian/Hessian 尺寸一致。",
+    "description": "函数输入的定长 Eigen 类型；矩阵按列展开作为导数输入。"
+  },
+  "grassland::DihedralAngleAssistNormalsAxisToSinCosTheta::Jacobian": {
+    "contract": "依赖前级提供两个单位法线和共同单位轴。",
+    "description": "第一行取行列式导数，第二行取前两列的点积导数。"
+  },
+  "grassland::DihedralAngleAssistNormalsAxisToSinCosTheta::OutputType": {
+    "contract": "维度见本页精确 typedef 声明，与 Jacobian/Hessian 尺寸一致。",
+    "description": "函数输出的定长 Eigen 类型；标量也以 1×1 矩阵表示。"
+  },
+  "grassland::DihedralAngleAssistNormalsAxisToSinCosTheta::Scalar": {
+    "contract": "维度见本页精确 typedef 声明，与 Jacobian/Hessian 尺寸一致。",
+    "description": "计算标量类型，由 Real 或内核 Scalar 指定。"
+  },
+  "grassland::DihedralAngleAssistNormalsAxisToSinCosTheta::ValidInput": {
+    "contract": "依赖前级提供两个单位法线和共同单位轴。",
+    "description": "始终 true，不验证单位化或正交关系。"
+  },
+  "grassland::DihedralAngleAssistNormalsAxisToSinCosTheta::operator()": {
+    "contract": "依赖前级提供两个单位法线和共同单位轴。",
+    "description": "返回 [det N,N0·N1]。"
+  },
+  "grassland::DihedralAngleAssistNormalsAxisToSinCosTheta<Real>::Hessian": {
+    "contract": "依赖前级提供两个单位法线和共同单位轴。",
+    "description": "第一个分片是行列式 Hessian，第二个在前 6×6 块填点积 Hessian。"
+  },
+  "grassland::DihedralAngleAssistNormalsAxisToSinCosTheta<Real>::Jacobian": {
+    "contract": "依赖前级提供两个单位法线和共同单位轴。",
+    "description": "第一行取行列式导数，第二行取前两列的点积导数。"
+  },
+  "grassland::DihedralAngleAssistNormalsAxisToSinCosTheta<Real>::ValidInput": {
+    "contract": "依赖前级提供两个单位法线和共同单位轴。",
+    "description": "始终 true，不验证单位化或正交关系。"
+  },
+  "grassland::DihedralAngleAssistNormalsAxisToSinCosTheta<Real>::operator()": {
+    "contract": "依赖前级提供两个单位法线和共同单位轴。",
+    "description": "返回 [det N,N0·N1]。"
+  },
+  "grassland::DihedralAngleAssistNormalsAxisToSinCosTheta<double>": {
+    "contract": "使 cpp 内定义的值与导数方法可由其他编译单元链接；算法约束与模板类型一致。",
+    "description": "为 double 标量生成该微分核的显式模板实例。"
+  },
+  "grassland::DihedralAngleAssistNormalsAxisToSinCosTheta<float>": {
+    "contract": "使 cpp 内定义的值与导数方法可由其他编译单元链接；算法约束与模板类型一致。",
+    "description": "为 float 标量生成该微分核的显式模板实例。"
+  },
+  "grassland::DihedralAngleAssistVerticesToEdges": {
+    "contract": "中间一列为共享边，顶点顺序决定最终角度符号。",
+    "description": "把四个顶点转换为三条连续边。"
+  },
+  "grassland::DihedralAngleAssistVerticesToEdges::Hessian": {
+    "contract": "中间一列为共享边，顶点顺序决定最终角度符号。",
+    "description": "返回全零张量。"
+  },
+  "grassland::DihedralAngleAssistVerticesToEdges::InputType": {
+    "contract": "维度见本页精确 typedef 声明，与 Jacobian/Hessian 尺寸一致。",
+    "description": "函数输入的定长 Eigen 类型；矩阵按列展开作为导数输入。"
+  },
+  "grassland::DihedralAngleAssistVerticesToEdges::Jacobian": {
+    "contract": "中间一列为共享边，顶点顺序决定最终角度符号。",
+    "description": "返回含 ±I 的常量 9×12 差分映射。"
+  },
+  "grassland::DihedralAngleAssistVerticesToEdges::OutputType": {
+    "contract": "维度见本页精确 typedef 声明，与 Jacobian/Hessian 尺寸一致。",
+    "description": "函数输出的定长 Eigen 类型；标量也以 1×1 矩阵表示。"
+  },
+  "grassland::DihedralAngleAssistVerticesToEdges::Scalar": {
+    "contract": "维度见本页精确 typedef 声明，与 Jacobian/Hessian 尺寸一致。",
+    "description": "计算标量类型，由 Real 或内核 Scalar 指定。"
+  },
+  "grassland::DihedralAngleAssistVerticesToEdges::ValidInput": {
+    "contract": "中间一列为共享边，顶点顺序决定最终角度符号。",
+    "description": "始终 true。"
+  },
+  "grassland::DihedralAngleAssistVerticesToEdges::operator()": {
+    "contract": "中间一列为共享边，顶点顺序决定最终角度符号。",
+    "description": "返回 [v1−v0,v2−v1,v3−v2]。"
+  },
+  "grassland::DihedralAngleAssistVerticesToEdges<Real>::Hessian": {
+    "contract": "中间一列为共享边，顶点顺序决定最终角度符号。",
+    "description": "返回全零张量。"
+  },
+  "grassland::DihedralAngleAssistVerticesToEdges<Real>::Jacobian": {
+    "contract": "中间一列为共享边，顶点顺序决定最终角度符号。",
+    "description": "返回含 ±I 的常量 9×12 差分映射。"
+  },
+  "grassland::DihedralAngleAssistVerticesToEdges<Real>::ValidInput": {
+    "contract": "中间一列为共享边，顶点顺序决定最终角度符号。",
+    "description": "始终 true。"
+  },
+  "grassland::DihedralAngleAssistVerticesToEdges<Real>::operator()": {
+    "contract": "中间一列为共享边，顶点顺序决定最终角度符号。",
+    "description": "返回 [v1−v0,v2−v1,v3−v2]。"
+  },
+  "grassland::DihedralAngleAssistVerticesToEdges<double>": {
+    "contract": "使 cpp 内定义的值与导数方法可由其他编译单元链接；算法约束与模板类型一致。",
+    "description": "为 double 标量生成该微分核的显式模板实例。"
+  },
+  "grassland::DihedralAngleAssistVerticesToEdges<float>": {
+    "contract": "使 cpp 内定义的值与导数方法可由其他编译单元链接；算法约束与模板类型一致。",
+    "description": "为 float 标量生成该微分核的显式模板实例。"
+  },
+  "grassland::DihedralAngleByEdges": {
+    "contract": "输入为三条连续边；通过 Compose 提供一、二阶链式求导。",
+    "description": "边→法线/轴→sin/cos→atan2 的组合核。"
+  },
+  "grassland::DihedralAngleByVertices": {
+    "contract": "四列顶点中 v1/v2 构成共享边，角度单位为弧度。",
+    "description": "顶点差分后接 DihedralAngleByEdges 的组合核。"
+  },
+  "grassland::DihedralAngleSubHessianJacobian": {
+    "contract": "0..3 有效；无效值不写输出，保留调用前内容。",
+    "description": "按 subdim 分派到四个局部梯度/Hessian 快速函数。"
+  },
+  "grassland::DihedralAngleSubHessianJacobian0": {
+    "contract": "仅 float 版本；输入顶点顺序与 DihedralAngle 相同，退化面没有保护。",
+    "description": "直接计算顶点 0 的三维角度梯度及 3×3 Hessian 对角块并写入引用。"
+  },
+  "grassland::DihedralAngleSubHessianJacobian1": {
+    "contract": "仅 float 版本；输入顶点顺序与 DihedralAngle 相同，退化面没有保护。",
+    "description": "直接计算顶点 1 的三维角度梯度及 3×3 Hessian 对角块并写入引用。"
+  },
+  "grassland::DihedralAngleSubHessianJacobian2": {
+    "contract": "仅 float 版本；输入顶点顺序与 DihedralAngle 相同，退化面没有保护。",
+    "description": "直接计算顶点 2 的三维角度梯度及 3×3 Hessian 对角块并写入引用。"
+  },
+  "grassland::DihedralAngleSubHessianJacobian3": {
+    "contract": "仅 float 版本；输入顶点顺序与 DihedralAngle 相同，退化面没有保护。",
+    "description": "直接计算顶点 3 的三维角度梯度及 3×3 Hessian 对角块并写入引用。"
+  },
+  "grassland::DihedralEnergy": {
+    "contract": "角差没有周期折返，也没有乘弯曲刚度或边长权重。",
+    "description": "四顶点弯曲能量，rest_angle 默认为 0 弧度。"
+  },
+  "grassland::DihedralEnergy::Hessian": {
+    "contract": "角差没有周期折返，也没有乘弯曲刚度或边长权重。",
+    "description": "返回 2((θ−rest_angle)Hθ+JθᵀJθ)。"
+  },
+  "grassland::DihedralEnergy::InputType": {
+    "contract": "维度见本页精确 typedef 声明，与 Jacobian/Hessian 尺寸一致。",
+    "description": "函数输入的定长 Eigen 类型；矩阵按列展开作为导数输入。"
+  },
+  "grassland::DihedralEnergy::Jacobian": {
+    "contract": "角差没有周期折返，也没有乘弯曲刚度或边长权重。",
+    "description": "返回 2(θ−rest_angle)Jθ。"
+  },
+  "grassland::DihedralEnergy::OutputType": {
+    "contract": "维度见本页精确 typedef 声明，与 Jacobian/Hessian 尺寸一致。",
+    "description": "函数输出的定长 Eigen 类型；标量也以 1×1 矩阵表示。"
+  },
+  "grassland::DihedralEnergy::Scalar": {
+    "contract": "维度见本页精确 typedef 声明，与 Jacobian/Hessian 尺寸一致。",
+    "description": "计算标量类型，由 Real 或内核 Scalar 指定。"
+  },
+  "grassland::DihedralEnergy::ValidInput": {
+    "contract": "角差没有周期折返，也没有乘弯曲刚度或边长权重。",
+    "description": "始终 true，不检查退化面。"
+  },
+  "grassland::DihedralEnergy::operator()": {
+    "contract": "角差没有周期折返，也没有乘弯曲刚度或边长权重。",
+    "description": "返回 (θ−rest_angle)²。"
+  },
+  "grassland::DihedralEnergy<Real>::Hessian": {
+    "contract": "角差没有周期折返，也没有乘弯曲刚度或边长权重。",
+    "description": "返回 2((θ−rest_angle)Hθ+JθᵀJθ)。"
+  },
+  "grassland::DihedralEnergy<Real>::Jacobian": {
+    "contract": "角差没有周期折返，也没有乘弯曲刚度或边长权重。",
+    "description": "返回 2(θ−rest_angle)Jθ。"
+  },
+  "grassland::DihedralEnergy<Real>::ValidInput": {
+    "contract": "角差没有周期折返，也没有乘弯曲刚度或边长权重。",
+    "description": "始终 true，不检查退化面。"
+  },
+  "grassland::DihedralEnergy<Real>::operator()": {
+    "contract": "角差没有周期折返，也没有乘弯曲刚度或边长权重。",
+    "description": "返回 (θ−rest_angle)²。"
+  },
+  "grassland::DihedralEnergy<double>": {
+    "contract": "使 cpp 内定义的值与导数方法可由其他编译单元链接；算法约束与模板类型一致。",
+    "description": "为 double 标量生成该微分核的显式模板实例。"
+  },
+  "grassland::DihedralEnergy<float>": {
+    "contract": "使 cpp 内定义的值与导数方法可由其他编译单元链接；算法约束与模板类型一致。",
+    "description": "为 float 标量生成该微分核的显式模板实例。"
+  },
+  "grassland::DistanceLineLine": {
+    "contract": "近似平行时固定第一条线 u=0 并求点线距离；零长直线没有保护。",
+    "description": "求两条无限直线的最近距离及可选参数 u/v。"
+  },
+  "grassland::DistancePointAABB": {
+    "contract": "可传上下界或 AABB 对象；每个轴必须 lower≤upper。",
+    "description": "计算点到有效盒区域的距离；盒内或边界返回 0。"
+  },
+  "grassland::DistancePointLine": {
+    "contract": "t 不限 [0,1]；要求 s0≠s1，不带 t 重载丢弃投影参数。",
+    "description": "计算点在无限直线上的投影与距离；带 t 重载输出 s0+t(s1−s0)。"
+  },
+  "grassland::DistancePointPlane": {
+    "contract": "投影为 v0+u(v1−v0)+v(v2−v0)，无需落在三角形内；要求非共线顶点。",
+    "description": "计算点到三顶点所在平面的无符号距离；带 u/v 重载求平面投影坐标。"
+  },
+  "grassland::DistancePointPoint": {
+    "contract": "非平方距离；float/double 显式实例化。",
+    "description": "返回两点差向量的长度。"
+  },
+  "grassland::DistancePointSegment": {
+    "contract": "带 t 重载输出最近点参数；零长度边未专门处理。",
+    "description": "计算点到线段的最近距离，将投影参数 t 钳制到 [0,1]。"
+  },
+  "grassland::DistancePointTriangle": {
+    "contract": "带 u/v 重载返回最近点重心参数，第三权重为 1−u−v；输入应非退化。",
+    "description": "先测试面投影，再取三条边的最近距离。"
+  },
+  "grassland::DistancePointTriangleProjection": {
+    "contract": "与真正的点到三角形距离不同，投影在外时不检查边界最近点。",
+    "description": "若平面投影落在三角形闭区域内则返回距离，否则返回 −1。"
+  },
+  "grassland::DistanceSegmentSegment": {
+    "contract": "可选 u/v 对应两条线段 [0,1] 参数；调用者应提供非零长度边。",
+    "description": "由直线最近点起步，将越界参数约束到线段端点并重新投影。"
+  },
+  "grassland::Dot": {
+    "contract": "标量输出包装为 1×1 矩阵。",
+    "description": "两个三维向量点积核。"
+  },
+  "grassland::Dot::Hessian": {
+    "contract": "标量输出包装为 1×1 矩阵。",
+    "description": "6×6 Hessian 的两个非对角 3×3 块是单位阵。"
+  },
+  "grassland::Dot::InputType": {
+    "contract": "维度见本页精确 typedef 声明，与 Jacobian/Hessian 尺寸一致。",
+    "description": "函数输入的定长 Eigen 类型；矩阵按列展开作为导数输入。"
+  },
+  "grassland::Dot::Jacobian": {
+    "contract": "标量输出包装为 1×1 矩阵。",
+    "description": "返回 [vᵀ,uᵀ]。"
+  },
+  "grassland::Dot::OutputType": {
+    "contract": "维度见本页精确 typedef 声明，与 Jacobian/Hessian 尺寸一致。",
+    "description": "函数输出的定长 Eigen 类型；标量也以 1×1 矩阵表示。"
+  },
+  "grassland::Dot::Scalar": {
+    "contract": "维度见本页精确 typedef 声明，与 Jacobian/Hessian 尺寸一致。",
+    "description": "计算标量类型，由 Real 或内核 Scalar 指定。"
+  },
+  "grassland::Dot::ValidInput": {
+    "contract": "标量输出包装为 1×1 矩阵。",
+    "description": "始终 true。"
+  },
+  "grassland::Dot::operator()": {
+    "contract": "标量输出包装为 1×1 矩阵。",
+    "description": "返回 u·v；两向量重载与 3×2 矩阵重载等价。"
+  },
+  "grassland::Dot<Real>::Hessian": {
+    "contract": "标量输出包装为 1×1 矩阵。",
+    "description": "6×6 Hessian 的两个非对角 3×3 块是单位阵。"
+  },
+  "grassland::Dot<Real>::Jacobian": {
+    "contract": "标量输出包装为 1×1 矩阵。",
+    "description": "返回 [vᵀ,uᵀ]。"
+  },
+  "grassland::Dot<Real>::ValidInput": {
+    "contract": "标量输出包装为 1×1 矩阵。",
+    "description": "始终 true。"
+  },
+  "grassland::Dot<Real>::operator()": {
+    "contract": "标量输出包装为 1×1 矩阵。",
+    "description": "返回 u·v；两向量重载与 3×2 矩阵重载等价。"
+  },
+  "grassland::EdgeEdgeCCD": {
+    "contract": "t 为输入上限及输出命中时间，必须非空且已初始化；持续共面没有专门解。",
+    "description": "在线性轨迹 [0,1] 内寻找两边首次共面且相交的候选时间。"
+  },
+  "grassland::EdgeEdgeIntersection": {
+    "contract": "预期两边已共面；不独立验证空间共面，平行/共线边返回 false。",
+    "description": "在非平行边的公共法平面中判断双方端点是否跨越另一条边。"
+  },
+  "grassland::EigenDecomp": {
+    "contract": "非对角项小于 Eps 时直接令 D=A、G=I；不排序特征值。",
+    "description": "对 2×2 对称矩阵计算旋转特征基 G 和近似对角矩阵 D，满足 A≈G D Gᵀ。"
+  },
+  "grassland::EigenToGLM": {
+    "contract": "矩阵维度从 row×col 对应 GLM mat<col,row>；不是矩阵转置。",
+    "description": "将 Eigen 矩阵或向量按元素复制为对应 GLM 类型。"
+  },
+  "grassland::ElasticNeoHookean": {
+    "contract": "mu/lambda 默认 1；J 必须为正。返回能量密度，未包含积分权重。",
+    "description": "对形变梯度计算μ/2 (||F||²−3)−μ ln J+λ/2 (ln J)²，J=det F。"
+  },
+  "grassland::ElasticNeoHookean::Hessian": {
+    "contract": "mu/lambda 默认 1；J 必须为正。返回能量密度，未包含积分权重。",
+    "description": "返回能量的二阶矩阵，包含 J 的 Hessian 和梯度外积项。不做正定投影。"
+  },
+  "grassland::ElasticNeoHookean::InputType": {
+    "contract": "mu/lambda 默认 1；J 必须为正。返回能量密度，未包含积分权重。",
+    "description": "形变梯度矩阵。"
+  },
+  "grassland::ElasticNeoHookean::Jacobian": {
+    "contract": "mu/lambda 默认 1；J 必须为正。返回能量密度，未包含积分权重。",
+    "description": "解析求能量对F 各元素的导数，按列展开为单行。"
+  },
+  "grassland::ElasticNeoHookean::OutputType": {
+    "contract": "mu/lambda 默认 1；J 必须为正。返回能量密度，未包含积分权重。",
+    "description": "包含能量密度的 1×1 Eigen 矩阵。"
+  },
+  "grassland::ElasticNeoHookean::Scalar": {
+    "contract": "mu/lambda 默认 1；J 必须为正。返回能量密度，未包含积分权重。",
+    "description": "Real 标量类型。"
+  },
+  "grassland::ElasticNeoHookean::ValidInput": {
+    "contract": "mu/lambda 默认 1；J 必须为正。返回能量密度，未包含积分权重。",
+    "description": "检查形变梯度行列式大于零；不自动随求值执行，也不检验材料参数。"
+  },
+  "grassland::ElasticNeoHookean::operator()": {
+    "contract": "mu/lambda 默认 1；J 必须为正。返回能量密度，未包含积分权重。",
+    "description": "计算 μ/2 (||F||²−3)−μ ln J+λ/2 (ln J)²，J=det F。输入直接作为 F。"
+  },
+  "grassland::ElasticNeoHookean<Real>::Hessian": {
+    "contract": "mu/lambda 默认 1；J 必须为正。返回能量密度，未包含积分权重。",
+    "description": "返回能量的二阶矩阵，包含 J 的 Hessian 和梯度外积项。不做正定投影。"
+  },
+  "grassland::ElasticNeoHookean<Real>::Jacobian": {
+    "contract": "mu/lambda 默认 1；J 必须为正。返回能量密度，未包含积分权重。",
+    "description": "解析求能量对F 各元素的导数，按列展开为单行。"
+  },
+  "grassland::ElasticNeoHookean<Real>::ValidInput": {
+    "contract": "mu/lambda 默认 1；J 必须为正。返回能量密度，未包含积分权重。",
+    "description": "检查形变梯度行列式大于零；不自动随求值执行，也不检验材料参数。"
+  },
+  "grassland::ElasticNeoHookean<Real>::operator()": {
+    "contract": "mu/lambda 默认 1；J 必须为正。返回能量密度，未包含积分权重。",
+    "description": "计算 μ/2 (||F||²−3)−μ ln J+λ/2 (ln J)²，J=det F。输入直接作为 F。"
+  },
+  "grassland::ElasticNeoHookean<double>": {
+    "contract": "使 cpp 内定义的值与导数方法可由其他编译单元链接；算法约束与模板类型一致。",
+    "description": "为 double 标量生成该微分核的显式模板实例。"
+  },
+  "grassland::ElasticNeoHookean<float>": {
+    "contract": "使 cpp 内定义的值与导数方法可由其他编译单元链接；算法约束与模板类型一致。",
+    "description": "为 float 标量生成该微分核的显式模板实例。"
+  },
+  "grassland::ElasticNeoHookeanF3x2": {
+    "contract": "mu/lambda 默认 1；J 必须为正。返回能量密度，未包含积分权重。",
+    "description": "对形变梯度计算μ/2 (||F||²−2)−μ ln J+λ/2 (ln J)²，J=||F0×F1||。"
+  },
+  "grassland::ElasticNeoHookeanF3x2::Hessian": {
+    "contract": "mu/lambda 默认 1；J 必须为正。返回能量密度，未包含积分权重。",
+    "description": "返回能量的二阶矩阵，包含 J 的 Hessian 和梯度外积项。不做正定投影。"
+  },
+  "grassland::ElasticNeoHookeanF3x2::InputType": {
+    "contract": "mu/lambda 默认 1；J 必须为正。返回能量密度，未包含积分权重。",
+    "description": "形变梯度矩阵。"
+  },
+  "grassland::ElasticNeoHookeanF3x2::Jacobian": {
+    "contract": "mu/lambda 默认 1；J 必须为正。返回能量密度，未包含积分权重。",
+    "description": "解析求能量对F 各元素的导数，按列展开为单行。"
+  },
+  "grassland::ElasticNeoHookeanF3x2::OutputType": {
+    "contract": "mu/lambda 默认 1；J 必须为正。返回能量密度，未包含积分权重。",
+    "description": "包含能量密度的 1×1 Eigen 矩阵。"
+  },
+  "grassland::ElasticNeoHookeanF3x2::Scalar": {
+    "contract": "mu/lambda 默认 1；J 必须为正。返回能量密度，未包含积分权重。",
+    "description": "Real 标量类型。"
+  },
+  "grassland::ElasticNeoHookeanF3x2::ValidInput": {
+    "contract": "mu/lambda 默认 1；J 必须为正。返回能量密度，未包含积分权重。",
+    "description": "检查形变后两列叉积范数大于 100×Eps；不自动随求值执行，也不检验材料参数。"
+  },
+  "grassland::ElasticNeoHookeanF3x2::operator()": {
+    "contract": "mu/lambda 默认 1；J 必须为正。返回能量密度，未包含积分权重。",
+    "description": "计算 μ/2 (||F||²−2)−μ ln J+λ/2 (ln J)²，J=||F0×F1||。输入直接作为 F。"
+  },
+  "grassland::ElasticNeoHookeanF3x2<Real>::Hessian": {
+    "contract": "mu/lambda 默认 1；J 必须为正。返回能量密度，未包含积分权重。",
+    "description": "返回能量的二阶矩阵，包含 J 的 Hessian 和梯度外积项。不做正定投影。"
+  },
+  "grassland::ElasticNeoHookeanF3x2<Real>::Jacobian": {
+    "contract": "mu/lambda 默认 1；J 必须为正。返回能量密度，未包含积分权重。",
+    "description": "解析求能量对F 各元素的导数，按列展开为单行。"
+  },
+  "grassland::ElasticNeoHookeanF3x2<Real>::ValidInput": {
+    "contract": "mu/lambda 默认 1；J 必须为正。返回能量密度，未包含积分权重。",
+    "description": "检查形变后两列叉积范数大于 100×Eps；不自动随求值执行，也不检验材料参数。"
+  },
+  "grassland::ElasticNeoHookeanF3x2<Real>::operator()": {
+    "contract": "mu/lambda 默认 1；J 必须为正。返回能量密度，未包含积分权重。",
+    "description": "计算 μ/2 (||F||²−2)−μ ln J+λ/2 (ln J)²，J=||F0×F1||。输入直接作为 F。"
+  },
+  "grassland::ElasticNeoHookeanF3x2<double>": {
+    "contract": "使 cpp 内定义的值与导数方法可由其他编译单元链接；算法约束与模板类型一致。",
+    "description": "为 double 标量生成该微分核的显式模板实例。"
+  },
+  "grassland::ElasticNeoHookeanF3x2<float>": {
+    "contract": "使 cpp 内定义的值与导数方法可由其他编译单元链接；算法约束与模板类型一致。",
+    "description": "为 float 标量生成该微分核的显式模板实例。"
+  },
+  "grassland::ElasticNeoHookeanSimple": {
+    "contract": "mu/lambda 默认 1；lambda 不得为零。返回能量密度，未包含积分权重。",
+    "description": "对形变梯度计算μ/2 (||F||²−3)+λ/2 (J−1−μ/λ)²，J=det F。"
+  },
+  "grassland::ElasticNeoHookeanSimple::Hessian": {
+    "contract": "mu/lambda 默认 1；lambda 不得为零。返回能量密度，未包含积分权重。",
+    "description": "返回能量的二阶矩阵，包含 J 的 Hessian 和梯度外积项。不做正定投影。"
+  },
+  "grassland::ElasticNeoHookeanSimple::InputType": {
+    "contract": "mu/lambda 默认 1；lambda 不得为零。返回能量密度，未包含积分权重。",
+    "description": "形变梯度矩阵。"
+  },
+  "grassland::ElasticNeoHookeanSimple::Jacobian": {
+    "contract": "mu/lambda 默认 1；lambda 不得为零。返回能量密度，未包含积分权重。",
+    "description": "解析求能量对F 各元素的导数，按列展开为单行。"
+  },
+  "grassland::ElasticNeoHookeanSimple::OutputType": {
+    "contract": "mu/lambda 默认 1；lambda 不得为零。返回能量密度，未包含积分权重。",
+    "description": "包含能量密度的 1×1 Eigen 矩阵。"
+  },
+  "grassland::ElasticNeoHookeanSimple::Scalar": {
+    "contract": "mu/lambda 默认 1；lambda 不得为零。返回能量密度，未包含积分权重。",
+    "description": "Real 标量类型。"
+  },
+  "grassland::ElasticNeoHookeanSimple::ValidInput": {
+    "contract": "mu/lambda 默认 1；lambda 不得为零。返回能量密度，未包含积分权重。",
+    "description": "检查始终 true；不自动随求值执行，也不检验材料参数。"
+  },
+  "grassland::ElasticNeoHookeanSimple::operator()": {
+    "contract": "mu/lambda 默认 1；lambda 不得为零。返回能量密度，未包含积分权重。",
+    "description": "计算 μ/2 (||F||²−3)+λ/2 (J−1−μ/λ)²，J=det F。输入直接作为 F。"
+  },
+  "grassland::ElasticNeoHookeanSimple<Real>::Hessian": {
+    "contract": "mu/lambda 默认 1；lambda 不得为零。返回能量密度，未包含积分权重。",
+    "description": "返回能量的二阶矩阵，包含 J 的 Hessian 和梯度外积项。不做正定投影。"
+  },
+  "grassland::ElasticNeoHookeanSimple<Real>::Jacobian": {
+    "contract": "mu/lambda 默认 1；lambda 不得为零。返回能量密度，未包含积分权重。",
+    "description": "解析求能量对F 各元素的导数，按列展开为单行。"
+  },
+  "grassland::ElasticNeoHookeanSimple<Real>::ValidInput": {
+    "contract": "mu/lambda 默认 1；lambda 不得为零。返回能量密度，未包含积分权重。",
+    "description": "检查始终 true；不自动随求值执行，也不检验材料参数。"
+  },
+  "grassland::ElasticNeoHookeanSimple<Real>::operator()": {
+    "contract": "mu/lambda 默认 1；lambda 不得为零。返回能量密度，未包含积分权重。",
+    "description": "计算 μ/2 (||F||²−3)+λ/2 (J−1−μ/λ)²，J=det F。输入直接作为 F。"
+  },
+  "grassland::ElasticNeoHookeanSimple<double>": {
+    "contract": "使 cpp 内定义的值与导数方法可由其他编译单元链接；算法约束与模板类型一致。",
+    "description": "为 double 标量生成该微分核的显式模板实例。"
+  },
+  "grassland::ElasticNeoHookeanSimple<float>": {
+    "contract": "使 cpp 内定义的值与导数方法可由其他编译单元链接；算法约束与模板类型一致。",
+    "description": "为 float 标量生成该微分核的显式模板实例。"
+  },
+  "grassland::ElasticNeoHookeanSimpleF3x2": {
+    "contract": "mu/lambda 默认 1；lambda 不得为零。返回能量密度，未包含积分权重。",
+    "description": "对形变梯度计算μ/2 (||F||²−2)+λ/2 (J−1−μ/λ)²，J=||F0×F1||。"
+  },
+  "grassland::ElasticNeoHookeanSimpleF3x2::Hessian": {
+    "contract": "mu/lambda 默认 1；lambda 不得为零。返回能量密度，未包含积分权重。",
+    "description": "返回能量的二阶矩阵，包含 J 的 Hessian 和梯度外积项。不做正定投影。"
+  },
+  "grassland::ElasticNeoHookeanSimpleF3x2::InputType": {
+    "contract": "mu/lambda 默认 1；lambda 不得为零。返回能量密度，未包含积分权重。",
+    "description": "形变梯度矩阵。"
+  },
+  "grassland::ElasticNeoHookeanSimpleF3x2::Jacobian": {
+    "contract": "mu/lambda 默认 1；lambda 不得为零。返回能量密度，未包含积分权重。",
+    "description": "解析求能量对F 各元素的导数，按列展开为单行。"
+  },
+  "grassland::ElasticNeoHookeanSimpleF3x2::OutputType": {
+    "contract": "mu/lambda 默认 1；lambda 不得为零。返回能量密度，未包含积分权重。",
+    "description": "包含能量密度的 1×1 Eigen 矩阵。"
+  },
+  "grassland::ElasticNeoHookeanSimpleF3x2::Scalar": {
+    "contract": "mu/lambda 默认 1；lambda 不得为零。返回能量密度，未包含积分权重。",
+    "description": "Real 标量类型。"
+  },
+  "grassland::ElasticNeoHookeanSimpleF3x2::ValidInput": {
+    "contract": "mu/lambda 默认 1；lambda 不得为零。返回能量密度，未包含积分权重。",
+    "description": "检查形变后两列叉积范数大于 100×Eps；不自动随求值执行，也不检验材料参数。"
+  },
+  "grassland::ElasticNeoHookeanSimpleF3x2::operator()": {
+    "contract": "mu/lambda 默认 1；lambda 不得为零。返回能量密度，未包含积分权重。",
+    "description": "计算 μ/2 (||F||²−2)+λ/2 (J−1−μ/λ)²，J=||F0×F1||。输入直接作为 F。"
+  },
+  "grassland::ElasticNeoHookeanSimpleF3x2<Real>::Hessian": {
+    "contract": "mu/lambda 默认 1；lambda 不得为零。返回能量密度，未包含积分权重。",
+    "description": "返回能量的二阶矩阵，包含 J 的 Hessian 和梯度外积项。不做正定投影。"
+  },
+  "grassland::ElasticNeoHookeanSimpleF3x2<Real>::Jacobian": {
+    "contract": "mu/lambda 默认 1；lambda 不得为零。返回能量密度，未包含积分权重。",
+    "description": "解析求能量对F 各元素的导数，按列展开为单行。"
+  },
+  "grassland::ElasticNeoHookeanSimpleF3x2<Real>::ValidInput": {
+    "contract": "mu/lambda 默认 1；lambda 不得为零。返回能量密度，未包含积分权重。",
+    "description": "检查形变后两列叉积范数大于 100×Eps；不自动随求值执行，也不检验材料参数。"
+  },
+  "grassland::ElasticNeoHookeanSimpleF3x2<Real>::operator()": {
+    "contract": "mu/lambda 默认 1；lambda 不得为零。返回能量密度，未包含积分权重。",
+    "description": "计算 μ/2 (||F||²−2)+λ/2 (J−1−μ/λ)²，J=||F0×F1||。输入直接作为 F。"
+  },
+  "grassland::ElasticNeoHookeanSimpleF3x2<double>": {
+    "contract": "使 cpp 内定义的值与导数方法可由其他编译单元链接；算法约束与模板类型一致。",
+    "description": "为 double 标量生成该微分核的显式模板实例。"
+  },
+  "grassland::ElasticNeoHookeanSimpleF3x2<float>": {
+    "contract": "使 cpp 内定义的值与导数方法可由其他编译单元链接；算法约束与模板类型一致。",
+    "description": "为 float 标量生成该微分核的显式模板实例。"
+  },
+  "grassland::ElasticNeoHookeanSimpleTetrahedron": {
+    "contract": "mu/lambda 默认 1；lambda 不得为零。 Dm 必须初始化且可逆；返回值未乘静止面积/体积。",
+    "description": "顶点位置映射到形变梯度后计算μ/2 (||F||²−3)+λ/2 (J−1−μ/λ)²，J=det F。"
+  },
+  "grassland::ElasticNeoHookeanSimpleTetrahedron::Hessian": {
+    "contract": "mu/lambda 默认 1；lambda 不得为零。 Dm 必须初始化且可逆；返回值未乘静止面积/体积。",
+    "description": "返回能量的二阶矩阵，将形变梯度 Hessian 经 FEM 线性映射作合同变换。不做正定投影。"
+  },
+  "grassland::ElasticNeoHookeanSimpleTetrahedron::InputType": {
+    "contract": "mu/lambda 默认 1；lambda 不得为零。 Dm 必须初始化且可逆；返回值未乘静止面积/体积。",
+    "description": "顶点按列排列的矩阵。"
+  },
+  "grassland::ElasticNeoHookeanSimpleTetrahedron::Jacobian": {
+    "contract": "mu/lambda 默认 1；lambda 不得为零。 Dm 必须初始化且可逆；返回值未乘静止面积/体积。",
+    "description": "解析求能量对顶点坐标的导数：将形变梯度能量 Jacobian 右乘 FEM 线性映射。"
+  },
+  "grassland::ElasticNeoHookeanSimpleTetrahedron::OutputType": {
+    "contract": "mu/lambda 默认 1；lambda 不得为零。 Dm 必须初始化且可逆；返回值未乘静止面积/体积。",
+    "description": "包含能量密度的 1×1 Eigen 矩阵。"
+  },
+  "grassland::ElasticNeoHookeanSimpleTetrahedron::Scalar": {
+    "contract": "mu/lambda 默认 1；lambda 不得为零。 Dm 必须初始化且可逆；返回值未乘静止面积/体积。",
+    "description": "Real 标量类型。"
+  },
+  "grassland::ElasticNeoHookeanSimpleTetrahedron::SubHessian": {
+    "contract": "dim 为 0..3；其他值使映射系数全零。Dm 可逆且材料输入有效时得到零块，不应用此行为掩盖无效参数。",
+    "description": "仅计算顶点 dim 对应的 3×3 Hessian 对角块。"
+  },
+  "grassland::ElasticNeoHookeanSimpleTetrahedron::ValidInput": {
+    "contract": "mu/lambda 默认 1；lambda 不得为零。 Dm 必须初始化且可逆；返回值未乘静止面积/体积。",
+    "description": "检查始终 true；不自动随求值执行，也不检验材料参数。"
+  },
+  "grassland::ElasticNeoHookeanSimpleTetrahedron::operator()": {
+    "contract": "mu/lambda 默认 1；lambda 不得为零。 Dm 必须初始化且可逆；返回值未乘静止面积/体积。",
+    "description": "计算 μ/2 (||F||²−3)+λ/2 (J−1−μ/λ)²，J=det F。先使用 Ds Dm⁻¹ 求 F。"
+  },
+  "grassland::ElasticNeoHookeanSimpleTetrahedron<Real>::Hessian": {
+    "contract": "mu/lambda 默认 1；lambda 不得为零。 Dm 必须初始化且可逆；返回值未乘静止面积/体积。",
+    "description": "返回能量的二阶矩阵，将形变梯度 Hessian 经 FEM 线性映射作合同变换。不做正定投影。"
+  },
+  "grassland::ElasticNeoHookeanSimpleTetrahedron<Real>::Jacobian": {
+    "contract": "mu/lambda 默认 1；lambda 不得为零。 Dm 必须初始化且可逆；返回值未乘静止面积/体积。",
+    "description": "解析求能量对顶点坐标的导数：将形变梯度能量 Jacobian 右乘 FEM 线性映射。"
+  },
+  "grassland::ElasticNeoHookeanSimpleTetrahedron<Real>::SubHessian": {
+    "contract": "dim 为 0..3；其他值使映射系数全零。Dm 可逆且材料输入有效时得到零块，不应用此行为掩盖无效参数。",
+    "description": "仅计算顶点 dim 对应的 3×3 Hessian 对角块。"
+  },
+  "grassland::ElasticNeoHookeanSimpleTetrahedron<Real>::ValidInput": {
+    "contract": "mu/lambda 默认 1；lambda 不得为零。 Dm 必须初始化且可逆；返回值未乘静止面积/体积。",
+    "description": "检查始终 true；不自动随求值执行，也不检验材料参数。"
+  },
+  "grassland::ElasticNeoHookeanSimpleTetrahedron<Real>::operator()": {
+    "contract": "mu/lambda 默认 1；lambda 不得为零。 Dm 必须初始化且可逆；返回值未乘静止面积/体积。",
+    "description": "计算 μ/2 (||F||²−3)+λ/2 (J−1−μ/λ)²，J=det F。先使用 Ds Dm⁻¹ 求 F。"
+  },
+  "grassland::ElasticNeoHookeanSimpleTetrahedron<double>": {
+    "contract": "使 cpp 内定义的值与导数方法可由其他编译单元链接；算法约束与模板类型一致。",
+    "description": "为 double 标量生成该微分核的显式模板实例。"
+  },
+  "grassland::ElasticNeoHookeanSimpleTetrahedron<float>": {
+    "contract": "使 cpp 内定义的值与导数方法可由其他编译单元链接；算法约束与模板类型一致。",
+    "description": "为 float 标量生成该微分核的显式模板实例。"
+  },
+  "grassland::ElasticNeoHookeanSimpleTriangle": {
+    "contract": "mu/lambda 默认 1；lambda 不得为零。 Dm 必须初始化且可逆；返回值未乘静止面积/体积。",
+    "description": "顶点位置映射到形变梯度后计算μ/2 (||F||²−2)+λ/2 (J−1−μ/λ)²，J=||F0×F1||。"
+  },
+  "grassland::ElasticNeoHookeanSimpleTriangle::Hessian": {
+    "contract": "mu/lambda 默认 1；lambda 不得为零。 Dm 必须初始化且可逆；返回值未乘静止面积/体积。",
+    "description": "返回能量的二阶矩阵，将形变梯度 Hessian 经 FEM 线性映射作合同变换。不做正定投影。"
+  },
+  "grassland::ElasticNeoHookeanSimpleTriangle::InputType": {
+    "contract": "mu/lambda 默认 1；lambda 不得为零。 Dm 必须初始化且可逆；返回值未乘静止面积/体积。",
+    "description": "顶点按列排列的矩阵。"
+  },
+  "grassland::ElasticNeoHookeanSimpleTriangle::Jacobian": {
+    "contract": "mu/lambda 默认 1；lambda 不得为零。 Dm 必须初始化且可逆；返回值未乘静止面积/体积。",
+    "description": "解析求能量对顶点坐标的导数：将形变梯度能量 Jacobian 右乘 FEM 线性映射。"
+  },
+  "grassland::ElasticNeoHookeanSimpleTriangle::OutputType": {
+    "contract": "mu/lambda 默认 1；lambda 不得为零。 Dm 必须初始化且可逆；返回值未乘静止面积/体积。",
+    "description": "包含能量密度的 1×1 Eigen 矩阵。"
+  },
+  "grassland::ElasticNeoHookeanSimpleTriangle::Scalar": {
+    "contract": "mu/lambda 默认 1；lambda 不得为零。 Dm 必须初始化且可逆；返回值未乘静止面积/体积。",
+    "description": "Real 标量类型。"
+  },
+  "grassland::ElasticNeoHookeanSimpleTriangle::ValidInput": {
+    "contract": "mu/lambda 默认 1；lambda 不得为零。 Dm 必须初始化且可逆；返回值未乘静止面积/体积。",
+    "description": "检查形变后两列叉积范数大于 100×Eps；不自动随求值执行，也不检验材料参数。"
+  },
+  "grassland::ElasticNeoHookeanSimpleTriangle::operator()": {
+    "contract": "mu/lambda 默认 1；lambda 不得为零。 Dm 必须初始化且可逆；返回值未乘静止面积/体积。",
+    "description": "计算 μ/2 (||F||²−2)+λ/2 (J−1−μ/λ)²，J=||F0×F1||。先使用 Ds Dm⁻¹ 求 F。"
+  },
+  "grassland::ElasticNeoHookeanSimpleTriangle<Real>::Hessian": {
+    "contract": "mu/lambda 默认 1；lambda 不得为零。 Dm 必须初始化且可逆；返回值未乘静止面积/体积。",
+    "description": "返回能量的二阶矩阵，将形变梯度 Hessian 经 FEM 线性映射作合同变换。不做正定投影。"
+  },
+  "grassland::ElasticNeoHookeanSimpleTriangle<Real>::Jacobian": {
+    "contract": "mu/lambda 默认 1；lambda 不得为零。 Dm 必须初始化且可逆；返回值未乘静止面积/体积。",
+    "description": "解析求能量对顶点坐标的导数：将形变梯度能量 Jacobian 右乘 FEM 线性映射。"
+  },
+  "grassland::ElasticNeoHookeanSimpleTriangle<Real>::ValidInput": {
+    "contract": "mu/lambda 默认 1；lambda 不得为零。 Dm 必须初始化且可逆；返回值未乘静止面积/体积。",
+    "description": "检查形变后两列叉积范数大于 100×Eps；不自动随求值执行，也不检验材料参数。"
+  },
+  "grassland::ElasticNeoHookeanSimpleTriangle<Real>::operator()": {
+    "contract": "mu/lambda 默认 1；lambda 不得为零。 Dm 必须初始化且可逆；返回值未乘静止面积/体积。",
+    "description": "计算 μ/2 (||F||²−2)+λ/2 (J−1−μ/λ)²，J=||F0×F1||。先使用 Ds Dm⁻¹ 求 F。"
+  },
+  "grassland::ElasticNeoHookeanSimpleTriangle<double>": {
+    "contract": "使 cpp 内定义的值与导数方法可由其他编译单元链接；算法约束与模板类型一致。",
+    "description": "为 double 标量生成该微分核的显式模板实例。"
+  },
+  "grassland::ElasticNeoHookeanSimpleTriangle<float>": {
+    "contract": "使 cpp 内定义的值与导数方法可由其他编译单元链接；算法约束与模板类型一致。",
+    "description": "为 float 标量生成该微分核的显式模板实例。"
+  },
+  "grassland::ElasticNeoHookeanTetrahedron": {
+    "contract": "mu/lambda 默认 1；J 必须为正。 Dm 必须初始化且可逆；返回值未乘静止面积/体积。",
+    "description": "顶点位置映射到形变梯度后计算μ/2 (||F||²−3)−μ ln J+λ/2 (ln J)²，J=det F。"
+  },
+  "grassland::ElasticNeoHookeanTetrahedron::Hessian": {
+    "contract": "mu/lambda 默认 1；J 必须为正。 Dm 必须初始化且可逆；返回值未乘静止面积/体积。",
+    "description": "返回能量的二阶矩阵，将形变梯度 Hessian 经 FEM 线性映射作合同变换。不做正定投影。"
+  },
+  "grassland::ElasticNeoHookeanTetrahedron::InputType": {
+    "contract": "mu/lambda 默认 1；J 必须为正。 Dm 必须初始化且可逆；返回值未乘静止面积/体积。",
+    "description": "顶点按列排列的矩阵。"
+  },
+  "grassland::ElasticNeoHookeanTetrahedron::Jacobian": {
+    "contract": "mu/lambda 默认 1；J 必须为正。 Dm 必须初始化且可逆；返回值未乘静止面积/体积。",
+    "description": "解析求能量对顶点坐标的导数：将形变梯度能量 Jacobian 右乘 FEM 线性映射。"
+  },
+  "grassland::ElasticNeoHookeanTetrahedron::OutputType": {
+    "contract": "mu/lambda 默认 1；J 必须为正。 Dm 必须初始化且可逆；返回值未乘静止面积/体积。",
+    "description": "包含能量密度的 1×1 Eigen 矩阵。"
+  },
+  "grassland::ElasticNeoHookeanTetrahedron::Scalar": {
+    "contract": "mu/lambda 默认 1；J 必须为正。 Dm 必须初始化且可逆；返回值未乘静止面积/体积。",
+    "description": "Real 标量类型。"
+  },
+  "grassland::ElasticNeoHookeanTetrahedron::SubHessian": {
+    "contract": "dim 为 0..3；其他值使映射系数全零。Dm 可逆且材料输入有效时得到零块，不应用此行为掩盖无效参数。",
+    "description": "仅计算顶点 dim 对应的 3×3 Hessian 对角块。"
+  },
+  "grassland::ElasticNeoHookeanTetrahedron::ValidInput": {
+    "contract": "mu/lambda 默认 1；J 必须为正。 Dm 必须初始化且可逆；返回值未乘静止面积/体积。",
+    "description": "检查形变梯度行列式大于零；不自动随求值执行，也不检验材料参数。"
+  },
+  "grassland::ElasticNeoHookeanTetrahedron::operator()": {
+    "contract": "mu/lambda 默认 1；J 必须为正。 Dm 必须初始化且可逆；返回值未乘静止面积/体积。",
+    "description": "计算 μ/2 (||F||²−3)−μ ln J+λ/2 (ln J)²，J=det F。先使用 Ds Dm⁻¹ 求 F。"
+  },
+  "grassland::ElasticNeoHookeanTetrahedron<Real>::Hessian": {
+    "contract": "mu/lambda 默认 1；J 必须为正。 Dm 必须初始化且可逆；返回值未乘静止面积/体积。",
+    "description": "返回能量的二阶矩阵，将形变梯度 Hessian 经 FEM 线性映射作合同变换。不做正定投影。"
+  },
+  "grassland::ElasticNeoHookeanTetrahedron<Real>::Jacobian": {
+    "contract": "mu/lambda 默认 1；J 必须为正。 Dm 必须初始化且可逆；返回值未乘静止面积/体积。",
+    "description": "解析求能量对顶点坐标的导数：将形变梯度能量 Jacobian 右乘 FEM 线性映射。"
+  },
+  "grassland::ElasticNeoHookeanTetrahedron<Real>::SubHessian": {
+    "contract": "dim 为 0..3；其他值使映射系数全零。Dm 可逆且材料输入有效时得到零块，不应用此行为掩盖无效参数。",
+    "description": "仅计算顶点 dim 对应的 3×3 Hessian 对角块。"
+  },
+  "grassland::ElasticNeoHookeanTetrahedron<Real>::ValidInput": {
+    "contract": "mu/lambda 默认 1；J 必须为正。 Dm 必须初始化且可逆；返回值未乘静止面积/体积。",
+    "description": "检查形变梯度行列式大于零；不自动随求值执行，也不检验材料参数。"
+  },
+  "grassland::ElasticNeoHookeanTetrahedron<Real>::operator()": {
+    "contract": "mu/lambda 默认 1；J 必须为正。 Dm 必须初始化且可逆；返回值未乘静止面积/体积。",
+    "description": "计算 μ/2 (||F||²−3)−μ ln J+λ/2 (ln J)²，J=det F。先使用 Ds Dm⁻¹ 求 F。"
+  },
+  "grassland::ElasticNeoHookeanTetrahedron<double>": {
+    "contract": "使 cpp 内定义的值与导数方法可由其他编译单元链接；算法约束与模板类型一致。",
+    "description": "为 double 标量生成该微分核的显式模板实例。"
+  },
+  "grassland::ElasticNeoHookeanTetrahedron<float>": {
+    "contract": "使 cpp 内定义的值与导数方法可由其他编译单元链接；算法约束与模板类型一致。",
+    "description": "为 float 标量生成该微分核的显式模板实例。"
+  },
+  "grassland::ElasticNeoHookeanTriangle": {
+    "contract": "mu/lambda 默认 1；J 必须为正。 Dm 必须初始化且可逆；返回值未乘静止面积/体积。",
+    "description": "顶点位置映射到形变梯度后计算μ/2 (||F||²−2)−μ ln J+λ/2 (ln J)²，J=||F0×F1||。"
+  },
+  "grassland::ElasticNeoHookeanTriangle::Hessian": {
+    "contract": "mu/lambda 默认 1；J 必须为正。 Dm 必须初始化且可逆；返回值未乘静止面积/体积。",
+    "description": "返回能量的二阶矩阵，将形变梯度 Hessian 经 FEM 线性映射作合同变换。不做正定投影。"
+  },
+  "grassland::ElasticNeoHookeanTriangle::InputType": {
+    "contract": "mu/lambda 默认 1；J 必须为正。 Dm 必须初始化且可逆；返回值未乘静止面积/体积。",
+    "description": "顶点按列排列的矩阵。"
+  },
+  "grassland::ElasticNeoHookeanTriangle::Jacobian": {
+    "contract": "mu/lambda 默认 1；J 必须为正。 Dm 必须初始化且可逆；返回值未乘静止面积/体积。",
+    "description": "解析求能量对顶点坐标的导数：将形变梯度能量 Jacobian 右乘 FEM 线性映射。"
+  },
+  "grassland::ElasticNeoHookeanTriangle::OutputType": {
+    "contract": "mu/lambda 默认 1；J 必须为正。 Dm 必须初始化且可逆；返回值未乘静止面积/体积。",
+    "description": "包含能量密度的 1×1 Eigen 矩阵。"
+  },
+  "grassland::ElasticNeoHookeanTriangle::Scalar": {
+    "contract": "mu/lambda 默认 1；J 必须为正。 Dm 必须初始化且可逆；返回值未乘静止面积/体积。",
+    "description": "Real 标量类型。"
+  },
+  "grassland::ElasticNeoHookeanTriangle::ValidInput": {
+    "contract": "mu/lambda 默认 1；J 必须为正。 Dm 必须初始化且可逆；返回值未乘静止面积/体积。",
+    "description": "检查形变后两列叉积范数大于 100×Eps；不自动随求值执行，也不检验材料参数。"
+  },
+  "grassland::ElasticNeoHookeanTriangle::operator()": {
+    "contract": "mu/lambda 默认 1；J 必须为正。 Dm 必须初始化且可逆；返回值未乘静止面积/体积。",
+    "description": "计算 μ/2 (||F||²−2)−μ ln J+λ/2 (ln J)²，J=||F0×F1||。先使用 Ds Dm⁻¹ 求 F。"
+  },
+  "grassland::ElasticNeoHookeanTriangle<Real>::Hessian": {
+    "contract": "mu/lambda 默认 1；J 必须为正。 Dm 必须初始化且可逆；返回值未乘静止面积/体积。",
+    "description": "返回能量的二阶矩阵，将形变梯度 Hessian 经 FEM 线性映射作合同变换。不做正定投影。"
+  },
+  "grassland::ElasticNeoHookeanTriangle<Real>::Jacobian": {
+    "contract": "mu/lambda 默认 1；J 必须为正。 Dm 必须初始化且可逆；返回值未乘静止面积/体积。",
+    "description": "解析求能量对顶点坐标的导数：将形变梯度能量 Jacobian 右乘 FEM 线性映射。"
+  },
+  "grassland::ElasticNeoHookeanTriangle<Real>::ValidInput": {
+    "contract": "mu/lambda 默认 1；J 必须为正。 Dm 必须初始化且可逆；返回值未乘静止面积/体积。",
+    "description": "检查形变后两列叉积范数大于 100×Eps；不自动随求值执行，也不检验材料参数。"
+  },
+  "grassland::ElasticNeoHookeanTriangle<Real>::operator()": {
+    "contract": "mu/lambda 默认 1；J 必须为正。 Dm 必须初始化且可逆；返回值未乘静止面积/体积。",
+    "description": "计算 μ/2 (||F||²−2)−μ ln J+λ/2 (ln J)²，J=||F0×F1||。先使用 Ds Dm⁻¹ 求 F。"
+  },
+  "grassland::ElasticNeoHookeanTriangle<double>": {
+    "contract": "使 cpp 内定义的值与导数方法可由其他编译单元链接；算法约束与模板类型一致。",
+    "description": "为 double 标量生成该微分核的显式模板实例。"
+  },
+  "grassland::ElasticNeoHookeanTriangle<float>": {
+    "contract": "使 cpp 内定义的值与导数方法可由其他编译单元链接；算法约束与模板类型一致。",
+    "description": "为 float 标量生成该微分核的显式模板实例。"
+  },
+  "grassland::Eps": {
+    "contract": "这里只提供 float 与 double 特化。",
+    "description": "数值算法容差模板声明。"
+  },
+  "grassland::Eps<double>": {
+    "contract": "用于几何判定和求根停止阈值。",
+    "description": "返回双精度算法容差 1e−8。"
+  },
+  "grassland::Eps<float>": {
+    "contract": "不是 std::numeric_limits<float>::epsilon。",
+    "description": "返回单精度算法容差 1e−4。"
+  },
+  "grassland::EvaluateCubicPolynomial": {
+    "contract": "系数按最高次项到常数项传入；没有数值缩放。",
+    "description": "按给定系数直接计算 ax³+bx²+cx+d。"
+  },
+  "grassland::EvaluateLinearPolynomial": {
+    "contract": "系数按最高次项到常数项传入；没有数值缩放。",
+    "description": "按给定系数直接计算 ax+b。"
+  },
+  "grassland::EvaluateQuadraticPolynomial": {
+    "contract": "系数按最高次项到常数项传入；没有数值缩放。",
+    "description": "按给定系数直接计算 ax²+bx+c。"
+  },
   "grassland::EventManager": {
     "contract": "无内部锁；回调执行期间不应修改正在迭代的注册集合。",
     "description": "持有回调表与优先级到 ID 集合的索引。"
@@ -158,6 +1602,198 @@
   "grassland::EventManager::UnregisterCallback": {
     "contract": "不提供回调执行期间迭代器稳定性的保证。",
     "description": "查到 ID 后同时移除优先级集合和回调表记录；未知 ID 无操作。"
+  },
+  "grassland::FEMDeformationGradient3x2To3x3": {
+    "contract": "第三列未归一化，其长度等于两列张成的面积。",
+    "description": "用叉积为两列形变梯度补第三列。"
+  },
+  "grassland::FEMDeformationGradient3x2To3x3::Hessian": {
+    "contract": "第三列未归一化，其长度等于两列张成的面积。",
+    "description": "前六个分片为零，后三个取叉积 Hessian。"
+  },
+  "grassland::FEMDeformationGradient3x2To3x3::InputType": {
+    "contract": "维度见本页精确 typedef 声明，与 Jacobian/Hessian 尺寸一致。",
+    "description": "函数输入的定长 Eigen 类型；矩阵按列展开作为导数输入。"
+  },
+  "grassland::FEMDeformationGradient3x2To3x3::Jacobian": {
+    "contract": "第三列未归一化，其长度等于两列张成的面积。",
+    "description": "前六行是单位映射，后三行是叉积 Jacobian。"
+  },
+  "grassland::FEMDeformationGradient3x2To3x3::OutputType": {
+    "contract": "维度见本页精确 typedef 声明，与 Jacobian/Hessian 尺寸一致。",
+    "description": "函数输出的定长 Eigen 类型；标量也以 1×1 矩阵表示。"
+  },
+  "grassland::FEMDeformationGradient3x2To3x3::Scalar": {
+    "contract": "维度见本页精确 typedef 声明，与 Jacobian/Hessian 尺寸一致。",
+    "description": "计算标量类型，由 Real 或内核 Scalar 指定。"
+  },
+  "grassland::FEMDeformationGradient3x2To3x3::ValidInput": {
+    "contract": "第三列未归一化，其长度等于两列张成的面积。",
+    "description": "始终 true。"
+  },
+  "grassland::FEMDeformationGradient3x2To3x3::operator()": {
+    "contract": "第三列未归一化，其长度等于两列张成的面积。",
+    "description": "前两列复制，第三列为 F0×F1。"
+  },
+  "grassland::FEMDeformationGradient3x2To3x3<Real>::Hessian": {
+    "contract": "第三列未归一化，其长度等于两列张成的面积。",
+    "description": "前六个分片为零，后三个取叉积 Hessian。"
+  },
+  "grassland::FEMDeformationGradient3x2To3x3<Real>::Jacobian": {
+    "contract": "第三列未归一化，其长度等于两列张成的面积。",
+    "description": "前六行是单位映射，后三行是叉积 Jacobian。"
+  },
+  "grassland::FEMDeformationGradient3x2To3x3<Real>::ValidInput": {
+    "contract": "第三列未归一化，其长度等于两列张成的面积。",
+    "description": "始终 true。"
+  },
+  "grassland::FEMDeformationGradient3x2To3x3<Real>::operator()": {
+    "contract": "第三列未归一化，其长度等于两列张成的面积。",
+    "description": "前两列复制，第三列为 F0×F1。"
+  },
+  "grassland::FEMTetrahedronDeformationGradient": {
+    "contract": "需预先初始化可逆的 3×3 Dm。",
+    "description": "以四个顶点和静止边矩阵 Dm 求 3×3 形变梯度。"
+  },
+  "grassland::FEMTetrahedronDeformationGradient::Hessian": {
+    "contract": "需预先初始化可逆的 3×3 Dm。",
+    "description": "返回全零张量，因为关于顶点是线性函数。"
+  },
+  "grassland::FEMTetrahedronDeformationGradient::InputType": {
+    "contract": "维度见本页精确 typedef 声明，与 Jacobian/Hessian 尺寸一致。",
+    "description": "函数输入的定长 Eigen 类型；矩阵按列展开作为导数输入。"
+  },
+  "grassland::FEMTetrahedronDeformationGradient::Jacobian": {
+    "contract": "需预先初始化可逆的 3×3 Dm。",
+    "description": "返回常量 9×12 线性映射，将顶点差与 Dm⁻¹ 组合。"
+  },
+  "grassland::FEMTetrahedronDeformationGradient::OutputType": {
+    "contract": "维度见本页精确 typedef 声明，与 Jacobian/Hessian 尺寸一致。",
+    "description": "函数输出的定长 Eigen 类型；标量也以 1×1 矩阵表示。"
+  },
+  "grassland::FEMTetrahedronDeformationGradient::Scalar": {
+    "contract": "维度见本页精确 typedef 声明，与 Jacobian/Hessian 尺寸一致。",
+    "description": "计算标量类型，由 Real 或内核 Scalar 指定。"
+  },
+  "grassland::FEMTetrahedronDeformationGradient::ValidInput": {
+    "contract": "需预先初始化可逆的 3×3 Dm。",
+    "description": "始终 true，不检查 Dm。"
+  },
+  "grassland::FEMTetrahedronDeformationGradient::operator()": {
+    "contract": "需预先初始化可逆的 3×3 Dm。",
+    "description": "返回 [v1−v0,v2−v0,v3−v0]Dm⁻¹。"
+  },
+  "grassland::FEMTetrahedronDeformationGradient<Real>::Hessian": {
+    "contract": "需预先初始化可逆的 3×3 Dm。",
+    "description": "返回全零张量，因为关于顶点是线性函数。"
+  },
+  "grassland::FEMTetrahedronDeformationGradient<Real>::Jacobian": {
+    "contract": "需预先初始化可逆的 3×3 Dm。",
+    "description": "返回常量 9×12 线性映射，将顶点差与 Dm⁻¹ 组合。"
+  },
+  "grassland::FEMTetrahedronDeformationGradient<Real>::ValidInput": {
+    "contract": "需预先初始化可逆的 3×3 Dm。",
+    "description": "始终 true，不检查 Dm。"
+  },
+  "grassland::FEMTetrahedronDeformationGradient<Real>::operator()": {
+    "contract": "需预先初始化可逆的 3×3 Dm。",
+    "description": "返回 [v1−v0,v2−v0,v3−v0]Dm⁻¹。"
+  },
+  "grassland::FEMTriangleDeformationGradient3x2": {
+    "contract": "需初始化可逆的 2×2 静止形态 Dm。",
+    "description": "三角形顶点到 3×2 面内形变梯度。"
+  },
+  "grassland::FEMTriangleDeformationGradient3x2::Hessian": {
+    "contract": "需初始化可逆的 2×2 静止形态 Dm。",
+    "description": "返回全零张量。"
+  },
+  "grassland::FEMTriangleDeformationGradient3x2::InputType": {
+    "contract": "维度见本页精确 typedef 声明，与 Jacobian/Hessian 尺寸一致。",
+    "description": "函数输入的定长 Eigen 类型；矩阵按列展开作为导数输入。"
+  },
+  "grassland::FEMTriangleDeformationGradient3x2::Jacobian": {
+    "contract": "需初始化可逆的 2×2 静止形态 Dm。",
+    "description": "返回常量 6×9 顶点差与 Dm⁻¹ 组合映射。"
+  },
+  "grassland::FEMTriangleDeformationGradient3x2::OutputType": {
+    "contract": "维度见本页精确 typedef 声明，与 Jacobian/Hessian 尺寸一致。",
+    "description": "函数输出的定长 Eigen 类型；标量也以 1×1 矩阵表示。"
+  },
+  "grassland::FEMTriangleDeformationGradient3x2::Scalar": {
+    "contract": "维度见本页精确 typedef 声明，与 Jacobian/Hessian 尺寸一致。",
+    "description": "计算标量类型，由 Real 或内核 Scalar 指定。"
+  },
+  "grassland::FEMTriangleDeformationGradient3x2::ValidInput": {
+    "contract": "需初始化可逆的 2×2 静止形态 Dm。",
+    "description": "始终 true，不检查 Dm。"
+  },
+  "grassland::FEMTriangleDeformationGradient3x2::operator()": {
+    "contract": "需初始化可逆的 2×2 静止形态 Dm。",
+    "description": "返回 [v1−v0,v2−v0]Dm⁻¹。"
+  },
+  "grassland::FEMTriangleDeformationGradient3x2<Real>::Hessian": {
+    "contract": "需初始化可逆的 2×2 静止形态 Dm。",
+    "description": "返回全零张量。"
+  },
+  "grassland::FEMTriangleDeformationGradient3x2<Real>::Jacobian": {
+    "contract": "需初始化可逆的 2×2 静止形态 Dm。",
+    "description": "返回常量 6×9 顶点差与 Dm⁻¹ 组合映射。"
+  },
+  "grassland::FEMTriangleDeformationGradient3x2<Real>::ValidInput": {
+    "contract": "需初始化可逆的 2×2 静止形态 Dm。",
+    "description": "始终 true，不检查 Dm。"
+  },
+  "grassland::FEMTriangleDeformationGradient3x2<Real>::operator()": {
+    "contract": "需初始化可逆的 2×2 静止形态 Dm。",
+    "description": "返回 [v1−v0,v2−v0]Dm⁻¹。"
+  },
+  "grassland::FEMTriangleDeformationGradient3x3": {
+    "contract": "初始化可逆 2×2 Dm，输入按三个顶点列排列。",
+    "description": "组合三角形 3×2 梯度和叉积扩展形成 3×3 梯度。"
+  },
+  "grassland::FEMTriangleDeformationGradient3x3::Hessian": {
+    "contract": "初始化可逆 2×2 Dm，输入按三个顶点列排列。",
+    "description": "将扩展 Hessian 通过线性映射作合同变换。"
+  },
+  "grassland::FEMTriangleDeformationGradient3x3::InputType": {
+    "contract": "维度见本页精确 typedef 声明，与 Jacobian/Hessian 尺寸一致。",
+    "description": "函数输入的定长 Eigen 类型；矩阵按列展开作为导数输入。"
+  },
+  "grassland::FEMTriangleDeformationGradient3x3::Jacobian": {
+    "contract": "初始化可逆 2×2 Dm，输入按三个顶点列排列。",
+    "description": "将扩展 Jacobian 乘三角形线性映射。"
+  },
+  "grassland::FEMTriangleDeformationGradient3x3::OutputType": {
+    "contract": "维度见本页精确 typedef 声明，与 Jacobian/Hessian 尺寸一致。",
+    "description": "函数输出的定长 Eigen 类型；标量也以 1×1 矩阵表示。"
+  },
+  "grassland::FEMTriangleDeformationGradient3x3::Scalar": {
+    "contract": "维度见本页精确 typedef 声明，与 Jacobian/Hessian 尺寸一致。",
+    "description": "计算标量类型，由 Real 或内核 Scalar 指定。"
+  },
+  "grassland::FEMTriangleDeformationGradient3x3::ValidInput": {
+    "contract": "初始化可逆 2×2 Dm，输入按三个顶点列排列。",
+    "description": "始终 true，不检查静止形态是否退化。"
+  },
+  "grassland::FEMTriangleDeformationGradient3x3::operator()": {
+    "contract": "初始化可逆 2×2 Dm，输入按三个顶点列排列。",
+    "description": "先计算 Ds Dm⁻¹，再补叉积第三列。"
+  },
+  "grassland::FEMTriangleDeformationGradient3x3<Real>::Hessian": {
+    "contract": "初始化可逆 2×2 Dm，输入按三个顶点列排列。",
+    "description": "将扩展 Hessian 通过线性映射作合同变换。"
+  },
+  "grassland::FEMTriangleDeformationGradient3x3<Real>::Jacobian": {
+    "contract": "初始化可逆 2×2 Dm，输入按三个顶点列排列。",
+    "description": "将扩展 Jacobian 乘三角形线性映射。"
+  },
+  "grassland::FEMTriangleDeformationGradient3x3<Real>::ValidInput": {
+    "contract": "初始化可逆 2×2 Dm，输入按三个顶点列排列。",
+    "description": "始终 true，不检查静止形态是否退化。"
+  },
+  "grassland::FEMTriangleDeformationGradient3x3<Real>::operator()": {
+    "contract": "初始化可逆 2×2 Dm，输入按三个顶点列排列。",
+    "description": "先计算 Ds Dm⁻¹，再补叉积第三列。"
   },
   "grassland::FPSCounter": {
     "contract": "无 GPU 同步，计量的是调用 TickFrame 的频率。",
@@ -178,6 +1814,14 @@
   "grassland::FPSCounter::TickFrame": {
     "contract": "停顿后仍以实际两帧间隔计算。",
     "description": "追加当前高精度时刻，淘汰早于一秒的记录但保留至少两项。"
+  },
+  "grassland::FacePointCCD": {
+    "contract": "t 为输入上限及输出命中时间；失败不修改 t，退化与持续共面可能漏检。",
+    "description": "在线性轨迹 [0,1] 内寻找点与三角面首次相交时间。"
+  },
+  "grassland::FacePointIntersection": {
+    "contract": "预期点已在面上；不验证到平面的距离，退化面返回 false。",
+    "description": "以三条边的半空间判断点的面内投影是否位于三角形中。"
   },
   "grassland::FileProbe": {
     "contract": "前缀和文件名直接字符串相加。",
@@ -215,6 +1859,10 @@
     "contract": "可返回目录。",
     "description": "调用全局 FileProbe::FindPath 查找存在的素材路径。"
   },
+  "grassland::GLMToEigen": {
+    "contract": "m[column][row] 写入结果(row,column)。",
+    "description": "将 GLM 矩阵或向量按元素复制为 Eigen 定长类型。"
+  },
   "grassland::GetTimeSeconds": {
     "contract": "不依赖窗口系统；时钟单调，返回 double。",
     "description": "返回从首次调用起累计的 steady_clock 秒数。"
@@ -223,9 +1871,157 @@
     "contract": "用于日志，不是单调计时；Windows 使用 localtime_s，其他平台 localtime_r。",
     "description": "读取本地系统时间，格式化到毫秒并返回带方括号的字符串。"
   },
+  "grassland::HessianTensor": {
+    "contract": "索引顺序为输出、输入、输入；默认构造全部清零。",
+    "description": "以 m[OutputDim] 保存每个输出分量的 InputDim×InputDim 二阶导数矩阵。"
+  },
+  "grassland::HessianTensor::HessianTensor": {
+    "contract": "后续只写非零块时其余项保持零。",
+    "description": "逐片将二阶矩阵置零。"
+  },
+  "grassland::HessianTensor::operator()": {
+    "contract": "i 在输出范围，j/k 在输入范围；引用依附张量。",
+    "description": "访问 m[i](j,k)，可变重载返回可写引用，const 重载返回只读引用。"
+  },
+  "grassland::HessianTensor::operator*": {
+    "contract": "不改变输入或输出维度。",
+    "description": "将所有 Hessian 分片乘标量。"
+  },
+  "grassland::HessianTensor::operator+": {
+    "contract": "输入尺寸在类型层面匹配。",
+    "description": "对两张同形张量逐片相加。"
+  },
+  "grassland::HessianTensor::operator-": {
+    "contract": "返回新张量，不修改原对象。",
+    "description": "二元重载逐片相减，一元重载逐片取负。"
+  },
+  "grassland::HessianTensor::operator/": {
+    "contract": "标量不能为零，接口不检查。",
+    "description": "将所有分片除以标量。"
+  },
+  "grassland::HessianType": {
+    "contract": "每个输出分量对应一张输入尺寸的方阵。",
+    "description": "由 Func 的标量及编译期尺寸推导 HessianTensor 类型。"
+  },
+  "grassland::IsSegmentTriangleIntersect": {
+    "contract": "近平行、共面与退化情形直接返回 false。",
+    "description": "解线段参数与三角形重心坐标并检查闭区间，返回是否相交。"
+  },
+  "grassland::JacobianType": {
+    "contract": "行是展开后的输出分量，列是展开后的输入分量。",
+    "description": "由 Func 的 Scalar 与输入/输出编译期尺寸推导 Jacobian 矩阵类型。"
+  },
+  "grassland::Join": {
+    "contract": "输入应是有效包围盒；返回同时包含两者的轴对齐包围盒。",
+    "description": "逐分量取两个 AABB 下界的最小值和上界的最大值。"
+  },
   "grassland::LM_DEVICE_FUNC": {
     "contract": "宏在预处理阶段工作，不是运行时函数。",
     "description": "NVCC 下同时标注主机与设备函数；普通编译器下展开为空。"
+  },
+  "grassland::LineSDF": {
+    "contract": "direction 必须单位化，查询点不能在线上；ValidInput 不验证这两项。",
+    "description": "过 origin 沿 direction 的无限直线距离，默认沿 Y 轴。"
+  },
+  "grassland::LineSDF::Hessian": {
+    "contract": "direction 必须单位化，查询点不能在线上；ValidInput 不验证这两项。",
+    "description": "返回 单位叉积向量外积除以叉积长度。"
+  },
+  "grassland::LineSDF::InputType": {
+    "contract": "direction 必须单位化，查询点不能在线上；ValidInput 不验证这两项。",
+    "description": "三维查询点向量。"
+  },
+  "grassland::LineSDF::Jacobian": {
+    "contract": "direction 必须单位化，查询点不能在线上；ValidInput 不验证这两项。",
+    "description": "返回 归一化的垂轴投影向量，接口类型为 1×3。"
+  },
+  "grassland::LineSDF::OutputType": {
+    "contract": "direction 必须单位化，查询点不能在线上；ValidInput 不验证这两项。",
+    "description": "包含距离值的 1×1 Eigen 矩阵。"
+  },
+  "grassland::LineSDF::Scalar": {
+    "contract": "direction 必须单位化，查询点不能在线上；ValidInput 不验证这两项。",
+    "description": "Real 标量类型。"
+  },
+  "grassland::LineSDF::ValidInput": {
+    "contract": "direction 必须单位化，查询点不能在线上；ValidInput 不验证这两项。",
+    "description": "始终 true。"
+  },
+  "grassland::LineSDF::operator()": {
+    "contract": "direction 必须单位化，查询点不能在线上；ValidInput 不验证这两项。",
+    "description": "返回 ||(v−origin)×direction||。"
+  },
+  "grassland::LineSDF<Real>::Hessian": {
+    "contract": "direction 必须单位化，查询点不能在线上；ValidInput 不验证这两项。",
+    "description": "返回 单位叉积向量外积除以叉积长度。"
+  },
+  "grassland::LineSDF<Real>::Jacobian": {
+    "contract": "direction 必须单位化，查询点不能在线上；ValidInput 不验证这两项。",
+    "description": "返回 归一化的垂轴投影向量，接口类型为 1×3。"
+  },
+  "grassland::LineSDF<Real>::ValidInput": {
+    "contract": "direction 必须单位化，查询点不能在线上；ValidInput 不验证这两项。",
+    "description": "始终 true。"
+  },
+  "grassland::LineSDF<Real>::operator()": {
+    "contract": "direction 必须单位化，查询点不能在线上；ValidInput 不验证这两项。",
+    "description": "返回 ||(v−origin)×direction||。"
+  },
+  "grassland::LineSDF<double>": {
+    "contract": "使 cpp 内定义的值与导数方法可由其他编译单元链接；算法约束与模板类型一致。",
+    "description": "为 double 标量生成该微分核的显式模板实例。"
+  },
+  "grassland::LineSDF<float>": {
+    "contract": "使 cpp 内定义的值与导数方法可由其他编译单元链接；算法约束与模板类型一致。",
+    "description": "为 float 标量生成该微分核的显式模板实例。"
+  },
+  "grassland::LogDeterminant3": {
+    "contract": "值及导数不自动检查 ValidInput。",
+    "description": "3×3 矩阵对数行列式核。"
+  },
+  "grassland::LogDeterminant3::Hessian": {
+    "contract": "值及导数不自动检查 ValidInput。",
+    "description": "返回 Hdet/det A−JdetᵀJdet/(det A)²。"
+  },
+  "grassland::LogDeterminant3::InputType": {
+    "contract": "维度见本页精确 typedef 声明，与 Jacobian/Hessian 尺寸一致。",
+    "description": "函数输入的定长 Eigen 类型；矩阵按列展开作为导数输入。"
+  },
+  "grassland::LogDeterminant3::Jacobian": {
+    "contract": "值及导数不自动检查 ValidInput。",
+    "description": "返回 Jdet/det A。"
+  },
+  "grassland::LogDeterminant3::OutputType": {
+    "contract": "维度见本页精确 typedef 声明，与 Jacobian/Hessian 尺寸一致。",
+    "description": "函数输出的定长 Eigen 类型；标量也以 1×1 矩阵表示。"
+  },
+  "grassland::LogDeterminant3::Scalar": {
+    "contract": "维度见本页精确 typedef 声明，与 Jacobian/Hessian 尺寸一致。",
+    "description": "计算标量类型，由 Real 或内核 Scalar 指定。"
+  },
+  "grassland::LogDeterminant3::ValidInput": {
+    "contract": "值及导数不自动检查 ValidInput。",
+    "description": "仅 det A>0 返回 true。"
+  },
+  "grassland::LogDeterminant3::operator()": {
+    "contract": "值及导数不自动检查 ValidInput。",
+    "description": "返回 ln(det A)。"
+  },
+  "grassland::LogDeterminant3<Real>::Hessian": {
+    "contract": "值及导数不自动检查 ValidInput。",
+    "description": "返回 Hdet/det A−JdetᵀJdet/(det A)²。"
+  },
+  "grassland::LogDeterminant3<Real>::Jacobian": {
+    "contract": "值及导数不自动检查 ValidInput。",
+    "description": "返回 Jdet/det A。"
+  },
+  "grassland::LogDeterminant3<Real>::ValidInput": {
+    "contract": "值及导数不自动检查 ValidInput。",
+    "description": "仅 det A>0 返回 true。"
+  },
+  "grassland::LogDeterminant3<Real>::operator()": {
+    "contract": "值及导数不自动检查 ValidInput。",
+    "description": "返回 ln(det A)。"
   },
   "grassland::LogError": {
     "contract": "需要错误传播时调用方必须显式 return/throw。",
@@ -235,9 +2031,257 @@
     "contract": "不抛业务错误；__CUDACC__ 下 format 占位返回空字符串。",
     "description": "输出 INFO 标记、时间戳和消息到 std::cout；变参重载先用 fmt::format 格式化。"
   },
+  "grassland::LogSquareDeterminant3": {
+    "contract": "不是 ln((det A)²)；要求正行列式。",
+    "description": "对数行列式平方核。"
+  },
+  "grassland::LogSquareDeterminant3::Hessian": {
+    "contract": "不是 ln((det A)²)；要求正行列式。",
+    "description": "组合 2(1−ln J)/J² 的梯度外积与 2 ln J/J 的行列式 Hessian。"
+  },
+  "grassland::LogSquareDeterminant3::InputType": {
+    "contract": "维度见本页精确 typedef 声明，与 Jacobian/Hessian 尺寸一致。",
+    "description": "函数输入的定长 Eigen 类型；矩阵按列展开作为导数输入。"
+  },
+  "grassland::LogSquareDeterminant3::Jacobian": {
+    "contract": "不是 ln((det A)²)；要求正行列式。",
+    "description": "返回 2 ln J/J 乘行列式 Jacobian。"
+  },
+  "grassland::LogSquareDeterminant3::OutputType": {
+    "contract": "维度见本页精确 typedef 声明，与 Jacobian/Hessian 尺寸一致。",
+    "description": "函数输出的定长 Eigen 类型；标量也以 1×1 矩阵表示。"
+  },
+  "grassland::LogSquareDeterminant3::Scalar": {
+    "contract": "维度见本页精确 typedef 声明，与 Jacobian/Hessian 尺寸一致。",
+    "description": "计算标量类型，由 Real 或内核 Scalar 指定。"
+  },
+  "grassland::LogSquareDeterminant3::ValidInput": {
+    "contract": "不是 ln((det A)²)；要求正行列式。",
+    "description": "仅 det A>0 返回 true。"
+  },
+  "grassland::LogSquareDeterminant3::operator()": {
+    "contract": "不是 ln((det A)²)；要求正行列式。",
+    "description": "返回 (ln(det A))²。"
+  },
+  "grassland::LogSquareDeterminant3<Real>::Hessian": {
+    "contract": "不是 ln((det A)²)；要求正行列式。",
+    "description": "组合 2(1−ln J)/J² 的梯度外积与 2 ln J/J 的行列式 Hessian。"
+  },
+  "grassland::LogSquareDeterminant3<Real>::Jacobian": {
+    "contract": "不是 ln((det A)²)；要求正行列式。",
+    "description": "返回 2 ln J/J 乘行列式 Jacobian。"
+  },
+  "grassland::LogSquareDeterminant3<Real>::ValidInput": {
+    "contract": "不是 ln((det A)²)；要求正行列式。",
+    "description": "仅 det A>0 返回 true。"
+  },
+  "grassland::LogSquareDeterminant3<Real>::operator()": {
+    "contract": "不是 ln((det A)²)；要求正行列式。",
+    "description": "返回 (ln(det A))²。"
+  },
   "grassland::LogWarning": {
     "contract": "不改变控制流。",
     "description": "输出 WARNING 标记的消息，模板重载转交格式化后的单字符串重载。"
+  },
+  "grassland::Mesh": {
+    "contract": "默认 Scalar=float；cpp 显式实例化 float/double。修改拓扑会使属性裸指针失效。",
+    "description": "拥有位置、索引以及可选法线/切线/UV/颜色数组的三角网格模板。"
+  },
+  "grassland::Mesh::Colors": {
+    "contract": "指针不拥有存储；重建/销毁后失效。缺省属性返回 nullptr。",
+    "description": "返回内部三维顶点色数组的裸指针，const 重载提供只读访问。"
+  },
+  "grassland::Mesh::GenerateNormals": {
+    "contract": "默认阈值 0.8；清空切线及手性，保留 UV/颜色。退化面和孤立点可能产生未定义或无效法线，需预处理。",
+    "description": "按面角加权生成平滑法线；任意相邻面法线点积低于阈值时按面拆分该顶点。"
+  },
+  "grassland::Mesh::GenerateTangents": {
+    "contract": "生成器失败返回 −1，此时网格已被部分修改；成功返回合并结果 0。",
+    "description": "先拆顶点，补默认 UV/法线，经 MikkTSpace 写入切线与手性，再合并顶点。"
+  },
+  "grassland::Mesh::Indices": {
+    "contract": "指针不拥有存储；重建/销毁后失效。长度由对应数量接口取得，空数组不得解引用。",
+    "description": "返回内部uint32 三角形索引数组的裸指针，const 重载提供只读访问。"
+  },
+  "grassland::Mesh::InitializeTexCoords": {
+    "contract": "返回 0；覆盖原有 UV，不是 UV 展开。",
+    "description": "为全部顶点填入同一个 UV，默认 (0.5,0.5)。"
+  },
+  "grassland::Mesh::LoadObjFile": {
+    "contract": "成功 0，文件无效或解析失败 −1；不保留材质、组或 OBJ 顶点色，且旧 colors_ 未清空，建议在空网格上加载。",
+    "description": "通过 TinyObjLoader 读取位置/法线/UV，以三角扇生成索引并精确合并相同属性顶点。"
+  },
+  "grassland::Mesh::MakeCollisionMesh": {
+    "contract": "就地修改，返回 MergeVertices 的结果；不修补孔洞或非流形几何。",
+    "description": "清除所有渲染附加属性，再仅按位置合并顶点。"
+  },
+  "grassland::Mesh::MergeVertices": {
+    "contract": "返回 0；不是按距离阈值焊接，也不删除三个不同顶点构成的共线面。",
+    "description": "以位置及所有已存在属性精确相等为键去重，重映射索引并丢弃重复顶点索引的三角形。"
+  },
+  "grassland::Mesh::Mesh": {
+    "contract": "indices/positions 可空；只有提供 normals 才复制 tangents，切线手性初始化为 +1；索引须有效且三角索引数为 3 的倍数。",
+    "description": "按给定数量分配并复制属性数组；默认构造空网格。"
+  },
+  "grassland::Mesh::Normals": {
+    "contract": "指针不拥有存储；重建/销毁后失效。缺省属性返回 nullptr。",
+    "description": "返回内部三维法线数组的裸指针，const 重载提供只读访问。"
+  },
+  "grassland::Mesh::NumIndices": {
+    "contract": "三角形数量为 NumIndices()/3，不是本方法的直接返回值。",
+    "description": "返回索引数量。"
+  },
+  "grassland::Mesh::NumVertices": {
+    "contract": "可选属性存在时应与此数量一致。",
+    "description": "返回当前顶点数量。"
+  },
+  "grassland::Mesh::Positions": {
+    "contract": "指针不拥有存储；重建/销毁后失效。长度由对应数量接口取得，空数组不得解引用。",
+    "description": "返回内部三维位置数组的裸指针，const 重载提供只读访问。"
+  },
+  "grassland::Mesh::SaveObjFile": {
+    "contract": "打开失败 −1，否则 0；不保存材质、颜色、切线，写入过程的流错误未单独检查。",
+    "description": "输出 v/vn/vt 和从 1 开始的三角面索引。"
+  },
+  "grassland::Mesh::Signals": {
+    "contract": "指针不拥有存储；重建/销毁后失效。缺省属性返回 nullptr。",
+    "description": "返回内部float 切线手性数组的裸指针，const 重载提供只读访问。"
+  },
+  "grassland::Mesh::Sphere": {
+    "contract": "precision_lon 控制从北到南的分段，precision_lat 控制环向，−1 默认取前者两倍；调用者提供有效正分辨率。",
+    "description": "构造原点为中心、半径 1、Y 为极轴的球网格，以位置作为单位法线。"
+  },
+  "grassland::Mesh::SplitVertices": {
+    "contract": "返回 0；所有旧属性指针失效，不检查索引范围。",
+    "description": "将每个索引角点复制为独立顶点，索引重写为连续整数，同时复制现有属性。"
+  },
+  "grassland::Mesh::Tangents": {
+    "contract": "指针不拥有存储；重建/销毁后失效。缺省属性返回 nullptr。",
+    "description": "返回内部三维切线数组的裸指针，const 重载提供只读访问。"
+  },
+  "grassland::Mesh::TexCoords": {
+    "contract": "指针不拥有存储；重建/销毁后失效。缺省属性返回 nullptr。",
+    "description": "返回内部二维 UV数组的裸指针，const 重载提供只读访问。"
+  },
+  "grassland::Mesh::Transformed": {
+    "contract": "法线使用逆转置并归一化，切线使用线性部分；需要可逆变换，镜像不会自动翻转面绕序或手性。",
+    "description": "返回经过 3×4 仿射变换的网格副本，原对象不变。"
+  },
+  "grassland::Mesh<Scalar>::GenerateNormals": {
+    "contract": "默认阈值 0.8；清空切线及手性，保留 UV/颜色。退化面和孤立点可能产生未定义或无效法线，需预处理。",
+    "description": "按面角加权生成平滑法线；任意相邻面法线点积低于阈值时按面拆分该顶点。"
+  },
+  "grassland::Mesh<Scalar>::GenerateTangents": {
+    "contract": "生成器失败返回 −1，此时网格已被部分修改；成功返回合并结果 0。",
+    "description": "先拆顶点，补默认 UV/法线，经 MikkTSpace 写入切线与手性，再合并顶点。"
+  },
+  "grassland::Mesh<Scalar>::InitializeTexCoords": {
+    "contract": "返回 0；覆盖原有 UV，不是 UV 展开。",
+    "description": "为全部顶点填入同一个 UV，默认 (0.5,0.5)。"
+  },
+  "grassland::Mesh<Scalar>::LoadObjFile": {
+    "contract": "成功 0，文件无效或解析失败 −1；不保留材质、组或 OBJ 顶点色，且旧 colors_ 未清空，建议在空网格上加载。",
+    "description": "通过 TinyObjLoader 读取位置/法线/UV，以三角扇生成索引并精确合并相同属性顶点。"
+  },
+  "grassland::Mesh<Scalar>::MakeCollisionMesh": {
+    "contract": "就地修改，返回 MergeVertices 的结果；不修补孔洞或非流形几何。",
+    "description": "清除所有渲染附加属性，再仅按位置合并顶点。"
+  },
+  "grassland::Mesh<Scalar>::MergeVertices": {
+    "contract": "返回 0；不是按距离阈值焊接，也不删除三个不同顶点构成的共线面。",
+    "description": "以位置及所有已存在属性精确相等为键去重，重映射索引并丢弃重复顶点索引的三角形。"
+  },
+  "grassland::Mesh<Scalar>::Mesh": {
+    "contract": "indices/positions 可空；只有提供 normals 才复制 tangents，切线手性初始化为 +1；索引须有效且三角索引数为 3 的倍数。",
+    "description": "按给定数量分配并复制属性数组；默认构造空网格。"
+  },
+  "grassland::Mesh<Scalar>::NumIndices": {
+    "contract": "三角形数量为 NumIndices()/3，不是本方法的直接返回值。",
+    "description": "返回索引数量。"
+  },
+  "grassland::Mesh<Scalar>::NumVertices": {
+    "contract": "可选属性存在时应与此数量一致。",
+    "description": "返回当前顶点数量。"
+  },
+  "grassland::Mesh<Scalar>::SaveObjFile": {
+    "contract": "打开失败 −1，否则 0；不保存材质、颜色、切线，写入过程的流错误未单独检查。",
+    "description": "输出 v/vn/vt 和从 1 开始的三角面索引。"
+  },
+  "grassland::Mesh<Scalar>::Sphere": {
+    "contract": "precision_lon 控制从北到南的分段，precision_lat 控制环向，−1 默认取前者两倍；调用者提供有效正分辨率。",
+    "description": "构造原点为中心、半径 1、Y 为极轴的球网格，以位置作为单位法线。"
+  },
+  "grassland::Mesh<Scalar>::SplitVertices": {
+    "contract": "返回 0；所有旧属性指针失效，不检查索引范围。",
+    "description": "将每个索引角点复制为独立顶点，索引重写为连续整数，同时复制现有属性。"
+  },
+  "grassland::Mesh<Scalar>::Transformed": {
+    "contract": "法线使用逆转置并归一化，切线使用线性部分；需要可逆变换，镜像不会自动翻转面绕序或手性。",
+    "description": "返回经过 3×4 仿射变换的网格副本，原对象不变。"
+  },
+  "grassland::Mesh<double>": {
+    "contract": "使定义在 cxx 中的成员可以由其他编译单元链接。",
+    "description": "为 double 标量网格生成显式模板实例。"
+  },
+  "grassland::Mesh<float>": {
+    "contract": "使定义在 cxx 中的成员可以由其他编译单元链接。",
+    "description": "为 float 标量网格生成显式模板实例。"
+  },
+  "grassland::MeshSDF": {
+    "contract": "应输入闭合、绕序一致且已按位置合并的非退化三角网格；不会自动修复拓扑。",
+    "description": "拥有 float 网格顶点、三角形、内部边及符号分类的数据容器。"
+  },
+  "grassland::MeshSDF::GetEdgeIndices": {
+    "contract": "不转移所有权；只读引用依附原 MeshSDF。",
+    "description": "返回每两项一条内部边的索引数组的 const vector 引用。"
+  },
+  "grassland::MeshSDF::GetEdgeInside": {
+    "contract": "不转移所有权；只读引用依附原 MeshSDF。",
+    "description": "返回每条边的内凹符号标记的 const vector 引用。"
+  },
+  "grassland::MeshSDF::GetPointInside": {
+    "contract": "不转移所有权；只读引用依附原 MeshSDF。",
+    "description": "返回每个顶点的符号标记的 const vector 引用。"
+  },
+  "grassland::MeshSDF::GetTriangleIndices": {
+    "contract": "不转移所有权；只读引用依附原 MeshSDF。",
+    "description": "返回每三项一面的索引数组的 const vector 引用。"
+  },
+  "grassland::MeshSDF::GetVertices": {
+    "contract": "不转移所有权；只读引用依附原 MeshSDF。",
+    "description": "返回顶点数组的 const vector 引用。"
+  },
+  "grassland::MeshSDF::MeshSDF": {
+    "contract": "顶点视图须能读取 Vector3<float>，num_indices 为 3 的倍数且索引有效；开放边不进入边特征集合。",
+    "description": "默认构造空容器，或从 VertexBufferView 和索引深复制数据并建立有向边邻接与内外标记。"
+  },
+  "grassland::MeshSDF::operator MeshSDFRef": {
+    "contract": "不复制数组，容器销毁或赋值后不可继续使用原视图。",
+    "description": "创建借用当前主机数组及图元数量的查询视图。"
+  },
+  "grassland::MeshSDFDevice": {
+    "contract": "仅 __CUDACC__ 下可见；预处理与拓扑分析仍在 CPU MeshSDF 构造时完成。",
+    "description": "使用 thrust::device_vector 持有网格 SDF 的设备副本。"
+  },
+  "grassland::MeshSDFDevice::MeshSDFDevice": {
+    "contract": "复制后不会自动跟踪源对象更新。",
+    "description": "默认空构造，或将 CPU MeshSDF 的所有数组复制到设备。"
+  },
+  "grassland::MeshSDFDevice::operator MeshSDF": {
+    "contract": "这是数据传输与新对象构建，不是廉价借用转换。",
+    "description": "将全部设备数组复制回新的主机 MeshSDF。"
+  },
+  "grassland::MeshSDFDevice::operator MeshSDFRef": {
+    "contract": "只能在可访问对应设备存储的执行环境使用，设备容器须持续存活。",
+    "description": "建立含设备裸指针的查询视图。"
+  },
+  "grassland::MeshSDFRef": {
+    "contract": "num_triangles/num_edges 是图元数，num_points 是顶点数；所有指针需处于执行端可访问存储。",
+    "description": "借用顶点、三角形、边和符号数组的轻量查询记录。"
+  },
+  "grassland::MeshSDFRef::SDF": {
+    "contract": "position 与 R*x+t 同坐标系；sdf 非空，导数可空。距离零点和最近特征切换处导数不保证光滑；所有特征逐一访问，复杂度线性。",
+    "description": "变换网格特征到查询坐标系，穷举最近面/边/点，输出有符号距离及可选一、二阶导数。"
   },
   "grassland::Metronome": {
     "contract": "Tick 会阻塞当前线程，不是异步定时器。",
@@ -251,17 +2295,621 @@
     "contract": "若工作已超时不额外睡眠；长周期误差不会用绝对时间补偿。",
     "description": "从目标 duration 减去已用时间，剩余为正时 sleep_for，随后以实际当前时刻重设起点。"
   },
+  "grassland::MultiplyConstant": {
+    "contract": "f 按值保存，s 不参与求导。",
+    "description": "将内核 f 的输出乘标量 s，默认 s=1。"
+  },
+  "grassland::MultiplyConstant::Hessian": {
+    "contract": "f 按值保存，s 不参与求导。",
+    "description": "返回 s Hf。"
+  },
+  "grassland::MultiplyConstant::InputType": {
+    "contract": "维度见本页精确 typedef 声明，与 Jacobian/Hessian 尺寸一致。",
+    "description": "函数输入的定长 Eigen 类型；矩阵按列展开作为导数输入。"
+  },
+  "grassland::MultiplyConstant::Jacobian": {
+    "contract": "f 按值保存，s 不参与求导。",
+    "description": "返回 s Jf。"
+  },
+  "grassland::MultiplyConstant::OutputType": {
+    "contract": "维度见本页精确 typedef 声明，与 Jacobian/Hessian 尺寸一致。",
+    "description": "函数输出的定长 Eigen 类型；标量也以 1×1 矩阵表示。"
+  },
+  "grassland::MultiplyConstant::Scalar": {
+    "contract": "维度见本页精确 typedef 声明，与 Jacobian/Hessian 尺寸一致。",
+    "description": "计算标量类型，由 Real 或内核 Scalar 指定。"
+  },
+  "grassland::MultiplyConstant::ValidInput": {
+    "contract": "f 按值保存，s 不参与求导。",
+    "description": "委托 f.ValidInput。"
+  },
+  "grassland::MultiplyConstant::operator()": {
+    "contract": "f 按值保存，s 不参与求导。",
+    "description": "返回 f(v)×s。"
+  },
+  "grassland::MultiplyConstant<Real>::Hessian": {
+    "contract": "f 按值保存，s 不参与求导。",
+    "description": "返回 s Hf。"
+  },
+  "grassland::MultiplyConstant<Real>::Jacobian": {
+    "contract": "f 按值保存，s 不参与求导。",
+    "description": "返回 s Jf。"
+  },
+  "grassland::MultiplyConstant<Real>::ValidInput": {
+    "contract": "f 按值保存，s 不参与求导。",
+    "description": "委托 f.ValidInput。"
+  },
+  "grassland::MultiplyConstant<Real>::operator()": {
+    "contract": "f 按值保存，s 不参与求导。",
+    "description": "返回 f(v)×s。"
+  },
   "grassland::PCIVendorIDToName": {
     "contract": "不查设备型号。",
     "description": "把已知 PCI 厂商 ID 映射为名称，未知值格式化为 Unknown vendor id 与四位十六进制数。"
+  },
+  "grassland::PI": {
+    "contract": "精度受常量字面量类型及 Scalar 限制。",
+    "description": "将内嵌 π 常量转换为 Scalar 返回。"
+  },
+  "grassland::PlaneSDF": {
+    "contract": "normal 必须单位化才是真实带符号距离，代码不代为归一化。",
+    "description": "平面 normal·v+d，默认 normal=(0,1,0)、d=0。"
+  },
+  "grassland::PlaneSDF::Hessian": {
+    "contract": "normal 必须单位化才是真实带符号距离，代码不代为归一化。",
+    "description": "返回 全零张量。"
+  },
+  "grassland::PlaneSDF::InputType": {
+    "contract": "normal 必须单位化才是真实带符号距离，代码不代为归一化。",
+    "description": "三维查询点向量。"
+  },
+  "grassland::PlaneSDF::Jacobian": {
+    "contract": "normal 必须单位化才是真实带符号距离，代码不代为归一化。",
+    "description": "返回 normalᵀ，接口类型为 1×3。"
+  },
+  "grassland::PlaneSDF::OutputType": {
+    "contract": "normal 必须单位化才是真实带符号距离，代码不代为归一化。",
+    "description": "包含距离值的 1×1 Eigen 矩阵。"
+  },
+  "grassland::PlaneSDF::Scalar": {
+    "contract": "normal 必须单位化才是真实带符号距离，代码不代为归一化。",
+    "description": "Real 标量类型。"
+  },
+  "grassland::PlaneSDF::ValidInput": {
+    "contract": "normal 必须单位化才是真实带符号距离，代码不代为归一化。",
+    "description": "始终 true。"
+  },
+  "grassland::PlaneSDF::operator()": {
+    "contract": "normal 必须单位化才是真实带符号距离，代码不代为归一化。",
+    "description": "返回 normal·v+d。"
+  },
+  "grassland::PlaneSDF<Real>::Hessian": {
+    "contract": "normal 必须单位化才是真实带符号距离，代码不代为归一化。",
+    "description": "返回 全零张量。"
+  },
+  "grassland::PlaneSDF<Real>::Jacobian": {
+    "contract": "normal 必须单位化才是真实带符号距离，代码不代为归一化。",
+    "description": "返回 normalᵀ，接口类型为 1×3。"
+  },
+  "grassland::PlaneSDF<Real>::ValidInput": {
+    "contract": "normal 必须单位化才是真实带符号距离，代码不代为归一化。",
+    "description": "始终 true。"
+  },
+  "grassland::PlaneSDF<Real>::operator()": {
+    "contract": "normal 必须单位化才是真实带符号距离，代码不代为归一化。",
+    "description": "返回 normal·v+d。"
+  },
+  "grassland::PlaneSDF<double>": {
+    "contract": "使 cpp 内定义的值与导数方法可由其他编译单元链接；算法约束与模板类型一致。",
+    "description": "为 double 标量生成该微分核的显式模板实例。"
+  },
+  "grassland::PlaneSDF<float>": {
+    "contract": "使 cpp 内定义的值与导数方法可由其他编译单元链接；算法约束与模板类型一致。",
+    "description": "为 float 标量生成该微分核的显式模板实例。"
+  },
+  "grassland::PlusConstant": {
+    "contract": "调用者为 s 设置所需偏移，不应依赖 Eigen 默认构造为零。",
+    "description": "给内核输出加 OutputType 常量 s。"
+  },
+  "grassland::PlusConstant::Hessian": {
+    "contract": "调用者为 s 设置所需偏移，不应依赖 Eigen 默认构造为零。",
+    "description": "返回 Hf，不受 s 影响。"
+  },
+  "grassland::PlusConstant::InputType": {
+    "contract": "维度见本页精确 typedef 声明，与 Jacobian/Hessian 尺寸一致。",
+    "description": "函数输入的定长 Eigen 类型；矩阵按列展开作为导数输入。"
+  },
+  "grassland::PlusConstant::Jacobian": {
+    "contract": "调用者为 s 设置所需偏移，不应依赖 Eigen 默认构造为零。",
+    "description": "返回 Jf，不受 s 影响。"
+  },
+  "grassland::PlusConstant::OutputType": {
+    "contract": "维度见本页精确 typedef 声明，与 Jacobian/Hessian 尺寸一致。",
+    "description": "函数输出的定长 Eigen 类型；标量也以 1×1 矩阵表示。"
+  },
+  "grassland::PlusConstant::Scalar": {
+    "contract": "维度见本页精确 typedef 声明，与 Jacobian/Hessian 尺寸一致。",
+    "description": "计算标量类型，由 Real 或内核 Scalar 指定。"
+  },
+  "grassland::PlusConstant::ValidInput": {
+    "contract": "调用者为 s 设置所需偏移，不应依赖 Eigen 默认构造为零。",
+    "description": "委托 f.ValidInput。"
+  },
+  "grassland::PlusConstant::operator()": {
+    "contract": "调用者为 s 设置所需偏移，不应依赖 Eigen 默认构造为零。",
+    "description": "返回 f(v)+s。"
+  },
+  "grassland::PlusConstant<Real>::Hessian": {
+    "contract": "调用者为 s 设置所需偏移，不应依赖 Eigen 默认构造为零。",
+    "description": "返回 Hf，不受 s 影响。"
+  },
+  "grassland::PlusConstant<Real>::Jacobian": {
+    "contract": "调用者为 s 设置所需偏移，不应依赖 Eigen 默认构造为零。",
+    "description": "返回 Jf，不受 s 影响。"
+  },
+  "grassland::PlusConstant<Real>::ValidInput": {
+    "contract": "调用者为 s 设置所需偏移，不应依赖 Eigen 默认构造为零。",
+    "description": "委托 f.ValidInput。"
+  },
+  "grassland::PlusConstant<Real>::operator()": {
+    "contract": "调用者为 s 设置所需偏移，不应依赖 Eigen 默认构造为零。",
+    "description": "返回 f(v)+s。"
+  },
+  "grassland::PointSDF": {
+    "contract": "在中心处不可微。",
+    "description": "以 position 为中心的点距离，默认原点。"
+  },
+  "grassland::PointSDF::Hessian": {
+    "contract": "在中心处不可微。",
+    "description": "返回 (I−nnᵀ)/距离。"
+  },
+  "grassland::PointSDF::InputType": {
+    "contract": "在中心处不可微。",
+    "description": "三维查询点向量。"
+  },
+  "grassland::PointSDF::Jacobian": {
+    "contract": "在中心处不可微。",
+    "description": "返回 单位径向向量的转置，接口类型为 1×3。"
+  },
+  "grassland::PointSDF::OutputType": {
+    "contract": "在中心处不可微。",
+    "description": "包含距离值的 1×1 Eigen 矩阵。"
+  },
+  "grassland::PointSDF::Scalar": {
+    "contract": "在中心处不可微。",
+    "description": "Real 标量类型。"
+  },
+  "grassland::PointSDF::ValidInput": {
+    "contract": "在中心处不可微。",
+    "description": "距离大于 100×Eps。"
+  },
+  "grassland::PointSDF::operator()": {
+    "contract": "在中心处不可微。",
+    "description": "返回 ||v−position||。"
+  },
+  "grassland::PointSDF<Real>::Hessian": {
+    "contract": "在中心处不可微。",
+    "description": "返回 (I−nnᵀ)/距离。"
+  },
+  "grassland::PointSDF<Real>::Jacobian": {
+    "contract": "在中心处不可微。",
+    "description": "返回 单位径向向量的转置，接口类型为 1×3。"
+  },
+  "grassland::PointSDF<Real>::ValidInput": {
+    "contract": "在中心处不可微。",
+    "description": "距离大于 100×Eps。"
+  },
+  "grassland::PointSDF<Real>::operator()": {
+    "contract": "在中心处不可微。",
+    "description": "返回 ||v−position||。"
+  },
+  "grassland::PointSDF<double>": {
+    "contract": "使 cpp 内定义的值与导数方法可由其他编译单元链接；算法约束与模板类型一致。",
+    "description": "为 double 标量生成该微分核的显式模板实例。"
+  },
+  "grassland::PointSDF<float>": {
+    "contract": "使 cpp 内定义的值与导数方法可由其他编译单元链接；算法约束与模板类型一致。",
+    "description": "为 float 标量生成该微分核的显式模板实例。"
+  },
+  "grassland::PolygonArea": {
+    "contract": "vertices 至少有 n 个按边界排列的点；n=0 返回 0，不检验自交。",
+    "description": "用鞋带公式计算二维多边形有向面积。"
+  },
+  "grassland::Ray": {
+    "contract": "只实现二维与三维特化。",
+    "description": "Ray 的维度参数化前置声明。"
+  },
+  "grassland::Ray2": {
+    "contract": "与目标类型完全相同，没有额外存储或校验。",
+    "description": "Ray 的 2 维、调用者指定标量 类型别名。"
+  },
+  "grassland::Ray2d": {
+    "contract": "与目标类型完全相同，没有额外存储或校验。",
+    "description": "Ray 的 2 维、double 类型别名。"
+  },
+  "grassland::Ray2f": {
+    "contract": "与目标类型完全相同，没有额外存储或校验。",
+    "description": "Ray 的 2 维、float 类型别名。"
+  },
+  "grassland::Ray3": {
+    "contract": "与目标类型完全相同，没有额外存储或校验。",
+    "description": "Ray 的 3 维、调用者指定标量 类型别名。"
+  },
+  "grassland::Ray3d": {
+    "contract": "与目标类型完全相同，没有额外存储或校验。",
+    "description": "Ray 的 3 维、double 类型别名。"
+  },
+  "grassland::Ray3f": {
+    "contract": "与目标类型完全相同，没有额外存储或校验。",
+    "description": "Ray 的 3 维、float 类型别名。"
+  },
+  "grassland::Ray<Scalar, 2>": {
+    "contract": "不提供索引范围或退化几何检查。",
+    "description": "保存 origin 与 direction，描述 origin+t×direction。"
+  },
+  "grassland::Ray<Scalar, 3>": {
+    "contract": "不提供索引范围或退化几何检查。",
+    "description": "保存 origin 与 direction，描述 origin+t×direction。"
+  },
+  "grassland::RightMultiplyMatrix": {
+    "contract": "s 的行数与 f 输出列数匹配；使用前初始化 s。",
+    "description": "将内核矩阵输出右乘常量矩阵 s。"
+  },
+  "grassland::RightMultiplyMatrix::Hessian": {
+    "contract": "s 的行数与 f 输出列数匹配；使用前初始化 s。",
+    "description": "按相同列映射线性组合 Hessian 分片。"
+  },
+  "grassland::RightMultiplyMatrix::InputType": {
+    "contract": "维度见本页精确 typedef 声明，与 Jacobian/Hessian 尺寸一致。",
+    "description": "函数输入的定长 Eigen 类型；矩阵按列展开作为导数输入。"
+  },
+  "grassland::RightMultiplyMatrix::Jacobian": {
+    "contract": "s 的行数与 f 输出列数匹配；使用前初始化 s。",
+    "description": "按 s(j,i) 对原输出列对应的 Jacobian 行块求线性组合。"
+  },
+  "grassland::RightMultiplyMatrix::OutputType": {
+    "contract": "维度见本页精确 typedef 声明，与 Jacobian/Hessian 尺寸一致。",
+    "description": "函数输出的定长 Eigen 类型；标量也以 1×1 矩阵表示。"
+  },
+  "grassland::RightMultiplyMatrix::Scalar": {
+    "contract": "维度见本页精确 typedef 声明，与 Jacobian/Hessian 尺寸一致。",
+    "description": "计算标量类型，由 Real 或内核 Scalar 指定。"
+  },
+  "grassland::RightMultiplyMatrix::ValidInput": {
+    "contract": "s 的行数与 f 输出列数匹配；使用前初始化 s。",
+    "description": "委托 f.ValidInput。"
+  },
+  "grassland::RightMultiplyMatrix::operator()": {
+    "contract": "s 的行数与 f 输出列数匹配；使用前初始化 s。",
+    "description": "返回 f(v)s。"
+  },
+  "grassland::RightMultiplyMatrix<Real>::Hessian": {
+    "contract": "s 的行数与 f 输出列数匹配；使用前初始化 s。",
+    "description": "按相同列映射线性组合 Hessian 分片。"
+  },
+  "grassland::RightMultiplyMatrix<Real>::Jacobian": {
+    "contract": "s 的行数与 f 输出列数匹配；使用前初始化 s。",
+    "description": "按 s(j,i) 对原输出列对应的 Jacobian 行块求线性组合。"
+  },
+  "grassland::RightMultiplyMatrix<Real>::ValidInput": {
+    "contract": "s 的行数与 f 输出列数匹配；使用前初始化 s。",
+    "description": "委托 f.ValidInput。"
+  },
+  "grassland::RightMultiplyMatrix<Real>::operator()": {
+    "contract": "s 的行数与 f 输出列数匹配；使用前初始化 s。",
+    "description": "返回 f(v)s。"
+  },
+  "grassland::SPDProjection": {
+    "contract": "输入应自伴随；零特征值被保留，结果是半正定。",
+    "description": "对称特征分解后将负特征值设为零，再用特征向量重构。"
+  },
+  "grassland::SVD": {
+    "contract": "显式提供 float/double；S 需可逆，秩亏或舍入造成负特征值时没有稳定补救。",
+    "description": "分解 2×2 或 3×2 输入 A≈U S Vt，通过 AᵀA 求 S 再求 U。"
+  },
+  "grassland::SegmentSDF": {
+    "contract": "要求 A≠B；轴上不可微，端点投影区域切换处二阶不连续。",
+    "description": "线段无符号距离，端点默认 A=(0,0,0)、B=(1,1,1)。"
+  },
+  "grassland::SegmentSDF::Hessian": {
+    "contract": "要求 A≠B；轴上不可微，端点投影区域切换处二阶不连续。",
+    "description": "返回 端点区域用点距离 Hessian；内部区域再减去单位轴的外积。"
+  },
+  "grassland::SegmentSDF::InputType": {
+    "contract": "要求 A≠B；轴上不可微，端点投影区域切换处二阶不连续。",
+    "description": "三维查询点向量。"
+  },
+  "grassland::SegmentSDF::Jacobian": {
+    "contract": "要求 A≠B；轴上不可微，端点投影区域切换处二阶不连续。",
+    "description": "返回 从最近点指向查询点的单位向量，接口类型为 1×3。"
+  },
+  "grassland::SegmentSDF::OutputType": {
+    "contract": "要求 A≠B；轴上不可微，端点投影区域切换处二阶不连续。",
+    "description": "包含距离值的 1×1 Eigen 矩阵。"
+  },
+  "grassland::SegmentSDF::Scalar": {
+    "contract": "要求 A≠B；轴上不可微，端点投影区域切换处二阶不连续。",
+    "description": "Real 标量类型。"
+  },
+  "grassland::SegmentSDF::ValidInput": {
+    "contract": "要求 A≠B；轴上不可微，端点投影区域切换处二阶不连续。",
+    "description": "点到线段距离大于 100×Eps。"
+  },
+  "grassland::SegmentSDF::operator()": {
+    "contract": "要求 A≠B；轴上不可微，端点投影区域切换处二阶不连续。",
+    "description": "返回 点到投影参数钳制在 [0,1] 的最近点的长度。"
+  },
+  "grassland::SegmentSDF<Real>::Hessian": {
+    "contract": "要求 A≠B；轴上不可微，端点投影区域切换处二阶不连续。",
+    "description": "返回 端点区域用点距离 Hessian；内部区域再减去单位轴的外积。"
+  },
+  "grassland::SegmentSDF<Real>::Jacobian": {
+    "contract": "要求 A≠B；轴上不可微，端点投影区域切换处二阶不连续。",
+    "description": "返回 从最近点指向查询点的单位向量，接口类型为 1×3。"
+  },
+  "grassland::SegmentSDF<Real>::ValidInput": {
+    "contract": "要求 A≠B；轴上不可微，端点投影区域切换处二阶不连续。",
+    "description": "点到线段距离大于 100×Eps。"
+  },
+  "grassland::SegmentSDF<Real>::operator()": {
+    "contract": "要求 A≠B；轴上不可微，端点投影区域切换处二阶不连续。",
+    "description": "返回 点到投影参数钳制在 [0,1] 的最近点的长度。"
+  },
+  "grassland::SegmentSDF<double>": {
+    "contract": "使 cpp 内定义的值与导数方法可由其他编译单元链接；算法约束与模板类型一致。",
+    "description": "为 double 标量生成该微分核的显式模板实例。"
+  },
+  "grassland::SegmentSDF<float>": {
+    "contract": "使 cpp 内定义的值与导数方法可由其他编译单元链接；算法约束与模板类型一致。",
+    "description": "为 float 标量生成该微分核的显式模板实例。"
+  },
+  "grassland::Sign": {
+    "contract": "没有容差；NaN 的比较均为假，因此也返回 0。",
+    "description": "负数返回 −1，正数返回 1，其余返回 0。"
+  },
+  "grassland::Skew3": {
+    "contract": "返回独立的 3×3 矩阵。",
+    "description": "构造 v 的反对称叉乘矩阵，使 Skew3(v)w=v×w。"
   },
   "grassland::SobolTableGen": {
     "contract": "N,D>0；文件须包含所需维度；打不开文件抛 runtime_error，后续格式错误没有完整检查。",
     "description": "读取方向数并生成样本主序的 N×D Sobol uint32 表；逐维计算方向向量，逐样本用 XOR 递推。"
   },
+  "grassland::SolidAngle": {
+    "contract": "使用 2 atan(分子/分母)，不保证退化输入或跨象限情形的鲁棒性。",
+    "description": "以三向量的标量三重积和长度点积组合计算有向立体角。"
+  },
+  "grassland::SolveCubicPolynomial": {
+    "contract": "roots 至少容纳 3 个数；不限制区间、不排序、不去重，三重根公式有 0/0 风险。CCD 实际调用另一套区间求根器。",
+    "description": "解析求三次多项式实根，最高项为零时退化为二次或一次。"
+  },
+  "grassland::SolveCubicPolynomialLimitedRange": {
+    "contract": "roots 至少 3 项；最高系数为零转二次，输出不去重，导数为零的牛顿修正可能产生非有限值。",
+    "description": "以二次导数方程的根分割区间，二分并牛顿修正各段根。"
+  },
+  "grassland::SolveLinearPolynomialLimitedRange": {
+    "contract": "a=0 一律 num_roots=0；roots 至少 1 项，num_roots 非空。",
+    "description": "求 ax+b=0，并仅输出闭区间内的根。"
+  },
+  "grassland::SolveQuadraticPolynomialLimitedRange": {
+    "contract": "roots 至少 2 项；默认 [0,1]，重根可能作为两个分段端点重复输出。",
+    "description": "以导数零点分段后求二次式区间实根；a=0 时转一次求解。"
+  },
+  "grassland::SphereSDF": {
+    "contract": "radius 应非负；球心不可微，球内距离为负。",
+    "description": "球体 SDF，默认 center=0、radius=1。"
+  },
+  "grassland::SphereSDF::Hessian": {
+    "contract": "radius 应非负；球心不可微，球内距离为负。",
+    "description": "返回 (I−nnᵀ)/到中心距离。"
+  },
+  "grassland::SphereSDF::InputType": {
+    "contract": "radius 应非负；球心不可微，球内距离为负。",
+    "description": "三维查询点向量。"
+  },
+  "grassland::SphereSDF::Jacobian": {
+    "contract": "radius 应非负；球心不可微，球内距离为负。",
+    "description": "返回 单位径向向量的转置，接口类型为 1×3。"
+  },
+  "grassland::SphereSDF::OutputType": {
+    "contract": "radius 应非负；球心不可微，球内距离为负。",
+    "description": "包含距离值的 1×1 Eigen 矩阵。"
+  },
+  "grassland::SphereSDF::Scalar": {
+    "contract": "radius 应非负；球心不可微，球内距离为负。",
+    "description": "Real 标量类型。"
+  },
+  "grassland::SphereSDF::ValidInput": {
+    "contract": "radius 应非负；球心不可微，球内距离为负。",
+    "description": "到中心距离大于 100×Eps。"
+  },
+  "grassland::SphereSDF::operator()": {
+    "contract": "radius 应非负；球心不可微，球内距离为负。",
+    "description": "返回 ||v−center||−radius。"
+  },
+  "grassland::SphereSDF<Real>::Hessian": {
+    "contract": "radius 应非负；球心不可微，球内距离为负。",
+    "description": "返回 (I−nnᵀ)/到中心距离。"
+  },
+  "grassland::SphereSDF<Real>::Jacobian": {
+    "contract": "radius 应非负；球心不可微，球内距离为负。",
+    "description": "返回 单位径向向量的转置，接口类型为 1×3。"
+  },
+  "grassland::SphereSDF<Real>::ValidInput": {
+    "contract": "radius 应非负；球心不可微，球内距离为负。",
+    "description": "到中心距离大于 100×Eps。"
+  },
+  "grassland::SphereSDF<Real>::operator()": {
+    "contract": "radius 应非负；球心不可微，球内距离为负。",
+    "description": "返回 ||v−center||−radius。"
+  },
+  "grassland::SphereSDF<double>": {
+    "contract": "使 cpp 内定义的值与导数方法可由其他编译单元链接；算法约束与模板类型一致。",
+    "description": "为 double 标量生成该微分核的显式模板实例。"
+  },
+  "grassland::SphereSDF<float>": {
+    "contract": "使 cpp 内定义的值与导数方法可由其他编译单元链接；算法约束与模板类型一致。",
+    "description": "为 float 标量生成该微分核的显式模板实例。"
+  },
   "grassland::StringToWString": {
     "contract": "不验证非法续字节、截断输入或码点范围；不是安全 Unicode 解码库。",
     "description": "按 UTF-8 前导字节和后续字节拼接 wchar_t 并写入输出。"
+  },
+  "grassland::TetrahedronVolume": {
+    "contract": "返回有向体积，绝对值才是几何体积。",
+    "description": "计算 ((p1−p0)×(p2−p0))·(p3−p0)/6。"
+  },
+  "grassland::ThirdOrderVolumetricPolynomial": {
+    "contract": "输出数组长度至少 4，按常数、一次、二次、三次排列。",
+    "description": "展开 (p0+v0t)·((p1+v1t)×(p2+v2t))。"
+  },
+  "grassland::Triangle": {
+    "contract": "只实现二维与三维特化。",
+    "description": "Triangle 的维度参数化前置声明。"
+  },
+  "grassland::Triangle2": {
+    "contract": "与目标类型完全相同，没有额外存储或校验。",
+    "description": "Triangle 的 2 维、调用者指定标量 类型别名。"
+  },
+  "grassland::Triangle2d": {
+    "contract": "与目标类型完全相同，没有额外存储或校验。",
+    "description": "Triangle 的 2 维、double 类型别名。"
+  },
+  "grassland::Triangle2f": {
+    "contract": "与目标类型完全相同，没有额外存储或校验。",
+    "description": "Triangle 的 2 维、float 类型别名。"
+  },
+  "grassland::Triangle3": {
+    "contract": "与目标类型完全相同，没有额外存储或校验。",
+    "description": "Triangle 的 3 维、调用者指定标量 类型别名。"
+  },
+  "grassland::Triangle3d": {
+    "contract": "与目标类型完全相同，没有额外存储或校验。",
+    "description": "Triangle 的 3 维、double 类型别名。"
+  },
+  "grassland::Triangle3f": {
+    "contract": "与目标类型完全相同，没有额外存储或校验。",
+    "description": "Triangle 的 3 维、float 类型别名。"
+  },
+  "grassland::Triangle<Scalar, 2>": {
+    "contract": "不提供索引范围或退化几何检查。",
+    "description": "以 2×3 矩阵 m 的三列保存顶点。"
+  },
+  "grassland::Triangle<Scalar, 2>::operator[]": {
+    "contract": "i 必须是 0、1、2；返回表达式依附原矩阵。",
+    "description": "返回第 i 列的 Eigen 表达式；非 const 重载可修改顶点。"
+  },
+  "grassland::Triangle<Scalar, 3>": {
+    "contract": "不提供索引范围或退化几何检查。",
+    "description": "以 3×3 矩阵 m 的三列保存顶点。"
+  },
+  "grassland::Triangle<Scalar, 3>::normal": {
+    "contract": "顶点绕序决定方向，退化面无有效单位法线。",
+    "description": "返回 (v1−v0)×(v2−v0) 的单位向量。"
+  },
+  "grassland::Triangle<Scalar, 3>::operator[]": {
+    "contract": "i 必须是 0、1、2；返回表达式依附原矩阵。",
+    "description": "返回第 i 列的 Eigen 表达式；非 const 重载可修改顶点。"
+  },
+  "grassland::Triangle<Scalar, 3>::vertex": {
+    "contract": "i 必须在 [0,2]。",
+    "description": "按值复制第 i 个三维顶点。"
+  },
+  "grassland::VecLength": {
+    "contract": "零向量处导数未定义，调用者先检查。",
+    "description": "dim 维向量欧氏范数核，dim 默认 3。"
+  },
+  "grassland::VecLength::Hessian": {
+    "contract": "零向量处导数未定义，调用者先检查。",
+    "description": "返回 (I−n nᵀ)/||v||。"
+  },
+  "grassland::VecLength::InputType": {
+    "contract": "维度见本页精确 typedef 声明，与 Jacobian/Hessian 尺寸一致。",
+    "description": "函数输入的定长 Eigen 类型；矩阵按列展开作为导数输入。"
+  },
+  "grassland::VecLength::Jacobian": {
+    "contract": "零向量处导数未定义，调用者先检查。",
+    "description": "返回单位向量的转置。"
+  },
+  "grassland::VecLength::OutputType": {
+    "contract": "维度见本页精确 typedef 声明，与 Jacobian/Hessian 尺寸一致。",
+    "description": "函数输出的定长 Eigen 类型；标量也以 1×1 矩阵表示。"
+  },
+  "grassland::VecLength::Scalar": {
+    "contract": "维度见本页精确 typedef 声明，与 Jacobian/Hessian 尺寸一致。",
+    "description": "计算标量类型，由 Real 或内核 Scalar 指定。"
+  },
+  "grassland::VecLength::ValidInput": {
+    "contract": "零向量处导数未定义，调用者先检查。",
+    "description": "要求范数大于 100×Eps。"
+  },
+  "grassland::VecLength::operator()": {
+    "contract": "零向量处导数未定义，调用者先检查。",
+    "description": "返回 ||v||。"
+  },
+  "grassland::VecLength<Real>::Hessian": {
+    "contract": "零向量处导数未定义，调用者先检查。",
+    "description": "返回 (I−n nᵀ)/||v||。"
+  },
+  "grassland::VecLength<Real>::Jacobian": {
+    "contract": "零向量处导数未定义，调用者先检查。",
+    "description": "返回单位向量的转置。"
+  },
+  "grassland::VecLength<Real>::ValidInput": {
+    "contract": "零向量处导数未定义，调用者先检查。",
+    "description": "要求范数大于 100×Eps。"
+  },
+  "grassland::VecLength<Real>::operator()": {
+    "contract": "零向量处导数未定义，调用者先检查。",
+    "description": "返回 ||v||。"
+  },
+  "grassland::VecNormalized": {
+    "contract": "返回 dim 个 Hessian 分片。",
+    "description": "dim 维向量单位化核，dim 默认 3。"
+  },
+  "grassland::VecNormalized::Hessian": {
+    "contract": "返回 dim 个 Hessian 分片。",
+    "description": "逐分量构造 (3nᵢnⱼnₖ−δⱼₖnᵢ−δᵢₖnⱼ−δᵢⱼnₖ)/||v||²。"
+  },
+  "grassland::VecNormalized::InputType": {
+    "contract": "维度见本页精确 typedef 声明，与 Jacobian/Hessian 尺寸一致。",
+    "description": "函数输入的定长 Eigen 类型；矩阵按列展开作为导数输入。"
+  },
+  "grassland::VecNormalized::Jacobian": {
+    "contract": "返回 dim 个 Hessian 分片。",
+    "description": "返回 (I−n nᵀ)/||v||。"
+  },
+  "grassland::VecNormalized::OutputType": {
+    "contract": "维度见本页精确 typedef 声明，与 Jacobian/Hessian 尺寸一致。",
+    "description": "函数输出的定长 Eigen 类型；标量也以 1×1 矩阵表示。"
+  },
+  "grassland::VecNormalized::Scalar": {
+    "contract": "维度见本页精确 typedef 声明，与 Jacobian/Hessian 尺寸一致。",
+    "description": "计算标量类型，由 Real 或内核 Scalar 指定。"
+  },
+  "grassland::VecNormalized::ValidInput": {
+    "contract": "返回 dim 个 Hessian 分片。",
+    "description": "要求范数大于 100×Eps。"
+  },
+  "grassland::VecNormalized::operator()": {
+    "contract": "返回 dim 个 Hessian 分片。",
+    "description": "返回 n=v/||v||。"
+  },
+  "grassland::VecNormalized<Real>::Hessian": {
+    "contract": "返回 dim 个 Hessian 分片。",
+    "description": "逐分量构造 (3nᵢnⱼnₖ−δⱼₖnᵢ−δᵢₖnⱼ−δᵢⱼnₖ)/||v||²。"
+  },
+  "grassland::VecNormalized<Real>::Jacobian": {
+    "contract": "返回 dim 个 Hessian 分片。",
+    "description": "返回 (I−n nᵀ)/||v||。"
+  },
+  "grassland::VecNormalized<Real>::ValidInput": {
+    "contract": "返回 dim 个 Hessian 分片。",
+    "description": "要求范数大于 100×Eps。"
+  },
+  "grassland::VecNormalized<Real>::operator()": {
+    "contract": "返回 dim 个 Hessian 分片。",
+    "description": "返回 n=v/||v||。"
   },
   "grassland::VertexBufferView": {
     "contract": "不拥有内存、不保存元素数量；调用方保证有效期、对齐与边界。",
@@ -435,9 +3083,1017 @@
     "contract": "决定赋值和构造时采用哪一种所有权包装。",
     "description": "标识输出槽类型：raw、shared 或 unique。"
   },
+  "grassland::graphics::(anonymous)::Diagnostics": {
+    "contract": "",
+    "description": "若 Slang diagnostic blob 非空，按字节长度转字符串并记 Info 日志。"
+  },
+  "grassland::graphics::(anonymous)::SameUUID": {
+    "contract": "",
+    "description": "逐字节比较 SlangUUID，供 COM 风格接口查询。"
+  },
+  "grassland::graphics::(anonymous)::ShaderFileSystem": {
+    "contract": "",
+    "description": "实现 Slang 文件系统接口，借用 VFS；不自行去重 include。"
+  },
+  "grassland::graphics::(anonymous)::ShaderFileSystem::ShaderFileSystem": {
+    "contract": "",
+    "description": "记录 VFS const 引用，不拷贝整个目录树。"
+  },
+  "grassland::graphics::(anonymous)::ShaderFileSystem::addRef": {
+    "contract": "",
+    "description": "原子增加引用计数。"
+  },
+  "grassland::graphics::(anonymous)::ShaderFileSystem::castAs": {
+    "contract": "",
+    "description": "识别 Unknown/Castable/FileSystem UUID 并返回接口，未知 UUID 返回 nullptr，不增加引用数。"
+  },
+  "grassland::graphics::(anonymous)::ShaderFileSystem::loadFile": {
+    "contract": "",
+    "description": "对路径做词法正规化后从 VFS 读取；成功创建 SourceBlob，找不到返回 SLANG_E_NOT_FOUND，捕获其他异常后返回 SLANG_FAIL。"
+  },
+  "grassland::graphics::(anonymous)::ShaderFileSystem::queryInterface": {
+    "contract": "",
+    "description": "调用 castAs；成功后 addRef，失败返回无接口状态。"
+  },
+  "grassland::graphics::(anonymous)::ShaderFileSystem::release": {
+    "contract": "",
+    "description": "减少引用计数，归零时销毁文件系统适配器。"
+  },
+  "grassland::graphics::(anonymous)::ShaderStage": {
+    "contract": "",
+    "description": "按 profile 首段将 vs/ps/cs/gs/hs/ds/ms/as 映射到阶段，lib 返回 NONE 并依赖 shader 属性；未知值抛 invalid_argument。"
+  },
+  "grassland::graphics::(anonymous)::SlangLibraryDirectory": {
+    "contract": "",
+    "description": "从 slang_createGlobalSession 所在动态库定位其父目录，支持 Win32 模块查询或 dladdr；失败返回空。"
+  },
+  "grassland::graphics::(anonymous)::SourceBlob": {
+    "contract": "",
+    "description": "实现 ISlangBlob，拥有字节向量并用原子引用计数管理自身。"
+  },
+  "grassland::graphics::(anonymous)::SourceBlob::SourceBlob": {
+    "contract": "",
+    "description": "移动接收字节向量，引用计数从 1 开始。"
+  },
+  "grassland::graphics::(anonymous)::SourceBlob::addRef": {
+    "contract": "",
+    "description": "原子增加引用计数并返回新值。"
+  },
+  "grassland::graphics::(anonymous)::SourceBlob::getBufferPointer": {
+    "contract": "",
+    "description": "返回内部字节向量借用地址，受 blob 生命周期约束。"
+  },
+  "grassland::graphics::(anonymous)::SourceBlob::getBufferSize": {
+    "contract": "",
+    "description": "返回内部字节数量。"
+  },
+  "grassland::graphics::(anonymous)::SourceBlob::queryInterface": {
+    "contract": "",
+    "description": "只响应 ISlangUnknown/ISlangBlob UUID；成功返回接口并 addRef，否则返回 SLANG_E_NO_INTERFACE。"
+  },
+  "grassland::graphics::(anonymous)::SourceBlob::release": {
+    "contract": "",
+    "description": "原子减少引用计数，归零时 delete this，返回余量。"
+  },
+  "grassland::graphics::(anonymous)::UseBundledSlangPlugins": {
+    "contract": "",
+    "description": "将 glslang 和 spirv-opt 下游编译器路径指定到 Slang 库目录，供打包的 Python/程序发现插件。"
+  },
+  "grassland::graphics::AccelerationStructure": {
+    "contract": "不是所有对象或后端都支持 UpdateInstances。",
+    "description": "BLAS/TLAS 的统一多态资源；提供实例描述生成和 TLAS 实例更新。"
+  },
+  "grassland::graphics::AccelerationStructure::MakeInstance": {
+    "contract": "ID/offset 只有 24 位，mask/flags 只有 8 位；调用方需避免截断。",
+    "description": "返回借用 this 的 RayTracingInstance，并逐元素把 GLM 变换转成 3×4 行排列；填入 ID、mask、hit-group offset 与 flags。"
+  },
+  "grassland::graphics::AccelerationStructure::UpdateInstances": {
+    "contract": "传入实例借用的 BLAS 必须有效，且设备支持该更新。",
+    "description": "完整重载交给后端更新实例；pair 重载用 MakeInstance 转换并按输入顺序分配实例 ID。"
+  },
+  "grassland::graphics::AccelerationStructure::~AccelerationStructure": {
+    "contract": "",
+    "description": "虚析构释放后端 AS 及其底层存储。"
+  },
+  "grassland::graphics::AddressMode": {
+    "contract": "",
+    "description": "纹理越界寻址：重复、镜像重复、边缘钳制或边界钳制。"
+  },
+  "grassland::graphics::BackendAPI": {
+    "contract": "",
+    "description": "后端枚举 Vulkan=0、D3D12=1、Metal=2；DEFAULT 按编译宏选择，不能将枚举存在当作已构建支持。"
+  },
+  "grassland::graphics::BackendAPIString": {
+    "contract": "",
+    "description": "返回 Metal/Vulkan/D3D12 的静态名称字符串，未知枚举返回 Unknown。"
+  },
+  "grassland::graphics::BindPoint": {
+    "contract": "",
+    "description": "资源绑定的程序域：GRAPHICS、COMPUTE、RAYTRACING；COUNT 用于内部数组大小。"
+  },
+  "grassland::graphics::BlendFactor": {
+    "contract": "",
+    "description": "源/目标颜色或 alpha 及其补值、0 和 1，用于颜色与 alpha 混合。"
+  },
+  "grassland::graphics::BlendOp": {
+    "contract": "",
+    "description": "ADD、SUBTRACT、REVERSE_SUBTRACT、MIN、MAX 混合运算。"
+  },
+  "grassland::graphics::BlendState": {
+    "contract": "",
+    "description": "单颜色附件混合开关及独立颜色/alpha 的源因子、目标因子、运算。"
+  },
+  "grassland::graphics::BlendState::BlendState": {
+    "contract": "",
+    "description": "默认关闭混合并配置 ONE/ZERO；bool 重载按传统源 alpha 混合配置；完整因子重载打开混合并逐项复制。"
+  },
+  "grassland::graphics::Buffer": {
+    "contract": "",
+    "description": "GPU 缓冲多态接口，具体存储、在途帧版本和传输机制由后端决定。"
+  },
+  "grassland::graphics::Buffer::Buffer": {
+    "contract": "",
+    "description": "默认构造抽象基类，无独立设备分配。"
+  },
+  "grassland::graphics::Buffer::DownloadData": {
+    "contract": "offset/size 必须位于资源内，CPU 指针需有效且有足够容量。",
+    "description": "从缓冲 offset 处复制 size 字节到 CPU data。"
+  },
+  "grassland::graphics::Buffer::Range": {
+    "contract": "offset/size 必须位于资源内，CPU 指针需有效且有足够容量。",
+    "description": "返回引用 this 的 BufferRange；默认覆盖剩余缓冲。"
+  },
+  "grassland::graphics::Buffer::Resize": {
+    "contract": "",
+    "description": "请求新字节容量，是否保留旧数据及同步方式见具体后端。"
+  },
+  "grassland::graphics::Buffer::Size": {
+    "contract": "",
+    "description": "查询字节容量。"
+  },
+  "grassland::graphics::Buffer::Type": {
+    "contract": "",
+    "description": "查询创建时缓冲用途类型。"
+  },
+  "grassland::graphics::Buffer::UploadData": {
+    "contract": "offset/size 必须位于资源内，CPU 指针需有效且有足够容量。",
+    "description": "从 CPU data 复制 size 字节到缓冲 offset 处。"
+  },
+  "grassland::graphics::Buffer::~Buffer": {
+    "contract": "调用方先确保 GPU 不再使用该资源。",
+    "description": "虚析构，用于释放后端派生缓冲。"
+  },
+  "grassland::graphics::BufferRange": {
+    "contract": "不持有资源所有权；offset 必须<=Buffer::Size。",
+    "description": "借用 buffer 加 offset/size 的字节区间描述。"
+  },
+  "grassland::graphics::BufferRange::BufferRange": {
+    "contract": "不检查 offset 的无符号下溢；空 buffer 只保留原始描述。",
+    "description": "保存 buffer/offset，非空 buffer 时将 size 截到 Size-offset；~0ull 表示尽可能到末尾。"
+  },
+  "grassland::graphics::BufferType": {
+    "contract": "",
+    "description": "STATIC、DYNAMIC、ONETIME 的资源更新用途分类；具体设备内存和帧复制策略由后端决定。"
+  },
+  "grassland::graphics::CUDABuffer": {
+    "contract": "只在启用 CUDA runtime 时声明。",
+    "description": "虚继承 Buffer 的共享设备内存接口，防止多重继承产生两份 Buffer 基类。"
+  },
+  "grassland::graphics::CUDABuffer::GetCUDAMemoryPointer": {
+    "contract": "返回设备地址不可在 CPU 上解引用；资源存活和同步由调用方保证。",
+    "description": "虚接口写出 CUDA 地址；模板重载先取得 void* 再转为 T* 写给调用方。"
+  },
+  "grassland::graphics::ClearValue": {
+    "contract": "",
+    "description": "无标签颜色/深度 union，使用者必须按图像格式选择成员。"
+  },
+  "grassland::graphics::ClearValueUnion": {
+    "contract": "",
+    "description": "通过不同构造重载填充 ClearValue，方便显式转换为命令所需 union。"
+  },
+  "grassland::graphics::ClearValueUnion::ClearValueUnion": {
+    "contract": "",
+    "description": "ColorClearValue 重载写 color，DepthClearValue 重载写 depth。"
+  },
+  "grassland::graphics::ClearValueUnion::operator ClearValue": {
+    "contract": "",
+    "description": "按值返回保存的 union，没有格式校验。"
+  },
+  "grassland::graphics::ColorClearValue": {
+    "contract": "",
+    "description": "颜色清除的四个浮点分量 r/g/b/a。"
+  },
+  "grassland::graphics::CommandContext": {
+    "contract": "资源须由同一 Core 创建，录制/提交/完成阶段分开。",
+    "description": "一批 GPU 命令和提交后回调的抽象记录器。"
+  },
+  "grassland::graphics::CommandContext::CmdBeginRendering": {
+    "contract": "资源/程序/附件布局及使用顺序必须匹配；裸指针不表达所有权转移。",
+    "description": "开始以 color_targets 和可选 depth_target 为附件的渲染区间。"
+  },
+  "grassland::graphics::CommandContext::CmdBindComputeProgram": {
+    "contract": "资源/程序/附件布局及使用顺序必须匹配；裸指针不表达所有权转移。",
+    "description": "绑定已 Finalize 的计算程序。"
+  },
+  "grassland::graphics::CommandContext::CmdBindIndexBuffer": {
+    "contract": "资源/程序/附件布局及使用顺序必须匹配；裸指针不表达所有权转移。",
+    "description": "绑定索引缓冲及字节偏移。"
+  },
+  "grassland::graphics::CommandContext::CmdBindProgram": {
+    "contract": "资源/程序/附件布局及使用顺序必须匹配；裸指针不表达所有权转移。",
+    "description": "绑定已 Finalize 的光栅程序。"
+  },
+  "grassland::graphics::CommandContext::CmdBindRayTracingProgram": {
+    "contract": "资源/程序/附件布局及使用顺序必须匹配；裸指针不表达所有权转移。",
+    "description": "绑定已 Finalize 的 RT 程序及其 SBT。"
+  },
+  "grassland::graphics::CommandContext::CmdBindResources": {
+    "contract": "资源/程序/附件布局及使用顺序必须匹配；裸指针不表达所有权转移。",
+    "description": "按 slot 和 BindPoint 绑定缓冲区间、图像、采样器或 AS；Buffer* 重载转为全区间再委托。"
+  },
+  "grassland::graphics::CommandContext::CmdBindVertexBuffers": {
+    "contract": "资源/程序/附件布局及使用顺序必须匹配；裸指针不表达所有权转移。",
+    "description": "从 first_binding 开始绑定若干顶点流，offsets 为各缓冲的字节偏移。"
+  },
+  "grassland::graphics::CommandContext::CmdClearImage": {
+    "contract": "资源/程序/附件布局及使用顺序必须匹配；裸指针不表达所有权转移。",
+    "description": "按图像格式解释 ClearValue 并清空图像。"
+  },
+  "grassland::graphics::CommandContext::CmdCopyBuffer": {
+    "contract": "资源/程序/附件布局及使用顺序必须匹配；裸指针不表达所有权转移。",
+    "description": "从 src_offset 向 dst_offset 复制 size 字节，注意参数顺序为目标在前。"
+  },
+  "grassland::graphics::CommandContext::CmdDispatch": {
+    "contract": "资源/程序/附件布局及使用顺序必须匹配；裸指针不表达所有权转移。",
+    "description": "记录 group_count_x/y/z 个线程组，实际线程数还乘 shader 的 numthreads。"
+  },
+  "grassland::graphics::CommandContext::CmdDispatchRays": {
+    "contract": "资源/程序/附件布局及使用顺序必须匹配；裸指针不表达所有权转移。",
+    "description": "记录 width×height×depth 的射线 dispatch。"
+  },
+  "grassland::graphics::CommandContext::CmdDraw": {
+    "contract": "资源/程序/附件布局及使用顺序必须匹配；裸指针不表达所有权转移。",
+    "description": "记录非索引实例化绘制；首参数虽命名 index_count，语义由后端作为顶点数量使用。"
+  },
+  "grassland::graphics::CommandContext::CmdDrawIndexed": {
+    "contract": "资源/程序/附件布局及使用顺序必须匹配；裸指针不表达所有权转移。",
+    "description": "记录索引实例化绘制，包含首索引、顶点基址和首实例。"
+  },
+  "grassland::graphics::CommandContext::CmdEndRendering": {
+    "contract": "资源/程序/附件布局及使用顺序必须匹配；裸指针不表达所有权转移。",
+    "description": "结束当前渲染区间。"
+  },
+  "grassland::graphics::CommandContext::CmdPresent": {
+    "contract": "资源/程序/附件布局及使用顺序必须匹配；裸指针不表达所有权转移。",
+    "description": "将指定 Image 送到 Window 的后端呈现路径，可包含格式/HDR 转换。"
+  },
+  "grassland::graphics::CommandContext::CmdSetPrimitiveTopology": {
+    "contract": "资源/程序/附件布局及使用顺序必须匹配；裸指针不表达所有权转移。",
+    "description": "设置顶点/索引解释为三角形、线或点的拓扑。"
+  },
+  "grassland::graphics::CommandContext::CmdSetScissor": {
+    "contract": "资源/程序/附件布局及使用顺序必须匹配；裸指针不表达所有权转移。",
+    "description": "设置整数像素裁剪矩形。"
+  },
+  "grassland::graphics::CommandContext::CmdSetViewport": {
+    "contract": "资源/程序/附件布局及使用顺序必须匹配；裸指针不表达所有权转移。",
+    "description": "设置视口位置、尺寸和深度范围。"
+  },
+  "grassland::graphics::CommandContext::GetCore": {
+    "contract": "",
+    "description": "返回创建此上下文的 Core 借用指针。"
+  },
+  "grassland::graphics::CommandContext::GetPostExecutionCallbacks": {
+    "contract": "",
+    "description": "返回回调向量的 const 引用，供后端安排完成后调用。"
+  },
+  "grassland::graphics::CommandContext::PushPostExecutionCallback": {
+    "contract": "",
+    "description": "把回调移动到本批命令的完成回调向量，注册时不执行。"
+  },
+  "grassland::graphics::CommandContext::~CommandContext": {
+    "contract": "",
+    "description": "虚析构清理后端上下文；GPU 在用资源生命周期应由提交方保证。"
+  },
+  "grassland::graphics::CompileShader": {
+    "contract": "默认 DXIL、列主序和 O3。返回 data 为空通常表示编译失败；非法 profile/编译器初始化失败抛异常。",
+    "description": "建立 Slang session，解析编译参数，加载 VFS 源文件与 includes，定位入口、组合链接并取得目标字节码；字符串重载使用 shader.slang 临时文件。"
+  },
+  "grassland::graphics::CompiledShaderBlob": {
+    "contract": "",
+    "description": "拥有编译后字节数组 data 和入口名 entry_point；data 为空是常见编译失败信号。"
+  },
+  "grassland::graphics::ComputeProgram": {
+    "contract": "配置在 Finalize 前完成；绑定与执行由 CommandContext 进行。",
+    "description": "可配置资源布局的计算管线接口。"
+  },
+  "grassland::graphics::ComputeProgram::AddResourceBinding": {
+    "contract": "着色器 register/space、CmdBindResources slot 及 count 必须与此布局一致。",
+    "description": "按调用顺序添加资源槽，指定 ResourceType 与数组 count。"
+  },
+  "grassland::graphics::ComputeProgram::Finalize": {
+    "contract": "具体编译或设备错误由后端返回/抛出；不要在使用中的程序上重新配置。",
+    "description": "完成布局和管线创建，使程序可用于录制；RT 还可指定 miss/hit/callable 的索引列表。"
+  },
+  "grassland::graphics::ComputeProgram::~ComputeProgram": {
+    "contract": "",
+    "description": "通过虚析构释放后端程序和对应管线资源。"
+  },
+  "grassland::graphics::Core": {
+    "contract": "Core 必须比其创建的设备资源存活更久。",
+    "description": "图形设备抽象和资源工厂，保存通用设置，由具体后端实现设备对象与提交。"
+  },
+  "grassland::graphics::Core::API": {
+    "contract": "",
+    "description": "返回实际后端 BackendAPI，不是自动选择请求值。"
+  },
+  "grassland::graphics::Core::CUDABeginExecutionBarrier": {
+    "contract": "仅 CUDA runtime；必须与同一后端的结束屏障协议配套。",
+    "description": "在指定 CUDA stream 开始访问共享资源前建立与图形队列的执行依赖。"
+  },
+  "grassland::graphics::Core::CUDADeviceIndex": {
+    "contract": "",
+    "description": "返回匹配的 CUDA 设备索引，默认 -1 表示未匹配。"
+  },
+  "grassland::graphics::Core::CUDAEndExecutionBarrier": {
+    "contract": "共享资源仍须按后端规定的顺序使用。",
+    "description": "结束指定 CUDA stream 的共享资源访问，并使后续图形工作等待其结果。"
+  },
+  "grassland::graphics::Core::Core": {
+    "contract": "",
+    "description": "复制设置并尝试 InitializeGLFW，允许无窗口系统时继续建立离屏后端。"
+  },
+  "grassland::graphics::Core::CreateBottomLevelAccelerationStructure": {
+    "contract": "输出通过 double_ptr 交付；返回码通常 0 成功。对象、格式、设备能力与资源生命周期须满足后端要求。",
+    "description": "三类重载支持 AABB 几何、显式顶点/索引区间以及整缓冲三角形；stride 为顶点或 AABB 字节步长，数量和 flag 由调用方提供。"
+  },
+  "grassland::graphics::Core::CreateBuffer": {
+    "contract": "输出通过 double_ptr 交付；返回码通常 0 成功。对象、格式、设备能力与资源生命周期须满足后端要求。",
+    "description": "按字节大小与 BufferType 创建缓冲。"
+  },
+  "grassland::graphics::Core::CreateCUDABuffer": {
+    "contract": "输出通过 double_ptr 交付；返回码通常 0 成功。对象、格式、设备能力与资源生命周期须满足后端要求。",
+    "description": "创建可与 CUDA 共享的设备缓冲，只有 CUDA runtime 构建中存在。"
+  },
+  "grassland::graphics::Core::CreateCommandContext": {
+    "contract": "输出通过 double_ptr 交付；返回码通常 0 成功。对象、格式、设备能力与资源生命周期须满足后端要求。",
+    "description": "创建本 Core 的命令记录上下文。"
+  },
+  "grassland::graphics::Core::CreateComputeProgram": {
+    "contract": "输出通过 double_ptr 交付；返回码通常 0 成功。对象、格式、设备能力与资源生命周期须满足后端要求。",
+    "description": "从已创建的 compute shader 创建计算程序描述对象。"
+  },
+  "grassland::graphics::Core::CreateImage": {
+    "contract": "输出通过 double_ptr 交付；返回码通常 0 成功。对象、格式、设备能力与资源生命周期须满足后端要求。",
+    "description": "创建指定宽高和 ImageFormat 的二维图像。"
+  },
+  "grassland::graphics::Core::CreateProgram": {
+    "contract": "输出通过 double_ptr 交付；返回码通常 0 成功。对象、格式、设备能力与资源生命周期须满足后端要求。",
+    "description": "按颜色附件格式数组和深度格式创建光栅程序描述对象。"
+  },
+  "grassland::graphics::Core::CreateRayTracingProgram": {
+    "contract": "输出通过 double_ptr 交付；返回码通常 0 成功。对象、格式、设备能力与资源生命周期须满足后端要求。",
+    "description": "空重载创建 RT 程序；三 shader 助手在成功后依次添加 raygen、miss 和 closest-hit group，尚未 Finalize。"
+  },
+  "grassland::graphics::Core::CreateSampler": {
+    "contract": "输出通过 double_ptr 交付；返回码通常 0 成功。对象、格式、设备能力与资源生命周期须满足后端要求。",
+    "description": "按 SamplerInfo 创建不可通过公共接口修改的采样器。"
+  },
+  "grassland::graphics::Core::CreateShader": {
+    "contract": "输出通过 double_ptr 交付；返回码通常 0 成功。对象、格式、设备能力与资源生命周期须满足后端要求。",
+    "description": "从字符串或 VFS 文件编译指定入口与 profile；带 args 重载传入额外编译选项，得到后端 Shader。"
+  },
+  "grassland::graphics::Core::CreateTopLevelAccelerationStructure": {
+    "contract": "输出通过 double_ptr 交付；返回码通常 0 成功。对象、格式、设备能力与资源生命周期须满足后端要求。",
+    "description": "完整版本接收 RayTracingInstance；简化版本把 (BLAS,transform) 按序转为 instance_id=i 的实例列表。"
+  },
+  "grassland::graphics::Core::CreateWindowObject": {
+    "contract": "输出通过 double_ptr 交付；返回码通常 0 成功。对象、格式、设备能力与资源生命周期须满足后端要求。",
+    "description": "完整重载接受 fullscreen/resizable；简化重载委托为 false/false。返回后端窗口对象。"
+  },
+  "grassland::graphics::Core::CurrentFrame": {
+    "contract": "",
+    "description": "由后端返回当前在途帧槽索引。"
+  },
+  "grassland::graphics::Core::DebugEnabled": {
+    "contract": "",
+    "description": "返回设置中的调试开关。"
+  },
+  "grassland::graphics::Core::DeviceName": {
+    "contract": "",
+    "description": "返回逻辑设备初始化后保存的名称。"
+  },
+  "grassland::graphics::Core::DeviceRayQuerySupport": {
+    "contract": "",
+    "description": "查询 inline ray query；基类默认 false，后端可覆盖。"
+  },
+  "grassland::graphics::Core::DeviceRayTracingSupport": {
+    "contract": "",
+    "description": "返回完整 RT pipeline 支持状态。"
+  },
+  "grassland::graphics::Core::FramesInFlight": {
+    "contract": "",
+    "description": "返回配置中的在途帧数量。"
+  },
+  "grassland::graphics::Core::GetPhysicalDeviceProperties": {
+    "contract": "输出数组容量需至少为首次查询数量。",
+    "description": "nullptr 查询设备数量；非空参数填入设备属性数组并返回数量。"
+  },
+  "grassland::graphics::Core::InitializeGLFW": {
+    "contract": "主线程调用；失败返回 false，日志解释原因，后续仍可重试。",
+    "description": "初始化并缓存 GLFW 成功状态；Linux 尊重 LONGMARCH_WINDOW_SYSTEM=auto/x11/wayland，自动路径优先可用 Wayland 并回退 X11。"
+  },
+  "grassland::graphics::Core::InitializeLogicalDevice": {
+    "contract": "检查返回码；无效索引由后端处理。",
+    "description": "用物理设备枚举索引初始化逻辑设备和相关队列。"
+  },
+  "grassland::graphics::Core::InitializeLogicalDeviceAutoSelect": {
+    "contract": "无候选时记录日志并传 -1 给 InitializeLogicalDevice；该条件不代表 ray query。",
+    "description": "枚举设备，按 score 选择最高分；require_ray_tracing=true 时跳过无完整 RT 支持设备。"
+  },
+  "grassland::graphics::Core::InitializeLogicalDeviceByCUDADeviceID": {
+    "contract": "无匹配时同样传 -1；仅 CUDA runtime 构建。",
+    "description": "寻找属性中 cuda_device_index 与参数匹配的物理设备，再初始化对应逻辑设备。"
+  },
+  "grassland::graphics::Core::Settings": {
+    "contract": "在途帧配置应为正，基类不统一校验。",
+    "description": "初始化配置：frames_in_flight 默认 2，enable_debug 默认由 NDEBUG 决定。"
+  },
+  "grassland::graphics::Core::SubmitCommandContext": {
+    "contract": "提交与 GPU 完成是不同阶段；不要立即释放在用资源。",
+    "description": "提交由同一 Core 创建并完成记录的命令上下文。"
+  },
+  "grassland::graphics::Core::WaitGPU": {
+    "contract": "",
+    "description": "阻塞等待后端 GPU 工作完成，用于回读、销毁或重分配前同步。"
+  },
+  "grassland::graphics::Core::WaveSize": {
+    "contract": "不要假定所有 GPU 固定为 32。",
+    "description": "返回后端设备的 wave/subgroup 大小信息。"
+  },
+  "grassland::graphics::Core::~Core": {
+    "contract": "先停止提交并清理依赖资源。",
+    "description": "虚析构，派生后端负责清理实际设备资源。"
+  },
+  "grassland::graphics::CpuProfileScope": {
+    "contract": "scope 生命周期不能超过 profile/context；名称指针必须在 CPU scope 结束前有效；GPU 结果在 WaitGPU 后 Finish。",
+    "description": "捕获当前 active profile 和名称的 CPU RAII 区间，不活动时为空操作。"
+  },
+  "grassland::graphics::CpuProfileScope::CpuProfileScope": {
+    "contract": "scope 生命周期不能超过 profile/context；名称指针必须在 CPU scope 结束前有效；GPU 结果在 WaitGPU 后 Finish。",
+    "description": "保存 active 和名称裸指针，活动时记录 steady_clock 起点。"
+  },
+  "grassland::graphics::CpuProfileScope::End": {
+    "contract": "scope 生命周期不能超过 profile/context；名称指针必须在 CPU scope 结束前有效；GPU 结果在 WaitGPU 后 Finish。",
+    "description": "活动时把从构造至今的毫秒累加到 cpu_ms[name]，然后清空 profile_ 防止重复计时。"
+  },
+  "grassland::graphics::CpuProfileScope::~CpuProfileScope": {
+    "contract": "scope 生命周期不能超过 profile/context；名称指针必须在 CPU scope 结束前有效；GPU 结果在 WaitGPU 后 Finish。",
+    "description": "调用 End，完成未结束的时间累计。"
+  },
+  "grassland::graphics::CreateCore": {
+    "contract": "成功只表示 Core 已构造，逻辑设备仍需要初始化。",
+    "description": "先检查后端编译支持，再构造 MetalCore、D3D12Core 或 VulkanCore 写入输出；不支持返回 -1。"
+  },
+  "grassland::graphics::CullMode": {
+    "contract": "",
+    "description": "三角形不剔除、剔除正面、剔除背面。具体正反面方向由后端光栅约定决定。"
+  },
+  "grassland::graphics::DEFAULT_API": {
+    "contract": "其内部数值不要与公开 BackendAPI 枚举值混用。",
+    "description": "core.cpp 中用于条件编译默认 switch 分支的内部宏。"
+  },
+  "grassland::graphics::DepthClearValue": {
+    "contract": "",
+    "description": "深度清除的浮点 depth。"
+  },
+  "grassland::graphics::DisplayBrightness": {
+    "contract": "数值 0 可表示未知；Metal headroom 是 EDR 当前余量，Windows 是估计峰值/SDR 白点。",
+    "description": "显示亮度查询结果：SDR 白点 nits、HDR 白点相对尺度、headroom、白点已知与 HDR 启用状态。"
+  },
+  "grassland::graphics::Extent2D": {
+    "contract": "",
+    "description": "无符号物理像素宽/高；使用范围由具体资源接口决定。"
+  },
+  "grassland::graphics::FilterMode": {
+    "contract": "",
+    "description": "纹理最近邻或线性过滤。"
+  },
+  "grassland::graphics::FrameProfile": {
+    "contract": "scope 生命周期不能超过 profile/context；名称指针必须在 CPU scope 结束前有效；GPU 结果在 WaitGPU 后 Finish。",
+    "description": "单线程可选帧分析器，CPU 名称累计毫秒、GPU 时间戳和 counters 由各 scope 写入。"
+  },
+  "grassland::graphics::FrameProfile::Begin": {
+    "contract": "scope 生命周期不能超过 profile/context；名称指针必须在 CPU scope 结束前有效；GPU 结果在 WaitGPU 后 Finish。",
+    "description": "拒绝任何已有 active profile，清空统计与名称，设置开关，并把 thread_local active 指向 this。"
+  },
+  "grassland::graphics::FrameProfile::BeginGpu": {
+    "contract": "scope 生命周期不能超过 profile/context；名称指针必须在 CPU scope 结束前有效；GPU 结果在 WaitGPU 后 Finish。",
+    "description": "已启用查询时分配两个槽、记录开始时间戳并返回槽索引；关闭时返回 -1；超过 64 槽或非 Vulkan context 抛异常。"
+  },
+  "grassland::graphics::FrameProfile::EndGpu": {
+    "contract": "scope 生命周期不能超过 profile/context；名称指针必须在 CPU scope 结束前有效；GPU 结果在 WaitGPU 后 Finish。",
+    "description": "索引非负时向 index+1 记录结束时间戳；负索引无操作。"
+  },
+  "grassland::graphics::FrameProfile::Finish": {
+    "contract": "scope 生命周期不能超过 profile/context；名称指针必须在 CPU scope 结束前有效；GPU 结果在 WaitGPU 后 Finish。",
+    "description": "清空 active，读取成对 GPU 查询值，按 valid bits 处理回绕并乘 timestampPeriod 转为毫秒，按名称累计。"
+  },
+  "grassland::graphics::FrameProfile::FrameProfile": {
+    "contract": "scope 生命周期不能超过 profile/context；名称指针必须在 CPU scope 结束前有效；GPU 结果在 WaitGPU 后 Finish。",
+    "description": "记录设备名；gpu_timestamps=false 不创建 GPU 资源；否则要求 Vulkan、有效时间戳并创建 64 槽 query pool。复制构造已删除。"
+  },
+  "grassland::graphics::FrameProfile::operator=": {
+    "contract": "scope 生命周期不能超过 profile/context；名称指针必须在 CPU scope 结束前有效；GPU 结果在 WaitGPU 后 Finish。",
+    "description": "复制赋值被删除，防止重复拥有 query pool。"
+  },
+  "grassland::graphics::FrameProfile::~FrameProfile": {
+    "contract": "scope 生命周期不能超过 profile/context；名称指针必须在 CPU scope 结束前有效；GPU 结果在 WaitGPU 后 Finish。",
+    "description": "若自身处于 active 则清除；持有 Vulkan pool 时等待设备空闲并销毁。"
+  },
+  "grassland::graphics::GpuProfileScope": {
+    "contract": "scope 生命周期不能超过 profile/context；名称指针必须在 CPU scope 结束前有效；GPU 结果在 WaitGPU 后 Finish。",
+    "description": "用 CommandContext 记录 GPU 开始/结束时间戳的 RAII 区间。"
+  },
+  "grassland::graphics::GpuProfileScope::End": {
+    "contract": "scope 生命周期不能超过 profile/context；名称指针必须在 CPU scope 结束前有效；GPU 结果在 WaitGPU 后 Finish。",
+    "description": "活动时调用 EndGpu，再清空 profile_ 防止重复录制。"
+  },
+  "grassland::graphics::GpuProfileScope::GpuProfileScope": {
+    "contract": "scope 生命周期不能超过 profile/context；名称指针必须在 CPU scope 结束前有效；GPU 结果在 WaitGPU 后 Finish。",
+    "description": "保存 active 和借用 commands，活动时调用 BeginGpu 并保存索引。"
+  },
+  "grassland::graphics::GpuProfileScope::~GpuProfileScope": {
+    "contract": "scope 生命周期不能超过 profile/context；名称指针必须在 CPU scope 结束前有效；GPU 结果在 WaitGPU 后 Finish。",
+    "description": "调用 End 录制未结束的终点时间戳。"
+  },
+  "grassland::graphics::GreyScale": {
+    "contract": "",
+    "description": "返回 0.299R+0.587G+0.114B 的加权灰度，不执行 sRGB 线性化。"
+  },
+  "grassland::graphics::HSVtoRGB": {
+    "contract": "H 要求落在 [0,1)，S/V 为调用方选定范围；H=1 或越界没有默认分支，不能依赖自动 wrap。",
+    "description": "按 H×6 的六个扇区从 HSV 计算 RGB。"
+  },
+  "grassland::graphics::HitGroup": {
+    "contract": "未指定 shader 默认为 nullptr；具体组合合法性由后端要求决定。",
+    "description": "RT 命中组描述：closest_hit、any_hit、intersection 借用 shader 指针，procedure 表示程序化几何组。"
+  },
+  "grassland::graphics::ImGuiLinearColors": {
+    "contract": "作用域必须覆盖后端上传 draw list 的阶段，避免重试时重复解码。",
+    "description": "暂时线性化 ImGui 顶点颜色并在析构时恢复的 RAII 适配。"
+  },
+  "grassland::graphics::ImGuiLinearColors::ImGuiLinearColors": {
+    "contract": "保留的 ImDrawVert* 必须在析构前仍有效。",
+    "description": "启用且存在 draw data 时，逐顶点保存原色，按 sRGB 分段曲线把 RGB 解码到线性值，alpha 保持不变。"
+  },
+  "grassland::graphics::ImGuiLinearColors::~ImGuiLinearColors": {
+    "contract": "不能在 guard 生命周期内重建或释放相关 draw list。",
+    "description": "把保存的原始 ImU32 颜色写回所有顶点。"
+  },
+  "grassland::graphics::Image": {
+    "contract": "",
+    "description": "固定格式和尺寸的二维图像接口，支持完整或局部数据传输。"
+  },
+  "grassland::graphics::Image::DownloadData": {
+    "contract": "目标内存容量至少为区域像素数×PixelSize；后端决定回读同步。",
+    "description": "把完整图像或区域写到调用方缓冲。"
+  },
+  "grassland::graphics::Image::Extent": {
+    "contract": "",
+    "description": "返回物理像素尺寸 Extent2D。"
+  },
+  "grassland::graphics::Image::Format": {
+    "contract": "",
+    "description": "返回图像创建格式。"
+  },
+  "grassland::graphics::Image::UploadData": {
+    "contract": "区域在图像范围内；data 需按格式提供足够字节。const 修饰接口不意味着 GPU 内容不变。",
+    "description": "完整重载上传全图，区域重载上传 offset/extent 指定像素矩形。"
+  },
+  "grassland::graphics::Image::~Image": {
+    "contract": "",
+    "description": "虚析构释放后端图像；不隐含跨对象资源使用期保证。"
+  },
+  "grassland::graphics::ImageFormat": {
+    "contract": "",
+    "description": "跨后端图像格式编号，覆盖 UNORM、浮点、整数与 D32 深度；UNDEFINED=0 表示未指定。"
+  },
+  "grassland::graphics::InputType": {
+    "contract": "",
+    "description": "顶点属性的标量类别与 1–4 分量组合，均以 32 位 int/uint/float 表示。"
+  },
+  "grassland::graphics::IsDepthFormat": {
+    "contract": "",
+    "description": "当前只对 IMAGE_FORMAT_D32_SFLOAT 返回 true。"
+  },
+  "grassland::graphics::LoadImageFromFile": {
+    "contract": "不保证 HDR 输入保留浮点动态范围，因为 8 位路径先执行；CreateImage 返回值在此助手中未检查。",
+    "description": "使用 STB 先尝试 RGBA8 解码并上传，否则尝试 RGBA32F；两次均失败返回 -1。"
+  },
+  "grassland::graphics::MagnifyGesture": {
+    "contract": "Cancel 结束手势但不回滚此前已经发送的缩放量。",
+    "description": "一次增量缩放事件，scale=1 表示不变，x/y 为逻辑内容坐标且原点左上。"
+  },
+  "grassland::graphics::MagnifyPhase": {
+    "contract": "",
+    "description": "原生缩放手势阶段：Begin、Update、End、Cancel。"
+  },
+  "grassland::graphics::Offset2D": {
+    "contract": "",
+    "description": "整数二维偏移 x/y。"
+  },
+  "grassland::graphics::PhysicalDeviceProperties": {
+    "contract": "",
+    "description": "设备枚举结果，含名称、排序 score、完整 RT/geometry shader 支持；CUDA runtime 构建附匹配索引，默认 -1。"
+  },
+  "grassland::graphics::PixelSize": {
+    "contract": "",
+    "description": "返回支持格式每像素的字节数，未知/UNDEFINED 返回 0。"
+  },
+  "grassland::graphics::PrimitiveTopology": {
+    "contract": "",
+    "description": "三角形列表/条带、线列表/条带、点列表的顶点连接方式。"
+  },
+  "grassland::graphics::Program": {
+    "contract": "配置在 Finalize 前完成；绑定与执行由 CommandContext 进行。",
+    "description": "可配置顶点输入、资源布局和光栅状态的管线接口。"
+  },
+  "grassland::graphics::Program::AddInputAttribute": {
+    "contract": "在 Finalize 前调用，并与目标格式和顶点数据布局一致。",
+    "description": "为指定流 binding 追加类型及字节 offset 的顶点属性，位置由添加顺序决定。"
+  },
+  "grassland::graphics::Program::AddInputBinding": {
+    "contract": "在 Finalize 前调用，并与目标格式和顶点数据布局一致。",
+    "description": "追加顶点流字节 stride，input_per_instance 决定按顶点还是实例推进。"
+  },
+  "grassland::graphics::Program::AddResourceBinding": {
+    "contract": "着色器 register/space、CmdBindResources slot 及 count 必须与此布局一致。",
+    "description": "按调用顺序添加资源槽，指定 ResourceType 与数组 count。"
+  },
+  "grassland::graphics::Program::BindShader": {
+    "contract": "在 Finalize 前调用，并与目标格式和顶点数据布局一致。",
+    "description": "把已编译 shader 关联到指定图形阶段。"
+  },
+  "grassland::graphics::Program::Finalize": {
+    "contract": "具体编译或设备错误由后端返回/抛出；不要在使用中的程序上重新配置。",
+    "description": "完成布局和管线创建，使程序可用于录制；RT 还可指定 miss/hit/callable 的索引列表。"
+  },
+  "grassland::graphics::Program::SetBlendState": {
+    "contract": "在 Finalize 前调用，并与目标格式和顶点数据布局一致。",
+    "description": "设置指定颜色附件 target_id 的混合因子和运算。"
+  },
+  "grassland::graphics::Program::SetCullMode": {
+    "contract": "在 Finalize 前调用，并与目标格式和顶点数据布局一致。",
+    "description": "设置三角形剔除模式。"
+  },
+  "grassland::graphics::Program::~Program": {
+    "contract": "",
+    "description": "通过虚析构释放后端程序和对应管线资源。"
+  },
+  "grassland::graphics::RayTracingAABB": {
+    "contract": "",
+    "description": "程序化几何包围盒的最小/最大三轴浮点坐标。"
+  },
+  "grassland::graphics::RayTracingGeometryFlag": {
+    "contract": "",
+    "description": "BLAS 几何位标志：不透明及禁止重复 any-hit 调用。"
+  },
+  "grassland::graphics::RayTracingInstance": {
+    "contract": "",
+    "description": "3×4 变换、24 位 ID、8 位 mask、24 位 hit-group offset、8 位 flags 和借用 AS 指针。"
+  },
+  "grassland::graphics::RayTracingInstanceFlag": {
+    "contract": "",
+    "description": "实例位标志控制朝向剔除、朝向翻转和强制不透明/非不透明。"
+  },
+  "grassland::graphics::RayTracingProgram": {
+    "contract": "配置在 Finalize 前完成；绑定与执行由 CommandContext 进行。",
+    "description": "管理 raygen/miss/hit/callable shader 和 SBT 排列的 RT 管线接口。"
+  },
+  "grassland::graphics::RayTracingProgram::AddCallableShader": {
+    "contract": "shader 需属于兼容后端且支持对应阶段；SBT/实例偏移必须引用有效组。",
+    "description": "按顺序添加 callable shader。"
+  },
+  "grassland::graphics::RayTracingProgram::AddHitGroup": {
+    "contract": "shader 需属于兼容后端且支持对应阶段；SBT/实例偏移必须引用有效组。",
+    "description": "描述符重载添加 HitGroup；指针重载组装 closest/any/intersection/procedure 后委托。"
+  },
+  "grassland::graphics::RayTracingProgram::AddMissShader": {
+    "contract": "shader 需属于兼容后端且支持对应阶段；SBT/实例偏移必须引用有效组。",
+    "description": "按顺序添加 miss shader。"
+  },
+  "grassland::graphics::RayTracingProgram::AddRayGenShader": {
+    "contract": "shader 需属于兼容后端且支持对应阶段；SBT/实例偏移必须引用有效组。",
+    "description": "添加 raygen shader。"
+  },
+  "grassland::graphics::RayTracingProgram::AddResourceBinding": {
+    "contract": "着色器 register/space、CmdBindResources slot 及 count 必须与此布局一致。",
+    "description": "按调用顺序添加资源槽，指定 ResourceType 与数组 count。"
+  },
+  "grassland::graphics::RayTracingProgram::Finalize": {
+    "contract": "具体编译或设备错误由后端返回/抛出；不要在使用中的程序上重新配置。",
+    "description": "完成布局和管线创建，使程序可用于录制；RT 还可指定 miss/hit/callable 的索引列表。"
+  },
+  "grassland::graphics::RayTracingProgram::~RayTracingProgram": {
+    "contract": "",
+    "description": "通过虚析构释放后端程序和对应管线资源。"
+  },
+  "grassland::graphics::ResourceType": {
+    "contract": "",
+    "description": "程序资源槽类别，区分 uniform/storage/read-write buffer、只读/可写 image、sampler 和 acceleration structure。"
+  },
+  "grassland::graphics::STB_IMAGE_IMPLEMENTATION": {
+    "contract": "",
+    "description": "在 image.cpp 这一翻译单元生成 STB 图像加载实现。"
+  },
+  "grassland::graphics::Sampler": {
+    "contract": "",
+    "description": "只含虚析构的采样器基类；采样配置通过 SamplerInfo 在工厂创建时给定。"
+  },
+  "grassland::graphics::Sampler::~Sampler": {
+    "contract": "",
+    "description": "允许通过基类指针释放后端 sampler。"
+  },
+  "grassland::graphics::SamplerInfo": {
+    "contract": "",
+    "description": "分别描述 min/mag/mip 过滤和 U/V/W 寻址模式。"
+  },
+  "grassland::graphics::SamplerInfo::SamplerInfo": {
+    "contract": "",
+    "description": "默认全部线性过滤和 repeat；单过滤/单寻址重载补全其他默认值；完整重载逐项复制。"
+  },
+  "grassland::graphics::Scissor": {
+    "contract": "",
+    "description": "由 offset 和 extent 构成的整数裁剪矩形。"
+  },
+  "grassland::graphics::Shader": {
+    "contract": "",
+    "description": "后端着色器资源接口，公开其入口点名称。"
+  },
+  "grassland::graphics::Shader::EntryPoint": {
+    "contract": "",
+    "description": "返回用于此 shader 的入口函数名。"
+  },
+  "grassland::graphics::Shader::~Shader": {
+    "contract": "",
+    "description": "虚析构释放后端编译代码或 shader handle。"
+  },
+  "grassland::graphics::ShaderType": {
+    "contract": "",
+    "description": "图形阶段枚举；PIXEL 和 FRAGMENT 同值，另有 VERTEX 与 GEOMETRY。计算与 RT 走专用程序接口。"
+  },
+  "grassland::graphics::SupportBackendAPI": {
+    "contract": "",
+    "description": "根据编译宏报告该后端是否包含在此构建中，不执行设备或驱动探测。"
+  },
+  "grassland::graphics::Viewport": {
+    "contract": "",
+    "description": "浮点 x/y/width/height 以及 min_depth/max_depth，用于光栅视口变换。"
+  },
+  "grassland::graphics::Window": {
+    "contract": "窗口操作和事件轮询在主线程；窗口关闭后不能继续调用需要 GLFWwindow 的查询接口。",
+    "description": "拥有 GLFWwindow、输入事件分发器与可选 HDR 呈现中间资源的多态窗口。"
+  },
+  "grassland::graphics::Window::AlignHDRComposition": {
+    "contract": "未 Prepare 时抛 logic_error；输出仍归 Window 所有。PQ 分支使用 203 nits 内容参考白，窗口系统处理显示参考白映射。",
+    "description": "要求已 Prepare；上传白点/PQ 参数，绑定 compute 资源，以 8×8 线程组执行缩放或 PQ 转换，返回借用 aligned 图像。"
+  },
+  "grassland::graphics::Window::BeginImGuiFrame": {
+    "contract": "主线程调用；不要跨窗口混用回调与原生句柄。",
+    "description": "在此窗口 ImGui 上下文开始一帧，应用随后构建控件。"
+  },
+  "grassland::graphics::Window::CharEvent": {
+    "contract": "注册返回的 ID 用于注销；回调捕获对象的生命周期由调用方管理。",
+    "description": "返回窗口拥有的 EventManager 引用。事件参数：uint32 Unicode codepoint，不应当作按键编号。"
+  },
+  "grassland::graphics::Window::CloseWindow": {
+    "contract": "主线程调用；不要跨窗口混用回调与原生句柄。",
+    "description": "先释放 HDR 中间资源，在 Mac 移除手势监视器，再销毁 GLFWwindow 并将指针置空。"
+  },
+  "grassland::graphics::Window::CursorEnterEvent": {
+    "contract": "注册返回的 ID 用于注销；回调捕获对象的生命周期由调用方管理。",
+    "description": "返回窗口拥有的 EventManager 引用。事件参数：bool 表示进入或离开内容区。"
+  },
+  "grassland::graphics::Window::DisplayBrightnessEvent": {
+    "contract": "注册返回的 ID 用于注销；回调捕获对象的生命周期由调用方管理。",
+    "description": "返回窗口拥有的 EventManager 引用。事件参数：const DisplayBrightness&，仅状态改变时触发。"
+  },
+  "grassland::graphics::Window::DropEvent": {
+    "contract": "注册返回的 ID 用于注销；回调捕获对象的生命周期由调用方管理。",
+    "description": "返回窗口拥有的 EventManager 引用。事件参数：count 与 const char** 路径列表；路径数据使用期遵循 GLFW 回调规则，需要长期保留时立即复制。"
+  },
+  "grassland::graphics::Window::EndImGuiFrame": {
+    "contract": "主线程调用；不要跨窗口混用回调与原生句柄。",
+    "description": "结束本帧 ImGui 控件构建；实际提交/合成细节由后端提供。"
+  },
+  "grassland::graphics::Window::Focus": {
+    "contract": "主线程调用；不要跨窗口混用回调与原生句柄。",
+    "description": "请求 GLFW 将此窗口取得焦点，最终行为由窗口系统决定。"
+  },
+  "grassland::graphics::Window::FocusEvent": {
+    "contract": "注册返回的 ID 用于注销；回调捕获对象的生命周期由调用方管理。",
+    "description": "返回窗口拥有的 EventManager 引用。事件参数：bool 表示获得或失去焦点。"
+  },
+  "grassland::graphics::Window::FramebufferResizeEvent": {
+    "contract": "注册返回的 ID 用于注销；回调捕获对象的生命周期由调用方管理。",
+    "description": "返回窗口拥有的 EventManager 引用。事件参数：物理像素 width,height；纯 DPI 变化可只触发此事件。"
+  },
+  "grassland::graphics::Window::GLFWWindow": {
+    "contract": "主线程调用；不要跨窗口混用回调与原生句柄。",
+    "description": "返回借用的原生 GLFWwindow*；不得由外部再行销毁。"
+  },
+  "grassland::graphics::Window::GetCursorPosition": {
+    "contract": "主线程调用；不要跨窗口混用回调与原生句柄。",
+    "description": "返回内容区左上角原点的双精度逻辑指针坐标。"
+  },
+  "grassland::graphics::Window::GetDisplayBrightness": {
+    "contract": "主线程调用；不要跨窗口混用回调与原生句柄。",
+    "description": "若缓存超过 500ms 则刷新，否则返回缓存快照。"
+  },
+  "grassland::graphics::Window::GetFrameSize": {
+    "contract": "主线程调用；不要跨窗口混用回调与原生句柄。",
+    "description": "返回窗口装饰边框左/上/右/下的逻辑宽度。"
+  },
+  "grassland::graphics::Window::GetFramebufferSize": {
+    "contract": "主线程调用；不要跨窗口混用回调与原生句柄。",
+    "description": "返回物理帧缓冲像素宽高，高 DPI 下可大于逻辑尺寸，最小化时可能为零。"
+  },
+  "grassland::graphics::Window::GetHeight": {
+    "contract": "主线程调用；不要跨窗口混用回调与原生句柄。",
+    "description": "调用 GLFW 查询逻辑内容区高度。"
+  },
+  "grassland::graphics::Window::GetImGuiContext": {
+    "contract": "主线程调用；不要跨窗口混用回调与原生句柄。",
+    "description": "返回窗口拥有的 ImGuiContext 借用指针；未初始化时可能为空。"
+  },
+  "grassland::graphics::Window::GetMonitorWorkArea": {
+    "contract": "主线程调用；不要跨窗口混用回调与原生句柄。",
+    "description": "在可定位平台选与窗口交叠面积最大的屏幕工作区；Wayland 用主屏工作区作为尺寸提示；无屏幕时返回窗口自身范围。"
+  },
+  "grassland::graphics::Window::GetPosition": {
+    "contract": "主线程调用；不要跨窗口混用回调与原生句柄。",
+    "description": "查询屏幕逻辑坐标位置；Wayland 由于不提供全局位置而返回 (0,0)。"
+  },
+  "grassland::graphics::Window::GetSize": {
+    "contract": "主线程调用；不要跨窗口混用回调与原生句柄。",
+    "description": "返回逻辑内容区宽高，单位与指针坐标一致。"
+  },
+  "grassland::graphics::Window::GetTitle": {
+    "contract": "主线程调用；不要跨窗口混用回调与原生句柄。",
+    "description": "复制并返回 GLFW 当前标题。"
+  },
+  "grassland::graphics::Window::GetWidth": {
+    "contract": "主线程调用；不要跨窗口混用回调与原生句柄。",
+    "description": "调用 GLFW 查询逻辑内容区宽度。"
+  },
+  "grassland::graphics::Window::HDRBrightnessAlignment": {
+    "contract": "主线程调用；不要跨窗口混用回调与原生句柄。",
+    "description": "返回当前对齐策略开关。"
+  },
+  "grassland::graphics::Window::HDRPresentation": {
+    "contract": "",
+    "description": "窗口私有中间资源包，借用 Core 并拥有合成图、输出图、shader、compute program 和设置缓冲。"
+  },
+  "grassland::graphics::Window::HDRReferenceWhiteScale": {
+    "contract": "主线程调用；不要跨窗口混用回调与原生句柄。",
+    "description": "同时启用 HDR 和亮度对齐时返回查询的参考白点尺度，否则返回 1。"
+  },
+  "grassland::graphics::Window::InitImGui": {
+    "contract": "主线程调用；不要跨窗口混用回调与原生句柄。",
+    "description": "由后端创建并初始化窗口自己的 ImGui 上下文、字体与渲染资源。"
+  },
+  "grassland::graphics::Window::IsFocused": {
+    "contract": "主线程调用；不要跨窗口混用回调与原生句柄。",
+    "description": "查询 GLFW_FOCUSED 属性。"
+  },
+  "grassland::graphics::Window::IsHDR": {
+    "contract": "主线程调用；不要跨窗口混用回调与原生句柄。",
+    "description": "返回应用请求/生效的 enable_hdr_，不等于系统桌面的 HDR 设置。"
+  },
+  "grassland::graphics::Window::IsKeyDown": {
+    "contract": "主线程调用；不要跨窗口混用回调与原生句柄。",
+    "description": "查询 GLFW key 是否处于 PRESS 状态；不是字符输入事件。"
+  },
+  "grassland::graphics::Window::IsMouseButtonDown": {
+    "contract": "主线程调用；不要跨窗口混用回调与原生句柄。",
+    "description": "查询指定 GLFW 鼠标按钮的 PRESS 状态。"
+  },
+  "grassland::graphics::Window::KeyEvent": {
+    "contract": "注册返回的 ID 用于注销；回调捕获对象的生命周期由调用方管理。",
+    "description": "返回窗口拥有的 EventManager 引用。事件参数：key,scancode,action,mods；键位事件与字符输入分离。"
+  },
+  "grassland::graphics::Window::MagnifyEvent": {
+    "contract": "注册返回的 ID 用于注销；回调捕获对象的生命周期由调用方管理。",
+    "description": "返回窗口拥有的 EventManager 引用。事件参数：const MagnifyGesture&；不支持原生手势的平台不会合成事件。"
+  },
+  "grassland::graphics::Window::MouseButtonEvent": {
+    "contract": "注册返回的 ID 用于注销；回调捕获对象的生命周期由调用方管理。",
+    "description": "返回窗口拥有的 EventManager 引用。事件参数：button,action,mods,x,y；最后两项是事件发生时的逻辑指针坐标。"
+  },
+  "grassland::graphics::Window::MouseMoveEvent": {
+    "contract": "注册返回的 ID 用于注销；回调捕获对象的生命周期由调用方管理。",
+    "description": "返回窗口拥有的 EventManager 引用。事件参数：double x,y 逻辑内容坐标。"
+  },
+  "grassland::graphics::Window::NotifyResize": {
+    "contract": "主线程调用；不要跨窗口混用回调与原生句柄。",
+    "description": "仅当逻辑尺寸不同于上次通知值时发送 ResizeEvent，避免原生与程序化调整重复通知。"
+  },
+  "grassland::graphics::Window::PollEvents": {
+    "contract": "主线程调用；不要跨窗口混用回调与原生句柄。",
+    "description": "调用 glfwPollEvents 为所有窗口处理事件，回调在该事件线程中执行。"
+  },
+  "grassland::graphics::Window::PrepareHDRComposition": {
+    "contract": "后续调用必须用同一 Core，否则抛 invalid_argument；调整图像尺寸前 WaitGPU。窗口必须比相关命令执行期长。",
+    "description": "非 HDR 返回 nullptr；首次懒创建计算 shader/program/常量缓冲，按尺寸分配 composition/aligned RGBA16F 图像，返回借用 composition。"
+  },
+  "grassland::graphics::Window::QueryDisplayBrightness": {
+    "contract": "主线程调用；不要跨窗口混用回调与原生句柄。",
+    "description": "基类在 Windows 查询窗口所属屏幕、HDR 状态、SDR 白点与峰值/白点比；其他平台基类返回未知值，后端可覆盖。"
+  },
+  "grassland::graphics::Window::RefreshDisplayBrightness": {
+    "contract": "主线程调用；不要跨窗口混用回调与原生句柄。",
+    "description": "调用虚 QueryDisplayBrightness 更新缓存和时间戳，只有字段发生变化才发送显示亮度事件。"
+  },
+  "grassland::graphics::Window::RequestClose": {
+    "contract": "主线程调用；不要跨窗口混用回调与原生句柄。",
+    "description": "只设置 should-close 标志，不立即销毁窗口。"
+  },
+  "grassland::graphics::Window::Resize": {
+    "contract": "主线程调用；不要跨窗口混用回调与原生句柄。",
+    "description": "请求 GLFW 改变逻辑尺寸；Wayland 再调用 NotifyResize 补偿缺失的原生通知。"
+  },
+  "grassland::graphics::Window::ResizeEvent": {
+    "contract": "注册返回的 ID 用于注销；回调捕获对象的生命周期由调用方管理。",
+    "description": "返回窗口拥有的 EventManager 引用。事件参数：逻辑 width,height；按逻辑尺寸去重。"
+  },
+  "grassland::graphics::Window::ScrollEvent": {
+    "contract": "注册返回的 ID 用于注销；回调捕获对象的生命周期由调用方管理。",
+    "description": "返回窗口拥有的 EventManager 引用。事件参数：double xoffset,yoffset；Ctrl+滚动仍独立于原生 magnify。"
+  },
+  "grassland::graphics::Window::SetHDR": {
+    "contract": "主线程调用；不要跨窗口混用回调与原生句柄。",
+    "description": "通用实现设置应用呈现开关，刷新显示亮度并发送 resize 事件；捕获异常时恢复原开关并返回 -1。后端可能覆盖。"
+  },
+  "grassland::graphics::Window::SetHDRBrightnessAlignment": {
+    "contract": "主线程调用；不要跨窗口混用回调与原生句柄。",
+    "description": "设置是否让 HDR 参考白点与系统亮度对齐；不修改系统设置。"
+  },
+  "grassland::graphics::Window::SetPosition": {
+    "contract": "主线程调用；不要跨窗口混用回调与原生句柄。",
+    "description": "设置屏幕逻辑位置；Wayland 分支无操作。"
+  },
+  "grassland::graphics::Window::SetTitle": {
+    "contract": "主线程调用；不要跨窗口混用回调与原生句柄。",
+    "description": "把 UTF-8 标题传给 GLFW。"
+  },
+  "grassland::graphics::Window::ShouldClose": {
+    "contract": "主线程调用；不要跨窗口混用回调与原生句柄。",
+    "description": "查询 GLFW should-close 标志，调用前要求窗口仍存在。"
+  },
+  "grassland::graphics::Window::SupportsMagnifyGestures": {
+    "contract": "主线程调用；不要跨窗口混用回调与原生句柄。",
+    "description": "通过是否安装原生监视器报告平台手势接口支持；不判断用户是否连接了触控板。"
+  },
+  "grassland::graphics::Window::TerminateImGui": {
+    "contract": "主线程调用；不要跨窗口混用回调与原生句柄。",
+    "description": "由后端结束并释放窗口的 ImGui 资源。"
+  },
+  "grassland::graphics::Window::UsesPQOutput": {
+    "contract": "",
+    "description": "后端呈现编码查询，基类 false；不由应用自由切换。"
+  },
+  "grassland::graphics::Window::Window": {
+    "contract": "主线程调用；不要跨窗口混用回调与原生句柄。",
+    "description": "初始化 GLFW，设置无 API 窗口提示，创建窗口、安装平台手势并连接全部输入回调；失败抛 runtime_error。"
+  },
+  "grassland::graphics::Window::~Window": {
+    "contract": "主线程调用；不要跨窗口混用回调与原生句柄。",
+    "description": "调用 CloseWindow 释放通用窗口资源，后端派生类另负责其 swapchain/ImGui 资源。"
+  },
+  "grassland::graphics::detail::DispatchMagnifyEvent": {
+    "contract": "取消只发 scale=1；原事件仍返回给系统继续处理。",
+    "description": "过滤非 magnify 和其他 NSWindow 事件，换算 Cocoa 点为左上原点逻辑坐标，把阶段和增量尺度发送给 MagnifyEvent。"
+  },
+  "grassland::graphics::detail::InstallMagnifyEvents": {
+    "contract": "必须在 GLFW window 销毁前配对 RemoveMagnifyEvents。",
+    "description": "安装 Cocoa 本地 NSEventMaskMagnify monitor 并 retain，返回由 Window 持有的不透明指针。"
+  },
+  "grassland::graphics::detail::RemoveMagnifyEvents": {
+    "contract": "",
+    "description": "非空时移除 Cocoa monitor 并 release；空指针无操作。"
+  },
+  "grassland::graphics::kEnableDebug": {
+    "contract": "",
+    "description": "NDEBUG 未定义时为 true，Release 常见构建中为 false；作为 Core::Settings 调试选项默认值。"
+  },
+  "grassland::operator*": {
+    "contract": "张量乘法维度需在编译期匹配；流输出是诊断文本。",
+    "description": "HessianTensor 重载：A*H 对输出分片线性组合，H*A 对每片执行 AᵀHᵢA，scalar*H 将各片缩放。"
+  },
   "grassland::operator<<": {
-    "contract": "这是自由函数，通过友元读取私有 search_paths_。",
-    "description": "把 FileProbe 的搜索前缀逐行输出到给定 ostream，返回该流。"
+    "contract": "这是自由函数，通过友元读取私有 search_paths_。 张量乘法维度需在编译期匹配；流输出是诊断文本。",
+    "description": "把 FileProbe 的搜索前缀逐行输出到给定 ostream，返回该流。 HessianTensor 重载：按输出分量依次向 ostream 写入矩阵并换行，返回该流。"
   },
   "practium::Core": {
     "contract": "",

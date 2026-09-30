@@ -1,4 +1,21 @@
 {
+  "code": {
+    "contracts": [
+      "C++ 标准为 17；通过 CMake target 传递 includes 和依赖，避免手工猜测链接顺序。",
+      "long_march.h 导入 grassland/snowberg 名称并保留其他模块别名；新增公共符号应避免跨模块重名歧义。",
+      "所有权不是统一一种形式：graphics 工厂用 double_ptr，Sparkium 多为借用关系+调用方拥有，visualizer 使用 shared_ptr/weak_ptr，具体以对象页为准。",
+      "可选 CUDA、Python 和各图形后端受构建宏控制；文档列出某声明不保证当前构建启用。",
+      "本参考范围覆盖 code/ 的每个受管文件，示例和测试通过相应对象/文件页关联。"
+    ],
+    "flow": [
+      "底层 Grassland 提供图形资源、数学/物理计算核和工具。",
+      "Snowberg 的绘制、GUI、可视化与求解组件复用基础能力；Sparkium 组织场景和渲染管线。",
+      "Contradium 提供当前 PBD 求解路径；Practium 组合其仿真状态与 Sparkium 可见实体。",
+      "应用可包含 long_march.h 使用聚合入口，也可只包含需要的子模块头。"
+    ],
+    "summary": "LongMarchCommon 聚合 Grassland、Snowberg、Sparkium、Contradium 和 Practium；LongMarch 是向应用暴露的 INTERFACE CMake 目标。Python 扩展单独链接该聚合库。",
+    "title": "LongMarch · 总体架构"
+  },
   "code/contradium": {
     "contracts": [
       "graphics::Core 是借用指针，拥有者必须活得更久。",
@@ -39,6 +56,106 @@
     ],
     "summary": "以网格 SDF 为接触查询，使用预测位姿与位置修正实现小规模刚体仿真。",
     "title": "刚体位置约束求解"
+  },
+  "code/grassland": {
+    "contracts": [
+      "可直接使用子模块类型；聚合 grassland.h 会引入较多依赖。",
+      "__CUDACC__ 控制 host/device 函数标记，LONGMARCH_CUDA_RUNTIME 控制主机侧 CUDA 互操作声明，二者含义不同。",
+      "几何/数值 API 对输入维度、有效网格与奇异点的约束见各文件，不假定统一异常检查。"
+    ],
+    "flow": [
+      "util 提供平台/内存/事件基础；math 和 physics 提供通用计算。",
+      "bvh 管理空间层次树；graphics 将抽象资源分派到 Metal/Vulkan/D3D12。",
+      "上层模块依赖公共声明，后端 helper 处理原生 API 细节。"
+    ],
+    "summary": "提供 graphics、math、physics、bvh、util，以及 ImGui 后端构建适配；Grassland 目标 PUBLIC 链接各子库。",
+    "title": "Grassland · 基础层"
+  },
+  "code/grassland/bvh": {
+    "contracts": [
+      "输入实例数必须至少为 1；空树没有可调用的遍历入口。",
+      "BVHRef 不拥有节点；宿主或设备存储必须存活且不能在查询期间重建。",
+      "查询几何、命中结果和提前裁剪语义由回调定义，结构本身不假定射线查询。"
+    ],
+    "flow": [
+      "BVHHost 从 AABB 与实例编号构建二叉树，按循环坐标轴排序并平分。",
+      "内部节点合并子节点包围盒，失败链接编码跳过子树的路径。",
+      "BVHRef 借用节点数组，以调用方的包围盒与实例回调执行查询。"
+    ],
+    "summary": "以 CPU 构建、连续节点数组和无栈遍历组成的通用 BVH；CUDA 包装只负责把构建结果复制到设备。",
+    "title": "包围体层次结构"
+  },
+  "code/grassland/graphics": {
+    "contracts": [
+      "输出工厂通常以 0 表示成功，非零表示失败；编译/设备错误也可能抛 C++ 异常，不能只检查一种通道。",
+      "double_ptr 接管新建对象的方式由调用方槽类型决定；传给命令的裸指针通常是借用，同一批命令的资源必须属于同一 Core。",
+      "Program 的资源声明顺序与 CmdBindResources slot、着色器寄存器/space 必须一致；资源种类和数组长度必须匹配。",
+      "命令提交不等价于 GPU 完成；不要在完成之前销毁或覆盖 GPU 正在读取的资源。",
+      "Window、GLFW 事件和显示亮度查询在主线程调用；一般资源和 EventManager 没有全局并发保护。",
+      "RT pipeline 和 ray query 独立查询；显式硬件功能须检查支持，不将后端存在视为全部特性可用。"
+    ],
+    "flow": [
+      "CreateCore 选择已编译后端；枚举物理设备后 InitializeLogicalDevice。",
+      "通过 double_ptr 输出缓冲、图像、着色器、程序及窗口。先声明 Program 输入/资源布局、绑定 shader，再 Finalize。",
+      "创建 CommandContext，记录渲染/计算/复制命令并 SubmitCommandContext；需要读取结果或释放在用资源时 WaitGPU。",
+      "窗口事件在主线程 PollEvents 中处理，逻辑尺寸和像素尺寸分别通知。"
+    ],
+    "summary": "Core 提供设备与资源工厂，Program 描述可执行管线，CommandContext 记录命令，Window 处理窗口输入与呈现。三类后端通过派生对象实现同一协议。",
+    "title": "统一图形接口"
+  },
+  "code/grassland/imgui": {
+    "contracts": [
+      "本目录不包含自有控件实现，也不是 Snowberg 新 GUI。",
+      "保留库层 ImGui 支持供 Window 和 Python 兼容接口使用；仅 demo 的 UI 迁移不删除外部依赖。"
+    ],
+    "flow": [
+      "始终加入 imgui_impl_glfw.cpp。",
+      "按构建选项加入 Vulkan、DX12 或 Metal 实现；Metal 使用 IMGUI_IMPL_METAL_CPP 并链接系统框架。"
+    ],
+    "summary": "该目录只有 CMakeLists.txt，组合外部 ImGui 的 GLFW 与启用图形后端的适配源码。",
+    "title": "ImGui 后端构建适配"
+  },
+  "code/grassland/math": {
+    "contracts": [
+      "数学模板以 float/double 为主要支持类型；若定义在 cpp 中，仅显式实例化的类型可直接链接。",
+      "距离返回欧氏距离，射线命中返回参数 t；方向未归一化时 t 不是世界长度。",
+      "退化几何、零分母、索引有效性多数由调用者保证；不能将这些算法当作任意坏输入的鲁棒几何库。",
+      "CUDA 开关把本目录 cpp 作为 CUDA 编译；OBJ 的 cxx 保持 C++。"
+    ],
+    "flow": [
+      "轻量几何与多项式函数供 BVH、物理微分核和渲染数据准备复用。",
+      "Mesh 拥有分离属性数组；OBJ、法线、切线和碰撞网格处理会重建这些数组。",
+      "MeshSDF 预计算边和顶点符号，再以穷举最近特征提供距离及导数；它没有使用 BVH 加速。"
+    ],
+    "summary": "以 Eigen 定长矩阵为核心，提供几何值类型、距离和相交查询、连续碰撞、网格处理及网格 SDF。",
+    "title": "几何与数值基础"
+  },
+  "code/grassland/physics": {
+    "contracts": [
+      "输入矩阵按 Eigen 列主序展开为导数坐标；一个顶点的 xyz 连续排列。",
+      "调用方负责有效输入、材料参数与静止形态矩阵，并自行乘积分体积/面积、装配全局系统。"
+    ],
+    "flow": [
+      "physics_util 提供叉乘矩阵，diff_kernel 用一致的值/一阶/二阶接口组合局部函数。",
+      "FEM 将顶点位置转换为形变梯度，弹性模型计算能量密度，再用链式法则回传顶点导数。"
+    ],
+    "summary": "汇总可微几何、有限元形变梯度、弹性能和二面角；本层提供局部数学核，不负责场景管理或时间积分。",
+    "title": "物理数学基础"
+  },
+  "code/grassland/physics/diff_kernel": {
+    "contracts": [
+      "每个核定义 Scalar/InputType/OutputType、ValidInput、operator()、Jacobian、Hessian；标量输出仍是 1×1 矩阵。",
+      "ValidInput 不是自动执行的防护；部分实现始终返回 true，即便公式存在退化奇点。",
+      "HessianTensor.m[i] 为第 i 个输出关于所有输入坐标的二阶矩阵；H*A 表示 AᵀHᵢA。",
+      "cpp 中的模板提供 float/double 显式实例化，CUDA 开关使这些 cpp 以 CUDA 编译。"
+    ],
+    "flow": [
+      "基础核提供行列式、范数、归一化、叉积、点积与 atan2。",
+      "几何 SDF、FEM 和二面角复用基础核，也提供直接解析实现与局部 Hessian 接口。",
+      "Neo-Hookean 模型覆盖体与膜、对数与简化能量，并组合顶点到形变梯度的线性映射。"
+    ],
+    "summary": "使用定长函数对象表达值、Jacobian 和按输出分量存储的 Hessian；Compose 显式实现二阶链式法则。",
+    "title": "可微物理核"
   },
   "code/grassland/util": {
     "contracts": [
@@ -122,5 +239,36 @@
     ],
     "summary": "Model 的两个网格接口允许降低碰撞复杂度而保留高质量视觉网格。ModelMesh 是当前具体实现。",
     "title": "视觉/碰撞模型"
+  },
+  "code/snowberg": {
+    "contracts": [
+      "模块内几种 Core/Scene 分别属于 draw、visualizer、solver 命名空间，不要混用。",
+      "GUI 的 Begin/End 帧与面板需配对，合成输出依赖图像和命令的使用期。",
+      "当前有些旧 GUI 源文件已不在新公共 gui.h 中聚合；文件文档会明确构建/公开范围。",
+      "CUDA 求解并没有同名 Metal 实现，按条件编译使用。"
+    ],
+    "flow": [
+      "draw 负责模型/文字绘制，gui::Context 组织控件并进行玻璃合成。",
+      "gui::WorldPanel 将控件图像放入世界空间；surface 为 2048/GoL 保留自定义绘制和交互。",
+      "visualizer 为可扩展可视化提供场景与多通道渲染阶段；solver 在 CUDA 路径管理粒子和约束。"
+    ],
+    "summary": "组织 draw、gui、solver、visualizer 四类应用设施；新的 GUI 与保留原外观的 surface 基础设施同属此模块。",
+    "title": "Snowberg · 应用基础组件"
+  },
+  "code/sparkium": {
+    "contracts": [
+      "公共对象和管线适配对象分层；不要把同名 raytracing::Scene 与 sparkium::Scene 混为一个所有权对象。",
+      "Scene、Entity 之间多为裸指针注册，必须按具体对象协议保留资源。",
+      "Shader Graph、Principled 等效果在不同管线的支持范围由实现决定。",
+      "变更场景或采样设置后需要使累积和管线缓存保持一致，具体失效/重置接口见对象说明。"
+    ],
+    "flow": [
+      "应用创建公共对象并注册进 Scene，传 Camera 和 Film 给 Core::Render。",
+      "Core 解析显式或 auto 管线，分派到 raster 或 raytracing；后者支持完整 RT、ray query 或 compute 软件 BVH。",
+      "管线构建/更新几何、材质、灯光与 GPU 资源，渲染结果写入 Film。",
+      "Film::Develop 应用曝光/显示变换到目标图像，Window 再完成实际呈现。"
+    ],
+    "summary": "公共 Core/Scene/Camera/Film/Geometry/Material/Entity 描述场景；raster 和 raytracing 子系统缓存各自的管线表示，Slang 着色器执行采样与着色。",
+    "title": "Sparkium · 多管线渲染"
   }
 }

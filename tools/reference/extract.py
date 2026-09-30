@@ -94,12 +94,13 @@ def extract(path: Path, root: Path) -> dict:
             if declarator:
                 function = next((n for n in walk(declarator) if n.type in {'function_declarator', 'operator_cast'}), None)
             # Parameters are not top-level callable declarations.
-        if is_type or function or kind in {'alias_declaration', 'type_definition', 'preproc_def', 'preproc_function_def'}:
+        is_variable = kind == 'declaration' and not function and node.child_by_field_name('declarator') is not None
+        if is_type or function or is_variable or kind in {'alias_declaration', 'type_definition', 'preproc_def', 'preproc_function_def'}:
             name = (text(node.child_by_field_name('name'), data) if is_type else
                     declarator_name(function.child_by_field_name('declarator'), data) if function else
                     text(node.child_by_field_name('name'), data) or declarator_name(node.child_by_field_name('declarator'), data))
             if function and function.type == 'operator_cast':
-                cast = text(function, data)
+                cast = text(node.child_by_field_name('declarator'), data)
                 name = cast.split('(')[0].strip()
             name = name or '(anonymous)'
             body = node.child_by_field_name('body')
@@ -112,6 +113,11 @@ def extract(path: Path, root: Path) -> dict:
                 'comment': preceding_comment(node, data), 'members': [], 'parameters': [],
                 'calls': [], 'returns': [], 'throws': [],
             }
+            if kind == 'type_definition':
+                enum = next((child for child in node.named_children if child.type == 'enum_specifier'), None)
+                enum_body = enum.child_by_field_name('body') if enum else None
+                if enum_body:
+                    obj['members'] = [{'declaration': text(child, data), 'access': 'public', 'line': child.start_point.row + 1} for child in enum_body.named_children if child.type == 'enumerator']
             if function:
                 params = function.child_by_field_name('parameters')
                 obj['parameters'] = [text(n, data) for n in params.named_children] if params else []
