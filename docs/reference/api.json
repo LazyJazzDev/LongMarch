@@ -17,7 +17,11 @@
   },
   "GLFW_EXPOSE_NATIVE_WIN32": {
     "contract": "",
-    "description": "使 GLFW native 头暴露 Win32 window handle 接口。"
+    "description": "启用GLFW Win32原生句柄声明。"
+  },
+  "GLFW_INCLUDE_VULKAN": {
+    "contract": "",
+    "description": "让GLFW包含Vulkan声明。"
   },
   "GUI_BUTTON_H": {
     "contract": "不是 GUI 类型或功能开关。",
@@ -49,7 +53,7 @@
   },
   "NOMINMAX": {
     "contract": "",
-    "description": "阻止 Windows 头定义 min/max 宏，避免干扰 C++ 算法名称。"
+    "description": "阻止Windows头定义min/max宏，避免污染标准库调用。"
   },
   "NSEvent": {
     "contract": "",
@@ -71,9 +75,53 @@
     "contract": "应只在预期实现单元定义，避免重复定义链接错误。",
     "description": "在本编译单元启用 TinyObjLoader 的实现。"
   },
+  "VMA_IMPLEMENTATION": {
+    "contract": "",
+    "description": "在唯一cpp中实例化VMA实现。"
+  },
+  "VMA_VULKAN_VERSION": {
+    "contract": "",
+    "description": "将VMA编译版本设为Vulkan1.2。"
+  },
   "WIN32_LEAN_AND_MEAN": {
     "contract": "",
     "description": "在 _WIN64 分支缩减 Windows 头包含范围。"
+  },
+  "code/grassland/graphics/backend/vulkan/helper/device_procedures.cpp#grassland::graphics::backend::vulkan::(anonymous)::GetProcedure": {
+    "contract": "",
+    "description": "用vkGetDeviceProcAddr取得函数，缺失抛异常。"
+  },
+  "code/grassland/graphics/backend/vulkan/helper/device_procedures.cpp#grassland::graphics::backend::vulkan::GET_PROCEDURE": {
+    "contract": "",
+    "description": "按PFN类型将device函数写入out成员。"
+  },
+  "code/grassland/graphics/backend/vulkan/helper/instance_procedures.cpp#grassland::graphics::backend::vulkan::(anonymous)::GetProcedure": {
+    "contract": "",
+    "description": "用vkGetInstanceProcAddr取得函数，缺失只警告。"
+  },
+  "code/grassland/graphics/backend/vulkan/helper/instance_procedures.cpp#grassland::graphics::backend::vulkan::GET_PROCEDURE": {
+    "contract": "",
+    "description": "按PFN类型将instance函数写入out成员。"
+  },
+  "code/grassland/graphics/shaders/d3d12/blit.slang#PSInput": {
+    "contract": "",
+    "description": "VS到PS的clip position及UV。"
+  },
+  "code/grassland/graphics/shaders/d3d12/blit.slang#PSMain": {
+    "contract": "",
+    "description": "以插值UV采样并原样输出RGBA。"
+  },
+  "code/grassland/graphics/shaders/d3d12/blit.slang#VSMain": {
+    "contract": "",
+    "description": "由0..5顶点ID查表生成两个三角形，UV从clip坐标映射到0..1并翻y。"
+  },
+  "code/grassland/graphics/shaders/d3d12/blit.slang#src_sampler": {
+    "contract": "",
+    "description": "s0采样器。"
+  },
+  "code/grassland/graphics/shaders/d3d12/blit.slang#src_texture": {
+    "contract": "",
+    "description": "t0输入图像。"
   },
   "code/snowberg/draw/shaders/draw.frag#frag_color": {
     "contract": "由管线后续混合到颜色附件。",
@@ -5983,9 +6031,1173 @@
     "contract": "零extent允许，由传输函数直接返回。",
     "description": "检查非负区域起点与64位相加后的终点不越界。"
   },
+  "grassland::graphics::backend::(anonymous)::CopyNativeBuffer": {
+    "contract": "",
+    "description": "仅将目标从声明original state转COPY_DEST，复制后恢复；源状态由调用方保证。"
+  },
+  "grassland::graphics::backend::(anonymous)::CreateCommandRecord": {
+    "contract": "",
+    "description": "创建allocator/list并立即Close初始list；失败抛异常。"
+  },
+  "grassland::graphics::backend::(anonymous)::MapBuffer": {
+    "contract": "",
+    "description": "Map资源并返回借用CPU地址；失败抛异常，调用方负责Unmap。"
+  },
+  "grassland::graphics::backend::(anonymous)::ResetCommandRecord": {
+    "contract": "",
+    "description": "依次Reset allocator与list；调用方确保此前GPU使用结束。"
+  },
+  "grassland::graphics::backend::AddressModeToD3D12AddressMode": {
+    "contract": "未知WRAP。",
+    "description": "映射repeat/mirror/edge/border。"
+  },
+  "grassland::graphics::backend::BlendFactorToD3D12Blend": {
+    "contract": "未知ZERO。",
+    "description": "映射统一混合因子。"
+  },
+  "grassland::graphics::backend::BlendOpToD3D12BlendOp": {
+    "contract": "未知ADD。",
+    "description": "映射五种混合操作。"
+  },
+  "grassland::graphics::backend::BlendStateToD3D12RenderTargetBlendDesc": {
+    "contract": "非法枚举走转换默认值。",
+    "description": "转换RGB/alpha混合，RGBA全写，LogicOp关闭。"
+  },
+  "grassland::graphics::backend::BlitPipeline": {
+    "contract": "成员字段及具体操作见本页；借用对象须保持有效。",
+    "description": "内置呈现shader和按输出格式缓存的PSO。"
+  },
+  "grassland::graphics::backend::BlitPipeline::GetPipelineState": {
+    "contract": "失败抛异常。",
+    "description": "按DXGI输出格式懒创建并缓存无深度/剔除的呈现PSO。"
+  },
+  "grassland::graphics::backend::BlitPipeline::Initialize": {
+    "contract": "借用device。",
+    "description": "编译内置VSMain/PSMain，建立SRV table及线性静态sampler。"
+  },
   "grassland::graphics::backend::CompileMetalStage": {
     "contract": "shader须非空blob；最多16set；fastMath开启，原生编译错误抛异常。",
     "description": "SPIRV-Cross生成MSL3.0 argument-buffer代码并编译MTL::Function，收集实际使用set的encoder及compute线程组尺寸。"
+  },
+  "grassland::graphics::backend::CreateNativeBuffer": {
+    "contract": "简写默认state取heap默认值，DEFAULT增加UAV flag；失败抛异常。",
+    "description": "创建按256字节对齐的Buffer。"
+  },
+  "grassland::graphics::backend::CreateNativeDescriptorHeap": {
+    "contract": "RTV/DSV为CPUonly；失败抛异常。",
+    "description": "创建至少1槽heap，CBV/SRV/UAV和SAMPLER启用shader visibility。"
+  },
+  "grassland::graphics::backend::CreateNativeImage": {
+    "contract": "初始GENERIC_READ；失败抛异常。",
+    "description": "创建单mip Tex2D并按深度选择flags/clear值。"
+  },
+  "grassland::graphics::backend::CreateNativeRootSignature": {
+    "contract": "序列化错误blob写日志，失败抛异常。",
+    "description": "优先1.1，设备不支持则降1.0，序列化并创建root signature。"
+  },
+  "grassland::graphics::backend::CreateNativeSwapChain": {
+    "contract": "尺寸来自GetClientRect，原生失败抛异常。",
+    "description": "为HWND创建FLIP_DISCARD交换链，可尝试HDR线性色彩空间。"
+  },
+  "grassland::graphics::backend::CullModeToD3D12CullMode": {
+    "contract": "未知NONE。",
+    "description": "映射NONE/BACK/FRONT。"
+  },
+  "grassland::graphics::backend::D3D12AccelerationStructure": {
+    "contract": "成员字段及具体操作见本页；借用对象须保持有效。",
+    "description": "拥有原生AS资源并借用Core。"
+  },
+  "grassland::graphics::backend::D3D12AccelerationStructure::D3D12AccelerationStructure": {
+    "contract": "Core仍需InitializeLogicalDevice；Program仍需Finalize；Range/Binding不取得资源所有权。",
+    "description": "初始化D3D12AccelerationStructure的本页状态及资源。"
+  },
+  "grassland::graphics::backend::D3D12AccelerationStructure::Handle": {
+    "contract": "更新可能替换。",
+    "description": "返回当前原生AS资源。"
+  },
+  "grassland::graphics::backend::D3D12AccelerationStructure::UpdateInstances": {
+    "contract": "只对TLAS调用；未验证BLAS输入类型/变换。",
+    "description": "上传实例列表；数量或容量改变则重建，否则原址update，同步完成。"
+  },
+  "grassland::graphics::backend::D3D12Buffer": {
+    "contract": "成员字段及具体操作见本页；借用对象须保持有效。",
+    "description": "区分当前帧GPU Buffer和即时Buffer的抽象基类。"
+  },
+  "grassland::graphics::backend::D3D12Buffer::Buffer": {
+    "contract": "借用句柄。",
+    "description": "取得当前帧GPU资源的纯虚接口。"
+  },
+  "grassland::graphics::backend::D3D12Buffer::InstantBuffer": {
+    "contract": "动态buffer返回staging。",
+    "description": "取得即时资源的纯虚接口。"
+  },
+  "grassland::graphics::backend::D3D12Buffer::~D3D12Buffer": {
+    "contract": "不承诺等待GPU完成。",
+    "description": "虚析构，释放本对象拥有的成员资源。"
+  },
+  "grassland::graphics::backend::D3D12BufferRange": {
+    "contract": "成员字段及具体操作见本页；借用对象须保持有效。",
+    "description": "Buffer借用指针及字节offset/size。"
+  },
+  "grassland::graphics::backend::D3D12BufferRange::D3D12BufferRange": {
+    "contract": "Core仍需InitializeLogicalDevice；Program仍需Finalize；Range/Binding不取得资源所有权。",
+    "description": "初始化D3D12BufferRange的本页状态及资源。"
+  },
+  "grassland::graphics::backend::D3D12CUDABuffer": {
+    "contract": "成员字段及具体操作见本页；借用对象须保持有效。",
+    "description": "D3D12/CUDA共享默认heap Buffer。"
+  },
+  "grassland::graphics::backend::D3D12CUDABuffer::Buffer": {
+    "contract": "Dynamic随CurrentFrame切换。",
+    "description": "返回当前使用的GPU Buffer借用指针。"
+  },
+  "grassland::graphics::backend::D3D12CUDABuffer::D3D12CUDABuffer": {
+    "contract": "Core仍需InitializeLogicalDevice；Program仍需Finalize；Range/Binding不取得资源所有权。",
+    "description": "初始化D3D12CUDABuffer的本页状态及资源。"
+  },
+  "grassland::graphics::backend::D3D12CUDABuffer::DownloadData": {
+    "contract": "Dynamic读CPU staging而非GPU结果；CUDA状态限制见文件说明。",
+    "description": "复制指定范围到host。"
+  },
+  "grassland::graphics::backend::D3D12CUDABuffer::GetCUDAMemoryPointer": {
+    "contract": "返回裸device pointer；没有缓存映射/检查CUDA错误。",
+    "description": "调用cudaExternalMemoryGetMappedBuffer映射全原生宽度。"
+  },
+  "grassland::graphics::backend::D3D12CUDABuffer::InstantBuffer": {
+    "contract": "Dynamic返回CPU upload staging，其余同Buffer。",
+    "description": "返回即时可用于AS构建的Buffer。"
+  },
+  "grassland::graphics::backend::D3D12CUDABuffer::Resize": {
+    "contract": "Static/CUDA先WaitGPU；Dynamic只重建staging。",
+    "description": "重新分配并复制旧/新尺寸最小前缀。"
+  },
+  "grassland::graphics::backend::D3D12CUDABuffer::Size": {
+    "contract": "不等于原始请求尺寸。",
+    "description": "返回原生Buffer宽度，已按256字节对齐。"
+  },
+  "grassland::graphics::backend::D3D12CUDABuffer::Type": {
+    "contract": "CUDA类仍报告STATIC。",
+    "description": "Dynamic返回DYNAMIC，其余返回STATIC。"
+  },
+  "grassland::graphics::backend::D3D12CUDABuffer::UploadData": {
+    "contract": "Static/CUDA等待并经staging提交；Dynamic仅Map CPU staging；不检查范围。",
+    "description": "从host复制指定字节范围。"
+  },
+  "grassland::graphics::backend::D3D12CUDABuffer::~D3D12CUDABuffer": {
+    "contract": "不隐式WaitGPU，调用方先同步。",
+    "description": "释放拥有的原生资源；CUDA另destroy external memory。"
+  },
+  "grassland::graphics::backend::D3D12CmdBeginRendering": {
+    "contract": "延迟命令持有借用资源，必须活到提交与GPU完成。",
+    "description": "将最多8个颜色附件及可选深度附件转为写状态并OMSetRenderTargets。"
+  },
+  "grassland::graphics::backend::D3D12CmdBeginRendering::CompileCommand": {
+    "contract": "原生范围、绑定和资源生命周期由调用方保证。",
+    "description": "将最多8个颜色附件及可选深度附件转为写状态并OMSetRenderTargets。"
+  },
+  "grassland::graphics::backend::D3D12CmdBeginRendering::D3D12CmdBeginRendering": {
+    "contract": "不立即执行；具体编译行为见CompileCommand。",
+    "description": "保存该命令的值参数和借用资源。"
+  },
+  "grassland::graphics::backend::D3D12CmdBindComputeProgram": {
+    "contract": "延迟命令持有借用资源，必须活到提交与GPU完成。",
+    "description": "设置计算root signature和PSO。"
+  },
+  "grassland::graphics::backend::D3D12CmdBindComputeProgram::CompileCommand": {
+    "contract": "原生范围、绑定和资源生命周期由调用方保证。",
+    "description": "设置计算root signature和PSO。"
+  },
+  "grassland::graphics::backend::D3D12CmdBindComputeProgram::D3D12CmdBindComputeProgram": {
+    "contract": "不立即执行；具体编译行为见CompileCommand。",
+    "description": "保存该命令的值参数和借用资源。"
+  },
+  "grassland::graphics::backend::D3D12CmdBindIndexBuffer": {
+    "contract": "延迟命令持有借用资源，必须活到提交与GPU完成。",
+    "description": "按uint32索引建立view并转为vertex/index读取状态。"
+  },
+  "grassland::graphics::backend::D3D12CmdBindIndexBuffer::CompileCommand": {
+    "contract": "原生范围、绑定和资源生命周期由调用方保证。",
+    "description": "按uint32索引建立view并转为vertex/index读取状态。"
+  },
+  "grassland::graphics::backend::D3D12CmdBindIndexBuffer::D3D12CmdBindIndexBuffer": {
+    "contract": "不立即执行；具体编译行为见CompileCommand。",
+    "description": "保存该命令的值参数和借用资源。"
+  },
+  "grassland::graphics::backend::D3D12CmdBindProgram": {
+    "contract": "延迟命令持有借用资源，必须活到提交与GPU完成。",
+    "description": "设置图形root signature和PSO。"
+  },
+  "grassland::graphics::backend::D3D12CmdBindProgram::CompileCommand": {
+    "contract": "原生范围、绑定和资源生命周期由调用方保证。",
+    "description": "设置图形root signature和PSO。"
+  },
+  "grassland::graphics::backend::D3D12CmdBindProgram::D3D12CmdBindProgram": {
+    "contract": "不立即执行；具体编译行为见CompileCommand。",
+    "description": "保存该命令的值参数和借用资源。"
+  },
+  "grassland::graphics::backend::D3D12CmdBindRayTracingProgram": {
+    "contract": "延迟命令持有借用资源，必须活到提交与GPU完成。",
+    "description": "设置计算root signature并QueryInterface list4设置DXR state object；接口不支持时不设置。"
+  },
+  "grassland::graphics::backend::D3D12CmdBindRayTracingProgram::CompileCommand": {
+    "contract": "原生范围、绑定和资源生命周期由调用方保证。",
+    "description": "设置计算root signature并QueryInterface list4设置DXR state object；接口不支持时不设置。"
+  },
+  "grassland::graphics::backend::D3D12CmdBindRayTracingProgram::D3D12CmdBindRayTracingProgram": {
+    "contract": "不立即执行；具体编译行为见CompileCommand。",
+    "description": "保存该命令的值参数和借用资源。"
+  },
+  "grassland::graphics::backend::D3D12CmdBindResourceAccelerationStructure": {
+    "contract": "延迟命令持有借用资源，必须活到提交与GPU完成。",
+    "description": "写单个AS SRV并设置root table，无普通资源状态转换。"
+  },
+  "grassland::graphics::backend::D3D12CmdBindResourceAccelerationStructure::CompileCommand": {
+    "contract": "原生范围、绑定和资源生命周期由调用方保证。",
+    "description": "写单个AS SRV并设置root table，无普通资源状态转换。"
+  },
+  "grassland::graphics::backend::D3D12CmdBindResourceAccelerationStructure::D3D12CmdBindResourceAccelerationStructure": {
+    "contract": "不立即执行；具体编译行为见CompileCommand。",
+    "description": "保存该命令的值参数和借用资源。"
+  },
+  "grassland::graphics::backend::D3D12CmdBindResourceBuffers": {
+    "contract": "延迟命令持有借用资源，必须活到提交与GPU完成。",
+    "description": "按range的CBV/SRV/UAV类型写描述符并转换资源状态，再设置对应root table。"
+  },
+  "grassland::graphics::backend::D3D12CmdBindResourceBuffers::CompileCommand": {
+    "contract": "原生范围、绑定和资源生命周期由调用方保证。",
+    "description": "按range的CBV/SRV/UAV类型写描述符并转换资源状态，再设置对应root table。"
+  },
+  "grassland::graphics::backend::D3D12CmdBindResourceBuffers::D3D12CmdBindResourceBuffers": {
+    "contract": "不立即执行；具体编译行为见CompileCommand。",
+    "description": "保存该命令的值参数和借用资源。"
+  },
+  "grassland::graphics::backend::D3D12CmdBindResourceImages": {
+    "contract": "延迟命令持有借用资源，必须活到提交与GPU完成。",
+    "description": "写Texture2D SRV/UAV并转换GENERIC_READ/UAV状态，再设置root table。"
+  },
+  "grassland::graphics::backend::D3D12CmdBindResourceImages::CompileCommand": {
+    "contract": "原生范围、绑定和资源生命周期由调用方保证。",
+    "description": "写Texture2D SRV/UAV并转换GENERIC_READ/UAV状态，再设置root table。"
+  },
+  "grassland::graphics::backend::D3D12CmdBindResourceImages::D3D12CmdBindResourceImages": {
+    "contract": "不立即执行；具体编译行为见CompileCommand。",
+    "description": "保存该命令的值参数和借用资源。"
+  },
+  "grassland::graphics::backend::D3D12CmdBindResourceSamplers": {
+    "contract": "延迟命令持有借用资源，必须活到提交与GPU完成。",
+    "description": "连续写sampler描述并设置root table。"
+  },
+  "grassland::graphics::backend::D3D12CmdBindResourceSamplers::CompileCommand": {
+    "contract": "原生范围、绑定和资源生命周期由调用方保证。",
+    "description": "连续写sampler描述并设置root table。"
+  },
+  "grassland::graphics::backend::D3D12CmdBindResourceSamplers::D3D12CmdBindResourceSamplers": {
+    "contract": "不立即执行；具体编译行为见CompileCommand。",
+    "description": "保存该命令的值参数和借用资源。"
+  },
+  "grassland::graphics::backend::D3D12CmdBindVertexBuffers": {
+    "contract": "延迟命令持有借用资源，必须活到提交与GPU完成。",
+    "description": "按Program stride、buffer尺寸及offset建立vertex views；缺少offset补0，转为vertex/index读取状态。"
+  },
+  "grassland::graphics::backend::D3D12CmdBindVertexBuffers::CompileCommand": {
+    "contract": "原生范围、绑定和资源生命周期由调用方保证。",
+    "description": "按Program stride、buffer尺寸及offset建立vertex views；缺少offset补0，转为vertex/index读取状态。"
+  },
+  "grassland::graphics::backend::D3D12CmdBindVertexBuffers::D3D12CmdBindVertexBuffers": {
+    "contract": "不立即执行；具体编译行为见CompileCommand。",
+    "description": "保存该命令的值参数和借用资源。"
+  },
+  "grassland::graphics::backend::D3D12CmdClearImage": {
+    "contract": "延迟命令持有借用资源，必须活到提交与GPU完成。",
+    "description": "按图像格式清颜色或仅深度，stencil不清。"
+  },
+  "grassland::graphics::backend::D3D12CmdClearImage::CompileCommand": {
+    "contract": "原生范围、绑定和资源生命周期由调用方保证。",
+    "description": "按图像格式清颜色或仅深度，stencil不清。"
+  },
+  "grassland::graphics::backend::D3D12CmdClearImage::D3D12CmdClearImage": {
+    "contract": "不立即执行；具体编译行为见CompileCommand。",
+    "description": "保存该命令的值参数和借用资源。"
+  },
+  "grassland::graphics::backend::D3D12CmdCopyBuffer": {
+    "contract": "延迟命令持有借用资源，必须活到提交与GPU完成。",
+    "description": "目标COPY_DEST、源COPY_SOURCE，按dst在前参数顺序CopyBufferRegion。"
+  },
+  "grassland::graphics::backend::D3D12CmdCopyBuffer::CompileCommand": {
+    "contract": "原生范围、绑定和资源生命周期由调用方保证。",
+    "description": "目标COPY_DEST、源COPY_SOURCE，按dst在前参数顺序CopyBufferRegion。"
+  },
+  "grassland::graphics::backend::D3D12CmdCopyBuffer::D3D12CmdCopyBuffer": {
+    "contract": "不立即执行；具体编译行为见CompileCommand。",
+    "description": "保存该命令的值参数和借用资源。"
+  },
+  "grassland::graphics::backend::D3D12CmdDispatch": {
+    "contract": "延迟命令持有借用资源，必须活到提交与GPU完成。",
+    "description": "Dispatch指定工作组数后发全局UAV屏障。"
+  },
+  "grassland::graphics::backend::D3D12CmdDispatch::CompileCommand": {
+    "contract": "原生范围、绑定和资源生命周期由调用方保证。",
+    "description": "Dispatch指定工作组数后发全局UAV屏障。"
+  },
+  "grassland::graphics::backend::D3D12CmdDispatch::D3D12CmdDispatch": {
+    "contract": "不立即执行；具体编译行为见CompileCommand。",
+    "description": "保存该命令的值参数和借用资源。"
+  },
+  "grassland::graphics::backend::D3D12CmdDispatchRays": {
+    "contract": "延迟命令持有借用资源，必须活到提交与GPU完成。",
+    "description": "以Program SBT地址/记录数构造DispatchRays并发全局UAV屏障；list4查询失败时跳过。"
+  },
+  "grassland::graphics::backend::D3D12CmdDispatchRays::CompileCommand": {
+    "contract": "原生范围、绑定和资源生命周期由调用方保证。",
+    "description": "以Program SBT地址/记录数构造DispatchRays并发全局UAV屏障；list4查询失败时跳过。"
+  },
+  "grassland::graphics::backend::D3D12CmdDispatchRays::D3D12CmdDispatchRays": {
+    "contract": "不立即执行；具体编译行为见CompileCommand。",
+    "description": "保存该命令的值参数和借用资源。"
+  },
+  "grassland::graphics::backend::D3D12CmdDraw": {
+    "contract": "延迟命令持有借用资源，必须活到提交与GPU完成。",
+    "description": "调用DrawInstanced；参数名index_count实际为非索引顶点数。"
+  },
+  "grassland::graphics::backend::D3D12CmdDraw::CompileCommand": {
+    "contract": "原生范围、绑定和资源生命周期由调用方保证。",
+    "description": "调用DrawInstanced；参数名index_count实际为非索引顶点数。"
+  },
+  "grassland::graphics::backend::D3D12CmdDraw::D3D12CmdDraw": {
+    "contract": "不立即执行；具体编译行为见CompileCommand。",
+    "description": "保存该命令的值参数和借用资源。"
+  },
+  "grassland::graphics::backend::D3D12CmdDrawIndexed": {
+    "contract": "延迟命令持有借用资源，必须活到提交与GPU完成。",
+    "description": "调用DrawIndexedInstanced，支持first_index/base_vertex/first_instance。"
+  },
+  "grassland::graphics::backend::D3D12CmdDrawIndexed::CompileCommand": {
+    "contract": "原生范围、绑定和资源生命周期由调用方保证。",
+    "description": "调用DrawIndexedInstanced，支持first_index/base_vertex/first_instance。"
+  },
+  "grassland::graphics::backend::D3D12CmdDrawIndexed::D3D12CmdDrawIndexed": {
+    "contract": "不立即执行；具体编译行为见CompileCommand。",
+    "description": "保存该命令的值参数和借用资源。"
+  },
+  "grassland::graphics::backend::D3D12CmdPresent": {
+    "contract": "延迟命令持有借用资源，必须活到提交与GPU完成。",
+    "description": "以6顶点blit保持宽高比、清黑边，可叠加兼容ImGui；backbuffer在PRESENT和RENDER_TARGET间转换。"
+  },
+  "grassland::graphics::backend::D3D12CmdPresent::CompileCommand": {
+    "contract": "原生范围、绑定和资源生命周期由调用方保证。",
+    "description": "以6顶点blit保持宽高比、清黑边，可叠加兼容ImGui；backbuffer在PRESENT和RENDER_TARGET间转换。"
+  },
+  "grassland::graphics::backend::D3D12CmdPresent::D3D12CmdPresent": {
+    "contract": "不立即执行；具体编译行为见CompileCommand。",
+    "description": "保存该命令的值参数和借用资源。"
+  },
+  "grassland::graphics::backend::D3D12CmdSetPrimitiveTopology": {
+    "contract": "延迟命令持有借用资源，必须活到提交与GPU完成。",
+    "description": "映射统一拓扑并IASetPrimitiveTopology。"
+  },
+  "grassland::graphics::backend::D3D12CmdSetPrimitiveTopology::CompileCommand": {
+    "contract": "原生范围、绑定和资源生命周期由调用方保证。",
+    "description": "映射统一拓扑并IASetPrimitiveTopology。"
+  },
+  "grassland::graphics::backend::D3D12CmdSetPrimitiveTopology::D3D12CmdSetPrimitiveTopology": {
+    "contract": "不立即执行；具体编译行为见CompileCommand。",
+    "description": "保存该命令的值参数和借用资源。"
+  },
+  "grassland::graphics::backend::D3D12CmdSetScissor": {
+    "contract": "延迟命令持有借用资源，必须活到提交与GPU完成。",
+    "description": "用offset+extent构造右下坐标并设置scissor。"
+  },
+  "grassland::graphics::backend::D3D12CmdSetScissor::CompileCommand": {
+    "contract": "原生范围、绑定和资源生命周期由调用方保证。",
+    "description": "用offset+extent构造右下坐标并设置scissor。"
+  },
+  "grassland::graphics::backend::D3D12CmdSetScissor::D3D12CmdSetScissor": {
+    "contract": "不立即执行；具体编译行为见CompileCommand。",
+    "description": "保存该命令的值参数和借用资源。"
+  },
+  "grassland::graphics::backend::D3D12CmdSetViewport": {
+    "contract": "延迟命令持有借用资源，必须活到提交与GPU完成。",
+    "description": "把统一viewport字段写入D3D12_VIEWPORT并RSSetViewports。"
+  },
+  "grassland::graphics::backend::D3D12CmdSetViewport::CompileCommand": {
+    "contract": "原生范围、绑定和资源生命周期由调用方保证。",
+    "description": "把统一viewport字段写入D3D12_VIEWPORT并RSSetViewports。"
+  },
+  "grassland::graphics::backend::D3D12CmdSetViewport::D3D12CmdSetViewport": {
+    "contract": "不立即执行；具体编译行为见CompileCommand。",
+    "description": "保存该命令的值参数和借用资源。"
+  },
+  "grassland::graphics::backend::D3D12Command": {
+    "contract": "成员字段及具体操作见本页；借用对象须保持有效。",
+    "description": "CompileCommand多态接口。"
+  },
+  "grassland::graphics::backend::D3D12Command::CompileCommand": {
+    "contract": "由Core按录制顺序调用。",
+    "description": "将命令写入给定list的纯虚接口。"
+  },
+  "grassland::graphics::backend::D3D12Command::~D3D12Command": {
+    "contract": "不承诺等待GPU完成。",
+    "description": "虚析构，释放本对象拥有的成员资源。"
+  },
+  "grassland::graphics::backend::D3D12CommandContext": {
+    "contract": "成员字段及具体操作见本页；借用对象须保持有效。",
+    "description": "一次性延迟录制与资源状态容器。"
+  },
+  "grassland::graphics::backend::D3D12CommandContext::CmdBeginRendering": {
+    "contract": "资源保持有效；Present另收集窗口并可插入HDR中间合成/对齐；CopyBuffer不会登记动态buffer上传。",
+    "description": "记录延迟命令：将最多8个颜色附件及可选深度附件转为写状态并OMSetRenderTargets。"
+  },
+  "grassland::graphics::backend::D3D12CommandContext::CmdBindComputeProgram": {
+    "contract": "资源保持有效；Present另收集窗口并可插入HDR中间合成/对齐；CopyBuffer不会登记动态buffer上传。",
+    "description": "记录延迟命令：设置计算root signature和PSO。"
+  },
+  "grassland::graphics::backend::D3D12CommandContext::CmdBindIndexBuffer": {
+    "contract": "资源保持有效；Present另收集窗口并可插入HDR中间合成/对齐；CopyBuffer不会登记动态buffer上传。",
+    "description": "记录延迟命令：按uint32索引建立view并转为vertex/index读取状态。"
+  },
+  "grassland::graphics::backend::D3D12CommandContext::CmdBindProgram": {
+    "contract": "资源保持有效；Present另收集窗口并可插入HDR中间合成/对齐；CopyBuffer不会登记动态buffer上传。",
+    "description": "记录延迟命令：设置图形root signature和PSO。"
+  },
+  "grassland::graphics::backend::D3D12CommandContext::CmdBindRayTracingProgram": {
+    "contract": "资源保持有效；Present另收集窗口并可插入HDR中间合成/对齐；CopyBuffer不会登记动态buffer上传。",
+    "description": "记录延迟命令：设置计算root signature并QueryInterface list4设置DXR state object；接口不支持时不设置。"
+  },
+  "grassland::graphics::backend::D3D12CommandContext::CmdBindResources": {
+    "contract": "未绑定program时日志返回；数组数量必须匹配range。",
+    "description": "记录资源命令并增加按Program声明的descriptor预算。"
+  },
+  "grassland::graphics::backend::D3D12CommandContext::CmdBindVertexBuffers": {
+    "contract": "资源保持有效；Present另收集窗口并可插入HDR中间合成/对齐；CopyBuffer不会登记动态buffer上传。",
+    "description": "记录延迟命令：按Program stride、buffer尺寸及offset建立vertex views；缺少offset补0，转为vertex/index读取状态。"
+  },
+  "grassland::graphics::backend::D3D12CommandContext::CmdClearImage": {
+    "contract": "资源保持有效；Present另收集窗口并可插入HDR中间合成/对齐；CopyBuffer不会登记动态buffer上传。",
+    "description": "记录延迟命令：按图像格式清颜色或仅深度，stencil不清。"
+  },
+  "grassland::graphics::backend::D3D12CommandContext::CmdCopyBuffer": {
+    "contract": "资源保持有效；Present另收集窗口并可插入HDR中间合成/对齐；CopyBuffer不会登记动态buffer上传。",
+    "description": "记录延迟命令：目标COPY_DEST、源COPY_SOURCE，按dst在前参数顺序CopyBufferRegion。"
+  },
+  "grassland::graphics::backend::D3D12CommandContext::CmdDispatch": {
+    "contract": "资源保持有效；Present另收集窗口并可插入HDR中间合成/对齐；CopyBuffer不会登记动态buffer上传。",
+    "description": "记录延迟命令：Dispatch指定工作组数后发全局UAV屏障。"
+  },
+  "grassland::graphics::backend::D3D12CommandContext::CmdDispatchRays": {
+    "contract": "资源保持有效；Present另收集窗口并可插入HDR中间合成/对齐；CopyBuffer不会登记动态buffer上传。",
+    "description": "记录延迟命令：以Program SBT地址/记录数构造DispatchRays并发全局UAV屏障；list4查询失败时跳过。"
+  },
+  "grassland::graphics::backend::D3D12CommandContext::CmdDraw": {
+    "contract": "资源保持有效；Present另收集窗口并可插入HDR中间合成/对齐；CopyBuffer不会登记动态buffer上传。",
+    "description": "记录延迟命令：调用DrawInstanced；参数名index_count实际为非索引顶点数。"
+  },
+  "grassland::graphics::backend::D3D12CommandContext::CmdDrawIndexed": {
+    "contract": "资源保持有效；Present另收集窗口并可插入HDR中间合成/对齐；CopyBuffer不会登记动态buffer上传。",
+    "description": "记录延迟命令：调用DrawIndexedInstanced，支持first_index/base_vertex/first_instance。"
+  },
+  "grassland::graphics::backend::D3D12CommandContext::CmdEndRendering": {
+    "contract": "",
+    "description": "空操作；D3D12此路径不创建显式render pass。"
+  },
+  "grassland::graphics::backend::D3D12CommandContext::CmdPresent": {
+    "contract": "资源保持有效；Present另收集窗口并可插入HDR中间合成/对齐；CopyBuffer不会登记动态buffer上传。",
+    "description": "记录延迟命令：以6顶点blit保持宽高比、清黑边，可叠加兼容ImGui；backbuffer在PRESENT和RENDER_TARGET间转换。"
+  },
+  "grassland::graphics::backend::D3D12CommandContext::CmdSetPrimitiveTopology": {
+    "contract": "资源保持有效；Present另收集窗口并可插入HDR中间合成/对齐；CopyBuffer不会登记动态buffer上传。",
+    "description": "记录延迟命令：映射统一拓扑并IASetPrimitiveTopology。"
+  },
+  "grassland::graphics::backend::D3D12CommandContext::CmdSetScissor": {
+    "contract": "资源保持有效；Present另收集窗口并可插入HDR中间合成/对齐；CopyBuffer不会登记动态buffer上传。",
+    "description": "记录延迟命令：用offset+extent构造右下坐标并设置scissor。"
+  },
+  "grassland::graphics::backend::D3D12CommandContext::CmdSetViewport": {
+    "contract": "资源保持有效；Present另收集窗口并可插入HDR中间合成/对齐；CopyBuffer不会登记动态buffer上传。",
+    "description": "记录延迟命令：把统一viewport字段写入D3D12_VIEWPORT并RSSetViewports。"
+  },
+  "grassland::graphics::backend::D3D12CommandContext::Core": {
+    "contract": "",
+    "description": "返回借用D3D12Core。"
+  },
+  "grassland::graphics::backend::D3D12CommandContext::D3D12CommandContext": {
+    "contract": "Core仍需InitializeLogicalDevice；Program仍需Finalize；Range/Binding不取得资源所有权。",
+    "description": "初始化D3D12CommandContext的本页状态及资源。"
+  },
+  "grassland::graphics::backend::D3D12CommandContext::DSVHandle": {
+    "contract": "未登记map::at抛异常。",
+    "description": "以已登记索引取得当前帧DSV。"
+  },
+  "grassland::graphics::backend::D3D12CommandContext::GetCore": {
+    "contract": "",
+    "description": "返回统一Core借用指针。"
+  },
+  "grassland::graphics::backend::D3D12CommandContext::RTVHandle": {
+    "contract": "未登记map::at抛异常。",
+    "description": "以已登记索引取得当前帧RTV。"
+  },
+  "grassland::graphics::backend::D3D12CommandContext::RecordDSVImage": {
+    "contract": "Image重载转发原生资源。",
+    "description": "为resource去重分配DSV索引。"
+  },
+  "grassland::graphics::backend::D3D12CommandContext::RecordDynamicBuffer": {
+    "contract": "提交前整缓冲上传。",
+    "description": "若为DynamicBuffer则加入去重集合。"
+  },
+  "grassland::graphics::backend::D3D12CommandContext::RecordRTVImage": {
+    "contract": "Image重载转发原生资源。",
+    "description": "为resource去重分配RTV索引。"
+  },
+  "grassland::graphics::backend::D3D12CommandContext::RequireResourceState": {
+    "contract": "不生成同状态UAV内存屏障。",
+    "description": "首次假定GENERIC_READ，状态变化时插入transition并更新缓存。"
+  },
+  "grassland::graphics::backend::D3D12CommandContext::WriteCBVDescriptor": {
+    "contract": "offset也须256对齐；容量预分配。",
+    "description": "写GPU地址加offset、size按256对齐的CBV并推进CPU/GPU游标。"
+  },
+  "grassland::graphics::backend::D3D12CommandContext::WriteSRVDescriptor": {
+    "contract": "D32映射R32；raw offset/size按4字节右移。",
+    "description": "写Texture2D、raw Buffer或AS的SRV并推进游标。"
+  },
+  "grassland::graphics::backend::D3D12CommandContext::WriteSamplerDescriptor": {
+    "contract": "heap须预分配足够容量。",
+    "description": "写sampler描述并推进sampler游标。"
+  },
+  "grassland::graphics::backend::D3D12CommandContext::WriteUAVDescriptor": {
+    "contract": "raw大小和offset必须4字节对齐。",
+    "description": "写Texture2D或raw Buffer UAV并推进游标。"
+  },
+  "grassland::graphics::backend::D3D12ComputeProgram": {
+    "contract": "成员字段及具体操作见本页；借用对象须保持有效。",
+    "description": "计算shader借用和PSO所有权。"
+  },
+  "grassland::graphics::backend::D3D12ComputeProgram::AddResourceBinding": {
+    "contract": "Finalize前配置，count须正。",
+    "description": "按调用顺序追加资源range。"
+  },
+  "grassland::graphics::backend::D3D12ComputeProgram::D3D12ComputeProgram": {
+    "contract": "Core仍需InitializeLogicalDevice；Program仍需Finalize；Range/Binding不取得资源所有权。",
+    "description": "初始化D3D12ComputeProgram的本页状态及资源。"
+  },
+  "grassland::graphics::backend::D3D12ComputeProgram::Finalize": {
+    "contract": "当前实现未检查HRESULT；shader不可为空。",
+    "description": "创建root signature并以compute shader创建PSO。"
+  },
+  "grassland::graphics::backend::D3D12ComputeProgram::PipelineState": {
+    "contract": "Compute返回ComPtr副本，其余借用指针。",
+    "description": "返回已创建PSO/state object。"
+  },
+  "grassland::graphics::backend::D3D12ComputeProgram::~D3D12ComputeProgram": {
+    "contract": "不承诺等待GPU完成。",
+    "description": "虚析构，释放本对象拥有的成员资源。"
+  },
+  "grassland::graphics::backend::D3D12Core": {
+    "contract": "成员字段及具体操作见本页；借用对象须保持有效。",
+    "description": "设备、队列、帧槽和共享资源所有者。"
+  },
+  "grassland::graphics::backend::D3D12Core::API": {
+    "contract": "",
+    "description": "返回BACKEND_API_D3D12。"
+  },
+  "grassland::graphics::backend::D3D12Core::BindDescriptorHeaps": {
+    "contract": "调用方list须可录制。",
+    "description": "绑定当前帧resource和sampler heap。"
+  },
+  "grassland::graphics::backend::D3D12Core::BlitPipeline": {
+    "contract": "初始化和生命周期由Core管理；不要并发重置内部对象。",
+    "description": "返回内置blit状态借用指针。"
+  },
+  "grassland::graphics::backend::D3D12Core::BuildBottomLevelAccelerationStructure": {
+    "contract": "不ALLOW_UPDATE；SingleTimeCommand返回值未检查，list4查询失败会跳过构建。",
+    "description": "查询预构建大小，分配result/scratch，以PREFER_FAST_TRACE同步构建单geometry BLAS。"
+  },
+  "grassland::graphics::backend::D3D12Core::BuildTopLevelAccelerationStructure": {
+    "contract": "返回HRESULT，但一次性提交返回值未检查。",
+    "description": "复制实例至共享upload缓存，构建PREFER_FAST_TRACE|ALLOW_UPDATE TLAS。"
+  },
+  "grassland::graphics::backend::D3D12Core::CUDABeginExecutionBarrier": {
+    "contract": "无匹配设备抛异常。",
+    "description": "令CUDA stream等待当前共享fence值。"
+  },
+  "grassland::graphics::backend::D3D12Core::CUDAEndExecutionBarrier": {
+    "contract": "后续D3D提交通过QueueWaitFence依赖它。",
+    "description": "令CUDA stream signal下一fence值并更新CPU计数。"
+  },
+  "grassland::graphics::backend::D3D12Core::CommandAllocator": {
+    "contract": "初始化和生命周期由Core管理；不要并发重置内部对象。",
+    "description": "返回当前帧allocator借用指针。"
+  },
+  "grassland::graphics::backend::D3D12Core::CommandList": {
+    "contract": "初始化和生命周期由Core管理；不要并发重置内部对象。",
+    "description": "返回当前帧list借用指针。"
+  },
+  "grassland::graphics::backend::D3D12Core::CommandQueue": {
+    "contract": "初始化和生命周期由Core管理；不要并发重置内部对象。",
+    "description": "返回graphics queue借用指针。"
+  },
+  "grassland::graphics::backend::D3D12Core::CreateBottomLevelAccelerationStructure": {
+    "contract": "简写按Size推数量，Size有padding；内部HRESULT被忽略，应提供显式数量。",
+    "description": "按AABB或float3顶点/uint32三角索引的Range即时地址同步构建BLAS。"
+  },
+  "grassland::graphics::backend::D3D12Core::CreateBuffer": {
+    "contract": "Core须已初始化；构造可抛异常，compute shader类型转换未检空。",
+    "description": "通过double_ptr构造按type选择Dynamic/StaticBuffer，成功返回0。"
+  },
+  "grassland::graphics::backend::D3D12Core::CreateCUDABuffer": {
+    "contract": "Core须已初始化；构造可抛异常，compute shader类型转换未检空。",
+    "description": "通过double_ptr构造CUDA共享Buffer，成功返回0。"
+  },
+  "grassland::graphics::backend::D3D12Core::CreateCommandContext": {
+    "contract": "Core须已初始化；构造可抛异常，compute shader类型转换未检空。",
+    "description": "通过double_ptr构造CommandContext，成功返回0。"
+  },
+  "grassland::graphics::backend::D3D12Core::CreateComputeProgram": {
+    "contract": "Core须已初始化；构造可抛异常，compute shader类型转换未检空。",
+    "description": "通过double_ptr构造ComputeProgram，成功返回0。"
+  },
+  "grassland::graphics::backend::D3D12Core::CreateImage": {
+    "contract": "Core须已初始化；构造可抛异常，compute shader类型转换未检空。",
+    "description": "通过double_ptr构造Image，成功返回0。"
+  },
+  "grassland::graphics::backend::D3D12Core::CreateProgram": {
+    "contract": "Core须已初始化；构造可抛异常，compute shader类型转换未检空。",
+    "description": "通过double_ptr构造图形Program，成功返回0。"
+  },
+  "grassland::graphics::backend::D3D12Core::CreateRayTracingPipeline": {
+    "contract": "payload2048、attributes16、recursion31；所有blob须有效。",
+    "description": "导出RayGenMain、MissMainN、HitGroupN、CallableMainN，创建DXR state object。"
+  },
+  "grassland::graphics::backend::D3D12Core::CreateRayTracingProgram": {
+    "contract": "Core须已初始化；构造可抛异常，compute shader类型转换未检空。",
+    "description": "通过double_ptr构造未配置的RayTracingProgram，成功返回0。"
+  },
+  "grassland::graphics::backend::D3D12Core::CreateSampler": {
+    "contract": "Core须已初始化；构造可抛异常，compute shader类型转换未检空。",
+    "description": "通过double_ptr构造Sampler，成功返回0。"
+  },
+  "grassland::graphics::backend::D3D12Core::CreateShader": {
+    "contract": "空blob返回-1，其余成功0。",
+    "description": "字符串转shader.slang VFS，统一Slang编译后保存blob。"
+  },
+  "grassland::graphics::backend::D3D12Core::CreateShaderTable": {
+    "contract": "record32/table64对齐；索引无校验，GetShaderIdentifier空指针未检查。",
+    "description": "按调用方索引填shader identifier，返回upload buffer及三表偏移。"
+  },
+  "grassland::graphics::backend::D3D12Core::CreateTopLevelAccelerationStructure": {
+    "contract": "内部HRESULT被忽略；实例借用BLAS必须有效。",
+    "description": "转换实例并同步创建允许update的TLAS。"
+  },
+  "grassland::graphics::backend::D3D12Core::CreateWindowObject": {
+    "contract": "Core须已初始化；构造可抛异常，compute shader类型转换未检空。",
+    "description": "通过double_ptr构造初始HDR=false的Window，成功返回0。"
+  },
+  "grassland::graphics::backend::D3D12Core::CurrentFrame": {
+    "contract": "",
+    "description": "返回逐次提交轮转的帧槽索引。"
+  },
+  "grassland::graphics::backend::D3D12Core::D3D12Core": {
+    "contract": "Core仍需InitializeLogicalDevice；Program仍需Finalize；Range/Binding不取得资源所有权。",
+    "description": "初始化D3D12Core的本页状态及资源。"
+  },
+  "grassland::graphics::backend::D3D12Core::DSVDescriptorHandle": {
+    "contract": "同上。",
+    "description": "按当前帧DSV起始句柄、index和increment计算CPU句柄。"
+  },
+  "grassland::graphics::backend::D3D12Core::DXGIFactory": {
+    "contract": "初始化和生命周期由Core管理；不要并发重置内部对象。",
+    "description": "返回DXGI factory借用指针。"
+  },
+  "grassland::graphics::backend::D3D12Core::DXRDevice": {
+    "contract": "初始化和生命周期由Core管理；不要并发重置内部对象。",
+    "description": "返回Device5借用指针。"
+  },
+  "grassland::graphics::backend::D3D12Core::Device": {
+    "contract": "初始化和生命周期由Core管理；不要并发重置内部对象。",
+    "description": "返回D3D12 device借用指针。"
+  },
+  "grassland::graphics::backend::D3D12Core::DeviceRayQuerySupport": {
+    "contract": "未初始化设备返回false。",
+    "description": "查询OPTIONS5且Tier>=1.1。"
+  },
+  "grassland::graphics::backend::D3D12Core::Fence": {
+    "contract": "初始化和生命周期由Core管理；不要并发重置内部对象。",
+    "description": "返回共享提交fence借用指针。"
+  },
+  "grassland::graphics::backend::D3D12Core::GetPhysicalDeviceProperties": {
+    "contract": "调用方分配足够数组。",
+    "description": "枚举非软件适配器，按需填输出数组并返回数量。"
+  },
+  "grassland::graphics::backend::D3D12Core::ImportCudaExternalMemory": {
+    "contract": "临时切到匹配CUDA设备；CUDA错误未检查。",
+    "description": "创建Win32 shared handle，按分配尺寸导入CUDA，再关闭handle。"
+  },
+  "grassland::graphics::backend::D3D12Core::InitializeLogicalDevice": {
+    "contract": "索引无效-1；QueryInterface Device5失败抛异常，即使非光追场景也会查询。",
+    "description": "验证索引，创建device/队列/逐帧资源/blit/fence。"
+  },
+  "grassland::graphics::backend::D3D12Core::QueueWaitFence": {
+    "contract": "GPU等待，不是CPU阻塞。",
+    "description": "向queue插入等待当前fence值。"
+  },
+  "grassland::graphics::backend::D3D12Core::RTVDescriptorHandle": {
+    "contract": "heap须已分配且index有效。",
+    "description": "按当前帧RTV起始句柄、index和increment计算CPU句柄。"
+  },
+  "grassland::graphics::backend::D3D12Core::RequestDownloadStagingBuffer": {
+    "contract": "不缩小；调用方负责同步。",
+    "description": "复用或扩容READBACK缓存。"
+  },
+  "grassland::graphics::backend::D3D12Core::RequestInstanceBuffer": {
+    "contract": "创建HRESULT未检查。",
+    "description": "复用或扩容UPLOAD实例缓存，至少一条instance大小。"
+  },
+  "grassland::graphics::backend::D3D12Core::RequestScratchBuffer": {
+    "contract": "创建HRESULT未检查。",
+    "description": "复用或扩容DEFAULT/UAV scratch。"
+  },
+  "grassland::graphics::backend::D3D12Core::RequestUploadStagingBuffer": {
+    "contract": "不缩小；调用方负责同步。",
+    "description": "复用或扩容UPLOAD缓存。"
+  },
+  "grassland::graphics::backend::D3D12Core::SignalFence": {
+    "contract": "失败抛异常。",
+    "description": "先递增统一fence值再向queue Signal。"
+  },
+  "grassland::graphics::backend::D3D12Core::SingleTimeCommand": {
+    "contract": "不支持并发重入。",
+    "description": "重置单次list，执行录制回调，队列等待当前fence，提交signal并CPU等待完成。"
+  },
+  "grassland::graphics::backend::D3D12Core::SingleTimeCommandAllocator": {
+    "contract": "初始化和生命周期由Core管理；不要并发重置内部对象。",
+    "description": "返回单次allocator借用指针。"
+  },
+  "grassland::graphics::backend::D3D12Core::SubmitCommandContext": {
+    "contract": "context按一次性使用；类型cast未检空，Present/Close HRESULT未全面检查。",
+    "description": "上传动态buffer、编译命令、呈现并signal；轮转帧槽并执行已完成回调。"
+  },
+  "grassland::graphics::backend::D3D12Core::WaitForFence": {
+    "contract": "WaitForSingleObject返回码未检查。",
+    "description": "未完成时设置Win32 event并无限等待。"
+  },
+  "grassland::graphics::backend::D3D12Core::WaitGPU": {
+    "contract": "须先初始化；回调异常传播。",
+    "description": "等待当前fence值并执行清空全部post callbacks。"
+  },
+  "grassland::graphics::backend::D3D12Core::WaveSize": {
+    "contract": "是最大lane数而非固定wave保证。",
+    "description": "返回OPTIONS1 WaveLaneCountMax。"
+  },
+  "grassland::graphics::backend::D3D12Core::~D3D12Core": {
+    "contract": "不隐式WaitGPU或销毁CUDA external semaphore。",
+    "description": "关闭fence event。"
+  },
+  "grassland::graphics::backend::D3D12DynamicBuffer": {
+    "contract": "成员字段及具体操作见本页；借用对象须保持有效。",
+    "description": "CPU staging及逐帧GPU副本。"
+  },
+  "grassland::graphics::backend::D3D12DynamicBuffer::Buffer": {
+    "contract": "Dynamic随CurrentFrame切换。",
+    "description": "返回当前使用的GPU Buffer借用指针。"
+  },
+  "grassland::graphics::backend::D3D12DynamicBuffer::D3D12DynamicBuffer": {
+    "contract": "Core仍需InitializeLogicalDevice；Program仍需Finalize；Range/Binding不取得资源所有权。",
+    "description": "初始化D3D12DynamicBuffer的本页状态及资源。"
+  },
+  "grassland::graphics::backend::D3D12DynamicBuffer::DownloadData": {
+    "contract": "Dynamic读CPU staging而非GPU结果；CUDA状态限制见文件说明。",
+    "description": "复制指定范围到host。"
+  },
+  "grassland::graphics::backend::D3D12DynamicBuffer::InstantBuffer": {
+    "contract": "Dynamic返回CPU upload staging，其余同Buffer。",
+    "description": "返回即时可用于AS构建的Buffer。"
+  },
+  "grassland::graphics::backend::D3D12DynamicBuffer::Resize": {
+    "contract": "Static/CUDA先WaitGPU；Dynamic只重建staging。",
+    "description": "重新分配并复制旧/新尺寸最小前缀。"
+  },
+  "grassland::graphics::backend::D3D12DynamicBuffer::Size": {
+    "contract": "不等于原始请求尺寸。",
+    "description": "返回原生Buffer宽度，已按256字节对齐。"
+  },
+  "grassland::graphics::backend::D3D12DynamicBuffer::TransferData": {
+    "contract": "Core负责帧槽可复用及队列同步。",
+    "description": "按staging宽度重建当前帧GPU副本并录制整缓冲复制。"
+  },
+  "grassland::graphics::backend::D3D12DynamicBuffer::Type": {
+    "contract": "CUDA类仍报告STATIC。",
+    "description": "Dynamic返回DYNAMIC，其余返回STATIC。"
+  },
+  "grassland::graphics::backend::D3D12DynamicBuffer::UploadData": {
+    "contract": "Static/CUDA等待并经staging提交；Dynamic仅Map CPU staging；不检查范围。",
+    "description": "从host复制指定字节范围。"
+  },
+  "grassland::graphics::backend::D3D12DynamicBuffer::~D3D12DynamicBuffer": {
+    "contract": "不隐式WaitGPU，调用方先同步。",
+    "description": "释放拥有的原生资源；CUDA另destroy external memory。"
+  },
+  "grassland::graphics::backend::D3D12ImGuiAssets": {
+    "contract": "成员字段及具体操作见本页；借用对象须保持有效。",
+    "description": "context、SRV heap、分配器、字体和待绘制标志。"
+  },
+  "grassland::graphics::backend::D3D12Image": {
+    "contract": "成员字段及具体操作见本页；借用对象须保持有效。",
+    "description": "二维默认heap texture。"
+  },
+  "grassland::graphics::backend::D3D12Image::D3D12Image": {
+    "contract": "Core仍需InitializeLogicalDevice；Program仍需Finalize；Range/Binding不取得资源所有权。",
+    "description": "初始化D3D12Image的本页状态及资源。"
+  },
+  "grassland::graphics::backend::D3D12Image::DownloadData": {
+    "contract": "输出必须容纳extent像素。",
+    "description": "全图或区域同步读回，逐行去除原生pitch。"
+  },
+  "grassland::graphics::backend::D3D12Image::Extent": {
+    "contract": "",
+    "description": "查询原生Width/Height。"
+  },
+  "grassland::graphics::backend::D3D12Image::Format": {
+    "contract": "",
+    "description": "返回创建时抽象格式。"
+  },
+  "grassland::graphics::backend::D3D12Image::Image": {
+    "contract": "",
+    "description": "返回借用ID3D12Resource。"
+  },
+  "grassland::graphics::backend::D3D12Image::UploadData": {
+    "contract": "区域路径使用临时texture；坐标/host长度由调用方保证。",
+    "description": "全图或区域紧密像素上传，提交后同步。"
+  },
+  "grassland::graphics::backend::D3D12Program": {
+    "contract": "成员字段及具体操作见本页；借用对象须保持有效。",
+    "description": "图形PSO配置与所有权。"
+  },
+  "grassland::graphics::backend::D3D12Program::AddInputAttribute": {
+    "contract": "binding必须已存在，无范围检查。",
+    "description": "生成TEXCOORD递增语义，使用binding的step分类和offset。"
+  },
+  "grassland::graphics::backend::D3D12Program::AddInputBinding": {
+    "contract": "应先于对应attribute添加。",
+    "description": "追加stride及是否逐实例步进。"
+  },
+  "grassland::graphics::backend::D3D12Program::AddResourceBinding": {
+    "contract": "Finalize前配置，count须正。",
+    "description": "按调用顺序追加资源range。"
+  },
+  "grassland::graphics::backend::D3D12Program::BindShader": {
+    "contract": "类型转换失败抛异常；Shader活到Finalize。",
+    "description": "保存D3D12 shader的VS/PS/GS bytecode。"
+  },
+  "grassland::graphics::backend::D3D12Program::D3D12Program": {
+    "contract": "Core仍需InitializeLogicalDevice；Program仍需Finalize；Range/Binding不取得资源所有权。",
+    "description": "初始化D3D12Program的本页状态及资源。"
+  },
+  "grassland::graphics::backend::D3D12Program::Finalize": {
+    "contract": "失败抛异常；配置输入布局及Shader必须完整。",
+    "description": "创建root signature和GraphicsPipelineState。"
+  },
+  "grassland::graphics::backend::D3D12Program::InputBindingStride": {
+    "contract": "index无检查。",
+    "description": "返回指定流字节stride。"
+  },
+  "grassland::graphics::backend::D3D12Program::NumInputBindings": {
+    "contract": "",
+    "description": "返回顶点流数量。"
+  },
+  "grassland::graphics::backend::D3D12Program::PipelineState": {
+    "contract": "Compute返回ComPtr副本，其余借用指针。",
+    "description": "返回已创建PSO/state object。"
+  },
+  "grassland::graphics::backend::D3D12Program::PipelineStateDesc": {
+    "contract": "其input layout引用内部vector。",
+    "description": "返回内部PSO描述借用指针。"
+  },
+  "grassland::graphics::backend::D3D12Program::SetBlendState": {
+    "contract": "target为0..7。",
+    "description": "打开IndependentBlend并设置指定附件混合。"
+  },
+  "grassland::graphics::backend::D3D12Program::SetCullMode": {
+    "contract": "Finalize前调用。",
+    "description": "更新PSO剔除模式。"
+  },
+  "grassland::graphics::backend::D3D12ProgramBase": {
+    "contract": "成员字段及具体操作见本页；借用对象须保持有效。",
+    "description": "descriptor ranges和root signature共享实现。"
+  },
+  "grassland::graphics::backend::D3D12ProgramBase::AddResourceBindingImpl": {
+    "contract": "count/类型由调用方保证。",
+    "description": "追加range，base register0，space为当前range数量。"
+  },
+  "grassland::graphics::backend::D3D12ProgramBase::D3D12ProgramBase": {
+    "contract": "Core仍需InitializeLogicalDevice；Program仍需Finalize；Range/Binding不取得资源所有权。",
+    "description": "初始化D3D12ProgramBase的本页状态及资源。"
+  },
+  "grassland::graphics::backend::D3D12ProgramBase::DescriptorRange": {
+    "contract": "index无检查，继续追加会使地址失效。",
+    "description": "返回指定range的可变地址。"
+  },
+  "grassland::graphics::backend::D3D12ProgramBase::FinalizeRootSignature": {
+    "contract": "无静态sampler，允许input assembler。",
+    "description": "每个range生成一个ALL-stage descriptor table并创建root signature。"
+  },
+  "grassland::graphics::backend::D3D12ProgramBase::RootSignature": {
+    "contract": "Finalize后有效。",
+    "description": "返回借用root signature。"
+  },
+  "grassland::graphics::backend::D3D12ProgramBase::~D3D12ProgramBase": {
+    "contract": "不承诺等待GPU完成。",
+    "description": "虚析构，释放本对象拥有的成员资源。"
+  },
+  "grassland::graphics::backend::D3D12RayTracingProgram": {
+    "contract": "成员字段及具体操作见本页；借用对象须保持有效。",
+    "description": "DXR shader集合、state object和SBT。"
+  },
+  "grassland::graphics::backend::D3D12RayTracingProgram::AddCallableShader": {
+    "contract": "需D3D12Shader。",
+    "description": "追加callable blob借用指针。"
+  },
+  "grassland::graphics::backend::D3D12RayTracingProgram::AddHitGroup": {
+    "contract": "closest-hit仅assert非空；procedure应与intersection匹配。",
+    "description": "保存必需closest-hit及可选any-hit/intersection和procedure标记。"
+  },
+  "grassland::graphics::backend::D3D12RayTracingProgram::AddMissShader": {
+    "contract": "需保持shader存活。",
+    "description": "追加miss blob借用指针。"
+  },
+  "grassland::graphics::backend::D3D12RayTracingProgram::AddRayGenShader": {
+    "contract": "后次覆盖，需D3D12Shader。",
+    "description": "设置唯一raygen blob借用指针。"
+  },
+  "grassland::graphics::backend::D3D12RayTracingProgram::AddResourceBinding": {
+    "contract": "Finalize前配置，count须正。",
+    "description": "按调用顺序追加资源range。"
+  },
+  "grassland::graphics::backend::D3D12RayTracingProgram::CallableShaderAddress": {
+    "contract": "Finalize后有效。",
+    "description": "返回SBT GPU基址加对应表偏移。"
+  },
+  "grassland::graphics::backend::D3D12RayTracingProgram::CallableShaderCount": {
+    "contract": "为Finalize索引数组长度。",
+    "description": "返回对应SBT记录数量。"
+  },
+  "grassland::graphics::backend::D3D12RayTracingProgram::D3D12RayTracingProgram": {
+    "contract": "Core仍需InitializeLogicalDevice；Program仍需Finalize；Range/Binding不取得资源所有权。",
+    "description": "初始化D3D12RayTracingProgram的本页状态及资源。"
+  },
+  "grassland::graphics::backend::D3D12RayTracingProgram::Finalize": {
+    "contract": "索引无校验，内部HRESULT未检查；必须先设置raygen。",
+    "description": "创建DXR管线及按索引顺序排列的SBT；无参重载用0..N-1。"
+  },
+  "grassland::graphics::backend::D3D12RayTracingProgram::HitGroupAddress": {
+    "contract": "Finalize后有效。",
+    "description": "返回SBT GPU基址加对应表偏移。"
+  },
+  "grassland::graphics::backend::D3D12RayTracingProgram::HitGroupCount": {
+    "contract": "为Finalize索引数组长度。",
+    "description": "返回对应SBT记录数量。"
+  },
+  "grassland::graphics::backend::D3D12RayTracingProgram::MissShaderAddress": {
+    "contract": "Finalize后有效。",
+    "description": "返回SBT GPU基址加对应表偏移。"
+  },
+  "grassland::graphics::backend::D3D12RayTracingProgram::MissShaderCount": {
+    "contract": "为Finalize索引数组长度。",
+    "description": "返回对应SBT记录数量。"
+  },
+  "grassland::graphics::backend::D3D12RayTracingProgram::PipelineState": {
+    "contract": "Compute返回ComPtr副本，其余借用指针。",
+    "description": "返回已创建PSO/state object。"
+  },
+  "grassland::graphics::backend::D3D12RayTracingProgram::ShaderTable": {
+    "contract": "Finalize后有效。",
+    "description": "返回SBT upload buffer借用指针。"
+  },
+  "grassland::graphics::backend::D3D12RayTracingProgram::~D3D12RayTracingProgram": {
+    "contract": "不承诺等待GPU完成。",
+    "description": "虚析构，释放本对象拥有的成员资源。"
+  },
+  "grassland::graphics::backend::D3D12ResourceBinding": {
+    "contract": "成员字段及具体操作见本页；借用对象须保持有效。",
+    "description": "buffer/image二选一借用引用。"
+  },
+  "grassland::graphics::backend::D3D12ResourceBinding::D3D12ResourceBinding": {
+    "contract": "Core仍需InitializeLogicalDevice；Program仍需Finalize；Range/Binding不取得资源所有权。",
+    "description": "初始化D3D12ResourceBinding的本页状态及资源。"
+  },
+  "grassland::graphics::backend::D3D12Sampler": {
+    "contract": "成员字段及具体操作见本页；借用对象须保持有效。",
+    "description": "原生sampler描述值。"
+  },
+  "grassland::graphics::backend::D3D12Sampler::D3D12Sampler": {
+    "contract": "Core仍需InitializeLogicalDevice；Program仍需Finalize；Range/Binding不取得资源所有权。",
+    "description": "初始化D3D12Sampler的本页状态及资源。"
+  },
+  "grassland::graphics::backend::D3D12Sampler::SamplerDesc": {
+    "contract": "随Sampler生命周期。",
+    "description": "返回内部sampler描述的const借用引用。"
+  },
+  "grassland::graphics::backend::D3D12Shader": {
+    "contract": "成员字段及具体操作见本页；借用对象须保持有效。",
+    "description": "拥有编译blob的shader包装。"
+  },
+  "grassland::graphics::backend::D3D12Shader::Bytecode": {
+    "contract": "借用。",
+    "description": "返回内部blob地址与字节长度。"
+  },
+  "grassland::graphics::backend::D3D12Shader::CompiledBlob": {
+    "contract": "DXR program借用它。",
+    "description": "返回内部blob const引用。"
+  },
+  "grassland::graphics::backend::D3D12Shader::D3D12Shader": {
+    "contract": "Core仍需InitializeLogicalDevice；Program仍需Finalize；Range/Binding不取得资源所有权。",
+    "description": "初始化D3D12Shader的本页状态及资源。"
+  },
+  "grassland::graphics::backend::D3D12Shader::EntryPoint": {
+    "contract": "",
+    "description": "返回保存的入口名副本。"
+  },
+  "grassland::graphics::backend::D3D12Shader::~D3D12Shader": {
+    "contract": "不承诺等待GPU完成。",
+    "description": "虚析构，释放本对象拥有的成员资源。"
+  },
+  "grassland::graphics::backend::D3D12StaticBuffer": {
+    "contract": "成员字段及具体操作见本页；借用对象须保持有效。",
+    "description": "单份默认heap Buffer。"
+  },
+  "grassland::graphics::backend::D3D12StaticBuffer::Buffer": {
+    "contract": "Dynamic随CurrentFrame切换。",
+    "description": "返回当前使用的GPU Buffer借用指针。"
+  },
+  "grassland::graphics::backend::D3D12StaticBuffer::D3D12StaticBuffer": {
+    "contract": "Core仍需InitializeLogicalDevice；Program仍需Finalize；Range/Binding不取得资源所有权。",
+    "description": "初始化D3D12StaticBuffer的本页状态及资源。"
+  },
+  "grassland::graphics::backend::D3D12StaticBuffer::DownloadData": {
+    "contract": "Dynamic读CPU staging而非GPU结果；CUDA状态限制见文件说明。",
+    "description": "复制指定范围到host。"
+  },
+  "grassland::graphics::backend::D3D12StaticBuffer::InstantBuffer": {
+    "contract": "Dynamic返回CPU upload staging，其余同Buffer。",
+    "description": "返回即时可用于AS构建的Buffer。"
+  },
+  "grassland::graphics::backend::D3D12StaticBuffer::Resize": {
+    "contract": "Static/CUDA先WaitGPU；Dynamic只重建staging。",
+    "description": "重新分配并复制旧/新尺寸最小前缀。"
+  },
+  "grassland::graphics::backend::D3D12StaticBuffer::Size": {
+    "contract": "不等于原始请求尺寸。",
+    "description": "返回原生Buffer宽度，已按256字节对齐。"
+  },
+  "grassland::graphics::backend::D3D12StaticBuffer::Type": {
+    "contract": "CUDA类仍报告STATIC。",
+    "description": "Dynamic返回DYNAMIC，其余返回STATIC。"
+  },
+  "grassland::graphics::backend::D3D12StaticBuffer::UploadData": {
+    "contract": "Static/CUDA等待并经staging提交；Dynamic仅Map CPU staging；不检查范围。",
+    "description": "从host复制指定字节范围。"
+  },
+  "grassland::graphics::backend::D3D12StaticBuffer::~D3D12StaticBuffer": {
+    "contract": "不隐式WaitGPU，调用方先同步。",
+    "description": "释放拥有的原生资源；CUDA另destroy external memory。"
+  },
+  "grassland::graphics::backend::D3D12Window": {
+    "contract": "成员字段及具体操作见本页；借用对象须保持有效。",
+    "description": "交换链与窗口呈现所有者。"
+  },
+  "grassland::graphics::backend::D3D12Window::BackBufferExtent": {
+    "contract": "GetDesc返回码未检查。",
+    "description": "查询交换链像素尺寸。"
+  },
+  "grassland::graphics::backend::D3D12Window::BackBufferFormat": {
+    "contract": "GetDesc返回码未检查。",
+    "description": "查询交换链格式。"
+  },
+  "grassland::graphics::backend::D3D12Window::BeginImGuiFrame": {
+    "contract": "无context时跳过。",
+    "description": "选择context并开始GLFW/DX12/ImGui帧。"
+  },
+  "grassland::graphics::backend::D3D12Window::CloseWindow": {
+    "contract": "",
+    "description": "WaitGPU后销毁ImGui、交换链及GLFW窗口并注销resize事件。"
+  },
+  "grassland::graphics::backend::D3D12Window::CurrentBackBuffer": {
+    "contract": "索引由DXGI提供。",
+    "description": "返回当前swapchain索引对应资源。"
+  },
+  "grassland::graphics::backend::D3D12Window::D3D12Window": {
+    "contract": "Core仍需InitializeLogicalDevice；Program仍需Finalize；Range/Binding不取得资源所有权。",
+    "description": "初始化D3D12Window的本页状态及资源。"
+  },
+  "grassland::graphics::backend::D3D12Window::EndImGuiFrame": {
+    "contract": "实际绘制由Present消费。",
+    "description": "ImGui::Render并设置待绘制标记。"
+  },
+  "grassland::graphics::backend::D3D12Window::GetImGuiContext": {
+    "contract": "可为空。",
+    "description": "返回借用context。"
+  },
+  "grassland::graphics::backend::D3D12Window::ImGuiAssets": {
+    "contract": "调用方不得破坏heap/context生命周期。",
+    "description": "返回内部可变兼容状态引用。"
+  },
+  "grassland::graphics::backend::D3D12Window::InitImGui": {
+    "contract": "重复初始化无防重入。",
+    "description": "保存字体配置并创建ImGui上下文。"
+  },
+  "grassland::graphics::backend::D3D12Window::RecreateSwapChain": {
+    "contract": "调用路径应已同步GPU。",
+    "description": "释放旧back buffers并按HDR模式创建新交换链。"
+  },
+  "grassland::graphics::backend::D3D12Window::SetupImGuiContext": {
+    "contract": "默认字体用font_size，外部字体使用ChineseFull字形范围。",
+    "description": "建立Classic主题、GLFW/DX12后端与64槽shader-visible heap，加载字体。"
+  },
+  "grassland::graphics::backend::D3D12Window::SwapChain": {
+    "contract": "",
+    "description": "返回借用IDXGISwapChain3。"
+  },
+  "grassland::graphics::backend::D3D12Window::TerminateImGui": {
+    "contract": "",
+    "description": "WaitGPU后关闭后端/context并释放heap。"
+  },
+  "grassland::graphics::backend::D3D12Window::~D3D12Window": {
+    "contract": "",
+    "description": "若GLFW窗口尚存则CloseWindow。"
+  },
+  "grassland::graphics::backend::EnumerateNativeAdapters": {
+    "contract": "只对NOT_FOUND终止，其他枚举错误未完整处理。",
+    "description": "枚举DXGI非软件adapter ComPtr列表。"
+  },
+  "grassland::graphics::backend::ExampleDescriptorHeapAllocator": {
+    "contract": "成员字段及具体操作见本页；借用对象须保持有效。",
+    "description": "借用heap的空闲槽栈。"
+  },
+  "grassland::graphics::backend::ExampleDescriptorHeapAllocator::Alloc": {
+    "contract": "耗尽仅由IM_ASSERT检查。",
+    "description": "弹出空闲槽并计算CPU/GPU句柄。"
+  },
+  "grassland::graphics::backend::ExampleDescriptorHeapAllocator::Create": {
+    "contract": "要求未初始化且free_indices为空。",
+    "description": "记录借用heap和descriptor步长，建立从0起分配的空闲索引栈。"
+  },
+  "grassland::graphics::backend::ExampleDescriptorHeapAllocator::Destroy": {
+    "contract": "不释放COM heap本身。",
+    "description": "清借用heap及空闲栈。"
+  },
+  "grassland::graphics::backend::ExampleDescriptorHeapAllocator::Free": {
+    "contract": "仅断言CPU/GPU索引相等，禁止重复或越界释放。",
+    "description": "由句柄差计算槽索引并压回栈。"
+  },
+  "grassland::graphics::backend::FilterModeToD3D12Filter": {
+    "contract": "未知回全POINT。",
+    "description": "组合min/mag/mip的八种POINT/LINEAR过滤。"
+  },
+  "grassland::graphics::backend::ImageFormatToDXGIFormat": {
+    "contract": "未知/UNDEFINED为UNKNOWN。",
+    "description": "映射统一像素格式。"
+  },
+  "grassland::graphics::backend::InputTypeToDXGIFormat": {
+    "contract": "未知UNKNOWN。",
+    "description": "映射int/uint/float的1..4分量格式。"
   },
   "grassland::graphics::backend::MetalAccelerationStructure": {
     "contract": "原生对象通过NS::SharedPtr持有，返回Handle借用；Core及依赖资源须满足本页生命周期说明。",
@@ -6434,6 +7646,506 @@
   "grassland::graphics::backend::MetalWindow::~MetalWindow": {
     "contract": "",
     "description": "调用CloseWindow完成GPU等待及原生窗口拆卸。"
+  },
+  "grassland::graphics::backend::NativeAdapterCUDADeviceIndex": {
+    "contract": "匹配返回索引，否则-1；CUDA返回码未检查。",
+    "description": "比较CUDA device LUID和adapter LUID。"
+  },
+  "grassland::graphics::backend::NativeAdapterName": {
+    "contract": "返回副本。",
+    "description": "GetDesc1后将Description转UTF8字符串。"
+  },
+  "grassland::graphics::backend::NativeAdapterScore": {
+    "contract": "设备选择评分非性能基准。",
+    "description": "专用显存MiB加Tier1.1支持奖励100000。"
+  },
+  "grassland::graphics::backend::NativeAdapterSupportsRayTracing": {
+    "contract": "不支持返回false。",
+    "description": "临时创建Device5并要求Tier1.1。"
+  },
+  "grassland::graphics::backend::PrimitiveTopologyToD3D12PrimitiveTopology": {
+    "contract": "未知TRIANGLELIST。",
+    "description": "映射五种统一拓扑。"
+  },
+  "grassland::graphics::backend::RayTracingInstanceToD3D12RayTracingInstanceDesc": {
+    "contract": "AS类型cast未检空。",
+    "description": "复制3×4行主序transform及id/mask/hitoffset/flags和BLAS地址。"
+  },
+  "grassland::graphics::backend::ResourceTypeToD3D12DescriptorRangeType": {
+    "contract": "默认SRV。",
+    "description": "uniform→CBV，只读→SRV，可写→UAV，sampler→SAMPLER。"
+  },
+  "grassland::graphics::backend::d3d12::(anonymous)::error_message": {
+    "contract": "无同步，不适合并发错误归属判断。",
+    "description": "进程级最后D3D12错误字符串。"
+  },
+  "grassland::graphics::backend::d3d12::CompileShader": {
+    "contract": "返回CompiledShaderBlob，编译失败语义与统一编译器一致。",
+    "description": "转发统一graphics::CompileShader的字符串/入口/target接口。"
+  },
+  "grassland::graphics::backend::d3d12::CreateBuffer": {
+    "contract": "无heap_flags重载使用NONE；失败写日志并返回HRESULT。",
+    "description": "创建按256字节对齐的committed Buffer，传入heap/state/resource flags。"
+  },
+  "grassland::graphics::backend::d3d12::GetErrorMessage": {
+    "contract": "可能被其他线程/后续宏日志覆盖。",
+    "description": "返回最后储存的错误字符串副本。"
+  },
+  "grassland::graphics::backend::d3d12::HRESULTToString": {
+    "contract": "不查询系统错误文字。",
+    "description": "格式化为HRESULT: 0xXXXXXXXX。"
+  },
+  "grassland::graphics::backend::d3d12::HeapTypeDefaultResourceState": {
+    "contract": "只返回建议状态，不创建资源。",
+    "description": "UPLOAD→GENERIC_READ，READBACK→COPY_DEST，其余COMMON。"
+  },
+  "grassland::graphics::backend::d3d12::HitGroup": {
+    "contract": "保持blob在使用时存活。",
+    "description": "借用closest-hit/any-hit/intersection三个blob，procedure标记默认为false。"
+  },
+  "grassland::graphics::backend::d3d12::IsDepthFormat": {
+    "contract": "不覆盖全部DXGI深度/typeless变体。",
+    "description": "仅D16_UNORM/D24_UNORM_S8_UINT/D32_FLOAT判为深度。"
+  },
+  "grassland::graphics::backend::d3d12::RETURN_IF_FAILED_HR": {
+    "contract": "业务消息被第二次SetErrorMessage覆盖；宏要求当前函数返回HRESULT兼容类型。",
+    "description": "执行命令并在FAILED时记录消息和HRESULT后从当前函数return。"
+  },
+  "grassland::graphics::backend::d3d12::SetErrorMessage": {
+    "contract": "无锁非线程局部。",
+    "description": "写错误日志并覆盖进程级error_message。"
+  },
+  "grassland::graphics::backend::d3d12::SingleTimeCommand": {
+    "contract": "调用方确保allocator空闲；回调接收借用list；返回HRESULT。",
+    "description": "取得queue设备、Reset allocator、录制并关闭Direct list，Execute后用fence/event等待。"
+  },
+  "grassland::graphics::backend::d3d12::SizeAlignTo": {
+    "contract": "alignment须非零2次幂，size加法不得溢出。",
+    "description": "用(size+alignment-1)&~(alignment-1)向上对齐。"
+  },
+  "grassland::graphics::backend::d3d12::SizeByFormat": {
+    "contract": "未知格式0，不可当作完整DXGI大小表。",
+    "description": "返回受支持DXGI格式每像素字节数。"
+  },
+  "grassland::graphics::backend::d3d12::ThrowError": {
+    "contract": "格式错误也可能抛异常。",
+    "description": "抛runtime_error；可变参重载先fmt::format。"
+  },
+  "grassland::graphics::backend::d3d12::ThrowIfFailed": {
+    "contract": "成功不做操作。",
+    "description": "仅FAILED(hr)时抛业务错误；模板重载提供格式化。"
+  },
+  "grassland::graphics::backend::d3d12::Warning": {
+    "contract": "不修改error_message。",
+    "description": "加[D3D12]前缀写警告；模板重载格式化。"
+  },
+  "grassland::graphics::backend::d3d12::kDefaultEnableDebugLayer": {
+    "contract": "编译期选择。",
+    "description": "随NDEBUG选择Release false、Debug true的默认调试层常量。"
+  },
+  "grassland::graphics::backend::vulkan::(anonymous)::error_message": {
+    "contract": "",
+    "description": "进程级最后错误字符串，无锁。"
+  },
+  "grassland::graphics::backend::vulkan::BuildAccelerationStructure": {
+    "contract": "返回VkResult；容量不足强制BUILD，scratch使用buildScratchSize；旧资源销毁前须同步。",
+    "description": "查询大小、按需重建AS存储、对齐scratch并同步Build/Update。"
+  },
+  "grassland::graphics::backend::vulkan::CheckValidationLayerSupport": {
+    "contract": "任何缺失false，枚举错误未检查。",
+    "description": "逐名检查系统层列表。"
+  },
+  "grassland::graphics::backend::vulkan::ChooseSwapExtent": {
+    "contract": "尺寸是像素而非逻辑窗口点。",
+    "description": "固定currentExtent优先，否则将framebuffer尺寸夹到允许区间。"
+  },
+  "grassland::graphics::backend::vulkan::ChooseSwapPresentMode": {
+    "contract": "不优先MAILBOX。",
+    "description": "有IMMEDIATE则选它，否则FIFO。"
+  },
+  "grassland::graphics::backend::vulkan::ChooseSwapSurfaceFormat": {
+    "contract": "空列表抛异常。",
+    "description": "精确请求→RGBA8_UNORM+sRGB→首项。"
+  },
+  "grassland::graphics::backend::vulkan::ComputeFamilyIndex": {
+    "contract": "找不到返回uint32(-1)，调用方检查。",
+    "description": "返回第一个支持COMPUTE的family索引。"
+  },
+  "grassland::graphics::backend::vulkan::CreateExternalBuffer": {
+    "contract": "调用方负责销毁；失败路径见文件说明。",
+    "description": "创建可导出Buffer及专用VkDeviceMemory并绑定。"
+  },
+  "grassland::graphics::backend::vulkan::CreateNativeInstance": {
+    "contract": "返回VkResult；validation缺失返回UNKNOWN，hint扩展列表会被补充。",
+    "description": "按hint创建instance、函数表及可选debug messenger。"
+  },
+  "grassland::graphics::backend::vulkan::DebugUtilsMessengerUserCallback": {
+    "contract": "正常返回VK_FALSE；不把回调异常视为安全跨C边界协议。",
+    "description": "忽略verbose，其余按severity标签输出stderr，ERROR抛异常。"
+  },
+  "grassland::graphics::backend::vulkan::DescriptorPoolSize": {
+    "contract": "具体成员声明与操作在本页逐项列出。",
+    "description": "descriptor类型到uint32计数的map。"
+  },
+  "grassland::graphics::backend::vulkan::DescriptorPoolSize::DescriptorPoolSize": {
+    "contract": "AS须显式登记。",
+    "description": "构造11种常规类型同计数，或只登记指定type/count。"
+  },
+  "grassland::graphics::backend::vulkan::DescriptorPoolSize::ToVkDescriptorPoolSize": {
+    "contract": "",
+    "description": "转为非零计数VkDescriptorPoolSize数组。"
+  },
+  "grassland::graphics::backend::vulkan::DescriptorPoolSize::operator std::vector<VkDescriptorPoolSize>": {
+    "contract": "",
+    "description": "过滤零计数并按map顺序返回数组。"
+  },
+  "grassland::graphics::backend::vulkan::DescriptorPoolSize::operator*": {
+    "contract": "",
+    "description": "按类型乘multiplier返回新值。"
+  },
+  "grassland::graphics::backend::vulkan::DescriptorPoolSize::operator*=": {
+    "contract": "返回类型不是引用。",
+    "description": "原址乘multiplier并返回值副本。"
+  },
+  "grassland::graphics::backend::vulkan::DescriptorPoolSize::operator+": {
+    "contract": "uint32溢出不检查。",
+    "description": "按类型相加返回新值。"
+  },
+  "grassland::graphics::backend::vulkan::DescriptorPoolSize::operator+=": {
+    "contract": "",
+    "description": "按类型累加并返回自身引用。"
+  },
+  "grassland::graphics::backend::vulkan::DeviceCreateInfo": {
+    "contract": "具体成员声明与操作在本页逐项列出。",
+    "description": "拥有feature链及queue配置、借用extension字符串的构建设备参数。"
+  },
+  "grassland::graphics::backend::vulkan::DeviceCreateInfo::AddExtension": {
+    "contract": "不去重，字符串须长寿命。",
+    "description": "追加借用扩展名指针。"
+  },
+  "grassland::graphics::backend::vulkan::DeviceCreateInfo::AddFeature": {
+    "contract": "FeatureType应含pNext且sType正确。",
+    "description": "复制FeatureType到类型擦除容器。"
+  },
+  "grassland::graphics::backend::vulkan::DeviceCreateInfo::AddQueueFamily": {
+    "contract": "同索引覆盖。",
+    "description": "设置family索引对应priority数组。"
+  },
+  "grassland::graphics::backend::vulkan::DeviceCreateInfo::CompileVkDeviceCreateInfo": {
+    "contract": "返回结构含内部指针；创建device前不能修改/销毁容器。validation参数不启用device layers。",
+    "description": "重建queue create infos、读取基础features，逆序连接feature链并返回借用配置。"
+  },
+  "grassland::graphics::backend::vulkan::DeviceCreateInfo::DeviceCreateInfo": {
+    "contract": "派生缓存不复制，在Compile重新建立。",
+    "description": "默认/移动构造；复制构造逐feature Duplicate并复制扩展和queue配置。"
+  },
+  "grassland::graphics::backend::vulkan::DeviceFeatureContainer": {
+    "contract": "具体成员声明与操作在本页逐项列出。",
+    "description": "拥有具体FeatureType副本。"
+  },
+  "grassland::graphics::backend::vulkan::DeviceFeatureContainer::DeviceFeatureContainer": {
+    "contract": "原始pNext先复制，Compile时会重接。",
+    "description": "复制FeatureType值。"
+  },
+  "grassland::graphics::backend::vulkan::DeviceFeatureContainer::Duplicate": {
+    "contract": "不深复制旧pNext指向的外部对象。",
+    "description": "make_unique复制当前feature。"
+  },
+  "grassland::graphics::backend::vulkan::DeviceFeatureContainer::LinkNext": {
+    "contract": "借用地址随容器生命周期。",
+    "description": "更新feature.pNext并返回feature地址。"
+  },
+  "grassland::graphics::backend::vulkan::DeviceFeatureContainerBase": {
+    "contract": "具体成员声明与操作在本页逐项列出。",
+    "description": "可复制、可连接pNext的类型擦除feature接口。"
+  },
+  "grassland::graphics::backend::vulkan::DeviceFeatureContainerBase::Duplicate": {
+    "contract": "",
+    "description": "返回独立拥有的容器副本的纯虚接口。"
+  },
+  "grassland::graphics::backend::vulkan::DeviceFeatureContainerBase::LinkNext": {
+    "contract": "",
+    "description": "连接外部pNext并返回本feature地址的纯虚接口。"
+  },
+  "grassland::graphics::backend::vulkan::DeviceFeatureContainerBase::~DeviceFeatureContainerBase": {
+    "contract": "",
+    "description": "虚析构，支持通过基类销毁具体feature容器。"
+  },
+  "grassland::graphics::backend::vulkan::DeviceFeatureRequirement": {
+    "contract": "具体成员声明与操作在本页逐项列出。",
+    "description": "是否启用原生RT pipeline和RayQuery的两个开关。"
+  },
+  "grassland::graphics::backend::vulkan::DeviceFeatureRequirement::GenerateRecommendedDeviceCreateInfo": {
+    "contract": "部分feature未经支持检查；光追开关分别追加pipeline/query，二者共享AS/address。",
+    "description": "构建推荐扩展/feature集合，并请求所有queue families中的全部队列。"
+  },
+  "grassland::graphics::backend::vulkan::DeviceFeatureRequirement::GetVmaAllocatorCreateFlags": {
+    "contract": "否则0。",
+    "description": "任一光追开关启用则返回BUFFER_DEVICE_ADDRESS flag。"
+  },
+  "grassland::graphics::backend::vulkan::DeviceProcedures": {
+    "contract": "具体成员声明与操作在本页逐项列出。",
+    "description": "AS与RT pipeline函数指针表，初始空。"
+  },
+  "grassland::graphics::backend::vulkan::EnumerateNativePhysicalDevices": {
+    "contract": "返回码未检查，handle由instance管理。",
+    "description": "两次vkEnumeratePhysicalDevices查询返回handle列表。"
+  },
+  "grassland::graphics::backend::vulkan::Evaluate": {
+    "contract": "选择启发值，不是实测性能。",
+    "description": "独显+1e9，光追+1e8，geometry+1e6，再加local memory十进制MB。"
+  },
+  "grassland::graphics::backend::vulkan::GRASSLAND_VULKAN_PROCEDURE_VAR": {
+    "contract": "",
+    "description": "声明并零初始化PFN函数指针成员。"
+  },
+  "grassland::graphics::backend::vulkan::GetCUDADeviceIndex": {
+    "contract": "返回匹配索引或-1，CUDA错误未检查。",
+    "description": "将Vulkan deviceUUID与CUDA UUID逐一比较。"
+  },
+  "grassland::graphics::backend::vulkan::GetDefaultExternalMemoryHandleType": {
+    "contract": "只在CUDA构建启用。",
+    "description": "Windows8.1及以后选OPAQUE_WIN32，更旧KMT，其他平台FD。"
+  },
+  "grassland::graphics::backend::vulkan::GetDefaultExternalSemaphoreHandleType": {
+    "contract": "仅CUDA构建。",
+    "description": "Windows8及以后Win32、更旧KMT，其他FD。"
+  },
+  "grassland::graphics::backend::vulkan::GetDeviceExtensions": {
+    "contract": "VkResult未检查。",
+    "description": "枚举设备扩展属性列表。"
+  },
+  "grassland::graphics::backend::vulkan::GetDeviceLocalMemorySize": {
+    "contract": "不是合计。",
+    "description": "返回遍历中最后一个DEVICE_LOCAL heap的字节数。"
+  },
+  "grassland::graphics::backend::vulkan::GetErrorMessage": {
+    "contract": "并发可能覆盖。",
+    "description": "返回最后错误副本。"
+  },
+  "grassland::graphics::backend::vulkan::GetPhysicalDeviceFeatures": {
+    "contract": "基础feature值，不包含扩展链。",
+    "description": "返回vkGetPhysicalDeviceFeatures结果。"
+  },
+  "grassland::graphics::backend::vulkan::GetPhysicalDeviceMemoryProperties": {
+    "contract": "",
+    "description": "返回heap/type信息。"
+  },
+  "grassland::graphics::backend::vulkan::GetPhysicalDeviceProperties": {
+    "contract": "",
+    "description": "返回基础设备属性。"
+  },
+  "grassland::graphics::backend::vulkan::GetPhysicalDeviceRayTracingPipelineFeatures": {
+    "contract": "",
+    "description": "通过Features2链查询rayTracingPipeline feature。"
+  },
+  "grassland::graphics::backend::vulkan::GetPhysicalDeviceRayTracingPipelineProperties": {
+    "contract": "调用方确认扩展适用。",
+    "description": "通过Properties2链查询RT pipeline属性。"
+  },
+  "grassland::graphics::backend::vulkan::GetQueueFamilyProperties": {
+    "contract": "",
+    "description": "查询全部queue family属性。"
+  },
+  "grassland::graphics::backend::vulkan::GetValidationLayers": {
+    "contract": "",
+    "description": "返回Khronos validation层名列表副本。"
+  },
+  "grassland::graphics::backend::vulkan::GraphicsFamilyIndex": {
+    "contract": "找不到返回uint32(-1)，调用方检查。",
+    "description": "返回第一个支持GRAPHICS的family索引。"
+  },
+  "grassland::graphics::backend::vulkan::HitGroup": {
+    "contract": "具体成员声明与操作在本页逐项列出。",
+    "description": "可选shader指针及procedure标记。"
+  },
+  "grassland::graphics::backend::vulkan::InstanceCreateHint": {
+    "contract": "具体成员声明与操作在本页逐项列出。",
+    "description": "validation、extension列表及ApplicationInfo。"
+  },
+  "grassland::graphics::backend::vulkan::InstanceCreateHint::AddExtension": {
+    "contract": "调用方保证字符串存活。",
+    "description": "按strcmp去重后保存借用扩展名。"
+  },
+  "grassland::graphics::backend::vulkan::InstanceCreateHint::ApplyGLFWSurfaceSupport": {
+    "contract": "若临时初始化则末尾glfwTerminate。",
+    "description": "添加GLFW必需扩展和swapchain colorspace。"
+  },
+  "grassland::graphics::backend::vulkan::InstanceCreateHint::InstanceCreateHint": {
+    "contract": "可能临时初始化GLFW。",
+    "description": "默认Grassland应用信息、Vulkan1.2并收集GLFW surface扩展。"
+  },
+  "grassland::graphics::backend::vulkan::InstanceCreateHint::IsEnabledExtension": {
+    "contract": "",
+    "description": "按名称查询已登记扩展。"
+  },
+  "grassland::graphics::backend::vulkan::InstanceCreateHint::SetValidationLayersEnabled": {
+    "contract": "默认参数由NDEBUG决定。",
+    "description": "设置validation开关。"
+  },
+  "grassland::graphics::backend::vulkan::InstanceProcedures": {
+    "contract": "具体成员声明与操作在本页逐项列出。",
+    "description": "debug/rendering/topology函数表，初始空。"
+  },
+  "grassland::graphics::backend::vulkan::IsDepthFormat": {
+    "contract": "其余false。",
+    "description": "识别D16/D32及三个带S8深度格式。"
+  },
+  "grassland::graphics::backend::vulkan::IsExtensionSupported": {
+    "contract": "每次重新枚举。",
+    "description": "按extensionName精确匹配扩展名。"
+  },
+  "grassland::graphics::backend::vulkan::LoadAccelerationStructureProcedures": {
+    "contract": "缺函数抛异常。",
+    "description": "加载address、AS大小/创建/构建/销毁/地址函数。"
+  },
+  "grassland::graphics::backend::vulkan::LoadInstanceProcedures": {
+    "contract": "缺函数只警告，结果可为空。",
+    "description": "按调试开关加载debug函数，并加载dynamic rendering/topology。"
+  },
+  "grassland::graphics::backend::vulkan::LoadRayTracingProcedures": {
+    "contract": "设备必须已启用对应扩展。",
+    "description": "加载AS函数后再加载RT pipeline、SBT handles和TraceRays。"
+  },
+  "grassland::graphics::backend::vulkan::PipelineSettings": {
+    "contract": "具体成员声明与操作在本页逐项列出。",
+    "description": "图形pipeline创建参数和值数组。"
+  },
+  "grassland::graphics::backend::vulkan::PipelineSettings::AddInputAttribute": {
+    "contract": "不校验范围。",
+    "description": "追加location/binding/format/offset。"
+  },
+  "grassland::graphics::backend::vulkan::PipelineSettings::AddInputBinding": {
+    "contract": "不校验重复binding。",
+    "description": "追加binding/stride/input rate。"
+  },
+  "grassland::graphics::backend::vulkan::PipelineSettings::AddShaderStage": {
+    "contract": "字符串和shader module须活到管线创建；本函数未使用entry storage。",
+    "description": "追加shader stage并保存entry_point.c_str()。"
+  },
+  "grassland::graphics::backend::vulkan::PipelineSettings::EnableDynamicPrimitiveTopology": {
+    "contract": "需要已启用extended dynamic state。",
+    "description": "设置dynamic topology开关。"
+  },
+  "grassland::graphics::backend::vulkan::PipelineSettings::PipelineSettings": {
+    "contract": "depth为UNDEFINED时无depth state。",
+    "description": "保存layout/附件格式并建立默认光栅、多采样、深度、混合状态。"
+  },
+  "grassland::graphics::backend::vulkan::PipelineSettings::PipelineSettingsCommon": {
+    "contract": "不重置所有vector。",
+    "description": "设置triangle、单sample、CCW/back/fill等默认值。"
+  },
+  "grassland::graphics::backend::vulkan::PipelineSettings::SetBlendState": {
+    "contract": "索引无检查。",
+    "description": "直接替换指定颜色附件blend值。"
+  },
+  "grassland::graphics::backend::vulkan::PipelineSettings::SetCullMode": {
+    "contract": "",
+    "description": "设置剔除flag。"
+  },
+  "grassland::graphics::backend::vulkan::PipelineSettings::SetMultiSampleState": {
+    "contract": "需设备支持。",
+    "description": "设置rasterizationSamples。"
+  },
+  "grassland::graphics::backend::vulkan::PipelineSettings::SetPolygonMode": {
+    "contract": "非fill需相应feature。",
+    "description": "设置填充模式。"
+  },
+  "grassland::graphics::backend::vulkan::PipelineSettings::SetPrimitiveTopology": {
+    "contract": "",
+    "description": "设置静态input assembly拓扑。"
+  },
+  "grassland::graphics::backend::vulkan::PipelineSettings::SetSubpass": {
+    "contract": "本Core工厂主要使用dynamic rendering。",
+    "description": "保存subpass索引。"
+  },
+  "grassland::graphics::backend::vulkan::PipelineSettings::SetTessellationState": {
+    "contract": "须与shader和拓扑一致。",
+    "description": "创建带patchControlPoints的可选tessellation state。"
+  },
+  "grassland::graphics::backend::vulkan::PresentFamilyIndex": {
+    "contract": "找不到返回uint32(-1)，调用方检查。",
+    "description": "返回第一个支持surface present support的family索引。"
+  },
+  "grassland::graphics::backend::vulkan::QuerySwapChainSupport": {
+    "contract": "原生结果码未检查。",
+    "description": "查询surface capabilities、formats和presentModes。"
+  },
+  "grassland::graphics::backend::vulkan::RETURN_IF_FAILED_VK": {
+    "contract": "",
+    "description": "非SUCCESS时记录消息与结果并从当前函数返回结果；最后错误只保留结果字符串。"
+  },
+  "grassland::graphics::backend::vulkan::SetErrorMessage": {
+    "contract": "无锁。",
+    "description": "输出错误并覆盖全局字符串。"
+  },
+  "grassland::graphics::backend::vulkan::SingleTimeCommand": {
+    "contract": "返回VkResult；回调抛异常无清理，submit_info借用局部指针会失效。",
+    "description": "分配一次性primary命令，回调录制后提交并vkQueueWaitIdle，再释放。"
+  },
+  "grassland::graphics::backend::vulkan::SupportGeometryShader": {
+    "contract": "",
+    "description": "返回基础features.geometryShader。"
+  },
+  "grassland::graphics::backend::vulkan::SupportRayQuery": {
+    "contract": "任何缺失false。",
+    "description": "检查ray query/AS/deferred host/address扩展及对应三个feature。"
+  },
+  "grassland::graphics::backend::vulkan::SupportRayTracing": {
+    "contract": "没有同步验证所有依赖扩展。",
+    "description": "返回rayTracingPipeline feature。"
+  },
+  "grassland::graphics::backend::vulkan::SwapChainSupportDetails": {
+    "contract": "具体成员声明与操作在本页逐项列出。",
+    "description": "surface能力、格式与presentModes快照。"
+  },
+  "grassland::graphics::backend::vulkan::ThrowError": {
+    "contract": "模板重载先fmt格式化。",
+    "description": "抛带[Vulkan]前缀的runtime_error。"
+  },
+  "grassland::graphics::backend::vulkan::ThrowIfFailed": {
+    "contract": "包括VK_TIMEOUT/NOT_READY等正状态。",
+    "description": "所有非VK_SUCCESS结果抛runtime_error并附数值。"
+  },
+  "grassland::graphics::backend::vulkan::TransferFamilyIndex": {
+    "contract": "找不到返回uint32(-1)，调用方检查。",
+    "description": "返回第一个支持TRANSFER的family索引。"
+  },
+  "grassland::graphics::backend::vulkan::TransitImageLayout": {
+    "contract": "不转移queue ownership；stage/access由调用方保证。",
+    "description": "录制单mip、全部层的image memory barrier。"
+  },
+  "grassland::graphics::backend::vulkan::VkColorSpaceToName": {
+    "contract": "未知带数值。",
+    "description": "返回已列举colorspace符号名。"
+  },
+  "grassland::graphics::backend::vulkan::VkFormatToName": {
+    "contract": "未列举格式返回Unknown format加数值，并非完整Vulkan枚举表。",
+    "description": "返回已列举VkFormat符号名。"
+  },
+  "grassland::graphics::backend::vulkan::VkPresentModeToName": {
+    "contract": "未知带数值。",
+    "description": "返回已列举present mode符号名。"
+  },
+  "grassland::graphics::backend::vulkan::VkResultToString": {
+    "contract": "未知以十六进制表示。",
+    "description": "返回常见VkResult符号名。"
+  },
+  "grassland::graphics::backend::vulkan::Warning": {
+    "contract": "",
+    "description": "输出带[Vulkan]前缀的警告。"
+  },
+  "grassland::graphics::backend::vulkan::kDefaultEnableValidationLayers": {
+    "contract": "",
+    "description": "NDEBUG时false，否则true。"
+  },
+  "grassland::graphics::backend::vulkan::operator*": {
+    "contract": "",
+    "description": "标量在左的DescriptorPoolSize乘法，转发pool_size*multiplier。"
+  },
+  "grassland::graphics::backend::vulkan::validationLayers": {
+    "contract": "",
+    "description": "唯一请求层VK_LAYER_KHRONOS_validation的常量列表。"
   },
   "grassland::graphics::detail::DispatchMagnifyEvent": {
     "contract": "取消只发 scale=1；原事件仍返回给系统继续处理。",

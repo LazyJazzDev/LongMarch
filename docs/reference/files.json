@@ -237,6 +237,302 @@
     "sha256": "b3ab4fa30096716e47434279ed2d133fa54c267c64343695f9d4cd8f00948b7e",
     "summary": "按编译宏聚合各后端公共入口。"
   },
+  "code/grassland/graphics/backend/d3d12/CMakeLists.txt": {
+    "details": [
+      "源文件集合、目标链接和父作用域导出以本页列出的 CMake 原文为准；PUBLIC 依赖会传递给使用此目标的调用方。"
+    ],
+    "sha256": "9accca75f8f46ce0dde93350d0a574ec5f06ee6aaafc2cf1a3faad765a222b14",
+    "summary": "定义 d3d12 的 CMake 构建边界与传递依赖。"
+  },
+  "code/grassland/graphics/backend/d3d12/d3d12_acceleration_structure.cpp": {
+    "details": [
+      "UpdateInstances按数量变化/容量不足选择重建，否则PERFORM_UPDATE；复制实例到共享upload buffer后同步构建。",
+      "没有BLAS/TLAS类型标记来阻止对BLAS调用UpdateInstances；调用方只对TLAS使用。scratch请求使用ScratchDataSizeInBytes，未单独采用UpdateScratchDataSizeInBytes。"
+    ],
+    "sha256": "33fa930d6d1f564027e563793f3b3c5fe390694a15be8fd3a0146d0ba8652add",
+    "summary": "持有BLAS/TLAS资源，并提供TLAS更新。；本文件实现接口行为。"
+  },
+  "code/grassland/graphics/backend/d3d12/d3d12_acceleration_structure.h": {
+    "details": [
+      "UpdateInstances按数量变化/容量不足选择重建，否则PERFORM_UPDATE；复制实例到共享upload buffer后同步构建。",
+      "没有BLAS/TLAS类型标记来阻止对BLAS调用UpdateInstances；调用方只对TLAS使用。scratch请求使用ScratchDataSizeInBytes，未单独采用UpdateScratchDataSizeInBytes。"
+    ],
+    "sha256": "70d03daa9106fafee3fea2c668ee00bc5a37b3a6b381c2d597323df3bf4bcb91",
+    "summary": "持有BLAS/TLAS资源，并提供TLAS更新。；本文件定义类型与调用接口。"
+  },
+  "code/grassland/graphics/backend/d3d12/d3d12_backend.cpp": {
+    "details": [
+      "#include \"grassland/graphics/backend/d3d12/d3d12_backend.h\""
+    ],
+    "sha256": "034e4fa621be0b45bbbd878f76ac06ba63aa7464070eb17e8c930b5453fea994",
+    "summary": "模块编译单元：包含对应头文件并保留命名空间边界，无额外运行时算法。"
+  },
+  "code/grassland/graphics/backend/d3d12/d3d12_backend.h": {
+    "details": [
+      "#include \"grassland/graphics/backend/d3d12/d3d12_core.h\"",
+      "#include \"grassland/graphics/backend/d3d12/d3d12_window.h\""
+    ],
+    "sha256": "1140bdb35348c067cf91f2e5ed85344aebe7859ccac6ec9942ae408edb19622e",
+    "summary": "聚合头：将相关声明从一个入口暴露给调用方。"
+  },
+  "code/grassland/graphics/backend/d3d12/d3d12_buffer.cpp": {
+    "details": [
+      "Size返回按256对齐的原生宽度，可能大于请求长度。上传/下载没有host长度或offset范围检查。",
+      "Static传输WaitGPU并使用Core缓存staging；Dynamic只Map CPU staging，Download不读取GPU执行结果；TransferData提交时复制整个staging。",
+      "Dynamic Resize只替换CPU staging，当前帧GPU资源在TransferData按需重建。",
+      "CUDA Download调用CopyNativeBuffer时沿用GENERIC_READ默认状态，而READBACK staging实际为COPY_DEST；这条路径存在状态假设不一致，不能视作已验证。"
+    ],
+    "sha256": "427cdc2bb7b71a184f829d902172098f46b71b77f5a5e99b57ea71100c3b1273",
+    "summary": "静态、逐帧动态与CUDA共享缓冲实现。；本文件实现接口行为。"
+  },
+  "code/grassland/graphics/backend/d3d12/d3d12_buffer.h": {
+    "details": [
+      "Size返回按256对齐的原生宽度，可能大于请求长度。上传/下载没有host长度或offset范围检查。",
+      "Static传输WaitGPU并使用Core缓存staging；Dynamic只Map CPU staging，Download不读取GPU执行结果；TransferData提交时复制整个staging。",
+      "Dynamic Resize只替换CPU staging，当前帧GPU资源在TransferData按需重建。",
+      "CUDA Download调用CopyNativeBuffer时沿用GENERIC_READ默认状态，而READBACK staging实际为COPY_DEST；这条路径存在状态假设不一致，不能视作已验证。"
+    ],
+    "sha256": "062595776d4c9f5f6f0efaa71f314bd681b721c83f72397db96d719b6528f66f",
+    "summary": "静态、逐帧动态与CUDA共享缓冲实现。；本文件定义类型与调用接口。"
+  },
+  "code/grassland/graphics/backend/d3d12/d3d12_command_context.cpp": {
+    "details": [
+      "CmdBindResources需先绑定对应Program，否则日志并返回；slot/count/跨后端指针多数未检查。",
+      "RequireResourceState假定首次出现的普通资源为GENERIC_READ；同状态不发屏障。提交末尾恢复原生状态，但context缓存未重置，按一次性context使用。",
+      "CBV大小按256对齐且offset须满足原生对齐；raw SRV/UAV按4字节计元素，非整倍数会截断。",
+      "CmdCopyBuffer头文件形参名写src/dst，而实现与基类实际约定是dst在前、src在后；调用时以实现语义为准。"
+    ],
+    "sha256": "86fdeb01360d21a55b5688889097ba8fe832984f0ae936aa896ef4cc9dfd673e",
+    "summary": "延迟命令队列、描述符预算和局部资源状态跟踪。；本文件实现接口行为。"
+  },
+  "code/grassland/graphics/backend/d3d12/d3d12_command_context.h": {
+    "details": [
+      "CmdBindResources需先绑定对应Program，否则日志并返回；slot/count/跨后端指针多数未检查。",
+      "RequireResourceState假定首次出现的普通资源为GENERIC_READ；同状态不发屏障。提交末尾恢复原生状态，但context缓存未重置，按一次性context使用。",
+      "CBV大小按256对齐且offset须满足原生对齐；raw SRV/UAV按4字节计元素，非整倍数会截断。",
+      "CmdCopyBuffer头文件形参名写src/dst，而实现与基类实际约定是dst在前、src在后；调用时以实现语义为准。"
+    ],
+    "sha256": "17e8b6b8a688ed8d3efde97b33e0cf30325e42c6e3f00fa70ac2f2924ed05609",
+    "summary": "延迟命令队列、描述符预算和局部资源状态跟踪。；本文件定义类型与调用接口。"
+  },
+  "code/grassland/graphics/backend/d3d12/d3d12_commands.cpp": {
+    "details": [
+      "构造仅复制参数/指针，不执行GPU操作；CompileCommand在Core提交时调用。",
+      "资源描述符按实际传入数组写入，但heap容量按声明预算，数组长度必须精确匹配。",
+      "Dispatch和DispatchRays之后发全局UAV barrier；图形Draw后没有自动UAV barrier。",
+      "Present保持宽高比、居中黑边，绘制6顶点；会覆盖图形pipeline、root signature、viewport等状态，后续绘制须重新绑定。"
+    ],
+    "sha256": "12a5443ff18f5e108ff952cb64f9fa7d12f1d1acd5c4309c3b53510031592a67",
+    "summary": "把已录制的参数和借用资源编译成原生D3D12命令。；本文件实现接口行为。"
+  },
+  "code/grassland/graphics/backend/d3d12/d3d12_commands.h": {
+    "details": [
+      "构造仅复制参数/指针，不执行GPU操作；CompileCommand在Core提交时调用。",
+      "资源描述符按实际传入数组写入，但heap容量按声明预算，数组长度必须精确匹配。",
+      "Dispatch和DispatchRays之后发全局UAV barrier；图形Draw后没有自动UAV barrier。",
+      "Present保持宽高比、居中黑边，绘制6顶点；会覆盖图形pipeline、root signature、viewport等状态，后续绘制须重新绑定。"
+    ],
+    "sha256": "93a76d05e1a10c22f08de8f50fb871bb3b6f5e904a326fb4cbe54cafd723b456",
+    "summary": "把已录制的参数和借用资源编译成原生D3D12命令。；本文件定义类型与调用接口。"
+  },
+  "code/grassland/graphics/backend/d3d12/d3d12_core.cpp": {
+    "details": [
+      "Submit先上传动态buffer，再编译命令、恢复普通资源GENERIC_READ、Present(0,0)、signal fence；轮转后等待可复用帧槽并执行回调。",
+      "WaitGPU等当前fence值并清全部完成回调；析构仅关闭event，不隐式等待GPU。",
+      "Create*通常成功返回0，原生错误可能抛异常；BLAS/TLAS创建忽略内部Build HRESULT，不能仅凭0判断资源有效。",
+      "DXR payload上限2048字节、attribute16字节、递归深度31；SBT record32字节、table64字节对齐，无local root参数。",
+      "CUDA共享fence导入返回码未检查，初始化查询cudaDeviceProp使用adapter索引而非匹配出的CUDA索引；共享semaphore/handle清理也不完整。"
+    ],
+    "sha256": "95ec196d41a708feacd307abb5e0c01c603d56cfe1c77c7aadf8c6bf2f8fc1ae",
+    "summary": "设备工厂、逐帧提交同步、共享staging与DXR构建。；本文件实现接口行为。"
+  },
+  "code/grassland/graphics/backend/d3d12/d3d12_core.h": {
+    "details": [
+      "Submit先上传动态buffer，再编译命令、恢复普通资源GENERIC_READ、Present(0,0)、signal fence；轮转后等待可复用帧槽并执行回调。",
+      "WaitGPU等当前fence值并清全部完成回调；析构仅关闭event，不隐式等待GPU。",
+      "Create*通常成功返回0，原生错误可能抛异常；BLAS/TLAS创建忽略内部Build HRESULT，不能仅凭0判断资源有效。",
+      "DXR payload上限2048字节、attribute16字节、递归深度31；SBT record32字节、table64字节对齐，无local root参数。",
+      "CUDA共享fence导入返回码未检查，初始化查询cudaDeviceProp使用adapter索引而非匹配出的CUDA索引；共享semaphore/handle清理也不完整。"
+    ],
+    "sha256": "be5c84531b0d3c391f3d77bb79b06831f5c58c2890a7c7c0ca45c685c5aba958",
+    "summary": "设备工厂、逐帧提交同步、共享staging与DXR构建。；本文件定义类型与调用接口。"
+  },
+  "code/grassland/graphics/backend/d3d12/d3d12_image.cpp": {
+    "details": [
+      "CPU像素紧密排列，GetCopyableFootprints给出原生行pitch；下载逐行去掉padding。",
+      "区域操作借助与区域同尺寸的临时texture及staging Buffer，主图像在拷贝前后转换状态。",
+      "未显式验证负坐标、零尺寸和越界区域；调用方保证格式、内存大小与范围正确。"
+    ],
+    "sha256": "15d8d91127e98ca6c31589b9727f106c22e05746a9718b7f072208207601d142",
+    "summary": "默认heap二维图像的全图/区域同步传输。；本文件实现接口行为。"
+  },
+  "code/grassland/graphics/backend/d3d12/d3d12_image.h": {
+    "details": [
+      "CPU像素紧密排列，GetCopyableFootprints给出原生行pitch；下载逐行去掉padding。",
+      "区域操作借助与区域同尺寸的临时texture及staging Buffer，主图像在拷贝前后转换状态。",
+      "未显式验证负坐标、零尺寸和越界区域；调用方保证格式、内存大小与范围正确。"
+    ],
+    "sha256": "a17440f64f3928612aca51fba4b15e724f09a56bb7126c4323d4d4a56bd4ba74",
+    "summary": "默认heap二维图像的全图/区域同步传输。；本文件定义类型与调用接口。"
+  },
+  "code/grassland/graphics/backend/d3d12/d3d12_imgui_assets.cpp": {
+    "details": [
+      "分配器借用heap，Alloc依赖断言防耗尽，Free只断言CPU/GPU索引一致，不查重复释放或范围。",
+      "这一兼容层不等于Snowberg GUI；已迁移demo使用统一GUI，底层旧API仍保留。"
+    ],
+    "sha256": "6dd81b828a5d8c4ad6cdf554a668a7b0653e4cb88f4a702c65934c778ef13f53",
+    "summary": "兼容ImGui的64槽SRV heap、空闲索引分配器及窗口状态。；本文件实现接口行为。"
+  },
+  "code/grassland/graphics/backend/d3d12/d3d12_imgui_assets.h": {
+    "details": [
+      "分配器借用heap，Alloc依赖断言防耗尽，Free只断言CPU/GPU索引一致，不查重复释放或范围。",
+      "这一兼容层不等于Snowberg GUI；已迁移demo使用统一GUI，底层旧API仍保留。"
+    ],
+    "sha256": "04fb0bc0bcc87ad81042d28e83896169d5a4aded6c71ff200fc2f3991876dcf5",
+    "summary": "兼容ImGui的64槽SRV heap、空闲索引分配器及窗口状态。；本文件定义类型与调用接口。"
+  },
+  "code/grassland/graphics/backend/d3d12/d3d12_program.cpp": {
+    "details": [
+      "每个资源绑定建立单个descriptor range，register space为添加顺序，base register为0。",
+      "图形管线单sample、CCW正面、默认triangle拓扑类型，深度格式有效才开启深度，stencil关闭；最多8颜色附件由调用方保证。",
+      "Compute Finalize未检查CreateComputePipelineState HRESULT；DXR Finalize也未传播Core返回HRESULT。",
+      "DXR必须先设置raygen；Shader blob全为借用指针。SBT索引须指向已注册shader/group，未做范围检查。"
+    ],
+    "sha256": "625193e066d2c8d3ad70e7bf9c1c78069af6df5ee2b74829e0d7626361e17e0b",
+    "summary": "图形、计算和DXR管线布局及Finalize。；本文件实现接口行为。"
+  },
+  "code/grassland/graphics/backend/d3d12/d3d12_program.h": {
+    "details": [
+      "每个资源绑定建立单个descriptor range，register space为添加顺序，base register为0。",
+      "图形管线单sample、CCW正面、默认triangle拓扑类型，深度格式有效才开启深度，stencil关闭；最多8颜色附件由调用方保证。",
+      "Compute Finalize未检查CreateComputePipelineState HRESULT；DXR Finalize也未传播Core返回HRESULT。",
+      "DXR必须先设置raygen；Shader blob全为借用指针。SBT索引须指向已注册shader/group，未做范围检查。"
+    ],
+    "sha256": "c7161ac32df78181748a364135fce13ca7189238ade2d5d8e7819ea9f9154946",
+    "summary": "图形、计算和DXR管线布局及Finalize。；本文件定义类型与调用接口。"
+  },
+  "code/grassland/graphics/backend/d3d12/d3d12_sampler.cpp": {
+    "details": [
+      "MaxAnisotropy=1，Comparison=NEVER，border透明黑，LOD范围0到FLOAT32_MAX。"
+    ],
+    "sha256": "a09ea0e411fd9693ebf1a838ad311fc6e30c3d7d2acd8735f52987008713ed6d",
+    "summary": "SamplerInfo映射为可复制的D3D12_SAMPLER_DESC。；本文件实现接口行为。"
+  },
+  "code/grassland/graphics/backend/d3d12/d3d12_sampler.h": {
+    "details": [
+      "MaxAnisotropy=1，Comparison=NEVER，border透明黑，LOD范围0到FLOAT32_MAX。"
+    ],
+    "sha256": "eb37ddc00d28d43e39f3f28e5252e4eb6051d2313eb57eacb8cd63af7732b136",
+    "summary": "SamplerInfo映射为可复制的D3D12_SAMPLER_DESC。；本文件定义类型与调用接口。"
+  },
+  "code/grassland/graphics/backend/d3d12/d3d12_shader.cpp": {
+    "details": [
+      "Bytecode地址指向对象内部vector，必须保持Shader存活至管线创建完成。"
+    ],
+    "sha256": "fdef865a41e4320f5fd326aca5338314af0a31b74d7b698b305248d6ea153211",
+    "summary": "拥有CompiledShaderBlob副本，暴露入口名及借用bytecode。；本文件实现接口行为。"
+  },
+  "code/grassland/graphics/backend/d3d12/d3d12_shader.h": {
+    "details": [
+      "Bytecode地址指向对象内部vector，必须保持Shader存活至管线创建完成。"
+    ],
+    "sha256": "da6f1042bed81921673a2b4d27404220fdc59655307b725b2cc3233405236bb9",
+    "summary": "拥有CompiledShaderBlob副本，暴露入口名及借用bytecode。；本文件定义类型与调用接口。"
+  },
+  "code/grassland/graphics/backend/d3d12/d3d12_util.cpp": {
+    "details": [
+      "Buffer 按256字节对齐；默认 heap Buffer 允许 UAV。Image 为单mip单sample Tex2D，深度使用DEPTH_STENCIL，其余RENDER_TARGET|UAV，初始GENERIC_READ。",
+      "SwapChain采用FLIP_DISCARD；RGBA16F时尝试线性P709色彩空间，系统不支持时不会因该检查失败而拒绝创建。",
+      "枚举跳过软件适配器，评分为专用显存MiB加光追支持100000。"
+    ],
+    "sha256": "6699d87032ff679cd9030b77062e23872084ddfa7b7b2f096de5afa7c44da83c",
+    "summary": "原生资源工厂、适配器枚举和抽象枚举转换。；本文件实现接口行为。"
+  },
+  "code/grassland/graphics/backend/d3d12/d3d12_util.h": {
+    "details": [
+      "Buffer 按256字节对齐；默认 heap Buffer 允许 UAV。Image 为单mip单sample Tex2D，深度使用DEPTH_STENCIL，其余RENDER_TARGET|UAV，初始GENERIC_READ。",
+      "SwapChain采用FLIP_DISCARD；RGBA16F时尝试线性P709色彩空间，系统不支持时不会因该检查失败而拒绝创建。",
+      "枚举跳过软件适配器，评分为专用显存MiB加光追支持100000。"
+    ],
+    "sha256": "a7071f9de655751a51572138987e246eb6f5de0c3fdbdcaf181e38fd7d6dfdb5",
+    "summary": "原生资源工厂、适配器枚举和抽象枚举转换。；本文件定义类型与调用接口。"
+  },
+  "code/grassland/graphics/backend/d3d12/d3d12_window.cpp": {
+    "details": [
+      "交换链buffer数将FramesInFlight夹到2..DXGI_MAX_SWAP_CHAIN_BUFFERS，SDR RGBA8/HDR RGBA16F。",
+      "Resize事件WaitGPU后整体重建交换链，格式变化时重建ImGui上下文，原有ImGui状态会丢失。",
+      "CloseWindow先WaitGPU，释放ImGui/交换链/窗口并注销事件。"
+    ],
+    "sha256": "bed4952ff50c3b99791bd9f55f2e5ba59d0545ddc843a6d67e69c88e9b16cc85",
+    "summary": "GLFW Win32窗口、DXGI交换链和兼容ImGui。；本文件实现接口行为。"
+  },
+  "code/grassland/graphics/backend/d3d12/d3d12_window.h": {
+    "details": [
+      "交换链buffer数将FramesInFlight夹到2..DXGI_MAX_SWAP_CHAIN_BUFFERS，SDR RGBA8/HDR RGBA16F。",
+      "Resize事件WaitGPU后整体重建交换链，格式变化时重建ImGui上下文，原有ImGui状态会丢失。",
+      "CloseWindow先WaitGPU，释放ImGui/交换链/窗口并注销事件。"
+    ],
+    "sha256": "d5ac1c05f1d62258a4ad0c0e71fcdbc51210581fc59c77c4d147dd4fb47800b1",
+    "summary": "GLFW Win32窗口、DXGI交换链和兼容ImGui。；本文件定义类型与调用接口。"
+  },
+  "code/grassland/graphics/backend/d3d12/helper/command_queue.cpp": {
+    "details": [
+      "queue/allocator必须相容且可重置；function录制期间抛异常会直接传播，HRESULT宏处理原生API失败。",
+      "WaitForSingleObject结果未检查；返回SetEventOnCompletion的HRESULT，事件会CloseHandle。"
+    ],
+    "sha256": "d4f7fdd410057ba7f314464394abe8fe1796b0f57bf64a897120f400b02b2610",
+    "summary": "一次性Direct命令提交与Win32 fence事件等待。；本文件实现接口行为。"
+  },
+  "code/grassland/graphics/backend/d3d12/helper/command_queue.h": {
+    "details": [
+      "queue/allocator必须相容且可重置；function录制期间抛异常会直接传播，HRESULT宏处理原生API失败。",
+      "WaitForSingleObject结果未检查；返回SetEventOnCompletion的HRESULT，事件会CloseHandle。"
+    ],
+    "sha256": "d34542bf12b55351d3b6cf060a5388d7243f52006cd1232a108a3e1cb4195728",
+    "summary": "一次性Direct命令提交与Win32 fence事件等待。；本文件定义类型与调用接口。"
+  },
+  "code/grassland/graphics/backend/d3d12/helper/d3d12util.cpp": {
+    "details": [
+      "RETURN_IF_FAILED_HR会先记录业务消息再记录HRESULT，因此GetErrorMessage最终仅保留后者。",
+      "SizeAlignTo使用位掩码，只适用于非零2次幂alignment；CreateBuffer固定按256对齐，size0仍为0。",
+      "SizeByFormat只覆盖源码列出的整数/float格式，未覆盖所有DXGI格式，未知返回0。"
+    ],
+    "sha256": "cb226d2185def94ff18b4defcca711838d43793528b6b2a88c0c1dd801830863",
+    "summary": "D3D12错误工具、像素大小查询、对齐计算与缓冲资源工厂。；本文件实现接口行为。"
+  },
+  "code/grassland/graphics/backend/d3d12/helper/d3d12util.h": {
+    "details": [
+      "RETURN_IF_FAILED_HR会先记录业务消息再记录HRESULT，因此GetErrorMessage最终仅保留后者。",
+      "SizeAlignTo使用位掩码，只适用于非零2次幂alignment；CreateBuffer固定按256对齐，size0仍为0。",
+      "SizeByFormat只覆盖源码列出的整数/float格式，未覆盖所有DXGI格式，未知返回0。"
+    ],
+    "sha256": "b62007f10518007b8736f4e704727d85ed16db89d33df575434a0f724e9a4c68",
+    "summary": "D3D12错误工具、像素大小查询、对齐计算与缓冲资源工厂。；本文件定义类型与调用接口。"
+  },
+  "code/grassland/graphics/backend/d3d12/helper/direct3d12.cpp": {
+    "details": [],
+    "sha256": "554f623e0e8dc5768689066cf16d79b86e49f68e35ab248178d3b6b9ed9827c2",
+    "summary": "聚合command_queue与shader_module的辅助入口，无额外运行时算法。"
+  },
+  "code/grassland/graphics/backend/d3d12/helper/direct3d12.h": {
+    "details": [],
+    "sha256": "6b35e8064553a0b761c34e6f631ddc81966380f1531cea1580aeab0ca8f21a13",
+    "summary": "聚合command_queue与shader_module的辅助入口，无额外运行时算法。"
+  },
+  "code/grassland/graphics/backend/d3d12/helper/shader_module.cpp": {
+    "details": [
+      "CompileShader直接调用graphics::CompileShader；helper本身不单独运行D3DCompile。"
+    ],
+    "sha256": "7489f70a75923b8abe9985754ca674da31e13dfb2c16ba515f313440e523937b",
+    "summary": "转发统一Shader编译与定义借用blob的HitGroup。；本文件实现接口行为。"
+  },
+  "code/grassland/graphics/backend/d3d12/helper/shader_module.h": {
+    "details": [
+      "CompileShader直接调用graphics::CompileShader；helper本身不单独运行D3DCompile。"
+    ],
+    "sha256": "17fe72f49472a8b22d855306b8121aead55145622f1407c5d8d9803b44755347",
+    "summary": "转发统一Shader编译与定义借用blob的HitGroup。；本文件定义类型与调用接口。"
+  },
   "code/grassland/graphics/backend/metal/CMakeLists.txt": {
     "details": [],
     "sha256": "824fcf48f22eed4d96e5981fda2ccb381910a48760034c96cce7f698e0567296",
@@ -430,6 +726,278 @@
     "sha256": "9e57bd06aa5a804471c232d58a7a0599fd66c8dac0067232145b63fc5ab64e29",
     "summary": "Cocoa CAMetalLayer、SDR/EDR呈现和兼容ImGui。；Objective-C++实现。"
   },
+  "code/grassland/graphics/backend/vulkan/helper/buffer.cpp": {
+    "details": [
+      "按平台选Win32/KMT或FD handle；创建Buffer后查询requirements，调用方回调选择memoryType。",
+      "需要device address时加分配flag；分配失败抛异常，前面已创建的Buffer未在失败路径自动销毁。vkBindBufferMemory返回码未检查。"
+    ],
+    "sha256": "b45421b6297bc6edfe307f08aa69d94dbc2554113960556197b900d849da753f",
+    "summary": "CUDA外部内存Buffer创建。；本文件实现接口行为。"
+  },
+  "code/grassland/graphics/backend/vulkan/helper/buffer.h": {
+    "details": [
+      "按平台选Win32/KMT或FD handle；创建Buffer后查询requirements，调用方回调选择memoryType。",
+      "需要device address时加分配flag；分配失败抛异常，前面已创建的Buffer未在失败路径自动销毁。vkBindBufferMemory返回码未检查。"
+    ],
+    "sha256": "08fbfd6886f337a7a8269db2c181a580e94b425ae108e3d68417b5e5bc80e98e",
+    "summary": "CUDA外部内存Buffer创建。；本文件定义类型与调用接口。"
+  },
+  "code/grassland/graphics/backend/vulkan/helper/descriptor_pool.h": {
+    "details": [
+      "默认构造登记11种常规类型但不含AS；单类型构造可添加AS。",
+      "转换VkDescriptorPoolSize列表过滤零计数；uint32运算无溢出检查，operator*=返回值副本而非引用。"
+    ],
+    "sha256": "389812ce9798b35b2267066c61f23a5b4a625e8d4e01d36238d6d42204992f53",
+    "summary": "按descriptor类型统计池容量的可加、可乘值对象。"
+  },
+  "code/grassland/graphics/backend/vulkan/helper/device_creation_assist.cpp": {
+    "details": [
+      "Compile会重建内部queue info，并从设备读取所有基础features作为启用值；validation只在instance启用。",
+      "推荐配置直接要求descriptor indexing/dynamic rendering/extended dynamic state/scalar layout等feature和扩展，未在此逐项验证支持。",
+      "为每个queue family请求全部队列、priority1；extension字符串仍借用。"
+    ],
+    "sha256": "e93bc0dd750d9d1148c648f0daece29c26465ba35c7a517bf3721a1a8d7a2ee4",
+    "summary": "拥有feature结构副本并生成借用它们的VkDeviceCreateInfo。；本文件实现接口行为。"
+  },
+  "code/grassland/graphics/backend/vulkan/helper/device_creation_assist.h": {
+    "details": [
+      "Compile会重建内部queue info，并从设备读取所有基础features作为启用值；validation只在instance启用。",
+      "推荐配置直接要求descriptor indexing/dynamic rendering/extended dynamic state/scalar layout等feature和扩展，未在此逐项验证支持。",
+      "为每个queue family请求全部队列、priority1；extension字符串仍借用。"
+    ],
+    "sha256": "52b289de03477f83a968b61170f7b6b6353496330452c118054b103a0f84d271",
+    "summary": "拥有feature结构副本并生成借用它们的VkDeviceCreateInfo。；本文件定义类型与调用接口。"
+  },
+  "code/grassland/graphics/backend/vulkan/helper/device_procedures.cpp": {
+    "details": [
+      "vkGetDeviceProcAddr缺函数会抛异常；RayTracing加载先包含AS函数。"
+    ],
+    "sha256": "7474513c826089693d4190aa456f5caae0ce6442eda8834718d6be81d59c301f",
+    "summary": "加载device级AS和SBT光追函数表。；本文件实现接口行为。"
+  },
+  "code/grassland/graphics/backend/vulkan/helper/device_procedures.h": {
+    "details": [
+      "vkGetDeviceProcAddr缺函数会抛异常；RayTracing加载先包含AS函数。"
+    ],
+    "sha256": "b02b45ba83f8ee5caa5f425fd4e6bcde43a35ce09efafab0037b64825f7d741f",
+    "summary": "加载device级AS和SBT光追函数表。；本文件定义类型与调用接口。"
+  },
+  "code/grassland/graphics/backend/vulkan/helper/image.cpp": {
+    "details": [
+      "队列family均IGNORED，不做跨队列所有权转移；stage/access/aspect由调用方提供。"
+    ],
+    "sha256": "aca50bf435650d5d469f7a4b4e0611214502c6c1c85dd0df3a3ced3c453b15dd",
+    "summary": "录制单mip、全部array layers的图像layout barrier。；本文件实现接口行为。"
+  },
+  "code/grassland/graphics/backend/vulkan/helper/image.h": {
+    "details": [
+      "队列family均IGNORED，不做跨队列所有权转移；stage/access/aspect由调用方提供。"
+    ],
+    "sha256": "034c6c9d90bfaae91585ede93f6312fc6ffb4e53935655a0df86837179a02df9",
+    "summary": "录制单mip、全部array layers的图像layout barrier。；本文件定义类型与调用接口。"
+  },
+  "code/grassland/graphics/backend/vulkan/helper/instance.cpp": {
+    "details": [
+      "构造hint时可能临时glfwInit/Terminate以获取surface扩展；总是添加swapchain colorspace扩展。",
+      "请求validation但系统无Khronos层时返回VK_ERROR_UNKNOWN；Apple添加portability enumeration。",
+      "CreateNativeInstance后续debug messenger失败不会自动销毁已创建instance。"
+    ],
+    "sha256": "16b4d268e9047f0ba77d1edcffec15076f6d5f1b6e8b63327dd73adad181ed74",
+    "summary": "Vulkan1.2 instance配置及物理设备枚举。；本文件实现接口行为。"
+  },
+  "code/grassland/graphics/backend/vulkan/helper/instance.h": {
+    "details": [
+      "构造hint时可能临时glfwInit/Terminate以获取surface扩展；总是添加swapchain colorspace扩展。",
+      "请求validation但系统无Khronos层时返回VK_ERROR_UNKNOWN；Apple添加portability enumeration。",
+      "CreateNativeInstance后续debug messenger失败不会自动销毁已创建instance。"
+    ],
+    "sha256": "179e6e47cf55783311e73ccf75e906948d22c476d7be0215f657d02fe22c341e",
+    "summary": "Vulkan1.2 instance配置及物理设备枚举。；本文件定义类型与调用接口。"
+  },
+  "code/grassland/graphics/backend/vulkan/helper/instance_procedures.cpp": {
+    "details": [
+      "vkGetInstanceProcAddr缺函数只写警告并保留null，后续调用者必须确认可用。"
+    ],
+    "sha256": "a55c8585003b640d78a5b22177ba5ca1fdc118201ecab7b9c2eef808da0b8f65",
+    "summary": "加载debug、dynamic rendering与dynamic topology函数。；本文件实现接口行为。"
+  },
+  "code/grassland/graphics/backend/vulkan/helper/instance_procedures.h": {
+    "details": [
+      "vkGetInstanceProcAddr缺函数只写警告并保留null，后续调用者必须确认可用。"
+    ],
+    "sha256": "3cc23f6c697110b3af5c240205a44c9c7a4b5c2809f1b4329fcdcb6e0553100b",
+    "summary": "加载debug、dynamic rendering与dynamic topology函数。；本文件定义类型与调用接口。"
+  },
+  "code/grassland/graphics/backend/vulkan/helper/native_types.h": {
+    "details": [
+      "#include \"glm/glm.hpp\"",
+      "#include \"grassland/graphics/backend/vulkan/helper/device_creation_assist.h\"",
+      "#include \"grassland/graphics/backend/vulkan/helper/device_procedures.h\"",
+      "#include \"grassland/graphics/backend/vulkan/helper/instance.h\"",
+      "#include \"grassland/graphics/backend/vulkan/helper/physical_device.h\""
+    ],
+    "sha256": "66d6a6a942319b3fdea0c2c60293f091a6f66b448c727676ac7b77a2fa4e85c8",
+    "summary": "聚合头：将相关声明从一个入口暴露给调用方。"
+  },
+  "code/grassland/graphics/backend/vulkan/helper/physical_device.cpp": {
+    "details": [
+      "GetDeviceLocalMemorySize返回最后一个DEVICE_LOCAL heap的大小，不是所有heap总和。",
+      "RayQuery同时检查4个扩展和query/AS/address feature；RayTracing只查rayTracingPipeline feature。",
+      "family选择取第一个符合条件者，失败返回uint32(-1)；不会优先专用transfer/compute队列。"
+    ],
+    "sha256": "4665ca539c2110d6cdde9adf216e499f32ac6514cc04b87f9b4af58c6d610f55",
+    "summary": "设备feature、扩展、队列family与选择评分。；本文件实现接口行为。"
+  },
+  "code/grassland/graphics/backend/vulkan/helper/physical_device.h": {
+    "details": [
+      "GetDeviceLocalMemorySize返回最后一个DEVICE_LOCAL heap的大小，不是所有heap总和。",
+      "RayQuery同时检查4个扩展和query/AS/address feature；RayTracing只查rayTracingPipeline feature。",
+      "family选择取第一个符合条件者，失败返回uint32(-1)；不会优先专用transfer/compute队列。"
+    ],
+    "sha256": "a20764ff94ef1f45b6be4779e272bb793204d028be6077d806d3e18fb58004bd",
+    "summary": "设备feature、扩展、队列family与选择评分。；本文件定义类型与调用接口。"
+  },
+  "code/grassland/graphics/backend/vulkan/helper/pipeline.cpp": {
+    "details": [
+      "默认triangle、单sample、CCW/back cull/fill；有depth format时LESS且写深度，stencil关闭。",
+      "AddShaderStage保存entry_point.c_str()借用地址，shader_entry_points_storage没有在此填充；调用方字符串须活到创建管线。"
+    ],
+    "sha256": "eb74af6080068e8a25f16ee62a30f0ee8e0920602fc1c198aab8cfedd9d4ed2c",
+    "summary": "图形管线配置值容器，供Core原生管线工厂消费。；本文件实现接口行为。"
+  },
+  "code/grassland/graphics/backend/vulkan/helper/pipeline.h": {
+    "details": [
+      "默认triangle、单sample、CCW/back cull/fill；有depth format时LESS且写深度，stencil关闭。",
+      "AddShaderStage保存entry_point.c_str()借用地址，shader_entry_points_storage没有在此填充；调用方字符串须活到创建管线。"
+    ],
+    "sha256": "cb37570fcbdd3e86ed51146a26a488817dbb543258f855c71f5c296cf7666405",
+    "summary": "图形管线配置值容器，供Core原生管线工厂消费。；本文件定义类型与调用接口。"
+  },
+  "code/grassland/graphics/backend/vulkan/helper/raytracing/acceleration_structure.cpp": {
+    "details": [
+      "扩容先销毁旧资源，后续创建失败不会回滚旧AS；当前函数未先WaitGPU，调用方负责。",
+      "scratch地址按minAccelerationStructureScratchOffsetAlignment对齐，正常返回前释放scratch；回调异常可能越过清理。"
+    ],
+    "sha256": "b356a18b25d89540fd8a4560dfa52664d53c3f501ac28ffe1757b7869c88f41e",
+    "summary": "单geometry原生AS构建/更新辅助。；本文件实现接口行为。"
+  },
+  "code/grassland/graphics/backend/vulkan/helper/raytracing/acceleration_structure.h": {
+    "details": [
+      "扩容先销毁旧资源，后续创建失败不会回滚旧AS；当前函数未先WaitGPU，调用方负责。",
+      "scratch地址按minAccelerationStructureScratchOffsetAlignment对齐，正常返回前释放scratch；回调异常可能越过清理。"
+    ],
+    "sha256": "0f1b7f4e19408b58987ddbd86d6fca9d1b9979d9680fd75f6b0cce251147b244",
+    "summary": "单geometry原生AS构建/更新辅助。；本文件定义类型与调用接口。"
+  },
+  "code/grassland/graphics/backend/vulkan/helper/raytracing/raytracing.h": {
+    "details": [
+      "#include \"grassland/graphics/backend/vulkan/helper/raytracing/acceleration_structure.h\""
+    ],
+    "sha256": "c6f5c7e9bd7ec377a369a15bc663493ccb8f965e2f5a131dea20fba46a5e8890",
+    "summary": "聚合头：将相关声明从一个入口暴露给调用方。"
+  },
+  "code/grassland/graphics/backend/vulkan/helper/semaphore.cpp": {
+    "details": [
+      "Windows8及以后OPAQUE_WIN32，更旧KMT；其他平台FD。"
+    ],
+    "sha256": "7b2ee2dd456c860c1f31b5714f35fe36a2f62ca80ec8a2b3fcac0fae3d6ca1f1",
+    "summary": "CUDA外部semaphore平台handle类型选择。；本文件实现接口行为。"
+  },
+  "code/grassland/graphics/backend/vulkan/helper/semaphore.h": {
+    "details": [
+      "Windows8及以后OPAQUE_WIN32，更旧KMT；其他平台FD。"
+    ],
+    "sha256": "c17fa21964984a1997381c49a5c13e78d838d7d0c86ede2b6d48dbffb81b847b",
+    "summary": "CUDA外部semaphore平台handle类型选择。；本文件定义类型与调用接口。"
+  },
+  "code/grassland/graphics/backend/vulkan/helper/shader_module.h": {
+    "details": [
+      "closest-hit/any-hit/intersection默认null，procedure默认false；不拥有shader。"
+    ],
+    "sha256": "560284d142934c3bc0211bb1047a27e7de788588df0a89d0055649d4188efe0f",
+    "summary": "定义借用VulkanShader指针的HitGroup。"
+  },
+  "code/grassland/graphics/backend/vulkan/helper/single_time_command.cpp": {
+    "details": [
+      "带submit_info重载修改commandBufferCount/pCommandBuffers，函数返回后后者指向已失效局部变量，不可原样复用。",
+      "正常路径释放command buffer；回调抛异常时没有RAII清理。"
+    ],
+    "sha256": "941154ff2777189c6fe183adb28f61ba2579a8c8c3e3d6a71e3807bc2b98e3f7",
+    "summary": "临时primary command buffer录制、提交并queue idle等待。；本文件实现接口行为。"
+  },
+  "code/grassland/graphics/backend/vulkan/helper/single_time_command.h": {
+    "details": [
+      "带submit_info重载修改commandBufferCount/pCommandBuffers，函数返回后后者指向已失效局部变量，不可原样复用。",
+      "正常路径释放command buffer；回调抛异常时没有RAII清理。"
+    ],
+    "sha256": "01e2b6a399d6126ccb9ef41d6063ff36b4f3cb715c58bd72b9c5ef84c306ef68",
+    "summary": "临时primary command buffer录制、提交并queue idle等待。；本文件定义类型与调用接口。"
+  },
+  "code/grassland/graphics/backend/vulkan/helper/swap_chain.cpp": {
+    "details": [
+      "格式优先精确请求，其次RGBA8_UNORM+sRGB，最后首项；空格式列表抛异常。",
+      "呈现模式优先IMMEDIATE，回退必备FIFO；extent使用固定currentExtent或夹取GLFW framebuffer尺寸。"
+    ],
+    "sha256": "863941ac9fcda71bc780ae9851a4c635a5c45d03707fb003bbdb548d0ec0318e",
+    "summary": "surface能力查询及format/present mode/extent选择。；本文件实现接口行为。"
+  },
+  "code/grassland/graphics/backend/vulkan/helper/swap_chain.h": {
+    "details": [
+      "格式优先精确请求，其次RGBA8_UNORM+sRGB，最后首项；空格式列表抛异常。",
+      "呈现模式优先IMMEDIATE，回退必备FIFO；extent使用固定currentExtent或夹取GLFW framebuffer尺寸。"
+    ],
+    "sha256": "207a6d2bedceeea582a8e553083368be3cbf65257006fed905616e2507f7e048",
+    "summary": "surface能力查询及format/present mode/extent选择。；本文件定义类型与调用接口。"
+  },
+  "code/grassland/graphics/backend/vulkan/helper/validation_layer.cpp": {
+    "details": [
+      "verbose直接忽略，其余输出stderr；severity高于WARNING时抛runtime_error。",
+      "回调跨Vulkan C调用边界抛异常不是一般安全的错误传播机制；本文记录现有行为。"
+    ],
+    "sha256": "e0ce9bd6134f2da6b49cdcbbb727c7b6dd7387a834117e5cbd1e4acbee5186c3",
+    "summary": "Khronos validation枚举及消息回调。；本文件实现接口行为。"
+  },
+  "code/grassland/graphics/backend/vulkan/helper/validation_layer.h": {
+    "details": [
+      "verbose直接忽略，其余输出stderr；severity高于WARNING时抛runtime_error。",
+      "回调跨Vulkan C调用边界抛异常不是一般安全的错误传播机制；本文记录现有行为。"
+    ],
+    "sha256": "c957b6d2e3c2e6ca427259cd65c55c3c1dfbc738217acaeccfac580e08573a2a",
+    "summary": "Khronos validation枚举及消息回调。；本文件定义类型与调用接口。"
+  },
+  "code/grassland/graphics/backend/vulkan/helper/vulkan.h": {
+    "details": [
+      "#include \"grassland/graphics/backend/vulkan/helper/buffer.h\"",
+      "#include \"grassland/graphics/backend/vulkan/helper/descriptor_pool.h\"",
+      "#include \"grassland/graphics/backend/vulkan/helper/image.h\"",
+      "#include \"grassland/graphics/backend/vulkan/helper/instance.h\"",
+      "#include \"grassland/graphics/backend/vulkan/helper/native_types.h\"",
+      "#include \"grassland/graphics/backend/vulkan/helper/pipeline.h\"",
+      "#include \"grassland/graphics/backend/vulkan/helper/raytracing/acceleration_structure.h\"",
+      "#include \"grassland/graphics/backend/vulkan/helper/semaphore.h\"",
+      "#include \"grassland/graphics/backend/vulkan/helper/shader_module.h\"",
+      "#include \"grassland/graphics/backend/vulkan/helper/single_time_command.h\"",
+      "#include \"grassland/graphics/backend/vulkan/helper/swap_chain.h\""
+    ],
+    "sha256": "acd5b10e5c20729685c44097384e8d23a73c2386d30433817466fbc5b410e1e1",
+    "summary": "聚合头：将相关声明从一个入口暴露给调用方。"
+  },
+  "code/grassland/graphics/backend/vulkan/helper/vulkan_util.cpp": {
+    "details": [
+      "本cpp定义VMA_IMPLEMENTATION；全局error_message不是线程局部。",
+      "RETURN_IF_FAILED_VK将所有非SUCCESS（包括正状态码）作为返回分支，两次写错误导致最终字符串仅保留VkResult。"
+    ],
+    "sha256": "a224b643cb197245f808341edf3a916f92f9ba59bf278858ae76cdfe42e0cec7",
+    "summary": "Vulkan/VMA包含配置、错误处理和枚举可读名称。；本文件实现接口行为。"
+  },
+  "code/grassland/graphics/backend/vulkan/helper/vulkan_util.h": {
+    "details": [
+      "本cpp定义VMA_IMPLEMENTATION；全局error_message不是线程局部。",
+      "RETURN_IF_FAILED_VK将所有非SUCCESS（包括正状态码）作为返回分支，两次写错误导致最终字符串仅保留VkResult。"
+    ],
+    "sha256": "ee9a4491224514381ee3f8c61c552422460a600468c20753f4984b58f83616b1",
+    "summary": "Vulkan/VMA包含配置、错误处理和枚举可读名称。；本文件定义类型与调用接口。"
+  },
   "code/grassland/graphics/buffer.cpp": {
     "details": [
       "Type/Size/Resize/Upload/Download 的具体内存与同步行为由后端定义。",
@@ -597,6 +1165,13 @@
     ],
     "sha256": "bd3dedb8229a13e2fadb7de699a81ade9b91a0f8a6d6fdd702223d80fcbdbc5b",
     "summary": "着色器资源与 Slang 编译器接入；本文件定义类型与调用接口。"
+  },
+  "code/grassland/graphics/shaders/d3d12/blit.slang": {
+    "details": [
+      "t0为源Texture2D<float4>，s0为静态线性sampler；不执行tone map或gamma变换。"
+    ],
+    "sha256": "34d2b467d68f227fba13f252da9cd873265d1c138b33504bbde2e5b01945964d",
+    "summary": "D3D12交换链blit的顶点与像素入口。"
   },
   "code/grassland/graphics/window.cpp": {
     "details": [

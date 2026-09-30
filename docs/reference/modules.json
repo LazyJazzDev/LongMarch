@@ -117,6 +117,36 @@
     "summary": "将统一Core/Buffer/Image/Program/CommandContext/Window接口映射到按构建选项启用的Metal、Vulkan或D3D12。",
     "title": "RHI后端适配"
   },
+  "code/grassland/graphics/backend/d3d12": {
+    "contracts": [
+      "Core 与借用资源必须活到 GPU 完成；资源析构不普遍隐式 WaitGPU。",
+      "Descriptor slot 对应 register space，起始寄存器为0；传入数量必须匹配声明，无统一边界检查。",
+      "光追能力按 Tier1.1 检测；原生 SBT 与 inline Ray Query 均需设备支持。",
+      "本后端未在当前 macOS 文档任务中运行验证；本文说明源码行为及可见限制。"
+    ],
+    "flow": [
+      "Core 创建设备、图形/传输队列和逐帧 allocator、descriptor heap。",
+      "动态 Buffer 的 CPU 暂存副本在提交前复制到当前帧 GPU 资源。",
+      "CommandContext 收集命令及资源状态，提交结束恢复 GENERIC_READ。",
+      "fence 控制帧槽复用与完成回调，Present 通过 blit 管线显示图像。"
+    ],
+    "summary": "将统一接口映射到 DXGI、D3D12 descriptor heap、Direct command list 和 DXR；命令先保存为对象，提交时集中分配描述符并编译。",
+    "title": "D3D12 后端"
+  },
+  "code/grassland/graphics/backend/d3d12/helper": {
+    "contracts": [
+      "SingleTimeCommand会Reset传入allocator；调用方必须确保它不仍被GPU使用，且不与别的录制并发。",
+      "全局error_message不是线程局部，后一次错误会覆盖前一次。",
+      "ComPtr管理COM引用；辅助HitGroup只借用CompiledShaderBlob指针。"
+    ],
+    "flow": [
+      "宏把失败HRESULT写入日志并返回。",
+      "CreateBuffer按256字节对齐创建committed resource。",
+      "SingleTimeCommand复用allocator录制回调，提交后用临时fence/event阻塞完成。"
+    ],
+    "summary": "提供HRESULT错误传播、COM公共类型、对齐Buffer创建和一次性同步命令。",
+    "title": "D3D12底层辅助"
+  },
   "code/grassland/graphics/backend/metal": {
     "contracts": [
       "初始化要求hasUnifiedMemory及Tier2，WaveSize固定32；DeviceRayTracingSupport为false，DeviceRayQuerySupport另查supportsRaytracing。",
@@ -132,6 +162,55 @@
     ],
     "summary": "面向统一内存和Tier2 argument buffers的Metal实现；Slang先编SPIR-V，再SPIRV-Cross生成MSL3.0。",
     "title": "Metal后端"
+  },
+  "code/grassland/graphics/backend/vulkan/helper": {
+    "contracts": [
+      "原生handle通常借用；创建函数输出资源由上层销毁。",
+      "VkResult路径和抛异常路径并存；部分枚举/查询未检查返回码。",
+      "共享error_message无锁且非thread_local；不能用于并发错误归属。"
+    ],
+    "flow": [
+      "InstanceCreateHint收集GLFW和调试扩展。",
+      "DeviceFeatureRequirement建立可复制的feature链和队列配置。",
+      "Core使用配置创建原生对象，helper提供同步单次命令及AS构建。"
+    ],
+    "summary": "为RHI适配层提供instance/device配置、能力查询、同步提交、管线参数及原生资源辅助。",
+    "title": "Vulkan 原生辅助"
+  },
+  "code/grassland/graphics/backend/vulkan/helper/raytracing": {
+    "contracts": [
+      "调用方保证旧AS已不在GPU使用，传入的handle/size输出指针均有效。",
+      "scratch采用buildScratchSize，即使update也未单独选择updateScratchSize。"
+    ],
+    "flow": [
+      "查询build sizes。",
+      "容量不足时销毁旧AS/Buffer并创建新资源，将update降为build。",
+      "分配对齐scratch、单次提交并等待queue idle后释放scratch。"
+    ],
+    "summary": "统一单geometry BLAS/TLAS的空间查询、资源扩容、scratch对齐和同步构建。",
+    "title": "Vulkan AS 构建辅助"
+  },
+  "code/grassland/graphics/shaders": {
+    "contracts": [
+      "呈现只采样输入，色彩映射由上层完成。"
+    ],
+    "flow": [
+      "CMake生成built_in_shaders.inl。",
+      "D3D12 BlitPipeline按虚拟路径读取并编译。"
+    ],
+    "summary": "随图形库打包的后端呈现着色器。",
+    "title": "Graphics 内置着色器"
+  },
+  "code/grassland/graphics/shaders/d3d12": {
+    "contracts": [
+      "无vertex buffer；CPU须绘制6顶点，输出格式由PSO决定。"
+    ],
+    "flow": [
+      "VSMain生成6顶点并翻转UV的y。",
+      "PSMain采样t0/s0。"
+    ],
+    "summary": "通过SV_VertexID生成全屏四边形，以线性采样呈现输入图像。",
+    "title": "D3D12 呈现着色器"
   },
   "code/grassland/imgui": {
     "contracts": [

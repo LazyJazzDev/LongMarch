@@ -9,14 +9,14 @@ or publish the draft as a completed reference.
 - Extraction: pinned tree-sitter 0.25.2 + tree-sitter-cpp 0.23.4. Version 0.26.0
   crashed on this machine, so keep the working pin. Parser diagnostics must be
   reviewed; C++ extensions and shaders require manual coverage checks.
-- Reviewed and authored: 532 / 629 files. Contradium, Practium, Grassland util,
+- Reviewed and authored: 601 / 629 files. Contradium, Practium, Grassland util,
   BVH, math and physics are complete at the file/API-note level. Graphics public
   interfaces, window/input/HDR/profiling and root build/umbrella files are also
   covered. All Snowberg modules (GUI/surface, draw, visualizer and CUDA solver)
   are covered. Sparkium frontend resources, JSON scene loading and the complete raster pipeline
   are covered. Ray tracing C++ and shared geometry/light/traversal shaders are covered.
   All Sparkium shader files, Python registration files and the Metal backend
-  have file notes. D3D12/Vulkan remain. Python exported objects, embedded shader
+  have file notes. D3D12 and Vulkan helpers are covered; the Vulkan RHI remains. Python exported objects, embedded shader
   functions and parser diagnostics still require explicit completeness review.
 - `files.json` records each file's SHA-256 and authored responsibilities.
 - `api.json` records semantic descriptions by qualified name. Overloads share a
