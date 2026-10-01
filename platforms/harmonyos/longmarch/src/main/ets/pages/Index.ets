@@ -3,7 +3,6 @@ import { window, display } from '@kit.ArkUI';
 import { fileIo as fs, picker } from '@kit.CoreFileKit';
 import { sensor } from '@kit.SensorServiceKit';
 import native from 'liblongmarch.so';
-import BuildProfile from 'BuildProfile';
 
 interface SceneInfo { id: string; name: string; width: number; height: number; }
 interface DemoInfo { id: string; name: string; detail: string; symbol: Resource; reason?: string; }
@@ -187,7 +186,8 @@ function rectEnd(start: number, size: number): number {
   return size > 0 ? start + size : 0;
 }
 
-@Entry
+// Apps load this page by name from their ability (see LongMarchAbility).
+@Entry({ routeName: 'LongMarchIndex' })
 @Component
 struct Index {
   @State private selected: string = '';
@@ -259,7 +259,7 @@ struct Index {
   private isGame(): boolean { return this.selected === '2048' || this.selected === 'gol'; }
   // A standalone game app (the gameoflife product) shows only that game: no demo
   // list, status header or way back.
-  private standalone(): boolean { return BuildProfile.STANDALONE_GAME.length > 0; }
+  private standalone(): boolean { return (AppStorage.get<string>('longmarchStandalone') ?? '').length > 0; }
 
   aboutToAppear(): void {
     const startup = AppStorage.get<string>('longmarchStartupError') ?? '';

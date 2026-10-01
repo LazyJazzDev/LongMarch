@@ -5,6 +5,12 @@ presentation. The mobile sessions in `platforms/ios` share the original desktop
 2048/GoL UI, Slang, NBody simulation, and Sparkium scene loader. Swift and Metal
 are not linked into the HarmonyOS application.
 
+The `longmarch` HAR module holds everything the apps share: the ArkUI page
+(loaded by the route name `LongMarchIndex`), `LongMarchAbility` and the native
+host `liblongmarch.so`. An app's `entry` module only extends `LongMarchAbility`
+and carries its name, icons and bundled resources, so another DevEco project can
+build an app on this HAR, for example from LongMarch as a Git submodule.
+
 The ARM64 native library, ArkTS application, and unsigned HAP build successfully
 with DevEco Studio 26.0.0.851. A signed build runs on Mate 70 RS; broader
 device validation remains in progress. See `VALIDATION.md` for the

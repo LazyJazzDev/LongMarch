@@ -7,3 +7,4 @@ entry/src/gol/resources/rawfile/Resources/
 *.hap
 *.app
 .cxx/
+longmarch/BuildProfile.ets
