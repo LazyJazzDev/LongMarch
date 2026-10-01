@@ -11,29 +11,7 @@
           "strictMode": {
             "caseSensitiveCheck": true,
             "useNormalizedOHMUrl": true
-          },
-          "arkOptions": { "buildProfileFields": { "STANDALONE_GAME": "" } }
-        }
-      },
-      {
-        // The standalone Game of Life app: its own bundle, name and icon, and
-        // only the game's resources (entry target gameoflife).
-        "name": "gameoflife",
-        "bundleName": "dev.lazyjazz.gameoflife",
-        "label": "$string:app_name",
-        "icon": "$media:app_icon",
-        "versionCode": 1000001,
-        "versionName": "1.0.1",
-        "resource": { "directories": ["./AppScope/gol/resources"] },
-        "compatibleSdkVersion": "5.0.0(12)",
-        "targetSdkVersion": "26.0.0",
-        "runtimeOS": "HarmonyOS",
-        "buildOption": {
-          "strictMode": {
-            "caseSensitiveCheck": true,
-            "useNormalizedOHMUrl": true
-          },
-          "arkOptions": { "buildProfileFields": { "STANDALONE_GAME": "gol" } }
+          }
         }
       }
     ],
@@ -55,12 +33,6 @@
           "name": "default",
           "applyToProducts": [
             "default"
-          ]
-        },
-        {
-          "name": "gameoflife",
-          "applyToProducts": [
-            "gameoflife"
           ]
         }
       ]

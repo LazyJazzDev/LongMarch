@@ -131,7 +131,6 @@ void Host::Extract(NativeResourceManager *manager, const std::string &directory)
   catalog_ = ReadFile(root / "catalog.json");
   rapidjson::Document catalog;
   catalog.Parse(catalog_.c_str());
-  // A standalone game's bundle has no scenes.
   if (catalog.HasParseError() || !catalog.IsArray())
     throw std::runtime_error("Invalid scene catalog");
   resources_ = root;

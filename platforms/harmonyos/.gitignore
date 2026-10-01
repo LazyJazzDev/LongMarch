@@ -3,7 +3,6 @@
 oh_modules/
 local.properties
 entry/src/demos/resources/rawfile/Resources/
-entry/src/gol/resources/rawfile/Resources/
 *.hap
 *.app
 .cxx/

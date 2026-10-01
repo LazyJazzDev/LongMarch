@@ -94,8 +94,6 @@ if(NOT CMAKE_SYSTEM_NAME STREQUAL "iOS")
   add_executable(mobile_demo_check demos/check.cpp)
   target_link_libraries(mobile_demo_check PRIVATE mobile_demos)
 endif()
-set(GAME_OF_LIFE_RESOURCES "${CMAKE_CURRENT_SOURCE_DIR}/../../out/ios/GameOfLifeResources" CACHE PATH
-  "Prepared resources of the standalone Game of Life app (prepare_game_resources.py)")
 
 # One SwiftUI app bundle. RESOURCES is a prepared folder copied into the bundle
 # as FOLDER; STRINGS are <language>.lproj/<name>.strings files.
@@ -176,14 +174,6 @@ if(SPARKIUM_APP)
     "${CMAKE_CURRENT_SOURCE_DIR}/Assets.xcassets" "${SPARKIUM_RESOURCES}" SparkiumResources
     SOURCES SparkiumApp.swift DemosApp.swift demos/DemoView.swift games/GamesView.swift
     STRINGS ${game_strings})
-  if(EXISTS "${GAME_OF_LIFE_RESOURCES}/Patterns/library.json")
-    longmarch_ios_app(GameOfLife net.lazyjazz.gameoflife "${CMAKE_CURRENT_SOURCE_DIR}/gol/Info.plist"
-      "${CMAKE_CURRENT_SOURCE_DIR}/gol/AppIcon.icon" "${GAME_OF_LIFE_RESOURCES}" GameResources
-      SOURCES gol/GameOfLifeApp.swift games/GamesView.swift
-      STRINGS ${game_strings} gol/en.lproj/InfoPlist.strings gol/zh-Hans.lproj/InfoPlist.strings)
-  else()
-    message(STATUS "Game of Life app skipped: prepare GAME_OF_LIFE_RESOURCES first; see README.md")
-  endif()
 endif()
 
 # Compile the actual desktop UI, geometry, animation and Slang for native hosts.

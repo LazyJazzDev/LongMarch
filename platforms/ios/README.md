@@ -164,49 +164,6 @@ For a signed device install, the existing Xcode workflow is also supported: use
 Apple development team and connected device, and Run. The bundle identifier is
 `dev.lazyjazz.longmarch`; the display name is **LongMarch Demos**.
 
-### Game of Life app
-
-The same project also builds **Game of Life** (生命游戏, `net.lazyjazz.gameoflife`), a
-standalone app with only the GoL page: no demo browser and no status header. It
-bundles the pattern library and the few shaders the game reads, about 200 KB
-instead of the full scene bundle. Extract them from a prepared bundle with a replay
-build (`SPARKIUM_PREPARE=OFF`) of `mobile_demo_check`. The `GameOfLife` target is
-added whenever `GAME_OF_LIFE_RESOURCES` (default `out/ios/GameOfLifeResources`)
-exists:
-
-```sh
-python3 platforms/ios/prepare_game_resources.py --source out/ios/Resources \
-  --checker build-ios-replay/mobile_demo_check --output out/ios/GameOfLifeResources
-```
-
-A signed device build uses the Xcode generator, and automatic signing creates the
-provisioning profile:
-
-```sh
-cmake -S platforms/ios -B build-ios-xcode -G Xcode -DCMAKE_SYSTEM_NAME=iOS \
-  -DCMAKE_OSX_SYSROOT=iphoneos -DCMAKE_OSX_ARCHITECTURES=arm64 \
-  -DCMAKE_OSX_DEPLOYMENT_TARGET=18.0 -DCMAKE_XCODE_ATTRIBUTE_DEVELOPMENT_TEAM=<team>
-xcodebuild -project build-ios-xcode/LongMarch.xcodeproj -scheme GameOfLife \
-  -configuration Release -destination id=<device> -allowProvisioningUpdates build
-xcrun devicectl device install app --device <device> \
-  build-ios-xcode/Release-iphoneos/GameOfLife.app
-```
-
-`demo/gol/tools/app_icon.py` generates its Icon Composer icon (`gol/AppIcon.icon`)
-from the boundary-mode button: the plate gradient as the fill and an enlarged glider
-as a Liquid Glass layer. actool renders the flat icons of earlier iOS versions from
-it. Preview a rendition with Icon Composer's `ictool`, for example
-`ictool gol/AppIcon.icon --export-image --output-file icon.png --platform iOS
---rendition Dark --width 1024 --height 1024 --scale 1`.
-
-Resource preparation refuses to overwrite an existing output. Use `--output` to
-prepare another bundle and `-DSPARKIUM_RESOURCES` to select it. Generated resources,
-previews and build products remain outside Git; assets stay in the LFS submodule.
-Use `--texture-max-dimension 512` for a smaller texture budget, or `0` to preserve
-original texture files. `texture-report.json` records original/packaged dimensions
-and estimated RGBA8 storage per texture. `asset-hashes.json` hashes the actual
-packaged files, and shader preparation renders those same files.
-
 ## Shader architecture
 
 The Mac preparation tool loads and renders each bundled scene through the same

@@ -3,7 +3,6 @@ import { window, display } from '@kit.ArkUI';
 import { fileIo as fs, picker } from '@kit.CoreFileKit';
 import { sensor } from '@kit.SensorServiceKit';
 import native from 'liblongmarch.so';
-import BuildProfile from 'BuildProfile';
 
 interface SceneInfo { id: string; name: string; width: number; height: number; }
 interface DemoInfo { id: string; name: string; detail: string; symbol: Resource; reason?: string; }
@@ -257,9 +256,6 @@ struct Index {
   }
   private send(c: NativeCommand): void { native.command(JSON.stringify(c)); }
   private isGame(): boolean { return this.selected === '2048' || this.selected === 'gol'; }
-  // A standalone game app (the gameoflife product) shows only that game: no demo
-  // list, status header or way back.
-  private standalone(): boolean { return BuildProfile.STANDALONE_GAME.length > 0; }
 
   aboutToAppear(): void {
     const startup = AppStorage.get<string>('longmarchStartupError') ?? '';
@@ -303,7 +299,7 @@ struct Index {
     this.leave();
   }
   onBackPress(): boolean {
-    if (this.selected.length > 0 && !this.standalone()) { this.leave(); return true; }
+    if (this.selected.length > 0) { this.leave(); return true; }
     return false;
   }
 
@@ -1184,10 +1180,8 @@ struct Index {
       Stack() { this.surface() }
         .width('100%').height('100%')
         .onAreaChange((oldArea: Area, area: Area) => this.canvasArea(area))
-      if (!this.standalone()) {
-        Row() { this.gameStatus('#73000000', LABEL) }
-          .position({ x: this.rootWidth / 2, y: this.safeTop + 4 }).markAnchor({ x: '50%', y: 0 })
-      }
+      Row() { this.gameStatus('#73000000', LABEL) }
+        .position({ x: this.rootWidth / 2, y: this.safeTop + 4 }).markAnchor({ x: '50%', y: 0 })
     } else {
       // Cream fills the system areas; the board stays top-aligned below the status.
       Column({ space: 8 }) {
@@ -1209,8 +1203,7 @@ struct Index {
   build() {
     Stack({ alignContent: Alignment.TopStart }) {
       if (this.selected.length === 0) {
-        // A standalone game stays blank until its resources are ready.
-        if (!this.standalone()) this.browser()
+        this.browser()
       } else if (this.isGame()) {
         this.gamePage()
       } else {

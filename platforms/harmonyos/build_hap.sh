@@ -7,16 +7,12 @@ export NODE_HOME="$DEVECO_STUDIO_DIR/tools/node"
 export JAVA_HOME="$DEVECO_STUDIO_DIR/jbr/Contents/Home"
 export DEVECO_SDK_HOME="${DEVECO_SDK_HOME:-$DEVECO_STUDIO_DIR/sdk}"
 export PATH="$NODE_HOME/bin:$PATH"
-# PRODUCT=gameoflife builds the standalone Game of Life; BUILD_MODE=release with
-# TASK=assembleApp builds the signed .app package for AppGallery.
+# BUILD_MODE=release with TASK=assembleApp builds the signed .app package.
 PRODUCT="${PRODUCT:-default}"
 BUILD_MODE="${BUILD_MODE:-debug}"
 TASK="${TASK:-assembleHap}"
 cd "$(dirname "$0")"
-case "$PRODUCT" in
-  gameoflife) RESOURCES=entry/src/gol/resources/rawfile/Resources ;;
-  *) RESOURCES=entry/src/demos/resources/rawfile/Resources ;;
-esac
+RESOURCES=entry/src/demos/resources/rawfile/Resources
 if [ ! -f "$RESOURCES/manifest.json" ]; then
   echo "Prepare bundled resources in $RESOURCES first; see README.md." >&2
   exit 1

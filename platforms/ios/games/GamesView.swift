@@ -386,11 +386,9 @@ final class GameAppDelegate: NSObject, UIApplicationDelegate {
   }
 }
 
-// The prepared resource folder: every scene in LongMarch Demos, only the game's
-// shaders and patterns in a standalone game (Info.plist LongMarchGameResources).
+// The prepared resource folder with every scene, shader and pattern.
 enum GameResources {
-  static let url = Bundle.main.resourceURL!.appendingPathComponent(
-    Bundle.main.object(forInfoDictionaryKey: "LongMarchGameResources") as? String ?? "SparkiumResources")
+  static let url = Bundle.main.resourceURL!.appendingPathComponent("SparkiumResources")
 }
 
 // A named pattern from the built-in Life Lexicon library (demo/gol/patterns/library.json).
@@ -905,8 +903,7 @@ private struct DesktopGameView: UIViewRepresentable {
 }
 struct GamesView: View {
   let life: Bool
-  // Nil in a standalone game, which shows no status header.
-  let onExit: (() -> Void)?
+  let onExit: () -> Void
   @Environment(\.scenePhase) private var phase
   @State private var fps = 0.0
   @State private var error: String?
@@ -923,16 +920,14 @@ struct GamesView: View {
           game.ignoresSafeArea()
           // Only this small overlay uses the safe area. The Metal canvas fills
           // the display, with reset/random beside the island and controls below.
-          if let onExit {
-            HStack(spacing: 12) {
-              Text("[Metal] GoL FPS: \(fps, specifier: "%.1f")")
-                .font(.caption2.monospaced())
-              Button("Demos", action: onExit).font(.caption)
-            }
-            .padding(.horizontal, 12).padding(.vertical, 6)
-            .statusCapsule()
-            .padding(.top, 4)
+          HStack(spacing: 12) {
+            Text("[Metal] GoL FPS: \(fps, specifier: "%.1f")")
+              .font(.caption2.monospaced())
+            Button("Demos", action: onExit).font(.caption)
           }
+          .padding(.horizontal, 12).padding(.vertical, 6)
+          .statusCapsule()
+          .padding(.top, 4)
         }
         .defersSystemGestures(on: .bottom)
       } else {
@@ -945,7 +940,7 @@ struct GamesView: View {
               Text("[Metal] 2048 FPS: \(fps, specifier: "%.1f")")
                 .font(.caption2.monospaced())
                 .foregroundStyle(Color(red: 0.47, green: 0.44, blue: 0.40))
-              if let onExit { Button("Demos", action: onExit).font(.caption) }
+              Button("Demos", action: onExit).font(.caption)
             }
             .padding(.horizontal, 12).padding(.vertical, 6)
             .background(.black.opacity(0.05), in: Capsule())

@@ -19,10 +19,8 @@ def stage(source: Path, output: Path, fallback_renderer: Path | None = None):
     output = output.resolve()
     if output.exists():
         raise ValueError('Output exists; choose a fresh output directory')
-    # A standalone game's source (platforms/ios/prepare_game_resources.py) has no scenes.
-    games_only = not (source / 'catalog.json').is_file()
-    catalog = [] if games_only else json.loads((source / 'catalog.json').read_text())
-    if not catalog and not games_only:
+    catalog = json.loads((source / 'catalog.json').read_text())
+    if not catalog:
         raise ValueError('Scene catalog is empty')
     shaders = sorted((source / 'shaders').glob('slang-*'))
     if not shaders:
@@ -43,8 +41,6 @@ def stage(source: Path, output: Path, fallback_renderer: Path | None = None):
         for name in ['catalog.json', 'texture-report.json', 'asset-hashes.json']:
             if (source / name).is_file():
                 shutil.copy2(source / name, bundle / name)
-        if games_only:
-            (bundle / 'catalog.json').write_text('[]\n')
         (bundle / 'shaders').mkdir()
         for shader in shaders:
             shutil.copy2(shader, bundle / 'shaders' / shader.name)
