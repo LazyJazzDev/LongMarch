@@ -289,7 +289,10 @@ void GameOfLife::OnWindowSize() {
   EndDragPan();
   auto window_width = float(FramebufferSize().x);
   auto window_height = float(FramebufferSize().y);
-  auto ui_unit = std::min(window_width, window_height) * 0.01f * ui_scale_;
+  auto extent = std::min(window_width, window_height);
+  if (control_extent_limit_ > 0.0f)
+    extent = std::min(extent, window_height * control_extent_limit_);
+  auto ui_unit = extent * 0.01f * ui_scale_;
   const float margin = ui_unit * 5.0f;
   // Native hosts reserve the home-gesture strip without shrinking the canvas.
   const float bottom_margin = std::max(margin, window_height * bottom_control_inset_);
@@ -299,6 +302,10 @@ void GameOfLife::OnWindowSize() {
   const float slider_gap = ui_unit * 1.5f;
   const float slider_thickness = (icon_size - slider_gap) * 0.5f;
   const float panel_size = ui_unit * 20.0f;
+  // Controls keep at least a margin from a host's safe-area boundary (a screen
+  // cutout); without host safe areas they use the fallback gap.
+  const bool cutouts = cutout_insets_.y >= 0.0f;
+  auto edge_offset = [&](float inset, float fallback) { return cutouts ? std::max(margin, inset) : fallback; };
 
   float playground_left = 0.0f;
   float playground_right = window_width;
@@ -313,23 +320,27 @@ void GameOfLife::OnWindowSize() {
   sidebar_ = window_width >= window_height;
   auto place = [icon_size](Button *button, float x, float y) { button->Resize(x, y, x + icon_size, y + icon_size); };
   if (sidebar_) {
-    playground_left = panel_size;
-    playground_right = window_width - panel_size;
-    panel_right_ = panel_size;
-    place(open_button_.get(), margin, margin);
-    place(save_button_.get(), margin, margin + step);
-    place(boundary_button_.get(), margin, window_height - bottom_margin - icon_size - step * 2.0f);
-    place(speed_toggle_button_.get(), margin, window_height - bottom_margin - icon_size - step);
-    place(pause_play_button_.get(), margin, window_height - bottom_margin - icon_size);
-    place(refresh_button_.get(), window_width - margin - icon_size, margin);
-    place(randomize_button_.get(), window_width - margin - icon_size, window_height - bottom_margin - icon_size);
+    const float left_x = edge_offset(window_width * cutout_insets_.x, margin);
+    const float right_x = window_width - edge_offset(window_width * cutout_insets_.z, margin) - icon_size;
+    playground_left = left_x + icon_size + margin;
+    playground_right = right_x - margin;
+    panel_right_ = playground_left;
+    place(open_button_.get(), left_x, margin);
+    place(save_button_.get(), left_x, margin + step);
+    place(boundary_button_.get(), left_x, window_height - bottom_margin - icon_size - step * 2.0f);
+    place(speed_toggle_button_.get(), left_x, window_height - bottom_margin - icon_size - step);
+    place(pause_play_button_.get(), left_x, window_height - bottom_margin - icon_size);
+    place(refresh_button_.get(), right_x, margin);
+    place(randomize_button_.get(), right_x, window_height - bottom_margin - icon_size);
     const float top = margin + step * 2.0f;
     const float bottom = window_height - top - step - bottom_shift;
-    width_slider_->Resize({margin, top, margin + slider_thickness, bottom}, true);
-    height_slider_->Resize({margin + slider_thickness + slider_gap, top, margin + icon_size, bottom}, true);
+    width_slider_->Resize({left_x, top, left_x + slider_thickness, bottom}, true);
+    height_slider_->Resize({left_x + slider_thickness + slider_gap, top, left_x + icon_size, bottom}, true);
   } else {
-    // Give the sparse top actions more breathing room against rounded corners.
-    const float action_top_margin = margin * 2.0f;
+    // The sparse top actions sit in the corners beside a top cutout, so they
+    // center on its safe-area boundary. Without host safe areas, give them
+    // more breathing room against rounded corners.
+    const float action_top_margin = edge_offset(window_height * cutout_insets_.y - icon_size * 0.5f, margin * 2.0f);
     playground_top = panel_size + action_top_margin - margin;
     playground_bottom = window_height - panel_size - bottom_shift;
     panel_top_ = playground_bottom;
@@ -583,6 +594,11 @@ glm::ivec2 GameOfLife::TakeSizeControlRequest() {
   return {axis, axis == 1 ? width_slider_->Value() : height_slider_->Value()};
 }
 
+glm::vec4 GameOfLife::SizeControlBounds(int axis) const {
+  const glm::vec2 size = glm::max(glm::vec2(FramebufferSize()), glm::vec2{1.0f});
+  return (axis == 1 ? width_slider_ : height_slider_)->Bounds() / glm::vec4{size, size};
+}
+
 void GameOfLife::SetGridDimension(int axis, int value) {
   if (axis == 1)
     width_slider_->SetValue(value);
@@ -594,6 +610,22 @@ void GameOfLife::SetBottomControlInset(float height_fraction) {
   const float inset = std::clamp(height_fraction, 0.0f, 0.25f);
   if (bottom_control_inset_ != inset) {
     bottom_control_inset_ = inset;
+    OnWindowSize();
+  }
+}
+
+void GameOfLife::SetCutoutInsets(float left, float top, float right) {
+  const glm::vec3 insets = glm::clamp(glm::vec3{left, top, right}, 0.0f, 0.25f);
+  if (cutout_insets_ != insets) {
+    cutout_insets_ = insets;
+    OnWindowSize();
+  }
+}
+
+void GameOfLife::SetControlExtentLimit(float height_fraction) {
+  const float limit = std::max(height_fraction, 0.0f);
+  if (control_extent_limit_ != limit) {
+    control_extent_limit_ = limit;
     OnWindowSize();
   }
 }

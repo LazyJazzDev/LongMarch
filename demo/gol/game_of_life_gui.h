@@ -31,8 +31,17 @@ class GameOfLife : public Application {
   double NextFrameDelay() const override;
   void SetIconOrientation(float radians);
   void SetBottomControlInset(float height_fraction);
+  // The host's left, top and right safe areas (a notch, Dynamic Island or camera
+  // hole) as fractions of the window width, height and width. Until set, the
+  // controls keep a fixed corner gap.
+  void SetCutoutInsets(float left, float top, float right);
+  // Caps the short edge that sizes controls, so large screens keep finger-sized controls.
+  void SetControlExtentLimit(float height_fraction);
   void EnableNativeSizeControls();
   glm::ivec2 TakeSizeControlRequest();
+  // A size slider's rectangle as fractions of the framebuffer, for anchoring a
+  // native picker on it (axis 1: width, 2: height).
+  glm::vec4 SizeControlBounds(int axis) const;
   void SetGridDimension(int axis, int value);
 
   void ResetFrameClock() {
@@ -104,6 +113,8 @@ class GameOfLife : public Application {
   int requested_height_{};
   bool sidebar_{true};
   float bottom_control_inset_{};
+  glm::vec3 cutout_insets_{-1.0f};
+  float control_extent_limit_{};
   bool sliders_were_dragging_{false};
   uint32_t magnify_callback_{};
   uint32_t scroll_callback_{};

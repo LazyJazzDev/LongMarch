@@ -27,6 +27,11 @@ class SizeSlider : public Listener {
     return value_;
   }
 
+  // Left, top, right and bottom in framebuffer pixels.
+  glm::vec4 Bounds() const {
+    return bounds_;
+  }
+
   void OnMouseButton(int button, int action, int mods) override;
   void OnCursorPos(double x, double y) override;
   void OnCursorEnter(int entered) override;
