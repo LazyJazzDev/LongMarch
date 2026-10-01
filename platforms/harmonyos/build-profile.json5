@@ -48,11 +48,6 @@
   },
   "modules": [
     {
-      // Page, ability and native host shared by the HarmonyOS apps.
-      "name": "longmarch",
-      "srcPath": "./longmarch"
-    },
-    {
       "name": "entry",
       "srcPath": "./entry",
       "targets": [

@@ -1,4 +1,4 @@
 {
   "name": "entry", "version": "1.0.0", "description": "LongMarch Demos",
-  "dependencies": { "longmarch": "file:../longmarch" }
+  "dependencies": { "liblongmarch.so": "file:./src/main/cpp/types/liblongmarch" }
 }

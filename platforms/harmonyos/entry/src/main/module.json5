@@ -3,6 +3,7 @@
     "name": "entry", "type": "entry", "mainElement": "EntryAbility",
     "description": "$string:module_desc", "deviceTypes": ["phone", "tablet"],
     "deliveryWithInstall": true, "installationFree": false,
+    "pages": "$profile:main_pages",
     "abilities": [{
       "name": "EntryAbility", "srcEntry": "./ets/entryability/EntryAbility.ets",
       "description": "$string:module_desc", "icon": "$media:app_icon",

@@ -1,5 +1,0 @@
-{
-  "name": "longmarch", "version": "1.0.0", "main": "Index.ets",
-  "description": "LongMarch native host and page shared by the HarmonyOS apps",
-  "dependencies": { "liblongmarch.so": "file:./src/main/cpp/types/liblongmarch" }
-}
