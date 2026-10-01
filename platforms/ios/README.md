@@ -164,6 +164,14 @@ For a signed device install, the existing Xcode workflow is also supported: use
 Apple development team and connected device, and Run. The bundle identifier is
 `dev.lazyjazz.longmarch`; the display name is **LongMarch Demos**.
 
+### Apps in other projects
+
+Another CMake project can build an app on these hosts, for example with LongMarch
+as a Git submodule: `add_subdirectory(LongMarch/platforms/ios longmarch)` with
+`SPARKIUM_APP=OFF`, then `longmarch_ios_enable_swift()` and `longmarch_ios_app(...)`
+with its own Info.plist, icon, Swift sources and
+`${LONGMARCH_IOS_DIR}/games/GamesView.swift`.
+
 ### Game of Life app
 
 The same project also builds **Game of Life** (生命游戏, `net.lazyjazz.gameoflife`), a

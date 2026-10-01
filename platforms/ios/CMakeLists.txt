@@ -97,8 +97,27 @@ endif()
 set(GAME_OF_LIFE_RESOURCES "${CMAKE_CURRENT_SOURCE_DIR}/../../out/ios/GameOfLifeResources" CACHE PATH
   "Prepared resources of the standalone Game of Life app (prepare_game_resources.py)")
 
+# Apps can also be defined by a project that adds this directory with
+# add_subdirectory (for example LongMarch as a Git submodule): it calls
+# longmarch_ios_enable_swift() and then longmarch_ios_app().
+set(LONGMARCH_IOS_DIR "${CMAKE_CURRENT_SOURCE_DIR}" CACHE INTERNAL "LongMarch iOS host sources")
+
+macro(longmarch_ios_enable_swift)
+  if(CMAKE_GENERATOR STREQUAL "Ninja" AND CMAKE_SYSTEM_NAME STREQUAL "iOS")
+    set(_longmarch_swift_target "arm64-apple-ios${CMAKE_OSX_DEPLOYMENT_TARGET}")
+    string(TOLOWER "${CMAKE_OSX_SYSROOT}" _longmarch_sysroot)
+    if(_longmarch_sysroot MATCHES "simulator")
+      string(APPEND _longmarch_swift_target "-simulator")
+    endif()
+    set(CMAKE_Swift_FLAGS "${CMAKE_Swift_FLAGS} -target ${_longmarch_swift_target}")
+  endif()
+  enable_language(Swift)
+endmacro()
+
 # One SwiftUI app bundle. RESOURCES is a prepared folder copied into the bundle
-# as FOLDER; STRINGS are <language>.lproj/<name>.strings files.
+# as FOLDER; STRINGS are <language>.lproj/<name>.strings files. SOURCES and
+# STRINGS are relative to the calling directory; the shared games UI is
+# ${LONGMARCH_IOS_DIR}/games/GamesView.swift with its Localizable.strings.
 function(longmarch_ios_app target bundle_id info_plist assets resources folder)
   cmake_parse_arguments(PARSE_ARGV 6 app "" "" "SOURCES;STRINGS")
   # A root folder literally named Resources makes CFBundle interpret an iOS app
@@ -106,9 +125,13 @@ function(longmarch_ios_app target bundle_id info_plist assets resources folder)
   set(bundle_resources "${CMAKE_CURRENT_BINARY_DIR}/${target}-bundle/${folder}")
   file(MAKE_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/${target}-bundle")
   file(CREATE_LINK "${resources}" "${bundle_resources}" SYMBOLIC)
+  set(host "${LONGMARCH_IOS_DIR}")
+  if(NOT Python3_EXECUTABLE)
+    find_package(Python3 REQUIRED COMPONENTS Interpreter)
+  endif()
   add_executable(${target} MACOSX_BUNDLE ${app_SOURCES}
-    demos/DemoBridge.mm demos/DemoBridge.h SparkiumBridge.mm SparkiumBridge.h RenderQueue.h
-    "${bundle_resources}" ${assets} ${app_STRINGS})
+    "${host}/demos/DemoBridge.mm" "${host}/demos/DemoBridge.h" "${host}/SparkiumBridge.mm"
+    "${host}/SparkiumBridge.h" "${host}/RenderQueue.h" "${bundle_resources}" ${assets} ${app_STRINGS})
   set_source_files_properties("${bundle_resources}" ${assets} PROPERTIES MACOSX_PACKAGE_LOCATION Resources)
   if(assets MATCHES "\\.icon$")
     # An Icon Composer icon: layered Liquid Glass on iOS 26, flat renderings before.
@@ -131,7 +154,7 @@ function(longmarch_ios_app target bundle_id info_plist assets resources folder)
     MACOSX_BUNDLE_INFO_PLIST "${info_plist}"
     XCODE_ATTRIBUTE_PRODUCT_BUNDLE_IDENTIFIER "${bundle_id}"
     XCODE_ATTRIBUTE_ASSETCATALOG_COMPILER_APPICON_NAME "AppIcon"
-    XCODE_ATTRIBUTE_SWIFT_OBJC_BRIDGING_HEADER "${CMAKE_CURRENT_SOURCE_DIR}/SparkiumBridge.h"
+    XCODE_ATTRIBUTE_SWIFT_OBJC_BRIDGING_HEADER "${host}/SparkiumBridge.h"
     XCODE_ATTRIBUTE_SWIFT_VERSION "5.0"
     XCODE_ATTRIBUTE_TARGETED_DEVICE_FAMILY "1,2"
     XCODE_ATTRIBUTE_CODE_SIGN_STYLE Automatic
@@ -140,10 +163,11 @@ function(longmarch_ios_app target bundle_id info_plist assets resources folder)
     XCODE_ATTRIBUTE_SKIP_INSTALL NO
     XCODE_ATTRIBUTE_INSTALL_PATH "$(LOCAL_APPS_DIR)")
   if(CMAKE_GENERATOR STREQUAL "Ninja")
-    target_compile_options(${target} PRIVATE "$<$<COMPILE_LANGUAGE:Swift>:-import-objc-header;${CMAKE_CURRENT_SOURCE_DIR}/SparkiumBridge.h>")
+    target_compile_options(${target} PRIVATE "$<$<COMPILE_LANGUAGE:Swift>:-import-objc-header;${host}/SparkiumBridge.h>")
     target_link_options(${target} PRIVATE -sdk "${CMAKE_OSX_SYSROOT}")
     set_target_properties(${target} PROPERTIES MACOSX_BUNDLE_GUI_IDENTIFIER "${bundle_id}")
     set(ios_platform iphoneos)
+    string(TOLOWER "${CMAKE_OSX_SYSROOT}" ios_sysroot_lower)
     if(ios_sysroot_lower MATCHES "simulator")
       set(ios_platform iphonesimulator)
     endif()
@@ -152,22 +176,14 @@ function(longmarch_ios_app target bundle_id info_plist assets resources folder)
         --platform ${ios_platform} --minimum-deployment-target ${CMAKE_OSX_DEPLOYMENT_TARGET}
         --app-icon AppIcon --target-device iphone --target-device ipad
         --output-partial-info-plist "${CMAKE_CURRENT_BINARY_DIR}/${target}-bundle/AppIcon.plist"
-      COMMAND "${Python3_EXECUTABLE}" "${CMAKE_CURRENT_SOURCE_DIR}/finish_bundle.py"
+      COMMAND "${Python3_EXECUTABLE}" "${host}/finish_bundle.py"
         "$<TARGET_BUNDLE_DIR:${target}>" "${CMAKE_CURRENT_BINARY_DIR}/${target}-bundle/AppIcon.plist" ${target} ${bundle_id}
       VERBATIM)
   endif()
 endfunction()
 
 if(SPARKIUM_APP)
-  if(CMAKE_GENERATOR STREQUAL "Ninja" AND CMAKE_SYSTEM_NAME STREQUAL "iOS")
-    set(swift_target "arm64-apple-ios${CMAKE_OSX_DEPLOYMENT_TARGET}")
-    string(TOLOWER "${CMAKE_OSX_SYSROOT}" ios_sysroot_lower)
-    if(ios_sysroot_lower MATCHES "simulator")
-      string(APPEND swift_target "-simulator")
-    endif()
-    set(CMAKE_Swift_FLAGS "${CMAKE_Swift_FLAGS} -target ${swift_target}")
-  endif()
-  enable_language(Swift)
+  longmarch_ios_enable_swift()
   if(NOT EXISTS "${SPARKIUM_RESOURCES}/catalog.json")
     message(FATAL_ERROR "Prepare resources first; see README.md")
   endif()
