@@ -1,5 +1,12 @@
 # Host-installed headers and portable sources; never link host libraries into apps.
-set(LONGMARCH_MOBILE_DEPS "${ROOT}/out/mobile/deps" CACHE PATH "vcpkg mobile host dependency installation")
+# The LONGMARCH_MOBILE_DEPS environment variable serves builds that cannot pass
+# CMake arguments, such as DevEco native builds of a project using LongMarch.
+if(DEFINED ENV{LONGMARCH_MOBILE_DEPS})
+  set(_mobile_deps_default "$ENV{LONGMARCH_MOBILE_DEPS}")
+else()
+  set(_mobile_deps_default "${ROOT}/out/mobile/deps")
+endif()
+set(LONGMARCH_MOBILE_DEPS "${_mobile_deps_default}" CACHE PATH "vcpkg mobile host dependency installation")
 file(GLOB _mobile_prefixes LIST_DIRECTORIES true "${LONGMARCH_MOBILE_DEPS}/*")
 set(_mobile_includes)
 set(_mobile_sources)
