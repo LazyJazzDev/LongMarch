@@ -135,7 +135,10 @@ function(longmarch_ios_app target bundle_id info_plist assets resources folder)
     XCODE_ATTRIBUTE_SWIFT_VERSION "5.0"
     XCODE_ATTRIBUTE_TARGETED_DEVICE_FAMILY "1,2"
     XCODE_ATTRIBUTE_CODE_SIGN_STYLE Automatic
-    XCODE_ATTRIBUTE_ENABLE_USER_SCRIPT_SANDBOXING NO)
+    XCODE_ATTRIBUTE_ENABLE_USER_SCRIPT_SANDBOXING NO
+    # Xcode archives only install the app; CMake skips installation by default.
+    XCODE_ATTRIBUTE_SKIP_INSTALL NO
+    XCODE_ATTRIBUTE_INSTALL_PATH "$(LOCAL_APPS_DIR)")
   if(CMAKE_GENERATOR STREQUAL "Ninja")
     target_compile_options(${target} PRIVATE "$<$<COMPILE_LANGUAGE:Swift>:-import-objc-header;${CMAKE_CURRENT_SOURCE_DIR}/SparkiumBridge.h>")
     target_link_options(${target} PRIVATE -sdk "${CMAKE_OSX_SYSROOT}")
@@ -174,7 +177,7 @@ if(SPARKIUM_APP)
     SOURCES SparkiumApp.swift DemosApp.swift demos/DemoView.swift games/GamesView.swift
     STRINGS ${game_strings})
   if(EXISTS "${GAME_OF_LIFE_RESOURCES}/Patterns/library.json")
-    longmarch_ios_app(GameOfLife dev.lazyjazz.gameoflife "${CMAKE_CURRENT_SOURCE_DIR}/gol/Info.plist"
+    longmarch_ios_app(GameOfLife net.lazyjazz.gameoflife "${CMAKE_CURRENT_SOURCE_DIR}/gol/Info.plist"
       "${CMAKE_CURRENT_SOURCE_DIR}/gol/AppIcon.icon" "${GAME_OF_LIFE_RESOURCES}" GameResources
       SOURCES gol/GameOfLifeApp.swift games/GamesView.swift
       STRINGS ${game_strings} gol/en.lproj/InfoPlist.strings gol/zh-Hans.lproj/InfoPlist.strings)

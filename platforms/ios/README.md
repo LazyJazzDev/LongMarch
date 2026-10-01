@@ -166,7 +166,7 @@ Apple development team and connected device, and Run. The bundle identifier is
 
 ### Game of Life app
 
-The same project also builds **Game of Life** (生命游戏, `dev.lazyjazz.gameoflife`), a
+The same project also builds **Game of Life** (生命游戏, `net.lazyjazz.gameoflife`), a
 standalone app with only the GoL page: no demo browser and no status header. It
 bundles the pattern library and the few shaders the game reads, about 200 KB
 instead of the full scene bundle. Extract them from a prepared bundle with a replay
