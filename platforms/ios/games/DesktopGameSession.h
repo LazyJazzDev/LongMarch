@@ -21,8 +21,11 @@ class DesktopGameSession {
   void Resize(int width, int height);
   void SetIconOrientation(float radians);
   void SetBottomControlInset(float height_fraction);
+  void SetCutoutInsets(float left, float top, float right);
+  void SetControlExtentLimit(float height_fraction);
   void EnableNativeSizeControls();
   glm::ivec2 TakeSizeControlRequest();
+  glm::vec4 SizeControlBounds(int axis) const;
   void SetGridDimension(int axis, int value);
   grassland::graphics::Core *Core() const;
   grassland::graphics::Image *Image() const;

@@ -88,6 +88,16 @@ void DesktopGameSession::SetBottomControlInset(float height_fraction) {
     life_->SetBottomControlInset(height_fraction);
 }
 
+void DesktopGameSession::SetCutoutInsets(float left, float top, float right) {
+  if (life_)
+    life_->SetCutoutInsets(left, top, right);
+}
+
+void DesktopGameSession::SetControlExtentLimit(float height_fraction) {
+  if (life_)
+    life_->SetControlExtentLimit(height_fraction);
+}
+
 void DesktopGameSession::EnableNativeSizeControls() {
   if (life_)
     life_->EnableNativeSizeControls();
@@ -95,6 +105,10 @@ void DesktopGameSession::EnableNativeSizeControls() {
 
 glm::ivec2 DesktopGameSession::TakeSizeControlRequest() {
   return life_ ? life_->TakeSizeControlRequest() : glm::ivec2{0};
+}
+
+glm::vec4 DesktopGameSession::SizeControlBounds(int axis) const {
+  return life_ ? life_->SizeControlBounds(axis) : glm::vec4{0.0f};
 }
 
 void DesktopGameSession::SetGridDimension(int axis, int value) {

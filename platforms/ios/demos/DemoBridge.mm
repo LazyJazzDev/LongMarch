@@ -174,6 +174,24 @@
   });
 }
 
+- (void)setGameCutoutInsetsLeft:(float)left top:(float)top right:(float)right {
+  const uint64_t generation = _generation;
+  [self wakeGame];
+  dispatch_async(LongMarchRenderQueue(), ^{
+    if (self->_generation == generation && self->_session && self->_session->Game())
+      self->_session->Game()->SetCutoutInsets(left, top, right);
+  });
+}
+
+- (void)setGameControlExtentLimit:(float)heightFraction {
+  const uint64_t generation = _generation;
+  [self wakeGame];
+  dispatch_async(LongMarchRenderQueue(), ^{
+    if (self->_generation == generation && self->_session && self->_session->Game())
+      self->_session->Game()->SetControlExtentLimit(heightFraction);
+  });
+}
+
 - (void)setGameIconRotation:(float)radians {
   const uint64_t generation = _generation;
   [self wakeGame];
@@ -320,13 +338,16 @@
             nextFrameDelay = game->NextFrameDelay();
             int action = game->FileRequest();
             const auto sizeRequest = game->TakeSizeControlRequest();
+            const auto sizeBounds = sizeRequest.x ? game->SizeControlBounds(sizeRequest.x) : glm::vec4{0.0f};
+            const CGRect sizeRect =
+                CGRectMake(sizeBounds.x, sizeBounds.y, sizeBounds.z - sizeBounds.x, sizeBounds.w - sizeBounds.y);
             dispatch_async(dispatch_get_main_queue(), ^{
               if (self->_generation == generation && action && !self->_filePending && self.fileRequest) {
                 self->_filePending = YES;
                 self.fileRequest(action);
               }
               if (self->_generation == generation && sizeRequest.x && self.sizeRequest)
-                self.sizeRequest(sizeRequest.x, sizeRequest.y);
+                self.sizeRequest(sizeRequest.x, sizeRequest.y, sizeRect);
             });
           }
           auto core = static_cast<grassland::graphics::backend::MetalCore *>(self->_session->Core());

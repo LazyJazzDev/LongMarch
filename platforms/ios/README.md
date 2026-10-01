@@ -347,3 +347,7 @@ frames; idle games still schedule no work.
 `LONGMARCH_SMOKE_SIZE_PICKER=width|height` taps the corresponding portrait readout
 through the normal native input path for popover screenshots. `mobile_games_check`
 verifies tap-only activation, drag cancellation, range limits and selected values.
+For store screenshots, `LONGMARCH_SMOKE_TAPS="x,y;x,y"` taps points given as fractions
+of the game view one second apart, and `LONGMARCH_SMOKE_PATTERN=<name>` makes the open
+button load that built-in pattern (for example `Gosper glider gun`) instead of
+presenting the library.

@@ -6,7 +6,6 @@ private final class GameMetalView: MTKView {
   let renderer = DemoRenderer()
   var life = false
   private var start = CGPoint.zero
-  private(set) var lastPointerPosition = CGPoint.zero
   private var pointerDown = false
   // Last two-finger pan position forwarded to the game.
   private var panPoint = CGPoint.zero
@@ -32,7 +31,12 @@ private final class GameMetalView: MTKView {
     let point = CGPoint(
       x: bounds.width * 0.435,
       y: bounds.height - bottom - bounds.width * (axis == 1 ? 0.07875 : 0.02125))
-    lastPointerPosition = point
+    send(1, point)
+    send(2, point)
+  }
+  // Taps a point given as fractions of the view, for store screenshots.
+  func smokeTap(_ x: Double, _ y: Double) {
+    let point = CGPoint(x: bounds.width * x, y: bounds.height * y)
     send(1, point)
     send(2, point)
   }
@@ -43,7 +47,6 @@ private final class GameMetalView: MTKView {
       return
     }
     start = touch.location(in: self)
-    lastPointerPosition = start
     pointerDown = true
     send(1, start)
   }
@@ -109,6 +112,10 @@ private final class GameCanvasView: UIView {
   private var entryOrientation: UIInterfaceOrientation = .portrait
   private var iconAngle: CGFloat?
   private var bottomControlInset: CGFloat?
+  private var cutoutInsets: [CGFloat]?
+  private var controlExtentLimit: CGFloat?
+  // The short edge, in points, beyond which controls stop growing (iPad).
+  private static let maxControlExtent: CGFloat = 560
 
   override init(frame: CGRect) {
     super.init(frame: frame)
@@ -135,6 +142,21 @@ private final class GameCanvasView: UIView {
       if bottomControlInset != fraction {
         bottomControlInset = fraction
         metal.renderer.setGameBottomControlInset(Float(fraction))
+      }
+      // Any screen cutout (Dynamic Island, notch) widens the safe area on its edge.
+      let safe = convert(window.bounds.inset(by: window.safeAreaInsets), from: window)
+      let insets = [
+        max(0, safe.minX - bounds.minX) / bounds.width, max(0, safe.minY - bounds.minY) / bounds.height,
+        max(0, bounds.maxX - safe.maxX) / bounds.width,
+      ]
+      if cutoutInsets != insets {
+        cutoutInsets = insets
+        metal.renderer.setGameCutoutInsetsLeft(Float(insets[0]), top: Float(insets[1]), right: Float(insets[2]))
+      }
+      let limit = Self.maxControlExtent / bounds.height
+      if controlExtentLimit != limit {
+        controlExtentLimit = limit
+        metal.renderer.setGameControlExtentLimit(Float(limit))
       }
     }
   }
@@ -167,7 +189,9 @@ private final class GameCanvasView: UIView {
     super.didMoveToWindow()
     if window == nil {
       stopOrientationTracking()
-    } else if metal.life, lockedScene == nil, let scene = window?.windowScene {
+    } else if metal.life, lockedScene == nil, traitCollection.userInterfaceIdiom == .phone,
+      let scene = window?.windowScene
+    {
       entryOrientation = scene.interfaceOrientation
       if entryOrientation == .unknown { entryOrientation = .portrait }
       lockedScene = scene
@@ -194,7 +218,7 @@ private final class GameCanvasView: UIView {
     UIDevice.current.endGeneratingDeviceOrientationNotifications()
     lockedScene = nil
     iconAngle = nil
-    GameAppDelegate.orientationMask = .allButUpsideDown
+    GameAppDelegate.orientationMask = GameAppDelegate.defaultOrientations
     scene.windows.first(where: { $0.isKeyWindow })?.rootViewController?
       .setNeedsUpdateOfSupportedInterfaceOrientations()
   }
@@ -345,11 +369,15 @@ private struct PatternFile: Identifiable {
   var name: String { url.deletingPathExtension().lastPathComponent }
 }
 
-// GoL freezes the interface orientation for the lifetime of its page. Device
-// orientation remains available to its icons without rotating the UIWindow.
+// On iPhone, GoL freezes the interface orientation for the lifetime of its page.
+// Device orientation remains available to its icons without rotating the UIWindow.
+// iPad rotates freely: the App Store requires all four orientations from apps
+// that support multitasking, and its layout follows the window's short edges.
 @MainActor
 final class GameAppDelegate: NSObject, UIApplicationDelegate {
-  static var orientationMask: UIInterfaceOrientationMask = .allButUpsideDown
+  static let defaultOrientations: UIInterfaceOrientationMask =
+    UIDevice.current.userInterfaceIdiom == .pad ? .all : .allButUpsideDown
+  static var orientationMask = defaultOrientations
 
   func application(
     _ application: UIApplication, supportedInterfaceOrientationsFor window: UIWindow?
@@ -665,10 +693,11 @@ private struct DesktopGameView: UIViewRepresentable {
     private var exporting = false
     private var temporary: URL?
     private weak var sizePopover: UIViewController?
+    private var sizeOrientationObserver: NSObjectProtocol?
     private weak var library: UIViewController?
     private var libraryHandled = false
 
-    func requestSize(_ axis: Int, value: Int) {
+    func requestSize(_ axis: Int, value: Int, bounds: CGRect) {
       guard let view, let root = view.window?.rootViewController,
         root.presentedViewController == nil
       else { return }
@@ -679,19 +708,42 @@ private struct DesktopGameView: UIViewRepresentable {
         },
         close: { [weak self] in
           self?.sizePopover?.dismiss(animated: true)
+          self?.stopSizeOrientationObserver()
         })
       let controller = UIHostingController(rootView: content)
       controller.modalPresentationStyle = .popover
       controller.preferredContentSize = CGSize(width: min(340, view.bounds.width - 24), height: 216)
       if let popover = controller.popoverPresentationController {
+        // Point at the center of the rendered slider, wherever the rail sits.
         popover.sourceView = view
         popover.sourceRect = CGRect(
-          origin: view.lastPointerPosition, size: CGSize(width: 1, height: 1))
-        popover.permittedArrowDirections = [.up, .down]
+          x: bounds.minX * view.bounds.width, y: bounds.minY * view.bounds.height,
+          width: bounds.width * view.bounds.width, height: bounds.height * view.bounds.height)
+        popover.permittedArrowDirections = .any
         popover.delegate = self
       }
       sizePopover = controller
       root.present(controller, animated: true)
+      if view.traitCollection.userInterfaceIdiom == .pad {
+        // Turning an iPad moves the slider out from under the popover arrow.
+        UIDevice.current.beginGeneratingDeviceOrientationNotifications()
+        let start = UIDevice.current.orientation
+        sizeOrientationObserver = NotificationCenter.default.addObserver(
+          forName: UIDevice.orientationDidChangeNotification, object: nil, queue: .main
+        ) { [weak self] _ in
+          let now = UIDevice.current.orientation
+          guard now.isPortrait || now.isLandscape, now != start else { return }
+          self?.sizePopover?.dismiss(animated: true)
+          self?.stopSizeOrientationObserver()
+        }
+      }
+    }
+
+    private func stopSizeOrientationObserver() {
+      guard let observer = sizeOrientationObserver else { return }
+      NotificationCenter.default.removeObserver(observer)
+      UIDevice.current.endGeneratingDeviceOrientationNotifications()
+      sizeOrientationObserver = nil
     }
 
     func adaptivePresentationStyle(
@@ -707,6 +759,16 @@ private struct DesktopGameView: UIViewRepresentable {
         cancel()
         return
       }
+      // LONGMARCH_SMOKE_PATTERN opens a built-in pattern by name instead of the library.
+      if action == 1, let name = ProcessInfo.processInfo.environment["LONGMARCH_SMOKE_PATTERN"],
+        let pattern = BuiltinPattern.all.first(where: { $0.name == name })
+      {
+        let url = FileManager.default.temporaryDirectory.appendingPathComponent("Builtin.cells")
+        if (try? pattern.cells.write(to: url, atomically: true, encoding: .utf8)) != nil {
+          complete(url)
+          return
+        }
+      }
       libraryHandled = false
       let content = PatternLibraryView(
         saving: action == 2,
@@ -714,7 +776,11 @@ private struct DesktopGameView: UIViewRepresentable {
         system: { [weak self] in self?.finishLibrary { self?.systemRequest(action) } },
         cancel: { [weak self] in self?.finishLibrary { self?.cancel() } })
       let controller = UIHostingController(rootView: content)
-      if let sheet = controller.sheetPresentationController {
+      if view.traitCollection.userInterfaceIdiom == .pad {
+        // A centered floating panel on iPad; a resizable bottom sheet on iPhone.
+        controller.modalPresentationStyle = .formSheet
+        controller.preferredContentSize = CGSize(width: 540, height: 620)
+      } else if let sheet = controller.sheetPresentationController {
         sheet.detents = [.medium(), .large()]
         sheet.prefersGrabberVisible = true
       }
@@ -729,6 +795,7 @@ private struct DesktopGameView: UIViewRepresentable {
     }
 
     func presentationControllerDidDismiss(_ controller: UIPresentationController) {
+      if controller.presentedViewController === sizePopover { stopSizeOrientationObserver() }
       guard controller.presentedViewController === library, !libraryHandled else { return }
       libraryHandled = true
       cancel()
@@ -798,8 +865,8 @@ private struct DesktopGameView: UIViewRepresentable {
     view.renderer.fileRequest = { [weak coordinator = context.coordinator] action in
       coordinator?.request(action)
     }
-    view.renderer.sizeRequest = { [weak coordinator = context.coordinator] axis, value in
-      coordinator?.requestSize(axis, value: value)
+    view.renderer.sizeRequest = { [weak coordinator = context.coordinator] axis, value, bounds in
+      coordinator?.requestSize(axis, value: value, bounds: bounds)
     }
     view.renderer.start(view: view, resources: GameResources.url, demo: life ? "gol" : "2048") {
       _, _, fps, _, _, _, _, error in status(fps, error)
@@ -813,6 +880,16 @@ private struct DesktopGameView: UIViewRepresentable {
         if let axis = ProcessInfo.processInfo.environment["LONGMARCH_SMOKE_SIZE_PICKER"] {
       DispatchQueue.main.asyncAfter(deadline: .now() + 1) { [weak view] in
         view?.smokeSizeTap(axis == "height" ? 2 : 1)
+      }
+    }
+    // LONGMARCH_SMOKE_TAPS="x,y;x,y" taps view fractions one second apart.
+    if let taps = ProcessInfo.processInfo.environment["LONGMARCH_SMOKE_TAPS"] {
+      for (i, tap) in taps.split(separator: ";").enumerated() {
+        let v = tap.split(separator: ",").compactMap { Double($0) }
+        guard v.count == 2 else { continue }
+        DispatchQueue.main.asyncAfter(deadline: .now() + Double(i + 1)) { [weak view] in
+          view?.smokeTap(v[0], v[1])
+        }
       }
     }
     return canvas
