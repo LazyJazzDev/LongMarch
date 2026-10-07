@@ -65,13 +65,11 @@ class VulkanDynamicBuffer : public VulkanBuffer {
 
   VkDeviceAddress DeviceAddress() const override;
 
-  void TransferData(VkCommandBuffer cmd_buffer);
+  std::shared_ptr<void> TransferData(VkCommandBuffer cmd_buffer);
 
  private:
   VulkanCore *core_;
-  std::vector<VkBuffer> buffers_;
-  std::vector<VmaAllocation> allocations_;
-  std::vector<size_t> buffer_sizes_;
+  VkBuffer current_buffer_{VK_NULL_HANDLE};
   VkBuffer staging_buffer_{VK_NULL_HANDLE};
   VmaAllocation staging_allocation_{VK_NULL_HANDLE};
   size_t size_{};

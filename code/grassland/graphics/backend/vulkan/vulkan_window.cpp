@@ -10,6 +10,9 @@ void VulkanWindow::DestroySwapChain() {
     vkDestroyImageView(core_->Handle(), view, nullptr);
   }
   swap_chain_image_views_.clear();
+  for (auto semaphore : render_finish_semaphores_)
+    vkDestroySemaphore(core_->Handle(), semaphore, nullptr);
+  render_finish_semaphores_.clear();
   swap_chain_images_.clear();
   if (swap_chain_) {
     vkDestroySwapchainKHR(core_->Handle(), swap_chain_, nullptr);
@@ -62,6 +65,11 @@ void VulkanWindow::LoadSwapChainImages() {
   swap_chain_images_.resize(image_count);
   vulkan::ThrowIfFailed(vkGetSwapchainImagesKHR(device, swap_chain_, &image_count, swap_chain_images_.data()),
                         "Failed to get Vulkan swap chain images");
+  render_finish_semaphores_.resize(image_count, VK_NULL_HANDLE);
+  for (auto &semaphore : render_finish_semaphores_) {
+    VkSemaphoreCreateInfo info{VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO};
+    vulkan::ThrowIfFailed(vkCreateSemaphore(device, &info, nullptr, &semaphore), "Create presentation semaphore");
+  }
   swap_chain_image_views_.resize(image_count);
   for (size_t i = 0; i < image_count; ++i) {
     VkImageViewCreateInfo view_info{VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO};
@@ -99,14 +107,11 @@ VulkanWindow::VulkanWindow(VulkanCore *core,
   vulkan::ThrowIfFailed(glfwCreateWindowSurface(core_->Instance(), GLFWWindow(), nullptr, &surface_),
                         "Failed to create window surface");
   CreateSwapChain();
-  image_available_semaphores_.resize(swap_chain_images_.size());
-  render_finish_semaphores_.resize(swap_chain_images_.size());
+  image_available_semaphores_.resize(2);
   for (size_t i = 0; i < image_available_semaphores_.size(); ++i) {
     VkSemaphoreCreateInfo semaphore_info{VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO};
     vulkan::ThrowIfFailed(vkCreateSemaphore(core_->Handle(), &semaphore_info, nullptr, &image_available_semaphores_[i]),
                           "Failed to create image available semaphore");
-    vulkan::ThrowIfFailed(vkCreateSemaphore(core_->Handle(), &semaphore_info, nullptr, &render_finish_semaphores_[i]),
-                          "Failed to create render finish semaphore");
   }
   vkGetDeviceQueue(core_->Handle(), vulkan::PresentFamilyIndex(core_->PhysicalDevice(), surface_), 0, &present_queue_);
   FramebufferResizeEvent().RegisterCallback([this](int width, int height) {
@@ -123,6 +128,8 @@ VulkanWindow::~VulkanWindow() {
 
 void VulkanWindow::CloseWindow() {
   core_->WaitGPU();
+  if (present_queue_)
+    vulkan::ThrowIfFailed(vkQueueWaitIdle(present_queue_), "Wait for presentation queue");
   if (hdr_framebuffer_ != VK_NULL_HANDLE) {
     vkDestroyFramebuffer(core_->Handle(), hdr_framebuffer_, nullptr);
     hdr_framebuffer_ = VK_NULL_HANDLE;
@@ -206,26 +213,35 @@ VkFormat VulkanWindow::ImGuiFormat() const {
 }
 
 VkSemaphore VulkanWindow::RenderFinishSemaphore() const {
-  return render_finish_semaphores_[core_->CurrentFrame()];
+  return render_finish_semaphores_[image_index_];
 }
 
 VkSemaphore VulkanWindow::ImageAvailableSemaphore() const {
-  return image_available_semaphores_[core_->CurrentFrame()];
+  return image_available_semaphores_[acquire_index_];
 }
 
 uint32_t VulkanWindow::AcquireNextImage() {
   if (presentation_failed_)
     throw std::runtime_error("Vulkan presentation unavailable after swapchain recovery failed");
+  acquire_index_ = (acquire_index_ + 1) % 2;
+  if (acquire_uses_[acquire_index_].IsValid())
+    acquire_uses_[acquire_index_].Wait();
   vulkan::ThrowIfFailed(vkAcquireNextImageKHR(core_->Handle(), swap_chain_, std::numeric_limits<uint64_t>::max(),
                                               ImageAvailableSemaphore(), VK_NULL_HANDLE, &image_index_),
                         "Failed to acquire Vulkan swapchain image");
   return image_index_;
 }
 
+void VulkanWindow::RetireAcquire(Submission submission) {
+  acquire_uses_[acquire_index_] = std::move(submission);
+}
+
 int VulkanWindow::Rebuild() {
   if (presentation_failed_)
     return -1;
   core_->WaitGPU();
+  if (present_queue_)
+    vulkan::ThrowIfFailed(vkQueueWaitIdle(present_queue_), "Wait for presentation queue");
   const auto format = SelectSurfaceFormat(enable_hdr_);
   if (!format)
     return -1;
@@ -309,6 +325,8 @@ void VulkanWindow::InitImGui(const char *font_file_path, float font_size) {
 
 void VulkanWindow::TerminateImGui() {
   core_->WaitGPU();
+  if (present_queue_)
+    vulkan::ThrowIfFailed(vkQueueWaitIdle(present_queue_), "Wait for presentation queue");
   if (imgui_assets_.context) {
     ImGui::SetCurrentContext(imgui_assets_.context);
     ImGui_ImplVulkan_Shutdown();

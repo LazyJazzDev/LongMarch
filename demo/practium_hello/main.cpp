@@ -198,7 +198,7 @@ int main() {
     std::unique_ptr<graphics::CommandContext> cmd_ctx;
     core_->CreateCommandContext(&cmd_ctx);
     cmd_ctx->CmdPresent(window.get(), srgb_image.get());
-    core_->SubmitCommandContext(cmd_ctx.get());
+    core_->Submit(cmd_ctx.get());
 
     grassland::graphics::Window::PollEvents();
   }

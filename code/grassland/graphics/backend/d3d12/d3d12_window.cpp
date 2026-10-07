@@ -37,6 +37,16 @@ D3D12Window::~D3D12Window() {
   }
 }
 
+void D3D12Window::PrepareSubmission() {
+  if (presentation_uses_[presentation_index_].IsValid())
+    presentation_uses_[presentation_index_].Wait();
+}
+
+void D3D12Window::RetirePresentation(Submission submission) {
+  presentation_uses_[presentation_index_] = std::move(submission);
+  presentation_index_ = (presentation_index_ + 1) % 2;
+}
+
 void D3D12Window::CloseWindow() {
   core_->WaitGPU();
   if (imgui_assets_.context) {
@@ -51,8 +61,7 @@ void D3D12Window::CloseWindow() {
 void D3D12Window::RecreateSwapChain() {
   back_buffers_.clear();
   swap_chain_.Reset();
-  swap_chain_ = CreateNativeSwapChain(core_->DXGIFactory(), core_->CommandQueue(), glfwGetWin32Window(GLFWWindow()),
-                                      std::max(std::min(core_->FramesInFlight(), DXGI_MAX_SWAP_CHAIN_BUFFERS), 2),
+  swap_chain_ = CreateNativeSwapChain(core_->DXGIFactory(), core_->CommandQueue(), glfwGetWin32Window(GLFWWindow()), 2,
                                       enable_hdr_ ? DXGI_FORMAT_R16G16B16A16_FLOAT : DXGI_FORMAT_R8G8B8A8_UNORM);
   DXGI_SWAP_CHAIN_DESC desc{};
   d3d12::ThrowIfFailed(swap_chain_->GetDesc(&desc), "Failed to query swap chain");
@@ -149,7 +158,7 @@ void D3D12Window::SetupImGuiContext() {
   ImGui_ImplDX12_InitInfo init_info = {};
   init_info.Device = core_->Device();
   init_info.CommandQueue = core_->CommandQueue();
-  init_info.NumFramesInFlight = core_->FramesInFlight();
+  init_info.NumFramesInFlight = 2;
   init_info.RTVFormat = BackBufferFormat();
   init_info.DSVFormat = DXGI_FORMAT_UNKNOWN;
   init_info.UserData = &imgui_assets_;

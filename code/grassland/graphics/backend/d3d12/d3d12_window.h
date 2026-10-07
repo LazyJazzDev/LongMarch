@@ -19,6 +19,8 @@ class D3D12Window : public Window {
   virtual void CloseWindow() override;
 
   IDXGISwapChain3 *SwapChain() const;
+  void PrepareSubmission();
+  void RetirePresentation(Submission submission);
 
   DXGI_FORMAT BackBufferFormat() const;
 
@@ -36,6 +38,8 @@ class D3D12Window : public Window {
   void SetupImGuiContext();
 
  private:
+  Submission presentation_uses_[2];
+  uint32_t presentation_index_{0};
   void RecreateSwapChain();
 
   D3D12Core *core_;

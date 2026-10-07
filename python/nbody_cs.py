@@ -95,7 +95,7 @@ class NBodyCS:
         self.options = options
         self.n_particles = options.particles
         self.rng = np.random.default_rng(options.seed)
-        self.core = graphics.Core(options.backend, graphics.CoreSettings(2, options.debug))
+        self.core = graphics.Core(options.backend, graphics.CoreSettings(enable_debug=options.debug))
         if self.core.init_auto(False):
             raise RuntimeError("could not initialize graphics backend")
         self.window = None
@@ -236,7 +236,7 @@ class NBodyCS:
         if self.profiler:
             self.profiler.end_gpu(ctx, gpu_scope)
         recorded = time.perf_counter()
-        self.core.submit_command_context(ctx)
+        self.core.submit(ctx)
         submitted = time.perf_counter()
         if self.benchmark():
             self.core.wait_gpu()

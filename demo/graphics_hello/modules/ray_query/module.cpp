@@ -102,7 +102,7 @@ void ModuleRayQuery::OnRender() {
   command_context->CmdBindResources(2, {camera_object_buffer_.get()}, grassland::graphics::BIND_POINT_COMPUTE);
   command_context->CmdDispatch((color_image_->Extent().width + 7) / 8, (color_image_->Extent().height + 7) / 8, 1);
   command_context->CmdPresent(window_.get(), color_image_.get());
-  core_->SubmitCommandContext(command_context.get());
+  core_->Submit(command_context.get());
 }
 
 }  // namespace graphics_hello::ray_query

@@ -62,8 +62,6 @@ class MetalCommandContext : public CommandContext {
     return command_.get();
   }
 
-  bool submitted = false;
-
  private:
   struct Resources {
     std::vector<BufferRange> buffers;

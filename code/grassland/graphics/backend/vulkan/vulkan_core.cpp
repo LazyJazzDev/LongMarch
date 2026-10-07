@@ -1,5 +1,7 @@
 #include "grassland/graphics/backend/vulkan/vulkan_core.h"
 
+#include <stdexcept>
+
 #include "grassland/graphics/backend/vulkan/vulkan_acceleration_structure.h"
 #include "grassland/graphics/backend/vulkan/vulkan_buffer.h"
 #include "grassland/graphics/backend/vulkan/vulkan_command_context.h"
@@ -10,7 +12,23 @@
 
 namespace grassland::graphics::backend {
 
-VulkanCore::VulkanCore(const Settings &settings) : Core(settings) {
+VulkanCore::CommandAllocation::~CommandAllocation() {
+  if (buffer)
+    vkFreeCommandBuffers(device, pool, 1, &buffer);
+  if (fence)
+    vkDestroyFence(device, fence, nullptr);
+}
+
+VulkanCore::DescriptorAllocation::~DescriptorAllocation() {
+  if (pool)
+    vkDestroyDescriptorPool(device, pool, nullptr);
+}
+
+VulkanCore::VulkanCore(const Settings &settings)
+    : Core(settings),
+      command_pool_(settings.command_pool_limit, "Vulkan commands"),
+      descriptor_pool_(settings.descriptor_pool_limit, "Vulkan descriptors"),
+      upload_pool_(settings.upload_pool_bytes, "Vulkan upload storage") {
   vulkan::InstanceCreateHint hint{};
   hint.SetValidationLayersEnabled(DebugEnabled());
 #if defined(LONGMARCH_CUDA_RUNTIME)
@@ -23,6 +41,7 @@ VulkanCore::VulkanCore(const Settings &settings) : Core(settings) {
 }
 
 VulkanCore::~VulkanCore() {
+  ShutdownSubmissions();
 #if defined(LONGMARCH_CUDA_RUNTIME)
   if (cuda_synchronization_semaphore_) {
     VkSemaphoreWaitInfo semaphore_wait_info{};
@@ -43,19 +62,9 @@ VulkanCore::~VulkanCore() {
   if (download_staging_buffer_)
     vmaDestroyBuffer(allocator_, download_staging_buffer_, download_staging_allocation_);
 
-  if (device_) {
-    for (VkDescriptorPool pool : descriptor_pools_) {
-      if (pool)
-        vkDestroyDescriptorPool(device_, pool, nullptr);
-    }
-  }
-  descriptor_pools_.clear();
-  if (device_) {
-    for (VkFence fence : in_flight_fences_) {
-      vkDestroyFence(this->Handle(), fence, nullptr);
-    }
-    in_flight_fences_.clear();
-  }
+  upload_pool_.Clear();
+  descriptor_pool_.Clear();
+  command_pool_.Clear();
   if (device_) {
     if (graphics_command_pool_) {
       vkDestroyCommandPool(this->Handle(), graphics_command_pool_, nullptr);
@@ -250,97 +259,64 @@ int VulkanCore::CreateRayTracingProgram(double_ptr<RayTracingProgram> pp_program
   return 0;
 }
 
-int VulkanCore::SubmitCommandContext(CommandContext *p_command_context) {
-  VulkanCommandContext *command_context = dynamic_cast<VulkanCommandContext *>(p_command_context);
+Submission VulkanCore::Submit(CommandContext *p_command_context) {
+  auto command_context = dynamic_cast<VulkanCommandContext *>(p_command_context);
+  if (!command_context)
+    throw std::invalid_argument("expected Vulkan command context");
+  command_context->BeginSubmission(this);
+  CollectCompletedSubmissions();
+  auto commands = command_pool_.Acquire(
+      1, [](const auto &) { return true; },
+      [&] {
+        auto result = std::make_shared<CommandAllocation>();
+        result->device = device_;
+        result->pool = graphics_command_pool_;
+        VkFenceCreateInfo fence_info{VK_STRUCTURE_TYPE_FENCE_CREATE_INFO};
+        vulkan::ThrowIfFailed(vkCreateFence(device_, &fence_info, nullptr, &result->fence), "Create submission fence");
+        VkCommandBufferAllocateInfo info{VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO};
+        info.commandPool = graphics_command_pool_;
+        info.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
+        info.commandBufferCount = 1;
+        vulkan::ThrowIfFailed(vkAllocateCommandBuffers(device_, &info, &result->buffer), "Allocate commands");
+        return result;
+      });
+  auto descriptors = descriptor_pool_.Acquire(
+      1,
+      [&](const auto &candidate) {
+        if (candidate.max_sets < command_context->required_set_count_)
+          return false;
+        for (auto [type, count] : command_context->required_pool_size_.descriptor_type_count) {
+          auto it = candidate.size.descriptor_type_count.find(type);
+          if (count && (it == candidate.size.descriptor_type_count.end() || it->second < count))
+            return false;
+        }
+        return true;
+      },
+      [&] {
+        auto result = std::make_shared<DescriptorAllocation>();
+        result->device = device_;
+        result->size = command_context->required_pool_size_;
+        result->max_sets = std::max(1, command_context->required_set_count_);
+        vulkan::ThrowIfFailed(
+            CreateDescriptorPool(result->size.ToVkDescriptorPoolSize(), result->max_sets, &result->pool),
+            "Create submission descriptors");
+        return result;
+      });
+  vulkan::ThrowIfFailed(vkResetDescriptorPool(device_, descriptors->pool, 0), "Reset submission descriptors");
+  current_descriptor_pool_ = descriptors->pool;
+  std::vector<std::shared_ptr<void>> retained{commands, descriptors};
 
-  auto &pool = descriptor_pools_[current_frame_];
-  auto pool_size = descriptor_pool_sizes_[current_frame_];
-  auto max_sets = descriptor_pool_max_sets_[current_frame_];
-  bool update_pool = false;
-  for (auto &[type, count] : command_context->required_pool_size_.descriptor_type_count) {
-    if (!pool_size.descriptor_type_count.count(type) || pool_size.descriptor_type_count[type] < count) {
-      uint32_t type_count = pool_size.descriptor_type_count[type];
-      if (!type_count) {
-        type_count = 1;
-      }
-      while (type_count < count) {
-        type_count *= 2;
-      }
-      pool_size.descriptor_type_count[type] = type_count;
-      update_pool = true;
-    }
-  }
-  while (max_sets < command_context->required_set_count_) {
-    max_sets *= 2;
-    update_pool = true;
-  }
-  if (update_pool) {
-    vkDestroyDescriptorPool(device_, pool, nullptr);
-    this->CreateDescriptorPool(pool_size.ToVkDescriptorPoolSize(), max_sets, &pool);
-    descriptor_pool_sizes_[current_frame_] = pool_size;
-    descriptor_pool_max_sets_[current_frame_] = max_sets;
-  } else {
-    vkResetDescriptorPool(device_, pool, 0);
-  }
-  current_descriptor_pool_ = pool;
-
-  for (auto &window : command_context->windows_) {
-    window->AcquireNextImage();
-  }
-
-  if (command_context->dynamic_buffers_.size()) {
-    vkResetCommandBuffer(transfer_command_buffer_, 0);
-    VkCommandBufferBeginInfo begin_info = {};
-    begin_info.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
-    begin_info.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
-
-    vkBeginCommandBuffer(transfer_command_buffer_, &begin_info);
-    for (auto &buffer : command_context->dynamic_buffers_) {
-      buffer->TransferData(transfer_command_buffer_);
-    }
-    vkEndCommandBuffer(transfer_command_buffer_);
-
-    VkCommandBuffer command_buffers[] = {transfer_command_buffer_};
-
-    VkSubmitInfo submit_info = {};
-    submit_info.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
-    submit_info.commandBufferCount = 1;
-    submit_info.pCommandBuffers = command_buffers;
-
-#if defined(LONGMARCH_CUDA_RUNTIME)
-    VkTimelineSemaphoreSubmitInfo timeline_info = {};
-    uint64_t wait_value;
-    uint64_t signal_value;
-    VkPipelineStageFlags wait_stages[] = {VK_PIPELINE_STAGE_ALL_COMMANDS_BIT};
-    if (cuda_device_ >= 0) {
-      wait_value = cuda_synchronization_value_++;
-      signal_value = cuda_synchronization_value_;
-      timeline_info.sType = VK_STRUCTURE_TYPE_TIMELINE_SEMAPHORE_SUBMIT_INFO;
-      timeline_info.waitSemaphoreValueCount = 1;
-      timeline_info.pWaitSemaphoreValues = &wait_value;
-      timeline_info.signalSemaphoreValueCount = 1;
-      timeline_info.pSignalSemaphoreValues = &signal_value;
-      timeline_info.pNext = submit_info.pNext;
-      submit_info.pNext = &timeline_info;
-      submit_info.signalSemaphoreCount = 1;
-      submit_info.pSignalSemaphores = &cuda_synchronization_semaphore_;
-      submit_info.pWaitDstStageMask = wait_stages;
-      submit_info.waitSemaphoreCount = 1;
-      submit_info.pWaitSemaphores = &cuda_synchronization_semaphore_;
-    }
-#endif
-
-    vulkan::ThrowIfFailed(vkQueueSubmit(transfer_queue_, 1, &submit_info, nullptr), "Submit Vulkan uploads");
-  }
-
-  VkCommandBuffer command_buffer = command_buffers_[current_frame_];
+  VkCommandBuffer command_buffer = commands->buffer;
   vkResetCommandBuffer(command_buffer, 0);
   VkCommandBufferBeginInfo begin_info{};
   begin_info.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
   begin_info.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
-  if (vkBeginCommandBuffer(command_buffer, &begin_info) != VK_SUCCESS) {
-    return -1;
-  }
+  vulkan::ThrowIfFailed(vkBeginCommandBuffer(command_buffer, &begin_info), "Begin Vulkan commands");
+  for (auto buffer : command_context->dynamic_buffers_)
+    retained.push_back(buffer->TransferData(command_buffer));
+
+  for (auto window : command_context->windows_)
+    window->AcquireNextImage();
 
   // Queue order alone does not make copied uniforms/instances visible to shaders.
   // This also orders static uploads and previous dispatches before this context.
@@ -362,7 +338,7 @@ int VulkanCore::SubmitCommandContext(CommandContext *p_command_context) {
   }
   command_context->image_states_.clear();
 
-  vkEndCommandBuffer(command_buffer);
+  vulkan::ThrowIfFailed(vkEndCommandBuffer(command_buffer), "End Vulkan commands");
 
   std::vector<VkSemaphore> wait_semaphores;
   std::vector<VkSemaphore> signal_semaphores;
@@ -374,8 +350,8 @@ int VulkanCore::SubmitCommandContext(CommandContext *p_command_context) {
     signal_semaphores.push_back(window->RenderFinishSemaphore());
   }
 
-  VkFence fence = in_flight_fences_[current_frame_];
-  vkResetFences(this->Handle(), 1, &fence);
+  VkFence fence = commands->fence;
+  vulkan::ThrowIfFailed(vkResetFences(this->Handle(), 1, &fence), "Reset Vulkan submission fence");
 
   VkSubmitInfo submit_info{};
   submit_info.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
@@ -410,27 +386,29 @@ int VulkanCore::SubmitCommandContext(CommandContext *p_command_context) {
     submit_info.pSignalSemaphores = signal_semaphores.data();
   }
 
-  vulkan::ThrowIfFailed(vkQueueSubmit(graphics_queue_, 1, &submit_info, fence), "Submit Vulkan rendering");
-
-  for (auto &window : command_context->windows_) {
+  auto callbacks = command_context->TakeCompletionCallbacks();
+  callbacks.push_back([retained = std::move(retained)] {});
+  auto submission = TrackSubmission(
+      [this, fence] {
+        auto result = vkGetFenceStatus(Handle(), fence);
+        if (result == VK_NOT_READY)
+          return false;
+        vulkan::ThrowIfFailed(result, "Query Vulkan submission");
+        return true;
+      },
+      [this, fence] {
+        vulkan::ThrowIfFailed(vkWaitForFences(Handle(), 1, &fence, VK_TRUE, std::numeric_limits<uint64_t>::max()),
+                              "Wait for Vulkan submission");
+      },
+      std::move(callbacks),
+      [&] {
+        vulkan::ThrowIfFailed(vkQueueSubmit(graphics_queue_, 1, &submit_info, fence), "Submit Vulkan rendering");
+      });
+  for (auto window : command_context->windows_)
+    window->RetireAcquire(submission);
+  for (auto &window : command_context->windows_)
     window->Present();
-  }
-
-  post_execute_functions_[current_frame_] = p_command_context->GetPostExecutionCallbacks();
-
-  current_frame_ = (current_frame_ + 1) % FramesInFlight();
-  fence = in_flight_fences_[current_frame_];
-  vulkan::ThrowIfFailed(vkWaitForFences(this->Handle(), 1, &fence, VK_TRUE, std::numeric_limits<uint64_t>::max()),
-                        "Wait for Vulkan rendering");
-
-  vulkan::ThrowIfFailed(vkQueueWaitIdle(transfer_queue_), "Wait for Vulkan uploads");
-
-  for (auto &callback : post_execute_functions_[current_frame_]) {
-    callback();
-  }
-  post_execute_functions_[current_frame_].clear();
-
-  return 0;
+  return submission;
 }
 
 int VulkanCore::GetPhysicalDeviceProperties(PhysicalDeviceProperties *p_physical_device_properties) {
@@ -525,37 +503,6 @@ int VulkanCore::InitializeLogicalDevice(int device_index) {
   vkGetDeviceQueue(native_device, vulkan::GraphicsFamilyIndex(physical_device), 0, &graphics_queue_);
   vkGetDeviceQueue(native_device, vulkan::GraphicsFamilyIndex(physical_device), 0, &transfer_queue_);
 
-  in_flight_fences_.resize(FramesInFlight());
-  command_buffers_.resize(FramesInFlight());
-
-  descriptor_pools_.resize(FramesInFlight());
-  descriptor_pool_sizes_.resize(FramesInFlight());
-  descriptor_pool_max_sets_.resize(FramesInFlight(), 1);
-
-  post_execute_functions_.resize(FramesInFlight());
-
-  for (int i = 0; i < FramesInFlight(); i++) {
-    VkFenceCreateInfo fence_info{VK_STRUCTURE_TYPE_FENCE_CREATE_INFO};
-    fence_info.flags = VK_FENCE_CREATE_SIGNALED_BIT;
-    vulkan::ThrowIfFailed(vkCreateFence(this->Handle(), &fence_info, nullptr, &in_flight_fences_[i]),
-                          "Failed to create in-flight fence");
-    VkCommandBufferAllocateInfo allocate_info{VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO};
-    allocate_info.commandPool = graphics_command_pool_;
-    allocate_info.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
-    allocate_info.commandBufferCount = 1;
-    vulkan::ThrowIfFailed(vkAllocateCommandBuffers(native_device, &allocate_info, &command_buffers_[i]),
-                          "failed to allocate graphics command buffer");
-
-    this->CreateDescriptorPool({{VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 1}}, 1, &descriptor_pools_[i]);
-    descriptor_pool_sizes_[i] = vulkan::DescriptorPoolSize(VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 1);
-  }
-  VkCommandBufferAllocateInfo transfer_allocate_info{VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO};
-  transfer_allocate_info.commandPool = transfer_command_pool_;
-  transfer_allocate_info.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
-  transfer_allocate_info.commandBufferCount = 1;
-  vulkan::ThrowIfFailed(vkAllocateCommandBuffers(native_device, &transfer_allocate_info, &transfer_command_buffer_),
-                        "failed to allocate transfer command buffer");
-
 #if defined(LONGMARCH_CUDA_RUNTIME)
 
   if (cuda_device_ >= 0) {
@@ -612,13 +559,9 @@ int VulkanCore::InitializeLogicalDevice(int device_index) {
 }
 
 void VulkanCore::WaitGPU() {
-  vkQueueWaitIdle(graphics_queue_);
-  for (auto &post_execute : post_execute_functions_) {
-    for (auto &callback : post_execute) {
-      callback();
-    }
-    post_execute.clear();
-  }
+  if (graphics_queue_)
+    vulkan::ThrowIfFailed(vkQueueWaitIdle(graphics_queue_), "Wait for Vulkan queue");
+  WaitSubmissions();
 }
 
 uint32_t VulkanCore::WaveSize() const {

@@ -14,7 +14,7 @@ namespace {
 
 NBodyCS::NBodyCS(const NBodyOptions &options) : options_(options), n_particles_(options.particles) {
   random_device_.seed(options.seed);
-  graphics::Core::Settings settings{2, options.debug};
+  graphics::Core::Settings settings{options.debug};
   if (graphics::CreateCore(options.backend, settings, &core_) || core_->InitializeLogicalDeviceAutoSelect(false))
     throw std::runtime_error("could not initialize graphics backend");
   if (options.mode == "interactive" || options.mode == "window")
@@ -144,7 +144,7 @@ void NBodyCS::OnRender() {
   if (profiler_)
     profiler_->EndGpu(ctx.get(), gpu_scope);
   auto recorded = Clock::now();
-  core_->SubmitCommandContext(ctx.get());
+  core_->Submit(ctx.get());
   auto submitted = Clock::now();
   if (Benchmark()) {
     core_->WaitGPU();

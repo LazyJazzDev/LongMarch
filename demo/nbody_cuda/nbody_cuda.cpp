@@ -188,7 +188,7 @@ void NBodyCUDA::OnRender() {
     if (!headless_)
       ctx->CmdPresent(window_.get(), frame_image_.get());
   }
-  core_->SubmitCommandContext(ctx.get());
+  core_->Submit(ctx.get());
 }
 
 void NBodyCUDA::BuildRenderNode() {

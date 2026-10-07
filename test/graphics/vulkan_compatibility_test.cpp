@@ -12,7 +12,7 @@ using namespace grassland::graphics;
 // with VK_LAYER_VALIDATE_SYNC=1 when running this explicit Vulkan GPU test.
 void CheckTiledComputeWithExplicitPixelOrigins(BackendAPI backend) {
   std::unique_ptr<Core> core;
-  ASSERT_EQ(CreateCore(backend, Core::Settings{1, true}, &core), 0);
+  ASSERT_EQ(CreateCore(backend, Core::Settings{true}, &core), 0);
   ASSERT_EQ(core->InitializeLogicalDeviceAutoSelect(false), 0);
   constexpr uint32_t width = 259, height = 130;
   std::unique_ptr<Image> image;
@@ -60,7 +60,7 @@ cbuffer Tile : register(b0, space2) { uint2 origin; uint2 padding; };
         commands->CmdDispatch(std::min(16u, nx - x), std::min(16u, ny - y), 1);
         origins.push_back(std::move(origin));
       }
-    ASSERT_EQ(core->SubmitCommandContext(commands.get()), 0);
+    ASSERT_TRUE(core->Submit(commands.get()).IsValid());
     core->WaitGPU();
     image->DownloadData(pixels.data());
     for (uint32_t y = 0; y < height; ++y)
@@ -86,7 +86,7 @@ TEST(MetalCompatibility, TiledComputeUsesExplicitPixelOrigins) {
 
 TEST(VulkanCompatibility, DivergentStorageBuffersThroughHelperProduceCorrectValues) {
   std::unique_ptr<Core> core;
-  ASSERT_EQ(CreateCore(BACKEND_API_VULKAN, Core::Settings{1, true}, &core), 0);
+  ASSERT_EQ(CreateCore(BACKEND_API_VULKAN, Core::Settings{true}, &core), 0);
   ASSERT_EQ(core->InitializeLogicalDeviceAutoSelect(false), 0);
   std::array<std::unique_ptr<Buffer>, 2> inputs;
   for (uint32_t i = 0; i < inputs.size(); ++i) {
@@ -121,7 +121,7 @@ uint ReadValue(uint index) {
   commands->CmdBindResources(0, std::vector<Buffer *>{inputs[0].get(), inputs[1].get()}, BIND_POINT_COMPUTE);
   commands->CmdBindResources(1, std::vector<Buffer *>{output.get()}, BIND_POINT_COMPUTE);
   commands->CmdDispatch(1, 1, 1);
-  ASSERT_EQ(core->SubmitCommandContext(commands.get()), 0);
+  ASSERT_TRUE(core->Submit(commands.get()).IsValid());
   core->WaitGPU();
   std::array<uint32_t, 64> result{};
   output->DownloadData(result.data(), sizeof(result));

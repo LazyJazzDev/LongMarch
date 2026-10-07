@@ -171,7 +171,7 @@ int main(int argc, char **argv) {
     if (seconds < 1 || seconds > 3600)
       throw std::invalid_argument("seconds must be in [1, 3600]");
     std::unique_ptr<graphics::Core> core;
-    if (graphics::CreateCore(graphics::BACKEND_API_VULKAN, {2, true}, &core) ||
+    if (graphics::CreateCore(graphics::BACKEND_API_VULKAN, {true}, &core) ||
         core->InitializeLogicalDeviceAutoSelect(false))
       throw std::runtime_error("Cannot initialize Vulkan");
     std::unique_ptr<graphics::Window> sdr, hdr;
@@ -201,7 +201,7 @@ int main(int argc, char **argv) {
       commands->CmdClearImage(hdr_image.get(), {{1, 1, 1, 1}});
       commands->CmdPresent(sdr.get(), sdr_image.get());
       commands->CmdPresent(hdr.get(), hdr_image.get());
-      core->SubmitCommandContext(commands.get());
+      core->Submit(commands.get());
       core->WaitGPU();
       if (++frames >= 3) {
         if (sdr_probe.changed)

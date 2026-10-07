@@ -5,6 +5,14 @@
 
 namespace grassland::graphics::backend {
 
+struct VulkanUploadAllocation {
+  VmaAllocator allocator{};
+  VkBuffer device_buffer{}, upload_buffer{};
+  VmaAllocation device_memory{}, upload_memory{};
+  size_t size{};
+  ~VulkanUploadAllocation();
+};
+
 class VulkanCore : public Core {
  public:
   VulkanCore(const Settings &settings);
@@ -85,7 +93,7 @@ class VulkanCore : public Core {
 
   int CreateRayTracingProgram(double_ptr<RayTracingProgram> pp_program) override;
 
-  int SubmitCommandContext(CommandContext *p_command_context) override;
+  Submission Submit(CommandContext *p_command_context) override;
 
   int GetPhysicalDeviceProperties(PhysicalDeviceProperties *p_physical_device_properties = nullptr) override;
 
@@ -231,17 +239,7 @@ class VulkanCore : public Core {
     return transfer_command_pool_;
   }
 
-  VkCommandBuffer CommandBuffer() const {
-    return command_buffers_[current_frame_];
-  }
-
-  VkFence InFlightFence() const {
-    return in_flight_fences_[current_frame_];
-  }
-
-  uint32_t CurrentFrame() const override {
-    return current_frame_;
-  }
+  std::shared_ptr<VulkanUploadAllocation> AcquireUploadStorage(size_t size);
 
   void SingleTimeCommand(std::function<void(VkCommandBuffer)> command);
 
@@ -285,23 +283,31 @@ class VulkanCore : public Core {
   void DestroyNativeDevice();
   VkPhysicalDeviceMemoryProperties memory_properties_;
 
-  uint32_t current_frame_{0};
-  std::vector<VkFence> in_flight_fences_;
+  struct CommandAllocation {
+    VkDevice device{};
+    VkCommandPool pool{};
+    VkCommandBuffer buffer{};
+    VkFence fence{};
+    ~CommandAllocation();
+  };
 
-  std::vector<VkDescriptorPool> descriptor_pools_;
-  std::vector<vulkan::DescriptorPoolSize> descriptor_pool_sizes_;
-  std::vector<uint32_t> descriptor_pool_max_sets_;
+  struct DescriptorAllocation {
+    VkDevice device{};
+    VkDescriptorPool pool{};
+    vulkan::DescriptorPoolSize size;
+    uint32_t max_sets{};
+    ~DescriptorAllocation();
+  };
+
+  detail::ResourcePool<CommandAllocation> command_pool_;
+  detail::ResourcePool<DescriptorAllocation> descriptor_pool_;
+  detail::ResourcePool<VulkanUploadAllocation> upload_pool_;
   VkDescriptorPool current_descriptor_pool_{VK_NULL_HANDLE};
-
   VkCommandPool graphics_command_pool_{VK_NULL_HANDLE};
   VkCommandPool transfer_command_pool_{VK_NULL_HANDLE};
-  std::vector<VkCommandBuffer> command_buffers_;
-  VkCommandBuffer transfer_command_buffer_{VK_NULL_HANDLE};
 
   VkQueue graphics_queue_{VK_NULL_HANDLE};
   VkQueue transfer_queue_{VK_NULL_HANDLE};
-
-  std::vector<std::vector<std::function<void()>>> post_execute_functions_;
 
 #if defined(LONGMARCH_CUDA_RUNTIME)
   VkSemaphore cuda_synchronization_semaphore_{VK_NULL_HANDLE};

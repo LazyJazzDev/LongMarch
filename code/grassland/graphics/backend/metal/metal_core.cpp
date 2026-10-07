@@ -19,6 +19,7 @@ MetalCore::MetalCore(const Settings &settings) : Core(settings) {
 }
 
 MetalCore::~MetalCore() {
+  ShutdownSubmissions();
   try {
     WaitGPU();
   } catch (const std::exception &e) {
@@ -56,46 +57,35 @@ uint32_t MetalCore::WaveSize() const {
   return 32;
 }
 
-void MetalCore::Reap(bool wait) {
-  while (!pending_.empty()) {
-    auto &submission = pending_.front();
-    auto buffer = submission.buffer;
-    if (wait)
-      buffer->waitUntilCompleted();
-    if (buffer->status() < MTL::CommandBufferStatusCompleted)
-      break;
-    auto callbacks = std::move(submission.callbacks);
-    pending_.pop_front();
-    if (buffer->status() == MTL::CommandBufferStatusError)
-      MetalCheck(nullptr, buffer->error(), "Metal command submission");
-    for (auto &callback : callbacks)
-      callback();
-  }
-}
-
 void MetalCore::WaitGPU() {
-  Reap(true);
+  WaitSubmissions();
 }
 
-void MetalCore::Commit(MTL::CommandBuffer *buffer, std::vector<std::function<void()>> callbacks) {
-  Reap(false);
-  if (pending_.size() >= std::max(1, FramesInFlight())) {
-    pending_.front().buffer->waitUntilCompleted();
-    Reap(false);
-  }
-  pending_.push_back({NS::RetainPtr(buffer), std::move(callbacks)});
-  buffer->commit();
-  frame_ = (frame_ + 1) % std::max(1, FramesInFlight());
+Submission MetalCore::Commit(MTL::CommandBuffer *buffer, std::vector<std::function<void()>> callbacks) {
+  CollectCompletedSubmissions();
+  auto retained = NS::RetainPtr(buffer);
+  auto submission = TrackSubmission(
+      [retained] {
+        if (retained->status() == MTL::CommandBufferStatusError)
+          MetalCheck(nullptr, retained->error(), "Metal command submission");
+        return retained->status() == MTL::CommandBufferStatusCompleted;
+      },
+      [retained] {
+        retained->waitUntilCompleted();
+        if (retained->status() == MTL::CommandBufferStatusError)
+          MetalCheck(nullptr, retained->error(), "Metal command submission");
+      },
+      std::move(callbacks), [buffer] { buffer->commit(); });
+  return submission;
 }
 
-int MetalCore::SubmitCommandContext(CommandContext *context) {
+Submission MetalCore::Submit(CommandContext *context) {
   auto metal = dynamic_cast<MetalCommandContext *>(context);
-  if (!metal || metal->GetCore() != this || metal->submitted)
-    return -1;
+  if (!metal)
+    throw std::invalid_argument("expected Metal command context");
+  metal->BeginSubmission(this);
   metal->EndEncoder();
-  Commit(metal->Handle(), metal->GetPostExecutionCallbacks());
-  metal->submitted = true;
-  return 0;
+  return Commit(metal->Handle(), metal->TakeCompletionCallbacks());
 }
 
 int MetalCore::CreateBuffer(size_t size, BufferType type, double_ptr<Buffer> pp_buffer) {

@@ -192,7 +192,7 @@ int main(int argc, char **argv) {
         std::unique_ptr<graphics::CommandContext> commands;
         graphics->CreateCommandContext(&commands);
         commands->CmdPresent(window.get(), image.get());
-        graphics->SubmitCommandContext(commands.get());
+        graphics->Submit(commands.get());
         graphics::Window::PollEvents();
       }
       ++rendered;

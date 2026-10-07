@@ -45,6 +45,7 @@ class VulkanWindow : public Window {
   VkSemaphore ImageAvailableSemaphore() const;
 
   uint32_t AcquireNextImage();
+  void RetireAcquire(Submission submission);
 
   int Rebuild();
 
@@ -82,7 +83,7 @@ class VulkanWindow : public Window {
   std::optional<VkSurfaceFormatKHR> SelectSurfaceFormat(bool hdr) const;
   VkFormat ImGuiFormat() const;
   VkSurfaceFormatKHR surface_format_{};
-  VkQueue present_queue_;
+  VkQueue present_queue_{VK_NULL_HANDLE};
   VulkanCore *core_;
   VkSurfaceKHR surface_{VK_NULL_HANDLE};
   VkSwapchainKHR swap_chain_{VK_NULL_HANDLE};
@@ -96,6 +97,8 @@ class VulkanWindow : public Window {
   std::vector<VkSemaphore> render_finish_semaphores_;
   std::vector<VkSemaphore> image_available_semaphores_;
   uint32_t image_index_;
+  uint32_t acquire_index_{1};
+  Submission acquire_uses_[2];
 
   VulkanImGuiAssets imgui_assets_{};
   VkFramebuffer hdr_framebuffer_{VK_NULL_HANDLE};

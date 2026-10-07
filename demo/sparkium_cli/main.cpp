@@ -103,7 +103,7 @@ int main(int argc, char **argv) {
       throw std::runtime_error("SDR and HDR outputs must use different paths");
 
     std::unique_ptr<graphics::Core> graphics_core;
-    if (graphics::CreateCore(backend, graphics::Core::Settings{2, debug}, &graphics_core) != 0)
+    if (graphics::CreateCore(backend, graphics::Core::Settings{debug}, &graphics_core) != 0)
       throw std::runtime_error("failed to create graphics core");
     if (graphics_core->InitializeLogicalDeviceAutoSelect(false) != 0)
       throw std::runtime_error("failed to initialize graphics device");

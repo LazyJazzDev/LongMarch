@@ -137,7 +137,7 @@ void Scene::Render(Camera *camera, Film *film) {
 
   cmd_context->CmdEndRendering();
 
-  core_->GraphicsCore()->SubmitCommandContext(cmd_context.get());
+  core_->GraphicsCore()->Submit(cmd_context.get());
   core_->GraphicsCore()->WaitGPU();
 }
 

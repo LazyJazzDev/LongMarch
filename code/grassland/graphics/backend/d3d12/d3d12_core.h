@@ -13,6 +13,11 @@ struct BlitPipeline {
   ID3D12PipelineState *GetPipelineState(DXGI_FORMAT format);
 };
 
+struct D3D12UploadAllocation {
+  ComPtr<ID3D12Resource> device_buffer, upload_buffer;
+  size_t size{};
+};
+
 class D3D12Core : public Core {
  public:
   D3D12Core(const Settings &settings);
@@ -136,7 +141,7 @@ class D3D12Core : public Core {
                             D3D12_GPU_VIRTUAL_ADDRESS &hit_group_offset,
                             D3D12_GPU_VIRTUAL_ADDRESS &callable_offset) const;
 
-  int SubmitCommandContext(CommandContext *p_command_context) override;
+  Submission Submit(CommandContext *p_command_context) override;
 
   int GetPhysicalDeviceProperties(PhysicalDeviceProperties *p_physical_device_properties = nullptr) override;
 
@@ -162,13 +167,7 @@ class D3D12Core : public Core {
     return command_queue_.Get();
   }
 
-  ID3D12GraphicsCommandList *CommandList() const {
-    return command_lists_[current_frame_].Get();
-  }
-
-  ID3D12CommandAllocator *CommandAllocator() const {
-    return command_allocators_[current_frame_].Get();
-  }
+  std::shared_ptr<D3D12UploadAllocation> AcquireUploadStorage(size_t size);
 
   ID3D12Fence *Fence() const {
     return fence_.Get();
@@ -176,10 +175,6 @@ class D3D12Core : public Core {
 
   ID3D12CommandAllocator *SingleTimeCommandAllocator() const {
     return single_time_allocator_.Get();
-  }
-
-  uint32_t CurrentFrame() const override {
-    return current_frame_;
   }
 
   void SingleTimeCommand(std::function<void(ID3D12GraphicsCommandList *)> command);
@@ -216,9 +211,23 @@ class D3D12Core : public Core {
   struct BlitPipeline blit_pipeline_;
 
   ComPtr<ID3D12CommandQueue> command_queue_;
-  ComPtr<ID3D12CommandQueue> transfer_command_queue_;
-  std::vector<ComPtr<ID3D12CommandAllocator>> command_allocators_;
-  std::vector<ComPtr<ID3D12GraphicsCommandList>> command_lists_;
+
+  struct CommandAllocation {
+    ComPtr<ID3D12CommandAllocator> allocator;
+    ComPtr<ID3D12GraphicsCommandList> commands;
+  };
+
+  struct DescriptorAllocation {
+    ComPtr<ID3D12DescriptorHeap> heap;
+  };
+
+  detail::ResourcePool<CommandAllocation> command_pool_;
+  detail::ResourcePool<DescriptorAllocation> resource_pool_, sampler_pool_, rtv_pool_, dsv_pool_;
+  detail::ResourcePool<D3D12UploadAllocation> upload_pool_;
+  std::shared_ptr<DescriptorAllocation> AcquireDescriptors(detail::ResourcePool<DescriptorAllocation> &pool,
+                                                           D3D12_DESCRIPTOR_HEAP_TYPE type,
+                                                           size_t count);
+  ID3D12DescriptorHeap *current_resource_heap_{}, *current_sampler_heap_{}, *current_rtv_heap_{}, *current_dsv_heap_{};
 
   ComPtr<ID3D12Fence> fence_;
   uint64_t fence_value_{1};
@@ -226,23 +235,9 @@ class D3D12Core : public Core {
   void SignalFence(ID3D12CommandQueue *queue);
   void QueueWaitFence(ID3D12CommandQueue *queue);
   void WaitForFence(uint64_t value);
-  std::vector<uint64_t> in_flight_values_;
 
   ComPtr<ID3D12CommandAllocator> single_time_allocator_;
   ComPtr<ID3D12GraphicsCommandList> single_time_command_list_;
-
-  ComPtr<ID3D12CommandAllocator> transfer_allocator_;
-  ComPtr<ID3D12GraphicsCommandList> transfer_command_list_;
-
-  std::vector<ComPtr<ID3D12DescriptorHeap>> resource_descriptor_heaps_;
-  std::vector<ComPtr<ID3D12DescriptorHeap>> sampler_descriptor_heaps_;
-
-  std::vector<ComPtr<ID3D12DescriptorHeap>> rtv_descriptor_heaps_;
-  std::vector<ComPtr<ID3D12DescriptorHeap>> dsv_descriptor_heaps_;
-
-  uint32_t current_frame_{0};
-
-  std::vector<std::vector<std::function<void()>>> post_execute_functions_;
 
 #if defined(LONGMARCH_CUDA_RUNTIME)
   uint32_t cuda_device_node_mask_;

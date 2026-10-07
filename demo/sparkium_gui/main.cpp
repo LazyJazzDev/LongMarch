@@ -296,7 +296,7 @@ int main(int argc, char **argv) {
       std::unique_ptr<graphics::CommandContext> command_context;
       graphics_core->CreateCommandContext(&command_context);
       command_context->CmdPresent(window.get(), image.get());
-      graphics_core->SubmitCommandContext(command_context.get());
+      graphics_core->Submit(command_context.get());
       graphics::Window::PollEvents();
       if (resize_pending) {
         ResizeWindowForFilm(window.get(), loaded->GetFilm());

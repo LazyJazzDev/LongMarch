@@ -91,15 +91,10 @@ ID3D12Resource *D3D12StaticBuffer::InstantBuffer() const {
 }
 
 D3D12DynamicBuffer::D3D12DynamicBuffer(D3D12Core *core, size_t size) : core_(core) {
-  buffers_.resize(core_->FramesInFlight());
-  for (size_t i = 0; i < buffers_.size(); ++i) {
-    buffers_[i] = CreateNativeBuffer(core_->Device(), size, D3D12_HEAP_TYPE_DEFAULT);
-  }
   staging_buffer_ = CreateNativeBuffer(core_->Device(), size, D3D12_HEAP_TYPE_UPLOAD);
 }
 
 D3D12DynamicBuffer::~D3D12DynamicBuffer() {
-  buffers_.clear();
   staging_buffer_.Reset();
 }
 
@@ -134,21 +129,37 @@ void D3D12DynamicBuffer::DownloadData(void *data, size_t size, size_t offset) {
 }
 
 ID3D12Resource *D3D12DynamicBuffer::Buffer() const {
-  return buffers_[core_->CurrentFrame()].Get();
+  return current_buffer_;
 }
 
 ID3D12Resource *D3D12DynamicBuffer::InstantBuffer() const {
   return staging_buffer_.Get();
 }
 
-void D3D12DynamicBuffer::TransferData(ID3D12GraphicsCommandList *command_list) {
-  if (buffers_[core_->CurrentFrame()]->GetDesc().Width != staging_buffer_->GetDesc().Width) {
-    buffers_[core_->CurrentFrame()].Reset();
-    buffers_[core_->CurrentFrame()] =
-        CreateNativeBuffer(core_->Device(), staging_buffer_->GetDesc().Width, D3D12_HEAP_TYPE_DEFAULT);
-  }
-  CopyNativeBuffer(command_list, staging_buffer_.Get(), buffers_[core_->CurrentFrame()].Get(),
-                   staging_buffer_->GetDesc().Width, 0, 0);
+std::shared_ptr<D3D12UploadAllocation> D3D12Core::AcquireUploadStorage(size_t size) {
+  if (size > std::numeric_limits<size_t>::max() / 2)
+    throw ResourcePoolExhausted("D3D12 upload storage");
+  return upload_pool_.Acquire(
+      size * 2, [size](const auto &entry) { return entry.size == size; },
+      [&] {
+        auto result = std::make_shared<D3D12UploadAllocation>();
+        result->size = size;
+        result->device_buffer = CreateNativeBuffer(Device(), size, D3D12_HEAP_TYPE_DEFAULT);
+        result->upload_buffer = CreateNativeBuffer(Device(), size, D3D12_HEAP_TYPE_UPLOAD);
+        return result;
+      });
+}
+
+std::shared_ptr<void> D3D12DynamicBuffer::TransferData(ID3D12GraphicsCommandList *command_list) {
+  auto storage = core_->AcquireUploadStorage(Size());
+  auto src = MapBuffer(staging_buffer_.Get());
+  auto dst = MapBuffer(storage->upload_buffer.Get());
+  std::memcpy(dst, src, Size());
+  storage->upload_buffer->Unmap(0, nullptr);
+  staging_buffer_->Unmap(0, nullptr);
+  CopyNativeBuffer(command_list, storage->upload_buffer.Get(), storage->device_buffer.Get(), Size(), 0, 0);
+  current_buffer_ = storage->device_buffer.Get();
+  return storage;
 }
 
 #if defined(LONGMARCH_CUDA_RUNTIME)

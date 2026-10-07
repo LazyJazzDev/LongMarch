@@ -56,12 +56,17 @@ class CommandContext {
                              uint64_t dst_offset = 0,
                              uint64_t src_offset = 0) = 0;
 
-  void PushPostExecutionCallback(std::function<void()> callback);
-  const std::vector<std::function<void()>> &GetPostExecutionCallbacks() const;
+  // Invoked on the host thread that observes completion. Callbacks must not
+  // reenter submission/collection on this Core or query their own ticket.
+  void OnCompleted(std::function<void()> callback);
+  // A context is submitted once; failure also consumes it. Referenced resources
+  // must still be kept alive by the caller through completion in this first stage.
+  void BeginSubmission(Core *core);
+  std::vector<std::function<void()>> TakeCompletionCallbacks();
 
- protected:
+ private:
+  bool submission_started_{false};
+
   std::vector<std::function<void()>> post_execution_callbacks_;
-
- public:
 };
 }  // namespace grassland::graphics
