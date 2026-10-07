@@ -58,15 +58,4 @@ class Submission {
   std::shared_ptr<detail::InFlightSubmission> state_;
 };
 
-namespace detail {
-// Protects the backing storage reused by a subsequent queue submission.
-class InFlightSlot {
- public:
-  void Wait() const;
-  void Retire(Submission submission);
-
- private:
-  Submission last_use_;
-};
-}  // namespace detail
 }  // namespace grassland::graphics

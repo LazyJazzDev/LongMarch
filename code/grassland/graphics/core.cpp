@@ -12,8 +12,8 @@
 namespace grassland::graphics {
 
 Core::Core(const Settings &settings) : settings_(settings) {
-  if (settings.submission_slot_count < 1)
-    throw std::invalid_argument("submission_slot_count must be positive");
+  if (!settings.command_pool_limit || !settings.descriptor_pool_limit || !settings.upload_pool_bytes)
+    throw std::invalid_argument("resource pool budgets must be positive");
   // Initialize the window system before backend-specific setup, but allow
   // headless rendering when no window system is available.
   InitializeGLFW();
@@ -124,10 +124,6 @@ int Core::InitializeLogicalDeviceAutoSelect(bool require_ray_tracing) {
   }
 
   return InitializeLogicalDevice(device_index);
-}
-
-int Core::SubmissionSlotCount() const {
-  return settings_.submission_slot_count;
 }
 
 bool Core::DebugEnabled() const {

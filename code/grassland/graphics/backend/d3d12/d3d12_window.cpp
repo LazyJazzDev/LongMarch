@@ -37,6 +37,16 @@ D3D12Window::~D3D12Window() {
   }
 }
 
+void D3D12Window::PrepareSubmission() {
+  if (presentation_uses_[presentation_index_].IsValid())
+    presentation_uses_[presentation_index_].Wait();
+}
+
+void D3D12Window::RetirePresentation(Submission submission) {
+  presentation_uses_[presentation_index_] = std::move(submission);
+  presentation_index_ = (presentation_index_ + 1) % 2;
+}
+
 void D3D12Window::CloseWindow() {
   core_->WaitGPU();
   if (imgui_assets_.context) {
@@ -148,7 +158,7 @@ void D3D12Window::SetupImGuiContext() {
   ImGui_ImplDX12_InitInfo init_info = {};
   init_info.Device = core_->Device();
   init_info.CommandQueue = core_->CommandQueue();
-  init_info.NumFramesInFlight = core_->SubmissionSlotCount();
+  init_info.NumFramesInFlight = 2;
   init_info.RTVFormat = BackBufferFormat();
   init_info.DSVFormat = DXGI_FORMAT_UNKNOWN;
   init_info.UserData = &imgui_assets_;

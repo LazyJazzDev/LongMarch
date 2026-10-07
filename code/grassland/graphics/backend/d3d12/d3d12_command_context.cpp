@@ -214,6 +214,8 @@ void D3D12CommandContext::CmdCopyBuffer(Buffer *dst_buffer,
                                         uint64_t size,
                                         uint64_t dst_offset,
                                         uint64_t src_offset) {
+  RecordDynamicBuffer(dynamic_cast<D3D12Buffer *>(src_buffer));
+  RecordDynamicBuffer(dynamic_cast<D3D12Buffer *>(dst_buffer));
   commands_.push_back(std::make_unique<D3D12CmdCopyBuffer>(
       dynamic_cast<D3D12Buffer *>(dst_buffer), dynamic_cast<D3D12Buffer *>(src_buffer), size, dst_offset, src_offset));
 }

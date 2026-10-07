@@ -2,6 +2,7 @@
 
 namespace grassland::graphics::pybind {
 void RegisterGraphics(py::module_ &m) {
+  py::register_exception<ResourcePoolExhausted>(m, "ResourcePoolExhausted");
   py::class_<Submission>(m, "Submission")
       .def("is_valid", &Submission::IsValid)
       .def("is_complete", &Submission::IsComplete)

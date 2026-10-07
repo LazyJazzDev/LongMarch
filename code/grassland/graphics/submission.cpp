@@ -141,18 +141,6 @@ void SubmissionQueue::Shutdown() noexcept {
   }
 }
 
-void InFlightSlot::Wait() const {
-  if (last_use_.IsValid())
-    last_use_.Wait();
-}
-
-void InFlightSlot::Retire(Submission submission) {
-  if (!submission.IsValid())
-    throw std::invalid_argument("invalid slot submission");
-  if (last_use_.IsValid() && !last_use_.IsComplete())
-    throw std::logic_error("in-flight slot reused before completion");
-  last_use_ = std::move(submission);
-}
 }  // namespace detail
 
 Submission::Submission(std::shared_ptr<detail::InFlightSubmission> state) : state_(std::move(state)) {

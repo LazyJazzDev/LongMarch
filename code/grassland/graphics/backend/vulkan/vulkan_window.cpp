@@ -107,7 +107,7 @@ VulkanWindow::VulkanWindow(VulkanCore *core,
   vulkan::ThrowIfFailed(glfwCreateWindowSurface(core_->Instance(), GLFWWindow(), nullptr, &surface_),
                         "Failed to create window surface");
   CreateSwapChain();
-  image_available_semaphores_.resize(core_->SubmissionSlotCount());
+  image_available_semaphores_.resize(2);
   for (size_t i = 0; i < image_available_semaphores_.size(); ++i) {
     VkSemaphoreCreateInfo semaphore_info{VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO};
     vulkan::ThrowIfFailed(vkCreateSemaphore(core_->Handle(), &semaphore_info, nullptr, &image_available_semaphores_[i]),
@@ -217,16 +217,23 @@ VkSemaphore VulkanWindow::RenderFinishSemaphore() const {
 }
 
 VkSemaphore VulkanWindow::ImageAvailableSemaphore() const {
-  return image_available_semaphores_[core_->CurrentSubmissionSlot()];
+  return image_available_semaphores_[acquire_index_];
 }
 
 uint32_t VulkanWindow::AcquireNextImage() {
   if (presentation_failed_)
     throw std::runtime_error("Vulkan presentation unavailable after swapchain recovery failed");
+  acquire_index_ = (acquire_index_ + 1) % 2;
+  if (acquire_uses_[acquire_index_].IsValid())
+    acquire_uses_[acquire_index_].Wait();
   vulkan::ThrowIfFailed(vkAcquireNextImageKHR(core_->Handle(), swap_chain_, std::numeric_limits<uint64_t>::max(),
                                               ImageAvailableSemaphore(), VK_NULL_HANDLE, &image_index_),
                         "Failed to acquire Vulkan swapchain image");
   return image_index_;
+}
+
+void VulkanWindow::RetireAcquire(Submission submission) {
+  acquire_uses_[acquire_index_] = std::move(submission);
 }
 
 int VulkanWindow::Rebuild() {

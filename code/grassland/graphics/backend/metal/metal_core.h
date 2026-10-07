@@ -90,10 +90,6 @@ class MetalCore : public Core {
 
   uint32_t WaveSize() const override;
 
-  uint32_t CurrentSubmissionSlot() const override {
-    return current_slot_;
-  }
-
   MTL::Device *Device() const {
     return device_.get();
   }
@@ -107,9 +103,6 @@ class MetalCore : public Core {
  private:
   NS::SharedPtr<MTL::Device> device_;
   NS::SharedPtr<MTL::CommandQueue> queue_;
-
-  std::vector<detail::InFlightSlot> in_flight_slots_;
-  uint32_t current_slot_ = 0;
 };
 
 }  // namespace grassland::graphics::backend

@@ -1,6 +1,7 @@
 #pragma once
 
 #include "grassland/graphics/graphics_util.h"
+#include "grassland/graphics/resource_pool.h"
 #include "grassland/graphics/submission.h"
 
 #if defined(LONGMARCH_CUDA_RUNTIME)
@@ -12,8 +13,13 @@ namespace grassland::graphics {
 class Core {
  public:
   struct Settings {
-    int submission_slot_count{2};
     bool enable_debug{kEnableDebug};
+    // Vulkan/D3D12 independent pool budgets. Metal currently uses native
+    // per-command storage and does not implement these pool policies.
+    size_t command_pool_limit{256};
+    size_t descriptor_pool_limit{256};
+    // Requested upload + device buffer bytes; excludes native allocation overhead.
+    size_t upload_pool_bytes{128 * 1024 * 1024};
   };
 
   Core(const Settings &settings);
@@ -114,10 +120,6 @@ class Core {
   virtual uint32_t WaveSize() const = 0;
 
   int InitializeLogicalDeviceAutoSelect(bool require_ray_tracing);
-
-  int SubmissionSlotCount() const;
-
-  virtual uint32_t CurrentSubmissionSlot() const = 0;
 
   bool DebugEnabled() const;
 

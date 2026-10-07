@@ -62,9 +62,6 @@ void MetalCore::WaitGPU() {
 }
 
 Submission MetalCore::Commit(MTL::CommandBuffer *buffer, std::vector<std::function<void()>> callbacks) {
-  if (in_flight_slots_.empty())
-    in_flight_slots_.resize(SubmissionSlotCount());
-  in_flight_slots_[current_slot_].Wait();
   CollectCompletedSubmissions();
   auto retained = NS::RetainPtr(buffer);
   auto submission = TrackSubmission(
@@ -79,8 +76,6 @@ Submission MetalCore::Commit(MTL::CommandBuffer *buffer, std::vector<std::functi
           MetalCheck(nullptr, retained->error(), "Metal command submission");
       },
       std::move(callbacks), [buffer] { buffer->commit(); });
-  in_flight_slots_[current_slot_].Retire(submission);
-  current_slot_ = (current_slot_ + 1) % SubmissionSlotCount();
   return submission;
 }
 

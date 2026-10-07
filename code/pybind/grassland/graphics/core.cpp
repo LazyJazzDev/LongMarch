@@ -2,13 +2,12 @@
 
 namespace grassland::graphics::pybind {
 void RegisterCoreSettings(py::classh<Core::Settings> &c) {
-  c.def(py::init<int, bool>(), py::arg("submission_slot_count") = 2, py::arg("enable_debug") = kEnableDebug);
-  c.def("__repr__", [](const Core::Settings &settings) {
-    return py::str("Core.Settings(submission_slot_count={}, enable_debug={})")
-        .format(settings.submission_slot_count, settings.enable_debug);
-  });
-  c.def_readwrite("submission_slot_count", &Core::Settings::submission_slot_count,
-                  "Number of reusable submission slots");
+  c.def(py::init<bool, size_t, size_t, size_t>(), py::arg("enable_debug") = kEnableDebug,
+        py::arg("command_pool_limit") = 256, py::arg("descriptor_pool_limit") = 256,
+        py::arg("upload_pool_bytes") = 128 * 1024 * 1024);
+  c.def_readwrite("command_pool_limit", &Core::Settings::command_pool_limit);
+  c.def_readwrite("descriptor_pool_limit", &Core::Settings::descriptor_pool_limit);
+  c.def_readwrite("upload_pool_bytes", &Core::Settings::upload_pool_bytes);
   c.def_readwrite("enable_debug", &Core::Settings::enable_debug,
                   "Enable debug mode, which may have performance impact");
 }
@@ -37,8 +36,6 @@ void RegisterCore(py::classh<Core> &c) {
   c.def("ray_query_support", &Core::DeviceRayQuerySupport, "Check native inline ray query support");
   c.def("ray_tracing_support", &Core::DeviceRayTracingSupport, "Check if the device supports ray tracing");
   c.def("debug_enabled", &Core::DebugEnabled, "Check if debug mode is enabled");
-  c.def("submission_slot_count", &Core::SubmissionSlotCount, "Get submission slot capacity");
-  c.def("current_submission_slot", &Core::CurrentSubmissionSlot, "Get next submission slot index");
   c.def("wave_size", &Core::WaveSize, "Get the wave size of the device");
   c.def("collect_completed_submissions", &Core::CollectCompletedSubmissions);
   c.def("wait_gpu", &Core::WaitGPU, "Wait for the GPU to finish all operations");

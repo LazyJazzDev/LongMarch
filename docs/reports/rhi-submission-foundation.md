@@ -1,235 +1,280 @@
-# RHI 第一版改造：提交、完成与在途回收
+# RHI 第一版：提交完成、独立资源池与窗口局部呈现同步
 
-关联：Issue #85；后续 Render Graph 见 #83。本 PR 不关闭 #85。
+关联：Issue #85；Render Graph 后续工作见 #83。本 PR 不关闭 #85。
 
-## 范围
+## 本轮修正与总体范围
 
-本版先落地单队列提交票据与提交槽回收，直接迁移 C++、Python、Sparkium、Snowberg、demo 和测试的提交调用，不提供旧名称适配器。提交不依赖窗口、呈现或帧计数。
+删除全局提交槽位。命令存储、描述符和动态上传存储独立申请、独立计费，按具体提交的完成情况回收。交换链图像和窗口呈现节流只影响需要呈现的工作；一帧内可以有多轮计算、拷贝和绘制提交。
 
-这是 #85 的基础增量。原生资源版本自动保留、异步上传/读回 API、显式 Barrier API、逻辑绑定 schema/BindingPlan 尚未实现；不能据此认为整个 RHI 重构或 Render Graph 前置条件已经完成。
+本报告描述 PR 的最终状态，替代先前的固定提交槽设计。`InFlightSlot`、`CurrentSubmissionSlot()`、`SubmissionSlotCount()` 和 `submission_slot_count` 均已删除，没有换名保留相同循环数组。没有引入 `FrameContext` 或笼统的 `Arena` 类型。
 
-## 新增类与概念（按名称）
+本版覆盖单队列完成票据、后端临时对象池、动态上传快照和调用迁移。完整资源 generation 保留、异步上传/读回公共接口、显式 Barrier、多队列依赖及 BindingPlan 仍属于 #85 后续阶段。
 
-### `Submission`
+## 新增或修改的类与设计（按名称）
 
-文件：`code/grassland/graphics/submission.h/.cpp`。可复制的公开完成票据，共享内部状态。
+### 1. `Submission`
 
-- `IsValid()`：是否关联提交；默认构造无效。
-- `QueueId()` / `Value()`：逻辑队列身份和单调提交序号。序号不要求连续，也不暴露原生 fence 值；只能在同队列内比较先后。
-- `IsComplete()`：非阻塞查询，同时处理该提交的完成回调。
-- `Wait()`：等待该提交，同时处理它的回调。
-- 无效票据查询/等待抛 `logic_error`；GPU 查询/等待和回调异常会缓存，后续查询继续抛出。
-- 完成后不再调用原生后端。Core 析构先 drain，因而票据可以在 Core 析构后查询最终结果。
-- 主机侧操作要求外部串行化，不承诺线程安全。回调不允许重入本 Core 的提交/收集，也不允许查询自身票据。
+文件：`code/grassland/graphics/submission.h/.cpp`。
+
+可复制的公开完成票据，共享内部状态：
+
+- `IsValid()`：默认构造无效。
+- `QueueId()/Value()`：逻辑队列身份和单调提交序号；序号不保证连续，也不直接等于原生 fence 值。
+- `IsComplete()`：非阻塞查询，并处理该提交的完成回调。
+- `Wait()`：等待该提交并处理其回调。
+- 无效票据查询或等待抛 `logic_error`；GPU 与回调错误会缓存，后续继续抛出。
+- Core 析构先 drain，已终止票据不再访问原生后端，可以在 Core 析构后查询。
 
 ```cpp
 auto done = core->Submit(commands.get());
-commands.reset();             // 提交已转成原生命令
-do_cpu_work();
-if (!done.IsComplete())
-    done.Wait();              // 只在 CPU 确实需要完成结果时等待
-// 此处才可以释放本提交引用的用户资源。
+commands.reset();
+do_other_cpu_work();
+done.Wait();
+// 本次引用的用户资源此时才可释放。
 ```
 
-等待后面的票据不保证前面票据的 CPU 回调已经执行；需要 `CollectCompletedSubmissions()` 或逐个查询来收集它们。
+主机访问需外部串行化。等待后一项提交，不代表前面所有提交的 CPU 回调都已被观察和执行；可调用 `CollectCompletedSubmissions()`。
 
-### `detail::InFlightSubmission`
+### 2. `detail::InFlightSubmission`
 
-实现隐藏在 `.cpp` 中。保存队列身份、序号、原生 poll/wait 闭包、完成回调和终止异常。
+内部保存队列身份、序号、原生 poll/wait 闭包、完成回调与终止异常。
 
 ```text
-Pending -- poll未完成 --> Pending
-Pending -- GPU完成 --> 清除原生闭包，逐个执行回调 --> Completed
-Pending -- GPU失败 --> 清除闭包与回调捕获 --> Failed
-回调抛异常 --> 继续执行其余回调，缓存首个异常 --> Failed
+Pending -> native completion -> 清除原生闭包 -> 执行全部回调 -> Completed
+Pending -> native failure    -> 清除闭包、释放捕获引用       -> Failed
+回调抛异常 -> 继续执行其他回调 -> 缓存第一个异常
 ```
 
-完成回调最多执行一次。GPU 失败不会执行成功回调，但会释放其捕获对象。本版这里保留的是完成所需状态和显式捕获的引用，尚未自动收集所有 Buffer/Image 原生版本。
+原生分配的 lease 被完成记录保留，GPU 完成并执行收集后才释放。GPU 失败不执行成功回调，但仍释放捕获。公开票据长期存活不会长期保留已完成分配。
 
-### `detail::SubmissionQueue`
+### 3. `detail::SubmissionQueue`
 
-由 Core 私有持有，是完成记录管理器，不是新建的第二条硬件队列。
+由 Core 私有持有，管理完成记录，不代表额外硬件队列。
 
-- `Track(poll, wait, callbacks, submit)`：先分配并登记内部状态，再调用原生提交闭包；提交失败移除记录并抛异常，不返回虚假票据。
-- `Collect()`：查询并移除已终止记录，不主动等待 GPU。某项失败后仍处理其他记录，再抛首个异常。
-- `WaitAll()`：等待当前记录并处理回调；某项失败不阻止其他项回收。
-- `Shutdown()`：析构使用的非抛异常 drain；异常仍保留在幸存票据中。
-- 丢弃公开票据不会丢失在途记录，也不会自动阻塞 CPU。
+- `Track(poll, wait, callbacks, submit)`：先分配记录，再执行原生提交。提交失败删除记录并抛异常，不返回虚假完成票据。
+- `Collect()`：不等待 GPU，处理已完成记录。单项错误不阻止其他项回收。
+- `WaitAll()`：等待已有记录，处理全部回调后再报告首个错误。
+- `Shutdown()`：析构使用的非抛异常 drain，错误保留在幸存票据中。
 
-仅 `Track` 被授予构造 `Submission` 的窄友元权限；没有公开可变状态 getter。
+丢弃公开票据不会丢失在途引用。仅 `Track` 获得构造 `Submission` 的窄友元权限，没有公开可变内部状态 getter。
 
-### `detail::InFlightSlot`
+### 4. `detail::ResourcePool<T>`（新增）
 
-保存上一次使用该槽的票据；`Wait()` 等待它，`Retire(ticket)` 记录新占用，并拒绝覆盖未完成的旧占用。
+文件：`code/grassland/graphics/resource_pool.h`。独立、惰性增长的内部资源池。
 
-```text
-slot = slots[next]
-slot.Wait()                         // 必须在 reset/copy/重写描述符之前
-CollectCompletedSubmissions()
-reset allocator / descriptor pool
-prepare immutable upload snapshot
-record and submit native commands
-slot.Retire(submission)
-next = (next + 1) % slot_count
+每个缓存项包含一个原生分配的共享所有权和成本。`Acquire(cost, matches, create)` 返回内部 lease：
+
+```cpp
+Acquire(request):
+    if 存在“只有池自身持有”且满足需求的缓存项:
+        return lease(缓存项)
+    if 预算不足:
+        淘汰空闲缓存项                       // 不碰任何在途 lease
+    if 仍不足:
+        throw ResourcePoolExhausted(pool_name)
+    allocation = create()
+    cache(allocation, cost)
+    return lease(allocation)
 ```
 
-本版槽的原生对象仍存放在各后端按槽索引组织的数组中，`InFlightSlot` 负责复用约束。槽满时形成背压，`Submit()` 因此可能等待；不承诺永不阻塞。槽数默认 2、可配置正数，与交换链图像数和画面帧数独立。
+使用 `shared_ptr` 所有权计数判定是否仍有 lease；这不是线程安全分配器，访问仍需串行化。每次提交的完成记录持有 lease，原生分配不会因下一次提交或另一窗口呈现而提前复用。
 
-未引入 `FrameContext` 或笼统的 `Arena`。后续上传分配器、描述符池、查询池应按实际职责单独命名。
+池不会每帧 reset，不维护全局当前索引。一个提交可持有多个上传分配；一个池可以增长而另一个池保持很小。闲置缓存会在本池需要空间时被淘汰，不主动周期性收缩。
 
-## 修改类与接口（按名称）
+### 5. `ResourcePoolExhausted`（新增）
 
-### `graphics::Core` / `Core::Settings`
+继承 `std::runtime_error`，错误文本标识哪个池耗尽。它是本版明确的非阻塞背压结果，不会偷偷执行 `WaitGPU()`。
 
-新增私有提交管理器、公开 `CollectCompletedSubmissions()`、受保护的 `TrackSubmission/WaitSubmissions/ShutdownSubmissions` 后端操作。`WaitGPU()` 保留为显式全队列 drain。
+```cpp
+try {
+    done = core->Submit(commands.get());
+} catch (const ResourcePoolExhausted&) {
+    // 调用者决定稍后重录、等待已知在途工作，或减少本次工作。
+    // 如果单次请求本身超过预算，等待不能解决，需要拆分工作或重新配置。
+}
+```
 
-| 原接口 | 新接口 / 契约 |
+失败的 CommandContext 已消费，不能直接重试；应创建新的 context。已申请但尚未提交的 lease 自动释放。D3D12 在失败路径关闭已开始录制的 command list，保证后续可以安全 Reset。
+
+### 6. `Core` / `Core::Settings`
+
+公开 `Submit()`、`CollectCompletedSubmissions()`；私有持有 SubmissionQueue。`WaitGPU()` 仍是显式管理 drain。
+
+最终配置：
+
+| 字段 | 默认值 | 含义 |
+| --- | --- | --- |
+| `enable_debug` | 构建默认值 | 开启后端调试 |
+| `command_pool_limit` | 256 | Vulkan/D3D12 命令分配块数量预算 |
+| `descriptor_pool_limit` | 256 | Vulkan descriptor pool 数量预算；D3D12 每种 descriptor heap 池分别使用此数量预算 |
+| `upload_pool_bytes` | 128 MiB | Vulkan/D3D12 动态上传存储的请求字节预算，包含 upload 与 device 两份存储 |
+
+这些是独立池预算，不是预先分配数量，也不是在途帧数。预算必须为正。字节预算按请求大小计费，不包含驱动分配对齐、堆元数据等原生开销，不能当作物理显存占用的硬上限。
+
+Metal 本版使用原生逐命令存储；这些新池预算目前用于 Vulkan/D3D12，不能宣称 Metal 已实现相同预算策略。
+
+| 删除的接口 | 最终使用方式 |
 | --- | --- |
-| `int SubmitCommandContext(ctx)` | `Submission Submit(ctx)`；失败抛异常 |
-| `Settings::frames_in_flight` | `Settings::submission_slot_count`，必须大于 0 |
-| `FramesInFlight()` | `SubmissionSlotCount()` |
-| `CurrentFrame()` | `CurrentSubmissionSlot()`，表示下次提交使用的槽 |
-| `PushPostExecutionCallback(fn)` | `CommandContext::OnCompleted(fn)` |
-| `GetPostExecutionCallbacks()` | 后端通过 `TakeCompletionCallbacks()` 转移所有权 |
+| `SubmitCommandContext(ctx)` 返回 int | `Submit(ctx)` 返回 Submission，失败抛异常 |
+| `FramesInFlight` / `SubmissionSlotCount` | 各池独立预算，没有全局数量查询 |
+| `CurrentFrame` / `CurrentSubmissionSlot` | 删除；前端不按循环索引管理临时资源 |
+| `PushPostExecutionCallback` | `OnCompleted` |
+| `GetPostExecutionCallbacks` | 后端通过 `TakeCompletionCallbacks` 转移所有权 |
 
-### `graphics::CommandContext`
+### 7. `CommandContext`
 
-新增私有 `submission_started_`；完成回调容器改为私有。`BeginSubmission(core)` 检查归属 Core 和是否重复提交；进入提交后，即使失败也不能重试同一个 context。`OnCompleted()` 在提交后拒绝追加。三个后端拒绝空指针和错误后端类型。
+`BeginSubmission(core)` 检查 Core 归属和重复提交。提交尝试消费 context；`OnCompleted()` 在提交后拒绝追加。回调容器私有化。
 
-尚未为全部 `Cmd*` 添加提交后录制检查；调用者应将 context 视为已消费，提交后立即销毁或停止使用。
+回调运行在观察完成的主机线程上，不能重入同一 Core 的提交/收集，也不能查询自身票据。全部 `Cmd*` 的提交后录制检查尚未统一补齐，因此提交后应停止使用 context。
 
-### `backend::VulkanCore`
+### 8. `VulkanCore::CommandAllocation` / `DescriptorAllocation`（新增）
 
-- 按槽复用 `VkFence`、command buffer、descriptor pool；先等待该槽，再 reset。
-- 票据使用 `vkGetFenceStatus/vkWaitForFences`。完成状态在复用 fence 前缓存，旧票据不会受到下一次 reset 影响。
-- 动态上传 copy 放进本次 graphics command buffer，沿用上传后内存 barrier。
-- 删除共享 transfer command buffer 及常规提交末尾的 transfer queue idle。现有 transfer queue 与 graphics queue 本来就是同一 family/index，不宣称实现了异步传输队列。
-- 开始/结束录制、fence reset、提交和等待错误传递为异常；析构在销毁 device/fence 前 drain。
+- `CommandAllocation`：一个可复用 command buffer 和完成 fence，从 Core 的命令池按需申请；析构释放原生句柄。共享 `VkCommandPool` 不做按帧整体 reset。
+- `DescriptorAllocation`：一个 VkDescriptorPool 及其各类型容量、max sets。独立匹配请求，空闲且容量足够才复用/reset。
+- 两者来自独立 ResourcePool。记录完成后才有资格复用，旧 Submission 的缓存完成状态不会受 fence reset 影响。
 
-### `backend::D3D12Core`
-
-- 每槽 command allocator/list、resource/sampler/RTV/DSV heap 的重置与复用由完成票据保护。
-- 动态 copy 并入本次 direct command list，删除独立 transfer queue/allocator/list。
-- 票据绑定此次 signal 的 fence 值；检测 `GetCompletedValue() == UINT64_MAX` 的 device removal，并检查事件等待失败。
-- 删除提交末尾等待下一个槽的旧流程，改为下次复用之前等待。
-- 提交登记先于 Execute/Present/Signal。完成 fence 在 Present 之后 signal，使窗口 teardown 的 drain 也覆盖呈现排队操作。Present 失败时先 signal 并等待已经入队的工作，再报告失败，避免释放仍在途的回调捕获。
-
-### `backend::MetalCore` / `MetalCommandContext`
-
-- `Commit()` 返回统一 `Submission`，由闭包保留 `MTL::CommandBuffer`，查询 status 或 `waitUntilCompleted()`。
-- 用统一完成管理器替换原 `pending_` deque、内部同名 Submission 和 `Reap()`。
-- 增加与计算提交无关帧语义的槽索引；移除 context 独立的 `submitted` 标记，统一使用基类约束。
-- AS generation、children、sampler 的已有保留回调迁移到 `OnCompleted()`。
-- Metal buffer 上传仍采用原来的显式等待实现，本版没有把 Metal 上传改为异步。
-
-### `backend::VulkanDynamicBuffer` / `D3D12DynamicBuffer`
-
-仅删除队列等待会让 GPU 继续读取正在被 CPU 改写的共享 staging。本版增加每槽上传快照，保护新的异步提交行为。
-
-```text
-UploadData(bytes): 更新 CPU shadow
-Submit:
-    等待将复用的槽
-    shadow -> slot.upload_snapshot       // CPU copy；大小变化时重新分配
-    slot.upload_snapshot -> slot.device_buffer  // GPU copy
-    录制消费 device_buffer 的命令
-Submit 返回后:
-    CPU 可以更新 shadow
-    该槽 snapshot/device_buffer 保持不变直到提交完成
+```cpp
+CollectCompletedSubmissions();
+auto commands = command_pool.Acquire(...);
+auto descriptors = descriptor_pool.Acquire(...);
+auto uploads = prepare_dynamic_buffers();
+record(commands, descriptors, uploads);
+return TrackSubmission(native_poll, native_wait,
+                       retain_until_completed(commands, descriptors, uploads),
+                       native_submit);
 ```
 
-Vulkan 对快照执行 flush，确保非 coherent 内存可见。描述符仍指向本槽的设备 buffer。
+常规提交不再在结尾等待 transfer queue idle。动态 copy 在同次 graphics command buffer 中；现有上传后 barrier 保留。没有声称增加了独立异步 transfer queue。
 
-冻结点是 **Submit 时**，不是录制 CmdBindResources 时。同一动态 buffer 在录制中间多次更新，仍不代表多个独立参数版本；需要不同 buffer 才能表达不同值。本版没有实现参数快照 API。
+`current_descriptor_pool_` 仅是串行编译当前命令时的工作指针，不是跨提交索引或资源所有者。
 
-代价：额外 CPU memcpy，以及每个使用槽的上传分配；仍全量复制，没有脏区跟踪、上传 ring 或性能收益承诺。普通资源绑定路径得到上述保证；原生地址和 CUDA 互操作不新增异步安全承诺。
+### 9. `D3D12Core::CommandAllocation` / `DescriptorAllocation`（新增）
 
-### `backend::VulkanWindow`
+- 命令分配块持有 allocator 与 command list。
+- resource、sampler、RTV、DSV 分别拥有独立 descriptor heap 池；匹配容量后才复用，互不共享轮转索引。
+- 上传 copy 与工作命令进入同一个 direct command list。
+- 完成票据绑定具体 fence 值，检查 device removal 和事件等待错误。
+- Signal 位于 Present 之后，窗口 teardown 的 drain 覆盖呈现排队操作。Present 失败时完成必要的 signal/等待后报告错误。
+- `CloseOnFailure` 清理未完成的录制，使资源池压力失败后的命令块仍可复用。
 
-- image-available semaphore 按提交槽分配，复用前由该槽完成保护。
-- render-finished semaphore 改为按交换链 image 分配。渲染 fence 完成并不表示 presentation 已消费 binary semaphore；按重新取得的 image 复用避免混淆两种生命周期。
-- 重建、关闭、ImGui teardown 等管理操作等待 presentation queue；销毁交换链同时销毁对应 render-finished semaphore。
-- Present 在递增提交槽之前执行，保持 acquire 对应关系。
+当前 heap 指针只在串行原生命令编译中使用；分配寿命由 lease 和完成记录负责。
 
-### `backend::D3D12Window`
+### 10. `VulkanUploadAllocation` / `D3D12UploadAllocation`（新增）
 
-交换链使用独立的双图像配置，不再由提交槽数推导。ImGui 的原生 `NumFramesInFlight` 字段仍使用其原名，值取提交槽预算。
+一项动态 buffer 存储包含 device buffer 与 CPU 可写 upload buffer。两者的大小在分配生命周期内固定，共同保留到消费它们的提交完成。
 
-### `snowberg::visualizer::Core` / `OwnershipHolder`
+这些分配由 Core 的独立上传存储池管理，可以跨不同逻辑 buffer 复用同尺寸的空闲块；不会为每个 buffer 预建 N 个副本。Vulkan 析构用 VMA 释放，D3D12 使用 ComPtr。
 
-移除 Core 内按槽存放的 holder 数组。每次 `Render()` 创建独立共享 holder，通过此次 context 的完成回调保留。
+目前分配单位仍是整块 buffer，没有实现 upload page 子分配、BufferSlice 或 dirty range 跟踪；这也意味着本版仍有额外 CPU memcpy 和整段 GPU copy。
+
+### 11. `VulkanDynamicBuffer` / `D3D12DynamicBuffer`
+
+删除按全局索引选择的 device/upload 数组。保留 CPU shadow；`TransferData()` 从池取得独立存储、复制 shadow、录制 GPU copy，并返回 lease 供此次提交保留。
+
+```text
+CPU UploadData -> shadow
+Submit A -> allocation A <- shadow snapshot A -> GPU
+CPU UploadData -> shadow changes
+Submit B -> allocation B <- shadow snapshot B -> GPU
+A observed complete -> release lease A -> pool may reuse A
+```
+
+冻结点仍为 Submit 时，不是 Bind 时。Vulkan flush 非 coherent upload allocation。原生访问指针仅供本次命令编译使用，不具备跨提交稳定性。
+
+### 12. `VulkanCommandContext` / `D3D12CommandContext`
+
+`CmdCopyBuffer()` 现在也登记源、目标中的动态 buffer，使复制命令经过同一快照与存储保留路径。此前只在绑定路径登记，不能覆盖直接复制。这项修改由上传池压力恢复测试覆盖。
+
+### 13. `VulkanWindow`
+
+交换链图像与 acquire 同步独立管理：
+
+- render-finished semaphore 按交换链 image 管理；渲染完成不等于呈现引擎已消费 semaphore。
+- 每个窗口独立维护两个 acquire semaphore 和各自的最后消费 Submission。`AcquireNextImage()` 只等待该窗口将复用的 acquire 对象。
+- `RetireAcquire()` 记录真实消费提交。其他窗口和纯计算提交不会推进此窗口的 acquire 索引。
+- 重建/关闭等操作等待 presentation queue，安全释放交换链及相关 semaphore。
+
+这个二项呈现节流属于窗口局部策略，并非 RHI 资源池大小。acquire semaphore 在获得 image index 前就必须提供，因此不能把所有同步对象简单绑定到 image index。
+
+### 14. `D3D12Window`
+
+双图像交换链独立于 RHI 池。新增 `PrepareSubmission()/RetirePresentation()`，每窗口保留两次呈现完成记录，限制窗口自身的提前呈现程度，并保护 ImGui 的双份原生动态存储。普通计算/拷贝提交不推进该索引。
+
+### 15. `MetalCore` / `MetalCommandContext`
+
+统一使用 Submission 和完成记录保留 `MTL::CommandBuffer`；删除本 PR 早期增加的固定提交槽限流。已有原生逐命令存储随命令完成释放。
+
+AS generation/children 与 sampler 的已有保留逻辑使用 `OnCompleted()`。Metal shared buffer 更新仍会走现有同步路径，argument buffer 尚未改成新的缓存池。Windows 无法验证 Metal 原生编译与运行。
+
+### 16. `snowberg::visualizer::Core` / `OwnershipHolder`
+
+每次 Render 单独创建共享 OwnershipHolder，通过该 context 的完成回调保留。删除按全局索引存放 holder 的数组，避免旧提交回调清理新录制加入的引用。OwnershipHolder 类型自身未改。
 
 ```cpp
 auto ownership = make_shared<OwnershipHolder>();
-context->OnCompleted([ownership] { ownership->Clear(); });
-record_scene(context, ownership.get());
-// 提交完成时仅清理本次 Render 收集的资源。
+commands->OnCompleted([ownership] { ownership->Clear(); });
+record_scene(commands, ownership.get());
 ```
 
-旧实现可能在新录制往同槽添加引用后，才执行旧提交回调并清空它们。按提交捕获解除这项时序耦合。`OwnershipHolder` 本身的类型定义未修改。
+### 17. Python `CoreSettings` / `Core` / `Submission` / `ResourcePoolExhausted`
 
-### Python `Submission`、`Core`、`Core.Settings`
-
-注册 `Submission.is_valid/is_complete/wait` 与只读 `queue_id/value`；提交方法改名为 `submit()`，同步迁移 settings 和槽查询命名，新增 `collect_completed_submissions()`。
+注册新异常类型、Submission 查询与等待、Core 收集方法。删除槽数构造参数与当前槽查询，公开独立预算字段；nbody 示例同步迁移。
 
 ```python
+settings = graphics.CoreSettings(enable_debug=True,
+                                 command_pool_limit=64,
+                                 descriptor_pool_limit=128,
+                                 upload_pool_bytes=32 * 1024 * 1024)
+core = graphics.Core(api, settings)
 done = core.submit(commands)
-do_cpu_work()
 done.wait()
 core.collect_completed_submissions()
 ```
 
-Python 也必须保留本提交使用的资源至完成；本版没有自动修复所有跨对象引用寿命。
+### 18. 上层调用与测试目标
 
-### Sparkium、demo、Python 示例和既有测试
+以下为提交 API 或 settings 调用迁移，没有引入新的渲染算法：
 
-以下是调用迁移，不引入新的渲染算法：
+- Sparkium 的 Film、raster Film/Scene、raytracing Film/Scene。
+- demo：2048、draw_n_gui、franka_kinematics、gol、graphics_hello 各模块、imgui、joystick_test、nbody_cs、nbody_cuda、practium_hello、sparkium_gui、sparkium_cli、thin_lens。
+- Python：graphics_hello 各提交示例、nbody_cs、nbody_warp。
+- 测试：vulkan_compatibility、Sparkium fallback/HDR/Metal/window/Wayland probe。
+- 新增显式 Ninja 目标 `test_graphics_submission`，覆盖完成状态、独立池预算和 GPU 回归。
 
-- `sparkium::Film`、raster 的 `Film/Scene`、raytracing 的 `Film/Scene`：提交改用 `Submit()`。
-- demo：2048、draw_n_gui、franka_kinematics、gol、graphics_hello 的全部提交模块、imgui、joystick_test、nbody_cs、nbody_cuda、practium_hello、sparkium_gui、thin_lens。
-- Python：graphics_hello 各示例、nbody_cs、nbody_warp 改用 `submit()`。
-- 测试：vulkan_compatibility、Sparkium fallback/HDR/Metal/window/Wayland probe；提交成功断言改为票据有效，重复提交断言改为异常。
-
-## 同步与寿命边界
+## 生命周期示意
 
 ```mermaid
-sequenceDiagram
-    participant CPU
-    participant Core
-    participant Slot
-    participant GPU
-    CPU->>Core: Submit(CommandContext)
-    Core->>Slot: Wait(last submission)
-    Core->>Slot: reset / snapshot / record
-    Core->>GPU: native submit + completion marker
-    Core->>Slot: Retire(ticket)
-    Core-->>CPU: Submission
-    CPU->>CPU: update shadow / other work
-    CPU->>Core: ticket.Wait or Collect
-    Core->>GPU: wait or poll
-    GPU-->>Core: complete
-    Core->>Core: callbacks once / release captures
+flowchart LR
+    C[CPU 录制] --> S[Submit]
+    CP[命令池] -->|lease| S
+    DP[描述符池] -->|lease| S
+    UP[上传存储池] -->|多个 lease| S
+    S --> R[完成记录保留实际分配]
+    R --> G[GPU 完成并被收集]
+    G -->|释放 lease| CP
+    G -->|释放 lease| DP
+    G -->|释放 lease| UP
+    S -->|仅含呈现的提交| W[对应窗口的呈现节流与交换链]
 ```
 
-本版 `Submission` 只解决 CPU 对提交完成的观察和内部复用依据，**不能替代 GPU Barrier，也不能作为跨队列 GPU wait API**。用户的 Buffer/Image/Program/Sampler 及底层依赖仍需活到 GPU 完成，资源不能在途 resize 或销毁。
+池预算限制资源压力；窗口节流控制呈现提前程度。它们没有共同索引。背压也不保证 Submit 永不阻塞：窗口 acquire/present、驱动原生分配等仍可能等待，但池耗尽本身明确报告错误，不主动等待整个队列。
 
-## 验证与后续
+## 验证
 
-新增 `test_graphics_submission` 显式 Ninja 测试目标：覆盖无效票据、查询/等待、槽提前复用、旧票据稳定性、GPU 错误模拟、回调异常、提交失败、丢弃票据和 Core 析构 drain。GPU 测试在两槽下连续提交 12 个无窗口 compute，提交后立即覆盖 CPU shadow，核对全部输出与完成回调。另有 Vulkan/D3D12 连续 12 次呈现测试（`LONGMARCH_TEST_SUBMISSION_WINDOWS=1`），期间不主动逐次 WaitGPU，检查多槽复用与关闭窗口。该测试实际发现并促成了 D3D12 Present/fence 顺序修正。
+环境：Windows / MSVC / Ninja Release；Vulkan 开启 `VK_LAYER_VALIDATE_SYNC=1`，D3D12 开启 debug layer。
 
-验证环境：Windows、MSVC、Ninja Release，Vulkan 测试开启 `VK_LAYER_VALIDATE_SYNC=1`。
+- 提交与资源池测试：14/14 通过，含 6 项提交状态、2 项确定性的池生命周期/预算、6 项 Vulkan/D3D12 GPU 用例。
+- 池模拟测试在完成前申请 8 项，确认无隐式等待；仅完成第 4 项后就能精确复用它，与另一池预算无关。
+- 上传预算恢复：768 字节预算不能容纳两份 256 字节 upload/device 对；失败后重新录制较小工作，核对结果并验证 command allocator/list 可安全复用。
+- 无窗口计算：连续 12 次动态参数提交，提交后立即覆盖 CPU shadow，核对全部 GPU 输出和回调。
+- 多轮提交与呈现：每帧先提交 5 轮工作再呈现，共 12 轮；第二窗口每 3 轮参与一次，验证窗口同步互不推进。
+- 默认 Release 构建及显式 graphics_hello、nbody_cs、gol、Vulkan compatibility、Sparkium fallback 目标构建通过。
+- Vulkan compatibility 2/2 通过；Python Vulkan/D3D12 的新 Settings、连续提交、等待、收集及 Core 释放后票据查询均通过。
+- 开启桌面测试后，Vulkan 窗口尺寸切换与 HDR 交换链故障恢复 2/2 通过；故障注入产生的预期错误日志不表示测试失败。
+- `pre-commit run` 和 `git diff --check` 通过。Metal 留待 macOS 原生验证。未运行全量测试套件或性能基准。
 
-| 检查 | 结果 |
-| --- | --- |
-| 默认构建（含 Python 扩展、Sparkium、Snowberg） | 通过 |
-| 显式目标 `demo_graphics_hello`、`demo_nbody_cs`、`demo_gol` | 构建通过 |
-| `test_graphics_submission` | 10/10 通过：6 项主机状态测试，4 项 Vulkan/D3D12 compute/presentation GPU 测试 |
-| `test_vulkan_compatibility` | 2/2 通过 |
-| `sparkium_fallback_test` 的 Vulkan 窗口尺寸切换用例 | SDR 路径通过 |
-| Vulkan HDR 交换链故障恢复用例 | 当前 surface 不支持 HDR，跳过 |
-| Python 新接口 smoke | Vulkan/D3D12 均通过；提交 5 次，查询、等待、收集与 Core 释放后票据查询 |
-| `pre-commit run`、`git diff --check` | 通过 |
+## 明确的边界与后续
 
-只构建并运行上述相关目标和用例，没有宣称全量示例运行或全测试套件通过。Windows 无法验证 Metal 原生编译/运行。没有在本版做性能基准，不将减少 queue idle 等同于已证明性能提升。
+这版会保留 RHI 池分配及显式捕获引用，但尚未自动保留所有用户 Buffer/Image/Program/Sampler 的原生版本；用户资源仍需活到完成。同步资源 API、整数绑定槽位和整体更新语义尚未全部替换。
 
-#85 后续仍需：原生资源 generation 保留、异步上传/读回和 BufferSlice、resize 版本替换、资源访问/Barrier 描述、多队列依赖、BindingSchema/BindingPlan/参数冻结，以及分配/绑定/等待计数与性能测量。现有同步资源 API 和整数槽位绑定 API 只在对应后续阶段替换，本版没有为它们增加兼容层。
+`Submission` 不替代 GPU Barrier，不提供跨队列 GPU wait。仍需实现 generation 保留、异步上传/读回、BufferSlice、resize 版本替换、显式资源访问与 Barrier、BindingSchema/BindingPlan、Metal 池策略及性能计数。未进行性能基准，不宣称吞吐已提高。

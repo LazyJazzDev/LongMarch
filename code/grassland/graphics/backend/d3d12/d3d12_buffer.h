@@ -63,12 +63,11 @@ class D3D12DynamicBuffer : public D3D12Buffer {
 
   ID3D12Resource *InstantBuffer() const override;
 
-  void TransferData(ID3D12GraphicsCommandList *command_list);
+  std::shared_ptr<void> TransferData(ID3D12GraphicsCommandList *command_list);
 
  private:
   D3D12Core *core_;
-  std::vector<ComPtr<ID3D12Resource>> buffers_;
-  std::vector<ComPtr<ID3D12Resource>> upload_snapshots_;
+  ID3D12Resource *current_buffer_{};
   ComPtr<ID3D12Resource> staging_buffer_;
 };
 

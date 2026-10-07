@@ -92,7 +92,7 @@ TEST(VulkanHDRRecoveryTest, RetiredSwapchainIsRecreatedOrPresentationStops) {
   if (!InteractiveHDRTests())
     GTEST_SKIP();
   std::unique_ptr<graphics::Core> core;
-  ASSERT_EQ(graphics::CreateCore(graphics::BACKEND_API_VULKAN, graphics::Core::Settings{2, true}, &core), 0);
+  ASSERT_EQ(graphics::CreateCore(graphics::BACKEND_API_VULKAN, graphics::Core::Settings{true}, &core), 0);
   ASSERT_EQ(core->InitializeLogicalDeviceAutoSelect(false), 0);
   FailingSwapchainWindow window(static_cast<graphics::backend::VulkanCore *>(core.get()));
   if (!HasHDRSurface(&window))
@@ -137,7 +137,7 @@ TEST(VulkanWindowResizeTest, ProgrammaticSquareToWideUpdatesPresentation) {
   if (!InteractiveHDRTests())
     GTEST_SKIP() << "Requires an interactive desktop session";
   std::unique_ptr<graphics::Core> core;
-  ASSERT_EQ(graphics::CreateCore(graphics::BACKEND_API_VULKAN, graphics::Core::Settings{2, true}, &core), 0);
+  ASSERT_EQ(graphics::CreateCore(graphics::BACKEND_API_VULKAN, graphics::Core::Settings{true}, &core), 0);
   ASSERT_EQ(core->InitializeLogicalDeviceAutoSelect(false), 0);
   for (bool hdr : {false, true}) {
     auto window = std::unique_ptr<graphics::Window>{};
@@ -394,7 +394,7 @@ TEST_P(HDRWindowTest, PresentationAndImGuiSwitching) {
   if (!InteractiveHDRTests())
     GTEST_SKIP() << "Set LONGMARCH_TEST_HDR=1 in an interactive desktop session";
   std::unique_ptr<graphics::Core> core;
-  ASSERT_EQ(graphics::CreateCore(GetParam(), graphics::Core::Settings{2, true}, &core), 0);
+  ASSERT_EQ(graphics::CreateCore(GetParam(), graphics::Core::Settings{true}, &core), 0);
   ASSERT_EQ(core->InitializeLogicalDeviceAutoSelect(false), 0);
   for (bool imgui : {false, true}) {
     std::unique_ptr<graphics::Window> window;
@@ -474,7 +474,7 @@ TEST_P(HDRWindowTest, ReferenceWhiteScalingPreservesSourceAndAlpha) {
   if (!InteractiveHDRTests())
     GTEST_SKIP() << "Requires an interactive desktop session";
   std::unique_ptr<graphics::Core> core;
-  ASSERT_EQ(graphics::CreateCore(GetParam(), graphics::Core::Settings{2, true}, &core), 0);
+  ASSERT_EQ(graphics::CreateCore(GetParam(), graphics::Core::Settings{true}, &core), 0);
   ASSERT_EQ(core->InitializeLogicalDeviceAutoSelect(false), 0);
   std::unique_ptr<graphics::Window> window;
   ASSERT_EQ(core->CreateWindowObject(320, 240, "HDR reference white test", &window), 0);
@@ -527,7 +527,7 @@ TEST_P(HDRWindowTest, UnsupportedHDRLeavesSDRPresentationUsable) {
   if (!InteractiveHDRTests())
     GTEST_SKIP();
   std::unique_ptr<graphics::Core> core;
-  ASSERT_EQ(graphics::CreateCore(GetParam(), graphics::Core::Settings{2, true}, &core), 0);
+  ASSERT_EQ(graphics::CreateCore(GetParam(), graphics::Core::Settings{true}, &core), 0);
   ASSERT_EQ(core->InitializeLogicalDeviceAutoSelect(false), 0);
   std::unique_ptr<graphics::Window> window;
   ASSERT_EQ(core->CreateWindowObject(320, 240, "SDR compatibility test", &window), 0);
@@ -558,7 +558,7 @@ TEST_P(HDRWindowTest, PQReadbackUsesAbsoluteNitsAndPreservesSource) {
   if (!InteractiveHDRTests())
     GTEST_SKIP();
   std::unique_ptr<graphics::Core> core;
-  ASSERT_EQ(graphics::CreateCore(GetParam(), graphics::Core::Settings{2, true}, &core), 0);
+  ASSERT_EQ(graphics::CreateCore(GetParam(), graphics::Core::Settings{true}, &core), 0);
   ASSERT_EQ(core->InitializeLogicalDeviceAutoSelect(false), 0);
   BrightnessProbeWindow window;
   window.pq_output = true;

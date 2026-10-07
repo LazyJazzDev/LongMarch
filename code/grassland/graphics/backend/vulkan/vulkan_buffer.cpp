@@ -112,26 +112,36 @@ VulkanDynamicBuffer::VulkanDynamicBuffer(VulkanCore *core, size_t size) : core_(
   vulkan::ThrowIfFailed(core_->CreateBuffer(size, DynamicStagingUsage(core), VMA_MEMORY_USAGE_CPU_TO_GPU,
                                             &staging_buffer_, &staging_allocation_),
                         "Failed to create Vulkan dynamic staging buffer");
-  buffers_.resize(core_->SubmissionSlotCount(), VK_NULL_HANDLE);
-  allocations_.resize(core_->SubmissionSlotCount(), VK_NULL_HANDLE);
-  buffer_sizes_.resize(core_->SubmissionSlotCount(), size);
-  upload_buffers_.resize(core_->SubmissionSlotCount(), VK_NULL_HANDLE);
-  upload_allocations_.resize(core_->SubmissionSlotCount(), VK_NULL_HANDLE);
-  upload_sizes_.resize(core_->SubmissionSlotCount(), 0);
-  for (size_t i = 0; i < buffers_.size(); ++i) {
-    vulkan::ThrowIfFailed(
-        core_->CreateBuffer(size, StaticUsage(core), VMA_MEMORY_USAGE_GPU_ONLY, &buffers_[i], &allocations_[i]),
-        "Failed to create Vulkan dynamic device buffer");
-  }
 }
 
 VulkanDynamicBuffer::~VulkanDynamicBuffer() {
-  for (size_t i = 0; i < upload_buffers_.size(); ++i)
-    if (upload_buffers_[i])
-      vmaDestroyBuffer(core_->Allocator(), upload_buffers_[i], upload_allocations_[i]);
-  for (size_t i = 0; i < buffers_.size(); ++i)
-    vmaDestroyBuffer(core_->Allocator(), buffers_[i], allocations_[i]);
   vmaDestroyBuffer(core_->Allocator(), staging_buffer_, staging_allocation_);
+}
+
+VulkanUploadAllocation::~VulkanUploadAllocation() {
+  if (device_buffer)
+    vmaDestroyBuffer(allocator, device_buffer, device_memory);
+  if (upload_buffer)
+    vmaDestroyBuffer(allocator, upload_buffer, upload_memory);
+}
+
+std::shared_ptr<VulkanUploadAllocation> VulkanCore::AcquireUploadStorage(size_t size) {
+  if (size > std::numeric_limits<size_t>::max() / 2)
+    throw ResourcePoolExhausted("Vulkan upload storage");
+  return upload_pool_.Acquire(
+      size * 2, [size](const auto &entry) { return entry.size == size; },
+      [&] {
+        auto result = std::make_shared<VulkanUploadAllocation>();
+        result->allocator = Allocator();
+        result->size = size;
+        vulkan::ThrowIfFailed(CreateBuffer(size, StaticUsage(this), VMA_MEMORY_USAGE_GPU_ONLY, &result->device_buffer,
+                                           &result->device_memory),
+                              "Create dynamic device storage");
+        vulkan::ThrowIfFailed(CreateBuffer(size, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VMA_MEMORY_USAGE_CPU_TO_GPU,
+                                           &result->upload_buffer, &result->upload_memory),
+                              "Create upload storage");
+        return result;
+      });
 }
 
 size_t VulkanDynamicBuffer::Size() const {
@@ -176,49 +186,32 @@ void VulkanDynamicBuffer::DownloadData(void *data, size_t size, size_t offset) {
 }
 
 VkBuffer VulkanDynamicBuffer::Buffer() const {
-  return buffers_[core_->CurrentSubmissionSlot()];
+  return current_buffer_;
 }
 
 VkDeviceAddress VulkanDynamicBuffer::DeviceAddress() const {
   return core_->BufferAddress(staging_buffer_);
 }
 
-void VulkanDynamicBuffer::TransferData(VkCommandBuffer cmd_buffer) {
-  size_t frame = core_->CurrentSubmissionSlot();
-  if (buffer_sizes_[frame] != size_) {
-    vmaDestroyBuffer(core_->Allocator(), buffers_[frame], allocations_[frame]);
-    vulkan::ThrowIfFailed(core_->CreateBuffer(size_, StaticUsage(core_), VMA_MEMORY_USAGE_GPU_ONLY, &buffers_[frame],
-                                              &allocations_[frame]),
-                          "Failed to resize Vulkan dynamic device buffer");
-    buffer_sizes_[frame] = size_;
-  }
+std::shared_ptr<void> VulkanDynamicBuffer::TransferData(VkCommandBuffer cmd_buffer) {
+  auto storage = core_->AcquireUploadStorage(size_);
   VkBufferCopy copy_region{};
   copy_region.size = size_;
-  // The slot has completed before Submit calls this method. The public staging
-  // buffer is CPU shadow data; only this immutable slot snapshot is read by GPU.
-  if (upload_sizes_[frame] != size_) {
-    if (upload_buffers_[frame])
-      vmaDestroyBuffer(core_->Allocator(), upload_buffers_[frame], upload_allocations_[frame]);
-    upload_buffers_[frame] = VK_NULL_HANDLE;
-    upload_sizes_[frame] = 0;
-    vulkan::ThrowIfFailed(core_->CreateBuffer(size_, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VMA_MEMORY_USAGE_CPU_TO_GPU,
-                                              &upload_buffers_[frame], &upload_allocations_[frame]),
-                          "Create upload snapshot");
-    upload_sizes_[frame] = size_;
-  }
   void *src = nullptr, *dst = nullptr;
   vulkan::ThrowIfFailed(vmaMapMemory(core_->Allocator(), staging_allocation_, &src), "Map upload shadow");
-  auto result = vmaMapMemory(core_->Allocator(), upload_allocations_[frame], &dst);
+  auto result = vmaMapMemory(core_->Allocator(), storage->upload_memory, &dst);
   if (result != VK_SUCCESS) {
     vmaUnmapMemory(core_->Allocator(), staging_allocation_);
     vulkan::ThrowIfFailed(result, "Map upload snapshot");
   }
   std::memcpy(dst, src, size_);
-  result = vmaFlushAllocation(core_->Allocator(), upload_allocations_[frame], 0, size_);
-  vmaUnmapMemory(core_->Allocator(), upload_allocations_[frame]);
+  result = vmaFlushAllocation(core_->Allocator(), storage->upload_memory, 0, size_);
+  vmaUnmapMemory(core_->Allocator(), storage->upload_memory);
   vmaUnmapMemory(core_->Allocator(), staging_allocation_);
   vulkan::ThrowIfFailed(result, "Flush upload snapshot");
-  vkCmdCopyBuffer(cmd_buffer, upload_buffers_[frame], buffers_[frame], 1, &copy_region);
+  vkCmdCopyBuffer(cmd_buffer, storage->upload_buffer, storage->device_buffer, 1, &copy_region);
+  current_buffer_ = storage->device_buffer;
+  return storage;
 }
 
 #if defined(LONGMARCH_CUDA_RUNTIME)

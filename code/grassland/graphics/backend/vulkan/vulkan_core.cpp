@@ -12,7 +12,23 @@
 
 namespace grassland::graphics::backend {
 
-VulkanCore::VulkanCore(const Settings &settings) : Core(settings) {
+VulkanCore::CommandAllocation::~CommandAllocation() {
+  if (buffer)
+    vkFreeCommandBuffers(device, pool, 1, &buffer);
+  if (fence)
+    vkDestroyFence(device, fence, nullptr);
+}
+
+VulkanCore::DescriptorAllocation::~DescriptorAllocation() {
+  if (pool)
+    vkDestroyDescriptorPool(device, pool, nullptr);
+}
+
+VulkanCore::VulkanCore(const Settings &settings)
+    : Core(settings),
+      command_pool_(settings.command_pool_limit, "Vulkan commands"),
+      descriptor_pool_(settings.descriptor_pool_limit, "Vulkan descriptors"),
+      upload_pool_(settings.upload_pool_bytes, "Vulkan upload storage") {
   vulkan::InstanceCreateHint hint{};
   hint.SetValidationLayersEnabled(DebugEnabled());
 #if defined(LONGMARCH_CUDA_RUNTIME)
@@ -46,19 +62,9 @@ VulkanCore::~VulkanCore() {
   if (download_staging_buffer_)
     vmaDestroyBuffer(allocator_, download_staging_buffer_, download_staging_allocation_);
 
-  if (device_) {
-    for (VkDescriptorPool pool : descriptor_pools_) {
-      if (pool)
-        vkDestroyDescriptorPool(device_, pool, nullptr);
-    }
-  }
-  descriptor_pools_.clear();
-  if (device_) {
-    for (VkFence fence : in_flight_fences_) {
-      vkDestroyFence(this->Handle(), fence, nullptr);
-    }
-    in_flight_fences_.clear();
-  }
+  upload_pool_.Clear();
+  descriptor_pool_.Clear();
+  command_pool_.Clear();
   if (device_) {
     if (graphics_command_pool_) {
       vkDestroyCommandPool(this->Handle(), graphics_command_pool_, nullptr);
@@ -258,52 +264,59 @@ Submission VulkanCore::Submit(CommandContext *p_command_context) {
   if (!command_context)
     throw std::invalid_argument("expected Vulkan command context");
   command_context->BeginSubmission(this);
-  in_flight_slots_[current_slot_].Wait();
   CollectCompletedSubmissions();
+  auto commands = command_pool_.Acquire(
+      1, [](const auto &) { return true; },
+      [&] {
+        auto result = std::make_shared<CommandAllocation>();
+        result->device = device_;
+        result->pool = graphics_command_pool_;
+        VkFenceCreateInfo fence_info{VK_STRUCTURE_TYPE_FENCE_CREATE_INFO};
+        vulkan::ThrowIfFailed(vkCreateFence(device_, &fence_info, nullptr, &result->fence), "Create submission fence");
+        VkCommandBufferAllocateInfo info{VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO};
+        info.commandPool = graphics_command_pool_;
+        info.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
+        info.commandBufferCount = 1;
+        vulkan::ThrowIfFailed(vkAllocateCommandBuffers(device_, &info, &result->buffer), "Allocate commands");
+        return result;
+      });
+  auto descriptors = descriptor_pool_.Acquire(
+      1,
+      [&](const auto &candidate) {
+        if (candidate.max_sets < command_context->required_set_count_)
+          return false;
+        for (auto [type, count] : command_context->required_pool_size_.descriptor_type_count) {
+          auto it = candidate.size.descriptor_type_count.find(type);
+          if (count && (it == candidate.size.descriptor_type_count.end() || it->second < count))
+            return false;
+        }
+        return true;
+      },
+      [&] {
+        auto result = std::make_shared<DescriptorAllocation>();
+        result->device = device_;
+        result->size = command_context->required_pool_size_;
+        result->max_sets = std::max(1, command_context->required_set_count_);
+        vulkan::ThrowIfFailed(
+            CreateDescriptorPool(result->size.ToVkDescriptorPoolSize(), result->max_sets, &result->pool),
+            "Create submission descriptors");
+        return result;
+      });
+  vulkan::ThrowIfFailed(vkResetDescriptorPool(device_, descriptors->pool, 0), "Reset submission descriptors");
+  current_descriptor_pool_ = descriptors->pool;
+  std::vector<std::shared_ptr<void>> retained{commands, descriptors};
 
-  auto &pool = descriptor_pools_[current_slot_];
-  auto pool_size = descriptor_pool_sizes_[current_slot_];
-  auto max_sets = descriptor_pool_max_sets_[current_slot_];
-  bool update_pool = false;
-  for (auto &[type, count] : command_context->required_pool_size_.descriptor_type_count) {
-    if (!pool_size.descriptor_type_count.count(type) || pool_size.descriptor_type_count[type] < count) {
-      uint32_t type_count = pool_size.descriptor_type_count[type];
-      if (!type_count) {
-        type_count = 1;
-      }
-      while (type_count < count) {
-        type_count *= 2;
-      }
-      pool_size.descriptor_type_count[type] = type_count;
-      update_pool = true;
-    }
-  }
-  while (max_sets < command_context->required_set_count_) {
-    max_sets *= 2;
-    update_pool = true;
-  }
-  if (update_pool) {
-    vkDestroyDescriptorPool(device_, pool, nullptr);
-    this->CreateDescriptorPool(pool_size.ToVkDescriptorPoolSize(), max_sets, &pool);
-    descriptor_pool_sizes_[current_slot_] = pool_size;
-    descriptor_pool_max_sets_[current_slot_] = max_sets;
-  } else {
-    vkResetDescriptorPool(device_, pool, 0);
-  }
-  current_descriptor_pool_ = pool;
-
-  for (auto &window : command_context->windows_) {
-    window->AcquireNextImage();
-  }
-
-  VkCommandBuffer command_buffer = command_buffers_[current_slot_];
+  VkCommandBuffer command_buffer = commands->buffer;
   vkResetCommandBuffer(command_buffer, 0);
   VkCommandBufferBeginInfo begin_info{};
   begin_info.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
   begin_info.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
   vulkan::ThrowIfFailed(vkBeginCommandBuffer(command_buffer, &begin_info), "Begin Vulkan commands");
   for (auto buffer : command_context->dynamic_buffers_)
-    buffer->TransferData(command_buffer);
+    retained.push_back(buffer->TransferData(command_buffer));
+
+  for (auto window : command_context->windows_)
+    window->AcquireNextImage();
 
   // Queue order alone does not make copied uniforms/instances visible to shaders.
   // This also orders static uploads and previous dispatches before this context.
@@ -337,7 +350,7 @@ Submission VulkanCore::Submit(CommandContext *p_command_context) {
     signal_semaphores.push_back(window->RenderFinishSemaphore());
   }
 
-  VkFence fence = in_flight_fences_[current_slot_];
+  VkFence fence = commands->fence;
   vulkan::ThrowIfFailed(vkResetFences(this->Handle(), 1, &fence), "Reset Vulkan submission fence");
 
   VkSubmitInfo submit_info{};
@@ -373,6 +386,8 @@ Submission VulkanCore::Submit(CommandContext *p_command_context) {
     submit_info.pSignalSemaphores = signal_semaphores.data();
   }
 
+  auto callbacks = command_context->TakeCompletionCallbacks();
+  callbacks.push_back([retained = std::move(retained)] {});
   auto submission = TrackSubmission(
       [this, fence] {
         auto result = vkGetFenceStatus(Handle(), fence);
@@ -385,14 +400,14 @@ Submission VulkanCore::Submit(CommandContext *p_command_context) {
         vulkan::ThrowIfFailed(vkWaitForFences(Handle(), 1, &fence, VK_TRUE, std::numeric_limits<uint64_t>::max()),
                               "Wait for Vulkan submission");
       },
-      command_context->TakeCompletionCallbacks(),
+      std::move(callbacks),
       [&] {
         vulkan::ThrowIfFailed(vkQueueSubmit(graphics_queue_, 1, &submit_info, fence), "Submit Vulkan rendering");
       });
-  in_flight_slots_[current_slot_].Retire(submission);
+  for (auto window : command_context->windows_)
+    window->RetireAcquire(submission);
   for (auto &window : command_context->windows_)
     window->Present();
-  current_slot_ = (current_slot_ + 1) % SubmissionSlotCount();
   return submission;
 }
 
@@ -488,30 +503,6 @@ int VulkanCore::InitializeLogicalDevice(int device_index) {
   vkGetDeviceQueue(native_device, vulkan::GraphicsFamilyIndex(physical_device), 0, &graphics_queue_);
   vkGetDeviceQueue(native_device, vulkan::GraphicsFamilyIndex(physical_device), 0, &transfer_queue_);
 
-  in_flight_fences_.resize(SubmissionSlotCount());
-  command_buffers_.resize(SubmissionSlotCount());
-
-  descriptor_pools_.resize(SubmissionSlotCount());
-  descriptor_pool_sizes_.resize(SubmissionSlotCount());
-  descriptor_pool_max_sets_.resize(SubmissionSlotCount(), 1);
-
-  in_flight_slots_.resize(SubmissionSlotCount());
-
-  for (int i = 0; i < SubmissionSlotCount(); i++) {
-    VkFenceCreateInfo fence_info{VK_STRUCTURE_TYPE_FENCE_CREATE_INFO};
-    fence_info.flags = VK_FENCE_CREATE_SIGNALED_BIT;
-    vulkan::ThrowIfFailed(vkCreateFence(this->Handle(), &fence_info, nullptr, &in_flight_fences_[i]),
-                          "Failed to create in-flight fence");
-    VkCommandBufferAllocateInfo allocate_info{VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO};
-    allocate_info.commandPool = graphics_command_pool_;
-    allocate_info.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
-    allocate_info.commandBufferCount = 1;
-    vulkan::ThrowIfFailed(vkAllocateCommandBuffers(native_device, &allocate_info, &command_buffers_[i]),
-                          "failed to allocate graphics command buffer");
-
-    this->CreateDescriptorPool({{VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 1}}, 1, &descriptor_pools_[i]);
-    descriptor_pool_sizes_[i] = vulkan::DescriptorPoolSize(VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 1);
-  }
 #if defined(LONGMARCH_CUDA_RUNTIME)
 
   if (cuda_device_ >= 0) {

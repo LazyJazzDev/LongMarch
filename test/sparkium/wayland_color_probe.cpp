@@ -171,7 +171,7 @@ int main(int argc, char **argv) {
     if (seconds < 1 || seconds > 3600)
       throw std::invalid_argument("seconds must be in [1, 3600]");
     std::unique_ptr<graphics::Core> core;
-    if (graphics::CreateCore(graphics::BACKEND_API_VULKAN, {2, true}, &core) ||
+    if (graphics::CreateCore(graphics::BACKEND_API_VULKAN, {true}, &core) ||
         core->InitializeLogicalDeviceAutoSelect(false))
       throw std::runtime_error("Cannot initialize Vulkan");
     std::unique_ptr<graphics::Window> sdr, hdr;

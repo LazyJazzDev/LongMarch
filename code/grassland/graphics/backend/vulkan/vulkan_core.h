@@ -5,6 +5,14 @@
 
 namespace grassland::graphics::backend {
 
+struct VulkanUploadAllocation {
+  VmaAllocator allocator{};
+  VkBuffer device_buffer{}, upload_buffer{};
+  VmaAllocation device_memory{}, upload_memory{};
+  size_t size{};
+  ~VulkanUploadAllocation();
+};
+
 class VulkanCore : public Core {
  public:
   VulkanCore(const Settings &settings);
@@ -231,17 +239,7 @@ class VulkanCore : public Core {
     return transfer_command_pool_;
   }
 
-  VkCommandBuffer CommandBuffer() const {
-    return command_buffers_[current_slot_];
-  }
-
-  VkFence InFlightFence() const {
-    return in_flight_fences_[current_slot_];
-  }
-
-  uint32_t CurrentSubmissionSlot() const override {
-    return current_slot_;
-  }
+  std::shared_ptr<VulkanUploadAllocation> AcquireUploadStorage(size_t size);
 
   void SingleTimeCommand(std::function<void(VkCommandBuffer)> command);
 
@@ -285,22 +283,31 @@ class VulkanCore : public Core {
   void DestroyNativeDevice();
   VkPhysicalDeviceMemoryProperties memory_properties_;
 
-  uint32_t current_slot_{0};
-  std::vector<VkFence> in_flight_fences_;
+  struct CommandAllocation {
+    VkDevice device{};
+    VkCommandPool pool{};
+    VkCommandBuffer buffer{};
+    VkFence fence{};
+    ~CommandAllocation();
+  };
 
-  std::vector<VkDescriptorPool> descriptor_pools_;
-  std::vector<vulkan::DescriptorPoolSize> descriptor_pool_sizes_;
-  std::vector<uint32_t> descriptor_pool_max_sets_;
+  struct DescriptorAllocation {
+    VkDevice device{};
+    VkDescriptorPool pool{};
+    vulkan::DescriptorPoolSize size;
+    uint32_t max_sets{};
+    ~DescriptorAllocation();
+  };
+
+  detail::ResourcePool<CommandAllocation> command_pool_;
+  detail::ResourcePool<DescriptorAllocation> descriptor_pool_;
+  detail::ResourcePool<VulkanUploadAllocation> upload_pool_;
   VkDescriptorPool current_descriptor_pool_{VK_NULL_HANDLE};
-
   VkCommandPool graphics_command_pool_{VK_NULL_HANDLE};
   VkCommandPool transfer_command_pool_{VK_NULL_HANDLE};
-  std::vector<VkCommandBuffer> command_buffers_;
 
   VkQueue graphics_queue_{VK_NULL_HANDLE};
   VkQueue transfer_queue_{VK_NULL_HANDLE};
-
-  std::vector<detail::InFlightSlot> in_flight_slots_;
 
 #if defined(LONGMARCH_CUDA_RUNTIME)
   VkSemaphore cuda_synchronization_semaphore_{VK_NULL_HANDLE};
