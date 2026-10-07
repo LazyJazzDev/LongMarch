@@ -126,7 +126,7 @@ void MetalCommandContext::BindStage(MetalStage &stage,
       for (const auto &child : structure->Children())
         use(child.get());
       // Capture the exact AS generation and dependencies until this submission completes.
-      PushPostExecutionCallback([storage = NS::RetainPtr(structure->Handle()), children = structure->Children()] {});
+      OnCompleted([storage = NS::RetainPtr(structure->Handle()), children = structure->Children()] {});
     } else if (binding.type == RESOURCE_TYPE_ACCELERATION_STRUCTURE) {
       throw std::invalid_argument("Metal AS slot requires an acceleration structure");
     }
@@ -151,7 +151,7 @@ void MetalCommandContext::BindStage(MetalStage &stage,
         throw std::invalid_argument("expected MetalSampler");
       encoder->setSamplerState(sampler->state.get(), i);
       // Samplers are indirect objects, not MTL::Resources. Retain through completion.
-      PushPostExecutionCallback([state = sampler->state]() {});
+      OnCompleted([state = sampler->state]() {});
     }
     if (point == BIND_POINT_COMPUTE)
       compute_->setBuffer(argument.get(), 0, slot);

@@ -234,7 +234,7 @@ void Application::OnRender() {
   context->CmdEndRendering();
 
   context->CmdPresent(window_.get(), present_image_.get());
-  core_->SubmitCommandContext(context.get());
+  core_->Submit(context.get());
 }
 
 void Application::RenderFrameTarget(graphics::CommandContext *context, FrameTarget &target) {

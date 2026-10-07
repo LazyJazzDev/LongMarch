@@ -57,7 +57,7 @@ int main() {
     std::unique_ptr<graphics::CommandContext> command_context;
     core->CreateCommandContext(&command_context);
     command_context->CmdPresent(window.get(), color_image.get());
-    core->SubmitCommandContext(command_context.get());
+    core->Submit(command_context.get());
     grassland::graphics::Window::PollEvents();
   }
 

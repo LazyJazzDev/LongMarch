@@ -1,4 +1,8 @@
 # Native window tests require a logged-in macOS desktop; run explicitly.
+add_executable(test_graphics_submission EXCLUDE_FROM_ALL submission_test.cpp)
+target_link_libraries(test_graphics_submission PRIVATE Grassland GTest::gtest_main)
+LONGMARCH_DEPLOY_RUNTIME_DEPENDENCIES(test_graphics_submission)
+
 if(APPLE)
     add_executable(test_window_gestures EXCLUDE_FROM_ALL window_gestures_test.mm)
     set_property(TARGET test_window_gestures PROPERTY OBJCXX_STANDARD 17)

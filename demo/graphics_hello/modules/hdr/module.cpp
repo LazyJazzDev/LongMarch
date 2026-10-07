@@ -87,7 +87,7 @@ void ModuleHDR::OnRender() {
   command_context->CmdDrawIndexed(12, 1, 0, 0, 0);
   command_context->CmdEndRendering();
   command_context->CmdPresent(window_.get(), color_image_.get());
-  core_->SubmitCommandContext(command_context.get());
+  core_->Submit(command_context.get());
 }
 
 }  // namespace graphics_hello::hdr

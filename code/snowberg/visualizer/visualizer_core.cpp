@@ -12,7 +12,6 @@
 
 namespace snowberg::visualizer {
 Core::Core(graphics::Core *core) : core_(core) {
-  ownership_holders_.resize(core->FramesInFlight());
 }
 
 graphics::Core *Core::GraphicsCore() const {
@@ -59,7 +58,9 @@ int Core::Render(graphics::CommandContext *context,
   render_context.cmd_ctx = context;
   render_context.film = film.get();
   render_context.camera_buffer = camera->camera_buffer_.get();
-  render_context.ownership_holder = &ownership_holders_[context->GetCore()->CurrentFrame()];
+  auto ownership = std::make_shared<OwnershipHolder>();
+  render_context.ownership_holder = ownership.get();
+  context->OnCompleted([ownership] { ownership->Clear(); });
 
   render_context.ownership_holder->AddCamera(camera);
   render_context.ownership_holder->AddFilm(film);
@@ -104,7 +105,6 @@ int Core::Render(graphics::CommandContext *context,
 
   context->CmdEndRendering();
 
-  context->PushPostExecutionCallback([holder = render_context.ownership_holder]() { holder->Clear(); });
   while (!to_del_entities.empty()) {
     scene->entities_.erase(to_del_entities.front());
     to_del_entities.pop();

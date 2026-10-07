@@ -82,7 +82,7 @@ class Module(gh.Module):
         command_context.cmd_bind_resources(2, [self.camera_object_buffer], graphics.BIND_POINT_RAYTRACING)
         command_context.cmd_dispatch_rays(self.window.get_width(), self.window.get_height(), 1)
         command_context.cmd_present(self.window, self.color_image)
-        self.core.submit_command_context(command_context)
+        self.core.submit(command_context)
 
 
 if __name__ == "__main__":

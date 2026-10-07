@@ -18,7 +18,7 @@ void Film::Reset() {
   std::unique_ptr<graphics::CommandContext> cmd_context;
   core_->GraphicsCore()->CreateCommandContext(&cmd_context);
   cmd_context->CmdClearImage(raw_image_.get(), {0.0f, 0.0f, 0.0f, 1.0f});
-  core_->GraphicsCore()->SubmitCommandContext(cmd_context.get());
+  core_->GraphicsCore()->Submit(cmd_context.get());
 
   for (auto &callback : reset_callbacks_) {
     callback();
@@ -56,7 +56,7 @@ void Film::Develop(graphics::Image *targ_image, bool linear_hdr) {
   cmd_context->CmdDispatch((targ_image->Extent().width + 7) / 8, (targ_image->Extent().height + 7) / 8, 1);
   tone_profile.End();
   graphics::CpuProfileScope submit_profile("develop_submit");
-  core_->GraphicsCore()->SubmitCommandContext(cmd_context.get());
+  core_->GraphicsCore()->Submit(cmd_context.get());
   submit_profile.End();
   graphics::CpuProfileScope wait_profile("develop_wait");
   core_->GraphicsCore()->WaitGPU();

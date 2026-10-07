@@ -20,7 +20,7 @@ void Film::Reset() {
   core_->GraphicsCore()->CreateCommandContext(&cmd_context);
   cmd_context->CmdClearImage(accumulated_color_.get(), {0.0f, 0.0f, 0.0f, 0.0f});
   cmd_context->CmdClearImage(accumulated_samples_.get(), {});
-  core_->GraphicsCore()->SubmitCommandContext(cmd_context.get());
+  core_->GraphicsCore()->Submit(cmd_context.get());
   film_.info.accumulated_samples = 0;
 }
 

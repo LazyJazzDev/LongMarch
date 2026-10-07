@@ -63,7 +63,7 @@ class Module(gh.Module):
         extent = self.color_image.extent()
         command_context.cmd_dispatch((extent.width + 7) // 8, (extent.height + 7) // 8, 1)
         command_context.cmd_present(self.window, self.color_image)
-        self.core.submit_command_context(command_context)
+        self.core.submit(command_context)
 
 
 if __name__ == "__main__":

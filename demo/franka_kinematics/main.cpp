@@ -327,7 +327,7 @@ int main() {
     std::unique_ptr<graphics::CommandContext> cmd_context;
     core_->CreateCommandContext(&cmd_context);
     cmd_context->CmdPresent(window.get(), srgb_image.get());
-    core_->SubmitCommandContext(cmd_context.get());
+    core_->Submit(cmd_context.get());
     grassland::graphics::Window::PollEvents();
     float fps = fps_counter.TickFPS();
     char fps_buf[16];

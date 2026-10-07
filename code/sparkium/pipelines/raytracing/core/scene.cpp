@@ -116,7 +116,7 @@ void Scene::Render(Camera *camera, Film *film, bool software, bool ray_query) {
   resolve_profile.End();
   setup_profile.End();
   graphics::CpuProfileScope submit_profile("render_submit");
-  core_->GraphicsCore()->SubmitCommandContext(cmd_context.get());
+  core_->GraphicsCore()->Submit(cmd_context.get());
   submit_profile.End();
   graphics::CpuProfileScope wait_profile("render_wait");
   core_->GraphicsCore()->WaitGPU();
@@ -439,7 +439,7 @@ void Scene::UpdatePipeline(Camera *camera) {
   light_selection_profile.End();
   light_record_profile.End();
   graphics::CpuProfileScope preprocess_submit_profile("preprocess_submit");
-  core_->GraphicsCore()->SubmitCommandContext(preprocess_cmd_context_.get());
+  core_->GraphicsCore()->Submit(preprocess_cmd_context_.get());
 }
 
 Scene *DedicatedCast(sparkium::Scene *scene) {

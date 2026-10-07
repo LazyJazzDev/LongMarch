@@ -2,6 +2,12 @@
 
 namespace grassland::graphics::pybind {
 void RegisterGraphics(py::module_ &m) {
+  py::class_<Submission>(m, "Submission")
+      .def("is_valid", &Submission::IsValid)
+      .def("is_complete", &Submission::IsComplete)
+      .def("wait", &Submission::Wait)
+      .def_property_readonly("queue_id", &Submission::QueueId)
+      .def_property_readonly("value", &Submission::Value);
   // Core classes
   py::classh<Core> c_core(m, "Core");
   py::classh<Core::Settings> c_core_settings(m, "CoreSettings");

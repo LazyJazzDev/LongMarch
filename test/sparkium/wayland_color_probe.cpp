@@ -201,7 +201,7 @@ int main(int argc, char **argv) {
       commands->CmdClearImage(hdr_image.get(), {{1, 1, 1, 1}});
       commands->CmdPresent(sdr.get(), sdr_image.get());
       commands->CmdPresent(hdr.get(), hdr_image.get());
-      core->SubmitCommandContext(commands.get());
+      core->Submit(commands.get());
       core->WaitGPU();
       if (++frames >= 3) {
         if (sdr_probe.changed)

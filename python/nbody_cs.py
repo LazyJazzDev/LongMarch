@@ -236,7 +236,7 @@ class NBodyCS:
         if self.profiler:
             self.profiler.end_gpu(ctx, gpu_scope)
         recorded = time.perf_counter()
-        self.core.submit_command_context(ctx)
+        self.core.submit(ctx)
         submitted = time.perf_counter()
         if self.benchmark():
             self.core.wait_gpu()

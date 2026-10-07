@@ -59,7 +59,7 @@ TEST(MetalWindowTest, HDRPresentationAndImGuiSwitching) {
         core->CreateCommandContext(&commands);
         commands->CmdClearImage(image.get(), {{3.0f, 2.0f, 1.0f, 1.0f}});
         commands->CmdPresent(window.get(), image.get());
-        ASSERT_EQ(core->SubmitCommandContext(commands.get()), 0);
+        ASSERT_TRUE(core->Submit(commands.get()).IsValid());
       }
       // Closing immediately after queued presentation must remain safe in HDR mode.
       window->CloseWindow();

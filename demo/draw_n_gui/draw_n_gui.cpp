@@ -111,5 +111,5 @@ void DrawNGUI::OnRender() {
   ctx->CmdClearImage(color_image_.get(), {0.6f, 0.7f, 0.8f, 1.0f});
   draw_core_->Render(ctx.get(), color_image_.get());
   ctx->CmdPresent(window_.get(), color_image_.get());
-  core_->SubmitCommandContext(ctx.get());
+  core_->Submit(ctx.get());
 }

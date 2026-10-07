@@ -91,7 +91,8 @@ ID3D12Resource *D3D12StaticBuffer::InstantBuffer() const {
 }
 
 D3D12DynamicBuffer::D3D12DynamicBuffer(D3D12Core *core, size_t size) : core_(core) {
-  buffers_.resize(core_->FramesInFlight());
+  buffers_.resize(core_->SubmissionSlotCount());
+  upload_snapshots_.resize(core_->SubmissionSlotCount());
   for (size_t i = 0; i < buffers_.size(); ++i) {
     buffers_[i] = CreateNativeBuffer(core_->Device(), size, D3D12_HEAP_TYPE_DEFAULT);
   }
@@ -134,7 +135,7 @@ void D3D12DynamicBuffer::DownloadData(void *data, size_t size, size_t offset) {
 }
 
 ID3D12Resource *D3D12DynamicBuffer::Buffer() const {
-  return buffers_[core_->CurrentFrame()].Get();
+  return buffers_[core_->CurrentSubmissionSlot()].Get();
 }
 
 ID3D12Resource *D3D12DynamicBuffer::InstantBuffer() const {
@@ -142,13 +143,21 @@ ID3D12Resource *D3D12DynamicBuffer::InstantBuffer() const {
 }
 
 void D3D12DynamicBuffer::TransferData(ID3D12GraphicsCommandList *command_list) {
-  if (buffers_[core_->CurrentFrame()]->GetDesc().Width != staging_buffer_->GetDesc().Width) {
-    buffers_[core_->CurrentFrame()].Reset();
-    buffers_[core_->CurrentFrame()] =
+  if (buffers_[core_->CurrentSubmissionSlot()]->GetDesc().Width != staging_buffer_->GetDesc().Width) {
+    buffers_[core_->CurrentSubmissionSlot()].Reset();
+    buffers_[core_->CurrentSubmissionSlot()] =
         CreateNativeBuffer(core_->Device(), staging_buffer_->GetDesc().Width, D3D12_HEAP_TYPE_DEFAULT);
   }
-  CopyNativeBuffer(command_list, staging_buffer_.Get(), buffers_[core_->CurrentFrame()].Get(),
-                   staging_buffer_->GetDesc().Width, 0, 0);
+  auto &upload = upload_snapshots_[core_->CurrentSubmissionSlot()];
+  const auto size = staging_buffer_->GetDesc().Width;
+  if (!upload || upload->GetDesc().Width != size)
+    upload = CreateNativeBuffer(core_->Device(), size, D3D12_HEAP_TYPE_UPLOAD);
+  auto src = MapBuffer(staging_buffer_.Get());
+  auto dst = MapBuffer(upload.Get());
+  std::memcpy(dst, src, size);
+  upload->Unmap(0, nullptr);
+  staging_buffer_->Unmap(0, nullptr);
+  CopyNativeBuffer(command_list, upload.Get(), buffers_[core_->CurrentSubmissionSlot()].Get(), size, 0, 0);
 }
 
 #if defined(LONGMARCH_CUDA_RUNTIME)

@@ -148,7 +148,7 @@ class NBodyWarp:
         self.renderer.record(ctx, self.particles_pos, self.n_particles)
         if not self.headless:
             ctx.cmd_present(self.window, self.renderer.frame_image)
-        self.core.submit_command_context(ctx)
+        self.core.submit(ctx)
 
     def galaxy_number(self):
         return self.controls.galaxy_number if self.controls else 10

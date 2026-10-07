@@ -127,7 +127,7 @@ void ModuleExternalShader::OnRender() {
   command_context->CmdBindResources(2, {camera_object_buffer_.get()}, grassland::graphics::BIND_POINT_RAYTRACING);
   command_context->CmdDispatchRays(window_->GetWidth(), window_->GetHeight(), 1);
   command_context->CmdPresent(window_.get(), color_image_.get());
-  core_->SubmitCommandContext(command_context.get());
+  core_->Submit(command_context.get());
 }
 
 }  // namespace graphics_hello::external_shader

@@ -144,7 +144,7 @@ void NBodyCS::OnRender() {
   if (profiler_)
     profiler_->EndGpu(ctx.get(), gpu_scope);
   auto recorded = Clock::now();
-  core_->SubmitCommandContext(ctx.get());
+  core_->Submit(ctx.get());
   auto submitted = Clock::now();
   if (Benchmark()) {
     core_->WaitGPU();

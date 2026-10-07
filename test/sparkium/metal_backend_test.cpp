@@ -46,7 +46,7 @@ TEST_F(MetalBackendTest, WindowCloseAfterPresent) {
       core->CreateCommandContext(&commands);
       commands->CmdClearImage(image.get(), {{0.2f, 0.3f, 0.4f, 1.0f}});
       commands->CmdPresent(window.get(), image.get());
-      ASSERT_EQ(core->SubmitCommandContext(commands.get()), 0);
+      ASSERT_TRUE(core->Submit(commands.get()).IsValid());
       // Match hello demos: close request, explicit CloseWindow, then destruction.
       if (explicit_close) {
         glfwSetWindowShouldClose(window->GLFWWindow(), GLFW_TRUE);
@@ -141,7 +141,7 @@ RWStructuredBuffer<float4> output : register(u0, space1);
   commands->CmdBindResources(0, scene.get(), graphics::BIND_POINT_COMPUTE);
   commands->CmdBindResources(1, {output.get()}, graphics::BIND_POINT_COMPUTE);
   commands->CmdDispatch(7, 1, 1);
-  ASSERT_EQ(core->SubmitCommandContext(commands.get()), 0);
+  ASSERT_TRUE(core->Submit(commands.get()).IsValid());
   std::array<glm::vec4, 7> hits;
   output->DownloadData(hits.data(), sizeof(hits));
   const float expected[]{1.25f, 0.25f, -1, -1, 1.75f, -1, 1.5f};
@@ -216,7 +216,7 @@ RWStructuredBuffer<float4> output : register(u0, space1);
   commands->CmdDispatch(2, 1, 1);
   tlas.reset();
   blas.reset();
-  ASSERT_EQ(core->SubmitCommandContext(commands.get()), 0);
+  ASSERT_TRUE(core->Submit(commands.get()).IsValid());
   commands.reset();
   float original[8], updated[8];
   before->DownloadData(original, sizeof(original));
@@ -271,7 +271,7 @@ RWStructuredBuffer<uint> output : register(u0, space1);
   commands->CmdBindComputeProgram(program.get());  // Compatible bindings survive a program switch.
   commands->CmdBindResources(1, {output2.get()}, graphics::BIND_POINT_COMPUTE);
   commands->CmdDispatch(count, 1, 1);
-  ASSERT_EQ(core->SubmitCommandContext(commands.get()), 0);
+  ASSERT_TRUE(core->Submit(commands.get()).IsValid());
   commands.reset();  // Native command retains argument snapshots until completion.
   std::vector<uint32_t> actual(count);
   output1->DownloadData(actual.data(), count * 4);
@@ -314,7 +314,7 @@ RWStructuredBuffer<float4> output : register(u0, space0);
   commands->CmdBindComputeProgram(program.get());
   commands->CmdBindResources(0, {output.get()}, graphics::BIND_POINT_COMPUTE);
   commands->CmdDispatch(1, 1, 1);
-  ASSERT_EQ(core->SubmitCommandContext(commands.get()), 0);
+  ASSERT_TRUE(core->Submit(commands.get()).IsValid());
   output->DownloadData(values.data(), sizeof(values));
   // Golden values from Cycles' parabolic height and local-envelope equations.
   const std::array<glm::vec4, 5> expected{{{0.026666667f, 0.026666667f, 0.115555556f, 0},
@@ -380,7 +380,7 @@ TEST_F(MetalBackendTest, LightSelectionPartialWorkgroupDoesNotOverwriteTail) {
     commands->CmdBindResources(1, {selector.get()}, graphics::BIND_POINT_COMPUTE);
     commands->CmdBindResources(2, {power.get()}, graphics::BIND_POINT_COMPUTE);
     commands->CmdDispatch((count + 63) / 64, 1, 1);
-    core->SubmitCommandContext(commands.get());
+    core->Submit(commands.get());
     selector->DownloadData(actual.data(), actual.size() * 4);
     EXPECT_EQ(actual[0], count);
     for (uint32_t i = 0; i < count; ++i) {
@@ -452,7 +452,7 @@ void PSMain(float4 position : SV_POSITION) {
   commands->CmdBindResources(0, {output.get()});
   commands->CmdDraw(3, 1, 0, 0);
   commands->CmdEndRendering();
-  core->SubmitCommandContext(commands.get());
+  core->Submit(commands.get());
   std::vector<glm::vec4> pixels(20);
   output->DownloadData(pixels.data());
   for (int y = 0; y < 4; ++y)
@@ -473,9 +473,9 @@ TEST_F(MetalBackendTest, BufferCopyResizeAndCompletionCallback) {
   core->CreateCommandContext(&commands);
   commands->CmdCopyBuffer(target.get(), source.get(), 64);
   int completed = 0;
-  commands->PushPostExecutionCallback([&] { ++completed; });
-  ASSERT_EQ(core->SubmitCommandContext(commands.get()), 0);
-  EXPECT_NE(core->SubmitCommandContext(commands.get()), 0);
+  commands->OnCompleted([&] { ++completed; });
+  ASSERT_TRUE(core->Submit(commands.get()).IsValid());
+  EXPECT_THROW(core->Submit(commands.get()), std::logic_error);
   target->Resize(128);
   target->DownloadData(actual.data(), 64);
   EXPECT_EQ(actual, values);

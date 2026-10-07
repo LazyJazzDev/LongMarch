@@ -72,6 +72,9 @@ class VulkanDynamicBuffer : public VulkanBuffer {
   std::vector<VkBuffer> buffers_;
   std::vector<VmaAllocation> allocations_;
   std::vector<size_t> buffer_sizes_;
+  std::vector<VkBuffer> upload_buffers_;
+  std::vector<VmaAllocation> upload_allocations_;
+  std::vector<size_t> upload_sizes_;
   VkBuffer staging_buffer_{VK_NULL_HANDLE};
   VmaAllocation staging_allocation_{VK_NULL_HANDLE};
   size_t size_{};

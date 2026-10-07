@@ -48,5 +48,5 @@ void Application::OnRender() {
   core_->CreateCommandContext(&command_context);
   command_context->CmdClearImage(frame_image_.get(), {{0.6, 0.7, 0.8, 1.0}});
   command_context->CmdPresent(window_.get(), frame_image_.get());
-  core_->SubmitCommandContext(command_context.get());
+  core_->Submit(command_context.get());
 }

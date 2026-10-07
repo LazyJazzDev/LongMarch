@@ -82,7 +82,7 @@ class VulkanWindow : public Window {
   std::optional<VkSurfaceFormatKHR> SelectSurfaceFormat(bool hdr) const;
   VkFormat ImGuiFormat() const;
   VkSurfaceFormatKHR surface_format_{};
-  VkQueue present_queue_;
+  VkQueue present_queue_{VK_NULL_HANDLE};
   VulkanCore *core_;
   VkSurfaceKHR surface_{VK_NULL_HANDLE};
   VkSwapchainKHR swap_chain_{VK_NULL_HANDLE};

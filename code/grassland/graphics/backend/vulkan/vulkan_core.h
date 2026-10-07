@@ -85,7 +85,7 @@ class VulkanCore : public Core {
 
   int CreateRayTracingProgram(double_ptr<RayTracingProgram> pp_program) override;
 
-  int SubmitCommandContext(CommandContext *p_command_context) override;
+  Submission Submit(CommandContext *p_command_context) override;
 
   int GetPhysicalDeviceProperties(PhysicalDeviceProperties *p_physical_device_properties = nullptr) override;
 
@@ -232,15 +232,15 @@ class VulkanCore : public Core {
   }
 
   VkCommandBuffer CommandBuffer() const {
-    return command_buffers_[current_frame_];
+    return command_buffers_[current_slot_];
   }
 
   VkFence InFlightFence() const {
-    return in_flight_fences_[current_frame_];
+    return in_flight_fences_[current_slot_];
   }
 
-  uint32_t CurrentFrame() const override {
-    return current_frame_;
+  uint32_t CurrentSubmissionSlot() const override {
+    return current_slot_;
   }
 
   void SingleTimeCommand(std::function<void(VkCommandBuffer)> command);
@@ -285,7 +285,7 @@ class VulkanCore : public Core {
   void DestroyNativeDevice();
   VkPhysicalDeviceMemoryProperties memory_properties_;
 
-  uint32_t current_frame_{0};
+  uint32_t current_slot_{0};
   std::vector<VkFence> in_flight_fences_;
 
   std::vector<VkDescriptorPool> descriptor_pools_;
@@ -296,12 +296,11 @@ class VulkanCore : public Core {
   VkCommandPool graphics_command_pool_{VK_NULL_HANDLE};
   VkCommandPool transfer_command_pool_{VK_NULL_HANDLE};
   std::vector<VkCommandBuffer> command_buffers_;
-  VkCommandBuffer transfer_command_buffer_{VK_NULL_HANDLE};
 
   VkQueue graphics_queue_{VK_NULL_HANDLE};
   VkQueue transfer_queue_{VK_NULL_HANDLE};
 
-  std::vector<std::vector<std::function<void()>>> post_execute_functions_;
+  std::vector<detail::InFlightSlot> in_flight_slots_;
 
 #if defined(LONGMARCH_CUDA_RUNTIME)
   VkSemaphore cuda_synchronization_semaphore_{VK_NULL_HANDLE};

@@ -1,6 +1,7 @@
 #include "grassland/graphics/backend/d3d12/d3d12_core.h"
 
 #include <numeric>
+#include <stdexcept>
 
 #include "grassland/graphics/backend/d3d12/d3d12_acceleration_structure.h"
 #include "grassland/graphics/backend/d3d12/d3d12_buffer.h"
@@ -13,8 +14,8 @@
 namespace grassland::graphics::backend {
 
 void D3D12Core::BindDescriptorHeaps(ID3D12GraphicsCommandList *commands) const {
-  ID3D12DescriptorHeap *heaps[] = {resource_descriptor_heaps_[current_frame_].Get(),
-                                   sampler_descriptor_heaps_[current_frame_].Get()};
+  ID3D12DescriptorHeap *heaps[] = {resource_descriptor_heaps_[current_slot_].Get(),
+                                   sampler_descriptor_heaps_[current_slot_].Get()};
   commands->SetDescriptorHeaps(2, heaps);
 }
 
@@ -97,6 +98,7 @@ D3D12Core::D3D12Core(const Settings &settings) : Core(settings) {
 }
 
 D3D12Core::~D3D12Core() {
+  ShutdownSubmissions();
   if (fence_event_) {
     CloseHandle(fence_event_);
   }
@@ -112,9 +114,14 @@ void D3D12Core::QueueWaitFence(ID3D12CommandQueue *queue) {
 }
 
 void D3D12Core::WaitForFence(uint64_t value) {
+  if (fence_->GetCompletedValue() == UINT64_MAX)
+    throw std::runtime_error("D3D12 device removed while waiting for submission");
   if (fence_->GetCompletedValue() < value) {
     d3d12::ThrowIfFailed(fence_->SetEventOnCompletion(value, fence_event_), "Failed to set fence event");
-    WaitForSingleObject(fence_event_, INFINITE);
+    if (WaitForSingleObject(fence_event_, INFINITE) != WAIT_OBJECT_0)
+      throw std::runtime_error("D3D12 fence event wait failed");
+    if (fence_->GetCompletedValue() == UINT64_MAX)
+      throw std::runtime_error("D3D12 device removed during submission");
   }
 }
 
@@ -281,44 +288,34 @@ int D3D12Core::CreateRayTracingProgram(double_ptr<RayTracingProgram> pp_program)
   return 0;
 }
 
-int D3D12Core::SubmitCommandContext(CommandContext *p_command_context) {
-  D3D12CommandContext *command_context = dynamic_cast<D3D12CommandContext *>(p_command_context);
+Submission D3D12Core::Submit(CommandContext *p_command_context) {
+  auto command_context = dynamic_cast<D3D12CommandContext *>(p_command_context);
+  if (!command_context)
+    throw std::invalid_argument("expected D3D12 command context");
+  command_context->BeginSubmission(this);
+  in_flight_slots_[current_slot_].Wait();
+  CollectCompletedSubmissions();
 
-  uint64_t transfer_wait_value = 0;
-  if (command_context->dynamic_buffers_.size()) {
-    ResetCommandRecord(transfer_allocator_.Get(), transfer_command_list_.Get());
-    for (auto buffer : command_context->dynamic_buffers_) {
-      buffer->TransferData(transfer_command_list_.Get());
-    }
-    transfer_command_list_->Close();
+  ResetCommandRecord(command_allocators_[current_slot_].Get(), command_lists_[current_slot_].Get());
 
-    ID3D12CommandList *command_lists[] = {transfer_command_list_.Get()};
-
-    QueueWaitFence(transfer_command_queue_.Get());
-    transfer_command_queue_.Get()->ExecuteCommandLists(1, command_lists);
-    SignalFence(transfer_command_queue_.Get());
-    transfer_wait_value = fence_value_;
-  }
-
-  ResetCommandRecord(command_allocators_[current_frame_].Get(), command_lists_[current_frame_].Get());
-
-  auto command_list = command_lists_[current_frame_].Get();
+  auto command_list = command_lists_[current_slot_].Get();
+  for (auto buffer : command_context->dynamic_buffers_)
+    buffer->TransferData(command_list);
 
   for (auto window : command_context->windows_) {
     command_context->RecordRTVImage(window->CurrentBackBuffer());
   }
 
-  if (!resource_descriptor_heaps_[current_frame_] ||
-      resource_descriptor_heaps_[current_frame_]->GetDesc().NumDescriptors <
+  if (!resource_descriptor_heaps_[current_slot_] ||
+      resource_descriptor_heaps_[current_slot_]->GetDesc().NumDescriptors <
           command_context->resource_descriptor_count_) {
-    resource_descriptor_heaps_[current_frame_] = CreateNativeDescriptorHeap(
+    resource_descriptor_heaps_[current_slot_] = CreateNativeDescriptorHeap(
         device_.Get(), D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV, command_context->resource_descriptor_count_);
   }
 
-  if (!sampler_descriptor_heaps_[current_frame_] ||
-      sampler_descriptor_heaps_[current_frame_]->GetDesc().NumDescriptors <
-          command_context->sampler_descriptor_count_) {
-    sampler_descriptor_heaps_[current_frame_] = CreateNativeDescriptorHeap(
+  if (!sampler_descriptor_heaps_[current_slot_] ||
+      sampler_descriptor_heaps_[current_slot_]->GetDesc().NumDescriptors < command_context->sampler_descriptor_count_) {
+    sampler_descriptor_heaps_[current_slot_] = CreateNativeDescriptorHeap(
         device_.Get(), D3D12_DESCRIPTOR_HEAP_TYPE_SAMPLER, command_context->sampler_descriptor_count_);
   }
 
@@ -326,29 +323,29 @@ int D3D12Core::SubmitCommandContext(CommandContext *p_command_context) {
     command_context->resource_descriptor_size_ =
         device_.Get()->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
     command_context->resource_descriptor_base_ =
-        resource_descriptor_heaps_[current_frame_]->GetCPUDescriptorHandleForHeapStart();
+        resource_descriptor_heaps_[current_slot_]->GetCPUDescriptorHandleForHeapStart();
     command_context->resource_descriptor_gpu_base_ =
-        resource_descriptor_heaps_[current_frame_]->GetGPUDescriptorHandleForHeapStart();
+        resource_descriptor_heaps_[current_slot_]->GetGPUDescriptorHandleForHeapStart();
   }
 
   if (command_context->sampler_descriptor_count_) {
     command_context->sampler_descriptor_size_ =
         device_.Get()->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_SAMPLER);
     command_context->sampler_descriptor_base_ =
-        sampler_descriptor_heaps_[current_frame_]->GetCPUDescriptorHandleForHeapStart();
+        sampler_descriptor_heaps_[current_slot_]->GetCPUDescriptorHandleForHeapStart();
     command_context->sampler_descriptor_gpu_base_ =
-        sampler_descriptor_heaps_[current_frame_]->GetGPUDescriptorHandleForHeapStart();
+        sampler_descriptor_heaps_[current_slot_]->GetGPUDescriptorHandleForHeapStart();
   }
 
-  if (!rtv_descriptor_heaps_[current_frame_] ||
-      rtv_descriptor_heaps_[current_frame_]->GetDesc().NumDescriptors < command_context->rtv_index_.size()) {
-    rtv_descriptor_heaps_[current_frame_] =
+  if (!rtv_descriptor_heaps_[current_slot_] ||
+      rtv_descriptor_heaps_[current_slot_]->GetDesc().NumDescriptors < command_context->rtv_index_.size()) {
+    rtv_descriptor_heaps_[current_slot_] =
         CreateNativeDescriptorHeap(device_.Get(), D3D12_DESCRIPTOR_HEAP_TYPE_RTV, command_context->rtv_index_.size());
   }
 
-  if (!dsv_descriptor_heaps_[current_frame_] ||
-      dsv_descriptor_heaps_[current_frame_]->GetDesc().NumDescriptors < command_context->dsv_index_.size()) {
-    dsv_descriptor_heaps_[current_frame_] =
+  if (!dsv_descriptor_heaps_[current_slot_] ||
+      dsv_descriptor_heaps_[current_slot_]->GetDesc().NumDescriptors < command_context->dsv_index_.size()) {
+    dsv_descriptor_heaps_[current_slot_] =
         CreateNativeDescriptorHeap(device_.Get(), D3D12_DESCRIPTOR_HEAP_TYPE_DSV, command_context->dsv_index_.size());
   }
 
@@ -376,33 +373,41 @@ int D3D12Core::SubmitCommandContext(CommandContext *p_command_context) {
     }
   }
 
-  command_list->Close();
+  d3d12::ThrowIfFailed(command_list->Close(), "Close D3D12 command list");
 
   command_context->dsv_index_.clear();
   command_context->rtv_index_.clear();
 
   ID3D12CommandList *command_lists[] = {command_list};
-  QueueWaitFence(command_queue_.Get());
-  command_queue_.Get()->ExecuteCommandLists(1, command_lists);
-
-  for (auto window : command_context->windows_) {
-    window->SwapChain()->Present(0, 0);
-  }
-
-  SignalFence(command_queue_.Get());
-  in_flight_values_[current_frame_] = fence_value_;
-
-  post_execute_functions_[current_frame_] = p_command_context->GetPostExecutionCallbacks();
-
-  current_frame_ = (current_frame_ + 1) % FramesInFlight();
-  WaitForFence(std::max(in_flight_values_[current_frame_], transfer_wait_value));
-
-  for (auto &function : post_execute_functions_[current_frame_]) {
-    function();
-  }
-  post_execute_functions_[current_frame_].clear();
-
-  return 0;
+  const auto value = fence_value_ + 1;
+  auto submission = TrackSubmission(
+      [this, value] {
+        auto completed = fence_->GetCompletedValue();
+        if (completed == UINT64_MAX)
+          throw std::runtime_error("D3D12 device removed while polling submission");
+        return completed >= value;
+      },
+      [this, value] { WaitForFence(value); }, command_context->TakeCompletionCallbacks(),
+      [&] {
+        QueueWaitFence(command_queue_.Get());
+        command_queue_->ExecuteCommandLists(1, command_lists);
+        HRESULT presentation = S_OK;
+        for (auto window : command_context->windows_) {
+          auto result = window->SwapChain()->Present(0, 0);
+          if (FAILED(result) && SUCCEEDED(presentation))
+            presentation = result;
+        }
+        // Present queues work too. The completion marker must follow it so
+        // draining before window teardown also protects the back buffers.
+        SignalFence(command_queue_.Get());
+        if (FAILED(presentation)) {
+          WaitForFence(value);
+          d3d12::ThrowIfFailed(presentation, "Present D3D12 window");
+        }
+      });
+  in_flight_slots_[current_slot_].Retire(submission);
+  current_slot_ = (current_slot_ + 1) % SubmissionSlotCount();
+  return submission;
 }
 
 int D3D12Core::GetPhysicalDeviceProperties(PhysicalDeviceProperties *p_physical_device_properties) {
@@ -469,14 +474,14 @@ int D3D12Core::InitializeLogicalDevice(int device_index) {
   queue_desc.Type = D3D12_COMMAND_LIST_TYPE_DIRECT;
   d3d12::ThrowIfFailed(device_.Get()->CreateCommandQueue(&queue_desc, IID_PPV_ARGS(command_queue_.GetAddressOf())),
                        "Failed to create graphics queue");
-  command_allocators_.resize(FramesInFlight());
-  command_lists_.resize(FramesInFlight());
-  resource_descriptor_heaps_.resize(FramesInFlight());
-  sampler_descriptor_heaps_.resize(FramesInFlight());
-  rtv_descriptor_heaps_.resize(FramesInFlight());
-  dsv_descriptor_heaps_.resize(FramesInFlight());
-  post_execute_functions_.resize(FramesInFlight());
-  for (int i = 0; i < FramesInFlight(); i++) {
+  command_allocators_.resize(SubmissionSlotCount());
+  command_lists_.resize(SubmissionSlotCount());
+  resource_descriptor_heaps_.resize(SubmissionSlotCount());
+  sampler_descriptor_heaps_.resize(SubmissionSlotCount());
+  rtv_descriptor_heaps_.resize(SubmissionSlotCount());
+  dsv_descriptor_heaps_.resize(SubmissionSlotCount());
+  in_flight_slots_.resize(SubmissionSlotCount());
+  for (int i = 0; i < SubmissionSlotCount(); i++) {
     resource_descriptor_heaps_[i] =
         CreateNativeDescriptorHeap(device_.Get(), D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV, 64);
     sampler_descriptor_heaps_[i] = CreateNativeDescriptorHeap(device_.Get(), D3D12_DESCRIPTOR_HEAP_TYPE_SAMPLER, 64);
@@ -485,11 +490,6 @@ int D3D12Core::InitializeLogicalDevice(int device_index) {
   }
 
   CreateCommandRecord(device_.Get(), D3D12_COMMAND_LIST_TYPE_DIRECT, single_time_allocator_, single_time_command_list_);
-
-  d3d12::ThrowIfFailed(
-      device_.Get()->CreateCommandQueue(&queue_desc, IID_PPV_ARGS(transfer_command_queue_.GetAddressOf())),
-      "Failed to create transfer queue");
-  CreateCommandRecord(device_.Get(), D3D12_COMMAND_LIST_TYPE_DIRECT, transfer_allocator_, transfer_command_list_);
 
   blit_pipeline_.Initialize(device_.Get());
 
@@ -526,31 +526,26 @@ int D3D12Core::InitializeLogicalDevice(int device_index) {
   if (!fence_event_) {
     throw std::runtime_error("Failed to create fence event");
   }
-  in_flight_values_.resize(FramesInFlight(), 0);
 
   return 0;
 }
 
 void D3D12Core::WaitGPU() {
-  WaitForFence(fence_value_);
-  for (auto &post_execute : post_execute_functions_) {
-    for (auto &callback : post_execute) {
-      callback();
-    }
-    post_execute.clear();
-  }
+  if (fence_)
+    WaitForFence(fence_value_);
+  WaitSubmissions();
 }
 
 CD3DX12_CPU_DESCRIPTOR_HANDLE D3D12Core::RTVDescriptorHandle(uint32_t index) const {
-  return CD3DX12_CPU_DESCRIPTOR_HANDLE(rtv_descriptor_heaps_[current_frame_]->GetCPUDescriptorHandleForHeapStart(),
+  return CD3DX12_CPU_DESCRIPTOR_HANDLE(rtv_descriptor_heaps_[current_slot_]->GetCPUDescriptorHandleForHeapStart(),
                                        index,
-                                       device_.Get()->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_RTV));
+                                       device_->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_RTV));
 }
 
 CD3DX12_CPU_DESCRIPTOR_HANDLE D3D12Core::DSVDescriptorHandle(uint32_t index) const {
-  return CD3DX12_CPU_DESCRIPTOR_HANDLE(dsv_descriptor_heaps_[current_frame_]->GetCPUDescriptorHandleForHeapStart(),
+  return CD3DX12_CPU_DESCRIPTOR_HANDLE(dsv_descriptor_heaps_[current_slot_]->GetCPUDescriptorHandleForHeapStart(),
                                        index,
-                                       device_.Get()->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_DSV));
+                                       device_->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_DSV));
 }
 
 uint32_t D3D12Core::WaveSize() const {

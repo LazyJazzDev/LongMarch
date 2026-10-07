@@ -75,7 +75,7 @@ void ModuleTriangle::OnRender() {
   command_context->CmdDrawIndexed(3, 1, 0, 0, 0);
   command_context->CmdEndRendering();
   command_context->CmdPresent(window_.get(), color_image_.get());
-  core_->SubmitCommandContext(command_context.get());
+  core_->Submit(command_context.get());
   if (first_frame_) {
     first_frame_ = false;
     std::vector<uint8_t> pixel_data(color_image_->Extent().width * color_image_->Extent().height * 4);

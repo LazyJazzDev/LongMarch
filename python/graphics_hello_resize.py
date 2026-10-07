@@ -80,7 +80,7 @@ class Module(gh.Module):
         command_context.cmd_draw_indexed(36, 1, 0, 0, 0)
         command_context.cmd_end_rendering()
         command_context.cmd_present(self.window, self.color_image)
-        self.core.submit_command_context(command_context)
+        self.core.submit(command_context)
 
 
 if __name__ == "__main__":

@@ -20,7 +20,7 @@ Film::Film(sparkium::Film &film) : film_(film), core_(DedicatedCast(film.GetCore
     cmd_ctx->CmdClearImage(albedo_roughness_buffer_.get(), {0.0f, 0.0f, 0.0f, 0.0f});
     cmd_ctx->CmdClearImage(position_specular_buffer_.get(), {0.0f, 0.0f, 0.0f, 0.0f});
     cmd_ctx->CmdClearImage(normal_metallic_buffer_.get(), {0.0f, 0.0f, 0.0f, 0.0f});
-    core_->GraphicsCore()->SubmitCommandContext(cmd_ctx.get());
+    core_->GraphicsCore()->Submit(cmd_ctx.get());
   });
 }
 

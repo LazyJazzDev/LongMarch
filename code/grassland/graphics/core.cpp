@@ -2,6 +2,7 @@
 
 #include <cstdlib>
 #include <cstring>
+#include <stdexcept>
 
 #include "grassland/graphics/acceleration_structure.h"
 #include "grassland/graphics/backend/backend.h"
@@ -11,9 +12,30 @@
 namespace grassland::graphics {
 
 Core::Core(const Settings &settings) : settings_(settings) {
+  if (settings.submission_slot_count < 1)
+    throw std::invalid_argument("submission_slot_count must be positive");
   // Initialize the window system before backend-specific setup, but allow
   // headless rendering when no window system is available.
   InitializeGLFW();
+}
+
+Submission Core::TrackSubmission(std::function<bool()> poll,
+                                 std::function<void()> wait,
+                                 std::vector<std::function<void()>> callbacks,
+                                 std::function<void()> submit) {
+  return submissions_.Track(std::move(poll), std::move(wait), std::move(callbacks), std::move(submit));
+}
+
+void Core::CollectCompletedSubmissions() {
+  submissions_.Collect();
+}
+
+void Core::WaitSubmissions() {
+  submissions_.WaitAll();
+}
+
+void Core::ShutdownSubmissions() noexcept {
+  submissions_.Shutdown();
 }
 
 bool Core::InitializeGLFW() {
@@ -104,8 +126,8 @@ int Core::InitializeLogicalDeviceAutoSelect(bool require_ray_tracing) {
   return InitializeLogicalDevice(device_index);
 }
 
-int Core::FramesInFlight() const {
-  return settings_.frames_in_flight;
+int Core::SubmissionSlotCount() const {
+  return settings_.submission_slot_count;
 }
 
 bool Core::DebugEnabled() const {

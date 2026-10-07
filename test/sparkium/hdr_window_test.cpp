@@ -116,7 +116,7 @@ TEST(VulkanHDRRecoveryTest, RetiredSwapchainIsRecreatedOrPresentationStops) {
       ASSERT_EQ(core->CreateCommandContext(&commands), 0);
       commands->CmdClearImage(image.get(), {{0.2f, 0.4f, 0.6f, 1.0f}});
       commands->CmdPresent(&window, image.get());
-      ASSERT_EQ(core->SubmitCommandContext(commands.get()), 0);
+      ASSERT_TRUE(core->Submit(commands.get()).IsValid());
       core->WaitGPU();
     }
   }
@@ -194,7 +194,7 @@ TEST(VulkanWindowResizeTest, ProgrammaticSquareToWideUpdatesPresentation) {
         ASSERT_EQ(core->CreateCommandContext(&commands), 0);
         commands->CmdClearImage(source.get(), {{0.5f, 0.5f, 0.5f, 1.0f}});
         commands->CmdPresent(window.get(), source.get());
-        ASSERT_EQ(core->SubmitCommandContext(commands.get()), 0);
+        ASSERT_TRUE(core->Submit(commands.get()).IsValid());
         core->WaitGPU();
         EXPECT_EQ(loaded->GetFilm(), film);
         EXPECT_EQ(film->GetWidth(), size.x);
@@ -210,7 +210,7 @@ TEST(VulkanWindowResizeTest, ProgrammaticSquareToWideUpdatesPresentation) {
           auto *aligned = window->AlignHDRComposition(readback.get());
           ASSERT_EQ(aligned->Extent().width, fb.x);
           ASSERT_EQ(aligned->Extent().height, fb.y);
-          ASSERT_EQ(core->SubmitCommandContext(readback.get()), 0);
+          ASSERT_TRUE(core->Submit(readback.get()).IsValid());
           core->WaitGPU();
           std::vector<uint16_t> pixels(size_t(fb.x) * fb.y * 4);
           aligned->DownloadData(pixels.data());
@@ -440,13 +440,13 @@ TEST_P(HDRWindowTest, PresentationAndImGuiSwitching) {
         ASSERT_EQ(core->CreateCommandContext(&commands), 0);
         commands->CmdClearImage(image.get(), {{3.0f, 2.0f, 1.0f, 1.0f}});
         commands->CmdPresent(window.get(), image.get());
-        ASSERT_EQ(core->SubmitCommandContext(commands.get()), 0);
+        ASSERT_TRUE(core->Submit(commands.get()).IsValid());
         core->WaitGPU();
         if (hdr) {
           std::unique_ptr<graphics::CommandContext> readback_commands;
           core->CreateCommandContext(&readback_commands);
           auto *aligned = window->AlignHDRComposition(readback_commands.get());
-          ASSERT_EQ(core->SubmitCommandContext(readback_commands.get()), 0);
+          ASSERT_TRUE(core->Submit(readback_commands.get()).IsValid());
           core->WaitGPU();
           std::vector<uint16_t> pixels(aligned->Extent().width * aligned->Extent().height * 4);
           aligned->DownloadData(pixels.data());
@@ -500,7 +500,7 @@ TEST_P(HDRWindowTest, ReferenceWhiteScalingPreservesSourceAndAlpha) {
   std::unique_ptr<graphics::CommandContext> commands;
   core->CreateCommandContext(&commands);
   auto *aligned = window->AlignHDRComposition(commands.get());
-  ASSERT_EQ(core->SubmitCommandContext(commands.get()), 0);
+  ASSERT_TRUE(core->Submit(commands.get()).IsValid());
   core->WaitGPU();
   std::vector<uint16_t> actual(source.size()), unchanged(source.size());
   aligned->DownloadData(actual.data());
@@ -546,7 +546,7 @@ TEST_P(HDRWindowTest, UnsupportedHDRLeavesSDRPresentationUsable) {
     ASSERT_EQ(core->CreateCommandContext(&commands), 0);
     commands->CmdClearImage(image.get(), {{0.2f, 0.4f, 0.6f, 1.0f}});
     commands->CmdPresent(window.get(), image.get());
-    ASSERT_EQ(core->SubmitCommandContext(commands.get()), 0);
+    ASSERT_TRUE(core->Submit(commands.get()).IsValid());
     core->WaitGPU();
     window->Resize(352 + i * 16, 256);
     glfwPollEvents();
@@ -578,7 +578,7 @@ TEST_P(HDRWindowTest, PQReadbackUsesAbsoluteNitsAndPreservesSource) {
     std::unique_ptr<graphics::CommandContext> commands;
     ASSERT_EQ(core->CreateCommandContext(&commands), 0);
     auto *encoded = window.AlignHDRComposition(commands.get());
-    ASSERT_EQ(core->SubmitCommandContext(commands.get()), 0);
+    ASSERT_TRUE(core->Submit(commands.get()).IsValid());
     core->WaitGPU();
     std::vector<uint16_t> actual(source.size()), unchanged(source.size());
     encoded->DownloadData(actual.data());
@@ -600,7 +600,7 @@ TEST_P(HDRWindowTest, PQReadbackUsesAbsoluteNitsAndPreservesSource) {
     std::unique_ptr<graphics::CommandContext> commands;
     ASSERT_EQ(core->CreateCommandContext(&commands), 0);
     auto *encoded = window.AlignHDRComposition(commands.get());
-    ASSERT_EQ(core->SubmitCommandContext(commands.get()), 0);
+    ASSERT_TRUE(core->Submit(commands.get()).IsValid());
     core->WaitGPU();
     std::vector<uint16_t> actual(source.size());
     encoded->DownloadData(actual.data());
@@ -615,7 +615,7 @@ TEST_P(HDRWindowTest, PQReadbackUsesAbsoluteNitsAndPreservesSource) {
   std::unique_ptr<graphics::CommandContext> commands;
   ASSERT_EQ(core->CreateCommandContext(&commands), 0);
   auto *linear = window.AlignHDRComposition(commands.get());
-  ASSERT_EQ(core->SubmitCommandContext(commands.get()), 0);
+  ASSERT_TRUE(core->Submit(commands.get()).IsValid());
   core->WaitGPU();
   std::vector<uint16_t> actual(source.size()), unchanged(source.size());
   linear->DownloadData(actual.data());

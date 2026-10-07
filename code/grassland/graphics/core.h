@@ -1,6 +1,7 @@
 #pragma once
 
 #include "grassland/graphics/graphics_util.h"
+#include "grassland/graphics/submission.h"
 
 #if defined(LONGMARCH_CUDA_RUNTIME)
 #include "cuda_runtime.h"
@@ -11,7 +12,7 @@ namespace grassland::graphics {
 class Core {
  public:
   struct Settings {
-    int frames_in_flight{2};
+    int submission_slot_count{2};
     bool enable_debug{kEnableDebug};
   };
 
@@ -99,7 +100,7 @@ class Core {
                                       Shader *closest_shader,
                                       double_ptr<RayTracingProgram> pp_program);
 
-  virtual int SubmitCommandContext(CommandContext *p_command_context) = 0;
+  virtual Submission Submit(CommandContext *p_command_context) = 0;
 
   virtual int GetPhysicalDeviceProperties(PhysicalDeviceProperties *p_physical_device_properties = nullptr) = 0;
 
@@ -107,13 +108,16 @@ class Core {
 
   virtual void WaitGPU() = 0;
 
+  // Poll and retire completed work without waiting. Host calls must be serialized.
+  void CollectCompletedSubmissions();
+
   virtual uint32_t WaveSize() const = 0;
 
   int InitializeLogicalDeviceAutoSelect(bool require_ray_tracing);
 
-  int FramesInFlight() const;
+  int SubmissionSlotCount() const;
 
-  virtual uint32_t CurrentFrame() const = 0;
+  virtual uint32_t CurrentSubmissionSlot() const = 0;
 
   bool DebugEnabled() const;
 
@@ -137,8 +141,15 @@ class Core {
 
  private:
   Settings settings_;
+  detail::SubmissionQueue submissions_;
 
  protected:
+  Submission TrackSubmission(std::function<bool()> poll,
+                             std::function<void()> wait,
+                             std::vector<std::function<void()>> callbacks,
+                             std::function<void()> submit = {});
+  void WaitSubmissions();
+  void ShutdownSubmissions() noexcept;
   std::string device_name_{};
   bool ray_tracing_support_{false};
 
