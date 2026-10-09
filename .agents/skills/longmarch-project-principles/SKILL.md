@@ -22,7 +22,8 @@ description: Apply the user-confirmed error-handling, build, commit-message, squ
 ## 构建
 
 - LongMarch 默认使用 CMake 的 `Ninja` 生成器（`-G Ninja`），除非用户明确指定其他方案。单配置 Release 构建使用 `-DCMAKE_BUILD_TYPE=Release`。
-- 切换生成器时使用独立构建目录，避免复用其他生成器的 CMake 缓存。
+- 常规工作区只使用 `cmake-build-release` 和 `cmake-build-debug`，分别对应 CLion 的 Release / Debug CMake 配置；配置由 CLion 管理，命令行构建沿用对应配置生成的目录，不另建临时 `cmake-build-*` 或 `build-*` 目录。
+- 特殊后端、交叉编译或其他独立构建需求，通过 CLion 添加 CMake 配置及其独立构建目录；不复用生成器、工具链或目标平台不兼容的缓存。特殊配置不再需要时清理其构建产物。
 - Ninja 下示例和测试通过 `EXCLUDE_FROM_ALL` 排除在默认目标外；用户要求全量编译时，也要显式构建这些目标。
 
 ## 更新与版本管理
@@ -97,4 +98,4 @@ GitHub CLI 的相关参数为 `--squash`、`--match-head-commit`、`--subject` �
 
 除上文明确授权的本地提交、开发中 PR 的自动推送和报告更新，以及内容性质素材库 PR 流程外，本 skill 不额外授予推送、合并或改写已发布历史的权限。当前任务中已有的明确授权继续有效，不重复请求确认；改写已发布历史时确认授权确实涵盖该改写范围，并用带旧提交校验的 `--force-with-lease`。
 
-仓库中的 `.agents/skills/longmarch-project-principles/` 是可共享、可版本管理的规则来源。本机安装在用户技能目录的副本用于自动发现，并在旧分支或素材仓库缺少项目副本时提供这些约定。两者有差异时，以当前项目副本和用户最新要求为准；修改规则时同步本机安装副本。不要把临时分支拓扑、构建目录、PR 编号、凭据或一次性授权写成永久原则。
+仓库中的 `.agents/skills/longmarch-project-principles/` 是可共享、可版本管理的规则来源。本机安装在用户技能目录的副本用于自动发现，并在旧分支或素材仓库缺少项目副本时提供这些约定。两者有差异时，以当前项目副本和用户最新要求为准；修改规则时同步本机安装副本。不要把临时分支拓扑、一次性构建目录、PR 编号、凭据或一次性授权写成永久原则；用户明确指定的长期构建目录约定按上文维护。
