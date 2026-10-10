@@ -37,6 +37,9 @@ class GameOfLife : public Application {
   void SetCutoutInsets(float left, float top, float right);
   // Caps the short edge that sizes controls, so large screens keep finger-sized controls.
   void SetControlExtentLimit(float height_fraction);
+  // Host-selected icon size in framebuffer pixels, independent of window extent.
+  // Zero restores proportional desktop sizing. Small windows may shrink to fit.
+  void SetControlPixelSize(float pixels);
   void EnableNativeSizeControls();
   glm::ivec2 TakeSizeControlRequest();
   // A size slider's rectangle as fractions of the framebuffer, for anchoring a
@@ -115,6 +118,7 @@ class GameOfLife : public Application {
   float bottom_control_inset_{};
   glm::vec3 cutout_insets_{-1.0f};
   float control_extent_limit_{};
+  float control_pixel_size_{};
   bool sliders_were_dragging_{false};
   uint32_t magnify_callback_{};
   uint32_t scroll_callback_{};

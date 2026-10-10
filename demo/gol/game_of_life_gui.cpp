@@ -293,6 +293,8 @@ void GameOfLife::OnWindowSize() {
   if (control_extent_limit_ > 0.0f)
     extent = std::min(extent, window_height * control_extent_limit_);
   auto ui_unit = extent * 0.01f * ui_scale_;
+  if (control_pixel_size_ > 0.0f)
+    ui_unit = std::min(control_pixel_size_ * 0.1f, std::min(window_width, window_height) / 90.0f);
   const float margin = ui_unit * 5.0f;
   // Native hosts reserve the home-gesture strip without shrinking the canvas.
   const float bottom_margin = std::max(margin, window_height * bottom_control_inset_);
@@ -626,6 +628,14 @@ void GameOfLife::SetControlExtentLimit(float height_fraction) {
   const float limit = std::max(height_fraction, 0.0f);
   if (control_extent_limit_ != limit) {
     control_extent_limit_ = limit;
+    OnWindowSize();
+  }
+}
+
+void GameOfLife::SetControlPixelSize(float pixels) {
+  const float size = std::isfinite(pixels) ? std::max(pixels, 0.0f) : 0.0f;
+  if (control_pixel_size_ != size) {
+    control_pixel_size_ = size;
     OnWindowSize();
   }
 }
