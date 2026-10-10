@@ -97,6 +97,10 @@ void VulkanCmdBeginRendering::CompileCommand(VulkanCommandContext *context, VkCo
     attachment_info.sType = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO;
     attachment_info.pNext = nullptr;
     attachment_info.imageView = color_target->ImageView();
+    // Single-sampled attachments have no resolve target. Self-resolve views
+    // cause striped output on Maleoon 920C even with resolveMode NONE.
+    attachment_info.resolveMode = VK_RESOLVE_MODE_NONE;
+    attachment_info.resolveImageView = VK_NULL_HANDLE;
     attachment_info.imageLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
     attachment_info.loadOp = VK_ATTACHMENT_LOAD_OP_LOAD;
     attachment_info.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
@@ -128,6 +132,8 @@ void VulkanCmdBeginRendering::CompileCommand(VulkanCommandContext *context, VkCo
     depth_attachment_info.sType = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO;
     depth_attachment_info.pNext = nullptr;
     depth_attachment_info.imageView = depth_target_->ImageView();
+    depth_attachment_info.resolveMode = VK_RESOLVE_MODE_NONE;
+    depth_attachment_info.resolveImageView = VK_NULL_HANDLE;
     depth_attachment_info.imageLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
     depth_attachment_info.loadOp = VK_ATTACHMENT_LOAD_OP_LOAD;
     depth_attachment_info.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
