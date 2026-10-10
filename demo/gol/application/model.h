@@ -1,4 +1,6 @@
 #pragma once
+#include <optional>
+
 #include "application.h"
 #include "glm/gtc/matrix_transform.hpp"
 #include "interpolation.h"
