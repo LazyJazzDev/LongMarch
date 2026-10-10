@@ -34,7 +34,17 @@ struct PSInput {
 };
 
 PSInput VSMain(VSInput input) {
-  InstanceInfo instance_info = instance_infos.Load<InstanceInfo>(sizeof(InstanceInfo) * input.instance_id);
+  // Keep a single uint view of the byte buffer. Loading the mixed-type struct
+  // directly emits aliased float/uint descriptors and crashes the Maleoon 910
+  // pipeline compiler. Instance matrices are stored as four column vectors.
+  uint offset = sizeof(InstanceInfo) * input.instance_id;
+  InstanceInfo instance_info;
+  instance_info.model =
+      transpose(float4x4(asfloat(instance_infos.Load4(offset)), asfloat(instance_infos.Load4(offset + 16)),
+                         asfloat(instance_infos.Load4(offset + 32)), asfloat(instance_infos.Load4(offset + 48))));
+  instance_info.color = asfloat(instance_infos.Load4(offset + 64));
+  instance_info.extra = instance_infos.Load4(offset + 80);
+  instance_info.clip_rect = asfloat(instance_infos.Load4(offset + 96));
   float4 screen_pos = mul(instance_info.model, float4(input.position, 0.0, 1.0));
   PSInput output;
   output.position = mul(global_uniform.view, screen_pos);
