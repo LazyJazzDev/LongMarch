@@ -52,19 +52,45 @@ class DeviceCreateInfo DeviceFeatureRequirement::GenerateRecommendedDeviceCreate
 #endif
   create_info.AddExtension(VK_KHR_MAINTENANCE3_EXTENSION_NAME);
   create_info.AddExtension(VK_EXT_DESCRIPTOR_INDEXING_EXTENSION_NAME);
-  create_info.AddExtension(VK_KHR_DYNAMIC_RENDERING_EXTENSION_NAME);
-  create_info.AddExtension(VK_EXT_EXTENDED_DYNAMIC_STATE_EXTENSION_NAME);
+  const uint32_t effective_api = std::min(api_version, GetPhysicalDeviceProperties(physical_device).apiVersion);
+  const bool core13 = effective_api >= VK_API_VERSION_1_3;
+  const bool rendering_available =
+      core13 || IsExtensionSupported(physical_device, VK_KHR_DYNAMIC_RENDERING_EXTENSION_NAME);
+  const bool topology_available =
+      core13 || IsExtensionSupported(physical_device, VK_EXT_EXTENDED_DYNAMIC_STATE_EXTENSION_NAME);
+  VkPhysicalDeviceDynamicRenderingFeatures rendering{VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_DYNAMIC_RENDERING_FEATURES};
+  VkPhysicalDeviceExtendedDynamicStateFeaturesEXT topology{
+      VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_EXTENDED_DYNAMIC_STATE_FEATURES_EXT};
+  VkPhysicalDeviceFeatures2 supported{VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2};
+  if (rendering_available) {
+    rendering.pNext = supported.pNext;
+    supported.pNext = &rendering;
+  }
+  if (topology_available && !core13) {
+    topology.pNext = supported.pNext;
+    supported.pNext = &topology;
+  }
+  vkGetPhysicalDeviceFeatures2(physical_device, &supported);
+  create_info.dynamic_rendering = allow_dynamic_rendering && rendering_available && rendering.dynamicRendering;
+  create_info.dynamic_topology =
+      allow_dynamic_topology && topology_available && (core13 || topology.extendedDynamicState);
+  if (create_info.dynamic_rendering) {
+    if (!core13)
+      create_info.AddExtension(VK_KHR_DYNAMIC_RENDERING_EXTENSION_NAME);
+    rendering.pNext = nullptr;
+    create_info.AddFeature(rendering);
+  }
+  if (create_info.dynamic_topology && !core13) {
+    create_info.AddExtension(VK_EXT_EXTENDED_DYNAMIC_STATE_EXTENSION_NAME);
+    topology.pNext = nullptr;
+    create_info.AddFeature(topology);
+  }
   create_info.AddExtension(VK_KHR_RELAXED_BLOCK_LAYOUT_EXTENSION_NAME);
   create_info.AddExtension(VK_EXT_SCALAR_BLOCK_LAYOUT_EXTENSION_NAME);
 
-  VkPhysicalDeviceExtendedDynamicStateFeaturesEXT physical_device_extended_dynamic_state_features{};
-  physical_device_extended_dynamic_state_features.sType =
-      VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_EXTENDED_DYNAMIC_STATE_FEATURES_EXT;
-  physical_device_extended_dynamic_state_features.extendedDynamicState = VK_TRUE;
   VkPhysicalDeviceScalarBlockLayoutFeaturesEXT scalar_block_layout_features = {};
   scalar_block_layout_features.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SCALAR_BLOCK_LAYOUT_FEATURES_EXT;
   scalar_block_layout_features.scalarBlockLayout = VK_TRUE;
-  create_info.AddFeature(physical_device_extended_dynamic_state_features);
   create_info.AddFeature(scalar_block_layout_features);
 
   // Slang uses DrawParameters for vertex/instance IDs. Enable the Vulkan 1.1
@@ -121,11 +147,7 @@ class DeviceCreateInfo DeviceFeatureRequirement::GenerateRecommendedDeviceCreate
   physical_device_descriptor_indexing_features.shaderStorageBufferArrayNonUniformIndexing = VK_TRUE;
   physical_device_descriptor_indexing_features.runtimeDescriptorArray = VK_TRUE;
   physical_device_descriptor_indexing_features.descriptorBindingVariableDescriptorCount = VK_TRUE;
-  VkPhysicalDeviceDynamicRenderingFeaturesKHR physical_device_dynamic_rendering_features{};
-  physical_device_dynamic_rendering_features.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_DYNAMIC_RENDERING_FEATURES_KHR;
-  physical_device_dynamic_rendering_features.dynamicRendering = VK_TRUE;
   create_info.AddFeature(physical_device_descriptor_indexing_features);
-  create_info.AddFeature(physical_device_dynamic_rendering_features);
 
   auto queue_family_properties = GetQueueFamilyProperties(physical_device);
 

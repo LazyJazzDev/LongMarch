@@ -1,3 +1,4 @@
+#include <algorithm>
 #include <numeric>
 #include <utility>
 
@@ -19,7 +20,7 @@ void VulkanCore::InitializeNativeDevice(uint32_t api_version,
                                         vulkan::DeviceCreateInfo create_info,
                                         VmaAllocatorCreateFlags allocator_flags,
                                         VkDevice device) {
-  api_version_ = api_version;
+  api_version_ = std::min(api_version, vulkan::GetPhysicalDeviceProperties(physical_device).apiVersion);
   physical_device_ = physical_device;
   create_info_.emplace(std::move(create_info));
   device_ = device;
@@ -57,8 +58,93 @@ void VulkanCore::InitializeNativeDevice(uint32_t api_version,
 }
 
 void VulkanCore::DestroyNativeDevice() {
+  for (const auto &[key, framebuffer] : framebuffers_)
+    vkDestroyFramebuffer(device_, framebuffer, nullptr);
+  framebuffers_.clear();
+  for (const auto &[key, pass] : render_passes_)
+    vkDestroyRenderPass(device_, pass, nullptr);
+  render_passes_.clear();
   vmaDestroyAllocator(allocator_);
   vkDestroyDevice(device_, nullptr);
+}
+
+VkRenderPass VulkanCore::AcquireRenderPass(const std::vector<VkFormat> &colors,
+                                           VkFormat depth,
+                                           const std::vector<VkAttachmentLoadOp> &loads) const {
+  std::lock_guard<std::mutex> lock(rendering_cache_mutex_);
+  RenderPassKey key{colors, depth, loads};
+  if (auto found = render_passes_.find(key); found != render_passes_.end())
+    return found->second;
+  if (loads.size() != colors.size() + (depth != VK_FORMAT_UNDEFINED))
+    throw std::invalid_argument("Invalid render pass attachment load operations");
+  std::vector<VkAttachmentDescription> attachments;
+  std::vector<VkAttachmentReference> color_refs;
+  auto add_attachment = [&](VkFormat format, VkImageLayout layout) {
+    VkAttachmentDescription attachment{};
+    attachment.format = format;
+    attachment.samples = VK_SAMPLE_COUNT_1_BIT;
+    attachment.loadOp = loads[attachments.size()];
+    attachment.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
+    attachment.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
+    attachment.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
+    // Layout transitions are performed explicitly by the command context.
+    attachment.initialLayout = attachment.finalLayout = layout;
+    attachments.push_back(attachment);
+  };
+  for (auto format : colors) {
+    color_refs.push_back({uint32_t(attachments.size()), VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL});
+    add_attachment(format, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
+  }
+  VkAttachmentReference depth_ref{uint32_t(attachments.size()), VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL};
+  if (depth != VK_FORMAT_UNDEFINED)
+    add_attachment(depth, VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL);
+  VkSubpassDescription subpass{};
+  subpass.pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS;
+  subpass.colorAttachmentCount = uint32_t(color_refs.size());
+  subpass.pColorAttachments = color_refs.data();
+  subpass.pDepthStencilAttachment = depth != VK_FORMAT_UNDEFINED ? &depth_ref : nullptr;
+  VkRenderPassCreateInfo info{VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO};
+  info.attachmentCount = uint32_t(attachments.size());
+  info.pAttachments = attachments.data();
+  info.subpassCount = 1;
+  info.pSubpasses = &subpass;
+  VkRenderPass pass = VK_NULL_HANDLE;
+  vulkan::ThrowIfFailed(vkCreateRenderPass(device_, &info, nullptr, &pass), "Create legacy render pass");
+  render_passes_.emplace(std::move(key), pass);
+  return pass;
+}
+
+VkFramebuffer VulkanCore::AcquireFramebuffer(VkRenderPass pass,
+                                             const std::vector<VkImageView> &views,
+                                             VkExtent2D extent) {
+  std::lock_guard<std::mutex> lock(rendering_cache_mutex_);
+  FramebufferKey key{pass, views, extent.width, extent.height};
+  if (auto found = framebuffers_.find(key); found != framebuffers_.end())
+    return found->second;
+  VkFramebufferCreateInfo info{VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO};
+  info.renderPass = pass;
+  info.attachmentCount = uint32_t(views.size());
+  info.pAttachments = views.data();
+  info.width = extent.width;
+  info.height = extent.height;
+  info.layers = 1;
+  VkFramebuffer framebuffer = VK_NULL_HANDLE;
+  vulkan::ThrowIfFailed(vkCreateFramebuffer(device_, &info, nullptr, &framebuffer), "Create legacy framebuffer");
+  framebuffers_.emplace(std::move(key), framebuffer);
+  return framebuffer;
+}
+
+void VulkanCore::ReleaseFramebuffersForView(VkImageView view) {
+  // Like destroying the image itself, this requires its GPU work to be complete.
+  std::lock_guard<std::mutex> lock(rendering_cache_mutex_);
+  for (auto it = framebuffers_.begin(); it != framebuffers_.end();) {
+    const auto &views = std::get<1>(it->first);
+    if (std::find(views.begin(), views.end(), view) != views.end()) {
+      vkDestroyFramebuffer(device_, it->second, nullptr);
+      it = framebuffers_.erase(it);
+    } else
+      ++it;
+  }
 }
 
 VkResult VulkanCore::CreateDescriptorPool(const std::vector<VkDescriptorPoolSize> &pool_sizes,
@@ -181,7 +267,9 @@ VkResult VulkanCore::CreateBuffer(VkDeviceSize size,
   return VK_SUCCESS;
 }
 
-VkResult VulkanCore::CreatePipeline(const struct vulkan::PipelineSettings &settings, VkPipeline *pp_pipeline) const {
+VkResult VulkanCore::CreatePipeline(const struct vulkan::PipelineSettings &settings,
+                                    VkPipeline *pp_pipeline,
+                                    std::optional<VkPrimitiveTopology> topology) const {
   if (!pp_pipeline) {
     SetErrorMessage("pp_pipeline is nullptr");
     return VK_ERROR_INITIALIZATION_FAILED;
@@ -237,19 +325,28 @@ VkResult VulkanCore::CreatePipeline(const struct vulkan::PipelineSettings &setti
   rendering_create_info.colorAttachmentCount = settings.color_attachment_formats.size();
   rendering_create_info.pColorAttachmentFormats = settings.color_attachment_formats.data();
   rendering_create_info.depthAttachmentFormat = settings.depth_attachment_format;
-  pipeline_create_info.pNext = &rendering_create_info;
+  pipeline_create_info.pNext = DynamicRenderingEnabled() ? &rendering_create_info : nullptr;
 
   pipeline_create_info.stageCount = settings.shader_stage_create_infos.size();
   pipeline_create_info.pStages = settings.shader_stage_create_infos.data();
   pipeline_create_info.pVertexInputState = &vertex_input_info;
-  pipeline_create_info.pInputAssemblyState = &settings.input_assembly_state_create_info;
+  auto input_assembly = settings.input_assembly_state_create_info;
+  if (topology)
+    input_assembly.topology = *topology;
+  pipeline_create_info.pInputAssemblyState = &input_assembly;
   pipeline_create_info.pViewportState = &viewport_state;
   pipeline_create_info.pRasterizationState = &settings.rasterization_state_create_info;
   pipeline_create_info.pMultisampleState = &settings.multisample_state_create_info;
   pipeline_create_info.pColorBlendState = &color_blend_state;
   pipeline_create_info.pDynamicState = &dynamic_state;
   pipeline_create_info.layout = settings.pipeline_layout;
-  pipeline_create_info.renderPass = VK_NULL_HANDLE;
+  pipeline_create_info.renderPass =
+      DynamicRenderingEnabled() ? VK_NULL_HANDLE
+                                : AcquireRenderPass(settings.color_attachment_formats, settings.depth_attachment_format,
+                                                    std::vector<VkAttachmentLoadOp>(
+                                                        settings.color_attachment_formats.size() +
+                                                            (settings.depth_attachment_format != VK_FORMAT_UNDEFINED),
+                                                        VK_ATTACHMENT_LOAD_OP_LOAD));
   pipeline_create_info.pDepthStencilState = settings.depth_stencil_state_create_info.has_value()
                                                 ? &settings.depth_stencil_state_create_info.value()
                                                 : nullptr;

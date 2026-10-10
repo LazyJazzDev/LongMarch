@@ -11,6 +11,9 @@ namespace grassland::graphics::backend::vulkan {
 struct DeviceFeatureRequirement {
   bool enable_raytracing_extension{false};
   bool enable_rayquery_extension{false};
+  uint32_t api_version{VK_API_VERSION_1_2};
+  bool allow_dynamic_rendering{true};
+  bool allow_dynamic_topology{true};
 
   class DeviceCreateInfo GenerateRecommendedDeviceCreateInfo(VkPhysicalDevice physical_device) const;
 
@@ -43,6 +46,8 @@ struct DeviceFeatureContainer : public DeviceFeatureContainerBase {
 struct DeviceCreateInfo {
   std::vector<std::unique_ptr<DeviceFeatureContainerBase>> features;
   std::vector<const char *> extensions;
+  bool dynamic_rendering{false};
+  bool dynamic_topology{false};
   std::map<int, std::vector<float>> queue_families;
 
  private:
@@ -56,6 +61,8 @@ struct DeviceCreateInfo {
       features.emplace_back(feature->Duplicate());
     }
     extensions = other.extensions;
+    dynamic_rendering = other.dynamic_rendering;
+    dynamic_topology = other.dynamic_topology;
     queue_families = other.queue_families;
   }
 

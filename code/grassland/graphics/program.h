@@ -13,6 +13,7 @@ class Program {
   virtual void SetCullMode(CullMode mode) = 0;
   virtual void SetBlendState(int target_id, const BlendState &state) = 0;
   virtual void BindShader(Shader *shader, ShaderType type) = 0;
+  // Freeze configuration. Backends may create state-specific PSOs lazily at draw time.
   virtual void Finalize() = 0;
 };
 

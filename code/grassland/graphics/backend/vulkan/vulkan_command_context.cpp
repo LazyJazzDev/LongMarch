@@ -277,6 +277,54 @@ void VulkanCommandContext::RequireImageState(VkCommandBuffer cmd_buffer,
   state = {layout, stage, access, aspect};
 }
 
+void VulkanCommandContext::ResetCompiledGraphicsState() {
+  compiled_program_ = nullptr;
+  compiled_topology_ = PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;
+  bound_graphics_pipeline_ = VK_NULL_HANDLE;
+  compiling_rendering_ = false;
+  compiled_color_formats_.clear();
+  compiled_depth_format_ = VK_FORMAT_UNDEFINED;
+}
+
+void VulkanCommandContext::SelectGraphicsProgram(VulkanProgram *program) {
+  compiled_program_ = program;
+}
+
+void VulkanCommandContext::SelectPrimitiveTopology(PrimitiveTopology topology) {
+  compiled_topology_ = topology;
+}
+
+void VulkanCommandContext::BeginGraphicsRendering(const std::vector<VkFormat> &colors, VkFormat depth) {
+  if (compiling_rendering_)
+    throw std::logic_error("Nested rendering is not supported");
+  compiling_rendering_ = true;
+  // Presentation/UI commands may have bound a different graphics pipeline.
+  bound_graphics_pipeline_ = VK_NULL_HANDLE;
+  compiled_color_formats_ = colors;
+  compiled_depth_format_ = depth;
+}
+
+void VulkanCommandContext::EndGraphicsRendering() {
+  if (!compiling_rendering_)
+    throw std::logic_error("No active rendering scope");
+  compiling_rendering_ = false;
+}
+
+void VulkanCommandContext::PrepareGraphicsDraw(VkCommandBuffer command_buffer) {
+  if (!compiling_rendering_ || !compiled_program_)
+    throw std::logic_error("Draw requires rendering and a Program");
+  if (!compiled_program_->MatchesAttachments(compiled_color_formats_, compiled_depth_format_))
+    throw std::invalid_argument("Program formats do not match rendering attachments");
+  const VkPipeline pipeline = compiled_program_->PipelineForTopology(compiled_topology_);
+  if (pipeline != bound_graphics_pipeline_) {
+    vkCmdBindPipeline(command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline);
+    bound_graphics_pipeline_ = pipeline;
+  }
+  if (core_->DynamicTopologyEnabled())
+    core_->InstanceProcedures().vkCmdSetPrimitiveTopologyEXT(
+        command_buffer, PrimitiveTopologyToVkPrimitiveTopology(compiled_topology_));
+}
+
 void VulkanCommandContext::RecordDynamicBuffer(VulkanBuffer *buffer) {
   auto dynamic_buffer = dynamic_cast<VulkanDynamicBuffer *>(buffer);
   if (dynamic_buffer) {

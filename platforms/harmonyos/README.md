@@ -10,6 +10,34 @@ with DevEco Studio 26.0.0.851. A signed build runs on Mate 70 RS; broader
 device validation remains in progress. See `VALIDATION.md` for the
 actual checks completed and remaining device limitations.
 
+## Vulkan rendering compatibility
+
+Dynamic rendering and extended dynamic state are optional. Device creation checks
+both advertised API/extension availability and feature support. Vulkan 1.3 uses
+core entry points; older devices use enabled KHR/EXT entry points when available.
+Devices without dynamic rendering use cached, single-subpass render passes and
+framebuffers. Explicit image barriers and folded attachment clears are shared by
+both paths; color/depth attachments retain the same LOAD/STORE semantics.
+
+`VulkanProgram::Finalize()` freezes configuration and creates the resource layout.
+Graphics PSOs are created on first use and cached by topology (or topology class
+when dynamic topology is enabled). Shader modules and entry point names remain
+owned by the Program configuration, so the original Shader objects may be released.
+CommandContext keeps its own desired state and selects a PSO before each draw.
+Programs and images must still outlive their GPU work. Framebuffers referencing an
+image are invalidated before that image's view is destroyed; cached render passes
+are released at device destruction.
+
+For driver workarounds and regression tests, the Vulkan-specific constructor accepts
+`VulkanRenderingOptions{allow_dynamic_rendering, allow_dynamic_topology}`. Setting
+either option to false forces that fallback without requiring an older GPU. The
+explicit `test_vulkan_rendering_fallback` target exercises all four combinations,
+including indexed draws, topology changes, shader lifetime, command replay,
+attachment recreation, multiple color attachments and depth-only passes. Run it
+with Vulkan validation and synchronization validation enabled. The tests passed on
+macOS/MoltenVK; this does not establish Mate 60 hardware compatibility. Other
+requirements, including descriptor indexing and scalar block layout, still apply.
+
 ## Functionality
 
 - Immersive fullscreen throughout the app, with system status/navigation bars hidden.

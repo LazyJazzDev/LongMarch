@@ -10,6 +10,10 @@ class VulkanShader : public Shader {
   ~VulkanShader() override;
 
   VkShaderModule ModuleHandle() const {
+    return *shader_module_;
+  }
+
+  std::shared_ptr<const VkShaderModule> RetainModule() const {
     return shader_module_;
   }
 
@@ -23,7 +27,7 @@ class VulkanShader : public Shader {
 
  private:
   VulkanCore *core_;
-  VkShaderModule shader_module_{VK_NULL_HANDLE};
+  std::shared_ptr<VkShaderModule> shader_module_;
   std::string entry_point_;
 };
 

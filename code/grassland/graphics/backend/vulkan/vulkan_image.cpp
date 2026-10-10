@@ -11,6 +11,7 @@ VulkanImage::VulkanImage(VulkanCore *core, int width, int height, ImageFormat fo
 }
 
 VulkanImage::~VulkanImage() {
+  core_->ReleaseFramebuffersForView(image_view_);
   vkDestroyImageView(core_->Handle(), image_view_, nullptr);
   vmaDestroyImage(core_->Allocator(), image_, allocation_);
 }

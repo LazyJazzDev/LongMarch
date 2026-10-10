@@ -10,13 +10,18 @@ VulkanShader::VulkanShader(VulkanCore *core, const CompiledShaderBlob &shader_bl
   VkShaderModuleCreateInfo create_info{VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO};
   create_info.codeSize = words.size() * sizeof(uint32_t);
   create_info.pCode = words.data();
-  vulkan::ThrowIfFailed(vkCreateShaderModule(core_->Handle(), &create_info, nullptr, &shader_module_),
+  shader_module_ = std::shared_ptr<VkShaderModule>(new VkShaderModule(VK_NULL_HANDLE),
+                                                   [device = core_->Handle()](VkShaderModule *module) {
+                                                     if (*module)
+                                                       vkDestroyShaderModule(device, *module, nullptr);
+                                                     delete module;
+                                                   });
+  vulkan::ThrowIfFailed(vkCreateShaderModule(core_->Handle(), &create_info, nullptr, shader_module_.get()),
                         "Failed to create Vulkan shader module");
   entry_point_ = shader_blob.entry_point;
 }
 
 VulkanShader::~VulkanShader() {
-  vkDestroyShaderModule(core_->Handle(), shader_module_, nullptr);
 }
 
 }  // namespace grassland::graphics::backend

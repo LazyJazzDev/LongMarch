@@ -16,9 +16,16 @@
 
 namespace grassland::graphics::backend {
 
-VulkanCore::VulkanCore(const Settings &settings) : Core(settings) {
+VulkanCore::VulkanCore(const Settings &settings, VulkanRenderingOptions rendering_options)
+    : Core(settings),
+      rendering_options_(rendering_options) {
   vulkan::InstanceCreateHint hint{};
   hint.SetValidationLayersEnabled(DebugEnabled());
+  uint32_t loader_version = VK_API_VERSION_1_0;
+  if (auto enumerate_version = reinterpret_cast<PFN_vkEnumerateInstanceVersion>(
+          vkGetInstanceProcAddr(VK_NULL_HANDLE, "vkEnumerateInstanceVersion")))
+    enumerate_version(&loader_version);
+  hint.app_info.apiVersion = std::min(loader_version, uint32_t(VK_API_VERSION_1_3));
 #ifdef __OHOS__
   hint.AddExtension(VK_KHR_SURFACE_EXTENSION_NAME);
   hint.AddExtension("VK_OHOS_surface");
@@ -383,6 +390,7 @@ int VulkanCore::SubmitCommandContext(CommandContext *p_command_context) {
   vkCmdPipelineBarrier(command_buffer, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, 0, 1,
                        &upload_barrier, 0, nullptr, 0, nullptr);
 
+  command_context->ResetCompiledGraphicsState();
   for (auto &command : command_context->commands_) {
     command->CompileCommand(command_context, command_buffer);
   }
@@ -510,6 +518,9 @@ int VulkanCore::InitializeLogicalDevice(int device_index) {
   grassland::graphics::backend::vulkan::DeviceFeatureRequirement device_feature_requirement{};
   device_feature_requirement.enable_raytracing_extension = vulkan::SupportRayTracing(physical_device);
   device_feature_requirement.enable_rayquery_extension = vulkan::SupportRayQuery(physical_device);
+  device_feature_requirement.api_version = instance_hint_.app_info.apiVersion;
+  device_feature_requirement.allow_dynamic_rendering = rendering_options_.allow_dynamic_rendering;
+  device_feature_requirement.allow_dynamic_topology = rendering_options_.allow_dynamic_topology;
   auto create_info = device_feature_requirement.GenerateRecommendedDeviceCreateInfo(physical_device);
   if (instance_hint_.IsEnabledExtension(VK_KHR_SURFACE_EXTENSION_NAME) &&
       vulkan::IsExtensionSupported(physical_device, VK_KHR_SWAPCHAIN_EXTENSION_NAME)) {
@@ -572,7 +583,8 @@ int VulkanCore::InitializeLogicalDevice(int device_index) {
   }
   InitializeNativeDevice(instance_hint_.app_info.apiVersion, physical_device, create_info,
                          device_feature_requirement.GetVmaAllocatorCreateFlags(), native_device);
-  vulkan::LoadDeviceRenderingProcedures(native_device, instance_procedures_);
+  vulkan::LoadDeviceRenderingProcedures(native_device, api_version_ >= VK_API_VERSION_1_3, DynamicRenderingEnabled(),
+                                        DynamicTopologyEnabled(), instance_procedures_);
   memory_properties_ = vulkan::GetPhysicalDeviceMemoryProperties(physical_device);
 
   device_name_ = vulkan::GetPhysicalDeviceProperties(physical_device).deviceName;

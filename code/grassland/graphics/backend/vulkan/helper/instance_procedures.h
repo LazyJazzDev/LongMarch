@@ -13,5 +13,9 @@ struct InstanceProcedures {
 };
 
 void LoadInstanceProcedures(VkInstance instance, bool enabled_validation_layers, InstanceProcedures &out);
-void LoadDeviceRenderingProcedures(VkDevice device, InstanceProcedures &out);
+void LoadDeviceRenderingProcedures(VkDevice device,
+                                   bool core13,
+                                   bool dynamic_rendering,
+                                   bool dynamic_topology,
+                                   InstanceProcedures &out);
 }  // namespace grassland::graphics::backend::vulkan

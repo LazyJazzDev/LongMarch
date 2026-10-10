@@ -75,39 +75,47 @@ void VulkanProgramBase::FinalizePipelineLayout() {
 VulkanProgram::VulkanProgram(VulkanCore *core, const std::vector<ImageFormat> &color_formats, ImageFormat depth_format)
     : VulkanProgramBase(core),
       pipeline_settings_(nullptr, ConvertImageFormats(color_formats), ImageFormatToVkFormat(depth_format)) {
-  pipeline_settings_.EnableDynamicPrimitiveTopology();
+  if (core_->DynamicTopologyEnabled())
+    pipeline_settings_.EnableDynamicPrimitiveTopology();
 }
 
 VulkanProgram::~VulkanProgram() {
-  if (pipeline_)
-    vkDestroyPipeline(core_->Handle(), pipeline_, nullptr);
+  for (const auto &[topology, pipeline] : pipelines_)
+    vkDestroyPipeline(core_->Handle(), pipeline, nullptr);
 }
 
 void VulkanProgram::AddInputAttribute(uint32_t binding, InputType type, uint32_t offset) {
+  RequireMutable();
   pipeline_settings_.AddInputAttribute(binding, pipeline_settings_.vertex_input_attribute_descriptions.size(),
                                        InputTypeToVkFormat(type), offset);
 }
 
 void VulkanProgram::AddInputBinding(uint32_t stride, bool input_per_instance) {
+  RequireMutable();
   pipeline_settings_.AddInputBinding(pipeline_settings_.vertex_input_binding_descriptions.size(), stride,
                                      input_per_instance ? VK_VERTEX_INPUT_RATE_INSTANCE : VK_VERTEX_INPUT_RATE_VERTEX);
 }
 
 void VulkanProgram::AddResourceBinding(ResourceType type, int count) {
+  RequireMutable();
   AddResourceBindingImpl(type, count);
 }
 
 void VulkanProgram::SetCullMode(CullMode mode) {
+  RequireMutable();
   pipeline_settings_.SetCullMode(CullModeToVkCullMode(mode));
 }
 
 void VulkanProgram::SetBlendState(int target_id, const BlendState &state) {
+  RequireMutable();
   pipeline_settings_.SetBlendState(target_id, BlendStateToVkPipelineColorBlendAttachmentState(state));
 }
 
 void VulkanProgram::BindShader(Shader *shader, ShaderType type) {
+  RequireMutable();
   VulkanShader *vulkan_shader = dynamic_cast<VulkanShader *>(shader);
   if (vulkan_shader) {
+    shader_modules_.push_back(vulkan_shader->RetainModule());
     pipeline_settings_.AddShaderStage(vulkan_shader->ModuleHandle(), vulkan_shader->EntryPointRef(),
                                       ShaderTypeToVkShaderStageFlags(type));
   } else {
@@ -115,10 +123,43 @@ void VulkanProgram::BindShader(Shader *shader, ShaderType type) {
   }
 }
 
+void VulkanProgram::RequireMutable() const {
+  if (finalized_)
+    throw std::logic_error("Vulkan Program configuration is frozen");
+}
+
 void VulkanProgram::Finalize() {
+  RequireMutable();
   FinalizePipelineLayout();
   pipeline_settings_.pipeline_layout = pipeline_layout_;
-  core_->CreatePipeline(pipeline_settings_, &pipeline_);
+  finalized_ = true;
+}
+
+bool VulkanProgram::MatchesAttachments(const std::vector<VkFormat> &colors, VkFormat depth) const {
+  return pipeline_settings_.color_attachment_formats == colors && pipeline_settings_.depth_attachment_format == depth;
+}
+
+VkPipeline VulkanProgram::PipelineForTopology(PrimitiveTopology topology) {
+  std::lock_guard<std::mutex> lock(pipeline_mutex_);
+  if (!finalized_)
+    throw std::logic_error("Finalize Program before drawing");
+  auto native_topology = PrimitiveTopologyToVkPrimitiveTopology(topology);
+  // Even extended dynamic state may restrict transitions across topology classes.
+  auto key = native_topology;
+  if (core_->DynamicTopologyEnabled()) {
+    if (key == VK_PRIMITIVE_TOPOLOGY_TRIANGLE_STRIP)
+      key = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;
+    if (key == VK_PRIMITIVE_TOPOLOGY_LINE_STRIP)
+      key = VK_PRIMITIVE_TOPOLOGY_LINE_LIST;
+  }
+  auto found = pipelines_.find(key);
+  if (found != pipelines_.end())
+    return found->second;
+  VkPipeline pipeline = VK_NULL_HANDLE;
+  vulkan::ThrowIfFailed(core_->CreatePipeline(pipeline_settings_, &pipeline, key),
+                        "Failed to create graphics pipeline variant");
+  pipelines_.emplace(key, pipeline);
+  return pipeline;
 }
 
 int VulkanProgram::NumInputBindings() const {

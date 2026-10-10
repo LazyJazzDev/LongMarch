@@ -59,13 +59,16 @@ class VulkanProgram : public Program, public VulkanProgramBase {
   int NumInputBindings() const;
   const vulkan::PipelineSettings *PipelineSettings() const;
 
-  VkPipeline Pipeline() const {
-    return pipeline_;
-  }
+  VkPipeline PipelineForTopology(PrimitiveTopology topology);
+  bool MatchesAttachments(const std::vector<VkFormat> &colors, VkFormat depth) const;
 
  private:
+  void RequireMutable() const;
+  bool finalized_{false};
+  std::mutex pipeline_mutex_;
+  std::vector<std::shared_ptr<const VkShaderModule>> shader_modules_;
   vulkan::PipelineSettings pipeline_settings_;
-  VkPipeline pipeline_{VK_NULL_HANDLE};
+  std::map<VkPrimitiveTopology, VkPipeline> pipelines_;
 };
 
 class VulkanComputeProgram : public ComputeProgram, public VulkanProgramBase {

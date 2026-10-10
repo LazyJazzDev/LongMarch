@@ -57,12 +57,24 @@ class VulkanCommandContext : public CommandContext {
                          VkImageAspectFlags aspect = VK_IMAGE_ASPECT_DEPTH_BIT);
 
   void RecordDynamicBuffer(VulkanBuffer *buffer);
+  void SelectGraphicsProgram(VulkanProgram *program);
+  void SelectPrimitiveTopology(PrimitiveTopology topology);
+  void BeginGraphicsRendering(const std::vector<VkFormat> &colors, VkFormat depth);
+  void EndGraphicsRendering();
+  void PrepareGraphicsDraw(VkCommandBuffer command_buffer);
 
   VkDescriptorSet AcquireDescriptorSet(VkDescriptorSetLayout set_layout) const;
 
  private:
   friend VulkanCore;
   VulkanCore *core_;
+  void ResetCompiledGraphicsState();
+  VulkanProgram *compiled_program_{nullptr};
+  PrimitiveTopology compiled_topology_{PRIMITIVE_TOPOLOGY_TRIANGLE_LIST};
+  VkPipeline bound_graphics_pipeline_{VK_NULL_HANDLE};
+  bool compiling_rendering_{false};
+  std::vector<VkFormat> compiled_color_formats_;
+  VkFormat compiled_depth_format_{VK_FORMAT_UNDEFINED};
 
   VulkanProgramBase *program_bases_[BIND_POINT_COUNT]{};
 

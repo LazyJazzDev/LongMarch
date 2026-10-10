@@ -19,7 +19,7 @@ VulkanCmdBindProgram::VulkanCmdBindProgram(VulkanProgram *program) : program_(pr
 }
 
 void VulkanCmdBindProgram::CompileCommand(VulkanCommandContext *context, VkCommandBuffer command_buffer) {
-  vkCmdBindPipeline(command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, program_->Pipeline());
+  context->SelectGraphicsProgram(program_);
 }
 
 VulkanCmdBindComputeProgram::VulkanCmdBindComputeProgram(VulkanComputeProgram *program) : program_(program) {
@@ -145,7 +145,36 @@ void VulkanCmdBeginRendering::CompileCommand(VulkanCommandContext *context, VkCo
 
   rendering_info.renderArea.extent.width = extent.width;
   rendering_info.renderArea.extent.height = extent.height;
-  context->Core()->InstanceProcedures().vkCmdBeginRenderingKHR(command_buffer, &rendering_info);
+  std::vector<VkFormat> formats;
+  std::vector<VkImageView> views;
+  std::vector<VkAttachmentLoadOp> loads;
+  std::vector<VkClearValue> clears;
+  for (size_t i = 0; i < color_targets_.size(); ++i) {
+    formats.push_back(color_targets_[i]->NativeFormat());
+    views.push_back(color_targets_[i]->ImageView());
+    loads.push_back(color_attachment_infos[i].loadOp);
+    clears.push_back(color_attachment_infos[i].clearValue);
+  }
+  const auto depth_format = depth_target_ ? depth_target_->NativeFormat() : VK_FORMAT_UNDEFINED;
+  context->BeginGraphicsRendering(formats, depth_format);
+  if (context->Core()->DynamicRenderingEnabled()) {
+    context->Core()->InstanceProcedures().vkCmdBeginRenderingKHR(command_buffer, &rendering_info);
+  } else {
+    if (depth_target_) {
+      views.push_back(depth_target_->ImageView());
+      loads.push_back(depth_attachment_info.loadOp);
+      clears.push_back(depth_attachment_info.clearValue);
+    }
+    auto core = context->Core();
+    const auto pass = core->AcquireRenderPass(formats, depth_format, loads);
+    VkRenderPassBeginInfo begin{VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO};
+    begin.renderPass = pass;
+    begin.framebuffer = core->AcquireFramebuffer(pass, views, rendering_info.renderArea.extent);
+    begin.renderArea = rendering_info.renderArea;
+    begin.clearValueCount = uint32_t(clears.size());
+    begin.pClearValues = clears.data();
+    vkCmdBeginRenderPass(command_buffer, &begin, VK_SUBPASS_CONTENTS_INLINE);
+  }
 }
 
 void VulkanCmdBeginRendering::RecordResourceImages(VulkanImage *resource_image) {
@@ -325,7 +354,11 @@ void VulkanCmdBindResourceAccelerationStructure::CompileCommand(VulkanCommandCon
 }
 
 void VulkanCmdEndRendering::CompileCommand(VulkanCommandContext *context, VkCommandBuffer command_buffer) {
-  context->Core()->InstanceProcedures().vkCmdEndRenderingKHR(command_buffer);
+  context->EndGraphicsRendering();
+  if (context->Core()->DynamicRenderingEnabled())
+    context->Core()->InstanceProcedures().vkCmdEndRenderingKHR(command_buffer);
+  else
+    vkCmdEndRenderPass(command_buffer);
 }
 
 VulkanCmdClearImage::VulkanCmdClearImage(VulkanImage *image, const ClearValue &clear_value)
@@ -393,8 +426,7 @@ VulkanCmdSetPrimitiveTopology::VulkanCmdSetPrimitiveTopology(PrimitiveTopology t
 }
 
 void VulkanCmdSetPrimitiveTopology::CompileCommand(VulkanCommandContext *context, VkCommandBuffer command_buffer) {
-  context->Core()->InstanceProcedures().vkCmdSetPrimitiveTopologyEXT(command_buffer,
-                                                                     PrimitiveTopologyToVkPrimitiveTopology(topology_));
+  context->SelectPrimitiveTopology(topology_);
 }
 
 VulkanCmdDraw::VulkanCmdDraw(uint32_t index_count,
@@ -408,6 +440,7 @@ VulkanCmdDraw::VulkanCmdDraw(uint32_t index_count,
 }
 
 void VulkanCmdDraw::CompileCommand(VulkanCommandContext *context, VkCommandBuffer command_buffer) {
+  context->PrepareGraphicsDraw(command_buffer);
   vkCmdDraw(command_buffer, index_count_, instance_count_, vertex_offset_, first_instance_);
 }
 
@@ -424,6 +457,7 @@ VulkanCmdDrawIndexed::VulkanCmdDrawIndexed(uint32_t index_count,
 }
 
 void VulkanCmdDrawIndexed::CompileCommand(VulkanCommandContext *context, VkCommandBuffer command_buffer) {
+  context->PrepareGraphicsDraw(command_buffer);
   vkCmdDrawIndexed(command_buffer, index_count_, instance_count_, first_index_, vertex_offset_, first_instance_);
 }
 

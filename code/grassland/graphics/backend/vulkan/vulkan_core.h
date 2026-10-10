@@ -1,13 +1,34 @@
 #pragma once
+#include <mutex>
 #include <queue>
+#include <tuple>
 
 #include "grassland/graphics/backend/vulkan/vulkan_util.h"
 
 namespace grassland::graphics::backend {
 
+struct VulkanRenderingOptions {
+  bool allow_dynamic_rendering{true};
+  bool allow_dynamic_topology{true};
+};
+
 class VulkanCore : public Core {
  public:
-  VulkanCore(const Settings &settings);
+  VulkanCore(const Settings &settings, VulkanRenderingOptions rendering_options = {});
+
+  bool DynamicRenderingEnabled() const {
+    return create_info_ && create_info_->dynamic_rendering;
+  }
+
+  bool DynamicTopologyEnabled() const {
+    return create_info_ && create_info_->dynamic_topology;
+  }
+
+  VkRenderPass AcquireRenderPass(const std::vector<VkFormat> &colors,
+                                 VkFormat depth,
+                                 const std::vector<VkAttachmentLoadOp> &loads) const;
+  VkFramebuffer AcquireFramebuffer(VkRenderPass pass, const std::vector<VkImageView> &views, VkExtent2D extent);
+  void ReleaseFramebuffersForView(VkImageView view);
   ~VulkanCore() override;
 
   bool DeviceRayQuerySupport() const override {
@@ -167,7 +188,9 @@ class VulkanCore : public Core {
     return vkGetBufferDeviceAddress(device_, &info);
   }
 
-  VkResult CreatePipeline(const vulkan::PipelineSettings &settings, VkPipeline *pipeline) const;
+  VkResult CreatePipeline(const vulkan::PipelineSettings &settings,
+                          VkPipeline *pipeline,
+                          std::optional<VkPrimitiveTopology> topology = std::nullopt) const;
 
   VkResult CreateNativeAABBAccelerationStructure(VkDeviceAddress aabb_address,
                                                  VkDeviceSize stride,
@@ -271,6 +294,12 @@ class VulkanCore : public Core {
 
  private:
   friend class VulkanCommandContext;
+  VulkanRenderingOptions rendering_options_;
+  mutable std::mutex rendering_cache_mutex_;
+  using RenderPassKey = std::tuple<std::vector<VkFormat>, VkFormat, std::vector<VkAttachmentLoadOp>>;
+  using FramebufferKey = std::tuple<VkRenderPass, std::vector<VkImageView>, uint32_t, uint32_t>;
+  mutable std::map<RenderPassKey, VkRenderPass> render_passes_;
+  std::map<FramebufferKey, VkFramebuffer> framebuffers_;
   VkInstance instance_{VK_NULL_HANDLE};
   VkDebugUtilsMessengerEXT debug_messenger_{VK_NULL_HANDLE};
   vulkan::InstanceCreateHint instance_hint_{};
