@@ -1,5 +1,9 @@
 #include "grassland/graphics/backend/vulkan/vulkan_core.h"
 
+#ifdef __OHOS__
+#include <hilog/log.h>
+#endif
+
 #include "grassland/graphics/backend/vulkan/vulkan_acceleration_structure.h"
 #include "grassland/graphics/backend/vulkan/vulkan_buffer.h"
 #include "grassland/graphics/backend/vulkan/vulkan_command_context.h"
@@ -532,7 +536,38 @@ int VulkanCore::InitializeLogicalDevice(int device_index) {
   auto native_create_info =
       create_info.CompileVkDeviceCreateInfo(instance_hint_.enable_validation_layers, physical_device);
   VkDevice native_device = VK_NULL_HANDLE;
-  if (vkCreateDevice(physical_device, &native_create_info, nullptr, &native_device) != VK_SUCCESS) {
+  const VkResult device_result = vkCreateDevice(physical_device, &native_create_info, nullptr, &native_device);
+  if (device_result != VK_SUCCESS) {
+#ifdef __OHOS__
+    const auto properties = vulkan::GetPhysicalDeviceProperties(physical_device);
+    OH_LOG_Print(LOG_APP, LOG_ERROR, 0, "LongMarchGPU",
+                 "vkCreateDevice=%{public}d GPU=%{public}s API=%{public}u.%{public}u.%{public}u driver=%{public}u",
+                 device_result, properties.deviceName, VK_VERSION_MAJOR(properties.apiVersion),
+                 VK_VERSION_MINOR(properties.apiVersion), VK_VERSION_PATCH(properties.apiVersion),
+                 properties.driverVersion);
+    for (const char *extension : create_info.extensions) {
+      OH_LOG_Print(LOG_APP, LOG_ERROR, 0, "LongMarchGPU", "requested extension %{public}s supported=%{public}d",
+                   extension, vulkan::IsExtensionSupported(physical_device, extension));
+    }
+    VkPhysicalDeviceDynamicRenderingFeatures rendering{VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_DYNAMIC_RENDERING_FEATURES};
+    VkPhysicalDeviceDescriptorIndexingFeatures indexing{VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_DESCRIPTOR_INDEXING_FEATURES};
+    VkPhysicalDeviceExtendedDynamicStateFeaturesEXT dynamic{
+        VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_EXTENDED_DYNAMIC_STATE_FEATURES_EXT};
+    VkPhysicalDeviceScalarBlockLayoutFeatures scalar{VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SCALAR_BLOCK_LAYOUT_FEATURES};
+    VkPhysicalDeviceFeatures2 features{VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2};
+    features.pNext = &rendering;
+    rendering.pNext = &indexing;
+    indexing.pNext = &dynamic;
+    dynamic.pNext = &scalar;
+    vkGetPhysicalDeviceFeatures2(physical_device, &features);
+    OH_LOG_Print(
+        LOG_APP, LOG_ERROR, 0, "LongMarchGPU",
+        "features dynamicRendering=%{public}u extendedDynamicState=%{public}u scalarBlockLayout=%{public}u "
+        "sampledNonUniform=%{public}u storageNonUniform=%{public}u runtimeArray=%{public}u variableCount=%{public}u",
+        rendering.dynamicRendering, dynamic.extendedDynamicState, scalar.scalarBlockLayout,
+        indexing.shaderSampledImageArrayNonUniformIndexing, indexing.shaderStorageBufferArrayNonUniformIndexing,
+        indexing.runtimeDescriptorArray, indexing.descriptorBindingVariableDescriptorCount);
+#endif
     return -1;
   }
   InitializeNativeDevice(instance_hint_.app_info.apiVersion, physical_device, create_info,
