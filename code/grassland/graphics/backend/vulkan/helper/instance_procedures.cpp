@@ -11,6 +11,18 @@ FuncTy GetProcedure(VkInstance instance, const char *function_name) {
   }
   return func;
 };
+
+template <class FuncTy>
+FuncTy GetDeviceRenderingProcedure(VkDevice device, const char *extension_name, const char *core_name) {
+  auto func = reinterpret_cast<FuncTy>(vkGetDeviceProcAddr(device, extension_name));
+  if (!func) {
+    func = reinterpret_cast<FuncTy>(vkGetDeviceProcAddr(device, core_name));
+  }
+  if (!func) {
+    throw std::runtime_error(std::string("Missing Vulkan rendering function: ") + extension_name);
+  }
+  return func;
+}
 }  // namespace
 
 #define GET_PROCEDURE(instance, function_name) \
@@ -22,9 +34,16 @@ void LoadInstanceProcedures(VkInstance instance, bool enabled_validation_layers,
     GET_PROCEDURE(instance, vkDestroyDebugUtilsMessengerEXT);
     GET_PROCEDURE(instance, vkSetDebugUtilsObjectNameEXT);
   }
+}
 
-  GET_PROCEDURE(instance, vkCmdBeginRenderingKHR);
-  GET_PROCEDURE(instance, vkCmdEndRenderingKHR);
-  GET_PROCEDURE(instance, vkCmdSetPrimitiveTopologyEXT);
+void LoadDeviceRenderingProcedures(VkDevice device, InstanceProcedures &out) {
+  // Resolve device extensions after device creation. Some loaders (including
+  // the HarmonyOS emulator) do not expose these through vkGetInstanceProcAddr.
+  out.vkCmdBeginRenderingKHR =
+      GetDeviceRenderingProcedure<PFN_vkCmdBeginRenderingKHR>(device, "vkCmdBeginRenderingKHR", "vkCmdBeginRendering");
+  out.vkCmdEndRenderingKHR =
+      GetDeviceRenderingProcedure<PFN_vkCmdEndRenderingKHR>(device, "vkCmdEndRenderingKHR", "vkCmdEndRendering");
+  out.vkCmdSetPrimitiveTopologyEXT = GetDeviceRenderingProcedure<PFN_vkCmdSetPrimitiveTopologyEXT>(
+      device, "vkCmdSetPrimitiveTopologyEXT", "vkCmdSetPrimitiveTopology");
 }
 }  // namespace grassland::graphics::backend::vulkan

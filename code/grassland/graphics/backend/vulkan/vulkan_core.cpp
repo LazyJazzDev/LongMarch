@@ -572,6 +572,7 @@ int VulkanCore::InitializeLogicalDevice(int device_index) {
   }
   InitializeNativeDevice(instance_hint_.app_info.apiVersion, physical_device, create_info,
                          device_feature_requirement.GetVmaAllocatorCreateFlags(), native_device);
+  vulkan::LoadDeviceRenderingProcedures(native_device, instance_procedures_);
   memory_properties_ = vulkan::GetPhysicalDeviceMemoryProperties(physical_device);
 
   device_name_ = vulkan::GetPhysicalDeviceProperties(physical_device).deviceName;
