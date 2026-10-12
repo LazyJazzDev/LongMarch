@@ -63,10 +63,10 @@ void GameOfLife::CustomOnInit() {
 
     std::vector<Vertex> vertices = ComposeVertices(positions, glm::vec4{1.0f});
 
-    white_icon_model = std::make_optional<DeviceModel>(this, Model(vertices, indices));
+    white_icon_model.emplace(this, Model(vertices, indices));
   }
 
-  white_rect_model = std::make_optional<DeviceModel>(
+  white_rect_model.emplace(
       this, Model(ComposeVertices({{-1.0f, -1.0f}, {-1.0f, 1.0f}, {1.0f, -1.0f}, {1.0f, 1.0f}}, glm::vec4{1.0f}),
                   {0, 1, 2, 2, 1, 3}));
 

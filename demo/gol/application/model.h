@@ -47,6 +47,7 @@ class DeviceModel {
  public:
   DeviceModel(Application *app, uint32_t num_vertices, uint32_t num_indices);
   DeviceModel(Application *app, const Model &model);
+  ~DeviceModel();
 
   [[nodiscard]] graphics::Buffer *VertexBuffer() const {
     return vertex_buffer_.get();
