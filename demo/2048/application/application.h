@@ -125,6 +125,7 @@ class Application {
   std::unique_ptr<graphics::Buffer> global_uniform_buffer_;
   std::unique_ptr<graphics::Buffer> resolve_uniform_buffer_;
   std::unique_ptr<graphics::Buffer> instance_index_buffer_;
+  size_t instance_index_count_{};
 
   std::unique_ptr<graphics::Image> depth_image_;
   std::unique_ptr<graphics::Image> present_image_;
