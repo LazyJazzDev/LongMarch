@@ -1,3 +1,10 @@
+# Explicit GPU regression tests are kept out of the default/headless suite.
+if(LONGMARCH_D3D12_ENABLED)
+    add_executable(test_d3d12_buffer EXCLUDE_FROM_ALL d3d12_buffer_test.cpp)
+    target_link_libraries(test_d3d12_buffer PRIVATE Grassland GTest::gtest_main)
+    LONGMARCH_DEPLOY_RUNTIME_DEPENDENCIES(test_d3d12_buffer)
+endif()
+
 # Native window tests require a logged-in macOS desktop; run explicitly.
 if(APPLE)
     add_executable(test_window_gestures EXCLUDE_FROM_ALL window_gestures_test.mm)

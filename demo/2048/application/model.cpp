@@ -18,6 +18,12 @@ DeviceModel::DeviceModel(Application *app, const Model &model)
   UploadIndices(model.Indices());
 }
 
+DeviceModel::~DeviceModel() {
+  // Replacing a UI mesh can happen while an earlier frame still uses its buffers.
+  // Keep both buffers alive until all submitted draws have finished.
+  app_->Core()->WaitGPU();
+}
+
 void DeviceModel::UploadVertices(const std::vector<Vertex> &vertices) {
   const size_t size = vertices.size() * sizeof(Vertex);
   if (size > vertex_buffer_->Size()) {

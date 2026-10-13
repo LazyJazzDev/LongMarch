@@ -17,6 +17,7 @@ class Buffer {
 
   virtual BufferType Type() const = 0;
 
+  // Requested byte size, excluding any backend allocation alignment padding.
   virtual size_t Size() const = 0;
 
   virtual void Resize(size_t new_size) = 0;

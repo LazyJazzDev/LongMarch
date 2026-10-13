@@ -161,6 +161,7 @@ void Application::OnInit() {
   const uint32_t first_instance_index = 0;
   core_->CreateBuffer(sizeof(uint32_t), graphics::BUFFER_TYPE_DYNAMIC, &instance_index_buffer_);
   instance_index_buffer_->UploadData(&first_instance_index, sizeof(uint32_t));
+  instance_index_count_ = 1;
   core_->CreateBuffer(sizeof(InstanceInfo), graphics::BUFFER_TYPE_DYNAMIC, &main_frame_.instance_buffer);
   core_->CreateBuffer(sizeof(InstanceInfo), graphics::BUFFER_TYPE_DYNAMIC, &second_frame_.instance_buffer);
 
@@ -200,13 +201,17 @@ void Application::OnRender() {
   // Instance indices are fed through a per-instance vertex stream so that the
   // first instance offset works identically on every backend.
   const size_t max_instances = std::max(main_frame_.instances.size(), second_frame_.instances.size());
-  if (max_instances * sizeof(uint32_t) > instance_index_buffer_->Size()) {
-    std::vector<uint32_t> indices(std::max<size_t>(max_instances, instance_index_buffer_->Size() / 2));
+  // Track which indices have been initialized independently of buffer capacity.
+  if (max_instances > instance_index_count_) {
+    std::vector<uint32_t> indices(std::max(max_instances, instance_index_count_ * 2));
     for (size_t i = 0; i < indices.size(); i++) {
       indices[i] = static_cast<uint32_t>(i);
     }
-    instance_index_buffer_->Resize(indices.size() * sizeof(uint32_t));
+    if (indices.size() * sizeof(uint32_t) > instance_index_buffer_->Size()) {
+      instance_index_buffer_->Resize(indices.size() * sizeof(uint32_t));
+    }
     instance_index_buffer_->UploadData(indices.data(), indices.size() * sizeof(uint32_t));
+    instance_index_count_ = indices.size();
   }
 
   std::unique_ptr<graphics::CommandContext> context;

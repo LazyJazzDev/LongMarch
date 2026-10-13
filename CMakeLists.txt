@@ -50,6 +50,14 @@ else ()
 endif ()
 
 if (MSVC)
+    # CUDA 13.2 bundles CCCL 3.2, which rejects MSVC's traditional preprocessor.
+    # CCCL 3.1 (CUDA 13.1) only emitted a diagnostic; older toolkits keep their defaults.
+    # https://github.com/NVIDIA/cccl/blob/v3.2.0/libcudacxx/include/cuda/std/__cccl/preprocessor.h
+    if (CUDAToolkit_FOUND AND CUDAToolkit_VERSION VERSION_GREATER_EQUAL "13.2")
+        add_compile_options("$<$<COMPILE_LANGUAGE:CXX>:/Zc:preprocessor>")
+        add_compile_options("$<$<COMPILE_LANGUAGE:CUDA>:-Xcompiler=/Zc:preprocessor>")
+    endif ()
+
     # /utf-8
     add_compile_options("$<$<COMPILE_LANGUAGE:CXX>:/utf-8>")
     add_compile_options("$<$<COMPILE_LANGUAGE:CUDA>:-Xcompiler=\"/utf-8\">")
