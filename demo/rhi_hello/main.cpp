@@ -1,6 +1,7 @@
 ﻿#include <atomic>
 #include <cstdint>
 #include <iostream>
+#include <string>
 #include <thread>
 #include <utility>
 
@@ -80,7 +81,13 @@ class ObjectRef {
 
 class ExampleObject final : public IObject {
  public:
-  explicit ExampleObject(std::atomic<uint32_t> &destructions) : destructions_(destructions) {
+  ExampleObject(std::string text, std::atomic<uint32_t> &destructions)
+      : text_(std::move(text)),
+        destructions_(destructions) {
+  }
+
+  const std::string &GetText() const noexcept {
+    return text_;
   }
 
  private:
@@ -88,12 +95,13 @@ class ExampleObject final : public IObject {
     ++destructions_;
   }
 
+  std::string text_;
   std::atomic<uint32_t> &destructions_;
 };
 
 int main() {
   std::atomic<uint32_t> destructions{0};
-  auto *object = new ExampleObject(destructions);
+  auto *object = new ExampleObject("Hello from ExampleObject!", destructions);
   auto owner = ObjectRef::Adopt(object);
   auto retained = ObjectRef::Retain(object);
   ObjectRef copy = owner;
@@ -111,7 +119,7 @@ int main() {
     return 1;
   }
 
-  auto replaced = ObjectRef::Adopt(new ExampleObject(destructions));
+  auto replaced = ObjectRef::Adopt(new ExampleObject("Temporary object", destructions));
   replaced = owner;  // Release the previous, different object.
   if (destructions != 1) {
     return 1;
@@ -134,6 +142,8 @@ int main() {
   if (destructions != 1) {
     return 1;
   }
+  // retained still owns the object after owner and the thread handles are released.
+  std::cout << "Stored text: " << object->GetText() << '\n';
   retained = {};
   if (destructions != 2) {
     return 1;
