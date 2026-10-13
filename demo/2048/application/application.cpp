@@ -182,8 +182,7 @@ void Application::OnRender() {
   // Instance indices are fed through a per-instance vertex stream so that the
   // first instance offset works identically on every backend.
   const size_t max_instances = std::max(main_frame_.instances.size(), second_frame_.instances.size());
-  // Buffer size may include backend alignment padding (256 bytes on D3D12).
-  // Grow the initialized index range independently of the allocated capacity.
+  // Track which indices have been initialized independently of buffer capacity.
   if (max_instances > instance_index_count_) {
     std::vector<uint32_t> indices(std::max(max_instances, instance_index_count_ * 2));
     for (size_t i = 0; i < indices.size(); i++) {

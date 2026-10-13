@@ -41,6 +41,7 @@ class D3D12StaticBuffer : public D3D12Buffer {
 
  private:
   D3D12Core *core_;
+  size_t size_;
   ComPtr<ID3D12Resource> buffer_;
 };
 
@@ -67,6 +68,7 @@ class D3D12DynamicBuffer : public D3D12Buffer {
 
  private:
   D3D12Core *core_;
+  size_t size_;
   std::vector<ComPtr<ID3D12Resource>> buffers_;
   ComPtr<ID3D12Resource> staging_buffer_;
 };
@@ -95,6 +97,7 @@ class D3D12CUDABuffer : public D3D12Buffer, public CUDABuffer {
 
  private:
   D3D12Core *core_;
+  size_t size_;
   ComPtr<ID3D12Resource> buffer_;
   cudaExternalMemory_t cuda_memory_;
 };
