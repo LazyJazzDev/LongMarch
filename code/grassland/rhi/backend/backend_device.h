@@ -7,8 +7,8 @@ namespace grassland::rhi::backend {
 
 class IDevice : public IObject {
  public:
-  IDevice(PhysicalDevice info, const ObjectRef &core) : core_(core), info_(std::move(info)) {
-  }
+  IDevice(PhysicalDevice info, const ObjectPtr<ICore> &core);
+  ~IDevice() override;
 
   const PhysicalDevice &GetPhysicalDevice() const noexcept {
     return info_;
@@ -16,7 +16,7 @@ class IDevice : public IObject {
 
  private:
   // Backends destroy their native device before this reference releases the Core.
-  ObjectRef core_;
+  ObjectPtr<ICore> core_;
   PhysicalDevice info_;
 };
 

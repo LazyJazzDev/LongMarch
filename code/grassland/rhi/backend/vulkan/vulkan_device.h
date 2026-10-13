@@ -7,13 +7,13 @@ namespace grassland::rhi::backend::vulkan {
 class VulkanDevice final : public IDevice {
  public:
   static std::unique_ptr<VulkanDevice> CreateVulkanDevice(PhysicalDevice info,
-                                                          const ObjectRef &core,
+                                                          const ObjectPtr<ICore> &core,
                                                           VkPhysicalDevice physical_device,
                                                           uint32_t api_version);
   ~VulkanDevice() override;
 
  private:
-  VulkanDevice(PhysicalDevice info, const ObjectRef &core);
+  VulkanDevice(PhysicalDevice info, const ObjectPtr<ICore> &core);
   VkDevice device_{VK_NULL_HANDLE};
 };
 

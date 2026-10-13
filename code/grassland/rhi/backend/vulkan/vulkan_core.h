@@ -9,7 +9,7 @@ class VulkanCore final : public ICore {
   static std::unique_ptr<VulkanCore> CreateVulkanCore();
   ~VulkanCore() override;
   std::vector<PhysicalDevice> GetPhysicalDevices() const override;
-  std::unique_ptr<IDevice> CreateDevice(int32_t device_idx, const ObjectRef &owner) const override;
+  std::unique_ptr<IDevice> CreateDevice(int32_t device_idx, const ObjectPtr<ICore> &owner) const override;
 
  private:
   struct Adapter {

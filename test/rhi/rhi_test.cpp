@@ -33,7 +33,9 @@ struct Calls {
 
 class TestDevice final : public backend::IDevice {
  public:
-  TestDevice(PhysicalDevice info, const ObjectRef &core, Calls &calls) : IDevice(std::move(info), core), calls_(calls) {
+  TestDevice(PhysicalDevice info, const backend::ObjectPtr<backend::ICore> &core, Calls &calls)
+      : IDevice(std::move(info), core),
+        calls_(calls) {
   }
 
   ~TestDevice() override {
@@ -61,7 +63,8 @@ class TestCore final : public backend::ICore {
     return devices_;
   }
 
-  std::unique_ptr<backend::IDevice> CreateDevice(int32_t id, const ObjectRef &owner) const override {
+  std::unique_ptr<backend::IDevice> CreateDevice(int32_t id,
+                                                 const backend::ObjectPtr<backend::ICore> &owner) const override {
     calls_.selected = id;
     ++calls_.creates;
     if (fail_)

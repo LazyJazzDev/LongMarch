@@ -2,7 +2,7 @@
 
 namespace grassland::rhi::backend::vulkan {
 
-VulkanDevice::VulkanDevice(PhysicalDevice info, const ObjectRef &core) : IDevice(std::move(info), core) {
+VulkanDevice::VulkanDevice(PhysicalDevice info, const ObjectPtr<ICore> &core) : IDevice(std::move(info), core) {
 }
 
 VulkanDevice::~VulkanDevice() {
@@ -12,7 +12,7 @@ VulkanDevice::~VulkanDevice() {
 }
 
 std::unique_ptr<VulkanDevice> VulkanDevice::CreateVulkanDevice(PhysicalDevice info,
-                                                               const ObjectRef &core,
+                                                               const ObjectPtr<ICore> &core,
                                                                VkPhysicalDevice physical_device,
                                                                uint32_t api_version) {
   auto device = std::unique_ptr<VulkanDevice>(new VulkanDevice(std::move(info), core));

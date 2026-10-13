@@ -35,7 +35,8 @@ Device Core::CreateDevice(int32_t device_idx) const {
       ReportError(-1, "Physical device ID is out of range.");
       return {};
     }
-    return backend::Access::Adopt<Device>(core.CreateDevice(device_idx, object_));
+    return backend::Access::Adopt<Device>(
+        core.CreateDevice(device_idx, backend::Access::Retain<backend::ICore>(*this)));
   } catch (const std::bad_alloc &) {
     // Standard-library allocation is the exceptional boundary; native failures return empty directly.
     return {};

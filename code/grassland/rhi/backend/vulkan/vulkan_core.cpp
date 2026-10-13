@@ -108,7 +108,7 @@ std::vector<PhysicalDevice> VulkanCore::GetPhysicalDevices() const {
   return devices;
 }
 
-std::unique_ptr<IDevice> VulkanCore::CreateDevice(int32_t device_idx, const ObjectRef &owner) const {
+std::unique_ptr<IDevice> VulkanCore::CreateDevice(int32_t device_idx, const ObjectPtr<ICore> &owner) const {
   if (device_idx < 0 || static_cast<size_t>(device_idx) >= adapters_.size()) {
     ReportError(-1, "Physical device ID is out of range.");
     return {};
