@@ -178,7 +178,7 @@ TEST(RhiCore, EmptyHandlesAndUnavailableBackendFailSafely) {
   EXPECT_FALSE(device.SupportGeometryShader());
   EXPECT_FALSE(device.SupportRayQuery());
   EXPECT_FALSE(device.SupportRayTracingPipeline());
-  EXPECT_FALSE(CreateCore(BACKEND_API_METAL));
+  EXPECT_FALSE(CreateCore(static_cast<BackendAPI>(-1)));
 }
 
 class RhiNative : public testing::TestWithParam<BackendAPI> {};
@@ -227,6 +227,9 @@ std::vector<BackendAPI> NativeBackends() {
 #endif
 #if defined(LONGMARCH_VULKAN_ENABLED)
       BACKEND_API_VULKAN,
+#endif
+#if defined(LONGMARCH_METAL_ENABLED)
+      BACKEND_API_METAL,
 #endif
   };
 }

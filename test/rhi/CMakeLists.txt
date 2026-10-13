@@ -7,3 +7,8 @@ if (LONGMARCH_VULKAN_ENABLED)
     target_sources(test_rhi PRIVATE vulkan_enumeration_test.cpp)
     target_include_directories(test_rhi PRIVATE ${Vulkan_INCLUDE_DIRS})
 endif ()
+
+if (LONGMARCH_METAL_ENABLED)
+    target_sources(test_rhi PRIVATE metal_test.cpp)
+    target_include_directories(test_rhi PRIVATE ${LONGMARCH_METAL_CPP_DIR})
+endif ()

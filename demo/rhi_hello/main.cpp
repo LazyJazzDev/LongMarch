@@ -7,7 +7,7 @@ int main(int argc, char **argv) {
   using namespace grassland::rhi;
   BackendAPI api = BACKEND_API_DEFAULT;
   if (argc > 2) {
-    std::cerr << "Usage: demo_rhi_hello [d3d12|vulkan]\n";
+    std::cerr << "Usage: demo_rhi_hello [d3d12|vulkan|metal]\n";
     return 1;
   }
   if (argc == 2) {
@@ -16,8 +16,10 @@ int main(int argc, char **argv) {
       api = BACKEND_API_D3D12;
     else if (name == "vulkan")
       api = BACKEND_API_VULKAN;
+    else if (name == "metal")
+      api = BACKEND_API_METAL;
     else {
-      std::cerr << "Usage: demo_rhi_hello [d3d12|vulkan]\n";
+      std::cerr << "Usage: demo_rhi_hello [d3d12|vulkan|metal]\n";
       return 1;
     }
   }

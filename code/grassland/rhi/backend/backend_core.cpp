@@ -9,6 +9,9 @@
 #if defined(LONGMARCH_VULKAN_ENABLED)
 #include "grassland/rhi/backend/vulkan/vulkan_core.h"
 #endif
+#if defined(LONGMARCH_METAL_ENABLED)
+#include "grassland/rhi/backend/metal/metal_core.h"
+#endif
 
 namespace grassland::rhi::backend {
 
@@ -21,6 +24,10 @@ std::unique_ptr<ICore> CreateCore(BackendAPI api) {
 #if defined(LONGMARCH_VULKAN_ENABLED)
     case BACKEND_API_VULKAN:
       return vulkan::VulkanCore::CreateVulkanCore();
+#endif
+#if defined(LONGMARCH_METAL_ENABLED)
+    case BACKEND_API_METAL:
+      return metal::MetalCore::CreateMetalCore();
 #endif
     default:
       ReportError(-1, "Requested RHI backend is unavailable in this build.");
