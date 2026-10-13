@@ -1,6 +1,6 @@
 #include "grassland/rhi/rhi_core.h"
 
-#include <exception>
+#include <new>
 
 #include "grassland/rhi/backend/backend.h"
 
@@ -9,8 +9,8 @@ namespace grassland::rhi {
 Core CreateCore(BackendAPI api) {
   try {
     return backend::Access::Adopt<Core>(backend::CreateCore(api));
-  } catch (const std::exception &error) {
-    ReportError(-1, error.what());
+  } catch (const std::bad_alloc &) {
+    // Standard-library allocation is the exceptional boundary; native failures return empty directly.
     return {};
   }
 }
@@ -36,8 +36,8 @@ Device Core::CreateDevice(int32_t device_idx) const {
       return {};
     }
     return backend::Access::Adopt<Device>(core.CreateDevice(device_idx, object_));
-  } catch (const std::exception &error) {
-    ReportError(-1, error.what());
+  } catch (const std::bad_alloc &) {
+    // Standard-library allocation is the exceptional boundary; native failures return empty directly.
     return {};
   }
 }

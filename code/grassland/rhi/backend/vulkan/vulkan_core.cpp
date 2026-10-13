@@ -8,8 +8,8 @@ std::unique_ptr<VulkanCore> VulkanCore::CreateVulkanCore() {
   uint32_t loader_version = VK_API_VERSION_1_0;
   const auto enumerate_version = reinterpret_cast<PFN_vkEnumerateInstanceVersion>(
       vkGetInstanceProcAddr(VK_NULL_HANDLE, "vkEnumerateInstanceVersion"));
-  if (enumerate_version)
-    Check(enumerate_version(&loader_version), "vkEnumerateInstanceVersion");
+  if (enumerate_version && !Check(enumerate_version(&loader_version), "vkEnumerateInstanceVersion"))
+    return {};
   if (loader_version < VK_API_VERSION_1_2) {
     ReportError(-1, "RHI requires Vulkan 1.2 or newer.");
     return {};
@@ -22,9 +22,13 @@ std::unique_ptr<VulkanCore> VulkanCore::CreateVulkanCore() {
   supported_version = VK_API_VERSION_1_4;
 #endif
   const uint32_t api_version = std::min(loader_version, supported_version);
-  const auto available = EnumerateList<VkExtensionProperties>([](uint32_t *count, VkExtensionProperties *data) {
-    return vkEnumerateInstanceExtensionProperties(nullptr, count, data);
-  });
+  std::vector<VkExtensionProperties> available;
+  if (!EnumerateList(
+          [](uint32_t *count, VkExtensionProperties *data) {
+            return vkEnumerateInstanceExtensionProperties(nullptr, count, data);
+          },
+          available))
+    return {};
   std::vector<const char *> extensions;
   VkInstanceCreateFlags flags = 0;
   for (const auto &extension : available) {
@@ -42,10 +46,13 @@ std::unique_ptr<VulkanCore> VulkanCore::CreateVulkanCore() {
   create.enabledExtensionCount = static_cast<uint32_t>(extensions.size());
   create.ppEnabledExtensionNames = extensions.data();
   auto core = std::make_unique<VulkanCore>();
-  Check(vkCreateInstance(&create, nullptr, &core->instance_), "vkCreateInstance");
-  const auto devices = EnumerateList<VkPhysicalDevice>([&](uint32_t *count, VkPhysicalDevice *data) {
-    return vkEnumeratePhysicalDevices(core->instance_, count, data);
-  });
+  if (!Check(vkCreateInstance(&create, nullptr, &core->instance_), "vkCreateInstance"))
+    return {};
+  std::vector<VkPhysicalDevice> devices;
+  if (!EnumerateList([&](uint32_t *count,
+                         VkPhysicalDevice *data) { return vkEnumeratePhysicalDevices(core->instance_, count, data); },
+                     devices))
+    return {};
   for (auto device : devices) {
     VkPhysicalDeviceProperties properties{};
     vkGetPhysicalDeviceProperties(device, &properties);
@@ -53,6 +60,8 @@ std::unique_ptr<VulkanCore> VulkanCore::CreateVulkanCore() {
       continue;
     const uint32_t device_version = std::min(api_version, properties.apiVersion);
     DeviceFeatures features(device, device_version);
+    if (!features)
+      return {};
     PhysicalDevice info{};
     info.name = properties.deviceName;
     switch (properties.deviceType) {
@@ -100,7 +109,11 @@ std::vector<PhysicalDevice> VulkanCore::GetPhysicalDevices() const {
 }
 
 std::unique_ptr<IDevice> VulkanCore::CreateDevice(int32_t device_idx, const ObjectRef &owner) const {
-  const auto &adapter = adapters_.at(device_idx);
+  if (device_idx < 0 || static_cast<size_t>(device_idx) >= adapters_.size()) {
+    ReportError(-1, "Physical device ID is out of range.");
+    return {};
+  }
+  const auto &adapter = adapters_[device_idx];
   return VulkanDevice::CreateVulkanDevice(adapter.info, owner, adapter.native, adapter.api_version);
 }
 

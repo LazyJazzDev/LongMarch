@@ -3,9 +3,13 @@
 namespace grassland::rhi::backend::vulkan {
 
 DeviceFeatures::DeviceFeatures(VkPhysicalDevice device, uint32_t api_version) {
-  const auto available = EnumerateList<VkExtensionProperties>([device](uint32_t *count, VkExtensionProperties *data) {
-    return vkEnumerateDeviceExtensionProperties(device, nullptr, count, data);
-  });
+  std::vector<VkExtensionProperties> available;
+  if (!EnumerateList(
+          [device](uint32_t *count, VkExtensionProperties *data) {
+            return vkEnumerateDeviceExtensionProperties(device, nullptr, count, data);
+          },
+          available))
+    return;
   const auto has = [&](const char *name) {
     return std::any_of(available.begin(), available.end(),
                        [&](const auto &entry) { return std::strcmp(entry.extensionName, name) == 0; });
@@ -55,6 +59,7 @@ DeviceFeatures::DeviceFeatures(VkPhysicalDevice device, uint32_t api_version) {
   // Enable every supported bit in the negotiated core and RHI extension feature chains.
   // No selection requirement is involved in this query or in vkCreateDevice.
   vkGetPhysicalDeviceFeatures2(device, &features_);
+  valid_ = true;
 }
 
 }  // namespace grassland::rhi::backend::vulkan

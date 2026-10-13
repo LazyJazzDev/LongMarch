@@ -3,8 +3,6 @@
 #include <dxgi1_6.h>
 #include <wrl.h>
 
-#include <stdexcept>
-
 #include "grassland/rhi/backend/backend_util.h"
 
 namespace grassland::rhi::backend::d3d12 {

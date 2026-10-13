@@ -6,13 +6,14 @@
 namespace grassland::rhi::backend::d3d12 {
 namespace {
 
-PhysicalDevice DescribeDevice(IDXGIAdapter1 *adapter, ID3D12Device *device) {
+bool DescribeDevice(IDXGIAdapter1 *adapter, ID3D12Device *device, PhysicalDevice &info) {
   DXGI_ADAPTER_DESC1 desc{};
   const HRESULT result = adapter->GetDesc1(&desc);
   if (FAILED(result)) {
-    throw std::runtime_error("IDXGIAdapter1::GetDesc1 failed: " + std::to_string(result));
+    ReportError(result, "IDXGIAdapter1::GetDesc1 failed.");
+    return false;
   }
-  PhysicalDevice info{};
+  info = {};
   info.name = WStringToString(desc.Description);
   info.dedicated_memory = desc.DedicatedVideoMemory;
   info.unified_memory = desc.SharedSystemMemory;
@@ -30,7 +31,7 @@ PhysicalDevice DescribeDevice(IDXGIAdapter1 *adapter, ID3D12Device *device) {
   }
   // Geometry shaders are part of the feature-level 11_0 baseline used below.
   info.geometry_shader_feature = true;
-  return info;
+  return true;
 }
 
 }  // namespace
@@ -54,7 +55,9 @@ std::unique_ptr<D3D12Core> D3D12Core::CreateD3D12Core() {
     ComPtr<ID3D12Device> probe;
     if (FAILED(D3D12CreateDevice(adapter.Get(), D3D_FEATURE_LEVEL_11_0, IID_PPV_ARGS(&probe))))
       continue;
-    auto info = DescribeDevice(adapter.Get(), probe.Get());
+    PhysicalDevice info{};
+    if (!DescribeDevice(adapter.Get(), probe.Get(), info))
+      return {};
     core->adapters_.push_back({std::move(adapter), std::move(info)});
   }
   return core;
@@ -68,7 +71,11 @@ std::vector<PhysicalDevice> D3D12Core::GetPhysicalDevices() const {
 }
 
 std::unique_ptr<IDevice> D3D12Core::CreateDevice(int32_t device_idx, const ObjectRef &owner) const {
-  const auto &adapter = adapters_.at(device_idx);
+  if (device_idx < 0 || static_cast<size_t>(device_idx) >= adapters_.size()) {
+    ReportError(-1, "Physical device ID is out of range.");
+    return {};
+  }
+  const auto &adapter = adapters_[device_idx];
   ComPtr<ID3D12Device> device;
   const HRESULT result = D3D12CreateDevice(adapter.native.Get(), D3D_FEATURE_LEVEL_11_0, IID_PPV_ARGS(&device));
   if (FAILED(result)) {
@@ -76,7 +83,9 @@ std::unique_ptr<IDevice> D3D12Core::CreateDevice(int32_t device_idx, const Objec
     return {};
   }
   // D3D12 exposes supported capabilities automatically; there is no Vulkan-style feature mask.
-  auto info = DescribeDevice(adapter.native.Get(), device.Get());
+  PhysicalDevice info{};
+  if (!DescribeDevice(adapter.native.Get(), device.Get(), info))
+    return {};
   return std::make_unique<D3D12Device>(std::move(info), owner, std::move(device));
 }
 

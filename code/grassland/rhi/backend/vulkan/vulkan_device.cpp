@@ -17,6 +17,8 @@ std::unique_ptr<VulkanDevice> VulkanDevice::CreateVulkanDevice(PhysicalDevice in
                                                                uint32_t api_version) {
   auto device = std::unique_ptr<VulkanDevice>(new VulkanDevice(std::move(info), core));
   DeviceFeatures enabled(physical_device, api_version);
+  if (!enabled)
+    return {};
   uint32_t count = 0;
   vkGetPhysicalDeviceQueueFamilyProperties(physical_device, &count, nullptr);
   std::vector<VkQueueFamilyProperties> families(count);

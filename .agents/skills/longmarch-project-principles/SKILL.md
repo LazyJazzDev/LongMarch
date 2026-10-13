@@ -1,6 +1,6 @@
 ---
 name: longmarch-project-principles
-description: Apply the user-confirmed build, commit-message, squash-merge, PR-history, and asset conventions for LazyJazzDev/LongMarch and LongMarchAssetsLFS. Use when building or editing these projects, creating commits, preparing or merging PRs, or changing branch history and asset references.
+description: Apply the user-confirmed error-handling, build, commit-message, squash-merge, PR-history, and asset conventions for LazyJazzDev/LongMarch and LongMarchAssetsLFS. Use when building or editing these projects, creating commits, preparing or merging PRs, or changing branch history and asset references.
 ---
 
 # LongMarch 项目原则
@@ -12,6 +12,12 @@ description: Apply the user-confirmed build, commit-message, squash-merge, PR-hi
 - 优先通过职责明确的成员函数接口协作，尽量不用友元访问其他类的内部状态；能少开访问权限就少开。
 - 不以公开字段、可变内部引用或无约束的 setter 代替友元。由拥有状态的类维护不变量；查询只暴露必要信息，修改通过语义明确的操作完成。
 - 确需友元时，将授权缩到必要的成员函数，避免授予整个类访问权限，并说明保留原因。
+
+## 错误处理与异常
+
+- 可预期的运行失败优先通过返回值表达，不以抛异常作为常规控制流；创建失败返回空句柄/容器，句柄转换为 `bool` 应为 `false`，调用者判空后处理。
+- 没有对象返回的可失败操作使用明确状态或 `bool`；保留必要错误信息，不把失败伪装成成功或让半初始化对象流出。枚举等操作需区分“成功但结果为空”和“操作失败”。
+- 非必要不使用异常，尤其不要先把原生 API 的失败码转换成异常，再在上层捕获并返回空对象。确需处理标准库或第三方库异常时，在必要边界集中处理，不无差别扩散 `try/catch`；不为此盲目添加 `noexcept`，以免将未处理异常变成进程终止。
 
 ## 构建
 

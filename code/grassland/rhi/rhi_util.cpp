@@ -1,6 +1,5 @@
 #include "grassland/rhi/rhi_util.h"
 
-#include <stdexcept>
 #include <utility>
 
 #include "grassland/rhi/backend/backend_util.h"
@@ -52,7 +51,8 @@ std::string to_string(BackendAPI api) {
     case BACKEND_API_METAL:
       return "BACKEND_API_METAL";
     default:
-      throw std::runtime_error("Unknown API type");
+      ReportError(-1, "Unknown API type.");
+      return {};
   }
 }
 
@@ -65,7 +65,8 @@ std::string BackendAPIName(BackendAPI api) {
     case BACKEND_API_METAL:
       return "Metal";
     default:
-      throw std::runtime_error("Unknown API type");
+      ReportError(-1, "Unknown API type.");
+      return {};
   }
 }
 
@@ -80,7 +81,8 @@ std::string to_string(PhysicalDeviceType type) {
     case PHYSICAL_DEVICE_TYPE_OTHER:
       return "PHYSICAL_DEVICE_TYPE_OTHER";
     default:
-      throw std::runtime_error("Unknown PHYSICAL_DEVICE_TYPE");
+      ReportError(-1, "Unknown physical device type.");
+      return {};
   }
 }
 
@@ -95,7 +97,8 @@ std::string PhysicalDeviceTypeName(PhysicalDeviceType type) {
     case PHYSICAL_DEVICE_TYPE_OTHER:
       return "Other";
     default:
-      throw std::runtime_error("Unknown PHYSICAL_DEVICE_TYPE");
+      ReportError(-1, "Unknown physical device type.");
+      return {};
   }
 }
 

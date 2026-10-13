@@ -3,32 +3,40 @@
 
 #include <algorithm>
 #include <cstring>
-#include <stdexcept>
 
 #include "grassland/rhi/backend/backend_util.h"
 
 namespace grassland::rhi::backend::vulkan {
 
-inline void Check(VkResult result, const char *operation) {
-  if (result != VK_SUCCESS)
-    throw std::runtime_error(std::string(operation) + ": " + std::to_string(result));
+inline bool Check(VkResult result, const char *operation) {
+  if (result == VK_SUCCESS)
+    return true;
+  ReportError(result, operation);
+  return false;
 }
 
 template <typename T, typename Enumerate>
-std::vector<T> EnumerateList(Enumerate enumerate) {
-  std::vector<T> values;
+bool EnumerateList(Enumerate enumerate, std::vector<T> &values) {
+  values.clear();
   VkResult result;
   do {
     uint32_t count = 0;
-    Check(enumerate(&count, nullptr), "Vulkan enumeration count");
+    if (!Check(enumerate(&count, nullptr), "Vulkan enumeration count")) {
+      values.clear();
+      return false;
+    }
     values.resize(count);
     if (!count)
-      return values;
+      return true;
     result = enumerate(&count, values.data());
+    if (result != VK_SUCCESS && result != VK_INCOMPLETE) {
+      Check(result, "Vulkan enumeration");
+      values.clear();
+      return false;
+    }
     values.resize(count);
   } while (result == VK_INCOMPLETE);
-  Check(result, "Vulkan enumeration");
-  return values;
+  return true;
 }
 
 // Rebuild the chain in place; its pointers must never be copied to another object.
@@ -37,6 +45,10 @@ class DeviceFeatures {
   DeviceFeatures(VkPhysicalDevice device, uint32_t api_version);
   DeviceFeatures(const DeviceFeatures &) = delete;
   DeviceFeatures &operator=(const DeviceFeatures &) = delete;
+
+  explicit operator bool() const noexcept {
+    return valid_;
+  }
 
   const VkPhysicalDeviceFeatures2 &Features() const noexcept {
     return features_;
@@ -55,6 +67,7 @@ class DeviceFeatures {
   }
 
  private:
+  bool valid_{false};
   VkPhysicalDeviceFeatures2 features_{VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2};
   std::vector<const char *> extensions_;
   VkPhysicalDeviceVulkan11Features v11_{VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_1_FEATURES};
