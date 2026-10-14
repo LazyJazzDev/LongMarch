@@ -87,6 +87,7 @@ class NativeStatus {
   ready: boolean = false;
   hdr: boolean = false;
   error: string = '';
+  fileError: string = '';
   demo: string = '';
   scene: string = '';
   device: string = '';
@@ -529,7 +530,7 @@ struct Index {
       await new Promise<void>((resolve) => setTimeout(resolve, 100));
       const value = JSON.parse(native.status()) as NativeStatus;
       if (value.fileRevision >= id) {
-        if (value.error.length > 0) throw new Error(value.error);
+        if (value.fileError.length > 0) throw new Error(value.fileError);
         return;
       }
       if (this.selected !== 'gol') return;

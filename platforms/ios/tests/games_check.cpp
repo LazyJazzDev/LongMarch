@@ -160,6 +160,27 @@ int main(int argc, char **argv) {
         std::filesystem::remove(path);
         Check(saved.width == 64 && saved.height == 64 && std::count(saved.cells.begin(), saved.cells.end(), 1) == 36,
               "Import/export lost centered pattern cells or grid dimensions");
+        // Malformed imports must preserve the current grid and release the file UI.
+        for (const auto &invalid : {std::string("not a saved pattern"), std::string("OO\nO\n"), std::string()}) {
+          std::ofstream bad(path, std::ios::binary);
+          bad << invalid;
+          bad.close();
+          window->SendKey(GLFW_KEY_O, GLFW_PRESS, GLFW_MOD_CONTROL);
+          window->SendKey(GLFW_KEY_O, GLFW_RELEASE, GLFW_MOD_CONTROL);
+          Settle(game);
+          Check(game.Game()->FileRequest() == 1, "Open did not recover after a previous import");
+          Check(!game.Game()->CompleteFile(path.string()).empty(), "Invalid file was accepted");
+          Check(game.Game()->FileRequest() == 0, "Failed import left the file UI blocked");
+          Settle(game);
+          window->SendKey(GLFW_KEY_S, GLFW_PRESS, GLFW_MOD_CONTROL);
+          window->SendKey(GLFW_KEY_S, GLFW_RELEASE, GLFW_MOD_CONTROL);
+          Settle(game);
+          Check(game.Game()->CompleteFile(path.string()).empty(), "Export failed after invalid import");
+          const auto preserved = LoadCellsPattern(path.string());
+          Check(preserved.cells == saved.cells && preserved.width == saved.width && preserved.height == saved.height,
+                "Invalid import modified the current simulation");
+        }
+        std::filesystem::remove(path);
         game.Game()->EnableNativeSizeControls();
         auto tapSize = [&](double x, double y) {
           window->SendPointer(x, y);

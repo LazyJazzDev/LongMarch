@@ -49,7 +49,7 @@ class Host {
   OHNativeWindow *window_ = nullptr;
   uint32_t width_ = 0, height_ = 0;
   std::filesystem::path resources_;
-  std::string catalog_ = "[]", selection_, scene_id_, error_;
+  std::string catalog_ = "[]", selection_, scene_id_, error_, file_error_;
   bool ready_ = false, active_ = true, dirty_ = false, paused_ = false, hdr_ = true;
   int limit_ = 32, particles_ = 4096, galaxies_ = 10, resets_ = 0;
   int size_axis_ = 0, size_value_ = 64, file_revision_ = 0;
