@@ -6,7 +6,7 @@ namespace grassland::rhi::backend::vulkan {
 
 class VulkanWindow final : public IWindow {
  public:
-  explicit VulkanWindow(std::shared_ptr<VulkanDevice::BackendLifetime> lifetime);
+  explicit VulkanWindow(VulkanDevice *device);
   ~VulkanWindow() override;
   bool Initialize(const WindowDesc &desc);
   ObjectPtr<IImage> AcquireFrame() override;
@@ -21,7 +21,7 @@ class VulkanWindow final : public IWindow {
  private:
   bool Rebuild();
   void DestroySwapchain();
-  std::shared_ptr<VulkanDevice::BackendLifetime> lifetime_;
+  VulkanDevice *device_;
   VkSurfaceKHR surface_{};
   VkSwapchainKHR swapchain_{};
   std::vector<VkImage> images_;

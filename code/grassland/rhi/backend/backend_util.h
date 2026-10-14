@@ -12,6 +12,9 @@ class IObject {
  public:
   void AddRef() noexcept;
   void Release() noexcept;
+  // For an owner reclaiming a child after external handles and leases end.
+  // Never use this to acquire ownership from an unprotected borrowed pointer.
+  bool IsUniquelyOwned() const noexcept;
   virtual ~IObject();
 
  private:

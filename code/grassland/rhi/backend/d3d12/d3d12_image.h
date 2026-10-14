@@ -9,7 +9,7 @@ class D3D12Window;
 class D3D12Image final : public IImage {
  public:
   D3D12Image(ImageDesc desc,
-             const ObjectPtr<D3D12Window> &window,
+             D3D12Window *window,
              uint64_t generation,
              ID3D12Resource *image,
              D3D12_CPU_DESCRIPTOR_HANDLE rtv);
@@ -21,7 +21,7 @@ class D3D12Image final : public IImage {
   HRESULT Present();
 
  private:
-  ObjectPtr<D3D12Window> window_;
+  D3D12Window *window_;
   uint64_t generation_;
   ID3D12Resource *image_;
   D3D12_CPU_DESCRIPTOR_HANDLE rtv_;

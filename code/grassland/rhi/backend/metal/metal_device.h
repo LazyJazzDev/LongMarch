@@ -8,7 +8,7 @@ namespace grassland::rhi::backend::metal {
 
 class MetalDevice final : public IDevice {
  public:
-  MetalDevice(PhysicalDevice info, const ObjectPtr<ICore> &core, NS::SharedPtr<MTL::Device> device);
+  MetalDevice(PhysicalDevice info, ICore *core, NS::SharedPtr<MTL::Device> device);
   ~MetalDevice() override;
 
   MTL::Device *NativeDevice() const noexcept {

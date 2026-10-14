@@ -14,12 +14,13 @@ class ICommandContext;
 
 class IDevice : public IObject {
  public:
-  IDevice(PhysicalDevice info, const ObjectPtr<ICore> &core);
+  IDevice(PhysicalDevice info, ICore *core);
   ~IDevice() override;
   const PhysicalDevice &GetPhysicalDevice() const noexcept;
   virtual const void *NativeIdentity() const;
   virtual std::unique_ptr<IWindow> CreateWindow(const WindowDesc &desc);
   virtual std::unique_ptr<IQueue> CreateQueue(QueueType type);
+  ObjectPtr<IWindow> ManageWindow(std::unique_ptr<IWindow> window);
 
   // Lightweight completion state: deliberately holds no native resources or packet.
   class SubmissionState final : public IObject {
@@ -42,6 +43,7 @@ class IDevice : public IObject {
 
  protected:
   void ShutdownQueues();
+  ICore *Core() const;
 
  private:
   struct Submission {
@@ -50,7 +52,10 @@ class IDevice : public IObject {
   };
 
   void Collect();
-  ObjectPtr<ICore> core_;
+  void CollectWindows();
+  std::mutex windows_mutex_;
+  std::vector<ObjectPtr<IWindow>> windows_;
+  ICore *core_;
   PhysicalDevice info_;
   std::mutex mutex_;
   std::condition_variable changed_;

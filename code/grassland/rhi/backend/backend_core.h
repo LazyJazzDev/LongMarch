@@ -7,7 +7,7 @@ namespace grassland::rhi::backend {
 class ICore : public IObject {
  public:
   virtual std::vector<PhysicalDevice> GetPhysicalDevices() const = 0;
-  virtual std::unique_ptr<IDevice> CreateDevice(int32_t device_idx, const ObjectPtr<ICore> &owner) const = 0;
+  virtual std::unique_ptr<IDevice> CreateDevice(int32_t device_idx, ICore *owner) const = 0;
 };
 
 std::unique_ptr<ICore> CreateCore(BackendAPI api);

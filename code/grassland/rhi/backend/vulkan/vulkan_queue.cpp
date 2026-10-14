@@ -4,11 +4,11 @@
 
 namespace grassland::rhi::backend::vulkan {
 
-VulkanQueue::VulkanQueue(const ObjectPtr<VulkanDevice> &device, QueueType type) : IQueue(device, type) {
+VulkanQueue::VulkanQueue(VulkanDevice *device, QueueType type) : IQueue(device, type) {
 }
 
 std::unique_ptr<ICommandContext> VulkanQueue::CreateCommandContext() const {
-  return std::make_unique<VulkanCommandContext>(static_cast<VulkanDevice *>(Owner().Get())->NativeLifetime(), Type());
+  return std::make_unique<VulkanCommandContext>(static_cast<VulkanDevice *>(Owner()), Type());
 }
 
 }  // namespace grassland::rhi::backend::vulkan

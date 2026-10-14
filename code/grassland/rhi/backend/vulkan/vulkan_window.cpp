@@ -6,30 +6,30 @@
 
 namespace grassland::rhi::backend::vulkan {
 
-VulkanWindow::VulkanWindow(std::shared_ptr<VulkanDevice::BackendLifetime> lifetime) : lifetime_(std::move(lifetime)) {
+VulkanWindow::VulkanWindow(VulkanDevice *device) : device_(device) {
 }
 
 VulkanWindow::~VulkanWindow() {
-  std::lock_guard<std::mutex> lock(lifetime_->QueueMutex());
-  vkDeviceWaitIdle(lifetime_->Device());
+  std::lock_guard<std::mutex> lock(device_->QueueMutex());
+  vkDeviceWaitIdle(device_->Device());
   DestroySwapchain();
   if (surface_)
-    vkDestroySurfaceKHR(lifetime_->Instance(), surface_, nullptr);
+    vkDestroySurfaceKHR(device_->Instance(), surface_, nullptr);
 }
 
 bool VulkanWindow::Initialize(const WindowDesc &desc) {
-  if (!lifetime_->SupportsSwapchain()) {
+  if (!device_->SupportsSwapchain()) {
     ReportError(-1, "VK_KHR_swapchain is unavailable.");
     return false;
   }
   if (!InitializeWindow(desc) ||
-      !Check(glfwCreateWindowSurface(lifetime_->Instance(), NativeWindow(), nullptr, &surface_),
+      !Check(glfwCreateWindowSurface(device_->Instance(), NativeWindow(), nullptr, &surface_),
              "glfwCreateWindowSurface"))
     return false;
   VkBool32 supported{};
-  if (!Check(vkGetPhysicalDeviceSurfaceSupportKHR(lifetime_->PhysicalDevice(), lifetime_->QueueFamily(), surface_,
-                                                  &supported),
-             "Surface queue support") ||
+  if (!Check(
+          vkGetPhysicalDeviceSurfaceSupportKHR(device_->PhysicalDevice(), device_->QueueFamily(), surface_, &supported),
+          "Surface queue support") ||
       !supported) {
     ReportError(-1, "The graphics queue cannot present to this surface.");
     return false;
@@ -43,7 +43,7 @@ bool VulkanWindow::IsFrameValid(uint64_t generation) const {
 }
 
 const void *VulkanWindow::DeviceIdentity() const {
-  return lifetime_.get();
+  return device_;
 }
 
 void VulkanWindow::CancelFrame(uint64_t generation) {
@@ -59,7 +59,7 @@ VkResult VulkanWindow::AcquireNative(VkSemaphore semaphore,
                                      uint32_t &index,
                                      VkImage &image,
                                      VkSemaphore &rendered) {
-  const auto result = vkAcquireNextImageKHR(lifetime_->Device(), swapchain_, UINT64_MAX, semaphore, fence, &index);
+  const auto result = vkAcquireNextImageKHR(device_->Device(), swapchain_, UINT64_MAX, semaphore, fence, &index);
   if (result == VK_SUCCESS || result == VK_SUBOPTIMAL_KHR) {
     image = images_[index];
     rendered = rendered_[index];
@@ -79,7 +79,7 @@ VkResult VulkanWindow::PresentFrame(uint64_t generation, uint32_t index, VkSemap
   present.swapchainCount = 1;
   present.pSwapchains = &swapchain_;
   present.pImageIndices = &index;
-  const auto result = vkQueuePresentKHR(lifetime_->Queue(), &present);
+  const auto result = vkQueuePresentKHR(device_->Queue(), &present);
   acquired_ = false;
   pending_acquire_ = VK_NULL_HANDLE;
   if (result == VK_SUBOPTIMAL_KHR || result == VK_ERROR_OUT_OF_DATE_KHR) {
@@ -106,8 +106,7 @@ ObjectPtr<IImage> VulkanWindow::AcquireFrame() {
     ReportError(-1, "Present or release the previous acquired frame first.");
     return {};
   }
-  auto frame = ObjectPtr<VulkanImage>::Adopt(
-      new VulkanImage(desc_, ObjectPtr<VulkanWindow>::Retain(this), generation_, lifetime_->Device()));
+  auto frame = ObjectPtr<VulkanImage>::Adopt(new VulkanImage(desc_, this, generation_, device_->Device()));
   return frame->Acquire() ? ObjectPtr<IImage>(frame) : ObjectPtr<IImage>{};
 }
 
@@ -126,11 +125,11 @@ PresentMode VulkanWindow::GetPresentMode() const {
 void VulkanWindow::DestroySwapchain() {
   for (auto semaphore : rendered_)
     if (semaphore)
-      vkDestroySemaphore(lifetime_->Device(), semaphore, nullptr);
+      vkDestroySemaphore(device_->Device(), semaphore, nullptr);
   rendered_.clear();
   images_.clear();
   if (swapchain_)
-    vkDestroySwapchainKHR(lifetime_->Device(), swapchain_, nullptr);
+    vkDestroySwapchainKHR(device_->Device(), swapchain_, nullptr);
   swapchain_ = VK_NULL_HANDLE;
 }
 
@@ -141,8 +140,8 @@ bool VulkanWindow::Rebuild() {
   glfwGetFramebufferSize(NativeWindow(), &width, &height);
   if (width <= 0 || height <= 0)
     return true;
-  const auto physical = lifetime_->PhysicalDevice();
-  const auto device = lifetime_->Device();
+  const auto physical = device_->PhysicalDevice();
+  const auto device = device_->Device();
   VkSurfaceCapabilitiesKHR caps{};
   if (!Check(vkGetPhysicalDeviceSurfaceCapabilitiesKHR(physical, surface_, &caps), "Surface capabilities"))
     return false;
@@ -207,7 +206,7 @@ bool VulkanWindow::Rebuild() {
   }
   create.presentMode = mode;
   create.clipped = VK_TRUE;
-  std::lock_guard<std::mutex> lock(lifetime_->QueueMutex());
+  std::lock_guard<std::mutex> lock(device_->QueueMutex());
   if (swapchain_) {
     if (pending_acquire_) {
       VkResult result;

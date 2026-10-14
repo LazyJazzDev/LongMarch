@@ -1,5 +1,7 @@
 #include "grassland/rhi/backend/backend_device.h"
 
+#include <cassert>
+
 #include "grassland/rhi/backend/backend_command_context.h"
 #include "grassland/rhi/backend/backend_core.h"
 #include "grassland/rhi/backend/backend_queue.h"
@@ -11,7 +13,7 @@ namespace {
 std::atomic<uint64_t> next_identity{1};
 }
 
-IDevice::IDevice(PhysicalDevice info, const ObjectPtr<ICore> &core)
+IDevice::IDevice(PhysicalDevice info, ICore *core)
     : core_(core),
       info_(std::move(info)),
       queue_identity_(next_identity.fetch_add(1)) {
@@ -23,6 +25,30 @@ IDevice::~IDevice() {
 
 const PhysicalDevice &IDevice::GetPhysicalDevice() const noexcept {
   return info_;
+}
+
+ICore *IDevice::Core() const {
+  return core_;
+}
+
+ObjectPtr<IWindow> IDevice::ManageWindow(std::unique_ptr<IWindow> window) {
+  if (!window)
+    return {};
+  CollectWindows();
+  auto result = ObjectPtr<IWindow>::Adopt(window.release());
+  std::lock_guard<std::mutex> lock(windows_mutex_);
+  windows_.push_back(result);
+  return result;
+}
+
+void IDevice::CollectWindows() {
+  std::lock_guard<std::mutex> lock(windows_mutex_);
+  for (auto it = windows_.begin(); it != windows_.end();) {
+    if ((*it)->IsUniquelyOwned() && !(*it)->HasFrameLeases())
+      it = windows_.erase(it);
+    else
+      ++it;
+  }
 }
 
 const void *IDevice::NativeIdentity() const {
@@ -128,6 +154,7 @@ void IDevice::Collect() {
     } while (status == SubmissionStatus::Pending);
     // Release payload before publishing completion; tokens never keep it alive.
     pending.commands.Reset();
+    CollectWindows();
     pending.completion->Complete(status);
   }
 }
@@ -140,6 +167,11 @@ void IDevice::ShutdownQueues() {
   changed_.notify_one();
   if (collector_.joinable())
     collector_.join();
+  // Derived destructors call this before destroying their native device.
+  for (const auto &window : windows_) {
+    assert(window->IsUniquelyOwned() && !window->HasFrameLeases());
+  }
+  windows_.clear();
 }
 
 }  // namespace grassland::rhi::backend

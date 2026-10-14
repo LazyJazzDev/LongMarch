@@ -2,6 +2,7 @@
 
 #include <gtest/gtest.h>
 
+#include <type_traits>
 #include <utility>
 
 #include "grassland/rhi/backend/backend_core.h"
@@ -33,9 +34,7 @@ struct Calls {
 
 class TestDevice final : public backend::IDevice {
  public:
-  TestDevice(PhysicalDevice info, const backend::ObjectPtr<backend::ICore> &core, Calls &calls)
-      : IDevice(std::move(info), core),
-        calls_(calls) {
+  TestDevice(PhysicalDevice info, backend::ICore *core, Calls &calls) : IDevice(std::move(info), core), calls_(calls) {
   }
 
   ~TestDevice() override {
@@ -63,8 +62,7 @@ class TestCore final : public backend::ICore {
     return devices_;
   }
 
-  std::unique_ptr<backend::IDevice> CreateDevice(int32_t id,
-                                                 const backend::ObjectPtr<backend::ICore> &owner) const override {
+  std::unique_ptr<backend::IDevice> CreateDevice(int32_t id, backend::ICore *owner) const override {
     calls_.selected = id;
     ++calls_.creates;
     if (fail_)
@@ -146,7 +144,17 @@ TEST(RhiCore, CreationFailureIsEmptyAndDoesNotSilentlyChooseAnotherDevice) {
   EXPECT_EQ(calls.creates, 1);
 }
 
-TEST(RhiOwnership, DeviceKeepsCoreAliveAcrossCopyMoveAndRelease) {
+TEST(RhiOwnership, CallerReleasesAllChildCopiesBeforeParent) {
+  static_assert(std::is_base_of_v<ObjectContainer, Core>);
+  static_assert(std::is_base_of_v<ObjectContainer, Device>);
+  static_assert(std::is_base_of_v<ObjectContainer, Window>);
+  static_assert(std::is_base_of_v<ObjectContainer, Image>);
+  static_assert(std::is_base_of_v<ObjectContainer, Queue>);
+  static_assert(std::is_base_of_v<ObjectContainer, SubmissionToken>);
+  static_assert(std::is_base_of_v<ObjectContainer, CommandContext>);
+  static_assert(std::is_base_of_v<ObjectContainer, RecordedCommands>);
+  static_assert(sizeof(Core) == sizeof(ObjectRef));
+  static_assert(sizeof(Image) == sizeof(ObjectRef));
   Calls calls;
   auto core = backend::Access::Adopt<Core>(std::make_unique<TestCore>(
       std::vector<PhysicalDevice>{MakePhysicalDevice(PHYSICAL_DEVICE_TYPE_DEDICATED, 8, true, true, true)}, calls));
@@ -155,14 +163,19 @@ TEST(RhiOwnership, DeviceKeepsCoreAliveAcrossCopyMoveAndRelease) {
   EXPECT_FALSE(copy);
   auto device = moved.CreateDevice(0);
   core = {};
-  moved = {};
+  EXPECT_TRUE(backend::Access::As<backend::ICore>(moved).IsUniquelyOwned());
   EXPECT_EQ(calls.core_destructions, 0);
   Device shared = device;
-  device = {};
+  ObjectContainer &container = device;
+  container.Release();
+  container.Release();  // Empty release is safe and does not affect another copy.
+  EXPECT_FALSE(device);
   EXPECT_EQ(shared.Name(), "Test device");
   EXPECT_TRUE(shared.SupportRayQuery());
   EXPECT_EQ(calls.device_destructions, 0);
-  shared = {};
+  shared.Release();
+  EXPECT_EQ(calls.core_destructions, 0);
+  moved.Release();
   EXPECT_EQ(calls.device_destructions, 1);
   EXPECT_EQ(calls.core_destructions, 1);
   EXPECT_TRUE(calls.device_destroyed_before_core);
@@ -215,9 +228,9 @@ TEST_P(RhiNative, EnumerateCreateEveryDeviceAndSelectWithAllRequirementCombinati
   auto device = core.CreateDeviceByAutoSelection();
   ASSERT_TRUE(device);
   auto name = device.Name();
-  core = {};
   EXPECT_EQ(device.Name(), name);
-  device = {};
+  device.Release();
+  core.Release();
 }
 
 std::vector<BackendAPI> NativeBackends() {

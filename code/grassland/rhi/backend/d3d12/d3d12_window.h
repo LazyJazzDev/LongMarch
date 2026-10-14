@@ -8,7 +8,7 @@ namespace grassland::rhi::backend::d3d12 {
 
 class D3D12Window final : public IWindow {
  public:
-  explicit D3D12Window(std::shared_ptr<D3D12Device::BackendLifetime> lifetime);
+  explicit D3D12Window(D3D12Device *device);
   ~D3D12Window() override;
   bool Initialize(const WindowDesc &desc);
   ObjectPtr<IImage> AcquireFrame() override;
@@ -21,7 +21,7 @@ class D3D12Window final : public IWindow {
 
  private:
   bool Rebuild(int width, int height);
-  std::shared_ptr<D3D12Device::BackendLifetime> lifetime_;
+  D3D12Device *device_;
   ComPtr<IDXGISwapChain3> swapchain_;
   ComPtr<ID3D12DescriptorHeap> rtv_;
   std::array<ComPtr<ID3D12Resource>, 3> images_;

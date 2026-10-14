@@ -4,11 +4,12 @@
 
 namespace grassland::rhi::backend::vulkan {
 
-VulkanImage::VulkanImage(ImageDesc desc, const ObjectPtr<VulkanWindow> &window, uint64_t generation, VkDevice device)
+VulkanImage::VulkanImage(ImageDesc desc, VulkanWindow *window, uint64_t generation, VkDevice device)
     : IImage(desc),
       window_(window),
       generation_(generation),
       device_(device) {
+  window_->AcquireFrameLease();
 }
 
 bool VulkanImage::Acquire() {
@@ -37,6 +38,7 @@ VulkanImage::~VulkanImage() {
     vkDestroySemaphore(device_, acquired_, nullptr);
   if (acquire_fence_)
     vkDestroyFence(device_, acquire_fence_, nullptr);
+  window_->ReleaseFrameLease();
 }
 
 bool VulkanImage::IsValid() const {

@@ -6,6 +6,8 @@
 
 namespace grassland::rhi {
 
+Device::Device() noexcept = default;
+
 std::string Device::Name() const {
   return *this ? backend::Access::As<backend::IDevice>(*this).GetPhysicalDevice().name : std::string{};
 }
@@ -22,16 +24,14 @@ bool Device::SupportGeometryShader() const {
   return *this && backend::Access::As<backend::IDevice>(*this).GetPhysicalDevice().geometry_shader_feature;
 }
 
-Device::operator bool() const noexcept {
-  return static_cast<bool>(object_);
-}
-
 using namespace backend;
 
 Window Device::CreateWindow(const WindowDesc &desc) const {
   try {
-    if (*this)
-      return Access::Adopt<Window>(Access::As<IDevice>(*this).CreateWindow(desc));
+    if (*this) {
+      auto &device = Access::As<IDevice>(*this);
+      return Access::Share<Window>(device.ManageWindow(device.CreateWindow(desc)));
+    }
     ReportError(-1, "Window creation is unavailable for this device.");
   } catch (const std::bad_alloc &) {
     ReportError(-1, "Window creation ran out of memory.");
@@ -52,7 +52,7 @@ CommandContext Device::CreateCommandContext(const Queue &queue) const {
   if (!*this || !queue)
     return {};
   const auto &impl = Access::As<IQueue>(queue);
-  if (impl.Owner().Get() != &Access::As<IDevice>(*this)) {
+  if (impl.Owner() != &Access::As<IDevice>(*this)) {
     ReportError(-1, "The queue belongs to another device.");
     return {};
   }

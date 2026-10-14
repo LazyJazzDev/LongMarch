@@ -5,7 +5,7 @@
 namespace grassland::rhi::backend::d3d12 {
 
 D3D12Image::D3D12Image(ImageDesc desc,
-                       const ObjectPtr<D3D12Window> &window,
+                       D3D12Window *window,
                        uint64_t generation,
                        ID3D12Resource *image,
                        D3D12_CPU_DESCRIPTOR_HANDLE rtv)
@@ -14,11 +14,13 @@ D3D12Image::D3D12Image(ImageDesc desc,
       generation_(generation),
       image_(image),
       rtv_(rtv) {
+  window_->AcquireFrameLease();
 }
 
 D3D12Image::~D3D12Image() {
   if (!presented_)
     window_->CancelFrame(generation_);
+  window_->ReleaseFrameLease();
 }
 
 bool D3D12Image::IsValid() const {

@@ -4,7 +4,7 @@
 
 namespace grassland::rhi::backend::metal {
 
-MetalDevice::MetalDevice(PhysicalDevice info, const ObjectPtr<ICore> &core, NS::SharedPtr<MTL::Device> device)
+MetalDevice::MetalDevice(PhysicalDevice info, ICore *core, NS::SharedPtr<MTL::Device> device)
     : IDevice(std::move(info), core),
       device_(std::move(device)) {
 }

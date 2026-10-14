@@ -8,7 +8,7 @@ class VulkanWindow;
 
 class VulkanImage final : public IImage {
  public:
-  VulkanImage(ImageDesc desc, const ObjectPtr<VulkanWindow> &window, uint64_t generation, VkDevice device);
+  VulkanImage(ImageDesc desc, VulkanWindow *window, uint64_t generation, VkDevice device);
   ~VulkanImage() override;
   bool Acquire();
   bool IsValid() const override;
@@ -19,7 +19,7 @@ class VulkanImage final : public IImage {
   VkResult Present();
 
  private:
-  ObjectPtr<VulkanWindow> window_;
+  VulkanWindow *window_;
   uint64_t generation_;
   VkDevice device_;
   VkImage image_{};

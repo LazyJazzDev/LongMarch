@@ -1,4 +1,6 @@
 #include "grassland/rhi/backend/backend_window.h"
+
+#include <cassert>
 #define GLFW_INCLUDE_NONE
 #include <GLFW/glfw3.h>
 
@@ -6,7 +8,20 @@ namespace grassland::rhi::backend {
 
 IWindow::IWindow() = default;
 
+void IWindow::AcquireFrameLease() {
+  frame_leases_.fetch_add(1, std::memory_order_relaxed);
+}
+
+void IWindow::ReleaseFrameLease() {
+  frame_leases_.fetch_sub(1, std::memory_order_release);
+}
+
+bool IWindow::HasFrameLeases() const {
+  return frame_leases_.load(std::memory_order_acquire) != 0;
+}
+
 IWindow::~IWindow() {
+  assert(!HasFrameLeases());
   glfw::DestroyWindow(window_);
 }
 

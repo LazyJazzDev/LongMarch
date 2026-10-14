@@ -6,14 +6,14 @@ namespace grassland::rhi::backend {
 
 class IQueue : public IObject {
  public:
-  IQueue(const ObjectPtr<IDevice> &device, QueueType type);
+  IQueue(IDevice *device, QueueType type);
   ~IQueue() override;
-  const ObjectPtr<IDevice> &Owner() const;
+  IDevice *Owner() const;
   QueueType Type() const;
   virtual std::unique_ptr<ICommandContext> CreateCommandContext() const = 0;
 
  private:
-  ObjectPtr<IDevice> device_;
+  IDevice *device_;
   QueueType type_;
 };
 

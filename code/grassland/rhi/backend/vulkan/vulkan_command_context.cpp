@@ -5,16 +5,16 @@
 
 namespace grassland::rhi::backend::vulkan {
 
-VulkanCommandContext::VulkanCommandContext(std::shared_ptr<VulkanDevice::BackendLifetime> lifetime, QueueType type)
-    : ICommandContext(lifetime.get(), type),
-      lifetime_(std::move(lifetime)) {
+VulkanCommandContext::VulkanCommandContext(VulkanDevice *device, QueueType type)
+    : ICommandContext(device, type),
+      device_(device) {
 }
 
 VulkanCommandContext::~VulkanCommandContext() {
   if (fence_)
-    vkDestroyFence(lifetime_->Device(), fence_, nullptr);
+    vkDestroyFence(device_->Device(), fence_, nullptr);
   if (pool_)
-    vkDestroyCommandPool(lifetime_->Device(), pool_, nullptr);
+    vkDestroyCommandPool(device_->Device(), pool_, nullptr);
 }
 
 ICommandContext::SubmitResult VulkanCommandContext::SubmitNative() {
@@ -22,9 +22,9 @@ ICommandContext::SubmitResult VulkanCommandContext::SubmitNative() {
     ReportError(-1, "Present must run on the window thread.");
     return SubmitResult::Rejected;
   }
-  const auto device = lifetime_->Device();
+  const auto device = device_->Device();
   VkCommandPoolCreateInfo pool{VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO};
-  pool.queueFamilyIndex = lifetime_->QueueFamily();
+  pool.queueFamilyIndex = device_->QueueFamily();
   pool.flags = VK_COMMAND_POOL_CREATE_TRANSIENT_BIT;
   VkFenceCreateInfo fence{VK_STRUCTURE_TYPE_FENCE_CREATE_INFO};
   if (!Check(vkCreateCommandPool(device, &pool, nullptr, &pool_), "Create command pool") ||
@@ -78,8 +78,8 @@ ICommandContext::SubmitResult VulkanCommandContext::SubmitNative() {
     submit.pWaitDstStageMask = &stage;
     submit.pSignalSemaphores = &rendered;
   }
-  std::lock_guard<std::mutex> lock(lifetime_->QueueMutex());
-  if (!Check(vkQueueSubmit(lifetime_->Queue(), 1, &submit, fence_), "vkQueueSubmit"))
+  std::lock_guard<std::mutex> lock(device_->QueueMutex());
+  if (!Check(vkQueueSubmit(device_->Queue(), 1, &submit, fence_), "vkQueueSubmit"))
     return SubmitResult::Rejected;
   MarkSubmitted();
   failed_ = true;
@@ -88,7 +88,7 @@ ICommandContext::SubmitResult VulkanCommandContext::SubmitNative() {
 }
 
 SubmissionStatus VulkanCommandContext::WaitForProgress() {
-  const auto result = vkWaitForFences(lifetime_->Device(), 1, &fence_, VK_TRUE, 50000000);
+  const auto result = vkWaitForFences(device_->Device(), 1, &fence_, VK_TRUE, 50000000);
   if (result == VK_TIMEOUT)
     return SubmissionStatus::Pending;
   if (result == VK_ERROR_DEVICE_LOST)
@@ -96,8 +96,8 @@ SubmissionStatus VulkanCommandContext::WaitForProgress() {
   if (result != VK_SUCCESS)
     failed_ = true;
   if (failed_) {
-    std::lock_guard<std::mutex> lock(lifetime_->QueueMutex());
-    const auto idle = vkDeviceWaitIdle(lifetime_->Device());
+    std::lock_guard<std::mutex> lock(device_->QueueMutex());
+    const auto idle = vkDeviceWaitIdle(device_->Device());
     return idle == VK_SUCCESS || idle == VK_ERROR_DEVICE_LOST ? SubmissionStatus::Failed : SubmissionStatus::Pending;
   }
   return SubmissionStatus::Completed;

@@ -37,7 +37,7 @@ TEST(RhiMetal, CapabilitiesMatchNativeDeviceAndEnumerationRemainsStable) {
   EXPECT_FALSE(core.CreateDeviceByAutoSelection({false, false, true}));
 }
 
-TEST(RhiMetal, NativeDeviceSurvivesCoreAndSiblingReleaseAndCanExecuteWork) {
+TEST(RhiMetal, NativeDeviceExecutesWorkBeforeParentRelease) {
   auto pool = NS::TransferPtr(NS::AutoreleasePool::alloc()->init());
   auto core = CreateCore(BACKEND_API_METAL);
   ASSERT_TRUE(core);
@@ -45,7 +45,6 @@ TEST(RhiMetal, NativeDeviceSurvivesCoreAndSiblingReleaseAndCanExecuteWork) {
   auto device = core.CreateDeviceByAutoSelection();
   ASSERT_TRUE(first);
   ASSERT_TRUE(device);
-  core = {};
   first = {};
   auto native = backend::Access::As<backend::metal::MetalDevice>(device).NativeDevice();
   auto queue = NS::TransferPtr(native->newCommandQueue());

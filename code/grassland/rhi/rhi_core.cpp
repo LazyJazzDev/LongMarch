@@ -6,6 +6,8 @@
 
 namespace grassland::rhi {
 
+Core::Core() noexcept = default;
+
 Core CreateCore(BackendAPI api) {
   try {
     return backend::Access::Adopt<Core>(backend::CreateCore(api));
@@ -35,8 +37,7 @@ Device Core::CreateDevice(int32_t device_idx) const {
       ReportError(-1, "Physical device ID is out of range.");
       return {};
     }
-    return backend::Access::Adopt<Device>(
-        core.CreateDevice(device_idx, backend::Access::Retain<backend::ICore>(*this)));
+    return backend::Access::Adopt<Device>(core.CreateDevice(device_idx, &backend::Access::As<backend::ICore>(*this)));
   } catch (const std::bad_alloc &) {
     // Standard-library allocation is the exceptional boundary; native failures return empty directly.
     return {};
@@ -50,10 +51,6 @@ Device Core::CreateDeviceByAutoSelection(DeviceFeatureRequirement requirement) c
     return {};
   }
   return CreateDevice(device_idx);
-}
-
-Core::operator bool() const noexcept {
-  return static_cast<bool>(object_);
 }
 
 }  // namespace grassland::rhi

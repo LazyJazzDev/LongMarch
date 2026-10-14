@@ -11,6 +11,10 @@ class IWindow : public IObject {
   bool ShouldClose() const;
   bool IsKeyDown(Key key) const;
   bool SetTitle(const std::string &title);
+  // An acquired Image carries one frame lease until all recorded/GPU uses end.
+  void AcquireFrameLease();
+  void ReleaseFrameLease();
+  bool HasFrameLeases() const;
   virtual ObjectPtr<IImage> AcquireFrame() = 0;
   virtual bool SetPresentMode(PresentMode mode) = 0;
   virtual PresentMode GetPresentMode() const = 0;
@@ -21,6 +25,7 @@ class IWindow : public IObject {
 
  private:
   GLFWwindow *window_{};
+  std::atomic<uint32_t> frame_leases_{};
 };
 
 }  // namespace grassland::rhi::backend

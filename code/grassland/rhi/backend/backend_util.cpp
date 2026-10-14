@@ -11,4 +11,8 @@ void IObject::Release() noexcept {
 }
 
 IObject::~IObject() = default;
+
+bool IObject::IsUniquelyOwned() const noexcept {
+  return references_.load(std::memory_order_acquire) == 1;
+}
 }  // namespace grassland::rhi

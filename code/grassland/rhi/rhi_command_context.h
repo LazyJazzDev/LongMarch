@@ -2,24 +2,23 @@
 #include <array>
 
 #include "grassland/rhi/rhi_image.h"
+#include "grassland/rhi/rhi_object_container.h"
 
 namespace grassland::rhi {
-class RecordedCommands {
+class RecordedCommands : public ObjectContainer {
  public:
   RecordedCommands();
   RecordedCommands(RecordedCommands &&) noexcept;
   RecordedCommands &operator=(RecordedCommands &&) noexcept;
   RecordedCommands(const RecordedCommands &) = delete;
   RecordedCommands &operator=(const RecordedCommands &) = delete;
-  explicit operator bool() const noexcept;
 
  private:
   using Interface = backend::ICommandContext;
-  ObjectRef object_;
   friend struct backend::Access;
 };
 
-class CommandContext {
+class CommandContext : public ObjectContainer {
  public:
   CommandContext();
   CommandContext(CommandContext &&) noexcept;
@@ -31,11 +30,9 @@ class CommandContext {
   // Consumes this context, including on failure. This first presentation path
   // records one clear + present pair, or an empty queue submission.
   RecordedCommands Finish();
-  explicit operator bool() const noexcept;
 
  private:
   using Interface = backend::ICommandContext;
-  ObjectRef object_;
   friend struct backend::Access;
 };
 

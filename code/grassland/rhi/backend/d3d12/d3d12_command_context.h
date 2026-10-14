@@ -6,13 +6,13 @@ namespace grassland::rhi::backend::d3d12 {
 
 class D3D12CommandContext final : public ICommandContext {
  public:
-  D3D12CommandContext(std::shared_ptr<D3D12Device::BackendLifetime> lifetime, QueueType type);
+  D3D12CommandContext(D3D12Device *device, QueueType type);
   ~D3D12CommandContext() override;
   SubmitResult SubmitNative() override;
   SubmissionStatus WaitForProgress() override;
 
  private:
-  std::shared_ptr<D3D12Device::BackendLifetime> lifetime_;
+  D3D12Device *device_;
   ComPtr<ID3D12CommandAllocator> allocator_;
   ComPtr<ID3D12GraphicsCommandList> list_;
   HANDLE event_{};

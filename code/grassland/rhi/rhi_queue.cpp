@@ -4,6 +4,10 @@
 #include "grassland/rhi/rhi_device.h"
 
 namespace grassland::rhi {
+
+Queue::Queue() noexcept = default;
+SubmissionToken::SubmissionToken() noexcept = default;
+
 using namespace backend;
 
 SubmissionStatus SubmissionToken::GetStatus() const {
@@ -12,10 +16,6 @@ SubmissionStatus SubmissionToken::GetStatus() const {
 
 bool SubmissionToken::WaitHost() const {
   return *this && Access::As<IDevice::SubmissionState>(*this).Wait();
-}
-
-SubmissionToken::operator bool() const noexcept {
-  return static_cast<bool>(object_);
 }
 
 SubmissionToken Queue::Submit(RecordedCommands &&commands, const SubmitInfo &info) const {
@@ -48,11 +48,7 @@ QueueType Queue::GetType() const {
 
 bool Queue::SharesPhysicalQueue(const Queue &other) const {
   // This first implementation deliberately maps both roles to one graphics queue.
-  return *this && other && Access::As<IQueue>(*this).Owner().Get() == Access::As<IQueue>(other).Owner().Get();
-}
-
-Queue::operator bool() const noexcept {
-  return static_cast<bool>(object_);
+  return *this && other && Access::As<IQueue>(*this).Owner() == Access::As<IQueue>(other).Owner();
 }
 
 }  // namespace grassland::rhi

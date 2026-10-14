@@ -8,7 +8,7 @@ class D3D12Core final : public ICore {
  public:
   static std::unique_ptr<D3D12Core> CreateD3D12Core();
   std::vector<PhysicalDevice> GetPhysicalDevices() const override;
-  std::unique_ptr<IDevice> CreateDevice(int32_t device_idx, const ObjectPtr<ICore> &owner) const override;
+  std::unique_ptr<IDevice> CreateDevice(int32_t device_idx, ICore *owner) const override;
 
  private:
   struct Adapter {

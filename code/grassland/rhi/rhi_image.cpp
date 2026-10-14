@@ -4,6 +4,9 @@
 #include "grassland/rhi/rhi_device.h"
 
 namespace grassland::rhi {
+
+Image::Image() noexcept = default;
+
 using namespace backend;
 
 ImageDesc Image::GetDesc() const {
@@ -11,7 +14,7 @@ ImageDesc Image::GetDesc() const {
 }
 
 Image::operator bool() const noexcept {
-  return object_ && Access::As<IImage>(*this).IsValid();
+  return ObjectContainer::operator bool() && Access::As<IImage>(*this).IsValid();
 }
 
 }  // namespace grassland::rhi

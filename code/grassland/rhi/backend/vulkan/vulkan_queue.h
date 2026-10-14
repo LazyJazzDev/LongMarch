@@ -6,7 +6,7 @@ namespace grassland::rhi::backend::vulkan {
 
 class VulkanQueue final : public IQueue {
  public:
-  VulkanQueue(const ObjectPtr<VulkanDevice> &device, QueueType type);
+  VulkanQueue(VulkanDevice *device, QueueType type);
   std::unique_ptr<ICommandContext> CreateCommandContext() const override;
 };
 

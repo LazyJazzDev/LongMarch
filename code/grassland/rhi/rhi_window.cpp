@@ -4,6 +4,9 @@
 #include "grassland/rhi/rhi_device.h"
 
 namespace grassland::rhi {
+
+Window::Window() noexcept = default;
+
 using namespace backend;
 
 bool Window::PollEvents() {
@@ -43,10 +46,6 @@ bool Window::SetPresentMode(PresentMode mode) const {
 
 PresentMode Window::GetPresentMode() const {
   return *this ? Access::As<IWindow>(*this).GetPresentMode() : PresentMode::VSync;
-}
-
-Window::operator bool() const noexcept {
-  return static_cast<bool>(object_);
 }
 
 }  // namespace grassland::rhi

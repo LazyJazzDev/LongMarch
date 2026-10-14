@@ -1,9 +1,11 @@
 #pragma once
 #include "grassland/rhi/rhi_image.h"
+#include "grassland/rhi/rhi_object_container.h"
 
 namespace grassland::rhi {
-class Window {
+class Window : public ObjectContainer {
  public:
+  Window() noexcept;
   // Window creation, events, acquisition and presentation run on the main thread.
   static bool PollEvents();
   bool ShouldClose() const;
@@ -12,11 +14,9 @@ class Window {
   Image AcquireFrame() const;
   bool SetPresentMode(PresentMode mode) const;
   PresentMode GetPresentMode() const;
-  explicit operator bool() const noexcept;
 
  private:
   using Interface = backend::IWindow;
-  ObjectRef object_;
   friend struct backend::Access;
 };
 

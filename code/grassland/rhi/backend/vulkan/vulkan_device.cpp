@@ -6,18 +6,17 @@
 
 namespace grassland::rhi::backend::vulkan {
 
-VulkanDevice::VulkanDevice(PhysicalDevice info, const ObjectPtr<ICore> &core) : IDevice(std::move(info), core) {
+VulkanDevice::VulkanDevice(grassland::rhi::PhysicalDevice info, ICore *core) : IDevice(std::move(info), core) {
 }
 
 VulkanDevice::~VulkanDevice() {
   ShutdownQueues();
-  // device_ is non-null only until ownership transfers to BackendLifetime.
   if (device_)
     vkDestroyDevice(device_, nullptr);
 }
 
-std::unique_ptr<VulkanDevice> VulkanDevice::CreateVulkanDevice(PhysicalDevice info,
-                                                               const ObjectPtr<ICore> &core,
+std::unique_ptr<VulkanDevice> VulkanDevice::CreateVulkanDevice(grassland::rhi::PhysicalDevice info,
+                                                               ICore *core,
                                                                VkPhysicalDevice physical_device,
                                                                uint32_t api_version) {
   auto device = std::unique_ptr<VulkanDevice>(new VulkanDevice(std::move(info), core));
@@ -60,72 +59,48 @@ std::unique_ptr<VulkanDevice> VulkanDevice::CreateVulkanDevice(PhysicalDevice in
   const bool swapchain = std::any_of(enabled.Extensions().begin(), enabled.Extensions().end(), [](const char *name) {
     return std::strcmp(name, VK_KHR_SWAPCHAIN_EXTENSION_NAME) == 0;
   });
-  device->lifetime_ =
-      std::make_shared<BackendLifetime>(device->device_, physical_device, core, graphics_family, swapchain);
-  device->device_ = VK_NULL_HANDLE;
+  device->physical_ = physical_device;
+  device->family_ = graphics_family;
+  device->swapchain_ = swapchain;
+  vkGetDeviceQueue(device->device_, graphics_family, 0, &device->queue_);
   return device;
 }
 
-VulkanDevice::BackendLifetime::BackendLifetime(VkDevice device,
-                                               VkPhysicalDevice physical,
-                                               const ObjectPtr<ICore> &core,
-                                               uint32_t family,
-                                               bool swapchain)
-    : core_(core),
-      device_(device),
-      physical_(physical),
-      family_(family),
-      swapchain_(swapchain) {
-  vkGetDeviceQueue(device_, family_, 0, &queue_);
-}
-
-VulkanDevice::BackendLifetime::~BackendLifetime() {
-  vkDestroyDevice(device_, nullptr);
-}
-
-VkDevice VulkanDevice::BackendLifetime::Device() const {
+VkDevice VulkanDevice::Device() const {
   return device_;
 }
 
-VkPhysicalDevice VulkanDevice::BackendLifetime::PhysicalDevice() const {
+VkPhysicalDevice VulkanDevice::PhysicalDevice() const {
   return physical_;
 }
 
-VkInstance VulkanDevice::BackendLifetime::Instance() const {
-  return static_cast<VulkanCore *>(core_.Get())->Instance();
+VkInstance VulkanDevice::Instance() const {
+  return static_cast<VulkanCore *>(Core())->Instance();
 }
 
-VkQueue VulkanDevice::BackendLifetime::Queue() const {
+VkQueue VulkanDevice::Queue() const {
   return queue_;
 }
 
-uint32_t VulkanDevice::BackendLifetime::QueueFamily() const {
+uint32_t VulkanDevice::QueueFamily() const {
   return family_;
 }
 
-bool VulkanDevice::BackendLifetime::SupportsSwapchain() const {
+bool VulkanDevice::SupportsSwapchain() const {
   return swapchain_;
 }
 
-std::mutex &VulkanDevice::BackendLifetime::QueueMutex() {
+std::mutex &VulkanDevice::QueueMutex() {
   return mutex_;
 }
 
-const std::shared_ptr<VulkanDevice::BackendLifetime> &VulkanDevice::NativeLifetime() const {
-  return lifetime_;
-}
-
-const void *VulkanDevice::NativeIdentity() const {
-  return lifetime_.get();
-}
-
 std::unique_ptr<IWindow> VulkanDevice::CreateWindow(const WindowDesc &desc) {
-  auto window = std::make_unique<VulkanWindow>(lifetime_);
+  auto window = std::make_unique<VulkanWindow>(this);
   return window->Initialize(desc) ? std::unique_ptr<IWindow>(std::move(window)) : nullptr;
 }
 
 std::unique_ptr<IQueue> VulkanDevice::CreateQueue(QueueType type) {
-  return std::make_unique<VulkanQueue>(ObjectPtr<VulkanDevice>::Retain(this), type);
+  return std::make_unique<VulkanQueue>(this, type);
 }
 
 }  // namespace grassland::rhi::backend::vulkan

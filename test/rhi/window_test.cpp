@@ -2,6 +2,7 @@
 
 #include <cstdlib>
 
+#include "grassland/rhi/backend/backend_window.h"
 #include "grassland/rhi/rhi.h"
 
 #ifdef _WIN32
@@ -96,16 +97,22 @@ TEST_P(RhiWindow, MultipleWindowsSingleUseFramesModesAndQueueLifetime) {
   auto context = device.CreateCommandContext(graphics);
   ASSERT_TRUE(context.ClearColor(frame, {0, 0, 1, 1}));
   ASSERT_TRUE(context.Present(frame));
-  first = {};
-  second = {};
-  frame = {};
-  device = {};
-  core = {};
+  auto &window_backend = backend::Access::As<backend::IWindow>(second);
+  frame.Release();
+  first.Release();
+  second.Release();
+  // Only Device owns the Window. The recorded Image holds a frame lease,
+  // not a strong Window reference, and keeps that lease until GPU completion.
+  EXPECT_TRUE(window_backend.IsUniquelyOwned());
+  EXPECT_TRUE(window_backend.HasFrameLeases());
   last = graphics.Submit(context.Finish(), {{ready}});
   ASSERT_TRUE(last);
-  graphics = {};
-  transfer = {};  // Teardown drains work even with tokens retained.
-  EXPECT_TRUE(last.WaitHost());
+  last.Release();
+  ready.Release();
+  graphics.Release();
+  transfer.Release();
+  device.Release();  // Device drains work after caller-owned children are released.
+  core.Release();
   EXPECT_TRUE(Window::PollEvents());  // Main-thread GLFW destruction after retirement.
 }
 

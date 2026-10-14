@@ -8,12 +8,12 @@
 
 namespace grassland::rhi::backend::d3d12 {
 
-D3D12Window::D3D12Window(std::shared_ptr<D3D12Device::BackendLifetime> lifetime) : lifetime_(std::move(lifetime)) {
+D3D12Window::D3D12Window(D3D12Device *device) : device_(device) {
 }
 
 D3D12Window::~D3D12Window() {
-  std::lock_guard<std::mutex> lock(lifetime_->QueueMutex());
-  lifetime_->WaitIdle();
+  std::lock_guard<std::mutex> lock(device_->QueueMutex());
+  device_->WaitIdle();
 }
 
 bool D3D12Window::Initialize(const WindowDesc &desc) {
@@ -30,7 +30,7 @@ bool D3D12Window::IsFrameValid(uint64_t generation) const {
 }
 
 const void *D3D12Window::DeviceIdentity() const {
-  return lifetime_.get();
+  return device_;
 }
 
 void D3D12Window::CancelFrame(uint64_t generation) {
@@ -64,14 +64,13 @@ ObjectPtr<IImage> D3D12Window::AcquireFrame() {
   const UINT index = swapchain_->GetCurrentBackBufferIndex();
   auto rtv = rtv_->GetCPUDescriptorHandleForHeapStart();
   rtv.ptr += index * stride_;
-  auto frame = ObjectPtr<IImage>::Adopt(
-      new D3D12Image(desc_, ObjectPtr<D3D12Window>::Retain(this), generation_, images_[index].Get(), rtv));
+  auto frame = ObjectPtr<IImage>::Adopt(new D3D12Image(desc_, this, generation_, images_[index].Get(), rtv));
   acquired_ = true;
   return frame;
 }
 
 bool D3D12Window::SetPresentMode(PresentMode mode) {
-  mode_ = mode == PresentMode::Continuous && lifetime_->SupportsTearing() ? mode : PresentMode::VSync;
+  mode_ = mode == PresentMode::Continuous && device_->SupportsTearing() ? mode : PresentMode::VSync;
   return true;
 }
 
@@ -82,10 +81,10 @@ PresentMode D3D12Window::GetPresentMode() const {
 bool D3D12Window::Rebuild(int width, int height) {
   if (width <= 0 || height <= 0)
     return false;
-  std::lock_guard<std::mutex> lock(lifetime_->QueueMutex());
-  const UINT flags = lifetime_->SupportsTearing() ? DXGI_SWAP_CHAIN_FLAG_ALLOW_TEARING : 0;
+  std::lock_guard<std::mutex> lock(device_->QueueMutex());
+  const UINT flags = device_->SupportsTearing() ? DXGI_SWAP_CHAIN_FLAG_ALLOW_TEARING : 0;
   if (swapchain_) {
-    if (!lifetime_->WaitIdle())
+    if (!device_->WaitIdle())
       return false;
     ++generation_;
     valid_ = false;
@@ -107,23 +106,23 @@ bool D3D12Window::Rebuild(int width, int height) {
     desc.Flags = flags;
     ComPtr<IDXGISwapChain1> chain;
     const HWND hwnd = glfwGetWin32Window(NativeWindow());
-    if (!Check(lifetime_->Factory()->CreateSwapChainForHwnd(lifetime_->Queue(), hwnd, &desc, nullptr, nullptr, &chain),
+    if (!Check(device_->Factory()->CreateSwapChainForHwnd(device_->Queue(), hwnd, &desc, nullptr, nullptr, &chain),
                "CreateSwapChainForHwnd") ||
         !Check(chain.As(&swapchain_), "Query IDXGISwapChain3"))
       return false;
-    lifetime_->Factory()->MakeWindowAssociation(hwnd, DXGI_MWA_NO_ALT_ENTER);
+    device_->Factory()->MakeWindowAssociation(hwnd, DXGI_MWA_NO_ALT_ENTER);
   }
   D3D12_DESCRIPTOR_HEAP_DESC heap{};
   heap.Type = D3D12_DESCRIPTOR_HEAP_TYPE_RTV;
   heap.NumDescriptors = 3;
-  if (!Check(lifetime_->Device()->CreateDescriptorHeap(&heap, IID_PPV_ARGS(&rtv_)), "Create RTV heap"))
+  if (!Check(device_->Device()->CreateDescriptorHeap(&heap, IID_PPV_ARGS(&rtv_)), "Create RTV heap"))
     return false;
-  stride_ = lifetime_->Device()->GetDescriptorHandleIncrementSize(heap.Type);
+  stride_ = device_->Device()->GetDescriptorHandleIncrementSize(heap.Type);
   auto handle = rtv_->GetCPUDescriptorHandleForHeapStart();
   for (UINT i = 0; i < 3; ++i) {
     if (!Check(swapchain_->GetBuffer(i, IID_PPV_ARGS(&images_[i])), "Get swapchain buffer"))
       return false;
-    lifetime_->Device()->CreateRenderTargetView(images_[i].Get(), nullptr, handle);
+    device_->Device()->CreateRenderTargetView(images_[i].Get(), nullptr, handle);
     handle.ptr += stride_;
   }
   desc_ = {static_cast<uint32_t>(width), static_cast<uint32_t>(height), ImageFormat::RGBA8Unorm};

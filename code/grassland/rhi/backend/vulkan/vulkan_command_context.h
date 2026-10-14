@@ -6,13 +6,13 @@ namespace grassland::rhi::backend::vulkan {
 
 class VulkanCommandContext final : public ICommandContext {
  public:
-  VulkanCommandContext(std::shared_ptr<VulkanDevice::BackendLifetime> lifetime, QueueType type);
+  VulkanCommandContext(VulkanDevice *device, QueueType type);
   ~VulkanCommandContext() override;
   SubmitResult SubmitNative() override;
   SubmissionStatus WaitForProgress() override;
 
  private:
-  std::shared_ptr<VulkanDevice::BackendLifetime> lifetime_;
+  VulkanDevice *device_;
   VkCommandPool pool_{};
   VkFence fence_{};
   bool failed_{};

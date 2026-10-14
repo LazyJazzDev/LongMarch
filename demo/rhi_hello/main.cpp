@@ -92,4 +92,9 @@ int main(int argc, char **argv) {
       title_time = now;
     }
   }
+  // Explicit child-before-parent release; Device drains remaining GPU work.
+  graphics.Release();
+  window.Release();
+  device.Release();
+  core.Release();
 }

@@ -6,6 +6,7 @@
 
 #include "grassland/rhi/backend/backend_core.h"
 #include "grassland/rhi/backend/backend_queue.h"
+#include "grassland/rhi/backend/backend_window.h"
 #include "grassland/rhi/rhi.h"
 
 namespace grassland::rhi {
@@ -18,14 +19,50 @@ struct Gate {
   bool complete{};
   int destroyed{};
   int devices_destroyed{};
+  int windows_destroyed{};
+};
+
+class TestWindow final : public IWindow {
+ public:
+  explicit TestWindow(std::shared_ptr<Gate> gate) : gate_(std::move(gate)) {
+  }
+
+  ~TestWindow() override {
+    EXPECT_FALSE(HasFrameLeases());
+    EXPECT_EQ(gate_->devices_destroyed, 0);
+    std::lock_guard<std::mutex> lock(gate_->mutex);
+    ++gate_->windows_destroyed;
+  }
+
+  ObjectPtr<IImage> AcquireFrame() override {
+    return {};
+  }
+
+  bool SetPresentMode(PresentMode) override {
+    return true;
+  }
+
+  PresentMode GetPresentMode() const override {
+    return PresentMode::VSync;
+  }
+
+ private:
+  std::shared_ptr<Gate> gate_;
 };
 
 class TestImage final : public IImage {
  public:
-  explicit TestImage(std::shared_ptr<Gate> gate) : IImage({16, 16, ImageFormat::RGBA8Unorm}), gate_(std::move(gate)) {
+  explicit TestImage(std::shared_ptr<Gate> gate, IWindow *window = nullptr)
+      : IImage({16, 16, ImageFormat::RGBA8Unorm}),
+        gate_(std::move(gate)),
+        window_(window) {
+    if (window_)
+      window_->AcquireFrameLease();
   }
 
   ~TestImage() override {
+    if (window_)
+      window_->ReleaseFrameLease();
     {
       std::lock_guard<std::mutex> lock(gate_->mutex);
       ++gate_->destroyed;
@@ -43,6 +80,7 @@ class TestImage final : public IImage {
 
  private:
   std::shared_ptr<Gate> gate_;
+  IWindow *window_;
 };
 
 class TestCommandContext final : public ICommandContext {
@@ -97,7 +135,7 @@ class TestDevice final : public IDevice {
 
 class TestQueue final : public IQueue {
  public:
-  TestQueue(const ObjectPtr<TestDevice> &device, QueueType type) : IQueue(device, type) {
+  TestQueue(const ObjectPtr<TestDevice> &device, QueueType type) : IQueue(device.Get(), type) {
   }
 
   std::unique_ptr<ICommandContext> CreateCommandContext() const override {
@@ -131,10 +169,11 @@ TEST(RhiCommands, RecordingAndSubmissionKeepExactImageWithoutKeepingPayloadInTok
   gate->changed.notify_all();
   ASSERT_TRUE(token.WaitHost());
   EXPECT_EQ(gate->destroyed, 1);  // The still-live token does not retain the image.
+  token.Release();
+  queue.Release();
   device.Reset();
-  queue = {};
   EXPECT_EQ(gate->devices_destroyed, 1);
-  EXPECT_EQ(token.GetStatus(), SubmissionStatus::Completed);
+  EXPECT_FALSE(token);
 }
 
 TEST(RhiCommands, DroppedTokenStillRetiresSingleSubmissionAutomatically) {
@@ -226,6 +265,55 @@ TEST(RhiCommands, AllocationFailureAfterNativeSubmitKeepsResourcesUntilCompletio
   gate->changed.notify_all();
   std::unique_lock<std::mutex> lock(gate->mutex);
   EXPECT_TRUE(gate->changed.wait_for(lock, std::chrono::seconds(2), [&] { return gate->destroyed == 1; }));
+}
+
+TEST(RhiCommands, DeviceShutdownDrainsWorkAndReclaimsWindowAfterFrameLease) {
+  auto gate = std::make_shared<Gate>();
+  auto device = ObjectPtr<TestDevice>::Adopt(new TestDevice(gate));
+  auto queue = Access::Adopt<Queue>(std::make_unique<TestQueue>(device, QueueType::Graphics));
+  auto managed = device->ManageWindow(std::make_unique<TestWindow>(gate));
+  auto *window_backend = managed.Get();
+  auto window = Access::Share<Window>(managed);
+  managed.Reset();
+  auto image = Access::Adopt<Image>(std::make_unique<TestImage>(gate, window_backend));
+  auto context = Access::Adopt<CommandContext>(std::make_unique<TestCommandContext>(gate, QueueType::Graphics));
+  ASSERT_TRUE(context.ClearColor(image, {0, 0, 0, 1}));
+  ASSERT_TRUE(context.Present(image));
+  image.Release();
+  window.Release();
+  ASSERT_TRUE(window_backend->IsUniquelyOwned());
+  ASSERT_TRUE(window_backend->HasFrameLeases());
+  auto token = queue.Submit(context.Finish());
+  ASSERT_TRUE(token);
+  token.Release();
+  queue.Release();
+  EXPECT_TRUE(device->IsUniquelyOwned());
+  {
+    std::lock_guard<std::mutex> lock(gate->mutex);
+    EXPECT_EQ(gate->destroyed, 0);
+    EXPECT_EQ(gate->windows_destroyed, 0);
+  }
+  // TestDevice makes the simulated GPU complete only when shutdown starts.
+  device.Reset();
+  EXPECT_EQ(gate->destroyed, 1);
+  EXPECT_EQ(gate->windows_destroyed, 1);
+  EXPECT_EQ(gate->devices_destroyed, 1);
+}
+
+TEST(RhiCommands, CancelingRecordingReturnsFrameLeaseWithoutOwningWindow) {
+  auto gate = std::make_shared<Gate>();
+  auto device = ObjectPtr<TestDevice>::Adopt(new TestDevice(gate));
+  auto window = device->ManageWindow(std::make_unique<TestWindow>(gate));
+  auto image = Access::Adopt<Image>(std::make_unique<TestImage>(gate, window.Get()));
+  auto context = Access::Adopt<CommandContext>(std::make_unique<TestCommandContext>(gate, QueueType::Graphics));
+  ASSERT_TRUE(context.ClearColor(image, {0, 0, 0, 1}));
+  image.Release();
+  EXPECT_TRUE(window->HasFrameLeases());
+  context.Release();
+  EXPECT_FALSE(window->HasFrameLeases());
+  window.Reset();
+  device.Reset();
+  EXPECT_EQ(gate->windows_destroyed, 1);
 }
 
 }  // namespace
