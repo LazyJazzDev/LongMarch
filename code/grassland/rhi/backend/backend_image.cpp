@@ -2,19 +2,19 @@
 
 namespace grassland::rhi::backend {
 
-IImage::IImage(ImageDesc desc) : desc_(desc) {
+Image::Image(ImageDesc desc) : desc_(desc) {
 }
 
-const ImageDesc &IImage::GetDesc() const {
+const ImageDesc &Image::GetDesc() const {
   return desc_;
 }
 
-bool IImage::Claim() {
+bool Image::Claim() {
   bool expected = false;
   return claimed_.compare_exchange_strong(expected, true);
 }
 
-void IImage::CancelClaim() {
+void Image::CancelClaim() {
   claimed_ = false;
 }
 

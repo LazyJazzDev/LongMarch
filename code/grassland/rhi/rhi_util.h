@@ -6,35 +6,6 @@
 
 namespace grassland::rhi {
 
-void ReportError(int32_t error_code, const std::string &error_message);
-
-class IObject;
-
-namespace backend {
-struct Access;
-class ICore;
-class IDevice;
-class IWindow;
-class IImage;
-class IQueue;
-class ICommandContext;
-}  // namespace backend
-
-class ObjectRef {
- public:
-  ObjectRef() noexcept;
-  ObjectRef(const ObjectRef &other) noexcept;
-  ObjectRef(ObjectRef &&other) noexcept;
-  ObjectRef &operator=(const ObjectRef &other) noexcept;
-  ObjectRef &operator=(ObjectRef &&other) noexcept;
-  ~ObjectRef();
-  explicit operator bool() const noexcept;
-
- private:
-  IObject *obj_{nullptr};
-  friend struct backend::Access;
-};
-
 typedef enum {
   BACKEND_API_D3D12 = 0,
   BACKEND_API_VULKAN = 1,
@@ -53,9 +24,6 @@ typedef enum {
 
 std::string to_string(BackendAPI api);
 std::string BackendAPIName(BackendAPI api);
-
-class Core;
-class Device;
 
 typedef enum {
   PHYSICAL_DEVICE_TYPE_INTEGRATED = 0,

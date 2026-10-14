@@ -3,7 +3,7 @@
 #include <cstdlib>
 
 #include "grassland/rhi/backend/backend_window.h"
-#include "grassland/rhi/rhi.h"
+#include "grassland/rhi/rhix/rhix.h"
 
 #ifdef _WIN32
 #define NOMINMAX
@@ -11,7 +11,10 @@
 #undef CreateWindow
 #endif
 
-namespace grassland::rhi {
+namespace grassland::rhix {
+using namespace rhi;
+namespace backend = rhi::backend;
+
 namespace {
 
 class RhiWindow : public testing::TestWithParam<BackendAPI> {};
@@ -19,7 +22,7 @@ class RhiWindow : public testing::TestWithParam<BackendAPI> {};
 TEST_P(RhiWindow, MultipleWindowsSingleUseFramesModesAndQueueLifetime) {
   if (!std::getenv("LONGMARCH_RHI_WINDOW_TESTS"))
     GTEST_SKIP() << "Set LONGMARCH_RHI_WINDOW_TESTS=1 on a desktop to run presentation tests.";
-  auto core = CreateCore(GetParam());
+  auto core = rhix::CreateCore(GetParam());
   ASSERT_TRUE(core);
   auto device = core.CreateDeviceByAutoSelection();
   ASSERT_TRUE(device);
@@ -97,7 +100,7 @@ TEST_P(RhiWindow, MultipleWindowsSingleUseFramesModesAndQueueLifetime) {
   auto context = device.CreateCommandContext(graphics);
   ASSERT_TRUE(context.ClearColor(frame, {0, 0, 1, 1}));
   ASSERT_TRUE(context.Present(frame));
-  auto &window_backend = backend::Access::As<backend::IWindow>(second);
+  auto &window_backend = (*static_cast<backend::Window *>((second).Get()));
   frame.Release();
   first.Release();
   second.Release();
@@ -130,4 +133,4 @@ std::vector<BackendAPI> WindowBackends() {
 INSTANTIATE_TEST_SUITE_P(Backends, RhiWindow, testing::ValuesIn(WindowBackends()));
 
 }  // namespace
-}  // namespace grassland::rhi
+}  // namespace grassland::rhix

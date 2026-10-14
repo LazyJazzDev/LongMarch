@@ -1,24 +1,24 @@
-﻿#pragma once
+#pragma once
 #include "grassland/rhi/backend/backend_device.h"
 #include "grassland/rhi/backend/d3d12/d3d12_util.h"
 
 namespace grassland::rhi::backend::d3d12 {
-class D3D12Device final : public IDevice {
+class D3D12Device final : public Device {
  public:
-  D3D12Device(PhysicalDevice info, ICore *core, ComPtr<ID3D12Device> device);
+  D3D12Device(PhysicalDevice info, Core *core, ComPtr<ID3D12Device> device);
   ~D3D12Device() override;
   bool IsInitialized() const;
-  ID3D12Device *Device() const;
+  ID3D12Device *NativeDevice() const;
   IDXGIFactory4 *Factory() const;
-  ID3D12CommandQueue *Queue() const;
+  ID3D12CommandQueue *NativeQueue() const;
   ID3D12Fence *Fence() const;
   bool SupportsTearing() const;
   std::mutex &QueueMutex();
   uint64_t NextSerial();
   bool Wait(uint64_t value, HANDLE event) const;
   bool WaitIdle();
-  std::unique_ptr<IWindow> CreateWindow(const WindowDesc &desc) override;
-  std::unique_ptr<IQueue> CreateQueue(QueueType type) override;
+  std::unique_ptr<Window> CreateNativeWindow(const WindowDesc &desc) override;
+  std::unique_ptr<Queue> CreateQueue(QueueType type) override;
 
  private:
   bool Initialize();

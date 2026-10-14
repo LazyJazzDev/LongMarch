@@ -4,10 +4,10 @@
 
 namespace grassland::rhi::backend::vulkan {
 
-VulkanQueue::VulkanQueue(VulkanDevice *device, QueueType type) : IQueue(device, type) {
+VulkanQueue::VulkanQueue(VulkanDevice *device, QueueType type) : Queue(device, type) {
 }
 
-std::unique_ptr<ICommandContext> VulkanQueue::CreateCommandContext() const {
+std::unique_ptr<CommandContext> VulkanQueue::CreateCommandContext() const {
   return std::make_unique<VulkanCommandContext>(static_cast<VulkanDevice *>(Owner()), Type());
 }
 

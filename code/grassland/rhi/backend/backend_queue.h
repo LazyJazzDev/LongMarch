@@ -1,19 +1,23 @@
 #pragma once
 #include "grassland/rhi/backend/backend_command_context.h"
 #include "grassland/rhi/backend/backend_device.h"
+#include "grassland/rhi/rhi_queue.h"
 
 namespace grassland::rhi::backend {
 
-class IQueue : public IObject {
+class Queue : public Object<rhi::IQueue> {
  public:
-  IQueue(IDevice *device, QueueType type);
-  ~IQueue() override;
-  IDevice *Owner() const;
+  Queue(Device *device, QueueType type);
+  ~Queue() override;
+  Device *Owner() const;
   QueueType Type() const;
-  virtual std::unique_ptr<ICommandContext> CreateCommandContext() const = 0;
+  QueueType GetType() const override;
+  bool SharesPhysicalQueue(const rhi::IQueue *other) const override;
+  rhi::ISubmissionToken *Submit(rhi::IRecordedCommands *commands, const rhi::SubmitInfo &info = {}) override;
+  virtual std::unique_ptr<CommandContext> CreateCommandContext() const = 0;
 
  private:
-  IDevice *device_;
+  Device *device_;
   QueueType type_;
 };
 

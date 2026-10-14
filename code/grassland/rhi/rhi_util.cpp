@@ -1,48 +1,10 @@
 #include "grassland/rhi/rhi_util.h"
 
-#include <utility>
-
 #include "grassland/rhi/backend/backend_util.h"
-#include "grassland/util/log.h"
 
 namespace grassland::rhi {
 
-ObjectRef::ObjectRef() noexcept = default;
-
-ObjectRef::ObjectRef(const ObjectRef &other) noexcept : obj_(other.obj_) {
-  if (obj_)
-    obj_->AddRef();
-}
-
-ObjectRef::ObjectRef(ObjectRef &&other) noexcept : obj_(std::exchange(other.obj_, nullptr)) {
-}
-
-ObjectRef &ObjectRef::operator=(const ObjectRef &other) noexcept {
-  ObjectRef copy(other);
-  std::swap(obj_, copy.obj_);
-  return *this;
-}
-
-ObjectRef &ObjectRef::operator=(ObjectRef &&other) noexcept {
-  if (this != &other) {
-    ObjectRef moved(std::move(other));
-    std::swap(obj_, moved.obj_);
-  }
-  return *this;
-}
-
-ObjectRef::~ObjectRef() {
-  if (obj_)
-    obj_->Release();
-}
-
-ObjectRef::operator bool() const noexcept {
-  return obj_ != nullptr;
-}
-
-void ReportError(int32_t error_code, const std::string &error_message) {
-  LogError("Error {}: {}", error_code, error_message);
-}
+using backend::ReportError;
 
 std::string to_string(BackendAPI api) {
   switch (api) {

@@ -6,13 +6,13 @@
 
 namespace grassland::rhi::backend::d3d12 {
 
-class D3D12Window final : public IWindow {
+class D3D12Window final : public Window {
  public:
   explicit D3D12Window(D3D12Device *device);
   ~D3D12Window() override;
   bool Initialize(const WindowDesc &desc);
-  ObjectPtr<IImage> AcquireFrame() override;
-  bool SetPresentMode(PresentMode mode) override;
+  ObjectPtr<Image> AcquireNativeFrame() override;
+  bool SetNativePresentMode(PresentMode mode) override;
   PresentMode GetPresentMode() const override;
   bool IsFrameValid(uint64_t generation) const;
   const void *DeviceIdentity() const;

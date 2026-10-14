@@ -7,11 +7,14 @@
 #include "grassland/rhi/backend/backend_core.h"
 #include "grassland/rhi/backend/backend_queue.h"
 #include "grassland/rhi/backend/backend_window.h"
-#include "grassland/rhi/rhi.h"
+#include "grassland/rhi/rhix/rhix.h"
 
-namespace grassland::rhi {
+namespace grassland::rhix {
+using namespace rhi;
+namespace backend = rhi::backend;
+
 namespace {
-using namespace backend;
+using backend::ObjectPtr;
 
 struct Gate {
   std::mutex mutex;
@@ -22,7 +25,7 @@ struct Gate {
   int windows_destroyed{};
 };
 
-class TestWindow final : public IWindow {
+class TestWindow final : public backend::Window {
  public:
   explicit TestWindow(std::shared_ptr<Gate> gate) : gate_(std::move(gate)) {
   }
@@ -34,11 +37,11 @@ class TestWindow final : public IWindow {
     ++gate_->windows_destroyed;
   }
 
-  ObjectPtr<IImage> AcquireFrame() override {
+  ObjectPtr<backend::Image> AcquireNativeFrame() override {
     return {};
   }
 
-  bool SetPresentMode(PresentMode) override {
+  bool SetNativePresentMode(PresentMode) override {
     return true;
   }
 
@@ -50,10 +53,10 @@ class TestWindow final : public IWindow {
   std::shared_ptr<Gate> gate_;
 };
 
-class TestImage final : public IImage {
+class TestImage final : public backend::Image {
  public:
-  explicit TestImage(std::shared_ptr<Gate> gate, IWindow *window = nullptr)
-      : IImage({16, 16, ImageFormat::RGBA8Unorm}),
+  explicit TestImage(std::shared_ptr<Gate> gate, backend::Window *window = nullptr)
+      : backend::Image({16, 16, ImageFormat::RGBA8Unorm}),
         gate_(std::move(gate)),
         window_(window) {
     if (window_)
@@ -80,13 +83,13 @@ class TestImage final : public IImage {
 
  private:
   std::shared_ptr<Gate> gate_;
-  IWindow *window_;
+  backend::Window *window_;
 };
 
-class TestCommandContext final : public ICommandContext {
+class TestCommandContext final : public backend::CommandContext {
  public:
   TestCommandContext(std::shared_ptr<Gate> gate, QueueType type, bool fail_after_submit = false)
-      : ICommandContext(gate.get(), type),
+      : backend::CommandContext(gate.get(), type),
         gate_(std::move(gate)),
         fail_after_submit_(fail_after_submit) {
   }
@@ -110,9 +113,9 @@ class TestCommandContext final : public ICommandContext {
   bool fail_after_submit_;
 };
 
-class TestDevice final : public IDevice {
+class TestDevice final : public backend::Device {
  public:
-  explicit TestDevice(std::shared_ptr<Gate> gate) : IDevice({}, {}), gate_(std::move(gate)) {
+  explicit TestDevice(std::shared_ptr<Gate> gate) : backend::Device({}, {}), gate_(std::move(gate)) {
   }
 
   ~TestDevice() override {
@@ -133,12 +136,12 @@ class TestDevice final : public IDevice {
   std::shared_ptr<Gate> gate_;
 };
 
-class TestQueue final : public IQueue {
+class TestQueue final : public backend::Queue {
  public:
-  TestQueue(const ObjectPtr<TestDevice> &device, QueueType type) : IQueue(device.Get(), type) {
+  TestQueue(const ObjectPtr<TestDevice> &device, QueueType type) : backend::Queue(device.Get(), type) {
   }
 
-  std::unique_ptr<ICommandContext> CreateCommandContext() const override {
+  std::unique_ptr<backend::CommandContext> CreateCommandContext() const override {
     return {};
   }
 };
@@ -148,9 +151,9 @@ TEST(RhiCommands, RecordingAndSubmissionKeepExactImageWithoutKeepingPayloadInTok
   static_assert(!std::is_copy_constructible_v<RecordedCommands>);
   auto gate = std::make_shared<Gate>();
   auto device = ObjectPtr<TestDevice>::Adopt(new TestDevice(gate));
-  auto queue = Access::Adopt<Queue>(std::make_unique<TestQueue>(device, QueueType::Graphics));
-  auto context = Access::Adopt<CommandContext>(std::make_unique<TestCommandContext>(gate, QueueType::Graphics));
-  auto image = Access::Adopt<Image>(std::make_unique<TestImage>(gate));
+  auto queue = Queue(new TestQueue(device, QueueType::Graphics));
+  auto context = CommandContext(new TestCommandContext(gate, QueueType::Graphics));
+  auto image = Image(new TestImage(gate));
   ASSERT_TRUE(context.ClearColor(image, {0, 0, 1, 1}));
   ASSERT_TRUE(context.Present(image));
   image = {};
@@ -179,9 +182,9 @@ TEST(RhiCommands, RecordingAndSubmissionKeepExactImageWithoutKeepingPayloadInTok
 TEST(RhiCommands, DroppedTokenStillRetiresSingleSubmissionAutomatically) {
   auto gate = std::make_shared<Gate>();
   auto device = ObjectPtr<TestDevice>::Adopt(new TestDevice(gate));
-  auto queue = Access::Adopt<Queue>(std::make_unique<TestQueue>(device, QueueType::Graphics));
-  auto context = Access::Adopt<CommandContext>(std::make_unique<TestCommandContext>(gate, QueueType::Graphics));
-  auto image = Access::Adopt<Image>(std::make_unique<TestImage>(gate));
+  auto queue = Queue(new TestQueue(device, QueueType::Graphics));
+  auto context = CommandContext(new TestCommandContext(gate, QueueType::Graphics));
+  auto image = Image(new TestImage(gate));
   ASSERT_TRUE(context.ClearColor(image, {1, 0, 0, 1}));
   ASSERT_TRUE(context.Present(image));
   ASSERT_TRUE(queue.Submit(context.Finish()));
@@ -198,16 +201,16 @@ TEST(RhiCommands, DroppedTokenStillRetiresSingleSubmissionAutomatically) {
 TEST(RhiCommands, CancellationReleasesClaimAndForeignQueueConsumesRejectedPacket) {
   auto gate = std::make_shared<Gate>();
   auto device = ObjectPtr<TestDevice>::Adopt(new TestDevice(gate));
-  auto image = Access::Adopt<Image>(std::make_unique<TestImage>(gate));
-  auto context = Access::Adopt<CommandContext>(std::make_unique<TestCommandContext>(gate, QueueType::Graphics));
+  auto image = Image(new TestImage(gate));
+  auto context = CommandContext(new TestCommandContext(gate, QueueType::Graphics));
   ASSERT_TRUE(context.ClearColor(image, {1, 0, 0, 1}));
   context = {};
-  context = Access::Adopt<CommandContext>(std::make_unique<TestCommandContext>(gate, QueueType::Graphics));
+  context = CommandContext(new TestCommandContext(gate, QueueType::Graphics));
   ASSERT_TRUE(context.ClearColor(image, {1, 0, 0, 1}));
   ASSERT_TRUE(context.Present(image));
   auto packet = context.Finish();
   auto other = ObjectPtr<TestDevice>::Adopt(new TestDevice(std::make_shared<Gate>()));
-  auto queue = Access::Adopt<Queue>(std::make_unique<TestQueue>(other, QueueType::Graphics));
+  auto queue = Queue(new TestQueue(other, QueueType::Graphics));
   EXPECT_FALSE(queue.Submit(std::move(packet)));
   EXPECT_FALSE(packet);
   image = {};
@@ -217,11 +220,11 @@ TEST(RhiCommands, CancellationReleasesClaimAndForeignQueueConsumesRejectedPacket
 TEST(RhiCommands, InvalidAndIncompleteContextsCannotBeSubmitted) {
   auto gate = std::make_shared<Gate>();
   auto device = ObjectPtr<TestDevice>::Adopt(new TestDevice(gate));
-  auto image = Access::Adopt<Image>(std::make_unique<TestImage>(gate));
-  auto context = Access::Adopt<CommandContext>(std::make_unique<TestCommandContext>(gate, QueueType::Transfer));
+  auto image = Image(new TestImage(gate));
+  auto context = CommandContext(new TestCommandContext(gate, QueueType::Transfer));
   EXPECT_FALSE(context.ClearColor(image, {1, 0, 0, 1}));
   EXPECT_FALSE(context.Finish());
-  context = Access::Adopt<CommandContext>(std::make_unique<TestCommandContext>(gate, QueueType::Graphics));
+  context = CommandContext(new TestCommandContext(gate, QueueType::Graphics));
   ASSERT_TRUE(context.ClearColor(image, {1, 0, 0, 1}));
   EXPECT_FALSE(context.Finish());
   EXPECT_FALSE(context);
@@ -230,12 +233,12 @@ TEST(RhiCommands, InvalidAndIncompleteContextsCannotBeSubmitted) {
 TEST(RhiCommands, AliasedQueueDependencyDoesNotWaitForGpuOnCpu) {
   auto gate = std::make_shared<Gate>();
   auto device = ObjectPtr<TestDevice>::Adopt(new TestDevice(gate));
-  auto transfer = Access::Adopt<Queue>(std::make_unique<TestQueue>(device, QueueType::Transfer));
-  auto graphics = Access::Adopt<Queue>(std::make_unique<TestQueue>(device, QueueType::Graphics));
-  auto context = Access::Adopt<CommandContext>(std::make_unique<TestCommandContext>(gate, QueueType::Transfer));
+  auto transfer = Queue(new TestQueue(device, QueueType::Transfer));
+  auto graphics = Queue(new TestQueue(device, QueueType::Graphics));
+  auto context = CommandContext(new TestCommandContext(gate, QueueType::Transfer));
   auto upload = transfer.Submit(context.Finish());
   ASSERT_TRUE(upload);
-  context = Access::Adopt<CommandContext>(std::make_unique<TestCommandContext>(gate, QueueType::Graphics));
+  context = CommandContext(new TestCommandContext(gate, QueueType::Graphics));
   auto done = graphics.Submit(context.Finish(), {{upload}});
   ASSERT_TRUE(done);
   EXPECT_EQ(done.GetStatus(), SubmissionStatus::Pending);
@@ -250,9 +253,9 @@ TEST(RhiCommands, AliasedQueueDependencyDoesNotWaitForGpuOnCpu) {
 TEST(RhiCommands, AllocationFailureAfterNativeSubmitKeepsResourcesUntilCompletion) {
   auto gate = std::make_shared<Gate>();
   auto device = ObjectPtr<TestDevice>::Adopt(new TestDevice(gate));
-  auto queue = Access::Adopt<Queue>(std::make_unique<TestQueue>(device, QueueType::Graphics));
-  auto context = Access::Adopt<CommandContext>(std::make_unique<TestCommandContext>(gate, QueueType::Graphics, true));
-  auto image = Access::Adopt<Image>(std::make_unique<TestImage>(gate));
+  auto queue = Queue(new TestQueue(device, QueueType::Graphics));
+  auto context = CommandContext(new TestCommandContext(gate, QueueType::Graphics, true));
+  auto image = Image(new TestImage(gate));
   ASSERT_TRUE(context.ClearColor(image, {0, 0, 1, 1}));
   ASSERT_TRUE(context.Present(image));
   image = {};
@@ -270,13 +273,13 @@ TEST(RhiCommands, AllocationFailureAfterNativeSubmitKeepsResourcesUntilCompletio
 TEST(RhiCommands, DeviceShutdownDrainsWorkAndReclaimsWindowAfterFrameLease) {
   auto gate = std::make_shared<Gate>();
   auto device = ObjectPtr<TestDevice>::Adopt(new TestDevice(gate));
-  auto queue = Access::Adopt<Queue>(std::make_unique<TestQueue>(device, QueueType::Graphics));
+  auto queue = Queue(new TestQueue(device, QueueType::Graphics));
   auto managed = device->ManageWindow(std::make_unique<TestWindow>(gate));
   auto *window_backend = managed.Get();
-  auto window = Access::Share<Window>(managed);
+  auto window = Window(ObjPtr<rhi::IWindow>::Retain((managed).Get()).Detach());
   managed.Reset();
-  auto image = Access::Adopt<Image>(std::make_unique<TestImage>(gate, window_backend));
-  auto context = Access::Adopt<CommandContext>(std::make_unique<TestCommandContext>(gate, QueueType::Graphics));
+  auto image = Image(new TestImage(gate, window_backend));
+  auto context = CommandContext(new TestCommandContext(gate, QueueType::Graphics));
   ASSERT_TRUE(context.ClearColor(image, {0, 0, 0, 1}));
   ASSERT_TRUE(context.Present(image));
   image.Release();
@@ -304,8 +307,8 @@ TEST(RhiCommands, CancelingRecordingReturnsFrameLeaseWithoutOwningWindow) {
   auto gate = std::make_shared<Gate>();
   auto device = ObjectPtr<TestDevice>::Adopt(new TestDevice(gate));
   auto window = device->ManageWindow(std::make_unique<TestWindow>(gate));
-  auto image = Access::Adopt<Image>(std::make_unique<TestImage>(gate, window.Get()));
-  auto context = Access::Adopt<CommandContext>(std::make_unique<TestCommandContext>(gate, QueueType::Graphics));
+  auto image = Image(new TestImage(gate, window.Get()));
+  auto context = CommandContext(new TestCommandContext(gate, QueueType::Graphics));
   ASSERT_TRUE(context.ClearColor(image, {0, 0, 0, 1}));
   image.Release();
   EXPECT_TRUE(window->HasFrameLeases());
@@ -317,4 +320,4 @@ TEST(RhiCommands, CancelingRecordingReturnsFrameLeaseWithoutOwningWindow) {
 }
 
 }  // namespace
-}  // namespace grassland::rhi
+}  // namespace grassland::rhix

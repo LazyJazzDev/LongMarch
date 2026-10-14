@@ -5,11 +5,12 @@
 #include <string>
 #include <thread>
 
-#include "grassland/rhi/rhi.h"
+#include "grassland/rhi/rhix/rhix.h"
 #include "grassland/util/fps_counter.h"
 
 int main(int argc, char **argv) {
   using namespace grassland::rhi;
+  using namespace grassland::rhix;
   BackendAPI api = BACKEND_API_DEFAULT;
   if (argc > 2) {
     std::cerr << "Usage: demo_rhi_hello [d3d12|vulkan|metal]\n";
@@ -29,7 +30,7 @@ int main(int argc, char **argv) {
     }
   }
 
-  auto core = CreateCore(api);
+  auto core = grassland::rhix::CreateCore(api);
   if (!core)
     return 1;
   const auto devices = core.GetPhysicalDevices();

@@ -6,7 +6,7 @@ namespace grassland::rhi::backend::d3d12 {
 
 class D3D12Window;
 
-class D3D12Image final : public IImage {
+class D3D12Image final : public Image {
  public:
   D3D12Image(ImageDesc desc,
              D3D12Window *window,

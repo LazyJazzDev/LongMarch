@@ -13,6 +13,50 @@ The demo enumerates devices, prints their memory and capabilities, and creates
 the automatically selected device. It links the independent `grassland_rhi`
 module and does not use the old `grassland::graphics` runtime.
 
+`grassland::rhi` is the pointer API. Its `rhi_*.h` headers declare pure virtual
+`ICore`, `IDevice`, `IWindow`, `IImage`, `IQueue`, `ICommandContext`,
+`IRecordedCommands` and `ISubmissionToken` interfaces without backend state or
+native API headers. Native implementations and shared implementation helpers stay
+under `backend/`.
+
+`grassland::rhix` is the optional RAII and dot-syntax extension, included through
+`grassland/rhi/rhix/rhix.h`. Both layers ship in `grassland_rhi`; using the pointer
+API does not require including or using rhix. The demo uses rhix:
+
+```cpp
+namespace rhi = grassland::rhi;
+namespace rhix = grassland::rhix;
+
+// Typed pointer container: a raw factory result transfers one owned reference.
+rhix::ObjPtr<rhi::ICore> core = rhi::CreateCore();
+if (!core) return;
+rhix::ObjPtr<rhi::IDevice> device = core->CreateDeviceByAutoSelection();
+if (!device) return;
+
+auto shared = device;             // Retain: an additional reference.
+auto moved = std::move(shared);   // Transfer: shared becomes empty.
+auto borrowed = device.Get();     // Borrow only; no implicit pointer conversion.
+auto retained = rhix::ObjPtr<rhi::IDevice>::Retain(borrowed);
+// Never adopt the same owned reference twice or adopt a borrowed Get() result.
+```
+
+The dot wrappers use the same public interfaces and can also adopt factory results:
+
+```cpp
+rhix::Core core = rhi::CreateCore();
+if (!core) return;
+rhix::Device device = core.CreateDeviceByAutoSelection();
+```
+
+Without any container, use `rhi::ICore *core = rhi::CreateCore()` and release each
+owned pointer with `Release()`, children before parents. Factories return one
+owned reference or `nullptr`. Ordinary object parameters are borrowed. The pointer
+`ICommandContext::Finish()` returns a separate owned `IRecordedCommands` reference;
+the caller still releases its context reference. `IQueue::Submit()` borrows the
+packet and retains accepted work. A packet can be submitted only once; unfinished
+contexts and repeat submissions are rejected. rhix wraps these operations with
+the consuming semantics described below.
+
 D3D12 and Vulkan then open a blue GLFW window. The title displays FPS measured
 by `grassland::FPSCounter`, refreshed four times per second. Press **P** to switch between
 VSync and continuous presentation; **Escape** or the close button exits. Continuous
@@ -41,8 +85,8 @@ from either role on that Device; native queue order supplies those dependencies
 without blocking the host. Contexts and recorded commands are move-only; Finish
 and Submit consume their input even on failure.
 
-All public object handles derive from `rhi::ObjectContainer`, which stores the
-`ObjectRef` and provides `Release()`. Release clears only that handle's reference;
+The rhix dot wrappers derive from `rhix::ObjectContainer`, which stores a
+`ObjPtr<rhi::IObject>` and provides `Release()`. Release clears only that handle's reference;
 it does not force GPU completion or invalidate other copies. Destruction releases
 the reference automatically. Contexts and recorded commands remain move-only.
 
@@ -70,8 +114,9 @@ contexts until completion even if the caller drops the image or completion token
 An empty acquired frame can mean a minimized/out-of-date window; creation and
 submission failures also return empty handles and log the native error.
 
-Window, Image, Queue and CommandContext each map directly to their `I*` interface
-and D3D12/Vulkan implementation in the corresponding object files. Window owns its
+Window, Image, Queue and CommandContext wrap their corresponding public `rhi::I*`
+interfaces. Common implementation bases and D3D12/Vulkan implementations stay
+in the backend object files; rhix has no backend includes or Access bridge. Window owns its
 swapchain; Image carries a counted frame lease and a borrowed Window pointer.
 Device owns managed Windows and reclaims them once caller references and frame
 leases are gone, during completion collection, subsequent window creation, or

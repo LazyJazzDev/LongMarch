@@ -1,19 +1,15 @@
 #pragma once
-#include "grassland/rhi/rhi_object_container.h"
-#include "grassland/rhi/rhi_util.h"
+#include "grassland/rhi/rhi_object.h"
 
 namespace grassland::rhi {
-class Image : public ObjectContainer {
+class IImage : public IObject {
  public:
-  Image() noexcept;
-  ImageDesc GetDesc() const;
-  // Acquired swapchain images are single-use. Resize or mode changes invalidate
-  // old frames; callers must release them before requesting another frame.
-  explicit operator bool() const noexcept;
+  virtual const ImageDesc &GetDesc() const = 0;
+  // Swapchain frames are single-use; they must not be held across resize.
+  virtual bool IsValid() const = 0;
 
- private:
-  using Interface = backend::IImage;
-  friend struct backend::Access;
+ protected:
+  ~IImage() override;
 };
 
 }  // namespace grassland::rhi

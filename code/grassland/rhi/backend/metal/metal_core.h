@@ -6,11 +6,11 @@
 
 namespace grassland::rhi::backend::metal {
 
-class MetalCore final : public ICore {
+class MetalCore final : public Core {
  public:
   static std::unique_ptr<MetalCore> CreateMetalCore();
   std::vector<PhysicalDevice> GetPhysicalDevices() const override;
-  std::unique_ptr<IDevice> CreateDevice(int32_t device_idx, ICore *owner) const override;
+  std::unique_ptr<Device> CreateNativeDevice(int32_t device_idx, Core *owner) const override;
 
  private:
   struct Adapter {

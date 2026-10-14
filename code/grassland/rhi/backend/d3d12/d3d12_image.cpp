@@ -9,7 +9,7 @@ D3D12Image::D3D12Image(ImageDesc desc,
                        uint64_t generation,
                        ID3D12Resource *image,
                        D3D12_CPU_DESCRIPTOR_HANDLE rtv)
-    : IImage(desc),
+    : Image(desc),
       window_(window),
       generation_(generation),
       image_(image),

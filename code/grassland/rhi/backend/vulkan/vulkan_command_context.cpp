@@ -6,23 +6,23 @@
 namespace grassland::rhi::backend::vulkan {
 
 VulkanCommandContext::VulkanCommandContext(VulkanDevice *device, QueueType type)
-    : ICommandContext(device, type),
+    : CommandContext(device, type),
       device_(device) {
 }
 
 VulkanCommandContext::~VulkanCommandContext() {
   if (fence_)
-    vkDestroyFence(device_->Device(), fence_, nullptr);
+    vkDestroyFence(device_->NativeDevice(), fence_, nullptr);
   if (pool_)
-    vkDestroyCommandPool(device_->Device(), pool_, nullptr);
+    vkDestroyCommandPool(device_->NativeDevice(), pool_, nullptr);
 }
 
-ICommandContext::SubmitResult VulkanCommandContext::SubmitNative() {
+CommandContext::SubmitResult VulkanCommandContext::SubmitNative() {
   if (Frame() && !glfw::IsWindowThread()) {
     ReportError(-1, "Present must run on the window thread.");
     return SubmitResult::Rejected;
   }
-  const auto device = device_->Device();
+  const auto device = device_->NativeDevice();
   VkCommandPoolCreateInfo pool{VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO};
   pool.queueFamilyIndex = device_->QueueFamily();
   pool.flags = VK_COMMAND_POOL_CREATE_TRANSIENT_BIT;
@@ -79,7 +79,7 @@ ICommandContext::SubmitResult VulkanCommandContext::SubmitNative() {
     submit.pSignalSemaphores = &rendered;
   }
   std::lock_guard<std::mutex> lock(device_->QueueMutex());
-  if (!Check(vkQueueSubmit(device_->Queue(), 1, &submit, fence_), "vkQueueSubmit"))
+  if (!Check(vkQueueSubmit(device_->NativeQueue(), 1, &submit, fence_), "vkQueueSubmit"))
     return SubmitResult::Rejected;
   MarkSubmitted();
   failed_ = true;
@@ -88,7 +88,7 @@ ICommandContext::SubmitResult VulkanCommandContext::SubmitNative() {
 }
 
 SubmissionStatus VulkanCommandContext::WaitForProgress() {
-  const auto result = vkWaitForFences(device_->Device(), 1, &fence_, VK_TRUE, 50000000);
+  const auto result = vkWaitForFences(device_->NativeDevice(), 1, &fence_, VK_TRUE, 50000000);
   if (result == VK_TIMEOUT)
     return SubmissionStatus::Pending;
   if (result == VK_ERROR_DEVICE_LOST)
@@ -97,7 +97,7 @@ SubmissionStatus VulkanCommandContext::WaitForProgress() {
     failed_ = true;
   if (failed_) {
     std::lock_guard<std::mutex> lock(device_->QueueMutex());
-    const auto idle = vkDeviceWaitIdle(device_->Device());
+    const auto idle = vkDeviceWaitIdle(device_->NativeDevice());
     return idle == VK_SUCCESS || idle == VK_ERROR_DEVICE_LOST ? SubmissionStatus::Failed : SubmissionStatus::Pending;
   }
   return SubmissionStatus::Completed;

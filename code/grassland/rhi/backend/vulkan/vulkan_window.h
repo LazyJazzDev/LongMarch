@@ -4,13 +4,13 @@
 
 namespace grassland::rhi::backend::vulkan {
 
-class VulkanWindow final : public IWindow {
+class VulkanWindow final : public Window {
  public:
   explicit VulkanWindow(VulkanDevice *device);
   ~VulkanWindow() override;
   bool Initialize(const WindowDesc &desc);
-  ObjectPtr<IImage> AcquireFrame() override;
-  bool SetPresentMode(PresentMode mode) override;
+  ObjectPtr<Image> AcquireNativeFrame() override;
+  bool SetNativePresentMode(PresentMode mode) override;
   PresentMode GetPresentMode() const override;
   bool IsFrameValid(uint64_t generation) const;
   const void *DeviceIdentity() const;

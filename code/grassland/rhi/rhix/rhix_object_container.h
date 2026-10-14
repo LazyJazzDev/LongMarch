@@ -1,10 +1,7 @@
 #pragma once
-#include "grassland/rhi/rhi_util.h"
+#include "grassland/rhi/rhix/obj_ptr.h"
 
-namespace grassland::rhi {
-
-// Release all caller-owned children before their parent. Releasing a handle
-// drops only this reference; submitted work retains its resources until done.
+namespace grassland::rhix {
 class ObjectContainer {
  public:
   void Release();
@@ -12,15 +9,15 @@ class ObjectContainer {
 
  protected:
   ObjectContainer() noexcept;
+  ObjectContainer(rhi::IObject *object) noexcept;
   ObjectContainer(const ObjectContainer &) noexcept;
   ObjectContainer(ObjectContainer &&) noexcept;
   ObjectContainer &operator=(const ObjectContainer &) noexcept;
   ObjectContainer &operator=(ObjectContainer &&) noexcept;
   ~ObjectContainer();
+  rhi::IObject *GetObject() const noexcept;
 
  private:
-  ObjectRef object_;
-  friend struct backend::Access;
+  ObjPtr<rhi::IObject> object_;
 };
-
-}  // namespace grassland::rhi
+}  // namespace grassland::rhix

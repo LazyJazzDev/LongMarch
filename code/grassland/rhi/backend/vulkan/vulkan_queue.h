@@ -4,10 +4,10 @@
 
 namespace grassland::rhi::backend::vulkan {
 
-class VulkanQueue final : public IQueue {
+class VulkanQueue final : public Queue {
  public:
   VulkanQueue(VulkanDevice *device, QueueType type);
-  std::unique_ptr<ICommandContext> CreateCommandContext() const override;
+  std::unique_ptr<CommandContext> CreateCommandContext() const override;
 };
 
 }  // namespace grassland::rhi::backend::vulkan

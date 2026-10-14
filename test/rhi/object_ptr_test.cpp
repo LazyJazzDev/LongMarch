@@ -9,7 +9,7 @@
 namespace grassland::rhi::backend {
 namespace {
 
-class TextObject final : public IObject {
+class TextObject final : public Object<IObject> {
  public:
   explicit TextObject(std::atomic<int> &destructions) : destructions_(destructions) {
   }

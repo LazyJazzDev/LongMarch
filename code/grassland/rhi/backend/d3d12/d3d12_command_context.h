@@ -4,7 +4,7 @@
 
 namespace grassland::rhi::backend::d3d12 {
 
-class D3D12CommandContext final : public ICommandContext {
+class D3D12CommandContext final : public CommandContext {
  public:
   D3D12CommandContext(D3D12Device *device, QueueType type);
   ~D3D12CommandContext() override;

@@ -19,7 +19,7 @@ D3D12Window::~D3D12Window() {
 bool D3D12Window::Initialize(const WindowDesc &desc) {
   if (!InitializeWindow(desc))
     return false;
-  SetPresentMode(desc.present_mode);
+  SetNativePresentMode(desc.present_mode);
   int width, height;
   glfwGetFramebufferSize(NativeWindow(), &width, &height);
   return Rebuild(width, height);
@@ -46,7 +46,7 @@ HRESULT D3D12Window::PresentFrame(uint64_t generation) {
                              mode_ == PresentMode::Continuous ? DXGI_PRESENT_ALLOW_TEARING : 0);
 }
 
-ObjectPtr<IImage> D3D12Window::AcquireFrame() {
+ObjectPtr<Image> D3D12Window::AcquireNativeFrame() {
   if (glfwGetWindowAttrib(NativeWindow(), GLFW_ICONIFIED))
     return {};
   int width, height;
@@ -64,12 +64,12 @@ ObjectPtr<IImage> D3D12Window::AcquireFrame() {
   const UINT index = swapchain_->GetCurrentBackBufferIndex();
   auto rtv = rtv_->GetCPUDescriptorHandleForHeapStart();
   rtv.ptr += index * stride_;
-  auto frame = ObjectPtr<IImage>::Adopt(new D3D12Image(desc_, this, generation_, images_[index].Get(), rtv));
+  auto frame = ObjectPtr<Image>::Adopt(new D3D12Image(desc_, this, generation_, images_[index].Get(), rtv));
   acquired_ = true;
   return frame;
 }
 
-bool D3D12Window::SetPresentMode(PresentMode mode) {
+bool D3D12Window::SetNativePresentMode(PresentMode mode) {
   mode_ = mode == PresentMode::Continuous && device_->SupportsTearing() ? mode : PresentMode::VSync;
   return true;
 }
@@ -106,8 +106,9 @@ bool D3D12Window::Rebuild(int width, int height) {
     desc.Flags = flags;
     ComPtr<IDXGISwapChain1> chain;
     const HWND hwnd = glfwGetWin32Window(NativeWindow());
-    if (!Check(device_->Factory()->CreateSwapChainForHwnd(device_->Queue(), hwnd, &desc, nullptr, nullptr, &chain),
-               "CreateSwapChainForHwnd") ||
+    if (!Check(
+            device_->Factory()->CreateSwapChainForHwnd(device_->NativeQueue(), hwnd, &desc, nullptr, nullptr, &chain),
+            "CreateSwapChainForHwnd") ||
         !Check(chain.As(&swapchain_), "Query IDXGISwapChain3"))
       return false;
     device_->Factory()->MakeWindowAssociation(hwnd, DXGI_MWA_NO_ALT_ENTER);
@@ -115,14 +116,14 @@ bool D3D12Window::Rebuild(int width, int height) {
   D3D12_DESCRIPTOR_HEAP_DESC heap{};
   heap.Type = D3D12_DESCRIPTOR_HEAP_TYPE_RTV;
   heap.NumDescriptors = 3;
-  if (!Check(device_->Device()->CreateDescriptorHeap(&heap, IID_PPV_ARGS(&rtv_)), "Create RTV heap"))
+  if (!Check(device_->NativeDevice()->CreateDescriptorHeap(&heap, IID_PPV_ARGS(&rtv_)), "Create RTV heap"))
     return false;
-  stride_ = device_->Device()->GetDescriptorHandleIncrementSize(heap.Type);
+  stride_ = device_->NativeDevice()->GetDescriptorHandleIncrementSize(heap.Type);
   auto handle = rtv_->GetCPUDescriptorHandleForHeapStart();
   for (UINT i = 0; i < 3; ++i) {
     if (!Check(swapchain_->GetBuffer(i, IID_PPV_ARGS(&images_[i])), "Get swapchain buffer"))
       return false;
-    device_->Device()->CreateRenderTargetView(images_[i].Get(), nullptr, handle);
+    device_->NativeDevice()->CreateRenderTargetView(images_[i].Get(), nullptr, handle);
     handle.ptr += stride_;
   }
   desc_ = {static_cast<uint32_t>(width), static_cast<uint32_t>(height), ImageFormat::RGBA8Unorm};

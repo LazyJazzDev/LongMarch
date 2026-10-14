@@ -3,7 +3,7 @@
 #include "grassland/rhi/rhi_core.h"
 #include "grassland/rhi/rhi_device.h"
 #include "grassland/rhi/rhi_image.h"
-#include "grassland/rhi/rhi_object_container.h"
+#include "grassland/rhi/rhi_object.h"
 #include "grassland/rhi/rhi_queue.h"
 #include "grassland/rhi/rhi_util.h"
 #include "grassland/rhi/rhi_window.h"

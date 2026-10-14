@@ -1,37 +1,33 @@
 #pragma once
-#include "grassland/rhi/rhi_object_container.h"
-#include "grassland/rhi/rhi_util.h"
+#include "grassland/rhi/rhi_object.h"
 
 namespace grassland::rhi {
-class SubmissionToken : public ObjectContainer {
- public:
-  SubmissionToken() noexcept;
-  SubmissionStatus GetStatus() const;
-  bool WaitHost() const;
+class IRecordedCommands;
 
- private:
-  // A token owns only completion state, never a native queue or command payload.
-  using Interface = IObject;
-  friend struct backend::Access;
+class ISubmissionToken : public IObject {
+ public:
+  virtual SubmissionStatus GetStatus() const = 0;
+  virtual bool WaitHost() const = 0;
+
+ protected:
+  ~ISubmissionToken() override;
 };
 
 struct SubmitInfo {
-  std::vector<SubmissionToken> waits;
+  // Borrowed for the duration of Submit.
+  std::vector<ISubmissionToken *> waits;
 };
 
-class RecordedCommands;
-
-class Queue : public ObjectContainer {
+class IQueue : public IObject {
  public:
-  Queue() noexcept;
-  // Always consumes commands. An empty token reports submission failure.
-  SubmissionToken Submit(RecordedCommands &&commands, const SubmitInfo &info = {}) const;
-  QueueType GetType() const;
-  bool SharesPhysicalQueue(const Queue &other) const;
+  // Borrows commands. Accepted work retains its resources until GPU completion.
+  // Each command packet may be submitted only once. Returns an owned token.
+  virtual ISubmissionToken *Submit(IRecordedCommands *commands, const SubmitInfo &info = {}) = 0;
+  virtual QueueType GetType() const = 0;
+  virtual bool SharesPhysicalQueue(const IQueue *other) const = 0;
 
- private:
-  using Interface = backend::IQueue;
-  friend struct backend::Access;
+ protected:
+  ~IQueue() override;
 };
 
 }  // namespace grassland::rhi

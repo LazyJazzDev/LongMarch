@@ -2,20 +2,25 @@
 #include <array>
 
 #include "grassland/rhi/backend/backend_image.h"
+#include "grassland/rhi/rhi_command_context.h"
 
 namespace grassland::rhi::backend {
 
-class ICommandContext : public IObject {
+class CommandContext : public Object<rhi::ICommandContext> {
  public:
   enum class SubmitResult { Rejected, Submitted, FailedInFlight };
-  ICommandContext(const void *identity, QueueType type);
-  ~ICommandContext() override;
-  bool Clear(const ObjectPtr<IImage> &image, const std::array<float, 4> &color);
-  bool Present(const ObjectPtr<IImage> &image);
+  CommandContext(const void *identity, QueueType type);
+  ~CommandContext() override;
+  bool ClearColor(rhi::IImage *image, const std::array<float, 4> &color) override;
+  bool Present(rhi::IImage *image) override;
+  rhi::IRecordedCommands *Finish() override;
+  bool CanSubmit() const;
+  bool Clear(const ObjectPtr<Image> &image, const std::array<float, 4> &color);
+  bool Present(const ObjectPtr<Image> &image);
   bool Seal();
   const void *DeviceIdentity() const;
   QueueType Type() const;
-  const ObjectPtr<IImage> &Frame() const;
+  const ObjectPtr<Image> &Frame() const;
   const std::array<float, 4> &Color() const;
   void MarkSubmitted();
   bool WasSubmitted() const;
@@ -25,7 +30,7 @@ class ICommandContext : public IObject {
  private:
   const void *identity_;
   QueueType type_;
-  ObjectPtr<IImage> image_;
+  ObjectPtr<Image> image_;
   std::array<float, 4> color_{};
   bool present_{};
   bool sealed_{};

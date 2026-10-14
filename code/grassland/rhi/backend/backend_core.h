@@ -4,13 +4,15 @@
 
 namespace grassland::rhi::backend {
 
-class ICore : public IObject {
+class Core : public Object<rhi::ICore> {
  public:
+  rhi::IDevice *CreateDevice(int32_t device_idx) override;
+  rhi::IDevice *CreateDeviceByAutoSelection(DeviceFeatureRequirement requirement = {}) override;
   virtual std::vector<PhysicalDevice> GetPhysicalDevices() const = 0;
-  virtual std::unique_ptr<IDevice> CreateDevice(int32_t device_idx, ICore *owner) const = 0;
+  virtual std::unique_ptr<Device> CreateNativeDevice(int32_t device_idx, Core *owner) const = 0;
 };
 
-std::unique_ptr<ICore> CreateCore(BackendAPI api);
+std::unique_ptr<Core> CreateCore(BackendAPI api);
 
 // Returns a stable vector index, or -1 when no device satisfies the filters.
 int32_t SelectPhysicalDevice(const std::vector<PhysicalDevice> &devices, DeviceFeatureRequirement requirement);

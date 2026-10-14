@@ -4,10 +4,10 @@
 
 namespace grassland::rhi::backend::d3d12 {
 
-class D3D12Queue final : public IQueue {
+class D3D12Queue final : public Queue {
  public:
   D3D12Queue(D3D12Device *device, QueueType type);
-  std::unique_ptr<ICommandContext> CreateCommandContext() const override;
+  std::unique_ptr<CommandContext> CreateCommandContext() const override;
 };
 
 }  // namespace grassland::rhi::backend::d3d12

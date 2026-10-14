@@ -10,3 +10,5 @@ target_include_directories(${GRASSLAND_SUBLIB_NAME} PUBLIC ${LONGMARCH_INCLUDE_D
 target_link_libraries(${GRASSLAND_SUBLIB_NAME} PRIVATE grassland_util ${GLFW3_LIB_NAME})
 
 add_subdirectory(backend)
+
+add_subdirectory(rhix)

@@ -2,21 +2,24 @@
 
 #include "grassland/rhi/backend/metal/metal_core.h"
 #include "grassland/rhi/backend/metal/metal_device.h"
-#include "grassland/rhi/rhi.h"
+#include "grassland/rhi/rhix/rhix.h"
 
-namespace grassland::rhi {
+namespace grassland::rhix {
+using namespace rhi;
+namespace backend = rhi::backend;
+
 namespace {
 
 TEST(RhiMetal, CapabilitiesMatchNativeDeviceAndEnumerationRemainsStable) {
   auto pool = NS::TransferPtr(NS::AutoreleasePool::alloc()->init());
-  auto core = CreateCore(BACKEND_API_METAL);
+  auto core = rhix::CreateCore(BACKEND_API_METAL);
   ASSERT_TRUE(core);
   const auto devices = core.GetPhysicalDevices();
   ASSERT_FALSE(devices.empty());
   for (size_t id = 0; id < devices.size(); ++id) {
     auto device = core.CreateDevice(static_cast<int32_t>(id));
     ASSERT_TRUE(device);
-    auto native = backend::Access::As<backend::metal::MetalDevice>(device).NativeDevice();
+    auto native = (*static_cast<backend::metal::MetalDevice *>((device).Get())).NativeDevice();
     ASSERT_NE(native, nullptr);
     EXPECT_EQ(devices[id].name, native->name()->utf8String());
     EXPECT_EQ(devices[id].ray_query_feature, native->supportsRaytracing());
@@ -39,14 +42,14 @@ TEST(RhiMetal, CapabilitiesMatchNativeDeviceAndEnumerationRemainsStable) {
 
 TEST(RhiMetal, NativeDeviceExecutesWorkBeforeParentRelease) {
   auto pool = NS::TransferPtr(NS::AutoreleasePool::alloc()->init());
-  auto core = CreateCore(BACKEND_API_METAL);
+  auto core = rhix::CreateCore(BACKEND_API_METAL);
   ASSERT_TRUE(core);
   auto first = core.CreateDeviceByAutoSelection();
   auto device = core.CreateDeviceByAutoSelection();
   ASSERT_TRUE(first);
   ASSERT_TRUE(device);
   first = {};
-  auto native = backend::Access::As<backend::metal::MetalDevice>(device).NativeDevice();
+  auto native = (*static_cast<backend::metal::MetalDevice *>((device).Get())).NativeDevice();
   auto queue = NS::TransferPtr(native->newCommandQueue());
   ASSERT_TRUE(queue);
   auto buffer = NS::TransferPtr(native->newBuffer(256, MTL::ResourceStorageModeShared));
@@ -66,4 +69,4 @@ TEST(RhiMetal, NativeDeviceExecutesWorkBeforeParentRelease) {
 }
 
 }  // namespace
-}  // namespace grassland::rhi
+}  // namespace grassland::rhix

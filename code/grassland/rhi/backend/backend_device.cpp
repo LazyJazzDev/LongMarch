@@ -13,35 +13,83 @@ namespace {
 std::atomic<uint64_t> next_identity{1};
 }
 
-IDevice::IDevice(PhysicalDevice info, ICore *core)
+Device::Device(PhysicalDevice info, Core *core)
     : core_(core),
       info_(std::move(info)),
       queue_identity_(next_identity.fetch_add(1)) {
 }
 
-IDevice::~IDevice() {
+Device::~Device() {
   ShutdownQueues();
 }
 
-const PhysicalDevice &IDevice::GetPhysicalDevice() const noexcept {
+std::string Device::Name() const {
+  return info_.name;
+}
+
+bool Device::SupportRayTracingPipeline() const {
+  return info_.ray_tracing_pipeline_feature;
+}
+
+bool Device::SupportRayQuery() const {
+  return info_.ray_query_feature;
+}
+
+bool Device::SupportGeometryShader() const {
+  return info_.geometry_shader_feature;
+}
+
+rhi::IWindow *Device::CreateWindow(const WindowDesc &desc) {
+  try {
+    return ManageWindow(CreateNativeWindow(desc)).Detach();
+  } catch (const std::bad_alloc &) {
+    ReportError(-1, "Window creation ran out of memory.");
+    return nullptr;
+  }
+}
+
+rhi::IQueue *Device::GetQueue(QueueType type) {
+  try {
+    return CreateQueue(type).release();
+  } catch (const std::bad_alloc &) {
+    ReportError(-1, "Queue creation ran out of memory.");
+    return nullptr;
+  }
+}
+
+rhi::ICommandContext *Device::CreateCommandContext(rhi::IQueue *queue) {
+  const auto impl = dynamic_cast<Queue *>(queue);
+  if (!impl || impl->Owner() != this) {
+    ReportError(-1, "The queue belongs to another device or implementation.");
+    return nullptr;
+  }
+  try {
+    return impl->CreateCommandContext().release();
+  } catch (const std::bad_alloc &) {
+    ReportError(-1, "Command context allocation failed.");
+    return nullptr;
+  }
+}
+
+const PhysicalDevice &Device::GetPhysicalDevice() const noexcept {
   return info_;
 }
 
-ICore *IDevice::Core() const {
+Core *Device::OwnerCore() const {
   return core_;
 }
 
-ObjectPtr<IWindow> IDevice::ManageWindow(std::unique_ptr<IWindow> window) {
+ObjectPtr<Window> Device::ManageWindow(std::unique_ptr<Window> window) {
   if (!window)
     return {};
   CollectWindows();
-  auto result = ObjectPtr<IWindow>::Adopt(window.release());
+  auto result = ObjectPtr<Window>::Adopt(window.release());
   std::lock_guard<std::mutex> lock(windows_mutex_);
   windows_.push_back(result);
   return result;
 }
 
-void IDevice::CollectWindows() {
+void Device::CollectWindows() {
   std::lock_guard<std::mutex> lock(windows_mutex_);
   for (auto it = windows_.begin(); it != windows_.end();) {
     if ((*it)->IsUniquelyOwned() && !(*it)->HasFrameLeases())
@@ -51,38 +99,46 @@ void IDevice::CollectWindows() {
   }
 }
 
-const void *IDevice::NativeIdentity() const {
+const void *Device::NativeIdentity() const {
   return this;
 }
 
-std::unique_ptr<IWindow> IDevice::CreateWindow(const WindowDesc &) {
+std::unique_ptr<Window> Device::CreateNativeWindow(const WindowDesc &) {
   ReportError(-1, "Window creation is unavailable.");
   return {};
 }
 
-std::unique_ptr<IQueue> IDevice::CreateQueue(QueueType) {
+std::unique_ptr<Queue> Device::CreateQueue(QueueType) {
   return {};
 }
 
-IDevice::SubmissionState::SubmissionState(uint64_t identity) : queue_identity_(identity) {
+Device::SubmissionState::SubmissionState(uint64_t identity) : queue_identity_(identity) {
 }
 
-uint64_t IDevice::SubmissionState::QueueIdentity() const {
+uint64_t Device::SubmissionState::QueueIdentity() const {
   return queue_identity_;
 }
 
-SubmissionStatus IDevice::SubmissionState::Status() const {
+SubmissionStatus Device::SubmissionState::GetStatus() const {
+  return Status();
+}
+
+bool Device::SubmissionState::WaitHost() const {
+  return Wait();
+}
+
+SubmissionStatus Device::SubmissionState::Status() const {
   std::lock_guard<std::mutex> lock(mutex_);
   return status_;
 }
 
-bool IDevice::SubmissionState::Wait() const {
+bool Device::SubmissionState::Wait() const {
   std::unique_lock<std::mutex> lock(mutex_);
   changed_.wait(lock, [&] { return status_ != SubmissionStatus::Pending; });
   return status_ == SubmissionStatus::Completed;
 }
 
-void IDevice::SubmissionState::Complete(SubmissionStatus status) {
+void Device::SubmissionState::Complete(SubmissionStatus status) {
   {
     std::lock_guard<std::mutex> lock(mutex_);
     status_ = status;
@@ -90,10 +146,11 @@ void IDevice::SubmissionState::Complete(SubmissionStatus status) {
   changed_.notify_all();
 }
 
-ObjectPtr<IDevice::SubmissionState> IDevice::Submit(const ObjectPtr<ICommandContext> &commands,
-                                                    const std::vector<ObjectPtr<IDevice::SubmissionState>> &waits) {
-  if (commands->DeviceIdentity() != NativeIdentity() || (commands->Frame() && !commands->Frame()->IsValid())) {
-    ReportError(-1, "Submission uses another device or an invalidated swapchain frame.");
+ObjectPtr<Device::SubmissionState> Device::Submit(const ObjectPtr<CommandContext> &commands,
+                                                  const std::vector<ObjectPtr<Device::SubmissionState>> &waits) {
+  if (!commands->CanSubmit() || commands->DeviceIdentity() != NativeIdentity() ||
+      (commands->Frame() && !commands->Frame()->IsValid())) {
+    ReportError(-1, "Submission requires fresh finished commands and a valid frame from this device.");
     return {};
   }
   for (const auto &wait : waits) {
@@ -105,7 +162,7 @@ ObjectPtr<IDevice::SubmissionState> IDevice::Submit(const ObjectPtr<ICommandCont
   }
   // Both logical roles share one physical queue. Its ordering already supplies
   // these GPU dependencies; no host wait or additional native wait is required.
-  auto completion = ObjectPtr<IDevice::SubmissionState>::Adopt(new IDevice::SubmissionState(queue_identity_));
+  auto completion = ObjectPtr<Device::SubmissionState>::Adopt(new Device::SubmissionState(queue_identity_));
   std::lock_guard<std::mutex> lock(mutex_);
   if (stopping_)
     return {};
@@ -113,7 +170,7 @@ ObjectPtr<IDevice::SubmissionState> IDevice::Submit(const ObjectPtr<ICommandCont
     collector_ = std::thread([this] { Collect(); });
   // Allocate the retirement record before submitting any GPU work.
   pending_.push_back({{}, completion});
-  ICommandContext::SubmitResult result;
+  CommandContext::SubmitResult result;
   try {
     result = commands->SubmitNative();
   } catch (...) {
@@ -127,17 +184,17 @@ ObjectPtr<IDevice::SubmissionState> IDevice::Submit(const ObjectPtr<ICommandCont
     }
     throw;
   }
-  if (result == ICommandContext::SubmitResult::Rejected) {
+  if (result == CommandContext::SubmitResult::Rejected) {
     pending_.pop_back();
     return {};
   }
   commands->MarkSubmitted();
   pending_.back().commands = commands;
   changed_.notify_one();
-  return result == ICommandContext::SubmitResult::Submitted ? completion : ObjectPtr<SubmissionState>{};
+  return result == CommandContext::SubmitResult::Submitted ? completion : ObjectPtr<SubmissionState>{};
 }
 
-void IDevice::Collect() {
+void Device::Collect() {
   for (;;) {
     Submission pending;
     {
@@ -159,7 +216,7 @@ void IDevice::Collect() {
   }
 }
 
-void IDevice::ShutdownQueues() {
+void Device::ShutdownQueues() {
   {
     std::lock_guard<std::mutex> lock(mutex_);
     stopping_ = true;

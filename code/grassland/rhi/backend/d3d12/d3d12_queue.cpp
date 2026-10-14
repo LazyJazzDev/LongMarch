@@ -4,10 +4,10 @@
 
 namespace grassland::rhi::backend::d3d12 {
 
-D3D12Queue::D3D12Queue(D3D12Device *device, QueueType type) : IQueue(device, type) {
+D3D12Queue::D3D12Queue(D3D12Device *device, QueueType type) : Queue(device, type) {
 }
 
-std::unique_ptr<ICommandContext> D3D12Queue::CreateCommandContext() const {
+std::unique_ptr<CommandContext> D3D12Queue::CreateCommandContext() const {
   return std::make_unique<D3D12CommandContext>(static_cast<D3D12Device *>(Owner()), Type());
 }
 

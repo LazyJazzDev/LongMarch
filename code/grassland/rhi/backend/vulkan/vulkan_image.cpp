@@ -5,7 +5,7 @@
 namespace grassland::rhi::backend::vulkan {
 
 VulkanImage::VulkanImage(ImageDesc desc, VulkanWindow *window, uint64_t generation, VkDevice device)
-    : IImage(desc),
+    : Image(desc),
       window_(window),
       generation_(generation),
       device_(device) {

@@ -1,26 +1,23 @@
 #pragma once
-#include "grassland/rhi/rhi_command_context.h"
-#include "grassland/rhi/rhi_object_container.h"
-#include "grassland/rhi/rhi_queue.h"
-#include "grassland/rhi/rhi_util.h"
-#include "grassland/rhi/rhi_window.h"
+#include "grassland/rhi/rhi_object.h"
 
 namespace grassland::rhi {
+class IWindow;
+class IQueue;
+class ICommandContext;
 
-class Device : public ObjectContainer {
+class IDevice : public IObject {
  public:
-  Device() noexcept;
-  std::string Name() const;
-  bool SupportRayTracingPipeline() const;
-  bool SupportRayQuery() const;
-  bool SupportGeometryShader() const;
-  Window CreateWindow(const WindowDesc &desc = {}) const;
-  Queue GetQueue(QueueType type) const;
-  CommandContext CreateCommandContext(const Queue &queue) const;
+  virtual std::string Name() const = 0;
+  virtual bool SupportRayTracingPipeline() const = 0;
+  virtual bool SupportRayQuery() const = 0;
+  virtual bool SupportGeometryShader() const = 0;
+  virtual IWindow *CreateWindow(const WindowDesc &desc = {}) = 0;
+  virtual IQueue *GetQueue(QueueType type) = 0;
+  virtual ICommandContext *CreateCommandContext(IQueue *queue) = 0;
 
- private:
-  using Interface = backend::IDevice;
-  friend struct backend::Access;
+ protected:
+  ~IDevice() override;
 };
 
 }  // namespace grassland::rhi

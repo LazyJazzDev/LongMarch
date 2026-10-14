@@ -6,7 +6,7 @@
 
 namespace grassland::rhi::backend::vulkan {
 
-VulkanDevice::VulkanDevice(grassland::rhi::PhysicalDevice info, ICore *core) : IDevice(std::move(info), core) {
+VulkanDevice::VulkanDevice(grassland::rhi::PhysicalDevice info, Core *core) : Device(std::move(info), core) {
 }
 
 VulkanDevice::~VulkanDevice() {
@@ -16,7 +16,7 @@ VulkanDevice::~VulkanDevice() {
 }
 
 std::unique_ptr<VulkanDevice> VulkanDevice::CreateVulkanDevice(grassland::rhi::PhysicalDevice info,
-                                                               ICore *core,
+                                                               Core *core,
                                                                VkPhysicalDevice physical_device,
                                                                uint32_t api_version) {
   auto device = std::unique_ptr<VulkanDevice>(new VulkanDevice(std::move(info), core));
@@ -66,19 +66,19 @@ std::unique_ptr<VulkanDevice> VulkanDevice::CreateVulkanDevice(grassland::rhi::P
   return device;
 }
 
-VkDevice VulkanDevice::Device() const {
+VkDevice VulkanDevice::NativeDevice() const {
   return device_;
 }
 
-VkPhysicalDevice VulkanDevice::PhysicalDevice() const {
+VkPhysicalDevice VulkanDevice::NativePhysicalDevice() const {
   return physical_;
 }
 
 VkInstance VulkanDevice::Instance() const {
-  return static_cast<VulkanCore *>(Core())->Instance();
+  return static_cast<VulkanCore *>(OwnerCore())->Instance();
 }
 
-VkQueue VulkanDevice::Queue() const {
+VkQueue VulkanDevice::NativeQueue() const {
   return queue_;
 }
 
@@ -94,12 +94,12 @@ std::mutex &VulkanDevice::QueueMutex() {
   return mutex_;
 }
 
-std::unique_ptr<IWindow> VulkanDevice::CreateWindow(const WindowDesc &desc) {
+std::unique_ptr<Window> VulkanDevice::CreateNativeWindow(const WindowDesc &desc) {
   auto window = std::make_unique<VulkanWindow>(this);
-  return window->Initialize(desc) ? std::unique_ptr<IWindow>(std::move(window)) : nullptr;
+  return window->Initialize(desc) ? std::unique_ptr<Window>(std::move(window)) : nullptr;
 }
 
-std::unique_ptr<IQueue> VulkanDevice::CreateQueue(QueueType type) {
+std::unique_ptr<Queue> VulkanDevice::CreateQueue(QueueType type) {
   return std::make_unique<VulkanQueue>(this, type);
 }
 

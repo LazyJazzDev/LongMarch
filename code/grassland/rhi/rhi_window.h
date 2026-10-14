@@ -1,23 +1,22 @@
 #pragma once
-#include "grassland/rhi/rhi_image.h"
-#include "grassland/rhi/rhi_object_container.h"
+#include "grassland/rhi/rhi_object.h"
 
 namespace grassland::rhi {
-class Window : public ObjectContainer {
- public:
-  Window() noexcept;
-  // Window creation, events, acquisition and presentation run on the main thread.
-  static bool PollEvents();
-  bool ShouldClose() const;
-  bool IsKeyDown(Key key) const;
-  bool SetTitle(const std::string &title) const;
-  Image AcquireFrame() const;
-  bool SetPresentMode(PresentMode mode) const;
-  PresentMode GetPresentMode() const;
+class IImage;
+// Window operations and presentation run on the main thread.
+bool PollEvents();
 
- private:
-  using Interface = backend::IWindow;
-  friend struct backend::Access;
+class IWindow : public IObject {
+ public:
+  virtual bool ShouldClose() const = 0;
+  virtual bool IsKeyDown(Key key) const = 0;
+  virtual bool SetTitle(const std::string &title) = 0;
+  virtual IImage *AcquireFrame() = 0;
+  virtual bool SetPresentMode(PresentMode mode) = 0;
+  virtual PresentMode GetPresentMode() const = 0;
+
+ protected:
+  ~IWindow() override;
 };
 
 }  // namespace grassland::rhi

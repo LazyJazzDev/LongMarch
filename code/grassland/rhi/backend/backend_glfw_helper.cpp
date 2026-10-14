@@ -3,7 +3,7 @@
 #include <mutex>
 #include <thread>
 
-#include "grassland/rhi/rhi_util.h"
+#include "grassland/rhi/backend/backend_util.h"
 #define GLFW_INCLUDE_NONE
 #include <GLFW/glfw3.h>
 

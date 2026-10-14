@@ -25,7 +25,7 @@ bool D3D12Device::Initialize() {
   return true;
 }
 
-ID3D12Device *D3D12Device::Device() const {
+ID3D12Device *D3D12Device::NativeDevice() const {
   return device_.Get();
 }
 
@@ -33,7 +33,7 @@ IDXGIFactory4 *D3D12Device::Factory() const {
   return factory_.Get();
 }
 
-ID3D12CommandQueue *D3D12Device::Queue() const {
+ID3D12CommandQueue *D3D12Device::NativeQueue() const {
   return queue_.Get();
 }
 
@@ -74,8 +74,8 @@ bool D3D12Device::WaitIdle() {
   return Check(queue_->Signal(fence_.Get(), value), "Signal idle fence") && Wait(value, idle_event_);
 }
 
-D3D12Device::D3D12Device(PhysicalDevice info, ICore *core, ComPtr<ID3D12Device> device)
-    : IDevice(std::move(info), core),
+D3D12Device::D3D12Device(PhysicalDevice info, Core *core, ComPtr<ID3D12Device> device)
+    : Device(std::move(info), core),
       device_(std::move(device)) {
   initialized_ = Initialize();
 }
@@ -90,12 +90,12 @@ bool D3D12Device::IsInitialized() const {
   return initialized_;
 }
 
-std::unique_ptr<IWindow> D3D12Device::CreateWindow(const WindowDesc &desc) {
+std::unique_ptr<Window> D3D12Device::CreateNativeWindow(const WindowDesc &desc) {
   auto window = std::make_unique<D3D12Window>(this);
-  return window->Initialize(desc) ? std::unique_ptr<IWindow>(std::move(window)) : nullptr;
+  return window->Initialize(desc) ? std::unique_ptr<Window>(std::move(window)) : nullptr;
 }
 
-std::unique_ptr<IQueue> D3D12Device::CreateQueue(QueueType type) {
+std::unique_ptr<Queue> D3D12Device::CreateQueue(QueueType type) {
   return std::make_unique<D3D12Queue>(this, type);
 }
 

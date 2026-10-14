@@ -4,7 +4,7 @@
 
 namespace grassland::rhi::backend::vulkan {
 
-class VulkanCommandContext final : public ICommandContext {
+class VulkanCommandContext final : public CommandContext {
  public:
   VulkanCommandContext(VulkanDevice *device, QueueType type);
   ~VulkanCommandContext() override;

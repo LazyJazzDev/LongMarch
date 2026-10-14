@@ -11,7 +11,7 @@ VulkanWindow::VulkanWindow(VulkanDevice *device) : device_(device) {
 
 VulkanWindow::~VulkanWindow() {
   std::lock_guard<std::mutex> lock(device_->QueueMutex());
-  vkDeviceWaitIdle(device_->Device());
+  vkDeviceWaitIdle(device_->NativeDevice());
   DestroySwapchain();
   if (surface_)
     vkDestroySurfaceKHR(device_->Instance(), surface_, nullptr);
@@ -27,9 +27,9 @@ bool VulkanWindow::Initialize(const WindowDesc &desc) {
              "glfwCreateWindowSurface"))
     return false;
   VkBool32 supported{};
-  if (!Check(
-          vkGetPhysicalDeviceSurfaceSupportKHR(device_->PhysicalDevice(), device_->QueueFamily(), surface_, &supported),
-          "Surface queue support") ||
+  if (!Check(vkGetPhysicalDeviceSurfaceSupportKHR(device_->NativePhysicalDevice(), device_->QueueFamily(), surface_,
+                                                  &supported),
+             "Surface queue support") ||
       !supported) {
     ReportError(-1, "The graphics queue cannot present to this surface.");
     return false;
@@ -59,7 +59,7 @@ VkResult VulkanWindow::AcquireNative(VkSemaphore semaphore,
                                      uint32_t &index,
                                      VkImage &image,
                                      VkSemaphore &rendered) {
-  const auto result = vkAcquireNextImageKHR(device_->Device(), swapchain_, UINT64_MAX, semaphore, fence, &index);
+  const auto result = vkAcquireNextImageKHR(device_->NativeDevice(), swapchain_, UINT64_MAX, semaphore, fence, &index);
   if (result == VK_SUCCESS || result == VK_SUBOPTIMAL_KHR) {
     image = images_[index];
     rendered = rendered_[index];
@@ -79,7 +79,7 @@ VkResult VulkanWindow::PresentFrame(uint64_t generation, uint32_t index, VkSemap
   present.swapchainCount = 1;
   present.pSwapchains = &swapchain_;
   present.pImageIndices = &index;
-  const auto result = vkQueuePresentKHR(device_->Queue(), &present);
+  const auto result = vkQueuePresentKHR(device_->NativeQueue(), &present);
   acquired_ = false;
   pending_acquire_ = VK_NULL_HANDLE;
   if (result == VK_SUBOPTIMAL_KHR || result == VK_ERROR_OUT_OF_DATE_KHR) {
@@ -91,7 +91,7 @@ VkResult VulkanWindow::PresentFrame(uint64_t generation, uint32_t index, VkSemap
   return result;
 }
 
-ObjectPtr<IImage> VulkanWindow::AcquireFrame() {
+ObjectPtr<Image> VulkanWindow::AcquireNativeFrame() {
   if (glfwGetWindowAttrib(NativeWindow(), GLFW_ICONIFIED))
     return {};
   int width, height;
@@ -106,11 +106,11 @@ ObjectPtr<IImage> VulkanWindow::AcquireFrame() {
     ReportError(-1, "Present or release the previous acquired frame first.");
     return {};
   }
-  auto frame = ObjectPtr<VulkanImage>::Adopt(new VulkanImage(desc_, this, generation_, device_->Device()));
-  return frame->Acquire() ? ObjectPtr<IImage>(frame) : ObjectPtr<IImage>{};
+  auto frame = ObjectPtr<VulkanImage>::Adopt(new VulkanImage(desc_, this, generation_, device_->NativeDevice()));
+  return frame->Acquire() ? ObjectPtr<Image>(frame) : ObjectPtr<Image>{};
 }
 
-bool VulkanWindow::SetPresentMode(PresentMode mode) {
+bool VulkanWindow::SetNativePresentMode(PresentMode mode) {
   if (requested_ == mode && valid_)
     return true;
   requested_ = mode;
@@ -125,11 +125,11 @@ PresentMode VulkanWindow::GetPresentMode() const {
 void VulkanWindow::DestroySwapchain() {
   for (auto semaphore : rendered_)
     if (semaphore)
-      vkDestroySemaphore(device_->Device(), semaphore, nullptr);
+      vkDestroySemaphore(device_->NativeDevice(), semaphore, nullptr);
   rendered_.clear();
   images_.clear();
   if (swapchain_)
-    vkDestroySwapchainKHR(device_->Device(), swapchain_, nullptr);
+    vkDestroySwapchainKHR(device_->NativeDevice(), swapchain_, nullptr);
   swapchain_ = VK_NULL_HANDLE;
 }
 
@@ -140,8 +140,8 @@ bool VulkanWindow::Rebuild() {
   glfwGetFramebufferSize(NativeWindow(), &width, &height);
   if (width <= 0 || height <= 0)
     return true;
-  const auto physical = device_->PhysicalDevice();
-  const auto device = device_->Device();
+  const auto physical = device_->NativePhysicalDevice();
+  const auto device = device_->NativeDevice();
   VkSurfaceCapabilitiesKHR caps{};
   if (!Check(vkGetPhysicalDeviceSurfaceCapabilitiesKHR(physical, surface_, &caps), "Surface capabilities"))
     return false;

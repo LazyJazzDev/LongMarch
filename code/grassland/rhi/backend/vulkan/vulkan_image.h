@@ -6,7 +6,7 @@ namespace grassland::rhi::backend::vulkan {
 
 class VulkanWindow;
 
-class VulkanImage final : public IImage {
+class VulkanImage final : public Image {
  public:
   VulkanImage(ImageDesc desc, VulkanWindow *window, uint64_t generation, VkDevice device);
   ~VulkanImage() override;
