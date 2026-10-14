@@ -49,7 +49,7 @@ TEST_P(RhiWindow, MultipleWindowsSingleUseFramesModesAndQueueLifetime) {
       ASSERT_TRUE(frame);
       EXPECT_GT(frame.GetDesc().width, 0u);
       auto context = device.CreateCommandContext(graphics);
-      ASSERT_TRUE(context.ClearColor(frame, {0.529f, 0.808f, 0.922f, 1.0f}));
+      ASSERT_TRUE(context.ClearColor(frame, {0.6f, 0.7f, 0.8f, 1.0f}));
       ASSERT_TRUE(context.Present(frame));
       frame = {};  // Recording already owns the exact frame.
       last = graphics.Submit(context.Finish());

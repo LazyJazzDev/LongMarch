@@ -75,7 +75,7 @@ int main(int argc, char **argv) {
       continue;
     }
     auto context = device.CreateCommandContext(graphics);
-    if (!context || !context.ClearColor(image, {0.529f, 0.808f, 0.922f, 1.0f}) || !context.Present(image) ||
+    if (!context || !context.ClearColor(image, {0.6f, 0.7f, 0.8f, 1.0f}) || !context.Present(image) ||
         !graphics.Submit(context.Finish()))
       return 1;
   }

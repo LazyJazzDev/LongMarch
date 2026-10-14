@@ -26,7 +26,7 @@ auto graphics = device.GetQueue(QueueType::Graphics);
 auto image = window.AcquireFrame();
 if (image) {
   auto context = device.CreateCommandContext(graphics);
-  if (context.ClearColor(image, {0.529f, 0.808f, 0.922f, 1.0f}) && context.Present(image)) {
+  if (context.ClearColor(image, {0.6f, 0.7f, 0.8f, 1.0f}) && context.Present(image)) {
     auto done = graphics.Submit(context.Finish());
     // done.WaitHost() is optional; GPU completion is collected automatically.
   }
