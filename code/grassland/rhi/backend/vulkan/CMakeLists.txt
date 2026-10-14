@@ -1,0 +1,5 @@
+file(GLOB_RECURSE SOURCES "*.cpp" "*.h")
+target_sources(grassland_rhi PRIVATE ${SOURCES})
+target_include_directories(grassland_rhi PRIVATE ${Vulkan_INCLUDE_DIRS})
+target_link_libraries(grassland_rhi PRIVATE ${VULKAN_LIB_NAME})
+target_compile_definitions(grassland_rhi PUBLIC LONGMARCH_VULKAN_ENABLED)
