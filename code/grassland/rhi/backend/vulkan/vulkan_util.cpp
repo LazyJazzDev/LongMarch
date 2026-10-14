@@ -15,6 +15,8 @@ DeviceFeatures::DeviceFeatures(VkPhysicalDevice device, uint32_t api_version) {
                        [&](const auto &entry) { return std::strcmp(entry.extensionName, name) == 0; });
   };
   features_.pNext = &v11_;
+  if (has(VK_KHR_SWAPCHAIN_EXTENSION_NAME))
+    extensions_.push_back(VK_KHR_SWAPCHAIN_EXTENSION_NAME);
   v11_.pNext = &v12_;
   void **tail = &v12_.pNext;
 #ifdef VK_VERSION_1_3
@@ -60,6 +62,33 @@ DeviceFeatures::DeviceFeatures(VkPhysicalDevice device, uint32_t api_version) {
   // No selection requirement is involved in this query or in vkCreateDevice.
   vkGetPhysicalDeviceFeatures2(device, &features_);
   valid_ = true;
+}
+
+bool Check(VkResult result, const char *operation) {
+  if (result == VK_SUCCESS)
+    return true;
+  ReportError(result, operation);
+  return false;
+}
+
+DeviceFeatures::operator bool() const noexcept {
+  return valid_;
+}
+
+const VkPhysicalDeviceFeatures2 &DeviceFeatures::Features() const noexcept {
+  return features_;
+}
+
+const std::vector<const char *> &DeviceFeatures::Extensions() const noexcept {
+  return extensions_;
+}
+
+bool DeviceFeatures::RayTracingPipeline() const {
+  return ray_pipeline_.rayTracingPipeline == VK_TRUE;
+}
+
+bool DeviceFeatures::RayQuery() const {
+  return ray_query_.rayQuery == VK_TRUE;
 }
 
 }  // namespace grassland::rhi::backend::vulkan

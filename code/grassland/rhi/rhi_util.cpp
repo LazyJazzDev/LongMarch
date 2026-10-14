@@ -7,6 +7,8 @@
 
 namespace grassland::rhi {
 
+ObjectRef::ObjectRef() noexcept = default;
+
 ObjectRef::ObjectRef(const ObjectRef &other) noexcept : obj_(other.obj_) {
   if (obj_)
     obj_->AddRef();

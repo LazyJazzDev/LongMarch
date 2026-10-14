@@ -10,17 +10,9 @@ namespace grassland::rhi {
 
 class IObject {
  public:
-  void AddRef() noexcept {
-    references_.fetch_add(1, std::memory_order_relaxed);
-  }
-
-  void Release() noexcept {
-    if (references_.fetch_sub(1, std::memory_order_acq_rel) == 1) {
-      delete this;
-    }
-  }
-
-  virtual ~IObject() = default;
+  void AddRef() noexcept;
+  void Release() noexcept;
+  virtual ~IObject();
 
  private:
   std::atomic<uint32_t> references_{1};
@@ -125,10 +117,19 @@ struct Access {
 
   template <typename Wrapper, typename Impl>
   static Wrapper Adopt(std::unique_ptr<Impl> object) noexcept {
-    static_assert((std::is_same_v<Wrapper, Core> && std::is_base_of_v<ICore, Impl>) ||
-                  (std::is_same_v<Wrapper, Device> && std::is_base_of_v<IDevice, Impl>));
+    static_assert(std::is_base_of_v<typename Wrapper::Interface, Impl>);
     Wrapper wrapper;
     wrapper.object_.obj_ = object.release();
+    return wrapper;
+  }
+
+  template <typename Wrapper, typename Impl>
+  static Wrapper Share(const ObjectPtr<Impl> &object) noexcept {
+    static_assert(std::is_base_of_v<typename Wrapper::Interface, Impl>);
+    Wrapper wrapper;
+    if (object)
+      object->AddRef();
+    wrapper.object_.obj_ = object.Get();
     return wrapper;
   }
 };

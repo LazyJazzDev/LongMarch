@@ -86,7 +86,10 @@ std::unique_ptr<IDevice> D3D12Core::CreateDevice(int32_t device_idx, const Objec
   PhysicalDevice info{};
   if (!DescribeDevice(adapter.native.Get(), device.Get(), info))
     return {};
-  return std::make_unique<D3D12Device>(std::move(info), owner, std::move(device));
+  auto result_device = std::make_unique<D3D12Device>(std::move(info), owner, std::move(device));
+  if (!result_device->IsInitialized())
+    return {};
+  return result_device;
 }
 
 }  // namespace grassland::rhi::backend::d3d12

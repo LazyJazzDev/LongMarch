@@ -12,11 +12,17 @@ class IObject;
 
 namespace backend {
 struct Access;
-}
+class ICore;
+class IDevice;
+class IWindow;
+class IImage;
+class IQueue;
+class ICommandContext;
+}  // namespace backend
 
 class ObjectRef {
  public:
-  ObjectRef() noexcept = default;
+  ObjectRef() noexcept;
   ObjectRef(const ObjectRef &other) noexcept;
   ObjectRef(ObjectRef &&other) noexcept;
   ObjectRef &operator=(const ObjectRef &other) noexcept;
@@ -70,6 +76,25 @@ struct PhysicalDevice {
   bool ray_tracing_pipeline_feature{};
   bool ray_query_feature{};
   bool geometry_shader_feature{};
+};
+
+enum class PresentMode { VSync, Continuous };
+enum class QueueType { Graphics, Transfer };
+enum class SubmissionStatus { Pending, Completed, Failed, Canceled };
+enum class ImageFormat { Unknown, RGBA8Unorm, BGRA8Unorm };
+enum class Key { P, Escape };
+
+struct WindowDesc {
+  int width{1280};
+  int height{720};
+  std::string title{"LongMarch RHI"};
+  PresentMode present_mode{PresentMode::VSync};
+};
+
+struct ImageDesc {
+  uint32_t width{};
+  uint32_t height{};
+  ImageFormat format{ImageFormat::Unknown};
 };
 
 }  // namespace grassland::rhi

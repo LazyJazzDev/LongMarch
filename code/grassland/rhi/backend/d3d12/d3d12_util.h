@@ -3,8 +3,14 @@
 #include <dxgi1_6.h>
 #include <wrl.h>
 
+// Keep the Win32 macro from rewriting the RHI Device::CreateWindow member.
+#ifdef CreateWindow
+#undef CreateWindow
+#endif
+
 #include "grassland/rhi/backend/backend_util.h"
 
 namespace grassland::rhi::backend::d3d12 {
 using Microsoft::WRL::ComPtr;
+bool Check(HRESULT result, const char *operation);
 }  // namespace grassland::rhi::backend::d3d12

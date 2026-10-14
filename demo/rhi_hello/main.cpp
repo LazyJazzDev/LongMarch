@@ -1,5 +1,7 @@
+#include <chrono>
 #include <iostream>
 #include <string>
+#include <thread>
 
 #include "grassland/rhi/rhi.h"
 
@@ -49,4 +51,32 @@ int main(int argc, char **argv) {
             << "Enabled: ray tracing pipeline=" << device.SupportRayTracingPipeline()
             << ", ray query=" << device.SupportRayQuery() << ", geometry shader=" << device.SupportGeometryShader()
             << '\n';
+  if (api == BACKEND_API_METAL)
+    return 0;  // Metal keeps the device-query demo until its presentation backend is added.
+  auto window = device.CreateWindow({1280, 720, "LongMarch RHI - P: toggle VSync"});
+  auto graphics = device.GetQueue(QueueType::Graphics);
+  if (!window || !graphics)
+    return 1;
+  bool previous_p = false;
+  PresentMode requested = PresentMode::VSync;
+  while (Window::PollEvents() && !window.ShouldClose() && !window.IsKeyDown(Key::Escape)) {
+    const bool p = window.IsKeyDown(Key::P);
+    if (p && !previous_p) {
+      requested = requested == PresentMode::VSync ? PresentMode::Continuous : PresentMode::VSync;
+      if (!window.SetPresentMode(requested))
+        return 1;
+      std::cout << "Present mode: " << (window.GetPresentMode() == PresentMode::VSync ? "VSync" : "Continuous")
+                << std::endl;
+    }
+    previous_p = p;
+    auto image = window.AcquireFrame();
+    if (!image) {
+      std::this_thread::sleep_for(std::chrono::milliseconds(10));
+      continue;
+    }
+    auto context = device.CreateCommandContext(graphics);
+    if (!context || !context.ClearColor(image, {0.529f, 0.808f, 0.922f, 1.0f}) || !context.Present(image) ||
+        !graphics.Submit(context.Finish()))
+      return 1;
+  }
 }

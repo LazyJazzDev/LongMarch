@@ -4,6 +4,10 @@
 
 namespace grassland::rhi::backend::vulkan {
 
+VkInstance VulkanCore::Instance() const {
+  return instance_;
+}
+
 std::unique_ptr<VulkanCore> VulkanCore::CreateVulkanCore() {
   uint32_t loader_version = VK_API_VERSION_1_0;
   const auto enumerate_version = reinterpret_cast<PFN_vkEnumerateInstanceVersion>(
@@ -32,6 +36,11 @@ std::unique_ptr<VulkanCore> VulkanCore::CreateVulkanCore() {
   std::vector<const char *> extensions;
   VkInstanceCreateFlags flags = 0;
   for (const auto &extension : available) {
+    for (const auto name : {"VK_KHR_surface", "VK_KHR_win32_surface", "VK_KHR_xlib_surface", "VK_KHR_xcb_surface",
+                            "VK_KHR_wayland_surface"}) {
+      if (std::strcmp(extension.extensionName, name) == 0)
+        extensions.push_back(name);
+    }
     if (std::strcmp(extension.extensionName, "VK_KHR_portability_enumeration") == 0) {
       extensions.push_back("VK_KHR_portability_enumeration");
       flags |= VK_INSTANCE_CREATE_ENUMERATE_PORTABILITY_BIT_KHR;

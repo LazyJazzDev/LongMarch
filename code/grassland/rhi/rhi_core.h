@@ -20,6 +20,7 @@ class Core {
   explicit operator bool() const noexcept;
 
  private:
+  using Interface = backend::ICore;
   ObjectRef object_;
   // Internal bridge keeps implementation pointers out of the public API.
   friend struct backend::Access;

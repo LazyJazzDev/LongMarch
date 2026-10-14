@@ -1,6 +1,8 @@
 #include "grassland/rhi/rhi_device.h"
 
 #include "grassland/rhi/backend/backend_device.h"
+#include "grassland/rhi/backend/backend_queue.h"
+#include "grassland/rhi/backend/backend_window.h"
 
 namespace grassland::rhi {
 
@@ -22,6 +24,44 @@ bool Device::SupportGeometryShader() const {
 
 Device::operator bool() const noexcept {
   return static_cast<bool>(object_);
+}
+
+using namespace backend;
+
+Window Device::CreateWindow(const WindowDesc &desc) const {
+  try {
+    if (*this)
+      return Access::Adopt<Window>(Access::As<IDevice>(*this).CreateWindow(desc));
+    ReportError(-1, "Window creation is unavailable for this device.");
+  } catch (const std::bad_alloc &) {
+    ReportError(-1, "Window creation ran out of memory.");
+  }
+  return {};
+}
+
+Queue Device::GetQueue(QueueType type) const {
+  try {
+    return *this ? Access::Adopt<Queue>(Access::As<IDevice>(*this).CreateQueue(type)) : Queue{};
+  } catch (const std::bad_alloc &) {
+    ReportError(-1, "Queue handle allocation failed.");
+    return {};
+  }
+}
+
+CommandContext Device::CreateCommandContext(const Queue &queue) const {
+  if (!*this || !queue)
+    return {};
+  const auto &impl = Access::As<IQueue>(queue);
+  if (impl.Owner().Get() != &Access::As<IDevice>(*this)) {
+    ReportError(-1, "The queue belongs to another device.");
+    return {};
+  }
+  try {
+    return Access::Adopt<CommandContext>(impl.CreateCommandContext());
+  } catch (const std::bad_alloc &) {
+    ReportError(-1, "Command context allocation failed.");
+    return {};
+  }
 }
 
 }  // namespace grassland::rhi
