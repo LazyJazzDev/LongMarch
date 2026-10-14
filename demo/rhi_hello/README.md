@@ -13,7 +13,8 @@ The demo enumerates devices, prints their memory and capabilities, and creates
 the automatically selected device. It links the independent `grassland_rhi`
 module and does not use the old `grassland::graphics` runtime.
 
-D3D12 and Vulkan then open a sky-blue GLFW window. Press **P** to switch between
+D3D12 and Vulkan then open a blue GLFW window. The title displays FPS measured
+by `grassland::FPSCounter`, refreshed four times per second. Press **P** to switch between
 VSync and continuous presentation; **Escape** or the close button exits. Continuous
 presentation falls back to VSync when unavailable. `Window::GetPresentMode()`
 reports the actual mode. Resizing and minimization are handled by the Window.

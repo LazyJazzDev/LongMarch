@@ -27,4 +27,8 @@ bool IWindow::IsKeyDown(Key key) const {
   return glfw::IsWindowThread() && glfwGetKey(window_, key == Key::P ? GLFW_KEY_P : GLFW_KEY_ESCAPE) == GLFW_PRESS;
 }
 
+bool IWindow::SetTitle(const std::string &title) {
+  return glfw::SetWindowTitle(window_, title.c_str());
+}
+
 }  // namespace grassland::rhi::backend

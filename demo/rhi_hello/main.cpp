@@ -1,9 +1,12 @@
+#include <fmt/format.h>
+
 #include <chrono>
 #include <iostream>
 #include <string>
 #include <thread>
 
 #include "grassland/rhi/rhi.h"
+#include "grassland/util/fps_counter.h"
 
 int main(int argc, char **argv) {
   using namespace grassland::rhi;
@@ -59,6 +62,8 @@ int main(int argc, char **argv) {
     return 1;
   bool previous_p = false;
   PresentMode requested = PresentMode::VSync;
+  grassland::FPSCounter fps_counter;
+  auto title_time = std::chrono::steady_clock::now();
   while (Window::PollEvents() && !window.ShouldClose() && !window.IsKeyDown(Key::Escape)) {
     const bool p = window.IsKeyDown(Key::P);
     if (p && !previous_p) {
@@ -71,6 +76,7 @@ int main(int argc, char **argv) {
     previous_p = p;
     auto image = window.AcquireFrame();
     if (!image) {
+      fps_counter.Reset();
       std::this_thread::sleep_for(std::chrono::milliseconds(10));
       continue;
     }
@@ -78,5 +84,12 @@ int main(int argc, char **argv) {
     if (!context || !context.ClearColor(image, {0.6f, 0.7f, 0.8f, 1.0f}) || !context.Present(image) ||
         !graphics.Submit(context.Finish()))
       return 1;
+    fps_counter.TickFrame();
+    const auto now = std::chrono::steady_clock::now();
+    if (now - title_time >= std::chrono::milliseconds(250)) {
+      if (!window.SetTitle(fmt::format("LongMarch RHI - FPS: {:.1f} - P: toggle VSync", fps_counter.GetFPS())))
+        return 1;
+      title_time = now;
+    }
   }
 }

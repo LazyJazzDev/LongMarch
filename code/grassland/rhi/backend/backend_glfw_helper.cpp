@@ -81,6 +81,20 @@ GLFWwindow *CreateWindow(int width, int height, const char *title) {
   return window;
 }
 
+bool SetWindowTitle(GLFWwindow *window, const char *title) {
+  if (!window || !IsWindowThread())
+    return false;
+  glfwGetError(nullptr);
+  glfwSetWindowTitle(window, title);
+  const char *message{};
+  const int error = glfwGetError(&message);
+  if (error != GLFW_NO_ERROR) {
+    ReportError(error, message ? message : "Setting window title failed.");
+    return false;
+  }
+  return true;
+}
+
 void DestroyWindow(GLFWwindow *window) {
   if (!window)
     return;

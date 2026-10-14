@@ -8,6 +8,7 @@ class Window {
   static bool PollEvents();
   bool ShouldClose() const;
   bool IsKeyDown(Key key) const;
+  bool SetTitle(const std::string &title) const;
   Image AcquireFrame() const;
   bool SetPresentMode(PresentMode mode) const;
   PresentMode GetPresentMode() const;

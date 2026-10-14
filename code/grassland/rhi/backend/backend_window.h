@@ -10,6 +10,7 @@ class IWindow : public IObject {
   ~IWindow() override;
   bool ShouldClose() const;
   bool IsKeyDown(Key key) const;
+  bool SetTitle(const std::string &title);
   virtual ObjectPtr<IImage> AcquireFrame() = 0;
   virtual bool SetPresentMode(PresentMode mode) = 0;
   virtual PresentMode GetPresentMode() const = 0;

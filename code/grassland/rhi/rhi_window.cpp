@@ -18,6 +18,10 @@ bool Window::IsKeyDown(Key key) const {
   return *this && Access::As<IWindow>(*this).IsKeyDown(key);
 }
 
+bool Window::SetTitle(const std::string &title) const {
+  return *this && Access::As<IWindow>(*this).SetTitle(title);
+}
+
 Image Window::AcquireFrame() const {
   try {
     if (*this && glfw::IsWindowThread())
