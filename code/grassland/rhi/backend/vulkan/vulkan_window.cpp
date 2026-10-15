@@ -2,6 +2,8 @@
 #define GLFW_INCLUDE_VULKAN
 #include "grassland/rhi/backend/vulkan/vulkan_window.h"
 
+#include <cstdlib>
+
 #include "grassland/rhi/backend/vulkan/vulkan_command_context.h"
 #include "grassland/rhi/backend/vulkan/vulkan_swap_chain_image.h"
 #define GLFW_INCLUDE_NONE
@@ -18,10 +20,6 @@ VulkanWindow::~VulkanWindow() {
   vkDeviceWaitIdle(device_->NativeDevice());
   ReleaseNextImage();
   DestroySwapchain();
-  if (initialization_fence_)
-    vkDestroyFence(device_->NativeDevice(), initialization_fence_, nullptr);
-  if (initialization_pool_)
-    vkDestroyCommandPool(device_->NativeDevice(), initialization_pool_, nullptr);
   if (surface_)
     vkDestroySurfaceKHR(device_->Instance(), surface_, nullptr);
 }
@@ -44,10 +42,6 @@ bool VulkanWindow::Initialize(const WindowDesc &desc) {
   }
   requested_ = desc.present_mode;
   return RebuildSwapChain();
-}
-
-bool VulkanWindow::IsFrameValid(uint64_t generation) const {
-  return generation_ == generation && valid_ && acquired_;
 }
 
 const void *VulkanWindow::DeviceIdentity() const {
@@ -81,7 +75,6 @@ VkResult VulkanWindow::AcquireNative() {
   if (result == VK_SUCCESS || result == VK_SUBOPTIMAL_KHR) {
     sync.acquired = true;
     next_sync_ = (next_sync_ + 1) % static_cast<uint32_t>(acquire_sync_.size());
-    ++generation_;
     acquire_wait_pending_ = true;
     const auto image = images_[current_image_];
     acquired_ = true;
@@ -93,57 +86,57 @@ VkResult VulkanWindow::AcquireNative() {
       if (status != VK_SUCCESS)
         return status;
       std::lock_guard<std::mutex> lock(device_->QueueMutex());
-      if (!initialization_pool_) {
-        VkCommandPoolCreateInfo pool{VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO};
-        pool.queueFamilyIndex = device_->QueueFamily();
-        status = vkCreateCommandPool(device, &pool, nullptr, &initialization_pool_);
+      VkCommandPool pool{};
+      VkCommandBuffer commands{};
+      VkFence completion{};
+      status = [&]() -> VkResult {
+        VkCommandPoolCreateInfo create_pool{VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO};
+        create_pool.queueFamilyIndex = device_->QueueFamily();
+        auto status = vkCreateCommandPool(device, &create_pool, nullptr, &pool);
         if (status != VK_SUCCESS)
           return status;
-      }
-      if (!initialization_commands_) {
         VkCommandBufferAllocateInfo allocate{VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO};
-        allocate.commandPool = initialization_pool_;
+        allocate.commandPool = pool;
         allocate.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
         allocate.commandBufferCount = 1;
-        status = vkAllocateCommandBuffers(device, &allocate, &initialization_commands_);
+        status = vkAllocateCommandBuffers(device, &allocate, &commands);
         if (status != VK_SUCCESS)
           return status;
-      }
-      if (!initialization_fence_) {
-        VkFenceCreateInfo create{VK_STRUCTURE_TYPE_FENCE_CREATE_INFO};
-        status = vkCreateFence(device, &create, nullptr, &initialization_fence_);
+        VkFenceCreateInfo create_fence{VK_STRUCTURE_TYPE_FENCE_CREATE_INFO};
+        status = vkCreateFence(device, &create_fence, nullptr, &completion);
         if (status != VK_SUCCESS)
           return status;
-      }
-      status = vkResetCommandPool(device, initialization_pool_, 0);
-      if (status != VK_SUCCESS)
-        return status;
-      status = vkResetFences(device, 1, &initialization_fence_);
-      if (status != VK_SUCCESS)
-        return status;
-      VkCommandBufferBeginInfo begin{VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO};
-      begin.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
-      status = vkBeginCommandBuffer(initialization_commands_, &begin);
-      if (status != VK_SUCCESS)
-        return status;
-      VkImageMemoryBarrier barrier{VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER};
-      barrier.oldLayout = VK_IMAGE_LAYOUT_UNDEFINED;
-      barrier.newLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
-      barrier.srcQueueFamilyIndex = barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-      barrier.image = image;
-      barrier.subresourceRange = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1};
-      vkCmdPipelineBarrier(initialization_commands_, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT,
-                           VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT, 0, 0, nullptr, 0, nullptr, 1, &barrier);
-      status = vkEndCommandBuffer(initialization_commands_);
-      if (status != VK_SUCCESS)
-        return status;
-      VkSubmitInfo submit{VK_STRUCTURE_TYPE_SUBMIT_INFO};
-      submit.commandBufferCount = 1;
-      submit.pCommandBuffers = &initialization_commands_;
-      status = vkQueueSubmit(device_->NativeQueue(), 1, &submit, initialization_fence_);
-      if (status != VK_SUCCESS)
-        return status;
-      status = vkWaitForFences(device, 1, &initialization_fence_, VK_TRUE, UINT64_MAX);
+        VkCommandBufferBeginInfo begin{VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO};
+        begin.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
+        status = vkBeginCommandBuffer(commands, &begin);
+        if (status != VK_SUCCESS)
+          return status;
+        VkImageMemoryBarrier barrier{VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER};
+        barrier.oldLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+        barrier.newLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
+        barrier.srcQueueFamilyIndex = barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+        barrier.image = image;
+        barrier.subresourceRange = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1};
+        vkCmdPipelineBarrier(commands, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT, 0, 0,
+                             nullptr, 0, nullptr, 1, &barrier);
+        status = vkEndCommandBuffer(commands);
+        if (status != VK_SUCCESS)
+          return status;
+        VkSubmitInfo submit{VK_STRUCTURE_TYPE_SUBMIT_INFO};
+        submit.commandBufferCount = 1;
+        submit.pCommandBuffers = &commands;
+        status = vkQueueSubmit(device_->NativeQueue(), 1, &submit, completion);
+        if (status != VK_SUCCESS)
+          return status;
+        // Submitted commands must finish before their temporary pool is destroyed.
+        if (!Check(vkWaitForFences(device, 1, &completion, VK_TRUE, UINT64_MAX), "Wait for image initialization"))
+          std::abort();
+        return VK_SUCCESS;
+      }();
+      if (completion)
+        vkDestroyFence(device, completion, nullptr);
+      if (pool)
+        vkDestroyCommandPool(device, pool, nullptr);
       if (status != VK_SUCCESS)
         return status;
       initialized_images_[current_image_] = true;
@@ -207,7 +200,7 @@ ObjectPtr<Image> VulkanWindow::AcquireNativeFrame() {
     Check(result, "vkAcquireNextImageKHR");
     return {};
   }
-  return ObjectPtr<Image>::Adopt(new VulkanSwapChainImage(desc_, this, generation_, images_[current_image_]));
+  return ObjectPtr<Image>::Adopt(new VulkanSwapChainImage(desc_, this, images_[current_image_]));
 }
 
 bool VulkanWindow::SetNativePresentMode(PresentMode mode) {
@@ -363,7 +356,6 @@ bool VulkanWindow::RebuildNativeSwapChain() {
     if (!Check(vkDeviceWaitIdle(device), "Wait before swapchain replacement"))
       return false;
   }
-  ++generation_;
   valid_ = false;
   acquired_ = false;
   DestroySwapchain();

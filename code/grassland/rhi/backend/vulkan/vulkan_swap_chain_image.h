@@ -8,7 +8,7 @@ class VulkanWindow;
 
 class VulkanSwapChainImage final : public VulkanImage {
  public:
-  VulkanSwapChainImage(ImageDesc desc, VulkanWindow *window, uint64_t generation, VkImage image);
+  VulkanSwapChainImage(ImageDesc desc, VulkanWindow *window, VkImage image);
   ~VulkanSwapChainImage() override;
   bool IsValid() const override;
   VkImage NativeImage() const override;
@@ -16,7 +16,6 @@ class VulkanSwapChainImage final : public VulkanImage {
 
  private:
   VulkanWindow *window_;
-  uint64_t generation_;
   VkImage image_{};
 };
 

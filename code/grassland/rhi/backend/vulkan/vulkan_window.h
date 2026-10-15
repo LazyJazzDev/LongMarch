@@ -16,7 +16,6 @@ class VulkanWindow final : public Window {
   bool SetNativePresentMode(PresentMode mode) override;
   PresentMode GetPresentMode() const override;
   std::vector<WindowPresentationOption> GetSupportedPresentationOptions() const override;
-  bool IsFrameValid(uint64_t generation) const;
   const void *DeviceIdentity() const;
   VkSemaphore AcquireSemaphore() const;
   void ConsumeAcquireSemaphore(VulkanCommandContext *submission);
@@ -47,11 +46,7 @@ class VulkanWindow final : public Window {
   std::vector<VkImage> images_;
   std::vector<VkSemaphore> rendered_;
   std::vector<bool> initialized_images_;
-  VkCommandPool initialization_pool_{};
-  VkCommandBuffer initialization_commands_{};
-  VkFence initialization_fence_{};
   ImageDesc desc_;
-  std::atomic<uint64_t> generation_{1};
   bool acquired_{};
   bool valid_{};
   PresentMode requested_{PRESENT_MODE_VSYNC};
