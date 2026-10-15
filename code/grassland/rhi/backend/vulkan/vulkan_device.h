@@ -27,13 +27,10 @@ class VulkanDevice final : public Device {
   // The pool grows on demand, independently of swapchain image count.
   bool AcquireCommandResources(VkCommandPool &pool, VkCommandBuffer &command, VkFence &fence);
   void RecycleCommandResources(VkCommandPool pool, VkCommandBuffer command, VkFence fence);
-  bool AcquireImageSync(VkSemaphore &semaphore, VkFence &fence);
-  void RecycleImageSync(VkSemaphore semaphore, VkFence fence);
 
  private:
   std::mutex resource_pool_mutex_;
   std::vector<std::tuple<VkCommandPool, VkCommandBuffer, VkFence>> command_pool_;
-  std::vector<std::pair<VkSemaphore, VkFence>> image_sync_pool_;
   VulkanDevice(grassland::rhi::PhysicalDevice info, Core *core);
   VkDevice device_{VK_NULL_HANDLE};
   VkPhysicalDevice physical_{};

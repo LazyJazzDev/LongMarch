@@ -175,7 +175,7 @@ CommandContext::SubmitResult VulkanCommandContext::SubmitNative() {
       return SUBMIT_RESULT_REJECTED;
     MarkSubmitted();
     for (auto frame : acquired_frames)
-      frame->ConsumeAcquireSemaphore();
+      frame->ConsumeAcquireSemaphore(this);
     submission_failed_ = true;
     bool presented = true;
     for (const auto &present : presents_) {
@@ -193,6 +193,10 @@ CommandContext::SubmitResult VulkanCommandContext::SubmitNative() {
     }
   }
   return SUBMIT_RESULT_SUBMITTED;
+}
+
+VkFence VulkanCommandContext::CompletionFence() const {
+  return fence_;
 }
 
 SubmissionStatus VulkanCommandContext::WaitForProgress() {

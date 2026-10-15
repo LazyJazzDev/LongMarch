@@ -52,34 +52,6 @@ void VulkanDevice::RecycleCommandResources(VkCommandPool pool, VkCommandBuffer c
   vkDestroyCommandPool(device_, pool, nullptr);
 }
 
-bool VulkanDevice::AcquireImageSync(VkSemaphore &semaphore, VkFence &fence) {
-  {
-    std::lock_guard<std::mutex> lock(resource_pool_mutex_);
-    if (!image_sync_pool_.empty()) {
-      std::tie(semaphore, fence) = image_sync_pool_.back();
-      image_sync_pool_.pop_back();
-    }
-  }
-  if (semaphore)
-    return Check(vkResetFences(device_, 1, &fence), "Reset acquire fence");
-  VkSemaphoreCreateInfo create{VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO};
-  if (!Check(vkCreateSemaphore(device_, &create, nullptr, &semaphore), "Create acquire semaphore"))
-    return false;
-  VkFenceCreateInfo fence_info{VK_STRUCTURE_TYPE_FENCE_CREATE_INFO};
-  return Check(vkCreateFence(device_, &fence_info, nullptr, &fence), "Create acquire fence");
-}
-
-void VulkanDevice::RecycleImageSync(VkSemaphore semaphore, VkFence fence) {
-  try {
-    std::lock_guard<std::mutex> lock(resource_pool_mutex_);
-    image_sync_pool_.emplace_back(semaphore, fence);
-    return;
-  } catch (const std::bad_alloc &) {
-  }
-  vkDestroySemaphore(device_, semaphore, nullptr);
-  vkDestroyFence(device_, fence, nullptr);
-}
-
 VulkanDevice::VulkanDevice(grassland::rhi::PhysicalDevice info, Core *core) : Device(std::move(info), core) {
 }
 
@@ -88,10 +60,6 @@ VulkanDevice::~VulkanDevice() {
   for (const auto &entry : command_pool_) {
     vkDestroyFence(device_, std::get<2>(entry), nullptr);
     vkDestroyCommandPool(device_, std::get<0>(entry), nullptr);
-  }
-  for (const auto &entry : image_sync_pool_) {
-    vkDestroySemaphore(device_, entry.first, nullptr);
-    vkDestroyFence(device_, entry.second, nullptr);
   }
   if (device_)
     vkDestroyDevice(device_, nullptr);

@@ -2,6 +2,7 @@
 #define GLFW_INCLUDE_VULKAN
 #include "grassland/rhi/backend/vulkan/vulkan_window.h"
 
+#include "grassland/rhi/backend/vulkan/vulkan_command_context.h"
 #include "grassland/rhi/backend/vulkan/vulkan_swap_chain_image.h"
 #define GLFW_INCLUDE_NONE
 #include <GLFW/glfw3.h>
@@ -53,13 +54,36 @@ const void *VulkanWindow::DeviceIdentity() const {
   return device_;
 }
 
-VkResult VulkanWindow::AcquireNative(VkSemaphore semaphore,
-                                     VkFence fence,
+VkResult VulkanWindow::AcquireNative(uint32_t &sync_index,
+                                     VkSemaphore &semaphore,
                                      uint32_t &index,
                                      VkImage &image,
                                      VkSemaphore &rendered) {
+  sync_index = next_sync_;
+  auto &sync = acquire_sync_[sync_index];
+  const auto native = device_->NativeDevice();
+  if (sync.submission) {
+    const auto completion = sync.submission->CompletionFence();
+    const auto status = vkWaitForFences(native, 1, &completion, VK_TRUE, UINT64_MAX);
+    if (status != VK_SUCCESS)
+      return status;
+    sync.submission.Reset();
+  }
+  if (sync.acquired) {
+    auto status = vkWaitForFences(native, 1, &sync.fence, VK_TRUE, UINT64_MAX);
+    if (status != VK_SUCCESS)
+      return status;
+    status = vkResetFences(native, 1, &sync.fence);
+    if (status != VK_SUCCESS)
+      return status;
+    sync.acquired = false;
+  }
+  semaphore = sync.semaphore;
+  const auto fence = sync.fence;
   const auto result = vkAcquireNextImageKHR(device_->NativeDevice(), swapchain_, UINT64_MAX, semaphore, fence, &index);
   if (result == VK_SUCCESS || result == VK_SUBOPTIMAL_KHR) {
+    sync.acquired = true;
+    next_sync_ = (next_sync_ + 1) % static_cast<uint32_t>(acquire_sync_.size());
     image = images_[index];
     rendered = rendered_[index];
     acquired_ = true;
@@ -131,6 +155,10 @@ VkResult VulkanWindow::AcquireNative(VkSemaphore semaphore,
   return result;
 }
 
+void VulkanWindow::TrackAcquireWait(uint32_t sync_index, VulkanCommandContext *submission) {
+  acquire_sync_[sync_index].submission = ObjectPtr<VulkanCommandContext>::Retain(submission);
+}
+
 VkResult VulkanWindow::PresentFrame(uint64_t generation, uint32_t index, VkSemaphore rendered) {
 #if !defined(NDEBUG)
   if (!IsFrameValid(generation))
@@ -170,7 +198,7 @@ ObjectPtr<Image> VulkanWindow::AcquireNativeFrame() {
     return {};
   }
 #endif
-  auto frame = ObjectPtr<VulkanSwapChainImage>::Adopt(new VulkanSwapChainImage(desc_, this, generation_, device_));
+  auto frame = ObjectPtr<VulkanSwapChainImage>::Adopt(new VulkanSwapChainImage(desc_, this, generation_));
   return frame->Acquire() ? ObjectPtr<Image>(frame) : ObjectPtr<Image>{};
 }
 
@@ -225,6 +253,18 @@ PresentMode VulkanWindow::GetPresentMode() const {
 }
 
 void VulkanWindow::DestroySwapchain() {
+  // Device idle covers submitted waits; acquisition itself is a presentation-engine operation.
+  for (auto &sync : acquire_sync_) {
+    if (sync.acquired)
+      vkWaitForFences(device_->NativeDevice(), 1, &sync.fence, VK_TRUE, UINT64_MAX);
+    sync.submission.Reset();
+    if (sync.semaphore)
+      vkDestroySemaphore(device_->NativeDevice(), sync.semaphore, nullptr);
+    if (sync.fence)
+      vkDestroyFence(device_->NativeDevice(), sync.fence, nullptr);
+  }
+  acquire_sync_.clear();
+  next_sync_ = 0;
   for (auto semaphore : rendered_)
     if (semaphore)
       vkDestroySemaphore(device_->NativeDevice(), semaphore, nullptr);
@@ -324,6 +364,15 @@ bool VulkanWindow::RebuildNativeSwapChain() {
   if (!EnumerateList([&](uint32_t *n, VkImage *p) { return vkGetSwapchainImagesKHR(device, swapchain_, n, p); },
                      images_))
     return false;
+  acquire_sync_.resize(images_.size() + 1);
+  for (auto &sync : acquire_sync_) {
+    VkSemaphoreCreateInfo semaphore{VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO};
+    if (!Check(vkCreateSemaphore(device, &semaphore, nullptr, &sync.semaphore), "Create acquire semaphore"))
+      return false;
+    VkFenceCreateInfo fence{VK_STRUCTURE_TYPE_FENCE_CREATE_INFO};
+    if (!Check(vkCreateFence(device, &fence, nullptr, &sync.fence), "Create acquire fence"))
+      return false;
+  }
   initialized_images_.assign(images_.size(), false);
   rendered_.resize(images_.size());
   VkSemaphoreCreateInfo semaphore{VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO};
