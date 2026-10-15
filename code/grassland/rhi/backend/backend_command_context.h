@@ -25,18 +25,21 @@ class CommandContext : public Object<rhi::ICommandContext> {
   const void *DeviceIdentity() const;
   QueueType Type() const;
   const ObjectPtr<Image> &Frame() const;
-  const std::array<float, 4> &Color() const;
   void MarkSubmitted();
   bool WasSubmitted() const;
   virtual SubmitResult SubmitNative() = 0;
   virtual SubmissionStatus WaitForProgress() = 0;
+
+ protected:
+  virtual bool RecordClear(Image *image, const std::array<float, 4> &color, bool first_use) = 0;
+  virtual bool RecordPresent(Image *image) = 0;
+  virtual bool EndRecording() = 0;
 
  private:
   Window *present_window_{};
   const void *identity_;
   QueueType type_;
   ObjectPtr<Image> image_;
-  std::array<float, 4> color_{};
   bool present_{};
   bool sealed_{};
   bool failed_{};

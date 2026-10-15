@@ -8,12 +8,17 @@ class VulkanCommandContext final : public CommandContext {
  public:
   VulkanCommandContext(VulkanDevice *device, QueueType type);
   ~VulkanCommandContext() override;
+  bool Initialize();
   SubmitResult SubmitNative() override;
   SubmissionStatus WaitForProgress() override;
 
  private:
+  bool RecordClear(Image *image, const std::array<float, 4> &color, bool first_use) override;
+  bool RecordPresent(Image *image) override;
+  bool EndRecording() override;
   VulkanDevice *device_;
   VkCommandPool pool_{};
+  VkCommandBuffer command_{};
   VkFence fence_{};
   bool failed_{};
 };

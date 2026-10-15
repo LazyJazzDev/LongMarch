@@ -8,7 +8,10 @@ VulkanQueue::VulkanQueue(VulkanDevice *device, QueueType type) : Queue(device, t
 }
 
 std::unique_ptr<CommandContext> VulkanQueue::CreateCommandContext() const {
-  return std::make_unique<VulkanCommandContext>(static_cast<VulkanDevice *>(Owner()), Type());
+  auto context = std::make_unique<VulkanCommandContext>(static_cast<VulkanDevice *>(Owner()), Type());
+  if (!context->Initialize())
+    return {};
+  return context;
 }
 
 }  // namespace grassland::rhi::backend::vulkan

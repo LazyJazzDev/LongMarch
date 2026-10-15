@@ -20,14 +20,25 @@ bool CommandContext::CmdClearColor(rhi::IImage *image, const std::array<float, 4
 bool CommandContext::CmdClearColor(const ObjectPtr<Image> &image, const std::array<float, 4> &color) {
   if (sealed_)
     return false;
-  if (failed_ || image_ || type_ != QUEUE_TYPE_GRAPHICS || !image || !image->IsValid() ||
-      image->DeviceIdentity() != identity_ || !image->Claim()) {
-    ReportError(-1, "CmdClearColor requires a fresh frame from this device and a graphics context.");
+  if (failed_ || present_ || type_ != QUEUE_TYPE_GRAPHICS || !image || !image->IsValid() ||
+      image->DeviceIdentity() != identity_ || (image_ && image_.Get() != image.Get())) {
+    ReportError(-1, "CmdClearColor requires this context's frame and a graphics queue.");
     failed_ = true;
     return false;
   }
-  image_ = image;
-  color_ = color;
+  const bool first_use = !image_;
+  if (first_use) {
+    if (!image->Claim()) {
+      failed_ = true;
+      return false;
+    }
+    // Retain the exact physical resource before encoding any native use.
+    image_ = image;
+  }
+  if (!RecordClear(image_.Get(), color, first_use)) {
+    failed_ = true;
+    return false;
+  }
   return true;
 }
 
@@ -37,6 +48,10 @@ bool CommandContext::CmdPresent(rhi::IWindow *window) {
   const auto target = dynamic_cast<Window *>(window);
   if (failed_ || present_ || !image_ || !target || !target->OwnsFrame(image_.Get()) || !image_->IsValid()) {
     ReportError(-1, "CmdPresent requires the window owning the recorded clear frame.");
+    failed_ = true;
+    return false;
+  }
+  if (!RecordPresent(image_.Get())) {
     failed_ = true;
     return false;
   }
@@ -60,6 +75,10 @@ bool CommandContext::Seal() {
     return false;
   }
   sealed_ = true;
+  if (!EndRecording()) {
+    failed_ = true;
+    return false;
+  }
   return true;
 }
 
@@ -73,10 +92,6 @@ QueueType CommandContext::Type() const {
 
 const ObjectPtr<Image> &CommandContext::Frame() const {
   return image_;
-}
-
-const std::array<float, 4> &CommandContext::Color() const {
-  return color_;
 }
 
 void CommandContext::MarkSubmitted() {

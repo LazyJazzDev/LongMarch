@@ -15,26 +15,23 @@ D3D12CommandContext::~D3D12CommandContext() {
     CloseHandle(event_);
 }
 
-CommandContext::SubmitResult D3D12CommandContext::SubmitNative() {
-  if (Frame() && !glfw::IsWindowThread()) {
-    ReportError(-1, "Present must run on the window thread.");
-    return SUBMIT_RESULT_REJECTED;
-  }
+bool D3D12CommandContext::Initialize() {
   event_ = CreateEventW(nullptr, FALSE, FALSE, nullptr);
-  if (!event_ ||
-      !Check(device_->NativeDevice()->CreateCommandAllocator(D3D12_COMMAND_LIST_TYPE_DIRECT, IID_PPV_ARGS(&allocator_)),
-             "CreateCommandAllocator") ||
-      !Check(device_->NativeDevice()->CreateCommandList(0, D3D12_COMMAND_LIST_TYPE_DIRECT, allocator_.Get(), nullptr,
-                                                        IID_PPV_ARGS(&list_)),
-             "CreateCommandList"))
-    return SUBMIT_RESULT_REJECTED;
-  auto frame = dynamic_cast<D3D12SwapChainImage *>(Frame().Get());
-  if (Frame() && !frame)
-    return SUBMIT_RESULT_REJECTED;
-  std::lock_guard<std::mutex> lock(device_->QueueMutex());
-  if (frame) {
-    if (!frame->IsValid())
-      return SUBMIT_RESULT_REJECTED;
+  if (!event_)
+    return false;
+  if (!Check(device_->NativeDevice()->CreateCommandAllocator(D3D12_COMMAND_LIST_TYPE_DIRECT, IID_PPV_ARGS(&allocator_)),
+             "CreateCommandAllocator"))
+    return false;
+  return Check(device_->NativeDevice()->CreateCommandList(0, D3D12_COMMAND_LIST_TYPE_DIRECT, allocator_.Get(), nullptr,
+                                                          IID_PPV_ARGS(&list_)),
+               "CreateCommandList");
+}
+
+bool D3D12CommandContext::RecordClear(Image *image, const std::array<float, 4> &color, bool first_use) {
+  const auto frame = dynamic_cast<D3D12SwapChainImage *>(image);
+  if (!frame || !list_)
+    return false;
+  if (first_use) {
     D3D12_RESOURCE_BARRIER barrier{};
     barrier.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
     barrier.Transition.pResource = frame->NativeImage();
@@ -42,12 +39,36 @@ CommandContext::SubmitResult D3D12CommandContext::SubmitNative() {
     barrier.Transition.StateBefore = D3D12_RESOURCE_STATE_PRESENT;
     barrier.Transition.StateAfter = D3D12_RESOURCE_STATE_RENDER_TARGET;
     list_->ResourceBarrier(1, &barrier);
-    list_->ClearRenderTargetView(frame->RenderTarget(), Color().data(), 0, nullptr);
-    std::swap(barrier.Transition.StateBefore, barrier.Transition.StateAfter);
-    list_->ResourceBarrier(1, &barrier);
   }
-  if (!Check(list_->Close(), "CommandList::Close"))
+  list_->ClearRenderTargetView(frame->RenderTarget(), color.data(), 0, nullptr);
+  return true;
+}
+
+bool D3D12CommandContext::RecordPresent(Image *image) {
+  const auto frame = dynamic_cast<D3D12SwapChainImage *>(image);
+  if (!frame || !list_)
+    return false;
+  D3D12_RESOURCE_BARRIER barrier{};
+  barrier.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
+  barrier.Transition.pResource = frame->NativeImage();
+  barrier.Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
+  barrier.Transition.StateBefore = D3D12_RESOURCE_STATE_RENDER_TARGET;
+  barrier.Transition.StateAfter = D3D12_RESOURCE_STATE_PRESENT;
+  list_->ResourceBarrier(1, &barrier);
+  return true;
+}
+
+bool D3D12CommandContext::EndRecording() {
+  return Check(list_->Close(), "CommandList::Close");
+}
+
+CommandContext::SubmitResult D3D12CommandContext::SubmitNative() {
+  if (Frame() && !glfw::IsWindowThread()) {
+    ReportError(-1, "Present must run on the window thread.");
     return SUBMIT_RESULT_REJECTED;
+  }
+  auto frame = static_cast<D3D12SwapChainImage *>(Frame().Get());
+  std::lock_guard<std::mutex> lock(device_->QueueMutex());
   failed_ = true;
   ID3D12CommandList *lists[] = {list_.Get()};
   device_->NativeQueue()->ExecuteCommandLists(1, lists);

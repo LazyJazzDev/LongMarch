@@ -89,6 +89,7 @@ TEST_P(RhiWindow, MultipleWindowsSingleUseFramesModesAndQueueLifetime) {
         return option.format == frame.GetDesc().format && option.present_mode == window.GetPresentMode();
       }));
       auto context = device.CreateCommandContext(graphics);
+      ASSERT_TRUE(context.CmdClearColor(frame, {1.0f, 0.0f, 0.0f, 1.0f}));
       ASSERT_TRUE(context.CmdClearColor(frame, {0.6f, 0.7f, 0.8f, 1.0f}));
       ASSERT_TRUE(context.CmdPresent(window));
       auto before_submit = window.GetNextImage();

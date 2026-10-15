@@ -110,7 +110,30 @@ class TestCommandContext final : public backend::CommandContext {
         fail_after_submit_(fail_after_submit) {
   }
 
+  std::vector<std::array<float, 4>> recorded_colors;
+  int recorded_presents{};
+  int ended{};
+
+  bool RecordClear(backend::Image *image, const std::array<float, 4> &color, bool first_use) override {
+    EXPECT_EQ(Frame().Get(), image);
+    EXPECT_EQ(first_use, recorded_colors.empty());
+    recorded_colors.push_back(color);
+    return true;
+  }
+
+  bool RecordPresent(backend::Image *image) override {
+    EXPECT_EQ(Frame().Get(), image);
+    ++recorded_presents;
+    return true;
+  }
+
+  bool EndRecording() override {
+    ++ended;
+    return true;
+  }
+
   SubmitResult SubmitNative() override {
+    EXPECT_EQ(ended, 1);
     if (fail_after_submit_) {
       MarkSubmitted();
       throw std::bad_alloc{};
@@ -161,6 +184,40 @@ class TestQueue final : public backend::Queue {
     return {};
   }
 };
+
+TEST(RhiCommands, CommandsAreEncodedImmediatelyAndKeepParameterValues) {
+  auto gate = std::make_shared<Gate>();
+  auto device = ObjectPtr<TestDevice>::Adopt(new TestDevice(gate));
+  auto queue = Queue(new TestQueue(device, QUEUE_TYPE_GRAPHICS));
+  auto window = Window(new TestWindow(gate));
+  auto image = Image(new TestImage(gate));
+  auto *native = new TestCommandContext(gate, QUEUE_TYPE_GRAPHICS);
+  CommandContext context = native;
+  std::array<float, 4> color{1, 0, 0, 1};
+  ASSERT_TRUE(context.CmdClearColor(image, color));
+  ASSERT_EQ(native->recorded_colors.size(), 1u);
+  color = {0, 1, 0, 1};
+  ASSERT_TRUE(context.CmdClearColor(image, color));
+  ASSERT_EQ(native->recorded_colors.size(), 2u);
+  EXPECT_EQ(native->recorded_colors[0], (std::array<float, 4>{1, 0, 0, 1}));
+  EXPECT_EQ(native->recorded_colors[1], color);
+  EXPECT_EQ(native->ended, 0);
+  image.Release();
+  EXPECT_EQ(gate->destroyed, 0);
+  ASSERT_TRUE(context.CmdPresent(window));
+  EXPECT_EQ(native->recorded_presents, 1);
+  auto token = queue.Submit(std::move(context));
+  ASSERT_TRUE(token);
+  EXPECT_EQ(native->ended, 1);
+  EXPECT_EQ(native->recorded_colors.size(), 2u);
+  {
+    std::lock_guard<std::mutex> lock(gate->mutex);
+    gate->complete = true;
+  }
+  gate->changed.notify_all();
+  ASSERT_TRUE(token.WaitHost());
+  EXPECT_EQ(gate->destroyed, 1);
+}
 
 TEST(RhiCommands, RecordingAndSubmissionKeepExactImageWithoutKeepingPayloadInToken) {
   static_assert(!std::is_copy_constructible_v<CommandContext>);
