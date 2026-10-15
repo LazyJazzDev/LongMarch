@@ -37,4 +37,8 @@ bool Window::SetPresentMode(rhi::PresentMode mode) const {
 rhi::PresentMode Window::GetPresentMode() const {
   return *this ? Get()->GetPresentMode() : rhi::PresentMode::VSync;
 }
+
+std::vector<rhi::WindowPresentationOption> Window::GetSupportedPresentationOptions() const {
+  return *this ? Get()->GetSupportedPresentationOptions() : std::vector<rhi::WindowPresentationOption>{};
+}
 }  // namespace grassland::rhix

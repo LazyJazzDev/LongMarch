@@ -1,5 +1,6 @@
 #include <gtest/gtest.h>
 
+#include <algorithm>
 #include <cstdlib>
 
 #ifdef _WIN32
@@ -34,6 +35,16 @@ TEST_P(RhiWindow, MultipleWindowsSingleUseFramesModesAndQueueLifetime) {
   auto second = device.CreateGLFWWindow({320, 240, "RHI window test B"});
   ASSERT_TRUE(first);
   ASSERT_TRUE(second);
+  const auto options = first.GetSupportedPresentationOptions();
+  ASSERT_FALSE(options.empty());
+  for (size_t i = 0; i < options.size(); ++i) {
+    EXPECT_NE(options[i].format, ImageFormat::Unknown);
+    for (size_t j = 0; j < i; ++j)
+      EXPECT_FALSE(options[i].format == options[j].format && options[i].present_mode == options[j].present_mode);
+    ASSERT_TRUE(first.SetPresentMode(options[i].present_mode));
+    EXPECT_EQ(first.GetPresentMode(), options[i].present_mode);
+  }
+  ASSERT_TRUE(first.SetPresentMode(PresentMode::VSync));
   // Dropping an unsubmitted acquisition must not strand the swapchain.
   {
     auto discarded = first.AcquireFrame();
@@ -51,6 +62,10 @@ TEST_P(RhiWindow, MultipleWindowsSingleUseFramesModesAndQueueLifetime) {
       auto frame = window.AcquireFrame();
       ASSERT_TRUE(frame);
       EXPECT_GT(frame.GetDesc().width, 0u);
+      const auto supported = window.GetSupportedPresentationOptions();
+      EXPECT_TRUE(std::any_of(supported.begin(), supported.end(), [&](const auto &option) {
+        return option.format == frame.GetDesc().format && option.present_mode == window.GetPresentMode();
+      }));
       auto context = device.CreateCommandContext(graphics);
       ASSERT_TRUE(context.ClearColor(frame, {0.6f, 0.7f, 0.8f, 1.0f}));
       ASSERT_TRUE(context.Present(frame));

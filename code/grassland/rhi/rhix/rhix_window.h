@@ -17,6 +17,7 @@ class Window : public ObjectContainer {
   Image AcquireFrame() const;
   bool SetPresentMode(rhi::PresentMode mode) const;
   rhi::PresentMode GetPresentMode() const;
+  std::vector<rhi::WindowPresentationOption> GetSupportedPresentationOptions() const;
 };
 
 }  // namespace grassland::rhix

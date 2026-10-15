@@ -12,6 +12,7 @@ class VulkanWindow final : public Window {
   ObjectPtr<Image> AcquireNativeFrame() override;
   bool SetNativePresentMode(PresentMode mode) override;
   PresentMode GetPresentMode() const override;
+  std::vector<WindowPresentationOption> GetSupportedPresentationOptions() const override;
   bool IsFrameValid(uint64_t generation) const;
   const void *DeviceIdentity() const;
   void CancelFrame(uint64_t generation);

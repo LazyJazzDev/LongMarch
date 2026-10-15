@@ -49,6 +49,10 @@ class TestWindow final : public backend::Window {
     return PresentMode::VSync;
   }
 
+  std::vector<WindowPresentationOption> GetSupportedPresentationOptions() const override {
+    return {{PresentMode::VSync, ImageFormat::RGBA8Unorm}};
+  }
+
  private:
   std::shared_ptr<Gate> gate_;
 };

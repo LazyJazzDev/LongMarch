@@ -78,6 +78,14 @@ PresentMode D3D12Window::GetPresentMode() const {
   return mode_;
 }
 
+std::vector<WindowPresentationOption> D3D12Window::GetSupportedPresentationOptions() const {
+  // The D3D12 swapchain implementation currently uses RGBA8 UNORM only.
+  std::vector<WindowPresentationOption> options{{PresentMode::VSync, ImageFormat::RGBA8Unorm}};
+  if (device_->SupportsTearing())
+    options.push_back({PresentMode::Continuous, ImageFormat::RGBA8Unorm});
+  return options;
+}
+
 bool D3D12Window::Rebuild(int width, int height) {
   if (width <= 0 || height <= 0)
     return false;

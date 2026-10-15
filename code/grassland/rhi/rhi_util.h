@@ -52,6 +52,11 @@ enum class SubmissionStatus { Pending, Completed, Failed, Canceled };
 enum class ImageFormat { Unknown, RGBA8Unorm, BGRA8Unorm };
 enum class Key { P, Escape };
 
+struct WindowPresentationOption {
+  PresentMode present_mode;
+  ImageFormat format;
+};
+
 struct WindowDesc {
   int width{1280};
   int height{720};

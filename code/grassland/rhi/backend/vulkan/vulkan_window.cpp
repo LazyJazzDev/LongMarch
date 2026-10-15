@@ -119,6 +119,47 @@ bool VulkanWindow::SetNativePresentMode(PresentMode mode) {
   return Rebuild();
 }
 
+std::vector<WindowPresentationOption> VulkanWindow::GetSupportedPresentationOptions() const {
+  const auto physical = device_->NativePhysicalDevice();
+  VkSurfaceCapabilitiesKHR caps{};
+  if (!Check(vkGetPhysicalDeviceSurfaceCapabilitiesKHR(physical, surface_, &caps), "Surface capabilities"))
+    return {};
+  if (!(caps.supportedUsageFlags & VK_IMAGE_USAGE_TRANSFER_DST_BIT)) {
+    ReportError(-1, "Surface does not support transfer clears.");
+    return {};
+  }
+  std::vector<VkSurfaceFormatKHR> formats;
+  std::vector<VkPresentModeKHR> modes;
+  if (!EnumerateList(
+          [&](uint32_t *n, VkSurfaceFormatKHR *p) {
+            return vkGetPhysicalDeviceSurfaceFormatsKHR(physical, surface_, n, p);
+          },
+          formats) ||
+      !EnumerateList(
+          [&](uint32_t *n, VkPresentModeKHR *p) {
+            return vkGetPhysicalDeviceSurfacePresentModesKHR(physical, surface_, n, p);
+          },
+          modes))
+    return {};
+  const bool continuous = std::find(modes.begin(), modes.end(), VK_PRESENT_MODE_IMMEDIATE_KHR) != modes.end() ||
+                          std::find(modes.begin(), modes.end(), VK_PRESENT_MODE_MAILBOX_KHR) != modes.end();
+  std::vector<WindowPresentationOption> options;
+  for (const auto &format : formats) {
+    // Match the formats and color space implemented by Rebuild.
+    if (format.colorSpace != VK_COLOR_SPACE_SRGB_NONLINEAR_KHR ||
+        (format.format != VK_FORMAT_R8G8B8A8_UNORM && format.format != VK_FORMAT_B8G8R8A8_UNORM))
+      continue;
+    const auto image_format =
+        format.format == VK_FORMAT_R8G8B8A8_UNORM ? ImageFormat::RGBA8Unorm : ImageFormat::BGRA8Unorm;
+    if (std::any_of(options.begin(), options.end(), [&](const auto &option) { return option.format == image_format; }))
+      continue;
+    options.push_back({PresentMode::VSync, image_format});
+    if (continuous)
+      options.push_back({PresentMode::Continuous, image_format});
+  }
+  return options;
+}
+
 PresentMode VulkanWindow::GetPresentMode() const {
   return mode_;
 }

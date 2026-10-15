@@ -67,6 +67,14 @@ presentation falls back to VSync when unavailable. `Window::GetPresentMode()`
 reports the actual mode. Resizing and minimization are handled by the Window.
 Metal retains the device-query-only behavior in this iteration.
 
+After window creation, both demos print `GetSupportedPresentationOptions()`:
+the presentation-mode/pixel-format combinations implemented by RHI and supported
+by this window. These are SDR combinations: D3D12 currently uses RGBA8 UNORM;
+Vulkan supports the surface's RGBA8/BGRA8 UNORM formats with sRGB nonlinear color
+space. Continuous mode is listed only when available without VSync fallback.
+Pixel format selection remains automatic; this query does not add format selection
+or report unimplemented HDR/native formats. An empty result indicates failure.
+
 ```cpp
 auto window = device.CreateGLFWWindow({1280, 720, "RHI"});
 auto graphics = device.GetQueue(QueueType::Graphics);

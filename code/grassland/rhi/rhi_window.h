@@ -14,6 +14,9 @@ class IWindow : public IObject {
   virtual IImage *AcquireFrame() = 0;
   virtual bool SetPresentMode(PresentMode mode) = 0;
   virtual PresentMode GetPresentMode() const = 0;
+  // Currently implemented combinations supported by this window's surface.
+  // Formats are selected automatically at creation/rebuild. Empty on failure.
+  virtual std::vector<WindowPresentationOption> GetSupportedPresentationOptions() const = 0;
 
  protected:
   ~IWindow() override;

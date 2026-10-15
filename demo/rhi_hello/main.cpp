@@ -11,6 +11,15 @@
 namespace {
 int RunWindow(grassland::rhi::IDevice *device, grassland::rhi::IWindow *window, grassland::rhi::IQueue *graphics) {
   using namespace grassland::rhi;
+  const auto options = window->GetSupportedPresentationOptions();
+  if (options.empty())
+    return 1;
+  std::cout << "Supported presentation combinations (SDR):\n";
+  for (const auto &option : options) {
+    const char *format = option.format == ImageFormat::RGBA8Unorm ? "RGBA8 UNORM" : "BGRA8 UNORM";
+    std::cout << "  " << (option.present_mode == PresentMode::VSync ? "VSync" : "Continuous") << " + " << format
+              << '\n';
+  }
   bool previous_p = false;
   PresentMode requested = PresentMode::VSync;
   grassland::FPSCounter fps_counter;
