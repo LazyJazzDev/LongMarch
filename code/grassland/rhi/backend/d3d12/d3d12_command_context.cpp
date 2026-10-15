@@ -1,7 +1,7 @@
 #include "grassland/rhi/backend/d3d12/d3d12_command_context.h"
 
 #include "grassland/rhi/backend/backend_glfw_helper.h"
-#include "grassland/rhi/backend/d3d12/d3d12_image.h"
+#include "grassland/rhi/backend/d3d12/d3d12_swap_chain_image.h"
 
 namespace grassland::rhi::backend::d3d12 {
 
@@ -28,7 +28,9 @@ CommandContext::SubmitResult D3D12CommandContext::SubmitNative() {
                                                         IID_PPV_ARGS(&list_)),
              "CreateCommandList"))
     return SubmitResult::Rejected;
-  auto frame = static_cast<D3D12Image *>(Frame().Get());
+  auto frame = dynamic_cast<D3D12SwapChainImage *>(Frame().Get());
+  if (Frame() && !frame)
+    return SubmitResult::Rejected;
   std::lock_guard<std::mutex> lock(device_->QueueMutex());
   if (frame) {
     if (!frame->IsValid())

@@ -1,7 +1,7 @@
 #include "grassland/rhi/backend/vulkan/vulkan_command_context.h"
 
 #include "grassland/rhi/backend/backend_glfw_helper.h"
-#include "grassland/rhi/backend/vulkan/vulkan_image.h"
+#include "grassland/rhi/backend/vulkan/vulkan_swap_chain_image.h"
 
 namespace grassland::rhi::backend::vulkan {
 
@@ -41,7 +41,9 @@ CommandContext::SubmitResult VulkanCommandContext::SubmitNative() {
   begin.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
   if (!Check(vkBeginCommandBuffer(command, &begin), "Begin command buffer"))
     return SubmitResult::Rejected;
-  auto frame = static_cast<VulkanImage *>(Frame().Get());
+  auto frame = dynamic_cast<VulkanSwapChainImage *>(Frame().Get());
+  if (Frame() && !frame)
+    return SubmitResult::Rejected;
   VkSemaphore acquired{}, rendered{};
   if (frame) {
     acquired = frame->AcquireSemaphore();

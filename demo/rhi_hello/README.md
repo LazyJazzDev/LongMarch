@@ -117,7 +117,14 @@ submission failures also return empty handles and log the native error.
 Window, Image, Queue and CommandContext wrap their corresponding public `rhi::I*`
 interfaces. Common implementation bases and D3D12/Vulkan implementations stay
 in the backend object files; rhix has no backend includes or Access bridge. Window owns its
-swapchain; Image carries a counted frame lease and a borrowed Window pointer.
+swapchain. `D3D12Image` and `VulkanImage` provide common backend resource access
+without depending on Window. Their `D3D12SwapChainImage` and
+`VulkanSwapChainImage` subclasses carry the counted frame lease, borrowed Window
+pointer, frame validity and presentation state. Vulkan acquisition synchronization
+also belongs to the swapchain subclass. The frontend still receives `IImage`:
+callers follow the ownership and lifetime contract of the API that produced it,
+without querying an ownership category. Independent images and pooled buffers
+can use their own backend subclasses when those creation APIs are implemented.
 Device owns managed Windows and reclaims them once caller references and frame
 leases are gone, during completion collection, subsequent window creation, or
 Device shutdown. Returning a frame lease does not itself destroy its parent.

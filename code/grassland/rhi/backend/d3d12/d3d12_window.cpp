@@ -1,6 +1,6 @@
 #include "grassland/rhi/backend/d3d12/d3d12_window.h"
 
-#include "grassland/rhi/backend/d3d12/d3d12_image.h"
+#include "grassland/rhi/backend/d3d12/d3d12_swap_chain_image.h"
 #define GLFW_INCLUDE_NONE
 #define GLFW_EXPOSE_NATIVE_WIN32
 #include <GLFW/glfw3.h>
@@ -64,7 +64,7 @@ ObjectPtr<Image> D3D12Window::AcquireNativeFrame() {
   const UINT index = swapchain_->GetCurrentBackBufferIndex();
   auto rtv = rtv_->GetCPUDescriptorHandleForHeapStart();
   rtv.ptr += index * stride_;
-  auto frame = ObjectPtr<Image>::Adopt(new D3D12Image(desc_, this, generation_, images_[index].Get(), rtv));
+  auto frame = ObjectPtr<Image>::Adopt(new D3D12SwapChainImage(desc_, this, generation_, images_[index].Get(), rtv));
   acquired_ = true;
   return frame;
 }

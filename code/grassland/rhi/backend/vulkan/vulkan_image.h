@@ -4,31 +4,17 @@
 
 namespace grassland::rhi::backend::vulkan {
 
-class VulkanWindow;
-
-class VulkanImage final : public Image {
+// Common resource access; derived classes define ownership and validity.
+class VulkanImage : public Image {
  public:
-  VulkanImage(ImageDesc desc, VulkanWindow *window, uint64_t generation, VkDevice device);
-  ~VulkanImage() override;
-  bool Acquire();
-  bool IsValid() const override;
   const void *DeviceIdentity() const override;
-  VkImage NativeImage() const;
-  VkSemaphore AcquireSemaphore() const;
-  VkSemaphore RenderSemaphore() const;
-  VkResult Present();
+  virtual VkImage NativeImage() const = 0;
+
+ protected:
+  VulkanImage(ImageDesc desc, const void *device);
 
  private:
-  VulkanWindow *window_;
-  uint64_t generation_;
-  VkDevice device_;
-  VkImage image_{};
-  VkSemaphore acquired_{};
-  VkSemaphore rendered_{};
-  VkFence acquire_fence_{};
-  uint32_t index_{};
-  bool acquired_image_{};
-  std::atomic<bool> presented_{};
+  const void *device_;
 };
 
 }  // namespace grassland::rhi::backend::vulkan

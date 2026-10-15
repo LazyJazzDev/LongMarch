@@ -1,6 +1,6 @@
 #include "grassland/rhi/backend/vulkan/vulkan_window.h"
 
-#include "grassland/rhi/backend/vulkan/vulkan_image.h"
+#include "grassland/rhi/backend/vulkan/vulkan_swap_chain_image.h"
 #define GLFW_INCLUDE_NONE
 #include <GLFW/glfw3.h>
 
@@ -106,7 +106,8 @@ ObjectPtr<Image> VulkanWindow::AcquireNativeFrame() {
     ReportError(-1, "Present or release the previous acquired frame first.");
     return {};
   }
-  auto frame = ObjectPtr<VulkanImage>::Adopt(new VulkanImage(desc_, this, generation_, device_->NativeDevice()));
+  auto frame = ObjectPtr<VulkanSwapChainImage>::Adopt(
+      new VulkanSwapChainImage(desc_, this, generation_, device_->NativeDevice()));
   return frame->Acquire() ? ObjectPtr<Image>(frame) : ObjectPtr<Image>{};
 }
 
