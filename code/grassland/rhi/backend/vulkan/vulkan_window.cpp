@@ -47,20 +47,16 @@ bool VulkanWindow::Initialize(const WindowDesc &desc) {
 }
 
 bool VulkanWindow::IsFrameValid(uint64_t generation) const {
-  return generation_ == generation && valid_;
+  return generation_ == generation && valid_ && acquired_;
 }
 
 const void *VulkanWindow::DeviceIdentity() const {
   return device_;
 }
 
-VkResult VulkanWindow::AcquireNative(uint32_t &sync_index,
-                                     VkSemaphore &semaphore,
-                                     uint32_t &index,
-                                     VkImage &image,
-                                     VkSemaphore &rendered) {
-  sync_index = next_sync_;
-  auto &sync = acquire_sync_[sync_index];
+VkResult VulkanWindow::AcquireNative() {
+  current_sync_ = next_sync_;
+  auto &sync = acquire_sync_[current_sync_];
   const auto native = device_->NativeDevice();
   if (sync.submission) {
     const auto completion = sync.submission->CompletionFence();
@@ -78,16 +74,18 @@ VkResult VulkanWindow::AcquireNative(uint32_t &sync_index,
       return status;
     sync.acquired = false;
   }
-  semaphore = sync.semaphore;
+  const auto semaphore = sync.semaphore;
   const auto fence = sync.fence;
-  const auto result = vkAcquireNextImageKHR(device_->NativeDevice(), swapchain_, UINT64_MAX, semaphore, fence, &index);
+  const auto result =
+      vkAcquireNextImageKHR(device_->NativeDevice(), swapchain_, UINT64_MAX, semaphore, fence, &current_image_);
   if (result == VK_SUCCESS || result == VK_SUBOPTIMAL_KHR) {
     sync.acquired = true;
     next_sync_ = (next_sync_ + 1) % static_cast<uint32_t>(acquire_sync_.size());
-    image = images_[index];
-    rendered = rendered_[index];
+    ++generation_;
+    acquire_wait_pending_ = true;
+    const auto image = images_[current_image_];
     acquired_ = true;
-    if (!initialized_images_[index]) {
+    if (!initialized_images_[current_image_]) {
       // Establish the fixed default layout before exposing this image to recording.
       // This runs once per physical swapchain image, not once per CommandContext.
       const auto device = device_->NativeDevice();
@@ -148,28 +146,34 @@ VkResult VulkanWindow::AcquireNative(uint32_t &sync_index,
       status = vkWaitForFences(device, 1, &initialization_fence_, VK_TRUE, UINT64_MAX);
       if (status != VK_SUCCESS)
         return status;
-      initialized_images_[index] = true;
+      initialized_images_[current_image_] = true;
     }
   } else if (result == VK_ERROR_OUT_OF_DATE_KHR)
     valid_ = false;
   return result;
 }
 
-void VulkanWindow::TrackAcquireWait(uint32_t sync_index, VulkanCommandContext *submission) {
-  acquire_sync_[sync_index].submission = ObjectPtr<VulkanCommandContext>::Retain(submission);
+VkSemaphore VulkanWindow::AcquireSemaphore() const {
+  return acquire_wait_pending_ ? acquire_sync_[current_sync_].semaphore : VK_NULL_HANDLE;
 }
 
-VkResult VulkanWindow::PresentFrame(uint64_t generation, uint32_t index, VkSemaphore rendered) {
-#if !defined(NDEBUG)
-  if (!IsFrameValid(generation))
-    return VK_ERROR_OUT_OF_DATE_KHR;
-#endif
+void VulkanWindow::ConsumeAcquireSemaphore(VulkanCommandContext *submission) {
+  acquire_sync_[current_sync_].submission = ObjectPtr<VulkanCommandContext>::Retain(submission);
+  acquire_wait_pending_ = false;
+}
+
+VkSemaphore VulkanWindow::RenderSemaphore() const {
+  return rendered_[current_image_];
+}
+
+VkResult VulkanWindow::PresentFrame() {
+  const auto rendered = RenderSemaphore();
   VkPresentInfoKHR present{VK_STRUCTURE_TYPE_PRESENT_INFO_KHR};
   present.waitSemaphoreCount = 1;
   present.pWaitSemaphores = &rendered;
   present.swapchainCount = 1;
   present.pSwapchains = &swapchain_;
-  present.pImageIndices = &index;
+  present.pImageIndices = &current_image_;
   const auto result = vkQueuePresentKHR(device_->NativeQueue(), &present);
   acquired_ = false;
   if (result == VK_SUBOPTIMAL_KHR || result == VK_ERROR_OUT_OF_DATE_KHR) {
@@ -198,8 +202,12 @@ ObjectPtr<Image> VulkanWindow::AcquireNativeFrame() {
     return {};
   }
 #endif
-  auto frame = ObjectPtr<VulkanSwapChainImage>::Adopt(new VulkanSwapChainImage(desc_, this, generation_));
-  return frame->Acquire() ? ObjectPtr<Image>(frame) : ObjectPtr<Image>{};
+  const auto result = AcquireNative();
+  if (result != VK_SUCCESS && result != VK_SUBOPTIMAL_KHR) {
+    Check(result, "vkAcquireNextImageKHR");
+    return {};
+  }
+  return ObjectPtr<Image>::Adopt(new VulkanSwapChainImage(desc_, this, generation_, images_[current_image_]));
 }
 
 bool VulkanWindow::SetNativePresentMode(PresentMode mode) {

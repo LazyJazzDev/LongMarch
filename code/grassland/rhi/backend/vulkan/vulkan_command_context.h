@@ -7,7 +7,6 @@
 namespace grassland::rhi::backend::vulkan {
 class VulkanImage;
 class VulkanWindow;
-class VulkanSwapChainImage;
 
 class VulkanCommandContext final : public CommandContext {
  public:
@@ -31,7 +30,7 @@ class VulkanCommandContext final : public CommandContext {
   };
 
   std::unordered_map<VulkanImage *, ImageState> image_states_;
-  std::vector<std::pair<VulkanWindow *, VulkanSwapChainImage *>> presents_;
+  std::vector<VulkanWindow *> presents_;
   VulkanDevice *device_;
   VkCommandPool pool_{};
   VkCommandBuffer command_{};

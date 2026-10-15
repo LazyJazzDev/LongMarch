@@ -98,7 +98,7 @@ bool VulkanCommandContext::CmdPresent(rhi::IWindow *window) {
     return false;
   }
   for (const auto &present : presents_) {
-    if (present.first == target) {
+    if (present == target) {
       recording_failed_ = true;
       ReportError(-1, "A context can present each window only once.");
       return false;
@@ -115,7 +115,7 @@ bool VulkanCommandContext::CmdPresent(rhi::IWindow *window) {
   if (!TransitionImage(frame.Get(), VK_IMAGE_LAYOUT_PRESENT_SRC_KHR, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, 0))
     return false;
   try {
-    presents_.emplace_back(target, frame.Get());
+    presents_.push_back(target);
   } catch (const std::bad_alloc &) {
     recording_failed_ = true;
     return false;
@@ -148,19 +148,20 @@ CommandContext::SubmitResult VulkanCommandContext::SubmitNative() {
 #endif
   std::vector<VkSemaphore> acquired, rendered;
   std::vector<VkPipelineStageFlags> stages;
-  std::vector<VulkanSwapChainImage *> acquired_frames;
+  std::vector<VulkanWindow *> acquired_windows;
   for (const auto &entry : image_states_) {
     // Swapchain acquisition synchronization is distinct from ordinary image barriers.
     if (auto frame = dynamic_cast<VulkanSwapChainImage *>(entry.first)) {
-      if (auto semaphore = frame->AcquireSemaphore()) {
+      auto window = frame->Owner();
+      if (auto semaphore = window->AcquireSemaphore()) {
         acquired.push_back(semaphore);
         stages.push_back(VK_PIPELINE_STAGE_ALL_COMMANDS_BIT);
-        acquired_frames.push_back(frame);
+        acquired_windows.push_back(window);
       }
     }
   }
   for (const auto &present : presents_)
-    rendered.push_back(present.second->RenderSemaphore());
+    rendered.push_back(present->RenderSemaphore());
   VkSubmitInfo submit{VK_STRUCTURE_TYPE_SUBMIT_INFO};
   submit.commandBufferCount = 1;
   submit.pCommandBuffers = &command_;
@@ -174,12 +175,12 @@ CommandContext::SubmitResult VulkanCommandContext::SubmitNative() {
     if (!Check(vkQueueSubmit(device_->NativeQueue(), 1, &submit, fence_), "vkQueueSubmit"))
       return SUBMIT_RESULT_REJECTED;
     MarkSubmitted();
-    for (auto frame : acquired_frames)
-      frame->ConsumeAcquireSemaphore(this);
+    for (auto window : acquired_windows)
+      window->ConsumeAcquireSemaphore(this);
     submission_failed_ = true;
     bool presented = true;
     for (const auto &present : presents_) {
-      if (!Check(present.second->Present(), "vkQueuePresentKHR"))
+      if (!Check(present->PresentFrame(), "vkQueuePresentKHR"))
         presented = false;
     }
     submission_failed_ = !presented;
@@ -187,7 +188,7 @@ CommandContext::SubmitResult VulkanCommandContext::SubmitNative() {
   if (submission_failed_)
     return SUBMIT_RESULT_FAILED_IN_FLIGHT;
   for (const auto &present : presents_) {
-    if (!present.first->UpdateNextImage()) {
+    if (!present->UpdateNextImage()) {
       ReportError(-1, "Failed to prepare the next swapchain image after submission.");
       std::abort();
     }
