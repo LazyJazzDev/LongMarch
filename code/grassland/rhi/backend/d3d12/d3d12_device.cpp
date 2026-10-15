@@ -6,6 +6,47 @@
 
 namespace grassland::rhi::backend::d3d12 {
 
+bool D3D12Device::AcquireCommandResources(ComPtr<ID3D12CommandAllocator> &allocator,
+                                          ComPtr<ID3D12GraphicsCommandList> &list,
+                                          HANDLE &event) {
+  {
+    std::lock_guard<std::mutex> lock(command_pool_mutex_);
+    if (!command_pool_.empty()) {
+      std::tie(allocator, list, event) = std::move(command_pool_.back());
+      command_pool_.pop_back();
+    }
+  }
+  if (list) {
+    if (!Check(allocator->Reset(), "Reset command allocator"))
+      return false;
+    if (!ResetEvent(event))
+      return false;
+    return Check(list->Reset(allocator.Get(), nullptr), "Reset command list");
+  }
+  event = CreateEventW(nullptr, FALSE, FALSE, nullptr);
+  if (!event)
+    return false;
+  if (!Check(device_->CreateCommandAllocator(D3D12_COMMAND_LIST_TYPE_DIRECT, IID_PPV_ARGS(&allocator)),
+             "CreateCommandAllocator"))
+    return false;
+  return Check(
+      device_->CreateCommandList(0, D3D12_COMMAND_LIST_TYPE_DIRECT, allocator.Get(), nullptr, IID_PPV_ARGS(&list)),
+      "CreateCommandList");
+}
+
+void D3D12Device::RecycleCommandResources(ComPtr<ID3D12CommandAllocator> allocator,
+                                          ComPtr<ID3D12GraphicsCommandList> list,
+                                          HANDLE event) {
+  try {
+    std::lock_guard<std::mutex> lock(command_pool_mutex_);
+    command_pool_.emplace_back(std::move(allocator), std::move(list), event);
+    return;
+  } catch (const std::bad_alloc &) {
+    // Recycling is optional: release the idle native objects if the pool cannot grow.
+  }
+  CloseHandle(event);
+}
+
 bool D3D12Device::Initialize() {
   D3D12_COMMAND_QUEUE_DESC desc{};
   desc.Type = D3D12_COMMAND_LIST_TYPE_DIRECT;
@@ -83,6 +124,9 @@ D3D12Device::D3D12Device(PhysicalDevice info, Core *core, ComPtr<ID3D12Device> d
 
 D3D12Device::~D3D12Device() {
   ShutdownQueues();
+  for (auto &entry : command_pool_)
+    CloseHandle(std::get<2>(entry));
+  command_pool_.clear();
   if (idle_event_)
     CloseHandle(idle_event_);
 }

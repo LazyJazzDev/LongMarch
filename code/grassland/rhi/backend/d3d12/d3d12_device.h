@@ -1,4 +1,6 @@
 #pragma once
+#include <tuple>
+
 #include "grassland/rhi/backend/backend_device.h"
 #include "grassland/rhi/backend/d3d12/d3d12_util.h"
 
@@ -21,7 +23,18 @@ class D3D12Device final : public Device {
   rhi::ICommandContext *CreateCommandContext() override;
   rhi::IQueue *GetQueue(QueueType type) override;
 
+  // Transfer idle native resources; callers recycle only after GPU completion and final handle release.
+  // The pool grows on demand, independently of swapchain image count.
+  bool AcquireCommandResources(ComPtr<ID3D12CommandAllocator> &allocator,
+                               ComPtr<ID3D12GraphicsCommandList> &list,
+                               HANDLE &event);
+  void RecycleCommandResources(ComPtr<ID3D12CommandAllocator> allocator,
+                               ComPtr<ID3D12GraphicsCommandList> list,
+                               HANDLE event);
+
  private:
+  std::mutex command_pool_mutex_;
+  std::vector<std::tuple<ComPtr<ID3D12CommandAllocator>, ComPtr<ID3D12GraphicsCommandList>, HANDLE>> command_pool_;
   bool Initialize();
   ComPtr<ID3D12Device> device_;
   ComPtr<IDXGIFactory4> factory_;

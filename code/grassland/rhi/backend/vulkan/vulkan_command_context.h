@@ -36,6 +36,7 @@ class VulkanCommandContext final : public CommandContext {
   VkCommandBuffer command_{};
   VkFence fence_{};
   bool submission_failed_{};
+  bool reusable_{};
 };
 
 }  // namespace grassland::rhi::backend::vulkan

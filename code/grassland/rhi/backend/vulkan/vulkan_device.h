@@ -1,4 +1,6 @@
 #pragma once
+#include <tuple>
+
 #include "grassland/rhi/backend/backend_device.h"
 #include "grassland/rhi/backend/vulkan/vulkan_util.h"
 
@@ -21,7 +23,17 @@ class VulkanDevice final : public Device {
   rhi::ICommandContext *CreateCommandContext() override;
   rhi::IQueue *GetQueue(QueueType type) override;
 
+  // Transfer idle native resources; callers recycle only after GPU completion and final handle release.
+  // The pool grows on demand, independently of swapchain image count.
+  bool AcquireCommandResources(VkCommandPool &pool, VkCommandBuffer &command, VkFence &fence);
+  void RecycleCommandResources(VkCommandPool pool, VkCommandBuffer command, VkFence fence);
+  bool AcquireImageSync(VkSemaphore &semaphore, VkFence &fence);
+  void RecycleImageSync(VkSemaphore semaphore, VkFence fence);
+
  private:
+  std::mutex resource_pool_mutex_;
+  std::vector<std::tuple<VkCommandPool, VkCommandBuffer, VkFence>> command_pool_;
+  std::vector<std::pair<VkSemaphore, VkFence>> image_sync_pool_;
   VulkanDevice(grassland::rhi::PhysicalDevice info, Core *core);
   VkDevice device_{VK_NULL_HANDLE};
   VkPhysicalDevice physical_{};

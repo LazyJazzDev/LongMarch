@@ -36,6 +36,8 @@ class D3D12CommandContext final : public CommandContext {
   HANDLE event_{};
   uint64_t value_{};
   bool submission_failed_{};
+  bool reusable_{};
+  bool closed_{};
 };
 
 }  // namespace grassland::rhi::backend::d3d12

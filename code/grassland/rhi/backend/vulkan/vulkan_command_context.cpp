@@ -12,6 +12,10 @@ VulkanCommandContext::VulkanCommandContext(VulkanDevice *device) : CommandContex
 }
 
 VulkanCommandContext::~VulkanCommandContext() {
+  if (reusable_) {
+    device_->RecycleCommandResources(pool_, command_, fence_);
+    return;
+  }
   if (fence_)
     vkDestroyFence(device_->NativeDevice(), fence_, nullptr);
   if (pool_)
@@ -19,24 +23,8 @@ VulkanCommandContext::~VulkanCommandContext() {
 }
 
 bool VulkanCommandContext::Initialize() {
-  const auto device = device_->NativeDevice();
-  VkCommandPoolCreateInfo pool{VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO};
-  pool.queueFamilyIndex = device_->QueueFamily();
-  pool.flags = VK_COMMAND_POOL_CREATE_TRANSIENT_BIT;
-  if (!Check(vkCreateCommandPool(device, &pool, nullptr, &pool_), "Create command pool"))
-    return false;
-  VkFenceCreateInfo fence{VK_STRUCTURE_TYPE_FENCE_CREATE_INFO};
-  if (!Check(vkCreateFence(device, &fence, nullptr, &fence_), "Create submission fence"))
-    return false;
-  VkCommandBufferAllocateInfo allocate{VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO};
-  allocate.commandPool = pool_;
-  allocate.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
-  allocate.commandBufferCount = 1;
-  if (!Check(vkAllocateCommandBuffers(device, &allocate, &command_), "Allocate command buffer"))
-    return false;
-  VkCommandBufferBeginInfo begin{VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO};
-  begin.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
-  return Check(vkBeginCommandBuffer(command_, &begin), "Begin command buffer");
+  reusable_ = device_->AcquireCommandResources(pool_, command_, fence_);
+  return reusable_;
 }
 
 bool VulkanCommandContext::TransitionImage(VulkanImage *image,

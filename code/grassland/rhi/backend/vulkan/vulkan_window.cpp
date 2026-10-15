@@ -170,8 +170,7 @@ ObjectPtr<Image> VulkanWindow::AcquireNativeFrame() {
     return {};
   }
 #endif
-  auto frame = ObjectPtr<VulkanSwapChainImage>::Adopt(
-      new VulkanSwapChainImage(desc_, this, generation_, device_->NativeDevice()));
+  auto frame = ObjectPtr<VulkanSwapChainImage>::Adopt(new VulkanSwapChainImage(desc_, this, generation_, device_));
   return frame->Acquire() ? ObjectPtr<Image>(frame) : ObjectPtr<Image>{};
 }
 

@@ -5,10 +5,11 @@
 namespace grassland::rhi::backend::vulkan {
 
 class VulkanWindow;
+class VulkanDevice;
 
 class VulkanSwapChainImage final : public VulkanImage {
  public:
-  VulkanSwapChainImage(ImageDesc desc, VulkanWindow *window, uint64_t generation, VkDevice device);
+  VulkanSwapChainImage(ImageDesc desc, VulkanWindow *window, uint64_t generation, VulkanDevice *device);
   ~VulkanSwapChainImage() override;
   bool Acquire();
   bool IsValid() const override;
@@ -21,7 +22,7 @@ class VulkanSwapChainImage final : public VulkanImage {
  private:
   VulkanWindow *window_;
   uint64_t generation_;
-  VkDevice device_;
+  VulkanDevice *device_;
   VkImage image_{};
   VkSemaphore acquired_{};
   VkSemaphore rendered_{};

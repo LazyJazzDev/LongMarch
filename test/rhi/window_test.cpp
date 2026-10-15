@@ -249,6 +249,32 @@ TEST_P(RhiWindow, MultipleImagesRestoreDefaultsAcrossContextsAndPresentWithoutCl
   cleanup_image.Release();
   second.Release();  // A pending clear without Present must not require Window in image destruction.
   EXPECT_TRUE(cleanup_done.WaitHost());
+  // Exercise reuse across abandoned recordings, asynchronous batches and retained handles.
+  // Retained contexts must not return their native resources while still caller-owned.
+  for (int batch = 0; batch < 8; ++batch) {
+    ASSERT_TRUE(first.SetPresentMode(batch % 2 ? PRESENT_MODE_VSYNC : PRESENT_MODE_CONTINUOUS));
+    std::vector<rhi::ObjPtr<rhi::ICommandContext>> held;
+    rhi::ObjPtr<rhi::ISubmissionToken> completed;
+    for (int frame = 0; frame < 8; ++frame) {
+      rhi::ObjPtr<rhi::IImage> image = first.Get()->GetNextImage();
+      ASSERT_TRUE(image);
+      {
+        rhi::ObjPtr<rhi::ICommandContext> abandoned = device.Get()->CreateCommandContext();
+        ASSERT_TRUE(abandoned);
+        ASSERT_TRUE(abandoned->CmdClearColor(image.Get(), {1, 0, 0, 1}));
+      }
+      rhi::ObjPtr<rhi::ICommandContext> recording = device.Get()->CreateCommandContext();
+      ASSERT_TRUE(recording);
+      ASSERT_TRUE(recording->CmdClearColor(image.Get(), {0.6f, 0.7f, 0.8f, 1}));
+      ASSERT_TRUE(recording->CmdPresent(first.Get()));
+      completed = queue.Get()->Submit(recording.Get());
+      ASSERT_TRUE(completed);
+      held.push_back(std::move(recording));
+    }
+    ASSERT_TRUE(completed->WaitHost());
+    // The next batch resets resources only after both completion and handle release.
+    held.clear();
+  }
 #if defined(LONGMARCH_D3D12_ENABLED)
   if (messages) {
     for (UINT64 i = 0; i < messages->GetNumStoredMessages(); ++i) {

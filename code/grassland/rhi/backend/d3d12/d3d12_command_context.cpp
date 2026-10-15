@@ -12,20 +12,21 @@ D3D12CommandContext::D3D12CommandContext(D3D12Device *device) : CommandContext(d
 }
 
 D3D12CommandContext::~D3D12CommandContext() {
+  if (reusable_) {
+    if (!closed_)
+      reusable_ = SUCCEEDED(list_->Close());
+    if (reusable_) {
+      device_->RecycleCommandResources(std::move(allocator_), std::move(list_), event_);
+      return;
+    }
+  }
   if (event_)
     CloseHandle(event_);
 }
 
 bool D3D12CommandContext::Initialize() {
-  event_ = CreateEventW(nullptr, FALSE, FALSE, nullptr);
-  if (!event_)
-    return false;
-  if (!Check(device_->NativeDevice()->CreateCommandAllocator(D3D12_COMMAND_LIST_TYPE_DIRECT, IID_PPV_ARGS(&allocator_)),
-             "CreateCommandAllocator"))
-    return false;
-  return Check(device_->NativeDevice()->CreateCommandList(0, D3D12_COMMAND_LIST_TYPE_DIRECT, allocator_.Get(), nullptr,
-                                                          IID_PPV_ARGS(&list_)),
-               "CreateCommandList");
+  reusable_ = device_->AcquireCommandResources(allocator_, list_, event_);
+  return reusable_;
 }
 
 bool D3D12CommandContext::TransitionResource(ID3D12Resource *resource,
@@ -109,7 +110,9 @@ bool D3D12CommandContext::EndRecording() {
     if (!TransitionResource(entry.first, entry.second.default_state, entry.second.default_state))
       return false;
   }
-  return Check(list_->Close(), "CommandList::Close");
+  closed_ = Check(list_->Close(), "CommandList::Close");
+  reusable_ = closed_;
+  return closed_;
 }
 
 CommandContext::SubmitResult D3D12CommandContext::SubmitNative() {
