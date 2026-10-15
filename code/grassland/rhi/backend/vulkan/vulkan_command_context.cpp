@@ -82,7 +82,7 @@ CommandContext::SubmitResult VulkanCommandContext::SubmitNative() {
     ReportError(-1, "Present must run on the window thread.");
     return SUBMIT_RESULT_REJECTED;
   }
-  const auto frame = static_cast<VulkanSwapChainImage *>(Frame().Get());
+  const auto frame = static_cast<VulkanSwapChainImage *>(Frame());
   VkSemaphore acquired{}, rendered{};
   VkSubmitInfo submit{VK_STRUCTURE_TYPE_SUBMIT_INFO};
   VkPipelineStageFlags stage = VK_PIPELINE_STAGE_TRANSFER_BIT;

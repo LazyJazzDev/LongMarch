@@ -1,5 +1,6 @@
 #pragma once
 #include <array>
+#include <unordered_map>
 
 #include "grassland/rhi/backend/backend_image.h"
 #include "grassland/rhi/rhi_command_context.h"
@@ -23,13 +24,15 @@ class CommandContext : public Object<rhi::ICommandContext> {
   bool Seal();
   void AdvanceFrame();
   const void *DeviceIdentity() const;
-  const ObjectPtr<Image> &Frame() const;
+  Image *Frame() const;
   void MarkSubmitted();
   bool WasSubmitted() const;
   virtual SubmitResult SubmitNative() = 0;
   virtual SubmissionStatus WaitForProgress() = 0;
 
  protected:
+  // Call before encoding each resource use. Retains each exact object once.
+  bool RetainResource(rhi::IObject *resource);
   virtual bool RecordClear(Image *image, const std::array<float, 4> &color, bool first_use) = 0;
   virtual bool RecordPresent(Image *image) = 0;
   virtual bool EndRecording() = 0;
@@ -37,7 +40,8 @@ class CommandContext : public Object<rhi::ICommandContext> {
  private:
   Window *present_window_{};
   const void *identity_;
-  ObjectPtr<Image> image_;
+  std::unordered_map<rhi::IObject *, ObjectPtr<rhi::IObject>> resources_;
+  Image *frame_{};  // Borrowed from resources_; only tracks presentation state.
   bool present_{};
   bool sealed_{};
   bool failed_{};

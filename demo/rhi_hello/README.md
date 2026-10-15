@@ -62,6 +62,16 @@ A context can be submitted only once; incomplete recordings and repeat submissio
 are rejected. The caller retains its own reference and may release it after Submit.
 The rhix overload consumes a moved CommandContext, including on failure.
 
+Backend command implementations call `RetainResource(IObject*)` before encoding
+native resource use. CommandContext stores strong references in an object-identity
+map, retaining each object once even when several commands use it. The same path
+supports images and future buffer/binding-group objects without per-type storage.
+The borrowed frame pointer only tracks the current presentation operation.
+Unsubmitted contexts release all references on destruction; Device keeps submitted
+contexts alive through GPU completion. Retaining a context longer also retains its
+resources. Future binding commands must retain the concrete resources or immutable
+binding snapshot used at recording time, rather than resolve mutable bindings at Submit.
+
 
 D3D12 and Vulkan then open a blue GLFW window. The title displays FPS measured
 by `grassland::FPSCounter`, refreshed four times per second. Press **P** to switch between

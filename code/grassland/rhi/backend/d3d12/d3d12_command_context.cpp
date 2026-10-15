@@ -65,7 +65,7 @@ CommandContext::SubmitResult D3D12CommandContext::SubmitNative() {
     ReportError(-1, "Present must run on the window thread.");
     return SUBMIT_RESULT_REJECTED;
   }
-  auto frame = static_cast<D3D12SwapChainImage *>(Frame().Get());
+  auto frame = static_cast<D3D12SwapChainImage *>(Frame());
   std::lock_guard<std::mutex> lock(device_->QueueMutex());
   failed_ = true;
   ID3D12CommandList *lists[] = {list_.Get()};

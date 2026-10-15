@@ -10,6 +10,21 @@ CommandContext::CommandContext(const void *identity) : identity_(identity) {
 
 CommandContext::~CommandContext() = default;
 
+bool CommandContext::RetainResource(rhi::IObject *resource) {
+  if (sealed_ || failed_)
+    return false;
+  if (resources_.find(resource) != resources_.end())
+    return true;
+  try {
+    resources_.emplace(resource, ObjectPtr<rhi::IObject>::Retain(resource));
+  } catch (const std::bad_alloc &) {
+    failed_ = true;
+    ReportError(-1, "Command resource retention ran out of memory.");
+    return false;
+  }
+  return true;
+}
+
 bool CommandContext::CmdClearColor(rhi::IImage *image, const std::array<float, 4> &color) {
   return CmdClearColor(ObjectPtr<Image>::Retain(dynamic_cast<Image *>(image)), color);
 }
@@ -18,17 +33,18 @@ bool CommandContext::CmdClearColor(const ObjectPtr<Image> &image, const std::arr
   if (sealed_)
     return false;
   if (failed_ || present_ || !image || !image->IsValid() || image->DeviceIdentity() != identity_ ||
-      (image_ && image_.Get() != image.Get())) {
+      (frame_ && frame_ != image.Get())) {
     ReportError(-1, "CmdClearColor requires this context's frame.");
     failed_ = true;
     return false;
   }
-  const bool first_use = !image_;
+  const bool first_use = !frame_;
   if (first_use) {
-    // Retain the exact physical resource before encoding any native use.
-    image_ = image;
+    if (!RetainResource(image.Get()))
+      return false;
+    frame_ = image.Get();
   }
-  if (!RecordClear(image_.Get(), color, first_use)) {
+  if (!RecordClear(frame_, color, first_use)) {
     failed_ = true;
     return false;
   }
@@ -39,12 +55,12 @@ bool CommandContext::CmdPresent(rhi::IWindow *window) {
   if (sealed_)
     return false;
   const auto target = dynamic_cast<Window *>(window);
-  if (failed_ || present_ || !image_ || !target || !target->OwnsFrame(image_.Get()) || !image_->IsValid()) {
+  if (failed_ || present_ || !frame_ || !target || !target->OwnsFrame(frame_) || !frame_->IsValid()) {
     ReportError(-1, "CmdPresent requires the window owning the recorded clear frame.");
     failed_ = true;
     return false;
   }
-  if (!RecordPresent(image_.Get())) {
+  if (!RecordPresent(frame_)) {
     failed_ = true;
     return false;
   }
@@ -63,7 +79,7 @@ void CommandContext::AdvanceFrame() {
 }
 
 bool CommandContext::Seal() {
-  if (sealed_ || failed_ || (image_ && !present_)) {
+  if (sealed_ || failed_ || (frame_ && !present_)) {
     ReportError(-1, "Cannot finish an invalid or incomplete presentation context.");
     return false;
   }
@@ -79,8 +95,8 @@ const void *CommandContext::DeviceIdentity() const {
   return identity_;
 }
 
-const ObjectPtr<Image> &CommandContext::Frame() const {
-  return image_;
+Image *CommandContext::Frame() const {
+  return frame_;
 }
 
 void CommandContext::MarkSubmitted() {

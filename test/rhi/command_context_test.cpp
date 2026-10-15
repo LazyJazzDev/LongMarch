@@ -21,6 +21,7 @@ struct Gate {
   std::condition_variable changed;
   bool complete{};
   int destroyed{};
+  int resources_destroyed{};
   int devices_destroyed{};
   int windows_destroyed{};
 };
@@ -102,6 +103,20 @@ class TestImage final : public backend::Image {
   backend::Window *window_;
 };
 
+class TestResource final : public backend::Object<rhi::IObject> {
+ public:
+  explicit TestResource(std::shared_ptr<Gate> gate) : gate_(std::move(gate)) {
+  }
+
+  ~TestResource() override {
+    std::lock_guard<std::mutex> lock(gate_->mutex);
+    ++gate_->resources_destroyed;
+  }
+
+ private:
+  std::shared_ptr<Gate> gate_;
+};
+
 class TestCommandContext final : public backend::CommandContext {
  public:
   TestCommandContext(std::shared_ptr<Gate> gate, bool fail_after_submit = false)
@@ -114,15 +129,19 @@ class TestCommandContext final : public backend::CommandContext {
   int recorded_presents{};
   int ended{};
 
+  bool CmdUseResource(rhi::IObject *resource) {
+    return RetainResource(resource);
+  }
+
   bool RecordClear(backend::Image *image, const std::array<float, 4> &color, bool first_use) override {
-    EXPECT_EQ(Frame().Get(), image);
+    EXPECT_EQ(Frame(), image);
     EXPECT_EQ(first_use, recorded_colors.empty());
     recorded_colors.push_back(color);
     return true;
   }
 
   bool RecordPresent(backend::Image *image) override {
-    EXPECT_EQ(Frame().Get(), image);
+    EXPECT_EQ(Frame(), image);
     ++recorded_presents;
     return true;
   }
@@ -213,6 +232,61 @@ TEST(RhiCommands, CommandsAreEncodedImmediatelyAndKeepParameterValues) {
   gate->changed.notify_all();
   ASSERT_TRUE(token.WaitHost());
   EXPECT_EQ(gate->destroyed, 1);
+}
+
+TEST(RhiCommands, DifferentResourceTypesAreRetainedOnceUntilSubmissionCompletes) {
+  auto gate = std::make_shared<Gate>();
+  auto device = ObjectPtr<TestDevice>::Adopt(new TestDevice(gate));
+  auto queue = Queue(new TestQueue(device, QUEUE_TYPE_GRAPHICS));
+  auto window = Window(new TestWindow(gate));
+  auto image = ObjectPtr<TestImage>::Adopt(new TestImage(gate));
+  auto resource = ObjectPtr<TestResource>::Adopt(new TestResource(gate));
+  auto another = ObjectPtr<TestResource>::Adopt(new TestResource(gate));
+  auto *native = new TestCommandContext(gate);
+  CommandContext context = native;
+  ASSERT_TRUE(native->CmdUseResource(resource.Get()));
+  ASSERT_TRUE(native->CmdClearColor(image, {0, 0, 1, 1}));
+  ASSERT_TRUE(native->CmdUseResource(another.Get()));
+  ASSERT_TRUE(native->CmdUseResource(resource.Get()));
+  ASSERT_TRUE(native->CmdUseResource(image.Get()));
+  auto *borrowed_image = image.Get();
+  auto *borrowed_resource = resource.Get();
+  auto *borrowed_another = another.Get();
+  image.Reset();
+  resource.Reset();
+  another.Reset();
+  EXPECT_TRUE(borrowed_image->IsUniquelyOwned());
+  EXPECT_TRUE(borrowed_resource->IsUniquelyOwned());
+  EXPECT_TRUE(borrowed_another->IsUniquelyOwned());
+  ASSERT_TRUE(context.CmdPresent(window));
+  auto token = queue.Submit(std::move(context));
+  ASSERT_TRUE(token);
+  {
+    std::lock_guard<std::mutex> lock(gate->mutex);
+    EXPECT_EQ(gate->destroyed, 0);
+    EXPECT_EQ(gate->resources_destroyed, 0);
+    gate->complete = true;
+  }
+  gate->changed.notify_all();
+  ASSERT_TRUE(token.WaitHost());
+  EXPECT_EQ(gate->destroyed, 1);
+  EXPECT_EQ(gate->resources_destroyed, 2);
+}
+
+TEST(RhiCommands, UnsubmittedContextReleasesAllResourceTypes) {
+  auto gate = std::make_shared<Gate>();
+  auto context = ObjectPtr<TestCommandContext>::Adopt(new TestCommandContext(gate));
+  auto image = ObjectPtr<TestImage>::Adopt(new TestImage(gate));
+  auto resource = ObjectPtr<TestResource>::Adopt(new TestResource(gate));
+  ASSERT_TRUE(context->CmdUseResource(image.Get()));
+  ASSERT_TRUE(context->CmdUseResource(resource.Get()));
+  image.Reset();
+  resource.Reset();
+  EXPECT_EQ(gate->destroyed, 0);
+  EXPECT_EQ(gate->resources_destroyed, 0);
+  context.Reset();
+  EXPECT_EQ(gate->destroyed, 1);
+  EXPECT_EQ(gate->resources_destroyed, 1);
 }
 
 TEST(RhiCommands, RecordingAndSubmissionKeepExactImageWithoutKeepingPayloadInToken) {
