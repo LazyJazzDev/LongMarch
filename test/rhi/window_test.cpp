@@ -115,20 +115,15 @@ TEST_P(RhiWindow, MultipleWindowsSingleUseFramesModesAndQueueLifetime) {
   auto old_context = device.CreateCommandContext();
   ASSERT_TRUE(old_context.CmdClearColor(old_frame, {0, 0, 0, 1}));
   ASSERT_TRUE(old_context.CmdPresent(first));
-  auto old_packet = std::move(old_context);
+  old_context.Release();
+  old_frame.Release();
   ASSERT_TRUE(MoveWindow(hwnd, 40, 40, 480, 360, TRUE));
   ASSERT_TRUE(Window::PollEvents());
-  EXPECT_FALSE(old_frame);  // Internal size callback replaced the swapchain.
   EXPECT_EQ(glfwGetWindowUserPointer(first.GLFWWindow()), &user_data);
   {
     auto resized = first.GetNextImage();
     ASSERT_TRUE(resized);
   }
-  // Holding this frame over resize violates the contract. We deliberately make
-  // it invalid instead of allowing the old packet to target a new backbuffer.
-  EXPECT_FALSE(old_frame);
-  EXPECT_FALSE(graphics.Submit(std::move(old_packet)));
-  old_frame = {};
   ShowWindow(hwnd, SW_MINIMIZE);
   ASSERT_TRUE(Window::PollEvents());
   EXPECT_FALSE(first.GetNextImage());
@@ -148,23 +143,27 @@ TEST_P(RhiWindow, MultipleWindowsSingleUseFramesModesAndQueueLifetime) {
   auto context = device.CreateCommandContext();
   ASSERT_TRUE(context.CmdClearColor(frame, {0, 0, 1, 1}));
   ASSERT_TRUE(context.CmdPresent(second));
-  auto &window_backend = (*static_cast<backend::Window *>((second).Get()));
   frame.Release();
   first.Release();
-  second.Release();
-  // Only Device owns the Window. The recorded Image holds a frame lease,
-  // not a strong Window reference, and keeps that lease until GPU completion.
-  EXPECT_TRUE(window_backend.IsUniquelyOwned());
-  EXPECT_TRUE(window_backend.HasFrameLeases());
+#ifdef _WIN32
+  EXPECT_FALSE(IsWindow(hwnd));
+  const auto second_hwnd = FindWindowA(nullptr, "RHI window test B");
+  ASSERT_NE(second_hwnd, nullptr);
+#endif
   last = graphics.Submit(std::move(context), {{ready}});
   ASSERT_TRUE(last);
+  second.Release();  // Destruction waits for native GPU use; Device does not retain Window.
+#ifdef _WIN32
+  EXPECT_FALSE(IsWindow(second_hwnd));
+#endif
+  ASSERT_TRUE(last.WaitHost());
   last.Release();
   ready.Release();
   graphics.Release();
   transfer.Release();
   device.Release();  // Device drains work after caller-owned children are released.
   core.Release();
-  EXPECT_TRUE(Window::PollEvents());  // Main-thread GLFW destruction after retirement.
+  EXPECT_TRUE(Window::PollEvents());
 }
 
 std::vector<BackendAPI> WindowBackends() {

@@ -12,13 +12,11 @@ D3D12SwapChainImage::D3D12SwapChainImage(ImageDesc desc,
     : D3D12Image(desc, window->DeviceIdentity(), image, rtv),
       window_(window),
       generation_(generation) {
-  window_->AcquireFrameLease();
 }
 
 D3D12SwapChainImage::~D3D12SwapChainImage() {
   if (!presented_)
     window_->CancelFrame(generation_);
-  window_->ReleaseFrameLease();
 }
 
 const D3D12Window *D3D12SwapChainImage::Owner() const {

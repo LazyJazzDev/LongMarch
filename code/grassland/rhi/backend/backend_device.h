@@ -30,7 +30,6 @@ class Device : public Object<rhi::IDevice> {
   virtual std::unique_ptr<Window> CreateNativeWindow(const WindowDesc &desc);
   virtual std::unique_ptr<CommandContext> CreateNativeCommandContext();
   virtual std::unique_ptr<Queue> CreateQueue(QueueType type);
-  ObjectPtr<Window> ManageWindow(std::unique_ptr<Window> window);
 
   // Lightweight completion state: deliberately holds no native resources or packet.
   class SubmissionState final : public Object<rhi::ISubmissionToken> {
@@ -64,9 +63,6 @@ class Device : public Object<rhi::IDevice> {
   };
 
   void Collect();
-  void CollectWindows();
-  std::mutex windows_mutex_;
-  std::vector<ObjectPtr<Window>> windows_;
   Core *core_;
   PhysicalDevice info_;
   std::mutex mutex_;

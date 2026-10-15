@@ -13,9 +13,9 @@ VulkanWindow::VulkanWindow(VulkanDevice *device) : device_(device) {
 
 VulkanWindow::~VulkanWindow() {
   glfw::UnregisterWindow(GLFWWindow());
-  ReleaseNextImage();
   std::lock_guard<std::mutex> lock(device_->QueueMutex());
   vkDeviceWaitIdle(device_->NativeDevice());
+  ReleaseNextImage();
   DestroySwapchain();
   if (surface_)
     vkDestroySurfaceKHR(device_->Instance(), surface_, nullptr);

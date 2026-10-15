@@ -20,10 +20,6 @@ class Window : public Object<rhi::IWindow> {
   bool ShouldClose() const override;
   bool IsKeyDown(int key) const override;
   bool SetTitle(const std::string &title) override;
-  // An acquired Image carries one frame lease until all recorded/GPU uses end.
-  void AcquireFrameLease();
-  void ReleaseFrameLease();
-  bool HasFrameLeases() const;
   virtual bool OwnsFrame(const Image *image) const = 0;
   virtual ObjectPtr<Image> AcquireNativeFrame() = 0;
   virtual bool RebuildNativeSwapChain() = 0;
@@ -37,7 +33,6 @@ class Window : public Object<rhi::IWindow> {
   GLFWwindow *window_{};
   std::mutex next_image_mutex_;
   ObjectPtr<Image> next_image_;
-  std::atomic<uint32_t> frame_leases_{};
 };
 
 }  // namespace grassland::rhi::backend

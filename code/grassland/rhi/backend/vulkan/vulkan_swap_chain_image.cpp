@@ -9,7 +9,6 @@ VulkanSwapChainImage::VulkanSwapChainImage(ImageDesc desc, VulkanWindow *window,
       window_(window),
       generation_(generation),
       device_(device) {
-  window_->AcquireFrameLease();
 }
 
 bool VulkanSwapChainImage::Acquire() {
@@ -38,7 +37,6 @@ VulkanSwapChainImage::~VulkanSwapChainImage() {
     vkDestroySemaphore(device_, acquired_, nullptr);
   if (acquire_fence_)
     vkDestroyFence(device_, acquire_fence_, nullptr);
-  window_->ReleaseFrameLease();
 }
 
 const VulkanWindow *VulkanSwapChainImage::Owner() const {

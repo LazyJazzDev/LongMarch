@@ -13,9 +13,9 @@ D3D12Window::D3D12Window(D3D12Device *device) : device_(device) {
 
 D3D12Window::~D3D12Window() {
   glfw::UnregisterWindow(GLFWWindow());
-  ReleaseNextImage();
   std::lock_guard<std::mutex> lock(device_->QueueMutex());
   device_->WaitIdle();
+  ReleaseNextImage();
 }
 
 bool D3D12Window::OwnsFrame(const Image *image) const {

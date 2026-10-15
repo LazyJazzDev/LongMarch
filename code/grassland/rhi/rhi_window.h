@@ -21,6 +21,8 @@ class IWindow : public IObject {
   // Returns an owned reference to the same next image until Present submission
   // or swapchain replacement. Null only while minimized or zero-sized.
   // This getter never acquires a native image or rebuilds the swapchain.
+  // Release caller-held frames and recordings before swapchain replacement or
+  // Window destruction. Window waits for GPU use; it is not retained by Device.
   virtual IImage *GetNextImage() = 0;
   virtual bool SetPresentMode(PresentMode mode) = 0;
   virtual PresentMode GetPresentMode() const = 0;

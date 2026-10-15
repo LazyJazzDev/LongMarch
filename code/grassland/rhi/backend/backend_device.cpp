@@ -1,7 +1,5 @@
 #include "grassland/rhi/backend/backend_device.h"
 
-#include <cassert>
-
 #include "grassland/rhi/backend/backend_command_context.h"
 #include "grassland/rhi/backend/backend_core.h"
 #include "grassland/rhi/backend/backend_queue.h"
@@ -41,7 +39,7 @@ bool Device::SupportGeometryShader() const {
 
 rhi::IWindow *Device::CreateGLFWWindow(const WindowDesc &desc) {
   try {
-    return ManageWindow(CreateNativeWindow(desc)).Detach();
+    return CreateNativeWindow(desc).release();
   } catch (const std::bad_alloc &) {
     ReportError(-1, "Window creation ran out of memory.");
     return nullptr;
@@ -72,28 +70,6 @@ const PhysicalDevice &Device::GetPhysicalDevice() const noexcept {
 
 Core *Device::OwnerCore() const {
   return core_;
-}
-
-ObjectPtr<Window> Device::ManageWindow(std::unique_ptr<Window> window) {
-  if (!window)
-    return {};
-  CollectWindows();
-  auto result = ObjectPtr<Window>::Adopt(window.release());
-  std::lock_guard<std::mutex> lock(windows_mutex_);
-  windows_.push_back(result);
-  return result;
-}
-
-void Device::CollectWindows() {
-  std::lock_guard<std::mutex> lock(windows_mutex_);
-  for (auto it = windows_.begin(); it != windows_.end();) {
-    if ((*it)->IsUniquelyOwned())
-      (*it)->ReleaseNextImage();
-    if ((*it)->IsUniquelyOwned() && !(*it)->HasFrameLeases())
-      it = windows_.erase(it);
-    else
-      ++it;
-  }
 }
 
 const void *Device::NativeIdentity() const {
@@ -215,7 +191,6 @@ void Device::Collect() {
     } while (status == SUBMISSION_STATUS_PENDING);
     // Release payload before publishing completion; tokens never keep it alive.
     pending.commands.Reset();
-    CollectWindows();
     pending.completion->Complete(status);
   }
 }
@@ -228,12 +203,6 @@ void Device::ShutdownQueues() {
   changed_.notify_one();
   if (collector_.joinable())
     collector_.join();
-  // Derived destructors call this before destroying their native device.
-  for (const auto &window : windows_) {
-    window->ReleaseNextImage();
-    assert(window->IsUniquelyOwned() && !window->HasFrameLeases());
-  }
-  windows_.clear();
 }
 
 }  // namespace grassland::rhi::backend

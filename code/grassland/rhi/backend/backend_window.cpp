@@ -1,6 +1,5 @@
 #include "grassland/rhi/backend/backend_window.h"
 
-#include <cassert>
 #include <cstdlib>
 #define GLFW_INCLUDE_NONE
 #include <GLFW/glfw3.h>
@@ -69,20 +68,7 @@ bool Window::SetPresentMode(PresentMode mode) {
   }
 }
 
-void Window::AcquireFrameLease() {
-  frame_leases_.fetch_add(1, std::memory_order_relaxed);
-}
-
-void Window::ReleaseFrameLease() {
-  frame_leases_.fetch_sub(1, std::memory_order_release);
-}
-
-bool Window::HasFrameLeases() const {
-  return frame_leases_.load(std::memory_order_acquire) != 0;
-}
-
 Window::~Window() {
-  assert(!HasFrameLeases());
   glfw::UnregisterWindow(window_);
   glfw::DestroyWindow(window_);
 }

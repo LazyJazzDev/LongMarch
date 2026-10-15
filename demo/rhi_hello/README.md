@@ -172,24 +172,26 @@ interfaces. Common implementation bases and D3D12/Vulkan implementations stay
 in the backend object files; rhix has no backend includes or Access bridge. Window owns its
 swapchain. `D3D12Image` and `VulkanImage` provide common backend resource access
 without depending on Window. Their `D3D12SwapChainImage` and
-`VulkanSwapChainImage` subclasses carry the counted frame lease, borrowed Window
-pointer, frame validity and presentation state. Vulkan acquisition synchronization
+`VulkanSwapChainImage` subclasses carry a borrowed Window pointer, frame validity
+and presentation state. Vulkan acquisition synchronization
 also belongs to the swapchain subclass. The frontend still receives `IImage`:
 callers follow the ownership and lifetime contract of the API that produced it,
 without querying an ownership category. Independent images and pooled buffers
 can use their own backend subclasses when those creation APIs are implemented.
-Device owns managed Windows and reclaims them once caller references and frame
-leases are gone, during completion collection, subsequent window creation, or
-Device shutdown. Returning a frame lease does not itself destroy its parent.
-Recorded and submitted uses retain the Image, so its lease remains active until
-those uses end. Native command storage belongs to the backend
+Window lifetime belongs to its callers; Device does not retain or defer reclamation
+of Windows. Release caller-held frames and recordings before their Window, and
+perform swapchain replacement outside command recording without retaining old
+frames. Window destruction and swapchain replacement wait for native GPU use
+before destroying the underlying swapchain resources. No frame-lease counter is
+needed. Contexts still strongly retain resources used by submitted commands.
+Native command storage belongs to the backend
 CommandContext, and completion collection belongs to Device. GLFW initialization,
 events and deferred main-thread window destruction live in `backend_glfw_helper`.
 Window operations and presentation must run on the main thread. Device directly
 owns the native device, queue and synchronization state; there is no separate
 `BackendLifetime`. Queue and CommandContext access Device without owning it.
-Device shutdown drains in-flight work and stops the collector before clearing
-managed Windows and destroying the native device. Resource pools added later must
+Device shutdown drains in-flight work and stops the collector before destroying
+the native device; caller-owned Windows must already have been released. Resource pools added later must
 follow the same contract: children retain leases, and the higher-level owner
 decides when the pool can be reset or destroyed. This change adds no general pool.
 
