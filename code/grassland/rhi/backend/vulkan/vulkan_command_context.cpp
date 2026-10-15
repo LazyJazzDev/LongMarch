@@ -13,17 +13,15 @@ VulkanCommandContext::VulkanCommandContext(VulkanDevice *device) : CommandContex
 
 VulkanCommandContext::~VulkanCommandContext() {
   if (reusable_) {
-    device_->RecycleCommandResources(pool_, command_, fence_);
+    device_->RecycleCommandResources(pool_, command_);
     return;
   }
-  if (fence_)
-    vkDestroyFence(device_->NativeDevice(), fence_, nullptr);
   if (pool_)
     vkDestroyCommandPool(device_->NativeDevice(), pool_, nullptr);
 }
 
 bool VulkanCommandContext::Initialize() {
-  reusable_ = device_->AcquireCommandResources(pool_, command_, fence_);
+  reusable_ = device_->AcquireCommandResources(pool_, command_);
   return reusable_;
 }
 
@@ -162,7 +160,16 @@ CommandContext::SubmitResult VulkanCommandContext::SubmitNative() {
   }
   for (const auto &present : presents_)
     rendered.push_back(present->RenderSemaphore());
+  rendered.push_back(device_->Timeline());
+  std::vector<uint64_t> wait_values(acquired.size(), 0);
+  std::vector<uint64_t> signal_values(rendered.size(), 0);
+  VkTimelineSemaphoreSubmitInfo timeline{VK_STRUCTURE_TYPE_TIMELINE_SEMAPHORE_SUBMIT_INFO};
+  timeline.waitSemaphoreValueCount = static_cast<uint32_t>(wait_values.size());
+  timeline.pWaitSemaphoreValues = wait_values.data();
+  timeline.signalSemaphoreValueCount = static_cast<uint32_t>(signal_values.size());
+  timeline.pSignalSemaphoreValues = signal_values.data();
   VkSubmitInfo submit{VK_STRUCTURE_TYPE_SUBMIT_INFO};
+  submit.pNext = &timeline;
   submit.commandBufferCount = 1;
   submit.pCommandBuffers = &command_;
   submit.waitSemaphoreCount = static_cast<uint32_t>(acquired.size());
@@ -172,11 +179,13 @@ CommandContext::SubmitResult VulkanCommandContext::SubmitNative() {
   submit.pSignalSemaphores = rendered.data();
   {
     std::lock_guard<std::mutex> lock(device_->QueueMutex());
-    if (!Check(vkQueueSubmit(device_->NativeQueue(), 1, &submit, fence_), "vkQueueSubmit"))
+    value_ = device_->NextSerial();
+    signal_values.back() = value_;
+    if (!Check(vkQueueSubmit(device_->NativeQueue(), 1, &submit, VK_NULL_HANDLE), "vkQueueSubmit"))
       return SUBMIT_RESULT_REJECTED;
     MarkSubmitted();
     for (auto window : acquired_windows)
-      window->ConsumeAcquireSemaphore(this);
+      window->MarkAcquireWaitSubmitted(value_);
     submission_failed_ = true;
     bool presented = true;
     for (const auto &present : presents_) {
@@ -196,12 +205,8 @@ CommandContext::SubmitResult VulkanCommandContext::SubmitNative() {
   return SUBMIT_RESULT_SUBMITTED;
 }
 
-VkFence VulkanCommandContext::CompletionFence() const {
-  return fence_;
-}
-
 SubmissionStatus VulkanCommandContext::WaitForProgress() {
-  const auto result = vkWaitForFences(device_->NativeDevice(), 1, &fence_, VK_TRUE, 50000000);
+  const auto result = device_->Wait(value_, 50000000);
   if (result == VK_TIMEOUT)
     return SUBMISSION_STATUS_PENDING;
   if (result == VK_ERROR_DEVICE_LOST)

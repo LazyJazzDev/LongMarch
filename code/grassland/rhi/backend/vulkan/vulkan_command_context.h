@@ -17,7 +17,6 @@ class VulkanCommandContext final : public CommandContext {
   bool CmdPresent(rhi::IWindow *window) override;
   SubmitResult SubmitNative() override;
   SubmissionStatus WaitForProgress() override;
-  VkFence CompletionFence() const;
 
  private:
   bool EndRecording() override;
@@ -34,7 +33,7 @@ class VulkanCommandContext final : public CommandContext {
   VulkanDevice *device_;
   VkCommandPool pool_{};
   VkCommandBuffer command_{};
-  VkFence fence_{};
+  uint64_t value_{};
   bool submission_failed_{};
   bool reusable_{};
 };

@@ -71,6 +71,8 @@ std::unique_ptr<VulkanCore> VulkanCore::CreateVulkanCore() {
     DeviceFeatures features(device, device_version);
     if (!features)
       return {};
+    if (!features.TimelineSemaphore())
+      continue;
     PhysicalDevice info{};
     info.name = properties.deviceName;
     switch (properties.deviceType) {

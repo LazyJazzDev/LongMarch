@@ -4,7 +4,6 @@
 
 #include <cstdlib>
 
-#include "grassland/rhi/backend/vulkan/vulkan_command_context.h"
 #include "grassland/rhi/backend/vulkan/vulkan_swap_chain_image.h"
 #define GLFW_INCLUDE_NONE
 #include <GLFW/glfw3.h>
@@ -67,12 +66,11 @@ ObjectPtr<Image> VulkanWindow::AcquireNativeFrame() {
   current_sync_ = next_sync_;
   auto &sync = acquire_sync_[current_sync_];
   const auto native = device_->NativeDevice();
-  if (sync.submission) {
-    const auto completion = sync.submission->CompletionFence();
-    const auto status = vkWaitForFences(native, 1, &completion, VK_TRUE, UINT64_MAX);
+  if (sync.submission_value) {
+    const auto status = device_->Wait(sync.submission_value);
     if (!Check(status, "Acquire frame synchronization"))
       return {};
-    sync.submission.Reset();
+    sync.submission_value = 0;
   }
   if (sync.acquired) {
     auto status = vkWaitForFences(native, 1, &sync.fence, VK_TRUE, UINT64_MAX);
@@ -90,7 +88,6 @@ ObjectPtr<Image> VulkanWindow::AcquireNativeFrame() {
   if (result == VK_SUCCESS || result == VK_SUBOPTIMAL_KHR) {
     sync.acquired = true;
     next_sync_ = (next_sync_ + 1) % static_cast<uint32_t>(acquire_sync_.size());
-    acquire_wait_pending_ = true;
     const auto image = images_[current_image_];
     acquired_ = true;
     if (!initialized_images_[current_image_]) {
@@ -103,7 +100,6 @@ ObjectPtr<Image> VulkanWindow::AcquireNativeFrame() {
       std::lock_guard<std::mutex> lock(device_->QueueMutex());
       VkCommandPool pool{};
       VkCommandBuffer commands{};
-      VkFence completion{};
       status = [&]() -> VkResult {
         VkCommandPoolCreateInfo create_pool{VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO};
         create_pool.queueFamilyIndex = device_->QueueFamily();
@@ -115,10 +111,6 @@ ObjectPtr<Image> VulkanWindow::AcquireNativeFrame() {
         allocate.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
         allocate.commandBufferCount = 1;
         status = vkAllocateCommandBuffers(device, &allocate, &commands);
-        if (status != VK_SUCCESS)
-          return status;
-        VkFenceCreateInfo create_fence{VK_STRUCTURE_TYPE_FENCE_CREATE_INFO};
-        status = vkCreateFence(device, &create_fence, nullptr, &completion);
         if (status != VK_SUCCESS)
           return status;
         VkCommandBufferBeginInfo begin{VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO};
@@ -137,19 +129,25 @@ ObjectPtr<Image> VulkanWindow::AcquireNativeFrame() {
         status = vkEndCommandBuffer(commands);
         if (status != VK_SUCCESS)
           return status;
+        const auto semaphore = device_->Timeline();
+        const auto value = device_->NextSerial();
+        VkTimelineSemaphoreSubmitInfo timeline{VK_STRUCTURE_TYPE_TIMELINE_SEMAPHORE_SUBMIT_INFO};
+        timeline.signalSemaphoreValueCount = 1;
+        timeline.pSignalSemaphoreValues = &value;
         VkSubmitInfo submit{VK_STRUCTURE_TYPE_SUBMIT_INFO};
+        submit.pNext = &timeline;
+        submit.signalSemaphoreCount = 1;
+        submit.pSignalSemaphores = &semaphore;
         submit.commandBufferCount = 1;
         submit.pCommandBuffers = &commands;
-        status = vkQueueSubmit(device_->NativeQueue(), 1, &submit, completion);
+        status = vkQueueSubmit(device_->NativeQueue(), 1, &submit, VK_NULL_HANDLE);
         if (status != VK_SUCCESS)
           return status;
         // Submitted commands must finish before their temporary pool is destroyed.
-        if (!Check(vkWaitForFences(device, 1, &completion, VK_TRUE, UINT64_MAX), "Wait for image initialization"))
+        if (!Check(device_->Wait(value), "Wait for image initialization"))
           std::abort();
         return VK_SUCCESS;
       }();
-      if (completion)
-        vkDestroyFence(device, completion, nullptr);
       if (pool)
         vkDestroyCommandPool(device, pool, nullptr);
       if (!Check(status, "Initialize swapchain image"))
@@ -166,12 +164,12 @@ ObjectPtr<Image> VulkanWindow::AcquireNativeFrame() {
 }
 
 VkSemaphore VulkanWindow::AcquireSemaphore() const {
-  return acquire_wait_pending_ ? acquire_sync_[current_sync_].semaphore : VK_NULL_HANDLE;
+  const auto &sync = acquire_sync_[current_sync_];
+  return sync.submission_value ? VK_NULL_HANDLE : sync.semaphore;
 }
 
-void VulkanWindow::ConsumeAcquireSemaphore(VulkanCommandContext *submission) {
-  acquire_sync_[current_sync_].submission = ObjectPtr<VulkanCommandContext>::Retain(submission);
-  acquire_wait_pending_ = false;
+void VulkanWindow::MarkAcquireWaitSubmitted(uint64_t value) {
+  acquire_sync_[current_sync_].submission_value = value;
 }
 
 VkSemaphore VulkanWindow::RenderSemaphore() const {
@@ -247,7 +245,7 @@ void VulkanWindow::DestroySwapchain() {
   for (auto &sync : acquire_sync_) {
     if (sync.acquired)
       vkWaitForFences(device_->NativeDevice(), 1, &sync.fence, VK_TRUE, UINT64_MAX);
-    sync.submission.Reset();
+    sync.submission_value = 0;
     if (sync.semaphore)
       vkDestroySemaphore(device_->NativeDevice(), sync.semaphore, nullptr);
     if (sync.fence)

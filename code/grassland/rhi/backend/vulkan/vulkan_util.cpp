@@ -87,6 +87,10 @@ bool DeviceFeatures::RayTracingPipeline() const {
   return ray_pipeline_.rayTracingPipeline == VK_TRUE;
 }
 
+bool DeviceFeatures::TimelineSemaphore() const {
+  return v12_.timelineSemaphore == VK_TRUE;
+}
+
 bool DeviceFeatures::RayQuery() const {
   return ray_query_.rayQuery == VK_TRUE;
 }

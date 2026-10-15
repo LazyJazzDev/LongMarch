@@ -50,6 +50,7 @@ class DeviceFeatures {
   bool RayTracingPipeline() const;
 
   bool RayQuery() const;
+  bool TimelineSemaphore() const;
 
  private:
   bool valid_{false};

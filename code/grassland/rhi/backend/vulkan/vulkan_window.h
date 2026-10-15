@@ -4,8 +4,6 @@
 
 namespace grassland::rhi::backend::vulkan {
 
-class VulkanCommandContext;
-
 class VulkanWindow final : public Window {
  public:
   explicit VulkanWindow(VulkanDevice *device);
@@ -17,7 +15,7 @@ class VulkanWindow final : public Window {
   std::vector<WindowPresentationOption> GetSupportedPresentationOptions() const override;
   const void *DeviceIdentity() const;
   VkSemaphore AcquireSemaphore() const;
-  void ConsumeAcquireSemaphore(VulkanCommandContext *submission);
+  void MarkAcquireWaitSubmitted(uint64_t value);
   VkSemaphore RenderSemaphore() const;
   VkResult PresentFrame();
 
@@ -32,15 +30,14 @@ class VulkanWindow final : public Window {
     VkSemaphore semaphore{};
     VkFence fence{};
     bool acquired{};
-    // Pins the submission fence against reset until this record is reused.
-    ObjectPtr<VulkanCommandContext> submission;
+    // Timeline value of the submission consuming this acquire semaphore.
+    uint64_t submission_value{};
   };
 
   std::vector<AcquireSync> acquire_sync_;
   uint32_t next_sync_{};
   uint32_t current_sync_{};
   uint32_t current_image_{};
-  bool acquire_wait_pending_{};
   std::vector<VkImage> images_;
   std::vector<VkSemaphore> rendered_;
   std::vector<bool> initialized_images_;

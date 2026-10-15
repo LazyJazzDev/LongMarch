@@ -7,27 +7,22 @@
 
 namespace grassland::rhi::backend::vulkan {
 
-bool VulkanDevice::AcquireCommandResources(VkCommandPool &pool, VkCommandBuffer &command, VkFence &fence) {
+bool VulkanDevice::AcquireCommandResources(VkCommandPool &pool, VkCommandBuffer &command) {
   {
     std::lock_guard<std::mutex> lock(resource_pool_mutex_);
     if (!command_pool_.empty()) {
-      std::tie(pool, command, fence) = command_pool_.back();
+      std::tie(pool, command) = command_pool_.back();
       command_pool_.pop_back();
     }
   }
   if (pool) {
     if (!Check(vkResetCommandPool(device_, pool, 0), "Reset command pool"))
       return false;
-    if (!Check(vkResetFences(device_, 1, &fence), "Reset submission fence"))
-      return false;
   } else {
     VkCommandPoolCreateInfo create{VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO};
     create.queueFamilyIndex = family_;
     create.flags = VK_COMMAND_POOL_CREATE_TRANSIENT_BIT;
     if (!Check(vkCreateCommandPool(device_, &create, nullptr, &pool), "Create command pool"))
-      return false;
-    VkFenceCreateInfo fence_info{VK_STRUCTURE_TYPE_FENCE_CREATE_INFO};
-    if (!Check(vkCreateFence(device_, &fence_info, nullptr, &fence), "Create submission fence"))
       return false;
     VkCommandBufferAllocateInfo allocate{VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO};
     allocate.commandPool = pool;
@@ -41,14 +36,13 @@ bool VulkanDevice::AcquireCommandResources(VkCommandPool &pool, VkCommandBuffer 
   return Check(vkBeginCommandBuffer(command, &begin), "Begin command buffer");
 }
 
-void VulkanDevice::RecycleCommandResources(VkCommandPool pool, VkCommandBuffer command, VkFence fence) {
+void VulkanDevice::RecycleCommandResources(VkCommandPool pool, VkCommandBuffer command) {
   try {
     std::lock_guard<std::mutex> lock(resource_pool_mutex_);
-    command_pool_.emplace_back(pool, command, fence);
+    command_pool_.emplace_back(pool, command);
     return;
   } catch (const std::bad_alloc &) {
   }
-  vkDestroyFence(device_, fence, nullptr);
   vkDestroyCommandPool(device_, pool, nullptr);
 }
 
@@ -58,9 +52,10 @@ VulkanDevice::VulkanDevice(grassland::rhi::PhysicalDevice info, Core *core) : De
 VulkanDevice::~VulkanDevice() {
   ShutdownQueues();
   for (const auto &entry : command_pool_) {
-    vkDestroyFence(device_, std::get<2>(entry), nullptr);
     vkDestroyCommandPool(device_, std::get<0>(entry), nullptr);
   }
+  if (timeline_)
+    vkDestroySemaphore(device_, timeline_, nullptr);
   if (device_)
     vkDestroyDevice(device_, nullptr);
 }
@@ -73,6 +68,10 @@ std::unique_ptr<VulkanDevice> VulkanDevice::CreateVulkanDevice(grassland::rhi::P
   DeviceFeatures enabled(physical_device, api_version);
   if (!enabled)
     return {};
+  if (!enabled.TimelineSemaphore()) {
+    ReportError(-1, "Vulkan RHI requires timelineSemaphore support.");
+    return {};
+  }
   uint32_t count = 0;
   vkGetPhysicalDeviceQueueFamilyProperties(physical_device, &count, nullptr);
   std::vector<VkQueueFamilyProperties> families(count);
@@ -106,6 +105,12 @@ std::unique_ptr<VulkanDevice> VulkanDevice::CreateVulkanDevice(grassland::rhi::P
     ReportError(result, "vkCreateDevice failed.");
     return {};
   }
+  VkSemaphoreTypeCreateInfo type{VK_STRUCTURE_TYPE_SEMAPHORE_TYPE_CREATE_INFO};
+  type.semaphoreType = VK_SEMAPHORE_TYPE_TIMELINE;
+  VkSemaphoreCreateInfo semaphore{VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO};
+  semaphore.pNext = &type;
+  if (!Check(vkCreateSemaphore(device->device_, &semaphore, nullptr, &device->timeline_), "Create submission timeline"))
+    return {};
   const bool swapchain = std::any_of(enabled.Extensions().begin(), enabled.Extensions().end(), [](const char *name) {
     return std::strcmp(name, VK_KHR_SWAPCHAIN_EXTENSION_NAME) == 0;
   });
@@ -114,6 +119,22 @@ std::unique_ptr<VulkanDevice> VulkanDevice::CreateVulkanDevice(grassland::rhi::P
   device->swapchain_ = swapchain;
   vkGetDeviceQueue(device->device_, graphics_family, 0, &device->queue_);
   return device;
+}
+
+VkSemaphore VulkanDevice::Timeline() const {
+  return timeline_;
+}
+
+uint64_t VulkanDevice::NextSerial() {
+  return ++next_serial_;
+}
+
+VkResult VulkanDevice::Wait(uint64_t value, uint64_t timeout) const {
+  VkSemaphoreWaitInfo wait{VK_STRUCTURE_TYPE_SEMAPHORE_WAIT_INFO};
+  wait.semaphoreCount = 1;
+  wait.pSemaphores = &timeline_;
+  wait.pValues = &value;
+  return vkWaitSemaphores(device_, &wait, timeout);
 }
 
 VkDevice VulkanDevice::NativeDevice() const {
