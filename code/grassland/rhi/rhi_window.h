@@ -1,4 +1,9 @@
 #pragma once
+#ifndef GLFW_INCLUDE_NONE
+#define GLFW_INCLUDE_NONE
+#endif
+#include <GLFW/glfw3.h>
+
 #include "grassland/rhi/rhi_object.h"
 
 namespace grassland::rhi {
@@ -8,8 +13,10 @@ bool PollEvents();
 
 class IWindow : public IObject {
  public:
+  // Borrowed handle; Window owns it. Use GLFW operations on the main thread.
+  virtual GLFWwindow *GLFWWindow() const = 0;
   virtual bool ShouldClose() const = 0;
-  virtual bool IsKeyDown(Key key) const = 0;
+  virtual bool IsKeyDown(int key) const = 0;
   virtual bool SetTitle(const std::string &title) = 0;
   virtual IImage *AcquireFrame() = 0;
   virtual bool SetPresentMode(PresentMode mode) = 0;

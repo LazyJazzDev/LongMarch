@@ -24,8 +24,8 @@ int RunWindow(grassland::rhi::IDevice *device, grassland::rhi::IWindow *window, 
   PresentMode requested = PRESENT_MODE_VSYNC;
   grassland::FPSCounter fps_counter;
   auto title_time = std::chrono::steady_clock::now();
-  while (PollEvents() && !window->ShouldClose() && !window->IsKeyDown(KEY_ESCAPE)) {
-    const bool p = window->IsKeyDown(KEY_P);
+  while (PollEvents() && !window->ShouldClose() && !window->IsKeyDown(GLFW_KEY_ESCAPE)) {
+    const bool p = window->IsKeyDown(GLFW_KEY_P);
     if (p && !previous_p) {
       requested = requested == PRESENT_MODE_VSYNC ? PRESENT_MODE_CONTINUOUS : PRESENT_MODE_VSYNC;
       if (!window->SetPresentMode(requested))

@@ -14,11 +14,15 @@ bool Window::PollEvents() {
   return rhi::PollEvents();
 }
 
+GLFWwindow *Window::GLFWWindow() const {
+  return *this ? Get()->GLFWWindow() : nullptr;
+}
+
 bool Window::ShouldClose() const {
   return !*this || Get()->ShouldClose();
 }
 
-bool Window::IsKeyDown(rhi::Key key) const {
+bool Window::IsKeyDown(int key) const {
   return *this && Get()->IsKeyDown(key);
 }
 

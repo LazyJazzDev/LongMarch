@@ -69,11 +69,6 @@ typedef enum {
   IMAGE_FORMAT_BGRA8_UNORM,
 } ImageFormat;
 
-typedef enum {
-  KEY_P,
-  KEY_ESCAPE,
-} Key;
-
 struct WindowPresentationOption {
   PresentMode present_mode;
   ImageFormat format;

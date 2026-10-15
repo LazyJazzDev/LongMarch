@@ -67,6 +67,11 @@ presentation falls back to VSync when unavailable. `Window::GetPresentMode()`
 reports the actual mode. Resizing and minimization are handled by the Window.
 Metal retains the device-query-only behavior in this iteration.
 
+Window input uses GLFW's existing key definitions, e.g. `IsKeyDown(GLFW_KEY_P)`.
+`IWindow::GLFWWindow()` (also exposed by rhix) returns a borrowed `GLFWwindow *`
+for other GLFW operations on the main thread. Window retains ownership: callers
+must not destroy the handle or terminate GLFW while RHI windows are alive.
+
 After window creation, both demos print `GetSupportedPresentationOptions()`:
 the presentation-mode/pixel-format combinations implemented by RHI and supported
 by this window. These are SDR combinations: D3D12 currently uses RGBA8 UNORM;

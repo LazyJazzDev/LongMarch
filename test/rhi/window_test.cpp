@@ -35,6 +35,13 @@ TEST_P(RhiWindow, MultipleWindowsSingleUseFramesModesAndQueueLifetime) {
   auto second = device.CreateGLFWWindow({320, 240, "RHI window test B"});
   ASSERT_TRUE(first);
   ASSERT_TRUE(second);
+  ASSERT_NE(first.GLFWWindow(), nullptr);
+  EXPECT_EQ(first.GLFWWindow(), first.Get()->GLFWWindow());
+  EXPECT_EQ(first.IsKeyDown(GLFW_KEY_A), glfwGetKey(first.GLFWWindow(), GLFW_KEY_A) == GLFW_PRESS);
+  glfwSetWindowShouldClose(first.GLFWWindow(), GLFW_TRUE);
+  EXPECT_TRUE(first.ShouldClose());
+  glfwSetWindowShouldClose(first.GLFWWindow(), GLFW_FALSE);
+  EXPECT_FALSE(first.ShouldClose());
   const auto options = first.GetSupportedPresentationOptions();
   ASSERT_FALSE(options.empty());
   for (size_t i = 0; i < options.size(); ++i) {

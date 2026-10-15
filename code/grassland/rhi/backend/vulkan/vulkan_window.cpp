@@ -1,3 +1,5 @@
+// Include Vulkan before GLFW declares its surface functions.
+#define GLFW_INCLUDE_VULKAN
 #include "grassland/rhi/backend/vulkan/vulkan_window.h"
 
 #include "grassland/rhi/backend/vulkan/vulkan_swap_chain_image.h"
@@ -23,8 +25,7 @@ bool VulkanWindow::Initialize(const WindowDesc &desc) {
     return false;
   }
   if (!InitializeWindow(desc) ||
-      !Check(glfwCreateWindowSurface(device_->Instance(), NativeWindow(), nullptr, &surface_),
-             "glfwCreateWindowSurface"))
+      !Check(glfwCreateWindowSurface(device_->Instance(), GLFWWindow(), nullptr, &surface_), "glfwCreateWindowSurface"))
     return false;
   VkBool32 supported{};
   if (!Check(vkGetPhysicalDeviceSurfaceSupportKHR(device_->NativePhysicalDevice(), device_->QueueFamily(), surface_,
@@ -92,10 +93,10 @@ VkResult VulkanWindow::PresentFrame(uint64_t generation, uint32_t index, VkSemap
 }
 
 ObjectPtr<Image> VulkanWindow::AcquireNativeFrame() {
-  if (glfwGetWindowAttrib(NativeWindow(), GLFW_ICONIFIED))
+  if (glfwGetWindowAttrib(GLFWWindow(), GLFW_ICONIFIED))
     return {};
   int width, height;
-  glfwGetFramebufferSize(NativeWindow(), &width, &height);
+  glfwGetFramebufferSize(GLFWWindow(), &width, &height);
   if (width <= 0 || height <= 0)
     return {};
   if (!valid_ || width != width_ || height != height_) {
@@ -176,10 +177,10 @@ void VulkanWindow::DestroySwapchain() {
 }
 
 bool VulkanWindow::Rebuild() {
-  if (glfwGetWindowAttrib(NativeWindow(), GLFW_ICONIFIED))
+  if (glfwGetWindowAttrib(GLFWWindow(), GLFW_ICONIFIED))
     return true;
   int width, height;
-  glfwGetFramebufferSize(NativeWindow(), &width, &height);
+  glfwGetFramebufferSize(GLFWWindow(), &width, &height);
   if (width <= 0 || height <= 0)
     return true;
   const auto physical = device_->NativePhysicalDevice();

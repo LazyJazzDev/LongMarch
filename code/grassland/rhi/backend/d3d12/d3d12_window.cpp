@@ -21,7 +21,7 @@ bool D3D12Window::Initialize(const WindowDesc &desc) {
     return false;
   SetNativePresentMode(desc.present_mode);
   int width, height;
-  glfwGetFramebufferSize(NativeWindow(), &width, &height);
+  glfwGetFramebufferSize(GLFWWindow(), &width, &height);
   return Rebuild(width, height);
 }
 
@@ -47,10 +47,10 @@ HRESULT D3D12Window::PresentFrame(uint64_t generation) {
 }
 
 ObjectPtr<Image> D3D12Window::AcquireNativeFrame() {
-  if (glfwGetWindowAttrib(NativeWindow(), GLFW_ICONIFIED))
+  if (glfwGetWindowAttrib(GLFWWindow(), GLFW_ICONIFIED))
     return {};
   int width, height;
-  glfwGetFramebufferSize(NativeWindow(), &width, &height);
+  glfwGetFramebufferSize(GLFWWindow(), &width, &height);
   if (width <= 0 || height <= 0)
     return {};
   if (!valid_ || desc_.width != width || desc_.height != height) {
@@ -113,7 +113,7 @@ bool D3D12Window::Rebuild(int width, int height) {
     desc.SwapEffect = DXGI_SWAP_EFFECT_FLIP_DISCARD;
     desc.Flags = flags;
     ComPtr<IDXGISwapChain1> chain;
-    const HWND hwnd = glfwGetWin32Window(NativeWindow());
+    const HWND hwnd = glfwGetWin32Window(GLFWWindow());
     if (!Check(
             device_->Factory()->CreateSwapChainForHwnd(device_->NativeQueue(), hwnd, &desc, nullptr, nullptr, &chain),
             "CreateSwapChainForHwnd") ||

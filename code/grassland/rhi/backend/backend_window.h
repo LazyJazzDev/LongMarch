@@ -11,8 +11,9 @@ class Window : public Object<rhi::IWindow> {
   ~Window() override;
   rhi::IImage *AcquireFrame() override;
   bool SetPresentMode(PresentMode mode) override;
+  GLFWwindow *GLFWWindow() const override;
   bool ShouldClose() const override;
-  bool IsKeyDown(Key key) const override;
+  bool IsKeyDown(int key) const override;
   bool SetTitle(const std::string &title) override;
   // An acquired Image carries one frame lease until all recorded/GPU uses end.
   void AcquireFrameLease();
@@ -24,7 +25,6 @@ class Window : public Object<rhi::IWindow> {
 
  protected:
   bool InitializeWindow(const WindowDesc &desc);
-  GLFWwindow *NativeWindow() const;
 
  private:
   GLFWwindow *window_{};

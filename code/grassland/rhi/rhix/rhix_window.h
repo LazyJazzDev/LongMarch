@@ -11,8 +11,9 @@ class Window : public ObjectContainer {
   Window() noexcept;
   // Window creation, events, acquisition and presentation run on the main thread.
   static bool PollEvents();
+  GLFWwindow *GLFWWindow() const;
   bool ShouldClose() const;
-  bool IsKeyDown(rhi::Key key) const;
+  bool IsKeyDown(int key) const;
   bool SetTitle(const std::string &title) const;
   Image AcquireFrame() const;
   bool SetPresentMode(rhi::PresentMode mode) const;

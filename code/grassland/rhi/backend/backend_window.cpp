@@ -49,7 +49,7 @@ bool Window::InitializeWindow(const WindowDesc &desc) {
   return window_ != nullptr;
 }
 
-GLFWwindow *Window::NativeWindow() const {
+GLFWwindow *Window::GLFWWindow() const {
   return window_;
 }
 
@@ -57,8 +57,8 @@ bool Window::ShouldClose() const {
   return !glfw::IsWindowThread() || glfwWindowShouldClose(window_);
 }
 
-bool Window::IsKeyDown(Key key) const {
-  return glfw::IsWindowThread() && glfwGetKey(window_, key == KEY_P ? GLFW_KEY_P : GLFW_KEY_ESCAPE) == GLFW_PRESS;
+bool Window::IsKeyDown(int key) const {
+  return glfw::IsWindowThread() && glfwGetKey(window_, key) == GLFW_PRESS;
 }
 
 bool Window::SetTitle(const std::string &title) {
