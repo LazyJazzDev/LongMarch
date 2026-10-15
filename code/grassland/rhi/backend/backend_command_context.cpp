@@ -1,5 +1,7 @@
 #include "grassland/rhi/backend/backend_command_context.h"
 
+#include "grassland/rhi/backend/backend_window.h"
+
 namespace grassland::rhi::backend {
 CommandContext::CommandContext(const void *identity, QueueType type) : identity_(identity), type_(type) {
 }
@@ -11,10 +13,6 @@ CommandContext::~CommandContext() {
 
 bool CommandContext::CmdClearColor(rhi::IImage *image, const std::array<float, 4> &color) {
   return CmdClearColor(ObjectPtr<Image>::Retain(dynamic_cast<Image *>(image)), color);
-}
-
-bool CommandContext::CmdPresent(rhi::IImage *image) {
-  return CmdPresent(ObjectPtr<Image>::Retain(dynamic_cast<Image *>(image)));
 }
 
 bool CommandContext::CmdClearColor(const ObjectPtr<Image> &image, const std::array<float, 4> &color) {
@@ -31,11 +29,12 @@ bool CommandContext::CmdClearColor(const ObjectPtr<Image> &image, const std::arr
   return true;
 }
 
-bool CommandContext::CmdPresent(const ObjectPtr<Image> &image) {
+bool CommandContext::CmdPresent(rhi::IWindow *window) {
   if (sealed_)
     return false;
-  if (failed_ || present_ || !image_ || image_.Get() != image.Get() || !image->IsValid()) {
-    ReportError(-1, "Present must follow CmdClearColor for the same acquired frame.");
+  const auto target = dynamic_cast<Window *>(window);
+  if (failed_ || present_ || !image_ || !target || !target->OwnsFrame(image_.Get()) || !image_->IsValid()) {
+    ReportError(-1, "CmdPresent requires the window owning the recorded clear frame.");
     failed_ = true;
     return false;
   }

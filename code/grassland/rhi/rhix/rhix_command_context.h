@@ -6,6 +6,8 @@
 #include "grassland/rhi/rhix/rhix_object_container.h"
 
 namespace grassland::rhix {
+class Window;
+
 class CommandContext : public ObjectContainer {
  public:
   CommandContext(rhi::ICommandContext *object) noexcept;
@@ -16,7 +18,7 @@ class CommandContext : public ObjectContainer {
   CommandContext(const CommandContext &) = delete;
   CommandContext &operator=(const CommandContext &) = delete;
   bool CmdClearColor(const Image &image, const std::array<float, 4> &color);
-  bool CmdPresent(const Image &image);
+  bool CmdPresent(const Window &window);
 };
 
 }  // namespace grassland::rhix

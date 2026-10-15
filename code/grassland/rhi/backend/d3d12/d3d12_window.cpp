@@ -16,6 +16,11 @@ D3D12Window::~D3D12Window() {
   device_->WaitIdle();
 }
 
+bool D3D12Window::OwnsFrame(const Image *image) const {
+  const auto frame = dynamic_cast<const D3D12SwapChainImage *>(image);
+  return frame && frame->Owner() == this;
+}
+
 bool D3D12Window::Initialize(const WindowDesc &desc) {
   if (!InitializeWindow(desc))
     return false;

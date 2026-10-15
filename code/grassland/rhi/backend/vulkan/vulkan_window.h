@@ -8,6 +8,7 @@ class VulkanWindow final : public Window {
  public:
   explicit VulkanWindow(VulkanDevice *device);
   ~VulkanWindow() override;
+  bool OwnsFrame(const Image *image) const override;
   bool Initialize(const WindowDesc &desc);
   ObjectPtr<Image> AcquireNativeFrame() override;
   bool SetNativePresentMode(PresentMode mode) override;

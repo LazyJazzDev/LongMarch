@@ -19,6 +19,11 @@ VulkanWindow::~VulkanWindow() {
     vkDestroySurfaceKHR(device_->Instance(), surface_, nullptr);
 }
 
+bool VulkanWindow::OwnsFrame(const Image *image) const {
+  const auto frame = dynamic_cast<const VulkanSwapChainImage *>(image);
+  return frame && frame->Owner() == this;
+}
+
 bool VulkanWindow::Initialize(const WindowDesc &desc) {
   if (!device_->SupportsSwapchain()) {
     ReportError(-1, "VK_KHR_swapchain is unavailable.");

@@ -17,9 +17,8 @@ class CommandContext : public Object<rhi::ICommandContext> {
   CommandContext(const void *identity, QueueType type);
   ~CommandContext() override;
   bool CmdClearColor(rhi::IImage *image, const std::array<float, 4> &color) override;
-  bool CmdPresent(rhi::IImage *image) override;
+  bool CmdPresent(rhi::IWindow *window) override;
   bool CmdClearColor(const ObjectPtr<Image> &image, const std::array<float, 4> &color);
-  bool CmdPresent(const ObjectPtr<Image> &image);
   bool Seal();
   const void *DeviceIdentity() const;
   QueueType Type() const;

@@ -11,6 +11,7 @@ class VulkanSwapChainImage final : public VulkanImage {
   VulkanSwapChainImage(ImageDesc desc, VulkanWindow *window, uint64_t generation, VkDevice device);
   ~VulkanSwapChainImage() override;
   bool Acquire();
+  const VulkanWindow *Owner() const;
   bool IsValid() const override;
   VkImage NativeImage() const override;
   VkSemaphore AcquireSemaphore() const;

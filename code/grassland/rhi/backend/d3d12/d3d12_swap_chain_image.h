@@ -14,6 +14,7 @@ class D3D12SwapChainImage final : public D3D12Image {
                       ID3D12Resource *image,
                       D3D12_CPU_DESCRIPTOR_HANDLE rtv);
   ~D3D12SwapChainImage() override;
+  const D3D12Window *Owner() const;
   bool IsValid() const override;
   HRESULT Present();
 

@@ -70,6 +70,12 @@ presentation falls back to VSync when unavailable. `Window::GetPresentMode()`
 reports the actual mode. Resizing and minimization are handled by the Window.
 Metal retains the device-query-only behavior in this iteration.
 
+`CmdClearColor` records work on an Image, while `CmdPresent` takes the target
+Window (`IWindow *` in RHI, `const rhix::Window &` in rhix). The current backend
+requires that window to own the acquired frame used by the preceding clear.
+Submission presents the recorded frame; it does not look up a different frame
+or copy an arbitrary image into the window.
+
 Window input uses GLFW's existing key definitions, e.g. `IsKeyDown(GLFW_KEY_P)`.
 `IWindow::GLFWWindow()` (also exposed by rhix) returns a borrowed `GLFWwindow *`
 for other GLFW operations on the main thread. Window retains ownership: callers
@@ -90,10 +96,12 @@ auto graphics = device.GetQueue(QUEUE_TYPE_GRAPHICS);
 auto image = window.AcquireFrame();
 if (image) {
   auto context = device.CreateCommandContext(graphics);
-  if (context.CmdClearColor(image, {0.6f, 0.7f, 0.8f, 1.0f}) && context.CmdPresent(image)) {
-    auto done = graphics.Submit(std::move(context));
-    // done.WaitHost() is optional; GPU completion is collected automatically.
-  }
+  if (!context) return;
+  if (!context.CmdClearColor(image, {0.6f, 0.7f, 0.8f, 1.0f})) return;
+  if (!context.CmdPresent(window)) return;
+  auto done = graphics.Submit(std::move(context));
+  if (!done) return;
+  // done.WaitHost() is optional; GPU completion is collected automatically.
 }
 ```
 
@@ -107,7 +115,7 @@ and Submit consume their input even on failure.
 The rhix dot wrappers derive from `rhix::ObjectContainer`, which stores a
 `ObjPtr<rhi::IObject>` and provides `Release()`. Release clears only that handle's reference;
 it does not force GPU completion or invalidate other copies. Destruction releases
-the reference automatically. Contexts and recorded commands remain move-only.
+the reference automatically. Command contexts remain move-only.
 
 The caller must release **all child handle copies before their parent**, including
 copies stored in containers or other threads. Release frames and recordings before

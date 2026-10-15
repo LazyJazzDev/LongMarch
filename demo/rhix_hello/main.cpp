@@ -101,7 +101,7 @@ int main(int argc, char **argv) {
       return 1;
     if (!context.CmdClearColor(image, {0.6f, 0.7f, 0.8f, 1.0f}))
       return 1;
-    if (!context.CmdPresent(image))
+    if (!context.CmdPresent(window))
       return 1;
     auto token = graphics.Submit(std::move(context));
     if (!token)

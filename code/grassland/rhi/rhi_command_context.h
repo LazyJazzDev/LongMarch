@@ -5,11 +5,14 @@
 
 namespace grassland::rhi {
 class IImage;
+class IWindow;
 
 class ICommandContext : public IObject {
  public:
   virtual bool CmdClearColor(IImage *image, const std::array<float, 4> &color) = 0;
-  virtual bool CmdPresent(IImage *image) = 0;
+  // Presents the target window's acquired frame. Currently requires a preceding
+  // CmdClearColor for that frame; does not copy an arbitrary image to the window.
+  virtual bool CmdPresent(IWindow *window) = 0;
 
  protected:
   ~ICommandContext() override;

@@ -19,6 +19,7 @@ class Window : public Object<rhi::IWindow> {
   void AcquireFrameLease();
   void ReleaseFrameLease();
   bool HasFrameLeases() const;
+  virtual bool OwnsFrame(const Image *image) const = 0;
   virtual ObjectPtr<Image> AcquireNativeFrame() = 0;
   virtual bool SetNativePresentMode(PresentMode mode) = 0;
   virtual PresentMode GetPresentMode() const = 0;

@@ -1,5 +1,7 @@
 #include "grassland/rhi/rhix/rhix_command_context.h"
 
+#include "grassland/rhi/rhix/rhix_window.h"
+
 namespace grassland::rhix {
 CommandContext::CommandContext() = default;
 CommandContext::CommandContext(CommandContext &&) noexcept = default;
@@ -16,8 +18,8 @@ bool CommandContext::CmdClearColor(const Image &image, const std::array<float, 4
   return *this && Get()->CmdClearColor(image.Get(), color);
 }
 
-bool CommandContext::CmdPresent(const Image &image) {
-  return *this && Get()->CmdPresent(image.Get());
+bool CommandContext::CmdPresent(const Window &window) {
+  return *this && Get()->CmdPresent(window.Get());
 }
 
 }  // namespace grassland::rhix

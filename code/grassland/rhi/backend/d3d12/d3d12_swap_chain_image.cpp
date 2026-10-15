@@ -21,6 +21,10 @@ D3D12SwapChainImage::~D3D12SwapChainImage() {
   window_->ReleaseFrameLease();
 }
 
+const D3D12Window *D3D12SwapChainImage::Owner() const {
+  return window_;
+}
+
 bool D3D12SwapChainImage::IsValid() const {
   return !presented_ && window_->IsFrameValid(generation_);
 }

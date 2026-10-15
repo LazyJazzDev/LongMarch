@@ -10,6 +10,7 @@ class D3D12Window final : public Window {
  public:
   explicit D3D12Window(D3D12Device *device);
   ~D3D12Window() override;
+  bool OwnsFrame(const Image *image) const override;
   bool Initialize(const WindowDesc &desc);
   ObjectPtr<Image> AcquireNativeFrame() override;
   bool SetNativePresentMode(PresentMode mode) override;

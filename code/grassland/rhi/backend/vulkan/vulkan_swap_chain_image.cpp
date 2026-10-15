@@ -41,6 +41,10 @@ VulkanSwapChainImage::~VulkanSwapChainImage() {
   window_->ReleaseFrameLease();
 }
 
+const VulkanWindow *VulkanSwapChainImage::Owner() const {
+  return window_;
+}
+
 bool VulkanSwapChainImage::IsValid() const {
   return acquired_image_ && !presented_ && window_->IsFrameValid(generation_);
 }
