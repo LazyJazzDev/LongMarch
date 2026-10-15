@@ -104,10 +104,8 @@ ObjectPtr<Image> VulkanWindow::AcquireNativeFrame() {
   glfwGetFramebufferSize(GLFWWindow(), &width, &height);
   if (width <= 0 || height <= 0)
     return {};
-  if (!valid_ || width != width_ || height != height_) {
-    if (!Rebuild())
-      return {};
-  }
+  if (!valid_ || width != width_ || height != height_)
+    return {};
   if (acquired_) {
     ReportError(-1, "Present or release the previous acquired frame first.");
     return {};
@@ -115,6 +113,11 @@ ObjectPtr<Image> VulkanWindow::AcquireNativeFrame() {
   auto frame = ObjectPtr<VulkanSwapChainImage>::Adopt(
       new VulkanSwapChainImage(desc_, this, generation_, device_->NativeDevice()));
   return frame->Acquire() ? ObjectPtr<Image>(frame) : ObjectPtr<Image>{};
+}
+
+bool VulkanWindow::RebuildNativeSwapChain() {
+  valid_ = false;
+  return Rebuild();
 }
 
 bool VulkanWindow::SetNativePresentMode(PresentMode mode) {

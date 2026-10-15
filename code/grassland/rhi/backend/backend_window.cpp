@@ -18,6 +18,17 @@ rhi::IImage *Window::AcquireFrame() {
   return nullptr;
 }
 
+bool Window::RebuildSwapChain() {
+  if (!glfw::IsWindowThread())
+    return false;
+  try {
+    return RebuildNativeSwapChain();
+  } catch (const std::bad_alloc &) {
+    ReportError(-1, "Swapchain rebuild ran out of memory.");
+    return false;
+  }
+}
+
 bool Window::SetPresentMode(PresentMode mode) {
   try {
     return glfw::IsWindowThread() && SetNativePresentMode(mode);

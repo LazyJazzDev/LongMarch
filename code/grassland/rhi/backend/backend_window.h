@@ -10,6 +10,7 @@ class Window : public Object<rhi::IWindow> {
   Window();
   ~Window() override;
   rhi::IImage *AcquireFrame() override;
+  bool RebuildSwapChain() override;
   bool SetPresentMode(PresentMode mode) override;
   GLFWwindow *GLFWWindow() const override;
   bool ShouldClose() const override;
@@ -21,6 +22,7 @@ class Window : public Object<rhi::IWindow> {
   bool HasFrameLeases() const;
   virtual bool OwnsFrame(const Image *image) const = 0;
   virtual ObjectPtr<Image> AcquireNativeFrame() = 0;
+  virtual bool RebuildNativeSwapChain() = 0;
   virtual bool SetNativePresentMode(PresentMode mode) = 0;
   virtual PresentMode GetPresentMode() const = 0;
 

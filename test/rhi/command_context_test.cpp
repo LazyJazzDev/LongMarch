@@ -45,6 +45,10 @@ class TestWindow final : public backend::Window {
     return {};
   }
 
+  bool RebuildNativeSwapChain() override {
+    return true;
+  }
+
   bool SetNativePresentMode(PresentMode) override {
     return true;
   }

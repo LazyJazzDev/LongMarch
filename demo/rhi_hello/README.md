@@ -67,7 +67,14 @@ D3D12 and Vulkan then open a blue GLFW window. The title displays FPS measured
 by `grassland::FPSCounter`, refreshed four times per second. Press **P** to switch between
 VSync and continuous presentation; **Escape** or the close button exits. Continuous
 presentation falls back to VSync when unavailable. `Window::GetPresentMode()`
-reports the actual mode. Resizing and minimization are handled by the Window.
+reports the actual mode. Swapchain replacement is explicit: `AcquireFrame()`
+never rebuilds. The demos install a GLFW framebuffer-size callback which calls
+`RebuildSwapChain()` when size events are dispatched (normally by `PollEvents()`).
+`SetPresentMode()` performs any required replacement during that explicit call.
+If acquisition returns empty, the demos explicitly request a rebuild before
+retrying, covering out-of-date surfaces and abandoned Vulkan acquisitions.
+When minimized or zero-sized, rebuilding is deferred until a later explicit call
+or framebuffer-size event with a usable size.
 Metal retains the device-query-only behavior in this iteration.
 
 `CmdClearColor` records work on an Image, while `CmdPresent` takes the target

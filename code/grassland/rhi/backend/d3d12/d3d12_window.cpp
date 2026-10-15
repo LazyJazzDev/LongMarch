@@ -58,10 +58,8 @@ ObjectPtr<Image> D3D12Window::AcquireNativeFrame() {
   glfwGetFramebufferSize(GLFWWindow(), &width, &height);
   if (width <= 0 || height <= 0)
     return {};
-  if (!valid_ || desc_.width != width || desc_.height != height) {
-    if (!Rebuild(width, height))
-      return {};
-  }
+  if (!valid_ || desc_.width != width || desc_.height != height)
+    return {};
   if (acquired_) {
     ReportError(-1, "Present or release the previous acquired frame first.");
     return {};
@@ -72,6 +70,17 @@ ObjectPtr<Image> D3D12Window::AcquireNativeFrame() {
   auto frame = ObjectPtr<Image>::Adopt(new D3D12SwapChainImage(desc_, this, generation_, images_[index].Get(), rtv));
   acquired_ = true;
   return frame;
+}
+
+bool D3D12Window::RebuildNativeSwapChain() {
+  valid_ = false;
+  if (glfwGetWindowAttrib(GLFWWindow(), GLFW_ICONIFIED))
+    return true;
+  int width, height;
+  glfwGetFramebufferSize(GLFWWindow(), &width, &height);
+  if (width <= 0 || height <= 0)
+    return true;
+  return Rebuild(width, height);
 }
 
 bool D3D12Window::SetNativePresentMode(PresentMode mode) {

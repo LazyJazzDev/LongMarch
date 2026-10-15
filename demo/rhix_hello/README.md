@@ -14,7 +14,9 @@ Both enumerate devices and capabilities, automatically select a device, and
 clear a GLFW window to RGB (0.6, 0.7, 0.8). Window titles show FPS measured by
 `grassland::FPSCounter`. Press **P** to toggle VSync/continuous presentation;
 **Escape** or the close button exits. Continuous presentation may fall back to
-VSync. The optional `metal` backend currently demonstrates device queries only.
+VSync. Framebuffer-size callbacks explicitly call `RebuildSwapChain()`; empty
+acquisitions also request explicit recovery. `AcquireFrame()` never rebuilds.
+The optional `metal` backend currently demonstrates device queries only.
 Both demos print the window's supported RHI presentation-mode/pixel-format
 combinations at startup via `GetSupportedPresentationOptions()`; format selection
 remains automatic. See the pointer demo documentation for the query's SDR scope.

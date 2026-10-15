@@ -16,6 +16,7 @@ class Window : public ObjectContainer {
   bool IsKeyDown(int key) const;
   bool SetTitle(const std::string &title) const;
   Image AcquireFrame() const;
+  bool RebuildSwapChain() const;
   bool SetPresentMode(rhi::PresentMode mode) const;
   rhi::PresentMode GetPresentMode() const;
   std::vector<rhi::WindowPresentationOption> GetSupportedPresentationOptions() const;

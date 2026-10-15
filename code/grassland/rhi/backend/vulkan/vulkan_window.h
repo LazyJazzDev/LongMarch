@@ -11,6 +11,7 @@ class VulkanWindow final : public Window {
   bool OwnsFrame(const Image *image) const override;
   bool Initialize(const WindowDesc &desc);
   ObjectPtr<Image> AcquireNativeFrame() override;
+  bool RebuildNativeSwapChain() override;
   bool SetNativePresentMode(PresentMode mode) override;
   PresentMode GetPresentMode() const override;
   std::vector<WindowPresentationOption> GetSupportedPresentationOptions() const override;

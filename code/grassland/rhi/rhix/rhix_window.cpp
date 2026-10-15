@@ -34,6 +34,12 @@ Image Window::AcquireFrame() const {
   return *this ? Get()->AcquireFrame() : nullptr;
 }
 
+bool Window::RebuildSwapChain() const {
+  if (!*this)
+    return false;
+  return Get()->RebuildSwapChain();
+}
+
 bool Window::SetPresentMode(rhi::PresentMode mode) const {
   return *this && Get()->SetPresentMode(mode);
 }

@@ -60,11 +60,16 @@ TEST_P(RhiWindow, MultipleWindowsSingleUseFramesModesAndQueueLifetime) {
     EXPECT_EQ(first.GetPresentMode(), options[i].present_mode);
   }
   ASSERT_TRUE(first.SetPresentMode(PRESENT_MODE_VSYNC));
-  // Dropping an unsubmitted acquisition must not strand the swapchain.
+  // Dropping a Vulkan acquisition requires explicit recovery, never an implicit rebuild.
   {
     auto discarded = first.AcquireFrame();
     ASSERT_TRUE(discarded);
   }
+  if (GetParam() == BACKEND_API_VULKAN) {
+    EXPECT_FALSE(first.AcquireFrame());
+    EXPECT_FALSE(first.AcquireFrame());
+  }
+  ASSERT_TRUE(first.RebuildSwapChain());
   SubmissionToken last;
   for (int i = 0; i < 12; ++i) {
     ASSERT_TRUE(Window::PollEvents());
@@ -101,6 +106,10 @@ TEST_P(RhiWindow, MultipleWindowsSingleUseFramesModesAndQueueLifetime) {
   auto old_packet = std::move(old_context);
   ASSERT_TRUE(MoveWindow(hwnd, 40, 40, 480, 360, TRUE));
   ASSERT_TRUE(Window::PollEvents());
+  EXPECT_FALSE(first.AcquireFrame());
+  EXPECT_TRUE(old_frame);  // Acquisition did not replace the swapchain.
+  ASSERT_TRUE(first.RebuildSwapChain());
+  EXPECT_FALSE(old_frame);
   {
     auto resized = first.AcquireFrame();
     ASSERT_TRUE(resized);
@@ -114,6 +123,11 @@ TEST_P(RhiWindow, MultipleWindowsSingleUseFramesModesAndQueueLifetime) {
   ASSERT_TRUE(Window::PollEvents());
   EXPECT_FALSE(first.AcquireFrame());
   ASSERT_TRUE(first.SetPresentMode(PRESENT_MODE_CONTINUOUS));
+  glfwSetWindowUserPointer(first.GLFWWindow(), first.Get());
+  glfwSetFramebufferSizeCallback(first.GLFWWindow(), [](GLFWwindow *native, int, int) {
+    auto *window = static_cast<rhi::IWindow *>(glfwGetWindowUserPointer(native));
+    EXPECT_TRUE(window->RebuildSwapChain());
+  });
   ShowWindow(hwnd, SW_RESTORE);
   ASSERT_TRUE(Window::PollEvents());
   {
