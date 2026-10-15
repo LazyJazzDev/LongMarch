@@ -10,12 +10,9 @@ class Image : public Object<rhi::IImage> {
   const ImageDesc &GetDesc() const override;
   virtual bool IsValid() const = 0;
   virtual const void *DeviceIdentity() const = 0;
-  bool Claim();
-  void CancelClaim();
 
  private:
   ImageDesc desc_;
-  std::atomic<bool> claimed_{};
 };
 
 }  // namespace grassland::rhi::backend

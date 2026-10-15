@@ -269,7 +269,7 @@ TEST(RhiCommands, DroppedTokenStillRetiresSingleSubmissionAutomatically) {
   EXPECT_TRUE(gate->changed.wait_for(lock, std::chrono::seconds(2), [&] { return gate->destroyed == 1; }));
 }
 
-TEST(RhiCommands, CancellationReleasesClaimAndForeignQueueConsumesRejectedPacket) {
+TEST(RhiCommands, CancellationReleasesResourcesAndForeignQueueConsumesRejectedPacket) {
   auto gate = std::make_shared<Gate>();
   auto device = ObjectPtr<TestDevice>::Adopt(new TestDevice(gate));
   auto window = Window(new TestWindow(gate));

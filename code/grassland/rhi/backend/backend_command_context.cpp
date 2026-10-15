@@ -8,10 +8,7 @@ namespace grassland::rhi::backend {
 CommandContext::CommandContext(const void *identity) : identity_(identity) {
 }
 
-CommandContext::~CommandContext() {
-  if (image_ && !submitted_)
-    image_->CancelClaim();
-}
+CommandContext::~CommandContext() = default;
 
 bool CommandContext::CmdClearColor(rhi::IImage *image, const std::array<float, 4> &color) {
   return CmdClearColor(ObjectPtr<Image>::Retain(dynamic_cast<Image *>(image)), color);
@@ -28,10 +25,6 @@ bool CommandContext::CmdClearColor(const ObjectPtr<Image> &image, const std::arr
   }
   const bool first_use = !image_;
   if (first_use) {
-    if (!image->Claim()) {
-      failed_ = true;
-      return false;
-    }
     // Retain the exact physical resource before encoding any native use.
     image_ = image;
   }
