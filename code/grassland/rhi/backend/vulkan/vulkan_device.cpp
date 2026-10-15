@@ -95,20 +95,37 @@ std::mutex &VulkanDevice::QueueMutex() {
   return mutex_;
 }
 
-std::unique_ptr<Window> VulkanDevice::CreateNativeWindow(const WindowDesc &desc) {
-  auto window = std::make_unique<VulkanWindow>(this);
-  return window->Initialize(desc) ? std::unique_ptr<Window>(std::move(window)) : nullptr;
+rhi::IWindow *VulkanDevice::CreateGLFWWindow(const WindowDesc &desc) {
+  try {
+    auto window = std::make_unique<VulkanWindow>(this);
+    if (!window->Initialize(desc))
+      return nullptr;
+    return window.release();
+  } catch (const std::bad_alloc &) {
+    ReportError(-1, "Window creation ran out of memory.");
+    return nullptr;
+  }
 }
 
-std::unique_ptr<CommandContext> VulkanDevice::CreateNativeCommandContext() {
-  auto context = std::make_unique<VulkanCommandContext>(this);
-  if (!context->Initialize())
-    return {};
-  return context;
+rhi::ICommandContext *VulkanDevice::CreateCommandContext() {
+  try {
+    auto context = std::make_unique<VulkanCommandContext>(this);
+    if (!context->Initialize())
+      return nullptr;
+    return context.release();
+  } catch (const std::bad_alloc &) {
+    ReportError(-1, "Command context allocation failed.");
+    return nullptr;
+  }
 }
 
-std::unique_ptr<Queue> VulkanDevice::CreateQueue(QueueType type) {
-  return std::make_unique<VulkanQueue>(this, type);
+rhi::IQueue *VulkanDevice::GetQueue(QueueType type) {
+  try {
+    return new VulkanQueue(this, type);
+  } catch (const std::bad_alloc &) {
+    ReportError(-1, "Queue creation ran out of memory.");
+    return nullptr;
+  }
 }
 
 }  // namespace grassland::rhi::backend::vulkan

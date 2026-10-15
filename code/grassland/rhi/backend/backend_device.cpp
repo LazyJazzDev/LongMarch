@@ -2,8 +2,6 @@
 
 #include "grassland/rhi/backend/backend_command_context.h"
 #include "grassland/rhi/backend/backend_core.h"
-#include "grassland/rhi/backend/backend_queue.h"
-#include "grassland/rhi/backend/backend_window.h"
 
 namespace grassland::rhi::backend {
 
@@ -37,31 +35,17 @@ bool Device::SupportGeometryShader() const {
   return info_.geometry_shader_feature;
 }
 
-rhi::IWindow *Device::CreateGLFWWindow(const WindowDesc &desc) {
-  try {
-    return CreateNativeWindow(desc).release();
-  } catch (const std::bad_alloc &) {
-    ReportError(-1, "Window creation ran out of memory.");
-    return nullptr;
-  }
+rhi::IWindow *Device::CreateGLFWWindow(const WindowDesc &) {
+  ReportError(-1, "Window creation is unavailable.");
+  return nullptr;
 }
 
-rhi::IQueue *Device::GetQueue(QueueType type) {
-  try {
-    return CreateQueue(type).release();
-  } catch (const std::bad_alloc &) {
-    ReportError(-1, "Queue creation ran out of memory.");
-    return nullptr;
-  }
+rhi::IQueue *Device::GetQueue(QueueType) {
+  return nullptr;
 }
 
 rhi::ICommandContext *Device::CreateCommandContext() {
-  try {
-    return CreateNativeCommandContext().release();
-  } catch (const std::bad_alloc &) {
-    ReportError(-1, "Command context allocation failed.");
-    return nullptr;
-  }
+  return nullptr;
 }
 
 const PhysicalDevice &Device::GetPhysicalDevice() const noexcept {
@@ -74,19 +58,6 @@ Core *Device::OwnerCore() const {
 
 const void *Device::NativeIdentity() const {
   return this;
-}
-
-std::unique_ptr<Window> Device::CreateNativeWindow(const WindowDesc &) {
-  ReportError(-1, "Window creation is unavailable.");
-  return {};
-}
-
-std::unique_ptr<CommandContext> Device::CreateNativeCommandContext() {
-  return {};
-}
-
-std::unique_ptr<Queue> Device::CreateQueue(QueueType) {
-  return {};
 }
 
 Device::SubmissionState::SubmissionState(uint64_t identity) : queue_identity_(identity) {

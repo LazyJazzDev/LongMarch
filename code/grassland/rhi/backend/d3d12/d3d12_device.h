@@ -17,9 +17,9 @@ class D3D12Device final : public Device {
   uint64_t NextSerial();
   bool Wait(uint64_t value, HANDLE event) const;
   bool WaitIdle();
-  std::unique_ptr<Window> CreateNativeWindow(const WindowDesc &desc) override;
-  std::unique_ptr<CommandContext> CreateNativeCommandContext() override;
-  std::unique_ptr<Queue> CreateQueue(QueueType type) override;
+  rhi::IWindow *CreateGLFWWindow(const WindowDesc &desc = {}) override;
+  rhi::ICommandContext *CreateCommandContext() override;
+  rhi::IQueue *GetQueue(QueueType type) override;
 
  private:
   bool Initialize();

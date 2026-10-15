@@ -10,8 +10,6 @@
 
 namespace grassland::rhi::backend {
 
-class Queue;
-class Window;
 class CommandContext;
 
 class Device : public Object<rhi::IDevice> {
@@ -27,9 +25,6 @@ class Device : public Object<rhi::IDevice> {
   rhi::IQueue *GetQueue(QueueType type) override;
   rhi::ICommandContext *CreateCommandContext() override;
   virtual const void *NativeIdentity() const;
-  virtual std::unique_ptr<Window> CreateNativeWindow(const WindowDesc &desc);
-  virtual std::unique_ptr<CommandContext> CreateNativeCommandContext();
-  virtual std::unique_ptr<Queue> CreateQueue(QueueType type);
 
   // Lightweight completion state: deliberately holds no native resources or packet.
   class SubmissionState final : public Object<rhi::ISubmissionToken> {

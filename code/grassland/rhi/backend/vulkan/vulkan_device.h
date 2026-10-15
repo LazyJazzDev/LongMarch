@@ -17,9 +17,9 @@ class VulkanDevice final : public Device {
   uint32_t QueueFamily() const;
   bool SupportsSwapchain() const;
   std::mutex &QueueMutex();
-  std::unique_ptr<Window> CreateNativeWindow(const WindowDesc &desc) override;
-  std::unique_ptr<CommandContext> CreateNativeCommandContext() override;
-  std::unique_ptr<Queue> CreateQueue(QueueType type) override;
+  rhi::IWindow *CreateGLFWWindow(const WindowDesc &desc = {}) override;
+  rhi::ICommandContext *CreateCommandContext() override;
+  rhi::IQueue *GetQueue(QueueType type) override;
 
  private:
   VulkanDevice(grassland::rhi::PhysicalDevice info, Core *core);

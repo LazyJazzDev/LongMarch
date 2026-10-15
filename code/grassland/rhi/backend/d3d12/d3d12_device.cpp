@@ -91,20 +91,37 @@ bool D3D12Device::IsInitialized() const {
   return initialized_;
 }
 
-std::unique_ptr<Window> D3D12Device::CreateNativeWindow(const WindowDesc &desc) {
-  auto window = std::make_unique<D3D12Window>(this);
-  return window->Initialize(desc) ? std::unique_ptr<Window>(std::move(window)) : nullptr;
+rhi::IWindow *D3D12Device::CreateGLFWWindow(const WindowDesc &desc) {
+  try {
+    auto window = std::make_unique<D3D12Window>(this);
+    if (!window->Initialize(desc))
+      return nullptr;
+    return window.release();
+  } catch (const std::bad_alloc &) {
+    ReportError(-1, "Window creation ran out of memory.");
+    return nullptr;
+  }
 }
 
-std::unique_ptr<CommandContext> D3D12Device::CreateNativeCommandContext() {
-  auto context = std::make_unique<D3D12CommandContext>(this);
-  if (!context->Initialize())
-    return {};
-  return context;
+rhi::ICommandContext *D3D12Device::CreateCommandContext() {
+  try {
+    auto context = std::make_unique<D3D12CommandContext>(this);
+    if (!context->Initialize())
+      return nullptr;
+    return context.release();
+  } catch (const std::bad_alloc &) {
+    ReportError(-1, "Command context allocation failed.");
+    return nullptr;
+  }
 }
 
-std::unique_ptr<Queue> D3D12Device::CreateQueue(QueueType type) {
-  return std::make_unique<D3D12Queue>(this, type);
+rhi::IQueue *D3D12Device::GetQueue(QueueType type) {
+  try {
+    return new D3D12Queue(this, type);
+  } catch (const std::bad_alloc &) {
+    ReportError(-1, "Queue creation ran out of memory.");
+    return nullptr;
+  }
 }
 
 }  // namespace grassland::rhi::backend::d3d12
