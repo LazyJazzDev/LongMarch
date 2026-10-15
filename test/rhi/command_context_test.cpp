@@ -152,7 +152,6 @@ class TestQueue final : public backend::Queue {
 
 TEST(RhiCommands, RecordingAndSubmissionKeepExactImageWithoutKeepingPayloadInToken) {
   static_assert(!std::is_copy_constructible_v<CommandContext>);
-  static_assert(!std::is_copy_constructible_v<RecordedCommands>);
   auto gate = std::make_shared<Gate>();
   auto device = ObjectPtr<TestDevice>::Adopt(new TestDevice(gate));
   auto queue = Queue(new TestQueue(device, QUEUE_TYPE_GRAPHICS));
@@ -161,7 +160,7 @@ TEST(RhiCommands, RecordingAndSubmissionKeepExactImageWithoutKeepingPayloadInTok
   ASSERT_TRUE(context.ClearColor(image, {0, 0, 1, 1}));
   ASSERT_TRUE(context.Present(image));
   image = {};
-  auto recorded = context.Finish();
+  auto recorded = std::move(context);
   ASSERT_FALSE(context);
   ASSERT_TRUE(recorded);
   auto token = queue.Submit(std::move(recorded));
@@ -191,7 +190,7 @@ TEST(RhiCommands, DroppedTokenStillRetiresSingleSubmissionAutomatically) {
   auto image = Image(new TestImage(gate));
   ASSERT_TRUE(context.ClearColor(image, {1, 0, 0, 1}));
   ASSERT_TRUE(context.Present(image));
-  ASSERT_TRUE(queue.Submit(context.Finish()));
+  ASSERT_TRUE(queue.Submit(std::move(context)));
   image = {};
   {
     std::lock_guard<std::mutex> lock(gate->mutex);
@@ -212,7 +211,7 @@ TEST(RhiCommands, CancellationReleasesClaimAndForeignQueueConsumesRejectedPacket
   context = CommandContext(new TestCommandContext(gate, QUEUE_TYPE_GRAPHICS));
   ASSERT_TRUE(context.ClearColor(image, {1, 0, 0, 1}));
   ASSERT_TRUE(context.Present(image));
-  auto packet = context.Finish();
+  auto packet = std::move(context);
   auto other = ObjectPtr<TestDevice>::Adopt(new TestDevice(std::make_shared<Gate>()));
   auto queue = Queue(new TestQueue(other, QUEUE_TYPE_GRAPHICS));
   EXPECT_FALSE(queue.Submit(std::move(packet)));
@@ -224,13 +223,15 @@ TEST(RhiCommands, CancellationReleasesClaimAndForeignQueueConsumesRejectedPacket
 TEST(RhiCommands, InvalidAndIncompleteContextsCannotBeSubmitted) {
   auto gate = std::make_shared<Gate>();
   auto device = ObjectPtr<TestDevice>::Adopt(new TestDevice(gate));
+  auto queue = Queue(new TestQueue(device, QUEUE_TYPE_TRANSFER));
   auto image = Image(new TestImage(gate));
   auto context = CommandContext(new TestCommandContext(gate, QUEUE_TYPE_TRANSFER));
   EXPECT_FALSE(context.ClearColor(image, {1, 0, 0, 1}));
-  EXPECT_FALSE(context.Finish());
+  EXPECT_FALSE(queue.Submit(std::move(context)));
+  queue = Queue(new TestQueue(device, QUEUE_TYPE_GRAPHICS));
   context = CommandContext(new TestCommandContext(gate, QUEUE_TYPE_GRAPHICS));
   ASSERT_TRUE(context.ClearColor(image, {1, 0, 0, 1}));
-  EXPECT_FALSE(context.Finish());
+  EXPECT_FALSE(queue.Submit(std::move(context)));
   EXPECT_FALSE(context);
 }
 
@@ -240,10 +241,10 @@ TEST(RhiCommands, AliasedQueueDependencyDoesNotWaitForGpuOnCpu) {
   auto transfer = Queue(new TestQueue(device, QUEUE_TYPE_TRANSFER));
   auto graphics = Queue(new TestQueue(device, QUEUE_TYPE_GRAPHICS));
   auto context = CommandContext(new TestCommandContext(gate, QUEUE_TYPE_TRANSFER));
-  auto upload = transfer.Submit(context.Finish());
+  auto upload = transfer.Submit(std::move(context));
   ASSERT_TRUE(upload);
   context = CommandContext(new TestCommandContext(gate, QUEUE_TYPE_GRAPHICS));
-  auto done = graphics.Submit(context.Finish(), {{upload}});
+  auto done = graphics.Submit(std::move(context), {{upload}});
   ASSERT_TRUE(done);
   EXPECT_EQ(done.GetStatus(), SUBMISSION_STATUS_PENDING);
   {
@@ -263,7 +264,7 @@ TEST(RhiCommands, AllocationFailureAfterNativeSubmitKeepsResourcesUntilCompletio
   ASSERT_TRUE(context.ClearColor(image, {0, 0, 1, 1}));
   ASSERT_TRUE(context.Present(image));
   image = {};
-  EXPECT_FALSE(queue.Submit(context.Finish()));
+  EXPECT_FALSE(queue.Submit(std::move(context)));
   {
     std::lock_guard<std::mutex> lock(gate->mutex);
     EXPECT_EQ(gate->destroyed, 0);
@@ -290,7 +291,7 @@ TEST(RhiCommands, DeviceShutdownDrainsWorkAndReclaimsWindowAfterFrameLease) {
   window.Release();
   ASSERT_TRUE(window_backend->IsUniquelyOwned());
   ASSERT_TRUE(window_backend->HasFrameLeases());
-  auto token = queue.Submit(context.Finish());
+  auto token = queue.Submit(std::move(context));
   ASSERT_TRUE(token);
   token.Release();
   queue.Release();

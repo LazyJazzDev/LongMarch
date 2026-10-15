@@ -37,8 +37,8 @@ bool Queue::SharesPhysicalQueue(const Queue &other) const {
   return *this && Get()->SharesPhysicalQueue(other.Get());
 }
 
-SubmissionToken Queue::Submit(RecordedCommands &&commands, const SubmitInfo &info) const {
-  RecordedCommands consumed = std::move(commands);
+SubmissionToken Queue::Submit(CommandContext &&commands, const SubmitInfo &info) const {
+  CommandContext consumed = std::move(commands);
   if (!*this || !consumed)
     return {};
   try {

@@ -15,7 +15,7 @@ module and does not use the old `grassland::graphics` runtime.
 
 `grassland::rhi` is the pointer API. Its `rhi_*.h` headers declare pure virtual
 `ICore`, `IDevice`, `IWindow`, `IImage`, `IQueue`, `ICommandContext`,
-`IRecordedCommands` and `ISubmissionToken` interfaces without backend state or
+and `ISubmissionToken` interfaces without backend state or
 native API headers. Native implementations and shared implementation helpers stay
 under `backend/`.
 
@@ -57,11 +57,11 @@ rhix::Device device = core.CreateDeviceByAutoSelection();
 Without any container, use `rhi::ICore *core = rhi::CreateCore()` and release each
 owned pointer with `Release()`, children before parents. Factories return one
 owned reference or `nullptr`. Ordinary object parameters are borrowed. The pointer
-`ICommandContext::Finish()` returns a separate owned `IRecordedCommands` reference;
-the caller still releases its context reference. `IQueue::Submit()` borrows the
-packet and retains accepted work. A packet can be submitted only once; unfinished
-contexts and repeat submissions are rejected. rhix wraps these operations with
-the consuming semantics described below.
+`IQueue::Submit()` borrows the context, ends recording, and retains accepted work.
+A context can be submitted only once; incomplete recordings and repeat submissions
+are rejected. The caller retains its own reference and may release it after Submit.
+The rhix overload consumes a moved CommandContext, including on failure.
+
 
 D3D12 and Vulkan then open a blue GLFW window. The title displays FPS measured
 by `grassland::FPSCounter`, refreshed four times per second. Press **P** to switch between
@@ -91,7 +91,7 @@ auto image = window.AcquireFrame();
 if (image) {
   auto context = device.CreateCommandContext(graphics);
   if (context.ClearColor(image, {0.6f, 0.7f, 0.8f, 1.0f}) && context.Present(image)) {
-    auto done = graphics.Submit(context.Finish());
+    auto done = graphics.Submit(std::move(context));
     // done.WaitHost() is optional; GPU completion is collected automatically.
   }
 }

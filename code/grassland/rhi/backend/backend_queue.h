@@ -13,7 +13,7 @@ class Queue : public Object<rhi::IQueue> {
   QueueType Type() const;
   QueueType GetType() const override;
   bool SharesPhysicalQueue(const rhi::IQueue *other) const override;
-  rhi::ISubmissionToken *Submit(rhi::IRecordedCommands *commands, const rhi::SubmitInfo &info = {}) override;
+  rhi::ISubmissionToken *Submit(rhi::ICommandContext *commands, const rhi::SubmitInfo &info = {}) override;
   virtual std::unique_ptr<CommandContext> CreateCommandContext() const = 0;
 
  private:

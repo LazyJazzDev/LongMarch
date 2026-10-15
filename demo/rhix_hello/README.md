@@ -20,8 +20,8 @@ combinations at startup via `GetSupportedPresentationOptions()`; format selectio
 remains automatic. See the pointer demo documentation for the query's SDR scope.
 
 Containers adopt factory results, retain on copy, and transfer on move.
-`context.Finish()` consumes the context, and `graphics.Submit()` consumes the
-recorded-command container. Temporary images and submission tokens release their
+`graphics.Submit(std::move(context))` ends recording and consumes the context,
+including on failure. Temporary images and submission tokens release their
 references automatically; the backend retains accepted work until completion.
 Parents are declared before their children so normal and early returns release
 children first. Normal shutdown also demonstrates explicit `Release()` calls.

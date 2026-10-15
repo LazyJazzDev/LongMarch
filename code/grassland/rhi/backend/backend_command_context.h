@@ -18,8 +18,6 @@ class CommandContext : public Object<rhi::ICommandContext> {
   ~CommandContext() override;
   bool ClearColor(rhi::IImage *image, const std::array<float, 4> &color) override;
   bool Present(rhi::IImage *image) override;
-  rhi::IRecordedCommands *Finish() override;
-  bool CanSubmit() const;
   bool Clear(const ObjectPtr<Image> &image, const std::array<float, 4> &color);
   bool Present(const ObjectPtr<Image> &image);
   bool Seal();

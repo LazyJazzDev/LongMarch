@@ -50,11 +50,8 @@ int RunWindow(grassland::rhi::IDevice *device, grassland::rhi::IWindow *window, 
       return 1;
     if (!context->Present(image.Get()))
       return 1;
-    // Finish returns another owned reference; Submit only borrows it.
-    ObjPtr<IRecordedCommands> commands = context->Finish();
-    if (!commands)
-      return 1;
-    ObjPtr<ISubmissionToken> token = graphics->Submit(commands.Get());
+    // Submit ends recording and borrows the caller's context reference.
+    ObjPtr<ISubmissionToken> token = graphics->Submit(context.Get());
     if (!token)
       return 1;
     // Local containers release caller references; accepted work retains its resources.

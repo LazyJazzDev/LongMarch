@@ -17,17 +17,6 @@ bool CommandContext::Present(rhi::IImage *image) {
   return Present(ObjectPtr<Image>::Retain(dynamic_cast<Image *>(image)));
 }
 
-rhi::IRecordedCommands *CommandContext::Finish() {
-  if (!Seal())
-    return nullptr;
-  AddRef();
-  return this;
-}
-
-bool CommandContext::CanSubmit() const {
-  return sealed_ && !failed_ && !submitted_;
-}
-
 bool CommandContext::Clear(const ObjectPtr<Image> &image, const std::array<float, 4> &color) {
   if (sealed_)
     return false;

@@ -2,7 +2,7 @@
 #include "grassland/rhi/rhi_object.h"
 
 namespace grassland::rhi {
-class IRecordedCommands;
+class ICommandContext;
 
 class ISubmissionToken : public IObject {
  public:
@@ -20,9 +20,10 @@ struct SubmitInfo {
 
 class IQueue : public IObject {
  public:
-  // Borrows commands. Accepted work retains its resources until GPU completion.
-  // Each command packet may be submitted only once. Returns an owned token.
-  virtual ISubmissionToken *Submit(IRecordedCommands *commands, const SubmitInfo &info = {}) = 0;
+  // Borrows the context and ends recording. Accepted work retains its resources
+  // until GPU completion. Submitted contexts cannot record or submit again.
+  // Returns an owned completion token, or nullptr on failure.
+  virtual ISubmissionToken *Submit(ICommandContext *commands, const SubmitInfo &info = {}) = 0;
   virtual QueueType GetType() const = 0;
   virtual bool SharesPhysicalQueue(const IQueue *other) const = 0;
 

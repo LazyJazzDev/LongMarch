@@ -148,9 +148,10 @@ void Device::SubmissionState::Complete(SubmissionStatus status) {
 
 ObjectPtr<Device::SubmissionState> Device::Submit(const ObjectPtr<CommandContext> &commands,
                                                   const std::vector<ObjectPtr<Device::SubmissionState>> &waits) {
-  if (!commands->CanSubmit() || commands->DeviceIdentity() != NativeIdentity() ||
-      (commands->Frame() && !commands->Frame()->IsValid())) {
-    ReportError(-1, "Submission requires fresh finished commands and a valid frame from this device.");
+  if (!commands->Seal())
+    return {};
+  if (commands->DeviceIdentity() != NativeIdentity() || (commands->Frame() && !commands->Frame()->IsValid())) {
+    ReportError(-1, "Submission requires a fresh context and a valid frame from this device.");
     return {};
   }
   for (const auto &wait : waits) {

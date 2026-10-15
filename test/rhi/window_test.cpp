@@ -77,7 +77,7 @@ TEST_P(RhiWindow, MultipleWindowsSingleUseFramesModesAndQueueLifetime) {
       ASSERT_TRUE(context.ClearColor(frame, {0.6f, 0.7f, 0.8f, 1.0f}));
       ASSERT_TRUE(context.Present(frame));
       frame = {};  // Recording already owns the exact frame.
-      last = graphics.Submit(context.Finish());
+      last = graphics.Submit(std::move(context));
       ASSERT_TRUE(last);
     }
   }
@@ -90,7 +90,7 @@ TEST_P(RhiWindow, MultipleWindowsSingleUseFramesModesAndQueueLifetime) {
   auto old_context = device.CreateCommandContext(graphics);
   ASSERT_TRUE(old_context.ClearColor(old_frame, {0, 0, 0, 1}));
   ASSERT_TRUE(old_context.Present(old_frame));
-  auto old_packet = old_context.Finish();
+  auto old_packet = std::move(old_context);
   ASSERT_TRUE(MoveWindow(hwnd, 40, 40, 480, 360, TRUE));
   ASSERT_TRUE(Window::PollEvents());
   {
@@ -114,7 +114,7 @@ TEST_P(RhiWindow, MultipleWindowsSingleUseFramesModesAndQueueLifetime) {
   }
 #endif
   auto upload = device.CreateCommandContext(transfer);
-  auto ready = transfer.Submit(upload.Finish());
+  auto ready = transfer.Submit(std::move(upload));
   ASSERT_TRUE(ready);
   auto frame = second.AcquireFrame();
   ASSERT_TRUE(frame);
@@ -129,7 +129,7 @@ TEST_P(RhiWindow, MultipleWindowsSingleUseFramesModesAndQueueLifetime) {
   // not a strong Window reference, and keeps that lease until GPU completion.
   EXPECT_TRUE(window_backend.IsUniquelyOwned());
   EXPECT_TRUE(window_backend.HasFrameLeases());
-  last = graphics.Submit(context.Finish(), {{ready}});
+  last = graphics.Submit(std::move(context), {{ready}});
   ASSERT_TRUE(last);
   last.Release();
   ready.Release();

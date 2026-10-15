@@ -2,5 +2,4 @@
 
 namespace grassland::rhi {
 ICommandContext::~ICommandContext() = default;
-IRecordedCommands::~IRecordedCommands() = default;
 }  // namespace grassland::rhi

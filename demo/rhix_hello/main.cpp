@@ -103,10 +103,7 @@ int main(int argc, char **argv) {
       return 1;
     if (!context.Present(image))
       return 1;
-    auto commands = context.Finish();
-    if (!commands)
-      return 1;
-    auto token = graphics.Submit(std::move(commands));
+    auto token = graphics.Submit(std::move(context));
     if (!token)
       return 1;
     fps_counter.TickFrame();

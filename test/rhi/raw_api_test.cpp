@@ -13,7 +13,6 @@ static_assert(std::is_abstract_v<IWindow>);
 static_assert(std::is_abstract_v<IImage>);
 static_assert(std::is_abstract_v<IQueue>);
 static_assert(std::is_abstract_v<ICommandContext>);
-static_assert(std::is_abstract_v<IRecordedCommands>);
 static_assert(std::is_abstract_v<ISubmissionToken>);
 
 class RhiRaw : public testing::TestWithParam<BackendAPI> {};
@@ -28,17 +27,12 @@ TEST_P(RhiRaw, PointerFactoriesAndBorrowedSubmissionWorkWithoutWrappers) {
   ASSERT_NE(queue, nullptr);
   ICommandContext *context = device->CreateCommandContext(queue);
   ASSERT_NE(context, nullptr);
-  // A recording is not a finished packet, even though it shares the interface.
-  EXPECT_EQ(queue->Submit(context), nullptr);
-  IRecordedCommands *commands = context->Finish();
-  ASSERT_NE(commands, nullptr);
-  EXPECT_FALSE(context->ClearColor(nullptr, {0, 0, 0, 1}));
-  EXPECT_EQ(context->Finish(), nullptr);
-  context->Release();  // Finish returned its own reference.
-  ISubmissionToken *done = queue->Submit(commands);
+  ISubmissionToken *done = queue->Submit(context);
   ASSERT_NE(done, nullptr);
-  EXPECT_EQ(queue->Submit(commands), nullptr);  // One-shot submission.
-  commands->Release();                          // Submit borrowed the caller reference and retained work.
+  EXPECT_FALSE(context->ClearColor(nullptr, {0, 0, 0, 1}));
+  EXPECT_FALSE(context->Present(nullptr));
+  EXPECT_EQ(queue->Submit(context), nullptr);  // One-shot submission.
+  context->Release();                          // Submit borrowed the caller reference and retained work.
   EXPECT_TRUE(done->WaitHost());
   EXPECT_EQ(done->GetStatus(), SUBMISSION_STATUS_COMPLETED);
   done->Release();

@@ -155,7 +155,6 @@ TEST(RhiOwnership, CallerReleasesAllChildCopiesBeforeParent) {
   static_assert(std::is_base_of_v<ObjectContainer, Queue>);
   static_assert(std::is_base_of_v<ObjectContainer, SubmissionToken>);
   static_assert(std::is_base_of_v<ObjectContainer, CommandContext>);
-  static_assert(std::is_base_of_v<ObjectContainer, RecordedCommands>);
   static_assert(sizeof(Core) == sizeof(ObjPtr<rhi::IObject>));
   static_assert(sizeof(Image) == sizeof(ObjPtr<rhi::IObject>));
   Calls calls;
