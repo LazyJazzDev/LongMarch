@@ -17,6 +17,7 @@ class VulkanWindow final : public Window {
   PresentMode GetPresentMode() const override;
   std::vector<WindowPresentationOption> GetSupportedPresentationOptions() const override;
   const void *DeviceIdentity() const;
+  void MarkImageInitialized(VkImage image);
   VkSemaphore AcquireSemaphore() const;
   void ConsumeAcquireSemaphore(VulkanCommandContext *submission);
   VkSemaphore RenderSemaphore() const;

@@ -235,7 +235,7 @@ TEST_P(RhiWindow, MultipleImagesRestoreDefaultsAcrossContextsAndPresentWithoutCl
   EXPECT_NE(b.Get(), second.GetNextImage().Get());
   a.Release();
   b.Release();
-  // A freshly prepared image is already in the default presentable layout.
+  // Present without a clear must also transition a fresh image into its presentable layout.
   auto next = device.CreateCommandContext();
   ASSERT_TRUE(next.CmdPresent(first));
   auto next_done = queue.Submit(std::move(next));
