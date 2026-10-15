@@ -4,6 +4,7 @@
 #include <iostream>
 #include <string>
 #include <thread>
+#include <utility>
 
 #include "grassland/rhi/rhix/rhix.h"
 #include "grassland/util/fps_counter.h"
@@ -58,8 +59,10 @@ int main(int argc, char **argv) {
   if (api == BACKEND_API_METAL)
     return 0;  // Metal keeps the device-query demo until its presentation backend is added.
   auto window = device.CreateGLFWWindow({1280, 720, "LongMarch RHIX - P: toggle VSync"});
+  if (!window)
+    return 1;
   auto graphics = device.GetQueue(QUEUE_TYPE_GRAPHICS);
-  if (!window || !graphics)
+  if (!graphics)
     return 1;
   const auto options = window.GetSupportedPresentationOptions();
   if (options.empty())
@@ -72,7 +75,13 @@ int main(int argc, char **argv) {
   PresentMode requested = PRESENT_MODE_VSYNC;
   grassland::FPSCounter fps_counter;
   auto title_time = std::chrono::steady_clock::now();
-  while (Window::PollEvents() && !window.ShouldClose() && !window.IsKeyDown(GLFW_KEY_ESCAPE)) {
+  while (true) {
+    if (!Window::PollEvents())
+      break;
+    if (window.ShouldClose())
+      break;
+    if (window.IsKeyDown(GLFW_KEY_ESCAPE))
+      break;
     const bool p = window.IsKeyDown(GLFW_KEY_P);
     if (p && !previous_p) {
       requested = requested == PRESENT_MODE_VSYNC ? PRESENT_MODE_CONTINUOUS : PRESENT_MODE_VSYNC;
@@ -88,8 +97,17 @@ int main(int argc, char **argv) {
       continue;
     }
     auto context = device.CreateCommandContext(graphics);
-    if (!context || !context.ClearColor(image, {0.6f, 0.7f, 0.8f, 1.0f}) || !context.Present(image) ||
-        !graphics.Submit(context.Finish()))
+    if (!context)
+      return 1;
+    if (!context.ClearColor(image, {0.6f, 0.7f, 0.8f, 1.0f}))
+      return 1;
+    if (!context.Present(image))
+      return 1;
+    auto commands = context.Finish();
+    if (!commands)
+      return 1;
+    auto token = graphics.Submit(std::move(commands));
+    if (!token)
       return 1;
     fps_counter.TickFrame();
     const auto now = std::chrono::steady_clock::now();

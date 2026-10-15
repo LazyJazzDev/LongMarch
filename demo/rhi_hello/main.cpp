@@ -22,7 +22,13 @@ int RunWindow(grassland::rhi::IDevice *device, grassland::rhi::IWindow *window, 
   PresentMode requested = PRESENT_MODE_VSYNC;
   grassland::FPSCounter fps_counter;
   auto title_time = std::chrono::steady_clock::now();
-  while (PollEvents() && !window->ShouldClose() && !window->IsKeyDown(GLFW_KEY_ESCAPE)) {
+  while (true) {
+    if (!PollEvents())
+      break;
+    if (window->ShouldClose())
+      break;
+    if (window->IsKeyDown(GLFW_KEY_ESCAPE))
+      break;
     const bool p = window->IsKeyDown(GLFW_KEY_P);
     if (p && !previous_p) {
       requested = requested == PRESENT_MODE_VSYNC ? PRESENT_MODE_CONTINUOUS : PRESENT_MODE_VSYNC;
@@ -38,17 +44,20 @@ int RunWindow(grassland::rhi::IDevice *device, grassland::rhi::IWindow *window, 
       continue;
     }
     ObjPtr<ICommandContext> context = device->CreateCommandContext(graphics);
-    ObjPtr<IRecordedCommands> commands = nullptr;
-    ObjPtr<ISubmissionToken> token = nullptr;
-    if (context && context->ClearColor(image.Get(), {0.6f, 0.7f, 0.8f, 1.0f}) && context->Present(image.Get())) {
-      // Finish returns another owned reference; Submit only borrows it.
-      commands = context->Finish();
-      if (commands)
-        token = graphics->Submit(commands.Get());
-    }
-    // Local containers release caller references; accepted work retains its resources.
+    if (!context)
+      return 1;
+    if (!context->ClearColor(image.Get(), {0.6f, 0.7f, 0.8f, 1.0f}))
+      return 1;
+    if (!context->Present(image.Get()))
+      return 1;
+    // Finish returns another owned reference; Submit only borrows it.
+    ObjPtr<IRecordedCommands> commands = context->Finish();
+    if (!commands)
+      return 1;
+    ObjPtr<ISubmissionToken> token = graphics->Submit(commands.Get());
     if (!token)
       return 1;
+    // Local containers release caller references; accepted work retains its resources.
     fps_counter.TickFrame();
     const auto now = std::chrono::steady_clock::now();
     if (now - title_time >= std::chrono::milliseconds(250)) {
@@ -110,7 +119,11 @@ int main(int argc, char **argv) {
   if (api == BACKEND_API_METAL)
     return 0;  // Metal keeps the device-query demo until its presentation backend is added.
   ObjPtr<IWindow> window = device->CreateGLFWWindow({1280, 720, "LongMarch RHI - P: toggle VSync"});
+  if (!window)
+    return 1;
   ObjPtr<IQueue> graphics = device->GetQueue(QUEUE_TYPE_GRAPHICS);
+  if (!graphics)
+    return 1;
   // Reverse declaration order releases children before their parents on every return.
-  return window && graphics ? RunWindow(device.Get(), window.Get(), graphics.Get()) : 1;
+  return RunWindow(device.Get(), window.Get(), graphics.Get());
 }
