@@ -1,4 +1,4 @@
-# RHI window and device creation demo
+# RHI pointer API window and device creation demo
 
 Build the `demo_rhi_hello` target using the CLion Release or Debug CMake profile.
 Run the executable with `metal`, `vulkan`, or `d3d12` to select a compiled backend;
@@ -21,7 +21,10 @@ under `backend/`.
 
 `grassland::rhix` is the optional RAII and dot-syntax extension, included through
 `grassland/rhi/rhix/rhix.h`. Both layers ship in `grassland_rhi`; using the pointer
-API does not require including or using rhix. The demo uses rhix:
+API does not require including or using rhix. This demo uses only raw interface
+pointers and explicitly releases every owned reference, including on failure.
+The companion [rhix_hello](../rhix_hello/README.md) demonstrates the same behavior
+with containers. The following illustrates the optional container API:
 
 ```cpp
 namespace rhi = grassland::rhi;
