@@ -19,27 +19,30 @@ module and does not use the old `grassland::graphics` runtime.
 native API headers. Native implementations and shared implementation helpers stay
 under `backend/`.
 
-`grassland::rhix` is the optional RAII and dot-syntax extension, included through
+`grassland::rhi::ObjPtr<T>` is the interface pointer container, available through
+`grassland/rhi/rhi_obj_ptr.h` or `grassland/rhi/rhi.h`.
+`grassland::rhix` is the optional typed dot-syntax extension built on it, included through
 `grassland/rhi/rhix/rhix.h`. Both layers ship in `grassland_rhi`; using the pointer
-API does not require including or using rhix. This demo uses only raw interface
-pointers and explicitly releases every owned reference, including on failure.
+API does not require including or using rhix. This demo uses `rhi::ObjPtr<IXXX>` to manage owned references and calls
+the pointer interfaces with `->`. Declaration order releases children before
+parents, including on early returns.
 The companion [rhix_hello](../rhix_hello/README.md) demonstrates the same behavior
-with containers. The following illustrates the optional container API:
+with typed wrappers. The following illustrates the RHI pointer container:
 
 ```cpp
 namespace rhi = grassland::rhi;
 namespace rhix = grassland::rhix;
 
 // Typed pointer container: a raw factory result transfers one owned reference.
-rhix::ObjPtr<rhi::ICore> core = rhi::CreateCore();
+rhi::ObjPtr<rhi::ICore> core = rhi::CreateCore();
 if (!core) return;
-rhix::ObjPtr<rhi::IDevice> device = core->CreateDeviceByAutoSelection();
+rhi::ObjPtr<rhi::IDevice> device = core->CreateDeviceByAutoSelection();
 if (!device) return;
 
 auto shared = device;             // Retain: an additional reference.
 auto moved = std::move(shared);   // Transfer: shared becomes empty.
 auto borrowed = device.Get();     // Borrow only; no implicit pointer conversion.
-auto retained = rhix::ObjPtr<rhi::IDevice>::Retain(borrowed);
+auto retained = rhi::ObjPtr<rhi::IDevice>::Retain(borrowed);
 // Never adopt the same owned reference twice or adopt a borrowed Get() result.
 ```
 

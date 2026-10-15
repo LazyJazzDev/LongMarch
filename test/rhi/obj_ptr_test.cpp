@@ -2,9 +2,10 @@
 
 #include <type_traits>
 
-#include "grassland/rhi/rhix/rhix.h"
+#include "grassland/rhi/rhi.h"
+#include "grassland/rhi/rhix/rhix_core.h"
 
-namespace grassland::rhix {
+namespace grassland::rhi {
 namespace {
 struct Counts {
   int references{1};
@@ -54,7 +55,7 @@ static_assert(!std::is_convertible_v<ObjPtr<rhi::ICore>, rhi::ICore *>);
 static_assert(std::is_constructible_v<ObjPtr<rhi::IObject>, ObjPtr<rhi::ICore>>);
 static_assert(!std::is_constructible_v<ObjPtr<rhi::ICore>, ObjPtr<rhi::IObject>>);
 
-TEST(RhixObjPtr, RawPointerAdoptsLvalueRetainsAndRvalueTransfers) {
+TEST(RhiObjPtr, RawPointerAdoptsLvalueRetainsAndRvalueTransfers) {
   Counts counts;
   ObjPtr<rhi::ICore> core = new PublicCore(counts);
   EXPECT_EQ(counts.retains, 0);
@@ -83,7 +84,7 @@ TEST(RhixObjPtr, RawPointerAdoptsLvalueRetainsAndRvalueTransfers) {
   EXPECT_EQ(counts.destroyed, 1);
 }
 
-TEST(RhixObjPtr, RawReplacementAndNullDoNotRetain) {
+TEST(RhiObjPtr, RawReplacementAndNullDoNotRetain) {
   Counts first, second;
   ObjPtr<rhi::ICore> core = new PublicCore(first);
   core = new PublicCore(second);
@@ -98,12 +99,12 @@ TEST(RhixObjPtr, RawReplacementAndNullDoNotRetain) {
 
 TEST(RhixWrappers, DotSyntaxUsesOnlyPublicInterfaceAndAdoptsRawPointer) {
   Counts counts;
-  Core core = new PublicCore(counts);
+  rhix::Core core = new PublicCore(counts);
   EXPECT_EQ(counts.retains, 0);
   EXPECT_TRUE(core.GetPhysicalDevices().empty());
   EXPECT_FALSE(core.CreateDevice(0));
-  Core copy = core;
-  Core moved = std::move(copy);
+  rhix::Core copy = core;
+  rhix::Core moved = std::move(copy);
   EXPECT_FALSE(copy);
   core.Release();
   EXPECT_EQ(counts.destroyed, 0);
@@ -111,4 +112,4 @@ TEST(RhixWrappers, DotSyntaxUsesOnlyPublicInterfaceAndAdoptsRawPointer) {
   EXPECT_EQ(counts.destroyed, 1);
 }
 }  // namespace
-}  // namespace grassland::rhix
+}  // namespace grassland::rhi

@@ -31,31 +31,23 @@ int RunWindow(grassland::rhi::IDevice *device, grassland::rhi::IWindow *window, 
       std::cout << "Present mode: " << PresentModeName(window->GetPresentMode()) << std::endl;
     }
     previous_p = p;
-    IImage *image = window->AcquireFrame();
+    ObjPtr<IImage> image = window->AcquireFrame();
     if (!image) {
       fps_counter.Reset();
       std::this_thread::sleep_for(std::chrono::milliseconds(10));
       continue;
     }
-    ICommandContext *context = device->CreateCommandContext(graphics);
-    IRecordedCommands *commands = nullptr;
-    ISubmissionToken *token = nullptr;
-    if (context && context->ClearColor(image, {0.6f, 0.7f, 0.8f, 1.0f}) && context->Present(image)) {
+    ObjPtr<ICommandContext> context = device->CreateCommandContext(graphics);
+    ObjPtr<IRecordedCommands> commands = nullptr;
+    ObjPtr<ISubmissionToken> token = nullptr;
+    if (context && context->ClearColor(image.Get(), {0.6f, 0.7f, 0.8f, 1.0f}) && context->Present(image.Get())) {
       // Finish returns another owned reference; Submit only borrows it.
       commands = context->Finish();
       if (commands)
-        token = graphics->Submit(commands);
+        token = graphics->Submit(commands.Get());
     }
-    const bool submitted = token != nullptr;
-    // Accepted work retains its resources until completion.
-    if (token)
-      token->Release();
-    if (commands)
-      commands->Release();
-    if (context)
-      context->Release();
-    image->Release();
-    if (!submitted)
+    // Local containers release caller references; accepted work retains its resources.
+    if (!token)
       return 1;
     fps_counter.TickFrame();
     const auto now = std::chrono::steady_clock::now();
@@ -90,7 +82,7 @@ int main(int argc, char **argv) {
     }
   }
 
-  ICore *core = CreateCore(api);
+  ObjPtr<ICore> core = CreateCore(api);
   if (!core)
     return 1;
   const auto devices = core->GetPhysicalDevices();
@@ -107,30 +99,18 @@ int main(int argc, char **argv) {
 
   // Requirements only filter candidates. All supported RHI features are enabled.
   DeviceFeatureRequirement requirements{};
-  IDevice *device = core->CreateDeviceByAutoSelection(requirements);
+  ObjPtr<IDevice> device = core->CreateDeviceByAutoSelection(requirements);
   // For an explicit ID, use core->CreateDevice(id) instead.
-  if (!device) {
-    core->Release();
+  if (!device)
     return 1;
-  }
   std::cout << "Selected: " << device->Name() << '\n'
             << "Enabled: ray tracing pipeline=" << device->SupportRayTracingPipeline()
             << ", ray query=" << device->SupportRayQuery() << ", geometry shader=" << device->SupportGeometryShader()
             << '\n';
-  if (api == BACKEND_API_METAL) {
-    device->Release();
-    core->Release();
+  if (api == BACKEND_API_METAL)
     return 0;  // Metal keeps the device-query demo until its presentation backend is added.
-  }
-  IWindow *window = device->CreateGLFWWindow({1280, 720, "LongMarch RHI - P: toggle VSync"});
-  IQueue *graphics = device->GetQueue(QUEUE_TYPE_GRAPHICS);
-  const int result = window && graphics ? RunWindow(device, window, graphics) : 1;
-  // Release every owned reference, including on failure, children before parents.
-  if (graphics)
-    graphics->Release();
-  if (window)
-    window->Release();
-  device->Release();
-  core->Release();
-  return result;
+  ObjPtr<IWindow> window = device->CreateGLFWWindow({1280, 720, "LongMarch RHI - P: toggle VSync"});
+  ObjPtr<IQueue> graphics = device->GetQueue(QUEUE_TYPE_GRAPHICS);
+  // Reverse declaration order releases children before their parents on every return.
+  return window && graphics ? RunWindow(device.Get(), window.Get(), graphics.Get()) : 1;
 }

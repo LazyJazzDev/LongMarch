@@ -7,8 +7,9 @@ cmake-build-release/demo/rhix_hello/demo_rhix_hello vulkan
 cmake-build-release/demo/rhix_hello/demo_rhix_hello d3d12
 ```
 
-This demo uses `grassland::rhix` containers and dot-syntax methods. The companion
-[rhi_hello](../rhi_hello/README.md) uses raw `grassland::rhi` interface pointers.
+This demo uses `grassland::rhix` typed wrappers and dot-syntax methods, built on
+`grassland::rhi::ObjPtr`. The companion
+[rhi_hello](../rhi_hello/README.md) uses `grassland::rhi::ObjPtr<IXXX>` and pointer interface calls.
 Both enumerate devices and capabilities, automatically select a device, and
 clear a GLFW window to RGB (0.6, 0.7, 0.8). Window titles show FPS measured by
 `grassland::FPSCounter`. Press **P** to toggle VSync/continuous presentation;

@@ -4,7 +4,7 @@
 
 #include "grassland/rhi/rhi_object.h"
 
-namespace grassland::rhix {
+namespace grassland::rhi {
 
 // A raw pointer transfers one owned reference. A container lvalue shares a
 // reference; a container rvalue transfers it. Get() returns only a borrowed pointer.
@@ -75,4 +75,4 @@ class ObjPtr {
   T *object_{};
 };
 
-}  // namespace grassland::rhix
+}  // namespace grassland::rhi

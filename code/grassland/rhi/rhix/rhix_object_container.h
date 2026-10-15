@@ -1,5 +1,5 @@
 #pragma once
-#include "grassland/rhi/rhix/obj_ptr.h"
+#include "grassland/rhi/rhi_obj_ptr.h"
 
 namespace grassland::rhix {
 class ObjectContainer {
@@ -18,6 +18,6 @@ class ObjectContainer {
   rhi::IObject *GetObject() const noexcept;
 
  private:
-  ObjPtr<rhi::IObject> object_;
+  rhi::ObjPtr<rhi::IObject> object_;
 };
 }  // namespace grassland::rhix
