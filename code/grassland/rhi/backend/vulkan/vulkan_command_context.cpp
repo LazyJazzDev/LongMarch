@@ -32,17 +32,12 @@ bool VulkanCommandContext::TransitionImage(VulkanImage *image,
                                            VkPipelineStageFlags stages,
                                            VkAccessFlags access) {
   try {
-    auto initial_layout = image->DefaultLayout();
-    if (auto frame = dynamic_cast<VulkanSwapChainImage *>(image)) {
-      if (frame->NeedsInitialization())
-        initial_layout = VK_IMAGE_LAYOUT_UNDEFINED;
-    }
-    const auto initial_access =
-        initial_layout == VK_IMAGE_LAYOUT_PRESENT_SRC_KHR || initial_layout == VK_IMAGE_LAYOUT_UNDEFINED
-            ? VkAccessFlags{0}
-            : VkAccessFlags{VK_ACCESS_MEMORY_READ_BIT | VK_ACCESS_MEMORY_WRITE_BIT};
+    const auto default_access = image->DefaultLayout() == VK_IMAGE_LAYOUT_PRESENT_SRC_KHR
+                                    ? VkAccessFlags{0}
+                                    : VkAccessFlags{VK_ACCESS_MEMORY_READ_BIT | VK_ACCESS_MEMORY_WRITE_BIT};
     auto &current =
-        image_states_.try_emplace(image, ImageState{initial_layout, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, initial_access})
+        image_states_
+            .try_emplace(image, ImageState{image->DefaultLayout(), VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, default_access})
             .first->second;
     constexpr VkAccessFlags writes = VK_ACCESS_SHADER_WRITE_BIT | VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT |
                                      VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT | VK_ACCESS_TRANSFER_WRITE_BIT |
@@ -180,11 +175,6 @@ CommandContext::SubmitResult VulkanCommandContext::SubmitNative() {
     if (!Check(vkQueueSubmit(device_->NativeQueue(), 1, &submit, fence_), "vkQueueSubmit"))
       return SUBMIT_RESULT_REJECTED;
     MarkSubmitted();
-    // Recording can be abandoned; publish layout initialization only after successful submission.
-    for (const auto &entry : image_states_) {
-      if (auto frame = dynamic_cast<VulkanSwapChainImage *>(entry.first))
-        frame->MarkInitialized();
-    }
     for (auto window : acquired_windows)
       window->ConsumeAcquireSemaphore(this);
     submission_failed_ = true;

@@ -2,6 +2,8 @@
 #define GLFW_INCLUDE_VULKAN
 #include "grassland/rhi/backend/vulkan/vulkan_window.h"
 
+#include <cstdlib>
+
 #include "grassland/rhi/backend/vulkan/vulkan_command_context.h"
 #include "grassland/rhi/backend/vulkan/vulkan_swap_chain_image.h"
 #define GLFW_INCLUDE_NONE
@@ -74,15 +76,74 @@ VkResult VulkanWindow::AcquireNative() {
     sync.acquired = true;
     next_sync_ = (next_sync_ + 1) % static_cast<uint32_t>(acquire_sync_.size());
     acquire_wait_pending_ = true;
+    const auto image = images_[current_image_];
     acquired_ = true;
+    if (!initialized_images_[current_image_]) {
+      // Establish the fixed default layout before exposing this image to recording.
+      // This runs once per physical swapchain image, not once per CommandContext.
+      const auto device = device_->NativeDevice();
+      auto status = vkWaitForFences(device, 1, &fence, VK_TRUE, UINT64_MAX);
+      if (status != VK_SUCCESS)
+        return status;
+      std::lock_guard<std::mutex> lock(device_->QueueMutex());
+      VkCommandPool pool{};
+      VkCommandBuffer commands{};
+      VkFence completion{};
+      status = [&]() -> VkResult {
+        VkCommandPoolCreateInfo create_pool{VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO};
+        create_pool.queueFamilyIndex = device_->QueueFamily();
+        auto status = vkCreateCommandPool(device, &create_pool, nullptr, &pool);
+        if (status != VK_SUCCESS)
+          return status;
+        VkCommandBufferAllocateInfo allocate{VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO};
+        allocate.commandPool = pool;
+        allocate.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
+        allocate.commandBufferCount = 1;
+        status = vkAllocateCommandBuffers(device, &allocate, &commands);
+        if (status != VK_SUCCESS)
+          return status;
+        VkFenceCreateInfo create_fence{VK_STRUCTURE_TYPE_FENCE_CREATE_INFO};
+        status = vkCreateFence(device, &create_fence, nullptr, &completion);
+        if (status != VK_SUCCESS)
+          return status;
+        VkCommandBufferBeginInfo begin{VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO};
+        begin.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
+        status = vkBeginCommandBuffer(commands, &begin);
+        if (status != VK_SUCCESS)
+          return status;
+        VkImageMemoryBarrier barrier{VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER};
+        barrier.oldLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+        barrier.newLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
+        barrier.srcQueueFamilyIndex = barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+        barrier.image = image;
+        barrier.subresourceRange = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1};
+        vkCmdPipelineBarrier(commands, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT, 0, 0,
+                             nullptr, 0, nullptr, 1, &barrier);
+        status = vkEndCommandBuffer(commands);
+        if (status != VK_SUCCESS)
+          return status;
+        VkSubmitInfo submit{VK_STRUCTURE_TYPE_SUBMIT_INFO};
+        submit.commandBufferCount = 1;
+        submit.pCommandBuffers = &commands;
+        status = vkQueueSubmit(device_->NativeQueue(), 1, &submit, completion);
+        if (status != VK_SUCCESS)
+          return status;
+        // Submitted commands must finish before their temporary pool is destroyed.
+        if (!Check(vkWaitForFences(device, 1, &completion, VK_TRUE, UINT64_MAX), "Wait for image initialization"))
+          std::abort();
+        return VK_SUCCESS;
+      }();
+      if (completion)
+        vkDestroyFence(device, completion, nullptr);
+      if (pool)
+        vkDestroyCommandPool(device, pool, nullptr);
+      if (status != VK_SUCCESS)
+        return status;
+      initialized_images_[current_image_] = true;
+    }
   } else if (result == VK_ERROR_OUT_OF_DATE_KHR)
     valid_ = false;
   return result;
-}
-
-void VulkanWindow::MarkImageInitialized(VkImage image) {
-  const auto index = std::find(images_.begin(), images_.end(), image) - images_.begin();
-  initialized_images_[index] = true;
 }
 
 VkSemaphore VulkanWindow::AcquireSemaphore() const {
@@ -139,8 +200,7 @@ ObjectPtr<Image> VulkanWindow::AcquireNativeFrame() {
     Check(result, "vkAcquireNextImageKHR");
     return {};
   }
-  return ObjectPtr<Image>::Adopt(
-      new VulkanSwapChainImage(desc_, this, images_[current_image_], !initialized_images_[current_image_]));
+  return ObjectPtr<Image>::Adopt(new VulkanSwapChainImage(desc_, this, images_[current_image_]));
 }
 
 bool VulkanWindow::SetNativePresentMode(PresentMode mode) {
