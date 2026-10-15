@@ -90,7 +90,7 @@ auto graphics = device.GetQueue(QUEUE_TYPE_GRAPHICS);
 auto image = window.AcquireFrame();
 if (image) {
   auto context = device.CreateCommandContext(graphics);
-  if (context.ClearColor(image, {0.6f, 0.7f, 0.8f, 1.0f}) && context.Present(image)) {
+  if (context.CmdClearColor(image, {0.6f, 0.7f, 0.8f, 1.0f}) && context.CmdPresent(image)) {
     auto done = graphics.Submit(std::move(context));
     // done.WaitHost() is optional; GPU completion is collected automatically.
   }

@@ -12,12 +12,12 @@ rhi::ICommandContext *CommandContext::Get() const noexcept {
   return static_cast<rhi::ICommandContext *>(GetObject());
 }
 
-bool CommandContext::ClearColor(const Image &image, const std::array<float, 4> &color) {
-  return *this && Get()->ClearColor(image.Get(), color);
+bool CommandContext::CmdClearColor(const Image &image, const std::array<float, 4> &color) {
+  return *this && Get()->CmdClearColor(image.Get(), color);
 }
 
-bool CommandContext::Present(const Image &image) {
-  return *this && Get()->Present(image.Get());
+bool CommandContext::CmdPresent(const Image &image) {
+  return *this && Get()->CmdPresent(image.Get());
 }
 
 }  // namespace grassland::rhix

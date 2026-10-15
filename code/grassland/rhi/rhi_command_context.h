@@ -8,8 +8,8 @@ class IImage;
 
 class ICommandContext : public IObject {
  public:
-  virtual bool ClearColor(IImage *image, const std::array<float, 4> &color) = 0;
-  virtual bool Present(IImage *image) = 0;
+  virtual bool CmdClearColor(IImage *image, const std::array<float, 4> &color) = 0;
+  virtual bool CmdPresent(IImage *image) = 0;
 
  protected:
   ~ICommandContext() override;

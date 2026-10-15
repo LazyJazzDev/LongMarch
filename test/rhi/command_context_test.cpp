@@ -157,8 +157,8 @@ TEST(RhiCommands, RecordingAndSubmissionKeepExactImageWithoutKeepingPayloadInTok
   auto queue = Queue(new TestQueue(device, QUEUE_TYPE_GRAPHICS));
   auto context = CommandContext(new TestCommandContext(gate, QUEUE_TYPE_GRAPHICS));
   auto image = Image(new TestImage(gate));
-  ASSERT_TRUE(context.ClearColor(image, {0, 0, 1, 1}));
-  ASSERT_TRUE(context.Present(image));
+  ASSERT_TRUE(context.CmdClearColor(image, {0, 0, 1, 1}));
+  ASSERT_TRUE(context.CmdPresent(image));
   image = {};
   auto recorded = std::move(context);
   ASSERT_FALSE(context);
@@ -188,8 +188,8 @@ TEST(RhiCommands, DroppedTokenStillRetiresSingleSubmissionAutomatically) {
   auto queue = Queue(new TestQueue(device, QUEUE_TYPE_GRAPHICS));
   auto context = CommandContext(new TestCommandContext(gate, QUEUE_TYPE_GRAPHICS));
   auto image = Image(new TestImage(gate));
-  ASSERT_TRUE(context.ClearColor(image, {1, 0, 0, 1}));
-  ASSERT_TRUE(context.Present(image));
+  ASSERT_TRUE(context.CmdClearColor(image, {1, 0, 0, 1}));
+  ASSERT_TRUE(context.CmdPresent(image));
   ASSERT_TRUE(queue.Submit(std::move(context)));
   image = {};
   {
@@ -206,11 +206,11 @@ TEST(RhiCommands, CancellationReleasesClaimAndForeignQueueConsumesRejectedPacket
   auto device = ObjectPtr<TestDevice>::Adopt(new TestDevice(gate));
   auto image = Image(new TestImage(gate));
   auto context = CommandContext(new TestCommandContext(gate, QUEUE_TYPE_GRAPHICS));
-  ASSERT_TRUE(context.ClearColor(image, {1, 0, 0, 1}));
+  ASSERT_TRUE(context.CmdClearColor(image, {1, 0, 0, 1}));
   context = {};
   context = CommandContext(new TestCommandContext(gate, QUEUE_TYPE_GRAPHICS));
-  ASSERT_TRUE(context.ClearColor(image, {1, 0, 0, 1}));
-  ASSERT_TRUE(context.Present(image));
+  ASSERT_TRUE(context.CmdClearColor(image, {1, 0, 0, 1}));
+  ASSERT_TRUE(context.CmdPresent(image));
   auto packet = std::move(context);
   auto other = ObjectPtr<TestDevice>::Adopt(new TestDevice(std::make_shared<Gate>()));
   auto queue = Queue(new TestQueue(other, QUEUE_TYPE_GRAPHICS));
@@ -226,11 +226,11 @@ TEST(RhiCommands, InvalidAndIncompleteContextsCannotBeSubmitted) {
   auto queue = Queue(new TestQueue(device, QUEUE_TYPE_TRANSFER));
   auto image = Image(new TestImage(gate));
   auto context = CommandContext(new TestCommandContext(gate, QUEUE_TYPE_TRANSFER));
-  EXPECT_FALSE(context.ClearColor(image, {1, 0, 0, 1}));
+  EXPECT_FALSE(context.CmdClearColor(image, {1, 0, 0, 1}));
   EXPECT_FALSE(queue.Submit(std::move(context)));
   queue = Queue(new TestQueue(device, QUEUE_TYPE_GRAPHICS));
   context = CommandContext(new TestCommandContext(gate, QUEUE_TYPE_GRAPHICS));
-  ASSERT_TRUE(context.ClearColor(image, {1, 0, 0, 1}));
+  ASSERT_TRUE(context.CmdClearColor(image, {1, 0, 0, 1}));
   EXPECT_FALSE(queue.Submit(std::move(context)));
   EXPECT_FALSE(context);
 }
@@ -261,8 +261,8 @@ TEST(RhiCommands, AllocationFailureAfterNativeSubmitKeepsResourcesUntilCompletio
   auto queue = Queue(new TestQueue(device, QUEUE_TYPE_GRAPHICS));
   auto context = CommandContext(new TestCommandContext(gate, QUEUE_TYPE_GRAPHICS, true));
   auto image = Image(new TestImage(gate));
-  ASSERT_TRUE(context.ClearColor(image, {0, 0, 1, 1}));
-  ASSERT_TRUE(context.Present(image));
+  ASSERT_TRUE(context.CmdClearColor(image, {0, 0, 1, 1}));
+  ASSERT_TRUE(context.CmdPresent(image));
   image = {};
   EXPECT_FALSE(queue.Submit(std::move(context)));
   {
@@ -285,8 +285,8 @@ TEST(RhiCommands, DeviceShutdownDrainsWorkAndReclaimsWindowAfterFrameLease) {
   managed.Reset();
   auto image = Image(new TestImage(gate, window_backend));
   auto context = CommandContext(new TestCommandContext(gate, QUEUE_TYPE_GRAPHICS));
-  ASSERT_TRUE(context.ClearColor(image, {0, 0, 0, 1}));
-  ASSERT_TRUE(context.Present(image));
+  ASSERT_TRUE(context.CmdClearColor(image, {0, 0, 0, 1}));
+  ASSERT_TRUE(context.CmdPresent(image));
   image.Release();
   window.Release();
   ASSERT_TRUE(window_backend->IsUniquelyOwned());
@@ -314,7 +314,7 @@ TEST(RhiCommands, CancelingRecordingReturnsFrameLeaseWithoutOwningWindow) {
   auto window = device->ManageWindow(std::make_unique<TestWindow>(gate));
   auto image = Image(new TestImage(gate, window.Get()));
   auto context = CommandContext(new TestCommandContext(gate, QUEUE_TYPE_GRAPHICS));
-  ASSERT_TRUE(context.ClearColor(image, {0, 0, 0, 1}));
+  ASSERT_TRUE(context.CmdClearColor(image, {0, 0, 0, 1}));
   image.Release();
   EXPECT_TRUE(window->HasFrameLeases());
   context.Release();

@@ -46,9 +46,9 @@ int RunWindow(grassland::rhi::IDevice *device, grassland::rhi::IWindow *window, 
     ObjPtr<ICommandContext> context = device->CreateCommandContext(graphics);
     if (!context)
       return 1;
-    if (!context->ClearColor(image.Get(), {0.6f, 0.7f, 0.8f, 1.0f}))
+    if (!context->CmdClearColor(image.Get(), {0.6f, 0.7f, 0.8f, 1.0f}))
       return 1;
-    if (!context->Present(image.Get()))
+    if (!context->CmdPresent(image.Get()))
       return 1;
     // Submit ends recording and borrows the caller's context reference.
     ObjPtr<ISubmissionToken> token = graphics->Submit(context.Get());

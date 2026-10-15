@@ -15,8 +15,8 @@ class CommandContext : public ObjectContainer {
   CommandContext &operator=(CommandContext &&) noexcept;
   CommandContext(const CommandContext &) = delete;
   CommandContext &operator=(const CommandContext &) = delete;
-  bool ClearColor(const Image &image, const std::array<float, 4> &color);
-  bool Present(const Image &image);
+  bool CmdClearColor(const Image &image, const std::array<float, 4> &color);
+  bool CmdPresent(const Image &image);
 };
 
 }  // namespace grassland::rhix

@@ -74,8 +74,8 @@ TEST_P(RhiWindow, MultipleWindowsSingleUseFramesModesAndQueueLifetime) {
         return option.format == frame.GetDesc().format && option.present_mode == window.GetPresentMode();
       }));
       auto context = device.CreateCommandContext(graphics);
-      ASSERT_TRUE(context.ClearColor(frame, {0.6f, 0.7f, 0.8f, 1.0f}));
-      ASSERT_TRUE(context.Present(frame));
+      ASSERT_TRUE(context.CmdClearColor(frame, {0.6f, 0.7f, 0.8f, 1.0f}));
+      ASSERT_TRUE(context.CmdPresent(frame));
       frame = {};  // Recording already owns the exact frame.
       last = graphics.Submit(std::move(context));
       ASSERT_TRUE(last);
@@ -88,8 +88,8 @@ TEST_P(RhiWindow, MultipleWindowsSingleUseFramesModesAndQueueLifetime) {
   auto old_frame = first.AcquireFrame();
   ASSERT_TRUE(old_frame);
   auto old_context = device.CreateCommandContext(graphics);
-  ASSERT_TRUE(old_context.ClearColor(old_frame, {0, 0, 0, 1}));
-  ASSERT_TRUE(old_context.Present(old_frame));
+  ASSERT_TRUE(old_context.CmdClearColor(old_frame, {0, 0, 0, 1}));
+  ASSERT_TRUE(old_context.CmdPresent(old_frame));
   auto old_packet = std::move(old_context);
   ASSERT_TRUE(MoveWindow(hwnd, 40, 40, 480, 360, TRUE));
   ASSERT_TRUE(Window::PollEvents());
@@ -119,8 +119,8 @@ TEST_P(RhiWindow, MultipleWindowsSingleUseFramesModesAndQueueLifetime) {
   auto frame = second.AcquireFrame();
   ASSERT_TRUE(frame);
   auto context = device.CreateCommandContext(graphics);
-  ASSERT_TRUE(context.ClearColor(frame, {0, 0, 1, 1}));
-  ASSERT_TRUE(context.Present(frame));
+  ASSERT_TRUE(context.CmdClearColor(frame, {0, 0, 1, 1}));
+  ASSERT_TRUE(context.CmdPresent(frame));
   auto &window_backend = (*static_cast<backend::Window *>((second).Get()));
   frame.Release();
   first.Release();

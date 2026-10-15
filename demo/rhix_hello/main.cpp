@@ -99,9 +99,9 @@ int main(int argc, char **argv) {
     auto context = device.CreateCommandContext(graphics);
     if (!context)
       return 1;
-    if (!context.ClearColor(image, {0.6f, 0.7f, 0.8f, 1.0f}))
+    if (!context.CmdClearColor(image, {0.6f, 0.7f, 0.8f, 1.0f}))
       return 1;
-    if (!context.Present(image))
+    if (!context.CmdPresent(image))
       return 1;
     auto token = graphics.Submit(std::move(context));
     if (!token)

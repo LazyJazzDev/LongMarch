@@ -9,20 +9,20 @@ CommandContext::~CommandContext() {
     image_->CancelClaim();
 }
 
-bool CommandContext::ClearColor(rhi::IImage *image, const std::array<float, 4> &color) {
-  return Clear(ObjectPtr<Image>::Retain(dynamic_cast<Image *>(image)), color);
+bool CommandContext::CmdClearColor(rhi::IImage *image, const std::array<float, 4> &color) {
+  return CmdClearColor(ObjectPtr<Image>::Retain(dynamic_cast<Image *>(image)), color);
 }
 
-bool CommandContext::Present(rhi::IImage *image) {
-  return Present(ObjectPtr<Image>::Retain(dynamic_cast<Image *>(image)));
+bool CommandContext::CmdPresent(rhi::IImage *image) {
+  return CmdPresent(ObjectPtr<Image>::Retain(dynamic_cast<Image *>(image)));
 }
 
-bool CommandContext::Clear(const ObjectPtr<Image> &image, const std::array<float, 4> &color) {
+bool CommandContext::CmdClearColor(const ObjectPtr<Image> &image, const std::array<float, 4> &color) {
   if (sealed_)
     return false;
   if (failed_ || image_ || type_ != QUEUE_TYPE_GRAPHICS || !image || !image->IsValid() ||
       image->DeviceIdentity() != identity_ || !image->Claim()) {
-    ReportError(-1, "ClearColor requires a fresh frame from this device and a graphics context.");
+    ReportError(-1, "CmdClearColor requires a fresh frame from this device and a graphics context.");
     failed_ = true;
     return false;
   }
@@ -31,11 +31,11 @@ bool CommandContext::Clear(const ObjectPtr<Image> &image, const std::array<float
   return true;
 }
 
-bool CommandContext::Present(const ObjectPtr<Image> &image) {
+bool CommandContext::CmdPresent(const ObjectPtr<Image> &image) {
   if (sealed_)
     return false;
   if (failed_ || present_ || !image_ || image_.Get() != image.Get() || !image->IsValid()) {
-    ReportError(-1, "Present must follow ClearColor for the same acquired frame.");
+    ReportError(-1, "Present must follow CmdClearColor for the same acquired frame.");
     failed_ = true;
     return false;
   }

@@ -29,8 +29,8 @@ TEST_P(RhiRaw, PointerFactoriesAndBorrowedSubmissionWorkWithoutWrappers) {
   ASSERT_NE(context, nullptr);
   ISubmissionToken *done = queue->Submit(context);
   ASSERT_NE(done, nullptr);
-  EXPECT_FALSE(context->ClearColor(nullptr, {0, 0, 0, 1}));
-  EXPECT_FALSE(context->Present(nullptr));
+  EXPECT_FALSE(context->CmdClearColor(nullptr, {0, 0, 0, 1}));
+  EXPECT_FALSE(context->CmdPresent(nullptr));
   EXPECT_EQ(queue->Submit(context), nullptr);  // One-shot submission.
   context->Release();                          // Submit borrowed the caller reference and retained work.
   EXPECT_TRUE(done->WaitHost());
