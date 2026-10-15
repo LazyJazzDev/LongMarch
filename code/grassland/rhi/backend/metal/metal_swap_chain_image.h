@@ -17,7 +17,9 @@ class MetalSwapChainImage final : public MetalImage {
   MetalWindow *window_;
   uint64_t generation_;
   NS::SharedPtr<CA::MetalDrawable> drawable_;
-  bool presented_{};
+#if !defined(NDEBUG)
+  bool present_requested_{};
+#endif
 };
 
 }  // namespace grassland::rhi::backend::metal

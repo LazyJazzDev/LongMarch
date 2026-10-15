@@ -44,7 +44,11 @@ VulkanSwapChainImage::~VulkanSwapChainImage() {
 }
 
 bool VulkanSwapChainImage::IsValid() const {
-  return acquired_image_ && !presented_ && window_->IsFrameValid(generation_);
+#if !defined(NDEBUG)
+  if (present_requested_)
+    return false;
+#endif
+  return acquired_image_ && window_->IsFrameValid(generation_);
 }
 
 VkImage VulkanSwapChainImage::NativeImage() const {
@@ -64,7 +68,9 @@ VkSemaphore VulkanSwapChainImage::RenderSemaphore() const {
 }
 
 VkResult VulkanSwapChainImage::Present() {
-  presented_ = true;
+#if !defined(NDEBUG)
+  present_requested_ = true;
+#endif
   return window_->PresentFrame(generation_, index_, rendered_);
 }
 

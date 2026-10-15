@@ -15,7 +15,11 @@ MetalSwapChainImage::MetalSwapChainImage(ImageDesc desc,
 }
 
 bool MetalSwapChainImage::IsValid() const {
-  return !presented_ && window_->IsFrameValid(generation_);
+#if !defined(NDEBUG)
+  if (present_requested_)
+    return false;
+#endif
+  return window_->IsFrameValid(generation_);
 }
 
 CA::MetalDrawable *MetalSwapChainImage::NativeDrawable() const {
@@ -23,7 +27,9 @@ CA::MetalDrawable *MetalSwapChainImage::NativeDrawable() const {
 }
 
 void MetalSwapChainImage::DidPresent() {
-  presented_ = true;
+#if !defined(NDEBUG)
+  present_requested_ = true;
+#endif
   window_->DidPresent();
   // presentDrawable and retained-reference command buffers own native GPU use.
   // Invalid caller-held frames must not exhaust CAMetalLayer's drawable pool.

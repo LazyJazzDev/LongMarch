@@ -17,11 +17,17 @@ D3D12SwapChainImage::D3D12SwapChainImage(ImageDesc desc,
 D3D12SwapChainImage::~D3D12SwapChainImage() = default;
 
 bool D3D12SwapChainImage::IsValid() const {
-  return !presented_ && window_->IsFrameValid(generation_);
+#if !defined(NDEBUG)
+  if (present_requested_)
+    return false;
+#endif
+  return window_->IsFrameValid(generation_);
 }
 
 HRESULT D3D12SwapChainImage::Present() {
-  presented_ = true;
+#if !defined(NDEBUG)
+  present_requested_ = true;
+#endif
   return window_->PresentFrame(generation_);
 }
 

@@ -20,7 +20,9 @@ class D3D12SwapChainImage final : public D3D12Image {
  private:
   D3D12Window *window_;
   uint64_t generation_;
-  std::atomic<bool> presented_{};
+#if !defined(NDEBUG)
+  bool present_requested_{};
+#endif
 };
 
 }  // namespace grassland::rhi::backend::d3d12

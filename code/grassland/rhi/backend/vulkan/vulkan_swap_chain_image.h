@@ -30,7 +30,9 @@ class VulkanSwapChainImage final : public VulkanImage {
   uint32_t index_{};
   bool acquired_image_{};
   bool acquire_wait_pending_{true};
-  std::atomic<bool> presented_{};
+#if !defined(NDEBUG)
+  bool present_requested_{};
+#endif
 };
 
 }  // namespace grassland::rhi::backend::vulkan
