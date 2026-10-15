@@ -66,9 +66,7 @@ int main(int argc, char **argv) {
     return 1;
   std::cout << "Supported presentation combinations (SDR):\n";
   for (const auto &option : options) {
-    const char *format = option.format == IMAGE_FORMAT_RGBA8_UNORM ? "RGBA8 UNORM" : "BGRA8 UNORM";
-    std::cout << "  " << (option.present_mode == PRESENT_MODE_VSYNC ? "VSync" : "Continuous") << " + " << format
-              << '\n';
+    std::cout << "  " << PresentModeName(option.present_mode) << " + " << ImageFormatName(option.format) << '\n';
   }
   bool previous_p = false;
   PresentMode requested = PRESENT_MODE_VSYNC;
@@ -80,8 +78,7 @@ int main(int argc, char **argv) {
       requested = requested == PRESENT_MODE_VSYNC ? PRESENT_MODE_CONTINUOUS : PRESENT_MODE_VSYNC;
       if (!window.SetPresentMode(requested))
         return 1;
-      std::cout << "Present mode: " << (window.GetPresentMode() == PRESENT_MODE_VSYNC ? "VSync" : "Continuous")
-                << std::endl;
+      std::cout << "Present mode: " << PresentModeName(window.GetPresentMode()) << std::endl;
     }
     previous_p = p;
     auto image = window.AcquireFrame();

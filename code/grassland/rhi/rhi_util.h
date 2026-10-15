@@ -51,10 +51,16 @@ typedef enum {
   PRESENT_MODE_CONTINUOUS,
 } PresentMode;
 
+std::string to_string(PresentMode value);
+std::string PresentModeName(PresentMode value);
+
 typedef enum {
   QUEUE_TYPE_GRAPHICS,
   QUEUE_TYPE_TRANSFER,
 } QueueType;
+
+std::string to_string(QueueType value);
+std::string QueueTypeName(QueueType value);
 
 typedef enum {
   SUBMISSION_STATUS_PENDING,
@@ -63,11 +69,17 @@ typedef enum {
   SUBMISSION_STATUS_CANCELED,
 } SubmissionStatus;
 
+std::string to_string(SubmissionStatus value);
+std::string SubmissionStatusName(SubmissionStatus value);
+
 typedef enum {
   IMAGE_FORMAT_UNKNOWN,
   IMAGE_FORMAT_RGBA8_UNORM,
   IMAGE_FORMAT_BGRA8_UNORM,
 } ImageFormat;
+
+std::string to_string(ImageFormat value);
+std::string ImageFormatName(ImageFormat value);
 
 struct WindowPresentationOption {
   PresentMode present_mode;

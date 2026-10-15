@@ -66,4 +66,112 @@ std::string PhysicalDeviceTypeName(PhysicalDeviceType type) {
   }
 }
 
+std::string to_string(PresentMode value) {
+  switch (value) {
+    case PRESENT_MODE_VSYNC:
+      return "PRESENT_MODE_VSYNC";
+    case PRESENT_MODE_CONTINUOUS:
+      return "PRESENT_MODE_CONTINUOUS";
+    default:
+      ReportError(-1, "Unknown PresentMode value.");
+      return {};
+  }
+}
+
+std::string PresentModeName(PresentMode value) {
+  switch (value) {
+    case PRESENT_MODE_VSYNC:
+      return "VSync";
+    case PRESENT_MODE_CONTINUOUS:
+      return "Continuous";
+    default:
+      ReportError(-1, "Unknown PresentMode value.");
+      return {};
+  }
+}
+
+std::string to_string(QueueType value) {
+  switch (value) {
+    case QUEUE_TYPE_GRAPHICS:
+      return "QUEUE_TYPE_GRAPHICS";
+    case QUEUE_TYPE_TRANSFER:
+      return "QUEUE_TYPE_TRANSFER";
+    default:
+      ReportError(-1, "Unknown QueueType value.");
+      return {};
+  }
+}
+
+std::string QueueTypeName(QueueType value) {
+  switch (value) {
+    case QUEUE_TYPE_GRAPHICS:
+      return "Graphics";
+    case QUEUE_TYPE_TRANSFER:
+      return "Transfer";
+    default:
+      ReportError(-1, "Unknown QueueType value.");
+      return {};
+  }
+}
+
+std::string to_string(SubmissionStatus value) {
+  switch (value) {
+    case SUBMISSION_STATUS_PENDING:
+      return "SUBMISSION_STATUS_PENDING";
+    case SUBMISSION_STATUS_COMPLETED:
+      return "SUBMISSION_STATUS_COMPLETED";
+    case SUBMISSION_STATUS_FAILED:
+      return "SUBMISSION_STATUS_FAILED";
+    case SUBMISSION_STATUS_CANCELED:
+      return "SUBMISSION_STATUS_CANCELED";
+    default:
+      ReportError(-1, "Unknown SubmissionStatus value.");
+      return {};
+  }
+}
+
+std::string SubmissionStatusName(SubmissionStatus value) {
+  switch (value) {
+    case SUBMISSION_STATUS_PENDING:
+      return "Pending";
+    case SUBMISSION_STATUS_COMPLETED:
+      return "Completed";
+    case SUBMISSION_STATUS_FAILED:
+      return "Failed";
+    case SUBMISSION_STATUS_CANCELED:
+      return "Canceled";
+    default:
+      ReportError(-1, "Unknown SubmissionStatus value.");
+      return {};
+  }
+}
+
+std::string to_string(ImageFormat value) {
+  switch (value) {
+    case IMAGE_FORMAT_UNKNOWN:
+      return "IMAGE_FORMAT_UNKNOWN";
+    case IMAGE_FORMAT_RGBA8_UNORM:
+      return "IMAGE_FORMAT_RGBA8_UNORM";
+    case IMAGE_FORMAT_BGRA8_UNORM:
+      return "IMAGE_FORMAT_BGRA8_UNORM";
+    default:
+      ReportError(-1, "Unknown ImageFormat value.");
+      return {};
+  }
+}
+
+std::string ImageFormatName(ImageFormat value) {
+  switch (value) {
+    case IMAGE_FORMAT_UNKNOWN:
+      return "Unknown";
+    case IMAGE_FORMAT_RGBA8_UNORM:
+      return "RGBA8 UNORM";
+    case IMAGE_FORMAT_BGRA8_UNORM:
+      return "BGRA8 UNORM";
+    default:
+      ReportError(-1, "Unknown ImageFormat value.");
+      return {};
+  }
+}
+
 }  // namespace grassland::rhi
