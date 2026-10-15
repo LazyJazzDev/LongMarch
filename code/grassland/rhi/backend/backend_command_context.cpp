@@ -11,7 +11,11 @@ CommandContext::CommandContext(const void *identity) : identity_(identity) {
 CommandContext::~CommandContext() = default;
 
 bool CommandContext::RetainResource(rhi::IObject *resource) {
-  if (sealed_ || failed_)
+#if !defined(NDEBUG)
+  if (sealed_)
+    return false;
+#endif
+  if (failed_)
     return false;
   if (resources_.find(resource) != resources_.end())
     return true;
@@ -26,18 +30,27 @@ bool CommandContext::RetainResource(rhi::IObject *resource) {
 }
 
 bool CommandContext::CmdClearColor(rhi::IImage *image, const std::array<float, 4> &color) {
-  return CmdClearColor(ObjectPtr<Image>::Retain(dynamic_cast<Image *>(image)), color);
+#if !defined(NDEBUG)
+  auto native = dynamic_cast<Image *>(image);
+#else
+  auto native = static_cast<Image *>(image);
+#endif
+  return CmdClearColor(ObjectPtr<Image>::Retain(native), color);
 }
 
 bool CommandContext::CmdClearColor(const ObjectPtr<Image> &image, const std::array<float, 4> &color) {
+  if (failed_)
+    return false;
+#if !defined(NDEBUG)
   if (sealed_)
     return false;
-  if (failed_ || present_ || !image || !image->IsValid() || image->DeviceIdentity() != identity_ ||
+  if (present_ || !image || !image->IsValid() || image->DeviceIdentity() != identity_ ||
       (frame_ && frame_ != image.Get())) {
     ReportError(-1, "CmdClearColor requires this context's frame.");
     failed_ = true;
     return false;
   }
+#endif
   const bool first_use = !frame_;
   if (first_use) {
     if (!RetainResource(image.Get()))
@@ -52,14 +65,20 @@ bool CommandContext::CmdClearColor(const ObjectPtr<Image> &image, const std::arr
 }
 
 bool CommandContext::CmdPresent(rhi::IWindow *window) {
+  if (failed_)
+    return false;
+#if !defined(NDEBUG)
   if (sealed_)
     return false;
   const auto target = dynamic_cast<Window *>(window);
-  if (failed_ || present_ || !frame_ || !target || !target->OwnsFrame(frame_) || !frame_->IsValid()) {
+  if (present_ || !frame_ || !target || !target->OwnsFrame(frame_) || !frame_->IsValid()) {
     ReportError(-1, "CmdPresent requires the window owning the recorded clear frame.");
     failed_ = true;
     return false;
   }
+#else
+  const auto target = static_cast<Window *>(window);
+#endif
   if (!RecordPresent(frame_)) {
     failed_ = true;
     return false;
@@ -79,10 +98,14 @@ void CommandContext::AdvanceFrame() {
 }
 
 bool CommandContext::Seal() {
-  if (sealed_ || failed_ || (frame_ && !present_)) {
+  if (failed_)
+    return false;
+#if !defined(NDEBUG)
+  if (sealed_ || (frame_ && !present_)) {
     ReportError(-1, "Cannot finish an invalid or incomplete presentation context.");
     return false;
   }
+#endif
   sealed_ = true;
   if (!EndRecording()) {
     failed_ = true;

@@ -37,9 +37,13 @@ bool VulkanCommandContext::Initialize() {
 }
 
 bool VulkanCommandContext::RecordClear(Image *image, const std::array<float, 4> &color, bool first_use) {
+#if !defined(NDEBUG)
   const auto frame = dynamic_cast<VulkanSwapChainImage *>(image);
   if (!frame || !command_)
     return false;
+#else
+  const auto frame = static_cast<VulkanSwapChainImage *>(image);
+#endif
   VkImageMemoryBarrier barrier{VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER};
   barrier.oldLayout = first_use ? VK_IMAGE_LAYOUT_UNDEFINED : VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
   barrier.newLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
@@ -58,9 +62,13 @@ bool VulkanCommandContext::RecordClear(Image *image, const std::array<float, 4> 
 }
 
 bool VulkanCommandContext::RecordPresent(Image *image) {
+#if !defined(NDEBUG)
   const auto frame = dynamic_cast<VulkanSwapChainImage *>(image);
   if (!frame || !command_)
     return false;
+#else
+  const auto frame = static_cast<VulkanSwapChainImage *>(image);
+#endif
   VkImageMemoryBarrier barrier{VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER};
   barrier.oldLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
   barrier.newLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
@@ -78,10 +86,12 @@ bool VulkanCommandContext::EndRecording() {
 }
 
 CommandContext::SubmitResult VulkanCommandContext::SubmitNative() {
+#if !defined(NDEBUG)
   if (Frame() && !glfw::IsWindowThread()) {
     ReportError(-1, "Present must run on the window thread.");
     return SUBMIT_RESULT_REJECTED;
   }
+#endif
   const auto frame = static_cast<VulkanSwapChainImage *>(Frame());
   VkSemaphore acquired{}, rendered{};
   VkSubmitInfo submit{VK_STRUCTURE_TYPE_SUBMIT_INFO};

@@ -58,9 +58,17 @@ Without any container, use `rhi::ICore *core = rhi::CreateCore()` and release ea
 owned pointer with `Release()`, children before parents. Factories return one
 owned reference or `nullptr`. Ordinary object parameters are borrowed. The pointer
 `IQueue::Submit()` borrows the context, ends recording, and retains accepted work.
-A context can be submitted only once; incomplete recordings and repeat submissions
-are rejected. The caller retains its own reference and may release it after Submit.
+A context can be submitted only once; Debug rejects incomplete recordings and
+repeat submissions. The caller retains its own reference and may release it after Submit.
 The rhix overload consumes a moved CommandContext, including on failure.
+
+Caller-contract checks use `#if !defined(NDEBUG)` throughout RHI and rhix. They
+cover invalid device IDs, object type/device mismatches, recording/submission
+order, stale-frame use, window-thread requirements and calls on empty wrappers.
+Release assumes callers satisfy these contracts; invalid calls have no guaranteed
+failure return. Checking an empty handle with `bool`, releasing empty handles,
+explicit state queries, minimized-window handling, allocation/native API failures
+and GPU completion/error handling remain available in every configuration.
 
 Backend command implementations call `RetainResource(IObject*)` before encoding
 native resource use. CommandContext stores strong references in an object-identity

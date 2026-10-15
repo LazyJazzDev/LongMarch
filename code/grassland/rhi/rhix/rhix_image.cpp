@@ -11,7 +11,11 @@ rhi::IImage *Image::Get() const noexcept {
 }
 
 rhi::ImageDesc Image::GetDesc() const {
-  return *this ? Get()->GetDesc() : rhi::ImageDesc{};
+#if !defined(NDEBUG)
+  if (!*this)
+    return rhi::ImageDesc{};
+#endif
+  return Get()->GetDesc();
 }
 
 Image::operator bool() const noexcept {

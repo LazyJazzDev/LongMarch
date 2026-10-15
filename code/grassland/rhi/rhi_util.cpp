@@ -15,7 +15,9 @@ std::string to_string(BackendAPI api) {
     case BACKEND_API_METAL:
       return "BACKEND_API_METAL";
     default:
+#if !defined(NDEBUG)
       ReportError(-1, "Unknown API type.");
+#endif
       return {};
   }
 }
@@ -29,7 +31,9 @@ std::string BackendAPIName(BackendAPI api) {
     case BACKEND_API_METAL:
       return "Metal";
     default:
+#if !defined(NDEBUG)
       ReportError(-1, "Unknown API type.");
+#endif
       return {};
   }
 }
@@ -45,7 +49,9 @@ std::string to_string(PhysicalDeviceType type) {
     case PHYSICAL_DEVICE_TYPE_OTHER:
       return "PHYSICAL_DEVICE_TYPE_OTHER";
     default:
+#if !defined(NDEBUG)
       ReportError(-1, "Unknown physical device type.");
+#endif
       return {};
   }
 }
@@ -61,7 +67,9 @@ std::string PhysicalDeviceTypeName(PhysicalDeviceType type) {
     case PHYSICAL_DEVICE_TYPE_OTHER:
       return "Other";
     default:
+#if !defined(NDEBUG)
       ReportError(-1, "Unknown physical device type.");
+#endif
       return {};
   }
 }
@@ -73,7 +81,9 @@ std::string to_string(PresentMode value) {
     case PRESENT_MODE_CONTINUOUS:
       return "PRESENT_MODE_CONTINUOUS";
     default:
+#if !defined(NDEBUG)
       ReportError(-1, "Unknown PresentMode value.");
+#endif
       return {};
   }
 }
@@ -85,7 +95,9 @@ std::string PresentModeName(PresentMode value) {
     case PRESENT_MODE_CONTINUOUS:
       return "Continuous";
     default:
+#if !defined(NDEBUG)
       ReportError(-1, "Unknown PresentMode value.");
+#endif
       return {};
   }
 }
@@ -97,7 +109,9 @@ std::string to_string(QueueType value) {
     case QUEUE_TYPE_TRANSFER:
       return "QUEUE_TYPE_TRANSFER";
     default:
+#if !defined(NDEBUG)
       ReportError(-1, "Unknown QueueType value.");
+#endif
       return {};
   }
 }
@@ -109,7 +123,9 @@ std::string QueueTypeName(QueueType value) {
     case QUEUE_TYPE_TRANSFER:
       return "Transfer";
     default:
+#if !defined(NDEBUG)
       ReportError(-1, "Unknown QueueType value.");
+#endif
       return {};
   }
 }
@@ -125,7 +141,9 @@ std::string to_string(SubmissionStatus value) {
     case SUBMISSION_STATUS_CANCELED:
       return "SUBMISSION_STATUS_CANCELED";
     default:
+#if !defined(NDEBUG)
       ReportError(-1, "Unknown SubmissionStatus value.");
+#endif
       return {};
   }
 }
@@ -141,7 +159,9 @@ std::string SubmissionStatusName(SubmissionStatus value) {
     case SUBMISSION_STATUS_CANCELED:
       return "Canceled";
     default:
+#if !defined(NDEBUG)
       ReportError(-1, "Unknown SubmissionStatus value.");
+#endif
       return {};
   }
 }
@@ -155,7 +175,9 @@ std::string to_string(ImageFormat value) {
     case IMAGE_FORMAT_BGRA8_UNORM:
       return "IMAGE_FORMAT_BGRA8_UNORM";
     default:
+#if !defined(NDEBUG)
       ReportError(-1, "Unknown ImageFormat value.");
+#endif
       return {};
   }
 }
@@ -169,7 +191,9 @@ std::string ImageFormatName(ImageFormat value) {
     case IMAGE_FORMAT_BGRA8_UNORM:
       return "BGRA8 UNORM";
     default:
+#if !defined(NDEBUG)
       ReportError(-1, "Unknown ImageFormat value.");
+#endif
       return {};
   }
 }

@@ -9,19 +9,23 @@ namespace grassland::rhi::backend {
 Window::Window() = default;
 
 rhi::IImage *Window::GetNextImage() {
+#if !defined(NDEBUG)
   if (!glfw::IsWindowThread()) {
     ReportError(-1, "GetNextImage must run on the window thread.");
     std::abort();
   }
+#endif
   int width, height;
   glfwGetFramebufferSize(window_, &width, &height);
   if (glfwGetWindowAttrib(window_, GLFW_ICONIFIED) || width <= 0 || height <= 0)
     return nullptr;
   std::lock_guard<std::mutex> lock(next_image_mutex_);
+#if !defined(NDEBUG)
   if (!next_image_) {
     ReportError(-1, "No prepared swapchain image for a drawable window.");
     std::abort();
   }
+#endif
   return ObjectPtr<Image>(next_image_).Detach();
 }
 
@@ -42,8 +46,10 @@ void Window::ReleaseNextImage() {
 }
 
 bool Window::RebuildSwapChain() {
+#if !defined(NDEBUG)
   if (!glfw::IsWindowThread())
     return false;
+#endif
   try {
     ReleaseNextImage();
     if (!RebuildNativeSwapChain())
@@ -57,8 +63,10 @@ bool Window::RebuildSwapChain() {
 
 bool Window::SetPresentMode(PresentMode mode) {
   try {
+#if !defined(NDEBUG)
     if (!glfw::IsWindowThread())
       return false;
+#endif
     if (!SetNativePresentMode(mode))
       return false;
     return RebuildSwapChain();
@@ -86,11 +94,19 @@ GLFWwindow *Window::GLFWWindow() const {
 }
 
 bool Window::ShouldClose() const {
-  return !glfw::IsWindowThread() || glfwWindowShouldClose(window_);
+#if !defined(NDEBUG)
+  if (!glfw::IsWindowThread())
+    return true;
+#endif
+  return glfwWindowShouldClose(window_);
 }
 
 bool Window::IsKeyDown(int key) const {
-  return glfw::IsWindowThread() && glfwGetKey(window_, key) == GLFW_PRESS;
+#if !defined(NDEBUG)
+  if (!glfw::IsWindowThread())
+    return false;
+#endif
+  return glfwGetKey(window_, key) == GLFW_PRESS;
 }
 
 bool Window::SetTitle(const std::string &title) {

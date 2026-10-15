@@ -44,8 +44,10 @@ void D3D12Window::CancelFrame(uint64_t generation) {
 }
 
 HRESULT D3D12Window::PresentFrame(uint64_t generation) {
+#if !defined(NDEBUG)
   if (!IsFrameValid(generation))
     return E_INVALIDARG;
+#endif
   acquired_ = false;
   return swapchain_->Present(mode_ == PRESENT_MODE_VSYNC ? 1 : 0,
                              mode_ == PRESENT_MODE_CONTINUOUS ? DXGI_PRESENT_ALLOW_TEARING : 0);
@@ -58,12 +60,16 @@ ObjectPtr<Image> D3D12Window::AcquireNativeFrame() {
   glfwGetFramebufferSize(GLFWWindow(), &width, &height);
   if (width <= 0 || height <= 0)
     return {};
+#if !defined(NDEBUG)
   if (!valid_ || desc_.width != width || desc_.height != height)
     return {};
+#endif
+#if !defined(NDEBUG)
   if (acquired_) {
     ReportError(-1, "Present or release the previous acquired frame first.");
     return {};
   }
+#endif
   const UINT index = swapchain_->GetCurrentBackBufferIndex();
   auto rtv = rtv_->GetCPUDescriptorHandleForHeapStart();
   rtv.ptr += index * stride_;

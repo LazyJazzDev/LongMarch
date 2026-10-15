@@ -340,6 +340,7 @@ TEST(RhiCommands, DroppedTokenStillRetiresSingleSubmissionAutomatically) {
   EXPECT_TRUE(gate->changed.wait_for(lock, std::chrono::seconds(2), [&] { return gate->destroyed == 1; }));
 }
 
+#if !defined(NDEBUG)
 TEST(RhiCommands, CancellationReleasesResourcesAndForeignQueueConsumesRejectedPacket) {
   auto gate = std::make_shared<Gate>();
   auto device = ObjectPtr<TestDevice>::Adopt(new TestDevice(gate));
@@ -375,6 +376,8 @@ TEST(RhiCommands, InvalidAndIncompleteContextsCannotBeSubmitted) {
   EXPECT_FALSE(queue.Submit(std::move(context)));
   EXPECT_FALSE(context);
 }
+
+#endif
 
 TEST(RhiCommands, AliasedQueueDependencyDoesNotWaitForGpuOnCpu) {
   auto gate = std::make_shared<Gate>();

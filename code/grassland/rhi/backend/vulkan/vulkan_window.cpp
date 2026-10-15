@@ -79,8 +79,10 @@ VkResult VulkanWindow::AcquireNative(VkSemaphore semaphore,
 }
 
 VkResult VulkanWindow::PresentFrame(uint64_t generation, uint32_t index, VkSemaphore rendered) {
+#if !defined(NDEBUG)
   if (!IsFrameValid(generation))
     return VK_ERROR_OUT_OF_DATE_KHR;
+#endif
   VkPresentInfoKHR present{VK_STRUCTURE_TYPE_PRESENT_INFO_KHR};
   present.waitSemaphoreCount = 1;
   present.pWaitSemaphores = &rendered;
@@ -106,12 +108,16 @@ ObjectPtr<Image> VulkanWindow::AcquireNativeFrame() {
   glfwGetFramebufferSize(GLFWWindow(), &width, &height);
   if (width <= 0 || height <= 0)
     return {};
+#if !defined(NDEBUG)
   if (!valid_ || width != width_ || height != height_)
     return {};
+#endif
+#if !defined(NDEBUG)
   if (acquired_) {
     ReportError(-1, "Present or release the previous acquired frame first.");
     return {};
   }
+#endif
   auto frame = ObjectPtr<VulkanSwapChainImage>::Adopt(
       new VulkanSwapChainImage(desc_, this, generation_, device_->NativeDevice()));
   return frame->Acquire() ? ObjectPtr<Image>(frame) : ObjectPtr<Image>{};

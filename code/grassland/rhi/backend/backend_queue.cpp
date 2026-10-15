@@ -21,16 +21,26 @@ bool Queue::SharesPhysicalQueue(const rhi::IQueue *other) const {
 }
 
 rhi::ISubmissionToken *Queue::Submit(rhi::ICommandContext *commands, const rhi::SubmitInfo &info) {
+#if !defined(NDEBUG)
   const auto impl = dynamic_cast<CommandContext *>(commands);
   if (!impl || impl->DeviceIdentity() != Owner()->NativeIdentity()) {
     ReportError(-1, "Commands must be submitted to a queue from their device.");
     return nullptr;
   }
+#else
+  const auto impl = static_cast<CommandContext *>(commands);
+#endif
   try {
     std::vector<ObjectPtr<Device::SubmissionState>> waits;
     waits.reserve(info.waits.size());
-    for (auto token : info.waits)
-      waits.push_back(ObjectPtr<Device::SubmissionState>::Retain(dynamic_cast<Device::SubmissionState *>(token)));
+    for (auto token : info.waits) {
+#if !defined(NDEBUG)
+      auto state = dynamic_cast<Device::SubmissionState *>(token);
+#else
+      auto state = static_cast<Device::SubmissionState *>(token);
+#endif
+      waits.push_back(ObjectPtr<Device::SubmissionState>::Retain(state));
+    }
     return Owner()->Submit(ObjectPtr<CommandContext>::Retain(impl), waits).Detach();
   } catch (const std::bad_alloc &) {
     ReportError(-1, "Submission allocation failed.");

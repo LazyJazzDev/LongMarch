@@ -17,11 +17,13 @@ namespace grassland::rhi::backend {
 
 rhi::IDevice *Core::CreateDevice(int32_t device_idx) {
   try {
+#if !defined(NDEBUG)
     const auto devices = GetPhysicalDevices();
     if (device_idx < 0 || static_cast<size_t>(device_idx) >= devices.size()) {
       ReportError(-1, "Physical device ID is out of range.");
       return nullptr;
     }
+#endif
     return CreateNativeDevice(device_idx, this).release();
   } catch (const std::bad_alloc &) {
     return nullptr;

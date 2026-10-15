@@ -58,8 +58,13 @@ void UnregisterWindow(GLFWwindow *window) {
 bool Initialize() {
   auto &state = Get();
   std::lock_guard<std::mutex> lock(state.mutex);
-  if (state.initialized)
+  if (state.initialized) {
+#if !defined(NDEBUG)
     return state.thread == std::this_thread::get_id();
+#else
+    return true;
+#endif
+  }
   if (!glfwInit()) {
     const char *message{};
     const int code = glfwGetError(&message);
@@ -91,10 +96,12 @@ bool PollEvents() {
 }
 
 GLFWwindow *CreateGLFWWindow(int width, int height, const char *title) {
+#if !defined(NDEBUG)
   if (width <= 0 || height <= 0) {
     ReportError(-1, "Window dimensions must be positive.");
     return nullptr;
   }
+#endif
   if (!Initialize())
     return nullptr;
   glfwDefaultWindowHints();
@@ -109,8 +116,10 @@ GLFWwindow *CreateGLFWWindow(int width, int height, const char *title) {
 }
 
 bool SetWindowTitle(GLFWwindow *window, const char *title) {
+#if !defined(NDEBUG)
   if (!window || !IsWindowThread())
     return false;
+#endif
   glfwGetError(nullptr);
   glfwSetWindowTitle(window, title);
   const char *message{};

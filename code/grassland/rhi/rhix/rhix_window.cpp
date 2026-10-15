@@ -15,34 +15,66 @@ bool Window::PollEvents() {
 }
 
 GLFWwindow *Window::GLFWWindow() const {
-  return *this ? Get()->GLFWWindow() : nullptr;
+#if !defined(NDEBUG)
+  if (!*this)
+    return nullptr;
+#endif
+  return Get()->GLFWWindow();
 }
 
 bool Window::ShouldClose() const {
-  return !*this || Get()->ShouldClose();
+#if !defined(NDEBUG)
+  if (!*this)
+    return true;
+#endif
+  return Get()->ShouldClose();
 }
 
 bool Window::IsKeyDown(int key) const {
-  return *this && Get()->IsKeyDown(key);
+#if !defined(NDEBUG)
+  if (!*this)
+    return false;
+#endif
+  return Get()->IsKeyDown(key);
 }
 
 bool Window::SetTitle(const std::string &title) const {
-  return *this && Get()->SetTitle(title);
+#if !defined(NDEBUG)
+  if (!*this)
+    return false;
+#endif
+  return Get()->SetTitle(title);
 }
 
 Image Window::GetNextImage() const {
-  return *this ? Get()->GetNextImage() : nullptr;
+#if !defined(NDEBUG)
+  if (!*this)
+    return nullptr;
+#endif
+  return Get()->GetNextImage();
 }
 
 bool Window::SetPresentMode(rhi::PresentMode mode) const {
-  return *this && Get()->SetPresentMode(mode);
+#if !defined(NDEBUG)
+  if (!*this)
+    return false;
+#endif
+  return Get()->SetPresentMode(mode);
 }
 
 rhi::PresentMode Window::GetPresentMode() const {
-  return *this ? Get()->GetPresentMode() : rhi::PRESENT_MODE_VSYNC;
+#if !defined(NDEBUG)
+  if (!*this)
+    return rhi::PRESENT_MODE_VSYNC;
+#endif
+  return Get()->GetPresentMode();
 }
 
 std::vector<rhi::WindowPresentationOption> Window::GetSupportedPresentationOptions() const {
-  return *this ? Get()->GetSupportedPresentationOptions() : std::vector<rhi::WindowPresentationOption>{};
+#if !defined(NDEBUG)
+  if (!*this)
+    return std::vector<rhi::WindowPresentationOption>{};
+#endif
+  return Get()->GetSupportedPresentationOptions();
 }
 }  // namespace grassland::rhix

@@ -118,10 +118,12 @@ std::vector<PhysicalDevice> VulkanCore::GetPhysicalDevices() const {
 }
 
 std::unique_ptr<Device> VulkanCore::CreateNativeDevice(int32_t device_idx, Core *owner) const {
+#if !defined(NDEBUG)
   if (device_idx < 0 || static_cast<size_t>(device_idx) >= adapters_.size()) {
     ReportError(-1, "Physical device ID is out of range.");
     return {};
   }
+#endif
   const auto &adapter = adapters_[device_idx];
   return VulkanDevice::CreateVulkanDevice(adapter.info, owner, adapter.native, adapter.api_version);
 }

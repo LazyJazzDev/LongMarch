@@ -15,14 +15,26 @@ Core CreateCore(rhi::BackendAPI api) {
 }
 
 std::vector<rhi::PhysicalDevice> Core::GetPhysicalDevices() const {
-  return *this ? Get()->GetPhysicalDevices() : std::vector<rhi::PhysicalDevice>{};
+#if !defined(NDEBUG)
+  if (!*this)
+    return std::vector<rhi::PhysicalDevice>{};
+#endif
+  return Get()->GetPhysicalDevices();
 }
 
 Device Core::CreateDevice(int32_t id) const {
-  return *this ? Get()->CreateDevice(id) : nullptr;
+#if !defined(NDEBUG)
+  if (!*this)
+    return nullptr;
+#endif
+  return Get()->CreateDevice(id);
 }
 
 Device Core::CreateDeviceByAutoSelection(rhi::DeviceFeatureRequirement requirement) const {
-  return *this ? Get()->CreateDeviceByAutoSelection(requirement) : nullptr;
+#if !defined(NDEBUG)
+  if (!*this)
+    return nullptr;
+#endif
+  return Get()->CreateDeviceByAutoSelection(requirement);
 }
 }  // namespace grassland::rhix

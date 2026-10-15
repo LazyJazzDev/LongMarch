@@ -11,30 +11,58 @@ rhi::IDevice *Device::Get() const noexcept {
 }
 
 std::string Device::Name() const {
-  return *this ? Get()->Name() : std::string{};
+#if !defined(NDEBUG)
+  if (!*this)
+    return std::string{};
+#endif
+  return Get()->Name();
 }
 
 bool Device::SupportRayTracingPipeline() const {
-  return *this && Get()->SupportRayTracingPipeline();
+#if !defined(NDEBUG)
+  if (!*this)
+    return false;
+#endif
+  return Get()->SupportRayTracingPipeline();
 }
 
 bool Device::SupportRayQuery() const {
-  return *this && Get()->SupportRayQuery();
+#if !defined(NDEBUG)
+  if (!*this)
+    return false;
+#endif
+  return Get()->SupportRayQuery();
 }
 
 bool Device::SupportGeometryShader() const {
-  return *this && Get()->SupportGeometryShader();
+#if !defined(NDEBUG)
+  if (!*this)
+    return false;
+#endif
+  return Get()->SupportGeometryShader();
 }
 
 Window Device::CreateGLFWWindow(const rhi::WindowDesc &desc) const {
-  return *this ? Get()->CreateGLFWWindow(desc) : nullptr;
+#if !defined(NDEBUG)
+  if (!*this)
+    return nullptr;
+#endif
+  return Get()->CreateGLFWWindow(desc);
 }
 
 Queue Device::GetQueue(rhi::QueueType type) const {
-  return *this ? Get()->GetQueue(type) : nullptr;
+#if !defined(NDEBUG)
+  if (!*this)
+    return nullptr;
+#endif
+  return Get()->GetQueue(type);
 }
 
 CommandContext Device::CreateCommandContext() const {
-  return *this ? Get()->CreateCommandContext() : nullptr;
+#if !defined(NDEBUG)
+  if (!*this)
+    return nullptr;
+#endif
+  return Get()->CreateCommandContext();
 }
 }  // namespace grassland::rhix

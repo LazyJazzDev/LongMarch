@@ -98,14 +98,21 @@ ObjectPtr<Device::SubmissionState> Device::Submit(const ObjectPtr<CommandContext
                                                   const std::vector<ObjectPtr<Device::SubmissionState>> &waits) {
   if (!commands->Seal())
     return {};
+#if !defined(NDEBUG)
   if (commands->DeviceIdentity() != NativeIdentity() || (commands->Frame() && !commands->Frame()->IsValid())) {
     ReportError(-1, "Submission requires a fresh context and a valid frame from this device.");
     return {};
   }
+#endif
   for (const auto &wait : waits) {
-    if (!wait || wait->QueueIdentity() != queue_identity_ || wait->Status() == SUBMISSION_STATUS_FAILED ||
-        wait->Status() == SUBMISSION_STATUS_CANCELED) {
-      ReportError(-1, "Submission dependency is empty, failed, or belongs to another device.");
+#if !defined(NDEBUG)
+    if (!wait || wait->QueueIdentity() != queue_identity_) {
+      ReportError(-1, "Submission dependency is empty or belongs to another device.");
+      return {};
+    }
+#endif
+    if (wait->Status() == SUBMISSION_STATUS_FAILED || wait->Status() == SUBMISSION_STATUS_CANCELED) {
+      ReportError(-1, "Submission dependency failed or was canceled.");
       return {};
     }
   }

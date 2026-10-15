@@ -71,10 +71,12 @@ std::vector<PhysicalDevice> D3D12Core::GetPhysicalDevices() const {
 }
 
 std::unique_ptr<Device> D3D12Core::CreateNativeDevice(int32_t device_idx, Core *owner) const {
+#if !defined(NDEBUG)
   if (device_idx < 0 || static_cast<size_t>(device_idx) >= adapters_.size()) {
     ReportError(-1, "Physical device ID is out of range.");
     return {};
   }
+#endif
   const auto &adapter = adapters_[device_idx];
   ComPtr<ID3D12Device> device;
   const HRESULT result = D3D12CreateDevice(adapter.native.Get(), D3D_FEATURE_LEVEL_11_0, IID_PPV_ARGS(&device));

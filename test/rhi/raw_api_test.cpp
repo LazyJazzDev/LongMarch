@@ -20,7 +20,9 @@ class RhiRaw : public testing::TestWithParam<BackendAPI> {};
 TEST_P(RhiRaw, PointerFactoriesAndBorrowedSubmissionWorkWithoutWrappers) {
   ICore *core = CreateCore(GetParam());
   ASSERT_NE(core, nullptr);
+#if !defined(NDEBUG)
   EXPECT_EQ(core->CreateDevice(-1), nullptr);
+#endif
   IDevice *device = core->CreateDeviceByAutoSelection();
   ASSERT_NE(device, nullptr);
   IQueue *queue = device->GetQueue(QUEUE_TYPE_GRAPHICS);
@@ -29,10 +31,12 @@ TEST_P(RhiRaw, PointerFactoriesAndBorrowedSubmissionWorkWithoutWrappers) {
   ASSERT_NE(context, nullptr);
   ISubmissionToken *done = queue->Submit(context);
   ASSERT_NE(done, nullptr);
+#if !defined(NDEBUG)
   EXPECT_FALSE(context->CmdClearColor(nullptr, {0, 0, 0, 1}));
   EXPECT_FALSE(context->CmdPresent(nullptr));
   EXPECT_EQ(queue->Submit(context), nullptr);  // One-shot submission.
-  context->Release();                          // Submit borrowed the caller reference and retained work.
+#endif
+  context->Release();  // Submit borrowed the caller reference and retained work.
   EXPECT_TRUE(done->WaitHost());
   EXPECT_EQ(done->GetStatus(), SUBMISSION_STATUS_COMPLETED);
   done->Release();

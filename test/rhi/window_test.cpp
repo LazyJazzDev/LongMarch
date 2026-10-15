@@ -37,6 +37,7 @@ TEST_P(RhiWindow, MultipleWindowsSingleUseFramesModesAndQueueLifetime) {
   ASSERT_TRUE(second);
   int user_data = 42;
   glfwSetWindowUserPointer(first.GLFWWindow(), &user_data);
+#if !defined(NDEBUG)
   {
     auto frame = first.GetNextImage();
     ASSERT_TRUE(frame);
@@ -45,6 +46,7 @@ TEST_P(RhiWindow, MultipleWindowsSingleUseFramesModesAndQueueLifetime) {
     EXPECT_FALSE(context.CmdPresent(second));
     EXPECT_FALSE(graphics.Submit(std::move(context)));
   }
+#endif
   ASSERT_NE(first.GLFWWindow(), nullptr);
   EXPECT_EQ(first.GLFWWindow(), first.Get()->GLFWWindow());
   EXPECT_EQ(first.IsKeyDown(GLFW_KEY_A), glfwGetKey(first.GLFWWindow(), GLFW_KEY_A) == GLFW_PRESS);

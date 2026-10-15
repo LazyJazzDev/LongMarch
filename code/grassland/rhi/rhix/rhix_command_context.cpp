@@ -15,11 +15,19 @@ rhi::ICommandContext *CommandContext::Get() const noexcept {
 }
 
 bool CommandContext::CmdClearColor(const Image &image, const std::array<float, 4> &color) {
-  return *this && Get()->CmdClearColor(image.Get(), color);
+#if !defined(NDEBUG)
+  if (!*this)
+    return false;
+#endif
+  return Get()->CmdClearColor(image.Get(), color);
 }
 
 bool CommandContext::CmdPresent(const Window &window) {
-  return *this && Get()->CmdPresent(window.Get());
+#if !defined(NDEBUG)
+  if (!*this)
+    return false;
+#endif
+  return Get()->CmdPresent(window.Get());
 }
 
 }  // namespace grassland::rhix

@@ -26,9 +26,13 @@ bool D3D12CommandContext::Initialize() {
 }
 
 bool D3D12CommandContext::RecordClear(Image *image, const std::array<float, 4> &color, bool first_use) {
+#if !defined(NDEBUG)
   const auto frame = dynamic_cast<D3D12SwapChainImage *>(image);
   if (!frame || !list_)
     return false;
+#else
+  const auto frame = static_cast<D3D12SwapChainImage *>(image);
+#endif
   if (first_use) {
     D3D12_RESOURCE_BARRIER barrier{};
     barrier.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
@@ -43,9 +47,13 @@ bool D3D12CommandContext::RecordClear(Image *image, const std::array<float, 4> &
 }
 
 bool D3D12CommandContext::RecordPresent(Image *image) {
+#if !defined(NDEBUG)
   const auto frame = dynamic_cast<D3D12SwapChainImage *>(image);
   if (!frame || !list_)
     return false;
+#else
+  const auto frame = static_cast<D3D12SwapChainImage *>(image);
+#endif
   D3D12_RESOURCE_BARRIER barrier{};
   barrier.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
   barrier.Transition.pResource = frame->NativeImage();
@@ -61,10 +69,12 @@ bool D3D12CommandContext::EndRecording() {
 }
 
 CommandContext::SubmitResult D3D12CommandContext::SubmitNative() {
+#if !defined(NDEBUG)
   if (Frame() && !glfw::IsWindowThread()) {
     ReportError(-1, "Present must run on the window thread.");
     return SUBMIT_RESULT_REJECTED;
   }
+#endif
   auto frame = static_cast<D3D12SwapChainImage *>(Frame());
   std::lock_guard<std::mutex> lock(device_->QueueMutex());
   failed_ = true;
