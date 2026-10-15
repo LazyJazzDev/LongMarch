@@ -42,8 +42,8 @@ HRESULT D3D12Window::PresentFrame(uint64_t generation) {
   if (!IsFrameValid(generation))
     return E_INVALIDARG;
   acquired_ = false;
-  return swapchain_->Present(mode_ == PresentMode::VSync ? 1 : 0,
-                             mode_ == PresentMode::Continuous ? DXGI_PRESENT_ALLOW_TEARING : 0);
+  return swapchain_->Present(mode_ == PRESENT_MODE_VSYNC ? 1 : 0,
+                             mode_ == PRESENT_MODE_CONTINUOUS ? DXGI_PRESENT_ALLOW_TEARING : 0);
 }
 
 ObjectPtr<Image> D3D12Window::AcquireNativeFrame() {
@@ -70,7 +70,7 @@ ObjectPtr<Image> D3D12Window::AcquireNativeFrame() {
 }
 
 bool D3D12Window::SetNativePresentMode(PresentMode mode) {
-  mode_ = mode == PresentMode::Continuous && device_->SupportsTearing() ? mode : PresentMode::VSync;
+  mode_ = mode == PRESENT_MODE_CONTINUOUS && device_->SupportsTearing() ? mode : PRESENT_MODE_VSYNC;
   return true;
 }
 
@@ -80,9 +80,9 @@ PresentMode D3D12Window::GetPresentMode() const {
 
 std::vector<WindowPresentationOption> D3D12Window::GetSupportedPresentationOptions() const {
   // The D3D12 swapchain implementation currently uses RGBA8 UNORM only.
-  std::vector<WindowPresentationOption> options{{PresentMode::VSync, ImageFormat::RGBA8Unorm}};
+  std::vector<WindowPresentationOption> options{{PRESENT_MODE_VSYNC, IMAGE_FORMAT_RGBA8_UNORM}};
   if (device_->SupportsTearing())
-    options.push_back({PresentMode::Continuous, ImageFormat::RGBA8Unorm});
+    options.push_back({PRESENT_MODE_CONTINUOUS, IMAGE_FORMAT_RGBA8_UNORM});
   return options;
 }
 
@@ -134,7 +134,7 @@ bool D3D12Window::Rebuild(int width, int height) {
     device_->NativeDevice()->CreateRenderTargetView(images_[i].Get(), nullptr, handle);
     handle.ptr += stride_;
   }
-  desc_ = {static_cast<uint32_t>(width), static_cast<uint32_t>(height), ImageFormat::RGBA8Unorm};
+  desc_ = {static_cast<uint32_t>(width), static_cast<uint32_t>(height), IMAGE_FORMAT_RGBA8_UNORM};
   valid_ = true;
   return true;
 }

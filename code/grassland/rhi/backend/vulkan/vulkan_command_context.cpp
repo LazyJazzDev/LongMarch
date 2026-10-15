@@ -20,7 +20,7 @@ VulkanCommandContext::~VulkanCommandContext() {
 CommandContext::SubmitResult VulkanCommandContext::SubmitNative() {
   if (Frame() && !glfw::IsWindowThread()) {
     ReportError(-1, "Present must run on the window thread.");
-    return SubmitResult::Rejected;
+    return SUBMIT_RESULT_REJECTED;
   }
   const auto device = device_->NativeDevice();
   VkCommandPoolCreateInfo pool{VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO};
@@ -29,21 +29,21 @@ CommandContext::SubmitResult VulkanCommandContext::SubmitNative() {
   VkFenceCreateInfo fence{VK_STRUCTURE_TYPE_FENCE_CREATE_INFO};
   if (!Check(vkCreateCommandPool(device, &pool, nullptr, &pool_), "Create command pool") ||
       !Check(vkCreateFence(device, &fence, nullptr, &fence_), "Create submission fence"))
-    return SubmitResult::Rejected;
+    return SUBMIT_RESULT_REJECTED;
   VkCommandBufferAllocateInfo allocate{VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO};
   allocate.commandPool = pool_;
   allocate.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
   allocate.commandBufferCount = 1;
   VkCommandBuffer command{};
   if (!Check(vkAllocateCommandBuffers(device, &allocate, &command), "Allocate command buffer"))
-    return SubmitResult::Rejected;
+    return SUBMIT_RESULT_REJECTED;
   VkCommandBufferBeginInfo begin{VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO};
   begin.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
   if (!Check(vkBeginCommandBuffer(command, &begin), "Begin command buffer"))
-    return SubmitResult::Rejected;
+    return SUBMIT_RESULT_REJECTED;
   auto frame = dynamic_cast<VulkanSwapChainImage *>(Frame().Get());
   if (Frame() && !frame)
-    return SubmitResult::Rejected;
+    return SUBMIT_RESULT_REJECTED;
   VkSemaphore acquired{}, rendered{};
   if (frame) {
     acquired = frame->AcquireSemaphore();
@@ -69,7 +69,7 @@ CommandContext::SubmitResult VulkanCommandContext::SubmitNative() {
                          0, nullptr, 1, &barrier);
   }
   if (!Check(vkEndCommandBuffer(command), "End command buffer"))
-    return SubmitResult::Rejected;
+    return SUBMIT_RESULT_REJECTED;
   VkSubmitInfo submit{VK_STRUCTURE_TYPE_SUBMIT_INFO};
   VkPipelineStageFlags stage = VK_PIPELINE_STAGE_TRANSFER_BIT;
   submit.commandBufferCount = 1;
@@ -82,27 +82,27 @@ CommandContext::SubmitResult VulkanCommandContext::SubmitNative() {
   }
   std::lock_guard<std::mutex> lock(device_->QueueMutex());
   if (!Check(vkQueueSubmit(device_->NativeQueue(), 1, &submit, fence_), "vkQueueSubmit"))
-    return SubmitResult::Rejected;
+    return SUBMIT_RESULT_REJECTED;
   MarkSubmitted();
   failed_ = true;
   failed_ = frame && !Check(frame->Present(), "vkQueuePresentKHR");
-  return failed_ ? SubmitResult::FailedInFlight : SubmitResult::Submitted;
+  return failed_ ? SUBMIT_RESULT_FAILED_IN_FLIGHT : SUBMIT_RESULT_SUBMITTED;
 }
 
 SubmissionStatus VulkanCommandContext::WaitForProgress() {
   const auto result = vkWaitForFences(device_->NativeDevice(), 1, &fence_, VK_TRUE, 50000000);
   if (result == VK_TIMEOUT)
-    return SubmissionStatus::Pending;
+    return SUBMISSION_STATUS_PENDING;
   if (result == VK_ERROR_DEVICE_LOST)
-    return SubmissionStatus::Failed;
+    return SUBMISSION_STATUS_FAILED;
   if (result != VK_SUCCESS)
     failed_ = true;
   if (failed_) {
     std::lock_guard<std::mutex> lock(device_->QueueMutex());
     const auto idle = vkDeviceWaitIdle(device_->NativeDevice());
-    return idle == VK_SUCCESS || idle == VK_ERROR_DEVICE_LOST ? SubmissionStatus::Failed : SubmissionStatus::Pending;
+    return idle == VK_SUCCESS || idle == VK_ERROR_DEVICE_LOST ? SUBMISSION_STATUS_FAILED : SUBMISSION_STATUS_PENDING;
   }
-  return SubmissionStatus::Completed;
+  return SUBMISSION_STATUS_COMPLETED;
 }
 
 }  // namespace grassland::rhi::backend::vulkan

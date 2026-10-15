@@ -77,7 +77,7 @@ or report unimplemented HDR/native formats. An empty result indicates failure.
 
 ```cpp
 auto window = device.CreateGLFWWindow({1280, 720, "RHI"});
-auto graphics = device.GetQueue(QueueType::Graphics);
+auto graphics = device.GetQueue(QUEUE_TYPE_GRAPHICS);
 // Inside the main-thread event loop:
 auto image = window.AcquireFrame();
 if (image) {

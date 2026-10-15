@@ -31,7 +31,7 @@ bool CommandContext::CanSubmit() const {
 bool CommandContext::Clear(const ObjectPtr<Image> &image, const std::array<float, 4> &color) {
   if (sealed_)
     return false;
-  if (failed_ || image_ || type_ != QueueType::Graphics || !image || !image->IsValid() ||
+  if (failed_ || image_ || type_ != QUEUE_TYPE_GRAPHICS || !image || !image->IsValid() ||
       image->DeviceIdentity() != identity_ || !image->Claim()) {
     ReportError(-1, "ClearColor requires a fresh frame from this device and a graphics context.");
     failed_ = true;

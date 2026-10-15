@@ -26,8 +26,8 @@ TEST_P(RhiWindow, MultipleWindowsSingleUseFramesModesAndQueueLifetime) {
   ASSERT_TRUE(core);
   auto device = core.CreateDeviceByAutoSelection();
   ASSERT_TRUE(device);
-  auto graphics = device.GetQueue(QueueType::Graphics);
-  auto transfer = device.GetQueue(QueueType::Transfer);
+  auto graphics = device.GetQueue(QUEUE_TYPE_GRAPHICS);
+  auto transfer = device.GetQueue(QUEUE_TYPE_TRANSFER);
   ASSERT_TRUE(graphics);
   ASSERT_TRUE(transfer);
   EXPECT_TRUE(graphics.SharesPhysicalQueue(transfer));
@@ -38,13 +38,13 @@ TEST_P(RhiWindow, MultipleWindowsSingleUseFramesModesAndQueueLifetime) {
   const auto options = first.GetSupportedPresentationOptions();
   ASSERT_FALSE(options.empty());
   for (size_t i = 0; i < options.size(); ++i) {
-    EXPECT_NE(options[i].format, ImageFormat::Unknown);
+    EXPECT_NE(options[i].format, IMAGE_FORMAT_UNKNOWN);
     for (size_t j = 0; j < i; ++j)
       EXPECT_FALSE(options[i].format == options[j].format && options[i].present_mode == options[j].present_mode);
     ASSERT_TRUE(first.SetPresentMode(options[i].present_mode));
     EXPECT_EQ(first.GetPresentMode(), options[i].present_mode);
   }
-  ASSERT_TRUE(first.SetPresentMode(PresentMode::VSync));
+  ASSERT_TRUE(first.SetPresentMode(PRESENT_MODE_VSYNC));
   // Dropping an unsubmitted acquisition must not strand the swapchain.
   {
     auto discarded = first.AcquireFrame();
@@ -54,9 +54,9 @@ TEST_P(RhiWindow, MultipleWindowsSingleUseFramesModesAndQueueLifetime) {
   for (int i = 0; i < 12; ++i) {
     ASSERT_TRUE(Window::PollEvents());
     if (i == 4 || i == 8) {
-      ASSERT_TRUE(first.SetPresentMode(i == 4 ? PresentMode::Continuous : PresentMode::VSync));
+      ASSERT_TRUE(first.SetPresentMode(i == 4 ? PRESENT_MODE_CONTINUOUS : PRESENT_MODE_VSYNC));
       if (i == 8)
-        EXPECT_EQ(first.GetPresentMode(), PresentMode::VSync);
+        EXPECT_EQ(first.GetPresentMode(), PRESENT_MODE_VSYNC);
     }
     for (auto &window : {first, second}) {
       auto frame = window.AcquireFrame();
@@ -98,7 +98,7 @@ TEST_P(RhiWindow, MultipleWindowsSingleUseFramesModesAndQueueLifetime) {
   ShowWindow(hwnd, SW_MINIMIZE);
   ASSERT_TRUE(Window::PollEvents());
   EXPECT_FALSE(first.AcquireFrame());
-  ASSERT_TRUE(first.SetPresentMode(PresentMode::Continuous));
+  ASSERT_TRUE(first.SetPresentMode(PRESENT_MODE_CONTINUOUS));
   ShowWindow(hwnd, SW_RESTORE);
   ASSERT_TRUE(Window::PollEvents());
   {

@@ -46,11 +46,33 @@ struct PhysicalDevice {
   bool geometry_shader_feature{};
 };
 
-enum class PresentMode { VSync, Continuous };
-enum class QueueType { Graphics, Transfer };
-enum class SubmissionStatus { Pending, Completed, Failed, Canceled };
-enum class ImageFormat { Unknown, RGBA8Unorm, BGRA8Unorm };
-enum class Key { P, Escape };
+typedef enum {
+  PRESENT_MODE_VSYNC,
+  PRESENT_MODE_CONTINUOUS,
+} PresentMode;
+
+typedef enum {
+  QUEUE_TYPE_GRAPHICS,
+  QUEUE_TYPE_TRANSFER,
+} QueueType;
+
+typedef enum {
+  SUBMISSION_STATUS_PENDING,
+  SUBMISSION_STATUS_COMPLETED,
+  SUBMISSION_STATUS_FAILED,
+  SUBMISSION_STATUS_CANCELED,
+} SubmissionStatus;
+
+typedef enum {
+  IMAGE_FORMAT_UNKNOWN,
+  IMAGE_FORMAT_RGBA8_UNORM,
+  IMAGE_FORMAT_BGRA8_UNORM,
+} ImageFormat;
+
+typedef enum {
+  KEY_P,
+  KEY_ESCAPE,
+} Key;
 
 struct WindowPresentationOption {
   PresentMode present_mode;
@@ -61,13 +83,13 @@ struct WindowDesc {
   int width{1280};
   int height{720};
   std::string title{"LongMarch RHI"};
-  PresentMode present_mode{PresentMode::VSync};
+  PresentMode present_mode{PRESENT_MODE_VSYNC};
 };
 
 struct ImageDesc {
   uint32_t width{};
   uint32_t height{};
-  ImageFormat format{ImageFormat::Unknown};
+  ImageFormat format{IMAGE_FORMAT_UNKNOWN};
 };
 
 }  // namespace grassland::rhi

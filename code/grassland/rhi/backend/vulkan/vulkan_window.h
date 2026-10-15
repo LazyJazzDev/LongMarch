@@ -32,8 +32,8 @@ class VulkanWindow final : public Window {
   std::atomic<uint64_t> generation_{1};
   bool acquired_{};
   bool valid_{};
-  PresentMode requested_{PresentMode::VSync};
-  PresentMode mode_{PresentMode::VSync};
+  PresentMode requested_{PRESENT_MODE_VSYNC};
+  PresentMode mode_{PRESENT_MODE_VSYNC};
   int width_{}, height_{};
 };
 

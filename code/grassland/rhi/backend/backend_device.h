@@ -45,7 +45,7 @@ class Device : public Object<rhi::IDevice> {
    private:
     mutable std::mutex mutex_;
     mutable std::condition_variable changed_;
-    SubmissionStatus status_{SubmissionStatus::Pending};
+    SubmissionStatus status_{SUBMISSION_STATUS_PENDING};
     uint64_t queue_identity_;
   };
 

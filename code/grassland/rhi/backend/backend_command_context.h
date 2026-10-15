@@ -8,7 +8,12 @@ namespace grassland::rhi::backend {
 
 class CommandContext : public Object<rhi::ICommandContext> {
  public:
-  enum class SubmitResult { Rejected, Submitted, FailedInFlight };
+  typedef enum {
+    SUBMIT_RESULT_REJECTED,
+    SUBMIT_RESULT_SUBMITTED,
+    SUBMIT_RESULT_FAILED_IN_FLIGHT,
+  } SubmitResult;
+
   CommandContext(const void *identity, QueueType type);
   ~CommandContext() override;
   bool ClearColor(rhi::IImage *image, const std::array<float, 4> &color) override;

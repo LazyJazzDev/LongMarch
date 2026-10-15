@@ -150,12 +150,12 @@ std::vector<WindowPresentationOption> VulkanWindow::GetSupportedPresentationOpti
         (format.format != VK_FORMAT_R8G8B8A8_UNORM && format.format != VK_FORMAT_B8G8R8A8_UNORM))
       continue;
     const auto image_format =
-        format.format == VK_FORMAT_R8G8B8A8_UNORM ? ImageFormat::RGBA8Unorm : ImageFormat::BGRA8Unorm;
+        format.format == VK_FORMAT_R8G8B8A8_UNORM ? IMAGE_FORMAT_RGBA8_UNORM : IMAGE_FORMAT_BGRA8_UNORM;
     if (std::any_of(options.begin(), options.end(), [&](const auto &option) { return option.format == image_format; }))
       continue;
-    options.push_back({PresentMode::VSync, image_format});
+    options.push_back({PRESENT_MODE_VSYNC, image_format});
     if (continuous)
-      options.push_back({PresentMode::Continuous, image_format});
+      options.push_back({PRESENT_MODE_CONTINUOUS, image_format});
   }
   return options;
 }
@@ -213,7 +213,7 @@ bool VulkanWindow::Rebuild() {
     return false;
   }
   VkPresentModeKHR mode = VK_PRESENT_MODE_FIFO_KHR;
-  if (requested_ == PresentMode::Continuous) {
+  if (requested_ == PRESENT_MODE_CONTINUOUS) {
     for (auto candidate : {VK_PRESENT_MODE_IMMEDIATE_KHR, VK_PRESENT_MODE_MAILBOX_KHR}) {
       if (std::find(modes.begin(), modes.end(), candidate) != modes.end()) {
         mode = candidate;
@@ -277,8 +277,8 @@ bool VulkanWindow::Rebuild() {
     if (!Check(vkCreateSemaphore(device, &semaphore, nullptr, &entry), "Create present semaphore"))
       return false;
   desc_ = {create.imageExtent.width, create.imageExtent.height,
-           format->format == VK_FORMAT_B8G8R8A8_UNORM ? ImageFormat::BGRA8Unorm : ImageFormat::RGBA8Unorm};
-  mode_ = mode == VK_PRESENT_MODE_FIFO_KHR ? PresentMode::VSync : PresentMode::Continuous;
+           format->format == VK_FORMAT_B8G8R8A8_UNORM ? IMAGE_FORMAT_BGRA8_UNORM : IMAGE_FORMAT_RGBA8_UNORM};
+  mode_ = mode == VK_PRESENT_MODE_FIFO_KHR ? PRESENT_MODE_VSYNC : PRESENT_MODE_CONTINUOUS;
   width_ = width;
   height_ = height;
   valid_ = true;

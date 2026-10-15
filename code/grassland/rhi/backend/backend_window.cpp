@@ -58,7 +58,7 @@ bool Window::ShouldClose() const {
 }
 
 bool Window::IsKeyDown(Key key) const {
-  return glfw::IsWindowThread() && glfwGetKey(window_, key == Key::P ? GLFW_KEY_P : GLFW_KEY_ESCAPE) == GLFW_PRESS;
+  return glfw::IsWindowThread() && glfwGetKey(window_, key == KEY_P ? GLFW_KEY_P : GLFW_KEY_ESCAPE) == GLFW_PRESS;
 }
 
 bool Window::SetTitle(const std::string &title) {

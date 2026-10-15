@@ -22,7 +22,7 @@ rhi::ISubmissionToken *SubmissionToken::Get() const noexcept {
 }
 
 rhi::SubmissionStatus SubmissionToken::GetStatus() const {
-  return *this ? Get()->GetStatus() : rhi::SubmissionStatus::Canceled;
+  return *this ? Get()->GetStatus() : rhi::SUBMISSION_STATUS_CANCELED;
 }
 
 bool SubmissionToken::WaitHost() const {
@@ -30,7 +30,7 @@ bool SubmissionToken::WaitHost() const {
 }
 
 rhi::QueueType Queue::GetType() const {
-  return *this ? Get()->GetType() : rhi::QueueType::Graphics;
+  return *this ? Get()->GetType() : rhi::QUEUE_TYPE_GRAPHICS;
 }
 
 bool Queue::SharesPhysicalQueue(const Queue &other) const {

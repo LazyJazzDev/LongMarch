@@ -35,7 +35,7 @@ bool Window::SetPresentMode(rhi::PresentMode mode) const {
 }
 
 rhi::PresentMode Window::GetPresentMode() const {
-  return *this ? Get()->GetPresentMode() : rhi::PresentMode::VSync;
+  return *this ? Get()->GetPresentMode() : rhi::PRESENT_MODE_VSYNC;
 }
 
 std::vector<rhi::WindowPresentationOption> Window::GetSupportedPresentationOptions() const {

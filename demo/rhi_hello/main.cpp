@@ -16,21 +16,21 @@ int RunWindow(grassland::rhi::IDevice *device, grassland::rhi::IWindow *window, 
     return 1;
   std::cout << "Supported presentation combinations (SDR):\n";
   for (const auto &option : options) {
-    const char *format = option.format == ImageFormat::RGBA8Unorm ? "RGBA8 UNORM" : "BGRA8 UNORM";
-    std::cout << "  " << (option.present_mode == PresentMode::VSync ? "VSync" : "Continuous") << " + " << format
+    const char *format = option.format == IMAGE_FORMAT_RGBA8_UNORM ? "RGBA8 UNORM" : "BGRA8 UNORM";
+    std::cout << "  " << (option.present_mode == PRESENT_MODE_VSYNC ? "VSync" : "Continuous") << " + " << format
               << '\n';
   }
   bool previous_p = false;
-  PresentMode requested = PresentMode::VSync;
+  PresentMode requested = PRESENT_MODE_VSYNC;
   grassland::FPSCounter fps_counter;
   auto title_time = std::chrono::steady_clock::now();
-  while (PollEvents() && !window->ShouldClose() && !window->IsKeyDown(Key::Escape)) {
-    const bool p = window->IsKeyDown(Key::P);
+  while (PollEvents() && !window->ShouldClose() && !window->IsKeyDown(KEY_ESCAPE)) {
+    const bool p = window->IsKeyDown(KEY_P);
     if (p && !previous_p) {
-      requested = requested == PresentMode::VSync ? PresentMode::Continuous : PresentMode::VSync;
+      requested = requested == PRESENT_MODE_VSYNC ? PRESENT_MODE_CONTINUOUS : PRESENT_MODE_VSYNC;
       if (!window->SetPresentMode(requested))
         return 1;
-      std::cout << "Present mode: " << (window->GetPresentMode() == PresentMode::VSync ? "VSync" : "Continuous")
+      std::cout << "Present mode: " << (window->GetPresentMode() == PRESENT_MODE_VSYNC ? "VSync" : "Continuous")
                 << std::endl;
     }
     previous_p = p;
@@ -126,7 +126,7 @@ int main(int argc, char **argv) {
     return 0;  // Metal keeps the device-query demo until its presentation backend is added.
   }
   IWindow *window = device->CreateGLFWWindow({1280, 720, "LongMarch RHI - P: toggle VSync"});
-  IQueue *graphics = device->GetQueue(QueueType::Graphics);
+  IQueue *graphics = device->GetQueue(QUEUE_TYPE_GRAPHICS);
   const int result = window && graphics ? RunWindow(device, window, graphics) : 1;
   // Release every owned reference, including on failure, children before parents.
   if (graphics)

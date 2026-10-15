@@ -24,7 +24,7 @@ TEST_P(RhiRaw, PointerFactoriesAndBorrowedSubmissionWorkWithoutWrappers) {
   EXPECT_EQ(core->CreateDevice(-1), nullptr);
   IDevice *device = core->CreateDeviceByAutoSelection();
   ASSERT_NE(device, nullptr);
-  IQueue *queue = device->GetQueue(QueueType::Graphics);
+  IQueue *queue = device->GetQueue(QUEUE_TYPE_GRAPHICS);
   ASSERT_NE(queue, nullptr);
   ICommandContext *context = device->CreateCommandContext(queue);
   ASSERT_NE(context, nullptr);
@@ -40,7 +40,7 @@ TEST_P(RhiRaw, PointerFactoriesAndBorrowedSubmissionWorkWithoutWrappers) {
   EXPECT_EQ(queue->Submit(commands), nullptr);  // One-shot submission.
   commands->Release();                          // Submit borrowed the caller reference and retained work.
   EXPECT_TRUE(done->WaitHost());
-  EXPECT_EQ(done->GetStatus(), SubmissionStatus::Completed);
+  EXPECT_EQ(done->GetStatus(), SUBMISSION_STATUS_COMPLETED);
   done->Release();
   queue->Release();
   device->Release();

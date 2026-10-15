@@ -134,8 +134,8 @@ SubmissionStatus Device::SubmissionState::Status() const {
 
 bool Device::SubmissionState::Wait() const {
   std::unique_lock<std::mutex> lock(mutex_);
-  changed_.wait(lock, [&] { return status_ != SubmissionStatus::Pending; });
-  return status_ == SubmissionStatus::Completed;
+  changed_.wait(lock, [&] { return status_ != SUBMISSION_STATUS_PENDING; });
+  return status_ == SUBMISSION_STATUS_COMPLETED;
 }
 
 void Device::SubmissionState::Complete(SubmissionStatus status) {
@@ -154,8 +154,8 @@ ObjectPtr<Device::SubmissionState> Device::Submit(const ObjectPtr<CommandContext
     return {};
   }
   for (const auto &wait : waits) {
-    if (!wait || wait->QueueIdentity() != queue_identity_ || wait->Status() == SubmissionStatus::Failed ||
-        wait->Status() == SubmissionStatus::Canceled) {
+    if (!wait || wait->QueueIdentity() != queue_identity_ || wait->Status() == SUBMISSION_STATUS_FAILED ||
+        wait->Status() == SUBMISSION_STATUS_CANCELED) {
       ReportError(-1, "Submission dependency is empty, failed, or belongs to another device.");
       return {};
     }
@@ -184,14 +184,14 @@ ObjectPtr<Device::SubmissionState> Device::Submit(const ObjectPtr<CommandContext
     }
     throw;
   }
-  if (result == CommandContext::SubmitResult::Rejected) {
+  if (result == CommandContext::SUBMIT_RESULT_REJECTED) {
     pending_.pop_back();
     return {};
   }
   commands->MarkSubmitted();
   pending_.back().commands = commands;
   changed_.notify_one();
-  return result == CommandContext::SubmitResult::Submitted ? completion : ObjectPtr<SubmissionState>{};
+  return result == CommandContext::SUBMIT_RESULT_SUBMITTED ? completion : ObjectPtr<SubmissionState>{};
 }
 
 void Device::Collect() {
@@ -208,7 +208,7 @@ void Device::Collect() {
     SubmissionStatus status;
     do {
       status = pending.commands->WaitForProgress();
-    } while (status == SubmissionStatus::Pending);
+    } while (status == SUBMISSION_STATUS_PENDING);
     // Release payload before publishing completion; tokens never keep it alive.
     pending.commands.Reset();
     CollectWindows();

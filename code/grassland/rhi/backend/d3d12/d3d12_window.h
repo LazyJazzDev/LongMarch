@@ -31,7 +31,7 @@ class D3D12Window final : public Window {
   std::atomic<uint64_t> generation_{1};
   bool acquired_{};
   bool valid_{};
-  PresentMode mode_{PresentMode::VSync};
+  PresentMode mode_{PRESENT_MODE_VSYNC};
 };
 
 }  // namespace grassland::rhi::backend::d3d12

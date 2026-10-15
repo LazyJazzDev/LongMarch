@@ -46,11 +46,11 @@ class TestWindow final : public backend::Window {
   }
 
   PresentMode GetPresentMode() const override {
-    return PresentMode::VSync;
+    return PRESENT_MODE_VSYNC;
   }
 
   std::vector<WindowPresentationOption> GetSupportedPresentationOptions() const override {
-    return {{PresentMode::VSync, ImageFormat::RGBA8Unorm}};
+    return {{PRESENT_MODE_VSYNC, IMAGE_FORMAT_RGBA8_UNORM}};
   }
 
  private:
@@ -60,7 +60,7 @@ class TestWindow final : public backend::Window {
 class TestImage final : public backend::Image {
  public:
   explicit TestImage(std::shared_ptr<Gate> gate, backend::Window *window = nullptr)
-      : backend::Image({16, 16, ImageFormat::RGBA8Unorm}),
+      : backend::Image({16, 16, IMAGE_FORMAT_RGBA8_UNORM}),
         gate_(std::move(gate)),
         window_(window) {
     if (window_)
@@ -103,13 +103,13 @@ class TestCommandContext final : public backend::CommandContext {
       MarkSubmitted();
       throw std::bad_alloc{};
     }
-    return SubmitResult::Submitted;
+    return SUBMIT_RESULT_SUBMITTED;
   }
 
   SubmissionStatus WaitForProgress() override {
     std::unique_lock<std::mutex> lock(gate_->mutex);
     gate_->changed.wait_for(lock, std::chrono::milliseconds(10), [&] { return gate_->complete; });
-    return gate_->complete ? SubmissionStatus::Completed : SubmissionStatus::Pending;
+    return gate_->complete ? SUBMISSION_STATUS_COMPLETED : SUBMISSION_STATUS_PENDING;
   }
 
  private:
@@ -155,8 +155,8 @@ TEST(RhiCommands, RecordingAndSubmissionKeepExactImageWithoutKeepingPayloadInTok
   static_assert(!std::is_copy_constructible_v<RecordedCommands>);
   auto gate = std::make_shared<Gate>();
   auto device = ObjectPtr<TestDevice>::Adopt(new TestDevice(gate));
-  auto queue = Queue(new TestQueue(device, QueueType::Graphics));
-  auto context = CommandContext(new TestCommandContext(gate, QueueType::Graphics));
+  auto queue = Queue(new TestQueue(device, QUEUE_TYPE_GRAPHICS));
+  auto context = CommandContext(new TestCommandContext(gate, QUEUE_TYPE_GRAPHICS));
   auto image = Image(new TestImage(gate));
   ASSERT_TRUE(context.ClearColor(image, {0, 0, 1, 1}));
   ASSERT_TRUE(context.Present(image));
@@ -167,7 +167,7 @@ TEST(RhiCommands, RecordingAndSubmissionKeepExactImageWithoutKeepingPayloadInTok
   auto token = queue.Submit(std::move(recorded));
   ASSERT_FALSE(recorded);
   ASSERT_TRUE(token);
-  EXPECT_EQ(token.GetStatus(), SubmissionStatus::Pending);
+  EXPECT_EQ(token.GetStatus(), SUBMISSION_STATUS_PENDING);
   {
     std::lock_guard<std::mutex> lock(gate->mutex);
     EXPECT_EQ(gate->destroyed, 0);
@@ -186,8 +186,8 @@ TEST(RhiCommands, RecordingAndSubmissionKeepExactImageWithoutKeepingPayloadInTok
 TEST(RhiCommands, DroppedTokenStillRetiresSingleSubmissionAutomatically) {
   auto gate = std::make_shared<Gate>();
   auto device = ObjectPtr<TestDevice>::Adopt(new TestDevice(gate));
-  auto queue = Queue(new TestQueue(device, QueueType::Graphics));
-  auto context = CommandContext(new TestCommandContext(gate, QueueType::Graphics));
+  auto queue = Queue(new TestQueue(device, QUEUE_TYPE_GRAPHICS));
+  auto context = CommandContext(new TestCommandContext(gate, QUEUE_TYPE_GRAPHICS));
   auto image = Image(new TestImage(gate));
   ASSERT_TRUE(context.ClearColor(image, {1, 0, 0, 1}));
   ASSERT_TRUE(context.Present(image));
@@ -206,15 +206,15 @@ TEST(RhiCommands, CancellationReleasesClaimAndForeignQueueConsumesRejectedPacket
   auto gate = std::make_shared<Gate>();
   auto device = ObjectPtr<TestDevice>::Adopt(new TestDevice(gate));
   auto image = Image(new TestImage(gate));
-  auto context = CommandContext(new TestCommandContext(gate, QueueType::Graphics));
+  auto context = CommandContext(new TestCommandContext(gate, QUEUE_TYPE_GRAPHICS));
   ASSERT_TRUE(context.ClearColor(image, {1, 0, 0, 1}));
   context = {};
-  context = CommandContext(new TestCommandContext(gate, QueueType::Graphics));
+  context = CommandContext(new TestCommandContext(gate, QUEUE_TYPE_GRAPHICS));
   ASSERT_TRUE(context.ClearColor(image, {1, 0, 0, 1}));
   ASSERT_TRUE(context.Present(image));
   auto packet = context.Finish();
   auto other = ObjectPtr<TestDevice>::Adopt(new TestDevice(std::make_shared<Gate>()));
-  auto queue = Queue(new TestQueue(other, QueueType::Graphics));
+  auto queue = Queue(new TestQueue(other, QUEUE_TYPE_GRAPHICS));
   EXPECT_FALSE(queue.Submit(std::move(packet)));
   EXPECT_FALSE(packet);
   image = {};
@@ -225,10 +225,10 @@ TEST(RhiCommands, InvalidAndIncompleteContextsCannotBeSubmitted) {
   auto gate = std::make_shared<Gate>();
   auto device = ObjectPtr<TestDevice>::Adopt(new TestDevice(gate));
   auto image = Image(new TestImage(gate));
-  auto context = CommandContext(new TestCommandContext(gate, QueueType::Transfer));
+  auto context = CommandContext(new TestCommandContext(gate, QUEUE_TYPE_TRANSFER));
   EXPECT_FALSE(context.ClearColor(image, {1, 0, 0, 1}));
   EXPECT_FALSE(context.Finish());
-  context = CommandContext(new TestCommandContext(gate, QueueType::Graphics));
+  context = CommandContext(new TestCommandContext(gate, QUEUE_TYPE_GRAPHICS));
   ASSERT_TRUE(context.ClearColor(image, {1, 0, 0, 1}));
   EXPECT_FALSE(context.Finish());
   EXPECT_FALSE(context);
@@ -237,15 +237,15 @@ TEST(RhiCommands, InvalidAndIncompleteContextsCannotBeSubmitted) {
 TEST(RhiCommands, AliasedQueueDependencyDoesNotWaitForGpuOnCpu) {
   auto gate = std::make_shared<Gate>();
   auto device = ObjectPtr<TestDevice>::Adopt(new TestDevice(gate));
-  auto transfer = Queue(new TestQueue(device, QueueType::Transfer));
-  auto graphics = Queue(new TestQueue(device, QueueType::Graphics));
-  auto context = CommandContext(new TestCommandContext(gate, QueueType::Transfer));
+  auto transfer = Queue(new TestQueue(device, QUEUE_TYPE_TRANSFER));
+  auto graphics = Queue(new TestQueue(device, QUEUE_TYPE_GRAPHICS));
+  auto context = CommandContext(new TestCommandContext(gate, QUEUE_TYPE_TRANSFER));
   auto upload = transfer.Submit(context.Finish());
   ASSERT_TRUE(upload);
-  context = CommandContext(new TestCommandContext(gate, QueueType::Graphics));
+  context = CommandContext(new TestCommandContext(gate, QUEUE_TYPE_GRAPHICS));
   auto done = graphics.Submit(context.Finish(), {{upload}});
   ASSERT_TRUE(done);
-  EXPECT_EQ(done.GetStatus(), SubmissionStatus::Pending);
+  EXPECT_EQ(done.GetStatus(), SUBMISSION_STATUS_PENDING);
   {
     std::lock_guard<std::mutex> lock(gate->mutex);
     gate->complete = true;
@@ -257,8 +257,8 @@ TEST(RhiCommands, AliasedQueueDependencyDoesNotWaitForGpuOnCpu) {
 TEST(RhiCommands, AllocationFailureAfterNativeSubmitKeepsResourcesUntilCompletion) {
   auto gate = std::make_shared<Gate>();
   auto device = ObjectPtr<TestDevice>::Adopt(new TestDevice(gate));
-  auto queue = Queue(new TestQueue(device, QueueType::Graphics));
-  auto context = CommandContext(new TestCommandContext(gate, QueueType::Graphics, true));
+  auto queue = Queue(new TestQueue(device, QUEUE_TYPE_GRAPHICS));
+  auto context = CommandContext(new TestCommandContext(gate, QUEUE_TYPE_GRAPHICS, true));
   auto image = Image(new TestImage(gate));
   ASSERT_TRUE(context.ClearColor(image, {0, 0, 1, 1}));
   ASSERT_TRUE(context.Present(image));
@@ -277,13 +277,13 @@ TEST(RhiCommands, AllocationFailureAfterNativeSubmitKeepsResourcesUntilCompletio
 TEST(RhiCommands, DeviceShutdownDrainsWorkAndReclaimsWindowAfterFrameLease) {
   auto gate = std::make_shared<Gate>();
   auto device = ObjectPtr<TestDevice>::Adopt(new TestDevice(gate));
-  auto queue = Queue(new TestQueue(device, QueueType::Graphics));
+  auto queue = Queue(new TestQueue(device, QUEUE_TYPE_GRAPHICS));
   auto managed = device->ManageWindow(std::make_unique<TestWindow>(gate));
   auto *window_backend = managed.Get();
   auto window = Window(ObjPtr<rhi::IWindow>::Retain((managed).Get()).Detach());
   managed.Reset();
   auto image = Image(new TestImage(gate, window_backend));
-  auto context = CommandContext(new TestCommandContext(gate, QueueType::Graphics));
+  auto context = CommandContext(new TestCommandContext(gate, QUEUE_TYPE_GRAPHICS));
   ASSERT_TRUE(context.ClearColor(image, {0, 0, 0, 1}));
   ASSERT_TRUE(context.Present(image));
   image.Release();
@@ -312,7 +312,7 @@ TEST(RhiCommands, CancelingRecordingReturnsFrameLeaseWithoutOwningWindow) {
   auto device = ObjectPtr<TestDevice>::Adopt(new TestDevice(gate));
   auto window = device->ManageWindow(std::make_unique<TestWindow>(gate));
   auto image = Image(new TestImage(gate, window.Get()));
-  auto context = CommandContext(new TestCommandContext(gate, QueueType::Graphics));
+  auto context = CommandContext(new TestCommandContext(gate, QUEUE_TYPE_GRAPHICS));
   ASSERT_TRUE(context.ClearColor(image, {0, 0, 0, 1}));
   image.Release();
   EXPECT_TRUE(window->HasFrameLeases());
