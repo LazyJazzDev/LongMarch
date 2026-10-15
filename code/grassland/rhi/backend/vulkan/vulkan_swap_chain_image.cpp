@@ -5,7 +5,7 @@
 namespace grassland::rhi::backend::vulkan {
 
 VulkanSwapChainImage::VulkanSwapChainImage(ImageDesc desc, VulkanWindow *window, uint64_t generation, VkDevice device)
-    : VulkanImage(desc, window->DeviceIdentity()),
+    : VulkanImage(desc, window->DeviceIdentity(), VK_IMAGE_LAYOUT_PRESENT_SRC_KHR),
       window_(window),
       generation_(generation),
       device_(device) {
@@ -14,8 +14,9 @@ VulkanSwapChainImage::VulkanSwapChainImage(ImageDesc desc, VulkanWindow *window,
 bool VulkanSwapChainImage::Acquire() {
   VkSemaphoreCreateInfo semaphore{VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO};
   VkFenceCreateInfo fence{VK_STRUCTURE_TYPE_FENCE_CREATE_INFO};
-  if (!Check(vkCreateSemaphore(device_, &semaphore, nullptr, &acquired_), "Create acquire semaphore") ||
-      !Check(vkCreateFence(device_, &fence, nullptr, &acquire_fence_), "Create acquire fence"))
+  if (!Check(vkCreateSemaphore(device_, &semaphore, nullptr, &acquired_), "Create acquire semaphore"))
+    return false;
+  if (!Check(vkCreateFence(device_, &fence, nullptr, &acquire_fence_), "Create acquire fence"))
     return false;
   const auto result = window_->AcquireNative(acquired_, acquire_fence_, index_, image_, rendered_);
   if (result == VK_ERROR_OUT_OF_DATE_KHR)
@@ -30,17 +31,11 @@ VulkanSwapChainImage::~VulkanSwapChainImage() {
   if (acquired_image_) {
     while (vkWaitForFences(device_, 1, &acquire_fence_, VK_TRUE, 50000000) == VK_TIMEOUT) {
     }
-    if (!presented_)
-      window_->CancelFrame(generation_);
   }
   if (acquired_)
     vkDestroySemaphore(device_, acquired_, nullptr);
   if (acquire_fence_)
     vkDestroyFence(device_, acquire_fence_, nullptr);
-}
-
-const VulkanWindow *VulkanSwapChainImage::Owner() const {
-  return window_;
 }
 
 bool VulkanSwapChainImage::IsValid() const {
@@ -52,7 +47,11 @@ VkImage VulkanSwapChainImage::NativeImage() const {
 }
 
 VkSemaphore VulkanSwapChainImage::AcquireSemaphore() const {
-  return acquired_;
+  return acquire_wait_pending_ ? acquired_ : VK_NULL_HANDLE;
+}
+
+void VulkanSwapChainImage::ConsumeAcquireSemaphore() {
+  acquire_wait_pending_ = false;
 }
 
 VkSemaphore VulkanSwapChainImage::RenderSemaphore() const {

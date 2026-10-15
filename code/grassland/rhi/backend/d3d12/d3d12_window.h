@@ -10,7 +10,6 @@ class D3D12Window final : public Window {
  public:
   explicit D3D12Window(D3D12Device *device);
   ~D3D12Window() override;
-  bool OwnsFrame(const Image *image) const override;
   bool Initialize(const WindowDesc &desc);
   ObjectPtr<Image> AcquireNativeFrame() override;
   bool RebuildNativeSwapChain() override;
@@ -19,7 +18,6 @@ class D3D12Window final : public Window {
   std::vector<WindowPresentationOption> GetSupportedPresentationOptions() const override;
   bool IsFrameValid(uint64_t generation) const;
   const void *DeviceIdentity() const;
-  void CancelFrame(uint64_t generation);
   HRESULT PresentFrame(uint64_t generation);
 
  private:

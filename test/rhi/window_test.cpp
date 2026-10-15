@@ -11,6 +11,12 @@
 #include "grassland/rhi/backend/backend_window.h"
 #include "grassland/rhi/rhix/rhix.h"
 
+#if defined(LONGMARCH_D3D12_ENABLED)
+#include <d3d12sdklayers.h>
+
+#include "grassland/rhi/backend/d3d12/d3d12_device.h"
+#endif
+
 namespace grassland::rhix {
 using namespace rhi;
 namespace backend = rhi::backend;
@@ -43,7 +49,8 @@ TEST_P(RhiWindow, MultipleWindowsSingleUseFramesModesAndQueueLifetime) {
     ASSERT_TRUE(frame);
     auto context = device.CreateCommandContext();
     ASSERT_TRUE(context.CmdClearColor(frame, {0, 0, 0, 1}));
-    EXPECT_FALSE(context.CmdPresent(second));
+    ASSERT_TRUE(context.CmdPresent(first));
+    EXPECT_FALSE(context.CmdPresent(first));
     EXPECT_FALSE(graphics.Submit(std::move(context)));
   }
 #endif
@@ -166,6 +173,95 @@ TEST_P(RhiWindow, MultipleWindowsSingleUseFramesModesAndQueueLifetime) {
   device.Release();  // Device drains work after caller-owned children are released.
   core.Release();
   EXPECT_TRUE(Window::PollEvents());
+}
+
+TEST_P(RhiWindow, MultipleImagesRestoreDefaultsAcrossContextsAndPresentWithoutClear) {
+  if (!std::getenv("LONGMARCH_RHI_WINDOW_TESTS"))
+    GTEST_SKIP() << "Set LONGMARCH_RHI_WINDOW_TESTS=1 to run native resource-state tests.";
+#if defined(LONGMARCH_D3D12_ENABLED)
+  backend::d3d12::ComPtr<ID3D12Debug> debug;
+  if (GetParam() == BACKEND_API_D3D12 && std::getenv("LONGMARCH_RHI_VALIDATION")) {
+    ASSERT_TRUE(SUCCEEDED(D3D12GetDebugInterface(IID_PPV_ARGS(&debug))));
+    debug->EnableDebugLayer();
+  }
+#endif
+  auto core = rhix::CreateCore(GetParam());
+  ASSERT_TRUE(core);
+  auto device = core.CreateDeviceByAutoSelection();
+  ASSERT_TRUE(device);
+#if defined(LONGMARCH_D3D12_ENABLED)
+  backend::d3d12::ComPtr<ID3D12InfoQueue> messages;
+  if (debug) {
+    auto native = static_cast<backend::d3d12::D3D12Device *>(device.Get());
+    ASSERT_TRUE(SUCCEEDED(native->NativeDevice()->QueryInterface(IID_PPV_ARGS(&messages))));
+    messages->ClearStoredMessages();
+  }
+#endif
+  auto queue = device.GetQueue(QUEUE_TYPE_GRAPHICS);
+  auto first = device.CreateGLFWWindow({320, 240, "RHI state test A"});
+  auto second = device.CreateGLFWWindow({320, 240, "RHI state test B"});
+  ASSERT_TRUE(first);
+  ASSERT_TRUE(second);
+  auto a = first.GetNextImage();
+  auto b = second.GetNextImage();
+  ASSERT_TRUE(a);
+  ASSERT_TRUE(b);
+  {
+    auto abandoned = device.CreateCommandContext();
+    ASSERT_TRUE(abandoned.CmdClearColor(a, {1, 0, 0, 1}));
+    ASSERT_TRUE(abandoned.CmdClearColor(b, {0, 1, 0, 1}));
+  }  // Recording alone must not change the next context's initial resource state.
+  auto clear = device.CreateCommandContext();
+  ASSERT_TRUE(clear.CmdClearColor(a, {1, 0, 0, 1}));
+  ASSERT_TRUE(clear.CmdClearColor(b, {0, 1, 0, 1}));
+  ASSERT_TRUE(clear.CmdClearColor(a, {0, 0, 1, 1}));
+  auto cleared = queue.Submit(std::move(clear));
+  ASSERT_TRUE(cleared);
+  ASSERT_TRUE(cleared.WaitHost());
+  EXPECT_EQ(a.Get(), first.GetNextImage().Get());
+  EXPECT_EQ(b.Get(), second.GetNextImage().Get());
+  auto reclear = device.CreateCommandContext();
+  ASSERT_TRUE(reclear.CmdClearColor(b, {0.6f, 0.7f, 0.8f, 1}));
+  ASSERT_TRUE(reclear.CmdClearColor(a, {0.6f, 0.7f, 0.8f, 1}));
+  auto ready = queue.Submit(std::move(reclear), {{cleared}});
+  ASSERT_TRUE(ready);
+  auto present = device.CreateCommandContext();
+  ASSERT_TRUE(present.CmdPresent(second));
+  ASSERT_TRUE(present.CmdPresent(first));
+  auto done = queue.Submit(std::move(present), {{ready}});
+  ASSERT_TRUE(done);
+  ASSERT_TRUE(done.WaitHost());
+  EXPECT_NE(a.Get(), first.GetNextImage().Get());
+  EXPECT_NE(b.Get(), second.GetNextImage().Get());
+  a.Release();
+  b.Release();
+  // A freshly prepared image is already in the default presentable layout.
+  auto next = device.CreateCommandContext();
+  ASSERT_TRUE(next.CmdPresent(first));
+  auto next_done = queue.Submit(std::move(next));
+  ASSERT_TRUE(next_done);
+  EXPECT_TRUE(next_done.WaitHost());
+  auto cleanup_image = second.GetNextImage();
+  auto cleanup = device.CreateCommandContext();
+  ASSERT_TRUE(cleanup.CmdClearColor(cleanup_image, {0, 0, 0, 1}));
+  auto cleanup_done = queue.Submit(std::move(cleanup));
+  ASSERT_TRUE(cleanup_done);
+  cleanup_image.Release();
+  second.Release();  // A pending clear without Present must not require Window in image destruction.
+  EXPECT_TRUE(cleanup_done.WaitHost());
+#if defined(LONGMARCH_D3D12_ENABLED)
+  if (messages) {
+    for (UINT64 i = 0; i < messages->GetNumStoredMessages(); ++i) {
+      SIZE_T size{};
+      ASSERT_TRUE(SUCCEEDED(messages->GetMessage(i, nullptr, &size)));
+      std::vector<uint8_t> storage(size);
+      auto message = reinterpret_cast<D3D12_MESSAGE *>(storage.data());
+      ASSERT_TRUE(SUCCEEDED(messages->GetMessage(i, message, &size)));
+      EXPECT_NE(message->Severity, D3D12_MESSAGE_SEVERITY_ERROR) << message->pDescription;
+      EXPECT_NE(message->Severity, D3D12_MESSAGE_SEVERITY_CORRUPTION) << message->pDescription;
+    }
+  }
+#endif
 }
 
 std::vector<BackendAPI> WindowBackends() {

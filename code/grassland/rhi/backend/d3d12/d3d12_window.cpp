@@ -18,11 +18,6 @@ D3D12Window::~D3D12Window() {
   ReleaseNextImage();
 }
 
-bool D3D12Window::OwnsFrame(const Image *image) const {
-  const auto frame = dynamic_cast<const D3D12SwapChainImage *>(image);
-  return frame && frame->Owner() == this;
-}
-
 bool D3D12Window::Initialize(const WindowDesc &desc) {
   if (!InitializeWindow(desc))
     return false;
@@ -36,11 +31,6 @@ bool D3D12Window::IsFrameValid(uint64_t generation) const {
 
 const void *D3D12Window::DeviceIdentity() const {
   return device_;
-}
-
-void D3D12Window::CancelFrame(uint64_t generation) {
-  if (generation_ == generation)
-    acquired_ = false;
 }
 
 HRESULT D3D12Window::PresentFrame(uint64_t generation) {

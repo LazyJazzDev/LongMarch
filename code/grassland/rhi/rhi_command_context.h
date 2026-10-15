@@ -12,10 +12,11 @@ class ICommandContext : public IObject {
   // Cmd calls encode native commands immediately and retain the exact resources
   // they use. Parameter values are consumed during the call, not during Submit.
   // Callers must not use an image concurrently from multiple command contexts.
-  // Submit ends recording; a context cannot be recorded or submitted again.
+  // Submit restores every used resource to its backend default state and ends
+  // recording; a context cannot be recorded or submitted again.
   virtual bool CmdClearColor(IImage *image, const std::array<float, 4> &color) = 0;
-  // Presents the target window's acquired frame. Currently requires a preceding
-  // CmdClearColor for that frame; does not copy an arbitrary image to the window.
+  // Presents the target window's next image fixed at this call. Multiple windows
+  // may be presented by one context; a preceding clear is not required.
   virtual bool CmdPresent(IWindow *window) = 0;
 
  protected:

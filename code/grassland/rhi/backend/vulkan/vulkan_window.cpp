@@ -17,13 +17,12 @@ VulkanWindow::~VulkanWindow() {
   vkDeviceWaitIdle(device_->NativeDevice());
   ReleaseNextImage();
   DestroySwapchain();
+  if (initialization_fence_)
+    vkDestroyFence(device_->NativeDevice(), initialization_fence_, nullptr);
+  if (initialization_pool_)
+    vkDestroyCommandPool(device_->NativeDevice(), initialization_pool_, nullptr);
   if (surface_)
     vkDestroySurfaceKHR(device_->Instance(), surface_, nullptr);
-}
-
-bool VulkanWindow::OwnsFrame(const Image *image) const {
-  const auto frame = dynamic_cast<const VulkanSwapChainImage *>(image);
-  return frame && frame->Owner() == this;
 }
 
 bool VulkanWindow::Initialize(const WindowDesc &desc) {
@@ -54,14 +53,6 @@ const void *VulkanWindow::DeviceIdentity() const {
   return device_;
 }
 
-void VulkanWindow::CancelFrame(uint64_t generation) {
-  if (generation_ == generation) {
-    acquired_ = false;
-    valid_ = false;
-    pending_acquire_ = VK_NULL_HANDLE;
-  }
-}
-
 VkResult VulkanWindow::AcquireNative(VkSemaphore semaphore,
                                      VkFence fence,
                                      uint32_t &index,
@@ -72,7 +63,69 @@ VkResult VulkanWindow::AcquireNative(VkSemaphore semaphore,
     image = images_[index];
     rendered = rendered_[index];
     acquired_ = true;
-    pending_acquire_ = fence;
+    if (!initialized_images_[index]) {
+      // Establish the fixed default layout before exposing this image to recording.
+      // This runs once per physical swapchain image, not once per CommandContext.
+      const auto device = device_->NativeDevice();
+      auto status = vkWaitForFences(device, 1, &fence, VK_TRUE, UINT64_MAX);
+      if (status != VK_SUCCESS)
+        return status;
+      std::lock_guard<std::mutex> lock(device_->QueueMutex());
+      if (!initialization_pool_) {
+        VkCommandPoolCreateInfo pool{VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO};
+        pool.queueFamilyIndex = device_->QueueFamily();
+        status = vkCreateCommandPool(device, &pool, nullptr, &initialization_pool_);
+        if (status != VK_SUCCESS)
+          return status;
+      }
+      if (!initialization_commands_) {
+        VkCommandBufferAllocateInfo allocate{VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO};
+        allocate.commandPool = initialization_pool_;
+        allocate.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
+        allocate.commandBufferCount = 1;
+        status = vkAllocateCommandBuffers(device, &allocate, &initialization_commands_);
+        if (status != VK_SUCCESS)
+          return status;
+      }
+      if (!initialization_fence_) {
+        VkFenceCreateInfo create{VK_STRUCTURE_TYPE_FENCE_CREATE_INFO};
+        status = vkCreateFence(device, &create, nullptr, &initialization_fence_);
+        if (status != VK_SUCCESS)
+          return status;
+      }
+      status = vkResetCommandPool(device, initialization_pool_, 0);
+      if (status != VK_SUCCESS)
+        return status;
+      status = vkResetFences(device, 1, &initialization_fence_);
+      if (status != VK_SUCCESS)
+        return status;
+      VkCommandBufferBeginInfo begin{VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO};
+      begin.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
+      status = vkBeginCommandBuffer(initialization_commands_, &begin);
+      if (status != VK_SUCCESS)
+        return status;
+      VkImageMemoryBarrier barrier{VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER};
+      barrier.oldLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+      barrier.newLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
+      barrier.srcQueueFamilyIndex = barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+      barrier.image = image;
+      barrier.subresourceRange = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1};
+      vkCmdPipelineBarrier(initialization_commands_, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT,
+                           VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT, 0, 0, nullptr, 0, nullptr, 1, &barrier);
+      status = vkEndCommandBuffer(initialization_commands_);
+      if (status != VK_SUCCESS)
+        return status;
+      VkSubmitInfo submit{VK_STRUCTURE_TYPE_SUBMIT_INFO};
+      submit.commandBufferCount = 1;
+      submit.pCommandBuffers = &initialization_commands_;
+      status = vkQueueSubmit(device_->NativeQueue(), 1, &submit, initialization_fence_);
+      if (status != VK_SUCCESS)
+        return status;
+      status = vkWaitForFences(device, 1, &initialization_fence_, VK_TRUE, UINT64_MAX);
+      if (status != VK_SUCCESS)
+        return status;
+      initialized_images_[index] = true;
+    }
   } else if (result == VK_ERROR_OUT_OF_DATE_KHR)
     valid_ = false;
   return result;
@@ -91,7 +144,6 @@ VkResult VulkanWindow::PresentFrame(uint64_t generation, uint32_t index, VkSemap
   present.pImageIndices = &index;
   const auto result = vkQueuePresentKHR(device_->NativeQueue(), &present);
   acquired_ = false;
-  pending_acquire_ = VK_NULL_HANDLE;
   if (result == VK_SUBOPTIMAL_KHR || result == VK_ERROR_OUT_OF_DATE_KHR) {
     valid_ = false;
     return VK_SUCCESS;
@@ -184,6 +236,7 @@ void VulkanWindow::DestroySwapchain() {
       vkDestroySemaphore(device_->NativeDevice(), semaphore, nullptr);
   rendered_.clear();
   images_.clear();
+  initialized_images_.clear();
   if (swapchain_)
     vkDestroySwapchainKHR(device_->NativeDevice(), swapchain_, nullptr);
   swapchain_ = VK_NULL_HANDLE;
@@ -264,27 +317,19 @@ bool VulkanWindow::Rebuild() {
   create.clipped = VK_TRUE;
   std::lock_guard<std::mutex> lock(device_->QueueMutex());
   if (swapchain_) {
-    if (pending_acquire_) {
-      VkResult result;
-      do {
-        result = vkWaitForFences(device, 1, &pending_acquire_, VK_TRUE, 50000000);
-      } while (result == VK_TIMEOUT);
-      if (!Check(result, "Wait for pending image acquisition"))
-        return false;
-    }
     if (!Check(vkDeviceWaitIdle(device), "Wait before swapchain replacement"))
       return false;
   }
   ++generation_;
   valid_ = false;
   acquired_ = false;
-  pending_acquire_ = VK_NULL_HANDLE;
   DestroySwapchain();
   if (!Check(vkCreateSwapchainKHR(device, &create, nullptr, &swapchain_), "vkCreateSwapchainKHR"))
     return false;
   if (!EnumerateList([&](uint32_t *n, VkImage *p) { return vkGetSwapchainImagesKHR(device, swapchain_, n, p); },
                      images_))
     return false;
+  initialized_images_.assign(images_.size(), false);
   rendered_.resize(images_.size());
   VkSemaphoreCreateInfo semaphore{VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO};
   for (auto &entry : rendered_)

@@ -14,14 +14,7 @@ D3D12SwapChainImage::D3D12SwapChainImage(ImageDesc desc,
       generation_(generation) {
 }
 
-D3D12SwapChainImage::~D3D12SwapChainImage() {
-  if (!presented_)
-    window_->CancelFrame(generation_);
-}
-
-const D3D12Window *D3D12SwapChainImage::Owner() const {
-  return window_;
-}
+D3D12SwapChainImage::~D3D12SwapChainImage() = default;
 
 bool D3D12SwapChainImage::IsValid() const {
   return !presented_ && window_->IsFrameValid(generation_);

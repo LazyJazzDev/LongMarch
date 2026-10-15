@@ -37,10 +37,6 @@ class TestWindow final : public backend::Window {
     ++gate_->windows_destroyed;
   }
 
-  bool OwnsFrame(const backend::Image *image) const override {
-    return image && image->DeviceIdentity() == gate_.get();
-  }
-
   ObjectPtr<backend::Image> AcquireNativeFrame() override {
     return {};
   }
@@ -130,15 +126,26 @@ class TestCommandContext final : public backend::CommandContext {
     return RetainResource(resource);
   }
 
-  bool RecordClear(backend::Image *image, const std::array<float, 4> &color, bool first_use) override {
-    EXPECT_EQ(Frame(), image);
-    EXPECT_EQ(first_use, recorded_colors.empty());
+  bool CmdClearColor(rhi::IImage *image, const std::array<float, 4> &color) override {
+#if !defined(NDEBUG)
+    if (!image) {
+      recording_failed_ = true;
+      return false;
+    }
+#endif
+    if (!RetainResource(image))
+      return false;
     recorded_colors.push_back(color);
     return true;
   }
 
-  bool RecordPresent(backend::Image *image) override {
-    EXPECT_EQ(Frame(), image);
+  bool CmdPresent(rhi::IWindow *window) override {
+#if !defined(NDEBUG)
+    if (sealed_ || !window)
+      return false;
+#endif
+    if (recording_failed_)
+      return false;
     ++recorded_presents;
     return true;
   }
@@ -242,7 +249,7 @@ TEST(RhiCommands, DifferentResourceTypesAreRetainedOnceUntilSubmissionCompletes)
   auto *native = new TestCommandContext(gate);
   CommandContext context = native;
   ASSERT_TRUE(native->CmdUseResource(resource.Get()));
-  ASSERT_TRUE(native->CmdClearColor(image, {0, 0, 1, 1}));
+  ASSERT_TRUE(native->CmdClearColor(image.Get(), {0, 0, 1, 1}));
   ASSERT_TRUE(native->CmdUseResource(another.Get()));
   ASSERT_TRUE(native->CmdUseResource(resource.Get()));
   ASSERT_TRUE(native->CmdUseResource(image.Get()));
@@ -361,20 +368,25 @@ TEST(RhiCommands, CancellationReleasesResourcesAndForeignQueueConsumesRejectedPa
   EXPECT_EQ(gate->destroyed, 1);
 }
 
-TEST(RhiCommands, InvalidAndIncompleteContextsCannotBeSubmitted) {
+TEST(RhiCommands, SealedContextsCannotRecordOrSubmitAgain) {
   auto gate = std::make_shared<Gate>();
   auto device = ObjectPtr<TestDevice>::Adopt(new TestDevice(gate));
-  auto queue = Queue(new TestQueue(device, QUEUE_TYPE_TRANSFER));
-  auto window = Window(new TestWindow(gate));
+  auto queue = Queue(new TestQueue(device, QUEUE_TYPE_GRAPHICS));
   auto image = Image(new TestImage(gate));
-  auto context = CommandContext(new TestCommandContext(gate));
-  EXPECT_TRUE(context.CmdClearColor(image, {1, 0, 0, 1}));
-  EXPECT_FALSE(queue.Submit(std::move(context)));
-  queue = Queue(new TestQueue(device, QUEUE_TYPE_GRAPHICS));
-  context = CommandContext(new TestCommandContext(gate));
+  auto native = ObjectPtr<TestCommandContext>::Adopt(new TestCommandContext(gate));
+  auto context = CommandContext(ObjPtr<rhi::ICommandContext>::Retain(native.Get()).Detach());
   ASSERT_TRUE(context.CmdClearColor(image, {1, 0, 0, 1}));
-  EXPECT_FALSE(queue.Submit(std::move(context)));
-  EXPECT_FALSE(context);
+  auto token = queue.Submit(std::move(context));
+  ASSERT_TRUE(token);
+  EXPECT_FALSE(native->CmdClearColor(image.Get(), {0, 1, 0, 1}));
+  EXPECT_EQ(queue.Get()->Submit(native.Get()), nullptr);
+  native.Reset();
+  {
+    std::lock_guard<std::mutex> lock(gate->mutex);
+    gate->complete = true;
+  }
+  gate->changed.notify_all();
+  EXPECT_TRUE(token.WaitHost());
 }
 
 #endif

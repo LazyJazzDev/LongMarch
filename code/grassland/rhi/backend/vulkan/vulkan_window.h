@@ -8,7 +8,6 @@ class VulkanWindow final : public Window {
  public:
   explicit VulkanWindow(VulkanDevice *device);
   ~VulkanWindow() override;
-  bool OwnsFrame(const Image *image) const override;
   bool Initialize(const WindowDesc &desc);
   ObjectPtr<Image> AcquireNativeFrame() override;
   bool RebuildNativeSwapChain() override;
@@ -17,7 +16,6 @@ class VulkanWindow final : public Window {
   std::vector<WindowPresentationOption> GetSupportedPresentationOptions() const override;
   bool IsFrameValid(uint64_t generation) const;
   const void *DeviceIdentity() const;
-  void CancelFrame(uint64_t generation);
   VkResult AcquireNative(VkSemaphore semaphore, VkFence fence, uint32_t &index, VkImage &image, VkSemaphore &rendered);
   VkResult PresentFrame(uint64_t generation, uint32_t index, VkSemaphore rendered);
 
@@ -29,7 +27,10 @@ class VulkanWindow final : public Window {
   VkSwapchainKHR swapchain_{};
   std::vector<VkImage> images_;
   std::vector<VkSemaphore> rendered_;
-  VkFence pending_acquire_{};
+  std::vector<bool> initialized_images_;
+  VkCommandPool initialization_pool_{};
+  VkCommandBuffer initialization_commands_{};
+  VkFence initialization_fence_{};
   ImageDesc desc_;
   std::atomic<uint64_t> generation_{1};
   bool acquired_{};

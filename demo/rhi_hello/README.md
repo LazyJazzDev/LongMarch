@@ -58,8 +58,7 @@ Without any container, use `rhi::ICore *core = rhi::CreateCore()` and release ea
 owned pointer with `Release()`, children before parents. Factories return one
 owned reference or `nullptr`. Ordinary object parameters are borrowed. The pointer
 `IQueue::Submit()` borrows the context, ends recording, and retains accepted work.
-A context can be submitted only once; Debug rejects incomplete recordings and
-repeat submissions. The caller retains its own reference and may release it after Submit.
+A context can be submitted only once; Debug rejects repeat submissions. The caller retains its own reference and may release it after Submit.
 The rhix overload consumes a moved CommandContext, including on failure.
 
 Caller-contract checks use `#if !defined(NDEBUG)` throughout RHI and rhix. They
@@ -74,7 +73,23 @@ Backend command implementations call `RetainResource(IObject*)` before encoding
 native resource use. CommandContext stores strong references in an object-identity
 map, retaining each object once even when several commands use it. The same path
 supports images and future buffer/binding-group objects without per-type storage.
-The borrowed frame pointer only tracks the current presentation operation.
+Presentation requests are stored separately from resource lifetime and state tracking;
+there is no single-frame field in the common CommandContext.
+D3D12 and Vulkan directly implement CmdClearColor and CmdPresent. Each backend
+tracks resource states locally to the context and inserts barriers as commands
+use resources. D3D12 tracks native resource states and their defaults; Vulkan
+tracks image layouts, pipeline stages and access masks, including same-layout
+write dependencies. Before Close/vkEndCommandBuffer, every tracked resource is
+restored to its default, even when no Present was recorded. Recording and
+abandoning a context do not mutate a shared current-resource-state variable.
+Swapchain defaults are D3D12 COMMON/PRESENT and Vulkan PRESENT_SRC_KHR. Vulkan
+establishes that layout once on the first acquisition of each physical image,
+using Window-owned initialization command storage and waiting for completion
+before exposing it. Each acquisition semaphore is consumed only by the first
+successful submission using that acquired image; later contexts use queue order.
+Buffer/BindingGroup APIs and subresource-specific transitions are not implemented
+in this iteration; the current state paths operate on full color images.
+
 Unsubmitted contexts release all references on destruction; Device keeps submitted
 contexts alive through GPU completion. Retaining a context longer also retains its
 resources. Future binding commands must retain the concrete resources or immutable
@@ -104,7 +119,7 @@ Metal retains the device-query-only behavior in this iteration.
 
 `CmdClearColor` records work on an Image, while `CmdPresent` takes the target
 Window (`IWindow *` in RHI, `const rhix::Window &` in rhix). The current backend
-requires that window to own the acquired frame used by the preceding clear.
+captures that window's next image during recording and does not require a preceding clear.
 Submission presents the recorded frame; it does not look up a different frame
 or copy an arbitrary image into the window.
 
@@ -137,8 +152,8 @@ if (image) {
 }
 ```
 
-The command path supports multiple clears of one frame followed by presentation,
-or an empty submission. Device creates contexts without a queue argument.
+The command path supports interleaved clears of multiple images, clear-only contexts,
+present-only contexts, multiple window presentations, and empty submissions. Device creates contexts without a queue argument.
 Graphics and Transfer are logical roles with the same full graphics capabilities,
 sharing one persistent native graphics queue. Either role can submit a context.
 `SubmitInfo::waits` accepts tokens

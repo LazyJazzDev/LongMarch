@@ -20,7 +20,6 @@ class Window : public Object<rhi::IWindow> {
   bool ShouldClose() const override;
   bool IsKeyDown(int key) const override;
   bool SetTitle(const std::string &title) override;
-  virtual bool OwnsFrame(const Image *image) const = 0;
   virtual ObjectPtr<Image> AcquireNativeFrame() = 0;
   virtual bool RebuildNativeSwapChain() = 0;
   virtual bool SetNativePresentMode(PresentMode mode) = 0;

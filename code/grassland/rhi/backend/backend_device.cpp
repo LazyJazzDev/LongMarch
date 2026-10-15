@@ -99,8 +99,8 @@ ObjectPtr<Device::SubmissionState> Device::Submit(const ObjectPtr<CommandContext
   if (!commands->Seal())
     return {};
 #if !defined(NDEBUG)
-  if (commands->DeviceIdentity() != NativeIdentity() || (commands->Frame() && !commands->Frame()->IsValid())) {
-    ReportError(-1, "Submission requires a fresh context and a valid frame from this device.");
+  if (commands->DeviceIdentity() != NativeIdentity()) {
+    ReportError(-1, "Submission requires a context from this device.");
     return {};
   }
 #endif
@@ -129,8 +129,6 @@ ObjectPtr<Device::SubmissionState> Device::Submit(const ObjectPtr<CommandContext
   CommandContext::SubmitResult result;
   try {
     result = commands->SubmitNative();
-    if (result == CommandContext::SUBMIT_RESULT_SUBMITTED)
-      commands->AdvanceFrame();
   } catch (...) {
     // Even error reporting can allocate after a native submit. Keep already
     // submitted work alive before propagating to the public allocation boundary.
