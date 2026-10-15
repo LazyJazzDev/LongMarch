@@ -2,8 +2,10 @@
 
 #include <mutex>
 #include <thread>
+#include <unordered_map>
 
 #include "grassland/rhi/backend/backend_util.h"
+#include "grassland/rhi/backend/backend_window.h"
 #define GLFW_INCLUDE_NONE
 #include <GLFW/glfw3.h>
 
@@ -16,6 +18,8 @@ struct State {
   bool initialized{};
   std::mutex mutex;
   std::vector<GLFWwindow *> destroyed;
+  std::unordered_map<GLFWwindow *, Window *> windows;
+  bool resize_failed{};
 
   ~State() {
     if (initialized && thread == std::this_thread::get_id())
@@ -28,6 +32,28 @@ State &Get() {
   return state;
 }
 }  // namespace
+
+void RegisterWindow(Window *window) {
+  auto native = window->GLFWWindow();
+  {
+    std::lock_guard<std::mutex> lock(Get().mutex);
+    Get().windows.emplace(native, window);
+  }
+  glfwSetFramebufferSizeCallback(native, [](GLFWwindow *native, int, int) {
+    // Native destructors unregister before teardown, under this same lock.
+    std::lock_guard<std::mutex> lock(Get().mutex);
+    auto it = Get().windows.find(native);
+    if (it == Get().windows.end())
+      return;
+    if (!it->second->RebuildSwapChain())
+      Get().resize_failed = true;
+  });
+}
+
+void UnregisterWindow(GLFWwindow *window) {
+  std::lock_guard<std::mutex> lock(Get().mutex);
+  Get().windows.erase(window);
+}
 
 bool Initialize() {
   auto &state = Get();
@@ -60,7 +86,8 @@ bool PollEvents() {
   for (auto window : destroyed)
     glfwDestroyWindow(window);
   glfwPollEvents();
-  return true;
+  std::lock_guard<std::mutex> lock(Get().mutex);
+  return !Get().resize_failed;
 }
 
 GLFWwindow *CreateGLFWWindow(int width, int height, const char *title) {

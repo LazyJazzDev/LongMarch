@@ -5,6 +5,7 @@
 #include "grassland/rhi/rhi_command_context.h"
 
 namespace grassland::rhi::backend {
+class Window;
 
 class CommandContext : public Object<rhi::ICommandContext> {
  public:
@@ -20,6 +21,7 @@ class CommandContext : public Object<rhi::ICommandContext> {
   bool CmdPresent(rhi::IWindow *window) override;
   bool CmdClearColor(const ObjectPtr<Image> &image, const std::array<float, 4> &color);
   bool Seal();
+  void AdvanceFrame();
   const void *DeviceIdentity() const;
   QueueType Type() const;
   const ObjectPtr<Image> &Frame() const;
@@ -30,6 +32,7 @@ class CommandContext : public Object<rhi::ICommandContext> {
   virtual SubmissionStatus WaitForProgress() = 0;
 
  private:
+  Window *present_window_{};
   const void *identity_;
   QueueType type_;
   ObjectPtr<Image> image_;

@@ -18,10 +18,10 @@ class IWindow : public IObject {
   virtual bool ShouldClose() const = 0;
   virtual bool IsKeyDown(int key) const = 0;
   virtual bool SetTitle(const std::string &title) = 0;
-  // Never rebuilds the swapchain. Returns nullptr when no frame is available.
-  virtual IImage *AcquireFrame() = 0;
-  // Explicit rebuild; call on the window thread after size changes or invalidation.
-  virtual bool RebuildSwapChain() = 0;
+  // Returns an owned reference to the same next image until Present submission
+  // or swapchain replacement. Null only while minimized or zero-sized.
+  // This getter never acquires a native image or rebuilds the swapchain.
+  virtual IImage *GetNextImage() = 0;
   virtual bool SetPresentMode(PresentMode mode) = 0;
   virtual PresentMode GetPresentMode() const = 0;
   // Currently implemented combinations supported by this window's surface.

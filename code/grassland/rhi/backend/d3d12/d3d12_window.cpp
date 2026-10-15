@@ -12,6 +12,8 @@ D3D12Window::D3D12Window(D3D12Device *device) : device_(device) {
 }
 
 D3D12Window::~D3D12Window() {
+  glfw::UnregisterWindow(GLFWWindow());
+  ReleaseNextImage();
   std::lock_guard<std::mutex> lock(device_->QueueMutex());
   device_->WaitIdle();
 }
@@ -25,9 +27,7 @@ bool D3D12Window::Initialize(const WindowDesc &desc) {
   if (!InitializeWindow(desc))
     return false;
   SetNativePresentMode(desc.present_mode);
-  int width, height;
-  glfwGetFramebufferSize(GLFWWindow(), &width, &height);
-  return Rebuild(width, height);
+  return RebuildSwapChain();
 }
 
 bool D3D12Window::IsFrameValid(uint64_t generation) const {

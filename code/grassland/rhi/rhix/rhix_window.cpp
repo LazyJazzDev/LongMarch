@@ -30,14 +30,8 @@ bool Window::SetTitle(const std::string &title) const {
   return *this && Get()->SetTitle(title);
 }
 
-Image Window::AcquireFrame() const {
-  return *this ? Get()->AcquireFrame() : nullptr;
-}
-
-bool Window::RebuildSwapChain() const {
-  if (!*this)
-    return false;
-  return Get()->RebuildSwapChain();
+Image Window::GetNextImage() const {
+  return *this ? Get()->GetNextImage() : nullptr;
 }
 
 bool Window::SetPresentMode(rhi::PresentMode mode) const {

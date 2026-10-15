@@ -92,6 +92,8 @@ ObjectPtr<Window> Device::ManageWindow(std::unique_ptr<Window> window) {
 void Device::CollectWindows() {
   std::lock_guard<std::mutex> lock(windows_mutex_);
   for (auto it = windows_.begin(); it != windows_.end();) {
+    if ((*it)->IsUniquelyOwned())
+      (*it)->ReleaseNextImage();
     if ((*it)->IsUniquelyOwned() && !(*it)->HasFrameLeases())
       it = windows_.erase(it);
     else
@@ -174,6 +176,8 @@ ObjectPtr<Device::SubmissionState> Device::Submit(const ObjectPtr<CommandContext
   CommandContext::SubmitResult result;
   try {
     result = commands->SubmitNative();
+    if (result == CommandContext::SUBMIT_RESULT_SUBMITTED)
+      commands->AdvanceFrame();
   } catch (...) {
     // Even error reporting can allocate after a native submit. Keep already
     // submitted work alive before propagating to the public allocation boundary.
@@ -227,6 +231,7 @@ void Device::ShutdownQueues() {
     collector_.join();
   // Derived destructors call this before destroying their native device.
   for (const auto &window : windows_) {
+    window->ReleaseNextImage();
     assert(window->IsUniquelyOwned() && !window->HasFrameLeases());
   }
   windows_.clear();

@@ -37,10 +37,8 @@ int RunWindow(grassland::rhi::IDevice *device, grassland::rhi::IWindow *window, 
       std::cout << "Present mode: " << PresentModeName(window->GetPresentMode()) << std::endl;
     }
     previous_p = p;
-    ObjPtr<IImage> image = window->AcquireFrame();
+    ObjPtr<IImage> image = window->GetNextImage();
     if (!image) {
-      if (!window->RebuildSwapChain())
-        return 1;
       fps_counter.Reset();
       std::this_thread::sleep_for(std::chrono::milliseconds(10));
       continue;
@@ -120,14 +118,7 @@ int main(int argc, char **argv) {
   ObjPtr<IWindow> window = device->CreateGLFWWindow({1280, 720, "LongMarch RHI - P: toggle VSync"});
   if (!window)
     return 1;
-  glfwSetWindowUserPointer(window->GLFWWindow(), window.Get());
-  glfwSetFramebufferSizeCallback(window->GLFWWindow(), [](GLFWwindow *native, int, int) {
-    auto *target = static_cast<IWindow *>(glfwGetWindowUserPointer(native));
-    if (!target->RebuildSwapChain()) {
-      std::cerr << "Swapchain rebuild failed.\n";
-      glfwSetWindowShouldClose(native, GLFW_TRUE);
-    }
-  });
+
   ObjPtr<IQueue> graphics = device->GetQueue(QUEUE_TYPE_GRAPHICS);
   if (!graphics)
     return 1;

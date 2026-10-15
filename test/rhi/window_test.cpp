@@ -35,8 +35,10 @@ TEST_P(RhiWindow, MultipleWindowsSingleUseFramesModesAndQueueLifetime) {
   auto second = device.CreateGLFWWindow({320, 240, "RHI window test B"});
   ASSERT_TRUE(first);
   ASSERT_TRUE(second);
+  int user_data = 42;
+  glfwSetWindowUserPointer(first.GLFWWindow(), &user_data);
   {
-    auto frame = first.AcquireFrame();
+    auto frame = first.GetNextImage();
     ASSERT_TRUE(frame);
     auto context = device.CreateCommandContext(graphics);
     ASSERT_TRUE(context.CmdClearColor(frame, {0, 0, 0, 1}));
@@ -60,16 +62,16 @@ TEST_P(RhiWindow, MultipleWindowsSingleUseFramesModesAndQueueLifetime) {
     EXPECT_EQ(first.GetPresentMode(), options[i].present_mode);
   }
   ASSERT_TRUE(first.SetPresentMode(PRESENT_MODE_VSYNC));
-  // Dropping a Vulkan acquisition requires explicit recovery, never an implicit rebuild.
-  {
-    auto discarded = first.AcquireFrame();
-    ASSERT_TRUE(discarded);
-  }
-  if (GetParam() == BACKEND_API_VULKAN) {
-    EXPECT_FALSE(first.AcquireFrame());
-    EXPECT_FALSE(first.AcquireFrame());
-  }
-  ASSERT_TRUE(first.RebuildSwapChain());
+  // Dropping a caller reference does not advance or invalidate the next image.
+  auto next = first.GetNextImage();
+  ASSERT_TRUE(next);
+  auto same = first.GetNextImage();
+  EXPECT_EQ(next.Get(), same.Get());
+  same.Release();
+  same = first.GetNextImage();
+  EXPECT_EQ(next.Get(), same.Get());
+  same.Release();
+  next.Release();
   SubmissionToken last;
   for (int i = 0; i < 12; ++i) {
     ASSERT_TRUE(Window::PollEvents());
@@ -79,7 +81,7 @@ TEST_P(RhiWindow, MultipleWindowsSingleUseFramesModesAndQueueLifetime) {
         EXPECT_EQ(first.GetPresentMode(), PRESENT_MODE_VSYNC);
     }
     for (auto &window : {first, second}) {
-      auto frame = window.AcquireFrame();
+      auto frame = window.GetNextImage();
       ASSERT_TRUE(frame);
       EXPECT_GT(frame.GetDesc().width, 0u);
       const auto supported = window.GetSupportedPresentationOptions();
@@ -89,16 +91,22 @@ TEST_P(RhiWindow, MultipleWindowsSingleUseFramesModesAndQueueLifetime) {
       auto context = device.CreateCommandContext(graphics);
       ASSERT_TRUE(context.CmdClearColor(frame, {0.6f, 0.7f, 0.8f, 1.0f}));
       ASSERT_TRUE(context.CmdPresent(window));
+      auto before_submit = window.GetNextImage();
+      EXPECT_EQ(frame.Get(), before_submit.Get());
       frame = {};  // Recording already owns the exact frame.
       last = graphics.Submit(std::move(context));
       ASSERT_TRUE(last);
+      auto after_submit = window.GetNextImage();
+      ASSERT_TRUE(after_submit);
+      EXPECT_NE(before_submit.Get(), after_submit.Get());
+      EXPECT_EQ(after_submit.Get(), window.GetNextImage().Get());
     }
   }
   ASSERT_TRUE(last.WaitHost());
 #ifdef _WIN32
   const auto hwnd = FindWindowA(nullptr, "RHI window test A");
   ASSERT_NE(hwnd, nullptr);
-  auto old_frame = first.AcquireFrame();
+  auto old_frame = first.GetNextImage();
   ASSERT_TRUE(old_frame);
   auto old_context = device.CreateCommandContext(graphics);
   ASSERT_TRUE(old_context.CmdClearColor(old_frame, {0, 0, 0, 1}));
@@ -106,12 +114,10 @@ TEST_P(RhiWindow, MultipleWindowsSingleUseFramesModesAndQueueLifetime) {
   auto old_packet = std::move(old_context);
   ASSERT_TRUE(MoveWindow(hwnd, 40, 40, 480, 360, TRUE));
   ASSERT_TRUE(Window::PollEvents());
-  EXPECT_FALSE(first.AcquireFrame());
-  EXPECT_TRUE(old_frame);  // Acquisition did not replace the swapchain.
-  ASSERT_TRUE(first.RebuildSwapChain());
-  EXPECT_FALSE(old_frame);
+  EXPECT_FALSE(old_frame);  // Internal size callback replaced the swapchain.
+  EXPECT_EQ(glfwGetWindowUserPointer(first.GLFWWindow()), &user_data);
   {
-    auto resized = first.AcquireFrame();
+    auto resized = first.GetNextImage();
     ASSERT_TRUE(resized);
   }
   // Holding this frame over resize violates the contract. We deliberately make
@@ -121,24 +127,19 @@ TEST_P(RhiWindow, MultipleWindowsSingleUseFramesModesAndQueueLifetime) {
   old_frame = {};
   ShowWindow(hwnd, SW_MINIMIZE);
   ASSERT_TRUE(Window::PollEvents());
-  EXPECT_FALSE(first.AcquireFrame());
+  EXPECT_FALSE(first.GetNextImage());
   ASSERT_TRUE(first.SetPresentMode(PRESENT_MODE_CONTINUOUS));
-  glfwSetWindowUserPointer(first.GLFWWindow(), first.Get());
-  glfwSetFramebufferSizeCallback(first.GLFWWindow(), [](GLFWwindow *native, int, int) {
-    auto *window = static_cast<rhi::IWindow *>(glfwGetWindowUserPointer(native));
-    EXPECT_TRUE(window->RebuildSwapChain());
-  });
   ShowWindow(hwnd, SW_RESTORE);
   ASSERT_TRUE(Window::PollEvents());
   {
-    auto restored = first.AcquireFrame();
+    auto restored = first.GetNextImage();
     ASSERT_TRUE(restored);
   }
 #endif
   auto upload = device.CreateCommandContext(transfer);
   auto ready = transfer.Submit(std::move(upload));
   ASSERT_TRUE(ready);
-  auto frame = second.AcquireFrame();
+  auto frame = second.GetNextImage();
   ASSERT_TRUE(frame);
   auto context = device.CreateCommandContext(graphics);
   ASSERT_TRUE(context.CmdClearColor(frame, {0, 0, 1, 1}));

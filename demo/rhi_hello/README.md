@@ -67,14 +67,21 @@ D3D12 and Vulkan then open a blue GLFW window. The title displays FPS measured
 by `grassland::FPSCounter`, refreshed four times per second. Press **P** to switch between
 VSync and continuous presentation; **Escape** or the close button exits. Continuous
 presentation falls back to VSync when unavailable. `Window::GetPresentMode()`
-reports the actual mode. Swapchain replacement is explicit: `AcquireFrame()`
-never rebuilds. The demos install a GLFW framebuffer-size callback which calls
-`RebuildSwapChain()` when size events are dispatched (normally by `PollEvents()`).
-`SetPresentMode()` performs any required replacement during that explicit call.
-If acquisition returns empty, the demos explicitly request a rebuild before
-retrying, covering out-of-date surfaces and abandoned Vulkan acquisitions.
-When minimized or zero-sized, rebuilding is deferred until a later explicit call
-or framebuffer-size event with a usable size.
+reports the actual mode. Window installs its own GLFW framebuffer-size callback
+at creation, rebuilding the swapchain when size events are dispatched (normally
+by `PollEvents()`). `SetPresentMode()` also rebuilds internally. There is no public
+rebuild function and the demos do not install resize callbacks. GLFW user pointers
+remain available to callers; replacing the framebuffer-size callback requires
+chaining the previous callback so the internal resize handling is preserved.
+
+`GetNextImage()` returns an owned reference to Window's prepared next image.
+Repeated calls return the same object until a context recording `CmdPresent(window)`
+is submitted. Submission presents that image and prepares the next one before
+returning. Dropping caller references does not advance the frame. Size/mode changes
+replace the prepared image as part of rebuilding. Only minimization or zero size
+returns an empty image; acquisition/rebuild work never occurs inside the getter.
+Creation/mode-change failures are reported at those calls, and resize callback
+failure is reported by `PollEvents()`. Device-loss recovery is not implemented.
 Metal retains the device-query-only behavior in this iteration.
 
 `CmdClearColor` records work on an Image, while `CmdPresent` takes the target
@@ -100,7 +107,7 @@ or report unimplemented HDR/native formats. An empty result indicates failure.
 auto window = device.CreateGLFWWindow({1280, 720, "RHI"});
 auto graphics = device.GetQueue(QUEUE_TYPE_GRAPHICS);
 // Inside the main-thread event loop:
-auto image = window.AcquireFrame();
+auto image = window.GetNextImage();
 if (image) {
   auto context = device.CreateCommandContext(graphics);
   if (!context) return;
@@ -145,7 +152,7 @@ the old image rather than silently redirecting it to another native image.
 Already submitted GPU use is drained before swapchain replacement. Recording
 retains the exact image immediately, and the Device retains submitted command
 contexts until completion even if the caller drops the image or completion token.
-An empty acquired frame can mean a minimized/out-of-date window; creation and
+An empty next image means a minimized or zero-sized window; creation and
 submission failures also return empty handles and log the native error.
 
 Window, Image, Queue and CommandContext wrap their corresponding public `rhi::I*`

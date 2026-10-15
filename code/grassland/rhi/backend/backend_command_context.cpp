@@ -1,5 +1,7 @@
 #include "grassland/rhi/backend/backend_command_context.h"
 
+#include <cstdlib>
+
 #include "grassland/rhi/backend/backend_window.h"
 
 namespace grassland::rhi::backend {
@@ -38,8 +40,18 @@ bool CommandContext::CmdPresent(rhi::IWindow *window) {
     failed_ = true;
     return false;
   }
+  present_window_ = target;
   present_ = true;
   return true;
+}
+
+void CommandContext::AdvanceFrame() {
+  if (!present_window_)
+    return;
+  if (!present_window_->UpdateNextImage()) {
+    ReportError(-1, "Failed to prepare the next swapchain image after submission.");
+    std::abort();
+  }
 }
 
 bool CommandContext::Seal() {

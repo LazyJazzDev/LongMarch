@@ -45,6 +45,10 @@ class TestWindow final : public backend::Window {
     return {};
   }
 
+  bool UpdateNextImage() override {
+    return true;
+  }
+
   bool RebuildNativeSwapChain() override {
     return true;
   }

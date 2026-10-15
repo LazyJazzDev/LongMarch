@@ -1,4 +1,6 @@
 #pragma once
+#include <mutex>
+
 #include "grassland/rhi/backend/backend_glfw_helper.h"
 #include "grassland/rhi/backend/backend_image.h"
 #include "grassland/rhi/rhi_window.h"
@@ -9,8 +11,10 @@ class Window : public Object<rhi::IWindow> {
  public:
   Window();
   ~Window() override;
-  rhi::IImage *AcquireFrame() override;
-  bool RebuildSwapChain() override;
+  rhi::IImage *GetNextImage() override;
+  bool RebuildSwapChain();
+  virtual bool UpdateNextImage();
+  void ReleaseNextImage();
   bool SetPresentMode(PresentMode mode) override;
   GLFWwindow *GLFWWindow() const override;
   bool ShouldClose() const override;
@@ -31,6 +35,8 @@ class Window : public Object<rhi::IWindow> {
 
  private:
   GLFWwindow *window_{};
+  std::mutex next_image_mutex_;
+  ObjectPtr<Image> next_image_;
   std::atomic<uint32_t> frame_leases_{};
 };
 

@@ -12,6 +12,8 @@ VulkanWindow::VulkanWindow(VulkanDevice *device) : device_(device) {
 }
 
 VulkanWindow::~VulkanWindow() {
+  glfw::UnregisterWindow(GLFWWindow());
+  ReleaseNextImage();
   std::lock_guard<std::mutex> lock(device_->QueueMutex());
   vkDeviceWaitIdle(device_->NativeDevice());
   DestroySwapchain();
@@ -41,7 +43,7 @@ bool VulkanWindow::Initialize(const WindowDesc &desc) {
     return false;
   }
   requested_ = desc.present_mode;
-  return Rebuild();
+  return RebuildSwapChain();
 }
 
 bool VulkanWindow::IsFrameValid(uint64_t generation) const {
@@ -121,11 +123,8 @@ bool VulkanWindow::RebuildNativeSwapChain() {
 }
 
 bool VulkanWindow::SetNativePresentMode(PresentMode mode) {
-  if (requested_ == mode && valid_)
-    return true;
   requested_ = mode;
-  valid_ = false;
-  return Rebuild();
+  return true;
 }
 
 std::vector<WindowPresentationOption> VulkanWindow::GetSupportedPresentationOptions() const {

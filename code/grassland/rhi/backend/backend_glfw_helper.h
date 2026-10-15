@@ -3,7 +3,11 @@ struct GLFWwindow;
 
 namespace grassland::rhi::backend {
 
+class Window;
+
 namespace glfw {
+void RegisterWindow(Window *window);
+void UnregisterWindow(GLFWwindow *window);
 bool Initialize();
 bool PollEvents();
 bool IsWindowThread();
