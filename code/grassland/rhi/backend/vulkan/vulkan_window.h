@@ -20,7 +20,6 @@ class VulkanWindow final : public Window {
   VkResult PresentFrame(uint64_t generation, uint32_t index, VkSemaphore rendered);
 
  private:
-  bool Rebuild();
   void DestroySwapchain();
   VulkanDevice *device_;
   VkSurfaceKHR surface_{};

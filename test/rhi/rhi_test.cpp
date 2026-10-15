@@ -66,12 +66,16 @@ class TestCore final : public backend::Core {
     return devices_;
   }
 
-  std::unique_ptr<backend::Device> CreateNativeDevice(int32_t id, backend::Core *owner) const override {
+  IDevice *CreateDevice(int32_t id) override {
+#if !defined(NDEBUG)
+    if (id < 0 || static_cast<size_t>(id) >= devices_.size())
+      return nullptr;
+#endif
     calls_.selected = id;
     ++calls_.creates;
     if (fail_)
       return {};
-    return std::make_unique<TestDevice>(devices_.at(id), owner, calls_);
+    return new TestDevice(devices_.at(id), this, calls_);
   }
 
  private:

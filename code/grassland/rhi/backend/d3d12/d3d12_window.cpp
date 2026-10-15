@@ -68,17 +68,6 @@ ObjectPtr<Image> D3D12Window::AcquireNativeFrame() {
   return frame;
 }
 
-bool D3D12Window::RebuildNativeSwapChain() {
-  valid_ = false;
-  if (glfwGetWindowAttrib(GLFWWindow(), GLFW_ICONIFIED))
-    return true;
-  int width, height;
-  glfwGetFramebufferSize(GLFWWindow(), &width, &height);
-  if (width <= 0 || height <= 0)
-    return true;
-  return Rebuild(width, height);
-}
-
 bool D3D12Window::SetNativePresentMode(PresentMode mode) {
   mode_ = mode == PRESENT_MODE_CONTINUOUS && device_->SupportsTearing() ? mode : PRESENT_MODE_VSYNC;
   return true;
@@ -96,9 +85,14 @@ std::vector<WindowPresentationOption> D3D12Window::GetSupportedPresentationOptio
   return options;
 }
 
-bool D3D12Window::Rebuild(int width, int height) {
+bool D3D12Window::RebuildNativeSwapChain() {
+  valid_ = false;
+  if (glfwGetWindowAttrib(GLFWWindow(), GLFW_ICONIFIED))
+    return true;
+  int width, height;
+  glfwGetFramebufferSize(GLFWWindow(), &width, &height);
   if (width <= 0 || height <= 0)
-    return false;
+    return true;
   std::lock_guard<std::mutex> lock(device_->QueueMutex());
   const UINT flags = device_->SupportsTearing() ? DXGI_SWAP_CHAIN_FLAG_ALLOW_TEARING : 0;
   if (swapchain_) {

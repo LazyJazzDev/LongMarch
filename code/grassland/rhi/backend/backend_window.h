@@ -23,7 +23,6 @@ class Window : public Object<rhi::IWindow> {
   virtual ObjectPtr<Image> AcquireNativeFrame() = 0;
   virtual bool RebuildNativeSwapChain() = 0;
   virtual bool SetNativePresentMode(PresentMode mode) = 0;
-  virtual PresentMode GetPresentMode() const = 0;
 
  protected:
   bool InitializeWindow(const WindowDesc &desc);

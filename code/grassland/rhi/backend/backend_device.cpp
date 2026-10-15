@@ -68,19 +68,11 @@ uint64_t Device::SubmissionState::QueueIdentity() const {
 }
 
 SubmissionStatus Device::SubmissionState::GetStatus() const {
-  return Status();
-}
-
-bool Device::SubmissionState::WaitHost() const {
-  return Wait();
-}
-
-SubmissionStatus Device::SubmissionState::Status() const {
   std::lock_guard<std::mutex> lock(mutex_);
   return status_;
 }
 
-bool Device::SubmissionState::Wait() const {
+bool Device::SubmissionState::WaitHost() const {
   std::unique_lock<std::mutex> lock(mutex_);
   changed_.wait(lock, [&] { return status_ != SUBMISSION_STATUS_PENDING; });
   return status_ == SUBMISSION_STATUS_COMPLETED;
@@ -111,7 +103,7 @@ ObjectPtr<Device::SubmissionState> Device::Submit(const ObjectPtr<CommandContext
       return {};
     }
 #endif
-    if (wait->Status() == SUBMISSION_STATUS_FAILED || wait->Status() == SUBMISSION_STATUS_CANCELED) {
+    if (wait->GetStatus() == SUBMISSION_STATUS_FAILED || wait->GetStatus() == SUBMISSION_STATUS_CANCELED) {
       ReportError(-1, "Submission dependency failed or was canceled.");
       return {};
     }

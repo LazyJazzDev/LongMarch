@@ -63,17 +63,21 @@ std::vector<PhysicalDevice> MetalCore::GetPhysicalDevices() const {
   return devices;
 }
 
-std::unique_ptr<Device> MetalCore::CreateNativeDevice(int32_t device_idx, Core *owner) const {
+rhi::IDevice *MetalCore::CreateDevice(int32_t device_idx) {
+  try {
 #if !defined(NDEBUG)
-  if (device_idx < 0 || static_cast<size_t>(device_idx) >= adapters_.size()) {
-    ReportError(-1, "Physical device ID is out of range.");
-    return {};
-  }
+    if (device_idx < 0 || static_cast<size_t>(device_idx) >= adapters_.size()) {
+      ReportError(-1, "Physical device ID is out of range.");
+      return {};
+    }
 #endif
-  const auto &adapter = adapters_[device_idx];
-  // Metal's enumerated MTLDevice is already usable; no feature enable mask or
-  // separate logical-device creation exists. Each wrapper owns a native retain.
-  return std::make_unique<MetalDevice>(adapter.info, owner, adapter.native);
+    const auto &adapter = adapters_[device_idx];
+    // Metal's enumerated MTLDevice is already usable; no feature enable mask or
+    // separate logical-device creation exists. Each wrapper owns a native retain.
+    return std::make_unique<MetalDevice>(adapter.info, this, adapter.native).release();
+  } catch (const std::bad_alloc &) {
+    return nullptr;
+  }
 }
 
 }  // namespace grassland::rhi::backend::metal

@@ -175,11 +175,6 @@ ObjectPtr<Image> VulkanWindow::AcquireNativeFrame() {
   return frame->Acquire() ? ObjectPtr<Image>(frame) : ObjectPtr<Image>{};
 }
 
-bool VulkanWindow::RebuildNativeSwapChain() {
-  valid_ = false;
-  return Rebuild();
-}
-
 bool VulkanWindow::SetNativePresentMode(PresentMode mode) {
   requested_ = mode;
   return true;
@@ -211,7 +206,7 @@ std::vector<WindowPresentationOption> VulkanWindow::GetSupportedPresentationOpti
                           std::find(modes.begin(), modes.end(), VK_PRESENT_MODE_MAILBOX_KHR) != modes.end();
   std::vector<WindowPresentationOption> options;
   for (const auto &format : formats) {
-    // Match the formats and color space implemented by Rebuild.
+    // Match the formats and color space implemented by RebuildNativeSwapChain.
     if (format.colorSpace != VK_COLOR_SPACE_SRGB_NONLINEAR_KHR ||
         (format.format != VK_FORMAT_R8G8B8A8_UNORM && format.format != VK_FORMAT_B8G8R8A8_UNORM))
       continue;
@@ -242,7 +237,8 @@ void VulkanWindow::DestroySwapchain() {
   swapchain_ = VK_NULL_HANDLE;
 }
 
-bool VulkanWindow::Rebuild() {
+bool VulkanWindow::RebuildNativeSwapChain() {
+  valid_ = false;
   if (glfwGetWindowAttrib(GLFWWindow(), GLFW_ICONIFIED))
     return true;
   int width, height;

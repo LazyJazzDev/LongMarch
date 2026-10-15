@@ -12,7 +12,7 @@ Device *Queue::Owner() const {
 }
 
 QueueType Queue::GetType() const {
-  return Type();
+  return type_;
 }
 
 bool Queue::SharesPhysicalQueue(const rhi::IQueue *other) const {
@@ -48,10 +48,6 @@ rhi::ISubmissionToken *Queue::Submit(rhi::ICommandContext *commands, const rhi::
     ReportError(error.code().value(), error.what());
   }
   return nullptr;
-}
-
-QueueType Queue::Type() const {
-  return type_;
 }
 
 }  // namespace grassland::rhi::backend

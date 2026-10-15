@@ -21,7 +21,6 @@ class D3D12Window final : public Window {
   HRESULT PresentFrame(uint64_t generation);
 
  private:
-  bool Rebuild(int width, int height);
   D3D12Device *device_;
   ComPtr<IDXGISwapChain3> swapchain_;
   ComPtr<ID3D12DescriptorHeap> rtv_;

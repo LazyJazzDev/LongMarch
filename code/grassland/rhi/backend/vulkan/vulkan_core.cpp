@@ -117,15 +117,19 @@ std::vector<PhysicalDevice> VulkanCore::GetPhysicalDevices() const {
   return devices;
 }
 
-std::unique_ptr<Device> VulkanCore::CreateNativeDevice(int32_t device_idx, Core *owner) const {
+rhi::IDevice *VulkanCore::CreateDevice(int32_t device_idx) {
+  try {
 #if !defined(NDEBUG)
-  if (device_idx < 0 || static_cast<size_t>(device_idx) >= adapters_.size()) {
-    ReportError(-1, "Physical device ID is out of range.");
-    return {};
-  }
+    if (device_idx < 0 || static_cast<size_t>(device_idx) >= adapters_.size()) {
+      ReportError(-1, "Physical device ID is out of range.");
+      return {};
+    }
 #endif
-  const auto &adapter = adapters_[device_idx];
-  return VulkanDevice::CreateVulkanDevice(adapter.info, owner, adapter.native, adapter.api_version);
+    const auto &adapter = adapters_[device_idx];
+    return VulkanDevice::CreateVulkanDevice(adapter.info, this, adapter.native, adapter.api_version).release();
+  } catch (const std::bad_alloc &) {
+    return nullptr;
+  }
 }
 
 }  // namespace grassland::rhi::backend::vulkan

@@ -32,8 +32,6 @@ class Device : public Object<rhi::IDevice> {
     explicit SubmissionState(uint64_t queue_identity);
     SubmissionStatus GetStatus() const override;
     bool WaitHost() const override;
-    SubmissionStatus Status() const;
-    bool Wait() const;
     void Complete(SubmissionStatus status);
     uint64_t QueueIdentity() const;
 

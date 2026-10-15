@@ -10,7 +10,7 @@ class MetalCore final : public Core {
  public:
   static std::unique_ptr<MetalCore> CreateMetalCore();
   std::vector<PhysicalDevice> GetPhysicalDevices() const override;
-  std::unique_ptr<Device> CreateNativeDevice(int32_t device_idx, Core *owner) const override;
+  rhi::IDevice *CreateDevice(int32_t device_idx) override;
 
  private:
   struct Adapter {
