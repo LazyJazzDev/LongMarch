@@ -5,9 +5,7 @@
 
 namespace grassland::rhi::backend::d3d12 {
 
-D3D12CommandContext::D3D12CommandContext(D3D12Device *device, QueueType type)
-    : CommandContext(device, type),
-      device_(device) {
+D3D12CommandContext::D3D12CommandContext(D3D12Device *device) : CommandContext(device), device_(device) {
 }
 
 D3D12CommandContext::~D3D12CommandContext() {

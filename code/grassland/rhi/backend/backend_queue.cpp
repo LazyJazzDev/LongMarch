@@ -22,8 +22,8 @@ bool Queue::SharesPhysicalQueue(const rhi::IQueue *other) const {
 
 rhi::ISubmissionToken *Queue::Submit(rhi::ICommandContext *commands, const rhi::SubmitInfo &info) {
   const auto impl = dynamic_cast<CommandContext *>(commands);
-  if (!impl || impl->Type() != Type() || impl->DeviceIdentity() != Owner()->NativeIdentity()) {
-    ReportError(-1, "Commands must be submitted to their recording queue.");
+  if (!impl || impl->DeviceIdentity() != Owner()->NativeIdentity()) {
+    ReportError(-1, "Commands must be submitted to a queue from their device.");
     return nullptr;
   }
   try {

@@ -18,6 +18,7 @@ class VulkanDevice final : public Device {
   bool SupportsSwapchain() const;
   std::mutex &QueueMutex();
   std::unique_ptr<Window> CreateNativeWindow(const WindowDesc &desc) override;
+  std::unique_ptr<CommandContext> CreateNativeCommandContext() override;
   std::unique_ptr<Queue> CreateQueue(QueueType type) override;
 
  private:

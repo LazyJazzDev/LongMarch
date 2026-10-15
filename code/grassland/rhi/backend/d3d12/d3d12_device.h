@@ -18,6 +18,7 @@ class D3D12Device final : public Device {
   bool Wait(uint64_t value, HANDLE event) const;
   bool WaitIdle();
   std::unique_ptr<Window> CreateNativeWindow(const WindowDesc &desc) override;
+  std::unique_ptr<CommandContext> CreateNativeCommandContext() override;
   std::unique_ptr<Queue> CreateQueue(QueueType type) override;
 
  private:

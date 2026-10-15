@@ -57,14 +57,9 @@ rhi::IQueue *Device::GetQueue(QueueType type) {
   }
 }
 
-rhi::ICommandContext *Device::CreateCommandContext(rhi::IQueue *queue) {
-  const auto impl = dynamic_cast<Queue *>(queue);
-  if (!impl || impl->Owner() != this) {
-    ReportError(-1, "The queue belongs to another device or implementation.");
-    return nullptr;
-  }
+rhi::ICommandContext *Device::CreateCommandContext() {
   try {
-    return impl->CreateCommandContext().release();
+    return CreateNativeCommandContext().release();
   } catch (const std::bad_alloc &) {
     ReportError(-1, "Command context allocation failed.");
     return nullptr;
@@ -107,6 +102,10 @@ const void *Device::NativeIdentity() const {
 
 std::unique_ptr<Window> Device::CreateNativeWindow(const WindowDesc &) {
   ReportError(-1, "Window creation is unavailable.");
+  return {};
+}
+
+std::unique_ptr<CommandContext> Device::CreateNativeCommandContext() {
   return {};
 }
 

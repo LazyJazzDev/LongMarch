@@ -25,9 +25,10 @@ class Device : public Object<rhi::IDevice> {
   bool SupportGeometryShader() const override;
   rhi::IWindow *CreateGLFWWindow(const WindowDesc &desc = {}) override;
   rhi::IQueue *GetQueue(QueueType type) override;
-  rhi::ICommandContext *CreateCommandContext(rhi::IQueue *queue) override;
+  rhi::ICommandContext *CreateCommandContext() override;
   virtual const void *NativeIdentity() const;
   virtual std::unique_ptr<Window> CreateNativeWindow(const WindowDesc &desc);
+  virtual std::unique_ptr<CommandContext> CreateNativeCommandContext();
   virtual std::unique_ptr<Queue> CreateQueue(QueueType type);
   ObjectPtr<Window> ManageWindow(std::unique_ptr<Window> window);
 

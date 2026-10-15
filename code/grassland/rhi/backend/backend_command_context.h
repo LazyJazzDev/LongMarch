@@ -15,7 +15,7 @@ class CommandContext : public Object<rhi::ICommandContext> {
     SUBMIT_RESULT_FAILED_IN_FLIGHT,
   } SubmitResult;
 
-  CommandContext(const void *identity, QueueType type);
+  CommandContext(const void *identity);
   ~CommandContext() override;
   bool CmdClearColor(rhi::IImage *image, const std::array<float, 4> &color) override;
   bool CmdPresent(rhi::IWindow *window) override;
@@ -23,7 +23,6 @@ class CommandContext : public Object<rhi::ICommandContext> {
   bool Seal();
   void AdvanceFrame();
   const void *DeviceIdentity() const;
-  QueueType Type() const;
   const ObjectPtr<Image> &Frame() const;
   void MarkSubmitted();
   bool WasSubmitted() const;
@@ -38,7 +37,6 @@ class CommandContext : public Object<rhi::ICommandContext> {
  private:
   Window *present_window_{};
   const void *identity_;
-  QueueType type_;
   ObjectPtr<Image> image_;
   bool present_{};
   bool sealed_{};

@@ -43,7 +43,7 @@ int RunWindow(grassland::rhi::IDevice *device, grassland::rhi::IWindow *window, 
       std::this_thread::sleep_for(std::chrono::milliseconds(10));
       continue;
     }
-    ObjPtr<ICommandContext> context = device->CreateCommandContext(graphics);
+    ObjPtr<ICommandContext> context = device->CreateCommandContext();
     if (!context)
       return 1;
     if (!context->CmdClearColor(image.Get(), {0.6f, 0.7f, 0.8f, 1.0f}))

@@ -40,7 +40,7 @@ TEST_P(RhiWindow, MultipleWindowsSingleUseFramesModesAndQueueLifetime) {
   {
     auto frame = first.GetNextImage();
     ASSERT_TRUE(frame);
-    auto context = device.CreateCommandContext(graphics);
+    auto context = device.CreateCommandContext();
     ASSERT_TRUE(context.CmdClearColor(frame, {0, 0, 0, 1}));
     EXPECT_FALSE(context.CmdPresent(second));
     EXPECT_FALSE(graphics.Submit(std::move(context)));
@@ -88,14 +88,17 @@ TEST_P(RhiWindow, MultipleWindowsSingleUseFramesModesAndQueueLifetime) {
       EXPECT_TRUE(std::any_of(supported.begin(), supported.end(), [&](const auto &option) {
         return option.format == frame.GetDesc().format && option.present_mode == window.GetPresentMode();
       }));
-      auto context = device.CreateCommandContext(graphics);
+      auto context = device.CreateCommandContext();
       ASSERT_TRUE(context.CmdClearColor(frame, {1.0f, 0.0f, 0.0f, 1.0f}));
       ASSERT_TRUE(context.CmdClearColor(frame, {0.6f, 0.7f, 0.8f, 1.0f}));
       ASSERT_TRUE(context.CmdPresent(window));
       auto before_submit = window.GetNextImage();
       EXPECT_EQ(frame.Get(), before_submit.Get());
       frame = {};  // Recording already owns the exact frame.
-      last = graphics.Submit(std::move(context));
+      if (window.Get() == first.Get())
+        last = transfer.Submit(std::move(context));
+      else
+        last = graphics.Submit(std::move(context));
       ASSERT_TRUE(last);
       auto after_submit = window.GetNextImage();
       ASSERT_TRUE(after_submit);
@@ -109,7 +112,7 @@ TEST_P(RhiWindow, MultipleWindowsSingleUseFramesModesAndQueueLifetime) {
   ASSERT_NE(hwnd, nullptr);
   auto old_frame = first.GetNextImage();
   ASSERT_TRUE(old_frame);
-  auto old_context = device.CreateCommandContext(graphics);
+  auto old_context = device.CreateCommandContext();
   ASSERT_TRUE(old_context.CmdClearColor(old_frame, {0, 0, 0, 1}));
   ASSERT_TRUE(old_context.CmdPresent(first));
   auto old_packet = std::move(old_context);
@@ -137,12 +140,12 @@ TEST_P(RhiWindow, MultipleWindowsSingleUseFramesModesAndQueueLifetime) {
     ASSERT_TRUE(restored);
   }
 #endif
-  auto upload = device.CreateCommandContext(transfer);
+  auto upload = device.CreateCommandContext();
   auto ready = transfer.Submit(std::move(upload));
   ASSERT_TRUE(ready);
   auto frame = second.GetNextImage();
   ASSERT_TRUE(frame);
-  auto context = device.CreateCommandContext(graphics);
+  auto context = device.CreateCommandContext();
   ASSERT_TRUE(context.CmdClearColor(frame, {0, 0, 1, 1}));
   ASSERT_TRUE(context.CmdPresent(second));
   auto &window_backend = (*static_cast<backend::Window *>((second).Get()));

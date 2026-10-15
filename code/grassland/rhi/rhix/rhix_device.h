@@ -19,7 +19,7 @@ class Device : public ObjectContainer {
   bool SupportGeometryShader() const;
   Window CreateGLFWWindow(const rhi::WindowDesc &desc = {}) const;
   Queue GetQueue(rhi::QueueType type) const;
-  CommandContext CreateCommandContext(const Queue &queue) const;
+  CommandContext CreateCommandContext() const;
 };
 
 }  // namespace grassland::rhix

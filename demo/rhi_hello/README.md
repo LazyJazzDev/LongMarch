@@ -109,7 +109,7 @@ auto graphics = device.GetQueue(QUEUE_TYPE_GRAPHICS);
 // Inside the main-thread event loop:
 auto image = window.GetNextImage();
 if (image) {
-  auto context = device.CreateCommandContext(graphics);
+  auto context = device.CreateCommandContext();
   if (!context) return;
   if (!context.CmdClearColor(image, {0.6f, 0.7f, 0.8f, 1.0f})) return;
   if (!context.CmdPresent(window)) return;
@@ -119,12 +119,14 @@ if (image) {
 }
 ```
 
-The first command path supports one full-image clear/present pair per context,
-or an empty submission. Graphics and Transfer are distinct logical queue handles
-sharing one persistent native graphics queue. `SubmitInfo::waits` accepts tokens
+The command path supports multiple clears of one frame followed by presentation,
+or an empty submission. Device creates contexts without a queue argument.
+Graphics and Transfer are logical roles with the same full graphics capabilities,
+sharing one persistent native graphics queue. Either role can submit a context.
+`SubmitInfo::waits` accepts tokens
 from either role on that Device; native queue order supplies those dependencies
-without blocking the host. Contexts and recorded commands are move-only; Finish
-and Submit consume their input even on failure.
+without blocking the host. rhix contexts are move-only; Submit consumes the
+context even on failure. There is no separate Finish or recorded-commands object.
 
 The rhix dot wrappers derive from `rhix::ObjectContainer`, which stores a
 `ObjPtr<rhi::IObject>` and provides `Release()`. Release clears only that handle's reference;

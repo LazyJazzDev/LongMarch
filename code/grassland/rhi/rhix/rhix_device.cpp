@@ -34,7 +34,7 @@ Queue Device::GetQueue(rhi::QueueType type) const {
   return *this ? Get()->GetQueue(type) : nullptr;
 }
 
-CommandContext Device::CreateCommandContext(const Queue &queue) const {
-  return *this ? Get()->CreateCommandContext(queue.Get()) : nullptr;
+CommandContext Device::CreateCommandContext() const {
+  return *this ? Get()->CreateCommandContext() : nullptr;
 }
 }  // namespace grassland::rhix

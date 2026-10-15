@@ -1,5 +1,6 @@
 #include "grassland/rhi/backend/vulkan/vulkan_device.h"
 
+#include "grassland/rhi/backend/vulkan/vulkan_command_context.h"
 #include "grassland/rhi/backend/vulkan/vulkan_core.h"
 #include "grassland/rhi/backend/vulkan/vulkan_queue.h"
 #include "grassland/rhi/backend/vulkan/vulkan_window.h"
@@ -97,6 +98,13 @@ std::mutex &VulkanDevice::QueueMutex() {
 std::unique_ptr<Window> VulkanDevice::CreateNativeWindow(const WindowDesc &desc) {
   auto window = std::make_unique<VulkanWindow>(this);
   return window->Initialize(desc) ? std::unique_ptr<Window>(std::move(window)) : nullptr;
+}
+
+std::unique_ptr<CommandContext> VulkanDevice::CreateNativeCommandContext() {
+  auto context = std::make_unique<VulkanCommandContext>(this);
+  if (!context->Initialize())
+    return {};
+  return context;
 }
 
 std::unique_ptr<Queue> VulkanDevice::CreateQueue(QueueType type) {

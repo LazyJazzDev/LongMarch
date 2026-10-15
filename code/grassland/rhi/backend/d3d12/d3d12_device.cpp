@@ -1,5 +1,6 @@
 #include "grassland/rhi/backend/d3d12/d3d12_device.h"
 
+#include "grassland/rhi/backend/d3d12/d3d12_command_context.h"
 #include "grassland/rhi/backend/d3d12/d3d12_queue.h"
 #include "grassland/rhi/backend/d3d12/d3d12_window.h"
 
@@ -93,6 +94,13 @@ bool D3D12Device::IsInitialized() const {
 std::unique_ptr<Window> D3D12Device::CreateNativeWindow(const WindowDesc &desc) {
   auto window = std::make_unique<D3D12Window>(this);
   return window->Initialize(desc) ? std::unique_ptr<Window>(std::move(window)) : nullptr;
+}
+
+std::unique_ptr<CommandContext> D3D12Device::CreateNativeCommandContext() {
+  auto context = std::make_unique<D3D12CommandContext>(this);
+  if (!context->Initialize())
+    return {};
+  return context;
 }
 
 std::unique_ptr<Queue> D3D12Device::CreateQueue(QueueType type) {

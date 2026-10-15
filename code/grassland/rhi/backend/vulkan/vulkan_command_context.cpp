@@ -5,9 +5,7 @@
 
 namespace grassland::rhi::backend::vulkan {
 
-VulkanCommandContext::VulkanCommandContext(VulkanDevice *device, QueueType type)
-    : CommandContext(device, type),
-      device_(device) {
+VulkanCommandContext::VulkanCommandContext(VulkanDevice *device) : CommandContext(device), device_(device) {
 }
 
 VulkanCommandContext::~VulkanCommandContext() {

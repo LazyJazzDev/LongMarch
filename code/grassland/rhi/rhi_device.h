@@ -14,7 +14,7 @@ class IDevice : public IObject {
   virtual bool SupportGeometryShader() const = 0;
   virtual IWindow *CreateGLFWWindow(const WindowDesc &desc = {}) = 0;
   virtual IQueue *GetQueue(QueueType type) = 0;
-  virtual ICommandContext *CreateCommandContext(IQueue *queue) = 0;
+  virtual ICommandContext *CreateCommandContext() = 0;
 
  protected:
   ~IDevice() override;

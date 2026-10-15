@@ -6,7 +6,7 @@ namespace grassland::rhi::backend::vulkan {
 
 class VulkanCommandContext final : public CommandContext {
  public:
-  VulkanCommandContext(VulkanDevice *device, QueueType type);
+  VulkanCommandContext(VulkanDevice *device);
   ~VulkanCommandContext() override;
   bool Initialize();
   SubmitResult SubmitNative() override;

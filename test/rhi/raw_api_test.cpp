@@ -25,7 +25,7 @@ TEST_P(RhiRaw, PointerFactoriesAndBorrowedSubmissionWorkWithoutWrappers) {
   ASSERT_NE(device, nullptr);
   IQueue *queue = device->GetQueue(QUEUE_TYPE_GRAPHICS);
   ASSERT_NE(queue, nullptr);
-  ICommandContext *context = device->CreateCommandContext(queue);
+  ICommandContext *context = device->CreateCommandContext();
   ASSERT_NE(context, nullptr);
   ISubmissionToken *done = queue->Submit(context);
   ASSERT_NE(done, nullptr);

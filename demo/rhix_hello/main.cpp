@@ -97,7 +97,7 @@ int main(int argc, char **argv) {
       std::this_thread::sleep_for(std::chrono::milliseconds(10));
       continue;
     }
-    auto context = device.CreateCommandContext(graphics);
+    auto context = device.CreateCommandContext();
     if (!context)
       return 1;
     if (!context.CmdClearColor(image, {0.6f, 0.7f, 0.8f, 1.0f}))

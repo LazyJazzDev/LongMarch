@@ -5,7 +5,7 @@
 #include "grassland/rhi/backend/backend_window.h"
 
 namespace grassland::rhi::backend {
-CommandContext::CommandContext(const void *identity, QueueType type) : identity_(identity), type_(type) {
+CommandContext::CommandContext(const void *identity) : identity_(identity) {
 }
 
 CommandContext::~CommandContext() {
@@ -20,9 +20,9 @@ bool CommandContext::CmdClearColor(rhi::IImage *image, const std::array<float, 4
 bool CommandContext::CmdClearColor(const ObjectPtr<Image> &image, const std::array<float, 4> &color) {
   if (sealed_)
     return false;
-  if (failed_ || present_ || type_ != QUEUE_TYPE_GRAPHICS || !image || !image->IsValid() ||
-      image->DeviceIdentity() != identity_ || (image_ && image_.Get() != image.Get())) {
-    ReportError(-1, "CmdClearColor requires this context's frame and a graphics queue.");
+  if (failed_ || present_ || !image || !image->IsValid() || image->DeviceIdentity() != identity_ ||
+      (image_ && image_.Get() != image.Get())) {
+    ReportError(-1, "CmdClearColor requires this context's frame.");
     failed_ = true;
     return false;
   }
@@ -84,10 +84,6 @@ bool CommandContext::Seal() {
 
 const void *CommandContext::DeviceIdentity() const {
   return identity_;
-}
-
-QueueType CommandContext::Type() const {
-  return type_;
 }
 
 const ObjectPtr<Image> &CommandContext::Frame() const {
