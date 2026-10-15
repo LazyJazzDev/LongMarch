@@ -48,6 +48,16 @@ void RegisterWindow(Window *window) {
     if (!it->second->RebuildSwapChain())
       Get().resize_failed = true;
   });
+  glfwSetWindowIconifyCallback(native, [](GLFWwindow *native, int iconified) {
+    // Restoring a Cocoa window need not change its framebuffer dimensions.
+    // A mode change while minimized may have discarded its prepared image.
+    if (iconified)
+      return;
+    std::lock_guard<std::mutex> lock(Get().mutex);
+    auto it = Get().windows.find(native);
+    if (it != Get().windows.end() && !it->second->RebuildSwapChain())
+      Get().resize_failed = true;
+  });
 }
 
 void UnregisterWindow(GLFWwindow *window) {

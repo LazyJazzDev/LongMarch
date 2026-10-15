@@ -56,8 +56,6 @@ int main(int argc, char **argv) {
             << "Enabled: ray tracing pipeline=" << device.SupportRayTracingPipeline()
             << ", ray query=" << device.SupportRayQuery() << ", geometry shader=" << device.SupportGeometryShader()
             << '\n';
-  if (api == BACKEND_API_METAL)
-    return 0;  // Metal keeps the device-query demo until its presentation backend is added.
   auto window = device.CreateGLFWWindow({1280, 720, "LongMarch RHIX - P: toggle VSync"});
   if (!window)
     return 1;

@@ -37,7 +37,7 @@ std::unique_ptr<VulkanCore> VulkanCore::CreateVulkanCore() {
   VkInstanceCreateFlags flags = 0;
   for (const auto &extension : available) {
     for (const auto name : {"VK_KHR_surface", "VK_KHR_win32_surface", "VK_KHR_xlib_surface", "VK_KHR_xcb_surface",
-                            "VK_KHR_wayland_surface"}) {
+                            "VK_KHR_wayland_surface", "VK_EXT_metal_surface", "VK_MVK_macos_surface"}) {
       if (std::strcmp(extension.extensionName, name) == 0)
         extensions.push_back(name);
     }

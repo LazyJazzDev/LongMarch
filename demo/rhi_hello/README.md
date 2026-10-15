@@ -100,11 +100,11 @@ D3D12 and Vulkan then open a blue GLFW window. The title displays FPS measured
 by `grassland::FPSCounter`, refreshed four times per second. Press **P** to switch between
 VSync and continuous presentation; **Escape** or the close button exits. Continuous
 presentation falls back to VSync when unavailable. `Window::GetPresentMode()`
-reports the actual mode. Window installs its own GLFW framebuffer-size callback
+reports the actual mode. Window installs its own GLFW framebuffer-size and restore callbacks
 at creation, rebuilding the swapchain when size events are dispatched (normally
 by `PollEvents()`). `SetPresentMode()` also rebuilds internally. There is no public
 rebuild function and the demos do not install resize callbacks. GLFW user pointers
-remain available to callers; replacing the framebuffer-size callback requires
+remain available to callers; replacing the framebuffer-size or iconify callback requires
 chaining the previous callback so the internal resize handling is preserved.
 
 `GetNextImage()` returns an owned reference to Window's prepared next image.
@@ -115,7 +115,9 @@ replace the prepared image as part of rebuilding. Only minimization or zero size
 returns an empty image; acquisition/rebuild work never occurs inside the getter.
 Creation/mode-change failures are reported at those calls, and resize callback
 failure is reported by `PollEvents()`. Device-loss recovery is not implemented.
-Metal retains the device-query-only behavior in this iteration.
+Metal implements the same presentation and submission contract using CAMetalLayer
+and retained-reference Metal command buffers. Graphics and transfer queues share
+one native command queue. SDR BGRA8 supports both VSync and continuous presentation.
 
 `CmdClearColor` records work on an Image, while `CmdPresent` takes the target
 Window (`IWindow *` in RHI, `const rhix::Window &` in rhix). The current backend
@@ -234,7 +236,8 @@ capacity is unknown (zero): `recommendedMaxWorkingSetSize` is a performance
 budget, not physical VRAM capacity, and is not substituted for it. Shared memory
 is not additional VRAM or a guarantee that the application can allocate it all.
 
-The Metal path tests enumeration and device creation, not rendering or ray tracing.
-The Metal native tests also execute and verify a buffer fill after releasing a
-sibling Device, while keeping Core alive, using Metal directly. This is an ownership
-test, not an implementation of RHI command submission.
+Metal tests cover enumeration, device creation, native buffer execution, ordered
+RHI clears verified by pixel readback, multi-window presentation, retained old
+image wrappers, resizing, and restoration after mode changes while minimized.
+Window tests require `LONGMARCH_RHI_WINDOW_TESTS=1` on a desktop; use
+`MTL_DEBUG_LAYER=1` to enable Metal API validation. Ray tracing is not exercised.

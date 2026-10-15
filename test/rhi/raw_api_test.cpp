@@ -50,6 +50,9 @@ std::vector<BackendAPI> Backends() {
 #ifdef LONGMARCH_D3D12_ENABLED
       BACKEND_API_D3D12,
 #endif
+#ifdef LONGMARCH_METAL_ENABLED
+      BACKEND_API_METAL,
+#endif
 #ifdef LONGMARCH_VULKAN_ENABLED
       BACKEND_API_VULKAN,
 #endif

@@ -74,7 +74,10 @@ rhi::IDevice *MetalCore::CreateDevice(int32_t device_idx) {
     const auto &adapter = adapters_[device_idx];
     // Metal's enumerated MTLDevice is already usable; no feature enable mask or
     // separate logical-device creation exists. Each wrapper owns a native retain.
-    return std::make_unique<MetalDevice>(adapter.info, this, adapter.native).release();
+    auto device = std::make_unique<MetalDevice>(adapter.info, this, adapter.native);
+    if (!device->IsInitialized())
+      return nullptr;
+    return device.release();
   } catch (const std::bad_alloc &) {
     return nullptr;
   }

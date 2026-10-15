@@ -1,7 +1,11 @@
 #include <gtest/gtest.h>
 
+#include <cstdlib>
+#include <thread>
+
 #include "grassland/rhi/backend/metal/metal_core.h"
 #include "grassland/rhi/backend/metal/metal_device.h"
+#include "grassland/rhi/backend/metal/metal_image.h"
 #include "grassland/rhi/rhix/rhix.h"
 
 namespace grassland::rhix {
@@ -66,6 +70,99 @@ TEST(RhiMetal, NativeDeviceExecutesWorkBeforeParentRelease) {
   const auto bytes = static_cast<const uint8_t *>(buffer->contents());
   for (size_t i = 0; i < 256; ++i)
     EXPECT_EQ(bytes[i], 0x5a);
+}
+
+TEST(RhiMetal, OrderedClearsReadbackAndRetainedPresentedImages) {
+  if (!std::getenv("LONGMARCH_RHI_WINDOW_TESTS"))
+    GTEST_SKIP() << "Requires a desktop.";
+  auto pool = NS::TransferPtr(NS::AutoreleasePool::alloc()->init());
+  auto core = rhix::CreateCore(BACKEND_API_METAL);
+  auto device = core.CreateDeviceByAutoSelection();
+  ASSERT_TRUE(device);
+  auto queue = device.GetQueue(QUEUE_TYPE_GRAPHICS);
+  auto first = device.CreateGLFWWindow({160, 120, "Metal readback A"});
+  auto second = device.CreateGLFWWindow({160, 120, "Metal readback B"});
+  ASSERT_TRUE(first);
+  ASSERT_TRUE(second);
+  auto a = first.GetNextImage();
+  auto b = second.GetNextImage();
+  auto clear = device.CreateCommandContext();
+  ASSERT_TRUE(clear.CmdClearColor(a, {1, 0, 0, 1}));
+  ASSERT_TRUE(clear.CmdClearColor(b, {0, 1, 0, 1}));
+  ASSERT_TRUE(clear.CmdClearColor(a, {0.6f, 0.7f, 0.8f, 1}));
+  auto done = queue.Submit(std::move(clear));
+  ASSERT_TRUE(done.WaitHost());
+  {
+    auto abandoned = device.CreateCommandContext();
+    ASSERT_TRUE(abandoned.CmdClearColor(a, {1, 0, 0, 1}));
+  }
+  auto native = static_cast<backend::metal::MetalDevice *>(device.Get());
+  auto readback = NS::TransferPtr(native->NativeDevice()->newBuffer(256, MTL::ResourceStorageModeShared));
+  ASSERT_TRUE(readback);
+  auto check = [&](const Image &image, std::array<int, 4> expected) {
+    auto commands = NS::RetainPtr(native->NativeQueue()->commandBuffer());
+    auto blit = commands->blitCommandEncoder();
+    auto texture = static_cast<backend::metal::MetalImage *>(image.Get())->NativeImage();
+    blit->copyFromTexture(texture, 0, 0, MTL::Origin::Make(0, 0, 0), MTL::Size::Make(1, 1, 1), readback.get(), 0, 256,
+                          256);
+    blit->endEncoding();
+    commands->commit();
+    commands->waitUntilCompleted();
+    ASSERT_EQ(commands->status(), MTL::CommandBufferStatusCompleted);
+    auto bytes = static_cast<const uint8_t *>(readback->contents());
+    for (size_t i = 0; i < 4; ++i)
+      EXPECT_NEAR(bytes[i], expected[i], 1);
+  };
+  check(a, {204, 179, 153, 255});
+  check(b, {0, 255, 0, 255});
+  a.Release();
+  b.Release();
+  std::vector<Image> old_images;
+  for (int i = 0; i < 12; ++i) {
+    old_images.push_back(first.GetNextImage());
+    auto present = device.CreateCommandContext();
+    ASSERT_TRUE(present.CmdPresent(first));
+    auto presented = queue.Submit(std::move(present));
+    ASSERT_TRUE(presented);
+    ASSERT_TRUE(presented.WaitHost());
+  }
+}
+
+TEST(RhiMetal, ResizeAndRestoreAfterModeChangeWhileMinimized) {
+  if (!std::getenv("LONGMARCH_RHI_WINDOW_TESTS"))
+    GTEST_SKIP() << "Requires a desktop.";
+  auto core = rhix::CreateCore(BACKEND_API_METAL);
+  auto device = core.CreateDeviceByAutoSelection();
+  auto window = device.CreateGLFWWindow({160, 120, "Metal resize test"});
+  ASSERT_TRUE(window);
+  int user_data = 42;
+  glfwSetWindowUserPointer(window.GLFWWindow(), &user_data);
+  glfwSetWindowSize(window.GLFWWindow(), 300, 200);
+  auto poll_until = [&](auto predicate) {
+    for (int i = 0; i < 200; ++i) {
+      if (!Window::PollEvents())
+        return false;
+      if (predicate())
+        return true;
+      std::this_thread::sleep_for(std::chrono::milliseconds(10));
+    }
+    return false;
+  };
+  ASSERT_TRUE(poll_until([&] {
+    int width, height;
+    glfwGetFramebufferSize(window.GLFWWindow(), &width, &height);
+    auto image = window.GetNextImage();
+    return image && image.GetDesc().width == width && image.GetDesc().height == height;
+  }));
+  EXPECT_EQ(glfwGetWindowUserPointer(window.GLFWWindow()), &user_data);
+  glfwIconifyWindow(window.GLFWWindow());
+  ASSERT_TRUE(poll_until([&] { return glfwGetWindowAttrib(window.GLFWWindow(), GLFW_ICONIFIED); }));
+  EXPECT_FALSE(window.GetNextImage());
+  ASSERT_TRUE(window.SetPresentMode(PRESENT_MODE_CONTINUOUS));
+  glfwRestoreWindow(window.GLFWWindow());
+  ASSERT_TRUE(poll_until([&] { return !glfwGetWindowAttrib(window.GLFWWindow(), GLFW_ICONIFIED); }));
+  EXPECT_TRUE(window.GetNextImage());
+  EXPECT_EQ(window.GetPresentMode(), PRESENT_MODE_CONTINUOUS);
 }
 
 }  // namespace

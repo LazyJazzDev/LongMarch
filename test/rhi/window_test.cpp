@@ -272,6 +272,9 @@ std::vector<BackendAPI> WindowBackends() {
 #ifdef LONGMARCH_VULKAN_ENABLED
   backends.push_back(BACKEND_API_VULKAN);
 #endif
+#ifdef LONGMARCH_METAL_ENABLED
+  backends.push_back(BACKEND_API_METAL);
+#endif
   return backends;
 }
 
