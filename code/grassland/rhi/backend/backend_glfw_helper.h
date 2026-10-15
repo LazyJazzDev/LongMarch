@@ -7,7 +7,7 @@ namespace glfw {
 bool Initialize();
 bool PollEvents();
 bool IsWindowThread();
-GLFWwindow *CreateWindow(int width, int height, const char *title);
+GLFWwindow *CreateGLFWWindow(int width, int height, const char *title);
 void DestroyWindow(GLFWwindow *window);
 bool SetWindowTitle(GLFWwindow *window, const char *title);
 }  // namespace glfw

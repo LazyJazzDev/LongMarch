@@ -26,8 +26,8 @@ bool Device::SupportGeometryShader() const {
   return *this && Get()->SupportGeometryShader();
 }
 
-Window Device::CreateWindow(const rhi::WindowDesc &desc) const {
-  return *this ? Get()->CreateWindow(desc) : nullptr;
+Window Device::CreateGLFWWindow(const rhi::WindowDesc &desc) const {
+  return *this ? Get()->CreateGLFWWindow(desc) : nullptr;
 }
 
 Queue Device::GetQueue(rhi::QueueType type) const {

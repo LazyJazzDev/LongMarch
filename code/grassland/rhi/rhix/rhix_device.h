@@ -17,7 +17,7 @@ class Device : public ObjectContainer {
   bool SupportRayTracingPipeline() const;
   bool SupportRayQuery() const;
   bool SupportGeometryShader() const;
-  Window CreateWindow(const rhi::WindowDesc &desc = {}) const;
+  Window CreateGLFWWindow(const rhi::WindowDesc &desc = {}) const;
   Queue GetQueue(rhi::QueueType type) const;
   CommandContext CreateCommandContext(const Queue &queue) const;
 };

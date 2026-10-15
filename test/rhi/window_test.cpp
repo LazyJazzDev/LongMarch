@@ -2,14 +2,13 @@
 
 #include <cstdlib>
 
-#include "grassland/rhi/backend/backend_window.h"
-#include "grassland/rhi/rhix/rhix.h"
-
 #ifdef _WIN32
 #define NOMINMAX
 #include <Windows.h>
-#undef CreateWindow
 #endif
+
+#include "grassland/rhi/backend/backend_window.h"
+#include "grassland/rhi/rhix/rhix.h"
 
 namespace grassland::rhix {
 using namespace rhi;
@@ -31,8 +30,8 @@ TEST_P(RhiWindow, MultipleWindowsSingleUseFramesModesAndQueueLifetime) {
   ASSERT_TRUE(graphics);
   ASSERT_TRUE(transfer);
   EXPECT_TRUE(graphics.SharesPhysicalQueue(transfer));
-  auto first = device.CreateWindow({320, 240, "RHI window test A"});
-  auto second = device.CreateWindow({320, 240, "RHI window test B"});
+  auto first = device.CreateGLFWWindow({320, 240, "RHI window test A"});
+  auto second = device.CreateGLFWWindow({320, 240, "RHI window test B"});
   ASSERT_TRUE(first);
   ASSERT_TRUE(second);
   // Dropping an unsubmitted acquisition must not strand the swapchain.

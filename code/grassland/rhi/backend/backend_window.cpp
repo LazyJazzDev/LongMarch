@@ -45,7 +45,7 @@ Window::~Window() {
 }
 
 bool Window::InitializeWindow(const WindowDesc &desc) {
-  window_ = glfw::CreateWindow(desc.width, desc.height, desc.title.c_str());
+  window_ = glfw::CreateGLFWWindow(desc.width, desc.height, desc.title.c_str());
   return window_ != nullptr;
 }
 

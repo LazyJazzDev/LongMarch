@@ -57,7 +57,7 @@ int main(int argc, char **argv) {
             << '\n';
   if (api == BACKEND_API_METAL)
     return 0;  // Metal keeps the device-query demo until its presentation backend is added.
-  auto window = device.CreateWindow({1280, 720, "LongMarch RHI - P: toggle VSync"});
+  auto window = device.CreateGLFWWindow({1280, 720, "LongMarch RHI - P: toggle VSync"});
   auto graphics = device.GetQueue(QueueType::Graphics);
   if (!window || !graphics)
     return 1;

@@ -63,7 +63,7 @@ bool PollEvents() {
   return true;
 }
 
-GLFWwindow *CreateWindow(int width, int height, const char *title) {
+GLFWwindow *CreateGLFWWindow(int width, int height, const char *title) {
   if (width <= 0 || height <= 0) {
     ReportError(-1, "Window dimensions must be positive.");
     return nullptr;

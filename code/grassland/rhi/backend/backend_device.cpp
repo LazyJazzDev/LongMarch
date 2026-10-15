@@ -39,7 +39,7 @@ bool Device::SupportGeometryShader() const {
   return info_.geometry_shader_feature;
 }
 
-rhi::IWindow *Device::CreateWindow(const WindowDesc &desc) {
+rhi::IWindow *Device::CreateGLFWWindow(const WindowDesc &desc) {
   try {
     return ManageWindow(CreateNativeWindow(desc)).Detach();
   } catch (const std::bad_alloc &) {

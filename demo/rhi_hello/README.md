@@ -65,7 +65,7 @@ reports the actual mode. Resizing and minimization are handled by the Window.
 Metal retains the device-query-only behavior in this iteration.
 
 ```cpp
-auto window = device.CreateWindow({1280, 720, "RHI"});
+auto window = device.CreateGLFWWindow({1280, 720, "RHI"});
 auto graphics = device.GetQueue(QueueType::Graphics);
 // Inside the main-thread event loop:
 auto image = window.AcquireFrame();

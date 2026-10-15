@@ -23,7 +23,7 @@ class Device : public Object<rhi::IDevice> {
   bool SupportRayTracingPipeline() const override;
   bool SupportRayQuery() const override;
   bool SupportGeometryShader() const override;
-  rhi::IWindow *CreateWindow(const WindowDesc &desc = {}) override;
+  rhi::IWindow *CreateGLFWWindow(const WindowDesc &desc = {}) override;
   rhi::IQueue *GetQueue(QueueType type) override;
   rhi::ICommandContext *CreateCommandContext(rhi::IQueue *queue) override;
   virtual const void *NativeIdentity() const;
