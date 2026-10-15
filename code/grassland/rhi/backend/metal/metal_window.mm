@@ -43,12 +43,13 @@ bool MetalWindow::Initialize(const WindowDesc &desc) {
   ((CAMetalLayer *)layer_.get()).colorspace = colorspace;
   if (colorspace)
     CGColorSpaceRelease(colorspace);
-  if (!SetNativePresentMode(desc.present_mode))
-    return false;
   return RebuildSwapChain();
 }
 
-bool MetalWindow::RebuildNativeSwapChain() {
+bool MetalWindow::RebuildNativeSwapChain(PresentMode requested_mode) {
+  auto layer = (CAMetalLayer *)layer_.get();
+  layer.displaySyncEnabled = requested_mode != PRESENT_MODE_CONTINUOUS;
+  mode_ = layer.displaySyncEnabled ? PRESENT_MODE_VSYNC : PRESENT_MODE_CONTINUOUS;
   auto pool = NS::TransferPtr(NS::AutoreleasePool::alloc()->init());
   std::lock_guard<std::mutex> lock(device_->QueueMutex());
   if (!device_->WaitIdle())
@@ -90,13 +91,6 @@ ObjectPtr<Image> MetalWindow::AcquireNativeFrame() {
   auto image = ObjectPtr<Image>::Adopt(new MetalSwapChainImage(desc_, this, generation_, drawable.get()));
   acquired_ = true;
   return image;
-}
-
-bool MetalWindow::SetNativePresentMode(PresentMode mode) {
-  auto native = (CAMetalLayer *)layer_.get();
-  native.displaySyncEnabled = mode != PRESENT_MODE_CONTINUOUS;
-  mode_ = native.displaySyncEnabled ? PRESENT_MODE_VSYNC : PRESENT_MODE_CONTINUOUS;
-  return true;
 }
 
 PresentMode MetalWindow::GetPresentMode() const {

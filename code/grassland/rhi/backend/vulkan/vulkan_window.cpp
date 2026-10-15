@@ -40,7 +40,6 @@ bool VulkanWindow::Initialize(const WindowDesc &desc) {
     ReportError(-1, "The graphics queue cannot present to this surface.");
     return false;
   }
-  requested_ = desc.present_mode;
   return RebuildSwapChain();
 }
 
@@ -48,24 +47,40 @@ const void *VulkanWindow::DeviceIdentity() const {
   return device_;
 }
 
-VkResult VulkanWindow::AcquireNative() {
+ObjectPtr<Image> VulkanWindow::AcquireNativeFrame() {
+  if (glfwGetWindowAttrib(GLFWWindow(), GLFW_ICONIFIED))
+    return {};
+  int width, height;
+  glfwGetFramebufferSize(GLFWWindow(), &width, &height);
+  if (width <= 0 || height <= 0)
+    return {};
+#if !defined(NDEBUG)
+  if (!valid_ || width != width_ || height != height_)
+    return {};
+#endif
+#if !defined(NDEBUG)
+  if (acquired_) {
+    ReportError(-1, "Present or release the previous acquired frame first.");
+    return {};
+  }
+#endif
   current_sync_ = next_sync_;
   auto &sync = acquire_sync_[current_sync_];
   const auto native = device_->NativeDevice();
   if (sync.submission) {
     const auto completion = sync.submission->CompletionFence();
     const auto status = vkWaitForFences(native, 1, &completion, VK_TRUE, UINT64_MAX);
-    if (status != VK_SUCCESS)
-      return status;
+    if (!Check(status, "Acquire frame synchronization"))
+      return {};
     sync.submission.Reset();
   }
   if (sync.acquired) {
     auto status = vkWaitForFences(native, 1, &sync.fence, VK_TRUE, UINT64_MAX);
-    if (status != VK_SUCCESS)
-      return status;
+    if (!Check(status, "Acquire frame synchronization"))
+      return {};
     status = vkResetFences(native, 1, &sync.fence);
-    if (status != VK_SUCCESS)
-      return status;
+    if (!Check(status, "Acquire frame synchronization"))
+      return {};
     sync.acquired = false;
   }
   const auto semaphore = sync.semaphore;
@@ -83,8 +98,8 @@ VkResult VulkanWindow::AcquireNative() {
       // This runs once per physical swapchain image, not once per CommandContext.
       const auto device = device_->NativeDevice();
       auto status = vkWaitForFences(device, 1, &fence, VK_TRUE, UINT64_MAX);
-      if (status != VK_SUCCESS)
-        return status;
+      if (!Check(status, "Acquire frame synchronization"))
+        return {};
       std::lock_guard<std::mutex> lock(device_->QueueMutex());
       VkCommandPool pool{};
       VkCommandBuffer commands{};
@@ -137,13 +152,17 @@ VkResult VulkanWindow::AcquireNative() {
         vkDestroyFence(device, completion, nullptr);
       if (pool)
         vkDestroyCommandPool(device, pool, nullptr);
-      if (status != VK_SUCCESS)
-        return status;
+      if (!Check(status, "Initialize swapchain image"))
+        return {};
       initialized_images_[current_image_] = true;
     }
   } else if (result == VK_ERROR_OUT_OF_DATE_KHR)
     valid_ = false;
-  return result;
+  if (result != VK_SUCCESS && result != VK_SUBOPTIMAL_KHR) {
+    Check(result, "vkAcquireNextImageKHR");
+    return {};
+  }
+  return ObjectPtr<Image>::Adopt(new VulkanSwapChainImage(desc_, this, images_[current_image_]));
 }
 
 VkSemaphore VulkanWindow::AcquireSemaphore() const {
@@ -176,36 +195,6 @@ VkResult VulkanWindow::PresentFrame() {
   if (result != VK_SUCCESS)
     valid_ = false;
   return result;
-}
-
-ObjectPtr<Image> VulkanWindow::AcquireNativeFrame() {
-  if (glfwGetWindowAttrib(GLFWWindow(), GLFW_ICONIFIED))
-    return {};
-  int width, height;
-  glfwGetFramebufferSize(GLFWWindow(), &width, &height);
-  if (width <= 0 || height <= 0)
-    return {};
-#if !defined(NDEBUG)
-  if (!valid_ || width != width_ || height != height_)
-    return {};
-#endif
-#if !defined(NDEBUG)
-  if (acquired_) {
-    ReportError(-1, "Present or release the previous acquired frame first.");
-    return {};
-  }
-#endif
-  const auto result = AcquireNative();
-  if (result != VK_SUCCESS && result != VK_SUBOPTIMAL_KHR) {
-    Check(result, "vkAcquireNextImageKHR");
-    return {};
-  }
-  return ObjectPtr<Image>::Adopt(new VulkanSwapChainImage(desc_, this, images_[current_image_]));
-}
-
-bool VulkanWindow::SetNativePresentMode(PresentMode mode) {
-  requested_ = mode;
-  return true;
 }
 
 std::vector<WindowPresentationOption> VulkanWindow::GetSupportedPresentationOptions() const {
@@ -277,7 +266,7 @@ void VulkanWindow::DestroySwapchain() {
   swapchain_ = VK_NULL_HANDLE;
 }
 
-bool VulkanWindow::RebuildNativeSwapChain() {
+bool VulkanWindow::RebuildNativeSwapChain(PresentMode requested_mode) {
   valid_ = false;
   if (glfwGetWindowAttrib(GLFWWindow(), GLFW_ICONIFIED))
     return true;
@@ -316,7 +305,7 @@ bool VulkanWindow::RebuildNativeSwapChain() {
     return false;
   }
   VkPresentModeKHR mode = VK_PRESENT_MODE_FIFO_KHR;
-  if (requested_ == PRESENT_MODE_CONTINUOUS) {
+  if (requested_mode == PRESENT_MODE_CONTINUOUS) {
     for (auto candidate : {VK_PRESENT_MODE_IMMEDIATE_KHR, VK_PRESENT_MODE_MAILBOX_KHR}) {
       if (std::find(modes.begin(), modes.end(), candidate) != modes.end()) {
         mode = candidate;

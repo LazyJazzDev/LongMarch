@@ -12,8 +12,7 @@ class D3D12Window final : public Window {
   ~D3D12Window() override;
   bool Initialize(const WindowDesc &desc);
   ObjectPtr<Image> AcquireNativeFrame() override;
-  bool RebuildNativeSwapChain() override;
-  bool SetNativePresentMode(PresentMode mode) override;
+  bool RebuildNativeSwapChain(PresentMode mode) override;
   PresentMode GetPresentMode() const override;
   std::vector<WindowPresentationOption> GetSupportedPresentationOptions() const override;
   bool IsFrameValid(uint64_t generation) const;

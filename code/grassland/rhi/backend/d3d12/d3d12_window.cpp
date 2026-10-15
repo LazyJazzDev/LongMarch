@@ -21,7 +21,6 @@ D3D12Window::~D3D12Window() {
 bool D3D12Window::Initialize(const WindowDesc &desc) {
   if (!InitializeWindow(desc))
     return false;
-  SetNativePresentMode(desc.present_mode);
   return RebuildSwapChain();
 }
 
@@ -68,11 +67,6 @@ ObjectPtr<Image> D3D12Window::AcquireNativeFrame() {
   return frame;
 }
 
-bool D3D12Window::SetNativePresentMode(PresentMode mode) {
-  mode_ = mode == PRESENT_MODE_CONTINUOUS && device_->SupportsTearing() ? mode : PRESENT_MODE_VSYNC;
-  return true;
-}
-
 PresentMode D3D12Window::GetPresentMode() const {
   return mode_;
 }
@@ -85,7 +79,8 @@ std::vector<WindowPresentationOption> D3D12Window::GetSupportedPresentationOptio
   return options;
 }
 
-bool D3D12Window::RebuildNativeSwapChain() {
+bool D3D12Window::RebuildNativeSwapChain(PresentMode requested_mode) {
+  mode_ = requested_mode == PRESENT_MODE_CONTINUOUS && device_->SupportsTearing() ? requested_mode : PRESENT_MODE_VSYNC;
   valid_ = false;
   if (glfwGetWindowAttrib(GLFWWindow(), GLFW_ICONIFIED))
     return true;

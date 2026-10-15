@@ -12,8 +12,7 @@ class VulkanWindow final : public Window {
   ~VulkanWindow() override;
   bool Initialize(const WindowDesc &desc);
   ObjectPtr<Image> AcquireNativeFrame() override;
-  bool RebuildNativeSwapChain() override;
-  bool SetNativePresentMode(PresentMode mode) override;
+  bool RebuildNativeSwapChain(PresentMode mode) override;
   PresentMode GetPresentMode() const override;
   std::vector<WindowPresentationOption> GetSupportedPresentationOptions() const override;
   const void *DeviceIdentity() const;
@@ -23,7 +22,6 @@ class VulkanWindow final : public Window {
   VkResult PresentFrame();
 
  private:
-  VkResult AcquireNative();
   void DestroySwapchain();
   VulkanDevice *device_;
   VkSurfaceKHR surface_{};
@@ -49,7 +47,6 @@ class VulkanWindow final : public Window {
   ImageDesc desc_;
   bool acquired_{};
   bool valid_{};
-  PresentMode requested_{PRESENT_MODE_VSYNC};
   PresentMode mode_{PRESENT_MODE_VSYNC};
   int width_{}, height_{};
 };

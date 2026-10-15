@@ -21,13 +21,13 @@ class Window : public Object<rhi::IWindow> {
   bool IsKeyDown(int key) const override;
   bool SetTitle(const std::string &title) override;
   virtual ObjectPtr<Image> AcquireNativeFrame() = 0;
-  virtual bool RebuildNativeSwapChain() = 0;
-  virtual bool SetNativePresentMode(PresentMode mode) = 0;
+  virtual bool RebuildNativeSwapChain(PresentMode mode) = 0;
 
  protected:
   bool InitializeWindow(const WindowDesc &desc);
 
  private:
+  PresentMode requested_mode_{PRESENT_MODE_VSYNC};
   GLFWwindow *window_{};
   std::mutex next_image_mutex_;
   ObjectPtr<Image> next_image_;

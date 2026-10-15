@@ -52,7 +52,7 @@ bool Window::RebuildSwapChain() {
 #endif
   try {
     ReleaseNextImage();
-    if (!RebuildNativeSwapChain())
+    if (!RebuildNativeSwapChain(requested_mode_))
       return false;
     return UpdateNextImage();
   } catch (const std::bad_alloc &) {
@@ -62,18 +62,12 @@ bool Window::RebuildSwapChain() {
 }
 
 bool Window::SetPresentMode(PresentMode mode) {
-  try {
 #if !defined(NDEBUG)
-    if (!glfw::IsWindowThread())
-      return false;
-#endif
-    if (!SetNativePresentMode(mode))
-      return false;
-    return RebuildSwapChain();
-  } catch (const std::bad_alloc &) {
-    ReportError(-1, "Present mode change ran out of memory.");
+  if (!glfw::IsWindowThread())
     return false;
-  }
+#endif
+  requested_mode_ = mode;
+  return RebuildSwapChain();
 }
 
 Window::~Window() {
@@ -82,6 +76,7 @@ Window::~Window() {
 }
 
 bool Window::InitializeWindow(const WindowDesc &desc) {
+  requested_mode_ = desc.present_mode;
   window_ = glfw::CreateGLFWWindow(desc.width, desc.height, desc.title.c_str());
   if (!window_)
     return false;
