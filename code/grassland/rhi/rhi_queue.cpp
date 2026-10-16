@@ -2,5 +2,4 @@
 
 namespace grassland::rhi {
 IQueue::~IQueue() = default;
-ISubmissionToken::~ISubmissionToken() = default;
 }  // namespace grassland::rhi

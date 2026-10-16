@@ -1,17 +1,8 @@
 #pragma once
-#include "grassland/rhi/rhi_object.h"
+#include "grassland/rhi/rhi_submission_token.h"
 
 namespace grassland::rhi {
 class ICommandContext;
-
-class ISubmissionToken : public IObject {
- public:
-  virtual SubmissionStatus GetStatus() const = 0;
-  virtual bool WaitHost() const = 0;
-
- protected:
-  ~ISubmissionToken() override;
-};
 
 struct SubmitInfo {
   // Borrowed for the duration of Submit.

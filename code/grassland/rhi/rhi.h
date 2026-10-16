@@ -6,6 +6,7 @@
 #include "grassland/rhi/rhi_obj_ptr.h"
 #include "grassland/rhi/rhi_object.h"
 #include "grassland/rhi/rhi_queue.h"
+#include "grassland/rhi/rhi_submission_token.h"
 #include "grassland/rhi/rhi_util.h"
 #include "grassland/rhi/rhi_window.h"
 

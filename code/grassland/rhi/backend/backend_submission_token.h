@@ -3,7 +3,7 @@
 #include <mutex>
 
 #include "grassland/rhi/backend/backend_util.h"
-#include "grassland/rhi/rhi_queue.h"
+#include "grassland/rhi/rhi_submission_token.h"
 
 namespace grassland::rhi::backend {
 
