@@ -31,15 +31,15 @@ rhi::ISubmissionToken *Queue::Submit(rhi::ICommandContext *commands, const rhi::
   const auto impl = static_cast<CommandContext *>(commands);
 #endif
   try {
-    std::vector<ObjectPtr<Device::SubmissionState>> waits;
+    std::vector<ObjectPtr<SubmissionToken>> waits;
     waits.reserve(info.waits.size());
     for (auto token : info.waits) {
 #if !defined(NDEBUG)
-      auto state = dynamic_cast<Device::SubmissionState *>(token);
+      auto state = dynamic_cast<SubmissionToken *>(token);
 #else
-      auto state = static_cast<Device::SubmissionState *>(token);
+      auto state = static_cast<SubmissionToken *>(token);
 #endif
-      waits.push_back(ObjectPtr<Device::SubmissionState>::Retain(state));
+      waits.push_back(ObjectPtr<SubmissionToken>::Retain(state));
     }
     return Owner()->Submit(ObjectPtr<CommandContext>::Retain(impl), waits).Detach();
   } catch (const std::bad_alloc &) {

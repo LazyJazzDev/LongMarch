@@ -60,34 +60,8 @@ const void *Device::NativeIdentity() const {
   return this;
 }
 
-Device::SubmissionState::SubmissionState(uint64_t identity) : queue_identity_(identity) {
-}
-
-uint64_t Device::SubmissionState::QueueIdentity() const {
-  return queue_identity_;
-}
-
-SubmissionStatus Device::SubmissionState::GetStatus() const {
-  std::lock_guard<std::mutex> lock(mutex_);
-  return status_;
-}
-
-bool Device::SubmissionState::WaitHost() const {
-  std::unique_lock<std::mutex> lock(mutex_);
-  changed_.wait(lock, [&] { return status_ != SUBMISSION_STATUS_PENDING; });
-  return status_ == SUBMISSION_STATUS_COMPLETED;
-}
-
-void Device::SubmissionState::Complete(SubmissionStatus status) {
-  {
-    std::lock_guard<std::mutex> lock(mutex_);
-    status_ = status;
-  }
-  changed_.notify_all();
-}
-
-ObjectPtr<Device::SubmissionState> Device::Submit(const ObjectPtr<CommandContext> &commands,
-                                                  const std::vector<ObjectPtr<Device::SubmissionState>> &waits) {
+ObjectPtr<SubmissionToken> Device::Submit(const ObjectPtr<CommandContext> &commands,
+                                          const std::vector<ObjectPtr<SubmissionToken>> &waits) {
   if (!commands->Seal())
     return {};
 #if !defined(NDEBUG)
@@ -110,7 +84,7 @@ ObjectPtr<Device::SubmissionState> Device::Submit(const ObjectPtr<CommandContext
   }
   // Both logical roles share one physical queue. Its ordering already supplies
   // these GPU dependencies; no host wait or additional native wait is required.
-  auto completion = ObjectPtr<Device::SubmissionState>::Adopt(new Device::SubmissionState(queue_identity_));
+  auto completion = ObjectPtr<SubmissionToken>::Adopt(new SubmissionToken(queue_identity_));
   std::lock_guard<std::mutex> lock(mutex_);
   if (stopping_)
     return {};
@@ -139,7 +113,7 @@ ObjectPtr<Device::SubmissionState> Device::Submit(const ObjectPtr<CommandContext
   commands->MarkSubmitted();
   pending_.back().commands = commands;
   changed_.notify_one();
-  return result == CommandContext::SUBMIT_RESULT_SUBMITTED ? completion : ObjectPtr<SubmissionState>{};
+  return result == CommandContext::SUBMIT_RESULT_SUBMITTED ? completion : ObjectPtr<SubmissionToken>{};
 }
 
 void Device::Collect() {

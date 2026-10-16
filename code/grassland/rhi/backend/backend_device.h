@@ -4,9 +4,9 @@
 #include <mutex>
 #include <thread>
 
+#include "grassland/rhi/backend/backend_submission_token.h"
 #include "grassland/rhi/backend/backend_util.h"
 #include "grassland/rhi/rhi_device.h"
-#include "grassland/rhi/rhi_queue.h"
 
 namespace grassland::rhi::backend {
 
@@ -26,24 +26,8 @@ class Device : public Object<rhi::IDevice> {
   rhi::ICommandContext *CreateCommandContext() override;
   virtual const void *NativeIdentity() const;
 
-  // Lightweight completion state: deliberately holds no native resources or packet.
-  class SubmissionState final : public Object<rhi::ISubmissionToken> {
-   public:
-    explicit SubmissionState(uint64_t queue_identity);
-    SubmissionStatus GetStatus() const override;
-    bool WaitHost() const override;
-    void Complete(SubmissionStatus status);
-    uint64_t QueueIdentity() const;
-
-   private:
-    mutable std::mutex mutex_;
-    mutable std::condition_variable changed_;
-    SubmissionStatus status_{SUBMISSION_STATUS_PENDING};
-    uint64_t queue_identity_;
-  };
-
-  ObjectPtr<SubmissionState> Submit(const ObjectPtr<CommandContext> &commands,
-                                    const std::vector<ObjectPtr<SubmissionState>> &waits);
+  ObjectPtr<SubmissionToken> Submit(const ObjectPtr<CommandContext> &commands,
+                                    const std::vector<ObjectPtr<SubmissionToken>> &waits);
 
  protected:
   void ShutdownQueues();
@@ -52,7 +36,7 @@ class Device : public Object<rhi::IDevice> {
  private:
   struct Submission {
     ObjectPtr<CommandContext> commands;
-    ObjectPtr<SubmissionState> completion;
+    ObjectPtr<SubmissionToken> completion;
   };
 
   void Collect();
