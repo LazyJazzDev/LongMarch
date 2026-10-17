@@ -1,5 +1,6 @@
 #include <gtest/gtest.h>
 
+#include <chrono>
 #include <cstdlib>
 #include <thread>
 
@@ -72,6 +73,47 @@ TEST(RhiMetal, NativeDeviceExecutesWorkBeforeParentRelease) {
     EXPECT_EQ(bytes[i], 0x5a);
 }
 
+TEST(RhiMetal, CompletionTokensSurviveBatchesAndParentRelease) {
+  std::vector<rhi::ObjPtr<rhi::ISubmissionToken>> tokens;
+  {
+    rhi::ObjPtr<rhi::ICore> core = rhi::CreateCore(BACKEND_API_METAL);
+    ASSERT_TRUE(core);
+    rhi::ObjPtr<rhi::IDevice> device = core->CreateDeviceByAutoSelection();
+    ASSERT_TRUE(device);
+    rhi::ObjPtr<rhi::IQueue> graphics = device->GetQueue(QUEUE_TYPE_GRAPHICS);
+    rhi::ObjPtr<rhi::IQueue> transfer = device->GetQueue(QUEUE_TYPE_TRANSFER);
+    ASSERT_TRUE(graphics);
+    ASSERT_TRUE(transfer);
+    for (int batch = 0; batch < 8; ++batch) {
+      std::vector<rhi::ObjPtr<rhi::ICommandContext>> held;
+      for (int i = 0; i < 16; ++i) {
+        // Abandoned recordings must not consume queue capacity permanently.
+        {
+          rhi::ObjPtr<rhi::ICommandContext> abandoned = device->CreateCommandContext();
+          ASSERT_TRUE(abandoned);
+        }
+        rhi::ObjPtr<rhi::ICommandContext> context = device->CreateCommandContext();
+        ASSERT_TRUE(context);
+        auto queue = i % 2 ? graphics.Get() : transfer.Get();
+        rhi::SubmitInfo desc;
+        if (!tokens.empty())
+          desc.waits.push_back(tokens.back().Get());
+        rhi::ObjPtr<rhi::ISubmissionToken> token = queue->Submit(context.Get(), desc);
+        ASSERT_TRUE(token);
+        tokens.push_back(std::move(token));
+        held.push_back(std::move(context));
+      }
+      ASSERT_TRUE(tokens.back()->WaitHost());
+      for (const auto &token : tokens)
+        EXPECT_EQ(token->GetStatus(), SUBMISSION_STATUS_COMPLETED);
+    }
+  }  // Completed tokens retain no contexts, windows or device.
+  for (const auto &token : tokens) {
+    EXPECT_TRUE(token->WaitHost());
+    EXPECT_EQ(token->GetStatus(), SUBMISSION_STATUS_COMPLETED);
+  }
+}
+
 TEST(RhiMetal, OrderedClearsReadbackAndRetainedPresentedImages) {
   if (!std::getenv("LONGMARCH_RHI_WINDOW_TESTS"))
     GTEST_SKIP() << "Requires a desktop.";
@@ -133,8 +175,9 @@ TEST(RhiMetal, ResizeAndRestoreAfterModeChangeWhileMinimized) {
     GTEST_SKIP() << "Requires a desktop.";
   auto core = rhix::CreateCore(BACKEND_API_METAL);
   auto device = core.CreateDeviceByAutoSelection();
-  auto window = device.CreateGLFWWindow({160, 120, "Metal resize test"});
+  auto window = device.CreateGLFWWindow({160, 120, "Metal resize test", PRESENT_MODE_CONTINUOUS});
   ASSERT_TRUE(window);
+  EXPECT_EQ(window.GetPresentMode(), PRESENT_MODE_CONTINUOUS);
   int user_data = 42;
   glfwSetWindowUserPointer(window.GLFWWindow(), &user_data);
   glfwSetWindowSize(window.GLFWWindow(), 300, 200);
@@ -155,6 +198,8 @@ TEST(RhiMetal, ResizeAndRestoreAfterModeChangeWhileMinimized) {
     return image && image.GetDesc().width == width && image.GetDesc().height == height;
   }));
   EXPECT_EQ(glfwGetWindowUserPointer(window.GLFWWindow()), &user_data);
+  EXPECT_EQ(window.GetPresentMode(), PRESENT_MODE_CONTINUOUS);
+  ASSERT_TRUE(window.SetPresentMode(PRESENT_MODE_VSYNC));
   glfwIconifyWindow(window.GLFWWindow());
   ASSERT_TRUE(poll_until([&] { return glfwGetWindowAttrib(window.GLFWWindow(), GLFW_ICONIFIED); }));
   EXPECT_FALSE(window.GetNextImage());

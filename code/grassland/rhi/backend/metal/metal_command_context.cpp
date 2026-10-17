@@ -10,6 +10,8 @@ MetalCommandContext::MetalCommandContext(MetalDevice *device) : CommandContext(d
 
 bool MetalCommandContext::Initialize() {
   auto pool = NS::TransferPtr(NS::AutoreleasePool::alloc()->init());
+  // Metal command buffers are single-use. The persistent native queue manages
+  // their backing storage; completed buffers cannot be reset like Vulkan/D3D12.
   commands_ = NS::RetainPtr(device_->NativeQueue()->commandBuffer());
   if (!commands_)
     ReportError(-1, "Metal command buffer creation failed.");

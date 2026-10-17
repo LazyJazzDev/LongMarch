@@ -117,7 +117,12 @@ Creation/mode-change failures are reported at those calls, and resize callback
 failure is reported by `PollEvents()`. Device-loss recovery is not implemented.
 Metal implements the same presentation and submission contract using CAMetalLayer
 and retained-reference Metal command buffers. Graphics and transfer queues share
-one native command queue. SDR BGRA8 supports both VSync and continuous presentation.
+one native command queue. Metal command buffers are single-use; the persistent
+native queue manages their backing storage, so they are not reset and pooled like
+D3D12 command allocators/lists or Vulkan command pools/buffers. Completion uses
+`waitUntilCompleted` and native error status; the standalone SubmissionToken stores
+only the published result and remains queryable after Device destruction.
+SDR BGRA8 supports both VSync and continuous presentation.
 
 `CmdClearColor` records work on an Image, while `CmdPresent` takes the target
 Window (`IWindow *` in RHI, `const rhix::Window &` in rhix). The current backend

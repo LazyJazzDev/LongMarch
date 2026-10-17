@@ -17,14 +17,12 @@ class MetalWindow final : public Window {
   std::vector<WindowPresentationOption> GetSupportedPresentationOptions() const override;
   bool IsFrameValid(uint64_t generation) const;
   const void *DeviceIdentity() const;
-  void DidPresent();
 
  private:
   MetalDevice *device_;
   NS::SharedPtr<CA::MetalLayer> layer_;
   ImageDesc desc_;
   uint64_t generation_{1};
-  bool acquired_{};
   bool valid_{};
   PresentMode mode_{PRESENT_MODE_VSYNC};
 };

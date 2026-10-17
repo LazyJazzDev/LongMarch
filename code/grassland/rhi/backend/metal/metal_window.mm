@@ -47,15 +47,14 @@ bool MetalWindow::Initialize(const WindowDesc &desc) {
 }
 
 bool MetalWindow::RebuildNativeSwapChain(PresentMode requested_mode) {
-  auto layer = (CAMetalLayer *)layer_.get();
-  layer.displaySyncEnabled = requested_mode != PRESENT_MODE_CONTINUOUS;
-  mode_ = layer.displaySyncEnabled ? PRESENT_MODE_VSYNC : PRESENT_MODE_CONTINUOUS;
   auto pool = NS::TransferPtr(NS::AutoreleasePool::alloc()->init());
   std::lock_guard<std::mutex> lock(device_->QueueMutex());
   if (!device_->WaitIdle())
     return false;
+  auto layer = (CAMetalLayer *)layer_.get();
+  layer.displaySyncEnabled = requested_mode != PRESENT_MODE_CONTINUOUS;
+  mode_ = layer.displaySyncEnabled ? PRESENT_MODE_VSYNC : PRESENT_MODE_CONTINUOUS;
   valid_ = false;
-  acquired_ = false;
   ++generation_;
   if (glfwGetWindowAttrib(GLFWWindow(), GLFW_ICONIFIED))
     return true;
@@ -78,7 +77,7 @@ ObjectPtr<Image> MetalWindow::AcquireNativeFrame() {
   if (glfwGetWindowAttrib(GLFWWindow(), GLFW_ICONIFIED) || width <= 0 || height <= 0)
     return {};
 #if !defined(NDEBUG)
-  if (!valid_ || acquired_ || desc_.width != width || desc_.height != height) {
+  if (!valid_ || desc_.width != width || desc_.height != height) {
     ReportError(-1, "Cannot acquire a Metal drawable in the current window state.");
     return {};
   }
@@ -88,9 +87,7 @@ ObjectPtr<Image> MetalWindow::AcquireNativeFrame() {
     ReportError(-1, "CAMetalLayer::nextDrawable failed.");
     return {};
   }
-  auto image = ObjectPtr<Image>::Adopt(new MetalSwapChainImage(desc_, this, generation_, drawable.get()));
-  acquired_ = true;
-  return image;
+  return ObjectPtr<Image>::Adopt(new MetalSwapChainImage(desc_, this, generation_, drawable.get()));
 }
 
 PresentMode MetalWindow::GetPresentMode() const {
@@ -107,10 +104,6 @@ bool MetalWindow::IsFrameValid(uint64_t generation) const {
 
 const void *MetalWindow::DeviceIdentity() const {
   return device_;
-}
-
-void MetalWindow::DidPresent() {
-  acquired_ = false;
 }
 
 }  // namespace grassland::rhi::backend::metal

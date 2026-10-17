@@ -30,7 +30,6 @@ void MetalSwapChainImage::DidPresent() {
 #if !defined(NDEBUG)
   present_requested_ = true;
 #endif
-  window_->DidPresent();
   // presentDrawable and retained-reference command buffers own native GPU use.
   // Invalid caller-held frames must not exhaust CAMetalLayer's drawable pool.
   drawable_.reset();
