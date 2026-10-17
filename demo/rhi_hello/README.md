@@ -102,8 +102,9 @@ VSync and continuous presentation; **Escape** or the close button exits. Continu
 presentation falls back to VSync when unavailable. `Window::GetPresentMode()`
 reports the actual mode. Window installs its own GLFW framebuffer-size and restore callbacks
 at creation, rebuilding the swapchain when size events are dispatched (normally
-by `PollEvents()`). `SetPresentMode()` also rebuilds internally. There is no public
-rebuild function and the demos do not install resize callbacks. GLFW user pointers
+by `PollEvents()`). `SetPresentMode()` also rebuilds internally.
+`RebuildSwapChain()` is also available explicitly; the demos do not install resize
+callbacks. GLFW user pointers
 remain available to callers; replacing the framebuffer-size or iconify callback requires
 chaining the previous callback so the internal resize handling is preserved.
 
@@ -111,10 +112,24 @@ chaining the previous callback so the internal resize handling is preserved.
 Repeated calls return the same object until a context recording `CmdPresent(window)`
 is submitted. Submission presents that image and prepares the next one before
 returning. Dropping caller references does not advance the frame. Size/mode changes
-replace the prepared image as part of rebuilding. Only minimization or zero size
-returns an empty image; acquisition/rebuild work never occurs inside the getter.
+replace the prepared image as part of rebuilding. Minimization, zero size or a
+known invalid swapchain returns an empty image; acquisition/rebuild work never occurs inside the getter.
 Creation/mode-change failures are reported at those calls, and resize callback
 failure is reported by `PollEvents()`. Device-loss recovery is not implemented.
+
+`IsSwapChainInvalid()` reports known invalidation without probing the native
+surface. Vulkan OUT_OF_DATE from presentation or acquisition sets this state;
+submission neither rebuilds the swapchain nor terminates the process. A valid
+submission token still tracks the accepted GPU work, even if its presentation
+was dropped. SUBOPTIMAL remains usable. Other native failures remain errors.
+Before recording a new frame, callers can query invalidation and explicitly call
+`RebuildSwapChain()` (also available through rhix). Release all caller-held frames
+and recordings first. The demos do this after `PollEvents()`. Rebuild preserves
+the requested presentation mode; a minimized window or another concurrent surface
+change may leave it invalid even when the operation returns true. Retry at a later
+safe boundary. Rebuild failure returns false and leaves invalidation set.
+No frame getter or submission performs implicit swapchain replacement.
+
 Metal implements the same presentation and submission contract using CAMetalLayer
 and retained-reference Metal command buffers. Graphics and transfer queues share
 one native command queue. Metal command buffers are single-use; the persistent
@@ -189,12 +204,13 @@ core.Release();
 
 Swapchain Images are **single-use borrowed frames**, not independently owned GPU
 allocations. Release the caller's frame before the next acquisition. Retaining a
-frame across resize violates the API contract; this implementation invalidates
-the old image rather than silently redirecting it to another native image.
+frame across resize violates the API contract; old objects must not be used after
+replacement. Their reference counts do not keep the destroyed swapchain alive,
+and Vulkan does not redirect old native handles.
 Already submitted GPU use is drained before swapchain replacement. Recording
 retains the exact image immediately, and the Device retains submitted command
 contexts until completion even if the caller drops the image or completion token.
-An empty next image means a minimized or zero-sized window; creation and
+An empty next image means a minimized, zero-sized or invalid window; creation and
 submission failures also return empty handles and log the native error.
 
 Window, Image, Queue and CommandContext wrap their corresponding public `rhi::I*`

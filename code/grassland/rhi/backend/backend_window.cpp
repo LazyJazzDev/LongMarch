@@ -15,6 +15,8 @@ rhi::IImage *Window::GetNextImage() {
     std::abort();
   }
 #endif
+  if (invalid_)
+    return nullptr;
   int width, height;
   glfwGetFramebufferSize(window_, &width, &height);
   if (glfwGetWindowAttrib(window_, GLFW_ICONIFIED) || width <= 0 || height <= 0)
@@ -37,12 +39,20 @@ bool Window::UpdateNextImage() {
   glfwGetFramebufferSize(window_, &width, &height);
   if (glfwGetWindowAttrib(window_, GLFW_ICONIFIED) || width <= 0 || height <= 0)
     return true;
-  return bool(next_image_);
+  // A native OUT_OF_DATE result defers recovery to an explicit rebuild.
+  if (next_image_ || invalid_)
+    return true;
+  invalid_ = true;
+  return false;
 }
 
 void Window::ReleaseNextImage() {
   std::lock_guard<std::mutex> lock(next_image_mutex_);
   next_image_.Reset();
+}
+
+bool Window::IsSwapChainInvalid() const {
+  return invalid_;
 }
 
 bool Window::RebuildSwapChain() {
@@ -51,11 +61,21 @@ bool Window::RebuildSwapChain() {
     return false;
 #endif
   try {
+    invalid_ = true;
     ReleaseNextImage();
     if (!RebuildNativeSwapChain(requested_mode_))
       return false;
-    return UpdateNextImage();
+    int width, height;
+    glfwGetFramebufferSize(window_, &width, &height);
+    if (glfwGetWindowAttrib(window_, GLFW_ICONIFIED) || width <= 0 || height <= 0)
+      return true;
+    invalid_ = false;
+    if (UpdateNextImage())
+      return true;
+    invalid_ = true;
+    return false;
   } catch (const std::bad_alloc &) {
+    invalid_ = true;
     ReportError(-1, "Swapchain rebuild ran out of memory.");
     return false;
   }

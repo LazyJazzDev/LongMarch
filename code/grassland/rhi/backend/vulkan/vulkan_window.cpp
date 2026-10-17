@@ -53,17 +53,8 @@ ObjectPtr<Image> VulkanWindow::AcquireNativeFrame() {
   glfwGetFramebufferSize(GLFWWindow(), &width, &height);
   if (width <= 0 || height <= 0)
     return {};
-#if !defined(NDEBUG)
-  if (!valid_ || width != width_ || height != height_)
+  if (invalid_)
     return {};
-#endif
-#if !defined(NDEBUG)
-  if (acquired_) {
-    ReportError(-1, "Present or release the previous acquired frame first.");
-    return {};
-  }
-#endif
-  current_sync_ = next_sync_;
   auto &sync = acquire_sync_[current_sync_];
   const auto native = device_->NativeDevice();
   if (sync.submission_value) {
@@ -87,9 +78,7 @@ ObjectPtr<Image> VulkanWindow::AcquireNativeFrame() {
       vkAcquireNextImageKHR(device_->NativeDevice(), swapchain_, UINT64_MAX, semaphore, fence, &current_image_);
   if (result == VK_SUCCESS || result == VK_SUBOPTIMAL_KHR) {
     sync.acquired = true;
-    next_sync_ = (next_sync_ + 1) % static_cast<uint32_t>(acquire_sync_.size());
     const auto image = images_[current_image_];
-    acquired_ = true;
     if (!initialized_images_[current_image_]) {
       // Establish the fixed default layout before exposing this image to recording.
       // This runs once per physical swapchain image, not once per CommandContext.
@@ -154,8 +143,10 @@ ObjectPtr<Image> VulkanWindow::AcquireNativeFrame() {
         return {};
       initialized_images_[current_image_] = true;
     }
-  } else if (result == VK_ERROR_OUT_OF_DATE_KHR)
-    valid_ = false;
+  } else if (result == VK_ERROR_OUT_OF_DATE_KHR) {
+    invalid_ = true;
+    return {};
+  }
   if (result != VK_SUCCESS && result != VK_SUBOPTIMAL_KHR) {
     Check(result, "vkAcquireNextImageKHR");
     return {};
@@ -185,13 +176,11 @@ VkResult VulkanWindow::PresentFrame() {
   present.pSwapchains = &swapchain_;
   present.pImageIndices = &current_image_;
   const auto result = vkQueuePresentKHR(device_->NativeQueue(), &present);
-  acquired_ = false;
-  if (result == VK_SUBOPTIMAL_KHR || result == VK_ERROR_OUT_OF_DATE_KHR) {
-    valid_ = false;
-    return VK_SUCCESS;
-  }
-  if (result != VK_SUCCESS)
-    valid_ = false;
+  // The prepared frame has been presented; this slot is reused only after
+  // its acquire fence and consuming submission have completed.
+  current_sync_ = (current_sync_ + 1) % static_cast<uint32_t>(acquire_sync_.size());
+  if (result != VK_SUCCESS && result != VK_SUBOPTIMAL_KHR)
+    invalid_ = true;
   return result;
 }
 
@@ -252,7 +241,7 @@ void VulkanWindow::DestroySwapchain() {
       vkDestroyFence(device_->NativeDevice(), sync.fence, nullptr);
   }
   acquire_sync_.clear();
-  next_sync_ = 0;
+  current_sync_ = 0;
   for (auto semaphore : rendered_)
     if (semaphore)
       vkDestroySemaphore(device_->NativeDevice(), semaphore, nullptr);
@@ -265,7 +254,6 @@ void VulkanWindow::DestroySwapchain() {
 }
 
 bool VulkanWindow::RebuildNativeSwapChain(PresentMode requested_mode) {
-  valid_ = false;
   if (glfwGetWindowAttrib(GLFWWindow(), GLFW_ICONIFIED))
     return true;
   int width, height;
@@ -343,8 +331,6 @@ bool VulkanWindow::RebuildNativeSwapChain(PresentMode requested_mode) {
     if (!Check(vkDeviceWaitIdle(device), "Wait before swapchain replacement"))
       return false;
   }
-  valid_ = false;
-  acquired_ = false;
   DestroySwapchain();
   if (!Check(vkCreateSwapchainKHR(device, &create, nullptr, &swapchain_), "vkCreateSwapchainKHR"))
     return false;
@@ -369,9 +355,6 @@ bool VulkanWindow::RebuildNativeSwapChain(PresentMode requested_mode) {
   desc_ = {create.imageExtent.width, create.imageExtent.height,
            format->format == VK_FORMAT_B8G8R8A8_UNORM ? IMAGE_FORMAT_BGRA8_UNORM : IMAGE_FORMAT_RGBA8_UNORM};
   mode_ = mode == VK_PRESENT_MODE_FIFO_KHR ? PRESENT_MODE_VSYNC : PRESENT_MODE_CONTINUOUS;
-  width_ = width;
-  height_ = height;
-  valid_ = true;
   return true;
 }
 

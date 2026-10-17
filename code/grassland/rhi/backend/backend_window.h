@@ -12,7 +12,8 @@ class Window : public Object<rhi::IWindow> {
   Window();
   ~Window() override;
   rhi::IImage *GetNextImage() override;
-  bool RebuildSwapChain();
+  bool IsSwapChainInvalid() const override;
+  bool RebuildSwapChain() override;
   virtual bool UpdateNextImage();
   void ReleaseNextImage();
   bool SetPresentMode(PresentMode mode) override;
@@ -25,6 +26,7 @@ class Window : public Object<rhi::IWindow> {
 
  protected:
   bool InitializeWindow(const WindowDesc &desc);
+  bool invalid_{true};
 
  private:
   PresentMode requested_mode_{PRESENT_MODE_VSYNC};

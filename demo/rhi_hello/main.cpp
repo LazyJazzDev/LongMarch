@@ -29,6 +29,9 @@ int RunWindow(grassland::rhi::IDevice *device, grassland::rhi::IWindow *window, 
       break;
     if (window->IsKeyDown(GLFW_KEY_ESCAPE))
       break;
+    // Previous loop locals are gone; rebuild only before recording this frame.
+    if (window->IsSwapChainInvalid() && !window->RebuildSwapChain())
+      return 1;
     const bool p = window->IsKeyDown(GLFW_KEY_P);
     if (p && !previous_p) {
       requested = requested == PRESENT_MODE_VSYNC ? PRESENT_MODE_CONTINUOUS : PRESENT_MODE_VSYNC;

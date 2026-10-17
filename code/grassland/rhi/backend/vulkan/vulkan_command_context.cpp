@@ -1,7 +1,5 @@
 #include "grassland/rhi/backend/vulkan/vulkan_command_context.h"
 
-#include <cstdlib>
-
 #include "grassland/rhi/backend/backend_glfw_helper.h"
 #include "grassland/rhi/backend/vulkan/vulkan_swap_chain_image.h"
 #include "grassland/rhi/backend/vulkan/vulkan_window.h"
@@ -189,7 +187,10 @@ CommandContext::SubmitResult VulkanCommandContext::SubmitNative() {
     submission_failed_ = true;
     bool presented = true;
     for (const auto &present : presents_) {
-      if (!Check(present->PresentFrame(), "vkQueuePresentKHR"))
+      const auto result = present->PresentFrame();
+      // OUT_OF_DATE drops presentation, not the accepted GPU work. The window
+      // exposes invalidation to the caller; no swapchain is replaced here.
+      if (result != VK_ERROR_OUT_OF_DATE_KHR && result != VK_SUBOPTIMAL_KHR && !Check(result, "vkQueuePresentKHR"))
         presented = false;
     }
     submission_failed_ = !presented;
@@ -197,12 +198,16 @@ CommandContext::SubmitResult VulkanCommandContext::SubmitNative() {
   if (submission_failed_)
     return SUBMIT_RESULT_FAILED_IN_FLIGHT;
   for (const auto &present : presents_) {
+    if (present->IsSwapChainInvalid()) {
+      present->ReleaseNextImage();
+      continue;
+    }
     if (!present->UpdateNextImage()) {
       ReportError(-1, "Failed to prepare the next swapchain image after submission.");
-      std::abort();
+      submission_failed_ = true;
     }
   }
-  return SUBMIT_RESULT_SUBMITTED;
+  return submission_failed_ ? SUBMIT_RESULT_FAILED_IN_FLIGHT : SUBMIT_RESULT_SUBMITTED;
 }
 
 SubmissionStatus VulkanCommandContext::WaitForProgress() {

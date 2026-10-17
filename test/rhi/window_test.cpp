@@ -290,6 +290,103 @@ TEST_P(RhiWindow, MultipleImagesRestoreDefaultsAcrossContextsAndPresentWithoutCl
 #endif
 }
 
+TEST_P(RhiWindow, ExplicitRebuildPreservesModeAndRecoversFromMinimization) {
+  if (!std::getenv("LONGMARCH_RHI_WINDOW_TESTS"))
+    GTEST_SKIP() << "Requires a desktop.";
+  auto core = rhix::CreateCore(GetParam());
+  ASSERT_TRUE(core);
+  auto device = core.CreateDeviceByAutoSelection();
+  ASSERT_TRUE(device);
+  auto window = device.CreateGLFWWindow({320, 240, "RHI explicit rebuild"});
+  ASSERT_TRUE(window);
+  EXPECT_FALSE(window.IsSwapChainInvalid());
+  ASSERT_TRUE(window.SetPresentMode(PRESENT_MODE_CONTINUOUS));
+  const auto mode = window.GetPresentMode();
+  ASSERT_TRUE(window.Get()->RebuildSwapChain());
+  EXPECT_FALSE(window.Get()->IsSwapChainInvalid());
+  EXPECT_EQ(window.GetPresentMode(), mode);
+  {
+    auto image = window.GetNextImage();
+    ASSERT_TRUE(image);
+    EXPECT_EQ(image.Get(), window.GetNextImage().Get());
+  }
+#ifdef _WIN32
+  const auto hwnd = FindWindowA(nullptr, "RHI explicit rebuild");
+  ASSERT_NE(hwnd, nullptr);
+  ShowWindow(hwnd, SW_MINIMIZE);
+  ASSERT_TRUE(Window::PollEvents());
+  ASSERT_TRUE(window.RebuildSwapChain());
+  EXPECT_TRUE(window.IsSwapChainInvalid());
+  EXPECT_FALSE(window.GetNextImage());
+  ShowWindow(hwnd, SW_RESTORE);
+  ASSERT_TRUE(Window::PollEvents());
+  EXPECT_FALSE(window.IsSwapChainInvalid());
+  EXPECT_EQ(window.GetPresentMode(), mode);
+  EXPECT_TRUE(window.GetNextImage());
+#endif
+}
+
+#if defined(_WIN32) && defined(LONGMARCH_VULKAN_ENABLED)
+TEST(RhiVulkanWindow, OutOfDateDefersRebuildAndKeepsSubmittedWorkAlive) {
+  if (!std::getenv("LONGMARCH_RHI_WINDOW_TESTS"))
+    GTEST_SKIP() << "Requires a desktop.";
+  auto core = rhix::CreateCore(BACKEND_API_VULKAN);
+  ASSERT_TRUE(core);
+  auto device = core.CreateDeviceByAutoSelection();
+  ASSERT_TRUE(device);
+  auto window = device.CreateGLFWWindow({320, 240, "RHI out of date"});
+  ASSERT_TRUE(window);
+  auto queue = device.GetQueue(QUEUE_TYPE_GRAPHICS);
+  ASSERT_TRUE(queue);
+  ASSERT_TRUE(Window::PollEvents());
+  auto native = window.GLFWWindow();
+  // Suppress event-driven rebuilding to reproduce a surface change observed
+  // by WSI before the application processes its resize notification.
+  const auto callback = glfwSetFramebufferSizeCallback(native, nullptr);
+  bool invalid = false;
+  for (int i = 0; i < 8 && !invalid; ++i) {
+    auto image = window.GetNextImage();
+    ASSERT_TRUE(image);
+    auto context = device.CreateCommandContext();
+    ASSERT_TRUE(context.CmdClearColor(image, {0.6f, 0.7f, 0.8f, 1}));
+    ASSERT_TRUE(context.CmdPresent(window));
+    glfwSetWindowSize(native, 400 + 40 * i, 300 + 30 * i);
+    // No callback has replaced the prepared object, even though the native
+    // surface changed. Submit may observe OUT_OF_DATE in Present or Acquire.
+    EXPECT_EQ(image.Get(), window.GetNextImage().Get());
+    auto token = queue.Submit(std::move(context));
+    ASSERT_TRUE(token);
+    ASSERT_TRUE(token.WaitHost());
+    invalid = window.IsSwapChainInvalid();
+    if (invalid) {
+      EXPECT_FALSE(window.GetNextImage());
+      EXPECT_TRUE(window.IsSwapChainInvalid());
+      EXPECT_EQ(image.GetDesc().width, 320u);
+    }
+  }
+  glfwSetFramebufferSizeCallback(native, callback);
+  if (!invalid)
+    GTEST_SKIP() << "Driver permits resized presentation without OUT_OF_DATE.";
+  // All caller-held frames and recordings are gone before explicit rebuild.
+  ASSERT_TRUE(window.RebuildSwapChain());
+  EXPECT_FALSE(window.IsSwapChainInvalid());
+  for (int i = 0; i < 24; ++i) {
+    auto image = window.GetNextImage();
+    ASSERT_TRUE(image);
+    int width, height;
+    glfwGetFramebufferSize(native, &width, &height);
+    EXPECT_EQ(image.GetDesc().width, static_cast<uint32_t>(width));
+    EXPECT_EQ(image.GetDesc().height, static_cast<uint32_t>(height));
+    auto context = device.CreateCommandContext();
+    ASSERT_TRUE(context.CmdClearColor(image, {0, 0, 1, 1}));
+    ASSERT_TRUE(context.CmdPresent(window));
+    auto token = queue.Submit(std::move(context));
+    ASSERT_TRUE(token);
+    ASSERT_TRUE(token.WaitHost());
+  }
+}
+#endif
+
 std::vector<BackendAPI> WindowBackends() {
   std::vector<BackendAPI> backends;
 #ifdef LONGMARCH_D3D12_ENABLED

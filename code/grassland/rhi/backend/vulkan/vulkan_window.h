@@ -35,17 +35,13 @@ class VulkanWindow final : public Window {
   };
 
   std::vector<AcquireSync> acquire_sync_;
-  uint32_t next_sync_{};
   uint32_t current_sync_{};
   uint32_t current_image_{};
   std::vector<VkImage> images_;
   std::vector<VkSemaphore> rendered_;
   std::vector<bool> initialized_images_;
   ImageDesc desc_;
-  bool acquired_{};
-  bool valid_{};
   PresentMode mode_{PRESENT_MODE_VSYNC};
-  int width_{}, height_{};
 };
 
 }  // namespace grassland::rhi::backend::vulkan

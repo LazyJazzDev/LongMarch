@@ -54,6 +54,22 @@ Image Window::GetNextImage() const {
   return Get()->GetNextImage();
 }
 
+bool Window::IsSwapChainInvalid() const {
+#if !defined(NDEBUG)
+  if (!*this)
+    return true;
+#endif
+  return Get()->IsSwapChainInvalid();
+}
+
+bool Window::RebuildSwapChain() const {
+#if !defined(NDEBUG)
+  if (!*this)
+    return false;
+#endif
+  return Get()->RebuildSwapChain();
+}
+
 bool Window::SetPresentMode(rhi::PresentMode mode) const {
 #if !defined(NDEBUG)
   if (!*this)
