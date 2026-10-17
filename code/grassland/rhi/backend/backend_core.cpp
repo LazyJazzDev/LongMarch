@@ -15,7 +15,20 @@
 
 namespace grassland::rhi::backend {
 
-std::unique_ptr<ICore> CreateCore(BackendAPI api) {
+rhi::IDevice *Core::CreateDeviceByAutoSelection(DeviceFeatureRequirement requirement) {
+  try {
+    const auto id = SelectPhysicalDevice(GetPhysicalDevices(), requirement);
+    if (id < 0) {
+      ReportError(-1, "No physical device satisfies the requested RHI features.");
+      return nullptr;
+    }
+    return CreateDevice(id);
+  } catch (const std::bad_alloc &) {
+    return nullptr;
+  }
+}
+
+std::unique_ptr<Core> CreateCore(BackendAPI api) {
   switch (api) {
 #if defined(LONGMARCH_D3D12_ENABLED)
     case BACKEND_API_D3D12:

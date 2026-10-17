@@ -4,29 +4,34 @@
 #include <type_traits>
 #include <utility>
 
-#include "grassland/rhi/rhi_util.h"
+#include "grassland/rhi/rhi_object.h"
 
-namespace grassland::rhi {
+namespace grassland::rhi::backend {
+void ReportError(int32_t error_code, const std::string &error_message);
 
-class IObject {
+// One intrusive counter per native implementation, with no public state layout.
+template <typename Interface>
+class Object : public Interface {
  public:
-  void AddRef() noexcept {
+  void AddRef() noexcept final {
     references_.fetch_add(1, std::memory_order_relaxed);
   }
 
-  void Release() noexcept {
-    if (references_.fetch_sub(1, std::memory_order_acq_rel) == 1) {
+  void Release() noexcept final {
+    if (references_.fetch_sub(1, std::memory_order_acq_rel) == 1)
       delete this;
-    }
   }
 
-  virtual ~IObject() = default;
+  bool IsUniquelyOwned() const noexcept {
+    return references_.load(std::memory_order_acquire) == 1;
+  }
+
+  ~Object() override = default;
 
  private:
   std::atomic<uint32_t> references_{1};
 };
 
-namespace backend {
 // Backend-only typed strong reference. T may be forward-declared at the storage site;
 // define the owning class's constructor/destructor where T is complete.
 template <typename T>
@@ -108,29 +113,7 @@ class ObjectPtr {
   T *ptr_{nullptr};
 };
 
-class ICore;
-class IDevice;
+class Core;
+class Device;
 
-// The only friend bridge: no public raw-pointer adoption or implementation getter.
-struct Access {
-  template <typename Impl, typename Wrapper>
-  static Impl &As(const Wrapper &wrapper) noexcept {
-    return *static_cast<Impl *>(wrapper.object_.obj_);
-  }
-
-  template <typename Impl, typename Wrapper>
-  static ObjectPtr<Impl> Retain(const Wrapper &wrapper) noexcept {
-    return ObjectPtr<Impl>::Retain(static_cast<Impl *>(wrapper.object_.obj_));
-  }
-
-  template <typename Wrapper, typename Impl>
-  static Wrapper Adopt(std::unique_ptr<Impl> object) noexcept {
-    static_assert((std::is_same_v<Wrapper, Core> && std::is_base_of_v<ICore, Impl>) ||
-                  (std::is_same_v<Wrapper, Device> && std::is_base_of_v<IDevice, Impl>));
-    Wrapper wrapper;
-    wrapper.object_.obj_ = object.release();
-    return wrapper;
-  }
-};
-}  // namespace backend
-}  // namespace grassland::rhi
+}  // namespace grassland::rhi::backend

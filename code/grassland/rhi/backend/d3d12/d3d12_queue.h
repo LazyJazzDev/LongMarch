@@ -1,0 +1,12 @@
+#pragma once
+#include "grassland/rhi/backend/backend_queue.h"
+#include "grassland/rhi/backend/d3d12/d3d12_device.h"
+
+namespace grassland::rhi::backend::d3d12 {
+
+class D3D12Queue final : public Queue {
+ public:
+  D3D12Queue(D3D12Device *device, QueueType type);
+};
+
+}  // namespace grassland::rhi::backend::d3d12

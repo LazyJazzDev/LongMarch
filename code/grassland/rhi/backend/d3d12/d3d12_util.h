@@ -7,4 +7,5 @@
 
 namespace grassland::rhi::backend::d3d12 {
 using Microsoft::WRL::ComPtr;
+bool Check(HRESULT result, const char *operation);
 }  // namespace grassland::rhi::backend::d3d12

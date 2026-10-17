@@ -4,6 +4,10 @@
 
 namespace grassland::rhi::backend::vulkan {
 
+VkInstance VulkanCore::Instance() const {
+  return instance_;
+}
+
 std::unique_ptr<VulkanCore> VulkanCore::CreateVulkanCore() {
   uint32_t loader_version = VK_API_VERSION_1_0;
   const auto enumerate_version = reinterpret_cast<PFN_vkEnumerateInstanceVersion>(
@@ -32,6 +36,11 @@ std::unique_ptr<VulkanCore> VulkanCore::CreateVulkanCore() {
   std::vector<const char *> extensions;
   VkInstanceCreateFlags flags = 0;
   for (const auto &extension : available) {
+    for (const auto name : {"VK_KHR_surface", "VK_KHR_win32_surface", "VK_KHR_xlib_surface", "VK_KHR_xcb_surface",
+                            "VK_KHR_wayland_surface", "VK_EXT_metal_surface", "VK_MVK_macos_surface"}) {
+      if (std::strcmp(extension.extensionName, name) == 0)
+        extensions.push_back(name);
+    }
     if (std::strcmp(extension.extensionName, "VK_KHR_portability_enumeration") == 0) {
       extensions.push_back("VK_KHR_portability_enumeration");
       flags |= VK_INSTANCE_CREATE_ENUMERATE_PORTABILITY_BIT_KHR;
@@ -62,6 +71,8 @@ std::unique_ptr<VulkanCore> VulkanCore::CreateVulkanCore() {
     DeviceFeatures features(device, device_version);
     if (!features)
       return {};
+    if (!features.TimelineSemaphore())
+      continue;
     PhysicalDevice info{};
     info.name = properties.deviceName;
     switch (properties.deviceType) {
@@ -108,13 +119,19 @@ std::vector<PhysicalDevice> VulkanCore::GetPhysicalDevices() const {
   return devices;
 }
 
-std::unique_ptr<IDevice> VulkanCore::CreateDevice(int32_t device_idx, const ObjectPtr<ICore> &owner) const {
-  if (device_idx < 0 || static_cast<size_t>(device_idx) >= adapters_.size()) {
-    ReportError(-1, "Physical device ID is out of range.");
-    return {};
+rhi::IDevice *VulkanCore::CreateDevice(int32_t device_idx) {
+  try {
+#if !defined(NDEBUG)
+    if (device_idx < 0 || static_cast<size_t>(device_idx) >= adapters_.size()) {
+      ReportError(-1, "Physical device ID is out of range.");
+      return {};
+    }
+#endif
+    const auto &adapter = adapters_[device_idx];
+    return VulkanDevice::CreateVulkanDevice(adapter.info, this, adapter.native, adapter.api_version).release();
+  } catch (const std::bad_alloc &) {
+    return nullptr;
   }
-  const auto &adapter = adapters_[device_idx];
-  return VulkanDevice::CreateVulkanDevice(adapter.info, owner, adapter.native, adapter.api_version);
 }
 
 }  // namespace grassland::rhi::backend::vulkan

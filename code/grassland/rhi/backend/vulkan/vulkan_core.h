@@ -4,12 +4,13 @@
 
 namespace grassland::rhi::backend::vulkan {
 
-class VulkanCore final : public ICore {
+class VulkanCore final : public Core {
  public:
   static std::unique_ptr<VulkanCore> CreateVulkanCore();
   ~VulkanCore() override;
+  VkInstance Instance() const;
   std::vector<PhysicalDevice> GetPhysicalDevices() const override;
-  std::unique_ptr<IDevice> CreateDevice(int32_t device_idx, const ObjectPtr<ICore> &owner) const override;
+  rhi::IDevice *CreateDevice(int32_t device_idx) override;
 
  private:
   struct Adapter {
