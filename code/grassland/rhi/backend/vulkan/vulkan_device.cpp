@@ -20,7 +20,7 @@ bool VulkanDevice::AcquireCommandResources(VkCommandPool &pool, VkCommandBuffer 
       return false;
   } else {
     VkCommandPoolCreateInfo create{VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO};
-    create.queueFamilyIndex = family_;
+    create.queueFamilyIndex = graphics_queue_family_index_;
     create.flags = VK_COMMAND_POOL_CREATE_TRANSIENT_BIT;
     if (!Check(vkCreateCommandPool(device_, &create, nullptr, &pool), "Create command pool"))
       return false;
@@ -115,8 +115,8 @@ std::unique_ptr<VulkanDevice> VulkanDevice::CreateVulkanDevice(grassland::rhi::P
     return std::strcmp(name, VK_KHR_SWAPCHAIN_EXTENSION_NAME) == 0;
   });
   device->physical_ = physical_device;
-  device->family_ = graphics_family;
-  device->swapchain_ = swapchain;
+  device->graphics_queue_family_index_ = graphics_family;
+  device->swapchain_enabled_ = swapchain;
   vkGetDeviceQueue(device->device_, graphics_family, 0, &device->queue_);
   return device;
 }
@@ -154,11 +154,11 @@ VkQueue VulkanDevice::NativeQueue() const {
 }
 
 uint32_t VulkanDevice::QueueFamily() const {
-  return family_;
+  return graphics_queue_family_index_;
 }
 
 bool VulkanDevice::SupportsSwapchain() const {
-  return swapchain_;
+  return swapchain_enabled_;
 }
 
 std::mutex &VulkanDevice::QueueMutex() {
