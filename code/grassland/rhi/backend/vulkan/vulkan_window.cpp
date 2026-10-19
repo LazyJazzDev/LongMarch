@@ -230,6 +230,8 @@ PresentMode VulkanWindow::GetPresentMode() const {
 }
 
 void VulkanWindow::DestroySwapchain() {
+  for (auto image : images_)
+    device_->RenderTargets().Retire(image);
   // Device idle covers submitted waits; acquisition itself is a presentation-engine operation.
   for (auto &sync : acquire_sync_) {
     if (sync.acquired)
@@ -314,7 +316,7 @@ bool VulkanWindow::RebuildNativeSwapChain(PresentMode requested_mode) {
         std::clamp(static_cast<uint32_t>(height), caps.minImageExtent.height, caps.maxImageExtent.height);
   }
   create.imageArrayLayers = 1;
-  create.imageUsage = VK_IMAGE_USAGE_TRANSFER_DST_BIT;
+  create.imageUsage = VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
   create.imageSharingMode = VK_SHARING_MODE_EXCLUSIVE;
   create.preTransform = caps.currentTransform;
   for (auto alpha : {VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR, VK_COMPOSITE_ALPHA_PRE_MULTIPLIED_BIT_KHR,

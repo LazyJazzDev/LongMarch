@@ -1,32 +1,32 @@
-# RHIX container API window and device creation demo
+# rhix_hello
 
-Build `demo_rhix_hello` using the CLion Release or Debug CMake profile:
+Two independent modules use `rhix` typed containers. Each module creates its own Core, Device, Window and Queue; main only selects the module/backend and parses arguments.
 
-```sh
-cmake-build-release/demo/rhix_hello/demo_rhix_hello vulkan
-cmake-build-release/demo/rhix_hello/demo_rhix_hello d3d12
-cmake-build-release/demo/rhix_hello/demo_rhix_hello metal
+```text
+demo_rhix_hello --list
+demo_rhix_hello --module hello_window --backend vulkan
+demo_rhix_hello --module hello_triangle --backend d3d12 --frames 120
 ```
 
-This demo uses `grassland::rhix` typed wrappers and dot-syntax methods, built on
-`grassland::rhi::ObjPtr`. The companion
-[rhi_hello](../rhi_hello/README.md) uses `grassland::rhi::ObjPtr<IXXX>` and pointer interface calls.
-Both enumerate devices and capabilities, automatically select a device, and
-clear a GLFW window to RGB (0.6, 0.7, 0.8). Window titles show FPS measured by
-`grassland::FPSCounter`. Press **P** to toggle VSync/continuous presentation;
-**Escape** or the close button exits. Continuous presentation may fall back to
-VSync. Window installs its own resize callback and rebuilds internally.
-`GetNextImage()` returns the same prepared image until Present submission advances
-it; minimized/zero-sized windows return empty. The getter never rebuilds.
-The `metal` backend supports the same clear and presentation loop on macOS.
-Both demos print the window's supported RHI presentation-mode/pixel-format
-combinations at startup via `GetSupportedPresentationOptions()`; format selection
-remains automatic. See the pointer demo documentation for the query's SDR scope.
+The positional backend argument remains supported. The default module is `hello_window`; omit `--frames` to run until the window closes. P switches requested VSync mode, Escape exits, and the title displays `grassland::FPSCounter` statistics.
 
-Containers adopt factory results, retain on copy, and transfer on move.
-`graphics.Submit(std::move(context))` ends recording and consumes the context,
-including on failure. Temporary images and submission tokens release their
-references automatically; the backend retains accepted work until completion.
-Parents are declared before their children so normal and early returns release
-children first. Normal shutdown also demonstrates explicit `Release()` calls.
-See the pointer demo documentation for the shared lifetime and backend contracts.
+- `hello_window`: original RGB (0.6, 0.7, 0.8) clear/presentation and supported presentation-combination output. D3D12, Vulkan and the existing Metal backend are supported.
+- `hello_triangle`: D3D12/Vulkan colored indexed triangle on that background. The module creates independent GPU-only vertex/index Buffers, uploads once through CommandContext, finalizes a Slang Program, then records bindings, viewport/scissor and DrawIndexed. Resize/minimize/restore and P-mode changes are supported.
+
+## Shader and Program contract
+
+Shader stores original Slang source, entry point and stage; creation does not compile it. Program captures shaders and the C++ vertex layout, owns their references, and compiles/creates the native pipeline at Finalize. After successful finalization it is immutable; repeated Finalize is a no-op.
+
+`RHI_INPUT(location, type, name)` is expanded by a generated prefix into the C++ layout's Vulkan locations or D3D12 input semantics. Source BOM is preserved by Shader and omitted only when concatenating the compilation input. Resource-binding layouts/groups and resource macros are deferred: a shader requiring global resource parameters is rejected at Finalize. This iteration supports triangle-list topology, one UNORM color target, no depth, culling or blending, and float/float2/float3/float4 vertex attributes.
+
+## Buffer and command lifetime
+
+CreateBuffer returns a fixed GPU-only allocation managed by VMA or D3D12MA. Backend Buffer bases expose resource access; AllocatedBuffer subclasses own allocations. Future pool-backed subclasses can implement the same interfaces without changing the public Buffer type. Each Device owns its allocator, upload pool and attachment pools; children borrow their Device.
+
+CmdUploadBuffer copies CPU bytes immediately into an automatically leased upload Buffer, then records a native GPU copy. The caller can release/reuse the CPU data after the call. CmdCopyBuffer copies between distinct Buffers. Upload storage is recycled after GPU completion and final CommandContext release, or immediately when an unsubmitted context is abandoned. There is no per-frame reset or CPU wait per upload. Callers still order overwrites against prior GPU readers using queue ordering/dependencies.
+
+CmdBindProgram precedes vertex-buffer binding. Bind all required vertex slots again after changing Program. CmdBindRenderTarget selects one image; render-pass scopes and RTV/framebuffer leases are backend details. CmdDraw and CmdDrawIndexed support instancing and base offsets. Contexts retain the exact Program, Buffer and Image objects they use. Barriers are recorded immediately and used resources return to default states when submission ends recording.
+
+D3D12 leases RTV slots from Device-owned heap pages. Vulkan uses ordinary RenderPass/Framebuffer objects, preserving the Vulkan 1.2 baseline; render passes are cached by format, image views/framebuffers by physical image. Swapchain teardown retires cached attachments after GPU idle, while completed contexts can finish returning their CPU leases. Dynamic rendering is not required.
+
+Callers release child handles before parent Device/Core handles, and release old frame references/recordings before resize/rebuild boundaries. Device shutdown drains submitted work. Metal retains window functionality; these new drawing/Buffer operations currently report unsupported.

@@ -65,4 +65,17 @@ CommandContext Device::CreateCommandContext() const {
 #endif
   return Get()->CreateCommandContext();
 }
+
+Shader Device::CreateShader(const rhi::ShaderDesc &desc) const {
+  return Get()->CreateShader(desc);
+}
+
+Program Device::CreateProgram(const rhi::ProgramDesc &desc) const {
+  return Get()->CreateProgram(desc);
+}
+
+Buffer Device::CreateBuffer(const rhi::BufferDesc &desc) const {
+  return Get()->CreateBuffer(desc);
+}
+
 }  // namespace grassland::rhix

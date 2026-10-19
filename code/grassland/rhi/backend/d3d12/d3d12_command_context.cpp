@@ -1,8 +1,11 @@
 ﻿#include "grassland/rhi/backend/d3d12/d3d12_command_context.h"
 
+#include <algorithm>
 #include <cstdlib>
 
 #include "grassland/rhi/backend/backend_glfw_helper.h"
+#include "grassland/rhi/backend/d3d12/d3d12_buffer.h"
+#include "grassland/rhi/backend/d3d12/d3d12_program.h"
 #include "grassland/rhi/backend/d3d12/d3d12_swap_chain_image.h"
 #include "grassland/rhi/backend/d3d12/d3d12_window.h"
 
@@ -12,6 +15,10 @@ D3D12CommandContext::D3D12CommandContext(D3D12Device *device) : CommandContext(d
 }
 
 D3D12CommandContext::~D3D12CommandContext() {
+  for (auto &upload : uploads_)
+    device_->UploadPool().Release(std::move(upload));
+  for (const auto &entry : rtv_leases_)
+    device_->RTVPool().Release(entry.second.first);
   if (reusable_) {
     if (!closed_)
       reusable_ = SUCCEEDED(list_->Close());
@@ -53,6 +60,30 @@ bool D3D12CommandContext::TransitionResource(ID3D12Resource *resource,
   }
 }
 
+bool D3D12CommandContext::RenderTarget(D3D12Image *image, D3D12_CPU_DESCRIPTOR_HANDLE &handle) {
+  try {
+    auto existing = rtv_leases_.find(image);
+    if (existing != rtv_leases_.end()) {
+      handle = existing->second.second;
+      return true;
+    }
+    // Allocate tracking storage before acquiring a slot, so failure cannot leak a lease.
+    auto inserted = rtv_leases_.try_emplace(image);
+    if (!device_->RTVPool().Acquire(image->NativeImage(), inserted.first->second.first,
+                                    inserted.first->second.second)) {
+      rtv_leases_.erase(inserted.first);
+      recording_failed_ = true;
+      return false;
+    }
+    handle = inserted.first->second.second;
+    return true;
+  } catch (const std::bad_alloc &) {
+    rtv_leases_.erase(image);
+    recording_failed_ = true;
+    return false;
+  }
+}
+
 bool D3D12CommandContext::CmdClearColor(rhi::IImage *image, const std::array<float, 4> &color) {
 #if !defined(NDEBUG)
   const auto native = dynamic_cast<D3D12Image *>(image);
@@ -68,7 +99,10 @@ bool D3D12CommandContext::CmdClearColor(rhi::IImage *image, const std::array<flo
     return false;
   if (!TransitionResource(native->NativeImage(), D3D12_RESOURCE_STATE_RENDER_TARGET, native->DefaultState()))
     return false;
-  list_->ClearRenderTargetView(native->RenderTarget(), color.data(), 0, nullptr);
+  D3D12_CPU_DESCRIPTOR_HANDLE handle{};
+  if (!RenderTarget(native, handle))
+    return false;
+  list_->ClearRenderTargetView(handle, color.data(), 0, nullptr);
   return true;
 }
 
@@ -168,4 +202,297 @@ SubmissionStatus D3D12CommandContext::WaitForProgress() {
   return SUBMISSION_STATUS_PENDING;
 }
 
+bool D3D12CommandContext::CmdUploadBuffer(IBuffer *buffer, uint64_t offset, const void *data, uint64_t size) {
+#if !defined(NDEBUG)
+  auto native = dynamic_cast<D3D12Buffer *>(buffer);
+  if (!native || native->Owner() != device_ || sealed_) {
+    recording_failed_ = true;
+    return false;
+  }
+#else
+  auto native = static_cast<D3D12Buffer *>(buffer);
+#endif
+  if (!RetainResource(native))
+    return false;
+
+  if (!data || !size || offset > native->GetDesc().size || size > native->GetDesc().size - offset) {
+    recording_failed_ = true;
+    return false;
+  }
+  try {
+    uploads_.reserve(uploads_.size() + 1);
+    auto upload = device_->UploadPool().Acquire(size);
+    if (!upload) {
+      recording_failed_ = true;
+      return false;
+    }
+    if (!upload->Write(data, size)) {
+      recording_failed_ = true;
+      return false;
+    }
+    if (!TransitionResource(native->NativeBuffer(), D3D12_RESOURCE_STATE_COPY_DEST, D3D12_RESOURCE_STATE_COMMON))
+      return false;
+    list_->CopyBufferRegion(native->NativeBuffer(), offset, upload->NativeBuffer(), 0, size);
+    uploads_.push_back(std::move(upload));
+    return true;
+  } catch (const std::bad_alloc &) {
+    recording_failed_ = true;
+    return false;
+  }
+}
+
+bool D3D12CommandContext::CmdCopyBuffer(IBuffer *source,
+                                        uint64_t source_offset,
+                                        IBuffer *destination,
+                                        uint64_t destination_offset,
+                                        uint64_t size) {
+#if !defined(NDEBUG)
+  auto src = dynamic_cast<D3D12Buffer *>(source);
+  auto dst = dynamic_cast<D3D12Buffer *>(destination);
+  if (!src || !dst || src->Owner() != device_ || dst->Owner() != device_ || sealed_) {
+    recording_failed_ = true;
+    return false;
+  }
+#else
+  auto src = static_cast<D3D12Buffer *>(source);
+  auto dst = static_cast<D3D12Buffer *>(destination);
+#endif
+  if (src == dst || !size || source_offset > src->GetDesc().size || size > src->GetDesc().size - source_offset ||
+      destination_offset > dst->GetDesc().size || size > dst->GetDesc().size - destination_offset) {
+    recording_failed_ = true;
+    return false;
+  }
+  if (!RetainResource(src))
+    return false;
+  if (!RetainResource(dst))
+    return false;
+  if (!TransitionResource(src->NativeBuffer(), D3D12_RESOURCE_STATE_COPY_SOURCE, D3D12_RESOURCE_STATE_COMMON))
+    return false;
+  if (!TransitionResource(dst->NativeBuffer(), D3D12_RESOURCE_STATE_COPY_DEST, D3D12_RESOURCE_STATE_COMMON))
+    return false;
+  list_->CopyBufferRegion(dst->NativeBuffer(), destination_offset, src->NativeBuffer(), source_offset, size);
+  return true;
+}
+
+bool D3D12CommandContext::CmdBindProgram(IProgram *program) {
+#if !defined(NDEBUG)
+  auto native = dynamic_cast<D3D12Program *>(program);
+  if (!native || native->Owner() != device_ || sealed_) {
+    recording_failed_ = true;
+    return false;
+  }
+#else
+  auto native = static_cast<D3D12Program *>(program);
+#endif
+  if (!RetainResource(native))
+    return false;
+  if (!native->IsFinalized()) {
+    recording_failed_ = true;
+    return false;
+  }
+  try {
+    vertex_buffers_.assign(native->GetDesc().vertex_bindings.size(), nullptr);
+  } catch (const std::bad_alloc &) {
+    recording_failed_ = true;
+    return false;
+  }
+  program_ = native;
+  list_->SetPipelineState(native->NativePipeline());
+  list_->SetGraphicsRootSignature(native->NativeRootSignature());
+  list_->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+  return true;
+}
+
+bool D3D12CommandContext::CmdBindRenderTarget(IImage *image) {
+#if !defined(NDEBUG)
+  auto native = dynamic_cast<D3D12Image *>(image);
+  if (!native || native->DeviceIdentity() != device_ || sealed_) {
+    recording_failed_ = true;
+    return false;
+  }
+#else
+  auto native = static_cast<D3D12Image *>(image);
+#endif
+  if (!RetainResource(native))
+    return false;
+  if (!TransitionResource(native->NativeImage(), D3D12_RESOURCE_STATE_RENDER_TARGET, native->DefaultState()))
+    return false;
+  D3D12_CPU_DESCRIPTOR_HANDLE handle{};
+  if (!RenderTarget(native, handle))
+    return false;
+  list_->OMSetRenderTargets(1, &handle, FALSE, nullptr);
+  render_target_ = native;
+  return true;
+}
+
+bool D3D12CommandContext::CmdBindVertexBuffer(uint32_t binding, IBuffer *buffer, uint64_t offset) {
+#if !defined(NDEBUG)
+  auto native = dynamic_cast<D3D12Buffer *>(buffer);
+  if (!native || native->Owner() != device_ || sealed_) {
+    recording_failed_ = true;
+    return false;
+  }
+#else
+  auto native = static_cast<D3D12Buffer *>(buffer);
+#endif
+  if (!RetainResource(native))
+    return false;
+  if (!program_ || binding >= program_->GetDesc().vertex_bindings.size() || offset >= native->GetDesc().size) {
+    recording_failed_ = true;
+    return false;
+  }
+  if (native->GetDesc().size - offset > UINT_MAX) {
+    recording_failed_ = true;
+    return false;
+  }
+  if (!TransitionResource(native->NativeBuffer(), D3D12_RESOURCE_STATE_VERTEX_AND_CONSTANT_BUFFER,
+                          D3D12_RESOURCE_STATE_COMMON))
+    return false;
+  D3D12_VERTEX_BUFFER_VIEW view{native->NativeBuffer()->GetGPUVirtualAddress() + offset,
+                                static_cast<UINT>(native->GetDesc().size - offset),
+                                program_->GetDesc().vertex_bindings[binding].stride};
+  list_->IASetVertexBuffers(binding, 1, &view);
+  vertex_buffers_[binding] = native;
+  return true;
+}
+
+bool D3D12CommandContext::CmdBindIndexBuffer(IBuffer *buffer, IndexFormat format, uint64_t offset) {
+#if !defined(NDEBUG)
+  auto native = dynamic_cast<D3D12Buffer *>(buffer);
+  if (!native || native->Owner() != device_ || sealed_) {
+    recording_failed_ = true;
+    return false;
+  }
+#else
+  auto native = static_cast<D3D12Buffer *>(buffer);
+#endif
+  if (!RetainResource(native))
+    return false;
+  if (format != INDEX_FORMAT_UINT16 && format != INDEX_FORMAT_UINT32) {
+    recording_failed_ = true;
+    return false;
+  }
+  auto alignment = format == INDEX_FORMAT_UINT16 ? 2u : 4u;
+  if (offset >= native->GetDesc().size || offset % alignment) {
+    recording_failed_ = true;
+    return false;
+  }
+  if (native->GetDesc().size - offset > UINT_MAX) {
+    recording_failed_ = true;
+    return false;
+  }
+  if (!TransitionResource(native->NativeBuffer(), D3D12_RESOURCE_STATE_INDEX_BUFFER, D3D12_RESOURCE_STATE_COMMON))
+    return false;
+  D3D12_INDEX_BUFFER_VIEW view{native->NativeBuffer()->GetGPUVirtualAddress() + offset,
+                               static_cast<UINT>(native->GetDesc().size - offset),
+                               format == INDEX_FORMAT_UINT16 ? DXGI_FORMAT_R16_UINT : DXGI_FORMAT_R32_UINT};
+  list_->IASetIndexBuffer(&view);
+  index_buffer_ = native;
+  index_bound_ = true;
+  return true;
+}
+
+bool D3D12CommandContext::CmdSetViewport(const Viewport &viewport) {
+#if !defined(NDEBUG)
+  if (sealed_ || !viewport.width || !viewport.height) {
+    recording_failed_ = true;
+    return false;
+  }
+#endif
+  if (recording_failed_)
+    return false;
+  D3D12_VIEWPORT native{viewport.x,      viewport.y,         viewport.width,
+                        viewport.height, viewport.min_depth, viewport.max_depth};
+  list_->RSSetViewports(1, &native);
+  viewport_set_ = true;
+  return true;
+}
+
+bool D3D12CommandContext::CmdSetScissor(const Scissor &scissor) {
+#if !defined(NDEBUG)
+  if (sealed_ || !scissor.width || !scissor.height) {
+    recording_failed_ = true;
+    return false;
+  }
+#endif
+  if (recording_failed_)
+    return false;
+  D3D12_RECT native{scissor.x, scissor.y, scissor.x + static_cast<LONG>(scissor.width),
+                    scissor.y + static_cast<LONG>(scissor.height)};
+  list_->RSSetScissorRects(1, &native);
+  scissor_set_ = true;
+  return true;
+}
+
+bool D3D12CommandContext::CmdDraw(uint32_t vertex_count,
+                                  uint32_t instance_count,
+                                  uint32_t first_vertex,
+                                  uint32_t first_instance) {
+#if !defined(NDEBUG)
+  if (sealed_ || !program_ || !render_target_ || !viewport_set_ || !scissor_set_) {
+    recording_failed_ = true;
+    return false;
+  }
+  if (program_->GetDesc().color_format != render_target_->GetDesc().format) {
+    recording_failed_ = true;
+    return false;
+  }
+#endif
+  if (recording_failed_)
+    return false;
+  if (!PrepareDrawBuffers(false))
+    return false;
+  list_->DrawInstanced(vertex_count, instance_count, first_vertex, first_instance);
+  return true;
+}
+
+bool D3D12CommandContext::CmdDrawIndexed(uint32_t index_count,
+                                         uint32_t instance_count,
+                                         uint32_t first_index,
+                                         int32_t vertex_offset,
+                                         uint32_t first_instance) {
+#if !defined(NDEBUG)
+  if (sealed_ || !program_ || !render_target_ || !viewport_set_ || !scissor_set_ || !index_bound_) {
+    recording_failed_ = true;
+    return false;
+  }
+  if (program_->GetDesc().color_format != render_target_->GetDesc().format) {
+    recording_failed_ = true;
+    return false;
+  }
+#endif
+  if (recording_failed_)
+    return false;
+  if (!PrepareDrawBuffers(true))
+    return false;
+  list_->DrawIndexedInstanced(index_count, instance_count, first_index, vertex_offset, first_instance);
+  return true;
+}
+
+bool D3D12CommandContext::PrepareDrawBuffers(bool indexed) {
+  for (auto buffer : vertex_buffers_) {
+#if !defined(NDEBUG)
+    if (!buffer) {
+      recording_failed_ = true;
+      return false;
+    }
+#endif
+    auto state = D3D12_RESOURCE_STATE_VERTEX_AND_CONSTANT_BUFFER;
+    if (indexed && buffer == index_buffer_)
+      state |= D3D12_RESOURCE_STATE_INDEX_BUFFER;
+    if (!TransitionResource(buffer->NativeBuffer(), state, D3D12_RESOURCE_STATE_COMMON))
+      return false;
+  }
+  if (indexed) {
+    auto state = D3D12_RESOURCE_STATE_INDEX_BUFFER;
+    if (std::find(vertex_buffers_.begin(), vertex_buffers_.end(), index_buffer_) != vertex_buffers_.end())
+      state |= D3D12_RESOURCE_STATE_VERTEX_AND_CONSTANT_BUFFER;
+    if (!TransitionResource(index_buffer_->NativeBuffer(), state, D3D12_RESOURCE_STATE_COMMON))
+      return false;
+  }
+  if (!TransitionResource(render_target_->NativeImage(), D3D12_RESOURCE_STATE_RENDER_TARGET,
+                          render_target_->DefaultState()))
+    return false;
+  return true;
+}
 }  // namespace grassland::rhi::backend::d3d12

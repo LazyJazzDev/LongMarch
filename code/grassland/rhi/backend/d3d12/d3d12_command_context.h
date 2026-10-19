@@ -6,6 +6,8 @@
 
 namespace grassland::rhi::backend::d3d12 {
 class D3D12Image;
+class D3D12Buffer;
+class D3D12Program;
 class D3D12Window;
 class D3D12SwapChainImage;
 
@@ -14,13 +16,44 @@ class D3D12CommandContext final : public CommandContext {
   D3D12CommandContext(D3D12Device *device);
   ~D3D12CommandContext() override;
   bool Initialize();
+  bool CmdUploadBuffer(IBuffer *buffer, uint64_t offset, const void *data, uint64_t size) override;
+  bool CmdCopyBuffer(IBuffer *source,
+                     uint64_t source_offset,
+                     IBuffer *destination,
+                     uint64_t destination_offset,
+                     uint64_t size) override;
+  bool CmdBindProgram(IProgram *program) override;
+  bool CmdBindRenderTarget(IImage *image) override;
+  bool CmdBindVertexBuffer(uint32_t binding, IBuffer *buffer, uint64_t offset = 0) override;
+  bool CmdBindIndexBuffer(IBuffer *buffer, IndexFormat format = INDEX_FORMAT_UINT32, uint64_t offset = 0) override;
+  bool CmdSetViewport(const Viewport &viewport) override;
+  bool CmdSetScissor(const Scissor &scissor) override;
+  bool CmdDraw(uint32_t vertex_count,
+               uint32_t instance_count = 1,
+               uint32_t first_vertex = 0,
+               uint32_t first_instance = 0) override;
+  bool CmdDrawIndexed(uint32_t index_count,
+                      uint32_t instance_count = 1,
+                      uint32_t first_index = 0,
+                      int32_t vertex_offset = 0,
+                      uint32_t first_instance = 0) override;
   bool CmdClearColor(rhi::IImage *image, const std::array<float, 4> &color) override;
   bool CmdPresent(rhi::IWindow *window) override;
   SubmitResult SubmitNative() override;
   SubmissionStatus WaitForProgress() override;
 
  private:
+  D3D12Program *program_{};
+  D3D12Image *render_target_{};
+  std::vector<D3D12Buffer *> vertex_buffers_;
+  D3D12Buffer *index_buffer_{};
+  bool PrepareDrawBuffers(bool indexed);
+  bool viewport_set_{}, scissor_set_{}, index_bound_{};
+  std::vector<ObjectPtr<D3D12AllocatedBuffer>> uploads_;
+
   bool EndRecording() override;
+  bool RenderTarget(D3D12Image *image, D3D12_CPU_DESCRIPTOR_HANDLE &handle);
+  std::unordered_map<D3D12Image *, std::pair<uint64_t, D3D12_CPU_DESCRIPTOR_HANDLE>> rtv_leases_;
   bool TransitionResource(ID3D12Resource *resource, D3D12_RESOURCE_STATES state, D3D12_RESOURCE_STATES default_state);
 
   struct ResourceState {

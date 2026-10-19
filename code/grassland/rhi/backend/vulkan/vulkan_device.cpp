@@ -1,7 +1,10 @@
 ﻿#include "grassland/rhi/backend/vulkan/vulkan_device.h"
 
+#include <vk_mem_alloc.h>
+
 #include "grassland/rhi/backend/vulkan/vulkan_command_context.h"
 #include "grassland/rhi/backend/vulkan/vulkan_core.h"
+#include "grassland/rhi/backend/vulkan/vulkan_program.h"
 #include "grassland/rhi/backend/vulkan/vulkan_queue.h"
 #include "grassland/rhi/backend/vulkan/vulkan_window.h"
 
@@ -46,16 +49,22 @@ void VulkanDevice::RecycleCommandResources(VkCommandPool pool, VkCommandBuffer c
   vkDestroyCommandPool(device_, pool, nullptr);
 }
 
-VulkanDevice::VulkanDevice(grassland::rhi::PhysicalDevice info, Core *core) : Device(std::move(info), core) {
+VulkanDevice::VulkanDevice(grassland::rhi::PhysicalDevice info, Core *core)
+    : Device(std::move(info), core),
+      upload_pool_(this) {
 }
 
 VulkanDevice::~VulkanDevice() {
   ShutdownQueues();
+  upload_pool_.Clear();
+  render_targets_.reset();
   for (const auto &entry : command_pool_) {
     vkDestroyCommandPool(device_, std::get<0>(entry), nullptr);
   }
   if (timeline_)
     vkDestroySemaphore(device_, timeline_, nullptr);
+  if (allocator_)
+    vmaDestroyAllocator(allocator_);
   if (device_)
     vkDestroyDevice(device_, nullptr);
 }
@@ -114,6 +123,14 @@ std::unique_ptr<VulkanDevice> VulkanDevice::CreateVulkanDevice(grassland::rhi::P
   const bool swapchain = std::any_of(enabled.Extensions().begin(), enabled.Extensions().end(), [](const char *name) {
     return std::strcmp(name, VK_KHR_SWAPCHAIN_EXTENSION_NAME) == 0;
   });
+  VmaAllocatorCreateInfo memory{};
+  memory.physicalDevice = physical_device;
+  memory.device = device->device_;
+  memory.instance = static_cast<VulkanCore *>(core)->Instance();
+  memory.vulkanApiVersion = VK_API_VERSION_1_2;
+  if (!Check(vmaCreateAllocator(&memory, &device->allocator_), "Create VMA allocator"))
+    return {};
+  device->render_targets_ = std::make_unique<VulkanRenderTargetPool>(device->device_);
   device->physical_ = physical_device;
   device->graphics_queue_family_index_ = graphics_family;
   device->swapchain_enabled_ = swapchain;
@@ -135,6 +152,14 @@ VkResult VulkanDevice::Wait(uint64_t value, uint64_t timeout) const {
   wait.pSemaphores = &timeline_;
   wait.pValues = &value;
   return vkWaitSemaphores(device_, &wait, timeout);
+}
+
+VulkanRenderTargetPool &VulkanDevice::RenderTargets() {
+  return *render_targets_;
+}
+
+VmaAllocator VulkanDevice::Allocator() const {
+  return allocator_;
 }
 
 VkDevice VulkanDevice::NativeDevice() const {
@@ -163,6 +188,33 @@ bool VulkanDevice::SupportsSwapchain() const {
 
 std::mutex &VulkanDevice::QueueMutex() {
   return mutex_;
+}
+
+VulkanUploadPool &VulkanDevice::UploadPool() {
+  return upload_pool_;
+}
+
+rhi::IBuffer *VulkanDevice::CreateBuffer(const BufferDesc &desc) {
+  if (!desc.size)
+    return nullptr;
+  try {
+    auto buffer = std::make_unique<VulkanAllocatedBuffer>(this, desc);
+    if (!buffer->Initialize())
+      return nullptr;
+    return buffer.release();
+  } catch (const std::bad_alloc &) {
+    ReportError(-1, "Buffer allocation failed.");
+    return nullptr;
+  }
+}
+
+rhi::IProgram *VulkanDevice::CreateProgram(const ProgramDesc &desc) {
+  try {
+    return new VulkanProgram(this, desc);
+  } catch (const std::bad_alloc &) {
+    ReportError(-1, "Program allocation failed.");
+    return nullptr;
+  }
 }
 
 rhi::IWindow *VulkanDevice::CreateGLFWWindow(const WindowDesc &desc) {

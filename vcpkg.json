@@ -8,6 +8,10 @@
       "name": "d3dx12",
       "platform": "windows"
     },
+    {
+      "name": "d3d12-memory-allocator",
+      "platform": "windows"
+    },
     "eigen3",
     "fmt",
     "freetype",
