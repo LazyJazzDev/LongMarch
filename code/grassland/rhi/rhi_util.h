@@ -108,6 +108,13 @@ typedef enum { VERTEX_FORMAT_FLOAT, VERTEX_FORMAT_FLOAT2, VERTEX_FORMAT_FLOAT3, 
 std::string to_string(VertexFormat format);
 uint32_t VertexFormatSize(VertexFormat format);
 
+typedef enum { ATTACHMENT_LOAD_OP_LOAD, ATTACHMENT_LOAD_OP_CLEAR, ATTACHMENT_LOAD_OP_DISCARD } AttachmentLoadOp;
+
+typedef enum { ATTACHMENT_STORE_OP_STORE, ATTACHMENT_STORE_OP_DISCARD } AttachmentStoreOp;
+
+std::string to_string(AttachmentLoadOp op);
+std::string to_string(AttachmentStoreOp op);
+
 typedef enum { INDEX_FORMAT_UINT16, INDEX_FORMAT_UINT32 } IndexFormat;
 
 std::string to_string(IndexFormat format);

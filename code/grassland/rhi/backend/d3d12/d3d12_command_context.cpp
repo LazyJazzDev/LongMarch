@@ -86,6 +86,11 @@ bool D3D12CommandContext::RenderTarget(D3D12Image *image, D3D12_CPU_DESCRIPTOR_H
 
 bool D3D12CommandContext::CmdClearColor(rhi::IImage *image, const std::array<float, 4> &color) {
 #if !defined(NDEBUG)
+  if (render_target_) {
+    recording_failed_ = true;
+    ReportError(-1, "End rendering before transfer, clear, present or submission.");
+    return false;
+  }
   const auto native = dynamic_cast<D3D12Image *>(image);
   if (!native || !native->IsValid() || native->DeviceIdentity() != device_) {
     recording_failed_ = true;
@@ -108,6 +113,11 @@ bool D3D12CommandContext::CmdClearColor(rhi::IImage *image, const std::array<flo
 
 bool D3D12CommandContext::CmdPresent(rhi::IWindow *window) {
 #if !defined(NDEBUG)
+  if (render_target_) {
+    recording_failed_ = true;
+    ReportError(-1, "End rendering before transfer, clear, present or submission.");
+    return false;
+  }
   const auto target = dynamic_cast<D3D12Window *>(window);
   if (!target || target->DeviceIdentity() != device_ || !glfw::IsWindowThread()) {
     recording_failed_ = true;
@@ -139,6 +149,13 @@ bool D3D12CommandContext::CmdPresent(rhi::IWindow *window) {
 }
 
 bool D3D12CommandContext::EndRecording() {
+#if !defined(NDEBUG)
+  if (render_target_) {
+    recording_failed_ = true;
+    ReportError(-1, "End rendering before transfer, clear, present or submission.");
+    return false;
+  }
+#endif
   // Restore each resource to its own creation-time default, including non-presented images.
   for (auto &entry : resource_states_) {
     if (!TransitionResource(entry.first, entry.second.default_state, entry.second.default_state))
@@ -204,6 +221,11 @@ SubmissionStatus D3D12CommandContext::WaitForProgress() {
 
 bool D3D12CommandContext::CmdUploadBuffer(IBuffer *buffer, uint64_t offset, const void *data, uint64_t size) {
 #if !defined(NDEBUG)
+  if (render_target_) {
+    recording_failed_ = true;
+    ReportError(-1, "End rendering before transfer, clear, present or submission.");
+    return false;
+  }
   auto native = dynamic_cast<D3D12Buffer *>(buffer);
   if (!native || native->Owner() != device_ || sealed_) {
     recording_failed_ = true;
@@ -247,6 +269,11 @@ bool D3D12CommandContext::CmdCopyBuffer(IBuffer *source,
                                         uint64_t destination_offset,
                                         uint64_t size) {
 #if !defined(NDEBUG)
+  if (render_target_) {
+    recording_failed_ = true;
+    ReportError(-1, "End rendering before transfer, clear, present or submission.");
+    return false;
+  }
   auto src = dynamic_cast<D3D12Buffer *>(source);
   auto dst = dynamic_cast<D3D12Buffer *>(destination);
   if (!src || !dst || src->Owner() != device_ || dst->Owner() != device_ || sealed_) {
@@ -303,10 +330,13 @@ bool D3D12CommandContext::CmdBindProgram(IProgram *program) {
   return true;
 }
 
-bool D3D12CommandContext::CmdBindRenderTarget(IImage *image) {
+bool D3D12CommandContext::CmdBeginRendering(const RenderingInfo &info) {
+  auto image = info.color_attachment;
 #if !defined(NDEBUG)
   auto native = dynamic_cast<D3D12Image *>(image);
-  if (!native || native->DeviceIdentity() != device_ || sealed_) {
+  if (!native || !native->IsValid() || native->DeviceIdentity() != device_ || sealed_ || render_target_ ||
+      info.load_op < ATTACHMENT_LOAD_OP_LOAD || info.load_op > ATTACHMENT_LOAD_OP_DISCARD ||
+      info.store_op < ATTACHMENT_STORE_OP_STORE || info.store_op > ATTACHMENT_STORE_OP_DISCARD) {
     recording_failed_ = true;
     return false;
   }
@@ -320,8 +350,29 @@ bool D3D12CommandContext::CmdBindRenderTarget(IImage *image) {
   D3D12_CPU_DESCRIPTOR_HANDLE handle{};
   if (!RenderTarget(native, handle))
     return false;
+  if (info.load_op == ATTACHMENT_LOAD_OP_CLEAR)
+    list_->ClearRenderTargetView(handle, info.clear_color.data(), 0, nullptr);
+  else if (info.load_op == ATTACHMENT_LOAD_OP_DISCARD)
+    list_->DiscardResource(native->NativeImage(), nullptr);
   list_->OMSetRenderTargets(1, &handle, FALSE, nullptr);
+  store_op_ = info.store_op;
   render_target_ = native;
+  return true;
+}
+
+bool D3D12CommandContext::CmdEndRendering() {
+#if !defined(NDEBUG)
+  if (sealed_ || !render_target_) {
+    recording_failed_ = true;
+    return false;
+  }
+#endif
+  if (recording_failed_)
+    return false;
+  if (store_op_ == ATTACHMENT_STORE_OP_DISCARD)
+    list_->DiscardResource(render_target_->NativeImage(), nullptr);
+  list_->OMSetRenderTargets(0, nullptr, FALSE, nullptr);
+  render_target_ = nullptr;
   return true;
 }
 

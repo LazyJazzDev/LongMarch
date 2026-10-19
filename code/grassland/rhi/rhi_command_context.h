@@ -8,6 +8,13 @@ class IBuffer;
 class IProgram;
 class IImage;
 
+struct RenderingInfo {
+  IImage *color_attachment{};
+  AttachmentLoadOp load_op{ATTACHMENT_LOAD_OP_LOAD};
+  AttachmentStoreOp store_op{ATTACHMENT_STORE_OP_STORE};
+  std::array<float, 4> clear_color{};
+};
+
 struct Viewport {
   float x{}, y{}, width{}, height{}, min_depth{}, max_depth{1};
 };
@@ -27,7 +34,9 @@ class ICommandContext : public IObject {
   // recording; a context cannot be recorded or submitted again.
   // Upload snapshots the CPU bytes now; staging storage is leased through GPU completion.
   // Bind a finalized Program before vertex buffers; rebind buffers after changing its layout.
-  // Rendering scopes and backend attachment leases are implicit. No caller frame slots.
+  // Begin/End delimit an explicit, non-nested rendering scope. Draw requires a scope.
+  // Upload, copy, standalone clear, Present and Submit require no active scope.
+  // Begin consumes attachment operations; backend attachment leases remain automatic.
   virtual bool CmdUploadBuffer(IBuffer *buffer, uint64_t offset, const void *data, uint64_t size) = 0;
   virtual bool CmdCopyBuffer(IBuffer *source,
                              uint64_t source_offset,
@@ -35,7 +44,8 @@ class ICommandContext : public IObject {
                              uint64_t destination_offset,
                              uint64_t size) = 0;
   virtual bool CmdBindProgram(IProgram *program) = 0;
-  virtual bool CmdBindRenderTarget(IImage *image) = 0;
+  virtual bool CmdBeginRendering(const RenderingInfo &info) = 0;
+  virtual bool CmdEndRendering() = 0;
   virtual bool CmdBindVertexBuffer(uint32_t binding, IBuffer *buffer, uint64_t offset = 0) = 0;
   virtual bool CmdBindIndexBuffer(IBuffer *buffer, IndexFormat format = INDEX_FORMAT_UINT32, uint64_t offset = 0) = 0;
   virtual bool CmdSetViewport(const Viewport &viewport) = 0;

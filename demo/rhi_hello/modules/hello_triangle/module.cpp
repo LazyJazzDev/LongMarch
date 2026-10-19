@@ -117,11 +117,10 @@ int HelloTriangle(grassland::rhi::BackendAPI api, int frames) {
     ObjPtr<ICommandContext> context = device->CreateCommandContext();
     if (!context)
       return 1;
-    if (!context->CmdClearColor(image.Get(), {0.6f, 0.7f, 0.8f, 1}))
-      return 1;
     if (!context->CmdBindProgram(program.Get()))
       return 1;
-    if (!context->CmdBindRenderTarget(image.Get()))
+    if (!context->CmdBeginRendering(
+            {image.Get(), ATTACHMENT_LOAD_OP_CLEAR, ATTACHMENT_STORE_OP_STORE, {0.6f, 0.7f, 0.8f, 1}}))
       return 1;
     if (!context->CmdBindVertexBuffer(0, vertex_buffer.Get()))
       return 1;
@@ -132,6 +131,8 @@ int HelloTriangle(grassland::rhi::BackendAPI api, int frames) {
     if (!context->CmdSetScissor({0, 0, extent.width, extent.height}))
       return 1;
     if (!context->CmdDrawIndexed(3))
+      return 1;
+    if (!context->CmdEndRendering())
       return 1;
     if (!context->CmdPresent(window.Get()))
       return 1;

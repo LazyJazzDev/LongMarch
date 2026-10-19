@@ -24,7 +24,8 @@ class CommandContext : public Object<rhi::ICommandContext> {
                      uint64_t destination_offset,
                      uint64_t size) override;
   bool CmdBindProgram(IProgram *program) override;
-  bool CmdBindRenderTarget(IImage *image) override;
+  bool CmdBeginRendering(const RenderingInfo &info) override;
+  bool CmdEndRendering() override;
   bool CmdBindVertexBuffer(uint32_t binding, IBuffer *buffer, uint64_t offset = 0) override;
   bool CmdBindIndexBuffer(IBuffer *buffer, IndexFormat format = INDEX_FORMAT_UINT32, uint64_t offset = 0) override;
   bool CmdSetViewport(const Viewport &viewport) override;

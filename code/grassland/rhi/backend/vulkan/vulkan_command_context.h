@@ -22,7 +22,8 @@ class VulkanCommandContext final : public CommandContext {
                      uint64_t destination_offset,
                      uint64_t size) override;
   bool CmdBindProgram(IProgram *program) override;
-  bool CmdBindRenderTarget(IImage *image) override;
+  bool CmdBeginRendering(const RenderingInfo &info) override;
+  bool CmdEndRendering() override;
   bool CmdBindVertexBuffer(uint32_t binding, IBuffer *buffer, uint64_t offset = 0) override;
   bool CmdBindIndexBuffer(IBuffer *buffer, IndexFormat format = INDEX_FORMAT_UINT32, uint64_t offset = 0) override;
   bool CmdSetViewport(const Viewport &viewport) override;
@@ -45,14 +46,10 @@ class VulkanCommandContext final : public CommandContext {
   VulkanProgram *program_{};
   VulkanImage *render_target_{};
   std::vector<VulkanBuffer *> vertex_buffers_;
-  VulkanBuffer *index_buffer_{};
-  bool PrepareDrawBuffers(bool indexed);
   bool viewport_set_{}, scissor_set_{}, index_bound_{};
   std::vector<ObjectPtr<VulkanAllocatedBuffer>> uploads_;
 
   bool EndRecording() override;
-  void EndRendering();
-  bool BeginRendering();
   bool TransitionBuffer(VulkanBuffer *buffer, VkPipelineStageFlags stages, VkAccessFlags access);
 
   struct BufferState {
@@ -62,7 +59,6 @@ class VulkanCommandContext final : public CommandContext {
 
   std::unordered_map<VulkanBuffer *, BufferState> buffer_states_;
   std::unordered_map<VulkanImage *, std::pair<uint64_t, VkFramebuffer>> framebuffer_leases_;
-  bool rendering_{};
   bool TransitionImage(VulkanImage *image, VkImageLayout layout, VkPipelineStageFlags stages, VkAccessFlags access);
 
   struct ImageState {

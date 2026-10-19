@@ -26,7 +26,11 @@ class CommandContext : public ObjectContainer {
                      uint64_t destination_offset,
                      uint64_t size);
   bool CmdBindProgram(const Program &program);
-  bool CmdBindRenderTarget(const Image &image);
+  bool CmdBeginRendering(const Image &image,
+                         rhi::AttachmentLoadOp load_op = rhi::ATTACHMENT_LOAD_OP_LOAD,
+                         rhi::AttachmentStoreOp store_op = rhi::ATTACHMENT_STORE_OP_STORE,
+                         const std::array<float, 4> &clear_color = {});
+  bool CmdEndRendering();
   bool CmdBindVertexBuffer(uint32_t binding, const Buffer &buffer, uint64_t offset = 0);
   bool CmdBindIndexBuffer(const Buffer &buffer,
                           rhi::IndexFormat format = rhi::INDEX_FORMAT_UINT32,

@@ -58,12 +58,23 @@ bool CommandContext::CmdBindProgram(const Program &program) {
   return Get()->CmdBindProgram(program.Get());
 }
 
-bool CommandContext::CmdBindRenderTarget(const Image &image) {
+bool CommandContext::CmdBeginRendering(const Image &image,
+                                       rhi::AttachmentLoadOp load_op,
+                                       rhi::AttachmentStoreOp store_op,
+                                       const std::array<float, 4> &clear_color) {
 #if !defined(NDEBUG)
   if (!*this)
     return false;
 #endif
-  return Get()->CmdBindRenderTarget(image.Get());
+  return Get()->CmdBeginRendering({image.Get(), load_op, store_op, clear_color});
+}
+
+bool CommandContext::CmdEndRendering() {
+#if !defined(NDEBUG)
+  if (!*this)
+    return false;
+#endif
+  return Get()->CmdEndRendering();
 }
 
 bool CommandContext::CmdBindVertexBuffer(uint32_t binding, const Buffer &buffer, uint64_t offset) {

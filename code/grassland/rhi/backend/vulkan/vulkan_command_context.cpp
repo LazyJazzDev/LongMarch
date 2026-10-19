@@ -33,7 +33,6 @@ bool VulkanCommandContext::TransitionImage(VulkanImage *image,
                                            VkImageLayout layout,
                                            VkPipelineStageFlags stages,
                                            VkAccessFlags access) {
-  EndRendering();
   try {
     const auto default_access = image->DefaultLayout() == VK_IMAGE_LAYOUT_PRESENT_SRC_KHR
                                     ? VkAccessFlags{0}
@@ -71,6 +70,11 @@ bool VulkanCommandContext::TransitionImage(VulkanImage *image,
 
 bool VulkanCommandContext::CmdClearColor(rhi::IImage *image, const std::array<float, 4> &color) {
 #if !defined(NDEBUG)
+  if (render_target_) {
+    recording_failed_ = true;
+    ReportError(-1, "End rendering before transfer, clear, present or submission.");
+    return false;
+  }
   const auto native = dynamic_cast<VulkanImage *>(image);
   if (!native || !native->IsValid() || native->DeviceIdentity() != device_) {
     recording_failed_ = true;
@@ -94,6 +98,11 @@ bool VulkanCommandContext::CmdClearColor(rhi::IImage *image, const std::array<fl
 
 bool VulkanCommandContext::CmdPresent(rhi::IWindow *window) {
 #if !defined(NDEBUG)
+  if (render_target_) {
+    recording_failed_ = true;
+    ReportError(-1, "End rendering before transfer, clear, present or submission.");
+    return false;
+  }
   const auto target = dynamic_cast<VulkanWindow *>(window);
   if (!target || target->DeviceIdentity() != device_ || !glfw::IsWindowThread()) {
     recording_failed_ = true;
@@ -127,7 +136,13 @@ bool VulkanCommandContext::CmdPresent(rhi::IWindow *window) {
 }
 
 bool VulkanCommandContext::EndRecording() {
-  EndRendering();
+#if !defined(NDEBUG)
+  if (render_target_) {
+    recording_failed_ = true;
+    ReportError(-1, "End rendering before transfer, clear, present or submission.");
+    return false;
+  }
+#endif
   for (auto &entry : buffer_states_) {
     if (!TransitionBuffer(entry.first, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT,
                           VK_ACCESS_MEMORY_READ_BIT | VK_ACCESS_MEMORY_WRITE_BIT))
@@ -241,6 +256,11 @@ SubmissionStatus VulkanCommandContext::WaitForProgress() {
 
 bool VulkanCommandContext::CmdUploadBuffer(IBuffer *buffer, uint64_t offset, const void *data, uint64_t size) {
 #if !defined(NDEBUG)
+  if (render_target_) {
+    recording_failed_ = true;
+    ReportError(-1, "End rendering before transfer, clear, present or submission.");
+    return false;
+  }
   auto native = dynamic_cast<VulkanBuffer *>(buffer);
   if (!native || native->Owner() != device_ || sealed_) {
     recording_failed_ = true;
@@ -285,6 +305,11 @@ bool VulkanCommandContext::CmdCopyBuffer(IBuffer *source,
                                          uint64_t destination_offset,
                                          uint64_t size) {
 #if !defined(NDEBUG)
+  if (render_target_) {
+    recording_failed_ = true;
+    ReportError(-1, "End rendering before transfer, clear, present or submission.");
+    return false;
+  }
   auto src = dynamic_cast<VulkanBuffer *>(source);
   auto dst = dynamic_cast<VulkanBuffer *>(destination);
   if (!src || !dst || src->Owner() != device_ || dst->Owner() != device_ || sealed_) {
@@ -340,10 +365,13 @@ bool VulkanCommandContext::CmdBindProgram(IProgram *program) {
   return true;
 }
 
-bool VulkanCommandContext::CmdBindRenderTarget(IImage *image) {
+bool VulkanCommandContext::CmdBeginRendering(const RenderingInfo &info) {
+  auto image = info.color_attachment;
 #if !defined(NDEBUG)
   auto native = dynamic_cast<VulkanImage *>(image);
-  if (!native || native->DeviceIdentity() != device_ || sealed_) {
+  if (!native || !native->IsValid() || native->DeviceIdentity() != device_ || sealed_ || render_target_ ||
+      info.load_op < ATTACHMENT_LOAD_OP_LOAD || info.load_op > ATTACHMENT_LOAD_OP_DISCARD ||
+      info.store_op < ATTACHMENT_STORE_OP_STORE || info.store_op > ATTACHMENT_STORE_OP_DISCARD) {
     recording_failed_ = true;
     return false;
   }
@@ -355,8 +383,46 @@ bool VulkanCommandContext::CmdBindRenderTarget(IImage *image) {
   if (!TransitionImage(native, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
                        VK_ACCESS_COLOR_ATTACHMENT_READ_BIT | VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT))
     return false;
+  // Bindings may change inside the scope, where ordinary buffer barriers cannot
+  // be emitted. Establish visibility for all vertex/index reads at its boundary.
+  VkMemoryBarrier barrier{VK_STRUCTURE_TYPE_MEMORY_BARRIER};
+  barrier.srcAccessMask = VK_ACCESS_MEMORY_WRITE_BIT;
+  barrier.dstAccessMask = VK_ACCESS_VERTEX_ATTRIBUTE_READ_BIT | VK_ACCESS_INDEX_READ_BIT;
+  vkCmdPipelineBarrier(command_, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, VK_PIPELINE_STAGE_VERTEX_INPUT_BIT, 0, 1, &barrier,
+                       0, nullptr, 0, nullptr);
   render_target_ = native;
-  return true;
+  try {
+    auto it = framebuffer_leases_.find(render_target_);
+    if (it == framebuffer_leases_.end()) {
+      auto inserted = framebuffer_leases_.try_emplace(render_target_);
+      it = inserted.first;
+      if (!device_->RenderTargets().Acquire(render_target_->NativeImage(), render_target_->GetDesc(), it->second.first,
+                                            it->second.second)) {
+        framebuffer_leases_.erase(it);
+        recording_failed_ = true;
+        return false;
+      }
+    }
+    auto desc = render_target_->GetDesc();
+    VkRenderPassBeginInfo begin{VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO};
+    begin.renderPass = device_->RenderTargets().RenderPass(desc.format, info.load_op, info.store_op);
+    if (!begin.renderPass) {
+      recording_failed_ = true;
+      return false;
+    }
+    VkClearValue clear{};
+    std::copy(info.clear_color.begin(), info.clear_color.end(), clear.color.float32);
+    begin.clearValueCount = 1;
+    begin.pClearValues = &clear;
+    begin.framebuffer = it->second.second;
+    begin.renderArea.extent = {desc.width, desc.height};
+    vkCmdBeginRenderPass(command_, &begin, VK_SUBPASS_CONTENTS_INLINE);
+    return true;
+  } catch (const std::bad_alloc &) {
+    framebuffer_leases_.erase(render_target_);
+    recording_failed_ = true;
+    return false;
+  }
 }
 
 bool VulkanCommandContext::CmdBindVertexBuffer(uint32_t binding, IBuffer *buffer, uint64_t offset) {
@@ -409,7 +475,6 @@ bool VulkanCommandContext::CmdBindIndexBuffer(IBuffer *buffer, IndexFormat forma
     return false;
   vkCmdBindIndexBuffer(command_, native->NativeBuffer(), offset,
                        format == INDEX_FORMAT_UINT16 ? VK_INDEX_TYPE_UINT16 : VK_INDEX_TYPE_UINT32);
-  index_buffer_ = native;
   index_bound_ = true;
   return true;
 }
@@ -454,16 +519,13 @@ bool VulkanCommandContext::CmdDraw(uint32_t vertex_count,
     recording_failed_ = true;
     return false;
   }
-  if (program_->GetDesc().color_format != render_target_->GetDesc().format) {
+  if (std::find(vertex_buffers_.begin(), vertex_buffers_.end(), nullptr) != vertex_buffers_.end() ||
+      program_->GetDesc().color_format != render_target_->GetDesc().format) {
     recording_failed_ = true;
     return false;
   }
 #endif
   if (recording_failed_)
-    return false;
-  if (!PrepareDrawBuffers(false))
-    return false;
-  if (!BeginRendering())
     return false;
   vkCmdDraw(command_, vertex_count, instance_count, first_vertex, first_instance);
   return true;
@@ -479,63 +541,42 @@ bool VulkanCommandContext::CmdDrawIndexed(uint32_t index_count,
     recording_failed_ = true;
     return false;
   }
-  if (program_->GetDesc().color_format != render_target_->GetDesc().format) {
+  if (std::find(vertex_buffers_.begin(), vertex_buffers_.end(), nullptr) != vertex_buffers_.end() ||
+      program_->GetDesc().color_format != render_target_->GetDesc().format) {
     recording_failed_ = true;
     return false;
   }
 #endif
   if (recording_failed_)
     return false;
-  if (!PrepareDrawBuffers(true))
-    return false;
-  if (!BeginRendering())
-    return false;
   vkCmdDrawIndexed(command_, index_count, instance_count, first_index, vertex_offset, first_instance);
   return true;
 }
 
-void VulkanCommandContext::EndRendering() {
-  if (rendering_) {
-    vkCmdEndRenderPass(command_);
-    rendering_ = false;
-  }
-}
-
-bool VulkanCommandContext::BeginRendering() {
-  if (rendering_)
-    return true;
-  if (!TransitionImage(render_target_, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
-                       VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
-                       VK_ACCESS_COLOR_ATTACHMENT_READ_BIT | VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT))
-    return false;
-  try {
-    auto it = framebuffer_leases_.find(render_target_);
-    if (it == framebuffer_leases_.end()) {
-      auto inserted = framebuffer_leases_.try_emplace(render_target_);
-      it = inserted.first;
-      if (!device_->RenderTargets().Acquire(render_target_->NativeImage(), render_target_->GetDesc(), it->second.first,
-                                            it->second.second)) {
-        framebuffer_leases_.erase(it);
-        recording_failed_ = true;
-        return false;
-      }
-    }
-    auto desc = render_target_->GetDesc();
-    VkRenderPassBeginInfo begin{VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO};
-    begin.renderPass = device_->RenderTargets().RenderPass(desc.format);
-    begin.framebuffer = it->second.second;
-    begin.renderArea.extent = {desc.width, desc.height};
-    vkCmdBeginRenderPass(command_, &begin, VK_SUBPASS_CONTENTS_INLINE);
-    rendering_ = true;
-    return true;
-  } catch (const std::bad_alloc &) {
-    framebuffer_leases_.erase(render_target_);
+bool VulkanCommandContext::CmdEndRendering() {
+#if !defined(NDEBUG)
+  if (sealed_ || !render_target_) {
     recording_failed_ = true;
     return false;
   }
+#endif
+  if (recording_failed_)
+    return false;
+  vkCmdEndRenderPass(command_);
+  // Make reads in this scope complete before later buffer writes, including buffers
+  // first bound inside the scope. Buffer bindings do not change image layouts.
+  VkMemoryBarrier barrier{VK_STRUCTURE_TYPE_MEMORY_BARRIER};
+  barrier.srcAccessMask = VK_ACCESS_VERTEX_ATTRIBUTE_READ_BIT | VK_ACCESS_INDEX_READ_BIT;
+  barrier.dstAccessMask = VK_ACCESS_MEMORY_READ_BIT | VK_ACCESS_MEMORY_WRITE_BIT;
+  vkCmdPipelineBarrier(command_, VK_PIPELINE_STAGE_VERTEX_INPUT_BIT, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, 0, 1, &barrier,
+                       0, nullptr, 0, nullptr);
+  render_target_ = nullptr;
+  return true;
 }
 
 bool VulkanCommandContext::TransitionBuffer(VulkanBuffer *buffer, VkPipelineStageFlags stages, VkAccessFlags access) {
+  if (render_target_)
+    return true;  // Vertex/index reads are synchronized by the explicit scope boundaries.
   auto known = buffer_states_.find(buffer);
   constexpr VkAccessFlags reads =
       VK_ACCESS_VERTEX_ATTRIBUTE_READ_BIT | VK_ACCESS_INDEX_READ_BIT | VK_ACCESS_TRANSFER_READ_BIT;
@@ -546,7 +587,6 @@ bool VulkanCommandContext::TransitionBuffer(VulkanBuffer *buffer, VkPipelineStag
     access |= known->second.access;
     stages |= known->second.stages;
   }
-  EndRendering();
   try {
     auto &state = buffer_states_
                       .try_emplace(buffer, BufferState{VK_PIPELINE_STAGE_ALL_COMMANDS_BIT,
@@ -567,21 +607,4 @@ bool VulkanCommandContext::TransitionBuffer(VulkanBuffer *buffer, VkPipelineStag
   }
 }
 
-bool VulkanCommandContext::PrepareDrawBuffers(bool indexed) {
-  for (auto buffer : vertex_buffers_) {
-#if !defined(NDEBUG)
-    if (!buffer) {
-      recording_failed_ = true;
-      return false;
-    }
-#endif
-    if (!TransitionBuffer(buffer, VK_PIPELINE_STAGE_VERTEX_INPUT_BIT, VK_ACCESS_VERTEX_ATTRIBUTE_READ_BIT))
-      return false;
-  }
-  if (indexed) {
-    if (!TransitionBuffer(index_buffer_, VK_PIPELINE_STAGE_VERTEX_INPUT_BIT, VK_ACCESS_INDEX_READ_BIT))
-      return false;
-  }
-  return true;
-}
 }  // namespace grassland::rhi::backend::vulkan

@@ -20,15 +20,21 @@ VulkanRenderTargetPool::~VulkanRenderTargetPool() {
       vkDestroyRenderPass(device_, pass, nullptr);
 }
 
-VkRenderPass VulkanRenderTargetPool::CreateRenderPass(ImageFormat format) {
-  auto &pass = passes_[format == IMAGE_FORMAT_RGBA8_UNORM ? 0 : 1];
+VkRenderPass VulkanRenderTargetPool::CreateRenderPass(ImageFormat format,
+                                                      AttachmentLoadOp load_op,
+                                                      AttachmentStoreOp store_op) {
+  auto &pass = passes_[(format == IMAGE_FORMAT_RGBA8_UNORM ? 0 : 6) + static_cast<int>(load_op) * 2 +
+                       static_cast<int>(store_op)];
   if (pass)
     return pass;
   VkAttachmentDescription attachment{};
   attachment.format = ColorFormat(format);
   attachment.samples = VK_SAMPLE_COUNT_1_BIT;
-  attachment.loadOp = VK_ATTACHMENT_LOAD_OP_LOAD;
-  attachment.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
+  constexpr VkAttachmentLoadOp loads[] = {VK_ATTACHMENT_LOAD_OP_LOAD, VK_ATTACHMENT_LOAD_OP_CLEAR,
+                                          VK_ATTACHMENT_LOAD_OP_DONT_CARE};
+  attachment.loadOp = loads[load_op];
+  constexpr VkAttachmentStoreOp stores[] = {VK_ATTACHMENT_STORE_OP_STORE, VK_ATTACHMENT_STORE_OP_DONT_CARE};
+  attachment.storeOp = stores[store_op];
   attachment.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
   attachment.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
   attachment.initialLayout = attachment.finalLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
@@ -47,9 +53,11 @@ VkRenderPass VulkanRenderTargetPool::CreateRenderPass(ImageFormat format) {
   return pass;
 }
 
-VkRenderPass VulkanRenderTargetPool::RenderPass(ImageFormat format) {
+VkRenderPass VulkanRenderTargetPool::RenderPass(ImageFormat format,
+                                                AttachmentLoadOp load_op,
+                                                AttachmentStoreOp store_op) {
   std::lock_guard<std::mutex> lock(mutex_);
-  return CreateRenderPass(format);
+  return CreateRenderPass(format, load_op, store_op);
 }
 
 bool VulkanRenderTargetPool::Acquire(VkImage image,

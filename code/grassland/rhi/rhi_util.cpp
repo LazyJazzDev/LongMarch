@@ -236,6 +236,28 @@ std::string to_string(VertexFormat format) {
   return "UNKNOWN";
 }
 
+std::string to_string(AttachmentLoadOp op) {
+  switch (op) {
+    case ATTACHMENT_LOAD_OP_LOAD:
+      return "Load";
+    case ATTACHMENT_LOAD_OP_CLEAR:
+      return "Clear";
+    case ATTACHMENT_LOAD_OP_DISCARD:
+      return "Discard";
+  }
+  return "Unknown";
+}
+
+std::string to_string(AttachmentStoreOp op) {
+  switch (op) {
+    case ATTACHMENT_STORE_OP_STORE:
+      return "Store";
+    case ATTACHMENT_STORE_OP_DISCARD:
+      return "Discard";
+  }
+  return "Unknown";
+}
+
 std::string to_string(IndexFormat format) {
   switch (format) {
     case INDEX_FORMAT_UINT16:

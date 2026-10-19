@@ -129,9 +129,7 @@ TEST_P(RhiProgram, DrawAndIndexedDrawRetainResourcesUntilCompletion) {
     ASSERT_TRUE(image);
     ObjPtr<ICommandContext> commands = device->CreateCommandContext();
     ASSERT_TRUE(commands);
-    ASSERT_TRUE(commands->CmdClearColor(image.Get(), {0.6f, 0.7f, 0.8f, 1}));
     ASSERT_TRUE(commands->CmdBindProgram(program.Get()));
-    ASSERT_TRUE(commands->CmdBindRenderTarget(image.Get()));
     ASSERT_TRUE(commands->CmdBindVertexBuffer(0, geometry.Get()));
     ASSERT_TRUE(commands->CmdBindIndexBuffer(geometry.Get(), INDEX_FORMAT_UINT32, sizeof(vertices)));
     // Upload after binding exercises restoration of bound resources' draw usages.
@@ -139,8 +137,17 @@ TEST_P(RhiProgram, DrawAndIndexedDrawRetainResourcesUntilCompletion) {
     ASSERT_TRUE(commands->CmdUploadBuffer(geometry.Get(), sizeof(vertices), indices, sizeof(indices)));
     ASSERT_TRUE(commands->CmdSetViewport({0, 0, 320, 240, 0, 1}));
     ASSERT_TRUE(commands->CmdSetScissor({0, 0, 320, 240}));
+    ASSERT_TRUE(commands->CmdBeginRendering(
+        {image.Get(), ATTACHMENT_LOAD_OP_CLEAR, ATTACHMENT_STORE_OP_STORE, {0.6f, 0.7f, 0.8f, 1}}));
     ASSERT_TRUE(commands->CmdDraw(3));
+    ASSERT_TRUE(commands->CmdEndRendering());
+    // A LOAD pass is compatible with the same Program and framebuffer as CLEAR.
+    ASSERT_TRUE(commands->CmdBeginRendering({image.Get()}));
+    // Rebinding inside a scope must not split it or emit illegal Vulkan barriers.
+    ASSERT_TRUE(commands->CmdBindVertexBuffer(0, geometry.Get()));
+    ASSERT_TRUE(commands->CmdBindIndexBuffer(geometry.Get(), INDEX_FORMAT_UINT32, sizeof(vertices)));
     ASSERT_TRUE(commands->CmdDrawIndexed(3));
+    ASSERT_TRUE(commands->CmdEndRendering());
     ASSERT_TRUE(commands->CmdPresent(window.Get()));
     if (frame == 11) {
       program.Release();
@@ -165,6 +172,88 @@ TEST_P(RhiProgram, DrawAndIndexedDrawRetainResourcesUntilCompletion) {
   }
 #endif
 }
+
+TEST_P(RhiProgram, ExplicitRenderingSupportsEmptyScopesAndAttachmentOperations) {
+  if (!std::getenv("LONGMARCH_RHI_WINDOW_TESTS"))
+    GTEST_SKIP();
+  ObjPtr<ICore> core = CreateCore(GetParam());
+  ASSERT_TRUE(core);
+  ObjPtr<IDevice> device = core->CreateDeviceByAutoSelection();
+  ASSERT_TRUE(device);
+  ObjPtr<IWindow> window = device->CreateGLFWWindow({160, 120, "RHI rendering scopes"});
+  ASSERT_TRUE(window);
+  ObjPtr<IQueue> queue = device->GetQueue(QUEUE_TYPE_GRAPHICS);
+  ASSERT_TRUE(queue);
+  ObjPtr<IImage> image = window->GetNextImage();
+  ASSERT_TRUE(image);
+  ObjPtr<ICommandContext> commands = device->CreateCommandContext();
+  ASSERT_TRUE(commands);
+  for (auto load : {ATTACHMENT_LOAD_OP_CLEAR, ATTACHMENT_LOAD_OP_LOAD, ATTACHMENT_LOAD_OP_DISCARD}) {
+    for (auto store : {ATTACHMENT_STORE_OP_STORE, ATTACHMENT_STORE_OP_DISCARD}) {
+      // Initialize before LOAD, including after a previous DISCARD store.
+      ASSERT_TRUE(commands->CmdClearColor(image.Get(), {0, 0, 0, 1}));
+      ASSERT_TRUE(commands->CmdBeginRendering({image.Get(), load, store, {0.6f, 0.7f, 0.8f, 1}}));
+      ASSERT_TRUE(commands->CmdEndRendering());
+    }
+  }
+  ASSERT_TRUE(commands->CmdBeginRendering(
+      {image.Get(), ATTACHMENT_LOAD_OP_CLEAR, ATTACHMENT_STORE_OP_STORE, {0.6f, 0.7f, 0.8f, 1}}));
+  ASSERT_TRUE(commands->CmdEndRendering());
+  ASSERT_TRUE(commands->CmdPresent(window.Get()));
+  ObjPtr<ISubmissionToken> done = queue->Submit(commands.Get());
+  ASSERT_TRUE(done);
+  ASSERT_TRUE(done->WaitHost());
+}
+
+#if !defined(NDEBUG)
+TEST_P(RhiProgram, ExplicitRenderingRejectsUnbalancedScopesAndOutsideCommands) {
+  if (!std::getenv("LONGMARCH_RHI_WINDOW_TESTS"))
+    GTEST_SKIP();
+  ObjPtr<ICore> core = CreateCore(GetParam());
+  ASSERT_TRUE(core);
+  ObjPtr<IDevice> device = core->CreateDeviceByAutoSelection();
+  ASSERT_TRUE(device);
+  ObjPtr<IWindow> window = device->CreateGLFWWindow({160, 120, "RHI scope contract"});
+  ASSERT_TRUE(window);
+  ObjPtr<IQueue> queue = device->GetQueue(QUEUE_TYPE_GRAPHICS);
+  ASSERT_TRUE(queue);
+  ObjPtr<IImage> image = window->GetNextImage();
+  ASSERT_TRUE(image);
+  ObjPtr<IBuffer> buffer = device->CreateBuffer({16});
+  ASSERT_TRUE(buffer);
+  for (int operation = 0; operation < 7; ++operation) {
+    ObjPtr<ICommandContext> commands = device->CreateCommandContext();
+    ASSERT_TRUE(commands);
+    if (operation == 0) {
+      EXPECT_FALSE(commands->CmdEndRendering());
+    } else if (operation == 1) {
+      EXPECT_FALSE(commands->CmdDraw(3));
+    } else {
+      ASSERT_TRUE(commands->CmdBeginRendering({image.Get(), ATTACHMENT_LOAD_OP_CLEAR}));
+      switch (operation) {
+        case 2:
+          EXPECT_FALSE(commands->CmdBeginRendering({image.Get()}));
+          break;
+        case 3:
+          EXPECT_FALSE(commands->CmdClearColor(image.Get(), {0, 0, 0, 1}));
+          break;
+        case 4:
+          EXPECT_FALSE(commands->CmdPresent(window.Get()));
+          break;
+        case 5: {
+          const uint32_t value = 0;
+          EXPECT_FALSE(commands->CmdUploadBuffer(buffer.Get(), 0, &value, sizeof(value)));
+          break;
+        }
+        case 6:
+          break;  // Submission must not implicitly end an open scope.
+      }
+    }
+    ObjPtr<ISubmissionToken> rejected = queue->Submit(commands.Get());
+    EXPECT_FALSE(rejected);
+  }
+}
+#endif
 
 static const BackendAPI program_backends[] = {
 #if defined(LONGMARCH_D3D12_ENABLED)

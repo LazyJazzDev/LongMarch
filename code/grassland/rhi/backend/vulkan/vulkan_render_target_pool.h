@@ -9,13 +9,17 @@ class VulkanRenderTargetPool {
  public:
   explicit VulkanRenderTargetPool(VkDevice device);
   ~VulkanRenderTargetPool();
-  VkRenderPass RenderPass(ImageFormat format);
+  VkRenderPass RenderPass(ImageFormat format,
+                          AttachmentLoadOp load_op = ATTACHMENT_LOAD_OP_LOAD,
+                          AttachmentStoreOp store_op = ATTACHMENT_STORE_OP_STORE);
   bool Acquire(VkImage image, const ImageDesc &desc, uint64_t &lease, VkFramebuffer &framebuffer);
   void Release(uint64_t lease);
   void Retire(VkImage image);
 
  private:
-  VkRenderPass CreateRenderPass(ImageFormat format);
+  VkRenderPass CreateRenderPass(ImageFormat format,
+                                AttachmentLoadOp load_op = ATTACHMENT_LOAD_OP_LOAD,
+                                AttachmentStoreOp store_op = ATTACHMENT_STORE_OP_STORE);
 
   struct Entry {
     VkImage image{};
@@ -26,7 +30,7 @@ class VulkanRenderTargetPool {
 
   VkDevice device_;
   std::mutex mutex_;
-  VkRenderPass passes_[2]{};
+  VkRenderPass passes_[12]{};
   std::vector<Entry> entries_;
 };
 

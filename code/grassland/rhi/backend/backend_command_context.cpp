@@ -76,9 +76,15 @@ bool CommandContext::CmdBindProgram(IProgram *program) {
   return false;
 }
 
-bool CommandContext::CmdBindRenderTarget(IImage *image) {
+bool CommandContext::CmdBeginRendering(const RenderingInfo &info) {
   recording_failed_ = true;
   ReportError(-1, "Drawing and buffers are not implemented for this backend.");
+  return false;
+}
+
+bool CommandContext::CmdEndRendering() {
+  recording_failed_ = true;
+  ReportError(-1, "Drawing is not implemented for this backend.");
   return false;
 }
 
