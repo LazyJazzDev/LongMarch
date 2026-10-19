@@ -1,5 +1,6 @@
 ﻿#include "grassland/rhi/backend/d3d12/d3d12_device.h"
 
+#include "grassland/rhi/backend/d3d12/d3d12_allocated_image.h"
 #include "grassland/rhi/backend/d3d12/d3d12_command_context.h"
 #include "grassland/rhi/backend/d3d12/d3d12_program.h"
 #include "grassland/rhi/backend/d3d12/d3d12_queue.h"
@@ -175,6 +176,10 @@ rhi::IProgram *D3D12Device::CreateProgram(const ProgramDesc &desc) {
 
 D3D12UploadPool &D3D12Device::UploadPool() {
   return upload_pool_;
+}
+
+rhi::IImage *D3D12Device::CreateImage(const ImageDesc &desc) {
+  return D3D12AllocatedImage::Create(this, desc);
 }
 
 rhi::IBuffer *D3D12Device::CreateBuffer(const BufferDesc &desc) {

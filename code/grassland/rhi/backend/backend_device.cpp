@@ -9,6 +9,11 @@ namespace grassland::rhi::backend {
 Device::Device(PhysicalDevice info, Core *core) : core_(core), info_(std::move(info)) {
 }
 
+rhi::IImage *Device::CreateImage(const ImageDesc &) {
+  ReportError(-1, "Independent images are not implemented for this backend.");
+  return nullptr;
+}
+
 rhi::IBuffer *Device::CreateBuffer(const BufferDesc &) {
   ReportError(-1, "Buffers are not implemented for this backend.");
   return nullptr;

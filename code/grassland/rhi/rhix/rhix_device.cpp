@@ -74,6 +74,10 @@ Program Device::CreateProgram(const rhi::ProgramDesc &desc) const {
   return Get()->CreateProgram(desc);
 }
 
+Image Device::CreateImage(const rhi::ImageDesc &desc) const {
+  return Get()->CreateImage(desc);
+}
+
 Buffer Device::CreateBuffer(const rhi::BufferDesc &desc) const {
   return Get()->CreateBuffer(desc);
 }

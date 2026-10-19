@@ -21,6 +21,7 @@ class Device : public Object<rhi::IDevice> {
   bool SupportRayTracingPipeline() const override;
   bool SupportRayQuery() const override;
   bool SupportGeometryShader() const override;
+  rhi::IImage *CreateImage(const ImageDesc &desc) override;
   rhi::IBuffer *CreateBuffer(const BufferDesc &desc) override;
   rhi::IProgram *CreateProgram(const ProgramDesc &desc) override;
   rhi::IShader *CreateShader(const ShaderDesc &desc) override;

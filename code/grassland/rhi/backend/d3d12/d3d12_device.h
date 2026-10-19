@@ -23,6 +23,7 @@ class D3D12Device final : public Device {
   bool Wait(uint64_t value, HANDLE event) const;
   bool WaitIdle();
   rhi::IProgram *CreateProgram(const ProgramDesc &desc) override;
+  rhi::IImage *CreateImage(const ImageDesc &desc) override;
   rhi::IBuffer *CreateBuffer(const BufferDesc &desc) override;
   D3D12UploadPool &UploadPool();
   rhi::IWindow *CreateGLFWWindow(const WindowDesc &desc = {}) override;

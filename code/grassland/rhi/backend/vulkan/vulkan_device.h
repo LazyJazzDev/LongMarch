@@ -30,6 +30,7 @@ class VulkanDevice final : public Device {
   // Allocate and submit serials while holding QueueMutex, preserving signal order.
   uint64_t NextSerial();
   VkResult Wait(uint64_t value, uint64_t timeout = UINT64_MAX) const;
+  rhi::IImage *CreateImage(const ImageDesc &desc) override;
   rhi::IBuffer *CreateBuffer(const BufferDesc &desc) override;
   VulkanUploadPool &UploadPool();
   rhi::IWindow *CreateGLFWWindow(const WindowDesc &desc = {}) override;

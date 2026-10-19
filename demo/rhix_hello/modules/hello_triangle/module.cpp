@@ -2,6 +2,7 @@
 
 #include <fmt/format.h>
 
+#include <array>
 #include <chrono>
 #include <iostream>
 #include <map>
@@ -22,7 +23,7 @@ struct Vertex {
 };
 }  // namespace
 
-int HelloTriangle(grassland::rhi::BackendAPI api, int frames) {
+int HelloTriangle(grassland::rhi::BackendAPI api, int frames, bool headless) {
   using namespace grassland::rhi;
   using namespace grassland::rhix;
   if (api == BACKEND_API_METAL) {
@@ -35,12 +36,24 @@ int HelloTriangle(grassland::rhi::BackendAPI api, int frames) {
   grassland::rhix::Device device = core.CreateDeviceByAutoSelection();
   if (!device)
     return 1;
-  grassland::rhix::Window window = device.CreateGLFWWindow({1280, 720, "RHIX hello_triangle - P: toggle VSync"});
-  if (!window)
-    return 1;
+  grassland::rhix::Window window;
+  if (!headless) {
+    window = device.CreateGLFWWindow({1280, 720, "RHIX hello_triangle - P: toggle VSync"});
+    if (!window)
+      return 1;
+  }
   grassland::rhix::Queue queue = device.GetQueue(QUEUE_TYPE_GRAPHICS);
   if (!queue)
     return 1;
+  std::array<grassland::rhix::Image, 3> targets;
+  std::array<grassland::rhix::SubmissionToken, 3> pending;
+  if (headless) {
+    for (auto &target : targets) {
+      target = device.CreateImage({1280, 720, IMAGE_FORMAT_RGBA8_UNORM});
+      if (!target)
+        return 1;
+    }
+  }
   const auto &embedded = shader_list.at("modules/hello_triangle/shaders/triangle.slang");
   std::string source(embedded.first, embedded.second);
   grassland::rhix::Shader vertex_shader = device.CreateShader({source, "VSMain", SHADER_STAGE_VERTEX});
@@ -55,7 +68,11 @@ int HelloTriangle(grassland::rhi::BackendAPI api, int frames) {
   desc.vertex_bindings = {{sizeof(Vertex), false}};
   desc.vertex_attributes = {{0, 0, VERTEX_FORMAT_FLOAT3, 0}, {1, 0, VERTEX_FORMAT_FLOAT3, 12}};
   {
-    grassland::rhix::Image image = window.GetNextImage();
+    grassland::rhix::Image image;
+    if (headless)
+      image = targets[0];
+    else
+      image = window.GetNextImage();
     if (!image)
       return 1;
     desc.color_format = image.GetDesc().format;
@@ -85,32 +102,64 @@ int HelloTriangle(grassland::rhi::BackendAPI api, int frames) {
     grassland::rhix::SubmissionToken uploaded = queue.Submit(std::move(upload));
     if (!uploaded)
       return 1;
+    if (headless) {
+      if (!uploaded.WaitHost())
+        return 1;
+    }
   }
   bool previous_p = false;
   PresentMode requested = PRESENT_MODE_VSYNC;
   grassland::FPSCounter fps;
   auto title_time = std::chrono::steady_clock::now();
-  int rendered = 0;
+  // Warm up allocations and pipelines before measuring completed GPU work.
+  auto benchmark_start = std::chrono::steady_clock::now();
+  int rendered = headless ? -60 : 0;
   while (!frames || rendered < frames) {
-    if (!Window::PollEvents())
-      break;
-    if (window.ShouldClose())
-      break;
-    if (window.IsKeyDown(GLFW_KEY_ESCAPE))
-      break;
-    if (window.IsSwapChainInvalid()) {
-      if (!window.RebuildSwapChain())
-        return 1;
+    if (!headless) {
+      if (!Window::PollEvents())
+        break;
+      if (window.ShouldClose())
+        break;
+      if (window.IsKeyDown(GLFW_KEY_ESCAPE))
+        break;
+      if (window.IsSwapChainInvalid()) {
+        if (!window.RebuildSwapChain())
+          return 1;
+      }
+      bool p = window.IsKeyDown(GLFW_KEY_P);
+      if (p && !previous_p) {
+        requested = requested == PRESENT_MODE_VSYNC ? PRESENT_MODE_CONTINUOUS : PRESENT_MODE_VSYNC;
+        if (!window.SetPresentMode(requested))
+          return 1;
+      }
+      previous_p = p;
     }
-    bool p = window.IsKeyDown(GLFW_KEY_P);
-    if (p && !previous_p) {
-      requested = requested == PRESENT_MODE_VSYNC ? PRESENT_MODE_CONTINUOUS : PRESENT_MODE_VSYNC;
-      if (!window.SetPresentMode(requested))
-        return 1;
+    const size_t slot = (static_cast<int64_t>(rendered) + 60) % targets.size();
+    if (headless) {
+      if (rendered == 0) {
+        for (auto &token : pending) {
+          if (token) {
+            if (!token.WaitHost())
+              return 1;
+            token = {};
+          }
+        }
+        benchmark_start = std::chrono::steady_clock::now();
+      }
+      if (pending[slot]) {
+        if (!pending[slot].WaitHost())
+          return 1;
+        pending[slot] = {};
+      }
     }
-    previous_p = p;
-    grassland::rhix::Image image = window.GetNextImage();
+    grassland::rhix::Image image;
+    if (headless)
+      image = targets[slot];
+    else
+      image = window.GetNextImage();
     if (!image) {
+      if (headless)
+        return 1;
       fps.Reset();
       std::this_thread::sleep_for(std::chrono::milliseconds(10));
       continue;
@@ -135,19 +184,35 @@ int HelloTriangle(grassland::rhi::BackendAPI api, int frames) {
       return 1;
     if (!context.CmdEndRendering())
       return 1;
-    if (!context.CmdPresent(window))
-      return 1;
+    if (!headless) {
+      if (!context.CmdPresent(window))
+        return 1;
+    }
     grassland::rhix::SubmissionToken token = queue.Submit(std::move(context));
     if (!token)
       return 1;
+    if (headless)
+      pending[slot] = std::move(token);
     ++rendered;
     fps.TickFrame();
     auto now = std::chrono::steady_clock::now();
-    if (now - title_time >= std::chrono::milliseconds(250)) {
+    if (!headless && now - title_time >= std::chrono::milliseconds(250)) {
       if (!window.SetTitle(fmt::format("RHIX hello_triangle - FPS: {:.1f} - P: toggle VSync", fps.GetFPS())))
         return 1;
       title_time = now;
     }
+  }
+  if (headless) {
+    for (const auto &token : pending) {
+      if (token) {
+        if (!token.WaitHost())
+          return 1;
+      }
+    }
+    const double seconds = std::chrono::duration<double>(std::chrono::steady_clock::now() - benchmark_start).count();
+    std::cout << fmt::format(
+        "hello_triangle: headless 1280x720, {} frames, {:.6f} s, {:.2f} FPS (3 in flight, 60 warmup)\n", rendered,
+        seconds, rendered / seconds);
   }
   return 0;
 }

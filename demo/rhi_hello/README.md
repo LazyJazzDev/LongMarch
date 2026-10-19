@@ -34,3 +34,15 @@ Callers release child handles before parent Device/Core handles, and release old
 ## Vulkan rendering-path regression
 
 With Vulkan SDK validation, API-dump and Profiles layers installed and a Vulkan 1.3+ GPU supporting dynamic rendering, run `python test/rhi/test_vulkan_rendering_paths.py <demo executable> [<second demo executable>]` from the repository root. This runs the triangle under native capabilities, a Vulkan 1.2 KHR profile, and a Vulkan 1.2 profile with dynamic rendering disabled. It verifies the actual native Begin/End commands and that dynamic rendering creates no RenderPass or Framebuffer objects. Profile simulation changes reported capabilities; it does not substitute for testing on older hardware.
+
+
+Headless benchmarks (D3D12/Vulkan) render to independent 1280x720 RGBA8 images without creating a GLFW window, swapchain, or presenting. `hello_window` measures its clear pass; `hello_triangle` measures the same indexed triangle draw as the windowed scene. Each module independently creates its own Core, Device and resources.
+
+```sh
+demo_rhi_hello --headless --all --backend vulkan --frames 10000
+demo_rhi_hello --headless --module hello_triangle --backend d3d12 --frames 10000
+```
+
+`--all` runs both modules sequentially on the selected backend, continues after a failed module, and returns nonzero if any module fails. It cannot be combined with `--module` or `--tui`. Each scene prints its measured frame count, wall time and average FPS. Headless runs use 60 untimed warmup frames and at most 3 in-flight frames; target reuse and the final timing boundary wait for GPU completion. Setup, shader compilation, image initialization and uploads are outside the measurement. This is end-to-end rendering throughput including CPU recording/submission and synchronization, not GPU timestamp duration. Use Release without validation layers for performance comparisons.
+
+Without a positive `--frames`, headless runs measure 3000 frames per scene; windowed `--all` runs 300 frames per scene. Normal individual windowed demos remain interactive. `--all` selects scenes, not backends. Metal independent images/triangle rendering remain unsupported and produce a failure exit code.

@@ -2,6 +2,7 @@
 
 #include <vk_mem_alloc.h>
 
+#include "grassland/rhi/backend/vulkan/vulkan_allocated_image.h"
 #include "grassland/rhi/backend/vulkan/vulkan_command_context.h"
 #include "grassland/rhi/backend/vulkan/vulkan_core.h"
 #include "grassland/rhi/backend/vulkan/vulkan_program.h"
@@ -212,6 +213,10 @@ std::mutex &VulkanDevice::QueueMutex() {
 
 VulkanUploadPool &VulkanDevice::UploadPool() {
   return upload_pool_;
+}
+
+rhi::IImage *VulkanDevice::CreateImage(const ImageDesc &desc) {
+  return VulkanAllocatedImage::Create(this, desc);
 }
 
 rhi::IBuffer *VulkanDevice::CreateBuffer(const BufferDesc &desc) {

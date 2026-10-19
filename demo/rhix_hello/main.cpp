@@ -9,9 +9,19 @@ int main(int argc, char **argv) {
   BackendAPI api = BACKEND_API_DEFAULT;
   std::string module;
   bool tui = false;
+  bool headless = false;
+  bool all = false;
   int frames = 0;
   for (int i = 1; i < argc; ++i) {
     std::string arg = argv[i];
+    if (arg == "--headless") {
+      headless = true;
+      continue;
+    }
+    if (arg == "--all") {
+      all = true;
+      continue;
+    }
     if (arg == "--tui") {
       tui = true;
       continue;
@@ -22,7 +32,7 @@ int main(int argc, char **argv) {
     }
     if (arg == "--help") {
       std::cout
-          << "[--module hello_window|hello_triangle | --tui] [--backend auto|d3d12|vulkan|metal] [--frames N]\nNo module specified: open the terminal selection menu.\n";
+          << "[--module hello_window|hello_triangle | --tui | --all] [--backend auto|d3d12|vulkan|metal] [--headless] [--frames N]\nHeadless defaults to 3000 frames per scene; --all defaults to 300 frames with windows.\nNo module specified: open the terminal selection menu.\n";
       return 0;
     }
     if (arg == "--module" && i + 1 < argc) {
@@ -50,6 +60,28 @@ int main(int argc, char **argv) {
       std::cerr << "Unknown option: " << arg << '\n';
       return 1;
     }
+  }
+  if (all && (tui || !module.empty())) {
+    std::cerr << "Use --all without --module or --tui\n";
+    return 1;
+  }
+  if (!frames) {
+    if (headless)
+      frames = 3000;
+    else if (all)
+      frames = 300;
+  }
+  if (all) {
+    int result = 0;
+    if (HelloWindow(api, frames, headless) != 0) {
+      std::cerr << "hello_window: FAILED\n";
+      result = 1;
+    }
+    if (HelloTriangle(api, frames, headless) != 0) {
+      std::cerr << "hello_triangle: FAILED\n";
+      result = 1;
+    }
+    return result;
   }
   if (tui && !module.empty()) {
     std::cerr << "Use either --module or --tui, not both\n";
@@ -82,9 +114,9 @@ int main(int argc, char **argv) {
     }
   }
   if (module == "hello_window")
-    return HelloWindow(api, frames);
+    return HelloWindow(api, frames, headless);
   if (module == "hello_triangle")
-    return HelloTriangle(api, frames);
+    return HelloTriangle(api, frames, headless);
   std::cerr << "Unknown module: " << module << '\n';
   return 1;
 }
