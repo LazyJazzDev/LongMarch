@@ -7,20 +7,22 @@
 
 namespace grassland::rhi::backend {
 
-// Lightweight completion state: deliberately holds no native resources or packet.
+class Device;
+
+// Completion state borrows its device; it owns no native resources or commands.
 class SubmissionToken final : public Object<rhi::ISubmissionToken> {
  public:
-  explicit SubmissionToken(uint64_t queue_identity);
+  explicit SubmissionToken(Device *device);
   SubmissionStatus GetStatus() const override;
   bool WaitHost() const override;
   void Complete(SubmissionStatus status);
-  uint64_t QueueIdentity() const;
+  Device *Owner() const;
 
  private:
   mutable std::mutex mutex_;
   mutable std::condition_variable changed_;
   SubmissionStatus status_{SUBMISSION_STATUS_PENDING};
-  uint64_t queue_identity_;
+  Device *device_;
 };
 
 }  // namespace grassland::rhi::backend

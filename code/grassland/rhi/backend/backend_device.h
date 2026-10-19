@@ -47,7 +47,6 @@ class Device : public Object<rhi::IDevice> {
   std::deque<Submission> pending_;
   std::thread collector_;
   bool stopping_{};
-  const uint64_t queue_identity_;
 };
 
 }  // namespace grassland::rhi::backend

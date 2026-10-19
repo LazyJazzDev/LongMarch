@@ -5,14 +5,7 @@
 
 namespace grassland::rhi::backend {
 
-namespace {
-std::atomic<uint64_t> next_identity{1};
-}
-
-Device::Device(PhysicalDevice info, Core *core)
-    : core_(core),
-      info_(std::move(info)),
-      queue_identity_(next_identity.fetch_add(1)) {
+Device::Device(PhysicalDevice info, Core *core) : core_(core), info_(std::move(info)) {
 }
 
 Device::~Device() {
@@ -72,7 +65,7 @@ ObjectPtr<SubmissionToken> Device::Submit(const ObjectPtr<CommandContext> &comma
 #endif
   for (const auto &wait : waits) {
 #if !defined(NDEBUG)
-    if (!wait || wait->QueueIdentity() != queue_identity_) {
+    if (!wait || wait->Owner() != this) {
       ReportError(-1, "Submission dependency is empty or belongs to another device.");
       return {};
     }
@@ -84,7 +77,7 @@ ObjectPtr<SubmissionToken> Device::Submit(const ObjectPtr<CommandContext> &comma
   }
   // Both logical roles share one physical queue. Its ordering already supplies
   // these GPU dependencies; no host wait or additional native wait is required.
-  auto completion = ObjectPtr<SubmissionToken>::Adopt(new SubmissionToken(queue_identity_));
+  auto completion = ObjectPtr<SubmissionToken>::Adopt(new SubmissionToken(this));
   std::lock_guard<std::mutex> lock(mutex_);
   if (stopping_)
     return {};

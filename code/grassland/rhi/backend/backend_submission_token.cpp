@@ -2,11 +2,11 @@
 
 namespace grassland::rhi::backend {
 
-SubmissionToken::SubmissionToken(uint64_t identity) : queue_identity_(identity) {
+SubmissionToken::SubmissionToken(Device *device) : device_(device) {
 }
 
-uint64_t SubmissionToken::QueueIdentity() const {
-  return queue_identity_;
+Device *SubmissionToken::Owner() const {
+  return device_;
 }
 
 SubmissionStatus SubmissionToken::GetStatus() const {
