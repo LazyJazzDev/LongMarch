@@ -51,6 +51,7 @@ class DeviceFeatures {
 
   bool RayQuery() const;
   bool TimelineSemaphore() const;
+  bool DynamicRendering() const;
 
  private:
   bool valid_{false};
@@ -64,6 +65,8 @@ class DeviceFeatures {
 #ifdef VK_VERSION_1_4
   VkPhysicalDeviceVulkan14Features v14_{VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_4_FEATURES};
 #endif
+  VkPhysicalDeviceDynamicRenderingFeatures dynamic_rendering_{
+      VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_DYNAMIC_RENDERING_FEATURES};
   VkPhysicalDeviceAccelerationStructureFeaturesKHR acceleration_{
       VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_ACCELERATION_STRUCTURE_FEATURES_KHR};
   VkPhysicalDeviceRayTracingPipelineFeaturesKHR ray_pipeline_{

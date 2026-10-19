@@ -5,7 +5,9 @@ VkFormat ColorFormat(ImageFormat format) {
   return format == IMAGE_FORMAT_RGBA8_UNORM ? VK_FORMAT_R8G8B8A8_UNORM : VK_FORMAT_B8G8R8A8_UNORM;
 }
 
-VulkanRenderTargetPool::VulkanRenderTargetPool(VkDevice device) : device_(device) {
+VulkanRenderTargetPool::VulkanRenderTargetPool(VkDevice device, bool dynamic_rendering)
+    : device_(device),
+      dynamic_rendering_(dynamic_rendering) {
 }
 
 VulkanRenderTargetPool::~VulkanRenderTargetPool() {
@@ -63,18 +65,23 @@ VkRenderPass VulkanRenderTargetPool::RenderPass(ImageFormat format,
 bool VulkanRenderTargetPool::Acquire(VkImage image,
                                      const ImageDesc &desc,
                                      uint64_t &lease,
+                                     VkImageView &image_view,
                                      VkFramebuffer &framebuffer) {
   std::lock_guard<std::mutex> lock(mutex_);
   for (size_t i = 0; i < entries_.size(); ++i)
     if (entries_[i].image == image) {
       ++entries_[i].leases;
       lease = i;
+      image_view = entries_[i].view;
       framebuffer = entries_[i].framebuffer;
       return true;
     }
-  auto pass = CreateRenderPass(desc.format);
-  if (!pass)
-    return false;
+  VkRenderPass pass{};
+  if (!dynamic_rendering_) {
+    pass = CreateRenderPass(desc.format);
+    if (!pass)
+      return false;
+  }
   size_t slot = 0;
   for (; slot < entries_.size(); ++slot)
     if (!entries_[slot].image && !entries_[slot].leases)
@@ -89,21 +96,24 @@ bool VulkanRenderTargetPool::Acquire(VkImage image,
   view.subresourceRange = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1};
   if (!Check(vkCreateImageView(device_, &view, nullptr, &entry.view), "Create render-target view"))
     return false;
-  VkFramebufferCreateInfo create{VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO};
-  create.renderPass = pass;
-  create.attachmentCount = 1;
-  create.pAttachments = &entry.view;
-  create.width = desc.width;
-  create.height = desc.height;
-  create.layers = 1;
-  if (!Check(vkCreateFramebuffer(device_, &create, nullptr, &entry.framebuffer), "Create framebuffer")) {
-    vkDestroyImageView(device_, entry.view, nullptr);
-    entry.view = {};
-    return false;
+  if (!dynamic_rendering_) {
+    VkFramebufferCreateInfo create{VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO};
+    create.renderPass = pass;
+    create.attachmentCount = 1;
+    create.pAttachments = &entry.view;
+    create.width = desc.width;
+    create.height = desc.height;
+    create.layers = 1;
+    if (!Check(vkCreateFramebuffer(device_, &create, nullptr, &entry.framebuffer), "Create framebuffer")) {
+      vkDestroyImageView(device_, entry.view, nullptr);
+      entry.view = {};
+      return false;
+    }
   }
   entry.image = image;
   entry.leases = 1;
   lease = slot;
+  image_view = entry.view;
   framebuffer = entry.framebuffer;
   return true;
 }
@@ -117,7 +127,8 @@ void VulkanRenderTargetPool::Retire(VkImage image) {
   std::lock_guard<std::mutex> lock(mutex_);
   for (auto &entry : entries_)
     if (entry.image == image) {
-      vkDestroyFramebuffer(device_, entry.framebuffer, nullptr);
+      if (entry.framebuffer)
+        vkDestroyFramebuffer(device_, entry.framebuffer, nullptr);
       vkDestroyImageView(device_, entry.view, nullptr);
       entry.image = {};
       entry.view = {};

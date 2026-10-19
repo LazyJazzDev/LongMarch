@@ -112,10 +112,18 @@ bool VulkanProgram::Finalize() {
     create.pColorBlendState = &blend;
     create.pDynamicState = &dynamic;
     create.layout = layout_;
-    create.renderPass = owner->RenderTargets().RenderPass(desc_.color_format);
-    if (!create.renderPass) {
-      cleanup();
-      return false;
+    const auto color_format = ColorFormat(desc_.color_format);
+    VkPipelineRenderingCreateInfo rendering{VK_STRUCTURE_TYPE_PIPELINE_RENDERING_CREATE_INFO};
+    if (owner->BeginRenderingCommand()) {
+      rendering.colorAttachmentCount = 1;
+      rendering.pColorAttachmentFormats = &color_format;
+      create.pNext = &rendering;
+    } else {
+      create.renderPass = owner->RenderTargets().RenderPass(desc_.color_format);
+      if (!create.renderPass) {
+        cleanup();
+        return false;
+      }
     }
     auto result = vkCreateGraphicsPipelines(device, VK_NULL_HANDLE, 1, &create, nullptr, &pipeline_);
     cleanup();

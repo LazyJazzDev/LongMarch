@@ -31,6 +31,12 @@ DeviceFeatures::DeviceFeatures(VkPhysicalDevice device, uint32_t api_version) {
     tail = &v14_.pNext;
   }
 #endif
+  // Vulkan 1.2 uses the extension feature instead of the promoted 1.3 structure.
+  if (api_version < VK_API_VERSION_1_3 && has(VK_KHR_DYNAMIC_RENDERING_EXTENSION_NAME)) {
+    extensions_.push_back(VK_KHR_DYNAMIC_RENDERING_EXTENSION_NAME);
+    *tail = &dynamic_rendering_;
+    tail = &dynamic_rendering_.pNext;
+  }
   // Query the core features first: acceleration structures require bufferDeviceAddress.
   vkGetPhysicalDeviceFeatures2(device, &features_);
   if (v12_.bufferDeviceAddress && has(VK_KHR_ACCELERATION_STRUCTURE_EXTENSION_NAME) &&
@@ -89,6 +95,14 @@ bool DeviceFeatures::RayTracingPipeline() const {
 
 bool DeviceFeatures::TimelineSemaphore() const {
   return v12_.timelineSemaphore == VK_TRUE;
+}
+
+bool DeviceFeatures::DynamicRendering() const {
+#ifdef VK_VERSION_1_3
+  if (v13_.dynamicRendering)
+    return true;
+#endif
+  return dynamic_rendering_.dynamicRendering == VK_TRUE;
 }
 
 bool DeviceFeatures::RayQuery() const {

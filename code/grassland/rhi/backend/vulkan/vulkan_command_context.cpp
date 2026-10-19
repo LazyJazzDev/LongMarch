@@ -12,8 +12,8 @@ VulkanCommandContext::VulkanCommandContext(VulkanDevice *device) : CommandContex
 }
 
 VulkanCommandContext::~VulkanCommandContext() {
-  for (const auto &entry : framebuffer_leases_)
-    device_->RenderTargets().Release(entry.second.first);
+  for (const auto &entry : attachment_leases_)
+    device_->RenderTargets().Release(std::get<0>(entry.second));
   for (auto &upload : uploads_)
     device_->UploadPool().Release(std::move(upload));
   if (reusable_) {
@@ -392,34 +392,53 @@ bool VulkanCommandContext::CmdBeginRendering(const RenderingInfo &info) {
                        0, nullptr, 0, nullptr);
   render_target_ = native;
   try {
-    auto it = framebuffer_leases_.find(render_target_);
-    if (it == framebuffer_leases_.end()) {
-      auto inserted = framebuffer_leases_.try_emplace(render_target_);
+    auto it = attachment_leases_.find(render_target_);
+    if (it == attachment_leases_.end()) {
+      auto inserted = attachment_leases_.try_emplace(render_target_);
       it = inserted.first;
-      if (!device_->RenderTargets().Acquire(render_target_->NativeImage(), render_target_->GetDesc(), it->second.first,
-                                            it->second.second)) {
-        framebuffer_leases_.erase(it);
+      if (!device_->RenderTargets().Acquire(render_target_->NativeImage(), render_target_->GetDesc(),
+                                            std::get<0>(it->second), std::get<1>(it->second),
+                                            std::get<2>(it->second))) {
+        attachment_leases_.erase(it);
         recording_failed_ = true;
         return false;
       }
     }
-    auto desc = render_target_->GetDesc();
-    VkRenderPassBeginInfo begin{VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO};
-    begin.renderPass = device_->RenderTargets().RenderPass(desc.format, info.load_op, info.store_op);
-    if (!begin.renderPass) {
-      recording_failed_ = true;
-      return false;
-    }
+    const auto desc = render_target_->GetDesc();
     VkClearValue clear{};
     std::copy(info.clear_color.begin(), info.clear_color.end(), clear.color.float32);
-    begin.clearValueCount = 1;
-    begin.pClearValues = &clear;
-    begin.framebuffer = it->second.second;
-    begin.renderArea.extent = {desc.width, desc.height};
-    vkCmdBeginRenderPass(command_, &begin, VK_SUBPASS_CONTENTS_INLINE);
+    if (auto begin_rendering = device_->BeginRenderingCommand()) {
+      constexpr VkAttachmentLoadOp loads[] = {VK_ATTACHMENT_LOAD_OP_LOAD, VK_ATTACHMENT_LOAD_OP_CLEAR,
+                                              VK_ATTACHMENT_LOAD_OP_DONT_CARE};
+      constexpr VkAttachmentStoreOp stores[] = {VK_ATTACHMENT_STORE_OP_STORE, VK_ATTACHMENT_STORE_OP_DONT_CARE};
+      VkRenderingAttachmentInfo color{VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO};
+      color.imageView = std::get<1>(it->second);
+      color.imageLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+      color.loadOp = loads[info.load_op];
+      color.storeOp = stores[info.store_op];
+      color.clearValue = clear;
+      VkRenderingInfo rendering{VK_STRUCTURE_TYPE_RENDERING_INFO};
+      rendering.renderArea.extent = {desc.width, desc.height};
+      rendering.layerCount = 1;
+      rendering.colorAttachmentCount = 1;
+      rendering.pColorAttachments = &color;
+      begin_rendering(command_, &rendering);
+    } else {
+      VkRenderPassBeginInfo begin{VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO};
+      begin.renderPass = device_->RenderTargets().RenderPass(desc.format, info.load_op, info.store_op);
+      if (!begin.renderPass) {
+        recording_failed_ = true;
+        return false;
+      }
+      begin.clearValueCount = 1;
+      begin.pClearValues = &clear;
+      begin.framebuffer = std::get<2>(it->second);
+      begin.renderArea.extent = {desc.width, desc.height};
+      vkCmdBeginRenderPass(command_, &begin, VK_SUBPASS_CONTENTS_INLINE);
+    }
     return true;
   } catch (const std::bad_alloc &) {
-    framebuffer_leases_.erase(render_target_);
+    attachment_leases_.erase(render_target_);
     recording_failed_ = true;
     return false;
   }
@@ -562,7 +581,10 @@ bool VulkanCommandContext::CmdEndRendering() {
 #endif
   if (recording_failed_)
     return false;
-  vkCmdEndRenderPass(command_);
+  if (auto end_rendering = device_->EndRenderingCommand())
+    end_rendering(command_);
+  else
+    vkCmdEndRenderPass(command_);
   // Make reads in this scope complete before later buffer writes, including buffers
   // first bound inside the scope. Buffer bindings do not change image layouts.
   VkMemoryBarrier barrier{VK_STRUCTURE_TYPE_MEMORY_BARRIER};

@@ -58,7 +58,7 @@ class VulkanCommandContext final : public CommandContext {
   };
 
   std::unordered_map<VulkanBuffer *, BufferState> buffer_states_;
-  std::unordered_map<VulkanImage *, std::pair<uint64_t, VkFramebuffer>> framebuffer_leases_;
+  std::unordered_map<VulkanImage *, std::tuple<uint64_t, VkImageView, VkFramebuffer>> attachment_leases_;
   bool TransitionImage(VulkanImage *image, VkImageLayout layout, VkPipelineStageFlags stages, VkAccessFlags access);
 
   struct ImageState {

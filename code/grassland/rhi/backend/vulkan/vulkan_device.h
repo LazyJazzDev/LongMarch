@@ -16,6 +16,8 @@ class VulkanDevice final : public Device {
   ~VulkanDevice() override;
   VkDevice NativeDevice() const;
   VulkanRenderTargetPool &RenderTargets();
+  PFN_vkCmdBeginRendering BeginRenderingCommand() const;
+  PFN_vkCmdEndRendering EndRenderingCommand() const;
   rhi::IProgram *CreateProgram(const ProgramDesc &desc) override;
   VmaAllocator Allocator() const;
   VkPhysicalDevice NativePhysicalDevice() const;
@@ -47,6 +49,8 @@ class VulkanDevice final : public Device {
   std::unique_ptr<VulkanRenderTargetPool> render_targets_;
   VmaAllocator allocator_{};
   VkDevice device_{VK_NULL_HANDLE};
+  PFN_vkCmdBeginRendering begin_rendering_{};
+  PFN_vkCmdEndRendering end_rendering_{};
   VkPhysicalDevice physical_{};
   VkQueue queue_{};
   VkSemaphore timeline_{};
