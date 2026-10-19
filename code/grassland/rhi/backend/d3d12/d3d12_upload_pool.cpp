@@ -3,14 +3,15 @@
 #include "grassland/rhi/backend/d3d12/d3d12_device.h"
 
 namespace grassland::rhi::backend::d3d12 {
-D3D12UploadPool::Lease::Lease(D3D12UploadPool *pool, D3D12AllocatedBuffer *buffer)
+D3D12UploadPool::Lease::Lease(D3D12UploadPool *pool, D3D12AllocatedBuffer *buffer, size_t level)
     : D3D12Buffer(static_cast<D3D12Device *>(buffer->Owner()), buffer->GetDesc()),
       pool_(pool),
-      buffer_(buffer) {
+      buffer_(buffer),
+      level_(level) {
 }
 
 D3D12UploadPool::Lease::~Lease() {
-  pool_->ReleaseBuffer(buffer_);
+  pool_->ReleaseBuffer(buffer_, level_);
 }
 
 BufferDesc D3D12UploadPool::Lease::GetDesc() const {
@@ -74,18 +75,15 @@ ObjectPtr<D3D12UploadPool::Lease> D3D12UploadPool::Acquire(uint64_t size) {
       ++bucket.occupied;
     }
     // Construct outside the lock: failed construction returns the borrowed slot.
-    return ObjectPtr<Lease>::Adopt(new Lease(this, buffer));
+    return ObjectPtr<Lease>::Adopt(new Lease(this, buffer, level));
   } catch (const std::bad_alloc &) {
     if (buffer)
-      ReleaseBuffer(buffer);
+      ReleaseBuffer(buffer, level);
     return {};
   }
 }
 
-void D3D12UploadPool::ReleaseBuffer(D3D12AllocatedBuffer *buffer) {
-  size_t level = 0;
-  for (auto capacity = buffer->GetDesc().size; capacity > 65536; capacity /= 2)
-    ++level;
+void D3D12UploadPool::ReleaseBuffer(D3D12AllocatedBuffer *buffer, size_t level) {
   std::lock_guard<std::mutex> lock(mutex_);
   auto &bucket = buckets_[level];
   --bucket.occupied;

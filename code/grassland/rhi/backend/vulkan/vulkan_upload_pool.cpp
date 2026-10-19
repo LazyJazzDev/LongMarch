@@ -3,14 +3,15 @@
 #include "grassland/rhi/backend/vulkan/vulkan_device.h"
 
 namespace grassland::rhi::backend::vulkan {
-VulkanUploadPool::Lease::Lease(VulkanUploadPool *pool, VulkanAllocatedBuffer *buffer)
+VulkanUploadPool::Lease::Lease(VulkanUploadPool *pool, VulkanAllocatedBuffer *buffer, size_t level)
     : VulkanBuffer(static_cast<VulkanDevice *>(buffer->Owner()), buffer->GetDesc()),
       pool_(pool),
-      buffer_(buffer) {
+      buffer_(buffer),
+      level_(level) {
 }
 
 VulkanUploadPool::Lease::~Lease() {
-  pool_->ReleaseBuffer(buffer_);
+  pool_->ReleaseBuffer(buffer_, level_);
 }
 
 BufferDesc VulkanUploadPool::Lease::GetDesc() const {
@@ -70,18 +71,15 @@ ObjectPtr<VulkanUploadPool::Lease> VulkanUploadPool::Acquire(uint64_t size) {
       ++bucket.occupied;
     }
     // Construct outside the lock: failed construction returns the borrowed slot.
-    return ObjectPtr<Lease>::Adopt(new Lease(this, buffer));
+    return ObjectPtr<Lease>::Adopt(new Lease(this, buffer, level));
   } catch (const std::bad_alloc &) {
     if (buffer)
-      ReleaseBuffer(buffer);
+      ReleaseBuffer(buffer, level);
     return {};
   }
 }
 
-void VulkanUploadPool::ReleaseBuffer(VulkanAllocatedBuffer *buffer) {
-  size_t level = 0;
-  for (auto capacity = buffer->GetDesc().size; capacity > 65536; capacity /= 2)
-    ++level;
+void VulkanUploadPool::ReleaseBuffer(VulkanAllocatedBuffer *buffer, size_t level) {
   std::lock_guard<std::mutex> lock(mutex_);
   auto &bucket = buckets_[level];
   --bucket.occupied;

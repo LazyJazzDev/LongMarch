@@ -13,7 +13,7 @@ class VulkanUploadPool {
   // Borrows pool-owned storage. The pool and its Device must outlive every lease.
   class Lease final : public VulkanBuffer {
    public:
-    Lease(VulkanUploadPool *pool, VulkanAllocatedBuffer *buffer);
+    Lease(VulkanUploadPool *pool, VulkanAllocatedBuffer *buffer, size_t level);
     ~Lease() override;
     BufferDesc GetDesc() const override;
     VkBuffer NativeBuffer() const override;
@@ -22,6 +22,7 @@ class VulkanUploadPool {
    private:
     VulkanUploadPool *pool_;
     VulkanAllocatedBuffer *buffer_;
+    size_t level_;
   };
 
   explicit VulkanUploadPool(VulkanDevice *device);
@@ -32,7 +33,7 @@ class VulkanUploadPool {
 
  private:
   // Called by the lease destructor; callers release the lease reference instead.
-  void ReleaseBuffer(VulkanAllocatedBuffer *buffer);
+  void ReleaseBuffer(VulkanAllocatedBuffer *buffer, size_t level);
 
   VulkanDevice *device_;
   mutable std::mutex mutex_;

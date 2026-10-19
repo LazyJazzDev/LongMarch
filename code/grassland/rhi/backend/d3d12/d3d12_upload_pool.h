@@ -13,7 +13,7 @@ class D3D12UploadPool {
   // Borrows pool-owned storage. The pool and its Device must outlive every lease.
   class Lease final : public D3D12Buffer {
    public:
-    Lease(D3D12UploadPool *pool, D3D12AllocatedBuffer *buffer);
+    Lease(D3D12UploadPool *pool, D3D12AllocatedBuffer *buffer, size_t level);
     ~Lease() override;
     BufferDesc GetDesc() const override;
     ID3D12Resource *NativeBuffer() const override;
@@ -23,6 +23,7 @@ class D3D12UploadPool {
    private:
     D3D12UploadPool *pool_;
     D3D12AllocatedBuffer *buffer_;
+    size_t level_;
   };
 
   explicit D3D12UploadPool(D3D12Device *device);
@@ -33,7 +34,7 @@ class D3D12UploadPool {
 
  private:
   // Called by the lease destructor; callers release the lease reference instead.
-  void ReleaseBuffer(D3D12AllocatedBuffer *buffer);
+  void ReleaseBuffer(D3D12AllocatedBuffer *buffer, size_t level);
 
   D3D12Device *device_;
   mutable std::mutex mutex_;
