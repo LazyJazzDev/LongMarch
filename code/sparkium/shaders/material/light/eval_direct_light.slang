@@ -1,4 +1,4 @@
-#pragma once
+﻿#pragma once
 
 __generic<BufferType : IBufferReader> float3
 MaterialLightEvaluateDirectLighting(BufferType material_data,

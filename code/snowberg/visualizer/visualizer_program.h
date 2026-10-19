@@ -1,4 +1,4 @@
-#pragma once
+﻿#pragma once
 #include "snowberg/visualizer/visualizer_util.h"
 
 namespace snowberg::visualizer {

@@ -1,4 +1,4 @@
-#include "grassland/rhi/rhix/rhix_core.h"
+﻿#include "grassland/rhi/rhix/rhix_core.h"
 
 namespace grassland::rhix {
 Core::Core() noexcept = default;

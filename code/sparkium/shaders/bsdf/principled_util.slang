@@ -1,4 +1,4 @@
-#pragma once
+﻿#pragma once
 #include "common.slang"
 #ifndef Spectrum
 #define Spectrum float3

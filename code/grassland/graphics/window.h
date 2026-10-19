@@ -1,4 +1,4 @@
-#pragma once
+﻿#pragma once
 #include <chrono>
 
 #include "grassland/graphics/graphics_util.h"

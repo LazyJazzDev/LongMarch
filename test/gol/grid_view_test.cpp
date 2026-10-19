@@ -1,4 +1,4 @@
-#include "../../demo/gol/grid_view.h"
+﻿#include "../../demo/gol/grid_view.h"
 
 #include <gtest/gtest.h>
 

@@ -1,4 +1,4 @@
-#include "listener.h"
+﻿#include "listener.h"
 
 Listener::Listener(Application *application) : application_(application) {
   application_->RegisterListener(this);

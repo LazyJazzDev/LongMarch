@@ -1,4 +1,4 @@
-#pragma once
+﻿#pragma once
 
 #include "grassland/graphics/backend/vulkan/helper/instance_procedures.h"
 #include "grassland/graphics/backend/vulkan/helper/vulkan_util.h"

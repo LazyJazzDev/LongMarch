@@ -1,4 +1,4 @@
-#pragma once
+﻿#pragma once
 #include "grassland/graphics/interface.h"
 
 namespace grassland::graphics {}  // namespace grassland::graphics

@@ -1,4 +1,4 @@
-#include "sparkium/scene_io/json_scene.h"
+﻿#include "sparkium/scene_io/json_scene.h"
 
 #include <algorithm>
 #include <array>

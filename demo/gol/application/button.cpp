@@ -1,4 +1,4 @@
-#include "button.h"
+﻿#include "button.h"
 
 Button::Button(Application *app, float left, float top, float right, float bottom)
     : Listener(app),

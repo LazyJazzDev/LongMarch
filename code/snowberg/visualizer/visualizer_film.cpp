@@ -1,4 +1,4 @@
-#include "snowberg/visualizer/visualizer_film.h"
+﻿#include "snowberg/visualizer/visualizer_film.h"
 
 #include "snowberg/visualizer/visualizer_core.h"
 

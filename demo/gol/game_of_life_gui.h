@@ -1,4 +1,4 @@
-#pragma once
+﻿#pragma once
 #include "application/animation_var.h"
 #include "application/application.h"
 #include "application/model.h"

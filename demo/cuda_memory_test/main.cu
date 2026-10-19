@@ -1,4 +1,4 @@
-#include <curand_kernel.h>
+﻿#include <curand_kernel.h>
 
 #include "cuda_runtime.h"
 #include "curand.h"

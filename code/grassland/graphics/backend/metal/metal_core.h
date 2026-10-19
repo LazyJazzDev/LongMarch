@@ -1,4 +1,4 @@
-#pragma once
+﻿#pragma once
 #include <deque>
 
 #include "grassland/graphics/backend/metal/metal_util.h"

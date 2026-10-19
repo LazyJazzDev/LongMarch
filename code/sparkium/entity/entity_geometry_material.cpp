@@ -1,4 +1,4 @@
-#include "sparkium/entity/entity_geometry_material.h"
+﻿#include "sparkium/entity/entity_geometry_material.h"
 
 #include "sparkium/core/core.h"
 #include "sparkium/core/geometry.h"

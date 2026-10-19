@@ -1,4 +1,4 @@
-#include "long_march.h"
+﻿#include "long_march.h"
 #include "thrust/device_vector.h"
 
 struct SDFResult {

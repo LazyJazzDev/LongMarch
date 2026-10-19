@@ -1,4 +1,4 @@
-#pragma once
+﻿#pragma once
 
 void SampleSpecularBSDF(float3 base_color,
                         float3 direction,

@@ -1,4 +1,4 @@
-#pragma once
+﻿#pragma once
 #include "snowberg/solver/solver_element.h"
 #include "snowberg/solver/solver_object_pack.h"
 #include "snowberg/solver/solver_rigid_object.h"

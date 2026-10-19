@@ -1,4 +1,4 @@
-#include "sparkium/pipelines/raytracing/entity/entity_point_light.h"
+﻿#include "sparkium/pipelines/raytracing/entity/entity_point_light.h"
 
 #include "sparkium/pipelines/raytracing/core/core.h"
 #include "sparkium/pipelines/raytracing/core/scene.h"

@@ -1,4 +1,4 @@
-#pragma once
+﻿#pragma once
 #include "grassland/graphics/acceleration_structure.h"
 #include "grassland/graphics/buffer.h"
 #include "grassland/graphics/command_context.h"

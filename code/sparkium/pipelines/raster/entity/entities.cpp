@@ -1,4 +1,4 @@
-#include "sparkium/pipelines/raster/entity/entities.h"
+﻿#include "sparkium/pipelines/raster/entity/entities.h"
 
 namespace sparkium::raster {
 

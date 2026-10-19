@@ -1,4 +1,4 @@
-#pragma once
+﻿#pragma once
 #include <QuartzCore/QuartzCore.hpp>
 
 #include "grassland/rhi/backend/metal/metal_image.h"

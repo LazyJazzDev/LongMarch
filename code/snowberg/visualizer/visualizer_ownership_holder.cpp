@@ -1,4 +1,4 @@
-#include "snowberg/visualizer/visualizer_ownership_holder.h"
+﻿#include "snowberg/visualizer/visualizer_ownership_holder.h"
 
 namespace snowberg::visualizer {
 

@@ -1,4 +1,4 @@
-#pragma once
+﻿#pragma once
 #include "glm/gtc/matrix_transform.hpp"
 #include "long_march.h"
 #include "params.h"

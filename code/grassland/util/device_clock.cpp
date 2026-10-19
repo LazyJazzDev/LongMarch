@@ -1,4 +1,4 @@
-#if defined(LONGMARCH_CUDA_RUNTIME)
+﻿#if defined(LONGMARCH_CUDA_RUNTIME)
 
 #include "grassland/util/device_clock.h"
 

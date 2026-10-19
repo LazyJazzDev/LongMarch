@@ -1,4 +1,4 @@
-#include "cuda_runtime.h"
+﻿#include "cuda_runtime.h"
 #include "long_march.h"
 #include "thrust/device_vector.h"
 #include "thrust/host_vector.h"

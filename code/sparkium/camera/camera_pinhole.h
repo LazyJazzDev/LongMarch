@@ -1,4 +1,4 @@
-#pragma once
+﻿#pragma once
 #include "sparkium/core/camera.h"
 
 namespace sparkium {

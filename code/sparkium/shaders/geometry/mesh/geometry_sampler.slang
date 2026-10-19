@@ -1,4 +1,4 @@
-#pragma once
+﻿#pragma once
 #include "geometry/mesh/sample_primitive.slang"
 
 __generic<BufferType : IBufferReader> struct GeometrySampler : IGeometrySampler {

@@ -1,4 +1,4 @@
-#pragma once
+﻿#pragma once
 
 [mutating] void CalculateClosureWeight() {
   diffuse_closure.weight = make_float3(0);

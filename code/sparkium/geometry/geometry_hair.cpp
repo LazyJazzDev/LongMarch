@@ -1,4 +1,4 @@
-#include "sparkium/geometry/geometry_hair.h"
+﻿#include "sparkium/geometry/geometry_hair.h"
 
 #include <cmath>
 #include <stdexcept>

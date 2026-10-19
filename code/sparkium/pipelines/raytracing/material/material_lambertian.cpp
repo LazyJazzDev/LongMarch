@@ -1,4 +1,4 @@
-#include "sparkium/pipelines/raytracing/material/material_lambertian.h"
+﻿#include "sparkium/pipelines/raytracing/material/material_lambertian.h"
 
 #include "sparkium/pipelines/raytracing/core/core.h"
 

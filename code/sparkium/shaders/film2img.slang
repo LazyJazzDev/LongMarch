@@ -1,4 +1,4 @@
-#include "tone_mapping_functions.slang"
+﻿#include "tone_mapping_functions.slang"
 // readonly rgba32f accumulated_color image
 Texture2D<float4> accumulated_color : register(t0, space0);
 // readonly r32f accumulated_samples

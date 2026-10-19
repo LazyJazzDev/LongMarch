@@ -1,4 +1,4 @@
-#pragma once
+﻿#pragma once
 #include "grassland/rhi/rhi_submission_token.h"
 #include "grassland/rhi/rhix/rhix_object_container.h"
 

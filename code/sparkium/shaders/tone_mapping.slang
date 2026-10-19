@@ -1,4 +1,4 @@
-#include "tone_mapping_functions.slang"
+﻿#include "tone_mapping_functions.slang"
 Texture2D<float4> accumulated_color : register(t0, space0);
 #ifdef SPARKIUM_HDR_OUTPUT
 [[vk::image_format("rgba32f")]] RWTexture2D<float4> output : register(u0, space1);

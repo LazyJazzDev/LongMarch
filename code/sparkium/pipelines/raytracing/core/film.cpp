@@ -1,4 +1,4 @@
-#include "sparkium/core/film.h"
+﻿#include "sparkium/core/film.h"
 
 #include "sparkium/pipelines/raytracing/core/core.h"
 #include "sparkium/pipelines/raytracing/core/film.h"

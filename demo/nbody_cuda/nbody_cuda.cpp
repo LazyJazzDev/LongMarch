@@ -1,4 +1,4 @@
-#include "nbody_cuda.h"
+﻿#include "nbody_cuda.h"
 #define STB_IMAGE_WRITE_IMPLEMENTATION
 #include "stb_image_write.h"
 

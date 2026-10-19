@@ -1,4 +1,4 @@
-#include "pybind/grassland/graphics/graphics.h"
+﻿#include "pybind/grassland/graphics/graphics.h"
 
 namespace grassland::graphics::pybind {
 void RegisterCoreSettings(py::classh<Core::Settings> &c) {

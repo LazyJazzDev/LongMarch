@@ -1,4 +1,4 @@
-#pragma once
+﻿#pragma once
 #include "practium/model/model_util.h"
 
 namespace practium {

@@ -1,4 +1,4 @@
-#include "sparkium/core/scene.h"
+﻿#include "sparkium/core/scene.h"
 
 #include <algorithm>
 #include <numeric>

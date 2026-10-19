@@ -1,4 +1,4 @@
-#include "sparkium/pipelines/raytracing/material/material_shader_graph.h"
+﻿#include "sparkium/pipelines/raytracing/material/material_shader_graph.h"
 
 #include <stdexcept>
 

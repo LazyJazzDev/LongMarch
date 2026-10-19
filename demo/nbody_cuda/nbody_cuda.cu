@@ -1,4 +1,4 @@
-#include "nbody_cuda.h"
+﻿#include "nbody_cuda.h"
 
 #define BLOCK_SIZE 128
 #define GRID_SIZE ((NUM_PARTICLE + BLOCK_SIZE - 1) / BLOCK_SIZE)

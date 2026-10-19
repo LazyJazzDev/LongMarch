@@ -1,4 +1,4 @@
-#include "level_set_grid.h"
+﻿#include "level_set_grid.h"
 
 struct Sphere {
   float radius{1.0f};

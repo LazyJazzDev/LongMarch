@@ -1,4 +1,4 @@
-#include "sparkium/core/material.h"
+﻿#include "sparkium/core/material.h"
 
 #include "sparkium/core/core.h"
 

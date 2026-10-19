@@ -1,4 +1,4 @@
-#pragma once
+﻿#pragma once
 #include "bindings.slang"
 
 #ifdef SPARKIUM_SOFTWARE_RT

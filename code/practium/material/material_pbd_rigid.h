@@ -1,4 +1,4 @@
-#pragma once
+﻿#pragma once
 #include "practium/material/material_util.h"
 
 namespace practium {

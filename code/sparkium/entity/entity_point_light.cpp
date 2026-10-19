@@ -1,4 +1,4 @@
-#include "sparkium/entity/entity_point_light.h"
+﻿#include "sparkium/entity/entity_point_light.h"
 
 #include "sparkium/core/core.h"
 

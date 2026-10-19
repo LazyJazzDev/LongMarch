@@ -1,4 +1,4 @@
-#include "grassland/graphics/window_gestures.h"
+﻿#include "grassland/graphics/window_gestures.h"
 
 #import <Cocoa/Cocoa.h>
 #define GLFW_EXPOSE_NATIVE_COCOA

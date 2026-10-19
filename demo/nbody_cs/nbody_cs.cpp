@@ -1,4 +1,4 @@
-#include "nbody_cs.h"
+﻿#include "nbody_cs.h"
 
 #include <fstream>
 #include <iomanip>

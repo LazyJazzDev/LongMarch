@@ -1,4 +1,4 @@
-#pragma once
+﻿#pragma once
 #include "snowberg/visualizer/visualizer_camera.h"
 #include "snowberg/visualizer/visualizer_core.h"
 #include "snowberg/visualizer/visualizer_entity.h"

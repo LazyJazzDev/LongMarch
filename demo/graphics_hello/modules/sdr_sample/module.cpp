@@ -1,4 +1,4 @@
-#include "module.h"
+﻿#include "module.h"
 
 namespace graphics_hello::sdr_sample {
 

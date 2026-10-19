@@ -1,4 +1,4 @@
-#include "snowberg/visualizer/visualizer_core.h"
+﻿#include "snowberg/visualizer/visualizer_core.h"
 
 #include <queue>
 

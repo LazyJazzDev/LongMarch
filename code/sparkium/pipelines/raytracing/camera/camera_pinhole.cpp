@@ -1,4 +1,4 @@
-#include "sparkium/pipelines/raytracing/camera/camera_pinhole.h"
+﻿#include "sparkium/pipelines/raytracing/camera/camera_pinhole.h"
 
 #include "sparkium/pipelines/raytracing/core/core.h"
 

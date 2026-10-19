@@ -1,4 +1,4 @@
-#include "sparkium/geometry/geometry_mesh.h"
+﻿#include "sparkium/geometry/geometry_mesh.h"
 
 #include <cmath>
 #include <cstddef>

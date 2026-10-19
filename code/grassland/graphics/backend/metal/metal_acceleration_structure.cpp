@@ -1,4 +1,4 @@
-#include "grassland/graphics/backend/metal/metal_acceleration_structure.h"
+﻿#include "grassland/graphics/backend/metal/metal_acceleration_structure.h"
 
 #include <algorithm>
 #include <cmath>

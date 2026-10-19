@@ -1,4 +1,4 @@
-struct GlobalSettings {
+﻿struct GlobalSettings {
   int num_particle;
   float delta_t;
   float gravity;

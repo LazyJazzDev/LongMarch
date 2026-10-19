@@ -1,4 +1,4 @@
-#include "sparkium/pipelines/raytracing/core/camera.h"
+﻿#include "sparkium/pipelines/raytracing/core/camera.h"
 
 #include <stdexcept>
 

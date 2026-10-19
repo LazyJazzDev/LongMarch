@@ -1,4 +1,4 @@
-struct VSInput {
+﻿struct VSInput {
   [[vk::location(0)]] float3 position : TEXCOORD0;
 #if defined(HAS_NORMAL)
   [[vk::location(1)]] float3 normal : TEXCOORD1;

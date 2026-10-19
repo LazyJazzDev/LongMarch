@@ -1,4 +1,4 @@
-#include "pause_play_button.h"
+﻿#include "pause_play_button.h"
 
 #include <algorithm>
 #include <cmath>

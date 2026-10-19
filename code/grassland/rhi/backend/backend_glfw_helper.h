@@ -1,4 +1,4 @@
-#pragma once
+﻿#pragma once
 struct GLFWwindow;
 
 namespace grassland::rhi::backend {

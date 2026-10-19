@@ -1,4 +1,4 @@
-#include "speed_toggle_button.h"
+﻿#include "speed_toggle_button.h"
 
 #include "button_palette.h"
 #include "simulation_clock.h"

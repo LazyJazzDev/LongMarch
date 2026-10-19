@@ -1,4 +1,4 @@
-#pragma once
+﻿#pragma once
 #include "bindings.slang"
 #include "shadow_terminator.slang"
 #include "geometry/mesh/geometry_header.slang"

@@ -1,4 +1,4 @@
-#include "bindings.slang"
+﻿#include "bindings.slang"
 #include "common.slang"
 #include "geometry_primitive_sampler.slang"
 

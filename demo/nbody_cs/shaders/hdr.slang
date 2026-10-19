@@ -1,4 +1,4 @@
-#include "global_uniform_object.slang"
+﻿#include "global_uniform_object.slang"
 
 ConstantBuffer<GlobalUniformObject> ubo : register(b0, space0);
 RWTexture2D<float4> output_image : register(u0, space1);

@@ -1,4 +1,4 @@
-#include "size_slider.h"
+﻿#include "size_slider.h"
 
 #include <array>
 #include <string>

@@ -1,4 +1,4 @@
-#include "sparkium/pipelines/raster/core/camera.h"
+﻿#include "sparkium/pipelines/raster/core/camera.h"
 
 #include <glm/ext/matrix_clip_space.hpp>
 

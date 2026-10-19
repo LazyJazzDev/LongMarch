@@ -1,4 +1,4 @@
-#include "sparkium/material/material_specular.h"
+﻿#include "sparkium/material/material_specular.h"
 
 #include "sparkium/core/core.h"
 

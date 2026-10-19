@@ -1,4 +1,4 @@
-#include "sparkium/pipelines/raytracing/light/light_point.h"
+﻿#include "sparkium/pipelines/raytracing/light/light_point.h"
 
 #include "sparkium/pipelines/raytracing/core/core.h"
 

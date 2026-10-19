@@ -1,4 +1,4 @@
-#pragma once
+﻿#pragma once
 #include "sparkium/pipelines/raster/core/material.h"
 
 namespace sparkium::raster {

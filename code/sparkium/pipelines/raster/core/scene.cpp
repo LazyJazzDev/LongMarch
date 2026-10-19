@@ -1,4 +1,4 @@
-#include "sparkium/core/scene.h"
+﻿#include "sparkium/core/scene.h"
 
 #include "sparkium/core/film.h"
 #include "sparkium/pipelines/raster/core/camera.h"

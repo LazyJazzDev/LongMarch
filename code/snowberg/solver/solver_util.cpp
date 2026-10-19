@@ -1,4 +1,4 @@
-#include "snowberg/solver/solver_util.h"
+﻿#include "snowberg/solver/solver_util.h"
 
 namespace snowberg::solver {
 

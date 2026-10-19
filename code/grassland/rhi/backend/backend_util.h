@@ -1,4 +1,4 @@
-#pragma once
+﻿#pragma once
 #include <atomic>
 #include <memory>
 #include <type_traits>

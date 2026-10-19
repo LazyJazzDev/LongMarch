@@ -1,4 +1,4 @@
-// Include Vulkan before GLFW declares its surface functions.
+﻿// Include Vulkan before GLFW declares its surface functions.
 #define GLFW_INCLUDE_VULKAN
 #include "grassland/rhi/backend/vulkan/vulkan_window.h"
 

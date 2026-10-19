@@ -1,4 +1,4 @@
-#pragma once
+﻿#pragma once
 #include "sparkium/core/core.h"
 #include "sparkium/core/scene.h"
 #include "sparkium/entity/entities.h"

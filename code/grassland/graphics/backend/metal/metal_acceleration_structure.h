@@ -1,4 +1,4 @@
-#pragma once
+﻿#pragma once
 #include "grassland/graphics/backend/metal/metal_util.h"
 
 namespace grassland::graphics::backend {

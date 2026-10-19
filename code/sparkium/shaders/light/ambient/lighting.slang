@@ -1,4 +1,4 @@
-
+﻿
 struct SceneSettings {
   float3 ambient_light;
 };

@@ -1,4 +1,4 @@
-#pragma once
+﻿#pragma once
 
 #include "font/factory.h"
 #include "listener.h"

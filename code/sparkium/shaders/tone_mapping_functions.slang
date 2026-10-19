@@ -1,4 +1,4 @@
-float3 sRGB2Linear(float3 srgb) {
+﻿float3 sRGB2Linear(float3 srgb) {
   float3 cutoff = step(float3(0.04045, 0.04045, 0.04045), srgb);
   float3 lower = srgb / 12.92;
   float3 higher = pow((srgb + 0.055) / 1.055, 2.4);

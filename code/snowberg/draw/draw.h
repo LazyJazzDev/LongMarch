@@ -1,4 +1,4 @@
-#pragma once
+﻿#pragma once
 #include "snowberg/draw/draw_commands.h"
 #include "snowberg/draw/draw_core.h"
 #include "snowberg/draw/draw_model.h"

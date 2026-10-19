@@ -1,4 +1,4 @@
-#pragma once
+﻿#pragma once
 #ifndef GLFW_INCLUDE_NONE
 #define GLFW_INCLUDE_NONE
 #endif

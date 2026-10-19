@@ -1,4 +1,4 @@
-#pragma once
+﻿#pragma once
 #include "grassland/rhi/rhi_submission_token.h"
 
 namespace grassland::rhi {

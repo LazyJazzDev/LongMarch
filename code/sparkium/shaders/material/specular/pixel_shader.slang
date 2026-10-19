@@ -1,4 +1,4 @@
-struct PSInput {
+﻿struct PSInput {
   float4 position : SV_POSITION;
   [[vk::location(0)]] float3 world_position : TEXCOORD0;
   [[vk::location(1)]] float3 world_normal : TEXCOORD1;

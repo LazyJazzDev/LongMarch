@@ -1,4 +1,4 @@
-#pragma once
+﻿#pragma once
 #include <QuartzCore/QuartzCore.hpp>
 
 #include "grassland/rhi/backend/backend_window.h"

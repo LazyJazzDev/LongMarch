@@ -1,4 +1,4 @@
-#include "buffer_helper.slang"
+﻿#include "buffer_helper.slang"
 #include "common.slang"
 
 ByteAddressBuffer light_metadatas : register(t0, space0);

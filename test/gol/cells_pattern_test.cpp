@@ -1,4 +1,4 @@
-#include "../../demo/gol/cells_pattern.h"
+﻿#include "../../demo/gol/cells_pattern.h"
 
 #include <gtest/gtest.h>
 

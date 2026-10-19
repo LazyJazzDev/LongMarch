@@ -1,4 +1,4 @@
-#pragma once
+﻿#pragma once
 
 float ShadowRayNoAlpha(float3 origin, float3 direction, float dist) {
   RayDesc ray;

@@ -1,4 +1,4 @@
-#pragma once
+﻿#pragma once
 #include "long_march.h"
 #include "snowberg/draw/draw.h"
 
