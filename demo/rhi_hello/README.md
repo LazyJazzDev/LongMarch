@@ -8,7 +8,7 @@ demo_rhi_hello --module hello_window --backend vulkan
 demo_rhi_hello --module hello_triangle --backend d3d12 --frames 120
 ```
 
-The positional backend argument remains supported. The default module is `hello_window`; omit `--frames` to run until the window closes. P switches requested VSync mode, Escape exits, and the title displays `grassland::FPSCounter` statistics.
+The positional backend argument remains supported. Without `--module`, a line-based terminal menu opens (also available with `--tui`). Enter a module number or name; invalid input retries, and `q`, `quit`, or EOF exits without opening a window. `--tui` and `--module` are mutually exclusive; `--backend auto` uses the default backend. Specify `--module` for unattended runs; omit `--frames` to run until the window closes. P switches requested VSync mode, Escape exits, and the title displays `grassland::FPSCounter` statistics.
 
 - `hello_window`: original RGB (0.6, 0.7, 0.8) clear/presentation and supported presentation-combination output. D3D12, Vulkan and the existing Metal backend are supported.
 - `hello_triangle`: D3D12/Vulkan colored indexed triangle on that background. The module creates independent GPU-only vertex/index Buffers, uploads once through CommandContext, finalizes a Slang Program, then records bindings, viewport/scissor and DrawIndexed. Resize/minimize/restore and P-mode changes are supported.
