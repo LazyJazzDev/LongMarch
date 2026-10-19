@@ -7,13 +7,25 @@
 
 namespace grassland::rhi::backend::metal {
 
+MetalDevice *MetalDevice::Create(PhysicalDevice info, Core *core, NS::SharedPtr<MTL::Device> device) {
+  try {
+    auto object = std::unique_ptr<MetalDevice>(new MetalDevice(std::move(info), core, std::move(device)));
+    auto pool = NS::TransferPtr(NS::AutoreleasePool::alloc()->init());
+    object->queue_ = NS::TransferPtr(object->device_->newCommandQueue());
+    if (!object->queue_) {
+      ReportError(-1, "Metal command queue creation failed.");
+      return nullptr;
+    }
+    return object.release();
+  } catch (const std::bad_alloc &) {
+    ReportError(-1, "MetalDevice creation ran out of memory.");
+    return nullptr;
+  }
+}
+
 MetalDevice::MetalDevice(PhysicalDevice info, Core *core, NS::SharedPtr<MTL::Device> device)
     : Device(std::move(info), core),
       device_(std::move(device)) {
-  auto pool = NS::TransferPtr(NS::AutoreleasePool::alloc()->init());
-  queue_ = NS::TransferPtr(device_->newCommandQueue());
-  if (!queue_)
-    ReportError(-1, "Metal command queue creation failed.");
 }
 
 MetalDevice::~MetalDevice() {
@@ -22,10 +34,6 @@ MetalDevice::~MetalDevice() {
 
 MTL::Device *MetalDevice::NativeDevice() const noexcept {
   return device_.get();
-}
-
-bool MetalDevice::IsInitialized() const {
-  return bool(queue_);
 }
 
 MTL::CommandQueue *MetalDevice::NativeQueue() const {
@@ -50,27 +58,11 @@ bool MetalDevice::WaitIdle() {
 }
 
 rhi::IWindow *MetalDevice::CreateGLFWWindow(const WindowDesc &desc) {
-  try {
-    auto window = std::make_unique<MetalWindow>(this);
-    if (!window->Initialize(desc))
-      return nullptr;
-    return window.release();
-  } catch (const std::bad_alloc &) {
-    ReportError(-1, "Window creation ran out of memory.");
-    return nullptr;
-  }
+  return MetalWindow::Create(this, desc);
 }
 
 rhi::ICommandContext *MetalDevice::CreateCommandContext() {
-  try {
-    auto context = std::make_unique<MetalCommandContext>(this);
-    if (!context->Initialize())
-      return nullptr;
-    return context.release();
-  } catch (const std::bad_alloc &) {
-    ReportError(-1, "Command context allocation failed.");
-    return nullptr;
-  }
+  return MetalCommandContext::Create(this);
 }
 
 rhi::IQueue *MetalDevice::GetQueue(QueueType type) {

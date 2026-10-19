@@ -12,9 +12,8 @@ class VulkanWindow;
 
 class VulkanCommandContext final : public CommandContext {
  public:
-  VulkanCommandContext(VulkanDevice *device);
   ~VulkanCommandContext() override;
-  bool Initialize();
+  static VulkanCommandContext *Create(VulkanDevice *device);
   bool CmdUploadBuffer(IBuffer *buffer, uint64_t offset, const void *data, uint64_t size) override;
   bool CmdCopyBuffer(IBuffer *source,
                      uint64_t source_offset,
@@ -43,6 +42,8 @@ class VulkanCommandContext final : public CommandContext {
   SubmissionStatus WaitForProgress() override;
 
  private:
+  VulkanCommandContext(VulkanDevice *device);
+
   VulkanProgram *program_{};
   VulkanImage *render_target_{};
   std::vector<VulkanBuffer *> vertex_buffers_;

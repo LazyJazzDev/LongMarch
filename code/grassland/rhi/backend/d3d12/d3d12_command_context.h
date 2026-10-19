@@ -13,9 +13,8 @@ class D3D12SwapChainImage;
 
 class D3D12CommandContext final : public CommandContext {
  public:
-  D3D12CommandContext(D3D12Device *device);
   ~D3D12CommandContext() override;
-  bool Initialize();
+  static D3D12CommandContext *Create(D3D12Device *device);
   bool CmdUploadBuffer(IBuffer *buffer, uint64_t offset, const void *data, uint64_t size) override;
   bool CmdCopyBuffer(IBuffer *source,
                      uint64_t source_offset,
@@ -44,6 +43,8 @@ class D3D12CommandContext final : public CommandContext {
   SubmissionStatus WaitForProgress() override;
 
  private:
+  D3D12CommandContext(D3D12Device *device);
+
   D3D12Program *program_{};
   D3D12Image *render_target_{};
   AttachmentStoreOp store_op_{ATTACHMENT_STORE_OP_STORE};

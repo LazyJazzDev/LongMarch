@@ -4,6 +4,9 @@
 #include "grassland/util/string_convert.h"
 
 namespace grassland::rhi::backend::d3d12 {
+
+D3D12Core::D3D12Core() = default;
+
 namespace {
 
 bool DescribeDevice(IDXGIAdapter1 *adapter, ID3D12Device *device, PhysicalDevice &info) {
@@ -36,8 +39,8 @@ bool DescribeDevice(IDXGIAdapter1 *adapter, ID3D12Device *device, PhysicalDevice
 
 }  // namespace
 
-std::unique_ptr<D3D12Core> D3D12Core::CreateD3D12Core() {
-  auto core = std::make_unique<D3D12Core>();
+D3D12Core *D3D12Core::CreateD3D12Core() {
+  auto core = std::unique_ptr<D3D12Core>(new D3D12Core());
   HRESULT result = CreateDXGIFactory2(0, IID_PPV_ARGS(&core->factory_));
   if (FAILED(result)) {
     ReportError(result, "CreateDXGIFactory2 failed.");
@@ -60,7 +63,7 @@ std::unique_ptr<D3D12Core> D3D12Core::CreateD3D12Core() {
       return {};
     core->adapters_.push_back({std::move(adapter), std::move(info)});
   }
-  return core;
+  return core.release();
 }
 
 std::vector<PhysicalDevice> D3D12Core::GetPhysicalDevices() const {
@@ -89,10 +92,7 @@ rhi::IDevice *D3D12Core::CreateDevice(int32_t device_idx) {
     PhysicalDevice info{};
     if (!DescribeDevice(adapter.native.Get(), device.Get(), info))
       return {};
-    auto result_device = std::make_unique<D3D12Device>(std::move(info), this, std::move(device));
-    if (!result_device->IsInitialized())
-      return {};
-    return result_device.release();
+    return D3D12Device::Create(std::move(info), this, std::move(device));
   } catch (const std::bad_alloc &) {
     return nullptr;
   }

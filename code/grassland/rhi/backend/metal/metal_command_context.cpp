@@ -8,14 +8,22 @@ namespace grassland::rhi::backend::metal {
 MetalCommandContext::MetalCommandContext(MetalDevice *device) : CommandContext(device), device_(device) {
 }
 
-bool MetalCommandContext::Initialize() {
-  auto pool = NS::TransferPtr(NS::AutoreleasePool::alloc()->init());
-  // Metal command buffers are single-use. The persistent native queue manages
-  // their backing storage; completed buffers cannot be reset like Vulkan/D3D12.
-  commands_ = NS::RetainPtr(device_->NativeQueue()->commandBuffer());
-  if (!commands_)
-    ReportError(-1, "Metal command buffer creation failed.");
-  return bool(commands_);
+MetalCommandContext *MetalCommandContext::Create(MetalDevice *device) {
+  try {
+    auto object = std::unique_ptr<MetalCommandContext>(new MetalCommandContext(device));
+    auto pool = NS::TransferPtr(NS::AutoreleasePool::alloc()->init());
+    // Metal command buffers are single-use. The persistent native queue manages
+    // their backing storage; completed buffers cannot be reset like Vulkan/D3D12.
+    object->commands_ = NS::RetainPtr(object->device_->NativeQueue()->commandBuffer());
+    if (!object->commands_) {
+      ReportError(-1, "Metal command buffer creation failed.");
+      return nullptr;
+    }
+    return object.release();
+  } catch (const std::bad_alloc &) {
+    ReportError(-1, "MetalCommandContext creation ran out of memory.");
+    return nullptr;
+  }
 }
 
 bool MetalCommandContext::CmdClearColor(rhi::IImage *image, const std::array<float, 4> &color) {

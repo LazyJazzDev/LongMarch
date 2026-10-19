@@ -8,11 +8,13 @@ namespace grassland::rhi::backend::metal {
 
 class MetalCore final : public Core {
  public:
-  static std::unique_ptr<MetalCore> CreateMetalCore();
+  static MetalCore *CreateMetalCore();
   std::vector<PhysicalDevice> GetPhysicalDevices() const override;
   rhi::IDevice *CreateDevice(int32_t device_idx) override;
 
  private:
+  MetalCore();
+
   struct Adapter {
     NS::SharedPtr<MTL::Device> native;
     PhysicalDevice info;

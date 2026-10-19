@@ -150,6 +150,7 @@ TEST_P(RhiBuffer, UploadSnapshotsCpuDataAndCopySurvivesCallerRelease) {
   ASSERT_TRUE(core);
   ObjPtr<IDevice> device = core->CreateDeviceByAutoSelection();
   ASSERT_TRUE(device);
+  EXPECT_EQ(device->CreateBuffer({0}), nullptr);
   ObjPtr<IQueue> transfer = device->GetQueue(QUEUE_TYPE_TRANSFER);
   ASSERT_TRUE(transfer);
   ObjPtr<IQueue> graphics = device->GetQueue(QUEUE_TYPE_GRAPHICS);

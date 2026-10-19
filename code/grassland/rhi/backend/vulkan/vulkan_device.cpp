@@ -69,10 +69,10 @@ VulkanDevice::~VulkanDevice() {
     vkDestroyDevice(device_, nullptr);
 }
 
-std::unique_ptr<VulkanDevice> VulkanDevice::CreateVulkanDevice(grassland::rhi::PhysicalDevice info,
-                                                               Core *core,
-                                                               VkPhysicalDevice physical_device,
-                                                               uint32_t api_version) {
+VulkanDevice *VulkanDevice::CreateVulkanDevice(grassland::rhi::PhysicalDevice info,
+                                               Core *core,
+                                               VkPhysicalDevice physical_device,
+                                               uint32_t api_version) {
   auto device = std::unique_ptr<VulkanDevice>(new VulkanDevice(std::move(info), core));
   DeviceFeatures enabled(physical_device, api_version);
   if (!enabled)
@@ -147,7 +147,7 @@ std::unique_ptr<VulkanDevice> VulkanDevice::CreateVulkanDevice(grassland::rhi::P
   device->graphics_queue_family_index_ = graphics_family;
   device->swapchain_enabled_ = swapchain;
   vkGetDeviceQueue(device->device_, graphics_family, 0, &device->queue_);
-  return device;
+  return device.release();
 }
 
 VkSemaphore VulkanDevice::Timeline() const {
@@ -215,17 +215,7 @@ VulkanUploadPool &VulkanDevice::UploadPool() {
 }
 
 rhi::IBuffer *VulkanDevice::CreateBuffer(const BufferDesc &desc) {
-  if (!desc.size)
-    return nullptr;
-  try {
-    auto buffer = std::make_unique<VulkanAllocatedBuffer>(this, desc);
-    if (!buffer->Initialize())
-      return nullptr;
-    return buffer.release();
-  } catch (const std::bad_alloc &) {
-    ReportError(-1, "Buffer allocation failed.");
-    return nullptr;
-  }
+  return VulkanAllocatedBuffer::Create(this, desc);
 }
 
 rhi::IProgram *VulkanDevice::CreateProgram(const ProgramDesc &desc) {
@@ -238,27 +228,11 @@ rhi::IProgram *VulkanDevice::CreateProgram(const ProgramDesc &desc) {
 }
 
 rhi::IWindow *VulkanDevice::CreateGLFWWindow(const WindowDesc &desc) {
-  try {
-    auto window = std::make_unique<VulkanWindow>(this);
-    if (!window->Initialize(desc))
-      return nullptr;
-    return window.release();
-  } catch (const std::bad_alloc &) {
-    ReportError(-1, "Window creation ran out of memory.");
-    return nullptr;
-  }
+  return VulkanWindow::Create(this, desc);
 }
 
 rhi::ICommandContext *VulkanDevice::CreateCommandContext() {
-  try {
-    auto context = std::make_unique<VulkanCommandContext>(this);
-    if (!context->Initialize())
-      return nullptr;
-    return context.release();
-  } catch (const std::bad_alloc &) {
-    ReportError(-1, "Command context allocation failed.");
-    return nullptr;
-  }
+  return VulkanCommandContext::Create(this);
 }
 
 rhi::IQueue *VulkanDevice::GetQueue(QueueType type) {

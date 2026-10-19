@@ -29,9 +29,17 @@ D3D12CommandContext::~D3D12CommandContext() {
     CloseHandle(event_);
 }
 
-bool D3D12CommandContext::Initialize() {
-  reusable_ = device_->AcquireCommandResources(allocator_, list_, event_);
-  return reusable_;
+D3D12CommandContext *D3D12CommandContext::Create(D3D12Device *device) {
+  try {
+    auto object = std::unique_ptr<D3D12CommandContext>(new D3D12CommandContext(device));
+    object->reusable_ = object->device_->AcquireCommandResources(object->allocator_, object->list_, object->event_);
+    if (!object->reusable_)
+      return nullptr;
+    return object.release();
+  } catch (const std::bad_alloc &) {
+    ReportError(-1, "D3D12CommandContext creation ran out of memory.");
+    return nullptr;
+  }
 }
 
 bool D3D12CommandContext::TransitionResource(ID3D12Resource *resource,

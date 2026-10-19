@@ -9,9 +9,8 @@
 namespace grassland::rhi::backend::d3d12 {
 class D3D12Device final : public Device {
  public:
-  D3D12Device(PhysicalDevice info, Core *core, ComPtr<ID3D12Device> device);
+  static D3D12Device *Create(PhysicalDevice info, Core *core, ComPtr<ID3D12Device> device);
   ~D3D12Device() override;
-  bool IsInitialized() const;
   ID3D12Device *NativeDevice() const;
   D3D12MA::Allocator *Allocator() const;
   D3D12RTVPool &RTVPool();
@@ -40,10 +39,11 @@ class D3D12Device final : public Device {
                                HANDLE event);
 
  private:
+  D3D12Device(PhysicalDevice info, Core *core, ComPtr<ID3D12Device> device);
+
   D3D12UploadPool upload_pool_;
   std::mutex command_pool_mutex_;
   std::vector<std::tuple<ComPtr<ID3D12CommandAllocator>, ComPtr<ID3D12GraphicsCommandList>, HANDLE>> command_pool_;
-  bool Initialize();
   ComPtr<ID3D12Device> device_;
   ComPtr<D3D12MA::Allocator> allocator_;
   D3D12RTVPool rtv_pool_;
@@ -54,6 +54,5 @@ class D3D12Device final : public Device {
   uint64_t serial_{};
   HANDLE idle_event_{};
   bool tearing_{};
-  bool initialized_{};
 };
 }  // namespace grassland::rhi::backend::d3d12

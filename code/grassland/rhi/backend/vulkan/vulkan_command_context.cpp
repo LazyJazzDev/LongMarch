@@ -22,9 +22,17 @@ VulkanCommandContext::~VulkanCommandContext() {
     vkDestroyCommandPool(device_->NativeDevice(), pool_, nullptr);
 }
 
-bool VulkanCommandContext::Initialize() {
-  reusable_ = device_->AcquireCommandResources(pool_, command_);
-  return reusable_;
+VulkanCommandContext *VulkanCommandContext::Create(VulkanDevice *device) {
+  try {
+    auto object = std::unique_ptr<VulkanCommandContext>(new VulkanCommandContext(device));
+    object->reusable_ = object->device_->AcquireCommandResources(object->pool_, object->command_);
+    if (!object->reusable_)
+      return nullptr;
+    return object.release();
+  } catch (const std::bad_alloc &) {
+    ReportError(-1, "VulkanCommandContext creation ran out of memory.");
+    return nullptr;
+  }
 }
 
 bool VulkanCommandContext::TransitionImage(VulkanImage *image,

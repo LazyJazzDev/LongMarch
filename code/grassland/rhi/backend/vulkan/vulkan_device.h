@@ -9,10 +9,10 @@
 namespace grassland::rhi::backend::vulkan {
 class VulkanDevice final : public Device {
  public:
-  static std::unique_ptr<VulkanDevice> CreateVulkanDevice(grassland::rhi::PhysicalDevice info,
-                                                          Core *core,
-                                                          VkPhysicalDevice physical_device,
-                                                          uint32_t api_version);
+  static VulkanDevice *CreateVulkanDevice(grassland::rhi::PhysicalDevice info,
+                                          Core *core,
+                                          VkPhysicalDevice physical_device,
+                                          uint32_t api_version);
   ~VulkanDevice() override;
   VkDevice NativeDevice() const;
   VulkanRenderTargetPool &RenderTargets();

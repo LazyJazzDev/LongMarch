@@ -8,14 +8,15 @@ class MetalSwapChainImage;
 
 class MetalCommandContext final : public CommandContext {
  public:
-  explicit MetalCommandContext(MetalDevice *device);
-  bool Initialize();
+  static MetalCommandContext *Create(MetalDevice *device);
   bool CmdClearColor(rhi::IImage *image, const std::array<float, 4> &color) override;
   bool CmdPresent(rhi::IWindow *window) override;
   SubmitResult SubmitNative() override;
   SubmissionStatus WaitForProgress() override;
 
  private:
+  MetalCommandContext(MetalDevice *device);
+
   bool EndRecording() override;
   MetalDevice *device_;
   NS::SharedPtr<MTL::CommandBuffer> commands_;

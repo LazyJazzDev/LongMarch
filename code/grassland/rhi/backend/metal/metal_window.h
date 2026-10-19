@@ -8,9 +8,8 @@ namespace grassland::rhi::backend::metal {
 
 class MetalWindow final : public Window {
  public:
-  explicit MetalWindow(MetalDevice *device);
   ~MetalWindow() override;
-  bool Initialize(const WindowDesc &desc);
+  static MetalWindow *Create(MetalDevice *device, const WindowDesc &desc);
   ObjectPtr<Image> AcquireNativeFrame() override;
   bool RebuildNativeSwapChain(PresentMode mode) override;
   PresentMode GetPresentMode() const override;
@@ -19,6 +18,8 @@ class MetalWindow final : public Window {
   const void *DeviceIdentity() const;
 
  private:
+  MetalWindow(MetalDevice *device);
+
   MetalDevice *device_;
   NS::SharedPtr<CA::MetalLayer> layer_;
   ImageDesc desc_;

@@ -7,9 +7,11 @@
 
 namespace grassland::rhi::backend::metal {
 
-std::unique_ptr<MetalCore> MetalCore::CreateMetalCore() {
+MetalCore::MetalCore() = default;
+
+MetalCore *MetalCore::CreateMetalCore() {
   auto pool = NS::TransferPtr(NS::AutoreleasePool::alloc()->init());
-  auto core = std::make_unique<MetalCore>();
+  auto core = std::unique_ptr<MetalCore>(new MetalCore());
   uint64_t host_memory = 0;
   size_t size = sizeof(host_memory);
   if (sysctlbyname("hw.memsize", &host_memory, &size, nullptr, 0) != 0)
@@ -53,7 +55,7 @@ std::unique_ptr<MetalCore> MetalCore::CreateMetalCore() {
   }
   add_device(device.get());
 #endif
-  return core;
+  return core.release();
 }
 
 std::vector<PhysicalDevice> MetalCore::GetPhysicalDevices() const {
@@ -74,10 +76,7 @@ rhi::IDevice *MetalCore::CreateDevice(int32_t device_idx) {
     const auto &adapter = adapters_[device_idx];
     // Metal's enumerated MTLDevice is already usable; no feature enable mask or
     // separate logical-device creation exists. Each wrapper owns a native retain.
-    auto device = std::make_unique<MetalDevice>(adapter.info, this, adapter.native);
-    if (!device->IsInitialized())
-      return nullptr;
-    return device.release();
+    return MetalDevice::Create(adapter.info, this, adapter.native);
   } catch (const std::bad_alloc &) {
     return nullptr;
   }

@@ -37,6 +37,7 @@ TEST_P(RhiWindow, MultipleWindowsSingleUseFramesModesAndQueueLifetime) {
   ASSERT_TRUE(graphics);
   ASSERT_TRUE(transfer);
   EXPECT_TRUE(graphics.SharesPhysicalQueue(transfer));
+  EXPECT_FALSE(device.CreateGLFWWindow({0, 240, "Invalid window"}));
   auto first = device.CreateGLFWWindow({320, 240, "RHI window test A"});
   auto second = device.CreateGLFWWindow({320, 240, "RHI window test B"});
   ASSERT_TRUE(first);

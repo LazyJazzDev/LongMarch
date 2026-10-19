@@ -8,11 +8,10 @@ namespace grassland::rhi::backend::metal {
 
 class MetalDevice final : public Device {
  public:
-  MetalDevice(PhysicalDevice info, Core *core, NS::SharedPtr<MTL::Device> device);
+  static MetalDevice *Create(PhysicalDevice info, Core *core, NS::SharedPtr<MTL::Device> device);
   ~MetalDevice() override;
 
   MTL::Device *NativeDevice() const noexcept;
-  bool IsInitialized() const;
   MTL::CommandQueue *NativeQueue() const;
   std::mutex &QueueMutex();
   bool WaitIdle();
@@ -21,6 +20,8 @@ class MetalDevice final : public Device {
   rhi::IQueue *GetQueue(QueueType type) override;
 
  private:
+  MetalDevice(PhysicalDevice info, Core *core, NS::SharedPtr<MTL::Device> device);
+
   NS::SharedPtr<MTL::Device> device_;
   NS::SharedPtr<MTL::CommandQueue> queue_;
   std::mutex queue_mutex_;

@@ -57,8 +57,9 @@ ObjectPtr<VulkanUploadPool::Lease> VulkanUploadPool::Acquire(uint64_t size) {
       if (bucket.available.empty()) {
         // Reserve return-list space before committing a new pool-owned allocation.
         bucket.available.reserve(bucket.allocated + 1);
-        auto storage = ObjectPtr<VulkanAllocatedBuffer>::Adopt(new VulkanAllocatedBuffer(device_, {capacity}));
-        if (!storage->Initialize(true))
+        auto storage =
+            ObjectPtr<VulkanAllocatedBuffer>::Adopt(VulkanAllocatedBuffer::Create(device_, {capacity}, true));
+        if (!storage)
           return {};
         auto pointer = storage.Get();
         bucket.buffers.emplace(pointer, std::move(storage));

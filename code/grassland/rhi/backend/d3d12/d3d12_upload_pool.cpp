@@ -61,8 +61,8 @@ ObjectPtr<D3D12UploadPool::Lease> D3D12UploadPool::Acquire(uint64_t size) {
       if (bucket.available.empty()) {
         // Reserve return-list space before committing a new pool-owned allocation.
         bucket.available.reserve(bucket.allocated + 1);
-        auto storage = ObjectPtr<D3D12AllocatedBuffer>::Adopt(new D3D12AllocatedBuffer(device_, {capacity}));
-        if (!storage->Initialize(true))
+        auto storage = ObjectPtr<D3D12AllocatedBuffer>::Adopt(D3D12AllocatedBuffer::Create(device_, {capacity}, true));
+        if (!storage)
           return {};
         auto pointer = storage.Get();
         bucket.buffers.emplace(pointer, std::move(storage));

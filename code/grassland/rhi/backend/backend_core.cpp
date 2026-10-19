@@ -28,7 +28,7 @@ rhi::IDevice *Core::CreateDeviceByAutoSelection(DeviceFeatureRequirement require
   }
 }
 
-std::unique_ptr<Core> CreateCore(BackendAPI api) {
+Core *CreateCore(BackendAPI api) {
   switch (api) {
 #if defined(LONGMARCH_D3D12_ENABLED)
     case BACKEND_API_D3D12:
