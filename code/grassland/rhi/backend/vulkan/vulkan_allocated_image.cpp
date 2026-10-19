@@ -13,8 +13,10 @@ VulkanAllocatedImage::VulkanAllocatedImage(VulkanDevice *device, ImageDesc desc)
 }
 
 VulkanAllocatedImage::~VulkanAllocatedImage() {
-  if (image_)
+  if (image_) {
+    device_->RenderTargets().Retire(image_);
     vmaDestroyImage(device_->Allocator(), image_, allocation_);
+  }
 }
 
 bool VulkanAllocatedImage::IsValid() const {
