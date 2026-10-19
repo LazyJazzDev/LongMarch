@@ -6,20 +6,35 @@
 #include <unordered_map>
 
 #include "grassland/rhi/backend/d3d12/d3d12_allocated_buffer.h"
-#include "grassland/rhi/backend/d3d12/d3d12_upload_buffer_lease.h"
 
 namespace grassland::rhi::backend::d3d12 {
 class D3D12UploadPool {
  public:
+  // Borrows pool-owned storage. The pool and its Device must outlive every lease.
+  class Lease final : public D3D12Buffer {
+   public:
+    Lease(D3D12UploadPool *pool, D3D12AllocatedBuffer *buffer);
+    ~Lease() override;
+    BufferDesc GetDesc() const override;
+    ID3D12Resource *NativeBuffer() const override;
+    D3D12_RESOURCE_STATES DefaultState() const override;
+    bool Write(const void *data, uint64_t size);
+
+   private:
+    D3D12UploadPool *pool_;
+    D3D12AllocatedBuffer *buffer_;
+  };
+
   explicit D3D12UploadPool(D3D12Device *device);
-  ObjectPtr<D3D12UploadBufferLease> Acquire(uint64_t size);
-  // Called by the lease destructor; callers release the lease reference instead.
-  void ReleaseBuffer(D3D12AllocatedBuffer *buffer);
+  ObjectPtr<Lease> Acquire(uint64_t size);
   // Allocated / occupied physical buffers in the requested size class.
   std::pair<size_t, size_t> GetBufferCounts(uint64_t size) const;
   void Clear();
 
  private:
+  // Called by the lease destructor; callers release the lease reference instead.
+  void ReleaseBuffer(D3D12AllocatedBuffer *buffer);
+
   D3D12Device *device_;
   mutable std::mutex mutex_;
 

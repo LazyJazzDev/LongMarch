@@ -3,6 +3,28 @@
 #include "grassland/rhi/backend/vulkan/vulkan_device.h"
 
 namespace grassland::rhi::backend::vulkan {
+VulkanUploadPool::Lease::Lease(VulkanUploadPool *pool, VulkanAllocatedBuffer *buffer)
+    : VulkanBuffer(static_cast<VulkanDevice *>(buffer->Owner()), buffer->GetDesc()),
+      pool_(pool),
+      buffer_(buffer) {
+}
+
+VulkanUploadPool::Lease::~Lease() {
+  pool_->ReleaseBuffer(buffer_);
+}
+
+BufferDesc VulkanUploadPool::Lease::GetDesc() const {
+  return buffer_->GetDesc();
+}
+
+VkBuffer VulkanUploadPool::Lease::NativeBuffer() const {
+  return buffer_->NativeBuffer();
+}
+
+bool VulkanUploadPool::Lease::Write(const void *data, uint64_t size) {
+  return buffer_->Write(data, size);
+}
+
 VulkanUploadPool::VulkanUploadPool(VulkanDevice *device) : device_(device) {
 }
 
@@ -17,7 +39,7 @@ void VulkanUploadPool::Bucket::Record(size_t occupancy, std::chrono::steady_cloc
     peaks.pop_front();
 }
 
-ObjectPtr<VulkanUploadBufferLease> VulkanUploadPool::Acquire(uint64_t size) {
+ObjectPtr<VulkanUploadPool::Lease> VulkanUploadPool::Acquire(uint64_t size) {
   uint64_t capacity = 65536;
   size_t level = 0;
   while (capacity < size && capacity <= UINT64_MAX / 2) {
@@ -48,7 +70,7 @@ ObjectPtr<VulkanUploadBufferLease> VulkanUploadPool::Acquire(uint64_t size) {
       ++bucket.occupied;
     }
     // Construct outside the lock: failed construction returns the borrowed slot.
-    return ObjectPtr<VulkanUploadBufferLease>::Adopt(new VulkanUploadBufferLease(this, buffer));
+    return ObjectPtr<Lease>::Adopt(new Lease(this, buffer));
   } catch (const std::bad_alloc &) {
     if (buffer)
       ReleaseBuffer(buffer);

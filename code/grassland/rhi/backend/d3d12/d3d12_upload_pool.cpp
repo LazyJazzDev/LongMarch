@@ -3,6 +3,32 @@
 #include "grassland/rhi/backend/d3d12/d3d12_device.h"
 
 namespace grassland::rhi::backend::d3d12 {
+D3D12UploadPool::Lease::Lease(D3D12UploadPool *pool, D3D12AllocatedBuffer *buffer)
+    : D3D12Buffer(static_cast<D3D12Device *>(buffer->Owner()), buffer->GetDesc()),
+      pool_(pool),
+      buffer_(buffer) {
+}
+
+D3D12UploadPool::Lease::~Lease() {
+  pool_->ReleaseBuffer(buffer_);
+}
+
+BufferDesc D3D12UploadPool::Lease::GetDesc() const {
+  return buffer_->GetDesc();
+}
+
+ID3D12Resource *D3D12UploadPool::Lease::NativeBuffer() const {
+  return buffer_->NativeBuffer();
+}
+
+D3D12_RESOURCE_STATES D3D12UploadPool::Lease::DefaultState() const {
+  return buffer_->DefaultState();
+}
+
+bool D3D12UploadPool::Lease::Write(const void *data, uint64_t size) {
+  return buffer_->Write(data, size);
+}
+
 D3D12UploadPool::D3D12UploadPool(D3D12Device *device) : device_(device) {
 }
 
@@ -17,7 +43,7 @@ void D3D12UploadPool::Bucket::Record(size_t occupancy, std::chrono::steady_clock
     peaks.pop_front();
 }
 
-ObjectPtr<D3D12UploadBufferLease> D3D12UploadPool::Acquire(uint64_t size) {
+ObjectPtr<D3D12UploadPool::Lease> D3D12UploadPool::Acquire(uint64_t size) {
   uint64_t capacity = 65536;
   size_t level = 0;
   while (capacity < size && capacity <= UINT64_MAX / 2) {
@@ -48,7 +74,7 @@ ObjectPtr<D3D12UploadBufferLease> D3D12UploadPool::Acquire(uint64_t size) {
       ++bucket.occupied;
     }
     // Construct outside the lock: failed construction returns the borrowed slot.
-    return ObjectPtr<D3D12UploadBufferLease>::Adopt(new D3D12UploadBufferLease(this, buffer));
+    return ObjectPtr<Lease>::Adopt(new Lease(this, buffer));
   } catch (const std::bad_alloc &) {
     if (buffer)
       ReleaseBuffer(buffer);
