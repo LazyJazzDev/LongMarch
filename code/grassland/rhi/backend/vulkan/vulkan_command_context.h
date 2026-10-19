@@ -47,7 +47,6 @@ class VulkanCommandContext final : public CommandContext {
   VulkanImage *render_target_{};
   std::vector<VulkanBuffer *> vertex_buffers_;
   bool viewport_set_{}, scissor_set_{}, index_bound_{};
-  std::vector<ObjectPtr<VulkanAllocatedBuffer>> uploads_;
 
   bool EndRecording() override;
   bool TransitionBuffer(VulkanBuffer *buffer, VkPipelineStageFlags stages, VkAccessFlags access);

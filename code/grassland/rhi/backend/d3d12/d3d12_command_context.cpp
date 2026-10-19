@@ -15,8 +15,6 @@ D3D12CommandContext::D3D12CommandContext(D3D12Device *device) : CommandContext(d
 }
 
 D3D12CommandContext::~D3D12CommandContext() {
-  for (auto &upload : uploads_)
-    device_->UploadPool().Release(std::move(upload));
   for (const auto &entry : rtv_leases_)
     device_->RTVPool().Release(entry.second.first);
   if (reusable_) {
@@ -39,6 +37,17 @@ bool D3D12CommandContext::Initialize() {
 bool D3D12CommandContext::TransitionResource(ID3D12Resource *resource,
                                              D3D12_RESOURCE_STATES state,
                                              D3D12_RESOURCE_STATES default_state) {
+  // Upload heaps stay in GENERIC_READ; compatible reads need no transition.
+  if (default_state == D3D12_RESOURCE_STATE_GENERIC_READ) {
+#if !defined(NDEBUG)
+    if ((state & default_state) != state) {
+      recording_failed_ = true;
+      ReportError(-1, "Upload buffers only support GPU read usages.");
+      return false;
+    }
+#endif
+    return true;
+  }
   try {
     auto &current =
         resource_states_.try_emplace(resource, ResourceState{default_state, default_state}).first->second.current;
@@ -241,29 +250,21 @@ bool D3D12CommandContext::CmdUploadBuffer(IBuffer *buffer, uint64_t offset, cons
     recording_failed_ = true;
     return false;
   }
-  try {
-    uploads_.reserve(uploads_.size() + 1);
-    auto upload = device_->UploadPool().Acquire(size);
-    if (!upload) {
-      recording_failed_ = true;
-      return false;
-    }
-    if (!upload->Write(data, size)) {
-      device_->UploadPool().Release(std::move(upload));
-      recording_failed_ = true;
-      return false;
-    }
-    if (!TransitionResource(native->NativeBuffer(), D3D12_RESOURCE_STATE_COPY_DEST, D3D12_RESOURCE_STATE_COMMON)) {
-      device_->UploadPool().Release(std::move(upload));
-      return false;
-    }
-    list_->CopyBufferRegion(native->NativeBuffer(), offset, upload->NativeBuffer(), 0, size);
-    uploads_.push_back(std::move(upload));
-    return true;
-  } catch (const std::bad_alloc &) {
+  auto upload = device_->UploadPool().Acquire(size);
+  if (!upload) {
     recording_failed_ = true;
     return false;
   }
+  if (!upload->Write(data, size)) {
+    recording_failed_ = true;
+    return false;
+  }
+  if (!RetainResource(upload.Get()))
+    return false;
+  if (!TransitionResource(native->NativeBuffer(), D3D12_RESOURCE_STATE_COPY_DEST, native->DefaultState()))
+    return false;
+  list_->CopyBufferRegion(native->NativeBuffer(), offset, upload->NativeBuffer(), 0, size);
+  return true;
 }
 
 bool D3D12CommandContext::CmdCopyBuffer(IBuffer *source,
@@ -296,9 +297,9 @@ bool D3D12CommandContext::CmdCopyBuffer(IBuffer *source,
     return false;
   if (!RetainResource(dst))
     return false;
-  if (!TransitionResource(src->NativeBuffer(), D3D12_RESOURCE_STATE_COPY_SOURCE, D3D12_RESOURCE_STATE_COMMON))
+  if (!TransitionResource(src->NativeBuffer(), D3D12_RESOURCE_STATE_COPY_SOURCE, src->DefaultState()))
     return false;
-  if (!TransitionResource(dst->NativeBuffer(), D3D12_RESOURCE_STATE_COPY_DEST, D3D12_RESOURCE_STATE_COMMON))
+  if (!TransitionResource(dst->NativeBuffer(), D3D12_RESOURCE_STATE_COPY_DEST, dst->DefaultState()))
     return false;
   list_->CopyBufferRegion(dst->NativeBuffer(), destination_offset, src->NativeBuffer(), source_offset, size);
   return true;
@@ -400,7 +401,7 @@ bool D3D12CommandContext::CmdBindVertexBuffer(uint32_t binding, IBuffer *buffer,
     return false;
   }
   if (!TransitionResource(native->NativeBuffer(), D3D12_RESOURCE_STATE_VERTEX_AND_CONSTANT_BUFFER,
-                          D3D12_RESOURCE_STATE_COMMON))
+                          native->DefaultState()))
     return false;
   D3D12_VERTEX_BUFFER_VIEW view{native->NativeBuffer()->GetGPUVirtualAddress() + offset,
                                 static_cast<UINT>(native->GetDesc().size - offset),
@@ -435,7 +436,7 @@ bool D3D12CommandContext::CmdBindIndexBuffer(IBuffer *buffer, IndexFormat format
     recording_failed_ = true;
     return false;
   }
-  if (!TransitionResource(native->NativeBuffer(), D3D12_RESOURCE_STATE_INDEX_BUFFER, D3D12_RESOURCE_STATE_COMMON))
+  if (!TransitionResource(native->NativeBuffer(), D3D12_RESOURCE_STATE_INDEX_BUFFER, native->DefaultState()))
     return false;
   D3D12_INDEX_BUFFER_VIEW view{native->NativeBuffer()->GetGPUVirtualAddress() + offset,
                                static_cast<UINT>(native->GetDesc().size - offset),
@@ -534,14 +535,14 @@ bool D3D12CommandContext::PrepareDrawBuffers(bool indexed) {
     auto state = D3D12_RESOURCE_STATE_VERTEX_AND_CONSTANT_BUFFER;
     if (indexed && buffer == index_buffer_)
       state |= D3D12_RESOURCE_STATE_INDEX_BUFFER;
-    if (!TransitionResource(buffer->NativeBuffer(), state, D3D12_RESOURCE_STATE_COMMON))
+    if (!TransitionResource(buffer->NativeBuffer(), state, buffer->DefaultState()))
       return false;
   }
   if (indexed) {
     auto state = D3D12_RESOURCE_STATE_INDEX_BUFFER;
     if (std::find(vertex_buffers_.begin(), vertex_buffers_.end(), index_buffer_) != vertex_buffers_.end())
       state |= D3D12_RESOURCE_STATE_VERTEX_AND_CONSTANT_BUFFER;
-    if (!TransitionResource(index_buffer_->NativeBuffer(), state, D3D12_RESOURCE_STATE_COMMON))
+    if (!TransitionResource(index_buffer_->NativeBuffer(), state, index_buffer_->DefaultState()))
       return false;
   }
   if (!TransitionResource(render_target_->NativeImage(), D3D12_RESOURCE_STATE_RENDER_TARGET,

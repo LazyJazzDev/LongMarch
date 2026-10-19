@@ -9,6 +9,7 @@ class D3D12Device;
 class D3D12Buffer : public Buffer {
  public:
   virtual ID3D12Resource *NativeBuffer() const = 0;
+  virtual D3D12_RESOURCE_STATES DefaultState() const = 0;
 
  protected:
   D3D12Buffer(D3D12Device *device, const BufferDesc &desc);

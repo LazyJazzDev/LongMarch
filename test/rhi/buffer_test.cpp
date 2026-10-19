@@ -198,7 +198,7 @@ TEST_P(RhiBuffer, AbandonedUploadsReturnStorageAndLeasesDoNotOverlap) {
     auto second = pool.Acquire(64);
     ASSERT_TRUE(second);
     EXPECT_NE(identity, second->NativeBuffer());
-    pool.Release(std::move(first));
+    first.Reset();
     {
       ObjPtr<ICommandContext> context = device->CreateCommandContext();
       std::array<uint32_t, 16> bytes{};
@@ -207,8 +207,8 @@ TEST_P(RhiBuffer, AbandonedUploadsReturnStorageAndLeasesDoNotOverlap) {
     auto reused = pool.Acquire(64);
     ASSERT_TRUE(reused);
     EXPECT_EQ(identity, reused->NativeBuffer());
-    pool.Release(std::move(reused));
-    pool.Release(std::move(second));
+    reused.Reset();
+    second.Reset();
   };
 #if defined(LONGMARCH_D3D12_ENABLED)
   if (GetParam() == BACKEND_API_D3D12)
@@ -231,8 +231,8 @@ TEST_P(RhiBuffer, UploadClassesReuseIndependentlyAndReleaseExpiredPeakCapacity) 
     auto large = pool.Acquire(65537);
     ASSERT_TRUE(large);
     EXPECT_EQ(large->GetDesc().size, 131072u);
-    auto observe_large = large;
-    pool.Release(std::move(large));
+    auto large_identity = large->NativeBuffer();
+    large.Reset();
     auto first = pool.Acquire(1);
     ASSERT_TRUE(first);
     EXPECT_EQ(first->GetDesc().size, 65536u);
@@ -242,47 +242,84 @@ TEST_P(RhiBuffer, UploadClassesReuseIndependentlyAndReleaseExpiredPeakCapacity) 
     ASSERT_TRUE(second);
     ASSERT_TRUE(third);
     ASSERT_TRUE(fourth);
-    // Extra test-owned references observe whether the pool has released ownership
-    // without relying on native handle values that an allocator may recycle.
-    auto observe_first = first;
-    auto observe_second = second;
-    auto observe_third = third;
-    auto observe_fourth = fourth;
-    pool.Release(std::move(first));
-    pool.Release(std::move(second));
-    pool.Release(std::move(third));
-    EXPECT_FALSE(observe_first->IsUniquelyOwned());
-    EXPECT_FALSE(observe_second->IsUniquelyOwned());
-    EXPECT_FALSE(observe_third->IsUniquelyOwned());
-    // An equal peak is refreshed by later demand, and buffers are reused LIFO.
+    auto third_identity = third->NativeBuffer();
+    first.Reset();
+    second.Reset();
+    third.Reset();
+    EXPECT_EQ(pool.GetBufferCounts(64).first, 4u);
+    EXPECT_EQ(pool.GetBufferCounts(64).second, 1u);
     auto reused = pool.Acquire(32);
     ASSERT_TRUE(reused);
-    EXPECT_EQ(reused.Get(), observe_third.Get());
-    pool.Release(std::move(reused));
+    EXPECT_EQ(reused->NativeBuffer(), third_identity);
+    reused.Reset();
     std::this_thread::sleep_for(std::chrono::milliseconds(1100));
     auto recent = pool.Acquire(64);
     ASSERT_TRUE(recent);
-    pool.Release(std::move(fourth));
-    // The expired peak of four shrinks to the new peak of two, not current use of one.
-    size_t retained = 0;
-    for (auto buffer : {observe_first.Get(), observe_second.Get(), observe_third.Get(), observe_fourth.Get()})
-      if (!buffer->IsUniquelyOwned())
-        ++retained;
-    EXPECT_EQ(retained, 2u);
+    fourth.Reset();
+    EXPECT_EQ(pool.GetBufferCounts(64).first, 2u);
+    EXPECT_EQ(pool.GetBufferCounts(64).second, 1u);
     std::this_thread::sleep_for(std::chrono::milliseconds(1100));
-    pool.Release(std::move(recent));
-    EXPECT_TRUE(observe_first->IsUniquelyOwned());
-    EXPECT_TRUE(observe_second->IsUniquelyOwned());
-    EXPECT_TRUE(observe_third->IsUniquelyOwned());
-    EXPECT_TRUE(observe_fourth->IsUniquelyOwned());
-    // Returning one size class does not scan or trim another size class.
-    EXPECT_FALSE(observe_large->IsUniquelyOwned());
+    recent.Reset();
+    EXPECT_EQ(pool.GetBufferCounts(64).first, 0u);
+    EXPECT_EQ(pool.GetBufferCounts(64).second, 0u);
+    EXPECT_EQ(pool.GetBufferCounts(65537).first, 1u);
     auto again = pool.Acquire(65537);
     ASSERT_TRUE(again);
-    EXPECT_EQ(again.Get(), observe_large.Get());
-    pool.Release(std::move(again));
+    EXPECT_EQ(again->NativeBuffer(), large_identity);
+    pool.Clear();  // Only idle storage may be cleared while a lease exists.
+    EXPECT_EQ(pool.GetBufferCounts(65537).first, 1u);
+    EXPECT_EQ(again->NativeBuffer(), large_identity);
+    again.Reset();
     pool.Clear();
-    EXPECT_TRUE(observe_large->IsUniquelyOwned());
+    EXPECT_EQ(pool.GetBufferCounts(65537).first, 0u);
+  };
+#if defined(LONGMARCH_D3D12_ENABLED)
+  if (GetParam() == BACKEND_API_D3D12)
+    check(static_cast<backend::d3d12::D3D12Device *>(device.Get())->UploadPool());
+#endif
+#if defined(LONGMARCH_VULKAN_ENABLED)
+  if (GetParam() == BACKEND_API_VULKAN)
+    check(static_cast<backend::vulkan::VulkanDevice *>(device.Get())->UploadPool());
+#endif
+}
+
+TEST_P(RhiBuffer, UploadLeaseForwardsBufferAndReturnsAfterLastCommandReference) {
+  ObjPtr<ICore> core = CreateCore(GetParam());
+  ASSERT_TRUE(core);
+  ObjPtr<IDevice> device = core->CreateDeviceByAutoSelection();
+  ASSERT_TRUE(device);
+  ObjPtr<IQueue> queue = device->GetQueue(QUEUE_TYPE_TRANSFER);
+  ASSERT_TRUE(queue);
+  std::array<uint32_t, 16> expected{};
+  for (uint32_t i = 0; i < expected.size(); ++i)
+    expected[i] = i * 31 + 7;
+  ObjPtr<IBuffer> target = device->CreateBuffer({sizeof(expected)});
+  ASSERT_TRUE(target);
+  auto check = [&](auto &pool) {
+    auto lease = pool.Acquire(sizeof(expected));
+    ASSERT_TRUE(lease);
+    EXPECT_EQ(lease->Owner(), device.Get());
+    ASSERT_TRUE(lease->Write(expected.data(), sizeof(expected)));
+    auto alias = lease;
+    lease.Reset();
+    EXPECT_EQ(pool.GetBufferCounts(sizeof(expected)).second, 1u);
+    ObjPtr<ICommandContext> commands = device->CreateCommandContext();
+    ASSERT_TRUE(commands);
+    ASSERT_TRUE(commands->CmdCopyBuffer(alias.Get(), 0, target.Get(), 0, sizeof(expected)));
+    alias.Reset();
+    // The common resource table keeps the lease occupied after all caller references go away.
+    EXPECT_EQ(pool.GetBufferCounts(sizeof(expected)).second, 1u);
+    ObjPtr<ISubmissionToken> done = queue->Submit(commands.Get());
+    ASSERT_TRUE(done);
+    commands.Release();
+    ASSERT_TRUE(done->WaitHost());
+    const auto deadline = std::chrono::steady_clock::now() + std::chrono::seconds(2);
+    while (pool.GetBufferCounts(sizeof(expected)).second && std::chrono::steady_clock::now() < deadline)
+      std::this_thread::sleep_for(std::chrono::milliseconds(1));
+    EXPECT_EQ(pool.GetBufferCounts(sizeof(expected)).second, 0u);
+    std::array<uint32_t, 16> actual{};
+    ReadBuffer(device.Get(), target.Get(), GetParam(), actual);
+    EXPECT_EQ(actual, expected);
   };
 #if defined(LONGMARCH_D3D12_ENABLED)
   if (GetParam() == BACKEND_API_D3D12)

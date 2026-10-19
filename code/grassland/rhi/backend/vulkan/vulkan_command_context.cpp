@@ -14,8 +14,6 @@ VulkanCommandContext::VulkanCommandContext(VulkanDevice *device) : CommandContex
 VulkanCommandContext::~VulkanCommandContext() {
   for (const auto &entry : attachment_leases_)
     device_->RenderTargets().Release(std::get<0>(entry.second));
-  for (auto &upload : uploads_)
-    device_->UploadPool().Release(std::move(upload));
   if (reusable_) {
     device_->RecycleCommandResources(pool_, command_);
     return;
@@ -276,30 +274,22 @@ bool VulkanCommandContext::CmdUploadBuffer(IBuffer *buffer, uint64_t offset, con
     recording_failed_ = true;
     return false;
   }
-  try {
-    uploads_.reserve(uploads_.size() + 1);
-    auto upload = device_->UploadPool().Acquire(size);
-    if (!upload) {
-      recording_failed_ = true;
-      return false;
-    }
-    if (!upload->Write(data, size)) {
-      device_->UploadPool().Release(std::move(upload));
-      recording_failed_ = true;
-      return false;
-    }
-    if (!TransitionBuffer(native, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_ACCESS_TRANSFER_WRITE_BIT)) {
-      device_->UploadPool().Release(std::move(upload));
-      return false;
-    }
-    VkBufferCopy copy{0, offset, size};
-    vkCmdCopyBuffer(command_, upload->NativeBuffer(), native->NativeBuffer(), 1, &copy);
-    uploads_.push_back(std::move(upload));
-    return true;
-  } catch (const std::bad_alloc &) {
+  auto upload = device_->UploadPool().Acquire(size);
+  if (!upload) {
     recording_failed_ = true;
     return false;
   }
+  if (!upload->Write(data, size)) {
+    recording_failed_ = true;
+    return false;
+  }
+  if (!RetainResource(upload.Get()))
+    return false;
+  if (!TransitionBuffer(native, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_ACCESS_TRANSFER_WRITE_BIT))
+    return false;
+  VkBufferCopy copy{0, offset, size};
+  vkCmdCopyBuffer(command_, upload->NativeBuffer(), native->NativeBuffer(), 1, &copy);
+  return true;
 }
 
 bool VulkanCommandContext::CmdCopyBuffer(IBuffer *source,

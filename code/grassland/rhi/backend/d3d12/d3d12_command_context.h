@@ -51,7 +51,6 @@ class D3D12CommandContext final : public CommandContext {
   D3D12Buffer *index_buffer_{};
   bool PrepareDrawBuffers(bool indexed);
   bool viewport_set_{}, scissor_set_{}, index_bound_{};
-  std::vector<ObjectPtr<D3D12AllocatedBuffer>> uploads_;
 
   bool EndRecording() override;
   bool RenderTarget(D3D12Image *image, D3D12_CPU_DESCRIPTOR_HANDLE &handle);

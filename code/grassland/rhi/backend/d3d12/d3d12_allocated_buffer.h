@@ -13,6 +13,7 @@ class D3D12AllocatedBuffer final : public D3D12Buffer {
   ~D3D12AllocatedBuffer() override;
   bool Initialize(bool upload = false);
   ID3D12Resource *NativeBuffer() const override;
+  D3D12_RESOURCE_STATES DefaultState() const override;
   bool Write(const void *data, uint64_t size);
 
  private:

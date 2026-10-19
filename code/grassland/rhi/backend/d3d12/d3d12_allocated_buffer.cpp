@@ -22,6 +22,10 @@ ID3D12Resource *D3D12AllocatedBuffer::NativeBuffer() const {
   return buffer_.Get();
 }
 
+D3D12_RESOURCE_STATES D3D12AllocatedBuffer::DefaultState() const {
+  return mapped_ ? D3D12_RESOURCE_STATE_GENERIC_READ : D3D12_RESOURCE_STATE_COMMON;
+}
+
 bool D3D12AllocatedBuffer::Initialize(bool upload) {
   D3D12_RESOURCE_DESC info{};
   info.Dimension = D3D12_RESOURCE_DIMENSION_BUFFER;
