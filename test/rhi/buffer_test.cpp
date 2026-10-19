@@ -6,16 +6,40 @@
 #include <thread>
 
 #include "grassland/rhi/rhi.h"
+#if defined(LONGMARCH_METAL_ENABLED)
+#include "grassland/rhi/backend/metal/metal_device.h"
+#include "grassland/rhi/backend/metal/metal_image.h"
+#endif
 #if defined(LONGMARCH_D3D12_ENABLED)
 #include "grassland/rhi/backend/d3d12/d3d12_device.h"
 #endif
 #if defined(LONGMARCH_VULKAN_ENABLED)
 #include "grassland/rhi/backend/vulkan/vulkan_device.h"
 #endif
-#if defined(LONGMARCH_D3D12_ENABLED) || defined(LONGMARCH_VULKAN_ENABLED)
+#if defined(LONGMARCH_D3D12_ENABLED) || defined(LONGMARCH_VULKAN_ENABLED) || defined(LONGMARCH_METAL_ENABLED)
 namespace grassland::rhi {
 namespace {
 void ReadBuffer(IDevice *device, IBuffer *buffer, BackendAPI api, std::array<uint32_t, 16> &output) {
+#if defined(LONGMARCH_METAL_ENABLED)
+  if (api == BACKEND_API_METAL) {
+    using namespace backend::metal;
+    auto pool = NS::TransferPtr(NS::AutoreleasePool::alloc()->init());
+    auto owner = static_cast<MetalDevice *>(device);
+    auto readback = NS::TransferPtr(owner->NativeDevice()->newBuffer(256, MTL::ResourceStorageModeShared));
+    ASSERT_TRUE(readback);
+    std::lock_guard<std::mutex> lock(owner->QueueMutex());
+    auto commands = NS::RetainPtr(owner->NativeQueue()->commandBuffer());
+    auto blit = commands->blitCommandEncoder();
+    blit->copyFromBuffer(static_cast<MetalBuffer *>(buffer)->NativeBuffer(), 0, readback.get(), 0, sizeof(output));
+    blit->endEncoding();
+    commands->commit();
+    commands->waitUntilCompleted();
+    ASSERT_EQ(commands->status(), MTL::CommandBufferStatusCompleted);
+    std::memcpy(output.data(), readback->contents(), sizeof(output));
+    return;
+  }
+#endif
+
 #if defined(LONGMARCH_D3D12_ENABLED)
   if (api == BACKEND_API_D3D12) {
     using namespace backend::d3d12;
@@ -219,6 +243,10 @@ TEST_P(RhiBuffer, AbandonedUploadsReturnStorageAndLeasesDoNotOverlap) {
   if (GetParam() == BACKEND_API_VULKAN)
     check(static_cast<backend::vulkan::VulkanDevice *>(device.Get())->UploadPool());
 #endif
+#if defined(LONGMARCH_METAL_ENABLED)
+  if (GetParam() == BACKEND_API_METAL)
+    check(static_cast<backend::metal::MetalDevice *>(device.Get())->UploadPool());
+#endif
 }
 
 TEST_P(RhiBuffer, UploadClassesReuseIndependentlyAndReleaseExpiredPeakCapacity) {
@@ -282,6 +310,10 @@ TEST_P(RhiBuffer, UploadClassesReuseIndependentlyAndReleaseExpiredPeakCapacity) 
   if (GetParam() == BACKEND_API_VULKAN)
     check(static_cast<backend::vulkan::VulkanDevice *>(device.Get())->UploadPool());
 #endif
+#if defined(LONGMARCH_METAL_ENABLED)
+  if (GetParam() == BACKEND_API_METAL)
+    check(static_cast<backend::metal::MetalDevice *>(device.Get())->UploadPool());
+#endif
 }
 
 TEST_P(RhiBuffer, UploadLeaseForwardsBufferAndReturnsAfterLastCommandReference) {
@@ -330,6 +362,10 @@ TEST_P(RhiBuffer, UploadLeaseForwardsBufferAndReturnsAfterLastCommandReference) 
   if (GetParam() == BACKEND_API_VULKAN)
     check(static_cast<backend::vulkan::VulkanDevice *>(device.Get())->UploadPool());
 #endif
+#if defined(LONGMARCH_METAL_ENABLED)
+  if (GetParam() == BACKEND_API_METAL)
+    check(static_cast<backend::metal::MetalDevice *>(device.Get())->UploadPool());
+#endif
 }
 
 const BackendAPI backends[] = {
@@ -338,6 +374,9 @@ const BackendAPI backends[] = {
 #endif
 #if defined(LONGMARCH_VULKAN_ENABLED)
     BACKEND_API_VULKAN,
+#endif
+#if defined(LONGMARCH_METAL_ENABLED)
+    BACKEND_API_METAL,
 #endif
 };
 INSTANTIATE_TEST_SUITE_P(Backends, RhiBuffer, testing::ValuesIn(backends));

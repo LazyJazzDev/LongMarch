@@ -13,7 +13,7 @@ std::string ShaderMacroHeader(const ProgramDesc &desc, BackendAPI api) {
   for (const auto &attribute : desc.vertex_attributes) {
     auto location = std::to_string(attribute.location);
     header += "#define RHI_INPUT_" + location + "(T,N) ";
-    if (api == BACKEND_API_VULKAN)
+    if (api == BACKEND_API_VULKAN || api == BACKEND_API_METAL)
       header += "[[vk::location(" + location + ")]] ";
     header += "T N : TEXCOORD" + location + "\n";
   }
@@ -36,9 +36,12 @@ bool CompileSlang(const ShaderDesc &shader, const std::string &prefix, BackendAP
                                  "-matrix-layout-column-major",
                                  "-O3",
                                  "-target",
-                                 api == BACKEND_API_VULKAN ? "spirv" : "dxil",
-                                 "-emit-spirv-directly",
+                                 api == BACKEND_API_METAL    ? "metal"
+                                 : api == BACKEND_API_VULKAN ? "spirv"
+                                                             : "dxil",
                                  "-fvk-use-entrypoint-name"};
+  if (api == BACKEND_API_VULKAN)
+    args.push_back("-emit-spirv-directly");
   slang::SessionDesc desc{};
   Slang::ComPtr<ISlangUnknown> allocation;
   if (SLANG_FAILED(

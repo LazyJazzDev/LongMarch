@@ -3,6 +3,7 @@
 #include <Metal/Metal.hpp>
 
 #include "grassland/rhi/backend/backend_device.h"
+#include "grassland/rhi/backend/metal/metal_upload_pool.h"
 
 namespace grassland::rhi::backend::metal {
 
@@ -11,6 +12,10 @@ class MetalDevice final : public Device {
   static MetalDevice *Create(PhysicalDevice info, Core *core, NS::SharedPtr<MTL::Device> device);
   ~MetalDevice() override;
 
+  rhi::IBuffer *CreateBuffer(const BufferDesc &desc) override;
+  rhi::IImage *CreateImage(const ImageDesc &desc) override;
+  rhi::IProgram *CreateProgram(const ProgramDesc &desc) override;
+  MetalUploadPool &UploadPool();
   MTL::Device *NativeDevice() const noexcept;
   MTL::CommandQueue *NativeQueue() const;
   std::mutex &QueueMutex();
@@ -25,6 +30,7 @@ class MetalDevice final : public Device {
   NS::SharedPtr<MTL::Device> device_;
   NS::SharedPtr<MTL::CommandQueue> queue_;
   std::mutex queue_mutex_;
+  MetalUploadPool uploads_{this};
 };
 
 }  // namespace grassland::rhi::backend::metal

@@ -90,7 +90,7 @@ int main(int argc, char **argv) {
   if (module.empty()) {
     std::cout << "\nModule Selection\n"
                  "  1. hello_window    Clear and present a window\n"
-                 "  2. hello_triangle  Colored indexed triangle (D3D12/Vulkan)\n";
+                 "  2. hello_triangle  Colored indexed triangle (D3D12/Vulkan/Metal)\n";
     for (;;) {
       std::cout << "\nSelect module [1-2 or name], q to quit: " << std::flush;
       std::string input;

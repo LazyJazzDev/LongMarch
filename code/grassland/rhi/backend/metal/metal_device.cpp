@@ -1,7 +1,9 @@
 ﻿#include "grassland/rhi/backend/metal/metal_device.h"
 
 #include "grassland/rhi/backend/backend_core.h"
+#include "grassland/rhi/backend/metal/metal_allocated_image.h"
 #include "grassland/rhi/backend/metal/metal_command_context.h"
+#include "grassland/rhi/backend/metal/metal_program.h"
 #include "grassland/rhi/backend/metal/metal_queue.h"
 #include "grassland/rhi/backend/metal/metal_window.h"
 
@@ -30,6 +32,7 @@ MetalDevice::MetalDevice(PhysicalDevice info, Core *core, NS::SharedPtr<MTL::Dev
 
 MetalDevice::~MetalDevice() {
   ShutdownQueues();
+  uploads_.Clear();
 }
 
 MTL::Device *MetalDevice::NativeDevice() const noexcept {
@@ -74,4 +77,24 @@ rhi::IQueue *MetalDevice::GetQueue(QueueType type) {
   }
 }
 
+rhi::IBuffer *MetalDevice::CreateBuffer(const BufferDesc &desc) {
+  return MetalAllocatedBuffer::Create(this, desc);
+}
+
+rhi::IImage *MetalDevice::CreateImage(const ImageDesc &desc) {
+  return MetalAllocatedImage::Create(this, desc);
+}
+
+rhi::IProgram *MetalDevice::CreateProgram(const ProgramDesc &desc) {
+  try {
+    return new MetalProgram(this, desc);
+  } catch (const std::bad_alloc &) {
+    ReportError(-1, "Metal program allocation failed.");
+    return nullptr;
+  }
+}
+
+MetalUploadPool &MetalDevice::UploadPool() {
+  return uploads_;
+}
 }  // namespace grassland::rhi::backend::metal

@@ -26,10 +26,7 @@ struct Vertex {
 int HelloTriangle(grassland::rhi::BackendAPI api, int frames, bool headless) {
   using namespace grassland::rhi;
   using namespace grassland::rhix;
-  if (api == BACKEND_API_METAL) {
-    std::cerr << "hello_triangle currently supports D3D12 and Vulkan.\n";
-    return 1;
-  }
+
   auto core = grassland::rhix::CreateCore(api);
   if (!core)
     return 1;

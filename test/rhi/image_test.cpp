@@ -6,6 +6,10 @@
 #include <thread>
 
 #include "grassland/rhi/rhi.h"
+#if defined(LONGMARCH_METAL_ENABLED)
+#include "grassland/rhi/backend/metal/metal_device.h"
+#include "grassland/rhi/backend/metal/metal_image.h"
+#endif
 #if defined(LONGMARCH_D3D12_ENABLED)
 #include <d3d12sdklayers.h>
 
@@ -16,10 +20,31 @@
 #include "grassland/rhi/backend/vulkan/vulkan_device.h"
 #include "grassland/rhi/backend/vulkan/vulkan_image.h"
 #endif
-#if defined(LONGMARCH_D3D12_ENABLED) || defined(LONGMARCH_VULKAN_ENABLED)
+#if defined(LONGMARCH_D3D12_ENABLED) || defined(LONGMARCH_VULKAN_ENABLED) || defined(LONGMARCH_METAL_ENABLED)
 namespace grassland::rhi {
 namespace {
 void ReadPixel(IDevice *device, IImage *image, BackendAPI api, uint32_t x, uint32_t y, std::array<uint8_t, 4> &output) {
+#if defined(LONGMARCH_METAL_ENABLED)
+  if (api == BACKEND_API_METAL) {
+    using namespace backend::metal;
+    auto pool = NS::TransferPtr(NS::AutoreleasePool::alloc()->init());
+    auto owner = static_cast<MetalDevice *>(device);
+    auto readback = NS::TransferPtr(owner->NativeDevice()->newBuffer(256, MTL::ResourceStorageModeShared));
+    ASSERT_TRUE(readback);
+    std::lock_guard<std::mutex> lock(owner->QueueMutex());
+    auto commands = NS::RetainPtr(owner->NativeQueue()->commandBuffer());
+    auto blit = commands->blitCommandEncoder();
+    blit->copyFromTexture(static_cast<MetalImage *>(image)->NativeImage(), 0, 0, MTL::Origin::Make(x, y, 0),
+                          MTL::Size::Make(1, 1, 1), readback.get(), 0, 256, 256);
+    blit->endEncoding();
+    commands->commit();
+    commands->waitUntilCompleted();
+    ASSERT_EQ(commands->status(), MTL::CommandBufferStatusCompleted);
+    std::memcpy(output.data(), readback->contents(), sizeof(output));
+    return;
+  }
+#endif
+
 #if defined(LONGMARCH_D3D12_ENABLED)
   if (api == BACKEND_API_D3D12) {
     using namespace backend::d3d12;
@@ -237,12 +262,79 @@ TEST_P(RhiImage, OffscreenClearDrawReadbackAndReuse) {
   }
 }
 
+TEST_P(RhiImage, IndexedInstancedAttributesAndOffsetsProduceExpectedPixels) {
+  ObjPtr<ICore> core = CreateCore(GetParam());
+  ASSERT_TRUE(core);
+  ObjPtr<IDevice> device = core->CreateDeviceByAutoSelection();
+  ASSERT_TRUE(device);
+  ObjPtr<IQueue> queue = device->GetQueue(QUEUE_TYPE_GRAPHICS);
+  ObjPtr<IImage> image = device->CreateImage({64, 64, IMAGE_FORMAT_RGBA8_UNORM});
+  ASSERT_TRUE(image);
+  const std::string source = R"(
+    struct Input { RHI_INPUT(3,float2,position); RHI_INPUT(5,float4,color); };
+    struct Varying { float4 position : SV_Position; float4 color : COLOR0; };
+    Varying VSMain(Input input) { Varying result; result.position=float4(input.position,0,1); result.color=input.color; return result; }
+    float4 PSMain(Varying input) : SV_Target0 { return input.color; }
+  )";
+  ObjPtr<IShader> vs = device->CreateShader({source, "VSMain", SHADER_STAGE_VERTEX});
+  ObjPtr<IShader> ps = device->CreateShader({source, "PSMain", SHADER_STAGE_FRAGMENT});
+  ProgramDesc desc;
+  desc.vertex_shader = vs.Get();
+  desc.fragment_shader = ps.Get();
+  desc.vertex_bindings = {{8, false}, {16, true}};
+  desc.vertex_attributes = {{3, 0, VERTEX_FORMAT_FLOAT2, 0}, {5, 1, VERTEX_FORMAT_FLOAT4, 0}};
+  ObjPtr<IProgram> program = device->CreateProgram(desc);
+  ASSERT_TRUE(program);
+  ASSERT_TRUE(program->Finalize());
+  // Skip prefixes with binding/index offsets, then use base vertex and base instance.
+  const float vertices[] = {9, 9, 9, 9, 0, .75f, -.75f, -.75f, .75f, -.75f};
+  const float colors[] = {0, 0, 1, 1, 0, 1, 0, 1, 1, 0, 0, 1};
+  const uint16_t indices[] = {99, 99, 0, 1, 2};
+  ObjPtr<IBuffer> vertex = device->CreateBuffer({sizeof(vertices)});
+  ObjPtr<IBuffer> color = device->CreateBuffer({sizeof(colors)});
+  ObjPtr<IBuffer> index = device->CreateBuffer({sizeof(indices)});
+  ASSERT_TRUE(vertex);
+  ASSERT_TRUE(color);
+  ASSERT_TRUE(index);
+  ObjPtr<ICommandContext> commands = device->CreateCommandContext();
+  ASSERT_TRUE(commands->CmdUploadBuffer(vertex.Get(), 0, vertices, sizeof(vertices)));
+  ASSERT_TRUE(commands->CmdUploadBuffer(color.Get(), 0, colors, sizeof(colors)));
+  ASSERT_TRUE(commands->CmdUploadBuffer(index.Get(), 0, indices, sizeof(indices)));
+  ASSERT_TRUE(commands->CmdBindProgram(program.Get()));
+  ASSERT_TRUE(commands->CmdBindVertexBuffer(0, vertex.Get(), 8));
+  ASSERT_TRUE(commands->CmdBindVertexBuffer(1, color.Get(), 16));
+  ASSERT_TRUE(commands->CmdBindIndexBuffer(index.Get(), INDEX_FORMAT_UINT16, 2));
+  ASSERT_TRUE(commands->CmdSetViewport({0, 0, 64, 64, 0, 1}));
+  ASSERT_TRUE(commands->CmdSetScissor({0, 0, 64, 64}));
+  ASSERT_TRUE(
+      commands->CmdBeginRendering({image.Get(), ATTACHMENT_LOAD_OP_CLEAR, ATTACHMENT_STORE_OP_STORE, {0, 0, 0, 1}}));
+  ASSERT_TRUE(commands->CmdDrawIndexed(3, 1, 1, 1, 1));
+  ASSERT_TRUE(commands->CmdEndRendering());
+  // A smaller attachment must clip an inherited scissor before any rebinding.
+  ObjPtr<IImage> smaller = device->CreateImage({32, 32, IMAGE_FORMAT_RGBA8_UNORM});
+  ASSERT_TRUE(smaller);
+  ASSERT_TRUE(
+      commands->CmdBeginRendering({smaller.Get(), ATTACHMENT_LOAD_OP_CLEAR, ATTACHMENT_STORE_OP_STORE, {0, 1, 0, 1}}));
+  ASSERT_TRUE(commands->CmdEndRendering());
+  ObjPtr<ISubmissionToken> done = queue->Submit(commands.Get());
+  ASSERT_TRUE(done);
+  ASSERT_TRUE(done->WaitHost());
+  std::array<uint8_t, 4> pixel{};
+  ReadPixel(device.Get(), image.Get(), GetParam(), 32, 32, pixel);
+  EXPECT_EQ(pixel, (std::array<uint8_t, 4>{255, 0, 0, 255}));
+  ReadPixel(device.Get(), image.Get(), GetParam(), 0, 0, pixel);
+  EXPECT_EQ(pixel, (std::array<uint8_t, 4>{0, 0, 0, 255}));
+}
+
 const BackendAPI backends[] = {
 #if defined(LONGMARCH_D3D12_ENABLED)
     BACKEND_API_D3D12,
 #endif
 #if defined(LONGMARCH_VULKAN_ENABLED)
     BACKEND_API_VULKAN,
+#endif
+#if defined(LONGMARCH_METAL_ENABLED)
+    BACKEND_API_METAL,
 #endif
 };
 INSTANTIATE_TEST_SUITE_P(Backends, RhiImage, testing::ValuesIn(backends));

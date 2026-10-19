@@ -3,6 +3,7 @@ import argparse
 from pathlib import Path
 import re
 import subprocess
+import sys
 
 
 def run(executable, args, success=True):
@@ -26,7 +27,7 @@ def check(executable, backend):
         for _, frames, seconds, fps in rows:
             if int(frames) != 7 or float(seconds) <= 0 or float(fps) <= 0:
                 raise RuntimeError(f"Invalid timing results:\n{output}")
-    output = run(executable, ["--headless", "--all", "--backend", "metal", "--frames", "1"], success=False)
+    output = run(executable, ["--headless", "--all", "--backend", "d3d12" if sys.platform == "darwin" else "metal", "--frames", "1"], success=False)
     if "hello_window: FAILED" not in output or "hello_triangle: FAILED" not in output:
         raise RuntimeError(f"--all did not continue after failure:\n{output}")
     for args in (["--all", "--module", "hello_window"], ["--all", "--tui"],
@@ -38,7 +39,7 @@ def check(executable, backend):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("executables", nargs="+", type=Path)
-    parser.add_argument("--backend", choices=["d3d12", "vulkan"], required=True)
+    parser.add_argument("--backend", choices=["d3d12", "vulkan", "metal"], required=True)
     args = parser.parse_args()
     for executable in args.executables:
         check(executable.resolve(), args.backend)

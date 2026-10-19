@@ -10,7 +10,7 @@
 #include "grassland/rhi/rhi.h"
 #include "grassland/rhi/rhix/rhix.h"
 
-#if defined(LONGMARCH_D3D12_ENABLED) || defined(LONGMARCH_VULKAN_ENABLED)
+#if defined(LONGMARCH_D3D12_ENABLED) || defined(LONGMARCH_VULKAN_ENABLED) || defined(LONGMARCH_METAL_ENABLED)
 namespace grassland::rhi {
 class RhiProgram : public testing::TestWithParam<BackendAPI> {};
 
@@ -261,6 +261,9 @@ static const BackendAPI program_backends[] = {
 #endif
 #if defined(LONGMARCH_VULKAN_ENABLED)
     BACKEND_API_VULKAN,
+#endif
+#if defined(LONGMARCH_METAL_ENABLED)
+    BACKEND_API_METAL,
 #endif
 };
 INSTANTIATE_TEST_SUITE_P(Backends, RhiProgram, testing::ValuesIn(program_backends));
