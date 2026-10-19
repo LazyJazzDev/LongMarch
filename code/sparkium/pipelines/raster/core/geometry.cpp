@@ -1,4 +1,4 @@
-#include "sparkium/pipelines/raster/core/geometry.h"
+﻿#include "sparkium/pipelines/raster/core/geometry.h"
 
 namespace sparkium::raster {
 

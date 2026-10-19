@@ -1,4 +1,4 @@
-#include "grassland/rhi/backend/d3d12/d3d12_core.h"
+﻿#include "grassland/rhi/backend/d3d12/d3d12_core.h"
 
 #include "grassland/rhi/backend/d3d12/d3d12_device.h"
 #include "grassland/util/string_convert.h"
@@ -70,23 +70,32 @@ std::vector<PhysicalDevice> D3D12Core::GetPhysicalDevices() const {
   return devices;
 }
 
-std::unique_ptr<IDevice> D3D12Core::CreateDevice(int32_t device_idx, const ObjectPtr<ICore> &owner) const {
-  if (device_idx < 0 || static_cast<size_t>(device_idx) >= adapters_.size()) {
-    ReportError(-1, "Physical device ID is out of range.");
-    return {};
+rhi::IDevice *D3D12Core::CreateDevice(int32_t device_idx) {
+  try {
+#if !defined(NDEBUG)
+    if (device_idx < 0 || static_cast<size_t>(device_idx) >= adapters_.size()) {
+      ReportError(-1, "Physical device ID is out of range.");
+      return {};
+    }
+#endif
+    const auto &adapter = adapters_[device_idx];
+    ComPtr<ID3D12Device> device;
+    const HRESULT result = D3D12CreateDevice(adapter.native.Get(), D3D_FEATURE_LEVEL_11_0, IID_PPV_ARGS(&device));
+    if (FAILED(result)) {
+      ReportError(result, "D3D12CreateDevice failed.");
+      return {};
+    }
+    // D3D12 exposes supported capabilities automatically; there is no Vulkan-style feature mask.
+    PhysicalDevice info{};
+    if (!DescribeDevice(adapter.native.Get(), device.Get(), info))
+      return {};
+    auto result_device = std::make_unique<D3D12Device>(std::move(info), this, std::move(device));
+    if (!result_device->IsInitialized())
+      return {};
+    return result_device.release();
+  } catch (const std::bad_alloc &) {
+    return nullptr;
   }
-  const auto &adapter = adapters_[device_idx];
-  ComPtr<ID3D12Device> device;
-  const HRESULT result = D3D12CreateDevice(adapter.native.Get(), D3D_FEATURE_LEVEL_11_0, IID_PPV_ARGS(&device));
-  if (FAILED(result)) {
-    ReportError(result, "D3D12CreateDevice failed.");
-    return {};
-  }
-  // D3D12 exposes supported capabilities automatically; there is no Vulkan-style feature mask.
-  PhysicalDevice info{};
-  if (!DescribeDevice(adapter.native.Get(), device.Get(), info))
-    return {};
-  return std::make_unique<D3D12Device>(std::move(info), owner, std::move(device));
 }
 
 }  // namespace grassland::rhi::backend::d3d12

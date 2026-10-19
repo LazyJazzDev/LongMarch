@@ -1,4 +1,4 @@
-#include "sparkium/core/code_lines.h"
+﻿#include "sparkium/core/code_lines.h"
 
 namespace sparkium {
 

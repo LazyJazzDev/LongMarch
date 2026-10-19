@@ -1,4 +1,4 @@
-#include "sparkium/core/core.h"
+﻿#include "sparkium/core/core.h"
 
 #include "sparkium/core/camera.h"
 #include "sparkium/core/entity.h"

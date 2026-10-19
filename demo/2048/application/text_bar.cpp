@@ -1,4 +1,4 @@
-#include "text_bar.h"
+﻿#include "text_bar.h"
 
 #include <map>
 

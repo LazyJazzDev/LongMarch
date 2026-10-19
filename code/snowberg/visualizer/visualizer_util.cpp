@@ -1,4 +1,4 @@
-#include "snowberg/visualizer/visualizer_util.h"
+﻿#include "snowberg/visualizer/visualizer_util.h"
 
 namespace snowberg::visualizer {
 

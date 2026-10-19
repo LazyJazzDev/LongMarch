@@ -1,4 +1,4 @@
-#pragma once
+﻿#pragma once
 
 #define NUM_PARTICLE (65536)
 #define DELTA_T 3e-2f

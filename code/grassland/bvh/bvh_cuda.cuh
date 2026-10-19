@@ -1,4 +1,4 @@
-#pragma once
+﻿#pragma once
 #include <thrust/device_vector.h>
 
 #include "grassland/bvh/bvh_host.h"

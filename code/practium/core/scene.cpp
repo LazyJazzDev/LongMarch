@@ -1,4 +1,4 @@
-#include "practium/core/scene.h"
+﻿#include "practium/core/scene.h"
 
 #include "practium/core/core.h"
 #include "practium/entity/entities.h"

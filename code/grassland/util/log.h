@@ -1,4 +1,4 @@
-#pragma once
+﻿#pragma once
 #if !defined(__CUDACC__)
 #include "fmt/format.h"
 #else

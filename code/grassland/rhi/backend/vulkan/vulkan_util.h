@@ -1,4 +1,4 @@
-#pragma once
+﻿#pragma once
 #include <vulkan/vulkan.h>
 
 #include <algorithm>
@@ -8,12 +8,7 @@
 
 namespace grassland::rhi::backend::vulkan {
 
-inline bool Check(VkResult result, const char *operation) {
-  if (result == VK_SUCCESS)
-    return true;
-  ReportError(result, operation);
-  return false;
-}
+bool Check(VkResult result, const char *operation);
 
 template <typename T, typename Enumerate>
 bool EnumerateList(Enumerate enumerate, std::vector<T> &values) {
@@ -46,25 +41,16 @@ class DeviceFeatures {
   DeviceFeatures(const DeviceFeatures &) = delete;
   DeviceFeatures &operator=(const DeviceFeatures &) = delete;
 
-  explicit operator bool() const noexcept {
-    return valid_;
-  }
+  explicit operator bool() const noexcept;
 
-  const VkPhysicalDeviceFeatures2 &Features() const noexcept {
-    return features_;
-  }
+  const VkPhysicalDeviceFeatures2 &Features() const noexcept;
 
-  const std::vector<const char *> &Extensions() const noexcept {
-    return extensions_;
-  }
+  const std::vector<const char *> &Extensions() const noexcept;
 
-  bool RayTracingPipeline() const {
-    return ray_pipeline_.rayTracingPipeline == VK_TRUE;
-  }
+  bool RayTracingPipeline() const;
 
-  bool RayQuery() const {
-    return ray_query_.rayQuery == VK_TRUE;
-  }
+  bool RayQuery() const;
+  bool TimelineSemaphore() const;
 
  private:
   bool valid_{false};

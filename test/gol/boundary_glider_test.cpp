@@ -1,4 +1,4 @@
-#include "../../demo/gol/boundary_glider.h"
+﻿#include "../../demo/gol/boundary_glider.h"
 
 #include <gtest/gtest.h>
 

@@ -1,4 +1,4 @@
-#include "sparkium/pipelines/raster/material/material_light.h"
+﻿#include "sparkium/pipelines/raster/material/material_light.h"
 
 #include "sparkium/pipelines/raster/core/core.h"
 

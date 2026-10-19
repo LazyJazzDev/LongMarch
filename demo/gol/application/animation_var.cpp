@@ -1,4 +1,4 @@
-#include "animation_var.h"
+﻿#include "animation_var.h"
 
 #include "interpolation.h"
 

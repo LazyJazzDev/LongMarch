@@ -1,12 +1,15 @@
-#include "grassland/rhi/rhi.h"
+﻿#include <gtest/gtest.h>
 
-#include <gtest/gtest.h>
-
+#include <type_traits>
 #include <utility>
 
 #include "grassland/rhi/backend/backend_core.h"
+#include "grassland/rhi/rhix/rhix.h"
 
-namespace grassland::rhi {
+namespace grassland::rhix {
+using namespace rhi;
+namespace backend = rhi::backend;
+
 namespace {
 
 PhysicalDevice MakePhysicalDevice(PhysicalDeviceType type, uint64_t gib, bool pipeline, bool query, bool geometry) {
@@ -31,10 +34,10 @@ struct Calls {
   bool device_destroyed_before_core{};
 };
 
-class TestDevice final : public backend::IDevice {
+class TestDevice final : public backend::Device {
  public:
-  TestDevice(PhysicalDevice info, const backend::ObjectPtr<backend::ICore> &core, Calls &calls)
-      : IDevice(std::move(info), core),
+  TestDevice(PhysicalDevice info, backend::Core *core, Calls &calls)
+      : backend::Device(std::move(info), core),
         calls_(calls) {
   }
 
@@ -47,7 +50,7 @@ class TestDevice final : public backend::IDevice {
   Calls &calls_;
 };
 
-class TestCore final : public backend::ICore {
+class TestCore final : public backend::Core {
  public:
   TestCore(std::vector<PhysicalDevice> devices, Calls &calls, bool fail = false)
       : devices_(std::move(devices)),
@@ -63,13 +66,16 @@ class TestCore final : public backend::ICore {
     return devices_;
   }
 
-  std::unique_ptr<backend::IDevice> CreateDevice(int32_t id,
-                                                 const backend::ObjectPtr<backend::ICore> &owner) const override {
+  IDevice *CreateDevice(int32_t id) override {
+#if !defined(NDEBUG)
+    if (id < 0 || static_cast<size_t>(id) >= devices_.size())
+      return nullptr;
+#endif
     calls_.selected = id;
     ++calls_.creates;
     if (fail_)
       return {};
-    return std::make_unique<TestDevice>(devices_.at(id), owner, calls_);
+    return new TestDevice(devices_.at(id), this, calls_);
   }
 
  private:
@@ -108,7 +114,7 @@ TEST(RhiSelection, RankingPrefersHardwareThenMemoryAndFeaturesWithStableTies) {
 
 TEST(RhiCore, AutoSelectionForwardsOnlyTheSelectedIdAndPreservesAllFeatures) {
   Calls calls;
-  auto core = backend::Access::Adopt<Core>(std::make_unique<TestCore>(
+  auto core = Core(new TestCore(
       std::vector<PhysicalDevice>{MakePhysicalDevice(PHYSICAL_DEVICE_TYPE_DEDICATED, 24, false, false, true),
                                   MakePhysicalDevice(PHYSICAL_DEVICE_TYPE_INTEGRATED, 8, true, true, true)},
       calls));
@@ -128,10 +134,12 @@ TEST(RhiCore, AutoSelectionForwardsOnlyTheSelectedIdAndPreservesAllFeatures) {
 
 TEST(RhiCore, InvalidIdsAndUnmatchedRequirementsNeverReachTheBackend) {
   Calls calls;
-  auto core = backend::Access::Adopt<Core>(std::make_unique<TestCore>(
+  auto core = Core(new TestCore(
       std::vector<PhysicalDevice>{MakePhysicalDevice(PHYSICAL_DEVICE_TYPE_DEDICATED, 8, false, false, true)}, calls));
+#if !defined(NDEBUG)
   EXPECT_FALSE(core.CreateDevice(-1));
   EXPECT_FALSE(core.CreateDevice(1));
+#endif
   EXPECT_FALSE(core.CreateDeviceByAutoSelection({true, false, false}));
   EXPECT_EQ(calls.creates, 0);
 }
@@ -139,36 +147,50 @@ TEST(RhiCore, InvalidIdsAndUnmatchedRequirementsNeverReachTheBackend) {
 TEST(RhiCore, CreationFailureIsEmptyAndDoesNotSilentlyChooseAnotherDevice) {
   Calls calls;
   auto info = MakePhysicalDevice(PHYSICAL_DEVICE_TYPE_DEDICATED, 8, true, true, true);
-  auto core =
-      backend::Access::Adopt<Core>(std::make_unique<TestCore>(std::vector<PhysicalDevice>{info, info}, calls, true));
+  auto core = Core(new TestCore(std::vector<PhysicalDevice>{info, info}, calls, true));
   EXPECT_FALSE(core.CreateDeviceByAutoSelection());
   EXPECT_EQ(calls.selected, 0);
   EXPECT_EQ(calls.creates, 1);
 }
 
-TEST(RhiOwnership, DeviceKeepsCoreAliveAcrossCopyMoveAndRelease) {
+TEST(RhiOwnership, CallerReleasesAllChildCopiesBeforeParent) {
+  static_assert(std::is_base_of_v<ObjectContainer, Core>);
+  static_assert(std::is_base_of_v<ObjectContainer, Device>);
+  static_assert(std::is_base_of_v<ObjectContainer, Window>);
+  static_assert(std::is_base_of_v<ObjectContainer, Image>);
+  static_assert(std::is_base_of_v<ObjectContainer, Queue>);
+  static_assert(std::is_base_of_v<ObjectContainer, SubmissionToken>);
+  static_assert(std::is_base_of_v<ObjectContainer, CommandContext>);
+  static_assert(sizeof(Core) == sizeof(ObjPtr<rhi::IObject>));
+  static_assert(sizeof(Image) == sizeof(ObjPtr<rhi::IObject>));
   Calls calls;
-  auto core = backend::Access::Adopt<Core>(std::make_unique<TestCore>(
+  auto core = Core(new TestCore(
       std::vector<PhysicalDevice>{MakePhysicalDevice(PHYSICAL_DEVICE_TYPE_DEDICATED, 8, true, true, true)}, calls));
   Core copy = core;
   Core moved = std::move(copy);
   EXPECT_FALSE(copy);
   auto device = moved.CreateDevice(0);
   core = {};
-  moved = {};
+  EXPECT_TRUE((*static_cast<backend::Core *>((moved).Get())).IsUniquelyOwned());
   EXPECT_EQ(calls.core_destructions, 0);
   Device shared = device;
-  device = {};
+  ObjectContainer &container = device;
+  container.Release();
+  container.Release();  // Empty release is safe and does not affect another copy.
+  EXPECT_FALSE(device);
   EXPECT_EQ(shared.Name(), "Test device");
   EXPECT_TRUE(shared.SupportRayQuery());
   EXPECT_EQ(calls.device_destructions, 0);
-  shared = {};
+  shared.Release();
+  EXPECT_EQ(calls.core_destructions, 0);
+  moved.Release();
   EXPECT_EQ(calls.device_destructions, 1);
   EXPECT_EQ(calls.core_destructions, 1);
   EXPECT_TRUE(calls.device_destroyed_before_core);
 }
 
 TEST(RhiCore, EmptyHandlesAndUnavailableBackendFailSafely) {
+#if !defined(NDEBUG)
   Core core;
   EXPECT_TRUE(core.GetPhysicalDevices().empty());
   EXPECT_FALSE(core.CreateDevice(0));
@@ -178,20 +200,23 @@ TEST(RhiCore, EmptyHandlesAndUnavailableBackendFailSafely) {
   EXPECT_FALSE(device.SupportGeometryShader());
   EXPECT_FALSE(device.SupportRayQuery());
   EXPECT_FALSE(device.SupportRayTracingPipeline());
-  EXPECT_FALSE(CreateCore(static_cast<BackendAPI>(-1)));
+#endif
+  EXPECT_FALSE(rhix::CreateCore(static_cast<BackendAPI>(-1)));
 }
 
 class RhiNative : public testing::TestWithParam<BackendAPI> {};
 
 TEST_P(RhiNative, EnumerateCreateEveryDeviceAndSelectWithAllRequirementCombinations) {
-  auto core = CreateCore(GetParam());
+  auto core = rhix::CreateCore(GetParam());
   ASSERT_TRUE(core);
   const auto devices = core.GetPhysicalDevices();
   if (devices.empty())
     GTEST_SKIP() << "No compatible devices on this machine";
   EXPECT_EQ(devices.size(), core.GetPhysicalDevices().size());
+#if !defined(NDEBUG)
   EXPECT_FALSE(core.CreateDevice(-1));
   EXPECT_FALSE(core.CreateDevice(static_cast<int32_t>(devices.size())));
+#endif
   for (size_t id = 0; id < devices.size(); ++id) {
     auto device = core.CreateDevice(static_cast<int32_t>(id));
     ASSERT_TRUE(device) << devices[id].name;
@@ -215,9 +240,9 @@ TEST_P(RhiNative, EnumerateCreateEveryDeviceAndSelectWithAllRequirementCombinati
   auto device = core.CreateDeviceByAutoSelection();
   ASSERT_TRUE(device);
   auto name = device.Name();
-  core = {};
   EXPECT_EQ(device.Name(), name);
-  device = {};
+  device.Release();
+  core.Release();
 }
 
 std::vector<BackendAPI> NativeBackends() {
@@ -237,4 +262,4 @@ std::vector<BackendAPI> NativeBackends() {
 INSTANTIATE_TEST_SUITE_P(Backends, RhiNative, testing::ValuesIn(NativeBackends()));
 
 }  // namespace
-}  // namespace grassland::rhi
+}  // namespace grassland::rhix

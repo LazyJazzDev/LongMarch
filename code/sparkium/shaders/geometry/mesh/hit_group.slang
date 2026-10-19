@@ -1,4 +1,4 @@
-#include "bindings.slang"
+﻿#include "bindings.slang"
 #include "direct_lighting.slang"
 #include "geometry/mesh/geometry_header.slang"
 #include "geometry/mesh/hit_record.slang"

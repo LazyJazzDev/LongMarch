@@ -1,4 +1,4 @@
-#pragma once
+﻿#pragma once
 
 #include "sparkium/pipelines/raster/core/core.h"
 #include "sparkium/pipelines/raster/entity/entities.h"

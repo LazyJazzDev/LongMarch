@@ -1,4 +1,4 @@
-#pragma once
+﻿#pragma once
 #include "random.slang"
 
 float3 EvalLambertianBSDF(float3 base_color, float3 N, float3 L, out float pdf) {

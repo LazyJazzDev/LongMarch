@@ -1,4 +1,4 @@
-#include "sparkium/pipelines/raytracing/material/material_specular.h"
+﻿#include "sparkium/pipelines/raytracing/material/material_specular.h"
 
 #include "sparkium/pipelines/raytracing/core/core.h"
 #include "sparkium/pipelines/raytracing/core/scene.h"

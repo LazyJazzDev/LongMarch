@@ -1,4 +1,4 @@
-#include "game_of_life_gui.h"
+﻿#include "game_of_life_gui.h"
 
 #include <tinyfiledialogs.h>
 

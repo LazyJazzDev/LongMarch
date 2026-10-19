@@ -1,4 +1,4 @@
-#include "sparkium/core/geometry.h"
+﻿#include "sparkium/core/geometry.h"
 
 #include "sparkium/core/core.h"
 

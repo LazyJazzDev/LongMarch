@@ -1,4 +1,4 @@
-#pragma once
+﻿#pragma once
 #include "application/text_bar.h"
 
 class NoticeBoard {

@@ -1,4 +1,4 @@
-#pragma once
+﻿#pragma once
 
 #ifdef __OBJC__
 @class NSEvent;

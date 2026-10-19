@@ -1,4 +1,4 @@
-#pragma once
+﻿#pragma once
 
 interface IBufferReader {
   uint Load(uint offset);

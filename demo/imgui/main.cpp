@@ -1,4 +1,4 @@
-#include "app.h"
+﻿#include "app.h"
 
 int main() {
   Application app{grassland::graphics::BACKEND_API_DEFAULT};

@@ -1,4 +1,4 @@
-#include "sparkium/pipelines/raytracing/entity/entities.h"
+﻿#include "sparkium/pipelines/raytracing/entity/entities.h"
 
 namespace sparkium::raytracing {
 

@@ -1,4 +1,4 @@
-#pragma once
+﻿#pragma once
 #include <d3d12.h>
 #include <dxgi1_6.h>
 #include <wrl.h>
@@ -7,4 +7,5 @@
 
 namespace grassland::rhi::backend::d3d12 {
 using Microsoft::WRL::ComPtr;
+bool Check(HRESULT result, const char *operation);
 }  // namespace grassland::rhi::backend::d3d12

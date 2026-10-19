@@ -1,8 +1,6 @@
-#pragma once
+﻿#pragma once
 #include <chrono>
 #include <queue>
-
-#include "grassland/util/util_util.h"
 
 namespace grassland {
 class FPSCounter {

@@ -1,4 +1,4 @@
-#include "sparkium/pipelines/raytracing/light/light_geometry_material.h"
+﻿#include "sparkium/pipelines/raytracing/light/light_geometry_material.h"
 
 #include "sparkium/pipelines/raytracing/core/core.h"
 #include "sparkium/pipelines/raytracing/core/geometry.h"

@@ -1,4 +1,4 @@
-#include "snowberg/solver/solver_scene.h"
+﻿#include "snowberg/solver/solver_scene.h"
 
 namespace snowberg::solver {
 LM_DEVICE_FUNC int SceneRef::ParticleIndex(int particle_id) const {

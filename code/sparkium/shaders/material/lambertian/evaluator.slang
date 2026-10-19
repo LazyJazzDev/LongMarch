@@ -1,4 +1,4 @@
-#pragma once
+﻿#pragma once
 #include "common.slang"
 #include "material/lambertian/eval_direct_light.slang"
 

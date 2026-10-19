@@ -1,4 +1,4 @@
-#include "../../demo/gol/simulation_clock.h"
+﻿#include "../../demo/gol/simulation_clock.h"
 
 #include <gtest/gtest.h>
 

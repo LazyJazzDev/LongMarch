@@ -1,4 +1,4 @@
-#include "game_rules.h"
+﻿#include "game_rules.h"
 
 #include <vector>
 

@@ -1,4 +1,4 @@
-#pragma once
+﻿#pragma once
 #include <Metal/Metal.hpp>
 
 #include "grassland/graphics/interface.h"

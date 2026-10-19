@@ -1,4 +1,4 @@
-#include "ai_player.h"
+﻿#include "ai_player.h"
 
 #include <algorithm>
 #include <chrono>

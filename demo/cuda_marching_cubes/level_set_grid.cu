@@ -1,4 +1,4 @@
-#include "level_set_grid.h"
+﻿#include "level_set_grid.h"
 
 void MeshData::SaveToFile(std::string filename) {
   std::ofstream file(filename);

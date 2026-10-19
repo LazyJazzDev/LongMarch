@@ -1,4 +1,4 @@
-struct InstanceInfo {
+﻿struct InstanceInfo {
   float4x4 model;
   float4 color;
   uint4 extra;

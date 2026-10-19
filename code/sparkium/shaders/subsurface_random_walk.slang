@@ -1,4 +1,4 @@
-#pragma once
+﻿#pragma once
 
 #include "bsdf/principled_util.slang"
 

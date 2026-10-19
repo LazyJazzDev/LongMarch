@@ -1,4 +1,4 @@
-#include "grassland/graphics/backend/metal/metal_window.h"
+﻿#include "grassland/graphics/backend/metal/metal_window.h"
 
 #include "grassland/graphics/backend/metal/metal_core.h"
 #include "grassland/graphics/backend/metal/metal_image.h"
@@ -25,6 +25,7 @@ MetalWindow::MetalWindow(MetalCore *core,
   layer_ = NS::RetainPtr(CA::MetalLayer::layer());
   layer_->setDevice(core_->Device());
   layer_->setFramebufferOnly(true);
+  ((CAMetalLayer *)layer_.get()).displaySyncEnabled = NO;
   [view setWantsLayer:YES];
   [view setLayer:(CAMetalLayer *)layer_.get()];
   ConfigurePresentation(false);

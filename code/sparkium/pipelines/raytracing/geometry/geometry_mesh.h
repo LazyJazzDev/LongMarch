@@ -1,4 +1,4 @@
-#pragma once
+﻿#pragma once
 #include "sparkium/pipelines/raytracing/core/geometry.h"
 
 namespace sparkium::raytracing {

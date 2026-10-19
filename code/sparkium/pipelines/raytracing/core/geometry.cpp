@@ -1,4 +1,4 @@
-#include "sparkium/pipelines/raytracing/core/geometry.h"
+﻿#include "sparkium/pipelines/raytracing/core/geometry.h"
 
 namespace sparkium::raytracing {
 

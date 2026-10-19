@@ -1,4 +1,4 @@
-#pragma once
+﻿#pragma once
 #include "grassland/physics/diff_kernel/dk_basics.h"
 #include "grassland/physics/diff_kernel/dk_dihedral_angle.h"
 #include "grassland/physics/diff_kernel/dk_elastic_models.h"

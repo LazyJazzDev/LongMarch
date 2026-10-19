@@ -1,30 +1,27 @@
-#pragma once
-#include "grassland/rhi/rhi_device.h"
-#include "grassland/rhi/rhi_util.h"
+﻿#pragma once
+#include "grassland/rhi/rhi_object.h"
 
 namespace grassland::rhi {
+class IDevice;
 
 struct DeviceFeatureRequirement {
-  // Selection filters only; CreateDevice enables all supported RHI features.
-  bool ray_tracing_pipeline{false};
-  bool ray_query{false};
-  bool geometry_shader{false};
+  // Filters only; every supported RHI feature is enabled during creation.
+  bool ray_tracing_pipeline{};
+  bool ray_query{};
+  bool geometry_shader{};
 };
 
-class Core {
+class ICore : public IObject {
  public:
-  // Vector indices are stable device IDs for the lifetime of this Core.
-  [[nodiscard]] std::vector<PhysicalDevice> GetPhysicalDevices() const;
-  Device CreateDevice(int32_t device_idx) const;
-  Device CreateDeviceByAutoSelection(DeviceFeatureRequirement feature_requirement = {}) const;
-  explicit operator bool() const noexcept;
+  virtual std::vector<PhysicalDevice> GetPhysicalDevices() const = 0;
+  virtual IDevice *CreateDevice(int32_t device_idx) = 0;
+  virtual IDevice *CreateDeviceByAutoSelection(DeviceFeatureRequirement requirement = {}) = 0;
 
- private:
-  ObjectRef object_;
-  // Internal bridge keeps implementation pointers out of the public API.
-  friend struct backend::Access;
+ protected:
+  ~ICore() override;
 };
 
-Core CreateCore(BackendAPI api = BACKEND_API_DEFAULT);
+// Success transfers one owned reference; failure returns nullptr.
+ICore *CreateCore(BackendAPI api = BACKEND_API_DEFAULT);
 
 }  // namespace grassland::rhi

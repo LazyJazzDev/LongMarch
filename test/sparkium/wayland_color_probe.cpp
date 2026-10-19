@@ -1,4 +1,4 @@
-// Observe compositor-provided reference white without changing system settings
+﻿// Observe compositor-provided reference white without changing system settings
 // or setting a color description on a surface owned by the Vulkan WSI driver.
 #include <long_march.h>
 

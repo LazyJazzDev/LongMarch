@@ -1,4 +1,4 @@
-#pragma once
+﻿#pragma once
 #include "buffer_helper.slang"
 
 // Explicit byte layouts shared with SoftwarePipeline. All indices are node indices.

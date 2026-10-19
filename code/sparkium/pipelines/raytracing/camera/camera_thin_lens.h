@@ -1,4 +1,4 @@
-#pragma once
+﻿#pragma once
 #include "sparkium/camera/camera_thin_lens.h"
 #include "sparkium/pipelines/raytracing/core/camera.h"
 

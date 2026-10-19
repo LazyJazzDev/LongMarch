@@ -1,4 +1,4 @@
-#pragma once
+﻿#pragma once
 
 #include "ft2build.h"
 #include "snowberg/draw/draw_util.h"

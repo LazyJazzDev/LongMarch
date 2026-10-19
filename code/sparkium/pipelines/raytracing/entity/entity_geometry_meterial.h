@@ -1,4 +1,4 @@
-#pragma once
+﻿#pragma once
 #include "sparkium/pipelines/raytracing/core/entity.h"
 #include "sparkium/pipelines/raytracing/light/light_geometry_material.h"
 

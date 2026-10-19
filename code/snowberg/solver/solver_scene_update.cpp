@@ -1,4 +1,4 @@
-#if defined(__CUDACC__)
+﻿#if defined(__CUDACC__)
 #include "snowberg/solver/solver_scene.h"
 
 #define DISPATCH_SIZE(thread_count, block_size) ((thread_count + block_size - 1) / block_size), block_size

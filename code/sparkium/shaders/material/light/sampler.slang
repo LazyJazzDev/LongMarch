@@ -1,4 +1,4 @@
-#pragma once
+﻿#pragma once
 #include "bindings.slang"
 #include "direct_lighting.slang"
 #include "geometry_primitive_sampler.slang"

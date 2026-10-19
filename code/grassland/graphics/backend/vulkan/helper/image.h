@@ -1,4 +1,4 @@
-#pragma once
+﻿#pragma once
 
 #include "grassland/graphics/backend/vulkan/helper/native_types.h"
 

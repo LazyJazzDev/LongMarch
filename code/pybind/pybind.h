@@ -1,4 +1,4 @@
-#pragma once
+﻿#pragma once
 // Python bindings are compiled only into the long_march extension module, so the
 // C++ libraries and executables do not depend on Python.
 #include "pybind11/chrono.h"

@@ -1,4 +1,4 @@
-#include "sparkium/pipelines/raytracing/core/software_pipeline.h"
+﻿#include "sparkium/pipelines/raytracing/core/software_pipeline.h"
 
 #include <algorithm>
 #include <array>

@@ -1,4 +1,4 @@
-#pragma once
+﻿#pragma once
 #if defined(LONGMARCH_CUDA_RUNTIME)
 #include <cuda_runtime.h>
 

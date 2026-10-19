@@ -1,4 +1,4 @@
-#include "sparkium/pipelines/raytracing/geometry/geometry_mesh.h"
+﻿#include "sparkium/pipelines/raytracing/geometry/geometry_mesh.h"
 
 #include "sparkium/pipelines/raytracing/core/core.h"
 

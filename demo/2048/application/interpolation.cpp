@@ -1,4 +1,4 @@
-#include "interpolation.h"
+﻿#include "interpolation.h"
 
 float PowerInterpolation(float x, float index) {
   if (x < 0.5f)

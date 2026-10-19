@@ -1,4 +1,4 @@
-
+﻿
 float4 VSMain(uint vertex_index : SV_VertexID) : SV_POSITION {
   // Define vertex positions for a rectangle [-0.5, 0.5]^2
   float3 positions[6] = {float3(-0.5f, -0.5f, 0.0f), float3(0.5f, -0.5f, 0.0f), float3(-0.5f, 0.5f, 0.0f),

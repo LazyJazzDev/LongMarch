@@ -1,4 +1,4 @@
-#ifndef INVERSE_SLANG
+﻿#ifndef INVERSE_SLANG
 #define INVERSE_SLANG
 
 // Returns the inverse of a matrix, by using the algorithm of calculating the classical

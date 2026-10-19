@@ -1,4 +1,4 @@
-#include "contradium/core/core.h"
+﻿#include "contradium/core/core.h"
 
 namespace contradium {
 

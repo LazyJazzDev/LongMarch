@@ -1,4 +1,4 @@
-#pragma once
+﻿#pragma once
 #include "sparkium/pipelines/raytracing/core/core_util.h"
 #include "sparkium/pipelines/raytracing/core/software_pipeline.h"
 

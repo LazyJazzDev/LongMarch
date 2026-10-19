@@ -1,4 +1,4 @@
-#pragma once
+﻿#pragma once
 #include <array>
 
 #include "2048_lib.h"

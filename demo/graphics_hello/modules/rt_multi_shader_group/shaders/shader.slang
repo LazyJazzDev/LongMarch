@@ -1,4 +1,4 @@
-
+﻿
 struct CameraInfo {
   float4x4 screen_to_camera;
   float4x4 camera_to_world;

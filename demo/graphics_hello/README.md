@@ -53,6 +53,10 @@ Shared options:
 
 Window titles retain the backend and demo name and show average FPS, refreshed
 every half second. The first interval displays `FPS: --`.
+Graphics windows request presentation without vertical synchronization by default:
+D3D12 uses a zero sync interval, Vulkan prefers immediate presentation (falling
+back to FIFO VSync if unavailable), and Metal disables display synchronization.
+The window system or driver may still constrain the visible refresh rate.
 All rotating geometry completes one revolution every two seconds, measured with
 a monotonic clock from the first animation update, independently of frame rate.
 

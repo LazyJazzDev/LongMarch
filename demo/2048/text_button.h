@@ -1,4 +1,4 @@
-#include <functional>
+﻿#include <functional>
 
 #include "application/button.h"
 #include "application/text_bar.h"

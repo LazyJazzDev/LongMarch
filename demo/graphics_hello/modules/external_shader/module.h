@@ -1,4 +1,4 @@
-#pragma once
+﻿#pragma once
 #include "../../module.h"
 
 namespace graphics_hello::external_shader {

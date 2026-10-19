@@ -1,4 +1,4 @@
-#pragma once
+﻿#pragma once
 
 #include <Metal/Metal.hpp>
 
@@ -6,11 +6,11 @@
 
 namespace grassland::rhi::backend::metal {
 
-class MetalCore final : public ICore {
+class MetalCore final : public Core {
  public:
   static std::unique_ptr<MetalCore> CreateMetalCore();
   std::vector<PhysicalDevice> GetPhysicalDevices() const override;
-  std::unique_ptr<IDevice> CreateDevice(int32_t device_idx, const ObjectPtr<ICore> &owner) const override;
+  rhi::IDevice *CreateDevice(int32_t device_idx) override;
 
  private:
   struct Adapter {

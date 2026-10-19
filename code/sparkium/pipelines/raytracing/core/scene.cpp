@@ -1,4 +1,4 @@
-#include "sparkium/pipelines/raytracing/core/scene.h"
+﻿#include "sparkium/pipelines/raytracing/core/scene.h"
 
 #include <numeric>
 
