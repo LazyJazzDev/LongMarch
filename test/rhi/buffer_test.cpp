@@ -1,7 +1,9 @@
 ﻿#include <gtest/gtest.h>
 
 #include <array>
+#include <chrono>
 #include <cstring>
+#include <thread>
 
 #include "grassland/rhi/rhi.h"
 #if defined(LONGMARCH_D3D12_ENABLED)
@@ -207,6 +209,80 @@ TEST_P(RhiBuffer, AbandonedUploadsReturnStorageAndLeasesDoNotOverlap) {
     EXPECT_EQ(identity, reused->NativeBuffer());
     pool.Release(std::move(reused));
     pool.Release(std::move(second));
+  };
+#if defined(LONGMARCH_D3D12_ENABLED)
+  if (GetParam() == BACKEND_API_D3D12)
+    check(static_cast<backend::d3d12::D3D12Device *>(device.Get())->UploadPool());
+#endif
+#if defined(LONGMARCH_VULKAN_ENABLED)
+  if (GetParam() == BACKEND_API_VULKAN)
+    check(static_cast<backend::vulkan::VulkanDevice *>(device.Get())->UploadPool());
+#endif
+}
+
+TEST_P(RhiBuffer, UploadClassesReuseIndependentlyAndReleaseExpiredPeakCapacity) {
+  ObjPtr<ICore> core = CreateCore(GetParam());
+  ASSERT_TRUE(core);
+  ObjPtr<IDevice> device = core->CreateDeviceByAutoSelection();
+  ASSERT_TRUE(device);
+  auto check = [&](auto &pool) {
+    pool.Clear();
+    EXPECT_FALSE(pool.Acquire(UINT64_MAX));
+    auto large = pool.Acquire(65537);
+    ASSERT_TRUE(large);
+    EXPECT_EQ(large->GetDesc().size, 131072u);
+    auto observe_large = large;
+    pool.Release(std::move(large));
+    auto first = pool.Acquire(1);
+    ASSERT_TRUE(first);
+    EXPECT_EQ(first->GetDesc().size, 65536u);
+    auto second = pool.Acquire(65536);
+    auto third = pool.Acquire(64);
+    auto fourth = pool.Acquire(64);
+    ASSERT_TRUE(second);
+    ASSERT_TRUE(third);
+    ASSERT_TRUE(fourth);
+    // Extra test-owned references observe whether the pool has released ownership
+    // without relying on native handle values that an allocator may recycle.
+    auto observe_first = first;
+    auto observe_second = second;
+    auto observe_third = third;
+    auto observe_fourth = fourth;
+    pool.Release(std::move(first));
+    pool.Release(std::move(second));
+    pool.Release(std::move(third));
+    EXPECT_FALSE(observe_first->IsUniquelyOwned());
+    EXPECT_FALSE(observe_second->IsUniquelyOwned());
+    EXPECT_FALSE(observe_third->IsUniquelyOwned());
+    // An equal peak is refreshed by later demand, and buffers are reused LIFO.
+    auto reused = pool.Acquire(32);
+    ASSERT_TRUE(reused);
+    EXPECT_EQ(reused.Get(), observe_third.Get());
+    pool.Release(std::move(reused));
+    std::this_thread::sleep_for(std::chrono::milliseconds(1100));
+    auto recent = pool.Acquire(64);
+    ASSERT_TRUE(recent);
+    pool.Release(std::move(fourth));
+    // The expired peak of four shrinks to the new peak of two, not current use of one.
+    size_t retained = 0;
+    for (auto buffer : {observe_first.Get(), observe_second.Get(), observe_third.Get(), observe_fourth.Get()})
+      if (!buffer->IsUniquelyOwned())
+        ++retained;
+    EXPECT_EQ(retained, 2u);
+    std::this_thread::sleep_for(std::chrono::milliseconds(1100));
+    pool.Release(std::move(recent));
+    EXPECT_TRUE(observe_first->IsUniquelyOwned());
+    EXPECT_TRUE(observe_second->IsUniquelyOwned());
+    EXPECT_TRUE(observe_third->IsUniquelyOwned());
+    EXPECT_TRUE(observe_fourth->IsUniquelyOwned());
+    // Returning one size class does not scan or trim another size class.
+    EXPECT_FALSE(observe_large->IsUniquelyOwned());
+    auto again = pool.Acquire(65537);
+    ASSERT_TRUE(again);
+    EXPECT_EQ(again.Get(), observe_large.Get());
+    pool.Release(std::move(again));
+    pool.Clear();
+    EXPECT_TRUE(observe_large->IsUniquelyOwned());
   };
 #if defined(LONGMARCH_D3D12_ENABLED)
   if (GetParam() == BACKEND_API_D3D12)

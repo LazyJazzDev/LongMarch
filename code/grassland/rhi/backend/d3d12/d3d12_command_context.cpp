@@ -249,11 +249,14 @@ bool D3D12CommandContext::CmdUploadBuffer(IBuffer *buffer, uint64_t offset, cons
       return false;
     }
     if (!upload->Write(data, size)) {
+      device_->UploadPool().Release(std::move(upload));
       recording_failed_ = true;
       return false;
     }
-    if (!TransitionResource(native->NativeBuffer(), D3D12_RESOURCE_STATE_COPY_DEST, D3D12_RESOURCE_STATE_COMMON))
+    if (!TransitionResource(native->NativeBuffer(), D3D12_RESOURCE_STATE_COPY_DEST, D3D12_RESOURCE_STATE_COMMON)) {
+      device_->UploadPool().Release(std::move(upload));
       return false;
+    }
     list_->CopyBufferRegion(native->NativeBuffer(), offset, upload->NativeBuffer(), 0, size);
     uploads_.push_back(std::move(upload));
     return true;

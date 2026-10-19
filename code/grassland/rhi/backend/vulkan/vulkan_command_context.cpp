@@ -284,11 +284,14 @@ bool VulkanCommandContext::CmdUploadBuffer(IBuffer *buffer, uint64_t offset, con
       return false;
     }
     if (!upload->Write(data, size)) {
+      device_->UploadPool().Release(std::move(upload));
       recording_failed_ = true;
       return false;
     }
-    if (!TransitionBuffer(native, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_ACCESS_TRANSFER_WRITE_BIT))
+    if (!TransitionBuffer(native, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_ACCESS_TRANSFER_WRITE_BIT)) {
+      device_->UploadPool().Release(std::move(upload));
       return false;
+    }
     VkBufferCopy copy{0, offset, size};
     vkCmdCopyBuffer(command_, upload->NativeBuffer(), native->NativeBuffer(), 1, &copy);
     uploads_.push_back(std::move(upload));
