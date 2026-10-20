@@ -11,37 +11,28 @@ class BindingGroup : public Object<IBindingGroup> {
    public:
     Version(Device *device, const BindingLayoutDesc &layout);
     const BindingLayoutDesc &GetLayout() const;
-    const BufferView &GetBuffer(size_t slot) const;
-    IImage *GetImage(size_t slot) const;
-    const SamplerDesc &GetSampler(size_t slot) const;
-    const std::vector<IImage *> &GetImages() const;
-    bool IsInitialized(size_t slot) const;
+    const std::vector<std::vector<ObjectPtr<IObject>>> &GetReferences() const;
+    virtual bool IsInitialized(size_t binding_index, uint32_t element) const = 0;
     bool IsComplete() const;
-    ObjectPtr<Version> Clone() const;
-    bool Write(size_t offset, const BindingDesc &binding, const std::vector<BufferView> &values);
-    bool Write(size_t offset, const BindingDesc &binding, const std::vector<IImage *> &values);
-    bool Write(size_t offset, const BindingDesc &binding, const std::vector<SamplerDesc> &values);
+    virtual ObjectPtr<Version> Clone() const = 0;
+    bool Write(size_t binding_index, uint32_t first_element, const std::vector<BufferView> &values);
+    bool Write(size_t binding_index, uint32_t first_element, const std::vector<IImage *> &values);
+    bool Write(size_t binding_index, uint32_t first_element, const std::vector<SamplerDesc> &values);
 
    protected:
-    size_t SlotCount() const;
-    uint32_t ArrayElement(size_t slot) const;
-    virtual ObjectPtr<Version> CreateEmpty() const = 0;
-    virtual bool WriteDescriptors(size_t offset, const BindingDesc &binding, const std::vector<BufferView> &values) = 0;
-    virtual bool WriteDescriptors(size_t offset, const BindingDesc &binding, const std::vector<IImage *> &values) = 0;
-    virtual bool WriteDescriptors(size_t offset,
-                                  const BindingDesc &binding,
+    virtual bool WriteDescriptors(size_t binding_index,
+                                  uint32_t first_element,
+                                  const std::vector<BufferView> &values) = 0;
+    virtual bool WriteDescriptors(size_t binding_index,
+                                  uint32_t first_element,
+                                  const std::vector<IImage *> &values) = 0;
+    virtual bool WriteDescriptors(size_t binding_index,
+                                  uint32_t first_element,
                                   const std::vector<SamplerDesc> &values) = 0;
     Device *device_;
     BindingLayoutDesc layout_;
-
-   private:
-    // Slots map into compact, type-specific arrays; layout fixes each slot's type.
-    std::vector<size_t> typed_offsets_;
-    std::vector<BufferView> buffers_;
-    std::vector<IImage *> images_;
-    std::vector<SamplerDesc> samplers_;
-    std::vector<bool> initialized_;
-    std::vector<ObjectPtr<IObject>> references_;
+    // Indexed by sorted layout binding, then array element. Samplers own no RHI resource.
+    std::vector<std::vector<ObjectPtr<IObject>>> references_;
   };
 
   BindingGroup(Device *device, ObjectPtr<Version> version);
@@ -55,7 +46,7 @@ class BindingGroup : public Object<IBindingGroup> {
   Version *CurrentVersion() const;
 
  private:
-  const BindingDesc *FindBinding(uint32_t binding, uint32_t first_element, size_t count, size_t &offset) const;
+  const BindingDesc *FindBinding(uint32_t binding, uint32_t first_element, size_t count, size_t &binding_index) const;
   Device *device_;
   BindingLayoutDesc layout_;
   ObjectPtr<Version> version_;

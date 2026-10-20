@@ -176,17 +176,21 @@ VulkanBindingGroup *VulkanBindingGroup::Create(VulkanDevice *device, const Bindi
 
 VulkanBindingGroup::Version::Version(VulkanDevice *device, const BindingLayoutDesc &layout)
     : BindingGroup::Version(device, layout) {
+  views_.resize(layout_.bindings.size());
+  samplers_.resize(layout_.bindings.size());
+  for (size_t i = 0; i < layout_.bindings.size(); ++i) {
+    const auto &binding = layout_.bindings[i];
+    initialized_.emplace_back(binding.count, false);
+    if (binding.type == BINDING_SAMPLER)
+      samplers_[i].resize(binding.count);
+    else if (binding.type == BINDING_TEXTURE2D || binding.type == BINDING_RW_TEXTURE2D)
+      views_[i].resize(binding.count);
+  }
 }
 
 VulkanBindingGroup::Version::~Version() {
   auto device = static_cast<VulkanDevice *>(device_)->NativeDevice();
   lease_ = {};
-  for (auto view : views_)
-    if (view)
-      vkDestroyImageView(device, view, nullptr);
-  for (auto sampler : samplers_)
-    if (sampler)
-      vkDestroySampler(device, sampler, nullptr);
   if (native_layout_)
     vkDestroyDescriptorSetLayout(device, native_layout_, nullptr);
 }
@@ -198,8 +202,6 @@ VkDescriptorSet VulkanBindingGroup::Version::Set() const {
 VulkanBindingGroup::Version *VulkanBindingGroup::Version::Create(VulkanDevice *device,
                                                                  const BindingLayoutDesc &layout) {
   auto version = std::unique_ptr<Version>(new Version(device, layout));
-  version->views_.resize(version->SlotCount());
-  version->samplers_.resize(version->SlotCount());
   version->native_layout_ = CreateBindingLayout(device->NativeDevice(), layout);
   if (!version->native_layout_)
     return nullptr;
@@ -209,13 +211,48 @@ VulkanBindingGroup::Version *VulkanBindingGroup::Version::Create(VulkanDevice *d
   return version.release();
 }
 
-ObjectPtr<BindingGroup::Version> VulkanBindingGroup::Version::CreateEmpty() const {
-  return ObjectPtr<Version>::Adopt(Create(static_cast<VulkanDevice *>(device_), layout_));
+ObjectPtr<BindingGroup::Version> VulkanBindingGroup::Version::Clone() const {
+  auto device = static_cast<VulkanDevice *>(device_);
+  auto copy = ObjectPtr<Version>::Adopt(Create(device, layout_));
+  if (!copy)
+    return {};
+  copy->references_ = references_;
+  copy->views_ = views_;
+  copy->samplers_ = samplers_;
+  copy->initialized_ = initialized_;
+  std::vector<VkCopyDescriptorSet> copies;
+  for (size_t i = 0; i < layout_.bindings.size(); ++i) {
+    const auto &binding = layout_.bindings[i];
+    uint32_t element = 0;
+    while (element < binding.count) {
+      if (!initialized_[i][element]) {
+        ++element;
+        continue;
+      }
+      const auto first = element;
+      while (element < binding.count && initialized_[i][element])
+        ++element;
+      VkCopyDescriptorSet range{VK_STRUCTURE_TYPE_COPY_DESCRIPTOR_SET};
+      range.srcSet = Set();
+      range.dstSet = copy->Set();
+      range.srcBinding = range.dstBinding = binding.binding;
+      range.srcArrayElement = range.dstArrayElement = first;
+      range.descriptorCount = element - first;
+      copies.push_back(range);
+    }
+  }
+  vkUpdateDescriptorSets(device->NativeDevice(), 0, nullptr, uint32_t(copies.size()), copies.data());
+  return copy;
 }
 
-bool VulkanBindingGroup::Version::WriteDescriptors(size_t offset,
-                                                   const BindingDesc &binding,
+bool VulkanBindingGroup::Version::IsInitialized(size_t binding_index, uint32_t element) const {
+  return initialized_[binding_index][element];
+}
+
+bool VulkanBindingGroup::Version::WriteDescriptors(size_t binding_index,
+                                                   uint32_t first_element,
                                                    const std::vector<BufferView> &buffers) {
+  const auto &binding = layout_.bindings[binding_index];
   auto device = static_cast<VulkanDevice *>(device_);
   VkPhysicalDeviceProperties properties{};
   vkGetPhysicalDeviceProperties(device->NativePhysicalDevice(), &properties);
@@ -233,23 +270,27 @@ bool VulkanBindingGroup::Version::WriteDescriptors(size_t offset,
   VkWriteDescriptorSet write{VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET};
   write.dstSet = Set();
   write.dstBinding = binding.binding;
-  write.dstArrayElement = ArrayElement(offset);
+  write.dstArrayElement = first_element;
   write.descriptorCount = uint32_t(infos.size());
   write.descriptorType = uniform ? VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER : VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
   write.pBufferInfo = infos.data();
   vkUpdateDescriptorSets(device->NativeDevice(), 1, &write, 0, nullptr);
+  for (size_t i = 0; i < buffers.size(); ++i)
+    initialized_[binding_index][first_element + i] = true;
   return true;
 }
 
-bool VulkanBindingGroup::Version::WriteDescriptors(size_t offset,
-                                                   const BindingDesc &binding,
+bool VulkanBindingGroup::Version::WriteDescriptors(size_t binding_index,
+                                                   uint32_t first_element,
                                                    const std::vector<IImage *> &images) {
+  const auto &binding = layout_.bindings[binding_index];
   for (auto image : images)
     if (!dynamic_cast<VulkanAllocatedImage *>(image))
       return false;
   auto native = static_cast<VulkanDevice *>(device_)->NativeDevice();
   // Stage all native handles before changing the set or any previous slot.
   std::vector<VkDescriptorImageInfo> infos(images.size());
+  std::vector<std::shared_ptr<VkImageView>> views(images.size());
   for (size_t i = 0; i < images.size(); ++i) {
     auto image = images[i];
     VkImageViewCreateInfo create{VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO};
@@ -257,36 +298,39 @@ bool VulkanBindingGroup::Version::WriteDescriptors(size_t offset,
     create.viewType = VK_IMAGE_VIEW_TYPE_2D;
     create.format = NativeImageFormat(image->GetDesc().format);
     create.subresourceRange = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1};
-    if (!Check(vkCreateImageView(native, &create, nullptr, &infos[i].imageView), "Create binding view")) {
-      for (const auto &info : infos)
-        if (info.imageView)
-          vkDestroyImageView(native, info.imageView, nullptr);
+    views[i] = std::shared_ptr<VkImageView>(new VkImageView{}, [native](VkImageView *view) {
+      if (*view)
+        vkDestroyImageView(native, *view, nullptr);
+      delete view;
+    });
+    if (!Check(vkCreateImageView(native, &create, nullptr, views[i].get()), "Create binding view"))
       return false;
-    }
+    infos[i].imageView = *views[i];
     infos[i].imageLayout = VK_IMAGE_LAYOUT_GENERAL;
   }
   VkWriteDescriptorSet write{VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET};
   write.dstSet = Set();
   write.dstBinding = binding.binding;
-  write.dstArrayElement = ArrayElement(offset);
+  write.dstArrayElement = first_element;
   write.descriptorCount = uint32_t(infos.size());
   write.descriptorType =
       binding.type == BINDING_TEXTURE2D ? VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE : VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
   write.pImageInfo = infos.data();
   vkUpdateDescriptorSets(native, 1, &write, 0, nullptr);
   for (size_t i = 0; i < infos.size(); ++i) {
-    if (views_[offset + i])
-      vkDestroyImageView(native, views_[offset + i], nullptr);
-    views_[offset + i] = infos[i].imageView;
+    views_[binding_index][first_element + i] = std::move(views[i]);
+    initialized_[binding_index][first_element + i] = true;
   }
   return true;
 }
 
-bool VulkanBindingGroup::Version::WriteDescriptors(size_t offset,
-                                                   const BindingDesc &binding,
+bool VulkanBindingGroup::Version::WriteDescriptors(size_t binding_index,
+                                                   uint32_t first_element,
                                                    const std::vector<SamplerDesc> &samplers) {
+  const auto &binding = layout_.bindings[binding_index];
   auto native = static_cast<VulkanDevice *>(device_)->NativeDevice();
   std::vector<VkDescriptorImageInfo> infos(samplers.size());
+  std::vector<std::shared_ptr<VkSampler>> handles(samplers.size());
   const VkSamplerAddressMode modes[] = {VK_SAMPLER_ADDRESS_MODE_REPEAT, VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE,
                                         VK_SAMPLER_ADDRESS_MODE_MIRRORED_REPEAT};
   for (size_t i = 0; i < samplers.size(); ++i) {
@@ -298,25 +342,26 @@ bool VulkanBindingGroup::Version::WriteDescriptors(size_t offset,
     create.addressModeU = modes[sampler.address_u];
     create.addressModeV = create.addressModeW = modes[sampler.address_v];
     create.maxLod = VK_LOD_CLAMP_NONE;
-    if (!Check(vkCreateSampler(native, &create, nullptr, &infos[i].sampler), "Create sampler")) {
-      for (const auto &info : infos)
-        if (info.sampler)
-          vkDestroySampler(native, info.sampler, nullptr);
+    handles[i] = std::shared_ptr<VkSampler>(new VkSampler{}, [native](VkSampler *sampler) {
+      if (*sampler)
+        vkDestroySampler(native, *sampler, nullptr);
+      delete sampler;
+    });
+    if (!Check(vkCreateSampler(native, &create, nullptr, handles[i].get()), "Create sampler"))
       return false;
-    }
+    infos[i].sampler = *handles[i];
   }
   VkWriteDescriptorSet write{VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET};
   write.dstSet = Set();
   write.dstBinding = binding.binding;
-  write.dstArrayElement = ArrayElement(offset);
+  write.dstArrayElement = first_element;
   write.descriptorCount = uint32_t(infos.size());
   write.descriptorType = VK_DESCRIPTOR_TYPE_SAMPLER;
   write.pImageInfo = infos.data();
   vkUpdateDescriptorSets(native, 1, &write, 0, nullptr);
   for (size_t i = 0; i < infos.size(); ++i) {
-    if (samplers_[offset + i])
-      vkDestroySampler(native, samplers_[offset + i], nullptr);
-    samplers_[offset + i] = infos[i].sampler;
+    samplers_[binding_index][first_element + i] = std::move(handles[i]);
+    initialized_[binding_index][first_element + i] = true;
   }
   return true;
 }

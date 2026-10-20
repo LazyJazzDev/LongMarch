@@ -13,6 +13,8 @@ class D3D12BindingGroup final : public BindingGroup {
   class Version final : public BindingGroup::Version {
    public:
     static Version *Create(D3D12Device *device, const BindingLayoutDesc &layout);
+    ObjectPtr<BindingGroup::Version> Clone() const override;
+    bool IsInitialized(size_t binding_index, uint32_t element) const override;
     uint32_t ResourceCount() const;
     // Borrowed CPU-only descriptor leases. Structured views depend on the Program's
     // reflected element strides; variants are cached by stride, not Program identity.
@@ -21,11 +23,15 @@ class D3D12BindingGroup final : public BindingGroup {
 
    private:
     Version(D3D12Device *device, const BindingLayoutDesc &layout);
-    ObjectPtr<BindingGroup::Version> CreateEmpty() const override;
-    bool WriteDescriptors(size_t offset, const BindingDesc &binding, const std::vector<BufferView> &values) override;
-    bool WriteDescriptors(size_t offset, const BindingDesc &binding, const std::vector<IImage *> &values) override;
-    bool WriteDescriptors(size_t offset, const BindingDesc &binding, const std::vector<SamplerDesc> &values) override;
+    bool WriteDescriptors(size_t binding_index, uint32_t first_element, const std::vector<BufferView> &values) override;
+    bool WriteDescriptors(size_t binding_index, uint32_t first_element, const std::vector<IImage *> &values) override;
+    bool WriteDescriptors(size_t binding_index,
+                          uint32_t first_element,
+                          const std::vector<SamplerDesc> &values) override;
     std::vector<uint32_t> offsets_;
+    std::vector<std::vector<bool>> initialized_;
+    // Only structured buffers need byte ranges until Program reflection supplies stride.
+    std::vector<std::vector<std::pair<uint64_t, uint64_t>>> structured_ranges_;
     ObjectPtr<D3D12DescriptorPool::Lease> resources_, samplers_;
     std::vector<std::pair<std::vector<uint32_t>, ObjectPtr<D3D12DescriptorPool::Lease>>> resource_variants_;
   };

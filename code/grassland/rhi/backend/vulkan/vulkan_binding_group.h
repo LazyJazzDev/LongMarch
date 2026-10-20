@@ -57,19 +57,24 @@ class VulkanBindingGroup final : public BindingGroup {
   class Version final : public BindingGroup::Version {
    public:
     static Version *Create(VulkanDevice *device, const BindingLayoutDesc &layout);
+    ObjectPtr<BindingGroup::Version> Clone() const override;
+    bool IsInitialized(size_t binding_index, uint32_t element) const override;
     ~Version() override;
     VkDescriptorSet Set() const;
 
    private:
     Version(VulkanDevice *device, const BindingLayoutDesc &layout);
-    ObjectPtr<BindingGroup::Version> CreateEmpty() const override;
-    bool WriteDescriptors(size_t offset, const BindingDesc &binding, const std::vector<BufferView> &values) override;
-    bool WriteDescriptors(size_t offset, const BindingDesc &binding, const std::vector<IImage *> &values) override;
-    bool WriteDescriptors(size_t offset, const BindingDesc &binding, const std::vector<SamplerDesc> &values) override;
+    bool WriteDescriptors(size_t binding_index, uint32_t first_element, const std::vector<BufferView> &values) override;
+    bool WriteDescriptors(size_t binding_index, uint32_t first_element, const std::vector<IImage *> &values) override;
+    bool WriteDescriptors(size_t binding_index,
+                          uint32_t first_element,
+                          const std::vector<SamplerDesc> &values) override;
     VkDescriptorSetLayout native_layout_{};
     ObjectPtr<VulkanDescriptorPool::Lease> lease_;
-    std::vector<VkImageView> views_;
-    std::vector<VkSampler> samplers_;
+    std::vector<std::vector<bool>> initialized_;
+    // Descriptor copies share native handles; each handle dies with its last version.
+    std::vector<std::vector<std::shared_ptr<VkImageView>>> views_;
+    std::vector<std::vector<std::shared_ptr<VkSampler>>> samplers_;
   };
 
   static VulkanBindingGroup *Create(VulkanDevice *device, const BindingLayoutDesc &layout);

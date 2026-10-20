@@ -361,8 +361,8 @@ TEST_P(RhiProgram, BindingUpdatesAreTransactionalAndForkOnlyCapturedVersions) {
   EXPECT_EQ(native->CurrentVersion(), initial);
   // Native validation rejects the second slot; the first must not change either.
   EXPECT_FALSE(group->BindResource(2, std::vector<BufferView>{{a.Get(), 256, 256}, {a.Get(), 1, 256}}));
-  EXPECT_EQ(initial->GetBuffer(0).buffer, b.Get());
-  EXPECT_EQ(initial->GetBuffer(1).offset, 0u);
+  EXPECT_EQ(initial->GetReferences()[0][0].Get(), b.Get());
+  EXPECT_EQ(initial->GetReferences()[0][1].Get(), a.Get());
   EXPECT_FALSE(group->BindResource(7, b.Get()));
   EXPECT_FALSE(group->BindResource(2, image.Get()));
   EXPECT_FALSE(group->BindResource(9, std::vector<SamplerDesc>{{static_cast<SamplerFilter>(-1)}}));
@@ -374,11 +374,12 @@ TEST_P(RhiProgram, BindingUpdatesAreTransactionalAndForkOnlyCapturedVersions) {
   auto next = native->CurrentVersion();
   EXPECT_NE(next, initial);
   EXPECT_EQ(&group->GetLayout(), stable_layout);
-  EXPECT_EQ(captured->GetBuffer(0).buffer, b.Get());
-  EXPECT_EQ(next->GetBuffer(0).buffer, a.Get());
+  EXPECT_EQ(captured->GetReferences()[0][0].Get(), b.Get());
+  EXPECT_EQ(next->GetReferences()[0][0].Get(), a.Get());
   ASSERT_TRUE(group->BindResource(9, SamplerDesc{SAMPLER_FILTER_NEAREST}));
   EXPECT_EQ(native->CurrentVersion(), next);
-  EXPECT_EQ(captured->GetSampler(3).filter, SAMPLER_FILTER_LINEAR);
+  EXPECT_TRUE(captured->IsInitialized(2, 0));
+  EXPECT_TRUE(captured->GetReferences()[2].empty());
   // Capture of the unchanged version shares all descriptors and resources.
   auto again = backend::ObjectPtr<backend::BindingGroup::Version>::Retain(next);
   EXPECT_EQ(again.Get(), next);
@@ -403,8 +404,8 @@ TEST_P(RhiProgram, BindingUpdatesAreTransactionalAndForkOnlyCapturedVersions) {
   a.Release();
   b.Release();
   image.Release();
-  EXPECT_EQ(captured->GetBuffer(0).buffer->GetDesc().size, 256u);
-  EXPECT_EQ(captured->GetImage(2)->GetDesc().width, 1u);
+  EXPECT_EQ(static_cast<IBuffer *>(captured->GetReferences()[0][0].Get())->GetDesc().size, 256u);
+  EXPECT_EQ(static_cast<IImage *>(captured->GetReferences()[1][0].Get())->GetDesc().width, 1u);
 }
 
 TEST_P(RhiProgram, TypedBindingArraysPreserveSparseVersionsAndPartialUpdates) {
@@ -433,14 +434,14 @@ TEST_P(RhiProgram, TypedBindingArraysPreserveSparseVersionsAndPartialUpdates) {
   ASSERT_TRUE(group->BindResource(9, std::vector<SamplerDesc>{{SAMPLER_FILTER_LINEAR}, {SAMPLER_FILTER_NEAREST}}, 1));
   auto next = native->CurrentVersion();
   EXPECT_NE(next, sparse.Get());
-  EXPECT_FALSE(next->IsInitialized(0));
-  EXPECT_EQ(next->GetBuffer(1).size, 256u);
-  EXPECT_FALSE(next->IsInitialized(2));
-  EXPECT_EQ(next->GetImage(5), first.Get());
-  EXPECT_EQ(sparse->GetSampler(7).filter, SAMPLER_FILTER_NEAREST);
-  EXPECT_EQ(next->GetSampler(7).filter, SAMPLER_FILTER_LINEAR);
-  EXPECT_FALSE(sparse->IsInitialized(8));
-  EXPECT_TRUE(next->IsInitialized(8));
+  EXPECT_FALSE(next->IsInitialized(0, 0));
+  EXPECT_EQ(next->GetReferences()[0][1].Get(), buffer.Get());
+  EXPECT_FALSE(next->IsInitialized(0, 2));
+  EXPECT_EQ(next->GetReferences()[1][2].Get(), first.Get());
+  EXPECT_TRUE(sparse->IsInitialized(2, 1));
+  EXPECT_TRUE(next->IsInitialized(2, 1));
+  EXPECT_FALSE(sparse->IsInitialized(2, 2));
+  EXPECT_TRUE(next->IsInitialized(2, 2));
   ASSERT_TRUE(group->BindResource(2, std::vector<BufferView>{{buffer.Get(), 0, 256}, {buffer.Get(), 256, 256}}, 0));
   ASSERT_TRUE(group->BindResource(2, std::vector<BufferView>{{buffer.Get(), 0, 256}}, 2));
   ASSERT_TRUE(group->BindResource(7, std::vector<IImage *>{first.Get(), second.Get()}, 0));
@@ -448,18 +449,18 @@ TEST_P(RhiProgram, TypedBindingArraysPreserveSparseVersionsAndPartialUpdates) {
   EXPECT_TRUE(next->IsComplete());
   EXPECT_EQ(native->CurrentVersion(), next);
   EXPECT_FALSE(group->BindResource(7, std::vector<IImage *>{second.Get(), nullptr}));
-  EXPECT_EQ(next->GetImage(3), first.Get());
+  EXPECT_EQ(next->GetReferences()[1][0].Get(), first.Get());
   EXPECT_FALSE(
       group->BindResource(9, std::vector<SamplerDesc>{{SAMPLER_FILTER_NEAREST}, {static_cast<SamplerFilter>(-1)}}));
-  EXPECT_EQ(next->GetSampler(6).filter, SAMPLER_FILTER_LINEAR);
+  EXPECT_EQ(native->CurrentVersion(), next);
   // Image array replacement must retain all inputs before dropping any old slot.
   auto first_ptr = first.Get();
   auto second_ptr = second.Get();
   first.Release();
   second.Release();
   ASSERT_TRUE(group->BindResource(7, std::vector<IImage *>{second_ptr, first_ptr}, 0));
-  EXPECT_EQ(next->GetImage(3)->GetDesc().width, 2u);
-  EXPECT_EQ(next->GetImage(4)->GetDesc().width, 1u);
+  EXPECT_EQ(static_cast<IImage *>(next->GetReferences()[1][0].Get())->GetDesc().width, 2u);
+  EXPECT_EQ(static_cast<IImage *>(next->GetReferences()[1][1].Get())->GetDesc().width, 1u);
 }
 
 TEST_P(RhiProgram, StructuredStridesComeFromTargetLayoutAndMustAgreeAcrossStages) {

@@ -5,6 +5,7 @@
 #include <cstring>
 #include <thread>
 
+#include "grassland/rhi/backend/backend_binding_group.h"
 #include "grassland/rhi/rhi.h"
 #if defined(LONGMARCH_METAL_ENABLED)
 #include "grassland/rhi/backend/metal/metal_device.h"
@@ -511,6 +512,13 @@ TEST_P(RhiImage, BindingVersionsPreserveRangesAndArraysAcrossHeapPages) {
   ASSERT_TRUE(material->BindResource(7, std::vector<IImage *>{red.Get(), green.Get()}));
   ASSERT_TRUE(material->BindResource(9, SamplerDesc{}));
   ASSERT_TRUE(material->BindResource(11, std::vector<BufferView>{{factors.Get(), 0, 16}, {factors.Get(), 16, 16}}));
+  // Fork only the buffer binding, then destroy the source version. Copied image
+  // and sampler descriptors must keep their native handles valid for GPU use.
+  auto original = backend::ObjectPtr<backend::BindingGroup::Version>::Retain(
+      static_cast<backend::BindingGroup *>(material.Get())->CurrentVersion());
+  ASSERT_TRUE(material->BindResource(11, std::vector<BufferView>{{factors.Get(), 0, 16}}, 0));
+  EXPECT_NE(static_cast<backend::BindingGroup *>(material.Get())->CurrentVersion(), original.Get());
+  original.Reset();
   ObjPtr<ICommandContext> commands = device->CreateCommandContext();
   const uint32_t red_pixel = 0xff0000ff, green_pixel = 0xff00ff00;
   ASSERT_TRUE(commands->CmdUploadImage(red.Get(), &red_pixel, 4));

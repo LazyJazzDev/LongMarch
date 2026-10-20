@@ -718,20 +718,20 @@ bool VulkanCommandContext::CmdBindGroup(uint32_t index, IBindingGroup *group) {
 
 bool VulkanCommandContext::BindGroupVersion(uint32_t index, VulkanBindingGroup::Version *native) {
   try {
-    size_t entry = 0;
-    for (auto b : native->GetLayout().bindings)
-      for (uint32_t i = 0; i < b.count; ++i, ++entry) {
+    for (size_t binding_index = 0; binding_index < native->GetLayout().bindings.size(); ++binding_index) {
+      const auto &b = native->GetLayout().bindings[binding_index];
+      for (uint32_t i = 0; i < b.count; ++i) {
         const VkAccessFlags access =
             VK_ACCESS_SHADER_READ_BIT |
             ((b.type == BINDING_RW_STORAGE_BUFFER || b.type == BINDING_RW_TEXTURE2D) ? VK_ACCESS_SHADER_WRITE_BIT : 0);
         if (b.type <= BINDING_RW_STORAGE_BUFFER) {
-          auto buffer = static_cast<VulkanBuffer *>(native->GetBuffer(entry).buffer);
+          auto buffer = static_cast<VulkanBuffer *>(native->GetReferences()[binding_index][i].Get());
           if (!TransitionBuffer(buffer, VK_PIPELINE_STAGE_ALL_GRAPHICS_BIT,
                                 b.type == BINDING_UNIFORM_BUFFER ? VK_ACCESS_UNIFORM_READ_BIT : access))
             return false;
         }
         if (b.type == BINDING_TEXTURE2D || b.type == BINDING_RW_TEXTURE2D) {
-          auto image = static_cast<VulkanImage *>(native->GetImage(entry));
+          auto image = static_cast<VulkanImage *>(native->GetReferences()[binding_index][i].Get());
           if (render_target_) {
             auto known = image_states_.find(image);
             if ((known != image_states_.end() && known->second.layout != VK_IMAGE_LAYOUT_GENERAL) ||
@@ -746,6 +746,7 @@ bool VulkanCommandContext::BindGroupVersion(uint32_t index, VulkanBindingGroup::
             return false;
         }
       }
+    }
     groups_[index] = native;
     auto set = native->Set();
     vkCmdBindDescriptorSets(command_, VK_PIPELINE_BIND_POINT_GRAPHICS, program_->NativeLayout(), index, 1, &set, 0,
@@ -763,15 +764,20 @@ bool VulkanCommandContext::ValidateGroups() {
       recording_failed_ = true;
       return false;
     }
-    if (groups_[i])
-      for (auto image : groups_[i]->GetImages())
-        if (image) {
-          for (auto c : rendering_.color_attachments)
-            if (c.color_attachment == image) {
+    if (groups_[i]) {
+      const auto &layout = groups_[i]->GetLayout();
+      for (size_t binding_index = 0; binding_index < layout.bindings.size(); ++binding_index) {
+        const auto type = layout.bindings[binding_index].type;
+        if (type != BINDING_TEXTURE2D && type != BINDING_RW_TEXTURE2D)
+          continue;
+        for (const auto &reference : groups_[i]->GetReferences()[binding_index])
+          for (const auto &color : rendering_.color_attachments)
+            if (color.color_attachment == reference.Get()) {
               recording_failed_ = true;
               return false;
             }
-        }
+      }
+    }
   }
   return !recording_failed_;
 }

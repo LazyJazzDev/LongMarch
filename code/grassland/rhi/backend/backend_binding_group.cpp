@@ -54,146 +54,58 @@ bool SameBindingLayout(const BindingLayoutDesc &a, const BindingLayoutDesc &b) {
 
 BindingGroup::Version::Version(Device *device, const BindingLayoutDesc &layout) : device_(device), layout_(layout) {
   std::sort(layout_.bindings.begin(), layout_.bindings.end(), [](auto a, auto b) { return a.binding < b.binding; });
-  for (const auto &binding : layout_.bindings) {
-    for (uint32_t i = 0; i < binding.count; ++i) {
-      if (binding.type <= BINDING_RW_STORAGE_BUFFER) {
-        typed_offsets_.push_back(buffers_.size());
-        buffers_.push_back({});
-      } else if (binding.type == BINDING_SAMPLER) {
-        typed_offsets_.push_back(samplers_.size());
-        samplers_.push_back({});
-      } else {
-        typed_offsets_.push_back(images_.size());
-        images_.push_back(nullptr);
-      }
-    }
-  }
-  initialized_.resize(typed_offsets_.size());
-  references_.resize(typed_offsets_.size());
+  references_.resize(layout_.bindings.size());
+  for (size_t i = 0; i < layout_.bindings.size(); ++i)
+    if (layout_.bindings[i].type != BINDING_SAMPLER)
+      references_[i].resize(layout_.bindings[i].count);
 }
 
 const BindingLayoutDesc &BindingGroup::Version::GetLayout() const {
   return layout_;
 }
 
-const BufferView &BindingGroup::Version::GetBuffer(size_t slot) const {
-  return buffers_[typed_offsets_[slot]];
-}
-
-IImage *BindingGroup::Version::GetImage(size_t slot) const {
-  return images_[typed_offsets_[slot]];
-}
-
-const SamplerDesc &BindingGroup::Version::GetSampler(size_t slot) const {
-  return samplers_[typed_offsets_[slot]];
-}
-
-const std::vector<IImage *> &BindingGroup::Version::GetImages() const {
-  return images_;
-}
-
-bool BindingGroup::Version::IsInitialized(size_t slot) const {
-  return initialized_[slot];
-}
-
-size_t BindingGroup::Version::SlotCount() const {
-  return typed_offsets_.size();
-}
-
-uint32_t BindingGroup::Version::ArrayElement(size_t slot) const {
-  for (const auto &binding : layout_.bindings) {
-    if (slot < binding.count)
-      return uint32_t(slot);
-    slot -= binding.count;
-  }
-  return 0;
+const std::vector<std::vector<ObjectPtr<IObject>>> &BindingGroup::Version::GetReferences() const {
+  return references_;
 }
 
 bool BindingGroup::Version::IsComplete() const {
-  return std::all_of(initialized_.begin(), initialized_.end(), [](bool value) { return value; });
+  for (size_t i = 0; i < layout_.bindings.size(); ++i)
+    for (uint32_t j = 0; j < layout_.bindings[i].count; ++j)
+      if (!IsInitialized(i, j))
+        return false;
+  return true;
 }
 
-ObjectPtr<BindingGroup::Version> BindingGroup::Version::Clone() const {
-  auto copy = CreateEmpty();
-  if (!copy)
-    return {};
-  size_t offset = 0;
-  for (const auto &binding : layout_.bindings) {
-    // Copy initialized runs only; unwritten native descriptors must not be read.
-    const size_t end = offset + binding.count;
-    while (offset < end) {
-      if (!initialized_[offset]) {
-        ++offset;
-        continue;
-      }
-      const size_t first = offset;
-      while (offset < end && initialized_[offset])
-        ++offset;
-      if (binding.type <= BINDING_RW_STORAGE_BUFFER) {
-        std::vector<BufferView> buffers;
-        for (size_t i = first; i < offset; ++i) {
-          buffers.push_back(GetBuffer(i));
-        }
-        if (!copy->Write(first, binding, buffers))
-          return {};
-      } else if (binding.type == BINDING_SAMPLER) {
-        std::vector<SamplerDesc> samplers;
-        for (size_t i = first; i < offset; ++i)
-          samplers.push_back(GetSampler(i));
-        if (!copy->Write(first, binding, samplers))
-          return {};
-      } else {
-        std::vector<IImage *> images;
-        for (size_t i = first; i < offset; ++i)
-          images.push_back(GetImage(i));
-        if (!copy->Write(first, binding, images))
-          return {};
-      }
-    }
-  }
-  return copy;
-}
-
-bool BindingGroup::Version::Write(size_t offset, const BindingDesc &binding, const std::vector<BufferView> &values) {
-  // Retain the whole array before replacing slots, including resource swaps.
+bool BindingGroup::Version::Write(size_t binding_index, uint32_t first_element, const std::vector<BufferView> &values) {
+  // Retain the entire update before releasing old slots, including resource swaps.
   std::vector<ObjectPtr<IObject>> references;
   references.reserve(values.size());
   for (const auto &value : values)
     references.push_back(ObjectPtr<IObject>::Retain(value.buffer));
-  if (!WriteDescriptors(offset, binding, values))
+  if (!WriteDescriptors(binding_index, first_element, values))
     return false;
-  for (size_t i = 0; i < values.size(); ++i) {
-    buffers_[typed_offsets_[offset + i]] = values[i];
-    initialized_[offset + i] = true;
-    references_[offset + i] = std::move(references[i]);
-  }
+  for (size_t i = 0; i < values.size(); ++i)
+    references_[binding_index][first_element + i] = std::move(references[i]);
   return true;
 }
 
-bool BindingGroup::Version::Write(size_t offset, const BindingDesc &binding, const std::vector<IImage *> &values) {
-  // Retain the whole array before replacing slots, including resource swaps.
+bool BindingGroup::Version::Write(size_t binding_index, uint32_t first_element, const std::vector<IImage *> &values) {
+  // Retain the entire update before releasing old slots, including resource swaps.
   std::vector<ObjectPtr<IObject>> references;
   references.reserve(values.size());
   for (const auto &value : values)
     references.push_back(ObjectPtr<IObject>::Retain(value));
-  if (!WriteDescriptors(offset, binding, values))
+  if (!WriteDescriptors(binding_index, first_element, values))
     return false;
-  for (size_t i = 0; i < values.size(); ++i) {
-    images_[typed_offsets_[offset + i]] = values[i];
-    initialized_[offset + i] = true;
-    references_[offset + i] = std::move(references[i]);
-  }
+  for (size_t i = 0; i < values.size(); ++i)
+    references_[binding_index][first_element + i] = std::move(references[i]);
   return true;
 }
 
-bool BindingGroup::Version::Write(size_t offset, const BindingDesc &binding, const std::vector<SamplerDesc> &values) {
-  if (!WriteDescriptors(offset, binding, values))
-    return false;
-  for (size_t i = 0; i < values.size(); ++i) {
-    samplers_[typed_offsets_[offset + i]] = values[i];
-    initialized_[offset + i] = true;
-  }
-  return true;
+bool BindingGroup::Version::Write(size_t binding_index,
+                                  uint32_t first_element,
+                                  const std::vector<SamplerDesc> &values) {
+  return WriteDescriptors(binding_index, first_element, values);
 }
 
 BindingGroup::BindingGroup(Device *device, ObjectPtr<Version> version)
@@ -217,24 +129,22 @@ BindingGroup::Version *BindingGroup::CurrentVersion() const {
 const BindingDesc *BindingGroup::FindBinding(uint32_t binding,
                                              uint32_t first_element,
                                              size_t count,
-                                             size_t &offset) const {
-  offset = 0;
-  for (const auto &desc : layout_.bindings) {
-    if (desc.binding == binding) {
-      if (!count || first_element > desc.count || count > desc.count - first_element)
-        return nullptr;
-      offset += first_element;
-      return &desc;
-    }
-    offset += desc.count;
+                                             size_t &binding_index) const {
+  for (binding_index = 0; binding_index < layout_.bindings.size(); ++binding_index) {
+    const auto &desc = layout_.bindings[binding_index];
+    if (desc.binding != binding)
+      continue;
+    if (!count || first_element > desc.count || count > desc.count - first_element)
+      return nullptr;
+    return &desc;
   }
   return nullptr;
 }
 
 bool BindingGroup::BindResource(uint32_t binding, const std::vector<BufferView> &buffers, uint32_t first_element) {
   try {
-    size_t offset;
-    const auto *desc = FindBinding(binding, first_element, buffers.size(), offset);
+    size_t binding_index;
+    const auto *desc = FindBinding(binding, first_element, buffers.size(), binding_index);
     if (!desc)
       return false;
     if (desc->type > BINDING_RW_STORAGE_BUFFER)
@@ -252,7 +162,7 @@ bool BindingGroup::BindResource(uint32_t binding, const std::vector<BufferView> 
     auto next = version_->IsUniquelyOwned() ? version_ : version_->Clone();
     if (!next)
       return false;
-    if (!next->Write(offset, *desc, values))
+    if (!next->Write(binding_index, first_element, values))
       return false;
     version_ = std::move(next);
     return true;
@@ -263,8 +173,8 @@ bool BindingGroup::BindResource(uint32_t binding, const std::vector<BufferView> 
 
 bool BindingGroup::BindResource(uint32_t binding, const std::vector<IImage *> &images, uint32_t first_element) {
   try {
-    size_t offset;
-    const auto *desc = FindBinding(binding, first_element, images.size(), offset);
+    size_t binding_index;
+    const auto *desc = FindBinding(binding, first_element, images.size(), binding_index);
     if (!desc)
       return false;
     if (desc->type != BINDING_TEXTURE2D && desc->type != BINDING_RW_TEXTURE2D)
@@ -280,7 +190,7 @@ bool BindingGroup::BindResource(uint32_t binding, const std::vector<IImage *> &i
     auto next = version_->IsUniquelyOwned() ? version_ : version_->Clone();
     if (!next)
       return false;
-    if (!next->Write(offset, *desc, images))
+    if (!next->Write(binding_index, first_element, images))
       return false;
     version_ = std::move(next);
     return true;
@@ -291,8 +201,8 @@ bool BindingGroup::BindResource(uint32_t binding, const std::vector<IImage *> &i
 
 bool BindingGroup::BindResource(uint32_t binding, const std::vector<SamplerDesc> &samplers, uint32_t first_element) {
   try {
-    size_t offset;
-    const auto *desc = FindBinding(binding, first_element, samplers.size(), offset);
+    size_t binding_index;
+    const auto *desc = FindBinding(binding, first_element, samplers.size(), binding_index);
     if (!desc)
       return false;
     if (desc->type != BINDING_SAMPLER)
@@ -306,7 +216,7 @@ bool BindingGroup::BindResource(uint32_t binding, const std::vector<SamplerDesc>
     auto next = version_->IsUniquelyOwned() ? version_ : version_->Clone();
     if (!next)
       return false;
-    if (!next->Write(offset, *desc, samplers))
+    if (!next->Write(binding_index, first_element, samplers))
       return false;
     version_ = std::move(next);
     return true;

@@ -633,13 +633,13 @@ bool D3D12CommandContext::PrepareGroups() {
         }
         continue;
       }
-      size_t entry = 0;
-      for (auto binding : version->GetLayout().bindings)
-        for (uint32_t j = 0; j < binding.count; ++j, ++entry) {
+      for (size_t binding_index = 0; binding_index < version->GetLayout().bindings.size(); ++binding_index) {
+        const auto &binding = version->GetLayout().bindings[binding_index];
+        for (uint32_t j = 0; j < binding.count; ++j) {
           auto type = binding.type;
           ID3D12Resource *resource = nullptr;
           if (type <= BINDING_RW_STORAGE_BUFFER) {
-            auto buffer = static_cast<D3D12Buffer *>(version->GetBuffer(entry).buffer);
+            auto buffer = static_cast<D3D12Buffer *>(version->GetReferences()[binding_index][j].Get());
             resource = buffer->NativeBuffer();
             if (!TransitionResource(resource,
                                     type == BINDING_RW_STORAGE_BUFFER ? D3D12_RESOURCE_STATE_UNORDERED_ACCESS
@@ -647,7 +647,7 @@ bool D3D12CommandContext::PrepareGroups() {
                                     buffer->DefaultState()))
               return false;
           } else if (type == BINDING_TEXTURE2D || type == BINDING_RW_TEXTURE2D) {
-            auto image = static_cast<D3D12Image *>(version->GetImage(entry));
+            auto image = static_cast<D3D12Image *>(version->GetReferences()[binding_index][j].Get());
             resource = image->NativeImage();
             for (auto color : rendering_.color_attachments)
               if (color.color_attachment == image) {
@@ -668,6 +668,7 @@ bool D3D12CommandContext::PrepareGroups() {
             list_->ResourceBarrier(1, &barrier);
           }
         }
+      }
     }
     if (!tables_dirty_)
       return true;
