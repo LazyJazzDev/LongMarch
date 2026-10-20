@@ -1,5 +1,7 @@
-﻿#include <gtest/gtest.h>
+#include <gtest/gtest.h>
 
+#include <algorithm>
+#include <random>
 #include <thread>
 
 #if defined(LONGMARCH_D3D12_ENABLED)
@@ -7,64 +9,198 @@
 #include "grassland/rhi/backend/d3d12/d3d12_transient_descriptor_pool.h"
 
 namespace grassland::rhi::backend::d3d12 {
-TEST(D3D12DescriptorPool, RingRangesRetainPagesUntilOrderedReclamation) {
+TEST(D3D12DescriptorPool, ReleasedHolesAreReusedAndMergedOnBothSides) {
   ComPtr<ID3D12Device> device;
   ASSERT_TRUE(SUCCEEDED(D3D12CreateDevice(nullptr, D3D_FEATURE_LEVEL_11_0, IID_PPV_ARGS(&device))));
   D3D12DescriptorPool pool(device.Get(), D3D12_DESCRIPTOR_HEAP_TYPE_RTV, 8);
-  auto a = pool.Acquire(3);
-  auto b = pool.Acquire(3);
-  ASSERT_TRUE(a && b);
+  auto a = pool.Acquire(2);
+  auto b = pool.Acquire(2);
+  auto c = pool.Acquire(2);
+  auto d = pool.Acquire(2);
+  ASSERT_TRUE(a && b && c && d);
   auto heap = a->Heap();
   auto start = a->CPU().ptr;
-  EXPECT_EQ(heap, b->Heap());
-  EXPECT_EQ(b->CPU().ptr - start, 3 * device->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_RTV));
-  b = {};
-  auto c = pool.Acquire(3);
-  ASSERT_TRUE(c);
-  EXPECT_NE(c->Heap(), heap);  // A still pins the ring head, including B's released range.
-  pool.Clear();
-  EXPECT_EQ(pool.GetPageCounts().first, 2u);
-  a = {};
-  auto d = pool.Acquire(8);
-  ASSERT_TRUE(d);
-  EXPECT_EQ(d->Heap(), heap);
-  EXPECT_EQ(d->CPU().ptr, start);
-  c = {};
-  d = {};
-  EXPECT_EQ(pool.GetPageCounts().first, 1u);
-  EXPECT_EQ(pool.GetPageCounts().second, 0u);
-  pool.Clear();
-  EXPECT_EQ(pool.GetPageCounts().first, 0u);
+  auto hole = b->CPU().ptr;
+  b.Reset();
+  b = pool.Acquire(2);
+  ASSERT_TRUE(b);
+  EXPECT_EQ(b->Heap(), heap);
+  EXPECT_EQ(b->CPU().ptr, hole);
+  a.Reset();
+  c.Reset();
+  b.Reset();  // Merge both free neighbors while D remains alive.
+  auto merged = pool.Acquire(6);
+  ASSERT_TRUE(merged);
+  EXPECT_EQ(merged->Heap(), heap);
+  EXPECT_EQ(merged->CPU().ptr, start);
+  d.Reset();
+  merged.Reset();
+  auto full = pool.Acquire(8);
+  ASSERT_TRUE(full);
+  EXPECT_EQ(full->CPU().ptr, start);
+  full.Reset();
+  EXPECT_EQ(pool.GetPageCounts(), (std::pair<size_t, size_t>{1, 0}));
 }
 
-TEST(D3D12DescriptorPool, WrapPaddingAndOversizedPages) {
+TEST(D3D12DescriptorPool, SmallestPagePrecedesTightestFit) {
   ComPtr<ID3D12Device> device;
   ASSERT_TRUE(SUCCEEDED(D3D12CreateDevice(nullptr, D3D_FEATURE_LEVEL_11_0, IID_PPV_ARGS(&device))));
-  D3D12DescriptorPool pool(device.Get(), D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV, 8);
-  auto a = pool.Acquire(3);
-  auto b = pool.Acquire(3);
-  ASSERT_TRUE(a && b);
-  auto start = a->CPU().ptr;
-  a = {};
-  auto c = pool.Acquire(3);  // Skip the last two slots and wrap into the released prefix.
-  ASSERT_TRUE(c);
-  EXPECT_EQ(c->Heap(), b->Heap());
-  EXPECT_EQ(c->CPU().ptr, start);
-  EXPECT_EQ(c->Heap()->GetDesc().Flags, D3D12_DESCRIPTOR_HEAP_FLAG_NONE);
-  auto d = pool.Acquire(1);
-  ASSERT_TRUE(d);
-  EXPECT_NE(d->Heap(), c->Heap());
-  c = {};
-  b = {};
-  d = {};
-  auto large = pool.Acquire(17);
+  D3D12DescriptorPool pool(device.Get(), D3D12_DESCRIPTOR_HEAP_TYPE_RTV, 8);
+  auto smaller = pool.Acquire(8);
+  auto large = pool.Acquire(16);
+  ASSERT_TRUE(smaller && large);
+  auto small_heap = smaller->Heap();
+  auto large_heap = large->Heap();
+  smaller.Reset();
+  large.Reset();
+  large = pool.Acquire(12);
   ASSERT_TRUE(large);
-  EXPECT_EQ(large->Count(), 17u);
-  EXPECT_EQ(pool.GetPageCounts().first, 2u);
-  large = {};
+  EXPECT_EQ(large->Heap(), large_heap);
+  auto result = pool.Acquire(3);  // Prefer the 8-slot page over the larger page's 4-slot hole.
+  ASSERT_TRUE(result);
+  EXPECT_EQ(result->Heap(), small_heap);
+}
+
+TEST(D3D12DescriptorPool, TightestFitSplitsAndRegistersRemainder) {
+  ComPtr<ID3D12Device> device;
+  ASSERT_TRUE(SUCCEEDED(D3D12CreateDevice(nullptr, D3D_FEATURE_LEVEL_11_0, IID_PPV_ARGS(&device))));
+  D3D12DescriptorPool pool(device.Get(), D3D12_DESCRIPTOR_HEAP_TYPE_RTV, 16);
+  auto a = pool.Acquire(6);
+  auto separator = pool.Acquire(1);
+  auto b = pool.Acquire(4);
+  auto end = pool.Acquire(5);
+  ASSERT_TRUE(a && separator && b && end);
+  auto a_start = a->CPU().ptr;
+  auto b_start = b->CPU().ptr;
+  a.Reset();
+  b.Reset();
+  auto best = pool.Acquire(3);
+  ASSERT_TRUE(best);
+  EXPECT_EQ(best->CPU().ptr, b_start);
+  auto remainder = pool.Acquire(1);
+  ASSERT_TRUE(remainder);
+  EXPECT_EQ(remainder->CPU().ptr,
+            b_start + 3 * device->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_RTV));
+  auto other = pool.Acquire(5);
+  ASSERT_TRUE(other);
+  EXPECT_EQ(other->CPU().ptr, a_start);
   EXPECT_EQ(pool.GetPageCounts().first, 1u);
+}
+
+TEST(D3D12DescriptorPool, PagesGrowGeometricallyAndRemainAllocated) {
+  ComPtr<ID3D12Device> device;
+  ASSERT_TRUE(SUCCEEDED(D3D12CreateDevice(nullptr, D3D_FEATURE_LEVEL_11_0, IID_PPV_ARGS(&device))));
+  D3D12DescriptorPool pool(device.Get(), D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV, 7);
+  auto a = pool.Acquire(8);
+  auto b = pool.Acquire(16);
+  auto c = pool.Acquire(33);
+  auto d = pool.Acquire(31);
+  auto e = pool.Acquire(1);
+  ASSERT_TRUE(a && b && c && d && e);
+  EXPECT_EQ(a->Heap()->GetDesc().NumDescriptors, 8u);
+  EXPECT_EQ(b->Heap()->GetDesc().NumDescriptors, 16u);
+  EXPECT_EQ(c->Heap()->GetDesc().NumDescriptors, 64u);
+  EXPECT_EQ(d->Heap(), c->Heap());
+  EXPECT_EQ(e->Heap()->GetDesc().NumDescriptors, 128u);
+  a.Reset();
+  b.Reset();
+  c.Reset();
+  d.Reset();
+  e.Reset();
+  EXPECT_EQ(pool.GetPageCounts(), (std::pair<size_t, size_t>{4, 0}));
+  auto huge = pool.Acquire(8000);
+  ASSERT_TRUE(huge);
+  EXPECT_EQ(huge->Count(), 8000u);
+  EXPECT_EQ(huge->Heap()->GetDesc().NumDescriptors, 8192u);
+  EXPECT_EQ(huge->Heap()->GetDesc().Flags, D3D12_DESCRIPTOR_HEAP_FLAG_NONE);
+  huge.Reset();
+  EXPECT_EQ(pool.GetPageCounts(), (std::pair<size_t, size_t>{5, 0}));
   EXPECT_FALSE(pool.Acquire(0));
   EXPECT_FALSE(pool.Acquire(UINT32_MAX));
+  auto reused = pool.Acquire(8);
+  ASSERT_TRUE(reused);
+  EXPECT_EQ(reused->Heap()->GetDesc().NumDescriptors, 8u);
+}
+
+TEST(D3D12DescriptorPool, RandomizedAllocationsMatchOccupancyModel) {
+  ComPtr<ID3D12Device> device;
+  ASSERT_TRUE(SUCCEEDED(D3D12CreateDevice(nullptr, D3D_FEATURE_LEVEL_11_0, IID_PPV_ARGS(&device))));
+  D3D12DescriptorPool pool(device.Get(), D3D12_DESCRIPTOR_HEAP_TYPE_RTV, 8);
+
+  struct ModelPage {
+    ID3D12DescriptorHeap *heap;
+    std::vector<bool> occupied;
+  };
+
+  std::vector<ModelPage> pages;
+  std::vector<ObjectPtr<D3D12DescriptorPool::Lease>> leases;
+  const auto stride = device->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_RTV);
+  auto release = [&](size_t i) {
+    auto &lease = leases[i];
+    auto &page = *std::find_if(pages.begin(), pages.end(), [&](const auto &p) { return p.heap == lease->Heap(); });
+    auto offset = (lease->CPU().ptr - page.heap->GetCPUDescriptorHandleForHeapStart().ptr) / stride;
+    for (size_t j = offset; j < offset + lease->Count(); ++j) {
+      EXPECT_TRUE(page.occupied[j]);
+      page.occupied[j] = false;
+    }
+    leases.erase(leases.begin() + i);
+  };
+  std::mt19937 random(87);
+  for (int step = 0; step < 2000; ++step) {
+    if (!leases.empty() && (leases.size() >= 32 || random() % 2)) {
+      release(random() % leases.size());
+      continue;
+    }
+    const uint32_t count = 1 + random() % 19;
+    size_t best_page = pages.size(), best_offset = 0, best_size = SIZE_MAX;
+    for (size_t i = 0; i < pages.size(); ++i) {
+      const auto &bits = pages[i].occupied;
+      for (size_t start = 0; start < bits.size();) {
+        if (bits[start]) {
+          ++start;
+          continue;
+        }
+        size_t end = start;
+        while (end < bits.size() && !bits[end])
+          ++end;
+        if (end - start >= count && (best_page == pages.size() || end - start < best_size)) {
+          best_page = i;
+          best_offset = start;
+          best_size = end - start;
+        }
+        start = end;
+      }
+      if (best_page != pages.size())
+        break;  // Pages are created in increasing capacity order.
+    }
+    auto lease = pool.Acquire(count);
+    ASSERT_TRUE(lease);
+    if (best_page == pages.size()) {
+      uint32_t capacity = pages.empty() ? 8 : uint32_t(pages.back().occupied.size()) * 2;
+      while (capacity < count)
+        capacity *= 2;
+      EXPECT_EQ(lease->Heap()->GetDesc().NumDescriptors, capacity);
+      pages.push_back({lease->Heap(), std::vector<bool>(capacity)});
+    }
+    auto &page = pages[best_page];
+    EXPECT_EQ(lease->Heap(), page.heap);
+    const auto offset = (lease->CPU().ptr - page.heap->GetCPUDescriptorHandleForHeapStart().ptr) / stride;
+    ASSERT_EQ(offset, best_offset);
+    for (size_t j = offset; j < offset + count; ++j) {
+      ASSERT_FALSE(page.occupied[j]);
+      page.occupied[j] = true;
+    }
+    leases.push_back(std::move(lease));
+  }
+  while (!leases.empty())
+    release(random() % leases.size());
+  EXPECT_EQ(pool.GetPageCounts(), (std::pair<size_t, size_t>{pages.size(), 0}));
+  for (const auto &page : pages) {
+    auto full = pool.Acquire(uint32_t(page.occupied.size()));
+    ASSERT_TRUE(full);
+    EXPECT_EQ(full->Heap(), page.heap);
+    EXPECT_EQ(full->CPU().ptr, page.heap->GetCPUDescriptorHandleForHeapStart().ptr);
+  }
 }
 
 TEST(D3D12TransientDescriptorPool, WholePagesReuseOnlyTheirClassAndNeverOverlap) {

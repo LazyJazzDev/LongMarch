@@ -1,23 +1,26 @@
-﻿#include "grassland/rhi/backend/d3d12/d3d12_descriptor_pool.h"
+#include "grassland/rhi/backend/d3d12/d3d12_descriptor_pool.h"
 
 #include <algorithm>
 #include <cassert>
+#include <limits>
 
 namespace grassland::rhi::backend::d3d12 {
 D3D12DescriptorPool::Lease::Lease(D3D12DescriptorPool *pool,
                                   Page *page,
-                                  Allocation *allocation,
                                   uint32_t offset,
-                                  uint32_t count)
+                                  uint32_t count,
+                                  FreeRanges::node_type range_node,
+                                  FreeIndex::node_type index_node)
     : pool_(pool),
       page_(page),
-      allocation_(allocation),
       offset_(offset),
-      count_(count) {
+      count_(count),
+      range_node_(std::move(range_node)),
+      index_node_(std::move(index_node)) {
 }
 
 D3D12DescriptorPool::Lease::~Lease() {
-  pool_->ReleaseRange(page_, allocation_);
+  pool_->ReleaseRange(page_, offset_, count_, std::move(range_node_), std::move(index_node_));
 }
 
 ID3D12DescriptorHeap *D3D12DescriptorPool::Lease::Heap() const {
@@ -45,81 +48,103 @@ D3D12DescriptorPool::D3D12DescriptorPool(ID3D12Device *device, D3D12_DESCRIPTOR_
 ObjectPtr<D3D12DescriptorPool::Lease> D3D12DescriptorPool::Acquire(uint32_t count) {
   if (!count || !page_capacity_)
     return {};
-  const uint32_t limit = type_ == D3D12_DESCRIPTOR_HEAP_TYPE_SAMPLER ? 2048 : 1000000;
-  if (count > limit || page_capacity_ > limit)
-    return {};
   try {
     std::lock_guard<std::mutex> lock(mutex_);
-    Page *page = nullptr;
-    uint64_t start = 0;
-    for (auto &candidate : pages_) {
-      auto cursor = candidate->head;
-      const auto remaining = candidate->capacity - cursor % candidate->capacity;
-      if (count > remaining)
-        cursor += remaining;
-      if (cursor + count - candidate->tail <= candidate->capacity) {
-        page = candidate.get();
-        start = cursor;
+    auto selected = free_index_.end();
+    // Skip insufficient ranges within each capacity class without scanning pages.
+    for (auto first = free_index_.begin(); first != free_index_.end();) {
+      const auto capacity = std::get<0>(first->first);
+      auto fit = free_index_.lower_bound({capacity, count, 0, 0});
+      if (fit != free_index_.end() && std::get<0>(fit->first) == capacity) {
+        selected = fit;
         break;
       }
+      first = fit;
     }
-    if (!page) {
+    if (selected == free_index_.end()) {
+      uint64_t capacity = 1;
+      const uint64_t minimum = pages_.empty() ? std::max(count, page_capacity_) : count;
+      while (capacity < minimum)
+        capacity *= 2;
+      if (!pages_.empty())
+        capacity = std::max(capacity, uint64_t(pages_.back()->capacity) * 2);
+      if (capacity > std::numeric_limits<uint32_t>::max())
+        return {};
       auto fresh = std::make_unique<Page>();
-      fresh->capacity = std::max(count, page_capacity_);
+      fresh->capacity = uint32_t(capacity);
+      fresh->id = pages_.size();
       D3D12_DESCRIPTOR_HEAP_DESC desc{};
       desc.Type = type_;
       desc.NumDescriptors = fresh->capacity;
       desc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_NONE;
       if (!Check(device_->CreateDescriptorHeap(&desc, IID_PPV_ARGS(&fresh->heap)), "Create descriptor pool page"))
         return {};
-      page = fresh.get();
+      fresh->free_ranges.emplace(0, fresh->capacity);
+      // Prepare both containers before registering the page in the pool.
+      FreeIndex pending;
+      pending.emplace(FreeKey{fresh->capacity, fresh->capacity, fresh->id, 0}, fresh.get());
       pages_.push_back(std::move(fresh));
+      selected = free_index_.insert(pending.extract(pending.begin())).position;
     }
-    auto allocation = std::make_unique<Allocation>();
-    allocation->end = start + count;
-    auto pointer = allocation.get();
-    page->allocations.push_back(std::move(allocation));
-    // Commit the ring cursor only after the lease itself has been allocated.
-    try {
-      auto lease = ObjectPtr<Lease>::Adopt(new Lease(this, page, pointer, uint32_t(start % page->capacity), count));
-      page->head = start + count;
-      return lease;
-    } catch (const std::bad_alloc &) {
-      page->allocations.pop_back();
-      return {};
+    Page *page = selected->second;
+    const auto offset = std::get<3>(selected->first);
+    const auto available = std::get<1>(selected->first);
+    FreeRanges pending_range;
+    FreeIndex pending_index;
+    pending_range.emplace(offset, count);
+    pending_index.emplace(FreeKey{page->capacity, count, page->id, offset}, page);
+    // All potentially failing allocations precede the interval mutation.
+    auto lease =
+        ObjectPtr<Lease>::Adopt(new Lease(this, page, offset, count, pending_range.extract(pending_range.begin()),
+                                          pending_index.extract(pending_index.begin())));
+    auto range_node = page->free_ranges.extract(offset);
+    auto index_node = free_index_.extract(selected);
+    if (available > count) {
+      range_node.key() = offset + count;
+      range_node.mapped() = available - count;
+      index_node.key() = {page->capacity, available - count, page->id, offset + count};
+      page->free_ranges.insert(std::move(range_node));
+      free_index_.insert(std::move(index_node));
     }
+    ++page->occupied;
+    return lease;
   } catch (const std::bad_alloc &) {
     return {};
   }
 }
 
-void D3D12DescriptorPool::ReleaseRange(Page *page, Allocation *allocation) {
+void D3D12DescriptorPool::ReleaseRange(Page *page,
+                                       uint32_t offset,
+                                       uint32_t count,
+                                       FreeRanges::node_type range_node,
+                                       FreeIndex::node_type index_node) {
   std::lock_guard<std::mutex> lock(mutex_);
-  allocation->released = true;
-  while (!page->allocations.empty() && page->allocations.front()->released) {
-    page->tail = page->allocations.front()->end;
-    page->allocations.pop_front();
+  auto right = page->free_ranges.lower_bound(offset);
+  if (right != page->free_ranges.begin()) {
+    auto left = std::prev(right);
+    if (left->first + left->second == offset) {
+      free_index_.erase({page->capacity, left->second, page->id, left->first});
+      offset = left->first;
+      count += left->second;
+      page->free_ranges.erase(left);
+    }
   }
-  if (!page->allocations.empty())
-    return;
-  page->head = page->tail = 0;
-  // Keep one ordinary idle page. Oversized pages are never retained as a cache.
-  const bool spare = std::any_of(pages_.begin(), pages_.end(), [page, this](const auto &other) {
-    return other.get() != page && other->capacity == page_capacity_ && other->allocations.empty();
-  });
-  if (page->capacity > page_capacity_ || spare)
-    pages_.erase(std::find_if(pages_.begin(), pages_.end(), [page](const auto &entry) { return entry.get() == page; }));
-}
-
-void D3D12DescriptorPool::Clear() {
-  std::lock_guard<std::mutex> lock(mutex_);
-  pages_.erase(std::remove_if(pages_.begin(), pages_.end(), [](const auto &page) { return page->allocations.empty(); }),
-               pages_.end());
+  if (right != page->free_ranges.end() && offset + count == right->first) {
+    free_index_.erase({page->capacity, right->second, page->id, right->first});
+    count += right->second;
+    page->free_ranges.erase(right);
+  }
+  range_node.key() = offset;
+  range_node.mapped() = count;
+  index_node.key() = {page->capacity, count, page->id, offset};
+  page->free_ranges.insert(std::move(range_node));
+  free_index_.insert(std::move(index_node));
+  --page->occupied;
 }
 
 std::pair<size_t, size_t> D3D12DescriptorPool::GetPageCounts() const {
   std::lock_guard<std::mutex> lock(mutex_);
-  return {pages_.size(), size_t(std::count_if(pages_.begin(), pages_.end(),
-                                              [](const auto &page) { return !page->allocations.empty(); }))};
+  return {pages_.size(),
+          size_t(std::count_if(pages_.begin(), pages_.end(), [](const auto &page) { return page->occupied != 0; }))};
 }
 }  // namespace grassland::rhi::backend::d3d12
