@@ -29,7 +29,6 @@ class D3D12DescriptorPool {
     ID3D12DescriptorHeap *Heap() const;
     uint32_t Count() const;
     D3D12_CPU_DESCRIPTOR_HANDLE CPU(uint32_t index = 0) const;
-    D3D12_GPU_DESCRIPTOR_HANDLE GPU(uint32_t index = 0) const;
 
    private:
     D3D12DescriptorPool *pool_;
@@ -38,13 +37,8 @@ class D3D12DescriptorPool {
     uint32_t offset_, count_;
   };
 
-  D3D12DescriptorPool(ID3D12Device *device,
-                      D3D12_DESCRIPTOR_HEAP_TYPE type,
-                      bool shader_visible = false,
-                      uint32_t page_capacity = 256);
+  D3D12DescriptorPool(ID3D12Device *device, D3D12_DESCRIPTOR_HEAP_TYPE type, uint32_t page_capacity = 256);
   ObjectPtr<Lease> Acquire(uint32_t count);
-  // Reserve a page-sized append region for one command context.
-  ObjectPtr<Lease> AcquirePage(uint32_t minimum_count);
   // Explicit trimming never invalidates a live lease.
   void Clear();
   std::pair<size_t, size_t> GetPageCounts() const;
@@ -53,7 +47,6 @@ class D3D12DescriptorPool {
   void ReleaseRange(Page *page, Allocation *allocation);
   ID3D12Device *device_;
   D3D12_DESCRIPTOR_HEAP_TYPE type_;
-  bool shader_visible_;
   uint32_t page_capacity_, stride_;
   mutable std::mutex mutex_;
   std::vector<std::unique_ptr<Page>> pages_;

@@ -605,6 +605,7 @@ bool D3D12CommandContext::CmdBindGroup(uint32_t index, IBindingGroup *group) {
     }
     if (!RetainResource(version))
       return false;
+
     auto &bound = groups_[index];
     std::array<D3D12DescriptorPool::Lease *, 2> sources{resources, version->SamplerDescriptors()};
     for (size_t kind = 0; kind < sources.size(); ++kind) {
@@ -694,7 +695,11 @@ bool D3D12CommandContext::PrepareGroups() {
           return false;
         }
         auto &pool = kind ? device_->SamplerDescriptors() : device_->ResourceDescriptors();
-        auto page = pool.AcquirePage(uint32_t(total));
+        // The context chooses growth; the pool only rounds and reuses size classes.
+        // At the native limit, further rollovers necessarily use equal-size heaps.
+        const uint32_t previous = descriptor_pages_[kind] ? descriptor_pages_[kind]->Count() : 0;
+        const uint32_t minimum = std::max(uint32_t(total), std::min(previous * 2, limit));
+        auto page = pool.Acquire(minimum);
         if (!page) {
           recording_failed_ = true;
           return false;

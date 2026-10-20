@@ -93,11 +93,11 @@ D3D12Device *D3D12Device::Create(PhysicalDevice info, Core *core, ComPtr<ID3D12D
   }
 }
 
-D3D12DescriptorPool &D3D12Device::ResourceDescriptors() {
+D3D12TransientDescriptorPool &D3D12Device::ResourceDescriptors() {
   return resource_descriptors_;
 }
 
-D3D12DescriptorPool &D3D12Device::SamplerDescriptors() {
+D3D12TransientDescriptorPool &D3D12Device::SamplerDescriptors() {
   return sampler_descriptors_;
 }
 
@@ -176,10 +176,10 @@ D3D12Device::D3D12Device(PhysicalDevice info, Core *core, ComPtr<ID3D12Device> d
       device_(std::move(device)),
       rtv_pool_(device_.Get(), D3D12_DESCRIPTOR_HEAP_TYPE_RTV),
       dsv_pool_(device_.Get(), D3D12_DESCRIPTOR_HEAP_TYPE_DSV),
-      resource_descriptors_(device_.Get(), D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV, true, 4096),
-      sampler_descriptors_(device_.Get(), D3D12_DESCRIPTOR_HEAP_TYPE_SAMPLER, true, 256),
-      resource_descriptor_storage_(device_.Get(), D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV, false, 4096),
-      sampler_descriptor_storage_(device_.Get(), D3D12_DESCRIPTOR_HEAP_TYPE_SAMPLER, false, 256) {
+      resource_descriptors_(device_.Get(), D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV),
+      sampler_descriptors_(device_.Get(), D3D12_DESCRIPTOR_HEAP_TYPE_SAMPLER),
+      resource_descriptor_storage_(device_.Get(), D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV, 4096),
+      sampler_descriptor_storage_(device_.Get(), D3D12_DESCRIPTOR_HEAP_TYPE_SAMPLER, 256) {
 }
 
 D3D12Device::~D3D12Device() {

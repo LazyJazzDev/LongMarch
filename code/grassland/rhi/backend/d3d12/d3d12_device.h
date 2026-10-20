@@ -3,6 +3,7 @@
 
 #include "grassland/rhi/backend/backend_device.h"
 #include "grassland/rhi/backend/d3d12/d3d12_descriptor_pool.h"
+#include "grassland/rhi/backend/d3d12/d3d12_transient_descriptor_pool.h"
 #include "grassland/rhi/backend/d3d12/d3d12_upload_pool.h"
 #include "grassland/rhi/backend/d3d12/d3d12_util.h"
 
@@ -15,8 +16,8 @@ class D3D12Device final : public Device {
   D3D12MA::Allocator *Allocator() const;
   D3D12DescriptorPool &RTVPool();
   D3D12DescriptorPool &DSVPool();
-  D3D12DescriptorPool &ResourceDescriptors();
-  D3D12DescriptorPool &SamplerDescriptors();
+  D3D12TransientDescriptorPool &ResourceDescriptors();
+  D3D12TransientDescriptorPool &SamplerDescriptors();
   D3D12DescriptorPool &ResourceDescriptorStorage();
   D3D12DescriptorPool &SamplerDescriptorStorage();
   IDXGIFactory4 *Factory() const;
@@ -55,7 +56,7 @@ class D3D12Device final : public Device {
   ComPtr<D3D12MA::Allocator> allocator_;
   D3D12DescriptorPool rtv_pool_;
   D3D12DescriptorPool dsv_pool_;
-  D3D12DescriptorPool resource_descriptors_, sampler_descriptors_;
+  D3D12TransientDescriptorPool resource_descriptors_, sampler_descriptors_;
   D3D12DescriptorPool resource_descriptor_storage_, sampler_descriptor_storage_;
   ComPtr<IDXGIFactory4> factory_;
   ComPtr<ID3D12CommandQueue> queue_;

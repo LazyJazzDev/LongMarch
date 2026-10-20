@@ -58,7 +58,7 @@ class D3D12CommandContext final : public CommandContext {
   };
 
   std::vector<BoundGroup> groups_;
-  std::array<D3D12DescriptorPool::Lease *, 2> descriptor_pages_{};
+  std::array<D3D12TransientDescriptorPool::Lease *, 2> descriptor_pages_{};
   std::array<uint32_t, 2> descriptor_used_{};
   bool tables_dirty_{};
   D3D12Program *program_{};

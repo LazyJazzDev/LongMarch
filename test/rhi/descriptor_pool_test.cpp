@@ -1,13 +1,16 @@
 ﻿#include <gtest/gtest.h>
 
+#include <thread>
+
 #if defined(LONGMARCH_D3D12_ENABLED)
 #include "grassland/rhi/backend/d3d12/d3d12_descriptor_pool.h"
+#include "grassland/rhi/backend/d3d12/d3d12_transient_descriptor_pool.h"
 
 namespace grassland::rhi::backend::d3d12 {
 TEST(D3D12DescriptorPool, RingRangesRetainPagesUntilOrderedReclamation) {
   ComPtr<ID3D12Device> device;
   ASSERT_TRUE(SUCCEEDED(D3D12CreateDevice(nullptr, D3D_FEATURE_LEVEL_11_0, IID_PPV_ARGS(&device))));
-  D3D12DescriptorPool pool(device.Get(), D3D12_DESCRIPTOR_HEAP_TYPE_RTV, false, 8);
+  D3D12DescriptorPool pool(device.Get(), D3D12_DESCRIPTOR_HEAP_TYPE_RTV, 8);
   auto a = pool.Acquire(3);
   auto b = pool.Acquire(3);
   ASSERT_TRUE(a && b);
@@ -37,7 +40,7 @@ TEST(D3D12DescriptorPool, RingRangesRetainPagesUntilOrderedReclamation) {
 TEST(D3D12DescriptorPool, WrapPaddingAndOversizedPages) {
   ComPtr<ID3D12Device> device;
   ASSERT_TRUE(SUCCEEDED(D3D12CreateDevice(nullptr, D3D_FEATURE_LEVEL_11_0, IID_PPV_ARGS(&device))));
-  D3D12DescriptorPool pool(device.Get(), D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV, true, 8);
+  D3D12DescriptorPool pool(device.Get(), D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV, 8);
   auto a = pool.Acquire(3);
   auto b = pool.Acquire(3);
   ASSERT_TRUE(a && b);
@@ -47,7 +50,7 @@ TEST(D3D12DescriptorPool, WrapPaddingAndOversizedPages) {
   ASSERT_TRUE(c);
   EXPECT_EQ(c->Heap(), b->Heap());
   EXPECT_EQ(c->CPU().ptr, start);
-  EXPECT_NE(c->GPU().ptr, 0u);
+  EXPECT_EQ(c->Heap()->GetDesc().Flags, D3D12_DESCRIPTOR_HEAP_FLAG_NONE);
   auto d = pool.Acquire(1);
   ASSERT_TRUE(d);
   EXPECT_NE(d->Heap(), c->Heap());
@@ -64,27 +67,90 @@ TEST(D3D12DescriptorPool, WrapPaddingAndOversizedPages) {
   EXPECT_FALSE(pool.Acquire(UINT32_MAX));
 }
 
-TEST(D3D12DescriptorPool, PageReservationsDoNotOverlapAndGrowForLiveTables) {
+TEST(D3D12TransientDescriptorPool, WholePagesReuseOnlyTheirClassAndNeverOverlap) {
   ComPtr<ID3D12Device> device;
   ASSERT_TRUE(SUCCEEDED(D3D12CreateDevice(nullptr, D3D_FEATURE_LEVEL_11_0, IID_PPV_ARGS(&device))));
-  D3D12DescriptorPool pool(device.Get(), D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV, true, 8);
-  auto first = pool.AcquirePage(3);
-  auto second = pool.AcquirePage(5);
+  D3D12TransientDescriptorPool pool(device.Get(), D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
+  auto first = pool.Acquire(3);
+  auto second = pool.Acquire(32);
+  auto large = pool.Acquire(33);
   ASSERT_TRUE(first);
   ASSERT_TRUE(second);
-  EXPECT_EQ(first->Count(), 8u);
-  EXPECT_EQ(second->Count(), 8u);
-  EXPECT_NE(first->Heap(), second->Heap());
-  auto large = pool.AcquirePage(12);
   ASSERT_TRUE(large);
-  EXPECT_GE(large->Count(), 12u);
-  EXPECT_EQ(pool.GetPageCounts().second, 3u);
+  EXPECT_EQ(first->Count(), 32u);
+  EXPECT_EQ(second->Count(), 32u);
+  EXPECT_EQ(large->Count(), 64u);
+  EXPECT_NE(first->Heap(), second->Heap());
+  EXPECT_NE(first->Heap(), large->Heap());
+  EXPECT_EQ(first->Heap()->GetDesc().Flags, D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE);
+  EXPECT_NE(first->GPU().ptr, 0u);
+  EXPECT_EQ(first->CPU(1).ptr - first->CPU().ptr,
+            device->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV));
+  EXPECT_EQ(pool.GetPageCounts(32), (std::pair<size_t, size_t>{2, 2}));
+  EXPECT_EQ(pool.GetPageCounts(64), (std::pair<size_t, size_t>{1, 1}));
   auto heap = first->Heap();
   first.Reset();
-  auto recycled = pool.AcquirePage(1);
+  auto recycled = pool.Acquire(1);
   ASSERT_TRUE(recycled);
   EXPECT_EQ(recycled->Heap(), heap);
-  EXPECT_FALSE(pool.AcquirePage(1000001));
+  pool.Clear();
+  EXPECT_EQ(pool.GetPageCounts(), (std::pair<size_t, size_t>{3, 3}));
+  EXPECT_FALSE(pool.Acquire(0));
+  EXPECT_FALSE(pool.Acquire(1000001));
+  EXPECT_FALSE(pool.Acquire(UINT32_MAX));
+}
+
+TEST(D3D12TransientDescriptorPool, RecentConcurrentDemandIsCachedThenTrimmedPerClass) {
+  ComPtr<ID3D12Device> device;
+  ASSERT_TRUE(SUCCEEDED(D3D12CreateDevice(nullptr, D3D_FEATURE_LEVEL_11_0, IID_PPV_ARGS(&device))));
+  D3D12TransientDescriptorPool pool(device.Get(), D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
+  auto first = pool.Acquire(1);
+  auto second = pool.Acquire(1);
+  auto third = pool.Acquire(1);
+  auto other = pool.Acquire(64);
+  ASSERT_TRUE(first);
+  ASSERT_TRUE(second);
+  ASSERT_TRUE(third);
+  ASSERT_TRUE(other);
+  first.Reset();
+  second.Reset();
+  third.Reset();
+  EXPECT_EQ(pool.GetPageCounts(32), (std::pair<size_t, size_t>{3, 0}));
+  first = pool.Acquire(1);
+  std::this_thread::sleep_for(std::chrono::milliseconds(1100));
+  second = pool.Acquire(1);
+  second.Reset();
+  EXPECT_EQ(pool.GetPageCounts(32), (std::pair<size_t, size_t>{2, 1}));
+  EXPECT_EQ(pool.GetPageCounts(64), (std::pair<size_t, size_t>{1, 1}));
+  pool.Clear();
+  EXPECT_EQ(pool.GetPageCounts(), (std::pair<size_t, size_t>{2, 2}));
+  first.Reset();
+  other.Reset();
+  EXPECT_EQ(pool.GetPageCounts(), (std::pair<size_t, size_t>{0, 0}));
+}
+
+TEST(D3D12TransientDescriptorPool, SamplerLimitAndConcurrentReuse) {
+  ComPtr<ID3D12Device> device;
+  ASSERT_TRUE(SUCCEEDED(D3D12CreateDevice(nullptr, D3D_FEATURE_LEVEL_11_0, IID_PPV_ARGS(&device))));
+  D3D12TransientDescriptorPool pool(device.Get(), D3D12_DESCRIPTOR_HEAP_TYPE_SAMPLER);
+  auto last = pool.Acquire(1025);
+  ASSERT_TRUE(last);
+  EXPECT_EQ(last->Count(), 2048u);
+  EXPECT_FALSE(pool.Acquire(2049));
+  std::array<std::thread, 4> threads;
+  for (auto &thread : threads)
+    thread = std::thread([&] {
+      for (int i = 0; i < 100; ++i) {
+        auto page = pool.Acquire(32);
+        ASSERT_TRUE(page);
+        EXPECT_EQ(page->Count(), 32u);
+      }
+    });
+  for (auto &thread : threads)
+    thread.join();
+  EXPECT_EQ(pool.GetPageCounts(32).second, 0u);
+  EXPECT_LE(pool.GetPageCounts(32).first, 4u);
+  EXPECT_EQ(pool.GetPageCounts(2048), (std::pair<size_t, size_t>{1, 1}));
 }
 
 }  // namespace grassland::rhi::backend::d3d12

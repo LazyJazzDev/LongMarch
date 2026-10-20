@@ -558,10 +558,14 @@ TEST_P(RhiImage, BindingVersionsPreserveRangesAndArraysAcrossHeapPages) {
 #if defined(LONGMARCH_D3D12_ENABLED)
   if (GetParam() == BACKEND_API_D3D12) {
     auto native = static_cast<backend::d3d12::D3D12Device *>(device.Get());
-    // Append-only copies consume two pages of each type, not one full set of
-    // all bound descriptors for every draw. Old pages remain live until completion.
-    EXPECT_EQ(native->ResourceDescriptors().GetPageCounts().second, 2u);
-    EXPECT_EQ(native->SamplerDescriptors().GetPageCounts().second, 2u);
+    // Grow independently from 32: resources reach 4096, samplers reach 256.
+    // Earlier recorded draws pin every smaller page until command retirement.
+    EXPECT_EQ(native->ResourceDescriptors().GetPageCounts().second, 8u);
+    EXPECT_EQ(native->SamplerDescriptors().GetPageCounts().second, 4u);
+    for (uint32_t size = 32; size <= 4096; size *= 2)
+      EXPECT_EQ(native->ResourceDescriptors().GetPageCounts(size).second, 1u);
+    for (uint32_t size = 32; size <= 256; size *= 2)
+      EXPECT_EQ(native->SamplerDescriptors().GetPageCounts(size).second, 1u);
   }
 #endif
   ASSERT_TRUE(commands->CmdEndRendering());
@@ -628,8 +632,22 @@ TEST_P(RhiImage, BindingVersionsPreserveRangesAndArraysAcrossHeapPages) {
   selection.Release();
   uniform.Release();
   commands.Release();
+#if defined(LONGMARCH_D3D12_ENABLED)
+  if (GetParam() == BACKEND_API_D3D12) {
+    auto native = static_cast<backend::d3d12::D3D12Device *>(device.Get());
+    EXPECT_EQ(native->ResourceDescriptors().GetPageCounts().second, 8u);
+    EXPECT_EQ(native->SamplerDescriptors().GetPageCounts().second, 4u);
+  }
+#endif
   gate.reset();
   ASSERT_TRUE(done->WaitHost());
+#if defined(LONGMARCH_D3D12_ENABLED)
+  if (GetParam() == BACKEND_API_D3D12) {
+    auto native = static_cast<backend::d3d12::D3D12Device *>(device.Get());
+    EXPECT_EQ(native->ResourceDescriptors().GetPageCounts().second, 0u);
+    EXPECT_EQ(native->SamplerDescriptors().GetPageCounts().second, 0u);
+  }
+#endif
   std::array<uint8_t, 4> pixel{};
   ReadPixel(device.Get(), target.Get(), GetParam(), 16, 32, pixel);
   EXPECT_EQ(pixel, (std::array<uint8_t, 4>{255, 0, 0, 255}));

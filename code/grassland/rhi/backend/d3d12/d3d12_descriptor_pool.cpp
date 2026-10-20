@@ -35,28 +35,15 @@ D3D12_CPU_DESCRIPTOR_HANDLE D3D12DescriptorPool::Lease::CPU(uint32_t index) cons
   return result;
 }
 
-D3D12_GPU_DESCRIPTOR_HANDLE D3D12DescriptorPool::Lease::GPU(uint32_t index) const {
-  assert(index < count_ && pool_->shader_visible_);
-  auto result = page_->heap->GetGPUDescriptorHandleForHeapStart();
-  result.ptr += UINT64(offset_ + index) * pool_->stride_;
-  return result;
-}
-
-D3D12DescriptorPool::D3D12DescriptorPool(ID3D12Device *device,
-                                         D3D12_DESCRIPTOR_HEAP_TYPE type,
-                                         bool shader_visible,
-                                         uint32_t page_capacity)
+D3D12DescriptorPool::D3D12DescriptorPool(ID3D12Device *device, D3D12_DESCRIPTOR_HEAP_TYPE type, uint32_t page_capacity)
     : device_(device),
       type_(type),
-      shader_visible_(shader_visible),
       page_capacity_(page_capacity),
       stride_(device->GetDescriptorHandleIncrementSize(type)) {
 }
 
 ObjectPtr<D3D12DescriptorPool::Lease> D3D12DescriptorPool::Acquire(uint32_t count) {
-  if (!count || !page_capacity_ ||
-      (shader_visible_ && type_ != D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV &&
-       type_ != D3D12_DESCRIPTOR_HEAP_TYPE_SAMPLER))
+  if (!count || !page_capacity_)
     return {};
   const uint32_t limit = type_ == D3D12_DESCRIPTOR_HEAP_TYPE_SAMPLER ? 2048 : 1000000;
   if (count > limit || page_capacity_ > limit)
@@ -82,7 +69,7 @@ ObjectPtr<D3D12DescriptorPool::Lease> D3D12DescriptorPool::Acquire(uint32_t coun
       D3D12_DESCRIPTOR_HEAP_DESC desc{};
       desc.Type = type_;
       desc.NumDescriptors = fresh->capacity;
-      desc.Flags = shader_visible_ ? D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE : D3D12_DESCRIPTOR_HEAP_FLAG_NONE;
+      desc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_NONE;
       if (!Check(device_->CreateDescriptorHeap(&desc, IID_PPV_ARGS(&fresh->heap)), "Create descriptor pool page"))
         return {};
       page = fresh.get();
@@ -104,10 +91,6 @@ ObjectPtr<D3D12DescriptorPool::Lease> D3D12DescriptorPool::Acquire(uint32_t coun
   } catch (const std::bad_alloc &) {
     return {};
   }
-}
-
-ObjectPtr<D3D12DescriptorPool::Lease> D3D12DescriptorPool::AcquirePage(uint32_t minimum_count) {
-  return Acquire(std::max(minimum_count, page_capacity_));
 }
 
 void D3D12DescriptorPool::ReleaseRange(Page *page, Allocation *allocation) {
