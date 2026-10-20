@@ -41,12 +41,11 @@ struct SamplerDesc {
   SamplerAddressMode address_u{SAMPLER_ADDRESS_REPEAT}, address_v{SAMPLER_ADDRESS_REPEAT};
 };
 
-// A borrowed buffer view. size == 0 selects the remaining bytes; stride defaults
-// to 32-bit elements for structured buffers and is ignored for uniform buffers.
+// A borrowed byte range. size == 0 selects the remaining bytes.
+// Structured element layout is reflected from the Program, not supplied by callers.
 struct BufferView {
   IBuffer *buffer{};
   uint64_t offset{}, size{};
-  uint32_t stride{4};
 };
 
 // Creation allocates the layout without populating resources. BindResource writes

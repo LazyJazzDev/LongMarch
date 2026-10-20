@@ -27,9 +27,6 @@ bool D3D12BindingGroup::Version::WriteDescriptors(size_t, const std::vector<Reso
       const auto size = (e.size + 255) & ~uint64_t(255);
       if (e.offset % 256 || size > e.buffer->GetDesc().size - e.offset)
         return false;
-    } else if (b.type == BINDING_STORAGE_BUFFER || b.type == BINDING_RW_STORAGE_BUFFER) {
-      if (e.stride > 2048 || e.size / e.stride > UINT32_MAX)
-        return false;
     }
   }
   // The context packs captured versions into its shader-visible descriptor tables.

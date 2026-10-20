@@ -63,7 +63,8 @@ bool CompileSlang(const ShaderDesc &shader,
                   const std::string &prefix,
                   BackendAPI api,
                   std::vector<uint8_t> &code,
-                  const PipelineLayoutDesc *binding_layout) {
+                  const PipelineLayoutDesc *binding_layout,
+                  StructuredBufferStrides *strides) {
   code.clear();
   thread_local Slang::ComPtr<slang::IGlobalSession> global;
   if (!global) {
@@ -147,11 +148,13 @@ bool CompileSlang(const ShaderDesc &shader,
   const auto bindings = binding_layout ? MapBindings(*binding_layout, api) : std::vector<MappedBinding>{};
   for (unsigned p = 0; p < layout->getParameterCount(); ++p) {
     auto parameter = layout->getParameterByIndex(p);
+    auto type_layout = parameter->getTypeLayout();
     auto type = parameter->getType();
     size_t count = 1;
     while (type->getKind() == slang::TypeReflection::Kind::Array) {
       count *= type->getElementCount();
       type = type->getElementType();
+      type_layout = type_layout->getElementTypeLayout();
     }
     int resource = -1;
     if (type->getKind() == slang::TypeReflection::Kind::ConstantBuffer)
@@ -185,6 +188,21 @@ bool CompileSlang(const ShaderDesc &shader,
     if (!match || count != match->desc.count || !(match->desc.visibility & stage_bit)) {
       ReportError(-1, std::string("Shader resource does not match the C++ binding layout: ") + parameter->getName());
       return false;
+    }
+    if (strides && (resource == BINDING_STORAGE_BUFFER || resource == BINDING_RW_STORAGE_BUFFER)) {
+      // Reflect the element in its structured-buffer layout for this target,
+      // not the standalone struct or constant-buffer layout.
+      auto element = type_layout->getElementTypeLayout();
+      const auto stride = element ? element->getStride() : 0;
+      if (!stride || stride > UINT32_MAX || (api == BACKEND_API_D3D12 && (stride > 2048 || stride % 4))) {
+        ReportError(-1, "Unsupported reflected structured-buffer stride.");
+        return false;
+      }
+      auto [it, inserted] = strides->emplace(std::make_pair(match->group, match->desc.binding), uint32_t(stride));
+      if (!inserted && it->second != stride) {
+        ReportError(-1, "Shader stages disagree on structured-buffer element stride.");
+        return false;
+      }
     }
   }
 

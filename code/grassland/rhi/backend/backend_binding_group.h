@@ -12,7 +12,6 @@ class BindingGroup : public Object<IBindingGroup> {
     uint32_t binding{}, array_element{};
     IBuffer *buffer{};
     uint64_t offset{}, size{};
-    uint32_t stride{};
     IImage *image{};
     SamplerDesc sampler;
     bool initialized{};

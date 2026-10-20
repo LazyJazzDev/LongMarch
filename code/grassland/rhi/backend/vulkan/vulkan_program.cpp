@@ -42,10 +42,13 @@ bool VulkanProgram::Finalize() {
       return false;
     }
     std::vector<uint8_t> code[2];
+    structured_buffer_strides_.clear();
     auto prefix = ShaderMacroHeader(desc_, BACKEND_API_VULKAN);
-    if (!CompileSlang(desc_.vertex_shader->GetDesc(), prefix, BACKEND_API_VULKAN, code[0], &desc_.pipeline_layout))
+    if (!CompileSlang(desc_.vertex_shader->GetDesc(), prefix, BACKEND_API_VULKAN, code[0], &desc_.pipeline_layout,
+                      &structured_buffer_strides_))
       return false;
-    if (!CompileSlang(desc_.fragment_shader->GetDesc(), prefix, BACKEND_API_VULKAN, code[1], &desc_.pipeline_layout))
+    if (!CompileSlang(desc_.fragment_shader->GetDesc(), prefix, BACKEND_API_VULKAN, code[1], &desc_.pipeline_layout,
+                      &structured_buffer_strides_))
       return false;
     for (int i = 0; i < 2; ++i) {
       VkShaderModuleCreateInfo create{VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO};

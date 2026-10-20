@@ -163,8 +163,6 @@ bool BindingGroup::Write(uint32_t binding, uint32_t first_element, BindingType k
         e.size = buffer->GetDesc().size - e.offset;
       if (e.size > buffer->GetDesc().size - e.offset)
         return false;
-      if (it->type != BINDING_UNIFORM_BUFFER && (!e.stride || e.offset % e.stride || e.size % e.stride || e.stride % 4))
-        return false;
     } else if (kind == BINDING_TEXTURE2D) {
       auto image = dynamic_cast<Image *>(e.image);
       if (!image || !image->IsValid() || image->DeviceIdentity() != device_->NativeIdentity() ||
@@ -198,7 +196,6 @@ bool BindingGroup::BindResource(uint32_t binding, const std::vector<BufferView> 
       r.buffer = b.buffer;
       r.offset = b.offset;
       r.size = b.size;
-      r.stride = b.stride;
       resources.push_back(r);
     }
     return Write(binding, first_element, BINDING_UNIFORM_BUFFER, std::move(resources));

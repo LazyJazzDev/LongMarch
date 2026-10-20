@@ -506,8 +506,7 @@ TEST_P(RhiImage, BindingVersionsPreserveRangesAndArraysAcrossHeapPages) {
   ASSERT_TRUE(material);
   ASSERT_TRUE(material->BindResource(7, std::vector<IImage *>{red.Get(), green.Get()}));
   ASSERT_TRUE(material->BindResource(9, SamplerDesc{}));
-  ASSERT_TRUE(
-      material->BindResource(11, std::vector<BufferView>{{factors.Get(), 0, 16, 16}, {factors.Get(), 16, 16, 16}}));
+  ASSERT_TRUE(material->BindResource(11, std::vector<BufferView>{{factors.Get(), 0, 16}, {factors.Get(), 16, 16}}));
   ObjPtr<ICommandContext> commands = device->CreateCommandContext();
   const uint32_t red_pixel = 0xff0000ff, green_pixel = 0xff00ff00;
   ASSERT_TRUE(commands->CmdUploadImage(red.Get(), &red_pixel, 4));
@@ -522,8 +521,7 @@ TEST_P(RhiImage, BindingVersionsPreserveRangesAndArraysAcrossHeapPages) {
   // Changes after binding must not affect this context, including render-pass restarts.
   ASSERT_TRUE(material->BindResource(7, std::vector<IImage *>{green.Get(), red.Get()}));
   ASSERT_TRUE(material->BindResource(9, SamplerDesc{SAMPLER_FILTER_NEAREST}));
-  ASSERT_TRUE(
-      material->BindResource(11, std::vector<BufferView>{{factors.Get(), 0, 16, 16}, {factors.Get(), 0, 16, 16}}));
+  ASSERT_TRUE(material->BindResource(11, std::vector<BufferView>{{factors.Get(), 0, 16}, {factors.Get(), 0, 16}}));
   ASSERT_TRUE(commands->CmdBeginRendering(
       {{{target.Get(), ATTACHMENT_LOAD_OP_CLEAR, ATTACHMENT_STORE_OP_STORE, {0, 0, 0, 1}}}}));
   ASSERT_TRUE(commands->CmdSetViewport({0, 0, 64, 64, 0, 1}));
@@ -609,6 +607,78 @@ TEST_P(RhiImage, BindingVersionsPreserveRangesAndArraysAcrossHeapPages) {
   EXPECT_EQ(pixel, (std::array<uint8_t, 4>{0, 255, 0, 255}));
 }
 
+TEST_P(RhiImage, ReflectedStructuredStrideReadsSecondPaddedElement) {
+  if (GetParam() == BACKEND_API_METAL)
+    GTEST_SKIP() << "Metal bindings are deferred.";
+  ObjPtr<ICore> core = CreateCore(GetParam());
+  ASSERT_TRUE(core);
+  ObjPtr<IDevice> device = core->CreateDeviceByAutoSelection();
+  ASSERT_TRUE(device);
+  Track(device.Get());
+  ObjPtr<IQueue> queue = device->GetQueue(QUEUE_TYPE_GRAPHICS);
+  ObjPtr<IImage> target = device->CreateImage({32, 32, IMAGE_FORMAT_RGBA8_UNORM});
+  ObjPtr<IBuffer> buffer = device->CreateBuffer({256});
+  ASSERT_TRUE(queue);
+  ASSERT_TRUE(target);
+  ASSERT_TRUE(buffer);
+  const std::string source = R"(
+    struct Element { float4 color; float scale; };
+    RHI_STRUCTURED_BUFFER(0,0,Element,values);
+    RHI_STRUCTURED_BUFFER(0,1,float4,unusedValues);
+    float4 VSMain(uint id:SV_VertexID):SV_Position {
+      float2 p[3]={float2(-1,-1),float2(3,-1),float2(-1,3)};return float4(p[id],0,1);
+    }
+    float4 PSMain():SV_Target0 { return values[1].color*values[1].scale; }
+  )";
+  ObjPtr<IShader> vs = device->CreateShader({source, "VSMain", SHADER_STAGE_VERTEX});
+  ObjPtr<IShader> ps = device->CreateShader({source, "PSMain", SHADER_STAGE_FRAGMENT});
+  ProgramDesc desc;
+  desc.vertex_shader = vs.Get();
+  desc.fragment_shader = ps.Get();
+  desc.pipeline_layout.groups = {{{{0, BINDING_STORAGE_BUFFER, 1, SHADER_VISIBILITY_FRAGMENT},
+                                   {1, BINDING_STORAGE_BUFFER, 1, SHADER_VISIBILITY_FRAGMENT}}}};
+  ObjPtr<IProgram> program = device->CreateProgram(desc);
+  ASSERT_TRUE(program);
+  ASSERT_TRUE(program->Finalize());
+  // The same Slang struct has a 20-byte DXIL stride and a padded 32-byte SPIR-V stride.
+  const uint32_t stride = GetParam() == BACKEND_API_D3D12 ? 20 : 32;
+  std::array<uint8_t, 256> data{};
+  const float value[] = {1, 0, 0, 1, 1};
+  std::memcpy(data.data() + stride, value, sizeof(value));
+  ObjPtr<IBindingGroup> group = device->CreateBindingGroup(desc.pipeline_layout.groups[0]);
+  ASSERT_TRUE(group);
+  ASSERT_TRUE(group->BindResource(0, BufferView{buffer.Get(), 0, stride * 2}));
+  // No stride is needed for an optimized-out binding, even for an arbitrary byte view.
+  ASSERT_TRUE(group->BindResource(1, BufferView{buffer.Get(), 0, 3}));
+  if (GetParam() == BACKEND_API_D3D12) {
+    ObjPtr<IBindingGroup> invalid = device->CreateBindingGroup(desc.pipeline_layout.groups[0]);
+    ASSERT_TRUE(invalid);
+    ASSERT_TRUE(invalid->BindResource(0, BufferView{buffer.Get(), 4, stride * 2}));
+    ASSERT_TRUE(invalid->BindResource(1, buffer.Get()));
+    ObjPtr<ICommandContext> rejected = device->CreateCommandContext();
+    ASSERT_TRUE(rejected);
+    ASSERT_TRUE(rejected->CmdBindProgram(program.Get()));
+    EXPECT_FALSE(rejected->CmdBindGroup(0, invalid.Get()));
+  }
+  ObjPtr<ICommandContext> commands = device->CreateCommandContext();
+  ASSERT_TRUE(commands);
+  ASSERT_TRUE(commands->CmdUploadBuffer(buffer.Get(), 0, data.data(), data.size()));
+  ASSERT_TRUE(commands->CmdBindProgram(program.Get()));
+  ASSERT_TRUE(commands->CmdBindGroup(0, group.Get()));
+  ASSERT_TRUE(commands->CmdBeginRendering(
+      {{{target.Get(), ATTACHMENT_LOAD_OP_CLEAR, ATTACHMENT_STORE_OP_STORE, {0, 0, 0, 1}}}}));
+  ASSERT_TRUE(commands->CmdSetViewport({0, 0, 32, 32, 0, 1}));
+  ASSERT_TRUE(commands->CmdSetScissor({0, 0, 32, 32}));
+  ASSERT_TRUE(commands->CmdDraw(3));
+  ASSERT_TRUE(commands->CmdEndRendering());
+  ObjPtr<ISubmissionToken> done = queue->Submit(commands.Get());
+  ASSERT_TRUE(done);
+  ASSERT_TRUE(done->WaitHost());
+  std::array<uint8_t, 4> pixel{};
+  ReadPixel(device.Get(), target.Get(), GetParam(), 16, 16, pixel);
+  EXPECT_EQ(pixel, (std::array<uint8_t, 4>{255, 0, 0, 255}));
+}
+
 TEST_P(RhiImage, StorageImageAndBufferBecomeReadableAfterRendering) {
   if (GetParam() == BACKEND_API_METAL)
     GTEST_SKIP() << "Metal implementation is deferred.";
@@ -667,7 +737,7 @@ TEST_P(RhiImage, StorageImageAndBufferBecomeReadableAfterRendering) {
   ASSERT_TRUE(rg);
   for (auto group : {wg.Get(), rg.Get()}) {
     ASSERT_TRUE(group->BindResource(0, storage.Get()));
-    ASSERT_TRUE(group->BindResource(1, BufferView{buffer.Get(), 0, 0, 16}));
+    ASSERT_TRUE(group->BindResource(1, BufferView{buffer.Get()}));
   }
   ObjPtr<ICommandContext> commands = device->CreateCommandContext();
   for (auto program : {writer.Get(), reader.Get()}) {

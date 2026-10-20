@@ -30,10 +30,13 @@ bool D3D12Program::Finalize() {
     }
     auto native = static_cast<D3D12Device *>(device_)->NativeDevice();
     std::vector<uint8_t> vertex, fragment;
+    structured_buffer_strides_.clear();
     auto prefix = ShaderMacroHeader(desc_, BACKEND_API_D3D12);
-    if (!CompileSlang(desc_.vertex_shader->GetDesc(), prefix, BACKEND_API_D3D12, vertex, &desc_.pipeline_layout))
+    if (!CompileSlang(desc_.vertex_shader->GetDesc(), prefix, BACKEND_API_D3D12, vertex, &desc_.pipeline_layout,
+                      &structured_buffer_strides_))
       return false;
-    if (!CompileSlang(desc_.fragment_shader->GetDesc(), prefix, BACKEND_API_D3D12, fragment, &desc_.pipeline_layout))
+    if (!CompileSlang(desc_.fragment_shader->GetDesc(), prefix, BACKEND_API_D3D12, fragment, &desc_.pipeline_layout,
+                      &structured_buffer_strides_))
       return false;
     D3D12_ROOT_SIGNATURE_DESC root{};
     root.Flags = D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT;

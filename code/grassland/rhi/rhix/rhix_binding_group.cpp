@@ -19,7 +19,7 @@ bool BindingGroup::BindResource(uint32_t binding, const Buffer &buffer) {
 }
 
 bool BindingGroup::BindResource(uint32_t binding, const BufferView &buffer) {
-  return Get()->BindResource(binding, rhi::BufferView{buffer.buffer.Get(), buffer.offset, buffer.size, buffer.stride});
+  return Get()->BindResource(binding, rhi::BufferView{buffer.buffer.Get(), buffer.offset, buffer.size});
 }
 
 bool BindingGroup::BindResource(uint32_t binding, const Image &image) {
@@ -47,7 +47,7 @@ bool BindingGroup::BindResource(uint32_t binding, const std::vector<BufferView> 
     std::vector<rhi::BufferView> native;
     native.reserve(buffers.size());
     for (const auto &b : buffers)
-      native.push_back({b.buffer.Get(), b.offset, b.size, b.stride});
+      native.push_back({b.buffer.Get(), b.offset, b.size});
     return Get()->BindResource(binding, native, first_element);
   } catch (const std::bad_alloc &) {
     return false;

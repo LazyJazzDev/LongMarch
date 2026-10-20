@@ -8,7 +8,6 @@ namespace grassland::rhix {
 struct BufferView {
   Buffer buffer;
   uint64_t offset{}, size{};
-  uint32_t stride{4};
 };
 
 class BindingGroup : public ObjectContainer {

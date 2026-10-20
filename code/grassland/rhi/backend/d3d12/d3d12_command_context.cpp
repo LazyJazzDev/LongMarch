@@ -597,6 +597,13 @@ bool D3D12CommandContext::CmdBindGroup(uint32_t index, IBindingGroup *group) {
     return false;
   }
   auto version = native->CurrentVersion();
+  for (const auto &resource : version->GetResources()) {
+    auto stride = program_->StructuredBufferStride(index, resource.binding);
+    if (stride && (resource.offset % stride || resource.size % stride || resource.size / stride > UINT32_MAX)) {
+      recording_failed_ = true;
+      return false;
+    }
+  }
   if (!RetainResource(version))
     return false;
   groups_[index] = version;
@@ -635,6 +642,7 @@ bool D3D12CommandContext::PrepareGroups() {
           for (auto e : groups_[g]->GetResources())
             if (e.binding == m.desc.binding) {
               auto type = m.desc.type;
+              const auto stride = program_->StructuredBufferStride(g, e.binding);
               D3D12_CPU_DESCRIPTOR_HANDLE handle{};
               if (groups_dirty_)
                 handle = type == BINDING_SAMPLER ? samplers->CPU(s++) : resources->CPU(r++);
@@ -659,19 +667,23 @@ bool D3D12CommandContext::PrepareGroups() {
                   D3D12_SHADER_RESOURCE_VIEW_DESC desc{};
                   desc.ViewDimension = D3D12_SRV_DIMENSION_BUFFER;
                   desc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
-                  desc.Buffer.FirstElement = e.offset / e.stride;
-                  desc.Buffer.NumElements = UINT(e.size / e.stride);
-                  desc.Buffer.StructureByteStride = e.stride;
+                  desc.Buffer.FirstElement = stride ? e.offset / stride : 0;
+                  desc.Buffer.NumElements = stride ? UINT(e.size / stride) : 1;
+                  // An optimized-out binding has no reflected stride; use a valid null descriptor.
+                  desc.Buffer.StructureByteStride = stride ? stride : 4;
                   if (groups_dirty_)
-                    device_->NativeDevice()->CreateShaderResourceView(buffer->NativeBuffer(), &desc, handle);
+                    device_->NativeDevice()->CreateShaderResourceView(stride ? buffer->NativeBuffer() : nullptr, &desc,
+                                                                      handle);
                 } else {
                   D3D12_UNORDERED_ACCESS_VIEW_DESC desc{};
                   desc.ViewDimension = D3D12_UAV_DIMENSION_BUFFER;
-                  desc.Buffer.FirstElement = e.offset / e.stride;
-                  desc.Buffer.NumElements = UINT(e.size / e.stride);
-                  desc.Buffer.StructureByteStride = e.stride;
+                  desc.Buffer.FirstElement = stride ? e.offset / stride : 0;
+                  desc.Buffer.NumElements = stride ? UINT(e.size / stride) : 1;
+                  // An optimized-out binding has no reflected stride; use a valid null descriptor.
+                  desc.Buffer.StructureByteStride = stride ? stride : 4;
                   if (groups_dirty_)
-                    device_->NativeDevice()->CreateUnorderedAccessView(buffer->NativeBuffer(), nullptr, &desc, handle);
+                    device_->NativeDevice()->CreateUnorderedAccessView(stride ? buffer->NativeBuffer() : nullptr,
+                                                                       nullptr, &desc, handle);
                   D3D12_RESOURCE_BARRIER barrier{};
                   barrier.Type = D3D12_RESOURCE_BARRIER_TYPE_UAV;
                   barrier.UAV.pResource = buffer->NativeBuffer();

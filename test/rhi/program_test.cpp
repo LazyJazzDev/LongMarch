@@ -3,6 +3,7 @@
 #include <cstdlib>
 
 #include "grassland/rhi/backend/backend_binding_group.h"
+#include "grassland/rhi/backend/backend_program.h"
 #if defined(LONGMARCH_D3D12_ENABLED)
 #include <d3d12sdklayers.h>
 
@@ -402,6 +403,75 @@ TEST_P(RhiProgram, BindingUpdatesAreTransactionalAndForkOnlyCapturedVersions) {
   image.Release();
   EXPECT_EQ(captured->GetResources()[0].buffer->GetDesc().size, 256u);
   EXPECT_EQ(captured->GetResources()[2].image->GetDesc().width, 1u);
+}
+
+TEST_P(RhiProgram, StructuredStridesComeFromTargetLayoutAndMustAgreeAcrossStages) {
+  if (GetParam() == BACKEND_API_METAL)
+    GTEST_SKIP() << "Metal bindings are deferred.";
+  ObjPtr<ICore> core = CreateCore(GetParam());
+  ASSERT_TRUE(core);
+  ObjPtr<IDevice> device = core->CreateDeviceByAutoSelection();
+  ASSERT_TRUE(device);
+  const std::string vertex = R"(
+    RHI_STRUCTURED_BUFFER(0,0,float4,positions);
+    float4 VSMain(uint id:SV_VertexID):SV_Position { return positions[id]; }
+  )";
+  const std::string fragment = R"(
+    RHI_STRUCTURED_BUFFER(0,0,float2,colors);
+    float4 PSMain():SV_Target0 { return float4(colors[0],0,1); }
+  )";
+  ObjPtr<IShader> vs = device->CreateShader({vertex, "VSMain", SHADER_STAGE_VERTEX});
+  ObjPtr<IShader> ps = device->CreateShader({fragment, "PSMain", SHADER_STAGE_FRAGMENT});
+  ProgramDesc desc;
+  desc.vertex_shader = vs.Get();
+  desc.fragment_shader = ps.Get();
+  desc.pipeline_layout.groups = {{{{0, BINDING_STORAGE_BUFFER}}}};
+  ObjPtr<IProgram> mismatch = device->CreateProgram(desc);
+  ASSERT_TRUE(mismatch);
+  EXPECT_FALSE(mismatch->Finalize());
+  EXPECT_FALSE(mismatch->IsFinalized());
+  // A retry must not reuse partially merged reflection from the previous attempt.
+  EXPECT_FALSE(mismatch->Finalize());
+  ps = device->CreateShader({R"(
+    RHI_STRUCTURED_BUFFER(0,0,float4,colors);
+    float4 PSMain():SV_Target0 { return colors[0]; }
+  )",
+                             "PSMain", SHADER_STAGE_FRAGMENT});
+  desc.fragment_shader = ps.Get();
+  ObjPtr<IProgram> matching = device->CreateProgram(desc);
+  ASSERT_TRUE(matching);
+  ASSERT_TRUE(matching->Finalize());
+  EXPECT_EQ(static_cast<backend::Program *>(matching.Get())->StructuredBufferStride(0, 0), 16u);
+
+  const std::string source = R"(
+    struct Element { float4 color; float scale; };
+    RHI_STRUCTURED_BUFFER_ARRAY(0,0,Element,values);
+    RHI_RW_STRUCTURED_BUFFER(0,1,Element,outputValues);
+    RHI_STRUCTURED_BUFFER(0,2,float4,unusedValues);
+    float4 VSMain(uint id:SV_VertexID):SV_Position {
+      float2 p[3]={float2(-1,-1),float2(3,-1),float2(-1,3)};
+      return float4(p[id],0,1);
+    }
+    float4 PSMain():SV_Target0 {
+      outputValues[0]=values[1][1];return outputValues[0].color*outputValues[0].scale;
+    }
+  )";
+  vs = device->CreateShader({source, "VSMain", SHADER_STAGE_VERTEX});
+  ps = device->CreateShader({source, "PSMain", SHADER_STAGE_FRAGMENT});
+  desc.vertex_shader = vs.Get();
+  desc.fragment_shader = ps.Get();
+  desc.pipeline_layout.groups = {{{{0, BINDING_STORAGE_BUFFER, 2, SHADER_VISIBILITY_FRAGMENT},
+                                   {1, BINDING_RW_STORAGE_BUFFER, 1, SHADER_VISIBILITY_FRAGMENT},
+                                   {2, BINDING_STORAGE_BUFFER, 1, SHADER_VISIBILITY_FRAGMENT}}}};
+  ObjPtr<IProgram> program = device->CreateProgram(desc);
+  ASSERT_TRUE(program);
+  ASSERT_TRUE(program->Finalize());
+  auto native = static_cast<backend::Program *>(program.Get());
+  const uint32_t stride = GetParam() == BACKEND_API_D3D12 ? 20 : 32;
+  EXPECT_EQ(native->StructuredBufferStride(0, 0), stride);
+  EXPECT_EQ(native->StructuredBufferStride(0, 1), stride);
+  EXPECT_EQ(native->StructuredBufferStride(0, 2), 0u);
+  EXPECT_TRUE(program->Finalize());
 }
 
 INSTANTIATE_TEST_SUITE_P(Backends, RhiProgram, testing::ValuesIn(program_backends));
