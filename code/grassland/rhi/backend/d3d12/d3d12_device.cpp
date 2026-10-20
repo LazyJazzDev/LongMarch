@@ -105,7 +105,7 @@ D3D12DescriptorPool &D3D12Device::DSVPool() {
   return dsv_pool_;
 }
 
-D3D12RTVPool &D3D12Device::RTVPool() {
+D3D12DescriptorPool &D3D12Device::RTVPool() {
   return rtv_pool_;
 }
 
@@ -174,7 +174,7 @@ D3D12Device::D3D12Device(PhysicalDevice info, Core *core, ComPtr<ID3D12Device> d
     : Device(std::move(info), core),
       upload_pool_(this),
       device_(std::move(device)),
-      rtv_pool_(device_.Get()),
+      rtv_pool_(device_.Get(), D3D12_DESCRIPTOR_HEAP_TYPE_RTV),
       dsv_pool_(device_.Get(), D3D12_DESCRIPTOR_HEAP_TYPE_DSV),
       resource_descriptors_(device_.Get(), D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV, true, 4096),
       sampler_descriptors_(device_.Get(), D3D12_DESCRIPTOR_HEAP_TYPE_SAMPLER, true, 256),

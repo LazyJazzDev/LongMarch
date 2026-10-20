@@ -2,7 +2,7 @@
 #include <tuple>
 
 #include "grassland/rhi/backend/backend_device.h"
-#include "grassland/rhi/backend/d3d12/d3d12_rtv_pool.h"
+#include "grassland/rhi/backend/d3d12/d3d12_descriptor_pool.h"
 #include "grassland/rhi/backend/d3d12/d3d12_upload_pool.h"
 #include "grassland/rhi/backend/d3d12/d3d12_util.h"
 
@@ -13,7 +13,7 @@ class D3D12Device final : public Device {
   ~D3D12Device() override;
   ID3D12Device *NativeDevice() const;
   D3D12MA::Allocator *Allocator() const;
-  D3D12RTVPool &RTVPool();
+  D3D12DescriptorPool &RTVPool();
   D3D12DescriptorPool &DSVPool();
   D3D12DescriptorPool &ResourceDescriptors();
   D3D12DescriptorPool &SamplerDescriptors();
@@ -53,7 +53,7 @@ class D3D12Device final : public Device {
   std::vector<std::tuple<ComPtr<ID3D12CommandAllocator>, ComPtr<ID3D12GraphicsCommandList>, HANDLE>> command_pool_;
   ComPtr<ID3D12Device> device_;
   ComPtr<D3D12MA::Allocator> allocator_;
-  D3D12RTVPool rtv_pool_;
+  D3D12DescriptorPool rtv_pool_;
   D3D12DescriptorPool dsv_pool_;
   D3D12DescriptorPool resource_descriptors_, sampler_descriptors_;
   D3D12DescriptorPool resource_descriptor_storage_, sampler_descriptor_storage_;
