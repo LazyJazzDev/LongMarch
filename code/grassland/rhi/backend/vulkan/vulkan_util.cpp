@@ -1,6 +1,25 @@
 ﻿#include "grassland/rhi/backend/vulkan/vulkan_util.h"
 
 namespace grassland::rhi::backend::vulkan {
+VkFormat NativeImageFormat(ImageFormat format) {
+  switch (format) {
+    case IMAGE_FORMAT_RGBA8_UNORM:
+      return VK_FORMAT_R8G8B8A8_UNORM;
+    case IMAGE_FORMAT_BGRA8_UNORM:
+      return VK_FORMAT_B8G8R8A8_UNORM;
+    case IMAGE_FORMAT_D32_FLOAT:
+      return VK_FORMAT_D32_SFLOAT;
+    case IMAGE_FORMAT_D24_UNORM_S8_UINT:
+      return VK_FORMAT_D24_UNORM_S8_UINT;
+    default:
+      return VK_FORMAT_UNDEFINED;
+  }
+}
+
+VkImageAspectFlags ImageAspect(ImageFormat format) {
+  return IsDepthFormat(format) ? VK_IMAGE_ASPECT_DEPTH_BIT | (HasStencil(format) ? VK_IMAGE_ASPECT_STENCIL_BIT : 0)
+                               : VK_IMAGE_ASPECT_COLOR_BIT;
+}
 
 DeviceFeatures::DeviceFeatures(VkPhysicalDevice device, uint32_t api_version) {
   std::vector<VkExtensionProperties> available;

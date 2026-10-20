@@ -46,6 +46,4 @@ class VulkanRenderTargetPool {
   std::vector<std::unique_ptr<Entry>> entries_;
 };
 
-VkFormat ColorFormat(ImageFormat format);
-VkImageAspectFlags ImageAspect(ImageFormat format);
 }  // namespace grassland::rhi::backend::vulkan

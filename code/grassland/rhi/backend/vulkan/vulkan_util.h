@@ -7,6 +7,8 @@
 #include "grassland/rhi/backend/backend_util.h"
 
 namespace grassland::rhi::backend::vulkan {
+VkFormat NativeImageFormat(ImageFormat format);
+VkImageAspectFlags ImageAspect(ImageFormat format);
 
 bool Check(VkResult result, const char *operation);
 

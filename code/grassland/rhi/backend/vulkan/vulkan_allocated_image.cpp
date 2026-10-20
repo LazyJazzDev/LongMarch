@@ -30,23 +30,9 @@ VkImage VulkanAllocatedImage::NativeImage() const {
 VulkanAllocatedImage *VulkanAllocatedImage::Create(VulkanDevice *device, const ImageDesc &desc) {
   if (!desc.width || !desc.height || (desc.storage && desc.format != IMAGE_FORMAT_RGBA8_UNORM))
     return nullptr;
-  VkFormat format;
-  switch (desc.format) {
-    case IMAGE_FORMAT_RGBA8_UNORM:
-      format = VK_FORMAT_R8G8B8A8_UNORM;
-      break;
-    case IMAGE_FORMAT_BGRA8_UNORM:
-      format = VK_FORMAT_B8G8R8A8_UNORM;
-      break;
-    case IMAGE_FORMAT_D32_FLOAT:
-      format = VK_FORMAT_D32_SFLOAT;
-      break;
-    case IMAGE_FORMAT_D24_UNORM_S8_UINT:
-      format = VK_FORMAT_D24_UNORM_S8_UINT;
-      break;
-    default:
-      return nullptr;
-  }
+  const auto format = NativeImageFormat(desc.format);
+  if (format == VK_FORMAT_UNDEFINED)
+    return nullptr;
   try {
     auto image = std::unique_ptr<VulkanAllocatedImage>(new VulkanAllocatedImage(device, desc));
     VkImageCreateInfo info{VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO};

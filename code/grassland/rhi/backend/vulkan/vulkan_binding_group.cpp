@@ -213,7 +213,7 @@ VulkanBindingGroup *VulkanBindingGroup::Create(VulkanDevice *device,
         VkImageViewCreateInfo create{VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO};
         create.image = static_cast<VulkanImage *>(e.image)->NativeImage();
         create.viewType = VK_IMAGE_VIEW_TYPE_2D;
-        create.format = ColorFormat(e.image->GetDesc().format);
+        create.format = NativeImageFormat(e.image->GetDesc().format);
         create.subresourceRange = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1};
         if (!Check(vkCreateImageView(native, &create, nullptr, &group->views_[i]), "Create binding view"))
           return nullptr;

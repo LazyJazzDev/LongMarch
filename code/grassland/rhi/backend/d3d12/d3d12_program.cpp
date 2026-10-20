@@ -119,14 +119,11 @@ bool D3D12Program::Finalize() {
     };
     state.DepthStencilState.FrontFace = face(ds.front);
     state.DepthStencilState.BackFace = face(ds.back);
-    state.DSVFormat = ds.format == IMAGE_FORMAT_D32_FLOAT           ? DXGI_FORMAT_D32_FLOAT
-                      : ds.format == IMAGE_FORMAT_D24_UNORM_S8_UINT ? DXGI_FORMAT_D24_UNORM_S8_UINT
-                                                                    : DXGI_FORMAT_UNKNOWN;
+    state.DSVFormat = NativeImageFormat(ds.format);
     state.PrimitiveTopologyType = D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE;
     state.NumRenderTargets = static_cast<UINT>(desc_.color_formats.size());
     for (size_t i = 0; i < desc_.color_formats.size(); ++i) {
-      state.RTVFormats[i] =
-          desc_.color_formats[i] == IMAGE_FORMAT_RGBA8_UNORM ? DXGI_FORMAT_R8G8B8A8_UNORM : DXGI_FORMAT_B8G8R8A8_UNORM;
+      state.RTVFormats[i] = NativeImageFormat(desc_.color_formats[i]);
       state.BlendState.RenderTarget[i] = blend;
     }
     state.SampleDesc.Count = 1;

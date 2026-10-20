@@ -3,26 +3,6 @@
 #include <algorithm>
 
 namespace grassland::rhi::backend::vulkan {
-VkFormat ColorFormat(ImageFormat format) {
-  switch (format) {
-    case IMAGE_FORMAT_RGBA8_UNORM:
-      return VK_FORMAT_R8G8B8A8_UNORM;
-    case IMAGE_FORMAT_BGRA8_UNORM:
-      return VK_FORMAT_B8G8R8A8_UNORM;
-    case IMAGE_FORMAT_D32_FLOAT:
-      return VK_FORMAT_D32_SFLOAT;
-    case IMAGE_FORMAT_D24_UNORM_S8_UINT:
-      return VK_FORMAT_D24_UNORM_S8_UINT;
-    default:
-      return VK_FORMAT_UNDEFINED;
-  }
-}
-
-VkImageAspectFlags ImageAspect(ImageFormat format) {
-  return IsDepthFormat(format) ? VK_IMAGE_ASPECT_DEPTH_BIT | (HasStencil(format) ? VK_IMAGE_ASPECT_STENCIL_BIT : 0)
-                               : VK_IMAGE_ASPECT_COLOR_BIT;
-}
-
 VulkanRenderTargetPool::Lease::Lease(VulkanRenderTargetPool *pool,
                                      Entry *entry,
                                      const std::vector<VulkanImage *> &images)
@@ -83,7 +63,7 @@ VkRenderPass VulkanRenderTargetPool::RenderPass(const std::vector<ImageFormat> &
     auto store = operations ? operations->color_attachments[i].store_op : ATTACHMENT_STORE_OP_STORE;
     key.insert(key.end(), {int(colors[i]), int(load), int(store)});
     VkAttachmentDescription a{};
-    a.format = ColorFormat(colors[i]);
+    a.format = NativeImageFormat(colors[i]);
     a.samples = VK_SAMPLE_COUNT_1_BIT;
     a.loadOp = loads[load];
     a.storeOp = stores[store];
@@ -100,7 +80,7 @@ VkRenderPass VulkanRenderTargetPool::RenderPass(const std::vector<ImageFormat> &
     key.insert(key.end(),
                {int(ds.depth_load_op), int(ds.depth_store_op), int(ds.stencil_load_op), int(ds.stencil_store_op)});
     VkAttachmentDescription a{};
-    a.format = ColorFormat(depth);
+    a.format = NativeImageFormat(depth);
     a.samples = VK_SAMPLE_COUNT_1_BIT;
     a.loadOp = loads[ds.depth_load_op];
     a.storeOp = stores[ds.depth_store_op];
@@ -152,7 +132,7 @@ ObjectPtr<VulkanRenderTargetPool::Lease> VulkanRenderTargetPool::Acquire(const s
         VkImageViewCreateInfo create{VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO};
         create.image = handles[i];
         create.viewType = VK_IMAGE_VIEW_TYPE_2D;
-        create.format = ColorFormat(images[i]->GetDesc().format);
+        create.format = NativeImageFormat(images[i]->GetDesc().format);
         create.subresourceRange = {ImageAspect(images[i]->GetDesc().format), 0, 1, 0, 1};
         if (!Check(vkCreateImageView(device_, &create, nullptr, &fresh->views[i]), "Create attachment view")) {
           DestroyEntry(*fresh);

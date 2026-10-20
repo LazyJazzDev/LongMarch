@@ -24,23 +24,9 @@ bool D3D12AllocatedImage::IsValid() const {
 D3D12AllocatedImage *D3D12AllocatedImage::Create(D3D12Device *device, const ImageDesc &desc) {
   if (!desc.width || !desc.height || (desc.storage && desc.format != IMAGE_FORMAT_RGBA8_UNORM))
     return nullptr;
-  DXGI_FORMAT format;
-  switch (desc.format) {
-    case IMAGE_FORMAT_RGBA8_UNORM:
-      format = DXGI_FORMAT_R8G8B8A8_UNORM;
-      break;
-    case IMAGE_FORMAT_BGRA8_UNORM:
-      format = DXGI_FORMAT_B8G8R8A8_UNORM;
-      break;
-    case IMAGE_FORMAT_D32_FLOAT:
-      format = DXGI_FORMAT_D32_FLOAT;
-      break;
-    case IMAGE_FORMAT_D24_UNORM_S8_UINT:
-      format = DXGI_FORMAT_D24_UNORM_S8_UINT;
-      break;
-    default:
-      return nullptr;
-  }
+  const auto format = NativeImageFormat(desc.format);
+  if (format == DXGI_FORMAT_UNKNOWN)
+    return nullptr;
   try {
     D3D12_RESOURCE_DESC info{};
     info.Dimension = D3D12_RESOURCE_DIMENSION_TEXTURE2D;

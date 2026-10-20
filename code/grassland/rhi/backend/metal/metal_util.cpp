@@ -2,5 +2,20 @@
 #define NS_PRIVATE_IMPLEMENTATION
 #define MTL_PRIVATE_IMPLEMENTATION
 #define CA_PRIVATE_IMPLEMENTATION
+#include "grassland/rhi/backend/metal/metal_util.h"
+
 #include <Metal/Metal.hpp>
 #include <QuartzCore/QuartzCore.hpp>
+
+namespace grassland::rhi::backend::metal {
+MTL::PixelFormat NativeImageFormat(ImageFormat format) {
+  switch (format) {
+    case IMAGE_FORMAT_RGBA8_UNORM:
+      return MTL::PixelFormatRGBA8Unorm;
+    case IMAGE_FORMAT_BGRA8_UNORM:
+      return MTL::PixelFormatBGRA8Unorm;
+    default:
+      return MTL::PixelFormatInvalid;
+  }
+}
+}  // namespace grassland::rhi::backend::metal

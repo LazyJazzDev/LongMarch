@@ -155,13 +155,13 @@ bool VulkanProgram::Finalize() {
     create.layout = layout_;
     std::vector<VkFormat> color_formats;
     for (auto format : desc_.color_formats)
-      color_formats.push_back(ColorFormat(format));
+      color_formats.push_back(NativeImageFormat(format));
     VkPipelineRenderingCreateInfo rendering{VK_STRUCTURE_TYPE_PIPELINE_RENDERING_CREATE_INFO};
     if (owner->BeginRenderingCommand()) {
       rendering.colorAttachmentCount = uint32_t(color_formats.size());
       rendering.pColorAttachmentFormats = color_formats.data();
-      rendering.depthAttachmentFormat = ColorFormat(ds.format);
-      rendering.stencilAttachmentFormat = HasStencil(ds.format) ? ColorFormat(ds.format) : VK_FORMAT_UNDEFINED;
+      rendering.depthAttachmentFormat = NativeImageFormat(ds.format);
+      rendering.stencilAttachmentFormat = HasStencil(ds.format) ? NativeImageFormat(ds.format) : VK_FORMAT_UNDEFINED;
       create.pNext = &rendering;
     } else {
       create.renderPass = owner->RenderTargets().RenderPass(desc_.color_formats, ds.format);

@@ -2,6 +2,7 @@
 
 #include "grassland/rhi/backend/backend_shader_compiler.h"
 #include "grassland/rhi/backend/metal/metal_device.h"
+#include "grassland/rhi/backend/metal/metal_util.h"
 
 namespace grassland::rhi::backend::metal {
 MetalProgram::MetalProgram(MetalDevice *device, const ProgramDesc &desc) : Program(device, desc) {
@@ -58,8 +59,7 @@ bool MetalProgram::Finalize() {
     auto descriptor = NS::TransferPtr(MTL::RenderPipelineDescriptor::alloc()->init());
     descriptor->setVertexFunction(functions[0].get());
     descriptor->setFragmentFunction(functions[1].get());
-    descriptor->colorAttachments()->object(0)->setPixelFormat(
-        desc_.color_format == IMAGE_FORMAT_RGBA8_UNORM ? MTL::PixelFormatRGBA8Unorm : MTL::PixelFormatBGRA8Unorm);
+    descriptor->colorAttachments()->object(0)->setPixelFormat(NativeImageFormat(desc_.color_format));
     auto vertex = MTL::VertexDescriptor::vertexDescriptor();
     for (size_t i = 0; i < desc_.vertex_bindings.size(); ++i) {
       auto layout = vertex->layouts()->object(i);
