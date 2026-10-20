@@ -121,6 +121,10 @@ bool DeviceFeatures::RayTracingPipeline() const {
   return ray_pipeline_.rayTracingPipeline == VK_TRUE;
 }
 
+bool DeviceFeatures::ScalarBlockLayout() const {
+  return v12_.scalarBlockLayout == VK_TRUE;
+}
+
 bool DeviceFeatures::TimelineSemaphore() const {
   return v12_.timelineSemaphore == VK_TRUE;
 }

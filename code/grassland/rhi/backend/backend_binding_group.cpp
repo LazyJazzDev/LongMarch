@@ -15,10 +15,12 @@ std::vector<MappedBinding> MapBindings(const PipelineLayoutDesc &layout, Backend
     std::sort(bindings.begin(), bindings.end(), [](auto a, auto b) { return a.binding < b.binding; });
     uint32_t registers[4]{}, resource_offset = 0, sampler_offset = 0;
     for (auto b : bindings) {
-      uint32_t kind = b.type == BINDING_UNIFORM_BUFFER                                          ? 0
-                      : b.type == BINDING_SAMPLER                                               ? 3
-                      : (b.type == BINDING_RW_STORAGE_BUFFER || b.type == BINDING_RW_TEXTURE2D) ? 2
-                                                                                                : 1;
+      uint32_t kind = b.type == BINDING_UNIFORM_BUFFER ? 0
+                      : b.type == BINDING_SAMPLER      ? 3
+                      : (b.type == BINDING_RW_STRUCTURED_BUFFER || b.type == BINDING_RW_BYTE_ADDRESS_BUFFER ||
+                         b.type == BINDING_RW_TEXTURE2D)
+                          ? 2
+                          : 1;
       uint32_t reg = registers[kind];
       registers[kind] += b.count;
       if (api == BACKEND_API_VULKAN)
@@ -37,6 +39,8 @@ bool ValidateBindingLayout(const BindingLayoutDesc &layout) {
     if (b.type < BINDING_UNIFORM_BUFFER || b.type > BINDING_SAMPLER || !b.count || !b.visibility ||
         (b.visibility & ~SHADER_VISIBILITY_ALL) || !bindings.insert(b.binding).second)
       return false;
+    if ((b.type == BINDING_STRUCTURED_BUFFER || b.type == BINDING_RW_STRUCTURED_BUFFER) && !b.stride)
+      return false;
   }
   return true;
 }
@@ -46,7 +50,8 @@ bool SameBindingLayout(const BindingLayoutDesc &a, const BindingLayoutDesc &b) {
     return false;
   for (auto x : a.bindings) {
     auto it = std::find_if(b.bindings.begin(), b.bindings.end(), [x](auto y) { return x.binding == y.binding; });
-    if (it == b.bindings.end() || x.type != it->type || x.count != it->count || x.visibility != it->visibility)
+    if (it == b.bindings.end() || x.type != it->type || x.count != it->count || x.visibility != it->visibility ||
+        ((x.type == BINDING_STRUCTURED_BUFFER || x.type == BINDING_RW_STRUCTURED_BUFFER) && x.stride != it->stride))
       return false;
   }
   return true;
@@ -147,7 +152,7 @@ bool BindingGroup::BindResource(uint32_t binding, const std::vector<BufferView> 
     const auto *desc = FindBinding(binding, first_element, buffers.size(), binding_index);
     if (!desc)
       return false;
-    if (desc->type > BINDING_RW_STORAGE_BUFFER)
+    if (desc->type > BINDING_RW_BYTE_ADDRESS_BUFFER)
       return false;
     auto values = buffers;
     for (auto &view : values) {
@@ -158,6 +163,13 @@ bool BindingGroup::BindResource(uint32_t binding, const std::vector<BufferView> 
         view.size = buffer->GetDesc().size - view.offset;
       if (view.size > buffer->GetDesc().size - view.offset)
         return false;
+      if (desc->type == BINDING_STRUCTURED_BUFFER || desc->type == BINDING_RW_STRUCTURED_BUFFER) {
+        if (view.offset % desc->stride || view.size % desc->stride)
+          return false;
+      } else if (desc->type == BINDING_BYTE_ADDRESS_BUFFER || desc->type == BINDING_RW_BYTE_ADDRESS_BUFFER) {
+        if (view.offset % 4 || view.size % 4)
+          return false;
+      }
     }
     auto next = version_->IsUniquelyOwned() ? version_ : version_->Clone();
     if (!next)

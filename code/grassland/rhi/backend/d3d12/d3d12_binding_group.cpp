@@ -5,28 +5,28 @@
 #include "grassland/rhi/backend/d3d12/d3d12_allocated_image.h"
 #include "grassland/rhi/backend/d3d12/d3d12_buffer.h"
 #include "grassland/rhi/backend/d3d12/d3d12_device.h"
-#include "grassland/rhi/backend/d3d12/d3d12_program.h"
 
 namespace grassland::rhi::backend::d3d12 {
 D3D12BindingGroup::Version::Version(D3D12Device *device, const BindingLayoutDesc &layout)
     : BindingGroup::Version(device, layout) {
   uint32_t resource = 0, sampler = 0;
-  structured_ranges_.resize(layout_.bindings.size());
   for (size_t i = 0; i < layout_.bindings.size(); ++i) {
     const auto &binding = layout_.bindings[i];
     auto &offset = binding.type == BINDING_SAMPLER ? sampler : resource;
     offsets_.push_back(offset);
     offset += binding.count;
     initialized_.emplace_back(binding.count, false);
-    if (binding.type == BINDING_STORAGE_BUFFER || binding.type == BINDING_RW_STORAGE_BUFFER)
-      structured_ranges_[i].resize(binding.count);
   }
 }
 
 D3D12BindingGroup::Version *D3D12BindingGroup::Version::Create(D3D12Device *device, const BindingLayoutDesc &layout) {
   uint64_t resources = 0, samplers = 0;
-  for (auto b : layout.bindings)
+  for (auto b : layout.bindings) {
+    if ((b.type == BINDING_STRUCTURED_BUFFER || b.type == BINDING_RW_STRUCTURED_BUFFER) &&
+        (b.stride > 2048 || b.stride % 4))
+      return nullptr;
     (b.type == BINDING_SAMPLER ? samplers : resources) += b.count;
+  }
   if (resources > 1000000 || samplers > 2048)
     return nullptr;
   auto version = std::unique_ptr<Version>(new Version(device, layout));
@@ -49,7 +49,6 @@ ObjectPtr<BindingGroup::Version> D3D12BindingGroup::Version::Clone() const {
   if (!copy)
     return {};
   copy->references_ = references_;
-  copy->structured_ranges_ = structured_ranges_;
   copy->initialized_ = initialized_;
   auto native = device->NativeDevice();
   for (size_t i = 0; i < layout_.bindings.size(); ++i) {
@@ -61,8 +60,6 @@ ObjectPtr<BindingGroup::Version> D3D12BindingGroup::Version::Clone() const {
       if (initialized_[i][j])
         native->CopyDescriptorsSimple(1, target->CPU(offsets_[i] + j), source->CPU(offsets_[i] + j), type);
   }
-  // Stride-specific tables are immutable; subsequent writes drop only the new version's cache.
-  copy->resource_variants_ = resource_variants_;
   return copy;
 }
 
@@ -91,7 +88,6 @@ bool D3D12BindingGroup::Version::WriteDescriptors(size_t binding_index,
         return false;
     }
   }
-  resource_variants_.clear();
   auto native = static_cast<D3D12Device *>(device_)->NativeDevice();
   switch (binding.type) {
     case BINDING_UNIFORM_BUFFER:
@@ -103,26 +99,47 @@ bool D3D12BindingGroup::Version::WriteDescriptors(size_t binding_index,
         native->CreateConstantBufferView(&desc, resources_->CPU(offsets_[binding_index] + first_element + uint32_t(i)));
       }
       break;
-    case BINDING_STORAGE_BUFFER: {
-      // Active structured views are materialized when the Program's stride is known.
-      D3D12_SHADER_RESOURCE_VIEW_DESC desc{};
-      desc.ViewDimension = D3D12_SRV_DIMENSION_BUFFER;
-      desc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
-      desc.Buffer.NumElements = 1;
-      desc.Buffer.StructureByteStride = 4;
-      for (size_t i = 0; i < buffers.size(); ++i)
-        native->CreateShaderResourceView(nullptr, &desc,
+    case BINDING_STRUCTURED_BUFFER:
+    case BINDING_BYTE_ADDRESS_BUFFER: {
+      const bool raw = binding.type == BINDING_BYTE_ADDRESS_BUFFER;
+      const uint32_t stride = raw ? 4 : binding.stride;
+      for (const auto &view : buffers)
+        if (view.size / stride > UINT32_MAX)
+          return false;
+      for (size_t i = 0; i < buffers.size(); ++i) {
+        const auto &view = buffers[i];
+        D3D12_SHADER_RESOURCE_VIEW_DESC desc{};
+        desc.Format = raw ? DXGI_FORMAT_R32_TYPELESS : DXGI_FORMAT_UNKNOWN;
+        desc.ViewDimension = D3D12_SRV_DIMENSION_BUFFER;
+        desc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
+        desc.Buffer.FirstElement = view.offset / stride;
+        desc.Buffer.NumElements = UINT(view.size / stride);
+        desc.Buffer.StructureByteStride = raw ? 0 : stride;
+        desc.Buffer.Flags = raw ? D3D12_BUFFER_SRV_FLAG_RAW : D3D12_BUFFER_SRV_FLAG_NONE;
+        native->CreateShaderResourceView(static_cast<D3D12Buffer *>(view.buffer)->NativeBuffer(), &desc,
                                          resources_->CPU(offsets_[binding_index] + first_element + uint32_t(i)));
+      }
       break;
     }
-    case BINDING_RW_STORAGE_BUFFER: {
-      D3D12_UNORDERED_ACCESS_VIEW_DESC desc{};
-      desc.ViewDimension = D3D12_UAV_DIMENSION_BUFFER;
-      desc.Buffer.NumElements = 1;
-      desc.Buffer.StructureByteStride = 4;
-      for (size_t i = 0; i < buffers.size(); ++i)
-        native->CreateUnorderedAccessView(nullptr, nullptr, &desc,
+    case BINDING_RW_STRUCTURED_BUFFER:
+    case BINDING_RW_BYTE_ADDRESS_BUFFER: {
+      const bool raw = binding.type == BINDING_RW_BYTE_ADDRESS_BUFFER;
+      const uint32_t stride = raw ? 4 : binding.stride;
+      for (const auto &view : buffers)
+        if (view.size / stride > UINT32_MAX)
+          return false;
+      for (size_t i = 0; i < buffers.size(); ++i) {
+        const auto &view = buffers[i];
+        D3D12_UNORDERED_ACCESS_VIEW_DESC desc{};
+        desc.Format = raw ? DXGI_FORMAT_R32_TYPELESS : DXGI_FORMAT_UNKNOWN;
+        desc.ViewDimension = D3D12_UAV_DIMENSION_BUFFER;
+        desc.Buffer.FirstElement = view.offset / stride;
+        desc.Buffer.NumElements = UINT(view.size / stride);
+        desc.Buffer.StructureByteStride = raw ? 0 : stride;
+        desc.Buffer.Flags = raw ? D3D12_BUFFER_UAV_FLAG_RAW : D3D12_BUFFER_UAV_FLAG_NONE;
+        native->CreateUnorderedAccessView(static_cast<D3D12Buffer *>(view.buffer)->NativeBuffer(), nullptr, &desc,
                                           resources_->CPU(offsets_[binding_index] + first_element + uint32_t(i)));
+      }
       break;
     }
     default:
@@ -130,9 +147,6 @@ bool D3D12BindingGroup::Version::WriteDescriptors(size_t binding_index,
   }
   for (size_t i = 0; i < buffers.size(); ++i)
     initialized_[binding_index][first_element + i] = true;
-  if (!structured_ranges_[binding_index].empty())
-    for (size_t i = 0; i < buffers.size(); ++i)
-      structured_ranges_[binding_index][first_element + i] = {buffers[i].offset, buffers[i].size};
   return true;
 }
 
@@ -143,7 +157,6 @@ bool D3D12BindingGroup::Version::WriteDescriptors(size_t binding_index,
   for (auto image : images)
     if (!dynamic_cast<D3D12AllocatedImage *>(image))
       return false;
-  resource_variants_.clear();
   auto native = static_cast<D3D12Device *>(device_)->NativeDevice();
   if (binding.type == BINDING_TEXTURE2D) {
     for (size_t i = 0; i < images.size(); ++i)
@@ -182,64 +195,8 @@ bool D3D12BindingGroup::Version::WriteDescriptors(size_t binding_index,
   return true;
 }
 
-D3D12DescriptorPool::Lease *D3D12BindingGroup::Version::ResourceDescriptors(const D3D12Program *program,
-                                                                            uint32_t group) {
-  if (!resources_)
-    return nullptr;
-  std::vector<uint32_t> strides;
-  for (auto b : layout_.bindings)
-    if (b.type == BINDING_STORAGE_BUFFER || b.type == BINDING_RW_STORAGE_BUFFER)
-      strides.push_back(program->StructuredBufferStride(group, b.binding));
-  if (std::all_of(strides.begin(), strides.end(), [](auto stride) { return stride == 0; }))
-    return resources_.Get();
-  for (const auto &variant : resource_variants_)
-    if (variant.first == strides)
-      return variant.second.Get();
-  for (size_t i = 0; i < layout_.bindings.size(); ++i) {
-    const auto stride = program->StructuredBufferStride(group, layout_.bindings[i].binding);
-    if (!stride)
-      continue;
-    for (const auto &[offset, size] : structured_ranges_[i])
-      if (offset % stride || size % stride || size / stride > UINT32_MAX)
-        return nullptr;
-  }
-  auto device = static_cast<D3D12Device *>(device_);
-  auto table = device->ResourceDescriptorStorage().Acquire(resources_->Count());
-  if (!table)
-    return nullptr;
-  auto native = device->NativeDevice();
-  native->CopyDescriptorsSimple(resources_->Count(), table->CPU(), resources_->CPU(),
-                                D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
-  for (size_t i = 0; i < layout_.bindings.size(); ++i) {
-    const auto &binding = layout_.bindings[i];
-    const auto stride = program->StructuredBufferStride(group, binding.binding);
-    if (!stride)
-      continue;
-    for (uint32_t j = 0; j < binding.count; ++j) {
-      const auto [offset, size] = structured_ranges_[i][j];
-      auto buffer = static_cast<D3D12Buffer *>(references_[i][j].Get())->NativeBuffer();
-      auto handle = table->CPU(offsets_[i] + j);
-      if (binding.type == BINDING_STORAGE_BUFFER) {
-        D3D12_SHADER_RESOURCE_VIEW_DESC desc{};
-        desc.ViewDimension = D3D12_SRV_DIMENSION_BUFFER;
-        desc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
-        desc.Buffer.FirstElement = offset / stride;
-        desc.Buffer.NumElements = UINT(size / stride);
-        desc.Buffer.StructureByteStride = stride;
-        native->CreateShaderResourceView(buffer, &desc, handle);
-      } else {
-        D3D12_UNORDERED_ACCESS_VIEW_DESC desc{};
-        desc.ViewDimension = D3D12_UAV_DIMENSION_BUFFER;
-        desc.Buffer.FirstElement = offset / stride;
-        desc.Buffer.NumElements = UINT(size / stride);
-        desc.Buffer.StructureByteStride = stride;
-        native->CreateUnorderedAccessView(buffer, nullptr, &desc, handle);
-      }
-    }
-  }
-  auto result = table.Get();
-  resource_variants_.emplace_back(std::move(strides), std::move(table));
-  return result;
+D3D12DescriptorPool::Lease *D3D12BindingGroup::Version::ResourceDescriptors() const {
+  return resources_.Get();
 }
 
 D3D12BindingGroup::D3D12BindingGroup(D3D12Device *device, ObjectPtr<Version> version)

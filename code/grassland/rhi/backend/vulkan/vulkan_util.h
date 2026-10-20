@@ -54,6 +54,7 @@ class DeviceFeatures {
 
   bool RayQuery() const;
   bool TimelineSemaphore() const;
+  bool ScalarBlockLayout() const;
   bool DynamicRendering() const;
 
  private:

@@ -4,7 +4,6 @@
 
 namespace grassland::rhi::backend::d3d12 {
 class D3D12Device;
-class D3D12Program;
 
 class D3D12BindingGroup final : public BindingGroup {
  public:
@@ -16,9 +15,7 @@ class D3D12BindingGroup final : public BindingGroup {
     ObjectPtr<BindingGroup::Version> Clone() const override;
     bool IsInitialized(size_t binding_index, uint32_t element) const override;
     uint32_t ResourceCount() const;
-    // Borrowed CPU-only descriptor leases. Structured views depend on the Program's
-    // reflected element strides; variants are cached by stride, not Program identity.
-    D3D12DescriptorPool::Lease *ResourceDescriptors(const D3D12Program *program, uint32_t group);
+    D3D12DescriptorPool::Lease *ResourceDescriptors() const;
     D3D12DescriptorPool::Lease *SamplerDescriptors() const;
 
    private:
@@ -30,10 +27,7 @@ class D3D12BindingGroup final : public BindingGroup {
                           const std::vector<SamplerDesc> &values) override;
     std::vector<uint32_t> offsets_;
     std::vector<std::vector<bool>> initialized_;
-    // Only structured buffers need byte ranges until Program reflection supplies stride.
-    std::vector<std::vector<std::pair<uint64_t, uint64_t>>> structured_ranges_;
     ObjectPtr<D3D12DescriptorPool::Lease> resources_, samplers_;
-    std::vector<std::pair<std::vector<uint32_t>, ObjectPtr<D3D12DescriptorPool::Lease>>> resource_variants_;
   };
 
  private:

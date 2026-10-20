@@ -28,11 +28,6 @@ Device *Program::Owner() const {
   return device_;
 }
 
-uint32_t Program::StructuredBufferStride(uint32_t group, uint32_t binding) const {
-  auto it = structured_buffer_strides_.find({group, binding});
-  return it == structured_buffer_strides_.end() ? 0 : it->second;
-}
-
 bool Program::ValidateLayout() const {
   if (desc_.pipeline_layout.groups.size() > 4)
     return false;

@@ -124,10 +124,10 @@ TEST(VulkanDescriptorPool, EqualNativeTypeCountsSharePagesAndDifferentPatternsSt
   ObjPtr<IDevice> device = core->CreateDeviceByAutoSelection();
   ASSERT_TRUE(device);
   auto native = static_cast<backend::vulkan::VulkanDevice *>(device.Get());
-  BindingLayoutDesc array{{{0, BINDING_STORAGE_BUFFER, 2, SHADER_VISIBILITY_VERTEX}}};
-  BindingLayoutDesc split{{{7, BINDING_STORAGE_BUFFER, 1, SHADER_VISIBILITY_FRAGMENT},
-                           {3, BINDING_RW_STORAGE_BUFFER, 1, SHADER_VISIBILITY_FRAGMENT}}};
-  BindingLayoutDesc single{{{0, BINDING_STORAGE_BUFFER, 1, SHADER_VISIBILITY_VERTEX}}};
+  BindingLayoutDesc array{{{0, BINDING_STRUCTURED_BUFFER, 2, SHADER_VISIBILITY_VERTEX, 16}}};
+  BindingLayoutDesc split{{{7, BINDING_STRUCTURED_BUFFER, 1, SHADER_VISIBILITY_FRAGMENT, 16},
+                           {3, BINDING_RW_STRUCTURED_BUFFER, 1, SHADER_VISIBILITY_FRAGMENT, 16}}};
+  BindingLayoutDesc single{{{0, BINDING_STRUCTURED_BUFFER, 1, SHADER_VISIBILITY_VERTEX, 16}}};
   std::vector<ObjPtr<IBindingGroup>> groups;
   for (int i = 0; i < 65; ++i) {
     if (i % 2)
@@ -161,7 +161,7 @@ TEST(VulkanDescriptorPool, LargeDescriptorArraysUseFullPageCapacity) {
   ObjPtr<IDevice> device = core->CreateDeviceByAutoSelection();
   ASSERT_TRUE(device);
   auto native = static_cast<backend::vulkan::VulkanDevice *>(device.Get());
-  BindingLayoutDesc layout{{{0, BINDING_STORAGE_BUFFER, 1025, SHADER_VISIBILITY_FRAGMENT}}};
+  BindingLayoutDesc layout{{{0, BINDING_STRUCTURED_BUFFER, 1025, SHADER_VISIBILITY_FRAGMENT, 16}}};
   // No library-imposed 1024 limit; hardware limits remain authoritative.
   ASSERT_TRUE(backend::ValidateBindingLayout(layout));
   if (!backend::vulkan::ValidatePipelineBindings(native->NativePhysicalDevice(), {{layout}}))

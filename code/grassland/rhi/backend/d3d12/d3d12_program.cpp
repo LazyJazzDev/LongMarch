@@ -30,13 +30,10 @@ bool D3D12Program::Finalize() {
     }
     auto native = static_cast<D3D12Device *>(device_)->NativeDevice();
     std::vector<uint8_t> vertex, fragment;
-    structured_buffer_strides_.clear();
     auto prefix = ShaderMacroHeader(desc_, BACKEND_API_D3D12);
-    if (!CompileSlang(desc_.vertex_shader->GetDesc(), prefix, BACKEND_API_D3D12, vertex, &desc_.pipeline_layout,
-                      &structured_buffer_strides_))
+    if (!CompileSlang(desc_.vertex_shader->GetDesc(), prefix, BACKEND_API_D3D12, vertex, &desc_.pipeline_layout))
       return false;
-    if (!CompileSlang(desc_.fragment_shader->GetDesc(), prefix, BACKEND_API_D3D12, fragment, &desc_.pipeline_layout,
-                      &structured_buffer_strides_))
+    if (!CompileSlang(desc_.fragment_shader->GetDesc(), prefix, BACKEND_API_D3D12, fragment, &desc_.pipeline_layout))
       return false;
     D3D12_ROOT_SIGNATURE_DESC root{};
     root.Flags = D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT;
@@ -46,7 +43,8 @@ bool D3D12Program::Finalize() {
       D3D12_DESCRIPTOR_RANGE range{};
       range.RangeType = m.desc.type == BINDING_SAMPLER          ? D3D12_DESCRIPTOR_RANGE_TYPE_SAMPLER
                         : m.desc.type == BINDING_UNIFORM_BUFFER ? D3D12_DESCRIPTOR_RANGE_TYPE_CBV
-                        : (m.desc.type == BINDING_RW_STORAGE_BUFFER || m.desc.type == BINDING_RW_TEXTURE2D)
+                        : (m.desc.type == BINDING_RW_STRUCTURED_BUFFER ||
+                           m.desc.type == BINDING_RW_BYTE_ADDRESS_BUFFER || m.desc.type == BINDING_RW_TEXTURE2D)
                             ? D3D12_DESCRIPTOR_RANGE_TYPE_UAV
                             : D3D12_DESCRIPTOR_RANGE_TYPE_SRV;
       range.NumDescriptors = m.desc.count;

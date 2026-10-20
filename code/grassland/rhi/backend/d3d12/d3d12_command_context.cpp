@@ -598,7 +598,7 @@ bool D3D12CommandContext::CmdBindGroup(uint32_t index, IBindingGroup *group) {
   }
   try {
     auto version = static_cast<D3D12BindingGroup::Version *>(native->CurrentVersion());
-    auto resources = version->ResourceDescriptors(program_, index);
+    auto resources = version->ResourceDescriptors();
     if (version->ResourceCount() && !resources) {
       recording_failed_ = true;
       return false;
@@ -638,12 +638,13 @@ bool D3D12CommandContext::PrepareGroups() {
         for (uint32_t j = 0; j < binding.count; ++j) {
           auto type = binding.type;
           ID3D12Resource *resource = nullptr;
-          if (type <= BINDING_RW_STORAGE_BUFFER) {
+          if (type <= BINDING_RW_BYTE_ADDRESS_BUFFER) {
             auto buffer = static_cast<D3D12Buffer *>(version->GetReferences()[binding_index][j].Get());
             resource = buffer->NativeBuffer();
             if (!TransitionResource(resource,
-                                    type == BINDING_RW_STORAGE_BUFFER ? D3D12_RESOURCE_STATE_UNORDERED_ACCESS
-                                                                      : D3D12_RESOURCE_STATE_GENERIC_READ,
+                                    (type == BINDING_RW_STRUCTURED_BUFFER || type == BINDING_RW_BYTE_ADDRESS_BUFFER)
+                                        ? D3D12_RESOURCE_STATE_UNORDERED_ACCESS
+                                        : D3D12_RESOURCE_STATE_GENERIC_READ,
                                     buffer->DefaultState()))
               return false;
           } else if (type == BINDING_TEXTURE2D || type == BINDING_RW_TEXTURE2D) {
@@ -661,7 +662,8 @@ bool D3D12CommandContext::PrepareGroups() {
                                     image->DefaultState()))
               return false;
           }
-          if (type == BINDING_RW_STORAGE_BUFFER || type == BINDING_RW_TEXTURE2D) {
+          if (type == BINDING_RW_STRUCTURED_BUFFER || type == BINDING_RW_BYTE_ADDRESS_BUFFER ||
+              type == BINDING_RW_TEXTURE2D) {
             D3D12_RESOURCE_BARRIER barrier{};
             barrier.Type = D3D12_RESOURCE_BARRIER_TYPE_UAV;
             barrier.UAV.pResource = resource;

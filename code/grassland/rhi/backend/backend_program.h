@@ -13,15 +13,12 @@ class Program : public Object<IProgram> {
   const ProgramDesc &GetDesc() const override;
   bool IsFinalized() const override;
   Device *Owner() const;
-  // Zero means the binding is unused by the compiled shader stages.
-  uint32_t StructuredBufferStride(uint32_t group, uint32_t binding) const;
 
  protected:
   bool ValidateLayout() const;
   Device *device_;
   ProgramDesc desc_;
   bool finalized_{};
-  StructuredBufferStrides structured_buffer_strides_;
 
  private:
   ObjectPtr<IShader> vertex_shader_;

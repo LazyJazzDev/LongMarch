@@ -18,18 +18,25 @@ std::string ShaderMacroHeader(const ProgramDesc &desc, BackendAPI api) {
       header += "[[vk::location(" + location + ")]] ";
     header += "T N : TEXCOORD" + location + "\n";
   }
-  const char *macros[] = {"UNIFORM",   "STRUCTURED_BUFFER", "RW_STRUCTURED_BUFFER",
-                          "TEXTURE2D", "RW_TEXTURE2D",      "SAMPLER"};
-  const char *types[] = {"ConstantBuffer<T>", "StructuredBuffer<T>", "RWStructuredBuffer<T>",
-                         "Texture2D<T>",      "RWTexture2D<T>",      "SamplerState"};
+  const char *macros[] = {"UNIFORM",
+                          "STRUCTURED_BUFFER",
+                          "RW_STRUCTURED_BUFFER",
+                          "BYTE_ADDRESS_BUFFER",
+                          "RW_BYTE_ADDRESS_BUFFER",
+                          "TEXTURE2D",
+                          "RW_TEXTURE2D",
+                          "SAMPLER"};
+  const char *types[] = {"ConstantBuffer<T>",   "StructuredBuffer<T>", "RWStructuredBuffer<T>", "ByteAddressBuffer",
+                         "RWByteAddressBuffer", "Texture2D<T>",        "RWTexture2D<T>",        "SamplerState"};
   for (auto macro : macros) {
     for (const auto &suffix : {std::string{}, std::string{"_ARRAY"}}) {
       auto name = std::string(macro) + suffix;
       header += "#define RHI_" + name + "_I(G,B) RHI_" + name + "_##G##_##B\n";
       header += "#define RHI_" + name + "_D(G,B) RHI_" + name + "_I(G,B)\n";
-      bool sampler = std::string(macro) == "SAMPLER";
-      header += "#define RHI_" + name + (sampler ? "(G,B,N) " : "(G,B,T,N) ") + "RHI_" + name + "_D(G,B)" +
-                (sampler ? "(N)\n" : "(T,N)\n");
+      bool untyped =
+          std::string(macro) == "SAMPLER" || std::string(macro).find("BYTE_ADDRESS_BUFFER") != std::string::npos;
+      header += "#define RHI_" + name + (untyped ? "(G,B,N) " : "(G,B,T,N) ") + "RHI_" + name + "_D(G,B)" +
+                (untyped ? "(N)\n" : "(T,N)\n");
     }
   }
   for (auto mapped : MapBindings(desc.pipeline_layout, api)) {
@@ -40,15 +47,20 @@ std::string ShaderMacroHeader(const ProgramDesc &desc, BackendAPI api) {
         continue;
       auto name = base + (array ? "_ARRAY" : "");
       header += "#define RHI_" + name + "_" + std::to_string(mapped.group) + "_" + std::to_string(b.binding) +
-                (b.type == BINDING_SAMPLER ? "(N) " : "(T,N) ");
+                ((b.type == BINDING_SAMPLER || b.type == BINDING_BYTE_ADDRESS_BUFFER ||
+                  b.type == BINDING_RW_BYTE_ADDRESS_BUFFER)
+                     ? "(N) "
+                     : "(T,N) ");
       if (api == BACKEND_API_VULKAN)
         header += "[[vk::binding(" + std::to_string(b.binding) + "," + std::to_string(mapped.group) + ")]] ";
       header += std::string(types[b.type]) + " N" + (array ? "[" + std::to_string(b.count) + "]" : "");
       if (api != BACKEND_API_VULKAN) {
-        const char reg = b.type == BINDING_UNIFORM_BUFFER                                          ? 'b'
-                         : b.type == BINDING_SAMPLER                                               ? 's'
-                         : (b.type == BINDING_RW_STORAGE_BUFFER || b.type == BINDING_RW_TEXTURE2D) ? 'u'
-                                                                                                   : 't';
+        const char reg = b.type == BINDING_UNIFORM_BUFFER ? 'b'
+                         : b.type == BINDING_SAMPLER      ? 's'
+                         : (b.type == BINDING_RW_STRUCTURED_BUFFER || b.type == BINDING_RW_BYTE_ADDRESS_BUFFER ||
+                            b.type == BINDING_RW_TEXTURE2D)
+                             ? 'u'
+                             : 't';
         header += " : register(" + std::string(1, reg) + std::to_string(mapped.shader_register) + ", space" +
                   std::to_string(api == BACKEND_API_METAL ? 0 : mapped.group) + ")";
       }
@@ -63,8 +75,7 @@ bool CompileSlang(const ShaderDesc &shader,
                   const std::string &prefix,
                   BackendAPI api,
                   std::vector<uint8_t> &code,
-                  const PipelineLayoutDesc *binding_layout,
-                  StructuredBufferStrides *strides) {
+                  const PipelineLayoutDesc *binding_layout) {
   code.clear();
   thread_local Slang::ComPtr<slang::IGlobalSession> global;
   if (!global) {
@@ -82,8 +93,10 @@ bool CompileSlang(const ShaderDesc &shader,
                                  : api == BACKEND_API_VULKAN ? "spirv"
                                                              : "dxil",
                                  "-fvk-use-entrypoint-name"};
-  if (api == BACKEND_API_VULKAN)
+  if (api == BACKEND_API_VULKAN) {
     args.push_back("-emit-spirv-directly");
+    args.push_back("-fvk-use-dx-layout");
+  }
   slang::SessionDesc desc{};
   Slang::ComPtr<ISlangUnknown> allocation;
   if (SLANG_FAILED(
@@ -164,7 +177,9 @@ bool CompileSlang(const ShaderDesc &shader,
     else if (type->getKind() == slang::TypeReflection::Kind::Resource) {
       const bool rw = type->getResourceAccess() == SLANG_RESOURCE_ACCESS_READ_WRITE;
       if (type->getResourceShape() == SLANG_STRUCTURED_BUFFER)
-        resource = rw ? BINDING_RW_STORAGE_BUFFER : BINDING_STORAGE_BUFFER;
+        resource = rw ? BINDING_RW_STRUCTURED_BUFFER : BINDING_STRUCTURED_BUFFER;
+      else if (type->getResourceShape() == SLANG_BYTE_ADDRESS_BUFFER)
+        resource = rw ? BINDING_RW_BYTE_ADDRESS_BUFFER : BINDING_BYTE_ADDRESS_BUFFER;
       else if (type->getResourceShape() == SLANG_TEXTURE_2D)
         resource = rw ? BINDING_RW_TEXTURE2D : BINDING_TEXTURE2D;
     }
@@ -189,7 +204,7 @@ bool CompileSlang(const ShaderDesc &shader,
       ReportError(-1, std::string("Shader resource does not match the C++ binding layout: ") + parameter->getName());
       return false;
     }
-    if (strides && (resource == BINDING_STORAGE_BUFFER || resource == BINDING_RW_STORAGE_BUFFER)) {
+    if (resource == BINDING_STRUCTURED_BUFFER || resource == BINDING_RW_STRUCTURED_BUFFER) {
       // Reflect the element in its structured-buffer layout for this target,
       // not the standalone struct or constant-buffer layout.
       auto element = type_layout->getElementTypeLayout();
@@ -198,9 +213,10 @@ bool CompileSlang(const ShaderDesc &shader,
         ReportError(-1, "Unsupported reflected structured-buffer stride.");
         return false;
       }
-      auto [it, inserted] = strides->emplace(std::make_pair(match->group, match->desc.binding), uint32_t(stride));
-      if (!inserted && it->second != stride) {
-        ReportError(-1, "Shader stages disagree on structured-buffer element stride.");
+      if (stride != match->desc.stride) {
+        ReportError(-1, std::string("Structured-buffer stride does not match BindingDesc: ") + parameter->getName() +
+                            " (layout " + std::to_string(match->desc.stride) + ", shader " + std::to_string(stride) +
+                            ")");
         return false;
       }
     }

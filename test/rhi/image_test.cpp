@@ -498,7 +498,7 @@ TEST_P(RhiImage, BindingVersionsPreserveRangesAndArraysAcrossHeapPages) {
   desc.pipeline_layout.groups = {{{{3, BINDING_UNIFORM_BUFFER, 1, SHADER_VISIBILITY_FRAGMENT}}},
                                  {{{7, BINDING_TEXTURE2D, 2, SHADER_VISIBILITY_FRAGMENT},
                                    {9, BINDING_SAMPLER, 1, SHADER_VISIBILITY_FRAGMENT},
-                                   {11, BINDING_STORAGE_BUFFER, 2, SHADER_VISIBILITY_FRAGMENT}}},
+                                   {11, BINDING_STRUCTURED_BUFFER, 2, SHADER_VISIBILITY_FRAGMENT, 16}}},
                                  {{{1, BINDING_SAMPLER, 1, SHADER_VISIBILITY_FRAGMENT}}}};
   ObjPtr<IProgram> program = device->CreateProgram(desc);
   ASSERT_TRUE(program);
@@ -637,7 +637,7 @@ TEST_P(RhiImage, BindingVersionsPreserveRangesAndArraysAcrossHeapPages) {
   EXPECT_EQ(pixel, (std::array<uint8_t, 4>{0, 255, 0, 255}));
 }
 
-TEST_P(RhiImage, ReflectedStructuredStrideReadsSecondPaddedElement) {
+TEST_P(RhiImage, ExplicitStructuredStrideReadsSecondCompactElement) {
   if (GetParam() == BACKEND_API_METAL)
     GTEST_SKIP() << "Metal bindings are deferred.";
   ObjPtr<ICore> core = CreateCore(GetParam());
@@ -665,34 +665,112 @@ TEST_P(RhiImage, ReflectedStructuredStrideReadsSecondPaddedElement) {
   ProgramDesc desc;
   desc.vertex_shader = vs.Get();
   desc.fragment_shader = ps.Get();
-  desc.pipeline_layout.groups = {{{{0, BINDING_STORAGE_BUFFER, 1, SHADER_VISIBILITY_FRAGMENT},
-                                   {1, BINDING_STORAGE_BUFFER, 1, SHADER_VISIBILITY_FRAGMENT}}}};
+  desc.pipeline_layout.groups = {{{{0, BINDING_STRUCTURED_BUFFER, 1, SHADER_VISIBILITY_FRAGMENT, 20},
+                                   {1, BINDING_STRUCTURED_BUFFER, 1, SHADER_VISIBILITY_FRAGMENT, 16}}}};
   ObjPtr<IProgram> program = device->CreateProgram(desc);
   ASSERT_TRUE(program);
   ASSERT_TRUE(program->Finalize());
-  // The same Slang struct has a 20-byte DXIL stride and a padded 32-byte SPIR-V stride.
-  const uint32_t stride = GetParam() == BACKEND_API_D3D12 ? 20 : 32;
+
+  // Both backends use the same compact C++ element layout.
+  struct Element {
+    float color[4];
+    float scale;
+  };
+
+  static_assert(sizeof(Element) == 20);
+  const uint32_t stride = sizeof(Element);
   std::array<uint8_t, 256> data{};
   const float value[] = {1, 0, 0, 1, 1};
   std::memcpy(data.data() + stride, value, sizeof(value));
   ObjPtr<IBindingGroup> group = device->CreateBindingGroup(desc.pipeline_layout.groups[0]);
   ASSERT_TRUE(group);
   ASSERT_TRUE(group->BindResource(0, BufferView{buffer.Get(), 0, stride * 2}));
-  // No stride is needed for an optimized-out binding, even for an arbitrary byte view.
-  ASSERT_TRUE(group->BindResource(1, BufferView{buffer.Get(), 0, 3}));
-  if (GetParam() == BACKEND_API_D3D12) {
-    ObjPtr<IBindingGroup> invalid = device->CreateBindingGroup(desc.pipeline_layout.groups[0]);
-    ASSERT_TRUE(invalid);
-    ASSERT_TRUE(invalid->BindResource(0, BufferView{buffer.Get(), 4, stride * 2}));
-    ASSERT_TRUE(invalid->BindResource(1, buffer.Get()));
-    ObjPtr<ICommandContext> rejected = device->CreateCommandContext();
-    ASSERT_TRUE(rejected);
-    ASSERT_TRUE(rejected->CmdBindProgram(program.Get()));
-    EXPECT_FALSE(rejected->CmdBindGroup(0, invalid.Get()));
-  }
+  EXPECT_FALSE(group->BindResource(1, BufferView{buffer.Get(), 0, 3}));
+  ASSERT_TRUE(group->BindResource(1, buffer.Get()));
+  EXPECT_FALSE(group->BindResource(0, BufferView{buffer.Get(), 4, stride * 2}));
+  EXPECT_FALSE(group->BindResource(0, BufferView{buffer.Get(), 0, stride * 2 - 1}));
   ObjPtr<ICommandContext> commands = device->CreateCommandContext();
   ASSERT_TRUE(commands);
   ASSERT_TRUE(commands->CmdUploadBuffer(buffer.Get(), 0, data.data(), data.size()));
+  ASSERT_TRUE(commands->CmdBindProgram(program.Get()));
+  ASSERT_TRUE(commands->CmdBindGroup(0, group.Get()));
+  ASSERT_TRUE(commands->CmdBeginRendering(
+      {{{target.Get(), ATTACHMENT_LOAD_OP_CLEAR, ATTACHMENT_STORE_OP_STORE, {0, 0, 0, 1}}}}));
+  ASSERT_TRUE(commands->CmdSetViewport({0, 0, 32, 32, 0, 1}));
+  ASSERT_TRUE(commands->CmdSetScissor({0, 0, 32, 32}));
+  ASSERT_TRUE(commands->CmdDraw(3));
+  ASSERT_TRUE(commands->CmdEndRendering());
+  ObjPtr<ISubmissionToken> done = queue->Submit(commands.Get());
+  ASSERT_TRUE(done);
+  ASSERT_TRUE(done->WaitHost());
+  std::array<uint8_t, 4> pixel{};
+  ReadPixel(device.Get(), target.Get(), GetParam(), 16, 16, pixel);
+  EXPECT_EQ(pixel, (std::array<uint8_t, 4>{255, 0, 0, 255}));
+}
+
+TEST_P(RhiImage, StructuredNestedArraysUseSameCppLayout) {
+  if (GetParam() == BACKEND_API_METAL)
+    GTEST_SKIP() << "Metal bindings are deferred.";
+  ObjPtr<ICore> core = CreateCore(GetParam());
+  ASSERT_TRUE(core);
+  ObjPtr<IDevice> device = core->CreateDeviceByAutoSelection();
+  ASSERT_TRUE(device);
+  Track(device.Get());
+  ObjPtr<IQueue> queue = device->GetQueue(QUEUE_TYPE_GRAPHICS);
+  ObjPtr<IImage> target = device->CreateImage({32, 32, IMAGE_FORMAT_RGBA8_UNORM});
+  ObjPtr<IBuffer> buffer = device->CreateBuffer({256});
+  ASSERT_TRUE(queue);
+  ASSERT_TRUE(target);
+  ASSERT_TRUE(buffer);
+  const std::string source = R"(
+    struct Inner { float3 color; float weight; };
+    struct Element { float scale; Inner samples[2]; float3 tail; };
+    RHI_STRUCTURED_BUFFER(0,0,Element,values);
+    RHI_STRUCTURED_BUFFER(0,1,float4,unusedValues);
+    float4 VSMain(uint id:SV_VertexID):SV_Position {
+      float2 p[3]={float2(-1,-1),float2(3,-1),float2(-1,3)};return float4(p[id],0,1);
+    }
+    float4 PSMain():SV_Target0 { return float4(values[1].samples[1].color * values[1].scale * values[1].samples[1].weight, values[1].tail.z); }
+  )";
+  ObjPtr<IShader> vs = device->CreateShader({source, "VSMain", SHADER_STAGE_VERTEX});
+  ObjPtr<IShader> ps = device->CreateShader({source, "PSMain", SHADER_STAGE_FRAGMENT});
+  ProgramDesc desc;
+  desc.vertex_shader = vs.Get();
+  desc.fragment_shader = ps.Get();
+  desc.pipeline_layout.groups = {{{{0, BINDING_STRUCTURED_BUFFER, 1, SHADER_VISIBILITY_FRAGMENT, 48},
+                                   {1, BINDING_STRUCTURED_BUFFER, 1, SHADER_VISIBILITY_FRAGMENT, 16}}}};
+  ObjPtr<IProgram> program = device->CreateProgram(desc);
+  ASSERT_TRUE(program);
+  ASSERT_TRUE(program->Finalize());
+
+  // Both backends use the same compact C++ element layout.
+  struct Inner {
+    float color[3];
+    float weight;
+  };
+
+  struct Element {
+    float scale;
+    Inner samples[2];
+    float tail[3];
+  };
+
+  static_assert(sizeof(Element) == 48);
+  const uint32_t stride = sizeof(Element);
+  std::array<Element, 2> data{};
+  data[1].scale = 1;
+  data[1].samples[1] = {{1, 0, 0}, 1};
+  data[1].tail[2] = 1;
+  ObjPtr<IBindingGroup> group = device->CreateBindingGroup(desc.pipeline_layout.groups[0]);
+  ASSERT_TRUE(group);
+  ASSERT_TRUE(group->BindResource(0, BufferView{buffer.Get(), 0, stride * 2}));
+  EXPECT_FALSE(group->BindResource(1, BufferView{buffer.Get(), 0, 3}));
+  ASSERT_TRUE(group->BindResource(1, buffer.Get()));
+  EXPECT_FALSE(group->BindResource(0, BufferView{buffer.Get(), 4, stride * 2}));
+  EXPECT_FALSE(group->BindResource(0, BufferView{buffer.Get(), 0, stride * 2 - 1}));
+  ObjPtr<ICommandContext> commands = device->CreateCommandContext();
+  ASSERT_TRUE(commands);
+  ASSERT_TRUE(commands->CmdUploadBuffer(buffer.Get(), 0, data.data(), sizeof(data)));
   ASSERT_TRUE(commands->CmdBindProgram(program.Get()));
   ASSERT_TRUE(commands->CmdBindGroup(0, group.Get()));
   ASSERT_TRUE(commands->CmdBeginRendering(
@@ -744,9 +822,89 @@ TEST_P(RhiImage, StorageImageAndBufferBecomeReadableAfterRendering) {
   desc.vertex_shader = vs.Get();
   desc.fragment_shader = write.Get();
   desc.pipeline_layout.groups = {{{{0, BINDING_RW_TEXTURE2D, 1, SHADER_VISIBILITY_FRAGMENT},
-                                   {1, BINDING_RW_STORAGE_BUFFER, 1, SHADER_VISIBILITY_FRAGMENT}}},
+                                   {1, BINDING_RW_STRUCTURED_BUFFER, 1, SHADER_VISIBILITY_FRAGMENT, 16}}},
                                  {{{0, BINDING_TEXTURE2D, 1, SHADER_VISIBILITY_FRAGMENT},
-                                   {1, BINDING_STORAGE_BUFFER, 1, SHADER_VISIBILITY_FRAGMENT}}}};
+                                   {1, BINDING_STRUCTURED_BUFFER, 1, SHADER_VISIBILITY_FRAGMENT, 16}}}};
+  const auto write_layout = desc.pipeline_layout.groups[0], read_layout = desc.pipeline_layout.groups[1];
+  desc.pipeline_layout.groups = {write_layout};
+  // Each entry is compiled against its own authoritative layout.
+  vs = device->CreateShader({"#define WRITE_PASS\n" + source, "VSMain", SHADER_STAGE_VERTEX});
+  desc.vertex_shader = vs.Get();
+  ObjPtr<IProgram> writer = device->CreateProgram(desc);
+  vs = device->CreateShader({source, "VSMain", SHADER_STAGE_VERTEX});
+  desc.vertex_shader = vs.Get();
+  desc.fragment_shader = read.Get();
+  desc.pipeline_layout.groups = {read_layout};
+  ObjPtr<IProgram> reader = device->CreateProgram(desc);
+  ASSERT_TRUE(writer && reader);
+  ASSERT_TRUE(writer->Finalize());
+  ASSERT_TRUE(reader->Finalize());
+  ObjPtr<IBindingGroup> wg = device->CreateBindingGroup(write_layout);
+  ObjPtr<IBindingGroup> rg = device->CreateBindingGroup(read_layout);
+  ASSERT_TRUE(wg);
+  ASSERT_TRUE(rg);
+  for (auto group : {wg.Get(), rg.Get()}) {
+    ASSERT_TRUE(group->BindResource(0, storage.Get()));
+    ASSERT_TRUE(group->BindResource(1, BufferView{buffer.Get()}));
+  }
+  ObjPtr<ICommandContext> commands = device->CreateCommandContext();
+  for (auto program : {writer.Get(), reader.Get()}) {
+    ASSERT_TRUE(commands->CmdBindProgram(program));
+    ASSERT_TRUE(commands->CmdBindGroup(0, program == writer.Get() ? wg.Get() : rg.Get()));
+    ASSERT_TRUE(commands->CmdBeginRendering(
+        {{{target.Get(), ATTACHMENT_LOAD_OP_CLEAR, ATTACHMENT_STORE_OP_STORE, {0, 0, 0, 1}}}}));
+    ASSERT_TRUE(commands->CmdSetViewport({0, 0, 64, 64, 0, 1}));
+    ASSERT_TRUE(commands->CmdSetScissor({0, 0, 64, 64}));
+    ASSERT_TRUE(commands->CmdDraw(3));
+    ASSERT_TRUE(commands->CmdEndRendering());
+  }
+  ObjPtr<ISubmissionToken> done = queue->Submit(commands.Get());
+  ASSERT_TRUE(done);
+  commands.Release();
+  ASSERT_TRUE(done->WaitHost());
+  std::array<uint8_t, 4> pixel{};
+  ReadPixel(device.Get(), target.Get(), GetParam(), 32, 32, pixel);
+  EXPECT_EQ(pixel, (std::array<uint8_t, 4>{255, 0, 255, 255}));
+}
+
+TEST_P(RhiImage, RawBufferWritesBecomeReadableAfterRendering) {
+  if (GetParam() == BACKEND_API_METAL)
+    GTEST_SKIP() << "Metal implementation is deferred.";
+  ObjPtr<ICore> core = CreateCore(GetParam());
+  ASSERT_TRUE(core);
+  ObjPtr<IDevice> device = core->CreateDeviceByAutoSelection();
+  ASSERT_TRUE(device);
+  Track(device.Get());
+  ObjPtr<IQueue> queue = device->GetQueue(QUEUE_TYPE_GRAPHICS);
+  ObjPtr<IImage> target = device->CreateImage({64, 64, IMAGE_FORMAT_RGBA8_UNORM});
+  ObjPtr<IImage> storage = device->CreateImage({64, 64, IMAGE_FORMAT_RGBA8_UNORM});
+  ObjPtr<IBuffer> buffer = device->CreateBuffer({64 * 64 * 16});
+  ASSERT_TRUE(target && storage && buffer);
+  const std::string source = R"(
+    #ifdef WRITE_PASS
+    RHI_RW_TEXTURE2D(0,0,float4,outputImage);
+    RHI_RW_BYTE_ADDRESS_BUFFER(0,1,outputBuffer);
+    #else
+    RHI_TEXTURE2D(0,0,float4,inputImage);
+    RHI_BYTE_ADDRESS_BUFFER(0,1,inputBuffer);
+    #endif
+    float4 VSMain(uint id:SV_VertexID):SV_Position {float2 p[3]={float2(-1,-1),float2(3,-1),float2(-1,3)};return float4(p[id],0,1);}
+    #ifdef WRITE_PASS
+    float4 WritePS(float4 pos:SV_Position):SV_Target0 {uint2 xy=uint2(pos.xy);outputImage[xy]=float4(1,0,0,1);outputBuffer.Store<float4>((xy.y*64+xy.x)*16,float4(0,0,1,0));return 0;}
+    #else
+    float4 ReadPS(float4 pos:SV_Position):SV_Target0 {uint2 xy=uint2(pos.xy);return inputImage.Load(int3(xy,0))+inputBuffer.Load<float4>((xy.y*64+xy.x)*16);}
+    #endif
+  )";
+  ObjPtr<IShader> vs = device->CreateShader({source, "VSMain", SHADER_STAGE_VERTEX});
+  ObjPtr<IShader> write = device->CreateShader({"#define WRITE_PASS\n" + source, "WritePS", SHADER_STAGE_FRAGMENT});
+  ObjPtr<IShader> read = device->CreateShader({source, "ReadPS", SHADER_STAGE_FRAGMENT});
+  ProgramDesc desc;
+  desc.vertex_shader = vs.Get();
+  desc.fragment_shader = write.Get();
+  desc.pipeline_layout.groups = {{{{0, BINDING_RW_TEXTURE2D, 1, SHADER_VISIBILITY_FRAGMENT},
+                                   {1, BINDING_RW_BYTE_ADDRESS_BUFFER, 1, SHADER_VISIBILITY_FRAGMENT}}},
+                                 {{{0, BINDING_TEXTURE2D, 1, SHADER_VISIBILITY_FRAGMENT},
+                                   {1, BINDING_BYTE_ADDRESS_BUFFER, 1, SHADER_VISIBILITY_FRAGMENT}}}};
   const auto write_layout = desc.pipeline_layout.groups[0], read_layout = desc.pipeline_layout.groups[1];
   desc.pipeline_layout.groups = {write_layout};
   // Each entry is compiled against its own authoritative layout.

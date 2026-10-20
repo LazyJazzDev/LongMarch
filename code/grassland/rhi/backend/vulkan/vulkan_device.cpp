@@ -83,6 +83,10 @@ VulkanDevice *VulkanDevice::CreateVulkanDevice(grassland::rhi::PhysicalDevice in
     ReportError(-1, "Vulkan RHI requires timelineSemaphore support.");
     return {};
   }
+  if (!enabled.ScalarBlockLayout()) {
+    ReportError(-1, "Vulkan RHI requires scalarBlockLayout for DX-compatible buffer layouts.");
+    return {};
+  }
   uint32_t count = 0;
   vkGetPhysicalDeviceQueueFamilyProperties(physical_device, &count, nullptr);
   std::vector<VkQueueFamilyProperties> families(count);

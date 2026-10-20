@@ -39,7 +39,7 @@ bool MetalProgram::Finalize() {
     auto prefix = ShaderMacroHeader(desc_, BACKEND_API_METAL);
     for (int i = 0; i < 2; ++i) {
       std::vector<uint8_t> code;
-      if (!CompileSlang(shaders[i]->GetDesc(), prefix, BACKEND_API_METAL, code))
+      if (!CompileSlang(shaders[i]->GetDesc(), prefix, BACKEND_API_METAL, code, &desc_.pipeline_layout))
         return false;
       code.push_back(0);
       NS::Error *error = nullptr;

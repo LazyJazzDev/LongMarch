@@ -14,7 +14,7 @@ constexpr VkDescriptorType descriptor_types[] = {VK_DESCRIPTOR_TYPE_UNIFORM_BUFF
                                                  VK_DESCRIPTOR_TYPE_SAMPLER};
 
 size_t Kind(BindingType type) {
-  const size_t kinds[] = {0, 1, 1, 2, 3, 4};
+  const size_t kinds[] = {0, 1, 1, 1, 1, 2, 3, 4};
   return kinds[type];
 }
 
@@ -402,7 +402,8 @@ bool ValidatePipelineBindings(VkPhysicalDevice device, const PipelineLayoutDesc 
   vkGetPhysicalDeviceFeatures(device, &features);
   for (const auto &group : layout.groups)
     for (auto b : group.bindings)
-      if (b.type == BINDING_RW_STORAGE_BUFFER || b.type == BINDING_RW_TEXTURE2D) {
+      if (b.type == BINDING_RW_STRUCTURED_BUFFER || b.type == BINDING_RW_BYTE_ADDRESS_BUFFER ||
+          b.type == BINDING_RW_TEXTURE2D) {
         if ((b.visibility & SHADER_VISIBILITY_VERTEX) && !features.vertexPipelineStoresAndAtomics)
           return false;
         if ((b.visibility & SHADER_VISIBILITY_FRAGMENT) && !features.fragmentStoresAndAtomics)

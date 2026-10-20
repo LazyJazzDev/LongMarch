@@ -722,9 +722,11 @@ bool VulkanCommandContext::BindGroupVersion(uint32_t index, VulkanBindingGroup::
       const auto &b = native->GetLayout().bindings[binding_index];
       for (uint32_t i = 0; i < b.count; ++i) {
         const VkAccessFlags access =
-            VK_ACCESS_SHADER_READ_BIT |
-            ((b.type == BINDING_RW_STORAGE_BUFFER || b.type == BINDING_RW_TEXTURE2D) ? VK_ACCESS_SHADER_WRITE_BIT : 0);
-        if (b.type <= BINDING_RW_STORAGE_BUFFER) {
+            VK_ACCESS_SHADER_READ_BIT | ((b.type == BINDING_RW_STRUCTURED_BUFFER ||
+                                          b.type == BINDING_RW_BYTE_ADDRESS_BUFFER || b.type == BINDING_RW_TEXTURE2D)
+                                             ? VK_ACCESS_SHADER_WRITE_BIT
+                                             : 0);
+        if (b.type <= BINDING_RW_BYTE_ADDRESS_BUFFER) {
           auto buffer = static_cast<VulkanBuffer *>(native->GetReferences()[binding_index][i].Get());
           if (!TransitionBuffer(buffer, VK_PIPELINE_STAGE_ALL_GRAPHICS_BIT,
                                 b.type == BINDING_UNIFORM_BUFFER ? VK_ACCESS_UNIFORM_READ_BIT : access))

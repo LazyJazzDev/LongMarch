@@ -463,7 +463,7 @@ TEST_P(RhiProgram, TypedBindingArraysPreserveSparseVersionsAndPartialUpdates) {
   EXPECT_EQ(static_cast<IImage *>(next->GetReferences()[1][1].Get())->GetDesc().width, 1u);
 }
 
-TEST_P(RhiProgram, StructuredStridesComeFromTargetLayoutAndMustAgreeAcrossStages) {
+TEST_P(RhiProgram, StructuredStridesMustMatchExplicitLayoutAcrossStages) {
   if (GetParam() == BACKEND_API_METAL)
     GTEST_SKIP() << "Metal bindings are deferred.";
   ObjPtr<ICore> core = CreateCore(GetParam());
@@ -483,12 +483,12 @@ TEST_P(RhiProgram, StructuredStridesComeFromTargetLayoutAndMustAgreeAcrossStages
   ProgramDesc desc;
   desc.vertex_shader = vs.Get();
   desc.fragment_shader = ps.Get();
-  desc.pipeline_layout.groups = {{{{0, BINDING_STORAGE_BUFFER}}}};
+  desc.pipeline_layout.groups = {{{{0, BINDING_STRUCTURED_BUFFER, 1, SHADER_VISIBILITY_ALL, 16}}}};
   ObjPtr<IProgram> mismatch = device->CreateProgram(desc);
   ASSERT_TRUE(mismatch);
   EXPECT_FALSE(mismatch->Finalize());
   EXPECT_FALSE(mismatch->IsFinalized());
-  // A retry must not reuse partially merged reflection from the previous attempt.
+  // Retrying must still reject the incompatible shader.
   EXPECT_FALSE(mismatch->Finalize());
   ps = device->CreateShader({R"(
     RHI_STRUCTURED_BUFFER(0,0,float4,colors);
@@ -499,7 +499,6 @@ TEST_P(RhiProgram, StructuredStridesComeFromTargetLayoutAndMustAgreeAcrossStages
   ObjPtr<IProgram> matching = device->CreateProgram(desc);
   ASSERT_TRUE(matching);
   ASSERT_TRUE(matching->Finalize());
-  EXPECT_EQ(static_cast<backend::Program *>(matching.Get())->StructuredBufferStride(0, 0), 16u);
 
   const std::string source = R"(
     struct Element { float4 color; float scale; };
@@ -518,22 +517,77 @@ TEST_P(RhiProgram, StructuredStridesComeFromTargetLayoutAndMustAgreeAcrossStages
   ps = device->CreateShader({source, "PSMain", SHADER_STAGE_FRAGMENT});
   desc.vertex_shader = vs.Get();
   desc.fragment_shader = ps.Get();
-  desc.pipeline_layout.groups = {{{{0, BINDING_STORAGE_BUFFER, 2, SHADER_VISIBILITY_FRAGMENT},
-                                   {1, BINDING_RW_STORAGE_BUFFER, 1, SHADER_VISIBILITY_FRAGMENT},
-                                   {2, BINDING_STORAGE_BUFFER, 1, SHADER_VISIBILITY_FRAGMENT}}}};
+  desc.pipeline_layout.groups = {{{{0, BINDING_STRUCTURED_BUFFER, 2, SHADER_VISIBILITY_FRAGMENT, 20},
+                                   {1, BINDING_RW_STRUCTURED_BUFFER, 1, SHADER_VISIBILITY_FRAGMENT, 20},
+                                   {2, BINDING_STRUCTURED_BUFFER, 1, SHADER_VISIBILITY_FRAGMENT, 16}}}};
   ObjPtr<IProgram> program = device->CreateProgram(desc);
   ASSERT_TRUE(program);
   ASSERT_TRUE(program->Finalize());
-  auto native = static_cast<backend::Program *>(program.Get());
-  const uint32_t stride = GetParam() == BACKEND_API_D3D12 ? 20 : 32;
-  EXPECT_EQ(native->StructuredBufferStride(0, 0), stride);
-  EXPECT_EQ(native->StructuredBufferStride(0, 1), stride);
-  EXPECT_EQ(native->StructuredBufferStride(0, 2), 0u);
+  desc.pipeline_layout.groups[0].bindings[0].stride = 32;
+  ObjPtr<IProgram> padded = device->CreateProgram(desc);
+  ASSERT_TRUE(padded);
+  EXPECT_FALSE(padded->Finalize());
   EXPECT_TRUE(program->Finalize());
 }
 
+TEST_P(RhiProgram, StructuredLayoutStrideControlsCompatibilityAndRanges) {
+  if (GetParam() == BACKEND_API_METAL)
+    GTEST_SKIP() << "Metal bindings are deferred.";
+  ObjPtr<ICore> core = CreateCore(GetParam());
+  ASSERT_TRUE(core);
+  ObjPtr<IDevice> device = core->CreateDeviceByAutoSelection();
+  ASSERT_TRUE(device);
+  BindingLayoutDesc layout{{{0, BINDING_STRUCTURED_BUFFER, 1, SHADER_VISIBILITY_ALL, 16}}};
+  auto other = layout;
+  other.bindings[0].stride = 8;
+  EXPECT_FALSE(backend::SameBindingLayout(layout, other));
+  other.bindings[0].stride = 0;
+  EXPECT_FALSE(device->CreateBindingGroup(other));
+  ObjPtr<IBuffer> buffer = device->CreateBuffer({256});
+  ASSERT_TRUE(buffer);
+  ObjPtr<IBindingGroup> group = device->CreateBindingGroup(layout);
+  ASSERT_TRUE(group);
+  EXPECT_FALSE(group->BindResource(0, BufferView{buffer.Get(), 4, 16}));
+  EXPECT_FALSE(group->BindResource(0, BufferView{buffer.Get(), 0, 17}));
+  EXPECT_TRUE(group->BindResource(0, BufferView{buffer.Get(), 0, 32}));
+  layout.bindings[0].type = BINDING_BYTE_ADDRESS_BUFFER;
+  other = layout;
+  other.bindings[0].stride = 123;
+  EXPECT_TRUE(backend::SameBindingLayout(layout, other));
+  group = device->CreateBindingGroup(other);
+  ASSERT_TRUE(group);
+  EXPECT_FALSE(group->BindResource(0, BufferView{buffer.Get(), 1, 4}));
+  EXPECT_FALSE(group->BindResource(0, BufferView{buffer.Get(), 0, 3}));
+  EXPECT_TRUE(group->BindResource(0, BufferView{buffer.Get(), 0, 4}));
+
+  const std::string source = R"(
+    RHI_STRUCTURED_BUFFER(0,0,float2,values);
+    float4 VSMain(uint id:SV_VertexID):SV_Position { return float4(values[id],0,1); }
+    float4 PSMain():SV_Target0 { return 1; }
+  )";
+  ObjPtr<IShader> vs = device->CreateShader({source, "VSMain", SHADER_STAGE_VERTEX});
+  ObjPtr<IShader> ps = device->CreateShader({source, "PSMain", SHADER_STAGE_FRAGMENT});
+  ProgramDesc desc;
+  desc.vertex_shader = vs.Get();
+  desc.fragment_shader = ps.Get();
+  layout.bindings[0].type = BINDING_STRUCTURED_BUFFER;
+  layout.bindings[0].stride = 8;
+  desc.pipeline_layout.groups = {layout};
+  ObjPtr<IProgram> program = device->CreateProgram(desc);
+  ASSERT_TRUE(program);
+  ASSERT_TRUE(program->Finalize());
+  layout.bindings[0].stride = 16;
+  group = device->CreateBindingGroup(layout);
+  ASSERT_TRUE(group);
+  ASSERT_TRUE(group->BindResource(0, buffer.Get()));
+  ObjPtr<ICommandContext> commands = device->CreateCommandContext();
+  ASSERT_TRUE(commands);
+  ASSERT_TRUE(commands->CmdBindProgram(program.Get()));
+  EXPECT_FALSE(commands->CmdBindGroup(0, group.Get()));
+}
+
 #if defined(LONGMARCH_D3D12_ENABLED)
-TEST(D3D12BindingGroup, CpuDescriptorsAreSharedByCommandsAndCachedByReflectedStride) {
+TEST(D3D12BindingGroup, CpuDescriptorsAreFinalBeforeProgramBinding) {
   using namespace backend::d3d12;
   ObjPtr<ICore> core = CreateCore(BACKEND_API_D3D12);
   ASSERT_TRUE(core);
@@ -541,7 +595,7 @@ TEST(D3D12BindingGroup, CpuDescriptorsAreSharedByCommandsAndCachedByReflectedStr
   ASSERT_TRUE(device);
   ObjPtr<IBuffer> buffer = device->CreateBuffer({256});
   ASSERT_TRUE(buffer);
-  BindingLayoutDesc layout{{{0, BINDING_STORAGE_BUFFER, 1, SHADER_VISIBILITY_FRAGMENT},
+  BindingLayoutDesc layout{{{0, BINDING_STRUCTURED_BUFFER, 1, SHADER_VISIBILITY_FRAGMENT, 16},
                             {1, BINDING_SAMPLER, 1, SHADER_VISIBILITY_FRAGMENT}}};
   auto make_program = [&](bool wide) {
     std::string source =
@@ -555,6 +609,7 @@ TEST(D3D12BindingGroup, CpuDescriptorsAreSharedByCommandsAndCachedByReflectedStr
     desc.vertex_shader = vs.Get();
     desc.fragment_shader = ps.Get();
     desc.pipeline_layout.groups = {layout};
+    desc.pipeline_layout.groups[0].bindings[0].stride = wide ? 16 : 8;
     return ObjPtr<IProgram>(device->CreateProgram(desc));
   };
   auto wide = make_program(true);
@@ -572,12 +627,8 @@ TEST(D3D12BindingGroup, CpuDescriptorsAreSharedByCommandsAndCachedByReflectedStr
   ASSERT_TRUE(group->BindResource(1, SamplerDesc{}));
   auto native = static_cast<D3D12BindingGroup *>(group.Get());
   auto version = static_cast<D3D12BindingGroup::Version *>(native->CurrentVersion());
-  auto a = version->ResourceDescriptors(static_cast<D3D12Program *>(wide.Get()), 0);
-  auto b = version->ResourceDescriptors(static_cast<D3D12Program *>(narrow.Get()), 0);
+  auto a = version->ResourceDescriptors();
   ASSERT_TRUE(a);
-  ASSERT_TRUE(b);
-  EXPECT_NE(a, b);
-  EXPECT_EQ(version->ResourceDescriptors(static_cast<D3D12Program *>(same.Get()), 0), a);
   EXPECT_EQ(a->Heap()->GetDesc().Flags, D3D12_DESCRIPTOR_HEAP_FLAG_NONE);
   EXPECT_EQ(version->SamplerDescriptors()->Heap()->GetDesc().Flags, D3D12_DESCRIPTOR_HEAP_FLAG_NONE);
   auto sampler = version->SamplerDescriptors()->CPU().ptr;
@@ -587,17 +638,20 @@ TEST(D3D12BindingGroup, CpuDescriptorsAreSharedByCommandsAndCachedByReflectedStr
   ASSERT_TRUE(second);
   ASSERT_TRUE(first->CmdBindProgram(wide.Get()));
   ASSERT_TRUE(first->CmdBindGroup(0, group.Get()));
-  ASSERT_TRUE(second->CmdBindProgram(narrow.Get()));
+  ASSERT_TRUE(second->CmdBindProgram(same.Get()));
   ASSERT_TRUE(second->CmdBindGroup(0, group.Get()));
   EXPECT_EQ(native->CurrentVersion(), version);
-  EXPECT_EQ(version->ResourceDescriptors(static_cast<D3D12Program *>(wide.Get()), 0), a);
-  EXPECT_EQ(version->ResourceDescriptors(static_cast<D3D12Program *>(narrow.Get()), 0), b);
+  EXPECT_EQ(version->ResourceDescriptors(), a);
   EXPECT_EQ(version->SamplerDescriptors()->CPU().ptr, sampler);
   ASSERT_TRUE(group->BindResource(1, SamplerDesc{SAMPLER_FILTER_NEAREST}));
   auto replacement = static_cast<D3D12BindingGroup::Version *>(native->CurrentVersion());
   EXPECT_NE(replacement, version);
   EXPECT_NE(replacement->SamplerDescriptors()->CPU().ptr, sampler);
-  EXPECT_EQ(version->ResourceDescriptors(static_cast<D3D12Program *>(wide.Get()), 0), a);
+  EXPECT_EQ(version->ResourceDescriptors(), a);
+  ObjPtr<ICommandContext> rejected = device->CreateCommandContext();
+  ASSERT_TRUE(rejected);
+  ASSERT_TRUE(rejected->CmdBindProgram(narrow.Get()));
+  EXPECT_FALSE(rejected->CmdBindGroup(0, group.Get()));
   // Discarding recorded commands must return their version leases, without submission.
   first.Release();
   second.Release();

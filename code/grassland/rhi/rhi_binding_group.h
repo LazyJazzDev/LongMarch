@@ -7,8 +7,10 @@ class IImage;
 
 enum BindingType {
   BINDING_UNIFORM_BUFFER,
-  BINDING_STORAGE_BUFFER,
-  BINDING_RW_STORAGE_BUFFER,
+  BINDING_STRUCTURED_BUFFER,
+  BINDING_RW_STRUCTURED_BUFFER,
+  BINDING_BYTE_ADDRESS_BUFFER,
+  BINDING_RW_BYTE_ADDRESS_BUFFER,
   BINDING_TEXTURE2D,
   BINDING_RW_TEXTURE2D,
   BINDING_SAMPLER
@@ -21,6 +23,8 @@ struct BindingDesc {
   BindingType type{BINDING_UNIFORM_BUFFER};
   uint32_t count{1};
   uint32_t visibility{SHADER_VISIBILITY_ALL};
+  // Element stride in bytes; only meaningful for [RW_]STRUCTURED_BUFFER.
+  uint32_t stride{};
 };
 
 // Value descriptions are copied into Programs and Groups; later edits do not affect them.
@@ -42,7 +46,7 @@ struct SamplerDesc {
 };
 
 // A borrowed byte range. size == 0 selects the remaining bytes.
-// Structured element layout is reflected from the Program, not supplied by callers.
+// Structured ranges must be multiples of BindingDesc::stride.
 struct BufferView {
   IBuffer *buffer{};
   uint64_t offset{}, size{};
