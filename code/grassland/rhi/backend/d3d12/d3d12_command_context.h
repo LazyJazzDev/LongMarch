@@ -1,4 +1,4 @@
-﻿#pragma once
+#pragma once
 #include <vector>
 
 #include "grassland/rhi/backend/backend_command_context.h"
@@ -70,8 +70,6 @@ class D3D12CommandContext final : public CommandContext {
   bool viewport_set_{}, scissor_set_{}, index_bound_{};
 
   bool EndRecording() override;
-  bool RenderTarget(D3D12Image *image, D3D12_CPU_DESCRIPTOR_HANDLE &handle);
-  std::unordered_map<D3D12Image *, D3D12_CPU_DESCRIPTOR_HANDLE> rtv_leases_;
   bool TransitionResource(ID3D12Resource *resource, D3D12_RESOURCE_STATES state, D3D12_RESOURCE_STATES default_state);
 
   struct ResourceState {

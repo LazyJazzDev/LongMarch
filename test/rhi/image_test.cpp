@@ -275,6 +275,40 @@ TEST_P(RhiImage, StorageUsageFollowsNativeFormatSupport) {
   }
 }
 
+#if defined(LONGMARCH_D3D12_ENABLED)
+TEST(RhiD3D12Image, AttachmentLeasesFollowImagesRetainedByCommands) {
+  ObjPtr<ICore> core = CreateCore(BACKEND_API_D3D12);
+  ASSERT_TRUE(core);
+  ObjPtr<IDevice> device = core->CreateDeviceByAutoSelection();
+  ASSERT_TRUE(device);
+  auto owner = static_cast<backend::d3d12::D3D12Device *>(device.Get());
+  ObjPtr<IImage> color = device->CreateImage({8, 8, IMAGE_FORMAT_RGBA8_UNORM});
+  ObjPtr<IImage> depth = device->CreateImage({8, 8, IMAGE_FORMAT_D32_FLOAT});
+  ASSERT_TRUE(color && depth);
+  auto handle = static_cast<backend::d3d12::D3D12Image *>(color.Get())->AttachmentView().ptr;
+  EXPECT_NE(handle, 0u);
+  EXPECT_EQ(owner->RTVPool().GetPageCounts().second, 1u);
+  EXPECT_EQ(owner->DSVPool().GetPageCounts().second, 1u);
+  ObjPtr<ICommandContext> commands = device->CreateCommandContext();
+  ASSERT_TRUE(commands);
+  ASSERT_TRUE(commands->CmdClearColor(color.Get(), {0, 0, 0, 1}));
+  RenderingInfo rendering;
+  rendering.color_attachments = {{color.Get(), ATTACHMENT_LOAD_OP_LOAD, ATTACHMENT_STORE_OP_STORE}};
+  rendering.depth_stencil.image = depth.Get();
+  rendering.depth_stencil.depth_load_op = ATTACHMENT_LOAD_OP_CLEAR;
+  ASSERT_TRUE(commands->CmdBeginRendering(rendering));
+  ASSERT_TRUE(commands->CmdEndRendering());
+  EXPECT_EQ(static_cast<backend::d3d12::D3D12Image *>(color.Get())->AttachmentView().ptr, handle);
+  color.Release();
+  depth.Release();
+  EXPECT_EQ(owner->RTVPool().GetPageCounts().second, 1u);
+  EXPECT_EQ(owner->DSVPool().GetPageCounts().second, 1u);
+  commands.Release();
+  EXPECT_EQ(owner->RTVPool().GetPageCounts().second, 0u);
+  EXPECT_EQ(owner->DSVPool().GetPageCounts().second, 0u);
+}
+#endif
+
 TEST_P(RhiImage, UploadRowsPreservePixelsWithDifferentSourceAndDestinationPitch) {
   ObjPtr<ICore> core = CreateCore(GetParam());
   ASSERT_TRUE(core);
@@ -452,6 +486,9 @@ TEST_P(RhiImage, MultipleTargetsAndDepthRejectOccludedFragments) {
   Track(device.Get());
   ObjPtr<IQueue> queue = device->GetQueue(QUEUE_TYPE_GRAPHICS);
   ObjPtr<IImage> first = device->CreateImage({64, 64, IMAGE_FORMAT_RGBA8_UNORM});
+  // Keep an intervening view alive so MRT cannot assume contiguous handles.
+  ObjPtr<IImage> spacer = device->CreateImage({64, 64, IMAGE_FORMAT_RGBA8_UNORM});
+  ASSERT_TRUE(spacer);
   ObjPtr<IImage> second = device->CreateImage({64, 64, IMAGE_FORMAT_RGBA8_UNORM});
   ObjPtr<IImage> depth = device->CreateImage({64, 64, IMAGE_FORMAT_D32_FLOAT});
   ASSERT_TRUE(first && second && depth);

@@ -77,29 +77,6 @@ bool D3D12CommandContext::TransitionResource(ID3D12Resource *resource,
   }
 }
 
-bool D3D12CommandContext::RenderTarget(D3D12Image *image, D3D12_CPU_DESCRIPTOR_HANDLE &handle) {
-  try {
-    auto existing = rtv_leases_.find(image);
-    if (existing != rtv_leases_.end()) {
-      handle = existing->second;
-      return true;
-    }
-    auto lease = device_->RTVPool().Acquire(1);
-    if (!lease || !RetainResource(lease.Get())) {
-      recording_failed_ = true;
-      return false;
-    }
-    handle = lease->CPU();
-    device_->NativeDevice()->CreateRenderTargetView(image->NativeImage(), nullptr, handle);
-    rtv_leases_.emplace(image, handle);
-    return true;
-  } catch (const std::bad_alloc &) {
-    rtv_leases_.erase(image);
-    recording_failed_ = true;
-    return false;
-  }
-}
-
 bool D3D12CommandContext::CmdClearColor(rhi::IImage *image, const std::array<float, 4> &color) {
 #if !defined(NDEBUG)
   if (render_target_) {
@@ -120,10 +97,7 @@ bool D3D12CommandContext::CmdClearColor(rhi::IImage *image, const std::array<flo
     return false;
   if (!TransitionResource(native->NativeImage(), D3D12_RESOURCE_STATE_RENDER_TARGET, native->DefaultState()))
     return false;
-  D3D12_CPU_DESCRIPTOR_HANDLE handle{};
-  if (!RenderTarget(native, handle))
-    return false;
-  list_->ClearRenderTargetView(handle, color.data(), 0, nullptr);
+  list_->ClearRenderTargetView(native->AttachmentView(), color.data(), 0, nullptr);
   return true;
 }
 
@@ -356,18 +330,12 @@ bool D3D12CommandContext::CmdBeginRendering(const RenderingInfo &info) {
   }
   std::array<D3D12_CPU_DESCRIPTOR_HANDLE, 8> colors{};
   auto count = static_cast<UINT>(rendering_.color_attachments.size());
-  auto rtvs = count ? device_->RTVPool().Acquire(count) : ObjectPtr<D3D12DescriptorPool::Lease>{};
-  if (count && (!rtvs || !RetainResource(rtvs.Get()))) {
-    recording_failed_ = true;
-    return false;
-  }
   for (UINT i = 0; i < count; ++i) {
     const auto &attachment = rendering_.color_attachments[i];
     auto image = static_cast<D3D12Image *>(attachment.color_attachment);
     if (!TransitionResource(image->NativeImage(), D3D12_RESOURCE_STATE_RENDER_TARGET, image->DefaultState()))
       return false;
-    colors[i] = rtvs->CPU(i);
-    device_->NativeDevice()->CreateRenderTargetView(image->NativeImage(), nullptr, colors[i]);
+    colors[i] = image->AttachmentView();
     if (attachment.load_op == ATTACHMENT_LOAD_OP_CLEAR)
       list_->ClearRenderTargetView(colors[i], attachment.clear_color.data(), 0, nullptr);
     else if (attachment.load_op == ATTACHMENT_LOAD_OP_DISCARD)
@@ -376,15 +344,9 @@ bool D3D12CommandContext::CmdBeginRendering(const RenderingInfo &info) {
   auto depth = static_cast<D3D12Image *>(rendering_.depth_stencil.image);
   D3D12_CPU_DESCRIPTOR_HANDLE dsv{};
   if (depth) {
-    auto lease = device_->DSVPool().Acquire(1);
-    if (!lease || !RetainResource(lease.Get())) {
-      recording_failed_ = true;
-      return false;
-    }
-    dsv = lease->CPU();
+    dsv = depth->AttachmentView();
     if (!TransitionResource(depth->NativeImage(), D3D12_RESOURCE_STATE_DEPTH_WRITE, depth->DefaultState()))
       return false;
-    device_->NativeDevice()->CreateDepthStencilView(depth->NativeImage(), nullptr, dsv);
     const auto &ds = rendering_.depth_stencil;
     UINT flags = ds.depth_load_op == ATTACHMENT_LOAD_OP_CLEAR ? D3D12_CLEAR_FLAG_DEPTH : 0;
     if (HasStencil(depth->GetDesc().format) && ds.stencil_load_op == ATTACHMENT_LOAD_OP_CLEAR)

@@ -1,4 +1,4 @@
-﻿#pragma once
+#pragma once
 #include "grassland/rhi/backend/d3d12/d3d12_image.h"
 
 namespace D3D12MA {
@@ -18,7 +18,8 @@ class D3D12AllocatedImage final : public D3D12Image {
   D3D12AllocatedImage(D3D12Device *device,
                       ImageDesc desc,
                       ComPtr<ID3D12Resource> image,
-                      ComPtr<D3D12MA::Allocation> allocation);
+                      ComPtr<D3D12MA::Allocation> allocation,
+                      ObjectPtr<D3D12DescriptorPool::Lease> attachment);
   ComPtr<D3D12MA::Allocation> allocation_;
   ComPtr<ID3D12Resource> image_;
 };

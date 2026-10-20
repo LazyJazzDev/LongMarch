@@ -1,4 +1,4 @@
-﻿#pragma once
+#pragma once
 #include <array>
 
 #include "grassland/rhi/backend/backend_window.h"
@@ -24,6 +24,7 @@ class D3D12Window final : public Window {
   D3D12Device *device_;
   ComPtr<IDXGISwapChain3> swapchain_;
   std::array<ComPtr<ID3D12Resource>, 3> images_;
+  std::array<ObjectPtr<D3D12DescriptorPool::Lease>, 3> attachments_;
   ImageDesc desc_;
   std::atomic<uint64_t> generation_{1};
   bool acquired_{};
