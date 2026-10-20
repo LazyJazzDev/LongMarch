@@ -1,6 +1,15 @@
 ﻿#include "grassland/rhi/backend/vulkan/vulkan_util.h"
 
 namespace grassland::rhi::backend::vulkan {
+bool SupportsImageStorage(VkPhysicalDevice device, ImageFormat format) {
+  const auto native = NativeImageFormat(format);
+  if (native == VK_FORMAT_UNDEFINED || IsDepthFormat(format))
+    return false;
+  VkFormatProperties properties{};
+  vkGetPhysicalDeviceFormatProperties(device, native, &properties);
+  return (properties.optimalTilingFeatures & VK_FORMAT_FEATURE_STORAGE_IMAGE_BIT) != 0;
+}
+
 VkFormat NativeImageFormat(ImageFormat format) {
   switch (format) {
     case IMAGE_FORMAT_RGBA8_UNORM:

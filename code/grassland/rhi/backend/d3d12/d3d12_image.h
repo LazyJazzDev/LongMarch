@@ -7,6 +7,7 @@ namespace grassland::rhi::backend::d3d12 {
 // Common resource access; derived classes define ownership and validity.
 class D3D12Image : public Image {
  public:
+  bool SupportsStorage() const override;
   const void *DeviceIdentity() const override;
   ID3D12Resource *NativeImage() const;
   D3D12_RESOURCE_STATES DefaultState() const;

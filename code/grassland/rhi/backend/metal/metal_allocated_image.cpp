@@ -17,7 +17,10 @@ MetalAllocatedImage *MetalAllocatedImage::Create(MetalDevice *device, const Imag
     auto pool = NS::TransferPtr(NS::AutoreleasePool::alloc()->init());
     auto descriptor = MTL::TextureDescriptor::texture2DDescriptor(format, desc.width, desc.height, false);
     descriptor->setStorageMode(MTL::StorageModePrivate);
-    descriptor->setUsage(MTL::TextureUsageRenderTarget);
+    auto usage = MTL::TextureUsageRenderTarget | MTL::TextureUsageShaderRead;
+    if (SupportsImageStorage(desc.format))
+      usage |= MTL::TextureUsageShaderWrite;
+    descriptor->setUsage(usage);
     auto texture = NS::TransferPtr(device->NativeDevice()->newTexture(descriptor));
     if (!texture) {
       ReportError(-1, "Metal image allocation failed.");

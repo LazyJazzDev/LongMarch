@@ -23,12 +23,16 @@ bool VulkanAllocatedImage::IsValid() const {
   return true;
 }
 
+bool VulkanAllocatedImage::SupportsStorage() const {
+  return storage_;
+}
+
 VkImage VulkanAllocatedImage::NativeImage() const {
   return image_;
 }
 
 VulkanAllocatedImage *VulkanAllocatedImage::Create(VulkanDevice *device, const ImageDesc &desc) {
-  if (!desc.width || !desc.height || (desc.storage && desc.format != IMAGE_FORMAT_RGBA8_UNORM))
+  if (!desc.width || !desc.height)
     return nullptr;
   const auto format = NativeImageFormat(desc.format);
   if (format == VK_FORMAT_UNDEFINED)
@@ -45,8 +49,9 @@ VulkanAllocatedImage *VulkanAllocatedImage::Create(VulkanDevice *device, const I
     info.usage = (IsDepthFormat(desc.format) ? VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT
                                              : VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT) |
                  VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT;
-    if (desc.storage)
+    if (SupportsImageStorage(device->NativePhysicalDevice(), desc.format))
       info.usage |= VK_IMAGE_USAGE_STORAGE_BIT;
+    image->storage_ = (info.usage & VK_IMAGE_USAGE_STORAGE_BIT) != 0;
     VmaAllocationCreateInfo memory{};
     memory.usage = VMA_MEMORY_USAGE_AUTO_PREFER_DEVICE;
     if (!Check(vmaCreateImage(device->Allocator(), &info, &memory, &image->image_, &image->allocation_, nullptr),

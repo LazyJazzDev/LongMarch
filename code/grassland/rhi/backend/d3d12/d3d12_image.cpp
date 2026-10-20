@@ -9,6 +9,10 @@ D3D12Image::D3D12Image(ImageDesc desc, const void *device, ID3D12Resource *image
       default_state_(default_state) {
 }
 
+bool D3D12Image::SupportsStorage() const {
+  return (image_->GetDesc().Flags & D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS) != 0;
+}
+
 const void *D3D12Image::DeviceIdentity() const {
   return device_;
 }

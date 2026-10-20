@@ -8,6 +8,10 @@ MetalImage::MetalImage(ImageDesc desc, const void *device, MTL::Texture *image)
       image_(image) {
 }
 
+bool MetalImage::SupportsStorage() const {
+  return (image_->usage() & MTL::TextureUsageShaderWrite) != 0;
+}
+
 const void *MetalImage::DeviceIdentity() const {
   return device_;
 }

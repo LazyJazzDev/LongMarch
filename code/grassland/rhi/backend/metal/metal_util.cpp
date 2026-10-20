@@ -8,6 +8,12 @@
 #include <QuartzCore/QuartzCore.hpp>
 
 namespace grassland::rhi::backend::metal {
+bool SupportsImageStorage(ImageFormat format) {
+  // Of the currently supported formats, RGBA8Unorm supports shader writes
+  // on all supported Metal GPU families; BGRA8Unorm is read-only.
+  return format == IMAGE_FORMAT_RGBA8_UNORM;
+}
+
 MTL::PixelFormat NativeImageFormat(ImageFormat format) {
   switch (format) {
     case IMAGE_FORMAT_RGBA8_UNORM:

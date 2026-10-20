@@ -7,6 +7,7 @@
 #include "grassland/rhi/backend/backend_util.h"
 
 namespace grassland::rhi::backend::vulkan {
+bool SupportsImageStorage(VkPhysicalDevice device, ImageFormat format);
 VkFormat NativeImageFormat(ImageFormat format);
 VkImageAspectFlags ImageAspect(ImageFormat format);
 

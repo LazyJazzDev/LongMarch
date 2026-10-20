@@ -232,6 +232,44 @@ class RhiImage : public testing::TestWithParam<BackendAPI> {
 #endif
 };
 
+TEST_P(RhiImage, StorageUsageFollowsNativeFormatSupport) {
+  ObjPtr<ICore> core = CreateCore(GetParam());
+  ASSERT_TRUE(core);
+  ObjPtr<IDevice> device = core->CreateDeviceByAutoSelection();
+  ASSERT_TRUE(device);
+  if (GetParam() == BACKEND_API_METAL)
+    GTEST_SKIP() << "Metal binding groups are not implemented.";
+  for (auto format :
+       {IMAGE_FORMAT_RGBA8_UNORM, IMAGE_FORMAT_BGRA8_UNORM, IMAGE_FORMAT_D32_FLOAT, IMAGE_FORMAT_D24_UNORM_S8_UINT}) {
+    ObjPtr<IImage> image = device->CreateImage({16, 16, format});
+    ASSERT_TRUE(image);
+    const auto native = static_cast<backend::Image *>(image.Get());
+    bool supported = false;
+#if defined(LONGMARCH_D3D12_ENABLED)
+    if (GetParam() == BACKEND_API_D3D12) {
+      auto owner = static_cast<backend::d3d12::D3D12Device *>(device.Get());
+      supported = backend::d3d12::SupportsImageStorage(owner->NativeDevice(), format);
+      EXPECT_FALSE(backend::d3d12::SupportsImageStorage(owner->NativeDevice(), IMAGE_FORMAT_UNKNOWN));
+    }
+#endif
+#if defined(LONGMARCH_VULKAN_ENABLED)
+    if (GetParam() == BACKEND_API_VULKAN) {
+      auto owner = static_cast<backend::vulkan::VulkanDevice *>(device.Get());
+      supported = backend::vulkan::SupportsImageStorage(owner->NativePhysicalDevice(), format);
+      EXPECT_FALSE(backend::vulkan::SupportsImageStorage(owner->NativePhysicalDevice(), IMAGE_FORMAT_UNKNOWN));
+    }
+#endif
+    EXPECT_EQ(native->SupportsStorage(), supported);
+    if (IsDepthFormat(format))
+      EXPECT_FALSE(supported);
+    BindingLayoutDesc layout{{{0, BINDING_RW_TEXTURE2D, 1, SHADER_VISIBILITY_FRAGMENT}}};
+    BindingEntry entry{};
+    entry.image = image.Get();
+    ObjPtr<IBindingGroup> group = device->CreateBindingGroup(layout, {entry});
+    EXPECT_EQ(bool(group), supported);
+  }
+}
+
 TEST_P(RhiImage, OffscreenClearDrawReadbackAndReuse) {
 #if defined(LONGMARCH_D3D12_ENABLED)
   backend::d3d12::ComPtr<ID3D12Debug> debug;
@@ -538,7 +576,7 @@ TEST_P(RhiImage, StorageImageAndBufferBecomeReadableAfterRendering) {
   Track(device.Get());
   ObjPtr<IQueue> queue = device->GetQueue(QUEUE_TYPE_GRAPHICS);
   ObjPtr<IImage> target = device->CreateImage({64, 64, IMAGE_FORMAT_RGBA8_UNORM});
-  ObjPtr<IImage> storage = device->CreateImage({64, 64, IMAGE_FORMAT_RGBA8_UNORM, true});
+  ObjPtr<IImage> storage = device->CreateImage({64, 64, IMAGE_FORMAT_RGBA8_UNORM});
   ObjPtr<IBuffer> buffer = device->CreateBuffer({64 * 64 * 16});
   ASSERT_TRUE(target && storage && buffer);
   const std::string source = R"(

@@ -22,7 +22,7 @@ bool D3D12AllocatedImage::IsValid() const {
 }
 
 D3D12AllocatedImage *D3D12AllocatedImage::Create(D3D12Device *device, const ImageDesc &desc) {
-  if (!desc.width || !desc.height || (desc.storage && desc.format != IMAGE_FORMAT_RGBA8_UNORM))
+  if (!desc.width || !desc.height)
     return nullptr;
   const auto format = NativeImageFormat(desc.format);
   if (format == DXGI_FORMAT_UNKNOWN)
@@ -38,7 +38,7 @@ D3D12AllocatedImage *D3D12AllocatedImage::Create(D3D12Device *device, const Imag
     info.SampleDesc.Count = 1;
     info.Flags =
         IsDepthFormat(desc.format) ? D3D12_RESOURCE_FLAG_ALLOW_DEPTH_STENCIL : D3D12_RESOURCE_FLAG_ALLOW_RENDER_TARGET;
-    if (desc.storage)
+    if (SupportsImageStorage(device->NativeDevice(), desc.format))
       info.Flags |= D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS;
     D3D12MA::ALLOCATION_DESC memory{};
     memory.HeapType = D3D12_HEAP_TYPE_DEFAULT;

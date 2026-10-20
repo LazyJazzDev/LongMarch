@@ -137,7 +137,6 @@ struct ImageDesc {
   uint32_t width{};
   uint32_t height{};
   ImageFormat format{IMAGE_FORMAT_UNKNOWN};
-  bool storage{};
 };
 
 typedef enum { SHADER_STAGE_VERTEX, SHADER_STAGE_FRAGMENT } ShaderStage;

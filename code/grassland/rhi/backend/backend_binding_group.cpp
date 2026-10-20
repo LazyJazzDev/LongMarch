@@ -81,7 +81,7 @@ bool BindingGroup::Validate(Device *device, const BindingLayoutDesc &layout, con
       if (e.buffer || !image || !image->IsValid() || image->DeviceIdentity() != device->NativeIdentity() ||
           IsDepthFormat(image->GetDesc().format))
         return false;
-      if (it->type == BINDING_RW_TEXTURE2D && !image->GetDesc().storage)
+      if (it->type == BINDING_RW_TEXTURE2D && !image->SupportsStorage())
         return false;
     } else if (e.buffer || e.image || e.sampler.filter < SAMPLER_FILTER_NEAREST ||
                e.sampler.filter > SAMPLER_FILTER_LINEAR || e.sampler.address_u < SAMPLER_ADDRESS_REPEAT ||
