@@ -33,14 +33,12 @@ std::vector<MappedBinding> MapBindings(const PipelineLayoutDesc &layout, Backend
 
 bool ValidateBindingLayout(const BindingLayoutDesc &layout) {
   std::set<uint32_t> bindings;
-  uint64_t total = 0;
   for (auto b : layout.bindings) {
     if (b.type < BINDING_UNIFORM_BUFFER || b.type > BINDING_SAMPLER || !b.count || !b.visibility ||
         (b.visibility & ~SHADER_VISIBILITY_ALL) || !bindings.insert(b.binding).second)
       return false;
-    total += b.count;
   }
-  return total <= 1024;
+  return true;
 }
 
 bool SameBindingLayout(const BindingLayoutDesc &a, const BindingLayoutDesc &b) {

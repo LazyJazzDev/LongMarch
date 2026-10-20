@@ -1,6 +1,7 @@
 ﻿#include "grassland/rhi/backend/vulkan/vulkan_binding_group.h"
 
 #include <algorithm>
+#include <limits>
 
 #include "grassland/rhi/backend/vulkan/vulkan_allocated_image.h"
 #include "grassland/rhi/backend/vulkan/vulkan_buffer.h"
@@ -8,11 +9,17 @@
 
 namespace grassland::rhi::backend::vulkan {
 namespace {
+constexpr VkDescriptorType descriptor_types[] = {VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
+                                                 VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE,
+                                                 VK_DESCRIPTOR_TYPE_SAMPLER};
+
+size_t Kind(BindingType type) {
+  const size_t kinds[] = {0, 1, 1, 2, 3, 4};
+  return kinds[type];
+}
+
 VkDescriptorType Type(BindingType type) {
-  const VkDescriptorType types[] = {VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
-                                    VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE,
-                                    VK_DESCRIPTOR_TYPE_STORAGE_IMAGE,  VK_DESCRIPTOR_TYPE_SAMPLER};
-  return types[type];
+  return descriptor_types[Kind(type)];
 }
 }  // namespace
 
@@ -33,60 +40,74 @@ VkDescriptorSet VulkanDescriptorPool::Lease::Set() const {
 VulkanDescriptorPool::VulkanDescriptorPool(VkDevice device) : device_(device) {
 }
 
-VulkanDescriptorPool::~VulkanDescriptorPool() {
-  for (auto &p : pages_)
-    vkDestroyDescriptorPool(device_, p->pool, nullptr);
+size_t VulkanDescriptorPool::PatternHash::operator()(const Pattern &pattern) const {
+  size_t hash = 0;
+  for (auto count : pattern)
+    hash ^= std::hash<uint32_t>{}(count) + size_t(0x9e3779b9) + (hash << 6) + (hash >> 2);
+  return hash;
 }
 
-ObjectPtr<VulkanDescriptorPool::Lease> VulkanDescriptorPool::Acquire(VkDescriptorSetLayout layout) {
+VulkanDescriptorPool::~VulkanDescriptorPool() {
+  for (auto &[pattern, pages] : pages_)
+    for (auto &page : pages)
+      vkDestroyDescriptorPool(device_, page->pool, nullptr);
+}
+
+ObjectPtr<VulkanDescriptorPool::Lease> VulkanDescriptorPool::Acquire(VkDescriptorSetLayout layout,
+                                                                     const BindingLayoutDesc &desc) {
   try {
-    std::lock_guard<std::mutex> lock(mutex_);
-    VkDescriptorSetAllocateInfo allocate{VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO};
-    allocate.descriptorSetCount = 1;
-    allocate.pSetLayouts = &layout;
-    VkDescriptorSet set{};
-    Page *page = nullptr;
-    for (auto &p : pages_) {
-      if (p->occupied >= 64)
-        continue;
-      allocate.descriptorPool = p->pool;
-      auto status = vkAllocateDescriptorSets(device_, &allocate, &set);
-      if (status == VK_SUCCESS) {
-        page = p.get();
-        break;
-      }
-      if (status != VK_ERROR_OUT_OF_POOL_MEMORY && status != VK_ERROR_FRAGMENTED_POOL) {
-        Check(status, "Allocate descriptor set");
+    Pattern pattern{};
+    for (auto binding : desc.bindings) {
+      auto &count = pattern[Kind(binding.type)];
+      if (binding.count > std::numeric_limits<uint32_t>::max() - count)
         return {};
+      count += binding.count;
+    }
+    std::lock_guard<std::mutex> lock(mutex_);
+    auto &pages = pages_[pattern];
+    Page *page = nullptr;
+    for (auto &candidate : pages) {
+      if (candidate->available_sets) {
+        page = candidate.get();
+        break;
       }
     }
     if (!page) {
       auto fresh = std::make_unique<Page>();
-      const VkDescriptorPoolSize sizes[] = {{VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 1024},
-                                            {VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1024},
-                                            {VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, 1024},
-                                            {VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, 1024},
-                                            {VK_DESCRIPTOR_TYPE_SAMPLER, 1024}};
+      fresh->pattern = pattern;
+      fresh->capacity = 64;
+      for (auto count : pattern)
+        if (count)
+          fresh->capacity = std::min(fresh->capacity, std::numeric_limits<uint32_t>::max() / count);
+      fresh->available_sets = fresh->capacity;
+      std::vector<VkDescriptorPoolSize> sizes;
+      for (size_t i = 0; i < pattern.size(); ++i)
+        if (pattern[i])
+          sizes.push_back({descriptor_types[i], pattern[i] * fresh->capacity});
       VkDescriptorPoolCreateInfo create{VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO};
       create.flags = VK_DESCRIPTOR_POOL_CREATE_FREE_DESCRIPTOR_SET_BIT;
-      create.maxSets = 64;
-      create.poolSizeCount = 5;
-      create.pPoolSizes = sizes;
-      pages_.reserve(pages_.size() + 1);
+      create.maxSets = fresh->capacity;
+      create.poolSizeCount = uint32_t(sizes.size());
+      create.pPoolSizes = sizes.data();
+      pages.reserve(pages.size() + 1);
       if (!Check(vkCreateDescriptorPool(device_, &create, nullptr, &fresh->pool), "Create descriptor page"))
         return {};
       page = fresh.get();
-      pages_.push_back(std::move(fresh));
-      allocate.descriptorPool = page->pool;
-      if (!Check(vkAllocateDescriptorSets(device_, &allocate, &set), "Allocate descriptor set"))
-        return {};
+      pages.push_back(std::move(fresh));
     }
+    VkDescriptorSetAllocateInfo allocate{VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO};
+    allocate.descriptorPool = page->pool;
+    allocate.descriptorSetCount = 1;
+    allocate.pSetLayouts = &layout;
+    VkDescriptorSet set{};
+    if (!Check(vkAllocateDescriptorSets(device_, &allocate, &set), "Allocate descriptor set"))
+      return {};
+    --page->available_sets;
     try {
-      auto lease = ObjectPtr<Lease>::Adopt(new Lease(this, page, set));
-      ++page->occupied;
-      return lease;
+      return ObjectPtr<Lease>::Adopt(new Lease(this, page, set));
     } catch (const std::bad_alloc &) {
-      vkFreeDescriptorSets(device_, page->pool, 1, &set);
+      if (Check(vkFreeDescriptorSets(device_, page->pool, 1, &set), "Free descriptor set"))
+        ++page->available_sets;
       return {};
     }
   } catch (const std::bad_alloc &) {
@@ -96,14 +117,18 @@ ObjectPtr<VulkanDescriptorPool::Lease> VulkanDescriptorPool::Acquire(VkDescripto
 
 void VulkanDescriptorPool::ReleaseSet(Page *page, VkDescriptorSet set) {
   std::lock_guard<std::mutex> lock(mutex_);
-  vkFreeDescriptorSets(device_, page->pool, 1, &set);
-  --page->occupied;
-  if (!page->occupied)
-    vkResetDescriptorPool(device_, page->pool, 0);
-  if (!page->occupied &&
-      std::any_of(pages_.begin(), pages_.end(), [page](const auto &p) { return p.get() != page && !p->occupied; })) {
+  if (!Check(vkFreeDescriptorSets(device_, page->pool, 1, &set), "Free descriptor set"))
+    return;
+  ++page->available_sets;
+  if (page->available_sets != page->capacity)
+    return;
+  Check(vkResetDescriptorPool(device_, page->pool, 0), "Reset descriptor page");
+  auto &pages = pages_.at(page->pattern);
+  // Retain one idle page per pattern, rather than across unrelated layouts.
+  if (std::any_of(pages.begin(), pages.end(),
+                  [page](const auto &p) { return p.get() != page && p->available_sets == p->capacity; })) {
     vkDestroyDescriptorPool(device_, page->pool, nullptr);
-    pages_.erase(std::find_if(pages_.begin(), pages_.end(), [page](const auto &p) { return p.get() == page; }));
+    pages.erase(std::find_if(pages.begin(), pages.end(), [page](const auto &p) { return p.get() == page; }));
   }
 }
 
@@ -167,7 +192,7 @@ VulkanBindingGroup *VulkanBindingGroup::Create(VulkanDevice *device,
     group->native_layout_ = CreateBindingLayout(native, layout);
     if (!group->native_layout_)
       return nullptr;
-    group->lease_ = device->DescriptorPool().Acquire(group->native_layout_);
+    group->lease_ = device->DescriptorPool().Acquire(group->native_layout_, layout);
     if (!group->lease_)
       return nullptr;
     group->views_.resize(entries.size());
@@ -235,14 +260,10 @@ bool ValidatePipelineBindings(VkPhysicalDevice device, const PipelineLayoutDesc 
   const auto &limits = properties.limits;
   if (layout.groups.size() > limits.maxBoundDescriptorSets)
     return false;
-  uint32_t totals[5]{}, stages[2][5]{};
+  uint64_t totals[5]{}, stages[2][5]{};
   for (const auto &group : layout.groups)
     for (auto b : group.bindings) {
-      int kind = b.type == BINDING_UNIFORM_BUFFER      ? 0
-                 : b.type <= BINDING_RW_STORAGE_BUFFER ? 1
-                 : b.type == BINDING_TEXTURE2D         ? 2
-                 : b.type == BINDING_RW_TEXTURE2D      ? 3
-                                                       : 4;
+      auto kind = Kind(b.type);
       totals[kind] += b.count;
       for (int i = 0; i < 2; ++i)
         if (b.visibility & (1 << i))
@@ -280,8 +301,13 @@ bool ValidatePipelineBindings(VkPhysicalDevice device, const PipelineLayoutDesc 
 
 std::pair<size_t, size_t> VulkanDescriptorPool::GetPageCounts() const {
   std::lock_guard<std::mutex> lock(mutex_);
-  return {pages_.size(),
-          size_t(std::count_if(pages_.begin(), pages_.end(), [](const auto &p) { return p->occupied != 0; }))};
+  size_t total = 0, occupied = 0;
+  for (const auto &[pattern, pages] : pages_) {
+    total += pages.size();
+    occupied +=
+        std::count_if(pages.begin(), pages.end(), [](const auto &p) { return p->available_sets != p->capacity; });
+  }
+  return {total, occupied};
 }
 
 }  // namespace grassland::rhi::backend::vulkan
