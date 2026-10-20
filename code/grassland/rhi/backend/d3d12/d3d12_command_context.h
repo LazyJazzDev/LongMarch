@@ -55,7 +55,7 @@ class D3D12CommandContext final : public CommandContext {
 
   bool EndRecording() override;
   bool RenderTarget(D3D12Image *image, D3D12_CPU_DESCRIPTOR_HANDLE &handle);
-  std::unordered_map<D3D12Image *, std::pair<uint64_t, D3D12_CPU_DESCRIPTOR_HANDLE>> rtv_leases_;
+  std::unordered_map<D3D12Image *, D3D12_CPU_DESCRIPTOR_HANDLE> rtv_leases_;
   bool TransitionResource(ID3D12Resource *resource, D3D12_RESOURCE_STATES state, D3D12_RESOURCE_STATES default_state);
 
   struct ResourceState {

@@ -15,8 +15,6 @@ D3D12CommandContext::D3D12CommandContext(D3D12Device *device) : CommandContext(d
 }
 
 D3D12CommandContext::~D3D12CommandContext() {
-  for (const auto &entry : rtv_leases_)
-    device_->RTVPool().Release(entry.second.first);
   if (reusable_) {
     if (!closed_)
       reusable_ = SUCCEEDED(list_->Close());
@@ -81,18 +79,17 @@ bool D3D12CommandContext::RenderTarget(D3D12Image *image, D3D12_CPU_DESCRIPTOR_H
   try {
     auto existing = rtv_leases_.find(image);
     if (existing != rtv_leases_.end()) {
-      handle = existing->second.second;
+      handle = existing->second;
       return true;
     }
-    // Allocate tracking storage before acquiring a slot, so failure cannot leak a lease.
-    auto inserted = rtv_leases_.try_emplace(image);
-    if (!device_->RTVPool().Acquire(image->NativeImage(), inserted.first->second.first,
-                                    inserted.first->second.second)) {
-      rtv_leases_.erase(inserted.first);
+    auto lease = device_->RTVPool().Acquire(1);
+    if (!lease || !RetainResource(lease.Get())) {
       recording_failed_ = true;
       return false;
     }
-    handle = inserted.first->second.second;
+    handle = lease->CPU();
+    device_->NativeDevice()->CreateRenderTargetView(image->NativeImage(), nullptr, handle);
+    rtv_leases_.emplace(image, handle);
     return true;
   } catch (const std::bad_alloc &) {
     rtv_leases_.erase(image);
