@@ -5,22 +5,15 @@
 #include <limits>
 
 namespace grassland::rhi::backend::d3d12 {
-D3D12DescriptorPool::Lease::Lease(D3D12DescriptorPool *pool,
-                                  Page *page,
-                                  uint32_t offset,
-                                  uint32_t count,
-                                  FreeRanges::node_type range_node,
-                                  FreeIndex::node_type index_node)
+D3D12DescriptorPool::Lease::Lease(D3D12DescriptorPool *pool, Page *page, uint32_t offset, uint32_t count)
     : pool_(pool),
       page_(page),
       offset_(offset),
-      count_(count),
-      range_node_(std::move(range_node)),
-      index_node_(std::move(index_node)) {
+      count_(count) {
 }
 
 D3D12DescriptorPool::Lease::~Lease() {
-  pool_->ReleaseRange(page_, offset_, count_, std::move(range_node_), std::move(index_node_));
+  pool_->ReleaseRange(page_, offset_, count_);
 }
 
 ID3D12DescriptorHeap *D3D12DescriptorPool::Lease::Heap() const {
@@ -50,18 +43,20 @@ ObjectPtr<D3D12DescriptorPool::Lease> D3D12DescriptorPool::Acquire(uint32_t coun
     return {};
   try {
     std::lock_guard<std::mutex> lock(mutex_);
-    auto selected = free_index_.end();
-    // Skip insufficient ranges within each capacity class without scanning pages.
-    for (auto first = free_index_.begin(); first != free_index_.end();) {
-      const auto capacity = std::get<0>(first->first);
-      auto fit = free_index_.lower_bound({capacity, count, 0, 0});
-      if (fit != free_index_.end() && std::get<0>(fit->first) == capacity) {
-        selected = fit;
+    Page *page = nullptr;
+    uint32_t offset = 0;
+    uint32_t available = 0;
+    // Geometric growth keeps pages ordered by capacity and their count logarithmic.
+    for (auto &candidate : pages_) {
+      auto fit = candidate->available.lower_bound({count, 0});
+      if (fit != candidate->available.end()) {
+        page = candidate.get();
+        available = fit->first;
+        offset = fit->second;
         break;
       }
-      first = fit;
     }
-    if (selected == free_index_.end()) {
+    if (!page) {
       uint64_t capacity = 1;
       const uint64_t minimum = pages_.empty() ? std::max(count, page_capacity_) : count;
       while (capacity < minimum)
@@ -72,39 +67,27 @@ ObjectPtr<D3D12DescriptorPool::Lease> D3D12DescriptorPool::Acquire(uint32_t coun
         return {};
       auto fresh = std::make_unique<Page>();
       fresh->capacity = uint32_t(capacity);
-      fresh->id = pages_.size();
       D3D12_DESCRIPTOR_HEAP_DESC desc{};
       desc.Type = type_;
       desc.NumDescriptors = fresh->capacity;
       desc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_NONE;
       if (!Check(device_->CreateDescriptorHeap(&desc, IID_PPV_ARGS(&fresh->heap)), "Create descriptor pool page"))
         return {};
-      fresh->free_ranges.emplace(0, fresh->capacity);
-      // Prepare both containers before registering the page in the pool.
-      FreeIndex pending;
-      pending.emplace(FreeKey{fresh->capacity, fresh->capacity, fresh->id, 0}, fresh.get());
+      fresh->ranges.emplace(0, fresh->capacity);
+      fresh->available.emplace(fresh->capacity, 0);
+      page = fresh.get();
+      available = fresh->capacity;
       pages_.push_back(std::move(fresh));
-      selected = free_index_.insert(pending.extract(pending.begin())).position;
     }
-    Page *page = selected->second;
-    const auto offset = std::get<3>(selected->first);
-    const auto available = std::get<1>(selected->first);
-    FreeRanges pending_range;
-    FreeIndex pending_index;
-    pending_range.emplace(offset, count);
-    pending_index.emplace(FreeKey{page->capacity, count, page->id, offset}, page);
-    // All potentially failing allocations precede the interval mutation.
-    auto lease =
-        ObjectPtr<Lease>::Adopt(new Lease(this, page, offset, count, pending_range.extract(pending_range.begin()),
-                                          pending_index.extract(pending_index.begin())));
-    auto range_node = page->free_ranges.extract(offset);
-    auto index_node = free_index_.extract(selected);
+    auto lease = ObjectPtr<Lease>::Adopt(new Lease(this, page, offset, count));
+    auto range = page->ranges.extract(offset);
+    auto fit = page->available.extract({available, offset});
     if (available > count) {
-      range_node.key() = offset + count;
-      range_node.mapped() = available - count;
-      index_node.key() = {page->capacity, available - count, page->id, offset + count};
-      page->free_ranges.insert(std::move(range_node));
-      free_index_.insert(std::move(index_node));
+      range.key() = offset + count;
+      range.mapped() = available - count;
+      fit.value() = {available - count, offset + count};
+      page->ranges.insert(std::move(range));
+      page->available.insert(std::move(fit));
     }
     ++page->occupied;
     return lease;
@@ -113,32 +96,23 @@ ObjectPtr<D3D12DescriptorPool::Lease> D3D12DescriptorPool::Acquire(uint32_t coun
   }
 }
 
-void D3D12DescriptorPool::ReleaseRange(Page *page,
-                                       uint32_t offset,
-                                       uint32_t count,
-                                       FreeRanges::node_type range_node,
-                                       FreeIndex::node_type index_node) {
+void D3D12DescriptorPool::ReleaseRange(Page *page, uint32_t offset, uint32_t count) {
   std::lock_guard<std::mutex> lock(mutex_);
-  auto right = page->free_ranges.lower_bound(offset);
-  if (right != page->free_ranges.begin()) {
-    auto left = std::prev(right);
-    if (left->first + left->second == offset) {
-      free_index_.erase({page->capacity, left->second, page->id, left->first});
-      offset = left->first;
-      count += left->second;
-      page->free_ranges.erase(left);
-    }
+  auto right = page->ranges.lower_bound(offset);
+  auto left = right == page->ranges.begin() ? page->ranges.end() : std::prev(right);
+  if (left != page->ranges.end() && left->first + left->second == offset) {
+    page->available.erase({left->second, left->first});
+    offset = left->first;
+    count += left->second;
+    page->ranges.erase(left);
   }
-  if (right != page->free_ranges.end() && offset + count == right->first) {
-    free_index_.erase({page->capacity, right->second, page->id, right->first});
+  if (right != page->ranges.end() && offset + count == right->first) {
+    page->available.erase({right->second, right->first});
     count += right->second;
-    page->free_ranges.erase(right);
+    page->ranges.erase(right);
   }
-  range_node.key() = offset;
-  range_node.mapped() = count;
-  index_node.key() = {page->capacity, count, page->id, offset};
-  page->free_ranges.insert(std::move(range_node));
-  free_index_.insert(std::move(index_node));
+  page->ranges.emplace(offset, count);
+  page->available.emplace(count, offset);
   --page->occupied;
 }
 
