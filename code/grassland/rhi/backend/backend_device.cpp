@@ -1,5 +1,6 @@
 ﻿#include "grassland/rhi/backend/backend_device.h"
 
+#include "grassland/rhi/backend/backend_binding_group.h"
 #include "grassland/rhi/backend/backend_command_context.h"
 #include "grassland/rhi/backend/backend_core.h"
 #include "grassland/rhi/backend/backend_shader.h"
@@ -31,6 +32,16 @@ rhi::IShader *Device::CreateShader(const ShaderDesc &desc) {
     return new Shader(desc);
   } catch (const std::bad_alloc &) {
     ReportError(-1, "Shader source allocation failed.");
+    return nullptr;
+  }
+}
+
+IBindingGroup *Device::CreateBindingGroup(const BindingLayoutDesc &layout, const std::vector<BindingEntry> &entries) {
+  try {
+    if (!BindingGroup::Validate(this, layout, entries))
+      return nullptr;
+    return new BindingGroup(this, layout, entries);
+  } catch (const std::bad_alloc &) {
     return nullptr;
   }
 }

@@ -21,6 +21,8 @@ class D3D12CommandContext final : public CommandContext {
                      IBuffer *destination,
                      uint64_t destination_offset,
                      uint64_t size) override;
+  bool CmdBindGroup(uint32_t index, IBindingGroup *group) override;
+  bool CmdUploadImage(IImage *image, const void *data, uint64_t row_pitch) override;
   bool CmdBindProgram(IProgram *program) override;
   bool CmdBeginRendering(const RenderingInfo &info) override;
   bool CmdEndRendering() override;
@@ -45,6 +47,9 @@ class D3D12CommandContext final : public CommandContext {
  private:
   D3D12CommandContext(D3D12Device *device);
 
+  bool PrepareGroups();
+  std::vector<IBindingGroup *> groups_;
+  bool groups_dirty_{true};
   D3D12Program *program_{};
   D3D12Image *render_target_{};
   AttachmentStoreOp store_op_{ATTACHMENT_STORE_OP_STORE};

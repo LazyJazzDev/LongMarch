@@ -1,6 +1,7 @@
 ﻿#pragma once
 #include "grassland/rhi/rhi.h"
 #include "grassland/rhi/rhi_util.h"
+#include "grassland/rhi/rhix/rhix_binding_group.h"
 #include "grassland/rhi/rhix/rhix_buffer.h"
 #include "grassland/rhi/rhix/rhix_command_context.h"
 #include "grassland/rhi/rhix/rhix_object_container.h"
@@ -20,6 +21,8 @@ class Device : public ObjectContainer {
   bool SupportRayTracingPipeline() const;
   bool SupportRayQuery() const;
   bool SupportGeometryShader() const;
+  BindingGroup CreateBindingGroup(const rhi::BindingLayoutDesc &layout,
+                                  const std::vector<rhi::BindingEntry> &entries) const;
   Shader CreateShader(const rhi::ShaderDesc &desc) const;
   Program CreateProgram(const rhi::ProgramDesc &desc) const;
   Image CreateImage(const rhi::ImageDesc &desc) const;

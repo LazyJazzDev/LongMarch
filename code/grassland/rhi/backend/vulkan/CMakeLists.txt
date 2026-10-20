@@ -1,4 +1,4 @@
-file(GLOB_RECURSE SOURCES "*.cpp" "*.h")
+file(GLOB_RECURSE SOURCES CONFIGURE_DEPENDS "*.cpp" "*.h")
 target_sources(grassland_rhi PRIVATE ${SOURCES})
 target_include_directories(grassland_rhi PRIVATE ${Vulkan_INCLUDE_DIRS})
 target_link_libraries(grassland_rhi PRIVATE ${VULKAN_LIB_NAME} ${VMA_LIB_NAME})

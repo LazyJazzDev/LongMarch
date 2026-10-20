@@ -1,5 +1,6 @@
 ﻿#include "grassland/rhi/backend/d3d12/d3d12_device.h"
 
+#include "grassland/rhi/backend/backend_binding_group.h"
 #include "grassland/rhi/backend/d3d12/d3d12_allocated_image.h"
 #include "grassland/rhi/backend/d3d12/d3d12_command_context.h"
 #include "grassland/rhi/backend/d3d12/d3d12_program.h"
@@ -91,6 +92,18 @@ D3D12Device *D3D12Device::Create(PhysicalDevice info, Core *core, ComPtr<ID3D12D
   }
 }
 
+D3D12DescriptorPool &D3D12Device::ResourceDescriptors() {
+  return resource_descriptors_;
+}
+
+D3D12DescriptorPool &D3D12Device::SamplerDescriptors() {
+  return sampler_descriptors_;
+}
+
+D3D12DescriptorPool &D3D12Device::DSVPool() {
+  return dsv_pool_;
+}
+
 D3D12RTVPool &D3D12Device::RTVPool() {
   return rtv_pool_;
 }
@@ -152,7 +165,10 @@ D3D12Device::D3D12Device(PhysicalDevice info, Core *core, ComPtr<ID3D12Device> d
     : Device(std::move(info), core),
       upload_pool_(this),
       device_(std::move(device)),
-      rtv_pool_(device_.Get()) {
+      rtv_pool_(device_.Get()),
+      dsv_pool_(device_.Get(), D3D12_DESCRIPTOR_HEAP_TYPE_DSV),
+      resource_descriptors_(device_.Get(), D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV, true, 4096),
+      sampler_descriptors_(device_.Get(), D3D12_DESCRIPTOR_HEAP_TYPE_SAMPLER, true, 256) {
 }
 
 D3D12Device::~D3D12Device() {
@@ -199,6 +215,32 @@ rhi::IQueue *D3D12Device::GetQueue(QueueType type) {
     return new D3D12Queue(this, type);
   } catch (const std::bad_alloc &) {
     ReportError(-1, "Queue creation ran out of memory.");
+    return nullptr;
+  }
+}
+
+IBindingGroup *D3D12Device::CreateBindingGroup(const BindingLayoutDesc &layout,
+                                               const std::vector<BindingEntry> &entries) {
+  try {
+    if (!BindingGroup::Validate(this, layout, entries))
+      return nullptr;
+    for (const auto &entry : entries)
+      if (entry.image && !dynamic_cast<D3D12AllocatedImage *>(entry.image))
+        return nullptr;
+    for (auto b : layout.bindings)
+      for (auto e : entries)
+        if (e.binding == b.binding) {
+          if (b.type == BINDING_UNIFORM_BUFFER) {
+            const auto size = (e.size + 255) & ~uint64_t(255);
+            if (e.offset % 256 || size > 65536 || size > e.buffer->GetDesc().size - e.offset)
+              return nullptr;
+          } else if (b.type == BINDING_STORAGE_BUFFER || b.type == BINDING_RW_STORAGE_BUFFER) {
+            if (e.stride > 2048 || e.size / e.stride > UINT32_MAX)
+              return nullptr;
+          }
+        }
+    return new BindingGroup(this, layout, entries);
+  } catch (const std::bad_alloc &) {
     return nullptr;
   }
 }

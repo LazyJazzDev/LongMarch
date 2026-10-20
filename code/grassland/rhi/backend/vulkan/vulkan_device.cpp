@@ -59,6 +59,7 @@ VulkanDevice::~VulkanDevice() {
   ShutdownQueues();
   upload_pool_.Clear();
   render_targets_.reset();
+  descriptor_pool_.reset();
   for (const auto &entry : command_pool_) {
     vkDestroyCommandPool(device_, std::get<0>(entry), nullptr);
   }
@@ -142,6 +143,7 @@ VulkanDevice *VulkanDevice::CreateVulkanDevice(grassland::rhi::PhysicalDevice in
   memory.vulkanApiVersion = VK_API_VERSION_1_2;
   if (!Check(vmaCreateAllocator(&memory, &device->allocator_), "Create VMA allocator"))
     return {};
+  device->descriptor_pool_ = std::make_unique<VulkanDescriptorPool>(device->device_);
   device->render_targets_ =
       std::make_unique<VulkanRenderTargetPool>(device->device_, device->begin_rendering_ != nullptr);
   device->physical_ = physical_device;
@@ -173,6 +175,15 @@ PFN_vkCmdBeginRendering VulkanDevice::BeginRenderingCommand() const {
 
 PFN_vkCmdEndRendering VulkanDevice::EndRenderingCommand() const {
   return end_rendering_;
+}
+
+IBindingGroup *VulkanDevice::CreateBindingGroup(const BindingLayoutDesc &layout,
+                                                const std::vector<BindingEntry> &entries) {
+  return VulkanBindingGroup::Create(this, layout, entries);
+}
+
+VulkanDescriptorPool &VulkanDevice::DescriptorPool() {
+  return *descriptor_pool_;
 }
 
 VulkanRenderTargetPool &VulkanDevice::RenderTargets() {

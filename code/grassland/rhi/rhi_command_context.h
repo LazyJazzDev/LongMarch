@@ -6,13 +6,33 @@
 namespace grassland::rhi {
 class IBuffer;
 class IProgram;
+class IBindingGroup;
 class IImage;
+
+struct ColorAttachmentInfo {
+  IImage *color_attachment{};
+  AttachmentLoadOp load_op{ATTACHMENT_LOAD_OP_LOAD};
+  AttachmentStoreOp store_op{ATTACHMENT_STORE_OP_STORE};
+  std::array<float, 4> clear_color{};
+};
+
+struct DepthStencilAttachmentInfo {
+  IImage *image{};
+  AttachmentLoadOp depth_load_op{ATTACHMENT_LOAD_OP_LOAD};
+  AttachmentStoreOp depth_store_op{ATTACHMENT_STORE_OP_STORE};
+  AttachmentLoadOp stencil_load_op{ATTACHMENT_LOAD_OP_LOAD};
+  AttachmentStoreOp stencil_store_op{ATTACHMENT_STORE_OP_STORE};
+  float clear_depth{1};
+  uint32_t clear_stencil{};
+};
 
 struct RenderingInfo {
   IImage *color_attachment{};
   AttachmentLoadOp load_op{ATTACHMENT_LOAD_OP_LOAD};
   AttachmentStoreOp store_op{ATTACHMENT_STORE_OP_STORE};
   std::array<float, 4> clear_color{};
+  std::vector<ColorAttachmentInfo> color_attachments;
+  DepthStencilAttachmentInfo depth_stencil;
 };
 
 struct Viewport {
@@ -43,6 +63,8 @@ class ICommandContext : public IObject {
                              IBuffer *destination,
                              uint64_t destination_offset,
                              uint64_t size) = 0;
+  virtual bool CmdBindGroup(uint32_t index, IBindingGroup *group) = 0;
+  virtual bool CmdUploadImage(IImage *image, const void *data, uint64_t row_pitch) = 0;
   virtual bool CmdBindProgram(IProgram *program) = 0;
   virtual bool CmdBeginRendering(const RenderingInfo &info) = 0;
   virtual bool CmdEndRendering() = 0;

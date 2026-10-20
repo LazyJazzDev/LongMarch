@@ -11,8 +11,10 @@ class VulkanProgram final : public Program {
   ~VulkanProgram() override;
   bool Finalize() override;
   VkPipeline NativePipeline() const;
+  VkPipelineLayout NativeLayout() const;
 
  private:
+  std::vector<VkDescriptorSetLayout> set_layouts_;
   VkPipeline pipeline_{};
   VkPipelineLayout layout_{};
 };

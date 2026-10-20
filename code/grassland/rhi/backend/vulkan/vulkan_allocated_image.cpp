@@ -28,7 +28,7 @@ VkImage VulkanAllocatedImage::NativeImage() const {
 }
 
 VulkanAllocatedImage *VulkanAllocatedImage::Create(VulkanDevice *device, const ImageDesc &desc) {
-  if (!desc.width || !desc.height)
+  if (!desc.width || !desc.height || (desc.storage && desc.format != IMAGE_FORMAT_RGBA8_UNORM))
     return nullptr;
   VkFormat format;
   switch (desc.format) {
@@ -37,6 +37,12 @@ VulkanAllocatedImage *VulkanAllocatedImage::Create(VulkanDevice *device, const I
       break;
     case IMAGE_FORMAT_BGRA8_UNORM:
       format = VK_FORMAT_B8G8R8A8_UNORM;
+      break;
+    case IMAGE_FORMAT_D32_FLOAT:
+      format = VK_FORMAT_D32_SFLOAT;
+      break;
+    case IMAGE_FORMAT_D24_UNORM_S8_UINT:
+      format = VK_FORMAT_D24_UNORM_S8_UINT;
       break;
     default:
       return nullptr;
@@ -50,8 +56,11 @@ VulkanAllocatedImage *VulkanAllocatedImage::Create(VulkanDevice *device, const I
     info.mipLevels = info.arrayLayers = 1;
     info.samples = VK_SAMPLE_COUNT_1_BIT;
     info.tiling = VK_IMAGE_TILING_OPTIMAL;
-    info.usage =
-        VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT;
+    info.usage = (IsDepthFormat(desc.format) ? VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT
+                                             : VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT) |
+                 VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT;
+    if (desc.storage)
+      info.usage |= VK_IMAGE_USAGE_STORAGE_BIT;
     VmaAllocationCreateInfo memory{};
     memory.usage = VMA_MEMORY_USAGE_AUTO_PREFER_DEVICE;
     if (!Check(vmaCreateImage(device->Allocator(), &info, &memory, &image->image_, &image->allocation_, nullptr),
@@ -87,7 +96,7 @@ VulkanAllocatedImage *VulkanAllocatedImage::Create(VulkanDevice *device, const I
       barrier.dstAccessMask = VK_ACCESS_MEMORY_READ_BIT | VK_ACCESS_MEMORY_WRITE_BIT;
       barrier.srcQueueFamilyIndex = barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
       barrier.image = image->image_;
-      barrier.subresourceRange = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1};
+      barrier.subresourceRange = {ImageAspect(desc.format), 0, 1, 0, 1};
       vkCmdPipelineBarrier(commands, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, 0, 0,
                            nullptr, 0, nullptr, 1, &barrier);
       status = vkEndCommandBuffer(commands);

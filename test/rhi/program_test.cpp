@@ -266,6 +266,75 @@ static const BackendAPI program_backends[] = {
     BACKEND_API_METAL,
 #endif
 };
+
+TEST_P(RhiProgram, BindingLayoutRejectsIncorrectStageTypeCountAndRange) {
+  if (GetParam() == BACKEND_API_METAL)
+    GTEST_SKIP() << "Metal implementation is deferred.";
+  ObjPtr<ICore> core = CreateCore(GetParam());
+  ASSERT_TRUE(core);
+  ObjPtr<IDevice> device = core->CreateDeviceByAutoSelection();
+  ASSERT_TRUE(device);
+  const std::string source = R"(
+    struct Data {float4 color;};RHI_UNIFORM(0,0,Data,data);
+    float4 VSMain(uint id:SV_VertexID):SV_Position {return float4(0,0,0,1);}
+    float4 PSMain():SV_Target0 {return data.color;}
+  )";
+  ObjPtr<IShader> vs = device->CreateShader({source, "VSMain", SHADER_STAGE_VERTEX});
+  ObjPtr<IShader> ps = device->CreateShader({source, "PSMain", SHADER_STAGE_FRAGMENT});
+  ProgramDesc desc;
+  desc.vertex_shader = vs.Get();
+  desc.fragment_shader = ps.Get();
+  desc.pipeline_layout.groups = {{{{0, BINDING_UNIFORM_BUFFER, 1, SHADER_VISIBILITY_VERTEX}}}};
+  ObjPtr<IProgram> program = device->CreateProgram(desc);
+  ASSERT_TRUE(program);
+  EXPECT_FALSE(program->Finalize());
+  desc.pipeline_layout.groups[0].bindings[0].visibility = SHADER_VISIBILITY_FRAGMENT;
+  program = device->CreateProgram(desc);
+  ASSERT_TRUE(program);
+  ASSERT_TRUE(program->Finalize());
+  desc.pipeline_layout.groups[0].bindings[0].type = BINDING_TEXTURE2D;
+  program = device->CreateProgram(desc);
+  ASSERT_TRUE(program);
+  EXPECT_FALSE(program->Finalize());
+  // Reflection also checks declarations that bypass the generated macro.
+  const std::string manual = (GetParam() == BACKEND_API_VULKAN ? "[[vk::binding(0,0)]] Texture2D<float4> textures[3];"
+                                                               : "Texture2D<float4> textures[3]:register(t0,space0);") +
+                             std::string(R"(
+    float4 VSMain(uint id:SV_VertexID):SV_Position {return float4(0,0,0,1);}
+    float4 PSMain():SV_Target0 {return textures[2].Load(int3(0,0,0));}
+  )");
+  vs = device->CreateShader({manual, "VSMain", SHADER_STAGE_VERTEX});
+  ps = device->CreateShader({manual, "PSMain", SHADER_STAGE_FRAGMENT});
+  desc.vertex_shader = vs.Get();
+  desc.fragment_shader = ps.Get();
+  desc.pipeline_layout.groups[0].bindings[0].count = 2;
+  program = device->CreateProgram(desc);
+  ASSERT_TRUE(program);
+  EXPECT_FALSE(program->Finalize());
+  ObjPtr<IBuffer> buffer = device->CreateBuffer({512});
+  ASSERT_TRUE(buffer);
+  BindingLayoutDesc layout{{{0, BINDING_UNIFORM_BUFFER}}};
+  BindingEntry entry;
+  entry.buffer = buffer.Get();
+  entry.size = 256;
+  entry.offset = 1;
+  ObjPtr<IBindingGroup> group = device->CreateBindingGroup(layout, {entry});
+  EXPECT_FALSE(group);
+  entry.offset = 512;
+  group = device->CreateBindingGroup(layout, {entry});
+  EXPECT_FALSE(group);
+  entry.offset = 256;
+  group = device->CreateBindingGroup(layout, {entry});
+  ASSERT_TRUE(group);
+  auto original = group->GetEntries()[0];
+  entry.offset = 0;
+  layout.bindings[0].count = 2;
+  EXPECT_EQ(group->GetEntries()[0].offset, original.offset);
+  EXPECT_EQ(group->GetLayout().bindings[0].count, 1u);
+  ObjPtr<IBindingGroup> missing = device->CreateBindingGroup(layout, {entry});
+  EXPECT_FALSE(missing);
+}
+
 INSTANTIATE_TEST_SUITE_P(Backends, RhiProgram, testing::ValuesIn(program_backends));
 }  // namespace grassland::rhi
 

@@ -65,3 +65,38 @@ TEST(D3D12DescriptorPool, WrapPaddingAndOversizedPages) {
 }
 }  // namespace grassland::rhi::backend::d3d12
 #endif
+
+#if defined(LONGMARCH_VULKAN_ENABLED)
+#include "grassland/rhi/backend/vulkan/vulkan_device.h"
+#include "grassland/rhi/rhi.h"
+
+namespace grassland::rhi {
+TEST(VulkanDescriptorPool, GroupsReleaseSetsAndTrimIdlePages) {
+  ObjPtr<ICore> core = CreateCore(BACKEND_API_VULKAN);
+  ASSERT_TRUE(core);
+  ObjPtr<IDevice> device = core->CreateDeviceByAutoSelection();
+  ASSERT_TRUE(device);
+  auto native = static_cast<backend::vulkan::VulkanDevice *>(device.Get());
+  ObjPtr<IBuffer> buffer = device->CreateBuffer({256});
+  ASSERT_TRUE(buffer);
+  BindingLayoutDesc layout{{{0, BINDING_UNIFORM_BUFFER}}};
+  BindingEntry entry;
+  entry.buffer = buffer.Get();
+  entry.size = 256;
+  std::vector<ObjPtr<IBindingGroup>> groups;
+  for (int i = 0; i < 130; ++i) {
+    groups.emplace_back(device->CreateBindingGroup(layout, {entry}));
+    ASSERT_TRUE(groups.back());
+  }
+  EXPECT_EQ(native->DescriptorPool().GetPageCounts(), (std::pair<size_t, size_t>{3, 3}));
+  for (int i = 64; i < 128; ++i)
+    groups[i].Release();
+  EXPECT_EQ(native->DescriptorPool().GetPageCounts(), (std::pair<size_t, size_t>{3, 2}));
+  groups.clear();
+  EXPECT_EQ(native->DescriptorPool().GetPageCounts(), (std::pair<size_t, size_t>{1, 0}));
+  ObjPtr<IBindingGroup> reused = device->CreateBindingGroup(layout, {entry});
+  ASSERT_TRUE(reused);
+  EXPECT_EQ(native->DescriptorPool().GetPageCounts(), (std::pair<size_t, size_t>{1, 1}));
+}
+}  // namespace grassland::rhi
+#endif

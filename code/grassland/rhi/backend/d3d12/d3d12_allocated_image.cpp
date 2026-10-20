@@ -22,7 +22,7 @@ bool D3D12AllocatedImage::IsValid() const {
 }
 
 D3D12AllocatedImage *D3D12AllocatedImage::Create(D3D12Device *device, const ImageDesc &desc) {
-  if (!desc.width || !desc.height)
+  if (!desc.width || !desc.height || (desc.storage && desc.format != IMAGE_FORMAT_RGBA8_UNORM))
     return nullptr;
   DXGI_FORMAT format;
   switch (desc.format) {
@@ -31,6 +31,12 @@ D3D12AllocatedImage *D3D12AllocatedImage::Create(D3D12Device *device, const Imag
       break;
     case IMAGE_FORMAT_BGRA8_UNORM:
       format = DXGI_FORMAT_B8G8R8A8_UNORM;
+      break;
+    case IMAGE_FORMAT_D32_FLOAT:
+      format = DXGI_FORMAT_D32_FLOAT;
+      break;
+    case IMAGE_FORMAT_D24_UNORM_S8_UINT:
+      format = DXGI_FORMAT_D24_UNORM_S8_UINT;
       break;
     default:
       return nullptr;
@@ -44,7 +50,10 @@ D3D12AllocatedImage *D3D12AllocatedImage::Create(D3D12Device *device, const Imag
     info.MipLevels = 1;
     info.Format = format;
     info.SampleDesc.Count = 1;
-    info.Flags = D3D12_RESOURCE_FLAG_ALLOW_RENDER_TARGET;
+    info.Flags =
+        IsDepthFormat(desc.format) ? D3D12_RESOURCE_FLAG_ALLOW_DEPTH_STENCIL : D3D12_RESOURCE_FLAG_ALLOW_RENDER_TARGET;
+    if (desc.storage)
+      info.Flags |= D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS;
     D3D12MA::ALLOCATION_DESC memory{};
     memory.HeapType = D3D12_HEAP_TYPE_DEFAULT;
     ComPtr<ID3D12Resource> image;

@@ -192,7 +192,45 @@ void ReadPixel(IDevice *device, IImage *image, BackendAPI api, uint32_t x, uint3
 #endif
 }
 
-class RhiImage : public testing::TestWithParam<BackendAPI> {};
+class RhiImage : public testing::TestWithParam<BackendAPI> {
+ protected:
+  void SetUp() override {
+#if defined(LONGMARCH_D3D12_ENABLED)
+    if (GetParam() == BACKEND_API_D3D12) {
+      backend::d3d12::ComPtr<ID3D12Debug> debug;
+      ASSERT_TRUE(SUCCEEDED(D3D12GetDebugInterface(IID_PPV_ARGS(&debug))));
+      debug->EnableDebugLayer();
+    }
+#endif
+  }
+
+  void Track(IDevice *device) {
+#if defined(LONGMARCH_D3D12_ENABLED)
+    if (GetParam() == BACKEND_API_D3D12)
+      ASSERT_TRUE(SUCCEEDED(static_cast<backend::d3d12::D3D12Device *>(device)->NativeDevice()->QueryInterface(
+          IID_PPV_ARGS(&messages_))));
+#endif
+  }
+
+  void TearDown() override {
+#if defined(LONGMARCH_D3D12_ENABLED)
+    if (messages_)
+      for (UINT64 i = 0; i < messages_->GetNumStoredMessagesAllowedByRetrievalFilter(); ++i) {
+        SIZE_T size = 0;
+        messages_->GetMessage(i, nullptr, &size);
+        std::vector<uint8_t> storage(size);
+        auto message = reinterpret_cast<D3D12_MESSAGE *>(storage.data());
+        messages_->GetMessage(i, message, &size);
+        if (message->Severity <= D3D12_MESSAGE_SEVERITY_ERROR)
+          ADD_FAILURE() << message->pDescription;
+      }
+    messages_.Reset();
+#endif
+  }
+#if defined(LONGMARCH_D3D12_ENABLED)
+  backend::d3d12::ComPtr<ID3D12InfoQueue> messages_;
+#endif
+};
 
 TEST_P(RhiImage, OffscreenClearDrawReadbackAndReuse) {
 #if defined(LONGMARCH_D3D12_ENABLED)
@@ -206,6 +244,7 @@ TEST_P(RhiImage, OffscreenClearDrawReadbackAndReuse) {
   ASSERT_TRUE(core);
   ObjPtr<IDevice> device = core->CreateDeviceByAutoSelection();
   ASSERT_TRUE(device);
+  Track(device.Get());
   EXPECT_EQ(device->CreateImage({0, 64, IMAGE_FORMAT_RGBA8_UNORM}), nullptr);
   EXPECT_EQ(device->CreateImage({64, 64, IMAGE_FORMAT_UNKNOWN}), nullptr);
   ObjPtr<IQueue> queue = device->GetQueue(QUEUE_TYPE_GRAPHICS);
@@ -267,6 +306,7 @@ TEST_P(RhiImage, IndexedInstancedAttributesAndOffsetsProduceExpectedPixels) {
   ASSERT_TRUE(core);
   ObjPtr<IDevice> device = core->CreateDeviceByAutoSelection();
   ASSERT_TRUE(device);
+  Track(device.Get());
   ObjPtr<IQueue> queue = device->GetQueue(QUEUE_TYPE_GRAPHICS);
   ObjPtr<IImage> image = device->CreateImage({64, 64, IMAGE_FORMAT_RGBA8_UNORM});
   ASSERT_TRUE(image);
@@ -323,6 +363,316 @@ TEST_P(RhiImage, IndexedInstancedAttributesAndOffsetsProduceExpectedPixels) {
   ReadPixel(device.Get(), image.Get(), GetParam(), 32, 32, pixel);
   EXPECT_EQ(pixel, (std::array<uint8_t, 4>{255, 0, 0, 255}));
   ReadPixel(device.Get(), image.Get(), GetParam(), 0, 0, pixel);
+  EXPECT_EQ(pixel, (std::array<uint8_t, 4>{0, 0, 0, 255}));
+}
+
+TEST_P(RhiImage, MultipleTargetsAndDepthRejectOccludedFragments) {
+  if (GetParam() == BACKEND_API_METAL)
+    GTEST_SKIP() << "Metal implementation is deferred.";
+  ObjPtr<ICore> core = CreateCore(GetParam());
+  ASSERT_TRUE(core);
+  ObjPtr<IDevice> device = core->CreateDeviceByAutoSelection();
+  ASSERT_TRUE(device);
+  Track(device.Get());
+  ObjPtr<IQueue> queue = device->GetQueue(QUEUE_TYPE_GRAPHICS);
+  ObjPtr<IImage> first = device->CreateImage({64, 64, IMAGE_FORMAT_RGBA8_UNORM});
+  ObjPtr<IImage> second = device->CreateImage({64, 64, IMAGE_FORMAT_RGBA8_UNORM});
+  ObjPtr<IImage> depth = device->CreateImage({64, 64, IMAGE_FORMAT_D32_FLOAT});
+  ASSERT_TRUE(first && second && depth);
+  const std::string source = R"(
+    struct V { float4 position : SV_Position; float nearValue : COLOR0; };
+    V VSMain(uint id : SV_VertexID) {
+      float2 p[3] = {float2(0,.75), float2(-.75,-.75),float2(.75,-.75)};
+      V v; v.nearValue = id < 3 ? 1 : 0; v.position=float4(p[id%3],id < 3 ? .2 : .8,1); return v;
+    }
+    struct P { float4 a : SV_Target0; float4 b : SV_Target1; };
+    P PSMain(V v) { P p; p.a=float4(v.nearValue,1-v.nearValue,0,1); p.b=float4(0,1-v.nearValue,v.nearValue,1); return p; }
+  )";
+  ObjPtr<IShader> vs = device->CreateShader({source, "VSMain", SHADER_STAGE_VERTEX});
+  ObjPtr<IShader> ps = device->CreateShader({source, "PSMain", SHADER_STAGE_FRAGMENT});
+  ProgramDesc desc;
+  desc.vertex_shader = vs.Get();
+  desc.fragment_shader = ps.Get();
+  desc.color_formats = {IMAGE_FORMAT_RGBA8_UNORM, IMAGE_FORMAT_RGBA8_UNORM};
+  desc.depth_stencil.format = IMAGE_FORMAT_D32_FLOAT;
+  desc.depth_stencil.depth_test = true;
+  desc.depth_stencil.depth_write = true;
+  ObjPtr<IProgram> program = device->CreateProgram(desc);
+  ASSERT_TRUE(program);
+  ASSERT_TRUE(program->Finalize());
+  for (int repeat = 0; repeat < 3; ++repeat) {
+    ObjPtr<ICommandContext> commands = device->CreateCommandContext();
+    ASSERT_TRUE(commands->CmdBindProgram(program.Get()));
+    RenderingInfo rendering;
+    rendering.color_attachments = {{first.Get(), ATTACHMENT_LOAD_OP_CLEAR, ATTACHMENT_STORE_OP_STORE, {0, 0, 0, 1}},
+                                   {second.Get(), ATTACHMENT_LOAD_OP_CLEAR, ATTACHMENT_STORE_OP_STORE, {0, 0, 0, 1}}};
+    rendering.depth_stencil.image = depth.Get();
+    rendering.depth_stencil.depth_load_op = ATTACHMENT_LOAD_OP_CLEAR;
+    ASSERT_TRUE(commands->CmdBeginRendering(rendering));
+    ASSERT_TRUE(commands->CmdSetViewport({0, 0, 64, 64, 0, 1}));
+    ASSERT_TRUE(commands->CmdSetScissor({0, 0, 64, 64}));
+    ASSERT_TRUE(commands->CmdDraw(6));
+    ASSERT_TRUE(commands->CmdEndRendering());
+    ObjPtr<ISubmissionToken> done = queue->Submit(commands.Get());
+    ASSERT_TRUE(done);
+    commands.Release();
+    ASSERT_TRUE(done->WaitHost());
+    std::array<uint8_t, 4> pixel{};
+    ReadPixel(device.Get(), first.Get(), GetParam(), 32, 32, pixel);
+    EXPECT_EQ(pixel, (std::array<uint8_t, 4>{255, 0, 0, 255}));
+    ReadPixel(device.Get(), second.Get(), GetParam(), 32, 32, pixel);
+    EXPECT_EQ(pixel, (std::array<uint8_t, 4>{0, 0, 255, 255}));
+  }
+}
+
+TEST_P(RhiImage, ImmutableGroupsBindFixedRangesAndArraysAcrossHeapPages) {
+  if (GetParam() == BACKEND_API_METAL)
+    GTEST_SKIP() << "Metal implementation is deferred.";
+  ObjPtr<ICore> core = CreateCore(GetParam());
+  ASSERT_TRUE(core);
+  ObjPtr<IDevice> device = core->CreateDeviceByAutoSelection();
+  ASSERT_TRUE(device);
+  Track(device.Get());
+  ObjPtr<IQueue> queue = device->GetQueue(QUEUE_TYPE_GRAPHICS);
+  ObjPtr<IImage> target = device->CreateImage({64, 64, IMAGE_FORMAT_RGBA8_UNORM});
+  ObjPtr<IImage> red = device->CreateImage({1, 1, IMAGE_FORMAT_RGBA8_UNORM});
+  ObjPtr<IImage> green = device->CreateImage({1, 1, IMAGE_FORMAT_RGBA8_UNORM});
+  ObjPtr<IBuffer> uniform = device->CreateBuffer({512});
+  ObjPtr<IBuffer> factors = device->CreateBuffer({256});
+  ASSERT_TRUE(target && red && green && uniform && factors);
+  const std::string source = R"(
+    struct Selection { uint textureIndex; };
+    RHI_UNIFORM(0,3,Selection,selection);
+    RHI_TEXTURE2D_ARRAY(1,7,float4,textures);
+    RHI_SAMPLER(1,9,nearestSampler);
+    RHI_STRUCTURED_BUFFER_ARRAY(1,11,float4,factors);
+    float4 VSMain(uint id:SV_VertexID):SV_Position {
+      float2 positions[3]={float2(-1,-1),float2(3,-1),float2(-1,3)};return float4(positions[id],0,1);
+    }
+    float4 PSMain():SV_Target0 {return (selection.textureIndex==0?textures[0].Sample(nearestSampler,float2(.5,.5)):textures[1].Sample(nearestSampler,float2(.5,.5)))*factors[1][0];}
+  )";
+  ObjPtr<IShader> vs = device->CreateShader({source, "VSMain", SHADER_STAGE_VERTEX});
+  ObjPtr<IShader> ps = device->CreateShader({source, "PSMain", SHADER_STAGE_FRAGMENT});
+  ProgramDesc desc;
+  desc.vertex_shader = vs.Get();
+  desc.fragment_shader = ps.Get();
+  desc.pipeline_layout.groups = {{{{3, BINDING_UNIFORM_BUFFER, 1, SHADER_VISIBILITY_FRAGMENT}}},
+                                 {{{7, BINDING_TEXTURE2D, 2, SHADER_VISIBILITY_FRAGMENT},
+                                   {9, BINDING_SAMPLER, 1, SHADER_VISIBILITY_FRAGMENT},
+                                   {11, BINDING_STORAGE_BUFFER, 2, SHADER_VISIBILITY_FRAGMENT}}}};
+  ObjPtr<IProgram> program = device->CreateProgram(desc);
+  ASSERT_TRUE(program);
+  ASSERT_TRUE(program->Finalize());
+  BindingEntry u;
+  u.binding = 3;
+  u.buffer = uniform.Get();
+  u.size = 256;
+  ObjPtr<IBindingGroup> first = device->CreateBindingGroup(desc.pipeline_layout.groups[0], {u});
+  u.offset = 256;
+  ObjPtr<IBindingGroup> second = device->CreateBindingGroup(desc.pipeline_layout.groups[0], {u});
+  BindingEntry a;
+  a.binding = 7;
+  a.image = red.Get();
+  BindingEntry b = a;
+  b.array_element = 1;
+  b.image = green.Get();
+  BindingEntry sampler;
+  sampler.binding = 9;
+  BindingEntry f;
+  f.binding = 11;
+  f.buffer = factors.Get();
+  f.size = 16;
+  f.stride = 16;
+  BindingEntry f2 = f;
+  f2.array_element = 1;
+  f2.offset = 16;
+  ObjPtr<IBindingGroup> material = device->CreateBindingGroup(desc.pipeline_layout.groups[1], {f2, b, sampler, a, f});
+  ASSERT_TRUE(first && second && material);
+  ObjPtr<ICommandContext> commands = device->CreateCommandContext();
+  const uint32_t red_pixel = 0xff0000ff, green_pixel = 0xff00ff00;
+  ASSERT_TRUE(commands->CmdUploadImage(red.Get(), &red_pixel, 4));
+  ASSERT_TRUE(commands->CmdUploadImage(green.Get(), &green_pixel, 4));
+  std::array<uint32_t, 128> constants{};
+  constants[64] = 1;
+  const float values[] = {0, 0, 0, 0, 1, 1, 1, 1};
+  ASSERT_TRUE(commands->CmdUploadBuffer(uniform.Get(), 0, constants.data(), sizeof(constants)));
+  ASSERT_TRUE(commands->CmdUploadBuffer(factors.Get(), 0, values, sizeof(values)));
+  ASSERT_TRUE(commands->CmdBindProgram(program.Get()));
+  ASSERT_TRUE(commands->CmdBindGroup(1, material.Get()));
+  ASSERT_TRUE(
+      commands->CmdBeginRendering({target.Get(), ATTACHMENT_LOAD_OP_CLEAR, ATTACHMENT_STORE_OP_STORE, {0, 0, 0, 1}}));
+  ASSERT_TRUE(commands->CmdSetViewport({0, 0, 64, 64, 0, 1}));
+  // Exceeds both resource/sampler page capacities. Previous draw tables must stay alive.
+  for (int i = 0; i < 1100; ++i) {
+    ASSERT_TRUE(commands->CmdBindGroup(0, i % 2 ? second.Get() : first.Get()));
+    ASSERT_TRUE(commands->CmdSetScissor({i % 2 ? 32 : 0, 0, 32, 64}));
+    ASSERT_TRUE(commands->CmdDraw(3));
+  }
+  ASSERT_TRUE(commands->CmdEndRendering());
+  first.Release();
+  second.Release();
+  material.Release();
+  uniform.Release();
+  factors.Release();
+  red.Release();
+  green.Release();
+  program.Release();
+  ObjPtr<ISubmissionToken> done = queue->Submit(commands.Get());
+  ASSERT_TRUE(done);
+  commands.Release();
+  ASSERT_TRUE(done->WaitHost());
+  std::array<uint8_t, 4> pixel{};
+  ReadPixel(device.Get(), target.Get(), GetParam(), 16, 32, pixel);
+  EXPECT_EQ(pixel, (std::array<uint8_t, 4>{255, 0, 0, 255}));
+  ReadPixel(device.Get(), target.Get(), GetParam(), 48, 32, pixel);
+  EXPECT_EQ(pixel, (std::array<uint8_t, 4>{0, 255, 0, 255}));
+}
+
+TEST_P(RhiImage, StorageImageAndBufferBecomeReadableAfterRendering) {
+  if (GetParam() == BACKEND_API_METAL)
+    GTEST_SKIP() << "Metal implementation is deferred.";
+  ObjPtr<ICore> core = CreateCore(GetParam());
+  ASSERT_TRUE(core);
+  ObjPtr<IDevice> device = core->CreateDeviceByAutoSelection();
+  ASSERT_TRUE(device);
+  Track(device.Get());
+  ObjPtr<IQueue> queue = device->GetQueue(QUEUE_TYPE_GRAPHICS);
+  ObjPtr<IImage> target = device->CreateImage({64, 64, IMAGE_FORMAT_RGBA8_UNORM});
+  ObjPtr<IImage> storage = device->CreateImage({64, 64, IMAGE_FORMAT_RGBA8_UNORM, true});
+  ObjPtr<IBuffer> buffer = device->CreateBuffer({64 * 64 * 16});
+  ASSERT_TRUE(target && storage && buffer);
+  const std::string source = R"(
+    #ifdef WRITE_PASS
+    RHI_RW_TEXTURE2D(0,0,float4,outputImage);
+    RHI_RW_STRUCTURED_BUFFER(0,1,float4,outputBuffer);
+    #else
+    RHI_TEXTURE2D(0,0,float4,inputImage);
+    RHI_STRUCTURED_BUFFER(0,1,float4,inputBuffer);
+    #endif
+    float4 VSMain(uint id:SV_VertexID):SV_Position {float2 p[3]={float2(-1,-1),float2(3,-1),float2(-1,3)};return float4(p[id],0,1);}
+    #ifdef WRITE_PASS
+    float4 WritePS(float4 pos:SV_Position):SV_Target0 {uint2 xy=uint2(pos.xy);outputImage[xy]=float4(1,0,0,1);outputBuffer[xy.y*64+xy.x]=float4(0,0,1,0);return 0;}
+    #else
+    float4 ReadPS(float4 pos:SV_Position):SV_Target0 {uint2 xy=uint2(pos.xy);return inputImage.Load(int3(xy,0))+inputBuffer[xy.y*64+xy.x];}
+    #endif
+  )";
+  ObjPtr<IShader> vs = device->CreateShader({source, "VSMain", SHADER_STAGE_VERTEX});
+  ObjPtr<IShader> write = device->CreateShader({"#define WRITE_PASS\n" + source, "WritePS", SHADER_STAGE_FRAGMENT});
+  ObjPtr<IShader> read = device->CreateShader({source, "ReadPS", SHADER_STAGE_FRAGMENT});
+  ProgramDesc desc;
+  desc.vertex_shader = vs.Get();
+  desc.fragment_shader = write.Get();
+  desc.pipeline_layout.groups = {{{{0, BINDING_RW_TEXTURE2D, 1, SHADER_VISIBILITY_FRAGMENT},
+                                   {1, BINDING_RW_STORAGE_BUFFER, 1, SHADER_VISIBILITY_FRAGMENT}}},
+                                 {{{0, BINDING_TEXTURE2D, 1, SHADER_VISIBILITY_FRAGMENT},
+                                   {1, BINDING_STORAGE_BUFFER, 1, SHADER_VISIBILITY_FRAGMENT}}}};
+  const auto write_layout = desc.pipeline_layout.groups[0], read_layout = desc.pipeline_layout.groups[1];
+  desc.pipeline_layout.groups = {write_layout};
+  // Each entry is compiled against its own authoritative layout.
+  vs = device->CreateShader({"#define WRITE_PASS\n" + source, "VSMain", SHADER_STAGE_VERTEX});
+  desc.vertex_shader = vs.Get();
+  ObjPtr<IProgram> writer = device->CreateProgram(desc);
+  vs = device->CreateShader({source, "VSMain", SHADER_STAGE_VERTEX});
+  desc.vertex_shader = vs.Get();
+  desc.fragment_shader = read.Get();
+  desc.pipeline_layout.groups = {read_layout};
+  ObjPtr<IProgram> reader = device->CreateProgram(desc);
+  ASSERT_TRUE(writer && reader);
+  ASSERT_TRUE(writer->Finalize());
+  ASSERT_TRUE(reader->Finalize());
+  BindingEntry im;
+  im.image = storage.Get();
+  BindingEntry bf;
+  bf.binding = 1;
+  bf.buffer = buffer.Get();
+  bf.size = 64 * 64 * 16;
+  bf.stride = 16;
+  ObjPtr<IBindingGroup> wg = device->CreateBindingGroup(write_layout, {im, bf});
+  ObjPtr<IBindingGroup> rg = device->CreateBindingGroup(read_layout, {im, bf});
+  ASSERT_TRUE(wg && rg);
+  ObjPtr<ICommandContext> commands = device->CreateCommandContext();
+  for (auto program : {writer.Get(), reader.Get()}) {
+    ASSERT_TRUE(commands->CmdBindProgram(program));
+    ASSERT_TRUE(commands->CmdBindGroup(0, program == writer.Get() ? wg.Get() : rg.Get()));
+    ASSERT_TRUE(
+        commands->CmdBeginRendering({target.Get(), ATTACHMENT_LOAD_OP_CLEAR, ATTACHMENT_STORE_OP_STORE, {0, 0, 0, 1}}));
+    ASSERT_TRUE(commands->CmdSetViewport({0, 0, 64, 64, 0, 1}));
+    ASSERT_TRUE(commands->CmdSetScissor({0, 0, 64, 64}));
+    ASSERT_TRUE(commands->CmdDraw(3));
+    ASSERT_TRUE(commands->CmdEndRendering());
+  }
+  ObjPtr<ISubmissionToken> done = queue->Submit(commands.Get());
+  ASSERT_TRUE(done);
+  commands.Release();
+  ASSERT_TRUE(done->WaitHost());
+  std::array<uint8_t, 4> pixel{};
+  ReadPixel(device.Get(), target.Get(), GetParam(), 32, 32, pixel);
+  EXPECT_EQ(pixel, (std::array<uint8_t, 4>{255, 0, 255, 255}));
+}
+
+TEST_P(RhiImage, StencilSurvivesDepthOnlyPassAndMasksColorPass) {
+  if (GetParam() == BACKEND_API_METAL)
+    GTEST_SKIP() << "Metal implementation is deferred.";
+  ObjPtr<ICore> core = CreateCore(GetParam());
+  ASSERT_TRUE(core);
+  ObjPtr<IDevice> device = core->CreateDeviceByAutoSelection();
+  ASSERT_TRUE(device);
+  Track(device.Get());
+  ObjPtr<IQueue> queue = device->GetQueue(QUEUE_TYPE_GRAPHICS);
+  ObjPtr<IImage> target = device->CreateImage({64, 64, IMAGE_FORMAT_RGBA8_UNORM});
+  ObjPtr<IImage> depth = device->CreateImage({64, 64, IMAGE_FORMAT_D24_UNORM_S8_UINT});
+  ASSERT_TRUE(target && depth);
+  const std::string source = R"(
+    float4 VSMain(uint id:SV_VertexID):SV_Position {float2 p[3]={float2(-1,-1),float2(3,-1),float2(-1,3)};return float4(p[id],.5,1);}
+    void MaskPS() {}
+    float4 PSMain():SV_Target0 {return float4(0,1,0,1);}
+  )";
+  ObjPtr<IShader> vs = device->CreateShader({source, "VSMain", SHADER_STAGE_VERTEX});
+  ObjPtr<IShader> mask = device->CreateShader({source, "MaskPS", SHADER_STAGE_FRAGMENT});
+  ObjPtr<IShader> ps = device->CreateShader({source, "PSMain", SHADER_STAGE_FRAGMENT});
+  ProgramDesc desc;
+  desc.vertex_shader = vs.Get();
+  desc.fragment_shader = mask.Get();
+  desc.color_format = IMAGE_FORMAT_UNKNOWN;
+  desc.depth_stencil.format = IMAGE_FORMAT_D24_UNORM_S8_UINT;
+  desc.depth_stencil.stencil_test = true;
+  desc.depth_stencil.stencil_reference = 5;
+  desc.depth_stencil.front.pass_op = desc.depth_stencil.back.pass_op = STENCIL_REPLACE;
+  ObjPtr<IProgram> writer = device->CreateProgram(desc);
+  desc.color_format = IMAGE_FORMAT_RGBA8_UNORM;
+  desc.fragment_shader = ps.Get();
+  desc.depth_stencil.front.pass_op = desc.depth_stencil.back.pass_op = STENCIL_KEEP;
+  desc.depth_stencil.front.compare = desc.depth_stencil.back.compare = COMPARE_EQUAL;
+  ObjPtr<IProgram> reader = device->CreateProgram(desc);
+  ASSERT_TRUE(writer && reader);
+  ASSERT_TRUE(writer->Finalize());
+  ASSERT_TRUE(reader->Finalize());
+  ObjPtr<ICommandContext> commands = device->CreateCommandContext();
+  RenderingInfo rendering;
+  rendering.depth_stencil.image = depth.Get();
+  rendering.depth_stencil.depth_load_op = ATTACHMENT_LOAD_OP_CLEAR;
+  rendering.depth_stencil.stencil_load_op = ATTACHMENT_LOAD_OP_CLEAR;
+  ASSERT_TRUE(commands->CmdBindProgram(writer.Get()));
+  ASSERT_TRUE(commands->CmdBeginRendering(rendering));
+  ASSERT_TRUE(commands->CmdSetViewport({0, 0, 64, 64, 0, 1}));
+  ASSERT_TRUE(commands->CmdSetScissor({0, 0, 32, 64}));
+  ASSERT_TRUE(commands->CmdDraw(3));
+  ASSERT_TRUE(commands->CmdEndRendering());
+  rendering.color_attachments = {{target.Get(), ATTACHMENT_LOAD_OP_CLEAR, ATTACHMENT_STORE_OP_STORE, {0, 0, 0, 1}}};
+  rendering.depth_stencil.depth_load_op = rendering.depth_stencil.stencil_load_op = ATTACHMENT_LOAD_OP_LOAD;
+  ASSERT_TRUE(commands->CmdBindProgram(reader.Get()));
+  ASSERT_TRUE(commands->CmdBeginRendering(rendering));
+  ASSERT_TRUE(commands->CmdSetScissor({0, 0, 64, 64}));
+  ASSERT_TRUE(commands->CmdDraw(3));
+  ASSERT_TRUE(commands->CmdEndRendering());
+  ObjPtr<ISubmissionToken> done = queue->Submit(commands.Get());
+  ASSERT_TRUE(done);
+  commands.Release();
+  ASSERT_TRUE(done->WaitHost());
+  std::array<uint8_t, 4> pixel{};
+  ReadPixel(device.Get(), target.Get(), GetParam(), 16, 32, pixel);
+  EXPECT_EQ(pixel, (std::array<uint8_t, 4>{0, 255, 0, 255}));
+  ReadPixel(device.Get(), target.Get(), GetParam(), 48, 32, pixel);
   EXPECT_EQ(pixel, (std::array<uint8_t, 4>{0, 0, 0, 255}));
 }
 

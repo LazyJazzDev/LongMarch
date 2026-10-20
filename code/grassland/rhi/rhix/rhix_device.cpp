@@ -82,4 +82,8 @@ Buffer Device::CreateBuffer(const rhi::BufferDesc &desc) const {
   return Get()->CreateBuffer(desc);
 }
 
+BindingGroup Device::CreateBindingGroup(const rhi::BindingLayoutDesc &layout,
+                                        const std::vector<rhi::BindingEntry> &entries) const {
+  return Get()->CreateBindingGroup(layout, entries);
+}
 }  // namespace grassland::rhix

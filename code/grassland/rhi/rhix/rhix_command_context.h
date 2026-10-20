@@ -2,6 +2,7 @@
 #include <array>
 
 #include "grassland/rhi/rhi.h"
+#include "grassland/rhi/rhix/rhix_binding_group.h"
 #include "grassland/rhi/rhix/rhix_buffer.h"
 #include "grassland/rhi/rhix/rhix_image.h"
 #include "grassland/rhi/rhix/rhix_object_container.h"
@@ -9,6 +10,19 @@
 
 namespace grassland::rhix {
 class Window;
+
+struct ColorAttachmentInfo {
+  Image image;
+  rhi::AttachmentLoadOp load_op{rhi::ATTACHMENT_LOAD_OP_LOAD};
+  rhi::AttachmentStoreOp store_op{rhi::ATTACHMENT_STORE_OP_STORE};
+  std::array<float, 4> clear_color{};
+};
+
+struct RenderingInfo {
+  std::vector<ColorAttachmentInfo> colors;
+  Image depth_stencil;
+  rhi::DepthStencilAttachmentInfo depth_stencil_ops;
+};
 
 class CommandContext : public ObjectContainer {
  public:
@@ -25,11 +39,14 @@ class CommandContext : public ObjectContainer {
                      const Buffer &destination,
                      uint64_t destination_offset,
                      uint64_t size);
+  bool CmdBindGroup(uint32_t index, const BindingGroup &group);
+  bool CmdUploadImage(const Image &image, const void *data, uint64_t row_pitch);
   bool CmdBindProgram(const Program &program);
   bool CmdBeginRendering(const Image &image,
                          rhi::AttachmentLoadOp load_op = rhi::ATTACHMENT_LOAD_OP_LOAD,
                          rhi::AttachmentStoreOp store_op = rhi::ATTACHMENT_STORE_OP_STORE,
                          const std::array<float, 4> &clear_color = {});
+  bool CmdBeginRendering(const RenderingInfo &info);
   bool CmdEndRendering();
   bool CmdBindVertexBuffer(uint32_t binding, const Buffer &buffer, uint64_t offset = 0);
   bool CmdBindIndexBuffer(const Buffer &buffer,

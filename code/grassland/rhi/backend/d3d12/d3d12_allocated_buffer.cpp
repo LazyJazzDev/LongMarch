@@ -34,6 +34,7 @@ D3D12AllocatedBuffer *D3D12AllocatedBuffer::Create(D3D12Device *device, const Bu
     D3D12_RESOURCE_DESC info{};
     info.Dimension = D3D12_RESOURCE_DIMENSION_BUFFER;
     info.Width = object->desc_.size;
+    info.Flags = upload ? D3D12_RESOURCE_FLAG_NONE : D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS;
     info.Height = 1;
     info.DepthOrArraySize = 1;
     info.MipLevels = 1;

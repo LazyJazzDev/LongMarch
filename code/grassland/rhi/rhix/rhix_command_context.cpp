@@ -3,6 +3,15 @@
 #include "grassland/rhi/rhix/rhix_window.h"
 
 namespace grassland::rhix {
+bool CommandContext::CmdBeginRendering(const RenderingInfo &info) {
+  rhi::RenderingInfo native;
+  for (const auto &color : info.colors)
+    native.color_attachments.push_back({color.image.Get(), color.load_op, color.store_op, color.clear_color});
+  native.depth_stencil = info.depth_stencil_ops;
+  native.depth_stencil.image = info.depth_stencil.Get();
+  return Get()->CmdBeginRendering(native);
+}
+
 CommandContext::CommandContext() = default;
 CommandContext::CommandContext(CommandContext &&) noexcept = default;
 CommandContext &CommandContext::operator=(CommandContext &&) noexcept = default;
@@ -130,5 +139,21 @@ bool CommandContext::CmdDrawIndexed(uint32_t index_count,
     return false;
 #endif
   return Get()->CmdDrawIndexed(index_count, instance_count, first_index, vertex_offset, first_instance);
+}
+
+bool CommandContext::CmdBindGroup(uint32_t index, const BindingGroup &group) {
+#if !defined(NDEBUG)
+  if (!*this)
+    return false;
+#endif
+  return Get()->CmdBindGroup(index, group.Get());
+}
+
+bool CommandContext::CmdUploadImage(const Image &image, const void *data, uint64_t row_pitch) {
+#if !defined(NDEBUG)
+  if (!*this)
+    return false;
+#endif
+  return Get()->CmdUploadImage(image.Get(), data, row_pitch);
 }
 }  // namespace grassland::rhix

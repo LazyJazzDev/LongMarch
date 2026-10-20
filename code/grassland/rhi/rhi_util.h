@@ -76,10 +76,50 @@ typedef enum {
   IMAGE_FORMAT_UNKNOWN,
   IMAGE_FORMAT_RGBA8_UNORM,
   IMAGE_FORMAT_BGRA8_UNORM,
+  IMAGE_FORMAT_D32_FLOAT,
+  IMAGE_FORMAT_D24_UNORM_S8_UINT,
 } ImageFormat;
 
 std::string to_string(ImageFormat value);
 std::string ImageFormatName(ImageFormat value);
+bool IsDepthFormat(ImageFormat format);
+bool HasStencil(ImageFormat format);
+
+enum CompareOp {
+  COMPARE_NEVER,
+  COMPARE_LESS,
+  COMPARE_EQUAL,
+  COMPARE_LESS_EQUAL,
+  COMPARE_GREATER,
+  COMPARE_NOT_EQUAL,
+  COMPARE_GREATER_EQUAL,
+  COMPARE_ALWAYS
+};
+
+enum StencilOp {
+  STENCIL_KEEP,
+  STENCIL_ZERO,
+  STENCIL_REPLACE,
+  STENCIL_INCREMENT_CLAMP,
+  STENCIL_DECREMENT_CLAMP,
+  STENCIL_INVERT,
+  STENCIL_INCREMENT_WRAP,
+  STENCIL_DECREMENT_WRAP
+};
+
+struct StencilFaceDesc {
+  StencilOp fail_op{STENCIL_KEEP}, depth_fail_op{STENCIL_KEEP}, pass_op{STENCIL_KEEP};
+  CompareOp compare{COMPARE_ALWAYS};
+};
+
+struct DepthStencilDesc {
+  ImageFormat format{IMAGE_FORMAT_UNKNOWN};
+  bool depth_test{}, depth_write{}, stencil_test{};
+  CompareOp depth_compare{COMPARE_LESS};
+  uint8_t stencil_read_mask{0xff}, stencil_write_mask{0xff};
+  uint32_t stencil_reference{};
+  StencilFaceDesc front, back;
+};
 
 struct WindowPresentationOption {
   PresentMode present_mode;
@@ -97,6 +137,7 @@ struct ImageDesc {
   uint32_t width{};
   uint32_t height{};
   ImageFormat format{IMAGE_FORMAT_UNKNOWN};
+  bool storage{};
 };
 
 typedef enum { SHADER_STAGE_VERTEX, SHADER_STAGE_FRAGMENT } ShaderStage;

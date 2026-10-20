@@ -14,6 +14,9 @@ class D3D12Device final : public Device {
   ID3D12Device *NativeDevice() const;
   D3D12MA::Allocator *Allocator() const;
   D3D12RTVPool &RTVPool();
+  D3D12DescriptorPool &DSVPool();
+  D3D12DescriptorPool &ResourceDescriptors();
+  D3D12DescriptorPool &SamplerDescriptors();
   IDXGIFactory4 *Factory() const;
   ID3D12CommandQueue *NativeQueue() const;
   ID3D12Fence *Fence() const;
@@ -24,6 +27,8 @@ class D3D12Device final : public Device {
   bool WaitIdle();
   rhi::IProgram *CreateProgram(const ProgramDesc &desc) override;
   rhi::IImage *CreateImage(const ImageDesc &desc) override;
+  rhi::IBindingGroup *CreateBindingGroup(const BindingLayoutDesc &layout,
+                                         const std::vector<BindingEntry> &entries) override;
   rhi::IBuffer *CreateBuffer(const BufferDesc &desc) override;
   D3D12UploadPool &UploadPool();
   rhi::IWindow *CreateGLFWWindow(const WindowDesc &desc = {}) override;
@@ -48,6 +53,8 @@ class D3D12Device final : public Device {
   ComPtr<ID3D12Device> device_;
   ComPtr<D3D12MA::Allocator> allocator_;
   D3D12RTVPool rtv_pool_;
+  D3D12DescriptorPool dsv_pool_;
+  D3D12DescriptorPool resource_descriptors_, sampler_descriptors_;
   ComPtr<IDXGIFactory4> factory_;
   ComPtr<ID3D12CommandQueue> queue_;
   ComPtr<ID3D12Fence> fence_;
