@@ -1,4 +1,4 @@
-﻿#pragma once
+#pragma once
 #include "grassland/rhi/backend/d3d12/d3d12_buffer.h"
 
 namespace D3D12MA {
@@ -13,7 +13,7 @@ class D3D12AllocatedBuffer final : public D3D12Buffer {
   static D3D12AllocatedBuffer *Create(D3D12Device *device, const BufferDesc &desc, bool upload = false);
   ID3D12Resource *NativeBuffer() const override;
   D3D12_RESOURCE_STATES DefaultState() const override;
-  bool Write(const void *data, uint64_t size);
+  bool Write(const void *data, uint64_t size, uint64_t offset = 0);
 
  private:
   D3D12AllocatedBuffer(D3D12Device *device, const BufferDesc &desc);

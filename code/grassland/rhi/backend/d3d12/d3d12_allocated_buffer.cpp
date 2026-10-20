@@ -1,4 +1,4 @@
-﻿#include "grassland/rhi/backend/d3d12/d3d12_allocated_buffer.h"
+#include "grassland/rhi/backend/d3d12/d3d12_allocated_buffer.h"
 
 #include <cstring>
 
@@ -61,10 +61,10 @@ D3D12AllocatedBuffer *D3D12AllocatedBuffer::Create(D3D12Device *device, const Bu
   }
 }
 
-bool D3D12AllocatedBuffer::Write(const void *data, uint64_t size) {
-  if (!mapped_ || size > desc_.size)
+bool D3D12AllocatedBuffer::Write(const void *data, uint64_t size, uint64_t offset) {
+  if (!mapped_ || offset > desc_.size || size > desc_.size - offset)
     return false;
-  std::memcpy(mapped_, data, static_cast<size_t>(size));
+  std::memcpy(static_cast<uint8_t *>(mapped_) + offset, data, static_cast<size_t>(size));
   return true;
 }
 }  // namespace grassland::rhi::backend::d3d12

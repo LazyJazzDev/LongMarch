@@ -1,4 +1,4 @@
-﻿#pragma once
+#pragma once
 #include <array>
 #include <chrono>
 #include <deque>
@@ -18,7 +18,7 @@ class D3D12UploadPool {
     BufferDesc GetDesc() const override;
     ID3D12Resource *NativeBuffer() const override;
     D3D12_RESOURCE_STATES DefaultState() const override;
-    bool Write(const void *data, uint64_t size);
+    bool Write(const void *data, uint64_t size, uint64_t offset = 0);
 
    private:
     D3D12UploadPool *pool_;

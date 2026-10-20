@@ -1,4 +1,4 @@
-﻿#include <gtest/gtest.h>
+#include <gtest/gtest.h>
 
 #include <array>
 #include <chrono>
@@ -273,6 +273,41 @@ TEST_P(RhiImage, StorageUsageFollowsNativeFormatSupport) {
     ASSERT_TRUE(group);
     EXPECT_EQ(group->BindResource(0, image.Get()), supported);
   }
+}
+
+TEST_P(RhiImage, UploadRowsPreservePixelsWithDifferentSourceAndDestinationPitch) {
+  ObjPtr<ICore> core = CreateCore(GetParam());
+  ASSERT_TRUE(core);
+  ObjPtr<IDevice> device = core->CreateDeviceByAutoSelection();
+  ASSERT_TRUE(device);
+  Track(device.Get());
+  ObjPtr<IQueue> queue = device->GetQueue(QUEUE_TYPE_GRAPHICS);
+  ASSERT_TRUE(queue);
+  ObjPtr<IImage> image = device->CreateImage({3, 3, IMAGE_FORMAT_RGBA8_UNORM});
+  ASSERT_TRUE(image);
+  // Twelve useful bytes per row, with eight bytes of caller-owned padding.
+  // D3D12 uses a different, 256-byte destination pitch for this image.
+  std::array<uint8_t, 60> source;
+  source.fill(0xcd);
+  for (uint32_t y = 0; y < 3; ++y)
+    for (uint32_t x = 0; x < 3; ++x) {
+      const std::array<uint8_t, 4> pixel{uint8_t(x * 70), uint8_t(y * 80), 37, 255};
+      std::memcpy(source.data() + y * 20 + x * 4, pixel.data(), pixel.size());
+    }
+  ObjPtr<ICommandContext> commands = device->CreateCommandContext();
+  ASSERT_TRUE(commands);
+  ASSERT_TRUE(commands->CmdUploadImage(image.Get(), source.data(), 20));
+  source.fill(0);  // Recording must already own the uploaded bytes.
+  ObjPtr<ISubmissionToken> done = queue->Submit(commands.Get());
+  ASSERT_TRUE(done);
+  commands.Release();
+  ASSERT_TRUE(done->WaitHost());
+  for (uint32_t y = 0; y < 3; ++y)
+    for (uint32_t x = 0; x < 3; ++x) {
+      std::array<uint8_t, 4> pixel{};
+      ReadPixel(device.Get(), image.Get(), GetParam(), x, y, pixel);
+      EXPECT_EQ(pixel, (std::array<uint8_t, 4>{uint8_t(x * 70), uint8_t(y * 80), 37, 255}));
+    }
 }
 
 TEST_P(RhiImage, OffscreenClearDrawReadbackAndReuse) {

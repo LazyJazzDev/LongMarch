@@ -1,4 +1,4 @@
-﻿#include "grassland/rhi/backend/d3d12/d3d12_command_context.h"
+#include "grassland/rhi/backend/d3d12/d3d12_command_context.h"
 
 #include <algorithm>
 #include <cstdlib>
@@ -767,14 +767,17 @@ bool D3D12CommandContext::CmdUploadImage(IImage *image, const void *data, uint64
   UINT64 bytes{}, total{};
   device_->NativeDevice()->GetCopyableFootprints(&desc, 0, 1, 0, &footprint, &rows, &bytes, &total);
   try {
-    std::vector<uint8_t> copy(size_t(total), 0);
-    for (UINT y = 0; y < rows; ++y)
-      std::memcpy(copy.data() + size_t(y) * footprint.Footprint.RowPitch,
-                  static_cast<const uint8_t *>(data) + size_t(y) * row_pitch, size_t(bytes));
     auto upload = device_->UploadPool().Acquire(total);
-    if (!upload || !upload->Write(copy.data(), total) || !RetainResource(upload.Get()) || !RetainResource(native)) {
+    if (!upload || !RetainResource(upload.Get()) || !RetainResource(native)) {
       recording_failed_ = true;
       return false;
+    }
+    for (UINT y = 0; y < rows; ++y) {
+      if (!upload->Write(static_cast<const uint8_t *>(data) + size_t(y) * row_pitch, bytes,
+                         footprint.Offset + uint64_t(y) * footprint.Footprint.RowPitch)) {
+        recording_failed_ = true;
+        return false;
+      }
     }
     if (!TransitionResource(native->NativeImage(), D3D12_RESOURCE_STATE_COPY_DEST, native->DefaultState()))
       return false;
