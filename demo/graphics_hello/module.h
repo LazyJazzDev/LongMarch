@@ -1,5 +1,6 @@
 ﻿#pragma once
 
+#include <array>
 #include <chrono>
 #include <cmath>
 #include <optional>
@@ -17,9 +18,10 @@ inline std::string GraphicsHelloTitle(grassland::graphics::BackendAPI api) {
 
 inline void InitializeGraphicsHello(grassland::graphics::BackendAPI api,
                                     std::shared_ptr<grassland::graphics::Core> &core,
-                                    bool require_ray_tracing = false) {
+                                    bool require_ray_tracing = false,
+                                    int frames_in_flight = 2) {
   using namespace grassland::graphics;
-  if (!SupportBackendAPI(api) || CreateCore(api, Core::Settings{}, &core) != 0 || !core)
+  if (!SupportBackendAPI(api) || CreateCore(api, Core::Settings{frames_in_flight}, &core) != 0 || !core)
     throw std::runtime_error("Requested graphics backend is unavailable");
   if (core->InitializeLogicalDeviceAutoSelect(require_ray_tracing) != 0)
     throw std::runtime_error("No compatible graphics device found");
@@ -31,7 +33,11 @@ inline void InitializeGraphicsHello(grassland::graphics::BackendAPI api,
 
 class Module {
  public:
+  explicit Module(bool headless = false) : headless_(headless) {
+  }
+
   virtual ~Module() = default;
+  virtual grassland::graphics::Core *GetCore() const = 0;
   virtual void OnInit() = 0;
   virtual void OnClose() = 0;
   virtual void OnUpdate() = 0;
@@ -40,6 +46,8 @@ class Module {
   virtual bool IsAlive() const = 0;
 
  protected:
+  bool headless_{};
+
   float RotationAngle() {
     const auto now = std::chrono::steady_clock::now();
     if (!animation_start_)

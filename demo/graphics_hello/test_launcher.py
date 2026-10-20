@@ -8,7 +8,7 @@ import unittest
 EXECUTABLE = str(pathlib.Path(sys.argv.pop(1)).resolve())
 MODULES = (
     "triangle", "blend", "cube", "texture", "resize", "hdr", "sdr_sample",
-    "raytracing", "rt_multi_shader_group", "external_shader", "ray_query",
+    "raytracing", "rt_multi_shader_group", "external_shader", "ray_query", "window",
 )
 
 
@@ -29,7 +29,7 @@ class LauncherTest(unittest.TestCase):
     def test_help(self):
         result = self.run_launcher("--help")
         self.assertEqual(result.returncode, 0, result.stderr)
-        for option in ("--module", "--tui", "--backend", "--frames", "--list"):
+        for option in ("--module", "--tui", "--backend", "--frames", "--list", "--headless", "--all"):
             self.assertIn(option, result.stdout)
 
     def test_invalid_arguments(self):
@@ -38,6 +38,8 @@ class LauncherTest(unittest.TestCase):
             ("--frames", "0"), ("--frames", "-1"), ("--frames", "12x"),
             ("--frames", "999999999999999999999"), ("--unknown",),
             ("--module", "triangle", "--tui"),
+            ("--all",), ("--all", "--headless", "--module", "cube"),
+            ("--headless", "--module", "raytracing"),
         ):
             with self.subTest(args=args):
                 result = self.run_launcher(*args)
@@ -54,7 +56,7 @@ class LauncherTest(unittest.TestCase):
                 self.assertNotIn("Device Name:", result.stdout)
 
     def test_tui_invalid_selection_retries(self):
-        result = self.run_launcher("--tui", text="0\n12\nmissing\n\n q \n")
+        result = self.run_launcher("--tui", text="0\n13\nmissing\n\n q \n")
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertEqual(result.stdout.count("Invalid selection."), 3)
         self.assertNotIn("Device Name:", result.stdout)

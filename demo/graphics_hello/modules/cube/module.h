@@ -17,7 +17,7 @@ struct GlobalUniformBuffer {
 
 class ModuleCube final : public Module {
  public:
-  ModuleCube(grassland::graphics::BackendAPI api = grassland::graphics::BACKEND_API_DEFAULT);
+  ModuleCube(grassland::graphics::BackendAPI api = grassland::graphics::BACKEND_API_DEFAULT, bool headless = false);
 
   ~ModuleCube() override;
 
@@ -28,6 +28,10 @@ class ModuleCube final : public Module {
 
   grassland::graphics::Window *GetWindow() const override {
     return window_.get();
+  }
+
+  grassland::graphics::Core *GetCore() const override {
+    return core_.get();
   }
 
   bool IsAlive() const override {
@@ -42,10 +46,11 @@ class ModuleCube final : public Module {
   std::unique_ptr<grassland::graphics::Buffer> uniform_buffer_;
   std::unique_ptr<grassland::graphics::Shader> vertex_shader_;
   std::unique_ptr<grassland::graphics::Shader> fragment_shader_;
-  std::unique_ptr<grassland::graphics::Image> color_image_;
+  std::array<std::unique_ptr<grassland::graphics::Image>, 3> color_images_;
   std::unique_ptr<grassland::graphics::Image> depth_image_;
   std::unique_ptr<grassland::graphics::Program> program_;
   bool alive_{false};
+  int frame_number_{};
 };
 
 }  // namespace graphics_hello::cube
