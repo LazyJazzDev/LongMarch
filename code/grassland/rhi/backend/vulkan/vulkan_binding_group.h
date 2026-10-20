@@ -63,7 +63,9 @@ class VulkanBindingGroup final : public BindingGroup {
    private:
     Version(VulkanDevice *device, const BindingLayoutDesc &layout);
     ObjectPtr<BindingGroup::Version> CreateEmpty() const override;
-    bool WriteDescriptors(size_t offset, const std::vector<Resource> &resources) override;
+    bool WriteDescriptors(size_t offset, const BindingDesc &binding, const std::vector<BufferView> &values) override;
+    bool WriteDescriptors(size_t offset, const BindingDesc &binding, const std::vector<IImage *> &values) override;
+    bool WriteDescriptors(size_t offset, const BindingDesc &binding, const std::vector<SamplerDesc> &values) override;
     VkDescriptorSetLayout native_layout_{};
     ObjectPtr<VulkanDescriptorPool::Lease> lease_;
     std::vector<VkImageView> views_;

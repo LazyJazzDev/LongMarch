@@ -80,34 +80,87 @@ ObjectPtr<BindingGroup::Version> BindingGroup::Version::Clone() const {
   auto copy = CreateEmpty();
   if (!copy)
     return {};
-  if (IsComplete()) {
-    if (!resources_.empty())
-      if (!copy->Write(0, resources_))
-        return {};
-    return copy;
+  size_t offset = 0;
+  for (const auto &binding : layout_.bindings) {
+    // Copy initialized runs only; unwritten native descriptors must not be read.
+    const size_t end = offset + binding.count;
+    while (offset < end) {
+      if (!resources_[offset].initialized) {
+        ++offset;
+        continue;
+      }
+      const size_t first = offset;
+      while (offset < end && resources_[offset].initialized)
+        ++offset;
+      if (binding.type <= BINDING_RW_STORAGE_BUFFER) {
+        std::vector<BufferView> buffers;
+        for (size_t i = first; i < offset; ++i) {
+          const auto &r = resources_[i];
+          buffers.push_back({r.buffer, r.offset, r.size});
+        }
+        if (!copy->Write(first, binding, buffers))
+          return {};
+      } else if (binding.type == BINDING_SAMPLER) {
+        std::vector<SamplerDesc> samplers;
+        for (size_t i = first; i < offset; ++i)
+          samplers.push_back(resources_[i].sampler);
+        if (!copy->Write(first, binding, samplers))
+          return {};
+      } else {
+        std::vector<IImage *> images;
+        for (size_t i = first; i < offset; ++i)
+          images.push_back(resources_[i].image);
+        if (!copy->Write(first, binding, images))
+          return {};
+      }
+    }
   }
-  // Only initialized slots may be copied into a native descriptor set.
-  for (size_t i = 0; i < resources_.size(); ++i)
-    if (resources_[i].initialized)
-      if (!copy->Write(i, {resources_[i]}))
-        return {};
   return copy;
 }
 
-bool BindingGroup::Version::Write(size_t offset, const std::vector<Resource> &resources) {
-  // Retain the whole update before replacing any slot: resources may be swapped
-  // between slots while the group is their only owner.
+bool BindingGroup::Version::Write(size_t offset, const BindingDesc &binding, const std::vector<BufferView> &values) {
+  // Retain the whole array before replacing slots, including resource swaps.
   std::vector<ObjectPtr<IObject>> references;
-  references.reserve(resources.size());
-  for (const auto &r : resources) {
-    IObject *object = r.buffer ? static_cast<IObject *>(r.buffer) : static_cast<IObject *>(r.image);
-    references.push_back(ObjectPtr<IObject>::Retain(object));
-  }
-  if (!WriteDescriptors(offset, resources))
+  references.reserve(values.size());
+  for (const auto &value : values)
+    references.push_back(ObjectPtr<IObject>::Retain(value.buffer));
+  if (!WriteDescriptors(offset, binding, values))
     return false;
-  for (size_t i = 0; i < resources.size(); ++i) {
+  for (size_t i = 0; i < values.size(); ++i) {
+    auto &slot = resources_[offset + i];
+    slot.buffer = values[i].buffer;
+    slot.offset = values[i].offset;
+    slot.size = values[i].size;
+    slot.initialized = true;
     references_[offset + i] = std::move(references[i]);
-    resources_[offset + i] = resources[i];
+  }
+  return true;
+}
+
+bool BindingGroup::Version::Write(size_t offset, const BindingDesc &binding, const std::vector<IImage *> &values) {
+  // Retain the whole array before replacing slots, including resource swaps.
+  std::vector<ObjectPtr<IObject>> references;
+  references.reserve(values.size());
+  for (const auto &value : values)
+    references.push_back(ObjectPtr<IObject>::Retain(value));
+  if (!WriteDescriptors(offset, binding, values))
+    return false;
+  for (size_t i = 0; i < values.size(); ++i) {
+    auto &slot = resources_[offset + i];
+    slot.image = values[i];
+    slot.initialized = true;
+    references_[offset + i] = std::move(references[i]);
+  }
+  return true;
+}
+
+bool BindingGroup::Version::Write(size_t offset, const BindingDesc &binding, const std::vector<SamplerDesc> &values) {
+  if (!WriteDescriptors(offset, binding, values))
+    return false;
+  for (size_t i = 0; i < values.size(); ++i) {
+    auto &slot = resources_[offset + i];
+    slot.sampler = values[i];
+    slot.initialized = true;
   }
   return true;
 }
@@ -130,75 +183,48 @@ BindingGroup::Version *BindingGroup::CurrentVersion() const {
   return version_.Get();
 }
 
-bool BindingGroup::Write(uint32_t binding, uint32_t first_element, BindingType kind, std::vector<Resource> resources) {
-  const auto &layout = GetLayout();
-  size_t offset = 0;
-  auto it = layout.bindings.begin();
-  for (; it != layout.bindings.end(); ++it) {
-    if (it->binding == binding)
-      break;
-    offset += it->count;
+const BindingDesc *BindingGroup::FindBinding(uint32_t binding,
+                                             uint32_t first_element,
+                                             size_t count,
+                                             size_t &offset) const {
+  offset = 0;
+  for (const auto &desc : layout_.bindings) {
+    if (desc.binding == binding) {
+      if (!count || first_element > desc.count || count > desc.count - first_element)
+        return nullptr;
+      offset += first_element;
+      return &desc;
+    }
+    offset += desc.count;
   }
-  if (it == layout.bindings.end() || resources.empty() || first_element > it->count ||
-      resources.size() > it->count - first_element)
-    return false;
-  if (kind == BINDING_UNIFORM_BUFFER) {
-    if (it->type > BINDING_RW_STORAGE_BUFFER)
-      return false;
-  } else if (kind == BINDING_TEXTURE2D) {
-    if (it->type != BINDING_TEXTURE2D && it->type != BINDING_RW_TEXTURE2D)
-      return false;
-  } else if (it->type != BINDING_SAMPLER)
-    return false;
-  for (size_t i = 0; i < resources.size(); ++i) {
-    auto &e = resources[i];
-    e.binding = binding;
-    e.array_element = first_element + uint32_t(i);
-    e.initialized = true;
-    if (kind == BINDING_UNIFORM_BUFFER) {
-      auto buffer = dynamic_cast<Buffer *>(e.buffer);
-      if (!buffer || buffer->Owner() != device_ || e.offset >= buffer->GetDesc().size)
-        return false;
-      if (!e.size)
-        e.size = buffer->GetDesc().size - e.offset;
-      if (e.size > buffer->GetDesc().size - e.offset)
-        return false;
-    } else if (kind == BINDING_TEXTURE2D) {
-      auto image = dynamic_cast<Image *>(e.image);
-      if (!image || !image->IsValid() || image->DeviceIdentity() != device_->NativeIdentity() ||
-          IsDepthFormat(image->GetDesc().format))
-        return false;
-      if (it->type == BINDING_RW_TEXTURE2D && !image->SupportsStorage())
-        return false;
-    } else if (e.sampler.filter < SAMPLER_FILTER_NEAREST || e.sampler.filter > SAMPLER_FILTER_LINEAR ||
-               e.sampler.address_u < SAMPLER_ADDRESS_REPEAT || e.sampler.address_u > SAMPLER_ADDRESS_MIRRORED_REPEAT ||
-               e.sampler.address_v < SAMPLER_ADDRESS_REPEAT || e.sampler.address_v > SAMPLER_ADDRESS_MIRRORED_REPEAT)
-      return false;
-  }
-  offset += first_element;
-  if (version_->IsUniquelyOwned())
-    return version_->Write(offset, resources);
-  auto next = version_->Clone();
-  if (!next)
-    return false;
-  if (!next->Write(offset, resources))
-    return false;
-  version_ = std::move(next);
-  return true;
+  return nullptr;
 }
 
 bool BindingGroup::BindResource(uint32_t binding, const std::vector<BufferView> &buffers, uint32_t first_element) {
   try {
-    std::vector<Resource> resources;
-    resources.reserve(buffers.size());
-    for (auto b : buffers) {
-      Resource r;
-      r.buffer = b.buffer;
-      r.offset = b.offset;
-      r.size = b.size;
-      resources.push_back(r);
+    size_t offset;
+    const auto *desc = FindBinding(binding, first_element, buffers.size(), offset);
+    if (!desc)
+      return false;
+    if (desc->type > BINDING_RW_STORAGE_BUFFER)
+      return false;
+    auto values = buffers;
+    for (auto &view : values) {
+      auto buffer = dynamic_cast<Buffer *>(view.buffer);
+      if (!buffer || buffer->Owner() != device_ || view.offset >= buffer->GetDesc().size)
+        return false;
+      if (!view.size)
+        view.size = buffer->GetDesc().size - view.offset;
+      if (view.size > buffer->GetDesc().size - view.offset)
+        return false;
     }
-    return Write(binding, first_element, BINDING_UNIFORM_BUFFER, std::move(resources));
+    auto next = version_->IsUniquelyOwned() ? version_ : version_->Clone();
+    if (!next)
+      return false;
+    if (!next->Write(offset, *desc, values))
+      return false;
+    version_ = std::move(next);
+    return true;
   } catch (const std::bad_alloc &) {
     return false;
   }
@@ -206,14 +232,27 @@ bool BindingGroup::BindResource(uint32_t binding, const std::vector<BufferView> 
 
 bool BindingGroup::BindResource(uint32_t binding, const std::vector<IImage *> &images, uint32_t first_element) {
   try {
-    std::vector<Resource> resources;
-    resources.reserve(images.size());
-    for (auto image : images) {
-      Resource r;
-      r.image = image;
-      resources.push_back(r);
+    size_t offset;
+    const auto *desc = FindBinding(binding, first_element, images.size(), offset);
+    if (!desc)
+      return false;
+    if (desc->type != BINDING_TEXTURE2D && desc->type != BINDING_RW_TEXTURE2D)
+      return false;
+    for (auto value : images) {
+      auto image = dynamic_cast<Image *>(value);
+      if (!image || !image->IsValid() || image->DeviceIdentity() != device_->NativeIdentity() ||
+          IsDepthFormat(image->GetDesc().format))
+        return false;
+      if (desc->type == BINDING_RW_TEXTURE2D && !image->SupportsStorage())
+        return false;
     }
-    return Write(binding, first_element, BINDING_TEXTURE2D, std::move(resources));
+    auto next = version_->IsUniquelyOwned() ? version_ : version_->Clone();
+    if (!next)
+      return false;
+    if (!next->Write(offset, *desc, images))
+      return false;
+    version_ = std::move(next);
+    return true;
   } catch (const std::bad_alloc &) {
     return false;
   }
@@ -221,16 +260,28 @@ bool BindingGroup::BindResource(uint32_t binding, const std::vector<IImage *> &i
 
 bool BindingGroup::BindResource(uint32_t binding, const std::vector<SamplerDesc> &samplers, uint32_t first_element) {
   try {
-    std::vector<Resource> resources;
-    resources.reserve(samplers.size());
-    for (auto sampler : samplers) {
-      Resource r;
-      r.sampler = sampler;
-      resources.push_back(r);
+    size_t offset;
+    const auto *desc = FindBinding(binding, first_element, samplers.size(), offset);
+    if (!desc)
+      return false;
+    if (desc->type != BINDING_SAMPLER)
+      return false;
+    for (const auto &sampler : samplers) {
+      if (sampler.filter < SAMPLER_FILTER_NEAREST || sampler.filter > SAMPLER_FILTER_LINEAR ||
+          sampler.address_u < SAMPLER_ADDRESS_REPEAT || sampler.address_u > SAMPLER_ADDRESS_MIRRORED_REPEAT ||
+          sampler.address_v < SAMPLER_ADDRESS_REPEAT || sampler.address_v > SAMPLER_ADDRESS_MIRRORED_REPEAT)
+        return false;
     }
-    return Write(binding, first_element, BINDING_SAMPLER, std::move(resources));
+    auto next = version_->IsUniquelyOwned() ? version_ : version_->Clone();
+    if (!next)
+      return false;
+    if (!next->Write(offset, *desc, samplers))
+      return false;
+    version_ = std::move(next);
+    return true;
   } catch (const std::bad_alloc &) {
     return false;
   }
 }
+
 }  // namespace grassland::rhi::backend

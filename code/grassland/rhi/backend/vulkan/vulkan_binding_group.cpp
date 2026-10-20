@@ -213,89 +213,110 @@ ObjectPtr<BindingGroup::Version> VulkanBindingGroup::Version::CreateEmpty() cons
   return ObjectPtr<Version>::Adopt(Create(static_cast<VulkanDevice *>(device_), layout_));
 }
 
-bool VulkanBindingGroup::Version::WriteDescriptors(size_t offset, const std::vector<Resource> &resources) {
+bool VulkanBindingGroup::Version::WriteDescriptors(size_t offset,
+                                                   const BindingDesc &binding,
+                                                   const std::vector<BufferView> &buffers) {
   auto device = static_cast<VulkanDevice *>(device_);
-  auto native = device->NativeDevice();
   VkPhysicalDeviceProperties properties{};
   vkGetPhysicalDeviceProperties(device->NativePhysicalDevice(), &properties);
-  for (auto e : resources) {
-    auto binding =
-        *std::find_if(layout_.bindings.begin(), layout_.bindings.end(), [e](auto b) { return b.binding == e.binding; });
-    if (binding.type <= BINDING_RW_STORAGE_BUFFER) {
-      bool uniform = binding.type == BINDING_UNIFORM_BUFFER;
-      auto alignment = uniform ? properties.limits.minUniformBufferOffsetAlignment
-                               : properties.limits.minStorageBufferOffsetAlignment;
-      auto limit = uniform ? properties.limits.maxUniformBufferRange : properties.limits.maxStorageBufferRange;
-      if (e.offset % alignment || e.size > limit)
-        return false;
-    } else if (e.image && !dynamic_cast<VulkanAllocatedImage *>(e.image))
+  const bool uniform = binding.type == BINDING_UNIFORM_BUFFER;
+  const auto alignment =
+      uniform ? properties.limits.minUniformBufferOffsetAlignment : properties.limits.minStorageBufferOffsetAlignment;
+  const auto limit = uniform ? properties.limits.maxUniformBufferRange : properties.limits.maxStorageBufferRange;
+  std::vector<VkDescriptorBufferInfo> infos;
+  infos.reserve(buffers.size());
+  for (const auto &view : buffers) {
+    if (view.offset % alignment || view.size > limit)
       return false;
+    infos.push_back({static_cast<VulkanBuffer *>(view.buffer)->NativeBuffer(), view.offset, view.size});
   }
-  // Allocate all CPU storage before creating native handles. Failure leaves every
-  // old slot intact, including when an array update fails halfway through.
-  std::vector<VkWriteDescriptorSet> writes(resources.size());
-  std::vector<VkDescriptorBufferInfo> buffers(resources.size());
-  std::vector<VkDescriptorImageInfo> images(resources.size());
-  auto discard = [&]() {
-    for (auto image : images) {
-      if (image.imageView)
-        vkDestroyImageView(native, image.imageView, nullptr);
-      if (image.sampler)
-        vkDestroySampler(native, image.sampler, nullptr);
+  VkWriteDescriptorSet write{VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET};
+  write.dstSet = Set();
+  write.dstBinding = binding.binding;
+  write.dstArrayElement = GetResources()[offset].array_element;
+  write.descriptorCount = uint32_t(infos.size());
+  write.descriptorType = uniform ? VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER : VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+  write.pBufferInfo = infos.data();
+  vkUpdateDescriptorSets(device->NativeDevice(), 1, &write, 0, nullptr);
+  return true;
+}
+
+bool VulkanBindingGroup::Version::WriteDescriptors(size_t offset,
+                                                   const BindingDesc &binding,
+                                                   const std::vector<IImage *> &images) {
+  for (auto image : images)
+    if (!dynamic_cast<VulkanAllocatedImage *>(image))
+      return false;
+  auto native = static_cast<VulkanDevice *>(device_)->NativeDevice();
+  // Stage all native handles before changing the set or any previous slot.
+  std::vector<VkDescriptorImageInfo> infos(images.size());
+  for (size_t i = 0; i < images.size(); ++i) {
+    auto image = images[i];
+    VkImageViewCreateInfo create{VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO};
+    create.image = static_cast<VulkanImage *>(image)->NativeImage();
+    create.viewType = VK_IMAGE_VIEW_TYPE_2D;
+    create.format = NativeImageFormat(image->GetDesc().format);
+    create.subresourceRange = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1};
+    if (!Check(vkCreateImageView(native, &create, nullptr, &infos[i].imageView), "Create binding view")) {
+      for (const auto &info : infos)
+        if (info.imageView)
+          vkDestroyImageView(native, info.imageView, nullptr);
+      return false;
     }
-  };
-  for (size_t i = 0; i < resources.size(); ++i) {
-    auto e = resources[i];
-    auto binding =
-        *std::find_if(layout_.bindings.begin(), layout_.bindings.end(), [e](auto b) { return b.binding == e.binding; });
-    auto &write = writes[i];
-    write = {VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET};
-    write.dstSet = Set();
-    write.dstBinding = e.binding;
-    write.dstArrayElement = e.array_element;
-    write.descriptorCount = 1;
-    write.descriptorType = Type(binding.type);
-    if (binding.type <= BINDING_RW_STORAGE_BUFFER) {
-      buffers[i] = {static_cast<VulkanBuffer *>(e.buffer)->NativeBuffer(), e.offset, e.size};
-      write.pBufferInfo = &buffers[i];
-    } else if (binding.type == BINDING_SAMPLER) {
-      VkSamplerCreateInfo create{VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO};
-      create.magFilter = create.minFilter =
-          e.sampler.filter == SAMPLER_FILTER_LINEAR ? VK_FILTER_LINEAR : VK_FILTER_NEAREST;
-      create.mipmapMode = VK_SAMPLER_MIPMAP_MODE_NEAREST;
-      const VkSamplerAddressMode modes[] = {VK_SAMPLER_ADDRESS_MODE_REPEAT, VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE,
-                                            VK_SAMPLER_ADDRESS_MODE_MIRRORED_REPEAT};
-      create.addressModeU = modes[e.sampler.address_u];
-      create.addressModeV = create.addressModeW = modes[e.sampler.address_v];
-      create.maxLod = VK_LOD_CLAMP_NONE;
-      if (!Check(vkCreateSampler(native, &create, nullptr, &images[i].sampler), "Create sampler")) {
-        discard();
-        return false;
-      }
-      write.pImageInfo = &images[i];
-    } else {
-      VkImageViewCreateInfo create{VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO};
-      create.image = static_cast<VulkanImage *>(e.image)->NativeImage();
-      create.viewType = VK_IMAGE_VIEW_TYPE_2D;
-      create.format = NativeImageFormat(e.image->GetDesc().format);
-      create.subresourceRange = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1};
-      if (!Check(vkCreateImageView(native, &create, nullptr, &images[i].imageView), "Create binding view")) {
-        discard();
-        return false;
-      }
-      images[i].imageLayout = VK_IMAGE_LAYOUT_GENERAL;
-      write.pImageInfo = &images[i];
+    infos[i].imageLayout = VK_IMAGE_LAYOUT_GENERAL;
+  }
+  VkWriteDescriptorSet write{VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET};
+  write.dstSet = Set();
+  write.dstBinding = binding.binding;
+  write.dstArrayElement = GetResources()[offset].array_element;
+  write.descriptorCount = uint32_t(infos.size());
+  write.descriptorType =
+      binding.type == BINDING_TEXTURE2D ? VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE : VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
+  write.pImageInfo = infos.data();
+  vkUpdateDescriptorSets(native, 1, &write, 0, nullptr);
+  for (size_t i = 0; i < infos.size(); ++i) {
+    if (views_[offset + i])
+      vkDestroyImageView(native, views_[offset + i], nullptr);
+    views_[offset + i] = infos[i].imageView;
+  }
+  return true;
+}
+
+bool VulkanBindingGroup::Version::WriteDescriptors(size_t offset,
+                                                   const BindingDesc &binding,
+                                                   const std::vector<SamplerDesc> &samplers) {
+  auto native = static_cast<VulkanDevice *>(device_)->NativeDevice();
+  std::vector<VkDescriptorImageInfo> infos(samplers.size());
+  const VkSamplerAddressMode modes[] = {VK_SAMPLER_ADDRESS_MODE_REPEAT, VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE,
+                                        VK_SAMPLER_ADDRESS_MODE_MIRRORED_REPEAT};
+  for (size_t i = 0; i < samplers.size(); ++i) {
+    const auto &sampler = samplers[i];
+    VkSamplerCreateInfo create{VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO};
+    create.magFilter = create.minFilter =
+        sampler.filter == SAMPLER_FILTER_LINEAR ? VK_FILTER_LINEAR : VK_FILTER_NEAREST;
+    create.mipmapMode = VK_SAMPLER_MIPMAP_MODE_NEAREST;
+    create.addressModeU = modes[sampler.address_u];
+    create.addressModeV = create.addressModeW = modes[sampler.address_v];
+    create.maxLod = VK_LOD_CLAMP_NONE;
+    if (!Check(vkCreateSampler(native, &create, nullptr, &infos[i].sampler), "Create sampler")) {
+      for (const auto &info : infos)
+        if (info.sampler)
+          vkDestroySampler(native, info.sampler, nullptr);
+      return false;
     }
   }
-  vkUpdateDescriptorSets(native, uint32_t(writes.size()), writes.data(), 0, nullptr);
-  for (size_t i = 0; i < resources.size(); ++i) {
-    auto slot = offset + i;
-    if (views_[slot])
-      vkDestroyImageView(native, views_[slot], nullptr);
-    if (samplers_[slot])
-      vkDestroySampler(native, samplers_[slot], nullptr);
-    views_[slot] = images[i].imageView;
-    samplers_[slot] = images[i].sampler;
+  VkWriteDescriptorSet write{VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET};
+  write.dstSet = Set();
+  write.dstBinding = binding.binding;
+  write.dstArrayElement = GetResources()[offset].array_element;
+  write.descriptorCount = uint32_t(infos.size());
+  write.descriptorType = VK_DESCRIPTOR_TYPE_SAMPLER;
+  write.pImageInfo = infos.data();
+  vkUpdateDescriptorSets(native, 1, &write, 0, nullptr);
+  for (size_t i = 0; i < infos.size(); ++i) {
+    if (samplers_[offset + i])
+      vkDestroySampler(native, samplers_[offset + i], nullptr);
+    samplers_[offset + i] = infos[i].sampler;
   }
   return true;
 }

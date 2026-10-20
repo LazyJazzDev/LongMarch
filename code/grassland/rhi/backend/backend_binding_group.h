@@ -7,7 +7,7 @@ class Device;
 
 class BindingGroup : public Object<IBindingGroup> {
  public:
-  // Backend-only slot encoding, never supplied by callers.
+  // Captured slot state for resource lifetime and barrier tracking, not write parameters.
   struct Resource {
     uint32_t binding{}, array_element{};
     IBuffer *buffer{};
@@ -24,11 +24,17 @@ class BindingGroup : public Object<IBindingGroup> {
     const std::vector<Resource> &GetResources() const;
     bool IsComplete() const;
     ObjectPtr<Version> Clone() const;
-    bool Write(size_t offset, const std::vector<Resource> &resources);
+    bool Write(size_t offset, const BindingDesc &binding, const std::vector<BufferView> &values);
+    bool Write(size_t offset, const BindingDesc &binding, const std::vector<IImage *> &values);
+    bool Write(size_t offset, const BindingDesc &binding, const std::vector<SamplerDesc> &values);
 
    protected:
     virtual ObjectPtr<Version> CreateEmpty() const = 0;
-    virtual bool WriteDescriptors(size_t offset, const std::vector<Resource> &resources) = 0;
+    virtual bool WriteDescriptors(size_t offset, const BindingDesc &binding, const std::vector<BufferView> &values) = 0;
+    virtual bool WriteDescriptors(size_t offset, const BindingDesc &binding, const std::vector<IImage *> &values) = 0;
+    virtual bool WriteDescriptors(size_t offset,
+                                  const BindingDesc &binding,
+                                  const std::vector<SamplerDesc> &values) = 0;
     Device *device_;
     BindingLayoutDesc layout_;
 
@@ -48,7 +54,7 @@ class BindingGroup : public Object<IBindingGroup> {
   Version *CurrentVersion() const;
 
  private:
-  bool Write(uint32_t binding, uint32_t first_element, BindingType kind, std::vector<Resource> resources);
+  const BindingDesc *FindBinding(uint32_t binding, uint32_t first_element, size_t count, size_t &offset) const;
   Device *device_;
   BindingLayoutDesc layout_;
   ObjectPtr<Version> version_;

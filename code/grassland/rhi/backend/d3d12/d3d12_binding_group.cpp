@@ -50,63 +50,93 @@ D3D12DescriptorPool::Lease *D3D12BindingGroup::Version::SamplerDescriptors() con
   return samplers_.Get();
 }
 
-bool D3D12BindingGroup::Version::WriteDescriptors(size_t offset, const std::vector<Resource> &resources) {
-  for (size_t i = 0; i < resources.size(); ++i) {
-    const auto &e = resources[i];
-    if (e.image && !dynamic_cast<D3D12AllocatedImage *>(e.image))
-      return false;
-    if (types_[offset + i] == BINDING_UNIFORM_BUFFER) {
-      if (e.size > 65536)
+bool D3D12BindingGroup::Version::WriteDescriptors(size_t offset,
+                                                  const BindingDesc &binding,
+                                                  const std::vector<BufferView> &buffers) {
+  if (binding.type == BINDING_UNIFORM_BUFFER) {
+    for (const auto &view : buffers) {
+      if (view.size > 65536)
         return false;
-      const auto size = (e.size + 255) & ~uint64_t(255);
-      if (e.offset % 256 || size > e.buffer->GetDesc().size - e.offset)
+      const auto size = (view.size + 255) & ~uint64_t(255);
+      if (view.offset % 256 || size > view.buffer->GetDesc().size - view.offset)
         return false;
     }
   }
-  // All fallible checks precede mutation. This version is unreferenced by commands.
   resource_variants_.clear();
   auto native = static_cast<D3D12Device *>(device_)->NativeDevice();
-  for (size_t i = 0; i < resources.size(); ++i) {
-    const auto &e = resources[i];
-    auto type = types_[offset + i];
-    auto handle = (type == BINDING_SAMPLER ? samplers_ : resources_)->CPU(offsets_[offset + i]);
-    if (type == BINDING_UNIFORM_BUFFER) {
-      auto buffer = static_cast<D3D12Buffer *>(e.buffer);
-      D3D12_CONSTANT_BUFFER_VIEW_DESC desc{buffer->NativeBuffer()->GetGPUVirtualAddress() + e.offset,
-                                           UINT((e.size + 255) & ~uint64_t(255))};
-      native->CreateConstantBufferView(&desc, handle);
-    } else if (type == BINDING_STORAGE_BUFFER) {
-      // A valid placeholder for bindings optimized out by a Program. Active
-      // structured views are materialized once their reflected stride is known.
+  switch (binding.type) {
+    case BINDING_UNIFORM_BUFFER:
+      for (size_t i = 0; i < buffers.size(); ++i) {
+        const auto &view = buffers[i];
+        auto buffer = static_cast<D3D12Buffer *>(view.buffer);
+        D3D12_CONSTANT_BUFFER_VIEW_DESC desc{buffer->NativeBuffer()->GetGPUVirtualAddress() + view.offset,
+                                             UINT((view.size + 255) & ~uint64_t(255))};
+        native->CreateConstantBufferView(&desc, resources_->CPU(offsets_[offset + i]));
+      }
+      break;
+    case BINDING_STORAGE_BUFFER: {
+      // Active structured views are materialized when the Program's stride is known.
       D3D12_SHADER_RESOURCE_VIEW_DESC desc{};
       desc.ViewDimension = D3D12_SRV_DIMENSION_BUFFER;
       desc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
       desc.Buffer.NumElements = 1;
       desc.Buffer.StructureByteStride = 4;
-      native->CreateShaderResourceView(nullptr, &desc, handle);
-    } else if (type == BINDING_RW_STORAGE_BUFFER) {
+      for (size_t i = 0; i < buffers.size(); ++i)
+        native->CreateShaderResourceView(nullptr, &desc, resources_->CPU(offsets_[offset + i]));
+      break;
+    }
+    case BINDING_RW_STORAGE_BUFFER: {
       D3D12_UNORDERED_ACCESS_VIEW_DESC desc{};
       desc.ViewDimension = D3D12_UAV_DIMENSION_BUFFER;
       desc.Buffer.NumElements = 1;
       desc.Buffer.StructureByteStride = 4;
-      native->CreateUnorderedAccessView(nullptr, nullptr, &desc, handle);
-    } else if (type == BINDING_TEXTURE2D) {
-      native->CreateShaderResourceView(static_cast<D3D12Image *>(e.image)->NativeImage(), nullptr, handle);
-    } else if (type == BINDING_RW_TEXTURE2D) {
-      native->CreateUnorderedAccessView(static_cast<D3D12Image *>(e.image)->NativeImage(), nullptr, nullptr, handle);
-    } else {
-      D3D12_SAMPLER_DESC desc{};
-      desc.Filter =
-          e.sampler.filter == SAMPLER_FILTER_LINEAR ? D3D12_FILTER_MIN_MAG_MIP_LINEAR : D3D12_FILTER_MIN_MAG_MIP_POINT;
-      const D3D12_TEXTURE_ADDRESS_MODE modes[] = {D3D12_TEXTURE_ADDRESS_MODE_WRAP, D3D12_TEXTURE_ADDRESS_MODE_CLAMP,
-                                                  D3D12_TEXTURE_ADDRESS_MODE_MIRROR};
-      desc.AddressU = modes[e.sampler.address_u];
-      desc.AddressV = desc.AddressW = modes[e.sampler.address_v];
-      desc.MaxLOD = D3D12_FLOAT32_MAX;
-      desc.ComparisonFunc = D3D12_COMPARISON_FUNC_ALWAYS;
-      desc.MaxAnisotropy = 1;
-      native->CreateSampler(&desc, handle);
+      for (size_t i = 0; i < buffers.size(); ++i)
+        native->CreateUnorderedAccessView(nullptr, nullptr, &desc, resources_->CPU(offsets_[offset + i]));
+      break;
     }
+    default:
+      return false;
+  }
+  return true;
+}
+
+bool D3D12BindingGroup::Version::WriteDescriptors(size_t offset,
+                                                  const BindingDesc &binding,
+                                                  const std::vector<IImage *> &images) {
+  for (auto image : images)
+    if (!dynamic_cast<D3D12AllocatedImage *>(image))
+      return false;
+  resource_variants_.clear();
+  auto native = static_cast<D3D12Device *>(device_)->NativeDevice();
+  if (binding.type == BINDING_TEXTURE2D) {
+    for (size_t i = 0; i < images.size(); ++i)
+      native->CreateShaderResourceView(static_cast<D3D12Image *>(images[i])->NativeImage(), nullptr,
+                                       resources_->CPU(offsets_[offset + i]));
+  } else {
+    for (size_t i = 0; i < images.size(); ++i)
+      native->CreateUnorderedAccessView(static_cast<D3D12Image *>(images[i])->NativeImage(), nullptr, nullptr,
+                                        resources_->CPU(offsets_[offset + i]));
+  }
+  return true;
+}
+
+bool D3D12BindingGroup::Version::WriteDescriptors(size_t offset,
+                                                  const BindingDesc &,
+                                                  const std::vector<SamplerDesc> &samplers) {
+  auto native = static_cast<D3D12Device *>(device_)->NativeDevice();
+  const D3D12_TEXTURE_ADDRESS_MODE modes[] = {D3D12_TEXTURE_ADDRESS_MODE_WRAP, D3D12_TEXTURE_ADDRESS_MODE_CLAMP,
+                                              D3D12_TEXTURE_ADDRESS_MODE_MIRROR};
+  for (size_t i = 0; i < samplers.size(); ++i) {
+    const auto &sampler = samplers[i];
+    D3D12_SAMPLER_DESC desc{};
+    desc.Filter =
+        sampler.filter == SAMPLER_FILTER_LINEAR ? D3D12_FILTER_MIN_MAG_MIP_LINEAR : D3D12_FILTER_MIN_MAG_MIP_POINT;
+    desc.AddressU = modes[sampler.address_u];
+    desc.AddressV = desc.AddressW = modes[sampler.address_v];
+    desc.MaxLOD = D3D12_FLOAT32_MAX;
+    desc.ComparisonFunc = D3D12_COMPARISON_FUNC_ALWAYS;
+    desc.MaxAnisotropy = 1;
+    native->CreateSampler(&desc, samplers_->CPU(offsets_[offset + i]));
   }
   return true;
 }

@@ -22,7 +22,9 @@ class D3D12BindingGroup final : public BindingGroup {
    private:
     Version(D3D12Device *device, const BindingLayoutDesc &layout);
     ObjectPtr<BindingGroup::Version> CreateEmpty() const override;
-    bool WriteDescriptors(size_t offset, const std::vector<Resource> &resources) override;
+    bool WriteDescriptors(size_t offset, const BindingDesc &binding, const std::vector<BufferView> &values) override;
+    bool WriteDescriptors(size_t offset, const BindingDesc &binding, const std::vector<IImage *> &values) override;
+    bool WriteDescriptors(size_t offset, const BindingDesc &binding, const std::vector<SamplerDesc> &values) override;
     std::vector<BindingType> types_;
     std::vector<uint32_t> offsets_;
     ObjectPtr<D3D12DescriptorPool::Lease> resources_, samplers_;

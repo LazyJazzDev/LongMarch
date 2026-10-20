@@ -407,6 +407,61 @@ TEST_P(RhiProgram, BindingUpdatesAreTransactionalAndForkOnlyCapturedVersions) {
   EXPECT_EQ(captured->GetResources()[2].image->GetDesc().width, 1u);
 }
 
+TEST_P(RhiProgram, TypedBindingArraysPreserveSparseVersionsAndPartialUpdates) {
+  if (GetParam() == BACKEND_API_METAL)
+    GTEST_SKIP() << "Metal bindings are deferred.";
+  ObjPtr<ICore> core = CreateCore(GetParam());
+  ASSERT_TRUE(core);
+  ObjPtr<IDevice> device = core->CreateDeviceByAutoSelection();
+  ASSERT_TRUE(device);
+  ObjPtr<IBuffer> buffer = device->CreateBuffer({512});
+  ObjPtr<IImage> first = device->CreateImage({1, 1, IMAGE_FORMAT_RGBA8_UNORM});
+  ObjPtr<IImage> second = device->CreateImage({2, 2, IMAGE_FORMAT_RGBA8_UNORM});
+  ASSERT_TRUE(buffer);
+  ASSERT_TRUE(first);
+  ASSERT_TRUE(second);
+  // Unsorted binding numbers and holes exercise cloning without reading unwritten descriptors.
+  ObjPtr<IBindingGroup> group = device->CreateBindingGroup(
+      {{{9, BINDING_SAMPLER, 3}, {2, BINDING_UNIFORM_BUFFER, 3}, {7, BINDING_TEXTURE2D, 3}}});
+  ASSERT_TRUE(group);
+  auto native = static_cast<backend::BindingGroup *>(group.Get());
+  ASSERT_TRUE(group->BindResource(2, std::vector<BufferView>{{buffer.Get(), 256, 0}}, 1));
+  ASSERT_TRUE(group->BindResource(7, std::vector<IImage *>{first.Get()}, 2));
+  ASSERT_TRUE(group->BindResource(9, std::vector<SamplerDesc>{{SAMPLER_FILTER_NEAREST}}, 1));
+  auto sparse = backend::ObjectPtr<backend::BindingGroup::Version>::Retain(native->CurrentVersion());
+  ASSERT_FALSE(sparse->IsComplete());
+  ASSERT_TRUE(group->BindResource(9, std::vector<SamplerDesc>{{SAMPLER_FILTER_LINEAR}, {SAMPLER_FILTER_NEAREST}}, 1));
+  auto next = native->CurrentVersion();
+  EXPECT_NE(next, sparse.Get());
+  EXPECT_FALSE(next->GetResources()[0].initialized);
+  EXPECT_EQ(next->GetResources()[1].size, 256u);
+  EXPECT_FALSE(next->GetResources()[2].initialized);
+  EXPECT_EQ(next->GetResources()[5].image, first.Get());
+  EXPECT_EQ(sparse->GetResources()[7].sampler.filter, SAMPLER_FILTER_NEAREST);
+  EXPECT_EQ(next->GetResources()[7].sampler.filter, SAMPLER_FILTER_LINEAR);
+  EXPECT_FALSE(sparse->GetResources()[8].initialized);
+  EXPECT_TRUE(next->GetResources()[8].initialized);
+  ASSERT_TRUE(group->BindResource(2, std::vector<BufferView>{{buffer.Get(), 0, 256}, {buffer.Get(), 256, 256}}, 0));
+  ASSERT_TRUE(group->BindResource(2, std::vector<BufferView>{{buffer.Get(), 0, 256}}, 2));
+  ASSERT_TRUE(group->BindResource(7, std::vector<IImage *>{first.Get(), second.Get()}, 0));
+  ASSERT_TRUE(group->BindResource(9, SamplerDesc{}));
+  EXPECT_TRUE(next->IsComplete());
+  EXPECT_EQ(native->CurrentVersion(), next);
+  EXPECT_FALSE(group->BindResource(7, std::vector<IImage *>{second.Get(), nullptr}));
+  EXPECT_EQ(next->GetResources()[3].image, first.Get());
+  EXPECT_FALSE(
+      group->BindResource(9, std::vector<SamplerDesc>{{SAMPLER_FILTER_NEAREST}, {static_cast<SamplerFilter>(-1)}}));
+  EXPECT_EQ(next->GetResources()[6].sampler.filter, SAMPLER_FILTER_LINEAR);
+  // Image array replacement must retain all inputs before dropping any old slot.
+  auto first_ptr = first.Get();
+  auto second_ptr = second.Get();
+  first.Release();
+  second.Release();
+  ASSERT_TRUE(group->BindResource(7, std::vector<IImage *>{second_ptr, first_ptr}, 0));
+  EXPECT_EQ(next->GetResources()[3].image->GetDesc().width, 2u);
+  EXPECT_EQ(next->GetResources()[4].image->GetDesc().width, 1u);
+}
+
 TEST_P(RhiProgram, StructuredStridesComeFromTargetLayoutAndMustAgreeAcrossStages) {
   if (GetParam() == BACKEND_API_METAL)
     GTEST_SKIP() << "Metal bindings are deferred.";
