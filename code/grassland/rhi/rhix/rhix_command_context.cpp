@@ -75,7 +75,7 @@ bool CommandContext::CmdBeginRendering(const Image &image,
   if (!*this)
     return false;
 #endif
-  return Get()->CmdBeginRendering({image.Get(), load_op, store_op, clear_color});
+  return Get()->CmdBeginRendering({{{image.Get(), load_op, store_op, clear_color}}});
 }
 
 bool CommandContext::CmdEndRendering() {

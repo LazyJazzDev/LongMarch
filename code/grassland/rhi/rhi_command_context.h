@@ -27,10 +27,6 @@ struct DepthStencilAttachmentInfo {
 };
 
 struct RenderingInfo {
-  IImage *color_attachment{};
-  AttachmentLoadOp load_op{ATTACHMENT_LOAD_OP_LOAD};
-  AttachmentStoreOp store_op{ATTACHMENT_STORE_OP_STORE};
-  std::array<float, 4> clear_color{};
   std::vector<ColorAttachmentInfo> color_attachments;
   DepthStencilAttachmentInfo depth_stencil;
 };

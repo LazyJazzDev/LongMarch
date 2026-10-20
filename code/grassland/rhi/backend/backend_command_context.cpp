@@ -17,8 +17,6 @@ bool CommandContext::CmdUploadImage(IImage *, const void *, uint64_t) {
 bool CommandContext::PrepareRendering(const RenderingInfo &info) {
   try {
     auto next = info;
-    if (next.color_attachments.empty() && next.color_attachment)
-      next.color_attachments.push_back({next.color_attachment, next.load_op, next.store_op, next.clear_color});
     if (next.color_attachments.size() > 8 || (next.color_attachments.empty() && !next.depth_stencil.image)) {
       recording_failed_ = true;
       return false;

@@ -273,16 +273,22 @@ void MetalCommandContext::ApplyScissor() {
 }
 
 bool MetalCommandContext::CmdBeginRendering(const RenderingInfo &info) {
+  // Metal currently implements one color attachment and no depth/stencil attachment.
+  if (info.color_attachments.size() != 1 || info.depth_stencil.image) {
+    recording_failed_ = true;
+    return false;
+  }
+  const auto &attachment = info.color_attachments.front();
 #if !defined(NDEBUG)
-  auto native = dynamic_cast<MetalImage *>(info.color_attachment);
+  auto native = dynamic_cast<MetalImage *>(attachment.color_attachment);
   if (!native || !native->IsValid() || native->DeviceIdentity() != device_ || sealed_ || render_target_ ||
-      info.load_op < ATTACHMENT_LOAD_OP_LOAD || info.load_op > ATTACHMENT_LOAD_OP_DISCARD ||
-      info.store_op < ATTACHMENT_STORE_OP_STORE || info.store_op > ATTACHMENT_STORE_OP_DISCARD) {
+      attachment.load_op < ATTACHMENT_LOAD_OP_LOAD || attachment.load_op > ATTACHMENT_LOAD_OP_DISCARD ||
+      attachment.store_op < ATTACHMENT_STORE_OP_STORE || attachment.store_op > ATTACHMENT_STORE_OP_DISCARD) {
     recording_failed_ = true;
     return false;
   }
 #else
-  auto native = static_cast<MetalImage *>(info.color_attachment);
+  auto native = static_cast<MetalImage *>(attachment.color_attachment);
 #endif
   if (!RetainResource(native))
     return false;
@@ -295,10 +301,11 @@ bool MetalCommandContext::CmdBeginRendering(const RenderingInfo &info) {
   auto color = pass->colorAttachments()->object(0);
   color->setTexture(native->NativeImage());
   const MTL::LoadAction loads[] = {MTL::LoadActionLoad, MTL::LoadActionClear, MTL::LoadActionDontCare};
-  color->setLoadAction(loads[info.load_op]);
-  color->setStoreAction(info.store_op == ATTACHMENT_STORE_OP_STORE ? MTL::StoreActionStore : MTL::StoreActionDontCare);
-  color->setClearColor(
-      MTL::ClearColor::Make(info.clear_color[0], info.clear_color[1], info.clear_color[2], info.clear_color[3]));
+  color->setLoadAction(loads[attachment.load_op]);
+  color->setStoreAction(attachment.store_op == ATTACHMENT_STORE_OP_STORE ? MTL::StoreActionStore
+                                                                         : MTL::StoreActionDontCare);
+  color->setClearColor(MTL::ClearColor::Make(attachment.clear_color[0], attachment.clear_color[1],
+                                             attachment.clear_color[2], attachment.clear_color[3]));
   encoder_ = NS::RetainPtr(commands_->renderCommandEncoder(pass));
   if (!encoder_) {
     recording_failed_ = true;

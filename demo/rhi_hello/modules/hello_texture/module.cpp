@@ -191,7 +191,7 @@ int HelloTexture(grassland::rhi::BackendAPI api, int frames, bool headless) {
     if (!context->CmdBindGroup(0, group.Get()))
       return 1;
     if (!context->CmdBeginRendering(
-            {image.Get(), ATTACHMENT_LOAD_OP_CLEAR, ATTACHMENT_STORE_OP_STORE, {0.6f, 0.7f, 0.8f, 1}}))
+            {{{image.Get(), ATTACHMENT_LOAD_OP_CLEAR, ATTACHMENT_STORE_OP_STORE, {0.6f, 0.7f, 0.8f, 1}}}}))
       return 1;
     if (!context->CmdBindVertexBuffer(0, vertex_buffer.Get()))
       return 1;

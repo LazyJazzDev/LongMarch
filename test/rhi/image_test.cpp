@@ -313,7 +313,7 @@ TEST_P(RhiImage, OffscreenClearDrawReadbackAndReuse) {
       ASSERT_TRUE(commands);
       ASSERT_TRUE(commands->CmdClearColor(image.Get(), {0.6f, 0.7f, 0.8f, 1}));
       ASSERT_TRUE(commands->CmdBindProgram(program.Get()));
-      ASSERT_TRUE(commands->CmdBeginRendering({image.Get(), ATTACHMENT_LOAD_OP_LOAD, ATTACHMENT_STORE_OP_STORE}));
+      ASSERT_TRUE(commands->CmdBeginRendering({{{image.Get(), ATTACHMENT_LOAD_OP_LOAD, ATTACHMENT_STORE_OP_STORE}}}));
       ASSERT_TRUE(commands->CmdSetViewport({0, 0, 64, 64, 0, 1}));
       ASSERT_TRUE(commands->CmdSetScissor({0, 0, 64, 64}));
       ASSERT_TRUE(commands->CmdDraw(3));
@@ -384,15 +384,15 @@ TEST_P(RhiImage, IndexedInstancedAttributesAndOffsetsProduceExpectedPixels) {
   ASSERT_TRUE(commands->CmdBindIndexBuffer(index.Get(), INDEX_FORMAT_UINT16, 2));
   ASSERT_TRUE(commands->CmdSetViewport({0, 0, 64, 64, 0, 1}));
   ASSERT_TRUE(commands->CmdSetScissor({0, 0, 64, 64}));
-  ASSERT_TRUE(
-      commands->CmdBeginRendering({image.Get(), ATTACHMENT_LOAD_OP_CLEAR, ATTACHMENT_STORE_OP_STORE, {0, 0, 0, 1}}));
+  ASSERT_TRUE(commands->CmdBeginRendering(
+      {{{image.Get(), ATTACHMENT_LOAD_OP_CLEAR, ATTACHMENT_STORE_OP_STORE, {0, 0, 0, 1}}}}));
   ASSERT_TRUE(commands->CmdDrawIndexed(3, 1, 1, 1, 1));
   ASSERT_TRUE(commands->CmdEndRendering());
   // A smaller attachment must clip an inherited scissor before any rebinding.
   ObjPtr<IImage> smaller = device->CreateImage({32, 32, IMAGE_FORMAT_RGBA8_UNORM});
   ASSERT_TRUE(smaller);
-  ASSERT_TRUE(
-      commands->CmdBeginRendering({smaller.Get(), ATTACHMENT_LOAD_OP_CLEAR, ATTACHMENT_STORE_OP_STORE, {0, 1, 0, 1}}));
+  ASSERT_TRUE(commands->CmdBeginRendering(
+      {{{smaller.Get(), ATTACHMENT_LOAD_OP_CLEAR, ATTACHMENT_STORE_OP_STORE, {0, 1, 0, 1}}}}));
   ASSERT_TRUE(commands->CmdEndRendering());
   ObjPtr<ISubmissionToken> done = queue->Submit(commands.Get());
   ASSERT_TRUE(done);
@@ -537,8 +537,8 @@ TEST_P(RhiImage, ImmutableGroupsBindFixedRangesAndArraysAcrossHeapPages) {
   ASSERT_TRUE(commands->CmdUploadBuffer(factors.Get(), 0, values, sizeof(values)));
   ASSERT_TRUE(commands->CmdBindProgram(program.Get()));
   ASSERT_TRUE(commands->CmdBindGroup(1, material.Get()));
-  ASSERT_TRUE(
-      commands->CmdBeginRendering({target.Get(), ATTACHMENT_LOAD_OP_CLEAR, ATTACHMENT_STORE_OP_STORE, {0, 0, 0, 1}}));
+  ASSERT_TRUE(commands->CmdBeginRendering(
+      {{{target.Get(), ATTACHMENT_LOAD_OP_CLEAR, ATTACHMENT_STORE_OP_STORE, {0, 0, 0, 1}}}}));
   ASSERT_TRUE(commands->CmdSetViewport({0, 0, 64, 64, 0, 1}));
   // Exceeds both resource/sampler page capacities. Previous draw tables must stay alive.
   for (int i = 0; i < 1100; ++i) {
@@ -632,8 +632,8 @@ TEST_P(RhiImage, StorageImageAndBufferBecomeReadableAfterRendering) {
   for (auto program : {writer.Get(), reader.Get()}) {
     ASSERT_TRUE(commands->CmdBindProgram(program));
     ASSERT_TRUE(commands->CmdBindGroup(0, program == writer.Get() ? wg.Get() : rg.Get()));
-    ASSERT_TRUE(
-        commands->CmdBeginRendering({target.Get(), ATTACHMENT_LOAD_OP_CLEAR, ATTACHMENT_STORE_OP_STORE, {0, 0, 0, 1}}));
+    ASSERT_TRUE(commands->CmdBeginRendering(
+        {{{target.Get(), ATTACHMENT_LOAD_OP_CLEAR, ATTACHMENT_STORE_OP_STORE, {0, 0, 0, 1}}}}));
     ASSERT_TRUE(commands->CmdSetViewport({0, 0, 64, 64, 0, 1}));
     ASSERT_TRUE(commands->CmdSetScissor({0, 0, 64, 64}));
     ASSERT_TRUE(commands->CmdDraw(3));
