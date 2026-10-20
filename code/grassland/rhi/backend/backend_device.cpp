@@ -2,10 +2,37 @@
 
 #include "grassland/rhi/backend/backend_command_context.h"
 #include "grassland/rhi/backend/backend_core.h"
+#include "grassland/rhi/backend/backend_shader.h"
 
 namespace grassland::rhi::backend {
 
 Device::Device(PhysicalDevice info, Core *core) : core_(core), info_(std::move(info)) {
+}
+
+rhi::IImage *Device::CreateImage(const ImageDesc &) {
+  ReportError(-1, "Independent images are not implemented for this backend.");
+  return nullptr;
+}
+
+rhi::IBuffer *Device::CreateBuffer(const BufferDesc &) {
+  ReportError(-1, "Buffers are not implemented for this backend.");
+  return nullptr;
+}
+
+rhi::IProgram *Device::CreateProgram(const ProgramDesc &) {
+  ReportError(-1, "Graphics programs are not implemented for this backend.");
+  return nullptr;
+}
+
+rhi::IShader *Device::CreateShader(const ShaderDesc &desc) {
+  if (desc.source.empty() || desc.entry_point.empty())
+    return nullptr;
+  try {
+    return new Shader(desc);
+  } catch (const std::bad_alloc &) {
+    ReportError(-1, "Shader source allocation failed.");
+    return nullptr;
+  }
 }
 
 Device::~Device() {

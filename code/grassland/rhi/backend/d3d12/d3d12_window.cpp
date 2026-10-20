@@ -18,10 +18,18 @@ D3D12Window::~D3D12Window() {
   ReleaseNextImage();
 }
 
-bool D3D12Window::Initialize(const WindowDesc &desc) {
-  if (!InitializeWindow(desc))
-    return false;
-  return RebuildSwapChain();
+D3D12Window *D3D12Window::Create(D3D12Device *device, const WindowDesc &desc) {
+  try {
+    auto object = std::unique_ptr<D3D12Window>(new D3D12Window(device));
+    if (!object->InitializeWindow(desc))
+      return nullptr;
+    if (!object->RebuildSwapChain())
+      return nullptr;
+    return object.release();
+  } catch (const std::bad_alloc &) {
+    ReportError(-1, "D3D12Window creation ran out of memory.");
+    return nullptr;
+  }
 }
 
 bool D3D12Window::IsFrameValid(uint64_t generation) const {
@@ -49,8 +57,13 @@ ObjectPtr<Image> D3D12Window::AcquireNativeFrame() {
   glfwGetFramebufferSize(GLFWWindow(), &width, &height);
   if (width <= 0 || height <= 0)
     return {};
+  // Native presentation can dispatch resize messages before the next PollEvents.
+  if (desc_.width != width || desc_.height != height) {
+    invalid_ = true;
+    return {};
+  }
 #if !defined(NDEBUG)
-  if (!valid_ || desc_.width != width || desc_.height != height)
+  if (!valid_)
     return {};
 #endif
 #if !defined(NDEBUG)
@@ -60,9 +73,7 @@ ObjectPtr<Image> D3D12Window::AcquireNativeFrame() {
   }
 #endif
   const UINT index = swapchain_->GetCurrentBackBufferIndex();
-  auto rtv = rtv_->GetCPUDescriptorHandleForHeapStart();
-  rtv.ptr += index * stride_;
-  auto frame = ObjectPtr<Image>::Adopt(new D3D12SwapChainImage(desc_, this, generation_, images_[index].Get(), rtv));
+  auto frame = ObjectPtr<Image>::Adopt(new D3D12SwapChainImage(desc_, this, generation_, images_[index].Get()));
   acquired_ = true;
   return frame;
 }
@@ -98,7 +109,6 @@ bool D3D12Window::RebuildNativeSwapChain(PresentMode requested_mode) {
     acquired_ = false;
     for (auto &image : images_)
       image.Reset();
-    rtv_.Reset();
     if (!Check(swapchain_->ResizeBuffers(3, width, height, DXGI_FORMAT_R8G8B8A8_UNORM, flags), "ResizeBuffers"))
       return false;
   } else {
@@ -120,18 +130,9 @@ bool D3D12Window::RebuildNativeSwapChain(PresentMode requested_mode) {
       return false;
     device_->Factory()->MakeWindowAssociation(hwnd, DXGI_MWA_NO_ALT_ENTER);
   }
-  D3D12_DESCRIPTOR_HEAP_DESC heap{};
-  heap.Type = D3D12_DESCRIPTOR_HEAP_TYPE_RTV;
-  heap.NumDescriptors = 3;
-  if (!Check(device_->NativeDevice()->CreateDescriptorHeap(&heap, IID_PPV_ARGS(&rtv_)), "Create RTV heap"))
-    return false;
-  stride_ = device_->NativeDevice()->GetDescriptorHandleIncrementSize(heap.Type);
-  auto handle = rtv_->GetCPUDescriptorHandleForHeapStart();
   for (UINT i = 0; i < 3; ++i) {
     if (!Check(swapchain_->GetBuffer(i, IID_PPV_ARGS(&images_[i])), "Get swapchain buffer"))
       return false;
-    device_->NativeDevice()->CreateRenderTargetView(images_[i].Get(), nullptr, handle);
-    handle.ptr += stride_;
   }
   desc_ = {static_cast<uint32_t>(width), static_cast<uint32_t>(height), IMAGE_FORMAT_RGBA8_UNORM};
   valid_ = true;

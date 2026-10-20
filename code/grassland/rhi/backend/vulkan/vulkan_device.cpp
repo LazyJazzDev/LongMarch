@@ -1,7 +1,11 @@
 ﻿#include "grassland/rhi/backend/vulkan/vulkan_device.h"
 
+#include <vk_mem_alloc.h>
+
+#include "grassland/rhi/backend/vulkan/vulkan_allocated_image.h"
 #include "grassland/rhi/backend/vulkan/vulkan_command_context.h"
 #include "grassland/rhi/backend/vulkan/vulkan_core.h"
+#include "grassland/rhi/backend/vulkan/vulkan_program.h"
 #include "grassland/rhi/backend/vulkan/vulkan_queue.h"
 #include "grassland/rhi/backend/vulkan/vulkan_window.h"
 
@@ -46,24 +50,30 @@ void VulkanDevice::RecycleCommandResources(VkCommandPool pool, VkCommandBuffer c
   vkDestroyCommandPool(device_, pool, nullptr);
 }
 
-VulkanDevice::VulkanDevice(grassland::rhi::PhysicalDevice info, Core *core) : Device(std::move(info), core) {
+VulkanDevice::VulkanDevice(grassland::rhi::PhysicalDevice info, Core *core)
+    : Device(std::move(info), core),
+      upload_pool_(this) {
 }
 
 VulkanDevice::~VulkanDevice() {
   ShutdownQueues();
+  upload_pool_.Clear();
+  render_targets_.reset();
   for (const auto &entry : command_pool_) {
     vkDestroyCommandPool(device_, std::get<0>(entry), nullptr);
   }
   if (timeline_)
     vkDestroySemaphore(device_, timeline_, nullptr);
+  if (allocator_)
+    vmaDestroyAllocator(allocator_);
   if (device_)
     vkDestroyDevice(device_, nullptr);
 }
 
-std::unique_ptr<VulkanDevice> VulkanDevice::CreateVulkanDevice(grassland::rhi::PhysicalDevice info,
-                                                               Core *core,
-                                                               VkPhysicalDevice physical_device,
-                                                               uint32_t api_version) {
+VulkanDevice *VulkanDevice::CreateVulkanDevice(grassland::rhi::PhysicalDevice info,
+                                               Core *core,
+                                               VkPhysicalDevice physical_device,
+                                               uint32_t api_version) {
   auto device = std::unique_ptr<VulkanDevice>(new VulkanDevice(std::move(info), core));
   DeviceFeatures enabled(physical_device, api_version);
   if (!enabled)
@@ -105,6 +115,17 @@ std::unique_ptr<VulkanDevice> VulkanDevice::CreateVulkanDevice(grassland::rhi::P
     ReportError(result, "vkCreateDevice failed.");
     return {};
   }
+  if (enabled.DynamicRendering()) {
+    const char *begin_name = api_version >= VK_API_VERSION_1_3 ? "vkCmdBeginRendering" : "vkCmdBeginRenderingKHR";
+    const char *end_name = api_version >= VK_API_VERSION_1_3 ? "vkCmdEndRendering" : "vkCmdEndRenderingKHR";
+    device->begin_rendering_ =
+        reinterpret_cast<PFN_vkCmdBeginRendering>(vkGetDeviceProcAddr(device->device_, begin_name));
+    device->end_rendering_ = reinterpret_cast<PFN_vkCmdEndRendering>(vkGetDeviceProcAddr(device->device_, end_name));
+    if (!device->begin_rendering_ || !device->end_rendering_) {
+      ReportError(-1, "Enabled dynamic rendering commands are unavailable.");
+      return {};
+    }
+  }
   VkSemaphoreTypeCreateInfo type{VK_STRUCTURE_TYPE_SEMAPHORE_TYPE_CREATE_INFO};
   type.semaphoreType = VK_SEMAPHORE_TYPE_TIMELINE;
   VkSemaphoreCreateInfo semaphore{VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO};
@@ -114,11 +135,20 @@ std::unique_ptr<VulkanDevice> VulkanDevice::CreateVulkanDevice(grassland::rhi::P
   const bool swapchain = std::any_of(enabled.Extensions().begin(), enabled.Extensions().end(), [](const char *name) {
     return std::strcmp(name, VK_KHR_SWAPCHAIN_EXTENSION_NAME) == 0;
   });
+  VmaAllocatorCreateInfo memory{};
+  memory.physicalDevice = physical_device;
+  memory.device = device->device_;
+  memory.instance = static_cast<VulkanCore *>(core)->Instance();
+  memory.vulkanApiVersion = VK_API_VERSION_1_2;
+  if (!Check(vmaCreateAllocator(&memory, &device->allocator_), "Create VMA allocator"))
+    return {};
+  device->render_targets_ =
+      std::make_unique<VulkanRenderTargetPool>(device->device_, device->begin_rendering_ != nullptr);
   device->physical_ = physical_device;
   device->graphics_queue_family_index_ = graphics_family;
   device->swapchain_enabled_ = swapchain;
   vkGetDeviceQueue(device->device_, graphics_family, 0, &device->queue_);
-  return device;
+  return device.release();
 }
 
 VkSemaphore VulkanDevice::Timeline() const {
@@ -135,6 +165,22 @@ VkResult VulkanDevice::Wait(uint64_t value, uint64_t timeout) const {
   wait.pSemaphores = &timeline_;
   wait.pValues = &value;
   return vkWaitSemaphores(device_, &wait, timeout);
+}
+
+PFN_vkCmdBeginRendering VulkanDevice::BeginRenderingCommand() const {
+  return begin_rendering_;
+}
+
+PFN_vkCmdEndRendering VulkanDevice::EndRenderingCommand() const {
+  return end_rendering_;
+}
+
+VulkanRenderTargetPool &VulkanDevice::RenderTargets() {
+  return *render_targets_;
+}
+
+VmaAllocator VulkanDevice::Allocator() const {
+  return allocator_;
 }
 
 VkDevice VulkanDevice::NativeDevice() const {
@@ -165,28 +211,33 @@ std::mutex &VulkanDevice::QueueMutex() {
   return mutex_;
 }
 
-rhi::IWindow *VulkanDevice::CreateGLFWWindow(const WindowDesc &desc) {
+VulkanUploadPool &VulkanDevice::UploadPool() {
+  return upload_pool_;
+}
+
+rhi::IImage *VulkanDevice::CreateImage(const ImageDesc &desc) {
+  return VulkanAllocatedImage::Create(this, desc);
+}
+
+rhi::IBuffer *VulkanDevice::CreateBuffer(const BufferDesc &desc) {
+  return VulkanAllocatedBuffer::Create(this, desc);
+}
+
+rhi::IProgram *VulkanDevice::CreateProgram(const ProgramDesc &desc) {
   try {
-    auto window = std::make_unique<VulkanWindow>(this);
-    if (!window->Initialize(desc))
-      return nullptr;
-    return window.release();
+    return new VulkanProgram(this, desc);
   } catch (const std::bad_alloc &) {
-    ReportError(-1, "Window creation ran out of memory.");
+    ReportError(-1, "Program allocation failed.");
     return nullptr;
   }
 }
 
+rhi::IWindow *VulkanDevice::CreateGLFWWindow(const WindowDesc &desc) {
+  return VulkanWindow::Create(this, desc);
+}
+
 rhi::ICommandContext *VulkanDevice::CreateCommandContext() {
-  try {
-    auto context = std::make_unique<VulkanCommandContext>(this);
-    if (!context->Initialize())
-      return nullptr;
-    return context.release();
-  } catch (const std::bad_alloc &) {
-    ReportError(-1, "Command context allocation failed.");
-    return nullptr;
-  }
+  return VulkanCommandContext::Create(this);
 }
 
 rhi::IQueue *VulkanDevice::GetQueue(QueueType type) {

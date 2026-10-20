@@ -18,3 +18,8 @@ endif ()
 if (LONGMARCH_CUDA_RUNTIME)
     target_compile_definitions(${GRASSLAND_SUBLIB_NAME} PUBLIC LONGMARCH_CUDA_RUNTIME)
 endif ()
+
+if (LONGMARCH_VULKAN_ENABLED)
+    target_link_libraries(${GRASSLAND_SUBLIB_NAME} PRIVATE ${VMA_LIB_NAME} ${VULKAN_LIB_NAME})
+    target_compile_definitions(${GRASSLAND_SUBLIB_NAME} PRIVATE LONGMARCH_VMA_ENABLED)
+endif ()

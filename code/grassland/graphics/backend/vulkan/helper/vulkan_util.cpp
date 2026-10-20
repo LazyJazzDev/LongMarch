@@ -1,9 +1,8 @@
 ﻿#include "grassland/graphics/backend/vulkan/helper/vulkan_util.h"
 
-#include <iostream>
-
-#define VMA_IMPLEMENTATION
 #include <vk_mem_alloc.h>
+
+#include <iostream>
 
 namespace grassland::graphics::backend::vulkan {
 

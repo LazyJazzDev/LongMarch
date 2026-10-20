@@ -6,9 +6,8 @@ namespace grassland::rhi::backend::vulkan {
 
 class VulkanWindow final : public Window {
  public:
-  explicit VulkanWindow(VulkanDevice *device);
   ~VulkanWindow() override;
-  bool Initialize(const WindowDesc &desc);
+  static VulkanWindow *Create(VulkanDevice *device, const WindowDesc &desc);
   ObjectPtr<Image> AcquireNativeFrame() override;
   bool RebuildNativeSwapChain(PresentMode mode) override;
   PresentMode GetPresentMode() const override;
@@ -20,6 +19,8 @@ class VulkanWindow final : public Window {
   VkResult PresentFrame();
 
  private:
+  VulkanWindow(VulkanDevice *device);
+
   void DestroySwapchain();
   VulkanDevice *device_;
   VkSurfaceKHR surface_{};

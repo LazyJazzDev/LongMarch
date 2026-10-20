@@ -4,11 +4,13 @@
 
 namespace grassland::rhi::backend::vulkan {
 
+VulkanCore::VulkanCore() = default;
+
 VkInstance VulkanCore::Instance() const {
   return instance_;
 }
 
-std::unique_ptr<VulkanCore> VulkanCore::CreateVulkanCore() {
+VulkanCore *VulkanCore::CreateVulkanCore() {
   uint32_t loader_version = VK_API_VERSION_1_0;
   const auto enumerate_version = reinterpret_cast<PFN_vkEnumerateInstanceVersion>(
       vkGetInstanceProcAddr(VK_NULL_HANDLE, "vkEnumerateInstanceVersion"));
@@ -54,7 +56,7 @@ std::unique_ptr<VulkanCore> VulkanCore::CreateVulkanCore() {
   create.pApplicationInfo = &application;
   create.enabledExtensionCount = static_cast<uint32_t>(extensions.size());
   create.ppEnabledExtensionNames = extensions.data();
-  auto core = std::make_unique<VulkanCore>();
+  auto core = std::unique_ptr<VulkanCore>(new VulkanCore());
   if (!Check(vkCreateInstance(&create, nullptr, &core->instance_), "vkCreateInstance"))
     return {};
   std::vector<VkPhysicalDevice> devices;
@@ -104,7 +106,7 @@ std::unique_ptr<VulkanCore> VulkanCore::CreateVulkanCore() {
     info.ray_query_feature = features.RayQuery();
     core->adapters_.push_back({device, device_version, std::move(info)});
   }
-  return core;
+  return core.release();
 }
 
 VulkanCore::~VulkanCore() {
@@ -128,7 +130,7 @@ rhi::IDevice *VulkanCore::CreateDevice(int32_t device_idx) {
     }
 #endif
     const auto &adapter = adapters_[device_idx];
-    return VulkanDevice::CreateVulkanDevice(adapter.info, this, adapter.native, adapter.api_version).release();
+    return VulkanDevice::CreateVulkanDevice(adapter.info, this, adapter.native, adapter.api_version);
   } catch (const std::bad_alloc &) {
     return nullptr;
   }

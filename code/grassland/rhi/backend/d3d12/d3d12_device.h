@@ -2,15 +2,18 @@
 #include <tuple>
 
 #include "grassland/rhi/backend/backend_device.h"
+#include "grassland/rhi/backend/d3d12/d3d12_rtv_pool.h"
+#include "grassland/rhi/backend/d3d12/d3d12_upload_pool.h"
 #include "grassland/rhi/backend/d3d12/d3d12_util.h"
 
 namespace grassland::rhi::backend::d3d12 {
 class D3D12Device final : public Device {
  public:
-  D3D12Device(PhysicalDevice info, Core *core, ComPtr<ID3D12Device> device);
+  static D3D12Device *Create(PhysicalDevice info, Core *core, ComPtr<ID3D12Device> device);
   ~D3D12Device() override;
-  bool IsInitialized() const;
   ID3D12Device *NativeDevice() const;
+  D3D12MA::Allocator *Allocator() const;
+  D3D12RTVPool &RTVPool();
   IDXGIFactory4 *Factory() const;
   ID3D12CommandQueue *NativeQueue() const;
   ID3D12Fence *Fence() const;
@@ -19,6 +22,10 @@ class D3D12Device final : public Device {
   uint64_t NextSerial();
   bool Wait(uint64_t value, HANDLE event) const;
   bool WaitIdle();
+  rhi::IProgram *CreateProgram(const ProgramDesc &desc) override;
+  rhi::IImage *CreateImage(const ImageDesc &desc) override;
+  rhi::IBuffer *CreateBuffer(const BufferDesc &desc) override;
+  D3D12UploadPool &UploadPool();
   rhi::IWindow *CreateGLFWWindow(const WindowDesc &desc = {}) override;
   rhi::ICommandContext *CreateCommandContext() override;
   rhi::IQueue *GetQueue(QueueType type) override;
@@ -33,10 +40,14 @@ class D3D12Device final : public Device {
                                HANDLE event);
 
  private:
+  D3D12Device(PhysicalDevice info, Core *core, ComPtr<ID3D12Device> device);
+
+  D3D12UploadPool upload_pool_;
   std::mutex command_pool_mutex_;
   std::vector<std::tuple<ComPtr<ID3D12CommandAllocator>, ComPtr<ID3D12GraphicsCommandList>, HANDLE>> command_pool_;
-  bool Initialize();
   ComPtr<ID3D12Device> device_;
+  ComPtr<D3D12MA::Allocator> allocator_;
+  D3D12RTVPool rtv_pool_;
   ComPtr<IDXGIFactory4> factory_;
   ComPtr<ID3D12CommandQueue> queue_;
   ComPtr<ID3D12Fence> fence_;
@@ -44,6 +55,5 @@ class D3D12Device final : public Device {
   uint64_t serial_{};
   HANDLE idle_event_{};
   bool tearing_{};
-  bool initialized_{};
 };
 }  // namespace grassland::rhi::backend::d3d12

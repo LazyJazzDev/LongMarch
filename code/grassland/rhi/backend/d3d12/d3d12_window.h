@@ -8,9 +8,8 @@ namespace grassland::rhi::backend::d3d12 {
 
 class D3D12Window final : public Window {
  public:
-  explicit D3D12Window(D3D12Device *device);
   ~D3D12Window() override;
-  bool Initialize(const WindowDesc &desc);
+  static D3D12Window *Create(D3D12Device *device, const WindowDesc &desc);
   ObjectPtr<Image> AcquireNativeFrame() override;
   bool RebuildNativeSwapChain(PresentMode mode) override;
   PresentMode GetPresentMode() const override;
@@ -20,12 +19,12 @@ class D3D12Window final : public Window {
   HRESULT PresentFrame(uint64_t generation);
 
  private:
+  D3D12Window(D3D12Device *device);
+
   D3D12Device *device_;
   ComPtr<IDXGISwapChain3> swapchain_;
-  ComPtr<ID3D12DescriptorHeap> rtv_;
   std::array<ComPtr<ID3D12Resource>, 3> images_;
   ImageDesc desc_;
-  UINT stride_{};
   std::atomic<uint64_t> generation_{1};
   bool acquired_{};
   bool valid_{};

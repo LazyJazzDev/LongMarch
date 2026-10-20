@@ -1,8 +1,15 @@
 ﻿#include "grassland/rhi/backend/d3d12/d3d12_device.h"
 
+#include "grassland/rhi/backend/d3d12/d3d12_allocated_image.h"
 #include "grassland/rhi/backend/d3d12/d3d12_command_context.h"
+#include "grassland/rhi/backend/d3d12/d3d12_program.h"
 #include "grassland/rhi/backend/d3d12/d3d12_queue.h"
 #include "grassland/rhi/backend/d3d12/d3d12_window.h"
+
+// Match the Windows SDK declarations used by the backend.
+#define D3D12MA_D3D12_HEADERS_ALREADY_INCLUDED
+#include <D3D12MemAlloc.h>
+#undef D3D12MA_D3D12_HEADERS_ALREADY_INCLUDED
 
 namespace grassland::rhi::backend::d3d12 {
 
@@ -47,24 +54,49 @@ void D3D12Device::RecycleCommandResources(ComPtr<ID3D12CommandAllocator> allocat
   CloseHandle(event);
 }
 
-bool D3D12Device::Initialize() {
-  D3D12_COMMAND_QUEUE_DESC desc{};
-  desc.Type = D3D12_COMMAND_LIST_TYPE_DIRECT;
-  if (!Check(CreateDXGIFactory2(0, IID_PPV_ARGS(&factory_)), "CreateDXGIFactory2") ||
-      !Check(device_->CreateCommandQueue(&desc, IID_PPV_ARGS(&queue_)), "CreateCommandQueue") ||
-      !Check(device_->CreateFence(0, D3D12_FENCE_FLAG_NONE, IID_PPV_ARGS(&fence_)), "CreateFence"))
-    return false;
-  idle_event_ = CreateEventW(nullptr, FALSE, FALSE, nullptr);
-  if (!idle_event_) {
-    ReportError(GetLastError(), "Create fence event failed.");
-    return false;
+D3D12Device *D3D12Device::Create(PhysicalDevice info, Core *core, ComPtr<ID3D12Device> device) {
+  try {
+    auto object = std::unique_ptr<D3D12Device>(new D3D12Device(std::move(info), core, std::move(device)));
+    D3D12_COMMAND_QUEUE_DESC desc{};
+    desc.Type = D3D12_COMMAND_LIST_TYPE_DIRECT;
+    if (!Check(CreateDXGIFactory2(0, IID_PPV_ARGS(&object->factory_)), "CreateDXGIFactory2"))
+      return nullptr;
+    if (!Check(object->device_->CreateCommandQueue(&desc, IID_PPV_ARGS(&object->queue_)), "CreateCommandQueue"))
+      return nullptr;
+    if (!Check(object->device_->CreateFence(0, D3D12_FENCE_FLAG_NONE, IID_PPV_ARGS(&object->fence_)), "CreateFence"))
+      return nullptr;
+    ComPtr<IDXGIAdapter> adapter;
+    if (!Check(object->factory_->EnumAdapterByLuid(object->device_->GetAdapterLuid(), IID_PPV_ARGS(&adapter)),
+               "Find allocation adapter"))
+      return nullptr;
+    D3D12MA::ALLOCATOR_DESC memory{};
+    memory.pDevice = object->device_.Get();
+    memory.pAdapter = adapter.Get();
+    if (!Check(D3D12MA::CreateAllocator(&memory, &object->allocator_), "Create D3D12MA allocator"))
+      return nullptr;
+    object->idle_event_ = CreateEventW(nullptr, FALSE, FALSE, nullptr);
+    if (!object->idle_event_) {
+      ReportError(GetLastError(), "Create fence event failed.");
+      return nullptr;
+    }
+    ComPtr<IDXGIFactory5> factory5;
+    BOOL tearing = FALSE;
+    if (SUCCEEDED(object->factory_.As(&factory5)) &&
+        SUCCEEDED(factory5->CheckFeatureSupport(DXGI_FEATURE_PRESENT_ALLOW_TEARING, &tearing, sizeof(tearing))))
+      object->tearing_ = tearing;
+    return object.release();
+  } catch (const std::bad_alloc &) {
+    ReportError(-1, "D3D12Device creation ran out of memory.");
+    return nullptr;
   }
-  ComPtr<IDXGIFactory5> factory5;
-  BOOL tearing = FALSE;
-  if (SUCCEEDED(factory_.As(&factory5)) &&
-      SUCCEEDED(factory5->CheckFeatureSupport(DXGI_FEATURE_PRESENT_ALLOW_TEARING, &tearing, sizeof(tearing))))
-    tearing_ = tearing;
-  return true;
+}
+
+D3D12RTVPool &D3D12Device::RTVPool() {
+  return rtv_pool_;
+}
+
+D3D12MA::Allocator *D3D12Device::Allocator() const {
+  return allocator_.Get();
 }
 
 ID3D12Device *D3D12Device::NativeDevice() const {
@@ -118,12 +150,14 @@ bool D3D12Device::WaitIdle() {
 
 D3D12Device::D3D12Device(PhysicalDevice info, Core *core, ComPtr<ID3D12Device> device)
     : Device(std::move(info), core),
-      device_(std::move(device)) {
-  initialized_ = Initialize();
+      upload_pool_(this),
+      device_(std::move(device)),
+      rtv_pool_(device_.Get()) {
 }
 
 D3D12Device::~D3D12Device() {
   ShutdownQueues();
+  upload_pool_.Clear();
   for (auto &entry : command_pool_)
     CloseHandle(std::get<2>(entry));
   command_pool_.clear();
@@ -131,32 +165,33 @@ D3D12Device::~D3D12Device() {
     CloseHandle(idle_event_);
 }
 
-bool D3D12Device::IsInitialized() const {
-  return initialized_;
+rhi::IProgram *D3D12Device::CreateProgram(const ProgramDesc &desc) {
+  try {
+    return new D3D12Program(this, desc);
+  } catch (const std::bad_alloc &) {
+    ReportError(-1, "Program allocation failed.");
+    return nullptr;
+  }
+}
+
+D3D12UploadPool &D3D12Device::UploadPool() {
+  return upload_pool_;
+}
+
+rhi::IImage *D3D12Device::CreateImage(const ImageDesc &desc) {
+  return D3D12AllocatedImage::Create(this, desc);
+}
+
+rhi::IBuffer *D3D12Device::CreateBuffer(const BufferDesc &desc) {
+  return D3D12AllocatedBuffer::Create(this, desc);
 }
 
 rhi::IWindow *D3D12Device::CreateGLFWWindow(const WindowDesc &desc) {
-  try {
-    auto window = std::make_unique<D3D12Window>(this);
-    if (!window->Initialize(desc))
-      return nullptr;
-    return window.release();
-  } catch (const std::bad_alloc &) {
-    ReportError(-1, "Window creation ran out of memory.");
-    return nullptr;
-  }
+  return D3D12Window::Create(this, desc);
 }
 
 rhi::ICommandContext *D3D12Device::CreateCommandContext() {
-  try {
-    auto context = std::make_unique<D3D12CommandContext>(this);
-    if (!context->Initialize())
-      return nullptr;
-    return context.release();
-  } catch (const std::bad_alloc &) {
-    ReportError(-1, "Command context allocation failed.");
-    return nullptr;
-  }
+  return D3D12CommandContext::Create(this);
 }
 
 rhi::IQueue *D3D12Device::GetQueue(QueueType type) {

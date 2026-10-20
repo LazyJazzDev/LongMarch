@@ -6,11 +6,13 @@ namespace grassland::rhi::backend::d3d12 {
 
 class D3D12Core final : public Core {
  public:
-  static std::unique_ptr<D3D12Core> CreateD3D12Core();
+  static D3D12Core *CreateD3D12Core();
   std::vector<PhysicalDevice> GetPhysicalDevices() const override;
   rhi::IDevice *CreateDevice(int32_t device_idx) override;
 
  private:
+  D3D12Core();
+
   struct Adapter {
     ComPtr<IDXGIAdapter1> native;
     PhysicalDevice info;

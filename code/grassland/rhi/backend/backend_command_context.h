@@ -17,6 +17,28 @@ class CommandContext : public Object<rhi::ICommandContext> {
 
   CommandContext(const void *identity);
   ~CommandContext() override;
+  bool CmdUploadBuffer(IBuffer *buffer, uint64_t offset, const void *data, uint64_t size) override;
+  bool CmdCopyBuffer(IBuffer *source,
+                     uint64_t source_offset,
+                     IBuffer *destination,
+                     uint64_t destination_offset,
+                     uint64_t size) override;
+  bool CmdBindProgram(IProgram *program) override;
+  bool CmdBeginRendering(const RenderingInfo &info) override;
+  bool CmdEndRendering() override;
+  bool CmdBindVertexBuffer(uint32_t binding, IBuffer *buffer, uint64_t offset = 0) override;
+  bool CmdBindIndexBuffer(IBuffer *buffer, IndexFormat format = INDEX_FORMAT_UINT32, uint64_t offset = 0) override;
+  bool CmdSetViewport(const Viewport &viewport) override;
+  bool CmdSetScissor(const Scissor &scissor) override;
+  bool CmdDraw(uint32_t vertex_count,
+               uint32_t instance_count = 1,
+               uint32_t first_vertex = 0,
+               uint32_t first_instance = 0) override;
+  bool CmdDrawIndexed(uint32_t index_count,
+                      uint32_t instance_count = 1,
+                      uint32_t first_index = 0,
+                      int32_t vertex_offset = 0,
+                      uint32_t first_instance = 0) override;
   bool Seal();
   const void *DeviceIdentity() const;
   void MarkSubmitted();

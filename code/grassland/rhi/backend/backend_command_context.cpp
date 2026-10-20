@@ -53,4 +53,81 @@ void CommandContext::MarkSubmitted() {
 bool CommandContext::WasSubmitted() const {
   return submitted_;
 }
+
+bool CommandContext::CmdUploadBuffer(IBuffer *buffer, uint64_t offset, const void *data, uint64_t size) {
+  recording_failed_ = true;
+  ReportError(-1, "Drawing and buffers are not implemented for this backend.");
+  return false;
+}
+
+bool CommandContext::CmdCopyBuffer(IBuffer *source,
+                                   uint64_t source_offset,
+                                   IBuffer *destination,
+                                   uint64_t destination_offset,
+                                   uint64_t size) {
+  recording_failed_ = true;
+  ReportError(-1, "Drawing and buffers are not implemented for this backend.");
+  return false;
+}
+
+bool CommandContext::CmdBindProgram(IProgram *program) {
+  recording_failed_ = true;
+  ReportError(-1, "Drawing and buffers are not implemented for this backend.");
+  return false;
+}
+
+bool CommandContext::CmdBeginRendering(const RenderingInfo &info) {
+  recording_failed_ = true;
+  ReportError(-1, "Drawing and buffers are not implemented for this backend.");
+  return false;
+}
+
+bool CommandContext::CmdEndRendering() {
+  recording_failed_ = true;
+  ReportError(-1, "Drawing is not implemented for this backend.");
+  return false;
+}
+
+bool CommandContext::CmdBindVertexBuffer(uint32_t binding, IBuffer *buffer, uint64_t offset) {
+  recording_failed_ = true;
+  ReportError(-1, "Drawing and buffers are not implemented for this backend.");
+  return false;
+}
+
+bool CommandContext::CmdBindIndexBuffer(IBuffer *buffer, IndexFormat format, uint64_t offset) {
+  recording_failed_ = true;
+  ReportError(-1, "Drawing and buffers are not implemented for this backend.");
+  return false;
+}
+
+bool CommandContext::CmdSetViewport(const Viewport &viewport) {
+  recording_failed_ = true;
+  ReportError(-1, "Drawing and buffers are not implemented for this backend.");
+  return false;
+}
+
+bool CommandContext::CmdSetScissor(const Scissor &scissor) {
+  recording_failed_ = true;
+  ReportError(-1, "Drawing and buffers are not implemented for this backend.");
+  return false;
+}
+
+bool CommandContext::CmdDraw(uint32_t vertex_count,
+                             uint32_t instance_count,
+                             uint32_t first_vertex,
+                             uint32_t first_instance) {
+  recording_failed_ = true;
+  ReportError(-1, "Drawing and buffers are not implemented for this backend.");
+  return false;
+}
+
+bool CommandContext::CmdDrawIndexed(uint32_t index_count,
+                                    uint32_t instance_count,
+                                    uint32_t first_index,
+                                    int32_t vertex_offset,
+                                    uint32_t first_instance) {
+  recording_failed_ = true;
+  ReportError(-1, "Drawing and buffers are not implemented for this backend.");
+  return false;
+}
 }  // namespace grassland::rhi::backend

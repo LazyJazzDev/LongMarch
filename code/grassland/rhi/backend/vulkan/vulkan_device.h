@@ -2,17 +2,24 @@
 #include <tuple>
 
 #include "grassland/rhi/backend/backend_device.h"
+#include "grassland/rhi/backend/vulkan/vulkan_render_target_pool.h"
+#include "grassland/rhi/backend/vulkan/vulkan_upload_pool.h"
 #include "grassland/rhi/backend/vulkan/vulkan_util.h"
 
 namespace grassland::rhi::backend::vulkan {
 class VulkanDevice final : public Device {
  public:
-  static std::unique_ptr<VulkanDevice> CreateVulkanDevice(grassland::rhi::PhysicalDevice info,
-                                                          Core *core,
-                                                          VkPhysicalDevice physical_device,
-                                                          uint32_t api_version);
+  static VulkanDevice *CreateVulkanDevice(grassland::rhi::PhysicalDevice info,
+                                          Core *core,
+                                          VkPhysicalDevice physical_device,
+                                          uint32_t api_version);
   ~VulkanDevice() override;
   VkDevice NativeDevice() const;
+  VulkanRenderTargetPool &RenderTargets();
+  PFN_vkCmdBeginRendering BeginRenderingCommand() const;
+  PFN_vkCmdEndRendering EndRenderingCommand() const;
+  rhi::IProgram *CreateProgram(const ProgramDesc &desc) override;
+  VmaAllocator Allocator() const;
   VkPhysicalDevice NativePhysicalDevice() const;
   VkInstance Instance() const;
   VkQueue NativeQueue() const;
@@ -23,6 +30,9 @@ class VulkanDevice final : public Device {
   // Allocate and submit serials while holding QueueMutex, preserving signal order.
   uint64_t NextSerial();
   VkResult Wait(uint64_t value, uint64_t timeout = UINT64_MAX) const;
+  rhi::IImage *CreateImage(const ImageDesc &desc) override;
+  rhi::IBuffer *CreateBuffer(const BufferDesc &desc) override;
+  VulkanUploadPool &UploadPool();
   rhi::IWindow *CreateGLFWWindow(const WindowDesc &desc = {}) override;
   rhi::ICommandContext *CreateCommandContext() override;
   rhi::IQueue *GetQueue(QueueType type) override;
@@ -33,10 +43,15 @@ class VulkanDevice final : public Device {
   void RecycleCommandResources(VkCommandPool pool, VkCommandBuffer command);
 
  private:
+  VulkanUploadPool upload_pool_;
   std::mutex resource_pool_mutex_;
   std::vector<std::tuple<VkCommandPool, VkCommandBuffer>> command_pool_;
   VulkanDevice(grassland::rhi::PhysicalDevice info, Core *core);
+  std::unique_ptr<VulkanRenderTargetPool> render_targets_;
+  VmaAllocator allocator_{};
   VkDevice device_{VK_NULL_HANDLE};
+  PFN_vkCmdBeginRendering begin_rendering_{};
+  PFN_vkCmdEndRendering end_rendering_{};
   VkPhysicalDevice physical_{};
   VkQueue queue_{};
   VkSemaphore timeline_{};

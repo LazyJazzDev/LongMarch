@@ -99,4 +99,24 @@ struct ImageDesc {
   ImageFormat format{IMAGE_FORMAT_UNKNOWN};
 };
 
+typedef enum { SHADER_STAGE_VERTEX, SHADER_STAGE_FRAGMENT } ShaderStage;
+
+std::string to_string(ShaderStage stage);
+
+typedef enum { VERTEX_FORMAT_FLOAT, VERTEX_FORMAT_FLOAT2, VERTEX_FORMAT_FLOAT3, VERTEX_FORMAT_FLOAT4 } VertexFormat;
+
+std::string to_string(VertexFormat format);
+uint32_t VertexFormatSize(VertexFormat format);
+
+typedef enum { ATTACHMENT_LOAD_OP_LOAD, ATTACHMENT_LOAD_OP_CLEAR, ATTACHMENT_LOAD_OP_DISCARD } AttachmentLoadOp;
+
+typedef enum { ATTACHMENT_STORE_OP_STORE, ATTACHMENT_STORE_OP_DISCARD } AttachmentStoreOp;
+
+std::string to_string(AttachmentLoadOp op);
+std::string to_string(AttachmentStoreOp op);
+
+typedef enum { INDEX_FORMAT_UINT16, INDEX_FORMAT_UINT32 } IndexFormat;
+
+std::string to_string(IndexFormat format);
+
 }  // namespace grassland::rhi

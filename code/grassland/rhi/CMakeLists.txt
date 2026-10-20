@@ -7,7 +7,7 @@ set(GRASSLAND_LIBS ${GRASSLAND_LIBS} PARENT_SCOPE)
 
 target_include_directories(${GRASSLAND_SUBLIB_NAME} PUBLIC ${LONGMARCH_INCLUDE_DIR})
 
-target_link_libraries(${GRASSLAND_SUBLIB_NAME} PRIVATE grassland_util PUBLIC ${GLFW3_LIB_NAME})
+target_link_libraries(${GRASSLAND_SUBLIB_NAME} PRIVATE grassland_util slang::slang PUBLIC ${GLFW3_LIB_NAME})
 
 add_subdirectory(backend)
 

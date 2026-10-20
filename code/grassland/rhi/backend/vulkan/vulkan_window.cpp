@@ -23,23 +23,33 @@ VulkanWindow::~VulkanWindow() {
     vkDestroySurfaceKHR(device_->Instance(), surface_, nullptr);
 }
 
-bool VulkanWindow::Initialize(const WindowDesc &desc) {
-  if (!device_->SupportsSwapchain()) {
-    ReportError(-1, "VK_KHR_swapchain is unavailable.");
-    return false;
+VulkanWindow *VulkanWindow::Create(VulkanDevice *device, const WindowDesc &desc) {
+  try {
+    auto object = std::unique_ptr<VulkanWindow>(new VulkanWindow(device));
+    if (!object->device_->SupportsSwapchain()) {
+      ReportError(-1, "VK_KHR_swapchain is unavailable.");
+      return nullptr;
+    }
+    if (!object->InitializeWindow(desc))
+      return nullptr;
+    if (!Check(glfwCreateWindowSurface(object->device_->Instance(), object->GLFWWindow(), nullptr, &object->surface_),
+               "glfwCreateWindowSurface"))
+      return nullptr;
+    VkBool32 supported{};
+    if (!Check(vkGetPhysicalDeviceSurfaceSupportKHR(object->device_->NativePhysicalDevice(),
+                                                    object->device_->QueueFamily(), object->surface_, &supported),
+               "Surface queue support") ||
+        !supported) {
+      ReportError(-1, "The graphics queue cannot present to this surface.");
+      return nullptr;
+    }
+    if (!object->RebuildSwapChain())
+      return nullptr;
+    return object.release();
+  } catch (const std::bad_alloc &) {
+    ReportError(-1, "VulkanWindow creation ran out of memory.");
+    return nullptr;
   }
-  if (!InitializeWindow(desc) ||
-      !Check(glfwCreateWindowSurface(device_->Instance(), GLFWWindow(), nullptr, &surface_), "glfwCreateWindowSurface"))
-    return false;
-  VkBool32 supported{};
-  if (!Check(vkGetPhysicalDeviceSurfaceSupportKHR(device_->NativePhysicalDevice(), device_->QueueFamily(), surface_,
-                                                  &supported),
-             "Surface queue support") ||
-      !supported) {
-    ReportError(-1, "The graphics queue cannot present to this surface.");
-    return false;
-  }
-  return RebuildSwapChain();
 }
 
 const void *VulkanWindow::DeviceIdentity() const {
@@ -230,6 +240,8 @@ PresentMode VulkanWindow::GetPresentMode() const {
 }
 
 void VulkanWindow::DestroySwapchain() {
+  for (auto image : images_)
+    device_->RenderTargets().Retire(image);
   // Device idle covers submitted waits; acquisition itself is a presentation-engine operation.
   for (auto &sync : acquire_sync_) {
     if (sync.acquired)
@@ -314,7 +326,7 @@ bool VulkanWindow::RebuildNativeSwapChain(PresentMode requested_mode) {
         std::clamp(static_cast<uint32_t>(height), caps.minImageExtent.height, caps.maxImageExtent.height);
   }
   create.imageArrayLayers = 1;
-  create.imageUsage = VK_IMAGE_USAGE_TRANSFER_DST_BIT;
+  create.imageUsage = VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
   create.imageSharingMode = VK_SHARING_MODE_EXCLUSIVE;
   create.preTransform = caps.currentTransform;
   for (auto alpha : {VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR, VK_COMPOSITE_ALPHA_PRE_MULTIPLIED_BIT_KHR,

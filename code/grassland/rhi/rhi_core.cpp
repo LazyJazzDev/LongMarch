@@ -7,7 +7,7 @@ ICore::~ICore() = default;
 
 ICore *CreateCore(BackendAPI api) {
   try {
-    return backend::CreateCore(api).release();
+    return backend::CreateCore(api);
   } catch (const std::bad_alloc &) {
     return nullptr;
   }

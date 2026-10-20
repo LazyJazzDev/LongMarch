@@ -1,5 +1,6 @@
 ﻿#include "grassland/rhi/backend/metal/metal_command_context.h"
 
+#include "grassland/rhi/backend/metal/metal_program.h"
 #include "grassland/rhi/backend/metal/metal_swap_chain_image.h"
 #include "grassland/rhi/backend/metal/metal_window.h"
 
@@ -8,18 +9,31 @@ namespace grassland::rhi::backend::metal {
 MetalCommandContext::MetalCommandContext(MetalDevice *device) : CommandContext(device), device_(device) {
 }
 
-bool MetalCommandContext::Initialize() {
-  auto pool = NS::TransferPtr(NS::AutoreleasePool::alloc()->init());
-  // Metal command buffers are single-use. The persistent native queue manages
-  // their backing storage; completed buffers cannot be reset like Vulkan/D3D12.
-  commands_ = NS::RetainPtr(device_->NativeQueue()->commandBuffer());
-  if (!commands_)
-    ReportError(-1, "Metal command buffer creation failed.");
-  return bool(commands_);
+MetalCommandContext *MetalCommandContext::Create(MetalDevice *device) {
+  try {
+    auto object = std::unique_ptr<MetalCommandContext>(new MetalCommandContext(device));
+    auto pool = NS::TransferPtr(NS::AutoreleasePool::alloc()->init());
+    // Metal command buffers are single-use. The persistent native queue manages
+    // their backing storage; completed buffers cannot be reset like Vulkan/D3D12.
+    object->commands_ = NS::RetainPtr(object->device_->NativeQueue()->commandBuffer());
+    if (!object->commands_) {
+      ReportError(-1, "Metal command buffer creation failed.");
+      return nullptr;
+    }
+    return object.release();
+  } catch (const std::bad_alloc &) {
+    ReportError(-1, "MetalCommandContext creation ran out of memory.");
+    return nullptr;
+  }
 }
 
 bool MetalCommandContext::CmdClearColor(rhi::IImage *image, const std::array<float, 4> &color) {
 #if !defined(NDEBUG)
+  if (render_target_) {
+    recording_failed_ = true;
+    ReportError(-1, "End rendering before clear, present or submission.");
+    return false;
+  }
   const auto native = dynamic_cast<MetalImage *>(image);
   if (!native || !native->IsValid() || native->DeviceIdentity() != device_) {
     recording_failed_ = true;
@@ -55,6 +69,11 @@ bool MetalCommandContext::CmdClearColor(rhi::IImage *image, const std::array<flo
 
 bool MetalCommandContext::CmdPresent(rhi::IWindow *window) {
 #if !defined(NDEBUG)
+  if (render_target_) {
+    recording_failed_ = true;
+    ReportError(-1, "End rendering before clear, present or submission.");
+    return false;
+  }
   const auto target = dynamic_cast<MetalWindow *>(window);
   if (!target || target->DeviceIdentity() != device_ || !glfw::IsWindowThread()) {
     recording_failed_ = true;
@@ -84,6 +103,13 @@ bool MetalCommandContext::CmdPresent(rhi::IWindow *window) {
 }
 
 bool MetalCommandContext::EndRecording() {
+#if !defined(NDEBUG)
+  if (render_target_) {
+    recording_failed_ = true;
+    ReportError(-1, "End rendering before clear, present or submission.");
+    return false;
+  }
+#endif
   // All encoders end at their Cmd call. Metal tracks texture hazards and layouts
   // automatically; there is no persistent layout to restore between contexts.
   return true;
@@ -133,4 +159,286 @@ SubmissionStatus MetalCommandContext::WaitForProgress() {
   return submission_failed_ ? SUBMISSION_STATUS_FAILED : SUBMISSION_STATUS_COMPLETED;
 }
 
+MetalCommandContext::~MetalCommandContext() {
+  if (encoder_)
+    encoder_->endEncoding();
+}
+
+bool MetalCommandContext::CmdUploadBuffer(IBuffer *buffer, uint64_t offset, const void *data, uint64_t size) {
+#if !defined(NDEBUG)
+  auto native = dynamic_cast<MetalBuffer *>(buffer);
+  if (!native || native->Owner() != device_ || sealed_ || render_target_) {
+    recording_failed_ = true;
+    return false;
+  }
+#else
+  auto native = static_cast<MetalBuffer *>(buffer);
+#endif
+  if (!data || !size || offset > native->GetDesc().size || size > native->GetDesc().size - offset) {
+    recording_failed_ = true;
+    return false;
+  }
+  auto upload = device_->UploadPool().Acquire(size);
+  if (!upload || !upload->Write(data, size)) {
+    recording_failed_ = true;
+    return false;
+  }
+  return CmdCopyBuffer(upload.Get(), 0, native, offset, size);
+}
+
+bool MetalCommandContext::CmdCopyBuffer(IBuffer *source,
+                                        uint64_t source_offset,
+                                        IBuffer *destination,
+                                        uint64_t destination_offset,
+                                        uint64_t size) {
+#if !defined(NDEBUG)
+  auto src = dynamic_cast<MetalBuffer *>(source);
+  auto dst = dynamic_cast<MetalBuffer *>(destination);
+  if (!src || !dst || src->Owner() != device_ || dst->Owner() != device_ || sealed_ || render_target_) {
+    recording_failed_ = true;
+    return false;
+  }
+#else
+  auto src = static_cast<MetalBuffer *>(source);
+  auto dst = static_cast<MetalBuffer *>(destination);
+#endif
+  if (src == dst || !size || source_offset > src->GetDesc().size || size > src->GetDesc().size - source_offset ||
+      destination_offset > dst->GetDesc().size || size > dst->GetDesc().size - destination_offset) {
+    recording_failed_ = true;
+    return false;
+  }
+  if (!RetainResource(src) || !RetainResource(dst))
+    return false;
+  auto pool = NS::TransferPtr(NS::AutoreleasePool::alloc()->init());
+  auto blit = commands_->blitCommandEncoder();
+  if (!blit) {
+    recording_failed_ = true;
+    return false;
+  }
+  blit->copyFromBuffer(src->NativeBuffer(), source_offset, dst->NativeBuffer(), destination_offset, size);
+  blit->endEncoding();
+  return true;
+}
+
+bool MetalCommandContext::CmdBindProgram(IProgram *program) {
+#if !defined(NDEBUG)
+  auto native = dynamic_cast<MetalProgram *>(program);
+  if (!native || native->Owner() != device_ || sealed_) {
+    recording_failed_ = true;
+    return false;
+  }
+#else
+  auto native = static_cast<MetalProgram *>(program);
+#endif
+  if (!RetainResource(native))
+    return false;
+  if (!native->IsFinalized()) {
+    recording_failed_ = true;
+    return false;
+  }
+  try {
+    vertex_buffers_.assign(native->GetDesc().vertex_bindings.size(), {});
+  } catch (const std::bad_alloc &) {
+    recording_failed_ = true;
+    return false;
+  }
+  program_ = native;
+  if (encoder_)
+    encoder_->setRenderPipelineState(program_->NativePipeline());
+  return true;
+}
+
+void MetalCommandContext::ApplyBindings() {
+  if (program_)
+    encoder_->setRenderPipelineState(program_->NativePipeline());
+  for (size_t i = 0; i < vertex_buffers_.size(); ++i)
+    if (vertex_buffers_[i].first)
+      encoder_->setVertexBuffer(vertex_buffers_[i].first->NativeBuffer(), vertex_buffers_[i].second, i);
+  if (viewport_set_)
+    encoder_->setViewport(MTL::Viewport{viewport_.x, viewport_.y, viewport_.width, viewport_.height,
+                                        viewport_.min_depth, viewport_.max_depth});
+  if (scissor_set_)
+    ApplyScissor();
+}
+
+void MetalCommandContext::ApplyScissor() {
+  // Metal requires the native scissor to fit the current attachment. Preserve
+  // the API state and intersect it again when switching to a different target.
+  const auto desc = render_target_->GetDesc();
+  const auto x = std::min<uint64_t>(scissor_.x, desc.width);
+  const auto y = std::min<uint64_t>(scissor_.y, desc.height);
+  const auto right = std::min<uint64_t>(uint64_t(scissor_.x) + scissor_.width, desc.width);
+  const auto bottom = std::min<uint64_t>(uint64_t(scissor_.y) + scissor_.height, desc.height);
+  encoder_->setScissorRect(MTL::ScissorRect{x, y, right - x, bottom - y});
+}
+
+bool MetalCommandContext::CmdBeginRendering(const RenderingInfo &info) {
+#if !defined(NDEBUG)
+  auto native = dynamic_cast<MetalImage *>(info.color_attachment);
+  if (!native || !native->IsValid() || native->DeviceIdentity() != device_ || sealed_ || render_target_ ||
+      info.load_op < ATTACHMENT_LOAD_OP_LOAD || info.load_op > ATTACHMENT_LOAD_OP_DISCARD ||
+      info.store_op < ATTACHMENT_STORE_OP_STORE || info.store_op > ATTACHMENT_STORE_OP_DISCARD) {
+    recording_failed_ = true;
+    return false;
+  }
+#else
+  auto native = static_cast<MetalImage *>(info.color_attachment);
+#endif
+  if (!RetainResource(native))
+    return false;
+  auto pool = NS::TransferPtr(NS::AutoreleasePool::alloc()->init());
+  auto pass = MTL::RenderPassDescriptor::renderPassDescriptor();
+  if (!pass) {
+    recording_failed_ = true;
+    return false;
+  }
+  auto color = pass->colorAttachments()->object(0);
+  color->setTexture(native->NativeImage());
+  const MTL::LoadAction loads[] = {MTL::LoadActionLoad, MTL::LoadActionClear, MTL::LoadActionDontCare};
+  color->setLoadAction(loads[info.load_op]);
+  color->setStoreAction(info.store_op == ATTACHMENT_STORE_OP_STORE ? MTL::StoreActionStore : MTL::StoreActionDontCare);
+  color->setClearColor(
+      MTL::ClearColor::Make(info.clear_color[0], info.clear_color[1], info.clear_color[2], info.clear_color[3]));
+  encoder_ = NS::RetainPtr(commands_->renderCommandEncoder(pass));
+  if (!encoder_) {
+    recording_failed_ = true;
+    return false;
+  }
+  render_target_ = native;
+  ApplyBindings();
+  return true;
+}
+
+bool MetalCommandContext::CmdEndRendering() {
+#if !defined(NDEBUG)
+  if (sealed_ || !render_target_) {
+    recording_failed_ = true;
+    return false;
+  }
+#endif
+  if (recording_failed_)
+    return false;
+  encoder_->endEncoding();
+  encoder_.reset();
+  render_target_ = nullptr;
+  return true;
+}
+
+bool MetalCommandContext::CmdBindVertexBuffer(uint32_t binding, IBuffer *buffer, uint64_t offset) {
+#if !defined(NDEBUG)
+  auto native = dynamic_cast<MetalBuffer *>(buffer);
+  if (!native || native->Owner() != device_ || sealed_) {
+    recording_failed_ = true;
+    return false;
+  }
+#else
+  auto native = static_cast<MetalBuffer *>(buffer);
+#endif
+  if (!RetainResource(native))
+    return false;
+  if (!program_ || binding >= vertex_buffers_.size() || offset >= native->GetDesc().size) {
+    recording_failed_ = true;
+    return false;
+  }
+  vertex_buffers_[binding] = {native, offset};
+  if (encoder_)
+    encoder_->setVertexBuffer(native->NativeBuffer(), offset, binding);
+  return true;
+}
+
+bool MetalCommandContext::CmdBindIndexBuffer(IBuffer *buffer, IndexFormat format, uint64_t offset) {
+#if !defined(NDEBUG)
+  auto native = dynamic_cast<MetalBuffer *>(buffer);
+  if (!native || native->Owner() != device_ || sealed_) {
+    recording_failed_ = true;
+    return false;
+  }
+#else
+  auto native = static_cast<MetalBuffer *>(buffer);
+#endif
+  if (!RetainResource(native))
+    return false;
+  if ((format != INDEX_FORMAT_UINT16 && format != INDEX_FORMAT_UINT32) || offset >= native->GetDesc().size ||
+      offset % (format == INDEX_FORMAT_UINT16 ? 2 : 4)) {
+    recording_failed_ = true;
+    return false;
+  }
+  index_ = native;
+  index_offset_ = offset;
+  index_format_ = format;
+  return true;
+}
+
+bool MetalCommandContext::CmdSetViewport(const Viewport &viewport) {
+#if !defined(NDEBUG)
+  if (sealed_ || viewport.width <= 0 || viewport.height <= 0) {
+    recording_failed_ = true;
+    return false;
+  }
+#endif
+  if (recording_failed_)
+    return false;
+  viewport_ = viewport;
+  viewport_set_ = true;
+  if (encoder_)
+    encoder_->setViewport(
+        MTL::Viewport{viewport.x, viewport.y, viewport.width, viewport.height, viewport.min_depth, viewport.max_depth});
+  return true;
+}
+
+bool MetalCommandContext::CmdSetScissor(const Scissor &scissor) {
+#if !defined(NDEBUG)
+  if (sealed_ || !scissor.width || !scissor.height || scissor.x < 0 || scissor.y < 0) {
+    recording_failed_ = true;
+    return false;
+  }
+#endif
+  if (recording_failed_)
+    return false;
+  scissor_ = scissor;
+  scissor_set_ = true;
+  if (encoder_)
+    ApplyScissor();
+  return true;
+}
+
+bool MetalCommandContext::ValidateDraw(bool indexed) {
+#if !defined(NDEBUG)
+  if (sealed_ || !program_ || !render_target_ || !viewport_set_ || !scissor_set_ || (indexed && !index_)) {
+    recording_failed_ = true;
+    return false;
+  }
+  if (program_->GetDesc().color_format != render_target_->GetDesc().format ||
+      std::any_of(vertex_buffers_.begin(), vertex_buffers_.end(), [](const auto &binding) { return !binding.first; })) {
+    recording_failed_ = true;
+    return false;
+  }
+#endif
+  return !recording_failed_;
+}
+
+bool MetalCommandContext::CmdDraw(uint32_t vertex_count,
+                                  uint32_t instance_count,
+                                  uint32_t first_vertex,
+                                  uint32_t first_instance) {
+  if (!ValidateDraw(false))
+    return false;
+  encoder_->drawPrimitives(MTL::PrimitiveTypeTriangle, first_vertex, vertex_count, instance_count, first_instance);
+  return true;
+}
+
+bool MetalCommandContext::CmdDrawIndexed(uint32_t index_count,
+                                         uint32_t instance_count,
+                                         uint32_t first_index,
+                                         int32_t vertex_offset,
+                                         uint32_t first_instance) {
+  if (!ValidateDraw(true))
+    return false;
+  encoder_->drawIndexedPrimitives(
+      MTL::PrimitiveTypeTriangle, index_count,
+      index_format_ == INDEX_FORMAT_UINT16 ? MTL::IndexTypeUInt16 : MTL::IndexTypeUInt32, index_->NativeBuffer(),
+      index_offset_ + uint64_t(first_index) * (index_format_ == INDEX_FORMAT_UINT16 ? 2 : 4), instance_count,
+      vertex_offset, first_instance);
+  return true;
+}
 }  // namespace grassland::rhi::backend::metal

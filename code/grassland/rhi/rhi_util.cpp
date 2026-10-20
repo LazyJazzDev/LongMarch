@@ -198,4 +198,74 @@ std::string ImageFormatName(ImageFormat value) {
   }
 }
 
+std::string to_string(ShaderStage stage) {
+  switch (stage) {
+    case SHADER_STAGE_VERTEX:
+      return "SHADER_STAGE_VERTEX";
+    case SHADER_STAGE_FRAGMENT:
+      return "SHADER_STAGE_FRAGMENT";
+  }
+  return "UNKNOWN";
+}
+
+uint32_t VertexFormatSize(VertexFormat format) {
+  switch (format) {
+    case VERTEX_FORMAT_FLOAT:
+      return 4;
+    case VERTEX_FORMAT_FLOAT2:
+      return 8;
+    case VERTEX_FORMAT_FLOAT3:
+      return 12;
+    case VERTEX_FORMAT_FLOAT4:
+      return 16;
+  }
+  return 0;
+}
+
+std::string to_string(VertexFormat format) {
+  switch (format) {
+    case VERTEX_FORMAT_FLOAT:
+      return "VERTEX_FORMAT_FLOAT";
+    case VERTEX_FORMAT_FLOAT2:
+      return "VERTEX_FORMAT_FLOAT2";
+    case VERTEX_FORMAT_FLOAT3:
+      return "VERTEX_FORMAT_FLOAT3";
+    case VERTEX_FORMAT_FLOAT4:
+      return "VERTEX_FORMAT_FLOAT4";
+  }
+  return "UNKNOWN";
+}
+
+std::string to_string(AttachmentLoadOp op) {
+  switch (op) {
+    case ATTACHMENT_LOAD_OP_LOAD:
+      return "Load";
+    case ATTACHMENT_LOAD_OP_CLEAR:
+      return "Clear";
+    case ATTACHMENT_LOAD_OP_DISCARD:
+      return "Discard";
+  }
+  return "Unknown";
+}
+
+std::string to_string(AttachmentStoreOp op) {
+  switch (op) {
+    case ATTACHMENT_STORE_OP_STORE:
+      return "Store";
+    case ATTACHMENT_STORE_OP_DISCARD:
+      return "Discard";
+  }
+  return "Unknown";
+}
+
+std::string to_string(IndexFormat format) {
+  switch (format) {
+    case INDEX_FORMAT_UINT16:
+      return "INDEX_FORMAT_UINT16";
+    case INDEX_FORMAT_UINT32:
+      return "INDEX_FORMAT_UINT32";
+  }
+  return "UNKNOWN";
+}
+
 }  // namespace grassland::rhi

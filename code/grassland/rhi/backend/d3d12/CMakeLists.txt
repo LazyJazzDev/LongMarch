@@ -1,5 +1,6 @@
+find_package(D3D12MemoryAllocator CONFIG REQUIRED)
 file(GLOB_RECURSE SOURCES "*.cpp" "*.h")
 target_sources(grassland_rhi PRIVATE ${SOURCES})
-target_link_libraries(grassland_rhi PRIVATE dxgi d3d12 dxguid)
+target_link_libraries(grassland_rhi PRIVATE dxgi d3d12 dxguid GPUOpen::D3D12MemoryAllocator)
 target_compile_definitions(grassland_rhi PRIVATE NOMINMAX WIN32_LEAN_AND_MEAN)
 target_compile_definitions(grassland_rhi PUBLIC LONGMARCH_D3D12_ENABLED)
