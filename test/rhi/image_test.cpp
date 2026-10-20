@@ -10,6 +10,7 @@
 #if defined(LONGMARCH_METAL_ENABLED)
 #include "grassland/rhi/backend/metal/metal_device.h"
 #include "grassland/rhi/backend/metal/metal_image.h"
+#include "grassland/rhi/backend/metal/metal_util.h"
 #endif
 #if defined(LONGMARCH_D3D12_ENABLED)
 #include <d3d12sdklayers.h>
@@ -238,8 +239,6 @@ TEST_P(RhiImage, StorageUsageFollowsNativeFormatSupport) {
   ASSERT_TRUE(core);
   ObjPtr<IDevice> device = core->CreateDeviceByAutoSelection();
   ASSERT_TRUE(device);
-  if (GetParam() == BACKEND_API_METAL)
-    GTEST_SKIP() << "Metal binding groups are not implemented.";
   for (auto format :
        {IMAGE_FORMAT_RGBA8_UNORM, IMAGE_FORMAT_BGRA8_UNORM, IMAGE_FORMAT_D32_FLOAT, IMAGE_FORMAT_D24_UNORM_S8_UINT}) {
     ObjPtr<IImage> image = device->CreateImage({16, 16, format});
@@ -258,6 +257,12 @@ TEST_P(RhiImage, StorageUsageFollowsNativeFormatSupport) {
       auto owner = static_cast<backend::vulkan::VulkanDevice *>(device.Get());
       supported = backend::vulkan::SupportsImageStorage(owner->NativePhysicalDevice(), format);
       EXPECT_FALSE(backend::vulkan::SupportsImageStorage(owner->NativePhysicalDevice(), IMAGE_FORMAT_UNKNOWN));
+    }
+#endif
+#if defined(LONGMARCH_METAL_ENABLED)
+    if (GetParam() == BACKEND_API_METAL) {
+      supported = backend::metal::SupportsImageStorage(format);
+      EXPECT_FALSE(backend::metal::SupportsImageStorage(IMAGE_FORMAT_UNKNOWN));
     }
 #endif
     EXPECT_EQ(native->SupportsStorage(), supported);
@@ -405,8 +410,6 @@ TEST_P(RhiImage, IndexedInstancedAttributesAndOffsetsProduceExpectedPixels) {
 }
 
 TEST_P(RhiImage, MultipleTargetsAndDepthRejectOccludedFragments) {
-  if (GetParam() == BACKEND_API_METAL)
-    GTEST_SKIP() << "Metal implementation is deferred.";
   ObjPtr<ICore> core = CreateCore(GetParam());
   ASSERT_TRUE(core);
   ObjPtr<IDevice> device = core->CreateDeviceByAutoSelection();
@@ -464,8 +467,6 @@ TEST_P(RhiImage, MultipleTargetsAndDepthRejectOccludedFragments) {
 }
 
 TEST_P(RhiImage, BindingVersionsPreserveRangesAndArraysAcrossHeapPages) {
-  if (GetParam() == BACKEND_API_METAL)
-    GTEST_SKIP() << "Metal implementation is deferred.";
   ObjPtr<ICore> core = CreateCore(GetParam());
   ASSERT_TRUE(core);
   ObjPtr<IDevice> device = core->CreateDeviceByAutoSelection();
@@ -625,6 +626,23 @@ TEST_P(RhiImage, BindingVersionsPreserveRangesAndArraysAcrossHeapPages) {
     ASSERT_EQ(vkQueueSubmit(native->NativeQueue(), 1, &submit, VK_NULL_HANDLE), VK_SUCCESS);
   }
 #endif
+#if defined(LONGMARCH_METAL_ENABLED)
+  if (GetParam() == BACKEND_API_METAL) {
+    auto native = static_cast<backend::metal::MetalDevice *>(device.Get());
+    auto pool = NS::TransferPtr(NS::AutoreleasePool::alloc()->init());
+    auto event = NS::TransferPtr(native->NativeDevice()->newSharedEvent());
+    ASSERT_TRUE(event);
+    gate = std::shared_ptr<void>(native, [native, event](void *) {
+      event->setSignaledValue(1);
+      std::lock_guard<std::mutex> lock(native->QueueMutex());
+      EXPECT_TRUE(native->WaitIdle());
+    });
+    std::lock_guard<std::mutex> lock(native->QueueMutex());
+    auto blocker = native->NativeQueue()->commandBuffer();
+    blocker->encodeWait(event.get(), 1);
+    blocker->commit();
+  }
+#endif
   ObjPtr<ISubmissionToken> done = queue->Submit(commands.Get());
   ASSERT_TRUE(done);
   EXPECT_EQ(done->GetStatus(), SUBMISSION_STATUS_PENDING);
@@ -656,8 +674,6 @@ TEST_P(RhiImage, BindingVersionsPreserveRangesAndArraysAcrossHeapPages) {
 }
 
 TEST_P(RhiImage, ExplicitStructuredStrideReadsSecondCompactElement) {
-  if (GetParam() == BACKEND_API_METAL)
-    GTEST_SKIP() << "Metal bindings are deferred.";
   ObjPtr<ICore> core = CreateCore(GetParam());
   ASSERT_TRUE(core);
   ObjPtr<IDevice> device = core->CreateDeviceByAutoSelection();
@@ -727,8 +743,6 @@ TEST_P(RhiImage, ExplicitStructuredStrideReadsSecondCompactElement) {
 }
 
 TEST_P(RhiImage, StructuredNestedArraysUseSameCppLayout) {
-  if (GetParam() == BACKEND_API_METAL)
-    GTEST_SKIP() << "Metal bindings are deferred.";
   ObjPtr<ICore> core = CreateCore(GetParam());
   ASSERT_TRUE(core);
   ObjPtr<IDevice> device = core->CreateDeviceByAutoSelection();
@@ -806,8 +820,6 @@ TEST_P(RhiImage, StructuredNestedArraysUseSameCppLayout) {
 }
 
 TEST_P(RhiImage, StorageImageAndBufferBecomeReadableAfterRendering) {
-  if (GetParam() == BACKEND_API_METAL)
-    GTEST_SKIP() << "Metal implementation is deferred.";
   ObjPtr<ICore> core = CreateCore(GetParam());
   ASSERT_TRUE(core);
   ObjPtr<IDevice> device = core->CreateDeviceByAutoSelection();
@@ -886,8 +898,6 @@ TEST_P(RhiImage, StorageImageAndBufferBecomeReadableAfterRendering) {
 }
 
 TEST_P(RhiImage, RawBufferWritesBecomeReadableAfterRendering) {
-  if (GetParam() == BACKEND_API_METAL)
-    GTEST_SKIP() << "Metal implementation is deferred.";
   ObjPtr<ICore> core = CreateCore(GetParam());
   ASSERT_TRUE(core);
   ObjPtr<IDevice> device = core->CreateDeviceByAutoSelection();
@@ -965,9 +975,75 @@ TEST_P(RhiImage, RawBufferWritesBecomeReadableAfterRendering) {
   EXPECT_EQ(pixel, (std::array<uint8_t, 4>{255, 0, 255, 255}));
 }
 
+TEST_P(RhiImage, BindingArraysExposeCapturedBufferViewLengths) {
+  ObjPtr<ICore> core = CreateCore(GetParam());
+  ASSERT_TRUE(core);
+  ObjPtr<IDevice> device = core->CreateDeviceByAutoSelection();
+  ASSERT_TRUE(device);
+  Track(device.Get());
+  ObjPtr<IQueue> queue = device->GetQueue(QUEUE_TYPE_GRAPHICS);
+  ObjPtr<IImage> target = device->CreateImage({8, 8, IMAGE_FORMAT_RGBA8_UNORM});
+  ObjPtr<IBuffer> buffer = device->CreateBuffer({1024});
+  ASSERT_TRUE(buffer && target && queue);
+  const std::string source = R"(
+    struct Color {float4 value;};
+    RHI_UNIFORM_ARRAY(0,7,Color,colors);
+    RHI_STRUCTURED_BUFFER_ARRAY(0,2,float4,structured);
+    RHI_BYTE_ADDRESS_BUFFER_ARRAY(0,9,raw);
+    float4 VSMain(uint id:SV_VertexID):SV_Position {
+      float2 p[3]={float2(-1,-1),float2(3,-1),float2(-1,3)};
+      return float4(p[id],colors[0].value.x,1);
+    }
+    float4 PSMain():SV_Target0 {
+      uint n0,s0,n1,s1,b0,b1;
+      structured[0].GetDimensions(n0,s0); structured[1].GetDimensions(n1,s1);
+      raw[0].GetDimensions(b0);raw[1].GetDimensions(b1);
+      return n0==1 && n1==2 && s0==16 && s1==16 && b0==4 && b1==8 ? colors[1].value : float4(0,1,0,1);
+    }
+  )";
+  ObjPtr<IShader> vs = device->CreateShader({source, "VSMain", SHADER_STAGE_VERTEX});
+  ObjPtr<IShader> ps = device->CreateShader({source, "PSMain", SHADER_STAGE_FRAGMENT});
+  ProgramDesc desc;
+  desc.vertex_shader = vs.Get();
+  desc.fragment_shader = ps.Get();
+  desc.pipeline_layout.groups = {{{{7, BINDING_UNIFORM_BUFFER, 2},
+                                   {2, BINDING_STRUCTURED_BUFFER, 2, SHADER_VISIBILITY_FRAGMENT, 16},
+                                   {9, BINDING_BYTE_ADDRESS_BUFFER, 2, SHADER_VISIBILITY_FRAGMENT}}}};
+  ObjPtr<IProgram> program = device->CreateProgram(desc);
+  ASSERT_TRUE(program);
+  ASSERT_TRUE(program->Finalize());
+  ObjPtr<IBindingGroup> group = device->CreateBindingGroup(desc.pipeline_layout.groups[0]);
+  ASSERT_TRUE(group);
+  ASSERT_TRUE(group->BindResource(7, std::vector<BufferView>{{buffer.Get(), 0, 256}, {buffer.Get(), 256, 256}}));
+  ASSERT_TRUE(group->BindResource(2, std::vector<BufferView>{{buffer.Get(), 512, 16}, {buffer.Get(), 528, 32}}));
+  ASSERT_TRUE(group->BindResource(9, std::vector<BufferView>{{buffer.Get(), 768, 4}, {buffer.Get(), 784, 8}}));
+  std::array<float, 256> data{};
+  data[64] = data[67] = 1;
+  ObjPtr<ICommandContext> commands = device->CreateCommandContext();
+  ASSERT_TRUE(commands);
+  ASSERT_TRUE(commands->CmdUploadBuffer(buffer.Get(), 0, data.data(), sizeof(data)));
+  ASSERT_TRUE(commands->CmdBindProgram(program.Get()));
+  ASSERT_TRUE(commands->CmdBindGroup(0, group.Get()));
+  // Both the size table and uniform array must remain those captured at BindGroup.
+  ASSERT_TRUE(group->BindResource(2, std::vector<BufferView>{{buffer.Get(), 512, 32}, {buffer.Get(), 528, 16}}));
+  ASSERT_TRUE(group->BindResource(9, std::vector<BufferView>{{buffer.Get(), 768, 8}, {buffer.Get(), 784, 4}}));
+  ASSERT_TRUE(group->BindResource(7, std::vector<BufferView>{{buffer.Get(), 256, 256}, {buffer.Get(), 0, 256}}));
+  group.Release();
+  ASSERT_TRUE(commands->CmdBeginRendering(
+      {{{target.Get(), ATTACHMENT_LOAD_OP_CLEAR, ATTACHMENT_STORE_OP_STORE, {0, 0, 0, 1}}}}));
+  ASSERT_TRUE(commands->CmdSetViewport({0, 0, 8, 8, 0, 1}));
+  ASSERT_TRUE(commands->CmdSetScissor({0, 0, 8, 8}));
+  ASSERT_TRUE(commands->CmdDraw(3));
+  ASSERT_TRUE(commands->CmdEndRendering());
+  ObjPtr<ISubmissionToken> done = queue->Submit(commands.Get());
+  ASSERT_TRUE(done);
+  ASSERT_TRUE(done->WaitHost());
+  std::array<uint8_t, 4> pixel{};
+  ReadPixel(device.Get(), target.Get(), GetParam(), 4, 4, pixel);
+  EXPECT_EQ(pixel, (std::array<uint8_t, 4>{255, 0, 0, 255}));
+}
+
 TEST_P(RhiImage, StencilSurvivesDepthOnlyPassAndMasksColorPass) {
-  if (GetParam() == BACKEND_API_METAL)
-    GTEST_SKIP() << "Metal implementation is deferred.";
   ObjPtr<ICore> core = CreateCore(GetParam());
   ASSERT_TRUE(core);
   ObjPtr<IDevice> device = core->CreateDeviceByAutoSelection();

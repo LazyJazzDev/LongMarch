@@ -273,8 +273,6 @@ static const BackendAPI program_backends[] = {
 };
 
 TEST_P(RhiProgram, BindingLayoutRejectsIncorrectStageTypeCountAndRange) {
-  if (GetParam() == BACKEND_API_METAL)
-    GTEST_SKIP() << "Metal implementation is deferred.";
   ObjPtr<ICore> core = CreateCore(GetParam());
   ASSERT_TRUE(core);
   ObjPtr<IDevice> device = core->CreateDeviceByAutoSelection();
@@ -334,8 +332,6 @@ TEST_P(RhiProgram, BindingLayoutRejectsIncorrectStageTypeCountAndRange) {
 }
 
 TEST_P(RhiProgram, BindingUpdatesAreTransactionalAndForkOnlyCapturedVersions) {
-  if (GetParam() == BACKEND_API_METAL)
-    GTEST_SKIP() << "Metal bindings are deferred.";
   ObjPtr<ICore> core = CreateCore(GetParam());
   ASSERT_TRUE(core);
   ObjPtr<IDevice> device = core->CreateDeviceByAutoSelection();
@@ -409,8 +405,6 @@ TEST_P(RhiProgram, BindingUpdatesAreTransactionalAndForkOnlyCapturedVersions) {
 }
 
 TEST_P(RhiProgram, TypedBindingArraysPreserveSparseVersionsAndPartialUpdates) {
-  if (GetParam() == BACKEND_API_METAL)
-    GTEST_SKIP() << "Metal bindings are deferred.";
   ObjPtr<ICore> core = CreateCore(GetParam());
   ASSERT_TRUE(core);
   ObjPtr<IDevice> device = core->CreateDeviceByAutoSelection();
@@ -464,8 +458,6 @@ TEST_P(RhiProgram, TypedBindingArraysPreserveSparseVersionsAndPartialUpdates) {
 }
 
 TEST_P(RhiProgram, StructuredStridesMustMatchExplicitLayoutAcrossStages) {
-  if (GetParam() == BACKEND_API_METAL)
-    GTEST_SKIP() << "Metal bindings are deferred.";
   ObjPtr<ICore> core = CreateCore(GetParam());
   ASSERT_TRUE(core);
   ObjPtr<IDevice> device = core->CreateDeviceByAutoSelection();
@@ -531,8 +523,6 @@ TEST_P(RhiProgram, StructuredStridesMustMatchExplicitLayoutAcrossStages) {
 }
 
 TEST_P(RhiProgram, StructuredLayoutStrideControlsCompatibilityAndRanges) {
-  if (GetParam() == BACKEND_API_METAL)
-    GTEST_SKIP() << "Metal bindings are deferred.";
   ObjPtr<ICore> core = CreateCore(GetParam());
   ASSERT_TRUE(core);
   ObjPtr<IDevice> device = core->CreateDeviceByAutoSelection();

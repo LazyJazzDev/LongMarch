@@ -3,4 +3,5 @@ target_sources(grassland_rhi PRIVATE ${SOURCES})
 target_include_directories(grassland_rhi PRIVATE ${LONGMARCH_METAL_CPP_DIR})
 target_compile_definitions(grassland_rhi PUBLIC LONGMARCH_METAL_ENABLED)
 target_link_libraries(grassland_rhi PRIVATE
+        spirv-cross-msl spirv-cross-glsl spirv-cross-core
         "-framework Metal" "-framework Foundation" "-framework QuartzCore" "-framework Cocoa")

@@ -1,5 +1,6 @@
 ﻿#pragma once
 #include "grassland/rhi/backend/backend_command_context.h"
+#include "grassland/rhi/backend/metal/metal_binding_group.h"
 #include "grassland/rhi/backend/metal/metal_device.h"
 
 namespace grassland::rhi::backend::metal {
@@ -20,6 +21,8 @@ class MetalCommandContext final : public CommandContext {
                      uint64_t destination_offset,
                      uint64_t size) override;
   bool CmdBindProgram(IProgram *program) override;
+  bool CmdBindGroup(uint32_t index, IBindingGroup *group) override;
+  bool CmdUploadImage(IImage *image, const void *data, uint64_t row_pitch) override;
   bool CmdBeginRendering(const RenderingInfo &info) override;
   bool CmdEndRendering() override;
   bool CmdBindVertexBuffer(uint32_t binding, IBuffer *buffer, uint64_t offset = 0) override;
@@ -49,6 +52,10 @@ class MetalCommandContext final : public CommandContext {
   bool ValidateDraw(bool indexed);
   MetalProgram *program_{};
   MetalImage *render_target_{};
+  std::vector<ImageFormat> color_formats_;
+  std::vector<IImage *> color_targets_;
+  ImageFormat depth_format_{IMAGE_FORMAT_UNKNOWN};
+  std::vector<MetalBindingGroup::Version *> groups_;
   NS::SharedPtr<MTL::RenderCommandEncoder> encoder_;
   std::vector<std::pair<MetalBuffer *, uint64_t>> vertex_buffers_;
   MetalBuffer *index_{};
