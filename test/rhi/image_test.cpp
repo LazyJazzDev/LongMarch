@@ -482,11 +482,12 @@ TEST_P(RhiImage, BindingVersionsPreserveRangesAndArraysAcrossHeapPages) {
     RHI_UNIFORM(0,3,Selection,selection);
     RHI_TEXTURE2D_ARRAY(1,7,float4,textures);
     RHI_SAMPLER(1,9,nearestSampler);
+    RHI_SAMPLER(2,1,changingSampler);
     RHI_STRUCTURED_BUFFER_ARRAY(1,11,float4,factors);
     float4 VSMain(uint id:SV_VertexID):SV_Position {
       float2 positions[3]={float2(-1,-1),float2(3,-1),float2(-1,3)};return float4(positions[id],0,1);
     }
-    float4 PSMain():SV_Target0 {return (selection.textureIndex==0?textures[0].Sample(nearestSampler,float2(.5,.5)):textures[1].Sample(nearestSampler,float2(.5,.5)))*factors[1][0];}
+    float4 PSMain():SV_Target0 {return (selection.textureIndex==0?textures[0].Sample(nearestSampler,float2(.5,.5)):textures[1].Sample(changingSampler,float2(.5,.5)))*factors[1][0];}
   )";
   ObjPtr<IShader> vs = device->CreateShader({source, "VSMain", SHADER_STAGE_VERTEX});
   ObjPtr<IShader> ps = device->CreateShader({source, "PSMain", SHADER_STAGE_FRAGMENT});
@@ -496,12 +497,15 @@ TEST_P(RhiImage, BindingVersionsPreserveRangesAndArraysAcrossHeapPages) {
   desc.pipeline_layout.groups = {{{{3, BINDING_UNIFORM_BUFFER, 1, SHADER_VISIBILITY_FRAGMENT}}},
                                  {{{7, BINDING_TEXTURE2D, 2, SHADER_VISIBILITY_FRAGMENT},
                                    {9, BINDING_SAMPLER, 1, SHADER_VISIBILITY_FRAGMENT},
-                                   {11, BINDING_STORAGE_BUFFER, 2, SHADER_VISIBILITY_FRAGMENT}}}};
+                                   {11, BINDING_STORAGE_BUFFER, 2, SHADER_VISIBILITY_FRAGMENT}}},
+                                 {{{1, BINDING_SAMPLER, 1, SHADER_VISIBILITY_FRAGMENT}}}};
   ObjPtr<IProgram> program = device->CreateProgram(desc);
   ASSERT_TRUE(program);
   ASSERT_TRUE(program->Finalize());
   ObjPtr<IBindingGroup> selection = device->CreateBindingGroup(desc.pipeline_layout.groups[0]);
   ObjPtr<IBindingGroup> material = device->CreateBindingGroup(desc.pipeline_layout.groups[1]);
+  ObjPtr<IBindingGroup> sampling = device->CreateBindingGroup(desc.pipeline_layout.groups[2]);
+  ASSERT_TRUE(sampling);
   ASSERT_TRUE(selection);
   ASSERT_TRUE(material);
   ASSERT_TRUE(material->BindResource(7, std::vector<IImage *>{red.Get(), green.Get()}));
@@ -525,17 +529,35 @@ TEST_P(RhiImage, BindingVersionsPreserveRangesAndArraysAcrossHeapPages) {
   ASSERT_TRUE(commands->CmdBeginRendering(
       {{{target.Get(), ATTACHMENT_LOAD_OP_CLEAR, ATTACHMENT_STORE_OP_STORE, {0, 0, 0, 1}}}}));
   ASSERT_TRUE(commands->CmdSetViewport({0, 0, 64, 64, 0, 1}));
-  // Exceeds both resource/sampler page capacities. Previous draw tables must stay alive.
-  for (int i = 0; i < 1100; ++i) {
+  // Resource-only and sampler-only groups change independently. The material
+  // stays bound across both page rollovers and must be migrated from its old version.
+  const int draws = GetParam() == BACKEND_API_D3D12 ? 4200 : 1100;
+  for (int i = 0; i < draws; ++i) {
+    if (i < 300) {
+      SamplerDesc sampler;
+      sampler.filter = i % 2 ? SAMPLER_FILTER_LINEAR : SAMPLER_FILTER_NEAREST;
+      ASSERT_TRUE(sampling->BindResource(1, sampler));
+      ASSERT_TRUE(commands->CmdBindGroup(2, sampling.Get()));
+    }
     ASSERT_TRUE(selection->BindResource(3, BufferView{uniform.Get(), uint64_t(i % 2 ? 256 : 0), 256}));
     ASSERT_TRUE(commands->CmdBindGroup(0, selection.Get()));
     // D3D12 builds tables at Draw, but must use the version captured at BindGroup.
-    if (i != 1099)
+    if (i != draws - 1)
       ASSERT_TRUE(selection->BindResource(3, BufferView{uniform.Get(), uint64_t(i % 2 ? 0 : 256), 256}));
     ASSERT_TRUE(commands->CmdSetScissor({i % 2 ? 32 : 0, 0, 32, 64}));
     ASSERT_TRUE(commands->CmdDraw(3));
   }
+#if defined(LONGMARCH_D3D12_ENABLED)
+  if (GetParam() == BACKEND_API_D3D12) {
+    auto native = static_cast<backend::d3d12::D3D12Device *>(device.Get());
+    // Append-only copies consume two pages of each type, not one full set of
+    // all bound descriptors for every draw. Old pages remain live until completion.
+    EXPECT_EQ(native->ResourceDescriptors().GetPageCounts().second, 2u);
+    EXPECT_EQ(native->SamplerDescriptors().GetPageCounts().second, 2u);
+  }
+#endif
   ASSERT_TRUE(commands->CmdEndRendering());
+  sampling.Release();
   material.Release();
   factors.Release();
   red.Release();

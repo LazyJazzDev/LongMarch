@@ -117,6 +117,14 @@ ID3D12Device *D3D12Device::NativeDevice() const {
   return device_.Get();
 }
 
+D3D12DescriptorPool &D3D12Device::ResourceDescriptorStorage() {
+  return resource_descriptor_storage_;
+}
+
+D3D12DescriptorPool &D3D12Device::SamplerDescriptorStorage() {
+  return sampler_descriptor_storage_;
+}
+
 IDXGIFactory4 *D3D12Device::Factory() const {
   return factory_.Get();
 }
@@ -169,7 +177,9 @@ D3D12Device::D3D12Device(PhysicalDevice info, Core *core, ComPtr<ID3D12Device> d
       rtv_pool_(device_.Get()),
       dsv_pool_(device_.Get(), D3D12_DESCRIPTOR_HEAP_TYPE_DSV),
       resource_descriptors_(device_.Get(), D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV, true, 4096),
-      sampler_descriptors_(device_.Get(), D3D12_DESCRIPTOR_HEAP_TYPE_SAMPLER, true, 256) {
+      sampler_descriptors_(device_.Get(), D3D12_DESCRIPTOR_HEAP_TYPE_SAMPLER, true, 256),
+      resource_descriptor_storage_(device_.Get(), D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV, false, 4096),
+      sampler_descriptor_storage_(device_.Get(), D3D12_DESCRIPTOR_HEAP_TYPE_SAMPLER, false, 256) {
 }
 
 D3D12Device::~D3D12Device() {

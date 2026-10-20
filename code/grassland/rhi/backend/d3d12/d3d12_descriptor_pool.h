@@ -43,6 +43,8 @@ class D3D12DescriptorPool {
                       bool shader_visible = false,
                       uint32_t page_capacity = 256);
   ObjectPtr<Lease> Acquire(uint32_t count);
+  // Reserve a page-sized append region for one command context.
+  ObjectPtr<Lease> AcquirePage(uint32_t minimum_count);
   // Explicit trimming never invalidates a live lease.
   void Clear();
   std::pair<size_t, size_t> GetPageCounts() const;

@@ -335,12 +335,12 @@ bool D3D12CommandContext::CmdBindProgram(IProgram *program) {
     return false;
   }
   try {
-    groups_.assign(native->GetDesc().pipeline_layout.groups.size(), nullptr);
+    groups_.assign(native->GetDesc().pipeline_layout.groups.size(), {});
   } catch (const std::bad_alloc &) {
     recording_failed_ = true;
     return false;
   }
-  groups_dirty_ = true;
+  tables_dirty_ = true;
   program_ = native;
   list_->OMSetStencilRef(native->GetDesc().depth_stencil.stencil_reference);
   list_->SetPipelineState(native->NativePipeline());
@@ -589,160 +589,155 @@ bool D3D12CommandContext::PrepareDrawBuffers(bool indexed) {
 }
 
 bool D3D12CommandContext::CmdBindGroup(uint32_t index, IBindingGroup *group) {
-  auto native = dynamic_cast<BindingGroup *>(group);
+  auto native = dynamic_cast<D3D12BindingGroup *>(group);
   if (sealed_ || !program_ || !native || native->Owner() != device_ || index >= groups_.size() ||
       !SameBindingLayout(program_->GetDesc().pipeline_layout.groups[index], group->GetLayout()) ||
       !native->CurrentVersion()->IsComplete()) {
     recording_failed_ = true;
     return false;
   }
-  auto version = native->CurrentVersion();
-  for (const auto &resource : version->GetResources()) {
-    auto stride = program_->StructuredBufferStride(index, resource.binding);
-    if (stride && (resource.offset % stride || resource.size % stride || resource.size / stride > UINT32_MAX)) {
+  try {
+    auto version = static_cast<D3D12BindingGroup::Version *>(native->CurrentVersion());
+    auto resources = version->ResourceDescriptors(program_, index);
+    if (version->ResourceCount() && !resources) {
       recording_failed_ = true;
       return false;
     }
-  }
-  if (!RetainResource(version))
+    if (!RetainResource(version))
+      return false;
+    auto &bound = groups_[index];
+    std::array<D3D12DescriptorPool::Lease *, 2> sources{resources, version->SamplerDescriptors()};
+    for (size_t kind = 0; kind < sources.size(); ++kind) {
+      if (bound.sources[kind] != sources[kind]) {
+        bound.sources[kind] = sources[kind];
+        bound.dirty[kind] = true;
+        tables_dirty_ = true;
+      }
+    }
+    bound.version = version;
+    return true;
+  } catch (const std::bad_alloc &) {
+    recording_failed_ = true;
     return false;
-  groups_[index] = version;
-  groups_dirty_ = true;
-  return true;
+  }
 }
 
 bool D3D12CommandContext::PrepareGroups() {
   try {
-    const auto mappings = MapBindings(program_->GetDesc().pipeline_layout, BACKEND_API_D3D12);
-    for (size_t i = 0; i < groups_.size(); ++i)
-      if (!groups_[i] && !program_->GetDesc().pipeline_layout.groups[i].bindings.empty()) {
-        recording_failed_ = true;
-        return false;
-      }
-    uint32_t resource_count = 0, sampler_count = 0;
-    for (auto m : mappings)
-      (m.desc.type == BINDING_SAMPLER ? sampler_count : resource_count) += m.desc.count;
-    auto resources = groups_dirty_ && resource_count ? device_->ResourceDescriptors().Acquire(resource_count)
-                                                     : ObjectPtr<D3D12DescriptorPool::Lease>{};
-    auto samplers = groups_dirty_ && sampler_count ? device_->SamplerDescriptors().Acquire(sampler_count)
-                                                   : ObjectPtr<D3D12DescriptorPool::Lease>{};
-    if (groups_dirty_ && ((resource_count && (!resources || !RetainResource(resources.Get()))) ||
-                          (sampler_count && (!samplers || !RetainResource(samplers.Get()))))) {
-      recording_failed_ = true;
-      return false;
-    }
-    uint32_t r = 0, s = 0;
-    std::vector<std::array<uint32_t, 2>> starts(groups_.size());
-    for (uint32_t g = 0; g < groups_.size(); ++g) {
-      starts[g] = {r, s};
-      if (!groups_[g])
+    for (size_t i = 0; i < groups_.size(); ++i) {
+      const auto version = groups_[i].version;
+      if (!version) {
+        if (!program_->GetDesc().pipeline_layout.groups[i].bindings.empty()) {
+          recording_failed_ = true;
+          return false;
+        }
         continue;
-      for (auto m : mappings)
-        if (m.group == g)
-          for (auto e : groups_[g]->GetResources())
-            if (e.binding == m.desc.binding) {
-              auto type = m.desc.type;
-              const auto stride = program_->StructuredBufferStride(g, e.binding);
-              D3D12_CPU_DESCRIPTOR_HANDLE handle{};
-              if (groups_dirty_)
-                handle = type == BINDING_SAMPLER ? samplers->CPU(s++) : resources->CPU(r++);
-              if (type <= BINDING_RW_STORAGE_BUFFER) {
-                auto buffer = static_cast<D3D12Buffer *>(e.buffer);
-                if (!TransitionResource(buffer->NativeBuffer(),
-                                        type == BINDING_RW_STORAGE_BUFFER ? D3D12_RESOURCE_STATE_UNORDERED_ACCESS
-                                                                          : D3D12_RESOURCE_STATE_GENERIC_READ,
-                                        buffer->DefaultState()))
-                  return false;
-                if (type == BINDING_UNIFORM_BUFFER) {
-                  auto size = (e.size + 255) & ~uint64_t(255);
-                  if (e.offset % 256 || size > 65536 || size > buffer->GetDesc().size - e.offset) {
-                    recording_failed_ = true;
-                    return false;
-                  }
-                  D3D12_CONSTANT_BUFFER_VIEW_DESC desc{buffer->NativeBuffer()->GetGPUVirtualAddress() + e.offset,
-                                                       UINT(size)};
-                  if (groups_dirty_)
-                    device_->NativeDevice()->CreateConstantBufferView(&desc, handle);
-                } else if (type == BINDING_STORAGE_BUFFER) {
-                  D3D12_SHADER_RESOURCE_VIEW_DESC desc{};
-                  desc.ViewDimension = D3D12_SRV_DIMENSION_BUFFER;
-                  desc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
-                  desc.Buffer.FirstElement = stride ? e.offset / stride : 0;
-                  desc.Buffer.NumElements = stride ? UINT(e.size / stride) : 1;
-                  // An optimized-out binding has no reflected stride; use a valid null descriptor.
-                  desc.Buffer.StructureByteStride = stride ? stride : 4;
-                  if (groups_dirty_)
-                    device_->NativeDevice()->CreateShaderResourceView(stride ? buffer->NativeBuffer() : nullptr, &desc,
-                                                                      handle);
-                } else {
-                  D3D12_UNORDERED_ACCESS_VIEW_DESC desc{};
-                  desc.ViewDimension = D3D12_UAV_DIMENSION_BUFFER;
-                  desc.Buffer.FirstElement = stride ? e.offset / stride : 0;
-                  desc.Buffer.NumElements = stride ? UINT(e.size / stride) : 1;
-                  // An optimized-out binding has no reflected stride; use a valid null descriptor.
-                  desc.Buffer.StructureByteStride = stride ? stride : 4;
-                  if (groups_dirty_)
-                    device_->NativeDevice()->CreateUnorderedAccessView(stride ? buffer->NativeBuffer() : nullptr,
-                                                                       nullptr, &desc, handle);
-                  D3D12_RESOURCE_BARRIER barrier{};
-                  barrier.Type = D3D12_RESOURCE_BARRIER_TYPE_UAV;
-                  barrier.UAV.pResource = buffer->NativeBuffer();
-                  list_->ResourceBarrier(1, &barrier);
-                }
-              } else if (type == BINDING_TEXTURE2D || type == BINDING_RW_TEXTURE2D) {
-                auto image = static_cast<D3D12Image *>(e.image);
-                for (auto color : rendering_.color_attachments)
-                  if (color.color_attachment == e.image) {
-                    recording_failed_ = true;
-                    return false;
-                  }
-                if (!TransitionResource(image->NativeImage(),
-                                        type == BINDING_TEXTURE2D ? D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE |
-                                                                        D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE
-                                                                  : D3D12_RESOURCE_STATE_UNORDERED_ACCESS,
-                                        image->DefaultState()))
-                  return false;
-                if (groups_dirty_) {
-                  if (type == BINDING_TEXTURE2D)
-                    device_->NativeDevice()->CreateShaderResourceView(image->NativeImage(), nullptr, handle);
-                  else
-                    device_->NativeDevice()->CreateUnorderedAccessView(image->NativeImage(), nullptr, nullptr, handle);
-                }
-              } else if (groups_dirty_) {
-                D3D12_SAMPLER_DESC desc{};
-                desc.Filter = e.sampler.filter == SAMPLER_FILTER_LINEAR ? D3D12_FILTER_MIN_MAG_MIP_LINEAR
-                                                                        : D3D12_FILTER_MIN_MAG_MIP_POINT;
-                const D3D12_TEXTURE_ADDRESS_MODE modes[] = {D3D12_TEXTURE_ADDRESS_MODE_WRAP,
-                                                            D3D12_TEXTURE_ADDRESS_MODE_CLAMP,
-                                                            D3D12_TEXTURE_ADDRESS_MODE_MIRROR};
-                desc.AddressU = modes[e.sampler.address_u];
-                desc.AddressV = modes[e.sampler.address_v];
-                desc.AddressW = desc.AddressV;
-                desc.MaxLOD = D3D12_FLOAT32_MAX;
-                desc.ComparisonFunc = D3D12_COMPARISON_FUNC_ALWAYS;
-                desc.MaxAnisotropy = 1;
-                device_->NativeDevice()->CreateSampler(&desc, handle);
+      }
+      size_t entry = 0;
+      for (auto binding : version->GetLayout().bindings)
+        for (uint32_t j = 0; j < binding.count; ++j) {
+          const auto &e = version->GetResources()[entry++];
+          auto type = binding.type;
+          ID3D12Resource *resource = nullptr;
+          if (e.buffer) {
+            auto buffer = static_cast<D3D12Buffer *>(e.buffer);
+            resource = buffer->NativeBuffer();
+            if (!TransitionResource(resource,
+                                    type == BINDING_RW_STORAGE_BUFFER ? D3D12_RESOURCE_STATE_UNORDERED_ACCESS
+                                                                      : D3D12_RESOURCE_STATE_GENERIC_READ,
+                                    buffer->DefaultState()))
+              return false;
+          } else if (e.image) {
+            auto image = static_cast<D3D12Image *>(e.image);
+            resource = image->NativeImage();
+            for (auto color : rendering_.color_attachments)
+              if (color.color_attachment == e.image) {
+                recording_failed_ = true;
+                return false;
               }
-            }
+            if (!TransitionResource(resource,
+                                    type == BINDING_TEXTURE2D ? D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE |
+                                                                    D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE
+                                                              : D3D12_RESOURCE_STATE_UNORDERED_ACCESS,
+                                    image->DefaultState()))
+              return false;
+          }
+          if (type == BINDING_RW_STORAGE_BUFFER || type == BINDING_RW_TEXTURE2D) {
+            D3D12_RESOURCE_BARRIER barrier{};
+            barrier.Type = D3D12_RESOURCE_BARRIER_TYPE_UAV;
+            barrier.UAV.pResource = resource;
+            list_->ResourceBarrier(1, &barrier);
+          }
+        }
     }
-    if (groups_dirty_) {
+    if (!tables_dirty_)
+      return true;
+    bool heaps_changed = false;
+    for (size_t kind = 0; kind < 2; ++kind) {
+      uint64_t total = 0, needed = 0;
+      for (const auto &bound : groups_) {
+        if (!bound.sources[kind])
+          continue;
+        total += bound.sources[kind]->Count();
+        if (bound.dirty[kind])
+          needed += bound.sources[kind]->Count();
+      }
+      if (!needed)
+        continue;
+      const auto available = descriptor_pages_[kind] ? descriptor_pages_[kind]->Count() - descriptor_used_[kind] : 0;
+      if (needed > available) {
+        const uint32_t limit = kind ? 2048 : 1000000;
+        if (total > limit) {
+          recording_failed_ = true;
+          return false;
+        }
+        auto &pool = kind ? device_->SamplerDescriptors() : device_->ResourceDescriptors();
+        auto page = pool.AcquirePage(uint32_t(total));
+        if (!page) {
+          recording_failed_ = true;
+          return false;
+        }
+        if (!RetainResource(page.Get()))
+          return false;
+        descriptor_pages_[kind] = page.Get();
+        descriptor_used_[kind] = 0;
+        heaps_changed = true;
+        // Every still-bound table of this heap type must move together. Earlier
+        // draws retain the old page through the context's resource references.
+        for (auto &bound : groups_)
+          bound.dirty[kind] = bound.sources[kind] != nullptr;
+      }
+      auto page = descriptor_pages_[kind];
+      const auto type = kind ? D3D12_DESCRIPTOR_HEAP_TYPE_SAMPLER : D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV;
+      for (auto &bound : groups_) {
+        if (!bound.dirty[kind] || !bound.sources[kind])
+          continue;
+        auto source = bound.sources[kind];
+        auto &cursor = descriptor_used_[kind];
+        // Copy only from CPU storage: shader-visible heaps cannot be copy sources.
+        device_->NativeDevice()->CopyDescriptorsSimple(source->Count(), page->CPU(cursor), source->CPU(), type);
+        bound.tables[kind] = page->GPU(cursor);
+        cursor += source->Count();
+        bound.dirty[kind] = false;
+      }
+    }
+    if (heaps_changed) {
       ID3D12DescriptorHeap *heaps[2]{};
       UINT count = 0;
-      if (resources)
-        heaps[count++] = resources->Heap();
-      if (samplers)
-        heaps[count++] = samplers->Heap();
-      if (count)
-        list_->SetDescriptorHeaps(count, heaps);
-      for (uint32_t g = 0; g < groups_.size(); ++g)
-        for (int kind = 0; kind < 2; ++kind) {
-          auto parameter = program_->RootParameter(g, kind != 0);
-          if (parameter == UINT32_MAX)
-            continue;
-          list_->SetGraphicsRootDescriptorTable(parameter, (kind ? samplers : resources)->GPU(starts[g][kind]));
-        }
-      groups_dirty_ = false;
+      for (auto page : descriptor_pages_)
+        if (page)
+          heaps[count++] = page->Heap();
+      list_->SetDescriptorHeaps(count, heaps);
     }
+    // Changing either heap invalidates root tables. Rebind both heap types,
+    // including unchanged tables which did not need to be copied again.
+    for (uint32_t g = 0; g < groups_.size(); ++g)
+      for (size_t kind = 0; kind < 2; ++kind) {
+        auto parameter = program_->RootParameter(g, kind != 0);
+        if (parameter != UINT32_MAX)
+          list_->SetGraphicsRootDescriptorTable(parameter, groups_[g].tables[kind]);
+      }
+    tables_dirty_ = false;
     return true;
   } catch (const std::bad_alloc &) {
     recording_failed_ = true;

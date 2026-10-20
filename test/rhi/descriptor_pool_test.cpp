@@ -63,6 +63,30 @@ TEST(D3D12DescriptorPool, WrapPaddingAndOversizedPages) {
   EXPECT_FALSE(pool.Acquire(0));
   EXPECT_FALSE(pool.Acquire(UINT32_MAX));
 }
+
+TEST(D3D12DescriptorPool, PageReservationsDoNotOverlapAndGrowForLiveTables) {
+  ComPtr<ID3D12Device> device;
+  ASSERT_TRUE(SUCCEEDED(D3D12CreateDevice(nullptr, D3D_FEATURE_LEVEL_11_0, IID_PPV_ARGS(&device))));
+  D3D12DescriptorPool pool(device.Get(), D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV, true, 8);
+  auto first = pool.AcquirePage(3);
+  auto second = pool.AcquirePage(5);
+  ASSERT_TRUE(first);
+  ASSERT_TRUE(second);
+  EXPECT_EQ(first->Count(), 8u);
+  EXPECT_EQ(second->Count(), 8u);
+  EXPECT_NE(first->Heap(), second->Heap());
+  auto large = pool.AcquirePage(12);
+  ASSERT_TRUE(large);
+  EXPECT_GE(large->Count(), 12u);
+  EXPECT_EQ(pool.GetPageCounts().second, 3u);
+  auto heap = first->Heap();
+  first.Reset();
+  auto recycled = pool.AcquirePage(1);
+  ASSERT_TRUE(recycled);
+  EXPECT_EQ(recycled->Heap(), heap);
+  EXPECT_FALSE(pool.AcquirePage(1000001));
+}
+
 }  // namespace grassland::rhi::backend::d3d12
 #endif
 

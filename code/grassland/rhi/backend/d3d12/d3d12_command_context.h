@@ -1,8 +1,8 @@
 ﻿#pragma once
 #include <vector>
 
-#include "grassland/rhi/backend/backend_binding_group.h"
 #include "grassland/rhi/backend/backend_command_context.h"
+#include "grassland/rhi/backend/d3d12/d3d12_binding_group.h"
 #include "grassland/rhi/backend/d3d12/d3d12_device.h"
 
 namespace grassland::rhi::backend::d3d12 {
@@ -49,8 +49,18 @@ class D3D12CommandContext final : public CommandContext {
   D3D12CommandContext(D3D12Device *device);
 
   bool PrepareGroups();
-  std::vector<BindingGroup::Version *> groups_;
-  bool groups_dirty_{true};
+
+  struct BoundGroup {
+    D3D12BindingGroup::Version *version{};
+    std::array<D3D12DescriptorPool::Lease *, 2> sources{};
+    std::array<D3D12_GPU_DESCRIPTOR_HANDLE, 2> tables{};
+    std::array<bool, 2> dirty{};
+  };
+
+  std::vector<BoundGroup> groups_;
+  std::array<D3D12DescriptorPool::Lease *, 2> descriptor_pages_{};
+  std::array<uint32_t, 2> descriptor_used_{};
+  bool tables_dirty_{};
   D3D12Program *program_{};
   D3D12Image *render_target_{};
   AttachmentStoreOp store_op_{ATTACHMENT_STORE_OP_STORE};

@@ -17,6 +17,8 @@ class D3D12Device final : public Device {
   D3D12DescriptorPool &DSVPool();
   D3D12DescriptorPool &ResourceDescriptors();
   D3D12DescriptorPool &SamplerDescriptors();
+  D3D12DescriptorPool &ResourceDescriptorStorage();
+  D3D12DescriptorPool &SamplerDescriptorStorage();
   IDXGIFactory4 *Factory() const;
   ID3D12CommandQueue *NativeQueue() const;
   ID3D12Fence *Fence() const;
@@ -54,6 +56,7 @@ class D3D12Device final : public Device {
   D3D12RTVPool rtv_pool_;
   D3D12DescriptorPool dsv_pool_;
   D3D12DescriptorPool resource_descriptors_, sampler_descriptors_;
+  D3D12DescriptorPool resource_descriptor_storage_, sampler_descriptor_storage_;
   ComPtr<IDXGIFactory4> factory_;
   ComPtr<ID3D12CommandQueue> queue_;
   ComPtr<ID3D12Fence> fence_;

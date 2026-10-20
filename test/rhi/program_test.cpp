@@ -7,7 +7,9 @@
 #if defined(LONGMARCH_D3D12_ENABLED)
 #include <d3d12sdklayers.h>
 
+#include "grassland/rhi/backend/d3d12/d3d12_binding_group.h"
 #include "grassland/rhi/backend/d3d12/d3d12_device.h"
+#include "grassland/rhi/backend/d3d12/d3d12_program.h"
 #endif
 
 #include "grassland/rhi/rhi.h"
@@ -473,6 +475,78 @@ TEST_P(RhiProgram, StructuredStridesComeFromTargetLayoutAndMustAgreeAcrossStages
   EXPECT_EQ(native->StructuredBufferStride(0, 2), 0u);
   EXPECT_TRUE(program->Finalize());
 }
+
+#if defined(LONGMARCH_D3D12_ENABLED)
+TEST(D3D12BindingGroup, CpuDescriptorsAreSharedByCommandsAndCachedByReflectedStride) {
+  using namespace backend::d3d12;
+  ObjPtr<ICore> core = CreateCore(BACKEND_API_D3D12);
+  ASSERT_TRUE(core);
+  ObjPtr<IDevice> device = core->CreateDeviceByAutoSelection();
+  ASSERT_TRUE(device);
+  ObjPtr<IBuffer> buffer = device->CreateBuffer({256});
+  ASSERT_TRUE(buffer);
+  BindingLayoutDesc layout{{{0, BINDING_STORAGE_BUFFER, 1, SHADER_VISIBILITY_FRAGMENT},
+                            {1, BINDING_SAMPLER, 1, SHADER_VISIBILITY_FRAGMENT}}};
+  auto make_program = [&](bool wide) {
+    std::string source =
+        wide ? "RHI_STRUCTURED_BUFFER(0,0,float4,values);" : "RHI_STRUCTURED_BUFFER(0,0,float2,values);";
+    source += "float4 VSMain(uint id:SV_VertexID):SV_Position { return float4(0,0,0,1); }";
+    source += wide ? "float4 PSMain():SV_Target0 { return values[0]; }"
+                   : "float4 PSMain():SV_Target0 { return float4(values[0],0,1); }";
+    ObjPtr<IShader> vs = device->CreateShader({source, "VSMain", SHADER_STAGE_VERTEX});
+    ObjPtr<IShader> ps = device->CreateShader({source, "PSMain", SHADER_STAGE_FRAGMENT});
+    ProgramDesc desc;
+    desc.vertex_shader = vs.Get();
+    desc.fragment_shader = ps.Get();
+    desc.pipeline_layout.groups = {layout};
+    return ObjPtr<IProgram>(device->CreateProgram(desc));
+  };
+  auto wide = make_program(true);
+  auto narrow = make_program(false);
+  auto same = make_program(true);
+  ASSERT_TRUE(wide);
+  ASSERT_TRUE(narrow);
+  ASSERT_TRUE(same);
+  ASSERT_TRUE(wide->Finalize());
+  ASSERT_TRUE(narrow->Finalize());
+  ASSERT_TRUE(same->Finalize());
+  ObjPtr<IBindingGroup> group = device->CreateBindingGroup(layout);
+  ASSERT_TRUE(group);
+  ASSERT_TRUE(group->BindResource(0, buffer.Get()));
+  ASSERT_TRUE(group->BindResource(1, SamplerDesc{}));
+  auto native = static_cast<D3D12BindingGroup *>(group.Get());
+  auto version = static_cast<D3D12BindingGroup::Version *>(native->CurrentVersion());
+  auto a = version->ResourceDescriptors(static_cast<D3D12Program *>(wide.Get()), 0);
+  auto b = version->ResourceDescriptors(static_cast<D3D12Program *>(narrow.Get()), 0);
+  ASSERT_TRUE(a);
+  ASSERT_TRUE(b);
+  EXPECT_NE(a, b);
+  EXPECT_EQ(version->ResourceDescriptors(static_cast<D3D12Program *>(same.Get()), 0), a);
+  EXPECT_EQ(a->Heap()->GetDesc().Flags, D3D12_DESCRIPTOR_HEAP_FLAG_NONE);
+  EXPECT_EQ(version->SamplerDescriptors()->Heap()->GetDesc().Flags, D3D12_DESCRIPTOR_HEAP_FLAG_NONE);
+  auto sampler = version->SamplerDescriptors()->CPU().ptr;
+  ObjPtr<ICommandContext> first = device->CreateCommandContext();
+  ObjPtr<ICommandContext> second = device->CreateCommandContext();
+  ASSERT_TRUE(first);
+  ASSERT_TRUE(second);
+  ASSERT_TRUE(first->CmdBindProgram(wide.Get()));
+  ASSERT_TRUE(first->CmdBindGroup(0, group.Get()));
+  ASSERT_TRUE(second->CmdBindProgram(narrow.Get()));
+  ASSERT_TRUE(second->CmdBindGroup(0, group.Get()));
+  EXPECT_EQ(native->CurrentVersion(), version);
+  EXPECT_EQ(version->ResourceDescriptors(static_cast<D3D12Program *>(wide.Get()), 0), a);
+  EXPECT_EQ(version->ResourceDescriptors(static_cast<D3D12Program *>(narrow.Get()), 0), b);
+  EXPECT_EQ(version->SamplerDescriptors()->CPU().ptr, sampler);
+  ASSERT_TRUE(group->BindResource(1, SamplerDesc{SAMPLER_FILTER_NEAREST}));
+  auto replacement = static_cast<D3D12BindingGroup::Version *>(native->CurrentVersion());
+  EXPECT_NE(replacement, version);
+  EXPECT_NE(replacement->SamplerDescriptors()->CPU().ptr, sampler);
+  EXPECT_EQ(version->ResourceDescriptors(static_cast<D3D12Program *>(wide.Get()), 0), a);
+  // Discarding recorded commands must return their version leases, without submission.
+  first.Release();
+  second.Release();
+}
+#endif
 
 INSTANTIATE_TEST_SUITE_P(Backends, RhiProgram, testing::ValuesIn(program_backends));
 }  // namespace grassland::rhi

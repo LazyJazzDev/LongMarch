@@ -106,6 +106,10 @@ ObjectPtr<D3D12DescriptorPool::Lease> D3D12DescriptorPool::Acquire(uint32_t coun
   }
 }
 
+ObjectPtr<D3D12DescriptorPool::Lease> D3D12DescriptorPool::AcquirePage(uint32_t minimum_count) {
+  return Acquire(std::max(minimum_count, page_capacity_));
+}
+
 void D3D12DescriptorPool::ReleaseRange(Page *page, Allocation *allocation) {
   std::lock_guard<std::mutex> lock(mutex_);
   allocation->released = true;
