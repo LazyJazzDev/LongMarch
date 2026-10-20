@@ -18,7 +18,7 @@ class VulkanDevice final : public Device {
   VkDevice NativeDevice() const;
   VulkanRenderTargetPool &RenderTargets();
   VulkanDescriptorPool &DescriptorPool();
-  IBindingGroup *CreateBindingGroup(const BindingLayoutDesc &layout, const std::vector<BindingEntry> &entries) override;
+  IBindingGroup *CreateBindingGroup(const BindingLayoutDesc &layout) override;
   PFN_vkCmdBeginRendering BeginRenderingCommand() const;
   PFN_vkCmdEndRendering EndRenderingCommand() const;
   rhi::IProgram *CreateProgram(const ProgramDesc &desc) override;

@@ -263,10 +263,9 @@ TEST_P(RhiImage, StorageUsageFollowsNativeFormatSupport) {
     if (IsDepthFormat(format))
       EXPECT_FALSE(supported);
     BindingLayoutDesc layout{{{0, BINDING_RW_TEXTURE2D, 1, SHADER_VISIBILITY_FRAGMENT}}};
-    BindingEntry entry{};
-    entry.image = image.Get();
-    ObjPtr<IBindingGroup> group = device->CreateBindingGroup(layout, {entry});
-    EXPECT_EQ(bool(group), supported);
+    ObjPtr<IBindingGroup> group = device->CreateBindingGroup(layout);
+    ASSERT_TRUE(group);
+    EXPECT_EQ(group->BindResource(0, image.Get()), supported);
   }
 }
 
@@ -463,7 +462,7 @@ TEST_P(RhiImage, MultipleTargetsAndDepthRejectOccludedFragments) {
   }
 }
 
-TEST_P(RhiImage, ImmutableGroupsBindFixedRangesAndArraysAcrossHeapPages) {
+TEST_P(RhiImage, BindingVersionsPreserveRangesAndArraysAcrossHeapPages) {
   if (GetParam() == BACKEND_API_METAL)
     GTEST_SKIP() << "Metal implementation is deferred.";
   ObjPtr<ICore> core = CreateCore(GetParam());
@@ -501,31 +500,14 @@ TEST_P(RhiImage, ImmutableGroupsBindFixedRangesAndArraysAcrossHeapPages) {
   ObjPtr<IProgram> program = device->CreateProgram(desc);
   ASSERT_TRUE(program);
   ASSERT_TRUE(program->Finalize());
-  BindingEntry u;
-  u.binding = 3;
-  u.buffer = uniform.Get();
-  u.size = 256;
-  ObjPtr<IBindingGroup> first = device->CreateBindingGroup(desc.pipeline_layout.groups[0], {u});
-  u.offset = 256;
-  ObjPtr<IBindingGroup> second = device->CreateBindingGroup(desc.pipeline_layout.groups[0], {u});
-  BindingEntry a;
-  a.binding = 7;
-  a.image = red.Get();
-  BindingEntry b = a;
-  b.array_element = 1;
-  b.image = green.Get();
-  BindingEntry sampler;
-  sampler.binding = 9;
-  BindingEntry f;
-  f.binding = 11;
-  f.buffer = factors.Get();
-  f.size = 16;
-  f.stride = 16;
-  BindingEntry f2 = f;
-  f2.array_element = 1;
-  f2.offset = 16;
-  ObjPtr<IBindingGroup> material = device->CreateBindingGroup(desc.pipeline_layout.groups[1], {f2, b, sampler, a, f});
-  ASSERT_TRUE(first && second && material);
+  ObjPtr<IBindingGroup> selection = device->CreateBindingGroup(desc.pipeline_layout.groups[0]);
+  ObjPtr<IBindingGroup> material = device->CreateBindingGroup(desc.pipeline_layout.groups[1]);
+  ASSERT_TRUE(selection);
+  ASSERT_TRUE(material);
+  ASSERT_TRUE(material->BindResource(7, std::vector<IImage *>{red.Get(), green.Get()}));
+  ASSERT_TRUE(material->BindResource(9, SamplerDesc{}));
+  ASSERT_TRUE(
+      material->BindResource(11, std::vector<BufferView>{{factors.Get(), 0, 16, 16}, {factors.Get(), 16, 16, 16}}));
   ObjPtr<ICommandContext> commands = device->CreateCommandContext();
   const uint32_t red_pixel = 0xff0000ff, green_pixel = 0xff00ff00;
   ASSERT_TRUE(commands->CmdUploadImage(red.Get(), &red_pixel, 4));
@@ -537,27 +519,88 @@ TEST_P(RhiImage, ImmutableGroupsBindFixedRangesAndArraysAcrossHeapPages) {
   ASSERT_TRUE(commands->CmdUploadBuffer(factors.Get(), 0, values, sizeof(values)));
   ASSERT_TRUE(commands->CmdBindProgram(program.Get()));
   ASSERT_TRUE(commands->CmdBindGroup(1, material.Get()));
+  // Changes after binding must not affect this context, including render-pass restarts.
+  ASSERT_TRUE(material->BindResource(7, std::vector<IImage *>{green.Get(), red.Get()}));
+  ASSERT_TRUE(material->BindResource(9, SamplerDesc{SAMPLER_FILTER_NEAREST}));
+  ASSERT_TRUE(
+      material->BindResource(11, std::vector<BufferView>{{factors.Get(), 0, 16, 16}, {factors.Get(), 0, 16, 16}}));
   ASSERT_TRUE(commands->CmdBeginRendering(
       {{{target.Get(), ATTACHMENT_LOAD_OP_CLEAR, ATTACHMENT_STORE_OP_STORE, {0, 0, 0, 1}}}}));
   ASSERT_TRUE(commands->CmdSetViewport({0, 0, 64, 64, 0, 1}));
   // Exceeds both resource/sampler page capacities. Previous draw tables must stay alive.
   for (int i = 0; i < 1100; ++i) {
-    ASSERT_TRUE(commands->CmdBindGroup(0, i % 2 ? second.Get() : first.Get()));
+    ASSERT_TRUE(selection->BindResource(3, BufferView{uniform.Get(), uint64_t(i % 2 ? 256 : 0), 256}));
+    ASSERT_TRUE(commands->CmdBindGroup(0, selection.Get()));
+    // D3D12 builds tables at Draw, but must use the version captured at BindGroup.
+    if (i != 1099)
+      ASSERT_TRUE(selection->BindResource(3, BufferView{uniform.Get(), uint64_t(i % 2 ? 0 : 256), 256}));
     ASSERT_TRUE(commands->CmdSetScissor({i % 2 ? 32 : 0, 0, 32, 64}));
     ASSERT_TRUE(commands->CmdDraw(3));
   }
   ASSERT_TRUE(commands->CmdEndRendering());
-  first.Release();
-  second.Release();
   material.Release();
-  uniform.Release();
   factors.Release();
   red.Release();
   green.Release();
   program.Release();
+  // Hold the native queue so rebinding is tested while the submission is truly
+  // pending, rather than relying on timing on a fast GPU. The guard also opens
+  // the gate on assertion failure, before Device teardown waits for the queue.
+  std::shared_ptr<void> gate;
+#if defined(LONGMARCH_D3D12_ENABLED)
+  if (GetParam() == BACKEND_API_D3D12) {
+    auto native = static_cast<backend::d3d12::D3D12Device *>(device.Get());
+    backend::d3d12::ComPtr<ID3D12Fence> fence;
+    ASSERT_TRUE(SUCCEEDED(native->NativeDevice()->CreateFence(0, D3D12_FENCE_FLAG_NONE, IID_PPV_ARGS(&fence))));
+    gate = std::shared_ptr<void>(native, [native, fence](void *) {
+      EXPECT_TRUE(SUCCEEDED(fence->Signal(1)));
+      std::lock_guard<std::mutex> lock(native->QueueMutex());
+      EXPECT_TRUE(native->WaitIdle());
+    });
+    std::lock_guard<std::mutex> lock(native->QueueMutex());
+    ASSERT_TRUE(SUCCEEDED(native->NativeQueue()->Wait(fence.Get(), 1)));
+  }
+#endif
+#if defined(LONGMARCH_VULKAN_ENABLED)
+  if (GetParam() == BACKEND_API_VULKAN) {
+    auto native = static_cast<backend::vulkan::VulkanDevice *>(device.Get());
+    VkSemaphoreTypeCreateInfo type{VK_STRUCTURE_TYPE_SEMAPHORE_TYPE_CREATE_INFO};
+    type.semaphoreType = VK_SEMAPHORE_TYPE_TIMELINE;
+    VkSemaphoreCreateInfo create{VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO};
+    create.pNext = &type;
+    VkSemaphore semaphore{};
+    ASSERT_EQ(vkCreateSemaphore(native->NativeDevice(), &create, nullptr, &semaphore), VK_SUCCESS);
+    gate = std::shared_ptr<void>(native, [native, semaphore](void *) {
+      VkSemaphoreSignalInfo signal{VK_STRUCTURE_TYPE_SEMAPHORE_SIGNAL_INFO};
+      signal.semaphore = semaphore;
+      signal.value = 1;
+      EXPECT_EQ(vkSignalSemaphore(native->NativeDevice(), &signal), VK_SUCCESS);
+      std::lock_guard<std::mutex> lock(native->QueueMutex());
+      EXPECT_EQ(vkQueueWaitIdle(native->NativeQueue()), VK_SUCCESS);
+      vkDestroySemaphore(native->NativeDevice(), semaphore, nullptr);
+    });
+    const uint64_t value = 1;
+    const VkPipelineStageFlags stage = VK_PIPELINE_STAGE_ALL_COMMANDS_BIT;
+    VkTimelineSemaphoreSubmitInfo timeline{VK_STRUCTURE_TYPE_TIMELINE_SEMAPHORE_SUBMIT_INFO};
+    timeline.waitSemaphoreValueCount = 1;
+    timeline.pWaitSemaphoreValues = &value;
+    VkSubmitInfo submit{VK_STRUCTURE_TYPE_SUBMIT_INFO};
+    submit.pNext = &timeline;
+    submit.waitSemaphoreCount = 1;
+    submit.pWaitSemaphores = &semaphore;
+    submit.pWaitDstStageMask = &stage;
+    std::lock_guard<std::mutex> lock(native->QueueMutex());
+    ASSERT_EQ(vkQueueSubmit(native->NativeQueue(), 1, &submit, VK_NULL_HANDLE), VK_SUCCESS);
+  }
+#endif
   ObjPtr<ISubmissionToken> done = queue->Submit(commands.Get());
   ASSERT_TRUE(done);
+  EXPECT_EQ(done->GetStatus(), SUBMISSION_STATUS_PENDING);
+  ASSERT_TRUE(selection->BindResource(3, BufferView{uniform.Get(), 0, 256}));
+  selection.Release();
+  uniform.Release();
   commands.Release();
+  gate.reset();
   ASSERT_TRUE(done->WaitHost());
   std::array<uint8_t, 4> pixel{};
   ReadPixel(device.Get(), target.Get(), GetParam(), 16, 32, pixel);
@@ -618,16 +661,14 @@ TEST_P(RhiImage, StorageImageAndBufferBecomeReadableAfterRendering) {
   ASSERT_TRUE(writer && reader);
   ASSERT_TRUE(writer->Finalize());
   ASSERT_TRUE(reader->Finalize());
-  BindingEntry im;
-  im.image = storage.Get();
-  BindingEntry bf;
-  bf.binding = 1;
-  bf.buffer = buffer.Get();
-  bf.size = 64 * 64 * 16;
-  bf.stride = 16;
-  ObjPtr<IBindingGroup> wg = device->CreateBindingGroup(write_layout, {im, bf});
-  ObjPtr<IBindingGroup> rg = device->CreateBindingGroup(read_layout, {im, bf});
-  ASSERT_TRUE(wg && rg);
+  ObjPtr<IBindingGroup> wg = device->CreateBindingGroup(write_layout);
+  ObjPtr<IBindingGroup> rg = device->CreateBindingGroup(read_layout);
+  ASSERT_TRUE(wg);
+  ASSERT_TRUE(rg);
+  for (auto group : {wg.Get(), rg.Get()}) {
+    ASSERT_TRUE(group->BindResource(0, storage.Get()));
+    ASSERT_TRUE(group->BindResource(1, BufferView{buffer.Get(), 0, 0, 16}));
+  }
   ObjPtr<ICommandContext> commands = device->CreateCommandContext();
   for (auto program : {writer.Get(), reader.Get()}) {
     ASSERT_TRUE(commands->CmdBindProgram(program));

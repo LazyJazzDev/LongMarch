@@ -98,12 +98,10 @@ int HelloCube(grassland::rhi::BackendAPI api, int frames, bool headless) {
   grassland::rhix::Buffer uniform = device.CreateBuffer({256});
   if (!uniform)
     return 1;
-  BindingEntry constant;
-  constant.binding = 0;
-  constant.buffer = uniform.Get();
-  constant.size = 256;
-  grassland::rhix::BindingGroup group = device.CreateBindingGroup(desc.pipeline_layout.groups[0], {constant});
+  grassland::rhix::BindingGroup group = device.CreateBindingGroup(desc.pipeline_layout.groups[0]);
   if (!group)
+    return 1;
+  if (!group.BindResource(0, uniform))
     return 1;
   grassland::rhix::Image depth;
   // Upload owns a snapshot and staging leases; later graphics work is ordered on the same native queue.

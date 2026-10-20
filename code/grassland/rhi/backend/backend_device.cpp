@@ -36,14 +36,9 @@ rhi::IShader *Device::CreateShader(const ShaderDesc &desc) {
   }
 }
 
-IBindingGroup *Device::CreateBindingGroup(const BindingLayoutDesc &layout, const std::vector<BindingEntry> &entries) {
-  try {
-    if (!BindingGroup::Validate(this, layout, entries))
-      return nullptr;
-    return new BindingGroup(this, layout, entries);
-  } catch (const std::bad_alloc &) {
-    return nullptr;
-  }
+IBindingGroup *Device::CreateBindingGroup(const BindingLayoutDesc &) {
+  ReportError(-1, "Binding groups are not implemented for this backend.");
+  return nullptr;
 }
 
 Device::~Device() {

@@ -592,11 +592,14 @@ bool D3D12CommandContext::CmdBindGroup(uint32_t index, IBindingGroup *group) {
   auto native = dynamic_cast<BindingGroup *>(group);
   if (sealed_ || !program_ || !native || native->Owner() != device_ || index >= groups_.size() ||
       !SameBindingLayout(program_->GetDesc().pipeline_layout.groups[index], group->GetLayout()) ||
-      !RetainResource(group)) {
+      !native->CurrentVersion()->IsComplete()) {
     recording_failed_ = true;
     return false;
   }
-  groups_[index] = group;
+  auto version = native->CurrentVersion();
+  if (!RetainResource(version))
+    return false;
+  groups_[index] = version;
   groups_dirty_ = true;
   return true;
 }
@@ -629,7 +632,7 @@ bool D3D12CommandContext::PrepareGroups() {
         continue;
       for (auto m : mappings)
         if (m.group == g)
-          for (auto e : groups_[g]->GetEntries())
+          for (auto e : groups_[g]->GetResources())
             if (e.binding == m.desc.binding) {
               auto type = m.desc.type;
               D3D12_CPU_DESCRIPTOR_HANDLE handle{};

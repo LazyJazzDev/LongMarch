@@ -374,7 +374,7 @@ bool VulkanCommandContext::CmdBeginRendering(const RenderingInfo &info) {
   }
   try {
     for (uint32_t i = 0; i < groups_.size(); ++i)
-      if (groups_[i] && !CmdBindGroup(i, groups_[i]))
+      if (groups_[i] && !BindGroupVersion(i, groups_[i]))
         return false;
     std::vector<VulkanImage *> images;
     std::vector<ImageFormat> formats;
@@ -705,17 +705,23 @@ bool VulkanCommandContext::CmdUploadImage(IImage *image, const void *data, uint6
 bool VulkanCommandContext::CmdBindGroup(uint32_t index, IBindingGroup *group) {
   auto native = dynamic_cast<VulkanBindingGroup *>(group);
   if (sealed_ || !program_ || !native || native->Owner() != device_ || index >= groups_.size() ||
-      !SameBindingLayout(native->GetLayout(), program_->GetDesc().pipeline_layout.groups[index])) {
+      !SameBindingLayout(native->GetLayout(), program_->GetDesc().pipeline_layout.groups[index]) ||
+      !native->CurrentVersion()->IsComplete()) {
     recording_failed_ = true;
     return false;
   }
-  if (!RetainResource(native))
+  auto version = static_cast<VulkanBindingGroup::Version *>(native->CurrentVersion());
+  if (!RetainResource(version))
     return false;
+  return BindGroupVersion(index, version);
+}
+
+bool VulkanCommandContext::BindGroupVersion(uint32_t index, VulkanBindingGroup::Version *native) {
   try {
     size_t entry = 0;
     for (auto b : native->GetLayout().bindings)
       for (uint32_t i = 0; i < b.count; ++i) {
-        auto e = native->GetEntries()[entry++];
+        auto e = native->GetResources()[entry++];
         const VkAccessFlags access =
             VK_ACCESS_SHADER_READ_BIT |
             ((b.type == BINDING_RW_STORAGE_BUFFER || b.type == BINDING_RW_TEXTURE2D) ? VK_ACCESS_SHADER_WRITE_BIT : 0);
@@ -756,7 +762,7 @@ bool VulkanCommandContext::ValidateGroups() {
       return false;
     }
     if (groups_[i])
-      for (auto e : groups_[i]->GetEntries())
+      for (auto e : groups_[i]->GetResources())
         if (e.image) {
           for (auto c : rendering_.color_attachments)
             if (c.color_attachment == e.image) {

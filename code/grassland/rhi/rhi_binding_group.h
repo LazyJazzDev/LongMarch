@@ -41,19 +41,28 @@ struct SamplerDesc {
   SamplerAddressMode address_u{SAMPLER_ADDRESS_REPEAT}, address_v{SAMPLER_ADDRESS_REPEAT};
 };
 
-struct BindingEntry {
-  uint32_t binding{}, array_element{};
+// A borrowed buffer view. size == 0 selects the remaining bytes; stride defaults
+// to 32-bit elements for structured buffers and is ignored for uniform buffers.
+struct BufferView {
   IBuffer *buffer{};
   uint64_t offset{}, size{};
-  uint32_t stride{};
-  IImage *image{};
-  SamplerDesc sampler;
+  uint32_t stride{4};
 };
 
+// Creation allocates the layout without populating resources. BindResource writes
+// slots and retains resources. CmdBindGroup captures the current version; later
+// writes never change recorded commands. CPU access to a group is externally synchronized.
 class IBindingGroup : public IObject {
  public:
   virtual const BindingLayoutDesc &GetLayout() const = 0;
-  virtual const std::vector<BindingEntry> &GetEntries() const = 0;
+  bool BindResource(uint32_t binding, IBuffer *buffer);
+  bool BindResource(uint32_t binding, const BufferView &buffer);
+  bool BindResource(uint32_t binding, IImage *image);
+  bool BindResource(uint32_t binding, const SamplerDesc &sampler);
+  bool BindResource(uint32_t binding, const std::vector<IBuffer *> &buffers, uint32_t first_element = 0);
+  virtual bool BindResource(uint32_t binding, const std::vector<BufferView> &buffers, uint32_t first_element = 0) = 0;
+  virtual bool BindResource(uint32_t binding, const std::vector<IImage *> &images, uint32_t first_element = 0) = 0;
+  virtual bool BindResource(uint32_t binding, const std::vector<SamplerDesc> &samplers, uint32_t first_element = 0) = 0;
 
  protected:
   ~IBindingGroup() override = default;

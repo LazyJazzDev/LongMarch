@@ -1,6 +1,7 @@
 ﻿#pragma once
 #include <vector>
 
+#include "grassland/rhi/backend/backend_binding_group.h"
 #include "grassland/rhi/backend/backend_command_context.h"
 #include "grassland/rhi/backend/d3d12/d3d12_device.h"
 
@@ -48,7 +49,7 @@ class D3D12CommandContext final : public CommandContext {
   D3D12CommandContext(D3D12Device *device);
 
   bool PrepareGroups();
-  std::vector<IBindingGroup *> groups_;
+  std::vector<BindingGroup::Version *> groups_;
   bool groups_dirty_{true};
   D3D12Program *program_{};
   D3D12Image *render_target_{};

@@ -177,9 +177,8 @@ PFN_vkCmdEndRendering VulkanDevice::EndRenderingCommand() const {
   return end_rendering_;
 }
 
-IBindingGroup *VulkanDevice::CreateBindingGroup(const BindingLayoutDesc &layout,
-                                                const std::vector<BindingEntry> &entries) {
-  return VulkanBindingGroup::Create(this, layout, entries);
+IBindingGroup *VulkanDevice::CreateBindingGroup(const BindingLayoutDesc &layout) {
+  return VulkanBindingGroup::Create(this, layout);
 }
 
 VulkanDescriptorPool &VulkanDevice::DescriptorPool() {

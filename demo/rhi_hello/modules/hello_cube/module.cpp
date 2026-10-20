@@ -96,12 +96,10 @@ int HelloCube(grassland::rhi::BackendAPI api, int frames, bool headless) {
   ObjPtr<IBuffer> uniform = device->CreateBuffer({256});
   if (!uniform)
     return 1;
-  BindingEntry constant;
-  constant.binding = 0;
-  constant.buffer = uniform.Get();
-  constant.size = 256;
-  ObjPtr<IBindingGroup> group = device->CreateBindingGroup(desc.pipeline_layout.groups[0], {constant});
+  ObjPtr<IBindingGroup> group = device->CreateBindingGroup(desc.pipeline_layout.groups[0]);
   if (!group)
+    return 1;
+  if (!group->BindResource(0, uniform.Get()))
     return 1;
   ObjPtr<IImage> depth;
   // Upload owns a snapshot and staging leases; later graphics work is ordered on the same native queue.

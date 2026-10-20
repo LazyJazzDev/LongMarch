@@ -2,6 +2,7 @@
 
 #include "grassland/rhi/backend/backend_binding_group.h"
 #include "grassland/rhi/backend/d3d12/d3d12_allocated_image.h"
+#include "grassland/rhi/backend/d3d12/d3d12_binding_group.h"
 #include "grassland/rhi/backend/d3d12/d3d12_command_context.h"
 #include "grassland/rhi/backend/d3d12/d3d12_program.h"
 #include "grassland/rhi/backend/d3d12/d3d12_queue.h"
@@ -219,30 +220,8 @@ rhi::IQueue *D3D12Device::GetQueue(QueueType type) {
   }
 }
 
-IBindingGroup *D3D12Device::CreateBindingGroup(const BindingLayoutDesc &layout,
-                                               const std::vector<BindingEntry> &entries) {
-  try {
-    if (!BindingGroup::Validate(this, layout, entries))
-      return nullptr;
-    for (const auto &entry : entries)
-      if (entry.image && !dynamic_cast<D3D12AllocatedImage *>(entry.image))
-        return nullptr;
-    for (auto b : layout.bindings)
-      for (auto e : entries)
-        if (e.binding == b.binding) {
-          if (b.type == BINDING_UNIFORM_BUFFER) {
-            const auto size = (e.size + 255) & ~uint64_t(255);
-            if (e.offset % 256 || size > 65536 || size > e.buffer->GetDesc().size - e.offset)
-              return nullptr;
-          } else if (b.type == BINDING_STORAGE_BUFFER || b.type == BINDING_RW_STORAGE_BUFFER) {
-            if (e.stride > 2048 || e.size / e.stride > UINT32_MAX)
-              return nullptr;
-          }
-        }
-    return new BindingGroup(this, layout, entries);
-  } catch (const std::bad_alloc &) {
-    return nullptr;
-  }
+IBindingGroup *D3D12Device::CreateBindingGroup(const BindingLayoutDesc &layout) {
+  return D3D12BindingGroup::Create(this, layout);
 }
 
 }  // namespace grassland::rhi::backend::d3d12

@@ -91,14 +91,12 @@ int HelloTexture(grassland::rhi::BackendAPI api, int frames, bool headless) {
   ObjPtr<IImage> texture = device->CreateImage({256, 256, IMAGE_FORMAT_RGBA8_UNORM});
   if (!texture)
     return 1;
-  BindingEntry sampled;
-  sampled.binding = 0;
-  sampled.image = texture.Get();
-  BindingEntry sampler;
-  sampler.binding = 1;
-  sampler.sampler.filter = SAMPLER_FILTER_LINEAR;
-  ObjPtr<IBindingGroup> group = device->CreateBindingGroup(desc.pipeline_layout.groups[0], {sampled, sampler});
+  ObjPtr<IBindingGroup> group = device->CreateBindingGroup(desc.pipeline_layout.groups[0]);
   if (!group)
+    return 1;
+  if (!group->BindResource(0, texture.Get()))
+    return 1;
+  if (!group->BindResource(1, SamplerDesc{}))
     return 1;
   // Upload owns a snapshot and staging leases; later graphics work is ordered on the same native queue.
   {

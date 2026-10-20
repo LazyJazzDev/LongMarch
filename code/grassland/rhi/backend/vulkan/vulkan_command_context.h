@@ -47,7 +47,8 @@ class VulkanCommandContext final : public CommandContext {
   VulkanCommandContext(VulkanDevice *device);
 
   bool ValidateGroups();
-  std::vector<VulkanBindingGroup *> groups_;
+  bool BindGroupVersion(uint32_t index, VulkanBindingGroup::Version *version);
+  std::vector<VulkanBindingGroup::Version *> groups_;
   VulkanProgram *program_{};
   VulkanImage *render_target_{};
   std::vector<VulkanBuffer *> vertex_buffers_;

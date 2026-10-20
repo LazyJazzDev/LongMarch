@@ -54,17 +54,25 @@ VkDescriptorSetLayout CreateBindingLayout(VkDevice device, const BindingLayoutDe
 
 class VulkanBindingGroup final : public BindingGroup {
  public:
-  static VulkanBindingGroup *Create(VulkanDevice *device,
-                                    const BindingLayoutDesc &layout,
-                                    const std::vector<BindingEntry> &entries);
-  ~VulkanBindingGroup() override;
-  VkDescriptorSet Set() const;
+  class Version final : public BindingGroup::Version {
+   public:
+    static Version *Create(VulkanDevice *device, const BindingLayoutDesc &layout);
+    ~Version() override;
+    VkDescriptorSet Set() const;
+
+   private:
+    Version(VulkanDevice *device, const BindingLayoutDesc &layout);
+    ObjectPtr<BindingGroup::Version> CreateEmpty() const override;
+    bool WriteDescriptors(size_t offset, const std::vector<Resource> &resources) override;
+    VkDescriptorSetLayout native_layout_{};
+    ObjectPtr<VulkanDescriptorPool::Lease> lease_;
+    std::vector<VkImageView> views_;
+    std::vector<VkSampler> samplers_;
+  };
+
+  static VulkanBindingGroup *Create(VulkanDevice *device, const BindingLayoutDesc &layout);
 
  private:
-  VulkanBindingGroup(VulkanDevice *device, const BindingLayoutDesc &layout, const std::vector<BindingEntry> &entries);
-  VkDescriptorSetLayout native_layout_{};
-  ObjectPtr<VulkanDescriptorPool::Lease> lease_;
-  std::vector<VkImageView> views_;
-  std::vector<VkSampler> samplers_;
+  VulkanBindingGroup(VulkanDevice *device, ObjectPtr<Version> version);
 };
 }  // namespace grassland::rhi::backend::vulkan

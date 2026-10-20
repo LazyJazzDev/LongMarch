@@ -22,8 +22,7 @@ class Device : public Object<rhi::IDevice> {
   bool SupportRayQuery() const override;
   bool SupportGeometryShader() const override;
   rhi::IImage *CreateImage(const ImageDesc &desc) override;
-  rhi::IBindingGroup *CreateBindingGroup(const BindingLayoutDesc &layout,
-                                         const std::vector<BindingEntry> &entries) override;
+  rhi::IBindingGroup *CreateBindingGroup(const BindingLayoutDesc &layout) override;
   rhi::IBuffer *CreateBuffer(const BufferDesc &desc) override;
   rhi::IProgram *CreateProgram(const ProgramDesc &desc) override;
   rhi::IShader *CreateShader(const ShaderDesc &desc) override;

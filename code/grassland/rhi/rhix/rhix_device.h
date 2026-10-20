@@ -21,8 +21,7 @@ class Device : public ObjectContainer {
   bool SupportRayTracingPipeline() const;
   bool SupportRayQuery() const;
   bool SupportGeometryShader() const;
-  BindingGroup CreateBindingGroup(const rhi::BindingLayoutDesc &layout,
-                                  const std::vector<rhi::BindingEntry> &entries) const;
+  BindingGroup CreateBindingGroup(const rhi::BindingLayoutDesc &layout) const;
   Shader CreateShader(const rhi::ShaderDesc &desc) const;
   Program CreateProgram(const rhi::ProgramDesc &desc) const;
   Image CreateImage(const rhi::ImageDesc &desc) const;
