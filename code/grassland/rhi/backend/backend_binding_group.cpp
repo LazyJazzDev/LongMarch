@@ -54,26 +54,63 @@ bool SameBindingLayout(const BindingLayoutDesc &a, const BindingLayoutDesc &b) {
 
 BindingGroup::Version::Version(Device *device, const BindingLayoutDesc &layout) : device_(device), layout_(layout) {
   std::sort(layout_.bindings.begin(), layout_.bindings.end(), [](auto a, auto b) { return a.binding < b.binding; });
-  for (auto b : layout_.bindings)
-    for (uint32_t i = 0; i < b.count; ++i) {
-      Resource resource;
-      resource.binding = b.binding;
-      resource.array_element = i;
-      resources_.push_back(resource);
+  for (const auto &binding : layout_.bindings) {
+    for (uint32_t i = 0; i < binding.count; ++i) {
+      if (binding.type <= BINDING_RW_STORAGE_BUFFER) {
+        typed_offsets_.push_back(buffers_.size());
+        buffers_.push_back({});
+      } else if (binding.type == BINDING_SAMPLER) {
+        typed_offsets_.push_back(samplers_.size());
+        samplers_.push_back({});
+      } else {
+        typed_offsets_.push_back(images_.size());
+        images_.push_back(nullptr);
+      }
     }
-  references_.resize(resources_.size());
+  }
+  initialized_.resize(typed_offsets_.size());
+  references_.resize(typed_offsets_.size());
 }
 
 const BindingLayoutDesc &BindingGroup::Version::GetLayout() const {
   return layout_;
 }
 
-const std::vector<BindingGroup::Resource> &BindingGroup::Version::GetResources() const {
-  return resources_;
+const BufferView &BindingGroup::Version::GetBuffer(size_t slot) const {
+  return buffers_[typed_offsets_[slot]];
+}
+
+IImage *BindingGroup::Version::GetImage(size_t slot) const {
+  return images_[typed_offsets_[slot]];
+}
+
+const SamplerDesc &BindingGroup::Version::GetSampler(size_t slot) const {
+  return samplers_[typed_offsets_[slot]];
+}
+
+const std::vector<IImage *> &BindingGroup::Version::GetImages() const {
+  return images_;
+}
+
+bool BindingGroup::Version::IsInitialized(size_t slot) const {
+  return initialized_[slot];
+}
+
+size_t BindingGroup::Version::SlotCount() const {
+  return typed_offsets_.size();
+}
+
+uint32_t BindingGroup::Version::ArrayElement(size_t slot) const {
+  for (const auto &binding : layout_.bindings) {
+    if (slot < binding.count)
+      return uint32_t(slot);
+    slot -= binding.count;
+  }
+  return 0;
 }
 
 bool BindingGroup::Version::IsComplete() const {
-  return std::all_of(resources_.begin(), resources_.end(), [](const auto &r) { return r.initialized; });
+  return std::all_of(initialized_.begin(), initialized_.end(), [](bool value) { return value; });
 }
 
 ObjectPtr<BindingGroup::Version> BindingGroup::Version::Clone() const {
@@ -85,31 +122,30 @@ ObjectPtr<BindingGroup::Version> BindingGroup::Version::Clone() const {
     // Copy initialized runs only; unwritten native descriptors must not be read.
     const size_t end = offset + binding.count;
     while (offset < end) {
-      if (!resources_[offset].initialized) {
+      if (!initialized_[offset]) {
         ++offset;
         continue;
       }
       const size_t first = offset;
-      while (offset < end && resources_[offset].initialized)
+      while (offset < end && initialized_[offset])
         ++offset;
       if (binding.type <= BINDING_RW_STORAGE_BUFFER) {
         std::vector<BufferView> buffers;
         for (size_t i = first; i < offset; ++i) {
-          const auto &r = resources_[i];
-          buffers.push_back({r.buffer, r.offset, r.size});
+          buffers.push_back(GetBuffer(i));
         }
         if (!copy->Write(first, binding, buffers))
           return {};
       } else if (binding.type == BINDING_SAMPLER) {
         std::vector<SamplerDesc> samplers;
         for (size_t i = first; i < offset; ++i)
-          samplers.push_back(resources_[i].sampler);
+          samplers.push_back(GetSampler(i));
         if (!copy->Write(first, binding, samplers))
           return {};
       } else {
         std::vector<IImage *> images;
         for (size_t i = first; i < offset; ++i)
-          images.push_back(resources_[i].image);
+          images.push_back(GetImage(i));
         if (!copy->Write(first, binding, images))
           return {};
       }
@@ -127,11 +163,8 @@ bool BindingGroup::Version::Write(size_t offset, const BindingDesc &binding, con
   if (!WriteDescriptors(offset, binding, values))
     return false;
   for (size_t i = 0; i < values.size(); ++i) {
-    auto &slot = resources_[offset + i];
-    slot.buffer = values[i].buffer;
-    slot.offset = values[i].offset;
-    slot.size = values[i].size;
-    slot.initialized = true;
+    buffers_[typed_offsets_[offset + i]] = values[i];
+    initialized_[offset + i] = true;
     references_[offset + i] = std::move(references[i]);
   }
   return true;
@@ -146,9 +179,8 @@ bool BindingGroup::Version::Write(size_t offset, const BindingDesc &binding, con
   if (!WriteDescriptors(offset, binding, values))
     return false;
   for (size_t i = 0; i < values.size(); ++i) {
-    auto &slot = resources_[offset + i];
-    slot.image = values[i];
-    slot.initialized = true;
+    images_[typed_offsets_[offset + i]] = values[i];
+    initialized_[offset + i] = true;
     references_[offset + i] = std::move(references[i]);
   }
   return true;
@@ -158,9 +190,8 @@ bool BindingGroup::Version::Write(size_t offset, const BindingDesc &binding, con
   if (!WriteDescriptors(offset, binding, values))
     return false;
   for (size_t i = 0; i < values.size(); ++i) {
-    auto &slot = resources_[offset + i];
-    slot.sampler = values[i];
-    slot.initialized = true;
+    samplers_[typed_offsets_[offset + i]] = values[i];
+    initialized_[offset + i] = true;
   }
   return true;
 }

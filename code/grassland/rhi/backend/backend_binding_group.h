@@ -7,21 +7,15 @@ class Device;
 
 class BindingGroup : public Object<IBindingGroup> {
  public:
-  // Captured slot state for resource lifetime and barrier tracking, not write parameters.
-  struct Resource {
-    uint32_t binding{}, array_element{};
-    IBuffer *buffer{};
-    uint64_t offset{}, size{};
-    IImage *image{};
-    SamplerDesc sampler;
-    bool initialized{};
-  };
-
   class Version : public Object<IObject> {
    public:
     Version(Device *device, const BindingLayoutDesc &layout);
     const BindingLayoutDesc &GetLayout() const;
-    const std::vector<Resource> &GetResources() const;
+    const BufferView &GetBuffer(size_t slot) const;
+    IImage *GetImage(size_t slot) const;
+    const SamplerDesc &GetSampler(size_t slot) const;
+    const std::vector<IImage *> &GetImages() const;
+    bool IsInitialized(size_t slot) const;
     bool IsComplete() const;
     ObjectPtr<Version> Clone() const;
     bool Write(size_t offset, const BindingDesc &binding, const std::vector<BufferView> &values);
@@ -29,6 +23,8 @@ class BindingGroup : public Object<IBindingGroup> {
     bool Write(size_t offset, const BindingDesc &binding, const std::vector<SamplerDesc> &values);
 
    protected:
+    size_t SlotCount() const;
+    uint32_t ArrayElement(size_t slot) const;
     virtual ObjectPtr<Version> CreateEmpty() const = 0;
     virtual bool WriteDescriptors(size_t offset, const BindingDesc &binding, const std::vector<BufferView> &values) = 0;
     virtual bool WriteDescriptors(size_t offset, const BindingDesc &binding, const std::vector<IImage *> &values) = 0;
@@ -39,7 +35,12 @@ class BindingGroup : public Object<IBindingGroup> {
     BindingLayoutDesc layout_;
 
    private:
-    std::vector<Resource> resources_;
+    // Slots map into compact, type-specific arrays; layout fixes each slot's type.
+    std::vector<size_t> typed_offsets_;
+    std::vector<BufferView> buffers_;
+    std::vector<IImage *> images_;
+    std::vector<SamplerDesc> samplers_;
+    std::vector<bool> initialized_;
     std::vector<ObjectPtr<IObject>> references_;
   };
 

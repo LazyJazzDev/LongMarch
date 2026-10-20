@@ -720,16 +720,18 @@ bool VulkanCommandContext::BindGroupVersion(uint32_t index, VulkanBindingGroup::
   try {
     size_t entry = 0;
     for (auto b : native->GetLayout().bindings)
-      for (uint32_t i = 0; i < b.count; ++i) {
-        auto e = native->GetResources()[entry++];
+      for (uint32_t i = 0; i < b.count; ++i, ++entry) {
         const VkAccessFlags access =
             VK_ACCESS_SHADER_READ_BIT |
             ((b.type == BINDING_RW_STORAGE_BUFFER || b.type == BINDING_RW_TEXTURE2D) ? VK_ACCESS_SHADER_WRITE_BIT : 0);
-        if (e.buffer && !TransitionBuffer(static_cast<VulkanBuffer *>(e.buffer), VK_PIPELINE_STAGE_ALL_GRAPHICS_BIT,
-                                          b.type == BINDING_UNIFORM_BUFFER ? VK_ACCESS_UNIFORM_READ_BIT : access))
-          return false;
-        if (e.image) {
-          auto image = static_cast<VulkanImage *>(e.image);
+        if (b.type <= BINDING_RW_STORAGE_BUFFER) {
+          auto buffer = static_cast<VulkanBuffer *>(native->GetBuffer(entry).buffer);
+          if (!TransitionBuffer(buffer, VK_PIPELINE_STAGE_ALL_GRAPHICS_BIT,
+                                b.type == BINDING_UNIFORM_BUFFER ? VK_ACCESS_UNIFORM_READ_BIT : access))
+            return false;
+        }
+        if (b.type == BINDING_TEXTURE2D || b.type == BINDING_RW_TEXTURE2D) {
+          auto image = static_cast<VulkanImage *>(native->GetImage(entry));
           if (render_target_) {
             auto known = image_states_.find(image);
             if ((known != image_states_.end() && known->second.layout != VK_IMAGE_LAYOUT_GENERAL) ||
@@ -762,10 +764,10 @@ bool VulkanCommandContext::ValidateGroups() {
       return false;
     }
     if (groups_[i])
-      for (auto e : groups_[i]->GetResources())
-        if (e.image) {
+      for (auto image : groups_[i]->GetImages())
+        if (image) {
           for (auto c : rendering_.color_attachments)
-            if (c.color_attachment == e.image) {
+            if (c.color_attachment == image) {
               recording_failed_ = true;
               return false;
             }

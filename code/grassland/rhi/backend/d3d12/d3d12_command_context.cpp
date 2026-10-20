@@ -635,23 +635,22 @@ bool D3D12CommandContext::PrepareGroups() {
       }
       size_t entry = 0;
       for (auto binding : version->GetLayout().bindings)
-        for (uint32_t j = 0; j < binding.count; ++j) {
-          const auto &e = version->GetResources()[entry++];
+        for (uint32_t j = 0; j < binding.count; ++j, ++entry) {
           auto type = binding.type;
           ID3D12Resource *resource = nullptr;
-          if (e.buffer) {
-            auto buffer = static_cast<D3D12Buffer *>(e.buffer);
+          if (type <= BINDING_RW_STORAGE_BUFFER) {
+            auto buffer = static_cast<D3D12Buffer *>(version->GetBuffer(entry).buffer);
             resource = buffer->NativeBuffer();
             if (!TransitionResource(resource,
                                     type == BINDING_RW_STORAGE_BUFFER ? D3D12_RESOURCE_STATE_UNORDERED_ACCESS
                                                                       : D3D12_RESOURCE_STATE_GENERIC_READ,
                                     buffer->DefaultState()))
               return false;
-          } else if (e.image) {
-            auto image = static_cast<D3D12Image *>(e.image);
+          } else if (type == BINDING_TEXTURE2D || type == BINDING_RW_TEXTURE2D) {
+            auto image = static_cast<D3D12Image *>(version->GetImage(entry));
             resource = image->NativeImage();
             for (auto color : rendering_.color_attachments)
-              if (color.color_attachment == e.image) {
+              if (color.color_attachment == image) {
                 recording_failed_ = true;
                 return false;
               }

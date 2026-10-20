@@ -198,8 +198,8 @@ VkDescriptorSet VulkanBindingGroup::Version::Set() const {
 VulkanBindingGroup::Version *VulkanBindingGroup::Version::Create(VulkanDevice *device,
                                                                  const BindingLayoutDesc &layout) {
   auto version = std::unique_ptr<Version>(new Version(device, layout));
-  version->views_.resize(version->GetResources().size());
-  version->samplers_.resize(version->GetResources().size());
+  version->views_.resize(version->SlotCount());
+  version->samplers_.resize(version->SlotCount());
   version->native_layout_ = CreateBindingLayout(device->NativeDevice(), layout);
   if (!version->native_layout_)
     return nullptr;
@@ -233,7 +233,7 @@ bool VulkanBindingGroup::Version::WriteDescriptors(size_t offset,
   VkWriteDescriptorSet write{VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET};
   write.dstSet = Set();
   write.dstBinding = binding.binding;
-  write.dstArrayElement = GetResources()[offset].array_element;
+  write.dstArrayElement = ArrayElement(offset);
   write.descriptorCount = uint32_t(infos.size());
   write.descriptorType = uniform ? VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER : VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
   write.pBufferInfo = infos.data();
@@ -268,7 +268,7 @@ bool VulkanBindingGroup::Version::WriteDescriptors(size_t offset,
   VkWriteDescriptorSet write{VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET};
   write.dstSet = Set();
   write.dstBinding = binding.binding;
-  write.dstArrayElement = GetResources()[offset].array_element;
+  write.dstArrayElement = ArrayElement(offset);
   write.descriptorCount = uint32_t(infos.size());
   write.descriptorType =
       binding.type == BINDING_TEXTURE2D ? VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE : VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
@@ -308,7 +308,7 @@ bool VulkanBindingGroup::Version::WriteDescriptors(size_t offset,
   VkWriteDescriptorSet write{VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET};
   write.dstSet = Set();
   write.dstBinding = binding.binding;
-  write.dstArrayElement = GetResources()[offset].array_element;
+  write.dstArrayElement = ArrayElement(offset);
   write.descriptorCount = uint32_t(infos.size());
   write.descriptorType = VK_DESCRIPTOR_TYPE_SAMPLER;
   write.pImageInfo = infos.data();

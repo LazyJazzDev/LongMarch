@@ -25,7 +25,6 @@ class D3D12BindingGroup final : public BindingGroup {
     bool WriteDescriptors(size_t offset, const BindingDesc &binding, const std::vector<BufferView> &values) override;
     bool WriteDescriptors(size_t offset, const BindingDesc &binding, const std::vector<IImage *> &values) override;
     bool WriteDescriptors(size_t offset, const BindingDesc &binding, const std::vector<SamplerDesc> &values) override;
-    std::vector<BindingType> types_;
     std::vector<uint32_t> offsets_;
     ObjectPtr<D3D12DescriptorPool::Lease> resources_, samplers_;
     std::vector<std::pair<std::vector<uint32_t>, ObjectPtr<D3D12DescriptorPool::Lease>>> resource_variants_;

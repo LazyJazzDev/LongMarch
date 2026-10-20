@@ -13,7 +13,6 @@ D3D12BindingGroup::Version::Version(D3D12Device *device, const BindingLayoutDesc
   uint32_t resource = 0, sampler = 0;
   for (auto b : layout_.bindings)
     for (uint32_t i = 0; i < b.count; ++i) {
-      types_.push_back(b.type);
       offsets_.push_back(b.type == BINDING_SAMPLER ? sampler++ : resource++);
     }
 }
@@ -154,10 +153,16 @@ D3D12DescriptorPool::Lease *D3D12BindingGroup::Version::ResourceDescriptors(cons
   for (const auto &variant : resource_variants_)
     if (variant.first == strides)
       return variant.second.Get();
-  for (const auto &e : GetResources()) {
-    auto stride = program->StructuredBufferStride(group, e.binding);
-    if (stride && (e.offset % stride || e.size % stride || e.size / stride > UINT32_MAX))
-      return nullptr;
+  size_t slot = 0;
+  for (const auto &binding : layout_.bindings) {
+    const auto stride = program->StructuredBufferStride(group, binding.binding);
+    for (uint32_t i = 0; i < binding.count; ++i, ++slot) {
+      if (!stride)
+        continue;
+      const auto &view = GetBuffer(slot);
+      if (view.offset % stride || view.size % stride || view.size / stride > UINT32_MAX)
+        return nullptr;
+    }
   }
   auto device = static_cast<D3D12Device *>(device_);
   auto table = device->ResourceDescriptorStorage().Acquire(resources_->Count());
@@ -166,28 +171,31 @@ D3D12DescriptorPool::Lease *D3D12BindingGroup::Version::ResourceDescriptors(cons
   auto native = device->NativeDevice();
   native->CopyDescriptorsSimple(resources_->Count(), table->CPU(), resources_->CPU(),
                                 D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
-  for (size_t i = 0; i < GetResources().size(); ++i) {
-    const auto &e = GetResources()[i];
-    const auto stride = program->StructuredBufferStride(group, e.binding);
-    if (!stride)
-      continue;
-    auto buffer = static_cast<D3D12Buffer *>(e.buffer)->NativeBuffer();
-    auto handle = table->CPU(offsets_[i]);
-    if (types_[i] == BINDING_STORAGE_BUFFER) {
-      D3D12_SHADER_RESOURCE_VIEW_DESC desc{};
-      desc.ViewDimension = D3D12_SRV_DIMENSION_BUFFER;
-      desc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
-      desc.Buffer.FirstElement = e.offset / stride;
-      desc.Buffer.NumElements = UINT(e.size / stride);
-      desc.Buffer.StructureByteStride = stride;
-      native->CreateShaderResourceView(buffer, &desc, handle);
-    } else {
-      D3D12_UNORDERED_ACCESS_VIEW_DESC desc{};
-      desc.ViewDimension = D3D12_UAV_DIMENSION_BUFFER;
-      desc.Buffer.FirstElement = e.offset / stride;
-      desc.Buffer.NumElements = UINT(e.size / stride);
-      desc.Buffer.StructureByteStride = stride;
-      native->CreateUnorderedAccessView(buffer, nullptr, &desc, handle);
+  slot = 0;
+  for (const auto &binding : layout_.bindings) {
+    const auto stride = program->StructuredBufferStride(group, binding.binding);
+    for (uint32_t i = 0; i < binding.count; ++i, ++slot) {
+      if (!stride)
+        continue;
+      const auto &view = GetBuffer(slot);
+      auto buffer = static_cast<D3D12Buffer *>(view.buffer)->NativeBuffer();
+      auto handle = table->CPU(offsets_[slot]);
+      if (binding.type == BINDING_STORAGE_BUFFER) {
+        D3D12_SHADER_RESOURCE_VIEW_DESC desc{};
+        desc.ViewDimension = D3D12_SRV_DIMENSION_BUFFER;
+        desc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
+        desc.Buffer.FirstElement = view.offset / stride;
+        desc.Buffer.NumElements = UINT(view.size / stride);
+        desc.Buffer.StructureByteStride = stride;
+        native->CreateShaderResourceView(buffer, &desc, handle);
+      } else {
+        D3D12_UNORDERED_ACCESS_VIEW_DESC desc{};
+        desc.ViewDimension = D3D12_UAV_DIMENSION_BUFFER;
+        desc.Buffer.FirstElement = view.offset / stride;
+        desc.Buffer.NumElements = UINT(view.size / stride);
+        desc.Buffer.StructureByteStride = stride;
+        native->CreateUnorderedAccessView(buffer, nullptr, &desc, handle);
+      }
     }
   }
   auto result = table.Get();
