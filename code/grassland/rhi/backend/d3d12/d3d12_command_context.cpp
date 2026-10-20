@@ -408,6 +408,7 @@ bool D3D12CommandContext::CmdEndRendering() {
       list_->DiscardResource(static_cast<D3D12Image *>(color.color_attachment)->NativeImage(), nullptr);
   list_->OMSetRenderTargets(0, nullptr, FALSE, nullptr);
   render_target_ = nullptr;
+  rendering_ = {};
   return true;
 }
 
