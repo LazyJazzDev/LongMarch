@@ -40,7 +40,7 @@ bool TraceScene(RayDesc ray, uint flags, out Hit hit) {
     return false;
   hit.distance = query.CommittedRayT();
   hit.object = query.CommittedInstanceID();
-  if (hit.object == 1000) {
+  if (hit.object == PRESSURE_BODY_COUNT) {
     hit.normal = float3(0, 1, 0);
   } else {
     float3 p = query.CommittedObjectRayOrigin() + hit.distance * query.CommittedObjectRayDirection();
@@ -69,7 +69,7 @@ bool TraceScene(RayDesc ray, uint flags, out Hit hit) {
   ray.Origin = mul(camera.camera_to_world, float4(0, 0, 0, 1)).xyz;
   ray.Direction = normalize(mul(camera.camera_to_world, float4(target.xyz, 0)).xyz);
   ray.TMin = .001;
-  ray.TMax = 200;
+  ray.TMax = 2000;
   float3 result = float3(.6, .7, .8);
   Hit hit;
   if (TraceScene(ray, RAY_FLAG_NONE, hit)) {
@@ -82,13 +82,13 @@ bool TraceScene(RayDesc ray, uint flags, out Hit hit) {
       shadow.Origin = p + hit.normal * .003;
       shadow.Direction = light;
       shadow.TMin = .001;
-      shadow.TMax = 200;
+      shadow.TMax = 2000;
       Hit blocker;
       if (TraceScene(shadow, RAY_FLAG_ACCEPT_FIRST_HIT_AND_END_SEARCH, blocker))
         visibility = 0;
     }
     float3 albedo = colors[hit.object].rgb;
-    if (hit.object == 1000) {
+    if (hit.object == PRESSURE_BODY_COUNT) {
       float checker = fmod(abs(floor(p.x) + floor(p.z)), 2);
       albedo *= lerp(.8, 1, checker);
     }

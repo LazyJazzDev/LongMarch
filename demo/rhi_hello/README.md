@@ -173,14 +173,14 @@ existing shaders and the shared DX-compatible Vulkan layout.
 ## TLAS pressure test
 
 `rhi_hello --module tlas_pressure_test --backend vulkan` (or `d3d12`) renders
-1,000 randomly positioned and colored cubes/spheres on a large ground plane.
+100,000 randomly positioned and colored cubes/spheres on a large ground plane.
 All bodies, including hidden ones, are simulated on the CPU with gravity along Y;
 ground contact assigns a new random upward speed. A sinusoid with an eight-second
-period selects 200 through 1,000 visible bodies, randomly moving IDs between the
+period selects 20,000 through 100,000 visible bodies, randomly moving IDs between the
 visible and hidden sets. Stable instance IDs retain each body's color.
 
 Three immutable BLASes (cube, sphere AABB, ground) are shared by the instances.
-The TLAS is allocated once for 1,001 instances. Every frame uses BUILD with exactly
+The TLAS is allocated once for 100,001 instances. Every frame uses BUILD with exactly
 `visible bodies + 1 ground` instances: hidden objects are absent, not masked out.
 Native UPDATE/refit cannot change the previous instance count. The allocation
 capacity in `TopLevelAccelerationStructureDesc::instance_count` is now an upper

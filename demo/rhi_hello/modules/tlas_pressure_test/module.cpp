@@ -23,6 +23,7 @@ namespace {
 
 int RunTLASPressureTest(grassland::rhi::BackendAPI api, int frames, bool headless) {
   using namespace grassland::rhi;
+  constexpr uint32_t body_count = 100000;
   ObjPtr<ICore> core = CreateCore(api);
   if (!core)
     return 1;
@@ -53,6 +54,8 @@ int RunTLASPressureTest(grassland::rhi::BackendAPI api, int frames, bool headles
     }
   const auto &embedded = shader_list.at("modules/tlas_pressure_test/shaders/trace.slang");
   std::string source(embedded.first, embedded.second);
+  const size_t prefix_offset = source.compare(0, 3, "\xef\xbb\xbf") == 0 ? 3 : 0;
+  source.insert(prefix_offset, "#define PRESSURE_BODY_COUNT " + std::to_string(body_count) + "\n");
   PipelineLayoutDesc trace_layout{{{{{0, BINDING_ACCELERATION_STRUCTURE, 1, SHADER_VISIBILITY_COMPUTE},
                                      {1, BINDING_RW_TEXTURE2D, 1, SHADER_VISIBILITY_COMPUTE},
                                      {2, BINDING_UNIFORM_BUFFER, 1, SHADER_VISIBILITY_COMPUTE},
@@ -98,7 +101,7 @@ int RunTLASPressureTest(grassland::rhi::BackendAPI api, int frames, bool headles
                                  -.5f, -.5f, .5f,  .5f, -.5f, .5f,  .5f, .5f, .5f,  -.5f, .5f, .5f};
   const uint32_t cube_indices[] = {0, 2, 1, 0, 3, 2, 4, 5, 6, 4, 6, 7, 0, 1, 5, 0, 5, 4,
                                    3, 7, 6, 3, 6, 2, 0, 4, 7, 0, 7, 3, 1, 2, 6, 1, 6, 5};
-  const float ground_vertices[] = {-24, 0, -24, 24, 0, -24, 24, 0, 24, -24, 0, -24, 24, 0, 24, -24, 0, 24};
+  const float ground_vertices[] = {-240, 0, -240, 240, 0, -240, 240, 0, 240, -240, 0, -240, 240, 0, 240, -240, 0, 240};
   const float bounds[] = {-.5f, -.5f, -.5f, .5f, .5f, .5f};
   BottomLevelAccelerationStructureDesc cube_desc;
   cube_desc.geometries = {{8, 12, 36}};
@@ -122,17 +125,17 @@ int RunTLASPressureTest(grassland::rhi::BackendAPI api, int frames, bool headles
   };
 
   std::mt19937 random(87);
-  std::uniform_real_distribution<float> position(-19.5f, 19.5f);
+  std::uniform_real_distribution<float> position(-195.0f, 195.0f);
   std::uniform_real_distribution<float> color(.15f, .95f);
   std::uniform_real_distribution<float> bounce(3.0f, 10.0f);
-  std::array<Body, 1000> bodies;
-  std::array<std::array<float, 4>, 1001> colors;
+  std::vector<Body> bodies(body_count);
+  std::vector<std::array<float, 4>> colors(body_count + 1);
   for (size_t i = 0; i < bodies.size(); ++i) {
     bodies[i] = {position(random), .5f, position(random), 0, (random() & 1) != 0};
     colors[i] = {color(random), color(random), color(random), 1};
   }
   colors.back() = {.55f, .58f, .62f, 1};
-  ObjPtr<IBuffer> color_buffer = device->CreateBuffer({sizeof(colors)});
+  ObjPtr<IBuffer> color_buffer = device->CreateBuffer({colors.size() * sizeof(colors[0])});
   if (!color_buffer)
     return 1;
   {
@@ -159,7 +162,7 @@ int RunTLASPressureTest(grassland::rhi::BackendAPI api, int frames, bool headles
       return 1;
     if (!build->CmdUploadBuffer(aabbs.Get(), 0, bounds, sizeof(bounds)))
       return 1;
-    if (!build->CmdUploadBuffer(color_buffer.Get(), 0, colors.data(), sizeof(colors)))
+    if (!build->CmdUploadBuffer(color_buffer.Get(), 0, colors.data(), colors.size() * sizeof(colors[0])))
       return 1;
     if (!build->CmdBuildBottomLevelAccelerationStructure(cube.Get(), {{{vertices.Get()}, {indices.Get()}}}))
       return 1;
@@ -173,14 +176,14 @@ int RunTLASPressureTest(grassland::rhi::BackendAPI api, int frames, bool headles
     if (!token->WaitHost())
       return 1;
   }
-  ObjPtr<ITopLevelAccelerationStructure> tlas = device->CreateTopLevelAccelerationStructure({1001});
+  ObjPtr<ITopLevelAccelerationStructure> tlas = device->CreateTopLevelAccelerationStructure({body_count + 1});
   if (!tlas)
     return 1;
-  std::vector<uint32_t> visible, hidden(1000);
+  std::vector<uint32_t> visible, hidden(body_count);
   std::iota(hidden.begin(), hidden.end(), 0);
-  visible.reserve(1000);
+  visible.reserve(body_count);
   std::vector<RayTracingInstance> instances;
-  instances.reserve(1001);
+  instances.reserve(body_count + 1);
   double simulation_time = 0;
   auto previous_frame = std::chrono::steady_clock::now();
 
@@ -189,7 +192,7 @@ int RunTLASPressureTest(grassland::rhi::BackendAPI api, int frames, bool headles
     uint64_t frames{}, instances{};
   } totals;
 
-  uint32_t minimum_visible = 1000, maximum_visible = 0;
+  uint32_t minimum_visible = body_count, maximum_visible = 0;
 
   struct CameraInfo {
     glm::mat4 screen_to_camera;
@@ -283,9 +286,9 @@ int RunTLASPressureTest(grassland::rhi::BackendAPI api, int frames, bool headles
         return 1;
       if (!display_group->BindResource(0, output.Get()))
         return 1;
-      CameraInfo camera{
-          glm::inverse(glm::perspective(glm::radians(55.0f), float(extent.width) / float(extent.height), 0.1f, 150.0f)),
-          glm::inverse(glm::lookAt(glm::vec3{32, 32, 42}, glm::vec3{0, 1, 0}, glm::vec3{0, 1, 0}))};
+      CameraInfo camera{glm::inverse(glm::perspective(glm::radians(55.0f), float(extent.width) / float(extent.height),
+                                                      0.1f, 1500.0f)),
+                        glm::inverse(glm::lookAt(glm::vec3{320, 320, 420}, glm::vec3{0, 1, 0}, glm::vec3{0, 1, 0}))};
       if (!context->CmdUploadBuffer(camera_buffer.Get(), 0, &camera, sizeof(camera)))
         return 1;
     }
@@ -308,7 +311,7 @@ int RunTLASPressureTest(grassland::rhi::BackendAPI api, int frames, bool headles
       dt -= step;
     }
     const uint32_t target_count =
-        uint32_t(std::lround(600.0 - 400.0 * std::cos(simulation_time * glm::two_pi<double>() / 8.0)));
+        uint32_t(std::lround(body_count * (0.6 - 0.4 * std::cos(simulation_time * glm::two_pi<double>() / 8.0))));
     while (visible.size() != target_count) {
       auto &from = visible.size() < target_count ? hidden : visible;
       auto &to = visible.size() < target_count ? visible : hidden;
@@ -320,7 +323,7 @@ int RunTLASPressureTest(grassland::rhi::BackendAPI api, int frames, bool headles
     instances.clear();
     RayTracingInstance plane;
     plane.blas = ground.Get();
-    plane.custom_index = 1000;
+    plane.custom_index = body_count;
     plane.disable_triangle_culling = true;
     instances.push_back(plane);
     for (uint32_t id : visible) {
@@ -361,8 +364,16 @@ int RunTLASPressureTest(grassland::rhi::BackendAPI api, int frames, bool headles
     if (!context->CmdEndRendering())
       return 1;
     if (!headless) {
-      if (!context->CmdPresent(window.Get()))
-        return 1;
+      if (!context->CmdPresent(window.Get())) {
+        // The OS can minimize the window during this long CPU recording interval.
+        ObjPtr<IImage> next = window->GetNextImage();
+        if (next)
+          return 1;
+        // Discard this recording; retry the camera upload if it was part of this frame.
+        output.Release();
+        fps.Reset();
+        continue;
+      }
     }
     const auto submit_start = std::chrono::steady_clock::now();
     ObjPtr<ISubmissionToken> token = queue->Submit(context.Get());
