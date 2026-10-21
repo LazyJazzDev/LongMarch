@@ -16,16 +16,12 @@
 namespace grassland::rhi::backend {
 
 rhi::IDevice *Core::CreateDeviceByAutoSelection(DeviceFeatureRequirement requirement) {
-  try {
-    const auto id = SelectPhysicalDevice(GetPhysicalDevices(), requirement);
-    if (id < 0) {
-      ReportError(-1, "No physical device satisfies the requested RHI features.");
-      return nullptr;
-    }
-    return CreateDevice(id);
-  } catch (const std::bad_alloc &) {
+  const auto id = SelectPhysicalDevice(GetPhysicalDevices(), requirement);
+  if (id < 0) {
+    ReportError(-1, "No physical device satisfies the requested RHI features.");
     return nullptr;
   }
+  return CreateDevice(id);
 }
 
 Core *CreateCore(BackendAPI api) {

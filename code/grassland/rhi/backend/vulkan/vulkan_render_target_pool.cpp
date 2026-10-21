@@ -110,49 +110,41 @@ VkRenderPass VulkanRenderTargetPool::RenderPass(const std::vector<ImageFormat> &
 
 ObjectPtr<VulkanRenderTargetPool::Lease> VulkanRenderTargetPool::Acquire(const std::vector<VulkanImage *> &images,
                                                                          VkRenderPass pass) {
-  try {
-    std::lock_guard<std::mutex> lock(mutex_);
-    std::vector<VkImage> handles;
+  std::lock_guard<std::mutex> lock(mutex_);
+  std::vector<VkImage> handles;
+  for (auto image : images)
+    handles.push_back(image->NativeImage());
+  Entry *entry = nullptr;
+  for (auto &candidate : entries_)
+    if (candidate->images == handles) {
+      entry = candidate.get();
+      break;
+    }
+  if (!entry) {
+    entries_.reserve(entries_.size() + 1);
+    auto fresh = std::make_unique<Entry>();
+    fresh->images = handles;
     for (auto image : images)
-      handles.push_back(image->NativeImage());
-    Entry *entry = nullptr;
-    for (auto &candidate : entries_)
-      if (candidate->images == handles) {
-        entry = candidate.get();
-        break;
-      }
-    if (!entry) {
-      auto fresh = std::make_unique<Entry>();
-      fresh->images = handles;
-      for (auto image : images)
-        fresh->views.push_back(image->AttachmentView());
-      if (!dynamic_rendering_) {
-        VkFramebufferCreateInfo create{VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO};
-        create.renderPass = pass;
-        create.attachmentCount = uint32_t(fresh->views.size());
-        create.pAttachments = fresh->views.data();
-        create.width = images[0]->GetDesc().width;
-        create.height = images[0]->GetDesc().height;
-        create.layers = 1;
-        if (!Check(vkCreateFramebuffer(device_, &create, nullptr, &fresh->framebuffer), "Create framebuffer")) {
-          DestroyEntry(*fresh);
-          return {};
-        }
-      }
-      entry = fresh.get();
-      try {
-        entries_.push_back(std::move(fresh));
-      } catch (const std::bad_alloc &) {
-        DestroyEntry(*entry);
-        throw;
+      fresh->views.push_back(image->AttachmentView());
+    if (!dynamic_rendering_) {
+      VkFramebufferCreateInfo create{VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO};
+      create.renderPass = pass;
+      create.attachmentCount = uint32_t(fresh->views.size());
+      create.pAttachments = fresh->views.data();
+      create.width = images[0]->GetDesc().width;
+      create.height = images[0]->GetDesc().height;
+      create.layers = 1;
+      if (!Check(vkCreateFramebuffer(device_, &create, nullptr, &fresh->framebuffer), "Create framebuffer")) {
+        DestroyEntry(*fresh);
+        return {};
       }
     }
-    auto lease = ObjectPtr<Lease>::Adopt(new Lease(this, entry, images));
-    ++entry->leases;
-    return lease;
-  } catch (const std::bad_alloc &) {
-    return {};
+    entry = fresh.get();
+    entries_.push_back(std::move(fresh));
   }
+  auto lease = ObjectPtr<Lease>::Adopt(new Lease(this, entry, images));
+  ++entry->leases;
+  return lease;
 }
 
 void VulkanRenderTargetPool::ReleaseEntry(Entry *entry) {

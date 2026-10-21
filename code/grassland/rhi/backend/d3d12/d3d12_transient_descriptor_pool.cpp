@@ -93,7 +93,7 @@ ObjectPtr<D3D12TransientDescriptorPool::Lease> D3D12TransientDescriptorPool::Acq
   } catch (const std::bad_alloc &) {
     if (heap)
       ReleasePage(heap, level);
-    return {};
+    throw;
   }
 }
 

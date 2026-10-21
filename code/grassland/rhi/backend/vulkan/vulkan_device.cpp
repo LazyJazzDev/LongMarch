@@ -243,12 +243,7 @@ rhi::IBuffer *VulkanDevice::CreateBuffer(const BufferDesc &desc) {
 }
 
 rhi::IProgram *VulkanDevice::CreateProgram(const ProgramDesc &desc) {
-  try {
-    return new VulkanProgram(this, desc);
-  } catch (const std::bad_alloc &) {
-    ReportError(-1, "Program allocation failed.");
-    return nullptr;
-  }
+  return new VulkanProgram(this, desc);
 }
 
 rhi::IWindow *VulkanDevice::CreateGLFWWindow(const WindowDesc &desc) {
@@ -260,12 +255,7 @@ rhi::ICommandContext *VulkanDevice::CreateCommandContext() {
 }
 
 rhi::IQueue *VulkanDevice::GetQueue(QueueType type) {
-  try {
-    return new VulkanQueue(this, type);
-  } catch (const std::bad_alloc &) {
-    ReportError(-1, "Queue creation ran out of memory.");
-    return nullptr;
-  }
+  return new VulkanQueue(this, type);
 }
 
 }  // namespace grassland::rhi::backend::vulkan

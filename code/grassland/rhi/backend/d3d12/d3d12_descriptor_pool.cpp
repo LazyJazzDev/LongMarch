@@ -41,59 +41,55 @@ D3D12DescriptorPool::D3D12DescriptorPool(ID3D12Device *device, D3D12_DESCRIPTOR_
 ObjectPtr<D3D12DescriptorPool::Lease> D3D12DescriptorPool::Acquire(uint32_t count) {
   if (!count || !page_capacity_)
     return {};
-  try {
-    std::lock_guard<std::mutex> lock(mutex_);
-    Page *page = nullptr;
-    uint32_t offset = 0;
-    uint32_t available = 0;
-    // Geometric growth keeps pages ordered by capacity and their count logarithmic.
-    for (auto &candidate : pages_) {
-      auto fit = candidate->available.lower_bound({count, 0});
-      if (fit != candidate->available.end()) {
-        page = candidate.get();
-        available = fit->first;
-        offset = fit->second;
-        break;
-      }
+  std::lock_guard<std::mutex> lock(mutex_);
+  Page *page = nullptr;
+  uint32_t offset = 0;
+  uint32_t available = 0;
+  // Geometric growth keeps pages ordered by capacity and their count logarithmic.
+  for (auto &candidate : pages_) {
+    auto fit = candidate->available.lower_bound({count, 0});
+    if (fit != candidate->available.end()) {
+      page = candidate.get();
+      available = fit->first;
+      offset = fit->second;
+      break;
     }
-    if (!page) {
-      uint64_t capacity = 1;
-      const uint64_t minimum = pages_.empty() ? std::max(count, page_capacity_) : count;
-      while (capacity < minimum)
-        capacity *= 2;
-      if (!pages_.empty())
-        capacity = std::max(capacity, uint64_t(pages_.back()->capacity) * 2);
-      if (capacity > std::numeric_limits<uint32_t>::max())
-        return {};
-      auto fresh = std::make_unique<Page>();
-      fresh->capacity = uint32_t(capacity);
-      D3D12_DESCRIPTOR_HEAP_DESC desc{};
-      desc.Type = type_;
-      desc.NumDescriptors = fresh->capacity;
-      desc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_NONE;
-      if (!Check(device_->CreateDescriptorHeap(&desc, IID_PPV_ARGS(&fresh->heap)), "Create descriptor pool page"))
-        return {};
-      fresh->ranges.emplace(0, fresh->capacity);
-      fresh->available.emplace(fresh->capacity, 0);
-      page = fresh.get();
-      available = fresh->capacity;
-      pages_.push_back(std::move(fresh));
-    }
-    auto lease = ObjectPtr<Lease>::Adopt(new Lease(this, page, offset, count));
-    auto range = page->ranges.extract(offset);
-    auto fit = page->available.extract({available, offset});
-    if (available > count) {
-      range.key() = offset + count;
-      range.mapped() = available - count;
-      fit.value() = {available - count, offset + count};
-      page->ranges.insert(std::move(range));
-      page->available.insert(std::move(fit));
-    }
-    ++page->occupied;
-    return lease;
-  } catch (const std::bad_alloc &) {
-    return {};
   }
+  if (!page) {
+    uint64_t capacity = 1;
+    const uint64_t minimum = pages_.empty() ? std::max(count, page_capacity_) : count;
+    while (capacity < minimum)
+      capacity *= 2;
+    if (!pages_.empty())
+      capacity = std::max(capacity, uint64_t(pages_.back()->capacity) * 2);
+    if (capacity > std::numeric_limits<uint32_t>::max())
+      return {};
+    auto fresh = std::make_unique<Page>();
+    fresh->capacity = uint32_t(capacity);
+    D3D12_DESCRIPTOR_HEAP_DESC desc{};
+    desc.Type = type_;
+    desc.NumDescriptors = fresh->capacity;
+    desc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_NONE;
+    if (!Check(device_->CreateDescriptorHeap(&desc, IID_PPV_ARGS(&fresh->heap)), "Create descriptor pool page"))
+      return {};
+    fresh->ranges.emplace(0, fresh->capacity);
+    fresh->available.emplace(fresh->capacity, 0);
+    page = fresh.get();
+    available = fresh->capacity;
+    pages_.push_back(std::move(fresh));
+  }
+  auto lease = ObjectPtr<Lease>::Adopt(new Lease(this, page, offset, count));
+  auto range = page->ranges.extract(offset);
+  auto fit = page->available.extract({available, offset});
+  if (available > count) {
+    range.key() = offset + count;
+    range.mapped() = available - count;
+    fit.value() = {available - count, offset + count};
+    page->ranges.insert(std::move(range));
+    page->available.insert(std::move(fit));
+  }
+  ++page->occupied;
+  return lease;
 }
 
 void D3D12DescriptorPool::ReleaseRange(Page *page, uint32_t offset, uint32_t count) {

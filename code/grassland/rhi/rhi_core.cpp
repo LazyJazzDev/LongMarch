@@ -6,10 +6,6 @@ namespace grassland::rhi {
 ICore::~ICore() = default;
 
 ICore *CreateCore(BackendAPI api) {
-  try {
-    return backend::CreateCore(api);
-  } catch (const std::bad_alloc &) {
-    return nullptr;
-  }
+  return backend::CreateCore(api);
 }
 }  // namespace grassland::rhi

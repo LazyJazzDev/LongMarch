@@ -30,16 +30,11 @@ D3D12CommandContext::~D3D12CommandContext() {
 }
 
 D3D12CommandContext *D3D12CommandContext::Create(D3D12Device *device) {
-  try {
-    auto object = std::unique_ptr<D3D12CommandContext>(new D3D12CommandContext(device));
-    object->reusable_ = object->device_->AcquireCommandResources(object->allocator_, object->list_, object->event_);
-    if (!object->reusable_)
-      return nullptr;
-    return object.release();
-  } catch (const std::bad_alloc &) {
-    ReportError(-1, "D3D12CommandContext creation ran out of memory.");
+  auto object = std::unique_ptr<D3D12CommandContext>(new D3D12CommandContext(device));
+  object->reusable_ = object->device_->AcquireCommandResources(object->allocator_, object->list_, object->event_);
+  if (!object->reusable_)
     return nullptr;
-  }
+  return object.release();
 }
 
 bool D3D12CommandContext::TransitionResource(ID3D12Resource *resource,
@@ -56,25 +51,19 @@ bool D3D12CommandContext::TransitionResource(ID3D12Resource *resource,
 #endif
     return true;
   }
-  try {
-    auto &current =
-        resource_states_.try_emplace(resource, ResourceState{default_state, default_state}).first->second.current;
-    if (current != state) {
-      D3D12_RESOURCE_BARRIER barrier{};
-      barrier.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
-      barrier.Transition.pResource = resource;
-      barrier.Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
-      barrier.Transition.StateBefore = current;
-      barrier.Transition.StateAfter = state;
-      list_->ResourceBarrier(1, &barrier);
-      current = state;
-    }
-    return true;
-  } catch (const std::bad_alloc &) {
-    recording_failed_ = true;
-    ReportError(-1, "Resource state tracking ran out of memory.");
-    return false;
+  auto &current =
+      resource_states_.try_emplace(resource, ResourceState{default_state, default_state}).first->second.current;
+  if (current != state) {
+    D3D12_RESOURCE_BARRIER barrier{};
+    barrier.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
+    barrier.Transition.pResource = resource;
+    barrier.Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
+    barrier.Transition.StateBefore = current;
+    barrier.Transition.StateAfter = state;
+    list_->ResourceBarrier(1, &barrier);
+    current = state;
   }
+  return true;
 }
 
 bool D3D12CommandContext::CmdClearColor(rhi::IImage *image, const std::array<float, 4> &color) {
@@ -129,12 +118,8 @@ bool D3D12CommandContext::CmdPresent(rhi::IWindow *window) {
     return false;
   if (!RetainResource(frame.Get()))
     return false;
-  try {
-    presents_.emplace_back(target, frame.Get());
-  } catch (const std::bad_alloc &) {
-    recording_failed_ = true;
-    return false;
-  }
+  presents_.emplace_back(target, frame.Get());
+
   return TransitionResource(frame->NativeImage(), D3D12_RESOURCE_STATE_PRESENT, frame->DefaultState());
 }
 
@@ -302,18 +287,10 @@ bool D3D12CommandContext::CmdBindProgram(IProgram *program) {
     recording_failed_ = true;
     return false;
   }
-  try {
-    vertex_buffers_.assign(native->GetDesc().vertex_bindings.size(), nullptr);
-  } catch (const std::bad_alloc &) {
-    recording_failed_ = true;
-    return false;
-  }
-  try {
-    groups_.assign(native->GetDesc().pipeline_layout.groups.size(), {});
-  } catch (const std::bad_alloc &) {
-    recording_failed_ = true;
-    return false;
-  }
+  vertex_buffers_.assign(native->GetDesc().vertex_bindings.size(), nullptr);
+
+  groups_.assign(native->GetDesc().pipeline_layout.groups.size(), {});
+
   tables_dirty_ = true;
   program_ = native;
   list_->OMSetStencilRef(native->GetDesc().depth_stencil.stencil_reference);
@@ -559,160 +536,150 @@ bool D3D12CommandContext::CmdBindGroup(uint32_t index, IBindingGroup *group) {
     recording_failed_ = true;
     return false;
   }
-  try {
-    auto version = static_cast<D3D12BindingGroup::Version *>(native->CurrentVersion());
-    auto resources = version->ResourceDescriptors();
-    if (version->ResourceCount() && !resources) {
-      recording_failed_ = true;
-      return false;
-    }
-    if (!RetainResource(version))
-      return false;
-
-    auto &bound = groups_[index];
-    std::array<D3D12DescriptorPool::Lease *, 2> sources{resources, version->SamplerDescriptors()};
-    for (size_t kind = 0; kind < sources.size(); ++kind) {
-      if (bound.sources[kind] != sources[kind]) {
-        bound.sources[kind] = sources[kind];
-        bound.dirty[kind] = true;
-        tables_dirty_ = true;
-      }
-    }
-    bound.version = version;
-    return true;
-  } catch (const std::bad_alloc &) {
+  auto version = static_cast<D3D12BindingGroup::Version *>(native->CurrentVersion());
+  auto resources = version->ResourceDescriptors();
+  if (version->ResourceCount() && !resources) {
     recording_failed_ = true;
     return false;
   }
+  if (!RetainResource(version))
+    return false;
+
+  auto &bound = groups_[index];
+  std::array<D3D12DescriptorPool::Lease *, 2> sources{resources, version->SamplerDescriptors()};
+  for (size_t kind = 0; kind < sources.size(); ++kind) {
+    if (bound.sources[kind] != sources[kind]) {
+      bound.sources[kind] = sources[kind];
+      bound.dirty[kind] = true;
+      tables_dirty_ = true;
+    }
+  }
+  bound.version = version;
+  return true;
 }
 
 bool D3D12CommandContext::PrepareGroups() {
-  try {
-    for (size_t i = 0; i < groups_.size(); ++i) {
-      const auto version = groups_[i].version;
-      if (!version) {
-        if (!program_->GetDesc().pipeline_layout.groups[i].bindings.empty()) {
-          recording_failed_ = true;
-          return false;
-        }
-        continue;
+  for (size_t i = 0; i < groups_.size(); ++i) {
+    const auto version = groups_[i].version;
+    if (!version) {
+      if (!program_->GetDesc().pipeline_layout.groups[i].bindings.empty()) {
+        recording_failed_ = true;
+        return false;
       }
-      for (size_t binding_index = 0; binding_index < version->GetLayout().bindings.size(); ++binding_index) {
-        const auto &binding = version->GetLayout().bindings[binding_index];
-        for (uint32_t j = 0; j < binding.count; ++j) {
-          auto type = binding.type;
-          ID3D12Resource *resource = nullptr;
-          if (type <= BINDING_RW_BYTE_ADDRESS_BUFFER) {
-            auto buffer = static_cast<D3D12Buffer *>(version->GetReferences()[binding_index][j].Get());
-            resource = buffer->NativeBuffer();
-            if (!TransitionResource(resource,
-                                    (type == BINDING_RW_STRUCTURED_BUFFER || type == BINDING_RW_BYTE_ADDRESS_BUFFER)
-                                        ? D3D12_RESOURCE_STATE_UNORDERED_ACCESS
-                                        : D3D12_RESOURCE_STATE_GENERIC_READ,
-                                    buffer->DefaultState()))
+      continue;
+    }
+    for (size_t binding_index = 0; binding_index < version->GetLayout().bindings.size(); ++binding_index) {
+      const auto &binding = version->GetLayout().bindings[binding_index];
+      for (uint32_t j = 0; j < binding.count; ++j) {
+        auto type = binding.type;
+        ID3D12Resource *resource = nullptr;
+        if (type <= BINDING_RW_BYTE_ADDRESS_BUFFER) {
+          auto buffer = static_cast<D3D12Buffer *>(version->GetReferences()[binding_index][j].Get());
+          resource = buffer->NativeBuffer();
+          if (!TransitionResource(resource,
+                                  (type == BINDING_RW_STRUCTURED_BUFFER || type == BINDING_RW_BYTE_ADDRESS_BUFFER)
+                                      ? D3D12_RESOURCE_STATE_UNORDERED_ACCESS
+                                      : D3D12_RESOURCE_STATE_GENERIC_READ,
+                                  buffer->DefaultState()))
+            return false;
+        } else if (type == BINDING_TEXTURE2D || type == BINDING_RW_TEXTURE2D) {
+          auto image = static_cast<D3D12Image *>(version->GetReferences()[binding_index][j].Get());
+          resource = image->NativeImage();
+          for (auto color : rendering_.color_attachments)
+            if (color.color_attachment == image) {
+              recording_failed_ = true;
               return false;
-          } else if (type == BINDING_TEXTURE2D || type == BINDING_RW_TEXTURE2D) {
-            auto image = static_cast<D3D12Image *>(version->GetReferences()[binding_index][j].Get());
-            resource = image->NativeImage();
-            for (auto color : rendering_.color_attachments)
-              if (color.color_attachment == image) {
-                recording_failed_ = true;
-                return false;
-              }
-            if (!TransitionResource(resource,
-                                    type == BINDING_TEXTURE2D ? D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE |
-                                                                    D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE
-                                                              : D3D12_RESOURCE_STATE_UNORDERED_ACCESS,
-                                    image->DefaultState()))
-              return false;
-          }
-          if (type == BINDING_RW_STRUCTURED_BUFFER || type == BINDING_RW_BYTE_ADDRESS_BUFFER ||
-              type == BINDING_RW_TEXTURE2D) {
-            D3D12_RESOURCE_BARRIER barrier{};
-            barrier.Type = D3D12_RESOURCE_BARRIER_TYPE_UAV;
-            barrier.UAV.pResource = resource;
-            list_->ResourceBarrier(1, &barrier);
-          }
+            }
+          if (!TransitionResource(resource,
+                                  type == BINDING_TEXTURE2D ? D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE |
+                                                                  D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE
+                                                            : D3D12_RESOURCE_STATE_UNORDERED_ACCESS,
+                                  image->DefaultState()))
+            return false;
+        }
+        if (type == BINDING_RW_STRUCTURED_BUFFER || type == BINDING_RW_BYTE_ADDRESS_BUFFER ||
+            type == BINDING_RW_TEXTURE2D) {
+          D3D12_RESOURCE_BARRIER barrier{};
+          barrier.Type = D3D12_RESOURCE_BARRIER_TYPE_UAV;
+          barrier.UAV.pResource = resource;
+          list_->ResourceBarrier(1, &barrier);
         }
       }
     }
-    if (!tables_dirty_)
-      return true;
-    bool heaps_changed = false;
-    for (size_t kind = 0; kind < 2; ++kind) {
-      uint64_t total = 0, needed = 0;
-      for (const auto &bound : groups_) {
-        if (!bound.sources[kind])
-          continue;
-        total += bound.sources[kind]->Count();
-        if (bound.dirty[kind])
-          needed += bound.sources[kind]->Count();
-      }
-      if (!needed)
-        continue;
-      const auto available = descriptor_pages_[kind] ? descriptor_pages_[kind]->Count() - descriptor_used_[kind] : 0;
-      if (needed > available) {
-        const uint32_t limit = kind ? 2048 : 1000000;
-        if (total > limit) {
-          recording_failed_ = true;
-          return false;
-        }
-        auto &pool = kind ? device_->SamplerDescriptors() : device_->ResourceDescriptors();
-        // The context chooses growth; the pool only rounds and reuses size classes.
-        // At the native limit, further rollovers necessarily use equal-size heaps.
-        const uint32_t previous = descriptor_pages_[kind] ? descriptor_pages_[kind]->Count() : 0;
-        const uint32_t minimum = std::max(uint32_t(total), std::min(previous * 2, limit));
-        auto page = pool.Acquire(minimum);
-        if (!page) {
-          recording_failed_ = true;
-          return false;
-        }
-        if (!RetainResource(page.Get()))
-          return false;
-        descriptor_pages_[kind] = page.Get();
-        descriptor_used_[kind] = 0;
-        heaps_changed = true;
-        // Every still-bound table of this heap type must move together. Earlier
-        // draws retain the old page through the context's resource references.
-        for (auto &bound : groups_)
-          bound.dirty[kind] = bound.sources[kind] != nullptr;
-      }
-      auto page = descriptor_pages_[kind];
-      const auto type = kind ? D3D12_DESCRIPTOR_HEAP_TYPE_SAMPLER : D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV;
-      for (auto &bound : groups_) {
-        if (!bound.dirty[kind] || !bound.sources[kind])
-          continue;
-        auto source = bound.sources[kind];
-        auto &cursor = descriptor_used_[kind];
-        // Copy only from CPU storage: shader-visible heaps cannot be copy sources.
-        device_->NativeDevice()->CopyDescriptorsSimple(source->Count(), page->CPU(cursor), source->CPU(), type);
-        bound.tables[kind] = page->GPU(cursor);
-        cursor += source->Count();
-        bound.dirty[kind] = false;
-      }
-    }
-    if (heaps_changed) {
-      ID3D12DescriptorHeap *heaps[2]{};
-      UINT count = 0;
-      for (auto page : descriptor_pages_)
-        if (page)
-          heaps[count++] = page->Heap();
-      list_->SetDescriptorHeaps(count, heaps);
-    }
-    // Changing either heap invalidates root tables. Rebind both heap types,
-    // including unchanged tables which did not need to be copied again.
-    for (uint32_t g = 0; g < groups_.size(); ++g)
-      for (size_t kind = 0; kind < 2; ++kind) {
-        auto parameter = program_->RootParameter(g, kind != 0);
-        if (parameter != UINT32_MAX)
-          list_->SetGraphicsRootDescriptorTable(parameter, groups_[g].tables[kind]);
-      }
-    tables_dirty_ = false;
-    return true;
-  } catch (const std::bad_alloc &) {
-    recording_failed_ = true;
-    return false;
   }
+  if (!tables_dirty_)
+    return true;
+  bool heaps_changed = false;
+  for (size_t kind = 0; kind < 2; ++kind) {
+    uint64_t total = 0, needed = 0;
+    for (const auto &bound : groups_) {
+      if (!bound.sources[kind])
+        continue;
+      total += bound.sources[kind]->Count();
+      if (bound.dirty[kind])
+        needed += bound.sources[kind]->Count();
+    }
+    if (!needed)
+      continue;
+    const auto available = descriptor_pages_[kind] ? descriptor_pages_[kind]->Count() - descriptor_used_[kind] : 0;
+    if (needed > available) {
+      const uint32_t limit = kind ? 2048 : 1000000;
+      if (total > limit) {
+        recording_failed_ = true;
+        return false;
+      }
+      auto &pool = kind ? device_->SamplerDescriptors() : device_->ResourceDescriptors();
+      // The context chooses growth; the pool only rounds and reuses size classes.
+      // At the native limit, further rollovers necessarily use equal-size heaps.
+      const uint32_t previous = descriptor_pages_[kind] ? descriptor_pages_[kind]->Count() : 0;
+      const uint32_t minimum = std::max(uint32_t(total), std::min(previous * 2, limit));
+      auto page = pool.Acquire(minimum);
+      if (!page) {
+        recording_failed_ = true;
+        return false;
+      }
+      if (!RetainResource(page.Get()))
+        return false;
+      descriptor_pages_[kind] = page.Get();
+      descriptor_used_[kind] = 0;
+      heaps_changed = true;
+      // Every still-bound table of this heap type must move together. Earlier
+      // draws retain the old page through the context's resource references.
+      for (auto &bound : groups_)
+        bound.dirty[kind] = bound.sources[kind] != nullptr;
+    }
+    auto page = descriptor_pages_[kind];
+    const auto type = kind ? D3D12_DESCRIPTOR_HEAP_TYPE_SAMPLER : D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV;
+    for (auto &bound : groups_) {
+      if (!bound.dirty[kind] || !bound.sources[kind])
+        continue;
+      auto source = bound.sources[kind];
+      auto &cursor = descriptor_used_[kind];
+      // Copy only from CPU storage: shader-visible heaps cannot be copy sources.
+      device_->NativeDevice()->CopyDescriptorsSimple(source->Count(), page->CPU(cursor), source->CPU(), type);
+      bound.tables[kind] = page->GPU(cursor);
+      cursor += source->Count();
+      bound.dirty[kind] = false;
+    }
+  }
+  if (heaps_changed) {
+    ID3D12DescriptorHeap *heaps[2]{};
+    UINT count = 0;
+    for (auto page : descriptor_pages_)
+      if (page)
+        heaps[count++] = page->Heap();
+    list_->SetDescriptorHeaps(count, heaps);
+  }
+  // Changing either heap invalidates root tables. Rebind both heap types,
+  // including unchanged tables which did not need to be copied again.
+  for (uint32_t g = 0; g < groups_.size(); ++g)
+    for (size_t kind = 0; kind < 2; ++kind) {
+      auto parameter = program_->RootParameter(g, kind != 0);
+      if (parameter != UINT32_MAX)
+        list_->SetGraphicsRootDescriptorTable(parameter, groups_[g].tables[kind]);
+    }
+  tables_dirty_ = false;
+  return true;
 }
 
 bool D3D12CommandContext::CmdUploadImage(IImage *image, const void *data, uint64_t row_pitch) {
@@ -728,33 +695,28 @@ bool D3D12CommandContext::CmdUploadImage(IImage *image, const void *data, uint64
   UINT rows{};
   UINT64 bytes{}, total{};
   device_->NativeDevice()->GetCopyableFootprints(&desc, 0, 1, 0, &footprint, &rows, &bytes, &total);
-  try {
-    auto upload = device_->UploadPool().Acquire(total);
-    if (!upload || !RetainResource(upload.Get()) || !RetainResource(native)) {
-      recording_failed_ = true;
-      return false;
-    }
-    for (UINT y = 0; y < rows; ++y) {
-      if (!upload->Write(static_cast<const uint8_t *>(data) + size_t(y) * row_pitch, bytes,
-                         footprint.Offset + uint64_t(y) * footprint.Footprint.RowPitch)) {
-        recording_failed_ = true;
-        return false;
-      }
-    }
-    if (!TransitionResource(native->NativeImage(), D3D12_RESOURCE_STATE_COPY_DEST, native->DefaultState()))
-      return false;
-    D3D12_TEXTURE_COPY_LOCATION src{}, dst{};
-    src.pResource = upload->NativeBuffer();
-    src.Type = D3D12_TEXTURE_COPY_TYPE_PLACED_FOOTPRINT;
-    src.PlacedFootprint = footprint;
-    dst.pResource = native->NativeImage();
-    dst.Type = D3D12_TEXTURE_COPY_TYPE_SUBRESOURCE_INDEX;
-    list_->CopyTextureRegion(&dst, 0, 0, 0, &src, nullptr);
-    return true;
-  } catch (const std::bad_alloc &) {
+  auto upload = device_->UploadPool().Acquire(total);
+  if (!upload || !RetainResource(upload.Get()) || !RetainResource(native)) {
     recording_failed_ = true;
     return false;
   }
+  for (UINT y = 0; y < rows; ++y) {
+    if (!upload->Write(static_cast<const uint8_t *>(data) + size_t(y) * row_pitch, bytes,
+                       footprint.Offset + uint64_t(y) * footprint.Footprint.RowPitch)) {
+      recording_failed_ = true;
+      return false;
+    }
+  }
+  if (!TransitionResource(native->NativeImage(), D3D12_RESOURCE_STATE_COPY_DEST, native->DefaultState()))
+    return false;
+  D3D12_TEXTURE_COPY_LOCATION src{}, dst{};
+  src.pResource = upload->NativeBuffer();
+  src.Type = D3D12_TEXTURE_COPY_TYPE_PLACED_FOOTPRINT;
+  src.PlacedFootprint = footprint;
+  dst.pResource = native->NativeImage();
+  dst.Type = D3D12_TEXTURE_COPY_TYPE_SUBRESOURCE_INDEX;
+  list_->CopyTextureRegion(&dst, 0, 0, 0, &src, nullptr);
+  return true;
 }
 
 }  // namespace grassland::rhi::backend::d3d12

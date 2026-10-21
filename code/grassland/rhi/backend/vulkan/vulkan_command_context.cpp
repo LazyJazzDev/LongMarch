@@ -23,55 +23,44 @@ VulkanCommandContext::~VulkanCommandContext() {
 }
 
 VulkanCommandContext *VulkanCommandContext::Create(VulkanDevice *device) {
-  try {
-    auto object = std::unique_ptr<VulkanCommandContext>(new VulkanCommandContext(device));
-    object->reusable_ = object->device_->AcquireCommandResources(object->pool_, object->command_);
-    if (!object->reusable_)
-      return nullptr;
-    return object.release();
-  } catch (const std::bad_alloc &) {
-    ReportError(-1, "VulkanCommandContext creation ran out of memory.");
+  auto object = std::unique_ptr<VulkanCommandContext>(new VulkanCommandContext(device));
+  object->reusable_ = object->device_->AcquireCommandResources(object->pool_, object->command_);
+  if (!object->reusable_)
     return nullptr;
-  }
+  return object.release();
 }
 
 bool VulkanCommandContext::TransitionImage(VulkanImage *image,
                                            VkImageLayout layout,
                                            VkPipelineStageFlags stages,
                                            VkAccessFlags access) {
-  try {
-    const auto default_access = image->DefaultLayout() == VK_IMAGE_LAYOUT_PRESENT_SRC_KHR
-                                    ? VkAccessFlags{0}
-                                    : VkAccessFlags{VK_ACCESS_MEMORY_READ_BIT | VK_ACCESS_MEMORY_WRITE_BIT};
-    auto &current =
-        image_states_
-            .try_emplace(image, ImageState{image->DefaultLayout(), VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, default_access})
-            .first->second;
-    constexpr VkAccessFlags writes = VK_ACCESS_SHADER_WRITE_BIT | VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT |
-                                     VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT | VK_ACCESS_TRANSFER_WRITE_BIT |
-                                     VK_ACCESS_HOST_WRITE_BIT | VK_ACCESS_MEMORY_WRITE_BIT;
-    // Equal layouts still need a memory dependency for write-after-write/read uses.
-    if (current.layout != layout || (current.access & writes) || (current.access && (access & writes))) {
-      VkImageMemoryBarrier barrier{VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER};
-      barrier.oldLayout = current.layout;
-      barrier.newLayout = layout;
-      barrier.srcAccessMask = current.access;
-      barrier.dstAccessMask = access;
-      barrier.srcQueueFamilyIndex = barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-      barrier.image = image->NativeImage();
-      barrier.subresourceRange = {ImageAspect(image->GetDesc().format), 0, 1, 0, 1};
-      vkCmdPipelineBarrier(command_, current.stages, stages, 0, 0, nullptr, 0, nullptr, 1, &barrier);
-      current = {layout, stages, access};
-    } else {
-      current.stages |= stages;
-      current.access |= access;
-    }
-    return true;
-  } catch (const std::bad_alloc &) {
-    recording_failed_ = true;
-    ReportError(-1, "Image state tracking ran out of memory.");
-    return false;
+  const auto default_access = image->DefaultLayout() == VK_IMAGE_LAYOUT_PRESENT_SRC_KHR
+                                  ? VkAccessFlags{0}
+                                  : VkAccessFlags{VK_ACCESS_MEMORY_READ_BIT | VK_ACCESS_MEMORY_WRITE_BIT};
+  auto &current =
+      image_states_
+          .try_emplace(image, ImageState{image->DefaultLayout(), VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, default_access})
+          .first->second;
+  constexpr VkAccessFlags writes = VK_ACCESS_SHADER_WRITE_BIT | VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT |
+                                   VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT | VK_ACCESS_TRANSFER_WRITE_BIT |
+                                   VK_ACCESS_HOST_WRITE_BIT | VK_ACCESS_MEMORY_WRITE_BIT;
+  // Equal layouts still need a memory dependency for write-after-write/read uses.
+  if (current.layout != layout || (current.access & writes) || (current.access && (access & writes))) {
+    VkImageMemoryBarrier barrier{VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER};
+    barrier.oldLayout = current.layout;
+    barrier.newLayout = layout;
+    barrier.srcAccessMask = current.access;
+    barrier.dstAccessMask = access;
+    barrier.srcQueueFamilyIndex = barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+    barrier.image = image->NativeImage();
+    barrier.subresourceRange = {ImageAspect(image->GetDesc().format), 0, 1, 0, 1};
+    vkCmdPipelineBarrier(command_, current.stages, stages, 0, 0, nullptr, 0, nullptr, 1, &barrier);
+    current = {layout, stages, access};
+  } else {
+    current.stages |= stages;
+    current.access |= access;
   }
+  return true;
 }
 
 bool VulkanCommandContext::CmdClearColor(rhi::IImage *image, const std::array<float, 4> &color) {
@@ -132,12 +121,8 @@ bool VulkanCommandContext::CmdPresent(rhi::IWindow *window) {
     return false;
   if (!TransitionImage(frame.Get(), VK_IMAGE_LAYOUT_PRESENT_SRC_KHR, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, 0))
     return false;
-  try {
-    presents_.push_back(target);
-  } catch (const std::bad_alloc &) {
-    recording_failed_ = true;
-    return false;
-  }
+  presents_.push_back(target);
+
   return true;
 }
 
@@ -355,13 +340,9 @@ bool VulkanCommandContext::CmdBindProgram(IProgram *program) {
     recording_failed_ = true;
     return false;
   }
-  try {
-    vertex_buffers_.assign(native->GetDesc().vertex_bindings.size(), nullptr);
-    groups_.assign(native->GetDesc().pipeline_layout.groups.size(), nullptr);
-  } catch (const std::bad_alloc &) {
-    recording_failed_ = true;
-    return false;
-  }
+  vertex_buffers_.assign(native->GetDesc().vertex_bindings.size(), nullptr);
+  groups_.assign(native->GetDesc().pipeline_layout.groups.size(), nullptr);
+
   program_ = native;
   vkCmdBindPipeline(command_, VK_PIPELINE_BIND_POINT_GRAPHICS, native->NativePipeline());
   return true;
@@ -372,102 +353,96 @@ bool VulkanCommandContext::CmdBeginRendering(const RenderingInfo &info) {
     recording_failed_ = true;
     return false;
   }
-  try {
-    for (uint32_t i = 0; i < groups_.size(); ++i)
-      if (groups_[i] && !BindGroupVersion(i, groups_[i]))
-        return false;
-    std::vector<VulkanImage *> images;
-    std::vector<ImageFormat> formats;
-    for (const auto &color : rendering_.color_attachments) {
-      auto image = static_cast<VulkanImage *>(color.color_attachment);
-      if (!TransitionImage(image, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
-                           VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
-                           VK_ACCESS_COLOR_ATTACHMENT_READ_BIT | VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT))
-        return false;
-      images.push_back(image);
-      formats.push_back(image->GetDesc().format);
-    }
-    auto depth = static_cast<VulkanImage *>(rendering_.depth_stencil.image);
-    if (depth) {
-      if (!TransitionImage(depth, VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL,
-                           VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT | VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT,
-                           VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_READ_BIT | VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT))
-        return false;
-      images.push_back(depth);
-    }
-    const auto depth_format = depth ? depth->GetDesc().format : IMAGE_FORMAT_UNKNOWN;
-    auto pass = device_->BeginRenderingCommand()
-                    ? VK_NULL_HANDLE
-                    : device_->RenderTargets().RenderPass(formats, depth_format, &rendering_);
-    if (!device_->BeginRenderingCommand() && !pass) {
-      recording_failed_ = true;
+  for (uint32_t i = 0; i < groups_.size(); ++i)
+    if (groups_[i] && !BindGroupVersion(i, groups_[i]))
       return false;
-    }
-    auto lease = device_->RenderTargets().Acquire(images, pass);
-    if (!lease || !RetainResource(lease.Get())) {
-      recording_failed_ = true;
+  std::vector<VulkanImage *> images;
+  std::vector<ImageFormat> formats;
+  for (const auto &color : rendering_.color_attachments) {
+    auto image = static_cast<VulkanImage *>(color.color_attachment);
+    if (!TransitionImage(image, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
+                         VK_ACCESS_COLOR_ATTACHMENT_READ_BIT | VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT))
       return false;
-    }
-    VkMemoryBarrier barrier{VK_STRUCTURE_TYPE_MEMORY_BARRIER};
-    barrier.srcAccessMask = VK_ACCESS_MEMORY_READ_BIT | VK_ACCESS_MEMORY_WRITE_BIT;
-    barrier.dstAccessMask = VK_ACCESS_VERTEX_ATTRIBUTE_READ_BIT | VK_ACCESS_INDEX_READ_BIT |
-                            VK_ACCESS_UNIFORM_READ_BIT | VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT;
-    vkCmdPipelineBarrier(command_, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, VK_PIPELINE_STAGE_ALL_GRAPHICS_BIT, 0, 1,
-                         &barrier, 0, nullptr, 0, nullptr);
-    constexpr VkAttachmentLoadOp loads[] = {VK_ATTACHMENT_LOAD_OP_LOAD, VK_ATTACHMENT_LOAD_OP_CLEAR,
-                                            VK_ATTACHMENT_LOAD_OP_DONT_CARE};
-    constexpr VkAttachmentStoreOp stores[] = {VK_ATTACHMENT_STORE_OP_STORE, VK_ATTACHMENT_STORE_OP_DONT_CARE};
-    std::array<VkClearValue, 9> clear{};
-    std::array<VkRenderingAttachmentInfo, 8> colors{};
-    for (size_t i = 0; i < formats.size(); ++i) {
-      const auto &source = rendering_.color_attachments[i];
-      std::copy(source.clear_color.begin(), source.clear_color.end(), clear[i].color.float32);
-      colors[i].sType = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO;
-      colors[i].imageView = lease->Views()[i];
-      colors[i].imageLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
-      colors[i].loadOp = loads[source.load_op];
-      colors[i].storeOp = stores[source.store_op];
-      colors[i].clearValue = clear[i];
-    }
-    const auto &ds = rendering_.depth_stencil;
-    VkRenderingAttachmentInfo depth_info{VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO},
-        stencil_info{VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO};
-    if (depth) {
-      clear[formats.size()].depthStencil = {ds.clear_depth, ds.clear_stencil};
-      depth_info.imageView = lease->Views().back();
-      depth_info.imageLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
-      depth_info.loadOp = loads[ds.depth_load_op];
-      depth_info.storeOp = stores[ds.depth_store_op];
-      depth_info.clearValue = clear[formats.size()];
-      stencil_info = depth_info;
-      stencil_info.loadOp = loads[ds.stencil_load_op];
-      stencil_info.storeOp = stores[ds.stencil_store_op];
-    }
-    auto desc = images.front()->GetDesc();
-    if (auto begin_rendering = device_->BeginRenderingCommand()) {
-      VkRenderingInfo rendering{VK_STRUCTURE_TYPE_RENDERING_INFO};
-      rendering.renderArea.extent = {desc.width, desc.height};
-      rendering.layerCount = 1;
-      rendering.colorAttachmentCount = uint32_t(formats.size());
-      rendering.pColorAttachments = colors.data();
-      rendering.pDepthAttachment = depth ? &depth_info : nullptr;
-      rendering.pStencilAttachment = HasStencil(depth_format) ? &stencil_info : nullptr;
-      begin_rendering(command_, &rendering);
-    } else {
-      VkRenderPassBeginInfo begin{VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO};
-      begin.renderPass = pass;
-      begin.framebuffer = lease->Framebuffer();
-      begin.renderArea.extent = {desc.width, desc.height};
-      begin.clearValueCount = uint32_t(images.size());
-      begin.pClearValues = clear.data();
-      vkCmdBeginRenderPass(command_, &begin, VK_SUBPASS_CONTENTS_INLINE);
-    }
-    render_target_ = images.front();
-    return true;
-  } catch (const std::bad_alloc &) {
+    images.push_back(image);
+    formats.push_back(image->GetDesc().format);
+  }
+  auto depth = static_cast<VulkanImage *>(rendering_.depth_stencil.image);
+  if (depth) {
+    if (!TransitionImage(depth, VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL,
+                         VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT | VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT,
+                         VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_READ_BIT | VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT))
+      return false;
+    images.push_back(depth);
+  }
+  const auto depth_format = depth ? depth->GetDesc().format : IMAGE_FORMAT_UNKNOWN;
+  auto pass = device_->BeginRenderingCommand()
+                  ? VK_NULL_HANDLE
+                  : device_->RenderTargets().RenderPass(formats, depth_format, &rendering_);
+  if (!device_->BeginRenderingCommand() && !pass) {
     recording_failed_ = true;
     return false;
   }
+  auto lease = device_->RenderTargets().Acquire(images, pass);
+  if (!lease || !RetainResource(lease.Get())) {
+    recording_failed_ = true;
+    return false;
+  }
+  VkMemoryBarrier barrier{VK_STRUCTURE_TYPE_MEMORY_BARRIER};
+  barrier.srcAccessMask = VK_ACCESS_MEMORY_READ_BIT | VK_ACCESS_MEMORY_WRITE_BIT;
+  barrier.dstAccessMask = VK_ACCESS_VERTEX_ATTRIBUTE_READ_BIT | VK_ACCESS_INDEX_READ_BIT | VK_ACCESS_UNIFORM_READ_BIT |
+                          VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT;
+  vkCmdPipelineBarrier(command_, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, VK_PIPELINE_STAGE_ALL_GRAPHICS_BIT, 0, 1, &barrier,
+                       0, nullptr, 0, nullptr);
+  constexpr VkAttachmentLoadOp loads[] = {VK_ATTACHMENT_LOAD_OP_LOAD, VK_ATTACHMENT_LOAD_OP_CLEAR,
+                                          VK_ATTACHMENT_LOAD_OP_DONT_CARE};
+  constexpr VkAttachmentStoreOp stores[] = {VK_ATTACHMENT_STORE_OP_STORE, VK_ATTACHMENT_STORE_OP_DONT_CARE};
+  std::array<VkClearValue, 9> clear{};
+  std::array<VkRenderingAttachmentInfo, 8> colors{};
+  for (size_t i = 0; i < formats.size(); ++i) {
+    const auto &source = rendering_.color_attachments[i];
+    std::copy(source.clear_color.begin(), source.clear_color.end(), clear[i].color.float32);
+    colors[i].sType = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO;
+    colors[i].imageView = lease->Views()[i];
+    colors[i].imageLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+    colors[i].loadOp = loads[source.load_op];
+    colors[i].storeOp = stores[source.store_op];
+    colors[i].clearValue = clear[i];
+  }
+  const auto &ds = rendering_.depth_stencil;
+  VkRenderingAttachmentInfo depth_info{VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO},
+      stencil_info{VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO};
+  if (depth) {
+    clear[formats.size()].depthStencil = {ds.clear_depth, ds.clear_stencil};
+    depth_info.imageView = lease->Views().back();
+    depth_info.imageLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
+    depth_info.loadOp = loads[ds.depth_load_op];
+    depth_info.storeOp = stores[ds.depth_store_op];
+    depth_info.clearValue = clear[formats.size()];
+    stencil_info = depth_info;
+    stencil_info.loadOp = loads[ds.stencil_load_op];
+    stencil_info.storeOp = stores[ds.stencil_store_op];
+  }
+  auto desc = images.front()->GetDesc();
+  if (auto begin_rendering = device_->BeginRenderingCommand()) {
+    VkRenderingInfo rendering{VK_STRUCTURE_TYPE_RENDERING_INFO};
+    rendering.renderArea.extent = {desc.width, desc.height};
+    rendering.layerCount = 1;
+    rendering.colorAttachmentCount = uint32_t(formats.size());
+    rendering.pColorAttachments = colors.data();
+    rendering.pDepthAttachment = depth ? &depth_info : nullptr;
+    rendering.pStencilAttachment = HasStencil(depth_format) ? &stencil_info : nullptr;
+    begin_rendering(command_, &rendering);
+  } else {
+    VkRenderPassBeginInfo begin{VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO};
+    begin.renderPass = pass;
+    begin.framebuffer = lease->Framebuffer();
+    begin.renderArea.extent = {desc.width, desc.height};
+    begin.clearValueCount = uint32_t(images.size());
+    begin.pClearValues = clear.data();
+    vkCmdBeginRenderPass(command_, &begin, VK_SUBPASS_CONTENTS_INLINE);
+  }
+  render_target_ = images.front();
+  return true;
 }
 
 bool VulkanCommandContext::CmdBindVertexBuffer(uint32_t binding, IBuffer *buffer, uint64_t offset) {
@@ -646,24 +621,19 @@ bool VulkanCommandContext::TransitionBuffer(VulkanBuffer *buffer, VkPipelineStag
     access |= known->second.access;
     stages |= known->second.stages;
   }
-  try {
-    auto &state = buffer_states_
-                      .try_emplace(buffer, BufferState{VK_PIPELINE_STAGE_ALL_COMMANDS_BIT,
-                                                       VK_ACCESS_MEMORY_READ_BIT | VK_ACCESS_MEMORY_WRITE_BIT})
-                      .first->second;
-    VkBufferMemoryBarrier barrier{VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER};
-    barrier.srcAccessMask = VK_ACCESS_MEMORY_READ_BIT | VK_ACCESS_MEMORY_WRITE_BIT;
-    barrier.dstAccessMask = access;
-    barrier.srcQueueFamilyIndex = barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-    barrier.buffer = buffer->NativeBuffer();
-    barrier.size = VK_WHOLE_SIZE;
-    vkCmdPipelineBarrier(command_, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, stages, 0, 0, nullptr, 1, &barrier, 0, nullptr);
-    state = {stages, access};
-    return true;
-  } catch (const std::bad_alloc &) {
-    recording_failed_ = true;
-    return false;
-  }
+  auto &state = buffer_states_
+                    .try_emplace(buffer, BufferState{VK_PIPELINE_STAGE_ALL_COMMANDS_BIT,
+                                                     VK_ACCESS_MEMORY_READ_BIT | VK_ACCESS_MEMORY_WRITE_BIT})
+                    .first->second;
+  VkBufferMemoryBarrier barrier{VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER};
+  barrier.srcAccessMask = VK_ACCESS_MEMORY_READ_BIT | VK_ACCESS_MEMORY_WRITE_BIT;
+  barrier.dstAccessMask = access;
+  barrier.srcQueueFamilyIndex = barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+  barrier.buffer = buffer->NativeBuffer();
+  barrier.size = VK_WHOLE_SIZE;
+  vkCmdPipelineBarrier(command_, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, stages, 0, 0, nullptr, 1, &barrier, 0, nullptr);
+  state = {stages, access};
+  return true;
 }
 
 bool VulkanCommandContext::CmdUploadImage(IImage *image, const void *data, uint64_t row_pitch) {
@@ -674,32 +644,27 @@ bool VulkanCommandContext::CmdUploadImage(IImage *image, const void *data, uint6
     recording_failed_ = true;
     return false;
   }
-  try {
-    const auto desc = native->GetDesc();
-    const uint64_t packed = uint64_t(desc.width) * 4;
-    std::vector<uint8_t> pixels(packed * desc.height);
-    for (uint32_t y = 0; y < desc.height; ++y)
-      std::memcpy(pixels.data() + y * packed, static_cast<const uint8_t *>(data) + y * row_pitch, packed);
-    auto upload = device_->UploadPool().Acquire(pixels.size());
-    if (!upload || !upload->Write(pixels.data(), pixels.size()) || !RetainResource(upload.Get()) ||
-        !RetainResource(native)) {
-      recording_failed_ = true;
-      return false;
-    }
-    if (!TransitionImage(native, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_PIPELINE_STAGE_TRANSFER_BIT,
-                         VK_ACCESS_TRANSFER_WRITE_BIT))
-      return false;
-    VkBufferImageCopy region{};
-    region.imageSubresource = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 0, 1};
-    region.imageExtent = {desc.width, desc.height, 1};
-    vkCmdCopyBufferToImage(command_, upload->NativeBuffer(), native->NativeImage(),
-                           VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &region);
-    return TransitionImage(native, VK_IMAGE_LAYOUT_GENERAL, VK_PIPELINE_STAGE_ALL_GRAPHICS_BIT,
-                           VK_ACCESS_SHADER_READ_BIT);
-  } catch (const std::bad_alloc &) {
+  const auto desc = native->GetDesc();
+  const uint64_t packed = uint64_t(desc.width) * 4;
+  std::vector<uint8_t> pixels(packed * desc.height);
+  for (uint32_t y = 0; y < desc.height; ++y)
+    std::memcpy(pixels.data() + y * packed, static_cast<const uint8_t *>(data) + y * row_pitch, packed);
+  auto upload = device_->UploadPool().Acquire(pixels.size());
+  if (!upload || !upload->Write(pixels.data(), pixels.size()) || !RetainResource(upload.Get()) ||
+      !RetainResource(native)) {
     recording_failed_ = true;
     return false;
   }
+  if (!TransitionImage(native, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_PIPELINE_STAGE_TRANSFER_BIT,
+                       VK_ACCESS_TRANSFER_WRITE_BIT))
+    return false;
+  VkBufferImageCopy region{};
+  region.imageSubresource = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 0, 1};
+  region.imageExtent = {desc.width, desc.height, 1};
+  vkCmdCopyBufferToImage(command_, upload->NativeBuffer(), native->NativeImage(), VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+                         1, &region);
+  return TransitionImage(native, VK_IMAGE_LAYOUT_GENERAL, VK_PIPELINE_STAGE_ALL_GRAPHICS_BIT,
+                         VK_ACCESS_SHADER_READ_BIT);
 }
 
 bool VulkanCommandContext::CmdBindGroup(uint32_t index, IBindingGroup *group) {
@@ -717,47 +682,42 @@ bool VulkanCommandContext::CmdBindGroup(uint32_t index, IBindingGroup *group) {
 }
 
 bool VulkanCommandContext::BindGroupVersion(uint32_t index, VulkanBindingGroup::Version *native) {
-  try {
-    for (size_t binding_index = 0; binding_index < native->GetLayout().bindings.size(); ++binding_index) {
-      const auto &b = native->GetLayout().bindings[binding_index];
-      for (uint32_t i = 0; i < b.count; ++i) {
-        const VkAccessFlags access =
-            VK_ACCESS_SHADER_READ_BIT | ((b.type == BINDING_RW_STRUCTURED_BUFFER ||
-                                          b.type == BINDING_RW_BYTE_ADDRESS_BUFFER || b.type == BINDING_RW_TEXTURE2D)
-                                             ? VK_ACCESS_SHADER_WRITE_BIT
-                                             : 0);
-        if (b.type <= BINDING_RW_BYTE_ADDRESS_BUFFER) {
-          auto buffer = static_cast<VulkanBuffer *>(native->GetReferences()[binding_index][i].Get());
-          if (!TransitionBuffer(buffer, VK_PIPELINE_STAGE_ALL_GRAPHICS_BIT,
-                                b.type == BINDING_UNIFORM_BUFFER ? VK_ACCESS_UNIFORM_READ_BIT : access))
+  for (size_t binding_index = 0; binding_index < native->GetLayout().bindings.size(); ++binding_index) {
+    const auto &b = native->GetLayout().bindings[binding_index];
+    for (uint32_t i = 0; i < b.count; ++i) {
+      const VkAccessFlags access =
+          VK_ACCESS_SHADER_READ_BIT | ((b.type == BINDING_RW_STRUCTURED_BUFFER ||
+                                        b.type == BINDING_RW_BYTE_ADDRESS_BUFFER || b.type == BINDING_RW_TEXTURE2D)
+                                           ? VK_ACCESS_SHADER_WRITE_BIT
+                                           : 0);
+      if (b.type <= BINDING_RW_BYTE_ADDRESS_BUFFER) {
+        auto buffer = static_cast<VulkanBuffer *>(native->GetReferences()[binding_index][i].Get());
+        if (!TransitionBuffer(buffer, VK_PIPELINE_STAGE_ALL_GRAPHICS_BIT,
+                              b.type == BINDING_UNIFORM_BUFFER ? VK_ACCESS_UNIFORM_READ_BIT : access))
+          return false;
+      }
+      if (b.type == BINDING_TEXTURE2D || b.type == BINDING_RW_TEXTURE2D) {
+        auto image = static_cast<VulkanImage *>(native->GetReferences()[binding_index][i].Get());
+        if (render_target_) {
+          auto known = image_states_.find(image);
+          if ((known != image_states_.end() && known->second.layout != VK_IMAGE_LAYOUT_GENERAL) ||
+              image->DefaultLayout() != VK_IMAGE_LAYOUT_GENERAL) {
+            recording_failed_ = true;
             return false;
-        }
-        if (b.type == BINDING_TEXTURE2D || b.type == BINDING_RW_TEXTURE2D) {
-          auto image = static_cast<VulkanImage *>(native->GetReferences()[binding_index][i].Get());
-          if (render_target_) {
-            auto known = image_states_.find(image);
-            if ((known != image_states_.end() && known->second.layout != VK_IMAGE_LAYOUT_GENERAL) ||
-                image->DefaultLayout() != VK_IMAGE_LAYOUT_GENERAL) {
-              recording_failed_ = true;
-              return false;
-            }
-            auto &state = image_states_.try_emplace(image, ImageState{VK_IMAGE_LAYOUT_GENERAL, 0, 0}).first->second;
-            state.stages |= VK_PIPELINE_STAGE_ALL_GRAPHICS_BIT;
-            state.access |= access;
-          } else if (!TransitionImage(image, VK_IMAGE_LAYOUT_GENERAL, VK_PIPELINE_STAGE_ALL_GRAPHICS_BIT, access))
-            return false;
-        }
+          }
+          auto &state = image_states_.try_emplace(image, ImageState{VK_IMAGE_LAYOUT_GENERAL, 0, 0}).first->second;
+          state.stages |= VK_PIPELINE_STAGE_ALL_GRAPHICS_BIT;
+          state.access |= access;
+        } else if (!TransitionImage(image, VK_IMAGE_LAYOUT_GENERAL, VK_PIPELINE_STAGE_ALL_GRAPHICS_BIT, access))
+          return false;
       }
     }
-    groups_[index] = native;
-    auto set = native->Set();
-    vkCmdBindDescriptorSets(command_, VK_PIPELINE_BIND_POINT_GRAPHICS, program_->NativeLayout(), index, 1, &set, 0,
-                            nullptr);
-    return true;
-  } catch (const std::bad_alloc &) {
-    recording_failed_ = true;
-    return false;
   }
+  groups_[index] = native;
+  auto set = native->Set();
+  vkCmdBindDescriptorSets(command_, VK_PIPELINE_BIND_POINT_GRAPHICS, program_->NativeLayout(), index, 1, &set, 0,
+                          nullptr);
+  return true;
 }
 
 bool VulkanCommandContext::ValidateGroups() {

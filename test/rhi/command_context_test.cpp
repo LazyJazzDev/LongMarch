@@ -417,7 +417,7 @@ TEST(RhiCommands, AllocationFailureAfterNativeSubmitKeepsResourcesUntilCompletio
   ASSERT_TRUE(context.CmdClearColor(image, {0, 0, 1, 1}));
   ASSERT_TRUE(context.CmdPresent(window));
   image = {};
-  EXPECT_FALSE(queue.Submit(std::move(context)));
+  EXPECT_THROW(queue.Submit(std::move(context)), std::bad_alloc);
   {
     std::lock_guard<std::mutex> lock(gate->mutex);
     EXPECT_EQ(gate->destroyed, 0);
