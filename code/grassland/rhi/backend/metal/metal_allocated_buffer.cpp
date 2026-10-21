@@ -11,20 +11,16 @@ MetalAllocatedBuffer::MetalAllocatedBuffer(MetalDevice *device, const BufferDesc
 MetalAllocatedBuffer *MetalAllocatedBuffer::Create(MetalDevice *device, const BufferDesc &desc, bool upload) {
   if (!desc.size || desc.size > device->NativeDevice()->maxBufferLength())
     return nullptr;
-  try {
-    auto pool = NS::TransferPtr(NS::AutoreleasePool::alloc()->init());
-    auto object = std::unique_ptr<MetalAllocatedBuffer>(new MetalAllocatedBuffer(device, desc));
-    object->buffer_ = NS::TransferPtr(device->NativeDevice()->newBuffer(
-        desc.size, upload ? MTL::ResourceStorageModeShared : MTL::ResourceStorageModePrivate));
-    if (!object->buffer_) {
-      ReportError(-1, "Metal buffer allocation failed.");
-      return nullptr;
-    }
-    return object.release();
-  } catch (const std::bad_alloc &) {
+
+  auto pool = NS::TransferPtr(NS::AutoreleasePool::alloc()->init());
+  auto object = std::unique_ptr<MetalAllocatedBuffer>(new MetalAllocatedBuffer(device, desc));
+  object->buffer_ = NS::TransferPtr(device->NativeDevice()->newBuffer(
+      desc.size, upload ? MTL::ResourceStorageModeShared : MTL::ResourceStorageModePrivate));
+  if (!object->buffer_) {
     ReportError(-1, "Metal buffer allocation failed.");
     return nullptr;
   }
+  return object.release();
 }
 
 MTL::Buffer *MetalAllocatedBuffer::NativeBuffer() const {

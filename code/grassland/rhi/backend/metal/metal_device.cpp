@@ -12,19 +12,14 @@
 namespace grassland::rhi::backend::metal {
 
 MetalDevice *MetalDevice::Create(PhysicalDevice info, Core *core, NS::SharedPtr<MTL::Device> device) {
-  try {
-    auto object = std::unique_ptr<MetalDevice>(new MetalDevice(std::move(info), core, std::move(device)));
-    auto pool = NS::TransferPtr(NS::AutoreleasePool::alloc()->init());
-    object->queue_ = NS::TransferPtr(object->device_->newCommandQueue());
-    if (!object->queue_) {
-      ReportError(-1, "Metal command queue creation failed.");
-      return nullptr;
-    }
-    return object.release();
-  } catch (const std::bad_alloc &) {
-    ReportError(-1, "MetalDevice creation ran out of memory.");
+  auto object = std::unique_ptr<MetalDevice>(new MetalDevice(std::move(info), core, std::move(device)));
+  auto pool = NS::TransferPtr(NS::AutoreleasePool::alloc()->init());
+  object->queue_ = NS::TransferPtr(object->device_->newCommandQueue());
+  if (!object->queue_) {
+    ReportError(-1, "Metal command queue creation failed.");
     return nullptr;
   }
+  return object.release();
 }
 
 MetalDevice::MetalDevice(PhysicalDevice info, Core *core, NS::SharedPtr<MTL::Device> device)
@@ -71,12 +66,7 @@ rhi::ICommandContext *MetalDevice::CreateCommandContext() {
 }
 
 rhi::IQueue *MetalDevice::GetQueue(QueueType type) {
-  try {
-    return new MetalQueue(this, type);
-  } catch (const std::bad_alloc &) {
-    ReportError(-1, "Queue creation ran out of memory.");
-    return nullptr;
-  }
+  return new MetalQueue(this, type);
 }
 
 rhi::IBuffer *MetalDevice::CreateBuffer(const BufferDesc &desc) {
@@ -88,12 +78,7 @@ rhi::IImage *MetalDevice::CreateImage(const ImageDesc &desc) {
 }
 
 rhi::IProgram *MetalDevice::CreateProgram(const ProgramDesc &desc) {
-  try {
-    return new MetalProgram(this, desc);
-  } catch (const std::bad_alloc &) {
-    ReportError(-1, "Metal program allocation failed.");
-    return nullptr;
-  }
+  return new MetalProgram(this, desc);
 }
 
 rhi::IBindingGroup *MetalDevice::CreateBindingGroup(const BindingLayoutDesc &layout) {

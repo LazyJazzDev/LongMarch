@@ -12,21 +12,16 @@ MetalCommandContext::MetalCommandContext(MetalDevice *device) : CommandContext(d
 }
 
 MetalCommandContext *MetalCommandContext::Create(MetalDevice *device) {
-  try {
-    auto object = std::unique_ptr<MetalCommandContext>(new MetalCommandContext(device));
-    auto pool = NS::TransferPtr(NS::AutoreleasePool::alloc()->init());
-    // Metal command buffers are single-use. The persistent native queue manages
-    // their backing storage; completed buffers cannot be reset like Vulkan/D3D12.
-    object->commands_ = NS::RetainPtr(object->device_->NativeQueue()->commandBuffer());
-    if (!object->commands_) {
-      ReportError(-1, "Metal command buffer creation failed.");
-      return nullptr;
-    }
-    return object.release();
-  } catch (const std::bad_alloc &) {
-    ReportError(-1, "MetalCommandContext creation ran out of memory.");
+  auto object = std::unique_ptr<MetalCommandContext>(new MetalCommandContext(device));
+  auto pool = NS::TransferPtr(NS::AutoreleasePool::alloc()->init());
+  // Metal command buffers are single-use. The persistent native queue manages
+  // their backing storage; completed buffers cannot be reset like Vulkan/D3D12.
+  object->commands_ = NS::RetainPtr(object->device_->NativeQueue()->commandBuffer());
+  if (!object->commands_) {
+    ReportError(-1, "Metal command buffer creation failed.");
     return nullptr;
   }
+  return object.release();
 }
 
 bool MetalCommandContext::CmdClearColor(rhi::IImage *image, const std::array<float, 4> &color) {
@@ -95,13 +90,9 @@ bool MetalCommandContext::CmdPresent(rhi::IWindow *window) {
   auto frame = ObjectPtr<MetalSwapChainImage>::Adopt(static_cast<MetalSwapChainImage *>(target->GetNextImage()));
   if (!frame || !RetainResource(frame.Get()))
     return false;
-  try {
-    presents_.emplace_back(target, frame.Get());
-    return true;
-  } catch (const std::bad_alloc &) {
-    recording_failed_ = true;
-    return false;
-  }
+
+  presents_.emplace_back(target, frame.Get());
+  return true;
 }
 
 bool MetalCommandContext::EndRecording() {
@@ -230,33 +221,29 @@ bool MetalCommandContext::CmdUploadImage(IImage *image, const void *data, uint64
     recording_failed_ = true;
     return false;
   }
-  try {
-    const auto desc = native->GetDesc();
-    const uint64_t pitch = uint64_t(desc.width) * 4;
-    const uint64_t size = pitch * desc.height;
-    auto upload = device_->UploadPool().Acquire(size);
-    if (!upload || !RetainResource(upload.Get()) || !RetainResource(native)) {
-      recording_failed_ = true;
-      return false;
-    }
-    // The lease is shared staging memory; snapshot rows directly into it.
-    auto destination = static_cast<uint8_t *>(upload->NativeBuffer()->contents());
-    for (uint32_t y = 0; y < desc.height; ++y)
-      std::memcpy(destination + y * pitch, static_cast<const uint8_t *>(data) + y * row_pitch, pitch);
-    auto pool = NS::TransferPtr(NS::AutoreleasePool::alloc()->init());
-    auto blit = commands_->blitCommandEncoder();
-    if (!blit) {
-      recording_failed_ = true;
-      return false;
-    }
-    blit->copyFromBuffer(upload->NativeBuffer(), 0, pitch, size, MTL::Size::Make(desc.width, desc.height, 1),
-                         native->NativeImage(), 0, 0, MTL::Origin::Make(0, 0, 0));
-    blit->endEncoding();
-    return true;
-  } catch (const std::bad_alloc &) {
+
+  const auto desc = native->GetDesc();
+  const uint64_t pitch = uint64_t(desc.width) * 4;
+  const uint64_t size = pitch * desc.height;
+  auto upload = device_->UploadPool().Acquire(size);
+  if (!upload || !RetainResource(upload.Get()) || !RetainResource(native)) {
     recording_failed_ = true;
     return false;
   }
+  // The lease is shared staging memory; snapshot rows directly into it.
+  auto destination = static_cast<uint8_t *>(upload->NativeBuffer()->contents());
+  for (uint32_t y = 0; y < desc.height; ++y)
+    std::memcpy(destination + y * pitch, static_cast<const uint8_t *>(data) + y * row_pitch, pitch);
+  auto pool = NS::TransferPtr(NS::AutoreleasePool::alloc()->init());
+  auto blit = commands_->blitCommandEncoder();
+  if (!blit) {
+    recording_failed_ = true;
+    return false;
+  }
+  blit->copyFromBuffer(upload->NativeBuffer(), 0, pitch, size, MTL::Size::Make(desc.width, desc.height, 1),
+                       native->NativeImage(), 0, 0, MTL::Origin::Make(0, 0, 0));
+  blit->endEncoding();
+  return true;
 }
 
 bool MetalCommandContext::CmdBindGroup(uint32_t index, IBindingGroup *group) {
@@ -292,13 +279,10 @@ bool MetalCommandContext::CmdBindProgram(IProgram *program) {
     recording_failed_ = true;
     return false;
   }
-  try {
-    vertex_buffers_.assign(native->GetDesc().vertex_bindings.size(), {});
-    groups_.assign(native->GetDesc().pipeline_layout.groups.size(), nullptr);
-  } catch (const std::bad_alloc &) {
-    recording_failed_ = true;
-    return false;
-  }
+
+  vertex_buffers_.assign(native->GetDesc().vertex_bindings.size(), {});
+  groups_.assign(native->GetDesc().pipeline_layout.groups.size(), nullptr);
+
   program_ = native;
   if (encoder_)
     ApplyBindings();
@@ -362,35 +346,31 @@ bool MetalCommandContext::CmdBeginRendering(const RenderingInfo &info) {
   auto store = [](AttachmentStoreOp op) {
     return op == ATTACHMENT_STORE_OP_STORE ? MTL::StoreActionStore : MTL::StoreActionDontCare;
   };
-  try {
-    color_formats_.clear();
-    color_targets_.clear();
-    for (size_t i = 0; i < info.color_attachments.size(); ++i) {
-      auto &a = info.color_attachments[i];
-      auto image = validate(a.color_attachment, a.load_op, a.store_op);
-      if (!image || IsDepthFormat(image->GetDesc().format)) {
+
+  color_formats_.clear();
+  color_targets_.clear();
+  for (size_t i = 0; i < info.color_attachments.size(); ++i) {
+    auto &a = info.color_attachments[i];
+    auto image = validate(a.color_attachment, a.load_op, a.store_op);
+    if (!image || IsDepthFormat(image->GetDesc().format)) {
+      recording_failed_ = true;
+      return false;
+    }
+    for (size_t j = 0; j < i; ++j)
+      if (info.color_attachments[j].color_attachment == a.color_attachment) {
         recording_failed_ = true;
         return false;
       }
-      for (size_t j = 0; j < i; ++j)
-        if (info.color_attachments[j].color_attachment == a.color_attachment) {
-          recording_failed_ = true;
-          return false;
-        }
-      native = image;
-      color_formats_.push_back(image->GetDesc().format);
-      color_targets_.push_back(image);
-      auto color = pass->colorAttachments()->object(i);
-      color->setTexture(image->NativeImage());
-      color->setLoadAction(loads[a.load_op]);
-      color->setStoreAction(store(a.store_op));
-      color->setClearColor(
-          MTL::ClearColor::Make(a.clear_color[0], a.clear_color[1], a.clear_color[2], a.clear_color[3]));
-    }
-  } catch (const std::bad_alloc &) {
-    recording_failed_ = true;
-    return false;
+    native = image;
+    color_formats_.push_back(image->GetDesc().format);
+    color_targets_.push_back(image);
+    auto color = pass->colorAttachments()->object(i);
+    color->setTexture(image->NativeImage());
+    color->setLoadAction(loads[a.load_op]);
+    color->setStoreAction(store(a.store_op));
+    color->setClearColor(MTL::ClearColor::Make(a.clear_color[0], a.clear_color[1], a.clear_color[2], a.clear_color[3]));
   }
+
   depth_format_ = IMAGE_FORMAT_UNKNOWN;
   const auto &ds = info.depth_stencil;
   if (ds.image) {

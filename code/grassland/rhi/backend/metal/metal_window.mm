@@ -24,34 +24,29 @@ MetalWindow::~MetalWindow() {
 }
 
 MetalWindow *MetalWindow::Create(MetalDevice *device, const WindowDesc &desc) {
-  try {
-    auto object = std::unique_ptr<MetalWindow>(new MetalWindow(device));
-    auto pool = NS::TransferPtr(NS::AutoreleasePool::alloc()->init());
-    if (!object->InitializeWindow(desc))
-      return nullptr;
-    object->layer_ = NS::RetainPtr(CA::MetalLayer::layer());
-    if (!object->layer_) {
-      ReportError(-1, "CAMetalLayer creation failed.");
-      return nullptr;
-    }
-    object->layer_->setDevice(object->device_->NativeDevice());
-    object->layer_->setPixelFormat(MTL::PixelFormatBGRA8Unorm);
-    // RHI images may also be read back/copied, rather than only render targets.
-    object->layer_->setFramebufferOnly(false);
-    auto view = [glfwGetCocoaWindow(object->GLFWWindow()) contentView];
-    [view setWantsLayer:YES];
-    [view setLayer:(CAMetalLayer *)object->layer_.get()];
-    auto colorspace = CGColorSpaceCreateWithName(kCGColorSpaceSRGB);
-    ((CAMetalLayer *)object->layer_.get()).colorspace = colorspace;
-    if (colorspace)
-      CGColorSpaceRelease(colorspace);
-    if (!object->RebuildSwapChain())
-      return nullptr;
-    return object.release();
-  } catch (const std::bad_alloc &) {
-    ReportError(-1, "MetalWindow creation ran out of memory.");
+  auto object = std::unique_ptr<MetalWindow>(new MetalWindow(device));
+  auto pool = NS::TransferPtr(NS::AutoreleasePool::alloc()->init());
+  if (!object->InitializeWindow(desc))
+    return nullptr;
+  object->layer_ = NS::RetainPtr(CA::MetalLayer::layer());
+  if (!object->layer_) {
+    ReportError(-1, "CAMetalLayer creation failed.");
     return nullptr;
   }
+  object->layer_->setDevice(object->device_->NativeDevice());
+  object->layer_->setPixelFormat(MTL::PixelFormatBGRA8Unorm);
+  // RHI images may also be read back/copied, rather than only render targets.
+  object->layer_->setFramebufferOnly(false);
+  auto view = [glfwGetCocoaWindow(object->GLFWWindow()) contentView];
+  [view setWantsLayer:YES];
+  [view setLayer:(CAMetalLayer *)object->layer_.get()];
+  auto colorspace = CGColorSpaceCreateWithName(kCGColorSpaceSRGB);
+  ((CAMetalLayer *)object->layer_.get()).colorspace = colorspace;
+  if (colorspace)
+    CGColorSpaceRelease(colorspace);
+  if (!object->RebuildSwapChain())
+    return nullptr;
+  return object.release();
 }
 
 bool MetalWindow::RebuildNativeSwapChain(PresentMode requested_mode) {
