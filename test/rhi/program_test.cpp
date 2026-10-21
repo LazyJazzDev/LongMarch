@@ -717,6 +717,36 @@ TEST(D3D12BindingGroup, CpuDescriptorsAreFinalBeforeProgramBinding) {
 }
 #endif
 
+TEST_P(RhiProgram, InvalidBlendStateFailsFinalize) {
+  ObjPtr<ICore> core = CreateCore(GetParam());
+  ASSERT_TRUE(core);
+  ObjPtr<IDevice> device = core->CreateDeviceByAutoSelection();
+  ASSERT_TRUE(device);
+  const std::string source = R"(
+    float4 VSMain(uint id:SV_VertexID):SV_Position { return float4(0,0,0,1); }
+    float4 PSMain():SV_Target0 { return 1; }
+  )";
+  ObjPtr<IShader> vs = device->CreateShader({source, "VSMain", SHADER_STAGE_VERTEX});
+  ObjPtr<IShader> ps = device->CreateShader({source, "PSMain", SHADER_STAGE_FRAGMENT});
+  ProgramDesc desc;
+  desc.vertex_shader = vs.Get();
+  desc.fragment_shader = ps.Get();
+  desc.blend_states = {true, true};
+  ObjPtr<IProgram> program = device->CreateProgram(desc);
+  ASSERT_TRUE(program);
+  EXPECT_FALSE(program->Finalize());
+  desc.blend_states = {true};
+  desc.blend_states[0].src_color = static_cast<BlendFactor>(-1);
+  program = device->CreateProgram(desc);
+  ASSERT_TRUE(program);
+  EXPECT_FALSE(program->Finalize());
+  desc.blend_states = {true};
+  desc.blend_states[0].alpha_op = static_cast<BlendOp>(99);
+  program = device->CreateProgram(desc);
+  ASSERT_TRUE(program);
+  EXPECT_FALSE(program->Finalize());
+}
+
 INSTANTIATE_TEST_SUITE_P(Backends, RhiProgram, testing::ValuesIn(program_backends));
 }  // namespace grassland::rhi
 

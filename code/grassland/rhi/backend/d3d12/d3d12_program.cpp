@@ -92,15 +92,7 @@ bool D3D12Program::Finalize() {
   state.RasterizerState.FillMode = D3D12_FILL_MODE_SOLID;
   state.RasterizerState.CullMode = D3D12_CULL_MODE_NONE;
   state.RasterizerState.DepthClipEnable = TRUE;
-  auto &blend = state.BlendState.RenderTarget[0];
-  blend.SrcBlend = D3D12_BLEND_ONE;
-  blend.DestBlend = D3D12_BLEND_ZERO;
-  blend.BlendOp = D3D12_BLEND_OP_ADD;
-  blend.SrcBlendAlpha = D3D12_BLEND_ONE;
-  blend.DestBlendAlpha = D3D12_BLEND_ZERO;
-  blend.BlendOpAlpha = D3D12_BLEND_OP_ADD;
-  blend.LogicOp = D3D12_LOGIC_OP_NOOP;
-  blend.RenderTargetWriteMask = D3D12_COLOR_WRITE_ENABLE_ALL;
+  state.BlendState.IndependentBlendEnable = TRUE;
   const auto &ds = desc_.depth_stencil;
   state.DepthStencilState.DepthEnable = ds.depth_test;
   state.DepthStencilState.DepthWriteMask = ds.depth_write ? D3D12_DEPTH_WRITE_MASK_ALL : D3D12_DEPTH_WRITE_MASK_ZERO;
@@ -123,7 +115,17 @@ bool D3D12Program::Finalize() {
   state.NumRenderTargets = static_cast<UINT>(desc_.color_formats.size());
   for (size_t i = 0; i < desc_.color_formats.size(); ++i) {
     state.RTVFormats[i] = NativeImageFormat(desc_.color_formats[i]);
-    state.BlendState.RenderTarget[i] = blend;
+    const auto value = desc_.blend_states.empty() ? BlendState{} : desc_.blend_states[i];
+    auto &blend = state.BlendState.RenderTarget[i];
+    blend.BlendEnable = value.blend_enable;
+    blend.SrcBlend = NativeBlendFactor(value.src_color);
+    blend.DestBlend = NativeBlendFactor(value.dst_color);
+    blend.BlendOp = NativeBlendOp(value.color_op);
+    blend.SrcBlendAlpha = NativeBlendFactor(value.src_alpha, true);
+    blend.DestBlendAlpha = NativeBlendFactor(value.dst_alpha, true);
+    blend.BlendOpAlpha = NativeBlendOp(value.alpha_op);
+    blend.LogicOp = D3D12_LOGIC_OP_NOOP;
+    blend.RenderTargetWriteMask = D3D12_COLOR_WRITE_ENABLE_ALL;
   }
   state.SampleDesc.Count = 1;
   ComPtr<ID3D12PipelineState> pipeline;

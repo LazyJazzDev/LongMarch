@@ -6,6 +6,8 @@
 #include "grassland/rhi/backend/backend_util.h"
 
 namespace grassland::rhi::backend::d3d12 {
+D3D12_BLEND NativeBlendFactor(BlendFactor factor, bool alpha = false);
+D3D12_BLEND_OP NativeBlendOp(BlendOp op);
 bool SupportsImageStorage(ID3D12Device *device, ImageFormat format);
 DXGI_FORMAT NativeImageFormat(ImageFormat format);
 using Microsoft::WRL::ComPtr;

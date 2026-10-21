@@ -1,6 +1,24 @@
 ﻿#include "grassland/rhi/backend/vulkan/vulkan_util.h"
 
 namespace grassland::rhi::backend::vulkan {
+VkBlendFactor NativeBlendFactor(BlendFactor factor, bool alpha) {
+  // Alpha equations use the alpha component of color factors as well.
+  if (alpha && factor >= BLEND_FACTOR_SRC_COLOR && factor <= BLEND_FACTOR_ONE_MINUS_DST_COLOR)
+    factor = static_cast<BlendFactor>(factor + BLEND_FACTOR_SRC_ALPHA - BLEND_FACTOR_SRC_COLOR);
+  const VkBlendFactor factors[] = {VK_BLEND_FACTOR_ZERO,      VK_BLEND_FACTOR_ONE,
+                                   VK_BLEND_FACTOR_SRC_COLOR, VK_BLEND_FACTOR_ONE_MINUS_SRC_COLOR,
+                                   VK_BLEND_FACTOR_DST_COLOR, VK_BLEND_FACTOR_ONE_MINUS_DST_COLOR,
+                                   VK_BLEND_FACTOR_SRC_ALPHA, VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA,
+                                   VK_BLEND_FACTOR_DST_ALPHA, VK_BLEND_FACTOR_ONE_MINUS_DST_ALPHA};
+  return factors[factor];
+}
+
+VkBlendOp NativeBlendOp(BlendOp op) {
+  const VkBlendOp operations[] = {VK_BLEND_OP_ADD, VK_BLEND_OP_SUBTRACT, VK_BLEND_OP_REVERSE_SUBTRACT, VK_BLEND_OP_MIN,
+                                  VK_BLEND_OP_MAX};
+  return operations[op];
+}
+
 size_t DescriptorTypeIndex(BindingType type) {
   constexpr size_t indices[] = {0, 1, 1, 1, 1, 2, 3, 4};
   return indices[type];

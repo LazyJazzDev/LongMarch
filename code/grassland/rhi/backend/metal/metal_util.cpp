@@ -8,6 +8,30 @@
 #include <QuartzCore/QuartzCore.hpp>
 
 namespace grassland::rhi::backend::metal {
+MTL::BlendFactor NativeBlendFactor(BlendFactor factor, bool alpha) {
+  // Alpha equations use the alpha component of color factors as well.
+  if (alpha && factor >= BLEND_FACTOR_SRC_COLOR && factor <= BLEND_FACTOR_ONE_MINUS_DST_COLOR)
+    factor = static_cast<BlendFactor>(factor + BLEND_FACTOR_SRC_ALPHA - BLEND_FACTOR_SRC_COLOR);
+  const MTL::BlendFactor factors[] = {MTL::BlendFactorZero,
+                                      MTL::BlendFactorOne,
+                                      MTL::BlendFactorSourceColor,
+                                      MTL::BlendFactorOneMinusSourceColor,
+                                      MTL::BlendFactorDestinationColor,
+                                      MTL::BlendFactorOneMinusDestinationColor,
+                                      MTL::BlendFactorSourceAlpha,
+                                      MTL::BlendFactorOneMinusSourceAlpha,
+                                      MTL::BlendFactorDestinationAlpha,
+                                      MTL::BlendFactorOneMinusDestinationAlpha};
+  return factors[factor];
+}
+
+MTL::BlendOperation NativeBlendOp(BlendOp op) {
+  const MTL::BlendOperation operations[] = {MTL::BlendOperationAdd, MTL::BlendOperationSubtract,
+                                            MTL::BlendOperationReverseSubtract, MTL::BlendOperationMin,
+                                            MTL::BlendOperationMax};
+  return operations[op];
+}
+
 bool SupportsImageStorage(ImageFormat format) {
   // Of the currently supported formats, RGBA8Unorm supports shader writes
   // on all supported Metal GPU families; BGRA8Unorm is read-only.

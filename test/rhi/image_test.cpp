@@ -1,5 +1,6 @@
-#include <gtest/gtest.h>
+﻿#include <gtest/gtest.h>
 
+#include <algorithm>
 #include <array>
 #include <chrono>
 #include <cstring>
@@ -1263,6 +1264,105 @@ const BackendAPI backends[] = {
     BACKEND_API_METAL,
 #endif
 };
+TEST_P(RhiImage, IndependentColorAndAlphaBlendingMatchesPixelResults) {
+  ObjPtr<ICore> core = CreateCore(GetParam());
+  ASSERT_TRUE(core);
+  ObjPtr<IDevice> device = core->CreateDeviceByAutoSelection();
+  ASSERT_TRUE(device);
+  Track(device.Get());
+  ObjPtr<IQueue> queue = device->GetQueue(QUEUE_TYPE_GRAPHICS);
+  ASSERT_TRUE(queue);
+  std::array<ObjPtr<IImage>, 3> targets;
+  for (auto &target : targets) {
+    target = device->CreateImage({8, 8, IMAGE_FORMAT_RGBA8_UNORM});
+    ASSERT_TRUE(target);
+  }
+  const std::string source = R"(
+    float4 VSMain(uint id:SV_VertexID):SV_Position {
+      float2 p[3]={float2(-1,-1),float2(3,-1),float2(-1,3)};
+      return float4(p[id],0,1);
+    }
+    struct Output { float4 a:SV_Target0; float4 b:SV_Target1; float4 c:SV_Target2; };
+    Output PSMain() { Output o; o.a=o.b=o.c=float4(.25,.5,.75,.5); return o; }
+  )";
+  ObjPtr<IShader> vs = device->CreateShader({source, "VSMain", SHADER_STAGE_VERTEX});
+  ObjPtr<IShader> ps = device->CreateShader({source, "PSMain", SHADER_STAGE_FRAGMENT});
+
+  struct Case {
+    BlendState state;
+    std::array<float, 4> expected;
+  };
+
+  // Literal results distinguish independent RGB/alpha factors, operation order,
+  // MIN/MAX ignoring factors, and disabled blending on adjacent MRT attachments.
+  std::vector<Case> cases{
+      {BlendState{}, {.25f, .5f, .75f, .5f}},
+      {BlendState(true), {.375f, .375f, .4375f, .625f}},
+      {{BLEND_FACTOR_ONE, BLEND_FACTOR_ONE, BLEND_OP_ADD, BLEND_FACTOR_ONE, BLEND_FACTOR_ONE, BLEND_OP_ADD},
+       {.75f, .75f, .875f, .75f}},
+      {{BLEND_FACTOR_ONE, BLEND_FACTOR_ONE, BLEND_OP_SUBTRACT, BLEND_FACTOR_ONE, BLEND_FACTOR_ONE, BLEND_OP_SUBTRACT},
+       {0, .25f, .625f, .25f}},
+      {{BLEND_FACTOR_ONE, BLEND_FACTOR_ONE, BLEND_OP_REVERSE_SUBTRACT, BLEND_FACTOR_ONE, BLEND_FACTOR_ONE,
+        BLEND_OP_REVERSE_SUBTRACT},
+       {.25f, 0, 0, 0}},
+      {{BLEND_FACTOR_ZERO, BLEND_FACTOR_ZERO, BLEND_OP_MIN, BLEND_FACTOR_ZERO, BLEND_FACTOR_ZERO, BLEND_OP_MIN},
+       {.25f, .25f, .125f, .25f}},
+      {{BLEND_FACTOR_ZERO, BLEND_FACTOR_ZERO, BLEND_OP_MAX, BLEND_FACTOR_ZERO, BLEND_FACTOR_ZERO, BLEND_OP_MAX},
+       {.5f, .5f, .75f, .5f}},
+  };
+  const std::array<float, 4> factor_results[] = {
+      {0, 0, 0, 0},
+      {.25f, .5f, .75f, .5f},
+      {.0625f, .25f, .5625f, .25f},
+      {.1875f, .25f, .1875f, .25f},
+      {.125f, .125f, .09375f, .125f},
+      {.125f, .375f, .65625f, .375f},
+      {.125f, .25f, .375f, .25f},
+      {.125f, .25f, .375f, .25f},
+      {.0625f, .125f, .1875f, .125f},
+      {.1875f, .375f, .5625f, .375f},
+  };
+  for (int f = BLEND_FACTOR_ZERO; f <= BLEND_FACTOR_ONE_MINUS_DST_ALPHA; ++f) {
+    const auto factor = static_cast<BlendFactor>(f);
+    cases.push_back(
+        {{factor, BLEND_FACTOR_ZERO, BLEND_OP_ADD, factor, BLEND_FACTOR_ZERO, BLEND_OP_ADD}, factor_results[f]});
+  }
+  for (size_t first = 0; first < cases.size(); first += targets.size()) {
+    ProgramDesc desc;
+    desc.vertex_shader = vs.Get();
+    desc.fragment_shader = ps.Get();
+    desc.color_formats.assign(targets.size(), IMAGE_FORMAT_RGBA8_UNORM);
+    for (size_t j = 0; j < targets.size(); ++j)
+      desc.blend_states.push_back(cases[(std::min)(first + j, cases.size() - 1)].state);
+    ObjPtr<IProgram> program = device->CreateProgram(desc);
+    ASSERT_TRUE(program);
+    ASSERT_TRUE(program->Finalize());
+    ObjPtr<ICommandContext> commands = device->CreateCommandContext();
+    ASSERT_TRUE(commands);
+    ASSERT_TRUE(commands->CmdBindProgram(program.Get()));
+    RenderingInfo rendering;
+    for (auto &target : targets)
+      rendering.color_attachments.push_back(
+          {target.Get(), ATTACHMENT_LOAD_OP_CLEAR, ATTACHMENT_STORE_OP_STORE, {.5f, .25f, .125f, .25f}});
+    ASSERT_TRUE(commands->CmdBeginRendering(rendering));
+    ASSERT_TRUE(commands->CmdSetViewport({0, 0, 8, 8, 0, 1}));
+    ASSERT_TRUE(commands->CmdSetScissor({0, 0, 8, 8}));
+    ASSERT_TRUE(commands->CmdDraw(3));
+    ASSERT_TRUE(commands->CmdEndRendering());
+    ObjPtr<ISubmissionToken> done = queue->Submit(commands.Get());
+    ASSERT_TRUE(done);
+    ASSERT_TRUE(done->WaitHost());
+    for (size_t j = 0; j < targets.size(); ++j) {
+      const auto index = (std::min)(first + j, cases.size() - 1);
+      SCOPED_TRACE(index);
+      std::array<uint8_t, 4> pixel{};
+      ReadPixel(device.Get(), targets[j].Get(), GetParam(), 4, 4, pixel);
+      for (size_t c = 0; c < pixel.size(); ++c)
+        EXPECT_NEAR(pixel[c], cases[index].expected[c] * 255, 2);
+    }
+  }
+}
+
 INSTANTIATE_TEST_SUITE_P(Backends, RhiImage, testing::ValuesIn(backends));
 }  // namespace
 }  // namespace grassland::rhi

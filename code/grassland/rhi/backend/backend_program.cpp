@@ -43,6 +43,16 @@ bool Program::ValidateLayout() const {
   for (auto format : desc_.color_formats)
     if (format != IMAGE_FORMAT_RGBA8_UNORM && format != IMAGE_FORMAT_BGRA8_UNORM)
       return false;
+  if (!desc_.blend_states.empty() && desc_.blend_states.size() != desc_.color_formats.size())
+    return false;
+  for (const auto &blend : desc_.blend_states) {
+    for (auto factor : {blend.src_color, blend.dst_color, blend.src_alpha, blend.dst_alpha})
+      if (factor < BLEND_FACTOR_ZERO || factor > BLEND_FACTOR_ONE_MINUS_DST_ALPHA)
+        return false;
+    for (auto op : {blend.color_op, blend.alpha_op})
+      if (op < BLEND_OP_ADD || op > BLEND_OP_MAX)
+        return false;
+  }
   const auto &depth = desc_.depth_stencil;
   if (depth.format != IMAGE_FORMAT_UNKNOWN && !IsDepthFormat(depth.format))
     return false;
