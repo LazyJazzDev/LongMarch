@@ -57,8 +57,6 @@ VulkanBindingGroup::Version::Version(VulkanDevice *device, const BindingLayoutDe
   for (size_t i = 0; i < layout_.bindings.size(); ++i) {
     const auto &binding = layout_.bindings[i];
     initialized_.emplace_back(binding.count, false);
-    if (binding.type == BINDING_SAMPLER)
-      references_[i].resize(binding.count);
   }
 }
 

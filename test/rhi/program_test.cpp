@@ -40,8 +40,6 @@ SamplerArray CreateSamplers(IDevice *device, std::initializer_list<SamplerDesc> 
 class RhiProgram : public testing::TestWithParam<BackendAPI> {};
 
 TEST_P(RhiProgram, SamplersAreReusableAndRetainedByCapturedVersions) {
-  if (GetParam() == BACKEND_API_METAL)
-    GTEST_SKIP() << "Metal retains native sampler state through the legacy adapter.";
   ObjPtr<ICore> core = CreateCore(GetParam());
   ASSERT_TRUE(core);
   ObjPtr<IDevice> device = core->CreateDeviceByAutoSelection();
@@ -443,10 +441,8 @@ TEST_P(RhiProgram, BindingUpdatesAreTransactionalAndForkOnlyCapturedVersions) {
       group->BindResource(9, ObjPtr<ISampler>(device->CreateSampler(SamplerDesc{SAMPLER_FILTER_NEAREST})).Get()));
   EXPECT_EQ(native->CurrentVersion(), next);
   EXPECT_TRUE(captured->IsInitialized(2, 0));
-  if (GetParam() != BACKEND_API_METAL) {
-    ASSERT_EQ(captured->GetReferences()[2].size(), 1u);
-    EXPECT_EQ(static_cast<ISampler *>(captured->GetReferences()[2][0].Get())->GetDesc().filter, SAMPLER_FILTER_LINEAR);
-  }
+  ASSERT_EQ(captured->GetReferences()[2].size(), 1u);
+  EXPECT_EQ(static_cast<ISampler *>(captured->GetReferences()[2][0].Get())->GetDesc().filter, SAMPLER_FILTER_LINEAR);
   // Capture of the unchanged version shares all descriptors and resources.
   auto again = backend::ObjectPtr<backend::BindingGroup::Version>::Retain(next);
   EXPECT_EQ(again.Get(), next);

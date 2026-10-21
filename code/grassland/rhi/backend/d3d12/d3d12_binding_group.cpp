@@ -17,8 +17,6 @@ D3D12BindingGroup::Version::Version(D3D12Device *device, const BindingLayoutDesc
     offsets_.push_back(offset);
     offset += binding.count;
     initialized_.emplace_back(binding.count, false);
-    if (binding.type == BINDING_SAMPLER)
-      references_[i].resize(binding.count);
   }
 }
 

@@ -26,13 +26,12 @@ class BindingGroup : public Object<IBindingGroup> {
     virtual bool WriteDescriptors(size_t binding_index,
                                   uint32_t first_element,
                                   const std::vector<IImage *> &values) = 0;
-    virtual bool WriteDescriptors(size_t binding_index, uint32_t first_element, const std::vector<ISampler *> &values);
-    // Internal bridge for the unchanged Metal implementation.
-    virtual bool WriteDescriptors(size_t binding_index, uint32_t first_element, const std::vector<SamplerDesc> &values);
+    virtual bool WriteDescriptors(size_t binding_index,
+                                  uint32_t first_element,
+                                  const std::vector<ISampler *> &values) = 0;
     Device *device_;
     BindingLayoutDesc layout_;
     // Indexed by sorted layout binding, then array element.
-    // Native sampler backends populate sampler slots; the legacy adapter leaves them empty.
     std::vector<std::vector<ObjectPtr<IObject>>> references_;
   };
 

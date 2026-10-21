@@ -4,6 +4,7 @@
 
 #include "grassland/rhi/backend/metal/metal_device.h"
 #include "grassland/rhi/backend/metal/metal_image.h"
+#include "grassland/rhi/backend/metal/metal_sampler.h"
 
 namespace grassland::rhi::backend::metal {
 uint32_t MetalArgumentCount(const BindingLayoutDesc &layout) {
@@ -55,7 +56,6 @@ MetalBindingGroup::Version *MetalBindingGroup::Version::Create(MetalDevice *devi
       descriptors.push_back(d);
       result->offsets_.push_back(offset);
       result->initialized_.emplace_back(b.count, false);
-      result->samplers_.emplace_back(b.type == BINDING_SAMPLER ? b.count : 0);
       offset += b.count;
     }
     // SPIRV-Cross uses one size array per descriptor set for GetDimensions.
@@ -90,7 +90,6 @@ ObjectPtr<BindingGroup::Version> MetalBindingGroup::Version::Clone() const {
     return {};
   copy->references_ = references_;
   copy->initialized_ = initialized_;
-  copy->samplers_ = samplers_;
   std::memcpy(copy->arguments_->contents(), arguments_->contents(), arguments_->length());
   std::memcpy(copy->sizes_->contents(), sizes_->contents(), sizes_->length());
   copy->encoder_->setBuffer(copy->sizes_.get(), 0, MetalArgumentCount(layout_));
@@ -123,27 +122,9 @@ bool MetalBindingGroup::Version::WriteDescriptors(size_t b, uint32_t first, cons
   return true;
 }
 
-bool MetalBindingGroup::Version::WriteDescriptors(size_t b, uint32_t first, const std::vector<SamplerDesc> &values) {
-  auto pool = NS::TransferPtr(NS::AutoreleasePool::alloc()->init());
-  std::vector<NS::SharedPtr<MTL::SamplerState>> samplers;
-  for (auto v : values) {
-    auto d = NS::TransferPtr(MTL::SamplerDescriptor::alloc()->init());
-    d->setSupportArgumentBuffers(true);
-    d->setMinFilter(v.filter == SAMPLER_FILTER_NEAREST ? MTL::SamplerMinMagFilterNearest
-                                                       : MTL::SamplerMinMagFilterLinear);
-    d->setMagFilter(d->minFilter());
-    const MTL::SamplerAddressMode modes[] = {MTL::SamplerAddressModeRepeat, MTL::SamplerAddressModeClampToEdge,
-                                             MTL::SamplerAddressModeMirrorRepeat};
-    d->setSAddressMode(modes[v.address_u]);
-    d->setTAddressMode(modes[v.address_v]);
-    auto sampler = NS::TransferPtr(static_cast<MetalDevice *>(device_)->NativeDevice()->newSamplerState(d.get()));
-    if (!sampler)
-      return false;
-    samplers.push_back(std::move(sampler));
-  }
+bool MetalBindingGroup::Version::WriteDescriptors(size_t b, uint32_t first, const std::vector<ISampler *> &values) {
   for (size_t i = 0; i < values.size(); ++i) {
-    encoder_->setSamplerState(samplers[i].get(), offsets_[b] + first + i);
-    samplers_[b][first + i] = std::move(samplers[i]);
+    encoder_->setSamplerState(static_cast<MetalSampler *>(values[i])->NativeSampler(), offsets_[b] + first + i);
     initialized_[b][first + i] = true;
   }
   return true;
@@ -155,6 +136,8 @@ void MetalBindingGroup::Version::Bind(MTL::RenderCommandEncoder *encoder, uint32
   encoder->useResource(sizes_.get(), MTL::ResourceUsageRead, MTL::RenderStageVertex | MTL::RenderStageFragment);
   for (size_t b = 0; b < layout_.bindings.size(); ++b) {
     auto desc = layout_.bindings[b];
+    if (desc.type == BINDING_SAMPLER)
+      continue;  // Samplers are retained objects, not MTL::Resource residency entries.
     MTL::ResourceUsage usage = MTL::ResourceUsageRead;
     if (desc.type == BINDING_RW_STRUCTURED_BUFFER || desc.type == BINDING_RW_BYTE_ADDRESS_BUFFER ||
         desc.type == BINDING_RW_TEXTURE2D)

@@ -1048,6 +1048,78 @@ TEST_P(RhiImage, RawBufferWritesBecomeReadableAfterRendering) {
   EXPECT_EQ(pixel, (std::array<uint8_t, 4>{255, 0, 255, 255}));
 }
 
+TEST_P(RhiImage, SamplerArraysPreserveFilteringAcrossCapturedVersions) {
+  ObjPtr<ICore> core = CreateCore(GetParam());
+  ASSERT_TRUE(core);
+  ObjPtr<IDevice> device = core->CreateDeviceByAutoSelection();
+  ASSERT_TRUE(device);
+  Track(device.Get());
+  ObjPtr<IQueue> queue = device->GetQueue(QUEUE_TYPE_GRAPHICS);
+  ObjPtr<IImage> target = device->CreateImage({8, 8, IMAGE_FORMAT_RGBA8_UNORM});
+  ObjPtr<IImage> texture = device->CreateImage({2, 1, IMAGE_FORMAT_RGBA8_UNORM});
+  ObjPtr<ISampler> nearest = device->CreateSampler({SAMPLER_FILTER_NEAREST});
+  ObjPtr<ISampler> linear = device->CreateSampler({SAMPLER_FILTER_LINEAR});
+  ASSERT_TRUE(queue && target && texture && nearest && linear);
+  const std::string source = R"(
+    RHI_TEXTURE2D(0,0,float4,image);
+    RHI_SAMPLER_ARRAY(0,3,samplers);
+    float4 VSMain(uint id:SV_VertexID):SV_Position {
+      float2 p[3]={float2(-1,-1),float2(3,-1),float2(-1,3)};
+      return float4(p[id],0,1);
+    }
+    float4 PSMain():SV_Target0 {
+      return image.Sample(samplers[1],float2(.375,.5));
+    }
+  )";
+  ObjPtr<IShader> vs = device->CreateShader({source, "VSMain", SHADER_STAGE_VERTEX});
+  ObjPtr<IShader> ps = device->CreateShader({source, "PSMain", SHADER_STAGE_FRAGMENT});
+  ProgramDesc desc;
+  desc.vertex_shader = vs.Get();
+  desc.fragment_shader = ps.Get();
+  desc.pipeline_layout.groups = {
+      {{{0, BINDING_TEXTURE2D, 1, SHADER_VISIBILITY_FRAGMENT}, {3, BINDING_SAMPLER, 2, SHADER_VISIBILITY_FRAGMENT}}}};
+  ObjPtr<IProgram> program = device->CreateProgram(desc);
+  ASSERT_TRUE(program);
+  ASSERT_TRUE(program->Finalize());
+  ObjPtr<IBindingGroup> group = device->CreateBindingGroup(desc.pipeline_layout.groups[0]);
+  ASSERT_TRUE(group);
+  ASSERT_TRUE(group->BindResource(0, texture.Get()));
+  ASSERT_TRUE(group->BindResource(3, std::vector<ISampler *>{linear.Get(), nearest.Get()}));
+  ObjPtr<ICommandContext> commands = device->CreateCommandContext();
+  ASSERT_TRUE(commands);
+  const std::array<uint8_t, 8> pixels{255, 0, 0, 255, 0, 0, 255, 255};
+  ASSERT_TRUE(commands->CmdUploadImage(texture.Get(), pixels.data(), pixels.size()));
+  ASSERT_TRUE(commands->CmdBindProgram(program.Get()));
+  ASSERT_TRUE(commands->CmdBindGroup(0, group.Get()));
+  // The first draw must still use nearest; the second captures the partial update.
+  ASSERT_TRUE(group->BindResource(3, std::vector<ISampler *>{linear.Get()}, 1));
+  nearest.Release();
+  linear.Release();
+  ASSERT_TRUE(commands->CmdBeginRendering(
+      {{{target.Get(), ATTACHMENT_LOAD_OP_CLEAR, ATTACHMENT_STORE_OP_STORE, {0, 0, 0, 1}}}}));
+  ASSERT_TRUE(commands->CmdSetViewport({0, 0, 8, 8, 0, 1}));
+  ASSERT_TRUE(commands->CmdSetScissor({0, 0, 4, 8}));
+  ASSERT_TRUE(commands->CmdDraw(3));
+  ASSERT_TRUE(commands->CmdBindGroup(0, group.Get()));
+  ASSERT_TRUE(commands->CmdSetScissor({4, 0, 4, 8}));
+  ASSERT_TRUE(commands->CmdDraw(3));
+  ASSERT_TRUE(commands->CmdEndRendering());
+  group.Release();
+  texture.Release();
+  ObjPtr<ISubmissionToken> done = queue->Submit(commands.Get());
+  ASSERT_TRUE(done);
+  commands.Release();
+  ASSERT_TRUE(done->WaitHost());
+  std::array<uint8_t, 4> pixel{};
+  ReadPixel(device.Get(), target.Get(), GetParam(), 2, 4, pixel);
+  EXPECT_EQ(pixel, (std::array<uint8_t, 4>{255, 0, 0, 255}));
+  ReadPixel(device.Get(), target.Get(), GetParam(), 6, 4, pixel);
+  EXPECT_NEAR(pixel[0], 191, 1);
+  EXPECT_EQ(pixel[1], 0);
+  EXPECT_NEAR(pixel[2], 64, 1);
+  EXPECT_EQ(pixel[3], 255);
+}
+
 TEST_P(RhiImage, BindingArraysExposeCapturedBufferViewLengths) {
   ObjPtr<ICore> core = CreateCore(GetParam());
   ASSERT_TRUE(core);

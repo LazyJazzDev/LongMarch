@@ -22,10 +22,9 @@ class MetalBindingGroup final : public BindingGroup {
     Version(MetalDevice *device, const BindingLayoutDesc &layout);
     bool WriteDescriptors(size_t binding, uint32_t first, const std::vector<BufferView> &values) override;
     bool WriteDescriptors(size_t binding, uint32_t first, const std::vector<IImage *> &values) override;
-    bool WriteDescriptors(size_t binding, uint32_t first, const std::vector<SamplerDesc> &values) override;
+    bool WriteDescriptors(size_t binding, uint32_t first, const std::vector<ISampler *> &values) override;
     std::vector<uint32_t> offsets_;
     std::vector<std::vector<bool>> initialized_;
-    std::vector<std::vector<NS::SharedPtr<MTL::SamplerState>>> samplers_;
     NS::SharedPtr<MTL::ArgumentEncoder> encoder_;
     NS::SharedPtr<MTL::Buffer> arguments_, sizes_;
   };

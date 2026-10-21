@@ -16,6 +16,7 @@ class MetalDevice final : public Device {
   rhi::IImage *CreateImage(const ImageDesc &desc) override;
   rhi::IProgram *CreateProgram(const ProgramDesc &desc) override;
   rhi::IBindingGroup *CreateBindingGroup(const BindingLayoutDesc &layout) override;
+  ISampler *CreateSampler(const SamplerDesc &desc = {}) override;
   MetalUploadPool &UploadPool();
   MTL::Device *NativeDevice() const noexcept;
   MTL::CommandQueue *NativeQueue() const;

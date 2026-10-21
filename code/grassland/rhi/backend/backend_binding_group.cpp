@@ -62,8 +62,7 @@ BindingGroup::Version::Version(Device *device, const BindingLayoutDesc &layout) 
   std::sort(layout_.bindings.begin(), layout_.bindings.end(), [](auto a, auto b) { return a.binding < b.binding; });
   references_.resize(layout_.bindings.size());
   for (size_t i = 0; i < layout_.bindings.size(); ++i)
-    if (layout_.bindings[i].type != BINDING_SAMPLER)
-      references_[i].resize(layout_.bindings[i].count);
+    references_[i].resize(layout_.bindings[i].count);
 }
 
 const BindingLayoutDesc &BindingGroup::Version::GetLayout() const {
@@ -115,26 +114,9 @@ bool BindingGroup::Version::Write(size_t binding_index, uint32_t first_element, 
     references.push_back(ObjectPtr<IObject>::Retain(value));
   if (!WriteDescriptors(binding_index, first_element, values))
     return false;
-  // Legacy Metal keeps its native sampler ownership separately and leaves these slots empty.
-  if (!references_[binding_index].empty())
-    for (size_t i = 0; i < values.size(); ++i)
-      references_[binding_index][first_element + i] = std::move(references[i]);
+  for (size_t i = 0; i < values.size(); ++i)
+    references_[binding_index][first_element + i] = std::move(references[i]);
   return true;
-}
-
-bool BindingGroup::Version::WriteDescriptors(size_t binding_index,
-                                             uint32_t first_element,
-                                             const std::vector<ISampler *> &values) {
-  // Legacy backends own native samplers in their versions and only consume descriptions.
-  std::vector<SamplerDesc> descriptions;
-  descriptions.reserve(values.size());
-  for (auto sampler : values)
-    descriptions.push_back(sampler->GetDesc());
-  return WriteDescriptors(binding_index, first_element, descriptions);
-}
-
-bool BindingGroup::Version::WriteDescriptors(size_t, uint32_t, const std::vector<SamplerDesc> &) {
-  return false;
 }
 
 BindingGroup::BindingGroup(Device *device, ObjectPtr<Version> version)

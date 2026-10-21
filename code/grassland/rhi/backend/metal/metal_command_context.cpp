@@ -233,22 +233,23 @@ bool MetalCommandContext::CmdUploadImage(IImage *image, const void *data, uint64
   try {
     const auto desc = native->GetDesc();
     const uint64_t pitch = uint64_t(desc.width) * 4;
-    std::vector<uint8_t> pixels(pitch * desc.height);
-    for (uint32_t y = 0; y < desc.height; ++y)
-      std::memcpy(pixels.data() + y * pitch, static_cast<const uint8_t *>(data) + y * row_pitch, pitch);
-    auto upload = device_->UploadPool().Acquire(pixels.size());
-    if (!upload || !upload->Write(pixels.data(), pixels.size()) || !RetainResource(upload.Get()) ||
-        !RetainResource(native)) {
+    const uint64_t size = pitch * desc.height;
+    auto upload = device_->UploadPool().Acquire(size);
+    if (!upload || !RetainResource(upload.Get()) || !RetainResource(native)) {
       recording_failed_ = true;
       return false;
     }
+    // The lease is shared staging memory; snapshot rows directly into it.
+    auto destination = static_cast<uint8_t *>(upload->NativeBuffer()->contents());
+    for (uint32_t y = 0; y < desc.height; ++y)
+      std::memcpy(destination + y * pitch, static_cast<const uint8_t *>(data) + y * row_pitch, pitch);
     auto pool = NS::TransferPtr(NS::AutoreleasePool::alloc()->init());
     auto blit = commands_->blitCommandEncoder();
     if (!blit) {
       recording_failed_ = true;
       return false;
     }
-    blit->copyFromBuffer(upload->NativeBuffer(), 0, pitch, pixels.size(), MTL::Size::Make(desc.width, desc.height, 1),
+    blit->copyFromBuffer(upload->NativeBuffer(), 0, pitch, size, MTL::Size::Make(desc.width, desc.height, 1),
                          native->NativeImage(), 0, 0, MTL::Origin::Make(0, 0, 0));
     blit->endEncoding();
     return true;
