@@ -23,7 +23,7 @@ Device *ComputeProgram::Owner() const {
 
 bool ComputeProgram::ValidateLayout() const {
   if (!desc_.compute_shader || desc_.compute_shader->GetDesc().stage != SHADER_STAGE_COMPUTE ||
-      desc_.pipeline_layout.groups.size() > 4)
+      desc_.pipeline_layout.groups.size() > 8)
     return false;
   for (const auto &group : desc_.pipeline_layout.groups)
     if (!ValidateBindingLayout(group))

@@ -390,6 +390,55 @@ const BackendAPI backends[] = {
     BACKEND_API_METAL,
 #endif
 };
+TEST_P(RhiBuffer, EightBindingGroupsDispatchAndRejectNinthGroup) {
+  ObjPtr<ICore> core = CreateCore(GetParam());
+  ASSERT_TRUE(core);
+  ObjPtr<IDevice> device = core->CreateDeviceByAutoSelection();
+  ASSERT_TRUE(device);
+  ObjPtr<IQueue> queue = device->GetQueue(QUEUE_TYPE_GRAPHICS);
+  ASSERT_TRUE(queue);
+  std::string source;
+  std::string body;
+  ComputeProgramDesc desc;
+  for (uint32_t i = 0; i < 8; ++i) {
+    const auto index = std::to_string(i);
+    source += "RHI_RW_STRUCTURED_BUFFER(" + index + ", 0, uint, values" + index + ");\n";
+    body += "values" + index + "[0] = " + std::to_string(i + 1) + ";\n";
+    desc.pipeline_layout.groups.push_back({{{0, BINDING_RW_STRUCTURED_BUFFER, 1, SHADER_VISIBILITY_COMPUTE, 4}}});
+  }
+  source += "[numthreads(1, 1, 1)] void CSMain() {\n" + body + "}\n";
+  ObjPtr<IShader> shader = device->CreateShader({source, "CSMain", SHADER_STAGE_COMPUTE});
+  ASSERT_TRUE(shader);
+  desc.compute_shader = shader.Get();
+  ObjPtr<IComputeProgram> program = device->CreateComputeProgram(desc);
+  ASSERT_TRUE(program);
+  ASSERT_TRUE(program->Finalize());
+  ObjPtr<ICommandContext> context = device->CreateCommandContext();
+  ASSERT_TRUE(context);
+  ASSERT_TRUE(context->CmdBindComputeProgram(program.Get()));
+  std::array<ObjPtr<IBuffer>, 8> buffers;
+  for (uint32_t i = 0; i < buffers.size(); ++i) {
+    buffers[i] = device->CreateBuffer({4});
+    ASSERT_TRUE(buffers[i]);
+    ObjPtr<IBindingGroup> group = device->CreateBindingGroup(desc.pipeline_layout.groups[i]);
+    ASSERT_TRUE(group);
+    ASSERT_TRUE(group->BindResource(0, buffers[i].Get()));
+    ASSERT_TRUE(context->CmdBindGroup(i, group.Get()));
+  }
+  ASSERT_TRUE(context->CmdDispatch(1));
+  ObjPtr<ISubmissionToken> token = queue->Submit(context.Get());
+  ASSERT_TRUE(token);
+  ASSERT_TRUE(token->WaitHost());
+  for (uint32_t i = 0; i < buffers.size(); ++i) {
+    std::array<uint32_t, 1> actual{};
+    ReadBuffer(device.Get(), buffers[i].Get(), GetParam(), actual);
+    EXPECT_EQ(actual[0], i + 1);
+  }
+  desc.pipeline_layout.groups.push_back(desc.pipeline_layout.groups.front());
+  ObjPtr<IComputeProgram> invalid = device->CreateComputeProgram(desc);
+  EXPECT_TRUE(!invalid || !invalid->Finalize());
+}
+
 TEST_P(RhiBuffer, ComputeDispatchDependenciesAndBindingSnapshots) {
   ObjPtr<ICore> core = CreateCore(GetParam());
   ASSERT_TRUE(core);

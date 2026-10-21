@@ -46,6 +46,7 @@ struct BindingLayoutDesc {
   std::vector<BindingDesc> bindings;
 };
 
+// Up to eight groups; backend device limits also apply.
 struct PipelineLayoutDesc {
   std::vector<BindingLayoutDesc> groups;
 };

@@ -27,7 +27,7 @@ Device *Program::Owner() const {
 }
 
 bool Program::ValidateLayout() const {
-  if (desc_.pipeline_layout.groups.size() > 4)
+  if (desc_.pipeline_layout.groups.size() > 8)
     return false;
   for (const auto &group : desc_.pipeline_layout.groups)
     if (!ValidateBindingLayout(group))
