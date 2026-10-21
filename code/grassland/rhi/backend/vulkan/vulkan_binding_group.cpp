@@ -5,7 +5,6 @@
 
 #include "grassland/rhi/backend/vulkan/vulkan_allocated_image.h"
 #include "grassland/rhi/backend/vulkan/vulkan_buffer.h"
-#include "grassland/rhi/backend/vulkan/vulkan_descriptor_types.h"
 #include "grassland/rhi/backend/vulkan/vulkan_device.h"
 #include "grassland/rhi/backend/vulkan/vulkan_sampler.h"
 
@@ -19,7 +18,7 @@ VkDescriptorSetLayout CreateBindingLayout(VkDevice device, const BindingLayoutDe
       stages |= VK_SHADER_STAGE_VERTEX_BIT;
     if (b.visibility & SHADER_VISIBILITY_FRAGMENT)
       stages |= VK_SHADER_STAGE_FRAGMENT_BIT;
-    bindings.push_back({b.binding, detail::Type(b.type), b.count, stages, nullptr});
+    bindings.push_back({b.binding, NativeDescriptorType(b.type), b.count, stages, nullptr});
   }
   VkDescriptorSetLayoutCreateInfo create{VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO};
   create.bindingCount = uint32_t(bindings.size());
@@ -212,7 +211,7 @@ bool ValidatePipelineBindings(VkPhysicalDevice device, const PipelineLayoutDesc 
   uint64_t totals[5]{}, stages[2][5]{};
   for (const auto &group : layout.groups)
     for (auto b : group.bindings) {
-      auto kind = detail::Kind(b.type);
+      auto kind = DescriptorTypeIndex(b.type);
       totals[kind] += b.count;
       for (int i = 0; i < 2; ++i)
         if (b.visibility & (1 << i))

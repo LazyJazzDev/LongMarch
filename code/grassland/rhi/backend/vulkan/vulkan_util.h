@@ -5,8 +5,14 @@
 #include <cstring>
 
 #include "grassland/rhi/backend/backend_util.h"
+#include "grassland/rhi/rhi_binding_group.h"
 
 namespace grassland::rhi::backend::vulkan {
+// Descriptor budget order: uniform buffer, storage buffer, sampled image, storage image, sampler.
+size_t DescriptorTypeIndex(BindingType type);
+VkDescriptorType DescriptorTypeFromIndex(size_t index);
+VkDescriptorType NativeDescriptorType(BindingType type);
+
 bool SupportsImageStorage(VkPhysicalDevice device, ImageFormat format);
 VkFormat NativeImageFormat(ImageFormat format);
 VkImageAspectFlags ImageAspect(ImageFormat format);

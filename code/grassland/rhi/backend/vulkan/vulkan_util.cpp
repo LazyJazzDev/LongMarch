@@ -1,6 +1,22 @@
 ﻿#include "grassland/rhi/backend/vulkan/vulkan_util.h"
 
 namespace grassland::rhi::backend::vulkan {
+size_t DescriptorTypeIndex(BindingType type) {
+  constexpr size_t indices[] = {0, 1, 1, 1, 1, 2, 3, 4};
+  return indices[type];
+}
+
+VkDescriptorType DescriptorTypeFromIndex(size_t index) {
+  constexpr VkDescriptorType types[] = {VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
+                                        VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE,
+                                        VK_DESCRIPTOR_TYPE_SAMPLER};
+  return types[index];
+}
+
+VkDescriptorType NativeDescriptorType(BindingType type) {
+  return DescriptorTypeFromIndex(DescriptorTypeIndex(type));
+}
+
 bool SupportsImageStorage(VkPhysicalDevice device, ImageFormat format) {
   const auto native = NativeImageFormat(format);
   if (native == VK_FORMAT_UNDEFINED || IsDepthFormat(format))

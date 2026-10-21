@@ -3,8 +3,6 @@
 #include <algorithm>
 #include <limits>
 
-#include "grassland/rhi/backend/vulkan/vulkan_descriptor_types.h"
-
 namespace grassland::rhi::backend::vulkan {
 VulkanDescriptorPool::Lease::Lease(VulkanDescriptorPool *owner, Page *page, VkDescriptorSet set)
     : owner_(owner),
@@ -41,7 +39,7 @@ ObjectPtr<VulkanDescriptorPool::Lease> VulkanDescriptorPool::Acquire(VkDescripto
   try {
     Pattern pattern{};
     for (auto binding : desc.bindings) {
-      auto &count = pattern[detail::Kind(binding.type)];
+      auto &count = pattern[DescriptorTypeIndex(binding.type)];
       if (binding.count > std::numeric_limits<uint32_t>::max() - count)
         return {};
       count += binding.count;
@@ -66,7 +64,7 @@ ObjectPtr<VulkanDescriptorPool::Lease> VulkanDescriptorPool::Acquire(VkDescripto
       std::vector<VkDescriptorPoolSize> sizes;
       for (size_t i = 0; i < pattern.size(); ++i)
         if (pattern[i])
-          sizes.push_back({detail::descriptor_types[i], pattern[i] * fresh->capacity});
+          sizes.push_back({DescriptorTypeFromIndex(i), pattern[i] * fresh->capacity});
       VkDescriptorPoolCreateInfo create{VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO};
       create.flags = VK_DESCRIPTOR_POOL_CREATE_FREE_DESCRIPTOR_SET_BIT;
       create.maxSets = fresh->capacity;
