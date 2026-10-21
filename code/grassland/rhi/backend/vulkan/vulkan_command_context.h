@@ -8,7 +8,7 @@ namespace grassland::rhi::backend::vulkan {
 class VulkanImage;
 class VulkanBuffer;
 class VulkanProgram;
-class VulkanComputeProgram;
+class VulkanProgramBase;
 class VulkanWindow;
 
 class VulkanCommandContext final : public CommandContext {
@@ -53,7 +53,8 @@ class VulkanCommandContext final : public CommandContext {
   bool BindGroupVersion(uint32_t index, VulkanBindingGroup::Version *version);
   std::vector<VulkanBindingGroup::Version *> groups_;
   VulkanProgram *program_{};
-  VulkanComputeProgram *compute_program_{};
+  VulkanProgramBase *native_program_{};
+  bool compute_active_{};
   const PipelineLayoutDesc *binding_layout_{};
   VulkanImage *render_target_{};
   std::vector<VulkanBuffer *> vertex_buffers_;

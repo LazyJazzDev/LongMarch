@@ -341,7 +341,8 @@ bool VulkanCommandContext::CmdBindComputeProgram(IComputeProgram *program) {
   }
   if (!RetainResource(native))
     return false;
-  compute_program_ = native;
+  native_program_ = native;
+  compute_active_ = true;
   program_ = nullptr;
   binding_layout_ = &native->GetDesc().pipeline_layout;
   groups_.assign(binding_layout_->groups.size(), {});
@@ -351,7 +352,7 @@ bool VulkanCommandContext::CmdBindComputeProgram(IComputeProgram *program) {
 
 bool VulkanCommandContext::CmdDispatch(uint32_t x, uint32_t y, uint32_t z) {
 #if !defined(NDEBUG)
-  if (sealed_ || render_target_ || !compute_program_) {
+  if (sealed_ || render_target_ || !compute_active_) {
     recording_failed_ = true;
     return false;
   }
@@ -394,7 +395,8 @@ bool VulkanCommandContext::CmdBindProgram(IProgram *program) {
   groups_.assign(native->GetDesc().pipeline_layout.groups.size(), nullptr);
 
   program_ = native;
-  compute_program_ = nullptr;
+  native_program_ = native;
+  compute_active_ = false;
   binding_layout_ = &native->GetDesc().pipeline_layout;
   vkCmdBindPipeline(command_, VK_PIPELINE_BIND_POINT_GRAPHICS, native->NativePipeline());
   return true;
@@ -731,7 +733,7 @@ bool VulkanCommandContext::CmdBindGroup(uint32_t index, IBindingGroup *group) {
   auto version = static_cast<VulkanBindingGroup::Version *>(native->CurrentVersion());
   if (!RetainResource(version))
     return false;
-  if (compute_program_) {
+  if (compute_active_) {
     groups_[index] = version;
     return true;
   }
@@ -740,7 +742,7 @@ bool VulkanCommandContext::CmdBindGroup(uint32_t index, IBindingGroup *group) {
 
 bool VulkanCommandContext::BindGroupVersion(uint32_t index, VulkanBindingGroup::Version *native) {
   const VkPipelineStageFlags stages =
-      compute_program_ ? VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT : VK_PIPELINE_STAGE_ALL_GRAPHICS_BIT;
+      compute_active_ ? VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT : VK_PIPELINE_STAGE_ALL_GRAPHICS_BIT;
   for (size_t binding_index = 0; binding_index < native->GetLayout().bindings.size(); ++binding_index) {
     const auto &b = native->GetLayout().bindings[binding_index];
     for (uint32_t i = 0; i < b.count; ++i) {
@@ -773,9 +775,8 @@ bool VulkanCommandContext::BindGroupVersion(uint32_t index, VulkanBindingGroup::
   }
   groups_[index] = native;
   auto set = native->Set();
-  vkCmdBindDescriptorSets(command_, compute_program_ ? VK_PIPELINE_BIND_POINT_COMPUTE : VK_PIPELINE_BIND_POINT_GRAPHICS,
-                          compute_program_ ? compute_program_->NativeLayout() : program_->NativeLayout(), index, 1,
-                          &set, 0, nullptr);
+  vkCmdBindDescriptorSets(command_, compute_active_ ? VK_PIPELINE_BIND_POINT_COMPUTE : VK_PIPELINE_BIND_POINT_GRAPHICS,
+                          native_program_->NativeLayout(), index, 1, &set, 0, nullptr);
   return true;
 }
 

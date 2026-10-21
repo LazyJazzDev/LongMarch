@@ -288,7 +288,8 @@ bool D3D12CommandContext::CmdBindComputeProgram(IComputeProgram *program) {
   }
   if (!RetainResource(native))
     return false;
-  compute_program_ = native;
+  native_program_ = native;
+  compute_active_ = true;
   program_ = nullptr;
   binding_layout_ = &native->GetDesc().pipeline_layout;
   groups_.assign(binding_layout_->groups.size(), {});
@@ -300,7 +301,7 @@ bool D3D12CommandContext::CmdBindComputeProgram(IComputeProgram *program) {
 
 bool D3D12CommandContext::CmdDispatch(uint32_t x, uint32_t y, uint32_t z) {
 #if !defined(NDEBUG)
-  if (sealed_ || rendering_active_ || !compute_program_) {
+  if (sealed_ || rendering_active_ || !compute_active_) {
     recording_failed_ = true;
     return false;
   }
@@ -339,7 +340,8 @@ bool D3D12CommandContext::CmdBindProgram(IProgram *program) {
 
   tables_dirty_ = true;
   program_ = native;
-  compute_program_ = nullptr;
+  native_program_ = native;
+  compute_active_ = false;
   binding_layout_ = &native->GetDesc().pipeline_layout;
   list_->OMSetStencilRef(native->GetDesc().depth_stencil.stencil_reference);
   list_->SetPipelineState(native->NativePipeline());
@@ -722,10 +724,9 @@ bool D3D12CommandContext::PrepareGroups() {
   // including unchanged tables which did not need to be copied again.
   for (uint32_t g = 0; g < groups_.size(); ++g)
     for (size_t kind = 0; kind < 2; ++kind) {
-      auto parameter =
-          compute_program_ ? compute_program_->RootParameter(g, kind != 0) : program_->RootParameter(g, kind != 0);
+      auto parameter = native_program_->RootParameter(g, kind != 0);
       if (parameter != UINT32_MAX) {
-        if (compute_program_)
+        if (compute_active_)
           list_->SetComputeRootDescriptorTable(parameter, groups_[g].tables[kind]);
         else
           list_->SetGraphicsRootDescriptorTable(parameter, groups_[g].tables[kind]);

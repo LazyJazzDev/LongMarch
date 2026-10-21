@@ -9,7 +9,7 @@ namespace grassland::rhi::backend::d3d12 {
 class D3D12Image;
 class D3D12Buffer;
 class D3D12Program;
-class D3D12ComputeProgram;
+class D3D12ProgramBase;
 class D3D12Window;
 class D3D12SwapChainImage;
 
@@ -65,7 +65,8 @@ class D3D12CommandContext final : public CommandContext {
   std::array<uint32_t, 2> descriptor_used_{};
   bool tables_dirty_{};
   D3D12Program *program_{};
-  D3D12ComputeProgram *compute_program_{};
+  D3D12ProgramBase *native_program_{};
+  bool compute_active_{};
   const PipelineLayoutDesc *binding_layout_{};
   bool rendering_active_{};
   std::vector<D3D12Buffer *> vertex_buffers_;

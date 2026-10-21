@@ -4,25 +4,19 @@
 #include "grassland/rhi/backend/vulkan/vulkan_device.h"
 
 namespace grassland::rhi::backend::vulkan {
-VulkanProgram::VulkanProgram(VulkanDevice *device, const ProgramDesc &desc) : Program(device, desc) {
+VulkanProgram::VulkanProgram(VulkanDevice *device, const ProgramDesc &desc)
+    : Program(device, desc),
+      VulkanProgramBase(device->NativeDevice()) {
 }
 
 VulkanProgram::~VulkanProgram() {
   auto device = static_cast<VulkanDevice *>(device_)->NativeDevice();
   if (pipeline_)
     vkDestroyPipeline(device, pipeline_, nullptr);
-  if (layout_)
-    vkDestroyPipelineLayout(device, layout_, nullptr);
-  for (auto layout : set_layouts_)
-    vkDestroyDescriptorSetLayout(device, layout, nullptr);
 }
 
 VkPipeline VulkanProgram::NativePipeline() const {
   return pipeline_;
-}
-
-VkPipelineLayout VulkanProgram::NativeLayout() const {
-  return layout_;
 }
 
 bool VulkanProgram::Finalize() {
@@ -61,25 +55,8 @@ bool VulkanProgram::Finalize() {
       return false;
     }
   }
-  if (!layout_) {
-    for (auto layout : set_layouts_)
-      vkDestroyDescriptorSetLayout(device, layout, nullptr);
-    set_layouts_.clear();
-    set_layouts_.reserve(desc_.pipeline_layout.groups.size());
-    for (const auto &group : desc_.pipeline_layout.groups) {
-      auto layout = CreateBindingLayout(device, group);
-      if (!layout) {
-        return false;
-      }
-      set_layouts_.push_back(layout);
-    }
-    VkPipelineLayoutCreateInfo create{VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO};
-    create.setLayoutCount = uint32_t(set_layouts_.size());
-    create.pSetLayouts = set_layouts_.data();
-    if (!Check(vkCreatePipelineLayout(device, &create, nullptr, &layout_), "Create pipeline layout")) {
-      return false;
-    }
-  }
+  if (!CreateLayout(desc_.pipeline_layout))
+    return false;
   VkPipelineShaderStageCreateInfo stages[2]{};
   for (int i = 0; i < 2; ++i) {
     stages[i].sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
@@ -179,7 +156,7 @@ bool VulkanProgram::Finalize() {
   create.pColorBlendState = &blend;
   create.pDepthStencilState = &depth;
   create.pDynamicState = &dynamic;
-  create.layout = layout_;
+  create.layout = NativeLayout();
   std::vector<VkFormat> color_formats;
   for (auto format : desc_.color_formats)
     color_formats.push_back(NativeImageFormat(format));

@@ -96,3 +96,5 @@ Pixel regressions cover MRT plus depth rejection, depth-only stencil writes pres
 Run `--module blend --backend d3d12` (or `vulkan`), or add `--headless --frames 100000` for offscreen throughput. Both `--list`, the interactive menu and `--all` include blend. Each module owns its device/window/resource setup independently.
 
 Nbody reports FPS and estimated TFLOP/s in the window title and headless output. Following `nbody_cs`, each particle interaction counts as 20 FLOP: `FLOP/frame = 20 * 65536^2 = 85,899,345,920`, and `TFLOP/s = FLOP/frame * FPS / 1e12`. This is an algorithmic estimate using complete frame time (simulation, copy and rendering), not hardware instruction counts or isolated compute timing. Headless output also reports FLOP/frame.
+
+Backend layout ownership is shared by graphics and compute programs through D3D12ProgramBase (root signature and root-parameter mapping) and VulkanProgramBase (descriptor-set layouts and pipeline layout). These internal bases have no IObject identity or reference counting; concrete programs retain responsibility for shader compilation and pipeline creation.

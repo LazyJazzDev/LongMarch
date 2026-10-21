@@ -12,14 +12,6 @@ ID3D12PipelineState *D3D12Program::NativePipeline() const {
   return pipeline_.Get();
 }
 
-ID3D12RootSignature *D3D12Program::NativeRootSignature() const {
-  return root_signature_.Get();
-}
-
-uint32_t D3D12Program::RootParameter(uint32_t group, bool sampler) const {
-  return root_parameters_[group][sampler];
-}
-
 bool D3D12Program::Finalize() {
   if (finalized_)
     return true;
@@ -34,8 +26,7 @@ bool D3D12Program::Finalize() {
     return false;
   if (!CompileSlang(desc_.fragment_shader->GetDesc(), prefix, BACKEND_API_D3D12, fragment, &desc_.pipeline_layout))
     return false;
-  ComPtr<ID3D12RootSignature> signature;
-  if (!CreateRootSignature(native, desc_.pipeline_layout, true, signature, root_parameters_))
+  if (!CreateLayout(native, desc_.pipeline_layout, D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT))
     return false;
   std::vector<D3D12_INPUT_ELEMENT_DESC> inputs;
   const DXGI_FORMAT formats[] = {DXGI_FORMAT_R32_FLOAT, DXGI_FORMAT_R32G32_FLOAT, DXGI_FORMAT_R32G32B32_FLOAT,
@@ -48,7 +39,7 @@ bool D3D12Program::Finalize() {
          instance ? 1u : 0u});
   }
   D3D12_GRAPHICS_PIPELINE_STATE_DESC state{};
-  state.pRootSignature = signature.Get();
+  state.pRootSignature = NativeRootSignature();
   state.VS = {vertex.data(), vertex.size()};
   state.PS = {fragment.data(), fragment.size()};
   state.InputLayout = {inputs.data(), static_cast<UINT>(inputs.size())};
@@ -95,7 +86,6 @@ bool D3D12Program::Finalize() {
   ComPtr<ID3D12PipelineState> pipeline;
   if (!Check(native->CreateGraphicsPipelineState(&state, IID_PPV_ARGS(&pipeline)), "Create graphics pipeline"))
     return false;
-  root_signature_ = std::move(signature);
   pipeline_ = std::move(pipeline);
   finalized_ = true;
   return true;

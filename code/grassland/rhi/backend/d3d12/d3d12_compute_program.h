@@ -1,23 +1,17 @@
 ﻿#pragma once
-#include <array>
-
 #include "grassland/rhi/backend/backend_compute_program.h"
-#include "grassland/rhi/backend/d3d12/d3d12_util.h"
+#include "grassland/rhi/backend/d3d12/d3d12_program_base.h"
 
 namespace grassland::rhi::backend::d3d12 {
 class D3D12Device;
 
-class D3D12ComputeProgram final : public ComputeProgram {
+class D3D12ComputeProgram final : public ComputeProgram, public D3D12ProgramBase {
  public:
   D3D12ComputeProgram(D3D12Device *device, const ComputeProgramDesc &desc);
   bool Finalize() override;
   ID3D12PipelineState *NativePipeline() const;
-  ID3D12RootSignature *NativeRootSignature() const;
-  uint32_t RootParameter(uint32_t group, bool sampler) const;
 
  private:
-  std::vector<std::array<uint32_t, 2>> root_parameters_;
   ComPtr<ID3D12PipelineState> pipeline_;
-  ComPtr<ID3D12RootSignature> root_signature_;
 };
 }  // namespace grassland::rhi::backend::d3d12

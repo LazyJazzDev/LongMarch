@@ -5,25 +5,18 @@
 
 namespace grassland::rhi::backend::vulkan {
 VulkanComputeProgram::VulkanComputeProgram(VulkanDevice *device, const ComputeProgramDesc &desc)
-    : ComputeProgram(device, desc) {
+    : ComputeProgram(device, desc),
+      VulkanProgramBase(device->NativeDevice()) {
 }
 
 VulkanComputeProgram::~VulkanComputeProgram() {
   auto device = static_cast<VulkanDevice *>(device_)->NativeDevice();
   if (pipeline_)
     vkDestroyPipeline(device, pipeline_, nullptr);
-  if (layout_)
-    vkDestroyPipelineLayout(device, layout_, nullptr);
-  for (auto layout : set_layouts_)
-    vkDestroyDescriptorSetLayout(device, layout, nullptr);
 }
 
 VkPipeline VulkanComputeProgram::NativePipeline() const {
   return pipeline_;
-}
-
-VkPipelineLayout VulkanComputeProgram::NativeLayout() const {
-  return layout_;
 }
 
 bool VulkanComputeProgram::Finalize() {
@@ -45,25 +38,8 @@ bool VulkanComputeProgram::Finalize() {
       return false;
   if (uint64_t(threads[0]) * threads[1] * threads[2] > properties.limits.maxComputeWorkGroupInvocations)
     return false;
-  if (!layout_) {
-    for (auto layout : set_layouts_)
-      vkDestroyDescriptorSetLayout(device, layout, nullptr);
-    set_layouts_.clear();
-    set_layouts_.reserve(desc_.pipeline_layout.groups.size());
-    for (const auto &group : desc_.pipeline_layout.groups) {
-      auto layout = CreateBindingLayout(device, group);
-      if (!layout) {
-        return false;
-      }
-      set_layouts_.push_back(layout);
-    }
-    VkPipelineLayoutCreateInfo create{VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO};
-    create.setLayoutCount = uint32_t(set_layouts_.size());
-    create.pSetLayouts = set_layouts_.data();
-    if (!Check(vkCreatePipelineLayout(device, &create, nullptr, &layout_), "Create pipeline layout")) {
-      return false;
-    }
-  }
+  if (!CreateLayout(desc_.pipeline_layout))
+    return false;
 
   VkShaderModuleCreateInfo module_info{VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO};
   module_info.codeSize = code.size();
@@ -76,7 +52,7 @@ bool VulkanComputeProgram::Finalize() {
   create.stage.stage = VK_SHADER_STAGE_COMPUTE_BIT;
   create.stage.module = module;
   create.stage.pName = desc_.compute_shader->GetDesc().entry_point.c_str();
-  create.layout = layout_;
+  create.layout = NativeLayout();
   auto result = vkCreateComputePipelines(device, VK_NULL_HANDLE, 1, &create, nullptr, &pipeline_);
   vkDestroyShaderModule(device, module, nullptr);
   if (!Check(result, "Create compute pipeline"))
