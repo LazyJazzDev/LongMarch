@@ -89,8 +89,7 @@ bool VulkanCommandContext::CmdBuildBottomLevelAccelerationStructure(
   build.pGeometries = native.data();
   build.scratchData.deviceAddress = (BufferAddress(device_, scratch.Get()) + alignment - 1) & ~(alignment - 1);
   auto range = ranges.data();
-  auto command = reinterpret_cast<PFN_vkCmdBuildAccelerationStructuresKHR>(
-      vkGetDeviceProcAddr(device_->NativeDevice(), "vkCmdBuildAccelerationStructuresKHR"));
+  auto command = device_->Procedures().CmdBuildAccelerationStructuresKHR;
   AccelerationStructureBarrier(command_);
   command(command_, 1, &build, &range);
   AccelerationStructureBarrier(command_);
@@ -179,8 +178,7 @@ bool VulkanCommandContext::CmdBuildTopLevelAccelerationStructure(ITopLevelAccele
   build.geometryCount = 1;
   build.pGeometries = &geometry;
   build.scratchData.deviceAddress = (BufferAddress(device_, scratch.Get()) + alignment - 1) & ~(alignment - 1);
-  auto command = reinterpret_cast<PFN_vkCmdBuildAccelerationStructuresKHR>(
-      vkGetDeviceProcAddr(device_->NativeDevice(), "vkCmdBuildAccelerationStructuresKHR"));
+  auto command = device_->Procedures().CmdBuildAccelerationStructuresKHR;
   AccelerationStructureBarrier(command_);
   command(command_, 1, &build, &ranges);
   AccelerationStructureBarrier(command_);
@@ -198,8 +196,7 @@ bool VulkanCommandContext::CmdQueryCompactedSize(IAccelerationStructure *structu
   AccelerationStructureBarrier(command_);
   vkCmdResetQueryPool(command_, target->CompactionQuery(), 0, 1);
   auto native = target->NativeStructure();
-  auto command = reinterpret_cast<PFN_vkCmdWriteAccelerationStructuresPropertiesKHR>(
-      vkGetDeviceProcAddr(device_->NativeDevice(), "vkCmdWriteAccelerationStructuresPropertiesKHR"));
+  auto command = device_->Procedures().CmdWriteAccelerationStructuresPropertiesKHR;
   command(command_, 1, &native, VK_QUERY_TYPE_ACCELERATION_STRUCTURE_COMPACTED_SIZE_KHR, target->CompactionQuery(), 0);
   return true;
 }
@@ -233,8 +230,7 @@ bool VulkanCommandContext::CmdCompactAccelerationStructure(IAccelerationStructur
   copy.src = from->NativeStructure();
   copy.dst = to->NativeStructure();
   copy.mode = VK_COPY_ACCELERATION_STRUCTURE_MODE_COMPACT_KHR;
-  auto command = reinterpret_cast<PFN_vkCmdCopyAccelerationStructureKHR>(
-      vkGetDeviceProcAddr(device_->NativeDevice(), "vkCmdCopyAccelerationStructureKHR"));
+  auto command = device_->Procedures().CmdCopyAccelerationStructureKHR;
   AccelerationStructureBarrier(command_);
   command(command_, &copy);
   AccelerationStructureBarrier(command_);

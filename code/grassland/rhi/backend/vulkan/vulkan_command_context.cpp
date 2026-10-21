@@ -436,10 +436,10 @@ bool VulkanCommandContext::CmdBeginRendering(const RenderingInfo &info) {
     images.push_back(depth);
   }
   const auto depth_format = depth ? depth->GetDesc().format : IMAGE_FORMAT_UNKNOWN;
-  auto pass = device_->BeginRenderingCommand()
+  auto pass = device_->Procedures().CmdBeginRendering
                   ? VK_NULL_HANDLE
                   : device_->RenderTargets().RenderPass(formats, depth_format, &rendering_);
-  if (!device_->BeginRenderingCommand() && !pass) {
+  if (!device_->Procedures().CmdBeginRendering && !pass) {
     recording_failed_ = true;
     return false;
   }
@@ -484,7 +484,7 @@ bool VulkanCommandContext::CmdBeginRendering(const RenderingInfo &info) {
     stencil_info.storeOp = stores[ds.stencil_store_op];
   }
   auto desc = images.front()->GetDesc();
-  if (auto begin_rendering = device_->BeginRenderingCommand()) {
+  if (auto begin_rendering = device_->Procedures().CmdBeginRendering) {
     VkRenderingInfo rendering{VK_STRUCTURE_TYPE_RENDERING_INFO};
     rendering.renderArea.extent = {desc.width, desc.height};
     rendering.layerCount = 1;
@@ -647,7 +647,7 @@ bool VulkanCommandContext::CmdEndRendering() {
 #endif
   if (recording_failed_)
     return false;
-  if (auto end_rendering = device_->EndRenderingCommand())
+  if (auto end_rendering = device_->Procedures().CmdEndRendering)
     end_rendering(command_);
   else
     vkCmdEndRenderPass(command_);
@@ -862,8 +862,7 @@ bool VulkanCommandContext::CmdDispatchRays(uint32_t width, uint32_t height, uint
         return false;
     }
   const auto &tables = ray_program_->ShaderTables();
-  auto trace =
-      reinterpret_cast<PFN_vkCmdTraceRaysKHR>(vkGetDeviceProcAddr(device_->NativeDevice(), "vkCmdTraceRaysKHR"));
+  auto trace = device_->Procedures().CmdTraceRaysKHR;
   trace(command_, &tables[0], &tables[1], &tables[2], &tables[3], width, height, depth);
   return true;
 }

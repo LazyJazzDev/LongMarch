@@ -127,17 +127,8 @@ VulkanDevice *VulkanDevice::CreateVulkanDevice(grassland::rhi::PhysicalDevice in
     ReportError(result, "vkCreateDevice failed.");
     return {};
   }
-  if (enabled.DynamicRendering()) {
-    const char *begin_name = api_version >= VK_API_VERSION_1_3 ? "vkCmdBeginRendering" : "vkCmdBeginRenderingKHR";
-    const char *end_name = api_version >= VK_API_VERSION_1_3 ? "vkCmdEndRendering" : "vkCmdEndRenderingKHR";
-    device->begin_rendering_ =
-        reinterpret_cast<PFN_vkCmdBeginRendering>(vkGetDeviceProcAddr(device->device_, begin_name));
-    device->end_rendering_ = reinterpret_cast<PFN_vkCmdEndRendering>(vkGetDeviceProcAddr(device->device_, end_name));
-    if (!device->begin_rendering_ || !device->end_rendering_) {
-      ReportError(-1, "Enabled dynamic rendering commands are unavailable.");
-      return {};
-    }
-  }
+  if (!device->procedures_.Load(device->device_, api_version, enabled))
+    return {};
   VkSemaphoreTypeCreateInfo type{VK_STRUCTURE_TYPE_SEMAPHORE_TYPE_CREATE_INFO};
   type.semaphoreType = VK_SEMAPHORE_TYPE_TIMELINE;
   VkSemaphoreCreateInfo semaphore{VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO};
@@ -158,7 +149,7 @@ VulkanDevice *VulkanDevice::CreateVulkanDevice(grassland::rhi::PhysicalDevice in
     return {};
   device->descriptor_pool_ = std::make_unique<VulkanDescriptorPool>(device->device_);
   device->render_targets_ =
-      std::make_unique<VulkanRenderTargetPool>(device->device_, device->begin_rendering_ != nullptr);
+      std::make_unique<VulkanRenderTargetPool>(device->device_, device->procedures_.CmdBeginRendering != nullptr);
   device->physical_ = physical_device;
   device->graphics_queue_family_index_ = graphics_family;
   device->swapchain_enabled_ = swapchain;
@@ -182,12 +173,8 @@ VkResult VulkanDevice::Wait(uint64_t value, uint64_t timeout) const {
   return vkWaitSemaphores(device_, &wait, timeout);
 }
 
-PFN_vkCmdBeginRendering VulkanDevice::BeginRenderingCommand() const {
-  return begin_rendering_;
-}
-
-PFN_vkCmdEndRendering VulkanDevice::EndRenderingCommand() const {
-  return end_rendering_;
+const DeviceProcedures &VulkanDevice::Procedures() const {
+  return procedures_;
 }
 
 ISampler *VulkanDevice::CreateSampler(const SamplerDesc &desc) {

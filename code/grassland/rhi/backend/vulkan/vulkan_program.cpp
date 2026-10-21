@@ -161,7 +161,7 @@ bool VulkanProgram::Finalize() {
   for (auto format : desc_.color_formats)
     color_formats.push_back(NativeImageFormat(format));
   VkPipelineRenderingCreateInfo rendering{VK_STRUCTURE_TYPE_PIPELINE_RENDERING_CREATE_INFO};
-  if (owner->BeginRenderingCommand()) {
+  if (owner->Procedures().CmdBeginRendering) {
     rendering.colorAttachmentCount = uint32_t(color_formats.size());
     rendering.pColorAttachmentFormats = color_formats.data();
     rendering.depthAttachmentFormat = NativeImageFormat(ds.format);

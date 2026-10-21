@@ -110,8 +110,7 @@ bool VulkanRayTracingProgram::Finalize() {
     create.pGroups = groups.data();
     create.maxPipelineRayRecursionDepth = desc_.max_recursion_depth;
     create.layout = NativeLayout();
-    auto command = reinterpret_cast<PFN_vkCreateRayTracingPipelinesKHR>(
-        vkGetDeviceProcAddr(device, "vkCreateRayTracingPipelinesKHR"));
+    auto command = owner->Procedures().CreateRayTracingPipelinesKHR;
     success = Check(command(device, VK_NULL_HANDLE, VK_NULL_HANDLE, 1, &create, nullptr, &pipeline),
                     "Create ray tracing pipeline");
   }
@@ -131,8 +130,7 @@ bool VulkanRayTracingProgram::Finalize() {
   if (stride > properties.maxShaderGroupStride)
     return false;
   std::vector<uint8_t> handles(groups.size() * handle_size);
-  auto get_handles = reinterpret_cast<PFN_vkGetRayTracingShaderGroupHandlesKHR>(
-      vkGetDeviceProcAddr(device, "vkGetRayTracingShaderGroupHandlesKHR"));
+  auto get_handles = owner->Procedures().GetRayTracingShaderGroupHandlesKHR;
   if (!Check(get_handles(device, pipeline, 0, uint32_t(groups.size()), handles.size(), handles.data()),
              "Get ray tracing shader handles"))
     return false;

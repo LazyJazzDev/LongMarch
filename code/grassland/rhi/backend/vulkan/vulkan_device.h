@@ -3,6 +3,7 @@
 
 #include "grassland/rhi/backend/backend_device.h"
 #include "grassland/rhi/backend/vulkan/vulkan_binding_group.h"
+#include "grassland/rhi/backend/vulkan/vulkan_device_procedures.h"
 #include "grassland/rhi/backend/vulkan/vulkan_render_target_pool.h"
 #include "grassland/rhi/backend/vulkan/vulkan_scratch_pool.h"
 #include "grassland/rhi/backend/vulkan/vulkan_upload_pool.h"
@@ -26,8 +27,7 @@ class VulkanDevice final : public Device {
   VulkanDescriptorPool &DescriptorPool();
   ISampler *CreateSampler(const SamplerDesc &desc = {}) override;
   IBindingGroup *CreateBindingGroup(const BindingLayoutDesc &layout) override;
-  PFN_vkCmdBeginRendering BeginRenderingCommand() const;
-  PFN_vkCmdEndRendering EndRenderingCommand() const;
+  const DeviceProcedures &Procedures() const;
   rhi::IComputeProgram *CreateComputeProgram(const ComputeProgramDesc &desc) override;
   rhi::IProgram *CreateProgram(const ProgramDesc &desc) override;
   VmaAllocator Allocator() const;
@@ -64,8 +64,7 @@ class VulkanDevice final : public Device {
   std::unique_ptr<VulkanDescriptorPool> descriptor_pool_;
   VmaAllocator allocator_{};
   VkDevice device_{VK_NULL_HANDLE};
-  PFN_vkCmdBeginRendering begin_rendering_{};
-  PFN_vkCmdEndRendering end_rendering_{};
+  DeviceProcedures procedures_;
   VkPhysicalDevice physical_{};
   VkQueue queue_{};
   VkSemaphore timeline_{};

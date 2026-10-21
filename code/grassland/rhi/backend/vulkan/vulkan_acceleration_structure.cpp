@@ -80,8 +80,7 @@ VulkanAccelerationStructure::~VulkanAccelerationStructure() {
   if (query_)
     vkDestroyQueryPool(device, query_, nullptr);
   if (structure_)
-    reinterpret_cast<PFN_vkDestroyAccelerationStructureKHR>(
-        vkGetDeviceProcAddr(device, "vkDestroyAccelerationStructureKHR"))(device, structure_, nullptr);
+    device_->Procedures().DestroyAccelerationStructureKHR(device, structure_, nullptr);
   if (buffer_)
     vmaDestroyBuffer(device_->Allocator(), buffer_, allocation_);
 }
@@ -130,9 +129,8 @@ bool VulkanAccelerationStructure::Allocate(const VkAccelerationStructureBuildGeo
   } else if (primitives > properties.maxPrimitiveCount)
     return false;
   VkAccelerationStructureBuildSizesInfoKHR sizes{VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_BUILD_SIZES_INFO_KHR};
-  reinterpret_cast<PFN_vkGetAccelerationStructureBuildSizesKHR>(
-      vkGetDeviceProcAddr(device, "vkGetAccelerationStructureBuildSizesKHR"))(
-      device, VK_ACCELERATION_STRUCTURE_BUILD_TYPE_DEVICE_KHR, &info, counts.data(), &sizes);
+  device_->Procedures().GetAccelerationStructureBuildSizesKHR(device, VK_ACCELERATION_STRUCTURE_BUILD_TYPE_DEVICE_KHR,
+                                                              &info, counts.data(), &sizes);
   if (!sizes.accelerationStructureSize)
     return false;
   flags_ = info.flags;
@@ -155,14 +153,12 @@ bool VulkanAccelerationStructure::Allocate(const VkAccelerationStructureBuildGeo
   create.type = info.type;
   create.buffer = buffer_;
   create.size = buffer.size;
-  if (!Check(reinterpret_cast<PFN_vkCreateAccelerationStructureKHR>(vkGetDeviceProcAddr(
-                 device, "vkCreateAccelerationStructureKHR"))(device, &create, nullptr, &structure_),
+  if (!Check(device_->Procedures().CreateAccelerationStructureKHR(device, &create, nullptr, &structure_),
              "Create acceleration structure"))
     return false;
   VkAccelerationStructureDeviceAddressInfoKHR address{VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_DEVICE_ADDRESS_INFO_KHR};
   address.accelerationStructure = structure_;
-  address_ = reinterpret_cast<PFN_vkGetAccelerationStructureDeviceAddressKHR>(
-      vkGetDeviceProcAddr(device, "vkGetAccelerationStructureDeviceAddressKHR"))(device, &address);
+  address_ = device_->Procedures().GetAccelerationStructureDeviceAddressKHR(device, &address);
   if (allow_compaction_) {
     VkQueryPoolCreateInfo query{VK_STRUCTURE_TYPE_QUERY_POOL_CREATE_INFO};
     query.queryType = VK_QUERY_TYPE_ACCELERATION_STRUCTURE_COMPACTED_SIZE_KHR;
