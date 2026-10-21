@@ -195,15 +195,11 @@ D3D12BindingGroup::D3D12BindingGroup(D3D12Device *device, ObjectPtr<Version> ver
 }
 
 D3D12BindingGroup *D3D12BindingGroup::Create(D3D12Device *device, const BindingLayoutDesc &layout) {
-  try {
-    if (!ValidateBindingLayout(layout))
-      return nullptr;
-    auto version = ObjectPtr<Version>::Adopt(Version::Create(device, layout));
-    if (!version)
-      return nullptr;
-    return new D3D12BindingGroup(device, std::move(version));
-  } catch (const std::bad_alloc &) {
+  if (!ValidateBindingLayout(layout))
     return nullptr;
-  }
+  auto version = ObjectPtr<Version>::Adopt(Version::Create(device, layout));
+  if (!version)
+    return nullptr;
+  return new D3D12BindingGroup(device, std::move(version));
 }
 }  // namespace grassland::rhi::backend::d3d12

@@ -60,25 +60,19 @@ bool Window::RebuildSwapChain() {
   if (!glfw::IsWindowThread())
     return false;
 #endif
-  try {
-    invalid_ = true;
-    ReleaseNextImage();
-    if (!RebuildNativeSwapChain(requested_mode_))
-      return false;
-    int width, height;
-    glfwGetFramebufferSize(window_, &width, &height);
-    if (glfwGetWindowAttrib(window_, GLFW_ICONIFIED) || width <= 0 || height <= 0)
-      return true;
-    invalid_ = false;
-    if (UpdateNextImage())
-      return true;
-    invalid_ = true;
+  invalid_ = true;
+  ReleaseNextImage();
+  if (!RebuildNativeSwapChain(requested_mode_))
     return false;
-  } catch (const std::bad_alloc &) {
-    invalid_ = true;
-    ReportError(-1, "Swapchain rebuild ran out of memory.");
-    return false;
-  }
+  int width, height;
+  glfwGetFramebufferSize(window_, &width, &height);
+  if (glfwGetWindowAttrib(window_, GLFW_ICONIFIED) || width <= 0 || height <= 0)
+    return true;
+  invalid_ = false;
+  if (UpdateNextImage())
+    return true;
+  invalid_ = true;
+  return false;
 }
 
 bool Window::SetPresentMode(PresentMode mode) {

@@ -79,7 +79,7 @@ ObjectPtr<D3D12UploadPool::Lease> D3D12UploadPool::Acquire(uint64_t size) {
   } catch (const std::bad_alloc &) {
     if (buffer)
       ReleaseBuffer(buffer, level);
-    return {};
+    throw;
   }
 }
 

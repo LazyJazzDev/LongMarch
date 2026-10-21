@@ -15,46 +15,40 @@ bool CommandContext::CmdUploadImage(IImage *, const void *, uint64_t) {
 }
 
 bool CommandContext::PrepareRendering(const RenderingInfo &info) {
-  try {
-    auto next = info;
-    if (next.color_attachments.size() > 8 || (next.color_attachments.empty() && !next.depth_stencil.image)) {
-      recording_failed_ = true;
-      return false;
-    }
-    std::vector<IImage *> images;
-    auto validate = [&](IImage *image, bool depth, AttachmentLoadOp load, AttachmentStoreOp store) {
-      auto native = dynamic_cast<Image *>(image);
-      if (!native || !native->IsValid() || native->DeviceIdentity() != DeviceIdentity() ||
-          IsDepthFormat(image->GetDesc().format) != depth || load < ATTACHMENT_LOAD_OP_LOAD ||
-          load > ATTACHMENT_LOAD_OP_DISCARD || store < ATTACHMENT_STORE_OP_STORE || store > ATTACHMENT_STORE_OP_DISCARD)
-        return false;
-      for (auto previous : images)
-        if (previous == image || previous->GetDesc().width != image->GetDesc().width ||
-            previous->GetDesc().height != image->GetDesc().height)
-          return false;
-      images.push_back(image);
-      return RetainResource(image);
-    };
-    for (auto color : next.color_attachments)
-      if (!validate(color.color_attachment, false, color.load_op, color.store_op)) {
-        recording_failed_ = true;
-        return false;
-      }
-    const auto &ds = next.depth_stencil;
-    if (ds.image &&
-        (!validate(ds.image, true, ds.depth_load_op, ds.depth_store_op) ||
-         ds.stencil_load_op < ATTACHMENT_LOAD_OP_LOAD || ds.stencil_load_op > ATTACHMENT_LOAD_OP_DISCARD ||
-         ds.stencil_store_op < ATTACHMENT_STORE_OP_STORE || ds.stencil_store_op > ATTACHMENT_STORE_OP_DISCARD ||
-         !(ds.clear_depth >= 0 && ds.clear_depth <= 1))) {
-      recording_failed_ = true;
-      return false;
-    }
-    rendering_ = std::move(next);
-    return true;
-  } catch (const std::bad_alloc &) {
+  auto next = info;
+  if (next.color_attachments.size() > 8 || (next.color_attachments.empty() && !next.depth_stencil.image)) {
     recording_failed_ = true;
     return false;
   }
+  std::vector<IImage *> images;
+  auto validate = [&](IImage *image, bool depth, AttachmentLoadOp load, AttachmentStoreOp store) {
+    auto native = dynamic_cast<Image *>(image);
+    if (!native || !native->IsValid() || native->DeviceIdentity() != DeviceIdentity() ||
+        IsDepthFormat(image->GetDesc().format) != depth || load < ATTACHMENT_LOAD_OP_LOAD ||
+        load > ATTACHMENT_LOAD_OP_DISCARD || store < ATTACHMENT_STORE_OP_STORE || store > ATTACHMENT_STORE_OP_DISCARD)
+      return false;
+    for (auto previous : images)
+      if (previous == image || previous->GetDesc().width != image->GetDesc().width ||
+          previous->GetDesc().height != image->GetDesc().height)
+        return false;
+    images.push_back(image);
+    return RetainResource(image);
+  };
+  for (auto color : next.color_attachments)
+    if (!validate(color.color_attachment, false, color.load_op, color.store_op)) {
+      recording_failed_ = true;
+      return false;
+    }
+  const auto &ds = next.depth_stencil;
+  if (ds.image &&
+      (!validate(ds.image, true, ds.depth_load_op, ds.depth_store_op) || ds.stencil_load_op < ATTACHMENT_LOAD_OP_LOAD ||
+       ds.stencil_load_op > ATTACHMENT_LOAD_OP_DISCARD || ds.stencil_store_op < ATTACHMENT_STORE_OP_STORE ||
+       ds.stencil_store_op > ATTACHMENT_STORE_OP_DISCARD || !(ds.clear_depth >= 0 && ds.clear_depth <= 1))) {
+    recording_failed_ = true;
+    return false;
+  }
+  rendering_ = std::move(next);
+  return true;
 }
 
 bool CommandContext::RenderingMatches(const IProgram *program) const {
@@ -82,13 +76,8 @@ bool CommandContext::RetainResource(rhi::IObject *resource) {
     return false;
   if (resources_.find(resource) != resources_.end())
     return true;
-  try {
-    resources_.emplace(resource, ObjectPtr<rhi::IObject>::Retain(resource));
-  } catch (const std::bad_alloc &) {
-    recording_failed_ = true;
-    ReportError(-1, "Command resource retention ran out of memory.");
-    return false;
-  }
+  resources_.emplace(resource, ObjectPtr<rhi::IObject>::Retain(resource));
+
   return true;
 }
 

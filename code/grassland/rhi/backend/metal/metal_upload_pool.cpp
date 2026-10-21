@@ -75,7 +75,7 @@ ObjectPtr<MetalUploadPool::Lease> MetalUploadPool::Acquire(uint64_t size) {
   } catch (const std::bad_alloc &) {
     if (buffer)
       ReleaseBuffer(buffer, level);
-    return {};
+    throw;
   }
 }
 

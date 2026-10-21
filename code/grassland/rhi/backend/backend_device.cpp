@@ -28,12 +28,7 @@ rhi::IProgram *Device::CreateProgram(const ProgramDesc &) {
 rhi::IShader *Device::CreateShader(const ShaderDesc &desc) {
   if (desc.source.empty() || desc.entry_point.empty())
     return nullptr;
-  try {
-    return new Shader(desc);
-  } catch (const std::bad_alloc &) {
-    ReportError(-1, "Shader source allocation failed.");
-    return nullptr;
-  }
+  return new Shader(desc);
 }
 
 ISampler *Device::CreateSampler(const SamplerDesc &) {

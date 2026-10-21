@@ -44,8 +44,6 @@ rhi::ISubmissionToken *Queue::Submit(rhi::ICommandContext *commands, const rhi::
       waits.push_back(ObjectPtr<SubmissionToken>::Retain(state));
     }
     return Owner()->Submit(ObjectPtr<CommandContext>::Retain(impl), waits).Detach();
-  } catch (const std::bad_alloc &) {
-    ReportError(-1, "Submission allocation failed.");
   } catch (const std::system_error &error) {
     ReportError(error.code().value(), error.what());
   }

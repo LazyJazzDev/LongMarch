@@ -15,26 +15,23 @@ MTL::SamplerState *MetalSampler::NativeSampler() const {
 MetalSampler *MetalSampler::Create(MetalDevice *device, const SamplerDesc &desc) {
   if (!Validate(desc))
     return nullptr;
-  try {
-    auto pool = NS::TransferPtr(NS::AutoreleasePool::alloc()->init());
-    auto descriptor = NS::TransferPtr(MTL::SamplerDescriptor::alloc()->init());
-    descriptor->setSupportArgumentBuffers(true);
-    descriptor->setMinFilter(desc.filter == SAMPLER_FILTER_NEAREST ? MTL::SamplerMinMagFilterNearest
-                                                                   : MTL::SamplerMinMagFilterLinear);
-    descriptor->setMagFilter(descriptor->minFilter());
-    const MTL::SamplerAddressMode modes[] = {MTL::SamplerAddressModeRepeat, MTL::SamplerAddressModeClampToEdge,
-                                             MTL::SamplerAddressModeMirrorRepeat};
-    descriptor->setSAddressMode(modes[desc.address_u]);
-    descriptor->setTAddressMode(modes[desc.address_v]);
-    descriptor->setRAddressMode(modes[desc.address_v]);
-    auto sampler = NS::TransferPtr(device->NativeDevice()->newSamplerState(descriptor.get()));
-    if (!sampler) {
-      ReportError(-1, "Metal sampler creation failed.");
-      return nullptr;
-    }
-    return new MetalSampler(device, desc, std::move(sampler));
-  } catch (const std::bad_alloc &) {
+
+  auto pool = NS::TransferPtr(NS::AutoreleasePool::alloc()->init());
+  auto descriptor = NS::TransferPtr(MTL::SamplerDescriptor::alloc()->init());
+  descriptor->setSupportArgumentBuffers(true);
+  descriptor->setMinFilter(desc.filter == SAMPLER_FILTER_NEAREST ? MTL::SamplerMinMagFilterNearest
+                                                                 : MTL::SamplerMinMagFilterLinear);
+  descriptor->setMagFilter(descriptor->minFilter());
+  const MTL::SamplerAddressMode modes[] = {MTL::SamplerAddressModeRepeat, MTL::SamplerAddressModeClampToEdge,
+                                           MTL::SamplerAddressModeMirrorRepeat};
+  descriptor->setSAddressMode(modes[desc.address_u]);
+  descriptor->setTAddressMode(modes[desc.address_v]);
+  descriptor->setRAddressMode(modes[desc.address_v]);
+  auto sampler = NS::TransferPtr(device->NativeDevice()->newSamplerState(descriptor.get()));
+  if (!sampler) {
+    ReportError(-1, "Metal sampler creation failed.");
     return nullptr;
   }
+  return new MetalSampler(device, desc, std::move(sampler));
 }
 }  // namespace grassland::rhi::backend::metal

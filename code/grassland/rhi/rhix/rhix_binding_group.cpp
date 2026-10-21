@@ -31,50 +31,34 @@ bool BindingGroup::BindResource(uint32_t binding, const Sampler &sampler) {
 }
 
 bool BindingGroup::BindResource(uint32_t binding, const std::vector<Buffer> &buffers, uint32_t first_element) {
-  try {
-    std::vector<rhi::IBuffer *> native;
-    native.reserve(buffers.size());
-    for (const auto &buffer : buffers)
-      native.push_back(buffer.Get());
-    return Get()->BindResource(binding, native, first_element);
-  } catch (const std::bad_alloc &) {
-    return false;
-  }
+  std::vector<rhi::IBuffer *> native;
+  native.reserve(buffers.size());
+  for (const auto &buffer : buffers)
+    native.push_back(buffer.Get());
+  return Get()->BindResource(binding, native, first_element);
 }
 
 bool BindingGroup::BindResource(uint32_t binding, const std::vector<BufferView> &buffers, uint32_t first_element) {
-  try {
-    std::vector<rhi::BufferView> native;
-    native.reserve(buffers.size());
-    for (const auto &b : buffers)
-      native.push_back({b.buffer.Get(), b.offset, b.size});
-    return Get()->BindResource(binding, native, first_element);
-  } catch (const std::bad_alloc &) {
-    return false;
-  }
+  std::vector<rhi::BufferView> native;
+  native.reserve(buffers.size());
+  for (const auto &b : buffers)
+    native.push_back({b.buffer.Get(), b.offset, b.size});
+  return Get()->BindResource(binding, native, first_element);
 }
 
 bool BindingGroup::BindResource(uint32_t binding, const std::vector<Image> &images, uint32_t first_element) {
-  try {
-    std::vector<rhi::IImage *> native;
-    native.reserve(images.size());
-    for (const auto &image : images)
-      native.push_back(image.Get());
-    return Get()->BindResource(binding, native, first_element);
-  } catch (const std::bad_alloc &) {
-    return false;
-  }
+  std::vector<rhi::IImage *> native;
+  native.reserve(images.size());
+  for (const auto &image : images)
+    native.push_back(image.Get());
+  return Get()->BindResource(binding, native, first_element);
 }
 
 bool BindingGroup::BindResource(uint32_t binding, const std::vector<Sampler> &samplers, uint32_t first_element) {
-  try {
-    std::vector<rhi::ISampler *> native;
-    native.reserve(samplers.size());
-    for (const auto &sampler : samplers)
-      native.push_back(sampler.Get());
-    return Get()->BindResource(binding, native, first_element);
-  } catch (const std::bad_alloc &) {
-    return false;
-  }
+  std::vector<rhi::ISampler *> native;
+  native.reserve(samplers.size());
+  for (const auto &sampler : samplers)
+    native.push_back(sampler.Get());
+  return Get()->BindResource(binding, native, first_element);
 }
 }  // namespace grassland::rhix

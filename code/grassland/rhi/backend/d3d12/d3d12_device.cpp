@@ -58,40 +58,35 @@ void D3D12Device::RecycleCommandResources(ComPtr<ID3D12CommandAllocator> allocat
 }
 
 D3D12Device *D3D12Device::Create(PhysicalDevice info, Core *core, ComPtr<ID3D12Device> device) {
-  try {
-    auto object = std::unique_ptr<D3D12Device>(new D3D12Device(std::move(info), core, std::move(device)));
-    D3D12_COMMAND_QUEUE_DESC desc{};
-    desc.Type = D3D12_COMMAND_LIST_TYPE_DIRECT;
-    if (!Check(CreateDXGIFactory2(0, IID_PPV_ARGS(&object->factory_)), "CreateDXGIFactory2"))
-      return nullptr;
-    if (!Check(object->device_->CreateCommandQueue(&desc, IID_PPV_ARGS(&object->queue_)), "CreateCommandQueue"))
-      return nullptr;
-    if (!Check(object->device_->CreateFence(0, D3D12_FENCE_FLAG_NONE, IID_PPV_ARGS(&object->fence_)), "CreateFence"))
-      return nullptr;
-    ComPtr<IDXGIAdapter> adapter;
-    if (!Check(object->factory_->EnumAdapterByLuid(object->device_->GetAdapterLuid(), IID_PPV_ARGS(&adapter)),
-               "Find allocation adapter"))
-      return nullptr;
-    D3D12MA::ALLOCATOR_DESC memory{};
-    memory.pDevice = object->device_.Get();
-    memory.pAdapter = adapter.Get();
-    if (!Check(D3D12MA::CreateAllocator(&memory, &object->allocator_), "Create D3D12MA allocator"))
-      return nullptr;
-    object->idle_event_ = CreateEventW(nullptr, FALSE, FALSE, nullptr);
-    if (!object->idle_event_) {
-      ReportError(GetLastError(), "Create fence event failed.");
-      return nullptr;
-    }
-    ComPtr<IDXGIFactory5> factory5;
-    BOOL tearing = FALSE;
-    if (SUCCEEDED(object->factory_.As(&factory5)) &&
-        SUCCEEDED(factory5->CheckFeatureSupport(DXGI_FEATURE_PRESENT_ALLOW_TEARING, &tearing, sizeof(tearing))))
-      object->tearing_ = tearing;
-    return object.release();
-  } catch (const std::bad_alloc &) {
-    ReportError(-1, "D3D12Device creation ran out of memory.");
+  auto object = std::unique_ptr<D3D12Device>(new D3D12Device(std::move(info), core, std::move(device)));
+  D3D12_COMMAND_QUEUE_DESC desc{};
+  desc.Type = D3D12_COMMAND_LIST_TYPE_DIRECT;
+  if (!Check(CreateDXGIFactory2(0, IID_PPV_ARGS(&object->factory_)), "CreateDXGIFactory2"))
+    return nullptr;
+  if (!Check(object->device_->CreateCommandQueue(&desc, IID_PPV_ARGS(&object->queue_)), "CreateCommandQueue"))
+    return nullptr;
+  if (!Check(object->device_->CreateFence(0, D3D12_FENCE_FLAG_NONE, IID_PPV_ARGS(&object->fence_)), "CreateFence"))
+    return nullptr;
+  ComPtr<IDXGIAdapter> adapter;
+  if (!Check(object->factory_->EnumAdapterByLuid(object->device_->GetAdapterLuid(), IID_PPV_ARGS(&adapter)),
+             "Find allocation adapter"))
+    return nullptr;
+  D3D12MA::ALLOCATOR_DESC memory{};
+  memory.pDevice = object->device_.Get();
+  memory.pAdapter = adapter.Get();
+  if (!Check(D3D12MA::CreateAllocator(&memory, &object->allocator_), "Create D3D12MA allocator"))
+    return nullptr;
+  object->idle_event_ = CreateEventW(nullptr, FALSE, FALSE, nullptr);
+  if (!object->idle_event_) {
+    ReportError(GetLastError(), "Create fence event failed.");
     return nullptr;
   }
+  ComPtr<IDXGIFactory5> factory5;
+  BOOL tearing = FALSE;
+  if (SUCCEEDED(object->factory_.As(&factory5)) &&
+      SUCCEEDED(factory5->CheckFeatureSupport(DXGI_FEATURE_PRESENT_ALLOW_TEARING, &tearing, sizeof(tearing))))
+    object->tearing_ = tearing;
+  return object.release();
 }
 
 D3D12TransientDescriptorPool &D3D12Device::ResourceDescriptors() {
@@ -194,12 +189,7 @@ D3D12Device::~D3D12Device() {
 }
 
 rhi::IProgram *D3D12Device::CreateProgram(const ProgramDesc &desc) {
-  try {
-    return new D3D12Program(this, desc);
-  } catch (const std::bad_alloc &) {
-    ReportError(-1, "Program allocation failed.");
-    return nullptr;
-  }
+  return new D3D12Program(this, desc);
 }
 
 D3D12UploadPool &D3D12Device::UploadPool() {
@@ -223,12 +213,7 @@ rhi::ICommandContext *D3D12Device::CreateCommandContext() {
 }
 
 rhi::IQueue *D3D12Device::GetQueue(QueueType type) {
-  try {
-    return new D3D12Queue(this, type);
-  } catch (const std::bad_alloc &) {
-    ReportError(-1, "Queue creation ran out of memory.");
-    return nullptr;
-  }
+  return new D3D12Queue(this, type);
 }
 
 ISampler *D3D12Device::CreateSampler(const SamplerDesc &desc) {

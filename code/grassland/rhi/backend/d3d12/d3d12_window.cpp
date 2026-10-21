@@ -19,17 +19,12 @@ D3D12Window::~D3D12Window() {
 }
 
 D3D12Window *D3D12Window::Create(D3D12Device *device, const WindowDesc &desc) {
-  try {
-    auto object = std::unique_ptr<D3D12Window>(new D3D12Window(device));
-    if (!object->InitializeWindow(desc))
-      return nullptr;
-    if (!object->RebuildSwapChain())
-      return nullptr;
-    return object.release();
-  } catch (const std::bad_alloc &) {
-    ReportError(-1, "D3D12Window creation ran out of memory.");
+  auto object = std::unique_ptr<D3D12Window>(new D3D12Window(device));
+  if (!object->InitializeWindow(desc))
     return nullptr;
-  }
+  if (!object->RebuildSwapChain())
+    return nullptr;
+  return object.release();
 }
 
 bool D3D12Window::IsFrameValid(uint64_t generation) const {

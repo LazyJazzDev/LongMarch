@@ -38,18 +38,14 @@ VulkanBindingGroup::VulkanBindingGroup(VulkanDevice *device, ObjectPtr<Version> 
 }
 
 VulkanBindingGroup *VulkanBindingGroup::Create(VulkanDevice *device, const BindingLayoutDesc &layout) {
-  try {
-    if (!ValidateBindingLayout(layout))
-      return nullptr;
-    if (!ValidatePipelineBindings(device->NativePhysicalDevice(), {{layout}}))
-      return nullptr;
-    auto version = ObjectPtr<Version>::Adopt(Version::Create(device, layout));
-    if (!version)
-      return nullptr;
-    return new VulkanBindingGroup(device, std::move(version));
-  } catch (const std::bad_alloc &) {
+  if (!ValidateBindingLayout(layout))
     return nullptr;
-  }
+  if (!ValidatePipelineBindings(device->NativePhysicalDevice(), {{layout}}))
+    return nullptr;
+  auto version = ObjectPtr<Version>::Adopt(Version::Create(device, layout));
+  if (!version)
+    return nullptr;
+  return new VulkanBindingGroup(device, std::move(version));
 }
 
 VulkanBindingGroup::Version::Version(VulkanDevice *device, const BindingLayoutDesc &layout)

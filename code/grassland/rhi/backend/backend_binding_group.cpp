@@ -153,93 +153,81 @@ const BindingDesc *BindingGroup::FindBinding(uint32_t binding,
 }
 
 bool BindingGroup::BindResource(uint32_t binding, const std::vector<BufferView> &buffers, uint32_t first_element) {
-  try {
-    size_t binding_index;
-    const auto *desc = FindBinding(binding, first_element, buffers.size(), binding_index);
-    if (!desc)
-      return false;
-    if (desc->type > BINDING_RW_BYTE_ADDRESS_BUFFER)
-      return false;
-    auto values = buffers;
-    for (auto &view : values) {
-      auto buffer = dynamic_cast<Buffer *>(view.buffer);
-      if (!buffer || buffer->Owner() != device_ || view.offset >= buffer->GetDesc().size)
-        return false;
-      if (!view.size)
-        view.size = buffer->GetDesc().size - view.offset;
-      if (view.size > buffer->GetDesc().size - view.offset)
-        return false;
-      if (desc->type == BINDING_STRUCTURED_BUFFER || desc->type == BINDING_RW_STRUCTURED_BUFFER) {
-        if (view.offset % desc->stride || view.size % desc->stride)
-          return false;
-      } else if (desc->type == BINDING_BYTE_ADDRESS_BUFFER || desc->type == BINDING_RW_BYTE_ADDRESS_BUFFER) {
-        if (view.offset % 4 || view.size % 4)
-          return false;
-      }
-    }
-    auto next = version_->IsUniquelyOwned() ? version_ : version_->Clone();
-    if (!next)
-      return false;
-    if (!next->Write(binding_index, first_element, values))
-      return false;
-    version_ = std::move(next);
-    return true;
-  } catch (const std::bad_alloc &) {
+  size_t binding_index;
+  const auto *desc = FindBinding(binding, first_element, buffers.size(), binding_index);
+  if (!desc)
     return false;
+  if (desc->type > BINDING_RW_BYTE_ADDRESS_BUFFER)
+    return false;
+  auto values = buffers;
+  for (auto &view : values) {
+    auto buffer = dynamic_cast<Buffer *>(view.buffer);
+    if (!buffer || buffer->Owner() != device_ || view.offset >= buffer->GetDesc().size)
+      return false;
+    if (!view.size)
+      view.size = buffer->GetDesc().size - view.offset;
+    if (view.size > buffer->GetDesc().size - view.offset)
+      return false;
+    if (desc->type == BINDING_STRUCTURED_BUFFER || desc->type == BINDING_RW_STRUCTURED_BUFFER) {
+      if (view.offset % desc->stride || view.size % desc->stride)
+        return false;
+    } else if (desc->type == BINDING_BYTE_ADDRESS_BUFFER || desc->type == BINDING_RW_BYTE_ADDRESS_BUFFER) {
+      if (view.offset % 4 || view.size % 4)
+        return false;
+    }
   }
+  auto next = version_->IsUniquelyOwned() ? version_ : version_->Clone();
+  if (!next)
+    return false;
+  if (!next->Write(binding_index, first_element, values))
+    return false;
+  version_ = std::move(next);
+  return true;
 }
 
 bool BindingGroup::BindResource(uint32_t binding, const std::vector<IImage *> &images, uint32_t first_element) {
-  try {
-    size_t binding_index;
-    const auto *desc = FindBinding(binding, first_element, images.size(), binding_index);
-    if (!desc)
-      return false;
-    if (desc->type != BINDING_TEXTURE2D && desc->type != BINDING_RW_TEXTURE2D)
-      return false;
-    for (auto value : images) {
-      auto image = dynamic_cast<Image *>(value);
-      if (!image || !image->IsValid() || image->DeviceIdentity() != device_->NativeIdentity() ||
-          IsDepthFormat(image->GetDesc().format))
-        return false;
-      if (desc->type == BINDING_RW_TEXTURE2D && !image->SupportsStorage())
-        return false;
-    }
-    auto next = version_->IsUniquelyOwned() ? version_ : version_->Clone();
-    if (!next)
-      return false;
-    if (!next->Write(binding_index, first_element, images))
-      return false;
-    version_ = std::move(next);
-    return true;
-  } catch (const std::bad_alloc &) {
+  size_t binding_index;
+  const auto *desc = FindBinding(binding, first_element, images.size(), binding_index);
+  if (!desc)
     return false;
+  if (desc->type != BINDING_TEXTURE2D && desc->type != BINDING_RW_TEXTURE2D)
+    return false;
+  for (auto value : images) {
+    auto image = dynamic_cast<Image *>(value);
+    if (!image || !image->IsValid() || image->DeviceIdentity() != device_->NativeIdentity() ||
+        IsDepthFormat(image->GetDesc().format))
+      return false;
+    if (desc->type == BINDING_RW_TEXTURE2D && !image->SupportsStorage())
+      return false;
   }
+  auto next = version_->IsUniquelyOwned() ? version_ : version_->Clone();
+  if (!next)
+    return false;
+  if (!next->Write(binding_index, first_element, images))
+    return false;
+  version_ = std::move(next);
+  return true;
 }
 
 bool BindingGroup::BindResource(uint32_t binding, const std::vector<ISampler *> &samplers, uint32_t first_element) {
-  try {
-    size_t binding_index;
-    const auto *desc = FindBinding(binding, first_element, samplers.size(), binding_index);
-    if (!desc)
-      return false;
-    if (desc->type != BINDING_SAMPLER)
-      return false;
-    for (auto sampler : samplers) {
-      auto native = dynamic_cast<Sampler *>(sampler);
-      if (!native || native->DeviceIdentity() != device_)
-        return false;
-    }
-    auto next = version_->IsUniquelyOwned() ? version_ : version_->Clone();
-    if (!next)
-      return false;
-    if (!next->Write(binding_index, first_element, samplers))
-      return false;
-    version_ = std::move(next);
-    return true;
-  } catch (const std::bad_alloc &) {
+  size_t binding_index;
+  const auto *desc = FindBinding(binding, first_element, samplers.size(), binding_index);
+  if (!desc)
     return false;
+  if (desc->type != BINDING_SAMPLER)
+    return false;
+  for (auto sampler : samplers) {
+    auto native = dynamic_cast<Sampler *>(sampler);
+    if (!native || native->DeviceIdentity() != device_)
+      return false;
   }
+  auto next = version_->IsUniquelyOwned() ? version_ : version_->Clone();
+  if (!next)
+    return false;
+  if (!next->Write(binding_index, first_element, samplers))
+    return false;
+  version_ = std::move(next);
+  return true;
 }
 
 }  // namespace grassland::rhi::backend

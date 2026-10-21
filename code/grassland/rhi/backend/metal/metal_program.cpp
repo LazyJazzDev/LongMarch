@@ -84,106 +84,102 @@ static bool CompileMetal(const ShaderDesc &shader, const ProgramDesc &desc, std:
 bool MetalProgram::Finalize() {
   if (finalized_)
     return true;
-  try {
-    if (!ValidateLayout() || desc_.vertex_bindings.size() > 31 - VertexBufferBase) {
-      ReportError(-1, "Invalid Metal graphics program layout.");
-      return false;
-    }
-    for (const auto &binding : desc_.vertex_bindings) {
-      if (!binding.stride || binding.stride > 2048 || binding.stride % 4) {
-        ReportError(-1, "Metal vertex stride must be a multiple of four in [4, 2048].");
-        return false;
-      }
-    }
-    for (const auto &attribute : desc_.vertex_attributes) {
-      if (attribute.location >= 31 || attribute.offset % 4) {
-        ReportError(-1, "Invalid Metal vertex attribute location or alignment.");
-        return false;
-      }
-    }
-    auto pool = NS::TransferPtr(NS::AutoreleasePool::alloc()->init());
-    auto device = static_cast<MetalDevice *>(device_)->NativeDevice();
-    NS::SharedPtr<MTL::Function> functions[2];
-    const IShader *shaders[] = {desc_.vertex_shader, desc_.fragment_shader};
-    for (const auto &group : desc_.pipeline_layout.groups)
-      if (!ValidateMetalBindingLayout(device, group))
-        return false;
-    for (int i = 0; i < 2; ++i) {
-      std::string code, entry;
-      if (!CompileMetal(shaders[i]->GetDesc(), desc_, code, entry))
-        return false;
-      NS::Error *error = nullptr;
-      auto library = NS::TransferPtr(
-          device->newLibrary(NS::String::string(code.c_str(), NS::UTF8StringEncoding), nullptr, &error));
-      if (!library) {
-        ReportError(-1, error ? error->localizedDescription()->utf8String() : "Metal library compilation failed.");
-        return false;
-      }
-      functions[i] = NS::TransferPtr(library->newFunction(NS::String::string(entry.c_str(), NS::UTF8StringEncoding)));
-      if (!functions[i]) {
-        ReportError(-1, "Metal shader entry point not found.");
-        return false;
-      }
-    }
-    auto descriptor = NS::TransferPtr(MTL::RenderPipelineDescriptor::alloc()->init());
-    descriptor->setVertexFunction(functions[0].get());
-    descriptor->setFragmentFunction(functions[1].get());
-    for (size_t i = 0; i < desc_.color_formats.size(); ++i)
-      descriptor->colorAttachments()->object(i)->setPixelFormat(NativeImageFormat(desc_.color_formats[i]));
-    const auto &ds = desc_.depth_stencil;
-    descriptor->setDepthAttachmentPixelFormat(NativeImageFormat(ds.format));
-    if (HasStencil(ds.format))
-      descriptor->setStencilAttachmentPixelFormat(NativeImageFormat(ds.format));
-    auto depth = NS::TransferPtr(MTL::DepthStencilDescriptor::alloc()->init());
-    depth->setDepthCompareFunction(ds.depth_test ? static_cast<MTL::CompareFunction>(ds.depth_compare)
-                                                 : MTL::CompareFunctionAlways);
-    depth->setDepthWriteEnabled(ds.depth_test && ds.depth_write);
-    if (ds.stencil_test) {
-      auto setup = [&](const StencilFaceDesc &face) {
-        auto d = MTL::StencilDescriptor::alloc()->init();
-        d->setStencilCompareFunction(static_cast<MTL::CompareFunction>(face.compare));
-        d->setStencilFailureOperation(static_cast<MTL::StencilOperation>(face.fail_op));
-        d->setDepthFailureOperation(static_cast<MTL::StencilOperation>(face.depth_fail_op));
-        d->setDepthStencilPassOperation(static_cast<MTL::StencilOperation>(face.pass_op));
-        d->setReadMask(ds.stencil_read_mask);
-        d->setWriteMask(ds.stencil_write_mask);
-        return NS::TransferPtr(d);
-      };
-      auto front = setup(ds.front), back = setup(ds.back);
-      depth->setFrontFaceStencil(front.get());
-      depth->setBackFaceStencil(back.get());
-    }
-    depth_stencil_ = NS::TransferPtr(device->newDepthStencilState(depth.get()));
-    if (!depth_stencil_)
-      return false;
-    auto vertex = MTL::VertexDescriptor::vertexDescriptor();
-    for (size_t i = 0; i < desc_.vertex_bindings.size(); ++i) {
-      auto layout = vertex->layouts()->object(i + VertexBufferBase);
-      layout->setStride(desc_.vertex_bindings[i].stride);
-      layout->setStepFunction(desc_.vertex_bindings[i].per_instance ? MTL::VertexStepFunctionPerInstance
-                                                                    : MTL::VertexStepFunctionPerVertex);
-      layout->setStepRate(1);
-    }
-    const MTL::VertexFormat formats[] = {MTL::VertexFormatFloat, MTL::VertexFormatFloat2, MTL::VertexFormatFloat3,
-                                         MTL::VertexFormatFloat4};
-    for (const auto &a : desc_.vertex_attributes) {
-      auto attribute = vertex->attributes()->object(a.location);
-      attribute->setFormat(formats[a.format]);
-      attribute->setBufferIndex(a.binding + VertexBufferBase);
-      attribute->setOffset(a.offset);
-    }
-    descriptor->setVertexDescriptor(vertex);
-    NS::Error *error = nullptr;
-    pipeline_ = NS::TransferPtr(device->newRenderPipelineState(descriptor.get(), &error));
-    if (!pipeline_) {
-      ReportError(-1, error ? error->localizedDescription()->utf8String() : "Metal pipeline creation failed.");
-      return false;
-    }
-    finalized_ = true;
-    return true;
-  } catch (const std::bad_alloc &) {
-    ReportError(-1, "Metal program allocation failed.");
+
+  if (!ValidateLayout() || desc_.vertex_bindings.size() > 31 - VertexBufferBase) {
+    ReportError(-1, "Invalid Metal graphics program layout.");
     return false;
   }
+  for (const auto &binding : desc_.vertex_bindings) {
+    if (!binding.stride || binding.stride > 2048 || binding.stride % 4) {
+      ReportError(-1, "Metal vertex stride must be a multiple of four in [4, 2048].");
+      return false;
+    }
+  }
+  for (const auto &attribute : desc_.vertex_attributes) {
+    if (attribute.location >= 31 || attribute.offset % 4) {
+      ReportError(-1, "Invalid Metal vertex attribute location or alignment.");
+      return false;
+    }
+  }
+  auto pool = NS::TransferPtr(NS::AutoreleasePool::alloc()->init());
+  auto device = static_cast<MetalDevice *>(device_)->NativeDevice();
+  NS::SharedPtr<MTL::Function> functions[2];
+  const IShader *shaders[] = {desc_.vertex_shader, desc_.fragment_shader};
+  for (const auto &group : desc_.pipeline_layout.groups)
+    if (!ValidateMetalBindingLayout(device, group))
+      return false;
+  for (int i = 0; i < 2; ++i) {
+    std::string code, entry;
+    if (!CompileMetal(shaders[i]->GetDesc(), desc_, code, entry))
+      return false;
+    NS::Error *error = nullptr;
+    auto library =
+        NS::TransferPtr(device->newLibrary(NS::String::string(code.c_str(), NS::UTF8StringEncoding), nullptr, &error));
+    if (!library) {
+      ReportError(-1, error ? error->localizedDescription()->utf8String() : "Metal library compilation failed.");
+      return false;
+    }
+    functions[i] = NS::TransferPtr(library->newFunction(NS::String::string(entry.c_str(), NS::UTF8StringEncoding)));
+    if (!functions[i]) {
+      ReportError(-1, "Metal shader entry point not found.");
+      return false;
+    }
+  }
+  auto descriptor = NS::TransferPtr(MTL::RenderPipelineDescriptor::alloc()->init());
+  descriptor->setVertexFunction(functions[0].get());
+  descriptor->setFragmentFunction(functions[1].get());
+  for (size_t i = 0; i < desc_.color_formats.size(); ++i)
+    descriptor->colorAttachments()->object(i)->setPixelFormat(NativeImageFormat(desc_.color_formats[i]));
+  const auto &ds = desc_.depth_stencil;
+  descriptor->setDepthAttachmentPixelFormat(NativeImageFormat(ds.format));
+  if (HasStencil(ds.format))
+    descriptor->setStencilAttachmentPixelFormat(NativeImageFormat(ds.format));
+  auto depth = NS::TransferPtr(MTL::DepthStencilDescriptor::alloc()->init());
+  depth->setDepthCompareFunction(ds.depth_test ? static_cast<MTL::CompareFunction>(ds.depth_compare)
+                                               : MTL::CompareFunctionAlways);
+  depth->setDepthWriteEnabled(ds.depth_test && ds.depth_write);
+  if (ds.stencil_test) {
+    auto setup = [&](const StencilFaceDesc &face) {
+      auto d = MTL::StencilDescriptor::alloc()->init();
+      d->setStencilCompareFunction(static_cast<MTL::CompareFunction>(face.compare));
+      d->setStencilFailureOperation(static_cast<MTL::StencilOperation>(face.fail_op));
+      d->setDepthFailureOperation(static_cast<MTL::StencilOperation>(face.depth_fail_op));
+      d->setDepthStencilPassOperation(static_cast<MTL::StencilOperation>(face.pass_op));
+      d->setReadMask(ds.stencil_read_mask);
+      d->setWriteMask(ds.stencil_write_mask);
+      return NS::TransferPtr(d);
+    };
+    auto front = setup(ds.front), back = setup(ds.back);
+    depth->setFrontFaceStencil(front.get());
+    depth->setBackFaceStencil(back.get());
+  }
+  depth_stencil_ = NS::TransferPtr(device->newDepthStencilState(depth.get()));
+  if (!depth_stencil_)
+    return false;
+  auto vertex = MTL::VertexDescriptor::vertexDescriptor();
+  for (size_t i = 0; i < desc_.vertex_bindings.size(); ++i) {
+    auto layout = vertex->layouts()->object(i + VertexBufferBase);
+    layout->setStride(desc_.vertex_bindings[i].stride);
+    layout->setStepFunction(desc_.vertex_bindings[i].per_instance ? MTL::VertexStepFunctionPerInstance
+                                                                  : MTL::VertexStepFunctionPerVertex);
+    layout->setStepRate(1);
+  }
+  const MTL::VertexFormat formats[] = {MTL::VertexFormatFloat, MTL::VertexFormatFloat2, MTL::VertexFormatFloat3,
+                                       MTL::VertexFormatFloat4};
+  for (const auto &a : desc_.vertex_attributes) {
+    auto attribute = vertex->attributes()->object(a.location);
+    attribute->setFormat(formats[a.format]);
+    attribute->setBufferIndex(a.binding + VertexBufferBase);
+    attribute->setOffset(a.offset);
+  }
+  descriptor->setVertexDescriptor(vertex);
+  NS::Error *error = nullptr;
+  pipeline_ = NS::TransferPtr(device->newRenderPipelineState(descriptor.get(), &error));
+  if (!pipeline_) {
+    ReportError(-1, error ? error->localizedDescription()->utf8String() : "Metal pipeline creation failed.");
+    return false;
+  }
+  finalized_ = true;
+  return true;
 }
 }  // namespace grassland::rhi::backend::metal

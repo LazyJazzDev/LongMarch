@@ -35,53 +35,50 @@ MetalBindingGroup::Version::Version(MetalDevice *device, const BindingLayoutDesc
 MetalBindingGroup::Version *MetalBindingGroup::Version::Create(MetalDevice *device, const BindingLayoutDesc &layout) {
   if (!ValidateMetalBindingLayout(device->NativeDevice(), layout))
     return nullptr;
-  try {
-    auto pool = NS::TransferPtr(NS::AutoreleasePool::alloc()->init());
-    auto result = std::unique_ptr<Version>(new Version(device, layout));
-    std::vector<MTL::ArgumentDescriptor *> descriptors;
-    uint32_t offset = 0;
-    for (auto b : result->layout_.bindings) {
-      auto d = MTL::ArgumentDescriptor::argumentDescriptor();
-      d->setIndex(offset);
-      d->setArrayLength(b.count);
-      d->setDataType(b.type == BINDING_SAMPLER     ? MTL::DataTypeSampler
-                     : b.type >= BINDING_TEXTURE2D ? MTL::DataTypeTexture
-                                                   : MTL::DataTypePointer);
-      if (b.type == BINDING_TEXTURE2D || b.type == BINDING_RW_TEXTURE2D)
-        d->setTextureType(MTL::TextureType2D);
-      d->setAccess(b.type == BINDING_RW_STRUCTURED_BUFFER || b.type == BINDING_RW_BYTE_ADDRESS_BUFFER ||
-                           b.type == BINDING_RW_TEXTURE2D
-                       ? MTL::ArgumentAccessReadWrite
-                       : MTL::ArgumentAccessReadOnly);
-      descriptors.push_back(d);
-      result->offsets_.push_back(offset);
-      result->initialized_.emplace_back(b.count, false);
-      offset += b.count;
-    }
-    // SPIRV-Cross uses one size array per descriptor set for GetDimensions.
-    auto sizes = MTL::ArgumentDescriptor::argumentDescriptor();
-    sizes->setIndex(offset);
-    sizes->setDataType(MTL::DataTypePointer);
-    sizes->setAccess(MTL::ArgumentAccessReadOnly);
-    descriptors.push_back(sizes);
-    result->encoder_ = NS::TransferPtr(device->NativeDevice()->newArgumentEncoder(
-        NS::Array::array(reinterpret_cast<const NS::Object *const *>(descriptors.data()), descriptors.size())));
-    if (!result->encoder_)
-      return nullptr;
-    result->arguments_ = NS::TransferPtr(
-        device->NativeDevice()->newBuffer(result->encoder_->encodedLength(), MTL::ResourceStorageModeShared));
-    result->sizes_ = NS::TransferPtr(
-        device->NativeDevice()->newBuffer(std::max(1u, offset) * sizeof(uint32_t), MTL::ResourceStorageModeShared));
-    if (!result->arguments_ || !result->sizes_)
-      return nullptr;
-    std::memset(result->arguments_->contents(), 0, result->arguments_->length());
-    std::memset(result->sizes_->contents(), 0, result->sizes_->length());
-    result->encoder_->setArgumentBuffer(result->arguments_.get(), 0);
-    result->encoder_->setBuffer(result->sizes_.get(), 0, offset);
-    return result.release();
-  } catch (const std::bad_alloc &) {
-    return nullptr;
+
+  auto pool = NS::TransferPtr(NS::AutoreleasePool::alloc()->init());
+  auto result = std::unique_ptr<Version>(new Version(device, layout));
+  std::vector<MTL::ArgumentDescriptor *> descriptors;
+  uint32_t offset = 0;
+  for (auto b : result->layout_.bindings) {
+    auto d = MTL::ArgumentDescriptor::argumentDescriptor();
+    d->setIndex(offset);
+    d->setArrayLength(b.count);
+    d->setDataType(b.type == BINDING_SAMPLER     ? MTL::DataTypeSampler
+                   : b.type >= BINDING_TEXTURE2D ? MTL::DataTypeTexture
+                                                 : MTL::DataTypePointer);
+    if (b.type == BINDING_TEXTURE2D || b.type == BINDING_RW_TEXTURE2D)
+      d->setTextureType(MTL::TextureType2D);
+    d->setAccess(b.type == BINDING_RW_STRUCTURED_BUFFER || b.type == BINDING_RW_BYTE_ADDRESS_BUFFER ||
+                         b.type == BINDING_RW_TEXTURE2D
+                     ? MTL::ArgumentAccessReadWrite
+                     : MTL::ArgumentAccessReadOnly);
+    descriptors.push_back(d);
+    result->offsets_.push_back(offset);
+    result->initialized_.emplace_back(b.count, false);
+    offset += b.count;
   }
+  // SPIRV-Cross uses one size array per descriptor set for GetDimensions.
+  auto sizes = MTL::ArgumentDescriptor::argumentDescriptor();
+  sizes->setIndex(offset);
+  sizes->setDataType(MTL::DataTypePointer);
+  sizes->setAccess(MTL::ArgumentAccessReadOnly);
+  descriptors.push_back(sizes);
+  result->encoder_ = NS::TransferPtr(device->NativeDevice()->newArgumentEncoder(
+      NS::Array::array(reinterpret_cast<const NS::Object *const *>(descriptors.data()), descriptors.size())));
+  if (!result->encoder_)
+    return nullptr;
+  result->arguments_ = NS::TransferPtr(
+      device->NativeDevice()->newBuffer(result->encoder_->encodedLength(), MTL::ResourceStorageModeShared));
+  result->sizes_ = NS::TransferPtr(
+      device->NativeDevice()->newBuffer(std::max(1u, offset) * sizeof(uint32_t), MTL::ResourceStorageModeShared));
+  if (!result->arguments_ || !result->sizes_)
+    return nullptr;
+  std::memset(result->arguments_->contents(), 0, result->arguments_->length());
+  std::memset(result->sizes_->contents(), 0, result->sizes_->length());
+  result->encoder_->setArgumentBuffer(result->arguments_.get(), 0);
+  result->encoder_->setBuffer(result->sizes_.get(), 0, offset);
+  return result.release();
 }
 
 ObjectPtr<BindingGroup::Version> MetalBindingGroup::Version::Clone() const {
@@ -162,11 +159,7 @@ MetalBindingGroup::MetalBindingGroup(MetalDevice *device, ObjectPtr<Version> ver
 }
 
 MetalBindingGroup *MetalBindingGroup::Create(MetalDevice *device, const BindingLayoutDesc &layout) {
-  try {
-    auto version = ObjectPtr<Version>::Adopt(Version::Create(device, layout));
-    return version ? new MetalBindingGroup(device, std::move(version)) : nullptr;
-  } catch (const std::bad_alloc &) {
-    return nullptr;
-  }
+  auto version = ObjectPtr<Version>::Adopt(Version::Create(device, layout));
+  return version ? new MetalBindingGroup(device, std::move(version)) : nullptr;
 }
 }  // namespace grassland::rhi::backend::metal
