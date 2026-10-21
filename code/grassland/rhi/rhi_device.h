@@ -1,6 +1,8 @@
 ﻿#pragma once
+#include "grassland/rhi/rhi_acceleration_structure.h"
 #include "grassland/rhi/rhi_binding_group.h"
 #include "grassland/rhi/rhi_object.h"
+#include "grassland/rhi/rhi_ray_tracing_program.h"
 
 namespace grassland::rhi {
 class IImage;
@@ -18,6 +20,11 @@ class ICommandContext;
 
 class IDevice : public IObject {
  public:
+  virtual IBottomLevelAccelerationStructure *CreateBottomLevelAccelerationStructure(
+      const BottomLevelAccelerationStructureDesc &desc) = 0;
+  virtual ITopLevelAccelerationStructure *CreateTopLevelAccelerationStructure(
+      const TopLevelAccelerationStructureDesc &desc) = 0;
+  virtual IRayTracingProgram *CreateRayTracingProgram(const RayTracingProgramDesc &desc) = 0;
   virtual std::string Name() const = 0;
   virtual bool SupportRayTracingPipeline() const = 0;
   virtual bool SupportRayQuery() const = 0;

@@ -18,14 +18,17 @@ def run(executable, args, success=True):
 
 def check(executable, backend):
     scenes = run(executable, ["--list"]).splitlines()
-    expected_scenes = ["window", "triangle", "cube", "texture", "blend", "nbody"]
+    expected_scenes = ["window", "triangle", "cube", "texture", "blend", "nbody", "raytracing", "ray_query"]
     if scenes != expected_scenes:
         raise RuntimeError(f"Unexpected module list for {executable.name}: {scenes}")
     for scene in (*scenes, "all"):
         selection = ["--all"] if scene == "all" else ["--module", scene]
         output = run(executable, ["--headless", "--backend", backend, "--frames", "7", *selection])
         rows = re.findall(r"(\w+): headless 1280x720, (\d+) frames, ([\d.]+) s, ([\d.]+) FPS", output)
-        expected = scenes if scene == "all" else [scene]
+        skipped = re.findall(r"(\w+): SKIPPED \(ray tracing unavailable\)", output)
+        if any(item not in ("raytracing", "ray_query") for item in skipped):
+            raise RuntimeError(output)
+        expected = [item for item in (scenes if scene == "all" else [scene]) if item not in skipped]
         if [row[0] for row in rows] != expected:
             raise RuntimeError(f"Missing or repeated scene results:\n{output}")
         for _, frames, seconds, fps in rows:

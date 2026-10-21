@@ -20,14 +20,15 @@ VkBlendOp NativeBlendOp(BlendOp op) {
 }
 
 size_t DescriptorTypeIndex(BindingType type) {
-  constexpr size_t indices[] = {0, 1, 1, 1, 1, 2, 3, 4};
+  constexpr size_t indices[] = {0, 1, 1, 1, 1, 2, 3, 4, 5};
   return indices[type];
 }
 
 VkDescriptorType DescriptorTypeFromIndex(size_t index) {
-  constexpr VkDescriptorType types[] = {VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
-                                        VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE,
-                                        VK_DESCRIPTOR_TYPE_SAMPLER};
+  constexpr VkDescriptorType types[] = {
+      VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
+      VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE,  VK_DESCRIPTOR_TYPE_STORAGE_IMAGE,
+      VK_DESCRIPTOR_TYPE_SAMPLER,        VK_DESCRIPTOR_TYPE_ACCELERATION_STRUCTURE_KHR};
   return types[index];
 }
 

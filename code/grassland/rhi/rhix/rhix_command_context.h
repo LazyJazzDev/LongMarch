@@ -2,12 +2,14 @@
 #include <array>
 
 #include "grassland/rhi/rhi.h"
+#include "grassland/rhi/rhix/rhix_acceleration_structure.h"
 #include "grassland/rhi/rhix/rhix_binding_group.h"
 #include "grassland/rhi/rhix/rhix_buffer.h"
 #include "grassland/rhi/rhix/rhix_compute_program.h"
 #include "grassland/rhi/rhix/rhix_image.h"
 #include "grassland/rhi/rhix/rhix_object_container.h"
 #include "grassland/rhi/rhix/rhix_program.h"
+#include "grassland/rhi/rhix/rhix_ray_tracing_program.h"
 
 namespace grassland::rhix {
 class Window;
@@ -42,6 +44,18 @@ class CommandContext : public ObjectContainer {
                      uint64_t size);
   bool CmdBindGroup(uint32_t index, const BindingGroup &group);
   bool CmdUploadImage(const Image &image, const void *data, uint64_t row_pitch);
+  bool CmdBuildBottomLevelAccelerationStructure(
+      const BottomLevelAccelerationStructure &destination,
+      const std::vector<AccelerationStructureGeometryBuffers> &geometries,
+      rhi::AccelerationStructureBuildMode mode = rhi::ACCELERATION_STRUCTURE_BUILD);
+  bool CmdBuildTopLevelAccelerationStructure(
+      const TopLevelAccelerationStructure &destination,
+      const std::vector<RayTracingInstance> &instances,
+      rhi::AccelerationStructureBuildMode mode = rhi::ACCELERATION_STRUCTURE_BUILD);
+  bool CmdQueryCompactedSize(const AccelerationStructure &structure);
+  bool CmdCompactAccelerationStructure(const AccelerationStructure &source, const AccelerationStructure &destination);
+  bool CmdBindRayTracingProgram(const RayTracingProgram &program);
+  bool CmdDispatchRays(uint32_t width, uint32_t height, uint32_t depth = 1);
   bool CmdBindComputeProgram(const ComputeProgram &program);
   bool CmdDispatch(uint32_t x, uint32_t y = 1, uint32_t z = 1);
   bool CmdBindProgram(const Program &program);

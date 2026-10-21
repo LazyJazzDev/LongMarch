@@ -16,6 +16,9 @@ uint32_t MetalArgumentCount(const BindingLayoutDesc &layout) {
 }
 
 bool ValidateMetalBindingLayout(MTL::Device *device, const BindingLayoutDesc &layout) {
+  for (auto binding : layout.bindings)
+    if (binding.type == BINDING_ACCELERATION_STRUCTURE)
+      return false;
   auto count = MetalArgumentCount(layout);
   if (!ValidateBindingLayout(layout) || (!layout.bindings.empty() && !count) ||
       device->argumentBuffersSupport() != MTL::ArgumentBuffersTier2 ||

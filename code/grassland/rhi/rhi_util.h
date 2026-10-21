@@ -139,7 +139,17 @@ struct ImageDesc {
   ImageFormat format{IMAGE_FORMAT_UNKNOWN};
 };
 
-typedef enum { SHADER_STAGE_VERTEX, SHADER_STAGE_FRAGMENT, SHADER_STAGE_COMPUTE } ShaderStage;
+typedef enum {
+  SHADER_STAGE_VERTEX,
+  SHADER_STAGE_FRAGMENT,
+  SHADER_STAGE_COMPUTE,
+  SHADER_STAGE_RAY_GENERATION,
+  SHADER_STAGE_MISS,
+  SHADER_STAGE_CLOSEST_HIT,
+  SHADER_STAGE_ANY_HIT,
+  SHADER_STAGE_INTERSECTION,
+  SHADER_STAGE_CALLABLE,
+} ShaderStage;
 
 std::string to_string(ShaderStage stage);
 
@@ -200,5 +210,18 @@ struct BlendState {
 
 std::string to_string(BlendFactor value);
 std::string to_string(BlendOp value);
+
+typedef enum {
+  ACCELERATION_STRUCTURE_BOTTOM_LEVEL,
+  ACCELERATION_STRUCTURE_TOP_LEVEL,
+} AccelerationStructureType;
+
+typedef enum {
+  ACCELERATION_STRUCTURE_BUILD,
+  ACCELERATION_STRUCTURE_UPDATE,
+} AccelerationStructureBuildMode;
+
+std::string to_string(AccelerationStructureType value);
+std::string to_string(AccelerationStructureBuildMode value);
 
 }  // namespace grassland::rhi

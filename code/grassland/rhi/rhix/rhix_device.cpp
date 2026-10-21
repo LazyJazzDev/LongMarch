@@ -93,4 +93,18 @@ Sampler Device::CreateSampler(const rhi::SamplerDesc &desc) const {
 BindingGroup Device::CreateBindingGroup(const rhi::BindingLayoutDesc &layout) const {
   return Get()->CreateBindingGroup(layout);
 }
+
+BottomLevelAccelerationStructure Device::CreateBottomLevelAccelerationStructure(
+    const rhi::BottomLevelAccelerationStructureDesc &desc) const {
+  return Get()->CreateBottomLevelAccelerationStructure(desc);
+}
+
+TopLevelAccelerationStructure Device::CreateTopLevelAccelerationStructure(
+    const rhi::TopLevelAccelerationStructureDesc &desc) const {
+  return Get()->CreateTopLevelAccelerationStructure(desc);
+}
+
+RayTracingProgram Device::CreateRayTracingProgram(const rhi::RayTracingProgramDesc &desc) const {
+  return Get()->CreateRayTracingProgram(desc);
+}
 }  // namespace grassland::rhix

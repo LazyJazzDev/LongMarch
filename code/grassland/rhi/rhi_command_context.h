@@ -1,7 +1,9 @@
 ﻿#pragma once
 #include <array>
 
+#include "grassland/rhi/rhi_acceleration_structure.h"
 #include "grassland/rhi/rhi_object.h"
+#include "grassland/rhi/rhi_ray_tracing_program.h"
 
 namespace grassland::rhi {
 class IBuffer;
@@ -44,6 +46,21 @@ class IWindow;
 
 class ICommandContext : public IObject {
  public:
+  // AS build/copy/query and DispatchRays require no active rendering scope.
+  // Modifying contexts for one AS must be submitted before recording later uses
+  // in another context; Build/Update retain inputs and rent scratch automatically.
+  virtual bool CmdQueryCompactedSize(IAccelerationStructure *structure) = 0;
+  virtual bool CmdCompactAccelerationStructure(IAccelerationStructure *source, IAccelerationStructure *destination) = 0;
+  virtual bool CmdBuildBottomLevelAccelerationStructure(
+      IBottomLevelAccelerationStructure *destination,
+      const std::vector<AccelerationStructureGeometryBuffers> &geometries,
+      AccelerationStructureBuildMode mode = ACCELERATION_STRUCTURE_BUILD) = 0;
+  virtual bool CmdBuildTopLevelAccelerationStructure(
+      ITopLevelAccelerationStructure *destination,
+      const std::vector<RayTracingInstance> &instances,
+      AccelerationStructureBuildMode mode = ACCELERATION_STRUCTURE_BUILD) = 0;
+  virtual bool CmdBindRayTracingProgram(IRayTracingProgram *program) = 0;
+  virtual bool CmdDispatchRays(uint32_t width, uint32_t height, uint32_t depth = 1) = 0;
   // Cmd calls encode native commands immediately and retain the exact resources
   // they use. Parameter values are consumed during the call, not during Submit.
   // Callers must not use an image concurrently from multiple command contexts.

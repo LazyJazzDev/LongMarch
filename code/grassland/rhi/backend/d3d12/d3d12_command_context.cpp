@@ -6,9 +6,11 @@
 
 #include "grassland/rhi/backend/backend_binding_group.h"
 #include "grassland/rhi/backend/backend_glfw_helper.h"
+#include "grassland/rhi/backend/d3d12/d3d12_acceleration_structure.h"
 #include "grassland/rhi/backend/d3d12/d3d12_buffer.h"
 #include "grassland/rhi/backend/d3d12/d3d12_compute_program.h"
 #include "grassland/rhi/backend/d3d12/d3d12_program.h"
+#include "grassland/rhi/backend/d3d12/d3d12_ray_tracing_program.h"
 #include "grassland/rhi/backend/d3d12/d3d12_swap_chain_image.h"
 #include "grassland/rhi/backend/d3d12/d3d12_window.h"
 
@@ -35,6 +37,10 @@ D3D12CommandContext *D3D12CommandContext::Create(D3D12Device *device) {
   object->reusable_ = object->device_->AcquireCommandResources(object->allocator_, object->list_, object->event_);
   if (!object->reusable_)
     return nullptr;
+  if (device->SupportRayTracingPipeline() || device->SupportRayQuery()) {
+    if (FAILED(object->list_.As(&object->ray_list_)))
+      return nullptr;
+  }
   return object.release();
 }
 
@@ -159,6 +165,9 @@ CommandContext::SubmitResult D3D12CommandContext::SubmitNative() {
     ID3D12CommandList *lists[] = {list_.Get()};
     device_->NativeQueue()->ExecuteCommandLists(1, lists);
     MarkSubmitted();
+    for (auto &entry : as_dependencies_)
+      entry.first->CommitDependencies(std::move(entry.second));
+    as_dependencies_.clear();
     bool presented = true;
     for (const auto &present : presents_) {
       if (!Check(present.second->Present(), "Swapchain::Present"))
@@ -290,6 +299,7 @@ bool D3D12CommandContext::CmdBindComputeProgram(IComputeProgram *program) {
     return false;
   native_program_ = native;
   compute_active_ = true;
+  ray_program_ = nullptr;
   program_ = nullptr;
   binding_layout_ = &native->GetDesc().pipeline_layout;
   groups_.assign(binding_layout_->groups.size(), {});
@@ -301,7 +311,7 @@ bool D3D12CommandContext::CmdBindComputeProgram(IComputeProgram *program) {
 
 bool D3D12CommandContext::CmdDispatch(uint32_t x, uint32_t y, uint32_t z) {
 #if !defined(NDEBUG)
-  if (sealed_ || rendering_active_ || !compute_active_) {
+  if (sealed_ || rendering_active_ || !compute_active_ || ray_program_) {
     recording_failed_ = true;
     return false;
   }
@@ -342,6 +352,7 @@ bool D3D12CommandContext::CmdBindProgram(IProgram *program) {
   program_ = native;
   native_program_ = native;
   compute_active_ = false;
+  ray_program_ = nullptr;
   binding_layout_ = &native->GetDesc().pipeline_layout;
   list_->OMSetStencilRef(native->GetDesc().depth_stencil.stencil_reference);
   list_->SetPipelineState(native->NativePipeline());
@@ -623,6 +634,13 @@ bool D3D12CommandContext::PrepareGroups() {
       for (uint32_t j = 0; j < binding.count; ++j) {
         auto type = binding.type;
         ID3D12Resource *resource = nullptr;
+        if (type == BINDING_ACCELERATION_STRUCTURE) {
+          auto top =
+              static_cast<D3D12TopLevelAccelerationStructure *>(version->GetReferences()[binding_index][j].Get());
+          for (const auto &blas : top->BottomLevels())
+            if (!RetainResource(blas.Get()))
+              return false;
+        }
         if (type <= BINDING_RW_BYTE_ADDRESS_BUFFER) {
           auto buffer = static_cast<D3D12Buffer *>(version->GetReferences()[binding_index][j].Get());
           resource = buffer->NativeBuffer();
@@ -770,6 +788,47 @@ bool D3D12CommandContext::CmdUploadImage(IImage *image, const void *data, uint64
   dst.pResource = native->NativeImage();
   dst.Type = D3D12_TEXTURE_COPY_TYPE_SUBRESOURCE_INDEX;
   list_->CopyTextureRegion(&dst, 0, 0, 0, &src, nullptr);
+  return true;
+}
+
+bool D3D12CommandContext::CmdBindRayTracingProgram(IRayTracingProgram *program) {
+  auto native = dynamic_cast<D3D12RayTracingProgram *>(program);
+  if (sealed_ || rendering_active_ || !native || native->Owner() != device_ || !native->IsFinalized()) {
+    recording_failed_ = true;
+    return false;
+  }
+  if (!RetainResource(native))
+    return false;
+  native_program_ = native;
+  ray_program_ = native;
+  compute_active_ = true;
+  program_ = nullptr;
+  binding_layout_ = &native->GetDesc().pipeline_layout;
+  groups_.assign(binding_layout_->groups.size(), {});
+  tables_dirty_ = true;
+  ray_list_->SetPipelineState1(native->NativePipeline());
+  list_->SetComputeRootSignature(native->NativeRootSignature());
+  return true;
+}
+
+bool D3D12CommandContext::CmdDispatchRays(uint32_t width, uint32_t height, uint32_t depth) {
+  if (sealed_ || rendering_active_ || !ray_program_ || !width || !height || !depth) {
+    recording_failed_ = true;
+    return false;
+  }
+  if (recording_failed_)
+    return false;
+  if (uint64_t(width) * height > (1ull << 30) / depth) {
+    recording_failed_ = true;
+    return false;
+  }
+  if (!PrepareGroups())
+    return false;
+  auto dispatch = ray_program_->DispatchDesc();
+  dispatch.Width = width;
+  dispatch.Height = height;
+  dispatch.Depth = depth;
+  ray_list_->DispatchRays(&dispatch);
   return true;
 }
 

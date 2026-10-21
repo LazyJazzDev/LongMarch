@@ -1,6 +1,7 @@
 ﻿#pragma once
 #include "grassland/rhi/rhi.h"
 #include "grassland/rhi/rhi_util.h"
+#include "grassland/rhi/rhix/rhix_acceleration_structure.h"
 #include "grassland/rhi/rhix/rhix_binding_group.h"
 #include "grassland/rhi/rhix/rhix_buffer.h"
 #include "grassland/rhi/rhix/rhix_command_context.h"
@@ -8,6 +9,7 @@
 #include "grassland/rhi/rhix/rhix_object_container.h"
 #include "grassland/rhi/rhix/rhix_program.h"
 #include "grassland/rhi/rhix/rhix_queue.h"
+#include "grassland/rhi/rhix/rhix_ray_tracing_program.h"
 #include "grassland/rhi/rhix/rhix_shader.h"
 #include "grassland/rhi/rhix/rhix_window.h"
 
@@ -24,6 +26,11 @@ class Device : public ObjectContainer {
   bool SupportGeometryShader() const;
   Sampler CreateSampler(const rhi::SamplerDesc &desc = {}) const;
   BindingGroup CreateBindingGroup(const rhi::BindingLayoutDesc &layout) const;
+  BottomLevelAccelerationStructure CreateBottomLevelAccelerationStructure(
+      const rhi::BottomLevelAccelerationStructureDesc &desc) const;
+  TopLevelAccelerationStructure CreateTopLevelAccelerationStructure(
+      const rhi::TopLevelAccelerationStructureDesc &desc) const;
+  RayTracingProgram CreateRayTracingProgram(const rhi::RayTracingProgramDesc &desc) const;
   Shader CreateShader(const rhi::ShaderDesc &desc) const;
   ComputeProgram CreateComputeProgram(const rhi::ComputeProgramDesc &desc) const;
   Program CreateProgram(const rhi::ProgramDesc &desc) const;

@@ -1,6 +1,6 @@
 # rhi_hello
 
-Six independent modules use `rhi::ObjPtr<IXXX>` pointer APIs. Each module creates its own Core, Device, Window and Queue; main only selects the module/backend and parses arguments.
+Eight independent modules use `rhi::ObjPtr<IXXX>` pointer APIs. Each module creates its own Core, Device, Window and Queue; main only selects the module/backend and parses arguments.
 
 ```text
 demo_rhi_hello --list
@@ -19,7 +19,7 @@ The positional backend argument remains supported. Without `--module`, a line-ba
 
 - `nbody`: shared-memory tiled compute simulation of 65,536 particles followed by additive particle drawing.
 
-All six modules and the depth/stencil, MRT and BindingGroup APIs are implemented on D3D12, Vulkan and Metal. Metal bindings require argument-buffer Tier 2 support. D24S8 uses native Depth32Float_Stencil8 on Metal, so depth precision differs from native 24-bit formats.
+The first six modules and the depth/stencil, MRT and BindingGroup APIs are implemented on D3D12, Vulkan and Metal. Metal bindings require argument-buffer Tier 2 support. D24S8 uses native Depth32Float_Stencil8 on Metal, so depth precision differs from native 24-bit formats.
 
 
 ## Shader and Program contract
@@ -71,7 +71,7 @@ Vulkan groups own descriptor-set leases from pages of up to 64 sets, with fixed 
 
 ## Vulkan rendering-path regression
 
-With Vulkan SDK validation, API-dump and Profiles layers installed and a Vulkan 1.3+ GPU supporting dynamic rendering, run `python test/rhi/test_vulkan_rendering_paths.py <demo executable> [<second demo executable>]` from the repository root. With `--headless`, this runs all five modules; windowed mode runs the triangle. It checks native capabilities, a Vulkan 1.2 KHR profile, and a Vulkan 1.2 profile with dynamic rendering disabled. It verifies the actual native Begin/End commands and that dynamic rendering creates no RenderPass or Framebuffer objects. Profile simulation changes reported capabilities; it does not substitute for testing on older hardware.
+With Vulkan SDK validation, API-dump and Profiles layers installed and a Vulkan 1.3+ GPU supporting dynamic rendering, run `python test/rhi/test_vulkan_rendering_paths.py <demo executable> [<second demo executable>]` from the repository root. With `--headless`, this runs all available modules; windowed mode runs the triangle. It checks native capabilities, a Vulkan 1.2 KHR profile, and a Vulkan 1.2 profile with dynamic rendering disabled. It verifies the actual native Begin/End commands and that dynamic rendering creates no RenderPass or Framebuffer objects. Profile simulation changes reported capabilities; it does not substitute for testing on older hardware.
 
 
 Headless benchmarks (D3D12/Vulkan/Metal) render to independent 1280x720 RGBA8 images without creating a GLFW window, swapchain, or presenting. `window` measures its clear pass; `triangle` measures the same indexed triangle draw as the windowed scene. Each module independently creates its own Core, Device and resources.
@@ -102,3 +102,65 @@ Nbody reports FPS and estimated TFLOP/s in the window title and headless output.
 Backend layout ownership is shared by graphics and compute programs through D3D12ProgramBase (root signature and root-parameter mapping) and VulkanProgramBase (descriptor-set layouts and pipeline layout). These internal bases have no IObject identity or reference counting; concrete programs retain responsibility for shader compilation and pipeline creation.
 
 Metal graphics and compute programs share `MetalProgramBase` argument-buffer layout validation and Slang/SPIR-V-to-MSL compilation. Compute threadgroup dimensions come from Slang reflection and are checked against device/pipeline limits. Each Dispatch uses a separate serial compute encoder; tracked resource residency synchronizes dependent dispatches, copies and rendering, including indirect argument-buffer resources. Switching programs requires rebinding groups.
+
+## Acceleration structures and ray tracing (D3D12 / Vulkan)
+
+`raytracing` uses a RayTracingProgram with ray-generation, miss, triangle closest-hit,
+procedural intersection and sphere closest-hit shaders. `ray_query` uses inline ray
+queries from a ComputeProgram. Both render a rotating triangle and an AABB-backed
+sphere, compact the triangle BLAS once, and refit the TLAS each frame. Each module
+owns its own setup, output image and fullscreen display pass. Both APIs expose these
+modules through the terminal menu, `--module`, `--all` and `--headless`. An unavailable
+ray-tracing feature is reported as `SKIPPED`; the existing Metal modules remain available.
+
+```sh
+demo_rhi_hello --module raytracing --backend vulkan
+demo_rhix_hello --headless --module ray_query --backend d3d12 --frames 3000
+```
+
+`IBottomLevelAccelerationStructure` and `ITopLevelAccelerationStructure` derive from
+`IAccelerationStructure`. Creation allocates fixed result storage; it does not build
+anything. A BLAS contains either triangle geometries (float3 positions, optional
+16/32-bit indices) or AABB geometries (float3 minimum followed by float3 maximum).
+A TLAS has a fixed instance count. Instance transforms are row-major 3x4 matrices.
+The instance custom index and hit-group offset are 24-bit values, and masks are 8-bit.
+
+`CmdBuildBottomLevelAccelerationStructure` and `CmdBuildTopLevelAccelerationStructure`
+record native Build or Update immediately, outside rendering scopes. Update requires
+`allow_update` at creation and an earlier submitted Build. Geometry type/count,
+primitive count, vertex format/stride, index format/topology, opacity and active versus
+inactive primitives must remain unchanged during Update. Positions, bounds, instance
+transforms/masks and BLAS references may change. To change fixed counts, create a new AS.
+No implicit resizing or CPU wait occurs. Calls accessing the same AS are externally
+synchronized; submit its modifying contexts in recording order before recording later
+uses in another context. CommandContext inserts build/read barriers automatically.
+
+Scratch storage is rented from Device-owned power-of-two pools. Build commands retain
+input buffers, scratch leases and exact BLAS references until GPU completion and final
+context release. TLAS owns its submitted BLAS dependencies; replacing these dependencies
+happens on submission, so abandoning a recording leaves the previous TLAS intact.
+Resources only point weakly to their Device. Destroy Device/Core after all children.
+
+Compaction is explicit: create with `allow_compaction`, Build, record
+`CmdQueryCompactedSize`, submit and wait for its token, then call `GetCompactedSize`.
+Copy the original description, set `compacted_size` to that result, create a new AS and
+record `CmdCompactAccelerationStructure(source, destination)`. The destination must
+use the same shape/counts/build flags as the source and sufficient queried capacity.
+Its physical identity stays fixed. A compact destination accepts compact copies and
+Update when enabled, but cannot receive an ordinary full Build. Rebuild TLAS references
+when replacing a BLAS with its compact copy. Changing the contents of a BLAS also
+requires rebuilding or updating every TLAS that uses it before tracing. `GetCompactedSize` never waits and is only
+valid after its query submission completes. Serialization is outside this implementation.
+
+Bind TLAS through `BINDING_ACCELERATION_STRUCTURE`, `BindResource(binding, tlas)` and
+`RHI_ACCELERATION_STRUCTURE(group, binding, name)` (or its `_ARRAY` variant). It uses the
+same captured-binding lifetime contract as other resources. RayTracingProgram captures
+original Shader sources and finalizes its native pipeline and shader binding table once.
+ProgramBase supplies the native global binding layout. Miss, hit-group and callable
+record indices follow their descriptor vectors; a hit group with an intersection shader
+is procedural. There are no local root parameters or user-defined SBT record data.
+`max_payload_size` and `max_attribute_size` set D3D12 pipeline configuration; Vulkan
+reflects shader payloads and checks the native hit-attribute limit. Bind with
+`CmdBindRayTracingProgram`, bind groups, then `CmdDispatchRays(width, height, depth)`.
+Slang uses SM 6.5 for ray pipelines and shaders with AS bindings, preserving SM 6.0 for
+existing shaders and the shared DX-compatible Vulkan layout.

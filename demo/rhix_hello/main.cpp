@@ -27,12 +27,12 @@ int main(int argc, char **argv) {
       continue;
     }
     if (arg == "--list") {
-      std::cout << "window\ntriangle\ncube\ntexture\nblend\nnbody\n";
+      std::cout << "window\ntriangle\ncube\ntexture\nblend\nnbody\nraytracing\nray_query\n";
       return 0;
     }
     if (arg == "--help") {
       std::cout
-          << "[--module window|triangle|cube|texture|blend|nbody | --tui | --all] [--backend auto|d3d12|vulkan|metal] [--headless] [--frames N]\nHeadless defaults to 3000 frames per scene; --all defaults to 300 frames with windows.\nNo module specified: open the terminal selection menu.\n";
+          << "[--module window|triangle|cube|texture|blend|nbody|raytracing|ray_query | --tui | --all] [--backend auto|d3d12|vulkan|metal] [--headless] [--frames N]\nHeadless defaults to 3000 frames per scene; --all defaults to 300 frames with windows.\nNo module specified: open the terminal selection menu.\n";
       return 0;
     }
     if (arg == "--module" && i + 1 < argc) {
@@ -97,6 +97,14 @@ int main(int argc, char **argv) {
       std::cerr << "nbody: FAILED\n";
       result = 1;
     }
+    if (RunRayTracing(api, frames, headless) != 0) {
+      std::cerr << "raytracing: FAILED\n";
+      result = 1;
+    }
+    if (RunRayQuery(api, frames, headless) != 0) {
+      std::cerr << "ray_query: FAILED\n";
+      result = 1;
+    }
     return result;
   }
   if (tui && !module.empty()) {
@@ -111,8 +119,10 @@ int main(int argc, char **argv) {
                  "  4. texture   Sampled XOR texture triangle\n"
                  "  5. blend     Source-alpha blended triangles\n"
                  "  6. nbody     Compute simulation and particle rendering (D3D12/Vulkan/Metal)\n";
+    std::cout << "  7. raytracing  Ray pipeline, triangles and procedural sphere (D3D12/Vulkan)\n"
+                 "  8. ray_query   Inline ray queries (D3D12/Vulkan)\n";
     for (;;) {
-      std::cout << "\nSelect module [1-6 or name], q to quit: " << std::flush;
+      std::cout << "\nSelect module [1-8 or name], q to quit: " << std::flush;
       std::string input;
       if (!std::getline(std::cin, input))
         return 0;
@@ -146,6 +156,14 @@ int main(int argc, char **argv) {
         module = "nbody";
         break;
       }
+      if (input == "7" || input == "raytracing") {
+        module = "raytracing";
+        break;
+      }
+      if (input == "8" || input == "ray_query") {
+        module = "ray_query";
+        break;
+      }
       std::cout << "Invalid selection. Enter a listed number or module name.\n";
     }
   }
@@ -161,6 +179,10 @@ int main(int argc, char **argv) {
     return RunBlend(api, frames, headless);
   if (module == "nbody")
     return RunNBody(api, frames, headless);
+  if (module == "raytracing")
+    return RunRayTracing(api, frames, headless);
+  if (module == "ray_query")
+    return RunRayQuery(api, frames, headless);
   std::cerr << "Unknown module: " << module << '\n';
   return 1;
 }

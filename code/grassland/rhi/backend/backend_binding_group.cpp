@@ -7,6 +7,7 @@
 #include "grassland/rhi/backend/backend_device.h"
 #include "grassland/rhi/backend/backend_image.h"
 #include "grassland/rhi/backend/backend_sampler.h"
+#include "grassland/rhi/rhi_acceleration_structure.h"
 
 namespace grassland::rhi::backend {
 std::vector<MappedBinding> MapBindings(const PipelineLayoutDesc &layout, BackendAPI api) {
@@ -37,7 +38,7 @@ std::vector<MappedBinding> MapBindings(const PipelineLayoutDesc &layout, Backend
 bool ValidateBindingLayout(const BindingLayoutDesc &layout) {
   std::set<uint32_t> bindings;
   for (auto b : layout.bindings) {
-    if (b.type < BINDING_UNIFORM_BUFFER || b.type > BINDING_SAMPLER || !b.count || !b.visibility ||
+    if (b.type < BINDING_UNIFORM_BUFFER || b.type > BINDING_ACCELERATION_STRUCTURE || !b.count || !b.visibility ||
         (b.visibility & ~SHADER_VISIBILITY_ALL) || !bindings.insert(b.binding).second)
       return false;
     if ((b.type == BINDING_STRUCTURED_BUFFER || b.type == BINDING_RW_STRUCTURED_BUFFER) && !b.stride)
@@ -225,6 +226,43 @@ bool BindingGroup::BindResource(uint32_t binding, const std::vector<ISampler *> 
   if (!next)
     return false;
   if (!next->Write(binding_index, first_element, samplers))
+    return false;
+  version_ = std::move(next);
+  return true;
+}
+
+bool BindingGroup::Version::Write(size_t binding_index,
+                                  uint32_t first_element,
+                                  const std::vector<ITopLevelAccelerationStructure *> &values) {
+  std::vector<ObjectPtr<IObject>> references;
+  references.reserve(values.size());
+  for (auto value : values)
+    references.push_back(ObjectPtr<IObject>::Retain(value));
+  if (!WriteDescriptors(binding_index, first_element, values))
+    return false;
+  for (size_t i = 0; i < values.size(); ++i)
+    references_[binding_index][first_element + i] = std::move(references[i]);
+  return true;
+}
+
+bool BindingGroup::Version::WriteDescriptors(size_t, uint32_t, const std::vector<ITopLevelAccelerationStructure *> &) {
+  return false;
+}
+
+bool BindingGroup::BindResource(uint32_t binding,
+                                const std::vector<ITopLevelAccelerationStructure *> &structures,
+                                uint32_t first_element) {
+  size_t binding_index;
+  auto desc = FindBinding(binding, first_element, structures.size(), binding_index);
+  if (!desc || desc->type != BINDING_ACCELERATION_STRUCTURE)
+    return false;
+  for (auto structure : structures)
+    if (!structure)
+      return false;
+  auto next = version_->IsUniquelyOwned() ? version_ : version_->Clone();
+  if (!next)
+    return false;
+  if (!next->Write(binding_index, first_element, structures))
     return false;
   version_ = std::move(next);
   return true;

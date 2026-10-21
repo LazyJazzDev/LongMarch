@@ -2,12 +2,14 @@
 
 #include <vk_mem_alloc.h>
 
+#include "grassland/rhi/backend/vulkan/vulkan_acceleration_structure.h"
 #include "grassland/rhi/backend/vulkan/vulkan_allocated_image.h"
 #include "grassland/rhi/backend/vulkan/vulkan_command_context.h"
 #include "grassland/rhi/backend/vulkan/vulkan_compute_program.h"
 #include "grassland/rhi/backend/vulkan/vulkan_core.h"
 #include "grassland/rhi/backend/vulkan/vulkan_program.h"
 #include "grassland/rhi/backend/vulkan/vulkan_queue.h"
+#include "grassland/rhi/backend/vulkan/vulkan_ray_tracing_program.h"
 #include "grassland/rhi/backend/vulkan/vulkan_sampler.h"
 #include "grassland/rhi/backend/vulkan/vulkan_window.h"
 
@@ -54,12 +56,14 @@ void VulkanDevice::RecycleCommandResources(VkCommandPool pool, VkCommandBuffer c
 
 VulkanDevice::VulkanDevice(grassland::rhi::PhysicalDevice info, Core *core)
     : Device(std::move(info), core),
-      upload_pool_(this) {
+      upload_pool_(this),
+      scratch_pool_(this) {
 }
 
 VulkanDevice::~VulkanDevice() {
   ShutdownQueues();
   upload_pool_.Clear();
+  scratch_pool_.Clear();
   render_targets_.reset();
   descriptor_pool_.reset();
   for (const auto &entry : command_pool_) {
@@ -144,6 +148,8 @@ VulkanDevice *VulkanDevice::CreateVulkanDevice(grassland::rhi::PhysicalDevice in
     return std::strcmp(name, VK_KHR_SWAPCHAIN_EXTENSION_NAME) == 0;
   });
   VmaAllocatorCreateInfo memory{};
+  if (enabled.RayTracingPipeline() || enabled.RayQuery())
+    memory.flags |= VMA_ALLOCATOR_CREATE_BUFFER_DEVICE_ADDRESS_BIT;
   memory.physicalDevice = physical_device;
   memory.device = device->device_;
   memory.instance = static_cast<VulkanCore *>(core)->Instance();
@@ -264,4 +270,28 @@ rhi::IQueue *VulkanDevice::GetQueue(QueueType type) {
   return new VulkanQueue(this, type);
 }
 
+}  // namespace grassland::rhi::backend::vulkan
+
+namespace grassland::rhi::backend::vulkan {
+VulkanScratchPool &VulkanDevice::ScratchPool() {
+  return scratch_pool_;
+}
+}  // namespace grassland::rhi::backend::vulkan
+
+namespace grassland::rhi::backend::vulkan {
+IBottomLevelAccelerationStructure *VulkanDevice::CreateBottomLevelAccelerationStructure(
+    const BottomLevelAccelerationStructureDesc &desc) {
+  return VulkanBottomLevelAccelerationStructure::Create(this, desc);
+}
+
+ITopLevelAccelerationStructure *VulkanDevice::CreateTopLevelAccelerationStructure(
+    const TopLevelAccelerationStructureDesc &desc) {
+  return VulkanTopLevelAccelerationStructure::Create(this, desc);
+}
+
+IRayTracingProgram *VulkanDevice::CreateRayTracingProgram(const RayTracingProgramDesc &desc) {
+  if (!SupportRayTracingPipeline())
+    return nullptr;
+  return new VulkanRayTracingProgram(this, desc);
+}
 }  // namespace grassland::rhi::backend::vulkan

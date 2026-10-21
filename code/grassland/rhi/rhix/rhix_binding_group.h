@@ -1,16 +1,12 @@
 ﻿#pragma once
 #include "grassland/rhi/rhi_binding_group.h"
+#include "grassland/rhi/rhix/rhix_acceleration_structure.h"
 #include "grassland/rhi/rhix/rhix_buffer.h"
 #include "grassland/rhi/rhix/rhix_image.h"
 #include "grassland/rhi/rhix/rhix_object_container.h"
 #include "grassland/rhi/rhix/rhix_sampler.h"
 
 namespace grassland::rhix {
-struct BufferView {
-  Buffer buffer;
-  uint64_t offset{}, size{};
-};
-
 class BindingGroup : public ObjectContainer {
  public:
   BindingGroup() noexcept;
@@ -18,6 +14,10 @@ class BindingGroup : public ObjectContainer {
   rhi::IBindingGroup *Get() const noexcept;
   const rhi::BindingLayoutDesc &GetLayout() const;
   bool BindResource(uint32_t binding, const Buffer &buffer);
+  bool BindResource(uint32_t binding, const TopLevelAccelerationStructure &structure);
+  bool BindResource(uint32_t binding,
+                    const std::vector<TopLevelAccelerationStructure> &structures,
+                    uint32_t first_element = 0);
   bool BindResource(uint32_t binding, const BufferView &buffer);
   bool BindResource(uint32_t binding, const Image &image);
   bool BindResource(uint32_t binding, const Sampler &sampler);

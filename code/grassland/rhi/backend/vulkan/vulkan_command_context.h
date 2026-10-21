@@ -8,11 +8,25 @@ namespace grassland::rhi::backend::vulkan {
 class VulkanImage;
 class VulkanBuffer;
 class VulkanProgram;
+class VulkanRayTracingProgram;
 class VulkanProgramBase;
 class VulkanWindow;
+class VulkanTopLevelAccelerationStructure;
 
 class VulkanCommandContext final : public CommandContext {
  public:
+  bool CmdBindRayTracingProgram(IRayTracingProgram *program) override;
+  bool CmdDispatchRays(uint32_t width, uint32_t height, uint32_t depth = 1) override;
+  bool CmdQueryCompactedSize(IAccelerationStructure *structure) override;
+  bool CmdCompactAccelerationStructure(IAccelerationStructure *source, IAccelerationStructure *destination) override;
+  bool CmdBuildBottomLevelAccelerationStructure(
+      IBottomLevelAccelerationStructure *destination,
+      const std::vector<AccelerationStructureGeometryBuffers> &geometries,
+      AccelerationStructureBuildMode mode = ACCELERATION_STRUCTURE_BUILD) override;
+  bool CmdBuildTopLevelAccelerationStructure(
+      ITopLevelAccelerationStructure *destination,
+      const std::vector<RayTracingInstance> &instances,
+      AccelerationStructureBuildMode mode = ACCELERATION_STRUCTURE_BUILD) override;
   ~VulkanCommandContext() override;
   static VulkanCommandContext *Create(VulkanDevice *device);
   bool CmdUploadBuffer(IBuffer *buffer, uint64_t offset, const void *data, uint64_t size) override;
@@ -54,7 +68,10 @@ class VulkanCommandContext final : public CommandContext {
   std::vector<VulkanBindingGroup::Version *> groups_;
   VulkanProgram *program_{};
   VulkanProgramBase *native_program_{};
+  std::unordered_map<VulkanTopLevelAccelerationStructure *, std::vector<ObjectPtr<IBottomLevelAccelerationStructure>>>
+      as_dependencies_;
   bool compute_active_{};
+  VulkanRayTracingProgram *ray_program_{};
   const PipelineLayoutDesc *binding_layout_{};
   VulkanImage *render_target_{};
   std::vector<VulkanBuffer *> vertex_buffers_;

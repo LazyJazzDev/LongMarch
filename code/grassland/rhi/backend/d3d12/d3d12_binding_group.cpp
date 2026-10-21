@@ -2,6 +2,7 @@
 
 #include <algorithm>
 
+#include "grassland/rhi/backend/d3d12/d3d12_acceleration_structure.h"
 #include "grassland/rhi/backend/d3d12/d3d12_allocated_image.h"
 #include "grassland/rhi/backend/d3d12/d3d12_buffer.h"
 #include "grassland/rhi/backend/d3d12/d3d12_device.h"
@@ -202,4 +203,28 @@ D3D12BindingGroup *D3D12BindingGroup::Create(D3D12Device *device, const BindingL
     return nullptr;
   return new D3D12BindingGroup(device, std::move(version));
 }
+
+bool D3D12BindingGroup::Version::WriteDescriptors(size_t binding_index,
+                                                  uint32_t first_element,
+                                                  const std::vector<ITopLevelAccelerationStructure *> &values) {
+  for (auto value : values) {
+    auto native = dynamic_cast<D3D12TopLevelAccelerationStructure *>(value);
+    if (!native || native->Owner() != device_)
+      return false;
+  }
+  auto device = static_cast<D3D12Device *>(device_)->NativeDevice();
+  for (size_t i = 0; i < values.size(); ++i) {
+    D3D12_SHADER_RESOURCE_VIEW_DESC desc{};
+    desc.ViewDimension = D3D12_SRV_DIMENSION_RAYTRACING_ACCELERATION_STRUCTURE;
+    desc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
+    desc.RaytracingAccelerationStructure.Location =
+        static_cast<D3D12TopLevelAccelerationStructure *>(values[i])->Address();
+    device->CreateShaderResourceView(nullptr, &desc,
+                                     resources_->CPU(offsets_[binding_index] + first_element + uint32_t(i)));
+  }
+  for (size_t i = 0; i < values.size(); ++i)
+    initialized_[binding_index][first_element + i] = true;
+  return true;
+}
+
 }  // namespace grassland::rhi::backend::d3d12

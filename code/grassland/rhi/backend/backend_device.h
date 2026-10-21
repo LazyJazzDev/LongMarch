@@ -6,7 +6,9 @@
 
 #include "grassland/rhi/backend/backend_submission_token.h"
 #include "grassland/rhi/backend/backend_util.h"
+#include "grassland/rhi/rhi_acceleration_structure.h"
 #include "grassland/rhi/rhi_device.h"
+#include "grassland/rhi/rhi_ray_tracing_program.h"
 
 namespace grassland::rhi::backend {
 
@@ -14,6 +16,11 @@ class CommandContext;
 
 class Device : public Object<rhi::IDevice> {
  public:
+  IBottomLevelAccelerationStructure *CreateBottomLevelAccelerationStructure(
+      const BottomLevelAccelerationStructureDesc &desc) override;
+  ITopLevelAccelerationStructure *CreateTopLevelAccelerationStructure(
+      const TopLevelAccelerationStructureDesc &desc) override;
+  IRayTracingProgram *CreateRayTracingProgram(const RayTracingProgramDesc &desc) override;
   Device(PhysicalDevice info, Core *core);
   ~Device() override;
   const PhysicalDevice &GetPhysicalDevice() const noexcept;

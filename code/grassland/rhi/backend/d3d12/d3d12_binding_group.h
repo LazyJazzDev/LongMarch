@@ -19,6 +19,9 @@ class D3D12BindingGroup final : public BindingGroup {
     D3D12DescriptorPool::Lease *SamplerDescriptors() const;
 
    private:
+    bool WriteDescriptors(size_t binding_index,
+                          uint32_t first_element,
+                          const std::vector<ITopLevelAccelerationStructure *> &values) override;
     Version(D3D12Device *device, const BindingLayoutDesc &layout);
     bool WriteDescriptors(size_t binding_index, uint32_t first_element, const std::vector<BufferView> &values) override;
     bool WriteDescriptors(size_t binding_index, uint32_t first_element, const std::vector<IImage *> &values) override;
