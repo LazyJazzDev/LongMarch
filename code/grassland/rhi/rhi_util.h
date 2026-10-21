@@ -159,4 +159,46 @@ typedef enum { INDEX_FORMAT_UINT16, INDEX_FORMAT_UINT32 } IndexFormat;
 
 std::string to_string(IndexFormat format);
 
+typedef enum {
+  BLEND_FACTOR_ZERO,
+  BLEND_FACTOR_ONE,
+  BLEND_FACTOR_SRC_COLOR,
+  BLEND_FACTOR_ONE_MINUS_SRC_COLOR,
+  BLEND_FACTOR_DST_COLOR,
+  BLEND_FACTOR_ONE_MINUS_DST_COLOR,
+  BLEND_FACTOR_SRC_ALPHA,
+  BLEND_FACTOR_ONE_MINUS_SRC_ALPHA,
+  BLEND_FACTOR_DST_ALPHA,
+  BLEND_FACTOR_ONE_MINUS_DST_ALPHA,
+} BlendFactor;
+
+typedef enum {
+  BLEND_OP_ADD,
+  BLEND_OP_SUBTRACT,
+  BLEND_OP_REVERSE_SUBTRACT,
+  BLEND_OP_MIN,
+  BLEND_OP_MAX,
+} BlendOp;
+
+struct BlendState {
+  bool blend_enable;
+  BlendFactor src_color, dst_color;
+  BlendOp color_op;
+  BlendFactor src_alpha, dst_alpha;
+  BlendOp alpha_op;
+
+  BlendState();
+  // Standard source-alpha blending, including source-over alpha accumulation.
+  BlendState(bool enabled);
+  BlendState(BlendFactor src_color,
+             BlendFactor dst_color,
+             BlendOp color_op,
+             BlendFactor src_alpha,
+             BlendFactor dst_alpha,
+             BlendOp alpha_op);
+};
+
+std::string to_string(BlendFactor value);
+std::string to_string(BlendOp value);
+
 }  // namespace grassland::rhi

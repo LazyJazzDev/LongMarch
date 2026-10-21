@@ -22,6 +22,8 @@ struct ProgramDesc {
   std::vector<VertexAttributeDesc> vertex_attributes;
   // Empty means no color attachments.
   std::vector<ImageFormat> color_formats{IMAGE_FORMAT_RGBA8_UNORM};
+  // Empty disables blending. Otherwise provide one state per color attachment.
+  std::vector<BlendState> blend_states;
   DepthStencilDesc depth_stencil;
   PipelineLayoutDesc pipeline_layout;
 };

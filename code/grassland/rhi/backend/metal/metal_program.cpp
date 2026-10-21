@@ -128,8 +128,18 @@ bool MetalProgram::Finalize() {
   auto descriptor = NS::TransferPtr(MTL::RenderPipelineDescriptor::alloc()->init());
   descriptor->setVertexFunction(functions[0].get());
   descriptor->setFragmentFunction(functions[1].get());
-  for (size_t i = 0; i < desc_.color_formats.size(); ++i)
-    descriptor->colorAttachments()->object(i)->setPixelFormat(NativeImageFormat(desc_.color_formats[i]));
+  for (size_t i = 0; i < desc_.color_formats.size(); ++i) {
+    auto attachment = descriptor->colorAttachments()->object(i);
+    attachment->setPixelFormat(NativeImageFormat(desc_.color_formats[i]));
+    const auto value = desc_.blend_states.empty() ? BlendState{} : desc_.blend_states[i];
+    attachment->setBlendingEnabled(value.blend_enable);
+    attachment->setSourceRGBBlendFactor(NativeBlendFactor(value.src_color));
+    attachment->setDestinationRGBBlendFactor(NativeBlendFactor(value.dst_color));
+    attachment->setRgbBlendOperation(NativeBlendOp(value.color_op));
+    attachment->setSourceAlphaBlendFactor(NativeBlendFactor(value.src_alpha, true));
+    attachment->setDestinationAlphaBlendFactor(NativeBlendFactor(value.dst_alpha, true));
+    attachment->setAlphaBlendOperation(NativeBlendOp(value.alpha_op));
+  }
   const auto &ds = desc_.depth_stencil;
   descriptor->setDepthAttachmentPixelFormat(NativeImageFormat(ds.format));
   if (HasStencil(ds.format))

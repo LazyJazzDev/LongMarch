@@ -115,10 +115,34 @@ bool VulkanProgram::Finalize() {
   raster.lineWidth = 1;
   VkPipelineMultisampleStateCreateInfo sample{VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO};
   sample.rasterizationSamples = VK_SAMPLE_COUNT_1_BIT;
-  VkPipelineColorBlendAttachmentState attachment{};
-  attachment.colorWriteMask = 0xf;
+  std::vector<VkPipelineColorBlendAttachmentState> blend_attachments;
+  for (size_t i = 0; i < desc_.color_formats.size(); ++i) {
+    const auto value = desc_.blend_states.empty() ? BlendState{} : desc_.blend_states[i];
+    VkPipelineColorBlendAttachmentState attachment{};
+    attachment.blendEnable = value.blend_enable;
+    attachment.srcColorBlendFactor = NativeBlendFactor(value.src_color);
+    attachment.dstColorBlendFactor = NativeBlendFactor(value.dst_color);
+    attachment.colorBlendOp = NativeBlendOp(value.color_op);
+    attachment.srcAlphaBlendFactor = NativeBlendFactor(value.src_alpha, true);
+    attachment.dstAlphaBlendFactor = NativeBlendFactor(value.dst_alpha, true);
+    attachment.alphaBlendOp = NativeBlendOp(value.alpha_op);
+    attachment.colorWriteMask = 0xf;
+    blend_attachments.push_back(attachment);
+  }
+  VkPhysicalDeviceFeatures features{};
+  vkGetPhysicalDeviceFeatures(owner->NativePhysicalDevice(), &features);
+  if (!features.independentBlend && !blend_attachments.empty()) {
+    const auto &first = blend_attachments.front();
+    for (const auto &value : blend_attachments)
+      if (value.blendEnable != first.blendEnable || value.srcColorBlendFactor != first.srcColorBlendFactor ||
+          value.dstColorBlendFactor != first.dstColorBlendFactor || value.colorBlendOp != first.colorBlendOp ||
+          value.srcAlphaBlendFactor != first.srcAlphaBlendFactor ||
+          value.dstAlphaBlendFactor != first.dstAlphaBlendFactor || value.alphaBlendOp != first.alphaBlendOp) {
+        ReportError(-1, "Independent color-attachment blending is unsupported.");
+        return false;
+      }
+  }
   VkPipelineColorBlendStateCreateInfo blend{VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO};
-  std::vector<VkPipelineColorBlendAttachmentState> blend_attachments(desc_.color_formats.size(), attachment);
   blend.attachmentCount = uint32_t(blend_attachments.size());
   blend.pAttachments = blend_attachments.data();
   const auto &ds = desc_.depth_stencil;

@@ -1,6 +1,6 @@
 # rhi_hello
 
-Four independent modules use `rhi::ObjPtr<IXXX>` pointer APIs. Each module creates its own Core, Device, Window and Queue; main only selects the module/backend and parses arguments.
+Five independent modules use `rhi::ObjPtr<IXXX>` pointer APIs. Each module creates its own Core, Device, Window and Queue; main only selects the module/backend and parses arguments.
 
 ```text
 demo_rhi_hello --list
@@ -15,8 +15,10 @@ The positional backend argument remains supported. Without `--module`, a line-ba
 
 - `hello_cube`: the rotating colored cube from `graphics_hello`, with a fixed uniform-buffer BindingGroup and a D32 depth attachment. The depth image follows the window extent. Uniform uploads take a CPU snapshot and are ordered with draws on the same queue.
 - `hello_texture`: the XOR texture triangle from `graphics_hello`, using a sampled image and linear sampler in a versioned BindingGroup.
+- `hello_blend`: the two overlapping triangles from `graphics_hello/blend`, first opaque and then alpha 0.5, over the same RGB (0.6, 0.7, 0.8) background. Renders directly to the RGBA8/BGRA8 target using two indexed draws; includes the same window controls and headless timing as other modules.
 
-All four modules and the depth/stencil, MRT and BindingGroup APIs are implemented on D3D12, Vulkan and Metal. Metal bindings require argument-buffer Tier 2 support. D24S8 uses native Depth32Float_Stencil8 on Metal, so depth precision differs from native 24-bit formats.
+All five modules and the depth/stencil, MRT and BindingGroup APIs are implemented on D3D12, Vulkan and Metal. Metal bindings require argument-buffer Tier 2 support. D24S8 uses native Depth32Float_Stencil8 on Metal, so depth precision differs from native 24-bit formats.
+
 
 ## Shader and Program contract
 
@@ -24,7 +26,7 @@ Shader stores original Slang source, entry point and stage; creation does not co
 
 `RHI_INPUT(location, type, name)` is expanded by a generated prefix into the C++ layout's Vulkan/Metal attribute locations or D3D12 input semantics. Source BOM is preserved by Shader and omitted only when concatenating the compilation input. C++ `PipelineLayoutDesc` and `BindingLayoutDesc` describe groups, binding numbers, resource types, fixed array capacities and shader visibility. Layouts are copied into Programs/Groups and remain fixed; group resources can be rebound. Generated `RHI_UNIFORM`, `RHI_STRUCTURED_BUFFER`, `RHI_RW_STRUCTURED_BUFFER`, `RHI_TEXTURE2D`, `RHI_RW_TEXTURE2D`, `RHI_SAMPLER` and corresponding `_ARRAY` macros use this layout. Resource macros take `(group,binding,type,name)`; sampler macros omit `type`. Arrays get their length from C++, not from reflection. Reflection checks used resources against the expected type, position, array count and stage; unused declarations may be eliminated.
 
-D3D12 assigns b/t/u/s registers in binding order within each group/space, and uses separate resource/sampler tables. Vulkan preserves group/binding as set/binding. Programs also describe up to eight RGBA8/BGRA8 color outputs and an optional D32 or D24S8 depth/stencil format, depth compare/write, front/back stencil operations, masks and reference. Triangle-list topology and float/float2/float3/float4 vertex attributes remain supported; culling/blending and runtime-sized descriptor arrays are outside this change.
+D3D12 assigns b/t/u/s registers in binding order within each group/space, and uses separate resource/sampler tables. Vulkan preserves group/binding as set/binding. Programs also describe up to eight RGBA8/BGRA8 color outputs and an optional D32 or D24S8 depth/stencil format, depth compare/write, front/back stencil operations, masks and reference. Triangle-list topology and float/float2/float3/float4 vertex attributes remain supported; culling and runtime-sized descriptor arrays are outside this change.
 
 ## Buffer and command lifetime
 
@@ -54,7 +56,7 @@ Vulkan groups own descriptor-set leases from pages of up to 64 sets, with fixed 
 
 ## Vulkan rendering-path regression
 
-With Vulkan SDK validation, API-dump and Profiles layers installed and a Vulkan 1.3+ GPU supporting dynamic rendering, run `python test/rhi/test_vulkan_rendering_paths.py <demo executable> [<second demo executable>]` from the repository root. With `--headless`, this runs all four modules; windowed mode runs the triangle. It checks native capabilities, a Vulkan 1.2 KHR profile, and a Vulkan 1.2 profile with dynamic rendering disabled. It verifies the actual native Begin/End commands and that dynamic rendering creates no RenderPass or Framebuffer objects. Profile simulation changes reported capabilities; it does not substitute for testing on older hardware.
+With Vulkan SDK validation, API-dump and Profiles layers installed and a Vulkan 1.3+ GPU supporting dynamic rendering, run `python test/rhi/test_vulkan_rendering_paths.py <demo executable> [<second demo executable>]` from the repository root. With `--headless`, this runs all five modules; windowed mode runs the triangle. It checks native capabilities, a Vulkan 1.2 KHR profile, and a Vulkan 1.2 profile with dynamic rendering disabled. It verifies the actual native Begin/End commands and that dynamic rendering creates no RenderPass or Framebuffer objects. Profile simulation changes reported capabilities; it does not substitute for testing on older hardware.
 
 
 Headless benchmarks (D3D12/Vulkan/Metal) render to independent 1280x720 RGBA8 images without creating a GLFW window, swapchain, or presenting. `hello_window` measures its clear pass; `hello_triangle` measures the same indexed triangle draw as the windowed scene. Each module independently creates its own Core, Device and resources.
@@ -64,12 +66,18 @@ demo_rhi_hello --headless --all --backend vulkan --frames 10000
 demo_rhi_hello --headless --module hello_triangle --backend d3d12 --frames 10000
 ```
 
-`--all` runs all four modules sequentially on the selected backend, continues after a failed module, and returns nonzero if any module fails. It cannot be combined with `--module` or `--tui`. Each scene prints its measured frame count, wall time and average FPS. Headless runs use 60 untimed warmup frames and at most 3 in-flight frames; target reuse and the final timing boundary wait for GPU completion. Setup, shader compilation, image initialization and initial uploads are outside the measurement. The cube's per-frame uniform update is included. This is end-to-end rendering throughput including CPU recording/submission and synchronization, not GPU timestamp duration. Use Release without validation layers for performance comparisons.
+`--all` runs all five modules sequentially on the selected backend, continues after a failed module, and returns nonzero if any module fails. It cannot be combined with `--module` or `--tui`. Each scene prints its measured frame count, wall time and average FPS. Headless runs use 60 untimed warmup frames and at most 3 in-flight frames; target reuse and the final timing boundary wait for GPU completion. Setup, shader compilation, image initialization and initial uploads are outside the measurement. The cube's per-frame uniform update is included. This is end-to-end rendering throughput including CPU recording/submission and synchronization, not GPU timestamp duration. Use Release without validation layers for performance comparisons.
 
-Without a positive `--frames`, headless runs measure 3000 frames per scene; windowed `--all` runs 300 frames per scene. Normal individual windowed demos remain interactive. `--all` selects scenes, not backends. Metal supports all four scenes in both windowed and headless mode.
+Without a positive `--frames`, headless runs measure 3000 frames per scene; windowed `--all` runs 300 frames per scene. Normal individual windowed demos remain interactive. `--all` selects scenes, not backends. Metal supports all five scenes in both windowed and headless mode.
 
 ## Regression tests
 
 Build `test_rhi` and run `ctest --test-dir cmake-build-debug/test/rhi --output-on-failure`. Set `LONGMARCH_RHI_WINDOW_TESTS=1` to include window tests, `VK_INSTANCE_LAYERS=VK_LAYER_KHRONOS_validation` and `VK_LAYER_VALIDATE_SYNC=1` for Vulkan validation. CTest runs each GoogleTest case in its own process. This also isolates the backends: on the tested Windows NVIDIA driver, globally enabling D3D12's debug layer and then destroying an acquired Vulkan window in the same process triggers an internal D3D12 destruction error, even without recording commands.
 
 Pixel regressions cover MRT plus depth rejection, depth-only stencil writes preserved into a color pass, fixed uniform ranges, texture/structured-buffer arrays, group changes across descriptor pages, release before submission, and storage image/buffer writes read in a subsequent scope. Buffer-view size queries also cover uniform/structured/raw arrays and mutation after capture. Metal tests can use `MTL_DEBUG_LAYER=1`; apply it only to Metal tests (`ctest -R '(/2$|RhiMetal)'`), separately from Vulkan tests. Pool tests cover contiguous ranges, wrap padding, out-of-order release, oversized pages, descriptor-set reuse and idle-page trimming.
+
+## Blending
+
+`ProgramDesc::blend_states` is empty by default (blending disabled), or contains exactly one `BlendState` per color attachment. `BlendState(true)` selects source-alpha RGB blending and source-over alpha accumulation, matching graphics_hello. The six-argument constructor configures independent RGB/alpha factors and operations. Supported factors are zero/one, source/destination color and alpha, and their inverses; operations are add, subtract, reverse subtract, min and max. Color factors in the alpha equation use their alpha component. States are captured at Program creation and finalized into the pipeline; differing attachment states require Vulkan independentBlend support. Metal mappings are implemented but this change was verified on Windows D3D12/Vulkan only.
+
+Run `--module hello_blend --backend d3d12` (or `vulkan`), or add `--headless --frames 100000` for offscreen throughput. Both `--list`, the interactive menu and `--all` include hello_blend. Each module owns its device/window/resource setup independently.
