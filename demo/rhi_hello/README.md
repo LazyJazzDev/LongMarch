@@ -1,23 +1,25 @@
 # rhi_hello
 
-Five independent modules use `rhi::ObjPtr<IXXX>` pointer APIs. Each module creates its own Core, Device, Window and Queue; main only selects the module/backend and parses arguments.
+Six independent modules use `rhi::ObjPtr<IXXX>` pointer APIs. Each module creates its own Core, Device, Window and Queue; main only selects the module/backend and parses arguments.
 
 ```text
 demo_rhi_hello --list
-demo_rhi_hello --module hello_window --backend vulkan
-demo_rhi_hello --module hello_triangle --backend d3d12 --frames 120
+demo_rhi_hello --module window --backend vulkan
+demo_rhi_hello --module triangle --backend d3d12 --frames 120
 ```
 
 The positional backend argument remains supported. Without `--module`, a line-based terminal menu opens (also available with `--tui`). Enter a module number or name; invalid input retries, and `q`, `quit`, or EOF exits without opening a window. `--tui` and `--module` are mutually exclusive; `--backend auto` uses the default backend. Specify `--module` for unattended runs; omit `--frames` to run until the window closes. P switches requested VSync mode, Escape exits, and the title displays `grassland::FPSCounter` statistics.
 
-- `hello_window`: original RGB (0.6, 0.7, 0.8) clear/presentation and supported presentation-combination output. D3D12, Vulkan and the existing Metal backend are supported.
-- `hello_triangle`: D3D12/Vulkan/Metal colored indexed triangle on that background. The module creates independent GPU-only vertex/index Buffers, uploads once through CommandContext, finalizes a Slang Program, then records bindings, viewport/scissor and DrawIndexed. Resize/minimize/restore and P-mode changes are supported.
+- `window`: original RGB (0.6, 0.7, 0.8) clear/presentation and supported presentation-combination output. D3D12, Vulkan and the existing Metal backend are supported.
+- `triangle`: D3D12/Vulkan/Metal colored indexed triangle on that background. The module creates independent GPU-only vertex/index Buffers, uploads once through CommandContext, finalizes a Slang Program, then records bindings, viewport/scissor and DrawIndexed. Resize/minimize/restore and P-mode changes are supported.
 
-- `hello_cube`: the rotating colored cube from `graphics_hello`, with a fixed uniform-buffer BindingGroup and a D32 depth attachment. The depth image follows the window extent. Uniform uploads take a CPU snapshot and are ordered with draws on the same queue.
-- `hello_texture`: the XOR texture triangle from `graphics_hello`, using a sampled image and linear sampler in a versioned BindingGroup.
-- `hello_blend`: the two overlapping triangles from `graphics_hello/blend`, first opaque and then alpha 0.5, over the same RGB (0.6, 0.7, 0.8) background. Renders directly to the RGBA8/BGRA8 target using two indexed draws; includes the same window controls and headless timing as other modules.
+- `cube`: the rotating colored cube from `graphics_hello`, with a fixed uniform-buffer BindingGroup and a D32 depth attachment. The depth image follows the window extent. Uniform uploads take a CPU snapshot and are ordered with draws on the same queue.
+- `texture`: the XOR texture triangle from `graphics_hello`, using a sampled image and linear sampler in a versioned BindingGroup.
+- `blend`: the two overlapping triangles from `graphics_hello/blend`, first opaque and then alpha 0.5, over the same RGB (0.6, 0.7, 0.8) background. Renders directly to the RGBA8/BGRA8 target using two indexed draws; includes the same window controls and headless timing as other modules.
 
-All five modules and the depth/stencil, MRT and BindingGroup APIs are implemented on D3D12, Vulkan and Metal. Metal bindings require argument-buffer Tier 2 support. D24S8 uses native Depth32Float_Stencil8 on Metal, so depth precision differs from native 24-bit formats.
+- `nbody`: shared-memory tiled compute simulation of 65,536 particles followed by additive particle drawing.
+
+All six modules and the depth/stencil, MRT and BindingGroup APIs are implemented on D3D12, Vulkan and Metal. Metal bindings require argument-buffer Tier 2 support. D24S8 uses native Depth32Float_Stencil8 on Metal, so depth precision differs from native 24-bit formats.
 
 
 ## Shader and Program contract
@@ -40,6 +42,19 @@ D3D12 leases RTV slots from Device-owned heap pages. Vulkan prefers dynamic rend
 
 Callers release child handles before parent Device/Core handles, and release old frame references/recordings before resize/rebuild boundaries. Device shutdown drains submitted work. Metal uses tracked private buffers/textures, shared upload leases and explicit render encoders. Bindings set outside a rendering scope are applied when the encoder begins; changes inside the scope are encoded immediately. Metal compiles Slang to DX-layout SPIR-V, validates the reflected layout, then translates through SPIRV-Cross to MSL at Finalize. This preserves compact structured-buffer layouts across backends.
 
+## Compute programs and nbody
+
+`nbody` is available on D3D12, Vulkan and Metal, through menu item 6, `--module nbody`, and `--all`. It follows `nbody_cs`: 65,536 particles, 128-thread shared-memory tiles, softened all-pairs gravity, velocity integration, position copy, and additive camera-facing particle quads. It uses ten initial galaxy clusters with seed 42, a fixed 0.03 simulation step, and the original gravity/radius/speed constants. There is no ImGui, HDR output or tone-mapping pass; particles render directly into SDR UNORM targets. Existing P/Escape/FPS/window handling and headless timing conventions apply. The nbody module creates all its own resources.
+
+```text
+demo_rhi_hello --module nbody --backend vulkan
+demo_rhi_hello --module nbody --backend d3d12 --headless --frames 300
+```
+
+Create a `SHADER_STAGE_COMPUTE` Shader, then `CreateComputeProgram(ComputeProgramDesc)` and `Finalize()`. The descriptor captures the shader and PipelineLayout; Finalize compiles Slang with the same RHI resource macros and validates binding type/count/visibility, structured-buffer stride and thread-group size. `SHADER_VISIBILITY_COMPUTE` is bit 4; `SHADER_VISIBILITY_ALL` includes vertex, fragment and compute. Dispatch arguments count workgroups, not threads.
+
+`CmdBindComputeProgram`, `CmdBindGroup`, then `CmdDispatch(x,y,z)` records native compute commands immediately. Graphics and compute share one active program selection and group-binding table: switching either Program requires rebinding groups. Compute binding/Dispatch must occur outside Begin/EndRendering. Group versions are retained at bind time; later BindResource does not change existing bindings. Barriers are inserted before each Dispatch, including repeated writes with no intervening rebind, and compute/copy/graphics transitions are automatic. Dispatch does not submit or wait on the CPU. D3D12 uses the existing transient descriptor heaps for both pipeline kinds; Vulkan uses compute descriptor visibility and bind points. Vulkan selects a queue family supporting both graphics and compute. The rhix package provides the corresponding ComputeProgram, creation and command wrappers; the nbody module itself uses the pointer API.
+
 ## Binding lifetime and descriptor pages
 
 `CreateBindingGroup(layout)` allocates binding slots without initializing them. `BindResource(binding, resource)` writes one slot; typed vectors write arrays, with an optional `first_element` for partial updates. Buffers, images, and sampler objects are retained. Create immutable samplers with CreateSampler(SamplerDesc), then bind the resulting object. Use `BufferView{buffer, offset, size}` for a byte subrange; size zero selects the remaining buffer. `BINDING_STRUCTURED_BUFFER` and `BINDING_RW_STRUCTURED_BUFFER` require an explicit byte `BindingDesc::stride`; Program Finalize checks it against Slang reflection for each used shader binding, including binding arrays. Other binding types ignore stride. `BINDING_BYTE_ADDRESS_BUFFER` and its RW variant use raw byte views and the `RHI_BYTE_ADDRESS_BUFFER(G,B,N)` / `RHI_RW_BYTE_ADDRESS_BUFFER(G,B,N)` macros (also available with `_ARRAY`). Vulkan compiles with `-fvk-use-dx-layout` and requires scalarBlockLayout, so D3D12 and Vulkan share DX buffer packing instead of backend-specific element padding. C++ upload structures must match shader field offsets and matrix ordering; stride equality alone does not validate every field. Binding failures leave the previous contents unchanged. All layout slots must be initialized before `CmdBindGroup`.
@@ -59,16 +74,16 @@ Vulkan groups own descriptor-set leases from pages of up to 64 sets, with fixed 
 With Vulkan SDK validation, API-dump and Profiles layers installed and a Vulkan 1.3+ GPU supporting dynamic rendering, run `python test/rhi/test_vulkan_rendering_paths.py <demo executable> [<second demo executable>]` from the repository root. With `--headless`, this runs all five modules; windowed mode runs the triangle. It checks native capabilities, a Vulkan 1.2 KHR profile, and a Vulkan 1.2 profile with dynamic rendering disabled. It verifies the actual native Begin/End commands and that dynamic rendering creates no RenderPass or Framebuffer objects. Profile simulation changes reported capabilities; it does not substitute for testing on older hardware.
 
 
-Headless benchmarks (D3D12/Vulkan/Metal) render to independent 1280x720 RGBA8 images without creating a GLFW window, swapchain, or presenting. `hello_window` measures its clear pass; `hello_triangle` measures the same indexed triangle draw as the windowed scene. Each module independently creates its own Core, Device and resources.
+Headless benchmarks (D3D12/Vulkan/Metal) render to independent 1280x720 RGBA8 images without creating a GLFW window, swapchain, or presenting. `window` measures its clear pass; `triangle` measures the same indexed triangle draw as the windowed scene. Each module independently creates its own Core, Device and resources.
 
 ```sh
 demo_rhi_hello --headless --all --backend vulkan --frames 10000
-demo_rhi_hello --headless --module hello_triangle --backend d3d12 --frames 10000
+demo_rhi_hello --headless --module triangle --backend d3d12 --frames 10000
 ```
 
-`--all` runs all five modules sequentially on the selected backend, continues after a failed module, and returns nonzero if any module fails. It cannot be combined with `--module` or `--tui`. Each scene prints its measured frame count, wall time and average FPS. Headless runs use 60 untimed warmup frames and at most 3 in-flight frames; target reuse and the final timing boundary wait for GPU completion. Setup, shader compilation, image initialization and initial uploads are outside the measurement. The cube's per-frame uniform update is included. This is end-to-end rendering throughput including CPU recording/submission and synchronization, not GPU timestamp duration. Use Release without validation layers for performance comparisons.
+`--all` runs all six modules sequentially on the selected backend, continues after a failed module, and returns nonzero if any module fails. It cannot be combined with `--module` or `--tui`. Each scene prints its measured frame count, wall time and average FPS. Headless runs use 60 untimed warmup frames and at most 3 in-flight frames; target reuse and the final timing boundary wait for GPU completion. Setup, shader compilation, image initialization and initial uploads are outside the measurement. The cube's per-frame uniform update is included. This is end-to-end rendering throughput including CPU recording/submission and synchronization, not GPU timestamp duration. Use Release without validation layers for performance comparisons.
 
-Without a positive `--frames`, headless runs measure 3000 frames per scene; windowed `--all` runs 300 frames per scene. Normal individual windowed demos remain interactive. `--all` selects scenes, not backends. Metal supports all five scenes in both windowed and headless mode.
+Without a positive `--frames`, headless runs measure 3000 frames per scene; windowed `--all` runs 300 frames per scene. Normal individual windowed demos remain interactive. `--all` selects scenes, not backends. Metal supports all six scenes in both windowed and headless mode.
 
 ## Regression tests
 
@@ -80,4 +95,10 @@ Pixel regressions cover MRT plus depth rejection, depth-only stencil writes pres
 
 `ProgramDesc::blend_states` is empty by default (blending disabled), or contains exactly one `BlendState` per color attachment. `BlendState(true)` selects source-alpha RGB blending and source-over alpha accumulation, matching graphics_hello. The six-argument constructor configures independent RGB/alpha factors and operations. Supported factors are zero/one, source/destination color and alpha, and their inverses; operations are add, subtract, reverse subtract, min and max. Color factors in the alpha equation use their alpha component. States are captured at Program creation and finalized into the pipeline; differing attachment states require Vulkan independentBlend support. Metal mappings are implemented but this change was verified on Windows D3D12/Vulkan only.
 
-Run `--module hello_blend --backend d3d12` (or `vulkan`), or add `--headless --frames 100000` for offscreen throughput. Both `--list`, the interactive menu and `--all` include hello_blend. Each module owns its device/window/resource setup independently.
+Run `--module blend --backend d3d12` (or `vulkan`), or add `--headless --frames 100000` for offscreen throughput. Both `--list`, the interactive menu and `--all` include blend. Each module owns its device/window/resource setup independently.
+
+Nbody reports FPS and estimated TFLOP/s in the window title and headless output. Following `nbody_cs`, each particle interaction counts as 20 FLOP: `FLOP/frame = 20 * 65536^2 = 85,899,345,920`, and `TFLOP/s = FLOP/frame * FPS / 1e12`. This is an algorithmic estimate using complete frame time (simulation, copy and rendering), not hardware instruction counts or isolated compute timing. Headless output also reports FLOP/frame.
+
+Backend layout ownership is shared by graphics and compute programs through D3D12ProgramBase (root signature and root-parameter mapping) and VulkanProgramBase (descriptor-set layouts and pipeline layout). These internal bases have no IObject identity or reference counting; concrete programs retain responsibility for shader compilation and pipeline creation.
+
+Metal graphics and compute programs share `MetalProgramBase` argument-buffer layout validation and Slang/SPIR-V-to-MSL compilation. Compute threadgroup dimensions come from Slang reflection and are checked against device/pipeline limits. Each Dispatch uses a separate serial compute encoder; tracked resource residency synchronizes dependent dispatches, copies and rendering, including indirect argument-buffer resources. Switching programs requires rebinding groups.

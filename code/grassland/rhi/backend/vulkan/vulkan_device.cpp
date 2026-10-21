@@ -4,6 +4,7 @@
 
 #include "grassland/rhi/backend/vulkan/vulkan_allocated_image.h"
 #include "grassland/rhi/backend/vulkan/vulkan_command_context.h"
+#include "grassland/rhi/backend/vulkan/vulkan_compute_program.h"
 #include "grassland/rhi/backend/vulkan/vulkan_core.h"
 #include "grassland/rhi/backend/vulkan/vulkan_program.h"
 #include "grassland/rhi/backend/vulkan/vulkan_queue.h"
@@ -98,7 +99,8 @@ VulkanDevice *VulkanDevice::CreateVulkanDevice(grassland::rhi::PhysicalDevice in
   for (uint32_t i = 0; i < count; ++i) {
     if (!families[i].queueCount)
       continue;
-    if (graphics_family == UINT32_MAX && (families[i].queueFlags & VK_QUEUE_GRAPHICS_BIT))
+    if (graphics_family == UINT32_MAX && ((families[i].queueFlags & (VK_QUEUE_GRAPHICS_BIT | VK_QUEUE_COMPUTE_BIT)) ==
+                                          (VK_QUEUE_GRAPHICS_BIT | VK_QUEUE_COMPUTE_BIT)))
       graphics_family = i;
     VkDeviceQueueCreateInfo queue{VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO};
     queue.queueFamilyIndex = i;
@@ -240,6 +242,10 @@ rhi::IImage *VulkanDevice::CreateImage(const ImageDesc &desc) {
 
 rhi::IBuffer *VulkanDevice::CreateBuffer(const BufferDesc &desc) {
   return VulkanAllocatedBuffer::Create(this, desc);
+}
+
+rhi::IComputeProgram *VulkanDevice::CreateComputeProgram(const ComputeProgramDesc &desc) {
+  return new VulkanComputeProgram(this, desc);
 }
 
 rhi::IProgram *VulkanDevice::CreateProgram(const ProgramDesc &desc) {

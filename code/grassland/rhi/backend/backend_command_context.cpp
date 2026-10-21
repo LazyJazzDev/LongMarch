@@ -4,6 +4,16 @@
 #include "grassland/rhi/rhi_program.h"
 
 namespace grassland::rhi::backend {
+bool CommandContext::CmdBindComputeProgram(IComputeProgram *) {
+  recording_failed_ = true;
+  return false;
+}
+
+bool CommandContext::CmdDispatch(uint32_t, uint32_t, uint32_t) {
+  recording_failed_ = true;
+  return false;
+}
+
 bool CommandContext::CmdBindGroup(uint32_t, IBindingGroup *) {
   recording_failed_ = true;
   return false;

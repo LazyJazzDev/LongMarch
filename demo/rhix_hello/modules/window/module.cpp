@@ -12,7 +12,7 @@
 #include "grassland/rhi/rhix/rhix.h"
 #include "grassland/util/fps_counter.h"
 
-int HelloWindow(grassland::rhi::BackendAPI api, int frames, bool headless) {
+int RunWindow(grassland::rhi::BackendAPI api, int frames, bool headless) {
   using namespace grassland::rhi;
   using namespace grassland::rhix;
   auto core = grassland::rhix::CreateCore(api);
@@ -158,9 +158,8 @@ int HelloWindow(grassland::rhi::BackendAPI api, int frames, bool headless) {
       }
     }
     const double seconds = std::chrono::duration<double>(std::chrono::steady_clock::now() - benchmark_start).count();
-    std::cout << fmt::format(
-        "hello_window: headless 1280x720, {} frames, {:.6f} s, {:.2f} FPS (3 in flight, 60 warmup)\n", rendered,
-        seconds, rendered / seconds);
+    std::cout << fmt::format("window: headless 1280x720, {} frames, {:.6f} s, {:.2f} FPS (3 in flight, 60 warmup)\n",
+                             rendered, seconds, rendered / seconds);
   }
   return 0;
 }

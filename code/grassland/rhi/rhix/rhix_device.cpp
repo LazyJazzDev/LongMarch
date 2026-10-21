@@ -70,6 +70,10 @@ Shader Device::CreateShader(const rhi::ShaderDesc &desc) const {
   return Get()->CreateShader(desc);
 }
 
+ComputeProgram Device::CreateComputeProgram(const rhi::ComputeProgramDesc &desc) const {
+  return Get()->CreateComputeProgram(desc);
+}
+
 Program Device::CreateProgram(const rhi::ProgramDesc &desc) const {
   return Get()->CreateProgram(desc);
 }

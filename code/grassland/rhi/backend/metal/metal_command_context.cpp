@@ -2,6 +2,7 @@
 
 #include <cstring>
 
+#include "grassland/rhi/backend/metal/metal_compute_program.h"
 #include "grassland/rhi/backend/metal/metal_program.h"
 #include "grassland/rhi/backend/metal/metal_swap_chain_image.h"
 #include "grassland/rhi/backend/metal/metal_window.h"
@@ -248,8 +249,8 @@ bool MetalCommandContext::CmdUploadImage(IImage *image, const void *data, uint64
 
 bool MetalCommandContext::CmdBindGroup(uint32_t index, IBindingGroup *group) {
   auto native = dynamic_cast<MetalBindingGroup *>(group);
-  if (sealed_ || !program_ || !native || native->Owner() != device_ || index >= groups_.size() ||
-      !SameBindingLayout(native->GetLayout(), program_->GetDesc().pipeline_layout.groups[index]) ||
+  if (sealed_ || !native_program_ || !native || native->Owner() != device_ || index >= groups_.size() ||
+      !SameBindingLayout(native->GetLayout(), native_program_->BindingLayout().groups[index]) ||
       !native->CurrentVersion()->IsComplete()) {
     recording_failed_ = true;
     return false;
@@ -260,6 +261,50 @@ bool MetalCommandContext::CmdBindGroup(uint32_t index, IBindingGroup *group) {
   groups_[index] = version;
   if (encoder_)
     version->Bind(encoder_.get(), index);
+  return true;
+}
+
+bool MetalCommandContext::CmdBindComputeProgram(IComputeProgram *program) {
+  auto native = dynamic_cast<MetalComputeProgram *>(program);
+  if (sealed_ || encoder_ || !native || native->Owner() != device_ || !native->IsFinalized()) {
+    recording_failed_ = true;
+    return false;
+  }
+  if (!RetainResource(native))
+    return false;
+  groups_.assign(native->BindingLayout().groups.size(), nullptr);
+  compute_program_ = native;
+  native_program_ = native;
+  program_ = nullptr;
+  return true;
+}
+
+bool MetalCommandContext::CmdDispatch(uint32_t x, uint32_t y, uint32_t z) {
+  if (sealed_ || encoder_ || !compute_program_ || recording_failed_) {
+    recording_failed_ = true;
+    return false;
+  }
+  for (size_t i = 0; i < groups_.size(); ++i)
+    if (!groups_[i] && !native_program_->BindingLayout().groups[i].bindings.empty()) {
+      recording_failed_ = true;
+      return false;
+    }
+  if (!x || !y || !z)
+    return true;
+  auto pool = NS::TransferPtr(NS::AutoreleasePool::alloc()->init());
+  auto encoder = commands_->computeCommandEncoder();
+  if (!encoder) {
+    recording_failed_ = true;
+    return false;
+  }
+  encoder->setComputePipelineState(compute_program_->NativePipeline());
+  for (uint32_t i = 0; i < groups_.size(); ++i)
+    if (groups_[i])
+      groups_[i]->Bind(encoder, i);
+  encoder->dispatchThreadgroups(MTL::Size::Make(x, y, z), compute_program_->ThreadGroupSize());
+  // Separate serial encoders plus tracked resource residency synchronize dependent
+  // dispatches, blits and rendering, including resources in argument buffers.
+  encoder->endEncoding();
   return true;
 }
 
@@ -284,6 +329,8 @@ bool MetalCommandContext::CmdBindProgram(IProgram *program) {
   groups_.assign(native->GetDesc().pipeline_layout.groups.size(), nullptr);
 
   program_ = native;
+  compute_program_ = nullptr;
+  native_program_ = native;
   if (encoder_)
     ApplyBindings();
   return true;

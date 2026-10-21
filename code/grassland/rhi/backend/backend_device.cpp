@@ -20,6 +20,11 @@ rhi::IBuffer *Device::CreateBuffer(const BufferDesc &) {
   return nullptr;
 }
 
+rhi::IComputeProgram *Device::CreateComputeProgram(const ComputeProgramDesc &) {
+  ReportError(-1, "Compute programs are not implemented for this backend.");
+  return nullptr;
+}
+
 rhi::IProgram *Device::CreateProgram(const ProgramDesc &) {
   ReportError(-1, "Graphics programs are not implemented for this backend.");
   return nullptr;

@@ -16,6 +16,7 @@ class MetalBindingGroup final : public BindingGroup {
     static Version *Create(MetalDevice *device, const BindingLayoutDesc &layout);
     ObjectPtr<BindingGroup::Version> Clone() const override;
     bool IsInitialized(size_t binding, uint32_t element) const override;
+    void Bind(MTL::ComputeCommandEncoder *encoder, uint32_t group) const;
     void Bind(MTL::RenderCommandEncoder *encoder, uint32_t group) const;
 
    private:

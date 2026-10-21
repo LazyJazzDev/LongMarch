@@ -27,12 +27,12 @@ int main(int argc, char **argv) {
       continue;
     }
     if (arg == "--list") {
-      std::cout << "hello_window\nhello_triangle\nhello_cube\nhello_texture\nhello_blend\n";
+      std::cout << "window\ntriangle\ncube\ntexture\nblend\nnbody\n";
       return 0;
     }
     if (arg == "--help") {
       std::cout
-          << "[--module hello_window|hello_triangle|hello_cube|hello_texture|hello_blend | --tui | --all] [--backend auto|d3d12|vulkan|metal] [--headless] [--frames N]\nHeadless defaults to 3000 frames per scene; --all defaults to 300 frames with windows.\nNo module specified: open the terminal selection menu.\n";
+          << "[--module window|triangle|cube|texture|blend|nbody | --tui | --all] [--backend auto|d3d12|vulkan|metal] [--headless] [--frames N]\nHeadless defaults to 3000 frames per scene; --all defaults to 300 frames with windows.\nNo module specified: open the terminal selection menu.\n";
       return 0;
     }
     if (arg == "--module" && i + 1 < argc) {
@@ -73,24 +73,28 @@ int main(int argc, char **argv) {
   }
   if (all) {
     int result = 0;
-    if (HelloWindow(api, frames, headless) != 0) {
-      std::cerr << "hello_window: FAILED\n";
+    if (RunWindow(api, frames, headless) != 0) {
+      std::cerr << "window: FAILED\n";
       result = 1;
     }
-    if (HelloTriangle(api, frames, headless) != 0) {
-      std::cerr << "hello_triangle: FAILED\n";
+    if (RunTriangle(api, frames, headless) != 0) {
+      std::cerr << "triangle: FAILED\n";
       result = 1;
     }
-    if (HelloCube(api, frames, headless) != 0) {
-      std::cerr << "hello_cube: FAILED\n";
+    if (RunCube(api, frames, headless) != 0) {
+      std::cerr << "cube: FAILED\n";
       result = 1;
     }
-    if (HelloTexture(api, frames, headless) != 0) {
-      std::cerr << "hello_texture: FAILED\n";
+    if (RunTexture(api, frames, headless) != 0) {
+      std::cerr << "texture: FAILED\n";
       result = 1;
     }
-    if (HelloBlend(api, frames, headless) != 0) {
-      std::cerr << "hello_blend: FAILED\n";
+    if (RunBlend(api, frames, headless) != 0) {
+      std::cerr << "blend: FAILED\n";
+      result = 1;
+    }
+    if (RunNBody(api, frames, headless) != 0) {
+      std::cerr << "nbody: FAILED\n";
       result = 1;
     }
     return result;
@@ -101,13 +105,14 @@ int main(int argc, char **argv) {
   }
   if (module.empty()) {
     std::cout << "\nModule Selection\n"
-                 "  1. hello_window    Clear and present a window\n"
-                 "  2. hello_triangle  Colored indexed triangle (D3D12/Vulkan/Metal)\n"
-                 "  3. hello_cube      Rotating cube with depth and uniform binding\n"
-                 "  4. hello_texture   Sampled XOR texture triangle\n"
-                 "  5. hello_blend     Source-alpha blended triangles\n";
+                 "  1. window    Clear and present a window\n"
+                 "  2. triangle  Colored indexed triangle (D3D12/Vulkan/Metal)\n"
+                 "  3. cube      Rotating cube with depth and uniform binding\n"
+                 "  4. texture   Sampled XOR texture triangle\n"
+                 "  5. blend     Source-alpha blended triangles\n"
+                 "  6. nbody     Compute simulation and particle rendering (D3D12/Vulkan/Metal)\n";
     for (;;) {
-      std::cout << "\nSelect module [1-5 or name], q to quit: " << std::flush;
+      std::cout << "\nSelect module [1-6 or name], q to quit: " << std::flush;
       std::string input;
       if (!std::getline(std::cin, input))
         return 0;
@@ -117,39 +122,45 @@ int main(int argc, char **argv) {
       input = input.substr(first, input.find_last_not_of(" \t\r") - first + 1);
       if (input == "q" || input == "quit")
         return 0;
-      if (input == "1" || input == "hello_window") {
-        module = "hello_window";
+      if (input == "1" || input == "window") {
+        module = "window";
         break;
       }
-      if (input == "2" || input == "hello_triangle") {
-        module = "hello_triangle";
+      if (input == "2" || input == "triangle") {
+        module = "triangle";
         break;
       }
-      if (input == "3" || input == "hello_cube") {
-        module = "hello_cube";
+      if (input == "3" || input == "cube") {
+        module = "cube";
         break;
       }
-      if (input == "4" || input == "hello_texture") {
-        module = "hello_texture";
+      if (input == "4" || input == "texture") {
+        module = "texture";
         break;
       }
-      if (input == "5" || input == "hello_blend") {
-        module = "hello_blend";
+      if (input == "5" || input == "blend") {
+        module = "blend";
+        break;
+      }
+      if (input == "6" || input == "nbody") {
+        module = "nbody";
         break;
       }
       std::cout << "Invalid selection. Enter a listed number or module name.\n";
     }
   }
-  if (module == "hello_window")
-    return HelloWindow(api, frames, headless);
-  if (module == "hello_triangle")
-    return HelloTriangle(api, frames, headless);
-  if (module == "hello_cube")
-    return HelloCube(api, frames, headless);
-  if (module == "hello_texture")
-    return HelloTexture(api, frames, headless);
-  if (module == "hello_blend")
-    return HelloBlend(api, frames, headless);
+  if (module == "window")
+    return RunWindow(api, frames, headless);
+  if (module == "triangle")
+    return RunTriangle(api, frames, headless);
+  if (module == "cube")
+    return RunCube(api, frames, headless);
+  if (module == "texture")
+    return RunTexture(api, frames, headless);
+  if (module == "blend")
+    return RunBlend(api, frames, headless);
+  if (module == "nbody")
+    return RunNBody(api, frames, headless);
   std::cerr << "Unknown module: " << module << '\n';
   return 1;
 }

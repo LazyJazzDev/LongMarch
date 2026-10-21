@@ -6,6 +6,8 @@ namespace grassland::rhi {
 class IImage;
 class IBuffer;
 struct BufferDesc;
+class IComputeProgram;
+struct ComputeProgramDesc;
 class IProgram;
 struct ProgramDesc;
 class IShader;
@@ -25,6 +27,7 @@ class IDevice : public IObject {
   virtual ISampler *CreateSampler(const SamplerDesc &desc = {}) = 0;
   virtual IBindingGroup *CreateBindingGroup(const BindingLayoutDesc &layout) = 0;
   virtual IBuffer *CreateBuffer(const BufferDesc &desc) = 0;
+  virtual IComputeProgram *CreateComputeProgram(const ComputeProgramDesc &desc) = 0;
   virtual IProgram *CreateProgram(const ProgramDesc &desc) = 0;
   virtual IShader *CreateShader(const ShaderDesc &desc) = 0;
   virtual IWindow *CreateGLFWWindow(const WindowDesc &desc = {}) = 0;

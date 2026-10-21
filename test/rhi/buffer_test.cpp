@@ -1,4 +1,4 @@
-#include <gtest/gtest.h>
+﻿#include <gtest/gtest.h>
 
 #include <array>
 #include <chrono>
@@ -19,13 +19,14 @@
 #if defined(LONGMARCH_D3D12_ENABLED) || defined(LONGMARCH_VULKAN_ENABLED) || defined(LONGMARCH_METAL_ENABLED)
 namespace grassland::rhi {
 namespace {
-void ReadBuffer(IDevice *device, IBuffer *buffer, BackendAPI api, std::array<uint32_t, 16> &output) {
+template <size_t N>
+void ReadBuffer(IDevice *device, IBuffer *buffer, BackendAPI api, std::array<uint32_t, N> &output) {
 #if defined(LONGMARCH_METAL_ENABLED)
   if (api == BACKEND_API_METAL) {
     using namespace backend::metal;
     auto pool = NS::TransferPtr(NS::AutoreleasePool::alloc()->init());
     auto owner = static_cast<MetalDevice *>(device);
-    auto readback = NS::TransferPtr(owner->NativeDevice()->newBuffer(256, MTL::ResourceStorageModeShared));
+    auto readback = NS::TransferPtr(owner->NativeDevice()->newBuffer(sizeof(output), MTL::ResourceStorageModeShared));
     ASSERT_TRUE(readback);
     std::lock_guard<std::mutex> lock(owner->QueueMutex());
     auto commands = NS::RetainPtr(owner->NativeQueue()->commandBuffer());
@@ -389,6 +390,167 @@ const BackendAPI backends[] = {
     BACKEND_API_METAL,
 #endif
 };
+TEST_P(RhiBuffer, ComputeDispatchDependenciesAndBindingSnapshots) {
+  ObjPtr<ICore> core = CreateCore(GetParam());
+  ASSERT_TRUE(core);
+  ObjPtr<IDevice> device = core->CreateDeviceByAutoSelection();
+  ASSERT_TRUE(device);
+  ObjPtr<IQueue> queue = device->GetQueue(QUEUE_TYPE_GRAPHICS);
+  ASSERT_TRUE(queue);
+  const std::string source = R"(
+    RHI_RW_STRUCTURED_BUFFER(0, 0, uint, values);
+    [numthreads(4, 1, 1)] void CSMain(uint3 id : SV_DispatchThreadID) {
+      values[id.x] = values[id.x] * 2 + 1;
+    }
+  )";
+  ObjPtr<IShader> shader = device->CreateShader({source, "CSMain", SHADER_STAGE_COMPUTE});
+  ASSERT_TRUE(shader);
+  ComputeProgramDesc desc;
+  desc.compute_shader = shader.Get();
+  desc.pipeline_layout.groups = {{{{0, BINDING_RW_STRUCTURED_BUFFER, 1, SHADER_VISIBILITY_COMPUTE, 4}}}};
+  ObjPtr<IComputeProgram> program = device->CreateComputeProgram(desc);
+  ASSERT_TRUE(program);
+  shader.Release();
+  ASSERT_TRUE(program->Finalize());
+  EXPECT_TRUE(program->Finalize());
+  ObjPtr<IBuffer> first = device->CreateBuffer({64});
+  ObjPtr<IBuffer> second = device->CreateBuffer({64});
+  ObjPtr<IBuffer> output = device->CreateBuffer({64});
+  ASSERT_TRUE(first);
+  ASSERT_TRUE(second);
+  ASSERT_TRUE(output);
+  ObjPtr<IBindingGroup> group = device->CreateBindingGroup(desc.pipeline_layout.groups[0]);
+  ASSERT_TRUE(group);
+  ASSERT_TRUE(group->BindResource(0, first.Get()));
+  std::array<uint32_t, 16> input{};
+  for (uint32_t i = 0; i < 16; ++i)
+    input[i] = i;
+  ObjPtr<ICommandContext> ctx = device->CreateCommandContext();
+  ASSERT_TRUE(ctx);
+  ASSERT_TRUE(ctx->CmdUploadBuffer(first.Get(), 0, input.data(), sizeof(input)));
+  ASSERT_TRUE(ctx->CmdUploadBuffer(second.Get(), 0, input.data(), sizeof(input)));
+  ASSERT_TRUE(ctx->CmdBindComputeProgram(program.Get()));
+  ASSERT_TRUE(ctx->CmdBindGroup(0, group.Get()));
+  // The captured first version must remain bound even if the frontend group changes.
+  ASSERT_TRUE(group->BindResource(0, second.Get()));
+  ASSERT_TRUE(ctx->CmdDispatch(4));
+  ASSERT_TRUE(ctx->CmdDispatch(4));
+  ASSERT_TRUE(ctx->CmdCopyBuffer(first.Get(), 0, output.Get(), 0, 64));
+  ASSERT_TRUE(ctx->CmdBindGroup(0, group.Get()));
+  ASSERT_TRUE(ctx->CmdDispatch(4));
+  first.Release();
+  group.Release();
+  program.Release();
+  ObjPtr<ISubmissionToken> token = queue->Submit(ctx.Get());
+  ASSERT_TRUE(token);
+  ASSERT_TRUE(token->WaitHost());
+  std::array<uint32_t, 16> actual{};
+  ReadBuffer(device.Get(), output.Get(), GetParam(), actual);
+  for (uint32_t i = 0; i < 16; ++i)
+    EXPECT_EQ(actual[i], i * 4 + 3);
+  ReadBuffer(device.Get(), second.Get(), GetParam(), actual);
+  for (uint32_t i = 0; i < 16; ++i)
+    EXPECT_EQ(actual[i], i * 2 + 1);
+  // A new context sees the completed writes in the same physical buffer.
+  shader = device->CreateShader({source, "CSMain", SHADER_STAGE_COMPUTE});
+  ASSERT_TRUE(shader);
+  program = device->CreateComputeProgram({shader.Get(), desc.pipeline_layout});
+  ASSERT_TRUE(program);
+  ASSERT_TRUE(program->Finalize());
+  group = device->CreateBindingGroup(desc.pipeline_layout.groups[0]);
+  ASSERT_TRUE(group);
+  ASSERT_TRUE(group->BindResource(0, second.Get()));
+  ctx = device->CreateCommandContext();
+  ASSERT_TRUE(ctx);
+  ASSERT_TRUE(ctx->CmdBindComputeProgram(program.Get()));
+  ASSERT_TRUE(ctx->CmdBindGroup(0, group.Get()));
+  ASSERT_TRUE(ctx->CmdDispatch(4));
+  token = queue->Submit(ctx.Get());
+  ASSERT_TRUE(token);
+  ASSERT_TRUE(token->WaitHost());
+  ReadBuffer(device.Get(), second.Get(), GetParam(), actual);
+  for (uint32_t i = 0; i < 16; ++i)
+    EXPECT_EQ(actual[i], i * 4 + 3);
+}
+
+TEST_P(RhiBuffer, ComputeDispatchUsesReflectedThreeDimensionalThreadgroups) {
+  ObjPtr<ICore> core = CreateCore(GetParam());
+  ASSERT_TRUE(core);
+  ObjPtr<IDevice> device = core->CreateDeviceByAutoSelection();
+  ASSERT_TRUE(device);
+  ObjPtr<IQueue> queue = device->GetQueue(QUEUE_TYPE_GRAPHICS);
+  ASSERT_TRUE(queue);
+  ObjPtr<IShader> shader = device->CreateShader({R"(
+    RHI_RW_STRUCTURED_BUFFER(0, 0, uint, values);
+    [numthreads(2, 3, 2)] void CSMain(uint3 id : SV_DispatchThreadID) {
+      uint index = id.x + 4 * (id.y + 6 * id.z);
+      values[index] += index + 1;
+    }
+  )",
+                                                 "CSMain", SHADER_STAGE_COMPUTE});
+  ComputeProgramDesc desc;
+  desc.compute_shader = shader.Get();
+  desc.pipeline_layout.groups = {{{{0, BINDING_RW_STRUCTURED_BUFFER, 1, SHADER_VISIBILITY_COMPUTE, 4}}}};
+  ObjPtr<IComputeProgram> program = device->CreateComputeProgram(desc);
+  ASSERT_TRUE(program);
+  ASSERT_TRUE(program->Finalize());
+  std::array<uint32_t, 96> values{};
+  ObjPtr<IBuffer> buffer = device->CreateBuffer({sizeof(values)});
+  ASSERT_TRUE(buffer);
+  ObjPtr<IBindingGroup> group = device->CreateBindingGroup(desc.pipeline_layout.groups[0]);
+  ASSERT_TRUE(group);
+  ASSERT_TRUE(group->BindResource(0, buffer.Get()));
+  ObjPtr<ICommandContext> commands = device->CreateCommandContext();
+  ASSERT_TRUE(commands);
+  ASSERT_TRUE(commands->CmdUploadBuffer(buffer.Get(), 0, values.data(), sizeof(values)));
+  ASSERT_TRUE(commands->CmdBindComputeProgram(program.Get()));
+  ASSERT_TRUE(commands->CmdBindGroup(0, group.Get()));
+  ASSERT_TRUE(commands->CmdDispatch(2, 2, 2));
+  ASSERT_TRUE(commands->CmdDispatch(0, 2, 2));
+  ASSERT_TRUE(commands->CmdDispatch(2, 0, 2));
+  ASSERT_TRUE(commands->CmdDispatch(2, 2, 0));
+  ObjPtr<ISubmissionToken> token = queue->Submit(commands.Get());
+  ASSERT_TRUE(token);
+  ASSERT_TRUE(token->WaitHost());
+  ReadBuffer(device.Get(), buffer.Get(), GetParam(), values);
+  for (size_t i = 0; i < values.size(); ++i)
+    EXPECT_EQ(values[i], i + 1);
+}
+
+TEST_P(RhiBuffer, ComputeFinalizeRejectsWrongStageVisibilityAndStride) {
+  ObjPtr<ICore> core = CreateCore(GetParam());
+  ASSERT_TRUE(core);
+  ObjPtr<IDevice> device = core->CreateDeviceByAutoSelection();
+  ASSERT_TRUE(device);
+  ObjPtr<IShader> shader = device->CreateShader({R"(
+    RHI_RW_STRUCTURED_BUFFER(0, 0, float3, values);
+    [numthreads(1, 1, 1)] void CSMain() { values[0] = float3(1, 2, 3); }
+  )",
+                                                 "CSMain", SHADER_STAGE_COMPUTE});
+  ASSERT_TRUE(shader);
+  ComputeProgramDesc desc;
+  desc.compute_shader = shader.Get();
+  desc.pipeline_layout.groups = {{{{0, BINDING_RW_STRUCTURED_BUFFER, 1, SHADER_VISIBILITY_VERTEX, 12}}}};
+  ObjPtr<IComputeProgram> program = device->CreateComputeProgram(desc);
+  ASSERT_TRUE(program);
+  EXPECT_FALSE(program->Finalize());
+  desc.pipeline_layout.groups[0].bindings[0].visibility = SHADER_VISIBILITY_COMPUTE;
+  desc.pipeline_layout.groups[0].bindings[0].stride = 16;
+  program = device->CreateComputeProgram(desc);
+  ASSERT_TRUE(program);
+  EXPECT_FALSE(program->Finalize());
+  desc.pipeline_layout.groups[0].bindings[0].stride = 12;
+  program = device->CreateComputeProgram(desc);
+  ASSERT_TRUE(program);
+  EXPECT_TRUE(program->Finalize());
+  ObjPtr<IShader> vertex =
+      device->CreateShader({"float4 VSMain():SV_Position { return 0; }", "VSMain", SHADER_STAGE_VERTEX});
+  desc.compute_shader = vertex.Get();
+  program = device->CreateComputeProgram(desc);
+  ASSERT_TRUE(program);
+  EXPECT_FALSE(program->Finalize());
+}
+
 INSTANTIATE_TEST_SUITE_P(Backends, RhiBuffer, testing::ValuesIn(backends));
 }  // namespace
 }  // namespace grassland::rhi

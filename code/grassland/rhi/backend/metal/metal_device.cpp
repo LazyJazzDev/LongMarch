@@ -4,6 +4,7 @@
 #include "grassland/rhi/backend/metal/metal_allocated_image.h"
 #include "grassland/rhi/backend/metal/metal_binding_group.h"
 #include "grassland/rhi/backend/metal/metal_command_context.h"
+#include "grassland/rhi/backend/metal/metal_compute_program.h"
 #include "grassland/rhi/backend/metal/metal_program.h"
 #include "grassland/rhi/backend/metal/metal_queue.h"
 #include "grassland/rhi/backend/metal/metal_sampler.h"
@@ -75,6 +76,10 @@ rhi::IBuffer *MetalDevice::CreateBuffer(const BufferDesc &desc) {
 
 rhi::IImage *MetalDevice::CreateImage(const ImageDesc &desc) {
   return MetalAllocatedImage::Create(this, desc);
+}
+
+IComputeProgram *MetalDevice::CreateComputeProgram(const ComputeProgramDesc &desc) {
+  return new MetalComputeProgram(this, desc);
 }
 
 rhi::IProgram *MetalDevice::CreateProgram(const ProgramDesc &desc) {

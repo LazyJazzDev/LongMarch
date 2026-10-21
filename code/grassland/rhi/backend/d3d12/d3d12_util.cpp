@@ -1,5 +1,7 @@
 ﻿#include "grassland/rhi/backend/d3d12/d3d12_util.h"
 
+#include "grassland/rhi/backend/backend_binding_group.h"
+
 namespace grassland::rhi::backend::d3d12 {
 D3D12_BLEND NativeBlendFactor(BlendFactor factor, bool alpha) {
   // Alpha equations use the alpha component of color factors as well.

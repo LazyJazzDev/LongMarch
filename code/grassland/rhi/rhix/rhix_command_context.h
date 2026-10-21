@@ -4,6 +4,7 @@
 #include "grassland/rhi/rhi.h"
 #include "grassland/rhi/rhix/rhix_binding_group.h"
 #include "grassland/rhi/rhix/rhix_buffer.h"
+#include "grassland/rhi/rhix/rhix_compute_program.h"
 #include "grassland/rhi/rhix/rhix_image.h"
 #include "grassland/rhi/rhix/rhix_object_container.h"
 #include "grassland/rhi/rhix/rhix_program.h"
@@ -41,6 +42,8 @@ class CommandContext : public ObjectContainer {
                      uint64_t size);
   bool CmdBindGroup(uint32_t index, const BindingGroup &group);
   bool CmdUploadImage(const Image &image, const void *data, uint64_t row_pitch);
+  bool CmdBindComputeProgram(const ComputeProgram &program);
+  bool CmdDispatch(uint32_t x, uint32_t y = 1, uint32_t z = 1);
   bool CmdBindProgram(const Program &program);
   bool CmdBeginRendering(const Image &image,
                          rhi::AttachmentLoadOp load_op = rhi::ATTACHMENT_LOAD_OP_LOAD,

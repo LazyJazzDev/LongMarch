@@ -4,7 +4,6 @@
 
 #include <array>
 #include <chrono>
-#include <glm/gtc/matrix_transform.hpp>
 #include <iostream>
 #include <map>
 #include <string>
@@ -24,7 +23,7 @@ struct Vertex {
 };
 }  // namespace
 
-int HelloCube(grassland::rhi::BackendAPI api, int frames, bool headless) {
+int RunTriangle(grassland::rhi::BackendAPI api, int frames, bool headless) {
   using namespace grassland::rhi;
   using namespace grassland::rhix;
 
@@ -36,7 +35,7 @@ int HelloCube(grassland::rhi::BackendAPI api, int frames, bool headless) {
     return 1;
   grassland::rhix::Window window;
   if (!headless) {
-    window = device.CreateGLFWWindow({1280, 720, "RHIX hello_cube - P: toggle VSync"});
+    window = device.CreateGLFWWindow({1280, 720, "RHIX triangle - P: toggle VSync"});
     if (!window)
       return 1;
   }
@@ -52,7 +51,7 @@ int HelloCube(grassland::rhi::BackendAPI api, int frames, bool headless) {
         return 1;
     }
   }
-  const auto &embedded = shader_list.at("modules/hello_cube/shaders/cube.slang");
+  const auto &embedded = shader_list.at("modules/triangle/shaders/triangle.slang");
   std::string source(embedded.first, embedded.second);
   grassland::rhix::Shader vertex_shader = device.CreateShader({source, "VSMain", SHADER_STAGE_VERTEX});
   if (!vertex_shader)
@@ -75,35 +74,19 @@ int HelloCube(grassland::rhi::BackendAPI api, int frames, bool headless) {
       return 1;
     desc.color_formats = {image.GetDesc().format};
   }
-  desc.pipeline_layout.groups = {{{{0, BINDING_UNIFORM_BUFFER, 1, SHADER_VISIBILITY_VERTEX}}}};
-  desc.depth_stencil.format = IMAGE_FORMAT_D32_FLOAT;
-  desc.depth_stencil.depth_test = true;
-  desc.depth_stencil.depth_write = true;
   grassland::rhix::Program program = device.CreateProgram(desc);
   if (!program)
     return 1;
   if (!program.Finalize())
     return 1;
-  const Vertex vertices[] = {{{-1, -1, 1}, {0, 0, 0}}, {{1, -1, 1}, {1, 0, 0}},   {{-1, 1, 1}, {0, 1, 0}},
-                             {{1, 1, 1}, {1, 1, 0}},   {{-1, -1, -1}, {0, 0, 1}}, {{1, -1, -1}, {1, 0, 1}},
-                             {{-1, 1, -1}, {0, 1, 1}}, {{1, 1, -1}, {1, 1, 1}}};
-  const uint32_t indices[] = {0, 1, 2, 2, 1, 3, 2, 3, 6, 6, 3, 7, 6, 7, 4, 4, 7, 5,
-                              4, 5, 0, 0, 5, 1, 1, 5, 3, 3, 5, 7, 0, 2, 4, 4, 2, 6};
+  const Vertex vertices[] = {{{0, 0.6f, 0}, {1, 0, 0}}, {{-0.6f, -0.6f, 0}, {0, 0, 1}}, {{0.6f, -0.6f, 0}, {0, 1, 0}}};
+  const uint32_t indices[] = {0, 1, 2};
   grassland::rhix::Buffer vertex_buffer = device.CreateBuffer({sizeof(vertices)});
   if (!vertex_buffer)
     return 1;
   grassland::rhix::Buffer index_buffer = device.CreateBuffer({sizeof(indices)});
   if (!index_buffer)
     return 1;
-  grassland::rhix::Buffer uniform = device.CreateBuffer({256});
-  if (!uniform)
-    return 1;
-  grassland::rhix::BindingGroup group = device.CreateBindingGroup(desc.pipeline_layout.groups[0]);
-  if (!group)
-    return 1;
-  if (!group.BindResource(0, uniform))
-    return 1;
-  grassland::rhix::Image depth;
   // Upload owns a snapshot and staging leases; later graphics work is ordered on the same native queue.
   {
     grassland::rhix::CommandContext upload = device.CreateCommandContext();
@@ -182,34 +165,9 @@ int HelloCube(grassland::rhi::BackendAPI api, int frames, bool headless) {
     grassland::rhix::CommandContext context = device.CreateCommandContext();
     if (!context)
       return 1;
-    // GPU copies and draws are ordered on the same queue; the upload takes a CPU snapshot.
-    const float angle =
-        headless ? float(rendered + 60) * .01f
-                 : float(std::chrono::duration<double>(std::chrono::steady_clock::now() - benchmark_start).count());
-
-    struct Uniform {
-      glm::mat4 model, view, projection;
-    } ubo;
-
-    ubo.model = glm::rotate(glm::mat4(1), angle, glm::vec3(0, 1, 0));
-    ubo.view = glm::lookAt(glm::vec3(0, 0, 5), glm::vec3(0), glm::vec3(0, 1, 0));
-    ubo.projection = glm::perspectiveZO(glm::radians(45.0f), float(extent.width) / extent.height, 3.5f, 6.5f);
-    if (!context.CmdUploadBuffer(uniform, 0, &ubo, sizeof(ubo)))
-      return 1;
-    if (!depth || depth.GetDesc().width != extent.width || depth.GetDesc().height != extent.height) {
-      depth = device.CreateImage({extent.width, extent.height, IMAGE_FORMAT_D32_FLOAT});
-      if (!depth)
-        return 1;
-    }
     if (!context.CmdBindProgram(program))
       return 1;
-    if (!context.CmdBindGroup(0, group))
-      return 1;
-    grassland::rhix::RenderingInfo render;
-    render.colors = {{image, ATTACHMENT_LOAD_OP_CLEAR, ATTACHMENT_STORE_OP_STORE, {.6f, .7f, .8f, 1}}};
-    render.depth_stencil = depth;
-    render.depth_stencil_ops.depth_load_op = ATTACHMENT_LOAD_OP_CLEAR;
-    if (!context.CmdBeginRendering(render))
+    if (!context.CmdBeginRendering(image, ATTACHMENT_LOAD_OP_CLEAR, ATTACHMENT_STORE_OP_STORE, {0.6f, 0.7f, 0.8f, 1}))
       return 1;
     if (!context.CmdBindVertexBuffer(0, vertex_buffer))
       return 1;
@@ -219,7 +177,7 @@ int HelloCube(grassland::rhi::BackendAPI api, int frames, bool headless) {
       return 1;
     if (!context.CmdSetScissor({0, 0, extent.width, extent.height}))
       return 1;
-    if (!context.CmdDrawIndexed(36))
+    if (!context.CmdDrawIndexed(3))
       return 1;
     if (!context.CmdEndRendering())
       return 1;
@@ -236,7 +194,7 @@ int HelloCube(grassland::rhi::BackendAPI api, int frames, bool headless) {
     fps.TickFrame();
     auto now = std::chrono::steady_clock::now();
     if (!headless && now - title_time >= std::chrono::milliseconds(250)) {
-      if (!window.SetTitle(fmt::format("RHIX hello_cube - FPS: {:.1f} - P: toggle VSync", fps.GetFPS())))
+      if (!window.SetTitle(fmt::format("RHIX triangle - FPS: {:.1f} - P: toggle VSync", fps.GetFPS())))
         return 1;
       title_time = now;
     }
@@ -249,9 +207,8 @@ int HelloCube(grassland::rhi::BackendAPI api, int frames, bool headless) {
       }
     }
     const double seconds = std::chrono::duration<double>(std::chrono::steady_clock::now() - benchmark_start).count();
-    std::cout << fmt::format(
-        "hello_cube: headless 1280x720, {} frames, {:.6f} s, {:.2f} FPS (3 in flight, 60 warmup)\n", rendered, seconds,
-        rendered / seconds);
+    std::cout << fmt::format("triangle: headless 1280x720, {} frames, {:.6f} s, {:.2f} FPS (3 in flight, 60 warmup)\n",
+                             rendered, seconds, rendered / seconds);
   }
   return 0;
 }

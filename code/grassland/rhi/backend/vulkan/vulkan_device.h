@@ -22,6 +22,7 @@ class VulkanDevice final : public Device {
   IBindingGroup *CreateBindingGroup(const BindingLayoutDesc &layout) override;
   PFN_vkCmdBeginRendering BeginRenderingCommand() const;
   PFN_vkCmdEndRendering EndRenderingCommand() const;
+  rhi::IComputeProgram *CreateComputeProgram(const ComputeProgramDesc &desc) override;
   rhi::IProgram *CreateProgram(const ProgramDesc &desc) override;
   VmaAllocator Allocator() const;
   VkPhysicalDevice NativePhysicalDevice() const;

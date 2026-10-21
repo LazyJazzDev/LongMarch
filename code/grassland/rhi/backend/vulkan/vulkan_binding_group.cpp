@@ -18,6 +18,8 @@ VkDescriptorSetLayout CreateBindingLayout(VkDevice device, const BindingLayoutDe
       stages |= VK_SHADER_STAGE_VERTEX_BIT;
     if (b.visibility & SHADER_VISIBILITY_FRAGMENT)
       stages |= VK_SHADER_STAGE_FRAGMENT_BIT;
+    if (b.visibility & SHADER_VISIBILITY_COMPUTE)
+      stages |= VK_SHADER_STAGE_COMPUTE_BIT;
     bindings.push_back({b.binding, NativeDescriptorType(b.type), b.count, stages, nullptr});
   }
   VkDescriptorSetLayoutCreateInfo create{VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO};
@@ -202,12 +204,12 @@ bool ValidatePipelineBindings(VkPhysicalDevice device, const PipelineLayoutDesc 
   const auto &limits = properties.limits;
   if (layout.groups.size() > limits.maxBoundDescriptorSets)
     return false;
-  uint64_t totals[5]{}, stages[2][5]{};
+  uint64_t totals[5]{}, stages[3][5]{};
   for (const auto &group : layout.groups)
     for (auto b : group.bindings) {
       auto kind = DescriptorTypeIndex(b.type);
       totals[kind] += b.count;
-      for (int i = 0; i < 2; ++i)
+      for (int i = 0; i < 3; ++i)
         if (b.visibility & (1 << i))
           stages[i][kind] += b.count;
     }
@@ -221,11 +223,11 @@ bool ValidatePipelineBindings(VkPhysicalDevice device, const PipelineLayoutDesc 
   for (int kind = 0; kind < 5; ++kind) {
     if (totals[kind] > set_limits[kind])
       return false;
-    for (int i = 0; i < 2; ++i)
+    for (int i = 0; i < 3; ++i)
       if (stages[i][kind] > stage_limits[kind])
         return false;
   }
-  for (int i = 0; i < 2; ++i)
+  for (int i = 0; i < 3; ++i)
     if (stages[i][0] + stages[i][1] + stages[i][2] + stages[i][3] > limits.maxPerStageResources)
       return false;
   VkPhysicalDeviceFeatures features{};

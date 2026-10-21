@@ -1,4 +1,4 @@
-#pragma once
+﻿#pragma once
 #include <vector>
 
 #include "grassland/rhi/backend/backend_command_context.h"
@@ -9,6 +9,7 @@ namespace grassland::rhi::backend::d3d12 {
 class D3D12Image;
 class D3D12Buffer;
 class D3D12Program;
+class D3D12ProgramBase;
 class D3D12Window;
 class D3D12SwapChainImage;
 
@@ -24,6 +25,8 @@ class D3D12CommandContext final : public CommandContext {
                      uint64_t size) override;
   bool CmdBindGroup(uint32_t index, IBindingGroup *group) override;
   bool CmdUploadImage(IImage *image, const void *data, uint64_t row_pitch) override;
+  bool CmdBindComputeProgram(IComputeProgram *program) override;
+  bool CmdDispatch(uint32_t x, uint32_t y = 1, uint32_t z = 1) override;
   bool CmdBindProgram(IProgram *program) override;
   bool CmdBeginRendering(const RenderingInfo &info) override;
   bool CmdEndRendering() override;
@@ -62,6 +65,9 @@ class D3D12CommandContext final : public CommandContext {
   std::array<uint32_t, 2> descriptor_used_{};
   bool tables_dirty_{};
   D3D12Program *program_{};
+  D3D12ProgramBase *native_program_{};
+  bool compute_active_{};
+  const PipelineLayoutDesc *binding_layout_{};
   bool rendering_active_{};
   std::vector<D3D12Buffer *> vertex_buffers_;
   D3D12Buffer *index_buffer_{};

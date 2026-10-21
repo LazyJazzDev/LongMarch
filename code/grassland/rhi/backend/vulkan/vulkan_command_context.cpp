@@ -4,6 +4,7 @@
 
 #include "grassland/rhi/backend/backend_glfw_helper.h"
 #include "grassland/rhi/backend/vulkan/vulkan_buffer.h"
+#include "grassland/rhi/backend/vulkan/vulkan_compute_program.h"
 #include "grassland/rhi/backend/vulkan/vulkan_program.h"
 #include "grassland/rhi/backend/vulkan/vulkan_swap_chain_image.h"
 #include "grassland/rhi/backend/vulkan/vulkan_window.h"
@@ -324,6 +325,56 @@ bool VulkanCommandContext::CmdCopyBuffer(IBuffer *source,
   return true;
 }
 
+bool VulkanCommandContext::CmdBindComputeProgram(IComputeProgram *program) {
+#if !defined(NDEBUG)
+  auto native = dynamic_cast<VulkanComputeProgram *>(program);
+  if (sealed_ || render_target_ || !native || native->Owner() != device_) {
+    recording_failed_ = true;
+    return false;
+  }
+#else
+  auto native = static_cast<VulkanComputeProgram *>(program);
+#endif
+  if (!native->IsFinalized()) {
+    recording_failed_ = true;
+    return false;
+  }
+  if (!RetainResource(native))
+    return false;
+  native_program_ = native;
+  compute_active_ = true;
+  program_ = nullptr;
+  binding_layout_ = &native->GetDesc().pipeline_layout;
+  groups_.assign(binding_layout_->groups.size(), {});
+  vkCmdBindPipeline(command_, VK_PIPELINE_BIND_POINT_COMPUTE, native->NativePipeline());
+  return true;
+}
+
+bool VulkanCommandContext::CmdDispatch(uint32_t x, uint32_t y, uint32_t z) {
+#if !defined(NDEBUG)
+  if (sealed_ || render_target_ || !compute_active_) {
+    recording_failed_ = true;
+    return false;
+  }
+  VkPhysicalDeviceProperties properties{};
+  vkGetPhysicalDeviceProperties(device_->NativePhysicalDevice(), &properties);
+  const auto limits = properties.limits.maxComputeWorkGroupCount;
+  if (x > limits[0] || y > limits[1] || z > limits[2]) {
+    recording_failed_ = true;
+    return false;
+  }
+#endif
+  if (recording_failed_)
+    return false;
+  if (!ValidateGroups())
+    return false;
+  for (uint32_t i = 0; i < groups_.size(); ++i)
+    if (groups_[i] && !BindGroupVersion(i, groups_[i]))
+      return false;
+  vkCmdDispatch(command_, x, y, z);
+  return true;
+}
+
 bool VulkanCommandContext::CmdBindProgram(IProgram *program) {
 #if !defined(NDEBUG)
   auto native = dynamic_cast<VulkanProgram *>(program);
@@ -344,6 +395,9 @@ bool VulkanCommandContext::CmdBindProgram(IProgram *program) {
   groups_.assign(native->GetDesc().pipeline_layout.groups.size(), nullptr);
 
   program_ = native;
+  native_program_ = native;
+  compute_active_ = false;
+  binding_layout_ = &native->GetDesc().pipeline_layout;
   vkCmdBindPipeline(command_, VK_PIPELINE_BIND_POINT_GRAPHICS, native->NativePipeline());
   return true;
 }
@@ -354,7 +408,7 @@ bool VulkanCommandContext::CmdBeginRendering(const RenderingInfo &info) {
     return false;
   }
   for (uint32_t i = 0; i < groups_.size(); ++i)
-    if (groups_[i] && !BindGroupVersion(i, groups_[i]))
+    if (program_ && groups_[i] && !BindGroupVersion(i, groups_[i]))
       return false;
   std::vector<VulkanImage *> images;
   std::vector<ImageFormat> formats;
@@ -605,6 +659,7 @@ bool VulkanCommandContext::CmdEndRendering() {
                          VK_ACCESS_MEMORY_READ_BIT | VK_ACCESS_MEMORY_WRITE_BIT))
       return false;
   }
+  rendering_ = {};
   return true;
 }
 
@@ -669,8 +724,8 @@ bool VulkanCommandContext::CmdUploadImage(IImage *image, const void *data, uint6
 
 bool VulkanCommandContext::CmdBindGroup(uint32_t index, IBindingGroup *group) {
   auto native = dynamic_cast<VulkanBindingGroup *>(group);
-  if (sealed_ || !program_ || !native || native->Owner() != device_ || index >= groups_.size() ||
-      !SameBindingLayout(native->GetLayout(), program_->GetDesc().pipeline_layout.groups[index]) ||
+  if (sealed_ || !binding_layout_ || !native || native->Owner() != device_ || index >= groups_.size() ||
+      !SameBindingLayout(native->GetLayout(), binding_layout_->groups[index]) ||
       !native->CurrentVersion()->IsComplete()) {
     recording_failed_ = true;
     return false;
@@ -678,10 +733,16 @@ bool VulkanCommandContext::CmdBindGroup(uint32_t index, IBindingGroup *group) {
   auto version = static_cast<VulkanBindingGroup::Version *>(native->CurrentVersion());
   if (!RetainResource(version))
     return false;
+  if (compute_active_) {
+    groups_[index] = version;
+    return true;
+  }
   return BindGroupVersion(index, version);
 }
 
 bool VulkanCommandContext::BindGroupVersion(uint32_t index, VulkanBindingGroup::Version *native) {
+  const VkPipelineStageFlags stages =
+      compute_active_ ? VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT : VK_PIPELINE_STAGE_ALL_GRAPHICS_BIT;
   for (size_t binding_index = 0; binding_index < native->GetLayout().bindings.size(); ++binding_index) {
     const auto &b = native->GetLayout().bindings[binding_index];
     for (uint32_t i = 0; i < b.count; ++i) {
@@ -692,8 +753,7 @@ bool VulkanCommandContext::BindGroupVersion(uint32_t index, VulkanBindingGroup::
                                            : 0);
       if (b.type <= BINDING_RW_BYTE_ADDRESS_BUFFER) {
         auto buffer = static_cast<VulkanBuffer *>(native->GetReferences()[binding_index][i].Get());
-        if (!TransitionBuffer(buffer, VK_PIPELINE_STAGE_ALL_GRAPHICS_BIT,
-                              b.type == BINDING_UNIFORM_BUFFER ? VK_ACCESS_UNIFORM_READ_BIT : access))
+        if (!TransitionBuffer(buffer, stages, b.type == BINDING_UNIFORM_BUFFER ? VK_ACCESS_UNIFORM_READ_BIT : access))
           return false;
       }
       if (b.type == BINDING_TEXTURE2D || b.type == BINDING_RW_TEXTURE2D) {
@@ -706,23 +766,23 @@ bool VulkanCommandContext::BindGroupVersion(uint32_t index, VulkanBindingGroup::
             return false;
           }
           auto &state = image_states_.try_emplace(image, ImageState{VK_IMAGE_LAYOUT_GENERAL, 0, 0}).first->second;
-          state.stages |= VK_PIPELINE_STAGE_ALL_GRAPHICS_BIT;
+          state.stages |= stages;
           state.access |= access;
-        } else if (!TransitionImage(image, VK_IMAGE_LAYOUT_GENERAL, VK_PIPELINE_STAGE_ALL_GRAPHICS_BIT, access))
+        } else if (!TransitionImage(image, VK_IMAGE_LAYOUT_GENERAL, stages, access))
           return false;
       }
     }
   }
   groups_[index] = native;
   auto set = native->Set();
-  vkCmdBindDescriptorSets(command_, VK_PIPELINE_BIND_POINT_GRAPHICS, program_->NativeLayout(), index, 1, &set, 0,
-                          nullptr);
+  vkCmdBindDescriptorSets(command_, compute_active_ ? VK_PIPELINE_BIND_POINT_COMPUTE : VK_PIPELINE_BIND_POINT_GRAPHICS,
+                          native_program_->NativeLayout(), index, 1, &set, 0, nullptr);
   return true;
 }
 
 bool VulkanCommandContext::ValidateGroups() {
   for (size_t i = 0; i < groups_.size(); ++i) {
-    if (!groups_[i] && !program_->GetDesc().pipeline_layout.groups[i].bindings.empty()) {
+    if (!groups_[i] && !binding_layout_->groups[i].bindings.empty()) {
       recording_failed_ = true;
       return false;
     }

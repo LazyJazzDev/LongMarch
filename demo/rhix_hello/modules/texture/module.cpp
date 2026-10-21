@@ -9,8 +9,9 @@
 #include <map>
 #include <string>
 #include <thread>
+#include <utility>
 
-#include "grassland/rhi/rhi.h"
+#include "grassland/rhi/rhix/rhix.h"
 #include "grassland/util/fps_counter.h"
 #include "grassland/util/virtual_file_system.h"
 
@@ -23,39 +24,40 @@ struct Vertex {
 };
 }  // namespace
 
-int HelloTexture(grassland::rhi::BackendAPI api, int frames, bool headless) {
+int RunTexture(grassland::rhi::BackendAPI api, int frames, bool headless) {
   using namespace grassland::rhi;
+  using namespace grassland::rhix;
 
-  ObjPtr<ICore> core = CreateCore(api);
+  auto core = grassland::rhix::CreateCore(api);
   if (!core)
     return 1;
-  ObjPtr<IDevice> device = core->CreateDeviceByAutoSelection();
+  grassland::rhix::Device device = core.CreateDeviceByAutoSelection();
   if (!device)
     return 1;
-  ObjPtr<IWindow> window;
+  grassland::rhix::Window window;
   if (!headless) {
-    window = device->CreateGLFWWindow({1280, 720, "RHI hello_texture - P: toggle VSync"});
+    window = device.CreateGLFWWindow({1280, 720, "RHIX texture - P: toggle VSync"});
     if (!window)
       return 1;
   }
-  ObjPtr<IQueue> queue = device->GetQueue(QUEUE_TYPE_GRAPHICS);
+  grassland::rhix::Queue queue = device.GetQueue(QUEUE_TYPE_GRAPHICS);
   if (!queue)
     return 1;
-  std::array<ObjPtr<IImage>, 3> targets;
-  std::array<ObjPtr<ISubmissionToken>, 3> pending;
+  std::array<grassland::rhix::Image, 3> targets;
+  std::array<grassland::rhix::SubmissionToken, 3> pending;
   if (headless) {
     for (auto &target : targets) {
-      target = device->CreateImage({1280, 720, IMAGE_FORMAT_RGBA8_UNORM});
+      target = device.CreateImage({1280, 720, IMAGE_FORMAT_RGBA8_UNORM});
       if (!target)
         return 1;
     }
   }
-  const auto &embedded = shader_list.at("modules/hello_texture/shaders/texture.slang");
+  const auto &embedded = shader_list.at("modules/texture/shaders/texture.slang");
   std::string source(embedded.first, embedded.second);
-  ObjPtr<IShader> vertex_shader = device->CreateShader({source, "VSMain", SHADER_STAGE_VERTEX});
+  grassland::rhix::Shader vertex_shader = device.CreateShader({source, "VSMain", SHADER_STAGE_VERTEX});
   if (!vertex_shader)
     return 1;
-  ObjPtr<IShader> fragment_shader = device->CreateShader({source, "PSMain", SHADER_STAGE_FRAGMENT});
+  grassland::rhix::Shader fragment_shader = device.CreateShader({source, "PSMain", SHADER_STAGE_FRAGMENT});
   if (!fragment_shader)
     return 1;
   ProgramDesc desc;
@@ -64,49 +66,49 @@ int HelloTexture(grassland::rhi::BackendAPI api, int frames, bool headless) {
   desc.vertex_bindings = {{sizeof(Vertex), false}};
   desc.vertex_attributes = {{0, 0, VERTEX_FORMAT_FLOAT3, 0}, {1, 0, VERTEX_FORMAT_FLOAT2, 12}};
   {
-    ObjPtr<IImage> image;
+    grassland::rhix::Image image;
     if (headless)
       image = targets[0];
     else
-      image = window->GetNextImage();
+      image = window.GetNextImage();
     if (!image)
       return 1;
-    desc.color_formats = {image->GetDesc().format};
+    desc.color_formats = {image.GetDesc().format};
   }
   desc.pipeline_layout.groups = {
       {{{0, BINDING_TEXTURE2D, 1, SHADER_VISIBILITY_FRAGMENT}, {1, BINDING_SAMPLER, 1, SHADER_VISIBILITY_FRAGMENT}}}};
-  ObjPtr<IProgram> program = device->CreateProgram(desc);
+  grassland::rhix::Program program = device.CreateProgram(desc);
   if (!program)
     return 1;
-  if (!program->Finalize())
+  if (!program.Finalize())
     return 1;
   const Vertex vertices[] = {{{0, .5f, 0}, {.5f, 0}}, {{-.5f, -.5f, 0}, {0, 1}}, {{.5f, -.5f, 0}, {1, 1}}};
   const uint32_t indices[] = {0, 1, 2};
-  ObjPtr<IBuffer> vertex_buffer = device->CreateBuffer({sizeof(vertices)});
+  grassland::rhix::Buffer vertex_buffer = device.CreateBuffer({sizeof(vertices)});
   if (!vertex_buffer)
     return 1;
-  ObjPtr<IBuffer> index_buffer = device->CreateBuffer({sizeof(indices)});
+  grassland::rhix::Buffer index_buffer = device.CreateBuffer({sizeof(indices)});
   if (!index_buffer)
     return 1;
-  ObjPtr<IImage> texture = device->CreateImage({256, 256, IMAGE_FORMAT_RGBA8_UNORM});
+  grassland::rhix::Image texture = device.CreateImage({256, 256, IMAGE_FORMAT_RGBA8_UNORM});
   if (!texture)
     return 1;
-  ObjPtr<IBindingGroup> group = device->CreateBindingGroup(desc.pipeline_layout.groups[0]);
+  grassland::rhix::BindingGroup group = device.CreateBindingGroup(desc.pipeline_layout.groups[0]);
   if (!group)
     return 1;
-  if (!group->BindResource(0, texture.Get()))
+  if (!group.BindResource(0, texture))
     return 1;
-  ObjPtr<ISampler> sampler = device->CreateSampler();
-  if (!sampler || !group->BindResource(1, sampler.Get()))
+  auto sampler = device.CreateSampler();
+  if (!sampler || !group.BindResource(1, sampler))
     return 1;
   // Upload owns a snapshot and staging leases; later graphics work is ordered on the same native queue.
   {
-    ObjPtr<ICommandContext> upload = device->CreateCommandContext();
+    grassland::rhix::CommandContext upload = device.CreateCommandContext();
     if (!upload)
       return 1;
-    if (!upload->CmdUploadBuffer(vertex_buffer.Get(), 0, vertices, sizeof(vertices)))
+    if (!upload.CmdUploadBuffer(vertex_buffer, 0, vertices, sizeof(vertices)))
       return 1;
-    if (!upload->CmdUploadBuffer(index_buffer.Get(), 0, indices, sizeof(indices)))
+    if (!upload.CmdUploadBuffer(index_buffer, 0, indices, sizeof(indices)))
       return 1;
     std::array<uint32_t, 256 * 256> pixels;
     for (uint32_t y = 0; y < 256; ++y)
@@ -114,13 +116,13 @@ int HelloTexture(grassland::rhi::BackendAPI api, int frames, bool headless) {
         uint32_t v = x ^ y;
         pixels[y * 256 + x] = v | (v << 8) | (v << 16) | 0xff000000;
       }
-    if (!upload->CmdUploadImage(texture.Get(), pixels.data(), 256 * 4))
+    if (!upload.CmdUploadImage(texture, pixels.data(), 256 * 4))
       return 1;
-    ObjPtr<ISubmissionToken> uploaded = queue->Submit(upload.Get());
+    grassland::rhix::SubmissionToken uploaded = queue.Submit(std::move(upload));
     if (!uploaded)
       return 1;
     if (headless) {
-      if (!uploaded->WaitHost())
+      if (!uploaded.WaitHost())
         return 1;
     }
   }
@@ -133,20 +135,20 @@ int HelloTexture(grassland::rhi::BackendAPI api, int frames, bool headless) {
   int rendered = headless ? -60 : 0;
   while (!frames || rendered < frames) {
     if (!headless) {
-      if (!PollEvents())
+      if (!Window::PollEvents())
         break;
-      if (window->ShouldClose())
+      if (window.ShouldClose())
         break;
-      if (window->IsKeyDown(GLFW_KEY_ESCAPE))
+      if (window.IsKeyDown(GLFW_KEY_ESCAPE))
         break;
-      if (window->IsSwapChainInvalid()) {
-        if (!window->RebuildSwapChain())
+      if (window.IsSwapChainInvalid()) {
+        if (!window.RebuildSwapChain())
           return 1;
       }
-      bool p = window->IsKeyDown(GLFW_KEY_P);
+      bool p = window.IsKeyDown(GLFW_KEY_P);
       if (p && !previous_p) {
         requested = requested == PRESENT_MODE_VSYNC ? PRESENT_MODE_CONTINUOUS : PRESENT_MODE_VSYNC;
-        if (!window->SetPresentMode(requested))
+        if (!window.SetPresentMode(requested))
           return 1;
       }
       previous_p = p;
@@ -156,7 +158,7 @@ int HelloTexture(grassland::rhi::BackendAPI api, int frames, bool headless) {
       if (rendered == 0) {
         for (auto &token : pending) {
           if (token) {
-            if (!token->WaitHost())
+            if (!token.WaitHost())
               return 1;
             token = {};
           }
@@ -164,16 +166,16 @@ int HelloTexture(grassland::rhi::BackendAPI api, int frames, bool headless) {
         benchmark_start = std::chrono::steady_clock::now();
       }
       if (pending[slot]) {
-        if (!pending[slot]->WaitHost())
+        if (!pending[slot].WaitHost())
           return 1;
         pending[slot] = {};
       }
     }
-    ObjPtr<IImage> image;
+    grassland::rhix::Image image;
     if (headless)
       image = targets[slot];
     else
-      image = window->GetNextImage();
+      image = window.GetNextImage();
     if (!image) {
       if (headless)
         return 1;
@@ -181,34 +183,33 @@ int HelloTexture(grassland::rhi::BackendAPI api, int frames, bool headless) {
       std::this_thread::sleep_for(std::chrono::milliseconds(10));
       continue;
     }
-    auto extent = image->GetDesc();
-    ObjPtr<ICommandContext> context = device->CreateCommandContext();
+    auto extent = image.GetDesc();
+    grassland::rhix::CommandContext context = device.CreateCommandContext();
     if (!context)
       return 1;
-    if (!context->CmdBindProgram(program.Get()))
+    if (!context.CmdBindProgram(program))
       return 1;
-    if (!context->CmdBindGroup(0, group.Get()))
+    if (!context.CmdBindGroup(0, group))
       return 1;
-    if (!context->CmdBeginRendering(
-            {{{image.Get(), ATTACHMENT_LOAD_OP_CLEAR, ATTACHMENT_STORE_OP_STORE, {0.6f, 0.7f, 0.8f, 1}}}}))
+    if (!context.CmdBeginRendering(image, ATTACHMENT_LOAD_OP_CLEAR, ATTACHMENT_STORE_OP_STORE, {0.6f, 0.7f, 0.8f, 1}))
       return 1;
-    if (!context->CmdBindVertexBuffer(0, vertex_buffer.Get()))
+    if (!context.CmdBindVertexBuffer(0, vertex_buffer))
       return 1;
-    if (!context->CmdBindIndexBuffer(index_buffer.Get()))
+    if (!context.CmdBindIndexBuffer(index_buffer))
       return 1;
-    if (!context->CmdSetViewport({0, 0, static_cast<float>(extent.width), static_cast<float>(extent.height), 0, 1}))
+    if (!context.CmdSetViewport({0, 0, static_cast<float>(extent.width), static_cast<float>(extent.height), 0, 1}))
       return 1;
-    if (!context->CmdSetScissor({0, 0, extent.width, extent.height}))
+    if (!context.CmdSetScissor({0, 0, extent.width, extent.height}))
       return 1;
-    if (!context->CmdDrawIndexed(3))
+    if (!context.CmdDrawIndexed(3))
       return 1;
-    if (!context->CmdEndRendering())
+    if (!context.CmdEndRendering())
       return 1;
     if (!headless) {
-      if (!context->CmdPresent(window.Get()))
+      if (!context.CmdPresent(window))
         return 1;
     }
-    ObjPtr<ISubmissionToken> token = queue->Submit(context.Get());
+    grassland::rhix::SubmissionToken token = queue.Submit(std::move(context));
     if (!token)
       return 1;
     if (headless)
@@ -217,7 +218,7 @@ int HelloTexture(grassland::rhi::BackendAPI api, int frames, bool headless) {
     fps.TickFrame();
     auto now = std::chrono::steady_clock::now();
     if (!headless && now - title_time >= std::chrono::milliseconds(250)) {
-      if (!window->SetTitle(fmt::format("RHI hello_texture - FPS: {:.1f} - P: toggle VSync", fps.GetFPS())))
+      if (!window.SetTitle(fmt::format("RHIX texture - FPS: {:.1f} - P: toggle VSync", fps.GetFPS())))
         return 1;
       title_time = now;
     }
@@ -225,14 +226,13 @@ int HelloTexture(grassland::rhi::BackendAPI api, int frames, bool headless) {
   if (headless) {
     for (const auto &token : pending) {
       if (token) {
-        if (!token->WaitHost())
+        if (!token.WaitHost())
           return 1;
       }
     }
     const double seconds = std::chrono::duration<double>(std::chrono::steady_clock::now() - benchmark_start).count();
-    std::cout << fmt::format(
-        "hello_texture: headless 1280x720, {} frames, {:.6f} s, {:.2f} FPS (3 in flight, 60 warmup)\n", rendered,
-        seconds, rendered / seconds);
+    std::cout << fmt::format("texture: headless 1280x720, {} frames, {:.6f} s, {:.2f} FPS (3 in flight, 60 warmup)\n",
+                             rendered, seconds, rendered / seconds);
   }
   return 0;
 }

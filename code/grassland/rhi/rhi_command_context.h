@@ -6,6 +6,7 @@
 namespace grassland::rhi {
 class IBuffer;
 class IProgram;
+class IComputeProgram;
 class IBindingGroup;
 class IImage;
 
@@ -61,6 +62,10 @@ class ICommandContext : public IObject {
                              uint64_t size) = 0;
   virtual bool CmdBindGroup(uint32_t index, IBindingGroup *group) = 0;
   virtual bool CmdUploadImage(IImage *image, const void *data, uint64_t row_pitch) = 0;
+  // One active graphics or compute program. Switching programs clears group bindings.
+  // Dispatch requires no rendering scope; dependencies between dispatches are automatic.
+  virtual bool CmdBindComputeProgram(IComputeProgram *program) = 0;
+  virtual bool CmdDispatch(uint32_t x, uint32_t y = 1, uint32_t z = 1) = 0;
   virtual bool CmdBindProgram(IProgram *program) = 0;
   virtual bool CmdBeginRendering(const RenderingInfo &info) = 0;
   virtual bool CmdEndRendering() = 0;

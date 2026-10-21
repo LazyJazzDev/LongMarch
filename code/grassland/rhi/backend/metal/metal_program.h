@@ -2,11 +2,12 @@
 #include <Metal/Metal.hpp>
 
 #include "grassland/rhi/backend/backend_program.h"
+#include "grassland/rhi/backend/metal/metal_program_base.h"
 
 namespace grassland::rhi::backend::metal {
 class MetalDevice;
 
-class MetalProgram final : public Program {
+class MetalProgram final : public Program, public MetalProgramBase {
  public:
   MetalProgram(MetalDevice *device, const ProgramDesc &desc);
   bool Finalize() override;

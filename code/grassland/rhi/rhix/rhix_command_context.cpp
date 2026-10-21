@@ -59,6 +59,14 @@ bool CommandContext::CmdCopyBuffer(const Buffer &source,
   return Get()->CmdCopyBuffer(source.Get(), source_offset, destination.Get(), destination_offset, size);
 }
 
+bool CommandContext::CmdBindComputeProgram(const ComputeProgram &program) {
+  return Get()->CmdBindComputeProgram(program.Get());
+}
+
+bool CommandContext::CmdDispatch(uint32_t x, uint32_t y, uint32_t z) {
+  return Get()->CmdDispatch(x, y, z);
+}
+
 bool CommandContext::CmdBindProgram(const Program &program) {
 #if !defined(NDEBUG)
   if (!*this)

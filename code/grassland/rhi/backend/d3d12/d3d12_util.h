@@ -3,7 +3,10 @@
 #include <dxgi1_6.h>
 #include <wrl.h>
 
+#include <array>
+
 #include "grassland/rhi/backend/backend_util.h"
+#include "grassland/rhi/rhi_binding_group.h"
 
 namespace grassland::rhi::backend::d3d12 {
 D3D12_BLEND NativeBlendFactor(BlendFactor factor, bool alpha = false);

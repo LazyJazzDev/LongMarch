@@ -17,20 +17,24 @@ def run(executable, args, success=True):
 
 
 def check(executable, backend):
-    for scene in ("hello_window", "hello_triangle", "hello_cube", "hello_texture", "hello_blend", "all"):
+    scenes = run(executable, ["--list"]).splitlines()
+    expected_scenes = ["window", "triangle", "cube", "texture", "blend", "nbody"]
+    if scenes != expected_scenes:
+        raise RuntimeError(f"Unexpected module list for {executable.name}: {scenes}")
+    for scene in (*scenes, "all"):
         selection = ["--all"] if scene == "all" else ["--module", scene]
         output = run(executable, ["--headless", "--backend", backend, "--frames", "7", *selection])
-        rows = re.findall(r"(hello_\w+): headless 1280x720, (\d+) frames, ([\d.]+) s, ([\d.]+) FPS", output)
-        expected = ["hello_window", "hello_triangle", "hello_cube", "hello_texture", "hello_blend"] if scene == "all" else [scene]
+        rows = re.findall(r"(\w+): headless 1280x720, (\d+) frames, ([\d.]+) s, ([\d.]+) FPS", output)
+        expected = scenes if scene == "all" else [scene]
         if [row[0] for row in rows] != expected:
             raise RuntimeError(f"Missing or repeated scene results:\n{output}")
         for _, frames, seconds, fps in rows:
             if int(frames) != 7 or float(seconds) <= 0 or float(fps) <= 0:
                 raise RuntimeError(f"Invalid timing results:\n{output}")
     output = run(executable, ["--headless", "--all", "--backend", "d3d12" if sys.platform == "darwin" else "metal", "--frames", "1"], success=False)
-    if "hello_window: FAILED" not in output or "hello_triangle: FAILED" not in output:
+    if any(f"{scene}: FAILED" not in output for scene in scenes):
         raise RuntimeError(f"--all did not continue after failure:\n{output}")
-    for args in (["--all", "--module", "hello_window"], ["--all", "--tui"],
+    for args in (["--all", "--module", scenes[0]], ["--all", "--tui"],
                  ["--headless", "--all", "--frames", "-1"], ["--frames", "invalid"]):
         run(executable, args, success=False)
     print(f"{executable.name}/{backend}: headless scenes, --all and invalid options passed", flush=True)

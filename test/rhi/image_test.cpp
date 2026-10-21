@@ -1363,6 +1363,93 @@ TEST_P(RhiImage, IndependentColorAndAlphaBlendingMatchesPixelResults) {
   }
 }
 
+TEST_P(RhiImage, ComputeGraphicsSwitchingPreservesImagesAndDescriptorTables) {
+  ObjPtr<ICore> core = CreateCore(GetParam());
+  ASSERT_TRUE(core);
+  ObjPtr<IDevice> device = core->CreateDeviceByAutoSelection();
+  ASSERT_TRUE(device);
+  Track(device.Get());
+  ObjPtr<IQueue> queue = device->GetQueue(QUEUE_TYPE_GRAPHICS);
+  ASSERT_TRUE(queue);
+  ObjPtr<IImage> a = device->CreateImage({4, 4, IMAGE_FORMAT_RGBA8_UNORM});
+  ASSERT_TRUE(a);
+  ObjPtr<IImage> b = device->CreateImage({4, 4, IMAGE_FORMAT_RGBA8_UNORM});
+  ASSERT_TRUE(b);
+  ObjPtr<IShader> cs = device->CreateShader({R"(
+    RHI_RW_TEXTURE2D(0, 0, float4, target);
+    [numthreads(4, 4, 1)] void CSMain(uint3 id:SV_DispatchThreadID) {
+      target[id.xy] += float4(1.0 / 255.0, 0, 0, 0);
+    }
+  )",
+                                             "CSMain", SHADER_STAGE_COMPUTE});
+  ASSERT_TRUE(cs);
+  ComputeProgramDesc cd;
+  cd.compute_shader = cs.Get();
+  cd.pipeline_layout.groups = {{{{0, BINDING_RW_TEXTURE2D, 1, SHADER_VISIBILITY_COMPUTE}}}};
+  ObjPtr<IComputeProgram> compute = device->CreateComputeProgram(cd);
+  ASSERT_TRUE(compute);
+  ASSERT_TRUE(compute->Finalize());
+  const std::string render_source = R"(
+    RHI_TEXTURE2D(0, 0, float4, source_image);
+    float4 VSMain(uint id:SV_VertexID):SV_Position {
+      float2 p[3] = {float2(-1,-1),float2(3,-1),float2(-1,3)};
+      return float4(p[id],0,1);
+    }
+    float4 PSMain(float4 p:SV_Position):SV_Target0 { return source_image.Load(int3(uint2(p.xy),0)); }
+  )";
+  ObjPtr<IShader> vs = device->CreateShader({render_source, "VSMain", SHADER_STAGE_VERTEX});
+  ASSERT_TRUE(vs);
+  ObjPtr<IShader> ps = device->CreateShader({render_source, "PSMain", SHADER_STAGE_FRAGMENT});
+  ASSERT_TRUE(ps);
+  ProgramDesc gd;
+  gd.vertex_shader = vs.Get();
+  gd.fragment_shader = ps.Get();
+  gd.pipeline_layout.groups = {{{{0, BINDING_TEXTURE2D, 1, SHADER_VISIBILITY_FRAGMENT}}}};
+  ObjPtr<IProgram> graphics = device->CreateProgram(gd);
+  ASSERT_TRUE(graphics);
+  ASSERT_TRUE(graphics->Finalize());
+  ObjPtr<IBindingGroup> ca = device->CreateBindingGroup(cd.pipeline_layout.groups[0]);
+  ASSERT_TRUE(ca);
+  ObjPtr<IBindingGroup> cb = device->CreateBindingGroup(cd.pipeline_layout.groups[0]);
+  ASSERT_TRUE(cb);
+  ObjPtr<IBindingGroup> ga = device->CreateBindingGroup(gd.pipeline_layout.groups[0]);
+  ASSERT_TRUE(ga);
+  ASSERT_TRUE(ca->BindResource(0, a.Get()));
+  ASSERT_TRUE(cb->BindResource(0, b.Get()));
+  ASSERT_TRUE(ga->BindResource(0, a.Get()));
+  ObjPtr<ICommandContext> ctx = device->CreateCommandContext();
+  ASSERT_TRUE(ctx);
+  ASSERT_TRUE(ctx->CmdClearColor(a.Get(), {0, 0, 0, 1}));
+  for (int round = 0; round < 40; ++round) {
+    ASSERT_TRUE(ctx->CmdBindComputeProgram(compute.Get()));
+    ASSERT_TRUE(ctx->CmdBindGroup(0, ca.Get()));
+    ASSERT_TRUE(ctx->CmdDispatch(1));
+    ASSERT_TRUE(ctx->CmdBindProgram(graphics.Get()));
+    ASSERT_TRUE(ctx->CmdBindGroup(0, ga.Get()));
+    ASSERT_TRUE(ctx->CmdBeginRendering({{{b.Get(), ATTACHMENT_LOAD_OP_DISCARD, ATTACHMENT_STORE_OP_STORE}}}));
+    ASSERT_TRUE(ctx->CmdSetViewport({0, 0, 4, 4, 0, 1}));
+    ASSERT_TRUE(ctx->CmdSetScissor({0, 0, 4, 4}));
+    ASSERT_TRUE(ctx->CmdDraw(3));
+    ASSERT_TRUE(ctx->CmdEndRendering());
+    ASSERT_TRUE(ctx->CmdBindComputeProgram(compute.Get()));
+    ASSERT_TRUE(ctx->CmdBindGroup(0, cb.Get()));
+    ASSERT_TRUE(ctx->CmdDispatch(1));
+  }
+  compute.Release();
+  graphics.Release();
+  ca.Release();
+  cb.Release();
+  ga.Release();
+  ObjPtr<ISubmissionToken> token = queue->Submit(ctx.Get());
+  ASSERT_TRUE(token);
+  ASSERT_TRUE(token->WaitHost());
+  std::array<uint8_t, 4> pixel{};
+  ReadPixel(device.Get(), a.Get(), GetParam(), 1, 1, pixel);
+  EXPECT_EQ(pixel[0], 40);
+  ReadPixel(device.Get(), b.Get(), GetParam(), 1, 1, pixel);
+  EXPECT_EQ(pixel[0], 41);
+}
+
 INSTANTIATE_TEST_SUITE_P(Backends, RhiImage, testing::ValuesIn(backends));
 }  // namespace
 }  // namespace grassland::rhi

@@ -1,6 +1,7 @@
 ﻿#pragma once
 #include "grassland/rhi/rhi_buffer.h"
 #include "grassland/rhi/rhi_command_context.h"
+#include "grassland/rhi/rhi_compute_program.h"
 #include "grassland/rhi/rhi_core.h"
 #include "grassland/rhi/rhi_device.h"
 #include "grassland/rhi/rhi_image.h"

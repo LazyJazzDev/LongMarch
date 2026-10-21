@@ -1,4 +1,4 @@
-#include "grassland/rhi/backend/d3d12/d3d12_command_context.h"
+﻿#include "grassland/rhi/backend/d3d12/d3d12_command_context.h"
 
 #include <algorithm>
 #include <cstdlib>
@@ -7,6 +7,7 @@
 #include "grassland/rhi/backend/backend_binding_group.h"
 #include "grassland/rhi/backend/backend_glfw_helper.h"
 #include "grassland/rhi/backend/d3d12/d3d12_buffer.h"
+#include "grassland/rhi/backend/d3d12/d3d12_compute_program.h"
 #include "grassland/rhi/backend/d3d12/d3d12_program.h"
 #include "grassland/rhi/backend/d3d12/d3d12_swap_chain_image.h"
 #include "grassland/rhi/backend/d3d12/d3d12_window.h"
@@ -271,6 +272,52 @@ bool D3D12CommandContext::CmdCopyBuffer(IBuffer *source,
   return true;
 }
 
+bool D3D12CommandContext::CmdBindComputeProgram(IComputeProgram *program) {
+#if !defined(NDEBUG)
+  auto native = dynamic_cast<D3D12ComputeProgram *>(program);
+  if (sealed_ || rendering_active_ || !native || native->Owner() != device_) {
+    recording_failed_ = true;
+    return false;
+  }
+#else
+  auto native = static_cast<D3D12ComputeProgram *>(program);
+#endif
+  if (!native->IsFinalized()) {
+    recording_failed_ = true;
+    return false;
+  }
+  if (!RetainResource(native))
+    return false;
+  native_program_ = native;
+  compute_active_ = true;
+  program_ = nullptr;
+  binding_layout_ = &native->GetDesc().pipeline_layout;
+  groups_.assign(binding_layout_->groups.size(), {});
+  tables_dirty_ = true;
+  list_->SetPipelineState(native->NativePipeline());
+  list_->SetComputeRootSignature(native->NativeRootSignature());
+  return true;
+}
+
+bool D3D12CommandContext::CmdDispatch(uint32_t x, uint32_t y, uint32_t z) {
+#if !defined(NDEBUG)
+  if (sealed_ || rendering_active_ || !compute_active_) {
+    recording_failed_ = true;
+    return false;
+  }
+  if (x > 65535 || y > 65535 || z > 65535) {
+    recording_failed_ = true;
+    return false;
+  }
+#endif
+  if (recording_failed_)
+    return false;
+  if (!PrepareGroups())
+    return false;
+  list_->Dispatch(x, y, z);
+  return true;
+}
+
 bool D3D12CommandContext::CmdBindProgram(IProgram *program) {
 #if !defined(NDEBUG)
   auto native = dynamic_cast<D3D12Program *>(program);
@@ -293,6 +340,9 @@ bool D3D12CommandContext::CmdBindProgram(IProgram *program) {
 
   tables_dirty_ = true;
   program_ = native;
+  native_program_ = native;
+  compute_active_ = false;
+  binding_layout_ = &native->GetDesc().pipeline_layout;
   list_->OMSetStencilRef(native->GetDesc().depth_stencil.stencil_reference);
   list_->SetPipelineState(native->NativePipeline());
   list_->SetGraphicsRootSignature(native->NativeRootSignature());
@@ -530,8 +580,8 @@ bool D3D12CommandContext::PrepareDrawBuffers(bool indexed) {
 
 bool D3D12CommandContext::CmdBindGroup(uint32_t index, IBindingGroup *group) {
   auto native = dynamic_cast<D3D12BindingGroup *>(group);
-  if (sealed_ || !program_ || !native || native->Owner() != device_ || index >= groups_.size() ||
-      !SameBindingLayout(program_->GetDesc().pipeline_layout.groups[index], group->GetLayout()) ||
+  if (sealed_ || !binding_layout_ || !native || native->Owner() != device_ || index >= groups_.size() ||
+      !SameBindingLayout(binding_layout_->groups[index], group->GetLayout()) ||
       !native->CurrentVersion()->IsComplete()) {
     recording_failed_ = true;
     return false;
@@ -562,7 +612,7 @@ bool D3D12CommandContext::PrepareGroups() {
   for (size_t i = 0; i < groups_.size(); ++i) {
     const auto version = groups_[i].version;
     if (!version) {
-      if (!program_->GetDesc().pipeline_layout.groups[i].bindings.empty()) {
+      if (!binding_layout_->groups[i].bindings.empty()) {
         recording_failed_ = true;
         return false;
       }
@@ -674,9 +724,13 @@ bool D3D12CommandContext::PrepareGroups() {
   // including unchanged tables which did not need to be copied again.
   for (uint32_t g = 0; g < groups_.size(); ++g)
     for (size_t kind = 0; kind < 2; ++kind) {
-      auto parameter = program_->RootParameter(g, kind != 0);
-      if (parameter != UINT32_MAX)
-        list_->SetGraphicsRootDescriptorTable(parameter, groups_[g].tables[kind]);
+      auto parameter = native_program_->RootParameter(g, kind != 0);
+      if (parameter != UINT32_MAX) {
+        if (compute_active_)
+          list_->SetComputeRootDescriptorTable(parameter, groups_[g].tables[kind]);
+        else
+          list_->SetGraphicsRootDescriptorTable(parameter, groups_[g].tables[kind]);
+      }
     }
   tables_dirty_ = false;
   return true;

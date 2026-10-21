@@ -144,12 +144,37 @@ void MetalBindingGroup::Version::Bind(MTL::RenderCommandEncoder *encoder, uint32
       stages |= MTL::RenderStageVertex;
     if (desc.visibility & SHADER_VISIBILITY_FRAGMENT)
       stages |= MTL::RenderStageFragment;
+    if (!stages)
+      continue;
     for (auto &resource : references_[b]) {
       MTL::Resource *native =
           desc.type <= BINDING_RW_BYTE_ADDRESS_BUFFER
               ? static_cast<MTL::Resource *>(static_cast<MetalBuffer *>(resource.Get())->NativeBuffer())
               : static_cast<MTL::Resource *>(static_cast<MetalImage *>(resource.Get())->NativeImage());
       encoder->useResource(native, usage, stages);
+    }
+  }
+}
+
+void MetalBindingGroup::Version::Bind(MTL::ComputeCommandEncoder *encoder, uint32_t group) const {
+  encoder->setBuffer(arguments_.get(), 0, group);
+  encoder->useResource(sizes_.get(), MTL::ResourceUsageRead);
+  for (size_t b = 0; b < layout_.bindings.size(); ++b) {
+    auto desc = layout_.bindings[b];
+    if (desc.type == BINDING_SAMPLER)
+      continue;  // Samplers are retained objects, not MTL::Resource residency entries.
+    MTL::ResourceUsage usage = MTL::ResourceUsageRead;
+    if (desc.type == BINDING_RW_STRUCTURED_BUFFER || desc.type == BINDING_RW_BYTE_ADDRESS_BUFFER ||
+        desc.type == BINDING_RW_TEXTURE2D)
+      usage |= MTL::ResourceUsageWrite;
+    if (!(desc.visibility & SHADER_VISIBILITY_COMPUTE))
+      continue;
+    for (auto &resource : references_[b]) {
+      MTL::Resource *native =
+          desc.type <= BINDING_RW_BYTE_ADDRESS_BUFFER
+              ? static_cast<MTL::Resource *>(static_cast<MetalBuffer *>(resource.Get())->NativeBuffer())
+              : static_cast<MTL::Resource *>(static_cast<MetalImage *>(resource.Get())->NativeImage());
+      encoder->useResource(native, usage);
     }
   }
 }
