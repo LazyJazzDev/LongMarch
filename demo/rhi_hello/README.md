@@ -17,7 +17,9 @@ The positional backend argument remains supported. Without `--module`, a line-ba
 - `texture`: the XOR texture triangle from `graphics_hello`, using a sampled image and linear sampler in a versioned BindingGroup.
 - `blend`: the two overlapping triangles from `graphics_hello/blend`, first opaque and then alpha 0.5, over the same RGB (0.6, 0.7, 0.8) background. Renders directly to the RGBA8/BGRA8 target using two indexed draws; includes the same window controls and headless timing as other modules.
 
-The first five modules and the depth/stencil, MRT and BindingGroup APIs are implemented on D3D12, Vulkan and Metal. Metal bindings require argument-buffer Tier 2 support. D24S8 uses native Depth32Float_Stencil8 on Metal, so depth precision differs from native 24-bit formats.
+- `nbody`: shared-memory tiled compute simulation of 65,536 particles followed by additive particle drawing.
+
+All six modules and the depth/stencil, MRT and BindingGroup APIs are implemented on D3D12, Vulkan and Metal. Metal bindings require argument-buffer Tier 2 support. D24S8 uses native Depth32Float_Stencil8 on Metal, so depth precision differs from native 24-bit formats.
 
 
 ## Shader and Program contract
@@ -42,7 +44,7 @@ Callers release child handles before parent Device/Core handles, and release old
 
 ## Compute programs and nbody
 
-`nbody` is available on D3D12 and Vulkan, through menu item 6, `--module nbody`, and `--all`. It follows `nbody_cs`: 65,536 particles, 128-thread shared-memory tiles, softened all-pairs gravity, velocity integration, position copy, and additive camera-facing particle quads. It uses ten initial galaxy clusters with seed 42, a fixed 0.03 simulation step, and the original gravity/radius/speed constants. There is no ImGui, HDR output or tone-mapping pass; particles render directly into SDR UNORM targets. Existing P/Escape/FPS/window handling and headless timing conventions apply. The nbody module creates all its own resources. Metal compute is not implemented in this iteration.
+`nbody` is available on D3D12, Vulkan and Metal, through menu item 6, `--module nbody`, and `--all`. It follows `nbody_cs`: 65,536 particles, 128-thread shared-memory tiles, softened all-pairs gravity, velocity integration, position copy, and additive camera-facing particle quads. It uses ten initial galaxy clusters with seed 42, a fixed 0.03 simulation step, and the original gravity/radius/speed constants. There is no ImGui, HDR output or tone-mapping pass; particles render directly into SDR UNORM targets. Existing P/Escape/FPS/window handling and headless timing conventions apply. The nbody module creates all its own resources.
 
 ```text
 demo_rhi_hello --module nbody --backend vulkan
@@ -79,9 +81,9 @@ demo_rhi_hello --headless --all --backend vulkan --frames 10000
 demo_rhi_hello --headless --module triangle --backend d3d12 --frames 10000
 ```
 
-`--all` runs all five modules sequentially on the selected backend, continues after a failed module, and returns nonzero if any module fails. It cannot be combined with `--module` or `--tui`. Each scene prints its measured frame count, wall time and average FPS. Headless runs use 60 untimed warmup frames and at most 3 in-flight frames; target reuse and the final timing boundary wait for GPU completion. Setup, shader compilation, image initialization and initial uploads are outside the measurement. The cube's per-frame uniform update is included. This is end-to-end rendering throughput including CPU recording/submission and synchronization, not GPU timestamp duration. Use Release without validation layers for performance comparisons.
+`--all` runs all six modules sequentially on the selected backend, continues after a failed module, and returns nonzero if any module fails. It cannot be combined with `--module` or `--tui`. Each scene prints its measured frame count, wall time and average FPS. Headless runs use 60 untimed warmup frames and at most 3 in-flight frames; target reuse and the final timing boundary wait for GPU completion. Setup, shader compilation, image initialization and initial uploads are outside the measurement. The cube's per-frame uniform update is included. This is end-to-end rendering throughput including CPU recording/submission and synchronization, not GPU timestamp duration. Use Release without validation layers for performance comparisons.
 
-Without a positive `--frames`, headless runs measure 3000 frames per scene; windowed `--all` runs 300 frames per scene. Normal individual windowed demos remain interactive. `--all` selects scenes, not backends. Metal supports all five scenes in both windowed and headless mode.
+Without a positive `--frames`, headless runs measure 3000 frames per scene; windowed `--all` runs 300 frames per scene. Normal individual windowed demos remain interactive. `--all` selects scenes, not backends. Metal supports all six scenes in both windowed and headless mode.
 
 ## Regression tests
 
@@ -98,3 +100,5 @@ Run `--module blend --backend d3d12` (or `vulkan`), or add `--headless --frames 
 Nbody reports FPS and estimated TFLOP/s in the window title and headless output. Following `nbody_cs`, each particle interaction counts as 20 FLOP: `FLOP/frame = 20 * 65536^2 = 85,899,345,920`, and `TFLOP/s = FLOP/frame * FPS / 1e12`. This is an algorithmic estimate using complete frame time (simulation, copy and rendering), not hardware instruction counts or isolated compute timing. Headless output also reports FLOP/frame.
 
 Backend layout ownership is shared by graphics and compute programs through D3D12ProgramBase (root signature and root-parameter mapping) and VulkanProgramBase (descriptor-set layouts and pipeline layout). These internal bases have no IObject identity or reference counting; concrete programs retain responsibility for shader compilation and pipeline creation.
+
+Metal graphics and compute programs share `MetalProgramBase` argument-buffer layout validation and Slang/SPIR-V-to-MSL compilation. Compute threadgroup dimensions come from Slang reflection and are checked against device/pipeline limits. Each Dispatch uses a separate serial compute encoder; tracked resource residency synchronizes dependent dispatches, copies and rendering, including indirect argument-buffer resources. Switching programs requires rebinding groups.

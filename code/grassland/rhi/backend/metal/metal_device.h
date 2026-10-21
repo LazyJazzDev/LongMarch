@@ -14,6 +14,7 @@ class MetalDevice final : public Device {
 
   rhi::IBuffer *CreateBuffer(const BufferDesc &desc) override;
   rhi::IImage *CreateImage(const ImageDesc &desc) override;
+  IComputeProgram *CreateComputeProgram(const ComputeProgramDesc &desc) override;
   rhi::IProgram *CreateProgram(const ProgramDesc &desc) override;
   rhi::IBindingGroup *CreateBindingGroup(const BindingLayoutDesc &layout) override;
   ISampler *CreateSampler(const SamplerDesc &desc = {}) override;

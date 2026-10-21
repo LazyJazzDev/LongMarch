@@ -110,7 +110,7 @@ int main(int argc, char **argv) {
                  "  3. cube      Rotating cube with depth and uniform binding\n"
                  "  4. texture   Sampled XOR texture triangle\n"
                  "  5. blend     Source-alpha blended triangles\n"
-                 "  6. nbody     Compute simulation and particle rendering (D3D12/Vulkan)\n";
+                 "  6. nbody     Compute simulation and particle rendering (D3D12/Vulkan/Metal)\n";
     for (;;) {
       std::cout << "\nSelect module [1-6 or name], q to quit: " << std::flush;
       std::string input;

@@ -1364,8 +1364,6 @@ TEST_P(RhiImage, IndependentColorAndAlphaBlendingMatchesPixelResults) {
 }
 
 TEST_P(RhiImage, ComputeGraphicsSwitchingPreservesImagesAndDescriptorTables) {
-  if (GetParam() == BACKEND_API_METAL)
-    GTEST_SKIP();
   ObjPtr<ICore> core = CreateCore(GetParam());
   ASSERT_TRUE(core);
   ObjPtr<IDevice> device = core->CreateDeviceByAutoSelection();

@@ -82,4 +82,4 @@ Pixel regressions cover MRT plus depth rejection, depth-only stencil writes pres
 
 Run `--module hello_blend --backend d3d12` (or `vulkan`), or add `--headless --frames 100000` for offscreen throughput. Both `--list`, the interactive menu and `--all` include hello_blend. Each module owns its device/window/resource setup independently.
 
-ComputeProgram creation, Finalize, CmdBindComputeProgram and CmdDispatch are also wrapped by rhix. Compute backends currently support D3D12/Vulkan. The nbody example is in rhi_hello only; see its README for binding and synchronization contracts.
+ComputeProgram creation, Finalize, CmdBindComputeProgram and CmdDispatch are also wrapped by rhix. Compute backends support D3D12/Vulkan/Metal. The nbody example is in rhi_hello only; see its README for binding and synchronization contracts.

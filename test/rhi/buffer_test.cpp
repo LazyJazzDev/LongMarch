@@ -19,13 +19,14 @@
 #if defined(LONGMARCH_D3D12_ENABLED) || defined(LONGMARCH_VULKAN_ENABLED) || defined(LONGMARCH_METAL_ENABLED)
 namespace grassland::rhi {
 namespace {
-void ReadBuffer(IDevice *device, IBuffer *buffer, BackendAPI api, std::array<uint32_t, 16> &output) {
+template <size_t N>
+void ReadBuffer(IDevice *device, IBuffer *buffer, BackendAPI api, std::array<uint32_t, N> &output) {
 #if defined(LONGMARCH_METAL_ENABLED)
   if (api == BACKEND_API_METAL) {
     using namespace backend::metal;
     auto pool = NS::TransferPtr(NS::AutoreleasePool::alloc()->init());
     auto owner = static_cast<MetalDevice *>(device);
-    auto readback = NS::TransferPtr(owner->NativeDevice()->newBuffer(256, MTL::ResourceStorageModeShared));
+    auto readback = NS::TransferPtr(owner->NativeDevice()->newBuffer(sizeof(output), MTL::ResourceStorageModeShared));
     ASSERT_TRUE(readback);
     std::lock_guard<std::mutex> lock(owner->QueueMutex());
     auto commands = NS::RetainPtr(owner->NativeQueue()->commandBuffer());
@@ -390,8 +391,6 @@ const BackendAPI backends[] = {
 #endif
 };
 TEST_P(RhiBuffer, ComputeDispatchDependenciesAndBindingSnapshots) {
-  if (GetParam() == BACKEND_API_METAL)
-    GTEST_SKIP();
   ObjPtr<ICore> core = CreateCore(GetParam());
   ASSERT_TRUE(core);
   ObjPtr<IDevice> device = core->CreateDeviceByAutoSelection();
@@ -474,9 +473,51 @@ TEST_P(RhiBuffer, ComputeDispatchDependenciesAndBindingSnapshots) {
     EXPECT_EQ(actual[i], i * 4 + 3);
 }
 
+TEST_P(RhiBuffer, ComputeDispatchUsesReflectedThreeDimensionalThreadgroups) {
+  ObjPtr<ICore> core = CreateCore(GetParam());
+  ASSERT_TRUE(core);
+  ObjPtr<IDevice> device = core->CreateDeviceByAutoSelection();
+  ASSERT_TRUE(device);
+  ObjPtr<IQueue> queue = device->GetQueue(QUEUE_TYPE_GRAPHICS);
+  ASSERT_TRUE(queue);
+  ObjPtr<IShader> shader = device->CreateShader({R"(
+    RHI_RW_STRUCTURED_BUFFER(0, 0, uint, values);
+    [numthreads(2, 3, 2)] void CSMain(uint3 id : SV_DispatchThreadID) {
+      uint index = id.x + 4 * (id.y + 6 * id.z);
+      values[index] += index + 1;
+    }
+  )",
+                                                 "CSMain", SHADER_STAGE_COMPUTE});
+  ComputeProgramDesc desc;
+  desc.compute_shader = shader.Get();
+  desc.pipeline_layout.groups = {{{{0, BINDING_RW_STRUCTURED_BUFFER, 1, SHADER_VISIBILITY_COMPUTE, 4}}}};
+  ObjPtr<IComputeProgram> program = device->CreateComputeProgram(desc);
+  ASSERT_TRUE(program);
+  ASSERT_TRUE(program->Finalize());
+  std::array<uint32_t, 96> values{};
+  ObjPtr<IBuffer> buffer = device->CreateBuffer({sizeof(values)});
+  ASSERT_TRUE(buffer);
+  ObjPtr<IBindingGroup> group = device->CreateBindingGroup(desc.pipeline_layout.groups[0]);
+  ASSERT_TRUE(group);
+  ASSERT_TRUE(group->BindResource(0, buffer.Get()));
+  ObjPtr<ICommandContext> commands = device->CreateCommandContext();
+  ASSERT_TRUE(commands);
+  ASSERT_TRUE(commands->CmdUploadBuffer(buffer.Get(), 0, values.data(), sizeof(values)));
+  ASSERT_TRUE(commands->CmdBindComputeProgram(program.Get()));
+  ASSERT_TRUE(commands->CmdBindGroup(0, group.Get()));
+  ASSERT_TRUE(commands->CmdDispatch(2, 2, 2));
+  ASSERT_TRUE(commands->CmdDispatch(0, 2, 2));
+  ASSERT_TRUE(commands->CmdDispatch(2, 0, 2));
+  ASSERT_TRUE(commands->CmdDispatch(2, 2, 0));
+  ObjPtr<ISubmissionToken> token = queue->Submit(commands.Get());
+  ASSERT_TRUE(token);
+  ASSERT_TRUE(token->WaitHost());
+  ReadBuffer(device.Get(), buffer.Get(), GetParam(), values);
+  for (size_t i = 0; i < values.size(); ++i)
+    EXPECT_EQ(values[i], i + 1);
+}
+
 TEST_P(RhiBuffer, ComputeFinalizeRejectsWrongStageVisibilityAndStride) {
-  if (GetParam() == BACKEND_API_METAL)
-    GTEST_SKIP();
   ObjPtr<ICore> core = CreateCore(GetParam());
   ASSERT_TRUE(core);
   ObjPtr<IDevice> device = core->CreateDeviceByAutoSelection();

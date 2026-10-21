@@ -5,6 +5,8 @@
 
 namespace grassland::rhi::backend::metal {
 class MetalProgram;
+class MetalComputeProgram;
+class MetalProgramBase;
 class MetalBuffer;
 class MetalImage;
 class MetalWindow;
@@ -20,6 +22,8 @@ class MetalCommandContext final : public CommandContext {
                      IBuffer *destination,
                      uint64_t destination_offset,
                      uint64_t size) override;
+  bool CmdBindComputeProgram(IComputeProgram *program) override;
+  bool CmdDispatch(uint32_t x, uint32_t y = 1, uint32_t z = 1) override;
   bool CmdBindProgram(IProgram *program) override;
   bool CmdBindGroup(uint32_t index, IBindingGroup *group) override;
   bool CmdUploadImage(IImage *image, const void *data, uint64_t row_pitch) override;
@@ -51,6 +55,8 @@ class MetalCommandContext final : public CommandContext {
   void ApplyScissor();
   bool ValidateDraw(bool indexed);
   MetalProgram *program_{};
+  MetalComputeProgram *compute_program_{};
+  MetalProgramBase *native_program_{};
   MetalImage *render_target_{};
   std::vector<ImageFormat> color_formats_;
   std::vector<IImage *> color_targets_;
