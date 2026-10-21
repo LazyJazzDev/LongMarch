@@ -10,8 +10,6 @@ Program::Program(Device *device, const ProgramDesc &desc)
       desc_(desc),
       vertex_shader_(ObjectPtr<IShader>::Retain(desc.vertex_shader)),
       fragment_shader_(ObjectPtr<IShader>::Retain(desc.fragment_shader)) {
-  if (desc_.color_formats.empty() && desc_.color_format != IMAGE_FORMAT_UNKNOWN)
-    desc_.color_formats.push_back(desc_.color_format);
 }
 
 Program::~Program() = default;

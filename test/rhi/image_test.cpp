@@ -378,7 +378,7 @@ TEST_P(RhiImage, OffscreenClearDrawReadbackAndReuse) {
     ProgramDesc desc;
     desc.vertex_shader = vs.Get();
     desc.fragment_shader = ps.Get();
-    desc.color_format = format;
+    desc.color_formats = {format};
     ObjPtr<IProgram> program = device->CreateProgram(desc);
     ASSERT_TRUE(program);
     ASSERT_TRUE(program->Finalize());
@@ -1136,13 +1136,13 @@ TEST_P(RhiImage, StencilSurvivesDepthOnlyPassAndMasksColorPass) {
   ProgramDesc desc;
   desc.vertex_shader = vs.Get();
   desc.fragment_shader = mask.Get();
-  desc.color_format = IMAGE_FORMAT_UNKNOWN;
+  desc.color_formats.clear();
   desc.depth_stencil.format = IMAGE_FORMAT_D24_UNORM_S8_UINT;
   desc.depth_stencil.stencil_test = true;
   desc.depth_stencil.stencil_reference = 5;
   desc.depth_stencil.front.pass_op = desc.depth_stencil.back.pass_op = STENCIL_REPLACE;
   ObjPtr<IProgram> writer = device->CreateProgram(desc);
-  desc.color_format = IMAGE_FORMAT_RGBA8_UNORM;
+  desc.color_formats = {IMAGE_FORMAT_RGBA8_UNORM};
   desc.fragment_shader = ps.Get();
   desc.depth_stencil.front.pass_op = desc.depth_stencil.back.pass_op = STENCIL_KEEP;
   desc.depth_stencil.front.compare = desc.depth_stencil.back.compare = COMPARE_EQUAL;

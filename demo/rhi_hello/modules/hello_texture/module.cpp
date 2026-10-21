@@ -71,7 +71,7 @@ int HelloTexture(grassland::rhi::BackendAPI api, int frames, bool headless) {
       image = window->GetNextImage();
     if (!image)
       return 1;
-    desc.color_format = image->GetDesc().format;
+    desc.color_formats = {image->GetDesc().format};
   }
   desc.pipeline_layout.groups = {
       {{{0, BINDING_TEXTURE2D, 1, SHADER_VISIBILITY_FRAGMENT}, {1, BINDING_SAMPLER, 1, SHADER_VISIBILITY_FRAGMENT}}}};

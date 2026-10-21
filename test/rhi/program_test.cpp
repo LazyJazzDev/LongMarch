@@ -116,7 +116,7 @@ TEST_P(RhiProgram, DrawAndIndexedDrawRetainResourcesUntilCompletion) {
   {
     ObjPtr<IImage> frame = window->GetNextImage();
     ASSERT_TRUE(frame);
-    desc.color_format = frame->GetDesc().format;
+    desc.color_formats = {frame->GetDesc().format};
   }
   ObjPtr<IProgram> program = device->CreateProgram(desc);
   ASSERT_TRUE(program);

@@ -20,9 +20,8 @@ struct ProgramDesc {
   IShader *fragment_shader{};
   std::vector<VertexBindingDesc> vertex_bindings;
   std::vector<VertexAttributeDesc> vertex_attributes;
-  ImageFormat color_format{IMAGE_FORMAT_RGBA8_UNORM};
-  // Empty uses color_format; UNKNOWN with an empty vector means depth-only.
-  std::vector<ImageFormat> color_formats;
+  // Empty means no color attachments.
+  std::vector<ImageFormat> color_formats{IMAGE_FORMAT_RGBA8_UNORM};
   DepthStencilDesc depth_stencil;
   PipelineLayoutDesc pipeline_layout;
 };

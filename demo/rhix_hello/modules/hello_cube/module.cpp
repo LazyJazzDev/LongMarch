@@ -73,7 +73,7 @@ int HelloCube(grassland::rhi::BackendAPI api, int frames, bool headless) {
       image = window.GetNextImage();
     if (!image)
       return 1;
-    desc.color_format = image.GetDesc().format;
+    desc.color_formats = {image.GetDesc().format};
   }
   desc.pipeline_layout.groups = {{{{0, BINDING_UNIFORM_BUFFER, 1, SHADER_VISIBILITY_VERTEX}}}};
   desc.depth_stencil.format = IMAGE_FORMAT_D32_FLOAT;
