@@ -54,15 +54,12 @@ VulkanBindingGroup *VulkanBindingGroup::Create(VulkanDevice *device, const Bindi
 
 VulkanBindingGroup::Version::Version(VulkanDevice *device, const BindingLayoutDesc &layout)
     : BindingGroup::Version(device, layout) {
-  views_.resize(layout_.bindings.size());
   samplers_.resize(layout_.bindings.size());
   for (size_t i = 0; i < layout_.bindings.size(); ++i) {
     const auto &binding = layout_.bindings[i];
     initialized_.emplace_back(binding.count, false);
     if (binding.type == BINDING_SAMPLER)
       samplers_[i].resize(binding.count);
-    else if (binding.type == BINDING_TEXTURE2D || binding.type == BINDING_RW_TEXTURE2D)
-      views_[i].resize(binding.count);
   }
 }
 
@@ -95,7 +92,6 @@ ObjectPtr<BindingGroup::Version> VulkanBindingGroup::Version::Clone() const {
   if (!copy)
     return {};
   copy->references_ = references_;
-  copy->views_ = views_;
   copy->samplers_ = samplers_;
   copy->initialized_ = initialized_;
   std::vector<VkCopyDescriptorSet> copies;
@@ -166,24 +162,9 @@ bool VulkanBindingGroup::Version::WriteDescriptors(size_t binding_index,
     if (!dynamic_cast<VulkanAllocatedImage *>(image))
       return false;
   auto native = static_cast<VulkanDevice *>(device_)->NativeDevice();
-  // Stage all native handles before changing the set or any previous slot.
   std::vector<VkDescriptorImageInfo> infos(images.size());
-  std::vector<std::shared_ptr<VkImageView>> views(images.size());
   for (size_t i = 0; i < images.size(); ++i) {
-    auto image = images[i];
-    VkImageViewCreateInfo create{VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO};
-    create.image = static_cast<VulkanImage *>(image)->NativeImage();
-    create.viewType = VK_IMAGE_VIEW_TYPE_2D;
-    create.format = NativeImageFormat(image->GetDesc().format);
-    create.subresourceRange = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1};
-    views[i] = std::shared_ptr<VkImageView>(new VkImageView{}, [native](VkImageView *view) {
-      if (*view)
-        vkDestroyImageView(native, *view, nullptr);
-      delete view;
-    });
-    if (!Check(vkCreateImageView(native, &create, nullptr, views[i].get()), "Create binding view"))
-      return false;
-    infos[i].imageView = *views[i];
+    infos[i].imageView = static_cast<VulkanImage *>(images[i])->BindingView();
     infos[i].imageLayout = VK_IMAGE_LAYOUT_GENERAL;
   }
   VkWriteDescriptorSet write{VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET};
@@ -196,7 +177,6 @@ bool VulkanBindingGroup::Version::WriteDescriptors(size_t binding_index,
   write.pImageInfo = infos.data();
   vkUpdateDescriptorSets(native, 1, &write, 0, nullptr);
   for (size_t i = 0; i < infos.size(); ++i) {
-    views_[binding_index][first_element + i] = std::move(views[i]);
     initialized_[binding_index][first_element + i] = true;
   }
   return true;

@@ -8,7 +8,7 @@ class VulkanWindow;
 
 class VulkanSwapChainImage final : public VulkanImage {
  public:
-  VulkanSwapChainImage(ImageDesc desc, VulkanWindow *window, VkImage image);
+  VulkanSwapChainImage(ImageDesc desc, VulkanWindow *window, VkImage image, std::shared_ptr<Views> views);
   ~VulkanSwapChainImage() override;
   bool IsValid() const override;
   VkImage NativeImage() const override;

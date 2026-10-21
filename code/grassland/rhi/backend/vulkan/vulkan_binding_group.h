@@ -28,8 +28,7 @@ class VulkanBindingGroup final : public BindingGroup {
     VkDescriptorSetLayout native_layout_{};
     ObjectPtr<VulkanDescriptorPool::Lease> lease_;
     std::vector<std::vector<bool>> initialized_;
-    // Descriptor copies share native handles; each handle dies with its last version.
-    std::vector<std::vector<std::shared_ptr<VkImageView>>> views_;
+    // Descriptor copies share samplers; each sampler dies with its last version.
     std::vector<std::vector<std::shared_ptr<VkSampler>>> samplers_;
   };
 

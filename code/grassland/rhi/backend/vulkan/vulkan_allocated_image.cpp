@@ -15,6 +15,7 @@ VulkanAllocatedImage::VulkanAllocatedImage(VulkanDevice *device, ImageDesc desc)
 VulkanAllocatedImage::~VulkanAllocatedImage() {
   if (image_) {
     device_->RenderTargets().Retire(image_);
+    views_.reset();
     vmaDestroyImage(device_->Allocator(), image_, allocation_);
   }
 }
@@ -56,6 +57,9 @@ VulkanAllocatedImage *VulkanAllocatedImage::Create(VulkanDevice *device, const I
     memory.usage = VMA_MEMORY_USAGE_AUTO_PREFER_DEVICE;
     if (!Check(vmaCreateImage(device->Allocator(), &info, &memory, &image->image_, &image->allocation_, nullptr),
                "Allocate image"))
+      return nullptr;
+    image->views_ = Views::Create(device->NativeDevice(), image->image_, desc.format, true);
+    if (!image->views_)
       return nullptr;
     // Establish the fixed default layout once, before exposing the resource.
     // Temporary initialization commands are outside the rendering loop.

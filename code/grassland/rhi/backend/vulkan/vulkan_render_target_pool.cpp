@@ -33,9 +33,6 @@ VulkanRenderTargetPool::VulkanRenderTargetPool(VkDevice device, bool dynamic_ren
 void VulkanRenderTargetPool::DestroyEntry(Entry &entry) {
   if (entry.framebuffer)
     vkDestroyFramebuffer(device_, entry.framebuffer, nullptr);
-  for (auto view : entry.views)
-    if (view)
-      vkDestroyImageView(device_, view, nullptr);
   entry.framebuffer = {};
   entry.views.clear();
   entry.images.clear();
@@ -127,18 +124,8 @@ ObjectPtr<VulkanRenderTargetPool::Lease> VulkanRenderTargetPool::Acquire(const s
     if (!entry) {
       auto fresh = std::make_unique<Entry>();
       fresh->images = handles;
-      fresh->views.resize(images.size());
-      for (size_t i = 0; i < images.size(); ++i) {
-        VkImageViewCreateInfo create{VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO};
-        create.image = handles[i];
-        create.viewType = VK_IMAGE_VIEW_TYPE_2D;
-        create.format = NativeImageFormat(images[i]->GetDesc().format);
-        create.subresourceRange = {ImageAspect(images[i]->GetDesc().format), 0, 1, 0, 1};
-        if (!Check(vkCreateImageView(device_, &create, nullptr, &fresh->views[i]), "Create attachment view")) {
-          DestroyEntry(*fresh);
-          return {};
-        }
-      }
+      for (auto image : images)
+        fresh->views.push_back(image->AttachmentView());
       if (!dynamic_rendering_) {
         VkFramebufferCreateInfo create{VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO};
         create.renderPass = pass;
