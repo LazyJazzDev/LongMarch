@@ -19,6 +19,9 @@ namespace {
 #include "built_in_shaders.inl"
 
 constexpr uint32_t particle_count = 65536;
+// Same algorithmic estimate as nbody_cs: 20 FLOP per particle interaction.
+// The rate uses whole-frame time, including copies and particle rendering.
+constexpr uint64_t flops_per_frame = uint64_t{20} * particle_count * particle_count;
 
 struct Simulation {
   uint32_t count;
@@ -31,7 +34,7 @@ struct Camera {
 };
 }  // namespace
 
-int HelloNBody(grassland::rhi::BackendAPI api, int frames, bool headless) {
+int RunNBody(grassland::rhi::BackendAPI api, int frames, bool headless) {
   using namespace grassland::rhi;
 
   ObjPtr<ICore> core = CreateCore(api);
@@ -42,7 +45,7 @@ int HelloNBody(grassland::rhi::BackendAPI api, int frames, bool headless) {
     return 1;
   ObjPtr<IWindow> window;
   if (!headless) {
-    window = device->CreateGLFWWindow({1280, 720, "RHI hello_nbody - P: toggle VSync"});
+    window = device->CreateGLFWWindow({1280, 720, "RHI nbody - P: toggle VSync"});
     if (!window)
       return 1;
   }
@@ -58,7 +61,7 @@ int HelloNBody(grassland::rhi::BackendAPI api, int frames, bool headless) {
         return 1;
     }
   }
-  const auto &embedded = shader_list.at("modules/hello_nbody/shaders/particle.slang");
+  const auto &embedded = shader_list.at("modules/nbody/shaders/particle.slang");
   std::string source(embedded.first, embedded.second);
   ObjPtr<IShader> vertex_shader = device->CreateShader({source, "VSMain", SHADER_STAGE_VERTEX});
   if (!vertex_shader)
@@ -89,7 +92,7 @@ int HelloNBody(grassland::rhi::BackendAPI api, int frames, bool headless) {
     return 1;
   if (!program->Finalize())
     return 1;
-  const auto &compute_source = shader_list.at("modules/hello_nbody/shaders/nbody.slang");
+  const auto &compute_source = shader_list.at("modules/nbody/shaders/nbody.slang");
   ObjPtr<IShader> compute_shader =
       device->CreateShader({std::string(compute_source.first, compute_source.second), "CSMain", SHADER_STAGE_COMPUTE});
   if (!compute_shader)
@@ -283,7 +286,9 @@ int HelloNBody(grassland::rhi::BackendAPI api, int frames, bool headless) {
     fps.TickFrame();
     auto now = std::chrono::steady_clock::now();
     if (!headless && now - title_time >= std::chrono::milliseconds(250)) {
-      if (!window->SetTitle(fmt::format("RHI hello_nbody - FPS: {:.1f} - P: toggle VSync", fps.GetFPS())))
+      const double frame_rate = fps.GetFPS();
+      if (!window->SetTitle(fmt::format("RHI nbody - FPS: {:.1f} - est. {:.2f} TFLOP/s - P: toggle VSync", frame_rate,
+                                        flops_per_frame * frame_rate * 1e-12)))
         return 1;
       title_time = now;
     }
@@ -296,9 +301,11 @@ int HelloNBody(grassland::rhi::BackendAPI api, int frames, bool headless) {
       }
     }
     const double seconds = std::chrono::duration<double>(std::chrono::steady_clock::now() - benchmark_start).count();
+    std::cout << fmt::format("nbody: headless 1280x720, {} frames, {:.6f} s, {:.2f} FPS (3 in flight, 60 warmup)\n",
+                             rendered, seconds, rendered / seconds);
     std::cout << fmt::format(
-        "hello_nbody: headless 1280x720, {} frames, {:.6f} s, {:.2f} FPS (3 in flight, 60 warmup)\n", rendered, seconds,
-        rendered / seconds);
+        "nbody: {} particles, {} FLOP/frame, estimated {:.3f} TFLOP/s (20 FLOP/interaction, whole-frame time)\n",
+        particle_count, flops_per_frame, flops_per_frame * (rendered / seconds) * 1e-12);
   }
   return 0;
 }

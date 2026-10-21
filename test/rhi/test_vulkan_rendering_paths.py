@@ -59,9 +59,11 @@ def check_path(executable, mode, directory, headless=False):
     env = os.environ.copy()
     env["VK_INSTANCE_LAYERS"] = os.pathsep.join(layers)
     env["VK_LAYER_SETTINGS_PATH"] = str(directory)
+    scenes = subprocess.check_output([str(executable), "--list"], text=True).splitlines()
+    triangle = next(scene for scene in scenes if scene.endswith("triangle"))
     result = subprocess.run(
         [str(executable), "--backend", "vulkan", "--frames", "3"]
-        + (["--headless", "--all"] if headless else ["--module", "hello_triangle"]),
+        + (["--headless", "--all"] if headless else ["--module", triangle]),
         env=env, capture_output=True, timeout=60,
     )
     output = (result.stdout + result.stderr).decode("utf-8", errors="replace")
@@ -73,7 +75,7 @@ def check_path(executable, mode, directory, headless=False):
         "fallback": ("vkCmdBeginRenderPass(", "vkCmdEndRenderPass("),
     }
     scenes = subprocess.check_output([str(executable), "--list"], text=True).splitlines()
-    rendering_scenes = len([scene for scene in scenes if scene != "hello_window"])
+    rendering_scenes = len([scene for scene in scenes if scene not in ("window", "hello_window")])
     for path, pair in commands.items():
         for command in pair:
             count = output.count(command)

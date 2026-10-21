@@ -4,6 +4,7 @@
 
 #include <array>
 #include <chrono>
+#include <glm/gtc/matrix_transform.hpp>
 #include <iostream>
 #include <map>
 #include <string>
@@ -18,11 +19,11 @@ namespace {
 
 struct Vertex {
   float position[3];
-  float color[4];
+  float color[3];
 };
 }  // namespace
 
-int HelloBlend(grassland::rhi::BackendAPI api, int frames, bool headless) {
+int RunCube(grassland::rhi::BackendAPI api, int frames, bool headless) {
   using namespace grassland::rhi;
 
   ObjPtr<ICore> core = CreateCore(api);
@@ -33,7 +34,7 @@ int HelloBlend(grassland::rhi::BackendAPI api, int frames, bool headless) {
     return 1;
   ObjPtr<IWindow> window;
   if (!headless) {
-    window = device->CreateGLFWWindow({1280, 720, "RHI hello_blend - P: toggle VSync"});
+    window = device->CreateGLFWWindow({1280, 720, "RHI cube - P: toggle VSync"});
     if (!window)
       return 1;
   }
@@ -49,7 +50,7 @@ int HelloBlend(grassland::rhi::BackendAPI api, int frames, bool headless) {
         return 1;
     }
   }
-  const auto &embedded = shader_list.at("modules/hello_blend/shaders/blend.slang");
+  const auto &embedded = shader_list.at("modules/cube/shaders/cube.slang");
   std::string source(embedded.first, embedded.second);
   ObjPtr<IShader> vertex_shader = device->CreateShader({source, "VSMain", SHADER_STAGE_VERTEX});
   if (!vertex_shader)
@@ -60,9 +61,8 @@ int HelloBlend(grassland::rhi::BackendAPI api, int frames, bool headless) {
   ProgramDesc desc;
   desc.vertex_shader = vertex_shader.Get();
   desc.fragment_shader = fragment_shader.Get();
-  desc.blend_states = {BlendState(true)};
   desc.vertex_bindings = {{sizeof(Vertex), false}};
-  desc.vertex_attributes = {{0, 0, VERTEX_FORMAT_FLOAT3, 0}, {1, 0, VERTEX_FORMAT_FLOAT4, 12}};
+  desc.vertex_attributes = {{0, 0, VERTEX_FORMAT_FLOAT3, 0}, {1, 0, VERTEX_FORMAT_FLOAT3, 12}};
   {
     ObjPtr<IImage> image;
     if (headless)
@@ -73,24 +73,35 @@ int HelloBlend(grassland::rhi::BackendAPI api, int frames, bool headless) {
       return 1;
     desc.color_formats = {image->GetDesc().format};
   }
+  desc.pipeline_layout.groups = {{{{0, BINDING_UNIFORM_BUFFER, 1, SHADER_VISIBILITY_VERTEX}}}};
+  desc.depth_stencil.format = IMAGE_FORMAT_D32_FLOAT;
+  desc.depth_stencil.depth_test = true;
+  desc.depth_stencil.depth_write = true;
   ObjPtr<IProgram> program = device->CreateProgram(desc);
   if (!program)
     return 1;
   if (!program->Finalize())
     return 1;
-  // Match graphics_hello/blend: opaque inner triangle, then translucent outer triangle.
-  const Vertex vertices[] = {
-      {{0.0f, 0.5f, 0.0f}, {0.0f, 1.0f, 1.0f, 0.5f}},    {{-0.5f, -0.5f, 0.0f}, {1.0f, 1.0f, 0.0f, 0.5f}},
-      {{0.5f, -0.5f, 0.0f}, {1.0f, 0.0f, 1.0f, 0.5f}},   {{0.0f, 0.25f, 0.0f}, {1.0f, 0.0f, 0.0f, 1.0f}},
-      {{-0.3f, -0.35f, 0.0f}, {0.0f, 0.0f, 1.0f, 1.0f}}, {{0.3f, -0.35f, 0.0f}, {0.0f, 1.0f, 0.0f, 1.0f}},
-  };
-  const uint32_t indices[] = {0, 1, 2};
+  const Vertex vertices[] = {{{-1, -1, 1}, {0, 0, 0}}, {{1, -1, 1}, {1, 0, 0}},   {{-1, 1, 1}, {0, 1, 0}},
+                             {{1, 1, 1}, {1, 1, 0}},   {{-1, -1, -1}, {0, 0, 1}}, {{1, -1, -1}, {1, 0, 1}},
+                             {{-1, 1, -1}, {0, 1, 1}}, {{1, 1, -1}, {1, 1, 1}}};
+  const uint32_t indices[] = {0, 1, 2, 2, 1, 3, 2, 3, 6, 6, 3, 7, 6, 7, 4, 4, 7, 5,
+                              4, 5, 0, 0, 5, 1, 1, 5, 3, 3, 5, 7, 0, 2, 4, 4, 2, 6};
   ObjPtr<IBuffer> vertex_buffer = device->CreateBuffer({sizeof(vertices)});
   if (!vertex_buffer)
     return 1;
   ObjPtr<IBuffer> index_buffer = device->CreateBuffer({sizeof(indices)});
   if (!index_buffer)
     return 1;
+  ObjPtr<IBuffer> uniform = device->CreateBuffer({256});
+  if (!uniform)
+    return 1;
+  ObjPtr<IBindingGroup> group = device->CreateBindingGroup(desc.pipeline_layout.groups[0]);
+  if (!group)
+    return 1;
+  if (!group->BindResource(0, uniform.Get()))
+    return 1;
+  ObjPtr<IImage> depth;
   // Upload owns a snapshot and staging leases; later graphics work is ordered on the same native queue.
   {
     ObjPtr<ICommandContext> upload = device->CreateCommandContext();
@@ -169,10 +180,34 @@ int HelloBlend(grassland::rhi::BackendAPI api, int frames, bool headless) {
     ObjPtr<ICommandContext> context = device->CreateCommandContext();
     if (!context)
       return 1;
+    // GPU copies and draws are ordered on the same queue; the upload takes a CPU snapshot.
+    const float angle =
+        headless ? float(rendered + 60) * .01f
+                 : float(std::chrono::duration<double>(std::chrono::steady_clock::now() - benchmark_start).count());
+
+    struct Uniform {
+      glm::mat4 model, view, projection;
+    } ubo;
+
+    ubo.model = glm::rotate(glm::mat4(1), angle, glm::vec3(0, 1, 0));
+    ubo.view = glm::lookAt(glm::vec3(0, 0, 5), glm::vec3(0), glm::vec3(0, 1, 0));
+    ubo.projection = glm::perspectiveZO(glm::radians(45.0f), float(extent.width) / extent.height, 3.5f, 6.5f);
+    if (!context->CmdUploadBuffer(uniform.Get(), 0, &ubo, sizeof(ubo)))
+      return 1;
+    if (!depth || depth->GetDesc().width != extent.width || depth->GetDesc().height != extent.height) {
+      depth = device->CreateImage({extent.width, extent.height, IMAGE_FORMAT_D32_FLOAT});
+      if (!depth)
+        return 1;
+    }
     if (!context->CmdBindProgram(program.Get()))
       return 1;
-    if (!context->CmdBeginRendering(
-            {{{image.Get(), ATTACHMENT_LOAD_OP_CLEAR, ATTACHMENT_STORE_OP_STORE, {0.6f, 0.7f, 0.8f, 1}}}}))
+    if (!context->CmdBindGroup(0, group.Get()))
+      return 1;
+    grassland::rhi::RenderingInfo render;
+    render.color_attachments = {{image.Get(), ATTACHMENT_LOAD_OP_CLEAR, ATTACHMENT_STORE_OP_STORE, {.6f, .7f, .8f, 1}}};
+    render.depth_stencil.image = depth.Get();
+    render.depth_stencil.depth_load_op = ATTACHMENT_LOAD_OP_CLEAR;
+    if (!context->CmdBeginRendering(render))
       return 1;
     if (!context->CmdBindVertexBuffer(0, vertex_buffer.Get()))
       return 1;
@@ -182,9 +217,7 @@ int HelloBlend(grassland::rhi::BackendAPI api, int frames, bool headless) {
       return 1;
     if (!context->CmdSetScissor({0, 0, extent.width, extent.height}))
       return 1;
-    if (!context->CmdDrawIndexed(3, 1, 0, 3))
-      return 1;
-    if (!context->CmdDrawIndexed(3))
+    if (!context->CmdDrawIndexed(36))
       return 1;
     if (!context->CmdEndRendering())
       return 1;
@@ -201,7 +234,7 @@ int HelloBlend(grassland::rhi::BackendAPI api, int frames, bool headless) {
     fps.TickFrame();
     auto now = std::chrono::steady_clock::now();
     if (!headless && now - title_time >= std::chrono::milliseconds(250)) {
-      if (!window->SetTitle(fmt::format("RHI hello_blend - FPS: {:.1f} - P: toggle VSync", fps.GetFPS())))
+      if (!window->SetTitle(fmt::format("RHI cube - FPS: {:.1f} - P: toggle VSync", fps.GetFPS())))
         return 1;
       title_time = now;
     }
@@ -214,9 +247,8 @@ int HelloBlend(grassland::rhi::BackendAPI api, int frames, bool headless) {
       }
     }
     const double seconds = std::chrono::duration<double>(std::chrono::steady_clock::now() - benchmark_start).count();
-    std::cout << fmt::format(
-        "hello_blend: headless 1280x720, {} frames, {:.6f} s, {:.2f} FPS (3 in flight, 60 warmup)\n", rendered, seconds,
-        rendered / seconds);
+    std::cout << fmt::format("cube: headless 1280x720, {} frames, {:.6f} s, {:.2f} FPS (3 in flight, 60 warmup)\n",
+                             rendered, seconds, rendered / seconds);
   }
   return 0;
 }

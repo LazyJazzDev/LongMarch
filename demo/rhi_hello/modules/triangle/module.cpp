@@ -22,7 +22,7 @@ struct Vertex {
 };
 }  // namespace
 
-int HelloTriangle(grassland::rhi::BackendAPI api, int frames, bool headless) {
+int RunTriangle(grassland::rhi::BackendAPI api, int frames, bool headless) {
   using namespace grassland::rhi;
 
   ObjPtr<ICore> core = CreateCore(api);
@@ -33,7 +33,7 @@ int HelloTriangle(grassland::rhi::BackendAPI api, int frames, bool headless) {
     return 1;
   ObjPtr<IWindow> window;
   if (!headless) {
-    window = device->CreateGLFWWindow({1280, 720, "RHI hello_triangle - P: toggle VSync"});
+    window = device->CreateGLFWWindow({1280, 720, "RHI triangle - P: toggle VSync"});
     if (!window)
       return 1;
   }
@@ -49,7 +49,7 @@ int HelloTriangle(grassland::rhi::BackendAPI api, int frames, bool headless) {
         return 1;
     }
   }
-  const auto &embedded = shader_list.at("modules/hello_triangle/shaders/triangle.slang");
+  const auto &embedded = shader_list.at("modules/triangle/shaders/triangle.slang");
   std::string source(embedded.first, embedded.second);
   ObjPtr<IShader> vertex_shader = device->CreateShader({source, "VSMain", SHADER_STAGE_VERTEX});
   if (!vertex_shader)
@@ -193,7 +193,7 @@ int HelloTriangle(grassland::rhi::BackendAPI api, int frames, bool headless) {
     fps.TickFrame();
     auto now = std::chrono::steady_clock::now();
     if (!headless && now - title_time >= std::chrono::milliseconds(250)) {
-      if (!window->SetTitle(fmt::format("RHI hello_triangle - FPS: {:.1f} - P: toggle VSync", fps.GetFPS())))
+      if (!window->SetTitle(fmt::format("RHI triangle - FPS: {:.1f} - P: toggle VSync", fps.GetFPS())))
         return 1;
       title_time = now;
     }
@@ -206,9 +206,8 @@ int HelloTriangle(grassland::rhi::BackendAPI api, int frames, bool headless) {
       }
     }
     const double seconds = std::chrono::duration<double>(std::chrono::steady_clock::now() - benchmark_start).count();
-    std::cout << fmt::format(
-        "hello_triangle: headless 1280x720, {} frames, {:.6f} s, {:.2f} FPS (3 in flight, 60 warmup)\n", rendered,
-        seconds, rendered / seconds);
+    std::cout << fmt::format("triangle: headless 1280x720, {} frames, {:.6f} s, {:.2f} FPS (3 in flight, 60 warmup)\n",
+                             rendered, seconds, rendered / seconds);
   }
   return 0;
 }
