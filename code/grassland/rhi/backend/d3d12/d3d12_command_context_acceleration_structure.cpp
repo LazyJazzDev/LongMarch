@@ -87,11 +87,15 @@ bool D3D12CommandContext::CmdBuildTopLevelAccelerationStructure(ITopLevelAcceler
   std::vector<D3D12_RAYTRACING_INSTANCE_DESC> native(instances.size());
   for (size_t i = 0; i < instances.size(); ++i) {
     const auto &instance = instances[i];
+#if !defined(NDEBUG)
     auto blas = dynamic_cast<D3D12BottomLevelAccelerationStructure *>(instance.blas);
     if (!blas || blas->Owner() != device_) {
       recording_failed_ = true;
       return false;
     }
+#else
+    auto blas = static_cast<D3D12BottomLevelAccelerationStructure *>(instance.blas);
+#endif
     if (!RetainResource(blas))
       return false;
     std::memcpy(native[i].Transform, instance.transform.data(), sizeof(native[i].Transform));
