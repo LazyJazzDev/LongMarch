@@ -4,20 +4,22 @@ Five independent modules use `rhix` typed containers. Each module creates its ow
 
 ```text
 demo_rhix_hello --list
-demo_rhix_hello --module hello_window --backend vulkan
-demo_rhix_hello --module hello_triangle --backend d3d12 --frames 120
+demo_rhix_hello --module window --backend vulkan
+demo_rhix_hello --module triangle --backend d3d12 --frames 120
 ```
 
 The positional backend argument remains supported. Without `--module`, a line-based terminal menu opens (also available with `--tui`). Enter a module number or name; invalid input retries, and `q`, `quit`, or EOF exits without opening a window. `--tui` and `--module` are mutually exclusive; `--backend auto` uses the default backend. Specify `--module` for unattended runs; omit `--frames` to run until the window closes. P switches requested VSync mode, Escape exits, and the title displays `grassland::FPSCounter` statistics.
 
-- `hello_window`: original RGB (0.6, 0.7, 0.8) clear/presentation and supported presentation-combination output. D3D12, Vulkan and the existing Metal backend are supported.
-- `hello_triangle`: D3D12/Vulkan/Metal colored indexed triangle on that background. The module creates independent GPU-only vertex/index Buffers, uploads once through CommandContext, finalizes a Slang Program, then records bindings, viewport/scissor and DrawIndexed. Resize/minimize/restore and P-mode changes are supported.
+- `window`: original RGB (0.6, 0.7, 0.8) clear/presentation and supported presentation-combination output. D3D12, Vulkan and the existing Metal backend are supported.
+- `triangle`: D3D12/Vulkan/Metal colored indexed triangle on that background. The module creates independent GPU-only vertex/index Buffers, uploads once through CommandContext, finalizes a Slang Program, then records bindings, viewport/scissor and DrawIndexed. Resize/minimize/restore and P-mode changes are supported.
 
-- `hello_cube`: the rotating colored cube from `graphics_hello`, with a fixed uniform-buffer BindingGroup and a D32 depth attachment. The depth image follows the window extent. Uniform uploads take a CPU snapshot and are ordered with draws on the same queue.
-- `hello_texture`: the XOR texture triangle from `graphics_hello`, using a sampled image and linear sampler in a versioned BindingGroup.
-- `hello_blend`: the two overlapping triangles from `graphics_hello/blend`, first opaque and then alpha 0.5, over the same RGB (0.6, 0.7, 0.8) background. Renders directly to the RGBA8/BGRA8 target using two indexed draws; includes the same window controls and headless timing as other modules.
+- `cube`: the rotating colored cube from `graphics_hello`, with a fixed uniform-buffer BindingGroup and a D32 depth attachment. The depth image follows the window extent. Uniform uploads take a CPU snapshot and are ordered with draws on the same queue.
+- `texture`: the XOR texture triangle from `graphics_hello`, using a sampled image and linear sampler in a versioned BindingGroup.
+- `blend`: the two overlapping triangles from `graphics_hello/blend`, first opaque and then alpha 0.5, over the same RGB (0.6, 0.7, 0.8) background. Renders directly to the RGBA8/BGRA8 target using two indexed draws; includes the same window controls and headless timing as other modules.
 
-All five modules and the depth/stencil, MRT and BindingGroup APIs are implemented on D3D12, Vulkan and Metal. Metal bindings require argument-buffer Tier 2 support. D24S8 uses native Depth32Float_Stencil8 on Metal, so depth precision differs from native 24-bit formats.
+- `nbody`: 65,536-particle compute simulation followed by additive particle drawing, using rhix containers.
+
+All six modules and the depth/stencil, MRT and BindingGroup APIs are implemented on D3D12, Vulkan and Metal. Metal bindings require argument-buffer Tier 2 support. D24S8 uses native Depth32Float_Stencil8 on Metal, so depth precision differs from native 24-bit formats.
 
 
 ## Shader and Program contract
@@ -56,19 +58,19 @@ Vulkan groups own descriptor-set leases from pages of up to 64 sets, with fixed 
 
 ## Vulkan rendering-path regression
 
-With Vulkan SDK validation, API-dump and Profiles layers installed and a Vulkan 1.3+ GPU supporting dynamic rendering, run `python test/rhi/test_vulkan_rendering_paths.py <demo executable> [<second demo executable>]` from the repository root. With `--headless`, this runs all five modules; windowed mode runs the triangle. It checks native capabilities, a Vulkan 1.2 KHR profile, and a Vulkan 1.2 profile with dynamic rendering disabled. It verifies the actual native Begin/End commands and that dynamic rendering creates no RenderPass or Framebuffer objects. Profile simulation changes reported capabilities; it does not substitute for testing on older hardware.
+With Vulkan SDK validation, API-dump and Profiles layers installed and a Vulkan 1.3+ GPU supporting dynamic rendering, run `python test/rhi/test_vulkan_rendering_paths.py <demo executable> [<second demo executable>]` from the repository root. With `--headless`, this runs all six modules; windowed mode runs the triangle. It checks native capabilities, a Vulkan 1.2 KHR profile, and a Vulkan 1.2 profile with dynamic rendering disabled. It verifies the actual native Begin/End commands and that dynamic rendering creates no RenderPass or Framebuffer objects. Profile simulation changes reported capabilities; it does not substitute for testing on older hardware.
 
 
-Headless benchmarks (D3D12/Vulkan/Metal) render to independent 1280x720 RGBA8 images without creating a GLFW window, swapchain, or presenting. `hello_window` measures its clear pass; `hello_triangle` measures the same indexed triangle draw as the windowed scene. Each module independently creates its own Core, Device and resources.
+Headless benchmarks (D3D12/Vulkan/Metal) render to independent 1280x720 RGBA8 images without creating a GLFW window, swapchain, or presenting. `window` measures its clear pass; `triangle` measures the same indexed triangle draw as the windowed scene. Each module independently creates its own Core, Device and resources.
 
 ```sh
 demo_rhix_hello --headless --all --backend vulkan --frames 10000
-demo_rhix_hello --headless --module hello_triangle --backend d3d12 --frames 10000
+demo_rhix_hello --headless --module triangle --backend d3d12 --frames 10000
 ```
 
-`--all` runs all five modules sequentially on the selected backend, continues after a failed module, and returns nonzero if any module fails. It cannot be combined with `--module` or `--tui`. Each scene prints its measured frame count, wall time and average FPS. Headless runs use 60 untimed warmup frames and at most 3 in-flight frames; target reuse and the final timing boundary wait for GPU completion. Setup, shader compilation, image initialization and initial uploads are outside the measurement. The cube's per-frame uniform update is included. This is end-to-end rendering throughput including CPU recording/submission and synchronization, not GPU timestamp duration. Use Release without validation layers for performance comparisons.
+`--all` runs all six modules sequentially on the selected backend, continues after a failed module, and returns nonzero if any module fails. It cannot be combined with `--module` or `--tui`. Each scene prints its measured frame count, wall time and average FPS. Headless runs use 60 untimed warmup frames and at most 3 in-flight frames; target reuse and the final timing boundary wait for GPU completion. Setup, shader compilation, image initialization and initial uploads are outside the measurement. The cube's per-frame uniform update is included. This is end-to-end rendering throughput including CPU recording/submission and synchronization, not GPU timestamp duration. Use Release without validation layers for performance comparisons.
 
-Without a positive `--frames`, headless runs measure 3000 frames per scene; windowed `--all` runs 300 frames per scene. Normal individual windowed demos remain interactive. `--all` selects scenes, not backends. Metal supports all five scenes in both windowed and headless mode.
+Without a positive `--frames`, headless runs measure 3000 frames per scene; windowed `--all` runs 300 frames per scene. Normal individual windowed demos remain interactive. `--all` selects scenes, not backends. Metal supports all six scenes in both windowed and headless mode.
 
 ## Regression tests
 
@@ -80,6 +82,13 @@ Pixel regressions cover MRT plus depth rejection, depth-only stencil writes pres
 
 `ProgramDesc::blend_states` is empty by default (blending disabled), or contains exactly one `BlendState` per color attachment. `BlendState(true)` selects source-alpha RGB blending and source-over alpha accumulation, matching graphics_hello. The six-argument constructor configures independent RGB/alpha factors and operations. Supported factors are zero/one, source/destination color and alpha, and their inverses; operations are add, subtract, reverse subtract, min and max. Color factors in the alpha equation use their alpha component. States are captured at Program creation and finalized into the pipeline; differing attachment states require Vulkan independentBlend support. Metal mappings are implemented but this change was verified on Windows D3D12/Vulkan only.
 
-Run `--module hello_blend --backend d3d12` (or `vulkan`), or add `--headless --frames 100000` for offscreen throughput. Both `--list`, the interactive menu and `--all` include hello_blend. Each module owns its device/window/resource setup independently.
+Run `--module blend --backend d3d12` (or `vulkan`), or add `--headless --frames 100000` for offscreen throughput. Both `--list`, the interactive menu and `--all` include blend. Each module owns its device/window/resource setup independently.
 
-ComputeProgram creation, Finalize, CmdBindComputeProgram and CmdDispatch are also wrapped by rhix. Compute backends support D3D12/Vulkan/Metal. The nbody example is in rhi_hello only; see its README for binding and synchronization contracts.
+ComputeProgram creation, Finalize, CmdBindComputeProgram and CmdDispatch are also wrapped by rhix. Compute backends support D3D12/Vulkan/Metal. The nbody example uses rhix ComputeProgram, BindingGroup, CommandContext and SubmissionToken containers throughout; each module creates its own resources.
+
+
+## Nbody
+
+`--module nbody` or menu item 6 runs the same 65,536-particle simulation and additive drawing as `rhi_hello`, using rhix containers. It supports D3D12, Vulkan and Metal, window controls (P toggles VSync, Escape exits), and `--headless --frames N`. Both demos list `window`, `triangle`, `cube`, `texture`, `blend`, `nbody`; `--all` runs all six.
+
+The compute and particle shaders, initialization seed (42), simulation step (0.03), 128-thread tiles, three headless targets and 60 warmup frames match `rhi_hello`. Submission moves the command container into Queue; tokens retain submitted work until completion. FPS and estimated TFLOP/s use the same whole-frame timing and 20 FLOP per particle pair (`20 * 65536^2` FLOP/frame), with decimal units.

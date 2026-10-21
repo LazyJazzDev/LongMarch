@@ -4,6 +4,7 @@
 
 #include <array>
 #include <chrono>
+#include <glm/gtc/matrix_transform.hpp>
 #include <iostream>
 #include <map>
 #include <string>
@@ -19,11 +20,11 @@ namespace {
 
 struct Vertex {
   float position[3];
-  float color[3];
+  float uv[2];
 };
 }  // namespace
 
-int HelloTriangle(grassland::rhi::BackendAPI api, int frames, bool headless) {
+int RunTexture(grassland::rhi::BackendAPI api, int frames, bool headless) {
   using namespace grassland::rhi;
   using namespace grassland::rhix;
 
@@ -35,7 +36,7 @@ int HelloTriangle(grassland::rhi::BackendAPI api, int frames, bool headless) {
     return 1;
   grassland::rhix::Window window;
   if (!headless) {
-    window = device.CreateGLFWWindow({1280, 720, "RHIX hello_triangle - P: toggle VSync"});
+    window = device.CreateGLFWWindow({1280, 720, "RHIX texture - P: toggle VSync"});
     if (!window)
       return 1;
   }
@@ -51,7 +52,7 @@ int HelloTriangle(grassland::rhi::BackendAPI api, int frames, bool headless) {
         return 1;
     }
   }
-  const auto &embedded = shader_list.at("modules/hello_triangle/shaders/triangle.slang");
+  const auto &embedded = shader_list.at("modules/texture/shaders/texture.slang");
   std::string source(embedded.first, embedded.second);
   grassland::rhix::Shader vertex_shader = device.CreateShader({source, "VSMain", SHADER_STAGE_VERTEX});
   if (!vertex_shader)
@@ -63,7 +64,7 @@ int HelloTriangle(grassland::rhi::BackendAPI api, int frames, bool headless) {
   desc.vertex_shader = vertex_shader.Get();
   desc.fragment_shader = fragment_shader.Get();
   desc.vertex_bindings = {{sizeof(Vertex), false}};
-  desc.vertex_attributes = {{0, 0, VERTEX_FORMAT_FLOAT3, 0}, {1, 0, VERTEX_FORMAT_FLOAT3, 12}};
+  desc.vertex_attributes = {{0, 0, VERTEX_FORMAT_FLOAT3, 0}, {1, 0, VERTEX_FORMAT_FLOAT2, 12}};
   {
     grassland::rhix::Image image;
     if (headless)
@@ -74,18 +75,31 @@ int HelloTriangle(grassland::rhi::BackendAPI api, int frames, bool headless) {
       return 1;
     desc.color_formats = {image.GetDesc().format};
   }
+  desc.pipeline_layout.groups = {
+      {{{0, BINDING_TEXTURE2D, 1, SHADER_VISIBILITY_FRAGMENT}, {1, BINDING_SAMPLER, 1, SHADER_VISIBILITY_FRAGMENT}}}};
   grassland::rhix::Program program = device.CreateProgram(desc);
   if (!program)
     return 1;
   if (!program.Finalize())
     return 1;
-  const Vertex vertices[] = {{{0, 0.6f, 0}, {1, 0, 0}}, {{-0.6f, -0.6f, 0}, {0, 0, 1}}, {{0.6f, -0.6f, 0}, {0, 1, 0}}};
+  const Vertex vertices[] = {{{0, .5f, 0}, {.5f, 0}}, {{-.5f, -.5f, 0}, {0, 1}}, {{.5f, -.5f, 0}, {1, 1}}};
   const uint32_t indices[] = {0, 1, 2};
   grassland::rhix::Buffer vertex_buffer = device.CreateBuffer({sizeof(vertices)});
   if (!vertex_buffer)
     return 1;
   grassland::rhix::Buffer index_buffer = device.CreateBuffer({sizeof(indices)});
   if (!index_buffer)
+    return 1;
+  grassland::rhix::Image texture = device.CreateImage({256, 256, IMAGE_FORMAT_RGBA8_UNORM});
+  if (!texture)
+    return 1;
+  grassland::rhix::BindingGroup group = device.CreateBindingGroup(desc.pipeline_layout.groups[0]);
+  if (!group)
+    return 1;
+  if (!group.BindResource(0, texture))
+    return 1;
+  auto sampler = device.CreateSampler();
+  if (!sampler || !group.BindResource(1, sampler))
     return 1;
   // Upload owns a snapshot and staging leases; later graphics work is ordered on the same native queue.
   {
@@ -95,6 +109,14 @@ int HelloTriangle(grassland::rhi::BackendAPI api, int frames, bool headless) {
     if (!upload.CmdUploadBuffer(vertex_buffer, 0, vertices, sizeof(vertices)))
       return 1;
     if (!upload.CmdUploadBuffer(index_buffer, 0, indices, sizeof(indices)))
+      return 1;
+    std::array<uint32_t, 256 * 256> pixels;
+    for (uint32_t y = 0; y < 256; ++y)
+      for (uint32_t x = 0; x < 256; ++x) {
+        uint32_t v = x ^ y;
+        pixels[y * 256 + x] = v | (v << 8) | (v << 16) | 0xff000000;
+      }
+    if (!upload.CmdUploadImage(texture, pixels.data(), 256 * 4))
       return 1;
     grassland::rhix::SubmissionToken uploaded = queue.Submit(std::move(upload));
     if (!uploaded)
@@ -167,6 +189,8 @@ int HelloTriangle(grassland::rhi::BackendAPI api, int frames, bool headless) {
       return 1;
     if (!context.CmdBindProgram(program))
       return 1;
+    if (!context.CmdBindGroup(0, group))
+      return 1;
     if (!context.CmdBeginRendering(image, ATTACHMENT_LOAD_OP_CLEAR, ATTACHMENT_STORE_OP_STORE, {0.6f, 0.7f, 0.8f, 1}))
       return 1;
     if (!context.CmdBindVertexBuffer(0, vertex_buffer))
@@ -194,7 +218,7 @@ int HelloTriangle(grassland::rhi::BackendAPI api, int frames, bool headless) {
     fps.TickFrame();
     auto now = std::chrono::steady_clock::now();
     if (!headless && now - title_time >= std::chrono::milliseconds(250)) {
-      if (!window.SetTitle(fmt::format("RHIX hello_triangle - FPS: {:.1f} - P: toggle VSync", fps.GetFPS())))
+      if (!window.SetTitle(fmt::format("RHIX texture - FPS: {:.1f} - P: toggle VSync", fps.GetFPS())))
         return 1;
       title_time = now;
     }
@@ -207,9 +231,8 @@ int HelloTriangle(grassland::rhi::BackendAPI api, int frames, bool headless) {
       }
     }
     const double seconds = std::chrono::duration<double>(std::chrono::steady_clock::now() - benchmark_start).count();
-    std::cout << fmt::format(
-        "hello_triangle: headless 1280x720, {} frames, {:.6f} s, {:.2f} FPS (3 in flight, 60 warmup)\n", rendered,
-        seconds, rendered / seconds);
+    std::cout << fmt::format("texture: headless 1280x720, {} frames, {:.6f} s, {:.2f} FPS (3 in flight, 60 warmup)\n",
+                             rendered, seconds, rendered / seconds);
   }
   return 0;
 }

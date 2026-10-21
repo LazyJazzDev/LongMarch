@@ -18,6 +18,9 @@ def run(executable, args, success=True):
 
 def check(executable, backend):
     scenes = run(executable, ["--list"]).splitlines()
+    expected_scenes = ["window", "triangle", "cube", "texture", "blend", "nbody"]
+    if scenes != expected_scenes:
+        raise RuntimeError(f"Unexpected module list for {executable.name}: {scenes}")
     for scene in (*scenes, "all"):
         selection = ["--all"] if scene == "all" else ["--module", scene]
         output = run(executable, ["--headless", "--backend", backend, "--frames", "7", *selection])
