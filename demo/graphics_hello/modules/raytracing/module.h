@@ -24,6 +24,10 @@ class ModuleRayTracing final : public Module {
     return window_.get();
   }
 
+  grassland::graphics::Core *GetCore() const override {
+    return core_.get();
+  }
+
   bool IsAlive() const override {
     return alive_;
   }

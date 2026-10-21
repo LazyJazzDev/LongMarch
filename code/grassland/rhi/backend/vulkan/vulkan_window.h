@@ -39,6 +39,7 @@ class VulkanWindow final : public Window {
   uint32_t current_sync_{};
   uint32_t current_image_{};
   std::vector<VkImage> images_;
+  std::vector<VulkanImage::Views> image_views_;
   std::vector<VkSemaphore> rendered_;
   std::vector<bool> initialized_images_;
   ImageDesc desc_;

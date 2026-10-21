@@ -2,9 +2,11 @@
 
 #include "grassland/rhi/backend/backend_core.h"
 #include "grassland/rhi/backend/metal/metal_allocated_image.h"
+#include "grassland/rhi/backend/metal/metal_binding_group.h"
 #include "grassland/rhi/backend/metal/metal_command_context.h"
 #include "grassland/rhi/backend/metal/metal_program.h"
 #include "grassland/rhi/backend/metal/metal_queue.h"
+#include "grassland/rhi/backend/metal/metal_sampler.h"
 #include "grassland/rhi/backend/metal/metal_window.h"
 
 namespace grassland::rhi::backend::metal {
@@ -92,6 +94,14 @@ rhi::IProgram *MetalDevice::CreateProgram(const ProgramDesc &desc) {
     ReportError(-1, "Metal program allocation failed.");
     return nullptr;
   }
+}
+
+rhi::IBindingGroup *MetalDevice::CreateBindingGroup(const BindingLayoutDesc &layout) {
+  return MetalBindingGroup::Create(this, layout);
+}
+
+ISampler *MetalDevice::CreateSampler(const SamplerDesc &desc) {
+  return MetalSampler::Create(this, desc);
 }
 
 MetalUploadPool &MetalDevice::UploadPool() {

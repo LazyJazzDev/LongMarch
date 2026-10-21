@@ -1,9 +1,12 @@
 ﻿#include "grassland/rhi/backend/d3d12/d3d12_device.h"
 
+#include "grassland/rhi/backend/backend_binding_group.h"
 #include "grassland/rhi/backend/d3d12/d3d12_allocated_image.h"
+#include "grassland/rhi/backend/d3d12/d3d12_binding_group.h"
 #include "grassland/rhi/backend/d3d12/d3d12_command_context.h"
 #include "grassland/rhi/backend/d3d12/d3d12_program.h"
 #include "grassland/rhi/backend/d3d12/d3d12_queue.h"
+#include "grassland/rhi/backend/d3d12/d3d12_sampler.h"
 #include "grassland/rhi/backend/d3d12/d3d12_window.h"
 
 // Match the Windows SDK declarations used by the backend.
@@ -91,7 +94,19 @@ D3D12Device *D3D12Device::Create(PhysicalDevice info, Core *core, ComPtr<ID3D12D
   }
 }
 
-D3D12RTVPool &D3D12Device::RTVPool() {
+D3D12TransientDescriptorPool &D3D12Device::ResourceDescriptors() {
+  return resource_descriptors_;
+}
+
+D3D12TransientDescriptorPool &D3D12Device::SamplerDescriptors() {
+  return sampler_descriptors_;
+}
+
+D3D12DescriptorPool &D3D12Device::DSVPool() {
+  return dsv_pool_;
+}
+
+D3D12DescriptorPool &D3D12Device::RTVPool() {
   return rtv_pool_;
 }
 
@@ -101,6 +116,14 @@ D3D12MA::Allocator *D3D12Device::Allocator() const {
 
 ID3D12Device *D3D12Device::NativeDevice() const {
   return device_.Get();
+}
+
+D3D12DescriptorPool &D3D12Device::ResourceDescriptorStorage() {
+  return resource_descriptor_storage_;
+}
+
+D3D12DescriptorPool &D3D12Device::SamplerDescriptorStorage() {
+  return sampler_descriptor_storage_;
 }
 
 IDXGIFactory4 *D3D12Device::Factory() const {
@@ -152,7 +175,12 @@ D3D12Device::D3D12Device(PhysicalDevice info, Core *core, ComPtr<ID3D12Device> d
     : Device(std::move(info), core),
       upload_pool_(this),
       device_(std::move(device)),
-      rtv_pool_(device_.Get()) {
+      rtv_pool_(device_.Get(), D3D12_DESCRIPTOR_HEAP_TYPE_RTV),
+      dsv_pool_(device_.Get(), D3D12_DESCRIPTOR_HEAP_TYPE_DSV),
+      resource_descriptors_(device_.Get(), D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV),
+      sampler_descriptors_(device_.Get(), D3D12_DESCRIPTOR_HEAP_TYPE_SAMPLER),
+      resource_descriptor_storage_(device_.Get(), D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV, 4096),
+      sampler_descriptor_storage_(device_.Get(), D3D12_DESCRIPTOR_HEAP_TYPE_SAMPLER, 256) {
 }
 
 D3D12Device::~D3D12Device() {
@@ -201,6 +229,14 @@ rhi::IQueue *D3D12Device::GetQueue(QueueType type) {
     ReportError(-1, "Queue creation ran out of memory.");
     return nullptr;
   }
+}
+
+ISampler *D3D12Device::CreateSampler(const SamplerDesc &desc) {
+  return D3D12Sampler::Create(this, desc);
+}
+
+IBindingGroup *D3D12Device::CreateBindingGroup(const BindingLayoutDesc &layout) {
+  return D3D12BindingGroup::Create(this, layout);
 }
 
 }  // namespace grassland::rhi::backend::d3d12

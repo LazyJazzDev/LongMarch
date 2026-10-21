@@ -8,6 +8,7 @@ namespace grassland::rhi::backend::metal {
 // Native texture is borrowed. Concrete image classes own its backing storage.
 class MetalImage : public Image {
  public:
+  bool SupportsStorage() const override;
   const void *DeviceIdentity() const override;
   MTL::Texture *NativeImage() const;
 

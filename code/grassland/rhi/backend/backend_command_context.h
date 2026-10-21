@@ -23,6 +23,8 @@ class CommandContext : public Object<rhi::ICommandContext> {
                      IBuffer *destination,
                      uint64_t destination_offset,
                      uint64_t size) override;
+  bool CmdBindGroup(uint32_t index, IBindingGroup *group) override;
+  bool CmdUploadImage(IImage *image, const void *data, uint64_t row_pitch) override;
   bool CmdBindProgram(IProgram *program) override;
   bool CmdBeginRendering(const RenderingInfo &info) override;
   bool CmdEndRendering() override;
@@ -50,6 +52,9 @@ class CommandContext : public Object<rhi::ICommandContext> {
   // Call before encoding each resource use. Retains each exact object once.
   bool RetainResource(rhi::IObject *resource);
   virtual bool EndRecording() = 0;
+  bool PrepareRendering(const RenderingInfo &info);
+  bool RenderingMatches(const IProgram *program) const;
+  RenderingInfo rendering_;
   bool recording_failed_{};
   bool sealed_{};
 

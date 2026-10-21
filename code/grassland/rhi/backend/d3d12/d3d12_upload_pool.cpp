@@ -1,4 +1,4 @@
-﻿#include "grassland/rhi/backend/d3d12/d3d12_upload_pool.h"
+#include "grassland/rhi/backend/d3d12/d3d12_upload_pool.h"
 
 #include "grassland/rhi/backend/d3d12/d3d12_device.h"
 
@@ -26,8 +26,8 @@ D3D12_RESOURCE_STATES D3D12UploadPool::Lease::DefaultState() const {
   return buffer_->DefaultState();
 }
 
-bool D3D12UploadPool::Lease::Write(const void *data, uint64_t size) {
-  return buffer_->Write(data, size);
+bool D3D12UploadPool::Lease::Write(const void *data, uint64_t size, uint64_t offset) {
+  return buffer_->Write(data, size, offset);
 }
 
 D3D12UploadPool::D3D12UploadPool(D3D12Device *device) : device_(device) {

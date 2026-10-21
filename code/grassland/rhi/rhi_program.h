@@ -1,4 +1,5 @@
 ﻿#pragma once
+#include "grassland/rhi/rhi_binding_group.h"
 #include "grassland/rhi/rhi_shader.h"
 
 namespace grassland::rhi {
@@ -19,11 +20,14 @@ struct ProgramDesc {
   IShader *fragment_shader{};
   std::vector<VertexBindingDesc> vertex_bindings;
   std::vector<VertexAttributeDesc> vertex_attributes;
-  ImageFormat color_format{IMAGE_FORMAT_RGBA8_UNORM};
+  // Empty means no color attachments.
+  std::vector<ImageFormat> color_formats{IMAGE_FORMAT_RGBA8_UNORM};
+  DepthStencilDesc depth_stencil;
+  PipelineLayoutDesc pipeline_layout;
 };
 
 // Immutable after successful Finalize. Shaders/layout are captured at creation.
-// Current graphics programs use triangle-list topology and one color attachment.
+// Current graphics programs use triangle-list topology and up to eight color attachments.
 class IProgram : public IObject {
  public:
   virtual bool Finalize() = 0;

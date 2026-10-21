@@ -8,6 +8,7 @@ class Image : public Object<rhi::IImage> {
  public:
   explicit Image(ImageDesc desc);
   const ImageDesc &GetDesc() const override;
+  virtual bool SupportsStorage() const;
   virtual const void *DeviceIdentity() const = 0;
 
  private:

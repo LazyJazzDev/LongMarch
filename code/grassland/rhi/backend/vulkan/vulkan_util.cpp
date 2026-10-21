@@ -1,6 +1,50 @@
 ﻿#include "grassland/rhi/backend/vulkan/vulkan_util.h"
 
 namespace grassland::rhi::backend::vulkan {
+size_t DescriptorTypeIndex(BindingType type) {
+  constexpr size_t indices[] = {0, 1, 1, 1, 1, 2, 3, 4};
+  return indices[type];
+}
+
+VkDescriptorType DescriptorTypeFromIndex(size_t index) {
+  constexpr VkDescriptorType types[] = {VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
+                                        VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE,
+                                        VK_DESCRIPTOR_TYPE_SAMPLER};
+  return types[index];
+}
+
+VkDescriptorType NativeDescriptorType(BindingType type) {
+  return DescriptorTypeFromIndex(DescriptorTypeIndex(type));
+}
+
+bool SupportsImageStorage(VkPhysicalDevice device, ImageFormat format) {
+  const auto native = NativeImageFormat(format);
+  if (native == VK_FORMAT_UNDEFINED || IsDepthFormat(format))
+    return false;
+  VkFormatProperties properties{};
+  vkGetPhysicalDeviceFormatProperties(device, native, &properties);
+  return (properties.optimalTilingFeatures & VK_FORMAT_FEATURE_STORAGE_IMAGE_BIT) != 0;
+}
+
+VkFormat NativeImageFormat(ImageFormat format) {
+  switch (format) {
+    case IMAGE_FORMAT_RGBA8_UNORM:
+      return VK_FORMAT_R8G8B8A8_UNORM;
+    case IMAGE_FORMAT_BGRA8_UNORM:
+      return VK_FORMAT_B8G8R8A8_UNORM;
+    case IMAGE_FORMAT_D32_FLOAT:
+      return VK_FORMAT_D32_SFLOAT;
+    case IMAGE_FORMAT_D24_UNORM_S8_UINT:
+      return VK_FORMAT_D24_UNORM_S8_UINT;
+    default:
+      return VK_FORMAT_UNDEFINED;
+  }
+}
+
+VkImageAspectFlags ImageAspect(ImageFormat format) {
+  return IsDepthFormat(format) ? VK_IMAGE_ASPECT_DEPTH_BIT | (HasStencil(format) ? VK_IMAGE_ASPECT_STENCIL_BIT : 0)
+                               : VK_IMAGE_ASPECT_COLOR_BIT;
+}
 
 DeviceFeatures::DeviceFeatures(VkPhysicalDevice device, uint32_t api_version) {
   std::vector<VkExtensionProperties> available;
@@ -91,6 +135,10 @@ const std::vector<const char *> &DeviceFeatures::Extensions() const noexcept {
 
 bool DeviceFeatures::RayTracingPipeline() const {
   return ray_pipeline_.rayTracingPipeline == VK_TRUE;
+}
+
+bool DeviceFeatures::ScalarBlockLayout() const {
+  return v12_.scalarBlockLayout == VK_TRUE;
 }
 
 bool DeviceFeatures::TimelineSemaphore() const {

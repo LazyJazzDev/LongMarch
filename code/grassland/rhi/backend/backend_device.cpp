@@ -1,5 +1,6 @@
 ﻿#include "grassland/rhi/backend/backend_device.h"
 
+#include "grassland/rhi/backend/backend_binding_group.h"
 #include "grassland/rhi/backend/backend_command_context.h"
 #include "grassland/rhi/backend/backend_core.h"
 #include "grassland/rhi/backend/backend_shader.h"
@@ -33,6 +34,16 @@ rhi::IShader *Device::CreateShader(const ShaderDesc &desc) {
     ReportError(-1, "Shader source allocation failed.");
     return nullptr;
   }
+}
+
+ISampler *Device::CreateSampler(const SamplerDesc &) {
+  ReportError(-1, "Samplers are not implemented for this backend.");
+  return nullptr;
+}
+
+IBindingGroup *Device::CreateBindingGroup(const BindingLayoutDesc &) {
+  ReportError(-1, "Binding groups are not implemented for this backend.");
+  return nullptr;
 }
 
 Device::~Device() {

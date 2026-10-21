@@ -1,4 +1,4 @@
-﻿#include <gtest/gtest.h>
+#include <gtest/gtest.h>
 
 #include <array>
 #include <chrono>
@@ -333,6 +333,16 @@ TEST_P(RhiBuffer, UploadLeaseForwardsBufferAndReturnsAfterLastCommandReference) 
     ASSERT_TRUE(lease);
     EXPECT_EQ(lease->Owner(), device.Get());
     ASSERT_TRUE(lease->Write(expected.data(), sizeof(expected)));
+#if defined(LONGMARCH_D3D12_ENABLED)
+    if (GetParam() == BACKEND_API_D3D12) {
+      auto upload = dynamic_cast<backend::d3d12::D3D12UploadPool::Lease *>(lease.Get());
+      ASSERT_TRUE(upload);
+      expected[7] = 12345;
+      ASSERT_TRUE(upload->Write(&expected[7], sizeof(uint32_t), 7 * sizeof(uint32_t)));
+      EXPECT_FALSE(upload->Write(expected.data(), sizeof(uint32_t), upload->GetDesc().size - 1));
+      EXPECT_FALSE(upload->Write(expected.data(), sizeof(uint32_t), UINT64_MAX));
+    }
+#endif
     auto alias = lease;
     lease.Reset();
     EXPECT_EQ(pool.GetBufferCounts(sizeof(expected)).second, 1u);

@@ -2,6 +2,8 @@
 
 #include <unordered_set>
 
+#include "grassland/rhi/backend/backend_binding_group.h"
+
 namespace grassland::rhi::backend {
 Program::Program(Device *device, const ProgramDesc &desc)
     : device_(device),
@@ -25,14 +27,38 @@ Device *Program::Owner() const {
 }
 
 bool Program::ValidateLayout() const {
+  if (desc_.pipeline_layout.groups.size() > 4)
+    return false;
+  for (const auto &group : desc_.pipeline_layout.groups)
+    if (!ValidateBindingLayout(group))
+      return false;
   if (!desc_.vertex_shader || !desc_.fragment_shader)
     return false;
   if (desc_.vertex_shader->GetDesc().stage != SHADER_STAGE_VERTEX)
     return false;
   if (desc_.fragment_shader->GetDesc().stage != SHADER_STAGE_FRAGMENT)
     return false;
-  if (desc_.color_format != IMAGE_FORMAT_RGBA8_UNORM && desc_.color_format != IMAGE_FORMAT_BGRA8_UNORM)
+  if (desc_.color_formats.size() > 8 || (desc_.color_formats.empty() && !IsDepthFormat(desc_.depth_stencil.format)))
     return false;
+  for (auto format : desc_.color_formats)
+    if (format != IMAGE_FORMAT_RGBA8_UNORM && format != IMAGE_FORMAT_BGRA8_UNORM)
+      return false;
+  const auto &depth = desc_.depth_stencil;
+  if (depth.format != IMAGE_FORMAT_UNKNOWN && !IsDepthFormat(depth.format))
+    return false;
+  if ((depth.depth_test || depth.depth_write || depth.stencil_test) && !IsDepthFormat(depth.format))
+    return false;
+  if (depth.stencil_test && !HasStencil(depth.format))
+    return false;
+  if (depth.depth_compare < COMPARE_NEVER || depth.depth_compare > COMPARE_ALWAYS)
+    return false;
+  for (auto face : {depth.front, depth.back}) {
+    if (face.compare < COMPARE_NEVER || face.compare > COMPARE_ALWAYS)
+      return false;
+    for (auto op : {face.fail_op, face.depth_fail_op, face.pass_op})
+      if (op < STENCIL_KEEP || op > STENCIL_DECREMENT_WRAP)
+        return false;
+  }
   std::unordered_set<uint32_t> locations;
   for (const auto &attribute : desc_.vertex_attributes) {
     if (attribute.binding >= desc_.vertex_bindings.size())

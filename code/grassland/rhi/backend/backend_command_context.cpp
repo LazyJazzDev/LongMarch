@@ -1,6 +1,73 @@
 ﻿#include "grassland/rhi/backend/backend_command_context.h"
 
+#include "grassland/rhi/backend/backend_image.h"
+#include "grassland/rhi/rhi_program.h"
+
 namespace grassland::rhi::backend {
+bool CommandContext::CmdBindGroup(uint32_t, IBindingGroup *) {
+  recording_failed_ = true;
+  return false;
+}
+
+bool CommandContext::CmdUploadImage(IImage *, const void *, uint64_t) {
+  recording_failed_ = true;
+  return false;
+}
+
+bool CommandContext::PrepareRendering(const RenderingInfo &info) {
+  try {
+    auto next = info;
+    if (next.color_attachments.size() > 8 || (next.color_attachments.empty() && !next.depth_stencil.image)) {
+      recording_failed_ = true;
+      return false;
+    }
+    std::vector<IImage *> images;
+    auto validate = [&](IImage *image, bool depth, AttachmentLoadOp load, AttachmentStoreOp store) {
+      auto native = dynamic_cast<Image *>(image);
+      if (!native || !native->IsValid() || native->DeviceIdentity() != DeviceIdentity() ||
+          IsDepthFormat(image->GetDesc().format) != depth || load < ATTACHMENT_LOAD_OP_LOAD ||
+          load > ATTACHMENT_LOAD_OP_DISCARD || store < ATTACHMENT_STORE_OP_STORE || store > ATTACHMENT_STORE_OP_DISCARD)
+        return false;
+      for (auto previous : images)
+        if (previous == image || previous->GetDesc().width != image->GetDesc().width ||
+            previous->GetDesc().height != image->GetDesc().height)
+          return false;
+      images.push_back(image);
+      return RetainResource(image);
+    };
+    for (auto color : next.color_attachments)
+      if (!validate(color.color_attachment, false, color.load_op, color.store_op)) {
+        recording_failed_ = true;
+        return false;
+      }
+    const auto &ds = next.depth_stencil;
+    if (ds.image &&
+        (!validate(ds.image, true, ds.depth_load_op, ds.depth_store_op) ||
+         ds.stencil_load_op < ATTACHMENT_LOAD_OP_LOAD || ds.stencil_load_op > ATTACHMENT_LOAD_OP_DISCARD ||
+         ds.stencil_store_op < ATTACHMENT_STORE_OP_STORE || ds.stencil_store_op > ATTACHMENT_STORE_OP_DISCARD ||
+         !(ds.clear_depth >= 0 && ds.clear_depth <= 1))) {
+      recording_failed_ = true;
+      return false;
+    }
+    rendering_ = std::move(next);
+    return true;
+  } catch (const std::bad_alloc &) {
+    recording_failed_ = true;
+    return false;
+  }
+}
+
+bool CommandContext::RenderingMatches(const IProgram *program) const {
+  const auto &desc = program->GetDesc();
+  if (desc.color_formats.size() != rendering_.color_attachments.size())
+    return false;
+  for (size_t i = 0; i < desc.color_formats.size(); ++i)
+    if (desc.color_formats[i] != rendering_.color_attachments[i].color_attachment->GetDesc().format)
+      return false;
+  return desc.depth_stencil.format ==
+         (rendering_.depth_stencil.image ? rendering_.depth_stencil.image->GetDesc().format : IMAGE_FORMAT_UNKNOWN);
+}
+
 CommandContext::CommandContext(const void *identity) : identity_(identity) {
 }
 

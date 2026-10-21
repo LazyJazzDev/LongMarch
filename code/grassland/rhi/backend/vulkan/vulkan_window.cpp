@@ -161,7 +161,8 @@ ObjectPtr<Image> VulkanWindow::AcquireNativeFrame() {
     Check(result, "vkAcquireNextImageKHR");
     return {};
   }
-  return ObjectPtr<Image>::Adopt(new VulkanSwapChainImage(desc_, this, images_[current_image_]));
+  return ObjectPtr<Image>::Adopt(
+      new VulkanSwapChainImage(desc_, this, images_[current_image_], image_views_[current_image_].Attachment()));
 }
 
 VkSemaphore VulkanWindow::AcquireSemaphore() const {
@@ -242,6 +243,7 @@ PresentMode VulkanWindow::GetPresentMode() const {
 void VulkanWindow::DestroySwapchain() {
   for (auto image : images_)
     device_->RenderTargets().Retire(image);
+  image_views_.clear();
   // Device idle covers submitted waits; acquisition itself is a presentation-engine operation.
   for (auto &sync : acquire_sync_) {
     if (sync.acquired)
@@ -349,6 +351,13 @@ bool VulkanWindow::RebuildNativeSwapChain(PresentMode requested_mode) {
   if (!EnumerateList([&](uint32_t *n, VkImage *p) { return vkGetSwapchainImagesKHR(device, swapchain_, n, p); },
                      images_))
     return false;
+  image_views_.resize(images_.size());
+  for (size_t i = 0; i < images_.size(); ++i) {
+    if (!image_views_[i].Initialize(
+            device, images_[i],
+            format->format == VK_FORMAT_B8G8R8A8_UNORM ? IMAGE_FORMAT_BGRA8_UNORM : IMAGE_FORMAT_RGBA8_UNORM, false))
+      return false;
+  }
   acquire_sync_.resize(images_.size() + 1);
   for (auto &sync : acquire_sync_) {
     VkSemaphoreCreateInfo semaphore{VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO};

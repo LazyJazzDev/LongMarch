@@ -1,4 +1,4 @@
-﻿#include "grassland/rhi/backend/d3d12/d3d12_swap_chain_image.h"
+#include "grassland/rhi/backend/d3d12/d3d12_swap_chain_image.h"
 
 #include "grassland/rhi/backend/d3d12/d3d12_window.h"
 
@@ -7,8 +7,9 @@ namespace grassland::rhi::backend::d3d12 {
 D3D12SwapChainImage::D3D12SwapChainImage(ImageDesc desc,
                                          D3D12Window *window,
                                          uint64_t generation,
-                                         ID3D12Resource *image)
-    : D3D12Image(desc, window->DeviceIdentity(), image),
+                                         ID3D12Resource *image,
+                                         ObjectPtr<D3D12DescriptorPool::Lease> attachment)
+    : D3D12Image(desc, window->DeviceIdentity(), image, std::move(attachment)),
       window_(window),
       generation_(generation) {
 }

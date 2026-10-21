@@ -1,4 +1,5 @@
 ﻿#pragma once
+#include "grassland/rhi/backend/backend_shader_compiler.h"
 #include "grassland/rhi/backend/backend_util.h"
 #include "grassland/rhi/rhi_program.h"
 

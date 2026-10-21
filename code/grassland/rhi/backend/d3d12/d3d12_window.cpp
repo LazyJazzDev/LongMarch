@@ -1,4 +1,4 @@
-﻿#include "grassland/rhi/backend/d3d12/d3d12_window.h"
+#include "grassland/rhi/backend/d3d12/d3d12_window.h"
 
 #include "grassland/rhi/backend/d3d12/d3d12_swap_chain_image.h"
 #define GLFW_INCLUDE_NONE
@@ -73,7 +73,8 @@ ObjectPtr<Image> D3D12Window::AcquireNativeFrame() {
   }
 #endif
   const UINT index = swapchain_->GetCurrentBackBufferIndex();
-  auto frame = ObjectPtr<Image>::Adopt(new D3D12SwapChainImage(desc_, this, generation_, images_[index].Get()));
+  auto frame = ObjectPtr<Image>::Adopt(
+      new D3D12SwapChainImage(desc_, this, generation_, images_[index].Get(), attachments_[index]));
   acquired_ = true;
   return frame;
 }
@@ -107,6 +108,8 @@ bool D3D12Window::RebuildNativeSwapChain(PresentMode requested_mode) {
     ++generation_;
     valid_ = false;
     acquired_ = false;
+    for (auto &attachment : attachments_)
+      attachment.Reset();
     for (auto &image : images_)
       image.Reset();
     if (!Check(swapchain_->ResizeBuffers(3, width, height, DXGI_FORMAT_R8G8B8A8_UNORM, flags), "ResizeBuffers"))
@@ -132,6 +135,9 @@ bool D3D12Window::RebuildNativeSwapChain(PresentMode requested_mode) {
   }
   for (UINT i = 0; i < 3; ++i) {
     if (!Check(swapchain_->GetBuffer(i, IID_PPV_ARGS(&images_[i])), "Get swapchain buffer"))
+      return false;
+    attachments_[i] = D3D12Image::CreateAttachmentView(device_, images_[i].Get());
+    if (!attachments_[i])
       return false;
   }
   desc_ = {static_cast<uint32_t>(width), static_cast<uint32_t>(height), IMAGE_FORMAT_RGBA8_UNORM};

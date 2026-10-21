@@ -82,4 +82,11 @@ Buffer Device::CreateBuffer(const rhi::BufferDesc &desc) const {
   return Get()->CreateBuffer(desc);
 }
 
+Sampler Device::CreateSampler(const rhi::SamplerDesc &desc) const {
+  return Get()->CreateSampler(desc);
+}
+
+BindingGroup Device::CreateBindingGroup(const rhi::BindingLayoutDesc &layout) const {
+  return Get()->CreateBindingGroup(layout);
+}
 }  // namespace grassland::rhix

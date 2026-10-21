@@ -15,12 +15,25 @@ VulkanAllocatedImage::VulkanAllocatedImage(VulkanDevice *device, ImageDesc desc)
 VulkanAllocatedImage::~VulkanAllocatedImage() {
   if (image_) {
     device_->RenderTargets().Retire(image_);
+    views_.Reset();
     vmaDestroyImage(device_->Allocator(), image_, allocation_);
   }
 }
 
+VkImageView VulkanAllocatedImage::AttachmentView() const {
+  return views_.Attachment();
+}
+
+VkImageView VulkanAllocatedImage::BindingView() const {
+  return views_.Binding();
+}
+
 bool VulkanAllocatedImage::IsValid() const {
   return true;
+}
+
+bool VulkanAllocatedImage::SupportsStorage() const {
+  return storage_;
 }
 
 VkImage VulkanAllocatedImage::NativeImage() const {
@@ -30,17 +43,9 @@ VkImage VulkanAllocatedImage::NativeImage() const {
 VulkanAllocatedImage *VulkanAllocatedImage::Create(VulkanDevice *device, const ImageDesc &desc) {
   if (!desc.width || !desc.height)
     return nullptr;
-  VkFormat format;
-  switch (desc.format) {
-    case IMAGE_FORMAT_RGBA8_UNORM:
-      format = VK_FORMAT_R8G8B8A8_UNORM;
-      break;
-    case IMAGE_FORMAT_BGRA8_UNORM:
-      format = VK_FORMAT_B8G8R8A8_UNORM;
-      break;
-    default:
-      return nullptr;
-  }
+  const auto format = NativeImageFormat(desc.format);
+  if (format == VK_FORMAT_UNDEFINED)
+    return nullptr;
   try {
     auto image = std::unique_ptr<VulkanAllocatedImage>(new VulkanAllocatedImage(device, desc));
     VkImageCreateInfo info{VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO};
@@ -50,12 +55,18 @@ VulkanAllocatedImage *VulkanAllocatedImage::Create(VulkanDevice *device, const I
     info.mipLevels = info.arrayLayers = 1;
     info.samples = VK_SAMPLE_COUNT_1_BIT;
     info.tiling = VK_IMAGE_TILING_OPTIMAL;
-    info.usage =
-        VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT;
+    info.usage = (IsDepthFormat(desc.format) ? VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT
+                                             : VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT) |
+                 VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT;
+    if (SupportsImageStorage(device->NativePhysicalDevice(), desc.format))
+      info.usage |= VK_IMAGE_USAGE_STORAGE_BIT;
+    image->storage_ = (info.usage & VK_IMAGE_USAGE_STORAGE_BIT) != 0;
     VmaAllocationCreateInfo memory{};
     memory.usage = VMA_MEMORY_USAGE_AUTO_PREFER_DEVICE;
     if (!Check(vmaCreateImage(device->Allocator(), &info, &memory, &image->image_, &image->allocation_, nullptr),
                "Allocate image"))
+      return nullptr;
+    if (!image->views_.Initialize(device->NativeDevice(), image->image_, desc.format, true))
       return nullptr;
     // Establish the fixed default layout once, before exposing the resource.
     // Temporary initialization commands are outside the rendering loop.
@@ -87,7 +98,7 @@ VulkanAllocatedImage *VulkanAllocatedImage::Create(VulkanDevice *device, const I
       barrier.dstAccessMask = VK_ACCESS_MEMORY_READ_BIT | VK_ACCESS_MEMORY_WRITE_BIT;
       barrier.srcQueueFamilyIndex = barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
       barrier.image = image->image_;
-      barrier.subresourceRange = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1};
+      barrier.subresourceRange = {ImageAspect(desc.format), 0, 1, 0, 1};
       vkCmdPipelineBarrier(commands, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, 0, 0,
                            nullptr, 0, nullptr, 1, &barrier);
       status = vkEndCommandBuffer(commands);

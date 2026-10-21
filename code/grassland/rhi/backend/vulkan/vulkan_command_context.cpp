@@ -1,5 +1,7 @@
 ﻿#include "grassland/rhi/backend/vulkan/vulkan_command_context.h"
 
+#include <cstring>
+
 #include "grassland/rhi/backend/backend_glfw_helper.h"
 #include "grassland/rhi/backend/vulkan/vulkan_buffer.h"
 #include "grassland/rhi/backend/vulkan/vulkan_program.h"
@@ -12,8 +14,6 @@ VulkanCommandContext::VulkanCommandContext(VulkanDevice *device) : CommandContex
 }
 
 VulkanCommandContext::~VulkanCommandContext() {
-  for (const auto &entry : attachment_leases_)
-    device_->RenderTargets().Release(std::get<0>(entry.second));
   if (reusable_) {
     device_->RecycleCommandResources(pool_, command_);
     return;
@@ -59,7 +59,7 @@ bool VulkanCommandContext::TransitionImage(VulkanImage *image,
       barrier.dstAccessMask = access;
       barrier.srcQueueFamilyIndex = barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
       barrier.image = image->NativeImage();
-      barrier.subresourceRange = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1};
+      barrier.subresourceRange = {ImageAspect(image->GetDesc().format), 0, 1, 0, 1};
       vkCmdPipelineBarrier(command_, current.stages, stages, 0, 0, nullptr, 0, nullptr, 1, &barrier);
       current = {layout, stages, access};
     } else {
@@ -357,6 +357,7 @@ bool VulkanCommandContext::CmdBindProgram(IProgram *program) {
   }
   try {
     vertex_buffers_.assign(native->GetDesc().vertex_bindings.size(), nullptr);
+    groups_.assign(native->GetDesc().pipeline_layout.groups.size(), nullptr);
   } catch (const std::bad_alloc &) {
     recording_failed_ = true;
     return false;
@@ -367,79 +368,103 @@ bool VulkanCommandContext::CmdBindProgram(IProgram *program) {
 }
 
 bool VulkanCommandContext::CmdBeginRendering(const RenderingInfo &info) {
-  auto image = info.color_attachment;
-#if !defined(NDEBUG)
-  auto native = dynamic_cast<VulkanImage *>(image);
-  if (!native || !native->IsValid() || native->DeviceIdentity() != device_ || sealed_ || render_target_ ||
-      info.load_op < ATTACHMENT_LOAD_OP_LOAD || info.load_op > ATTACHMENT_LOAD_OP_DISCARD ||
-      info.store_op < ATTACHMENT_STORE_OP_STORE || info.store_op > ATTACHMENT_STORE_OP_DISCARD) {
+  if (sealed_ || render_target_ || !PrepareRendering(info)) {
     recording_failed_ = true;
     return false;
   }
-#else
-  auto native = static_cast<VulkanImage *>(image);
-#endif
-  if (!RetainResource(native))
-    return false;
-  if (!TransitionImage(native, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
-                       VK_ACCESS_COLOR_ATTACHMENT_READ_BIT | VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT))
-    return false;
-  // Bindings may change inside the scope, where ordinary buffer barriers cannot
-  // be emitted. Establish visibility for all vertex/index reads at its boundary.
-  VkMemoryBarrier barrier{VK_STRUCTURE_TYPE_MEMORY_BARRIER};
-  barrier.srcAccessMask = VK_ACCESS_MEMORY_WRITE_BIT;
-  barrier.dstAccessMask = VK_ACCESS_VERTEX_ATTRIBUTE_READ_BIT | VK_ACCESS_INDEX_READ_BIT;
-  vkCmdPipelineBarrier(command_, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, VK_PIPELINE_STAGE_VERTEX_INPUT_BIT, 0, 1, &barrier,
-                       0, nullptr, 0, nullptr);
-  render_target_ = native;
   try {
-    auto it = attachment_leases_.find(render_target_);
-    if (it == attachment_leases_.end()) {
-      auto inserted = attachment_leases_.try_emplace(render_target_);
-      it = inserted.first;
-      if (!device_->RenderTargets().Acquire(render_target_->NativeImage(), render_target_->GetDesc(),
-                                            std::get<0>(it->second), std::get<1>(it->second),
-                                            std::get<2>(it->second))) {
-        attachment_leases_.erase(it);
-        recording_failed_ = true;
+    for (uint32_t i = 0; i < groups_.size(); ++i)
+      if (groups_[i] && !BindGroupVersion(i, groups_[i]))
         return false;
-      }
+    std::vector<VulkanImage *> images;
+    std::vector<ImageFormat> formats;
+    for (const auto &color : rendering_.color_attachments) {
+      auto image = static_cast<VulkanImage *>(color.color_attachment);
+      if (!TransitionImage(image, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
+                           VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
+                           VK_ACCESS_COLOR_ATTACHMENT_READ_BIT | VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT))
+        return false;
+      images.push_back(image);
+      formats.push_back(image->GetDesc().format);
     }
-    const auto desc = render_target_->GetDesc();
-    VkClearValue clear{};
-    std::copy(info.clear_color.begin(), info.clear_color.end(), clear.color.float32);
+    auto depth = static_cast<VulkanImage *>(rendering_.depth_stencil.image);
+    if (depth) {
+      if (!TransitionImage(depth, VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL,
+                           VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT | VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT,
+                           VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_READ_BIT | VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT))
+        return false;
+      images.push_back(depth);
+    }
+    const auto depth_format = depth ? depth->GetDesc().format : IMAGE_FORMAT_UNKNOWN;
+    auto pass = device_->BeginRenderingCommand()
+                    ? VK_NULL_HANDLE
+                    : device_->RenderTargets().RenderPass(formats, depth_format, &rendering_);
+    if (!device_->BeginRenderingCommand() && !pass) {
+      recording_failed_ = true;
+      return false;
+    }
+    auto lease = device_->RenderTargets().Acquire(images, pass);
+    if (!lease || !RetainResource(lease.Get())) {
+      recording_failed_ = true;
+      return false;
+    }
+    VkMemoryBarrier barrier{VK_STRUCTURE_TYPE_MEMORY_BARRIER};
+    barrier.srcAccessMask = VK_ACCESS_MEMORY_READ_BIT | VK_ACCESS_MEMORY_WRITE_BIT;
+    barrier.dstAccessMask = VK_ACCESS_VERTEX_ATTRIBUTE_READ_BIT | VK_ACCESS_INDEX_READ_BIT |
+                            VK_ACCESS_UNIFORM_READ_BIT | VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT;
+    vkCmdPipelineBarrier(command_, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, VK_PIPELINE_STAGE_ALL_GRAPHICS_BIT, 0, 1,
+                         &barrier, 0, nullptr, 0, nullptr);
+    constexpr VkAttachmentLoadOp loads[] = {VK_ATTACHMENT_LOAD_OP_LOAD, VK_ATTACHMENT_LOAD_OP_CLEAR,
+                                            VK_ATTACHMENT_LOAD_OP_DONT_CARE};
+    constexpr VkAttachmentStoreOp stores[] = {VK_ATTACHMENT_STORE_OP_STORE, VK_ATTACHMENT_STORE_OP_DONT_CARE};
+    std::array<VkClearValue, 9> clear{};
+    std::array<VkRenderingAttachmentInfo, 8> colors{};
+    for (size_t i = 0; i < formats.size(); ++i) {
+      const auto &source = rendering_.color_attachments[i];
+      std::copy(source.clear_color.begin(), source.clear_color.end(), clear[i].color.float32);
+      colors[i].sType = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO;
+      colors[i].imageView = lease->Views()[i];
+      colors[i].imageLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+      colors[i].loadOp = loads[source.load_op];
+      colors[i].storeOp = stores[source.store_op];
+      colors[i].clearValue = clear[i];
+    }
+    const auto &ds = rendering_.depth_stencil;
+    VkRenderingAttachmentInfo depth_info{VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO},
+        stencil_info{VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO};
+    if (depth) {
+      clear[formats.size()].depthStencil = {ds.clear_depth, ds.clear_stencil};
+      depth_info.imageView = lease->Views().back();
+      depth_info.imageLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
+      depth_info.loadOp = loads[ds.depth_load_op];
+      depth_info.storeOp = stores[ds.depth_store_op];
+      depth_info.clearValue = clear[formats.size()];
+      stencil_info = depth_info;
+      stencil_info.loadOp = loads[ds.stencil_load_op];
+      stencil_info.storeOp = stores[ds.stencil_store_op];
+    }
+    auto desc = images.front()->GetDesc();
     if (auto begin_rendering = device_->BeginRenderingCommand()) {
-      constexpr VkAttachmentLoadOp loads[] = {VK_ATTACHMENT_LOAD_OP_LOAD, VK_ATTACHMENT_LOAD_OP_CLEAR,
-                                              VK_ATTACHMENT_LOAD_OP_DONT_CARE};
-      constexpr VkAttachmentStoreOp stores[] = {VK_ATTACHMENT_STORE_OP_STORE, VK_ATTACHMENT_STORE_OP_DONT_CARE};
-      VkRenderingAttachmentInfo color{VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO};
-      color.imageView = std::get<1>(it->second);
-      color.imageLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
-      color.loadOp = loads[info.load_op];
-      color.storeOp = stores[info.store_op];
-      color.clearValue = clear;
       VkRenderingInfo rendering{VK_STRUCTURE_TYPE_RENDERING_INFO};
       rendering.renderArea.extent = {desc.width, desc.height};
       rendering.layerCount = 1;
-      rendering.colorAttachmentCount = 1;
-      rendering.pColorAttachments = &color;
+      rendering.colorAttachmentCount = uint32_t(formats.size());
+      rendering.pColorAttachments = colors.data();
+      rendering.pDepthAttachment = depth ? &depth_info : nullptr;
+      rendering.pStencilAttachment = HasStencil(depth_format) ? &stencil_info : nullptr;
       begin_rendering(command_, &rendering);
     } else {
       VkRenderPassBeginInfo begin{VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO};
-      begin.renderPass = device_->RenderTargets().RenderPass(desc.format, info.load_op, info.store_op);
-      if (!begin.renderPass) {
-        recording_failed_ = true;
-        return false;
-      }
-      begin.clearValueCount = 1;
-      begin.pClearValues = &clear;
-      begin.framebuffer = std::get<2>(it->second);
+      begin.renderPass = pass;
+      begin.framebuffer = lease->Framebuffer();
       begin.renderArea.extent = {desc.width, desc.height};
+      begin.clearValueCount = uint32_t(images.size());
+      begin.pClearValues = clear.data();
       vkCmdBeginRenderPass(command_, &begin, VK_SUBPASS_CONTENTS_INLINE);
     }
+    render_target_ = images.front();
     return true;
   } catch (const std::bad_alloc &) {
-    attachment_leases_.erase(render_target_);
     recording_failed_ = true;
     return false;
   }
@@ -540,12 +565,14 @@ bool VulkanCommandContext::CmdDraw(uint32_t vertex_count,
     return false;
   }
   if (std::find(vertex_buffers_.begin(), vertex_buffers_.end(), nullptr) != vertex_buffers_.end() ||
-      program_->GetDesc().color_format != render_target_->GetDesc().format) {
+      !RenderingMatches(program_)) {
     recording_failed_ = true;
     return false;
   }
 #endif
   if (recording_failed_)
+    return false;
+  if (!ValidateGroups())
     return false;
   vkCmdDraw(command_, vertex_count, instance_count, first_vertex, first_instance);
   return true;
@@ -562,12 +589,14 @@ bool VulkanCommandContext::CmdDrawIndexed(uint32_t index_count,
     return false;
   }
   if (std::find(vertex_buffers_.begin(), vertex_buffers_.end(), nullptr) != vertex_buffers_.end() ||
-      program_->GetDesc().color_format != render_target_->GetDesc().format) {
+      !RenderingMatches(program_)) {
     recording_failed_ = true;
     return false;
   }
 #endif
   if (recording_failed_)
+    return false;
+  if (!ValidateGroups())
     return false;
   vkCmdDrawIndexed(command_, index_count, instance_count, first_index, vertex_offset, first_instance);
   return true;
@@ -589,17 +618,24 @@ bool VulkanCommandContext::CmdEndRendering() {
   // Make reads in this scope complete before later buffer writes, including buffers
   // first bound inside the scope. Buffer bindings do not change image layouts.
   VkMemoryBarrier barrier{VK_STRUCTURE_TYPE_MEMORY_BARRIER};
-  barrier.srcAccessMask = VK_ACCESS_VERTEX_ATTRIBUTE_READ_BIT | VK_ACCESS_INDEX_READ_BIT;
+  barrier.srcAccessMask = VK_ACCESS_VERTEX_ATTRIBUTE_READ_BIT | VK_ACCESS_INDEX_READ_BIT | VK_ACCESS_UNIFORM_READ_BIT |
+                          VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT;
   barrier.dstAccessMask = VK_ACCESS_MEMORY_READ_BIT | VK_ACCESS_MEMORY_WRITE_BIT;
-  vkCmdPipelineBarrier(command_, VK_PIPELINE_STAGE_VERTEX_INPUT_BIT, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, 0, 1, &barrier,
+  vkCmdPipelineBarrier(command_, VK_PIPELINE_STAGE_ALL_GRAPHICS_BIT, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, 0, 1, &barrier,
                        0, nullptr, 0, nullptr);
   render_target_ = nullptr;
+  for (auto color : rendering_.color_attachments) {
+    auto image = static_cast<VulkanImage *>(color.color_attachment);
+    if (!TransitionImage(image, image->DefaultLayout(), VK_PIPELINE_STAGE_ALL_COMMANDS_BIT,
+                         VK_ACCESS_MEMORY_READ_BIT | VK_ACCESS_MEMORY_WRITE_BIT))
+      return false;
+  }
   return true;
 }
 
 bool VulkanCommandContext::TransitionBuffer(VulkanBuffer *buffer, VkPipelineStageFlags stages, VkAccessFlags access) {
   if (render_target_)
-    return true;  // Vertex/index reads are synchronized by the explicit scope boundaries.
+    return true;  // Graphics buffer accesses are synchronized by the explicit scope boundaries.
   auto known = buffer_states_.find(buffer);
   constexpr VkAccessFlags reads =
       VK_ACCESS_VERTEX_ATTRIBUTE_READ_BIT | VK_ACCESS_INDEX_READ_BIT | VK_ACCESS_TRANSFER_READ_BIT;
@@ -628,6 +664,124 @@ bool VulkanCommandContext::TransitionBuffer(VulkanBuffer *buffer, VkPipelineStag
     recording_failed_ = true;
     return false;
   }
+}
+
+bool VulkanCommandContext::CmdUploadImage(IImage *image, const void *data, uint64_t row_pitch) {
+  auto native = dynamic_cast<VulkanImage *>(image);
+  if (sealed_ || render_target_ || !native || !native->IsValid() || native->DeviceIdentity() != device_ || !data ||
+      IsDepthFormat(native->GetDesc().format) || row_pitch < uint64_t(native->GetDesc().width) * 4 ||
+      (native->GetDesc().height - 1) > (SIZE_MAX - uint64_t(native->GetDesc().width) * 4) / row_pitch) {
+    recording_failed_ = true;
+    return false;
+  }
+  try {
+    const auto desc = native->GetDesc();
+    const uint64_t packed = uint64_t(desc.width) * 4;
+    std::vector<uint8_t> pixels(packed * desc.height);
+    for (uint32_t y = 0; y < desc.height; ++y)
+      std::memcpy(pixels.data() + y * packed, static_cast<const uint8_t *>(data) + y * row_pitch, packed);
+    auto upload = device_->UploadPool().Acquire(pixels.size());
+    if (!upload || !upload->Write(pixels.data(), pixels.size()) || !RetainResource(upload.Get()) ||
+        !RetainResource(native)) {
+      recording_failed_ = true;
+      return false;
+    }
+    if (!TransitionImage(native, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_PIPELINE_STAGE_TRANSFER_BIT,
+                         VK_ACCESS_TRANSFER_WRITE_BIT))
+      return false;
+    VkBufferImageCopy region{};
+    region.imageSubresource = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 0, 1};
+    region.imageExtent = {desc.width, desc.height, 1};
+    vkCmdCopyBufferToImage(command_, upload->NativeBuffer(), native->NativeImage(),
+                           VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &region);
+    return TransitionImage(native, VK_IMAGE_LAYOUT_GENERAL, VK_PIPELINE_STAGE_ALL_GRAPHICS_BIT,
+                           VK_ACCESS_SHADER_READ_BIT);
+  } catch (const std::bad_alloc &) {
+    recording_failed_ = true;
+    return false;
+  }
+}
+
+bool VulkanCommandContext::CmdBindGroup(uint32_t index, IBindingGroup *group) {
+  auto native = dynamic_cast<VulkanBindingGroup *>(group);
+  if (sealed_ || !program_ || !native || native->Owner() != device_ || index >= groups_.size() ||
+      !SameBindingLayout(native->GetLayout(), program_->GetDesc().pipeline_layout.groups[index]) ||
+      !native->CurrentVersion()->IsComplete()) {
+    recording_failed_ = true;
+    return false;
+  }
+  auto version = static_cast<VulkanBindingGroup::Version *>(native->CurrentVersion());
+  if (!RetainResource(version))
+    return false;
+  return BindGroupVersion(index, version);
+}
+
+bool VulkanCommandContext::BindGroupVersion(uint32_t index, VulkanBindingGroup::Version *native) {
+  try {
+    for (size_t binding_index = 0; binding_index < native->GetLayout().bindings.size(); ++binding_index) {
+      const auto &b = native->GetLayout().bindings[binding_index];
+      for (uint32_t i = 0; i < b.count; ++i) {
+        const VkAccessFlags access =
+            VK_ACCESS_SHADER_READ_BIT | ((b.type == BINDING_RW_STRUCTURED_BUFFER ||
+                                          b.type == BINDING_RW_BYTE_ADDRESS_BUFFER || b.type == BINDING_RW_TEXTURE2D)
+                                             ? VK_ACCESS_SHADER_WRITE_BIT
+                                             : 0);
+        if (b.type <= BINDING_RW_BYTE_ADDRESS_BUFFER) {
+          auto buffer = static_cast<VulkanBuffer *>(native->GetReferences()[binding_index][i].Get());
+          if (!TransitionBuffer(buffer, VK_PIPELINE_STAGE_ALL_GRAPHICS_BIT,
+                                b.type == BINDING_UNIFORM_BUFFER ? VK_ACCESS_UNIFORM_READ_BIT : access))
+            return false;
+        }
+        if (b.type == BINDING_TEXTURE2D || b.type == BINDING_RW_TEXTURE2D) {
+          auto image = static_cast<VulkanImage *>(native->GetReferences()[binding_index][i].Get());
+          if (render_target_) {
+            auto known = image_states_.find(image);
+            if ((known != image_states_.end() && known->second.layout != VK_IMAGE_LAYOUT_GENERAL) ||
+                image->DefaultLayout() != VK_IMAGE_LAYOUT_GENERAL) {
+              recording_failed_ = true;
+              return false;
+            }
+            auto &state = image_states_.try_emplace(image, ImageState{VK_IMAGE_LAYOUT_GENERAL, 0, 0}).first->second;
+            state.stages |= VK_PIPELINE_STAGE_ALL_GRAPHICS_BIT;
+            state.access |= access;
+          } else if (!TransitionImage(image, VK_IMAGE_LAYOUT_GENERAL, VK_PIPELINE_STAGE_ALL_GRAPHICS_BIT, access))
+            return false;
+        }
+      }
+    }
+    groups_[index] = native;
+    auto set = native->Set();
+    vkCmdBindDescriptorSets(command_, VK_PIPELINE_BIND_POINT_GRAPHICS, program_->NativeLayout(), index, 1, &set, 0,
+                            nullptr);
+    return true;
+  } catch (const std::bad_alloc &) {
+    recording_failed_ = true;
+    return false;
+  }
+}
+
+bool VulkanCommandContext::ValidateGroups() {
+  for (size_t i = 0; i < groups_.size(); ++i) {
+    if (!groups_[i] && !program_->GetDesc().pipeline_layout.groups[i].bindings.empty()) {
+      recording_failed_ = true;
+      return false;
+    }
+    if (groups_[i]) {
+      const auto &layout = groups_[i]->GetLayout();
+      for (size_t binding_index = 0; binding_index < layout.bindings.size(); ++binding_index) {
+        const auto type = layout.bindings[binding_index].type;
+        if (type != BINDING_TEXTURE2D && type != BINDING_RW_TEXTURE2D)
+          continue;
+        for (const auto &reference : groups_[i]->GetReferences()[binding_index])
+          for (const auto &color : rendering_.color_attachments)
+            if (color.color_attachment == reference.Get()) {
+              recording_failed_ = true;
+              return false;
+            }
+      }
+    }
+  }
+  return !recording_failed_;
 }
 
 }  // namespace grassland::rhi::backend::vulkan

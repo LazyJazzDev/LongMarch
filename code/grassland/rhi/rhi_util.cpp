@@ -3,6 +3,13 @@
 #include "grassland/rhi/backend/backend_util.h"
 
 namespace grassland::rhi {
+bool IsDepthFormat(ImageFormat format) {
+  return format == IMAGE_FORMAT_D32_FLOAT || format == IMAGE_FORMAT_D24_UNORM_S8_UINT;
+}
+
+bool HasStencil(ImageFormat format) {
+  return format == IMAGE_FORMAT_D24_UNORM_S8_UINT;
+}
 
 using backend::ReportError;
 
@@ -172,6 +179,10 @@ std::string to_string(ImageFormat value) {
       return "IMAGE_FORMAT_UNKNOWN";
     case IMAGE_FORMAT_RGBA8_UNORM:
       return "IMAGE_FORMAT_RGBA8_UNORM";
+    case IMAGE_FORMAT_D32_FLOAT:
+      return "IMAGE_FORMAT_D32_FLOAT";
+    case IMAGE_FORMAT_D24_UNORM_S8_UINT:
+      return "IMAGE_FORMAT_D24_UNORM_S8_UINT";
     case IMAGE_FORMAT_BGRA8_UNORM:
       return "IMAGE_FORMAT_BGRA8_UNORM";
     default:
@@ -188,6 +199,10 @@ std::string ImageFormatName(ImageFormat value) {
       return "Unknown";
     case IMAGE_FORMAT_RGBA8_UNORM:
       return "RGBA8 UNORM";
+    case IMAGE_FORMAT_D32_FLOAT:
+      return "IMAGE_FORMAT_D32_FLOAT";
+    case IMAGE_FORMAT_D24_UNORM_S8_UINT:
+      return "IMAGE_FORMAT_D24_UNORM_S8_UINT";
     case IMAGE_FORMAT_BGRA8_UNORM:
       return "BGRA8 UNORM";
     default:

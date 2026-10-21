@@ -27,12 +27,12 @@ int main(int argc, char **argv) {
       continue;
     }
     if (arg == "--list") {
-      std::cout << "hello_window\nhello_triangle\n";
+      std::cout << "hello_window\nhello_triangle\nhello_cube\nhello_texture\n";
       return 0;
     }
     if (arg == "--help") {
       std::cout
-          << "[--module hello_window|hello_triangle | --tui | --all] [--backend auto|d3d12|vulkan|metal] [--headless] [--frames N]\nHeadless defaults to 3000 frames per scene; --all defaults to 300 frames with windows.\nNo module specified: open the terminal selection menu.\n";
+          << "[--module hello_window|hello_triangle|hello_cube|hello_texture | --tui | --all] [--backend auto|d3d12|vulkan|metal] [--headless] [--frames N]\nHeadless defaults to 3000 frames per scene; --all defaults to 300 frames with windows.\nNo module specified: open the terminal selection menu.\n";
       return 0;
     }
     if (arg == "--module" && i + 1 < argc) {
@@ -81,6 +81,14 @@ int main(int argc, char **argv) {
       std::cerr << "hello_triangle: FAILED\n";
       result = 1;
     }
+    if (HelloCube(api, frames, headless) != 0) {
+      std::cerr << "hello_cube: FAILED\n";
+      result = 1;
+    }
+    if (HelloTexture(api, frames, headless) != 0) {
+      std::cerr << "hello_texture: FAILED\n";
+      result = 1;
+    }
     return result;
   }
   if (tui && !module.empty()) {
@@ -90,9 +98,11 @@ int main(int argc, char **argv) {
   if (module.empty()) {
     std::cout << "\nModule Selection\n"
                  "  1. hello_window    Clear and present a window\n"
-                 "  2. hello_triangle  Colored indexed triangle (D3D12/Vulkan/Metal)\n";
+                 "  2. hello_triangle  Colored indexed triangle (D3D12/Vulkan/Metal)\n"
+                 "  3. hello_cube      Rotating cube with depth and uniform binding\n"
+                 "  4. hello_texture   Sampled XOR texture triangle\n";
     for (;;) {
-      std::cout << "\nSelect module [1-2 or name], q to quit: " << std::flush;
+      std::cout << "\nSelect module [1-4 or name], q to quit: " << std::flush;
       std::string input;
       if (!std::getline(std::cin, input))
         return 0;
@@ -110,6 +120,14 @@ int main(int argc, char **argv) {
         module = "hello_triangle";
         break;
       }
+      if (input == "3" || input == "hello_cube") {
+        module = "hello_cube";
+        break;
+      }
+      if (input == "4" || input == "hello_texture") {
+        module = "hello_texture";
+        break;
+      }
       std::cout << "Invalid selection. Enter a listed number or module name.\n";
     }
   }
@@ -117,6 +135,10 @@ int main(int argc, char **argv) {
     return HelloWindow(api, frames, headless);
   if (module == "hello_triangle")
     return HelloTriangle(api, frames, headless);
+  if (module == "hello_cube")
+    return HelloCube(api, frames, headless);
+  if (module == "hello_texture")
+    return HelloTexture(api, frames, headless);
   std::cerr << "Unknown module: " << module << '\n';
   return 1;
 }

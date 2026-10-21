@@ -1,4 +1,4 @@
-file(GLOB SOURCES "*.h" "*.cpp")
+file(GLOB SOURCES CONFIGURE_DEPENDS "*.h" "*.cpp")
 
 add_library(${GRASSLAND_SUBLIB_NAME} ${SOURCES})
 

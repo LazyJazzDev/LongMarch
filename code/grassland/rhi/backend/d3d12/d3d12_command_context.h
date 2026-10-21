@@ -1,7 +1,8 @@
-﻿#pragma once
+#pragma once
 #include <vector>
 
 #include "grassland/rhi/backend/backend_command_context.h"
+#include "grassland/rhi/backend/d3d12/d3d12_binding_group.h"
 #include "grassland/rhi/backend/d3d12/d3d12_device.h"
 
 namespace grassland::rhi::backend::d3d12 {
@@ -21,6 +22,8 @@ class D3D12CommandContext final : public CommandContext {
                      IBuffer *destination,
                      uint64_t destination_offset,
                      uint64_t size) override;
+  bool CmdBindGroup(uint32_t index, IBindingGroup *group) override;
+  bool CmdUploadImage(IImage *image, const void *data, uint64_t row_pitch) override;
   bool CmdBindProgram(IProgram *program) override;
   bool CmdBeginRendering(const RenderingInfo &info) override;
   bool CmdEndRendering() override;
@@ -45,17 +48,27 @@ class D3D12CommandContext final : public CommandContext {
  private:
   D3D12CommandContext(D3D12Device *device);
 
+  bool PrepareGroups();
+
+  struct BoundGroup {
+    D3D12BindingGroup::Version *version{};
+    std::array<D3D12DescriptorPool::Lease *, 2> sources{};
+    std::array<D3D12_GPU_DESCRIPTOR_HANDLE, 2> tables{};
+    std::array<bool, 2> dirty{};
+  };
+
+  std::vector<BoundGroup> groups_;
+  std::array<D3D12TransientDescriptorPool::Lease *, 2> descriptor_pages_{};
+  std::array<uint32_t, 2> descriptor_used_{};
+  bool tables_dirty_{};
   D3D12Program *program_{};
-  D3D12Image *render_target_{};
-  AttachmentStoreOp store_op_{ATTACHMENT_STORE_OP_STORE};
+  bool rendering_active_{};
   std::vector<D3D12Buffer *> vertex_buffers_;
   D3D12Buffer *index_buffer_{};
   bool PrepareDrawBuffers(bool indexed);
   bool viewport_set_{}, scissor_set_{}, index_bound_{};
 
   bool EndRecording() override;
-  bool RenderTarget(D3D12Image *image, D3D12_CPU_DESCRIPTOR_HANDLE &handle);
-  std::unordered_map<D3D12Image *, std::pair<uint64_t, D3D12_CPU_DESCRIPTOR_HANDLE>> rtv_leases_;
   bool TransitionResource(ID3D12Resource *resource, D3D12_RESOURCE_STATES state, D3D12_RESOURCE_STATES default_state);
 
   struct ResourceState {

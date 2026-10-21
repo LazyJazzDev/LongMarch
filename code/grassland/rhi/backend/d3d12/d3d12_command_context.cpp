@@ -1,8 +1,10 @@
-﻿#include "grassland/rhi/backend/d3d12/d3d12_command_context.h"
+#include "grassland/rhi/backend/d3d12/d3d12_command_context.h"
 
 #include <algorithm>
 #include <cstdlib>
+#include <cstring>
 
+#include "grassland/rhi/backend/backend_binding_group.h"
 #include "grassland/rhi/backend/backend_glfw_helper.h"
 #include "grassland/rhi/backend/d3d12/d3d12_buffer.h"
 #include "grassland/rhi/backend/d3d12/d3d12_program.h"
@@ -15,8 +17,6 @@ D3D12CommandContext::D3D12CommandContext(D3D12Device *device) : CommandContext(d
 }
 
 D3D12CommandContext::~D3D12CommandContext() {
-  for (const auto &entry : rtv_leases_)
-    device_->RTVPool().Release(entry.second.first);
   if (reusable_) {
     if (!closed_)
       reusable_ = SUCCEEDED(list_->Close());
@@ -77,33 +77,9 @@ bool D3D12CommandContext::TransitionResource(ID3D12Resource *resource,
   }
 }
 
-bool D3D12CommandContext::RenderTarget(D3D12Image *image, D3D12_CPU_DESCRIPTOR_HANDLE &handle) {
-  try {
-    auto existing = rtv_leases_.find(image);
-    if (existing != rtv_leases_.end()) {
-      handle = existing->second.second;
-      return true;
-    }
-    // Allocate tracking storage before acquiring a slot, so failure cannot leak a lease.
-    auto inserted = rtv_leases_.try_emplace(image);
-    if (!device_->RTVPool().Acquire(image->NativeImage(), inserted.first->second.first,
-                                    inserted.first->second.second)) {
-      rtv_leases_.erase(inserted.first);
-      recording_failed_ = true;
-      return false;
-    }
-    handle = inserted.first->second.second;
-    return true;
-  } catch (const std::bad_alloc &) {
-    rtv_leases_.erase(image);
-    recording_failed_ = true;
-    return false;
-  }
-}
-
 bool D3D12CommandContext::CmdClearColor(rhi::IImage *image, const std::array<float, 4> &color) {
 #if !defined(NDEBUG)
-  if (render_target_) {
+  if (rendering_active_) {
     recording_failed_ = true;
     ReportError(-1, "End rendering before transfer, clear, present or submission.");
     return false;
@@ -121,16 +97,13 @@ bool D3D12CommandContext::CmdClearColor(rhi::IImage *image, const std::array<flo
     return false;
   if (!TransitionResource(native->NativeImage(), D3D12_RESOURCE_STATE_RENDER_TARGET, native->DefaultState()))
     return false;
-  D3D12_CPU_DESCRIPTOR_HANDLE handle{};
-  if (!RenderTarget(native, handle))
-    return false;
-  list_->ClearRenderTargetView(handle, color.data(), 0, nullptr);
+  list_->ClearRenderTargetView(native->AttachmentView(), color.data(), 0, nullptr);
   return true;
 }
 
 bool D3D12CommandContext::CmdPresent(rhi::IWindow *window) {
 #if !defined(NDEBUG)
-  if (render_target_) {
+  if (rendering_active_) {
     recording_failed_ = true;
     ReportError(-1, "End rendering before transfer, clear, present or submission.");
     return false;
@@ -167,7 +140,7 @@ bool D3D12CommandContext::CmdPresent(rhi::IWindow *window) {
 
 bool D3D12CommandContext::EndRecording() {
 #if !defined(NDEBUG)
-  if (render_target_) {
+  if (rendering_active_) {
     recording_failed_ = true;
     ReportError(-1, "End rendering before transfer, clear, present or submission.");
     return false;
@@ -238,7 +211,7 @@ SubmissionStatus D3D12CommandContext::WaitForProgress() {
 
 bool D3D12CommandContext::CmdUploadBuffer(IBuffer *buffer, uint64_t offset, const void *data, uint64_t size) {
 #if !defined(NDEBUG)
-  if (render_target_) {
+  if (rendering_active_) {
     recording_failed_ = true;
     ReportError(-1, "End rendering before transfer, clear, present or submission.");
     return false;
@@ -281,7 +254,7 @@ bool D3D12CommandContext::CmdCopyBuffer(IBuffer *source,
                                         uint64_t destination_offset,
                                         uint64_t size) {
 #if !defined(NDEBUG)
-  if (render_target_) {
+  if (rendering_active_) {
     recording_failed_ = true;
     ReportError(-1, "End rendering before transfer, clear, present or submission.");
     return false;
@@ -335,7 +308,15 @@ bool D3D12CommandContext::CmdBindProgram(IProgram *program) {
     recording_failed_ = true;
     return false;
   }
+  try {
+    groups_.assign(native->GetDesc().pipeline_layout.groups.size(), {});
+  } catch (const std::bad_alloc &) {
+    recording_failed_ = true;
+    return false;
+  }
+  tables_dirty_ = true;
   program_ = native;
+  list_->OMSetStencilRef(native->GetDesc().depth_stencil.stencil_reference);
   list_->SetPipelineState(native->NativePipeline());
   list_->SetGraphicsRootSignature(native->NativeRootSignature());
   list_->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
@@ -343,48 +324,53 @@ bool D3D12CommandContext::CmdBindProgram(IProgram *program) {
 }
 
 bool D3D12CommandContext::CmdBeginRendering(const RenderingInfo &info) {
-  auto image = info.color_attachment;
-#if !defined(NDEBUG)
-  auto native = dynamic_cast<D3D12Image *>(image);
-  if (!native || !native->IsValid() || native->DeviceIdentity() != device_ || sealed_ || render_target_ ||
-      info.load_op < ATTACHMENT_LOAD_OP_LOAD || info.load_op > ATTACHMENT_LOAD_OP_DISCARD ||
-      info.store_op < ATTACHMENT_STORE_OP_STORE || info.store_op > ATTACHMENT_STORE_OP_DISCARD) {
+  if (sealed_ || rendering_active_ || !PrepareRendering(info)) {
     recording_failed_ = true;
     return false;
   }
-#else
-  auto native = static_cast<D3D12Image *>(image);
-#endif
-  if (!RetainResource(native))
-    return false;
-  if (!TransitionResource(native->NativeImage(), D3D12_RESOURCE_STATE_RENDER_TARGET, native->DefaultState()))
-    return false;
-  D3D12_CPU_DESCRIPTOR_HANDLE handle{};
-  if (!RenderTarget(native, handle))
-    return false;
-  if (info.load_op == ATTACHMENT_LOAD_OP_CLEAR)
-    list_->ClearRenderTargetView(handle, info.clear_color.data(), 0, nullptr);
-  else if (info.load_op == ATTACHMENT_LOAD_OP_DISCARD)
-    list_->DiscardResource(native->NativeImage(), nullptr);
-  list_->OMSetRenderTargets(1, &handle, FALSE, nullptr);
-  store_op_ = info.store_op;
-  render_target_ = native;
+  std::array<D3D12_CPU_DESCRIPTOR_HANDLE, 8> colors{};
+  auto count = static_cast<UINT>(rendering_.color_attachments.size());
+  for (UINT i = 0; i < count; ++i) {
+    const auto &attachment = rendering_.color_attachments[i];
+    auto image = static_cast<D3D12Image *>(attachment.color_attachment);
+    if (!TransitionResource(image->NativeImage(), D3D12_RESOURCE_STATE_RENDER_TARGET, image->DefaultState()))
+      return false;
+    colors[i] = image->AttachmentView();
+    if (attachment.load_op == ATTACHMENT_LOAD_OP_CLEAR)
+      list_->ClearRenderTargetView(colors[i], attachment.clear_color.data(), 0, nullptr);
+    else if (attachment.load_op == ATTACHMENT_LOAD_OP_DISCARD)
+      list_->DiscardResource(image->NativeImage(), nullptr);
+  }
+  auto depth = static_cast<D3D12Image *>(rendering_.depth_stencil.image);
+  D3D12_CPU_DESCRIPTOR_HANDLE dsv{};
+  if (depth) {
+    dsv = depth->AttachmentView();
+    if (!TransitionResource(depth->NativeImage(), D3D12_RESOURCE_STATE_DEPTH_WRITE, depth->DefaultState()))
+      return false;
+    const auto &ds = rendering_.depth_stencil;
+    UINT flags = ds.depth_load_op == ATTACHMENT_LOAD_OP_CLEAR ? D3D12_CLEAR_FLAG_DEPTH : 0;
+    if (HasStencil(depth->GetDesc().format) && ds.stencil_load_op == ATTACHMENT_LOAD_OP_CLEAR)
+      flags |= D3D12_CLEAR_FLAG_STENCIL;
+    if (flags)
+      list_->ClearDepthStencilView(dsv, static_cast<D3D12_CLEAR_FLAGS>(flags), ds.clear_depth,
+                                   static_cast<UINT8>(ds.clear_stencil), 0, nullptr);
+  }
+  list_->OMSetRenderTargets(count, colors.data(), FALSE, depth ? &dsv : nullptr);
+  rendering_active_ = true;
   return true;
 }
 
 bool D3D12CommandContext::CmdEndRendering() {
-#if !defined(NDEBUG)
-  if (sealed_ || !render_target_) {
+  if (sealed_ || !rendering_active_ || recording_failed_) {
     recording_failed_ = true;
     return false;
   }
-#endif
-  if (recording_failed_)
-    return false;
-  if (store_op_ == ATTACHMENT_STORE_OP_DISCARD)
-    list_->DiscardResource(render_target_->NativeImage(), nullptr);
+  for (const auto &color : rendering_.color_attachments)
+    if (color.store_op == ATTACHMENT_STORE_OP_DISCARD)
+      list_->DiscardResource(static_cast<D3D12Image *>(color.color_attachment)->NativeImage(), nullptr);
   list_->OMSetRenderTargets(0, nullptr, FALSE, nullptr);
-  render_target_ = nullptr;
+  rendering_active_ = false;
+  rendering_ = {};
   return true;
 }
 
@@ -492,11 +478,11 @@ bool D3D12CommandContext::CmdDraw(uint32_t vertex_count,
                                   uint32_t first_vertex,
                                   uint32_t first_instance) {
 #if !defined(NDEBUG)
-  if (sealed_ || !program_ || !render_target_ || !viewport_set_ || !scissor_set_) {
+  if (sealed_ || !program_ || !rendering_active_ || !viewport_set_ || !scissor_set_) {
     recording_failed_ = true;
     return false;
   }
-  if (program_->GetDesc().color_format != render_target_->GetDesc().format) {
+  if (!RenderingMatches(program_)) {
     recording_failed_ = true;
     return false;
   }
@@ -504,6 +490,8 @@ bool D3D12CommandContext::CmdDraw(uint32_t vertex_count,
   if (recording_failed_)
     return false;
   if (!PrepareDrawBuffers(false))
+    return false;
+  if (!PrepareGroups())
     return false;
   list_->DrawInstanced(vertex_count, instance_count, first_vertex, first_instance);
   return true;
@@ -515,11 +503,11 @@ bool D3D12CommandContext::CmdDrawIndexed(uint32_t index_count,
                                          int32_t vertex_offset,
                                          uint32_t first_instance) {
 #if !defined(NDEBUG)
-  if (sealed_ || !program_ || !render_target_ || !viewport_set_ || !scissor_set_ || !index_bound_) {
+  if (sealed_ || !program_ || !rendering_active_ || !viewport_set_ || !scissor_set_ || !index_bound_) {
     recording_failed_ = true;
     return false;
   }
-  if (program_->GetDesc().color_format != render_target_->GetDesc().format) {
+  if (!RenderingMatches(program_)) {
     recording_failed_ = true;
     return false;
   }
@@ -527,6 +515,8 @@ bool D3D12CommandContext::CmdDrawIndexed(uint32_t index_count,
   if (recording_failed_)
     return false;
   if (!PrepareDrawBuffers(true))
+    return false;
+  if (!PrepareGroups())
     return false;
   list_->DrawIndexedInstanced(index_count, instance_count, first_index, vertex_offset, first_instance);
   return true;
@@ -553,9 +543,218 @@ bool D3D12CommandContext::PrepareDrawBuffers(bool indexed) {
     if (!TransitionResource(index_buffer_->NativeBuffer(), state, index_buffer_->DefaultState()))
       return false;
   }
-  if (!TransitionResource(render_target_->NativeImage(), D3D12_RESOURCE_STATE_RENDER_TARGET,
-                          render_target_->DefaultState()))
-    return false;
+  for (const auto &color : rendering_.color_attachments) {
+    auto image = static_cast<D3D12Image *>(color.color_attachment);
+    if (!TransitionResource(image->NativeImage(), D3D12_RESOURCE_STATE_RENDER_TARGET, image->DefaultState()))
+      return false;
+  }
   return true;
 }
+
+bool D3D12CommandContext::CmdBindGroup(uint32_t index, IBindingGroup *group) {
+  auto native = dynamic_cast<D3D12BindingGroup *>(group);
+  if (sealed_ || !program_ || !native || native->Owner() != device_ || index >= groups_.size() ||
+      !SameBindingLayout(program_->GetDesc().pipeline_layout.groups[index], group->GetLayout()) ||
+      !native->CurrentVersion()->IsComplete()) {
+    recording_failed_ = true;
+    return false;
+  }
+  try {
+    auto version = static_cast<D3D12BindingGroup::Version *>(native->CurrentVersion());
+    auto resources = version->ResourceDescriptors();
+    if (version->ResourceCount() && !resources) {
+      recording_failed_ = true;
+      return false;
+    }
+    if (!RetainResource(version))
+      return false;
+
+    auto &bound = groups_[index];
+    std::array<D3D12DescriptorPool::Lease *, 2> sources{resources, version->SamplerDescriptors()};
+    for (size_t kind = 0; kind < sources.size(); ++kind) {
+      if (bound.sources[kind] != sources[kind]) {
+        bound.sources[kind] = sources[kind];
+        bound.dirty[kind] = true;
+        tables_dirty_ = true;
+      }
+    }
+    bound.version = version;
+    return true;
+  } catch (const std::bad_alloc &) {
+    recording_failed_ = true;
+    return false;
+  }
+}
+
+bool D3D12CommandContext::PrepareGroups() {
+  try {
+    for (size_t i = 0; i < groups_.size(); ++i) {
+      const auto version = groups_[i].version;
+      if (!version) {
+        if (!program_->GetDesc().pipeline_layout.groups[i].bindings.empty()) {
+          recording_failed_ = true;
+          return false;
+        }
+        continue;
+      }
+      for (size_t binding_index = 0; binding_index < version->GetLayout().bindings.size(); ++binding_index) {
+        const auto &binding = version->GetLayout().bindings[binding_index];
+        for (uint32_t j = 0; j < binding.count; ++j) {
+          auto type = binding.type;
+          ID3D12Resource *resource = nullptr;
+          if (type <= BINDING_RW_BYTE_ADDRESS_BUFFER) {
+            auto buffer = static_cast<D3D12Buffer *>(version->GetReferences()[binding_index][j].Get());
+            resource = buffer->NativeBuffer();
+            if (!TransitionResource(resource,
+                                    (type == BINDING_RW_STRUCTURED_BUFFER || type == BINDING_RW_BYTE_ADDRESS_BUFFER)
+                                        ? D3D12_RESOURCE_STATE_UNORDERED_ACCESS
+                                        : D3D12_RESOURCE_STATE_GENERIC_READ,
+                                    buffer->DefaultState()))
+              return false;
+          } else if (type == BINDING_TEXTURE2D || type == BINDING_RW_TEXTURE2D) {
+            auto image = static_cast<D3D12Image *>(version->GetReferences()[binding_index][j].Get());
+            resource = image->NativeImage();
+            for (auto color : rendering_.color_attachments)
+              if (color.color_attachment == image) {
+                recording_failed_ = true;
+                return false;
+              }
+            if (!TransitionResource(resource,
+                                    type == BINDING_TEXTURE2D ? D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE |
+                                                                    D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE
+                                                              : D3D12_RESOURCE_STATE_UNORDERED_ACCESS,
+                                    image->DefaultState()))
+              return false;
+          }
+          if (type == BINDING_RW_STRUCTURED_BUFFER || type == BINDING_RW_BYTE_ADDRESS_BUFFER ||
+              type == BINDING_RW_TEXTURE2D) {
+            D3D12_RESOURCE_BARRIER barrier{};
+            barrier.Type = D3D12_RESOURCE_BARRIER_TYPE_UAV;
+            barrier.UAV.pResource = resource;
+            list_->ResourceBarrier(1, &barrier);
+          }
+        }
+      }
+    }
+    if (!tables_dirty_)
+      return true;
+    bool heaps_changed = false;
+    for (size_t kind = 0; kind < 2; ++kind) {
+      uint64_t total = 0, needed = 0;
+      for (const auto &bound : groups_) {
+        if (!bound.sources[kind])
+          continue;
+        total += bound.sources[kind]->Count();
+        if (bound.dirty[kind])
+          needed += bound.sources[kind]->Count();
+      }
+      if (!needed)
+        continue;
+      const auto available = descriptor_pages_[kind] ? descriptor_pages_[kind]->Count() - descriptor_used_[kind] : 0;
+      if (needed > available) {
+        const uint32_t limit = kind ? 2048 : 1000000;
+        if (total > limit) {
+          recording_failed_ = true;
+          return false;
+        }
+        auto &pool = kind ? device_->SamplerDescriptors() : device_->ResourceDescriptors();
+        // The context chooses growth; the pool only rounds and reuses size classes.
+        // At the native limit, further rollovers necessarily use equal-size heaps.
+        const uint32_t previous = descriptor_pages_[kind] ? descriptor_pages_[kind]->Count() : 0;
+        const uint32_t minimum = std::max(uint32_t(total), std::min(previous * 2, limit));
+        auto page = pool.Acquire(minimum);
+        if (!page) {
+          recording_failed_ = true;
+          return false;
+        }
+        if (!RetainResource(page.Get()))
+          return false;
+        descriptor_pages_[kind] = page.Get();
+        descriptor_used_[kind] = 0;
+        heaps_changed = true;
+        // Every still-bound table of this heap type must move together. Earlier
+        // draws retain the old page through the context's resource references.
+        for (auto &bound : groups_)
+          bound.dirty[kind] = bound.sources[kind] != nullptr;
+      }
+      auto page = descriptor_pages_[kind];
+      const auto type = kind ? D3D12_DESCRIPTOR_HEAP_TYPE_SAMPLER : D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV;
+      for (auto &bound : groups_) {
+        if (!bound.dirty[kind] || !bound.sources[kind])
+          continue;
+        auto source = bound.sources[kind];
+        auto &cursor = descriptor_used_[kind];
+        // Copy only from CPU storage: shader-visible heaps cannot be copy sources.
+        device_->NativeDevice()->CopyDescriptorsSimple(source->Count(), page->CPU(cursor), source->CPU(), type);
+        bound.tables[kind] = page->GPU(cursor);
+        cursor += source->Count();
+        bound.dirty[kind] = false;
+      }
+    }
+    if (heaps_changed) {
+      ID3D12DescriptorHeap *heaps[2]{};
+      UINT count = 0;
+      for (auto page : descriptor_pages_)
+        if (page)
+          heaps[count++] = page->Heap();
+      list_->SetDescriptorHeaps(count, heaps);
+    }
+    // Changing either heap invalidates root tables. Rebind both heap types,
+    // including unchanged tables which did not need to be copied again.
+    for (uint32_t g = 0; g < groups_.size(); ++g)
+      for (size_t kind = 0; kind < 2; ++kind) {
+        auto parameter = program_->RootParameter(g, kind != 0);
+        if (parameter != UINT32_MAX)
+          list_->SetGraphicsRootDescriptorTable(parameter, groups_[g].tables[kind]);
+      }
+    tables_dirty_ = false;
+    return true;
+  } catch (const std::bad_alloc &) {
+    recording_failed_ = true;
+    return false;
+  }
+}
+
+bool D3D12CommandContext::CmdUploadImage(IImage *image, const void *data, uint64_t row_pitch) {
+  auto native = dynamic_cast<D3D12Image *>(image);
+  if (!native || native->DeviceIdentity() != device_ || !native->IsValid() || !data || sealed_ || rendering_active_ ||
+      IsDepthFormat(image->GetDesc().format) || row_pitch < uint64_t(image->GetDesc().width) * 4 ||
+      (image->GetDesc().height - 1) > (SIZE_MAX - uint64_t(image->GetDesc().width) * 4) / row_pitch) {
+    recording_failed_ = true;
+    return false;
+  }
+  auto desc = native->NativeImage()->GetDesc();
+  D3D12_PLACED_SUBRESOURCE_FOOTPRINT footprint{};
+  UINT rows{};
+  UINT64 bytes{}, total{};
+  device_->NativeDevice()->GetCopyableFootprints(&desc, 0, 1, 0, &footprint, &rows, &bytes, &total);
+  try {
+    auto upload = device_->UploadPool().Acquire(total);
+    if (!upload || !RetainResource(upload.Get()) || !RetainResource(native)) {
+      recording_failed_ = true;
+      return false;
+    }
+    for (UINT y = 0; y < rows; ++y) {
+      if (!upload->Write(static_cast<const uint8_t *>(data) + size_t(y) * row_pitch, bytes,
+                         footprint.Offset + uint64_t(y) * footprint.Footprint.RowPitch)) {
+        recording_failed_ = true;
+        return false;
+      }
+    }
+    if (!TransitionResource(native->NativeImage(), D3D12_RESOURCE_STATE_COPY_DEST, native->DefaultState()))
+      return false;
+    D3D12_TEXTURE_COPY_LOCATION src{}, dst{};
+    src.pResource = upload->NativeBuffer();
+    src.Type = D3D12_TEXTURE_COPY_TYPE_PLACED_FOOTPRINT;
+    src.PlacedFootprint = footprint;
+    dst.pResource = native->NativeImage();
+    dst.Type = D3D12_TEXTURE_COPY_TYPE_SUBRESOURCE_INDEX;
+    list_->CopyTextureRegion(&dst, 0, 0, 0, &src, nullptr);
+    return true;
+  } catch (const std::bad_alloc &) {
+    recording_failed_ = true;
+    return false;
+  }
+}
+
 }  // namespace grassland::rhi::backend::d3d12

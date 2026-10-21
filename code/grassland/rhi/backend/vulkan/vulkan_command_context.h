@@ -20,6 +20,8 @@ class VulkanCommandContext final : public CommandContext {
                      IBuffer *destination,
                      uint64_t destination_offset,
                      uint64_t size) override;
+  bool CmdBindGroup(uint32_t index, IBindingGroup *group) override;
+  bool CmdUploadImage(IImage *image, const void *data, uint64_t row_pitch) override;
   bool CmdBindProgram(IProgram *program) override;
   bool CmdBeginRendering(const RenderingInfo &info) override;
   bool CmdEndRendering() override;
@@ -44,6 +46,9 @@ class VulkanCommandContext final : public CommandContext {
  private:
   VulkanCommandContext(VulkanDevice *device);
 
+  bool ValidateGroups();
+  bool BindGroupVersion(uint32_t index, VulkanBindingGroup::Version *version);
+  std::vector<VulkanBindingGroup::Version *> groups_;
   VulkanProgram *program_{};
   VulkanImage *render_target_{};
   std::vector<VulkanBuffer *> vertex_buffers_;
@@ -58,7 +63,6 @@ class VulkanCommandContext final : public CommandContext {
   };
 
   std::unordered_map<VulkanBuffer *, BufferState> buffer_states_;
-  std::unordered_map<VulkanImage *, std::tuple<uint64_t, VkImageView, VkFramebuffer>> attachment_leases_;
   bool TransitionImage(VulkanImage *image, VkImageLayout layout, VkPipelineStageFlags stages, VkAccessFlags access);
 
   struct ImageState {

@@ -5,6 +5,10 @@ namespace grassland::rhi::backend {
 Image::Image(ImageDesc desc) : desc_(desc) {
 }
 
+bool Image::SupportsStorage() const {
+  return false;
+}
+
 const ImageDesc &Image::GetDesc() const {
   return desc_;
 }

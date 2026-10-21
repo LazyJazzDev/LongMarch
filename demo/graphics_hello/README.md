@@ -1,27 +1,26 @@
 # Graphics Hello
 
-One executable, eleven built-in modules. Each module implements the `Module`
+One executable, twelve built-in modules. Each module implements the `Module`
 lifecycle interface and is created only when selected. Modules are statically
 linked; no separate executables or dynamic plugins are needed.
 Embedded modules share one shader bundle;
 `external_shader` intentionally loads shader files from `assets/shaders/raytracing`.
 
 ```sh
-cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release
-cmake --build build --target demo_graphics_hello
+cmake --build cmake-build-release --target demo_graphics_hello
 
 # Open the terminal selection menu (also available with --tui).
-build/demo/graphics_hello/demo_graphics_hello
+cmake-build-release/demo/graphics_hello/demo_graphics_hello
 
 # Launch a module directly.
-build/demo/graphics_hello/demo_graphics_hello --module triangle
-build/demo/graphics_hello/demo_graphics_hello --module ray_query --backend metal
+cmake-build-release/demo/graphics_hello/demo_graphics_hello --module triangle
+cmake-build-release/demo/graphics_hello/demo_graphics_hello --module ray_query --backend metal
 
 # Discover modules without initializing a graphics device.
-build/demo/graphics_hello/demo_graphics_hello --list
+cmake-build-release/demo/graphics_hello/demo_graphics_hello --list
 ```
 
-The terminal UI lists module names and descriptions. Enter a number (1–11) or a
+The terminal UI lists module names and descriptions. Enter a number (1–12) or a
 module name, followed by Enter. Invalid choices prompt again; `q`, `quit`, or EOF
 exits without creating a window. This line-based menu works in IDE consoles and
 with redirected input as well as native terminals. Closing a demo window exits
@@ -29,6 +28,7 @@ the executable normally.
 
 | Module | Demonstration |
 | --- | --- |
+| `window` | Clear sky-blue image |
 | `triangle` | Colored triangle |
 | `blend` | Alpha blending |
 | `cube` | Rotating cube |
@@ -60,7 +60,7 @@ The window system or driver may still constrain the visible refresh rate.
 All rotating geometry completes one revolution every two seconds, measured with
 a monotonic clock from the first animation update, independently of frame rate.
 
-Metal supports the seven raster modules and `ray_query` on compatible devices.
+Metal supports the eight raster modules and `ray_query` on compatible devices.
 `raytracing`, `rt_multi_shader_group`, and `external_shader` require ray tracing
 pipelines, which Metal does not implement;
 their diagnostics recommend `--module ray_query`. Query support is checked
@@ -84,8 +84,8 @@ retain their length, and normals use the inverse transpose for correct ellipsoid
 shading. Bounds checks handle partial 8-by-8 workgroups.
 
 ```sh
-build/demo/graphics_hello/demo_graphics_hello --module rt_multi_shader_group --backend vulkan
-build/demo/graphics_hello/demo_graphics_hello --module external_shader --backend d3d12
+cmake-build-release/demo/graphics_hello/demo_graphics_hello --module rt_multi_shader_group --backend vulkan
+cmake-build-release/demo/graphics_hello/demo_graphics_hello --module external_shader --backend d3d12
 ```
 
 The external-shader module retains its runtime `VirtualFileSystem::LoadDirectory`
@@ -94,15 +94,63 @@ workflow and requires the assets submodule's `shaders/raytracing` files.
 Validation examples:
 
 ```sh
-python3 demo/graphics_hello/test_launcher.py build/demo/graphics_hello/demo_graphics_hello
+python3 demo/graphics_hello/test_launcher.py cmake-build-release/demo/graphics_hello/demo_graphics_hello
 MTL_DEBUG_LAYER=1 MTL_SHADER_VALIDATION=1 \
-  build/demo/graphics_hello/demo_graphics_hello --module ray_query --backend metal --frames 10
+  cmake-build-release/demo/graphics_hello/demo_graphics_hello --module ray_query --backend metal --frames 10
 ```
+
+## Offscreen benchmarks
+
+```sh
+cmake-build-release/demo/graphics_hello/demo_graphics_hello --headless --all --backend vulkan --frames 100000
+cmake-build-release/demo/graphics_hello/demo_graphics_hello --headless --module cube --backend d3d12 --frames 100000
+```
+
+`--headless` supports `window`, `triangle`, `cube`, and `texture`, corresponding to
+`rhi_hello`'s `hello_window`, `hello_triangle`, `hello_cube`, and `hello_texture`.
+`--all` runs these four modules and requires `--headless`; it cannot be combined
+with `--module` or `--tui`. Other modules reject headless mode. The default is
+600 measured frames when `--frames` is omitted. Python demos remain windowed.
+
+No GLFW window, swapchain, Present, screenshot, or event loop is used. Each module
+creates its own device and resources. The benchmark uses 1280x720 RGBA8 images,
+three cyclic color targets and three configured frames in flight. Sixty warmup
+frames and a GPU drain precede timing; the final GPU drain is included in timing.
+Initialization, shader compilation and teardown are excluded. The reported FPS
+measures CPU recording/submission plus completed GPU work, not GPU-only duration.
+
+Headless geometry, formats and draw counts match the RHI scenes: clear only,
+one indexed RGB triangle, a 36-index cube with D32 depth and a per-frame matrix
+upload, and a 256x256 XOR texture on one indexed triangle without depth.
+Cube rotation advances by 0.01 radians each frame, including warmup. Headless
+triangle uses static vertex/index buffers and the RHI triangle dimensions.
+Windowed modules retain their original formats and animation timing.
+
+The libraries retain their own command, barrier, upload and synchronization
+implementations: graphics uses its Core frame ring (waiting for the next slot
+at the end of Submit), while RHI waits on a submission token before slot reuse.
+Graphics dynamic uniform uploads use its existing transfer path; RHI records
+uploads into its command context. Results compare these end-to-end APIs, rather
+than identical native command streams. Run Release builds on the same GPU with
+validation disabled, one benchmark process at a time, and compare repeated
+runs (for example, three runs of 100000 frames and their medians).
+
+The comparison script runs both executables serially, alternates their order,
+prints median FPS and ratios, and writes raw logs plus JSON under `out/`:
+
+```sh
+python demo/graphics_hello/benchmark_compare.py --frames 100000 --runs 3
+```
+
+It defaults to D3D12 and Vulkan. Repeat `--backend` to select other compiled
+backends. Validation layers are disabled by the script for measurement; run
+Debug/validation smoke tests separately. Use a Release build directory and
+check device logs to confirm that both libraries selected the same GPU.
 
 ## Python
 
 `python/graphics_hello.py` is the Python counterpart, built on the installed
-`long_march` module. It has the same eleven modules, options, menu, window
+`long_march` module. It retains the original eleven windowed modules, options, menu, window
 titles, FPS display and animation timing, and compiles the shaders in
 `modules/NAME/shaders/`. Each module is also a standalone script,
 `python/graphics_hello_NAME.py`, which accepts `--backend` and `--frames`.

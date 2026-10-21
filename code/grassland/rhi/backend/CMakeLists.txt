@@ -1,4 +1,4 @@
-file(GLOB SOURCES "*.cpp" "*.h")
+file(GLOB SOURCES CONFIGURE_DEPENDS "*.cpp" "*.h")
 
 target_sources(grassland_rhi PRIVATE ${SOURCES})
 

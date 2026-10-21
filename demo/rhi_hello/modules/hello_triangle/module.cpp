@@ -70,7 +70,7 @@ int HelloTriangle(grassland::rhi::BackendAPI api, int frames, bool headless) {
       image = window->GetNextImage();
     if (!image)
       return 1;
-    desc.color_format = image->GetDesc().format;
+    desc.color_formats = {image->GetDesc().format};
   }
   ObjPtr<IProgram> program = device->CreateProgram(desc);
   if (!program)
@@ -166,7 +166,7 @@ int HelloTriangle(grassland::rhi::BackendAPI api, int frames, bool headless) {
     if (!context->CmdBindProgram(program.Get()))
       return 1;
     if (!context->CmdBeginRendering(
-            {image.Get(), ATTACHMENT_LOAD_OP_CLEAR, ATTACHMENT_STORE_OP_STORE, {0.6f, 0.7f, 0.8f, 1}}))
+            {{{image.Get(), ATTACHMENT_LOAD_OP_CLEAR, ATTACHMENT_STORE_OP_STORE, {0.6f, 0.7f, 0.8f, 1}}}}))
       return 1;
     if (!context->CmdBindVertexBuffer(0, vertex_buffer.Get()))
       return 1;
