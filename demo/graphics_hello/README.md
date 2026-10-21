@@ -106,9 +106,9 @@ cmake-build-release/demo/graphics_hello/demo_graphics_hello --headless --all --b
 cmake-build-release/demo/graphics_hello/demo_graphics_hello --headless --module cube --backend d3d12 --frames 100000
 ```
 
-`--headless` supports `window`, `triangle`, `cube`, and `texture`, corresponding to
-`rhi_hello`'s `hello_window`, `hello_triangle`, `hello_cube`, and `hello_texture`.
-`--all` runs these four modules and requires `--headless`; it cannot be combined
+`--headless` supports `window`, `triangle`, `cube`, `texture`, and `blend`, corresponding to
+`rhi_hello`'s `hello_window`, `hello_triangle`, `hello_cube`, `hello_texture`, and `hello_blend`.
+`--all` runs these five modules and requires `--headless`; it cannot be combined
 with `--module` or `--tui`. Other modules reject headless mode. The default is
 600 measured frames when `--frames` is omitted. Python demos remain windowed.
 
@@ -125,6 +125,8 @@ upload, and a 256x256 XOR texture on one indexed triangle without depth.
 Cube rotation advances by 0.01 radians each frame, including warmup. Headless
 triangle uses static vertex/index buffers and the RHI triangle dimensions.
 Windowed modules retain their original formats and animation timing.
+
+The headless `blend` scene draws the opaque inner triangle followed by the half-alpha outer triangle, using three RGBA8 targets and static vertex/index buffers to match `rhi_hello`. Windowed blending retains its existing floating-point target.
 
 The libraries retain their own command, barrier, upload and synchronization
 implementations: graphics uses its Core frame ring (waiting for the next slot

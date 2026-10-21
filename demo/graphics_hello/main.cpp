@@ -40,7 +40,7 @@ std::unique_ptr<Module> CreateModule(BackendAPI api, bool headless) {
 
 const std::array<ModuleInfo, 12> modules{{
     {"triangle", "Colored triangle", CreateModule<triangle::ModuleTriangle>, true},
-    {"blend", "Alpha blending", CreateModule<blend::ModuleBlend>},
+    {"blend", "Alpha blending", CreateModule<blend::ModuleBlend>, true},
     {"cube", "Rotating cube", CreateModule<cube::ModuleCube>, true},
     {"texture", "Textured triangle", CreateModule<texture::ModuleTexture>, true},
     {"resize", "Resizable window", CreateModule<resize::ModuleResize>},
@@ -168,8 +168,8 @@ void RunModule(const ModuleInfo &info, BackendAPI api, int frames, bool headless
 void PrintHelp(const char *executable) {
   std::cout << "Usage: " << executable
             << " [--module NAME | --tui | --all] [--backend auto|metal|vulkan|d3d12] [--frames N] [--headless]\n"
-               "       --headless Benchmark window/triangle/cube/texture without a window (default 600 frames)\n"
-               "       --all      Run all four headless benchmarks (requires --headless)\n"
+               "       --headless Benchmark window/triangle/cube/texture/blend without a window (default 600 frames)\n"
+               "       --all      Run all five headless benchmarks (requires --headless)\n"
                "       --list     List all modules without opening a window\n"
                "       --help     Show this help\n"
                "With no module specified, the terminal selection menu opens.\n\n";
