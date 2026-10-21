@@ -17,7 +17,7 @@ class BindingGroup : public Object<IBindingGroup> {
     virtual ObjectPtr<Version> Clone() const = 0;
     bool Write(size_t binding_index, uint32_t first_element, const std::vector<BufferView> &values);
     bool Write(size_t binding_index, uint32_t first_element, const std::vector<IImage *> &values);
-    bool Write(size_t binding_index, uint32_t first_element, const std::vector<SamplerDesc> &values);
+    bool Write(size_t binding_index, uint32_t first_element, const std::vector<ISampler *> &values);
 
    protected:
     virtual bool WriteDescriptors(size_t binding_index,
@@ -26,12 +26,13 @@ class BindingGroup : public Object<IBindingGroup> {
     virtual bool WriteDescriptors(size_t binding_index,
                                   uint32_t first_element,
                                   const std::vector<IImage *> &values) = 0;
-    virtual bool WriteDescriptors(size_t binding_index,
-                                  uint32_t first_element,
-                                  const std::vector<SamplerDesc> &values) = 0;
+    virtual bool WriteDescriptors(size_t binding_index, uint32_t first_element, const std::vector<ISampler *> &values);
+    // Internal bridge for the unchanged Metal implementation.
+    virtual bool WriteDescriptors(size_t binding_index, uint32_t first_element, const std::vector<SamplerDesc> &values);
     Device *device_;
     BindingLayoutDesc layout_;
-    // Indexed by sorted layout binding, then array element. Samplers own no RHI resource.
+    // Indexed by sorted layout binding, then array element.
+    // Native sampler backends populate sampler slots; the legacy adapter leaves them empty.
     std::vector<std::vector<ObjectPtr<IObject>>> references_;
   };
 
@@ -40,7 +41,7 @@ class BindingGroup : public Object<IBindingGroup> {
   const BindingLayoutDesc &GetLayout() const override;
   bool BindResource(uint32_t binding, const std::vector<BufferView> &buffers, uint32_t first_element = 0) override;
   bool BindResource(uint32_t binding, const std::vector<IImage *> &images, uint32_t first_element = 0) override;
-  bool BindResource(uint32_t binding, const std::vector<SamplerDesc> &samplers, uint32_t first_element = 0) override;
+  bool BindResource(uint32_t binding, const std::vector<ISampler *> &samplers, uint32_t first_element = 0) override;
   Device *Owner() const;
   // Borrowed until the next mutation; the context retains it before recording use.
   Version *CurrentVersion() const;

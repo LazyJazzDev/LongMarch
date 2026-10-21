@@ -18,6 +18,7 @@ class VulkanDevice final : public Device {
   VkDevice NativeDevice() const;
   VulkanRenderTargetPool &RenderTargets();
   VulkanDescriptorPool &DescriptorPool();
+  ISampler *CreateSampler(const SamplerDesc &desc = {}) override;
   IBindingGroup *CreateBindingGroup(const BindingLayoutDesc &layout) override;
   PFN_vkCmdBeginRendering BeginRenderingCommand() const;
   PFN_vkCmdEndRendering EndRenderingCommand() const;

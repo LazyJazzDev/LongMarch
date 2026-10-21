@@ -30,6 +30,7 @@ class D3D12Device final : public Device {
   bool WaitIdle();
   rhi::IProgram *CreateProgram(const ProgramDesc &desc) override;
   rhi::IImage *CreateImage(const ImageDesc &desc) override;
+  ISampler *CreateSampler(const SamplerDesc &desc = {}) override;
   rhi::IBindingGroup *CreateBindingGroup(const BindingLayoutDesc &layout) override;
   rhi::IBuffer *CreateBuffer(const BufferDesc &desc) override;
   D3D12UploadPool &UploadPool();

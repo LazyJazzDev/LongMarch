@@ -5,6 +5,7 @@
 #include "grassland/rhi/backend/d3d12/d3d12_allocated_image.h"
 #include "grassland/rhi/backend/d3d12/d3d12_buffer.h"
 #include "grassland/rhi/backend/d3d12/d3d12_device.h"
+#include "grassland/rhi/backend/d3d12/d3d12_sampler.h"
 
 namespace grassland::rhi::backend::d3d12 {
 D3D12BindingGroup::Version::Version(D3D12Device *device, const BindingLayoutDesc &layout)
@@ -16,6 +17,8 @@ D3D12BindingGroup::Version::Version(D3D12Device *device, const BindingLayoutDesc
     offsets_.push_back(offset);
     offset += binding.count;
     initialized_.emplace_back(binding.count, false);
+    if (binding.type == BINDING_SAMPLER)
+      references_[i].resize(binding.count);
   }
 }
 
@@ -174,22 +177,12 @@ bool D3D12BindingGroup::Version::WriteDescriptors(size_t binding_index,
 
 bool D3D12BindingGroup::Version::WriteDescriptors(size_t binding_index,
                                                   uint32_t first_element,
-                                                  const std::vector<SamplerDesc> &samplers) {
+                                                  const std::vector<ISampler *> &samplers) {
   auto native = static_cast<D3D12Device *>(device_)->NativeDevice();
-  const D3D12_TEXTURE_ADDRESS_MODE modes[] = {D3D12_TEXTURE_ADDRESS_MODE_WRAP, D3D12_TEXTURE_ADDRESS_MODE_CLAMP,
-                                              D3D12_TEXTURE_ADDRESS_MODE_MIRROR};
-  for (size_t i = 0; i < samplers.size(); ++i) {
-    const auto &sampler = samplers[i];
-    D3D12_SAMPLER_DESC desc{};
-    desc.Filter =
-        sampler.filter == SAMPLER_FILTER_LINEAR ? D3D12_FILTER_MIN_MAG_MIP_LINEAR : D3D12_FILTER_MIN_MAG_MIP_POINT;
-    desc.AddressU = modes[sampler.address_u];
-    desc.AddressV = desc.AddressW = modes[sampler.address_v];
-    desc.MaxLOD = D3D12_FLOAT32_MAX;
-    desc.ComparisonFunc = D3D12_COMPARISON_FUNC_ALWAYS;
-    desc.MaxAnisotropy = 1;
-    native->CreateSampler(&desc, samplers_->CPU(offsets_[binding_index] + first_element + uint32_t(i)));
-  }
+  for (size_t i = 0; i < samplers.size(); ++i)
+    native->CopyDescriptorsSimple(1, samplers_->CPU(offsets_[binding_index] + first_element + uint32_t(i)),
+                                  static_cast<D3D12Sampler *>(samplers[i])->Descriptor(),
+                                  D3D12_DESCRIPTOR_HEAP_TYPE_SAMPLER);
   for (size_t i = 0; i < samplers.size(); ++i)
     initialized_[binding_index][first_element + i] = true;
   return true;

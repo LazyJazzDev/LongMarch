@@ -17,7 +17,74 @@
 
 #if defined(LONGMARCH_D3D12_ENABLED) || defined(LONGMARCH_VULKAN_ENABLED) || defined(LONGMARCH_METAL_ENABLED)
 namespace grassland::rhi {
+namespace {
+struct SamplerArray {
+  std::vector<ObjPtr<ISampler>> owners;
+  std::vector<ISampler *> handles;
+
+  operator const std::vector<ISampler *> &() const {
+    return handles;
+  }
+};
+
+SamplerArray CreateSamplers(IDevice *device, std::initializer_list<SamplerDesc> descriptions) {
+  SamplerArray result;
+  for (const auto &desc : descriptions) {
+    result.owners.emplace_back(device->CreateSampler(desc));
+    result.handles.push_back(result.owners.back().Get());
+  }
+  return result;
+}
+}  // namespace
+
 class RhiProgram : public testing::TestWithParam<BackendAPI> {};
+
+TEST_P(RhiProgram, SamplersAreReusableAndRetainedByCapturedVersions) {
+  if (GetParam() == BACKEND_API_METAL)
+    GTEST_SKIP() << "Metal retains native sampler state through the legacy adapter.";
+  ObjPtr<ICore> core = CreateCore(GetParam());
+  ASSERT_TRUE(core);
+  ObjPtr<IDevice> device = core->CreateDeviceByAutoSelection();
+  ASSERT_TRUE(device);
+  EXPECT_FALSE(device->CreateSampler({static_cast<SamplerFilter>(-1)}));
+  SamplerDesc desc;
+  desc.address_u = static_cast<SamplerAddressMode>(-1);
+  EXPECT_FALSE(device->CreateSampler(desc));
+  desc = {};
+  ObjPtr<ISampler> first = device->CreateSampler(desc);
+  ObjPtr<ISampler> second = device->CreateSampler({SAMPLER_FILTER_NEAREST});
+  ASSERT_TRUE(first);
+  ASSERT_TRUE(second);
+  desc.filter = SAMPLER_FILTER_NEAREST;
+  EXPECT_EQ(first->GetDesc().filter, SAMPLER_FILTER_LINEAR);
+  ObjPtr<IBindingGroup> group = device->CreateBindingGroup({{{0, BINDING_SAMPLER, 2}}});
+  ObjPtr<IBindingGroup> other = device->CreateBindingGroup({{{0, BINDING_SAMPLER}}});
+  ASSERT_TRUE(group);
+  ASSERT_TRUE(other);
+  ASSERT_TRUE(group->BindResource(0, std::vector<ISampler *>{first.Get(), second.Get()}));
+  ASSERT_TRUE(other->BindResource(0, first.Get()));
+  auto native = static_cast<backend::BindingGroup *>(group.Get());
+  auto captured = backend::ObjectPtr<backend::BindingGroup::Version>::Retain(native->CurrentVersion());
+  auto first_ptr = first.Get();
+  auto second_ptr = second.Get();
+  first.Release();
+  second.Release();
+  ASSERT_TRUE(group->BindResource(0, std::vector<ISampler *>{second_ptr, first_ptr}));
+  EXPECT_EQ(captured->GetReferences()[0][0].Get(), first_ptr);
+  EXPECT_EQ(native->CurrentVersion()->GetReferences()[0][0].Get(), second_ptr);
+  auto current = native->CurrentVersion();
+  EXPECT_FALSE(group->BindResource(0, std::vector<ISampler *>{first_ptr, nullptr}));
+  EXPECT_EQ(native->CurrentVersion(), current);
+  ObjPtr<IDevice> foreign = core->CreateDeviceByAutoSelection();
+  ASSERT_TRUE(foreign);
+  ObjPtr<ISampler> foreign_sampler = foreign->CreateSampler();
+  ASSERT_TRUE(foreign_sampler);
+  EXPECT_FALSE(group->BindResource(0, foreign_sampler.Get()));
+  group.Release();
+  other.Release();
+  EXPECT_EQ(static_cast<ISampler *>(captured->GetReferences()[0][0].Get())->GetDesc().filter, SAMPLER_FILTER_LINEAR);
+  EXPECT_EQ(static_cast<ISampler *>(captured->GetReferences()[0][1].Get())->GetDesc().filter, SAMPLER_FILTER_NEAREST);
+}
 
 TEST_P(RhiProgram, DeferredCompilationOwnsSourcesAndUsesInputMacros) {
   ObjPtr<ICore> core = CreateCore(GetParam());
@@ -352,7 +419,7 @@ TEST_P(RhiProgram, BindingUpdatesAreTransactionalAndForkOnlyCapturedVersions) {
   ASSERT_TRUE(group->BindResource(2, std::vector<BufferView>{{a.Get(), 0, 256}}, 1));
   ASSERT_TRUE(group->BindResource(2, BufferView{b.Get()}));
   ASSERT_TRUE(group->BindResource(7, image.Get()));
-  ASSERT_TRUE(group->BindResource(9, SamplerDesc{}));
+  ASSERT_TRUE(group->BindResource(9, ObjPtr<ISampler>(device->CreateSampler(SamplerDesc{})).Get()));
   EXPECT_TRUE(initial->IsComplete());
   EXPECT_EQ(native->CurrentVersion(), initial);
   // Native validation rejects the second slot; the first must not change either.
@@ -361,7 +428,7 @@ TEST_P(RhiProgram, BindingUpdatesAreTransactionalAndForkOnlyCapturedVersions) {
   EXPECT_EQ(initial->GetReferences()[0][1].Get(), a.Get());
   EXPECT_FALSE(group->BindResource(7, b.Get()));
   EXPECT_FALSE(group->BindResource(2, image.Get()));
-  EXPECT_FALSE(group->BindResource(9, std::vector<SamplerDesc>{{static_cast<SamplerFilter>(-1)}}));
+  EXPECT_FALSE(group->BindResource(9, CreateSamplers(device.Get(), {{static_cast<SamplerFilter>(-1)}})));
   // A command's use-reference is the only reason to fork.
   auto captured = backend::ObjectPtr<backend::BindingGroup::Version>::Retain(initial);
   EXPECT_FALSE(group->BindResource(2, BufferView{a.Get(), 1, 256}));
@@ -372,10 +439,14 @@ TEST_P(RhiProgram, BindingUpdatesAreTransactionalAndForkOnlyCapturedVersions) {
   EXPECT_EQ(&group->GetLayout(), stable_layout);
   EXPECT_EQ(captured->GetReferences()[0][0].Get(), b.Get());
   EXPECT_EQ(next->GetReferences()[0][0].Get(), a.Get());
-  ASSERT_TRUE(group->BindResource(9, SamplerDesc{SAMPLER_FILTER_NEAREST}));
+  ASSERT_TRUE(
+      group->BindResource(9, ObjPtr<ISampler>(device->CreateSampler(SamplerDesc{SAMPLER_FILTER_NEAREST})).Get()));
   EXPECT_EQ(native->CurrentVersion(), next);
   EXPECT_TRUE(captured->IsInitialized(2, 0));
-  EXPECT_TRUE(captured->GetReferences()[2].empty());
+  if (GetParam() != BACKEND_API_METAL) {
+    ASSERT_EQ(captured->GetReferences()[2].size(), 1u);
+    EXPECT_EQ(static_cast<ISampler *>(captured->GetReferences()[2][0].Get())->GetDesc().filter, SAMPLER_FILTER_LINEAR);
+  }
   // Capture of the unchanged version shares all descriptors and resources.
   auto again = backend::ObjectPtr<backend::BindingGroup::Version>::Retain(next);
   EXPECT_EQ(again.Get(), next);
@@ -422,10 +493,11 @@ TEST_P(RhiProgram, TypedBindingArraysPreserveSparseVersionsAndPartialUpdates) {
   auto native = static_cast<backend::BindingGroup *>(group.Get());
   ASSERT_TRUE(group->BindResource(2, std::vector<BufferView>{{buffer.Get(), 256, 0}}, 1));
   ASSERT_TRUE(group->BindResource(7, std::vector<IImage *>{first.Get()}, 2));
-  ASSERT_TRUE(group->BindResource(9, std::vector<SamplerDesc>{{SAMPLER_FILTER_NEAREST}}, 1));
+  ASSERT_TRUE(group->BindResource(9, CreateSamplers(device.Get(), {{SAMPLER_FILTER_NEAREST}}), 1));
   auto sparse = backend::ObjectPtr<backend::BindingGroup::Version>::Retain(native->CurrentVersion());
   ASSERT_FALSE(sparse->IsComplete());
-  ASSERT_TRUE(group->BindResource(9, std::vector<SamplerDesc>{{SAMPLER_FILTER_LINEAR}, {SAMPLER_FILTER_NEAREST}}, 1));
+  ASSERT_TRUE(
+      group->BindResource(9, CreateSamplers(device.Get(), {{SAMPLER_FILTER_LINEAR}, {SAMPLER_FILTER_NEAREST}}), 1));
   auto next = native->CurrentVersion();
   EXPECT_NE(next, sparse.Get());
   EXPECT_FALSE(next->IsInitialized(0, 0));
@@ -439,13 +511,13 @@ TEST_P(RhiProgram, TypedBindingArraysPreserveSparseVersionsAndPartialUpdates) {
   ASSERT_TRUE(group->BindResource(2, std::vector<BufferView>{{buffer.Get(), 0, 256}, {buffer.Get(), 256, 256}}, 0));
   ASSERT_TRUE(group->BindResource(2, std::vector<BufferView>{{buffer.Get(), 0, 256}}, 2));
   ASSERT_TRUE(group->BindResource(7, std::vector<IImage *>{first.Get(), second.Get()}, 0));
-  ASSERT_TRUE(group->BindResource(9, SamplerDesc{}));
+  ASSERT_TRUE(group->BindResource(9, ObjPtr<ISampler>(device->CreateSampler(SamplerDesc{})).Get()));
   EXPECT_TRUE(next->IsComplete());
   EXPECT_EQ(native->CurrentVersion(), next);
   EXPECT_FALSE(group->BindResource(7, std::vector<IImage *>{second.Get(), nullptr}));
   EXPECT_EQ(next->GetReferences()[1][0].Get(), first.Get());
-  EXPECT_FALSE(
-      group->BindResource(9, std::vector<SamplerDesc>{{SAMPLER_FILTER_NEAREST}, {static_cast<SamplerFilter>(-1)}}));
+  EXPECT_FALSE(group->BindResource(
+      9, CreateSamplers(device.Get(), {{SAMPLER_FILTER_NEAREST}, {static_cast<SamplerFilter>(-1)}})));
   EXPECT_EQ(native->CurrentVersion(), next);
   // Image array replacement must retain all inputs before dropping any old slot.
   auto first_ptr = first.Get();
@@ -614,7 +686,7 @@ TEST(D3D12BindingGroup, CpuDescriptorsAreFinalBeforeProgramBinding) {
   ObjPtr<IBindingGroup> group = device->CreateBindingGroup(layout);
   ASSERT_TRUE(group);
   ASSERT_TRUE(group->BindResource(0, buffer.Get()));
-  ASSERT_TRUE(group->BindResource(1, SamplerDesc{}));
+  ASSERT_TRUE(group->BindResource(1, ObjPtr<ISampler>(device->CreateSampler(SamplerDesc{})).Get()));
   auto native = static_cast<D3D12BindingGroup *>(group.Get());
   auto version = static_cast<D3D12BindingGroup::Version *>(native->CurrentVersion());
   auto a = version->ResourceDescriptors();
@@ -633,7 +705,8 @@ TEST(D3D12BindingGroup, CpuDescriptorsAreFinalBeforeProgramBinding) {
   EXPECT_EQ(native->CurrentVersion(), version);
   EXPECT_EQ(version->ResourceDescriptors(), a);
   EXPECT_EQ(version->SamplerDescriptors()->CPU().ptr, sampler);
-  ASSERT_TRUE(group->BindResource(1, SamplerDesc{SAMPLER_FILTER_NEAREST}));
+  ASSERT_TRUE(
+      group->BindResource(1, ObjPtr<ISampler>(device->CreateSampler(SamplerDesc{SAMPLER_FILTER_NEAREST})).Get()));
   auto replacement = static_cast<D3D12BindingGroup::Version *>(native->CurrentVersion());
   EXPECT_NE(replacement, version);
   EXPECT_NE(replacement->SamplerDescriptors()->CPU().ptr, sampler);

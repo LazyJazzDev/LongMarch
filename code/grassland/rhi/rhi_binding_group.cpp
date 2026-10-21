@@ -21,9 +21,9 @@ bool IBindingGroup::BindResource(uint32_t binding, IImage *image) {
   }
 }
 
-bool IBindingGroup::BindResource(uint32_t binding, const SamplerDesc &sampler) {
+bool IBindingGroup::BindResource(uint32_t binding, ISampler *sampler) {
   try {
-    return BindResource(binding, std::vector<SamplerDesc>{sampler});
+    return BindResource(binding, std::vector<ISampler *>{sampler});
   } catch (const std::bad_alloc &) {
     return false;
   }

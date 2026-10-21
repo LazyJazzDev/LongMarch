@@ -16,3 +16,4 @@
 namespace grassland::rhi {}
 
 #include "grassland/rhi/rhi_binding_group.h"
+#include "grassland/rhi/rhi_sampler.h"

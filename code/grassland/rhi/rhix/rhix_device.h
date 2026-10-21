@@ -21,6 +21,7 @@ class Device : public ObjectContainer {
   bool SupportRayTracingPipeline() const;
   bool SupportRayQuery() const;
   bool SupportGeometryShader() const;
+  Sampler CreateSampler(const rhi::SamplerDesc &desc = {}) const;
   BindingGroup CreateBindingGroup(const rhi::BindingLayoutDesc &layout) const;
   Shader CreateShader(const rhi::ShaderDesc &desc) const;
   Program CreateProgram(const rhi::ProgramDesc &desc) const;

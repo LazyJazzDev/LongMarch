@@ -22,6 +22,7 @@ class IDevice : public IObject {
   virtual bool SupportGeometryShader() const = 0;
   // Independent 2D color target, also usable for transfer/clear commands.
   virtual IImage *CreateImage(const ImageDesc &desc) = 0;
+  virtual ISampler *CreateSampler(const SamplerDesc &desc = {}) = 0;
   virtual IBindingGroup *CreateBindingGroup(const BindingLayoutDesc &layout) = 0;
   virtual IBuffer *CreateBuffer(const BufferDesc &desc) = 0;
   virtual IProgram *CreateProgram(const ProgramDesc &desc) = 0;

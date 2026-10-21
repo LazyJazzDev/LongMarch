@@ -583,7 +583,7 @@ TEST_P(RhiImage, BindingVersionsPreserveRangesAndArraysAcrossHeapPages) {
   ASSERT_TRUE(selection);
   ASSERT_TRUE(material);
   ASSERT_TRUE(material->BindResource(7, std::vector<IImage *>{red.Get(), green.Get()}));
-  ASSERT_TRUE(material->BindResource(9, SamplerDesc{}));
+  ASSERT_TRUE(material->BindResource(9, ObjPtr<ISampler>(device->CreateSampler(SamplerDesc{})).Get()));
   ASSERT_TRUE(material->BindResource(11, std::vector<BufferView>{{factors.Get(), 0, 16}, {factors.Get(), 16, 16}}));
   // Fork only the buffer binding, then destroy the source version. Copied image
   // and sampler descriptors must keep their native handles valid for GPU use.
@@ -605,7 +605,8 @@ TEST_P(RhiImage, BindingVersionsPreserveRangesAndArraysAcrossHeapPages) {
   ASSERT_TRUE(commands->CmdBindGroup(1, material.Get()));
   // Changes after binding must not affect this context, including render-pass restarts.
   ASSERT_TRUE(material->BindResource(7, std::vector<IImage *>{green.Get(), red.Get()}));
-  ASSERT_TRUE(material->BindResource(9, SamplerDesc{SAMPLER_FILTER_NEAREST}));
+  ASSERT_TRUE(
+      material->BindResource(9, ObjPtr<ISampler>(device->CreateSampler(SamplerDesc{SAMPLER_FILTER_NEAREST})).Get()));
   ASSERT_TRUE(material->BindResource(11, std::vector<BufferView>{{factors.Get(), 0, 16}, {factors.Get(), 0, 16}}));
   ASSERT_TRUE(commands->CmdBeginRendering(
       {{{target.Get(), ATTACHMENT_LOAD_OP_CLEAR, ATTACHMENT_STORE_OP_STORE, {0, 0, 0, 1}}}}));
@@ -617,7 +618,7 @@ TEST_P(RhiImage, BindingVersionsPreserveRangesAndArraysAcrossHeapPages) {
     if (i < 300) {
       SamplerDesc sampler;
       sampler.filter = i % 2 ? SAMPLER_FILTER_LINEAR : SAMPLER_FILTER_NEAREST;
-      ASSERT_TRUE(sampling->BindResource(1, sampler));
+      ASSERT_TRUE(sampling->BindResource(1, ObjPtr<ISampler>(device->CreateSampler(sampler)).Get()));
       ASSERT_TRUE(commands->CmdBindGroup(2, sampling.Get()));
     }
     ASSERT_TRUE(selection->BindResource(3, BufferView{uniform.Get(), uint64_t(i % 2 ? 256 : 0), 256}));

@@ -1,5 +1,6 @@
 ﻿#pragma once
 #include "grassland/rhi/rhi_object.h"
+#include "grassland/rhi/rhi_sampler.h"
 
 namespace grassland::rhi {
 class IBuffer;
@@ -36,15 +37,6 @@ struct PipelineLayoutDesc {
   std::vector<BindingLayoutDesc> groups;
 };
 
-enum SamplerFilter { SAMPLER_FILTER_NEAREST, SAMPLER_FILTER_LINEAR };
-
-enum SamplerAddressMode { SAMPLER_ADDRESS_REPEAT, SAMPLER_ADDRESS_CLAMP_TO_EDGE, SAMPLER_ADDRESS_MIRRORED_REPEAT };
-
-struct SamplerDesc {
-  SamplerFilter filter{SAMPLER_FILTER_LINEAR};
-  SamplerAddressMode address_u{SAMPLER_ADDRESS_REPEAT}, address_v{SAMPLER_ADDRESS_REPEAT};
-};
-
 // A borrowed byte range. size == 0 selects the remaining bytes.
 // Structured ranges must be multiples of BindingDesc::stride.
 struct BufferView {
@@ -61,11 +53,11 @@ class IBindingGroup : public IObject {
   bool BindResource(uint32_t binding, IBuffer *buffer);
   bool BindResource(uint32_t binding, const BufferView &buffer);
   bool BindResource(uint32_t binding, IImage *image);
-  bool BindResource(uint32_t binding, const SamplerDesc &sampler);
+  bool BindResource(uint32_t binding, ISampler *sampler);
   bool BindResource(uint32_t binding, const std::vector<IBuffer *> &buffers, uint32_t first_element = 0);
   virtual bool BindResource(uint32_t binding, const std::vector<BufferView> &buffers, uint32_t first_element = 0) = 0;
   virtual bool BindResource(uint32_t binding, const std::vector<IImage *> &images, uint32_t first_element = 0) = 0;
-  virtual bool BindResource(uint32_t binding, const std::vector<SamplerDesc> &samplers, uint32_t first_element = 0) = 0;
+  virtual bool BindResource(uint32_t binding, const std::vector<ISampler *> &samplers, uint32_t first_element = 0) = 0;
 
  protected:
   ~IBindingGroup() override = default;

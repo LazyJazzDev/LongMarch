@@ -22,14 +22,10 @@ class VulkanBindingGroup final : public BindingGroup {
     Version(VulkanDevice *device, const BindingLayoutDesc &layout);
     bool WriteDescriptors(size_t binding_index, uint32_t first_element, const std::vector<BufferView> &values) override;
     bool WriteDescriptors(size_t binding_index, uint32_t first_element, const std::vector<IImage *> &values) override;
-    bool WriteDescriptors(size_t binding_index,
-                          uint32_t first_element,
-                          const std::vector<SamplerDesc> &values) override;
+    bool WriteDescriptors(size_t binding_index, uint32_t first_element, const std::vector<ISampler *> &values) override;
     VkDescriptorSetLayout native_layout_{};
     ObjectPtr<VulkanDescriptorPool::Lease> lease_;
     std::vector<std::vector<bool>> initialized_;
-    // Descriptor copies share samplers; each sampler dies with its last version.
-    std::vector<std::vector<std::shared_ptr<VkSampler>>> samplers_;
   };
 
   static VulkanBindingGroup *Create(VulkanDevice *device, const BindingLayoutDesc &layout);

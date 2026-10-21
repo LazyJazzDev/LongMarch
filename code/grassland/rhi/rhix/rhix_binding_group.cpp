@@ -26,8 +26,8 @@ bool BindingGroup::BindResource(uint32_t binding, const Image &image) {
   return Get()->BindResource(binding, image.Get());
 }
 
-bool BindingGroup::BindResource(uint32_t binding, const rhi::SamplerDesc &sampler) {
-  return Get()->BindResource(binding, sampler);
+bool BindingGroup::BindResource(uint32_t binding, const Sampler &sampler) {
+  return Get()->BindResource(binding, sampler.Get());
 }
 
 bool BindingGroup::BindResource(uint32_t binding, const std::vector<Buffer> &buffers, uint32_t first_element) {
@@ -66,9 +66,15 @@ bool BindingGroup::BindResource(uint32_t binding, const std::vector<Image> &imag
   }
 }
 
-bool BindingGroup::BindResource(uint32_t binding,
-                                const std::vector<rhi::SamplerDesc> &samplers,
-                                uint32_t first_element) {
-  return Get()->BindResource(binding, samplers, first_element);
+bool BindingGroup::BindResource(uint32_t binding, const std::vector<Sampler> &samplers, uint32_t first_element) {
+  try {
+    std::vector<rhi::ISampler *> native;
+    native.reserve(samplers.size());
+    for (const auto &sampler : samplers)
+      native.push_back(sampler.Get());
+    return Get()->BindResource(binding, native, first_element);
+  } catch (const std::bad_alloc &) {
+    return false;
+  }
 }
 }  // namespace grassland::rhix

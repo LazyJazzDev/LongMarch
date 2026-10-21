@@ -3,6 +3,7 @@
 #include "grassland/rhi/backend/backend_binding_group.h"
 #include "grassland/rhi/backend/backend_command_context.h"
 #include "grassland/rhi/backend/backend_core.h"
+#include "grassland/rhi/backend/backend_sampler.h"
 #include "grassland/rhi/backend/backend_shader.h"
 
 namespace grassland::rhi::backend {
@@ -32,6 +33,17 @@ rhi::IShader *Device::CreateShader(const ShaderDesc &desc) {
     return new Shader(desc);
   } catch (const std::bad_alloc &) {
     ReportError(-1, "Shader source allocation failed.");
+    return nullptr;
+  }
+}
+
+ISampler *Device::CreateSampler(const SamplerDesc &desc) {
+  // Description-backed compatibility for backends not yet owning native samplers.
+  if (!Sampler::Validate(desc))
+    return nullptr;
+  try {
+    return new Sampler(desc, this);
+  } catch (const std::bad_alloc &) {
     return nullptr;
   }
 }

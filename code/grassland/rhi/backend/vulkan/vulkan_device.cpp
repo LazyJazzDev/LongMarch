@@ -7,6 +7,7 @@
 #include "grassland/rhi/backend/vulkan/vulkan_core.h"
 #include "grassland/rhi/backend/vulkan/vulkan_program.h"
 #include "grassland/rhi/backend/vulkan/vulkan_queue.h"
+#include "grassland/rhi/backend/vulkan/vulkan_sampler.h"
 #include "grassland/rhi/backend/vulkan/vulkan_window.h"
 
 namespace grassland::rhi::backend::vulkan {
@@ -179,6 +180,10 @@ PFN_vkCmdBeginRendering VulkanDevice::BeginRenderingCommand() const {
 
 PFN_vkCmdEndRendering VulkanDevice::EndRenderingCommand() const {
   return end_rendering_;
+}
+
+ISampler *VulkanDevice::CreateSampler(const SamplerDesc &desc) {
+  return VulkanSampler::Create(this, desc);
 }
 
 IBindingGroup *VulkanDevice::CreateBindingGroup(const BindingLayoutDesc &layout) {

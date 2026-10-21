@@ -6,6 +6,7 @@
 #include "grassland/rhi/backend/backend_buffer.h"
 #include "grassland/rhi/backend/backend_device.h"
 #include "grassland/rhi/backend/backend_image.h"
+#include "grassland/rhi/backend/backend_sampler.h"
 
 namespace grassland::rhi::backend {
 std::vector<MappedBinding> MapBindings(const PipelineLayoutDesc &layout, BackendAPI api) {
@@ -107,10 +108,33 @@ bool BindingGroup::Version::Write(size_t binding_index, uint32_t first_element, 
   return true;
 }
 
-bool BindingGroup::Version::Write(size_t binding_index,
-                                  uint32_t first_element,
-                                  const std::vector<SamplerDesc> &values) {
-  return WriteDescriptors(binding_index, first_element, values);
+bool BindingGroup::Version::Write(size_t binding_index, uint32_t first_element, const std::vector<ISampler *> &values) {
+  std::vector<ObjectPtr<IObject>> references;
+  references.reserve(values.size());
+  for (auto value : values)
+    references.push_back(ObjectPtr<IObject>::Retain(value));
+  if (!WriteDescriptors(binding_index, first_element, values))
+    return false;
+  // Legacy Metal keeps its native sampler ownership separately and leaves these slots empty.
+  if (!references_[binding_index].empty())
+    for (size_t i = 0; i < values.size(); ++i)
+      references_[binding_index][first_element + i] = std::move(references[i]);
+  return true;
+}
+
+bool BindingGroup::Version::WriteDescriptors(size_t binding_index,
+                                             uint32_t first_element,
+                                             const std::vector<ISampler *> &values) {
+  // Legacy backends own native samplers in their versions and only consume descriptions.
+  std::vector<SamplerDesc> descriptions;
+  descriptions.reserve(values.size());
+  for (auto sampler : values)
+    descriptions.push_back(sampler->GetDesc());
+  return WriteDescriptors(binding_index, first_element, descriptions);
+}
+
+bool BindingGroup::Version::WriteDescriptors(size_t, uint32_t, const std::vector<SamplerDesc> &) {
+  return false;
 }
 
 BindingGroup::BindingGroup(Device *device, ObjectPtr<Version> version)
@@ -211,7 +235,7 @@ bool BindingGroup::BindResource(uint32_t binding, const std::vector<IImage *> &i
   }
 }
 
-bool BindingGroup::BindResource(uint32_t binding, const std::vector<SamplerDesc> &samplers, uint32_t first_element) {
+bool BindingGroup::BindResource(uint32_t binding, const std::vector<ISampler *> &samplers, uint32_t first_element) {
   try {
     size_t binding_index;
     const auto *desc = FindBinding(binding, first_element, samplers.size(), binding_index);
@@ -219,10 +243,9 @@ bool BindingGroup::BindResource(uint32_t binding, const std::vector<SamplerDesc>
       return false;
     if (desc->type != BINDING_SAMPLER)
       return false;
-    for (const auto &sampler : samplers) {
-      if (sampler.filter < SAMPLER_FILTER_NEAREST || sampler.filter > SAMPLER_FILTER_LINEAR ||
-          sampler.address_u < SAMPLER_ADDRESS_REPEAT || sampler.address_u > SAMPLER_ADDRESS_MIRRORED_REPEAT ||
-          sampler.address_v < SAMPLER_ADDRESS_REPEAT || sampler.address_v > SAMPLER_ADDRESS_MIRRORED_REPEAT)
+    for (auto sampler : samplers) {
+      auto native = dynamic_cast<Sampler *>(sampler);
+      if (!native || native->DeviceIdentity() != device_)
         return false;
     }
     auto next = version_->IsUniquelyOwned() ? version_ : version_->Clone();

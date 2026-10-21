@@ -98,7 +98,8 @@ int HelloTexture(grassland::rhi::BackendAPI api, int frames, bool headless) {
     return 1;
   if (!group.BindResource(0, texture))
     return 1;
-  if (!group.BindResource(1, SamplerDesc{}))
+  auto sampler = device.CreateSampler();
+  if (!sampler || !group.BindResource(1, sampler))
     return 1;
   // Upload owns a snapshot and staging leases; later graphics work is ordered on the same native queue.
   {

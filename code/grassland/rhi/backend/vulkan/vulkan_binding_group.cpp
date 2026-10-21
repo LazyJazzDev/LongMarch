@@ -7,6 +7,7 @@
 #include "grassland/rhi/backend/vulkan/vulkan_buffer.h"
 #include "grassland/rhi/backend/vulkan/vulkan_descriptor_types.h"
 #include "grassland/rhi/backend/vulkan/vulkan_device.h"
+#include "grassland/rhi/backend/vulkan/vulkan_sampler.h"
 
 namespace grassland::rhi::backend::vulkan {
 
@@ -54,12 +55,11 @@ VulkanBindingGroup *VulkanBindingGroup::Create(VulkanDevice *device, const Bindi
 
 VulkanBindingGroup::Version::Version(VulkanDevice *device, const BindingLayoutDesc &layout)
     : BindingGroup::Version(device, layout) {
-  samplers_.resize(layout_.bindings.size());
   for (size_t i = 0; i < layout_.bindings.size(); ++i) {
     const auto &binding = layout_.bindings[i];
     initialized_.emplace_back(binding.count, false);
     if (binding.type == BINDING_SAMPLER)
-      samplers_[i].resize(binding.count);
+      references_[i].resize(binding.count);
   }
 }
 
@@ -92,7 +92,6 @@ ObjectPtr<BindingGroup::Version> VulkanBindingGroup::Version::Clone() const {
   if (!copy)
     return {};
   copy->references_ = references_;
-  copy->samplers_ = samplers_;
   copy->initialized_ = initialized_;
   std::vector<VkCopyDescriptorSet> copies;
   for (size_t i = 0; i < layout_.bindings.size(); ++i) {
@@ -184,31 +183,12 @@ bool VulkanBindingGroup::Version::WriteDescriptors(size_t binding_index,
 
 bool VulkanBindingGroup::Version::WriteDescriptors(size_t binding_index,
                                                    uint32_t first_element,
-                                                   const std::vector<SamplerDesc> &samplers) {
+                                                   const std::vector<ISampler *> &samplers) {
   const auto &binding = layout_.bindings[binding_index];
   auto native = static_cast<VulkanDevice *>(device_)->NativeDevice();
   std::vector<VkDescriptorImageInfo> infos(samplers.size());
-  std::vector<std::shared_ptr<VkSampler>> handles(samplers.size());
-  const VkSamplerAddressMode modes[] = {VK_SAMPLER_ADDRESS_MODE_REPEAT, VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE,
-                                        VK_SAMPLER_ADDRESS_MODE_MIRRORED_REPEAT};
-  for (size_t i = 0; i < samplers.size(); ++i) {
-    const auto &sampler = samplers[i];
-    VkSamplerCreateInfo create{VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO};
-    create.magFilter = create.minFilter =
-        sampler.filter == SAMPLER_FILTER_LINEAR ? VK_FILTER_LINEAR : VK_FILTER_NEAREST;
-    create.mipmapMode = VK_SAMPLER_MIPMAP_MODE_NEAREST;
-    create.addressModeU = modes[sampler.address_u];
-    create.addressModeV = create.addressModeW = modes[sampler.address_v];
-    create.maxLod = VK_LOD_CLAMP_NONE;
-    handles[i] = std::shared_ptr<VkSampler>(new VkSampler{}, [native](VkSampler *sampler) {
-      if (*sampler)
-        vkDestroySampler(native, *sampler, nullptr);
-      delete sampler;
-    });
-    if (!Check(vkCreateSampler(native, &create, nullptr, handles[i].get()), "Create sampler"))
-      return false;
-    infos[i].sampler = *handles[i];
-  }
+  for (size_t i = 0; i < samplers.size(); ++i)
+    infos[i].sampler = static_cast<VulkanSampler *>(samplers[i])->NativeSampler();
   VkWriteDescriptorSet write{VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET};
   write.dstSet = Set();
   write.dstBinding = binding.binding;
@@ -218,7 +198,6 @@ bool VulkanBindingGroup::Version::WriteDescriptors(size_t binding_index,
   write.pImageInfo = infos.data();
   vkUpdateDescriptorSets(native, 1, &write, 0, nullptr);
   for (size_t i = 0; i < infos.size(); ++i) {
-    samplers_[binding_index][first_element + i] = std::move(handles[i]);
     initialized_[binding_index][first_element + i] = true;
   }
   return true;

@@ -6,6 +6,7 @@
 #include "grassland/rhi/backend/d3d12/d3d12_command_context.h"
 #include "grassland/rhi/backend/d3d12/d3d12_program.h"
 #include "grassland/rhi/backend/d3d12/d3d12_queue.h"
+#include "grassland/rhi/backend/d3d12/d3d12_sampler.h"
 #include "grassland/rhi/backend/d3d12/d3d12_window.h"
 
 // Match the Windows SDK declarations used by the backend.
@@ -228,6 +229,10 @@ rhi::IQueue *D3D12Device::GetQueue(QueueType type) {
     ReportError(-1, "Queue creation ran out of memory.");
     return nullptr;
   }
+}
+
+ISampler *D3D12Device::CreateSampler(const SamplerDesc &desc) {
+  return D3D12Sampler::Create(this, desc);
 }
 
 IBindingGroup *D3D12Device::CreateBindingGroup(const BindingLayoutDesc &layout) {
