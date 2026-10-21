@@ -79,7 +79,7 @@ bool D3D12CommandContext::TransitionResource(ID3D12Resource *resource,
 
 bool D3D12CommandContext::CmdClearColor(rhi::IImage *image, const std::array<float, 4> &color) {
 #if !defined(NDEBUG)
-  if (render_target_) {
+  if (rendering_active_) {
     recording_failed_ = true;
     ReportError(-1, "End rendering before transfer, clear, present or submission.");
     return false;
@@ -103,7 +103,7 @@ bool D3D12CommandContext::CmdClearColor(rhi::IImage *image, const std::array<flo
 
 bool D3D12CommandContext::CmdPresent(rhi::IWindow *window) {
 #if !defined(NDEBUG)
-  if (render_target_) {
+  if (rendering_active_) {
     recording_failed_ = true;
     ReportError(-1, "End rendering before transfer, clear, present or submission.");
     return false;
@@ -140,7 +140,7 @@ bool D3D12CommandContext::CmdPresent(rhi::IWindow *window) {
 
 bool D3D12CommandContext::EndRecording() {
 #if !defined(NDEBUG)
-  if (render_target_) {
+  if (rendering_active_) {
     recording_failed_ = true;
     ReportError(-1, "End rendering before transfer, clear, present or submission.");
     return false;
@@ -211,7 +211,7 @@ SubmissionStatus D3D12CommandContext::WaitForProgress() {
 
 bool D3D12CommandContext::CmdUploadBuffer(IBuffer *buffer, uint64_t offset, const void *data, uint64_t size) {
 #if !defined(NDEBUG)
-  if (render_target_) {
+  if (rendering_active_) {
     recording_failed_ = true;
     ReportError(-1, "End rendering before transfer, clear, present or submission.");
     return false;
@@ -254,7 +254,7 @@ bool D3D12CommandContext::CmdCopyBuffer(IBuffer *source,
                                         uint64_t destination_offset,
                                         uint64_t size) {
 #if !defined(NDEBUG)
-  if (render_target_) {
+  if (rendering_active_) {
     recording_failed_ = true;
     ReportError(-1, "End rendering before transfer, clear, present or submission.");
     return false;
@@ -324,7 +324,7 @@ bool D3D12CommandContext::CmdBindProgram(IProgram *program) {
 }
 
 bool D3D12CommandContext::CmdBeginRendering(const RenderingInfo &info) {
-  if (sealed_ || render_target_ || !PrepareRendering(info)) {
+  if (sealed_ || rendering_active_ || !PrepareRendering(info)) {
     recording_failed_ = true;
     return false;
   }
@@ -356,12 +356,12 @@ bool D3D12CommandContext::CmdBeginRendering(const RenderingInfo &info) {
                                    static_cast<UINT8>(ds.clear_stencil), 0, nullptr);
   }
   list_->OMSetRenderTargets(count, colors.data(), FALSE, depth ? &dsv : nullptr);
-  render_target_ = count ? static_cast<D3D12Image *>(rendering_.color_attachments[0].color_attachment) : depth;
+  rendering_active_ = true;
   return true;
 }
 
 bool D3D12CommandContext::CmdEndRendering() {
-  if (sealed_ || !render_target_ || recording_failed_) {
+  if (sealed_ || !rendering_active_ || recording_failed_) {
     recording_failed_ = true;
     return false;
   }
@@ -369,7 +369,7 @@ bool D3D12CommandContext::CmdEndRendering() {
     if (color.store_op == ATTACHMENT_STORE_OP_DISCARD)
       list_->DiscardResource(static_cast<D3D12Image *>(color.color_attachment)->NativeImage(), nullptr);
   list_->OMSetRenderTargets(0, nullptr, FALSE, nullptr);
-  render_target_ = nullptr;
+  rendering_active_ = false;
   rendering_ = {};
   return true;
 }
@@ -478,7 +478,7 @@ bool D3D12CommandContext::CmdDraw(uint32_t vertex_count,
                                   uint32_t first_vertex,
                                   uint32_t first_instance) {
 #if !defined(NDEBUG)
-  if (sealed_ || !program_ || !render_target_ || !viewport_set_ || !scissor_set_) {
+  if (sealed_ || !program_ || !rendering_active_ || !viewport_set_ || !scissor_set_) {
     recording_failed_ = true;
     return false;
   }
@@ -503,7 +503,7 @@ bool D3D12CommandContext::CmdDrawIndexed(uint32_t index_count,
                                          int32_t vertex_offset,
                                          uint32_t first_instance) {
 #if !defined(NDEBUG)
-  if (sealed_ || !program_ || !render_target_ || !viewport_set_ || !scissor_set_ || !index_bound_) {
+  if (sealed_ || !program_ || !rendering_active_ || !viewport_set_ || !scissor_set_ || !index_bound_) {
     recording_failed_ = true;
     return false;
   }
@@ -717,7 +717,7 @@ bool D3D12CommandContext::PrepareGroups() {
 
 bool D3D12CommandContext::CmdUploadImage(IImage *image, const void *data, uint64_t row_pitch) {
   auto native = dynamic_cast<D3D12Image *>(image);
-  if (!native || native->DeviceIdentity() != device_ || !native->IsValid() || !data || sealed_ || render_target_ ||
+  if (!native || native->DeviceIdentity() != device_ || !native->IsValid() || !data || sealed_ || rendering_active_ ||
       IsDepthFormat(image->GetDesc().format) || row_pitch < uint64_t(image->GetDesc().width) * 4 ||
       (image->GetDesc().height - 1) > (SIZE_MAX - uint64_t(image->GetDesc().width) * 4) / row_pitch) {
     recording_failed_ = true;

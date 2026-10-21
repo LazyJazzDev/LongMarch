@@ -62,8 +62,7 @@ class D3D12CommandContext final : public CommandContext {
   std::array<uint32_t, 2> descriptor_used_{};
   bool tables_dirty_{};
   D3D12Program *program_{};
-  D3D12Image *render_target_{};
-  AttachmentStoreOp store_op_{ATTACHMENT_STORE_OP_STORE};
+  bool rendering_active_{};
   std::vector<D3D12Buffer *> vertex_buffers_;
   D3D12Buffer *index_buffer_{};
   bool PrepareDrawBuffers(bool indexed);
