@@ -14,6 +14,8 @@ class RayTracingProgram : public Object<IRayTracingProgram> {
 
  protected:
   bool ValidateLayout() const;
+  bool ValidateShaderBindingTable(const ShaderBindingTableDesc &desc) const;
+  ShaderBindingTableDesc DefaultShaderBindingTableDesc() const;
   Device *device_;
   RayTracingProgramDesc desc_;
   bool finalized_{};

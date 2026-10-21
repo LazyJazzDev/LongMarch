@@ -14,8 +14,14 @@ ID3D12StateObject *D3D12RayTracingProgram::NativePipeline() const {
   return pipeline_.Get();
 }
 
-D3D12_DISPATCH_RAYS_DESC D3D12RayTracingProgram::DispatchDesc() const {
-  return dispatch_;
+const ShaderBindingTable *D3D12RayTracingProgram::DefaultShaderBindingTable() const {
+  return table_.Get();
+}
+
+IShaderBindingTable *D3D12RayTracingProgram::CreateShaderBindingTable(const ShaderBindingTableDesc &desc) {
+  if (!finalized_ || !ValidateShaderBindingTable(desc))
+    return nullptr;
+  return BuildShaderBindingTable(desc);
 }
 
 bool D3D12RayTracingProgram::Finalize() {
@@ -92,42 +98,57 @@ bool D3D12RayTracingProgram::Finalize() {
   ComPtr<ID3D12StateObjectProperties> properties;
   if (FAILED(pipeline.As(&properties)))
     return false;
-  std::vector<uint8_t> data;
-  std::array<uint64_t, 4> offsets{}, sizes{};
   std::vector<std::vector<std::wstring>> tables{{names[0]}, {}, hit_names, {}};
   for (size_t i = 0; i < desc_.miss_shaders.size(); ++i)
     tables[1].push_back(names[1 + i]);
   for (size_t i = callable_start; i < names.size(); ++i)
     tables[3].push_back(names[i]);
   for (size_t t = 0; t < 4; ++t) {
-    data.resize((data.size() + 63) & ~size_t(63));
-    offsets[t] = data.size();
-    sizes[t] = tables[t].size() * 32;
-    data.resize(data.size() + sizes[t]);
+    identifiers_[t].resize(tables[t].size() * D3D12_SHADER_IDENTIFIER_SIZE_IN_BYTES);
     for (size_t i = 0; i < tables[t].size(); ++i) {
       auto identifier = properties->GetShaderIdentifier(tables[t][i].c_str());
       if (!identifier)
         return false;
-      std::memcpy(data.data() + offsets[t] + i * 32, identifier, 32);
+      std::memcpy(identifiers_[t].data() + i * D3D12_SHADER_IDENTIFIER_SIZE_IN_BYTES, identifier,
+                  D3D12_SHADER_IDENTIFIER_SIZE_IN_BYTES);
     }
   }
-  auto table =
-      ObjectPtr<D3D12AllocatedBuffer>::Adopt(D3D12AllocatedBuffer::Create(owner, {uint64_t(data.size())}, true));
-  if (!table)
+  table_ = ObjectPtr<ShaderBindingTable>::Adopt(BuildShaderBindingTable(DefaultShaderBindingTableDesc()));
+  if (!table_)
     return false;
-  if (!table->Write(data.data(), data.size()))
-    return false;
-  const auto address = table->NativeBuffer()->GetGPUVirtualAddress();
-  dispatch_.RayGenerationShaderRecord = {address, 32};
-  if (sizes[1])
-    dispatch_.MissShaderTable = {address + offsets[1], sizes[1], 32};
-  if (sizes[2])
-    dispatch_.HitGroupTable = {address + offsets[2], sizes[2], 32};
-  if (sizes[3])
-    dispatch_.CallableShaderTable = {address + offsets[3], sizes[3], 32};
-  table_ = std::move(table);
   pipeline_ = std::move(pipeline);
   finalized_ = true;
   return true;
 }
+
+ShaderBindingTable *D3D12RayTracingProgram::BuildShaderBindingTable(const ShaderBindingTableDesc &desc) {
+  constexpr uint64_t stride = D3D12_SHADER_IDENTIFIER_SIZE_IN_BYTES;
+  constexpr uint64_t alignment = D3D12_RAYTRACING_SHADER_TABLE_BYTE_ALIGNMENT;
+  std::vector<uint8_t> data;
+  std::array<ShaderBindingTable::Region, 4> regions{};
+  const std::vector<uint32_t> raygen{0};
+  const std::vector<uint32_t> *indices[] = {&raygen, &desc.miss_shader_indices, &desc.hit_group_indices,
+                                            &desc.callable_shader_indices};
+  for (size_t t = 0; t < 4; ++t) {
+    if (indices[t]->empty())
+      continue;
+    data.resize((data.size() + alignment - 1) & ~(alignment - 1));
+    auto offset = data.size();
+    regions[t] = {offset, indices[t]->size() * stride, stride};
+    data.resize(offset + regions[t].size);
+    for (size_t i = 0; i < indices[t]->size(); ++i)
+      std::memcpy(data.data() + offset + i * stride, identifiers_[t].data() + (*indices[t])[i] * stride, stride);
+  }
+  auto owner = static_cast<D3D12Device *>(device_);
+  auto buffer =
+      ObjectPtr<D3D12AllocatedBuffer>::Adopt(D3D12AllocatedBuffer::Create(owner, {uint64_t(data.size())}, true));
+  if (!buffer || !buffer->Write(data.data(), data.size()))
+    return nullptr;
+  auto address = buffer->NativeBuffer()->GetGPUVirtualAddress();
+  for (auto &region : regions)
+    if (region.size)
+      region.address += address;
+  return new ShaderBindingTable(this, desc, std::move(buffer), regions);
+}
+
 }  // namespace grassland::rhi::backend::d3d12

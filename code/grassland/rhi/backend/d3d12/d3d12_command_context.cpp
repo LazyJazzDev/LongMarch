@@ -811,7 +811,7 @@ bool D3D12CommandContext::CmdBindRayTracingProgram(IRayTracingProgram *program) 
   return true;
 }
 
-bool D3D12CommandContext::CmdDispatchRays(uint32_t width, uint32_t height, uint32_t depth) {
+bool D3D12CommandContext::CmdDispatchRays(uint32_t width, uint32_t height, uint32_t depth, IShaderBindingTable *sbt) {
   if (sealed_ || rendering_active_ || !ray_program_ || !width || !height || !depth) {
     recording_failed_ = true;
     return false;
@@ -822,9 +822,29 @@ bool D3D12CommandContext::CmdDispatchRays(uint32_t width, uint32_t height, uint3
     recording_failed_ = true;
     return false;
   }
+  const ShaderBindingTable *table = ray_program_->DefaultShaderBindingTable();
+  if (sbt) {
+#ifndef NDEBUG
+    auto custom = dynamic_cast<ShaderBindingTable *>(sbt);
+#else
+    auto custom = static_cast<ShaderBindingTable *>(sbt);
+#endif
+    if (!custom || custom->GetProgram() != ray_program_) {
+      recording_failed_ = true;
+      return false;
+    }
+    if (!RetainResource(custom))
+      return false;
+    table = custom;
+  }
+  const auto &regions = table->Regions();
   if (!PrepareGroups())
     return false;
-  auto dispatch = ray_program_->DispatchDesc();
+  D3D12_DISPATCH_RAYS_DESC dispatch{};
+  dispatch.RayGenerationShaderRecord = {regions[0].address, regions[0].size};
+  dispatch.MissShaderTable = {regions[1].address, regions[1].size, regions[1].stride};
+  dispatch.HitGroupTable = {regions[2].address, regions[2].size, regions[2].stride};
+  dispatch.CallableShaderTable = {regions[3].address, regions[3].size, regions[3].stride};
   dispatch.Width = width;
   dispatch.Height = height;
   dispatch.Depth = depth;

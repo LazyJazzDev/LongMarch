@@ -60,7 +60,11 @@ class ICommandContext : public IObject {
       const std::vector<RayTracingInstance> &instances,
       AccelerationStructureBuildMode mode = ACCELERATION_STRUCTURE_BUILD) = 0;
   virtual bool CmdBindRayTracingProgram(IRayTracingProgram *program) = 0;
-  virtual bool CmdDispatchRays(uint32_t width, uint32_t height, uint32_t depth = 1) = 0;
+  // nullptr selects the program default; custom tables must belong to the bound program.
+  virtual bool CmdDispatchRays(uint32_t width,
+                               uint32_t height,
+                               uint32_t depth = 1,
+                               IShaderBindingTable *sbt = nullptr) = 0;
   // Cmd calls encode native commands immediately and retain the exact resources
   // they use. Parameter values are consumed during the call, not during Submit.
   // Callers must not use an image concurrently from multiple command contexts.

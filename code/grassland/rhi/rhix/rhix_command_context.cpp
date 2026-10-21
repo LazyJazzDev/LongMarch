@@ -199,7 +199,7 @@ bool CommandContext::CmdBindRayTracingProgram(const RayTracingProgram &program) 
   return Get()->CmdBindRayTracingProgram(program.Get());
 }
 
-bool CommandContext::CmdDispatchRays(uint32_t width, uint32_t height, uint32_t depth) {
-  return Get()->CmdDispatchRays(width, height, depth);
+bool CommandContext::CmdDispatchRays(uint32_t width, uint32_t height, uint32_t depth, const ShaderBindingTable &sbt) {
+  return Get()->CmdDispatchRays(width, height, depth, sbt.Get());
 }
 }  // namespace grassland::rhix

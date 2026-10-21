@@ -55,7 +55,7 @@ class CommandContext : public ObjectContainer {
   bool CmdQueryCompactedSize(const AccelerationStructure &structure);
   bool CmdCompactAccelerationStructure(const AccelerationStructure &source, const AccelerationStructure &destination);
   bool CmdBindRayTracingProgram(const RayTracingProgram &program);
-  bool CmdDispatchRays(uint32_t width, uint32_t height, uint32_t depth = 1);
+  bool CmdDispatchRays(uint32_t width, uint32_t height, uint32_t depth = 1, const ShaderBindingTable &sbt = {});
   bool CmdBindComputeProgram(const ComputeProgram &program);
   bool CmdDispatch(uint32_t x, uint32_t y = 1, uint32_t z = 1);
   bool CmdBindProgram(const Program &program);

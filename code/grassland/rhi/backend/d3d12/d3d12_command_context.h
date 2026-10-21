@@ -18,7 +18,10 @@ class D3D12SwapChainImage;
 class D3D12CommandContext final : public CommandContext {
  public:
   bool CmdBindRayTracingProgram(IRayTracingProgram *program) override;
-  bool CmdDispatchRays(uint32_t width, uint32_t height, uint32_t depth = 1) override;
+  bool CmdDispatchRays(uint32_t width,
+                       uint32_t height,
+                       uint32_t depth = 1,
+                       IShaderBindingTable *sbt = nullptr) override;
   bool CmdQueryCompactedSize(IAccelerationStructure *structure) override;
   bool CmdCompactAccelerationStructure(IAccelerationStructure *source, IAccelerationStructure *destination) override;
   bool CmdBuildBottomLevelAccelerationStructure(

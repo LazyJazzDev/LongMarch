@@ -839,7 +839,7 @@ bool VulkanCommandContext::CmdBindRayTracingProgram(IRayTracingProgram *program)
   return true;
 }
 
-bool VulkanCommandContext::CmdDispatchRays(uint32_t width, uint32_t height, uint32_t depth) {
+bool VulkanCommandContext::CmdDispatchRays(uint32_t width, uint32_t height, uint32_t depth, IShaderBindingTable *sbt) {
   if (sealed_ || render_target_ || !ray_program_ || !width || !height || !depth) {
     recording_failed_ = true;
     return false;
@@ -861,7 +861,25 @@ bool VulkanCommandContext::CmdDispatchRays(uint32_t width, uint32_t height, uint
       if (!BindGroupVersion(i, groups_[i]))
         return false;
     }
-  const auto &tables = ray_program_->ShaderTables();
+  const ShaderBindingTable *table = ray_program_->DefaultShaderBindingTable();
+  if (sbt) {
+#ifndef NDEBUG
+    auto custom = dynamic_cast<ShaderBindingTable *>(sbt);
+#else
+    auto custom = static_cast<ShaderBindingTable *>(sbt);
+#endif
+    if (!custom || custom->GetProgram() != ray_program_) {
+      recording_failed_ = true;
+      return false;
+    }
+    if (!RetainResource(custom))
+      return false;
+    table = custom;
+  }
+  const auto &regions = table->Regions();
+  std::array<VkStridedDeviceAddressRegionKHR, 4> tables{};
+  for (size_t i = 0; i < 4; ++i)
+    tables[i] = {regions[i].address, regions[i].stride, regions[i].size};
   auto trace = device_->Procedures().CmdTraceRaysKHR;
   trace(command_, &tables[0], &tables[1], &tables[2], &tables[3], width, height, depth);
   return true;

@@ -20,8 +20,14 @@ VkPipeline VulkanRayTracingProgram::NativePipeline() const {
   return pipeline_;
 }
 
-const std::array<VkStridedDeviceAddressRegionKHR, 4> &VulkanRayTracingProgram::ShaderTables() const {
-  return tables_;
+const ShaderBindingTable *VulkanRayTracingProgram::DefaultShaderBindingTable() const {
+  return table_.Get();
+}
+
+IShaderBindingTable *VulkanRayTracingProgram::CreateShaderBindingTable(const ShaderBindingTableDesc &desc) {
+  if (!finalized_ || !ValidateShaderBindingTable(desc))
+    return nullptr;
+  return BuildShaderBindingTable(desc);
 }
 
 bool VulkanRayTracingProgram::Finalize() {
@@ -123,45 +129,61 @@ bool VulkanRayTracingProgram::Finalize() {
   if (pipeline_)
     vkDestroyPipeline(device, pipeline_, nullptr);
   pipeline_ = pipeline;
-  const uint64_t handle_size = properties.shaderGroupHandleSize;
-  const uint64_t stride = (handle_size + properties.shaderGroupHandleAlignment - 1) &
-                          ~(uint64_t(properties.shaderGroupHandleAlignment) - 1);
-  const uint64_t alignment = properties.shaderGroupBaseAlignment;
-  if (stride > properties.maxShaderGroupStride)
+  handle_size_ = properties.shaderGroupHandleSize;
+  stride_ = (handle_size_ + properties.shaderGroupHandleAlignment - 1) &
+            ~(uint64_t(properties.shaderGroupHandleAlignment) - 1);
+  alignment_ = properties.shaderGroupBaseAlignment;
+  if (stride_ > properties.maxShaderGroupStride)
     return false;
-  std::vector<uint8_t> handles(groups.size() * handle_size);
+  std::vector<uint8_t> handles(groups.size() * handle_size_);
   auto get_handles = owner->Procedures().GetRayTracingShaderGroupHandlesKHR;
   if (!Check(get_handles(device, pipeline, 0, uint32_t(groups.size()), handles.size(), handles.data()),
              "Get ray tracing shader handles"))
     return false;
   const size_t counts[] = {1, desc_.miss_shaders.size(), desc_.hit_groups.size(), desc_.callable_shaders.size()};
-  uint64_t capacity = alignment;
-  for (auto count : counts)
-    capacity += count * stride + alignment;
-  auto table = ObjectPtr<VulkanAllocatedBuffer>::Adopt(VulkanAllocatedBuffer::Create(owner, {capacity}, true));
-  if (!table)
-    return false;
-  VkBufferDeviceAddressInfo address_info{VK_STRUCTURE_TYPE_BUFFER_DEVICE_ADDRESS_INFO};
-  address_info.buffer = table->NativeBuffer();
-  auto address = vkGetBufferDeviceAddress(device, &address_info);
-  std::vector<uint8_t> data(capacity);
-  uint64_t offset = 0, handle = 0;
+  size_t offset = 0;
   for (size_t t = 0; t < 4; ++t) {
-    offset = ((address + offset + alignment - 1) & ~(alignment - 1)) - address;
-    if (counts[t])
-      tables_[t] = {address + offset, stride, counts[t] * stride};
-    else
-      tables_[t] = {};
-    for (size_t i = 0; i < counts[t]; ++i) {
-      std::memcpy(data.data() + offset + i * stride, handles.data() + handle * handle_size, handle_size);
-      ++handle;
-    }
-    offset += counts[t] * stride;
+    auto size = counts[t] * handle_size_;
+    identifiers_[t].assign(handles.begin() + offset, handles.begin() + offset + size);
+    offset += size;
   }
-  if (!table->Write(data.data(), data.size()))
+  table_ = ObjectPtr<ShaderBindingTable>::Adopt(BuildShaderBindingTable(DefaultShaderBindingTableDesc()));
+  if (!table_)
     return false;
-  table_ = std::move(table);
   finalized_ = true;
   return true;
 }
+
+ShaderBindingTable *VulkanRayTracingProgram::BuildShaderBindingTable(const ShaderBindingTableDesc &desc) {
+  const std::vector<uint32_t> raygen{0};
+  const std::vector<uint32_t> *indices[] = {&raygen, &desc.miss_shader_indices, &desc.hit_group_indices,
+                                            &desc.callable_shader_indices};
+  uint64_t capacity = alignment_;
+  for (auto table : indices)
+    capacity += table->size() * stride_ + alignment_;
+  auto owner = static_cast<VulkanDevice *>(device_);
+  auto buffer = ObjectPtr<VulkanAllocatedBuffer>::Adopt(VulkanAllocatedBuffer::Create(owner, {capacity}, true));
+  if (!buffer)
+    return nullptr;
+  VkBufferDeviceAddressInfo info{VK_STRUCTURE_TYPE_BUFFER_DEVICE_ADDRESS_INFO};
+  info.buffer = buffer->NativeBuffer();
+  auto address = vkGetBufferDeviceAddress(owner->NativeDevice(), &info);
+  std::vector<uint8_t> data(capacity);
+  std::array<ShaderBindingTable::Region, 4> regions{};
+  uint64_t offset = 0;
+  for (size_t t = 0; t < 4; ++t) {
+    if (indices[t]->empty())
+      continue;
+    offset = ((address + offset + alignment_ - 1) & ~(alignment_ - 1)) - address;
+    regions[t] = {address + offset, indices[t]->size() * stride_, stride_};
+    for (size_t i = 0; i < indices[t]->size(); ++i)
+      std::memcpy(data.data() + offset + i * stride_, identifiers_[t].data() + (*indices[t])[i] * handle_size_,
+                  handle_size_);
+    offset += regions[t].size;
+  }
+  if (!buffer->Write(data.data(), data.size()))
+    return nullptr;
+  return new ShaderBindingTable(this, desc, std::move(buffer), regions);
+}
+
 }  // namespace grassland::rhi::backend::vulkan

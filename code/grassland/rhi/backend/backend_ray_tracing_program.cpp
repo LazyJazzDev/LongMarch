@@ -58,4 +58,30 @@ bool RayTracingProgram::ValidateLayout() const {
       return false;
   return true;
 }
+
+bool RayTracingProgram::ValidateShaderBindingTable(const ShaderBindingTableDesc &desc) const {
+  for (auto index : desc.miss_shader_indices)
+    if (index >= desc_.miss_shaders.size())
+      return false;
+  for (auto index : desc.hit_group_indices)
+    if (index >= desc_.hit_groups.size())
+      return false;
+  for (auto index : desc.callable_shader_indices)
+    if (index >= desc_.callable_shaders.size())
+      return false;
+  return true;
+}
+
+ShaderBindingTableDesc RayTracingProgram::DefaultShaderBindingTableDesc() const {
+  ShaderBindingTableDesc result;
+  auto fill = [](auto &indices, size_t count) {
+    for (size_t i = 0; i < count; ++i)
+      indices.push_back(uint32_t(i));
+  };
+  fill(result.miss_shader_indices, desc_.miss_shaders.size());
+  fill(result.hit_group_indices, desc_.hit_groups.size());
+  fill(result.callable_shader_indices, desc_.callable_shaders.size());
+  return result;
+}
+
 }  // namespace grassland::rhi::backend

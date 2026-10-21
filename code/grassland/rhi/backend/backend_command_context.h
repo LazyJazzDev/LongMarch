@@ -22,7 +22,10 @@ class CommandContext : public Object<rhi::ICommandContext> {
       const std::vector<RayTracingInstance> &instances,
       AccelerationStructureBuildMode mode = ACCELERATION_STRUCTURE_BUILD) override;
   bool CmdBindRayTracingProgram(IRayTracingProgram *program) override;
-  bool CmdDispatchRays(uint32_t width, uint32_t height, uint32_t depth = 1) override;
+  bool CmdDispatchRays(uint32_t width,
+                       uint32_t height,
+                       uint32_t depth = 1,
+                       IShaderBindingTable *sbt = nullptr) override;
 
   typedef enum {
     SUBMIT_RESULT_REJECTED,

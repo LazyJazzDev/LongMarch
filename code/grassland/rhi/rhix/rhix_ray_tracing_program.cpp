@@ -21,4 +21,9 @@ bool RayTracingProgram::Finalize() const {
 bool RayTracingProgram::IsFinalized() const {
   return Get()->IsFinalized();
 }
+
+ShaderBindingTable RayTracingProgram::CreateShaderBindingTable(const rhi::ShaderBindingTableDesc &desc) const {
+  return Get()->CreateShaderBindingTable(desc);
+}
+
 }  // namespace grassland::rhix

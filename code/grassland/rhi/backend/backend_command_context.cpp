@@ -23,7 +23,7 @@ bool CommandContext::CmdBindRayTracingProgram(IRayTracingProgram *) {
   return false;
 }
 
-bool CommandContext::CmdDispatchRays(uint32_t, uint32_t, uint32_t) {
+bool CommandContext::CmdDispatchRays(uint32_t, uint32_t, uint32_t, IShaderBindingTable *) {
   recording_failed_ = true;
   return false;
 }

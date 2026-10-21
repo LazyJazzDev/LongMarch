@@ -341,7 +341,7 @@ void CSMain() {
   CheckNativeErrors(device.Get());
 }
 
-TEST_P(RhiRayTracing, RayPipelineUsesTriangleProceduralAndMissRecords) {
+TEST_P(RhiRayTracing, CustomShaderBindingTablesRouteRecordsAndRestoreDefault) {
   const auto api = GetParam();
   ObjPtr<ICore> core = CreateCore(api);
   ASSERT_TRUE(core);
@@ -404,6 +404,12 @@ void Callable(inout Payload p) { p.result += 1; }
 void Miss(inout Payload p) { p.result = 333; }
 [shader("closesthit")]
 void Triangle(inout Payload p, BuiltInTriangleIntersectionAttributes attr) { p.result = 111; }
+[shader("closesthit")]
+void AlternateTriangle(inout Payload p, BuiltInTriangleIntersectionAttributes attr) { p.result = 444; }
+[shader("miss")]
+void AlternateMiss(inout Payload p) { p.result = 555; }
+[shader("callable")]
+void AlternateCallable(inout Payload p) { p.result += 10; }
 [shader("intersection")]
 void Intersection() {
  float3 o = ObjectRayOrigin(); float3 d = ObjectRayDirection();
@@ -430,36 +436,85 @@ void Sphere(inout Payload p, Attributes attr) { p.result = 222; }
   ObjPtr<IShader> callable = device->CreateShader({source, "Callable", SHADER_STAGE_CALLABLE});
   ASSERT_TRUE(callable);
   desc.callable_shaders = {callable.Get()};
+  ObjPtr<IShader> alternate_hit = device->CreateShader({source, "AlternateTriangle", SHADER_STAGE_CLOSEST_HIT});
+  ObjPtr<IShader> alternate_miss = device->CreateShader({source, "AlternateMiss", SHADER_STAGE_MISS});
+  ObjPtr<IShader> alternate_callable = device->CreateShader({source, "AlternateCallable", SHADER_STAGE_CALLABLE});
+  ASSERT_TRUE(alternate_hit);
+  ASSERT_TRUE(alternate_miss);
+  ASSERT_TRUE(alternate_callable);
+  desc.hit_groups.push_back({alternate_hit.Get(), nullptr, nullptr});
+  desc.miss_shaders.push_back(alternate_miss.Get());
+  desc.callable_shaders.push_back(alternate_callable.Get());
   desc.max_payload_size = 4;
   desc.pipeline_layout.groups = {{{{0, BINDING_ACCELERATION_STRUCTURE, 1, SHADER_VISIBILITY_RAY_GENERATION},
                                    {1, BINDING_RW_BYTE_ADDRESS_BUFFER, 1, SHADER_VISIBILITY_RAY_GENERATION}}}};
   ObjPtr<IRayTracingProgram> program = device->CreateRayTracingProgram(desc);
   ASSERT_TRUE(program);
+  EXPECT_EQ(program->CreateShaderBindingTable({}), nullptr);
   ASSERT_TRUE(program->Finalize());
+  EXPECT_EQ(program->CreateShaderBindingTable({{2}, {}, {}}), nullptr);
+  EXPECT_EQ(program->CreateShaderBindingTable({{}, {3}, {}}), nullptr);
+  EXPECT_EQ(program->CreateShaderBindingTable({{}, {}, {2}}), nullptr);
+  ObjPtr<IShaderBindingTable> empty = program->CreateShaderBindingTable({});
+  ASSERT_TRUE(empty);
+  empty.Release();
+  ShaderBindingTableDesc table_desc{{1, 0, 1}, {2, 1, 2}, {1, 0, 1}};
+  ObjPtr<IShaderBindingTable> custom = program->CreateShaderBindingTable(table_desc);
+  ASSERT_TRUE(custom);
+  EXPECT_EQ(custom->GetProgram(), program.Get());
+  EXPECT_EQ(custom->GetDesc().hit_group_indices, table_desc.hit_group_indices);
   ObjPtr<IBuffer> output = device->CreateBuffer({12});
   ASSERT_TRUE(output);
   ObjPtr<IBindingGroup> group = device->CreateBindingGroup(desc.pipeline_layout.groups[0]);
   ASSERT_TRUE(group);
   ASSERT_TRUE(group->BindResource(0, tlas.Get()));
   ASSERT_TRUE(group->BindResource(1, output.Get()));
+  ObjPtr<IRayTracingProgram> other = device->CreateRayTracingProgram(desc);
+  ASSERT_TRUE(other && other->Finalize());
+  ObjPtr<ICommandContext> rejected = device->CreateCommandContext();
+  ASSERT_TRUE(rejected->CmdBindRayTracingProgram(other.Get()));
+  ASSERT_TRUE(rejected->CmdBindGroup(0, group.Get()));
+  EXPECT_FALSE(rejected->CmdDispatchRays(3, 1, 1, custom.Get()));
+  EXPECT_FALSE(queue->Submit(rejected.Get()));
+  rejected.Release();
+  other.Release();
   ASSERT_TRUE(commands->CmdBindRayTracingProgram(program.Get()));
   ASSERT_TRUE(commands->CmdBindGroup(0, group.Get()));
   ASSERT_TRUE(commands->CmdDispatchRays(3, 1));
   ObjPtr<ISubmissionToken> token = queue->Submit(commands.Get());
+  ASSERT_TRUE(token && token->WaitHost());
+  std::array<uint32_t, 3> result{};
+  ReadBuffer(device.Get(), output.Get(), api, result);
+  EXPECT_EQ(result, (std::array<uint32_t, 3>{112, 223, 334}));
+
+  commands = device->CreateCommandContext();
+  a.hit_group_offset = 2;  // Exercise a repeated record beyond the original two groups.
+  ASSERT_TRUE(commands->CmdBuildTopLevelAccelerationStructure(tlas.Get(), {a, b}));
+  ASSERT_TRUE(commands->CmdBindRayTracingProgram(program.Get()));
+  ASSERT_TRUE(commands->CmdBindGroup(0, group.Get()));
+  ASSERT_TRUE(commands->CmdDispatchRays(3, 1, 1, custom.Get()));
+  custom.Release();  // The recorded command must keep the SBT buffer alive.
+  token = queue->Submit(commands.Get());
   ASSERT_TRUE(token);
   commands.Release();
-  input.Release();
-  triangle.Release();
-  sphere.Release();
-  tlas.Release();
+  ASSERT_TRUE(token->WaitHost());
+  ReadBuffer(device.Get(), output.Get(), api, result);
+  EXPECT_EQ(result, (std::array<uint32_t, 3>{454, 232, 565}));
+
+  commands = device->CreateCommandContext();
+  a.hit_group_offset = 0;
+  ASSERT_TRUE(commands->CmdBuildTopLevelAccelerationStructure(tlas.Get(), {a, b}));
+  ASSERT_TRUE(commands->CmdBindRayTracingProgram(program.Get()));
+  ASSERT_TRUE(commands->CmdBindGroup(0, group.Get()));
+  ASSERT_TRUE(commands->CmdDispatchRays(3, 1));
+  token = queue->Submit(commands.Get());
+  ASSERT_TRUE(token);
+  commands.Release();
   group.Release();
   program.Release();
   ASSERT_TRUE(token->WaitHost());
-  std::array<uint32_t, 3> result{};
   ReadBuffer(device.Get(), output.Get(), api, result);
-  EXPECT_EQ(result[0], 112u);
-  EXPECT_EQ(result[1], 223u);
-  EXPECT_EQ(result[2], 334u);
+  EXPECT_EQ(result, (std::array<uint32_t, 3>{112, 223, 334}));
   CheckNativeErrors(device.Get());
 }
 
