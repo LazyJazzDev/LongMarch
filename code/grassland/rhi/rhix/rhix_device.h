@@ -4,6 +4,7 @@
 #include "grassland/rhi/rhix/rhix_binding_group.h"
 #include "grassland/rhi/rhix/rhix_buffer.h"
 #include "grassland/rhi/rhix/rhix_command_context.h"
+#include "grassland/rhi/rhix/rhix_compute_program.h"
 #include "grassland/rhi/rhix/rhix_object_container.h"
 #include "grassland/rhi/rhix/rhix_program.h"
 #include "grassland/rhi/rhix/rhix_queue.h"
@@ -24,6 +25,7 @@ class Device : public ObjectContainer {
   Sampler CreateSampler(const rhi::SamplerDesc &desc = {}) const;
   BindingGroup CreateBindingGroup(const rhi::BindingLayoutDesc &layout) const;
   Shader CreateShader(const rhi::ShaderDesc &desc) const;
+  ComputeProgram CreateComputeProgram(const rhi::ComputeProgramDesc &desc) const;
   Program CreateProgram(const rhi::ProgramDesc &desc) const;
   Image CreateImage(const rhi::ImageDesc &desc) const;
   Buffer CreateBuffer(const rhi::BufferDesc &desc) const;

@@ -3,7 +3,10 @@
 #include <dxgi1_6.h>
 #include <wrl.h>
 
+#include <array>
+
 #include "grassland/rhi/backend/backend_util.h"
+#include "grassland/rhi/rhi_binding_group.h"
 
 namespace grassland::rhi::backend::d3d12 {
 D3D12_BLEND NativeBlendFactor(BlendFactor factor, bool alpha = false);
@@ -11,5 +14,10 @@ D3D12_BLEND_OP NativeBlendOp(BlendOp op);
 bool SupportsImageStorage(ID3D12Device *device, ImageFormat format);
 DXGI_FORMAT NativeImageFormat(ImageFormat format);
 using Microsoft::WRL::ComPtr;
+bool CreateRootSignature(ID3D12Device *device,
+                         const PipelineLayoutDesc &layout,
+                         bool graphics,
+                         ComPtr<ID3D12RootSignature> &signature,
+                         std::vector<std::array<uint32_t, 2>> &parameters_map);
 bool Check(HRESULT result, const char *operation);
 }  // namespace grassland::rhi::backend::d3d12

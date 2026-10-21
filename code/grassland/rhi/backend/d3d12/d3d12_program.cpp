@@ -29,49 +29,13 @@ bool D3D12Program::Finalize() {
   }
   auto native = static_cast<D3D12Device *>(device_)->NativeDevice();
   std::vector<uint8_t> vertex, fragment;
-  auto prefix = ShaderMacroHeader(desc_, BACKEND_API_D3D12);
+  auto prefix = ShaderMacroHeader(desc_.pipeline_layout, BACKEND_API_D3D12, desc_.vertex_attributes);
   if (!CompileSlang(desc_.vertex_shader->GetDesc(), prefix, BACKEND_API_D3D12, vertex, &desc_.pipeline_layout))
     return false;
   if (!CompileSlang(desc_.fragment_shader->GetDesc(), prefix, BACKEND_API_D3D12, fragment, &desc_.pipeline_layout))
     return false;
-  D3D12_ROOT_SIGNATURE_DESC root{};
-  root.Flags = D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT;
-  const auto mappings = MapBindings(desc_.pipeline_layout, BACKEND_API_D3D12);
-  std::vector<std::vector<D3D12_DESCRIPTOR_RANGE>> ranges(desc_.pipeline_layout.groups.size() * 2);
-  for (auto m : mappings) {
-    D3D12_DESCRIPTOR_RANGE range{};
-    range.RangeType = m.desc.type == BINDING_SAMPLER          ? D3D12_DESCRIPTOR_RANGE_TYPE_SAMPLER
-                      : m.desc.type == BINDING_UNIFORM_BUFFER ? D3D12_DESCRIPTOR_RANGE_TYPE_CBV
-                      : (m.desc.type == BINDING_RW_STRUCTURED_BUFFER || m.desc.type == BINDING_RW_BYTE_ADDRESS_BUFFER ||
-                         m.desc.type == BINDING_RW_TEXTURE2D)
-                          ? D3D12_DESCRIPTOR_RANGE_TYPE_UAV
-                          : D3D12_DESCRIPTOR_RANGE_TYPE_SRV;
-    range.NumDescriptors = m.desc.count;
-    range.BaseShaderRegister = m.shader_register;
-    range.RegisterSpace = m.group;
-    range.OffsetInDescriptorsFromTableStart = m.table_offset;
-    ranges[m.group * 2 + (m.desc.type == BINDING_SAMPLER)].push_back(range);
-  }
-  std::vector<D3D12_ROOT_PARAMETER> parameters;
-  root_parameters_.assign(desc_.pipeline_layout.groups.size(), {UINT32_MAX, UINT32_MAX});
-  for (size_t i = 0; i < ranges.size(); ++i)
-    if (!ranges[i].empty()) {
-      root_parameters_[i / 2][i % 2] = uint32_t(parameters.size());
-      D3D12_ROOT_PARAMETER p{};
-      p.ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
-      p.ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL;
-      p.DescriptorTable = {UINT(ranges[i].size()), ranges[i].data()};
-      parameters.push_back(p);
-    }
-  root.NumParameters = UINT(parameters.size());
-  root.pParameters = parameters.data();
-  ComPtr<ID3DBlob> blob, errors;
-  if (!Check(D3D12SerializeRootSignature(&root, D3D_ROOT_SIGNATURE_VERSION_1, &blob, &errors),
-             "Serialize root signature"))
-    return false;
   ComPtr<ID3D12RootSignature> signature;
-  if (!Check(native->CreateRootSignature(0, blob->GetBufferPointer(), blob->GetBufferSize(), IID_PPV_ARGS(&signature)),
-             "Create root signature"))
+  if (!CreateRootSignature(native, desc_.pipeline_layout, true, signature, root_parameters_))
     return false;
   std::vector<D3D12_INPUT_ELEMENT_DESC> inputs;
   const DXGI_FORMAT formats[] = {DXGI_FORMAT_R32_FLOAT, DXGI_FORMAT_R32G32_FLOAT, DXGI_FORMAT_R32G32B32_FLOAT,

@@ -25,6 +25,8 @@ class CommandContext : public Object<rhi::ICommandContext> {
                      uint64_t size) override;
   bool CmdBindGroup(uint32_t index, IBindingGroup *group) override;
   bool CmdUploadImage(IImage *image, const void *data, uint64_t row_pitch) override;
+  bool CmdBindComputeProgram(IComputeProgram *program) override;
+  bool CmdDispatch(uint32_t x, uint32_t y = 1, uint32_t z = 1) override;
   bool CmdBindProgram(IProgram *program) override;
   bool CmdBeginRendering(const RenderingInfo &info) override;
   bool CmdEndRendering() override;

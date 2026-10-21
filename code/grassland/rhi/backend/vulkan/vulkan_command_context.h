@@ -8,6 +8,7 @@ namespace grassland::rhi::backend::vulkan {
 class VulkanImage;
 class VulkanBuffer;
 class VulkanProgram;
+class VulkanComputeProgram;
 class VulkanWindow;
 
 class VulkanCommandContext final : public CommandContext {
@@ -22,6 +23,8 @@ class VulkanCommandContext final : public CommandContext {
                      uint64_t size) override;
   bool CmdBindGroup(uint32_t index, IBindingGroup *group) override;
   bool CmdUploadImage(IImage *image, const void *data, uint64_t row_pitch) override;
+  bool CmdBindComputeProgram(IComputeProgram *program) override;
+  bool CmdDispatch(uint32_t x, uint32_t y = 1, uint32_t z = 1) override;
   bool CmdBindProgram(IProgram *program) override;
   bool CmdBeginRendering(const RenderingInfo &info) override;
   bool CmdEndRendering() override;
@@ -50,6 +53,8 @@ class VulkanCommandContext final : public CommandContext {
   bool BindGroupVersion(uint32_t index, VulkanBindingGroup::Version *version);
   std::vector<VulkanBindingGroup::Version *> groups_;
   VulkanProgram *program_{};
+  VulkanComputeProgram *compute_program_{};
+  const PipelineLayoutDesc *binding_layout_{};
   VulkanImage *render_target_{};
   std::vector<VulkanBuffer *> vertex_buffers_;
   bool viewport_set_{}, scissor_set_{}, index_bound_{};

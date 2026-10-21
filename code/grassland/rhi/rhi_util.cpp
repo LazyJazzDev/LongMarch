@@ -219,6 +219,8 @@ std::string to_string(ShaderStage stage) {
       return "SHADER_STAGE_VERTEX";
     case SHADER_STAGE_FRAGMENT:
       return "SHADER_STAGE_FRAGMENT";
+    case SHADER_STAGE_COMPUTE:
+      return "SHADER_STAGE_COMPUTE";
   }
   return "UNKNOWN";
 }

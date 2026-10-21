@@ -17,7 +17,12 @@ enum BindingType {
   BINDING_SAMPLER
 };
 
-enum ShaderVisibility { SHADER_VISIBILITY_VERTEX = 1, SHADER_VISIBILITY_FRAGMENT = 2, SHADER_VISIBILITY_ALL = 3 };
+typedef enum {
+  SHADER_VISIBILITY_VERTEX = 1,
+  SHADER_VISIBILITY_FRAGMENT = 2,
+  SHADER_VISIBILITY_COMPUTE = 4,
+  SHADER_VISIBILITY_ALL = 7
+} ShaderVisibility;
 
 struct BindingDesc {
   uint32_t binding{};

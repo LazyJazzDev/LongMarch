@@ -9,9 +9,11 @@
 #include "grassland/rhi/backend/backend_util.h"
 
 namespace grassland::rhi::backend {
-std::string ShaderMacroHeader(const ProgramDesc &desc, BackendAPI api) {
+std::string ShaderMacroHeader(const PipelineLayoutDesc &layout,
+                              BackendAPI api,
+                              const std::vector<VertexAttributeDesc> &attributes) {
   std::string header = "#define RHI_INPUT_I(L,T,N) RHI_INPUT_##L(T,N)\n#define RHI_INPUT(L,T,N) RHI_INPUT_I(L,T,N)\n";
-  for (const auto &attribute : desc.vertex_attributes) {
+  for (const auto &attribute : attributes) {
     auto location = std::to_string(attribute.location);
     header += "#define RHI_INPUT_" + location + "(T,N) ";
     if (api == BACKEND_API_VULKAN || api == BACKEND_API_METAL)
@@ -39,7 +41,7 @@ std::string ShaderMacroHeader(const ProgramDesc &desc, BackendAPI api) {
                 (untyped ? "(N)\n" : "(T,N)\n");
     }
   }
-  for (auto mapped : MapBindings(desc.pipeline_layout, api)) {
+  for (auto mapped : MapBindings(layout, api)) {
     auto b = mapped.desc;
     std::string base = macros[b.type];
     for (bool array : {false, true}) {
@@ -75,7 +77,8 @@ bool CompileSlang(const ShaderDesc &shader,
                   const std::string &prefix,
                   BackendAPI api,
                   std::vector<uint8_t> &code,
-                  const PipelineLayoutDesc *binding_layout) {
+                  const PipelineLayoutDesc *binding_layout,
+                  std::array<uint32_t, 3> *thread_group_size) {
   code.clear();
   thread_local Slang::ComPtr<slang::IGlobalSession> global;
   if (!global) {
@@ -120,7 +123,9 @@ bool CompileSlang(const ShaderDesc &shader,
     return false;
   }
   Slang::ComPtr<slang::IEntryPoint> entry;
-  auto stage = shader.stage == SHADER_STAGE_VERTEX ? SLANG_STAGE_VERTEX : SLANG_STAGE_FRAGMENT;
+  auto stage = shader.stage == SHADER_STAGE_VERTEX     ? SLANG_STAGE_VERTEX
+               : shader.stage == SHADER_STAGE_FRAGMENT ? SLANG_STAGE_FRAGMENT
+                                                       : SLANG_STAGE_COMPUTE;
   if (SLANG_FAILED(module->findAndCheckEntryPoint(shader.entry_point.c_str(), stage, entry.writeRef(),
                                                   diagnostics.writeRef()))) {
     report();
@@ -198,8 +203,9 @@ bool CompileSlang(const ShaderDesc &shader,
         break;
       }
     }
-    const uint32_t stage_bit =
-        shader.stage == SHADER_STAGE_VERTEX ? SHADER_VISIBILITY_VERTEX : SHADER_VISIBILITY_FRAGMENT;
+    const uint32_t stage_bit = shader.stage == SHADER_STAGE_VERTEX     ? SHADER_VISIBILITY_VERTEX
+                               : shader.stage == SHADER_STAGE_FRAGMENT ? SHADER_VISIBILITY_FRAGMENT
+                                                                       : SHADER_VISIBILITY_COMPUTE;
     if (!match || count != match->desc.count || !(match->desc.visibility & stage_bit)) {
       ReportError(-1, std::string("Shader resource does not match the C++ binding layout: ") + parameter->getName());
       return false;
@@ -222,6 +228,12 @@ bool CompileSlang(const ShaderDesc &shader,
     }
   }
 
+  if (thread_group_size) {
+    SlangUInt sizes[3]{};
+    layout->getEntryPointByIndex(0)->getComputeThreadGroupSize(3, sizes);
+    for (int i = 0; i < 3; ++i)
+      (*thread_group_size)[i] = uint32_t(sizes[i]);
+  }
   code.resize(blob->getBufferSize());
   std::memcpy(code.data(), blob->getBufferPointer(), code.size());
   return true;

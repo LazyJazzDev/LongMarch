@@ -28,6 +28,7 @@ class D3D12Device final : public Device {
   uint64_t NextSerial();
   bool Wait(uint64_t value, HANDLE event) const;
   bool WaitIdle();
+  rhi::IComputeProgram *CreateComputeProgram(const ComputeProgramDesc &desc) override;
   rhi::IProgram *CreateProgram(const ProgramDesc &desc) override;
   rhi::IImage *CreateImage(const ImageDesc &desc) override;
   ISampler *CreateSampler(const SamplerDesc &desc = {}) override;

@@ -27,12 +27,12 @@ int main(int argc, char **argv) {
       continue;
     }
     if (arg == "--list") {
-      std::cout << "hello_window\nhello_triangle\nhello_cube\nhello_texture\nhello_blend\n";
+      std::cout << "hello_window\nhello_triangle\nhello_cube\nhello_texture\nhello_blend\nhello_nbody\n";
       return 0;
     }
     if (arg == "--help") {
       std::cout
-          << "[--module hello_window|hello_triangle|hello_cube|hello_texture|hello_blend | --tui | --all] [--backend auto|d3d12|vulkan|metal] [--headless] [--frames N]\nHeadless defaults to 3000 frames per scene; --all defaults to 300 frames with windows.\nNo module specified: open the terminal selection menu.\n";
+          << "[--module hello_window|hello_triangle|hello_cube|hello_texture|hello_blend|hello_nbody | --tui | --all] [--backend auto|d3d12|vulkan|metal] [--headless] [--frames N]\nHeadless defaults to 3000 frames per scene; --all defaults to 300 frames with windows.\nNo module specified: open the terminal selection menu.\n";
       return 0;
     }
     if (arg == "--module" && i + 1 < argc) {
@@ -93,6 +93,10 @@ int main(int argc, char **argv) {
       std::cerr << "hello_blend: FAILED\n";
       result = 1;
     }
+    if (HelloNBody(api, frames, headless) != 0) {
+      std::cerr << "hello_nbody: FAILED\n";
+      result = 1;
+    }
     return result;
   }
   if (tui && !module.empty()) {
@@ -105,9 +109,10 @@ int main(int argc, char **argv) {
                  "  2. hello_triangle  Colored indexed triangle (D3D12/Vulkan/Metal)\n"
                  "  3. hello_cube      Rotating cube with depth and uniform binding\n"
                  "  4. hello_texture   Sampled XOR texture triangle\n"
-                 "  5. hello_blend     Source-alpha blended triangles\n";
+                 "  5. hello_blend     Source-alpha blended triangles\n"
+                 "  6. hello_nbody     Compute simulation and particle rendering (D3D12/Vulkan)\n";
     for (;;) {
-      std::cout << "\nSelect module [1-5 or name], q to quit: " << std::flush;
+      std::cout << "\nSelect module [1-6 or name], q to quit: " << std::flush;
       std::string input;
       if (!std::getline(std::cin, input))
         return 0;
@@ -137,6 +142,10 @@ int main(int argc, char **argv) {
         module = "hello_blend";
         break;
       }
+      if (input == "6" || input == "hello_nbody") {
+        module = "hello_nbody";
+        break;
+      }
       std::cout << "Invalid selection. Enter a listed number or module name.\n";
     }
   }
@@ -150,6 +159,8 @@ int main(int argc, char **argv) {
     return HelloTexture(api, frames, headless);
   if (module == "hello_blend")
     return HelloBlend(api, frames, headless);
+  if (module == "hello_nbody")
+    return HelloNBody(api, frames, headless);
   std::cerr << "Unknown module: " << module << '\n';
   return 1;
 }

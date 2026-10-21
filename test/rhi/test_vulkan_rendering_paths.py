@@ -72,10 +72,12 @@ def check_path(executable, mode, directory, headless=False):
         "khr": ("vkCmdBeginRenderingKHR(", "vkCmdEndRenderingKHR("),
         "fallback": ("vkCmdBeginRenderPass(", "vkCmdEndRenderPass("),
     }
+    scenes = subprocess.check_output([str(executable), "--list"], text=True).splitlines()
+    rendering_scenes = len([scene for scene in scenes if scene != "hello_window"])
     for path, pair in commands.items():
         for command in pair:
             count = output.count(command)
-            expected = (63 * 4 if headless else 3) if path == mode else 0
+            expected = (63 * rendering_scenes if headless else 3) if path == mode else 0
             if count != expected:
                 raise RuntimeError(f"{executable.name}/{mode}: {command} count {count}, expected {expected}\n{output}")
     for command in ("vkCreateRenderPass(", "vkCreateFramebuffer("):

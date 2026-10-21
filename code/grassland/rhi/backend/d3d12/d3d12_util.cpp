@@ -1,6 +1,54 @@
 ﻿#include "grassland/rhi/backend/d3d12/d3d12_util.h"
 
+#include "grassland/rhi/backend/backend_binding_group.h"
+
 namespace grassland::rhi::backend::d3d12 {
+bool CreateRootSignature(ID3D12Device *device,
+                         const PipelineLayoutDesc &layout,
+                         bool graphics,
+                         ComPtr<ID3D12RootSignature> &signature,
+                         std::vector<std::array<uint32_t, 2>> &parameters_map) {
+  D3D12_ROOT_SIGNATURE_DESC root{};
+  root.Flags = graphics ? D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT : D3D12_ROOT_SIGNATURE_FLAG_NONE;
+  const auto mappings = MapBindings(layout, BACKEND_API_D3D12);
+  std::vector<std::vector<D3D12_DESCRIPTOR_RANGE>> ranges(layout.groups.size() * 2);
+  for (auto m : mappings) {
+    D3D12_DESCRIPTOR_RANGE range{};
+    range.RangeType = m.desc.type == BINDING_SAMPLER          ? D3D12_DESCRIPTOR_RANGE_TYPE_SAMPLER
+                      : m.desc.type == BINDING_UNIFORM_BUFFER ? D3D12_DESCRIPTOR_RANGE_TYPE_CBV
+                      : (m.desc.type == BINDING_RW_STRUCTURED_BUFFER || m.desc.type == BINDING_RW_BYTE_ADDRESS_BUFFER ||
+                         m.desc.type == BINDING_RW_TEXTURE2D)
+                          ? D3D12_DESCRIPTOR_RANGE_TYPE_UAV
+                          : D3D12_DESCRIPTOR_RANGE_TYPE_SRV;
+    range.NumDescriptors = m.desc.count;
+    range.BaseShaderRegister = m.shader_register;
+    range.RegisterSpace = m.group;
+    range.OffsetInDescriptorsFromTableStart = m.table_offset;
+    ranges[m.group * 2 + (m.desc.type == BINDING_SAMPLER)].push_back(range);
+  }
+  std::vector<D3D12_ROOT_PARAMETER> parameters;
+  parameters_map.assign(layout.groups.size(), {UINT32_MAX, UINT32_MAX});
+  for (size_t i = 0; i < ranges.size(); ++i)
+    if (!ranges[i].empty()) {
+      parameters_map[i / 2][i % 2] = uint32_t(parameters.size());
+      D3D12_ROOT_PARAMETER p{};
+      p.ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
+      p.ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL;
+      p.DescriptorTable = {UINT(ranges[i].size()), ranges[i].data()};
+      parameters.push_back(p);
+    }
+  root.NumParameters = UINT(parameters.size());
+  root.pParameters = parameters.data();
+  ComPtr<ID3DBlob> blob, errors;
+  if (!Check(D3D12SerializeRootSignature(&root, D3D_ROOT_SIGNATURE_VERSION_1, &blob, &errors),
+             "Serialize root signature"))
+    return false;
+  if (!Check(device->CreateRootSignature(0, blob->GetBufferPointer(), blob->GetBufferSize(), IID_PPV_ARGS(&signature)),
+             "Create root signature"))
+    return false;
+  return true;
+}
+
 D3D12_BLEND NativeBlendFactor(BlendFactor factor, bool alpha) {
   // Alpha equations use the alpha component of color factors as well.
   if (alpha && factor >= BLEND_FACTOR_SRC_COLOR && factor <= BLEND_FACTOR_ONE_MINUS_DST_COLOR)

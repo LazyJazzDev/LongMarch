@@ -17,11 +17,12 @@ def run(executable, args, success=True):
 
 
 def check(executable, backend):
-    for scene in ("hello_window", "hello_triangle", "hello_cube", "hello_texture", "hello_blend", "all"):
+    scenes = run(executable, ["--list"]).splitlines()
+    for scene in (*scenes, "all"):
         selection = ["--all"] if scene == "all" else ["--module", scene]
         output = run(executable, ["--headless", "--backend", backend, "--frames", "7", *selection])
         rows = re.findall(r"(hello_\w+): headless 1280x720, (\d+) frames, ([\d.]+) s, ([\d.]+) FPS", output)
-        expected = ["hello_window", "hello_triangle", "hello_cube", "hello_texture", "hello_blend"] if scene == "all" else [scene]
+        expected = scenes if scene == "all" else [scene]
         if [row[0] for row in rows] != expected:
             raise RuntimeError(f"Missing or repeated scene results:\n{output}")
         for _, frames, seconds, fps in rows:

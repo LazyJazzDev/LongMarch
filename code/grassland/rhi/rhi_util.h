@@ -139,7 +139,7 @@ struct ImageDesc {
   ImageFormat format{IMAGE_FORMAT_UNKNOWN};
 };
 
-typedef enum { SHADER_STAGE_VERTEX, SHADER_STAGE_FRAGMENT } ShaderStage;
+typedef enum { SHADER_STAGE_VERTEX, SHADER_STAGE_FRAGMENT, SHADER_STAGE_COMPUTE } ShaderStage;
 
 std::string to_string(ShaderStage stage);
 

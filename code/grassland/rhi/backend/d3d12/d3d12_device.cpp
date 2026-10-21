@@ -4,6 +4,7 @@
 #include "grassland/rhi/backend/d3d12/d3d12_allocated_image.h"
 #include "grassland/rhi/backend/d3d12/d3d12_binding_group.h"
 #include "grassland/rhi/backend/d3d12/d3d12_command_context.h"
+#include "grassland/rhi/backend/d3d12/d3d12_compute_program.h"
 #include "grassland/rhi/backend/d3d12/d3d12_program.h"
 #include "grassland/rhi/backend/d3d12/d3d12_queue.h"
 #include "grassland/rhi/backend/d3d12/d3d12_sampler.h"
@@ -186,6 +187,10 @@ D3D12Device::~D3D12Device() {
   command_pool_.clear();
   if (idle_event_)
     CloseHandle(idle_event_);
+}
+
+rhi::IComputeProgram *D3D12Device::CreateComputeProgram(const ComputeProgramDesc &desc) {
+  return new D3D12ComputeProgram(this, desc);
 }
 
 rhi::IProgram *D3D12Device::CreateProgram(const ProgramDesc &desc) {

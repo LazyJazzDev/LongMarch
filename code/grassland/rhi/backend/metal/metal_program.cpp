@@ -24,8 +24,8 @@ MTL::DepthStencilState *MetalProgram::NativeDepthStencil() const {
 // complete C++ layout, so unused declarations never shift a captured version.
 static bool CompileMetal(const ShaderDesc &shader, const ProgramDesc &desc, std::string &source, std::string &entry) {
   std::vector<uint8_t> code;
-  if (!CompileSlang(shader, ShaderMacroHeader(desc, BACKEND_API_VULKAN), BACKEND_API_VULKAN, code,
-                    &desc.pipeline_layout))
+  if (!CompileSlang(shader, ShaderMacroHeader(desc.pipeline_layout, BACKEND_API_VULKAN, desc.vertex_attributes),
+                    BACKEND_API_VULKAN, code, &desc.pipeline_layout))
     return false;
   std::vector<uint32_t> words(code.size() / 4);
   std::memcpy(words.data(), code.data(), code.size());

@@ -1,6 +1,6 @@
 # rhi_hello
 
-Five independent modules use `rhi::ObjPtr<IXXX>` pointer APIs. Each module creates its own Core, Device, Window and Queue; main only selects the module/backend and parses arguments.
+Six independent modules use `rhi::ObjPtr<IXXX>` pointer APIs. Each module creates its own Core, Device, Window and Queue; main only selects the module/backend and parses arguments.
 
 ```text
 demo_rhi_hello --list
@@ -17,7 +17,7 @@ The positional backend argument remains supported. Without `--module`, a line-ba
 - `hello_texture`: the XOR texture triangle from `graphics_hello`, using a sampled image and linear sampler in a versioned BindingGroup.
 - `hello_blend`: the two overlapping triangles from `graphics_hello/blend`, first opaque and then alpha 0.5, over the same RGB (0.6, 0.7, 0.8) background. Renders directly to the RGBA8/BGRA8 target using two indexed draws; includes the same window controls and headless timing as other modules.
 
-All five modules and the depth/stencil, MRT and BindingGroup APIs are implemented on D3D12, Vulkan and Metal. Metal bindings require argument-buffer Tier 2 support. D24S8 uses native Depth32Float_Stencil8 on Metal, so depth precision differs from native 24-bit formats.
+The first five modules and the depth/stencil, MRT and BindingGroup APIs are implemented on D3D12, Vulkan and Metal. Metal bindings require argument-buffer Tier 2 support. D24S8 uses native Depth32Float_Stencil8 on Metal, so depth precision differs from native 24-bit formats.
 
 
 ## Shader and Program contract
@@ -39,6 +39,19 @@ CmdBindProgram precedes vertex-buffer and group binding. Bind all required verte
 D3D12 leases RTV slots from Device-owned heap pages. Vulkan prefers dynamic rendering when the negotiated Vulkan 1.3 core feature or Vulkan 1.2 VK_KHR_dynamic_rendering feature is supported. Program uses attachment formats instead of a RenderPass, and Begin/End record the corresponding core/KHR commands; the attachment cache creates only ImageViews. Otherwise, it uses traditional RenderPass/Framebuffer objects: render passes are cached by format and load/store operations, image views/framebuffers by ordered physical-image tuple. Load/store variants remain compatible with the same Program pipeline. Vulkan synchronizes vertex/index/uniform/shader reads and storage writes at scope boundaries so bindings can change inside a scope without splitting it. Swapchain teardown retires cached attachments after GPU idle, while completed contexts can finish returning their CPU leases. Dynamic rendering is not required.
 
 Callers release child handles before parent Device/Core handles, and release old frame references/recordings before resize/rebuild boundaries. Device shutdown drains submitted work. Metal uses tracked private buffers/textures, shared upload leases and explicit render encoders. Bindings set outside a rendering scope are applied when the encoder begins; changes inside the scope are encoded immediately. Metal compiles Slang to DX-layout SPIR-V, validates the reflected layout, then translates through SPIRV-Cross to MSL at Finalize. This preserves compact structured-buffer layouts across backends.
+
+## Compute programs and nbody
+
+`hello_nbody` is available on D3D12 and Vulkan, through menu item 6, `--module hello_nbody`, and `--all`. It follows `nbody_cs`: 65,536 particles, 128-thread shared-memory tiles, softened all-pairs gravity, velocity integration, position copy, and additive camera-facing particle quads. It uses ten initial galaxy clusters with seed 42, a fixed 0.03 simulation step, and the original gravity/radius/speed constants. There is no ImGui, HDR output or tone-mapping pass; particles render directly into SDR UNORM targets. Existing P/Escape/FPS/window handling and headless timing conventions apply. The nbody module creates all its own resources. Metal compute is not implemented in this iteration.
+
+```text
+demo_rhi_hello --module hello_nbody --backend vulkan
+demo_rhi_hello --module hello_nbody --backend d3d12 --headless --frames 300
+```
+
+Create a `SHADER_STAGE_COMPUTE` Shader, then `CreateComputeProgram(ComputeProgramDesc)` and `Finalize()`. The descriptor captures the shader and PipelineLayout; Finalize compiles Slang with the same RHI resource macros and validates binding type/count/visibility, structured-buffer stride and thread-group size. `SHADER_VISIBILITY_COMPUTE` is bit 4; `SHADER_VISIBILITY_ALL` includes vertex, fragment and compute. Dispatch arguments count workgroups, not threads.
+
+`CmdBindComputeProgram`, `CmdBindGroup`, then `CmdDispatch(x,y,z)` records native compute commands immediately. Graphics and compute share one active program selection and group-binding table: switching either Program requires rebinding groups. Compute binding/Dispatch must occur outside Begin/EndRendering. Group versions are retained at bind time; later BindResource does not change existing bindings. Barriers are inserted before each Dispatch, including repeated writes with no intervening rebind, and compute/copy/graphics transitions are automatic. Dispatch does not submit or wait on the CPU. D3D12 uses the existing transient descriptor heaps for both pipeline kinds; Vulkan uses compute descriptor visibility and bind points. Vulkan selects a queue family supporting both graphics and compute. The rhix package provides the corresponding ComputeProgram, creation and command wrappers; the nbody module itself uses the pointer API.
 
 ## Binding lifetime and descriptor pages
 
