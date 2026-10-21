@@ -516,6 +516,92 @@ TEST_P(RhiRayTracing, CompactedLargeBlasSupportsInPlaceUpdate) {
   CheckNativeErrors(device.Get());
 }
 
+TEST_P(RhiRayTracing, RebuildsTlasWithChangingInstanceCountWithinCapacity) {
+  const auto api = GetParam();
+  ObjPtr<ICore> core = CreateCore(api);
+  ASSERT_TRUE(core);
+  DeviceFeatureRequirement required;
+  required.ray_query = true;
+  ObjPtr<IDevice> device = core->CreateDeviceByAutoSelection(required);
+  if (!device)
+    GTEST_SKIP();
+  ObjPtr<IQueue> queue = device->GetQueue(QUEUE_TYPE_GRAPHICS);
+  ASSERT_TRUE(queue);
+  BottomLevelAccelerationStructureDesc desc;
+  desc.geometries = {{3}};
+  ObjPtr<IBottomLevelAccelerationStructure> blas = device->CreateBottomLevelAccelerationStructure(desc);
+  ASSERT_TRUE(blas);
+  ObjPtr<IBuffer> vertices = device->CreateBuffer({36});
+  ASSERT_TRUE(vertices);
+  const float positions[] = {-1, -1, 0, 0, 1, 0, 1, -1, 0};
+  ObjPtr<ITopLevelAccelerationStructure> tlas = device->CreateTopLevelAccelerationStructure({4, true});
+  ASSERT_TRUE(tlas);
+  ObjPtr<ICommandContext> build = device->CreateCommandContext();
+  ASSERT_TRUE(build);
+  ASSERT_TRUE(build->CmdUploadBuffer(vertices.Get(), 0, positions, sizeof(positions)));
+  ASSERT_TRUE(build->CmdBuildBottomLevelAccelerationStructure(blas.Get(), {{{vertices.Get()}, {}}}));
+  ObjPtr<ISubmissionToken> token = queue->Submit(build.Get());
+  ASSERT_TRUE(token);
+  ASSERT_TRUE(token->WaitHost());
+  const char *source = R"(
+RHI_ACCELERATION_STRUCTURE(0,0,scene);
+RHI_RW_BYTE_ADDRESS_BUFFER(0,1,output);
+[numthreads(1,1,1)] void CSMain(uint3 id : SV_DispatchThreadID) {
+ RayDesc ray; ray.Origin=float3(id.x*3,0,-2); ray.Direction=float3(0,0,1); ray.TMin=0; ray.TMax=10;
+ RayQuery<RAY_FLAG_NONE> query;
+ query.TraceRayInline(scene,RAY_FLAG_NONE,255,ray);
+ while(query.Proceed()) {}
+ output.Store(id.x*4,query.CommittedStatus()==COMMITTED_TRIANGLE_HIT ? query.CommittedInstanceID()+1 : 0);
+}
+)";
+  PipelineLayoutDesc layout{{{{{0, BINDING_ACCELERATION_STRUCTURE, 1, SHADER_VISIBILITY_COMPUTE},
+                               {1, BINDING_RW_BYTE_ADDRESS_BUFFER, 1, SHADER_VISIBILITY_COMPUTE}}}}};
+  ObjPtr<IShader> shader = device->CreateShader({source, "CSMain", SHADER_STAGE_COMPUTE});
+  ASSERT_TRUE(shader);
+  ObjPtr<IComputeProgram> program = device->CreateComputeProgram({shader.Get(), layout});
+  ASSERT_TRUE(program);
+  ASSERT_TRUE(program->Finalize());
+  ObjPtr<IBuffer> output = device->CreateBuffer({16});
+  ASSERT_TRUE(output);
+  ObjPtr<IBindingGroup> group = device->CreateBindingGroup(layout.groups[0]);
+  ASSERT_TRUE(group);
+  ASSERT_TRUE(group->BindResource(0, tlas.Get()));
+  ASSERT_TRUE(group->BindResource(1, output.Get()));
+  for (uint32_t count : {1u, 4u, 2u, 3u, 1u}) {
+    std::vector<RayTracingInstance> instances(count);
+    for (uint32_t i = 0; i < count; ++i) {
+      instances[i].blas = blas.Get();
+      instances[i].custom_index = i;
+      instances[i].transform[3] = float(i * 3);
+      instances[i].disable_triangle_culling = true;
+    }
+    build = device->CreateCommandContext();
+    ASSERT_TRUE(build);
+    ASSERT_TRUE(build->CmdBuildTopLevelAccelerationStructure(tlas.Get(), instances));
+    ASSERT_TRUE(build->CmdBuildTopLevelAccelerationStructure(tlas.Get(), instances, ACCELERATION_STRUCTURE_UPDATE));
+    ASSERT_TRUE(build->CmdBindComputeProgram(program.Get()));
+    ASSERT_TRUE(build->CmdBindGroup(0, group.Get()));
+    ASSERT_TRUE(build->CmdDispatch(4));
+    token = queue->Submit(build.Get());
+    ASSERT_TRUE(token);
+    ASSERT_TRUE(token->WaitHost());
+    std::array<uint32_t, 4> result{};
+    ReadBuffer(device.Get(), output.Get(), api, result);
+    for (uint32_t i = 0; i < 4; ++i)
+      EXPECT_EQ(result[i], i < count ? i + 1 : 0);
+  }
+  RayTracingInstance instance;
+  instance.blas = blas.Get();
+  build = device->CreateCommandContext();
+  ASSERT_TRUE(build);
+  EXPECT_FALSE(
+      build->CmdBuildTopLevelAccelerationStructure(tlas.Get(), {instance, instance}, ACCELERATION_STRUCTURE_UPDATE));
+  build = device->CreateCommandContext();
+  ASSERT_TRUE(build);
+  EXPECT_FALSE(build->CmdBuildTopLevelAccelerationStructure(tlas.Get(), std::vector<RayTracingInstance>(5, instance)));
+  CheckNativeErrors(device.Get());
+}
+
 constexpr BackendAPI backends[] = {
 #if defined(LONGMARCH_D3D12_ENABLED)
     BACKEND_API_D3D12,

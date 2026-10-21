@@ -51,7 +51,7 @@ bool ValidateGeometryBuffers(const BottomLevelAccelerationStructureDesc &desc,
 
 bool ValidateInstances(const TopLevelAccelerationStructureDesc &desc,
                        const std::vector<RayTracingInstance> &instances) {
-  if (instances.size() != desc.instance_count)
+  if (instances.size() > desc.instance_count)
     return false;
   for (const auto &instance : instances)
     if (!instance.blas || instance.custom_index > 0xffffff || instance.hit_group_offset > 0xffffff)

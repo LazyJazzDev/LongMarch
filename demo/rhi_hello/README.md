@@ -127,15 +127,15 @@ demo_rhix_hello --headless --module ray_query --backend d3d12 --frames 3000
 `IAccelerationStructure`. Creation allocates fixed result storage; it does not build
 anything. A BLAS contains either triangle geometries (float3 positions, optional
 16/32-bit indices) or AABB geometries (float3 minimum followed by float3 maximum).
-A TLAS has a fixed instance count. Instance transforms are row-major 3x4 matrices.
+A TLAS has a fixed allocation capacity; BUILD accepts an actual instance count up to that capacity. Instance transforms are row-major 3x4 matrices.
 The instance custom index and hit-group offset are 24-bit values, and masks are 8-bit.
 
 `CmdBuildBottomLevelAccelerationStructure` and `CmdBuildTopLevelAccelerationStructure`
 record native Build or Update immediately, outside rendering scopes. Update requires
-`allow_update` at creation and an earlier submitted Build. Geometry type/count,
+`allow_update` at creation and an earlier Build ordered before the update. Geometry type/count,
 primitive count, vertex format/stride, index format/topology, opacity and active versus
 inactive primitives must remain unchanged during Update. Positions, bounds, instance
-transforms/masks and BLAS references may change. To change fixed counts, create a new AS.
+transforms/masks and BLAS references may change. Changing a TLAS instance count requires BUILD; exceeding its capacity or changing BLAS geometry counts requires a new AS.
 No implicit resizing or CPU wait occurs. Calls accessing the same AS are externally
 synchronized; submit its modifying contexts in recording order before recording later
 uses in another context. CommandContext inserts build/read barriers automatically.
@@ -169,3 +169,37 @@ reflects shader payloads and checks the native hit-attribute limit. Bind with
 `CmdBindRayTracingProgram`, bind groups, then `CmdDispatchRays(width, height, depth)`.
 Slang uses SM 6.5 for ray pipelines and shaders with AS bindings, preserving SM 6.0 for
 existing shaders and the shared DX-compatible Vulkan layout.
+
+## TLAS pressure test
+
+`rhi_hello --module tlas_pressure_test --backend vulkan` (or `d3d12`) renders
+1,000 randomly positioned and colored cubes/spheres on a large ground plane.
+All bodies, including hidden ones, are simulated on the CPU with gravity along Y;
+ground contact assigns a new random upward speed. A sinusoid with an eight-second
+period selects 200 through 1,000 visible bodies, randomly moving IDs between the
+visible and hidden sets. Stable instance IDs retain each body's color.
+
+Three immutable BLASes (cube, sphere AABB, ground) are shared by the instances.
+The TLAS is allocated once for 1,001 instances. Every frame uses BUILD with exactly
+`visible bodies + 1 ground` instances: hidden objects are absent, not masked out.
+Native UPDATE/refit cannot change the previous instance count. The allocation
+capacity in `TopLevelAccelerationStructureDesc::instance_count` is now an upper
+bound for BUILD; UPDATE still requires the preceding build's actual count.
+This scene tests instance transforms and membership, not deforming BLAS vertices.
+
+Compute ray queries shade one primary ray per pixel and a shadow ray for lit hits
+under a fixed directional light. A fullscreen pass displays the result. P toggles
+VSync; the title reports FPS, visible body count and total TLAS instance count.
+The module also participates in the menu, `--list`, `--all` and `--headless`.
+
+```sh
+demo_rhi_hello --headless --module tlas_pressure_test --backend vulkan --frames 3000
+```
+
+Headless runs at 1280x720 with three frames in flight and 60 warmup frames, using
+seed 87 and a fixed 1/120-second simulation step for reproducible scene evolution.
+Window mode advances with elapsed time, using physics substeps capped at 1/120 s.
+The report includes completed-work FPS, actual visible-count range and CPU time
+spent on simulation/instance packing, TLAS command recording, rendering command
+recording, submission and frame waiting. CPU recording times are not GPU durations;
+use a GPU profiler to separate TLAS build from ray traversal/shading costs.

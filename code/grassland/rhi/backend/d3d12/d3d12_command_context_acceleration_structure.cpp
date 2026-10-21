@@ -75,6 +75,15 @@ bool D3D12CommandContext::CmdBuildTopLevelAccelerationStructure(ITopLevelAcceler
     recording_failed_ = true;
     return false;
   }
+  if (mode == ACCELERATION_STRUCTURE_UPDATE) {
+    auto pending = as_dependencies_.find(target);
+    const size_t previous_count =
+        pending == as_dependencies_.end() ? target->BottomLevels().size() : pending->second.size();
+    if (instances.size() != previous_count) {
+      recording_failed_ = true;
+      return false;
+    }
+  }
   std::vector<D3D12_RAYTRACING_INSTANCE_DESC> native(instances.size());
   for (size_t i = 0; i < instances.size(); ++i) {
     const auto &instance = instances[i];
@@ -125,6 +134,7 @@ bool D3D12CommandContext::CmdBuildTopLevelAccelerationStructure(ITopLevelAcceler
   as_dependencies_[target] = std::move(dependencies);
   D3D12_BUILD_RAYTRACING_ACCELERATION_STRUCTURE_DESC build{};
   build.Inputs = target->NativeInputs();
+  build.Inputs.NumDescs = uint32_t(instances.size());
   build.Inputs.InstanceDescs = upload->NativeBuffer()->GetGPUVirtualAddress();
   build.DestAccelerationStructureData = target->Address();
   build.ScratchAccelerationStructureData = scratch->NativeBuffer()->GetGPUVirtualAddress();

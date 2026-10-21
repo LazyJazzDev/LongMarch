@@ -108,6 +108,15 @@ bool VulkanCommandContext::CmdBuildTopLevelAccelerationStructure(ITopLevelAccele
     recording_failed_ = true;
     return false;
   }
+  if (mode == ACCELERATION_STRUCTURE_UPDATE) {
+    auto pending = as_dependencies_.find(target);
+    const size_t previous_count =
+        pending == as_dependencies_.end() ? target->BottomLevels().size() : pending->second.size();
+    if (instances.size() != previous_count) {
+      recording_failed_ = true;
+      return false;
+    }
+  }
   std::vector<VkAccelerationStructureInstanceKHR> native(instances.size());
   for (size_t i = 0; i < instances.size(); ++i) {
     const auto &instance = instances[i];

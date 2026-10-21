@@ -31,6 +31,7 @@ struct BottomLevelAccelerationStructureDesc {
 };
 
 struct TopLevelAccelerationStructureDesc {
+  // Allocated capacity. BUILD may use fewer instances; UPDATE must preserve the last build count.
   uint32_t instance_count{};
   bool allow_update{};
   bool allow_compaction{};
