@@ -5,6 +5,7 @@
 #include <array>
 #include <chrono>
 #include <cmath>
+#include <glm/gtc/matrix_transform.hpp>
 #include <iostream>
 #include <map>
 #include <thread>
@@ -49,28 +50,34 @@ int RunRayTracing(grassland::rhi::BackendAPI api, int frames, bool headless) {
   const auto &embedded = shader_list.at("modules/raytracing/shaders/trace.slang");
   std::string source(embedded.first, embedded.second);
   PipelineLayoutDesc trace_layout{{{{{0, BINDING_ACCELERATION_STRUCTURE, 1, SHADER_VISIBILITY_RAY_GENERATION},
-                                     {1, BINDING_RW_TEXTURE2D, 1, SHADER_VISIBILITY_RAY_GENERATION}}}}};
-  ObjPtr<IShader> raygen = device->CreateShader({source, "RayGen", SHADER_STAGE_RAY_GENERATION});
+                                     {1, BINDING_RW_TEXTURE2D, 1, SHADER_VISIBILITY_RAY_GENERATION},
+                                     {2, BINDING_UNIFORM_BUFFER, 1, SHADER_VISIBILITY_RAY_GENERATION}}}}};
+  ObjPtr<IShader> raygen = device->CreateShader({source, "RayGenMain", SHADER_STAGE_RAY_GENERATION});
   if (!raygen)
     return 1;
-  ObjPtr<IShader> miss = device->CreateShader({source, "Miss", SHADER_STAGE_MISS});
+  ObjPtr<IShader> miss = device->CreateShader({source, "MissMain", SHADER_STAGE_MISS});
   if (!miss)
     return 1;
-  ObjPtr<IShader> hit = device->CreateShader({source, "TriangleHit", SHADER_STAGE_CLOSEST_HIT});
+  ObjPtr<IShader> hit = device->CreateShader({source, "ClosestHitMain", SHADER_STAGE_CLOSEST_HIT});
   if (!hit)
     return 1;
-  ObjPtr<IShader> sphere_hit = device->CreateShader({source, "SphereClosest", SHADER_STAGE_CLOSEST_HIT});
+  ObjPtr<IShader> sphere_hit = device->CreateShader({source, "SphereClosestHitMain", SHADER_STAGE_CLOSEST_HIT});
   if (!sphere_hit)
     return 1;
-  ObjPtr<IShader> intersection = device->CreateShader({source, "SphereIntersection", SHADER_STAGE_INTERSECTION});
+  ObjPtr<IShader> intersection = device->CreateShader({source, "SphereIntersectionMain", SHADER_STAGE_INTERSECTION});
   if (!intersection)
+    return 1;
+  ObjPtr<IShader> callable = device->CreateShader({source, "CallableMain", SHADER_STAGE_CALLABLE});
+  if (!callable)
     return 1;
   RayTracingProgramDesc desc;
   desc.ray_generation = raygen.Get();
   desc.miss_shaders = {miss.Get()};
   desc.hit_groups = {{hit.Get(), nullptr, nullptr}, {sphere_hit.Get(), nullptr, intersection.Get()}};
   desc.pipeline_layout = trace_layout;
-  desc.max_payload_size = 12;
+  desc.callable_shaders = {callable.Get()};
+  desc.max_payload_size = 32;
+  desc.max_attribute_size = 12;
   ObjPtr<IRayTracingProgram> trace = device->CreateRayTracingProgram(desc);
   if (!trace)
     return 1;
@@ -108,7 +115,7 @@ int RunRayTracing(grassland::rhi::BackendAPI api, int frames, bool headless) {
   triangles.geometries = {{3, 12, 0}};
   triangles.allow_compaction = true;
   BottomLevelAccelerationStructureDesc boxes;
-  boxes.aabbs = {{1, 24, false}};
+  boxes.aabbs = {{1, 24, true}};
   ObjPtr<IBottomLevelAccelerationStructure> triangle = device->CreateBottomLevelAccelerationStructure(triangles);
   if (!triangle)
     return 1;
@@ -119,8 +126,8 @@ int RunRayTracing(grassland::rhi::BackendAPI api, int frames, bool headless) {
   if (!tlas)
     return 1;
   {
-    const float vertices[] = {-0.6f, -0.6f, 0, 0, 0.65f, 0, 0.6f, -0.6f, 0};
-    const float bounds[] = {-0.6f, -0.6f, -0.6f, 0.6f, 0.6f, 0.6f};
+    const float vertices[] = {-1, -1, 0, 1, -1, 0, 0, 1, 0};
+    const float bounds[] = {-1, -1, -1, 1, 1, 1};
     ObjPtr<IBuffer> vertex_buffer = device->CreateBuffer({sizeof(vertices)});
     if (!vertex_buffer)
       return 1;
@@ -165,9 +172,8 @@ int RunRayTracing(grassland::rhi::BackendAPI api, int frames, bool headless) {
   }
   std::vector<RayTracingInstance> instances(2);
   instances[0].blas = triangle.Get();
-  instances[0].disable_triangle_culling = true;
   instances[1].blas = sphere.Get();
-  instances[1].transform[3] = 0.7f;
+  instances[1].transform[3] = 2.0f;
   instances[1].hit_group_offset = 1;
   {
     ObjPtr<ICommandContext> build = device->CreateCommandContext();
@@ -181,6 +187,15 @@ int RunRayTracing(grassland::rhi::BackendAPI api, int frames, bool headless) {
     if (!token->WaitHost())
       return 1;
   }
+
+  struct CameraInfo {
+    glm::mat4 screen_to_camera;
+    glm::mat4 camera_to_world;
+  };
+
+  ObjPtr<IBuffer> camera_buffer = device->CreateBuffer({256});
+  if (!camera_buffer)
+    return 1;
   ObjPtr<IBindingGroup> trace_group = device->CreateBindingGroup(trace_layout.groups[0]);
   if (!trace_group)
     return 1;
@@ -190,12 +205,15 @@ int RunRayTracing(grassland::rhi::BackendAPI api, int frames, bool headless) {
   if (!display_group)
     return 1;
   ObjPtr<IImage> output;
+  if (!trace_group->BindResource(2, camera_buffer.Get()))
+    return 1;
   bool previous_p = false;
   PresentMode requested = PRESENT_MODE_VSYNC;
   grassland::FPSCounter fps;
   auto title_time = std::chrono::steady_clock::now();
   // Warm up allocations and pipelines before measuring completed GPU work.
   auto benchmark_start = std::chrono::steady_clock::now();
+  const auto animation_start = std::chrono::steady_clock::now();
   int rendered = headless ? -60 : 0;
   while (!frames || rendered < frames) {
     if (!headless) {
@@ -259,10 +277,21 @@ int RunRayTracing(grassland::rhi::BackendAPI api, int frames, bool headless) {
         return 1;
       if (!display_group->BindResource(0, output.Get()))
         return 1;
+      CameraInfo camera{
+          glm::inverse(glm::perspective(glm::radians(60.0f), float(extent.width) / float(extent.height), 0.1f, 10.0f)),
+          glm::inverse(glm::lookAt(glm::vec3{0, 0, 5}, glm::vec3{0, 0, 0}, glm::vec3{0, 1, 0}))};
+      if (!context->CmdUploadBuffer(camera_buffer.Get(), 0, &camera, sizeof(camera)))
+        return 1;
     }
-    const float angle = float(rendered + 60) * 0.01f;
-    instances[0].transform = {
-        std::cos(angle), -std::sin(angle), 0, -0.65f, std::sin(angle), std::cos(angle), 0, 0, 0, 0, 1, 0};
+    // Match graphics_hello: one Y-axis revolution every two seconds.
+    const float angle = headless
+                            ? float(rendered + 60) * 0.01f
+                            : std::chrono::duration<float>(std::chrono::steady_clock::now() - animation_start).count() *
+                                  glm::pi<float>();
+    instances[0].transform = {std::cos(angle),  0, std::sin(angle), -2, 0, 1, 0, 0,
+                              -std::sin(angle), 0, std::cos(angle), 0};
+    instances[1].transform = {std::cos(angle),  0, std::sin(angle) * 0.5f, 2, 0, 1, 0, 0,
+                              -std::sin(angle), 0, std::cos(angle) * 0.5f, 0};
     if (!context->CmdBuildTopLevelAccelerationStructure(tlas.Get(), instances, ACCELERATION_STRUCTURE_UPDATE))
       return 1;
     if (!context->CmdBindRayTracingProgram(trace.Get()))

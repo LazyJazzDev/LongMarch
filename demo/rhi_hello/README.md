@@ -106,9 +106,14 @@ Metal graphics and compute programs share `MetalProgramBase` argument-buffer lay
 ## Acceleration structures and ray tracing (D3D12 / Vulkan)
 
 `raytracing` uses a RayTracingProgram with ray-generation, miss, triangle closest-hit,
-procedural intersection and sphere closest-hit shaders. `ray_query` uses inline ray
-queries from a ComputeProgram. Both render a rotating triangle and an AABB-backed
-sphere, compact the triangle BLAS once, and refit the TLAS each frame. Each module
+procedural intersection, sphere closest-hit and callable shaders, matching
+`graphics_hello/rt_multi_shader_group`. `ray_query` matches `graphics_hello/ray_query`
+using inline queries from a ComputeProgram. Both use the reference 60-degree camera,
+triangle at x = -2, scaled ellipsoid at x = 2, two-second Y-axis rotation, front/back
+face coloring, blue-gray sphere lighting and tan background. They compact the
+triangle BLAS once and refit the TLAS each frame. The RHI output uses RGBA8 UNORM
+(the current supported color format) rather than the reference float image; all
+reference shader colors are in [0, 1]. Each module
 owns its own setup, output image and fullscreen display pass. Both APIs expose these
 modules through the terminal menu, `--module`, `--all` and `--headless`. An unavailable
 ray-tracing feature is reported as `SKIPPED`; the existing Metal modules remain available.
