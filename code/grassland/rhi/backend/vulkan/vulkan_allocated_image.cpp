@@ -15,9 +15,17 @@ VulkanAllocatedImage::VulkanAllocatedImage(VulkanDevice *device, ImageDesc desc)
 VulkanAllocatedImage::~VulkanAllocatedImage() {
   if (image_) {
     device_->RenderTargets().Retire(image_);
-    views_.reset();
+    views_.Reset();
     vmaDestroyImage(device_->Allocator(), image_, allocation_);
   }
+}
+
+VkImageView VulkanAllocatedImage::AttachmentView() const {
+  return views_.Attachment();
+}
+
+VkImageView VulkanAllocatedImage::BindingView() const {
+  return views_.Binding();
 }
 
 bool VulkanAllocatedImage::IsValid() const {
@@ -58,8 +66,7 @@ VulkanAllocatedImage *VulkanAllocatedImage::Create(VulkanDevice *device, const I
     if (!Check(vmaCreateImage(device->Allocator(), &info, &memory, &image->image_, &image->allocation_, nullptr),
                "Allocate image"))
       return nullptr;
-    image->views_ = Views::Create(device->NativeDevice(), image->image_, desc.format, true);
-    if (!image->views_)
+    if (!image->views_.Initialize(device->NativeDevice(), image->image_, desc.format, true))
       return nullptr;
     // Establish the fixed default layout once, before exposing the resource.
     // Temporary initialization commands are outside the rendering loop.

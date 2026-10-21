@@ -8,15 +8,18 @@ class VulkanWindow;
 
 class VulkanSwapChainImage final : public VulkanImage {
  public:
-  VulkanSwapChainImage(ImageDesc desc, VulkanWindow *window, VkImage image, std::shared_ptr<Views> views);
+  VulkanSwapChainImage(ImageDesc desc, VulkanWindow *window, VkImage image, VkImageView attachment);
   ~VulkanSwapChainImage() override;
   bool IsValid() const override;
   VkImage NativeImage() const override;
+  VkImageView AttachmentView() const override;
+  VkImageView BindingView() const override;
   VulkanWindow *Owner() const;
 
  private:
   VulkanWindow *window_;
   VkImage image_{};
+  VkImageView attachment_{};
 };
 
 }  // namespace grassland::rhi::backend::vulkan

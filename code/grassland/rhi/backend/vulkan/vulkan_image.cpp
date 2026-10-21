@@ -1,5 +1,7 @@
 ﻿#include "grassland/rhi/backend/vulkan/vulkan_image.h"
 
+#include <utility>
+
 namespace grassland::rhi::backend::vulkan {
 
 VulkanImage::VulkanImage(ImageDesc desc, const void *device, VkImageLayout default_layout)
@@ -8,7 +10,20 @@ VulkanImage::VulkanImage(ImageDesc desc, const void *device, VkImageLayout defau
       default_layout_(default_layout) {
 }
 
-VulkanImage::Views::Views(VkDevice device) : device_(device) {
+VulkanImage::Views::Views(Views &&other) noexcept
+    : device_(other.device_),
+      attachment_(std::exchange(other.attachment_, VK_NULL_HANDLE)),
+      binding_(std::exchange(other.binding_, VK_NULL_HANDLE)) {
+}
+
+VulkanImage::Views &VulkanImage::Views::operator=(Views &&other) noexcept {
+  if (this != &other) {
+    Reset();
+    device_ = other.device_;
+    attachment_ = std::exchange(other.attachment_, VK_NULL_HANDLE);
+    binding_ = std::exchange(other.binding_, VK_NULL_HANDLE);
+  }
+  return *this;
 }
 
 VulkanImage::Views::~Views() {
@@ -31,36 +46,28 @@ VkImageView VulkanImage::Views::Binding() const {
   return binding_;
 }
 
-std::shared_ptr<VulkanImage::Views> VulkanImage::Views::Create(VkDevice device,
-                                                               VkImage image,
-                                                               ImageFormat format,
-                                                               bool sampled) {
-  auto views = std::shared_ptr<Views>(new Views(device));
+bool VulkanImage::Views::Initialize(VkDevice device, VkImage image, ImageFormat format, bool sampled) {
+  Reset();
+  device_ = device;
   VkImageViewCreateInfo create{VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO};
   create.image = image;
   create.viewType = VK_IMAGE_VIEW_TYPE_2D;
   create.format = NativeImageFormat(format);
   create.subresourceRange = {ImageAspect(format), 0, 1, 0, 1};
-  if (!Check(vkCreateImageView(device, &create, nullptr, &views->attachment_), "Create attachment view"))
-    return {};
+  if (!Check(vkCreateImageView(device, &create, nullptr, &attachment_), "Create attachment view"))
+    return false;
   if (sampled) {
     if (IsDepthFormat(format) && (create.subresourceRange.aspectMask & VK_IMAGE_ASPECT_STENCIL_BIT)) {
       create.subresourceRange.aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT;
-      if (!Check(vkCreateImageView(device, &create, nullptr, &views->binding_), "Create depth binding view"))
-        return {};
+      if (!Check(vkCreateImageView(device, &create, nullptr, &binding_), "Create depth binding view")) {
+        Reset();
+        return false;
+      }
     } else {
-      views->binding_ = views->attachment_;
+      binding_ = attachment_;
     }
   }
-  return views;
-}
-
-VkImageView VulkanImage::AttachmentView() const {
-  return views_->Attachment();
-}
-
-VkImageView VulkanImage::BindingView() const {
-  return views_->Binding();
+  return true;
 }
 
 VkImageLayout VulkanImage::DefaultLayout() const {

@@ -12,11 +12,14 @@ class VulkanAllocatedImage final : public VulkanImage {
   bool IsValid() const override;
   bool SupportsStorage() const override;
   VkImage NativeImage() const override;
+  VkImageView AttachmentView() const override;
+  VkImageView BindingView() const override;
 
  private:
   VulkanAllocatedImage(VulkanDevice *device, ImageDesc desc);
   VulkanDevice *device_;
   VkImage image_{};
+  Views views_;
   bool storage_{};
   VmaAllocation allocation_{};
 };
