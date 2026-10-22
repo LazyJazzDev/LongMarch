@@ -120,7 +120,7 @@ int main(int argc, char **argv) {
                  "  5. blend     Source-alpha blended triangles\n"
                  "  6. nbody     Compute simulation and particle rendering (D3D12/Vulkan/Metal)\n";
     std::cout << "  7. raytracing  Ray pipeline, triangles and procedural sphere (D3D12/Vulkan)\n"
-                 "  8. ray_query   Inline ray queries (D3D12/Vulkan)\n";
+                 "  8. ray_query   Inline ray queries (D3D12/Vulkan/Metal)\n";
     for (;;) {
       std::cout << "\nSelect module [1-8 or name], q to quit: " << std::flush;
       std::string input;

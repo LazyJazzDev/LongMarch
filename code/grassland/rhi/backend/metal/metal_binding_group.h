@@ -24,6 +24,9 @@ class MetalBindingGroup final : public BindingGroup {
     bool WriteDescriptors(size_t binding, uint32_t first, const std::vector<BufferView> &values) override;
     bool WriteDescriptors(size_t binding, uint32_t first, const std::vector<IImage *> &values) override;
     bool WriteDescriptors(size_t binding, uint32_t first, const std::vector<ISampler *> &values) override;
+    bool WriteDescriptors(size_t binding,
+                          uint32_t first,
+                          const std::vector<ITopLevelAccelerationStructure *> &values) override;
     std::vector<uint32_t> offsets_;
     std::vector<std::vector<bool>> initialized_;
     NS::SharedPtr<MTL::ArgumentEncoder> encoder_;

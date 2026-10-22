@@ -1,6 +1,7 @@
 ﻿#include "grassland/rhi/backend/metal/metal_device.h"
 
 #include "grassland/rhi/backend/backend_core.h"
+#include "grassland/rhi/backend/metal/metal_acceleration_structure.h"
 #include "grassland/rhi/backend/metal/metal_allocated_image.h"
 #include "grassland/rhi/backend/metal/metal_binding_group.h"
 #include "grassland/rhi/backend/metal/metal_command_context.h"
@@ -31,6 +32,21 @@ MetalDevice::MetalDevice(PhysicalDevice info, Core *core, NS::SharedPtr<MTL::Dev
 MetalDevice::~MetalDevice() {
   ShutdownQueues();
   uploads_.Clear();
+  scratch_.Clear();
+}
+
+MetalScratchPool &MetalDevice::ScratchPool() {
+  return scratch_;
+}
+
+IBottomLevelAccelerationStructure *MetalDevice::CreateBottomLevelAccelerationStructure(
+    const BottomLevelAccelerationStructureDesc &desc) {
+  return MetalBottomLevelAccelerationStructure::Create(this, desc);
+}
+
+ITopLevelAccelerationStructure *MetalDevice::CreateTopLevelAccelerationStructure(
+    const TopLevelAccelerationStructureDesc &desc) {
+  return MetalTopLevelAccelerationStructure::Create(this, desc);
 }
 
 MTL::Device *MetalDevice::NativeDevice() const noexcept {

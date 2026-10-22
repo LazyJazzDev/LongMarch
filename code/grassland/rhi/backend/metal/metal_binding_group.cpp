@@ -2,6 +2,7 @@
 
 #include <cstring>
 
+#include "grassland/rhi/backend/metal/metal_acceleration_structure.h"
 #include "grassland/rhi/backend/metal/metal_device.h"
 #include "grassland/rhi/backend/metal/metal_image.h"
 #include "grassland/rhi/backend/metal/metal_sampler.h"
@@ -17,7 +18,7 @@ uint32_t MetalArgumentCount(const BindingLayoutDesc &layout) {
 
 bool ValidateMetalBindingLayout(MTL::Device *device, const BindingLayoutDesc &layout) {
   for (auto binding : layout.bindings)
-    if (binding.type == BINDING_ACCELERATION_STRUCTURE)
+    if (binding.type == BINDING_ACCELERATION_STRUCTURE && !device->supportsRaytracing())
       return false;
   auto count = MetalArgumentCount(layout);
   if (!ValidateBindingLayout(layout) || (!layout.bindings.empty() && !count) ||
@@ -47,9 +48,10 @@ MetalBindingGroup::Version *MetalBindingGroup::Version::Create(MetalDevice *devi
     auto d = MTL::ArgumentDescriptor::argumentDescriptor();
     d->setIndex(offset);
     d->setArrayLength(b.count);
-    d->setDataType(b.type == BINDING_SAMPLER     ? MTL::DataTypeSampler
-                   : b.type >= BINDING_TEXTURE2D ? MTL::DataTypeTexture
-                                                 : MTL::DataTypePointer);
+    d->setDataType(b.type == BINDING_ACCELERATION_STRUCTURE ? MTL::DataTypeInstanceAccelerationStructure
+                   : b.type == BINDING_SAMPLER              ? MTL::DataTypeSampler
+                   : b.type >= BINDING_TEXTURE2D            ? MTL::DataTypeTexture
+                                                            : MTL::DataTypePointer);
     if (b.type == BINDING_TEXTURE2D || b.type == BINDING_RW_TEXTURE2D)
       d->setTextureType(MTL::TextureType2D);
     d->setAccess(b.type == BINDING_RW_STRUCTURED_BUFFER || b.type == BINDING_RW_BYTE_ADDRESS_BUFFER ||
@@ -130,6 +132,22 @@ bool MetalBindingGroup::Version::WriteDescriptors(size_t b, uint32_t first, cons
   return true;
 }
 
+bool MetalBindingGroup::Version::WriteDescriptors(size_t b,
+                                                  uint32_t first,
+                                                  const std::vector<ITopLevelAccelerationStructure *> &values) {
+  for (auto value : values) {
+    auto native = dynamic_cast<MetalTopLevelAccelerationStructure *>(value);
+    if (!native || native->Owner() != device_)
+      return false;
+  }
+  for (size_t i = 0; i < values.size(); ++i) {
+    encoder_->setAccelerationStructure(static_cast<MetalTopLevelAccelerationStructure *>(values[i])->NativeStructure(),
+                                       offsets_[b] + first + i);
+    initialized_[b][first + i] = true;
+  }
+  return true;
+}
+
 void MetalBindingGroup::Version::Bind(MTL::RenderCommandEncoder *encoder, uint32_t group) const {
   encoder->setVertexBuffer(arguments_.get(), 0, group);
   encoder->setFragmentBuffer(arguments_.get(), 0, group);
@@ -151,7 +169,10 @@ void MetalBindingGroup::Version::Bind(MTL::RenderCommandEncoder *encoder, uint32
       continue;
     for (auto &resource : references_[b]) {
       MTL::Resource *native =
-          desc.type <= BINDING_RW_BYTE_ADDRESS_BUFFER
+          desc.type == BINDING_ACCELERATION_STRUCTURE
+              ? static_cast<MTL::Resource *>(
+                    static_cast<MetalTopLevelAccelerationStructure *>(resource.Get())->NativeStructure())
+          : desc.type <= BINDING_RW_BYTE_ADDRESS_BUFFER
               ? static_cast<MTL::Resource *>(static_cast<MetalBuffer *>(resource.Get())->NativeBuffer())
               : static_cast<MTL::Resource *>(static_cast<MetalImage *>(resource.Get())->NativeImage());
       encoder->useResource(native, usage, stages);
@@ -174,7 +195,10 @@ void MetalBindingGroup::Version::Bind(MTL::ComputeCommandEncoder *encoder, uint3
       continue;
     for (auto &resource : references_[b]) {
       MTL::Resource *native =
-          desc.type <= BINDING_RW_BYTE_ADDRESS_BUFFER
+          desc.type == BINDING_ACCELERATION_STRUCTURE
+              ? static_cast<MTL::Resource *>(
+                    static_cast<MetalTopLevelAccelerationStructure *>(resource.Get())->NativeStructure())
+          : desc.type <= BINDING_RW_BYTE_ADDRESS_BUFFER
               ? static_cast<MTL::Resource *>(static_cast<MetalBuffer *>(resource.Get())->NativeBuffer())
               : static_cast<MTL::Resource *>(static_cast<MetalImage *>(resource.Get())->NativeImage());
       encoder->useResource(native, usage);

@@ -3,6 +3,7 @@
 #include <Metal/Metal.hpp>
 
 #include "grassland/rhi/backend/backend_device.h"
+#include "grassland/rhi/backend/metal/metal_scratch_pool.h"
 #include "grassland/rhi/backend/metal/metal_upload_pool.h"
 
 namespace grassland::rhi::backend::metal {
@@ -19,6 +20,11 @@ class MetalDevice final : public Device {
   rhi::IBindingGroup *CreateBindingGroup(const BindingLayoutDesc &layout) override;
   ISampler *CreateSampler(const SamplerDesc &desc = {}) override;
   MetalUploadPool &UploadPool();
+  MetalScratchPool &ScratchPool();
+  IBottomLevelAccelerationStructure *CreateBottomLevelAccelerationStructure(
+      const BottomLevelAccelerationStructureDesc &desc) override;
+  ITopLevelAccelerationStructure *CreateTopLevelAccelerationStructure(
+      const TopLevelAccelerationStructureDesc &desc) override;
   MTL::Device *NativeDevice() const noexcept;
   MTL::CommandQueue *NativeQueue() const;
   std::mutex &QueueMutex();
@@ -34,6 +40,7 @@ class MetalDevice final : public Device {
   NS::SharedPtr<MTL::CommandQueue> queue_;
   std::mutex queue_mutex_;
   MetalUploadPool uploads_{this};
+  MetalScratchPool scratch_{this};
 };
 
 }  // namespace grassland::rhi::backend::metal

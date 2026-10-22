@@ -29,7 +29,7 @@ int main(int argc, char **argv) {
   for (int i = 1; i < argc; ++i) {
     const std::string arg = argv[i];
     if (arg == "--help") {
-      std::cout << "[--backend auto|d3d12|vulkan] [--headless] [--frames N]\n"
+      std::cout << "[--backend auto|d3d12|vulkan|metal] [--headless] [--frames N]\n"
                    "Headless defaults to 3000 measured frames after 60 warmup frames.\n"
                    "Window mode runs until closed; P toggles VSync.\n";
       return 0;
@@ -55,6 +55,8 @@ int main(int argc, char **argv) {
         api = BACKEND_API_D3D12;
       else if (value == "vulkan")
         api = BACKEND_API_VULKAN;
+      else if (value == "metal")
+        api = BACKEND_API_METAL;
       else {
         std::cerr << "Unknown backend: " << value << '\n';
         return 1;

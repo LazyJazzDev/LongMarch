@@ -12,7 +12,7 @@ class MetalProgram final : public Program, public MetalProgramBase {
   static MetalProgram *Create(MetalDevice *device, const ProgramDesc &desc);
   MTL::RenderPipelineState *NativePipeline() const;
   MTL::DepthStencilState *NativeDepthStencil() const;
-  static constexpr uint32_t VertexBufferBase = 4;
+  static constexpr uint32_t VertexBufferBase = 8;
 
  private:
   MetalProgram(MetalDevice *device, const ProgramDesc &desc);

@@ -127,6 +127,9 @@ CommandContext::SubmitResult MetalCommandContext::SubmitNative() {
       commands_->presentDrawable(present.second->NativeDrawable());
     commands_->commit();
     MarkSubmitted();
+    for (auto &entry : as_dependencies_)
+      entry.first->CommitDependencies(std::move(entry.second));
+    as_dependencies_.clear();
     for (const auto &present : presents_)
       present.second->DidPresent();
   }
@@ -292,11 +295,14 @@ bool MetalCommandContext::CmdDispatch(uint32_t x, uint32_t y, uint32_t z) {
   if (!x || !y || !z)
     return true;
   auto pool = NS::TransferPtr(NS::AutoreleasePool::alloc()->init());
+  auto acceleration_resources = AccelerationResources();
   auto encoder = commands_->computeCommandEncoder();
   if (!encoder) {
     recording_failed_ = true;
     return false;
   }
+  for (auto resource : acceleration_resources)
+    encoder->useResource(resource, MTL::ResourceUsageRead);
   encoder->setComputePipelineState(compute_program_->NativePipeline());
   for (uint32_t i = 0; i < groups_.size(); ++i)
     if (groups_[i])
@@ -576,6 +582,8 @@ bool MetalCommandContext::ValidateDraw(bool indexed) {
       }
     }
   }
+  for (auto resource : AccelerationResources())
+    encoder_->useResource(resource, MTL::ResourceUsageRead, MTL::RenderStageVertex | MTL::RenderStageFragment);
   return !recording_failed_;
 }
 

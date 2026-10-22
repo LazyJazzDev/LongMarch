@@ -2,7 +2,7 @@
 
 Build the `demo_tlas_pressure_test` CMake target.
 
-`demo_tlas_pressure_test --backend vulkan` (or `d3d12`) renders
+`demo_tlas_pressure_test --backend vulkan` (or `d3d12` / `metal`) renders
 100,000 randomly positioned and colored cubes/spheres on a large ground plane.
 All bodies, including hidden ones, are simulated on the CPU with gravity along Y;
 ground contact assigns a new random upward speed. A sinusoid with an eight-second
@@ -21,7 +21,7 @@ Compute ray queries shade one primary ray per pixel and a shadow ray for lit hit
 under a fixed directional light. A fullscreen pass displays the result. P toggles
 VSync; the title reports FPS, visible body count and total TLAS instance count.
 This is a standalone executable, separate from the rhi_hello module menu.
-It supports `--backend auto|d3d12|vulkan`, `--headless`, `--frames N` and `--help`.
+It supports `--backend auto|d3d12|vulkan|metal`, `--headless`, `--frames N` and `--help`.
 Without arguments it opens a window. Headless defaults to 3000 measured frames.
 
 ```sh

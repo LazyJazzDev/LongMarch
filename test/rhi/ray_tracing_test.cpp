@@ -7,6 +7,7 @@
 
 #include "grassland/rhi/rhi.h"
 #if defined(LONGMARCH_METAL_ENABLED)
+#include "grassland/rhi/backend/metal/metal_acceleration_structure.h"
 #include "grassland/rhi/backend/metal/metal_device.h"
 #include "grassland/rhi/backend/metal/metal_image.h"
 #endif
@@ -20,7 +21,7 @@
 #include "grassland/rhi/backend/vulkan/vulkan_acceleration_structure.h"
 #include "grassland/rhi/backend/vulkan/vulkan_device.h"
 #endif
-#if defined(LONGMARCH_D3D12_ENABLED) || defined(LONGMARCH_VULKAN_ENABLED)
+#if defined(LONGMARCH_D3D12_ENABLED) || defined(LONGMARCH_VULKAN_ENABLED) || defined(LONGMARCH_METAL_ENABLED)
 namespace grassland::rhi {
 namespace {
 template <size_t N>
@@ -284,6 +285,11 @@ TEST_P(RhiRayTracing, BuildsUpdatesCompactsAndQueriesRetainedGeometry) {
     ASSERT_TRUE(
         abandoned->CmdBuildTopLevelAccelerationStructure(tlas.Get(), {next_instance}, ACCELERATION_STRUCTURE_UPDATE));
     abandoned.Release();
+#if defined(LONGMARCH_METAL_ENABLED)
+    if (api == BACKEND_API_METAL)
+      EXPECT_EQ(static_cast<backend::metal::MetalTopLevelAccelerationStructure *>(tlas.Get())->BottomLevels()[0].Get(),
+                compact.Get());
+#endif
 #if defined(LONGMARCH_D3D12_ENABLED)
     if (api == BACKEND_API_D3D12)
       EXPECT_EQ(static_cast<backend::d3d12::D3D12TopLevelAccelerationStructure *>(tlas.Get())->BottomLevels()[0].Get(),
@@ -337,6 +343,91 @@ void CSMain() {
     EXPECT_EQ(result[0], frame ? 456u : 123u);
   }
   compact.Release();
+  CheckNativeErrors(device.Get());
+}
+
+TEST_P(RhiRayTracing, ProceduralQueriesUseArraysMasksAndCapturedBindings) {
+  const auto api = GetParam();
+  ObjPtr<ICore> core = CreateCore(api);
+  ASSERT_TRUE(core);
+  DeviceFeatureRequirement required;
+  required.ray_query = true;
+  ObjPtr<IDevice> device = core->CreateDeviceByAutoSelection(required);
+  if (!device)
+    GTEST_SKIP() << "Ray query unavailable";
+  ObjPtr<IQueue> queue = device->GetQueue(QUEUE_TYPE_GRAPHICS);
+  ASSERT_TRUE(queue);
+  BottomLevelAccelerationStructureDesc desc;
+  desc.aabbs = {{1}};
+  desc.allow_update = true;
+  ObjPtr<IBottomLevelAccelerationStructure> blas = device->CreateBottomLevelAccelerationStructure(desc);
+  ASSERT_TRUE(blas);
+  const float bounds[] = {-1, -1, -1, 1, 1, 1};
+  ObjPtr<IBuffer> input = device->CreateBuffer({sizeof(bounds)});
+  ASSERT_TRUE(input);
+  std::array<ObjPtr<ITopLevelAccelerationStructure>, 2> tops;
+  ObjPtr<ICommandContext> commands = device->CreateCommandContext();
+  ASSERT_TRUE(commands);
+  ASSERT_TRUE(commands->CmdUploadBuffer(input.Get(), 0, bounds, sizeof(bounds)));
+  ASSERT_TRUE(commands->CmdBuildBottomLevelAccelerationStructure(blas.Get(), {{{input.Get()}, {}}}));
+  ASSERT_TRUE(commands->CmdBuildBottomLevelAccelerationStructure(blas.Get(), {{{input.Get()}, {}}},
+                                                                 ACCELERATION_STRUCTURE_UPDATE));
+  for (uint32_t i = 0; i < tops.size(); ++i) {
+    tops[i] = device->CreateTopLevelAccelerationStructure({1});
+    ASSERT_TRUE(tops[i]);
+    RayTracingInstance instance;
+    instance.blas = blas.Get();
+    instance.custom_index = 71 + i;
+    instance.mask = 1 << i;
+    instance.transform[3] = float(i * 4);
+    ASSERT_TRUE(commands->CmdBuildTopLevelAccelerationStructure(tops[i].Get(), {instance}));
+  }
+  const char *source = R"(
+RHI_ACCELERATION_STRUCTURE_ARRAY(0,3,scenes);
+RHI_RW_BYTE_ADDRESS_BUFFER(0,8,output);
+[numthreads(1,1,1)] void CSMain(uint3 id : SV_DispatchThreadID) {
+ uint index = id.x & 1;
+ RayDesc ray; ray.Origin=float3(index*4,0,-3); ray.Direction=float3(0,0,1); ray.TMin=0; ray.TMax=10;
+ RayQuery<RAY_FLAG_NONE> query;
+ query.TraceRayInline(scenes[index], RAY_FLAG_NONE, id.x < 2 ? (1u << index) : (2u >> index), ray);
+ while (query.Proceed()) {
+   if (query.CandidateType() == CANDIDATE_PROCEDURAL_PRIMITIVE)
+     query.CommitProceduralPrimitiveHit(2.0);
+ }
+ output.Store(id.x*4, query.CommittedStatus()==COMMITTED_PROCEDURAL_PRIMITIVE_HIT ? query.CommittedInstanceID() : 0);
+}
+)";
+  // Unused AS entries before the active array exercise argument-buffer padding.
+  PipelineLayoutDesc layout{{{{{0, BINDING_ACCELERATION_STRUCTURE, 2, SHADER_VISIBILITY_COMPUTE},
+                               {3, BINDING_ACCELERATION_STRUCTURE, 2, SHADER_VISIBILITY_COMPUTE},
+                               {8, BINDING_RW_BYTE_ADDRESS_BUFFER, 1, SHADER_VISIBILITY_COMPUTE}}}}};
+  ObjPtr<IShader> shader = device->CreateShader({source, "CSMain", SHADER_STAGE_COMPUTE});
+  ASSERT_TRUE(shader);
+  ObjPtr<IComputeProgram> program = device->CreateComputeProgram({shader.Get(), layout});
+  ASSERT_TRUE(program);
+  ObjPtr<IBuffer> output = device->CreateBuffer({16});
+  ASSERT_TRUE(output);
+  ObjPtr<IBindingGroup> group = device->CreateBindingGroup(layout.groups[0]);
+  ASSERT_TRUE(group);
+  std::vector<ITopLevelAccelerationStructure *> structures{tops[0].Get(), tops[1].Get()};
+  ASSERT_TRUE(group->BindResource(0, structures));
+  ASSERT_TRUE(group->BindResource(3, structures));
+  ASSERT_TRUE(group->BindResource(8, output.Get()));
+  ASSERT_TRUE(commands->CmdBindComputeProgram(program.Get()));
+  ASSERT_TRUE(commands->CmdBindGroup(0, group.Get()));
+  ASSERT_TRUE(group->BindResource(3, std::vector<ITopLevelAccelerationStructure *>{tops[1].Get()}, 0));
+  ASSERT_TRUE(commands->CmdDispatch(4));
+  ObjPtr<ISubmissionToken> token = queue->Submit(commands.Get());
+  ASSERT_TRUE(token);
+  commands.Release();
+  input.Release();
+  blas.Release();
+  tops = {};
+  group.Release();
+  ASSERT_TRUE(token->WaitHost());
+  std::array<uint32_t, 4> result{};
+  ReadBuffer(device.Get(), output.Get(), api, result);
+  EXPECT_EQ(result, (std::array<uint32_t, 4>{71, 72, 0, 0}));
   CheckNativeErrors(device.Get());
 }
 
@@ -700,6 +791,10 @@ TEST_P(RhiRayTracing, ScratchPoolSharesStorageAndShrinksAfterDemandExpires) {
   if (GetParam() == BACKEND_API_VULKAN)
     check(static_cast<backend::vulkan::VulkanDevice *>(device.Get())->ScratchPool());
 #endif
+#if defined(LONGMARCH_METAL_ENABLED)
+  if (GetParam() == BACKEND_API_METAL)
+    check(static_cast<backend::metal::MetalDevice *>(device.Get())->ScratchPool());
+#endif
   CheckNativeErrors(device.Get());
 }
 
@@ -741,6 +836,10 @@ TEST_P(RhiRayTracing, SharedScratchSurvivesResizingAndOutOfOrderContextSubmissio
     }
     if (batch == 1) {
       // Replace the cache while unsubmitted commands still reference the old buffer.
+#if defined(LONGMARCH_METAL_ENABLED)
+      if (api == BACKEND_API_METAL)
+        ASSERT_TRUE(static_cast<backend::metal::MetalDevice *>(device.Get())->ScratchPool().Acquire(4 * 1024 * 1024));
+#endif
 #if defined(LONGMARCH_D3D12_ENABLED)
       if (api == BACKEND_API_D3D12)
         ASSERT_TRUE(static_cast<backend::d3d12::D3D12Device *>(device.Get())->ScratchPool().Acquire(4 * 1024 * 1024));
@@ -852,6 +951,9 @@ TEST_P(RhiRayTracing, ProgramCreationRejectsInvalidDescriptionAndShader) {
 }
 
 constexpr BackendAPI backends[] = {
+#if defined(LONGMARCH_METAL_ENABLED)
+    BACKEND_API_METAL,
+#endif
 #if defined(LONGMARCH_D3D12_ENABLED)
     BACKEND_API_D3D12,
 #endif
