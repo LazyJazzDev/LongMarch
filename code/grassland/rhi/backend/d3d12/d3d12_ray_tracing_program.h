@@ -9,13 +9,13 @@ class D3D12Device;
 
 class D3D12RayTracingProgram final : public RayTracingProgram, public D3D12ProgramBase {
  public:
-  D3D12RayTracingProgram(D3D12Device *device, const RayTracingProgramDesc &desc);
-  bool Finalize() override;
+  static D3D12RayTracingProgram *Create(D3D12Device *device, const RayTracingProgramDesc &desc);
   IShaderBindingTable *CreateShaderBindingTable(const ShaderBindingTableDesc &desc) override;
   const ShaderBindingTable *DefaultShaderBindingTable() const;
   ID3D12StateObject *NativePipeline() const;
 
  private:
+  D3D12RayTracingProgram(D3D12Device *device, const RayTracingProgramDesc &desc);
   ComPtr<ID3D12StateObject> pipeline_;
   ShaderBindingTable *BuildShaderBindingTable(const ShaderBindingTableDesc &desc);
   ObjectPtr<ShaderBindingTable> table_;

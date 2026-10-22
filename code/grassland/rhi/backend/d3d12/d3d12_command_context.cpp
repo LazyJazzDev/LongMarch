@@ -291,10 +291,6 @@ bool D3D12CommandContext::CmdBindComputeProgram(IComputeProgram *program) {
 #else
   auto native = static_cast<D3D12ComputeProgram *>(program);
 #endif
-  if (!native->IsFinalized()) {
-    recording_failed_ = true;
-    return false;
-  }
   if (!RetainResource(native))
     return false;
   native_program_ = native;
@@ -340,10 +336,6 @@ bool D3D12CommandContext::CmdBindProgram(IProgram *program) {
 #endif
   if (!RetainResource(native))
     return false;
-  if (!native->IsFinalized()) {
-    recording_failed_ = true;
-    return false;
-  }
   vertex_buffers_.assign(native->GetDesc().vertex_bindings.size(), nullptr);
 
   groups_.assign(native->GetDesc().pipeline_layout.groups.size(), {});
@@ -793,7 +785,7 @@ bool D3D12CommandContext::CmdUploadImage(IImage *image, const void *data, uint64
 
 bool D3D12CommandContext::CmdBindRayTracingProgram(IRayTracingProgram *program) {
   auto native = dynamic_cast<D3D12RayTracingProgram *>(program);
-  if (sealed_ || rendering_active_ || !native || native->Owner() != device_ || !native->IsFinalized()) {
+  if (sealed_ || rendering_active_ || !native || native->Owner() != device_) {
     recording_failed_ = true;
     return false;
   }

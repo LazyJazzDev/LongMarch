@@ -412,7 +412,6 @@ TEST_P(RhiBuffer, EightBindingGroupsDispatchAndRejectNinthGroup) {
   desc.compute_shader = shader.Get();
   ObjPtr<IComputeProgram> program = device->CreateComputeProgram(desc);
   ASSERT_TRUE(program);
-  ASSERT_TRUE(program->Finalize());
   ObjPtr<ICommandContext> context = device->CreateCommandContext();
   ASSERT_TRUE(context);
   ASSERT_TRUE(context->CmdBindComputeProgram(program.Get()));
@@ -436,7 +435,7 @@ TEST_P(RhiBuffer, EightBindingGroupsDispatchAndRejectNinthGroup) {
   }
   desc.pipeline_layout.groups.push_back(desc.pipeline_layout.groups.front());
   ObjPtr<IComputeProgram> invalid = device->CreateComputeProgram(desc);
-  EXPECT_TRUE(!invalid || !invalid->Finalize());
+  EXPECT_FALSE(invalid);
 }
 
 TEST_P(RhiBuffer, ComputeDispatchDependenciesAndBindingSnapshots) {
@@ -460,8 +459,6 @@ TEST_P(RhiBuffer, ComputeDispatchDependenciesAndBindingSnapshots) {
   ObjPtr<IComputeProgram> program = device->CreateComputeProgram(desc);
   ASSERT_TRUE(program);
   shader.Release();
-  ASSERT_TRUE(program->Finalize());
-  EXPECT_TRUE(program->Finalize());
   ObjPtr<IBuffer> first = device->CreateBuffer({64});
   ObjPtr<IBuffer> second = device->CreateBuffer({64});
   ObjPtr<IBuffer> output = device->CreateBuffer({64});
@@ -505,7 +502,6 @@ TEST_P(RhiBuffer, ComputeDispatchDependenciesAndBindingSnapshots) {
   ASSERT_TRUE(shader);
   program = device->CreateComputeProgram({shader.Get(), desc.pipeline_layout});
   ASSERT_TRUE(program);
-  ASSERT_TRUE(program->Finalize());
   group = device->CreateBindingGroup(desc.pipeline_layout.groups[0]);
   ASSERT_TRUE(group);
   ASSERT_TRUE(group->BindResource(0, second.Get()));
@@ -542,7 +538,6 @@ TEST_P(RhiBuffer, ComputeDispatchUsesReflectedThreeDimensionalThreadgroups) {
   desc.pipeline_layout.groups = {{{{0, BINDING_RW_STRUCTURED_BUFFER, 1, SHADER_VISIBILITY_COMPUTE, 4}}}};
   ObjPtr<IComputeProgram> program = device->CreateComputeProgram(desc);
   ASSERT_TRUE(program);
-  ASSERT_TRUE(program->Finalize());
   std::array<uint32_t, 96> values{};
   ObjPtr<IBuffer> buffer = device->CreateBuffer({sizeof(values)});
   ASSERT_TRUE(buffer);
@@ -566,7 +561,7 @@ TEST_P(RhiBuffer, ComputeDispatchUsesReflectedThreeDimensionalThreadgroups) {
     EXPECT_EQ(values[i], i + 1);
 }
 
-TEST_P(RhiBuffer, ComputeFinalizeRejectsWrongStageVisibilityAndStride) {
+TEST_P(RhiBuffer, ComputeCreationRejectsWrongStageVisibilityAndStride) {
   ObjPtr<ICore> core = CreateCore(GetParam());
   ASSERT_TRUE(core);
   ObjPtr<IDevice> device = core->CreateDeviceByAutoSelection();
@@ -581,23 +576,24 @@ TEST_P(RhiBuffer, ComputeFinalizeRejectsWrongStageVisibilityAndStride) {
   desc.compute_shader = shader.Get();
   desc.pipeline_layout.groups = {{{{0, BINDING_RW_STRUCTURED_BUFFER, 1, SHADER_VISIBILITY_VERTEX, 12}}}};
   ObjPtr<IComputeProgram> program = device->CreateComputeProgram(desc);
-  ASSERT_TRUE(program);
-  EXPECT_FALSE(program->Finalize());
+  EXPECT_FALSE(program);
   desc.pipeline_layout.groups[0].bindings[0].visibility = SHADER_VISIBILITY_COMPUTE;
   desc.pipeline_layout.groups[0].bindings[0].stride = 16;
   program = device->CreateComputeProgram(desc);
-  ASSERT_TRUE(program);
-  EXPECT_FALSE(program->Finalize());
+  EXPECT_FALSE(program);
   desc.pipeline_layout.groups[0].bindings[0].stride = 12;
   program = device->CreateComputeProgram(desc);
   ASSERT_TRUE(program);
-  EXPECT_TRUE(program->Finalize());
   ObjPtr<IShader> vertex =
       device->CreateShader({"float4 VSMain():SV_Position { return 0; }", "VSMain", SHADER_STAGE_VERTEX});
   desc.compute_shader = vertex.Get();
   program = device->CreateComputeProgram(desc);
-  ASSERT_TRUE(program);
-  EXPECT_FALSE(program->Finalize());
+  EXPECT_FALSE(program);
+  shader = device->CreateShader({"invalid shader code", "CSMain", SHADER_STAGE_COMPUTE});
+  ASSERT_TRUE(shader);
+  desc.compute_shader = shader.Get();
+  program = device->CreateComputeProgram(desc);
+  EXPECT_FALSE(program);
 }
 
 INSTANTIATE_TEST_SUITE_P(Backends, RhiBuffer, testing::ValuesIn(backends));

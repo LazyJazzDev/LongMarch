@@ -11,14 +11,14 @@ class VulkanDevice;
 
 class VulkanRayTracingProgram final : public RayTracingProgram, public VulkanProgramBase {
  public:
-  VulkanRayTracingProgram(VulkanDevice *device, const RayTracingProgramDesc &desc);
-  bool Finalize() override;
+  static VulkanRayTracingProgram *Create(VulkanDevice *device, const RayTracingProgramDesc &desc);
   IShaderBindingTable *CreateShaderBindingTable(const ShaderBindingTableDesc &desc) override;
   const ShaderBindingTable *DefaultShaderBindingTable() const;
   ~VulkanRayTracingProgram() override;
   VkPipeline NativePipeline() const;
 
  private:
+  VulkanRayTracingProgram(VulkanDevice *device, const RayTracingProgramDesc &desc);
   VkPipeline pipeline_{};
   ShaderBindingTable *BuildShaderBindingTable(const ShaderBindingTableDesc &desc);
   ObjectPtr<ShaderBindingTable> table_;

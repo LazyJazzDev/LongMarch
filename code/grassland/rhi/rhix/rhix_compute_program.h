@@ -8,8 +8,6 @@ class ComputeProgram : public ObjectContainer {
   ComputeProgram() noexcept;
   ComputeProgram(rhi::IComputeProgram *object) noexcept;
   rhi::IComputeProgram *Get() const noexcept;
-  bool Finalize() const;
-  bool IsFinalized() const;
   const rhi::ComputeProgramDesc &GetDesc() const;
 };
 }  // namespace grassland::rhix

@@ -7,12 +7,12 @@ class MetalDevice;
 
 class MetalComputeProgram final : public ComputeProgram, public MetalProgramBase {
  public:
-  MetalComputeProgram(MetalDevice *device, const ComputeProgramDesc &desc);
-  bool Finalize() override;
+  static MetalComputeProgram *Create(MetalDevice *device, const ComputeProgramDesc &desc);
   MTL::ComputePipelineState *NativePipeline() const;
   MTL::Size ThreadGroupSize() const;
 
  private:
+  MetalComputeProgram(MetalDevice *device, const ComputeProgramDesc &desc);
   NS::SharedPtr<MTL::ComputePipelineState> pipeline_;
   MTL::Size threads_{};
 };

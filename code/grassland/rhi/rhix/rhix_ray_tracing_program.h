@@ -25,8 +25,6 @@ class RayTracingProgram : public ObjectContainer {
   RayTracingProgram(rhi::IRayTracingProgram *object) noexcept;
   rhi::IRayTracingProgram *Get() const noexcept;
   ShaderBindingTable CreateShaderBindingTable(const rhi::ShaderBindingTableDesc &desc) const;
-  bool Finalize() const;
-  bool IsFinalized() const;
   const rhi::RayTracingProgramDesc &GetDesc() const;
 };
 }  // namespace grassland::rhix

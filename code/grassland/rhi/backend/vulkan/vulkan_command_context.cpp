@@ -340,10 +340,6 @@ bool VulkanCommandContext::CmdBindComputeProgram(IComputeProgram *program) {
 #else
   auto native = static_cast<VulkanComputeProgram *>(program);
 #endif
-  if (!native->IsFinalized()) {
-    recording_failed_ = true;
-    return false;
-  }
   if (!RetainResource(native))
     return false;
   native_program_ = native;
@@ -393,10 +389,6 @@ bool VulkanCommandContext::CmdBindProgram(IProgram *program) {
 #endif
   if (!RetainResource(native))
     return false;
-  if (!native->IsFinalized()) {
-    recording_failed_ = true;
-    return false;
-  }
   vertex_buffers_.assign(native->GetDesc().vertex_bindings.size(), nullptr);
   groups_.assign(native->GetDesc().pipeline_layout.groups.size(), nullptr);
 
@@ -823,7 +815,7 @@ bool VulkanCommandContext::ValidateGroups() {
 
 bool VulkanCommandContext::CmdBindRayTracingProgram(IRayTracingProgram *program) {
   auto native = dynamic_cast<VulkanRayTracingProgram *>(program);
-  if (sealed_ || render_target_ || !native || native->Owner() != device_ || !native->IsFinalized()) {
+  if (sealed_ || render_target_ || !native || native->Owner() != device_) {
     recording_failed_ = true;
     return false;
   }

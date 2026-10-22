@@ -382,7 +382,6 @@ TEST_P(RhiImage, OffscreenClearDrawReadbackAndReuse) {
     desc.color_formats = {format};
     ObjPtr<IProgram> program = device->CreateProgram(desc);
     ASSERT_TRUE(program);
-    ASSERT_TRUE(program->Finalize());
     for (int frame = 0; frame < 3; ++frame) {
       ObjPtr<ICommandContext> commands = device->CreateCommandContext();
       ASSERT_TRUE(commands);
@@ -438,7 +437,6 @@ TEST_P(RhiImage, IndexedInstancedAttributesAndOffsetsProduceExpectedPixels) {
   desc.vertex_attributes = {{3, 0, VERTEX_FORMAT_FLOAT2, 0}, {5, 1, VERTEX_FORMAT_FLOAT4, 0}};
   ObjPtr<IProgram> program = device->CreateProgram(desc);
   ASSERT_TRUE(program);
-  ASSERT_TRUE(program->Finalize());
   // Skip prefixes with binding/index offsets, then use base vertex and base instance.
   const float vertices[] = {9, 9, 9, 9, 0, .75f, -.75f, -.75f, .75f, -.75f};
   const float colors[] = {0, 0, 1, 1, 0, 1, 0, 1, 1, 0, 0, 1};
@@ -513,7 +511,6 @@ TEST_P(RhiImage, MultipleTargetsAndDepthRejectOccludedFragments) {
   desc.depth_stencil.depth_write = true;
   ObjPtr<IProgram> program = device->CreateProgram(desc);
   ASSERT_TRUE(program);
-  ASSERT_TRUE(program->Finalize());
   for (int repeat = 0; repeat < 3; ++repeat) {
     ObjPtr<ICommandContext> commands = device->CreateCommandContext();
     ASSERT_TRUE(commands->CmdBindProgram(program.Get()));
@@ -576,7 +573,6 @@ TEST_P(RhiImage, BindingVersionsPreserveRangesAndArraysAcrossHeapPages) {
                                  {{{1, BINDING_SAMPLER, 1, SHADER_VISIBILITY_FRAGMENT}}}};
   ObjPtr<IProgram> program = device->CreateProgram(desc);
   ASSERT_TRUE(program);
-  ASSERT_TRUE(program->Finalize());
   ObjPtr<IBindingGroup> selection = device->CreateBindingGroup(desc.pipeline_layout.groups[0]);
   ObjPtr<IBindingGroup> material = device->CreateBindingGroup(desc.pipeline_layout.groups[1]);
   ObjPtr<IBindingGroup> sampling = device->CreateBindingGroup(desc.pipeline_layout.groups[2]);
@@ -777,7 +773,6 @@ TEST_P(RhiImage, ExplicitStructuredStrideReadsSecondCompactElement) {
                                    {1, BINDING_STRUCTURED_BUFFER, 1, SHADER_VISIBILITY_FRAGMENT, 16}}}};
   ObjPtr<IProgram> program = device->CreateProgram(desc);
   ASSERT_TRUE(program);
-  ASSERT_TRUE(program->Finalize());
 
   // Both backends use the same compact C++ element layout.
   struct Element {
@@ -847,7 +842,6 @@ TEST_P(RhiImage, StructuredNestedArraysUseSameCppLayout) {
                                    {1, BINDING_STRUCTURED_BUFFER, 1, SHADER_VISIBILITY_FRAGMENT, 16}}}};
   ObjPtr<IProgram> program = device->CreateProgram(desc);
   ASSERT_TRUE(program);
-  ASSERT_TRUE(program->Finalize());
 
   // Both backends use the same compact C++ element layout.
   struct Inner {
@@ -941,8 +935,6 @@ TEST_P(RhiImage, StorageImageAndBufferBecomeReadableAfterRendering) {
   desc.pipeline_layout.groups = {read_layout};
   ObjPtr<IProgram> reader = device->CreateProgram(desc);
   ASSERT_TRUE(writer && reader);
-  ASSERT_TRUE(writer->Finalize());
-  ASSERT_TRUE(reader->Finalize());
   ObjPtr<IBindingGroup> wg = device->CreateBindingGroup(write_layout);
   ObjPtr<IBindingGroup> rg = device->CreateBindingGroup(read_layout);
   ASSERT_TRUE(wg);
@@ -1019,8 +1011,6 @@ TEST_P(RhiImage, RawBufferWritesBecomeReadableAfterRendering) {
   desc.pipeline_layout.groups = {read_layout};
   ObjPtr<IProgram> reader = device->CreateProgram(desc);
   ASSERT_TRUE(writer && reader);
-  ASSERT_TRUE(writer->Finalize());
-  ASSERT_TRUE(reader->Finalize());
   ObjPtr<IBindingGroup> wg = device->CreateBindingGroup(write_layout);
   ObjPtr<IBindingGroup> rg = device->CreateBindingGroup(read_layout);
   ASSERT_TRUE(wg);
@@ -1081,7 +1071,6 @@ TEST_P(RhiImage, SamplerArraysPreserveFilteringAcrossCapturedVersions) {
       {{{0, BINDING_TEXTURE2D, 1, SHADER_VISIBILITY_FRAGMENT}, {3, BINDING_SAMPLER, 2, SHADER_VISIBILITY_FRAGMENT}}}};
   ObjPtr<IProgram> program = device->CreateProgram(desc);
   ASSERT_TRUE(program);
-  ASSERT_TRUE(program->Finalize());
   ObjPtr<IBindingGroup> group = device->CreateBindingGroup(desc.pipeline_layout.groups[0]);
   ASSERT_TRUE(group);
   ASSERT_TRUE(group->BindResource(0, texture.Get()));
@@ -1157,7 +1146,6 @@ TEST_P(RhiImage, BindingArraysExposeCapturedBufferViewLengths) {
                                    {9, BINDING_BYTE_ADDRESS_BUFFER, 2, SHADER_VISIBILITY_FRAGMENT}}}};
   ObjPtr<IProgram> program = device->CreateProgram(desc);
   ASSERT_TRUE(program);
-  ASSERT_TRUE(program->Finalize());
   ObjPtr<IBindingGroup> group = device->CreateBindingGroup(desc.pipeline_layout.groups[0]);
   ASSERT_TRUE(group);
   ASSERT_TRUE(group->BindResource(7, std::vector<BufferView>{{buffer.Get(), 0, 256}, {buffer.Get(), 256, 256}}));
@@ -1222,8 +1210,6 @@ TEST_P(RhiImage, StencilSurvivesDepthOnlyPassAndMasksColorPass) {
   desc.depth_stencil.front.compare = desc.depth_stencil.back.compare = COMPARE_EQUAL;
   ObjPtr<IProgram> reader = device->CreateProgram(desc);
   ASSERT_TRUE(writer && reader);
-  ASSERT_TRUE(writer->Finalize());
-  ASSERT_TRUE(reader->Finalize());
   ObjPtr<ICommandContext> commands = device->CreateCommandContext();
   RenderingInfo rendering;
   rendering.depth_stencil.image = depth.Get();
@@ -1336,7 +1322,6 @@ TEST_P(RhiImage, IndependentColorAndAlphaBlendingMatchesPixelResults) {
       desc.blend_states.push_back(cases[(std::min)(first + j, cases.size() - 1)].state);
     ObjPtr<IProgram> program = device->CreateProgram(desc);
     ASSERT_TRUE(program);
-    ASSERT_TRUE(program->Finalize());
     ObjPtr<ICommandContext> commands = device->CreateCommandContext();
     ASSERT_TRUE(commands);
     ASSERT_TRUE(commands->CmdBindProgram(program.Get()));
@@ -1388,7 +1373,6 @@ TEST_P(RhiImage, ComputeGraphicsSwitchingPreservesImagesAndDescriptorTables) {
   cd.pipeline_layout.groups = {{{{0, BINDING_RW_TEXTURE2D, 1, SHADER_VISIBILITY_COMPUTE}}}};
   ObjPtr<IComputeProgram> compute = device->CreateComputeProgram(cd);
   ASSERT_TRUE(compute);
-  ASSERT_TRUE(compute->Finalize());
   const std::string render_source = R"(
     RHI_TEXTURE2D(0, 0, float4, source_image);
     float4 VSMain(uint id:SV_VertexID):SV_Position {
@@ -1407,7 +1391,6 @@ TEST_P(RhiImage, ComputeGraphicsSwitchingPreservesImagesAndDescriptorTables) {
   gd.pipeline_layout.groups = {{{{0, BINDING_TEXTURE2D, 1, SHADER_VISIBILITY_FRAGMENT}}}};
   ObjPtr<IProgram> graphics = device->CreateProgram(gd);
   ASSERT_TRUE(graphics);
-  ASSERT_TRUE(graphics->Finalize());
   ObjPtr<IBindingGroup> ca = device->CreateBindingGroup(cd.pipeline_layout.groups[0]);
   ASSERT_TRUE(ca);
   ObjPtr<IBindingGroup> cb = device->CreateBindingGroup(cd.pipeline_layout.groups[0]);

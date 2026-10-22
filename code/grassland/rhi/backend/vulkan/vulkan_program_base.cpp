@@ -18,12 +18,6 @@ VkPipelineLayout VulkanProgramBase::NativeLayout() const {
 }
 
 bool VulkanProgramBase::CreateLayout(const PipelineLayoutDesc &desc) {
-  if (layout_)
-    return true;
-  // A failed Finalize can be retried; release any partially created set layouts.
-  for (auto layout : set_layouts_)
-    vkDestroyDescriptorSetLayout(layout_device_, layout, nullptr);
-  set_layouts_.clear();
   set_layouts_.reserve(desc.groups.size());
   for (const auto &group : desc.groups) {
     auto layout = CreateBindingLayout(layout_device_, group);

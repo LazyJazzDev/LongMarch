@@ -13,10 +13,6 @@ const ComputeProgramDesc &ComputeProgram::GetDesc() const {
   return desc_;
 }
 
-bool ComputeProgram::IsFinalized() const {
-  return finalized_;
-}
-
 Device *ComputeProgram::Owner() const {
   return device_;
 }

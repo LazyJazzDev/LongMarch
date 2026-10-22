@@ -14,14 +14,6 @@ const rhi::RayTracingProgramDesc &RayTracingProgram::GetDesc() const {
   return Get()->GetDesc();
 }
 
-bool RayTracingProgram::Finalize() const {
-  return Get()->Finalize();
-}
-
-bool RayTracingProgram::IsFinalized() const {
-  return Get()->IsFinalized();
-}
-
 ShaderBindingTable RayTracingProgram::CreateShaderBindingTable(const rhi::ShaderBindingTableDesc &desc) const {
   return Get()->CreateShaderBindingTable(desc);
 }

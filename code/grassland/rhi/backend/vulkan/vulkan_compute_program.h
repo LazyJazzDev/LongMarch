@@ -7,12 +7,12 @@ class VulkanDevice;
 
 class VulkanComputeProgram final : public ComputeProgram, public VulkanProgramBase {
  public:
-  VulkanComputeProgram(VulkanDevice *device, const ComputeProgramDesc &desc);
+  static VulkanComputeProgram *Create(VulkanDevice *device, const ComputeProgramDesc &desc);
   ~VulkanComputeProgram() override;
-  bool Finalize() override;
   VkPipeline NativePipeline() const;
 
  private:
+  VulkanComputeProgram(VulkanDevice *device, const ComputeProgramDesc &desc);
   VkPipeline pipeline_{};
 };
 }  // namespace grassland::rhi::backend::vulkan

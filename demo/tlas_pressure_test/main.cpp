@@ -109,8 +109,6 @@ int main(int argc, char **argv) {
   ObjPtr<IComputeProgram> trace = device->CreateComputeProgram({cs.Get(), trace_layout});
   if (!trace)
     return 1;
-  if (!trace->Finalize())
-    return 1;
 
   const auto &display_source = shader_list.at("shaders/display.slang");
   std::string display(display_source.first, display_source.second);
@@ -136,8 +134,6 @@ int main(int argc, char **argv) {
   }
   ObjPtr<IProgram> program = device->CreateProgram(graphics);
   if (!program)
-    return 1;
-  if (!program->Finalize())
     return 1;
   // One shared BLAS per shape. Motion changes instances, not mesh vertices.
   const float cube_vertices[] = {-.5f, -.5f, -.5f, .5f, -.5f, -.5f, .5f, .5f, -.5f, -.5f, .5f, -.5f,

@@ -238,11 +238,11 @@ rhi::IBuffer *VulkanDevice::CreateBuffer(const BufferDesc &desc) {
 }
 
 rhi::IComputeProgram *VulkanDevice::CreateComputeProgram(const ComputeProgramDesc &desc) {
-  return new VulkanComputeProgram(this, desc);
+  return VulkanComputeProgram::Create(this, desc);
 }
 
 rhi::IProgram *VulkanDevice::CreateProgram(const ProgramDesc &desc) {
-  return new VulkanProgram(this, desc);
+  return VulkanProgram::Create(this, desc);
 }
 
 rhi::IWindow *VulkanDevice::CreateGLFWWindow(const WindowDesc &desc) {
@@ -279,6 +279,6 @@ ITopLevelAccelerationStructure *VulkanDevice::CreateTopLevelAccelerationStructur
 IRayTracingProgram *VulkanDevice::CreateRayTracingProgram(const RayTracingProgramDesc &desc) {
   if (!SupportRayTracingPipeline())
     return nullptr;
-  return new VulkanRayTracingProgram(this, desc);
+  return VulkanRayTracingProgram::Create(this, desc);
 }
 }  // namespace grassland::rhi::backend::vulkan

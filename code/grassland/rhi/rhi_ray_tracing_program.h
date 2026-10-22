@@ -43,12 +43,11 @@ class IShaderBindingTable : public IObject {
   ~IShaderBindingTable() override = default;
 };
 
+// Creation compiles the pipeline and default SBT; successful objects are ready to bind.
 class IRayTracingProgram : public IObject {
  public:
-  // Requires a finalized program. Returns one owned, immutable table.
+  // Returns one owned, immutable table, or nullptr on failure.
   virtual IShaderBindingTable *CreateShaderBindingTable(const ShaderBindingTableDesc &desc) = 0;
-  virtual bool Finalize() = 0;
-  virtual bool IsFinalized() const = 0;
   virtual const RayTracingProgramDesc &GetDesc() const = 0;
 
  protected:

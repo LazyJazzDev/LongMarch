@@ -59,8 +59,6 @@ int RunRayQuery(grassland::rhi::BackendAPI api, int frames, bool headless) {
   ComputeProgram trace = device.CreateComputeProgram({cs.Get(), trace_layout});
   if (!trace)
     return 1;
-  if (!trace.Finalize())
-    return 1;
 
   const auto &display_source = shader_list.at("modules/ray_query/shaders/display.slang");
   std::string display(display_source.first, display_source.second);
@@ -86,8 +84,6 @@ int RunRayQuery(grassland::rhi::BackendAPI api, int frames, bool headless) {
   }
   Program program = device.CreateProgram(graphics);
   if (!program)
-    return 1;
-  if (!program.Finalize())
     return 1;
   BottomLevelAccelerationStructureDesc triangles;
   triangles.geometries = {{3, 12, 0}};

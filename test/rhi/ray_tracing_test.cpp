@@ -314,7 +314,6 @@ void CSMain() {
   ASSERT_TRUE(shader);
   ObjPtr<IComputeProgram> program = device->CreateComputeProgram({shader.Get(), layout});
   ASSERT_TRUE(program);
-  ASSERT_TRUE(program->Finalize());
   ObjPtr<IBuffer> output = device->CreateBuffer({4});
   ASSERT_TRUE(output);
   ObjPtr<IBindingGroup> group = device->CreateBindingGroup(layout.groups[0]);
@@ -450,8 +449,6 @@ void Sphere(inout Payload p, Attributes attr) { p.result = 222; }
                                    {1, BINDING_RW_BYTE_ADDRESS_BUFFER, 1, SHADER_VISIBILITY_RAY_GENERATION}}}};
   ObjPtr<IRayTracingProgram> program = device->CreateRayTracingProgram(desc);
   ASSERT_TRUE(program);
-  EXPECT_EQ(program->CreateShaderBindingTable({}), nullptr);
-  ASSERT_TRUE(program->Finalize());
   EXPECT_EQ(program->CreateShaderBindingTable({{2}, {}, {}}), nullptr);
   EXPECT_EQ(program->CreateShaderBindingTable({{}, {3}, {}}), nullptr);
   EXPECT_EQ(program->CreateShaderBindingTable({{}, {}, {2}}), nullptr);
@@ -470,7 +467,7 @@ void Sphere(inout Payload p, Attributes attr) { p.result = 222; }
   ASSERT_TRUE(group->BindResource(0, tlas.Get()));
   ASSERT_TRUE(group->BindResource(1, output.Get()));
   ObjPtr<IRayTracingProgram> other = device->CreateRayTracingProgram(desc);
-  ASSERT_TRUE(other && other->Finalize());
+  ASSERT_TRUE(other);
   ObjPtr<ICommandContext> rejected = device->CreateCommandContext();
   ASSERT_TRUE(rejected->CmdBindRayTracingProgram(other.Get()));
   ASSERT_TRUE(rejected->CmdBindGroup(0, group.Get()));
@@ -615,7 +612,6 @@ RHI_RW_BYTE_ADDRESS_BUFFER(0,1,output);
   ASSERT_TRUE(shader);
   ObjPtr<IComputeProgram> program = device->CreateComputeProgram({shader.Get(), layout});
   ASSERT_TRUE(program);
-  ASSERT_TRUE(program->Finalize());
   ObjPtr<IBuffer> output = device->CreateBuffer({16});
   ASSERT_TRUE(output);
   ObjPtr<IBindingGroup> group = device->CreateBindingGroup(layout.groups[0]);
@@ -788,7 +784,6 @@ RHI_RW_BYTE_ADDRESS_BUFFER(0,1,output);
   ASSERT_TRUE(shader);
   ObjPtr<IComputeProgram> program = device->CreateComputeProgram({shader.Get(), layout});
   ASSERT_TRUE(program);
-  ASSERT_TRUE(program->Finalize());
   ObjPtr<IBuffer> output = device->CreateBuffer({count * sizeof(uint32_t)});
   ASSERT_TRUE(output);
   ObjPtr<IBindingGroup> group = device->CreateBindingGroup(layout.groups[0]);
@@ -811,6 +806,48 @@ RHI_RW_BYTE_ADDRESS_BUFFER(0,1,output);
   ReadBuffer(device.Get(), output.Get(), api, hits);
   for (uint32_t i = 0; i < count; ++i)
     EXPECT_EQ(hits[i], i + 1);
+  CheckNativeErrors(device.Get());
+}
+
+TEST_P(RhiRayTracing, ProgramCreationRejectsInvalidDescriptionAndShader) {
+  ObjPtr<ICore> core = CreateCore(GetParam());
+  ASSERT_TRUE(core);
+  DeviceFeatureRequirement required;
+  required.ray_tracing_pipeline = true;
+  ObjPtr<IDevice> device = core->CreateDeviceByAutoSelection(required);
+  if (!device)
+    GTEST_SKIP();
+  ObjPtr<IRayTracingProgram> program = device->CreateRayTracingProgram({});
+  EXPECT_FALSE(program);
+  ObjPtr<IShader> invalid = device->CreateShader({"invalid shader code", "RayGen", SHADER_STAGE_RAY_GENERATION});
+  ASSERT_TRUE(invalid);
+  RayTracingProgramDesc desc;
+  desc.ray_generation = invalid.Get();
+  program = device->CreateRayTracingProgram(desc);
+  EXPECT_FALSE(program);
+  ObjPtr<IShader> raygen =
+      device->CreateShader({"[shader(\"raygeneration\")] void RayGen() {}", "RayGen", SHADER_STAGE_RAY_GENERATION});
+  ASSERT_TRUE(raygen);
+  desc.ray_generation = raygen.Get();
+  desc.max_recursion_depth = 0;
+  program = device->CreateRayTracingProgram(desc);
+  EXPECT_FALSE(program);
+  desc.max_recursion_depth = 1;
+  program = device->CreateRayTracingProgram(desc);
+  ASSERT_TRUE(program);
+  raygen.Release();
+  ObjPtr<IShaderBindingTable> table = program->CreateShaderBindingTable({});
+  ASSERT_TRUE(table);
+  ObjPtr<ICommandContext> commands = device->CreateCommandContext();
+  ASSERT_TRUE(commands);
+  ASSERT_TRUE(commands->CmdBindRayTracingProgram(program.Get()));
+  ASSERT_TRUE(commands->CmdDispatchRays(1, 1, 1, table.Get()));
+  ObjPtr<IQueue> queue = device->GetQueue(QUEUE_TYPE_GRAPHICS);
+  ASSERT_TRUE(queue);
+  ObjPtr<ISubmissionToken> token = queue->Submit(commands.Get());
+  ASSERT_TRUE(token);
+  commands.Release();
+  ASSERT_TRUE(token->WaitHost());
   CheckNativeErrors(device.Get());
 }
 

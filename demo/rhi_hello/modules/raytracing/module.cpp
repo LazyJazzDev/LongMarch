@@ -81,8 +81,6 @@ int RunRayTracing(grassland::rhi::BackendAPI api, int frames, bool headless) {
   ObjPtr<IRayTracingProgram> trace = device->CreateRayTracingProgram(desc);
   if (!trace)
     return 1;
-  if (!trace->Finalize())
-    return 1;
 
   const auto &display_source = shader_list.at("modules/raytracing/shaders/display.slang");
   std::string display(display_source.first, display_source.second);
@@ -108,8 +106,6 @@ int RunRayTracing(grassland::rhi::BackendAPI api, int frames, bool headless) {
   }
   ObjPtr<IProgram> program = device->CreateProgram(graphics);
   if (!program)
-    return 1;
-  if (!program->Finalize())
     return 1;
   BottomLevelAccelerationStructureDesc triangles;
   triangles.geometries = {{3, 12, 0}};

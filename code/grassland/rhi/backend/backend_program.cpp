@@ -18,10 +18,6 @@ const ProgramDesc &Program::GetDesc() const {
   return desc_;
 }
 
-bool Program::IsFinalized() const {
-  return finalized_;
-}
-
 Device *Program::Owner() const {
   return device_;
 }

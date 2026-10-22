@@ -12,34 +12,36 @@ ID3D12PipelineState *D3D12Program::NativePipeline() const {
   return pipeline_.Get();
 }
 
-bool D3D12Program::Finalize() {
-  if (finalized_)
-    return true;
-  if (!ValidateLayout()) {
+D3D12Program *D3D12Program::Create(D3D12Device *owner_device, const ProgramDesc &desc) {
+  auto object = std::unique_ptr<D3D12Program>(new D3D12Program(owner_device, desc));
+  if (!object->ValidateLayout()) {
     ReportError(-1, "Invalid graphics program layout.");
-    return false;
+    return nullptr;
   }
-  auto native = static_cast<D3D12Device *>(device_)->NativeDevice();
+  auto native = owner_device->NativeDevice();
   std::vector<uint8_t> vertex, fragment;
-  auto prefix = ShaderMacroHeader(desc_.pipeline_layout, BACKEND_API_D3D12, desc_.vertex_attributes);
-  if (!CompileSlang(desc_.vertex_shader->GetDesc(), prefix, BACKEND_API_D3D12, vertex, &desc_.pipeline_layout))
-    return false;
-  if (!CompileSlang(desc_.fragment_shader->GetDesc(), prefix, BACKEND_API_D3D12, fragment, &desc_.pipeline_layout))
-    return false;
-  if (!CreateLayout(native, desc_.pipeline_layout, D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT))
-    return false;
+  auto prefix = ShaderMacroHeader(object->desc_.pipeline_layout, BACKEND_API_D3D12, object->desc_.vertex_attributes);
+  if (!CompileSlang(object->desc_.vertex_shader->GetDesc(), prefix, BACKEND_API_D3D12, vertex,
+                    &object->desc_.pipeline_layout))
+    return nullptr;
+  if (!CompileSlang(object->desc_.fragment_shader->GetDesc(), prefix, BACKEND_API_D3D12, fragment,
+                    &object->desc_.pipeline_layout))
+    return nullptr;
+  if (!object->CreateLayout(native, object->desc_.pipeline_layout,
+                            D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT))
+    return nullptr;
   std::vector<D3D12_INPUT_ELEMENT_DESC> inputs;
   const DXGI_FORMAT formats[] = {DXGI_FORMAT_R32_FLOAT, DXGI_FORMAT_R32G32_FLOAT, DXGI_FORMAT_R32G32B32_FLOAT,
                                  DXGI_FORMAT_R32G32B32A32_FLOAT};
-  for (const auto &a : desc_.vertex_attributes) {
-    auto instance = desc_.vertex_bindings[a.binding].per_instance;
+  for (const auto &a : object->desc_.vertex_attributes) {
+    auto instance = object->desc_.vertex_bindings[a.binding].per_instance;
     inputs.push_back(
         {"TEXCOORD", a.location, formats[a.format], a.binding, a.offset,
          instance ? D3D12_INPUT_CLASSIFICATION_PER_INSTANCE_DATA : D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA,
          instance ? 1u : 0u});
   }
   D3D12_GRAPHICS_PIPELINE_STATE_DESC state{};
-  state.pRootSignature = NativeRootSignature();
+  state.pRootSignature = object->NativeRootSignature();
   state.VS = {vertex.data(), vertex.size()};
   state.PS = {fragment.data(), fragment.size()};
   state.InputLayout = {inputs.data(), static_cast<UINT>(inputs.size())};
@@ -48,7 +50,7 @@ bool D3D12Program::Finalize() {
   state.RasterizerState.CullMode = D3D12_CULL_MODE_NONE;
   state.RasterizerState.DepthClipEnable = TRUE;
   state.BlendState.IndependentBlendEnable = TRUE;
-  const auto &ds = desc_.depth_stencil;
+  const auto &ds = object->desc_.depth_stencil;
   state.DepthStencilState.DepthEnable = ds.depth_test;
   state.DepthStencilState.DepthWriteMask = ds.depth_write ? D3D12_DEPTH_WRITE_MASK_ALL : D3D12_DEPTH_WRITE_MASK_ZERO;
   state.DepthStencilState.DepthFunc = static_cast<D3D12_COMPARISON_FUNC>(ds.depth_compare + 1);
@@ -67,10 +69,10 @@ bool D3D12Program::Finalize() {
   state.DepthStencilState.BackFace = face(ds.back);
   state.DSVFormat = NativeImageFormat(ds.format);
   state.PrimitiveTopologyType = D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE;
-  state.NumRenderTargets = static_cast<UINT>(desc_.color_formats.size());
-  for (size_t i = 0; i < desc_.color_formats.size(); ++i) {
-    state.RTVFormats[i] = NativeImageFormat(desc_.color_formats[i]);
-    const auto value = desc_.blend_states.empty() ? BlendState{} : desc_.blend_states[i];
+  state.NumRenderTargets = static_cast<UINT>(object->desc_.color_formats.size());
+  for (size_t i = 0; i < object->desc_.color_formats.size(); ++i) {
+    state.RTVFormats[i] = NativeImageFormat(object->desc_.color_formats[i]);
+    const auto value = object->desc_.blend_states.empty() ? BlendState{} : object->desc_.blend_states[i];
     auto &blend = state.BlendState.RenderTarget[i];
     blend.BlendEnable = value.blend_enable;
     blend.SrcBlend = NativeBlendFactor(value.src_color);
@@ -85,9 +87,8 @@ bool D3D12Program::Finalize() {
   state.SampleDesc.Count = 1;
   ComPtr<ID3D12PipelineState> pipeline;
   if (!Check(native->CreateGraphicsPipelineState(&state, IID_PPV_ARGS(&pipeline)), "Create graphics pipeline"))
-    return false;
-  pipeline_ = std::move(pipeline);
-  finalized_ = true;
-  return true;
+    return nullptr;
+  object->pipeline_ = std::move(pipeline);
+  return object.release();
 }
 }  // namespace grassland::rhi::backend::d3d12

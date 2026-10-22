@@ -194,11 +194,11 @@ D3D12Device::~D3D12Device() {
 }
 
 rhi::IComputeProgram *D3D12Device::CreateComputeProgram(const ComputeProgramDesc &desc) {
-  return new D3D12ComputeProgram(this, desc);
+  return D3D12ComputeProgram::Create(this, desc);
 }
 
 rhi::IProgram *D3D12Device::CreateProgram(const ProgramDesc &desc) {
-  return new D3D12Program(this, desc);
+  return D3D12Program::Create(this, desc);
 }
 
 D3D12UploadPool &D3D12Device::UploadPool() {
@@ -255,6 +255,6 @@ ITopLevelAccelerationStructure *D3D12Device::CreateTopLevelAccelerationStructure
 IRayTracingProgram *D3D12Device::CreateRayTracingProgram(const RayTracingProgramDesc &desc) {
   if (!SupportRayTracingPipeline())
     return nullptr;
-  return new D3D12RayTracingProgram(this, desc);
+  return D3D12RayTracingProgram::Create(this, desc);
 }
 }  // namespace grassland::rhi::backend::d3d12

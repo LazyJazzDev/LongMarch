@@ -79,11 +79,11 @@ rhi::IImage *MetalDevice::CreateImage(const ImageDesc &desc) {
 }
 
 IComputeProgram *MetalDevice::CreateComputeProgram(const ComputeProgramDesc &desc) {
-  return new MetalComputeProgram(this, desc);
+  return MetalComputeProgram::Create(this, desc);
 }
 
 rhi::IProgram *MetalDevice::CreateProgram(const ProgramDesc &desc) {
-  return new MetalProgram(this, desc);
+  return MetalProgram::Create(this, desc);
 }
 
 rhi::IBindingGroup *MetalDevice::CreateBindingGroup(const BindingLayoutDesc &layout) {

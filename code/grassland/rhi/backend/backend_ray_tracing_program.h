@@ -9,7 +9,6 @@ class RayTracingProgram : public Object<IRayTracingProgram> {
  public:
   RayTracingProgram(Device *device, const RayTracingProgramDesc &desc);
   const RayTracingProgramDesc &GetDesc() const override;
-  bool IsFinalized() const override;
   Device *Owner() const;
 
  protected:
@@ -18,7 +17,6 @@ class RayTracingProgram : public Object<IRayTracingProgram> {
   ShaderBindingTableDesc DefaultShaderBindingTableDesc() const;
   Device *device_;
   RayTracingProgramDesc desc_;
-  bool finalized_{};
 
  private:
   std::vector<ObjectPtr<IShader>> shaders_;

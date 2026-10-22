@@ -11,14 +11,12 @@ class Program : public Object<IProgram> {
   Program(Device *device, const ProgramDesc &desc);
   ~Program() override;
   const ProgramDesc &GetDesc() const override;
-  bool IsFinalized() const override;
   Device *Owner() const;
 
  protected:
   bool ValidateLayout() const;
   Device *device_;
   ProgramDesc desc_;
-  bool finalized_{};
 
  private:
   ObjectPtr<IShader> vertex_shader_;

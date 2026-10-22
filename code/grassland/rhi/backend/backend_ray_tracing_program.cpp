@@ -24,10 +24,6 @@ const RayTracingProgramDesc &RayTracingProgram::GetDesc() const {
   return desc_;
 }
 
-bool RayTracingProgram::IsFinalized() const {
-  return finalized_;
-}
-
 Device *RayTracingProgram::Owner() const {
   return device_;
 }

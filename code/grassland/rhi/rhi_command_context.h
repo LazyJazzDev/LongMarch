@@ -71,7 +71,7 @@ class ICommandContext : public IObject {
   // Submit restores every used resource to its backend default state and ends
   // recording; a context cannot be recorded or submitted again.
   // Upload snapshots the CPU bytes now; staging storage is leased through GPU completion.
-  // Bind a finalized Program before vertex buffers; rebind buffers after changing its layout.
+  // Bind a Program before vertex buffers; rebind buffers after changing its layout.
   // Begin/End delimit an explicit, non-nested rendering scope. Draw requires a scope.
   // Upload, copy, standalone clear, Present and Submit require no active scope.
   // Begin consumes attachment operations; backend attachment leases remain automatic.

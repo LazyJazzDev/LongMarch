@@ -266,7 +266,7 @@ bool MetalCommandContext::CmdBindGroup(uint32_t index, IBindingGroup *group) {
 
 bool MetalCommandContext::CmdBindComputeProgram(IComputeProgram *program) {
   auto native = dynamic_cast<MetalComputeProgram *>(program);
-  if (sealed_ || encoder_ || !native || native->Owner() != device_ || !native->IsFinalized()) {
+  if (sealed_ || encoder_ || !native || native->Owner() != device_) {
     recording_failed_ = true;
     return false;
   }
@@ -320,10 +320,6 @@ bool MetalCommandContext::CmdBindProgram(IProgram *program) {
 #endif
   if (!RetainResource(native))
     return false;
-  if (!native->IsFinalized()) {
-    recording_failed_ = true;
-    return false;
-  }
 
   vertex_buffers_.assign(native->GetDesc().vertex_bindings.size(), {});
   groups_.assign(native->GetDesc().pipeline_layout.groups.size(), nullptr);
