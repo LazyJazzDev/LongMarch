@@ -56,6 +56,9 @@ bool D3D12CommandContext::CmdBuildBottomLevelAccelerationStructure(
   }
   D3D12_RESOURCE_BARRIER barrier{};
   barrier.Type = D3D12_RESOURCE_BARRIER_TYPE_UAV;
+  // Scratch is shared across builds and contexts on this physical queue.
+  barrier.UAV.pResource = scratch->NativeBuffer();
+  list_->ResourceBarrier(1, &barrier);
   barrier.UAV.pResource = target->NativeResource();
   list_->ResourceBarrier(1, &barrier);
   ray_list_->BuildRaytracingAccelerationStructure(&build, 0, nullptr);
@@ -148,6 +151,9 @@ bool D3D12CommandContext::CmdBuildTopLevelAccelerationStructure(ITopLevelAcceler
   }
   D3D12_RESOURCE_BARRIER barrier{};
   barrier.Type = D3D12_RESOURCE_BARRIER_TYPE_UAV;
+  // Scratch is shared across builds and contexts on this physical queue.
+  barrier.UAV.pResource = scratch->NativeBuffer();
+  list_->ResourceBarrier(1, &barrier);
   barrier.UAV.pResource = target->NativeResource();
   list_->ResourceBarrier(1, &barrier);
   ray_list_->BuildRaytracingAccelerationStructure(&build, 0, nullptr);

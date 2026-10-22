@@ -140,8 +140,11 @@ No implicit resizing or CPU wait occurs. Calls accessing the same AS are externa
 synchronized; submit its modifying contexts in recording order before recording later
 uses in another context. CommandContext inserts build/read barriers automatically.
 
-Scratch storage is rented from Device-owned power-of-two pools. Build commands retain
-input buffers, scratch leases and exact BLAS references until GPU completion and final
+Scratch storage is shared on a single physical queue, with barriers between builds.
+Each Device caches one buffer, grows it in power-of-two sizes (at least 64 KiB), and
+shrinks it on acquisition when the last second's peak request is below half its capacity.
+Replaced buffers survive through references held by recorded or submitted commands.
+Build commands retain input buffers, scratch buffers and exact BLAS references until GPU completion and final
 context release. TLAS owns its submitted BLAS dependencies; replacing these dependencies
 happens on submission, so abandoning a recording leaves the previous TLAS intact.
 Resources only point weakly to their Device. Destroy Device/Core after all children.

@@ -1,52 +1,24 @@
 ﻿#pragma once
-#include <array>
 #include <chrono>
 #include <deque>
 #include <mutex>
-#include <unordered_map>
 
 #include "grassland/rhi/backend/d3d12/d3d12_allocated_buffer.h"
 
 namespace grassland::rhi::backend::d3d12 {
+// All users must submit to the same physical queue and synchronize scratch accesses.
+// Contexts retain the returned storage directly, including buffers replaced by resizing.
 class D3D12ScratchPool {
  public:
-  // Borrows pool-owned storage. The pool and its Device must outlive every lease.
-  class Lease final : public D3D12Buffer {
-   public:
-    Lease(D3D12ScratchPool *pool, D3D12AllocatedBuffer *buffer, size_t level);
-    ~Lease() override;
-    BufferDesc GetDesc() const override;
-    ID3D12Resource *NativeBuffer() const override;
-    D3D12_RESOURCE_STATES DefaultState() const override;
-
-   private:
-    D3D12ScratchPool *pool_;
-    D3D12AllocatedBuffer *buffer_;
-    size_t level_;
-  };
-
   explicit D3D12ScratchPool(D3D12Device *device);
-  ObjectPtr<Lease> Acquire(uint64_t size);
-  // Allocated / occupied physical buffers in the requested size class.
-  std::pair<size_t, size_t> GetBufferCounts(uint64_t size) const;
+  // Share the current buffer; resize on demand using the last second's peak request.
+  ObjectPtr<D3D12AllocatedBuffer> Acquire(uint64_t size);
   void Clear();
 
  private:
-  // Called by the lease destructor; callers release the lease reference instead.
-  void ReleaseBuffer(D3D12AllocatedBuffer *buffer, size_t level);
-
   D3D12Device *device_;
-  mutable std::mutex mutex_;
-
-  struct Bucket {
-    void Record(size_t occupancy, std::chrono::steady_clock::time_point now);
-    std::unordered_map<D3D12AllocatedBuffer *, ObjectPtr<D3D12AllocatedBuffer>> buffers;
-    std::vector<D3D12AllocatedBuffer *> available;
-    size_t allocated{}, occupied{};
-    std::deque<std::pair<size_t, std::chrono::steady_clock::time_point>> peaks;
-  };
-
-  // 64 KiB through 2^63 bytes, indexed directly by the requested power-of-two class.
-  std::array<Bucket, 48> buckets_;
+  std::mutex mutex_;
+  ObjectPtr<D3D12AllocatedBuffer> buffer_;
+  std::deque<std::pair<uint64_t, std::chrono::steady_clock::time_point>> peaks_;
 };
 }  // namespace grassland::rhi::backend::d3d12

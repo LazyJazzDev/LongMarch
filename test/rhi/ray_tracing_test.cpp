@@ -657,6 +657,163 @@ RHI_RW_BYTE_ADDRESS_BUFFER(0,1,output);
   CheckNativeErrors(device.Get());
 }
 
+TEST_P(RhiRayTracing, ScratchPoolSharesStorageAndShrinksAfterDemandExpires) {
+  ObjPtr<ICore> core = CreateCore(GetParam());
+  ASSERT_TRUE(core);
+  DeviceFeatureRequirement required;
+  required.ray_query = true;
+  ObjPtr<IDevice> device = core->CreateDeviceByAutoSelection(required);
+  if (!device)
+    GTEST_SKIP();
+  auto check = [](auto &pool) {
+    auto initial_buffer = pool.Acquire(1);
+    ASSERT_TRUE(initial_buffer);
+    EXPECT_EQ(initial_buffer->GetDesc().size, 65536u);
+    EXPECT_EQ(pool.Acquire(65536).Get(), initial_buffer.Get());
+    auto large = pool.Acquire(700000);
+    ASSERT_TRUE(large);
+    EXPECT_EQ(large->GetDesc().size, 1048576u);
+    EXPECT_EQ(pool.Acquire(1).Get(), large.Get());
+    EXPECT_NE(large.Get(), initial_buffer.Get());
+    EXPECT_FALSE(pool.Acquire(UINT64_MAX));
+    std::this_thread::sleep_for(std::chrono::milliseconds(1100));
+    // Exactly 50% is not below the shrink threshold, and remains in the peak window.
+    EXPECT_EQ(pool.Acquire(524288).Get(), large.Get());
+    EXPECT_EQ(pool.Acquire(1).Get(), large.Get());
+    std::this_thread::sleep_for(std::chrono::milliseconds(1100));
+    auto shrunk = pool.Acquire(65537);
+    ASSERT_TRUE(shrunk);
+    EXPECT_EQ(shrunk->GetDesc().size, 131072u);
+    EXPECT_NE(shrunk.Get(), large.Get());
+    EXPECT_EQ(pool.Acquire(1).Get(), shrunk.Get());
+    // Old borrowers remain usable after replacement and clearing the cache.
+    EXPECT_TRUE(large->NativeBuffer());
+    EXPECT_TRUE(initial_buffer->NativeBuffer());
+    pool.Clear();
+    EXPECT_TRUE(shrunk->NativeBuffer());
+    auto next = pool.Acquire(1);
+    ASSERT_TRUE(next);
+    EXPECT_EQ(next->GetDesc().size, 65536u);
+    EXPECT_NE(next.Get(), shrunk.Get());
+  };
+#if defined(LONGMARCH_D3D12_ENABLED)
+  if (GetParam() == BACKEND_API_D3D12)
+    check(static_cast<backend::d3d12::D3D12Device *>(device.Get())->ScratchPool());
+#endif
+#if defined(LONGMARCH_VULKAN_ENABLED)
+  if (GetParam() == BACKEND_API_VULKAN)
+    check(static_cast<backend::vulkan::VulkanDevice *>(device.Get())->ScratchPool());
+#endif
+  CheckNativeErrors(device.Get());
+}
+
+TEST_P(RhiRayTracing, SharedScratchSurvivesResizingAndOutOfOrderContextSubmission) {
+  const auto api = GetParam();
+  ObjPtr<ICore> core = CreateCore(api);
+  ASSERT_TRUE(core);
+  DeviceFeatureRequirement required;
+  required.ray_query = true;
+  ObjPtr<IDevice> device = core->CreateDeviceByAutoSelection(required);
+  if (!device)
+    GTEST_SKIP();
+  ObjPtr<IQueue> graphics = device->GetQueue(QUEUE_TYPE_GRAPHICS);
+  ObjPtr<IQueue> transfer = device->GetQueue(QUEUE_TYPE_TRANSFER);
+  ASSERT_TRUE(graphics);
+  ASSERT_TRUE(transfer);
+  constexpr uint32_t count = 32;
+  const float positions[] = {-1, -1, 0, 0, 1, 0, 1, -1, 0};
+  ObjPtr<IBuffer> vertices = device->CreateBuffer({sizeof(positions)});
+  ASSERT_TRUE(vertices);
+  ObjPtr<ICommandContext> upload = device->CreateCommandContext();
+  ASSERT_TRUE(upload);
+  ASSERT_TRUE(upload->CmdUploadBuffer(vertices.Get(), 0, positions, sizeof(positions)));
+  ObjPtr<ISubmissionToken> uploaded = transfer->Submit(upload.Get());
+  ASSERT_TRUE(uploaded);
+  upload.Release();
+  ASSERT_TRUE(uploaded->WaitHost());
+  BottomLevelAccelerationStructureDesc desc;
+  desc.geometries = {{3}};
+  std::array<ObjPtr<IBottomLevelAccelerationStructure>, count> blases;
+  std::array<ObjPtr<ICommandContext>, 4> contexts;
+  for (uint32_t batch = 0; batch < contexts.size(); ++batch) {
+    contexts[batch] = device->CreateCommandContext();
+    ASSERT_TRUE(contexts[batch]);
+    for (uint32_t i = batch * 8; i < (batch + 1) * 8; ++i) {
+      blases[i] = device->CreateBottomLevelAccelerationStructure(desc);
+      ASSERT_TRUE(blases[i]);
+      ASSERT_TRUE(contexts[batch]->CmdBuildBottomLevelAccelerationStructure(blases[i].Get(), {{{vertices.Get()}, {}}}));
+    }
+    if (batch == 1) {
+      // Replace the cache while unsubmitted commands still reference the old buffer.
+#if defined(LONGMARCH_D3D12_ENABLED)
+      if (api == BACKEND_API_D3D12)
+        ASSERT_TRUE(static_cast<backend::d3d12::D3D12Device *>(device.Get())->ScratchPool().Acquire(4 * 1024 * 1024));
+#endif
+#if defined(LONGMARCH_VULKAN_ENABLED)
+      if (api == BACKEND_API_VULKAN)
+        ASSERT_TRUE(static_cast<backend::vulkan::VulkanDevice *>(device.Get())->ScratchPool().Acquire(4 * 1024 * 1024));
+#endif
+    }
+  }
+  std::vector<ObjPtr<ISubmissionToken>> tokens;
+  for (uint32_t i : {3u, 1u, 0u, 2u}) {
+    auto queue = i % 2 ? transfer.Get() : graphics.Get();
+    tokens.emplace_back(queue->Submit(contexts[i].Get()));
+    ASSERT_TRUE(tokens.back());
+    contexts[i].Release();
+  }
+  ObjPtr<ITopLevelAccelerationStructure> tlas = device->CreateTopLevelAccelerationStructure({count});
+  ASSERT_TRUE(tlas);
+  std::vector<RayTracingInstance> instances(count);
+  for (uint32_t i = 0; i < count; ++i) {
+    instances[i].blas = blases[i].Get();
+    instances[i].transform[3] = float(i * 3);
+    instances[i].custom_index = i;
+    instances[i].disable_triangle_culling = true;
+  }
+  const char *source = R"(
+RHI_ACCELERATION_STRUCTURE(0,0,scene);
+RHI_RW_BYTE_ADDRESS_BUFFER(0,1,output);
+[numthreads(1,1,1)] void CSMain(uint3 id : SV_DispatchThreadID) {
+ RayDesc ray; ray.Origin=float3(id.x*3,0,-2); ray.Direction=float3(0,0,1); ray.TMin=0; ray.TMax=10;
+ RayQuery<RAY_FLAG_NONE> query;
+ query.TraceRayInline(scene,RAY_FLAG_NONE,255,ray);
+ while(query.Proceed()) {}
+ output.Store(id.x*4,query.CommittedStatus()==COMMITTED_TRIANGLE_HIT ? query.CommittedInstanceID()+1 : 0);
+}
+)";
+  PipelineLayoutDesc layout{{{{{0, BINDING_ACCELERATION_STRUCTURE, 1, SHADER_VISIBILITY_COMPUTE},
+                               {1, BINDING_RW_BYTE_ADDRESS_BUFFER, 1, SHADER_VISIBILITY_COMPUTE}}}}};
+  ObjPtr<IShader> shader = device->CreateShader({source, "CSMain", SHADER_STAGE_COMPUTE});
+  ASSERT_TRUE(shader);
+  ObjPtr<IComputeProgram> program = device->CreateComputeProgram({shader.Get(), layout});
+  ASSERT_TRUE(program);
+  ASSERT_TRUE(program->Finalize());
+  ObjPtr<IBuffer> output = device->CreateBuffer({count * sizeof(uint32_t)});
+  ASSERT_TRUE(output);
+  ObjPtr<IBindingGroup> group = device->CreateBindingGroup(layout.groups[0]);
+  ASSERT_TRUE(group);
+  ASSERT_TRUE(group->BindResource(0, tlas.Get()));
+  ASSERT_TRUE(group->BindResource(1, output.Get()));
+  ObjPtr<ICommandContext> query = device->CreateCommandContext();
+  ASSERT_TRUE(query);
+  ASSERT_TRUE(query->CmdBuildTopLevelAccelerationStructure(tlas.Get(), instances));
+  ASSERT_TRUE(query->CmdBindComputeProgram(program.Get()));
+  ASSERT_TRUE(query->CmdBindGroup(0, group.Get()));
+  ASSERT_TRUE(query->CmdDispatch(count));
+  ObjPtr<ISubmissionToken> completed = graphics->Submit(query.Get());
+  ASSERT_TRUE(completed);
+  query.Release();
+  ASSERT_TRUE(completed->WaitHost());
+  for (const auto &token : tokens)
+    ASSERT_TRUE(token->WaitHost());
+  std::array<uint32_t, count> hits{};
+  ReadBuffer(device.Get(), output.Get(), api, hits);
+  for (uint32_t i = 0; i < count; ++i)
+    EXPECT_EQ(hits[i], i + 1);
+  CheckNativeErrors(device.Get());
+}
+
 constexpr BackendAPI backends[] = {
 #if defined(LONGMARCH_D3D12_ENABLED)
     BACKEND_API_D3D12,

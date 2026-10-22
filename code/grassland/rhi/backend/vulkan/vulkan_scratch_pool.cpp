@@ -3,120 +3,46 @@
 #include "grassland/rhi/backend/vulkan/vulkan_device.h"
 
 namespace grassland::rhi::backend::vulkan {
-VulkanScratchPool::Lease::Lease(VulkanScratchPool *pool, VulkanAllocatedBuffer *buffer, size_t level)
-    : VulkanBuffer(static_cast<VulkanDevice *>(buffer->Owner()), buffer->GetDesc()),
-      pool_(pool),
-      buffer_(buffer),
-      level_(level) {
-}
-
-VulkanScratchPool::Lease::~Lease() {
-  pool_->ReleaseBuffer(buffer_, level_);
-}
-
-BufferDesc VulkanScratchPool::Lease::GetDesc() const {
-  return buffer_->GetDesc();
-}
-
-VkBuffer VulkanScratchPool::Lease::NativeBuffer() const {
-  return buffer_->NativeBuffer();
-}
-
 VulkanScratchPool::VulkanScratchPool(VulkanDevice *device) : device_(device) {
 }
 
-void VulkanScratchPool::Bucket::Record(size_t occupancy, std::chrono::steady_clock::time_point now) {
-  // Allocate first: failure must not erase previously recorded demand.
-  peaks.emplace_back(occupancy, now);
-  while (peaks.size() > 1 && peaks[peaks.size() - 2].first <= occupancy) {
-    peaks.pop_back();
-    peaks.back() = {occupancy, now};
-  }
-  while (now - peaks.front().second > std::chrono::seconds(1))
-    peaks.pop_front();
-}
-
-ObjectPtr<VulkanScratchPool::Lease> VulkanScratchPool::Acquire(uint64_t size) {
-  uint64_t capacity = 65536;
-  size_t level = 0;
-  while (capacity < size && capacity <= UINT64_MAX / 2) {
-    capacity *= 2;
-    ++level;
-  }
-  if (capacity < size)
+ObjectPtr<VulkanAllocatedBuffer> VulkanScratchPool::Acquire(uint64_t size) {
+  if (size > (uint64_t(1) << 63))
     return {};
-  VulkanAllocatedBuffer *buffer = nullptr;
-  try {
-    {
-      std::lock_guard<std::mutex> lock(mutex_);
-      auto &bucket = buckets_[level];
-      if (bucket.available.empty()) {
-        // Reserve return-list space before committing a new pool-owned allocation.
-        bucket.available.reserve(bucket.allocated + 1);
-        auto storage =
-            ObjectPtr<VulkanAllocatedBuffer>::Adopt(VulkanAllocatedBuffer::Create(device_, {capacity}, false));
-        if (!storage)
-          return {};
-        auto pointer = storage.Get();
-        bucket.buffers.emplace(pointer, std::move(storage));
-        bucket.available.push_back(pointer);
-        ++bucket.allocated;
+  std::lock_guard<std::mutex> lock(mutex_);
+  const auto now = std::chrono::steady_clock::now();
+  // Append before removing history so allocation failure preserves previous demand.
+  peaks_.emplace_back(size, now);
+  while (peaks_.size() > 1 && peaks_[peaks_.size() - 2].first <= size) {
+    peaks_.pop_back();
+    peaks_.back() = {size, now};
+  }
+  while (now - peaks_.front().second > std::chrono::seconds(1))
+    peaks_.pop_front();
+
+  const auto demand = peaks_.front().first;
+  const auto current = buffer_ ? buffer_->GetDesc().size : 0;
+  if (!buffer_ || size > current || demand < current / 2) {
+    uint64_t capacity = 65536;
+    while (capacity < demand)
+      capacity *= 2;
+    if (capacity != current) {
+      auto storage = ObjectPtr<VulkanAllocatedBuffer>::Adopt(VulkanAllocatedBuffer::Create(device_, {capacity}, false));
+      if (!storage) {
+        // Shrinking is optional; a failed growth must not return undersized storage.
+        if (size <= current)
+          return buffer_;
+        return {};
       }
-      bucket.Record(bucket.occupied + 1, std::chrono::steady_clock::now());
-      buffer = bucket.available.back();
-      bucket.available.pop_back();
-      ++bucket.occupied;
+      buffer_ = std::move(storage);
     }
-    // Construct outside the lock: failed construction returns the borrowed slot.
-    return ObjectPtr<Lease>::Adopt(new Lease(this, buffer, level));
-  } catch (const std::bad_alloc &) {
-    if (buffer)
-      ReleaseBuffer(buffer, level);
-    throw;
   }
-}
-
-void VulkanScratchPool::ReleaseBuffer(VulkanAllocatedBuffer *buffer, size_t level) {
-  std::lock_guard<std::mutex> lock(mutex_);
-  auto &bucket = buckets_[level];
-  --bucket.occupied;
-  try {
-    bucket.Record(bucket.occupied, std::chrono::steady_clock::now());
-  } catch (const std::bad_alloc &) {
-    bucket.buffers.erase(buffer);
-    --bucket.allocated;
-    return;
-  }
-  bucket.available.push_back(buffer);  // Capacity reserved by Acquire.
-  const auto demand = bucket.peaks.front().first;
-  while (bucket.allocated > demand && !bucket.available.empty()) {
-    bucket.buffers.erase(bucket.available.back());
-    bucket.available.pop_back();
-    --bucket.allocated;
-  }
-}
-
-std::pair<size_t, size_t> VulkanScratchPool::GetBufferCounts(uint64_t size) const {
-  uint64_t capacity = 65536;
-  size_t level = 0;
-  while (capacity < size && capacity <= UINT64_MAX / 2) {
-    capacity *= 2;
-    ++level;
-  }
-  if (capacity < size)
-    return {};
-  std::lock_guard<std::mutex> lock(mutex_);
-  return {buckets_[level].allocated, buckets_[level].occupied};
+  return buffer_;
 }
 
 void VulkanScratchPool::Clear() {
   std::lock_guard<std::mutex> lock(mutex_);
-  for (auto &bucket : buckets_) {
-    bucket.allocated -= bucket.available.size();
-    for (auto buffer : bucket.available)
-      bucket.buffers.erase(buffer);
-    bucket.available.clear();
-    bucket.peaks.clear();
-  }
+  buffer_.Reset();
+  peaks_.clear();
 }
 }  // namespace grassland::rhi::backend::vulkan
