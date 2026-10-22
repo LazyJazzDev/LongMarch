@@ -8,11 +8,9 @@ struct ComputeProgramDesc {
   PipelineLayoutDesc pipeline_layout;
 };
 
-// Immutable after successful Finalize; creation retains the shader.
+// Creation retains the shader and returns a ready-to-bind pipeline, or nullptr.
 class IComputeProgram : public IObject {
  public:
-  virtual bool Finalize() = 0;
-  virtual bool IsFinalized() const = 0;
   virtual const ComputeProgramDesc &GetDesc() const = 0;
 
  protected:

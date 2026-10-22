@@ -27,16 +27,18 @@ std::string ShaderMacroHeader(const PipelineLayoutDesc &layout,
                           "RW_BYTE_ADDRESS_BUFFER",
                           "TEXTURE2D",
                           "RW_TEXTURE2D",
-                          "SAMPLER"};
-  const char *types[] = {"ConstantBuffer<T>",   "StructuredBuffer<T>", "RWStructuredBuffer<T>", "ByteAddressBuffer",
-                         "RWByteAddressBuffer", "Texture2D<T>",        "RWTexture2D<T>",        "SamplerState"};
+                          "SAMPLER",
+                          "ACCELERATION_STRUCTURE"};
+  const char *types[] = {"ConstantBuffer<T>", "StructuredBuffer<T>", "RWStructuredBuffer<T>",
+                         "ByteAddressBuffer", "RWByteAddressBuffer", "Texture2D<T>",
+                         "RWTexture2D<T>",    "SamplerState",        "RaytracingAccelerationStructure"};
   for (auto macro : macros) {
     for (const auto &suffix : {std::string{}, std::string{"_ARRAY"}}) {
       auto name = std::string(macro) + suffix;
       header += "#define RHI_" + name + "_I(G,B) RHI_" + name + "_##G##_##B\n";
       header += "#define RHI_" + name + "_D(G,B) RHI_" + name + "_I(G,B)\n";
-      bool untyped =
-          std::string(macro) == "SAMPLER" || std::string(macro).find("BYTE_ADDRESS_BUFFER") != std::string::npos;
+      bool untyped = std::string(macro) == "SAMPLER" || std::string(macro) == "ACCELERATION_STRUCTURE" ||
+                     std::string(macro).find("BYTE_ADDRESS_BUFFER") != std::string::npos;
       header += "#define RHI_" + name + (untyped ? "(G,B,N) " : "(G,B,T,N) ") + "RHI_" + name + "_D(G,B)" +
                 (untyped ? "(N)\n" : "(T,N)\n");
     }
@@ -49,8 +51,8 @@ std::string ShaderMacroHeader(const PipelineLayoutDesc &layout,
         continue;
       auto name = base + (array ? "_ARRAY" : "");
       header += "#define RHI_" + name + "_" + std::to_string(mapped.group) + "_" + std::to_string(b.binding) +
-                ((b.type == BINDING_SAMPLER || b.type == BINDING_BYTE_ADDRESS_BUFFER ||
-                  b.type == BINDING_RW_BYTE_ADDRESS_BUFFER)
+                ((b.type == BINDING_ACCELERATION_STRUCTURE || b.type == BINDING_SAMPLER ||
+                  b.type == BINDING_BYTE_ADDRESS_BUFFER || b.type == BINDING_RW_BYTE_ADDRESS_BUFFER)
                      ? "(N) "
                      : "(T,N) ");
       if (api == BACKEND_API_VULKAN)
@@ -87,8 +89,14 @@ bool CompileSlang(const ShaderDesc &shader,
       return false;
     }
   }
+  bool ray_tracing = shader.stage >= SHADER_STAGE_RAY_GENERATION;
+  if (binding_layout)
+    for (const auto &group : binding_layout->groups)
+      for (auto binding : group.bindings)
+        if (binding.type == BINDING_ACCELERATION_STRUCTURE)
+          ray_tracing = true;
   std::vector<const char *> args{"-profile",
-                                 "sm_6_0",
+                                 ray_tracing ? "sm_6_5" : "sm_6_0",
                                  "-matrix-layout-column-major",
                                  "-O3",
                                  "-target",
@@ -123,9 +131,10 @@ bool CompileSlang(const ShaderDesc &shader,
     return false;
   }
   Slang::ComPtr<slang::IEntryPoint> entry;
-  auto stage = shader.stage == SHADER_STAGE_VERTEX     ? SLANG_STAGE_VERTEX
-               : shader.stage == SHADER_STAGE_FRAGMENT ? SLANG_STAGE_FRAGMENT
-                                                       : SLANG_STAGE_COMPUTE;
+  constexpr SlangStage stages[] = {SLANG_STAGE_VERTEX,         SLANG_STAGE_FRAGMENT,     SLANG_STAGE_COMPUTE,
+                                   SLANG_STAGE_RAY_GENERATION, SLANG_STAGE_MISS,         SLANG_STAGE_CLOSEST_HIT,
+                                   SLANG_STAGE_ANY_HIT,        SLANG_STAGE_INTERSECTION, SLANG_STAGE_CALLABLE};
+  const auto stage = stages[shader.stage];
   if (SLANG_FAILED(module->findAndCheckEntryPoint(shader.entry_point.c_str(), stage, entry.writeRef(),
                                                   diagnostics.writeRef()))) {
     report();
@@ -181,7 +190,9 @@ bool CompileSlang(const ShaderDesc &shader,
       resource = BINDING_SAMPLER;
     else if (type->getKind() == slang::TypeReflection::Kind::Resource) {
       const bool rw = type->getResourceAccess() == SLANG_RESOURCE_ACCESS_READ_WRITE;
-      if (type->getResourceShape() == SLANG_STRUCTURED_BUFFER)
+      if (type->getResourceShape() == SLANG_ACCELERATION_STRUCTURE)
+        resource = BINDING_ACCELERATION_STRUCTURE;
+      else if (type->getResourceShape() == SLANG_STRUCTURED_BUFFER)
         resource = rw ? BINDING_RW_STRUCTURED_BUFFER : BINDING_STRUCTURED_BUFFER;
       else if (type->getResourceShape() == SLANG_BYTE_ADDRESS_BUFFER)
         resource = rw ? BINDING_RW_BYTE_ADDRESS_BUFFER : BINDING_BYTE_ADDRESS_BUFFER;
@@ -203,9 +214,7 @@ bool CompileSlang(const ShaderDesc &shader,
         break;
       }
     }
-    const uint32_t stage_bit = shader.stage == SHADER_STAGE_VERTEX     ? SHADER_VISIBILITY_VERTEX
-                               : shader.stage == SHADER_STAGE_FRAGMENT ? SHADER_VISIBILITY_FRAGMENT
-                                                                       : SHADER_VISIBILITY_COMPUTE;
+    const uint32_t stage_bit = 1u << shader.stage;
     if (!match || count != match->desc.count || !(match->desc.visibility & stage_bit)) {
       ReportError(-1, std::string("Shader resource does not match the C++ binding layout: ") + parameter->getName());
       return false;

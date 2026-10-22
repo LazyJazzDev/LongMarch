@@ -77,8 +77,6 @@ int RunTriangle(grassland::rhi::BackendAPI api, int frames, bool headless) {
   grassland::rhix::Program program = device.CreateProgram(desc);
   if (!program)
     return 1;
-  if (!program.Finalize())
-    return 1;
   const Vertex vertices[] = {{{0, 0.6f, 0}, {1, 0, 0}}, {{-0.6f, -0.6f, 0}, {0, 0, 1}}, {{0.6f, -0.6f, 0}, {0, 1, 0}}};
   const uint32_t indices[] = {0, 1, 2};
   grassland::rhix::Buffer vertex_buffer = device.CreateBuffer({sizeof(vertices)});

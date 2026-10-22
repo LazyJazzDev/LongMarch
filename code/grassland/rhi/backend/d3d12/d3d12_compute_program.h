@@ -7,11 +7,11 @@ class D3D12Device;
 
 class D3D12ComputeProgram final : public ComputeProgram, public D3D12ProgramBase {
  public:
-  D3D12ComputeProgram(D3D12Device *device, const ComputeProgramDesc &desc);
-  bool Finalize() override;
+  static D3D12ComputeProgram *Create(D3D12Device *device, const ComputeProgramDesc &desc);
   ID3D12PipelineState *NativePipeline() const;
 
  private:
+  D3D12ComputeProgram(D3D12Device *device, const ComputeProgramDesc &desc);
   ComPtr<ID3D12PipelineState> pipeline_;
 };
 }  // namespace grassland::rhi::backend::d3d12

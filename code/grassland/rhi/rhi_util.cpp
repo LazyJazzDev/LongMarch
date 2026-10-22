@@ -221,6 +221,18 @@ std::string to_string(ShaderStage stage) {
       return "SHADER_STAGE_FRAGMENT";
     case SHADER_STAGE_COMPUTE:
       return "SHADER_STAGE_COMPUTE";
+    case SHADER_STAGE_RAY_GENERATION:
+      return "SHADER_STAGE_RAY_GENERATION";
+    case SHADER_STAGE_MISS:
+      return "SHADER_STAGE_MISS";
+    case SHADER_STAGE_CLOSEST_HIT:
+      return "SHADER_STAGE_CLOSEST_HIT";
+    case SHADER_STAGE_ANY_HIT:
+      return "SHADER_STAGE_ANY_HIT";
+    case SHADER_STAGE_INTERSECTION:
+      return "SHADER_STAGE_INTERSECTION";
+    case SHADER_STAGE_CALLABLE:
+      return "SHADER_STAGE_CALLABLE";
   }
   return "UNKNOWN";
 }
@@ -342,4 +354,28 @@ std::string to_string(BlendOp value) {
   return names[value];
 }
 
+}  // namespace grassland::rhi
+
+namespace grassland::rhi {
+std::string to_string(AccelerationStructureType value) {
+  switch (value) {
+    case ACCELERATION_STRUCTURE_BOTTOM_LEVEL:
+      return "ACCELERATION_STRUCTURE_BOTTOM_LEVEL";
+    case ACCELERATION_STRUCTURE_TOP_LEVEL:
+      return "ACCELERATION_STRUCTURE_TOP_LEVEL";
+    default:
+      return "UNKNOWN";
+  }
+}
+
+std::string to_string(AccelerationStructureBuildMode value) {
+  switch (value) {
+    case ACCELERATION_STRUCTURE_BUILD:
+      return "ACCELERATION_STRUCTURE_BUILD";
+    case ACCELERATION_STRUCTURE_UPDATE:
+      return "ACCELERATION_STRUCTURE_UPDATE";
+    default:
+      return "UNKNOWN";
+  }
+}
 }  // namespace grassland::rhi

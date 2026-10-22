@@ -78,8 +78,6 @@ int RunBlend(grassland::rhi::BackendAPI api, int frames, bool headless) {
   grassland::rhix::Program program = device.CreateProgram(desc);
   if (!program)
     return 1;
-  if (!program.Finalize())
-    return 1;
   // Match graphics_hello/blend: opaque inner triangle, then translucent outer triangle.
   const Vertex vertices[] = {
       {{0.0f, 0.5f, 0.0f}, {0.0f, 1.0f, 1.0f, 0.5f}},    {{-0.5f, -0.5f, 0.0f}, {1.0f, 1.0f, 0.0f, 0.5f}},

@@ -382,7 +382,6 @@ TEST_P(RhiImage, OffscreenClearDrawReadbackAndReuse) {
     desc.color_formats = {format};
     ObjPtr<IProgram> program = device->CreateProgram(desc);
     ASSERT_TRUE(program);
-    ASSERT_TRUE(program->Finalize());
     for (int frame = 0; frame < 3; ++frame) {
       ObjPtr<ICommandContext> commands = device->CreateCommandContext();
       ASSERT_TRUE(commands);
@@ -414,6 +413,151 @@ TEST_P(RhiImage, OffscreenClearDrawReadbackAndReuse) {
   }
 }
 
+TEST_P(RhiImage, FragmentRayQueriesRetainIndirectBlasResources) {
+  ObjPtr<ICore> core = CreateCore(GetParam());
+  ASSERT_TRUE(core);
+  DeviceFeatureRequirement required;
+  required.ray_query = true;
+  ObjPtr<IDevice> device = core->CreateDeviceByAutoSelection(required);
+  if (!device)
+    GTEST_SKIP() << "Ray query unavailable";
+#if defined(LONGMARCH_METAL_ENABLED)
+  if (GetParam() == BACKEND_API_METAL &&
+      !static_cast<backend::metal::MetalDevice *>(device.Get())->NativeDevice()->supportsRaytracingFromRender())
+    GTEST_SKIP() << "Render-stage ray query unavailable";
+#endif
+  Track(device.Get());
+  ObjPtr<IQueue> queue = device->GetQueue(QUEUE_TYPE_GRAPHICS);
+  ObjPtr<IImage> image = device->CreateImage({16, 16, IMAGE_FORMAT_RGBA8_UNORM});
+  ASSERT_TRUE(queue && image);
+  BottomLevelAccelerationStructureDesc bottom;
+  bottom.geometries = {{3}};
+  ObjPtr<IBottomLevelAccelerationStructure> blas = device->CreateBottomLevelAccelerationStructure(bottom);
+  ObjPtr<ITopLevelAccelerationStructure> tlas = device->CreateTopLevelAccelerationStructure({1});
+  const float positions[] = {-1, -1, 0, 0, 1, 0, 1, -1, 0};
+  ObjPtr<IBuffer> vertices = device->CreateBuffer({sizeof(positions)});
+  ASSERT_TRUE(blas && tlas && vertices);
+  ObjPtr<ICommandContext> build = device->CreateCommandContext();
+  ASSERT_TRUE(build);
+  ASSERT_TRUE(build->CmdUploadBuffer(vertices.Get(), 0, positions, sizeof(positions)));
+  ASSERT_TRUE(build->CmdBuildBottomLevelAccelerationStructure(blas.Get(), {{{vertices.Get()}, {}}}));
+  RayTracingInstance instance;
+  instance.blas = blas.Get();
+  instance.disable_triangle_culling = true;
+  ASSERT_TRUE(build->CmdBuildTopLevelAccelerationStructure(tlas.Get(), {instance}));
+  ObjPtr<ISubmissionToken> built = queue->Submit(build.Get());
+  ASSERT_TRUE(built);
+  build.Release();
+  ASSERT_TRUE(built->WaitHost());
+  blas.Release();
+  vertices.Release();
+  const char *source = R"(
+RHI_ACCELERATION_STRUCTURE(0,0,scene);
+float4 VSMain(uint id:SV_VertexID):SV_Position {
+ float2 p[3]={float2(-1,-1),float2(3,-1),float2(-1,3)};
+ return float4(p[id],0,1);
+}
+float4 PSMain():SV_Target0 {
+ RayDesc ray; ray.Origin=float3(0,0,-2); ray.Direction=float3(0,0,1); ray.TMin=0; ray.TMax=10;
+ RayQuery<RAY_FLAG_NONE> query; query.TraceRayInline(scene,RAY_FLAG_NONE,255,ray);
+ while(query.Proceed()) {}
+ return query.CommittedStatus()==COMMITTED_TRIANGLE_HIT ? float4(0,1,0,1) : float4(1,0,0,1);
+}
+)";
+  ObjPtr<IShader> vs = device->CreateShader({source, "VSMain", SHADER_STAGE_VERTEX});
+  ObjPtr<IShader> ps = device->CreateShader({source, "PSMain", SHADER_STAGE_FRAGMENT});
+  ASSERT_TRUE(vs && ps);
+  ProgramDesc desc;
+  desc.vertex_shader = vs.Get();
+  desc.fragment_shader = ps.Get();
+  desc.pipeline_layout.groups = {{{{0, BINDING_ACCELERATION_STRUCTURE, 1, SHADER_VISIBILITY_FRAGMENT}}}};
+  ObjPtr<IProgram> program = device->CreateProgram(desc);
+  ASSERT_TRUE(program);
+  ObjPtr<IBindingGroup> group = device->CreateBindingGroup(desc.pipeline_layout.groups[0]);
+  ASSERT_TRUE(group);
+  ASSERT_TRUE(group->BindResource(0, tlas.Get()));
+  ObjPtr<ICommandContext> commands = device->CreateCommandContext();
+  ASSERT_TRUE(commands);
+  ASSERT_TRUE(commands->CmdBindProgram(program.Get()));
+  ASSERT_TRUE(commands->CmdBeginRendering(
+      {{{image.Get(), ATTACHMENT_LOAD_OP_CLEAR, ATTACHMENT_STORE_OP_STORE, {0, 0, 0, 1}}}}));
+  ASSERT_TRUE(commands->CmdBindGroup(0, group.Get()));
+  ASSERT_TRUE(commands->CmdSetViewport({0, 0, 16, 16, 0, 1}));
+  ASSERT_TRUE(commands->CmdSetScissor({0, 0, 16, 16}));
+  ASSERT_TRUE(commands->CmdDraw(3));
+  ASSERT_TRUE(commands->CmdEndRendering());
+  group.Release();
+  tlas.Release();
+  ObjPtr<ISubmissionToken> done = queue->Submit(commands.Get());
+  ASSERT_TRUE(done);
+  commands.Release();
+  ASSERT_TRUE(done->WaitHost());
+  std::array<uint8_t, 4> pixel{};
+  ReadPixel(device.Get(), image.Get(), GetParam(), 8, 8, pixel);
+  EXPECT_EQ(pixel, (std::array<uint8_t, 4>{0, 255, 0, 255}));
+}
+
+TEST_P(RhiImage, EightBindingGroupsDoNotOverlapVertexBuffers) {
+  ObjPtr<ICore> core = CreateCore(GetParam());
+  ASSERT_TRUE(core);
+  ObjPtr<IDevice> device = core->CreateDeviceByAutoSelection();
+  ASSERT_TRUE(device);
+  Track(device.Get());
+  ObjPtr<IQueue> queue = device->GetQueue(QUEUE_TYPE_GRAPHICS);
+  ObjPtr<IImage> image = device->CreateImage({16, 16, IMAGE_FORMAT_RGBA8_UNORM});
+  ASSERT_TRUE(queue && image);
+  ProgramDesc desc;
+  std::string source;
+  std::string sum;
+  for (uint32_t i = 0; i < 8; ++i) {
+    source += "RHI_STRUCTURED_BUFFER(" + std::to_string(i) + ",0,float4,color" + std::to_string(i) + ");\n";
+    sum += (i ? "+" : "") + std::string("color") + std::to_string(i) + "[0]";
+    desc.pipeline_layout.groups.push_back({{{0, BINDING_STRUCTURED_BUFFER, 1, SHADER_VISIBILITY_ALL, 16}}});
+  }
+  source += "struct Input { RHI_INPUT(0,float2,position); };\n";
+  source += "float4 VSMain(Input input):SV_Position { return float4(input.position,0,1); }\n";
+  source += "float4 PSMain():SV_Target0 { return " + sum + "; }\n";
+  ObjPtr<IShader> vs = device->CreateShader({source, "VSMain", SHADER_STAGE_VERTEX});
+  ObjPtr<IShader> ps = device->CreateShader({source, "PSMain", SHADER_STAGE_FRAGMENT});
+  ASSERT_TRUE(vs && ps);
+  desc.vertex_shader = vs.Get();
+  desc.fragment_shader = ps.Get();
+  desc.vertex_bindings = {{8}};
+  desc.vertex_attributes = {{0, 0, VERTEX_FORMAT_FLOAT2, 0}};
+  ObjPtr<IProgram> program = device->CreateProgram(desc);
+  ASSERT_TRUE(program);
+  const float vertices[] = {-1, -1, 3, -1, -1, 3};
+  ObjPtr<IBuffer> vertex = device->CreateBuffer({sizeof(vertices)});
+  ASSERT_TRUE(vertex);
+  ObjPtr<ICommandContext> commands = device->CreateCommandContext();
+  ASSERT_TRUE(commands);
+  ASSERT_TRUE(commands->CmdUploadBuffer(vertex.Get(), 0, vertices, sizeof(vertices)));
+  ASSERT_TRUE(commands->CmdBindProgram(program.Get()));
+  ASSERT_TRUE(commands->CmdBindVertexBuffer(0, vertex.Get()));
+  for (uint32_t i = 0; i < 8; ++i) {
+    ObjPtr<IBuffer> color = device->CreateBuffer({16});
+    ObjPtr<IBindingGroup> group = device->CreateBindingGroup(desc.pipeline_layout.groups[i]);
+    ASSERT_TRUE(color && group);
+    const float value[] = {0.125f, 0, 0.125f, 0.125f};
+    ASSERT_TRUE(commands->CmdUploadBuffer(color.Get(), 0, value, sizeof(value)));
+    ASSERT_TRUE(group->BindResource(0, color.Get()));
+    ASSERT_TRUE(commands->CmdBindGroup(i, group.Get()));
+  }
+  ASSERT_TRUE(commands->CmdBeginRendering(
+      {{{image.Get(), ATTACHMENT_LOAD_OP_CLEAR, ATTACHMENT_STORE_OP_STORE, {0, 0, 0, 1}}}}));
+  ASSERT_TRUE(commands->CmdSetViewport({0, 0, 16, 16, 0, 1}));
+  ASSERT_TRUE(commands->CmdSetScissor({0, 0, 16, 16}));
+  ASSERT_TRUE(commands->CmdDraw(3));
+  ASSERT_TRUE(commands->CmdEndRendering());
+  ObjPtr<ISubmissionToken> done = queue->Submit(commands.Get());
+  ASSERT_TRUE(done);
+  commands.Release();
+  ASSERT_TRUE(done->WaitHost());
+  std::array<uint8_t, 4> pixel{};
+  ReadPixel(device.Get(), image.Get(), GetParam(), 8, 8, pixel);
+  EXPECT_EQ(pixel, (std::array<uint8_t, 4>{255, 0, 255, 255}));
+}
+
 TEST_P(RhiImage, IndexedInstancedAttributesAndOffsetsProduceExpectedPixels) {
   ObjPtr<ICore> core = CreateCore(GetParam());
   ASSERT_TRUE(core);
@@ -438,7 +582,6 @@ TEST_P(RhiImage, IndexedInstancedAttributesAndOffsetsProduceExpectedPixels) {
   desc.vertex_attributes = {{3, 0, VERTEX_FORMAT_FLOAT2, 0}, {5, 1, VERTEX_FORMAT_FLOAT4, 0}};
   ObjPtr<IProgram> program = device->CreateProgram(desc);
   ASSERT_TRUE(program);
-  ASSERT_TRUE(program->Finalize());
   // Skip prefixes with binding/index offsets, then use base vertex and base instance.
   const float vertices[] = {9, 9, 9, 9, 0, .75f, -.75f, -.75f, .75f, -.75f};
   const float colors[] = {0, 0, 1, 1, 0, 1, 0, 1, 1, 0, 0, 1};
@@ -513,7 +656,6 @@ TEST_P(RhiImage, MultipleTargetsAndDepthRejectOccludedFragments) {
   desc.depth_stencil.depth_write = true;
   ObjPtr<IProgram> program = device->CreateProgram(desc);
   ASSERT_TRUE(program);
-  ASSERT_TRUE(program->Finalize());
   for (int repeat = 0; repeat < 3; ++repeat) {
     ObjPtr<ICommandContext> commands = device->CreateCommandContext();
     ASSERT_TRUE(commands->CmdBindProgram(program.Get()));
@@ -576,7 +718,6 @@ TEST_P(RhiImage, BindingVersionsPreserveRangesAndArraysAcrossHeapPages) {
                                  {{{1, BINDING_SAMPLER, 1, SHADER_VISIBILITY_FRAGMENT}}}};
   ObjPtr<IProgram> program = device->CreateProgram(desc);
   ASSERT_TRUE(program);
-  ASSERT_TRUE(program->Finalize());
   ObjPtr<IBindingGroup> selection = device->CreateBindingGroup(desc.pipeline_layout.groups[0]);
   ObjPtr<IBindingGroup> material = device->CreateBindingGroup(desc.pipeline_layout.groups[1]);
   ObjPtr<IBindingGroup> sampling = device->CreateBindingGroup(desc.pipeline_layout.groups[2]);
@@ -777,7 +918,6 @@ TEST_P(RhiImage, ExplicitStructuredStrideReadsSecondCompactElement) {
                                    {1, BINDING_STRUCTURED_BUFFER, 1, SHADER_VISIBILITY_FRAGMENT, 16}}}};
   ObjPtr<IProgram> program = device->CreateProgram(desc);
   ASSERT_TRUE(program);
-  ASSERT_TRUE(program->Finalize());
 
   // Both backends use the same compact C++ element layout.
   struct Element {
@@ -847,7 +987,6 @@ TEST_P(RhiImage, StructuredNestedArraysUseSameCppLayout) {
                                    {1, BINDING_STRUCTURED_BUFFER, 1, SHADER_VISIBILITY_FRAGMENT, 16}}}};
   ObjPtr<IProgram> program = device->CreateProgram(desc);
   ASSERT_TRUE(program);
-  ASSERT_TRUE(program->Finalize());
 
   // Both backends use the same compact C++ element layout.
   struct Inner {
@@ -941,8 +1080,6 @@ TEST_P(RhiImage, StorageImageAndBufferBecomeReadableAfterRendering) {
   desc.pipeline_layout.groups = {read_layout};
   ObjPtr<IProgram> reader = device->CreateProgram(desc);
   ASSERT_TRUE(writer && reader);
-  ASSERT_TRUE(writer->Finalize());
-  ASSERT_TRUE(reader->Finalize());
   ObjPtr<IBindingGroup> wg = device->CreateBindingGroup(write_layout);
   ObjPtr<IBindingGroup> rg = device->CreateBindingGroup(read_layout);
   ASSERT_TRUE(wg);
@@ -1019,8 +1156,6 @@ TEST_P(RhiImage, RawBufferWritesBecomeReadableAfterRendering) {
   desc.pipeline_layout.groups = {read_layout};
   ObjPtr<IProgram> reader = device->CreateProgram(desc);
   ASSERT_TRUE(writer && reader);
-  ASSERT_TRUE(writer->Finalize());
-  ASSERT_TRUE(reader->Finalize());
   ObjPtr<IBindingGroup> wg = device->CreateBindingGroup(write_layout);
   ObjPtr<IBindingGroup> rg = device->CreateBindingGroup(read_layout);
   ASSERT_TRUE(wg);
@@ -1081,7 +1216,6 @@ TEST_P(RhiImage, SamplerArraysPreserveFilteringAcrossCapturedVersions) {
       {{{0, BINDING_TEXTURE2D, 1, SHADER_VISIBILITY_FRAGMENT}, {3, BINDING_SAMPLER, 2, SHADER_VISIBILITY_FRAGMENT}}}};
   ObjPtr<IProgram> program = device->CreateProgram(desc);
   ASSERT_TRUE(program);
-  ASSERT_TRUE(program->Finalize());
   ObjPtr<IBindingGroup> group = device->CreateBindingGroup(desc.pipeline_layout.groups[0]);
   ASSERT_TRUE(group);
   ASSERT_TRUE(group->BindResource(0, texture.Get()));
@@ -1157,7 +1291,6 @@ TEST_P(RhiImage, BindingArraysExposeCapturedBufferViewLengths) {
                                    {9, BINDING_BYTE_ADDRESS_BUFFER, 2, SHADER_VISIBILITY_FRAGMENT}}}};
   ObjPtr<IProgram> program = device->CreateProgram(desc);
   ASSERT_TRUE(program);
-  ASSERT_TRUE(program->Finalize());
   ObjPtr<IBindingGroup> group = device->CreateBindingGroup(desc.pipeline_layout.groups[0]);
   ASSERT_TRUE(group);
   ASSERT_TRUE(group->BindResource(7, std::vector<BufferView>{{buffer.Get(), 0, 256}, {buffer.Get(), 256, 256}}));
@@ -1222,8 +1355,6 @@ TEST_P(RhiImage, StencilSurvivesDepthOnlyPassAndMasksColorPass) {
   desc.depth_stencil.front.compare = desc.depth_stencil.back.compare = COMPARE_EQUAL;
   ObjPtr<IProgram> reader = device->CreateProgram(desc);
   ASSERT_TRUE(writer && reader);
-  ASSERT_TRUE(writer->Finalize());
-  ASSERT_TRUE(reader->Finalize());
   ObjPtr<ICommandContext> commands = device->CreateCommandContext();
   RenderingInfo rendering;
   rendering.depth_stencil.image = depth.Get();
@@ -1336,7 +1467,6 @@ TEST_P(RhiImage, IndependentColorAndAlphaBlendingMatchesPixelResults) {
       desc.blend_states.push_back(cases[(std::min)(first + j, cases.size() - 1)].state);
     ObjPtr<IProgram> program = device->CreateProgram(desc);
     ASSERT_TRUE(program);
-    ASSERT_TRUE(program->Finalize());
     ObjPtr<ICommandContext> commands = device->CreateCommandContext();
     ASSERT_TRUE(commands);
     ASSERT_TRUE(commands->CmdBindProgram(program.Get()));
@@ -1388,7 +1518,6 @@ TEST_P(RhiImage, ComputeGraphicsSwitchingPreservesImagesAndDescriptorTables) {
   cd.pipeline_layout.groups = {{{{0, BINDING_RW_TEXTURE2D, 1, SHADER_VISIBILITY_COMPUTE}}}};
   ObjPtr<IComputeProgram> compute = device->CreateComputeProgram(cd);
   ASSERT_TRUE(compute);
-  ASSERT_TRUE(compute->Finalize());
   const std::string render_source = R"(
     RHI_TEXTURE2D(0, 0, float4, source_image);
     float4 VSMain(uint id:SV_VertexID):SV_Position {
@@ -1407,7 +1536,6 @@ TEST_P(RhiImage, ComputeGraphicsSwitchingPreservesImagesAndDescriptorTables) {
   gd.pipeline_layout.groups = {{{{0, BINDING_TEXTURE2D, 1, SHADER_VISIBILITY_FRAGMENT}}}};
   ObjPtr<IProgram> graphics = device->CreateProgram(gd);
   ASSERT_TRUE(graphics);
-  ASSERT_TRUE(graphics->Finalize());
   ObjPtr<IBindingGroup> ca = device->CreateBindingGroup(cd.pipeline_layout.groups[0]);
   ASSERT_TRUE(ca);
   ObjPtr<IBindingGroup> cb = device->CreateBindingGroup(cd.pipeline_layout.groups[0]);

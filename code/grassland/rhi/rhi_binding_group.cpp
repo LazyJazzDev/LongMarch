@@ -24,4 +24,9 @@ bool IBindingGroup::BindResource(uint32_t binding, const std::vector<IBuffer *> 
     views.push_back({buffer});
   return BindResource(binding, views, first_element);
 }
+
+bool IBindingGroup::BindResource(uint32_t binding, ITopLevelAccelerationStructure *structure) {
+  return BindResource(binding, std::vector<ITopLevelAccelerationStructure *>{structure});
+}
+
 }  // namespace grassland::rhi

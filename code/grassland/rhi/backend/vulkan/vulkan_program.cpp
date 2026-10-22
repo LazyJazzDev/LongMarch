@@ -19,11 +19,9 @@ VkPipeline VulkanProgram::NativePipeline() const {
   return pipeline_;
 }
 
-bool VulkanProgram::Finalize() {
-  if (finalized_)
-    return true;
-  auto owner = static_cast<VulkanDevice *>(device_);
-  auto device = owner->NativeDevice();
+VulkanProgram *VulkanProgram::Create(VulkanDevice *owner_device, const ProgramDesc &desc) {
+  auto object = std::unique_ptr<VulkanProgram>(new VulkanProgram(owner_device, desc));
+  auto device = owner_device->NativeDevice();
 
   struct ShaderModules {
     VkDevice device;
@@ -37,44 +35,47 @@ bool VulkanProgram::Finalize() {
   } shader_modules{device};
 
   auto &modules = shader_modules.handles;
-  if (!ValidateLayout() || !ValidatePipelineBindings(owner->NativePhysicalDevice(), desc_.pipeline_layout)) {
+  if (!object->ValidateLayout() ||
+      !ValidatePipelineBindings(owner_device->NativePhysicalDevice(), object->desc_.pipeline_layout)) {
     ReportError(-1, "Invalid graphics program layout.");
-    return false;
+    return nullptr;
   }
   std::vector<uint8_t> code[2];
-  auto prefix = ShaderMacroHeader(desc_.pipeline_layout, BACKEND_API_VULKAN, desc_.vertex_attributes);
-  if (!CompileSlang(desc_.vertex_shader->GetDesc(), prefix, BACKEND_API_VULKAN, code[0], &desc_.pipeline_layout))
-    return false;
-  if (!CompileSlang(desc_.fragment_shader->GetDesc(), prefix, BACKEND_API_VULKAN, code[1], &desc_.pipeline_layout))
-    return false;
+  auto prefix = ShaderMacroHeader(object->desc_.pipeline_layout, BACKEND_API_VULKAN, object->desc_.vertex_attributes);
+  if (!CompileSlang(object->desc_.vertex_shader->GetDesc(), prefix, BACKEND_API_VULKAN, code[0],
+                    &object->desc_.pipeline_layout))
+    return nullptr;
+  if (!CompileSlang(object->desc_.fragment_shader->GetDesc(), prefix, BACKEND_API_VULKAN, code[1],
+                    &object->desc_.pipeline_layout))
+    return nullptr;
   for (int i = 0; i < 2; ++i) {
     VkShaderModuleCreateInfo create{VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO};
     create.codeSize = code[i].size();
     create.pCode = reinterpret_cast<const uint32_t *>(code[i].data());
     if (!Check(vkCreateShaderModule(device, &create, nullptr, &modules[i]), "Create shader module")) {
-      return false;
+      return nullptr;
     }
   }
-  if (!CreateLayout(desc_.pipeline_layout))
-    return false;
+  if (!object->CreateLayout(object->desc_.pipeline_layout))
+    return nullptr;
   VkPipelineShaderStageCreateInfo stages[2]{};
   for (int i = 0; i < 2; ++i) {
     stages[i].sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
     stages[i].module = modules[i];
   }
   stages[0].stage = VK_SHADER_STAGE_VERTEX_BIT;
-  stages[0].pName = desc_.vertex_shader->GetDesc().entry_point.c_str();
+  stages[0].pName = object->desc_.vertex_shader->GetDesc().entry_point.c_str();
   stages[1].stage = VK_SHADER_STAGE_FRAGMENT_BIT;
-  stages[1].pName = desc_.fragment_shader->GetDesc().entry_point.c_str();
+  stages[1].pName = object->desc_.fragment_shader->GetDesc().entry_point.c_str();
   std::vector<VkVertexInputBindingDescription> bindings;
-  for (uint32_t i = 0; i < desc_.vertex_bindings.size(); ++i) {
-    const auto &b = desc_.vertex_bindings[i];
+  for (uint32_t i = 0; i < object->desc_.vertex_bindings.size(); ++i) {
+    const auto &b = object->desc_.vertex_bindings[i];
     bindings.push_back({i, b.stride, b.per_instance ? VK_VERTEX_INPUT_RATE_INSTANCE : VK_VERTEX_INPUT_RATE_VERTEX});
   }
   const VkFormat formats[] = {VK_FORMAT_R32_SFLOAT, VK_FORMAT_R32G32_SFLOAT, VK_FORMAT_R32G32B32_SFLOAT,
                               VK_FORMAT_R32G32B32A32_SFLOAT};
   std::vector<VkVertexInputAttributeDescription> attributes;
-  for (const auto &a : desc_.vertex_attributes)
+  for (const auto &a : object->desc_.vertex_attributes)
     attributes.push_back({a.location, a.binding, formats[a.format], a.offset});
   VkPipelineVertexInputStateCreateInfo input{VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO};
   input.vertexBindingDescriptionCount = static_cast<uint32_t>(bindings.size());
@@ -93,8 +94,8 @@ bool VulkanProgram::Finalize() {
   VkPipelineMultisampleStateCreateInfo sample{VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO};
   sample.rasterizationSamples = VK_SAMPLE_COUNT_1_BIT;
   std::vector<VkPipelineColorBlendAttachmentState> blend_attachments;
-  for (size_t i = 0; i < desc_.color_formats.size(); ++i) {
-    const auto value = desc_.blend_states.empty() ? BlendState{} : desc_.blend_states[i];
+  for (size_t i = 0; i < object->desc_.color_formats.size(); ++i) {
+    const auto value = object->desc_.blend_states.empty() ? BlendState{} : object->desc_.blend_states[i];
     VkPipelineColorBlendAttachmentState attachment{};
     attachment.blendEnable = value.blend_enable;
     attachment.srcColorBlendFactor = NativeBlendFactor(value.src_color);
@@ -107,7 +108,7 @@ bool VulkanProgram::Finalize() {
     blend_attachments.push_back(attachment);
   }
   VkPhysicalDeviceFeatures features{};
-  vkGetPhysicalDeviceFeatures(owner->NativePhysicalDevice(), &features);
+  vkGetPhysicalDeviceFeatures(owner_device->NativePhysicalDevice(), &features);
   if (!features.independentBlend && !blend_attachments.empty()) {
     const auto &first = blend_attachments.front();
     for (const auto &value : blend_attachments)
@@ -116,13 +117,13 @@ bool VulkanProgram::Finalize() {
           value.srcAlphaBlendFactor != first.srcAlphaBlendFactor ||
           value.dstAlphaBlendFactor != first.dstAlphaBlendFactor || value.alphaBlendOp != first.alphaBlendOp) {
         ReportError(-1, "Independent color-attachment blending is unsupported.");
-        return false;
+        return nullptr;
       }
   }
   VkPipelineColorBlendStateCreateInfo blend{VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO};
   blend.attachmentCount = uint32_t(blend_attachments.size());
   blend.pAttachments = blend_attachments.data();
-  const auto &ds = desc_.depth_stencil;
+  const auto &ds = object->desc_.depth_stencil;
   VkPipelineDepthStencilStateCreateInfo depth{VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO};
   depth.depthTestEnable = ds.depth_test;
   depth.depthWriteEnable = ds.depth_write;
@@ -156,29 +157,26 @@ bool VulkanProgram::Finalize() {
   create.pColorBlendState = &blend;
   create.pDepthStencilState = &depth;
   create.pDynamicState = &dynamic;
-  create.layout = NativeLayout();
+  create.layout = object->NativeLayout();
   std::vector<VkFormat> color_formats;
-  for (auto format : desc_.color_formats)
+  for (auto format : object->desc_.color_formats)
     color_formats.push_back(NativeImageFormat(format));
   VkPipelineRenderingCreateInfo rendering{VK_STRUCTURE_TYPE_PIPELINE_RENDERING_CREATE_INFO};
-  if (owner->BeginRenderingCommand()) {
+  if (owner_device->Procedures().CmdBeginRendering) {
     rendering.colorAttachmentCount = uint32_t(color_formats.size());
     rendering.pColorAttachmentFormats = color_formats.data();
     rendering.depthAttachmentFormat = NativeImageFormat(ds.format);
     rendering.stencilAttachmentFormat = HasStencil(ds.format) ? NativeImageFormat(ds.format) : VK_FORMAT_UNDEFINED;
     create.pNext = &rendering;
   } else {
-    create.renderPass = owner->RenderTargets().RenderPass(desc_.color_formats, ds.format);
+    create.renderPass = owner_device->RenderTargets().RenderPass(object->desc_.color_formats, ds.format);
     if (!create.renderPass) {
-      return false;
+      return nullptr;
     }
   }
-  auto result = vkCreateGraphicsPipelines(device, VK_NULL_HANDLE, 1, &create, nullptr, &pipeline_);
-  finalized_ = Check(result, "Create graphics pipeline");
-  if (!finalized_ && pipeline_) {
-    vkDestroyPipeline(device, pipeline_, nullptr);
-    pipeline_ = {};
-  }
-  return finalized_;
+  auto result = vkCreateGraphicsPipelines(device, VK_NULL_HANDLE, 1, &create, nullptr, &object->pipeline_);
+  if (!Check(result, "Create graphics pipeline"))
+    return nullptr;
+  return object.release();
 }
 }  // namespace grassland::rhi::backend::vulkan

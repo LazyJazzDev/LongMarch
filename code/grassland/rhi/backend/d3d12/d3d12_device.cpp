@@ -1,12 +1,14 @@
 ﻿#include "grassland/rhi/backend/d3d12/d3d12_device.h"
 
 #include "grassland/rhi/backend/backend_binding_group.h"
+#include "grassland/rhi/backend/d3d12/d3d12_acceleration_structure.h"
 #include "grassland/rhi/backend/d3d12/d3d12_allocated_image.h"
 #include "grassland/rhi/backend/d3d12/d3d12_binding_group.h"
 #include "grassland/rhi/backend/d3d12/d3d12_command_context.h"
 #include "grassland/rhi/backend/d3d12/d3d12_compute_program.h"
 #include "grassland/rhi/backend/d3d12/d3d12_program.h"
 #include "grassland/rhi/backend/d3d12/d3d12_queue.h"
+#include "grassland/rhi/backend/d3d12/d3d12_ray_tracing_program.h"
 #include "grassland/rhi/backend/d3d12/d3d12_sampler.h"
 #include "grassland/rhi/backend/d3d12/d3d12_window.h"
 
@@ -170,6 +172,7 @@ bool D3D12Device::WaitIdle() {
 D3D12Device::D3D12Device(PhysicalDevice info, Core *core, ComPtr<ID3D12Device> device)
     : Device(std::move(info), core),
       upload_pool_(this),
+      scratch_pool_(this),
       device_(std::move(device)),
       rtv_pool_(device_.Get(), D3D12_DESCRIPTOR_HEAP_TYPE_RTV),
       dsv_pool_(device_.Get(), D3D12_DESCRIPTOR_HEAP_TYPE_DSV),
@@ -182,6 +185,7 @@ D3D12Device::D3D12Device(PhysicalDevice info, Core *core, ComPtr<ID3D12Device> d
 D3D12Device::~D3D12Device() {
   ShutdownQueues();
   upload_pool_.Clear();
+  scratch_pool_.Clear();
   for (auto &entry : command_pool_)
     CloseHandle(std::get<2>(entry));
   command_pool_.clear();
@@ -190,11 +194,11 @@ D3D12Device::~D3D12Device() {
 }
 
 rhi::IComputeProgram *D3D12Device::CreateComputeProgram(const ComputeProgramDesc &desc) {
-  return new D3D12ComputeProgram(this, desc);
+  return D3D12ComputeProgram::Create(this, desc);
 }
 
 rhi::IProgram *D3D12Device::CreateProgram(const ProgramDesc &desc) {
-  return new D3D12Program(this, desc);
+  return D3D12Program::Create(this, desc);
 }
 
 D3D12UploadPool &D3D12Device::UploadPool() {
@@ -229,4 +233,28 @@ IBindingGroup *D3D12Device::CreateBindingGroup(const BindingLayoutDesc &layout) 
   return D3D12BindingGroup::Create(this, layout);
 }
 
+}  // namespace grassland::rhi::backend::d3d12
+
+namespace grassland::rhi::backend::d3d12 {
+D3D12ScratchPool &D3D12Device::ScratchPool() {
+  return scratch_pool_;
+}
+}  // namespace grassland::rhi::backend::d3d12
+
+namespace grassland::rhi::backend::d3d12 {
+IBottomLevelAccelerationStructure *D3D12Device::CreateBottomLevelAccelerationStructure(
+    const BottomLevelAccelerationStructureDesc &desc) {
+  return D3D12BottomLevelAccelerationStructure::Create(this, desc);
+}
+
+ITopLevelAccelerationStructure *D3D12Device::CreateTopLevelAccelerationStructure(
+    const TopLevelAccelerationStructureDesc &desc) {
+  return D3D12TopLevelAccelerationStructure::Create(this, desc);
+}
+
+IRayTracingProgram *D3D12Device::CreateRayTracingProgram(const RayTracingProgramDesc &desc) {
+  if (!SupportRayTracingPipeline())
+    return nullptr;
+  return D3D12RayTracingProgram::Create(this, desc);
+}
 }  // namespace grassland::rhi::backend::d3d12

@@ -84,7 +84,7 @@ TEST_P(RhiProgram, SamplersAreReusableAndRetainedByCapturedVersions) {
   EXPECT_EQ(static_cast<ISampler *>(captured->GetReferences()[0][1].Get())->GetDesc().filter, SAMPLER_FILTER_NEAREST);
 }
 
-TEST_P(RhiProgram, DeferredCompilationOwnsSourcesAndUsesInputMacros) {
+TEST_P(RhiProgram, CreationCompilesAndOwnsSourcesUsingInputMacros) {
   ObjPtr<ICore> core = CreateCore(GetParam());
   ASSERT_TRUE(core);
   ObjPtr<IDevice> device = core->CreateDeviceByAutoSelection();
@@ -112,15 +112,13 @@ TEST_P(RhiProgram, DeferredCompilationOwnsSourcesAndUsesInputMacros) {
   desc.vertex_attributes = {{0, 0, VERTEX_FORMAT_FLOAT3, 0}, {1, 0, VERTEX_FORMAT_FLOAT3, 12}};
   ObjPtr<IProgram> program = device->CreateProgram(desc);
   ASSERT_TRUE(program);
-  EXPECT_FALSE(program->IsFinalized());
   vertex.Release();
   fragment.Release();
-  ASSERT_TRUE(program->Finalize());
-  EXPECT_TRUE(program->IsFinalized());
-  EXPECT_TRUE(program->Finalize());
+  EXPECT_EQ(program->GetDesc().vertex_shader->GetDesc().entry_point, "VSMain");
+  EXPECT_EQ(program->GetDesc().fragment_shader->GetDesc().entry_point, "PSMain");
 }
 
-TEST_P(RhiProgram, InvalidShaderIsRejectedAtFinalizeNotSourceCreation) {
+TEST_P(RhiProgram, InvalidShaderIsRejectedAtProgramCreationNotSourceCreation) {
   ObjPtr<ICore> core = CreateCore(GetParam());
   ASSERT_TRUE(core);
   ObjPtr<IDevice> device = core->CreateDeviceByAutoSelection();
@@ -133,9 +131,7 @@ TEST_P(RhiProgram, InvalidShaderIsRejectedAtFinalizeNotSourceCreation) {
   desc.vertex_shader = vertex.Get();
   desc.fragment_shader = fragment.Get();
   ObjPtr<IProgram> program = device->CreateProgram(desc);
-  ASSERT_TRUE(program);
-  EXPECT_FALSE(program->Finalize());
-  EXPECT_FALSE(program->IsFinalized());
+  EXPECT_FALSE(program);
 }
 
 TEST_P(RhiProgram, DrawAndIndexedDrawRetainResourcesUntilCompletion) {
@@ -185,7 +181,6 @@ TEST_P(RhiProgram, DrawAndIndexedDrawRetainResourcesUntilCompletion) {
   }
   ObjPtr<IProgram> program = device->CreateProgram(desc);
   ASSERT_TRUE(program);
-  ASSERT_TRUE(program->Finalize());
   vs.Release();
   ps.Release();
   const float vertices[] = {0, 0.5f, 0, -0.5f, -0.5f, 0, 0.5f, -0.5f, 0};
@@ -354,16 +349,13 @@ TEST_P(RhiProgram, BindingLayoutRejectsIncorrectStageTypeCountAndRange) {
   desc.fragment_shader = ps.Get();
   desc.pipeline_layout.groups = {{{{0, BINDING_UNIFORM_BUFFER, 1, SHADER_VISIBILITY_VERTEX}}}};
   ObjPtr<IProgram> program = device->CreateProgram(desc);
-  ASSERT_TRUE(program);
-  EXPECT_FALSE(program->Finalize());
+  EXPECT_FALSE(program);
   desc.pipeline_layout.groups[0].bindings[0].visibility = SHADER_VISIBILITY_FRAGMENT;
   program = device->CreateProgram(desc);
   ASSERT_TRUE(program);
-  ASSERT_TRUE(program->Finalize());
   desc.pipeline_layout.groups[0].bindings[0].type = BINDING_TEXTURE2D;
   program = device->CreateProgram(desc);
-  ASSERT_TRUE(program);
-  EXPECT_FALSE(program->Finalize());
+  EXPECT_FALSE(program);
   // Reflection also checks declarations that bypass the generated macro.
   const std::string manual = (GetParam() == BACKEND_API_VULKAN ? "[[vk::binding(0,0)]] Texture2D<float4> textures[3];"
                                                                : "Texture2D<float4> textures[3]:register(t0,space0);") +
@@ -377,8 +369,7 @@ TEST_P(RhiProgram, BindingLayoutRejectsIncorrectStageTypeCountAndRange) {
   desc.fragment_shader = ps.Get();
   desc.pipeline_layout.groups[0].bindings[0].count = 2;
   program = device->CreateProgram(desc);
-  ASSERT_TRUE(program);
-  EXPECT_FALSE(program->Finalize());
+  EXPECT_FALSE(program);
   ObjPtr<IBuffer> buffer = device->CreateBuffer({512});
   ASSERT_TRUE(buffer);
   BindingLayoutDesc layout{{{0, BINDING_UNIFORM_BUFFER}}};
@@ -545,11 +536,10 @@ TEST_P(RhiProgram, StructuredStridesMustMatchExplicitLayoutAcrossStages) {
   desc.fragment_shader = ps.Get();
   desc.pipeline_layout.groups = {{{{0, BINDING_STRUCTURED_BUFFER, 1, SHADER_VISIBILITY_ALL, 16}}}};
   ObjPtr<IProgram> mismatch = device->CreateProgram(desc);
-  ASSERT_TRUE(mismatch);
-  EXPECT_FALSE(mismatch->Finalize());
-  EXPECT_FALSE(mismatch->IsFinalized());
-  // Retrying must still reject the incompatible shader.
-  EXPECT_FALSE(mismatch->Finalize());
+  EXPECT_FALSE(mismatch);
+  // Repeated creation must still reject the incompatible shader.
+  mismatch = device->CreateProgram(desc);
+  EXPECT_FALSE(mismatch);
   ps = device->CreateShader({R"(
     RHI_STRUCTURED_BUFFER(0,0,float4,colors);
     float4 PSMain():SV_Target0 { return colors[0]; }
@@ -558,7 +548,6 @@ TEST_P(RhiProgram, StructuredStridesMustMatchExplicitLayoutAcrossStages) {
   desc.fragment_shader = ps.Get();
   ObjPtr<IProgram> matching = device->CreateProgram(desc);
   ASSERT_TRUE(matching);
-  ASSERT_TRUE(matching->Finalize());
 
   const std::string source = R"(
     struct Element { float4 color; float scale; };
@@ -582,12 +571,9 @@ TEST_P(RhiProgram, StructuredStridesMustMatchExplicitLayoutAcrossStages) {
                                    {2, BINDING_STRUCTURED_BUFFER, 1, SHADER_VISIBILITY_FRAGMENT, 16}}}};
   ObjPtr<IProgram> program = device->CreateProgram(desc);
   ASSERT_TRUE(program);
-  ASSERT_TRUE(program->Finalize());
   desc.pipeline_layout.groups[0].bindings[0].stride = 32;
   ObjPtr<IProgram> padded = device->CreateProgram(desc);
-  ASSERT_TRUE(padded);
-  EXPECT_FALSE(padded->Finalize());
-  EXPECT_TRUE(program->Finalize());
+  EXPECT_FALSE(padded);
 }
 
 TEST_P(RhiProgram, StructuredLayoutStrideControlsCompatibilityAndRanges) {
@@ -633,7 +619,6 @@ TEST_P(RhiProgram, StructuredLayoutStrideControlsCompatibilityAndRanges) {
   desc.pipeline_layout.groups = {layout};
   ObjPtr<IProgram> program = device->CreateProgram(desc);
   ASSERT_TRUE(program);
-  ASSERT_TRUE(program->Finalize());
   layout.bindings[0].stride = 16;
   group = device->CreateBindingGroup(layout);
   ASSERT_TRUE(group);
@@ -676,9 +661,6 @@ TEST(D3D12BindingGroup, CpuDescriptorsAreFinalBeforeProgramBinding) {
   ASSERT_TRUE(wide);
   ASSERT_TRUE(narrow);
   ASSERT_TRUE(same);
-  ASSERT_TRUE(wide->Finalize());
-  ASSERT_TRUE(narrow->Finalize());
-  ASSERT_TRUE(same->Finalize());
   ObjPtr<IBindingGroup> group = device->CreateBindingGroup(layout);
   ASSERT_TRUE(group);
   ASSERT_TRUE(group->BindResource(0, buffer.Get()));
@@ -717,7 +699,7 @@ TEST(D3D12BindingGroup, CpuDescriptorsAreFinalBeforeProgramBinding) {
 }
 #endif
 
-TEST_P(RhiProgram, InvalidBlendStateFailsFinalize) {
+TEST_P(RhiProgram, InvalidBlendStateFailsCreation) {
   ObjPtr<ICore> core = CreateCore(GetParam());
   ASSERT_TRUE(core);
   ObjPtr<IDevice> device = core->CreateDeviceByAutoSelection();
@@ -733,18 +715,15 @@ TEST_P(RhiProgram, InvalidBlendStateFailsFinalize) {
   desc.fragment_shader = ps.Get();
   desc.blend_states = {true, true};
   ObjPtr<IProgram> program = device->CreateProgram(desc);
-  ASSERT_TRUE(program);
-  EXPECT_FALSE(program->Finalize());
+  EXPECT_FALSE(program);
   desc.blend_states = {true};
   desc.blend_states[0].src_color = static_cast<BlendFactor>(-1);
   program = device->CreateProgram(desc);
-  ASSERT_TRUE(program);
-  EXPECT_FALSE(program->Finalize());
+  EXPECT_FALSE(program);
   desc.blend_states = {true};
   desc.blend_states[0].alpha_op = static_cast<BlendOp>(99);
   program = device->CreateProgram(desc);
-  ASSERT_TRUE(program);
-  EXPECT_FALSE(program->Finalize());
+  EXPECT_FALSE(program);
 }
 
 INSTANTIATE_TEST_SUITE_P(Backends, RhiProgram, testing::ValuesIn(program_backends));

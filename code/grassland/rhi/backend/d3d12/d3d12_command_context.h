@@ -9,12 +9,29 @@ namespace grassland::rhi::backend::d3d12 {
 class D3D12Image;
 class D3D12Buffer;
 class D3D12Program;
+class D3D12RayTracingProgram;
 class D3D12ProgramBase;
 class D3D12Window;
+class D3D12TopLevelAccelerationStructure;
 class D3D12SwapChainImage;
 
 class D3D12CommandContext final : public CommandContext {
  public:
+  bool CmdBindRayTracingProgram(IRayTracingProgram *program) override;
+  bool CmdDispatchRays(uint32_t width,
+                       uint32_t height,
+                       uint32_t depth = 1,
+                       IShaderBindingTable *sbt = nullptr) override;
+  bool CmdQueryCompactedSize(IAccelerationStructure *structure) override;
+  bool CmdCompactAccelerationStructure(IAccelerationStructure *source, IAccelerationStructure *destination) override;
+  bool CmdBuildBottomLevelAccelerationStructure(
+      IBottomLevelAccelerationStructure *destination,
+      const std::vector<AccelerationStructureGeometryBuffers> &geometries,
+      AccelerationStructureBuildMode mode = ACCELERATION_STRUCTURE_BUILD) override;
+  bool CmdBuildTopLevelAccelerationStructure(
+      ITopLevelAccelerationStructure *destination,
+      const std::vector<RayTracingInstance> &instances,
+      AccelerationStructureBuildMode mode = ACCELERATION_STRUCTURE_BUILD) override;
   ~D3D12CommandContext() override;
   static D3D12CommandContext *Create(D3D12Device *device);
   bool CmdUploadBuffer(IBuffer *buffer, uint64_t offset, const void *data, uint64_t size) override;
@@ -66,7 +83,10 @@ class D3D12CommandContext final : public CommandContext {
   bool tables_dirty_{};
   D3D12Program *program_{};
   D3D12ProgramBase *native_program_{};
+  std::unordered_map<D3D12TopLevelAccelerationStructure *, std::vector<ObjectPtr<IBottomLevelAccelerationStructure>>>
+      as_dependencies_;
   bool compute_active_{};
+  D3D12RayTracingProgram *ray_program_{};
   const PipelineLayoutDesc *binding_layout_{};
   bool rendering_active_{};
   std::vector<D3D12Buffer *> vertex_buffers_;
@@ -87,6 +107,7 @@ class D3D12CommandContext final : public CommandContext {
   D3D12Device *device_;
   ComPtr<ID3D12CommandAllocator> allocator_;
   ComPtr<ID3D12GraphicsCommandList> list_;
+  ComPtr<ID3D12GraphicsCommandList4> ray_list_;
   HANDLE event_{};
   uint64_t value_{};
   bool submission_failed_{};

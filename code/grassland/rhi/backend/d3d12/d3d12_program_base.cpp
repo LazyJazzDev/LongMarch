@@ -17,8 +17,6 @@ uint32_t D3D12ProgramBase::RootParameter(uint32_t group, bool sampler) const {
 bool D3D12ProgramBase::CreateLayout(ID3D12Device *device,
                                     const PipelineLayoutDesc &layout,
                                     D3D12_ROOT_SIGNATURE_FLAGS flags) {
-  if (root_signature_)
-    return true;
   D3D12_ROOT_SIGNATURE_DESC root{};
   root.Flags = flags;
   const auto mappings = MapBindings(layout, BACKEND_API_D3D12);

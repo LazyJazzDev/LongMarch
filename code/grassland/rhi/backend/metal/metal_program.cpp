@@ -18,42 +18,41 @@ MTL::DepthStencilState *MetalProgram::NativeDepthStencil() const {
   return depth_stencil_.get();
 }
 
-bool MetalProgram::Finalize() {
-  if (finalized_)
-    return true;
+MetalProgram *MetalProgram::Create(MetalDevice *owner_device, const ProgramDesc &desc) {
+  auto object = std::unique_ptr<MetalProgram>(new MetalProgram(owner_device, desc));
 
-  if (!ValidateLayout() || desc_.vertex_bindings.size() > 31 - VertexBufferBase) {
+  if (!object->ValidateLayout() || object->desc_.vertex_bindings.size() > 31 - VertexBufferBase) {
     ReportError(-1, "Invalid Metal graphics program layout.");
-    return false;
+    return nullptr;
   }
-  for (const auto &binding : desc_.vertex_bindings) {
+  for (const auto &binding : object->desc_.vertex_bindings) {
     if (!binding.stride || binding.stride > 2048 || binding.stride % 4) {
       ReportError(-1, "Metal vertex stride must be a multiple of four in [4, 2048].");
-      return false;
+      return nullptr;
     }
   }
-  for (const auto &attribute : desc_.vertex_attributes) {
+  for (const auto &attribute : object->desc_.vertex_attributes) {
     if (attribute.location >= 31 || attribute.offset % 4) {
       ReportError(-1, "Invalid Metal vertex attribute location or alignment.");
-      return false;
+      return nullptr;
     }
   }
   auto pool = NS::TransferPtr(NS::AutoreleasePool::alloc()->init());
-  auto device = static_cast<MetalDevice *>(device_)->NativeDevice();
+  auto device = owner_device->NativeDevice();
   NS::SharedPtr<MTL::Function> functions[2];
-  const IShader *shaders[] = {desc_.vertex_shader, desc_.fragment_shader};
+  const IShader *shaders[] = {object->desc_.vertex_shader, object->desc_.fragment_shader};
   for (int i = 0; i < 2; ++i) {
-    functions[i] = CompileFunction(shaders[i]->GetDesc(), desc_.vertex_attributes);
+    functions[i] = object->CompileFunction(shaders[i]->GetDesc(), object->desc_.vertex_attributes);
     if (!functions[i])
-      return false;
+      return nullptr;
   }
   auto descriptor = NS::TransferPtr(MTL::RenderPipelineDescriptor::alloc()->init());
   descriptor->setVertexFunction(functions[0].get());
   descriptor->setFragmentFunction(functions[1].get());
-  for (size_t i = 0; i < desc_.color_formats.size(); ++i) {
+  for (size_t i = 0; i < object->desc_.color_formats.size(); ++i) {
     auto attachment = descriptor->colorAttachments()->object(i);
-    attachment->setPixelFormat(NativeImageFormat(desc_.color_formats[i]));
-    const auto value = desc_.blend_states.empty() ? BlendState{} : desc_.blend_states[i];
+    attachment->setPixelFormat(NativeImageFormat(object->desc_.color_formats[i]));
+    const auto value = object->desc_.blend_states.empty() ? BlendState{} : object->desc_.blend_states[i];
     attachment->setBlendingEnabled(value.blend_enable);
     attachment->setSourceRGBBlendFactor(NativeBlendFactor(value.src_color));
     attachment->setDestinationRGBBlendFactor(NativeBlendFactor(value.dst_color));
@@ -62,7 +61,7 @@ bool MetalProgram::Finalize() {
     attachment->setDestinationAlphaBlendFactor(NativeBlendFactor(value.dst_alpha, true));
     attachment->setAlphaBlendOperation(NativeBlendOp(value.alpha_op));
   }
-  const auto &ds = desc_.depth_stencil;
+  const auto &ds = object->desc_.depth_stencil;
   descriptor->setDepthAttachmentPixelFormat(NativeImageFormat(ds.format));
   if (HasStencil(ds.format))
     descriptor->setStencilAttachmentPixelFormat(NativeImageFormat(ds.format));
@@ -85,20 +84,20 @@ bool MetalProgram::Finalize() {
     depth->setFrontFaceStencil(front.get());
     depth->setBackFaceStencil(back.get());
   }
-  depth_stencil_ = NS::TransferPtr(device->newDepthStencilState(depth.get()));
-  if (!depth_stencil_)
-    return false;
+  object->depth_stencil_ = NS::TransferPtr(device->newDepthStencilState(depth.get()));
+  if (!object->depth_stencil_)
+    return nullptr;
   auto vertex = MTL::VertexDescriptor::vertexDescriptor();
-  for (size_t i = 0; i < desc_.vertex_bindings.size(); ++i) {
+  for (size_t i = 0; i < object->desc_.vertex_bindings.size(); ++i) {
     auto layout = vertex->layouts()->object(i + VertexBufferBase);
-    layout->setStride(desc_.vertex_bindings[i].stride);
-    layout->setStepFunction(desc_.vertex_bindings[i].per_instance ? MTL::VertexStepFunctionPerInstance
-                                                                  : MTL::VertexStepFunctionPerVertex);
+    layout->setStride(object->desc_.vertex_bindings[i].stride);
+    layout->setStepFunction(object->desc_.vertex_bindings[i].per_instance ? MTL::VertexStepFunctionPerInstance
+                                                                          : MTL::VertexStepFunctionPerVertex);
     layout->setStepRate(1);
   }
   const MTL::VertexFormat formats[] = {MTL::VertexFormatFloat, MTL::VertexFormatFloat2, MTL::VertexFormatFloat3,
                                        MTL::VertexFormatFloat4};
-  for (const auto &a : desc_.vertex_attributes) {
+  for (const auto &a : object->desc_.vertex_attributes) {
     auto attribute = vertex->attributes()->object(a.location);
     attribute->setFormat(formats[a.format]);
     attribute->setBufferIndex(a.binding + VertexBufferBase);
@@ -106,12 +105,11 @@ bool MetalProgram::Finalize() {
   }
   descriptor->setVertexDescriptor(vertex);
   NS::Error *error = nullptr;
-  pipeline_ = NS::TransferPtr(device->newRenderPipelineState(descriptor.get(), &error));
-  if (!pipeline_) {
+  object->pipeline_ = NS::TransferPtr(device->newRenderPipelineState(descriptor.get(), &error));
+  if (!object->pipeline_) {
     ReportError(-1, error ? error->localizedDescription()->utf8String() : "Metal pipeline creation failed.");
-    return false;
+    return nullptr;
   }
-  finalized_ = true;
-  return true;
+  return object.release();
 }
 }  // namespace grassland::rhi::backend::metal

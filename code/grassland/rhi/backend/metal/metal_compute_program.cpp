@@ -16,33 +16,31 @@ MTL::Size MetalComputeProgram::ThreadGroupSize() const {
   return threads_;
 }
 
-bool MetalComputeProgram::Finalize() {
-  if (finalized_)
-    return true;
-  if (!ValidateLayout())
-    return false;
+MetalComputeProgram *MetalComputeProgram::Create(MetalDevice *owner_device, const ComputeProgramDesc &desc) {
+  auto object = std::unique_ptr<MetalComputeProgram>(new MetalComputeProgram(owner_device, desc));
+  if (!object->ValidateLayout())
+    return nullptr;
   auto pool = NS::TransferPtr(NS::AutoreleasePool::alloc()->init());
   std::array<uint32_t, 3> threads{};
-  auto function = CompileFunction(desc_.compute_shader->GetDesc(), {}, &threads);
+  auto function = object->CompileFunction(object->desc_.compute_shader->GetDesc(), {}, &threads);
   if (!function)
-    return false;
-  auto device = static_cast<MetalDevice *>(device_)->NativeDevice();
+    return nullptr;
+  auto device = owner_device->NativeDevice();
   const auto limits = device->maxThreadsPerThreadgroup();
   if (!threads[0] || !threads[1] || !threads[2] || threads[0] > limits.width || threads[1] > limits.height ||
       threads[2] > limits.depth)
-    return false;
+    return nullptr;
   NS::Error *error = nullptr;
   auto pipeline = NS::TransferPtr(device->newComputePipelineState(function.get(), &error));
   if (!pipeline) {
     ReportError(-1, error ? error->localizedDescription()->utf8String() : "Metal compute pipeline creation failed.");
-    return false;
+    return nullptr;
   }
   if (uint64_t(threads[0]) * threads[1] * threads[2] > pipeline->maxTotalThreadsPerThreadgroup() ||
       pipeline->staticThreadgroupMemoryLength() > device->maxThreadgroupMemoryLength())
-    return false;
-  threads_ = MTL::Size::Make(threads[0], threads[1], threads[2]);
-  pipeline_ = std::move(pipeline);
-  finalized_ = true;
-  return true;
+    return nullptr;
+  object->threads_ = MTL::Size::Make(threads[0], threads[1], threads[2]);
+  object->pipeline_ = std::move(pipeline);
+  return object.release();
 }
 }  // namespace grassland::rhi::backend::metal

@@ -14,11 +14,4 @@ const rhi::ComputeProgramDesc &ComputeProgram::GetDesc() const {
   return Get()->GetDesc();
 }
 
-bool ComputeProgram::Finalize() const {
-  return Get()->Finalize();
-}
-
-bool ComputeProgram::IsFinalized() const {
-  return Get()->IsFinalized();
-}
 }  // namespace grassland::rhix

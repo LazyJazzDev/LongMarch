@@ -4,6 +4,30 @@
 #include "grassland/rhi/rhi_program.h"
 
 namespace grassland::rhi::backend {
+bool CommandContext::CmdBuildBottomLevelAccelerationStructure(IBottomLevelAccelerationStructure *,
+                                                              const std::vector<AccelerationStructureGeometryBuffers> &,
+                                                              AccelerationStructureBuildMode) {
+  recording_failed_ = true;
+  return false;
+}
+
+bool CommandContext::CmdBuildTopLevelAccelerationStructure(ITopLevelAccelerationStructure *,
+                                                           const std::vector<RayTracingInstance> &,
+                                                           AccelerationStructureBuildMode) {
+  recording_failed_ = true;
+  return false;
+}
+
+bool CommandContext::CmdBindRayTracingProgram(IRayTracingProgram *) {
+  recording_failed_ = true;
+  return false;
+}
+
+bool CommandContext::CmdDispatchRays(uint32_t, uint32_t, uint32_t, IShaderBindingTable *) {
+  recording_failed_ = true;
+  return false;
+}
+
 bool CommandContext::CmdBindComputeProgram(IComputeProgram *) {
   recording_failed_ = true;
   return false;
@@ -194,6 +218,18 @@ bool CommandContext::CmdDrawIndexed(uint32_t index_count,
                                     uint32_t first_instance) {
   recording_failed_ = true;
   ReportError(-1, "Drawing and buffers are not implemented for this backend.");
+  return false;
+}
+}  // namespace grassland::rhi::backend
+
+namespace grassland::rhi::backend {
+bool CommandContext::CmdQueryCompactedSize(IAccelerationStructure *) {
+  recording_failed_ = true;
+  return false;
+}
+
+bool CommandContext::CmdCompactAccelerationStructure(IAccelerationStructure *, IAccelerationStructure *) {
+  recording_failed_ = true;
   return false;
 }
 }  // namespace grassland::rhi::backend

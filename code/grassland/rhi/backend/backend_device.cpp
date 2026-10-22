@@ -6,6 +6,21 @@
 #include "grassland/rhi/backend/backend_shader.h"
 
 namespace grassland::rhi::backend {
+IBottomLevelAccelerationStructure *Device::CreateBottomLevelAccelerationStructure(
+    const BottomLevelAccelerationStructureDesc &) {
+  ReportError(-1, "Acceleration structures are unavailable for this backend.");
+  return nullptr;
+}
+
+ITopLevelAccelerationStructure *Device::CreateTopLevelAccelerationStructure(const TopLevelAccelerationStructureDesc &) {
+  ReportError(-1, "Acceleration structures are unavailable for this backend.");
+  return nullptr;
+}
+
+IRayTracingProgram *Device::CreateRayTracingProgram(const RayTracingProgramDesc &) {
+  ReportError(-1, "Ray tracing pipelines are unavailable for this backend.");
+  return nullptr;
+}
 
 Device::Device(PhysicalDevice info, Core *core) : core_(core), info_(std::move(info)) {
 }
@@ -31,7 +46,8 @@ rhi::IProgram *Device::CreateProgram(const ProgramDesc &) {
 }
 
 rhi::IShader *Device::CreateShader(const ShaderDesc &desc) {
-  if (desc.source.empty() || desc.entry_point.empty())
+  if (desc.source.empty() || desc.entry_point.empty() || desc.stage < SHADER_STAGE_VERTEX ||
+      desc.stage > SHADER_STAGE_CALLABLE)
     return nullptr;
   return new Shader(desc);
 }

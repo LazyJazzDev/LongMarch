@@ -10,4 +10,10 @@ class Buffer : public ObjectContainer {
   rhi::IBuffer *Get() const noexcept;
   rhi::BufferDesc GetDesc() const;
 };
+
+struct BufferView {
+  Buffer buffer;
+  uint64_t offset{}, size{};
+};
+
 }  // namespace grassland::rhix

@@ -45,9 +45,11 @@ static bool CompileMetal(const ShaderDesc &shader,
         binding.binding = b.binding;
         binding.count = b.count;
         binding.msl_buffer = binding.msl_texture = binding.msl_sampler = index;
-        binding.basetype = b.type == BINDING_SAMPLER     ? spirv_cross::SPIRType::Sampler
-                           : b.type >= BINDING_TEXTURE2D ? spirv_cross::SPIRType::Image
-                                                         : spirv_cross::SPIRType::Void;
+        // Unused AS slots pad as 64-bit buffer handles; active AS types come from SPIR-V.
+        binding.basetype = b.type == BINDING_ACCELERATION_STRUCTURE ? spirv_cross::SPIRType::Void
+                           : b.type == BINDING_SAMPLER              ? spirv_cross::SPIRType::Sampler
+                           : b.type >= BINDING_TEXTURE2D            ? spirv_cross::SPIRType::Image
+                                                                    : spirv_cross::SPIRType::Void;
         compiler.add_msl_resource_binding(binding);
         index += b.count;
       }

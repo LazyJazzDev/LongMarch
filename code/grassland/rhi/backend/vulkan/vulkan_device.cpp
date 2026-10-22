@@ -2,12 +2,14 @@
 
 #include <vk_mem_alloc.h>
 
+#include "grassland/rhi/backend/vulkan/vulkan_acceleration_structure.h"
 #include "grassland/rhi/backend/vulkan/vulkan_allocated_image.h"
 #include "grassland/rhi/backend/vulkan/vulkan_command_context.h"
 #include "grassland/rhi/backend/vulkan/vulkan_compute_program.h"
 #include "grassland/rhi/backend/vulkan/vulkan_core.h"
 #include "grassland/rhi/backend/vulkan/vulkan_program.h"
 #include "grassland/rhi/backend/vulkan/vulkan_queue.h"
+#include "grassland/rhi/backend/vulkan/vulkan_ray_tracing_program.h"
 #include "grassland/rhi/backend/vulkan/vulkan_sampler.h"
 #include "grassland/rhi/backend/vulkan/vulkan_window.h"
 
@@ -54,12 +56,14 @@ void VulkanDevice::RecycleCommandResources(VkCommandPool pool, VkCommandBuffer c
 
 VulkanDevice::VulkanDevice(grassland::rhi::PhysicalDevice info, Core *core)
     : Device(std::move(info), core),
-      upload_pool_(this) {
+      upload_pool_(this),
+      scratch_pool_(this) {
 }
 
 VulkanDevice::~VulkanDevice() {
   ShutdownQueues();
   upload_pool_.Clear();
+  scratch_pool_.Clear();
   render_targets_.reset();
   descriptor_pool_.reset();
   for (const auto &entry : command_pool_) {
@@ -123,17 +127,8 @@ VulkanDevice *VulkanDevice::CreateVulkanDevice(grassland::rhi::PhysicalDevice in
     ReportError(result, "vkCreateDevice failed.");
     return {};
   }
-  if (enabled.DynamicRendering()) {
-    const char *begin_name = api_version >= VK_API_VERSION_1_3 ? "vkCmdBeginRendering" : "vkCmdBeginRenderingKHR";
-    const char *end_name = api_version >= VK_API_VERSION_1_3 ? "vkCmdEndRendering" : "vkCmdEndRenderingKHR";
-    device->begin_rendering_ =
-        reinterpret_cast<PFN_vkCmdBeginRendering>(vkGetDeviceProcAddr(device->device_, begin_name));
-    device->end_rendering_ = reinterpret_cast<PFN_vkCmdEndRendering>(vkGetDeviceProcAddr(device->device_, end_name));
-    if (!device->begin_rendering_ || !device->end_rendering_) {
-      ReportError(-1, "Enabled dynamic rendering commands are unavailable.");
-      return {};
-    }
-  }
+  if (!device->procedures_.Load(device->device_, api_version, enabled))
+    return {};
   VkSemaphoreTypeCreateInfo type{VK_STRUCTURE_TYPE_SEMAPHORE_TYPE_CREATE_INFO};
   type.semaphoreType = VK_SEMAPHORE_TYPE_TIMELINE;
   VkSemaphoreCreateInfo semaphore{VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO};
@@ -144,6 +139,8 @@ VulkanDevice *VulkanDevice::CreateVulkanDevice(grassland::rhi::PhysicalDevice in
     return std::strcmp(name, VK_KHR_SWAPCHAIN_EXTENSION_NAME) == 0;
   });
   VmaAllocatorCreateInfo memory{};
+  if (enabled.RayTracingPipeline() || enabled.RayQuery())
+    memory.flags |= VMA_ALLOCATOR_CREATE_BUFFER_DEVICE_ADDRESS_BIT;
   memory.physicalDevice = physical_device;
   memory.device = device->device_;
   memory.instance = static_cast<VulkanCore *>(core)->Instance();
@@ -152,7 +149,7 @@ VulkanDevice *VulkanDevice::CreateVulkanDevice(grassland::rhi::PhysicalDevice in
     return {};
   device->descriptor_pool_ = std::make_unique<VulkanDescriptorPool>(device->device_);
   device->render_targets_ =
-      std::make_unique<VulkanRenderTargetPool>(device->device_, device->begin_rendering_ != nullptr);
+      std::make_unique<VulkanRenderTargetPool>(device->device_, device->procedures_.CmdBeginRendering != nullptr);
   device->physical_ = physical_device;
   device->graphics_queue_family_index_ = graphics_family;
   device->swapchain_enabled_ = swapchain;
@@ -176,12 +173,8 @@ VkResult VulkanDevice::Wait(uint64_t value, uint64_t timeout) const {
   return vkWaitSemaphores(device_, &wait, timeout);
 }
 
-PFN_vkCmdBeginRendering VulkanDevice::BeginRenderingCommand() const {
-  return begin_rendering_;
-}
-
-PFN_vkCmdEndRendering VulkanDevice::EndRenderingCommand() const {
-  return end_rendering_;
+const DeviceProcedures &VulkanDevice::Procedures() const {
+  return procedures_;
 }
 
 ISampler *VulkanDevice::CreateSampler(const SamplerDesc &desc) {
@@ -245,11 +238,11 @@ rhi::IBuffer *VulkanDevice::CreateBuffer(const BufferDesc &desc) {
 }
 
 rhi::IComputeProgram *VulkanDevice::CreateComputeProgram(const ComputeProgramDesc &desc) {
-  return new VulkanComputeProgram(this, desc);
+  return VulkanComputeProgram::Create(this, desc);
 }
 
 rhi::IProgram *VulkanDevice::CreateProgram(const ProgramDesc &desc) {
-  return new VulkanProgram(this, desc);
+  return VulkanProgram::Create(this, desc);
 }
 
 rhi::IWindow *VulkanDevice::CreateGLFWWindow(const WindowDesc &desc) {
@@ -264,4 +257,28 @@ rhi::IQueue *VulkanDevice::GetQueue(QueueType type) {
   return new VulkanQueue(this, type);
 }
 
+}  // namespace grassland::rhi::backend::vulkan
+
+namespace grassland::rhi::backend::vulkan {
+VulkanScratchPool &VulkanDevice::ScratchPool() {
+  return scratch_pool_;
+}
+}  // namespace grassland::rhi::backend::vulkan
+
+namespace grassland::rhi::backend::vulkan {
+IBottomLevelAccelerationStructure *VulkanDevice::CreateBottomLevelAccelerationStructure(
+    const BottomLevelAccelerationStructureDesc &desc) {
+  return VulkanBottomLevelAccelerationStructure::Create(this, desc);
+}
+
+ITopLevelAccelerationStructure *VulkanDevice::CreateTopLevelAccelerationStructure(
+    const TopLevelAccelerationStructureDesc &desc) {
+  return VulkanTopLevelAccelerationStructure::Create(this, desc);
+}
+
+IRayTracingProgram *VulkanDevice::CreateRayTracingProgram(const RayTracingProgramDesc &desc) {
+  if (!SupportRayTracingPipeline())
+    return nullptr;
+  return VulkanRayTracingProgram::Create(this, desc);
+}
 }  // namespace grassland::rhi::backend::vulkan

@@ -1,4 +1,4 @@
-#pragma once
+﻿#pragma once
 #include <array>
 #include <memory>
 #include <mutex>
@@ -9,8 +9,8 @@
 
 namespace grassland::rhi::backend::vulkan {
 class VulkanDescriptorPool {
-  // Uniform buffers, storage buffers, sampled images, storage images, samplers.
-  using Pattern = std::array<uint32_t, 5>;
+  // Uniform buffers, storage buffers, sampled images, storage images, samplers, acceleration structures.
+  using Pattern = std::array<uint32_t, 6>;
 
   struct PatternHash {
     size_t operator()(const Pattern &pattern) const;

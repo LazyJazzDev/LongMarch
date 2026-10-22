@@ -18,16 +18,12 @@ const ProgramDesc &Program::GetDesc() const {
   return desc_;
 }
 
-bool Program::IsFinalized() const {
-  return finalized_;
-}
-
 Device *Program::Owner() const {
   return device_;
 }
 
 bool Program::ValidateLayout() const {
-  if (desc_.pipeline_layout.groups.size() > 4)
+  if (desc_.pipeline_layout.groups.size() > 8)
     return false;
   for (const auto &group : desc_.pipeline_layout.groups)
     if (!ValidateBindingLayout(group))

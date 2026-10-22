@@ -3,12 +3,30 @@
 #include <unordered_map>
 
 #include "grassland/rhi/backend/backend_util.h"
+#include "grassland/rhi/rhi_acceleration_structure.h"
 #include "grassland/rhi/rhi_command_context.h"
+#include "grassland/rhi/rhi_ray_tracing_program.h"
 
 namespace grassland::rhi::backend {
 
 class CommandContext : public Object<rhi::ICommandContext> {
  public:
+  bool CmdQueryCompactedSize(IAccelerationStructure *structure) override;
+  bool CmdCompactAccelerationStructure(IAccelerationStructure *source, IAccelerationStructure *destination) override;
+  bool CmdBuildBottomLevelAccelerationStructure(
+      IBottomLevelAccelerationStructure *destination,
+      const std::vector<AccelerationStructureGeometryBuffers> &geometries,
+      AccelerationStructureBuildMode mode = ACCELERATION_STRUCTURE_BUILD) override;
+  bool CmdBuildTopLevelAccelerationStructure(
+      ITopLevelAccelerationStructure *destination,
+      const std::vector<RayTracingInstance> &instances,
+      AccelerationStructureBuildMode mode = ACCELERATION_STRUCTURE_BUILD) override;
+  bool CmdBindRayTracingProgram(IRayTracingProgram *program) override;
+  bool CmdDispatchRays(uint32_t width,
+                       uint32_t height,
+                       uint32_t depth = 1,
+                       IShaderBindingTable *sbt = nullptr) override;
+
   typedef enum {
     SUBMIT_RESULT_REJECTED,
     SUBMIT_RESULT_SUBMITTED,

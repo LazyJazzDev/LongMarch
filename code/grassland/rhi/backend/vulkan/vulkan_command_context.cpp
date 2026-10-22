@@ -3,9 +3,11 @@
 #include <cstring>
 
 #include "grassland/rhi/backend/backend_glfw_helper.h"
+#include "grassland/rhi/backend/vulkan/vulkan_acceleration_structure.h"
 #include "grassland/rhi/backend/vulkan/vulkan_buffer.h"
 #include "grassland/rhi/backend/vulkan/vulkan_compute_program.h"
 #include "grassland/rhi/backend/vulkan/vulkan_program.h"
+#include "grassland/rhi/backend/vulkan/vulkan_ray_tracing_program.h"
 #include "grassland/rhi/backend/vulkan/vulkan_swap_chain_image.h"
 #include "grassland/rhi/backend/vulkan/vulkan_window.h"
 
@@ -202,6 +204,9 @@ CommandContext::SubmitResult VulkanCommandContext::SubmitNative() {
     if (!Check(vkQueueSubmit(device_->NativeQueue(), 1, &submit, VK_NULL_HANDLE), "vkQueueSubmit"))
       return SUBMIT_RESULT_REJECTED;
     MarkSubmitted();
+    for (auto &entry : as_dependencies_)
+      entry.first->CommitDependencies(std::move(entry.second));
+    as_dependencies_.clear();
     for (auto window : acquired_windows)
       window->MarkAcquireWaitSubmitted(value_);
     submission_failed_ = true;
@@ -335,14 +340,11 @@ bool VulkanCommandContext::CmdBindComputeProgram(IComputeProgram *program) {
 #else
   auto native = static_cast<VulkanComputeProgram *>(program);
 #endif
-  if (!native->IsFinalized()) {
-    recording_failed_ = true;
-    return false;
-  }
   if (!RetainResource(native))
     return false;
   native_program_ = native;
   compute_active_ = true;
+  ray_program_ = nullptr;
   program_ = nullptr;
   binding_layout_ = &native->GetDesc().pipeline_layout;
   groups_.assign(binding_layout_->groups.size(), {});
@@ -352,7 +354,7 @@ bool VulkanCommandContext::CmdBindComputeProgram(IComputeProgram *program) {
 
 bool VulkanCommandContext::CmdDispatch(uint32_t x, uint32_t y, uint32_t z) {
 #if !defined(NDEBUG)
-  if (sealed_ || render_target_ || !compute_active_) {
+  if (sealed_ || render_target_ || !compute_active_ || ray_program_) {
     recording_failed_ = true;
     return false;
   }
@@ -387,16 +389,13 @@ bool VulkanCommandContext::CmdBindProgram(IProgram *program) {
 #endif
   if (!RetainResource(native))
     return false;
-  if (!native->IsFinalized()) {
-    recording_failed_ = true;
-    return false;
-  }
   vertex_buffers_.assign(native->GetDesc().vertex_bindings.size(), nullptr);
   groups_.assign(native->GetDesc().pipeline_layout.groups.size(), nullptr);
 
   program_ = native;
   native_program_ = native;
   compute_active_ = false;
+  ray_program_ = nullptr;
   binding_layout_ = &native->GetDesc().pipeline_layout;
   vkCmdBindPipeline(command_, VK_PIPELINE_BIND_POINT_GRAPHICS, native->NativePipeline());
   return true;
@@ -429,10 +428,10 @@ bool VulkanCommandContext::CmdBeginRendering(const RenderingInfo &info) {
     images.push_back(depth);
   }
   const auto depth_format = depth ? depth->GetDesc().format : IMAGE_FORMAT_UNKNOWN;
-  auto pass = device_->BeginRenderingCommand()
+  auto pass = device_->Procedures().CmdBeginRendering
                   ? VK_NULL_HANDLE
                   : device_->RenderTargets().RenderPass(formats, depth_format, &rendering_);
-  if (!device_->BeginRenderingCommand() && !pass) {
+  if (!device_->Procedures().CmdBeginRendering && !pass) {
     recording_failed_ = true;
     return false;
   }
@@ -477,7 +476,7 @@ bool VulkanCommandContext::CmdBeginRendering(const RenderingInfo &info) {
     stencil_info.storeOp = stores[ds.stencil_store_op];
   }
   auto desc = images.front()->GetDesc();
-  if (auto begin_rendering = device_->BeginRenderingCommand()) {
+  if (auto begin_rendering = device_->Procedures().CmdBeginRendering) {
     VkRenderingInfo rendering{VK_STRUCTURE_TYPE_RENDERING_INFO};
     rendering.renderArea.extent = {desc.width, desc.height};
     rendering.layerCount = 1;
@@ -640,7 +639,7 @@ bool VulkanCommandContext::CmdEndRendering() {
 #endif
   if (recording_failed_)
     return false;
-  if (auto end_rendering = device_->EndRenderingCommand())
+  if (auto end_rendering = device_->Procedures().CmdEndRendering)
     end_rendering(command_);
   else
     vkCmdEndRenderPass(command_);
@@ -741,8 +740,9 @@ bool VulkanCommandContext::CmdBindGroup(uint32_t index, IBindingGroup *group) {
 }
 
 bool VulkanCommandContext::BindGroupVersion(uint32_t index, VulkanBindingGroup::Version *native) {
-  const VkPipelineStageFlags stages =
-      compute_active_ ? VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT : VK_PIPELINE_STAGE_ALL_GRAPHICS_BIT;
+  const VkPipelineStageFlags stages = ray_program_      ? VK_PIPELINE_STAGE_RAY_TRACING_SHADER_BIT_KHR
+                                      : compute_active_ ? VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT
+                                                        : VK_PIPELINE_STAGE_ALL_GRAPHICS_BIT;
   for (size_t binding_index = 0; binding_index < native->GetLayout().bindings.size(); ++binding_index) {
     const auto &b = native->GetLayout().bindings[binding_index];
     for (uint32_t i = 0; i < b.count; ++i) {
@@ -751,6 +751,12 @@ bool VulkanCommandContext::BindGroupVersion(uint32_t index, VulkanBindingGroup::
                                         b.type == BINDING_RW_BYTE_ADDRESS_BUFFER || b.type == BINDING_RW_TEXTURE2D)
                                            ? VK_ACCESS_SHADER_WRITE_BIT
                                            : 0);
+      if (b.type == BINDING_ACCELERATION_STRUCTURE) {
+        auto top = static_cast<VulkanTopLevelAccelerationStructure *>(native->GetReferences()[binding_index][i].Get());
+        for (const auto &blas : top->BottomLevels())
+          if (!RetainResource(blas.Get()))
+            return false;
+      }
       if (b.type <= BINDING_RW_BYTE_ADDRESS_BUFFER) {
         auto buffer = static_cast<VulkanBuffer *>(native->GetReferences()[binding_index][i].Get());
         if (!TransitionBuffer(buffer, stages, b.type == BINDING_UNIFORM_BUFFER ? VK_ACCESS_UNIFORM_READ_BIT : access))
@@ -775,7 +781,10 @@ bool VulkanCommandContext::BindGroupVersion(uint32_t index, VulkanBindingGroup::
   }
   groups_[index] = native;
   auto set = native->Set();
-  vkCmdBindDescriptorSets(command_, compute_active_ ? VK_PIPELINE_BIND_POINT_COMPUTE : VK_PIPELINE_BIND_POINT_GRAPHICS,
+  vkCmdBindDescriptorSets(command_,
+                          ray_program_      ? VK_PIPELINE_BIND_POINT_RAY_TRACING_KHR
+                          : compute_active_ ? VK_PIPELINE_BIND_POINT_COMPUTE
+                                            : VK_PIPELINE_BIND_POINT_GRAPHICS,
                           native_program_->NativeLayout(), index, 1, &set, 0, nullptr);
   return true;
 }
@@ -802,6 +811,70 @@ bool VulkanCommandContext::ValidateGroups() {
     }
   }
   return !recording_failed_;
+}
+
+bool VulkanCommandContext::CmdBindRayTracingProgram(IRayTracingProgram *program) {
+  auto native = dynamic_cast<VulkanRayTracingProgram *>(program);
+  if (sealed_ || render_target_ || !native || native->Owner() != device_) {
+    recording_failed_ = true;
+    return false;
+  }
+  if (!RetainResource(native))
+    return false;
+  native_program_ = native;
+  ray_program_ = native;
+  compute_active_ = true;
+  program_ = nullptr;
+  binding_layout_ = &native->GetDesc().pipeline_layout;
+  groups_.assign(binding_layout_->groups.size(), {});
+  vkCmdBindPipeline(command_, VK_PIPELINE_BIND_POINT_RAY_TRACING_KHR, native->NativePipeline());
+  return true;
+}
+
+bool VulkanCommandContext::CmdDispatchRays(uint32_t width, uint32_t height, uint32_t depth, IShaderBindingTable *sbt) {
+  if (sealed_ || render_target_ || !ray_program_ || !width || !height || !depth) {
+    recording_failed_ = true;
+    return false;
+  }
+  if (recording_failed_)
+    return false;
+  VkPhysicalDeviceRayTracingPipelinePropertiesKHR rt{
+      VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_RAY_TRACING_PIPELINE_PROPERTIES_KHR};
+  VkPhysicalDeviceProperties2 properties{VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_PROPERTIES_2, &rt};
+  vkGetPhysicalDeviceProperties2(device_->NativePhysicalDevice(), &properties);
+  if (uint64_t(width) * height > uint64_t(rt.maxRayDispatchInvocationCount) / depth) {
+    recording_failed_ = true;
+    return false;
+  }
+  if (!ValidateGroups())
+    return false;
+  for (uint32_t i = 0; i < groups_.size(); ++i)
+    if (groups_[i]) {
+      if (!BindGroupVersion(i, groups_[i]))
+        return false;
+    }
+  const ShaderBindingTable *table = ray_program_->DefaultShaderBindingTable();
+  if (sbt) {
+#ifndef NDEBUG
+    auto custom = dynamic_cast<ShaderBindingTable *>(sbt);
+#else
+    auto custom = static_cast<ShaderBindingTable *>(sbt);
+#endif
+    if (!custom || custom->GetProgram() != ray_program_) {
+      recording_failed_ = true;
+      return false;
+    }
+    if (!RetainResource(custom))
+      return false;
+    table = custom;
+  }
+  const auto &regions = table->Regions();
+  std::array<VkStridedDeviceAddressRegionKHR, 4> tables{};
+  for (size_t i = 0; i < 4; ++i)
+    tables[i] = {regions[i].address, regions[i].stride, regions[i].size};
+  auto trace = device_->Procedures().CmdTraceRaysKHR;
+  trace(command_, &tables[0], &tables[1], &tables[2], &tables[3], width, height, depth);
+  return true;
 }
 
 }  // namespace grassland::rhi::backend::vulkan

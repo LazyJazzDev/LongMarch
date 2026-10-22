@@ -28,12 +28,10 @@ struct ProgramDesc {
   PipelineLayoutDesc pipeline_layout;
 };
 
-// Immutable after successful Finalize. Shaders/layout are captured at creation.
+// Immutable and ready to bind when creation succeeds; failure returns nullptr.
 // Current graphics programs use triangle-list topology and up to eight color attachments.
 class IProgram : public IObject {
  public:
-  virtual bool Finalize() = 0;
-  virtual bool IsFinalized() const = 0;
   virtual const ProgramDesc &GetDesc() const = 0;
 
  protected:

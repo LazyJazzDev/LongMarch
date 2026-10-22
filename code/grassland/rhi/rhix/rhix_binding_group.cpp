@@ -61,4 +61,17 @@ bool BindingGroup::BindResource(uint32_t binding, const std::vector<Sampler> &sa
     native.push_back(sampler.Get());
   return Get()->BindResource(binding, native, first_element);
 }
+
+bool BindingGroup::BindResource(uint32_t binding, const TopLevelAccelerationStructure &structure) {
+  return Get()->BindResource(binding, structure.Get());
+}
+
+bool BindingGroup::BindResource(uint32_t binding,
+                                const std::vector<TopLevelAccelerationStructure> &structures,
+                                uint32_t first_element) {
+  std::vector<rhi::ITopLevelAccelerationStructure *> native;
+  for (const auto &structure : structures)
+    native.push_back(structure.Get());
+  return Get()->BindResource(binding, native, first_element);
+}
 }  // namespace grassland::rhix

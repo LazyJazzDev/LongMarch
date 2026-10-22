@@ -18,8 +18,14 @@ class BindingGroup : public Object<IBindingGroup> {
     bool Write(size_t binding_index, uint32_t first_element, const std::vector<BufferView> &values);
     bool Write(size_t binding_index, uint32_t first_element, const std::vector<IImage *> &values);
     bool Write(size_t binding_index, uint32_t first_element, const std::vector<ISampler *> &values);
+    bool Write(size_t binding_index,
+               uint32_t first_element,
+               const std::vector<ITopLevelAccelerationStructure *> &values);
 
    protected:
+    virtual bool WriteDescriptors(size_t binding_index,
+                                  uint32_t first_element,
+                                  const std::vector<ITopLevelAccelerationStructure *> &values);
     virtual bool WriteDescriptors(size_t binding_index,
                                   uint32_t first_element,
                                   const std::vector<BufferView> &values) = 0;
@@ -37,6 +43,9 @@ class BindingGroup : public Object<IBindingGroup> {
 
   BindingGroup(Device *device, ObjectPtr<Version> version);
   using IBindingGroup::BindResource;
+  bool BindResource(uint32_t binding,
+                    const std::vector<ITopLevelAccelerationStructure *> &structures,
+                    uint32_t first_element = 0) override;
   const BindingLayoutDesc &GetLayout() const override;
   bool BindResource(uint32_t binding, const std::vector<BufferView> &buffers, uint32_t first_element = 0) override;
   bool BindResource(uint32_t binding, const std::vector<IImage *> &images, uint32_t first_element = 0) override;

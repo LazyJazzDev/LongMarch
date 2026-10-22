@@ -91,8 +91,6 @@ int RunNBody(grassland::rhi::BackendAPI api, int frames, bool headless) {
   grassland::rhix::Program program = device.CreateProgram(desc);
   if (!program)
     return 1;
-  if (!program.Finalize())
-    return 1;
   const auto &compute_source = shader_list.at("modules/nbody/shaders/nbody.slang");
   grassland::rhix::Shader compute_shader =
       device.CreateShader({std::string(compute_source.first, compute_source.second), "CSMain", SHADER_STAGE_COMPUTE});
@@ -106,8 +104,6 @@ int RunNBody(grassland::rhi::BackendAPI api, int frames, bool headless) {
                                            {3, BINDING_UNIFORM_BUFFER, 1, SHADER_VISIBILITY_COMPUTE}}}};
   grassland::rhix::ComputeProgram compute = device.CreateComputeProgram(compute_desc);
   if (!compute)
-    return 1;
-  if (!compute.Finalize())
     return 1;
   constexpr uint64_t bytes = particle_count * sizeof(glm::vec3);
   grassland::rhix::Buffer positions = device.CreateBuffer({bytes});

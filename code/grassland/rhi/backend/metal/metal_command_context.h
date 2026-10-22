@@ -1,5 +1,8 @@
 ﻿#pragma once
+#include <unordered_map>
+
 #include "grassland/rhi/backend/backend_command_context.h"
+#include "grassland/rhi/backend/metal/metal_acceleration_structure.h"
 #include "grassland/rhi/backend/metal/metal_binding_group.h"
 #include "grassland/rhi/backend/metal/metal_device.h"
 
@@ -16,6 +19,16 @@ class MetalCommandContext final : public CommandContext {
  public:
   static MetalCommandContext *Create(MetalDevice *device);
   ~MetalCommandContext() override;
+  bool CmdBuildBottomLevelAccelerationStructure(
+      IBottomLevelAccelerationStructure *destination,
+      const std::vector<AccelerationStructureGeometryBuffers> &geometries,
+      AccelerationStructureBuildMode mode = ACCELERATION_STRUCTURE_BUILD) override;
+  bool CmdBuildTopLevelAccelerationStructure(
+      ITopLevelAccelerationStructure *destination,
+      const std::vector<RayTracingInstance> &instances,
+      AccelerationStructureBuildMode mode = ACCELERATION_STRUCTURE_BUILD) override;
+  bool CmdQueryCompactedSize(IAccelerationStructure *structure) override;
+  bool CmdCompactAccelerationStructure(IAccelerationStructure *source, IAccelerationStructure *destination) override;
   bool CmdUploadBuffer(IBuffer *buffer, uint64_t offset, const void *data, uint64_t size) override;
   bool CmdCopyBuffer(IBuffer *source,
                      uint64_t source_offset,
@@ -51,6 +64,9 @@ class MetalCommandContext final : public CommandContext {
   MetalCommandContext(MetalDevice *device);
 
   bool EndRecording() override;
+  std::vector<MTL::Resource *> AccelerationResources();
+  std::unordered_map<MetalTopLevelAccelerationStructure *, std::vector<ObjectPtr<IBottomLevelAccelerationStructure>>>
+      as_dependencies_;
   void ApplyBindings();
   void ApplyScissor();
   bool ValidateDraw(bool indexed);

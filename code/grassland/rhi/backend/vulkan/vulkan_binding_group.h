@@ -19,6 +19,9 @@ class VulkanBindingGroup final : public BindingGroup {
     VkDescriptorSet Set() const;
 
    private:
+    bool WriteDescriptors(size_t binding_index,
+                          uint32_t first_element,
+                          const std::vector<ITopLevelAccelerationStructure *> &values) override;
     Version(VulkanDevice *device, const BindingLayoutDesc &layout);
     bool WriteDescriptors(size_t binding_index, uint32_t first_element, const std::vector<BufferView> &values) override;
     bool WriteDescriptors(size_t binding_index, uint32_t first_element, const std::vector<IImage *> &values) override;

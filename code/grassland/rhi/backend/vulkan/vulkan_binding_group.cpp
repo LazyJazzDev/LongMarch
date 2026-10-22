@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <limits>
 
+#include "grassland/rhi/backend/vulkan/vulkan_acceleration_structure.h"
 #include "grassland/rhi/backend/vulkan/vulkan_allocated_image.h"
 #include "grassland/rhi/backend/vulkan/vulkan_buffer.h"
 #include "grassland/rhi/backend/vulkan/vulkan_device.h"
@@ -20,6 +21,22 @@ VkDescriptorSetLayout CreateBindingLayout(VkDevice device, const BindingLayoutDe
       stages |= VK_SHADER_STAGE_FRAGMENT_BIT;
     if (b.visibility & SHADER_VISIBILITY_COMPUTE)
       stages |= VK_SHADER_STAGE_COMPUTE_BIT;
+    if (b.visibility == SHADER_VISIBILITY_ALL)
+      stages = VK_SHADER_STAGE_ALL;
+    else {
+      if (b.visibility & SHADER_VISIBILITY_RAY_GENERATION)
+        stages |= VK_SHADER_STAGE_RAYGEN_BIT_KHR;
+      if (b.visibility & SHADER_VISIBILITY_MISS)
+        stages |= VK_SHADER_STAGE_MISS_BIT_KHR;
+      if (b.visibility & SHADER_VISIBILITY_CLOSEST_HIT)
+        stages |= VK_SHADER_STAGE_CLOSEST_HIT_BIT_KHR;
+      if (b.visibility & SHADER_VISIBILITY_ANY_HIT)
+        stages |= VK_SHADER_STAGE_ANY_HIT_BIT_KHR;
+      if (b.visibility & SHADER_VISIBILITY_INTERSECTION)
+        stages |= VK_SHADER_STAGE_INTERSECTION_BIT_KHR;
+      if (b.visibility & SHADER_VISIBILITY_CALLABLE)
+        stages |= VK_SHADER_STAGE_CALLABLE_BIT_KHR;
+    }
     bindings.push_back({b.binding, NativeDescriptorType(b.type), b.count, stages, nullptr});
   }
   VkDescriptorSetLayoutCreateInfo create{VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO};
@@ -204,31 +221,35 @@ bool ValidatePipelineBindings(VkPhysicalDevice device, const PipelineLayoutDesc 
   const auto &limits = properties.limits;
   if (layout.groups.size() > limits.maxBoundDescriptorSets)
     return false;
-  uint64_t totals[5]{}, stages[3][5]{};
+  VkPhysicalDeviceAccelerationStructurePropertiesKHR as{
+      VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_ACCELERATION_STRUCTURE_PROPERTIES_KHR};
+  VkPhysicalDeviceProperties2 extended{VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_PROPERTIES_2, &as};
+  vkGetPhysicalDeviceProperties2(device, &extended);
+  uint64_t totals[6]{}, stages[9][6]{};
   for (const auto &group : layout.groups)
     for (auto b : group.bindings) {
       auto kind = DescriptorTypeIndex(b.type);
       totals[kind] += b.count;
-      for (int i = 0; i < 3; ++i)
+      for (int i = 0; i < 9; ++i)
         if (b.visibility & (1 << i))
           stages[i][kind] += b.count;
     }
   const uint32_t set_limits[] = {limits.maxDescriptorSetUniformBuffers, limits.maxDescriptorSetStorageBuffers,
-                                 limits.maxDescriptorSetSampledImages, limits.maxDescriptorSetStorageImages,
-                                 limits.maxDescriptorSetSamplers};
-  const uint32_t stage_limits[] = {limits.maxPerStageDescriptorUniformBuffers,
-                                   limits.maxPerStageDescriptorStorageBuffers,
-                                   limits.maxPerStageDescriptorSampledImages, limits.maxPerStageDescriptorStorageImages,
-                                   limits.maxPerStageDescriptorSamplers};
-  for (int kind = 0; kind < 5; ++kind) {
+                                 limits.maxDescriptorSetSampledImages,  limits.maxDescriptorSetStorageImages,
+                                 limits.maxDescriptorSetSamplers,       as.maxDescriptorSetAccelerationStructures};
+  const uint32_t stage_limits[] = {
+      limits.maxPerStageDescriptorUniformBuffers, limits.maxPerStageDescriptorStorageBuffers,
+      limits.maxPerStageDescriptorSampledImages,  limits.maxPerStageDescriptorStorageImages,
+      limits.maxPerStageDescriptorSamplers,       as.maxPerStageDescriptorAccelerationStructures};
+  for (int kind = 0; kind < 6; ++kind) {
     if (totals[kind] > set_limits[kind])
       return false;
-    for (int i = 0; i < 3; ++i)
+    for (int i = 0; i < 9; ++i)
       if (stages[i][kind] > stage_limits[kind])
         return false;
   }
-  for (int i = 0; i < 3; ++i)
-    if (stages[i][0] + stages[i][1] + stages[i][2] + stages[i][3] > limits.maxPerStageResources)
+  for (int i = 0; i < 9; ++i)
+    if (stages[i][0] + stages[i][1] + stages[i][2] + stages[i][3] + stages[i][5] > limits.maxPerStageResources)
       return false;
   VkPhysicalDeviceFeatures features{};
   vkGetPhysicalDeviceFeatures(device, &features);
@@ -241,6 +262,32 @@ bool ValidatePipelineBindings(VkPhysicalDevice device, const PipelineLayoutDesc 
         if ((b.visibility & SHADER_VISIBILITY_FRAGMENT) && !features.fragmentStoresAndAtomics)
           return false;
       }
+  return true;
+}
+
+bool VulkanBindingGroup::Version::WriteDescriptors(size_t binding_index,
+                                                   uint32_t first_element,
+                                                   const std::vector<ITopLevelAccelerationStructure *> &values) {
+  for (auto value : values) {
+    auto native = dynamic_cast<VulkanTopLevelAccelerationStructure *>(value);
+    if (!native || native->Owner() != device_)
+      return false;
+  }
+  std::vector<VkAccelerationStructureKHR> handles;
+  for (auto value : values)
+    handles.push_back(static_cast<VulkanTopLevelAccelerationStructure *>(value)->NativeStructure());
+  VkWriteDescriptorSetAccelerationStructureKHR as{VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET_ACCELERATION_STRUCTURE_KHR};
+  as.accelerationStructureCount = uint32_t(handles.size());
+  as.pAccelerationStructures = handles.data();
+  VkWriteDescriptorSet write{VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET, &as};
+  write.dstSet = Set();
+  write.dstBinding = layout_.bindings[binding_index].binding;
+  write.dstArrayElement = first_element;
+  write.descriptorCount = uint32_t(handles.size());
+  write.descriptorType = VK_DESCRIPTOR_TYPE_ACCELERATION_STRUCTURE_KHR;
+  vkUpdateDescriptorSets(static_cast<VulkanDevice *>(device_)->NativeDevice(), 1, &write, 0, nullptr);
+  for (size_t i = 0; i < values.size(); ++i)
+    initialized_[binding_index][first_element + i] = true;
   return true;
 }
 

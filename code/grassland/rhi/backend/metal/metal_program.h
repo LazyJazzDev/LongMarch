@@ -9,13 +9,13 @@ class MetalDevice;
 
 class MetalProgram final : public Program, public MetalProgramBase {
  public:
-  MetalProgram(MetalDevice *device, const ProgramDesc &desc);
-  bool Finalize() override;
+  static MetalProgram *Create(MetalDevice *device, const ProgramDesc &desc);
   MTL::RenderPipelineState *NativePipeline() const;
   MTL::DepthStencilState *NativeDepthStencil() const;
-  static constexpr uint32_t VertexBufferBase = 4;
+  static constexpr uint32_t VertexBufferBase = 8;
 
  private:
+  MetalProgram(MetalDevice *device, const ProgramDesc &desc);
   NS::SharedPtr<MTL::RenderPipelineState> pipeline_;
   NS::SharedPtr<MTL::DepthStencilState> depth_stencil_;
 };

@@ -164,4 +164,42 @@ bool CommandContext::CmdUploadImage(const Image &image, const void *data, uint64
 #endif
   return Get()->CmdUploadImage(image.Get(), data, row_pitch);
 }
+
+bool CommandContext::CmdBuildBottomLevelAccelerationStructure(
+    const BottomLevelAccelerationStructure &destination,
+    const std::vector<AccelerationStructureGeometryBuffers> &geometries,
+    rhi::AccelerationStructureBuildMode mode) {
+  std::vector<rhi::AccelerationStructureGeometryBuffers> native;
+  for (const auto &g : geometries)
+    native.push_back({{g.data.buffer.Get(), g.data.offset, g.data.size},
+                      {g.indices.buffer.Get(), g.indices.offset, g.indices.size}});
+  return Get()->CmdBuildBottomLevelAccelerationStructure(destination.Get(), native, mode);
+}
+
+bool CommandContext::CmdBuildTopLevelAccelerationStructure(const TopLevelAccelerationStructure &destination,
+                                                           const std::vector<RayTracingInstance> &instances,
+                                                           rhi::AccelerationStructureBuildMode mode) {
+  std::vector<rhi::RayTracingInstance> native;
+  for (const auto &i : instances)
+    native.push_back({i.blas.Get(), i.transform, i.custom_index, i.hit_group_offset, i.mask, i.disable_triangle_culling,
+                      i.front_counter_clockwise});
+  return Get()->CmdBuildTopLevelAccelerationStructure(destination.Get(), native, mode);
+}
+
+bool CommandContext::CmdQueryCompactedSize(const AccelerationStructure &structure) {
+  return Get()->CmdQueryCompactedSize(structure.Get());
+}
+
+bool CommandContext::CmdCompactAccelerationStructure(const AccelerationStructure &source,
+                                                     const AccelerationStructure &destination) {
+  return Get()->CmdCompactAccelerationStructure(source.Get(), destination.Get());
+}
+
+bool CommandContext::CmdBindRayTracingProgram(const RayTracingProgram &program) {
+  return Get()->CmdBindRayTracingProgram(program.Get());
+}
+
+bool CommandContext::CmdDispatchRays(uint32_t width, uint32_t height, uint32_t depth, const ShaderBindingTable &sbt) {
+  return Get()->CmdDispatchRays(width, height, depth, sbt.Get());
+}
 }  // namespace grassland::rhix
