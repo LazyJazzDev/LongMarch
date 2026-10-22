@@ -1,9 +1,8 @@
-﻿#include "../../module.h"
-
-#include <fmt/format.h>
+﻿#include <fmt/format.h>
 
 #include <algorithm>
 #include <array>
+#include <charconv>
 #include <chrono>
 #include <cmath>
 #include <glm/gtc/matrix_transform.hpp>
@@ -11,6 +10,7 @@
 #include <map>
 #include <numeric>
 #include <random>
+#include <string>
 #include <thread>
 
 #include "grassland/rhi/rhi.h"
@@ -21,8 +21,51 @@ namespace {
 #include "built_in_shaders.inl"
 }
 
-int RunTLASPressureTest(grassland::rhi::BackendAPI api, int frames, bool headless) {
+int main(int argc, char **argv) {
   using namespace grassland::rhi;
+  BackendAPI api = BACKEND_API_DEFAULT;
+  bool headless = false;
+  int frames = 0;
+  for (int i = 1; i < argc; ++i) {
+    const std::string arg = argv[i];
+    if (arg == "--help") {
+      std::cout << "[--backend auto|d3d12|vulkan] [--headless] [--frames N]\n"
+                   "Headless defaults to 3000 measured frames after 60 warmup frames.\n"
+                   "Window mode runs until closed; P toggles VSync.\n";
+      return 0;
+    }
+    if (arg == "--headless") {
+      headless = true;
+      continue;
+    }
+    if (arg == "--frames" && i + 1 < argc) {
+      const std::string value = argv[++i];
+      const auto result = std::from_chars(value.data(), value.data() + value.size(), frames);
+      if (result.ec != std::errc{} || result.ptr != value.data() + value.size() || frames < 0) {
+        std::cerr << "Invalid frame count: " << value << '\n';
+        return 1;
+      }
+      continue;
+    }
+    if (arg == "--backend" && i + 1 < argc) {
+      const std::string value = argv[++i];
+      if (value == "auto")
+        api = BACKEND_API_DEFAULT;
+      else if (value == "d3d12")
+        api = BACKEND_API_D3D12;
+      else if (value == "vulkan")
+        api = BACKEND_API_VULKAN;
+      else {
+        std::cerr << "Unknown backend: " << value << '\n';
+        return 1;
+      }
+      continue;
+    }
+    std::cerr << "Unknown or incomplete option: " << arg << '\n';
+    return 1;
+  }
+  if (headless && !frames)
+    frames = 3000;
   constexpr uint32_t body_count = 100000;
   ObjPtr<ICore> core = CreateCore(api);
   if (!core)
@@ -52,7 +95,7 @@ int RunTLASPressureTest(grassland::rhi::BackendAPI api, int frames, bool headles
       if (!target)
         return 1;
     }
-  const auto &embedded = shader_list.at("modules/tlas_pressure_test/shaders/trace.slang");
+  const auto &embedded = shader_list.at("shaders/trace.slang");
   std::string source(embedded.first, embedded.second);
   const size_t prefix_offset = source.compare(0, 3, "\xef\xbb\xbf") == 0 ? 3 : 0;
   source.insert(prefix_offset, "#define PRESSURE_BODY_COUNT " + std::to_string(body_count) + "\n");
@@ -69,7 +112,7 @@ int RunTLASPressureTest(grassland::rhi::BackendAPI api, int frames, bool headles
   if (!trace->Finalize())
     return 1;
 
-  const auto &display_source = shader_list.at("modules/tlas_pressure_test/shaders/display.slang");
+  const auto &display_source = shader_list.at("shaders/display.slang");
   std::string display(display_source.first, display_source.second);
   ObjPtr<IShader> vs = device->CreateShader({display, "VSMain", SHADER_STAGE_VERTEX});
   if (!vs)

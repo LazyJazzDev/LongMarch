@@ -27,12 +27,12 @@ int main(int argc, char **argv) {
       continue;
     }
     if (arg == "--list") {
-      std::cout << "window\ntriangle\ncube\ntexture\nblend\nnbody\nraytracing\nray_query\ntlas_pressure_test\n";
+      std::cout << "window\ntriangle\ncube\ntexture\nblend\nnbody\nraytracing\nray_query\n";
       return 0;
     }
     if (arg == "--help") {
       std::cout
-          << "[--module window|triangle|cube|texture|blend|nbody|raytracing|ray_query|tlas_pressure_test | --tui | --all] [--backend auto|d3d12|vulkan|metal] [--headless] [--frames N]\nHeadless defaults to 3000 frames per scene; --all defaults to 300 frames with windows.\nNo module specified: open the terminal selection menu.\n";
+          << "[--module window|triangle|cube|texture|blend|nbody|raytracing|ray_query | --tui | --all] [--backend auto|d3d12|vulkan|metal] [--headless] [--frames N]\nHeadless defaults to 3000 frames per scene; --all defaults to 300 frames with windows.\nNo module specified: open the terminal selection menu.\n";
       return 0;
     }
     if (arg == "--module" && i + 1 < argc) {
@@ -105,10 +105,6 @@ int main(int argc, char **argv) {
       std::cerr << "ray_query: FAILED\n";
       result = 1;
     }
-    if (RunTLASPressureTest(api, frames, headless) != 0) {
-      std::cerr << "tlas_pressure_test: FAILED\n";
-      result = 1;
-    }
     return result;
   }
   if (tui && !module.empty()) {
@@ -124,10 +120,9 @@ int main(int argc, char **argv) {
                  "  5. blend     Source-alpha blended triangles\n"
                  "  6. nbody     Compute simulation and particle rendering (D3D12/Vulkan/Metal)\n";
     std::cout << "  7. raytracing  Ray pipeline, triangles and procedural sphere (D3D12/Vulkan)\n"
-                 "  8. ray_query   Inline ray queries (D3D12/Vulkan)\n"
-                 "  9. tlas_pressure_test  Bouncing objects, varying TLAS count and shadows\n";
+                 "  8. ray_query   Inline ray queries (D3D12/Vulkan)\n";
     for (;;) {
-      std::cout << "\nSelect module [1-9 or name], q to quit: " << std::flush;
+      std::cout << "\nSelect module [1-8 or name], q to quit: " << std::flush;
       std::string input;
       if (!std::getline(std::cin, input))
         return 0;
@@ -169,15 +164,9 @@ int main(int argc, char **argv) {
         module = "ray_query";
         break;
       }
-      if (input == "9" || input == "tlas_pressure_test") {
-        module = "tlas_pressure_test";
-        break;
-      }
       std::cout << "Invalid selection. Enter a listed number or module name.\n";
     }
   }
-  if (module == "tlas_pressure_test")
-    return RunTLASPressureTest(api, frames, headless);
   if (module == "window")
     return RunWindow(api, frames, headless);
   if (module == "triangle")

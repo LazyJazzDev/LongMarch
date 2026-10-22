@@ -81,7 +81,7 @@ demo_rhi_hello --headless --all --backend vulkan --frames 10000
 demo_rhi_hello --headless --module triangle --backend d3d12 --frames 10000
 ```
 
-`--all` runs all six modules sequentially on the selected backend, continues after a failed module, and returns nonzero if any module fails. It cannot be combined with `--module` or `--tui`. Each scene prints its measured frame count, wall time and average FPS. Headless runs use 60 untimed warmup frames and at most 3 in-flight frames; target reuse and the final timing boundary wait for GPU completion. Setup, shader compilation, image initialization and initial uploads are outside the measurement. The cube's per-frame uniform update is included. This is end-to-end rendering throughput including CPU recording/submission and synchronization, not GPU timestamp duration. Use Release without validation layers for performance comparisons.
+`--all` runs all eight modules sequentially on the selected backend, continues after a failed module, and returns nonzero if any module fails. It cannot be combined with `--module` or `--tui`. Each scene prints its measured frame count, wall time and average FPS. Headless runs use 60 untimed warmup frames and at most 3 in-flight frames; target reuse and the final timing boundary wait for GPU completion. Setup, shader compilation, image initialization and initial uploads are outside the measurement. The cube's per-frame uniform update is included. This is end-to-end rendering throughput including CPU recording/submission and synchronization, not GPU timestamp duration. Use Release without validation layers for performance comparisons.
 
 Without a positive `--frames`, headless runs measure 3000 frames per scene; windowed `--all` runs 300 frames per scene. Normal individual windowed demos remain interactive. `--all` selects scenes, not backends. Metal supports all six scenes in both windowed and headless mode.
 
@@ -173,36 +173,5 @@ reflects shader payloads and checks the native hit-attribute limit. Bind with
 Slang uses SM 6.5 for ray pipelines and shaders with AS bindings, preserving SM 6.0 for
 existing shaders and the shared DX-compatible Vulkan layout.
 
-## TLAS pressure test
-
-`rhi_hello --module tlas_pressure_test --backend vulkan` (or `d3d12`) renders
-100,000 randomly positioned and colored cubes/spheres on a large ground plane.
-All bodies, including hidden ones, are simulated on the CPU with gravity along Y;
-ground contact assigns a new random upward speed. A sinusoid with an eight-second
-period selects 20,000 through 100,000 visible bodies, randomly moving IDs between the
-visible and hidden sets. Stable instance IDs retain each body's color.
-
-Three immutable BLASes (cube, sphere AABB, ground) are shared by the instances.
-The TLAS is allocated once for 100,001 instances. Every frame uses BUILD with exactly
-`visible bodies + 1 ground` instances: hidden objects are absent, not masked out.
-Native UPDATE/refit cannot change the previous instance count. The allocation
-capacity in `TopLevelAccelerationStructureDesc::instance_count` is now an upper
-bound for BUILD; UPDATE still requires the preceding build's actual count.
-This scene tests instance transforms and membership, not deforming BLAS vertices.
-
-Compute ray queries shade one primary ray per pixel and a shadow ray for lit hits
-under a fixed directional light. A fullscreen pass displays the result. P toggles
-VSync; the title reports FPS, visible body count and total TLAS instance count.
-The module also participates in the menu, `--list`, `--all` and `--headless`.
-
-```sh
-demo_rhi_hello --headless --module tlas_pressure_test --backend vulkan --frames 3000
-```
-
-Headless runs at 1280x720 with three frames in flight and 60 warmup frames, using
-seed 87 and a fixed 1/120-second simulation step for reproducible scene evolution.
-Window mode advances with elapsed time, using physics substeps capped at 1/120 s.
-The report includes completed-work FPS, actual visible-count range and CPU time
-spent on simulation/instance packing, TLAS command recording, rendering command
-recording, submission and frame waiting. CPU recording times are not GPU durations;
-use a GPU profiler to separate TLAS build from ray traversal/shading costs.
+The standalone [TLAS pressure test](../tlas_pressure_test/README.md) is built as
+`demo_tlas_pressure_test` and is not included in this demo's module list or `--all`.

@@ -1,4 +1,4 @@
-add_executable(${DEMO_NAME} main.cpp modules/window/module.cpp modules/triangle/module.cpp modules/cube/module.cpp modules/texture/module.cpp modules/blend/module.cpp modules/nbody/module.cpp modules/raytracing/module.cpp modules/ray_query/module.cpp modules/tlas_pressure_test/module.cpp)
+add_executable(${DEMO_NAME} main.cpp modules/window/module.cpp modules/triangle/module.cpp modules/cube/module.cpp modules/texture/module.cpp modules/blend/module.cpp modules/nbody/module.cpp modules/raytracing/module.cpp modules/ray_query/module.cpp)
 target_link_libraries(${DEMO_NAME} PRIVATE grassland_rhi grassland_util)
 
 PACK_SHADER_CODE(${DEMO_NAME})
