@@ -45,3 +45,13 @@ events. The optional DLL path tests IDE-bundled ConPTY implementations.
 In CLion's Run window, enable **Emulate terminal in the output console**; the
 ordinary output console is not a full terminal. This setting is separate from
 the Terminal tool window, where ConPTY mouse capture is negotiated by the module.
+
+On POSIX hosts, run `python3 test/tui/test_pty.py <tui_menu_probe>` for isolated
+PTY integration tests of arrows, fragmented VT input, SGR clicks/double-clicks,
+wheel events, clipping/scrolling, resize, cancellation, fallback and termios
+restoration. On macOS, append the three hello executable paths to verify that
+selecting their default menu entry starts a one-frame Metal demo. These tests
+exercise the native PTY protocol, not an IDE/Terminal application's physical
+mouse event forwarding. Darwin's transient PENDIN flag is excluded from the
+terminal configuration comparison; input, echo, signal and control-character
+settings are checked.
