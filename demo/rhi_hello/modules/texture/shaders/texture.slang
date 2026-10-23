@@ -1,4 +1,4 @@
-﻿RHI_TEXTURE2D(0, 0, float4, albedo);
+RHI_TEXTURE2D(0, 0, float4, albedo);
 RHI_SAMPLER(0, 1, linearSampler);
 
 struct Input {

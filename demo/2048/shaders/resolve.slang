@@ -1,4 +1,4 @@
-﻿struct ResolveParams {
+struct ResolveParams {
   float second_frame_alpha;
   uint scale;
   uint2 padding;

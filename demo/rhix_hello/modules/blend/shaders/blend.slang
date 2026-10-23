@@ -1,4 +1,4 @@
-﻿struct Input {
+struct Input {
   RHI_INPUT(0, float3, position);
   RHI_INPUT(1, float4, color);
 };

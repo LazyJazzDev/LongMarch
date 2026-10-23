@@ -1,4 +1,4 @@
-﻿RHI_TEXTURE2D(0, 0, float4, input_image);
+RHI_TEXTURE2D(0, 0, float4, input_image);
 
 struct Vertex {
   float4 position : SV_Position;

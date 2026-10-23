@@ -1,4 +1,4 @@
-﻿#include "bindings.slang"
+#include "bindings.slang"
 #include "common.slang"
 #include "random.slang"
 #include "shadow_ray.slang"

@@ -1,4 +1,4 @@
-﻿#pragma once
+#pragma once
 
 void microfacet_beckmann_sample_slopes(const float cos_theta_i,
                                        const float sin_theta_i,

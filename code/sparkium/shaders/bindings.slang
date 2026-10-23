@@ -1,4 +1,4 @@
-﻿#pragma once
+#pragma once
 #include "common.slang"
 #include "buffer_helper.slang"
 

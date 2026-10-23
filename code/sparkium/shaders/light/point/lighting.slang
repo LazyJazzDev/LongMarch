@@ -1,4 +1,4 @@
-﻿
+
 #include "bsdf/principled_material.slang"
 #include "common.slang"
 

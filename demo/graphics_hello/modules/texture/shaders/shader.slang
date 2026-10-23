@@ -1,4 +1,4 @@
-﻿
+
 Texture2D texture : register(t0, space0);
 SamplerState samp : register(s0, space1);
 

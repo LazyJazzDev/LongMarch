@@ -1,4 +1,4 @@
-﻿#define SPARKIUM_SOFTWARE_RT
+#define SPARKIUM_SOFTWARE_RT
 #include "bindings.slang"
 #include "bsdf/lambertian.slang"
 #include "bsdf/principled_material.slang"

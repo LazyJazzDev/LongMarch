@@ -1,4 +1,4 @@
-﻿#pragma once
+#pragma once
 #include "common.slang"
 
 __generic<BufferType : IBufferReader> GeometryPrimitiveSample MeshSamplePrimitive(BufferType geometry_data,
