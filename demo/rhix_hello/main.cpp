@@ -34,7 +34,7 @@ int main(int argc, char **argv) {
     }
     if (arg == "--help") {
       std::cout
-          << "[--module window|triangle|cube|texture|blend|nbody|raytracing|ray_query | --tui | --all] [--backend auto|d3d12|vulkan|metal] [--headless] [--frames N]\nHeadless defaults to 3000 frames per scene; --all defaults to 300 frames with windows.\nMissing backend or module: select each missing option in the terminal menu. --backend auto explicitly uses the default API.\n";
+          << "[--module window|triangle|cube|texture|blend|nbody|raytracing|ray_query | --tui | --all] [--backend auto|d3d12|vulkan|metal] [--headless] [--frames N]\nHeadless defaults to 3000 frames per scene; --all defaults to 300 frames with windows.\nMissing backend or module: select each missing option in the terminal menu; a sole enabled backend is automatic. --backend auto explicitly uses the default API.\n";
       return 0;
     }
     if (arg == "--module" && i + 1 < argc) {
@@ -85,13 +85,32 @@ int main(int argc, char **argv) {
 #endif
     };
     std::vector<snowberg::tui::MenuOption> options;
-    for (const auto backend : backends)
-      options.push_back({BackendAPIName(backend), ""});
-    snowberg::tui::Menu menu;
-    const auto selected = menu.Select("RHIx Hello - API Selection", options);
-    if (!selected)
-      return 0;
-    api = backends[*selected];
+    for (const auto backend : backends) {
+      switch (backend) {
+        case BACKEND_API_D3D12:
+          options.push_back({BackendAPIName(backend), "Microsoft | Windows"});
+          break;
+        case BACKEND_API_VULKAN:
+          options.push_back({BackendAPIName(backend), "Khronos Group | Windows, Linux, Android"});
+          break;
+        case BACKEND_API_METAL:
+          options.push_back({BackendAPIName(backend), "Apple | macOS, iOS, iPadOS"});
+          break;
+      }
+    }
+    if (backends.empty()) {
+      std::cerr << "No graphics backend is enabled in this build.\n";
+      return 1;
+    }
+    if (backends.size() == 1) {
+      api = backends.front();
+    } else {
+      snowberg::tui::Menu menu;
+      const auto selected = menu.Select("RHIx Hello - API Selection", options);
+      if (!selected)
+        return 0;
+      api = backends[*selected];
+    }
   }
   if (!frames) {
     if (headless)

@@ -157,7 +157,7 @@ void PrintHelp(const char *executable) {
          "       --all      Run all five headless benchmarks (requires --headless)\n"
          "       --list     List all modules without opening a window\n"
          "       --help     Show this help\n"
-         "Missing backend or module: select each missing option in the terminal menu.\n--backend auto explicitly uses the default API.\n\n";
+         "Missing backend or module: select each missing option in the terminal menu; a sole enabled backend is automatic.\n--backend auto explicitly uses the default API.\n\n";
   ListModules();
 }
 }  // namespace
@@ -223,14 +223,32 @@ int Main(int argc, char **argv) {
       for (const auto backend : {BACKEND_API_D3D12, BACKEND_API_VULKAN, BACKEND_API_METAL}) {
         if (SupportBackendAPI(backend)) {
           backends.push_back(backend);
-          options.push_back({BackendAPIString(backend), ""});
+          switch (backend) {
+            case BACKEND_API_D3D12:
+              options.push_back({BackendAPIString(backend), "Microsoft | Windows"});
+              break;
+            case BACKEND_API_VULKAN:
+              options.push_back({BackendAPIString(backend), "Khronos Group | Windows, Linux, Android"});
+              break;
+            case BACKEND_API_METAL:
+              options.push_back({BackendAPIString(backend), "Apple | macOS, iOS, iPadOS"});
+              break;
+          }
         }
       }
-      snowberg::tui::Menu menu;
-      const auto selected = menu.Select("Graphics Hello - API Selection", options);
-      if (!selected)
-        return 0;
-      api = backends[*selected];
+      if (backends.empty()) {
+        std::cerr << "No graphics backend is enabled in this build.\n";
+        return 1;
+      }
+      if (backends.size() == 1) {
+        api = backends.front();
+      } else {
+        snowberg::tui::Menu menu;
+        const auto selected = menu.Select("Graphics Hello - API Selection", options);
+        if (!selected)
+          return 0;
+        api = backends[*selected];
+      }
     }
     if (!SupportBackendAPI(api))
       throw std::runtime_error("Requested graphics backend is unavailable");
