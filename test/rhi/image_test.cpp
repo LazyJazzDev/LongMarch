@@ -197,6 +197,11 @@ void ReadPixel(IDevice *device, IImage *image, BackendAPI api, uint32_t x, uint3
 
 class RhiImage : public testing::TestWithParam<BackendAPI> {
  protected:
+  // Keep validation enabled for every image test, including newly added cases.
+  ICore *CreateCore(BackendAPI api) {
+    return grassland::rhi::CreateCore(api, {true});
+  }
+
   void Track(IDevice *device) {
 #if defined(LONGMARCH_D3D12_ENABLED)
     if (GetParam() == BACKEND_API_D3D12)
@@ -226,7 +231,7 @@ class RhiImage : public testing::TestWithParam<BackendAPI> {
 };
 
 TEST_P(RhiImage, StorageUsageFollowsNativeFormatSupport) {
-  ObjPtr<ICore> core = CreateCore(GetParam(), {true});
+  ObjPtr<ICore> core = CreateCore(GetParam());
   ASSERT_TRUE(core);
   ObjPtr<IDevice> device = core->CreateDeviceByAutoSelection();
   ASSERT_TRUE(device);
@@ -301,7 +306,7 @@ TEST(RhiD3D12Image, AttachmentLeasesFollowImagesRetainedByCommands) {
 #endif
 
 TEST_P(RhiImage, UploadRowsPreservePixelsWithDifferentSourceAndDestinationPitch) {
-  ObjPtr<ICore> core = CreateCore(GetParam(), {true});
+  ObjPtr<ICore> core = CreateCore(GetParam());
   ASSERT_TRUE(core);
   ObjPtr<IDevice> device = core->CreateDeviceByAutoSelection();
   ASSERT_TRUE(device);
@@ -336,7 +341,7 @@ TEST_P(RhiImage, UploadRowsPreservePixelsWithDifferentSourceAndDestinationPitch)
 }
 
 TEST_P(RhiImage, OffscreenClearDrawReadbackAndReuse) {
-  ObjPtr<ICore> core = CreateCore(GetParam(), {true});
+  ObjPtr<ICore> core = CreateCore(GetParam());
   ASSERT_TRUE(core);
   ObjPtr<IDevice> device = core->CreateDeviceByAutoSelection();
   ASSERT_TRUE(device);
@@ -397,7 +402,7 @@ TEST_P(RhiImage, OffscreenClearDrawReadbackAndReuse) {
 }
 
 TEST_P(RhiImage, FragmentRayQueriesRetainIndirectBlasResources) {
-  ObjPtr<ICore> core = CreateCore(GetParam(), {true});
+  ObjPtr<ICore> core = CreateCore(GetParam());
   ASSERT_TRUE(core);
   DeviceFeatureRequirement required;
   required.ray_query = true;
@@ -481,7 +486,7 @@ float4 PSMain():SV_Target0 {
 }
 
 TEST_P(RhiImage, EightBindingGroupsDoNotOverlapVertexBuffers) {
-  ObjPtr<ICore> core = CreateCore(GetParam(), {true});
+  ObjPtr<ICore> core = CreateCore(GetParam());
   ASSERT_TRUE(core);
   ObjPtr<IDevice> device = core->CreateDeviceByAutoSelection();
   ASSERT_TRUE(device);
@@ -542,7 +547,7 @@ TEST_P(RhiImage, EightBindingGroupsDoNotOverlapVertexBuffers) {
 }
 
 TEST_P(RhiImage, IndexedInstancedAttributesAndOffsetsProduceExpectedPixels) {
-  ObjPtr<ICore> core = CreateCore(GetParam(), {true});
+  ObjPtr<ICore> core = CreateCore(GetParam());
   ASSERT_TRUE(core);
   ObjPtr<IDevice> device = core->CreateDeviceByAutoSelection();
   ASSERT_TRUE(device);
@@ -606,7 +611,7 @@ TEST_P(RhiImage, IndexedInstancedAttributesAndOffsetsProduceExpectedPixels) {
 }
 
 TEST_P(RhiImage, MultipleTargetsAndDepthRejectOccludedFragments) {
-  ObjPtr<ICore> core = CreateCore(GetParam(), {true});
+  ObjPtr<ICore> core = CreateCore(GetParam());
   ASSERT_TRUE(core);
   ObjPtr<IDevice> device = core->CreateDeviceByAutoSelection();
   ASSERT_TRUE(device);
@@ -665,7 +670,7 @@ TEST_P(RhiImage, MultipleTargetsAndDepthRejectOccludedFragments) {
 }
 
 TEST_P(RhiImage, BindingVersionsPreserveRangesAndArraysAcrossHeapPages) {
-  ObjPtr<ICore> core = CreateCore(GetParam(), {true});
+  ObjPtr<ICore> core = CreateCore(GetParam());
   ASSERT_TRUE(core);
   ObjPtr<IDevice> device = core->CreateDeviceByAutoSelection();
   ASSERT_TRUE(device);
@@ -872,7 +877,7 @@ TEST_P(RhiImage, BindingVersionsPreserveRangesAndArraysAcrossHeapPages) {
 }
 
 TEST_P(RhiImage, ExplicitStructuredStrideReadsSecondCompactElement) {
-  ObjPtr<ICore> core = CreateCore(GetParam(), {true});
+  ObjPtr<ICore> core = CreateCore(GetParam());
   ASSERT_TRUE(core);
   ObjPtr<IDevice> device = core->CreateDeviceByAutoSelection();
   ASSERT_TRUE(device);
@@ -940,7 +945,7 @@ TEST_P(RhiImage, ExplicitStructuredStrideReadsSecondCompactElement) {
 }
 
 TEST_P(RhiImage, StructuredNestedArraysUseSameCppLayout) {
-  ObjPtr<ICore> core = CreateCore(GetParam(), {true});
+  ObjPtr<ICore> core = CreateCore(GetParam());
   ASSERT_TRUE(core);
   ObjPtr<IDevice> device = core->CreateDeviceByAutoSelection();
   ASSERT_TRUE(device);
@@ -1016,7 +1021,7 @@ TEST_P(RhiImage, StructuredNestedArraysUseSameCppLayout) {
 }
 
 TEST_P(RhiImage, StorageImageAndBufferBecomeReadableAfterRendering) {
-  ObjPtr<ICore> core = CreateCore(GetParam(), {true});
+  ObjPtr<ICore> core = CreateCore(GetParam());
   ASSERT_TRUE(core);
   ObjPtr<IDevice> device = core->CreateDeviceByAutoSelection();
   ASSERT_TRUE(device);
@@ -1092,7 +1097,7 @@ TEST_P(RhiImage, StorageImageAndBufferBecomeReadableAfterRendering) {
 }
 
 TEST_P(RhiImage, RawBufferWritesBecomeReadableAfterRendering) {
-  ObjPtr<ICore> core = CreateCore(GetParam(), {true});
+  ObjPtr<ICore> core = CreateCore(GetParam());
   ASSERT_TRUE(core);
   ObjPtr<IDevice> device = core->CreateDeviceByAutoSelection();
   ASSERT_TRUE(device);
@@ -1168,7 +1173,7 @@ TEST_P(RhiImage, RawBufferWritesBecomeReadableAfterRendering) {
 }
 
 TEST_P(RhiImage, SamplerArraysPreserveFilteringAcrossCapturedVersions) {
-  ObjPtr<ICore> core = CreateCore(GetParam(), {true});
+  ObjPtr<ICore> core = CreateCore(GetParam());
   ASSERT_TRUE(core);
   ObjPtr<IDevice> device = core->CreateDeviceByAutoSelection();
   ASSERT_TRUE(device);
@@ -1239,7 +1244,7 @@ TEST_P(RhiImage, SamplerArraysPreserveFilteringAcrossCapturedVersions) {
 }
 
 TEST_P(RhiImage, BindingArraysExposeCapturedBufferViewLengths) {
-  ObjPtr<ICore> core = CreateCore(GetParam(), {true});
+  ObjPtr<ICore> core = CreateCore(GetParam());
   ASSERT_TRUE(core);
   ObjPtr<IDevice> device = core->CreateDeviceByAutoSelection();
   ASSERT_TRUE(device);
@@ -1306,7 +1311,7 @@ TEST_P(RhiImage, BindingArraysExposeCapturedBufferViewLengths) {
 }
 
 TEST_P(RhiImage, StencilSurvivesDepthOnlyPassAndMasksColorPass) {
-  ObjPtr<ICore> core = CreateCore(GetParam(), {true});
+  ObjPtr<ICore> core = CreateCore(GetParam());
   ASSERT_TRUE(core);
   ObjPtr<IDevice> device = core->CreateDeviceByAutoSelection();
   ASSERT_TRUE(device);
@@ -1379,7 +1384,7 @@ const BackendAPI backends[] = {
 #endif
 };
 TEST_P(RhiImage, IndependentColorAndAlphaBlendingMatchesPixelResults) {
-  ObjPtr<ICore> core = CreateCore(GetParam(), {true});
+  ObjPtr<ICore> core = CreateCore(GetParam());
   ASSERT_TRUE(core);
   ObjPtr<IDevice> device = core->CreateDeviceByAutoSelection();
   ASSERT_TRUE(device);
@@ -1477,7 +1482,7 @@ TEST_P(RhiImage, IndependentColorAndAlphaBlendingMatchesPixelResults) {
 }
 
 TEST_P(RhiImage, ComputeGraphicsSwitchingPreservesImagesAndDescriptorTables) {
-  ObjPtr<ICore> core = CreateCore(GetParam(), {true});
+  ObjPtr<ICore> core = CreateCore(GetParam());
   ASSERT_TRUE(core);
   ObjPtr<IDevice> device = core->CreateDeviceByAutoSelection();
   ASSERT_TRUE(device);
