@@ -1,4 +1,4 @@
-﻿#pragma once
+#pragma once
 #include "bindings.slang"
 #include "common.slang"
 #include "geometry/mesh/sample_primitive.slang"

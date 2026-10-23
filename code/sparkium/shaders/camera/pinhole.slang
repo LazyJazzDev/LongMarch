@@ -1,4 +1,4 @@
-﻿#include "bindings.slang"
+#include "bindings.slang"
 #include "common.slang"
 
 #ifndef SPARKIUM_SOFTWARE_RT

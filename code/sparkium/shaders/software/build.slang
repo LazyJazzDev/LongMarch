@@ -1,4 +1,4 @@
-﻿#include "software/layout.slang"
+#include "software/layout.slang"
 RWByteAddressBuffer nodes : register(u0, space0);
 ByteAddressBuffer geometries[] : register(t0, space1);
 

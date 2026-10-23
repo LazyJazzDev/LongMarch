@@ -1,4 +1,4 @@
-﻿
+
 struct VSInput {
   [[vk::location(0)]] float3 position : TEXCOORD0;
   [[vk::location(1)]] float4 color : TEXCOORD1;

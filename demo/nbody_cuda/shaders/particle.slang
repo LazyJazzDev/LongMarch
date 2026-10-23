@@ -1,4 +1,4 @@
-﻿#include "global_uniform_object.slang"
+#include "global_uniform_object.slang"
 
 struct PSInput {
   float4 position : SV_POSITION;

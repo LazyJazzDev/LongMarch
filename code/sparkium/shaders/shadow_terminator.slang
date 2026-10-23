@@ -1,4 +1,4 @@
-﻿/* SPDX-FileCopyrightText: 2011-2022 Blender Foundation
+/* SPDX-FileCopyrightText: 2011-2022 Blender Foundation
  * SPDX-License-Identifier: Apache-2.0
  * Adapted from Cycles kernel/light/sample.h; see external/cycles/README.md.
  * Changes: pure Slang helpers; mesh loading/transforms handled by the caller.

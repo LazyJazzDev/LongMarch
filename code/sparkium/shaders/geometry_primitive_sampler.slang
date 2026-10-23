@@ -1,4 +1,4 @@
-﻿#pragma once
+#pragma once
 
 __generic<BufferType : IBufferReader> void SamplePrimitivePower(BufferType direct_lighting_sampler_data,
                                                                 inout float r,
