@@ -24,15 +24,15 @@ rhi::IDevice *Core::CreateDeviceByAutoSelection(DeviceFeatureRequirement require
   return CreateDevice(id);
 }
 
-Core *CreateCore(BackendAPI api) {
+Core *CreateCore(BackendAPI api, const CoreDesc &desc) {
   switch (api) {
 #if defined(LONGMARCH_D3D12_ENABLED)
     case BACKEND_API_D3D12:
-      return d3d12::D3D12Core::CreateD3D12Core();
+      return d3d12::D3D12Core::CreateD3D12Core(desc);
 #endif
 #if defined(LONGMARCH_VULKAN_ENABLED)
     case BACKEND_API_VULKAN:
-      return vulkan::VulkanCore::CreateVulkanCore();
+      return vulkan::VulkanCore::CreateVulkanCore(desc);
 #endif
 #if defined(LONGMARCH_METAL_ENABLED)
     case BACKEND_API_METAL:

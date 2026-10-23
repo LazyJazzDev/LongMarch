@@ -1,6 +1,7 @@
 ﻿#include "grassland/rhi/backend/vulkan/vulkan_core.h"
 
 #include "grassland/rhi/backend/vulkan/vulkan_device.h"
+#include "grassland/util/log.h"
 
 namespace grassland::rhi::backend::vulkan {
 
@@ -10,7 +11,7 @@ VkInstance VulkanCore::Instance() const {
   return instance_;
 }
 
-VulkanCore *VulkanCore::CreateVulkanCore() {
+VulkanCore *VulkanCore::CreateVulkanCore(const CoreDesc &desc) {
   uint32_t loader_version = VK_API_VERSION_1_0;
   const auto enumerate_version = reinterpret_cast<PFN_vkEnumerateInstanceVersion>(
       vkGetInstanceProcAddr(VK_NULL_HANDLE, "vkEnumerateInstanceVersion"));
@@ -48,17 +49,58 @@ VulkanCore *VulkanCore::CreateVulkanCore() {
       flags |= VK_INSTANCE_CREATE_ENUMERATE_PORTABILITY_BIT_KHR;
     }
   }
+  const char *validation_layer = "VK_LAYER_KHRONOS_validation";
+  VkDebugUtilsMessengerCreateInfoEXT debug{VK_STRUCTURE_TYPE_DEBUG_UTILS_MESSENGER_CREATE_INFO_EXT};
+  if (desc.enable_debug) {
+    std::vector<VkLayerProperties> layers;
+    if (!EnumerateList([](uint32_t *n, VkLayerProperties *p) { return vkEnumerateInstanceLayerProperties(n, p); },
+                       layers))
+      return nullptr;
+    if (std::none_of(layers.begin(), layers.end(),
+                     [&](const auto &layer) { return std::strcmp(layer.layerName, validation_layer) == 0; }) ||
+        std::none_of(available.begin(), available.end(), [](const auto &extension) {
+          return std::strcmp(extension.extensionName, VK_EXT_DEBUG_UTILS_EXTENSION_NAME) == 0;
+        })) {
+      ReportError(-1, "Requested Vulkan validation layer or debug-utils extension is unavailable.");
+      return nullptr;
+    }
+    extensions.push_back(VK_EXT_DEBUG_UTILS_EXTENSION_NAME);
+    debug.messageSeverity =
+        VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT | VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT;
+    debug.messageType = VK_DEBUG_UTILS_MESSAGE_TYPE_GENERAL_BIT_EXT | VK_DEBUG_UTILS_MESSAGE_TYPE_VALIDATION_BIT_EXT |
+                        VK_DEBUG_UTILS_MESSAGE_TYPE_PERFORMANCE_BIT_EXT;
+    debug.pfnUserCallback = [](VkDebugUtilsMessageSeverityFlagBitsEXT severity, VkDebugUtilsMessageTypeFlagsEXT,
+                               const VkDebugUtilsMessengerCallbackDataEXT *data, void *) -> VkBool32 {
+      if (severity & VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT)
+        LogError(data->pMessage);
+      else
+        LogWarning(data->pMessage);
+      return VK_FALSE;
+    };
+  }
   VkApplicationInfo application{VK_STRUCTURE_TYPE_APPLICATION_INFO};
   application.pApplicationName = "LongMarch RHI";
   application.apiVersion = api_version;
   VkInstanceCreateInfo create{VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO};
   create.flags = flags;
+  if (desc.enable_debug) {
+    create.enabledLayerCount = 1;
+    create.ppEnabledLayerNames = &validation_layer;
+    create.pNext = &debug;
+  }
   create.pApplicationInfo = &application;
   create.enabledExtensionCount = static_cast<uint32_t>(extensions.size());
   create.ppEnabledExtensionNames = extensions.data();
   auto core = std::unique_ptr<VulkanCore>(new VulkanCore());
   if (!Check(vkCreateInstance(&create, nullptr, &core->instance_), "vkCreateInstance"))
     return {};
+  if (desc.enable_debug) {
+    auto create_debug = reinterpret_cast<PFN_vkCreateDebugUtilsMessengerEXT>(
+        vkGetInstanceProcAddr(core->instance_, "vkCreateDebugUtilsMessengerEXT"));
+    if (!create_debug || !Check(create_debug(core->instance_, &debug, nullptr, &core->debug_messenger_),
+                                "Create Vulkan debug messenger"))
+      return nullptr;
+  }
   std::vector<VkPhysicalDevice> devices;
   if (!EnumerateList([&](uint32_t *count,
                          VkPhysicalDevice *data) { return vkEnumeratePhysicalDevices(core->instance_, count, data); },
@@ -110,6 +152,11 @@ VulkanCore *VulkanCore::CreateVulkanCore() {
 }
 
 VulkanCore::~VulkanCore() {
+  if (debug_messenger_) {
+    auto destroy_debug = reinterpret_cast<PFN_vkDestroyDebugUtilsMessengerEXT>(
+        vkGetInstanceProcAddr(instance_, "vkDestroyDebugUtilsMessengerEXT"));
+    destroy_debug(instance_, debug_messenger_, nullptr);
+  }
   if (instance_)
     vkDestroyInstance(instance_, nullptr);
 }

@@ -10,8 +10,8 @@ rhi::ICore *Core::Get() const noexcept {
   return static_cast<rhi::ICore *>(GetObject());
 }
 
-Core CreateCore(rhi::BackendAPI api) {
-  return rhi::CreateCore(api);
+Core CreateCore(rhi::BackendAPI api, const rhi::CoreDesc &desc) {
+  return rhi::CreateCore(api, desc);
 }
 
 std::vector<rhi::PhysicalDevice> Core::GetPhysicalDevices() const {

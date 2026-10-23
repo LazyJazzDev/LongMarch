@@ -17,6 +17,6 @@ class Core : public ObjectContainer {
   Device CreateDeviceByAutoSelection(rhi::DeviceFeatureRequirement feature_requirement = {}) const;
 };
 
-Core CreateCore(rhi::BackendAPI api = rhi::BACKEND_API_DEFAULT);
+Core CreateCore(rhi::BackendAPI api = rhi::BACKEND_API_DEFAULT, const rhi::CoreDesc &desc = {});
 
 }  // namespace grassland::rhix

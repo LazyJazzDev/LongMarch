@@ -6,7 +6,8 @@ namespace grassland::rhi::backend::d3d12 {
 
 class D3D12Core final : public Core {
  public:
-  static D3D12Core *CreateD3D12Core();
+  static D3D12Core *CreateD3D12Core(const CoreDesc &desc);
+  ~D3D12Core() override;
   std::vector<PhysicalDevice> GetPhysicalDevices() const override;
   rhi::IDevice *CreateDevice(int32_t device_idx) override;
 
@@ -18,6 +19,7 @@ class D3D12Core final : public Core {
     PhysicalDevice info;
   };
 
+  bool registered_{};
   ComPtr<IDXGIFactory4> factory_;
   std::vector<Adapter> adapters_;
 };
