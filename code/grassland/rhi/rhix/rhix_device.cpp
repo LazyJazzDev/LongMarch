@@ -107,4 +107,17 @@ TopLevelAccelerationStructure Device::CreateTopLevelAccelerationStructure(
 RayTracingProgram Device::CreateRayTracingProgram(const rhi::RayTracingProgramDesc &desc) const {
   return Get()->CreateRayTracingProgram(desc);
 }
+
+Shader Device::CreateShader(const std::string &filename,
+                            const std::string &entry_point,
+                            rhi::ShaderStage stage,
+                            FileSystem *fs) const {
+  return Get()->CreateShader(filename, entry_point, stage, fs);
+}
+
+Shader Device::CreateShaderFromSource(const std::string &source,
+                                      const std::string &entry_point,
+                                      rhi::ShaderStage stage) const {
+  return Get()->CreateShaderFromSource(source, entry_point, stage);
+}
 }  // namespace grassland::rhix

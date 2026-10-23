@@ -2,6 +2,7 @@
 #include <filesystem>
 #include <map>
 
+#include "grassland/util/file_system.h"
 #include "grassland/util/util_util.h"
 
 namespace grassland {
@@ -21,7 +22,7 @@ class VirtualFileSystemEntry {
   VirtualFileSystemEntry *parent_;
 };
 
-class VirtualFileSystem {
+class VirtualFileSystem : public FileSystem {
  public:
   VirtualFileSystem();
 
@@ -35,7 +36,7 @@ class VirtualFileSystem {
   int WriteFile(const std::string &file_name, const std::string &data);
   int WriteFile(const std::string &file_name, const char *data, size_t size);
 
-  int ReadFile(const std::string &file_name, std::vector<uint8_t> &data) const;
+  int ReadFile(const std::string &file_name, std::vector<uint8_t> &data) const override;
 
   void Print() const;
 

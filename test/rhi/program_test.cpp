@@ -4,6 +4,8 @@
 
 #include "grassland/rhi/backend/backend_binding_group.h"
 #include "grassland/rhi/backend/backend_program.h"
+#include "grassland/rhi/backend/backend_shader_compiler.h"
+#include "grassland/util/virtual_file_system.h"
 #if defined(LONGMARCH_D3D12_ENABLED)
 #include <d3d12sdklayers.h>
 
@@ -38,6 +40,94 @@ SamplerArray CreateSamplers(IDevice *device, std::initializer_list<SamplerDesc> 
 }  // namespace
 
 class RhiProgram : public testing::TestWithParam<BackendAPI> {};
+
+TEST_P(RhiProgram, FileShadersOwnPreprocessedIncludesAndDeferLayoutMacros) {
+  ObjPtr<ICore> core = CreateCore(GetParam());
+  ASSERT_TRUE(core);
+  ObjPtr<IDevice> device = core->CreateDeviceByAutoSelection();
+  ASSERT_TRUE(device);
+  ObjPtr<IShader> vertex, fragment;
+  {
+    VirtualFileSystem fs;
+    ASSERT_EQ(fs.WriteFile("shaders/include/types.slang", "#pragma once\nstruct Settings { float4 color; };\n"), 0);
+    ASSERT_EQ(
+        fs.WriteFile("shaders/common.slang", "#include \"include/types.slang\"\nRHI_UNIFORM(0,0,Settings,settings);\n"),
+        0);
+    ASSERT_EQ(fs.WriteFile("shaders/main.slang", R"(
+#include "common.slang"
+#include "include/types.slang"
+struct Input { RHI_INPUT(0,float3,position); };
+float4 VSMain(Input input):SV_Position { return float4(input.position,1); }
+float4 PSMain():SV_Target0 { return settings.color; }
+)"),
+              0);
+    vertex = device->CreateShader("shaders/main.slang", "VSMain", SHADER_STAGE_VERTEX, &fs);
+    fragment = device->CreateShader("shaders/main.slang", "PSMain", SHADER_STAGE_FRAGMENT, &fs);
+    ASSERT_TRUE(vertex);
+    ASSERT_TRUE(fragment);
+    EXPECT_EQ(vertex->GetDesc().file_system, &fs);
+    EXPECT_EQ(vertex->GetDesc().filename, "shaders/main.slang");
+    const auto &expanded = backend::ShaderCompileDesc(vertex.Get()).source;
+    EXPECT_EQ(expanded.find("#include"), std::string::npos);
+    EXPECT_NE(expanded.find("RHI_INPUT"), std::string::npos);
+    EXPECT_NE(expanded.find("RHI_UNIFORM"), std::string::npos);
+  }  // Compilation below must not dereference the destroyed filesystem.
+  ProgramDesc desc;
+  desc.vertex_shader = vertex.Get();
+  desc.fragment_shader = fragment.Get();
+  desc.vertex_bindings = {{12, false}};
+  desc.vertex_attributes = {{0, 0, VERTEX_FORMAT_FLOAT3, 0}};
+  desc.pipeline_layout.groups = {{{{0, BINDING_UNIFORM_BUFFER, 1, SHADER_VISIBILITY_FRAGMENT}}}};
+  ObjPtr<IProgram> program = device->CreateProgram(desc);
+  ASSERT_TRUE(program);
+}
+
+TEST_P(RhiProgram, DiskAndMemoryShadersUseOfficialPreprocessing) {
+  auto core = rhix::CreateCore(GetParam());
+  ASSERT_TRUE(core);
+  auto device = core.CreateDeviceByAutoSelection();
+  ASSERT_TRUE(device);
+  const auto filename = (std::filesystem::path(__FILE__).parent_path() / "shaders/include_compute.slang").string();
+  auto shader = device.CreateShader(filename, "CSMain", SHADER_STAGE_COMPUTE);
+  ASSERT_TRUE(shader);
+  auto program = device.CreateComputeProgram({shader.Get()});
+  ASSERT_TRUE(program);
+  ShaderDesc desc{"#include \"include_settings.slang\"\n[numthreads(GROUP_SIZE,1,1)] void CSMain() {}", "CSMain",
+                  SHADER_STAGE_COMPUTE};
+  desc.filename = filename;
+  auto memory = device.CreateShader(desc);
+  ASSERT_TRUE(memory);
+  EXPECT_TRUE(device.CreateComputeProgram({memory.Get()}));
+  VirtualFileSystem fs;
+  fs.WriteFile("lib/settings.slang", "#if ENABLED\n#define GROUP_SIZE 1\n#else\n#error missing define\n#endif\n");
+  desc.source = "#include <settings.slang>\n[numthreads(GROUP_SIZE,1,1)] void CSMain() {}";
+  desc.filename = "main.slang";
+  desc.file_system = &fs;
+  desc.include_paths = {"lib"};
+  desc.defines = {{"ENABLED", "1"}};
+  auto configured = device.CreateShader(desc);
+  ASSERT_TRUE(configured);
+  EXPECT_TRUE(device.CreateComputeProgram({configured.Get()}));
+}
+
+TEST_P(RhiProgram, ShaderPreprocessingReportsMissingIncludesAndDirectiveErrors) {
+  ObjPtr<ICore> core = CreateCore(GetParam());
+  ASSERT_TRUE(core);
+  ObjPtr<IDevice> device = core->CreateDeviceByAutoSelection();
+  ASSERT_TRUE(device);
+  VirtualFileSystem fs;
+  ObjPtr<IShader> missing = device->CreateShader("missing.slang", "Main", SHADER_STAGE_COMPUTE, &fs);
+  EXPECT_FALSE(missing);
+  ShaderDesc desc{"#include \"missing.slang\"\n", "Main", SHADER_STAGE_COMPUTE};
+  desc.file_system = &fs;
+  ObjPtr<IShader> include = device->CreateShader(desc);
+  EXPECT_FALSE(include);
+  ObjPtr<IShader> error = device->CreateShaderFromSource("#error preprocessing failed\n", "Main", SHADER_STAGE_COMPUTE);
+  EXPECT_FALSE(error);
+  ObjPtr<IShader> warning = device->CreateShaderFromSource("#warning harmless\n[numthreads(1,1,1)] void Main() {}",
+                                                           "Main", SHADER_STAGE_COMPUTE);
+  EXPECT_TRUE(warning);
+}
 
 TEST_P(RhiProgram, SlangPlatformMacrosMatchExecutionPlatform) {
   ObjPtr<ICore> core = CreateCore(GetParam());

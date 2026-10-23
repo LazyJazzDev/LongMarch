@@ -42,10 +42,10 @@ VulkanProgram *VulkanProgram::Create(VulkanDevice *owner_device, const ProgramDe
   }
   std::vector<uint8_t> code[2];
   auto prefix = ShaderMacroHeader(object->desc_.pipeline_layout, BACKEND_API_VULKAN, object->desc_.vertex_attributes);
-  if (!CompileSlang(object->desc_.vertex_shader->GetDesc(), prefix, BACKEND_API_VULKAN, code[0],
+  if (!CompileSlang(ShaderCompileDesc(object->desc_.vertex_shader), prefix, BACKEND_API_VULKAN, code[0],
                     &object->desc_.pipeline_layout))
     return nullptr;
-  if (!CompileSlang(object->desc_.fragment_shader->GetDesc(), prefix, BACKEND_API_VULKAN, code[1],
+  if (!CompileSlang(ShaderCompileDesc(object->desc_.fragment_shader), prefix, BACKEND_API_VULKAN, code[1],
                     &object->desc_.pipeline_layout))
     return nullptr;
   for (int i = 0; i < 2; ++i) {

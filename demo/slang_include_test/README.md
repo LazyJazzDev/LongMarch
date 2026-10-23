@@ -33,3 +33,35 @@ macOS，`/usr/local/bin/slangc`，版本 `2026.1-52-gc8ddf20bb`。这是工具�
 该方案能实现“先加载并展开 include，再注入布局宏”。第一阶段必须不定义需要延迟的 RHI 宏；用于选择 include、平台分支及其他条件编译的宏则必须提前确定。已定义的普通宏会在第一阶段展开，定义本身不会作为宏定义保留在输出中。
 
 目前最明显的集成障碍是原始文件行号丢失和 `-E` 的错误退出状态。下一步可以验证链接库的官方预处理接口及诊断 writer；不能直接假设 `loadModuleFromSourceString()` 能返回未经语法分析的预处理文本。此实验尚未验证 SDK 路径、Slang `import` 模块、DXIL 或其他平台。
+
+## RHI 集成
+
+RHI / RHIX 现在提供三个入口：
+
+```cpp
+// 系统文件系统；相对 include 相对于源文件所在目录解析。
+auto shader = device.CreateShader("shaders/main.slang", "VSMain", SHADER_STAGE_VERTEX);
+
+// 自定义文件系统。VirtualFileSystem 实现 grassland::FileSystem。
+auto shader = device.CreateShader("shaders/main.slang", "VSMain", SHADER_STAGE_VERTEX, &files);
+
+// 直接提供源码；默认虚拟文件名为 shader.slang。
+auto shader = device.CreateShaderFromSource(source, "VSMain", SHADER_STAGE_VERTEX);
+```
+
+仍支持 `CreateShader(ShaderDesc)`，原有 `{source, entry_point, stage}` 调用兼容。
+`ShaderDesc` 新增 `filename`、`file_system`、`include_paths`、`defines`：
+
+- `source` 非空时使用内存源码，`filename` 指定其诊断路径和相对 include 基准；否则读取 `filename`。
+- `file_system == nullptr` 时使用 Slang 的系统文件系统；自定义 FileSystem 的 `ReadFile` 返回 0 表示成功。
+- `defines` 是预处理阶段的名称/值对；布局宏由 Program 创建阶段注入，不应在这里定义。
+- `GetDesc()` 保留原始参数，包括借用的 FileSystem 指针。该指针只在创建期间使用；调用者必须自行确认其仍然存活，不能通过 GetDesc 延长其生命周期。
+- Shader 内部保存独立的预处理结果，FileSystem 可以在 CreateShader 返回后销毁，Program 创建不会再次读取 include。
+
+预处理通过链接的 Slang SDK 的官方 `ICompileRequest`、`-E` 和输出 writer 完成，不启动外部 slangc。该接口已被 Slang 标为 deprecated，目前仍是本实现使用的官方预处理输出路径。Metal 与 Vulkan 使用 SPIR-V 预处理目标，D3D12 使用 DXIL；执行平台宏在预处理阶段提供。
+
+语法、入口点和布局检查仍在 Program 创建时执行；缺失文件、include 错误及 `#error` 则在 Shader 创建时返回空句柄。由于当前 SDK 的预处理请求可能在报错后返回成功，实现额外识别旧式和当前格式的错误诊断头；升级 Slang 后需继续运行错误路径测试。警告不会导致创建失败。
+
+限制仍包括：预处理输出不能保留原始 include 行号；条件分支已经确定；本功能封装 `#include` 源码，不封装 Slang `import` 模块及其编译会话依赖。不要把依赖已销毁自定义文件系统的 import 当作受支持输入。
+
+本机验证：文件系统生命周期、磁盘/内存输入、相对 include、搜索路径和宏定义、预处理失败、警告以及延迟布局宏均覆盖 Metal / Vulkan。两个 hello demo 的 triangle 模块展示嵌入式 VirtualFileSystem 文件加载。D3D12 已接入同一路径，但未在本机执行。

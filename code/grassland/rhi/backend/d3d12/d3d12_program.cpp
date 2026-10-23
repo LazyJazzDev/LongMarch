@@ -21,10 +21,10 @@ D3D12Program *D3D12Program::Create(D3D12Device *owner_device, const ProgramDesc 
   auto native = owner_device->NativeDevice();
   std::vector<uint8_t> vertex, fragment;
   auto prefix = ShaderMacroHeader(object->desc_.pipeline_layout, BACKEND_API_D3D12, object->desc_.vertex_attributes);
-  if (!CompileSlang(object->desc_.vertex_shader->GetDesc(), prefix, BACKEND_API_D3D12, vertex,
+  if (!CompileSlang(ShaderCompileDesc(object->desc_.vertex_shader), prefix, BACKEND_API_D3D12, vertex,
                     &object->desc_.pipeline_layout))
     return nullptr;
-  if (!CompileSlang(object->desc_.fragment_shader->GetDesc(), prefix, BACKEND_API_D3D12, fragment,
+  if (!CompileSlang(ShaderCompileDesc(object->desc_.fragment_shader), prefix, BACKEND_API_D3D12, fragment,
                     &object->desc_.pipeline_layout))
     return nullptr;
   if (!object->CreateLayout(native, object->desc_.pipeline_layout,

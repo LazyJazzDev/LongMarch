@@ -4,6 +4,9 @@
 #include "grassland/rhi/rhi_program.h"
 
 namespace grassland::rhi::backend {
+const ShaderDesc &ShaderCompileDesc(const IShader *shader);
+bool PreprocessShader(const ShaderDesc &desc, BackendAPI api, std::string &source);
+
 // The C++ input layout owns locations. Slang expands this prefix; no source parsing.
 std::string ShaderMacroHeader(const PipelineLayoutDesc &layout,
                               BackendAPI api,
