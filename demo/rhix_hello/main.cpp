@@ -138,13 +138,13 @@ int main(int argc, char **argv) {
   if (module.empty()) {
     const std::vector<snowberg::tui::MenuOption> options{
         {"window", "Clear and present a window"},
-        {"triangle", "Colored indexed triangle (D3D12/Vulkan/Metal)"},
+        {"triangle", "Colored indexed triangle"},
         {"cube", "Rotating cube with depth and uniform binding"},
         {"texture", "Sampled XOR texture triangle"},
         {"blend", "Source-alpha blended triangles"},
-        {"nbody", "Compute simulation and particle rendering (D3D12/Vulkan/Metal)"},
+        {"nbody", "Compute simulation and particle rendering"},
         {"raytracing", "Ray pipeline, triangles and procedural sphere (D3D12/Vulkan)"},
-        {"ray_query", "Inline ray queries (D3D12/Vulkan/Metal)"},
+        {"ray_query", "Inline ray queries"},
     };
     snowberg::tui::Menu menu;
     const auto selected = menu.Select("RHIx Hello - Module Selection", options);
