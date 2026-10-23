@@ -1,6 +1,7 @@
 ﻿#include "grassland/rhi/backend/metal/metal_compute_program.h"
 
 #include "grassland/rhi/backend/metal/metal_device.h"
+#include "grassland/rhi/backend/metal/metal_diagnostics.h"
 
 namespace grassland::rhi::backend::metal {
 MetalComputeProgram::MetalComputeProgram(MetalDevice *device, const ComputeProgramDesc &desc)
@@ -33,7 +34,7 @@ MetalComputeProgram *MetalComputeProgram::Create(MetalDevice *owner_device, cons
   NS::Error *error = nullptr;
   auto pipeline = NS::TransferPtr(device->newComputePipelineState(function.get(), &error));
   if (!pipeline) {
-    ReportError(-1, error ? error->localizedDescription()->utf8String() : "Metal compute pipeline creation failed.");
+    ReportMetalError(error, "Metal compute pipeline creation failed");
     return nullptr;
   }
   if (uint64_t(threads[0]) * threads[1] * threads[2] > pipeline->maxTotalThreadsPerThreadgroup() ||

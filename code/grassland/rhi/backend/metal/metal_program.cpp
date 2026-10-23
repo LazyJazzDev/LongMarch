@@ -2,6 +2,7 @@
 
 #include "grassland/rhi/backend/metal/metal_binding_group.h"
 #include "grassland/rhi/backend/metal/metal_device.h"
+#include "grassland/rhi/backend/metal/metal_diagnostics.h"
 #include "grassland/rhi/backend/metal/metal_util.h"
 
 namespace grassland::rhi::backend::metal {
@@ -107,7 +108,7 @@ MetalProgram *MetalProgram::Create(MetalDevice *owner_device, const ProgramDesc 
   NS::Error *error = nullptr;
   object->pipeline_ = NS::TransferPtr(device->newRenderPipelineState(descriptor.get(), &error));
   if (!object->pipeline_) {
-    ReportError(-1, error ? error->localizedDescription()->utf8String() : "Metal pipeline creation failed.");
+    ReportMetalError(error, "Metal pipeline creation failed");
     return nullptr;
   }
   return object.release();

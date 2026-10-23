@@ -6,7 +6,7 @@ namespace grassland::rhi::backend::vulkan {
 
 class VulkanCore final : public Core {
  public:
-  static VulkanCore *CreateVulkanCore();
+  static VulkanCore *CreateVulkanCore(const CoreDesc &desc);
   ~VulkanCore() override;
   VkInstance Instance() const;
   std::vector<PhysicalDevice> GetPhysicalDevices() const override;
@@ -22,6 +22,7 @@ class VulkanCore final : public Core {
   };
 
   VkInstance instance_{VK_NULL_HANDLE};
+  VkDebugUtilsMessengerEXT debug_messenger_{};
   std::vector<Adapter> adapters_;
 };
 

@@ -5,6 +5,7 @@
 
 #include "grassland/rhi/backend/backend_shader_compiler.h"
 #include "grassland/rhi/backend/metal/metal_binding_group.h"
+#include "grassland/rhi/backend/metal/metal_diagnostics.h"
 
 namespace grassland::rhi::backend::metal {
 // Both backends consume the same DX-layout SPIR-V. Argument IDs come from the
@@ -100,7 +101,7 @@ NS::SharedPtr<MTL::Function> MetalProgramBase::CompileFunction(const ShaderDesc 
   auto library = NS::TransferPtr(
       native_device_->newLibrary(NS::String::string(code.c_str(), NS::UTF8StringEncoding), nullptr, &error));
   if (!library) {
-    ReportError(-1, error ? error->localizedDescription()->utf8String() : "Metal library compilation failed.");
+    ReportMetalError(error, "Metal library compilation failed");
     return {};
   }
   auto function = NS::TransferPtr(library->newFunction(NS::String::string(entry.c_str(), NS::UTF8StringEncoding)));

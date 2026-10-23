@@ -1,11 +1,12 @@
 ﻿#include "grassland/rhi/backend/metal/metal_device.h"
 
-#include "grassland/rhi/backend/backend_core.h"
 #include "grassland/rhi/backend/metal/metal_acceleration_structure.h"
 #include "grassland/rhi/backend/metal/metal_allocated_image.h"
 #include "grassland/rhi/backend/metal/metal_binding_group.h"
 #include "grassland/rhi/backend/metal/metal_command_context.h"
 #include "grassland/rhi/backend/metal/metal_compute_program.h"
+#include "grassland/rhi/backend/metal/metal_core.h"
+#include "grassland/rhi/backend/metal/metal_diagnostics.h"
 #include "grassland/rhi/backend/metal/metal_program.h"
 #include "grassland/rhi/backend/metal/metal_queue.h"
 #include "grassland/rhi/backend/metal/metal_sampler.h"
@@ -16,6 +17,11 @@ namespace grassland::rhi::backend::metal {
 MetalDevice *MetalDevice::Create(PhysicalDevice info, Core *core, NS::SharedPtr<MTL::Device> device) {
   auto object = std::unique_ptr<MetalDevice>(new MetalDevice(std::move(info), core, std::move(device)));
   auto pool = NS::TransferPtr(NS::AutoreleasePool::alloc()->init());
+  object->command_buffer_descriptor_ = NS::TransferPtr(MTL::CommandBufferDescriptor::alloc()->init());
+  object->command_buffer_descriptor_->setRetainedReferences(true);
+  object->command_buffer_descriptor_->setErrorOptions(static_cast<MetalCore *>(core)->DebugEnabled()
+                                                          ? MTL::CommandBufferErrorOptionEncoderExecutionStatus
+                                                          : MTL::CommandBufferErrorOptionNone);
   object->queue_ = NS::TransferPtr(object->device_->newCommandQueue());
   if (!object->queue_) {
     ReportError(-1, "Metal command queue creation failed.");
@@ -61,17 +67,26 @@ std::mutex &MetalDevice::QueueMutex() {
   return queue_mutex_;
 }
 
+NS::SharedPtr<MTL::CommandBuffer> MetalDevice::CreateCommandBuffer() {
+  return NS::RetainPtr(queue_->commandBuffer(command_buffer_descriptor_.get()));
+}
+
 bool MetalDevice::WaitIdle() {
   // Caller serializes this marker with commits using QueueMutex().
   auto pool = NS::TransferPtr(NS::AutoreleasePool::alloc()->init());
-  auto marker = NS::RetainPtr(queue_->commandBuffer());
+  auto marker = CreateCommandBuffer();
   if (!marker) {
     ReportError(-1, "Metal idle marker allocation failed.");
     return false;
   }
   marker->commit();
   marker->waitUntilCompleted();
-  return marker->status() == MTL::CommandBufferStatusCompleted;
+  if (marker->status() != MTL::CommandBufferStatusCompleted) {
+    ReportMetalError(marker->error(), "Metal idle marker failed",
+                     static_cast<MetalCore *>(OwnerCore())->DebugEnabled());
+    return false;
+  }
+  return true;
 }
 
 rhi::IWindow *MetalDevice::CreateGLFWWindow(const WindowDesc &desc) {

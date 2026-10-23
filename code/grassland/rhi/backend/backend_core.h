@@ -9,7 +9,7 @@ class Core : public Object<rhi::ICore> {
   rhi::IDevice *CreateDeviceByAutoSelection(DeviceFeatureRequirement requirement = {}) override;
 };
 
-Core *CreateCore(BackendAPI api);
+Core *CreateCore(BackendAPI api, const CoreDesc &desc);
 
 // Returns a stable vector index, or -1 when no device satisfies the filters.
 int32_t SelectPhysicalDevice(const std::vector<PhysicalDevice> &devices, DeviceFeatureRequirement requirement);

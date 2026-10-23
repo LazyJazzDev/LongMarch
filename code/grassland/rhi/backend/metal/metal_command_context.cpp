@@ -3,6 +3,7 @@
 #include <cstring>
 
 #include "grassland/rhi/backend/metal/metal_compute_program.h"
+#include "grassland/rhi/backend/metal/metal_diagnostics.h"
 #include "grassland/rhi/backend/metal/metal_program.h"
 #include "grassland/rhi/backend/metal/metal_swap_chain_image.h"
 #include "grassland/rhi/backend/metal/metal_window.h"
@@ -17,7 +18,7 @@ MetalCommandContext *MetalCommandContext::Create(MetalDevice *device) {
   auto pool = NS::TransferPtr(NS::AutoreleasePool::alloc()->init());
   // Metal command buffers are single-use. The persistent native queue manages
   // their backing storage; completed buffers cannot be reset like Vulkan/D3D12.
-  object->commands_ = NS::RetainPtr(object->device_->NativeQueue()->commandBuffer());
+  object->commands_ = object->device_->CreateCommandBuffer();
   if (!object->commands_) {
     ReportError(-1, "Metal command buffer creation failed.");
     return nullptr;
@@ -147,8 +148,8 @@ SubmissionStatus MetalCommandContext::WaitForProgress() {
   auto pool = NS::TransferPtr(NS::AutoreleasePool::alloc()->init());
   commands_->waitUntilCompleted();
   if (commands_->status() == MTL::CommandBufferStatusError) {
-    auto error = commands_->error();
-    ReportError(-1, error ? error->localizedDescription()->utf8String() : "Metal command buffer failed.");
+    ReportMetalError(commands_->error(), "Metal command buffer failed",
+                     commands_->errorOptions() & MTL::CommandBufferErrorOptionEncoderExecutionStatus);
     return SUBMISSION_STATUS_FAILED;
   }
   if (commands_->status() != MTL::CommandBufferStatusCompleted)

@@ -11,6 +11,7 @@
 #include "grassland/rhi/backend/d3d12/d3d12_ray_tracing_program.h"
 #include "grassland/rhi/backend/d3d12/d3d12_sampler.h"
 #include "grassland/rhi/backend/d3d12/d3d12_window.h"
+#include "grassland/util/log.h"
 
 // Match the Windows SDK declarations used by the backend.
 #define D3D12MA_D3D12_HEADERS_ALREADY_INCLUDED
@@ -62,6 +63,24 @@ void D3D12Device::RecycleCommandResources(ComPtr<ID3D12CommandAllocator> allocat
 
 D3D12Device *D3D12Device::Create(PhysicalDevice info, Core *core, ComPtr<ID3D12Device> device) {
   auto object = std::unique_ptr<D3D12Device>(new D3D12Device(std::move(info), core, std::move(device)));
+  if (SUCCEEDED(object->device_.As(&object->debug_messages_))) {
+    auto callback = [](D3D12_MESSAGE_CATEGORY, D3D12_MESSAGE_SEVERITY severity, D3D12_MESSAGE_ID id, LPCSTR description,
+                       void *) {
+      if (severity == D3D12_MESSAGE_SEVERITY_CORRUPTION || severity == D3D12_MESSAGE_SEVERITY_ERROR)
+        LogError("D3D12 [{}]: {}", static_cast<int>(id), description);
+      else if (severity == D3D12_MESSAGE_SEVERITY_WARNING)
+        LogWarning("D3D12 [{}]: {}", static_cast<int>(id), description);
+    };
+    if (!Check(object->debug_messages_->RegisterMessageCallback(callback, D3D12_MESSAGE_CALLBACK_FLAG_NONE, nullptr,
+                                                                &object->debug_callback_cookie_),
+               "Register D3D12 debug message callback"))
+      return nullptr;
+  } else {
+    ComPtr<ID3D12InfoQueue> messages;
+    if (SUCCEEDED(object->device_.As(&messages)))
+      LogWarning(
+          "D3D12 debug message callbacks are unavailable; validation messages remain in the native debug output.");
+  }
   D3D12_COMMAND_QUEUE_DESC desc{};
   desc.Type = D3D12_COMMAND_LIST_TYPE_DIRECT;
   if (!Check(CreateDXGIFactory2(0, IID_PPV_ARGS(&object->factory_)), "CreateDXGIFactory2"))
@@ -191,6 +210,8 @@ D3D12Device::~D3D12Device() {
   command_pool_.clear();
   if (idle_event_)
     CloseHandle(idle_event_);
+  if (debug_callback_cookie_)
+    debug_messages_->UnregisterMessageCallback(debug_callback_cookie_);
 }
 
 rhi::IComputeProgram *D3D12Device::CreateComputeProgram(const ComputeProgramDesc &desc) {

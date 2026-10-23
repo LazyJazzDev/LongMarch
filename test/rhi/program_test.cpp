@@ -137,14 +137,7 @@ TEST_P(RhiProgram, InvalidShaderIsRejectedAtProgramCreationNotSourceCreation) {
 TEST_P(RhiProgram, DrawAndIndexedDrawRetainResourcesUntilCompletion) {
   if (!std::getenv("LONGMARCH_RHI_WINDOW_TESTS"))
     GTEST_SKIP();
-#if defined(LONGMARCH_D3D12_ENABLED)
-  backend::d3d12::ComPtr<ID3D12Debug> debug;
-  if (GetParam() == BACKEND_API_D3D12) {
-    ASSERT_TRUE(SUCCEEDED(D3D12GetDebugInterface(IID_PPV_ARGS(&debug))));
-    debug->EnableDebugLayer();
-  }
-#endif
-  ObjPtr<ICore> core = CreateCore(GetParam());
+  ObjPtr<ICore> core = CreateCore(GetParam(), {true});
   ASSERT_TRUE(core);
   ObjPtr<IDevice> device = core->CreateDeviceByAutoSelection();
   ASSERT_TRUE(device);
