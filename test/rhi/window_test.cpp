@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <cstdlib>
+#include <limits>
 
 #ifdef _WIN32
 #define NOMINMAX
@@ -46,6 +47,15 @@ TEST_P(RhiWindow, ReferenceWhiteQueryDoesNotReplaceTheCurrentFrame) {
   }
 #ifndef _WIN32
   EXPECT_FALSE(known);
+#endif
+  const float scale = window.GetHDRReferenceWhiteScale();
+  EXPECT_FLOAT_EQ(scale, known ? nits / 80.0f : 1.0f);
+  const float headroom = window.GetHDRHeadroom();
+  EXPECT_GE(headroom, 1.0f);
+  EXPECT_LT(headroom, std::numeric_limits<float>::infinity());
+#ifdef _WIN32
+  if (!known)
+    EXPECT_FLOAT_EQ(headroom, 10.0f);
 #endif
   EXPECT_FALSE(window.IsSwapChainInvalid());
   EXPECT_EQ(frame.Get(), window.GetNextImage().Get());

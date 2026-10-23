@@ -28,6 +28,12 @@ TEST(RhiMetalHDR, LayerEncodingAndEDRFollowSwapchainTransitions) {
                         : space == COLOR_SPACE_HDR10_ST2084       ? MTLPixelFormatRGB10A2Unorm
                                                                   : MTLPixelFormatBGRA8Unorm;
     EXPECT_EQ(layer.pixelFormat, format);
+    EXPECT_FLOAT_EQ(window.GetHDRReferenceWhiteScale(), 1.0f);
+    auto screen = [glfwGetCocoaWindow(window.GLFWWindow()) screen];
+    if (screen)
+      EXPECT_FLOAT_EQ(window.GetHDRHeadroom(), float(screen.maximumExtendedDynamicRangeColorComponentValue));
+    else
+      EXPECT_FLOAT_EQ(window.GetHDRHeadroom(), 10.0f);
     auto expected =
         CGColorSpaceCreateWithName(space == COLOR_SPACE_EXTENDED_SRGB_LINEAR ? kCGColorSpaceExtendedLinearSRGB
                                    : space == COLOR_SPACE_HDR10_ST2084       ? kCGColorSpaceITUR_2100_PQ

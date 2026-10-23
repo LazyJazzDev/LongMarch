@@ -20,6 +20,8 @@ class Window : public Object<rhi::IWindow> {
   bool SetColorSpace(ColorSpace color_space) override;
   ColorSpace GetColorSpace() const override;
   bool GetHDRReferenceWhiteNits(float &nits) const override;
+  float GetHDRReferenceWhiteScale() const override;
+  float GetHDRHeadroom() const override;
   GLFWwindow *GLFWWindow() const override;
   bool ShouldClose() const override;
   bool IsKeyDown(int key) const override;

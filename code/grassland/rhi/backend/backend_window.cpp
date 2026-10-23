@@ -1,12 +1,15 @@
 ﻿#include "grassland/rhi/backend/backend_window.h"
 
 #include <algorithm>
+#include <cmath>
 #include <cstdlib>
 #define GLFW_INCLUDE_NONE
 #include <GLFW/glfw3.h>
 #ifdef _WIN32
 #define GLFW_EXPOSE_NATIVE_WIN32
 #include <GLFW/glfw3native.h>
+#include <dxgi1_6.h>
+#include <wrl/client.h>
 #endif
 
 namespace grassland::rhi::backend {
@@ -115,6 +118,40 @@ bool Window::SetColorSpace(ColorSpace color_space) {
 
 ColorSpace Window::GetColorSpace() const {
   return color_space_;
+}
+
+float Window::GetHDRReferenceWhiteScale() const {
+  float nits;
+  return GetHDRReferenceWhiteNits(nits) ? nits / 80.0f : 1.0f;
+}
+
+float Window::GetHDRHeadroom() const {
+#ifdef _WIN32
+  float white;
+  if (!GetHDRReferenceWhiteNits(white))
+    return 10.0f;
+  const auto monitor = MonitorFromWindow(glfwGetWin32Window(window_), MONITOR_DEFAULTTONEAREST);
+  Microsoft::WRL::ComPtr<IDXGIFactory1> factory;
+  if (FAILED(CreateDXGIFactory1(IID_PPV_ARGS(&factory))))
+    return 10.0f;
+  for (UINT a = 0;; ++a) {
+    Microsoft::WRL::ComPtr<IDXGIAdapter1> adapter;
+    if (factory->EnumAdapters1(a, &adapter) != S_OK)
+      break;
+    for (UINT o = 0;; ++o) {
+      Microsoft::WRL::ComPtr<IDXGIOutput> output;
+      if (adapter->EnumOutputs(o, &output) != S_OK)
+        break;
+      Microsoft::WRL::ComPtr<IDXGIOutput6> output6;
+      DXGI_OUTPUT_DESC1 desc{};
+      if (FAILED(output.As(&output6)) || FAILED(output6->GetDesc1(&desc)) || desc.Monitor != monitor)
+        continue;
+      const float ratio = desc.MaxLuminance / white;
+      return std::isfinite(ratio) && ratio > 0.0f ? std::max(1.0f, ratio) : 10.0f;
+    }
+  }
+#endif
+  return 10.0f;
 }
 
 bool Window::GetHDRReferenceWhiteNits(float &nits) const {

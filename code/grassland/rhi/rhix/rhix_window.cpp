@@ -102,6 +102,22 @@ rhi::ColorSpace Window::GetColorSpace() const {
   return Get()->GetColorSpace();
 }
 
+float Window::GetHDRReferenceWhiteScale() const {
+#if !defined(NDEBUG)
+  if (!*this)
+    return 1.0f;
+#endif
+  return Get()->GetHDRReferenceWhiteScale();
+}
+
+float Window::GetHDRHeadroom() const {
+#if !defined(NDEBUG)
+  if (!*this)
+    return 10.0f;
+#endif
+  return Get()->GetHDRHeadroom();
+}
+
 bool Window::GetHDRReferenceWhiteNits(float &nits) const {
 #if !defined(NDEBUG)
   if (!*this)

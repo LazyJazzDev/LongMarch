@@ -43,6 +43,12 @@ class IWindow : public IObject {
   // Windows only: false when HDR is disabled, unavailable, or the query fails.
   // On failure nits is unchanged. This does not change presentation encoding.
   virtual bool GetHDRReferenceWhiteNits(float &nits) const = 0;
+  // Multiply relative linear RGB by this to align 1.0 with SDR white.
+  // Windows: reference white / 80; macOS EDR: 1. Unavailable: 1.
+  virtual float GetHDRReferenceWhiteScale() const = 0;
+  // Peak / reference white, in relative linear units, at least 1.
+  // Unavailable display information returns 10, not a measured capability.
+  virtual float GetHDRHeadroom() const = 0;
   // Currently implemented combinations supported by this window's surface.
   // Formats are selected within the requested color space at creation/rebuild.
   // This is presentation capability, not a measurement of display luminance. Empty on failure.

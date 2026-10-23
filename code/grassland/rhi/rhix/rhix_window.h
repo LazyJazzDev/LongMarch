@@ -23,6 +23,8 @@ class Window : public ObjectContainer {
   bool SetColorSpace(rhi::ColorSpace color_space) const;
   rhi::ColorSpace GetColorSpace() const;
   bool GetHDRReferenceWhiteNits(float &nits) const;
+  float GetHDRReferenceWhiteScale() const;
+  float GetHDRHeadroom() const;
   std::vector<rhi::WindowPresentationOption> GetSupportedPresentationOptions() const;
 };
 
