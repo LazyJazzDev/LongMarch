@@ -94,7 +94,7 @@ int main(int argc, char **argv) {
           options.push_back({BackendAPIName(backend), "Khronos Group | Windows, Linux, macOS"});
           break;
         case BACKEND_API_METAL:
-          options.push_back({BackendAPIName(backend), "Apple | macOS, iOS, iPadOS"});
+          options.push_back({BackendAPIName(backend), "Apple | macOS"});
           break;
       }
     }
