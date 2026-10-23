@@ -65,3 +65,5 @@ auto shader = device.CreateShaderFromSource(source, "VSMain", SHADER_STAGE_VERTE
 限制仍包括：预处理输出不能保留原始 include 行号；条件分支已经确定；本功能封装 `#include` 源码，不封装 Slang `import` 模块及其编译会话依赖。不要把依赖已销毁自定义文件系统的 import 当作受支持输入。
 
 本机验证：文件系统生命周期、磁盘/内存输入、相对 include、搜索路径和宏定义、预处理失败、警告以及延迟布局宏均覆盖 Metal / Vulkan。两个 hello demo 的 triangle 模块展示嵌入式 VirtualFileSystem 文件加载。D3D12 已接入同一路径，但未在本机执行。
+
+前端默认入口文件名为 `main.slang`；Program 阶段后端合成源码使用 `shader.slang`，包括宏前缀后的 `#line` 和 Slang 模块源码路径，以区分两个阶段的诊断。
