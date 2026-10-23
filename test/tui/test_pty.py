@@ -165,11 +165,44 @@ class PtyMenuTest(unittest.TestCase):
             terminal.finish(13, interactive=False)
             self.assertIn(b"Invalid selection", terminal.output)
 
+    def test_run_console_sized_pty_falls_back_without_changing_modes(self):
+        for columns, rows in ((120, 1), (0, 0), (80, 0), (0, 24), (1, 24)):
+            for data, expected in ((b"4\n", 13), (b"bad\n item3 \n", 13)):
+                with self.subTest(size=(columns, rows), data=data), Terminal(columns=columns, rows=rows) as terminal:
+                    terminal.until(lambda: b"Select option" in terminal.output)
+                    self.assertEqual(termios.tcgetattr(terminal.slave), terminal.original)
+                    self.assertIn(b"1. item0", terminal.output)
+                    self.assertIn(b"20. item19", terminal.output)
+                    terminal.send(data)
+                    terminal.finish(expected, interactive=False)
+                    self.assertNotIn(b"\x1b", terminal.output)
+
+    def test_empty_term_falls_back(self):
+        with Terminal(term="") as terminal:
+            terminal.until(lambda: b"Select option" in terminal.output)
+            terminal.send(b"4\n")
+            terminal.finish(13, interactive=False)
+
     def test_redirected_streams(self):
-        for data, expected in (("q\n", 0), ("", 0), ("bad\nitem2\n", 12)):
+        for data, expected in (("q\n", 0), ("", 0), ("4\n", 13), ("bad\nitem2\n", 12)):
             result = subprocess.run([PROBE], input=data, text=True, capture_output=True, timeout=10)
             self.assertEqual(result.returncode, expected)
-            self.assertNotIn("\x1b[?1049h", result.stdout)
+            self.assertIn("1. item0", result.stdout)
+            self.assertIn("20. item19", result.stdout)
+            self.assertNotIn("\x1b", result.stdout)
+
+    @unittest.skipUnless(DEMOS, "Pass demo executables for macOS Metal launch checks")
+    def test_demo_redirected_number_and_name_selection(self):
+        for demo in DEMOS:
+            for choice in ("1\n", "triangle\n"):
+                with self.subTest(demo=demo, choice=choice), tempfile.TemporaryDirectory(prefix="longmarch-tui-") as directory:
+                    result = subprocess.run(
+                        [demo, "--backend", "metal", "--frames", "1"], input=choice,
+                        text=True, capture_output=True, timeout=30, cwd=directory,
+                    )
+                    self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+                    self.assertIn("Select option", result.stdout)
+                    self.assertNotIn("\x1b[?1049h", result.stdout)
 
     @unittest.skipUnless(DEMOS, "Pass demo executables for macOS Metal launch checks")
     def test_demo_default_menu_launch(self):

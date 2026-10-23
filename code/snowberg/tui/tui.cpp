@@ -63,6 +63,12 @@ bool Terminal::Open() {
 #if defined(_WIN32)
   if (!GetConsoleMode(input_, &input_mode_) || !GetConsoleMode(output_, &output_mode_))
     return false;
+  // IDE Run consoles may expose console handles but only a one-line viewport.
+  // Decide before changing modes or emitting any terminal control sequences.
+  CONSOLE_SCREEN_BUFFER_INFO info{};
+  if (!GetConsoleScreenBufferInfo(output_, &info) || info.srWindow.Right - info.srWindow.Left + 1 < 2 ||
+      info.srWindow.Bottom - info.srWindow.Top + 1 < 2)
+    return false;
   const DWORD mode =
       (input_mode_ | ENABLE_MOUSE_INPUT | ENABLE_WINDOW_INPUT | ENABLE_EXTENDED_FLAGS | ENABLE_VIRTUAL_TERMINAL_INPUT) &
       ~(ENABLE_QUICK_EDIT_MODE | ENABLE_LINE_INPUT | ENABLE_ECHO_INPUT | ENABLE_PROCESSED_INPUT);
@@ -77,7 +83,10 @@ bool Terminal::Open() {
   SetConsoleOutputCP(CP_UTF8);
 #else
   const char *term = std::getenv("TERM");
-  if (!isatty(STDIN_FILENO) || !isatty(STDOUT_FILENO) || !term || std::string_view(term) == "dumb")
+  if (!isatty(STDIN_FILENO) || !isatty(STDOUT_FILENO) || !term || !*term || std::string_view(term) == "dumb")
+    return false;
+  winsize size{};
+  if (ioctl(STDOUT_FILENO, TIOCGWINSZ, &size) != 0 || size.ws_col < 2 || size.ws_row < 2)
     return false;
   if (tcgetattr(STDIN_FILENO, &original_) != 0)
     return false;

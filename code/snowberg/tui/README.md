@@ -30,7 +30,7 @@ if (!choice)
   and the alternate screen are cleaned up when selection ends. Don't run other
   console writers or menus concurrently. Forced process termination cannot restore
   terminal state.
-- Redirected streams and unsupported terminals use a number/name prompt. Invalid
+- Redirected streams and unsupported terminals use a sequentially printed number/name prompt. Invalid
   entries retry; `q`, `quit`, Esc or EOF cancels. CLI demo selection remains available
   through `--module` without entering terminal mode.
 
@@ -42,9 +42,19 @@ against `tui_menu_probe` and the three demo launchers.
 stream for mouse capture enable/disable and feeds SGR mouse reports and wheel
 events. The optional DLL path tests IDE-bundled ConPTY implementations.
 
-In CLion's Run window, enable **Emulate terminal in the output console**; the
-ordinary output console is not a full terminal. This setting is separate from
-the Terminal tool window, where ConPTY mouse capture is negotiated by the module.
+CLion's ordinary Run output console uses the sequential text menu: enter an
+option's one-based number or its name, then Enter. Pipes, missing/empty/dumb TERM
+on POSIX, unavailable terminal dimensions, and initial viewports smaller than two
+rows or two columns take this path before any mode changes or escape sequences.
+The size check also handles IDE bridges exposing a one-line pseudo-console.
+This is capability-based detection, not a check for an IDE process name.
+
+For interactive highlighting and mouse input in CLion Run, enable **Emulate
+terminal in the output console**. A full terminal with usable dimensions keeps
+the interactive menu, including subsequent resizes to small sizes. This setting
+is separate from the Terminal tool window. A bridge advertising full terminal
+capabilities while not implementing them cannot be reliably identified from
+its handles and size alone.
 
 On POSIX hosts, run `python3 test/tui/test_pty.py <tui_menu_probe>` for isolated
 PTY integration tests of arrows, fragmented VT input, SGR clicks/double-clicks,
