@@ -19,16 +19,13 @@ struct State {
   std::thread::id thread;
   bool initialized{};
   std::mutex mutex;
-  std::vector<std::pair<GLFWwindow *, std::unique_ptr<WaylandColor>>> destroyed;
+  std::vector<GLFWwindow *> destroyed;
   std::unordered_map<GLFWwindow *, Window *> windows;
   bool resize_failed{};
 
   ~State() {
-    if (initialized && thread == std::this_thread::get_id()) {
-      // Destroy observers while the GLFW-owned Wayland connection is still alive.
-      destroyed.clear();
+    if (initialized && thread == std::this_thread::get_id())
       glfwTerminate();
-    }
   }
 };
 
@@ -132,15 +129,13 @@ bool IsWindowThread() {
 bool PollEvents() {
   if (!Initialize())
     return false;
-  std::vector<std::pair<GLFWwindow *, std::unique_ptr<WaylandColor>>> destroyed;
+  std::vector<GLFWwindow *> destroyed;
   {
     std::lock_guard<std::mutex> lock(Get().mutex);
     destroyed.swap(Get().destroyed);
   }
-  for (auto &entry : destroyed) {
-    entry.second.reset();
-    glfwDestroyWindow(entry.first);
-  }
+  for (auto window : destroyed)
+    glfwDestroyWindow(window);
   glfwPollEvents();
   std::lock_guard<std::mutex> lock(Get().mutex);
   return !Get().resize_failed;
@@ -182,15 +177,14 @@ bool SetWindowTitle(GLFWwindow *window, const char *title) {
   return true;
 }
 
-void DestroyWindow(GLFWwindow *window, std::unique_ptr<WaylandColor> color) {
+void DestroyWindow(GLFWwindow *window) {
   if (!window)
     return;
-  if (IsWindowThread()) {
-    color.reset();
+  if (IsWindowThread())
     glfwDestroyWindow(window);
-  } else {
+  else {
     std::lock_guard<std::mutex> lock(Get().mutex);
-    Get().destroyed.emplace_back(window, std::move(color));
+    Get().destroyed.push_back(window);
   }
 }
 }  // namespace glfw

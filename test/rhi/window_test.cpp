@@ -1,10 +1,8 @@
 #include <gtest/gtest.h>
 
 #include <algorithm>
-#include <chrono>
 #include <cstdlib>
 #include <limits>
-#include <thread>
 
 #ifdef _WIN32
 #define NOMINMAX
@@ -47,7 +45,7 @@ TEST_P(RhiWindow, ReferenceWhiteQueryDoesNotReplaceTheCurrentFrame) {
   } else {
     EXPECT_EQ(nits, -1.0f);
   }
-#ifdef __APPLE__
+#ifndef _WIN32
   EXPECT_FALSE(known);
 #endif
   const float scale = window.GetHDRReferenceWhiteScale();
@@ -69,35 +67,21 @@ TEST_P(RhiWindow, ReferenceWhiteQueryDoesNotReplaceTheCurrentFrame) {
 }
 
 #if defined(__linux__) && defined(GLFW_PLATFORM)
-TEST_P(RhiWindow, LinuxWindowSystemAndAsyncReferenceWhite) {
+TEST_P(RhiWindow, LinuxWindowSystemAndHDRDefaults) {
   if (!std::getenv("LONGMARCH_RHI_WINDOW_TESTS"))
     GTEST_SKIP();
   auto core = rhix::CreateCore(GetParam());
   ASSERT_TRUE(core);
   auto device = core.CreateDeviceByAutoSelection();
   ASSERT_TRUE(device);
-  auto window = device.CreateGLFWWindow({320, 240, "RHI Linux feedback"});
+  auto window = device.CreateGLFWWindow({320, 240, "RHI Linux HDR defaults"});
   ASSERT_TRUE(window);
   if (const char *expected = std::getenv("LONGMARCH_TEST_EXPECT_PLATFORM"))
     EXPECT_EQ(glfwGetPlatform(), std::string(expected) == "wayland" ? GLFW_PLATFORM_WAYLAND : GLFW_PLATFORM_X11);
-  bool known = false;
+  ASSERT_TRUE(Window::PollEvents());
   float nits = -1;
-  for (int i = 0; i < 100; ++i) {
-    ASSERT_TRUE(Window::PollEvents());
-    known = window.GetHDRReferenceWhiteNits(nits);
-    if (known)
-      break;
-    EXPECT_EQ(nits, -1);
-    std::this_thread::sleep_for(std::chrono::milliseconds(10));
-  }
-  if (glfwGetPlatform() == GLFW_PLATFORM_X11)
-    EXPECT_FALSE(known);
-  if (std::getenv("LONGMARCH_TEST_REQUIRE_COLOR_FEEDBACK"))
-    EXPECT_TRUE(known);
-  if (known) {
-    EXPECT_GT(nits, 0);
-    RecordProperty("reference_white_nits", std::to_string(nits));
-  }
+  EXPECT_FALSE(window.GetHDRReferenceWhiteNits(nits));
+  EXPECT_EQ(nits, -1);
   EXPECT_FLOAT_EQ(window.GetHDRReferenceWhiteScale(), 1);
   EXPECT_FLOAT_EQ(window.GetHDRHeadroom(), 10);
 }

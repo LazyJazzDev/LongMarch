@@ -125,7 +125,7 @@ float Window::GetHDRReferenceWhiteScale() const {
   float nits;
   return GetHDRReferenceWhiteNits(nits) ? nits / 80.0f : 1.0f;
 #else
-  // Wayland output feedback is not the source encoding's reference white.
+  // Linux uses fixed source encoding parameters; macOS uses relative EDR.
   return 1.0f;
 #endif
 }
@@ -197,7 +197,7 @@ bool Window::GetHDRReferenceWhiteNits(float &nits) const {
     return true;
   }
 #endif
-  return wayland_color_ && wayland_color_->ReferenceWhite(nits);
+  return false;
 }
 
 ColorSpace Window::RequestedColorSpace() const {
@@ -206,7 +206,7 @@ ColorSpace Window::RequestedColorSpace() const {
 
 Window::~Window() {
   glfw::UnregisterWindow(window_);
-  glfw::DestroyWindow(window_, std::move(wayland_color_));
+  glfw::DestroyWindow(window_);
 }
 
 bool Window::InitializeWindow(const WindowDesc &desc) {
@@ -215,7 +215,6 @@ bool Window::InitializeWindow(const WindowDesc &desc) {
   window_ = glfw::CreateGLFWWindow(desc.width, desc.height, desc.title.c_str());
   if (!window_)
     return false;
-  wayland_color_ = std::make_unique<WaylandColor>(window_);
   glfw::RegisterWindow(this);
   return true;
 }

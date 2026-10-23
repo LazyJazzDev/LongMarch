@@ -40,13 +40,12 @@ class IWindow : public IObject {
   // Encoding of the last successfully configured, drawable swapchain.
   virtual ColorSpace GetColorSpace() const = 0;
   // Query reference white in cd/m^2 on the window thread. Windows requires HDR enabled.
-  // Wayland returns the surface's preferred reference white (also in SDR), asynchronously
-  // updated by PollEvents. Unsupported, pending or failed feedback returns false.
+  // Unsupported platforms (including Linux) and failed queries return false.
   // On failure nits is unchanged. This does not change presentation encoding.
   virtual bool GetHDRReferenceWhiteNits(float &nits) const = 0;
   // Multiply relative linear RGB by this to align 1.0 with SDR white.
   // Windows: reference white / 80; macOS EDR and Linux: 1. Unavailable: 1.
-  // Wayland output reference white must not be reapplied to source encoding.
+  // Linux uses fixed source encoding parameters without an output-white query.
   virtual float GetHDRReferenceWhiteScale() const = 0;
   // Peak / reference white, in relative linear units, at least 1.
   // Unavailable display information returns 10, not a measured capability.

@@ -269,20 +269,14 @@ an accidental second output-white adjustment in the presentation shader.
 
 ## RHI / rhix HDR windows
 
-The RHI and rhix hello HDR modules use the same 203-nit Linux PQ content reference
-white. Their native linear scale remains 1; output feedback is never applied a
-second time to PQ pixels. `GetHDRReferenceWhiteNits` observes the window surface's
-preferred description asynchronously through `PollEvents`, in SDR as well as HDR.
-It reports false without modifying the argument while pending, unsupported,
-ICC-only or failed, and refreshes after `preferred_changed`. It neither sets a
-surface color description nor changes desktop settings. `GetHDRHeadroom` remains
-the unknown-information default of 10: a 10000-nit PQ volume is not a panel peak.
+The RHI and rhix hello HDR modules use a fixed 203-nit Linux PQ content reference
+white, linear scale 1 and unknown-headroom default 10. On Linux,
+`GetHDRReferenceWhiteNits` returns false without modifying its argument. RHI does
+not query Wayland color-management feedback or add protocol build dependencies.
+These constants describe demo encoding policy, not measured display brightness.
+The optional Sparkium diagnostic described above remains separate.
 
-RHI enables this observer automatically when native GLFW Wayland, `wayland-client`,
-`wayland-scanner` and `wayland-protocols >= 1.41` are available at build time. Builds
-without these dependencies retain unknown-query behavior and SDR/X11 support.
-This does not change the optional Sparkium probe or Sparkium's rendering policy.
-RHI also exposes `COLOR_SPACE_BT709_LINEAR` when Vulkan advertises
+RHI exposes `COLOR_SPACE_BT709_LINEAR` when Vulkan advertises
 `RGBA16_FLOAT + BT709_LINEAR_EXT`. Both hello HDR demos show this as **Linear
 Rec.709** and write linear values directly, without PQ or sRGB encoding or scRGB
 white compensation. This is separate from scRGB; the compositor determines the
@@ -292,27 +286,12 @@ RHI defaults to trying compiled-in Wayland first, then X11 on initialization fai
 and honors `LONGMARCH_WINDOW_SYSTEM=auto|wayland|x11`. Explicit requests do not fall
 back. A working SDR-only Wayland connection stays on Wayland.
 
-### RHI validation, 2026-10-23
+### RHI validation after removing output feedback, 2026-10-23
 
-Ninja Release, Vulkan, RTX 3090 Ti / NVIDIA 595.99.02, native Wayland:
-
-- Full RHI suite with window tests enabled: **85/85 passed**. The async surface
-  feedback query returned **203 nits**, with linear scale 1 and fallback headroom 10.
-- Explicit X11 (XWayland) and automatic fallback with a nonexistent Wayland socket:
-  **3/3 window/HDR tests passed in each mode**, including unknown reference white
-  without modifying the query argument.
-- Both RHI and rhix HDR demos completed 12 frames each on native Wayland, explicit
-  X11, and headless Vulkan (six runs). Wayland exercised PQ/SDR switching; X11
-  explicitly reported SDR-only support; headless runs exercised all three encodings.
-- The observer's dependency-free stub also passed a standalone C++ syntax check.
-
-These checks do not measure physical brightness. Live desktop setting changes,
-multi-monitor migration, an entirely X11-only build, and Windows/macOS were not
-retested in this Linux run.
-
-The subsequent linear Rec.709 update passed the five targeted reference-white,
-color-space transition, HDR upload and platform-macro tests, plus the three
-window tests in each of explicit X11 and automatic fallback. Both hello demos
-again completed all six 12-frame runs: Wayland now advertises and renders
-**Linear Rec.709 / RGBA16 FLOAT** alongside PQ and SDR; headless runs exercise
-all four encodings. Physical luminance mapping was not measured.
+Release builds of both hello demos and `test_rhi` passed. Five targeted Vulkan
+reference-white/default-value, color-space transition, HDR upload and platform-macro
+tests passed on Wayland; three window tests passed in each of explicit X11
+(XWayland) and automatic fallback with an invalid Wayland socket. Both demos
+completed six 12-frame runs across Wayland, X11 and headless. Wayland rendered
+linear Rec.709, PQ and SDR; headless covered all four encodings. Physical brightness,
+Windows/macOS and a full X11-only build were not validated in this update.

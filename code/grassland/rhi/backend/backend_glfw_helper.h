@@ -1,6 +1,4 @@
 ﻿#pragma once
-#include "grassland/rhi/backend/backend_wayland_color.h"
-
 struct GLFWwindow;
 
 namespace grassland::rhi::backend {
@@ -14,7 +12,7 @@ bool Initialize();
 bool PollEvents();
 bool IsWindowThread();
 GLFWwindow *CreateGLFWWindow(int width, int height, const char *title);
-void DestroyWindow(GLFWwindow *window, std::unique_ptr<WaylandColor> color);
+void DestroyWindow(GLFWwindow *window);
 bool SetWindowTitle(GLFWwindow *window, const char *title);
 }  // namespace glfw
 
