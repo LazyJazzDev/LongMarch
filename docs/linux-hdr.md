@@ -269,7 +269,8 @@ an accidental second output-white adjustment in the presentation shader.
 
 ## RHI / rhix HDR windows
 
-The RHI and rhix hello HDR modules use a fixed 203-nit Linux PQ content reference
+The RHI and rhix hello HDR modules require a window; explicit headless requests
+are rejected, and headless `--all` runs skip HDR. They use a fixed 203-nit Linux PQ content reference
 white, linear scale 1 and unknown-headroom default 10. On Linux,
 `GetHDRReferenceWhiteNits` returns false without modifying its argument. RHI does
 not query Wayland color-management feedback or add protocol build dependencies.
@@ -286,12 +287,11 @@ RHI defaults to trying compiled-in Wayland first, then X11 on initialization fai
 and honors `LONGMARCH_WINDOW_SYSTEM=auto|wayland|x11`. Explicit requests do not fall
 back. A working SDR-only Wayland connection stays on Wayland.
 
-### RHI validation after removing output feedback, 2026-10-23
+### RHI HDR demo validation, 2026-10-23
 
-Release builds of both hello demos and `test_rhi` passed. Five targeted Vulkan
-reference-white/default-value, color-space transition, HDR upload and platform-macro
-tests passed on Wayland; three window tests passed in each of explicit X11
-(XWayland) and automatic fallback with an invalid Wayland socket. Both demos
-completed six 12-frame runs across Wayland, X11 and headless. Wayland rendered
-linear Rec.709, PQ and SDR; headless covered all four encodings. Physical brightness,
-Windows/macOS and a full X11-only build were not validated in this update.
+Release builds of both window-only HDR demos passed. Both completed 12-frame native
+Wayland runs covering linear Rec.709, PQ and SDR. Explicit headless HDR requests
+were rejected, and both headless `--all --frames 1` runs succeeded while skipping
+HDR. XWayland key-event checks verified P toggles V-Sync once per press, the title
+shows positive FPS and On/Off state, and Escape exits cleanly. Physical brightness,
+native Wayland keyboard input and Windows/macOS were not validated in this update.

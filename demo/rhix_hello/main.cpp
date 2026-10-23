@@ -34,7 +34,7 @@ int main(int argc, char **argv) {
     }
     if (arg == "--help") {
       std::cout
-          << "[--module window|triangle|cube|texture|blend|nbody|raytracing|ray_query|hdr | --tui | --all] [--backend auto|d3d12|vulkan|metal] [--headless] [--frames N]\nHeadless defaults to 3000 frames per scene; --all defaults to 300 frames with windows.\nMissing backend or module: select each missing option in the terminal menu; a sole enabled backend is automatic. --backend auto explicitly uses the default API.\n";
+          << "[--module window|triangle|cube|texture|blend|nbody|raytracing|ray_query|hdr | --tui | --all] [--backend auto|d3d12|vulkan|metal] [--headless] [--frames N]\nHDR requires a window; --headless --all skips HDR.\nHeadless defaults to 3000 frames per scene; --all defaults to 300 frames with windows.\nMissing backend or module: select each missing option in the terminal menu; a sole enabled backend is automatic. --backend auto explicitly uses the default API.\n";
       return 0;
     }
     if (arg == "--module" && i + 1 < argc) {
@@ -159,7 +159,9 @@ int main(int argc, char **argv) {
       std::cerr << "ray_query: FAILED\n";
       result = 1;
     }
-    if (RunHDR(api, frames, headless) != 0) {
+    if (headless) {
+      std::cout << "hdr: SKIPPED (requires a window)\n";
+    } else if (RunHDR(api, frames) != 0) {
       std::cerr << "hdr: FAILED\n";
       result = 1;
     }
@@ -175,7 +177,7 @@ int main(int argc, char **argv) {
         {"nbody", "Compute simulation and particle rendering"},
         {"raytracing", "Ray pipeline, triangles and procedural sphere (D3D12/Vulkan)"},
         {"ray_query", "Inline ray queries"},
-        {"hdr", "HDR presentation and encoding test"},
+        {"hdr", "HDR presentation (window only)"},
     };
     snowberg::tui::Menu menu;
     const auto selected = menu.Select("RHIx Hello - Module Selection", options);
@@ -199,8 +201,13 @@ int main(int argc, char **argv) {
     return RunRayTracing(api, frames, headless);
   if (module == "ray_query")
     return RunRayQuery(api, frames, headless);
-  if (module == "hdr")
-    return RunHDR(api, frames, headless);
+  if (module == "hdr") {
+    if (headless) {
+      std::cerr << "hdr requires a window; --headless is unsupported.\n";
+      return 1;
+    }
+    return RunHDR(api, frames);
+  }
   std::cerr << "Unknown module: " << module << '\n';
   return 1;
 }

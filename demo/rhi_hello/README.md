@@ -184,7 +184,6 @@ The standalone [TLAS pressure test](../tlas_pressure_test/README.md) is built as
 demo_rhi_hello --module hdr --backend d3d12
 demo_rhi_hello --module hdr --backend vulkan
 demo_rhi_hello --module hdr --backend metal
-demo_rhi_hello --module hdr --backend vulkan --headless --frames 12
 ```
 
 `hdr` displays **0.25x, 0.5x, 1x, 2x and 4x relative to SDR reference white**, with neutral patches above Rec.709 primaries. Rendering consumes two window queries:
@@ -194,9 +193,9 @@ demo_rhi_hello --module hdr --backend vulkan --headless --frames 12
 
 The demo updates uniforms each frame. Before encoding it scales all RGB components by the same factor if their maximum exceeds headroom, preserving RGB ratios rather than clipping channels independently. SDR uses a limit of 1. This is a simple peak limiter, not a perceptual tone mapper, and does not guarantee gamut handling by the physical display. The shader defines `PQ_NITS_PER_UNIT` as 100 on macOS, 203 on Linux and 80 on Windows, unless overridden in the shader source prefix. It computes PQ normalization as `display.linear_scale * (PQ_NITS_PER_UNIT / 10000.0)`; C++ only supplies white scale and headroom. macOS linear EDR remains unscaled.
 
-`GetHDRReferenceWhiteNits(float &nits)` reads `DISPLAYCONFIG_SDR_WHITE_LEVEL` on Windows (HDR must be enabled). On Linux it returns false without changing the argument; no Wayland color-management feedback is queried. Headless runs use scale 1 and headroom 10; these defaults are not measurements.
+`GetHDRReferenceWhiteNits(float &nits)` reads `DISPLAYCONFIG_SDR_WHITE_LEVEL` on Windows (HDR must be enabled). On Linux it returns false without changing the argument; no Wayland color-management feedback is queried. The Linux defaults are not measurements.
 
-H cycles available color spaces; P toggles V-Sync once per press; Escape closes the window. Bounded window runs with at least three frames per available color space cycle automatically. The title shows FPS, the current V-Sync state and relative levels, refreshing every 250 ms or after a mode change. FPS counts completed render-loop frames and resets on color-space or V-Sync changes; it is not a measurement of physical scanout rate. The console reports presentation-mode changes, white scale and relative headroom (including defaults when unavailable). Headless mode exercises all encodings without claiming physical display validation. The demo waits after each frame and is not a throughput benchmark.
+H cycles available color spaces; P toggles V-Sync once per press; Escape closes the window. Bounded window runs with at least three frames per available color space cycle automatically. The title shows FPS, the current V-Sync state and relative levels, refreshing every 250 ms or after a mode change. FPS counts completed render-loop frames and resets on color-space or V-Sync changes; it is not a measurement of physical scanout rate. The console reports presentation-mode changes, white scale and relative headroom (including defaults when unavailable). HDR requires a window: `--module hdr --headless` reports an error, and `--headless --all` skips HDR. The demo waits after each frame and is not a throughput benchmark.
 
 `WindowDesc::color_space` selects the initial encoding. `GetSupportedPresentationOptions()` reports `(present_mode, format, color_space)` combinations; `SetColorSpace()` explicitly rebuilds the swapchain, and `GetColorSpace()` reports the last successfully configured drawable swapchain. Release caller-held frames and recordings before switching, just as for resize/rebuild. Unsupported requests fail without silently selecting SDR or replacing the current frame; native failures can invalidate the swapchain. When minimized, a successful request may remain pending until restoration. A shader/pipeline must match the acquired image format and active color space.
 

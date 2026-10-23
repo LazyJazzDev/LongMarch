@@ -16,7 +16,7 @@ namespace {
 #include "built_in_shaders.inl"
 }
 
-int RunHDR(grassland::rhi::BackendAPI api, int frames, bool headless) {
+int RunHDR(grassland::rhi::BackendAPI api, int frames) {
   using namespace grassland::rhi;
 
   grassland::rhix::Core core = grassland::rhix::CreateCore(api);
@@ -30,32 +30,26 @@ int RunHDR(grassland::rhi::BackendAPI api, int frames, bool headless) {
     return 1;
   grassland::rhix::Window window;
   std::vector<ColorSpace> spaces{COLOR_SPACE_SRGB_NONLINEAR};
-  if (!headless) {
-    window = device.CreateGLFWWindow({960, 540, "RHIX HDR - H: color space, P: toggle VSync, Escape: close"});
-    if (!window)
-      return 1;
-    for (const auto &option : window.GetSupportedPresentationOptions()) {
-      std::cout << ColorSpaceName(option.color_space) << " / " << ImageFormatName(option.format) << " / "
-                << PresentModeName(option.present_mode) << '\n';
-      if (std::find(spaces.begin(), spaces.end(), option.color_space) == spaces.end())
-        spaces.push_back(option.color_space);
-    }
-    if (spaces.size() == 1)
-      std::cout << "HDR presentation unavailable on this surface; showing SDR explicitly.\n";
-  } else {
-    spaces = {COLOR_SPACE_SRGB_NONLINEAR, COLOR_SPACE_EXTENDED_SRGB_LINEAR, COLOR_SPACE_HDR10_ST2084,
-              COLOR_SPACE_BT709_LINEAR};
+  window = device.CreateGLFWWindow({960, 540, "RHIX HDR - H: color space, P: toggle VSync, Escape: close"});
+  if (!window)
+    return 1;
+  for (const auto &option : window.GetSupportedPresentationOptions()) {
+    std::cout << ColorSpaceName(option.color_space) << " / " << ImageFormatName(option.format) << " / "
+              << PresentModeName(option.present_mode) << '\n';
+    if (std::find(spaces.begin(), spaces.end(), option.color_space) == spaces.end())
+      spaces.push_back(option.color_space);
   }
+  if (spaces.size() == 1)
+    std::cout << "HDR presentation unavailable on this surface; showing SDR explicitly.\n";
   std::cout
       << "hdr: relative linear levels 0.25x, 0.5x, 1x, 2x, 4x reference white; top neutral, bottom Rec.709 primaries.\n";
   const auto pq = std::find(spaces.begin(), spaces.end(), COLOR_SPACE_HDR10_ST2084);
   size_t selected = pq != spaces.end() ? static_cast<size_t>(pq - spaces.begin()) : (spaces.size() > 1 ? 1 : 0);
-  if (window && !window.SetColorSpace(spaces[selected]))
+  if (!window.SetColorSpace(spaces[selected]))
     return 1;
   const auto &embedded = shader_list.at("modules/hdr/shaders/hdr.slang");
   const std::string shader(embedded.first, embedded.second);
   std::map<std::pair<ImageFormat, ColorSpace>, grassland::rhix::Program> programs;
-  std::map<ColorSpace, grassland::rhix::Image> targets;
   const BindingLayoutDesc settings_layout{{{0, BINDING_UNIFORM_BUFFER, 1, SHADER_VISIBILITY_FRAGMENT}}};
   auto settings_buffer = device.CreateBuffer({256});
   auto settings_group = device.CreateBindingGroup(settings_layout);
@@ -70,61 +64,43 @@ int RunHDR(grassland::rhi::BackendAPI api, int frames, bool headless) {
   auto title_time = std::chrono::steady_clock::now();
   int rendered = 0;
   while (!frames || rendered < frames) {
-    if (!headless) {
-      if (!PollEvents() || window.ShouldClose() || window.IsKeyDown(GLFW_KEY_ESCAPE))
-        break;
-      if (window.IsSwapChainInvalid() && !window.RebuildSwapChain())
+    if (!PollEvents() || window.ShouldClose() || window.IsKeyDown(GLFW_KEY_ESCAPE))
+      break;
+    if (window.IsSwapChainInvalid() && !window.RebuildSwapChain())
+      return 1;
+    const bool h = window.IsKeyDown(GLFW_KEY_H);
+    // Bounded runs exercise all available color spaces automatically.
+    const bool cycle = frames >= 3 * static_cast<int>(spaces.size()) && rendered > 0 &&
+                       rendered % std::max(1, frames / static_cast<int>(spaces.size())) == 0;
+    if ((h && !previous_h) || cycle) {
+      selected = (selected + 1) % spaces.size();
+      if (!window.SetColorSpace(spaces[selected]))
         return 1;
-      const bool h = window.IsKeyDown(GLFW_KEY_H);
-      // Bounded runs exercise all available color spaces automatically.
-      const bool cycle = frames >= 3 * static_cast<int>(spaces.size()) && rendered > 0 &&
-                         rendered % std::max(1, frames / static_cast<int>(spaces.size())) == 0;
-      if ((h && !previous_h) || cycle) {
-        selected = (selected + 1) % spaces.size();
-        if (!window.SetColorSpace(spaces[selected]))
-          return 1;
-        fps.Reset();
-        title_dirty = true;
-      }
-      previous_h = h;
-      const bool p = window.IsKeyDown(GLFW_KEY_P);
-      if (p && !previous_p) {
-        const auto requested =
-            window.GetPresentMode() == PRESENT_MODE_VSYNC ? PRESENT_MODE_CONTINUOUS : PRESENT_MODE_VSYNC;
-        if (!window.SetPresentMode(requested))
-          return 1;
-        std::cout << "hdr: presentation mode " << PresentModeName(window.GetPresentMode()) << '\n';
-        fps.Reset();
-        title_dirty = true;
-      }
-      previous_p = p;
-    } else {
-      selected = (rendered / std::max(1, frames / static_cast<int>(spaces.size()))) % spaces.size();
+      fps.Reset();
+      title_dirty = true;
     }
-    const float linear_scale = window ? window.GetHDRReferenceWhiteScale() : 1.0f;
-    const float headroom = window ? window.GetHDRHeadroom() : 10.0f;
+    previous_h = h;
+    const bool p = window.IsKeyDown(GLFW_KEY_P);
+    if (p && !previous_p) {
+      const auto requested =
+          window.GetPresentMode() == PRESENT_MODE_VSYNC ? PRESENT_MODE_CONTINUOUS : PRESENT_MODE_VSYNC;
+      if (!window.SetPresentMode(requested))
+        return 1;
+      std::cout << "hdr: presentation mode " << PresentModeName(window.GetPresentMode()) << '\n';
+      fps.Reset();
+      title_dirty = true;
+    }
+    previous_p = p;
+    const float linear_scale = window.GetHDRReferenceWhiteScale();
+    const float headroom = window.GetHDRHeadroom();
     if (linear_scale != previous_scale || headroom != previous_headroom) {
       std::cout << "hdr: reference white scale " << linear_scale << "; relative headroom " << headroom << '\n';
       previous_scale = linear_scale;
       previous_headroom = headroom;
     }
     const float settings[4] = {linear_scale, headroom, 0, 0};
-    const auto color_space = headless ? spaces[selected] : window.GetColorSpace();
-    grassland::rhix::Image image;
-    if (headless) {
-      auto &target = targets[color_space];
-      if (!target) {
-        const auto format = (color_space == COLOR_SPACE_EXTENDED_SRGB_LINEAR || color_space == COLOR_SPACE_BT709_LINEAR)
-                                ? IMAGE_FORMAT_RGBA16_FLOAT
-                            : color_space == COLOR_SPACE_HDR10_ST2084 ? IMAGE_FORMAT_RGB10A2_UNORM
-                                                                      : IMAGE_FORMAT_RGBA8_UNORM;
-        target = device.CreateImage({640, 360, format});
-        if (!target)
-          return 1;
-      }
-      image = target;
-    } else
-      image = window.GetNextImage();
+    const auto color_space = window.GetColorSpace();
+    grassland::rhix::Image image = window.GetNextImage();
     if (!image) {
       std::this_thread::sleep_for(std::chrono::milliseconds(10));
       continue;
@@ -155,7 +131,7 @@ int RunHDR(grassland::rhi::BackendAPI api, int frames, bool headless) {
         !context.CmdSetScissor({0, 0, extent.width, extent.height}) || !context.CmdDraw(3) ||
         !context.CmdEndRendering())
       return 1;
-    if (!headless && !context.CmdPresent(window))
+    if (!context.CmdPresent(window))
       return 1;
     grassland::rhix::SubmissionToken token = queue.Submit(std::move(context));
     if (!token || !token.WaitHost())
@@ -163,7 +139,7 @@ int RunHDR(grassland::rhi::BackendAPI api, int frames, bool headless) {
     fps.TickFrame();
     // The image and recording leave scope before a mode switch or PollEvents.
     const auto now = std::chrono::steady_clock::now();
-    if (!headless && (title_dirty || now - title_time >= std::chrono::milliseconds(250))) {
+    if (title_dirty || now - title_time >= std::chrono::milliseconds(250)) {
       if (!window.SetTitle(fmt::format(
               "RHIX HDR - {} - FPS: {:.1f} - VSync: {} - 0.25x | 0.5x | 1x | 2x | 4x white - H: color space, P: toggle VSync",
               ColorSpaceName(color_space), fps.GetFPS(), window.GetPresentMode() == PRESENT_MODE_VSYNC ? "On" : "Off")))
@@ -173,7 +149,6 @@ int RunHDR(grassland::rhi::BackendAPI api, int frames, bool headless) {
     }
     ++rendered;
   }
-  std::cout << "hdr: completed " << rendered << " frames ("
-            << (headless ? "offscreen encoding; no HDR display validation" : "window presentation") << ").\n";
+  std::cout << "hdr: completed " << rendered << " frames (window presentation).\n";
   return 0;
 }
