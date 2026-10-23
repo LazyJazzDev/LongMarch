@@ -102,6 +102,14 @@ rhi::ColorSpace Window::GetColorSpace() const {
   return Get()->GetColorSpace();
 }
 
+bool Window::GetHDRReferenceWhiteNits(float &nits) const {
+#if !defined(NDEBUG)
+  if (!*this)
+    return false;
+#endif
+  return Get()->GetHDRReferenceWhiteNits(nits);
+}
+
 std::vector<rhi::WindowPresentationOption> Window::GetSupportedPresentationOptions() const {
 #if !defined(NDEBUG)
   if (!*this)

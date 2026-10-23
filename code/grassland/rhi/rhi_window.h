@@ -39,6 +39,10 @@ class IWindow : public IObject {
   virtual bool SetColorSpace(ColorSpace color_space) = 0;
   // Encoding of the last successfully configured, drawable swapchain.
   virtual ColorSpace GetColorSpace() const = 0;
+  // Query the containing display's HDR-mode SDR reference white in cd/m^2.
+  // Windows only: false when HDR is disabled, unavailable, or the query fails.
+  // On failure nits is unchanged. This does not change presentation encoding.
+  virtual bool GetHDRReferenceWhiteNits(float &nits) const = 0;
   // Currently implemented combinations supported by this window's surface.
   // Formats are selected within the requested color space at creation/rebuild.
   // This is presentation capability, not a measurement of display luminance. Empty on failure.

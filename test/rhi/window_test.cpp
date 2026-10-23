@@ -1,4 +1,4 @@
-﻿#include <gtest/gtest.h>
+#include <gtest/gtest.h>
 
 #include <algorithm>
 #include <cstdlib>
@@ -24,6 +24,33 @@ namespace backend = rhi::backend;
 namespace {
 
 class RhiWindow : public testing::TestWithParam<BackendAPI> {};
+
+TEST_P(RhiWindow, ReferenceWhiteQueryDoesNotReplaceTheCurrentFrame) {
+  if (!std::getenv("LONGMARCH_RHI_WINDOW_TESTS"))
+    GTEST_SKIP();
+  auto core = rhix::CreateCore(GetParam());
+  ASSERT_TRUE(core);
+  auto device = core.CreateDeviceByAutoSelection();
+  ASSERT_TRUE(device);
+  auto window = device.CreateGLFWWindow({320, 240, "RHI reference white query"});
+  ASSERT_TRUE(window);
+  auto frame = window.GetNextImage();
+  ASSERT_TRUE(frame);
+  float nits = -1.0f;
+  const bool known = window.GetHDRReferenceWhiteNits(nits);
+  if (known) {
+    EXPECT_GT(nits, 0.0f);
+    EXPECT_LT(nits, 10000.0f);
+  } else {
+    EXPECT_EQ(nits, -1.0f);
+  }
+#ifndef _WIN32
+  EXPECT_FALSE(known);
+#endif
+  EXPECT_FALSE(window.IsSwapChainInvalid());
+  EXPECT_EQ(frame.Get(), window.GetNextImage().Get());
+  EXPECT_EQ(window.GetColorSpace(), COLOR_SPACE_SRGB_NONLINEAR);
+}
 
 TEST_P(RhiWindow, ColorSpaceSwitchingPreservesFrameContractAndRejectsUnsupportedModes) {
   if (!std::getenv("LONGMARCH_RHI_WINDOW_TESTS"))

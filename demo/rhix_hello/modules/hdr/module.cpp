@@ -22,10 +22,10 @@ int RunHDR(grassland::rhi::BackendAPI api, int frames, bool headless) {
 
 #if defined(__APPLE__) && TARGET_OS_OSX
   // Match PQ 100 nits to extended-linear 1.0 in the macOS EDR presentation path.
-  constexpr int pq_nits_per_unit = 100;
+  constexpr float fallback_white_nits = 100.0f;
 #else
   // Windows scRGB defines linear 1.0 as 80 nits.
-  constexpr int pq_nits_per_unit = 80;
+  constexpr float fallback_white_nits = 80.0f;
 #endif
 
   grassland::rhix::Core core = grassland::rhix::CreateCore(api);
@@ -54,8 +54,8 @@ int RunHDR(grassland::rhi::BackendAPI api, int frames, bool headless) {
   } else {
     spaces = {COLOR_SPACE_SRGB_NONLINEAR, COLOR_SPACE_EXTENDED_SRGB_LINEAR, COLOR_SPACE_HDR10_ST2084};
   }
-  std::cout << "hdr: linear patch levels 0.25, 1, 2.5375, 5, 12.5; PQ uses " << pq_nits_per_unit
-            << " nits/unit; top neutral, bottom Rec.709 primaries.\n";
+  std::cout
+      << "hdr: relative linear levels 0.25x, 0.5x, 1x, 2x, 4x reference white; top neutral, bottom Rec.709 primaries.\n";
   const auto pq = std::find(spaces.begin(), spaces.end(), COLOR_SPACE_HDR10_ST2084);
   size_t selected = pq != spaces.end() ? static_cast<size_t>(pq - spaces.begin()) : (spaces.size() > 1 ? 1 : 0);
   if (window && !window.SetColorSpace(spaces[selected]))
@@ -64,6 +64,13 @@ int RunHDR(grassland::rhi::BackendAPI api, int frames, bool headless) {
   const std::string shader(embedded.first, embedded.second);
   std::map<std::pair<ImageFormat, ColorSpace>, grassland::rhix::Program> programs;
   std::map<ColorSpace, grassland::rhix::Image> targets;
+  const BindingLayoutDesc settings_layout{{{0, BINDING_UNIFORM_BUFFER, 1, SHADER_VISIBILITY_FRAGMENT}}};
+  auto settings_buffer = device.CreateBuffer({256});
+  auto settings_group = device.CreateBindingGroup(settings_layout);
+  if (!settings_buffer || !settings_group || !settings_group.BindResource(0, settings_buffer))
+    return 1;
+  float previous_white = -1.0f;
+  bool previous_known = false;
   bool previous_h = false;
   int rendered = 0;
   while (!frames || rendered < frames) {
@@ -84,6 +91,20 @@ int RunHDR(grassland::rhi::BackendAPI api, int frames, bool headless) {
     } else {
       selected = (rendered / std::max(1, frames / 3)) % spaces.size();
     }
+    float white_nits = fallback_white_nits;
+    const bool white_known = window && window.GetHDRReferenceWhiteNits(white_nits);
+    float linear_scale = 1.0f;
+#ifdef _WIN32
+    linear_scale = white_nits / 80.0f;
+#endif
+    if (white_nits != previous_white || white_known != previous_known) {
+      std::cout << "hdr: reference white " << white_nits
+                << (white_known ? " nit (Windows display setting)" : " nit (encoding fallback; physical white unknown)")
+                << "; linear output scale " << linear_scale << '\n';
+      previous_white = white_nits;
+      previous_known = white_known;
+    }
+    const float settings[4] = {linear_scale, white_nits, 0, 0};
     const auto color_space = headless ? spaces[selected] : window.GetColorSpace();
     grassland::rhix::Image image;
     if (headless) {
@@ -106,8 +127,7 @@ int RunHDR(grassland::rhi::BackendAPI api, int frames, bool headless) {
     const auto extent = image.GetDesc();
     auto &program = programs[{extent.format, color_space}];
     if (!program) {
-      const auto source = "#define OUTPUT_COLOR_SPACE " + std::to_string(static_cast<int>(color_space)) +
-                          "\n#define PQ_NITS_PER_UNIT " + std::to_string(pq_nits_per_unit) + ".0\n" + shader;
+      const auto source = "#define OUTPUT_COLOR_SPACE " + std::to_string(static_cast<int>(color_space)) + "\n" + shader;
       grassland::rhix::Shader vs = device.CreateShader({source, "VSMain", SHADER_STAGE_VERTEX});
       grassland::rhix::Shader ps = device.CreateShader({source, "PSMain", SHADER_STAGE_FRAGMENT});
       if (!vs || !ps)
@@ -116,13 +136,15 @@ int RunHDR(grassland::rhi::BackendAPI api, int frames, bool headless) {
       desc.vertex_shader = vs.Get();
       desc.fragment_shader = ps.Get();
       desc.color_formats = {extent.format};
+      desc.pipeline_layout.groups = {settings_layout};
       program = device.CreateProgram(desc);
       if (!program)
         return 1;
       std::cout << "Rendering " << ColorSpaceName(color_space) << " / " << ImageFormatName(extent.format) << '\n';
     }
     grassland::rhix::CommandContext context = device.CreateCommandContext();
-    if (!context || !context.CmdBindProgram(program) ||
+    if (!context || !context.CmdUploadBuffer(settings_buffer, 0, settings, sizeof(settings)) ||
+        !context.CmdBindProgram(program) || !context.CmdBindGroup(0, settings_group) ||
         !context.CmdBeginRendering(image, ATTACHMENT_LOAD_OP_CLEAR, ATTACHMENT_STORE_OP_STORE, {0, 0, 0, 1}) ||
         !context.CmdSetViewport({0, 0, float(extent.width), float(extent.height), 0, 1}) ||
         !context.CmdSetScissor({0, 0, extent.width, extent.height}) || !context.CmdDraw(3) ||
@@ -134,7 +156,8 @@ int RunHDR(grassland::rhi::BackendAPI api, int frames, bool headless) {
     if (!token || !token.WaitHost())
       return 1;
     // The image and recording leave scope before a color-space switch or PollEvents.
-    if (!headless && !window.SetTitle("RHIX HDR - " + ColorSpaceName(color_space) + " - H: color space"))
+    if (!headless && !window.SetTitle("RHIX HDR - " + ColorSpaceName(color_space) +
+                                      " - 0.25x | 0.5x | 1x | 2x | 4x white - H: color space"))
       return 1;
     ++rendered;
   }

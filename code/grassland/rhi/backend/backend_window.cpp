@@ -4,6 +4,10 @@
 #include <cstdlib>
 #define GLFW_INCLUDE_NONE
 #include <GLFW/glfw3.h>
+#ifdef _WIN32
+#define GLFW_EXPOSE_NATIVE_WIN32
+#include <GLFW/glfw3native.h>
+#endif
 
 namespace grassland::rhi::backend {
 
@@ -111,6 +115,49 @@ bool Window::SetColorSpace(ColorSpace color_space) {
 
 ColorSpace Window::GetColorSpace() const {
   return color_space_;
+}
+
+bool Window::GetHDRReferenceWhiteNits(float &nits) const {
+#ifdef _WIN32
+#if !defined(NDEBUG)
+  if (!glfw::IsWindowThread())
+    return false;
+#endif
+  MONITORINFOEXW monitor{};
+  monitor.cbSize = sizeof(monitor);
+  if (!GetMonitorInfoW(MonitorFromWindow(glfwGetWin32Window(window_), MONITOR_DEFAULTTONEAREST), &monitor))
+    return false;
+  UINT32 path_count{}, mode_count{};
+  if (GetDisplayConfigBufferSizes(QDC_ONLY_ACTIVE_PATHS, &path_count, &mode_count) != ERROR_SUCCESS)
+    return false;
+  std::vector<DISPLAYCONFIG_PATH_INFO> paths(path_count);
+  std::vector<DISPLAYCONFIG_MODE_INFO> modes(mode_count);
+  if (QueryDisplayConfig(QDC_ONLY_ACTIVE_PATHS, &path_count, paths.data(), &mode_count, modes.data(), nullptr) !=
+      ERROR_SUCCESS)
+    return false;
+  for (UINT32 i = 0; i < path_count; ++i) {
+    const auto &path = paths[i];
+    DISPLAYCONFIG_SOURCE_DEVICE_NAME source{};
+    source.header = {DISPLAYCONFIG_DEVICE_INFO_GET_SOURCE_NAME, sizeof(source), path.sourceInfo.adapterId,
+                     path.sourceInfo.id};
+    if (DisplayConfigGetDeviceInfo(&source.header) != ERROR_SUCCESS ||
+        wcscmp(source.viewGdiDeviceName, monitor.szDevice))
+      continue;
+    DISPLAYCONFIG_GET_ADVANCED_COLOR_INFO color{};
+    color.header = {DISPLAYCONFIG_DEVICE_INFO_GET_ADVANCED_COLOR_INFO, sizeof(color), path.targetInfo.adapterId,
+                    path.targetInfo.id};
+    if (DisplayConfigGetDeviceInfo(&color.header) != ERROR_SUCCESS || !color.advancedColorEnabled)
+      return false;
+    DISPLAYCONFIG_SDR_WHITE_LEVEL white{};
+    white.header = {DISPLAYCONFIG_DEVICE_INFO_GET_SDR_WHITE_LEVEL, sizeof(white), path.targetInfo.adapterId,
+                    path.targetInfo.id};
+    if (DisplayConfigGetDeviceInfo(&white.header) != ERROR_SUCCESS || !white.SDRWhiteLevel)
+      return false;
+    nits = 80.0f * (white.SDRWhiteLevel / 1000.0f);
+    return true;
+  }
+#endif
+  return false;
 }
 
 ColorSpace Window::RequestedColorSpace() const {
