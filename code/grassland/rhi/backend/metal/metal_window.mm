@@ -1,7 +1,5 @@
 ﻿#include "grassland/rhi/backend/metal/metal_window.h"
 
-#include <cmath>
-
 #include "grassland/rhi/backend/metal/metal_swap_chain_image.h"
 #include "grassland/rhi/backend/metal/metal_util.h"
 #define GLFW_EXPOSE_NATIVE_COCOA
@@ -10,17 +8,6 @@
 #import <QuartzCore/CAMetalLayer.h>
 
 namespace grassland::rhi::backend::metal {
-float MetalWindow::GetHDRHeadroom() const {
-  @autoreleasepool {
-    auto screen = [glfwGetCocoaWindow(GLFWWindow()) screen];
-    if (screen) {
-      const float headroom = screen.maximumExtendedDynamicRangeColorComponentValue;
-      if (std::isfinite(headroom) && headroom >= 1.0f)
-        return headroom;
-    }
-    return 10.0f;
-  }
-}
 
 namespace {
 ImageFormat PresentationFormat(ColorSpace space) {

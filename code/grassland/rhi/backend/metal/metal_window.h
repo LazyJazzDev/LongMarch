@@ -13,7 +13,6 @@ class MetalWindow final : public Window {
   ObjectPtr<Image> AcquireNativeFrame() override;
   bool RebuildNativeSwapChain(PresentMode mode) override;
   PresentMode GetPresentMode() const override;
-  float GetHDRHeadroom() const override;
   std::vector<WindowPresentationOption> GetSupportedPresentationOptions() const override;
   bool IsFrameValid(uint64_t generation) const;
   const void *DeviceIdentity() const;

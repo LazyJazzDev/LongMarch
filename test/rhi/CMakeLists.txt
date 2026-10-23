@@ -16,3 +16,8 @@ if (LONGMARCH_METAL_ENABLED)
     target_sources(test_rhi PRIVATE metal_test.cpp metal_hdr_test.mm)
     target_include_directories(test_rhi PRIVATE ${LONGMARCH_METAL_CPP_DIR})
 endif ()
+
+if (APPLE)
+    target_sources(test_rhi PRIVATE cocoa_hdr_test.mm)
+    target_link_libraries(test_rhi PRIVATE "-framework Cocoa")
+endif ()

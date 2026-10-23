@@ -130,6 +130,7 @@ float Window::GetHDRReferenceWhiteScale() const {
 #endif
 }
 
+#ifndef __APPLE__
 float Window::GetHDRHeadroom() const {
 #ifdef _WIN32
   float white;
@@ -158,6 +159,8 @@ float Window::GetHDRHeadroom() const {
 #endif
   return 10.0f;
 }
+
+#endif
 
 bool Window::GetHDRReferenceWhiteNits(float &nits) const {
   if (!glfw::IsWindowThread())
