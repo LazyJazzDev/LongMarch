@@ -52,7 +52,7 @@ description: Apply the user-confirmed error-handling, build, commit-message, squ
 - 两组方括号之间没有空格，第二组后有一个空格。标题沿用项目的简洁英文描述。
 - `type` 选用与改动相符的类型，例如 `feat`、`fix`、`docs`、`chore`、`refactor`、`perf`、`test`。
 - `module` 使用实际模块，例如 `sparkium`、`graphics`、`assets`、`vscode`；不强行把跨模块改动归入错误模块。
-- 不要替换为 `feat(scope): ...` 等其他格式。PR 标题可以是自然语言，但不能直接将没有前缀的 PR 标题作为最终提交标题。
+- 不要替换为 `feat(scope): ...` 等其他格式。PR 标题必须使用英文，可以是自然语言，但不能直接将没有前缀的 PR 标题作为最终提交标题。
 - “提交 comment 格式”指 commit message，不是源代码注释或 GitHub 讨论评论。
 
 示例：
@@ -64,6 +64,8 @@ description: Apply the user-confirmed error-handling, build, commit-message, squ
 ```
 
 ## PR 报告
+
+- PR 标题统一使用英文；正文报告可以使用中文。更正历史中文标题时，已合并 PR 使用合并提交的英文标题（commit message 首行），不改写 Git 提交历史；未合并 PR 按当前内容拟定英文标题。
 
 - 在 macOS 上提交或更新图文报告时，所有应用界面截图统一使用 macOS 系统级窗口截图能力生成（例如系统截图工具或 `screencapture` 的窗口捕获），保留真实窗口外框、标题栏和系统阴影。不得以应用内部帧缓冲导出、无窗口截图或后期拼接的窗口与阴影替代；发布前检查截图确实包含窗口及阴影。
 - Sparkium 的功能性 PR 必须图文搭配：正文说明功能变化、使用方式与验证结果，并配合能展示该功能的实际截图、渲染结果或前后对比图；架构与流程可辅以 Mermaid 示意图。
