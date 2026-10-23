@@ -43,7 +43,7 @@ std::string ColorSpaceName(ColorSpace value) {
     case COLOR_SPACE_SRGB_NONLINEAR:
       return "SDR sRGB";
     case COLOR_SPACE_EXTENDED_SRGB_LINEAR:
-      return "HDR linear scRGB (80 nits/unit)";
+      return "HDR linear extended sRGB";
     case COLOR_SPACE_HDR10_ST2084:
       return "HDR10 Rec.2020 PQ";
     case COLOR_SPACE_BT709_LINEAR:
