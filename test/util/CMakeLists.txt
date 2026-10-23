@@ -1,1 +1,6 @@
 LONGMARCH_ADD_TEST()
+
+add_executable(test_virtual_file_system virtual_file_system_test.cpp)
+target_link_libraries(test_virtual_file_system PRIVATE grassland_util GTest::gtest_main)
+include(GoogleTest)
+gtest_discover_tests(test_virtual_file_system)

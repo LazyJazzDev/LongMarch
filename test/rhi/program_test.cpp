@@ -49,7 +49,7 @@ TEST_P(RhiProgram, FileShadersOwnPreprocessedIncludesAndDeferLayoutMacros) {
   ObjPtr<IShader> vertex, fragment;
   {
     VirtualFileSystem fs;
-    ASSERT_EQ(fs.WriteFile("shaders/include/types.slang", "#pragma once\nstruct Settings { float4 color; };\n"), 0);
+    ASSERT_EQ(fs.WriteFile(R"(shaders\include\types.slang)", "#pragma once\nstruct Settings { float4 color; };\n"), 0);
     ASSERT_EQ(
         fs.WriteFile("shaders/common.slang", "#include \"include/types.slang\"\nRHI_UNIFORM(0,0,Settings,settings);\n"),
         0);
@@ -61,12 +61,12 @@ float4 VSMain(Input input):SV_Position { return float4(input.position,1); }
 float4 PSMain():SV_Target0 { return settings.color; }
 )"),
               0);
-    vertex = device->CreateShader("shaders/main.slang", "VSMain", SHADER_STAGE_VERTEX, &fs);
+    vertex = device->CreateShader(R"(shaders\main.slang)", "VSMain", SHADER_STAGE_VERTEX, &fs);
     fragment = device->CreateShader("shaders/main.slang", "PSMain", SHADER_STAGE_FRAGMENT, &fs);
     ASSERT_TRUE(vertex);
     ASSERT_TRUE(fragment);
     EXPECT_EQ(vertex->GetDesc().file_system, &fs);
-    EXPECT_EQ(vertex->GetDesc().filename, "shaders/main.slang");
+    EXPECT_EQ(vertex->GetDesc().filename, R"(shaders\main.slang)");
     const auto &expanded = backend::ShaderCompileDesc(vertex.Get()).source;
     EXPECT_EQ(expanded.find("#include"), std::string::npos);
     EXPECT_NE(expanded.find("RHI_INPUT"), std::string::npos);

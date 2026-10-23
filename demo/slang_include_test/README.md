@@ -67,3 +67,16 @@ auto shader = device.CreateShaderFromSource(source, "VSMain", SHADER_STAGE_VERTE
 本机验证：文件系统生命周期、磁盘/内存输入、相对 include、搜索路径和宏定义、预处理失败、警告以及延迟布局宏均覆盖 Metal / Vulkan。两个 hello demo 的 triangle 模块展示嵌入式 VirtualFileSystem 文件加载。D3D12 已接入同一路径，但未在本机执行。
 
 前端默认入口文件名为 `main.slang`；Program 阶段后端合成源码使用 `shader.slang`，包括宏前缀后的 `#line` 和 Slang 模块源码路径，以区分两个阶段的诊断。
+
+## VirtualFileSystem 路径约定
+
+内部使用规范化 UTF-8 路径到文件内容的映射，目录由文件路径隐式表示；公开读写、复制移动及目录导入导出接口保持不变。
+
+- 每个平台都把 `/` 和 `\\` 识别为分隔符，允许混用及重复分隔符。
+- 前导分隔符表示 VFS 根目录，`/shaders/main.slang` 与 `shaders/main.slang` 等价。它不表示宿主磁盘根目录或 UNC 网络共享。
+- `.`、`..` 交给 `std::filesystem::path::lexically_normal()` 处理，不要求被消去的中间目录存在；规范化后越过虚拟根目录的路径失败。
+- 文件路径不能以分隔符、`.` 或 `..` 结尾；空路径、NUL、冒号（包括 Windows 盘符和流语法）无效。VFS 不解释宿主盘符。
+- 路径大小写敏感；文件不能覆盖隐式目录，也不能作为其他文件的父目录。无效路径及冲突写入不会建立部分目录；读取失败保持调用者的输出内容不变。
+- 虚拟路径按 UTF-8 转换，导入导出使用 `u8path` / `generic_u8string`，避免 Windows 系统代码页参与虚拟文件名转换。
+
+验证入口：`test_virtual_file_system`，以及 `test_rhi` 中的 `FileShadersOwnPreprocessedIncludesAndDeferLayoutMacros` 等 Shader 文件加载测试。反斜杠行为在 macOS 上也实际测试；不等同于已经执行原生 Windows 测试。

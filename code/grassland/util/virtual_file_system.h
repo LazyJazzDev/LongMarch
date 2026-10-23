@@ -32,6 +32,9 @@ class VirtualFileSystem : public FileSystem {
   VirtualFileSystem &operator=(const VirtualFileSystem &other);
   VirtualFileSystem &operator=(VirtualFileSystem &&other) noexcept;
 
+  // UTF-8 virtual paths: both separators are accepted on every host. Leading
+  // separators refer to the VFS root; drive-qualified paths and root escapes fail.
+  // Paths are lexical and case-sensitive. Directories are implicit.
   int WriteFile(const std::string &file_name, const std::vector<uint8_t> &data);
   int WriteFile(const std::string &file_name, const std::string &data);
   int WriteFile(const std::string &file_name, const char *data, size_t size);
@@ -45,9 +48,7 @@ class VirtualFileSystem : public FileSystem {
   void SaveToDirectory(const std::filesystem::path &path) const;
 
  private:
-  VirtualFileSystemEntry *AccessFile(const std::string &path, bool create_if_not_exists = false) const;
-
-  std::unique_ptr<VirtualFileSystemEntry> root_;
+  std::map<std::string, std::vector<uint8_t>> files_;
 };
 
 }  // namespace grassland
