@@ -3,6 +3,7 @@
 
 #include "grassland/rhi/backend/backend_glfw_helper.h"
 #include "grassland/rhi/backend/backend_image.h"
+#include "grassland/rhi/backend/backend_wayland_color.h"
 #include "grassland/rhi/rhi_window.h"
 
 namespace grassland::rhi::backend {
@@ -39,6 +40,7 @@ class Window : public Object<rhi::IWindow> {
   ColorSpace requested_color_space_{COLOR_SPACE_SRGB_NONLINEAR};
   ColorSpace color_space_{COLOR_SPACE_SRGB_NONLINEAR};
   GLFWwindow *window_{};
+  std::unique_ptr<WaylandColor> wayland_color_;
   std::mutex next_image_mutex_;
   ObjectPtr<Image> next_image_;
 };

@@ -1,5 +1,7 @@
 ﻿#include "grassland/rhi/backend/backend_glfw_helper.h"
 
+#include <cstdlib>
+#include <cstring>
 #include <mutex>
 #include <thread>
 #include <unordered_map>
@@ -17,13 +19,16 @@ struct State {
   std::thread::id thread;
   bool initialized{};
   std::mutex mutex;
-  std::vector<GLFWwindow *> destroyed;
+  std::vector<std::pair<GLFWwindow *, std::unique_ptr<WaylandColor>>> destroyed;
   std::unordered_map<GLFWwindow *, Window *> windows;
   bool resize_failed{};
 
   ~State() {
-    if (initialized && thread == std::this_thread::get_id())
+    if (initialized && thread == std::this_thread::get_id()) {
+      // Destroy observers while the GLFW-owned Wayland connection is still alive.
+      destroyed.clear();
       glfwTerminate();
+    }
   }
 };
 
@@ -75,7 +80,41 @@ bool Initialize() {
     return true;
 #endif
   }
-  if (!glfwInit()) {
+  bool initialized = false;
+#if defined(__linux__) && defined(GLFW_PLATFORM)
+  const char *platform = std::getenv("LONGMARCH_WINDOW_SYSTEM");
+  if (platform && std::strcmp(platform, "auto") != 0) {
+    int requested;
+    if (std::strcmp(platform, "wayland") == 0)
+      requested = GLFW_PLATFORM_WAYLAND;
+    else if (std::strcmp(platform, "x11") == 0)
+      requested = GLFW_PLATFORM_X11;
+    else {
+      ReportError(-1, "LONGMARCH_WINDOW_SYSTEM must be auto, wayland or x11.");
+      return false;
+    }
+    if (!glfwPlatformSupported(requested)) {
+      ReportError(-1, "Requested window system was not compiled into GLFW.");
+      return false;
+    }
+    glfwInitHint(GLFW_PLATFORM, requested);
+    initialized = glfwInit() == GLFW_TRUE;
+  } else {
+    if (glfwPlatformSupported(GLFW_PLATFORM_WAYLAND)) {
+      glfwInitHint(GLFW_PLATFORM, GLFW_PLATFORM_WAYLAND);
+      initialized = glfwInit() == GLFW_TRUE;
+      if (!initialized)
+        glfwGetError(nullptr);
+    }
+    if (!initialized && glfwPlatformSupported(GLFW_PLATFORM_X11)) {
+      glfwInitHint(GLFW_PLATFORM, GLFW_PLATFORM_X11);
+      initialized = glfwInit() == GLFW_TRUE;
+    }
+  }
+#else
+  initialized = glfwInit() == GLFW_TRUE;
+#endif
+  if (!initialized) {
     const char *message{};
     const int code = glfwGetError(&message);
     ReportError(code, message ? message : "GLFW initialization failed.");
@@ -93,13 +132,15 @@ bool IsWindowThread() {
 bool PollEvents() {
   if (!Initialize())
     return false;
-  std::vector<GLFWwindow *> destroyed;
+  std::vector<std::pair<GLFWwindow *, std::unique_ptr<WaylandColor>>> destroyed;
   {
     std::lock_guard<std::mutex> lock(Get().mutex);
     destroyed.swap(Get().destroyed);
   }
-  for (auto window : destroyed)
-    glfwDestroyWindow(window);
+  for (auto &entry : destroyed) {
+    entry.second.reset();
+    glfwDestroyWindow(entry.first);
+  }
   glfwPollEvents();
   std::lock_guard<std::mutex> lock(Get().mutex);
   return !Get().resize_failed;
@@ -141,14 +182,15 @@ bool SetWindowTitle(GLFWwindow *window, const char *title) {
   return true;
 }
 
-void DestroyWindow(GLFWwindow *window) {
+void DestroyWindow(GLFWwindow *window, std::unique_ptr<WaylandColor> color) {
   if (!window)
     return;
-  if (IsWindowThread())
+  if (IsWindowThread()) {
+    color.reset();
     glfwDestroyWindow(window);
-  else {
+  } else {
     std::lock_guard<std::mutex> lock(Get().mutex);
-    Get().destroyed.push_back(window);
+    Get().destroyed.emplace_back(window, std::move(color));
   }
 }
 }  // namespace glfw

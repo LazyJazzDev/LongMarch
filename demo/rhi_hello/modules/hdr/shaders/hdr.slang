@@ -2,6 +2,9 @@
 #ifndef PQ_NITS_PER_UNIT
 #if RHI_PLATFORM_MACOS
 #define PQ_NITS_PER_UNIT 100.0
+#elif RHI_PLATFORM_LINUX
+// Wayland PQ source reference white; output feedback must not be applied twice.
+#define PQ_NITS_PER_UNIT 203.0
 #else
 #define PQ_NITS_PER_UNIT 80.0
 #endif

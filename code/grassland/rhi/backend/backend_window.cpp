@@ -121,8 +121,13 @@ ColorSpace Window::GetColorSpace() const {
 }
 
 float Window::GetHDRReferenceWhiteScale() const {
+#ifdef _WIN32
   float nits;
   return GetHDRReferenceWhiteNits(nits) ? nits / 80.0f : 1.0f;
+#else
+  // Wayland output feedback is not the source encoding's reference white.
+  return 1.0f;
+#endif
 }
 
 float Window::GetHDRHeadroom() const {
@@ -155,11 +160,9 @@ float Window::GetHDRHeadroom() const {
 }
 
 bool Window::GetHDRReferenceWhiteNits(float &nits) const {
-#ifdef _WIN32
-#if !defined(NDEBUG)
   if (!glfw::IsWindowThread())
     return false;
-#endif
+#ifdef _WIN32
   MONITORINFOEXW monitor{};
   monitor.cbSize = sizeof(monitor);
   if (!GetMonitorInfoW(MonitorFromWindow(glfwGetWin32Window(window_), MONITOR_DEFAULTTONEAREST), &monitor))
@@ -194,7 +197,7 @@ bool Window::GetHDRReferenceWhiteNits(float &nits) const {
     return true;
   }
 #endif
-  return false;
+  return wayland_color_ && wayland_color_->ReferenceWhite(nits);
 }
 
 ColorSpace Window::RequestedColorSpace() const {
@@ -203,7 +206,7 @@ ColorSpace Window::RequestedColorSpace() const {
 
 Window::~Window() {
   glfw::UnregisterWindow(window_);
-  glfw::DestroyWindow(window_);
+  glfw::DestroyWindow(window_, std::move(wayland_color_));
 }
 
 bool Window::InitializeWindow(const WindowDesc &desc) {
@@ -212,6 +215,7 @@ bool Window::InitializeWindow(const WindowDesc &desc) {
   window_ = glfw::CreateGLFWWindow(desc.width, desc.height, desc.title.c_str());
   if (!window_)
     return false;
+  wayland_color_ = std::make_unique<WaylandColor>(window_);
   glfw::RegisterWindow(this);
   return true;
 }

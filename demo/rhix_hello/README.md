@@ -110,12 +110,12 @@ demo_rhix_hello --module hdr --backend vulkan --headless --frames 12
 
 `hdr` displays **0.25x, 0.5x, 1x, 2x and 4x relative to SDR reference white**, with neutral patches above Rec.709 primaries. Rendering consumes two window queries:
 
-- `GetHDRReferenceWhiteScale()`: multiplier aligning relative linear 1.0 with SDR white in the native linear HDR encoding. Windows computes reference-white nits / 80 on the CPU; macOS EDR always returns 1. Unavailable information returns 1.
-- `GetHDRHeadroom()`: peak brightness divided by reference white, in relative linear units. Windows matches the window's monitor across DXGI adapters and uses `IDXGIOutput6::GetDesc1().MaxLuminance`; macOS uses the current screen's `maximumExtendedDynamicRangeColorComponentValue`. Valid results are at least 1; unavailable information returns **10.0**.
+- `GetHDRReferenceWhiteScale()`: multiplier aligning relative linear 1.0 with SDR white in the native linear HDR encoding. Windows computes reference-white nits / 80 on the CPU; macOS EDR and Linux return 1. Wayland output feedback is not reapplied to the source encoding. Unavailable information returns 1.
+- `GetHDRHeadroom()`: peak brightness divided by reference white, in relative linear units. Windows matches the window's monitor across DXGI adapters and uses `IDXGIOutput6::GetDesc1().MaxLuminance`; macOS uses the current screen's `maximumExtendedDynamicRangeColorComponentValue`. Valid results are at least 1; unavailable information returns **10.0**. Linux retains this default: the Wayland primary-volume maximum is not a physical display peak.
 
-The demo updates uniforms each frame. Before encoding it scales all RGB components by the same factor if their maximum exceeds headroom, preserving RGB ratios rather than clipping channels independently. SDR uses a limit of 1. This is a simple peak limiter, not a perceptual tone mapper, and does not guarantee gamut handling by the physical display. The shader defines `PQ_NITS_PER_UNIT` as 100 on macOS and 80 elsewhere, unless overridden in the shader source prefix. It computes PQ normalization as `display.linear_scale * (PQ_NITS_PER_UNIT / 10000.0)`; C++ only supplies white scale and headroom. macOS linear EDR remains unscaled.
+The demo updates uniforms each frame. Before encoding it scales all RGB components by the same factor if their maximum exceeds headroom, preserving RGB ratios rather than clipping channels independently. SDR uses a limit of 1. This is a simple peak limiter, not a perceptual tone mapper, and does not guarantee gamut handling by the physical display. The shader defines `PQ_NITS_PER_UNIT` as 100 on macOS, 203 on Linux and 80 on Windows, unless overridden in the shader source prefix. It computes PQ normalization as `display.linear_scale * (PQ_NITS_PER_UNIT / 10000.0)`; C++ only supplies white scale and headroom. macOS linear EDR remains unscaled.
 
-`GetHDRReferenceWhiteNits(float &nits)` remains an optional Windows-only absolute query using `DISPLAYCONFIG_SDR_WHITE_LEVEL`. The demo does not call it. It returns false with its argument unchanged when HDR is disabled, unsupported or the query fails. Headless runs use scale 1 and headroom 10; these defaults are not measurements.
+`GetHDRReferenceWhiteNits(float &nits)` reads `DISPLAYCONFIG_SDR_WHITE_LEVEL` on Windows (HDR must be enabled), or the surface preferred reference white on native Wayland (including SDR). Wayland feedback updates asynchronously through `PollEvents`, including `preferred_changed`; pending, unsupported, ICC-only or failed queries return false without changing the argument. The demo does not use this output-side value for encoding. Headless runs use scale 1 and headroom 10; these defaults are not measurements.
 
 H cycles available color spaces; Escape closes the window. Bounded window runs of at least nine frames cycle automatically. The title lists the relative levels and the console reports white scale and relative headroom (including defaults when unavailable). Headless mode exercises all encodings without claiming physical display validation. The demo waits after each frame and is not a throughput benchmark.
 
@@ -134,3 +134,13 @@ Metal maps SDR to BGRA8Unorm / sRGB, linear HDR to RGBA16Float / extended linear
 Independent Metal images also support BGR10A2Unorm; RGBA16Float supports storage writes. HDR upload/readback tests cover all three new formats, including padded rows and highlights above 1.0. Shader source files use UTF-8 without BOM to permit source concatenation.
 
 RHI `CompileSlang` defines `RHI_PLATFORM_WINDOWS`, `RHI_PLATFORM_MACOS` and `RHI_PLATFORM_LINUX` as 0 or 1 for every shader session, including imported modules. Use `#if RHI_PLATFORM_MACOS`, not `#ifdef`, to select platform behavior. These describe the execution platform, independently of the shader output target (including Metal via SPIR-V). All three are zero on other platforms.
+
+On Linux, RHI tries Wayland first and falls back to X11 if initialization fails.
+`LONGMARCH_WINDOW_SYSTEM=auto|wayland|x11` can select the policy; explicit selections
+fail if unavailable. HDR capability does not trigger an X11 fallback.
+Wayland reference-white feedback is enabled automatically when native GLFW Wayland,
+`wayland-client`, `wayland-scanner` and `wayland-protocols >= 1.41` are available at
+build time. Otherwise the query remains unknown. X11 remains supported.
+Linux PQ source reference white is **203 nits**; compositor output reference white
+must not be multiplied into the pixels again. This follows the existing
+[Linux HDR convention](../../docs/linux-hdr.md), not a physical brightness measurement.

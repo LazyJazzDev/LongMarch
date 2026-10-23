@@ -266,3 +266,40 @@ an accidental second output-white adjustment in the presentation shader.
 - [Wayland color-management protocol](https://wayland.app/protocols/color-management-v1)
 - [GLFW build options](https://www.glfw.org/docs/latest/compile_guide.html)
 - [Vulkan HDR metadata](https://registry.khronos.org/vulkan/specs/latest/man/html/VK_EXT_hdr_metadata.html)
+
+## RHI / rhix HDR windows
+
+The RHI and rhix hello HDR modules use the same 203-nit Linux PQ content reference
+white. Their native linear scale remains 1; output feedback is never applied a
+second time to PQ pixels. `GetHDRReferenceWhiteNits` observes the window surface's
+preferred description asynchronously through `PollEvents`, in SDR as well as HDR.
+It reports false without modifying the argument while pending, unsupported,
+ICC-only or failed, and refreshes after `preferred_changed`. It neither sets a
+surface color description nor changes desktop settings. `GetHDRHeadroom` remains
+the unknown-information default of 10: a 10000-nit PQ volume is not a panel peak.
+
+RHI enables this observer automatically when native GLFW Wayland, `wayland-client`,
+`wayland-scanner` and `wayland-protocols >= 1.41` are available at build time. Builds
+without these dependencies retain unknown-query behavior and SDR/X11 support.
+This does not change the optional Sparkium probe or Sparkium's rendering policy.
+RHI defaults to trying compiled-in Wayland first, then X11 on initialization failure,
+and honors `LONGMARCH_WINDOW_SYSTEM=auto|wayland|x11`. Explicit requests do not fall
+back. A working SDR-only Wayland connection stays on Wayland.
+
+### RHI validation, 2026-10-23
+
+Ninja Release, Vulkan, RTX 3090 Ti / NVIDIA 595.99.02, native Wayland:
+
+- Full RHI suite with window tests enabled: **85/85 passed**. The async surface
+  feedback query returned **203 nits**, with linear scale 1 and fallback headroom 10.
+- Explicit X11 (XWayland) and automatic fallback with a nonexistent Wayland socket:
+  **3/3 window/HDR tests passed in each mode**, including unknown reference white
+  without modifying the query argument.
+- Both RHI and rhix HDR demos completed 12 frames each on native Wayland, explicit
+  X11, and headless Vulkan (six runs). Wayland exercised PQ/SDR switching; X11
+  explicitly reported SDR-only support; headless runs exercised all three encodings.
+- The observer's dependency-free stub also passed a standalone C++ syntax check.
+
+These checks do not measure physical brightness. Live desktop setting changes,
+multi-monitor migration, an entirely X11-only build, and Windows/macOS were not
+retested in this Linux run.
