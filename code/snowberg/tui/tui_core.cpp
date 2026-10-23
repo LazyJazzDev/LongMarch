@@ -21,12 +21,12 @@ namespace snowberg::tui {
 namespace {
 class Terminal {
  public:
-  bool Open();
+  bool Open(bool enhanced);
   ~Terminal();
   bool Read(std::deque<InputEvent> &events);
 
  private:
-  bool active_{};
+  bool active_{}, enhanced_{};
   detail::InputParser parser_;
 #if defined(_WIN32)
   HANDLE input_{GetStdHandle(STD_INPUT_HANDLE)};
@@ -42,7 +42,8 @@ class Terminal {
 #endif
 };
 
-bool Terminal::Open() {
+bool Terminal::Open(bool enhanced) {
+  enhanced_ = enhanced;
 #if defined(_WIN32)
   if (!GetConsoleMode(input_, &input_mode_) || !GetConsoleMode(output_, &output_mode_))
     return false;
@@ -73,6 +74,8 @@ bool Terminal::Open() {
   // ConPTY forwards mouse tracking to the outer terminal only with VT input enabled.
   // Read() accepts both native console events and VT sequences from terminal bridges.
   std::cout << "\x1b[?1049h\x1b[?25l\x1b[?1000h\x1b[?1003h\x1b[?1006h";
+  if (enhanced_)
+    std::cout << "\x1b[>4;2m\x1b[>1u\x1b[?2004h";
   std::cout << std::flush;
 #if defined(_WIN32)
   // Query dimensions and mouse coordinates from the active alternate screen.
@@ -89,7 +92,10 @@ Terminal::~Terminal() {
     std::cout.clear();
   // Stop report production before draining: disabling SGR first could make
   // an in-flight mouse report fall back to the legacy encoding.
-  std::cout << "\x1b[?1003l\x1b[?1000l\x1b[?1006l" << std::flush;
+  std::cout << "\x1b[?1003l\x1b[?1000l\x1b[?1006l";
+  if (enhanced_)
+    std::cout << "\x1b[?2004l\x1b[<u\x1b[>4;0m";
+  std::cout << std::flush;
 #if defined(_WIN32)
   DWORD mode{};
   if (GetConsoleMode(input_, &mode))
@@ -251,7 +257,7 @@ bool Terminal::Read(std::deque<InputEvent> &events) {
 }  // namespace
 
 struct Core::Impl {
-  bool active{}, running{}, failed{};
+  bool active{}, running{}, failed{}, enhanced{};
   int columns{}, rows{};
   std::string foreground, background;
   bool inverse{};
@@ -268,7 +274,7 @@ RunResult Core::Run() {
   if (!IsTerminalAvailable())
     return RunResult::Unavailable;
   Terminal terminal;
-  if (!terminal.Open())
+  if (!terminal.Open(impl_->enhanced))
     return RunResult::Error;
 
   // Also reset Core state if a user callback unwinds; Terminal restores modes.
@@ -319,8 +325,10 @@ RunResult Core::Run() {
       events.pop_front();
       if (const auto key = std::get_if<KeyEvent>(&event))
         OnKey(*key);
+      else if (const auto mouse = std::get_if<MouseEvent>(&event))
+        OnMouse(*mouse);
       else
-        OnMouse(std::get<MouseEvent>(event));
+        OnPaste(std::get<PasteEvent>(event));
     }
     if (impl_->running)
       OnUpdate();
@@ -328,6 +336,11 @@ RunResult Core::Run() {
   OnStop();
   impl_->active = impl_->running = false;
   return impl_->failed ? RunResult::Error : RunResult::Completed;
+}
+
+void Core::EnableEnhancedInput(bool enabled) {
+  if (!impl_->active)
+    impl_->enhanced = enabled;
 }
 
 void Core::Terminate() {

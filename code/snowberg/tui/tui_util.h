@@ -62,7 +62,11 @@ struct MouseEvent {
   Modifiers modifiers{};
 };
 
-using InputEvent = std::variant<KeyEvent, MouseEvent>;
+struct PasteEvent {
+  std::string text;
+};
+
+using InputEvent = std::variant<KeyEvent, MouseEvent, PasteEvent>;
 
 // Read-only capability check. POSIX waits up to 500 ms for an IDE PTY's size.
 bool IsTerminalAvailable();
@@ -71,6 +75,8 @@ Key MapVirtualKey(unsigned key);  // Windows virtual-key values; no platform hea
 Key MapTerminalKey(char final, int parameter = 0);
 
 namespace detail {
+std::string EncodeUTF8(char32_t character);
+std::u32string DecodeUTF8(std::string_view text);
 // Terminal-cell coordinates, not UTF-8 byte offsets. Control characters are sanitized.
 int TextWidth(std::string_view text);
 std::string TextSlice(std::string_view text, int offset, int width);
@@ -94,6 +100,7 @@ class InputParser {
 
  private:
   std::string pending_;
+  bool pasting_{};
   Clock::time_point pending_at_{};
 };
 }  // namespace detail

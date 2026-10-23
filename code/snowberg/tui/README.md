@@ -35,7 +35,7 @@ const auto status = app.Run();
 
 `Run()` checks the environment and enables terminal modes. It calls `OnStart`,
 `OnResize(columns, rows)`, then `OnUpdate`. Each iteration reads a bounded input
-batch, checks the viewport, dispatches queued `OnKey`/`OnMouse` events in order,
+batch, checks the viewport, dispatches queued `OnKey`/`OnMouse`/`OnPaste` events in order,
 and calls `OnUpdate` once. Idle reads wait about 40 ms so applications can animate.
 A resize callback precedes the batch's input callbacks. `Terminate()` stops further
 input/update callbacks; `OnStop()` runs while output remains available, then
@@ -155,3 +155,13 @@ not prove a terminal frontend's physical mouse forwarding.
 `test_console.py` and `test_conpty.py` provide native Windows and ConPTY menu
 regressions. These require native Windows; the Core refactor has not yet been
 run there. Linux also shares the POSIX code but was not tested in this change.
+
+## Message editor demo
+
+`demo/tui` provides `demo_tui`, a standalone multiline message recorder derived
+from Core. The shared CLion **TUI Messages** configuration enables emulation.
+See [the demo README](../../../demo/tui/README.md) for editing shortcuts and
+Shift+Enter host compatibility. `EnableEnhancedInput()` opts into CSI-u / xterm
+modified keys and bracketed paste; paste is delivered as one `OnPaste` event so
+embedded newlines cannot accidentally submit messages. This is opt-in; Menu
+does not enable the extra terminal modes.

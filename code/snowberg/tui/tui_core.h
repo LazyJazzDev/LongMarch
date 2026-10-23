@@ -23,6 +23,9 @@ class Core {
   // returning. Unavailable invokes no callbacks and emits no VT sequences.
   RunResult Run();
   void Terminate();
+  // Opt in before Run: request disambiguated keys and bracketed paste.
+  // Unsupported terminal protocols are ignored by the host.
+  void EnableEnhancedInput(bool enabled = true);
   int Columns() const;
   int Rows() const;
   void SetForegroundColor(uint8_t r, uint8_t g, uint8_t b);
@@ -47,6 +50,9 @@ class Core {
   }
 
   virtual void OnMouse(const MouseEvent &event) {
+  }
+
+  virtual void OnPaste(const PasteEvent &event) {
   }
 
   virtual void OnUpdate() {

@@ -218,6 +218,41 @@ Glyph Next(std::string_view &text) {
 }
 }  // namespace
 
+std::string EncodeUTF8(char32_t code) {
+  if (code > 0x10ffff || (code >= 0xd800 && code <= 0xdfff))
+    code = 0xfffd;
+  std::string result;
+  if (code < 0x80)
+    result += static_cast<char>(code);
+  else {
+    const int count = code < 0x800 ? 2 : code < 0x10000 ? 3 : 4;
+    result += static_cast<char>((count == 2 ? 0xc0 : count == 3 ? 0xe0 : 0xf0) | (code >> (6 * (count - 1))));
+    for (int i = count - 2; i >= 0; --i)
+      result += static_cast<char>(0x80 | ((code >> (6 * i)) & 0x3f));
+  }
+  return result;
+}
+
+std::u32string DecodeUTF8(std::string_view text) {
+  std::u32string result;
+  while (!text.empty()) {
+    const auto glyph = Next(text);
+    if (glyph.bytes.empty()) {
+      result += U'\ufffd';
+      continue;
+    }
+    const auto size = glyph.bytes.size();
+    char32_t code = static_cast<unsigned char>(glyph.bytes[0]) & (size == 1   ? 0x7f
+                                                                  : size == 2 ? 0x1f
+                                                                  : size == 3 ? 0x0f
+                                                                              : 7);
+    for (size_t i = 1; i < size; ++i)
+      code = (code << 6) | (static_cast<unsigned char>(glyph.bytes[i]) & 0x3f);
+    result += code;
+  }
+  return result;
+}
+
 RowText FitRow(std::string_view content, int cells) {
   RowText result;
   if (cells <= 0)
@@ -310,6 +345,16 @@ void InputParser::Feed(std::string_view bytes, Clock::time_point now) {
 
 void InputParser::Parse(std::deque<InputEvent> &events, Clock::time_point now) {
   while (!pending_.empty()) {
+    if (pasting_) {
+      const auto end = pending_.find("\x1b[201~");
+      if (end == std::string::npos)
+        break;
+      events.emplace_back(PasteEvent{pending_.substr(0, end)});
+      pending_.erase(0, end + 6);
+      pasting_ = false;
+      pending_at_ = now;
+      continue;
+    }
     const bool expired = now - pending_at_ >= std::chrono::milliseconds(80);
     const bool escape = pending_[0] == '\x1b';
     if (escape && pending_.size() == 1) {
@@ -358,6 +403,28 @@ void InputParser::Parse(std::deque<InputEvent> &events, Clock::time_point now) {
         }
         events.emplace_back(event);
       } else if (Parameters(sequence, params)) {
+        if (final == '~' && params.size() == 1 && params[0] == 200) {
+          pasting_ = true;
+          continue;
+        }
+        // CSI-u / Kitty disambiguation and xterm modifyOtherKeys.
+        const bool csi_u = final == 'u' && !params.empty() && params.size() <= 2;
+        const bool modified = final == '~' && params.size() == 3 && params[0] == 27;
+        if (csi_u || modified) {
+          const int code = params[modified ? 2 : 0];
+          const int flags = params.size() > 1 && params[1] > 0 ? params[1] - 1 : 0;
+          if (code < 0 || code > 0x10ffff || (code >= 0xd800 && code <= 0xdfff))
+            continue;
+          KeyEvent event{code == 13    ? Key::Enter
+                         : code == 27  ? Key::Escape
+                         : code == 9   ? Key::Tab
+                         : code == 127 ? Key::Backspace
+                                       : Key::Character,
+                         static_cast<char32_t>(code),
+                         {bool(flags & 1), bool(flags & 2), bool(flags & 4)}};
+          events.emplace_back(event);
+          continue;
+        }
         const auto key = MapTerminalKey(final, params.empty() ? 0 : params[0]);
         if (key == Key::Unknown)
           continue;

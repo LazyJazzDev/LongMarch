@@ -68,3 +68,29 @@ TEST(TuiUtil, RejectsMalformedMouseWithoutLosingFollowingKeys) {
   EXPECT_EQ(MapTerminalKey('~', 24), Key::F12);
 }
 }  // namespace snowberg::tui
+
+namespace snowberg::tui {
+TEST(TuiUtil, ModifiedEnterAndBracketedPaste) {
+  detail::InputParser parser;
+  std::deque<InputEvent> events;
+  parser.Feed("\x1b[13;2u\x1b[27;2;13~\x1b[200~a\r\nb\x1b[20");
+  parser.Parse(events);
+  ASSERT_EQ(events.size(), 2);
+  for (const auto &event : events) {
+    EXPECT_EQ(std::get<KeyEvent>(event).key, Key::Enter);
+    EXPECT_TRUE(std::get<KeyEvent>(event).modifiers.shift);
+  }
+  parser.Feed("1~\r");
+  parser.Parse(events);
+  ASSERT_EQ(events.size(), 4);
+  EXPECT_EQ(std::get<PasteEvent>(events[2]).text, "a\r\nb");
+  EXPECT_EQ(std::get<KeyEvent>(events[3]).key, Key::Enter);
+}
+
+TEST(TuiUtil, UnicodeConversionRoundTripsAndReplacesInvalidBytes) {
+  EXPECT_EQ(detail::DecodeUTF8(u8"中😀\n"), U"中😀\n");
+  EXPECT_EQ(detail::EncodeUTF8(U'😀'), u8"😀");
+  EXPECT_EQ(detail::DecodeUTF8("\xff"), U"\ufffd");
+  EXPECT_EQ(detail::EncodeUTF8(0xd800), u8"\ufffd");
+}
+}  // namespace snowberg::tui
