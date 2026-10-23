@@ -5,7 +5,7 @@
 #include <chrono>
 #include <iostream>
 
-#include "snowberg/tui/tui_text.h"
+#include "snowberg/tui/tui_util.h"
 
 namespace snowberg::tui {
 namespace {

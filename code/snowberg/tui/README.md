@@ -27,9 +27,8 @@ const auto status = app.Run();
 - `tui_core.h/cpp`: platform terminal modes, lifecycle, event queue, callbacks,
   viewport queries and row/color output. Platform types are private.
 - `tui_util.h/cpp`: key and mouse definitions, native/VT key mappings, capability
-  checks, terminal size queries and incremental VT parsing.
-- `tui_text.h/cpp`: UTF-8 display-cell widths, safe slicing/prefix fitting and
-  scrolling calculations. Complex emoji clusters and ambiguous-width characters
+  checks, terminal size queries, incremental VT parsing, UTF-8 display-cell
+  widths, safe slicing/prefix fitting and scrolling calculations. Complex emoji clusters and ambiguous-width characters
   are not fully normalized across terminals.
 - `tui_menu.h/cpp`: the public `Menu` application derived from `Core`, with `Menu::Select` for the
   three hello demos, plus its plain-text fallback.

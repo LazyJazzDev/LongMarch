@@ -1,6 +1,6 @@
 ﻿#include <gtest/gtest.h>
 
-#include "snowberg/tui/tui_text.h"
+#include "snowberg/tui/tui_util.h"
 
 namespace snowberg::tui::detail {
 TEST(TuiText, CropsToCellsWithoutSplittingWideCharacters) {

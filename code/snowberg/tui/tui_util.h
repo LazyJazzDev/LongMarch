@@ -71,6 +71,11 @@ Key MapVirtualKey(unsigned key);  // Windows virtual-key values; no platform hea
 Key MapTerminalKey(char final, int parameter = 0);
 
 namespace detail {
+// Terminal-cell coordinates, not UTF-8 byte offsets. Control characters are sanitized.
+int TextWidth(std::string_view text);
+std::string TextSlice(std::string_view text, int offset, int width);
+int ScrollOffset(int text_width, int viewport_width, double seconds);
+
 // Clips a UTF-8 prefix to cells, sanitizes controls/invalid bytes, and reports
 // consumed source bytes. A wide glyph that cannot fit is left unconsumed.
 struct RowText {
