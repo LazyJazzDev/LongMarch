@@ -38,6 +38,29 @@ TEST(RhiCoreSettings, D3D12OverridesDefaultAcrossSequentialCores) {
     ASSERT_TRUE(done->WaitHost());
   }
 }
+
+TEST(RhiCoreSettings, D3D12ValidationMessagesReachConsole) {
+  ObjPtr<ICore> core = CreateCore(BACKEND_API_D3D12, {true});
+  ASSERT_TRUE(core);
+  ObjPtr<IDevice> device = core->CreateDeviceByAutoSelection();
+  ASSERT_TRUE(device);
+  backend::d3d12::ComPtr<ID3D12InfoQueue1> messages;
+  ASSERT_EQ(
+      static_cast<backend::d3d12::D3D12Device *>(device.Get())->NativeDevice()->QueryInterface(IID_PPV_ARGS(&messages)),
+      S_OK);
+  testing::internal::CaptureStdout();
+  auto warning = messages->AddApplicationMessage(D3D12_MESSAGE_SEVERITY_WARNING, "RHI console warning probe");
+  auto error = messages->AddApplicationMessage(D3D12_MESSAGE_SEVERITY_ERROR, "RHI console error probe");
+  auto output = testing::internal::GetCapturedStdout();
+  EXPECT_EQ(warning, S_OK);
+  EXPECT_EQ(error, S_OK);
+  EXPECT_NE(output.find("[WARNING]"), std::string::npos);
+  EXPECT_NE(output.find("[ERROR]"), std::string::npos);
+  EXPECT_NE(output.find("D3D12 ["), std::string::npos);
+  EXPECT_NE(output.find("RHI console warning probe"), std::string::npos);
+  EXPECT_NE(output.find("RHI console error probe"), std::string::npos);
+}
+
 #endif
 
 #if defined(LONGMARCH_VULKAN_ENABLED)
