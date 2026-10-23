@@ -40,7 +40,12 @@ batch, checks the viewport, dispatches queued `OnKey`/`OnMouse` events in order,
 and calls `OnUpdate` once. Idle reads wait about 40 ms so applications can animate.
 A resize callback precedes the batch's input callbacks. `Terminate()` stops further
 input/update callbacks; `OnStop()` runs while output remains available, then
-terminal modes are restored before `Run()` returns. A later `Run()` can reuse the
+terminal modes are restored before `Run()` returns. Teardown first disables
+mouse reporting, then discards queued/in-flight input while raw/no-echo input is
+still active. It waits for 40 ms of quiet, capped at 250 ms under continuous
+traffic, and performs a final platform input flush when restoring modes. Stale
+reports are discarded, never sent to callbacks after termination. This bounded
+drain cannot guarantee against a bridge delaying a report beyond the deadline. A later `Run()` can reuse the
 Core; application state belongs to the subclass. Recursive Run is rejected.
 
 All methods and callbacks use the Run thread. Only one application may own the

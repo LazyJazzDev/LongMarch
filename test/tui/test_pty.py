@@ -110,6 +110,37 @@ class PtyMenuTest(unittest.TestCase):
         self.assertEqual(result.returncode, 0)
         self.assertEqual(result.stdout, "UNAVAILABLE\n")
 
+    def test_exit_drains_queued_and_in_flight_mouse_input(self):
+        core = str(pathlib.Path(PROBE).with_name("tui_core_probe"))
+        with Terminal([core, "--drain"], columns=20, rows=6) as terminal:
+            terminal.until(lambda: b"CORE_READY" in terminal.output)
+            # Pump both directions so a full PTY queue cannot deadlock the
+            # test writer against the application's output stream.
+            payload = memoryview(b"\r" + b"\x1b[<35;7;4M" * 500)
+            os.set_blocking(terminal.master, False)
+            deadline = time.monotonic() + 3
+            try:
+                while payload:
+                    self.assertLess(time.monotonic(), deadline, "PTY write stalled")
+                    try:
+                        payload = payload[os.write(terminal.master, payload):]
+                    except BlockingIOError:
+                        terminal.read(0.001)
+            finally:
+                os.set_blocking(terminal.master, True)
+            terminal.until(lambda: b"\x1b[?1006l" in terminal.output)
+            # Simulate a bridge delivering a fragmented report after disable.
+            terminal.send(b"\x1b[<0;7;")
+            terminal.read(0.01)
+            terminal.send(b"4m")
+            terminal.until(lambda: b"INPUT_READY" in terminal.output)
+            self.assertIn(b"\x1b[?1049l", terminal.output)
+            terminal.send(b"clean\n")
+            terminal.finish(0)
+            tail = terminal.output.split(b"\x1b[?1049l")[-1]
+            self.assertNotIn(b"[<", tail)
+            self.assertNotIn(b"mouse:", tail)
+
     def test_core_resize_callback(self):
         core = str(pathlib.Path(PROBE).with_name("tui_core_probe"))
         with Terminal([core], columns=20, rows=6) as terminal:

@@ -47,12 +47,18 @@ class Probe : public snowberg::tui::Core {
   }
 };
 
-int main() {
+int main(int argc, char **argv) {
   Probe probe;
   const auto result = probe.Run();
   if (result == snowberg::tui::RunResult::Unavailable) {
     std::cout << "UNAVAILABLE\n";
     return probe.events.empty() ? 0 : 1;
+  }
+  if (argc > 1 && std::string(argv[1]) == "--drain") {
+    std::cout << "INPUT_READY\n" << std::flush;
+    std::string line;
+    if (!std::getline(std::cin, line) || line != "clean")
+      return 102;
   }
   for (const auto &event : probe.events)
     std::cout << event << '\n';

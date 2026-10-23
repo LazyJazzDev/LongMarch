@@ -87,8 +87,44 @@ Terminal::~Terminal() {
     return;
   if (!std::cout)
     std::cout.clear();
-  std::cout << "\x1b[?1006l\x1b[?1003l\x1b[?1000l\x1b[0m\x1b[?25h\x1b[?1049l" << std::flush;
+  // Stop report production before draining: disabling SGR first could make
+  // an in-flight mouse report fall back to the legacy encoding.
+  std::cout << "\x1b[?1003l\x1b[?1000l\x1b[?1006l" << std::flush;
 #if defined(_WIN32)
+  DWORD mode{};
+  if (GetConsoleMode(input_, &mode))
+    SetConsoleMode(input_, mode & ~ENABLE_MOUSE_INPUT);
+#endif
+  // Terminal bridges can still deliver reports already in transit. Discard
+  // input until 40 ms of quiet, with a 250 ms cap under continuous traffic.
+  // Never dispatch these events to application callbacks after Terminate().
+  const auto deadline = std::chrono::steady_clock::now() + std::chrono::milliseconds(250);
+  while (std::chrono::steady_clock::now() < deadline) {
+    const int timeout = std::min(40, static_cast<int>(std::chrono::duration_cast<std::chrono::milliseconds>(
+                                                          deadline - std::chrono::steady_clock::now())
+                                                          .count()));
+    if (timeout <= 0)
+      break;
+#if defined(_WIN32)
+    FlushConsoleInputBuffer(input_);
+    if (WaitForSingleObject(input_, static_cast<DWORD>(timeout)) != WAIT_OBJECT_0)
+      break;
+#else
+    pollfd descriptor{STDIN_FILENO, POLLIN, 0};
+    const int ready = poll(&descriptor, 1, timeout);
+    if (ready < 0 && errno == EINTR)
+      continue;
+    if (ready <= 0 || (descriptor.revents & (POLLERR | POLLNVAL)))
+      break;
+    char discarded[4096];
+    if (read(STDIN_FILENO, discarded, sizeof(discarded)) <= 0)
+      break;
+#endif
+  }
+  parser_ = {};
+  std::cout << "\x1b[0m\x1b[?25h\x1b[?1049l" << std::flush;
+#if defined(_WIN32)
+  FlushConsoleInputBuffer(input_);
   if (screen_ != INVALID_HANDLE_VALUE)
     CloseHandle(screen_);
   SetConsoleMode(input_, input_mode_);
@@ -97,7 +133,7 @@ Terminal::~Terminal() {
   if (cursor_.dwSize)
     SetConsoleCursorInfo(output_, &cursor_);
 #else
-  tcsetattr(STDIN_FILENO, TCSANOW, &original_);
+  tcsetattr(STDIN_FILENO, TCSAFLUSH, &original_);
 #endif
 }
 
