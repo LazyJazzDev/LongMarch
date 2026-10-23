@@ -40,6 +40,14 @@ draw data. The `window` module remains a plain clear/present example.
 Select `imgui` from the menu or pass `--module imgui`; `--all` includes it.
 Headless runs explicitly skip this platform-input example.
 
+`rhi_hello --module imgui_multi_window` creates two independent native windows:
+one with a counter, text input and background editor, and another with an animated
+plot, speed/amplitude sliders and pause control. Each window owns its UI context
+and state. I toggles only the focused window's UI; Escape or the native close
+button closes only that window. The remaining window keeps running. This module
+also supports `--frames`, appears last in the selection menu, and skips headless
+runs explicitly.
+
 Each enabled window owns a separate ImGui context and default font atlas.
 `CmdPresent` starts a frame, invokes ImGuiEvent, renders, then appends an overlay
 pass with LOAD/STORE attachment operations before the native present transition.
