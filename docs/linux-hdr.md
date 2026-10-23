@@ -282,6 +282,12 @@ RHI enables this observer automatically when native GLFW Wayland, `wayland-clien
 `wayland-scanner` and `wayland-protocols >= 1.41` are available at build time. Builds
 without these dependencies retain unknown-query behavior and SDR/X11 support.
 This does not change the optional Sparkium probe or Sparkium's rendering policy.
+RHI also exposes `COLOR_SPACE_BT709_LINEAR` when Vulkan advertises
+`RGBA16_FLOAT + BT709_LINEAR_EXT`. Both hello HDR demos show this as **Linear
+Rec.709** and write linear values directly, without PQ or sRGB encoding or scRGB
+white compensation. This is separate from scRGB; the compositor determines the
+luminance mapping. The existing Sparkium negotiation policy is unchanged.
+
 RHI defaults to trying compiled-in Wayland first, then X11 on initialization failure,
 and honors `LONGMARCH_WINDOW_SYSTEM=auto|wayland|x11`. Explicit requests do not fall
 back. A working SDR-only Wayland connection stays on Wayland.
@@ -303,3 +309,10 @@ Ninja Release, Vulkan, RTX 3090 Ti / NVIDIA 595.99.02, native Wayland:
 These checks do not measure physical brightness. Live desktop setting changes,
 multi-monitor migration, an entirely X11-only build, and Windows/macOS were not
 retested in this Linux run.
+
+The subsequent linear Rec.709 update passed the five targeted reference-white,
+color-space transition, HDR upload and platform-macro tests, plus the three
+window tests in each of explicit X11 and automatic fallback. Both hello demos
+again completed all six 12-frame runs: Wayland now advertises and renders
+**Linear Rec.709 / RGBA16 FLOAT** alongside PQ and SDR; headless runs exercise
+all four encodings. Physical luminance mapping was not measured.

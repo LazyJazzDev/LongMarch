@@ -33,6 +33,8 @@ Varying VSMain(uint id : SV_VertexID) {
 float3 Encode(float3 linear709) {
 #if OUTPUT_COLOR_SPACE == 1
   return linear709 * display.linear_scale;  // Relative white to native linear encoding.
+#elif OUTPUT_COLOR_SPACE == 3
+  return linear709;  // Native linear Rec.709; no scRGB absolute-white compensation.
 #elif OUTPUT_COLOR_SPACE == 2
   const float3x3 to2020 =
       float3x3(0.627404, 0.329283, 0.043313, 0.069097, 0.919540, 0.011362, 0.016391, 0.088013, 0.895595);

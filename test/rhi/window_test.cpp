@@ -121,7 +121,8 @@ TEST_P(RhiWindow, ColorSpaceSwitchingPreservesFrameContractAndRejectsUnsupported
     EXPECT_FALSE(window.IsSwapChainInvalid());
     EXPECT_EQ(frame.Get(), window.GetNextImage().Get());
   }
-  for (auto space : {COLOR_SPACE_EXTENDED_SRGB_LINEAR, COLOR_SPACE_HDR10_ST2084, COLOR_SPACE_SRGB_NONLINEAR}) {
+  for (auto space : {COLOR_SPACE_EXTENDED_SRGB_LINEAR, COLOR_SPACE_BT709_LINEAR, COLOR_SPACE_HDR10_ST2084,
+                     COLOR_SPACE_SRGB_NONLINEAR}) {
     const bool supported =
         std::any_of(options.begin(), options.end(), [&](const auto &option) { return option.color_space == space; });
     EXPECT_EQ(window.SetColorSpace(space), supported);
@@ -139,9 +140,10 @@ TEST_P(RhiWindow, ColorSpaceSwitchingPreservesFrameContractAndRejectsUnsupported
         return option.color_space == space && option.format == frame.GetDesc().format;
       }));
       auto context = device.CreateCommandContext();
-      ASSERT_TRUE(context.CmdClearColor(frame, space == COLOR_SPACE_EXTENDED_SRGB_LINEAR
-                                                   ? std::array<float, 4>{2, 2, 2, 1}
-                                                   : std::array<float, 4>{.5f, .5f, .5f, 1}));
+      ASSERT_TRUE(
+          context.CmdClearColor(frame, (space == COLOR_SPACE_EXTENDED_SRGB_LINEAR || space == COLOR_SPACE_BT709_LINEAR)
+                                           ? std::array<float, 4>{2, 2, 2, 1}
+                                           : std::array<float, 4>{.5f, .5f, .5f, 1}));
       ASSERT_TRUE(context.CmdPresent(window));
       auto done = queue.Submit(std::move(context));
       ASSERT_TRUE(done && done.WaitHost());
@@ -152,7 +154,7 @@ TEST_P(RhiWindow, ColorSpaceSwitchingPreservesFrameContractAndRejectsUnsupported
     EXPECT_EQ(window.GetColorSpace(), space);
   }
   // Also exercise creation in the requested encoding, not only transitions.
-  for (auto space : {COLOR_SPACE_EXTENDED_SRGB_LINEAR, COLOR_SPACE_HDR10_ST2084}) {
+  for (auto space : {COLOR_SPACE_EXTENDED_SRGB_LINEAR, COLOR_SPACE_BT709_LINEAR, COLOR_SPACE_HDR10_ST2084}) {
     const bool supported =
         std::any_of(options.begin(), options.end(), [&](const auto &o) { return o.color_space == space; });
     auto created = device.CreateGLFWWindow({320, 240, "RHI HDR creation", PRESENT_MODE_VSYNC, space});

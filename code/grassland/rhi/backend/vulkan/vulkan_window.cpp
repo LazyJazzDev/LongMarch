@@ -21,6 +21,8 @@ std::optional<WindowPresentationOption> PresentationFormat(VkSurfaceFormatKHR na
   }
   if (native.colorSpace == VK_COLOR_SPACE_EXTENDED_SRGB_LINEAR_EXT && native.format == VK_FORMAT_R16G16B16A16_SFLOAT)
     return WindowPresentationOption{PRESENT_MODE_VSYNC, IMAGE_FORMAT_RGBA16_FLOAT, COLOR_SPACE_EXTENDED_SRGB_LINEAR};
+  if (native.colorSpace == VK_COLOR_SPACE_BT709_LINEAR_EXT && native.format == VK_FORMAT_R16G16B16A16_SFLOAT)
+    return WindowPresentationOption{PRESENT_MODE_VSYNC, IMAGE_FORMAT_RGBA16_FLOAT, COLOR_SPACE_BT709_LINEAR};
   if (native.colorSpace == VK_COLOR_SPACE_HDR10_ST2084_EXT) {
     if (native.format == VK_FORMAT_A2B10G10R10_UNORM_PACK32)
       return WindowPresentationOption{PRESENT_MODE_VSYNC, IMAGE_FORMAT_RGB10A2_UNORM, COLOR_SPACE_HDR10_ST2084};

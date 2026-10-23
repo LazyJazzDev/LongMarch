@@ -134,6 +134,8 @@ enum ColorSpace {
   COLOR_SPACE_EXTENDED_SRGB_LINEAR,
   // Rec.2020 primaries, ST.2084/PQ encoded absolute luminance (0..10000 cd/m^2).
   COLOR_SPACE_HDR10_ST2084,
+  // Linear Rec.709 with platform-defined luminance mapping; not the scRGB contract.
+  COLOR_SPACE_BT709_LINEAR,
 };
 
 std::string to_string(ColorSpace value);

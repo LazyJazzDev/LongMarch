@@ -31,6 +31,8 @@ std::string to_string(ColorSpace value) {
       return "COLOR_SPACE_EXTENDED_SRGB_LINEAR";
     case COLOR_SPACE_HDR10_ST2084:
       return "COLOR_SPACE_HDR10_ST2084";
+    case COLOR_SPACE_BT709_LINEAR:
+      return "COLOR_SPACE_BT709_LINEAR";
     default:
       return "COLOR_SPACE_UNKNOWN";
   }
@@ -44,6 +46,8 @@ std::string ColorSpaceName(ColorSpace value) {
       return "HDR linear scRGB (80 nits/unit)";
     case COLOR_SPACE_HDR10_ST2084:
       return "HDR10 Rec.2020 PQ";
+    case COLOR_SPACE_BT709_LINEAR:
+      return "Linear Rec.709";
     default:
       return "Unknown color space";
   }

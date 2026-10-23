@@ -202,6 +202,7 @@ H cycles available color spaces; Escape closes the window. Bounded window runs o
 
 - `COLOR_SPACE_SRGB_NONLINEAR`: SDR sRGB encoded output in RGBA8/BGRA8 UNORM.
 - `COLOR_SPACE_EXTENDED_SRGB_LINEAR`: linear Rec.709/scRGB in RGBA16 float, where native 1.0 represents 80 cd/m^2 on Windows and system reference white on macOS EDR. Values above 1.0 preserve highlights.
+- `COLOR_SPACE_BT709_LINEAR`: native linear Rec.709 in RGBA16 float when Vulkan advertises `BT709_LINEAR_EXT`. The demo writes linear values directly, preserving highlights above 1; luminance mapping is platform-defined and is not assumed to match scRGB.
 - `COLOR_SPACE_HDR10_ST2084`: Rec.2020 primaries and ST.2084/PQ absolute luminance in RGB10A2 UNORM (also BGR10A2 on Vulkan).
 
 Present performs no implicit transfer-function conversion, gamut conversion or tone mapping. The demo implements the sRGB encoding, Rec.709-to-Rec.2020 conversion and PQ encoding in its fragment shader. `CmdUploadImage` accepts native packed pixels and byte row pitch; RGBA16 float uses eight bytes per pixel, 10-bit formats use four.

@@ -40,7 +40,8 @@ int RunHDR(grassland::rhi::BackendAPI api, int frames, bool headless) {
     if (spaces.size() == 1)
       std::cout << "HDR presentation unavailable on this surface; showing SDR explicitly.\n";
   } else {
-    spaces = {COLOR_SPACE_SRGB_NONLINEAR, COLOR_SPACE_EXTENDED_SRGB_LINEAR, COLOR_SPACE_HDR10_ST2084};
+    spaces = {COLOR_SPACE_SRGB_NONLINEAR, COLOR_SPACE_EXTENDED_SRGB_LINEAR, COLOR_SPACE_HDR10_ST2084,
+              COLOR_SPACE_BT709_LINEAR};
   }
   std::cout
       << "hdr: relative linear levels 0.25x, 0.5x, 1x, 2x, 4x reference white; top neutral, bottom Rec.709 primaries.\n";
@@ -69,7 +70,8 @@ int RunHDR(grassland::rhi::BackendAPI api, int frames, bool headless) {
         return 1;
       const bool h = window.IsKeyDown(GLFW_KEY_H);
       // Bounded runs exercise all available color spaces automatically.
-      const bool cycle = frames >= 9 && rendered > 0 && rendered % std::max(1, frames / 3) == 0;
+      const bool cycle = frames >= 3 * static_cast<int>(spaces.size()) && rendered > 0 &&
+                         rendered % std::max(1, frames / static_cast<int>(spaces.size())) == 0;
       if ((h && !previous_h) || cycle) {
         selected = (selected + 1) % spaces.size();
         if (!window.SetColorSpace(spaces[selected]))
@@ -77,7 +79,7 @@ int RunHDR(grassland::rhi::BackendAPI api, int frames, bool headless) {
       }
       previous_h = h;
     } else {
-      selected = (rendered / std::max(1, frames / 3)) % spaces.size();
+      selected = (rendered / std::max(1, frames / static_cast<int>(spaces.size()))) % spaces.size();
     }
     const float linear_scale = window ? window.GetHDRReferenceWhiteScale() : 1.0f;
     const float headroom = window ? window.GetHDRHeadroom() : 10.0f;
@@ -92,9 +94,10 @@ int RunHDR(grassland::rhi::BackendAPI api, int frames, bool headless) {
     if (headless) {
       auto &target = targets[color_space];
       if (!target) {
-        const auto format = color_space == COLOR_SPACE_EXTENDED_SRGB_LINEAR ? IMAGE_FORMAT_RGBA16_FLOAT
-                            : color_space == COLOR_SPACE_HDR10_ST2084       ? IMAGE_FORMAT_RGB10A2_UNORM
-                                                                            : IMAGE_FORMAT_RGBA8_UNORM;
+        const auto format = (color_space == COLOR_SPACE_EXTENDED_SRGB_LINEAR || color_space == COLOR_SPACE_BT709_LINEAR)
+                                ? IMAGE_FORMAT_RGBA16_FLOAT
+                            : color_space == COLOR_SPACE_HDR10_ST2084 ? IMAGE_FORMAT_RGB10A2_UNORM
+                                                                      : IMAGE_FORMAT_RGBA8_UNORM;
         target = device.CreateImage({640, 360, format});
         if (!target)
           return 1;
