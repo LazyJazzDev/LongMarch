@@ -177,3 +177,7 @@ existing shaders and the shared DX-compatible Vulkan layout.
 
 The standalone [TLAS pressure test](../tlas_pressure_test/README.md) is built as
 `demo_tlas_pressure_test` and is not included in this demo's module list or `--all`.
+
+The window module enables an interactive ImGui overlay through Window callbacks;
+Present inserts its rendering automatically. See [Window callbacks and ImGui](../../docs/rhi-window-imgui.md)
+for registration, context, input and resource lifetime rules.

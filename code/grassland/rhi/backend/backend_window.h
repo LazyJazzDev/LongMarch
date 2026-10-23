@@ -7,9 +7,60 @@
 
 namespace grassland::rhi::backend {
 
+class WindowImGui;
+class Device;
+
 class Window : public Object<rhi::IWindow> {
  public:
   Window();
+  bool EnableImGui(bool enabled = true) override;
+  ImGuiContext *GetImGuiContext() const override;
+  bool RecordImGui(rhi::ICommandContext *commands, rhi::IImage *image);
+
+  EventManager<void(int, int)> &ResizeEvent() override {
+    return resize_event_;
+  }
+
+  EventManager<void(int, int)> &FramebufferResizeEvent() override {
+    return framebufferresize_event_;
+  }
+
+  EventManager<void(bool)> &CursorEnterEvent() override {
+    return cursorenter_event_;
+  }
+
+  EventManager<void(bool)> &FocusEvent() override {
+    return focus_event_;
+  }
+
+  EventManager<void(double, double)> &MouseMoveEvent() override {
+    return mousemove_event_;
+  }
+
+  EventManager<void(int, int, int, double, double)> &MouseButtonEvent() override {
+    return mousebutton_event_;
+  }
+
+  EventManager<void(double, double)> &ScrollEvent() override {
+    return scroll_event_;
+  }
+
+  EventManager<void(int, int, int, int)> &KeyEvent() override {
+    return key_event_;
+  }
+
+  EventManager<void(uint32_t)> &CharEvent() override {
+    return char_event_;
+  }
+
+  EventManager<void(int, const char **)> &DropEvent() override {
+    return drop_event_;
+  }
+
+  EventManager<void()> &ImGuiEvent() override {
+    return imgui_event_;
+  }
+
   ~Window() override;
   rhi::IImage *GetNextImage() override;
   bool IsSwapChainInvalid() const override;
@@ -25,10 +76,24 @@ class Window : public Object<rhi::IWindow> {
   virtual bool RebuildNativeSwapChain(PresentMode mode) = 0;
 
  protected:
-  bool InitializeWindow(const WindowDesc &desc);
+  bool InitializeWindow(Device *device, const WindowDesc &desc);
   bool invalid_{true};
 
  private:
+  Device *device_{};
+  std::unique_ptr<WindowImGui> imgui_;
+  bool recording_imgui_{};
+  EventManager<void(int, int)> resize_event_;
+  EventManager<void(int, int)> framebufferresize_event_;
+  EventManager<void(bool)> cursorenter_event_;
+  EventManager<void(bool)> focus_event_;
+  EventManager<void(double, double)> mousemove_event_;
+  EventManager<void(int, int, int, double, double)> mousebutton_event_;
+  EventManager<void(double, double)> scroll_event_;
+  EventManager<void(int, int, int, int)> key_event_;
+  EventManager<void(uint32_t)> char_event_;
+  EventManager<void(int, const char **)> drop_event_;
+  EventManager<void()> imgui_event_;
   PresentMode requested_mode_{PRESENT_MODE_VSYNC};
   GLFWwindow *window_{};
   std::mutex next_image_mutex_;

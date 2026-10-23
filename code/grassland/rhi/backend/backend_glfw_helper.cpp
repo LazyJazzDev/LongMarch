@@ -6,6 +6,8 @@
 
 #include "grassland/rhi/backend/backend_util.h"
 #include "grassland/rhi/backend/backend_window.h"
+#include "grassland/rhi/backend/backend_window_imgui.h"
+#include "imgui_impl_glfw.h"
 #define GLFW_INCLUDE_NONE
 #include <GLFW/glfw3.h>
 
@@ -31,6 +33,13 @@ State &Get() {
   static State state;
   return state;
 }
+
+ObjectPtr<Window> FindWindow(GLFWwindow *native) {
+  std::lock_guard<std::mutex> lock(Get().mutex);
+  const auto it = Get().windows.find(native);
+  return it == Get().windows.end() ? ObjectPtr<Window>{} : ObjectPtr<Window>::Retain(it->second);
+}
+
 }  // namespace
 
 void RegisterWindow(Window *window) {
@@ -39,24 +48,102 @@ void RegisterWindow(Window *window) {
     std::lock_guard<std::mutex> lock(Get().mutex);
     Get().windows.emplace(native, window);
   }
-  glfwSetFramebufferSizeCallback(native, [](GLFWwindow *native, int, int) {
-    // Native destructors unregister before teardown, under this same lock.
-    std::lock_guard<std::mutex> lock(Get().mutex);
-    auto it = Get().windows.find(native);
-    if (it == Get().windows.end())
+  glfwSetFramebufferSizeCallback(native, [](GLFWwindow *native, int width, int height) {
+    auto window = FindWindow(native);
+    if (!window)
       return;
-    if (!it->second->RebuildSwapChain())
+    if (!window->RebuildSwapChain())
       Get().resize_failed = true;
+    window->FramebufferResizeEvent().InvokeCallbacks(width, height);
   });
   glfwSetWindowIconifyCallback(native, [](GLFWwindow *native, int iconified) {
-    // Restoring a Cocoa window need not change its framebuffer dimensions.
-    // A mode change while minimized may have discarded its prepared image.
-    if (iconified)
-      return;
-    std::lock_guard<std::mutex> lock(Get().mutex);
-    auto it = Get().windows.find(native);
-    if (it != Get().windows.end() && !it->second->RebuildSwapChain())
+    auto window = FindWindow(native);
+    if (window && !iconified && !window->RebuildSwapChain())
       Get().resize_failed = true;
+  });
+  glfwSetWindowSizeCallback(native, [](GLFWwindow *native, int width, int height) {
+    auto window = FindWindow(native);
+    if (!window)
+      return;
+    window->ResizeEvent().InvokeCallbacks(width, height);
+  });
+  glfwSetCursorEnterCallback(native, [](GLFWwindow *native, int entered) {
+    auto window = FindWindow(native);
+    if (!window)
+      return;
+    if (auto context = window->GetImGuiContext()) {
+      ImGuiContextScope scope(context);
+      ImGui_ImplGlfw_CursorEnterCallback(native, entered);
+    }
+    window->CursorEnterEvent().InvokeCallbacks(bool(entered));
+  });
+  glfwSetWindowFocusCallback(native, [](GLFWwindow *native, int focused) {
+    auto window = FindWindow(native);
+    if (!window)
+      return;
+    if (auto context = window->GetImGuiContext()) {
+      ImGuiContextScope scope(context);
+      ImGui_ImplGlfw_WindowFocusCallback(native, focused);
+    }
+    window->FocusEvent().InvokeCallbacks(bool(focused));
+  });
+  glfwSetCursorPosCallback(native, [](GLFWwindow *native, double x, double y) {
+    auto window = FindWindow(native);
+    if (!window)
+      return;
+    if (auto context = window->GetImGuiContext()) {
+      ImGuiContextScope scope(context);
+      ImGui_ImplGlfw_CursorPosCallback(native, x, y);
+    }
+    window->MouseMoveEvent().InvokeCallbacks(x, y);
+  });
+  glfwSetMouseButtonCallback(native, [](GLFWwindow *native, int button, int action, int mods) {
+    auto window = FindWindow(native);
+    if (!window)
+      return;
+    if (auto context = window->GetImGuiContext()) {
+      ImGuiContextScope scope(context);
+      ImGui_ImplGlfw_MouseButtonCallback(native, button, action, mods);
+    }
+    double x, y;
+    glfwGetCursorPos(native, &x, &y);
+    window->MouseButtonEvent().InvokeCallbacks(button, action, mods, x, y);
+  });
+  glfwSetScrollCallback(native, [](GLFWwindow *native, double x, double y) {
+    auto window = FindWindow(native);
+    if (!window)
+      return;
+    if (auto context = window->GetImGuiContext()) {
+      ImGuiContextScope scope(context);
+      ImGui_ImplGlfw_ScrollCallback(native, x, y);
+    }
+    window->ScrollEvent().InvokeCallbacks(x, y);
+  });
+  glfwSetKeyCallback(native, [](GLFWwindow *native, int key, int scancode, int action, int mods) {
+    auto window = FindWindow(native);
+    if (!window)
+      return;
+    if (auto context = window->GetImGuiContext()) {
+      ImGuiContextScope scope(context);
+      ImGui_ImplGlfw_KeyCallback(native, key, scancode, action, mods);
+    }
+    window->KeyEvent().InvokeCallbacks(key, scancode, action, mods);
+  });
+  glfwSetCharCallback(native, [](GLFWwindow *native, unsigned int codepoint) {
+    auto window = FindWindow(native);
+    if (!window)
+      return;
+    if (auto context = window->GetImGuiContext()) {
+      ImGuiContextScope scope(context);
+      ImGui_ImplGlfw_CharCallback(native, codepoint);
+    }
+    window->CharEvent().InvokeCallbacks(codepoint);
+  });
+  glfwSetDropCallback(native, [](GLFWwindow *native, int count, const char **paths) {
+    auto window = FindWindow(native);
+    if (!window)
+      return;
+    window->DropEvent().InvokeCallbacks(count, paths);
   });
 }
 

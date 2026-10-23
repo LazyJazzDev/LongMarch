@@ -125,6 +125,10 @@ bool D3D12CommandContext::CmdPresent(rhi::IWindow *window) {
     return false;
   if (!RetainResource(frame.Get()))
     return false;
+  if (!target->RecordImGui(this, frame.Get())) {
+    recording_failed_ = true;
+    return false;
+  }
   presents_.emplace_back(target, frame.Get());
 
   return TransitionResource(frame->NativeImage(), D3D12_RESOURCE_STATE_PRESENT, frame->DefaultState());

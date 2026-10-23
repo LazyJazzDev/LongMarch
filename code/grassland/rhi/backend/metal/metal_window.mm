@@ -26,7 +26,7 @@ MetalWindow::~MetalWindow() {
 MetalWindow *MetalWindow::Create(MetalDevice *device, const WindowDesc &desc) {
   auto object = std::unique_ptr<MetalWindow>(new MetalWindow(device));
   auto pool = NS::TransferPtr(NS::AutoreleasePool::alloc()->init());
-  if (!object->InitializeWindow(desc))
+  if (!object->InitializeWindow(device, desc))
     return nullptr;
   object->layer_ = NS::RetainPtr(CA::MetalLayer::layer());
   if (!object->layer_) {

@@ -5,14 +5,40 @@
 #include <GLFW/glfw3.h>
 
 #include "grassland/rhi/rhi_object.h"
+#include "grassland/util/event_manager.h"
+
+struct ImGuiContext;
 
 namespace grassland::rhi {
 class IImage;
+class ICommandContext;
 // Window operations and presentation run on the main thread.
 bool PollEvents();
 
 class IWindow : public IObject {
  public:
+  // Registries belong to the window; callbacks run on the window thread.
+  // ImGui callbacks run with this window's context between NewFrame and Render
+  // when CmdPresent records the overlay. Do not present/reconfigure the window
+  // recursively from these callbacks. Input events are delivered even when ImGui
+  // captures input; inspect WantCaptureMouse/WantCaptureKeyboard in its context.
+  virtual EventManager<void(int, int)> &ResizeEvent() = 0;
+  virtual EventManager<void(int, int)> &FramebufferResizeEvent() = 0;
+  virtual EventManager<void(bool)> &CursorEnterEvent() = 0;
+  virtual EventManager<void(bool)> &FocusEvent() = 0;
+  virtual EventManager<void(double, double)> &MouseMoveEvent() = 0;
+  virtual EventManager<void(int, int, int, double, double)> &MouseButtonEvent() = 0;
+  virtual EventManager<void(double, double)> &ScrollEvent() = 0;
+  virtual EventManager<void(int, int, int, int)> &KeyEvent() = 0;
+  virtual EventManager<void(uint32_t)> &CharEvent() = 0;
+  virtual EventManager<void(int, const char **)> &DropEvent() = 0;
+  virtual EventManager<void()> &ImGuiEvent() = 0;
+
+  // Creates a separate ImGui context and font texture. Disabling releases them.
+  // Completed/in-flight recordings own the GPU resources they use independently.
+  virtual bool EnableImGui(bool enabled = true) = 0;
+  virtual ImGuiContext *GetImGuiContext() const = 0;
+
   // Borrowed handle; Window owns it. Use GLFW operations on the main thread.
   virtual GLFWwindow *GLFWWindow() const = 0;
   virtual bool ShouldClose() const = 0;

@@ -3,11 +3,14 @@
 #include <algorithm>
 #include <array>
 #include <chrono>
+#include <cstdlib>
 #include <cstring>
 #include <thread>
 
 #include "grassland/rhi/backend/backend_binding_group.h"
+#include "grassland/rhi/backend/backend_window.h"
 #include "grassland/rhi/rhi.h"
+#include "imgui.h"
 #if defined(LONGMARCH_METAL_ENABLED)
 #include "grassland/rhi/backend/metal/metal_device.h"
 #include "grassland/rhi/backend/metal/metal_image.h"
@@ -338,6 +341,60 @@ TEST_P(RhiImage, UploadRowsPreservePixelsWithDifferentSourceAndDestinationPitch)
       ReadPixel(device.Get(), image.Get(), GetParam(), x, y, pixel);
       EXPECT_EQ(pixel, (std::array<uint8_t, 4>{uint8_t(x * 70), uint8_t(y * 80), 37, 255}));
     }
+}
+
+TEST_P(RhiImage, ImGuiOverlayPreservesBackgroundClipsAndBlends) {
+  if (!std::getenv("LONGMARCH_RHI_WINDOW_TESTS"))
+    GTEST_SKIP() << "Requires a desktop for the ImGui platform backend.";
+  ObjPtr<ICore> core = CreateCore(GetParam());
+  ASSERT_TRUE(core);
+  ObjPtr<IDevice> device = core->CreateDeviceByAutoSelection();
+  ASSERT_TRUE(device);
+  Track(device.Get());
+  ObjPtr<IWindow> window = device->CreateGLFWWindow({160, 120, "ImGui pixel verification"});
+  ASSERT_TRUE(window);
+  ASSERT_TRUE(window->EnableImGui());
+  ObjPtr<IImage> frame = window->GetNextImage();
+  ASSERT_TRUE(frame);
+  const auto width = frame->GetDesc().width;
+  const auto height = frame->GetDesc().height;
+  ObjPtr<IImage> target = device->CreateImage({width, height, IMAGE_FORMAT_RGBA8_UNORM});
+  ObjPtr<IImage> texture = device->CreateImage({1, 1, IMAGE_FORMAT_RGBA8_UNORM});
+  ASSERT_TRUE(target && texture);
+  ObjPtr<IQueue> queue = device->GetQueue(QUEUE_TYPE_GRAPHICS);
+  ObjPtr<ICommandContext> commands = device->CreateCommandContext();
+  ASSERT_TRUE(commands->CmdClearColor(target.Get(), {0, 0, 1, 1}));
+  const uint32_t green = 0xff00ff00;
+  ASSERT_TRUE(commands->CmdUploadImage(texture.Get(), &green, 4));
+  window->ImGuiEvent().RegisterCallback([&] {
+    auto *draw = ImGui::GetForegroundDrawList();
+    // Force 16-bit draw-index rollover and VtxOffset handling.
+    for (int i = 0; i < 17000; ++i)
+      draw->AddRectFilled({130, 90}, {140, 100}, IM_COL32_WHITE);
+    draw->PushClipRect({10, 10}, {50, 50});
+    draw->AddRectFilled({0, 0}, {80, 80}, IM_COL32(255, 0, 0, 128));
+    draw->PopClipRect();
+    draw->AddCallback(ImDrawCallback_ResetRenderState, nullptr);
+    draw->AddImage(static_cast<ImTextureID>(reinterpret_cast<uintptr_t>(texture.Get())), {80, 10}, {110, 40});
+  });
+  ASSERT_TRUE(static_cast<backend::Window *>(window.Get())->RecordImGui(commands.Get(), target.Get()));
+  ASSERT_TRUE(window->EnableImGui(false));
+  texture.Release();
+  ObjPtr<ISubmissionToken> done = queue->Submit(commands.Get());
+  ASSERT_TRUE(done);
+  commands.Release();
+  ASSERT_TRUE(done->WaitHost());
+  auto read = [&](int x, int y, std::array<uint8_t, 4> expected) {
+    std::array<uint8_t, 4> pixel{};
+    ReadPixel(device.Get(), target.Get(), GetParam(), uint32_t(x) * width / 160, uint32_t(y) * height / 120, pixel);
+    for (int i = 0; i < 4; ++i)
+      EXPECT_NEAR(pixel[i], expected[i], 1) << "pixel " << x << "," << y << " channel " << i;
+  };
+  read(20, 20, {128, 0, 127, 255});
+  read(5, 5, {0, 0, 255, 255});
+  read(60, 20, {0, 0, 255, 255});
+  read(90, 20, {0, 255, 0, 255});
+  read(135, 95, {255, 255, 255, 255});
 }
 
 TEST_P(RhiImage, OffscreenClearDrawReadbackAndReuse) {

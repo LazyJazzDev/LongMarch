@@ -11,6 +11,7 @@
 
 #include "grassland/rhi/rhix/rhix.h"
 #include "grassland/util/fps_counter.h"
+#include "imgui.h"
 
 int RunWindow(grassland::rhi::BackendAPI api, int frames, bool headless) {
   using namespace grassland::rhi;
@@ -50,6 +51,27 @@ int RunWindow(grassland::rhi::BackendAPI api, int frames, bool headless) {
   auto graphics = device.GetQueue(QUEUE_TYPE_GRAPHICS);
   if (!graphics)
     return 1;
+  if (!headless) {
+    if (!window.EnableImGui())
+      return 1;
+    window.KeyEvent().RegisterCallback([](int key, int, int action, int) {
+      if (action == GLFW_PRESS)
+        std::cout << "Window key callback: " << key << '\n';
+    });
+    window.ImGuiEvent().RegisterCallback([clicks = 0, show_demo = false]() mutable {
+      ImGui::Begin("RHI Window overlay");
+      ImGui::TextUnformatted("Drawn automatically before Present");
+      if (ImGui::Button("Click me"))
+        ++clicks;
+      ImGui::SameLine();
+      ImGui::Text("Clicks: %d", clicks);
+      ImGui::Checkbox("Show ImGui demo", &show_demo);
+      ImGui::TextUnformatted("P: toggle VSync; Escape: close");
+      ImGui::End();
+      if (show_demo)
+        ImGui::ShowDemoWindow(&show_demo);
+    });
+  }
   if (!headless) {
     const auto options = window.GetSupportedPresentationOptions();
     if (options.empty())

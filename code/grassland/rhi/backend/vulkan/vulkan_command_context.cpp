@@ -122,6 +122,10 @@ bool VulkanCommandContext::CmdPresent(rhi::IWindow *window) {
     return false;
   if (!RetainResource(frame.Get()))
     return false;
+  if (!target->RecordImGui(this, frame.Get())) {
+    recording_failed_ = true;
+    return false;
+  }
   if (!TransitionImage(frame.Get(), VK_IMAGE_LAYOUT_PRESENT_SRC_KHR, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, 0))
     return false;
   presents_.push_back(target);

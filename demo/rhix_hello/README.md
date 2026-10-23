@@ -98,3 +98,7 @@ The compute and particle shaders, initialization seed (42), simulation step (0.0
 `ray_query` uses rhix containers for triangle/AABB BLAS construction, explicit compaction, per-frame TLAS refit, compute ray queries and display. D3D12, Vulkan and Metal are supported. `raytracing` uses the RT pipeline on D3D12/Vulkan and is skipped on Metal. Both modules support the menu, `--all` and headless runs.
 
 The AS capacity, update, compaction, binding lifetime and shared scratch contracts match [rhi_hello](../rhi_hello/README.md#acceleration-structures-and-ray-queries-d3d12--vulkan--metal). Metal uses native AS encoders and tracked scratch/AS resources; it retains indirect BLAS resources for compute and render ray queries.
+
+The window module enables an interactive ImGui overlay through Window callbacks;
+Present inserts its rendering automatically. See [Window callbacks and ImGui](../../docs/rhi-window-imgui.md)
+for registration, context, input and resource lifetime rules.

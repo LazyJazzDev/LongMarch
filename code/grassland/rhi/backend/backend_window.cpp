@@ -1,12 +1,51 @@
 ﻿#include "grassland/rhi/backend/backend_window.h"
 
 #include <cstdlib>
+
+#include "grassland/rhi/backend/backend_window_imgui.h"
 #define GLFW_INCLUDE_NONE
 #include <GLFW/glfw3.h>
 
 namespace grassland::rhi::backend {
 
 Window::Window() = default;
+
+bool Window::EnableImGui(bool enabled) {
+  if (!glfw::IsWindowThread() || recording_imgui_)
+    return false;
+  if (!enabled) {
+    imgui_.reset();
+    return true;
+  }
+  if (!imgui_)
+    imgui_ = WindowImGui::Create(device_, window_);
+  return bool(imgui_);
+}
+
+ImGuiContext *Window::GetImGuiContext() const {
+  return imgui_ ? imgui_->Context() : nullptr;
+}
+
+bool Window::RecordImGui(rhi::ICommandContext *commands, rhi::IImage *image) {
+  if (!imgui_)
+    return true;
+  if (!glfw::IsWindowThread() || recording_imgui_)
+    return false;
+
+  struct RecordingScope {
+    bool &flag;
+
+    RecordingScope(bool &value) : flag(value) {
+      flag = true;
+    }
+
+    ~RecordingScope() {
+      flag = false;
+    }
+  } scope(recording_imgui_);
+
+  return imgui_->Record(commands, image, imgui_event_);
+}
 
 rhi::IImage *Window::GetNextImage() {
 #if !defined(NDEBUG)
@@ -85,11 +124,13 @@ bool Window::SetPresentMode(PresentMode mode) {
 }
 
 Window::~Window() {
+  imgui_.reset();
   glfw::UnregisterWindow(window_);
   glfw::DestroyWindow(window_);
 }
 
-bool Window::InitializeWindow(const WindowDesc &desc) {
+bool Window::InitializeWindow(Device *device, const WindowDesc &desc) {
+  device_ = device;
   requested_mode_ = desc.present_mode;
   window_ = glfw::CreateGLFWWindow(desc.width, desc.height, desc.title.c_str());
   if (!window_)

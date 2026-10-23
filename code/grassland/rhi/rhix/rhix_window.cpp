@@ -10,6 +10,58 @@ rhi::IWindow *Window::Get() const noexcept {
   return static_cast<rhi::IWindow *>(GetObject());
 }
 
+bool Window::EnableImGui(bool enabled) const {
+  return Get() && Get()->EnableImGui(enabled);
+}
+
+ImGuiContext *Window::GetImGuiContext() const {
+  return Get() ? Get()->GetImGuiContext() : nullptr;
+}
+
+EventManager<void(int, int)> &Window::ResizeEvent() const {
+  return Get()->ResizeEvent();
+}
+
+EventManager<void(int, int)> &Window::FramebufferResizeEvent() const {
+  return Get()->FramebufferResizeEvent();
+}
+
+EventManager<void(bool)> &Window::CursorEnterEvent() const {
+  return Get()->CursorEnterEvent();
+}
+
+EventManager<void(bool)> &Window::FocusEvent() const {
+  return Get()->FocusEvent();
+}
+
+EventManager<void(double, double)> &Window::MouseMoveEvent() const {
+  return Get()->MouseMoveEvent();
+}
+
+EventManager<void(int, int, int, double, double)> &Window::MouseButtonEvent() const {
+  return Get()->MouseButtonEvent();
+}
+
+EventManager<void(double, double)> &Window::ScrollEvent() const {
+  return Get()->ScrollEvent();
+}
+
+EventManager<void(int, int, int, int)> &Window::KeyEvent() const {
+  return Get()->KeyEvent();
+}
+
+EventManager<void(uint32_t)> &Window::CharEvent() const {
+  return Get()->CharEvent();
+}
+
+EventManager<void(int, const char **)> &Window::DropEvent() const {
+  return Get()->DropEvent();
+}
+
+EventManager<void()> &Window::ImGuiEvent() const {
+  return Get()->ImGuiEvent();
+}
+
 bool Window::PollEvents() {
   return rhi::PollEvents();
 }
